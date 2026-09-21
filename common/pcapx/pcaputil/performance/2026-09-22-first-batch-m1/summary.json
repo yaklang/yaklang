@@ -1,0 +1,120 @@
+{
+  "baseline_sha": "5f4ea0ecaecec97a93e5dbd2ba8e46bf1a36e79b",
+  "go": "1.22.12",
+  "os": "darwin/arm64",
+  "cpu": "Apple M1 Max",
+  "gomaxprocs": 2,
+  "workers": 1,
+  "benchtime": "300ms",
+  "repeats": 3,
+  "command": "GOMAXPROCS=2 go test ./common/pcapx/pcaputil -run '^$' -bench '^BenchmarkPcapBinParser/mixed=true/(full|deferred-view)/workers=1$' -benchtime=300ms -count=1",
+  "method": "baseline/initial M1 alternating order; optimized repeated after profiling; medians, no statistical significance claim",
+  "scope": "synthetic 3080-PDU MQTT/HTTP/opaque TLS mix per batch; complete message count verified; additional M1 TLS metadata and provenance work not present in baseline",
+  "medians": {
+    "baseline": {
+      "BenchmarkPcapBinParser/mixed=true/full/workers=1-2": {
+        "ns/op": 9143591.0,
+        "MB/s": 180.66,
+        "cpu-ms/batch": 12.09,
+        "cpu-ns/message": 3927.0,
+        "gomaxprocs": 2.0,
+        "messages/batch": 3080.0,
+        "ns/message": 2969.0,
+        "B/op": 19617198.0,
+        "allocs/op": 98859.0
+      },
+      "BenchmarkPcapBinParser/mixed=true/full-history/workers=1-2": {
+        "ns/op": 10142207.0,
+        "MB/s": 162.87,
+        "cpu-ms/batch": 13.68,
+        "cpu-ns/message": 4441.0,
+        "gomaxprocs": 2.0,
+        "messages/batch": 3080.0,
+        "ns/message": 3293.0,
+        "B/op": 22554772.0,
+        "allocs/op": 105021.0
+      },
+      "BenchmarkPcapBinParser/mixed=true/deferred-view/workers=1-2": {
+        "ns/op": 5072268.0,
+        "MB/s": 325.66,
+        "cpu-ms/batch": 6.916,
+        "cpu-ns/message": 2246.0,
+        "gomaxprocs": 2.0,
+        "messages/batch": 3080.0,
+        "ns/message": 1647.0,
+        "B/op": 12271631.0,
+        "allocs/op": 38170.0
+      }
+    },
+    "m1_initial": {
+      "BenchmarkPcapBinParser/mixed=true/full/workers=1-2": {
+        "ns/op": 11370007.0,
+        "MB/s": 145.28,
+        "cpu-ms/batch": 14.82,
+        "cpu-ns/message": 4811.0,
+        "gomaxprocs": 2.0,
+        "messages/batch": 3080.0,
+        "ns/message": 3692.0,
+        "B/op": 22164859.0,
+        "allocs/op": 112534.0
+      },
+      "BenchmarkPcapBinParser/mixed=true/full-history/workers=1-2": {
+        "ns/op": 14463769.0,
+        "MB/s": 114.21,
+        "cpu-ms/batch": 18.93,
+        "cpu-ns/message": 6147.0,
+        "gomaxprocs": 2.0,
+        "messages/batch": 3080.0,
+        "ns/message": 4696.0,
+        "B/op": 26973436.0,
+        "allocs/op": 127924.0
+      },
+      "BenchmarkPcapBinParser/mixed=true/deferred-view/workers=1-2": {
+        "ns/op": 9581440.0,
+        "MB/s": 172.4,
+        "cpu-ms/batch": 12.81,
+        "cpu-ns/message": 4160.0,
+        "gomaxprocs": 2.0,
+        "messages/batch": 3080.0,
+        "ns/message": 3111.0,
+        "B/op": 18671944.0,
+        "allocs/op": 75406.0
+      }
+    },
+    "m1_optimized": {
+      "BenchmarkPcapBinParser/mixed=true/full/workers=1-2": {
+        "ns/op": 10992737.0,
+        "MB/s": 150.27,
+        "cpu-ms/batch": 14.77,
+        "cpu-ns/message": 4794.0,
+        "gomaxprocs": 2.0,
+        "messages/batch": 3080.0,
+        "ns/message": 3569.0,
+        "B/op": 20130481.0,
+        "allocs/op": 106355.0
+      },
+      "BenchmarkPcapBinParser/mixed=true/full-history/workers=1-2": {
+        "ns/op": 12932222.0,
+        "MB/s": 127.73,
+        "cpu-ms/batch": 17.68,
+        "cpu-ns/message": 5739.0,
+        "gomaxprocs": 2.0,
+        "messages/batch": 3080.0,
+        "ns/message": 4199.0,
+        "B/op": 24249657.0,
+        "allocs/op": 117645.0
+      },
+      "BenchmarkPcapBinParser/mixed=true/deferred-view/workers=1-2": {
+        "ns/op": 8465759.0,
+        "MB/s": 195.12,
+        "cpu-ms/batch": 11.54,
+        "cpu-ns/message": 3748.0,
+        "gomaxprocs": 2.0,
+        "messages/batch": 3080.0,
+        "ns/message": 2749.0,
+        "B/op": 15949496.0,
+        "allocs/op": 65133.0
+      }
+    }
+  }
+}

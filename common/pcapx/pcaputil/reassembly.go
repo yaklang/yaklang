@@ -22,6 +22,7 @@ var connectionPool = &sync.Pool{ // TrafficConnection
 }
 
 type futureFrame struct {
+	evidence  captureEvidence
 	Payload   []byte
 	Seq       uint32
 	FIN       bool
@@ -30,6 +31,7 @@ type futureFrame struct {
 
 // TrafficConnection is a tcp connection
 type TrafficConnection struct {
+	evidence             captureEvidence
 	hash                 string
 	pendingBytes         int
 	pendingBySeq         map[uint32]*futureFrame
@@ -149,6 +151,7 @@ func (t *TrafficConnection) Release() {
 	t.pendingBySeq = nil
 	t.pendingBytes = 0
 	t.hash = ""
+	t.evidence = captureEvidence{}
 	t.localPort, t.remotePort = 0, 0
 	t.isn, t.nextSeq, t.currentSeq = 0, 0, 0
 	t.finSeq, t.finSeen = 0, false
@@ -162,7 +165,7 @@ func (t *TrafficConnection) Write(b []byte, seq int64, ts time.Time) (int, error
 	if ts.IsZero() {
 		ts = time.Now()
 	}
-	frame := &TrafficFrame{ConnHash: t.hash, Seq: uint32(seq), Payload: b, Timestamp: ts, Connection: t}
+	frame := &TrafficFrame{evidence: t.evidence, ConnHash: t.hash, Seq: uint32(seq), Payload: b, Timestamp: ts, Connection: t}
 	if !t.Flow.pool.options.Stream {
 		// Timestamp bookkeeping only: retaining payload here kept every packet alive
 		// even after its bytes had already been copied to the stream and frame.
@@ -199,6 +202,7 @@ func (t *TrafficConnection) queueFuture(seq uint32, payload []byte, fin bool, ts
 			t.Flow.closeWithReason(TrafficFlowCloseReason_RESOURCE_LIMIT)
 			return
 		}
+		old.evidence.Ref.Number = 0
 		old.Payload = append(old.Payload, payload[len(old.Payload):]...)
 		old.FIN = fin
 		t.pendingBytes += extra
@@ -209,7 +213,7 @@ func (t *TrafficConnection) queueFuture(seq uint32, payload []byte, fin bool, ts
 		t.Flow.closeWithReason(TrafficFlowCloseReason_RESOURCE_LIMIT)
 		return
 	}
-	f := &futureFrame{Seq: seq, Payload: bytes.Clone(payload), FIN: fin, Timestamp: ts}
+	f := &futureFrame{evidence: t.evidence, Seq: seq, Payload: bytes.Clone(payload), FIN: fin, Timestamp: ts}
 	if t.pendingBySeq == nil {
 		t.pendingBySeq = make(map[uint32]*futureFrame)
 	}
@@ -416,6 +420,7 @@ func (t *TrafficConnection) FeedClient(tcp *layers.TCP, ts time.Time) {
 	t.consume(seq, tcp.Payload, tcp.FIN, ts)
 	for !t.IsClosed() && len(t.waitGroup) > 0 && !seqBefore(t.nextSeq, t.waitGroup[0].Seq) {
 		f := t.popFuture()
+		t.evidence = f.evidence
 		t.consume(f.Seq, f.Payload, f.FIN, f.Timestamp)
 	}
 	if len(t.waitGroup) == 0 {
@@ -460,7 +465,7 @@ func (p *TrafficPool) newFlow(netType string, srcAddr, dstAddr string) (*Traffic
 }
 
 // Feed already has decoded endpoints. Resolve names only for public NewFlow.
-func (p *TrafficPool) newFlowWithAddrs(netType string, src, dst *net.TCPAddr) *TrafficFlow {
+func (p *TrafficPool) newFlowWithAddrs(netType string, src, dst *net.TCPAddr, domains ...CaptureDomain) *TrafficFlow {
 	srcAddr, dstAddr := src.String(), dst.String()
 	var clientReader, serverReader *tcpStreamBuffer
 	var clientWriter, serverWriter *tcpStreamBuffer
@@ -506,6 +511,9 @@ func (p *TrafficPool) newFlowWithAddrs(netType string, src, dst *net.TCPAddr) *T
 	c2sConn.Flow = flow
 	s2cConn.Flow = flow
 	flow.key, _ = makeFlowKey(src.IP, dst.IP, uint16(src.Port), uint16(dst.Port), netType == "tcp6")
+	if len(domains) > 0 {
+		flow.key.domain = domains[0]
+	}
 	if !p.flowCache.Set(flow.key, flow) {
 		return nil
 	}

@@ -21,7 +21,7 @@ func (f *binFlow) detectDirection(dir int, w []byte) {
 	}
 	if f.captureTCP {
 		switch p.Protocol {
-		case "radius", "dhcp", "ntp", "coap":
+		case "radius", "dhcp", "ntp", "coap", "websocket":
 			// These profiles describe UDP datagrams, not their distinct TCP
 			// variants. Explicit ProtocolSession callers supply their own
 			// message framing; captured UDP is handled by datagramFields.
@@ -156,7 +156,30 @@ func (f *binFlow) consumeSession(dir int, e *ProtocolEvent, result map[string]an
 		}
 		e.Session, err = f.h2.consume(dir, e.Raw)
 		if err == nil {
-			err = f.consumeGRPC(dir, e, previous)
+			stream := previous
+			if stream == nil {
+				if id, ok := e.Session["Stream ID"].(uint32); ok {
+					stream = f.h2.streams[id]
+				}
+			}
+			err = f.validateH2Body(dir, e, stream)
+			if err == nil {
+				err = f.consumeGRPC(dir, e, previous)
+			}
+			if err != nil && e.Session != nil {
+				e.Session["Error Scope"] = "stream"
+				if previous != nil {
+					for d := range previous.grpc {
+						f.h2.grpcBuffered -= int64(cap(previous.grpc[d]))
+						previous.grpc[d] = nil
+					}
+				}
+				if id, ok := e.Session["Stream ID"].(uint32); ok {
+					if stream := f.h2.streams[id]; stream != nil {
+						stream.grpcFailed = true
+					}
+				}
+			}
 		}
 		if err == nil {
 			err = f.consumeDoHH2(dir, e, previous)
@@ -362,6 +385,13 @@ func (f *binFlow) invalidateSession(dir int) {
 }
 
 func (f *binFlow) closeSession() {
+	f.httpMethods, f.httpWSKeys, f.httpWSExtensions = nil, nil, nil
+	f.httpIDs, f.httpTimes = nil, nil
+	f.httpUpgrades, f.httpDoH, f.httpIPP = nil, nil, nil
+	if f.tls != nil && f.tls.child != nil {
+		f.tls.child.close(TrafficFlowCloseReason("TLS carrier closed"))
+	}
+	f.tls = nil
 	f.stun, f.tftp, f.rtsp, f.ipp = nil, nil, nil, nil
 	f.diameter, f.iec104, f.s7, f.opcua = nil, nil, nil, nil
 	f.rfb = nil
@@ -377,6 +407,13 @@ func (f *binFlow) finishSession(reason TrafficFlowCloseReason) {
 		e.Session = session
 		f.a.incomplete.Add(1)
 		f.a.emit(e)
+	}
+	if tls := f.tls; tls != nil {
+		for dir, b := range tls.handshake {
+			if len(b) != 0 {
+				emit(dir, map[string]any{"Handshake Buffered Bytes": len(b)}, "TLS handshake ended before its declared length")
+			}
+		}
 	}
 	if h := f.h2; h != nil && f.protocol == "http2" {
 		ids := make([]int, 0, len(h.streams))
@@ -609,5 +646,5 @@ func sessionSnapshotSize(v any, byteCapacity bool) int {
 }
 
 func protocolHistoryBytes(e *ProtocolEvent) int {
-	return len(e.Raw) + sessionSnapshotSize(e.Session, false)
+	return len(e.Raw) + sessionSnapshotSize(e.Session, false) + sessionSnapshotSize(e.semanticFields, false) + len(e.SourceBytes.PacketRefs)*64 + len(e.SourceBytes.ParentPDUs)*8
 }

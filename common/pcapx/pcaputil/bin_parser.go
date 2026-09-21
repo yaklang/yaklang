@@ -15,6 +15,12 @@ import (
 // legacy WithBinParser callbacks may run concurrently for different flows.
 // Messages in one TCP flow are delivered in order.
 type ProtocolEvent struct {
+	Admission                                string
+	semanticFields                           map[string]any
+	Domain                                   CaptureDomain
+	SourceBytes                              ByteSource
+	Profile, Completeness, ExpertCode        string
+	TransactionID, ResponseTo                uint64
 	ID, FlowID                               uint64
 	Timestamp                                time.Time
 	Transport, Source, Destination, Protocol string
@@ -54,6 +60,12 @@ func (e *ProtocolEvent) Decode() (result map[string]any, err error) {
 			result = owned
 		}
 	}()
+	if e.Protocol == "tls" && e.Session != nil {
+		return map[string]any{"fields": cloneSession(e.Session)}, nil
+	}
+	if e.semanticFields != nil {
+		return map[string]any{"fields": cloneSession(e.semanticFields)}, nil
+	}
 	if e.Structured != nil {
 		return e.Structured, nil
 	}
@@ -184,6 +196,11 @@ type binSpec struct {
 	plan        *binparser.StructuredPlan
 }
 type binParser struct {
+	datagramDecodeAs                                                           map[uint16]string
+	fragments                                                                  fragmentStore
+	dnsMu                                                                      sync.Mutex
+	dns                                                                        dnsCorrelation
+	tlsSecrets                                                                 TLSSecretProvider
 	udpMu                                                                      sync.Mutex
 	udpSessions                                                                *binUDPStore
 	budget                                                                     ParserBudget
@@ -237,6 +254,11 @@ func (c *CaptureConfig) prepareBinParser() error {
 		b := &a.config.Bindings[i]
 		a.bindings[b.Port] = append(a.bindings[b.Port], b)
 	}
+	a.tlsSecrets = c.tlsSecrets
+	a.datagramDecodeAs = make(map[uint16]string, len(c.datagramDecodeAs))
+	for k, v := range c.datagramDecodeAs {
+		a.datagramDecodeAs[k] = v
+	}
 	c.binParser = a
 	c.reassemblyOptions.Stream = true
 	return nil
@@ -261,6 +283,7 @@ func (c *CaptureConfig) finishBinParser() error {
 	}
 	a := c.binParser
 	a.closeUDPSessions()
+	a.closeFragments()
 	if a.config.OnStats != nil {
 		a.config.OnStats(a.stats())
 	}
@@ -275,7 +298,10 @@ func (a *binParser) emit(e *BinParserEvent) {
 		return
 	}
 	e.setStructured(e.Structured)
-	e.ID = a.ids.Add(1)
+	if e.ID == 0 {
+		e.ID = a.ids.Add(1)
+	}
+	e.finalizeEvidence()
 	defer func() {
 		if p := recover(); p != nil {
 			a.panics.Add(1)
@@ -286,14 +312,20 @@ func (a *binParser) emit(e *BinParserEvent) {
 }
 
 type binDirection struct {
-	headerScan int
-	http       *binHTTPState
-	buffer     []byte
-	offset     uint64
-	ts         time.Time
-	stopped    bool
+	contributions   []contribution
+	evidenceLimited bool
+	headerScan      int
+	http            *binHTTPState
+	buffer          []byte
+	offset          uint64
+	ts              time.Time
+	stopped         bool
 }
 type binFlow struct {
+	domain           CaptureDomain
+	tls              *binTLS
+	byteSource       string
+	parentID         uint64
 	captureTCP       bool
 	lastSessionError *ProtocolError
 	sessionBytes     int64
@@ -344,6 +376,10 @@ type binFlow struct {
 	httpUpgrades     []bool
 	httpDoH          []bool
 	httpIPP          []bool
+	httpIDs          []uint64
+	httpTimes        []time.Time
+	httpWSKeys       []string
+	httpWSExtensions []string
 	httpMethods      []string
 	a                *binParser
 	id               uint64
@@ -356,16 +392,19 @@ type binFlow struct {
 }
 
 func (a *binParser) newFlow(t *TrafficFlow) *binFlow {
-	return &binFlow{a: a, captureTCP: true, id: a.flows.Add(1), endpoints: [2]string{t.ClientConn.LocalAddr().String(), t.ServerConn.LocalAddr().String()}, ports: [2]uint16{uint16(t.ClientConn.LocalPort()), uint16(t.ServerConn.LocalPort())}}
+	return &binFlow{domain: t.key.domain, a: a, captureTCP: true, id: a.flows.Add(1), endpoints: [2]string{t.ClientConn.LocalAddr().String(), t.ServerConn.LocalAddr().String()}, ports: [2]uint16{uint16(t.ClientConn.LocalPort()), uint16(t.ServerConn.LocalPort())}}
 }
 
 func (f *binFlow) event(dir int, raw []byte, status, detail string) *BinParserEvent {
 	d := &f.directions[dir]
-	return &BinParserEvent{FlowID: f.id, Timestamp: d.ts, Transport: "tcp", Source: f.endpoints[dir], Destination: f.endpoints[1-dir], Direction: dir, Offset: d.offset, Length: len(raw), Protocol: f.protocol, Status: status, Summary: detail, Raw: append([]byte(nil), raw...)}
+	e := &BinParserEvent{FlowID: f.id, Timestamp: d.ts, Transport: "tcp", Source: f.endpoints[dir], Destination: f.endpoints[1-dir], Direction: dir, Offset: d.offset, Length: len(raw), Protocol: f.protocol, Status: status, Summary: detail, Raw: append([]byte(nil), raw...)}
+	f.eventEvidence(dir, e)
+	return e
 }
 
 func (f *binFlow) release(d *binDirection) {
-	f.a.buffered.Add(-int64(cap(d.buffer)))
+	f.a.buffered.Add(-int64(cap(d.buffer)) - int64(len(d.contributions))*80)
+	d.contributions = nil
 	d.buffer = nil
 	d.headerScan = 0
 }
@@ -544,22 +583,39 @@ func (f *binFlow) feed(dir int, data []byte, ts time.Time) {
 			e.ipp = d.http.ipp
 			e.decodeConfig = d.http.config()
 			e.Summary = d.http.summary
+			f.httpEvidence(dir, e)
 			f.finishHTTP(dir)
 		}
 		a.messages.Add(1)
 		a.messageBytes.Add(uint64(n))
 		stateful := httpSession || f.protocol != "http" && f.hasSession()
-		if !a.config.Deferred || stateful {
+		if !a.config.Deferred || stateful || f.protocol == "tls" {
 			rawCopy := e.Raw
 			if f.protocol == "quic" {
 				rawCopy = append([]byte(nil), e.Raw...)
 			}
-			result, err := e.Decode()
+			var result map[string]any
+			var err error
+			if f.protocol == "tls" {
+				if f.byteSource == "decrypted" {
+					err = protocolError(ErrUnsupportedFeature, "nested TLS carrier")
+				} else {
+					result, err = f.consumeTLS(dir, e)
+				}
+			} else if f.protocol == "websocket" && f.ws != nil && f.ws.deflate {
+				result = map[string]any{"fields": map[string]any{}}
+			} else {
+				result, err = e.Decode()
+			}
 			if err == nil && stateful {
 				if f.protocol == "quic" {
 					e.Raw = rawCopy
 				}
 				err = f.consumeSession(dir, e, result)
+				if e.Protocol == "websocket" && f.ws != nil && f.ws.deflate {
+					e.semanticFields = cloneSession(e.Session)
+					result = map[string]any{"fields": e.semanticFields}
+				}
 			} else if err != nil && stateful && f.mailLike() {
 				if cerr := f.consumeSession(dir, e, result); cerr == nil && e.Session != nil {
 					err = nil
@@ -579,6 +635,9 @@ func (f *binFlow) feed(dir int, data []byte, ts time.Time) {
 					a.malformed.Add(1)
 				}
 			} else if a.config.Deferred {
+				if e.Protocol == "tls" {
+					e.Structured = result
+				}
 				a.deferred.Add(1)
 			} else {
 				e.Status, e.Structured = "decoded", result
@@ -587,11 +646,27 @@ func (f *binFlow) feed(dir int, data []byte, ts time.Time) {
 		} else {
 			a.deferred.Add(1)
 		}
+		if e.Protocol == "dns" || e.Protocol == "dot" {
+			if f.byteSource != "decrypted" {
+				e.Protocol = "dns"
+				e.Profile = "dns-tcp"
+			} else {
+				e.Profile = "dns-over-tls"
+			}
+			if err := a.dnsEvent(e, e.Raw[2:]); err != nil {
+				e.Status = "malformed"
+				e.Error = err.Error()
+			}
+		}
 		d.offset += uint64(n)
+		d.pruneContributions(a)
 		wire = wire[n:]
 		failed := e.Error != ""
 		a.emit(e)
-		if failed {
+		if !failed {
+			f.deliverTLS(dir, e)
+		}
+		if failed && !((e.Protocol == "http2" || e.Protocol == "grpc") && e.Session["Error Scope"] == "stream") {
 			if stateful {
 				f.invalidateSession(1 - dir)
 				f.closeSession()
@@ -657,6 +732,7 @@ func (f *binFlow) close(reason TrafficFlowCloseReason) {
 					e.Status, e.Structured = "decoded", result
 					f.a.decoded.Add(1)
 				}
+				f.httpEvidence(dir, e)
 				f.release(d)
 				f.finishHTTP(dir)
 				f.a.emit(e)
@@ -710,7 +786,9 @@ func (v *BinParserInspector) OnEvent(e *BinParserEvent) {
 		return
 	}
 	row := protocolHistoryEntry{BinParserEvent: *e, retainedCost: cost}
+	row.semanticFields = cloneSession(e.semanticFields)
 	row.Session = cloneSession(e.Session)
+	cloneEvidence(&row.BinParserEvent)
 	row.Structured, row.Fields, row.Metadata = nil, nil, nil
 	row.Raw = append([]byte(nil), e.Raw...)
 	v.mu.Lock()
@@ -739,8 +817,8 @@ func (v *BinParserInspector) Rows(protocol string, flow uint64) []*BinParserEven
 		e := &v.rows[(v.head+i)%len(v.rows)].BinParserEvent
 		if (protocol == "" || protocol == e.Protocol) && (flow == 0 || flow == e.FlowID) {
 			row := *e
-			row.Raw = nil
-			row.Session = nil
+			cloneEvidence(&row)
+			row.Raw, row.Session, row.Structured, row.semanticFields = nil, nil, nil, nil
 			rows = append(rows, &row)
 		}
 	}
@@ -754,6 +832,9 @@ func (v *BinParserInspector) Details(id uint64) (*BinParserEvent, error) {
 		e := &v.rows[(v.head+i)%len(v.rows)].BinParserEvent
 		if e.ID == id {
 			copyEvent := *e
+			cloneEvidence(&copyEvent)
+			copyEvent.Structured = cloneSession(e.Structured)
+			copyEvent.semanticFields = cloneSession(e.semanticFields)
 			copyEvent.Session = cloneSession(e.Session)
 			copyEvent.Raw = append([]byte(nil), e.Raw...)
 			row = &copyEvent
@@ -764,13 +845,15 @@ func (v *BinParserInspector) Details(id uint64) (*BinParserEvent, error) {
 	if row == nil {
 		return nil, fmt.Errorf("message %d is absent or evicted", id)
 	}
-	if row.Rule != "" {
+	if row.Rule != "" || row.semanticFields != nil {
 		result, err := row.Decode()
 		if err != nil {
 			return row, err
 		}
 		row.setStructured(result)
-		row.Status = "decoded"
+		if row.Status == "deferred" {
+			row.Status = "decoded"
+		}
 	}
 	return row, nil
 }
@@ -800,7 +883,8 @@ func (v *BinParserInspector) RowsAfter(after uint64, limit int, protocol string,
 			matching++
 			if len(rows) < limit {
 				row := *e
-				row.Raw, row.Structured, row.Session = nil, nil, nil
+				cloneEvidence(&row)
+				row.Raw, row.Structured, row.Session, row.semanticFields = nil, nil, nil, nil
 				rows = append(rows, &row)
 			}
 		}
@@ -811,3 +895,6 @@ func (v *BinParserInspector) RowsAfter(after uint64, limit int, protocol string,
 	}
 	return
 }
+
+// RetainedBytes estimates owned evidence storage for bounded consumers.
+func (e *ProtocolEvent) RetainedBytes() int { return protocolHistoryBytes(e) }

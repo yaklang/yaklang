@@ -3,16 +3,22 @@ package pcaputil
 import (
 	"bufio"
 	"bytes"
+	"crypto/sha1"
+	"encoding/base64"
 	"errors"
 	"fmt"
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 )
 
 var errBinContext = errors.New("protocol context required")
 
 type binHTTPState struct {
+	ws                                                             *binWebSocket
+	requestID                                                      uint64
+	wsKey, wsOffer                                                 string
 	header, total, cursor, next, search                            int
 	chunked, trailers, closeDelimited, response, tunnel, websocket bool
 	method, summary                                                string
@@ -162,8 +168,20 @@ func (f *binFlow) frameDirection(dir int, w []byte) (int, *binSpec, error) {
 				if len(f.httpUpgrades) == 0 || !f.httpUpgrades[0] {
 					return 0, nil, sessionContext("WebSocket response lacks a matching upgrade request")
 				}
-				if response.Header.Get("Sec-WebSocket-Extensions") != "" {
-					return 0, nil, protocolError(ErrUnsupportedFeature, "WebSocket extensions are unsupported")
+				if len(f.httpWSKeys) == 0 {
+					return 0, nil, sessionContext("WebSocket key missing")
+				}
+				sum := sha1.Sum([]byte(f.httpWSKeys[0] + "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"))
+				if response.Header.Get("Sec-WebSocket-Accept") != base64.StdEncoding.EncodeToString(sum[:]) {
+					return 0, nil, fmt.Errorf("WebSocket accept mismatch")
+				}
+				extension := response.Header.Get("Sec-WebSocket-Extensions")
+				if err := validateWSDeflateOffer(f.httpWSExtensions[0], extension); err != nil {
+					return 0, nil, err
+				}
+				h.ws, err = wsDeflate(extension, 1-dir)
+				if err != nil {
+					return 0, nil, err
 				}
 			}
 			h.tunnel = h.status == 101 || (h.method == "CONNECT" && h.status >= 200 && h.status < 300)
@@ -184,6 +202,14 @@ func (f *binFlow) frameDirection(dir int, w []byte) (int, *binSpec, error) {
 			h.ipp = ippMedia(request.Header.Get("Content-Type"))
 			h.doh = dohPathEvidence(request.URL.RequestURI()) || dohMedia(request.Header.Get("Content-Type")) || dohMedia(request.Header.Get("Accept"))
 			h.websocket = request.Method == "GET" && request.Header.Get("Sec-WebSocket-Version") == "13" && httpHeaderHasToken(request.Header, "Upgrade", "websocket") && httpHeaderHasToken(request.Header, "Connection", "upgrade")
+			if h.websocket {
+				h.wsKey = request.Header.Get("Sec-WebSocket-Key")
+				key, err := base64.StdEncoding.DecodeString(h.wsKey)
+				if err != nil || len(key) != 16 {
+					h.websocket = false
+				}
+				h.wsOffer = request.Header.Get("Sec-WebSocket-Extensions")
+			}
 			length, transfer = request.ContentLength, request.TransferEncoding
 			if len(f.httpMethods) >= 128 {
 				return 0, nil, fmt.Errorf("%w: HTTP request pipeline exceeds 128 entries", errBinContext)
@@ -204,8 +230,23 @@ func (f *binFlow) frameDirection(dir int, w []byte) (int, *binSpec, error) {
 		// Expect: 100-continue can produce a response before the request body.
 		// Associate the method as soon as its complete header is validated.
 		if !h.response {
+			h.requestID = f.a.ids.Add(1)
+			f.httpIDs = append(f.httpIDs, h.requestID)
+			f.httpTimes = append(f.httpTimes, d.ts)
+			cost := int64(128*(len(f.httpMethods)+1) + len(h.wsKey) + len(h.wsOffer) + len(h.method))
+			for _, s := range f.httpWSKeys {
+				cost += int64(len(s))
+			}
+			for _, s := range f.httpWSExtensions {
+				cost += int64(len(s))
+			}
+			if err := f.reserveSession(cost); err != nil {
+				return 0, nil, err
+			}
 			f.httpMethods = append(f.httpMethods, h.method)
 			f.httpUpgrades = append(f.httpUpgrades, h.websocket)
+			f.httpWSKeys = append(f.httpWSKeys, h.wsKey)
+			f.httpWSExtensions = append(f.httpWSExtensions, h.wsOffer)
 			f.httpDoH = append(f.httpDoH, h.doh)
 			// Allocate the sparse IPP marker queue only after an IPP request.
 			if h.ipp || len(f.httpIPP) > 0 {
@@ -279,8 +320,12 @@ func (f *binFlow) finishHTTP(dir int) {
 		if h.status >= 200 || h.status == 101 {
 			f.httpMethods[0] = ""
 			f.httpMethods = f.httpMethods[1:]
+			f.httpIDs = f.httpIDs[1:]
+			f.httpTimes = f.httpTimes[1:]
 			if len(f.httpUpgrades) > 0 {
 				f.httpUpgrades = f.httpUpgrades[1:]
+				f.httpWSKeys = f.httpWSKeys[1:]
+				f.httpWSExtensions = f.httpWSExtensions[1:]
 			}
 			if len(f.httpIPP) > 0 {
 				f.httpIPP = f.httpIPP[1:]
@@ -292,9 +337,16 @@ func (f *binFlow) finishHTTP(dir int) {
 	}
 	f.directions[dir].http = nil
 	f.directions[dir].headerScan = 0
+	if h.tunnel {
+		f.httpIDs, f.httpTimes = nil, nil
+		f.httpWSKeys, f.httpWSExtensions = nil, nil
+	}
 	if h.tunnel && h.status == 101 && h.websocket {
 		client := 1 - dir
-		f.protocol, f.ws = "websocket", &binWebSocket{client: client, phase: "frame"}
+		f.protocol, f.ws = "websocket", h.ws
+		if f.ws == nil {
+			f.ws = &binWebSocket{client: client, phase: "frame"}
+		}
 		f.httpUpgrades = nil
 		f.httpDoH, f.httpIPP = nil, nil
 		f.binding, f.level, f.httpMethods = nil, 0, nil
@@ -337,4 +389,23 @@ func httpHeaderHasToken(header http.Header, name, token string) bool {
 		}
 	}
 	return false
+}
+
+func (f *binFlow) httpEvidence(dir int, e *ProtocolEvent) {
+	h := f.directions[dir].http
+	if h == nil {
+		return
+	}
+	e.Completeness = "message"
+	if !h.response {
+		e.ID = h.requestID
+		e.TransactionID = e.ID
+	} else if len(f.httpIDs) > 0 {
+		e.TransactionID = f.httpIDs[0]
+		e.ResponseTo = f.httpIDs[0]
+		e.Session = map[string]any{"Response Latency": e.Timestamp.Sub(f.httpTimes[0]) / time.Microsecond}
+		if h.status >= 200 {
+			e.Completeness = "transaction"
+		}
+	}
 }

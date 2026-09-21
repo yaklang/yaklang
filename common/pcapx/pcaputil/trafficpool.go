@@ -17,6 +17,7 @@ import (
 )
 
 type flowKey struct {
+	domain   CaptureDomain
 	src, dst netip.AddrPort
 	ipv6     bool
 }
@@ -172,8 +173,11 @@ func (p *TrafficPool) canceled() bool {
 }
 
 func (p *TrafficPool) Feed(ethernetLayer *layers.Ethernet, networkLayer gopacket.SerializableLayer, tcp *layers.TCP, tss ...time.Time) {
+	p.feedEvidence(ethernetLayer, networkLayer, tcp, captureEvidence{}, tss...)
+}
+func (p *TrafficPool) feedEvidence(ethernetLayer *layers.Ethernet, networkLayer gopacket.SerializableLayer, tcp *layers.TCP, evidence captureEvidence, tss ...time.Time) {
 	if p.parallel != nil && p.owner == nil {
-		p.parallel.submitLayers(ethernetLayer, networkLayer, tcp, tss)
+		p.parallel.submitLayers(ethernetLayer, networkLayer, tcp, tss, evidence)
 		return
 	}
 	if tcp == nil {
@@ -191,6 +195,7 @@ func (p *TrafficPool) Feed(ethernetLayer *layers.Ethernet, networkLayer gopacket
 		return
 	}
 	key, valid := makeFlowKey(srcIP, dstIP, uint16(tcp.SrcPort), uint16(tcp.DstPort), ipv6)
+	key.domain = evidence.Ref.Domain
 	if !valid {
 		return
 	}
@@ -224,7 +229,7 @@ func (p *TrafficPool) Feed(ethernetLayer *layers.Ethernet, networkLayer gopacket
 		// Packet-layer address slices may be overwritten by the next read.
 		src := &net.TCPAddr{IP: append(net.IP(nil), srcIP...), Port: int(tcp.SrcPort)}
 		dst := &net.TCPAddr{IP: append(net.IP(nil), dstIP...), Port: int(tcp.DstPort)}
-		flow = p.newFlowWithAddrs(network, src, dst)
+		flow = p.newFlowWithAddrs(network, src, dst, evidence.Ref.Domain)
 		if flow == nil {
 			return
 		}
@@ -241,6 +246,7 @@ func (p *TrafficPool) Feed(ethernetLayer *layers.Ethernet, networkLayer gopacket
 	if flow.ClientConn.localPort == int(tcp.SrcPort) && flow.ClientConn.localIP.Equal(srcIP) {
 		conn = flow.ClientConn
 	}
+	conn.evidence = evidence
 	conn.FeedClient(tcp, ts)
 	if flow.ClientConn.IsClosed() {
 		flow.ClientConn.discardPending()

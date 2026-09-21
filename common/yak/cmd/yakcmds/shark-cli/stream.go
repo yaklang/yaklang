@@ -10,6 +10,7 @@ import (
 	"github.com/gopacket/gopacket"
 	"github.com/gopacket/gopacket/layers"
 	"github.com/gopacket/gopacket/reassembly"
+	"github.com/yaklang/yaklang/common/pcapx/pcaputil"
 )
 
 const (
@@ -18,13 +19,16 @@ const (
 	streamPrefixLimit  = 16 << 10
 )
 
-type streamKey [2]gopacket.Flow
+type streamKey struct {
+	network, transport gopacket.Flow
+	domain             pcaputil.CaptureDomain
+}
 
 func connectionKey(network, transport gopacket.Flow) streamKey {
 	if network.Src().LessThan(network.Dst()) || network.Src() == network.Dst() && transport.Src().LessThan(transport.Dst()) {
-		return streamKey{network, transport}
+		return streamKey{network: network, transport: transport}
 	}
-	return streamKey{network.Reverse(), transport.Reverse()}
+	return streamKey{network: network.Reverse(), transport: transport.Reverse()}
 }
 
 type streamChunk struct {
@@ -44,6 +48,7 @@ type streamSide struct {
 	synSeq           uint32
 }
 type tcpStream struct {
+	first                                           time.Time
 	store                                           *streamStore
 	id                                              uint64
 	key                                             streamKey
@@ -61,8 +66,11 @@ type tcpStream struct {
 // All assembly happens before the lossy display queue. The UI only reads copied
 // snapshots, so display skips and a pinned packet list cannot lose stream bytes.
 type streamStore struct {
+	history                         *pcaputil.ProtocolInspector
 	mu                              sync.RWMutex
 	assembler                       *reassembly.Assembler
+	assemblers                      map[pcaputil.CaptureDomain]*reassembly.Assembler
+	currentDomain                   pcaputil.CaptureDomain
 	active                          map[streamKey]*tcpStream
 	records                         map[uint64]*tcpStream
 	lru                             list.List
@@ -81,7 +89,8 @@ func newStreamStore(maxStreams, perStream int) *streamStore {
 	}
 	s := &streamStore{active: map[streamKey]*tcpStream{}, records: map[uint64]*tcpStream{}, maxStreams: maxStreams, perStream: perStream}
 	s.assembler = reassembly.NewAssembler(reassembly.NewStreamPool(s))
-	s.assembler.MaxBufferedPagesTotal = 4096
+	s.assemblers = map[pcaputil.CaptureDomain]*reassembly.Assembler{{}: s.assembler}
+	s.assembler.MaxBufferedPagesTotal = 128
 	s.assembler.MaxBufferedPagesPerConnection = 128
 	return s
 }
@@ -93,6 +102,7 @@ func (c streamContext) GetCaptureInfo() gopacket.CaptureInfo { return c.ci }
 func (s *streamStore) New(network, transport gopacket.Flow, tcp *layers.TCP, ac reassembly.AssemblerContext) reassembly.Stream {
 	s.next++
 	r := &tcpStream{store: s, id: s.next, key: connectionKey(network, transport)}
+	r.key.domain = s.currentDomain
 	r.sides[0] = streamSide{endpoint: net.JoinHostPort(network.Src().String(), transport.Src().String()), port: uint16(tcp.SrcPort)}
 	r.sides[1] = streamSide{endpoint: net.JoinHostPort(network.Dst().String(), transport.Dst().String()), port: uint16(tcp.DstPort)}
 	r.protocol = portProtocol("tcp", uint16(tcp.SrcPort), uint16(tcp.DstPort))
@@ -123,6 +133,9 @@ func (r *tcpStream) Accept(tcp *layers.TCP, ci gopacket.CaptureInfo, dir reassem
 	}
 	r.packets++
 	r.version++
+	if r.first.IsZero() {
+		r.first = ci.Timestamp
+	}
 	r.last = ci.Timestamp
 	if next >= 0 && len(tcp.Payload) > 0 {
 		diff := int32(tcp.Seq - uint32(next))
@@ -224,8 +237,25 @@ func (s *streamStore) add(raw *capturedPacket) {
 		return
 	}
 	key := connectionKey(network.NetworkFlow(), tcp.TransportFlow())
+	key.domain = pcaputil.PacketDomain(raw.data, raw.ci, raw.link)
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	s.currentDomain = key.domain
+	assembler := s.assemblers[key.domain]
+	if assembler == nil {
+		if len(s.assemblers) >= 32 {
+			s.flushReason = "capture domain budget eviction"
+			for k, a := range s.assemblers {
+				a.FlushAll()
+				delete(s.assemblers, k)
+			}
+			s.flushReason = ""
+		}
+		assembler = reassembly.NewAssembler(reassembly.NewStreamPool(s))
+		assembler.MaxBufferedPagesTotal = 128
+		assembler.MaxBufferedPagesPerConnection = 128
+		s.assemblers[key.domain] = assembler
+	}
 	// The assembler owns connection lifetimes. Bound active state independently
 	// of the history, and distinguish a reused tuple's new SYN/ISN.
 	reused := false
@@ -239,10 +269,12 @@ func (s *streamStore) add(raw *capturedPacket) {
 	}
 	if reused || s.active[key] == nil && len(s.active) >= s.maxStreams {
 		s.flushReason = "assembly window reset"
-		s.assembler.FlushAll()
+		for _, a := range s.assemblers {
+			a.FlushAll()
+		}
 		s.flushReason = ""
 	}
-	s.assembler.AssembleWithContext(network.NetworkFlow(), tcp, streamContext{raw.ci})
+	assembler.AssembleWithContext(network.NetworkFlow(), tcp, streamContext{raw.ci})
 	// A FIN/RST may close the stream during this call, so use the latest record
 	// for this key if it is no longer in the active map.
 	r := s.active[key]
@@ -297,7 +329,9 @@ func (s *streamStore) flushLocked(now time.Time) {
 	}
 	s.lastFlush = s.clock
 	s.flushReason = "idle timeout"
-	s.assembler.FlushWithOptions(reassembly.FlushOptions{T: s.clock.Add(-2 * time.Second), TC: s.clock.Add(-2 * time.Minute)})
+	for _, a := range s.assemblers {
+		a.FlushWithOptions(reassembly.FlushOptions{T: s.clock.Add(-2 * time.Second), TC: s.clock.Add(-2 * time.Minute)})
+	}
 	s.flushReason = ""
 }
 func (s *streamStore) tick(now time.Time) {
@@ -310,7 +344,9 @@ func (s *streamStore) finish() {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.flushReason = "capture ended"
-	s.assembler.FlushAll()
+	for _, a := range s.assemblers {
+		a.FlushAll()
+	}
 	s.flushReason = ""
 	s.trim()
 }
@@ -327,6 +363,9 @@ func (s *streamStore) label(id uint64) (string, string) {
 }
 
 type streamSnapshot struct {
+	domain                                          pcaputil.CaptureDomain
+	first, last                                     time.Time
+	events                                          []*pcaputil.ProtocolEvent
 	startKnown                                      [2]bool
 	prefixGap                                       [2]bool
 	prefixTime                                      [2]time.Time
@@ -352,7 +391,7 @@ func (s *streamStore) snapshot(id uint64) *streamSnapshot {
 	if r == nil {
 		return nil
 	}
-	v := &streamSnapshot{id: r.id, version: r.version, protocol: r.protocol, evidence: r.evidence, closed: r.closed, packets: r.packets, retransmits: r.retransmits, outOfOrder: r.outOfOrder, gaps: r.gaps, missing: r.missing, omitted: r.omitted}
+	v := &streamSnapshot{first: r.first, last: r.last, id: r.id, version: r.version, protocol: r.protocol, evidence: r.evidence, closed: r.closed, packets: r.packets, retransmits: r.retransmits, outOfOrder: r.outOfOrder, gaps: r.gaps, missing: r.missing, omitted: r.omitted}
 	for d, side := range r.sides {
 		v.startKnown[d], v.prefixGap[d], v.prefixTime[d] = side.startKnown, side.broken, side.prefixTime
 		v.endpoints[d] = side.endpoint
@@ -360,7 +399,9 @@ func (s *streamStore) snapshot(id uint64) *streamSnapshot {
 		v.bytes[d] = side.bytes
 		v.prefix[d] = append([]byte(nil), side.prefix...)
 	}
-	v.decodeVersion = uint64(len(v.prefix[0]))<<32 | uint64(len(v.prefix[1]))
+	v.domain = r.key.domain
+	v.events = retainedStreamEvents(s.history, v)
+	v.decodeVersion = r.version
 	for _, chunk := range r.chunks {
 		c := chunk
 		c.data = append([]byte(nil), c.data...)

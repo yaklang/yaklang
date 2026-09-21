@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/hex"
 	"fmt"
+	"github.com/yaklang/yaklang/common/pcapx/pcaputil"
 	"net"
 	"strconv"
 	"strings"
@@ -11,6 +12,7 @@ import (
 )
 
 type packetSearch struct {
+	fields   *pcaputil.DisplayFilter
 	groups   [][]searchTerm // OR of AND groups.
 	dynamic  bool
 	metadata bool
@@ -88,6 +90,14 @@ func searchTokens(input string) ([]searchToken, error) {
 }
 
 func compileSearch(input string) (*packetSearch, error) {
+	if strings.HasPrefix(strings.TrimSpace(input), "fields ") {
+		f, err := pcaputil.CompileDisplayFilter(strings.TrimSpace(strings.TrimPrefix(strings.TrimSpace(input), "fields ")))
+		if err != nil {
+			return nil, err
+		}
+		return &packetSearch{fields: f}, nil
+	}
+
 	if len(input) > 4096 {
 		return nil, fmt.Errorf("search exceeds 4096 bytes")
 	}
@@ -384,6 +394,14 @@ func (t searchTerm) matches(e *packetEntry, row packetSummary, c *packetSearchCo
 func (u *tui) matchesSearch(e *packetEntry, c *packetSearchContext) bool {
 	if u.search == nil {
 		return true
+	}
+	if u.search.fields != nil {
+		for _, event := range e.packet.protocolEvents() {
+			if u.search.fields.Match(event) {
+				return true
+			}
+		}
+		return false
 	}
 	version := uint64(0)
 	var stream *searchStream

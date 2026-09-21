@@ -1,0 +1,92 @@
+1						
+2						
+3						
+4						
+5	m1.example	0xc02f				
+6						
+7		0xc02f				
+8						
+9						
+10						
+11						
+12						
+13			0			
+14						
+15			0,0			
+16						
+17			0			
+18						
+19			1		:authority,:method,:path,:scheme,content-type,te,accept-encoding,user-agent	127.0.0.1:19440,POST,/m1.Echo/Bidi,https,application/grpc,trailers,gzip,Go-http-client/2.0
+20						
+21			1	5		
+22						
+23			0			
+24						
+25			0			
+26						
+27			1		:status,content-type,trailer,date	200,application/grpc,Grpc-Status,Mon, 21 Sep 2026 15:24:34 GMT
+28						
+29			1	5		
+30						
+31			1	5		
+32						
+33			1	5		
+34						
+35			1	5		
+36						
+37			1	5		
+38						
+39			1,1		grpc-status	0
+40						
+41						
+42						
+43						
+44						
+45						
+46						
+47						
+48						
+49						
+50						
+51						
+52						
+53	m1.example	0x1301,0x1302,0x1303				
+54						
+55		0x1301				
+56						
+57						
+58						
+59			0,0			
+60						
+61			1		:authority,:method,:path,:scheme,te,content-type,accept-encoding,user-agent	127.0.0.1:19441,POST,/m1.Echo/Bidi,https,trailers,application/grpc,gzip,Go-http-client/2.0
+62						
+63			1	5		
+64						
+65			0			
+66						
+67			0,0			
+68						
+69			0			
+70						
+71			1		:status,content-type,trailer,date	200,application/grpc,Grpc-Status,Mon, 21 Sep 2026 15:24:35 GMT
+72						
+73			1	5		
+74						
+75			1	5		
+76						
+77			1	5		
+78						
+79			1	5		
+80						
+81			1	5		
+82						
+83			1,1		grpc-status	0
+84						
+85			1			
+86						
+87						
+88						
+89						
+90						
+91						
+92						

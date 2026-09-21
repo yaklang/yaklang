@@ -18,7 +18,7 @@ func (a *binParser) decodeQUICDatagram(base *ProtocolEvent, wire []byte) ([]*Pro
 	}
 	a.udpMu.Lock()
 	defer a.udpMu.Unlock()
-	key := binUDPKey{base.Source, base.Destination}
+	key := binUDPKey{base.Source, base.Destination, base.Domain}
 	if key.a > key.b {
 		key.a, key.b = key.b, key.a
 	}

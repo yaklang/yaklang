@@ -338,7 +338,7 @@ func (a *binParser) datagram(packet gopacket.Packet, udp *layers.UDP) {
 	if ip, ok := network.(*layers.IPv6); ok && (ip.Version != 6 || packet.Layer(layers.LayerTypeIPv6Fragment) != nil) {
 		return
 	}
-	a.datagramFields(network, udp, packet.Metadata().CaptureInfo, packet.Metadata().Truncated)
+	a.datagramFields(network, udp, withEvidence(packet.Metadata().CaptureInfo, packetEvidence(packet)), packet.Metadata().Truncated)
 }
 
 // The caller has already excluded IP fragments and validated the network layer.
@@ -347,6 +347,15 @@ func (a *binParser) datagramFields(network gopacket.NetworkLayer, udp *layers.UD
 	a.input.Add(uint64(len(wire)))
 	src, dst := network.NetworkFlow().Endpoints()
 	e := &BinParserEvent{Timestamp: ci.Timestamp, Transport: "udp", Source: net.JoinHostPort(src.String(), strconv.Itoa(int(udp.SrcPort))), Destination: net.JoinHostPort(dst.String(), strconv.Itoa(int(udp.DstPort))), Length: len(wire), Status: "unrecognized", Summary: "unrecognized UDP datagram"}
+	evidence := evidenceFrom(ci)
+	e.Domain = evidence.Ref.Domain
+	if evidence.Ref.Number != 0 {
+		e.SourceBytes.PacketRefs = []PacketReference{evidence.Ref}
+		if len(evidence.refs) > 0 {
+			e.SourceBytes.Kind = "reassembled"
+			e.SourceBytes.PacketRefs = append([]PacketReference(nil), evidence.refs...)
+		}
+	}
 	if truncated || ci.CaptureLength < ci.Length || udp.Length < 8 || int(udp.Length) != len(wire)+8 {
 		e.Status, e.Summary = "incomplete", "truncated or invalid UDP datagram"
 		a.incomplete.Add(1)
@@ -360,11 +369,11 @@ func (a *binParser) datagramFields(network gopacket.NetworkLayer, udp *layers.UD
 			}
 			return
 		}
-		var spec *binSpec
-		if (udp.SrcPort == 53 || udp.DstPort == 53) && dnsHeader(wire) {
-			e.Protocol = "dns"
-			spec = a.specs["application-layer.dns/DNS"]
+		if a.decodeNativeDatagram(e, wire, uint16(udp.SrcPort), uint16(udp.DstPort)) {
+			a.emit(e)
+			return
 		}
+		var spec *binSpec
 		if (udp.SrcPort == 88 || udp.DstPort == 88) && len(wire) >= 2 && kerberosTag(wire[0]) {
 			e.Protocol = "kerberos"
 			spec = a.specs["application-layer.kerberos_fields/KerberosMessageFields"]
@@ -391,6 +400,12 @@ func (a *binParser) datagramFields(network gopacket.NetworkLayer, udp *layers.UD
 		} else {
 			a.unknown.Add(1)
 			a.unclassified.Add(uint64(len(wire)))
+		}
+	}
+	if e.Protocol == "dns" || e.Protocol == "mdns" || e.Protocol == "llmnr" {
+		if err := a.dnsEvent(e, wire); err != nil {
+			e.Status = "malformed"
+			e.Error = err.Error()
 		}
 	}
 	if e.Raw == nil {

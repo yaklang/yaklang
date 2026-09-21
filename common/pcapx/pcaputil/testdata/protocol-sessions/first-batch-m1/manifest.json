@@ -1,0 +1,156 @@
+{
+  "schema_version": 1,
+  "milestone": "M1",
+  "captured_or_retrieved": "2026-09-21",
+  "baseline": "5f4ea0ecaecec97a93e5dbd2ba8e46bf1a36e79b",
+  "secrets_policy": "Only ephemeral generated test-session NSS secrets. Production key logs are never auto-discovered. Wrong or missing keys never yield plaintext.",
+  "samples": [
+    {
+      "id": "tls-h2-bidi",
+      "representation": "native_capture",
+      "native_carrier": true,
+      "source": "local loopback; scripts/protocol-tests/generate-m1; Go 1.22.12 net/http + x/net/http2; tcpdump macOS lo0, zero kernel drops",
+      "license": "repository license; locally generated test traffic",
+      "record_count": 92,
+      "oracle": {
+        "tool": "TShark 4.4.8",
+        "fields": [
+          "frame.number",
+          "tls.handshake.extensions_server_name",
+          "tls.handshake.ciphersuite",
+          "http2.streamid",
+          "grpc.message_length",
+          "http2.header.name",
+          "http2.header.value"
+        ],
+        "expected": {
+          "grpc_messages": 12,
+          "grpc_payload_hex": [
+            "0a036d3130",
+            "0a036d3131",
+            "0a036d3132"
+          ],
+          "tls_versions": [
+            771,
+            772
+          ],
+          "sni": "m1.example",
+          "final_grpc_status": "0"
+        }
+      },
+      "files": [
+        {
+          "file": "tls-h2-bidi.pcap",
+          "sha256": "aa633bc473e7e650047eadddcb41f3946e014527e216d16fa92634dbae5dc999",
+          "bytes": 11634
+        },
+        {
+          "file": "tls-h2-bidi.tshark.tsv",
+          "sha256": "7c11099d83760d967a9ea001a9f1f08c0a5603d88e70cd3ad99a9ba151386e16",
+          "bytes": 1471
+        },
+        {
+          "file": "tls-h2-bidi.keys",
+          "sha256": "36e9091beac1b8fe5e2e53d897e7ae6e72452295272facad476bd9874b5fd3e3",
+          "bytes": 1616
+        }
+      ]
+    },
+    {
+      "id": "http-ws-native",
+      "representation": "native_capture",
+      "native_carrier": true,
+      "source": "local loopback; scripts/protocol-tests/generate-m1; Go net/http + gorilla/websocket; tcpdump macOS lo0, zero kernel drops",
+      "license": "repository license; locally generated test traffic",
+      "record_count": 42,
+      "oracle": {
+        "tool": "TShark 4.4.8",
+        "fields": [
+          "frame.number",
+          "http.request.method",
+          "http.response.code",
+          "websocket.opcode",
+          "websocket.rsv1"
+        ],
+        "expected": {
+          "websocket_messages": 4,
+          "websocket_payload_bytes": 1500,
+          "http_requests": 3,
+          "http_responses": 5,
+          "early_hints": 2,
+          "trailer": {
+            "X-M1": "done"
+          }
+        }
+      },
+      "files": [
+        {
+          "file": "http-ws-native.pcap",
+          "sha256": "e91840a18e2e64288f84cd7d5c75f04aedf92294f70e28276ee16dcbe095879d",
+          "bytes": 4364
+        },
+        {
+          "file": "http-ws-native.tshark.tsv",
+          "sha256": "6502cecc5b28cd1d79e4308e2fad11404d83b87503fb8116f399bfcd84ba88b9",
+          "bytes": 330
+        }
+      ]
+    },
+    {
+      "id": "dhcpv6-native",
+      "representation": "native_capture",
+      "native_carrier": true,
+      "source": "https://wiki.wireshark.org/uploads/__moin_import__/attachments/SampleCaptures/DHCPv6.pcap",
+      "license": "repository license for generated traffic; upstream sample uploader terms unspecified",
+      "record_count": 12,
+      "oracle": {
+        "tool": "TShark 4.4.8",
+        "fields": [
+          "frame.number",
+          "dhcpv6.msgtype",
+          "dhcpv6.xid",
+          "dhcpv6.iaprefix.pref_addr"
+        ],
+        "expected": {
+          "dhcpv6_messages": 6,
+          "message_types": [
+            1,
+            2,
+            3,
+            7,
+            8,
+            7
+          ],
+          "transaction_ids": [
+            "100874",
+            "49174e",
+            "c789b0"
+          ],
+          "prefix": "2001:0:0:fe00::",
+          "nd_messages": 4
+        }
+      },
+      "files": [
+        {
+          "file": "dhcpv6-native.pcap",
+          "sha256": "4ae07cbcfdd3fb616c1c051945e931576778057762576510c54ebea52c636c25",
+          "bytes": 1627
+        },
+        {
+          "file": "dhcpv6-native.tshark.tsv",
+          "sha256": "ce27c392377754d733072fad024b1ba26437a853557813becc056e92bc9eada5",
+          "bytes": 177
+        }
+      ]
+    }
+  ],
+  "reused_upstream_manifest": "common/bin-parser/testdata/protocol-corpus/manifest.json",
+  "reused_original_files": [
+    "ndpi/ndpi-dns.pcap",
+    "wireshark-tests/wireshark-mdns.pcap",
+    "wireshark-tests/wireshark-dhcp.pcap",
+    "wireshark-tests/wireshark-icmp-ascii.pcapng"
+  ],
+  "excluded_positive": "wireshark-arp.pcap uses Frame Relay DLT107; ARP positive evidence is from wireshark-mdns.pcap.",
+  "synthetic_policy": "Crafted frames are boundary/negative tests and are not represented as native captures."
+}

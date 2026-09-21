@@ -181,6 +181,14 @@ func TestProtocolSessionReviewGRPCErrors(t *testing.T) {
 			r := s.Feed(0, time.Time{}, h2TestFrame(0, 1, 1, payload))
 			require.NotNil(t, r.Err)
 			require.NotEqual(t, "decoded", r.Events[0].Status)
+			require.Equal(t, "stream", r.Events[0].Session["Error Scope"])
+			// A message error releases its partial message, while the connection
+			// retains HPACK state so an unrelated stream can still be decoded.
+			r = s.Feed(0, time.Time{}, h2TestFrame(1, 5, 3, h2TestHeaders(t, ":method", "GET", ":scheme", "http", ":path", "/healthy")))
+			require.Nil(t, r.Err)
+			require.NotEmpty(t, r.Events)
+			require.Empty(t, r.Events[0].Error)
+			s.Close("FIN")
 			require.Zero(t, s.Stats().BufferedBytes)
 		})
 	}

@@ -7,11 +7,15 @@ import (
 )
 
 type binWebSocket struct {
-	client int
-	phase  string
-	buf    [2][]byte
-	opcode [2]byte
-	closed [2]bool
+	deflate               bool
+	noContext, compressed [2]bool
+	dictionary            [2][]byte
+	limit                 int
+	client                int
+	phase                 string
+	buf                   [2][]byte
+	opcode                [2]byte
+	closed                [2]bool
 }
 
 func probeWebSocket(w []byte, limit int) ProbeResult {
@@ -86,7 +90,7 @@ func (f *binFlow) frameWebSocket(dir int, w []byte) (int, *binSpec, error) {
 		return n, nil, nil
 	}
 	op := w[0] & 15
-	if w[0]&0x70 != 0 {
+	if w[0]&0x30 != 0 || w[0]&0x40 != 0 && (!ws.deflate || op == 0 || op >= 8) {
 		return 0, nil, protocolError(ErrUnsupportedFeature, "WebSocket RSV/extension is unsupported")
 	}
 	if op > 10 || op >= 3 && op <= 7 {
@@ -107,7 +111,11 @@ func (f *binFlow) frameWebSocket(dir int, w []byte) (int, *binSpec, error) {
 	if (op == 1 || op == 2) && ws.opcode[dir] != 0 {
 		return 0, nil, fmt.Errorf("websocket: new data frame interrupts fragmented message")
 	}
-	target := int64(256 + cap(ws.buf[0]) + cap(ws.buf[1]))
+	ws.limit = f.a.config.MaxMessageBytes
+	target := int64(256 + cap(ws.buf[0]) + cap(ws.buf[1]) + cap(ws.dictionary[0]) + cap(ws.dictionary[1]))
+	if ws.deflate {
+		target += int64(2*f.a.config.MaxMessageBytes + 65536)
+	}
 	if op <= 2 && (op == 0 || w[0]&128 == 0) {
 		header := 2
 		if w[1]&127 == 126 {
@@ -135,6 +143,10 @@ func (ws *binWebSocket) consume(dir int, raw []byte) (map[string]any, error) {
 	op, fin := raw[0]&15, raw[0]&128 != 0
 	info := map[string]any{"Opcode": uint64(op), "Opcode Name": websocketOpcodeName(op), "FIN": fin, "Masked": raw[1]&128 != 0, "Client": dir == ws.client}
 	payload := websocketPayload(raw)
+	if op == 1 || op == 2 {
+		ws.compressed[dir] = raw[0]&0x40 != 0
+	}
+	info["Compressed"] = ws.compressed[dir]
 	if op == 0 || !fin && op <= 2 {
 		if op != 0 {
 			ws.opcode[dir] = op
@@ -149,6 +161,11 @@ func (ws *binWebSocket) consume(dir int, raw []byte) (map[string]any, error) {
 		info["Fragment"] = true
 		if fin {
 			opcode := ws.opcode[dir]
+			decoded, err := ws.message(dir, opcode, ws.buf[dir])
+			if err != nil {
+				return info, err
+			}
+			ws.buf[dir] = decoded
 			if opcode == 1 && !utf8.Valid(ws.buf[dir]) {
 				return info, fmt.Errorf("websocket: text is not UTF-8")
 			}
@@ -157,6 +174,13 @@ func (ws *binWebSocket) consume(dir int, raw []byte) (map[string]any, error) {
 			ws.buf[dir], ws.opcode[dir] = nil, 0
 		}
 		return info, nil
+	}
+	if op == 1 || op == 2 {
+		var err error
+		payload, err = ws.message(dir, op, payload)
+		if err != nil {
+			return info, err
+		}
 	}
 	if op == 1 && !utf8.Valid(payload) {
 		return info, fmt.Errorf("websocket: text is not UTF-8")
