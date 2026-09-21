@@ -66,6 +66,13 @@ func EnsureConfigLoaded() {
 	}
 	if err := yakit.ApplyAIGlobalConfig(db, cfg); err != nil { // set to consts
 		log.Warnf("failed to apply ai global config from %s: %v", source, err)
+		if cfg.GetSingleModelMode() {
+			// A corrupt persisted single-model choice must block requests,
+			// not silently reactivate a previous tier/legacy configuration.
+			consts.SetTieredAIConfig(&consts.TieredAIConfig{
+				SingleModelMode: true, IntelligentConfigs: cfg.GetIntelligentModels(),
+			})
+		}
 	}
 
 	configLoaded = true
@@ -115,6 +122,10 @@ func buildDefaultAIGlobalConfig() *ypb.AIGlobalConfig {
 }
 
 func ensureTierModelConfigsAvailable(cfg *ypb.AIGlobalConfig) bool {
+	if cfg != nil && cfg.GetSingleModelMode() {
+		// Do not backfill unrelated providers or silently invent a sole model.
+		return false
+	}
 	if cfg == nil {
 		return false
 	}
@@ -214,6 +225,7 @@ func buildAIGlobalConfigFromTiered(tiered *consts.TieredAIConfig) *ypb.AIGlobalC
 		RoutingPolicy:   string(tiered.RoutingPolicy),
 		DisableFallback: tiered.DisableFallback,
 		DefaultModelId:  tiered.DefaultModelID,
+		SingleModelMode: tiered.SingleModelMode,
 		GlobalWeight:    tiered.GlobalWeight,
 	}
 	if cfg.RoutingPolicy == "" {

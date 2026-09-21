@@ -3,13 +3,12 @@ package aicommon
 import (
 	"context"
 
-	"github.com/yaklang/yaklang/common/ai/aispec"
 	"github.com/yaklang/yaklang/common/utils"
 )
 
 // ScheduleAuxiliaryTask is the Config-owned entry point for auxiliary AI work.
-// In single-model mode the registry decides whether the task is skipped,
-// executed with lightweight request parameters, or passed through unchanged.
+// In single-model mode the registry only decides whether to skip the task.
+// Non-skipped calls use the Speed callback already bound at initialization.
 // Outside single-model mode every task preserves its existing behavior.
 func (c *Config) ScheduleAuxiliaryTask(
 	ctx context.Context,
@@ -35,10 +34,6 @@ func (c *Config) ScheduleAuxiliaryTask(
 	prompt := promptBuilder()
 	if prompt == "" {
 		return
-	}
-	if len(decision.RequestOpts) > 0 {
-		spec.Opts = append([]GeneralKVConfigOption(nil), spec.Opts...)
-		spec.Opts = append(spec.Opts, WithGeneralConfigExtraRequestOpts(decision.RequestOpts...))
 	}
 
 	if utils.IsNil(ctx) {
@@ -91,19 +86,9 @@ func (c *Config) ScheduleAuxiliaryTask(
 // ResolveAuxiliaryTask exposes the Config-owned policy to non-LiteForge Speed
 // calls without changing their prompt or response protocol.
 func (c *Config) ResolveAuxiliaryTask(name string) AuxiliaryTaskDecision {
-	decision := AuxiliaryTaskDecision{Action: SingleModelPassThrough}
-	if c == nil {
-		return decision
-	}
-	action := SingleModelPassThrough
-	if c.IsSingleAIModelMode() {
-		action = GetSingleModelAction(name)
-	}
-	decision.Action = action
-	if action == SingleModelLiteCall {
-		decision.RequestOpts = []AIRequestOption{
-			WithAIRequest_ExtraSpecOpts(aispec.WithThinkingLevel("none")),
-		}
+	decision := AuxiliaryTaskDecision{Action: SingleModelRun}
+	if c != nil && c.IsSingleAIModelMode() {
+		decision.Action = GetSingleModelAction(name)
 	}
 	return decision
 }

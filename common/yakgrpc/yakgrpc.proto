@@ -2340,6 +2340,8 @@ message AIStartParams {
   // 为 true 时禁用 Memory Triage（智能记忆处理），不创建 AIMemory 实例，
   // 跳过 embedding/DB/AI 调用。适用于轻量级或无状态会话。
   bool DisableMemoryTriage = 49;
+  // Session-local opt-in; a globally enabled single-model mode still wins.
+  bool SingleModelMode = 50;
 }
 
 message AIExecutionStrategy {
@@ -9515,6 +9517,8 @@ message AIGlobalConfig {
   repeated AIModelConfig VisionModels = 8;
   string AIPresetPrompt = 9;
   string AIPlanPrompt = 10;
+  // Single-model routing takes precedence over tier selection without deleting tier lists.
+  bool SingleModelMode = 11;
 }
 
 // Local Model Messages

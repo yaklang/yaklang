@@ -132,8 +132,8 @@ func WithLiteForgeOutputValidator(validate func(*Action) error) GeneralKVConfigO
 // aiforge.WithLiteForge_ExtraRequestOpts, ultimately reaching
 // AIRequest.extraSpecOpts and the underlying AI call.
 //
-// Used by the auxiliary task scheduler to inject parameter degradation
-// (e.g. aispec.WithThinkingLevel("none")) for LiteCall decisions.
+// Carries caller-supplied request settings without changing scheduling policy.
+// LiteCall parameters belong to the initialized Speed callback.
 func WithGeneralConfigExtraRequestOpts(opts ...AIRequestOption) GeneralKVConfigOption {
 	return func(c *GeneralKVConfig) {
 		existing := c.GetExtraRequestOpts()

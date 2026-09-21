@@ -41,13 +41,21 @@ func TestSpeedLoopLiteForgeIntegration(t *testing.T) {
 				aicommon.WithSpeedPriorityAICallback(func(c aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 					attempt := speedCalls.Add(1)
 					require.Equal(t, "react-loop:auxiliary-integration", req.GetCallerLabel())
-					require.Same(t, activeTask.GetContext(), req.GetContext())
+					if mode == "single-model" {
+						require.Equal(t, activeTask.GetContext().Done(), req.GetContext().Done())
+					} else {
+						require.Same(t, activeTask.GetContext(), req.GetContext())
+					}
 					require.Equal(t, mode == "functioncall", req.IsToolCallArgumentsStreamEnabled())
 					var opts aispec.AIConfig
 					for _, option := range req.GetExtraSpecOpts() {
 						option(&opts)
 					}
-					require.Empty(t, opts.ThinkingLevel, "unregistered loops remain PassThrough")
+					if mode == "single-model" {
+						require.Equal(t, "none", opts.ThinkingLevel)
+					} else {
+						require.Empty(t, opts.ThinkingLevel)
+					}
 					if mode == "functioncall" {
 						require.NotEmpty(t, opts.Tools)
 					}

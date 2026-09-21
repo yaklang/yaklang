@@ -68,7 +68,7 @@ func TestMiniAITasksUseConfigLiteCall(t *testing.T) {
 				result, err := test.handler(ctx, &MiniAITaskContext{Config: cfg, Timeline: cfg.GetTimeline()}, test.input)
 				require.EqualValues(t, 1, speedCalls.Load(), "LiteCall must execute rather than skip")
 				require.Zero(t, qualityCalls.Load())
-				require.Equal(t, aicommon.SingleModelLiteCall, aicommon.GetSingleModelAction(test.name))
+				require.Equal(t, aicommon.SingleModelRun, aicommon.GetSingleModelAction(test.name))
 				if mode == "failure" {
 					require.ErrorContains(t, err, "mini task provider failed")
 					require.Nil(t, result)

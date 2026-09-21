@@ -19,10 +19,6 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
-func fixOptionsWithServiceName(serviceName string, opts ...aicommon.ConfigOption) []aicommon.ConfigOption {
-	return sessionruntime.FixOptionsWithServiceName(serviceName, opts...)
-}
-
 func ConvertYPBAIStartParamsToReActConfig(i *ypb.AIStartParams) []aicommon.ConfigOption {
 	return sessionruntime.ConvertStartParamsToReActConfig(i)
 }
