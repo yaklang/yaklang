@@ -8,6 +8,7 @@ import (
 	"io"
 	"path/filepath"
 	"strings"
+	"unicode/utf8"
 
 	excelize "github.com/xuri/excelize/v2"
 )
@@ -63,6 +64,9 @@ func (w *Workspace) ReadLines(ctx context.Context, name string, startLine, endLi
 			return nil, fail("input_range_invalid", resource.ResourceId)
 		}
 		if line != "" {
+			if !utf8.ValidString(line) || strings.ContainsRune(line, '\x00') {
+				return nil, fail("input_text_required", resource.ResourceId)
+			}
 			lineNumber++
 			if lineNumber >= startLine && lineNumber <= endLine {
 				lines = append(lines, strings.TrimSuffix(strings.TrimSuffix(line, "\n"), "\r"))
@@ -74,6 +78,9 @@ func (w *Workspace) ReadLines(ctx context.Context, name string, startLine, endLi
 		if readErr != nil {
 			return nil, fail("input_read_failed", resource.ResourceId)
 		}
+	}
+	if err := w.check(ctx); err != nil {
+		return nil, err
 	}
 	w.event("input.file.access", Event{ResourceID: resource.ResourceId, Path: name, Operation: "read_lines", BytesRead: int64(bytesRead)})
 	return map[string]any{

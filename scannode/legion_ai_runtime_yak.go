@@ -9,6 +9,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"path"
 	"strings"
 	"sync"
 	"time"
@@ -667,10 +668,37 @@ func aiApplicationMaterialReferences(
 	if release.GetCapabilityProfile() == legionForgeHTTPProfile && len(requestRefs) == 0 {
 		return nil, fmt.Errorf("HTTP Forge release produced no bounded request evidence")
 	}
-	if release.GetCapabilityProfile() == legionForgeDiscoveryProfile && len(requestRefs) == 0 {
-		return nil, fmt.Errorf("discovery Forge release produced no network observations")
+	if release.GetCapabilityProfile() == legionForgeDiscoveryProfile {
+		dns, tcp, labels := false, false, false
+		requiredLabels := map[string]bool{}
+		for _, parameter := range release.GetParameters() {
+			if parameter.Key == "labels" {
+				labels = true
+				for _, label := range strings.Split(parameter.Value, ",") {
+					requiredLabels[strings.ToLower(strings.TrimSpace(label))] = false
+				}
+			}
+		}
+		for _, ref := range requestRefs {
+			dns = dns || ref.Kind == "dns_lookup"
+			tcp = tcp || ref.Kind == "tcp_connect_scan"
+			if ref.Kind == "dns_lookup" && len(ref.Operations) == 2 {
+				requiredLabels[strings.TrimPrefix(ref.Operations[1], "label:")] = true
+			}
+		}
+		if !dns || (!labels && !tcp) {
+			return nil, fmt.Errorf("discovery Forge did not perform the required DNS/TCP observations")
+		}
+		for _, observed := range requiredLabels {
+			if !observed {
+				return nil, fmt.Errorf("discovery Forge did not query all authorized labels")
+			}
+		}
 	}
 	if release.GetCapabilityProfile() == legionForgeEvidenceProfile {
+		if len(pathKeys) == 0 {
+			return nil, fmt.Errorf("evidence Forge requires an authorized file")
+		}
 		for resourcePath := range pathKeys {
 			read := false
 			for _, material := range result {
@@ -678,7 +706,7 @@ func aiApplicationMaterialReferences(
 					continue
 				}
 				for _, operation := range material.Operations {
-					if operation != "metadata" {
+					if legionEvidenceOperationMatches(resourcePath, operation) {
 						read = true
 					}
 				}
@@ -689,6 +717,21 @@ func aiApplicationMaterialReferences(
 		}
 	}
 	return result, nil
+}
+
+func legionEvidenceOperationMatches(resourcePath, operation string) bool {
+	switch strings.ToLower(path.Ext(resourcePath)) {
+	case ".pcap", ".pcapng":
+		return operation == "parse_packet_capture"
+	case ".apk":
+		return operation == "parse_android_package"
+	case ".xlsx":
+		return operation == "extract_xlsx"
+	case ".txt", ".json", ".md", ".csv", ".log":
+		return operation == "read" || operation == "read_lines"
+	default:
+		return false
+	}
 }
 
 var executeYakAIForge = yak.ExecuteForge

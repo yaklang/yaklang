@@ -23,19 +23,26 @@ import (
 const legionDiscoveryBudget = 512
 
 type legionForgeDiscoveryRuntime struct {
-	ctx       context.Context
-	target    string
-	ports     []int
-	addresses []net.IP
-	lookup    legionForgeLookupIPFunc
-	dial      func(context.Context, string, string) (net.Conn, error)
-	mu        sync.Mutex
-	remaining int
-	calls     int
-	evidence  []aiApplicationMaterialReference
+	ctx           context.Context
+	target        string
+	ports         []int
+	addresses     []net.IP
+	allowedLabels map[string]struct{}
+	lookup        legionForgeLookupIPFunc
+	dial          func(context.Context, string, string) (net.Conn, error)
+	mu            sync.Mutex
+	remaining     int
+	calls         int
+	evidence      []aiApplicationMaterialReference
 }
 
 func legionForgeDiscoveryParameters(release *aiv1.ContextForgeRelease) (string, []int, error) {
+	if len(release.GetParameters()) > 16 {
+		return "", nil, fmt.Errorf("discovery input field limit exceeded")
+	}
+	if _, err := legionForgeDiscoveryLabels(release); err != nil {
+		return "", nil, err
+	}
 	target, ports := "", "80,443"
 	for _, p := range release.GetParameters() {
 		if p.GetKey() == "target-host" || p.GetKey() == "ports" {
@@ -55,6 +62,34 @@ func legionForgeDiscoveryParameters(release *aiv1.ContextForgeRelease) (string, 
 	}
 	parsed, err := parseLegionDiscoveryPorts(ports)
 	return host, parsed, err
+}
+
+// Labels are user-bound release inputs, never a model-selected expansion of scope.
+func legionForgeDiscoveryLabels(release *aiv1.ContextForgeRelease) (map[string]struct{}, error) {
+	labels := make(map[string]struct{})
+	for _, p := range release.GetParameters() {
+		if p.GetKey() != "labels" {
+			continue
+		}
+		if p.GetValueKind() != "string" {
+			return nil, fmt.Errorf("discovery labels must be a string")
+		}
+		parts := strings.Split(p.GetValue(), ",")
+		if len(parts) > 16 {
+			return nil, fmt.Errorf("discovery permits at most 16 labels")
+		}
+		for _, raw := range parts {
+			label := strings.ToLower(strings.TrimSpace(raw))
+			if !legionDiscoveryLabel(label) {
+				return nil, fmt.Errorf("discovery labels must be single DNS labels")
+			}
+			if _, exists := labels[label]; exists {
+				return nil, fmt.Errorf("discovery labels must be unique")
+			}
+			labels[label] = struct{}{}
+		}
+	}
+	return labels, nil
 }
 
 func normalizeLegionDiscoveryHost(raw string) (string, error) {
@@ -183,9 +218,19 @@ func newLegionForgeDiscoveryRuntime(ctx context.Context, target string, ports []
 func (r *legionForgeDiscoveryRuntime) record(kind string, result map[string]any) {
 	raw, _ := json.Marshal(result)
 	digest := sha256.Sum256(raw)
+	operations := []string{kind}
+	if kind == "dns_lookup" {
+		host, _ := result["host"].(string)
+		if strings.HasSuffix(host, "."+r.target) {
+			label := strings.TrimSuffix(host, "."+r.target)
+			if _, allowed := r.allowedLabels[label]; allowed && legionDiscoveryLabel(label) {
+				operations = append(operations, "label:"+label)
+			}
+		}
+	}
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	r.evidence = append(r.evidence, aiApplicationMaterialReference{Kind: kind, InputKey: "target-host", ResourceID: fmt.Sprintf("discovery_%x", digest[:16]), SHA256: fmt.Sprintf("%x", digest), Operations: []string{kind}})
+	r.evidence = append(r.evidence, aiApplicationMaterialReference{Kind: kind, InputKey: "target-host", ResourceID: fmt.Sprintf("discovery_%x", digest[:16]), SHA256: fmt.Sprintf("%x", digest), Operations: operations})
 }
 
 func (r *legionForgeDiscoveryRuntime) applicationHTTPMaterialReferences() []aiApplicationMaterialReference {
@@ -228,6 +273,9 @@ func (r *legionForgeDiscoveryRuntime) execute(ctx context.Context, name string, 
 		addresses := r.addresses
 		label := strings.ToLower(strings.TrimSpace(utils.InterfaceToString(params["label"])))
 		if label != "" {
+			if _, allowed := r.allowedLabels[label]; !allowed {
+				return nil, fmt.Errorf("DNS label is outside the user-authorized labels")
+			}
 			if net.ParseIP(r.target) != nil || !legionDiscoveryLabel(label) {
 				return nil, fmt.Errorf("DNS label must be one bounded subdomain label")
 			}
@@ -301,6 +349,10 @@ func legionForgeDiscoveryOptions(ctx context.Context, release *aiv1.ContextForge
 		return nil, nil, err
 	}
 	runtime, err := newLegionForgeDiscoveryRuntime(ctx, host, ports, defaultLegionForgeLookupIP)
+	if err != nil {
+		return nil, nil, err
+	}
+	runtime.allowedLabels, err = legionForgeDiscoveryLabels(release)
 	if err != nil {
 		return nil, nil, err
 	}
