@@ -2,7 +2,7 @@ package node
 
 import (
 	"github.com/pkg/errors"
-	"github.com/tevino/abool"
+	"github.com/yaklang/yaklang/common/utils/atomicbool"
 )
 
 type tickerFunc struct {
@@ -11,7 +11,7 @@ type tickerFunc struct {
 	F               func()
 
 	first         bool
-	firstExecuted *abool.AtomicBool
+	firstExecuted *atomicbool.AtomicBool
 	currentMod    int
 }
 
@@ -24,7 +24,7 @@ func (n *NodeBase) RegisterTickerFunc(name string, intervalSec int, first bool, 
 		Name:            name,
 		IntervalSeconds: intervalSec,
 		first:           first,
-		firstExecuted:   abool.NewBool(false),
+		firstExecuted:   atomicbool.NewBool(false),
 		F:               f,
 	})
 	return nil

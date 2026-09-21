@@ -3,7 +3,7 @@ package node
 import (
 	"context"
 	"fmt"
-	"github.com/tevino/abool"
+	"github.com/yaklang/yaklang/common/utils/atomicbool"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -102,7 +102,7 @@ func TestNodeHeartbeatRequiresPolicyAndReportsEffectiveUnlimited(t *testing.T) {
 func TestInvalidManagedPolicyRetainsRegisteredSession(t *testing.T) {
 	provider := &policyStatusProvider{maximum: 2, reject: true}
 	transport := &policyTestTransport{response: HeartbeatResponse{ResourcePolicy: &ResourcePolicy{MaxRunningJobs: 3}}}
-	n := &NodeBase{rootCtx: context.Background(), requestTimeout: time.Second, transport: transport, statusProvider: provider, isRegistered: abool.NewBool(true), session: SessionState{SessionID: "session", SessionToken: "token", ResourcePolicyRequired: true}}
+	n := &NodeBase{rootCtx: context.Background(), requestTimeout: time.Second, transport: transport, statusProvider: provider, isRegistered: atomicbool.NewBool(true), session: SessionState{SessionID: "session", SessionToken: "token", ResourcePolicyRequired: true}}
 	if err := n.heartbeat(); err != nil {
 		t.Fatalf("invalid update must not trigger session replacement: %v", err)
 	}

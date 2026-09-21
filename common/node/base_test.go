@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/tevino/abool"
+	"github.com/yaklang/yaklang/common/utils/atomicbool"
 )
 
 func TestNodeBaseShutdownReportsSessionEnd(t *testing.T) {
@@ -19,7 +19,7 @@ func TestNodeBaseShutdownReportsSessionEnd(t *testing.T) {
 		NodeId:         "node-1",
 		requestTimeout: time.Second,
 		transport:      transport,
-		isRegistered:   abool.NewBool(true),
+		isRegistered:   atomicbool.NewBool(true),
 		session: SessionState{
 			SessionID:    "session-1",
 			SessionToken: "token-1",
@@ -61,7 +61,7 @@ func TestNodeBaseShutdownWithoutSessionStillCancels(t *testing.T) {
 		cancel:         cancel,
 		requestTimeout: time.Second,
 		transport:      transport,
-		isRegistered:   abool.NewBool(false),
+		isRegistered:   atomicbool.NewBool(false),
 	}
 
 	node.Shutdown()

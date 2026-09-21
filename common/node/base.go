@@ -7,9 +7,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/tevino/abool"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/spec"
+	"github.com/yaklang/yaklang/common/utils/atomicbool"
 )
 
 const sessionRetryInterval = 3 * time.Second
@@ -49,7 +49,7 @@ type NodeBase struct {
 
 	tickerFuncs *sync.Map
 
-	isRegistered *abool.AtomicBool
+	isRegistered *atomicbool.AtomicBool
 
 	sessionMu sync.RWMutex
 	session   SessionState
@@ -104,7 +104,7 @@ func NewNodeBase(cfg BaseConfig) (*NodeBase, error) {
 		tickerInterval:       normalized.TickerInterval,
 		postBootstrapHook:    normalized.PostBootstrapHook,
 		tickerFuncs:          new(sync.Map),
-		isRegistered:         abool.NewBool(false),
+		isRegistered:         atomicbool.NewBool(false),
 		instanceLock:         instanceLock,
 	}
 	return node, nil

@@ -2,121 +2,16 @@ package utils
 
 import (
 	"errors"
-	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
+	"github.com/yaklang/yaklang/common/utils/appconfig"
 	"reflect"
-	"sort"
 	"strconv"
 	"strings"
 )
 
-func ParseAppTagToOptions(template any, ext ...map[string]string) (configInfo []*ypb.ThirdPartyAppConfigItemTemplate, err error) {
-	extTag := make(map[string]string)
-	for _, m := range ext {
-		for k, v := range m {
-			extTag[k] = v
-		}
-	}
-	defer func() {
-		if r := recover(); r != nil {
-			err = Error(r)
-		}
-	}()
-	typeRef := reflect.TypeOf(template)
-	varRef := reflect.ValueOf(template)
-	if typeRef.Kind() == reflect.Ptr {
-		typeRef = typeRef.Elem()
-		varRef = varRef.Elem()
-	} else {
-		return configInfo, errors.New("template struct must be a pointer")
-	}
-	if typeRef.Kind() != reflect.Struct {
-		return configInfo, errors.New("template struct must be a struct")
-	}
-	idMap := make(map[*ypb.ThirdPartyAppConfigItemTemplate]int)
-	for i := 0; i < typeRef.NumField(); i++ {
-		field := typeRef.Field(i)
-		tag := field.Tag
-		appTag := tag.Get("app")
-		parseKv := func(item *ypb.ThirdPartyAppConfigItemTemplate, tag string) error {
-			splits := strings.Split(tag, ",")
-			for _, split := range splits {
-				if strings.Contains(split, ":") {
-					kv := strings.Split(split, ":")
-					if len(kv) == 2 {
-						switch kv[0] {
-						case "id":
-							id, err := strconv.Atoi(kv[1])
-							if err != nil {
-								return Errorf("invalid id %s", kv[1])
-							}
-							idMap[item] = id
-						case "name":
-							item.Name = kv[1]
-						case "desc":
-							item.Desc = kv[1]
-						case "required":
-							item.Required = kv[1] == "true"
-						case "type":
-							item.Type = kv[1]
-						case "default":
-							item.DefaultValue = kv[1]
-						case "verbose":
-							item.Verbose = kv[1]
-						case "extra":
-							item.Extra = kv[1]
-						default:
-							return Errorf("invalid tag %s", kv[0])
-						}
-					}
-				}
-			}
-			return nil
-		}
-		if appTag != "" {
-			item := &ypb.ThirdPartyAppConfigItemTemplate{}
-			err = parseKv(item, appTag)
-			if err != nil {
-				return nil, err
-			}
-			//if item.Name == "" {
-			//	item.Name = field.Name
-			//}
-			if item.Name == "" {
-				item.Name = field.Name
-			}
-			if item.Verbose == "" {
-				item.Verbose = item.Name
-			}
-			if item.Type == "" {
-				typeName := ""
-				switch field.Type.Kind().String() {
-				case "string":
-					typeName = "string"
-				case "int", "int8", "int16", "int32", "int64", "uint", "uint8", "uint16", "uint32", "uint64", "float32", "float64":
-					typeName = "number"
-				case "bool":
-					typeName = "bool"
-				default:
-					return nil, errors.New("unsupported field type")
-				}
-				item.Type = typeName
-			}
-			if !StringArrayContains([]string{"string", "number", "bool", "list"}, item.Type) {
-				return nil, Errorf("invalid type %s", item.Type)
-			}
-			if extTags, ok := extTag[item.Name]; ok {
-				err := parseKv(item, extTags)
-				if err != nil {
-					return nil, err
-				}
-			}
-			configInfo = append(configInfo, item)
-		}
-	}
-	sort.Slice(configInfo, func(i, j int) bool {
-		return idMap[configInfo[i]] < idMap[configInfo[j]]
-	})
-	return configInfo, nil
+// ParseAppTagToOptions parses application tags into transport-independent descriptors.
+// Service callers convert these descriptors to their wire format at the boundary.
+func ParseAppTagToOptions(template any, ext ...map[string]string) ([]*appconfig.FieldDescriptor, error) {
+	return appconfig.ParseAppTagToOptions(template, ext...)
 }
 
 func ExportAppConfigToMap(ins any) (map[string]string, error) {

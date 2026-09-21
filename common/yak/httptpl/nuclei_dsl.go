@@ -16,7 +16,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/asaskevich/govalidator"
 	"github.com/davecgh/go-spew/spew"
 	"github.com/dgrijalva/jwt-go"
 	"github.com/hashicorp/go-version"
@@ -27,6 +26,7 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/jodatime"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
+	"github.com/yaklang/yaklang/common/utils/textvalidate"
 	"github.com/yaklang/yaklang/common/yak/antlr4yak"
 	"github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm"
 	"github.com/yaklang/yaklang/common/yak/yaklang"
@@ -608,11 +608,11 @@ var nucleiDSLFunctions = map[string]interface{}{
 	},
 	"to_number": func(i ...interface{}) interface{} {
 		raw := strings.Join(utils.InterfaceToStringSlice(i), "")
-		if govalidator.IsInt(raw) {
+		if textvalidate.IsInt(raw) {
 			return atoi(raw)
 		}
 
-		if govalidator.IsFloat(raw) {
+		if textvalidate.IsFloat(raw) {
 			return atof(raw)
 		}
 

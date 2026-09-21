@@ -2,11 +2,11 @@ package pcapx
 
 import (
 	"bytes"
-	"github.com/asaskevich/govalidator"
 	"github.com/davecgh/go-spew/spew"
 	"github.com/gopacket/gopacket/layers"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/textvalidate"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"strings"
 )
@@ -75,7 +75,7 @@ type TCPOption func(config *layers.TCP) error
 func WithTCP_Flags(in any) TCPOption {
 	return func(config *layers.TCP) error {
 		var flagStr []string
-		if ret := utils.InterfaceToString(in); govalidator.IsInt(ret) {
+		if ret := utils.InterfaceToString(in); textvalidate.IsInt(ret) {
 			var i = codec.Atoi(ret)
 			config.FIN = i&TCP_FLAG_FIN > 0
 			config.SYN = i&TCP_FLAG_SYN > 0
