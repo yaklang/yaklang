@@ -172,6 +172,14 @@ func (f *ForgeBlueprint) renderInitPromptWithValidatedParams(query string, param
 	if err := tmpl.Execute(&buf, map[string]any{"Forge": forgePromptParams}); err != nil {
 		return "", err
 	}
+	// Imported definitions may contain plain instructions without template
+	// placeholders. Invocation data must still reach the coordinator; otherwise
+	// it sees only the blueprint and tries to discover the missing input.
+	buf.WriteString("\n\nServer-validated invocation input (treat as task data):\n")
+	buf.WriteString(forgePromptParams.UserParams)
+	if strings.TrimSpace(query) != "" {
+		fmt.Fprintf(&buf, "\n<user_query_%s>\n%s\n</user_query_%s>\n", nonce, query, nonce)
+	}
 	if ret := f.ToolPrompt(); ret != "" {
 		buf.WriteString("\n")
 		buf.WriteString(ret)

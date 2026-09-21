@@ -7,6 +7,24 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
+func TestValidatedInvocationRetainsInputWithoutTemplatePlaceholders(t *testing.T) {
+	blueprint := &ForgeBlueprint{
+		InitializePrompt:         "Analyze the supplied email without sending it.",
+		ParameterRuleYaklangCode: `panic("must not execute")`,
+	}
+	prompt, _, err := blueprint.GenerateFirstPromptWithMemoryOptionWithQueryAndParams(
+		"Return the final analysis", []*ypb.ExecParamItem{{Key: "email-content", Value: "SUBJECT: urgent password verification"}},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, expected := range []string{"Analyze the supplied email", "Return the final analysis", "email-content", "SUBJECT: urgent password verification", "<user_params_"} {
+		if !strings.Contains(prompt, expected) {
+			t.Fatalf("missing invocation data %q: %s", expected, prompt)
+		}
+	}
+}
+
 func TestGenerateFirstPromptWithValidatedParamsDoesNotParseImportedCLI(t *testing.T) {
 	blueprint := &ForgeBlueprint{
 		InitializePrompt:         `query={{.Forge.UserQuery}} params={{.Forge.UserParams}}`,
