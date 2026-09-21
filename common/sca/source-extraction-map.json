@@ -4794,15 +4794,19 @@
     },
     {
       "local_file": "common/sca/report.go",
-      "sha256": "7733d906226ec4b3990193eef35f4596ca1a7292332856ef268178adf5ee559f",
+      "sha256": "db61ee7ca5173cba606ed48dc71469b757659677b7335c09e47c35cc2dc414ca",
       "symbols": [
         {
+          "name": "chargeAndSortPackages",
+          "line": 76
+        },
+        {
           "name": "fillReport",
-          "line": 11
+          "line": 118
         },
         {
           "name": "manifestEvidence",
-          "line": 226
+          "line": 408
         }
       ],
       "decision": "REWRITE",

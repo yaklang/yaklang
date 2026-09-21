@@ -43,6 +43,78 @@ func requirementKey(p *dxtypes.Package) string {
 	return string(raw)
 }
 
+type reportSortKey struct {
+	id, loc, req string
+}
+
+func locationKeyCharge(p *dxtypes.Package) int64 {
+	n := 1 + len(p.Locations)
+	c, err := budget.SizeMul(n, budget.SizeObject+24)
+	if err != nil {
+		return -1
+	}
+	return budget.SizeSlice + c
+}
+
+func requirementKeyCharge(p *dxtypes.Package) int64 {
+	n := budget.SizeSlice
+	for _, q := range p.Requirements {
+		n += budget.SizeObject
+		n += budget.SizeOfString(q.Target)
+		n += budget.SizeOfString(q.Constraint)
+		n += budget.SizeOfString(q.Scope)
+		n += budget.SizeOfString(q.From)
+		n += budget.SizeOfString(q.Group)
+		n += budget.SizeOfString(q.Operator)
+		n += budget.SizeOfString(q.Condition)
+		n += budget.SizeOfStrings(q.Candidates)
+		n += budget.SizeOfStrings(q.Resolved)
+	}
+	return n
+}
+
+func chargeAndSortPackages(st *budget.State, pkgs []*dxtypes.Package) error {
+	n, err := budget.SizeMul(3, budget.SizeOfSortIndex(len(pkgs)))
+	if err != nil {
+		return err
+	}
+	if err := st.Result(n); err != nil {
+		return err
+	}
+	keys := make([]reportSortKey, len(pkgs))
+	for i, p := range pkgs {
+		p.EnsureDetails()
+		need := budget.SizeOfBytes(64) + locationKeyCharge(p) + requirementKeyCharge(p)
+		if need < 0 {
+			return scanerr.New(scanerr.ResourceLimit, "result memory estimate")
+		}
+		if err := st.Result(need); err != nil {
+			return err
+		}
+		keys[i] = reportSortKey{p.Identifier(), locationKey(p), requirementKey(p)}
+	}
+	order := make([]int, len(pkgs))
+	for i := range order {
+		order[i] = i
+	}
+	sort.SliceStable(order, func(i, j int) bool {
+		a, b := keys[order[i]], keys[order[j]]
+		if a.id != b.id {
+			return a.id < b.id
+		}
+		if a.loc != b.loc {
+			return a.loc < b.loc
+		}
+		return a.req < b.req
+	})
+	sorted := make([]*dxtypes.Package, len(pkgs))
+	for i, j := range order {
+		sorted[i] = pkgs[j]
+	}
+	copy(pkgs, sorted)
+	return nil
+}
+
 func fillReport(r *model.Report, pkgs []*dxtypes.Package, l ResourceLimits, shared ...*budget.State) []error {
 	st := &budget.State{Limits: l}
 	if len(shared) > 0 && shared[0] != nil {
@@ -79,15 +151,11 @@ func fillReport(r *model.Report, pkgs []*dxtypes.Package, l ResourceLimits, shar
 			return p.Requirements[i].Scope < p.Requirements[j].Scope
 		})
 	}
-	sort.SliceStable(pkgs, func(i, j int) bool {
-		if a, b := pkgs[i].Identifier(), pkgs[j].Identifier(); a != b {
-			return a < b
-		}
-		if a, b := locationKey(pkgs[i]), locationKey(pkgs[j]); a != b {
-			return a < b
-		}
-		return requirementKey(pkgs[i]) < requirementKey(pkgs[j])
-	})
+	if err := chargeAndSortPackages(st, pkgs); err != nil {
+		r.Complete = false
+		r.Diagnostics = append(r.Diagnostics, model.Diagnostic{Code: "resource_limit", Stage: "normalize", Reason: "result memory estimate", Incomplete: true})
+		return []error{scanerr.New(scanerr.ResourceLimit, "result memory estimate")}
+	}
 	observations := map[*dxtypes.Package]string{}
 	actual := map[*dxtypes.Package]bool{}
 	native := map[[3]string]string{}
