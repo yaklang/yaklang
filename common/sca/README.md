@@ -1,5 +1,7 @@
 # SCA
 
+本内核为后续独立的依赖清除功能提供组件身份、依赖关系和来源证据；当前只做分析，不修改项目清单、锁文件或删除依赖。
+
 SCA 从调用方提供的只读文件系统快照提取组件、出现位置、依赖声明和诊断。`common/sca/...` 的生产及测试闭包仅使用标准库和仓库内部叶子包，不需要第三方模块或 CGO。
 
 `ScanReport(ctx, fs.FS, opts...)` 返回结构化报告；`ScanFilesystem` 保留旧包列表接口。20 类分析器及固定语法边界见 [function-contracts.json](function-contracts.json)。Docker、镜像、Git 获取入口已移除，调用方须先提供快照；POM 只访问快照中的父级、模块和显式仓库材料，JAR 不查询远端坐标。

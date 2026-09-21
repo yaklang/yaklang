@@ -497,7 +497,9 @@ jobs:
             ${{ runner.os }}-essential-gobuild-
 
       - name: Test ScanNode packages
-        run: go test -count=1 -timeout 10m ./scannode/...
+        run: |
+          go test -count=1 -timeout 10s ./common/dockerhttp ./common/thirdpartyservices
+          go test -count=1 -timeout 10m ./scannode/...
 
       - name: Test Legion Node entrypoint
         run: go test -count=1 -timeout 10m ./cmd/legion-smoke-node
@@ -812,6 +814,8 @@ jobs:
                 {"package": "./common/domainextractor", "timeout": "20s"},
                 {"package": "./common/cve", "timeout": "20s", "run": "^TestQueryCVE.*$"},
                 {"package": "./common/sca/...", "timeout": "20s"},
+                {"package": "./common/dockerhttp", "timeout": "10s"},
+                {"package": "./common/thirdpartyservices", "timeout": "10s", "run": "^TestPullServiceImagesThroughEngineHTTP$"},
                 {"package": "./common/openapi/...", "timeout": "30s"},
                 {"package": "./common/pcapx/pcaputil/...", "timeout": "15s"},
                 {"package": "./common/yso/...", "timeout": "20s"},

@@ -29,7 +29,6 @@ const (
 	AIRuntimeHostCapabilityKey = "ai.runtime.host.v1"
 	runtimeHostSpecVersion     = "v2"
 	runtimeHostReplyPrefix     = "legion.realtime.ai.runtime."
-	runtimeHostCleanupLabel    = "legion.ai.runtime.cleanup_key"
 	runtimeHostLeaseLabel      = "legion.ai.runtime.lease_token"
 	runtimeHostSessionLabel    = "legion.ai.runtime.session_id"
 	runtimeHostReleaseLabel    = "legion.ai.runtime.release_id"
