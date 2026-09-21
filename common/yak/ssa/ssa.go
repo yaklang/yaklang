@@ -247,6 +247,7 @@ type Program struct {
 	Language        ssaconfig.Language
 	magicMethodName []string
 	// from pom.xml file
+	metaMu      sync.Mutex
 	SCAPackages []*dxtypes.Package
 
 	// filename and data,
@@ -278,6 +279,7 @@ type Program struct {
 
 	// TODO: this four map should need????!
 	editorStack *omap.OrderedMap[string, *memedit.MemEditor]
+	fileListMu  sync.Mutex
 	FileList    map[string]string // file-name and file hash
 	LineCount   int
 
@@ -287,6 +289,7 @@ type Program struct {
 	Cache *ProgramCache
 
 	finished            bool
+	deferredBuildsMu    sync.Mutex
 	deferredBuilds      *omap.OrderedMap[string, *deferredBuildTask]
 	deferredBuildTotal  int
 	currentCompileUnit  string
@@ -353,7 +356,8 @@ type Program struct {
 	ProjectConfig map[string]*ProjectConfig
 
 	// Template Language
-	Template map[string]tl.TemplateGeneratedInfo
+	templateMu sync.Mutex
+	Template   map[string]tl.TemplateGeneratedInfo
 
 	config *LanguageConfig
 	ctx    context.Context

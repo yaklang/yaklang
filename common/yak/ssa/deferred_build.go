@@ -47,6 +47,8 @@ func (prog *Program) registerDeferredBuildTask(task *deferredBuildTask) *deferre
 	if app == nil {
 		app = prog
 	}
+	app.deferredBuildsMu.Lock()
+	defer app.deferredBuildsMu.Unlock()
 	if app.deferredBuilds == nil {
 		app.deferredBuilds = omap.NewEmptyOrderedMap[string, *deferredBuildTask]()
 	}
@@ -101,6 +103,8 @@ func (prog *Program) DeferredBuildCount() int {
 	if app == nil {
 		app = prog
 	}
+	app.deferredBuildsMu.Lock()
+	defer app.deferredBuildsMu.Unlock()
 	return app.deferredBuildTotal
 }
 
@@ -112,25 +116,37 @@ func (prog *Program) RunDeferredBuildsWithCallback(afterEach func(index int, tot
 	if app == nil {
 		app = prog
 	}
-	if app.deferredBuilds == nil {
-		return true
-	}
-	total := app.deferredBuilds.Len()
-	for index := 0; index < app.deferredBuilds.Len(); index++ {
+	index := 0
+	for {
+		app.deferredBuildsMu.Lock()
+		if app.deferredBuilds == nil {
+			app.deferredBuildsMu.Unlock()
+			return true
+		}
+		total := app.deferredBuilds.Len()
+		if index >= total {
+			app.deferredBuildsMu.Unlock()
+			break
+		}
 		task, ok := app.deferredBuilds.GetByIndex(index)
+		app.deferredBuildsMu.Unlock()
 		if !ok || task == nil {
+			index++
 			continue
 		}
 		task.Build()
 		task.release()
 		if afterEach != nil {
-			if app.deferredBuilds.Len() > total {
+			app.deferredBuildsMu.Lock()
+			if app.deferredBuilds != nil && app.deferredBuilds.Len() > total {
 				total = app.deferredBuilds.Len()
 			}
+			app.deferredBuildsMu.Unlock()
 			if !afterEach(index+1, total) {
 				return false
 			}
 		}
+		index++
 	}
 	app.releaseDeferredBuildTasks()
 	return true
@@ -144,7 +160,9 @@ func (prog *Program) releaseDeferredBuildTasks() {
 	if app == nil {
 		app = prog
 	}
+	app.deferredBuildsMu.Lock()
 	app.deferredBuilds = nil
+	app.deferredBuildsMu.Unlock()
 }
 
 // RunDeferredBuildsForUnits 只执行归属给定编译单元的延迟构建任务，执行后从队列移除。
@@ -177,9 +195,6 @@ func (prog *Program) RunDeferredBuildsForUnitsWithUnitCallback(
 	if app == nil {
 		app = prog
 	}
-	if app.deferredBuilds == nil {
-		return true
-	}
 	units := make(map[string]struct{}, len(unitKeys))
 	for _, unitKey := range unitKeys {
 		if unitKey != "" {
@@ -190,21 +205,16 @@ func (prog *Program) RunDeferredBuildsForUnitsWithUnitCallback(
 		return true
 	}
 
+	app.deferredBuildsMu.Lock()
+	if app.deferredBuilds == nil {
+		app.deferredBuildsMu.Unlock()
+		return true
+	}
+
 	// Count tasks per unit and total, in a single pass over the keys.
 	total := 0
 	unitRemaining := make(map[string]int, len(units))
 	keys := app.deferredBuilds.Keys()
-	for _, id := range keys {
-		task, ok := app.deferredBuilds.Get(id)
-		if !ok || task == nil {
-			continue
-		}
-		if _, match := units[task.unitKey]; match {
-			total++
-			unitRemaining[task.unitKey]++
-		}
-	}
-
 	queue := make([]string, 0, len(keys))
 	queued := make(map[string]struct{}, len(keys))
 	for _, id := range keys {
@@ -215,15 +225,20 @@ func (prog *Program) RunDeferredBuildsForUnitsWithUnitCallback(
 		if _, match := units[task.unitKey]; !match {
 			continue
 		}
+		total++
+		unitRemaining[task.unitKey]++
 		queue = append(queue, id)
 		queued[id] = struct{}{}
 	}
+	app.deferredBuildsMu.Unlock()
 
 	completed := 0
 	for len(queue) > 0 {
 		id := queue[0]
 		queue = queue[1:]
+		app.deferredBuildsMu.Lock()
 		task, ok := app.deferredBuilds.Get(id)
+		app.deferredBuildsMu.Unlock()
 		if !ok || task == nil {
 			continue
 		}
@@ -239,13 +254,9 @@ func (prog *Program) RunDeferredBuildsForUnitsWithUnitCallback(
 		task.Build()
 		app.currentCompileUnit = previousUnit
 		task.release()
+		app.deferredBuildsMu.Lock()
 		app.deferredBuilds.Delete(id)
-		completed++
-		if afterEach != nil {
-			if !afterEach(completed, total) {
-				return false
-			}
-		}
+		var newcomers []string
 		for _, nid := range app.deferredBuilds.Keys() {
 			if _, seen := queued[nid]; seen {
 				continue
@@ -258,9 +269,17 @@ func (prog *Program) RunDeferredBuildsForUnitsWithUnitCallback(
 				continue
 			}
 			queued[nid] = struct{}{}
-			queue = append(queue, nid)
+			newcomers = append(newcomers, nid)
 			total++
 			unitRemaining[ntask.unitKey]++
+		}
+		app.deferredBuildsMu.Unlock()
+		queue = append(queue, newcomers...)
+		completed++
+		if afterEach != nil {
+			if !afterEach(completed, total) {
+				return false
+			}
 		}
 		// Per-unit completion: decrement this unit's remaining count.
 		// When it reaches zero, all tasks for this unit are done.

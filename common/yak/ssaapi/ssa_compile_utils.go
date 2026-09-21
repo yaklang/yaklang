@@ -367,12 +367,12 @@ func (c *Config) GetFileHandler(
 	preHandlerFiles []string,
 	preHandlerFileSet map[string]struct{},
 ) <-chan *ssareducer.FileContent {
-	return c.getFileHandlerWithOrder(filesystem, preHandlerFiles, handlerFilesMap, c.GetCompileASTSequence())
+	return c.getFileHandlerWithOrder(filesystem, preHandlerFiles, preHandlerFileSet, c.GetCompileASTSequence())
 }
 
 func (c *Config) getFileHandlerWithOrder(
 	filesystem filesys_interface.FileSystem, preHandlerFiles []string,
-	handlerFilesMap map[string]struct{}, order ssareducer.ASTSequenceType,
+	preHandlerFileSet map[string]struct{}, order ssareducer.ASTSequenceType,
 ) <-chan *ssareducer.FileContent {
 	parser := newAntlrASTParseWorker(c)
 	parse := func(path string, content []byte, store *utils.SafeMap[any]) (ssa.FrontAST, error) {

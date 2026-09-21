@@ -37,6 +37,8 @@ func (p *Program) NewFunctionWithParent(name string, parent *Function) *Function
 		SideEffects: make([]*FunctionSideEffect, 0),
 		builder:     nil,
 	}
+	f.Type = NewFunctionType("", nil, nil, false)
+	f.Type.This = f
 	f.SetName(name)
 	f.SetProgram(p)
 	p.SetVirtualRegister(f)
@@ -239,8 +241,11 @@ func (f *Function) SetMethod(is bool, objType Type) {
 		f.Type = NewFunctionType("", nil, nil, false)
 		f.Type.This = f
 	}
-	f.Type.IsMethod = is
-	f.Type.ObjectType = objType
+	ft := f.Type
+	ft.methodLock.Lock()
+	ft.IsMethod = is
+	ft.ObjectType = objType
+	ft.methodLock.Unlock()
 }
 
 func (f *Function) SetVerboseName(name string) {

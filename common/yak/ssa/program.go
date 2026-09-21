@@ -155,6 +155,11 @@ func (prog *Program) createSubProgram(name string, kind ssadb.ProgramKind, path 
 	prog.AddUpStream(subProg)
 	prog.Application.AddUpStream(subProg)
 	subProg.Application = prog.Application
+	if prog.Application != nil && prog.Application.Build != nil {
+		subProg.Build = prog.Application.Build
+	} else {
+		subProg.Build = prog.Build
+	}
 	subProg.Cache = prog.Cache
 	subProg.NameCache = prog.NameCache
 	subProg.fixImportCallback = make([]func(), 0)
@@ -230,15 +235,17 @@ func (prog *Program) GetLibrary(name string) (*Program, bool) {
 	currentEditor := prog.GetCurrentEditor()
 	// this program has current file
 	hasFile := func(p *Program) bool {
-		if currentEditor == nil {
+		if currentEditor == nil || p == nil {
 			return false
 		}
-		if hash, ok := p.FileList[currentEditor.GetUrl()]; ok {
-			if hash == currentEditor.GetIrSourceHash() {
-				return true
-			}
+		owner := app
+		if owner == nil {
+			owner = p
 		}
-		return false
+		owner.fileListMu.Lock()
+		hash, ok := p.FileList[currentEditor.GetUrl()]
+		owner.fileListMu.Unlock()
+		return ok && hash == currentEditor.GetIrSourceHash()
 	}
 
 	// contain in memory
@@ -507,16 +514,60 @@ func (p *Program) PopEditor(save bool) {
 	}
 	e := p.editorStack.Pop()
 	if save && e != nil {
-		p.FileList[e.GetUrl()] = e.GetIrSourceHash()
-		p.LineCount += e.GetLineCount()
+		owner := p
+		if app := p.GetApplication(); app != nil {
+			owner = app
+		}
+		owner.fileListMu.Lock()
+		if owner.FileList == nil {
+			owner.FileList = make(map[string]string)
+		}
+		owner.FileList[e.GetUrl()] = e.GetIrSourceHash()
+		owner.LineCount += e.GetLineCount()
+		owner.fileListMu.Unlock()
 	}
+}
+
+func (p *Program) SetExtraFile(path, hash string) {
+	if p == nil || path == "" {
+		return
+	}
+	owner := p
+	if app := p.GetApplication(); app != nil {
+		owner = app
+	}
+	owner.metaMu.Lock()
+	if owner.ExtraFile == nil {
+		owner.ExtraFile = make(map[string]string)
+	}
+	owner.ExtraFile[path] = hash
+	owner.metaMu.Unlock()
+}
+
+func (p *Program) AppendSCAPackages(pkgs ...*dxtypes.Package) {
+	if p == nil || len(pkgs) == 0 {
+		return
+	}
+	owner := p
+	if app := p.GetApplication(); app != nil {
+		owner = app
+	}
+	owner.metaMu.Lock()
+	owner.SCAPackages = append(owner.SCAPackages, pkgs...)
+	owner.metaMu.Unlock()
 }
 
 func (p *Program) GetSCAPackageByName(name string) *dxtypes.Package {
 	if p == nil {
 		return nil
 	}
-	for _, pkg := range p.SCAPackages {
+	owner := p
+	if app := p.GetApplication(); app != nil {
+		owner = app
+	}
+	owner.metaMu.Lock()
+	defer owner.metaMu.Unlock()
+	for _, pkg := range owner.SCAPackages {
 		if strings.Contains(pkg.Name, name) {
 			return pkg
 		}
@@ -531,23 +582,40 @@ func (p *Program) GetApplication() *Program {
 	return p.Application
 }
 
-func (p *Program) GetTemplate(path string) tl.TemplateGeneratedInfo {
+func (p *Program) templateOwner() *Program {
 	if p == nil {
 		return nil
 	}
-	return p.Template[path]
+	if app := p.GetApplication(); app != nil {
+		return app
+	}
+	return p
+}
+
+func (p *Program) GetTemplate(path string) tl.TemplateGeneratedInfo {
+	owner := p.templateOwner()
+	if owner == nil {
+		return nil
+	}
+	owner.templateMu.Lock()
+	info := owner.Template[path]
+	owner.templateMu.Unlock()
+	return info
 }
 
 func (p *Program) TryGetTemplate(path string) tl.TemplateGeneratedInfo {
-	if p == nil {
+	owner := p.templateOwner()
+	if owner == nil {
 		return nil
 	}
-	if t := p.GetTemplate(path); t != nil {
+	if t := owner.GetTemplate(path); t != nil {
 		return t
 	}
 	fileName := filepath.Base(path)
+	owner.templateMu.Lock()
+	defer owner.templateMu.Unlock()
 	var rets []tl.TemplateGeneratedInfo
-	for tp, t := range p.Template {
+	for tp, t := range owner.Template {
 		if strings.Contains(tp, fileName) {
 			rets = append(rets, t)
 		}
@@ -559,10 +627,16 @@ func (p *Program) TryGetTemplate(path string) tl.TemplateGeneratedInfo {
 }
 
 func (p *Program) SetTemplate(path string, info tl.TemplateGeneratedInfo) {
-	if p == nil {
+	owner := p.templateOwner()
+	if owner == nil {
 		return
 	}
-	p.Template[path] = info
+	owner.templateMu.Lock()
+	if owner.Template == nil {
+		owner.Template = make(map[string]tl.TemplateGeneratedInfo)
+	}
+	owner.Template[path] = info
+	owner.templateMu.Unlock()
 }
 
 func (prog *Program) SetDiagnosticsRecorder(rec *diagnostics.Recorder) {
