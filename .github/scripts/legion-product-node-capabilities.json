@@ -1,5 +1,9 @@
 [
   "ai.code_workspace.v1",
+	"ai.forge.discovery.v1",
+	"ai.forge.discovery.v2",
+	"ai.forge.evidence.v1",
+	"ai.forge.http_assessment.v2",
 	"ai.forge_release.v1",
   "ai.input.managed_attachment.v1",
   "ai.runtime.host.v1",

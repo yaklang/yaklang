@@ -29,3 +29,20 @@ func TestProductNodeManifestCapabilitiesMatchCompiledSurface(t *testing.T) {
 		t.Fatalf("product-node manifest capabilities drifted from compiled surface: got=%#v want=%#v", advertised, want)
 	}
 }
+
+func TestProductManifestForgeCapabilitiesDoNotOverrideStatefulRuntime(t *testing.T) {
+	raw, err := os.ReadFile("../.github/scripts/legion-product-node-capabilities.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var advertised []string
+	if err := json.Unmarshal(raw, &advertised); err != nil {
+		t.Fatal(err)
+	}
+	actual := normalizeScanNodeCapabilityKeysForRuntime(advertised, aiSessionRuntimeModeStateful)
+	for _, key := range []string{capabilityKeyAIForgeReleaseV1, capabilityKeyAIForgeEvidenceV1, capabilityKeyAIForgeDiscoveryV1, capabilityKeyAIForgeDiscoveryV2, capabilityKeyAIForgeHTTPAssessmentV2} {
+		if slices.Contains(actual, key) {
+			t.Fatalf("stateful runtime inherited Forge capability %s", key)
+		}
+	}
+}
