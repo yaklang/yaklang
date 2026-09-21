@@ -16,33 +16,97 @@ func (prog *Program) BeginCompileUnit(unitKey string) {
 	if prog == nil {
 		return
 	}
-	app := prog.GetApplication()
-	if app == nil {
-		app = prog
-	}
-	app.currentCompileUnit = unitKey
+	prog.currentCompileUnit = unitKey
 }
 
 func (prog *Program) EndCompileUnit() {
 	if prog == nil {
 		return
 	}
-	app := prog.GetApplication()
-	if app == nil {
-		app = prog
-	}
-	app.currentCompileUnit = ""
+	prog.currentCompileUnit = ""
 }
 
 func (prog *Program) CurrentCompileUnit() string {
 	if prog == nil {
 		return ""
 	}
+	if prog.currentCompileUnit != "" {
+		return prog.currentCompileUnit
+	}
+	if app := prog.GetApplication(); app != nil && app != prog {
+		return app.currentCompileUnit
+	}
+	return ""
+}
+
+// EnsureLibraryForCompileUnit returns the Program that will own this unit.
+// Java package keys create the library before concurrent pre-handlers start
+// so NewLibrary is not called from worker goroutines.
+func (prog *Program) EnsureLibraryForCompileUnit(unitKey string) *Program {
+	if prog == nil {
+		return nil
+	}
 	app := prog.GetApplication()
 	if app == nil {
 		app = prog
 	}
-	return app.currentCompileUnit
+	name := libraryNameFromCompileUnitKey(unitKey)
+	if name == "" {
+		return app
+	}
+	if lib, _ := app.GetLibrary(name); lib != nil {
+		return lib
+	}
+	if lib, ok := app.UpStream.Get(name); ok && lib != nil {
+		return lib
+	}
+	return app.NewLibrary(name, strings.Split(name, "."))
+}
+
+// GetOrCreateUnitBuilder returns a fully initialized builder for this unit.
+// Library builders inherit build support from the application builder so
+// CurrentBlock, language config and parent scope are present before PreHandler.
+func (prog *Program) GetOrCreateUnitBuilder(unitKey string, parent *FunctionBuilder) *FunctionBuilder {
+	if prog == nil {
+		return parent
+	}
+	name := libraryNameFromCompileUnitKey(unitKey)
+	if name == "" {
+		if parent != nil {
+			return parent
+		}
+		return prog.GetAndCreateFunctionBuilder(string(MainFunctionName), string(MainFunctionName))
+	}
+	owner := prog.EnsureLibraryForCompileUnit(unitKey)
+	if owner == nil {
+		return parent
+	}
+	owner.SetPackageName(name)
+	fun := owner.GetAndCreateFunction(name, string(MainFunctionName))
+	if fun == nil {
+		return parent
+	}
+	if fun.builder != nil {
+		if parent != nil {
+			fun.builder.SetBuildSupport(parent)
+			fun.builder.DefineFunc = parent.DefineFunc
+			fun.builder.ctx = parent.ctx
+		}
+		if fun.builder.CurrentBlock == nil {
+			if block, ok := fun.GetBasicBlockByID(fun.EnterBlock); ok && block != nil {
+				fun.builder.CurrentBlock = block
+				block.restoreScopeIfMissing()
+			}
+		}
+		return fun.builder
+	}
+	builder := NewBuilder(nil, fun, nil)
+	if parent != nil {
+		builder.SetBuildSupport(parent)
+		builder.DefineFunc = parent.DefineFunc
+		builder.ctx = parent.ctx
+	}
+	return builder
 }
 
 // libraryNameFromCompileUnitKey maps a compile-unit key onto the library

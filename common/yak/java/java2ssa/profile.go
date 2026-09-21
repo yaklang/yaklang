@@ -23,25 +23,25 @@ var (
 
 func deltaAssignVariableCostFrom(t time.Time) {
 	du := atomic.AddInt64(&assignVariableCostNano, time.Now().Sub(t).Nanoseconds())
-	if ret := time.Duration(du).Seconds(); ret > float64(lastAssignVariableSecond+1) {
+	if ret := time.Duration(du).Seconds(); ret > float64(atomic.LoadInt64(&lastAssignVariableSecond)+1) {
 		log.Debugf("abnormal deltaAssignVariableCost cost: %v cost-heavy-percent: %.2f%%", time.Duration(du), 100*(float64(du)/float64(time.Since(initTime))))
-		lastAssignVariableSecond = int64(ret)
+		atomic.StoreInt64(&lastAssignVariableSecond, int64(ret))
 	}
 }
 
 func deltaAnnotationCostFrom(t time.Time) {
 	du := atomic.AddInt64(&annotationCostNano, time.Now().Sub(t).Nanoseconds())
-	if ret := time.Duration(du).Seconds(); ret > float64(lastAnnotationSecond+1) {
+	if ret := time.Duration(du).Seconds(); ret > float64(atomic.LoadInt64(&lastAnnotationSecond)+1) {
 		log.Debugf("abnormal deltaAnnotationCost cost: %v cost-heavy-percent: %.2f%%", time.Duration(du), 100*(float64(du)/float64(time.Since(initTime))))
-		lastAnnotationSecond = int64(ret)
+		atomic.StoreInt64(&lastAnnotationSecond, int64(ret))
 	}
 }
 
 func deltaPackageCostFrom(t time.Time) {
 	du := atomic.AddInt64(&packageCostNano, time.Now().Sub(t).Nanoseconds())
-	if ret := time.Duration(du).Seconds(); ret > float64(lastPackageSecond+1) {
+	if ret := time.Duration(du).Seconds(); ret > float64(atomic.LoadInt64(&lastPackageSecond)+1) {
 		log.Debugf("abnormal deltaPackageCost cost: %v cost-heavy-percent: %.2f%%", time.Duration(du), 100*(float64(du)/float64(time.Since(initTime))))
-		lastPackageSecond = int64(ret)
+		atomic.StoreInt64(&lastPackageSecond, int64(ret))
 	}
 }
 

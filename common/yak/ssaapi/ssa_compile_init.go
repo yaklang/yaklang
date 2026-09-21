@@ -62,16 +62,20 @@ func (c *Config) init(filesystem filesys_interface.FileSystem, fileSize int) (*s
 		if originEditor != nil {
 			originEditor.PushSourceCodeContext(newCodeEditor.SourceCodeMd5())
 		}
-		// push into program for recording what code is compiling
-		application.PushEditor(newCodeEditor)
+		// Record the editor on the builder's program so concurrent unit
+		// pre-handlers do not share the application editor stack.
+		editorOwner := fb.GetProgram()
+		if editorOwner == nil {
+			editorOwner = application
+		}
+		editorOwner.PushEditor(newCodeEditor)
 		defer func() {
-			// recover source code context
 			fb.SetEditor(originEditor)
 			save := true
 			if c.GetCompileStrictMode() && err != nil {
 				save = false
 			}
-			application.PopEditor(save)
+			editorOwner.PopEditor(save)
 		}()
 
 		if editor := fb.GetEditor(); editor != nil {

@@ -22,8 +22,13 @@ barrier.
    slots are released by the consumer; a slow head cannot retain the whole batch
    or starve behind later files. Prefetching for the next batch can overlap the
    previous batch's semantic scan and persistence.
-2. Declaration registration and deferred helpers remain serial: they use
-   application-wide import, editor and declaration state.
+2. Declaration PreHandler is serial inside one unit and concurrent across
+   units in a batch. Each Java package gets its own builder that inherits
+   application build support. Application-owned resource units stay on one
+   worker. Editor recording uses the builder's program stack. Import names
+   are recorded locally during the skeleton pass; linking into other
+   libraries waits for the deferred post-skeleton import task after every
+   unit in the batch has registered its declarations.
 3. Frontends opt into library body parallelism through `ConcurrentUnitBuilder`.
    Java supplies package dependencies and private execution builder views.
    Application-owned units execute exclusively. Each actual Program owner is

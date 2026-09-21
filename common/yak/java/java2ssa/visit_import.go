@@ -77,6 +77,14 @@ func (y *singleFileBuilder) visitCapturedImportDeclarations(decls []javaImportDe
 			}
 		}
 
+		// Skeleton PreHandler only needs the local type-name maps. Linking
+		// mutates the imported library's builder and editor stack; when units
+		// pre-handle in parallel that races. The deferred post-skeleton import
+		// task links types after every skeleton in the batch exists.
+		if !resolveStaticTypes && y.GetProgram() != nil && y.GetProgram().ConcurrentUnitBuildEnabled() {
+			continue
+		}
+
 		var prog *ssa.Program
 		var className string
 		// found package
@@ -237,7 +245,10 @@ func (y *singleFileBuilder) registerPostSkeletonImportTask(i *javaparser.Compila
 	if app == nil {
 		app = prog
 	}
-	fileEditor := app.GetCurrentEditor()
+	fileEditor := y.GetEditor()
+	if fileEditor == nil {
+		fileEditor = app.GetCurrentEditor()
+	}
 	capturedDecls := make([]javaImportDecl, 0, len(decls))
 	for _, decl := range decls {
 		if item, ok := newJavaImportDecl(decl); ok {

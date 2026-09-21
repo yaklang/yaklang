@@ -27,10 +27,6 @@ func (s *SSABuilder) PreHandlerProject(fileSystem fi.FileSystem, ast ssa.FrontAS
 		log.Errorf("program is nil")
 		return nil
 	}
-	if prog.ExtraFile == nil {
-		prog.ExtraFile = make(map[string]string)
-	}
-
 	filename := editor.GetFilename()
 	// pom.xml
 	if strings.TrimLeft(filename, string(fileSystem.GetSeparators())) == "pom.xml" {
@@ -41,21 +37,26 @@ func (s *SSABuilder) PreHandlerProject(fileSystem fi.FileSystem, ast ssa.FrontAS
 		if err != nil {
 			log.Warnf("scan pom.xml error: %v", err)
 		}
-		prog.SCAPackages = append(prog.SCAPackages, pkgs...)
+		prog.AppendSCAPackages(pkgs...)
 		fb.GenerateDependence(pkgs, filename)
 	}
 
 	saveExtraFile := func(path string) {
-		if prog.GetProgramName() == "" {
-			prog.ExtraFile[path] = editor.GetIrSourceHash()
-		} else {
-			prog.ExtraFile[path] = editor.GetIrSourceHash()
-		}
+		prog.SetExtraFile(path, editor.GetIrSourceHash())
 	}
 	path := editor.GetUrl()
 	switch strings.ToLower(fileSystem.Ext(path)) {
 	case ".java":
-		prog.Build(ast, editor, fb)
+		build := prog.Build
+		if build == nil {
+			if app := prog.GetApplication(); app != nil {
+				build = app.Build
+			}
+		}
+		if build == nil {
+			return utils.Errorf("program build is nil")
+		}
+		return build(ast, editor, fb)
 	case ".jpg", ".png", ".gif", ".jpeg", ".css", ".js", ".avi", ".mp4", ".mp3", ".pdf", ".doc":
 		return nil
 
