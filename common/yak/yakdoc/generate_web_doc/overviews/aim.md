@@ -4,6 +4,7 @@
 
 - 启动引擎：`aim.InvokeReAct` 同步执行一次 ReAct 任务，`aim.InvokeReActAsync` 异步返回 `*AIEngine` 句柄，`aim.NewAIEngine` 创建可复用引擎。
 - 快速首轮：`aim.allowSyncInitContext` 默认 `false`，首轮直接进入主循环，后续按需识别意图、发现能力；设置为 `true` 可在首轮前同步增强上下文。记忆后端与自动检索始终异步加载，就绪后供后续轮次使用。
+- 目标模式：通过 `aim.enableGoalMode(true)` 开启；`aim.goalAcceptanceCriteria` 设置 finish 时检查的验收条件，`aim.goalDurationSeconds` 设置强制继续深入的时间窗口（`3600` / `10800` / `18000` 分别是一、三、五小时，`-1` 表示永不自动结束），还可用 `aim.goalMinIterations` 设置最少迭代轮次。
 - 接入模型与能力：`aim.aiConfig` / `aim.aiCallback` 配置模型，`aim.attachedAITool` / `aim.attachedAIForge` / `aim.attachedKnowledgeBase` 挂载工具、Forge 与知识库，`aim.includeToolNames` / `aim.excludeToolNames` 精选工具集。
 - 过程观测与交互：`aim.onStream` / `aim.onStreamContent` / `aim.onEvent` / `aim.onFinished` 订阅流式输出与事件，`aim.onInputRequired` 处理需要人工补充输入的场景，`aim.maxIteration` / `aim.timeout` 控制迭代与超时。
 

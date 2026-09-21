@@ -606,6 +606,19 @@ func buildReActOptions(ctx context.Context, config *AIEngineConfig, outputChan c
 		options = append(options, aicommon.WithMaxIterationCount(int64(config.MaxIteration)))
 	}
 
+	if config.EnableGoalMode {
+		options = append(options,
+			aicommon.WithEnableGoalMode(true),
+			aicommon.WithGoalMinIterations(config.GoalMinIterations),
+		)
+		if config.GoalDurationSeconds != 0 {
+			options = append(options, aicommon.WithGoalDurationSeconds(config.GoalDurationSeconds))
+		}
+		if config.GoalAcceptanceCriteria != "" {
+			options = append(options, aicommon.WithGoalAcceptanceCriteria(config.GoalAcceptanceCriteria))
+		}
+	}
+
 	// 工具配置
 	if config.DisableToolUse {
 		options = append(options, aicommon.WithDisableToolUse(true))
