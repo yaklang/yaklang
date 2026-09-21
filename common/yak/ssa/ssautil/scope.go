@@ -145,6 +145,7 @@ type ScopedVersionedTable[T versionedValue] struct {
 	newVersioned VersionedBuilder[T]
 
 	callback        func(VersionedIF[T])
+	linkMu          sync.RWMutex
 	linkValues      linkNodeMap[T]
 	linkVariable    map[T]VersionedIF[T]
 	linkCaptured    *omap.OrderedMap[string, VersionedIF[T]]
@@ -454,10 +455,10 @@ func (scope *ScopedVersionedTable[T]) AssignVariable(variable VersionedIF[T], va
 	}
 
 	if updata {
-		// variable to value
+		scope.linkMu.Lock()
 		scope.linkValues.Append(variable.GetName(), variable)
-		// value to variable
 		scope.linkVariable[value] = variable
+		scope.linkMu.Unlock()
 	}
 
 	// capture variable
@@ -472,6 +473,8 @@ func (scope *ScopedVersionedTable[T]) AssignVariable(variable VersionedIF[T], va
 }
 
 func (scope *ScopedVersionedTable[T]) GetVariableFromValue(value T) VersionedIF[T] {
+	scope.linkMu.RLock()
+	defer scope.linkMu.RUnlock()
 	if res, ok := scope.linkVariable[value]; ok {
 		return res
 	}
