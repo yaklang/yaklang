@@ -23,24 +23,26 @@ import (
 const legionDiscoveryBudget = 512
 
 type legionForgeDiscoveryRuntime struct {
-	ctx           context.Context
-	target        string
-	ports         []int
-	addresses     []net.IP
-	allowedLabels map[string]struct{}
-	lookup        legionForgeLookupIPFunc
-	dial          func(context.Context, string, string) (net.Conn, error)
-	mu            sync.Mutex
-	remaining     int
-	calls         int
-	evidence      []aiApplicationMaterialReference
+	ctx               context.Context
+	target            string
+	ports             []int
+	addresses         []net.IP
+	allowedLabels     map[string]struct{}
+	nativeEnumeration bool
+	lookup            legionForgeLookupIPFunc
+	dial              func(context.Context, string, string) (net.Conn, error)
+	mu                sync.Mutex
+	remaining         int
+	calls             int
+	evidence          []aiApplicationMaterialReference
 }
 
 func legionForgeDiscoveryParameters(release *aiv1.ContextForgeRelease) (string, []int, error) {
 	if len(release.GetParameters()) > 16 {
 		return "", nil, fmt.Errorf("discovery input field limit exceeded")
 	}
-	if _, err := legionForgeDiscoveryLabels(release); err != nil {
+	labels, err := legionForgeDiscoveryLabels(release)
+	if err != nil {
 		return "", nil, err
 	}
 	target, ports := "", "80,443"
@@ -59,6 +61,9 @@ func legionForgeDiscoveryParameters(release *aiv1.ContextForgeRelease) (string, 
 	host, err := normalizeLegionDiscoveryHost(target)
 	if err != nil {
 		return "", nil, err
+	}
+	if release.GetCapabilityProfile() == legionForgeDiscoveryProfileV2 && (len(labels) == 0 || net.ParseIP(host) != nil || len(host) > 236) {
+		return "", nil, fmt.Errorf("discovery.v2 requires a DNS hostname of at most 236 bytes and 1 to 16 labels")
 	}
 	parsed, err := parseLegionDiscoveryPorts(ports)
 	return host, parsed, err
@@ -292,6 +297,9 @@ func (r *legionForgeDiscoveryRuntime) execute(ctx context.Context, name string, 
 	result := map[string]any{"target": r.target, "observed_at": time.Now().UTC().Format(time.RFC3339Nano)}
 	switch name {
 	case "dns_lookup":
+		if r.nativeEnumeration && strings.TrimSpace(utils.InterfaceToString(params["label"])) == "" {
+			return r.enumerateNative(bounded)
+		}
 		host := r.target
 		addresses := r.addresses
 		label := strings.ToLower(strings.TrimSpace(utils.InterfaceToString(params["label"])))
@@ -367,11 +375,15 @@ func (r *legionForgeDiscoveryRuntime) execute(ctx context.Context, name string, 
 }
 
 func legionForgeDiscoveryOptions(ctx context.Context, release *aiv1.ContextForgeRelease) ([]aicommon.ConfigOption, legionForgeMaterialRuntime, error) {
+	return legionForgeDiscoveryOptionsWithLookup(ctx, release, defaultLegionForgeLookupIP)
+}
+
+func legionForgeDiscoveryOptionsWithLookup(ctx context.Context, release *aiv1.ContextForgeRelease, lookup legionForgeLookupIPFunc) ([]aicommon.ConfigOption, legionForgeMaterialRuntime, error) {
 	host, ports, err := legionForgeDiscoveryParameters(release)
 	if err != nil {
 		return nil, nil, err
 	}
-	runtime, err := newLegionForgeDiscoveryRuntime(ctx, host, ports, defaultLegionForgeLookupIP)
+	runtime, err := newLegionForgeDiscoveryRuntime(ctx, host, ports, lookup)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -379,6 +391,7 @@ func legionForgeDiscoveryOptions(ctx context.Context, release *aiv1.ContextForge
 	if err != nil {
 		return nil, nil, err
 	}
+	runtime.nativeEnumeration = release.GetCapabilityProfile() == legionForgeDiscoveryProfileV2
 	tools := []*aitool.Tool{}
 	for _, name := range legionForgeDiscoveryTools {
 		name := name

@@ -15,6 +15,8 @@ const (
 	capabilityKeyAIForgeReleaseV1           = "ai.forge_release.v1"
 	capabilityKeyAIForgeEvidenceV1          = "ai.forge.evidence.v1"
 	capabilityKeyAIForgeDiscoveryV1         = "ai.forge.discovery.v1"
+	capabilityKeyAIForgeDiscoveryV2         = "ai.forge.discovery.v2"
+	capabilityKeyAIForgeHTTPAssessmentV2    = "ai.forge.http_assessment.v2"
 	capabilityKeyAICodeWorkspaceV1          = "ai.code_workspace.v1"
 	capabilityKeyAIManagedInputV1           = inputresolver.CapabilityV1
 	capabilityKeyPluginBundleV1             = "plugin.bundle.v1"
@@ -37,7 +39,7 @@ func normalizeScanNodeCapabilityKeysForRuntime(input []string, runtimeMode strin
 		if (trimmed == capabilityKeyAICodeWorkspaceV1 || trimmed == capabilityKeyAIManagedInputV1 || trimmed == capabilityKeyAIForgeReleaseV1) && runtimeMode == aiSessionRuntimeModeStateful {
 			return
 		}
-		if (trimmed == capabilityKeyAIForgeEvidenceV1 || trimmed == capabilityKeyAIForgeDiscoveryV1) && runtimeMode == aiSessionRuntimeModeStateful {
+		if (trimmed == capabilityKeyAIForgeEvidenceV1 || trimmed == capabilityKeyAIForgeDiscoveryV1 || trimmed == capabilityKeyAIForgeDiscoveryV2 || trimmed == capabilityKeyAIForgeHTTPAssessmentV2) && runtimeMode == aiSessionRuntimeModeStateful {
 			return
 		}
 		if trimmed == capabilityKeyAIForgeEvidenceV1 && !inputresolver.Supported() {
