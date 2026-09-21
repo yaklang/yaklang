@@ -223,7 +223,7 @@ func TestLegionDiscoveryUserBoundLabels(t *testing.T) {
 			t.Fatalf("accepted labels %q", raw)
 		}
 	}
-	release := &aiv1.ContextForgeRelease{Parameters: []*aiv1.ContextForgeParameter{{Key: "labels", ValueKind: "string", Value: " WWW, api "}}}
+	release := &aiv1.ContextForgeRelease{Parameters: []*aiv1.ContextForgeParameter{{Key: "labels", ValueKind: "string", Value: " WWW, api "}, {Key: "target-host", ValueKind: "string", Value: "example.com"}}}
 	labels, err := legionForgeDiscoveryLabels(release)
 	if err != nil || len(labels) != 2 {
 		t.Fatalf("labels: %v %v", labels, err)
@@ -249,5 +249,30 @@ func TestLegionDiscoveryUserBoundLabels(t *testing.T) {
 	}
 	if _, err := r.execute(context.Background(), "dns_lookup", nil); err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestLegionDiscoveryRejectsUnqueryableLabelScope(t *testing.T) {
+	longHost := strings.Repeat("a", 63) + "." + strings.Repeat("b", 63) + "." + strings.Repeat("c", 63) + "." + strings.Repeat("d", 57)
+	for _, tc := range []struct {
+		target, label string
+		valid         bool
+	}{
+		{"10.0.0.1", "www", false},
+		{"2001:4860:4860::8888", "www", false},
+		{longHost, "abc", true}, // 249 + one separator + three label bytes = 253.
+		{longHost, "abcd", false},
+	} {
+		t.Run(tc.target+"/"+tc.label, func(t *testing.T) {
+			r := testLegionContextForgeRelease(t)
+			r.CapabilityProfile = legionForgeDiscoveryProfile
+			r.DeclaredToolNames = append([]string(nil), legionForgeDiscoveryTools...)
+			r.Parameters = []*aiv1.ContextForgeParameter{{Key: "labels", ValueKind: "string", Value: tc.label}, {Key: "target-host", ValueKind: "string", Value: tc.target}}
+			rehashLegionContextForgeRelease(t, r)
+			err := validateContextForgeRelease(r)
+			if (err == nil) != tc.valid {
+				t.Fatalf("valid=%v error=%v", tc.valid, err)
+			}
+		})
 	}
 }

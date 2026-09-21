@@ -67,7 +67,11 @@ func legionForgeDiscoveryParameters(release *aiv1.ContextForgeRelease) (string, 
 // Labels are user-bound release inputs, never a model-selected expansion of scope.
 func legionForgeDiscoveryLabels(release *aiv1.ContextForgeRelease) (map[string]struct{}, error) {
 	labels := make(map[string]struct{})
+	target := ""
 	for _, p := range release.GetParameters() {
+		if p.GetKey() == "target-host" {
+			target = p.GetValue()
+		}
 		if p.GetKey() != "labels" {
 			continue
 		}
@@ -87,6 +91,20 @@ func legionForgeDiscoveryLabels(release *aiv1.ContextForgeRelease) (map[string]s
 				return nil, fmt.Errorf("discovery labels must be unique")
 			}
 			labels[label] = struct{}{}
+		}
+	}
+	if len(labels) > 0 {
+		host, err := normalizeLegionDiscoveryHost(target)
+		if err != nil {
+			return nil, err
+		}
+		if net.ParseIP(host) != nil {
+			return nil, fmt.Errorf("discovery labels require a DNS hostname target")
+		}
+		for label := range labels {
+			if len(label)+1+len(host) > 253 {
+				return nil, fmt.Errorf("discovery label and target exceed DNS hostname length")
+			}
 		}
 	}
 	return labels, nil
