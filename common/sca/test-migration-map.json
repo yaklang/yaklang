@@ -6230,6 +6230,7 @@
       "case": "TestModulePath",
       "disposition": "SEMANTIC_REPLACEMENT",
       "local_tests": [
+        "core/gomod/upstream_test.go:TestModuleLine",
         "core/gomod/upstream_test.go:TestModulePath"
       ],
       "reason": "Read-only gomod lexer/path/go-line/comment-indirect remainder of x/mod; ParseLax, print, and mutation APIs stay OUT_OF_SCOPE."
@@ -7123,8 +7124,10 @@
       "case": "TestUnmarshal",
       "disposition": "SEMANTIC_REPLACEMENT",
       "local_tests": [
-        "core/lockyaml/read_test.go",
-        "analyzer/dep-parser/nodejs/pnpm/upstream_test.go"
+        "core/lockyaml/read_test.go:TestUpstreamLockGrammar",
+        "core/lockyaml/read_test.go:TestNestedFlowQuotedKeysAndVersions/pnpm-peer-key",
+        "core/lockyaml/read_test.go:TestMultilineFlowAndSequence/flow-and-block-seq",
+        "analyzer/dep-parser/nodejs/pnpm/upstream_test.go:TestParse"
       ],
       "reason": "Only pnpm v5/v6 finite grammar; upstream reflection/aliases/tags excluded; six full pnpm fixtures and explicit unsupported negatives."
     },
@@ -7189,8 +7192,8 @@
       "case": "TestUnmarshalErrors",
       "disposition": "SEMANTIC_REPLACEMENT",
       "local_tests": [
-        "core/lockyaml/read_test.go",
-        "analyzer/dep-parser/nodejs/pnpm/upstream_test.go"
+        "core/lockyaml/read_test.go:TestRejectDuplicatesAliasesAndTrailing",
+        "analyzer/dep-parser/nodejs/pnpm/upstream_test.go:TestParse"
       ],
       "reason": "Only pnpm v5/v6 finite grammar; upstream reflection/aliases/tags excluded; six full pnpm fixtures and explicit unsupported negatives."
     },

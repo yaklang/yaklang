@@ -2792,7 +2792,7 @@
     },
     {
       "local_file": "common/sca/core/gomod/parse.go",
-      "sha256": "8b63c00ee5150a536ad88c99862a48dc3112a24b92a67871fbfabe1efbeab924",
+      "sha256": "d319c311fec4839b1ce49a7c4537bfb426a764f1fc8dc9bd828c176ab00eb16b",
       "symbols": [
         {
           "name": "Limits",
@@ -2828,15 +2828,19 @@
         },
         {
           "name": "modulePath",
-          "line": 61
+          "line": 62
         },
         {
-          "name": "Parse",
+          "name": "toolchainName",
           "line": 67
         },
         {
+          "name": "Parse",
+          "line": 73
+        },
+        {
           "name": "File.add",
-          "line": 178
+          "line": 187
         }
       ],
       "decision": "EXTRACT_AND_REWRITE",

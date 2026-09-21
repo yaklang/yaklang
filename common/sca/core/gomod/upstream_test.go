@@ -144,7 +144,55 @@ func TestUpstreamLexPunctuation(t *testing.T) {
 	}
 }
 
-// TestModulePath is the retained read-only subset of x/mod ModulePath.
+// TestModuleLine is the original x/mod ModulePath table applied to Parse.
+// Original ModulePath is tolerant of junk after a module line; Parse is not.
+// Cases with parseOK=false keep the original expected path as uncovered.
+func TestModuleLine(t *testing.T) {
+	for _, tc := range []struct {
+		name, src, original string
+		parseOK             bool
+	}{
+		{"quoted", `module "github.com/rsc/vgotest"`, "github.com/rsc/vgotest", true},
+		{"plain", "module github.com/rsc/vgotest", "github.com/rsc/vgotest", true},
+		{"quoted-spaces", `module  "github.com/rsc/vgotest"`, "github.com/rsc/vgotest", true},
+		{"plain-spaces", "module  github.com/rsc/vgotest", "github.com/rsc/vgotest", true},
+		{"raw-quotes", "module `github.com/rsc/vgotest`", "github.com/rsc/vgotest", true},
+		{"quoted-v2", `module "github.com/rsc/vgotest/v2"`, "github.com/rsc/vgotest/v2", true},
+		{"plain-v2", "module github.com/rsc/vgotest/v2", "github.com/rsc/vgotest/v2", true},
+		{"quoted-yaml-v2", `module "gopkg.in/yaml.v2"`, "gopkg.in/yaml.v2", true},
+		{"plain-yaml-v2", "module gopkg.in/yaml.v2", "gopkg.in/yaml.v2", true},
+		{"quoted-nl", "module \"gopkg.in/check.v1\"\n", "gopkg.in/check.v1", true},
+		{"quoted-broken-nl", "module \"gopkg.in/check.v1\n\"", "", false},
+		{"plain-nl", "module gopkg.in/check.v1\n", "gopkg.in/check.v1", true},
+		{"quoted-crlf", "module \"gopkg.in/check.v1\"\r\n", "gopkg.in/check.v1", true},
+		{"plain-crlf", "module gopkg.in/check.v1\r\n", "gopkg.in/check.v1", true},
+		{"quoted-blank", "module \"gopkg.in/check.v1\"\n\n", "gopkg.in/check.v1", true},
+		{"plain-blank", "module gopkg.in/check.v1\n\n", "gopkg.in/check.v1", true},
+		{"split-quoted", "module \n\"gopkg.in/check.v1\"\n\n", "", false},
+		{"split-plain", "module \ngopkg.in/check.v1\n\n", "", false},
+		{"quoted-junk", "module \"gopkg.in/check.v1\"asd", "", false},
+		{"duplicate-module", "module  \nmodule a/b/c ", "a/b/c", false},
+		{"quoted-only-spaces", `module "   "`, "   ", false},
+		{"module-only", "module   ", "", false},
+		{"quoted-padded-path", `module "  a/b/c  "`, "  a/b/c  ", false},
+		{"comment", `module "github.com/rsc/vgotest1" // with a comment`, "github.com/rsc/vgotest1", true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			f, err := Parse(context.Background(), []byte(tc.src), Limits{})
+			if tc.parseOK {
+				if err != nil || f == nil || f.Module != tc.original {
+					t.Fatalf("src %q: module=%v err=%v want %q", tc.src, f, err, tc.original)
+				}
+				return
+			}
+			if err == nil {
+				t.Fatalf("src %q: Parse accepted; original ModulePath=%q", tc.src, tc.original)
+			}
+		})
+	}
+}
+
+// TestModulePath is a local path-character check, not x/mod ModulePath extraction.
 // Unicode and version-suffix path rules from x/mod are not claimed.
 func TestModulePath(t *testing.T) {
 	for _, tc := range []struct {
@@ -191,6 +239,9 @@ func TestParseVersions(t *testing.T) {
 		{"alt3", "module m\ngo 1.2beta1\n", true},
 		{"alt4", "module m\ngo 1.2.beta1\n", false},
 		{"tool", "module m\ntoolchain go1.2\n", true},
+		{"tool1", "module m\ntoolchain go1.2.3\n", true},
+		{"tool2", "module m\ntoolchain go1.2rc1\n", true},
+		{"tool3", "module m\ntoolchain go1.2rc1-gccgo\n", true},
 		{"tool4", "module m\ntoolchain default\n", true},
 		{"tool5", "module m\ntoolchain inconceivable!\n", false},
 	} {

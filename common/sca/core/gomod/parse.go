@@ -63,6 +63,11 @@ func modulePath(s string) bool {
 	return s != "" && !strings.ContainsAny(s, "\x00\r\n\t \\") && !strings.HasPrefix(s, "/") && !strings.Contains(s, "//")
 }
 
+// toolchainName is the read-only x/mod ToolchainRE: default or go1 / go1.*
+func toolchainName(s string) bool {
+	return s == "default" || strings.HasPrefix(s, "go1") && (len(s) == 3 || s[3] == '.')
+}
+
 // Parse retains declarations and replacement sources separately. Returned
 // versions are declarations, not evidence that a module is installed.
 func Parse(ctx context.Context, data []byte, limits Limits) (result *File, err error) {
@@ -203,7 +208,7 @@ func (f *File) add(ctx context.Context, verb string, a []string, line int, comme
 		}
 		f.Go = a[0]
 	case "toolchain":
-		if len(a) != 1 || f.Toolchain != "" || !(a[0] == "default" || strings.HasPrefix(a[0], "go") && goRE.MatchString(strings.TrimPrefix(a[0], "go"))) {
+		if len(a) != 1 || f.Toolchain != "" || !toolchainName(a[0]) {
 			return bad()
 		}
 		f.Toolchain = a[0]
