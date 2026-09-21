@@ -28,7 +28,7 @@ func (a pomAnalyzer) Analyze(afi AnalyzeFileInfo) ([]*dxtypes.Package, error) {
 	fi := afi.Self
 	switch fi.MatchStatus {
 	case statusPom:
-		p := pom.NewParser(fi.Path, pom.WithOffline(true))
+		p := pom.NewParser(fi.Path)
 		pkgs, err := ParseLanguageConfiguration(fi, p)
 		if err != nil {
 			return nil, err

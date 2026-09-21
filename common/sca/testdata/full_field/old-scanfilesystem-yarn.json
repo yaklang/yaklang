@@ -1,0 +1,116 @@
+[
+  {
+    "Name": "js-tokens",
+    "Version": "2.0.0",
+    "Verification": "",
+    "License": null,
+    "Potential": false,
+    "DependsAnd": null,
+    "UpNames": null,
+    "FromFile": [
+      "yarn.lock"
+    ],
+    "FromAnalyzer": [
+      "yarm-lang"
+    ]
+  },
+  {
+    "Name": "js-tokens",
+    "Version": "4.0.0",
+    "Verification": "",
+    "License": null,
+    "Potential": false,
+    "DependsAnd": null,
+    "UpNames": null,
+    "FromFile": [
+      "yarn.lock"
+    ],
+    "FromAnalyzer": [
+      "yarm-lang"
+    ]
+  },
+  {
+    "Name": "loose-envify",
+    "Version": "1.4.0",
+    "Verification": "",
+    "License": null,
+    "Potential": false,
+    "DependsAnd": null,
+    "UpNames": [
+      "js-tokens@4.0.0"
+    ],
+    "FromFile": [
+      "yarn.lock"
+    ],
+    "FromAnalyzer": [
+      "yarm-lang"
+    ]
+  },
+  {
+    "Name": "object-assign",
+    "Version": "4.1.1",
+    "Verification": "",
+    "License": null,
+    "Potential": false,
+    "DependsAnd": null,
+    "UpNames": null,
+    "FromFile": [
+      "yarn.lock"
+    ],
+    "FromAnalyzer": [
+      "yarm-lang"
+    ]
+  },
+  {
+    "Name": "prop-types",
+    "Version": "15.7.2",
+    "Verification": "",
+    "License": null,
+    "Potential": false,
+    "DependsAnd": null,
+    "UpNames": [
+      "loose-envify@1.4.0",
+      "object-assign@4.1.1",
+      "react-is@16.13.1"
+    ],
+    "FromFile": [
+      "yarn.lock"
+    ],
+    "FromAnalyzer": [
+      "yarm-lang"
+    ]
+  },
+  {
+    "Name": "react-is",
+    "Version": "16.13.1",
+    "Verification": "",
+    "License": null,
+    "Potential": false,
+    "DependsAnd": null,
+    "UpNames": null,
+    "FromFile": [
+      "yarn.lock"
+    ],
+    "FromAnalyzer": [
+      "yarm-lang"
+    ]
+  },
+  {
+    "Name": "scheduler",
+    "Version": "0.13.6",
+    "Verification": "",
+    "License": null,
+    "Potential": false,
+    "DependsAnd": null,
+    "UpNames": [
+      "loose-envify@1.4.0",
+      "object-assign@4.1.1"
+    ],
+    "FromFile": [
+      "yarn.lock"
+    ],
+    "FromAnalyzer": [
+      "yarm-lang"
+    ]
+  }
+]

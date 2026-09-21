@@ -2,13 +2,39 @@ package dxtypes
 
 import (
 	"fmt"
+	"github.com/yaklang/yaklang/common/sca/model"
 	"strings"
 
-	"github.com/samber/lo"
-	"github.com/yaklang/yaklang/common/utils"
+	"crypto/sha256"
+	"encoding/binary"
+	"encoding/hex"
+	"sort"
 )
 
+type PackageDetails struct {
+	Provides          []string
+	Condition, Scope  string
+	DeclaredCondition string
+	Diagnostics       []model.Diagnostic
+
+	Requirements       []model.Requirement
+	StartLine, EndLine int
+	Locations          []SourceRange
+	ArtifactPath       string
+
+	UnresolvedDependencies []string
+
+	Evidence, DeclaredName, DeclaredVersion, ReplacementVersion, DeclaredIntegrity string
+	Indirect                                                                       bool
+
+	// Qualifiers are optional on legacy producers and required by migrated ones.
+	Ecosystem, Source, Architecture, Variant, Snapshot, ProjectRoot, Instance string
+
+	RawLicenses []string
+}
+
 type Package struct {
+	*PackageDetails
 	Name           string
 	Version        string
 	IsVersionRange bool // Version is a version range
@@ -24,6 +50,7 @@ type Package struct {
 	// ...
 	Verification string
 
+	// RawLicenses preserves original expressions; License is legacy display text.
 	License []string
 
 	// Related
@@ -40,17 +67,37 @@ type Package struct {
 	AssociatedCVE []string
 }
 
+type SourceRange struct{ StartLine, EndLine int }
+
 type PackageRelationShip struct {
 	And map[string]string   // key: package name, value: version range
 	Or  []map[string]string // key: package name, value: version range
 }
 
+// Identifier encodes fields separately; a name/version boundary cannot collide.
+// Qualifiers and verification keep ecosystems, instances and conflicting evidence apart.
 func (p *Package) Identifier() string {
-	//if p.id == "" {
-	//	p.id = utils.CalcSha1(p.Name, p.Version)
-	//}
-	//return p.id
-	return utils.CalcSha1(p.Name, p.Version)
+	if p == nil {
+		return ""
+	}
+	raw := p.IdentityDigest()
+	return hex.EncodeToString(raw[:])
+}
+
+// IdentityDigest uses length-framed fields, preserving arbitrary separator bytes
+// without allocating a reflection-based intermediate JSON object for each key.
+func (p *Package) IdentityDigest() [32]byte {
+	details := p.Details()
+	h := sha256.New()
+	var length [8]byte
+	for _, field := range [...]string{details.Ecosystem, p.Name, p.Version, details.Source, details.Architecture, details.Variant, details.Snapshot, details.ProjectRoot, details.Instance, p.Verification} {
+		binary.LittleEndian.PutUint64(length[:], uint64(len(field)))
+		h.Write(length[:])
+		h.Write([]byte(field))
+	}
+	var sum [32]byte
+	h.Sum(sum[:0])
+	return sum
 }
 
 func (p *Package) HasVersionRange() bool {
@@ -61,16 +108,12 @@ func (p Package) String() string {
 	ret := fmt.Sprintf("%s-%s", p.Name, p.Version)
 	ret += "\n\tupstream: "
 	ret += strings.Join(
-		lo.MapToSlice(p.UpStreamPackages, func(name string, pkg *Package) string {
-			return fmt.Sprintf("%s-%s", name, pkg.Version)
-		}),
+		relationStrings(p.UpStreamPackages),
 		",",
 	)
 	ret += "\n\tdownstream: "
 	ret += strings.Join(
-		lo.MapToSlice(p.DownStreamPackages, func(name string, pkg *Package) string {
-			return fmt.Sprintf("%s-%s", name, pkg.Version)
-		}),
+		relationStrings(p.DownStreamPackages),
 		",",
 	)
 	ret += "\n\tverfication: " + p.Verification
@@ -109,109 +152,90 @@ func (down *Package) LinkDepend(up *Package) {
 
 // merge p2 to p1
 func (p *Package) Merge(p2 *Package) *Package {
-	p.Potential = false
+	if CanMerge(p, p2) != 1 {
+		return p
+	}
 	if p.License == nil {
 		p.License = make([]string, 0)
 	}
-	p.License = lo.Uniq(append(p.License, p2.License...))
+	p.License = uniqueStrings(append(p.License, p2.License...))
+	if p2.PackageDetails != nil {
+		p.EnsureDetails()
+		p.MergeDetails(p2.Details())
+	}
+
 	if p.FromAnalyzer == nil {
 		p.FromAnalyzer = make([]string, 0)
 	}
-	p.FromAnalyzer = lo.Uniq(append(p.FromAnalyzer, p2.FromAnalyzer...))
+	p.FromAnalyzer = uniqueStrings(append(p.FromAnalyzer, p2.FromAnalyzer...))
 	if p.FromFile == nil {
 		p.FromFile = make([]string, 0)
 	}
-	p.FromFile = lo.Uniq(append(p.FromFile, p2.FromFile...))
+	p.FromFile = uniqueStrings(append(p.FromFile, p2.FromFile...))
 
+	pID, p2ID := p.Identifier(), p2.Identifier()
 	for _, p2up := range p2.UpStreamPackages {
 		p.LinkDepend(p2up)
-		if p.Identifier() != p2.Identifier() {
-			delete(p2up.DownStreamPackages, p2.Identifier())
+		if pID != p2ID {
+			delete(p2up.DownStreamPackages, p2ID)
 		}
 	}
 	for _, p2down := range p2.DownStreamPackages {
 		p2down.LinkDepend(p)
-		if p.Identifier() != p2.Identifier() {
-			delete(p2down.UpStreamPackages, p2.Identifier())
+		if pID != p2ID {
+			delete(p2down.UpStreamPackages, p2ID)
 		}
 	}
 	return p
 }
 
-func CompareVersionRange(target, versionRange string) bool {
-	index := strings.IndexFunc(versionRange, func(r rune) bool {
-		return r >= '0' && r <= '9'
-	})
-	if index == -1 {
-		return false
-	}
-	op := versionRange[:index]
-	version := versionRange[index:]
-	ret, err := utils.VersionCompare(target, version)
-	if err != nil {
-		return false
-	}
-	if strings.Contains(op, "=") && ret == 0 {
-		return true
-	}
-	if strings.Contains(op, ">") && ret > 0 {
-		return true
-	}
-	if strings.Contains(op, "<") && ret < 0 {
-		return true
-	}
-	return false
-}
-
-// p2 is version range
-func CanMergeWithVersionRange(version, versionRange string) bool {
-	if versionRange == "*" {
-		return true
-	} else {
-		versionRanges := strings.Split(versionRange, "&&")
-		for _, vrange := range versionRanges {
-			if !CompareVersionRange(version, strings.TrimSpace(vrange)) {
-				return false
-			}
-		}
-		return true
-	}
-}
-
-func CanMerge(p *Package, p2 *Package) int {
-	// func (p *Package) CanMerge(p2 *Package) bool {
-	// verification
-	if p.Verification != "" && p2.Verification != "" && p.Verification != p2.Verification {
-		return 0
-	}
-	// name
-	if p.Name != p2.Name {
-		return 0
-	}
-	// version
-	if p.Version == p2.Version {
+// CanMerge only permits exact identity. Constraints never select components.
+func CanMerge(a, b *Package) int {
+	if a != nil && b != nil && a.Identifier() == b.Identifier() && a.Potential == b.Potential && a.Details().Evidence == b.Details().Evidence && a.HasVersionRange() == b.HasVersionRange() {
 		return 1
 	}
-
-	// version range
-	p1HasRange := p.HasVersionRange()
-	p2HasRange := p2.HasVersionRange()
-
-	// two range, not merge
-	if p1HasRange && p2HasRange {
-		return 0
-	}
-
-	if p2HasRange {
-		if CanMergeWithVersionRange(p.Version, p2.Version) {
-			return 1
-		}
-	}
-	if p1HasRange {
-		if CanMergeWithVersionRange(p2.Version, p.Version) {
-			return -1
-		}
-	}
-
 	return 0
+}
+
+func relationStrings(pkgs map[string]*Package) []string {
+	ret := make([]string, 0, len(pkgs))
+	for name, p := range pkgs {
+		ret = append(ret, fmt.Sprintf("%s-%s", name, p.Version))
+	}
+	sort.Strings(ret)
+	return ret
+}
+func uniqueStrings(values []string) []string {
+	seen := make(map[string]struct{}, len(values))
+	result := make([]string, 0, len(values))
+	for _, v := range values {
+		if _, ok := seen[v]; !ok {
+			seen[v] = struct{}{}
+			result = append(result, v)
+		}
+	}
+	return result
+}
+
+// Details returns a zero value for legacy records that have no extended evidence.
+// Use EnsureDetails before mutating the optional evidence.
+func (p *Package) Details() PackageDetails {
+	if p.PackageDetails == nil {
+		return PackageDetails{}
+	}
+	return *p.PackageDetails
+}
+func (p *Package) EnsureDetails() {
+	if p.PackageDetails == nil {
+		p.PackageDetails = &PackageDetails{}
+	}
+}
+func (p *Package) MergeDetails(other PackageDetails) {
+	p.EnsureDetails()
+	p.RawLicenses = uniqueStrings(append(p.RawLicenses, other.RawLicenses...))
+	p.Locations = append(p.Locations, other.Locations...)
+	p.Requirements = append(p.Requirements, other.Requirements...)
+	p.Diagnostics = append(p.Diagnostics, other.Diagnostics...)
+	p.UnresolvedDependencies = uniqueStrings(append(p.UnresolvedDependencies, other.UnresolvedDependencies...))
+	p.Provides = uniqueStrings(append(p.Provides, other.Provides...))
 }

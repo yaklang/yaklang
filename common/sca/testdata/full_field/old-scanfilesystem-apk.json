@@ -1,0 +1,618 @@
+[
+  {
+    "Name": "alpine-baselayout",
+    "Version": "3.4.3-r1",
+    "Verification": "sha1:cf0bca32762cd5be9974f4c127467b0f93f78f20",
+    "License": [
+      "GPL-2.0"
+    ],
+    "Potential": false,
+    "VersionRange": false,
+    "DependsAnd": {
+      "alpine-baselayout-data": "3.4.3-r1",
+      "busybox-binsh": "1.36.1-r0"
+    },
+    "DependsOr": null,
+    "UpNames": [
+      "alpine-baselayout-data@3.4.3-r1",
+      "busybox-binsh@1.36.1-r0"
+    ],
+    "DownNames": null,
+    "FromFile": [
+      "lib/apk/db/installed"
+    ],
+    "FromAnalyzer": [
+      "apk-pkg"
+    ]
+  },
+  {
+    "Name": "alpine-baselayout-data",
+    "Version": "3.4.3-r1",
+    "Verification": "sha1:602007ee374ed96f35e9bf39b1487d67c6afe027",
+    "License": [
+      "GPL-2.0"
+    ],
+    "Potential": false,
+    "VersionRange": false,
+    "DependsAnd": null,
+    "DependsOr": null,
+    "UpNames": null,
+    "DownNames": [
+      "alpine-baselayout@3.4.3-r1"
+    ],
+    "FromFile": [
+      "lib/apk/db/installed"
+    ],
+    "FromAnalyzer": [
+      "apk-pkg"
+    ]
+  },
+  {
+    "Name": "alpine-keys",
+    "Version": "2.4-r1",
+    "Verification": "sha1:ec3a3d5ef4c7a168d09516097bb3219ca77c1534",
+    "License": [
+      "MIT"
+    ],
+    "Potential": false,
+    "VersionRange": false,
+    "DependsAnd": null,
+    "DependsOr": null,
+    "UpNames": null,
+    "DownNames": null,
+    "FromFile": [
+      "lib/apk/db/installed"
+    ],
+    "FromAnalyzer": [
+      "apk-pkg"
+    ]
+  },
+  {
+    "Name": "apk-tools",
+    "Version": "2.14.0-r2",
+    "Verification": "sha1:8cde25f239ebf691cd135a3954e5193c1ac2ae13",
+    "License": [
+      "GPL-2.0"
+    ],
+    "Potential": false,
+    "VersionRange": false,
+    "DependsAnd": {
+      "ca-certificates-bundle": "*",
+      "libcrypto3": "3.1.1-r1",
+      "libssl3": "3.1.1-r1",
+      "musl": "1.2.4-r0",
+      "zlib": "1.2.13-r1"
+    },
+    "DependsOr": null,
+    "UpNames": [
+      "ca-certificates-bundle@20230506-r0",
+      "libcrypto3@3.1.1-r1",
+      "libssl3@3.1.1-r1",
+      "musl@1.2.4-r0",
+      "zlib@1.2.13-r1"
+    ],
+    "DownNames": null,
+    "FromFile": [
+      "lib/apk/db/installed"
+    ],
+    "FromAnalyzer": [
+      "apk-pkg"
+    ]
+  },
+  {
+    "Name": "brotli-libs",
+    "Version": "1.0.9-r14",
+    "Verification": "sha1:48b2006d35cdde849a18f7cadbfaf17c9273130f",
+    "License": [
+      "MIT"
+    ],
+    "Potential": false,
+    "VersionRange": false,
+    "DependsAnd": {
+      "musl": "1.2.4-r0"
+    },
+    "DependsOr": null,
+    "UpNames": [
+      "musl@1.2.4-r0"
+    ],
+    "DownNames": [
+      "libcurl@8.1.2-r0"
+    ],
+    "FromFile": [
+      "lib/apk/db/installed"
+    ],
+    "FromAnalyzer": [
+      "apk-pkg"
+    ]
+  },
+  {
+    "Name": "busybox",
+    "Version": "1.36.1-r0",
+    "Verification": "sha1:53bff6ed72a869ce4555a2e0af6750eebea002fc",
+    "License": [
+      "GPL-2.0"
+    ],
+    "Potential": false,
+    "VersionRange": false,
+    "DependsAnd": {
+      "musl": "1.2.4-r0"
+    },
+    "DependsOr": null,
+    "UpNames": [
+      "musl@1.2.4-r0"
+    ],
+    "DownNames": [
+      "busybox-binsh@1.36.1-r0"
+    ],
+    "FromFile": [
+      "lib/apk/db/installed"
+    ],
+    "FromAnalyzer": [
+      "apk-pkg"
+    ]
+  },
+  {
+    "Name": "busybox-binsh",
+    "Version": "1.36.1-r0",
+    "Verification": "sha1:1819eefdc85da3f9baa0277b10d24062d53f0f84",
+    "License": [
+      "GPL-2.0"
+    ],
+    "Potential": false,
+    "VersionRange": false,
+    "DependsAnd": {
+      "busybox": "1.36.1-r0"
+    },
+    "DependsOr": null,
+    "UpNames": [
+      "busybox@1.36.1-r0"
+    ],
+    "DownNames": [
+      "alpine-baselayout@3.4.3-r1",
+      "ca-certificates@20230506-r0"
+    ],
+    "FromFile": [
+      "lib/apk/db/installed"
+    ],
+    "FromAnalyzer": [
+      "apk-pkg"
+    ]
+  },
+  {
+    "Name": "ca-certificates",
+    "Version": "20230506-r0",
+    "Verification": "sha1:146f0cfbbc3e7648d5f55cb49861565b6b78f83a",
+    "License": [
+      "MPL-2.0",
+      "MIT"
+    ],
+    "Potential": false,
+    "VersionRange": false,
+    "DependsAnd": {
+      "busybox-binsh": "1.36.1-r0",
+      "libcrypto3": "3.1.1-r1",
+      "musl": "1.2.4-r0"
+    },
+    "DependsOr": null,
+    "UpNames": [
+      "busybox-binsh@1.36.1-r0",
+      "libcrypto3@3.1.1-r1",
+      "musl@1.2.4-r0"
+    ],
+    "DownNames": [
+      "libcurl@8.1.2-r0"
+    ],
+    "FromFile": [
+      "lib/apk/db/installed"
+    ],
+    "FromAnalyzer": [
+      "apk-pkg"
+    ]
+  },
+  {
+    "Name": "ca-certificates-bundle",
+    "Version": "20230506-r0",
+    "Verification": "sha1:47f485d08670a9eb21ebf10e70ae65dc43ab6c3d",
+    "License": [
+      "MPL-2.0",
+      "MIT"
+    ],
+    "Potential": false,
+    "VersionRange": false,
+    "DependsAnd": null,
+    "DependsOr": null,
+    "UpNames": null,
+    "DownNames": [
+      "apk-tools@2.14.0-r2"
+    ],
+    "FromFile": [
+      "lib/apk/db/installed"
+    ],
+    "FromAnalyzer": [
+      "apk-pkg"
+    ]
+  },
+  {
+    "Name": "curl",
+    "Version": "8.1.2-r0",
+    "Verification": "sha1:8bed52a52a72a65aa7f73b4576ce913fb788bfc5",
+    "License": [
+      "curl"
+    ],
+    "Potential": false,
+    "VersionRange": false,
+    "DependsAnd": {
+      "libcurl": "8.1.2-r0",
+      "musl": "1.2.4-r0",
+      "zlib": "1.2.13-r1"
+    },
+    "DependsOr": null,
+    "UpNames": [
+      "libcurl@8.1.2-r0",
+      "musl@1.2.4-r0",
+      "zlib@1.2.13-r1"
+    ],
+    "DownNames": null,
+    "FromFile": [
+      "lib/apk/db/installed"
+    ],
+    "FromAnalyzer": [
+      "apk-pkg"
+    ]
+  },
+  {
+    "Name": "libc-utils",
+    "Version": "0.7.2-r5",
+    "Verification": "sha1:2e59dafeb8bca0786540846c686f121ae8348a42",
+    "License": [
+      "BSD-2-Clause",
+      "BSD-3-Clause"
+    ],
+    "Potential": false,
+    "VersionRange": false,
+    "DependsAnd": {
+      "musl-utils": "*"
+    },
+    "DependsOr": null,
+    "UpNames": [
+      "musl-utils@1.2.4-r0"
+    ],
+    "DownNames": null,
+    "FromFile": [
+      "lib/apk/db/installed"
+    ],
+    "FromAnalyzer": [
+      "apk-pkg"
+    ]
+  },
+  {
+    "Name": "libcrypto3",
+    "Version": "3.1.1-r1",
+    "Verification": "sha1:c81bb336f4e54404b0469c02c2e81a23b24652be",
+    "License": [
+      "Apache-2.0"
+    ],
+    "Potential": false,
+    "VersionRange": false,
+    "DependsAnd": {
+      "musl": "1.2.4-r0"
+    },
+    "DependsOr": null,
+    "UpNames": [
+      "musl@1.2.4-r0"
+    ],
+    "DownNames": [
+      "apk-tools@2.14.0-r2",
+      "ca-certificates@20230506-r0",
+      "libcurl@8.1.2-r0",
+      "libssl3@3.1.1-r1",
+      "ssl_client@1.36.1-r0"
+    ],
+    "FromFile": [
+      "lib/apk/db/installed"
+    ],
+    "FromAnalyzer": [
+      "apk-pkg"
+    ]
+  },
+  {
+    "Name": "libcurl",
+    "Version": "8.1.2-r0",
+    "Verification": "sha1:d91300aff047a12cc19b4ab4f2c738970da71855",
+    "License": [
+      "curl"
+    ],
+    "Potential": false,
+    "VersionRange": false,
+    "DependsAnd": {
+      "brotli-libs": "1.0.9-r14",
+      "ca-certificates": "*",
+      "libcrypto3": "3.1.1-r1",
+      "libidn2": "2.3.4-r1",
+      "libssl3": "3.1.1-r1",
+      "musl": "1.2.4-r0",
+      "nghttp2-libs": "1.53.0-r0",
+      "zlib": "1.2.13-r1"
+    },
+    "DependsOr": null,
+    "UpNames": [
+      "brotli-libs@1.0.9-r14",
+      "ca-certificates@20230506-r0",
+      "libcrypto3@3.1.1-r1",
+      "libidn2@2.3.4-r1",
+      "libssl3@3.1.1-r1",
+      "musl@1.2.4-r0",
+      "nghttp2-libs@1.53.0-r0",
+      "zlib@1.2.13-r1"
+    ],
+    "DownNames": [
+      "curl@8.1.2-r0"
+    ],
+    "FromFile": [
+      "lib/apk/db/installed"
+    ],
+    "FromAnalyzer": [
+      "apk-pkg"
+    ]
+  },
+  {
+    "Name": "libidn2",
+    "Version": "2.3.4-r1",
+    "Verification": "sha1:7bc3cd824a388677844c8e6e75ccf5344cf42f6f",
+    "License": [
+      "GPL-2.0",
+      "LGPL-3.0-or-later"
+    ],
+    "Potential": false,
+    "VersionRange": false,
+    "DependsAnd": {
+      "libunistring": "1.1-r1",
+      "musl": "1.2.4-r0"
+    },
+    "DependsOr": null,
+    "UpNames": [
+      "libunistring@1.1-r1",
+      "musl@1.2.4-r0"
+    ],
+    "DownNames": [
+      "libcurl@8.1.2-r0"
+    ],
+    "FromFile": [
+      "lib/apk/db/installed"
+    ],
+    "FromAnalyzer": [
+      "apk-pkg"
+    ]
+  },
+  {
+    "Name": "libssl3",
+    "Version": "3.1.1-r1",
+    "Verification": "sha1:f867d5ec872470b96cf651da758a53e6a1187c2a",
+    "License": [
+      "Apache-2.0"
+    ],
+    "Potential": false,
+    "VersionRange": false,
+    "DependsAnd": {
+      "libcrypto3": "3.1.1-r1",
+      "musl": "1.2.4-r0"
+    },
+    "DependsOr": null,
+    "UpNames": [
+      "libcrypto3@3.1.1-r1",
+      "musl@1.2.4-r0"
+    ],
+    "DownNames": [
+      "apk-tools@2.14.0-r2",
+      "libcurl@8.1.2-r0",
+      "ssl_client@1.36.1-r0"
+    ],
+    "FromFile": [
+      "lib/apk/db/installed"
+    ],
+    "FromAnalyzer": [
+      "apk-pkg"
+    ]
+  },
+  {
+    "Name": "libunistring",
+    "Version": "1.1-r1",
+    "Verification": "sha1:14ce8b4b122fdd33acb11cc7f106aa0561c219a1",
+    "License": [
+      "GPL-2.0",
+      "LGPL-3.0-or-later"
+    ],
+    "Potential": false,
+    "VersionRange": false,
+    "DependsAnd": {
+      "musl": "1.2.4-r0"
+    },
+    "DependsOr": null,
+    "UpNames": [
+      "musl@1.2.4-r0"
+    ],
+    "DownNames": [
+      "libidn2@2.3.4-r1"
+    ],
+    "FromFile": [
+      "lib/apk/db/installed"
+    ],
+    "FromAnalyzer": [
+      "apk-pkg"
+    ]
+  },
+  {
+    "Name": "musl",
+    "Version": "1.2.4-r0",
+    "Verification": "sha1:e779b680e85539adb9dc4c6c48e6f7dd75e1df6b",
+    "License": [
+      "MIT"
+    ],
+    "Potential": false,
+    "VersionRange": false,
+    "DependsAnd": null,
+    "DependsOr": null,
+    "UpNames": null,
+    "DownNames": [
+      "apk-tools@2.14.0-r2",
+      "brotli-libs@1.0.9-r14",
+      "busybox@1.36.1-r0",
+      "ca-certificates@20230506-r0",
+      "curl@8.1.2-r0",
+      "libcrypto3@3.1.1-r1",
+      "libcurl@8.1.2-r0",
+      "libidn2@2.3.4-r1",
+      "libssl3@3.1.1-r1",
+      "libunistring@1.1-r1",
+      "musl-utils@1.2.4-r0",
+      "nghttp2-libs@1.53.0-r0",
+      "scanelf@1.3.7-r1",
+      "ssl_client@1.36.1-r0",
+      "zlib@1.2.13-r1"
+    ],
+    "FromFile": [
+      "lib/apk/db/installed"
+    ],
+    "FromAnalyzer": [
+      "apk-pkg"
+    ]
+  },
+  {
+    "Name": "musl-utils",
+    "Version": "1.2.4-r0",
+    "Verification": "sha1:e96f86ad77fb1d0c3e93b26e63b6402235ab8189",
+    "License": [
+      "MIT",
+      "BSD-2-Clause",
+      "GPL-2.0"
+    ],
+    "Potential": false,
+    "VersionRange": false,
+    "DependsAnd": {
+      "musl": "1.2.4-r0",
+      "scanelf": "*"
+    },
+    "DependsOr": null,
+    "UpNames": [
+      "musl@1.2.4-r0",
+      "scanelf@1.3.7-r1"
+    ],
+    "DownNames": [
+      "libc-utils@0.7.2-r5"
+    ],
+    "FromFile": [
+      "lib/apk/db/installed"
+    ],
+    "FromAnalyzer": [
+      "apk-pkg"
+    ]
+  },
+  {
+    "Name": "nghttp2-libs",
+    "Version": "1.53.0-r0",
+    "Verification": "sha1:577c7f2ee19642ee1c2a2755a10a818fcdf51979",
+    "License": [
+      "MIT"
+    ],
+    "Potential": false,
+    "VersionRange": false,
+    "DependsAnd": {
+      "musl": "1.2.4-r0"
+    },
+    "DependsOr": null,
+    "UpNames": [
+      "musl@1.2.4-r0"
+    ],
+    "DownNames": [
+      "libcurl@8.1.2-r0"
+    ],
+    "FromFile": [
+      "lib/apk/db/installed"
+    ],
+    "FromAnalyzer": [
+      "apk-pkg"
+    ]
+  },
+  {
+    "Name": "scanelf",
+    "Version": "1.3.7-r1",
+    "Verification": "sha1:e27abda38faea3635a2db4d50d007751ea280b43",
+    "License": [
+      "GPL-2.0"
+    ],
+    "Potential": false,
+    "VersionRange": false,
+    "DependsAnd": {
+      "musl": "1.2.4-r0"
+    },
+    "DependsOr": null,
+    "UpNames": [
+      "musl@1.2.4-r0"
+    ],
+    "DownNames": [
+      "musl-utils@1.2.4-r0"
+    ],
+    "FromFile": [
+      "lib/apk/db/installed"
+    ],
+    "FromAnalyzer": [
+      "apk-pkg"
+    ]
+  },
+  {
+    "Name": "ssl_client",
+    "Version": "1.36.1-r0",
+    "Verification": "sha1:8722023d7e6cde7b861a7c076481000d05f0272e",
+    "License": [
+      "GPL-2.0"
+    ],
+    "Potential": false,
+    "VersionRange": false,
+    "DependsAnd": {
+      "libcrypto3": "3.1.1-r1",
+      "libssl3": "3.1.1-r1",
+      "musl": "1.2.4-r0"
+    },
+    "DependsOr": null,
+    "UpNames": [
+      "libcrypto3@3.1.1-r1",
+      "libssl3@3.1.1-r1",
+      "musl@1.2.4-r0"
+    ],
+    "DownNames": null,
+    "FromFile": [
+      "lib/apk/db/installed"
+    ],
+    "FromAnalyzer": [
+      "apk-pkg"
+    ]
+  },
+  {
+    "Name": "zlib",
+    "Version": "1.2.13-r1",
+    "Verification": "sha1:2656e848992b378aa40dca24af8cde9e97161174",
+    "License": [
+      "Zlib"
+    ],
+    "Potential": false,
+    "VersionRange": false,
+    "DependsAnd": {
+      "musl": "1.2.4-r0"
+    },
+    "DependsOr": null,
+    "UpNames": [
+      "musl@1.2.4-r0"
+    ],
+    "DownNames": [
+      "apk-tools@2.14.0-r2",
+      "curl@8.1.2-r0",
+      "libcurl@8.1.2-r0"
+    ],
+    "FromFile": [
+      "lib/apk/db/installed"
+    ],
+    "FromAnalyzer": [
+      "apk-pkg"
+    ]
+  }
+]

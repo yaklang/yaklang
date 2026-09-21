@@ -257,8 +257,6 @@ var generatedSharedGroups = map[string][]string{
 		"github.com/yaklang/yaklang/common/sca/analyzer",
 		"github.com/yaklang/yaklang/common/sca/analyzer/dep-parser/c/conan",
 		"github.com/yaklang/yaklang/common/sca/analyzer/dep-parser/golang/binary",
-		"github.com/yaklang/yaklang/common/sca/analyzer/dep-parser/golang/mod",
-		"github.com/yaklang/yaklang/common/sca/analyzer/dep-parser/golang/sum",
 		"github.com/yaklang/yaklang/common/sca/analyzer/dep-parser/java/gradle",
 		"github.com/yaklang/yaklang/common/sca/analyzer/dep-parser/java/pom",
 		"github.com/yaklang/yaklang/common/sca/analyzer/dep-parser/nodejs/npm",

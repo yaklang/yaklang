@@ -1,0 +1,456 @@
+[
+  {
+    "Name": "adduser",
+    "Version": "3.118ubuntu5",
+    "Verification": "",
+    "License": [],
+    "Potential": false,
+    "DependsAnd": null,
+    "UpNames": [
+      "debconf|debconf-2.0@\u003e= 0.5|*",
+      "passwd@*"
+    ],
+    "FromFile": [
+      "var/lib/dpkg/status"
+    ],
+    "FromAnalyzer": [
+      "dpkg-pkg"
+    ]
+  },
+  {
+    "Name": "apt",
+    "Version": "2.4.9",
+    "Verification": "",
+    "License": null,
+    "Potential": false,
+    "DependsAnd": null,
+    "UpNames": [
+      "adduser@3.118ubuntu5",
+      "gpgv|gpgv1|gpgv2@*|*|*",
+      "libapt-pkg6.0@\u003e= 2.4.9",
+      "libc6@\u003e= 2.34",
+      "libgcc-s1@\u003e= 3.3.1",
+      "libgnutls30@\u003e= 3.7.0",
+      "libseccomp2@\u003e= 2.4.2",
+      "libstdc++6@\u003e= 11",
+      "libsystemd0@*",
+      "ubuntu-keyring@*"
+    ],
+    "FromFile": [
+      "var/lib/dpkg/status"
+    ],
+    "FromAnalyzer": [
+      "dpkg-pkg"
+    ]
+  },
+  {
+    "Name": "base-files",
+    "Version": "12ubuntu4.3",
+    "Verification": "",
+    "License": [],
+    "Potential": false,
+    "DependsAnd": null,
+    "UpNames": [
+      "libc6@\u003e= 2.34",
+      "libcrypt1@\u003e= 1:4.4.10-10ubuntu3"
+    ],
+    "FromFile": [
+      "var/lib/dpkg/status"
+    ],
+    "FromAnalyzer": [
+      "dpkg-pkg"
+    ]
+  },
+  {
+    "Name": "base-passwd",
+    "Version": "3.5.52build1",
+    "Verification": "",
+    "License": null,
+    "Potential": false,
+    "DependsAnd": null,
+    "UpNames": [
+      "libc6@\u003e= 2.34",
+      "libdebconfclient0@\u003e= 0.145"
+    ],
+    "FromFile": [
+      "var/lib/dpkg/status"
+    ],
+    "FromAnalyzer": [
+      "dpkg-pkg"
+    ]
+  },
+  {
+    "Name": "bash",
+    "Version": "5.1-6ubuntu1",
+    "Verification": "",
+    "License": null,
+    "Potential": false,
+    "DependsAnd": null,
+    "UpNames": [
+      "base-files@12ubuntu4.3",
+      "debianutils@\u003e= 2.15"
+    ],
+    "FromFile": [
+      "var/lib/dpkg/status"
+    ],
+    "FromAnalyzer": [
+      "dpkg-pkg"
+    ]
+  },
+  {
+    "Name": "bsdutils",
+    "Version": "1:2.37.2-4ubuntu3",
+    "Verification": "",
+    "License": null,
+    "Potential": false,
+    "DependsAnd": null,
+    "UpNames": null,
+    "FromFile": [
+      "var/lib/dpkg/status"
+    ],
+    "FromAnalyzer": [
+      "dpkg-pkg"
+    ]
+  },
+  {
+    "Name": "ca-certificates",
+    "Version": "20230311ubuntu0.22.04.1",
+    "Verification": "",
+    "License": null,
+    "Potential": false,
+    "DependsAnd": null,
+    "UpNames": [
+      "debconf|debconf-2.0@\u003e= 0.5|*",
+      "openssl@\u003e= 1.1.1"
+    ],
+    "FromFile": [
+      "var/lib/dpkg/status"
+    ],
+    "FromAnalyzer": [
+      "dpkg-pkg"
+    ]
+  },
+  {
+    "Name": "coreutils",
+    "Version": "8.32-4.1ubuntu1",
+    "Verification": "",
+    "License": null,
+    "Potential": false,
+    "DependsAnd": null,
+    "UpNames": null,
+    "FromFile": [
+      "var/lib/dpkg/status"
+    ],
+    "FromAnalyzer": [
+      "dpkg-pkg"
+    ]
+  },
+  {
+    "Name": "curl",
+    "Version": "7.81.0-1ubuntu1.10",
+    "Verification": "",
+    "License": null,
+    "Potential": false,
+    "DependsAnd": null,
+    "UpNames": [
+      "libc6@\u003e= 2.34",
+      "libcurl4@= 7.81.0-1ubuntu1.10",
+      "zlib1g@\u003e= 1:1.1.4"
+    ],
+    "FromFile": [
+      "var/lib/dpkg/status"
+    ],
+    "FromAnalyzer": [
+      "dpkg-pkg"
+    ]
+  },
+  {
+    "Name": "dash",
+    "Version": "0.5.11+git20210903+057cd650a4ed-3build1",
+    "Verification": "",
+    "License": null,
+    "Potential": false,
+    "DependsAnd": null,
+    "UpNames": [
+      "debconf|debconf-2.0@\u003e= 0.5|*",
+      "debianutils@\u003e= 2.15",
+      "dpkg@\u003e= 1.19.1"
+    ],
+    "FromFile": [
+      "var/lib/dpkg/status"
+    ],
+    "FromAnalyzer": [
+      "dpkg-pkg"
+    ]
+  },
+  {
+    "Name": "debconf|debconf-2.0",
+    "Version": "\u003e= 0.5|*",
+    "Verification": "",
+    "License": null,
+    "Potential": true,
+    "DependsAnd": null,
+    "UpNames": null,
+    "FromFile": [
+      "var/lib/dpkg/status"
+    ],
+    "FromAnalyzer": [
+      "dpkg-pkg"
+    ]
+  },
+  {
+    "Name": "debianutils",
+    "Version": "\u003e= 2.15",
+    "Verification": "",
+    "License": null,
+    "Potential": true,
+    "DependsAnd": null,
+    "UpNames": null,
+    "FromFile": [
+      "var/lib/dpkg/status"
+    ],
+    "FromAnalyzer": [
+      "dpkg-pkg"
+    ]
+  },
+  {
+    "Name": "dpkg",
+    "Version": "\u003e= 1.19.1",
+    "Verification": "",
+    "License": null,
+    "Potential": true,
+    "DependsAnd": null,
+    "UpNames": null,
+    "FromFile": [
+      "var/lib/dpkg/status"
+    ],
+    "FromAnalyzer": [
+      "dpkg-pkg"
+    ]
+  },
+  {
+    "Name": "gpgv|gpgv1|gpgv2",
+    "Version": "*|*|*",
+    "Verification": "",
+    "License": null,
+    "Potential": true,
+    "DependsAnd": null,
+    "UpNames": null,
+    "FromFile": [
+      "var/lib/dpkg/status"
+    ],
+    "FromAnalyzer": [
+      "dpkg-pkg"
+    ]
+  },
+  {
+    "Name": "libapt-pkg6.0",
+    "Version": "\u003e= 2.4.9",
+    "Verification": "",
+    "License": null,
+    "Potential": true,
+    "DependsAnd": null,
+    "UpNames": null,
+    "FromFile": [
+      "var/lib/dpkg/status"
+    ],
+    "FromAnalyzer": [
+      "dpkg-pkg"
+    ]
+  },
+  {
+    "Name": "libc6",
+    "Version": "\u003e= 2.34",
+    "Verification": "",
+    "License": null,
+    "Potential": true,
+    "DependsAnd": null,
+    "UpNames": null,
+    "FromFile": [
+      "var/lib/dpkg/status"
+    ],
+    "FromAnalyzer": [
+      "dpkg-pkg"
+    ]
+  },
+  {
+    "Name": "libcrypt1",
+    "Version": "\u003e= 1:4.4.10-10ubuntu3",
+    "Verification": "",
+    "License": null,
+    "Potential": true,
+    "DependsAnd": null,
+    "UpNames": null,
+    "FromFile": [
+      "var/lib/dpkg/status"
+    ],
+    "FromAnalyzer": [
+      "dpkg-pkg"
+    ]
+  },
+  {
+    "Name": "libcurl4",
+    "Version": "= 7.81.0-1ubuntu1.10",
+    "Verification": "",
+    "License": null,
+    "Potential": true,
+    "DependsAnd": null,
+    "UpNames": null,
+    "FromFile": [
+      "var/lib/dpkg/status"
+    ],
+    "FromAnalyzer": [
+      "dpkg-pkg"
+    ]
+  },
+  {
+    "Name": "libdebconfclient0",
+    "Version": "\u003e= 0.145",
+    "Verification": "",
+    "License": null,
+    "Potential": true,
+    "DependsAnd": null,
+    "UpNames": null,
+    "FromFile": [
+      "var/lib/dpkg/status"
+    ],
+    "FromAnalyzer": [
+      "dpkg-pkg"
+    ]
+  },
+  {
+    "Name": "libgcc-s1",
+    "Version": "\u003e= 3.3.1",
+    "Verification": "",
+    "License": null,
+    "Potential": true,
+    "DependsAnd": null,
+    "UpNames": null,
+    "FromFile": [
+      "var/lib/dpkg/status"
+    ],
+    "FromAnalyzer": [
+      "dpkg-pkg"
+    ]
+  },
+  {
+    "Name": "libgnutls30",
+    "Version": "\u003e= 3.7.0",
+    "Verification": "",
+    "License": null,
+    "Potential": true,
+    "DependsAnd": null,
+    "UpNames": null,
+    "FromFile": [
+      "var/lib/dpkg/status"
+    ],
+    "FromAnalyzer": [
+      "dpkg-pkg"
+    ]
+  },
+  {
+    "Name": "libseccomp2",
+    "Version": "\u003e= 2.4.2",
+    "Verification": "",
+    "License": null,
+    "Potential": true,
+    "DependsAnd": null,
+    "UpNames": null,
+    "FromFile": [
+      "var/lib/dpkg/status"
+    ],
+    "FromAnalyzer": [
+      "dpkg-pkg"
+    ]
+  },
+  {
+    "Name": "libstdc++6",
+    "Version": "\u003e= 11",
+    "Verification": "",
+    "License": null,
+    "Potential": true,
+    "DependsAnd": null,
+    "UpNames": null,
+    "FromFile": [
+      "var/lib/dpkg/status"
+    ],
+    "FromAnalyzer": [
+      "dpkg-pkg"
+    ]
+  },
+  {
+    "Name": "libsystemd0",
+    "Version": "*",
+    "Verification": "",
+    "License": null,
+    "Potential": true,
+    "DependsAnd": null,
+    "UpNames": null,
+    "FromFile": [
+      "var/lib/dpkg/status"
+    ],
+    "FromAnalyzer": [
+      "dpkg-pkg"
+    ]
+  },
+  {
+    "Name": "openssl",
+    "Version": "\u003e= 1.1.1",
+    "Verification": "",
+    "License": null,
+    "Potential": true,
+    "DependsAnd": null,
+    "UpNames": null,
+    "FromFile": [
+      "var/lib/dpkg/status"
+    ],
+    "FromAnalyzer": [
+      "dpkg-pkg"
+    ]
+  },
+  {
+    "Name": "passwd",
+    "Version": "*",
+    "Verification": "",
+    "License": null,
+    "Potential": true,
+    "DependsAnd": null,
+    "UpNames": null,
+    "FromFile": [
+      "var/lib/dpkg/status"
+    ],
+    "FromAnalyzer": [
+      "dpkg-pkg"
+    ]
+  },
+  {
+    "Name": "ubuntu-keyring",
+    "Version": "*",
+    "Verification": "",
+    "License": null,
+    "Potential": true,
+    "DependsAnd": null,
+    "UpNames": null,
+    "FromFile": [
+      "var/lib/dpkg/status"
+    ],
+    "FromAnalyzer": [
+      "dpkg-pkg"
+    ]
+  },
+  {
+    "Name": "zlib1g",
+    "Version": "\u003e= 1:1.1.4",
+    "Verification": "",
+    "License": null,
+    "Potential": true,
+    "DependsAnd": null,
+    "UpNames": null,
+    "FromFile": [
+      "var/lib/dpkg/status"
+    ],
+    "FromAnalyzer": [
+      "dpkg-pkg"
+    ]
+  }
+]

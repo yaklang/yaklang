@@ -1,0 +1,17 @@
+[
+  {
+    "Name": "lodash",
+    "Version": "4.17.21",
+    "Verification": "",
+    "License": null,
+    "Potential": false,
+    "DependsAnd": null,
+    "UpNames": null,
+    "FromFile": [
+      "pnpm-lock.yaml"
+    ],
+    "FromAnalyzer": [
+      "npmp-lang"
+    ]
+  }
+]

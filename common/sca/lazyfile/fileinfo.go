@@ -32,7 +32,7 @@ func (f *FileInfo) Mode() fs.FileMode {
 }
 
 func (f *FileInfo) ModTime() time.Time {
-	return time.Now()
+	return time.Time{}
 }
 
 func (f *FileInfo) IsDir() bool {
@@ -40,5 +40,5 @@ func (f *FileInfo) IsDir() bool {
 }
 
 func (f *FileInfo) Sys() any {
-	panic("not implemented") // TODO: Implement
+	return nil
 }

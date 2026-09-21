@@ -3,16 +3,11 @@ package sca
 import "github.com/yaklang/yaklang/common/sca/analyzer"
 
 var Exports = map[string]interface{}{
-	"ScanImageFromContext":     ScanDockerImageFromContext,
-	"ScanContainerFromContext": ScanDockerContainerFromContext,
-	"ScanImageFromFile":        ScanDockerImageFromFile,
-	"ScanGitRepo":              ScanGitRepo,
-	"ScanLocalFilesystem":      ScanLocalFilesystem,
-	"ScanFilesystem":           ScanFilesystem,
-	"NewAnalyzerResult":        analyzer.NewAnalyzerResult,
+	"ScanLocalFilesystem": ScanLocalFilesystem,
+	"ScanFilesystem":      ScanFilesystem,
+	"NewAnalyzerResult":   analyzer.NewAnalyzerResult,
 
 	// options
-	"endpoint":       _withEndPoint,
 	"scanMode":       _withScanMode,
 	"concurrent":     _withConcurrent,
 	"analyzers":      _withAnalayzers,

@@ -1,15 +1,18 @@
 package analyzer
 
 import (
-	"encoding/json"
 	"fmt"
+	"github.com/yaklang/yaklang/common/sca/core/jsonrecord"
+	"github.com/yaklang/yaklang/common/sca/core/textdecode"
+	"regexp"
+	"sort"
 	"strings"
 
-	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/sca/analyzer/dep-parser/nodejs/npm"
 	"github.com/yaklang/yaklang/common/sca/analyzer/dep-parser/types"
 	godeptypes "github.com/yaklang/yaklang/common/sca/analyzer/dep-parser/types"
 	"github.com/yaklang/yaklang/common/sca/dxtypes"
+	lo "github.com/yaklang/yaklang/common/sca/internal/collection"
 	fi "github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
 )
 
@@ -71,6 +74,7 @@ type packageJSON struct {
 	License              interface{}       `json:"license"`
 	Dependencies         map[string]string `json:"dependencies"`
 	OptionalDependencies map[string]string `json:"optionalDependencies"`
+	DevDependencies      map[string]string `json:"devDependencies"`
 	Workspaces           []string          `json:"workspaces"`
 }
 
@@ -81,7 +85,8 @@ func parseLicense(val interface{}) string {
 		return v
 	case map[string]interface{}:
 		if license, ok := v["type"]; ok {
-			return license.(string)
+			text, _ := license.(string)
+			return text
 		}
 	}
 	return ""
@@ -94,10 +99,15 @@ func newNpmParse() *parser {
 }
 
 func (*parser) Parse(fs fi.FileSystem, r types.ReadSeekerAt) ([]godeptypes.Library, []godeptypes.Dependency, error) {
+	ctx := types.ContextOf(r)
 	var pkgJSON packageJSON
 	// todo: use json field select
-	if err := json.NewDecoder(r).Decode(&pkgJSON); err != nil {
-		return nil, nil, nil
+	data, err := textdecode.ReadRaw(ctx, r, 16<<20)
+	if err != nil {
+		return nil, nil, err
+	}
+	if _, err := jsonrecord.Decode(ctx, data, &pkgJSON); err != nil {
+		return nil, nil, err
 	}
 
 	id := fmt.Sprintf("%s@%s", pkgJSON.Name, pkgJSON.Version)
@@ -108,13 +118,33 @@ func (*parser) Parse(fs fi.FileSystem, r types.ReadSeekerAt) ([]godeptypes.Libra
 		License: parseLicense(pkgJSON.License),
 	}
 
-	dep := godeptypes.Dependency{
-		ID: id,
-		// depend id list
-		DependsOn: lo.MapToSlice(pkgJSON.Dependencies, func(name, version string) string {
-			return fmt.Sprintf("%s@%s", name, version)
-		}),
+	var libs []godeptypes.Library
+	if lib.Name != "" {
+		libs = append(libs, lib)
 	}
-
-	return []godeptypes.Library{lib}, []godeptypes.Dependency{dep}, nil
+	dep := godeptypes.Dependency{ID: id}
+	for _, scope := range []struct {
+		name    string
+		values  map[string]string
+		emitLib bool
+		dev     bool
+	}{{"runtime", pkgJSON.Dependencies, true, false}, {"optional", pkgJSON.OptionalDependencies, true, false}, {"dev", pkgJSON.DevDependencies, false, true}} {
+		names := make([]string, 0, len(scope.values))
+		for n := range scope.values {
+			names = append(names, n)
+		}
+		sort.Strings(names)
+		for _, name := range names {
+			version := scope.values[name]
+			if scope.emitLib {
+				ref := "declaration:" + name
+				libs = append(libs, godeptypes.Library{ID: ref, Name: name, Version: version, IsVersionRange: !exactNPMVersion.MatchString(version), Evidence: "declared", DeclaredName: name, DeclaredVersion: version, Dev: scope.dev, Scope: scope.name})
+				dep.DependsOn = append(dep.DependsOn, ref)
+			}
+			dep.Requirements = append(dep.Requirements, godeptypes.Requirement{Target: name, Constraint: version, Scope: scope.name})
+		}
+	}
+	return libs, []godeptypes.Dependency{dep}, nil
 }
+
+var exactNPMVersion = regexp.MustCompile(`^[0-9]+\.[0-9]+\.[0-9]+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$`)

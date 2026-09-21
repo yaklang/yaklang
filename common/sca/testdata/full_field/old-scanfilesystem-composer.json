@@ -1,0 +1,38 @@
+[
+  {
+    "Name": "pear/log",
+    "Version": "1.13.3",
+    "Verification": "",
+    "License": [
+      "MIT"
+    ],
+    "Potential": false,
+    "DependsAnd": null,
+    "UpNames": [
+      "pear/pear_exception@v1.0.2"
+    ],
+    "FromFile": [
+      "composer.lock"
+    ],
+    "FromAnalyzer": [
+      "composer-lang"
+    ]
+  },
+  {
+    "Name": "pear/pear_exception",
+    "Version": "v1.0.2",
+    "Verification": "",
+    "License": [
+      "BSD-2-Clause"
+    ],
+    "Potential": false,
+    "DependsAnd": null,
+    "UpNames": null,
+    "FromFile": [
+      "composer.lock"
+    ],
+    "FromAnalyzer": [
+      "composer-lang"
+    ]
+  }
+]

@@ -1,12 +1,14 @@
 package analyzer
 
 import (
+	"github.com/yaklang/yaklang/common/sca/core/jsonrecord"
+	"github.com/yaklang/yaklang/common/sca/core/textdecode"
 	"strings"
 
 	"github.com/yaklang/yaklang/common/sca/dxtypes"
 
 	"github.com/yaklang/yaklang/common/sca/analyzer/dep-parser/php/composer"
-	"golang.org/x/exp/slices"
+	"slices"
 )
 
 const (
@@ -32,6 +34,27 @@ func NewPHPComposerAnalyzer() *composerAnalyzer {
 func (a composerAnalyzer) Analyze(afi AnalyzeFileInfo) ([]*dxtypes.Package, error) {
 	fi := afi.Self
 	switch fi.MatchStatus {
+	case statusComposerJson:
+		var manifest struct {
+			Name, Version string
+			Require       map[string]string `json:"require"`
+			License       []string          `json:"license"`
+		}
+		raw, err := textdecode.ReadRaw(fi.LazyFile.Context(), fi.LazyFile, 16<<20)
+		if err != nil {
+			return nil, err
+		}
+		if _, err = jsonrecord.Decode(fi.LazyFile.Context(), raw, &manifest); err != nil {
+			return nil, err
+		}
+		var packages []*dxtypes.Package
+		if manifest.Name != "" {
+			packages = append(packages, &dxtypes.Package{Name: manifest.Name, Version: manifest.Version, PackageDetails: &dxtypes.PackageDetails{Evidence: "declared", RawLicenses: manifest.License}})
+		}
+		for name, constraint := range manifest.Require {
+			packages = append(packages, &dxtypes.Package{Name: name, Version: constraint, IsVersionRange: !exactNPMVersion.MatchString(constraint), PackageDetails: &dxtypes.PackageDetails{Evidence: "declared", DeclaredName: name, DeclaredVersion: constraint, Instance: "declaration:" + name}})
+		}
+		return packages, nil
 	case statusComposerLock:
 		// parse composer lock file
 		lockParser := composer.NewParser()

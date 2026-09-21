@@ -319,7 +319,7 @@ func NewVirtualFileInfo(name string, size int64, isDir bool) *VirtualFileInfo {
 	return &VirtualFileInfo{
 		name: name,
 		size: size,
-		mod:  fs.ModeType,
+		mod:  0, // A virtual byte stream is a regular file, not every special file type.
 	}
 }
 

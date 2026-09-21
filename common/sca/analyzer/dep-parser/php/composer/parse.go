@@ -1,17 +1,17 @@
 package composer
 
 import (
-	"io"
+	"fmt"
+	"github.com/yaklang/yaklang/common/sca/core/textdecode"
 	"sort"
 	"strings"
 
-	"github.com/liamg/jfather"
-	"golang.org/x/exp/maps"
+	"github.com/yaklang/yaklang/common/sca/core/jsonrecord"
+	maps "github.com/yaklang/yaklang/common/sca/internal/collection"
 
-	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/sca/analyzer/dep-parser/types"
 	"github.com/yaklang/yaklang/common/sca/analyzer/dep-parser/utils"
-	outils "github.com/yaklang/yaklang/common/utils"
+
 	fi "github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
 )
 
@@ -19,10 +19,14 @@ type lockFile struct {
 	Packages []packageInfo `json:"packages"`
 }
 type packageInfo struct {
-	Name      string            `json:"name"`
-	Version   string            `json:"version"`
-	Require   map[string]string `json:"require"`
-	License   []string          `json:"license"`
+	Name    string            `json:"name"`
+	Version string            `json:"version"`
+	Require map[string]string `json:"require"`
+	License []string          `json:"license"`
+	Source  struct {
+		URL       string `json:"url"`
+		Reference string `json:"reference"`
+	} `json:"source"`
 	StartLine int
 	EndLine   int
 }
@@ -34,17 +38,23 @@ func NewParser() types.Parser {
 }
 
 func (p *Parser) Parse(fs fi.FileSystem, r types.ReadSeekerAt) ([]types.Library, []types.Dependency, error) {
+	ctx := types.ContextOf(r)
 	var lockFile lockFile
-	input, err := io.ReadAll(r)
+	input, err := textdecode.ReadRaw(ctx, r, 16<<20)
 	if err != nil {
-		return nil, nil, outils.Errorf("read error: %w", err)
+		return nil, nil, fmt.Errorf("read error: %w", err)
 	}
-	if err = jfather.Unmarshal(input, &lockFile); err != nil {
-		return nil, nil, outils.Errorf("decode error: %w", err)
+	nodes, err := jsonrecord.Decode(ctx, input, &lockFile)
+	if err != nil {
+		return nil, nil, fmt.Errorf("decode error: %w", err)
+	}
+	for i, n := range nodes.Get("packages").Elements() {
+		lockFile.Packages[i].StartLine, lockFile.Packages[i].EndLine = n.Lines()
 	}
 
 	libs := map[string]types.Library{}
 	foundDeps := map[string][]string{}
+	requirements := map[string][]types.Requirement{}
 	for _, pkg := range lockFile.Packages {
 		lib := types.Library{
 			ID:       utils.PackageID(pkg.Name, pkg.Version),
@@ -59,18 +69,25 @@ func (p *Parser) Parse(fs fi.FileSystem, r types.ReadSeekerAt) ([]types.Library,
 				},
 			},
 		}
+		if pkg.Source.URL != "" {
+			lib.Source = pkg.Source.URL + "#" + pkg.Source.Reference
+		}
+		if _, exists := libs[lib.Name]; exists {
+			return nil, nil, fmt.Errorf("malformed_input: duplicate Composer package %s", lib.Name)
+		}
 		libs[lib.Name] = lib
 
 		var dependsOn []string
-		for depName := range pkg.Require {
+		for depName, constraint := range pkg.Require {
+			requirements[lib.ID] = append(requirements[lib.ID], types.Requirement{Target: depName, Constraint: constraint})
 			// Require field includes required php version, skip this
 			// Also skip PHP extensions
-			if depName == "php" || strings.HasPrefix(depName, "ext") {
+			if depName == "php" || strings.HasPrefix(depName, "ext-") {
 				continue
 			}
 			dependsOn = append(dependsOn, depName) // field uses range of versions, so later we will fill in the versions from the libraries
 		}
-		if len(dependsOn) > 0 {
+		if len(requirements[lib.ID]) > 0 {
 			foundDeps[lib.ID] = dependsOn
 		}
 	}
@@ -84,12 +101,19 @@ func (p *Parser) Parse(fs fi.FileSystem, r types.ReadSeekerAt) ([]types.Library,
 				dependsOn = append(dependsOn, lib.ID)
 				continue
 			}
-			log.Debugf("unable to find version of %s", depName)
 		}
 		sort.Strings(dependsOn)
+		qs := requirements[libID]
+		for i := range qs {
+			if target, ok := libs[qs[i].Target]; ok {
+				qs[i].Resolved = target.ID
+			}
+		}
+		sort.Slice(qs, func(i, j int) bool { return qs[i].Target < qs[j].Target })
 		deps = append(deps, types.Dependency{
-			ID:        libID,
-			DependsOn: dependsOn,
+			ID:           libID,
+			DependsOn:    dependsOn,
+			Requirements: qs,
 		})
 	}
 
@@ -98,15 +122,4 @@ func (p *Parser) Parse(fs fi.FileSystem, r types.ReadSeekerAt) ([]types.Library,
 	sort.Sort(types.Dependencies(deps))
 
 	return libSlice, deps, nil
-}
-
-// UnmarshalJSONWithMetadata needed to detect start and end lines of deps
-func (t *packageInfo) UnmarshalJSONWithMetadata(node jfather.Node) error {
-	if err := node.Decode(&t); err != nil {
-		return err
-	}
-	// Decode func will overwrite line numbers if we save them first
-	t.StartLine = node.Range().Start.Line
-	t.EndLine = node.Range().End.Line
-	return nil
 }

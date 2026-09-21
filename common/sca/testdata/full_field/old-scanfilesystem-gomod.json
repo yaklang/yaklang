@@ -1,0 +1,38 @@
+[
+  {
+    "Name": "github.com/aquasecurity/go-dep-parser",
+    "Version": "0.0.0-20220406074731-71021a481237",
+    "Verification": "",
+    "License": null,
+    "Potential": false,
+    "VersionRange": false,
+    "DependsAnd": null,
+    "DependsOr": null,
+    "UpNames": null,
+    "DownNames": null,
+    "FromFile": [
+      "go.mod"
+    ],
+    "FromAnalyzer": [
+      "go-mod-lang"
+    ]
+  },
+  {
+    "Name": "golang.org/x/xerrors",
+    "Version": "0.0.0-20200804184101-5ec99f83aff1",
+    "Verification": "",
+    "License": null,
+    "Potential": false,
+    "VersionRange": false,
+    "DependsAnd": null,
+    "DependsOr": null,
+    "UpNames": null,
+    "DownNames": null,
+    "FromFile": [
+      "go.mod"
+    ],
+    "FromAnalyzer": [
+      "go-mod-lang"
+    ]
+  }
+]

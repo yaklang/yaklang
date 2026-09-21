@@ -1,0 +1,188 @@
+{
+  "schema_version": 1,
+  "yak_baseline": "d33a21b6a30945df93a663a18f3cce087b0f3718",
+  "sources": [
+    {
+      "module": "golang.org/x/mod",
+      "selected_version": "v0.19.0",
+      "module_sum": "h1:fEdghXQSo20giMthA7cd28ZC+jts4amQ3YMXiP5oMQ8=",
+      "go_mod_sum": "h1:hTbmBsO62+eylJbnUtE2MGJUyE7QWk4xUqPFrRgJ+7c=",
+      "module_zip_sha256": "f98b5d576225d13dac6945afc53bc79cb66ad3ebd9a4eacdefbf629f4d20ea44",
+      "reference_directory": "/Users/v1ll4n/.codex/sca-upstream-reference/x-mod",
+      "repository": "https://go.googlesource.com/mod",
+      "commit": "d58be1cb16e62a9821b6dbd0157b8c7ff0b667ec",
+      "acquisition": "CLONED_PINNED",
+      "files": [
+        {
+          "path": "modfile/read.go",
+          "sha256": "94addf2b410f66a822d3048c1b8f78fa1fc53cfc3bb5c35757caab844f417eb5",
+          "module_snapshot_equal": true
+        },
+        {
+          "path": "modfile/read_test.go",
+          "sha256": "cccc3aef92fd7afe3b49875aa2a7ac154b9be76a298730648904d9d99a88721f",
+          "module_snapshot_equal": true
+        },
+        {
+          "path": "LICENSE",
+          "sha256": "2d36597f7117c38b006835ae7f537487207d8ec407aa9d9980794b2030cbc067",
+          "module_snapshot_equal": true
+        }
+      ]
+    },
+    {
+      "module": "github.com/knqyf263/go-rpmdb",
+      "selected_version": "v0.1.0",
+      "module_sum": "h1:pOgjtOGtW0B+ibY905hP3ETrYFmLZsHiReKsplcs+to=",
+      "go_mod_sum": "h1:9LQcoMCMQ9vrF7HcDtXfvqGO4+ddxFQ8+YF/0CVGDww=",
+      "module_zip_sha256": "1ed1a057d648fd7d982d7c5612025a74a1f5beae5139dcdadab49e0526c9aee2",
+      "reference_directory": "/Users/v1ll4n/.codex/sca-upstream-reference/go-rpmdb",
+      "repository": "https://github.com/knqyf263/go-rpmdb.git",
+      "commit": "a8af76a6220fc762827743740291ab88943183be",
+      "acquisition": "CLONED_PINNED",
+      "files": [
+        {
+          "path": "pkg/entry.go",
+          "sha256": "c276932e4f8467d984b02c3d2367b936b98ba338e8c00a6df2a58f48e77ad70b",
+          "module_snapshot_equal": true
+        },
+        {
+          "path": "pkg/ndb/ndb.go",
+          "sha256": "1bb0aabcc508c4761fc64a6fad94d6515fb8d202cf2465915023c5316116263e",
+          "module_snapshot_equal": true
+        },
+        {
+          "path": "pkg/rpmdb_test.go",
+          "sha256": "3bea9515bb6654dfbb26ff1acb6e952d866a6e3eff26ac9926dacfe1a62f988d",
+          "module_snapshot_equal": true
+        },
+        {
+          "path": "LICENSE",
+          "sha256": "ed7d020329551a6ffe43df3a479e03e135b9d42e56af97bfe644f65df51360a2",
+          "module_snapshot_equal": true
+        }
+      ]
+    },
+    {
+      "module": "github.com/BurntSushi/toml",
+      "selected_version": "v1.3.2",
+      "module_sum": "h1:o7IhLm0Msx3BaB+n3Ag7L8EVlByGnpq14C4YWiu/gL8=",
+      "go_mod_sum": "h1:CxXYINrC8qIiEnFrOxCa7Jy5BFHlXnUU2pbicEuybxQ=",
+      "module_zip_sha256": "5de246a0cb4c256f3fd5d0db8a08a114f58af0c2e193bbf0ad9012104adbb6b2",
+      "reference_directory": "/Users/v1ll4n/.codex/sca-upstream-reference/toml",
+      "repository": "https://github.com/BurntSushi/toml.git",
+      "commit": "b324da5ffbb2a87e4a611b1703bd03bffbe7ffbf",
+      "acquisition": "CLONED_PINNED",
+      "files": [
+        {
+          "path": "parse.go",
+          "sha256": "0d02803922363df7b4dd5a09dda5f340d2e0050b19d2d4ae2532f158e99e1f1e",
+          "module_snapshot_equal": true
+        },
+        {
+          "path": "lex.go",
+          "sha256": "e2cc420888ce329f315abf95b28f8e9e8f0fa013045af089575251f49554e3ef",
+          "module_snapshot_equal": true
+        },
+        {
+          "path": "COPYING",
+          "sha256": "d21cb1c60785d6d3a84a7059323ccafc45c645b1bbda281c76a62d66ad2d7dc3",
+          "module_snapshot_equal": true
+        }
+      ]
+    },
+    {
+      "module": "gopkg.in/yaml.v3",
+      "selected_version": "v3.0.1",
+      "module_sum": "h1:fxVm/GzAzEWqLHuvctI91KS9hhNmmWOoWu0XTYJS7CA=",
+      "go_mod_sum": "h1:K4uyk7z7BCEPqu6E+C64Yfv1cQ7kz7rIZviUmN+EgEM=",
+      "module_zip_sha256": "aab8fbc4e6300ea08e6afe1caea18a21c90c79f489f52c53e2f20431f1a9a015",
+      "reference_directory": "/Users/v1ll4n/.codex/sca-upstream-reference/yaml",
+      "repository": "https://github.com/go-yaml/yaml.git",
+      "commit": "f6f7691b1fdeb513f56608cd2c32c51f8194bf51",
+      "acquisition": "CLONED_PINNED",
+      "files": [
+        {
+          "path": "decode.go",
+          "sha256": "a66a783addb0f9cdb45f9e87deb0e51c2aca6bf81e46d4e822136993ba81505d",
+          "module_snapshot_equal": true
+        },
+        {
+          "path": "scannerc.go",
+          "sha256": "730400aff4d8033ea29e472fe29f63aa9d78068dc3a2f719385dc2a612ccf884",
+          "module_snapshot_equal": true
+        },
+        {
+          "path": "LICENSE",
+          "sha256": "d18f6323b71b0b768bb5e9616e36da390fbd39369a81807cca352de4e4e6aa0b",
+          "module_snapshot_equal": true
+        }
+      ]
+    },
+    {
+      "module": "github.com/CycloneDX/cyclonedx-go",
+      "selected_version": "v0.7.2",
+      "module_sum": "h1:kKQ0t1dPOlugSIYVOMiMtFqeXI2wp/f5DBIdfux8gnQ=",
+      "go_mod_sum": "h1:K2bA+324+Og0X84fA8HhN2X066K7Bxz4rpMQ4ZhjtSk=",
+      "module_zip_sha256": "0ec9a7c538af92e884d7caed88c62890d5eaadc3d0bb0e2e0e0d7c5d0cb5fdbb",
+      "reference_directory": "/Users/v1ll4n/.codex/sca-upstream-reference/cyclonedx-go",
+      "repository": "https://github.com/CycloneDX/cyclonedx-go.git",
+      "commit": "83031d6697bd6d8b20bce2a0326347a0ea7691c7",
+      "acquisition": "CLONED_PINNED",
+      "files": [
+        {
+          "path": "cyclonedx.go",
+          "sha256": "7c4b81d6b3c0829e6a33f1aefac62c8c340cae721e9cb0b1029c98be3976ba90",
+          "module_snapshot_equal": true
+        },
+        {
+          "path": "LICENSE",
+          "sha256": "8d774b8e55770e19ccdbebe68a10c7505efaa6988257e87bfc58bf0c6675817b",
+          "module_snapshot_equal": true
+        }
+      ]
+    },
+    {
+      "module": "github.com/yaklang/go-sqlite3",
+      "selected_version": "v0.0.1",
+      "module_sum": "h1:IXdqvUAct8FygqoQ3XgWBqw8Bh7qQFa0miTl4cM4B+4=",
+      "go_mod_sum": "h1:RCLoOuANeSNMmFMCABJyusomiGXnZjkLk20oZSAAh5U=",
+      "module_zip_sha256": "2659dd1606bbca41a7b6fc69e6ca7fb2c01e61ad076dcb09cb81e8ee1e7815d9",
+      "reference_directory": "/Users/v1ll4n/go/1.22.12/pkg/mod/github.com/yaklang/go-sqlite3@v0.0.1",
+      "acquisition": "VERIFIED_MODULE_SNAPSHOT_ONLY",
+      "origin": null,
+      "clone_status": "NOT_CLONED_REFERENCE_ONLY",
+      "replaces": "github.com/mattn/go-sqlite3@v1.14.48"
+    },
+    {
+      "module": "github.com/aquasecurity/go-dep-parser",
+      "selected_version": "v0.0.0-20230627073354-fb7eb3159bd5",
+      "module_sum": "h1:FA5XM/KP1l+PYH+QafFzzBjdsT+WxWTWsYGPzKrMeAQ=",
+      "go_mod_sum": "h1:VjG2wX19QDny5yKN+he0v9wuZjF0k+00173mh0FJCVU=",
+      "module_zip_sha256": "33076be22273f31ce4d17ed5fbdb00c8ed54a11b578d8542e96795839873f46d",
+      "reference_directory": "/Users/v1ll4n/.codex/sca-upstream-reference/go-dep-parser",
+      "repository": "https://github.com/aquasecurity/go-dep-parser.git",
+      "commit": "fb7eb3159bd5b83c24e5dbf29e15b4b7ca4618e9",
+      "acquisition": "CLONED_PINNED",
+      "files": [
+        {
+          "path": "pkg/golang/mod/parse.go",
+          "sha256": "30232eb0a38940aa021bbf4d18d16f4db48150b22f55eb31561acb3280449334",
+          "module_snapshot_equal": true
+        },
+        {
+          "path": "pkg/golang/mod/parse_test.go",
+          "sha256": "4ddeca0bbe8c411def98ec9b2327b7dfe91f35446d17e3b3b8c9709706530d3a",
+          "module_snapshot_equal": true
+        },
+        {
+          "path": "LICENSE",
+          "sha256": "ed7d020329551a6ffe43df3a479e03e135b9d42e56af97bfe644f65df51360a2",
+          "module_snapshot_equal": true
+        }
+      ]
+    }
+  ],
+  "release_review": "REVIEWED_FIXED_SOURCE_AND_TEST_SCOPE",
+  "review_scope": "Pinned source commits/files/licenses and all 802 migration candidates reviewed against local implementation and original expectations. Source audit, artifact checks and semantic regressions are separate gates; this field does not assert CI or release approval."
+}
