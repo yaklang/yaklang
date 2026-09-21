@@ -961,6 +961,7 @@ http:
 		t.Fatal(err)
 	}
 
+	var runtimeId string
 	for {
 		rsp, err := stream.Recv()
 		if err != nil {
@@ -969,11 +970,26 @@ http:
 			}
 			t.Errorf("recv Error: %v", err)
 		}
+		if rsp != nil && rsp.GetRuntimeID() != "" {
+			runtimeId = rsp.GetRuntimeID()
+		}
 		spew.Dump(rsp)
 	}
 	if !ok {
 		t.Fatal("nuclei check error")
 	}
+	require.NotEmpty(t, runtimeId, "nuclei debug runtime id should not be empty")
+	err = utils.AttemptWithDelay(8, 300*time.Millisecond, func() error {
+		flows, err := client.QueryHTTPFlows(context.Background(), &ypb.QueryHTTPFlowRequest{RuntimeId: runtimeId})
+		if err != nil {
+			return err
+		}
+		if flows.GetTotal() < 1 {
+			return utils.Errorf("expected nuclei debug httpflow by runtimeId, got 0")
+		}
+		return nil
+	})
+	require.NoError(t, err, "nuclei yaml debug should save HTTP flows for plugin HTTP 流量 tab")
 }
 
 func TestGRPCMUSTPASS_DebugPlugin_Nuclei_MockResponse(t *testing.T) {
