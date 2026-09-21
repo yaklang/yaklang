@@ -1360,8 +1360,13 @@ type FunctionType struct {
 var _ Type = (*FunctionType)(nil)
 
 func (f *FunctionType) SetIsMethod(isMethod bool, obj Type) {
+	if f == nil {
+		return
+	}
+	f.methodLock.Lock()
 	f.IsMethod = isMethod
 	f.ObjectType = obj
+	f.methodLock.Unlock()
 }
 
 func (f *FunctionType) AddFullTypeName(name string) {
