@@ -49,11 +49,7 @@ func TestGoalAcceptanceUsesAuxiliaryConfig(t *testing.T) {
 					for _, option := range req.GetExtraSpecOpts() {
 						option(&options)
 					}
-					if name == "single-model" {
-						require.Equal(t, "none", options.ThinkingLevel)
-					} else {
-						require.Empty(t, options.ThinkingLevel)
-					}
+					require.Empty(t, options.ThinkingLevel, "custom Speed callback keeps its configured parameters")
 					if name == "error" {
 						return nil, errors.New("review unavailable")
 					}

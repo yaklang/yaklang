@@ -15,7 +15,7 @@ import (
 	"github.com/yaklang/yaklang/common/consts"
 )
 
-func TestAuxiliaryLiteCallOptionsAreRequestLocal(t *testing.T) {
+func TestAuxiliaryCustomCallbackOptionsAreRequestLocal(t *testing.T) {
 	previous := consts.GetTieredAIConfig()
 	t.Cleanup(func() { consts.SetTieredAIConfig(previous) })
 	consts.SetTieredAIConfig(nil)
@@ -61,8 +61,8 @@ func TestAuxiliaryLiteCallOptionsAreRequestLocal(t *testing.T) {
 		require.NoError(t, gotError)
 		require.Equal(t, 1, results)
 	}
-	invoke(aicommon.CallerLabelMiniTodoDraft)        // LiteCall overrides high for this request only.
-	invoke(aicommon.CallerLabelGoalAcceptanceReview) // All single-model Speed calls are LiteCall.
+	invoke(aicommon.CallerLabelMiniTodoDraft)
+	invoke(aicommon.CallerLabelGoalAcceptanceReview)
 	response, err := cfg.CallQualityPriorityAI(aicommon.NewAIRequest("normal quality", aicommon.WithAIRequest_ExtraSpecOpts(extra...)))
 	require.NoError(t, err)
 	_, err = io.ReadAll(response.GetOutputStreamReader("test", true, cfg.GetEmitter()))
@@ -71,7 +71,7 @@ func TestAuxiliaryLiteCallOptionsAreRequestLocal(t *testing.T) {
 	cfg = aicommon.NewConfig(ctx, aicommon.WithSingleAIModelMode(false), aicommon.WithDisableAutoSkills(true), aicommon.WithDisableCreateDBRuntime(true), aicommon.WithSpeedPriorityAICallback(callback("speed")), aicommon.WithQualityPriorityAICallback(callback("quality")))
 	invoke(aicommon.CallerLabelMiniTodoDraft) // The same task in multi-model mode preserves high.
 	require.Equal(t, []string{"speed", "speed", "quality", "speed"}, roles)
-	require.Equal(t, []string{"none", "none", "high", "high"}, thinking)
+	require.Equal(t, []string{"high", "high", "high", "high"}, thinking)
 	var original aispec.AIConfig
 	for _, opt := range extra {
 		opt(&original)
@@ -109,11 +109,7 @@ func TestAuxiliaryResponseHandlerTransaction(t *testing.T) {
 					for _, opt := range req.GetExtraSpecOpts() {
 						opt(&opts)
 					}
-					if mode == "lite-call" {
-						require.Equal(t, "none", opts.ThinkingLevel)
-					} else {
-						require.Empty(t, opts.ThinkingLevel)
-					}
+					require.Empty(t, opts.ThinkingLevel, "custom Speed callback keeps its configured parameters")
 					if mode == "cancel" {
 						cancel()
 						return nil, ctx.Err()
