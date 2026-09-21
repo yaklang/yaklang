@@ -3,6 +3,7 @@ package scannode
 import (
 	"context"
 	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -965,7 +966,26 @@ func buildYakAIEngineOptions(
 	if callbacks.Vision != nil {
 		extOptions = append(extOptions, aicommon.WithVisionPriorityAICallback(callbacks.Vision))
 	}
-	if binding.InputWorkspace != nil {
+	if binding.InputWorkspace != nil && options.ApplicationAttemptID != "" {
+		// Forge binds inputs before its immutable release arrives with the turn.
+		// Its profile installs workspace tools at execution, not through Focus.
+		identity := binding.InputWorkspace.Identity()
+		// Identity is pinned by the server bind, never inherited from provider
+		// configuration. Task definition fields are not provider option overlays.
+		pinned, decodeErr := decodeYakRuntimeOptions(binding.RuntimeOptionSnapshotJSON, true)
+		checksum, checksumErr := hex.DecodeString(pinned.AITaskDefinitionChecksum)
+		if decodeErr != nil || pinned.AITaskSessionRole != "execution" || !strings.HasPrefix(pinned.AITaskKey, "forge:") || len(pinned.AITaskKey) <= len("forge:") ||
+			pinned.AITaskVersion == "" || checksumErr != nil || len(checksum) != sha256.Size ||
+			identity.ManifestID != pinned.InputManifestID || identity.RunID != pinned.AITaskRunID || identity.SessionID != binding.Ref.SessionID || identity.AttemptID != pinned.ApplicationAttemptID ||
+			binding.LegionResultRuntime != nil || binding.AuthorizedFocusReleaseID != "" || binding.AuthorizedTargetURL != "" ||
+			options.SourceWorkspace != nil || options.Workdir != "" || options.ForgeName != "" || options.FocusReleaseID != "" || options.FocusTargetURL != "" || options.Focus != "" || options.FocusModeLoop != "" ||
+			len(options.SessionMCPServers) > 0 || len(options.EnabledCapabilities) > 0 || (options.EnableSystemFileSystemOperator != nil && *options.EnableSystemFileSystemOperator) {
+			return nil, fmt.Errorf("managed Forge input binding identity or runtime policy mismatch")
+		}
+		extOptions = append(extOptions, restrictedLegionForgeToolOptions(nil)...)
+		extOptions = append(extOptions, aicommon.WithDisableToolUse(true))
+		config = append(config, aiengine.WithDisableToolUse(true))
+	} else if binding.InputWorkspace != nil {
 		runtime, ok := binding.LegionResultRuntime.(*legionServerFocusRuntime)
 		if !ok || runtime.inputWorkspace != binding.InputWorkspace {
 			return nil, fmt.Errorf("managed input runtime is unavailable")
