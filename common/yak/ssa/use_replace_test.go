@@ -31,6 +31,17 @@ func TestCallReplaceValueKeepsUnrelatedOperands(t *testing.T) {
 	call.Binding = map[string]int64{"x": bound.GetId()}
 	builder.EmitCall(call)
 
+	gotIDs := make(map[int64]struct{})
+	for _, val := range call.GetValues() {
+		gotIDs[val.GetId()] = struct{}{}
+	}
+	require.Contains(t, gotIDs, method.GetId())
+	require.Contains(t, gotIDs, arg.GetId())
+	require.Contains(t, gotIDs, other.GetId())
+	require.Contains(t, gotIDs, bound.GetId())
+	require.NotContains(t, gotIDs, member.GetId())
+	require.NotContains(t, gotIDs, untouchedMember.GetId())
+
 	ReplaceAllValue(arg, to)
 	require.Equal(t, []int64{to.GetId(), other.GetId()}, call.Args)
 	require.Equal(t, []int64{member.GetId(), untouchedMember.GetId()}, call.ArgMember)

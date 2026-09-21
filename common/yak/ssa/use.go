@@ -52,6 +52,14 @@ func ReplaceValue(v Value, to Value, skip func(Instruction) bool) {
 					break
 				}
 			}
+			// Call.ArgMember is a use-def operand but is intentionally
+			// omitted from GetValues so TopDef does not treat captured
+			// object members (e.g. destructors) as call dataflow sources.
+			if !found {
+				if call, ok := ToCall(user); ok && call.hasOperandID(v.GetId()) {
+					found = true
+				}
+			}
 			if !found {
 				// 指令不再使用 v，记录为无效 user
 				invalidUsers = append(invalidUsers, user)
@@ -223,33 +231,45 @@ func (u *UnOp) ReplaceValue(v Value, to Value) {
 // ----------- Call
 func (c *Call) HasValues() bool { return true }
 func (c *Call) GetValues() Values {
-	ret := make(Values, 0, len(c.Args)+len(c.Binding)+len(c.ArgMember)+1)
-	seen := make(map[int64]struct{}, len(c.Args)+len(c.Binding)+len(c.ArgMember)+1)
-	appendID := func(id int64) {
-		if id <= 0 {
-			return
-		}
-		if _, ok := seen[id]; ok {
-			return
-		}
-		val, ok := c.GetValueById(id)
-		if !ok || val == nil {
-			return
-		}
-		seen[id] = struct{}{}
-		ret = append(ret, val)
+	// Method + Args + Binding only. ArgMember is a use-def operand for
+	// ReplaceValue, but including it here makes TopDef walk destructor /
+	// member captures as call sources.
+	ret := make(Values, 0, len(c.Args)+len(c.Binding)+1)
+	if method, ok := c.GetValueById(c.Method); ok {
+		ret = append(ret, method)
 	}
-	appendID(c.Method)
-	for _, id := range c.Args {
-		appendID(id)
-	}
-	for _, id := range c.ArgMember {
-		appendID(id)
-	}
+	ret = append(ret, c.GetValuesByIDs(c.Args)...)
 	for _, id := range c.Binding {
-		appendID(id)
+		if val, ok := c.GetValueById(id); ok {
+			ret = append(ret, val)
+		}
 	}
 	return ret
+}
+
+func (c *Call) hasOperandID(id int64) bool {
+	if id <= 0 {
+		return false
+	}
+	if c.Method == id {
+		return true
+	}
+	for _, arg := range c.Args {
+		if arg == id {
+			return true
+		}
+	}
+	for _, member := range c.ArgMember {
+		if member == id {
+			return true
+		}
+	}
+	for _, bound := range c.Binding {
+		if bound == id {
+			return true
+		}
+	}
+	return false
 }
 
 func (c *Call) ReplaceValue(v Value, to Value) {

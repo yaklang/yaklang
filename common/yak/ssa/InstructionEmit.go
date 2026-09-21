@@ -21,6 +21,18 @@ func fixupUseChain(node Instruction) {
 			v.AddUser(u)
 		}
 	}
+	// ArgMember is omitted from Call.GetValues (TopDef must not treat
+	// captured members as call sources) but is still a real use.
+	if call, ok := ToCall(node); ok {
+		for _, id := range call.ArgMember {
+			if id <= 0 {
+				continue
+			}
+			if val, ok := call.GetValueById(id); ok && val != nil && !utils.IsNil(val) {
+				val.AddUser(call)
+			}
+		}
+	}
 }
 
 func DeleteInst(i Instruction) {
@@ -64,6 +76,16 @@ func detachDeletedInstruction(i Instruction) {
 			}
 		}
 	}
+	if call, ok := ToCall(i); ok && call != nil {
+		for _, id := range call.ArgMember {
+			if id <= 0 {
+				continue
+			}
+			if val, ok := call.GetValueById(id); ok && val != nil && !utils.IsNil(val) {
+				val.RemoveUser(call)
+			}
+		}
+	}
 	deleted, ok := ToValue(i)
 	if !ok || deleted == nil || utils.IsNil(deleted) {
 		return
@@ -83,10 +105,8 @@ func detachDeletedInstruction(i Instruction) {
 	if av == nil {
 		return
 	}
-	// Keep memberPairs on the deleted value. Loop spin still calls
-	// ReplaceMemberCall after the empty phi is removed, and that walk
-	// reads the object's own member list.
 	members := append([]memberPairRecord(nil), av.memberPairs...)
+	av.memberPairs = nil
 	for _, pair := range members {
 		member, ok := deleted.GetValueById(pair.member)
 		if !ok || member == nil || utils.IsNil(member) {
@@ -653,21 +673,21 @@ func (f *FunctionBuilder) EmitRecover() *Recover {
 }
 
 func (f *FunctionBuilder) EmitPhi(name string, vs Values) *Phi {
-	// Dedup only. A single remaining edge stays a Phi; generatePhi is what
-	// folds that trivial case back to the value itself.
-	unique, _ := normalizePhiIncoming(vs)
-	if len(unique) == 0 {
+	// Drop Go-nils only. Duplicate predecessor edges stay so each CFG
+	// incoming is visible to later analysis.
+	incoming := normalizePhiIncoming(vs)
+	if len(incoming) == 0 {
 		return nil
 	}
 	p := &Phi{
 		anValue: NewValue(),
-		Edge:    unique.GetIds(),
+		Edge:    incoming.GetIds(),
 	}
 	p.SetName(name)
 	f.emitEx(p, func(i Instruction) {
 		f.CurrentBlock.Phis = append(f.CurrentBlock.Phis, p.GetId())
 	})
-	for _, v := range unique {
+	for _, v := range incoming {
 		// if _, ok := ToFunction(v); ok {
 		// 	continue
 		// }

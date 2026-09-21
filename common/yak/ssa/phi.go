@@ -148,27 +148,23 @@ func SpinHandle(name string, phiValue, header, latch Value) map[string]Value {
 
 var _ ssautil.SpinHandle[Value] = SpinHandle
 
-// normalizePhiIncoming drops nils and duplicate ids, preserving first-seen order.
-// trivial is true when fewer than two distinct values remain: merge sites should
-// return that single value (or nil) instead of emitting a Phi.
-func normalizePhiIncoming(vs []Value) (Values, bool) {
+// normalizePhiIncoming drops only Go-nil operands. Duplicate ids are kept:
+// each incoming value is a CFG predecessor, and analysis/tests depend on
+// that multiplicity (e.g. if/switch merges of the same value).
+// A one-edge Phi is still emitted; folding it back to the value itself
+// drops Const-nil / trivial merge sites that TopDef reports by name.
+func normalizePhiIncoming(vs []Value) Values {
 	if len(vs) == 0 {
-		return nil, true
+		return nil
 	}
 	out := make(Values, 0, len(vs))
-	seen := make(map[int64]struct{}, len(vs))
 	for _, v := range vs {
 		if v == nil || utils.IsNil(v) {
 			continue
 		}
-		id := v.GetId()
-		if _, ok := seen[id]; ok {
-			continue
-		}
-		seen[id] = struct{}{}
 		out = append(out, v)
 	}
-	return out, len(out) <= 1
+	return out
 }
 
 // build phi
@@ -193,12 +189,9 @@ func generatePhi(builder *FunctionBuilder, block *BasicBlock, cfgEntryBlock Valu
 			}()
 		}
 
-		vs, trivial := normalizePhiIncoming(vst)
-		if trivial {
-			if len(vs) == 0 {
-				return nil
-			}
-			return vs[0]
+		vs := normalizePhiIncoming(vst)
+		if len(vs) == 0 {
+			return nil
 		}
 
 		var t Type
