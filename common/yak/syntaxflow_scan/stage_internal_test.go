@@ -3,6 +3,7 @@ package syntaxflow_scan
 import (
 	"encoding/json"
 	"fmt"
+	"sync"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -125,9 +126,10 @@ func TestParseCompileScale(t *testing.T) {
 func TestStageOutcomeRecorder_ObserveScale(t *testing.T) {
 	recorder := newStageOutcomeRecorder()
 	recorder.observeScale(&RuleProcessInfoList{TotalFiles: 12, TotalBytes: 4096, TotalLines: 80})
-	require.EqualValues(t, 12, recorder.scale.TotalFiles)
-	require.EqualValues(t, 4096, recorder.scale.TotalBytes)
-	require.EqualValues(t, 80, recorder.scale.TotalLines)
+	scale := recorder.Scale()
+	require.EqualValues(t, 12, scale.TotalFiles)
+	require.EqualValues(t, 4096, scale.TotalBytes)
+	require.EqualValues(t, 80, scale.TotalLines)
 }
 
 func TestStageOutcomeRecorder_AccumulatesStreamedRisks(t *testing.T) {
@@ -173,4 +175,38 @@ func TestMergeStageInfoKeepsCompileScaleAndStructRules(t *testing.T) {
 	require.EqualValues(t, 3, got.RiskCount)
 	require.Len(t, got.Rules, 1)
 	require.Equal(t, "php-struct", got.Rules[0].RuleName)
+}
+
+// A stage streams its rule/risk callbacks from several goroutines at once, so
+// the recorder has to be safe to touch concurrently. Unsynchronized map writes
+// used to abort the whole process with "fatal error: concurrent map writes"
+// and left the report file empty.
+func TestStageOutcomeRecorder_ConcurrentUpdates(t *testing.T) {
+	recorder := newStageOutcomeRecorder()
+	recorder.enter(StageInspect)
+
+	var wg sync.WaitGroup
+	for i := 0; i < 32; i++ {
+		wg.Add(1)
+		go func(i int) {
+			defer wg.Done()
+			recorder.addRule(StageInspect, fmt.Sprintf("rule-%d", i))
+			recorder.addRisk(StageInspect, 1)
+			recorder.observe(StageInspect, &RuleProcessInfoList{
+				TotalQuery: int64(i),
+				RiskCount:  int64(i),
+			})
+			recorder.observeScale(&RuleProcessInfoList{TotalFiles: int64(i + 1)})
+		}(i)
+	}
+	wg.Wait()
+
+	recorder.record(StageInspect, nil)
+
+	outcome := recorder.Outcomes()[0]
+	require.EqualValues(t, 32, outcome.RuleCount)
+	// addRisk accumulates while observe keeps the maximum, so the risk total
+	// depends on the interleaving; only the lower bound is deterministic.
+	require.GreaterOrEqual(t, outcome.RiskCount, int64(32))
+	require.Positive(t, recorder.Scale().TotalFiles)
 }
