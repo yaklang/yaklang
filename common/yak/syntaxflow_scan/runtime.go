@@ -358,8 +358,18 @@ func (m *scanManager) notifyDone() {
 	})
 }
 
+// saveReport writes the accumulated report at the end of a scan.
+//
+// A stage scan inside ScanProject defers to the project, which owns the report
+// and saves once after every stage has streamed its results in. Saving inside
+// a stage would write a document that is missing the later stages and, because
+// the writer is opened once, concatenate one whole document per stage into the
+// same file.
 func (m *scanManager) saveReport() {
 	if m == nil || m.Config == nil || m.Config.Reporter == nil {
+		return
+	}
+	if m.Config.deferReportSave {
 		return
 	}
 	if err := m.Config.Reporter.Save(); err != nil {

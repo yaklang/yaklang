@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/syntaxflow/sfpattern"
 	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
@@ -133,6 +134,11 @@ func ScanProject(ctx context.Context, opts ...ssaconfig.Option) (ProjectResult, 
 			userResultCallback(result)
 		}
 	}
+	// The reporter is one object shared by every stage scan below: results
+	// stream into it as each stage runs (see notifyResult), so the document is
+	// only complete after the last stage finishes. Stages must not write it;
+	// ScanProject saves the finished report once the pipeline returns.
+	cfg.deferReportSave = true
 	hasLoaded := len(cfg.Programs) > 0
 	hasCode := hasCodeSource(cfg)
 	localDir := localSourceDir(cfg)
@@ -325,18 +331,24 @@ func ScanProject(ctx context.Context, opts ...ssaconfig.Option) (ProjectResult, 
 // stay visible through stage outcomes instead of turning an already-useful
 // result into a failed job.
 func finishScanProject(cfg *Config, recorder *stageOutcomeRecorder, programName string, err error) (ProjectResult, error) {
+	// Every stage has streamed its results into the shared reporter by now, so
+	// this is the one point where the document is complete. Saving here also
+	// covers the error paths, which used to leave a half-written report.
+	saveProjectReport(cfg)
+
 	result := ProjectResult{
 		Stages:      recorder.Outcomes(),
 		ProgramName: programName,
 		Succeeded:   recorder.Succeeded(),
 	}
 	if recorder != nil {
-		result.TotalFiles = recorder.scale.TotalFiles
-		result.HandlerFiles = recorder.scale.HandlerFiles
-		result.PrehandlerFiles = recorder.scale.PrehandlerFiles
-		result.TotalBytes = recorder.scale.TotalBytes
-		result.TotalLines = recorder.scale.TotalLines
-		result.SourceStatistics = recorder.sourceStatistics
+		scale := recorder.Scale()
+		result.TotalFiles = scale.TotalFiles
+		result.HandlerFiles = scale.HandlerFiles
+		result.PrehandlerFiles = scale.PrehandlerFiles
+		result.TotalBytes = scale.TotalBytes
+		result.TotalLines = scale.TotalLines
+		result.SourceStatistics = recorder.SourceStatistics()
 	}
 	result.SkippedStages = skippedRequestedStages(resolveProductModes(cfg), result.Stages)
 	result.IncompleteStages = len(result.SkippedStages) > 0
@@ -661,19 +673,33 @@ func structRuleProcessInfoAll(progs []*ssaapi.Program) *RuleProcessInfoList {
 	return info
 }
 
+// saveProjectReport writes the report that every stage of this project scan has
+// streamed into. It runs once per ScanProject because the reporter only holds a
+// complete document after the last stage; it is a no-op when no reporter was
+// configured.
+func saveProjectReport(cfg *Config) {
+	if cfg == nil || cfg.Reporter == nil {
+		return
+	}
+	if err := cfg.Reporter.Save(); err != nil {
+		log.Errorf("save report failed: %v", err)
+	}
+}
+
 func scaleInfoFromRecorder(recorder *stageOutcomeRecorder) *RuleProcessInfoList {
 	if recorder == nil {
 		return nil
 	}
-	if recorder.scale.TotalFiles <= 0 && recorder.scale.TotalBytes <= 0 && recorder.scale.TotalLines <= 0 {
+	scale := recorder.Scale()
+	if scale.TotalFiles <= 0 && scale.TotalBytes <= 0 && scale.TotalLines <= 0 {
 		return nil
 	}
 	return &RuleProcessInfoList{
-		TotalFiles:      recorder.scale.TotalFiles,
-		HandlerFiles:    recorder.scale.HandlerFiles,
-		PrehandlerFiles: recorder.scale.PrehandlerFiles,
-		TotalBytes:      recorder.scale.TotalBytes,
-		TotalLines:      recorder.scale.TotalLines,
+		TotalFiles:      scale.TotalFiles,
+		HandlerFiles:    scale.HandlerFiles,
+		PrehandlerFiles: scale.PrehandlerFiles,
+		TotalBytes:      scale.TotalBytes,
+		TotalLines:      scale.TotalLines,
 	}
 }
 
@@ -682,13 +708,7 @@ func captureProgramEvidence(recorder *stageOutcomeRecorder, prog *ssaapi.Program
 		return
 	}
 	if stats, err := prog.GetSourceStatistics(); err == nil && stats != nil {
-		recorder.setSourceStatistics(stats)
-		if stats.AnalyzedLineCount > 0 {
-			recorder.scale.TotalLines = stats.AnalyzedLineCount
-		}
-		if stats.AnalyzedFileCount > 0 && recorder.scale.TotalFiles == 0 {
-			recorder.scale.TotalFiles = stats.AnalyzedFileCount
-		}
+		recorder.observeAnalyzedSource(stats)
 	}
 }
 
@@ -867,6 +887,11 @@ func sharedScanCallbackOptions(cfg *Config) []ssaconfig.Option {
 	}
 	if cfg.Reporter != nil {
 		opts = append(opts, WithReporter(cfg.Reporter))
+	}
+	// A stage scan only feeds the shared reporter; the owner of that report
+	// writes it once the whole pipeline is done.
+	if cfg.deferReportSave {
+		opts = append(opts, WithDeferredReportSave(true))
 	}
 	if cfg.GetScanIgnoreLanguage() {
 		opts = append(opts, ssaconfig.WithScanIgnoreLanguage(true))

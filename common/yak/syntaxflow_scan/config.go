@@ -49,6 +49,12 @@ type ScanTaskCallback struct {
 	Reporter       sfreport.IReport `json:"-"`
 	ReporterWriter io.Writer        `json:"-"`
 
+	// deferReportSave tells a stage scan to feed the reporter without writing
+	// it. ScanProject runs one StartScan per product stage against a single
+	// accumulated report, so a stage that saved would both publish a partial
+	// document and concatenate one whole document per stage into the same file.
+	deferReportSave bool `json:"-"`
+
 	// EnableRulePerformanceLog 是否启用规则级别的详细性能日志
 	// 默认为 false，只显示任务级别的性能统计（编译时间等）
 	// 设置为 true 时，会显示每个规则在每个程序上的详细执行时间
@@ -77,10 +83,17 @@ const (
 	errorCallbackKey   = "syntaxflow-scan/errorCallback"
 	processCallbackKey = "syntaxflow-scan/processCallback"
 	reporterKey        = "syntaxflow-scan/reporter"
+	deferReportSaveKey = "syntaxflow-scan/deferReportSave"
 )
 
 var WithReporter = ssaconfig.SetOption(reporterKey, func(c *Config, reporter sfreport.IReport) {
 	c.Reporter = reporter
+})
+
+// WithDeferredReportSave keeps a scan from writing the reporter, because the
+// caller accumulates results across several scans and saves once at the end.
+var WithDeferredReportSave = ssaconfig.SetOption(deferReportSaveKey, func(c *Config, deferred bool) {
+	c.deferReportSave = deferred
 })
 
 var WithPauseFunc = ssaconfig.SetOption(pauseFuncKey, func(c *Config, pause func() bool) {
