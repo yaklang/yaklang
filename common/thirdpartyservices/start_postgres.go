@@ -3,19 +3,13 @@ package thirdpartyservices
 import (
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"time"
 
-	"github.com/docker/docker/api/types"
-	"github.com/docker/docker/api/types/container"
-	"github.com/docker/docker/api/types/mount"
-	"github.com/docker/go-connections/nat"
 	"github.com/yaklang/gorm"
+	"github.com/yaklang/yaklang/common/dockerhttp"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
-
-	"github.com/docker/docker/client"
 )
 
 const (
@@ -25,7 +19,6 @@ const (
 	PostgresPort          = 5435
 	PostgresUser          = "palm-user"
 	PostgresContainerName = "palm-postgres"
-	PostgresImageName     = "postgres:12.4"
 )
 
 // PALM_POSTGRES_HOST
@@ -55,37 +48,6 @@ func GetPostgresParams() string {
 	)
 }
 
-func init() {
-	/*
-		switch runtime.GOOS {
-		case "linux":
-			dir := "/usr/share/palm/database"
-			err := os.MkdirAll(dir, 0666)
-			if err != nil {
-				panic(fmt.Sprintf("prepare data failed: %s", err))
-			}
-
-		default:
-			dir, err := os.Getwd()
-			if err != nil {
-				panic(fmt.Sprintf("get cwd failed: %s", err))
-			}
-		}
-	*/
-}
-
-func PullPostgresImage() error {
-	log.Infof("[POSTGRES] loading image or pulling image")
-	cmd := exec.Command("docker", "pull", PostgresImageName)
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-	err := cmd.Run()
-	if err != nil {
-		return utils.Errorf("docker pull %s failed: %s", PostgresImageName, err)
-	}
-	return nil
-}
-
 func StartPostgres(pgdir string) error {
 	if pgdir != "" {
 		if !filepath.IsAbs(pgdir) {
@@ -101,7 +63,7 @@ func StartPostgres(pgdir string) error {
 	password := PostgresPassword
 	dbname := PostgresDatabaseName
 
-	log.Info("detecting database connecting... pgdir=%v", pgdir)
+	log.Infof("detecting database connecting... pgdir=%v", pgdir)
 	d, err := gorm.Open("postgres", param)
 	if err == nil {
 		log.Info("detected exsited database.")
@@ -112,38 +74,40 @@ func StartPostgres(pgdir string) error {
 	}
 
 	log.Info("try to start a database...")
-	cli, err := client.NewEnvClient()
+	cli, err := dockerhttp.New(dockerhttp.FromEnv)
 	if err != nil {
 		return utils.Errorf("docker env is miss: %v", err)
 	}
 	defer cli.Close()
 
-	err = cli.ContainerKill(utils.TimeoutContext(10*time.Second), PostgresContainerName, "SIGKILL")
+	err = cli.ContainerKill(utils.TimeoutContext(10*time.Second), PostgresContainerName, dockerhttp.ContainerKillOptions{Signal: "SIGKILL"})
 	if err != nil {
 		log.Errorf("kill %v failed: %s", PostgresContainerName, err)
 	}
 
 	var startNewContainer bool
 	_, err = cli.ContainerInspect(utils.TimeoutContext(10*time.Second), PostgresContainerName)
-	if err != nil {
+	if dockerhttp.IsNotFound(err) {
 		startNewContainer = true
+	} else if err != nil {
+		return fmt.Errorf("inspect service container: %w", err)
 	}
 
 	if !startNewContainer {
 		err = cli.ContainerStart(
 			utils.TimeoutContext(10*time.Second),
-			PostgresContainerName, types.ContainerStartOptions{},
+			PostgresContainerName,
 		)
 		if err != nil {
 			return utils.Errorf("start existed postgres container failed: %s", err)
 		}
 	} else {
-		var mounts []mount.Mount
+		var mounts []dockerhttp.Mount
 		if pgdir != "" {
 			log.Infof("create bind from %v ===> /var/lib/postgresql/data", pgdir)
-			mounts = []mount.Mount{
+			mounts = []dockerhttp.Mount{
 				{
-					Type:   mount.TypeBind,
+					Type:   "bind",
 					Source: pgdir,
 					Target: "/var/lib/postgresql/data",
 				},
@@ -155,8 +119,8 @@ func StartPostgres(pgdir string) error {
 
 		resp, err := cli.ContainerCreate(
 			utils.TimeoutContext(10*time.Second),
-			&container.Config{
-				ExposedPorts: map[nat.Port]struct{}{
+			&dockerhttp.ContainerConfig{
+				ExposedPorts: map[string]struct{}{
 					"5432/tcp": {},
 				},
 				Env: []string{
@@ -165,12 +129,9 @@ func StartPostgres(pgdir string) error {
 					fmt.Sprintf("POSTGRES_DB=%s", dbname),
 				},
 				Image: PostgresImageName,
-				//Volumes: map[string]struct{}{
-				//	fmt.Sprintf("%v:/var/lib/postgresql/data", pgdir): {},
-				//},
-			}, &container.HostConfig{
-				PortBindings: nat.PortMap{
-					"5432/tcp": []nat.PortBinding{
+			}, &dockerhttp.HostConfig{
+				PortBindings: dockerhttp.PortMap{
+					"5432/tcp": []dockerhttp.PortBinding{
 						{
 							HostIP:   PostgresHost,
 							HostPort: fmt.Sprint(PostgresPort),
@@ -178,7 +139,7 @@ func StartPostgres(pgdir string) error {
 					},
 				},
 				Mounts: mounts,
-			}, nil, nil, PostgresContainerName,
+			}, PostgresContainerName,
 		)
 		if err != nil {
 			return utils.Errorf("create postgres container failed: %s", err)
@@ -189,7 +150,7 @@ func StartPostgres(pgdir string) error {
 		}
 
 		log.Infof("start to run %v", PostgresContainerName)
-		err = cli.ContainerStart(utils.TimeoutContext(30*time.Second), resp.ID, types.ContainerStartOptions{})
+		err = cli.ContainerStart(utils.TimeoutContext(30*time.Second), resp.ID)
 		if err != nil {
 			return utils.Errorf("start %v failed: %s", PostgresContainerName, err)
 		}
