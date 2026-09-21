@@ -35,11 +35,19 @@ func (y *singleFileBuilder) VisitCompilationUnit(raw javaparser.ICompilationUnit
 		if lib == nil {
 			lib = prog.NewLibrary(pkgName, pkgPath)
 		}
-		lib.PushEditor(prog.GetApplication().GetCurrentEditor())
+		editor := y.GetEditor()
+		if editor == nil {
+			editor = prog.GetApplication().GetCurrentEditor()
+		}
+		if editor != nil {
+			lib.PushEditor(editor)
+		}
 
 		builder := lib.GetAndCreateFunctionBuilder(pkgName, string(ssa.MainFunctionName))
 		if builder != nil {
-			builder.SetEditor(prog.GetApplication().GetCurrentEditor())
+			if editor != nil {
+				builder.SetEditor(editor)
+			}
 			builder.SetBuildSupport(y.FunctionBuilder)
 			currentBuilder := y.FunctionBuilder
 			y.FunctionBuilder = builder

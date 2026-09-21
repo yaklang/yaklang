@@ -1,13 +1,14 @@
 package ssaapi
 
 import (
-	"errors"
 	"fmt"
+	"math"
 	"os"
 	"runtime"
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/yaklang/yaklang/common/utils"
@@ -217,7 +218,15 @@ func (c *Config) parseProjectWithFSUnits(
 	compilePhase := "f0_scan"
 	programName := c.GetProgramName()
 	programPath := c.programPath
-	process := 0.0
+	var processBits atomic.Uint64
+	var progressMu sync.Mutex
+	loadProcess := func() float64 { return math.Float64frombits(processBits.Load()) }
+	storeProcess := func(p float64) { processBits.Store(math.Float64bits(p)) }
+	reportProcess := func(p float64, msg string, args ...any) {
+		progressMu.Lock()
+		processCallback(p, msg, args...)
+		progressMu.Unlock()
+	}
 	start := time.Now()
 
 	log.Debugf("ssa.compile.phase enter %s", compilePhase)
@@ -259,7 +268,7 @@ func (c *Config) parseProjectWithFSUnits(
 	}
 	calculateTime = time.Since(start)
 	c.Config.SetCompileProjectBytes(scanResult.HandlerBytes)
-	emitCompileScale(processCallback, process, scanResult)
+	emitCompileScale(processCallback, loadProcess(), scanResult)
 	if restoreGC := c.applyLargeProjectGCPercent(); restoreGC != nil {
 		defer restoreGC()
 	}
@@ -324,7 +333,7 @@ func (c *Config) parseProjectWithFSUnits(
 		if compilePhase != "" {
 			msg = fmt.Sprintf("[%s] %s", compilePhase, msg)
 		}
-		processCallback(process, msg)
+		reportProcess(loadProcess(), msg)
 	}
 	if stopAdaptiveGC := startSSACompileAdaptiveGC(prog.ProcessInfof); stopAdaptiveGC != nil {
 		defer stopAdaptiveGC()
@@ -372,14 +381,15 @@ func (c *Config) parseProjectWithFSUnits(
 	astParseErrSuppressed := false
 	const maxAstParseErrLogs = 20
 	preHandlerBuildsFiles := c.LanguageBuilder != nil && c.LanguageBuilder.UsesDeferredFileBuild()
-	preHandlerNum := 0
+	var preHandlerNum atomic.Int32
 	preHandlerProcess := func() {
-		preHandlerNum++
-		process = (float64(preHandlerNum) / float64(preHandlerTotal)) * 0.4
-		if process > 0.4 {
-			process = 0.4
+		n := preHandlerNum.Add(1)
+		p := (float64(n) / float64(preHandlerTotal)) * 0.4
+		if p > 0.4 {
+			p = 0.4
 		}
-		processCallback(process, fmt.Sprintf("[%s] pre-handler progress(%d/%d)", compilePhase, preHandlerNum, preHandlerTotal))
+		storeProcess(p)
+		reportProcess(p, fmt.Sprintf("[%s] pre-handler progress(%d/%d)", compilePhase, n, preHandlerTotal))
 	}
 
 	compilePhase = "f1_units"
@@ -434,107 +444,37 @@ func (c *Config) parseProjectWithFSUnits(
 			prog.ProcessInfof("compile unit batch(%d/%d) scc=%d-%d units=%d files=%d bytes=%d spill=%s",
 				batchIndex+1, len(batches), batch.startSCC+1, batch.endSCC+1, len(batch.units), batch.files, batch.bytes, spillMode)
 		}
-		unitCanceled := false
-		for fileContent := range prefetchedFiles {
-			if fileContent != nil {
-				prog.BeginCompileUnit(fileUnits[fileContent.Path])
+		concurrentPrehandle := prog.ConcurrentUnitBuildEnabled()
+		if concurrentPrehandle {
+			for _, key := range unitKeys {
+				prog.EnsureLibraryForCompileUnit(key)
 			}
-			if fileContent == nil {
-				continue
-			}
-			func(fileContent *ssareducer.FileContent) {
-				defer fileContent.Release()
-				if fileContent.Status == ssareducer.FileStatusFsError {
-					prog.RecordCompileDiagnostic("file", fileContent.Path, fmt.Sprint(fileContent.Err))
-					log.Errorf("skip file: %s with fs error: %v", fileContent.Path, fileContent.Err)
-					prog.ProcessInfof("skip  file: %s with fs error: %v", fileContent.Path, fileContent.Err)
-					return
-				}
-				if fileContent.Status == ssareducer.FileParseASTError {
-					prog.RecordCompileDiagnostic("ast", fileContent.Path, fmt.Sprint(fileContent.Err))
-					if astParseErrLogged < maxAstParseErrLogs {
-						log.Warnf("parse Ast file: %s error: %s", fileContent.Path, fileContent.Err)
-						astParseErrLogged++
-					} else if !astParseErrSuppressed {
-						astParseErrSuppressed = true
-						log.Warnf("too many AST parse errors; suppressing further per-file logs (limit=%d)", maxAstParseErrLogs)
-					}
-					astErr = utils.Errorf("parse Ast file: %s error: %s", fileContent.Path, fileContent.Err)
-				}
-				editor := prog.CreateEditor(fileContent.Content, fileContent.Path)
-				fileContent.Editor = editor
-				fileContent.Content = nil
-				if fileContent.Err != nil {
-					prog.ProcessInfof("file %s parse ast error: %v", fileContent.Path, fileContent.Err)
-					astErr = utils.JoinErrors(astErr,
-						utils.Errorf("pre-handler parse file %s error: %v", fileContent.Path, fileContent.Err),
-					)
-				}
-				preHandlerProcess()
-				if language := c.LanguageBuilder; language != nil {
-					func() {
-						defer func() {
-							if r := recover(); r != nil {
-								prog.RecordCompileDiagnostic("prehandler", fileContent.Path, fmt.Sprint(r))
-								log.Errorf("pre-handler parse [%s] error %v  ", fileContent.Path, r)
-								utils.PrintCurrentGoroutineRuntimeStack()
-							}
-						}()
-						language.InitHandler(builder)
-						err = language.PreHandlerProject(filesystem, fileContent.AST, builder, editor)
-						if err != nil {
-							var configError *ssa.ProjectConfigError
-							if errors.As(err, &configError) {
-								log.Warnf("%v", err)
-							} else {
-								prog.RecordCompileDiagnostic("prehandler", fileContent.Path, err.Error())
-								log.Errorf("pre-handler parse [%s] error %v", fileContent.Path, err)
-							}
-						}
-					}()
-				}
-				if preHandlerBuildsFiles {
-					ssa.ReleaseASTRoot(fileContent.AST)
-				}
-				if _, needBuild := preHandlerFileSet[fileContent.Path]; needBuild {
-					_, needsCompile := handlerFileSet[fileContent.Path]
-					switch {
-					case needsCompile && fileContent.AST != nil && !preHandlerBuildsFiles:
-						ast := fileContent.AST
-						path := fileContent.Path
-						prog.RegisterFileBuild(path, editor, builder, func(fileBuilder *ssa.FunctionBuilder) {
-							fileBuildStart := time.Now()
-							defer func() {
-								if d := time.Since(fileBuildStart); d > 100*time.Millisecond {
-									log.Debugf("[file build] %s cost %v", path, d)
-								}
-							}()
-							if err := c.LanguageBuilder.BuildFromAST(ast, fileBuilder); err != nil {
-								log.Errorf("file build [%s] failed: %v", path, err)
-							}
-						})
-					case !needsCompile && fileContent.Editor != nil:
-						rootEditor := fileContent.Editor
-						prog.RegisterDeferredBuild(ssa.DeferredBuildKindHelper, "extra-file:"+rootEditor.GetUrl(), func() {
-							prog.PushEditor(rootEditor)
-							prog.PopEditor(true)
-						})
-					}
-				}
-				fileContent.AST = nil
-			}(fileContent)
-			if c.isStop() {
-				unitCanceled = true
-				break
-			}
-			prog.EndCompileUnit()
 		}
+		prehandleStart := time.Now()
+		prehandle := &prehandleBatchEnv{
+			c:                     c,
+			prog:                  prog,
+			builder:               builder,
+			filesystem:            filesystem,
+			fileUnits:             fileUnits,
+			preHandlerFileSet:     preHandlerFileSet,
+			handlerFileSet:        handlerFileSet,
+			preHandlerBuildsFiles: preHandlerBuildsFiles,
+			preHandlerProcess:     preHandlerProcess,
+			concurrentUnits:       concurrentPrehandle,
+			concurrency:           c.GetCompileConcurrency(),
+			astErr:                astErr,
+			astParseErrLogged:     astParseErrLogged,
+			astParseErrSuppressed: astParseErrSuppressed,
+			maxAstParseErrLogs:    maxAstParseErrLogs,
+		}
+		unitCanceled := prehandle.consume(prefetchedFiles)
+		astErr = prehandle.astErr
+		astParseErrLogged = prehandle.astParseErrLogged
+		astParseErrSuppressed = prehandle.astParseErrSuppressed
+		log.Infof("compile unit prehandler batch=%d units=%d files=%d concurrency=%d cost=%v",
+			batchIndex+1, len(unitKeys), len(batchFiles), prehandle.concurrency, time.Since(prehandleStart))
 		if unitCanceled {
-			// A bounded parser can be blocked delivering a file when its
-			// consumer stops. Drain and release the remaining AST permits.
-			for file := range prefetchedFiles {
-				file.Release()
-			}
 			prog.EndCompileUnit()
 			return nil, ErrContextCancel
 		}
@@ -564,8 +504,9 @@ func (c *Config) parseProjectWithFSUnits(
 			func(index int, total int) bool {
 				// Match legacy deferred band: pre-handler ends ~0.40, builds fill to ~0.88.
 				// Spread that band across all batches so batch 1/N cannot claim ~87%.
-				process = deferredBuildProcessFraction(batchIndex, len(batches), index, total)
-				processCallback(process, fmt.Sprintf("[%s] deferred build progress(%d/%d) batch(%d/%d)", compilePhase, index, total, batchIndex+1, len(batches)))
+				p := deferredBuildProcessFraction(batchIndex, len(batches), index, total)
+				storeProcess(p)
+				reportProcess(p, fmt.Sprintf("[%s] deferred build progress(%d/%d) batch(%d/%d)", compilePhase, index, total, batchIndex+1, len(batches)))
 				return !c.isStop()
 			},
 			func(unitKey string) bool {
@@ -622,7 +563,7 @@ func (c *Config) parseProjectWithFSUnits(
 					if unit == nil {
 						continue
 					}
-					processCallback(process, fmt.Sprintf("[struct_scan] package=%s", unit.Key))
+					reportProcess(loadProcess(), fmt.Sprintf("[struct_scan] package=%s", unit.Key))
 					c.structScan.scanStructWithOpcodeIndex(structProgAPI, unit, index)
 					if c.isStop() {
 						return ErrContextCancel
@@ -666,7 +607,7 @@ func (c *Config) parseProjectWithFSUnits(
 	compilePhase = "f4_finish"
 	log.Debugf("ssa.compile.phase enter %s", compilePhase)
 	finishStart := time.Now()
-	process = 0.88
+	storeProcess(0.88)
 	prog.SetPreHandler(false)
 	if !prog.RunDeferredBuildsWithCallback(func(index int, total int) bool {
 		return !c.isStop()
@@ -707,7 +648,7 @@ func (c *Config) parseProjectWithFSUnits(
 	remaining := prog.Cache.CountInstruction()
 	persisted := prog.Cache.InstructionPersistedCount()
 	total := remaining + persisted
-	process = 0.90
+	storeProcess(0.90)
 	// Log memory state before the heaviest save phase
 	{
 		var ms runtime.MemStats
@@ -723,7 +664,7 @@ func (c *Config) parseProjectWithFSUnits(
 		prog.ProcessInfof("[SSA/persist] program %s finishing cache instruction(len:%d) (memory only, not saved)", prog.Name, remaining)
 	}
 	if err := prog.Cache.SaveToDatabase(irSaveProgressCallback(prog, total, persisted, 0.90, 1.0, func(p float64) {
-		process = p
+		storeProcess(p)
 	})); err != nil {
 		return nil, utils.Errorf("persist IR to database failed: %w", err)
 	}

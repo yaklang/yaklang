@@ -236,6 +236,43 @@ class Top { void run() { println(Left.value()); println(Right.value()); } }`)
 	}
 }
 
+func TestPrehandleUnitWorkerPinsApplicationAndHashesPackages(t *testing.T) {
+	cfg, err := ssaconfig.New(ssaconfig.ModeSSACompile)
+	require.NoError(t, err)
+	prog := ssa.NewProgram(cfg, ssa.ProgramCacheMemory, ssa.Application, filesys.NewVirtualFs(), ".", 0)
+	env := &prehandleBatchEnv{prog: prog}
+	require.Equal(t, 0, env.unitWorker("resource:web", 8))
+	require.Equal(t, 0, env.unitWorker("dir:src", 8))
+	require.Equal(t, 0, env.unitWorker("", 8))
+	a := env.unitWorker("java:a", 8)
+	require.NotZero(t, a)
+	require.Equal(t, a, env.unitWorker("java:a", 8))
+	seen := map[int]bool{}
+	for i := 0; i < 40; i++ {
+		seen[env.unitWorker(fmt.Sprintf("java:p%d", i), 8)] = true
+	}
+	require.Greater(t, len(seen), 1)
+}
+
+func TestCompileUnitPrehandlerIndependentPackages(t *testing.T) {
+	vf := filesys.NewVirtualFs()
+	for i := 0; i < 8; i++ {
+		vf.AddFile(fmt.Sprintf("p%d/C.java", i), fmt.Sprintf("package p%d; public class C { public static String n() { return \"p%d\"; } }", i, i))
+	}
+	vf.AddFile("top/Top.java", `package top;
+import p0.C;
+public class Top { String run() { println(C.n()); return C.n(); } }`)
+	cfg, err := DefaultConfig(WithFileSystem(vf), WithLanguage(ssaconfig.JAVA), WithMemory(), ssaconfig.WithCompileConcurrency(8))
+	require.NoError(t, err)
+	program, err := cfg.parseProjectWithFSUnits(vf, func(float64, string, ...any) {})
+	require.NoError(t, err)
+	require.NotNil(t, program)
+	result, err := program.SyntaxFlowWithError(`println(* #-> * as $source) as $call`)
+	require.NoError(t, err)
+	require.Equal(t, 1, result.GetValues("call").Len())
+	require.Contains(t, result.GetValues("source").String(), "p0")
+}
+
 func TestCompileUnitApplicationDoesNotDrainReadyLibraries(t *testing.T) {
 	cfg, err := ssaconfig.New(ssaconfig.ModeSSACompile)
 	require.NoError(t, err)
