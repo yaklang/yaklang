@@ -186,6 +186,15 @@ func TestFormatFieldMatrix(t *testing.T) {
 			if !strings.Contains(c.Key.Verification, "f7bd337ae2962162ac73a509ed7129f0") {
 				t.Fatalf("rpm md5 dropped: %q", c.Key.Verification)
 			}
+			found := false
+			for _, q := range r.Requirements {
+				if q.Target == "config(mariner-release)" && q.Constraint == "= 2.0-4.cm2" {
+					found = true
+				}
+			}
+			if !found {
+				t.Fatalf("rpm require version qualifier dropped: %+v", r.Requirements)
+			}
 		}},
 		{"gobinary", files{"app": "testdata/go_binary/go-binary"}, func(t *testing.T, r *model.Report) {
 			c := mustNamed(t, r, "github.com/aquasecurity/go-pep440-version", "v0.0.0-20210121094942-22b2f8951d46")

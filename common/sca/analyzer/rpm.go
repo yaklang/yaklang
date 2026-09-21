@@ -6,6 +6,7 @@ import (
 
 	"github.com/yaklang/yaklang/common/sca/dxtypes"
 	licenses "github.com/yaklang/yaklang/common/sca/license"
+	"github.com/yaklang/yaklang/common/sca/model"
 
 	rpmdb "github.com/yaklang/yaklang/common/sca/core/rpm"
 )
@@ -50,12 +51,32 @@ func (a rpmAnalyzer) createPackage(pkgInfo *rpmdb.PackageInfo, provides map[stri
 		License:      []string{licenses.Normalize(pkgInfo.License)}, PackageDetails: &dxtypes.PackageDetails{RawLicenses: []string{pkgInfo.License}},
 	}
 	pkg.Architecture = pkgInfo.Arch
+	pkg.Ecosystem = "rpm"
 	pkg.Variant = fmt.Sprintf("epoch=%d;release=%s", pkgInfo.Epoch, pkgInfo.Release)
 	pkg.Evidence = "installed"
-	pkg.Provides = append([]string(nil), pkgInfo.Provides...)
-	pkg.DependsOn.And = map[string]string{}
-	for _, dep := range pkgInfo.Requires {
-		pkg.DependsOn.And[dep] = ""
+	for _, d := range pkgInfo.ProvideDeps {
+		s := d.Name
+		if c := d.Constraint(); c != "" {
+			s = d.Name + " " + c
+		}
+		pkg.Provides = append(pkg.Provides, s)
+	}
+	if len(pkg.Provides) == 0 {
+		pkg.Provides = append([]string(nil), pkgInfo.Provides...)
+	}
+	for _, d := range pkgInfo.RequireDeps {
+		pkg.Requirements = append(pkg.Requirements, model.Requirement{
+			Target:     d.Name,
+			Constraint: d.Constraint(),
+			Condition:  fmt.Sprintf("rpmflags=%d", d.Flags),
+			Operator:   "and",
+		})
+	}
+	if len(pkg.Requirements) == 0 {
+		pkg.DependsOn.And = map[string]string{}
+		for _, dep := range pkgInfo.Requires {
+			pkg.DependsOn.And[dep] = ""
+		}
 	}
 	return pkg
 }
@@ -72,7 +93,7 @@ func (a rpmAnalyzer) Analyze(afi AnalyzeFileInfo) ([]*dxtypes.Package, error) {
 		}
 		pkgList, err := rpmdb.Parse(afi.Self.LazyFile.Context(), fi.LazyFile, stat.Size(), rpmdb.Limits{})
 		if err != nil {
-			return nil, fmt.Errorf("failed to list packages: %v", err)
+			return nil, err
 		}
 		pkgs := make([]*dxtypes.Package, len(pkgList))
 		for i, pkgInfo := range pkgList {

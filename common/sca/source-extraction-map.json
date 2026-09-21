@@ -2263,7 +2263,7 @@
     },
     {
       "local_file": "common/sca/analyzer/rpm.go",
-      "sha256": "4b8a1c9f5125fa8e93ab88505cab51f60f00926be281ecf067c6447f39f84d6e",
+      "sha256": "2b86f2920b44476ce9b736127457e2e8c6aadd166f1fa63990f077fb3bf84be1",
       "symbols": [
         {
           "name": "init",
@@ -3825,7 +3825,7 @@
     },
     {
       "local_file": "common/sca/core/rpm/bdb.go",
-      "sha256": "f2ea06ae7cb3f0b843978a8967983d7fc61d919c1abad75c73b11ad286b6d203",
+      "sha256": "a0e304bc9c2fc64039878e0b9e366b53c58157773a71f99d09c859d3cb179cf7",
       "symbols": [
         {
           "name": "snapshot.bdb",
@@ -3889,35 +3889,47 @@
     },
     {
       "local_file": "common/sca/core/rpm/read.go",
-      "sha256": "c43a618cb8dc60be6686139d1b68e2e02d2c28ae37af23a6bc93de72a9a95db4",
+      "sha256": "a7aee13a4fb6768546f6b5d626353fc4b7039029b8332bf405e3037036094041",
       "symbols": [
         {
+          "name": "Dependency",
+          "line": 25
+        },
+        {
+          "name": "Dependency.Constraint",
+          "line": 30
+        },
+        {
           "name": "PackageInfo",
-          "line": 17
+          "line": 50
         },
         {
           "name": "Limits",
-          "line": 22
+          "line": 56
         },
         {
           "name": "snapshot",
-          "line": 26
+          "line": 60
         },
         {
           "name": "Parse",
-          "line": 34
+          "line": 68
         },
         {
           "name": "snapshot.at",
-          "line": 86
+          "line": 130
         },
         {
           "name": "header",
-          "line": 111
+          "line": 155
         },
         {
           "name": "headerWithContext",
-          "line": 115
+          "line": 159
+        },
+        {
+          "name": "alignRPMDeps",
+          "line": 295
         }
       ],
       "decision": "REWRITE",
@@ -3945,7 +3957,7 @@
     },
     {
       "local_file": "common/sca/core/rpm/sqlite.go",
-      "sha256": "3a2d50658a0ae36af2888da9add169c91d26c3da9863b9228ab7b642d7d630b3",
+      "sha256": "599e1dedf0692a0732f4ca0a32d0e847b6decbb67a59b12884ab7be87a9e8097",
       "symbols": [
         {
           "name": "sqliteSnapshot",
@@ -4802,7 +4814,7 @@
     },
     {
       "local_file": "common/sca/report.go",
-      "sha256": "f704f78b46a710f0eba804d801aff95383abe7fbc2609f5e6b25be8353985684",
+      "sha256": "0e7af047f748733c26b955b4e14c81f6d743ff82c8120251a99f8d742c82f20f",
       "symbols": [
         {
           "name": "chargeAndSortPackages",
@@ -4814,7 +4826,7 @@
         },
         {
           "name": "manifestEvidence",
-          "line": 570
+          "line": 583
         }
       ],
       "decision": "REWRITE",

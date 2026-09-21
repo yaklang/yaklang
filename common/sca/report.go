@@ -421,9 +421,9 @@ func fillReport(r *model.Report, pkgs []*dxtypes.Package, l ResourceLimits, shar
 		if p.Evidence == "installed" {
 			for _, raw := range append([]string{p.Name}, p.Provides...) {
 				name := raw
-				if p.Ecosystem == "apk" {
+				if p.Ecosystem == "apk" || p.Ecosystem == "rpm" {
 					if at := strings.IndexAny(raw, "<>="); at >= 0 {
-						name = raw[:at]
+						name = strings.TrimSpace(raw[:at])
 					}
 				}
 				if p.Ecosystem == "dpkg" {
@@ -532,6 +532,19 @@ func fillReport(r *model.Report, pkgs []*dxtypes.Package, l ResourceLimits, shar
 			for _, ref := range refs {
 				if id := native[[3]string{p.Snapshot, p.ProjectRoot, ref}]; id != "" {
 					q.Resolved = append(q.Resolved, id)
+				}
+			}
+			if len(q.Candidates) == 0 {
+				for _, id := range providers[[4]string{p.Snapshot, p.ProjectRoot, p.Ecosystem, q.Target}] {
+					if candidateCount >= l.MaxEdges {
+						if !edgeLimitReported {
+							limit("provider candidate count")
+							edgeLimitReported = true
+						}
+						break
+					}
+					q.Candidates = append(q.Candidates, id)
+					candidateCount++
 				}
 			}
 			add(q)

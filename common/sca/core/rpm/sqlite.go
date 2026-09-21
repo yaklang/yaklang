@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"fmt"
 	"strings"
+
+	"github.com/yaklang/yaklang/common/sca/core/scanerr"
 )
 
 // This is a reader for the frozen RPM Packages(hnum,blob) layout, based on
@@ -91,7 +93,7 @@ func (db *sqliteSnapshot) page(number uint32) ([]byte, error) {
 }
 func (db *sqliteSnapshot) table(number uint32, depth int, emit func([]byte) error) error {
 	if depth > 64 {
-		return fmt.Errorf("resource_limit: SQLite btree depth")
+		return scanerr.New(scanerr.ResourceLimit, "SQLite btree depth")
 	}
 	b, err := db.page(number)
 	if err != nil {
@@ -136,7 +138,7 @@ func (db *sqliteSnapshot) table(number uint32, depth int, emit func([]byte) erro
 			return err
 		}
 		if plen > uint64(db.s.limits.MaxRecordBytes) {
-			return fmt.Errorf("resource_limit: SQLite payload")
+			return scanerr.New(scanerr.ResourceLimit, "SQLite payload")
 		}
 		_, rn, err := sqliteVarint(cell[n:])
 		if err != nil {
@@ -176,7 +178,7 @@ func (db *sqliteSnapshot) table(number uint32, depth int, emit func([]byte) erro
 		}
 		db.rows++
 		if db.rows > db.s.limits.MaxRecords+10000 {
-			return fmt.Errorf("resource_limit: SQLite rows")
+			return scanerr.New(scanerr.ResourceLimit, "SQLite rows")
 		}
 		if err = emit(raw); err != nil {
 			return err

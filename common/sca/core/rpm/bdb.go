@@ -5,6 +5,8 @@ package rpm
 import (
 	"encoding/binary"
 	"fmt"
+
+	"github.com/yaklang/yaklang/common/sca/core/scanerr"
 )
 
 func (s *snapshot) bdb(h []byte, emit func([]byte) error) error {
@@ -49,7 +51,7 @@ func (s *snapshot) bdb(h []byte, emit func([]byte) error) error {
 			next := order.Uint32(page[pos+4:])
 			length := int(order.Uint32(page[pos+8:]))
 			if length > s.limits.MaxRecordBytes {
-				return fmt.Errorf("resource_limit: BDB record")
+				return scanerr.New(scanerr.ResourceLimit, "BDB record")
 			}
 			raw := make([]byte, 0, length)
 			seen := map[uint32]bool{}
