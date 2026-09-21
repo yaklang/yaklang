@@ -24,6 +24,9 @@ func fixupUseChain(node Instruction) {
 }
 
 func DeleteInst(i Instruction) {
+	if i == nil || utils.IsNil(i) {
+		return
+	}
 	_, ok := i.(*anInstruction)
 	if ok {
 		if inst, ok := i.GetInstructionById(i.GetId()); ok && inst != nil {
@@ -31,29 +34,82 @@ func DeleteInst(i Instruction) {
 		}
 	}
 
+	detachDeletedInstruction(i)
+
 	b := i.GetBlock()
 	if b == nil {
 		log.Debugf("void block!! %s:%s", i, i.GetRange())
-		return
-	}
-	if phi, ok := ToPhi(i); ok {
+	} else if phi, ok := ToPhi(i); ok {
 		b.Phis = lo.Filter(b.Phis, func(item int64, index int) bool {
 			return item != phi.GetId()
 		})
 	} else {
-		// b.Insts = utils.RemoveSliceItem(b.Insts, Instruction(i))
 		b.Insts = lo.Filter(b.Insts, func(id int64, index int) bool {
 			return id != i.GetId()
 		})
 	}
-	if user, ok := ToUser(i); ok {
+	if prog := i.GetProgram(); prog != nil {
+		prog.DeleteInstruction(i)
+	}
+}
+
+// detachDeletedInstruction drops use-def and member links that would otherwise
+// keep pointing at an instruction after it is removed from the program.
+func detachDeletedInstruction(i Instruction) {
+	id := i.GetId()
+	if user, ok := ToUser(i); ok && user != nil {
 		for _, value := range user.GetValues() {
 			if value != nil && !utils.IsNil(value) {
 				value.RemoveUser(user)
 			}
 		}
 	}
-	i.GetProgram().DeleteInstruction(i)
+	deleted, ok := ToValue(i)
+	if !ok || deleted == nil || utils.IsNil(deleted) {
+		return
+	}
+	for _, user := range deleted.GetUsers() {
+		if user == nil || utils.IsNil(user) {
+			continue
+		}
+		if phi, ok := ToPhi(user); ok && phi != nil {
+			phi.Edge = lo.Filter(phi.Edge, func(edge int64, _ int) bool {
+				return edge != id
+			})
+		}
+		deleted.RemoveUser(user)
+	}
+	av := deleted.getAnValue()
+	if av == nil {
+		return
+	}
+	members := append([]memberPairRecord(nil), av.memberPairs...)
+	av.memberPairs = nil
+	for _, pair := range members {
+		member, ok := deleted.GetValueById(pair.member)
+		if !ok || member == nil || utils.IsNil(member) {
+			continue
+		}
+		if mav := member.getAnValue(); mav != nil {
+			mav.ownerPairs = slices.DeleteFunc(mav.ownerPairs, func(owner ownerPairRecord) bool {
+				return owner.object == id
+			})
+		}
+	}
+	owners := append([]ownerPairRecord(nil), av.ownerPairs...)
+	av.ownerPairs = nil
+	for _, pair := range owners {
+		obj, ok := deleted.GetValueById(pair.object)
+		if !ok || obj == nil || utils.IsNil(obj) {
+			continue
+		}
+		if oav := obj.getAnValue(); oav != nil {
+			oav.memberPairs = slices.DeleteFunc(oav.memberPairs, func(member memberPairRecord) bool {
+				return member.member == id
+			})
+		}
+	}
+	av.userList = nil
 }
 
 // func EmitInst(i Instruction) {
