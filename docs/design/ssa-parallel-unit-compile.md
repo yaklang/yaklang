@@ -7,9 +7,12 @@ batches. A memory batch is therefore not itself proof that its units are
 independent.
 
 `compileUnitBuildWaves` derives dependency-ready waves inside each batch. Each
-wave runs independent SCC groups concurrently; units inside one SCC stay serial.
-Dependencies in earlier batches have already completed. Splitting an SCC does
-not permit its fragments to overlap across the batch lifecycle barrier.
+wave runs independent SCC groups concurrently. After declaration registration,
+library body builds inside one SCC also run concurrently: Java packages in a
+cycle still need a shared skeleton, but method bodies only need signatures and
+can overlap. Dependencies in earlier batches have already completed. Splitting
+an SCC still does not let its fragments overlap across the batch lifecycle
+barrier.
 
 ## Ownership and lifecycle
 
@@ -25,8 +28,10 @@ not permit its fragments to overlap across the batch lifecycle barrier.
    Java supplies package dependencies and private execution builder views.
    Application-owned units execute exclusively. Each actual Program owner is
    drained once per batch, without recursively draining its upstream libraries;
-   the scheduler controls when those library bodies run. Frontends that have not
-   opted in retain the original single serial batch drain.
+   the scheduler controls when those library bodies run. Independent libraries
+   in the same SCC drain concurrently after skeletons exist. Method bodies that
+   share a declaration builder stay serial inside one library. Frontends that
+   have not opted in retain the original single serial batch drain.
 4. All active body builders join before semantic scanning, persistence and
    release. Cancellation also joins active builders before returning and does
    not start queued work.
