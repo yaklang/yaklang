@@ -51,11 +51,7 @@ func TestMiniAITasksUseConfigLiteCall(t *testing.T) {
 						for _, option := range req.GetExtraSpecOpts() {
 							option(&options)
 						}
-						if mode == "single-model" {
-							require.Equal(t, "none", options.ThinkingLevel)
-						} else {
-							require.Empty(t, options.ThinkingLevel)
-						}
+						require.Empty(t, options.ThinkingLevel, "custom Speed callback keeps its configured parameters")
 						require.Equal(t, "liteforge["+test.name+"]", req.GetCallerLabel())
 						require.Equal(t, test.name, req.GetContext().Value(requestContextKey{}))
 						if mode == "failure" {

@@ -623,7 +623,7 @@ func NewConfig(ctx context.Context, opts ...ConfigOption) *Config {
 	config.Epm = NewEndpointManagerContext(ctx)
 	config.Epm.SetConfig(config)
 	if !config.AICallbackAvailable() {
-		if err := WithTieredAICallback()(config); err != nil || !config.AICallbackAvailable() {
+		if err := WithTieredAICallback(config.IsSingleAIModelMode())(config); err != nil || !config.AICallbackAvailable() {
 			log.Errorf("Failed to set AI callback: %v", err)
 		}
 	}
@@ -1055,21 +1055,26 @@ func WithVisionPriorityAICallback(cb AICallbackType) ConfigOption {
 	}
 }
 
-// WithTieredAICallback configures quality, speed, and vision callbacks using tiered AI configuration.
-// It maps intelligent models to quality, lightweight models to speed, and vision models to image understanding.
-func WithTieredAICallback() ConfigOption {
+// WithTieredAICallback configures quality, speed, and vision callbacks using
+// tiered AI configuration. singleModelMode optionally overrides the Config
+// mode used only while constructing these callbacks.
+func WithTieredAICallback(singleModelMode ...bool) ConfigOption {
 	return func(c *Config) error {
 		if c.m == nil {
 			c.m = &sync.Mutex{}
 		}
+		single := c.IsSingleAIModelMode()
+		if len(singleModelMode) > 0 {
+			single = singleModelMode[0]
+		}
 
 		// Check if tiered AI config is enabled
-		if !consts.IsTieredAIModelConfigEnabled() {
+		if !single && !consts.IsTieredAIModelConfigEnabled() {
 			log.Debugf("Tiered AI config not enabled, skipping tiered callback configuration")
 			return nil
 		}
 
-		serviceName, modelName, err := GetIntelligentAIModelInfo()
+		serviceName, modelName, err := GetIntelligentAIModelInfo(single)
 		if err != nil {
 			log.Warnf("Failed to get service and model name from tiered config: %v", err)
 		} else {
@@ -1079,7 +1084,7 @@ func WithTieredAICallback() ConfigOption {
 		}
 
 		// Configure quality priority callback (uses intelligent model)
-		intelligentCB, err := GetIntelligentAIModelCallback()
+		intelligentCB, err := GetIntelligentAIModelCallback(single)
 		if err == nil {
 			c.m.Lock()
 			c.setQualityPriorityAICallbackLocked(intelligentCB)
@@ -1089,7 +1094,7 @@ func WithTieredAICallback() ConfigOption {
 			log.Warnf("Failed to load intelligent model callback: %v", err)
 		}
 
-		lightweightCB, err := GetLightweightAIModelCallback()
+		lightweightCB, err := GetLightweightAIModelCallback(single)
 		if err == nil {
 			c.m.Lock()
 			c.setSpeedPriorityAICallbackLocked(lightweightCB)
@@ -1099,7 +1104,7 @@ func WithTieredAICallback() ConfigOption {
 			log.Warnf("Failed to load lightweight model callback: %v", err)
 		}
 
-		visionCB, err := GetVisionAIModelCallback()
+		visionCB, err := GetVisionAIModelCallback(single)
 		if err == nil {
 			c.m.Lock()
 			c.setVisionPriorityAICallbackLocked(visionCB)
@@ -1207,9 +1212,9 @@ func WithAutoTieredAICallback(defaultCallback AICallbackType) ConfigOption {
 		}
 
 		// Check if tiered AI config is enabled
-		if consts.IsTieredAIModelConfigEnabled() {
+		if c.IsSingleAIModelMode() || consts.IsTieredAIModelConfigEnabled() {
 			// Try to configure tiered callbacks
-			if err := WithTieredAICallback()(c); err == nil {
+			if err := WithTieredAICallback(c.IsSingleAIModelMode())(c); err == nil {
 				// Also set the original callback if not already set
 				if defaultCallback != nil { // force set original callback to default if tiered config is enabled, to ensure async tasks have a valid callback
 					c.m.Lock()
@@ -2769,19 +2774,18 @@ func WithDisablePerception(disable bool) ConfigOption {
 }
 
 // IsSingleAIModelMode returns whether single-model simple mode is enabled.
-// In this mode, auxiliary AI tasks are routed through ScheduleAuxiliaryTask
-// which decides whether to skip, use a lightweight call, or pass through.
+// In this mode, auxiliary AI tasks use the centralized Skip/Run policy.
 func (c *Config) IsSingleAIModelMode() bool {
 	if c == nil {
 		return false
 	}
-	return c.singleAIModelMode
+	return c.singleAIModelMode || consts.IsSingleAIModelMode()
 }
 
 // WithSingleAIModelMode enables or disables single-model simple mode.
 // When enabled, auxiliary AI calls (title generation, intent recognition,
-// knowledge compression, perception, etc.) are routed through a centralized
-// scheduler that can skip them, degrade parameters, or pass them through.
+// knowledge compression, perception, etc.) use the centralized Skip/Run
+// policy. It does not rewrite callbacks configured by other options.
 func WithSingleAIModelMode(enable bool) ConfigOption {
 	return func(c *Config) error {
 		if c.m == nil {
@@ -4558,7 +4562,7 @@ func ConvertConfigToOptions(i *Config) []ConfigOption {
 	// Propagate single-model simple mode flag so sub-loops inherit the setting.
 	// This ensures child agents (P&E task, plan, sub ReAct agents) also route
 	// auxiliary tasks through the scheduler and apply subsystem disable switches.
-	if i.singleAIModelMode {
+	if i.IsSingleAIModelMode() {
 		opts = append(opts, WithSingleAIModelMode(true))
 	}
 

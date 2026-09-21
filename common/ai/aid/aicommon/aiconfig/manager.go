@@ -4,10 +4,6 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/yaklang/yaklang/common/ai"
-	"github.com/yaklang/yaklang/common/ai/aispec"
-	"google.golang.org/protobuf/proto"
-
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
@@ -46,83 +42,6 @@ func GetGlobalManager() *AIConfigManager {
 func IsTieredAIConfig() bool {
 	EnsureConfigLoaded()
 	return consts.IsTieredAIModelConfigEnabled()
-}
-
-// IsAIModelRoutingEnabled includes single-model routing even when the legacy
-// tier-enabled switch is off. IsTieredAIConfig retains its historical meaning.
-func IsAIModelRoutingEnabled(modes ...bool) bool {
-	EnsureConfigLoaded()
-	return IsAIModelRoutingConfigured(modes...)
-}
-
-// IsAIModelRoutingConfigured inspects the currently applied configuration.
-// Callback setup must not load built-in defaults and unexpectedly replace an
-// explicitly supplied fallback callback while checking whether to use tiers.
-func IsAIModelRoutingConfigured(modes ...bool) bool {
-	return (&AIConfigManager{}).singleModelMode(modes...) || consts.IsTieredAIModelConfigEnabled()
-}
-
-// BindModelConfig fixes the role at creation, but reads the latest model
-// configuration in that role on each invocation. Global mode changes cannot
-// redirect an already-bound callback.
-func (m *AIConfigManager) BindModelConfig(tier consts.ModelTier, provider, name string, modes ...bool) func() (*ypb.AIModelConfig, error) {
-	single := m.singleModelMode(modes...)
-	if single {
-		tier, provider, name = consts.TierIntelligent, "", ""
-	}
-	return func() (*ypb.AIModelConfig, error) {
-		model := m.GetFirstConfigByTierAndProviderAndModel(tier, provider, name)
-		if provider == "" && name == "" {
-			model = m.GetFirstConfig(tier)
-		}
-		if single {
-			if err := consts.ValidateSingleAIModel(model); err != nil {
-				return nil, err
-			}
-		} else if model == nil || model.GetProvider() == nil || strings.TrimSpace(model.GetProvider().GetType()) == "" {
-			return nil, ErrNoConfigAvailable
-		}
-		return proto.Clone(model).(*ypb.AIModelConfig), nil
-	}
-}
-
-func (m *AIConfigManager) singleModelMode(modes ...bool) bool {
-	if len(modes) > 0 {
-		return modes[0]
-	}
-	return consts.IsSingleAIModelMode()
-}
-
-// BindRequestOptions fixes both the source tier and the LiteCall policy.
-// Only provider/model settings are reread by the returned function.
-func (m *AIConfigManager) BindRequestOptions(tier consts.ModelTier, provider, name string, modes ...bool) func(...aispec.AIConfigOption) ([]aispec.AIConfigOption, error) {
-	single := m.singleModelMode(modes...)
-	frozen := single
-	getModel := m.BindModelConfig(tier, provider, name, frozen)
-	lite := single && tier == consts.TierLightweight
-	return func(opts ...aispec.AIConfigOption) ([]aispec.AIConfigOption, error) {
-		model, err := getModel()
-		if err != nil {
-			return nil, err
-		}
-		resolved := append(aispec.BuildOptionsFromConfig(model), opts...)
-		resolved = append(resolved, aispec.WithType(model.GetProvider().GetType()), aispec.WithModel(getModelFromConfig(model)), aispec.WithDisableProviderFallback(true))
-		if lite {
-			resolved = append(resolved, aispec.WithThinkingLevel("none"))
-		}
-		return resolved, nil
-	}
-}
-
-func (m *AIConfigManager) NewChatCallback(tier consts.ModelTier, provider, name string, modes ...bool) aispec.GeneralChatter {
-	resolve := m.BindRequestOptions(tier, provider, name, modes...)
-	return func(prompt string, opts ...aispec.AIConfigOption) (string, error) {
-		resolved, err := resolve(opts...)
-		if err != nil {
-			return "", err
-		}
-		return ai.Chat(prompt, resolved...)
-	}
 }
 
 // GetCurrentPolicy returns the current user-configured routing policy
@@ -322,15 +241,31 @@ func getModelFromConfig(config *ypb.AIModelConfig) string {
 // - performance: uses intelligent model
 // - cost: uses lightweight model
 // - balance: uses lightweight model by default
-func GetModelByPolicy(policy consts.RoutingPolicy, modes ...bool) (*ypb.AIModelConfig, error) {
-	tier := consts.TierLightweight
-	if policy == consts.PolicyPerformance {
-		tier = consts.TierIntelligent
+func GetModelByPolicy(policy consts.RoutingPolicy) (*ypb.AIModelConfig, error) {
+	mgr := GetGlobalManager()
+
+	var config *ypb.AIModelConfig
+	switch policy {
+	case consts.PolicyPerformance:
+		config = mgr.GetFirstConfig(consts.TierIntelligent)
+	case consts.PolicyCost:
+		config = mgr.GetFirstConfig(consts.TierLightweight)
+	case consts.PolicyBalance, consts.PolicyAuto:
+		// Balance mode: default to lightweight
+		config = mgr.GetFirstConfig(consts.TierLightweight)
+	default:
+		// Default to lightweight
+		config = mgr.GetFirstConfig(consts.TierLightweight)
 	}
-	return GetGlobalManager().BindModelConfig(tier, "", "", modes...)()
+
+	if config == nil {
+		return nil, ErrNoConfigAvailable
+	}
+
+	return config, nil
 }
 
 // IsFallbackDisabled checks if fallback to lightweight model is disabled
 func IsFallbackDisabled() bool {
-	return consts.IsSingleAIModelMode() || consts.IsTieredAIFallbackDisabled()
+	return consts.IsTieredAIFallbackDisabled()
 }

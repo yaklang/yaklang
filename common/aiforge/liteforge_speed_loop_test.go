@@ -51,11 +51,7 @@ func TestSpeedLoopLiteForgeIntegration(t *testing.T) {
 					for _, option := range req.GetExtraSpecOpts() {
 						option(&opts)
 					}
-					if mode == "single-model" {
-						require.Equal(t, "none", opts.ThinkingLevel)
-					} else {
-						require.Empty(t, opts.ThinkingLevel)
-					}
+					require.Empty(t, opts.ThinkingLevel, "custom Speed callback keeps its configured parameters")
 					if mode == "functioncall" {
 						require.NotEmpty(t, opts.Tools)
 					}
