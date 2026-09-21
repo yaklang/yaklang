@@ -2,6 +2,7 @@ package scannode
 
 import (
 	"context"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -76,15 +77,14 @@ func validateInputWorkspaceBind(command *aiv1.BindAISessionCommand) error {
 		(options.EnableSystemFileSystemOperator != nil && *options.EnableSystemFileSystemOperator) {
 		return &inputresolver.Error{Code: "input_runtime_policy_unsupported"}
 	}
-	var applicationOptions struct {
-		ForgeRelease *aiv1.ContextForgeRelease `json:"forge_release_snapshot"`
-	}
-	if json.Unmarshal(command.GetRuntimeOptionSnapshotJson(), &applicationOptions) != nil {
-		return &inputresolver.Error{Code: "input_manifest_invalid"}
-	}
-	if applicationOptions.ForgeRelease != nil {
-		if command.GetResultContext() != nil || applicationOptions.ForgeRelease.GetCapabilityProfile() != legionForgeReportProfile ||
-			validateContextForgeRelease(applicationOptions.ForgeRelease) != nil {
+	if options.ApplicationAttemptID != "" {
+		checksum, checksumErr := hex.DecodeString(options.AITaskDefinitionChecksum)
+		// The release itself arrives in the immutable turn ContextPackage, not
+		// the opaque bind options. Bind only its authorized input identity here;
+		// native Forge execution validates the release before using the workspace.
+		if command.GetResultContext() != nil || options.AITaskSessionRole != "execution" ||
+			!strings.HasPrefix(options.AITaskKey, "forge:") || len(options.AITaskKey) <= len("forge:") ||
+			options.AITaskVersion == "" || checksumErr != nil || len(checksum) != 32 {
 			return &inputresolver.Error{Code: "input_runtime_policy_unsupported"}
 		}
 		return nil
