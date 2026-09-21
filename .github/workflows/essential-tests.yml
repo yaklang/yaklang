@@ -954,6 +954,7 @@ jobs:
               ]
 
           - name: "Test Antiviral / No Plaintext Malicious Strings"
+            needs_grpc: "0"
             test_configs: |
               [
                 {"package": "./ci_antiviral_check/...", "timeout": "30s"}
@@ -1071,6 +1072,7 @@ jobs:
           export TEST_CONFIG="${{ runner.temp }}/test_config.json"
           export SUITE_NAME="${{ matrix.name }}"
           export SUITE_SYNC_RULE="${{ matrix.sync_rule == '1' && '1' || '0' }}"
+          export SUITE_NEEDS_GRPC="${{ matrix.needs_grpc }}"
           # Every package in this matrix is exercised by exactly one job, so a separate
           # compile pass buys nothing and lets one build error erase the whole job's test
           # results. `go test` compiles per package against the shared build cache, so a
