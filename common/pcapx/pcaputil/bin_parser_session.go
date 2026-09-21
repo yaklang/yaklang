@@ -88,7 +88,7 @@ func (f *binFlow) detectDirection(dir int, w []byte) {
 	case "rtp":
 		f.protocol, f.rtp = "rtp", &binRTP{sources: map[uint32]*rtpSource{}}
 	case "quic":
-		f.protocol, f.quic = "quic", &binQUIC{streams: map[uint64]*quicStream{}, keys: f.a.quicKeys}
+		f.protocol, f.quic = "quic", &binQUIC{streams: map[uint64]*quicStream{}, keys: cloneQUICKeyring(f.a.quicKeys), decryptedSource: f.a.decryptedQUICSource}
 	case "smtp":
 		client := dir
 		if smtpReplyPrefix(w) {

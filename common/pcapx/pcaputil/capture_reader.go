@@ -68,7 +68,7 @@ func replayWithConfig(input io.Reader, conf *CaptureConfig) (resultErr error) {
 	var link layers.LinkType
 	var ng *pcapgo.NgReader
 	if binary.LittleEndian.Uint32(header) == 0x0a0d0d0a {
-		ng, err = pcapgo.NewNgReader(&boundedNgInput{input: br}, pcapgo.NgReaderOptions{WantMixedLinkType: true})
+		ng, err = NewBoundedNgReader(br, pcapgo.NgReaderOptions{WantMixedLinkType: true})
 		if err != nil {
 			return err
 		}

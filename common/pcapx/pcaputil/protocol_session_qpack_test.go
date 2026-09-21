@@ -12,7 +12,7 @@ func h3EncoderStream(inst []byte) []byte { return append([]byte{0x02}, inst...) 
 func h3DecoderStream(inst []byte) []byte { return append([]byte{0x03}, inst...) }
 
 func TestProtocolSessionQPACKStaticAndDynamic(t *testing.T) {
-	s, err := NewProtocolSession(DefaultParserBudget())
+	s, err := NewDecryptedQUICSession(DefaultParserBudget(), "synthetic algorithm fixture; not wire evidence")
 	require.NoError(t, err)
 	dcid, scid := quicTestDCID(), quicTestSCID()
 	ts := time.Unix(1, 0)
@@ -30,7 +30,7 @@ func TestProtocolSessionQPACKStaticAndDynamic(t *testing.T) {
 	require.Equal(t, ":authority", headers[3]["Name"])
 	require.Equal(t, "example.com", headers[3]["Value"])
 
-	s2, err := NewProtocolSession(DefaultParserBudget())
+	s2, err := NewDecryptedQUICSession(DefaultParserBudget(), "synthetic algorithm fixture; not wire evidence")
 	require.NoError(t, err)
 	require.Nil(t, s2.Feed(0, ts, quicLongPacket(0, 1, dcid, nil, nil, 0, quicCryptoFrame(0, []byte("CHLO")))).Err)
 	require.Nil(t, s2.Feed(1, ts, quicLongPacket(1, 1, dcid, scid, nil, 0, quicStreamFrame(3, 0, false, h3ControlSETTINGS(0x01, 220)))).Err)
@@ -54,7 +54,7 @@ func TestProtocolSessionQPACKStaticAndDynamic(t *testing.T) {
 }
 
 func TestProtocolSessionQPACKBlockedDecoderAndBudget(t *testing.T) {
-	s, err := NewProtocolSession(DefaultParserBudget())
+	s, err := NewDecryptedQUICSession(DefaultParserBudget(), "synthetic algorithm fixture; not wire evidence")
 	require.NoError(t, err)
 	dcid, scid := quicTestDCID(), quicTestSCID()
 	ts := time.Unix(1, 0)
@@ -66,7 +66,7 @@ func TestProtocolSessionQPACKBlockedDecoderAndBudget(t *testing.T) {
 	require.Equal(t, ErrContextRequired, r.Err.Kind)
 	require.Contains(t, r.Err.Message, "blocked")
 
-	s2, err := NewProtocolSession(DefaultParserBudget())
+	s2, err := NewDecryptedQUICSession(DefaultParserBudget(), "synthetic algorithm fixture; not wire evidence")
 	require.NoError(t, err)
 	require.Nil(t, s2.Feed(0, ts, quicLongPacket(0, 1, dcid, nil, nil, 0, quicCryptoFrame(0, []byte("CHLO")))).Err)
 	require.Nil(t, s2.Feed(1, ts, quicLongPacket(1, 1, dcid, scid, nil, 0, quicStreamFrame(3, 0, false, h3ControlSETTINGS(0x01, 100)))).Err)
@@ -74,7 +74,7 @@ func TestProtocolSessionQPACKBlockedDecoderAndBudget(t *testing.T) {
 	require.NotNil(t, r.Err)
 	require.Equal(t, ErrResourceExceeded, r.Err.Kind)
 
-	s3, err := NewProtocolSession(DefaultParserBudget())
+	s3, err := NewDecryptedQUICSession(DefaultParserBudget(), "synthetic algorithm fixture; not wire evidence")
 	require.NoError(t, err)
 	require.Nil(t, s3.Feed(0, ts, quicLongPacket(0, 1, dcid, nil, nil, 0, quicCryptoFrame(0, []byte("CHLO")))).Err)
 	r = s3.Feed(1, ts, quicLongPacket(1, 1, dcid, scid, nil, 0, quicStreamFrame(7, 0, false, h3DecoderStream([]byte{0x84, 0x01, 0x48}))))
@@ -97,7 +97,7 @@ func TestProtocolSessionQPACKFragmentation(t *testing.T) {
 		{0, quicLongPacket(1, 1, dcid, scid, nil, 1, quicStreamFrame(0, 0, true, h3Frame(0x01, rfcHex("03811011"))))},
 	}
 	assertFragmentation(t, steps, func(chunk int) []string {
-		s, err := NewProtocolSession(DefaultParserBudget())
+		s, err := NewDecryptedQUICSession(DefaultParserBudget(), "synthetic algorithm fixture; not wire evidence")
 		require.NoError(t, err)
 		ts := time.Unix(1, 0)
 		var names []string

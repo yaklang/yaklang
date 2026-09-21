@@ -354,6 +354,12 @@ func (a *binParser) datagramFields(network gopacket.NetworkLayer, udp *layers.UD
 		e.Status, e.Summary = "limited", "UDP datagram exceeds message limit"
 		a.limited.Add(uint64(len(wire)))
 	} else {
+		if events, ok := a.decodeQUICDatagram(e, wire); ok {
+			for _, event := range events {
+				a.emit(event)
+			}
+			return
+		}
 		var spec *binSpec
 		if (udp.SrcPort == 53 || udp.DstPort == 53) && dnsHeader(wire) {
 			e.Protocol = "dns"

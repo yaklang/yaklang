@@ -30,15 +30,16 @@ type ProbeResult struct {
 type ProtocolErrorKind string
 
 const (
-	ErrNeedMore           ProtocolErrorKind = "NeedMore"
-	ErrMalformedMessage   ProtocolErrorKind = "MalformedMessage"
-	ErrUnsupportedVersion ProtocolErrorKind = "UnsupportedVersion"
-	ErrUnsupportedFeature ProtocolErrorKind = "UnsupportedFeature"
-	ErrContextRequired    ProtocolErrorKind = "ContextRequired"
-	ErrEncrypted          ProtocolErrorKind = "Encrypted"
-	ErrResourceExceeded   ProtocolErrorKind = "ResourceExceeded"
-	ErrDesynchronized     ProtocolErrorKind = "Desynchronized"
-	ErrFatalSessionError  ProtocolErrorKind = "FatalSessionError"
+	ErrNeedMore             ProtocolErrorKind = "NeedMore"
+	ErrMalformedMessage     ProtocolErrorKind = "MalformedMessage"
+	ErrUnsupportedVersion   ProtocolErrorKind = "UnsupportedVersion"
+	ErrUnsupportedFeature   ProtocolErrorKind = "UnsupportedFeature"
+	ErrContextRequired      ProtocolErrorKind = "ContextRequired"
+	ErrEncrypted            ProtocolErrorKind = "Encrypted"
+	ErrAuthenticationFailed ProtocolErrorKind = "AuthenticationFailed"
+	ErrResourceExceeded     ProtocolErrorKind = "ResourceExceeded"
+	ErrDesynchronized       ProtocolErrorKind = "Desynchronized"
+	ErrFatalSessionError    ProtocolErrorKind = "FatalSessionError"
 )
 
 // ProtocolError is a typed session failure. It is never a successful tree.
@@ -146,6 +147,23 @@ func NewProtocolSession(budget ParserBudget) (ProtocolSession, error) {
 		ports:     [2]uint16{40000, 40001},
 	}
 	return s, nil
+}
+
+// NewDecryptedQUICSession accepts caller-authenticated/decrypted long-header
+// packets with unprotected packet numbers and plaintext frame payloads. It is
+// NOT a capture/wire decoder. The source label is required and emitted on every
+// plaintext event; Authentication Verified remains false (verification belongs
+// to the caller). Capture configuration never enables this mode.
+func NewDecryptedQUICSession(budget ParserBudget, source string) (ProtocolSession, error) {
+	if source == "" || len(source) > 256 {
+		return nil, fmt.Errorf("QUIC plaintext requires a bounded source label")
+	}
+	session, err := NewProtocolSession(budget)
+	if err != nil {
+		return nil, err
+	}
+	session.(*captureSession).f.a.decryptedQUICSource = source
+	return session, nil
 }
 
 func (s *captureSession) Probe(data []byte) ProbeResult {

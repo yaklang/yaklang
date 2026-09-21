@@ -9,7 +9,7 @@ import (
 )
 
 func TestProtocolSessionHTTP3ControlRequestResponse(t *testing.T) {
-	s, err := NewProtocolSession(DefaultParserBudget())
+	s, err := NewDecryptedQUICSession(DefaultParserBudget(), "synthetic algorithm fixture; not wire evidence")
 	require.NoError(t, err)
 	dcid, scid := quicTestDCID(), quicTestSCID()
 	ts := time.Unix(1, 0)
@@ -52,7 +52,7 @@ func TestProtocolSessionHTTP3ControlRequestResponse(t *testing.T) {
 }
 
 func TestProtocolSessionHTTP3ResetAndFailClosed(t *testing.T) {
-	s, err := NewProtocolSession(DefaultParserBudget())
+	s, err := NewDecryptedQUICSession(DefaultParserBudget(), "synthetic algorithm fixture; not wire evidence")
 	require.NoError(t, err)
 	dcid, scid := quicTestDCID(), quicTestSCID()
 	ts := time.Unix(1, 0)
@@ -63,7 +63,7 @@ func TestProtocolSessionHTTP3ResetAndFailClosed(t *testing.T) {
 	require.NotNil(t, r.Err)
 	require.Equal(t, ErrMalformedMessage, r.Err.Kind)
 
-	s2, err := NewProtocolSession(DefaultParserBudget())
+	s2, err := NewDecryptedQUICSession(DefaultParserBudget(), "synthetic algorithm fixture; not wire evidence")
 	require.NoError(t, err)
 	require.Nil(t, s2.Feed(0, ts, quicLongPacket(0, 1, dcid, nil, nil, 0, quicCryptoFrame(0, []byte("CHLO")))).Err)
 	require.Nil(t, s2.Feed(0, ts, quicLongPacket(1, 1, dcid, scid, nil, 0, quicStreamFrame(0, 0, false, h3RequestHeaders()))).Err)
@@ -71,7 +71,7 @@ func TestProtocolSessionHTTP3ResetAndFailClosed(t *testing.T) {
 	require.NotNil(t, r.Err)
 	require.Equal(t, ErrMalformedMessage, r.Err.Kind)
 
-	s3, err := NewProtocolSession(DefaultParserBudget())
+	s3, err := NewDecryptedQUICSession(DefaultParserBudget(), "synthetic algorithm fixture; not wire evidence")
 	require.NoError(t, err)
 	require.Nil(t, s3.Feed(0, ts, quicLongPacket(0, 1, dcid, nil, nil, 0, quicCryptoFrame(0, []byte("CHLO")))).Err)
 	require.Nil(t, s3.Feed(0, ts, quicLongPacket(1, 1, dcid, scid, nil, 0, quicStreamFrame(0, 0, false, h3RequestHeaders()))).Err)
@@ -92,7 +92,7 @@ func TestProtocolSessionHTTP3Fragmentation(t *testing.T) {
 		{1, quicLongPacket(1, 1, dcid, scid, nil, 0, quicStreamFrame(0, 0, true, h3ResponseHeaders()))},
 	}
 	assertFragmentation(t, steps, func(chunk int) []string {
-		s, err := NewProtocolSession(DefaultParserBudget())
+		s, err := NewDecryptedQUICSession(DefaultParserBudget(), "synthetic algorithm fixture; not wire evidence")
 		require.NoError(t, err)
 		ts := time.Unix(1, 0)
 		var names []string

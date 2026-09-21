@@ -10,7 +10,7 @@ import (
 )
 
 func TestProtocolSessionDoQQueryResponse(t *testing.T) {
-	s, err := NewProtocolSession(DefaultParserBudget())
+	s, err := NewDecryptedQUICSession(DefaultParserBudget(), "synthetic algorithm fixture; not wire evidence")
 	require.NoError(t, err)
 	dcid, scid := quicTestDCID(), quicTestSCID()
 	ts := time.Unix(1, 0)
@@ -38,7 +38,7 @@ func TestProtocolSessionDoQQueryResponse(t *testing.T) {
 }
 
 func TestProtocolSessionDoQFailClosedResetAndMissing(t *testing.T) {
-	s, err := NewProtocolSession(DefaultParserBudget())
+	s, err := NewDecryptedQUICSession(DefaultParserBudget(), "synthetic algorithm fixture; not wire evidence")
 	require.NoError(t, err)
 	dcid, scid := quicTestDCID(), quicTestSCID()
 	ts := time.Unix(1, 0)
@@ -51,7 +51,7 @@ func TestProtocolSessionDoQFailClosedResetAndMissing(t *testing.T) {
 	require.NotNil(t, r.Err)
 	require.Equal(t, ErrMalformedMessage, r.Err.Kind)
 
-	s2, err := NewProtocolSession(DefaultParserBudget())
+	s2, err := NewDecryptedQUICSession(DefaultParserBudget(), "synthetic algorithm fixture; not wire evidence")
 	require.NoError(t, err)
 	require.Nil(t, s2.Feed(0, ts, quicLongPacket(0, 1, dcid, nil, nil, 0, quicCryptoFrame(0, []byte("CHLO")))).Err)
 	r = s2.Feed(1, ts, quicLongPacket(1, 1, dcid, scid, nil, 0, quicStreamFrame(0, 0, true, dnsAResponse(9, "orphan.example", [4]byte{1, 1, 1, 1}))))
@@ -60,7 +60,7 @@ func TestProtocolSessionDoQFailClosedResetAndMissing(t *testing.T) {
 	require.Equal(t, "missing-request", r.Events[0].Session["Association Status"])
 	require.Equal(t, "doq", r.Events[0].Protocol)
 
-	s3, err := NewProtocolSession(DefaultParserBudget())
+	s3, err := NewDecryptedQUICSession(DefaultParserBudget(), "synthetic algorithm fixture; not wire evidence")
 	require.NoError(t, err)
 	require.Nil(t, s3.Feed(0, ts, quicLongPacket(0, 1, dcid, nil, nil, 0, quicCryptoFrame(0, []byte("CHLO")))).Err)
 	require.Nil(t, s3.Feed(0, ts, quicLongPacket(1, 1, dcid, scid, nil, 0, quicStreamFrame(0, 0, false, dnsQuery(2, "rst.example", 1)))).Err)
@@ -78,7 +78,7 @@ func TestProtocolSessionDoQFragmentation(t *testing.T) {
 		{1, quicLongPacket(1, 1, dcid, scid, nil, 0, quicStreamFrame(0, 0, true, dnsAResponse(0x22, "ietf.org", [4]byte{4, 31, 198, 44})))},
 	}
 	assertFragmentation(t, steps, func(chunk int) []string {
-		s, err := NewProtocolSession(DefaultParserBudget())
+		s, err := NewDecryptedQUICSession(DefaultParserBudget(), "synthetic algorithm fixture; not wire evidence")
 		require.NoError(t, err)
 		ts := time.Unix(1, 0)
 		var names []string

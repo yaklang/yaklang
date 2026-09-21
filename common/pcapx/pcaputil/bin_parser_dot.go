@@ -155,8 +155,11 @@ func dnsParseName(msg []byte, at int) (string, int, error) {
 	var labels []string
 	next := at
 	jumped := false
-	for hops := 0; hops < 16; hops++ {
-		if at >= len(msg) {
+	var targets [128]int // cycles require a repeated compression-pointer target
+	expanded := 1        // terminal root label counts toward RFC 1035's 255 octets
+	jumps := 0
+	for {
+		if at < 0 || at >= len(msg) {
 			return "", 0, fmt.Errorf("dot: truncated QNAME")
 		}
 		l := int(msg[at])
@@ -167,6 +170,9 @@ func dnsParseName(msg []byte, at int) (string, int, error) {
 			return strings.Join(labels, "."), next, nil
 		}
 		if l >= 0xc0 {
+			if jumps == len(targets) {
+				return "", 0, protocolError(ErrResourceExceeded, "DNS pointer budget")
+			}
 			if at+1 >= len(msg) {
 				return "", 0, fmt.Errorf("dot: truncated name pointer")
 			}
@@ -175,6 +181,13 @@ func dnsParseName(msg []byte, at int) (string, int, error) {
 				jumped = true
 			}
 			at = (l&0x3f)<<8 | int(msg[at+1])
+			for _, target := range targets[:jumps] {
+				if target == at {
+					return "", 0, fmt.Errorf("dot: DNS name pointer loop")
+				}
+			}
+			targets[jumps] = at
+			jumps++
 			continue
 		}
 		if l > 63 {
@@ -184,10 +197,13 @@ func dnsParseName(msg []byte, at int) (string, int, error) {
 		if at+l > len(msg) {
 			return "", 0, fmt.Errorf("dot: truncated DNS label")
 		}
+		expanded += l + 1
+		if expanded > 255 {
+			return "", 0, fmt.Errorf("dot: DNS name exceeds 255 octets")
+		}
 		labels = append(labels, string(msg[at:at+l]))
 		at += l
 	}
-	return "", 0, fmt.Errorf("dot: DNS name pointer loop")
 }
 
 func dnsARecords(msg []byte) []string {

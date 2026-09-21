@@ -195,6 +195,7 @@ type binParser struct {
 	input, messageBytes, unclassified, limited, panics, ids                    atomic.Uint64
 	buffered, peak                                                             atomic.Int64
 	err                                                                        atomic.Pointer[binParserError]
+	decryptedQUICSource                                                        string
 	quicKeys                                                                   *quicKeyring
 }
 type binParserError struct{ err error }

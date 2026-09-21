@@ -143,7 +143,7 @@ func (r *kafkaReader) request(info map[string]any) {
 	case 18:
 		// ApiVersions v0-v2 request body is empty (v1-v2 still empty before flexible).
 	case 3:
-		r.metadataRequest(info)
+		r.metadataRequest(ver, info)
 	case 0:
 		r.produceRequest(ver, info)
 	case 1:
@@ -159,17 +159,33 @@ func (r *kafkaReader) response(info map[string]any) {
 	}
 }
 
-func (r *kafkaReader) metadataRequest(info map[string]any) {
+func (r *kafkaReader) metadataRequest(ver int16, info map[string]any) {
 	n := int(r.i32("Topics Count"))
-	if n < 0 {
-		info["All Topics"] = true
+	if n < -1 || (n == -1 && ver == 0) {
+		r.err = fmt.Errorf("kafka-fields: invalid nullable topics")
 		return
 	}
+	info["All Topics"] = n == -1 || (n == 0 && ver == 0)
 	var names []string
 	for i := 0; i < n && r.err == nil; i++ {
 		names = append(names, r.str("Topic Name"))
 	}
 	info["Topics"] = names
+	if ver >= 4 {
+		info["Allow Auto Topic Creation"] = r.boolean("Allow Auto Topic Creation")
+	}
+	if ver >= 8 {
+		info["Include Cluster Authorized Operations"] = r.boolean("Include Cluster Authorized Operations")
+		info["Include Topic Authorized Operations"] = r.boolean("Include Topic Authorized Operations")
+	}
+}
+
+func (r *kafkaReader) boolean(name string) bool {
+	b := r.i8(name)
+	if b != 0 && b != 1 {
+		r.err = fmt.Errorf("kafka-fields: invalid boolean %s", name)
+	}
+	return b == 1
 }
 
 func (r *kafkaReader) produceRequest(ver int16, info map[string]any) {
@@ -216,19 +232,46 @@ func (r *kafkaReader) fetchRequest(ver int16, info map[string]any) {
 	if ver >= 4 {
 		info["Isolation Level"] = r.i8("Isolation Level")
 	}
+	if ver >= 7 {
+		info["Session ID"] = r.i32("Session ID")
+		info["Session Epoch"] = r.i32("Session Epoch")
+	}
 	n := int(r.i32("Topics Count"))
 	for i := 0; i < n && r.err == nil; i++ {
 		info["Topic Name"] = r.str("Topic Name")
 		pc := int(r.i32("Partition Count"))
 		for p := 0; p < pc && r.err == nil; p++ {
 			info["Partition"] = r.i32("Partition")
+			if ver >= 9 {
+				info["Current Leader Epoch"] = r.i32("Current Leader Epoch")
+			}
 			info["Fetch Offset"] = r.i64("Fetch Offset")
 			if ver >= 5 {
-				r.i32("Log Start Offset")
+				info["Log Start Offset"] = r.i64("Log Start Offset")
 			}
 			info["Partition Max Bytes"] = r.i32("Partition Max Bytes")
 		}
 	}
+	if ver >= 7 {
+		n := r.i32("Forgotten Topics Count")
+		if n < 0 {
+			r.err = fmt.Errorf("kafka-fields: negative forgotten topics")
+		}
+		for i := int32(0); i < n && r.err == nil; i++ {
+			r.str("Forgotten Topic Name")
+			pc := r.i32("Forgotten Partition Count")
+			if pc < 0 {
+				r.err = fmt.Errorf("kafka-fields: negative forgotten partitions")
+			}
+			for j := int32(0); j < pc && r.err == nil; j++ {
+				r.i32("Forgotten Partition")
+			}
+		}
+	}
+	if ver >= 11 {
+		info["Rack ID"] = r.str("Rack ID")
+	}
+
 }
 
 func (r *kafkaReader) recordBatch(info map[string]any) {
