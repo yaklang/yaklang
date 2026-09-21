@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
+	"github.com/yaklang/yaklang/common/utils/memorybudget"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 )
 
@@ -26,8 +27,8 @@ func TestDefaultCPUConcurrencyIsCountMinusOne(t *testing.T) {
 	}
 }
 
-// TestCompileAndScanConcurrencyBothUseCPUConcurrency proves that both
-// compile and scan concurrency default to the unified CPU concurrency.
+// TestCompileAndScanConcurrencyBothUseCPUConcurrency proves that scan
+// defaults to the CPU budget and compile defaults to that budget capped by RAM.
 func TestCompileAndScanConcurrencyBothUseCPUConcurrency(t *testing.T) {
 	cfg, err := ssaconfig.New(ssaconfig.ModeSyntaxFlowScan)
 	require.NoError(t, err)
@@ -36,9 +37,26 @@ func TestCompileAndScanConcurrencyBothUseCPUConcurrency(t *testing.T) {
 	compile := cfg.GetCompileConcurrency()
 	scan := int(cfg.GetScanConcurrency())
 
-	// With default config (no override), both should use CPU concurrency
-	require.Equal(t, cpu, compile,
-		"compile concurrency must default to CPU concurrency")
 	require.Equal(t, cpu, scan,
 		"scan concurrency must default to CPU concurrency (not 5)")
+	require.LessOrEqual(t, compile, cpu,
+		"compile concurrency must not exceed the CPU budget")
+	require.GreaterOrEqual(t, compile, 1)
+}
+
+func TestCompileConcurrencyForCapsByMemory(t *testing.T) {
+	require.Equal(t, 31, ssaconfig.CompileConcurrencyFor(32, 0))
+	require.Equal(t, 31, ssaconfig.CompileConcurrencyFor(32, 32<<30))
+	require.Equal(t, 6, ssaconfig.CompileConcurrencyFor(32, 2<<30))
+	require.Equal(t, 1, ssaconfig.CompileConcurrencyFor(2, 32<<30))
+	require.Equal(t, 1, ssaconfig.CompileConcurrencyFor(1, 1<<20))
+}
+
+func TestCompileMemoryLimitUsesUsableRAM(t *testing.T) {
+	require.Equal(t, int64(24<<30), memorybudget.UsableFrom(30<<30))
+	cfg, err := ssaconfig.New(ssaconfig.ModeSSACompile)
+	require.NoError(t, err)
+	require.Equal(t, ssaconfig.DefaultCompileMemoryLimit(), cfg.GetCompileMemoryLimit())
+	require.NoError(t, ssaconfig.WithCompileMemoryLimit(4<<30)(cfg))
+	require.Equal(t, int64(4<<30), cfg.GetCompileMemoryLimit())
 }

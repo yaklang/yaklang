@@ -11,6 +11,7 @@ import (
 	"sync"
 
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/memorybudget"
 )
 
 // Environment knobs for opt-in SSA compile GC overrides. Large-project parsing
@@ -31,13 +32,30 @@ var ssaCompileGCMu sync.Mutex
 // Automatic large-project tuning must not replace an explicit environment or
 // adaptive compile policy. In particular adaptive GC installs its limit before
 // GetFileHandler runs; replacing it with 80% of host RAM defeats that policy.
-func automaticSSACompileMemoryLimit(totalMemory int64) (int64, bool) {
-	if totalMemory <= 0 || strings.TrimSpace(os.Getenv("GOMEMLIMIT")) != "" ||
+func compileMemoryLimitBlockedByEnv() bool {
+	return strings.TrimSpace(os.Getenv("GOMEMLIMIT")) != "" ||
 		strings.TrimSpace(os.Getenv(ssaCompileMemLimitEnv)) != "" ||
-		envFlagEnabled(ssaCompileAdaptiveGCEnv) {
+		envFlagEnabled(ssaCompileAdaptiveGCEnv)
+}
+
+func automaticSSACompileMemoryLimit(totalMemory int64) (int64, bool) {
+	if totalMemory <= 0 || compileMemoryLimitBlockedByEnv() {
 		return 0, false
 	}
-	return totalMemory / 5 * 4, true
+	return memorybudget.UsableFrom(totalMemory), true
+}
+
+func (c *Config) resolveCompileMemoryLimit(totalMemory int64) (int64, bool) {
+	if compileMemoryLimitBlockedByEnv() {
+		return 0, false
+	}
+	if c != nil && c.Config != nil && c.SSACompile != nil && c.SSACompile.MemoryLimit > 0 {
+		return c.SSACompile.MemoryLimit, true
+	}
+	if totalMemory <= 0 {
+		return 0, false
+	}
+	return memorybudget.UsableFrom(totalMemory), true
 }
 
 // startSSACompileCPUProfile starts a CPU profile when YAK_SSA_CPU_PROFILE is

@@ -376,7 +376,8 @@ type Function struct {
 	methodName string
 
 	// Type
-	Type *FunctionType
+	typeMu sync.RWMutex
+	Type   *FunctionType
 
 	// just function parameter
 	Params      []int64 // parameter

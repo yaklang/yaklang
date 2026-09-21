@@ -95,11 +95,16 @@ func (f *Function) GetCurrentBlueprint() *Blueprint {
 	return f.currentBlueprint
 }
 func (f *Function) GetType() Type {
-	if f != nil && f.Type != nil {
-		return f.Type
-	} else {
+	if f == nil {
 		return defaultAnyType
 	}
+	f.typeMu.RLock()
+	ft := f.Type
+	f.typeMu.RUnlock()
+	if ft != nil {
+		return ft
+	}
+	return defaultAnyType
 }
 
 func (f *Function) AddThrow(vs ...Value) {
@@ -114,7 +119,9 @@ func (f *Function) SetType(t Type) {
 	}
 
 	if funTyp, ok := ToFunctionType(t); ok {
+		f.typeMu.Lock()
 		f.Type = funTyp
+		f.typeMu.Unlock()
 	} else if t.GetTypeKind() == AnyTypeKind {
 		// Assigning AnyType to a function is an expected, benign condition that
 		// fires once per function on large projects (hadoop scan produced ~59k
@@ -228,20 +235,32 @@ func NewFunctionWithType(name string, typ *FunctionType) *Function {
 	return f
 }
 
-func (f *Function) IsMethod() bool {
-	if f.Type == nil {
-		f.Type = NewFunctionType("", nil, nil, false)
-		f.Type.This = f
+func (f *Function) functionType() *FunctionType {
+	if f == nil {
+		return nil
 	}
-	return f.Type.IsMethod
+	f.typeMu.RLock()
+	ft := f.Type
+	f.typeMu.RUnlock()
+	return ft
+}
+
+func (f *Function) IsMethod() bool {
+	ft := f.functionType()
+	if ft == nil {
+		return false
+	}
+	ft.methodLock.RLock()
+	is := ft.IsMethod
+	ft.methodLock.RUnlock()
+	return is
 }
 
 func (f *Function) SetMethod(is bool, objType Type) {
-	if f.Type == nil {
-		f.Type = NewFunctionType("", nil, nil, false)
-		f.Type.This = f
+	ft := f.functionType()
+	if ft == nil {
+		return
 	}
-	ft := f.Type
 	ft.methodLock.Lock()
 	ft.IsMethod = is
 	ft.ObjectType = objType
