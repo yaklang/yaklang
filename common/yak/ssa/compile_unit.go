@@ -63,6 +63,17 @@ func (p *Program) ConcurrentUnitBuildEnabled() bool {
 	return app != nil && app.concurrentUnitBuild
 }
 
+// shouldBuildOnLookup reports whether reading a class or function should also
+// drain its lazy body. Opted-in concurrent units register skeletons first and
+// drain each library's bodies from the scheduler, so a lookup must not start a
+// foreign library's body on the caller's goroutine.
+func (p *Program) shouldBuildOnLookup() bool {
+	if p == nil || p.PreHandler() {
+		return false
+	}
+	return !p.ConcurrentUnitBuildEnabled()
+}
+
 // --- shared compile-unit path helpers (used by language builders) ---
 
 // ReadUnitSource reads a file's content via fs, returning "" on error.
