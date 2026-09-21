@@ -7,17 +7,19 @@ import (
 
 // binQUIC is the M0 session state for RFC 9000 QUIC v1 transport. Port 443
 // is never consulted. Protected payloads without keys are Encrypted; frames
-// are parsed only from plaintext (constructed or caller-decrypted) input.
+// are parsed only after packet protection succeeds or through the explicitly
+// declared decrypted-stream API.
 type binQUIC struct {
-	dcid, scid  []byte
-	initialDCID []byte
-	spaces      [3]quicPNSpace
-	streams     map[uint64]*quicStream
-	crypto      [3][]quicRange
-	state       string
-	closed      bool
-	keys        *quicKeyring
-	qpack       qpackConn
+	decryptedSource string
+	dcid, scid      []byte
+	initialDCID     []byte
+	spaces          [2][3]quicPNSpace
+	streams         map[uint64]*quicStream
+	crypto          [2][3][]quicRange
+	state           string
+	closed          bool
+	keys            *quicKeyring
+	qpack           qpackConn
 }
 
 type quicPNSpace struct {
@@ -125,17 +127,25 @@ func (q *binQUIC) consume(dir int, raw []byte, max int) (map[string]any, error) 
 	if err != nil {
 		return nil, err
 	}
-	if q.state == "" {
-		q.state = "initial"
+	if dir < 0 || dir > 1 {
+		return nil, fmt.Errorf("quic: invalid direction")
 	}
-	if h.space == quicSpaceInitial && dir == 0 && len(q.initialDCID) == 0 && len(h.dcid) > 0 {
-		q.initialDCID = append([]byte(nil), h.dcid...)
+	if h.size > len(raw) || h.payloadOff > h.size {
+		return nil, protocolError(ErrMalformedMessage, "truncated QUIC packet payload")
 	}
-	if len(h.dcid) > 0 {
-		q.dcid = append([]byte(nil), h.dcid...)
-	}
-	if len(h.scid) > 0 {
-		q.scid = append([]byte(nil), h.scid...)
+	commitHeader := func() {
+		if q.state == "" {
+			q.state = "initial"
+		}
+		if h.space == quicSpaceInitial && dir == 0 && len(q.initialDCID) == 0 && len(h.dcid) > 0 {
+			q.initialDCID = append([]byte(nil), h.dcid...)
+		}
+		if len(h.dcid) > 0 {
+			q.dcid = append([]byte(nil), h.dcid...)
+		}
+		if len(h.scid) > 0 {
+			q.scid = append([]byte(nil), h.scid...)
+		}
 	}
 	info := map[string]any{
 		"Packet Name":         h.typeName,
@@ -151,22 +161,26 @@ func (q *binQUIC) consume(dir int, raw []byte, max int) (map[string]any, error) 
 	}
 	if h.vn {
 		info["Supported Versions"] = h.versions
-		q.state = "version-negotiation"
-		info["Connection State"] = q.state
+		info["Connection State"] = "version-negotiation-observed"
+		info["Authentication Verified"] = false
 		return info, nil
 	}
 	if h.retry {
 		info["Retry"] = true
-		q.state = "retry"
-		info["Connection State"] = q.state
+		info["Connection State"] = "retry-observed"
+		info["Authentication Verified"] = false
 		return info, nil
 	}
 	payload := raw[h.payloadOff:h.size]
-	if h.long && h.pnLen > 0 && h.pnLen <= len(payload) {
+	if q.decryptedSource != "" && h.long && h.pnLen > 0 && h.pnLen <= len(payload) {
 		frames, ferr := quicParseFrames(payload[h.pnLen:], max)
 		if ferr == nil {
+			commitHeader()
+			info["Input Representation"] = "decrypted-stream"
+			info["Plaintext Source"] = q.decryptedSource
+			info["Authentication Verified"] = false
 			truncated := quicTruncatedPN(payload[:h.pnLen])
-			space := q.space(h.space)
+			space := q.space(dir, h.space)
 			pn := quicDecodePN(space.largest, truncated, h.pnLen)
 			info["Packet Number"] = pn
 			info["Packet Number Length"] = h.pnLen
@@ -175,7 +189,15 @@ func (q *binQUIC) consume(dir int, raw []byte, max int) (map[string]any, error) 
 			return q.finishFrames(dir, h.space, frames, info, max)
 		}
 	}
-	tk, reason := q.keysFor(dir, h)
+	if q.decryptedSource != "" {
+		return info, protocolError(ErrMalformedMessage, "invalid explicit decrypted QUIC frame input")
+	}
+	candidate := *q
+	candidate.keys = cloneQUICKeyring(q.keys)
+	if h.space == quicSpaceInitial && dir == 0 && len(candidate.initialDCID) == 0 {
+		candidate.initialDCID = append([]byte(nil), h.dcid...)
+	}
+	tk, reason := candidate.keysFor(dir, h)
 	if tk == nil {
 		info["Encrypted"] = true
 		info["Protected Payload"] = true
@@ -185,16 +207,20 @@ func (q *binQUIC) consume(dir int, raw []byte, max int) (map[string]any, error) 
 	}
 	var phaseKeys [2]*quicTrafficKeys
 	if q.keys != nil && !h.long {
-		phaseKeys = q.keys.app[dir]
+		phaseKeys = candidate.keys.app[dir]
 	}
-	plain, pn, pnLen, first, phase, uerr := quicUnprotect(raw, h, tk, phaseKeys, q.space(h.space).largest)
+	plain, pn, pnLen, first, phase, uerr := quicUnprotect(raw, h, tk, phaseKeys, q.space(dir, h.space).largest)
 	if uerr != nil {
 		info["Encrypted"] = true
 		info["Protected Payload"] = true
-		info["Header Protection"] = "failed"
-		return info, protocolError(ErrEncrypted, "QUIC payload is protected; keys were not provided")
+		info["Authentication Verified"] = false
+		info["Authentication Failure"] = "packet-protection-failed"
+		return info, protocolError(ErrAuthenticationFailed, "QUIC packet protection authentication failed")
 	}
 	info["Decrypted"] = true
+	info["Authentication Verified"] = true
+	info["Peer Identity Verified"] = false
+	info["Input Representation"] = "wire-packet"
 	info["Header Protection"] = "removed"
 	info["Packet Number"] = pn
 	info["Packet Number Length"] = pnLen
@@ -203,13 +229,16 @@ func (q *binQUIC) consume(dir int, raw []byte, max int) (map[string]any, error) 
 		info["Key Phase"] = phase
 		_ = first
 	}
-	space := q.space(h.space)
-	q.observePN(space, pn, info)
 	frames, ferr := quicParseFrames(plain, max)
 	if ferr != nil {
-		info["Encrypted"] = true
-		return info, protocolError(ErrEncrypted, "QUIC decrypted payload is not a valid frame sequence")
+		return info, protocolError(ErrMalformedMessage, "QUIC authenticated payload is not a valid frame sequence")
 	}
+	if err := quicValidateProtectedFrames(h.space, frames); err != nil {
+		return info, err
+	}
+	q.keys, q.initialDCID = candidate.keys, candidate.initialDCID
+	commitHeader()
+	q.observePN(q.space(dir, h.space), pn, info)
 	return q.finishFrames(dir, h.space, frames, info, max)
 }
 
@@ -238,11 +267,11 @@ func (q *binQUIC) finishFrames(dir, space int, frames []map[string]any, info map
 	return info, nil
 }
 
-func (q *binQUIC) space(id int) *quicPNSpace {
+func (q *binQUIC) space(dir, id int) *quicPNSpace {
 	if id < 0 || id > 2 {
 		id = quicSpaceApplication
 	}
-	return &q.spaces[id]
+	return &q.spaces[dir][id]
 }
 
 func (q *binQUIC) applyFrames(dir, space int, frames []map[string]any, info map[string]any, max int) error {
@@ -253,14 +282,14 @@ func (q *binQUIC) applyFrames(dir, space int, frames []map[string]any, info map[
 			off, _ := fr["Offset"].(uint64)
 			data, _ := fr["Crypto Data"].([]byte)
 			end := off + uint64(len(data))
-			if quicOverlap(q.crypto[space], off, end) {
+			if quicOverlap(q.crypto[dir][space], off, end) {
 				fr["Retransmission"] = true
 				info["Retransmission"] = true
 			}
-			q.crypto[space] = append(q.crypto[space], quicRange{off, end})
-			if len(q.crypto[space]) > max {
+			if len(q.crypto[dir][space]) >= max {
 				return protocolError(ErrResourceExceeded, "QUIC CRYPTO range budget exceeded")
 			}
+			q.crypto[dir][space] = append(q.crypto[dir][space], quicRange{off, end})
 		case "STREAM":
 			sid, _ := fr["Stream ID"].(uint64)
 			off, _ := fr["Offset"].(uint64)
@@ -921,4 +950,32 @@ func quicVersionNegotiation(dcid, scid []byte, versions ...uint32) []byte {
 		b = append(b, n[:]...)
 	}
 	return b
+}
+
+// RFC 9000 section 12.4: Initial/Handshake keys never authorize application
+// stream frames. Initial protection authenticates bytes, not peer identity.
+func quicValidateProtectedFrames(space int, frames []map[string]any) error {
+	if space == quicSpaceApplication {
+		return nil
+	}
+	for _, f := range frames {
+		switch f["Frame Type"] {
+		case "PADDING", "PING", "ACK", "CRYPTO", "CONNECTION_CLOSE":
+		default:
+			return protocolError(ErrMalformedMessage, "QUIC frame forbidden at Initial/Handshake encryption level")
+		}
+	}
+	return nil
+}
+
+// UDP currently retains Initial metadata only; no stream payload is admitted
+// without Handshake/Application keys. Include slice capacity in its reservation.
+func (q *binQUIC) initialMemory() int64 {
+	n := int64(4096)
+	for d := range q.spaces {
+		for s := range q.spaces[d] {
+			n += int64(cap(q.spaces[d][s].seen))*8 + int64(cap(q.crypto[d][s]))*16
+		}
+	}
+	return n
 }

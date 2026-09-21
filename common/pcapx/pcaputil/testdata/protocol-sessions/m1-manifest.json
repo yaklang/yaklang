@@ -1,9 +1,14 @@
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "generator": "protocol_session_samples_test.go:TestProtocolSessionM1PCAP",
   "reproduce": "YAK_UPDATE_SESSION_PCAP=1 go test ./common/pcapx/pcaputil -run ^TestProtocolSessionM1PCAP$ -count=1",
   "samples": [
     {
+      "representation": "synthetic_frame",
+      "transport": "tcp",
+      "native_carrier": true,
+      "evidence_test": "TestProtocolSessionM1PCAP",
+      "completeness": "algorithm-smoke; not native wire completeness",
       "file": "postgres-extended-query.pcap",
       "protocol": "postgresql",
       "sha256": "939e39f10eb7667d77db6707d908e6140dc3be275bda368fb89ee5e09ec00ed0",
@@ -13,6 +18,11 @@
       "source": "constructed Ethernet+IPv4+TCP from protocol_session_samples_test.go"
     },
     {
+      "representation": "synthetic_frame",
+      "transport": "tcp",
+      "native_carrier": true,
+      "evidence_test": "TestProtocolSessionM1PCAP",
+      "completeness": "algorithm-smoke; not native wire completeness",
       "file": "ldap-bind-search.pcap",
       "protocol": "ldap",
       "sha256": "0ccfdd3626b19c30960bbe1968c6699013cc18cc9d29d8b578f5c6dc51f9cfd8",
@@ -22,6 +32,11 @@
       "source": "constructed Ethernet+IPv4+TCP from protocol_session_samples_test.go"
     },
     {
+      "representation": "synthetic_frame",
+      "transport": "tcp",
+      "native_carrier": true,
+      "evidence_test": "TestProtocolSessionM1PCAP",
+      "completeness": "algorithm-smoke; not native wire completeness",
       "file": "websocket-upgrade-text.pcap",
       "protocol": "websocket",
       "sha256": "ee383c291d18abcc85b5e0c3cf50c812dea1f1a4831dc86d1672d84df308943b",
@@ -31,6 +46,11 @@
       "source": "constructed Ethernet+IPv4+TCP from protocol_session_samples_test.go"
     },
     {
+      "representation": "synthetic_frame",
+      "transport": "tcp",
+      "native_carrier": true,
+      "evidence_test": "TestProtocolSessionM1PCAP",
+      "completeness": "algorithm-smoke; not native wire completeness",
       "file": "redis-resp2-resp3.pcap",
       "protocol": "redis",
       "sha256": "97b6427e0c5f4e1488bfdaa8341fc034645c85c7251a1d82373c781c442ee0e8",
@@ -40,6 +60,11 @@
       "source": "constructed Ethernet+IPv4+TCP from protocol_session_samples_test.go"
     },
     {
+      "representation": "synthetic_frame",
+      "transport": "tcp",
+      "native_carrier": true,
+      "evidence_test": "TestProtocolSessionM1PCAP",
+      "completeness": "algorithm-smoke; not native wire completeness",
       "file": "kafka-apiversions-metadata.pcap",
       "protocol": "kafka",
       "sha256": "9d27f7a1890c85a9c705ac9de7dff77db0131605c38cb5d808613c7a32253287",
@@ -49,6 +74,11 @@
       "source": "constructed Ethernet+IPv4+TCP from protocol_session_samples_test.go"
     },
     {
+      "representation": "synthetic_frame",
+      "transport": "tcp",
+      "native_carrier": true,
+      "evidence_test": "TestProtocolSessionM1PCAP",
+      "completeness": "algorithm-smoke; not native wire completeness",
       "file": "tds-prelogin-login-batch.pcap",
       "protocol": "tds",
       "sha256": "cea2e5ba621f42df0123e8d67e82bf8371532cb8a0e6f051de0910876cbbf383",
@@ -58,6 +88,11 @@
       "source": "constructed Ethernet+IPv4+TCP from protocol_session_samples_test.go"
     },
     {
+      "representation": "synthetic_frame",
+      "transport": "tcp",
+      "native_carrier": true,
+      "evidence_test": "TestProtocolSessionM1PCAP",
+      "completeness": "algorithm-smoke; not native wire completeness",
       "file": "amqp-publish-deliver.pcap",
       "protocol": "amqp",
       "sha256": "6e1a89c345f4d67f9d8dad40bfbc318decb4c8b265f63fec96b11b9784c9d45d",
@@ -67,6 +102,11 @@
       "source": "constructed Ethernet+IPv4+TCP from protocol_session_samples_test.go"
     },
     {
+      "representation": "synthetic_frame",
+      "transport": "tcp",
+      "native_carrier": true,
+      "evidence_test": "TestProtocolSessionM1PCAP",
+      "completeness": "algorithm-smoke; not native wire completeness",
       "file": "smb2-negotiate-create.pcap",
       "protocol": "smb2",
       "sha256": "19f7638dcffee691c112273ae808fe6de1c8e1e23a615e1ab57ee7196eff164d",
@@ -76,6 +116,11 @@
       "source": "constructed Ethernet+IPv4+TCP from protocol_session_samples_test.go"
     },
     {
+      "representation": "synthetic_frame",
+      "transport": "tcp",
+      "native_carrier": true,
+      "evidence_test": "TestProtocolSessionM1PCAP",
+      "completeness": "algorithm-smoke; not native wire completeness",
       "file": "dcerpc-epm-srvsvc.pcap",
       "protocol": "dcerpc",
       "sha256": "c23f3bec06a192aafa7079ddfb38ba37510a14f33b562220a05100efdb3cdf75",
@@ -85,6 +130,11 @@
       "source": "constructed Ethernet+IPv4+TCP from protocol_session_samples_test.go"
     },
     {
+      "representation": "synthetic_frame",
+      "transport": "tcp",
+      "native_carrier": true,
+      "evidence_test": "TestProtocolSessionM1PCAP",
+      "completeness": "algorithm-smoke; not native wire completeness",
       "file": "ssh-kex-newkeys.pcap",
       "protocol": "ssh",
       "sha256": "1d0e4bd4628c9e8bf66e3fcb97035d77a79529497b46a1b2a8626836768f4f59",
@@ -94,6 +144,11 @@
       "source": "constructed Ethernet+IPv4+TCP from protocol_session_samples_test.go"
     },
     {
+      "representation": "synthetic_frame",
+      "transport": "tcp",
+      "native_carrier": true,
+      "evidence_test": "TestProtocolSessionM1PCAP",
+      "completeness": "algorithm-smoke; not native wire completeness",
       "file": "nfsv3-lookup-read.pcap",
       "protocol": "nfs",
       "sha256": "4776939711962023d859e1434eb33dfd39c743a43ee06bcec67d991facb024f0",
@@ -103,6 +158,11 @@
       "source": "constructed Ethernet+IPv4+TCP from protocol_session_samples_test.go"
     },
     {
+      "representation": "synthetic_frame",
+      "transport": "tcp",
+      "native_carrier": true,
+      "evidence_test": "TestProtocolSessionM1PCAP",
+      "completeness": "algorithm-smoke; not native wire completeness",
       "file": "snmpv3-get-response.pcap",
       "protocol": "snmp",
       "sha256": "618af80452a61bf2eda8996c6ced70e9fe5638cc9d6d695cb363ab91e34f42ee",
@@ -112,6 +172,11 @@
       "source": "constructed Ethernet+IPv4+TCP from protocol_session_samples_test.go"
     },
     {
+      "representation": "synthetic_frame",
+      "transport": "tcp",
+      "native_carrier": true,
+      "evidence_test": "TestProtocolSessionM1PCAP",
+      "completeness": "algorithm-smoke; not native wire completeness",
       "file": "rdp-tpkt-negotiate-mcs.pcap",
       "protocol": "rdp",
       "sha256": "5033da8288408b2bccc0443cc91661487c24eee99c64ed71fe5b4a5d4c64d6eb",
@@ -121,6 +186,11 @@
       "source": "constructed Ethernet+IPv4+TCP from protocol_session_samples_test.go"
     },
     {
+      "representation": "synthetic_frame",
+      "transport": "tcp",
+      "native_carrier": true,
+      "evidence_test": "TestProtocolSessionM1PCAP",
+      "completeness": "algorithm-smoke; not native wire completeness",
       "file": "dot-dns-tcp-length.pcap",
       "protocol": "dot",
       "sha256": "ca073f1abebf0c0ded92297722a867db895ff3fe3a28a04084d25c7fa1ae5c92",
@@ -130,6 +200,11 @@
       "source": "constructed Ethernet+IPv4+TCP from protocol_session_samples_test.go"
     },
     {
+      "representation": "synthetic_frame",
+      "transport": "tcp",
+      "native_carrier": true,
+      "evidence_test": "TestProtocolSessionM1PCAP",
+      "completeness": "algorithm-smoke; not native wire completeness",
       "file": "doh-http-get-post.pcap",
       "protocol": "doh",
       "sha256": "6d4e1f15ec3f50fe9cc790d943272aeb56c1e0948804549516e52965e77702e9",
@@ -139,6 +214,11 @@
       "source": "constructed Ethernet+IPv4+TCP from protocol_session_samples_test.go"
     },
     {
+      "representation": "synthetic_frame",
+      "transport": "tcp",
+      "native_carrier": false,
+      "evidence_test": "TestProtocolSessionM1PCAP",
+      "completeness": "algorithm-smoke; not native wire completeness",
       "file": "rtp-seq-sr-rr.pcap",
       "protocol": "rtp",
       "sha256": "a3199a0d2d5f585a52d12116065fcb7f03468c852ff0a4b5a3878972e390f893",
@@ -148,6 +228,12 @@
       "source": "constructed Ethernet+IPv4+TCP from protocol_session_samples_test.go"
     },
     {
+      "representation": "synthetic_frame",
+      "transport": "tcp",
+      "native_carrier": false,
+      "plaintext_source": "synthetic unprotected packet/frame fixture; not authenticated wire",
+      "evidence_test": "TestProtocolSessionM1PCAP",
+      "completeness": "algorithm-smoke; not native wire completeness",
       "file": "doq-query-response.pcap",
       "protocol": "doq",
       "sha256": "a63ebbff6555bdbdb38e6c72f0971cfe7e2b1b444fbcf83392a035c9898233f8",
@@ -157,6 +243,12 @@
       "source": "constructed Ethernet+IPv4+TCP from protocol_session_samples_test.go"
     },
     {
+      "representation": "synthetic_frame",
+      "transport": "tcp",
+      "native_carrier": false,
+      "plaintext_source": "synthetic unprotected packet/frame fixture; not authenticated wire",
+      "evidence_test": "TestProtocolSessionM1PCAP",
+      "completeness": "algorithm-smoke; not native wire completeness",
       "file": "http3-qpack-encoder-headers.pcap",
       "protocol": "http3",
       "sha256": "ee33438be781182484b2e84bb6c906e91615e08faf7c8b1ce3308c6c80a8c3b8",
@@ -166,6 +258,12 @@
       "source": "constructed Ethernet+IPv4+TCP from protocol_session_samples_test.go"
     },
     {
+      "representation": "synthetic_frame",
+      "transport": "tcp",
+      "native_carrier": false,
+      "plaintext_source": "synthetic unprotected packet/frame fixture; not authenticated wire",
+      "evidence_test": "TestProtocolSessionM1PCAP",
+      "completeness": "algorithm-smoke; not native wire completeness",
       "file": "http3-settings-headers-data.pcap",
       "protocol": "http3",
       "sha256": "cb4c758077bc1b1b6c555215b86f9a4f9a8f2765d336572c75b44141651b28c0",
@@ -175,6 +273,11 @@
       "source": "constructed Ethernet+IPv4+TCP from protocol_session_samples_test.go"
     },
     {
+      "representation": "synthetic_frame",
+      "transport": "tcp",
+      "native_carrier": false,
+      "evidence_test": "TestProtocolSessionM1PCAP",
+      "completeness": "algorithm-smoke; not native wire completeness",
       "file": "quic-v1-rfc9001-initial.pcap",
       "protocol": "quic",
       "sha256": "a04715a7f0ff155411d6eefd3379563807d63c7b2154224a00f95f5ee287ab99",
@@ -184,6 +287,12 @@
       "source": "constructed Ethernet+IPv4+TCP from protocol_session_samples_test.go"
     },
     {
+      "representation": "synthetic_frame",
+      "transport": "tcp",
+      "native_carrier": false,
+      "plaintext_source": "synthetic unprotected packet/frame fixture; not authenticated wire",
+      "evidence_test": "TestProtocolSessionM1PCAP",
+      "completeness": "algorithm-smoke; not native wire completeness",
       "file": "quic-v1-crypto-stream.pcap",
       "protocol": "quic",
       "sha256": "3612ee02ab8b832a189fceba1b63dda67512011c6da9234043a62e7a41059028",
@@ -193,6 +302,11 @@
       "source": "constructed Ethernet+IPv4+TCP from protocol_session_samples_test.go"
     },
     {
+      "representation": "synthetic_frame",
+      "transport": "tcp",
+      "native_carrier": true,
+      "evidence_test": "TestProtocolSessionM1PCAP",
+      "completeness": "algorithm-smoke; not native wire completeness",
       "file": "sip-invite-ack-bye.pcap",
       "protocol": "sip",
       "sha256": "06e06284db82ac3b5c6f0d7ec8e5b5c3391a9774c90c241a824bd268194f496c",
@@ -202,6 +316,11 @@
       "source": "constructed Ethernet+IPv4+TCP from protocol_session_samples_test.go"
     },
     {
+      "representation": "synthetic_frame",
+      "transport": "tcp",
+      "native_carrier": true,
+      "evidence_test": "TestProtocolSessionM1PCAP",
+      "completeness": "algorithm-smoke; not native wire completeness",
       "file": "mongodb-opmsg-compressed.pcap",
       "protocol": "mongodb",
       "sha256": "b1182f341fa9655ea69e8c0dcc7a4f2f229bbb56f7cc62c4f56a505701113a9a",
@@ -211,6 +330,11 @@
       "source": "constructed Ethernet+IPv4+TCP from protocol_session_samples_test.go"
     },
     {
+      "representation": "synthetic_frame",
+      "transport": "tcp",
+      "native_carrier": true,
+      "evidence_test": "TestProtocolSessionM1PCAP",
+      "completeness": "algorithm-smoke; not native wire completeness",
       "file": "mqtt5-connect-qos.pcap",
       "protocol": "mqtt",
       "sha256": "d8a7a21673a7572d3cafe289c0c64fcaa6acf625d3c7c8dec3363a2815b35215",
@@ -220,6 +344,11 @@
       "source": "constructed Ethernet+IPv4+TCP from protocol_session_samples_test.go"
     },
     {
+      "representation": "synthetic_frame",
+      "transport": "tcp",
+      "native_carrier": true,
+      "evidence_test": "TestProtocolSessionM1PCAP",
+      "completeness": "algorithm-smoke; not native wire completeness",
       "file": "smtp-ehlo-mail.pcap",
       "protocol": "smtp",
       "sha256": "58f65214ac1d818b074e368c42266a030cbd885c12bb50be968fa99c8aa7d4fe",
@@ -229,6 +358,11 @@
       "source": "constructed Ethernet+IPv4+TCP from protocol_session_samples_test.go"
     },
     {
+      "representation": "synthetic_frame",
+      "transport": "tcp",
+      "native_carrier": true,
+      "evidence_test": "TestProtocolSessionM1PCAP",
+      "completeness": "algorithm-smoke; not native wire completeness",
       "file": "imap-capability-login.pcap",
       "protocol": "imap",
       "sha256": "2702ea27b9d06ddabf6e98f0404c6154db487f7d41d3c8f4e6e463b3829b2452",
@@ -238,6 +372,11 @@
       "source": "constructed Ethernet+IPv4+TCP from protocol_session_samples_test.go"
     },
     {
+      "representation": "synthetic_frame",
+      "transport": "tcp",
+      "native_carrier": true,
+      "evidence_test": "TestProtocolSessionM1PCAP",
+      "completeness": "algorithm-smoke; not native wire completeness",
       "file": "pop3-capa-stat.pcap",
       "protocol": "pop3",
       "sha256": "26d02751d7835278df63424607c5126ba9810a908480da95a4865caf2be66b29",
@@ -247,6 +386,11 @@
       "source": "constructed Ethernet+IPv4+TCP from protocol_session_samples_test.go"
     },
     {
+      "representation": "synthetic_frame",
+      "transport": "tcp",
+      "native_carrier": true,
+      "evidence_test": "TestProtocolSessionM1PCAP",
+      "completeness": "algorithm-smoke; not native wire completeness",
       "file": "ftp-user-pass-pasv.pcap",
       "protocol": "ftp",
       "sha256": "cc7d7a8a8bcc37a8c1220d16bb8a07d3caebe7dd30ae3ca3bbca363068fdcfbc",
@@ -256,6 +400,11 @@
       "source": "constructed Ethernet+IPv4+TCP from protocol_session_samples_test.go"
     },
     {
+      "representation": "synthetic_frame",
+      "transport": "tcp",
+      "native_carrier": true,
+      "evidence_test": "TestProtocolSessionM1PCAP",
+      "completeness": "algorithm-smoke; not native wire completeness",
       "file": "tns-connect-accept.pcap",
       "protocol": "tns",
       "sha256": "192bf0d04b860cfeb29320dd1e8c578fe5671ad848cfde15f4b4597a353e48fa",
@@ -265,6 +414,11 @@
       "source": "constructed Ethernet+IPv4+TCP from protocol_session_samples_test.go"
     },
     {
+      "representation": "synthetic_frame",
+      "transport": "udp",
+      "native_carrier": true,
+      "evidence_test": "TestProtocolSessionM1PCAP",
+      "completeness": "algorithm-smoke; not native wire completeness",
       "file": "radius-access-accept.pcap",
       "protocol": "radius",
       "sha256": "cb4c7302d38f2949da72b75b8f936430f79bd5bda0d008bcbd060469424ec5d8",
@@ -274,6 +428,11 @@
       "source": "constructed Ethernet+IPv4+UDP from protocol_session_samples_test.go"
     },
     {
+      "representation": "synthetic_frame",
+      "transport": "udp",
+      "native_carrier": true,
+      "evidence_test": "TestProtocolSessionM1PCAP",
+      "completeness": "algorithm-smoke; not native wire completeness",
       "file": "dhcp-discover-ack.pcap",
       "protocol": "dhcp",
       "sha256": "e179b89c12a6163b2c11b75f7bb0811b9d59cdc3611782ee89ba6e3781d63dff",
@@ -283,6 +442,11 @@
       "source": "constructed Ethernet+IPv4+UDP from protocol_session_samples_test.go"
     },
     {
+      "representation": "synthetic_frame",
+      "transport": "udp",
+      "native_carrier": true,
+      "evidence_test": "TestProtocolSessionM1PCAP",
+      "completeness": "algorithm-smoke; not native wire completeness",
       "file": "ntp-client-server.pcap",
       "protocol": "ntp",
       "sha256": "d875e206900de64aab355a3b4c3a2cb37bf3f01776959149e13da044bc527bf6",
@@ -292,6 +456,11 @@
       "source": "constructed Ethernet+IPv4+UDP from protocol_session_samples_test.go"
     },
     {
+      "representation": "synthetic_frame",
+      "transport": "udp",
+      "native_carrier": true,
+      "evidence_test": "TestProtocolSessionM1PCAP",
+      "completeness": "algorithm-smoke; not native wire completeness",
       "file": "coap-get-content.pcap",
       "protocol": "coap",
       "sha256": "8a690efaa4c50f67762d33e3fb313e9398faf437c49fca509918ddb8353fc10b",
@@ -301,6 +470,11 @@
       "source": "constructed Ethernet+IPv4+UDP from protocol_session_samples_test.go"
     },
     {
+      "representation": "synthetic_frame",
+      "transport": "tcp",
+      "native_carrier": true,
+      "evidence_test": "TestProtocolSessionM1PCAP",
+      "completeness": "algorithm-smoke; not native wire completeness",
       "file": "modbus-read-holding.pcap",
       "protocol": "modbus",
       "sha256": "06c6ce3c1eb84084e6a78907a2bfe63880ba5ae45292db7eac2d915cee7a59f5",
@@ -310,6 +484,11 @@
       "source": "constructed Ethernet+IPv4+TCP from protocol_session_samples_test.go"
     },
     {
+      "representation": "synthetic_frame",
+      "transport": "tcp",
+      "native_carrier": true,
+      "evidence_test": "TestProtocolSessionM1PCAP",
+      "completeness": "algorithm-smoke; not native wire completeness",
       "file": "iec104-startdt-interrogation.pcap",
       "protocol": "iec104",
       "sha256": "0e348ba16c0b9ce0da1d85cceb6c9054aca1cb9494e97fda184b5ff989d2ef38",
@@ -319,6 +498,11 @@
       "source": "constructed Ethernet+IPv4+TCP from protocol_session_samples_test.go"
     },
     {
+      "representation": "synthetic_frame",
+      "transport": "tcp",
+      "native_carrier": true,
+      "evidence_test": "TestProtocolSessionM1PCAP",
+      "completeness": "algorithm-smoke; not native wire completeness",
       "file": "dnp3-read-response.pcap",
       "protocol": "dnp3",
       "sha256": "019da577dfa957b51e05d03d42e66b4f34628082179dd00979578e832629d22d",
@@ -328,6 +512,11 @@
       "source": "constructed Ethernet+IPv4+TCP from protocol_session_samples_test.go"
     },
     {
+      "representation": "synthetic_frame",
+      "transport": "tcp",
+      "native_carrier": true,
+      "evidence_test": "TestProtocolSessionM1PCAP",
+      "completeness": "algorithm-smoke; not native wire completeness",
       "file": "c37118-cmd.pcap",
       "protocol": "c37118",
       "sha256": "663f819f598b37d2c6bcb112f6eb1e07b0be7a9d66a3020f4a945d55f5b5d901",
@@ -337,6 +526,11 @@
       "source": "constructed Ethernet+IPv4+TCP from protocol_session_samples_test.go"
     },
     {
+      "representation": "synthetic_frame",
+      "transport": "tcp",
+      "native_carrier": false,
+      "evidence_test": "TestProtocolSessionM1PCAP",
+      "completeness": "algorithm-smoke; not native wire completeness",
       "file": "goose-dataset.pcap",
       "protocol": "goose",
       "sha256": "1f1d80ebeb1837a69653c90a0894d55011c7df91f4385b2dd27b172334fb8711",
@@ -346,6 +540,11 @@
       "source": "constructed Ethernet+IPv4+TCP from protocol_session_samples_test.go"
     },
     {
+      "representation": "synthetic_frame",
+      "transport": "tcp",
+      "native_carrier": true,
+      "evidence_test": "TestProtocolSessionM1PCAP",
+      "completeness": "algorithm-smoke; not native wire completeness",
       "file": "grpc-unary-http2.pcap",
       "protocol": "http2",
       "sha256": "8b05a8b1293dce8c0f0ba1e4084e2fbb9e6390bff13d4a89e82ae382b6ee09a1",

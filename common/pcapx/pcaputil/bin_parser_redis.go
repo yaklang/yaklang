@@ -69,7 +69,15 @@ func redisFrameLengthBudget(w []byte, depth int, budget ParserBudget, used *int)
 	}
 	if nl < 0 {
 		switch w[0] {
-		case '$', '!', '=', '*', '%', '~', '>', '(', ':':
+		case ':', '(':
+			digits := w[1:]
+			if len(digits) > 0 && (digits[0] == '+' || digits[0] == '-') {
+				digits = digits[1:]
+			}
+			if err := redisUnsignedPrefix(digits); err != nil {
+				return 0, err
+			}
+		case '$', '!', '=', '*', '%', '~', '>':
 			if err := redisLengthDigits(w[1:]); err != nil {
 				return 0, err
 			}
@@ -255,12 +263,16 @@ func redisLengthDigits(w []byte) error {
 	if i >= len(w) {
 		return nil
 	}
-	for ; i < len(w); i++ {
-		if w[i] == '\r' {
+	return redisUnsignedPrefix(w[i:])
+}
+
+func redisUnsignedPrefix(w []byte) error {
+	for i, b := range w {
+		if b == '\r' && i == len(w)-1 {
 			return nil
 		}
-		if w[i] < '0' || w[i] > '9' {
-			return fmt.Errorf("redis: invalid length digits")
+		if b < '0' || b > '9' {
+			return fmt.Errorf("redis: invalid numeric prefix")
 		}
 	}
 	return nil

@@ -341,3 +341,13 @@ func ApplyQUICKeys(s ProtocolSession, km QUICKeyMaterial) error {
 	}
 	return nil
 }
+
+// Traffic keys are immutable. Copy the per-connection slots so deriving Initial
+// keys or installing a phase never mutates another connection's keyring.
+func cloneQUICKeyring(r *quicKeyring) *quicKeyring {
+	if r == nil {
+		return nil
+	}
+	copy := *r
+	return &copy
+}

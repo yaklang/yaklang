@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/gopacket/gopacket/layers"
 	"github.com/stretchr/testify/require"
@@ -301,13 +302,19 @@ func TestProtocolSessionM1PCAP(t *testing.T) {
 	dir := filepath.Join("testdata", "protocol-sessions")
 	manifestPath := filepath.Join(dir, "m1-manifest.json")
 	type row struct {
-		File     string `json:"file"`
-		Protocol string `json:"protocol"`
-		SHA256   string `json:"sha256"`
-		Bytes    int    `json:"bytes"`
-		Port     int    `json:"decode_as_port"`
-		Kind     string `json:"kind"`
-		Source   string `json:"source"`
+		Representation  string `json:"representation"`
+		Transport       string `json:"transport"`
+		NativeCarrier   bool   `json:"native_carrier"`
+		PlaintextSource string `json:"plaintext_source,omitempty"`
+		EvidenceTest    string `json:"evidence_test"`
+		Completeness    string `json:"completeness"`
+		File            string `json:"file"`
+		Protocol        string `json:"protocol"`
+		SHA256          string `json:"sha256"`
+		Bytes           int    `json:"bytes"`
+		Port            int    `json:"decode_as_port"`
+		Kind            string `json:"kind"`
+		Source          string `json:"source"`
 	}
 	doc := struct {
 		Schema    int    `json:"schema_version"`
@@ -315,7 +322,7 @@ func TestProtocolSessionM1PCAP(t *testing.T) {
 		Reproduce string `json:"reproduce"`
 		Samples   []row  `json:"samples"`
 	}{
-		Schema:    1,
+		Schema:    2,
 		Generator: "protocol_session_samples_test.go:TestProtocolSessionM1PCAP",
 		Reproduce: "YAK_UPDATE_SESSION_PCAP=1 go test ./common/pcapx/pcaputil -run ^TestProtocolSessionM1PCAP$ -count=1",
 	}
@@ -338,7 +345,35 @@ func TestProtocolSessionM1PCAP(t *testing.T) {
 		require.Equal(t, hex.EncodeToString(golden), hex.EncodeToString(stored), sample.name)
 		events, stats, err := binReplay(t, stored, 1)
 		require.NoError(t, err, sample.name)
-		require.Zero(t, stats.Malformed, sample.name)
+		plaintext := (sample.protocol == "quic" && sample.name != "quic-v1-rfc9001-initial") || sample.protocol == "http3" || sample.protocol == "doq"
+		if plaintext {
+			// Historical TCP-wrapped plaintext fixtures remain byte-identical. Their
+			// ordinary replay is now a negative authentication test, not wire coverage.
+			for _, e := range events {
+				require.NotEqual(t, true, e.Session["Plaintext Input"], sample.name)
+				require.NotEqual(t, true, e.Session["Decrypted"], sample.name)
+				require.NotEqual(t, "http3", e.Protocol, sample.name)
+				require.NotEqual(t, "doq", e.Protocol, sample.name)
+			}
+			require.Positive(t, stats.Malformed+stats.ContextRequired, sample.name)
+			session, err := NewDecryptedQUICSession(DefaultParserBudget(), "synthetic fixture: "+sample.name)
+			require.NoError(t, err)
+			events = nil
+			for _, step := range sample.steps {
+				result := session.Feed(step.dir, time.Unix(1, 0), step.wire)
+				require.Nil(t, result.Err, sample.name)
+				for _, e := range result.Events {
+					require.Equal(t, "decrypted-stream", e.Session["Input Representation"])
+					require.Equal(t, false, e.Session["Authentication Verified"])
+				}
+				events = append(events, result.Events...)
+			}
+			require.Len(t, events, len(sample.steps), sample.name)
+			session.Close("fixture-end")
+			require.Zero(t, session.Stats().BufferedBytes)
+		} else {
+			require.Zero(t, stats.Malformed, sample.name)
+		}
 		found := false
 		for _, e := range events {
 			if e.Protocol == sample.protocol || sample.protocol == "http2" && e.Protocol == "grpc" {
@@ -346,7 +381,20 @@ func TestProtocolSessionM1PCAP(t *testing.T) {
 			}
 		}
 		require.True(t, found, "%s: no %s events in %d", sample.name, sample.protocol, len(events))
+		transport, native := "tcp", true
+		switch sample.protocol {
+		case "radius", "dhcp", "ntp", "coap":
+			transport = "udp"
+		case "quic", "http3", "doq", "goose", "rtp":
+			native = false
+		}
+		plaintextSource := ""
+		if plaintext {
+			plaintextSource = "synthetic unprotected packet/frame fixture; not authenticated wire"
+		}
 		doc.Samples = append(doc.Samples, row{
+			Representation: "synthetic_frame", Transport: transport, NativeCarrier: native,
+			PlaintextSource: plaintextSource, EvidenceTest: "TestProtocolSessionM1PCAP", Completeness: "algorithm-smoke; not native wire completeness",
 			File: sample.name + ".pcap", Protocol: sample.protocol,
 			SHA256: hex.EncodeToString(sum[:]), Bytes: len(golden),
 			Port: int(sample.port), Kind: "deterministic-generated-not-real-capture",

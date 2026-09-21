@@ -45,7 +45,7 @@ func TestQUICParseStreamAndAckFrames(t *testing.T) {
 }
 
 func TestProtocolSessionQUICTransportAndLifecycle(t *testing.T) {
-	s, err := NewProtocolSession(DefaultParserBudget())
+	s, err := NewDecryptedQUICSession(DefaultParserBudget(), "synthetic algorithm fixture; not wire evidence")
 	require.NoError(t, err)
 	dcid, scid := quicTestDCID(), quicTestSCID()
 	initPkt := quicLongPacket(0, 1, dcid, nil, nil, 0, quicCryptoFrame(0, []byte("CHLO")))
@@ -106,7 +106,7 @@ func TestProtocolSessionQUICTransportAndLifecycle(t *testing.T) {
 }
 
 func TestProtocolSessionQUICPNWrapDuplicateGapAndEncrypted(t *testing.T) {
-	s, err := NewProtocolSession(DefaultParserBudget())
+	s, err := NewDecryptedQUICSession(DefaultParserBudget(), "synthetic algorithm fixture; not wire evidence")
 	require.NoError(t, err)
 	dcid := quicTestDCID()
 	ts := time.Unix(1, 0)
@@ -122,7 +122,7 @@ func TestProtocolSessionQUICPNWrapDuplicateGapAndEncrypted(t *testing.T) {
 	require.Equal(t, true, r.Events[0].Session["Duplicate"])
 	require.Equal(t, true, r.Events[0].Session["Retransmission"])
 
-	s2, err := NewProtocolSession(DefaultParserBudget())
+	s2, err := NewDecryptedQUICSession(DefaultParserBudget(), "synthetic algorithm fixture; not wire evidence")
 	require.NoError(t, err)
 	require.Nil(t, s2.Feed(0, ts, quicLongPacket(0, 1, dcid, nil, nil, 1, quicCryptoFrame(0, []byte("A")))).Err)
 	r = s2.Feed(0, ts, quicLongPacket(0, 1, dcid, nil, nil, 3, quicCryptoFrame(1, []byte("C"))))
@@ -130,19 +130,20 @@ func TestProtocolSessionQUICPNWrapDuplicateGapAndEncrypted(t *testing.T) {
 	require.Equal(t, true, r.Events[0].Session["Gap"])
 	require.Equal(t, uint64(1), r.Events[0].Session["Missing Count"])
 
+	// Corrupt wire authentication is a different contract from decrypted fixtures.
 	s3, err := NewProtocolSession(DefaultParserBudget())
 	require.NoError(t, err)
 	protected := quicLongPacket(0, 1, dcid, nil, nil, 0, bytesRepeat(0xaa, 20))
 	r = s3.Feed(0, ts, protected)
 	require.NotNil(t, r.Err)
-	require.Equal(t, ErrEncrypted, r.Err.Kind)
+	require.Equal(t, ErrAuthenticationFailed, r.Err.Kind)
 	require.Equal(t, true, r.Events[0].Session["Encrypted"])
 	require.Equal(t, "Initial", r.Events[0].Session["Packet Name"])
 	require.Equal(t, dcid, r.Events[0].Session["DCID"])
 }
 
 func TestProtocolSessionQUICFailClosedAndProbe(t *testing.T) {
-	s, err := NewProtocolSession(DefaultParserBudget())
+	s, err := NewDecryptedQUICSession(DefaultParserBudget(), "synthetic algorithm fixture; not wire evidence")
 	require.NoError(t, err)
 	require.Equal(t, ProbeReject, s.Probe([]byte{0xc0, 0x00, 0x00}).Verdict)
 	require.Equal(t, ProbeNeedMore, s.Probe([]byte{0xc0, 0x00, 0x00, 0x00, 0x01}).Verdict)
@@ -158,7 +159,7 @@ func TestProtocolSessionQUICFailClosedAndProbe(t *testing.T) {
 	require.Equal(t, ErrNeedMore, cut.Err.Kind)
 
 	vn := quicVersionNegotiation(quicTestDCID(), nil, 1)
-	s2, err := NewProtocolSession(DefaultParserBudget())
+	s2, err := NewDecryptedQUICSession(DefaultParserBudget(), "synthetic algorithm fixture; not wire evidence")
 	require.NoError(t, err)
 	r := s2.Feed(0, ts, vn)
 	require.Nil(t, r.Err, "%v", r.Err)
@@ -176,7 +177,7 @@ func TestProtocolSessionQUICFragmentation(t *testing.T) {
 		{1, quicLongPacket(2, 1, dcid, scid, nil, 1, quicConnectionClose(0, "done"))},
 	}
 	assertFragmentation(t, steps, func(chunk int) []string {
-		s, err := NewProtocolSession(DefaultParserBudget())
+		s, err := NewDecryptedQUICSession(DefaultParserBudget(), "synthetic algorithm fixture; not wire evidence")
 		require.NoError(t, err)
 		ts := time.Unix(1, 0)
 		var names []string

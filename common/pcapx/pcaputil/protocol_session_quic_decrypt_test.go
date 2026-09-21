@@ -175,8 +175,8 @@ func TestProtocolSessionQUICChaCha20KeyPhaseAndKeyLog(t *testing.T) {
 	ts := time.Unix(1, 0)
 	require.Nil(t, s.Feed(0, ts, rfc9001ClientInitial()).Err)
 	cs := s.(*captureSession)
-	cs.f.quic.spaces[quicSpaceApplication].largest = 654360564 - 1
-	cs.f.quic.spaces[quicSpaceApplication].init = true
+	cs.f.quic.spaces[1][quicSpaceApplication].largest = 654360564 - 1
+	cs.f.quic.spaces[1][quicSpaceApplication].init = true
 	pkt := rfcHex("4cfe4189655e5cd55c41f69080575d7999c25a5bfb")
 	r := s.Feed(1, ts, pkt)
 	require.Nil(t, r.Err, "%v", r.Err)
@@ -195,7 +195,7 @@ func TestProtocolSessionQUICDecryptFailClosed(t *testing.T) {
 	bad[len(bad)-1] ^= 0xff
 	r := s.Feed(0, ts, bad)
 	require.NotNil(t, r.Err)
-	require.Equal(t, ErrEncrypted, r.Err.Kind)
+	require.Equal(t, ErrAuthenticationFailed, r.Err.Kind)
 	require.Equal(t, true, r.Events[0].Session["Encrypted"])
 	require.Equal(t, "Initial", r.Events[0].Session["Packet Name"])
 	require.Nil(t, r.Events[0].Session["Frames"])

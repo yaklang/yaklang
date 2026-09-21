@@ -106,7 +106,7 @@ func openOffline(name, filter string) (_ *captureSource, result error) {
 	}
 	src := &captureSource{file: f, name: name, offline: true}
 	if binary.LittleEndian.Uint32(magic) == 0x0a0d0d0a {
-		ng, err := pcapgo.NewNgReader(reader, pcapgo.NgReaderOptions{ErrorOnMismatchingLinkType: true})
+		ng, err := pcaputil.NewBoundedNgReader(reader, pcapgo.NgReaderOptions{ErrorOnMismatchingLinkType: true})
 		if err != nil {
 			return nil, fmt.Errorf("read pcapng header: %w", err)
 		}
@@ -114,7 +114,7 @@ func openOffline(name, filter string) (_ *captureSource, result error) {
 		src.link = ng.LinkType()
 		src.snaplen = 262144
 	} else {
-		p, err := pcapgo.NewReader(reader)
+		p, err := pcaputil.NewBoundedPcapReader(reader)
 		if err != nil {
 			return nil, fmt.Errorf("read pcap header: %w", err)
 		}
