@@ -22,11 +22,7 @@ func legionForgeCapabilityOptions(
 ) ([]aicommon.ConfigOption, *legionServerFocusRuntime, error) {
 	switch release.GetCapabilityProfile() {
 	case legionForgeAdvisoryProfile:
-		return []aicommon.ConfigOption{
-			aicommon.WithDisableToolUse(true),
-			aicommon.WithDisallowMCPServers(true),
-			aicommon.WithShowForgeListInPrompt(false),
-		}, nil, nil
+		return append(restrictedLegionForgeToolOptions(nil), aicommon.WithDisableToolUse(true)), nil, nil
 	case legionForgeReportProfile:
 		options, err := legionForgeReportOptions(ctx, release, binding.InputWorkspace)
 		return options, nil, err
@@ -157,6 +153,12 @@ func restrictedLegionForgeToolOptions(tools []*aitool.Tool) []aicommon.ConfigOpt
 		buildinaitools.WithOnlyTools(tools...),
 	)
 	return []aicommon.ConfigOption{
+		// Immutable applications already pin their plan and capability set.
+		// Host skills and generic capability recommendation are not part of
+		// that release and must not be discovered during its execution.
+		aicommon.WithDisableAutoSkills(true),
+		aicommon.WithDisableIntentRecognition(true),
+		aicommon.WithDisableMemoryTriage(true),
 		aicommon.WithDisableToolUse(false),
 		aicommon.WithAiToolManager(manager),
 		aicommon.WithDisallowMCPServers(true),
