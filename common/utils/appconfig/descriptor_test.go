@@ -44,7 +44,7 @@ func TestInvalidDescriptors(t *testing.T) {
 			t.Errorf("%T: expected error", v)
 		}
 	}
-	// A typed nil pointer was accepted by the original type-only parser.
+	// Parsing needs the type, not a populated value.
 	var typedNil *struct {
 		V string `app:"name:v"`
 	}

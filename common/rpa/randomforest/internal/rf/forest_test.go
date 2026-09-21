@@ -1,6 +1,8 @@
 package rf
 
 import (
+	"io"
+	"os"
 	"reflect"
 	"testing"
 )
@@ -33,6 +35,14 @@ func TestForestNormalizedVotes(t *testing.T) {
 	}
 }
 func TestClassificationTraining(t *testing.T) {
+	output, err := os.CreateTemp(t.TempDir(), "training-output")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer output.Close()
+	stdout := os.Stdout
+	os.Stdout = output
+	t.Cleanup(func() { os.Stdout = stdout })
 	inputs := [][]interface{}{{float64(0)}, {float64(0)}, {float64(1)}, {float64(1)}}
 	labels := []string{"zero", "zero", "one", "one"}
 	// All samples are supplied directly to remove bootstrap randomness from this check.
@@ -46,5 +56,12 @@ func TestClassificationTraining(t *testing.T) {
 	forest := BuildForest(inputs, []string{"same", "same", "same", "same"}, 3, 8, 1)
 	if len(forest.Trees) != 3 || forest.Predicate(inputs[0]) != "same" {
 		t.Fatal("training failed")
+	}
+	os.Stdout = stdout
+	if _, err := output.Seek(0, io.SeekStart); err != nil {
+		t.Fatal(err)
+	}
+	if raw, err := io.ReadAll(output); err != nil || len(raw) != 0 {
+		t.Fatalf("training output: %q (%v)", raw, err)
 	}
 }

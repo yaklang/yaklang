@@ -1,6 +1,5 @@
 // Derived from tevino/abool 9b9efcf221b5; see LICENSE.
-// Package abool provides atomic Boolean type for cleaner code and
-// better performance.
+// Package atomicbool provides an atomic Boolean.
 package atomicbool
 
 import "sync/atomic"

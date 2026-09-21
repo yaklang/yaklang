@@ -1,6 +1,4 @@
 // Derived from github.com/fxsjy/RF.go, commit 46700521f302.
-// Only the classification core used by RPA is retained.
-// a random forest implemtation in GoLang
 package rf
 
 import (
@@ -109,7 +107,6 @@ func getBestGain(samples [][]interface{}, c int, samples_labels []string, column
 		p2 := float64(total_l) / float64(len(samples))
 
 		new_entropy := p1*getEntropy(map_r, total_r) + p2*getEntropy(map_l, total_l)
-		//fmt.Println(new_entropy,current_entropy)
 		entropy_gain := current_entropy - new_entropy
 
 		if entropy_gain >= best_gain {
@@ -145,10 +142,7 @@ func splitSamples(samples [][]interface{}, column_type string, c int, value inte
 }
 
 func buildTree(samples [][]interface{}, samples_labels []string, selected_feature_count int) *TreeNode {
-	//fmt.Println(len(samples))
-	//find a best splitter
 	column_count := len(samples[0])
-	//split_count := int(math.Log(float64(column_count)))
 	split_count := selected_feature_count
 	columns_choosen := getRandomRange(column_count, split_count)
 
@@ -175,7 +169,6 @@ func buildTree(samples [][]interface{}, samples_labels []string, selected_featur
 		}
 
 		gain, value, total_l, total_r := getBestGain(samples, c, samples_labels, column_type, current_entropy)
-		//fmt.Println("kkkkk",gain,part_l,part_r)
 		if gain >= best_gain {
 			best_gain = gain
 			best_value = value
@@ -208,7 +201,6 @@ func genLeafNode(labels []string) *TreeNode {
 
 	node := &TreeNode{}
 	node.Labels = counter
-	//fmt.Println(node)
 	return node
 }
 
