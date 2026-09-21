@@ -308,7 +308,8 @@ func WithProjectLanguage(language Language) Option {
 // SSACompileConfig controls project-wide SSA compilation (JSON field `SSACompile` on the root config).
 //
 // Large-project notes:
-//   - compile_concurrency: only parallelizes pre-handler read+ParseAST; main per-file SSA build stays serial.
+//   - compile_concurrency: AST parse workers, independent compile-unit groups,
+//     and opted-in Java library/method-body drains share this cap.
 //   - exclude_files / entry_files: primary levers to shrink work.
 //   - peephole_size: splits the virtual FS into multiple compile chunks (multiple programs).
 //   - enable_incremental_compile + base_program_name: incremental / diff workflows.
