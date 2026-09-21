@@ -100,16 +100,7 @@ func buildCompileUnitWaveWithOwners(ctx context.Context, prog *ssa.Program, wave
 	slots := make(chan struct{}, concurrency)
 	owners := make(map[*ssa.Program]bool)
 	build := func(libraries []*ssa.Program) {
-		current := active.Add(1)
-		defer active.Add(-1)
-		for old := peak.Load(); current > old; old = peak.Load() {
-			if peak.CompareAndSwap(old, current) {
-				break
-			}
-		}
-		for _, library := range libraries {
-			library.LazyBuildCurrentProgram()
-		}
+		runCompileUnitLibraries(ctx, libraries, concurrency, &active, &peak)
 	}
 	for _, keys := range wave {
 		if err := ctx.Err(); err != nil {
@@ -161,4 +152,61 @@ func buildCompileUnitWaveWithOwners(ctx context.Context, prog *ssa.Program, wave
 	}
 	wg.Wait()
 	return int(peak.Load()), ctx.Err()
+}
+
+func runCompileUnitLibraries(ctx context.Context, libraries []*ssa.Program, concurrency int, active, peak *atomic.Int32) {
+	if len(libraries) == 0 {
+		return
+	}
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	if concurrency < 1 {
+		concurrency = 1
+	}
+	track := func() func() {
+		current := active.Add(1)
+		for old := peak.Load(); current > old; old = peak.Load() {
+			if peak.CompareAndSwap(old, current) {
+				break
+			}
+		}
+		return func() { active.Add(-1) }
+	}
+	if len(libraries) == 1 || concurrency == 1 {
+		for _, library := range libraries {
+			if ctx.Err() != nil {
+				return
+			}
+			done := track()
+			library.LazyBuildCurrentProgram()
+			done()
+		}
+		return
+	}
+	var wg sync.WaitGroup
+	slots := make(chan struct{}, concurrency)
+	for _, library := range libraries {
+		if ctx.Err() != nil {
+			break
+		}
+		select {
+		case slots <- struct{}{}:
+		case <-ctx.Done():
+			wg.Wait()
+			return
+		}
+		wg.Add(1)
+		go func(library *ssa.Program) {
+			defer wg.Done()
+			defer func() { <-slots }()
+			if ctx.Err() != nil {
+				return
+			}
+			done := track()
+			defer done()
+			library.LazyBuildCurrentProgram()
+		}(library)
+	}
+	wg.Wait()
 }

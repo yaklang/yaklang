@@ -81,6 +81,40 @@ func TestCompileUnitBuildWaveOverlapsLibraries(t *testing.T) {
 	require.EqualValues(t, 2, completed.Load())
 }
 
+func TestCompileUnitSCCGroupLibrariesOverlap(t *testing.T) {
+	cfg, err := ssaconfig.New(ssaconfig.ModeSSACompile)
+	require.NoError(t, err)
+	prog := ssa.NewProgram(cfg, ssa.ProgramCacheMemory, ssa.Application, filesys.NewVirtualFs(), ".", 0)
+	entered := make(chan struct{}, 2)
+	release := make(chan struct{})
+	var completed atomic.Int32
+	for _, name := range []string{"a", "b"} {
+		lib := prog.NewLibrary(name, []string{name})
+		lib.NewFunction("work").AddLazyBuilder(func() {
+			entered <- struct{}{}
+			<-release
+			completed.Add(1)
+		})
+	}
+	finished := make(chan error, 1)
+	go func() {
+		_, err := buildCompileUnitWave(context.Background(), prog, [][]string{{"java:a", "java:b"}}, 2)
+		finished <- err
+	}()
+	for i := 0; i < 2; i++ {
+		select {
+		case <-entered:
+		case <-time.After(5 * time.Second):
+			close(release)
+			t.Fatal("libraries inside one SCC group did not overlap")
+		}
+	}
+	require.EqualValues(t, 0, completed.Load())
+	close(release)
+	require.NoError(t, <-finished)
+	require.EqualValues(t, 2, completed.Load())
+}
+
 func TestCompileUnitParallelJavaMemory(t *testing.T) {
 	vf := filesys.NewVirtualFs()
 	vf.AddFile("base/Base.java", "package base;\n@Example public class Base { public static String shared = \"shared\"; public String field; public static String value(String s) { return s; } }")
