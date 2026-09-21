@@ -22,7 +22,12 @@ func legionForgeCapabilityOptions(
 ) ([]aicommon.ConfigOption, *legionServerFocusRuntime, error) {
 	switch release.GetCapabilityProfile() {
 	case legionForgeAdvisoryProfile:
-		return append(restrictedLegionForgeToolOptions(nil), aicommon.WithDisableToolUse(true)), nil, nil
+		return append(restrictedLegionForgeToolOptions(nil),
+			aicommon.WithDisableToolUse(true),
+			aicommon.WithReActActionPolicy(func(_, action string) bool {
+				return action == "directly_answer" || action == "finish"
+			}),
+		), nil, nil
 	case legionForgeReportProfile:
 		options, err := legionForgeReportOptions(ctx, release, binding.InputWorkspace)
 		return options, nil, err
