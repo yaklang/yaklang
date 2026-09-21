@@ -3,6 +3,8 @@ package scannode
 import (
 	"context"
 	"fmt"
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
+	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	aiv1 "github.com/yaklang/yaklang/scannode/gen/legionpb/legion/ai/v1"
 	"io"
 	"net"
@@ -33,6 +35,49 @@ func TestLegionDiscoveryRejectsUnsafeTargets(t *testing.T) {
 		if _, err := parseLegionDiscoveryPorts(ports); err == nil {
 			t.Errorf("accepted ports %q", ports)
 		}
+	}
+}
+
+func TestLegionDiscoveryToolInvocationAcceptsOnlyRuntimeBookkeeping(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	release := &aiv1.ContextForgeRelease{Parameters: []*aiv1.ContextForgeParameter{{Key: "target-host", ValueKind: "string", Value: "10.0.0.1"}}}
+	opts, material, err := legionForgeDiscoveryOptions(ctx, release)
+	if err != nil {
+		t.Fatal(err)
+	}
+	runtime := material.(*legionForgeDiscoveryRuntime)
+	dials := 0
+	runtime.dial = func(_ context.Context, network, address string) (net.Conn, error) {
+		dials++
+		if network != "tcp" || (address != "10.0.0.1:80" && address != "10.0.0.1:443") {
+			t.Fatalf("scope escaped: %s %s", network, address)
+		}
+		return nil, fmt.Errorf("fixture connection refused")
+	}
+	cfg := aicommon.NewConfig(ctx, opts...)
+	for _, name := range legionForgeDiscoveryTools {
+		tool, err := cfg.GetAiToolManager().GetToolByName(name)
+		if err != nil {
+			t.Fatal(err)
+		}
+		// Match the exact field ToolCaller injects before invoking this adapter.
+		result, err := tool.InvokeWithParams(map[string]any{"runtime_id": "fixture-tool-runtime"}, aitool.WithContext(ctx))
+		if err != nil || result == nil || !result.Success {
+			t.Fatalf("%s rejected runtime metadata: %+v %v", name, result, err)
+		}
+		for _, key := range []string{"host", "ports", "url", "unknown_business_argument", "tool_call_id"} {
+			result, err := tool.InvokeWithParams(map[string]any{"runtime_id": "fixture-tool-runtime", key: "evil"}, aitool.WithContext(ctx))
+			if err == nil && result != nil && result.Success {
+				t.Fatalf("%s accepted undeclared %s", name, key)
+			}
+		}
+	}
+	if dials != 2 {
+		t.Fatalf("unexpected scoped dial count: %d", dials)
+	}
+	if len(runtime.applicationHTTPMaterialReferences()) != 2 {
+		t.Fatal("expected only actual successful adapter observations")
 	}
 }
 

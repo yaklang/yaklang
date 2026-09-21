@@ -280,6 +280,11 @@ func (r *legionForgeDiscoveryRuntime) execute(ctx context.Context, name string, 
 	}
 	// Host and port arguments are never accepted, even if a model invents them.
 	for key := range params {
+		// ToolCaller injects runtime_id and Tool.InvokeWithParams restores it
+		// after schema validation. It is bookkeeping, never a target input.
+		if key == "runtime_id" {
+			continue
+		}
 		if key != "label" || name != "dns_lookup" {
 			return nil, fmt.Errorf("discovery argument %q cannot alter the authorized scope", key)
 		}
