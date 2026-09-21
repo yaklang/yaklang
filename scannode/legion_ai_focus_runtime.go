@@ -701,11 +701,9 @@ func (r *legionServerFocusRuntime) executeHTTPRequestContext(ctx context.Context
 	bodyHash := sha256.Sum256(body)
 	requestEvidence := renderServerFocusRequest(req)
 	responseEvidence := renderServerFocusResponse(response, bodyText)
-	r.mu.Lock()
-	r.httpEvidence = append(r.httpEvidence, legionForgeHTTPRequestEvidence{
+	r.recordForgeHTTPRequestEvidence(ctx, legionForgeHTTPRequestEvidence{
 		Method: method, StatusCode: response.StatusCode, BodySHA256: hex.EncodeToString(bodyHash[:]),
 	})
-	r.mu.Unlock()
 	return map[string]any{
 		"url":               target.String(),
 		"method":            method,

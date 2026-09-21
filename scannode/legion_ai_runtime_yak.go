@@ -665,7 +665,7 @@ func aiApplicationMaterialReferences(
 	if release.GetCapabilityProfile() == legionForgeReportProfile && len(result) == 0 {
 		return nil, fmt.Errorf("report Forge release produced no authorized material provenance")
 	}
-	if release.GetCapabilityProfile() == legionForgeHTTPProfile && len(requestRefs) == 0 {
+	if (release.GetCapabilityProfile() == legionForgeHTTPProfile || release.GetCapabilityProfile() == legionForgeHTTPProfileV2) && len(requestRefs) == 0 {
 		return nil, fmt.Errorf("HTTP Forge release produced no bounded request evidence")
 	}
 	if release.GetCapabilityProfile() == legionForgeDiscoveryProfile || release.GetCapabilityProfile() == legionForgeDiscoveryProfileV2 {

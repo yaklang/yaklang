@@ -93,7 +93,48 @@ func legionForgePassiveFingerprint(ctx context.Context, packet string) (map[stri
 	return map[string]any{"products": products, "source": "yaklang_embedded_expression_rules", "rules_sha256": legionNativeFingerprintRules.digest, "rule_count": len(legionNativeFingerprintRules.rules), "unsupported_rule_count": legionNativeFingerprintRules.skipped, "passive": true, "matches_truncated": truncated}, nil
 }
 
+type legionForgeHTTPEvidenceStageKey struct{}
+
+type legionForgeHTTPEvidenceStage struct {
+	mu       sync.Mutex
+	requests []legionForgeHTTPRequestEvidence
+}
+
+func (r *legionServerFocusRuntime) recordForgeHTTPRequestEvidence(ctx context.Context, item legionForgeHTTPRequestEvidence) {
+	if stage, ok := ctx.Value(legionForgeHTTPEvidenceStageKey{}).(*legionForgeHTTPEvidenceStage); ok {
+		stage.mu.Lock()
+		stage.requests = append(stage.requests, item)
+		stage.mu.Unlock()
+		return
+	}
+	// Existing v1 and Focus requests retain immediate evidence publication.
+	r.mu.Lock()
+	r.httpEvidence = append(r.httpEvidence, item)
+	r.mu.Unlock()
+}
+
 func legionForgeNativeHTTPCall(callCtx, parent context.Context, runtime *legionServerFocusRuntime, name string, request map[string]any) (map[string]any, error) {
+	stage := &legionForgeHTTPEvidenceStage{}
+	ctx := context.WithValue(callCtx, legionForgeHTTPEvidenceStageKey{}, stage)
+	result, err := legionForgeNativeHTTPCallStaged(ctx, parent, runtime, name, request)
+	if err != nil {
+		return nil, err
+	}
+	if err := callCtx.Err(); err != nil {
+		return nil, err
+	}
+	if err := parent.Err(); err != nil {
+		return nil, err
+	}
+	stage.mu.Lock()
+	runtime.mu.Lock()
+	runtime.httpEvidence = append(runtime.httpEvidence, stage.requests...)
+	runtime.mu.Unlock()
+	stage.mu.Unlock()
+	return result, nil
+}
+
+func legionForgeNativeHTTPCallStaged(callCtx, parent context.Context, runtime *legionServerFocusRuntime, name string, request map[string]any) (map[string]any, error) {
 	ctx, cancel := context.WithTimeout(callCtx, 20*time.Second)
 	defer cancel()
 	stop := context.AfterFunc(parent, cancel)
@@ -153,7 +194,13 @@ func legionForgeNativeHTTPCall(callCtx, parent context.Context, runtime *legionS
 			}
 			pages = append(pages, page)
 		}
+		if err := ctx.Err(); err != nil {
+			return nil, err
+		}
 		return map[string]any{"url": result["url"], "pages": pages, "failures": failures, "references": refs, "attempted_pages": attempted, "skipped_pages": skipped, "max_pages": 4, "max_depth": 1, "exhaustive": false}, nil
+	}
+	if err := ctx.Err(); err != nil {
+		return nil, err
 	}
 	return result, nil
 }
