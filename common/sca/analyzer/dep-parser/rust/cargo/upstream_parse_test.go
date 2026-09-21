@@ -148,6 +148,8 @@ func TestParse(t *testing.T) {
 						gotDeps[i].DependsOn[j] = id
 					}
 				}
+				// Upstream oracle is DependsOn IDs. Original lock names live on Requirements.
+				gotDeps[i].Requirements = nil
 			}
 			sortLibs(gotLibs)
 			sortDeps(gotDeps)

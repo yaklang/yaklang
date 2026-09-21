@@ -96,22 +96,36 @@ func parseDependencies(id string, pkg cargoPkg, index cargoIndex) *types.Depende
 	for _, raw := range pkg.Dependencies {
 		f := strings.Fields(raw)
 		var matches []cargoPkg
+		name, constraint := "", ""
 		switch len(f) {
 		case 1:
+			name = f[0]
 			matches = index.name[f[0]]
 		case 2:
+			name, constraint = f[0], f[1]
 			matches = index.version[[2]string{f[0], f[1]}]
 		case 3:
-			matches = index.full[[3]string{f[0], f[1], strings.TrimSuffix(strings.TrimPrefix(f[2], "("), ")")}]
+			name, constraint = f[0], f[1]
+			src := strings.TrimSuffix(strings.TrimPrefix(f[2], "("), ")")
+			matches = index.full[[3]string{f[0], f[1], src}]
 		}
-
+		if name == "" {
+			continue
+		}
+		req := types.Requirement{Target: name, Constraint: constraint}
 		if len(matches) == 1 {
-			dep.DependsOn = append(dep.DependsOn, nativeID(matches[0]))
+			nid := nativeID(matches[0])
+			dep.DependsOn = append(dep.DependsOn, nid)
+			req.Resolved = nid
+			if req.Constraint == "" {
+				req.Constraint = matches[0].Version
+			}
 		} else {
 			dep.DependsOn = append(dep.DependsOn, "unresolved-cargo:"+raw)
 		}
+		dep.Requirements = append(dep.Requirements, req)
 	}
-	if len(dep.DependsOn) == 0 {
+	if len(dep.DependsOn) == 0 && len(dep.Requirements) == 0 {
 		return nil
 	}
 	sort.Strings(dep.DependsOn)

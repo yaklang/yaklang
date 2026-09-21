@@ -1,0 +1,139 @@
+[
+  {
+    "Name": "ansi-colors",
+    "Version": "3.2.3",
+    "Verification": "",
+    "License": null,
+    "Potential": false,
+    "VersionRange": false,
+    "DependsAnd": null,
+    "DependsOr": null,
+    "UpNames": null,
+    "DownNames": null,
+    "FromFile": [
+      "package-lock.json"
+    ],
+    "FromAnalyzer": [
+      "npm-lang"
+    ]
+  },
+  {
+    "Name": "array-flatten",
+    "Version": "1.1.1",
+    "Verification": "",
+    "License": null,
+    "Potential": false,
+    "VersionRange": false,
+    "DependsAnd": null,
+    "DependsOr": null,
+    "UpNames": null,
+    "DownNames": null,
+    "FromFile": [
+      "package-lock.json"
+    ],
+    "FromAnalyzer": [
+      "npm-lang"
+    ]
+  },
+  {
+    "Name": "body-parser",
+    "Version": "1.18.3",
+    "Verification": "",
+    "License": null,
+    "Potential": false,
+    "VersionRange": false,
+    "DependsAnd": null,
+    "DependsOr": null,
+    "UpNames": [
+      "debug@2.6.9"
+    ],
+    "DownNames": null,
+    "FromFile": [
+      "package-lock.json"
+    ],
+    "FromAnalyzer": [
+      "npm-lang"
+    ]
+  },
+  {
+    "Name": "debug",
+    "Version": "2.6.9",
+    "Verification": "",
+    "License": null,
+    "Potential": false,
+    "VersionRange": false,
+    "DependsAnd": null,
+    "DependsOr": null,
+    "UpNames": [
+      "ms@2.0.0"
+    ],
+    "DownNames": [
+      "body-parser@1.18.3",
+      "express@4.16.4"
+    ],
+    "FromFile": [
+      "package-lock.json"
+    ],
+    "FromAnalyzer": [
+      "npm-lang"
+    ]
+  },
+  {
+    "Name": "express",
+    "Version": "4.16.4",
+    "Verification": "",
+    "License": null,
+    "Potential": false,
+    "VersionRange": false,
+    "DependsAnd": null,
+    "DependsOr": null,
+    "UpNames": [
+      "debug@2.6.9"
+    ],
+    "DownNames": null,
+    "FromFile": [
+      "package-lock.json"
+    ],
+    "FromAnalyzer": [
+      "npm-lang"
+    ]
+  },
+  {
+    "Name": "ms",
+    "Version": "2.0.0",
+    "Verification": "",
+    "License": null,
+    "Potential": false,
+    "VersionRange": false,
+    "DependsAnd": null,
+    "DependsOr": null,
+    "UpNames": null,
+    "DownNames": [
+      "debug@2.6.9"
+    ],
+    "FromFile": [
+      "package-lock.json"
+    ],
+    "FromAnalyzer": [
+      "npm-lang"
+    ]
+  },
+  {
+    "Name": "ms",
+    "Version": "2.1.1",
+    "Verification": "",
+    "License": null,
+    "Potential": false,
+    "VersionRange": false,
+    "DependsAnd": null,
+    "DependsOr": null,
+    "UpNames": null,
+    "DownNames": null,
+    "FromFile": [
+      "package-lock.json"
+    ],
+    "FromAnalyzer": [
+      "npm-lang"
+    ]
+  }
+]

@@ -1350,7 +1350,7 @@
     },
     {
       "local_file": "common/sca/analyzer/dep-parser/rust/cargo/parse.go",
-      "sha256": "16e74ce81823991dbd363374d82be1e8fbcdbe08464a11bcd69297a06cef4023",
+      "sha256": "a70e3687674104daa566c1c1f7d5b2dd84acd6f529817489bab3eb02a3153b21",
       "symbols": [
         {
           "name": "cargoPkg",
@@ -1374,15 +1374,15 @@
         },
         {
           "name": "nativeID",
-          "line": 73
+          "line": 90
         },
         {
           "name": "parseDependencies",
-          "line": 77
+          "line": 94
         },
         {
           "name": "cargoIndex",
-          "line": 104
+          "line": 135
         }
       ],
       "decision": "TRIM_AND_REWRITE",
@@ -1397,7 +1397,8 @@
       "maintenance_owner": "yaklang/yaklang SCA maintainers",
       "review": "implementation self-review; pinned upstream changes require re-evaluation",
       "tests": [
-        "analyzer/dep-parser/rust/cargo/upstream_parse_test.go"
+        "analyzer/dep-parser/rust/cargo/upstream_parse_test.go",
+        "analyzer/dep-parser/rust/cargo/requirements_test.go"
       ]
     },
     {

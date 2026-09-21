@@ -8833,6 +8833,42 @@
         "baseline_or_generated": "d33a21b6a30945df93a663a18f3cce087b0f3718"
       },
       "expectation": "Pinned upstream oracle plus independent contract assertions; see test-migration-map.json and README.md"
+    },
+    {
+      "path": "testdata/full_field/old-scanfilesystem-apk.json",
+      "sha256": "d92767775bbbba76d44e5c021b7edf698750f42ff06e41648403e9cc8fa98577",
+      "bytes": 12600,
+      "source": {
+        "frozen_old_scanfilesystem": "d33a21b6a30945df93a663a18f3cce087b0f3718 baseline-eval ScanFilesystem"
+      },
+      "expectation": "Frozen old ScanFilesystem package fields for full-field old/new comparison; not generated from new ScanReport"
+    },
+    {
+      "path": "testdata/full_field/old-scanfilesystem-cargo.json",
+      "sha256": "85fac11d9e3df5a29299ede99bf377c8a048c6f45ce5de505f8e96b74118d384",
+      "bytes": 4641,
+      "source": {
+        "frozen_old_scanfilesystem": "d33a21b6a30945df93a663a18f3cce087b0f3718 baseline-eval ScanFilesystem"
+      },
+      "expectation": "Frozen old ScanFilesystem package fields for full-field old/new comparison; not generated from new ScanReport"
+    },
+    {
+      "path": "testdata/full_field/old-scanfilesystem-gomod.json",
+      "sha256": "b9b86c39753528f5f2d887ec88f0982bc915560428e182fdec23605f0c4543ad",
+      "bytes": 764,
+      "source": {
+        "frozen_old_scanfilesystem": "d33a21b6a30945df93a663a18f3cce087b0f3718 baseline-eval ScanFilesystem"
+      },
+      "expectation": "Frozen old ScanFilesystem package fields for full-field old/new comparison; not generated from new ScanReport"
+    },
+    {
+      "path": "testdata/full_field/old-scanfilesystem-npm.json",
+      "sha256": "53ebd0afb4106737c8b0fa6d6451824020a3b6e1664b530f6c0bc50f3e4d8cad",
+      "bytes": 2523,
+      "source": {
+        "frozen_old_scanfilesystem": "d33a21b6a30945df93a663a18f3cce087b0f3718 baseline-eval ScanFilesystem"
+      },
+      "expectation": "Frozen old ScanFilesystem package fields for full-field old/new comparison; not generated from new ScanReport"
     }
   ]
 }
