@@ -22,14 +22,18 @@ const (
 	legionForgeAdvisoryProfile  = "advisory.v1"
 	legionForgeReportProfile    = "report.v1"
 	legionForgeHTTPProfile      = "http_assessment.v1"
+	legionForgeDiscoveryProfile = "discovery.v1"
+	legionForgeEvidenceProfile  = "evidence.v1"
 	maxLegionForgeParameters    = 64
 	maxLegionForgeTools         = 32
 	maxLegionForgeReleaseBytes  = 512 << 10
 )
 
 var (
-	legionForgeReportTools = []string{"parse_office_to_text", "query_file_meta", "read_file", "read_file_lines"}
-	legionForgeHTTPTools   = []string{"do_http_request", "send_http_request_by_url", "simple_crawler", "url_content_summary", "web_fingerprint"}
+	legionForgeReportTools    = []string{"parse_office_to_text", "query_file_meta", "read_file", "read_file_lines"}
+	legionForgeHTTPTools      = []string{"do_http_request", "send_http_request_by_url", "simple_crawler", "url_content_summary", "web_fingerprint"}
+	legionForgeDiscoveryTools = []string{"dns_lookup", "tcp_connect_scan"}
+	legionForgeEvidenceTools  = []string{"parse_android_package", "parse_office_to_text", "parse_packet_capture", "query_file_meta", "read_file", "read_file_lines"}
 )
 
 func validateContextForgeRelease(release *aiv1.ContextForgeRelease) error {
@@ -53,13 +57,24 @@ func validateContextForgeRelease(release *aiv1.ContextForgeRelease) error {
 		return fmt.Errorf("Forge release has unsupported executor %q", release.GetExecutorKind())
 	}
 	profile := strings.TrimSpace(release.GetCapabilityProfile())
-	if profile != legionForgeAdvisoryProfile && profile != legionForgeReportProfile && profile != legionForgeHTTPProfile {
+	if profile != legionForgeAdvisoryProfile && profile != legionForgeReportProfile && profile != legionForgeHTTPProfile && profile != legionForgeDiscoveryProfile && profile != legionForgeEvidenceProfile {
 		return fmt.Errorf("Forge release capability profile %q is not supported by this node", release.GetCapabilityProfile())
 	}
 	if len(release.GetParameters()) > maxLegionForgeParameters || len(release.GetDeclaredToolNames()) > maxLegionForgeTools {
 		return fmt.Errorf("Forge release exceeds bounded input limits")
 	}
 	switch profile {
+	case legionForgeDiscoveryProfile:
+		if !equalContextForgeStrings(release.GetDeclaredToolNames(), legionForgeDiscoveryTools) {
+			return fmt.Errorf("discovery Forge release must declare exact discovery tools")
+		}
+		if _, _, err := legionForgeDiscoveryParameters(release); err != nil {
+			return err
+		}
+	case legionForgeEvidenceProfile:
+		if !equalContextForgeStrings(release.GetDeclaredToolNames(), legionForgeEvidenceTools) {
+			return fmt.Errorf("evidence Forge release must declare exact evidence tools")
+		}
 	case legionForgeAdvisoryProfile:
 		if len(release.GetDeclaredToolNames()) != 0 {
 			return fmt.Errorf("advisory Forge release cannot declare executable tools")
@@ -158,7 +173,7 @@ func normalizedContextForgeParameters(values []*aiv1.ContextForgeParameter, prof
 		if key == "" || key != value.GetKey() || strings.TrimSpace(value.GetValue()) == "" || (kind != "string" && kind != "text" && kind != "resource") {
 			return false
 		}
-		if kind == "resource" && profile != legionForgeReportProfile {
+		if kind == "resource" && profile != legionForgeReportProfile && profile != legionForgeEvidenceProfile {
 			return false
 		}
 		if _, exists := seen[key]; exists {

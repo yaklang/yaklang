@@ -516,7 +516,7 @@ func runYakAIForgeDirect(
 
 	var result any
 	var err error
-	var httpRuntime *legionServerFocusRuntime
+	var httpRuntime legionForgeMaterialRuntime
 	if forgeRelease != nil {
 		capabilityOptions, runtime, capabilityErr := legionForgeCapabilityOptions(ctx, forgeRelease, binding)
 		if capabilityErr != nil {
@@ -569,7 +569,7 @@ func emitAIApplicationResult(
 	runtime yakRuntimeOptions,
 	release *aiv1.ContextForgeRelease,
 	binding aiSessionBinding,
-	httpRuntime *legionServerFocusRuntime,
+	httpRuntime legionForgeMaterialRuntime,
 	result any,
 ) error {
 	forgeResult, ok := result.(*aiforge.ForgeResult)
@@ -623,7 +623,7 @@ type aiApplicationMaterialReference struct {
 func aiApplicationMaterialReferences(
 	release *aiv1.ContextForgeRelease,
 	binding aiSessionBinding,
-	httpRuntime *legionServerFocusRuntime,
+	httpRuntime legionForgeMaterialRuntime,
 ) ([]aiApplicationMaterialReference, error) {
 	result := make([]aiApplicationMaterialReference, 0, len(release.GetParameters()))
 	pathKeys := make(map[string]string)
@@ -656,13 +656,37 @@ func aiApplicationMaterialReferences(
 			})
 		}
 	}
-	requestRefs := httpRuntime.applicationHTTPMaterialReferences()
+	var requestRefs []aiApplicationMaterialReference
+	if httpRuntime != nil {
+		requestRefs = httpRuntime.applicationHTTPMaterialReferences()
+	}
 	result = append(result, requestRefs...)
 	if release.GetCapabilityProfile() == legionForgeReportProfile && len(result) == 0 {
 		return nil, fmt.Errorf("report Forge release produced no authorized material provenance")
 	}
 	if release.GetCapabilityProfile() == legionForgeHTTPProfile && len(requestRefs) == 0 {
 		return nil, fmt.Errorf("HTTP Forge release produced no bounded request evidence")
+	}
+	if release.GetCapabilityProfile() == legionForgeDiscoveryProfile && len(requestRefs) == 0 {
+		return nil, fmt.Errorf("discovery Forge release produced no network observations")
+	}
+	if release.GetCapabilityProfile() == legionForgeEvidenceProfile {
+		for resourcePath := range pathKeys {
+			read := false
+			for _, material := range result {
+				if material.RelativePath != resourcePath {
+					continue
+				}
+				for _, operation := range material.Operations {
+					if operation != "metadata" {
+						read = true
+					}
+				}
+			}
+			if !read {
+				return nil, fmt.Errorf("evidence Forge did not read an authorized input")
+			}
+		}
 	}
 	return result, nil
 }
