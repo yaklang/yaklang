@@ -358,7 +358,7 @@ func GetSameSubStrings(raw ...string) []string {
 			}
 		}
 	}
-	// The old set returned a non-nil empty slice and unspecified map order.
+	// Empty intersections are non-nil; result order is unspecified.
 	out := make([]string, 0, len(intersection))
 	for value := range intersection {
 		out = append(out, value)

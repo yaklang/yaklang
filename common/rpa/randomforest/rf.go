@@ -4,13 +4,12 @@ import (
 	"bytes"
 	_ "embed"
 	"encoding/json"
-	"fmt"
-	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/rpa/character"
-	"github.com/yaklang/yaklang/common/utils"
 	"os"
 
-	RF "github.com/yaklang/yaklang/common/rpa/randomforest/internal/rf"
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/rpa/character"
+	"github.com/yaklang/yaklang/common/rpa/randomforest/internal/rf"
+	"github.com/yaklang/yaklang/common/utils"
 )
 
 // rf.model.gz 是 rf.model 的 gzip 副本（2.4MB -> 76KB），随二进制一起发布。
@@ -23,7 +22,7 @@ type UrlDetectSys struct {
 	X        [][]interface{}
 	Y        []string
 	Filepath string
-	model    *RF.Forest
+	model    *rf.Forest
 }
 
 func (sys *UrlDetectSys) SysReadFile() {
@@ -56,23 +55,22 @@ func (sys *UrlDetectSys) RebuildData(splitNum int) ([][]interface{}, []string) {
 }
 
 func (sys *UrlDetectSys) SysTrain(x [][]interface{}, y []string) {
-	forest := RF.BuildForest(x, y, 80, 1200, len(x[0]))
+	forest := rf.BuildForest(x, y, 80, 1200, len(x[0]))
 	sys.model = forest
 }
 
-func (sys *UrlDetectSys) PredictScore(xx [][]interface{}, yy []string) {
-	error_count := 0.0
-	for i := 0; i < len(xx); i++ {
-		output := sys.model.Predicate(xx[i])
-		expected := yy[i]
-		if output != expected {
-			fmt.Println(output, " ", expected)
-			error_count += 1
-		} else {
-			fmt.Println("***", output, " ", expected)
+// PredictScore returns classification accuracy, or zero for an empty sample set.
+func (sys *UrlDetectSys) PredictScore(xx [][]interface{}, yy []string) float64 {
+	if len(xx) == 0 {
+		return 0
+	}
+	incorrect := 0
+	for i, sample := range xx {
+		if sys.model.Predicate(sample) != yy[i] {
+			incorrect++
 		}
 	}
-	fmt.Println("success rate:", 1.0-error_count/float64(len(xx)))
+	return 1 - float64(incorrect)/float64(len(xx))
 }
 
 func (sys *UrlDetectSys) PredictX(s string) string {
@@ -103,7 +101,7 @@ func (sys *UrlDetectSys) LoadModel(path string) error {
 		return err
 	}
 	defer f.Close()
-	forest := &RF.Forest{}
+	forest := &rf.Forest{}
 	if err := json.NewDecoder(f).Decode(forest); err != nil {
 		return err
 	}
@@ -112,14 +110,12 @@ func (sys *UrlDetectSys) LoadModel(path string) error {
 }
 
 // LoadEmbeddedModel 加载编译进二进制的模型。
-// 之前这里用的是一个写死的开发机绝对路径，除作者机器外都会 os.Stat 失败，
-// 导致 strictUrl 实际上从来没有生效过。
 func (sys *UrlDetectSys) LoadEmbeddedModel() error {
 	raw, err := utils.GzipDeCompress(embeddedRFModelGz)
 	if err != nil {
 		return utils.Wrap(err, "decompress embedded rf model failed")
 	}
-	forest := &RF.Forest{}
+	forest := &rf.Forest{}
 	if err := json.NewDecoder(bytes.NewReader(raw)).Decode(forest); err != nil {
 		return utils.Wrap(err, "decode embedded rf model failed")
 	}
