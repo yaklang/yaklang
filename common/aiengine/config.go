@@ -34,9 +34,13 @@ type AIEngineConfig struct {
 	UserUsageCallback func(*aispec.ChatUsage)
 
 	// 执行配置
-	MaxIteration         int    // 最大迭代次数，默认 10
-	SessionID            string // 会话 ID，用于持久化
-	AllowSyncInitContext bool   // 允许首轮同步增强上下文，默认 false
+	MaxIteration           int    // 最大迭代次数，默认 10
+	SessionID              string // 会话 ID，用于持久化
+	AllowSyncInitContext   bool   // 允许首轮同步增强上下文，默认 false
+	EnableGoalMode         bool   // 启用目标模式
+	GoalMinIterations      int64  // 目标模式允许 finish 前的最少迭代数；<=0 使用底层默认值
+	GoalDurationSeconds    int64  // 目标模式时间窗口（秒）；-1 表示永不自动结束，0 表示禁用时间 gate
+	GoalAcceptanceCriteria string // 目标模式验收条件；非空时 finish 前由 AI 检查
 
 	// Stateless 为 true 时,引擎不持久化会话历史/memory/timeline 到本地 DB。
 	// 每轮由服务端打包 ContextPackage 注入历史,turn 完销毁引擎实例。
@@ -240,6 +244,60 @@ func WithAIService(service string) AIEngineConfigOption {
 func WithMaxIteration(max int) AIEngineConfigOption {
 	return func(c *AIEngineConfig) {
 		c.MaxIteration = max
+	}
+}
+
+// WithEnableGoalMode 设置是否启用目标模式（导出名为 aim.enableGoalMode）。
+// 目标模式启用后，可以通过 goalMinIterations、goalDurationSeconds 和
+// goalAcceptanceCriteria 组合 finish gate。
+//
+// Example:
+// ```
+// aim.InvokeReAct("深入分析目标", aim.enableGoalMode(true))
+// ```
+func WithEnableGoalMode(enable bool) AIEngineConfigOption {
+	return func(c *AIEngineConfig) {
+		c.EnableGoalMode = enable
+	}
+}
+
+// WithGoalMinIterations 设置目标模式允许 finish 前的最少迭代数
+// （导出名为 aim.goalMinIterations）。<=0 时使用底层默认值。
+func WithGoalMinIterations(iterations int64) AIEngineConfigOption {
+	return func(c *AIEngineConfig) {
+		c.GoalMinIterations = iterations
+	}
+}
+
+// WithGoalDurationSeconds 设置目标模式时间窗口（导出名为
+// aim.goalDurationSeconds）。>0 时在指定秒数内拒绝 finish；-1 表示永不自动
+// 结束；0 表示不启用时间 gate。
+//
+// Example:
+// ```
+// // 至少继续深入一小时
+// aim.InvokeReAct("深入分析目标", aim.enableGoalMode(true), aim.goalDurationSeconds(3600))
+// ```
+func WithGoalDurationSeconds(seconds int64) AIEngineConfigOption {
+	return func(c *AIEngineConfig) {
+		c.GoalDurationSeconds = seconds
+	}
+}
+
+// WithGoalAcceptanceCriteria 设置目标模式验收条件（导出名为
+// aim.goalAcceptanceCriteria）。非空时，每次 finish 都会根据当前执行证据检查
+// 验收条件；未通过时继续执行。
+//
+// Example:
+// ```
+// aim.InvokeReAct("审计项目", aim.enableGoalMode(true),
+//
+//	aim.goalAcceptanceCriteria("输出至少三个有证据和风险评级的漏洞"))
+//
+// ```
+func WithGoalAcceptanceCriteria(criteria string) AIEngineConfigOption {
+	return func(c *AIEngineConfig) {
+		c.GoalAcceptanceCriteria = criteria
 	}
 }
 
@@ -1093,7 +1151,7 @@ func WithExtendedForgeFromZip(zipPath string, password ...string) AIEngineConfig
 // ConvertToYPBAIStartParams 将 AIEngineConfig 转换为 YPB 的 AIStartParams
 // 用于与现有的 gRPC 接口兼容
 func (c *AIEngineConfig) ConvertToYPBAIStartParams() *ypb.AIStartParams {
-	return &ypb.AIStartParams{
+	params := &ypb.AIStartParams{
 		DisallowRequireForUserPrompt: !c.AllowUserInteract,
 		ReviewPolicy:                 c.ReviewPolicy,
 		ReActMaxIteration:            int64(c.MaxIteration),
@@ -1107,4 +1165,13 @@ func (c *AIEngineConfig) ConvertToYPBAIStartParams() *ypb.AIStartParams {
 		AIService:                    c.AIService,
 		TimelineSessionID:            c.SessionID,
 	}
+	if c.EnableGoalMode || c.GoalMinIterations != 0 || c.GoalDurationSeconds != 0 || c.GoalAcceptanceCriteria != "" {
+		params.Strategy = &ypb.AIExecutionStrategy{
+			EnableGoalMode:         c.EnableGoalMode,
+			GoalMinIterations:      c.GoalMinIterations,
+			GoalDurationSeconds:    c.GoalDurationSeconds,
+			GoalAcceptanceCriteria: c.GoalAcceptanceCriteria,
+		}
+	}
+	return params
 }
