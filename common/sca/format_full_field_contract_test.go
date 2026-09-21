@@ -24,7 +24,7 @@ type oldScanRec struct {
 	UpNames, FromFile, FromAnalyzer []string
 }
 
-type origDep struct{ Target, Constraint string }
+type origDep struct{ Target, Constraint, Raw string }
 
 type origPkg struct {
 	Name, Version, Verification, Source, Arch, LicenseRaw, Integrity, ResolvedURL string
@@ -112,7 +112,7 @@ func parseApkInstalled(raw []byte) []origPkg {
 					if i := strings.IndexAny(tok, "<>="); i >= 0 {
 						name, c = tok[:i], tok[i:]
 					}
-					p.Depends = append(p.Depends, origDep{name, c})
+					p.Depends = append(p.Depends, origDep{Target: name, Constraint: c, Raw: tok})
 				}
 			}
 		}
@@ -161,7 +161,7 @@ func parseCargoLock(raw []byte) []origPkg {
 			if len(f) > 1 {
 				c = f[1]
 			}
-			cur.Depends = append(cur.Depends, origDep{f[0], c})
+			cur.Depends = append(cur.Depends, origDep{f[0], c, dep})
 			continue
 		}
 		switch {
@@ -210,7 +210,7 @@ func parseNpmLockV1(raw []byte) []origPkg {
 				p.Verification = "sha1:" + hex.EncodeToString(mustB64(d.Integrity[len("sha1-"):]))
 			}
 			for tgt, c := range d.Requires {
-				p.Depends = append(p.Depends, origDep{tgt, c})
+				p.Depends = append(p.Depends, origDep{Target: tgt, Constraint: c, Raw: tgt + " " + c})
 			}
 			out = append(out, p)
 			if len(d.Dependencies) > 0 {
@@ -509,15 +509,24 @@ func testFullFieldCargo(t *testing.T) {
 					continue
 				}
 				found = true
-				if d.Constraint != "" && q.Constraint != d.Constraint {
-					t.Fatalf("%s dep %s constraint got %q fixture %q", p.Name, d.Target, q.Constraint, d.Constraint)
+				if strings.HasPrefix(q.Target, "unresolved-cargo:") {
+					t.Fatalf("synthetic target for original %q: %+v", d.Raw, q)
+				}
+				if q.Constraint != d.Constraint {
+					t.Fatalf("%s dep %s invented or dropped declared version: got %q fixture %q", p.Name, d.Target, q.Constraint, d.Constraint)
+				}
+				if q.Condition != d.Raw {
+					t.Fatalf("%s dep raw form got %q fixture %q", p.Name, q.Condition, d.Raw)
+				}
+				if d.Constraint == "" {
+					continue
 				}
 				if len(q.Resolved) != 1 {
 					t.Fatalf("%s dep %s resolved %v", p.Name, d.Target, q.Resolved)
 				}
 				res := obsByID[q.Resolved[0]]
 				want := comps[d.Target+"@"+d.Constraint]
-				if d.Constraint != "" && res.Component != want.Key.ID() {
+				if res.Component != want.Key.ID() {
 					t.Fatalf("%s dep %s resolved observation component mismatch", p.Name, d.Target)
 				}
 			}
@@ -540,12 +549,12 @@ func testFullFieldCargo(t *testing.T) {
 	from := byComp[app.Key.ID()][0].ID()
 	ok := false
 	for _, q := range sbomReqs {
-		if q.From == from && q.Target == "regex" {
+		if q.From == from && q.Target == "regex" && q.Constraint == "1.7.3" && q.Condition == "regex 1.7.3 (registry+https://github.com/rust-lang/crates.io-index)" {
 			ok = true
 		}
 	}
 	if !ok {
-		t.Fatalf("SBOM app->regex not associated: %s", extra5149JSON(t, sbomReqs))
+		t.Fatalf("SBOM app->regex original qualifier not associated: %s", extra5149JSON(t, sbomReqs))
 	}
 }
 

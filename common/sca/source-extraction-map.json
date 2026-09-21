@@ -65,7 +65,7 @@
     },
     {
       "local_file": "common/sca/analyzer/analyzer.go",
-      "sha256": "ccdc4fa72e7a9a26a826f74562df79a7da3c9f5cb9d67fb631b9aba45f3e434a",
+      "sha256": "6c36e5729d281413424bd99d08d371b52c13e40cabacce900da539a68228fc3f",
       "symbols": [
         {
           "name": "TypAnalyzer",
@@ -1350,7 +1350,7 @@
     },
     {
       "local_file": "common/sca/analyzer/dep-parser/rust/cargo/parse.go",
-      "sha256": "a70e3687674104daa566c1c1f7d5b2dd84acd6f529817489bab3eb02a3153b21",
+      "sha256": "c29e92219a5fa8857363b2fcb7999e943fa84b78b80849cb1f209f729f46ac2a",
       "symbols": [
         {
           "name": "cargoPkg",
@@ -1382,7 +1382,7 @@
         },
         {
           "name": "cargoIndex",
-          "line": 135
+          "line": 133
         }
       ],
       "decision": "TRIM_AND_REWRITE",
@@ -4831,7 +4831,7 @@
     },
     {
       "local_file": "common/sca/report.go",
-      "sha256": "0e7af047f748733c26b955b4e14c81f6d743ff82c8120251a99f8d742c82f20f",
+      "sha256": "3659c59ce7440f2413cbc2593ccec173abe73864ad3013beb28936f89919592a",
       "symbols": [
         {
           "name": "chargeAndSortPackages",
@@ -4843,7 +4843,7 @@
         },
         {
           "name": "manifestEvidence",
-          "line": 583
+          "line": 591
         }
       ],
       "decision": "REWRITE",

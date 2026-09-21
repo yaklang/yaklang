@@ -451,7 +451,15 @@ func fillReport(r *model.Report, pkgs []*dxtypes.Package, l ResourceLimits, shar
 			}
 			return
 		}
-		if err := st.Result(budget.SizeOfEdge() + budget.SizeOfString(q.Target) + budget.SizeOfString(q.Constraint)); err != nil {
+		need, err := budget.SizeAdd(budget.SizeOfEdge(), budget.SizeOfString(q.Target), budget.SizeOfString(q.Constraint), budget.SizeOfString(q.Condition))
+		if err != nil {
+			if !edgeLimitReported {
+				edgeLimitReported = true
+				limit("result memory estimate")
+			}
+			return
+		}
+		if err := st.Result(need); err != nil {
 			if !edgeLimitReported {
 				edgeLimitReported = true
 				limit("result memory estimate")

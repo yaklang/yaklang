@@ -206,7 +206,11 @@ func handlerParsedBudget(ctx context.Context, parsedLibs types.Libraries, parsed
 				pkg.LinkDepend(up)
 				req.Resolved = []string{up.Instance}
 			}
-			if err := st.Result(budget.SizeOfEdge() + budget.SizeOfString(q.Target) + budget.SizeOfString(q.Constraint)); err != nil {
+			need, err := budget.SizeAdd(budget.SizeOfEdge(), budget.SizeOfString(q.Target), budget.SizeOfString(q.Constraint), budget.SizeOfString(q.Condition))
+			if err != nil {
+				return nil, err
+			}
+			if err := st.Result(need); err != nil {
 				return nil, err
 			}
 			pkg.Requirements = append(pkg.Requirements, req)

@@ -112,16 +112,14 @@ func parseDependencies(id string, pkg cargoPkg, index cargoIndex) *types.Depende
 		if name == "" {
 			continue
 		}
-		req := types.Requirement{Target: name, Constraint: constraint}
+		// Constraint is only the version token present in the lock line.
+		// Name-only "foo" stays unconstrained; the locked version belongs on
+		// the uniquely Resolved package, not on the declaration.
+		req := types.Requirement{Target: name, Constraint: constraint, Condition: raw}
 		if len(matches) == 1 {
 			nid := nativeID(matches[0])
 			dep.DependsOn = append(dep.DependsOn, nid)
 			req.Resolved = nid
-			if req.Constraint == "" {
-				req.Constraint = matches[0].Version
-			}
-		} else {
-			dep.DependsOn = append(dep.DependsOn, "unresolved-cargo:"+raw)
 		}
 		dep.Requirements = append(dep.Requirements, req)
 	}
