@@ -49,7 +49,11 @@ func TestGoalAcceptanceUsesAuxiliaryConfig(t *testing.T) {
 					for _, option := range req.GetExtraSpecOpts() {
 						option(&options)
 					}
-					require.Empty(t, options.ThinkingLevel, "goal review preserves its existing parameters")
+					if name == "single-model" {
+						require.Equal(t, "none", options.ThinkingLevel)
+					} else {
+						require.Empty(t, options.ThinkingLevel)
+					}
 					if name == "error" {
 						return nil, errors.New("review unavailable")
 					}
@@ -74,7 +78,7 @@ func TestGoalAcceptanceUsesAuxiliaryConfig(t *testing.T) {
 			result := loop.CheckGoalAcceptanceCriteria(ctx)
 			require.NotNil(t, result)
 			require.Zero(t, intelligenceCalls.Load())
-			require.Equal(t, aicommon.SingleModelPassThrough, aicommon.GetSingleModelAction(aicommon.CallerLabelGoalAcceptanceReview))
+			require.Equal(t, aicommon.SingleModelRun, aicommon.GetSingleModelAction(aicommon.CallerLabelGoalAcceptanceReview))
 			switch name {
 			case "disabled", "empty-criteria", "sub-agent":
 				require.Zero(t, speedCalls.Load())

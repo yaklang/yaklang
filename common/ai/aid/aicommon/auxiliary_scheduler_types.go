@@ -56,8 +56,7 @@ func WithAuxiliaryOnError(handler func(error)) AuxiliaryTaskOption {
 }
 
 type AuxiliaryTaskDecision struct {
-	Action      SingleModelAction
-	RequestOpts []AIRequestOption
+	Action SingleModelAction
 }
 
 func (d AuxiliaryTaskDecision) ShouldRun() bool {

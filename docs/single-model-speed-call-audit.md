@@ -1,8 +1,10 @@
 # Speed 模型辅助任务迁移审计
 
 > 分支：`feat/single-ai-model-mode`  
-> 更新日期：2026-09-18  
-> 定义边界：**凡执行路径明确选择 Speed 模型的任务，均属于辅助任务。**
+> 更新日期：2026-09-20
+> 定义边界：Agent 内部明确选择 Speed 的辅助工作走辅助调度。Yak 脚本主动发起的 AI 调用不属于这次辅助任务迁移；脚本 ai 库保持底层原有调用行为，不额外加入单模型处理。
+
+> 提交边界：协议与存储、manager 回调工厂、Skip/Run 调度及 LiteCall 参数函数先提交。aicommon.Config 的模式、回调装配、构建顺序与继承集成暂留工作区；相关集成测试依赖这部分后续接线。下文涉及初始化固定模式的内容描述待集成方案，不代表这部分已经提交。
 
 ## 一、边界约束
 
@@ -13,7 +15,8 @@
 - `WithLiteForge_SpeedPriority`
 - `MustGetSpeedPriorityAIModelCallback`
 - `Config.InvokeLiteForge` 中实际用于 Speed 辅助工作的调用
-- Yak 的 `liteforge.speedPriority()`
+
+Yak 的 `liteforge.speedPriority()`、主动 `ai.Chat` / `ai.FunctionCall` 保持原调用方式，不因为请求 Speed 就被 Skip；见第 6.3 节。
 
 以下 Intelligence/Quality 路径不属于辅助任务，本次不得迁移或降级：
 
@@ -149,7 +152,7 @@ Timeline 两处压缩和 Interval Review 已统一通过 `ScheduleAuxiliaryTask 
 - `evaluateInsufficientReason`
 - `matchCapabilityCatalogChunk`
 
-## 六、仍未接入 Config 调度器的 Speed 边界
+## 六、外围 Speed 调用：调度边界与全局选模
 
 ### 6.1 Crawler
 
@@ -171,7 +174,7 @@ Timeline 两处压缩和 Interval Review 已统一通过 `ScheduleAuxiliaryTask 
 
 其中 Agent 内的 RAG Enhance 当前通过 `EnhanceKnowledgeManager` 入口 gate 关闭；独立产品能力不应强行绑定 AID Config。是否需要统一策略注入，应在后续配置设计阶段单独决定。
 
-### 6.3 Yak 脚本
+### 6.3 Yak 主动调用（不迁入辅助调度）
 
 生产 Yak 中仍有以下 `liteforge.speedPriority()`：
 
@@ -180,17 +183,17 @@ Timeline 两处压缩和 Interval Review 已统一通过 `ScheduleAuxiliaryTask 
 - `aitool/.../ssa/syntaxflow_rule_completion.yak`；
 - `loop_infosec_recon/embedded/js-static-extract-ai.yak`。
 
-Yak 调用无法读取当前 `aicommon.Config`。需要先设计上下文/策略传播接口，再迁移；不能通过修改 Quality 调用或全局替换模型规避。
+按用户确认，上述脚本主动调用不需要增加辅助调度判断。会话 Config 在初始化时固定回调角色，回调执行时读取所绑定类别的最新模型配置。工具脚本／独立 engine 不继承当前会话模式，脚本 ai 库保持原有底层调用，不再改接 aiconfig 或新增单模型处理。脚本仍正常执行，不进入辅助任务 Skip 调度；gateway 不读取单模型开关或拦截底层显式调用。普通模式保留原 tier 行为。Config 初始化与继承部分仍待单独集成。
 
 ## 七、验证规则
 
 后续可以增加静态检查，保证边界不回退：
 
 1. `common/ai/aid` 生产代码不得新增直接 `InvokeSpeedPriorityLiteForge(...)` 调用；
-2. 新增 Speed LiteForge 任务必须声明 CallerLabel 并走 `Config.ScheduleAuxiliaryTask`；
-3. 新增直接 `CallSpeedPriorityAI` 必须调用 `ResolveAuxiliaryTask`；
+2. 新增 Agent 内部 Speed 辅助任务必须声明 CallerLabel 并走 `Config.ScheduleAuxiliaryTask`；
+3. 辅助任务必须由调度器实际执行，不能只调用 `ResolveAuxiliaryTask` 后自行执行；
 4. Quality/Intelligence CallerLabel 不得注册到辅助任务注册表；
-5. 辅助调度器不得回退到 Quality callback。
+5. 多模型下辅助调度器不得回退到 Quality callback；单模型下 Speed 在 Config 初始化时绑定为高质模型的 LiteCall；调度器只判断 Skip / Run。
 
 ## 八、当前状态
 
@@ -199,10 +202,11 @@ Yak 调用无法读取当前 `aicommon.Config`。需要先设计上下文/策略
 - 已列出的 Speed LiteForge 调用（含三个内置 Mini AI Task、目标验收检查）完成迁移；
 - Timeline/Interval Review 和 Speed Loop 已完成 LiteForge 调度执行迁移；
 - AIVE 在单模型模式直接停用，检查已前移到循环/审批/风险反馈的记录构建之前；普通模式保留现状，不为它增加 caller 覆盖；
-- Quality/Intelligence 调用没有修改；
-- 剩余边界集中在 Crawler、独立 RAG/产品能力和 Yak 脚本的配置传播问题。
+- Quality/Intelligence 不迁入辅助调度；实际选模受全局模式控制；
+- Yak 主动 ai 调用保持底层原样，不额外处理单模型、不继承会话模式、不进入辅助任务调度；
+- Crawler、独立 RAG/产品能力的调用性质仍需分别界定，不能仅因使用 Speed 就推断需要 Agent 调度。
 
-这些剩余问题需要配置方案支持，适合在“辅助任务迁移完成”之后再进入单模型模式设计阶段。
+全局单模型配置与运行时选模已单独实现，保留原始 tier 配置；这不等于将上述所有独立能力都迁入了辅助调度。
 
 ## 九、流式迁移回归结果（2026-09-18）
 

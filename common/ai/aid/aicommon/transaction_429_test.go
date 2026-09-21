@@ -41,7 +41,7 @@ func (t *transactionTestConfig) ScheduleAuxiliaryTask(
 }
 
 func (t *transactionTestConfig) ResolveAuxiliaryTask(_ string) AuxiliaryTaskDecision {
-	return AuxiliaryTaskDecision{Action: SingleModelPassThrough}
+	return AuxiliaryTaskDecision{Action: SingleModelRun}
 }
 
 func newTransactionTestConfig(ctx context.Context) *transactionTestConfig {

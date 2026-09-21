@@ -9,11 +9,8 @@ const (
 	// SingleModelSkip means the auxiliary task is not called at all.
 	// OnResult is not invoked, so downstream logic naturally does not execute.
 	SingleModelSkip SingleModelAction = iota
-	// SingleModelLiteCall means the task is called on the same model but with
-	// degraded parameters (e.g. thinking=none) to reduce cost/latency.
-	SingleModelLiteCall
-	// SingleModelPassThrough means the task is called normally, no degradation.
-	SingleModelPassThrough
+	// SingleModelRun executes the already-bound Speed callback.
+	SingleModelRun
 )
 
 // singleModelRegistry holds the action decision for each auxiliary CallerLabel.
@@ -49,35 +46,6 @@ func initSingleModelRegistry() {
 	register(CallerLabelBatchMemoryDeduplication, SingleModelSkip)
 	register(CallerLabelPerception, SingleModelSkip)
 
-	// ===== LiteCall (critical path: still call, but degraded) =====
-	// User-requested mini tasks must still produce a result.
-	register(CallerLabelMiniPromptOptimize, SingleModelLiteCall)
-	register(CallerLabelMiniTimelineSummary, SingleModelLiteCall)
-	register(CallerLabelMiniTodoDraft, SingleModelLiteCall)
-	// InitTask key steps — skipping would break loop startup.
-	register(CallerLabelExtractExploreTargetPath, SingleModelLiteCall)
-	register(CallerLabelExtractHTTPRequestFromInput, SingleModelLiteCall)
-	register(CallerLabelAnalyzeReportIntent, SingleModelLiteCall)
-	register(CallerLabelKnowledgeCompress, SingleModelLiteCall)
-	register(CallerLabelKnowledgeCompressBench, SingleModelLiteCall)
-	register(CallerLabelSelectKnowledgeBase, SingleModelLiteCall)
-	register(CallerLabelEvaluateNextSearch, SingleModelLiteCall)
-	register(CallerLabelPlanFactsHook, SingleModelLiteCall)
-	register(CallerLabelPlanDirect, SingleModelLiteCall)
-	register(CallerLabelCapabilityCatalogMatch, SingleModelLiteCall)
-	register(CallerLabelAnalyzeRequirementAndSearch, SingleModelLiteCall)
-	register(CallerLabelExtractRankedLines, SingleModelLiteCall)
-	register(CallerLabelHttpFuzztestInitBootstrap, SingleModelLiteCall)
-	register(CallerLabelScanPlan, SingleModelLiteCall)
-	register(CallerLabelLLMRerank, SingleModelLiteCall)
-	register(CallerLabelTimelineBatchCompress, SingleModelLiteCall)
-	register(CallerLabelTimelineHeadRefine, SingleModelLiteCall)
-	register(CallerLabelCrawlerJSPathExtract, SingleModelLiteCall)
-
-	// ===== PassThrough (explicitly registered for audit) =====
-	register(CallerLabelGoalAcceptanceReview, SingleModelPassThrough)
-	register(CallerLabelHttpFlowAnalyzeFinalizeSummary, SingleModelPassThrough)
-	register(CallerLabelSkillConflictResolver, SingleModelPassThrough)
 }
 
 // ensureSingleModelRegistry initializes the registry once.
@@ -86,14 +54,14 @@ func ensureSingleModelRegistry() {
 }
 
 // GetSingleModelAction returns the single-model-mode action for the given
-// CallerLabel. If the label is not in the registry, the default is PassThrough
-// (i.e. unregistered tasks are called normally, matching current behavior).
+// CallerLabel. If the label is not in the registry, the default is Run
+// All non-skipped tasks use Speed; single-model Speed was bound to LiteCall at initialization.
 // Config.ResolveAuxiliaryTask consults this registry only when single-model
-// mode is enabled; both LiteForge and direct Speed calls share that decision.
+// mode is enabled; this registry does not control request parameters.
 func GetSingleModelAction(name string) SingleModelAction {
 	ensureSingleModelRegistry()
 	if action, ok := singleModelRegistry[name]; ok {
 		return action
 	}
-	return SingleModelPassThrough
+	return SingleModelRun
 }

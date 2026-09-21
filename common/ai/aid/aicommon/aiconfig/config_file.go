@@ -23,6 +23,7 @@ type AIModelConfigEntry struct {
 }
 
 type TieredAIConfigFile struct {
+	SingleModelMode    bool                 `json:"single_model_mode,omitempty" yaml:"single_model_mode,omitempty"`
 	Enabled            bool                 `json:"enabled" yaml:"enabled"`
 	RoutingPolicy      string               `json:"routing_policy" yaml:"routing_policy"`
 	DisableFallback    bool                 `json:"disable_fallback" yaml:"disable_fallback"`
@@ -94,6 +95,7 @@ func ThirdPartyConfigToEntry(cfg *ypb.ThirdPartyApplicationConfig) AIModelConfig
 
 func ConfigFileToTieredAIConfig(cfg *TieredAIConfigFile) *consts.TieredAIConfig {
 	tiered := &consts.TieredAIConfig{
+		SingleModelMode: cfg.SingleModelMode,
 		Enabled:         cfg.Enabled,
 		DisableFallback: cfg.DisableFallback,
 	}
@@ -167,6 +169,7 @@ func ResolveConfigFilePath(specified string) string {
 // tiered AI configuration -- all runtime reads should come from the database.
 func SaveTieredAIConfigToDB(cfg *TieredAIConfigFile) error {
 	aiConfig := &ypb.AIGlobalConfig{
+		SingleModelMode: cfg.SingleModelMode,
 		Enabled:         cfg.Enabled,
 		RoutingPolicy:   cfg.RoutingPolicy,
 		DisableFallback: cfg.DisableFallback,

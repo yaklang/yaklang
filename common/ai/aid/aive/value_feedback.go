@@ -222,7 +222,7 @@ func submitValueFeedbackInternal(ctx context.Context, cfg *aicommon.Config, reco
 	// 硬编码 lightweight 回调 (memfit-light-free), 不暴露任何模型 option.
 	// 严格只用 lightweight tier: 拿不到就放弃, 绝不回退到 legacy ai.Chat (那会违反
 	// "只能用 memfit-light-free" 的硬约束, 并在无后端环境里发起真实请求).
-	cb, cbErr := aicommon.GetLightweightAIModelCallback()
+	cb, cbErr := aicommon.GetLightweightAIModelCallback(cfg.IsSingleAIModelMode())
 	if cbErr != nil {
 		log.Debugf("aive skip value feedback: lightweight model callback unavailable: %v", cbErr)
 		return
@@ -234,7 +234,6 @@ func submitValueFeedbackInternal(ctx context.Context, cfg *aicommon.Config, reco
 		aiforge.WithLiteForge_DisableTimeline(),
 		aiforge.WithLiteForge_OutputSchemaRaw(valueFeedbackActionName, outputSchema),
 		aiforge.WithLiteForge_SpeedPriority(),
-		aiforge.WithLiteForge_ExtraRequestOpts(decision.RequestOpts...),
 		aiforge.WithExtendLiteForge_AIOption(aicommon.WithFastAICallback(cb)),
 	)
 	if err != nil {

@@ -67,7 +67,7 @@ func (m *MockedAIConfig) ScheduleAuxiliaryTask(
 }
 
 func (m *MockedAIConfig) ResolveAuxiliaryTask(_ string) aicommon.AuxiliaryTaskDecision {
-	return aicommon.AuxiliaryTaskDecision{Action: aicommon.SingleModelPassThrough}
+	return aicommon.AuxiliaryTaskDecision{Action: aicommon.SingleModelRun}
 }
 
 func NewMockedAIConfig(ctx context.Context) aicommon.AICallerConfigIf {

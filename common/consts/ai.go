@@ -55,6 +55,7 @@ const (
 
 // TieredAIConfig stores the tiered AI model configuration
 type TieredAIConfig struct {
+	SingleModelMode bool
 	// Enabled indicates whether tiered AI model configuration is enabled
 	Enabled bool
 	// RoutingPolicy defines how to route requests to different models
@@ -262,11 +263,11 @@ func cloneHTTPHeadersForAIConfig(headers []*ypb.KVPair) []*ypb.KVPair {
 }
 
 const (
-	RoutingPolicyAuto        = string(PolicyAuto)
-	RoutingPolicyPerformance = string(PolicyPerformance)
-	RoutingPolicyCost        = string(PolicyCost)
-	RoutingPolicyBalance     = string(PolicyBalance)
-	DefaultRoutingPolicy     = RoutingPolicyBalance
-	ModelExtraParamKey       = "model"
-	BuildinModelExtraParamKey       = "isBuildin"
+	RoutingPolicyAuto         = string(PolicyAuto)
+	RoutingPolicyPerformance  = string(PolicyPerformance)
+	RoutingPolicyCost         = string(PolicyCost)
+	RoutingPolicyBalance      = string(PolicyBalance)
+	DefaultRoutingPolicy      = RoutingPolicyBalance
+	ModelExtraParamKey        = "model"
+	BuildinModelExtraParamKey = "isBuildin"
 )

@@ -37,6 +37,10 @@ func ResetVerification() {
 
 // doVerifyAIConfig performs the actual verification logic
 func doVerifyAIConfig() error {
+	if mgr := GetGlobalManager(); mgr.singleModelMode() {
+		_, err := mgr.BindModelConfig(consts.TierIntelligent, "", "")()
+		return err
+	}
 	// Check if tiered config is enabled
 	if !consts.IsTieredAIModelConfigEnabled() {
 		// If tiered config is not enabled, we don't need to verify it

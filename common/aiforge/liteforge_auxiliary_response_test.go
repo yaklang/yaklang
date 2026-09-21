@@ -12,7 +12,72 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aispec"
+	"github.com/yaklang/yaklang/common/consts"
 )
+
+func TestAuxiliaryLiteCallOptionsAreRequestLocal(t *testing.T) {
+	previous := consts.GetTieredAIConfig()
+	t.Cleanup(func() { consts.SetTieredAIConfig(previous) })
+	consts.SetTieredAIConfig(nil)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	var roles, thinking []string
+	callback := func(role string) aicommon.AICallbackType {
+		return func(c aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+			var opts aispec.AIConfig
+			for _, opt := range req.GetExtraSpecOpts() {
+				opt(&opts)
+			}
+			roles = append(roles, role)
+			thinking = append(thinking, opts.ThinkingLevel)
+			response := c.NewAIResponse()
+			response.EmitOutputStream(strings.NewReader("ok"))
+			response.Close()
+			return response, nil
+		}
+	}
+	cfg := aicommon.NewConfig(ctx, aicommon.WithSingleAIModelMode(true),
+		aicommon.WithDisableAutoSkills(true), aicommon.WithDisableCreateDBRuntime(true),
+		aicommon.WithAIAutoRetry(1), aicommon.WithAITransactionAutoRetry(1),
+		aicommon.WithSpeedPriorityAICallback(callback("speed")),
+		aicommon.WithQualityPriorityAICallback(callback("quality")))
+	// Reuse the same caller-owned options across LiteCall and ordinary calls.
+	extra := []aispec.AIConfigOption{aispec.WithThinkingLevel("high")}
+	shared := []aicommon.GeneralKVConfigOption{
+		aicommon.WithGeneralConfigExtraRequestOpts(aicommon.WithAIRequest_ExtraSpecOpts(extra...)),
+	}
+	invoke := func(name string) {
+		var gotError error
+		results := 0
+		cfg.ScheduleAuxiliaryTask(ctx, name, func() string { return "unchanged prompt" },
+			func(*aicommon.Action) { results++ }, aicommon.WithAuxiliaryOpts(shared...),
+			aicommon.WithAuxiliaryOnError(func(err error) { gotError = err }),
+			aicommon.WithAuxiliaryResponseHandler(func(response *aicommon.AIResponse) (*aicommon.Action, error) {
+				body, err := io.ReadAll(response.GetOutputStreamReader("test", true, cfg.GetEmitter()))
+				require.NoError(t, err)
+				require.Equal(t, "ok", string(body))
+				return aicommon.NewSimpleAction("done", nil), nil
+			}))
+		require.NoError(t, gotError)
+		require.Equal(t, 1, results)
+	}
+	invoke(aicommon.CallerLabelMiniTodoDraft)        // LiteCall overrides high for this request only.
+	invoke(aicommon.CallerLabelGoalAcceptanceReview) // All single-model Speed calls are LiteCall.
+	response, err := cfg.CallQualityPriorityAI(aicommon.NewAIRequest("normal quality", aicommon.WithAIRequest_ExtraSpecOpts(extra...)))
+	require.NoError(t, err)
+	_, err = io.ReadAll(response.GetOutputStreamReader("test", true, cfg.GetEmitter()))
+	require.NoError(t, err)
+	require.NoError(t, response.GetError())
+	cfg = aicommon.NewConfig(ctx, aicommon.WithSingleAIModelMode(false), aicommon.WithDisableAutoSkills(true), aicommon.WithDisableCreateDBRuntime(true), aicommon.WithSpeedPriorityAICallback(callback("speed")), aicommon.WithQualityPriorityAICallback(callback("quality")))
+	invoke(aicommon.CallerLabelMiniTodoDraft) // The same task in multi-model mode preserves high.
+	require.Equal(t, []string{"speed", "speed", "quality", "speed"}, roles)
+	require.Equal(t, []string{"none", "none", "high", "high"}, thinking)
+	var original aispec.AIConfig
+	for _, opt := range extra {
+		opt(&original)
+	}
+	require.Equal(t, "high", original.ThinkingLevel)
+}
 
 func TestAuxiliaryResponseHandlerTransaction(t *testing.T) {
 	for _, mode := range []string{"normal", "retry", "invalid", "nil-action", "cancel", "skip", "lite-call"} {

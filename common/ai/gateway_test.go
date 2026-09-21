@@ -289,7 +289,8 @@ func TestClientStreamExtInfo(t *testing.T) {
 func TestChat_DisableProviderFallback(t *testing.T) {
 	cfg := yakit.GetNetworkConfig()
 	if cfg == nil {
-		t.Fail()
+		// A fresh isolated profile has no legacy network settings yet.
+		cfg = &ypb.GlobalNetworkConfig{}
 	}
 	bak := append([]string(nil), cfg.AiApiPriority...)
 	defer func() {

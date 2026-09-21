@@ -85,14 +85,23 @@ func SetAIGlobalConfig(db *gorm.DB, cfg *ypb.AIGlobalConfig) (*ypb.AIGlobalConfi
 		return nil, utils.Error("config is nil")
 	}
 
-	if err := validateModelConfigs(cfg.IntelligentModels); err != nil {
-		return nil, err
-	}
-	if err := validateModelConfigs(cfg.LightweightModels); err != nil {
-		return nil, err
-	}
-	if err := validateModelConfigs(cfg.VisionModels); err != nil {
-		return nil, err
+	if cfg.GetSingleModelMode() {
+		if err := consts.ValidateSingleAIModel(consts.FirstIntelligentModel(cfg.GetIntelligentModels())); err != nil {
+			return nil, err
+		}
+		if err := validateModelConfigs(cfg.IntelligentModels); err != nil {
+			return nil, err
+		}
+	} else {
+		if err := validateModelConfigs(cfg.IntelligentModels); err != nil {
+			return nil, err
+		}
+		if err := validateModelConfigs(cfg.LightweightModels); err != nil {
+			return nil, err
+		}
+		if err := validateModelConfigs(cfg.VisionModels); err != nil {
+			return nil, err
+		}
 	}
 	migrateAIGlobalConfigBaseURLs(cfg)
 
@@ -112,6 +121,11 @@ func ApplyAIGlobalConfig(db *gorm.DB, cfg *ypb.AIGlobalConfig) error {
 		consts.SetTieredAIConfig(nil)
 		return nil
 	}
+	if cfg.GetSingleModelMode() {
+		if err := consts.ValidateSingleAIModel(consts.FirstIntelligentModel(cfg.GetIntelligentModels())); err != nil {
+			return err
+		}
+	}
 
 	buildModels := func(models []*ypb.AIModelConfig) []*ypb.AIModelConfig {
 		if len(models) == 0 {
@@ -127,13 +141,13 @@ func ApplyAIGlobalConfig(db *gorm.DB, cfg *ypb.AIGlobalConfig) error {
 				continue
 			}
 			result = append(result, &ypb.AIModelConfig{
-				ProviderId:             model.GetProviderId(),
-				Provider:               providerCfg,
-				ModelName:              model.GetModelName(),
-				ExtraParams:            cloneKVPairs(model.GetExtraParams()),
-				IsOnline:               model.GetIsOnline(),
-				ProbedExtendedEfforts:  cloneStringSlice(model.GetProbedExtendedEfforts()),
-				EffortProbed:           model.GetEffortProbed(),
+				ProviderId:            model.GetProviderId(),
+				Provider:              providerCfg,
+				ModelName:             model.GetModelName(),
+				ExtraParams:           cloneKVPairs(model.GetExtraParams()),
+				IsOnline:              model.GetIsOnline(),
+				ProbedExtendedEfforts: cloneStringSlice(model.GetProbedExtendedEfforts()),
+				EffortProbed:          model.GetEffortProbed(),
 			})
 		}
 		return result
@@ -152,6 +166,7 @@ func ApplyAIGlobalConfig(db *gorm.DB, cfg *ypb.AIGlobalConfig) error {
 	}
 
 	tiered := &consts.TieredAIConfig{
+		SingleModelMode: cfg.GetSingleModelMode(),
 		Enabled:         cfg.GetEnabled(),
 		DisableFallback: cfg.GetDisableFallback(),
 		RoutingPolicy:   routing,
@@ -173,6 +188,7 @@ func cloneAIGlobalConfig(cfg *ypb.AIGlobalConfig) *ypb.AIGlobalConfig {
 		return nil
 	}
 	return &ypb.AIGlobalConfig{
+		SingleModelMode:   cfg.GetSingleModelMode(),
 		Enabled:           cfg.GetEnabled(),
 		RoutingPolicy:     cfg.GetRoutingPolicy(),
 		DisableFallback:   cfg.GetDisableFallback(),
@@ -196,12 +212,13 @@ func cloneAIModelConfigs(models []*ypb.AIModelConfig) []*ypb.AIModelConfig {
 			continue
 		}
 		cloned = append(cloned, &ypb.AIModelConfig{
-			ProviderId:             model.GetProviderId(),
-			Provider:               cloneThirdPartyConfig(model.GetProvider()),
-			ModelName:              model.GetModelName(),
-			ExtraParams:            cloneKVPairs(model.GetExtraParams()),
-			ProbedExtendedEfforts:  cloneStringSlice(model.GetProbedExtendedEfforts()),
-			EffortProbed:           model.GetEffortProbed(),
+			ProviderId:            model.GetProviderId(),
+			IsOnline:              model.GetIsOnline(),
+			Provider:              cloneThirdPartyConfig(model.GetProvider()),
+			ModelName:             model.GetModelName(),
+			ExtraParams:           cloneKVPairs(model.GetExtraParams()),
+			ProbedExtendedEfforts: cloneStringSlice(model.GetProbedExtendedEfforts()),
+			EffortProbed:          model.GetEffortProbed(),
 		})
 	}
 	return cloned
