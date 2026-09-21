@@ -20,7 +20,7 @@ func BuildSessionSnapshot(cfg *aicommon.Config, loop *ReActLoop, task aicommon.A
 		BackgroundProcesses: cfg.BuildSessionSnapshotBackgroundProcesses(),
 	}
 	aicommon.NormalizeSessionSnapshot(snapshot)
-	return snapshot
+	return cfg.MaterializeSessionSnapshot(task, snapshot)
 }
 
 func loopCapabilityContext(loop *ReActLoop) aicommon.CapabilityInventoryLoopContext {
