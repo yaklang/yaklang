@@ -6,6 +6,8 @@ TEST_BIN_DIR="${TEST_BIN_DIR:-}"
 TEST_CONFIG="${TEST_CONFIG:-}"
 SUITE_NAME="${SUITE_NAME:-suite}"
 SUITE_SYNC_RULE="${SUITE_SYNC_RULE:-0}"
+# Pure static checks can run without starting the engine. Default stays strict.
+SUITE_NEEDS_GRPC="${SUITE_NEEDS_GRPC:-1}"
 TEST_TIMEOUT="${TEST_TIMEOUT:-2m}"
 TEST_VERBOSE="${TEST_VERBOSE:-1}"
 SKIP_SYNC_EMBED_RULE_IN_GITHUB="${SKIP_SYNC_EMBED_RULE_IN_GITHUB:-true}"
@@ -17,12 +19,20 @@ SUITE_TIMEOUT="${SUITE_TIMEOUT:-50m}"
 # and the failure path reports *why* the wait ended instead of a generic message.
 GRPC_READY_TIMEOUT="${GRPC_READY_TIMEOUT:-240}"
 
-if [[ -z "$YAK_BINARY_PATH" || -z "$TEST_BIN_DIR" || -z "$TEST_CONFIG" ]]; then
-  echo "ERROR: YAK_BINARY_PATH, TEST_BIN_DIR, and TEST_CONFIG must be set"
+if [[ "$SUITE_NEEDS_GRPC" != "0" && "$SUITE_NEEDS_GRPC" != "1" ]]; then
+  echo "ERROR: SUITE_NEEDS_GRPC must be 0 or 1"
+  exit 1
+fi
+if [[ "$SUITE_NEEDS_GRPC" == "0" && "$SUITE_SYNC_RULE" == "1" ]]; then
+  echo "ERROR: rule synchronization requires the engine"
+  exit 1
+fi
+if [[ -z "$TEST_BIN_DIR" || -z "$TEST_CONFIG" ]]; then
+  echo "ERROR: TEST_BIN_DIR and TEST_CONFIG must be set"
   exit 1
 fi
 
-if [[ ! -x "$YAK_BINARY_PATH" ]]; then
+if [[ "$SUITE_NEEDS_GRPC" == "1" && ! -x "$YAK_BINARY_PATH" ]]; then
   echo "ERROR: YAK binary is missing or not executable: $YAK_BINARY_PATH"
   exit 1
 fi
@@ -64,45 +74,49 @@ rm -f "$TEST_LOG_DIR"/test_*.run.log "$grpc_log" "$suite_log"
 echo "=== Running suite: ${SUITE_NAME} ==="
 echo "Suite timeout: ${SUITE_TIMEOUT}"
 
-nohup env SKIP_SYNC_EMBED_RULE_IN_GITHUB="$SKIP_SYNC_EMBED_RULE_IN_GITHUB" "$YAK_BINARY_PATH" grpc >"$grpc_log" 2>&1 < /dev/null &
-grpc_pid=$!
+if [[ "$SUITE_NEEDS_GRPC" == "1" ]]; then
+  nohup env SKIP_SYNC_EMBED_RULE_IN_GITHUB="$SKIP_SYNC_EMBED_RULE_IN_GITHUB" "$YAK_BINARY_PATH" grpc >"$grpc_log" 2>&1 < /dev/null &
+  grpc_pid=$!
 
-# Wait for the structured ready event, which the engine writes immediately after
-# the listener is bound. Polling only the port is not enough: a healthy engine
-# can hold the listener open while still initializing, and `grep` on a log that
-# is being written concurrently can transiently miss the marker line.
-grpc_exited=0
-waited=0
-for ((waited = 0; waited < GRPC_READY_TIMEOUT; waited++)); do
-  if ! kill -0 "$grpc_pid" 2>/dev/null; then
-    grpc_exited=1
-    break
-  fi
-  if grep -q '^yak grpc ready {' "$grpc_log" 2>/dev/null; then
-    grpc_ready=1
-    break
-  fi
-  sleep 1
-done
+  # Wait for the structured ready event, which the engine writes immediately after
+  # the listener is bound. Polling only the port is not enough: a healthy engine
+  # can hold the listener open while still initializing, and `grep` on a log that
+  # is being written concurrently can transiently miss the marker line.
+  grpc_exited=0
+  waited=0
+  for ((waited = 0; waited < GRPC_READY_TIMEOUT; waited++)); do
+    if ! kill -0 "$grpc_pid" 2>/dev/null; then
+      grpc_exited=1
+      break
+    fi
+    if grep -q '^yak grpc ready {' "$grpc_log" 2>/dev/null; then
+      grpc_ready=1
+      break
+    fi
+    sleep 1
+  done
 
-if [[ "$grpc_ready" -ne 1 ]]; then
-  # Distinguish "engine reported a startup failure" from "engine never became
-  # ready in time" so the log and the exit code point at the real cause.
-  # `|| true` matters: grep exits 1 when the marker is absent, and under
-  # `set -e`/pipefail that would abort before the diagnostic below is printed.
-  grpc_failure_event="$(grep -a '^yak grpc failed ' "$grpc_log" 2>/dev/null | tail -1 || true)"
-  if [[ -n "$grpc_failure_event" ]]; then
-    echo "GRPC server failed to start: $grpc_failure_event" | tee -a "$suite_log"
-  elif [[ "$grpc_exited" -eq 1 ]]; then
-    echo "GRPC server exited before becoming ready (after ${waited}s)" | tee -a "$suite_log"
-  else
-    echo "GRPC server did not become ready within ${GRPC_READY_TIMEOUT}s" | tee -a "$suite_log"
+  if [[ "$grpc_ready" -ne 1 ]]; then
+    # Distinguish "engine reported a startup failure" from "engine never became
+    # ready in time" so the log and the exit code point at the real cause.
+    # `|| true` matters: grep exits 1 when the marker is absent, and under
+    # `set -e`/pipefail that would abort before the diagnostic below is printed.
+    grpc_failure_event="$(grep -a '^yak grpc failed ' "$grpc_log" 2>/dev/null | tail -1 || true)"
+    if [[ -n "$grpc_failure_event" ]]; then
+      echo "GRPC server failed to start: $grpc_failure_event" | tee -a "$suite_log"
+    elif [[ "$grpc_exited" -eq 1 ]]; then
+      echo "GRPC server exited before becoming ready (after ${waited}s)" | tee -a "$suite_log"
+    else
+      echo "GRPC server did not become ready within ${GRPC_READY_TIMEOUT}s" | tee -a "$suite_log"
+    fi
+    cat "$grpc_log" | tee -a "$suite_log"
+    exit 1
   fi
-  cat "$grpc_log" | tee -a "$suite_log"
-  exit 1
+
+  echo "GRPC ready after ${waited}s"
+else
+  echo "Static suite: engine startup is not required"
 fi
-
-echo "GRPC ready after ${waited}s"
 
 if [[ "$SUITE_SYNC_RULE" == "1" ]]; then
   "$YAK_BINARY_PATH" sync-rule 2>&1 | tee -a "$suite_log"
