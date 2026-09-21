@@ -43,6 +43,8 @@ func (r *ReAct) handleSyncMessage(event *ypb.AIInputEvent) error {
 		return r.HandleSyncTypePerceptionEvent(event)
 	case aicommon.SYNC_TYPE_SESSION_SNAPSHOT:
 		return r.HandleSyncTypeSessionSnapshotEvent(event)
+	case aicommon.SYNC_TYPE_TASK_SNAPSHOT:
+		return r.HandleSyncTypeTaskSnapshotEvent(event)
 	case aicommon.SYNC_TYPE_CLOSE_BROWSER:
 		return r.HandleSyncTypeCloseBrowserEvent(event)
 	case aicommon.SYNC_TYPE_LOAD_SKILL:
@@ -69,6 +71,7 @@ func (r *ReAct) RegisterReActSyncEvent() {
 	r.config.InputEventManager.RegisterSyncCallback(aicommon.SYNC_TYPE_CAPABILITY_INVENTORY, r.HandleSyncTypeCapabilityInventoryEvent)
 	r.config.InputEventManager.RegisterSyncCallback(aicommon.SYNC_TYPE_PERCEPTION, r.HandleSyncTypePerceptionEvent)
 	r.config.InputEventManager.RegisterSyncCallback(aicommon.SYNC_TYPE_SESSION_SNAPSHOT, r.HandleSyncTypeSessionSnapshotEvent)
+	r.config.InputEventManager.RegisterSyncCallback(aicommon.SYNC_TYPE_TASK_SNAPSHOT, r.HandleSyncTypeTaskSnapshotEvent)
 	r.config.InputEventManager.RegisterSyncCallback(aicommon.SYNC_TYPE_CLOSE_BROWSER, r.HandleSyncTypeCloseBrowserEvent)
 	r.config.InputEventManager.RegisterSyncCallback(aicommon.SYNC_TYPE_LOAD_SKILL, r.HandleSyncTypeLoadSkillEvent)
 	r.config.InputEventManager.RegisterSyncCallback(SYNC_TYPE_AI_MINI_TASK, r.HandleSyncTypeAIMiniTaskEvent)
@@ -88,6 +91,7 @@ func (r *ReAct) UnRegisterReActSyncEvent() {
 	r.config.InputEventManager.UnRegisterSyncCallback(aicommon.SYNC_TYPE_CAPABILITY_INVENTORY)
 	r.config.InputEventManager.UnRegisterSyncCallback(aicommon.SYNC_TYPE_PERCEPTION)
 	r.config.InputEventManager.UnRegisterSyncCallback(aicommon.SYNC_TYPE_SESSION_SNAPSHOT)
+	r.config.InputEventManager.UnRegisterSyncCallback(aicommon.SYNC_TYPE_TASK_SNAPSHOT)
 	r.config.InputEventManager.UnRegisterSyncCallback(aicommon.SYNC_TYPE_CLOSE_BROWSER)
 	r.config.InputEventManager.UnRegisterSyncCallback(aicommon.SYNC_TYPE_LOAD_SKILL)
 	r.config.InputEventManager.UnRegisterSyncCallback(SYNC_TYPE_AI_MINI_TASK)
@@ -430,6 +434,34 @@ func (r *ReAct) HandleSyncTypeSessionSnapshotEvent(event *ypb.AIInputEvent) erro
 	snapshot := reactloops.BuildSessionSnapshot(r.config, r.GetCurrentLoop(), r.GetCurrentTask())
 	taskIndex := aicommon.BuildVerificationTodoScope(r.GetCurrentTask()).TaskIndex
 	_, _ = r.EmitSyncJSONWithTaskIndex(schema.EVENT_TYPE_STRUCTURED, aicommon.SessionSnapshotNodeID, snapshot, event.SyncID, taskIndex)
+	return nil
+}
+
+func (r *ReAct) HandleSyncTypeTaskSnapshotEvent(event *ypb.AIInputEvent) error {
+	if event == nil {
+		return errors.New("task snapshot sync event is nil")
+	}
+	var params struct {
+		TaskID string `json:"task_id"`
+	}
+	if err := json.Unmarshal([]byte(event.SyncJsonInput), &params); err != nil {
+		return fmt.Errorf("parse task snapshot sync input: %w", err)
+	}
+	params.TaskID = strings.TrimSpace(params.TaskID)
+	if params.TaskID == "" {
+		return errors.New("task_id is required")
+	}
+	snapshot := r.config.GetSessionTaskSnapshot(params.TaskID)
+	if snapshot == nil {
+		return fmt.Errorf("task snapshot %q not found", params.TaskID)
+	}
+	_, _ = r.EmitSyncJSONWithTaskIndex(
+		schema.EVENT_TYPE_STRUCTURED,
+		aicommon.SessionTaskSnapshotNodeID,
+		snapshot,
+		event.SyncID,
+		snapshot.TaskIndex,
+	)
 	return nil
 }
 

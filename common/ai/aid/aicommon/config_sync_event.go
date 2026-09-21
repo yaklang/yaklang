@@ -30,6 +30,7 @@ const (
 	SYNC_TYPE_CAPABILITY_INVENTORY        = "capability_inventory_sync"
 	SYNC_TYPE_PERCEPTION                  = "perception_sync"
 	SYNC_TYPE_SESSION_SNAPSHOT            = "session_snapshot_sync"
+	SYNC_TYPE_TASK_SNAPSHOT               = "task_snapshot_sync"
 	SYNC_TYPE_CLOSE_BROWSER               = "close_browser_sync"
 	// SYNC_TYPE_LOAD_SKILL 是用户强制加载 SKILL 的 sync 事件.
 	// 客户端发 AIInputEvent{IsSyncMessage:true, SyncType:"load_skill_sync",
