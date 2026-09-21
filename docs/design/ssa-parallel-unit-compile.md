@@ -86,6 +86,9 @@ results, phase timing, process CPU/RSS/swap samples and profiles together.
 
 Each build-wave log records `groups`, requested `concurrency`, `peak_active` and
 elapsed `cost`. `peak_active` measures overlapping group workers, not occupied
-CPU cores. Compare it with process CPU samples. A large SCC or serial declaration
-phase can still limit utilization; increasing the worker limit cannot remove
-these dependencies.
+CPU cores. Compare it with process CPU samples. AST parse, declaration
+PreHandler, independent groups and opted-in library drains share
+`ssaconfig` `compile_concurrency`. The default is `GOMAXPROCS-1`, further
+capped so each worker has at least 256MiB of usable RAM (80% of cgroup/host
+memory). `compile_memory_limit` defaults to that same 80% as Go's soft heap
+limit. Explicit options win over the machine default.

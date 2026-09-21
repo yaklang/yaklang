@@ -8,6 +8,12 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestUsableFromReservesOneFifth(t *testing.T) {
+	require.Equal(t, int64(0), UsableFrom(0))
+	require.Equal(t, int64(0), UsableFrom(-1))
+	require.Equal(t, int64(24<<30), UsableFrom(30<<30))
+}
+
 func TestCgroupMemoryBudget(t *testing.T) {
 	for _, tc := range []struct {
 		name, groups, mounts string

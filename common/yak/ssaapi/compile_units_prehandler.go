@@ -56,8 +56,8 @@ func (env *prehandleBatchEnv) consume(prefetchedFiles <-chan *ssareducer.FileCon
 
 func (env *prehandleBatchEnv) consumeParallel(prefetchedFiles <-chan *ssareducer.FileContent) bool {
 	workers := env.concurrency
-	if workers < 2 {
-		workers = 2
+	if workers < 1 {
+		workers = 1
 	}
 	queues := make([]chan *ssareducer.FileContent, workers)
 	var wg sync.WaitGroup
