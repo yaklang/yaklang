@@ -4039,19 +4039,19 @@
     },
     {
       "local_file": "common/sca/core/xmlrecord/read.go",
-      "sha256": "edaa0d4da3bb389e593f82061c288dbf451af2f5909f761dcc1b41f4a08bdfe7",
+      "sha256": "8cf4beea41e5100b3f7809420da15a55115b1683e459cdfc8998368daad89a81",
       "symbols": [
         {
           "name": "tokens",
-          "line": 15
+          "line": 16
         },
         {
           "name": "tokens.Token",
-          "line": 22
+          "line": 23
         },
         {
           "name": "Decode",
-          "line": 59
+          "line": 65
         }
       ],
       "decision": "REWRITE",

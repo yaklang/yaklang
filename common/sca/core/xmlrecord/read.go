@@ -7,6 +7,7 @@ import (
 	"encoding/xml"
 	"fmt"
 	"github.com/yaklang/yaklang/common/sca/core/budget"
+	"github.com/yaklang/yaklang/common/sca/core/scanerr"
 	"github.com/yaklang/yaklang/common/sca/core/textdecode"
 	"io"
 	"strings"
@@ -23,11 +24,11 @@ func (t *tokens) Token() (xml.Token, error) {
 	if err := t.ctx.Err(); err != nil {
 		return nil, err
 	}
-	token, err := t.d.Token()
-	if err != nil {
+	if err := budget.From(t.ctx).Add(1, budget.SizeObject); err != nil {
 		return nil, err
 	}
-	if err := budget.From(t.ctx).Add(1, budget.SizeObject); err != nil {
+	token, err := t.d.Token()
+	if err != nil {
 		return nil, err
 	}
 	switch v := token.(type) {
@@ -43,12 +44,18 @@ func (t *tokens) Token() (xml.Token, error) {
 			if len(a.Value) > t.l.MaxFieldBytes {
 				return nil, fmt.Errorf("resource_limit: XML attribute")
 			}
+			if err := budget.From(t.ctx).Result(budget.SizeOfString(a.Value)); err != nil {
+				return nil, err
+			}
 		}
 	case xml.EndElement:
 		t.depth--
 	case xml.CharData:
 		if len(v) > t.l.MaxFieldBytes {
 			return nil, fmt.Errorf("resource_limit: XML text")
+		}
+		if err := budget.From(t.ctx).Result(budget.SizeOfBytes(len(v))); err != nil {
+			return nil, err
 		}
 	case xml.Directive:
 		return nil, fmt.Errorf("unsupported_syntax: XML directives")
@@ -57,12 +64,16 @@ func (t *tokens) Token() (xml.Token, error) {
 }
 func Decode(ctx context.Context, r io.Reader, out any) error {
 	l := budget.From(ctx).Limits
-	b, err := io.ReadAll(io.LimitReader(r, min(l.MaxFileBytes, 16<<20)+1))
+	capn := min(l.MaxFileBytes, 16<<20)
+	if l.MaxResultBytes > 0 && l.MaxResultBytes < capn {
+		capn = l.MaxResultBytes
+	}
+	b, err := io.ReadAll(io.LimitReader(r, capn+1))
 	if err != nil {
 		return err
 	}
-	if int64(len(b)) > min(l.MaxFileBytes, 16<<20) {
-		return fmt.Errorf("resource_limit: XML bytes")
+	if int64(len(b)) > capn {
+		return scanerr.New(scanerr.ResourceLimit, "XML working copy")
 	}
 	if err := budget.From(ctx).Working(int64(len(b))); err != nil {
 		return err
@@ -94,6 +105,9 @@ func Decode(ctx context.Context, r io.Reader, out any) error {
 	}
 	guard := &tokens{ctx: ctx, d: d, l: l}
 	decoder := xml.NewTokenDecoder(guard)
+	if err = budget.From(ctx).Working(int64(len(b))); err != nil {
+		return err
+	}
 	if err = decoder.Decode(out); err != nil {
 		return fmt.Errorf("malformed_input: XML: %w", err)
 	}

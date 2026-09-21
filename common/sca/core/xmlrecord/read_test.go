@@ -3,8 +3,12 @@ package xmlrecord
 import (
 	"bytes"
 	"context"
+	"errors"
 	"strings"
 	"testing"
+
+	"github.com/yaklang/yaklang/common/sca/core/budget"
+	"github.com/yaklang/yaklang/common/sca/core/scanerr"
 )
 
 func TestBoundedXML(t *testing.T) {
@@ -18,6 +22,28 @@ func TestBoundedXML(t *testing.T) {
 		if err := Decode(context.Background(), strings.NewReader(s), &out); err == nil {
 			t.Fatalf("accepted %q", s)
 		}
+	}
+}
+
+func TestDecodeChargesBeforeMapping(t *testing.T) {
+	raw := `<root>` + strings.Repeat(`<value>xxxxxxxx</value>`, 80) + `</root>`
+	l, err := (budget.Limits{MaxResultBytes: 8000}).Normalize()
+	if err != nil {
+		t.Fatal(err)
+	}
+	var out struct {
+		Value []string `xml:"value"`
+	}
+	err = Decode(budget.Bind(context.Background(), l), strings.NewReader(raw), &out)
+	if err == nil || !errors.Is(err, scanerr.ErrResourceLimit) {
+		t.Fatalf("XML destination mapping must be charged: out=%d err=%v", len(out.Value), err)
+	}
+	if len(out.Value) != 0 {
+		t.Fatalf("Decode filled caller record after budget exhaustion: %d", len(out.Value))
+	}
+	out.Value = nil
+	if err = Decode(context.Background(), strings.NewReader(`<root><value>works</value></root>`), &out); err != nil || len(out.Value) != 1 || out.Value[0] != "works" {
+		t.Fatalf("positive: %+v %v", out, err)
 	}
 }
 
