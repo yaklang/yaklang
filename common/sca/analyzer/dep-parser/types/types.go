@@ -1,6 +1,9 @@
 package types
 
 import (
+	"context"
+	"github.com/yaklang/yaklang/common/sca/core/budget"
+	"github.com/yaklang/yaklang/common/sca/model"
 	"io"
 
 	fi "github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
@@ -17,12 +20,21 @@ type ReadSeekCloserAt interface {
 }
 
 type Library struct {
+	Condition, Scope                        string
+	IsVersionRange                          bool
+	DeclaredCondition, Extras, Verification string
+	DeclaredIntegrity                       string
+	Diagnostics                             []model.Diagnostic
+
+	Source, Variant, Evidence, DeclaredName, DeclaredVersion string
+
 	ID                 string `json:",omitempty"`
 	Name               string
 	Version            string
 	Dev                bool
 	Indirect           bool          `json:",omitempty"`
 	License            string        `json:",omitempty"`
+	RawLicenses        []string      `json:",omitempty"` // Exact static entries, before legacy display joining.
 	ExternalReferences []ExternalRef `json:",omitempty"`
 	Locations          Locations     `json:",omitempty"`
 	FilePath           string        `json:",omitempty"` // Required to show nested jars
@@ -60,7 +72,14 @@ type ExternalRef struct {
 	URL  string
 }
 
+type Requirement struct {
+	Target, Constraint, Scope, Condition string
+	Resolved                             string
+}
+
 type Dependency struct {
+	Requirements []Requirement
+
 	ID        string
 	DependsOn []string
 }
@@ -87,3 +106,10 @@ const (
 	RefIssueTracker RefType = "issue-tracker"
 	RefOther        RefType = "other"
 )
+
+func ContextOf(r any) context.Context {
+	if c, ok := r.(interface{ Context() context.Context }); ok {
+		return budget.Ensure(c.Context())
+	}
+	return budget.Ensure(context.Background())
+}

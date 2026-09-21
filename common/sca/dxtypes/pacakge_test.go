@@ -3,9 +3,10 @@ package dxtypes
 import (
 	"sort"
 	"strings"
+	"sync"
 	"testing"
 
-	"golang.org/x/exp/slices"
+	"slices"
 )
 
 func createPackage(name, version, file, analyzer string) Package {
@@ -78,7 +79,7 @@ func TestPackageMergeNormal(t *testing.T) {
 	pa := createPackage("pa", "0.0.1", "/path/pa", "pa-analyzer")
 	pa_down := createPackage("pa-down", "0.0.2", "/path/pa", "pa-analyzer")
 	pa_down.LinkDepend(&pa)
-	pb := createPackage("pb", "0.0.1", "/path/pb", "pb-analyzer")
+	pb := createPackage("pa", "0.0.1", "/path/pb", "pb-analyzer")
 	pb_down := createPackage("pb-down", "0.0.3", "/path/pd", "pb-analyzer")
 	// pb.LinkDepend(&pb_down)
 	pb_down.LinkDepend(&pb)
@@ -101,7 +102,7 @@ func TestPackageMergeNormal(t *testing.T) {
 func TestPackageMergeRepeat(t *testing.T) {
 	// same file and analyzer
 	pa := createPackage("pa", "0.0.1", "/path/pa", "pa-analyzer")
-	pb := createPackage("pb", "0.0.1", "/path/pa", "pa-analyzer")
+	pb := createPackage("pa", "0.0.1", "/path/pa", "pa-analyzer")
 
 	pa_down := createPackage("pa-down", "0.0.2", "/path/pa", "pa-analyzer")
 	pb_down := createPackage("pb-down", "0.0.3", "/path/pd", "pb-analyzer")
@@ -156,11 +157,11 @@ func TestPackageCanMerge(t *testing.T) {
 		pa := createPackage("pa", "*", "", "")
 		pa.IsVersionRange = true
 		pb := createPackage("pa", "0.0.1", "", "")
-		if CanMerge(&pa, &pb) != -1 {
-			t.Fatal("same name and version is * shoud merge pa(pb)")
+		if CanMerge(&pa, &pb) != 0 {
+			t.Fatal("same name and version is * must remain distinct pa(pb)")
 		}
-		if CanMerge(&pb, &pa) != 1 {
-			t.Fatal("same name and version is * shoud merge pb(pa)")
+		if CanMerge(&pb, &pa) != 0 {
+			t.Fatal("same name and version is * must remain distinct pb(pa)")
 		}
 	})
 	// pa range: "<0.0.3"
@@ -169,11 +170,11 @@ func TestPackageCanMerge(t *testing.T) {
 		pa := createPackage("pa", "<0.0.3", "", "")
 		pa.IsVersionRange = true
 		pb := createPackage("pa", "0.0.1", "", "")
-		if CanMerge(&pa, &pb) != -1 {
-			t.Fatal("same name and version match range shoud merge pa(pb)")
+		if CanMerge(&pa, &pb) != 0 {
+			t.Fatal("same name and version match range must remain distinct pa(pb)")
 		}
-		if CanMerge(&pb, &pa) != 1 {
-			t.Fatal("same name and version match range shoud merge pb(pa)")
+		if CanMerge(&pb, &pa) != 0 {
+			t.Fatal("same name and version match range must remain distinct pb(pa)")
 		}
 	})
 
@@ -183,11 +184,11 @@ func TestPackageCanMerge(t *testing.T) {
 		pa := createPackage("pa", "=0.0.3", "", "")
 		pa.IsVersionRange = true
 		pb := createPackage("pa", "0.0.3", "", "")
-		if CanMerge(&pa, &pb) != -1 {
-			t.Fatal("same name and version match range shoud merge pa(pb)")
+		if CanMerge(&pa, &pb) != 0 {
+			t.Fatal("same name and version match range must remain distinct pa(pb)")
 		}
-		if CanMerge(&pb, &pa) != 1 {
-			t.Fatal("same name and version match range shoud merge pb(pa)")
+		if CanMerge(&pb, &pa) != 0 {
+			t.Fatal("same name and version match range must remain distinct pb(pa)")
 		}
 	})
 
@@ -211,11 +212,11 @@ func TestPackageCanMerge(t *testing.T) {
 	t.Run("merge-version-range-match-ignore-IsVersionRange", func(t *testing.T) {
 		pa := createPackage("pa", "<0.0.3", "", "")
 		pb := createPackage("pa", "0.0.1", "", "")
-		if CanMerge(&pa, &pb) != -1 {
-			t.Fatal("same name and version match range shoud merge even not set IsVersionRange pa(pb)")
+		if CanMerge(&pa, &pb) != 0 {
+			t.Fatal("same name and version match range must remain distinct even not set IsVersionRange pa(pb)")
 		}
-		if CanMerge(&pb, &pa) != 1 {
-			t.Fatal("same name and version match range shoud merge even not set IsVersionRange pb(pa)")
+		if CanMerge(&pb, &pa) != 0 {
+			t.Fatal("same name and version match range must remain distinct even not set IsVersionRange pb(pa)")
 		}
 	})
 
@@ -250,10 +251,10 @@ func TestPackageCanMerge(t *testing.T) {
 	t.Run("merge-same-name-version-range-match", func(t *testing.T) {
 		pa := createPackage("pa", ">0.0.1 && <0.0.3", "", "")
 		pb := createPackage("pa", "0.0.2", "", "")
-		if CanMerge(&pa, &pb) != -1 {
+		if CanMerge(&pa, &pb) != 0 {
 			t.Fatal("same name and version range match, merge")
 		}
-		if CanMerge(&pb, &pa) != 1 {
+		if CanMerge(&pb, &pa) != 0 {
 			t.Fatal("same name and version range match, merge")
 		}
 	})
@@ -270,4 +271,66 @@ func TestPackageCanMerge(t *testing.T) {
 			t.Fatal("two package with version range, don't merge")
 		}
 	})
+}
+
+func TestMergeRejectsDifferentIdentity(t *testing.T) {
+	a := &Package{Name: "a", Version: "1"}
+	b := &Package{Name: "b", Version: "1", License: []string{"MIT"}}
+	a.Merge(b)
+	if a.Name != "a" || len(a.License) != 0 {
+		t.Fatal("merged different identity")
+	}
+}
+
+func TestIdentifierFollowsPublicIdentityFields(t *testing.T) {
+	mutations := []struct {
+		name   string
+		change func(*Package)
+	}{
+		{"name", func(p *Package) { p.Name = "b" }},
+		{"version", func(p *Package) { p.Version = "2" }},
+		{"verification", func(p *Package) { p.Verification = "sha256:different" }},
+		{"ecosystem", func(p *Package) { p.Ecosystem = "npm" }},
+		{"source", func(p *Package) { p.Source = "another" }},
+		{"architecture", func(p *Package) { p.Architecture = "arm64" }},
+		{"variant", func(p *Package) { p.Variant = "debug" }},
+		{"snapshot", func(p *Package) { p.Snapshot = "s" }},
+		{"project", func(p *Package) { p.ProjectRoot = "project" }},
+		{"instance", func(p *Package) { p.Instance = "y" }},
+	}
+	for _, tc := range mutations {
+		t.Run(tc.name, func(t *testing.T) {
+			p := &Package{Name: "a", Version: "1", PackageDetails: &PackageDetails{Instance: "x"}}
+			first := p.Identifier()
+			tc.change(p)
+			fresh := &Package{Name: "a", Version: "1", PackageDetails: &PackageDetails{Instance: "x"}}
+			tc.change(fresh)
+			if p.Identifier() == first || p.Identifier() != fresh.Identifier() {
+				t.Fatal("identity did not follow current fields")
+			}
+		})
+	}
+}
+
+func TestIdentifierConcurrentReads(t *testing.T) {
+	for _, details := range []*PackageDetails{nil, {Instance: "x"}} {
+		p := &Package{Name: "a", Version: "1", PackageDetails: details}
+		want := p.Identifier()
+		var wg sync.WaitGroup
+		for i := 0; i < 16; i++ {
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				for j := 0; j < 100; j++ {
+					if got := p.Identifier(); got != want {
+						t.Errorf("unstable identity: %s", got)
+					}
+				}
+			}()
+		}
+		wg.Wait()
+		if p.PackageDetails != details {
+			t.Fatal("read mutated optional details")
+		}
+	}
 }

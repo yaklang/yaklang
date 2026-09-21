@@ -1,0 +1,17 @@
+[
+  {
+    "Name": "com.example:example",
+    "Version": "0.0.1",
+    "Verification": "",
+    "License": null,
+    "Potential": false,
+    "DependsAnd": null,
+    "UpNames": null,
+    "FromFile": [
+      "gradle.lockfile"
+    ],
+    "FromAnalyzer": [
+      "gradle-lang"
+    ]
+  }
+]

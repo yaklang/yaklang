@@ -5,7 +5,7 @@ import (
 	"sort"
 
 	"github.com/yaklang/yaklang/common/sca/analyzer/dep-parser/types"
-	"golang.org/x/exp/maps"
+	maps "github.com/yaklang/yaklang/common/sca/internal/collection"
 )
 
 func UniqueStrings(ss []string) []string {

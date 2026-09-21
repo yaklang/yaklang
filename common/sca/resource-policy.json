@@ -1,0 +1,103 @@
+{
+  "version": 1,
+  "zero": "bounded default",
+  "negative": "configuration error",
+  "workers": {
+    "default": 5,
+    "min": 1,
+    "max": 64
+  },
+  "defaults": {
+    "MaxFiles": 200000,
+    "MaxCandidateFiles": 10000,
+    "MaxFileBytes": 67108864,
+    "MaxTotalReadBytes": 536870912,
+    "MaxComponents": 200000,
+    "MaxObservations": 400000,
+    "MaxEdges": 1000000,
+    "MaxArchiveEntries": 100000,
+    "MaxArchiveDepth": 8,
+    "MaxExpandedBytes": 536870912,
+    "MaxFieldBytes": 1048576,
+    "MaxSyntaxDepth": 64,
+    "MaxExpressionNodes": 100000,
+    "MaxResolveSteps": 1000000,
+    "MaxReferenceDepth": 64,
+    "MaxResultBytes": 268435456
+  },
+  "global_budgets": [
+    "MaxFiles",
+    "MaxCandidateFiles",
+    "MaxTotalReadBytes",
+    "MaxArchiveEntries",
+    "MaxExpandedBytes",
+    "MaxComponents",
+    "MaxObservations",
+    "MaxEdges",
+    "MaxResultBytes"
+  ],
+  "per_parser": [
+    "MaxFieldBytes",
+    "MaxSyntaxDepth",
+    "MaxExpressionNodes",
+    "MaxResolveSteps",
+    "MaxReferenceDepth",
+    "MaxArchiveDepth"
+  ],
+  "additional_hard_caps": {
+    "structured_text_bytes": 16777216,
+    "gomod_directives": 200000,
+    "RPM_header_entries": 65536
+  },
+  "on_shared_budget_exhaustion": "discard concurrently produced graph; retain deterministic discovery diagnostics",
+  "policy_basis": "Versioned bounded defaults; not claimed as production sizing evidence",
+  "result_memory": {
+    "unit": "logical working-set estimate, not Go heap or RSS",
+    "charges_before": [
+      "snapshot backing allocation and size-change probe",
+      "raw/line decoder backing growth",
+      "grammar node and map/slice insert",
+      "fixed schema conversion and decoder working copies",
+      "executable table and compressed-name preflight",
+      "archive central directory and decompressor",
+      "job enqueue and result backing",
+      "package merge and provenance qualification",
+      "report graph and normalization"
+    ],
+    "shared_once": "POM analysis cache keys and identical material ids",
+    "derived_caps": [
+      "Raw reads reserve an exact geometric backing array before reading; snapshots allocate declared bytes and use one extra byte only to detect input changes. Old buffers remain charged.",
+      "JSON reserves decoder buffers and raw token bounds before Token, then 4KiB per fixed DTO/index/library value and 24x string bytes before conversion. TOML/YAML fixed record conversions reserve equivalent node/string allowances before downstream DTOs, native IDs, indexes or JSON bridging.",
+      "Line-record conversions reserve 4KiB plus 256x line bytes. Bundler uses explicit Grow/Insert reservations; Yarn uses a preflight per block and descriptor. MIME records reserve 8KiB plus 512x input bytes before stdlib header mapping.",
+      "Go 1.22 buildinfo preflight reserves 32MiB initial saferio allowance, 16x file bytes, table counts, compressed ELF expansion and actual PE/Mach-O symbol name copies before the stdlib reader. Name lengths are indexed once to prevent repeated quadratic scans.",
+      "ZIP central records and decompressor buffers are checked before archive/zip allocation. RPM pages/records have explicit visit, bytes, record and result budgets.",
+      "Model normalization reserves fixed containers, geometric copies, JSON escaping and key storage before mutation. Identity/observation/requirement ASCII fast paths are byte-compared to encoding/json by tests.",
+      "Error exhaustion has one fixed emergency diagnostic; it cannot append one emergency record per subsequent failure. A failed shared result budget discards the graph.",
+      "MergePackages retains its no-error compatibility signature: budget failure returns the original slice without partially mutating representatives. MergePackagesBudget returns the typed error."
+    ],
+    "unbounded_runtime": [
+      "Go allocator size-class rounding, stacks, GC and process RSS are outside the logical allocation estimate.",
+      "The caller supplies immutable fs.FS and any trusted custom analyzer. Allocations inside that caller implementation (including its ReadDir inventory) are not controlled by the SCA budget. SCA-owned copies are budgeted."
+    ]
+  },
+  "strict_preallocation_status": "SCA-controlled backing growth, grammar containers, fixed conversions, executable/archive metadata and graph normalization reserve their documented logical allowance before allocation. This is a bounded logical working-set contract, not an operating-system heap/RSS cap. Fixed bootstrap/error objects and caller-owned implementations are explicitly outside the configurable result budget.",
+  "maxima": {
+    "MaxFiles": 1000000,
+    "MaxCandidateFiles": 100000,
+    "MaxFileBytes": 268435456,
+    "MaxTotalReadBytes": 2147483648,
+    "MaxComponents": 1000000,
+    "MaxObservations": 2000000,
+    "MaxEdges": 5000000,
+    "MaxArchiveEntries": 1000000,
+    "MaxArchiveDepth": 32,
+    "MaxExpandedBytes": 2147483648,
+    "MaxFieldBytes": 16777216,
+    "MaxSyntaxDepth": 128,
+    "MaxExpressionNodes": 1000000,
+    "MaxResolveSteps": 10000000,
+    "MaxReferenceDepth": 128,
+    "MaxResultBytes": 2147483648
+  },
+  "above_maximum": "configuration error before scan; raising limits does not extend grammar or filesystem authority"
+}

@@ -1,0 +1,21 @@
+[
+  {
+    "Name": "test-unit",
+    "Version": "3.3.7",
+    "Verification": "",
+    "License": [
+      "Ruby",
+      "BSDL",
+      "PSFL"
+    ],
+    "Potential": false,
+    "DependsAnd": null,
+    "UpNames": null,
+    "FromFile": [
+      "gems/specifications/test-unit.gemspec"
+    ],
+    "FromAnalyzer": [
+      "ruby-gemspec-lang"
+    ]
+  }
+]

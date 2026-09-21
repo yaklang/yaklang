@@ -3,12 +3,24 @@ dump(targetUrl)
 localReposDir = file.Join(os.TempDir(), str.RandStr(16))
 os.RemoveAll(localReposDir)
 git.Clone(targetUrl, localReposDir)~
+defer os.RemoveAll(localReposDir)
 ret := string(file.ReadFile(file.Join(localReposDir, `testdata`,`node_npm`,`positive_file`,`package.json`))~)
 dump(ret)
 assert `unopinionated, minimalist web framework` in ret
 checked = false
-for result in sca.ScanLocalFilesystem(file.Join(localReposDir, `testdata`))~ {
-    if `53733d3ba4843f2efb79e7c70ef0615f2aa22581` in sdump(result) { checked = true}
+// The repository includes negative fixtures. Scanning returns their diagnostics
+// alongside valid packages, so assert both parts of the contract.
+results, scanErr = sca.ScanLocalFilesystem(file.Join(localReposDir, `testdata`))
+assert scanErr != nil
+assert `malformed_input` in string(scanErr)
+assert `java_pom/negative/pom.xml` in string(scanErr)
+for result in results {
+    // The old name/version hash identified this package; identity now also
+    // includes ecosystem and source. Check the original evidence directly.
+    if result.Name == `hrr_rb_ssh-ed25519` && result.Version == `0.4.2` {
+        assert `ruby_bundler/positive/Gemfile.lock` in sdump(result.FromFile)
+        checked = true
+    }
 }
 if !checked {
     die(`SCA FileSystem Is not worked well`)

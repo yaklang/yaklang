@@ -1,6 +1,7 @@
 package analyzer
 
 import (
+	"path"
 	"strings"
 
 	"github.com/yaklang/yaklang/common/sca/dxtypes"
@@ -27,7 +28,7 @@ func NewPythonPIPEnvAnalyzer() *pythonPIPEnvAnalyzer {
 }
 
 func (a pythonPIPEnvAnalyzer) Match(info MatchInfo) int {
-	if strings.HasSuffix(strings.ToLower(info.Path), pipFile) {
+	if strings.EqualFold(path.Base(info.Path), pipenvLockFile) {
 		return statusPIPenvLock
 	}
 	return 0

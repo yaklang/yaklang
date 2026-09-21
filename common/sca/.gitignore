@@ -1,0 +1,4 @@
+# Keep generated local audit output out of commits.
+/audit/
+# Pinned Go PE buildinfo fixture.
+!/analyzer/dep-parser/golang/binary/testdata/test.exe

@@ -1,0 +1,19 @@
+[
+  {
+    "Name": "distlib",
+    "Version": "0.3.1",
+    "Verification": "",
+    "License": [
+      "Python license"
+    ],
+    "Potential": false,
+    "DependsAnd": null,
+    "UpNames": null,
+    "FromFile": [
+      "x.dist-info/METADATA"
+    ],
+    "FromAnalyzer": [
+      "python-packaging-lang"
+    ]
+  }
+]

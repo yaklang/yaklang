@@ -1,0 +1,47 @@
+[
+  {
+    "Name": "Flask",
+    "Version": "2.0.0",
+    "Verification": "",
+    "License": null,
+    "Potential": false,
+    "DependsAnd": null,
+    "UpNames": null,
+    "FromFile": [
+      "requirements.txt"
+    ],
+    "FromAnalyzer": [
+      "python-pip-lang"
+    ]
+  },
+  {
+    "Name": "click",
+    "Version": "8.0.0",
+    "Verification": "",
+    "License": null,
+    "Potential": false,
+    "DependsAnd": null,
+    "UpNames": null,
+    "FromFile": [
+      "requirements.txt"
+    ],
+    "FromAnalyzer": [
+      "python-pip-lang"
+    ]
+  },
+  {
+    "Name": "itsdangerous",
+    "Version": "2.0.0",
+    "Verification": "",
+    "License": null,
+    "Potential": false,
+    "DependsAnd": null,
+    "UpNames": null,
+    "FromFile": [
+      "requirements.txt"
+    ],
+    "FromAnalyzer": [
+      "python-pip-lang"
+    ]
+  }
+]

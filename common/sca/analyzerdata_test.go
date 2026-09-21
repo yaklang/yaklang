@@ -1524,15 +1524,10 @@ var GoModWantPkgs = []*dxtypes.Package{
 	},
 }
 
+// BUGFIX: go.sum records checksums, not the build list. The previous TOML
+// expectation is retained in the isolated baseline archive.
 var GoModLess117Pkgs = []*dxtypes.Package{
-	{
-		Name:    "github.com/aquasecurity/go-dep-parser",
-		Version: "0.0.0-20230219131432-590b1dfb6edd",
-	},
-	{
-		Name:    "github.com/BurntSushi/toml",
-		Version: "0.3.1",
-	},
+	{Name: "github.com/aquasecurity/go-dep-parser", Version: "0.0.0-20230219131432-590b1dfb6edd", Verification: "h1:H9IR14rR3+Z13ZH7ay9bs2hHBL7WAqdEJLLr8nhx/Rs="},
 }
 
 var PHPComposerPkgs = []*dxtypes.Package{
@@ -1616,6 +1611,9 @@ var PythonPackagingWheel = []*dxtypes.Package{
 }
 
 var PythonPIPPkgs = []*dxtypes.Package{
+	{Name: "Jinja2", Version: ""},
+	{Name: "MarkupSafe", Version: ""},
+	{Name: "Werkzeug", Version: ""},
 	{
 		Name:    "click",
 		Version: "8.0.0",
@@ -1754,7 +1752,7 @@ var JavaPomRequirementPkgs = []*dxtypes.Package{
 	},
 	{
 		Name:    "org.example:example-api",
-		Version: "",
+		Version: "(,1.0]",
 	},
 }
 
@@ -2306,8 +2304,9 @@ var NodeNpmPkgsFolder = []*dxtypes.Package{
 var NodePnpmPkgs = []*dxtypes.Package{
 	{
 		// lodash-4.17.21
-		Name:    "lodash",
-		Version: "4.17.21",
+		Name:         "lodash",
+		Version:      "4.17.21",
+		Verification: "sha512:bf690311ee7b95e713ba568322e3533f2dd1cb880b189e99d4edef13592b81764daec43e2c54c61d5c558dc5cfb35ecb85b65519e74026ff17675b6f8f916f4a",
 	},
 }
 
@@ -3238,14 +3237,14 @@ var RustCargoPkgs = []*dxtypes.Package{
 	{
 		Name:         "memchr",
 		Version:      "1.0.2",
-		Verification: "",
+		Verification: "sha256:148fab2e51b4f1cfc66da2a7c32981d1d3c083a803978268bb11fe4b86925e7a",
 		License:      nil,
 		Potential:    false,
 	},
 	{
 		Name:         "memchr",
 		Version:      "2.5.0",
-		Verification: "",
+		Verification: "sha256:2dffe52ecf27772e601905b7522cb4ef790d2cc203488bbd0e2fe85fcb74566d",
 		License:      nil,
 		Potential:    false,
 	},
@@ -3259,63 +3258,63 @@ var RustCargoPkgs = []*dxtypes.Package{
 	{
 		Name:         "libc",
 		Version:      "0.2.140",
-		Verification: "",
+		Verification: "sha256:99227334921fae1a979cf0bfdfcc6b3e5ce376ef57e16fb6fb3ea2ed6095f80c",
 		License:      nil,
 		Potential:    false,
 	},
 	{
 		Name:         "regex-syntax",
 		Version:      "0.6.29",
-		Verification: "",
+		Verification: "sha256:f162c6dd7b008981e4d40210aca20b4bd0f9b60ca9271061b07f78537722f2e1",
 		License:      nil,
 		Potential:    false,
 	},
 	{
 		Name:         "regex-syntax",
 		Version:      "0.5.6",
-		Verification: "",
+		Verification: "sha256:7d707a4fa2637f2dca2ef9fd02225ec7661fe01a53623c1e6515b6916511f7a7",
 		License:      nil,
 		Potential:    false,
 	},
 	{
 		Name:         "regex",
 		Version:      "1.7.3",
-		Verification: "",
+		Verification: "sha256:8b1f693b24f6ac912f4893ef08244d70b6067480d2f1a46e950c9691e6749d1d",
 		License:      nil,
 		Potential:    false,
 	},
 	{
 		Name:         "winapi-i686-pc-windows-gnu",
 		Version:      "0.4.0",
-		Verification: "",
+		Verification: "sha256:ac3b87c63620426dd9b991e5ce0329eff545bccbbb34f3be09ff6fb6ab51b7b6",
 		License:      nil,
 		Potential:    false,
 	},
 	{
 		Name:         "winapi-x86_64-pc-windows-gnu",
 		Version:      "0.4.0",
-		Verification: "",
+		Verification: "sha256:712e227841d057c1ee1cd2fb22fa7e5a5461ae8e48fa2ca79ec42cfc1931183f",
 		License:      nil,
 		Potential:    false,
 	},
 	{
 		Name:         "aho-corasick",
 		Version:      "0.7.20",
-		Verification: "",
+		Verification: "sha256:cc936419f96fa211c1b9166887b38e5e40b19958e5b895be7c1f93adec7071ac",
 		License:      nil,
 		Potential:    false,
 	},
 	{
 		Name:         "ucd-util",
 		Version:      "0.1.10",
-		Verification: "",
+		Verification: "sha256:abd2fc5d32b590614af8b0a20d837f32eca055edd0bbead59a9cfe80858be003",
 		License:      nil,
 		Potential:    false,
 	},
 	{
 		Name:         "winapi",
 		Version:      "0.3.9",
-		Verification: "",
+		Verification: "sha256:5c839a674fcd7a98952e593242ea400abe93992746761e38641405d28b00f419",
 		License:      nil,
 		Potential:    false,
 	},
@@ -3339,34 +3338,41 @@ func check(t *testing.T, tag string, target []*dxtypes.Package) {
 }
 
 func TestData(t *testing.T) {
-	check(t, "apk", APKWantPkgs)
-	check(t, "apk-negative", APKNegativePkgs)
-	check(t, "dpkg", DPKGWantPkgs)
-	check(t, "rpm", RPMWantPkgs)
-	check(t, "conan", ConanWantPkgs)
-	check(t, "go-bianary", GOBianryWantPkgs)
-	check(t, "go-mod", GoModWantPkgs)
-	check(t, "go-modless", GoModLess117Pkgs)
-	check(t, "php-composer", PHPComposerPkgs)
-	check(t, "php-composer-wrong-json", PHPComposerWrongJsonPkgs)
-	check(t, "php-composer-no-json", PHPComposerNoJsonPkgs)
-	check(t, "python-packaging", PythonPackagingPkgs)
-	check(t, "python-packaging-egg", PythonPackagingEggPkg)
-	check(t, "python-packageing-whell", PythonPackagingWheel)
-	check(t, "python-pip", PythonPIPPkgs)
-	check(t, "python-pip-env", PythonPIPEnvPkgs)
-	check(t, "python-poetry", PythonPoetryPkgs)
-	check(t, "python-poetry-no-project", PythonPoetryNoProjectPkgs)
-	check(t, "python-poetry-wrong-project", PythonPoetryWrongProjectPkgs)
-	check(t, "java-gradle", JavaGradlePkgs)
-	check(t, "java-pom", JavaPomPkgs)
-	check(t, "java-pom-requirement", JavaPomRequirementPkgs)
-	check(t, "node-npm", NodeNpmPkgs)
-	check(t, "node-npm-folder", NodeNpmPkgsFolder)
-	check(t, "node-pnpm", NodePnpmPkgs)
-	check(t, "node-yarn", NodeYarnPkgs)
-	check(t, "node-yarn-monorepo", NodeYarnProtocolPkgs)
-	check(t, "ruby-bundler", RubyBundlerPkgs)
-	check(t, "ruby-gemspec", RubyGemspecPkgs)
-	check(t, "rust-cargo", RustCargoPkgs)
+	for _, tc := range []struct {
+		tag string
+		pkg []*dxtypes.Package
+	}{
+		{"apk", APKWantPkgs},
+		{"apk-negative", APKNegativePkgs},
+		{"dpkg", DPKGWantPkgs},
+		{"rpm", RPMWantPkgs},
+		{"conan", ConanWantPkgs},
+		{"go-bianary", GOBianryWantPkgs},
+		{"go-mod", GoModWantPkgs},
+		{"go-modless", GoModLess117Pkgs},
+		{"php-composer", PHPComposerPkgs},
+		{"php-composer-wrong-json", PHPComposerWrongJsonPkgs},
+		{"php-composer-no-json", PHPComposerNoJsonPkgs},
+		{"python-packaging", PythonPackagingPkgs},
+		{"python-packaging-egg", PythonPackagingEggPkg},
+		{"python-packageing-whell", PythonPackagingWheel},
+		{"python-pip", PythonPIPPkgs},
+		{"python-pip-env", PythonPIPEnvPkgs},
+		{"python-poetry", PythonPoetryPkgs},
+		{"python-poetry-no-project", PythonPoetryNoProjectPkgs},
+		{"python-poetry-wrong-project", PythonPoetryWrongProjectPkgs},
+		{"java-gradle", JavaGradlePkgs},
+		{"java-pom", JavaPomPkgs},
+		{"java-pom-requirement", JavaPomRequirementPkgs},
+		{"node-npm", NodeNpmPkgs},
+		{"node-npm-folder", NodeNpmPkgsFolder},
+		{"node-pnpm", NodePnpmPkgs},
+		{"node-yarn", NodeYarnPkgs},
+		{"node-yarn-monorepo", NodeYarnProtocolPkgs},
+		{"ruby-bundler", RubyBundlerPkgs},
+		{"ruby-gemspec", RubyGemspecPkgs},
+		{"rust-cargo", RustCargoPkgs},
+	} {
+		t.Run(tc.tag, func(t *testing.T) { check(t, tc.tag, tc.pkg) })
+	}
 }
