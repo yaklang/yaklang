@@ -219,3 +219,17 @@ func TestTimelineBatchReducerPromptUsesProjectionWithoutRewritingToolData(t *tes
 	require.Contains(t, prompt, "KEEP_REDUCER_DIRECT_PARAMS")
 	require.Contains(t, prompt, "KEEP_RECENT_REVIEW")
 }
+
+func TestBatchCompressCoveredPrefixCrossesProjectedBookkeepingOnly(t *testing.T) {
+	items := []*TimelineItem{
+		{value: &TextTimelineItem{ID: 1, Text: "[TODO_DELTA]:\nDROP_ALREADY_MATERIALIZED"}},
+		{value: &aitool.ToolResult{ID: 2, Name: "included", Success: true, Data: "INCLUDED_SEMANTIC_ITEM"}},
+		{value: &TextTimelineItem{ID: 3, Text: "[evidence_ops]:\nDROP_ALREADY_MATERIALIZED"}},
+		{value: &aitool.ToolResult{ID: 4, Name: "deferred", Success: true, Data: "DEFERRED_SEMANTIC_ITEM"}},
+		{value: &TextTimelineItem{ID: 5, Text: "[TODO_DELTA]:\nDROP_ALREADY_MATERIALIZED"}},
+	}
+
+	covered := batchCompressCoveredPrefixIDs(items, 1)
+	require.Equal(t, []int64{1, 2, 3}, covered,
+		"projection-only bookkeeping may be crossed, but coverage must stop before the first semantic item omitted by budget")
+}

@@ -1,6 +1,7 @@
 package aicommon
 
 import (
+	"context"
 	"strings"
 	"testing"
 	"time"
@@ -229,6 +230,58 @@ func TestBuildItemsToCompressString_Truncation(t *testing.T) {
 	require.Contains(t, out, "more items truncated due to size limit")
 	// 最旧的几条必须保留（id=1 在结果里）
 	require.Contains(t, out, "[1]")
+}
+
+// TestBatchCompress_TruncatedItemsRemainActive verifies the commit boundary of
+// batch compression. The renderer may fit only a prefix of toCompress into the
+// bounded reducer prompt; items outside that prefix must remain active and the
+// compressed head must not claim to cover them.
+func TestBatchCompress_TruncatedItemsRemainActive(t *testing.T) {
+	cfg := NewConfig(context.Background(), WithDisableAutoSkills(true), WithTimelineContentLimit(1<<30))
+	tl := NewTimeline(&mockedAI{}, nil)
+	tl.SoftBindConfig(cfg, nil)
+
+	baseTs := time.Date(2024, 6, 1, 10, 0, 0, 0, time.UTC)
+	const oldCount = 80
+	var toCompress []*TimelineItem
+	for i := int64(1); i <= oldCount; i++ {
+		payload := "old-evidence-" + strings.Repeat("X", 2*1024)
+		injectTimelineItem(tl, i, baseTs.Add(time.Duration(i)*time.Second),
+			makeToolResult(i, "old-tool", true, payload))
+		item, _ := tl.idToTimelineItem.Get(i)
+		toCompress = append(toCompress, item)
+	}
+
+	var recentKeep []*TimelineItem
+	for i := int64(oldCount + 1); i <= oldCount+3; i++ {
+		injectTimelineItem(tl, i, baseTs.Add(time.Duration(i)*time.Second),
+			makeToolResult(i, "recent-tool", true, "recent-evidence"))
+		item, _ := tl.idToTimelineItem.Get(i)
+		recentKeep = append(recentKeep, item)
+	}
+
+	promptRecent := projectTimelineItemsForPrompt(recentKeep)
+	recentStr, _, _ := buildRecentKeptString(promptRecent, MaxBatchCompressRecentSize)
+	remainingBudget := MaxBatchCompressPromptSize - len(recentStr) - 1024
+	_, includedCount, truncated := buildItemsToCompressString(
+		projectTimelineItemsForPrompt(toCompress), remainingBudget,
+	)
+	require.True(t, truncated, "fixture must exceed the reducer prompt budget")
+	require.Greater(t, includedCount, 0)
+	require.Less(t, includedCount, oldCount)
+
+	tl.batchCompressOldestWithRecent(toCompress, recentKeep)
+
+	require.NotNil(t, tl.compressedHead)
+	expectedCoveredEnd := toCompress[includedCount-1].GetID()
+	require.Equal(t, expectedCoveredEnd, tl.compressedHead.CoveredEndItemID,
+		"compressed head must stop at the last item actually sent to the reducer")
+
+	firstOmitted := toCompress[includedCount]
+	require.False(t, firstOmitted.IsDeleted(),
+		"item omitted from the reducer prompt must remain active")
+	require.Contains(t, tl.getActiveTimelineItemIDs(), firstOmitted.GetID())
+	require.Len(t, tl.getActiveTimelineItemIDs(), oldCount-includedCount+len(recentKeep))
 }
 
 // TestRenderBatchCompressPrompt_RecentBudgetRespectsToCompress recent 段总量超 budget 时
