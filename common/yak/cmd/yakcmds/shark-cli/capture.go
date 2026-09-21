@@ -1,9 +1,7 @@
 package sharkcli
 
 import (
-	"bufio"
 	"context"
-	"encoding/binary"
 	"errors"
 	"fmt"
 	"io"
@@ -27,6 +25,7 @@ type captureConfig struct {
 	duration                      time.Duration
 	promisc                       bool
 	maxStreams, streamBytes       int
+	tlsSecrets                    pcaputil.TLSSecretProvider
 }
 
 type packetReader interface {
@@ -99,29 +98,12 @@ func openOffline(name, filter string) (_ *captureSource, result error) {
 			_ = f.Close()
 		}
 	}()
-	reader := bufio.NewReader(f)
-	magic, err := reader.Peek(4)
+	reader, err := pcaputil.NewCaptureReader(f)
 	if err != nil {
 		return nil, fmt.Errorf("read capture header: %w", err)
 	}
-	src := &captureSource{file: f, name: name, offline: true}
-	if binary.LittleEndian.Uint32(magic) == 0x0a0d0d0a {
-		ng, err := pcaputil.NewBoundedNgReader(reader, pcapgo.NgReaderOptions{ErrorOnMismatchingLinkType: true})
-		if err != nil {
-			return nil, fmt.Errorf("read pcapng header: %w", err)
-		}
-		src.reader = ng
-		src.link = ng.LinkType()
-		src.snaplen = 262144
-	} else {
-		p, err := pcaputil.NewBoundedPcapReader(reader)
-		if err != nil {
-			return nil, fmt.Errorf("read pcap header: %w", err)
-		}
-		src.reader = p
-		src.link = p.LinkType()
-		src.snaplen = p.Snaplen()
-	}
+	src := &captureSource{file: f, name: name, offline: true, reader: reader, link: reader.LinkType(), snaplen: reader.Snaplen()}
+
 	if filter != "" {
 		src.bpf, err = pcap.NewBPF(src.link, int(src.snaplen), filter)
 		if err != nil {
@@ -132,6 +114,10 @@ func openOffline(name, filter string) (_ *captureSource, result error) {
 }
 
 type capturedPacket struct {
+	reference             pcaputil.PacketReference
+	events                []*pcaputil.ProtocolEvent
+	eventIDs              []uint64
+	history               *pcaputil.ProtocolInspector
 	streamID              uint64
 	application, evidence string
 	number                uint64
@@ -172,6 +158,27 @@ func (s *captureSession) Stop()         { s.stopOnce.Do(s.cancel); <-s.done }
 func (s *captureSession) result() error { <-s.done; return s.err }
 
 func (s *captureSession) capture(ctx context.Context, src *captureSource, cfg captureConfig, lossyDisplay bool) (result error) {
+	history, _ := pcaputil.NewProtocolInspector(4096, 32<<20)
+	if s.streams != nil {
+		s.streams.mu.Lock()
+		s.streams.history = history
+		s.streams.mu.Unlock()
+	}
+	var current *capturedPacket
+	analyzer, err := pcaputil.NewPacketAnalyzer(pcaputil.WithTLSSecrets(cfg.tlsSecrets), pcaputil.WithOnProtocolMessage(func(e *pcaputil.ProtocolEvent) {
+		history.OnEvent(e)
+		if current != nil {
+			current.history = history
+			if len(current.eventIDs) < 128 {
+				current.eventIDs = append(current.eventIDs, e.ID)
+			}
+		}
+	}))
+	if err != nil {
+		return err
+	}
+	defer func() { result = errors.Join(result, analyzer.Close()) }()
+
 	if s.streams != nil {
 		defer s.streams.finish()
 	}
@@ -242,6 +249,9 @@ func (s *captureSession) capture(ctx context.Context, src *captureSource, cfg ca
 		if err != nil {
 			return fmt.Errorf("read capture: %w", err)
 		}
+		if reader, ok := src.reader.(*pcaputil.CaptureReader); ok && reader.LinkType() != src.link {
+			return fmt.Errorf("shark does not yet export mixed link types; capture interface changed")
+		}
 		if src.bpf != nil && !src.bpf.Matches(ci, data) {
 			continue
 		}
@@ -256,10 +266,20 @@ func (s *captureSession) capture(ctx context.Context, src *captureSource, cfg ca
 		}
 		n := s.captured.Add(1)
 		s.bytes.Add(uint64(len(data)))
-		packet := &capturedPacket{number: n, data: data, ci: ci, link: src.link}
+		ref := pcaputil.CapturePacketReference(ci)
+		if ref.Number == 0 {
+			ref.Number = n
+		}
+		ref.Domain = pcaputil.PacketDomain(data, ci, src.link)
+		packet := &capturedPacket{number: n, data: data, ci: ci, link: src.link, history: history, reference: ref}
 		if s.streams != nil {
 			s.streams.add(packet)
 		}
+		current = packet
+		if err := analyzer.Feed(data, ci, src.link); err != nil {
+			return err
+		}
+		current = nil
 		if lossyDisplay && !src.offline {
 			s.enqueueLatest(packet)
 		} else {

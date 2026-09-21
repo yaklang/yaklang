@@ -17,6 +17,7 @@ import (
 	"github.com/yaklang/yaklang/common/bin-parser/parser"
 	"github.com/yaklang/yaklang/common/bin-parser/parser/base"
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/pcapx/pcaputil"
 	cli "github.com/yaklang/yaklang/common/urfavecli"
 )
 
@@ -24,6 +25,7 @@ const decoderEnvironment = "YAK_SHARK_WORKER"
 const decoderFrame = "\x1eYAKSHARK:"
 
 type decodeRequest struct {
+	Events []*pcaputil.ProtocolEvent
 	Stream *streamDecodeRequest
 	Number uint64
 	Data   []byte
@@ -31,6 +33,7 @@ type decodeRequest struct {
 	Link   layers.LinkType
 }
 type streamDecodeRequest struct {
+	Events []*pcaputil.ProtocolEvent
 	ID     uint64
 	Ports  [2]uint16
 	Prefix [2][]byte
@@ -73,7 +76,7 @@ func runDecodeWorker(input io.Reader, output io.Writer) error {
 	if req.Stream != nil {
 		d = decodeStream(*req.Stream)
 	} else {
-		raw := &capturedPacket{number: req.Number, data: req.Data, link: req.Link, ci: gopacket.CaptureInfo{Length: req.Length, CaptureLength: len(req.Data)}}
+		raw := &capturedPacket{events: req.Events, number: req.Number, data: req.Data, link: req.Link, ci: gopacket.CaptureInfo{Length: req.Length, CaptureLength: len(req.Data)}}
 		d = detail(raw)
 	}
 	response := decodeResponse{Number: d.number, Protocol: d.protocol}
@@ -100,7 +103,7 @@ func (b *boundedOutput) Write(p []byte) (int, error) {
 // Only pinned packets use the VM. A bounded child process keeps both parser
 // diagnostics and pathological input away from the capture/UI event loops.
 func decodeIsolated(parent context.Context, raw *capturedPacket) (packetDetail, error) {
-	output, err := runIsolated(parent, decodeRequest{Number: raw.number, Data: raw.data, Length: raw.ci.Length, Link: raw.link})
+	output, err := runIsolated(parent, decodeRequest{Events: raw.protocolEvents(), Number: raw.number, Data: raw.data, Length: raw.ci.Length, Link: raw.link})
 	if err != nil {
 		return packetDetail{}, err
 	}
@@ -108,7 +111,10 @@ func decodeIsolated(parent context.Context, raw *capturedPacket) (packetDetail, 
 }
 
 func decodeStreamIsolated(parent context.Context, stream *streamSnapshot) (packetDetail, error) {
-	output, err := runIsolated(parent, decodeRequest{Stream: &streamDecodeRequest{ID: stream.id, Ports: stream.ports, Prefix: stream.prefix}})
+	if stream.events == nil {
+		stream.events = []*pcaputil.ProtocolEvent{}
+	}
+	output, err := runIsolated(parent, decodeRequest{Stream: &streamDecodeRequest{ID: stream.id, Ports: stream.ports, Events: stream.events, Prefix: stream.prefix}})
 	if err != nil {
 		return packetDetail{}, err
 	}
@@ -171,6 +177,11 @@ func decodeWorkerOutput(output []byte, raw *capturedPacket) (packetDetail, error
 // prefix. Synthetic transport fields are never shown as captured facts.
 func decodeStream(req streamDecodeRequest) (d packetDetail) {
 	d.number = req.ID
+	if req.Events != nil {
+		d.fields = protocolEventFields(req.Events)
+		d.protocol = eventProtocols(req.Events)
+		return
+	}
 	defer func() {
 		if v := recover(); v != nil {
 			d.fields = append(d.fields, field{text: fmt.Sprintf("Stream dissector incomplete: %v", v)})

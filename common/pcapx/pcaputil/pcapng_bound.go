@@ -1,6 +1,7 @@
 package pcaputil
 
 import (
+	"bytes"
 	"encoding/binary"
 	"fmt"
 	"io"
@@ -12,8 +13,8 @@ const maxCaptureBlock = 16 << 20
 
 // NewBoundedNgReader validates packet headers before pcapgo sees allocation
 // lengths. Complete blocks (including options and trailers) are checked before
-// publication. Unknown private blocks are bounded; NRB/DSB are explicitly
-// unsupported until their independently retained tables have budgets.
+// publication. Unknown private blocks are bounded; name records have a lifetime metadata
+// budget. Embedded secrets are rejected rather than implicitly authorized.
 func NewBoundedNgReader(input io.Reader, options pcapgo.NgReaderOptions) (*pcapgo.NgReader, error) {
 	return pcapgo.NewNgReader(&boundedNgInput{input: input}, options)
 }
@@ -25,6 +26,7 @@ type boundedNgInput struct {
 	order              binary.ByteOrder
 	snaplens           []uint32
 	sections, metadata int
+	totalMetadata      int
 	err                error
 }
 
@@ -92,8 +94,8 @@ func (r *boundedNgInput) nextBlock() error {
 		fixed = 12
 	case 5:
 		fixed = 20
-	case 4, 10:
-		return fmt.Errorf("pcapng: unsupported retained-metadata block %d", kind)
+	case 10:
+		return fmt.Errorf("pcapng: embedded secrets require explicit external authorization")
 	}
 	if int(length) < fixed+4 {
 		return fmt.Errorf("pcapng: block shorter than header")
@@ -164,14 +166,58 @@ func (r *boundedNgInput) nextBlock() error {
 	if r.order.Uint32(r.block[len(r.block)-4:]) != length {
 		return fmt.Errorf("pcapng: block trailer mismatch")
 	}
+	if kind == 4 {
+		b := r.block[8 : len(r.block)-4]
+		count := 0
+		for {
+			if len(b) < 4 || count >= 4096 {
+				return fmt.Errorf("pcapng: name record budget/header")
+			}
+			code, n := r.order.Uint16(b), int(r.order.Uint16(b[2:]))
+			b = b[4:]
+			if code == 0 {
+				if n != 0 {
+					return fmt.Errorf("pcapng: name end length")
+				}
+				if err := r.validateOptions(kind, b); err != nil {
+					return err
+				}
+				break
+			}
+			count++
+			padded := (n + 3) &^ 3
+			if padded > len(b) {
+				return fmt.Errorf("pcapng: name record length")
+			}
+			size := 0
+			switch code {
+			case 1:
+				size = 4
+			case 2:
+				size = 16
+			case 3:
+				size = 6
+			case 4:
+				size = 8
+			}
+			if size > 0 && (n <= size || b[n-1] != 0 || bytes.Count(b[size:n], []byte{0}) > 128) {
+				return fmt.Errorf("pcapng: bounded name list")
+			}
+			b = b[padded:]
+		}
+	}
 	switch kind {
 	case 0x0a0d0d0a, 1, 2, 5, 6:
 		if err := r.validateOptions(kind, r.block[options:len(r.block)-4]); err != nil {
 			return err
 		}
 	}
-	if kind == 1 || kind == 5 || section {
+	if kind == 1 || kind == 4 || kind == 5 || section {
 		r.metadata += len(r.block)
+		r.totalMetadata += len(r.block)
+		if r.totalMetadata > 4<<20 {
+			return fmt.Errorf("pcapng: total metadata budget")
+		}
 		if r.metadata > 1<<20 {
 			return fmt.Errorf("pcapng: section metadata budget")
 		}

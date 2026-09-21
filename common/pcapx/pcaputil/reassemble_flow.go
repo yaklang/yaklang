@@ -24,6 +24,7 @@ var flowPool = &sync.Pool{ // TrafficFlow
 
 // TrafficFrame is a tcp frame
 type TrafficFrame struct {
+	evidence   captureEvidence
 	Timestamp  time.Time
 	Connection *TrafficConnection
 	ConnHash   string // connection local -> remote
@@ -156,6 +157,13 @@ func (t *TrafficFlow) onFrame(frame *TrafficFrame) {
 		direction := 0
 		if frame.Connection != t.ClientConn {
 			direction = 1
+		}
+		if len(frame.evidence.refs) > 0 {
+			for _, ref := range frame.evidence.refs {
+				t.binState.contribute(direction, len(frame.Payload), ref)
+			}
+		} else {
+			t.binState.contribute(direction, len(frame.Payload), frame.evidence.Ref)
 		}
 		t.binState.feed(direction, frame.Payload, frame.Timestamp)
 	}

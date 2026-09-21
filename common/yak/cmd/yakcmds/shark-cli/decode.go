@@ -16,6 +16,7 @@ import (
 )
 
 type packetSummary struct {
+	PDUs             []map[string]any `json:"pdus,omitempty"`
 	packetProtocol   string
 	ProtocolScope    string    `json:"protocol_scope,omitempty"`
 	Transport        string    `json:"transport,omitempty"`
@@ -163,6 +164,7 @@ type packetDetail struct {
 
 func detail(raw *capturedPacket) (d packetDetail) {
 	d.number = raw.number
+	d.fields = append(d.fields, protocolEventFields(raw.protocolEvents())...)
 	d.hex = strings.Split(strings.TrimSuffix(hex.Dump(raw.data), "\n"), "\n")
 	defer func() {
 		if r := recover(); r != nil {

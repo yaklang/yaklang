@@ -111,7 +111,7 @@ func (d *offlineDecoder) feed(ctx context.Context, raw []byte, ci gopacket.Captu
 			return
 		}
 		feeding = true
-		d.conf.trafficPool.Feed(ethernet, network, &d.tcp, ci.Timestamp)
+		d.conf.trafficPool.feedEvidence(ethernet, network, &d.tcp, evidenceFrom(ci), ci.Timestamp)
 		return true
 	}
 	if network != nil && transport == layers.IPProtocolUDP && d.conf.binParser != nil {
@@ -145,6 +145,7 @@ func openOfflineFast(conf *CaptureConfig, ctx context.Context, handler *PcapHand
 			}
 		}
 	}
+	var number uint64
 	for ctx.Err() == nil {
 		// Consume the borrowed Go/native buffer before the next read invalidates it.
 		raw, ci, err := read()
@@ -154,6 +155,8 @@ func openOfflineFast(conf *CaptureConfig, ctx context.Context, handler *PcapHand
 		if err != nil {
 			return err
 		}
+		number++
+		ci = withEvidence(ci, captureEvidence{Ref: PacketReference{Number: number, Domain: CaptureDomain{Interface: ci.InterfaceIndex}}})
 		conf.trafficPool.observeCapture(len(raw))
 		if conf.recorder != nil {
 			if err := conf.recorder.write(raw, ci, d.link); err != nil {
@@ -165,7 +168,7 @@ func openOfflineFast(conf *CaptureConfig, ctx context.Context, handler *PcapHand
 			if key, ok, err := rawFlowKey(raw, d.link); err != nil {
 				conf.trafficPool.malformedPacket(err.Error())
 			} else if ok {
-				conf.trafficPool.parallel.submit(workerPacket{data: raw, ts: ci.Timestamp, link: d.link, raw: true, key: key})
+				conf.trafficPool.parallel.submit(workerPacket{data: raw, ts: ci.Timestamp, link: d.link, raw: true, key: key, evidence: evidenceFrom(ci)})
 			} else if conf.binParser != nil {
 				d.feed(ctx, raw, ci)
 			}

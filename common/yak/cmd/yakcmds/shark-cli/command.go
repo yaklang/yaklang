@@ -12,6 +12,7 @@ import (
 	"syscall"
 
 	"github.com/yaklang/pcap"
+	"github.com/yaklang/yaklang/common/pcapx/pcaputil"
 	cli "github.com/yaklang/yaklang/common/urfavecli"
 	"golang.org/x/term"
 )
@@ -32,11 +33,12 @@ var Command = &cli.Command{
 		"Click Search or press /: proto:http ip:10.223 content:hello hex:00ff stream:hello.\n" +
 		"c changes packet cache capacity (default 20000); --max-packets sets it at startup.\n" +
 		"Application protocol shortcuts use conventional ports. BPF is a capture filter;\n" +
-		"interactive filters affect the display only. TCP streams are reassembled; TLS is not decrypted.",
+		"interactive filters affect the display only. TCP streams are reassembled; TLS decryption requires an authorized --tls-keylog file. Search: fields dns.qry.name contains \"example\".",
 	Flags: []cli.Flag{
 		cli.StringFlag{Name: "interface,i", Usage: "Capture interface (default: physical interface with router gateway; excludes VPN/TUN)"},
 		cli.StringFlag{Name: "pcap-file,r", Usage: "Read a pcap or pcapng capture instead of live traffic"},
 		cli.StringFlag{Name: "output-file,w", Usage: "Save captured packets as .pcap or .pcapng (new file only)"},
+		cli.StringFlag{Name: "tls-keylog", Usage: "Authorized NSS key log (bounded TLS AES-128-GCM profiles; never exported)"},
 		cli.StringFlag{Name: "bpf,f", Usage: "BPF capture filter, combined with --protocol using AND"},
 		cli.StringSliceFlag{Name: "protocol", Usage: "Quick protocol filter, comma-separated or repeatable (OR)"},
 		cli.BoolFlag{Name: "list-interfaces,D", Usage: "List capture interfaces and exit"},
@@ -108,6 +110,22 @@ func run(c *cli.Context) error {
 	}
 	cfg := captureConfig{device: c.String("interface"), input: c.String("pcap-file"), output: c.String("output-file"), filter: filter, snaplen: c.Int("snaplen"), count: c.Int("count"), duration: c.Duration("duration"), promisc: c.Bool("promisc")}
 	cfg.maxStreams, cfg.streamBytes = c.Int("max-streams"), c.Int("stream-bytes")
+	if path := c.String("tls-keylog"); path != "" {
+		f, err := os.Open(path)
+		if err != nil {
+			return err
+		}
+		data, err := io.ReadAll(io.LimitReader(f, (1<<20)+1))
+		f.Close()
+		if err != nil {
+			return err
+		}
+		cfg.tlsSecrets, err = pcaputil.ParseTLSKeyLog(string(data))
+		if err != nil {
+			return err
+		}
+	}
+
 	src, err := openCapture(cfg)
 	if err != nil {
 		return err
@@ -140,6 +158,9 @@ func runPlain(ctx context.Context, s *captureSession, out io.Writer, asJSON bool
 			row := summarize(packet)
 			var err error
 			if asJSON {
+				for _, e := range packet.protocolEvents() {
+					row.PDUs = append(row.PDUs, map[string]any{"id": e.ID, "protocol": e.Protocol, "status": e.Status, "completeness": e.Completeness, "response_to": e.ResponseTo, "byte_source": e.SourceBytes, "fields": e.DisplayFields()})
+				}
 				err = encoder.Encode(row)
 			} else {
 				_, err = fmt.Fprintf(out, "%6d %s %-24s → %-24s %-12s %6d %s\n", row.Number, row.Time.Format("15:04:05.000000"), row.Source, row.Destination, row.Protocol, row.Length, row.Info)

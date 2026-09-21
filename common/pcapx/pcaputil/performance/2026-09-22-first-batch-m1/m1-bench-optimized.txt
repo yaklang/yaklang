@@ -1,0 +1,14 @@
+goos: darwin
+goarch: arm64
+pkg: github.com/yaklang/yaklang/common/pcapx/pcaputil
+BenchmarkPcapBinParser/mixed=true/full/workers=1-2         	      28	  10992737 ns/op	 150.27 MB/s	        14.77 cpu-ms/batch	      4797 cpu-ns/message	         2.000 gomaxprocs	      3080 messages/batch	      3569 ns/message	20130126 B/op	  106355 allocs/op
+BenchmarkPcapBinParser/mixed=true/full/workers=1-2         	      28	  10995981 ns/op	 150.22 MB/s	        14.77 cpu-ms/batch	      4794 cpu-ns/message	         2.000 gomaxprocs	      3080 messages/batch	      3570 ns/message	20130481 B/op	  106355 allocs/op
+BenchmarkPcapBinParser/mixed=true/full/workers=1-2         	      30	  10917190 ns/op	 151.31 MB/s	        14.61 cpu-ms/batch	      4744 cpu-ns/message	         2.000 gomaxprocs	      3080 messages/batch	      3545 ns/message	20131161 B/op	  106357 allocs/op
+BenchmarkPcapBinParser/mixed=true/full-history/workers=1-2 	      27	  13052495 ns/op	 126.55 MB/s	        17.82 cpu-ms/batch	      5785 cpu-ns/message	         2.000 gomaxprocs	      3080 messages/batch	      4238 ns/message	24249776 B/op	  117646 allocs/op
+BenchmarkPcapBinParser/mixed=true/full-history/workers=1-2 	      27	  12932222 ns/op	 127.73 MB/s	        17.68 cpu-ms/batch	      5739 cpu-ns/message	         2.000 gomaxprocs	      3080 messages/batch	      4199 ns/message	24249495 B/op	  117645 allocs/op
+BenchmarkPcapBinParser/mixed=true/full-history/workers=1-2 	      27	  12597576 ns/op	 131.12 MB/s	        17.18 cpu-ms/batch	      5577 cpu-ns/message	         2.000 gomaxprocs	      3080 messages/batch	      4090 ns/message	24249657 B/op	  117645 allocs/op
+BenchmarkPcapBinParser/mixed=true/deferred-view/workers=1-2         	      40	   8491891 ns/op	 194.52 MB/s	        11.54 cpu-ms/batch	      3748 cpu-ns/message	         2.000 gomaxprocs	      3080 messages/batch	      2757 ns/message	15949487 B/op	   65133 allocs/op
+BenchmarkPcapBinParser/mixed=true/deferred-view/workers=1-2         	      37	   8465759 ns/op	 195.12 MB/s	        11.56 cpu-ms/batch	      3755 cpu-ns/message	         2.000 gomaxprocs	      3080 messages/batch	      2749 ns/message	15949496 B/op	   65132 allocs/op
+BenchmarkPcapBinParser/mixed=true/deferred-view/workers=1-2         	      39	   8376355 ns/op	 197.20 MB/s	        11.34 cpu-ms/batch	      3681 cpu-ns/message	         2.000 gomaxprocs	      3080 messages/batch	      2720 ns/message	15949611 B/op	   65133 allocs/op
+PASS
+ok  	github.com/yaklang/yaklang/common/pcapx/pcaputil	7.101s

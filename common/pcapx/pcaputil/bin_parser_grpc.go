@@ -27,6 +27,10 @@ func (f *binFlow) consumeGRPC(dir int, e *ProtocolEvent, stream *binH2Stream) er
 			}
 		}()
 	}
+	if stream.grpcFailed {
+		e.Session["GRPC State"] = "invalid-message-stream"
+		return nil
+	}
 	if e.Session["Reset"] == true {
 		return nil
 	}
@@ -34,6 +38,9 @@ func (f *binFlow) consumeGRPC(dir int, e *ProtocolEvent, stream *binH2Stream) er
 	for _, header := range headers {
 		name, _ := header["Name"].(string)
 		value, _ := header["Value"].(string)
+		if name == "grpc-encoding" {
+			stream.grpcEncoding[dir] = value
+		}
 		if name == "content-type" && (e.Session["Header Kind"] == "request" || e.Session["Header Kind"] == "response") {
 			media := strings.ToLower(strings.TrimSpace(strings.SplitN(value, ";", 2)[0]))
 			stream.grpcEnabled[dir] = media == "application/grpc" || strings.HasPrefix(media, "application/grpc+")
@@ -79,7 +86,40 @@ func (f *binFlow) consumeGRPC(dir int, e *ProtocolEvent, stream *binH2Stream) er
 		stream.grpc[dir] = bytes.Clone(rest)
 		h.grpcBuffered += int64(cap(stream.grpc[dir]) - cap(old))
 		if len(msgs) > 0 {
+			total := 0
+			for _, m := range msgs {
+				stream.grpcIndex[dir]++
+				m["Index"] = stream.grpcIndex[dir]
+				if m["Compressed"] == true {
+					encoding := stream.grpcEncoding[dir]
+					if encoding != "gzip" {
+						return protocolError(ErrUnsupportedFeature, "gRPC compressed message requires gzip encoding")
+					}
+					remaining := f.a.config.MaxMessageBytes - total
+					if err := f.reserveSession(h.sessionStorageBytes() + int64(f.a.config.MaxMessageBytes)); err != nil {
+						return err
+					}
+					plain, err := DecodeBody(m["Payload"].([]byte), encoding, remaining)
+					if err != nil {
+						return err
+					}
+					total += len(plain)
+					m["Decoded Payload"], m["Decoded Length"], m["Byte Source"] = plain, len(plain), "decompressed"
+				}
+				payload := m["Payload"].([]byte)
+				if decoded, ok := m["Decoded Payload"].([]byte); ok {
+					payload = decoded
+				}
+				if fields, err := DecodeProtobufWire(payload, f.a.budget.MaxCollectionElements); err == nil {
+					m["Protobuf Wire Fields"] = fields
+				} else {
+					m["Protobuf Wire Status"] = "opaque-or-unsupported"
+				}
+			}
 			e.Session["GRPC Messages"] = msgs
+			if err := f.reserveSession(h.sessionStorageBytes()); err != nil {
+				return err
+			}
 		}
 	}
 	if e.Session["End Stream"] == true && len(stream.grpc[dir]) != 0 {

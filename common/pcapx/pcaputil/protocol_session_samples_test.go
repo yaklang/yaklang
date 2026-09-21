@@ -142,7 +142,7 @@ func m1SessionSamples(t testing.TB) []m1Sample {
 			{0, rdpConnectInitial("rdpdr", "cliprdr")},
 			{1, rdpConnectResponse("rdpdr", "cliprdr")},
 		}},
-		{"dot-dns-tcp-length", "dot", 1853, []sessionStep{
+		{"dot-dns-tcp-length", "dns", 1853, []sessionStep{
 			{0, dnsQuery(0x1234, "example.com", 1)},
 			{1, dnsAResponse(0x1234, "example.com", [4]byte{93, 184, 216, 34})},
 			{0, dnsQuery(0x22, "ietf.org", 1)},
@@ -345,6 +345,15 @@ func TestProtocolSessionM1PCAP(t *testing.T) {
 		require.Equal(t, hex.EncodeToString(golden), hex.EncodeToString(stored), sample.name)
 		events, stats, err := binReplay(t, stored, 1)
 		require.NoError(t, err, sample.name)
+		if sample.name == "websocket-upgrade-text" {
+			// Preserve this original historical PCAP: its key is only 10 bytes and
+			// its 101 lacks Sec-WebSocket-Accept. It is a negative handshake fixture.
+			require.Positive(t, stats.Malformed+stats.ContextRequired)
+			for _, e := range events {
+				require.NotEqual(t, "websocket", e.Protocol)
+			}
+		}
+		negativeWS := sample.name == "websocket-upgrade-text"
 		plaintext := (sample.protocol == "quic" && sample.name != "quic-v1-rfc9001-initial") || sample.protocol == "http3" || sample.protocol == "doq"
 		if plaintext {
 			// Historical TCP-wrapped plaintext fixtures remain byte-identical. Their
@@ -371,7 +380,7 @@ func TestProtocolSessionM1PCAP(t *testing.T) {
 			require.Len(t, events, len(sample.steps), sample.name)
 			session.Close("fixture-end")
 			require.Zero(t, session.Stats().BufferedBytes)
-		} else {
+		} else if !negativeWS {
 			require.Zero(t, stats.Malformed, sample.name)
 		}
 		found := false
@@ -380,7 +389,9 @@ func TestProtocolSessionM1PCAP(t *testing.T) {
 				found = true
 			}
 		}
-		require.True(t, found, "%s: no %s events in %d", sample.name, sample.protocol, len(events))
+		if !negativeWS {
+			require.True(t, found, "%s: no %s events in %d", sample.name, sample.protocol, len(events))
+		}
 		transport, native := "tcp", true
 		switch sample.protocol {
 		case "radius", "dhcp", "ntp", "coap":
@@ -389,12 +400,16 @@ func TestProtocolSessionM1PCAP(t *testing.T) {
 			native = false
 		}
 		plaintextSource := ""
+		completeness := "algorithm-smoke; not native wire completeness"
+		if negativeWS {
+			completeness = "negative handshake: invalid key and absent accept; no upgrade"
+		}
 		if plaintext {
 			plaintextSource = "synthetic unprotected packet/frame fixture; not authenticated wire"
 		}
 		doc.Samples = append(doc.Samples, row{
 			Representation: "synthetic_frame", Transport: transport, NativeCarrier: native,
-			PlaintextSource: plaintextSource, EvidenceTest: "TestProtocolSessionM1PCAP", Completeness: "algorithm-smoke; not native wire completeness",
+			PlaintextSource: plaintextSource, EvidenceTest: "TestProtocolSessionM1PCAP", Completeness: completeness,
 			File: sample.name + ".pcap", Protocol: sample.protocol,
 			SHA256: hex.EncodeToString(sum[:]), Bytes: len(golden),
 			Port: int(sample.port), Kind: "deterministic-generated-not-real-capture",

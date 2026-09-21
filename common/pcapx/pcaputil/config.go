@@ -33,6 +33,8 @@ type DeviceAdapter struct {
 }
 
 type CaptureConfig struct {
+	tlsSecrets            TLSSecretProvider
+	datagramDecodeAs      map[uint16]string
 	binParserConfig       *BinParserConfig
 	binParser             *binParser
 	recorder              *captureWriter
@@ -485,7 +487,7 @@ func (c *CaptureConfig) assemblyWithTS(flow gopacket.Packet, networkLayer gopack
 		}
 	}()
 	raw, _ := flow.Layer(layers.LayerTypeEthernet).(*layers.Ethernet)
-	c.trafficPool.Feed(raw, networkLayer, tcp, ts)
+	c.trafficPool.feedEvidence(raw, networkLayer, tcp, packetEvidence(flow), ts)
 }
 
 func (c *CaptureConfig) packetHandler(ctx context.Context, packet gopacket.Packet) {
@@ -507,10 +509,11 @@ func (c *CaptureConfig) packetHandler(ctx context.Context, packet gopacket.Packe
 		ts = time.Now()
 	}
 
+	originalPacket := packet
 	defer func() {
 		if c.onEveryPacket != nil {
 			for _, f := range c.onEveryPacket {
-				f(packet)
+				f(originalPacket)
 			}
 		}
 	}()
@@ -522,6 +525,13 @@ func (c *CaptureConfig) packetHandler(ctx context.Context, packet gopacket.Packe
 		c.trafficPool.parallel.checkTruncation(packet.Metadata().CaptureInfo)
 	}
 
+	if c.binParser != nil {
+		var consumed bool
+		packet, consumed = c.binParser.networkPacket(packet)
+		if consumed {
+			return
+		}
+	}
 	var matched bool
 	ret, isOk := packet.TransportLayer().(*layers.TCP)
 	if !isOk && packet.TransportLayer() != nil {
@@ -535,6 +545,10 @@ func (c *CaptureConfig) packetHandler(ctx context.Context, packet gopacket.Packe
 	// A decoder can expose a partially populated TCP layer before returning
 	// an option/header error. Never feed such a layer into stream state.
 	if failure := packet.ErrorLayer(); failure != nil {
+		if !isOk && c.binParser != nil && unsupportedNetworkDecode(packet) {
+			c.binParser.networkDiagnostic(packetEvidence(packet), packet.Metadata().CaptureInfo, "unrecognized", "UnsupportedOrMalformedNetworkLayer")
+			return
+		}
 		c.trafficPool.malformedPacket(failure.Error().Error())
 		return
 	}

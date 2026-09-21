@@ -19,7 +19,7 @@ func (a *binParser) decodeSessionDatagram(e *ProtocolEvent, wire []byte) bool {
 		return true
 	case len(wire) >= 240 && (wire[0] == 1 || wire[0] == 2) && binary.BigEndian.Uint32(wire[236:240]) == dhcpCookie:
 		e.Protocol, spec = "dhcp", a.specs["application-layer.dhcp/DHCP"]
-		session, err = (&binDHCP{}).consume(wire)
+		session, err = decodeDHCP4(wire, a.budget.MaxCollectionElements)
 	case probeRADIUS(wire, len(wire)).Verdict == ProbeAccept:
 		e.Protocol, spec = "radius", a.specs["application-layer.radius/RADIUS"]
 		session, err = (&binRADIUS{}).consume(wire, a.budget.MaxCollectionElements)
@@ -49,6 +49,10 @@ func (a *binParser) decodeSessionDatagram(e *ProtocolEvent, wire []byte) bool {
 	if err == nil {
 		e.Session = session
 		e.Session["Observation Scope"] = "datagram"
+		if e.Protocol == "dhcp" {
+			e.Completeness = "message"
+			a.dhcpObservation(e)
+		}
 		if a.config.Deferred {
 			a.deferred.Add(1)
 			return true

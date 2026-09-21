@@ -6,7 +6,10 @@ import (
 	"time"
 )
 
-type binUDPKey struct{ a, b string }
+type binUDPKey struct {
+	a, b   string
+	domain CaptureDomain
+}
 type binUDPEntry struct {
 	key     binUDPKey
 	flow    *binFlow
@@ -27,14 +30,14 @@ func (a *binParser) decodeTFTPDatagram(e *ProtocolEvent, w []byte) bool {
 		return false
 	}
 	request := probeTFTP(w, sessionCollectionLimit(a.budget.MaxCollectionElements))
-	key := binUDPKey{"tftp/" + e.Source, dstIP}
+	key := binUDPKey{"tftp/" + e.Source, dstIP, e.Domain}
 	s := a.udpSessions
 	var el *list.Element
 	dir := 0
 	if s != nil {
 		el = s.entries[key]
 		if el == nil && !request {
-			key = binUDPKey{"tftp/" + e.Destination, srcIP}
+			key = binUDPKey{"tftp/" + e.Destination, srcIP, e.Domain}
 			el = s.entries[key]
 			dir = 1
 		}
@@ -99,7 +102,7 @@ func (a *binParser) decodeTFTPDatagram(e *ProtocolEvent, w []byte) bool {
 func (a *binParser) decodeSTUNDatagram(e *ProtocolEvent, w []byte) bool {
 	a.udpMu.Lock()
 	defer a.udpMu.Unlock()
-	key := binUDPKey{e.Source, e.Destination}
+	key := binUDPKey{e.Source, e.Destination, e.Domain}
 	if key.a > key.b {
 		key.a, key.b = key.b, key.a
 	}
@@ -203,6 +206,12 @@ func (a *binParser) finishProtocolDatagram(e *ProtocolEvent, w []byte, spec *bin
 	}
 }
 func (a *binParser) closeUDPSessions() {
+	a.dnsMu.Lock()
+	for k := range a.dns.pending {
+		a.buffered.Add(-int64(len(k) + 128))
+	}
+	a.dns.pending = nil
+	a.dnsMu.Unlock()
 	a.udpMu.Lock()
 	defer a.udpMu.Unlock()
 	if s := a.udpSessions; s != nil {

@@ -25,7 +25,7 @@ import (
 
 type options struct {
 	read, device, bpf, write, report, protocol string
-	cpuProfile                                 string
+	cpuProfile, tlsKeyLog                      string
 	duration, interval                         time.Duration
 	workers, history, memory, rows, snaplen    int
 	captureBuffer, gomaxprocs                  int
@@ -36,6 +36,7 @@ type options struct {
 func parseOptions(args []string, stderr io.Writer) (o options, err error) {
 	f := flag.NewFlagSet("pcap-inspect", flag.ContinueOnError)
 	f.SetOutput(stderr)
+	f.StringVar(&o.tlsKeyLog, "tls-keylog", "", "authorized NSS key log; AES-128-GCM TLS profiles only")
 	f.StringVar(&o.read, "read", "", "pcap/pcapng input file")
 	f.StringVar(&o.device, "interface", "", "capture device name or index from -list")
 	f.BoolVar(&o.list, "list", false, "list interfaces and exit")
@@ -184,6 +185,22 @@ func run(ctx context.Context, args []string, stdout, stderr io.Writer) (resultEr
 		}),
 		pcaputil.WithBinParserStats(func(s pcaputil.BinParserStats) { metrics.Analysis = s }),
 		pcaputil.WithTCPReassemblyStats(func(s pcaputil.TCPReassemblyStats) { metrics.Reassembly = s }),
+	}
+	if o.tlsKeyLog != "" {
+		keyFile, err := os.Open(o.tlsKeyLog)
+		if err != nil {
+			return err
+		}
+		data, err := io.ReadAll(io.LimitReader(keyFile, (1<<20)+1))
+		keyFile.Close()
+		if err != nil {
+			return err
+		}
+		keys, err := pcaputil.ParseTLSKeyLog(string(data))
+		if err != nil {
+			return err
+		}
+		opts = append(opts, pcaputil.WithTLSSecrets(keys))
 	}
 	var recording *os.File
 	var buffer *bufio.Writer

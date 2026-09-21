@@ -268,6 +268,11 @@ func (f *binFlow) ensureDoH() {
 }
 
 func (d *binDoH) attachDNS(info map[string]any, msg []byte, response bool, max int) (map[string]any, error) {
+	semantic, err := DecodeDNSMessage(msg, max)
+	if err != nil {
+		return info, err
+	}
+	info["DNS"] = semantic
 	if len(msg) < 12 {
 		return info, protocolError(ErrMalformedMessage, "DoH DNS message shorter than header")
 	}

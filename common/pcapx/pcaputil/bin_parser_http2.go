@@ -10,6 +10,14 @@ import (
 )
 
 type binH2Stream struct {
+	unsupported    bool
+	grpcFailed     bool
+	bodyExpected   [2]int64
+	bodyLengthSet  [2]bool
+	bodyBytes      [2]int64
+	noBody         [2]bool
+	grpcEncoding   [2]string
+	grpcIndex      [2]uint64
 	headers, ended [2]bool
 	window         [2]int64
 	method         string
@@ -234,7 +242,32 @@ func (h *binHTTP2) consume(dir int, wire []byte) (map[string]any, error) {
 		return nil, fmt.Errorf("http2: orphan CONTINUATION")
 	}
 	if f.Type == 5 {
-		return nil, sessionContext("HTTP/2 PUSH_PROMISE requires a push profile")
+		if dir == h.client || stream == nil || f.Promised == 0 || f.Promised%2 != 0 || f.Promised <= h.last[dir] || !h.effectiveSettings(1-dir).push {
+			return nil, fmt.Errorf("http2: invalid PUSH_PROMISE context")
+		}
+		if len(h.streams) >= 1024 {
+			return nil, sessionContext("HTTP/2 active stream limit")
+		}
+		block := bytes.Clone(f.Fragment)
+		for at := h2FrameLength(wire); at < len(wire); {
+			n := h2FrameLength(wire[at:])
+			next, e := stream_parser.InspectHTTP2Frame(wire[at : at+n])
+			if e != nil {
+				return nil, e
+			}
+			block = append(block, next.Fragment...)
+			at += n
+		}
+		headers, e := h.decoder[dir].Decode(block)
+		if e != nil {
+			return nil, fmt.Errorf("http2: HPACK: %w", e)
+		}
+		pushed := &binH2Stream{unsupported: true, method: "GET", window: [2]int64{h.effectiveSettings(1).window, h.effectiveSettings(0).window}}
+		pushed.headers[h.client], pushed.ended[h.client] = true, true
+		h.streams[f.Promised] = pushed
+		h.last[dir] = f.Promised
+		info["Headers"], info["Promised Stream ID"], info["Error Scope"] = headers, f.Promised, "stream"
+		return info, protocolError(ErrUnsupportedFeature, "HTTP/2 PUSH_PROMISE application semantics unsupported; HPACK state retained")
 	}
 	if f.Type == 1 {
 		if stream == nil {
@@ -349,6 +382,11 @@ func (h *binHTTP2) consume(dir int, wire []byte) (map[string]any, error) {
 	}
 	if f.Type == 3 {
 		if stream == nil {
+			if f.Stream%2 == 1 && f.Stream <= h.last[h.client] {
+				info["Reset"] = true
+				info["Closed Stream"] = true
+				return info, nil
+			}
 			return nil, sessionContext("HTTP/2 reset without observed stream")
 		}
 		delete(h.streams, f.Stream)
@@ -359,6 +397,10 @@ func (h *binHTTP2) consume(dir int, wire []byte) (map[string]any, error) {
 		if stream.ended[0] && stream.ended[1] {
 			delete(h.streams, f.Stream)
 		}
+	}
+	if stream != nil && stream.unsupported {
+		info["Error Scope"] = "stream"
+		return info, protocolError(ErrUnsupportedFeature, "HTTP/2 pushed stream application semantics unsupported")
 	}
 	return info, nil
 }

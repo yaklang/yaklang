@@ -12,6 +12,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
+	"github.com/yaklang/yaklang/common/pcapx/pcaputil"
 )
 
 func TestInspectReplayModesAndRecording(t *testing.T) {
@@ -131,4 +132,25 @@ func TestInspectSchedulerIndependentOfWorkers(t *testing.T) {
 	}
 	_, err := parseOptions([]string{"-read", input, "-gomaxprocs", "-1"}, io.Discard)
 	require.Error(t, err)
+}
+
+func TestFirstBatchT05Inspect(t *testing.T) {
+	base := "../../pcaputil/testdata/protocol-sessions/first-batch-m1/"
+	key, err := os.ReadFile(base + "tls-h2-bidi.keys")
+	require.NoError(t, err)
+	keys, err := pcaputil.ParseTLSKeyLog(string(key))
+	require.NoError(t, err)
+	for _, name := range []string{"tls-h2-bidi.pcap", "http-ws-native.pcap", "dhcpv6-native.pcap"} {
+		t.Run(name, func(t *testing.T) {
+			var expected pcaputil.ProtocolStats
+			require.NoError(t, pcaputil.ReplayPcapFile(base+name, pcaputil.WithTLSSecrets(keys), pcaputil.WithOnProtocolMessage(func(*pcaputil.ProtocolEvent) {}), pcaputil.WithOnProtocolStats(func(s pcaputil.ProtocolStats) { expected = s })))
+			file := filepath.Join(t.TempDir(), "report.json")
+			require.NoError(t, run(context.Background(), []string{"-read", base + name, "-tls-keylog", base + "tls-h2-bidi.keys", "-report", file, "-quiet"}, io.Discard, io.Discard))
+			raw, err := os.ReadFile(file)
+			require.NoError(t, err)
+			var got report
+			require.NoError(t, json.Unmarshal(raw, &got))
+			require.Equal(t, expected, got.Analysis)
+		})
+	}
 }

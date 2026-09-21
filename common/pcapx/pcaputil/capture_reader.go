@@ -1,17 +1,13 @@
 package pcaputil
 
 import (
-	"bufio"
 	"context"
-	"encoding/binary"
 	"errors"
 	"fmt"
 	"io"
 	"os"
 
 	"github.com/gopacket/gopacket"
-	"github.com/gopacket/gopacket/layers"
-	"github.com/gopacket/gopacket/pcapgo"
 )
 
 // ReplayPcapFile replays pcap or pcapng without opening a native capture handle.
@@ -59,27 +55,12 @@ func replayWithConfig(input io.Reader, conf *CaptureConfig) (resultErr error) {
 	if conf.reassemblyOptions.Stream && conf.requiresFullStream {
 		return fmt.Errorf("TCP streaming cannot be combined with built-in HTTP/TLS parsers")
 	}
-	br := bufio.NewReader(input)
-	header, err := br.Peek(4)
+	r, err := NewCaptureReader(input)
 	if err != nil {
 		return err
 	}
-	var read func() ([]byte, gopacket.CaptureInfo, error)
-	var link layers.LinkType
-	var ng *pcapgo.NgReader
-	if binary.LittleEndian.Uint32(header) == 0x0a0d0d0a {
-		ng, err = NewBoundedNgReader(br, pcapgo.NgReaderOptions{WantMixedLinkType: true})
-		if err != nil {
-			return err
-		}
-		read = ng.ZeroCopyReadPacketData
-	} else {
-		r, err := newClassicPcapReader(br)
-		if err != nil {
-			return err
-		}
-		read, link = r.read, r.link
-	}
+	read, link, ng := r.readBorrowed, r.LinkType(), r.ng
+
 	closeOutput, err := conf.openCaptureOutput()
 	if err != nil {
 		return err
@@ -151,7 +132,9 @@ func replayWithConfig(input io.Reader, conf *CaptureConfig) (resultErr error) {
 			if key, ok, err := rawFlowKey(raw, link); err != nil {
 				pool.malformedPacket(err.Error())
 			} else if ok {
-				pool.parallel.submit(workerPacket{data: raw, ts: ci.Timestamp, link: link, raw: true, key: key})
+				e := evidenceFrom(ci)
+				key.domain = e.Ref.Domain
+				pool.parallel.submit(workerPacket{data: raw, ts: ci.Timestamp, link: link, raw: true, key: key, evidence: e})
 			} else if conf.binParser != nil {
 				d.feed(ctx, raw, ci) // datagrams; TCP still uses the private worker path
 			}

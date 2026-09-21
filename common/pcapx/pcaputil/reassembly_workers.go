@@ -88,6 +88,7 @@ func (b *reassemblyBudget) release(bytes, segments int) {
 // Decoded submissions own addresses and just the TCP fields consumed by the
 // reassembler. Raw private capture paths move full decoding onto the worker.
 type workerPacket struct {
+	evidence       captureEvidence
 	data           []byte
 	ts             time.Time
 	link           layers.LinkType
@@ -293,7 +294,7 @@ func (d *tcpWorkers) submit(packet workerPacket) {
 	}
 }
 
-func (d *tcpWorkers) submitLayers(eth *layers.Ethernet, network gopacket.SerializableLayer, tcp *layers.TCP, tss []time.Time) {
+func (d *tcpWorkers) submitLayers(eth *layers.Ethernet, network gopacket.SerializableLayer, tcp *layers.TCP, tss []time.Time, evidence ...captureEvidence) {
 	if tcp == nil {
 		return
 	}
@@ -321,6 +322,10 @@ func (d *tcpWorkers) submitLayers(eth *layers.Ethernet, network gopacket.Seriali
 	src, _ := netip.AddrFromSlice(srcIP)
 	dst, _ := netip.AddrFromSlice(dstIP)
 	r := workerPacket{data: tcp.Payload, ts: ts, key: key, src: src.As16(), dst: dst.As16(), sport: uint16(tcp.SrcPort), dport: uint16(tcp.DstPort), seq: tcp.Seq}
+	if len(evidence) > 0 {
+		r.evidence = evidence[0]
+		r.key.domain = evidence[0].Ref.Domain
+	}
 	if tcp.SYN {
 		r.flags |= 1
 	}
@@ -447,7 +452,7 @@ func (d *tcpWorkers) run(w *tcpWorker) {
 				r := &b.packets[i]
 				if r.raw {
 					decoder.link = r.link
-					decoder.feed(w.pool.ctx, r.data, gopacket.CaptureInfo{Timestamp: r.ts, CaptureLength: len(r.data), Length: len(r.data)})
+					decoder.feed(w.pool.ctx, r.data, withEvidence(gopacket.CaptureInfo{Timestamp: r.ts, CaptureLength: len(r.data), Length: len(r.data)}, r.evidence))
 				} else {
 					tcp := layers.TCP{SrcPort: layers.TCPPort(r.sport), DstPort: layers.TCPPort(r.dport), Seq: r.seq, SYN: r.flags&1 != 0, ACK: r.flags&2 != 0, FIN: r.flags&4 != 0, RST: r.flags&8 != 0}
 					tcp.Payload = r.data
@@ -459,7 +464,7 @@ func (d *tcpWorkers) run(w *tcpWorker) {
 					if r.ethernet {
 						eth = &layers.Ethernet{SrcMAC: net.HardwareAddr(r.macSrc[:]), DstMAC: net.HardwareAddr(r.macDst[:])}
 					}
-					w.pool.Feed(eth, network, &tcp, r.ts)
+					w.pool.feedEvidence(eth, network, &tcp, r.evidence, r.ts)
 				}
 			}()
 		}
@@ -566,7 +571,7 @@ func rawFlowKey(raw []byte, link layers.LinkType) (flowKey, bool, error) {
 	if !ok && packet.TransportLayer() != nil {
 		return flowKey{}, false, nil
 	}
-	if failure := packet.ErrorLayer(); failure != nil {
+	if failure := packet.ErrorLayer(); failure != nil && !unsupportedNetworkDecode(packet) {
 		return flowKey{}, false, failure.Error()
 	}
 	if !ok {
