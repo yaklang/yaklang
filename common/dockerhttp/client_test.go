@@ -177,14 +177,16 @@ func TestImageLoadStream(t *testing.T) {
 	}
 
 	m.LoadHandler = func(w http.ResponseWriter, r *http.Request) {
-		<-r.Context().Done()
+		_, _ = io.Copy(io.Discard, r.Body)
 	}
 	ctx, cancel := context.WithCancel(context.Background())
 	go func() {
 		time.Sleep(30 * time.Millisecond)
 		cancel()
 	}()
-	_ = c.ImageLoad(ctx, foreverReader{})
+	if err := c.ImageLoad(ctx, foreverReader{}); !errors.Is(err, context.Canceled) {
+		t.Fatalf("load cancellation: %v", err)
+	}
 }
 
 type foreverReader struct{}

@@ -87,7 +87,7 @@ func TestLiveLifecycleExecAndNAT(t *testing.T) {
 	c, ctx := liveClient(t)
 	label := liveUnique(t)
 	ins, err := c.CreateAndStart(ctx, &dockerhttp.ContainerConfig{
-		Image: "nginx:alpine", Cmd: []string{"sh", "-c", "echo dockerhttp-ok > /usr/share/nginx/html/index.html; exec nginx -g 'daemon off;'"},
+		Image: liveImage(t, c, ctx), Cmd: []string{"sh", "-c", `while true; do printf 'HTTP/1.1 200 OK\r\nContent-Length: 13\r\nConnection: close\r\n\r\ndockerhttp-ok\n' | nc -l -p 80; done`},
 		Env: []string{"DOCKERHTTP_TEST=1"}, Labels: map[string]string{"yaklang.dockerhttp.test": label}, ExposedPorts: map[string]struct{}{"80/tcp": {}},
 	}, &dockerhttp.HostConfig{Memory: 32 << 20, NanoCPUs: 500_000_000, PortBindings: dockerhttp.PortMap{"80/tcp": {{HostIP: "127.0.0.1", HostPort: "0"}}}}, "")
 	if err != nil {
@@ -100,7 +100,7 @@ func TestLiveLifecycleExecAndNAT(t *testing.T) {
 	if ins.Config.Labels["yaklang.dockerhttp.test"] != label {
 		t.Fatal("label lost")
 	}
-	code, err := c.ContainerExecRun(ctx, ins.ID, []string{"sh", "-c", "test \"$DOCKERHTTP_TEST\" = 1; exit 7"})
+	code, err := c.ContainerExecRun(ctx, ins.ID, []string{"sh", "-c", "test \"$DOCKERHTTP_TEST\" = 1 || exit 1; exit 7"})
 	if err != nil || code != 7 {
 		t.Fatalf("exec: %d %v", code, err)
 	}

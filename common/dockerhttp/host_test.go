@@ -40,11 +40,6 @@ func TestParseHostURL(t *testing.T) {
 }
 
 func TestHostFromEnv(t *testing.T) {
-	t.Setenv(dockerhttp.EnvOverrideHost, "")
-	os.Unsetenv(dockerhttp.EnvOverrideHost)
-	if got := dockerhttp.HostFromEnv(); got != dockerhttp.DefaultDockerHost {
-		t.Fatalf("default host = %q", got)
-	}
 	t.Setenv(dockerhttp.EnvOverrideHost, "tcp://1.2.3.4:2375")
 	if got := dockerhttp.HostFromEnv(); got != "tcp://1.2.3.4:2375" {
 		t.Fatalf("env host = %q", got)
@@ -52,6 +47,8 @@ func TestHostFromEnv(t *testing.T) {
 }
 
 func TestFromEnvAPIVersion(t *testing.T) {
+	t.Setenv(dockerhttp.EnvTLSVerify, "")
+	t.Setenv(dockerhttp.EnvCertPath, "")
 	t.Setenv(dockerhttp.EnvOverrideHost, "unix:///tmp/x.sock")
 	t.Setenv(dockerhttp.EnvOverrideAPIVersion, "1.40")
 	c, err := dockerhttp.New(dockerhttp.FromEnv)

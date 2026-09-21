@@ -26,29 +26,26 @@ malformed JSON. A failed start or inspect rolls back only the newly created
 container, using a bounded cleanup context even after caller cancellation.
 Scannode retains exact cleanup-label matching and rejects multiple matches.
 
-## Verification
+## Tests
 
 ```sh
-scripts/ci/dockerhttp-fast.sh
-GOWORK=off go test -race ./common/dockerhttp -count=1 -timeout=10s
-GOWORK=off go test ./scannode -run '^(TestDockerRuntime|TestRuntimeHost|TestResilienceRuntimeHost)' -count=1
-GOWORK=off go test ./common/thirdpartyservices -count=1
+go test ./common/dockerhttp -count=1 -timeout=10s
+go test scannode/runtime_host_docker.go scannode/runtime_host_docker_test.go -count=1 -timeout=10s
+go test common/thirdpartyservices/docker_images.go common/thirdpartyservices/docker_test.go -count=1 -timeout=10s
 ```
 
-The fast suite includes every client mock and the actual scannode adapter's
-contract tests. Compilation is separate; the test phase has a total 10-second
-budget. CI runs its binaries in a network namespace with only loopback enabled,
-without access to an external network or a Docker daemon. Separate jobs run
-call-site/SCA regressions and Windows named-pipe mocks.
+These tests use temporary local HTTP/Unix/named-pipe mocks, require no daemon,
+images, certificates, or external services, and finish within 10 seconds once
+compiled. Essential Tests adds only the client and service-pull entries; its
+existing scannode entry covers the adapter. No additional jobs or runner setup.
 
-Optional real-daemon tests require preinstalled `alpine:3.20` and `nginx:alpine`:
+Real-daemon tests are opt-in local checks, requiring preinstalled `alpine:3.20`
+and `nginx:alpine`:
 
 ```sh
 go test -tags=docker_integration ./common/dockerhttp -run '^TestLive' -count=1 -timeout=6m -v
 ```
 
-They cover a local registry pull, CPU/memory limits, exec, label lookup, NAT HTTP,
-save/load identity, export/import, and idempotent removal. Containers and image
-tags created by tests are uniquely named and cleaned up; existing tags are not
-removed. Pull uses a temporary registry bound to the daemon's loopback. Set
-`DOCKERHTTP_TEST_IMAGE` to override Alpine for the archive test.
+They cover a local registry pull, resources, exec, labels, NAT HTTP, save/load
+identity, export/import, and idempotent removal. Only uniquely named test
+containers and image tags are cleaned up. CI never enables this build tag.
