@@ -447,6 +447,7 @@ type Config struct {
 	forgeUnloadHandler             forgeUnloadHandler
 	capabilityInventoryEmitHandler capabilityInventoryEmitHandler
 	sessionSnapshot                *sessionSnapshotState
+	sessionSnapshotDocument        *sessionSnapshotDocumentStore
 	hotpatchCurrentTaskIdResolver  func() string
 	capabilityHotpatchHandler      func(enable bool, caps []EnabledCapability)
 
@@ -4485,6 +4486,12 @@ func convertConfigToOptions(i *Config, inheritHotPatch bool) []ConfigOption {
 	}
 	if i.SessionPromptState != nil {
 		opts = append(opts, WithSessionPromptState(i.SessionPromptState))
+	}
+	if store := i.getSessionSnapshotDocumentStore(); store != nil {
+		opts = append(opts, func(c *Config) error {
+			c.sessionSnapshotDocument = store
+			return nil
+		})
 	}
 	if i.FrozenBlockPartitionProducer != nil {
 		opts = append(opts, WithFrozenBlockPartitionProducer(i.FrozenBlockPartitionProducer))
