@@ -5,6 +5,7 @@ package main
 import (
 	"bytes"
 	"crypto/tls"
+	"crypto/x509"
 	"encoding/binary"
 	"flag"
 	"fmt"
@@ -64,7 +65,9 @@ func main() {
 		srv.EnableHTTP2 = true
 		srv.TLS = &tls.Config{MinVersion: version, MaxVersion: version, KeyLogWriter: keys, CipherSuites: []uint16{tls.TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256}}
 		srv.StartTLS()
-		tr := &http2.Transport{TLSClientConfig: &tls.Config{InsecureSkipVerify: true, ServerName: "m1.example", MinVersion: version, MaxVersion: version, KeyLogWriter: keys, CipherSuites: []uint16{tls.TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256}}}
+		roots := x509.NewCertPool()
+		roots.AddCert(srv.Certificate())
+		tr := &http2.Transport{TLSClientConfig: &tls.Config{RootCAs: roots, ServerName: "m1.example.com", MinVersion: version, MaxVersion: version, KeyLogWriter: keys, CipherSuites: []uint16{tls.TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256}}}
 		rd, wr := io.Pipe()
 		req, err := http.NewRequest("POST", srv.URL+"/m1.Echo/Bidi", rd)
 		must(err)
