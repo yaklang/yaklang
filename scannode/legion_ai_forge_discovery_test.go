@@ -107,13 +107,25 @@ func TestLegionDiscoveryDNSBoundsCancellationAndBudget(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	r.allowedLabels = map[string]struct{}{"www": {}}
 	if _, err := r.execute(ctx, "dns_lookup", map[string]any{"label": "www"}); err != nil {
 		t.Fatal(err)
 	}
 	if !reflect.DeepEqual(hosts, []string{"example.com", "www.example.com"}) {
 		t.Fatal(hosts)
 	}
-	for _, label := range []string{"evil.com", "../other", strings.Repeat("a", 64), "-x"} {
+	refs := r.applicationHTTPMaterialReferences()
+	if len(refs) != 1 || !reflect.DeepEqual(refs[0].Operations, []string{"dns_lookup", "label:www"}) {
+		t.Fatalf("missing child-label provenance: %+v", refs)
+	}
+	if _, err := r.execute(ctx, "dns_lookup", nil); err != nil {
+		t.Fatal(err)
+	}
+	refs = r.applicationHTTPMaterialReferences()
+	if len(refs) != 2 || !reflect.DeepEqual(refs[1].Operations, []string{"dns_lookup"}) {
+		t.Fatalf("base lookup incorrectly claims label coverage: %+v", refs)
+	}
+	for _, label := range []string{"evil", "api", "evil.com", "../other", strings.Repeat("a", 64), "-x"} {
 		if _, err := r.execute(ctx, "dns_lookup", map[string]any{"label": label}); err == nil {
 			t.Fatal("bad label accepted")
 		}
@@ -194,11 +206,48 @@ func TestLegionDiscoveryRootNXDOMAINAllowsScopedSubdomain(t *testing.T) {
 	if err != nil || tcp["status"] != "no_resolved_addresses" {
 		t.Fatalf("tcp: %v %v", tcp, err)
 	}
+	r.allowedLabels = map[string]struct{}{"www": {}}
 	sub, err := r.execute(context.Background(), "dns_lookup", map[string]any{"label": "www"})
 	if err != nil || sub["status"] != "resolved" {
 		t.Fatalf("sub: %v %v", sub, err)
 	}
 	if len(r.applicationHTTPMaterialReferences()) != 3 {
 		t.Fatal("missing actual negative/positive evidence")
+	}
+}
+
+func TestLegionDiscoveryUserBoundLabels(t *testing.T) {
+	for _, raw := range []string{"", "www,www", "WWW,www", "www.evil", "*", "-bad", strings.Repeat("a", 64), "a,b,c,d,e,f,g,h,i,j,k,l,m,n,o,p,q"} {
+		release := &aiv1.ContextForgeRelease{Parameters: []*aiv1.ContextForgeParameter{{Key: "labels", ValueKind: "string", Value: raw}}}
+		if _, err := legionForgeDiscoveryLabels(release); err == nil {
+			t.Fatalf("accepted labels %q", raw)
+		}
+	}
+	release := &aiv1.ContextForgeRelease{Parameters: []*aiv1.ContextForgeParameter{{Key: "labels", ValueKind: "string", Value: " WWW, api "}}}
+	labels, err := legionForgeDiscoveryLabels(release)
+	if err != nil || len(labels) != 2 {
+		t.Fatalf("labels: %v %v", labels, err)
+	}
+	if _, ok := labels["www"]; !ok {
+		t.Fatal("labels not normalized")
+	}
+	release.Parameters[0].ValueKind = "text"
+	if _, err := legionForgeDiscoveryLabels(release); err == nil {
+		t.Fatal("nonstring labels accepted")
+	}
+	r, err := newLegionForgeDiscoveryRuntime(context.Background(), "example.com", []int{443}, func(_ context.Context, host string) ([]net.IP, error) {
+		if host != "example.com" {
+			t.Fatal("base-only application performed subdomain lookup")
+		}
+		return []net.IP{net.ParseIP("93.184.216.34")}, nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := r.execute(context.Background(), "dns_lookup", map[string]any{"label": "www"}); err == nil {
+		t.Fatal("application without labels expanded target")
+	}
+	if _, err := r.execute(context.Background(), "dns_lookup", nil); err != nil {
+		t.Fatal(err)
 	}
 }

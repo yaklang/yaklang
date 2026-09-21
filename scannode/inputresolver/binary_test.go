@@ -268,6 +268,38 @@ func TestFailedBinaryParsingDoesNotRecordSuccessfulMaterialUse(t *testing.T) {
 	}
 }
 
+func TestBinaryThroughTextReadsDoesNotRecordMaterialUse(t *testing.T) {
+	malformedCapture := captureFixture(t, false, 1)[:23]
+	for _, content := range [][]byte{malformedCapture, []byte("prefix\x00suffix"), []byte("prefix\xff"), []byte("prefix\xe4\xb8")} {
+		for _, lines := range []bool{false, true} {
+			w, name := binaryWorkspace(t, content)
+			var err error
+			if lines {
+				_, err = w.ReadLines(context.Background(), name, 1, 20)
+			} else {
+				_, err = w.Read(context.Background(), name, 0, MaxReadBytes)
+			}
+			if err == nil {
+				t.Fatalf("binary text read accepted: lines=%v content=%q", lines, content)
+			}
+			if refs := w.MaterialReferences(); len(refs) != 0 {
+				t.Fatalf("failed text read recorded material use: %#v", refs)
+			}
+		}
+	}
+}
+
+func TestTextReadPreservesUnicodePageBoundary(t *testing.T) {
+	w, name := binaryWorkspace(t, []byte("中文🙂tail"))
+	result, err := w.Read(context.Background(), name, 1, 4)
+	if err != nil || result["content"] != "文" || result["next_offset"] != int64(6) {
+		t.Fatalf("unicode page: %#v %v", result, err)
+	}
+	if len(w.MaterialReferences()) != 1 {
+		t.Fatal("successful text read missing provenance")
+	}
+}
+
 func TestAndroidArchiveExpansionAndCountLimits(t *testing.T) {
 	for _, count := range []int{1, maxAndroidEntries + 1} {
 		var b bytes.Buffer
