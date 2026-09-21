@@ -70,10 +70,20 @@ func TestReadBudgetsAndCancel(t *testing.T) {
 	}
 }
 func TestMalformedHeader(t *testing.T) {
-	for _, b := range [][]byte{nil, make([]byte, 8), {255, 255, 255, 255, 255, 255, 255, 255}} {
-		if _, err := header(b); err == nil {
-			t.Fatal("accepted malformed header")
-		}
+	for _, tc := range []struct {
+		name string
+		data []byte
+	}{
+		{"nil", nil},
+		{"short", make([]byte, 8)},
+		{"negative il", []byte{0xe3, 0x30, 0x30, 0x30, 0x30, 0x30, 0x30, 0x30}},
+		{"all-ff", []byte{255, 255, 255, 255, 255, 255, 255, 255}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			if _, err := header(tc.data); err == nil {
+				t.Fatal("accepted malformed header")
+			}
+		})
 	}
 }
 func FuzzDatabase(f *testing.F) {

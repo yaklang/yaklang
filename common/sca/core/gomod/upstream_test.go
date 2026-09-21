@@ -116,29 +116,90 @@ func TestModuleID(t *testing.T) {
 // this tests the extracted lexer, not acceptance of these as require directives.
 func TestUpstreamLexPunctuation(t *testing.T) {
 	for _, tc := range []struct {
-		src  string
-		want []string
+		desc, src string
+		want      []string
 	}{
-		{"require ()", []string{"require", "(", ")"}},
-		{"require []{},", []string{"require", "[", "]", "{", "}", ","}},
-		{"require a[b]c{d}e,", []string{"require", "a", "[", "b", "]", "c", "{", "d", "}", "e", ","}},
-		{"require (\n\ta[b]\n)", []string{"require", "(", "a", "[", "b", "]", ")"}},
-		{"require [v1.0.0, v1.1.0)", []string{"require", "[", "v1.0.0", ",", "v1.1.0", ")"}},
+		{"paren", "require ()", []string{"require", "(", ")"}},
+		{"brackets", "require []{},", []string{"require", "[", "]", "{", "}", ","}},
+		{"mix", "require a[b]c{d}e,", []string{"require", "a", "[", "b", "]", "c", "{", "d", "}", "e", ","}},
+		{"block_mix", "require (\n\ta[b]\n)", []string{"require", "(", "a", "[", "b", "]", ")"}},
+		{"interval", "require [v1.0.0, v1.1.0)", []string{"require", "[", "v1.0.0", ",", "v1.1.0", ")"}},
 	} {
-		in := &input{complete: []byte(tc.src), remaining: []byte(tc.src), ctx: context.Background(), limits: Limits{MaxTokenBytes: 65536}, pos: Position{Line: 1, LineRune: 1}}
-		var got []string
-		for {
-			in.readToken()
-			if in.token.kind == _EOF {
-				break
+		t.Run(tc.desc, func(t *testing.T) {
+			in := &input{complete: []byte(tc.src), remaining: []byte(tc.src), ctx: context.Background(), limits: Limits{MaxTokenBytes: 65536}, pos: Position{Line: 1, LineRune: 1}}
+			var got []string
+			for {
+				in.readToken()
+				if in.token.kind == _EOF {
+					break
+				}
+				if in.token.kind != '\n' {
+					got = append(got, in.token.text)
+				}
 			}
-			if in.token.kind != '\n' {
-				got = append(got, in.token.text)
+			if !reflect.DeepEqual(got, tc.want) {
+				t.Fatalf("%q: %#v", tc.src, got)
 			}
+		})
+	}
+}
+
+// TestModulePath is the retained read-only subset of x/mod ModulePath.
+// Unicode and version-suffix path rules from x/mod are not claimed.
+func TestModulePath(t *testing.T) {
+	for _, tc := range []struct {
+		in   string
+		want bool
+	}{
+		{"example.com/mod", true},
+		{"github.com/a/b", true},
+		{"", false},
+		{"/abs", false},
+		{"a b", false},
+		{"a//b", false},
+		{"a\\b", false},
+		{"a\nb", false},
+	} {
+		name := tc.in
+		if name == "" {
+			name = "empty"
 		}
-		if !reflect.DeepEqual(got, tc.want) {
-			t.Fatalf("%q: %#v", tc.src, got)
-		}
+		t.Run(name, func(t *testing.T) {
+			if modulePath(tc.in) != tc.want {
+				t.Fatalf("modulePath(%q)=%v want %v", tc.in, modulePath(tc.in), tc.want)
+			}
+		})
+	}
+}
+
+// TestParseVersions covers x/mod TestParseVersions Strict go/toolchain
+// cases that apply to this grammar. ParseLax is out of scope.
+func TestParseVersions(t *testing.T) {
+	for _, tc := range []struct {
+		desc, input string
+		ok          bool
+	}{
+		{"empty", "module m\ngo \n", false},
+		{"one", "module m\ngo 1\n", false},
+		{"two", "module m\ngo 1.22\n", true},
+		{"three", "module m\ngo 1.22.333\n", true},
+		{"before", "module m\ngo v1.2\n", false},
+		{"after", "module m\ngo 1.2rc1\n", true},
+		{"space", "module m\ngo 1.2 3.4\n", false},
+		{"alt1", "module m\ngo 1.2.3\n", true},
+		{"alt2", "module m\ngo 1.2rc1\n", true},
+		{"alt3", "module m\ngo 1.2beta1\n", true},
+		{"alt4", "module m\ngo 1.2.beta1\n", false},
+		{"tool", "module m\ntoolchain go1.2\n", true},
+		{"tool4", "module m\ntoolchain default\n", true},
+		{"tool5", "module m\ntoolchain inconceivable!\n", false},
+	} {
+		t.Run(tc.desc, func(t *testing.T) {
+			_, err := Parse(context.Background(), []byte(tc.input), Limits{})
+			if (err == nil) != tc.ok {
+				t.Fatalf("input %q err=%v want ok=%v", tc.input, err, tc.ok)
+			}
+		})
 	}
 }
 func TestCanonicalModuleVersions(t *testing.T) {

@@ -73,6 +73,13 @@ func TestQuotesCommentsAndNoFinalNewline(t *testing.T) {
 	}
 }
 
+// TestComments is the retained read-only remainder of x/mod TestComments:
+// //indirect is kept as a declaration flag. Print/comment-block reconstruction
+// is out of scope.
+func TestComments(t *testing.T) {
+	t.Run("quotes-indirect", TestQuotesCommentsAndNoFinalNewline)
+}
+
 func FuzzParse(f *testing.F) {
 	for _, s := range []string{"", "module m\nrequire a v1.0.0", "require (\na v1.0.0\n)", "replace a => ../a", "retract [v1.0.0, v1.2.0]", "require \"\\q\" v1.0.0"} {
 		f.Add(s)
