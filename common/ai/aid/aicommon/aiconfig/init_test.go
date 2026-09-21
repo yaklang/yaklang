@@ -90,7 +90,7 @@ func TestLoadTieredConfigFromNetworkConfig_Enabled(t *testing.T) {
 	assert.True(t, IsConfigLoaded())
 }
 
-func TestLoadTieredConfigFromNetworkConfig_Disabled(t *testing.T) {
+func TestLoadTieredConfigFromNetworkConfig_LegacyDisabledFieldIgnored(t *testing.T) {
 	saveAndRestore(t)
 	consts.SetTieredAIConfig(nil)
 	ResetConfigLoaded()
@@ -107,9 +107,9 @@ func TestLoadTieredConfigFromNetworkConfig_Disabled(t *testing.T) {
 
 	cfg := consts.GetTieredAIConfig()
 	require.NotNil(t, cfg)
-	assert.False(t, cfg.Enabled, "DB says disabled, must be respected")
+	assert.False(t, cfg.Enabled, "legacy value is still preserved")
 	assert.True(t, IsConfigLoaded())
-	assert.False(t, consts.IsTieredAIModelConfigEnabled())
+	assert.True(t, consts.IsTieredAIModelConfigEnabled(), "config presence controls runtime routing")
 }
 
 func TestLoadTieredConfigFromNetworkConfig_EmptyPolicy(t *testing.T) {
@@ -171,8 +171,8 @@ func TestEnsureConfigLoaded_DBEnabled(t *testing.T) {
 	assert.True(t, consts.IsTieredAIModelConfigEnabled())
 }
 
-// DB returns disabled config. Must be respected -- defaults must NOT override.
-func TestEnsureConfigLoaded_DBDisabled(t *testing.T) {
+// The legacy disabled value is preserved but no longer disables routing.
+func TestEnsureConfigLoaded_LegacyDisabledFieldDoesNotDisableRouting(t *testing.T) {
 	saveAndRestore(t)
 	setupTempYakitHome(t)
 
@@ -192,9 +192,9 @@ func TestEnsureConfigLoaded_DBDisabled(t *testing.T) {
 
 	cfg := consts.GetTieredAIConfig()
 	require.NotNil(t, cfg)
-	assert.False(t, cfg.Enabled, "DB disabled config must NOT be overridden by defaults")
+	assert.False(t, cfg.Enabled, "legacy value is still preserved")
 	assert.True(t, IsConfigLoaded())
-	assert.False(t, consts.IsTieredAIModelConfigEnabled())
+	assert.True(t, consts.IsTieredAIModelConfigEnabled(), "loaded config is active regardless of legacy Enabled")
 }
 
 // No DB config, no in-memory config -> built-in defaults should be loaded.

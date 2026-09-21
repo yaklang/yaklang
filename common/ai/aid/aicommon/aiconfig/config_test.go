@@ -28,12 +28,12 @@ func TestIsTieredAIConfig(t *testing.T) {
 	// Reset to prevent EnsureConfigLoaded from interfering
 	ResetConfigLoaded()
 
-	// Test when disabled - set configLoaded to true to prevent auto-loading
+	// The legacy Enabled field does not disable an existing global config.
 	consts.SetTieredAIConfig(&consts.TieredAIConfig{
 		Enabled: false,
 	})
 	// Directly test consts function to avoid EnsureConfigLoaded interference
-	assert.False(t, consts.IsTieredAIModelConfigEnabled())
+	assert.True(t, consts.IsTieredAIModelConfigEnabled())
 
 	// Test when enabled
 	consts.SetTieredAIConfig(&consts.TieredAIConfig{

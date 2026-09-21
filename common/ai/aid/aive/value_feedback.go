@@ -147,19 +147,18 @@ func (p *valueFeedbackPool) tryEnqueue(cfg *aicommon.Config, record *aicommon.Va
 // submitValueFeedback 是注册进 aicommon 的 submitter 入口 (非阻塞投递).
 //
 // 硬约束: 价值评估只能走 lightweight tier (aibalance 的 memfit-light-free), 绝不
-// 回退到 legacy ai.Chat. 当宿主没有启用 tiered/lightweight 模型时 (离线 / 测试 /
-// 未接入 aibalance), 直接 no-op 丢弃, 不入队、不发起任何真实网络调用.
+// 回退到 legacy ai.Chat. 当宿主尚无 tiered 配置时 (离线 / 测试 / 未接入
+// aibalance), 直接 no-op 丢弃, 不入队、不发起任何真实网络调用.
 //
-// 关键: 这里只能用 consts.IsTieredAIModelConfigEnabled() 这种"纯读"探针来判定, 绝不
+// 关键: 这里只能用 consts.IsTieredAIModelConfigEnabled() 这种"纯读配置存在性"探针来判定, 绝不
 // 能调用 aicommon.GetLightweightAIModelCallback() / aiconfig.IsTieredAIConfig() —— 后
 // 两者会触发 EnsureConfigLoaded() 把"内建默认 tiered 配置 (aibalance)"懒加载并写入全
-// 局 consts, 从而把全局 tiered 开关由 false 翻成 true. 一旦在宿主线程 (尤其测试进程)
-// 里发生这种副作用, 后续所有依赖 WithAutoTieredAICallback 的逻辑都会绕过 mock 回调直
-// 连真实模型, 既污染单测又会发起真实网络调用. 价值评估只应"搭车"宿主已经启用的 tiered
-// 配置, 绝不能成为那个启用全局配置的人.
+// 局 consts. 一旦在宿主线程 (尤其测试进程) 里发生这种副作用, 后续所有依赖
+// WithAutoTieredAICallback 的逻辑都会绕过 mock 回调直连真实模型, 既污染单测又会发起
+// 真实网络调用. 价值评估只应"搭车"宿主已经加载的 tiered 配置, 绝不能成为加载者.
 func submitValueFeedback(cfg *aicommon.Config, record *aicommon.ValueFeedbackRecord) {
 	if !consts.IsTieredAIModelConfigEnabled() {
-		// 宿主尚未启用 tiered 配置: 价值评估直接放弃, 不入队、不触发任何全局副作用.
+		// 宿主尚无 tiered 配置: 价值评估直接放弃, 不入队、不触发任何全局副作用.
 		return
 	}
 	globalValueFeedbackPool.enqueue(cfg, record)

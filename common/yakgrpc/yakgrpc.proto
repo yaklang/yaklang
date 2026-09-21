@@ -9507,6 +9507,8 @@ message AIModelConfig {
 }
 
 message AIGlobalConfig {
+  // Legacy compatibility field. Runtime routing is controlled by the presence
+  // of AIGlobalConfig and no longer reads this value.
   bool Enabled = 1;
   string RoutingPolicy = 2;
   bool DisableFallback = 3;

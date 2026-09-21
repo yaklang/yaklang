@@ -17,7 +17,7 @@ func TestSingleModelLoadingDoesNotBackfillUnusedTiers(t *testing.T) {
 	EnsureConfigLoaded()
 
 	require.True(t, consts.IsSingleAIModelMode())
-	require.False(t, IsTieredAIConfig(), "single-model mode is independent of the legacy Enabled switch")
+	require.True(t, IsTieredAIConfig(), "the intelligent model makes the global config available")
 	require.Len(t, cfg.IntelligentModels, 1)
 	require.Empty(t, cfg.LightweightModels)
 	require.Empty(t, cfg.VisionModels)
