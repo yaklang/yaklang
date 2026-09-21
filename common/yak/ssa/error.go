@@ -3,6 +3,7 @@ package ssa
 import (
 	"errors"
 	"fmt"
+	"slices"
 	"strings"
 
 	"github.com/yaklang/yaklang/common/utils"
@@ -113,13 +114,25 @@ func (f *Function) NewError(kind ErrorKind, tag ErrorTag, format string) {
 	f.NewErrorWithPos(kind, tag, f.GetRange(), format)
 }
 
+func (prog *Program) errorOwner() *Program {
+	if app := prog.GetApplication(); app != nil {
+		return app
+	}
+	return prog
+}
+
 func (prog *Program) AddError(err *SSAError) {
-	app := prog.GetApplication()
+	app := prog.errorOwner()
+	app.errorsMu.Lock()
+	defer app.errorsMu.Unlock()
 	app.errors = append(app.errors, err)
 }
+
 func (prog *Program) GetErrors() SSAErrors {
-	errs := prog.errors
-	return errs
+	app := prog.errorOwner()
+	app.errorsMu.Lock()
+	defer app.errorsMu.Unlock()
+	return slices.Clone(app.errors)
 }
 
 func (errs SSAErrors) String() string {
