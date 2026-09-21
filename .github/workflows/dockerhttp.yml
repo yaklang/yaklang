@@ -1,0 +1,115 @@
+name: Docker HTTP contracts
+
+on:
+  pull_request:
+    branches: [main, codex/sca-minimal-dependency-core]
+    paths:
+      - 'common/dockerhttp/**'
+      - 'common/sca/**'
+      - 'common/thirdpartyservices/**'
+      - 'scannode/runtime_host*'
+      - 'scripts/ci/dockerhttp-fast.sh'
+      - '.github/workflows/dockerhttp.yml'
+      - 'go.mod'
+      - 'go.sum'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: dockerhttp-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  offline-contracts:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 10
+    env:
+      GOWORK: 'off'
+      GOTOOLCHAIN: local
+      DOCKERHTTP_TEST_BIN_DIR: /tmp/yak-dockerhttp-tests
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+      - name: Compile offline suites
+        run: scripts/ci/dockerhttp-fast.sh build
+      - name: Run all mocks and core contracts without external networking (10s budget)
+        run: |
+          sudo --preserve-env=DOCKERHTTP_TEST_BIN_DIR unshare --net bash -c '
+            set -e
+            ip link set lo up
+            timeout 10s scripts/ci/dockerhttp-fast.sh run
+          '
+      - name: Race detection
+        run: |
+          go test -race ./common/dockerhttp -count=1 -timeout=30s
+          go test -race scannode/runtime_host_docker.go scannode/runtime_host_docker_test.go -count=1 -timeout=30s
+      - name: Cross-compile Windows named pipe transport
+        run: |
+          go mod download github.com/Microsoft/go-winio golang.org/x/sys
+          GOOS=windows GOARCH=amd64 go test -c -o /tmp/dockerhttp-windows.test.exe ./common/dockerhttp
+      - name: Reject obsolete Docker SDK dependencies
+        run: |
+          python3 - <<'PY'
+          import re
+          from pathlib import Path
+          forbidden = r'github\.com/(?:docker/|moby/|gogo/protobuf(?:\s|/))'
+          for name in ('go.mod', 'go.sum'):
+              hits = [line for line in Path(name).read_text().splitlines() if re.search(forbidden, line)]
+              if hits:
+                  raise SystemExit(f'{name}: obsolete dependencies: {hits}')
+          PY
+
+  callsite-regressions:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 20
+    env:
+      GOWORK: 'off'
+      GOTOOLCHAIN: local
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+      - name: Install native dependencies
+        run: sudo apt-get update && sudo apt-get install -y libpcap-dev libpcre2-dev
+      - name: Runtime host and service call sites
+        run: |
+          go test ./scannode -run '^(TestDockerRuntime|TestRuntimeHost|TestResilienceRuntimeHost)' -count=1 -timeout=2m
+          go test ./common/thirdpartyservices -count=1 -timeout=30s
+      - name: Preserve SCA zero-dependency baseline
+        run: |
+          CGO_ENABLED=0 go test ./common/sca/... -count=1 -timeout=2m
+          python3 scripts/sca/dependency_audit.py
+          python3 scripts/sca/dependency_audit.py --test
+          python3 scripts/sca/verify_artifacts.py
+      - name: Audit actual migrated test dependency closures
+        run: |
+          go list -mod=readonly -deps -test -f '{{if .Module}}{{.Module.Path}}{{end}}' ./scannode ./common/thirdpartyservices ./common/dockerhttp > /tmp/docker-modules.txt
+          python3 - <<'PY'
+          from pathlib import Path
+          forbidden = ('github.com/docker/', 'github.com/moby/', 'github.com/gogo/protobuf')
+          hits = sorted({line for line in Path('/tmp/docker-modules.txt').read_text().splitlines() if line.startswith(forbidden)})
+          if hits:
+              raise SystemExit(f'Obsolete modules in test closure: {hits}')
+          PY
+
+  windows-pipe:
+    runs-on: windows-latest
+    timeout-minutes: 10
+    env:
+      GOWORK: 'off'
+      GOTOOLCHAIN: local
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+      - name: Test named-pipe HTTP and cancellation with a local mock
+        run: go test ./common/dockerhttp -run '^TestWindows' -count=1 -timeout=10s
