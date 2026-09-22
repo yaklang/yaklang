@@ -40,6 +40,8 @@ import (
 //go:embed testdata/poetry_lock_v2_1_corpus_v1.zip
 //go:embed testdata/nuget_lock_v1_v2_corpus_v1.zip
 //go:embed testdata/swift_resolved_v1_v2_v3_corpus_v1.zip
+//go:embed testdata/uv_lock_v1_rev0_3_corpus_v1.zip
+//go:embed testdata/bun_lock_v0_v3_corpus_v1.zip
 var fixtureArchives embed.FS
 
 var fixtures = testcheck.MustLoadFixtures(fixtureArchives)

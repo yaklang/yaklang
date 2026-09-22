@@ -961,6 +961,124 @@
       ]
     },
     {
+      "local_file": "common/sca/analyzer/dep-parser/modernlock/bun.go",
+      "decision": "OWNED_IMPLEMENTATION",
+      "reason": "Bounded static uv/Bun lock reader from published format contracts; no acquisition or package-manager runtime.",
+      "yak_baseline_sha256": null,
+      "upstream": [],
+      "maintenance_owner": "yaklang/yaklang SCA maintainers",
+      "review": "pinned official old/current fixtures and independent inventory/declaration projections",
+      "tests": [
+        "uv_bun_lock_test.go"
+      ],
+      "sha256": "9a137d0bcec54c43c88897ee625727148d2a6835d079a98b07ba4d0d8364a766",
+      "symbols": [
+        {
+          "name": "Bun",
+          "line": 17
+        },
+        {
+          "name": "bunInfo",
+          "line": 18
+        },
+        {
+          "name": "bunLock",
+          "line": 29
+        },
+        {
+          "name": "bunPath",
+          "line": 40
+        },
+        {
+          "name": "bunParent",
+          "line": 58
+        },
+        {
+          "name": "bunTarget",
+          "line": 73
+        },
+        {
+          "name": "bunObject",
+          "line": 74
+        },
+        {
+          "name": "bunString",
+          "line": 75
+        },
+        {
+          "name": "bunInfoDecode",
+          "line": 85
+        },
+        {
+          "name": "bunRecord",
+          "line": 126
+        },
+        {
+          "name": "Bun.Parse",
+          "line": 133
+        }
+      ]
+    },
+    {
+      "local_file": "common/sca/analyzer/dep-parser/modernlock/uv.go",
+      "decision": "OWNED_IMPLEMENTATION",
+      "reason": "Bounded static uv/Bun lock reader from published format contracts; no acquisition or package-manager runtime.",
+      "yak_baseline_sha256": null,
+      "upstream": [],
+      "maintenance_owner": "yaklang/yaklang SCA maintainers",
+      "review": "pinned official old/current fixtures and independent inventory/declaration projections",
+      "tests": [
+        "uv_bun_lock_test.go"
+      ],
+      "sha256": "f18150ddef06aadd0a7b86536866b4c5722af17af7de37eaa459dd70964b2506",
+      "symbols": [
+        {
+          "name": "UV",
+          "line": 21
+        },
+        {
+          "name": "bad",
+          "line": 23
+        },
+        {
+          "name": "encoded",
+          "line": 24
+        },
+        {
+          "name": "str",
+          "line": 25
+        },
+        {
+          "name": "stringsOf",
+          "line": 26
+        },
+        {
+          "name": "uvSource",
+          "line": 44
+        },
+        {
+          "name": "uvName",
+          "line": 71
+        },
+        {
+          "name": "uvArtifacts",
+          "line": 86
+        },
+        {
+          "name": "uvRecord",
+          "line": 126
+        },
+        {
+          "name": "UV.Parse",
+          "line": 131
+        },
+        {
+          "name": "jsonc",
+          "line": 368
+        }
+      ]
+    },
+    {
       "local_file": "common/sca/analyzer/dep-parser/nodejs/npm/parse.go",
       "sha256": "3b12459defa4a9fe436022a9ae60ca7081432e52d18392f830bf8698d93529ea",
       "symbols": [
@@ -2146,31 +2264,39 @@
       "tests": [
         "ecosystem_lock_test.go"
       ],
-      "sha256": "cc87caf35ec483500ae5299c9b9b1070187fc26ae72b691a9c4fdb09a76569dd",
+      "sha256": "20a85366ddae9d0d3499463ff143b17d7ca71dbe5f8b02b0ca0a41eebdf58487",
       "symbols": [
         {
           "name": "lockedJSONAnalyzer",
-          "line": 14
+          "line": 17
         },
         {
           "name": "init",
-          "line": 19
+          "line": 22
         },
         {
           "name": "lockedJSONAnalyzer.Match",
-          "line": 23
+          "line": 28
         },
         {
           "name": "lockedJSONAnalyzer.Analyze",
-          "line": 29
+          "line": 34
         },
         {
           "name": "NewNugetAnalyzer",
-          "line": 33
+          "line": 38
         },
         {
           "name": "NewSwiftAnalyzer",
-          "line": 36
+          "line": 41
+        },
+        {
+          "name": "NewUVAnalyzer",
+          "line": 45
+        },
+        {
+          "name": "NewBunAnalyzer",
+          "line": 46
         }
       ]
     },
@@ -5016,7 +5142,7 @@
     },
     {
       "local_file": "common/sca/exports.go",
-      "sha256": "f6564d9f7e706ef035d501f25cc5647f480c3b6f9e99d410d0d6530e7f511372",
+      "sha256": "d11e49d5b97bbcf0bcabac279609d7fe2f5938bfff74ed314a3b5f079c0ccf7b",
       "symbols": [],
       "decision": "REWRITE",
       "reason": "Owned bounded implementation or compatibility conversion; no old runtime fallback.",
@@ -5572,7 +5698,7 @@
     },
     {
       "local_file": "common/sca/pipeline.go",
-      "sha256": "cbc19d36d4d0efee2bcc216c3ad59d936baf41b5a1c6940c3250e52dcd20b712",
+      "sha256": "0aa83ae810f0ef81ee2cbc5740735503a1074ac0eac2f9fd4b37bb77d36e06d8",
       "symbols": [
         {
           "name": "material",
