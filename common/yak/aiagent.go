@@ -140,7 +140,8 @@ func YakTool2AITool(aitools []*schema.AIYakTool) []*aitool.Tool {
 
 // YakTool2AIToolWithForgeHandle additionally supports a declared forgeHandle
 // entrypoint when no explicit RESULT was produced. This opt-in keeps ordinary
-// Yak tool semantics unchanged. It is not a permissions sandbox.
+// Yak tool semantics unchanged, including observation-only tools without an
+// explicit return value. It is not a permissions sandbox.
 func YakTool2AIToolWithForgeHandle(aitools []*schema.AIYakTool) []*aitool.Tool {
 	return yakTool2AITool(aitools, true)
 }
@@ -283,7 +284,11 @@ func yakTool2AITool(aitools []*schema.AIYakTool, invokeForgeHandle bool) []*aito
 							}
 							return result, err
 						}
-						return nil, fmt.Errorf("Forge tool has neither RESULT nor forgeHandle")
+						// Opting into forgeHandle support must not require every
+						// original Yak tool to implement that optional entrypoint.
+						// Native observation-only tools already emit through the
+						// captured Yakit feedback channel; preserve their semantics.
+						return nil, nil
 					}
 				}
 				return nil, nil
