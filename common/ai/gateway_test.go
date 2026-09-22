@@ -27,6 +27,31 @@ func TestExportsReasoningEffortOption(t *testing.T) {
 	require.IsType(t, (func(string) aispec.AIConfigOption)(nil), option)
 }
 
+func TestModelInfoCallbacksIncludeThinkingLevelAndKeepLegacyCompatibility(t *testing.T) {
+	const provider = "test-resolved-model-info"
+	aispec.Register(provider, func() aispec.AIClient { return &TestGateway{} })
+
+	var gotProvider, gotModel, gotThinking string
+	var confirmedProvider, confirmedModel string
+	_, err := Chat("hello",
+		aispec.WithType(provider),
+		aispec.WithModel("resolved-model"),
+		aispec.WithThinkingLevel("none"),
+		aispec.WithModelInfoCallback(func(provider, model, thinkingLevel string) {
+			gotProvider, gotModel, gotThinking = provider, model, thinkingLevel
+		}),
+		aispec.WithModelInfoConfirmCallback(func(provider, model string) {
+			confirmedProvider, confirmedModel = provider, model
+		}),
+	)
+	require.NoError(t, err)
+	require.Equal(t, provider, gotProvider)
+	require.Equal(t, "resolved-model", gotModel)
+	require.Equal(t, "none", gotThinking)
+	require.Equal(t, provider, confirmedProvider)
+	require.Equal(t, "resolved-model", confirmedModel)
+}
+
 func TestDashscope_Search(t *testing.T) {
 	if utils.InGithubActions() {
 		return

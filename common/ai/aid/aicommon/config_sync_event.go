@@ -50,13 +50,7 @@ func (c *Config) HandleSyncConsumptionEvent(e *ypb.AIInputEvent) error {
 	c.EmitSyncJSON(
 		schema.EVENT_TYPE_CONSUMPTION,
 		"system",
-		map[string]any{
-			"input_consumption":  c.GetInputConsumption(),
-			"output_consumption": c.GetOutputConsumption(),
-			"cache_hit_token":    c.GetCacheHitToken(),
-			"consumption_uuid":   c.GetConsumptionUUID(),
-			"tier_consumption":   c.GetTierConsumptionSnapshot(),
-		},
+		c.BuildConsumptionPayload(),
 		e.SyncID,
 	)
 	return nil

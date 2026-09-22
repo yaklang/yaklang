@@ -67,6 +67,7 @@ type AIResponse struct {
 	providerName     string
 	modelName        string
 	modelVerboseName string
+	thinkingLevel    string
 
 	firstOutputByteTime time.Time
 	totalOutputBytes    atomic.Int64
@@ -305,6 +306,24 @@ func (a *AIResponse) GetModelVerboseName() string {
 	a.modelInfoMu.RLock()
 	defer a.modelInfoMu.RUnlock()
 	return a.modelVerboseName
+}
+
+func (a *AIResponse) SetThinkingLevel(level string) {
+	if a == nil {
+		return
+	}
+	a.modelInfoMu.Lock()
+	a.thinkingLevel = level
+	a.modelInfoMu.Unlock()
+}
+
+func (a *AIResponse) GetThinkingLevel() string {
+	if a == nil {
+		return ""
+	}
+	a.modelInfoMu.RLock()
+	defer a.modelInfoMu.RUnlock()
+	return a.thinkingLevel
 }
 
 func (a *AIResponse) GetAIEventMeta() AIEventMeta {
@@ -870,6 +889,8 @@ func TeeAIResponse(
 	refreshFromSrc := func() {
 		first.SetModelInfo(src.GetProviderName(), src.GetModelName())
 		second.SetModelInfo(src.GetProviderName(), src.GetModelName())
+		first.SetThinkingLevel(src.GetThinkingLevel())
+		second.SetThinkingLevel(src.GetThinkingLevel())
 		src.rawHTTPResponseHeaderMu.Lock()
 		headerCopy := src.rawHTTPResponseHeader
 		bodyCopy := src.rawHTTPResponseBody
