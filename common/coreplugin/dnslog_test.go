@@ -8,6 +8,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/consts"
@@ -30,16 +31,18 @@ type localDNSLog struct {
 	grpc      *grpc.Server
 	listener  net.Listener
 	previous  string
+	closeOnce sync.Once
+	done      chan struct{}
 }
 
-func startLocalDNSLog() *localDNSLog {
+func startLocalDNSLog(options ...grpc.ServerOption) *localDNSLog {
 	lis, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
 		panic(err)
 	}
-	d := &localDNSLog{events: make(map[string]*tpb.DNSLogEvent), domains: make(map[string]string), grpc: grpc.NewServer(), listener: lis, previous: consts.GetDefaultPublicReverseServer()}
+	d := &localDNSLog{events: make(map[string]*tpb.DNSLogEvent), domains: make(map[string]string), grpc: grpc.NewServer(append(options, grpc.WaitForHandlers(true))...), done: make(chan struct{}), listener: lis, previous: consts.GetDefaultPublicReverseServer()}
 	tpb.RegisterDNSLogServer(d.grpc, d)
-	go d.grpc.Serve(lis)
+	go func() { defer close(d.done); _ = d.grpc.Serve(lis) }()
 	consts.SetDefaultPublicReverseServer(lis.Addr().String())
 	return d
 }
@@ -78,15 +81,21 @@ func (d *localDNSLog) ObserveDomain(domain string) {
 }
 
 func (d *localDNSLog) Close() {
-	d.grpc.Stop()
-	_ = d.listener.Close()
-	for _, callback := range d.callbacks {
-		callback.Close()
-	}
-	consts.SetDefaultPublicReverseServer(d.previous)
+	d.closeOnce.Do(func() {
+		// RequireDomain may allocate callbacks after its client disconnects.
+		// Join those handlers before traversing and closing their listeners.
+		d.grpc.Stop()
+		_ = d.listener.Close()
+		<-d.done
+		for _, callback := range d.callbacks {
+			callback.Close()
+		}
+		consts.SetDefaultPublicReverseServer(d.previous)
+	})
 }
 
 func TestLocalDNSLog(t *testing.T) {
+	t.Run("close waits for domain allocation", testDNSLogCloseWaitsForHandlers)
 	addr := consts.GetDefaultPublicReverseServer()
 	domain, token, _, err := cybertunnel.RequireDNSLogDomainByRemote(addr, "")
 	require.NoError(t, err)
@@ -110,4 +119,66 @@ func TestLocalDNSLog(t *testing.T) {
 	events, err = cybertunnel.QueryExistedDNSLogEventsEx(addr, other, "", 1)
 	require.NoError(t, err)
 	require.Empty(t, events)
+}
+
+func testDNSLogCloseWaitsForHandlers(t *testing.T) {
+	const requests = 8
+	entered := make(chan struct{}, requests)
+	release := make(chan struct{})
+	var releaseOnce sync.Once
+	unblock := func() { releaseOnce.Do(func() { close(release) }) }
+	d := startLocalDNSLog(grpc.UnaryInterceptor(func(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (interface{}, error) {
+		entered <- struct{}{}
+		<-release
+		return handler(ctx, req)
+	}))
+	t.Cleanup(d.Close)
+	t.Cleanup(unblock)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	conn, err := grpc.DialContext(ctx, d.listener.Addr().String(), grpc.WithInsecure(), grpc.WithBlock())
+	require.NoError(t, err)
+	defer conn.Close()
+	client := tpb.NewDNSLogClient(conn)
+	replies := make(chan error, requests)
+	for i := 0; i < requests; i++ {
+		go func() { _, err := client.RequireDomain(ctx, &tpb.RequireDomainParams{}); replies <- err }()
+	}
+	for i := 0; i < requests; i++ {
+		select {
+		case <-entered:
+		case <-ctx.Done():
+			t.Fatal("RPC did not enter handler")
+		}
+	}
+	closed := make(chan struct{})
+	go func() { d.Close(); close(closed) }()
+	// Stop cancels the active RPCs while their handlers are still behind the gate.
+	for i := 0; i < requests; i++ {
+		select {
+		case err := <-replies:
+			require.Error(t, err)
+		case <-ctx.Done():
+			t.Fatal("Stop did not cancel RPCs")
+		}
+	}
+	select {
+	case <-closed:
+		t.Error("Close returned before callback allocation finished")
+	case <-time.After(100 * time.Millisecond): // Bound the assertion; channels establish the window.
+	}
+	unblock()
+	select {
+	case <-closed:
+	case <-ctx.Done():
+		t.Fatal("Close did not join handlers")
+	}
+	require.Len(t, d.callbacks, requests)
+	for _, callback := range d.callbacks {
+		conn, err := net.DialTimeout("tcp", callback.Listener.Addr().String(), time.Second)
+		if conn != nil {
+			conn.Close()
+		}
+		require.Error(t, err, "callback listener leaked: %s", callback.URL)
+	}
 }

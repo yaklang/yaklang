@@ -1130,11 +1130,12 @@ jobs:
       matrix:
         include:
           - name: "Test gRPC deterministic boundaries"
+            shuffle: "on"
             artifact_name: "essential-tests-yakgrpc"
             artifact_file: "essential-tests-yakgrpc.tar.gz"
             test_configs: |
               [
-                {"package": "./common/yakgrpc", "timeout": "2m", "run": "^(TestInMemoryClient|TestUploadPayloadToOnline|TestDownloadPayload|TestUploadHotPatchTemplateToOnline|TestDownloadHotPatchTemplate|TestProbeReasoningEffort.*|TestIsLikelyErrorResponse|TestUploadSyntaxFlowRule|TestDownloadSyntaxFlowRule|TestSyntaxFlowOnlineFailures|TestGetApiKey_ReplaceAPIKeys|TestDoHTTPFlowsToOnline|TestSSARiskFeedbackToOnline)$"}
+                {"package": "./common/yakgrpc", "timeout": "2m", "run": "^(TestInMemoryClient|TestUploadPayloadToOnline|TestDownloadPayload|TestUploadHotPatchTemplateToOnline|TestDownloadHotPatchTemplate|TestProbeReasoningEffort.*|TestIsLikelyErrorResponse|TestUploadSyntaxFlowRule|TestDownloadSyntaxFlowRule|TestSyntaxFlowOnlineFailures|TestGetApiKey_ReplaceAPIKeys|TestAIGlobalConfig_GRPC_Local|TestUpdateApiKey_ReplaceAllAPIKeys|TestDoHTTPFlowsToOnline|TestSSARiskFeedbackToOnline)$"}
               ]
 
           - name: "Test gRPC MUSTPASS MITM"
@@ -1212,7 +1213,7 @@ jobs:
                 {"package": "./common/yakgrpc/yakit", "timeout": "2m", "run": "^TestMUSTPASS_(UpdateMCPServer|SyncAndCache|McpServerEndpoint|MCPServerToolFullName|MigrateMCPServer|MigrateMCPClientBridge|DeleteMCPServer|MCPServerUserJourney|GetMCPServerToolConfigByFullName).*$"},
                 {"package": "./common/yakgrpc/...", "timeout": "4m", "run": "^TestGRPCMUSTPASS_StartMcpServer_.*$", "retry": 1, "retry_delay": 5},
                 {"package": "./common/yakgrpc/yakit", "timeout": "10m", "skip": "^TestMUSTPASS.*$"},
-                {"package": "./common/yakgrpc/...", "timeout": "10m", "exclude_packages": ["./common/yakgrpc/yakit/...", "./common/yakgrpc/airaghttp/...", "./common/yakgrpc/aihttp/tests/..."], "skip": "^(TestMiTMPlugins|TestInMemoryClient|TestUploadPayloadToOnline|TestDownloadPayload|TestUploadHotPatchTemplateToOnline|TestDownloadHotPatchTemplate|TestProbeReasoningEffort.*|TestIsLikelyErrorResponse|TestUploadSyntaxFlowRule|TestDownloadSyntaxFlowRule|TestSyntaxFlowOnlineFailures|TestGetApiKey_ReplaceAPIKeys|TestDoHTTPFlowsToOnline|TestSSARiskFeedbackToOnline|TestGRPCMUSTPASS_PluginTrace.*|TestGRPCMUSTPASS_AnalyzeHTTPFlow.*|TestGRPCMUSTPASS_Fingerprint.*|TestGRPCMUSTPASS_HTTP_.*|TestGRPCMUSTPASS_HTTPFlowSlowSQL|TestGRPCMUSTPASS_HTTPFUZZER.*|TestGRPCMUSTPASS_HTTPFuzzer.*|TestAITaskWith.*|TestGRPCMUSTPASS_MITM.*|TestGRPCMUSTPASS_MITMV2.*|TestGRPCMUSTPASS_LANGUAGE.*|TestGRPCMUSTPASS_COMMON.*|TestGRPCMUSTPASS_HybridScan.*|TestLARGEGRPCMUSTPASS.*|TestGRPCMUSTPASS_SyntaxFlow.*|TestGRPCMUSTPASS_SSA.*|TestGRPCMUSTPASS_FuzzerConfig|TestGRPCMUSTPASS_MaxSize|TestPBTest|TestLargePayload|TestGRPCMUSTPASS_AIForge.*|TestGRPCMUSTPASS_RequestYakURL.*|TestGRPCMUSTPASS_StartMcpServer_.*)$", "retry": 1, "retry_delay": 5}
+                {"package": "./common/yakgrpc/...", "timeout": "10m", "exclude_packages": ["./common/yakgrpc/yakit/...", "./common/yakgrpc/airaghttp/...", "./common/yakgrpc/aihttp/tests/..."], "skip": "^(TestMiTMPlugins|TestInMemoryClient|TestUploadPayloadToOnline|TestDownloadPayload|TestUploadHotPatchTemplateToOnline|TestDownloadHotPatchTemplate|TestProbeReasoningEffort.*|TestIsLikelyErrorResponse|TestUploadSyntaxFlowRule|TestDownloadSyntaxFlowRule|TestSyntaxFlowOnlineFailures|TestGetApiKey_ReplaceAPIKeys|TestAIGlobalConfig_GRPC_Local|TestUpdateApiKey_ReplaceAllAPIKeys|TestDoHTTPFlowsToOnline|TestSSARiskFeedbackToOnline|TestGRPCMUSTPASS_PluginTrace.*|TestGRPCMUSTPASS_AnalyzeHTTPFlow.*|TestGRPCMUSTPASS_Fingerprint.*|TestGRPCMUSTPASS_HTTP_.*|TestGRPCMUSTPASS_HTTPFlowSlowSQL|TestGRPCMUSTPASS_HTTPFUZZER.*|TestGRPCMUSTPASS_HTTPFuzzer.*|TestAITaskWith.*|TestGRPCMUSTPASS_MITM.*|TestGRPCMUSTPASS_MITMV2.*|TestGRPCMUSTPASS_LANGUAGE.*|TestGRPCMUSTPASS_COMMON.*|TestGRPCMUSTPASS_HybridScan.*|TestLARGEGRPCMUSTPASS.*|TestGRPCMUSTPASS_SyntaxFlow.*|TestGRPCMUSTPASS_SSA.*|TestGRPCMUSTPASS_FuzzerConfig|TestGRPCMUSTPASS_MaxSize|TestPBTest|TestLargePayload|TestGRPCMUSTPASS_AIForge.*|TestGRPCMUSTPASS_RequestYakURL.*|TestGRPCMUSTPASS_StartMcpServer_.*)$", "retry": 1, "retry_delay": 5}
               ]
     steps:
       - name: Checkout
@@ -1264,6 +1265,7 @@ jobs:
           export TEST_TIMEOUT="2m"
           export TEST_VERBOSE="1"
           export TEST_CONFIG="${{ runner.temp }}/test_config.json"
+          export TEST_SHUFFLE="${{ matrix.shuffle || 'off' }}"
           export SUITE_NAME="${{ matrix.name }}"
           export SUITE_NEEDS_GRPC="0"
           export SUITE_SYNC_RULE="${{ matrix.sync_rule == '1' && '1' || '0' }}"
