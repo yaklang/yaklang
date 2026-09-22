@@ -1343,7 +1343,7 @@
     },
     {
       "local_file": "common/sca/analyzer/dep-parser/python/poetry/parse.go",
-      "sha256": "8c2a7fde6ab2d0b599a3e33026a7e19f49ecc876b39f94d1991e59a1dbd6996d",
+      "sha256": "9a877a23a1255a5ee70d90ee93a7c350bdaa5550338a5e42f96a66d3803d4567",
       "symbols": [
         {
           "name": "poetrySource",
@@ -1387,39 +1387,39 @@
         },
         {
           "name": "extrasText",
-          "line": 252
+          "line": 255
         },
         {
           "name": "poetryIdent",
-          "line": 283
+          "line": 286
         },
         {
           "name": "poetryNativeID",
-          "line": 287
+          "line": 290
         },
         {
           "name": "parseIndex",
-          "line": 292
+          "line": 295
         },
         {
           "name": "parseDependencies",
-          "line": 309
+          "line": 312
         },
         {
           "name": "parseDependency",
-          "line": 324
+          "line": 327
         },
         {
           "name": "normalizePkgName",
-          "line": 336
+          "line": 339
         },
         {
           "name": "decodeLock",
-          "line": 345
+          "line": 348
         },
         {
           "name": "validateDependencies",
-          "line": 502
+          "line": 505
         }
       ],
       "decision": "TRIM_AND_REWRITE",
