@@ -98,5 +98,28 @@ func IsValidBool(raw string) bool {
 }
 
 func IsValidHost(raw string) bool {
-	return IsValidDomain(raw) || IsIPv4(raw) || IsIPv6(raw)
+	if IsValidDomain(raw) || IsIPv4(raw) || IsIPv6(raw) {
+		return true
+	}
+	host, ok := hostFromHostPort(raw)
+	if !ok {
+		return false
+	}
+	return IsValidDomain(host) || IsIPv4(host) || IsIPv6(host)
+}
+
+// hostFromHostPort strips a numeric port from host:port or [ipv6]:port.
+// URLs with a scheme are rejected so callers that pass a raw URL stay invalid.
+func hostFromHostPort(raw string) (string, bool) {
+	if raw == "" || strings.Contains(raw, "://") {
+		return "", false
+	}
+	host, port, err := net.SplitHostPort(raw)
+	if err != nil || host == "" || port == "" {
+		return "", false
+	}
+	if _, err := strconv.Atoi(port); err != nil {
+		return "", false
+	}
+	return host, true
 }
