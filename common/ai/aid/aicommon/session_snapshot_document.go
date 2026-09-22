@@ -342,6 +342,12 @@ func (s *sessionSnapshotDocumentStore) buildCumulativeExecutionLocked(c *Config,
 			continue
 		}
 		exec := task.Snapshot.Execution
+		result.ExecutionRounds += exec.ExecutionRounds
+		for _, attempt := range task.PreviousAttempts {
+			if attempt.Snapshot != nil && attempt.Snapshot.Execution != nil {
+				result.ExecutionRounds += attempt.Snapshot.Execution.ExecutionRounds
+			}
+		}
 		if result.StartedAt == 0 || exec.StartedAt > 0 && exec.StartedAt < result.StartedAt {
 			result.StartedAt = exec.StartedAt
 		}

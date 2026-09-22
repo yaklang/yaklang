@@ -29,4 +29,18 @@ func TestBuildSessionSnapshot_AlwaysEmitsFullPayload(t *testing.T) {
 	var execution map[string]any
 	require.NoError(t, json.Unmarshal(payload["execution"], &execution))
 	require.Equal(t, "processing", execution["status"])
+	require.Contains(t, execution, "execution_rounds")
+}
+
+func TestBuildSessionSnapshot_ExecutionRoundsFromLoop(t *testing.T) {
+	cfg := aicommon.NewConfig(context.Background(), aicommon.WithDisableAutoSkills(true))
+	loop := NewMinimalReActLoop(cfg, nil)
+	task := aicommon.NewStatefulTaskBase("rounds-task", "input", context.Background(), nil, true)
+	loop.SetCurrentTask(task)
+	loop.currentIterationIndex = 4
+
+	snapshot := BuildSessionSnapshot(cfg, loop, task)
+	require.NotNil(t, snapshot)
+	require.NotNil(t, snapshot.Execution)
+	require.Equal(t, 4, snapshot.Execution.ExecutionRounds)
 }

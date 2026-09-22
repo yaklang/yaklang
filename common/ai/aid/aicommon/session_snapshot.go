@@ -55,10 +55,12 @@ type SessionSnapshotExecution struct {
 	EndedAt   int64  `json:"ended_at"`
 	// Legacy wire names retained for frontend compatibility. These count
 	// protocol-completed and protocol-failed calls, not execution outcomes.
-	ToolCallSuccess   int `json:"tool_call_success"`
-	ToolCallFailed    int `json:"tool_call_failed"`
-	ToolCallTotal     int `json:"tool_call_total"`
-	ExecutionMinutes  int `json:"execution_minutes"`
+	ToolCallSuccess  int `json:"tool_call_success"`
+	ToolCallFailed   int `json:"tool_call_failed"`
+	ToolCallTotal    int `json:"tool_call_total"`
+	ExecutionMinutes int `json:"execution_minutes"`
+	// ExecutionRounds is the raw number of ReAct loop iterations executed.
+	ExecutionRounds   int `json:"execution_rounds"`
 	HTTPFlowCount     int `json:"http_flow_count"`
 	RiskCount         int `json:"risk_count"`
 	ModifiedFileCount int `json:"modified_file_count"`

@@ -39,12 +39,15 @@ func TestSessionSnapshotDocument_PersistsCumulativeAndTaskViews(t *testing.T) {
 	cfg.RecordSessionSnapshotFileWrite("/tmp/a.txt")
 	cfg.FinalizeSessionSnapshotExecution("completed", startedAt.Add(2*time.Minute))
 
+	task1Execution := cfg.BuildSessionSnapshotExecution(task1)
+	task1Execution.ExecutionRounds = 3
 	first := cfg.MaterializeSessionSnapshot(task1, &SessionSnapshot{
 		Revision:  1,
 		UpdatedAt: startedAt.Unix(),
-		Execution: cfg.BuildSessionSnapshotExecution(task1),
+		Execution: task1Execution,
 	})
 	require.Equal(t, 1, first.Execution.ToolCallTotal)
+	require.Equal(t, 3, first.Execution.ExecutionRounds)
 	require.Equal(t, 1, first.Execution.ModifiedFileCount, "session count is unique modified paths")
 	require.Len(t, first.Tasks, 1)
 	require.True(t, first.Tasks[0].IsFinal)
@@ -54,12 +57,15 @@ func TestSessionSnapshotDocument_PersistsCumulativeAndTaskViews(t *testing.T) {
 	task2.SetName("second task")
 	cfg.ResetSessionSnapshotExecution(task2.GetName(), "processing", startedAt.Add(3*time.Minute))
 	cfg.RecordSessionSnapshotToolCall(&aitool.ToolResult{ToolCallID: "call-2", Success: false})
+	task2Execution := cfg.BuildSessionSnapshotExecution(task2)
+	task2Execution.ExecutionRounds = 2
 	second := cfg.MaterializeSessionSnapshot(task2, &SessionSnapshot{
 		Revision:  1,
 		UpdatedAt: startedAt.Add(3 * time.Minute).Unix(),
-		Execution: cfg.BuildSessionSnapshotExecution(task2),
+		Execution: task2Execution,
 	})
 	require.Equal(t, 2, second.Execution.ToolCallTotal)
+	require.Equal(t, 5, second.Execution.ExecutionRounds)
 	require.Equal(t, 1, second.Execution.ToolCallSuccess)
 	require.Equal(t, 1, second.Execution.ToolCallFailed)
 	require.Len(t, second.Tasks, 2)
@@ -71,18 +77,22 @@ func TestSessionSnapshotDocument_PersistsCumulativeAndTaskViews(t *testing.T) {
 	require.NoError(t, json.Unmarshal([]byte(raw), &persisted))
 	require.Len(t, persisted.Tasks, 2)
 	require.Equal(t, 2, persisted.Session.Execution.ToolCallTotal)
+	require.Equal(t, 5, persisted.Session.Execution.ExecutionRounds)
 
 	restored := NewConfig(context.Background(), WithPersistentSessionId(sessionID), WithDisableAutoSkills(true))
 	restoredTask := restored.GetSessionTaskSnapshot("task-1")
 	require.NotNil(t, restoredTask)
 	require.True(t, restoredTask.IsFinal)
 	require.Equal(t, 1, restoredTask.Snapshot.Execution.ToolCallTotal)
+	require.Equal(t, 3, restoredTask.Snapshot.Execution.ExecutionRounds)
 
 	restored.SetHotpatchCurrentTaskIdResolver(func() string { return "task-1" })
 	BeginSessionSnapshotExecutionForTask(restored, task1, startedAt.Add(5*time.Minute))
-	restored.MaterializeSessionSnapshot(task1, &SessionSnapshot{
+	retriedSession := restored.MaterializeSessionSnapshot(task1, &SessionSnapshot{
 		Execution: restored.BuildSessionSnapshotExecution(task1),
 	})
+	require.Equal(t, 5, retriedSession.Execution.ExecutionRounds,
+		"session rounds retain previous task attempts")
 	retried := restored.GetSessionTaskSnapshot("task-1")
 	require.NotNil(t, retried)
 	require.Equal(t, 2, retried.Attempt)
