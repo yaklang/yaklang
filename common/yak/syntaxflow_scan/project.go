@@ -3,7 +3,6 @@ package syntaxflow_scan
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"os"
 	"strings"
@@ -60,15 +59,6 @@ func ScanProject(ctx context.Context, opts ...ssaconfig.Option) (result ProjectR
 		return ProjectResult{}, err
 	}
 	ssaconfig.ApplyExtraOptions(cfg, cfg.Config)
-	// The project owns one report across source, compile-time struct and SSA
-	// scans. A nested StartScan must not close it after its individual stage.
-	if cfg.Reporter != nil {
-		defer func() {
-			if saveErr := cfg.Reporter.Save(); saveErr != nil {
-				err = errors.Join(err, fmt.Errorf("save project report: %w", saveErr))
-			}
-		}()
-	}
 	cfg.SetSyntaxFlowResultSaveMemory()
 	if cfg.SyntaxFlow != nil {
 		cfg.SyntaxFlow.Memory = true
@@ -131,9 +121,6 @@ func ScanProject(ctx context.Context, opts ...ssaconfig.Option) (result ProjectR
 	userResultCallback := cfg.resultCallback
 	cfg.resultCallback = func(result *ScanResult) {
 		if result != nil && result.Result != nil {
-			if cfg.Reporter != nil {
-				cfg.Reporter.AddSyntaxFlowResult(result.Result)
-			}
 			stage := resultModeStage(result)
 			if rule := result.Result.GetRule(); rule != nil {
 				recorder.addRule(stage, rule.RuleName)
@@ -376,11 +363,6 @@ func finishScanProject(cfg *Config, recorder *stageOutcomeRecorder, programName 
 	}
 	result.SkippedStages = skippedRequestedStages(resolveProductModes(cfg), result.Stages)
 	result.IncompleteStages = len(result.SkippedStages) > 0
-	for _, stage := range result.Stages {
-		if stage.Status == StageStatusPartial || stage.Status == StageStatusFailed {
-			result.IncompleteStages = true
-		}
-	}
 	if err != nil {
 		result.Error = err.Error()
 	}
@@ -562,6 +544,12 @@ func emitStructResults(cfg *Config, prog *ssaapi.Program) {
 	for _, res := range prog.StructScanResults() {
 		if res == nil {
 			continue
+		}
+		// Struct rules run inside compile, not StartScan, so they never reach
+		// notifyResult. Fold them into the shared report here; source and SSA
+		// results are added by the stage scan that owns the same reporter.
+		if cfg.Reporter != nil {
+			cfg.Reporter.AddSyntaxFlowResult(res)
 		}
 		cfg.resultCallback(&ScanResult{Status: "executing", Result: res})
 	}
@@ -926,6 +914,9 @@ func sharedScanCallbackOptions(cfg *Config) []ssaconfig.Option {
 	}
 	if cfg.pauseCheck != nil {
 		opts = append(opts, WithPauseFunc(cfg.pauseCheck))
+	}
+	if cfg.Reporter != nil {
+		opts = append(opts, WithReporter(cfg.Reporter))
 	}
 	if cfg.GetScanIgnoreLanguage() {
 		opts = append(opts, ssaconfig.WithScanIgnoreLanguage(true))
