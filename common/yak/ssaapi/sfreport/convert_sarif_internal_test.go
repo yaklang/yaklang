@@ -3,6 +3,7 @@ package sfreport
 import (
 	"bytes"
 	"encoding/json"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -118,4 +119,48 @@ func TestSarifSecuritySeverityFor_DefaultsToMedium(t *testing.T) {
 	require.Equal(t, "9.5", sarifSecuritySeverityFor("critical"))
 	require.Equal(t, "5.0", sarifSecuritySeverityFor(""))
 	require.Equal(t, "5.0", sarifSecuritySeverityFor("unknown"))
+}
+
+// stdout cannot be rewound, so the CLI wraps it in a SnapshotBuffer: every save
+// is buffered, and only the latest one reaches the stream.
+func TestSnapshotBuffer_PublishesOnlyLatestSnapshot(t *testing.T) {
+	var dst bytes.Buffer
+	buffer := NewSnapshotBuffer(&dst)
+
+	require.NoError(t, buffer.Flush(), "nothing to publish before the first save")
+	require.Empty(t, dst.String())
+
+	_, err := buffer.Write([]byte(`{"snapshot":1}`))
+	require.NoError(t, err)
+	// A later save replaces the buffered snapshot instead of appending.
+	buffer.Reset()
+	_, err = buffer.Write([]byte(`{"snapshot":2}`))
+	require.NoError(t, err)
+
+	require.Empty(t, dst.String(), "snapshots stay buffered until the scan ends")
+	require.NoError(t, buffer.Flush())
+	require.Equal(t, "{\"snapshot\":2}\n", dst.String())
+	require.True(t, strings.HasSuffix(dst.String(), "\n"),
+		"the snapshot must end with a newline so later output is not glued to it")
+}
+
+// A report over a SnapshotBuffer must publish exactly one document to a
+// forward-only stream, which is what stdout is.
+func TestSarifReport_StdoutStreamGetsOneDocument(t *testing.T) {
+	var stream bytes.Buffer
+	buffer := NewSnapshotBuffer(&stream)
+
+	report, err := NewSarifReport()
+	require.NoError(t, err)
+	require.NoError(t, report.SetWriter(buffer))
+
+	require.NoError(t, report.Save())
+	empty, err := json.Marshal(report.Report())
+	require.NoError(t, err)
+	_, err = buffer.Write(empty)
+	require.NoError(t, err)
+	require.NoError(t, report.Save())
+
+	require.NoError(t, buffer.Flush())
+	parseSarifDocument(t, stream.Bytes())
 }

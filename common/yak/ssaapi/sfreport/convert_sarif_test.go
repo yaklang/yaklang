@@ -85,6 +85,13 @@ func sarifDriver(t *testing.T, run map[string]interface{}) map[string]interface{
 	return driver
 }
 
+func readFile(t *testing.T, path string) []byte {
+	t.Helper()
+	raw, err := os.ReadFile(path)
+	require.NoError(t, err)
+	return raw
+}
+
 func sarifEntries(t *testing.T, value interface{}) []map[string]interface{} {
 	t.Helper()
 	raw, ok := value.([]interface{})
@@ -218,35 +225,60 @@ func TestSarifReport_ArtifactURIIsRepoRelative(t *testing.T) {
 	require.Positive(t, seen)
 }
 
-// Risks stream into the report as each stage runs; one save at the end must
-// publish every streamed result as a single JSON document.
-func TestSarifReport_StreamedResultsSavedOnceOnFile(t *testing.T) {
+// A report is saved at every stage boundary and once at the end; each save must
+// replace the file with a complete snapshot, never append a second document.
+func TestSarifReport_EverySaveRewritesACompleteSnapshot(t *testing.T) {
 	report, err := sfreport.NewSarifReport()
 	require.NoError(t, err)
-
-	result := scanJavaProject(t)
-	// Several stages feed the same report before anything is written.
-	require.True(t, report.AddSyntaxFlowResult(result))
-	require.True(t, report.AddSyntaxFlowResult(result))
 
 	path := filepath.Join(t.TempDir(), "out.sarif")
 	file, err := os.OpenFile(path, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o644)
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = file.Close() })
-
 	require.NoError(t, report.SetWriter(file))
+
+	// A snapshot taken before any finding is already a valid document: this is
+	// what a scan that fails early leaves behind.
+	require.NoError(t, report.Save())
+	emptySnapshot := parseSarifDocument(t, readFile(t, path))
+	require.Empty(t, firstSarifRun(t, emptySnapshot)["results"])
+
+	// Stream two findings in, one save per stage.
+	result := scanJavaProject(t)
+	require.True(t, report.AddSyntaxFlowResult(result))
+	require.NoError(t, report.Save())
+	firstSnapshot := parseSarifDocument(t, readFile(t, path))
+	require.Len(t, sarifEntries(t, firstSarifRun(t, firstSnapshot)["results"]), 1,
+		"the stage snapshot must carry what has streamed in so far")
+
+	require.True(t, report.AddSyntaxFlowResult(result))
 	require.NoError(t, report.Save())
 
-	raw, err := os.ReadFile(path)
+	raw := readFile(t, path)
+	require.NotContains(t, string(raw), "}{", "a save must replace the file, not append to it")
+	final := parseSarifDocument(t, raw)
+	require.Len(t, sarifEntries(t, firstSarifRun(t, final)["results"]), 2,
+		"the final snapshot must carry every streamed result")
+}
+
+// The accumulated struct can be serialized at any moment, without a separate
+// build step, which is what makes the per-stage saves cheap.
+func TestSarifReport_StructIsSerializableMidStream(t *testing.T) {
+	report, err := sfreport.NewSarifReport()
 	require.NoError(t, err)
 
-	doc := parseSarifDocument(t, raw)
-	run := firstSarifRun(t, doc)
-	require.NotContains(t, string(raw), "}{", "one report must produce one document")
+	// No writer at all: serialize the struct directly.
+	raw, err := json.Marshal(report.Report())
+	require.NoError(t, err)
+	firstSarifRun(t, parseSarifDocument(t, raw))
 
-	// Nothing streamed in may be dropped by the single save.
-	results := sarifEntries(t, run["results"])
-	require.Len(t, results, 2, "both streamed results must survive into the saved document")
+	require.True(t, report.AddSyntaxFlowResult(scanJavaProject(t)))
+	raw, err = json.Marshal(report.Report())
+	require.NoError(t, err)
+
+	run := firstSarifRun(t, parseSarifDocument(t, raw))
+	require.NotEmpty(t, sarifEntries(t, run["results"]))
+	require.NotEmpty(t, sarifDriver(t, run)["rules"])
 }
 
 // Two rules must be merged into the single run GitHub accepts, with every
