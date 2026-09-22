@@ -4,7 +4,7 @@ package binary_test
 import (
 	"context"
 	"errors"
-	"os"
+	"github.com/yaklang/yaklang/common/sca/internal/testcheck"
 	"testing"
 
 	assert "github.com/yaklang/yaklang/common/sca/internal/testcheck"
@@ -17,7 +17,7 @@ import (
 )
 
 type ctxFile struct {
-	*os.File
+	*testcheck.FixtureFile
 	ctx context.Context
 }
 
@@ -96,7 +96,7 @@ func TestParse(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			f, err := os.Open(tt.inputFile)
+			f, err := fixtures.OpenReader(tt.inputFile)
 			require.NoError(t, err)
 			defer f.Close()
 
@@ -119,13 +119,13 @@ func TestParse(t *testing.T) {
 }
 
 func TestParseBudget(t *testing.T) {
-	f, err := os.Open("testdata/test.elf")
+	f, err := fixtures.OpenReader("testdata/test.elf")
 	require.NoError(t, err)
 	defer f.Close()
 	l, err := (budget.Limits{MaxResultBytes: 48}).Normalize()
 	require.NoError(t, err)
 	ctx := budget.Bind(context.Background(), l)
-	_, _, err = binary.NewParser().Parse(nil, ctxFile{File: f, ctx: ctx})
+	_, _, err = binary.NewParser().Parse(nil, ctxFile{FixtureFile: f, ctx: ctx})
 	if err == nil || !errors.Is(err, scanerr.ErrResourceLimit) {
 		t.Fatalf("small budget: %v", err)
 	}

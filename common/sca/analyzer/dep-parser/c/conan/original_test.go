@@ -1,7 +1,6 @@
 package conan
 
 import (
-	"os"
 	"strings"
 	"testing"
 
@@ -9,7 +8,7 @@ import (
 )
 
 func TestParseConanOriginalRefs(t *testing.T) {
-	f, err := os.Open("testdata/happy.lock")
+	f, err := fixtures.OpenReader("testdata/happy.lock")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -43,7 +42,7 @@ func TestParseConanOriginalRefs(t *testing.T) {
 }
 
 func TestParseConanRevisionRef(t *testing.T) {
-	f, err := os.Open("testdata/happy2.lock")
+	f, err := fixtures.OpenReader("testdata/happy2.lock")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -150,7 +149,7 @@ func TestParseConanMissingAndEmptyRef(t *testing.T) {
 }
 
 func TestParseConanRootWithoutRef(t *testing.T) {
-	f, err := os.Open("testdata/happy.lock")
+	f, err := fixtures.OpenReader("testdata/happy.lock")
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -1,7 +1,6 @@
 package gradle
 
 import (
-	"os"
 	"strings"
 	"testing"
 
@@ -51,7 +50,7 @@ func TestParseGradleMalformed(t *testing.T) {
 }
 
 func TestParseGradleFrozenHappyLockfile(t *testing.T) {
-	f, err := os.Open("testdata/happy.lockfile")
+	f, err := fixtures.OpenReader("testdata/happy.lockfile")
 	if err != nil {
 		t.Fatal(err)
 	}

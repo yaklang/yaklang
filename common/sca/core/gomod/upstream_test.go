@@ -6,7 +6,6 @@ package gomod
 
 import (
 	"context"
-	"os"
 	"reflect"
 	"testing"
 )
@@ -42,7 +41,7 @@ func TestUpstreamGoModFixtures(t *testing.T) {
 		{"go116", "go116.mod", []expected{{dep, old, "", false}, {y, yv, "", true}}, false},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			data, e := os.ReadFile("testdata/" + tc.file)
+			data, e := fixtures.ReadFile("testdata/" + tc.file)
 			if e != nil {
 				t.Fatal(e)
 			}

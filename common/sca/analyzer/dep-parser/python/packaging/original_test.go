@@ -1,7 +1,6 @@
 package packaging_test
 
 import (
-	"os"
 	"strings"
 	"testing"
 
@@ -10,7 +9,7 @@ import (
 )
 
 func TestParsePackagingOriginalMetadata(t *testing.T) {
-	src, err := os.ReadFile("testdata/distlib-0.3.1.METADATA")
+	src, err := fixtures.ReadFile("testdata/distlib-0.3.1.METADATA")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -36,7 +35,7 @@ func TestParsePackagingOriginalMetadata(t *testing.T) {
 }
 
 func TestParsePackagingRequiresDistExtrasAndMarkers(t *testing.T) {
-	src, err := os.ReadFile("testdata/zipp-3.12.1.METADATA")
+	src, err := fixtures.ReadFile("testdata/zipp-3.12.1.METADATA")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -117,7 +116,7 @@ func TestParsePackagingNameExtrasAndEmptyRange(t *testing.T) {
 }
 
 func TestParsePackagingProjectURLHomepage(t *testing.T) {
-	src, err := os.ReadFile("testdata/iniconfig-2.0.0.METADATA")
+	src, err := fixtures.ReadFile("testdata/iniconfig-2.0.0.METADATA")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -175,7 +174,7 @@ func TestParsePackagingTruncated(t *testing.T) {
 }
 
 func TestParsePackagingNetworkxLicenseFileNotHash(t *testing.T) {
-	src, err := os.ReadFile("testdata/networkx-3.0.METADATA")
+	src, err := fixtures.ReadFile("testdata/networkx-3.0.METADATA")
 	if err != nil {
 		t.Fatal(err)
 	}

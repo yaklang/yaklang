@@ -5,7 +5,6 @@ import (
 	"github.com/yaklang/yaklang/common/sca/analyzer/dep-parser/types"
 	assert "github.com/yaklang/yaklang/common/sca/internal/testcheck"
 	require "github.com/yaklang/yaklang/common/sca/internal/testcheck"
-	"os"
 	"testing"
 )
 
@@ -158,7 +157,7 @@ func TestParse(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			f, err := os.Open(tt.file)
+			f, err := fixtures.OpenReader(tt.file)
 			require.NoError(t, err)
 			defer f.Close()
 

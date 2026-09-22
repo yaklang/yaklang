@@ -2,7 +2,6 @@ package sca
 
 import (
 	"context"
-	"os"
 	"testing"
 	"testing/fstest"
 )
@@ -13,7 +12,7 @@ func FuzzFrozenFormats(f *testing.F) {
 	seeds := map[string]string{
 		"var/lib/dpkg/status": "testdata/dpkg/dpkg", "lib/apk/db/installed": "testdata/apk/apk", "Gemfile.lock": "testdata/ruby_bundler/positive/Gemfile.lock", "Cargo.lock": "testdata/rust_cargo/positive/Cargo.lock", "a.gemspec": "testdata/ruby_gemspec/positive/multiple_licenses.gemspec", "poetry.lock": "testdata/python_poetry/positive/poetry.lock", "Pipfile.lock": "testdata/python_pipenv/Pipfile.lock", "requirements.txt": "testdata/python_pip/requirements.txt", "x.dist-info/METADATA": "testdata/python_packaging/dist-info/METADATA", "composer.lock": "testdata/php_composer/positive/composer.lock", "composer.json": "testdata/php_composer/positive/composer.json", "yarn.lock": "testdata/node_yarn/positive/yarn.lock", "pnpm-lock.yaml": "testdata/node_pnpm/pnpm-lock.yaml", "package-lock.json": "testdata/node_npm/positive_folder/package-lock.json", "package.json": "testdata/node_npm/positive_file/package.json", "pom.xml": "testdata/java_pom/positive/pom.xml", "gradle.lockfile": "testdata/java_gradle/positive.lockfile", "x.jar": "testdata/java_jar/positive/test.jar", "go.mod": "testdata/go_mod/positive/mod", "conan.lock": "testdata/conan/conan"}
 	for name, file := range seeds {
-		b, e := os.ReadFile(file)
+		b, e := fixtures.ReadFile(file)
 		if e != nil {
 			f.Fatal(e)
 		}

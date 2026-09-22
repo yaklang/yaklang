@@ -46,7 +46,7 @@ func scanNamed(t *testing.T, id string, files map[string]string) *model.Report {
 	t.Helper()
 	in := fstest.MapFS{}
 	for path, file := range files {
-		raw, err := os.ReadFile(file)
+		raw, err := fixtures.ReadFile(file)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -61,7 +61,7 @@ func scanNamed(t *testing.T, id string, files map[string]string) *model.Report {
 
 func loadOldScan(t *testing.T, format string) []oldScanRec {
 	t.Helper()
-	raw, err := os.ReadFile("testdata/full_field/old-scanfilesystem-" + format + ".json")
+	raw, err := fixtures.ReadFile("testdata/full_field/old-scanfilesystem-" + format + ".json")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -346,7 +346,7 @@ func TestFourFormatFullFieldContract(t *testing.T) {
 }
 
 func testFullFieldAPK(t *testing.T) {
-	raw, err := os.ReadFile("testdata/apk/apk")
+	raw, err := fixtures.ReadFile("testdata/apk/apk")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -471,7 +471,7 @@ func testFullFieldAPK(t *testing.T) {
 }
 
 func testFullFieldCargo(t *testing.T) {
-	raw, err := os.ReadFile("testdata/rust_cargo/positive/Cargo.lock")
+	raw, err := fixtures.ReadFile("testdata/rust_cargo/positive/Cargo.lock")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -581,7 +581,7 @@ func testFullFieldCargo(t *testing.T) {
 }
 
 func testFullFieldNPM(t *testing.T) {
-	raw, err := os.ReadFile("testdata/node_npm/positive_folder/package-lock.json")
+	raw, err := fixtures.ReadFile("testdata/node_npm/positive_folder/package-lock.json")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -682,11 +682,11 @@ func testFullFieldNPM(t *testing.T) {
 }
 
 func testFullFieldGoMod(t *testing.T) {
-	mod, err := os.ReadFile("testdata/go_mod/positive/mod")
+	mod, err := fixtures.ReadFile("testdata/go_mod/positive/mod")
 	if err != nil {
 		t.Fatal(err)
 	}
-	sum, err := os.ReadFile("testdata/go_mod/positive/sum")
+	sum, err := fixtures.ReadFile("testdata/go_mod/positive/sum")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -976,7 +976,7 @@ func parseBundlerLock(raw []byte) []origPkg {
 }
 
 func testFullFieldYarn(t *testing.T) {
-	raw, err := os.ReadFile("testdata/node_yarn/positive/yarn.lock")
+	raw, err := fixtures.ReadFile("testdata/node_yarn/positive/yarn.lock")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1113,7 +1113,7 @@ func testFullFieldYarn(t *testing.T) {
 }
 
 func testFullFieldBundler(t *testing.T) {
-	raw, err := os.ReadFile("testdata/ruby_bundler/positive/Gemfile.lock")
+	raw, err := fixtures.ReadFile("testdata/ruby_bundler/positive/Gemfile.lock")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1441,7 +1441,7 @@ func parsePoetryLock(raw []byte) []origPkg {
 }
 
 func testFullFieldPnpm(t *testing.T) {
-	raw, err := os.ReadFile("testdata/node_pnpm/pnpm-lock.yaml")
+	raw, err := fixtures.ReadFile("testdata/node_pnpm/pnpm-lock.yaml")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1534,7 +1534,7 @@ func testFullFieldPnpm(t *testing.T) {
 }
 
 func testFullFieldPoetry(t *testing.T) {
-	raw, err := os.ReadFile("testdata/python_poetry/positive/poetry.lock")
+	raw, err := fixtures.ReadFile("testdata/python_poetry/positive/poetry.lock")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1789,7 +1789,7 @@ func parsePackagingOrig(raw []byte) origPkg {
 }
 
 func testFullFieldGemspec(t *testing.T) {
-	raw, err := os.ReadFile("testdata/ruby_gemspec/positive/multiple_licenses.gemspec")
+	raw, err := fixtures.ReadFile("testdata/ruby_gemspec/positive/multiple_licenses.gemspec")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1938,7 +1938,7 @@ func testFullFieldGemspec(t *testing.T) {
 }
 
 func testFullFieldPackaging(t *testing.T) {
-	raw, err := os.ReadFile("testdata/python_packaging/dist-info/METADATA")
+	raw, err := fixtures.ReadFile("testdata/python_packaging/dist-info/METADATA")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -2029,7 +2029,7 @@ func scanReportFiles(t *testing.T, id string, files map[string]string) *model.Re
 	t.Helper()
 	in := fstest.MapFS{}
 	for path, file := range files {
-		raw, err := os.ReadFile(file)
+		raw, err := fixtures.ReadFile(file)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -2045,7 +2045,7 @@ func scanReportFiles(t *testing.T, id string, files map[string]string) *model.Re
 func pomRepoFiles(t *testing.T, files map[string]string) map[string]string {
 	t.Helper()
 	root := "analyzer/dep-parser/java/pom/testdata/repository"
-	err := filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
+	err := fixtures.Walk(root, func(path string, info os.FileInfo, err error) error {
 		if err != nil || info.IsDir() {
 			return err
 		}
@@ -2079,7 +2079,7 @@ func requireEdge(t *testing.T, r *model.Report, from, target, constraint, scope,
 
 func testFullFieldPOM(t *testing.T) {
 	t.Run("matrix-old", func(t *testing.T) {
-		raw, err := os.ReadFile("testdata/java_pom/positive/pom.xml")
+		raw, err := fixtures.ReadFile("testdata/java_pom/positive/pom.xml")
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -2353,7 +2353,7 @@ func testFullFieldPOM(t *testing.T) {
 }
 
 func testFullFieldGradle(t *testing.T) {
-	raw, err := os.ReadFile("testdata/java_gradle/positive.lockfile")
+	raw, err := fixtures.ReadFile("testdata/java_gradle/positive.lockfile")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -2456,7 +2456,7 @@ func testFullFieldGradle(t *testing.T) {
 }
 
 func testFullFieldJAR(t *testing.T) {
-	raw, err := os.ReadFile("testdata/java_jar/positive/test.jar")
+	raw, err := fixtures.ReadFile("testdata/java_jar/positive/test.jar")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -2684,7 +2684,7 @@ func testFullFieldGoBinary(t *testing.T) {
 }
 
 func testFullFieldConan(t *testing.T) {
-	raw, err := os.ReadFile("testdata/conan/conan")
+	raw, err := fixtures.ReadFile("testdata/conan/conan")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -2838,7 +2838,7 @@ func dpkgNameVer(raw string) (string, string) {
 }
 
 func testFullFieldDPKG(t *testing.T) {
-	raw, err := os.ReadFile("testdata/dpkg/dpkg")
+	raw, err := fixtures.ReadFile("testdata/dpkg/dpkg")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -3118,7 +3118,7 @@ func testFullFieldRPM(t *testing.T) {
 }
 
 func testFullFieldPip(t *testing.T) {
-	raw, err := os.ReadFile("testdata/python_pip/requirements.txt")
+	raw, err := fixtures.ReadFile("testdata/python_pip/requirements.txt")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -3212,7 +3212,7 @@ func testFullFieldPip(t *testing.T) {
 }
 
 func testFullFieldPipenv(t *testing.T) {
-	raw, err := os.ReadFile("testdata/python_pipenv/Pipfile.lock")
+	raw, err := fixtures.ReadFile("testdata/python_pipenv/Pipfile.lock")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -3226,7 +3226,7 @@ func testFullFieldPipenv(t *testing.T) {
 	if !strings.Contains(text, `"url": "https://pypi.org/simple"`) || !strings.Contains(text, `"pipfile-spec": 6`) {
 		t.Fatal("frozen Pipfile.lock sources table drifted")
 	}
-	oldRaw, err := os.ReadFile("testdata/full_field/old-scanfilesystem-pipenv.json")
+	oldRaw, err := fixtures.ReadFile("testdata/full_field/old-scanfilesystem-pipenv.json")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -3304,11 +3304,11 @@ func testFullFieldPipenv(t *testing.T) {
 }
 
 func testFullFieldComposer(t *testing.T) {
-	lock, err := os.ReadFile("testdata/php_composer/positive/composer.lock")
+	lock, err := fixtures.ReadFile("testdata/php_composer/positive/composer.lock")
 	if err != nil {
 		t.Fatal(err)
 	}
-	man, err := os.ReadFile("testdata/php_composer/positive/composer.json")
+	man, err := fixtures.ReadFile("testdata/php_composer/positive/composer.json")
 	if err != nil {
 		t.Fatal(err)
 	}

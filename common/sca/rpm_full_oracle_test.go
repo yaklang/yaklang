@@ -5,7 +5,6 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"os"
 	"reflect"
 	"sort"
 	"strings"
@@ -49,14 +48,14 @@ func TestRPMAllFrozenFields(t *testing.T) {
 		SourceSHA256 string `json:"source_sha256"`
 		Packages     []rawRPMRecord
 	}
-	raw, err := os.ReadFile("testdata/full_field/rpm-sqlite-raw-fields.json")
+	raw, err := fixtures.ReadFile("testdata/full_field/rpm-sqlite-raw-fields.json")
 	if err != nil {
 		t.Fatal(err)
 	}
 	if err = json.Unmarshal(raw, &oracle); err != nil {
 		t.Fatal(err)
 	}
-	snapshot, err := os.ReadFile("testdata/rpm/rpmdb.sqlite")
+	snapshot, err := fixtures.ReadFile("testdata/rpm/rpmdb.sqlite")
 	if err != nil {
 		t.Fatal(err)
 	}

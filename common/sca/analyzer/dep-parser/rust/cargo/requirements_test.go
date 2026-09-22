@@ -2,7 +2,6 @@ package cargo
 
 import (
 	"bytes"
-	"os"
 	"strings"
 	"testing"
 
@@ -10,7 +9,7 @@ import (
 )
 
 func TestParseKeepsOriginalDependencyNames(t *testing.T) {
-	f, err := os.Open("testdata/cargo_v3.lock")
+	f, err := fixtures.OpenReader("testdata/cargo_v3.lock")
 	if err != nil {
 		t.Fatal(err)
 	}

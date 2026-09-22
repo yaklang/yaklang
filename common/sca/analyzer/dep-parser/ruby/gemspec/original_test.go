@@ -1,7 +1,6 @@
 package gemspec_test
 
 import (
-	"os"
 	"strings"
 	"testing"
 
@@ -10,7 +9,7 @@ import (
 )
 
 func TestParseGemspecOriginalDeclarations(t *testing.T) {
-	src, err := os.ReadFile("testdata/multiple_licenses.gemspec")
+	src, err := fixtures.ReadFile("testdata/multiple_licenses.gemspec")
 	if err != nil {
 		t.Fatal(err)
 	}

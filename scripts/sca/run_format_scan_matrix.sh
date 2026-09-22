@@ -437,6 +437,11 @@ def fixture_hash(files):
     return h.hexdigest()
 
 def run_matrix(root, out, count):
+    sys.path.insert(0, os.path.join(root, "scripts/sca"))
+    from fixture_store import FixtureStore
+    corpus = FixtureStore(os.path.join(root, "common/sca"))
+    def logical(src):
+        return os.path.relpath(src, os.path.join(root, "common/sca")).replace("\\", "/")
     cases = {}
     order = []
     with open(os.path.join(out, "cases.txt")) as f:
@@ -452,7 +457,7 @@ def run_matrix(root, out, count):
     new_failed = False
     for name in order:
         files = cases[name]
-        missing = [src for _, src in files if not os.path.isfile(src)]
+        missing = [src for _, src in files if logical(src) not in corpus.rows]
         if missing:
             rows.append({"case": name, "comparable": False, "new_failed": True,
                          "reason": "missing fixture " + ",".join(missing)})
@@ -465,7 +470,7 @@ def run_matrix(root, out, count):
             for dest, src in files:
                 path = os.path.join(tdir, dest)
                 os.makedirs(os.path.dirname(path), exist_ok=True)
-                data = open(src, "rb").read()
+                data = corpus.read(logical(src))
                 open(path, "wb").write(data)
                 copied.append((dest, data))
             rec["input_sha256"] = fixture_hash(copied)

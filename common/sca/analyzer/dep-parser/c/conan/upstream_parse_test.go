@@ -2,7 +2,6 @@
 package conan_test
 
 import (
-	"os"
 	"sort"
 	"strings"
 	"testing"
@@ -93,7 +92,7 @@ func TestParse(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			f, err := os.Open(tt.inputFile)
+			f, err := fixtures.OpenReader(tt.inputFile)
 			require.NoError(t, err)
 			defer f.Close()
 

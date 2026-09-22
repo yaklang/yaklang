@@ -2,7 +2,6 @@ package sca
 
 import (
 	"context"
-	"os"
 	"strings"
 	"testing"
 	"testing/fstest"
@@ -48,7 +47,7 @@ func loadFormatScanFS(t testing.TB, files map[string]string) fstest.MapFS {
 	t.Helper()
 	in := fstest.MapFS{}
 	for path, file := range files {
-		raw, err := os.ReadFile(file)
+		raw, err := fixtures.ReadFile(file)
 		if err != nil {
 			t.Fatal(err)
 		}

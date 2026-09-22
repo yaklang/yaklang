@@ -8,8 +8,6 @@ import (
 	"github.com/yaklang/yaklang/common/sca/core/locktoml"
 	"github.com/yaklang/yaklang/common/sca/core/scanerr"
 	"io/fs"
-	"os"
-	"path/filepath"
 	"reflect"
 	"strings"
 	"testing"
@@ -19,7 +17,7 @@ import (
 // lock file, including source/checksum/marker/file metadata, not just identities.
 func TestFixedLockMappingAgainstJSONOracle(t *testing.T) {
 	count := 0
-	err := filepath.WalkDir("testdata", func(path string, d fs.DirEntry, err error) error {
+	err := fixtures.WalkDir("testdata", func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
@@ -27,7 +25,7 @@ func TestFixedLockMappingAgainstJSONOracle(t *testing.T) {
 			return nil
 		}
 		t.Run(path, func(t *testing.T) {
-			raw, err := os.ReadFile(path)
+			raw, err := fixtures.ReadFile(path)
 			if err != nil {
 				t.Fatal(err)
 			}

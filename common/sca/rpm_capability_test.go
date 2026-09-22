@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"os"
 	"strings"
 	"testing"
 	"testing/fstest"
@@ -15,7 +14,7 @@ import (
 )
 
 func TestRPMFrozenRequireConstraint(t *testing.T) {
-	raw, err := os.ReadFile("testdata/rpm/rpmdb.sqlite")
+	raw, err := fixtures.ReadFile("testdata/rpm/rpmdb.sqlite")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -100,7 +99,7 @@ func TestRPMFrozenRequireConstraint(t *testing.T) {
 }
 
 func TestRPMResourceLimitTyped(t *testing.T) {
-	raw, err := os.ReadFile("testdata/rpm/rpmdb.sqlite")
+	raw, err := fixtures.ReadFile("testdata/rpm/rpmdb.sqlite")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -131,7 +130,7 @@ func TestRPMResourceLimitTyped(t *testing.T) {
 }
 
 func TestRPMCancelAndMalformedStayClassified(t *testing.T) {
-	raw, err := os.ReadFile("testdata/rpm/rpmdb.sqlite")
+	raw, err := fixtures.ReadFile("testdata/rpm/rpmdb.sqlite")
 	if err != nil {
 		t.Fatal(err)
 	}

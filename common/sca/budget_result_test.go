@@ -8,7 +8,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"os"
 	"strings"
 	"testing"
 	"testing/fstest"
@@ -178,7 +177,7 @@ func TestResultBudgetTextJSONTOMLYAMLXML(t *testing.T) {
 }
 
 func TestResultBudgetRPMAndJAR(t *testing.T) {
-	gz, err := os.ReadFile("core/rpm/testdata/libuuid.gz")
+	gz, err := fixtures.ReadFile("core/rpm/testdata/libuuid.gz")
 	if err != nil {
 		t.Fatal(err)
 	}

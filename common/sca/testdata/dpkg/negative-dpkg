@@ -1,6 +1,0 @@
-
-Package: brokenPackageWithNoVersionThatShouldGetThrownOut
-
-Package: invalidpkg
-Source: invalidpkg-5 (5.#)
-Version: 1:5.#

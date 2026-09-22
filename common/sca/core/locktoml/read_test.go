@@ -19,7 +19,7 @@ import (
 )
 
 func TestUpstreamSyntaxCorpus(t *testing.T) {
-	err := filepath.WalkDir("testdata/upstream", func(path string, d os.DirEntry, err error) error {
+	err := fixtures.WalkDir("testdata/upstream", func(path string, d os.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
@@ -28,7 +28,7 @@ func TestUpstreamSyntaxCorpus(t *testing.T) {
 			return nil
 		}
 		t.Run(strings.TrimPrefix(path, "testdata/upstream/"), func(t *testing.T) {
-			b, err := os.ReadFile(path)
+			b, err := fixtures.ReadFile(path)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -39,7 +39,7 @@ func TestUpstreamSyntaxCorpus(t *testing.T) {
 				}
 				return
 			}
-			expected, e := os.ReadFile(strings.TrimSuffix(path, ".toml") + ".json")
+			expected, e := fixtures.ReadFile(strings.TrimSuffix(path, ".toml") + ".json")
 			if e != nil {
 				t.Fatal(e)
 			}
