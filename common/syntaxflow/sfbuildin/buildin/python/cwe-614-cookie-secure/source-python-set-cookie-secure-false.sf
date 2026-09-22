@@ -1,0 +1,49 @@
+desc(
+	mode: "source"
+	language: "python"
+	title: "源码扫描：Python Cookie secure=False"
+	title_zh: "源码扫描：Python Cookie secure=False"
+	type: vuln
+	level: middle
+	rule_id: "source-python-set-cookie-secure-false"
+	risk: "cookie-security"
+	cwe: "CWE-614"
+	desc: <<<DESC
+### 规则说明
+set_cookie(..., secure=False) 允许浏览器在明文 HTTP 上发送该 Cookie。
+
+### 风险类型
+cookie-security
+
+### 影响
+命中说明代码里出现了该危险 API、配置或数据流入口。
+
+### 检测方式
+源码模式正则匹配，定位源码中的危险调用或配置。
+### 参考
+- CWE-614
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+会话 Cookie 设置 secure=True，并且只通过 HTTPS 提供服务。
+SOLUTION
+	alert_min: 1
+	"file://bad.py": <<<POS
+def bad(resp):
+    resp.set_cookie("sid", "v", secure=False)
+
+POS
+	"safefile://ok.py": <<<NEG
+def ok(resp):
+    resp.set_cookie("sid", "v", secure=True)
+
+NEG
+)
+${*.py}.pattern_regex(/set_cookie\s*\([^)]*secure\s*=\s*False/) as $hit
+alert $hit for {
+	level: "middle",
+	title: "源码扫描：Python Cookie secure=False",
+	title_zh: "源码扫描：Python Cookie secure=False",
+	message: "源码扫描：Python Cookie secure=False",
+	risk: "cookie-security",
+}

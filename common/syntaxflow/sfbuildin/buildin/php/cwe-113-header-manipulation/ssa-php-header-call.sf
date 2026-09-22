@@ -1,0 +1,49 @@
+desc(
+	mode: "ssa"
+	language: "php"
+	title: "数据流：PHP header 写入外部值"
+	title_zh: "数据流：PHP header 写入外部值"
+	type: vuln
+	level: high
+	rule_id: "ssa-php-header-call"
+	risk: "crlf-injection"
+	cwe: "CWE-113"
+	desc: <<<DESC
+### 规则说明
+header() 的参数若包含外部数据和换行，可以注入额外响应头。
+
+### 风险类型
+crlf-injection
+
+### 影响
+参数不是常量，且不是函数自身的参数对象时告警。常量配置和纯参数传递不报。
+
+### 检测方式
+SSA 上匹配调用，保留非常量且非 param 的实参。
+### 参考
+- CWE-113
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+去掉回车和换行，不要把请求参数拼进 header()。
+SOLUTION
+	alert_min: 1
+	"file://bad.php": <<<POS
+<?php
+function bad($v) { header("X-Name: " . $_GET["n"]); }
+
+POS
+	"safefile://ok.php": <<<NEG
+<?php
+function ok() { header("X-Name: fixed"); }
+
+NEG
+)
+header(*?{!opcode: const && !opcode: param} as $dyn) as $call
+alert $dyn for {
+	level: "high",
+	title: "数据流：PHP header 写入外部值",
+	title_zh: "数据流：PHP header 写入外部值",
+	message: "数据流：PHP header 写入外部值",
+	risk: "crlf-injection",
+}

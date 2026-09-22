@@ -58,6 +58,11 @@ func RunBuiltinRuleVerify(t *testing.T, filter BuiltinVerifyFilter) {
 		if info.IsDir() || !strings.HasSuffix(path, ".sf") {
 			return nil
 		}
+		// Languages without a frontend live under pending-language/ as source
+		// rules. Skip them until that frontend exists.
+		if strings.Contains(filepath.ToSlash(path), "/pending-language/") {
+			return nil
+		}
 		raw, err := local.ReadFile(path)
 		if err != nil {
 			return err

@@ -1,0 +1,47 @@
+desc(
+	mode: "source"
+	language: "javascript"
+	title: "源码扫描：JavaScript sax ondoctype"
+	title_zh: "源码扫描：JavaScript sax ondoctype"
+	type: vuln
+	level: high
+	rule_id: "source-js-sax-ondoctype"
+	risk: "xxe"
+	cwe: "CWE-611"
+	desc: <<<DESC
+### 规则说明
+给 sax 解析器设置 ondoctype 会处理外部 DTD。不可信 XML 可以借此读取本地文件或发起请求。
+
+### 风险类型
+xxe
+
+### 影响
+命中说明代码里出现了该危险 API、配置或数据流入口。
+
+### 检测方式
+源码模式正则匹配，定位源码中的危险调用或配置。
+### 参考
+- CWE-611
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+不要设置 ondoctype。解析不可信 XML 时禁用 DTD 和外部实体。
+SOLUTION
+	alert_min: 1
+	"file://bad.js": <<<POS
+function bad(parser) { parser.ondoctype = function (d) { return d; }; }
+
+POS
+	"safefile://ok.js": <<<NEG
+function ok(xml) { return xml.length; }
+
+NEG
+)
+${*.js}.pattern_regex(/\.ondoctype\s*=/) as $hit
+alert $hit for {
+	level: "high",
+	title: "源码扫描：JavaScript sax ondoctype",
+	title_zh: "源码扫描：JavaScript sax ondoctype",
+	message: "源码扫描：JavaScript sax ondoctype",
+	risk: "xxe",
+}

@@ -1,0 +1,47 @@
+desc(
+	mode: "ssa"
+	language: "java"
+	title: "数据流：Java 会话写入请求参数"
+	title_zh: "数据流：Java 会话写入请求参数"
+	type: vuln
+	level: middle
+	rule_id: "ssa-java-session-set-request"
+	risk: "access-control"
+	cwe: "CWE-501"
+	desc: <<<DESC
+### 规则说明
+把请求参数直接放进 HttpSession，等于让客户端数据跨过信任边界进入服务端会话。
+
+### 风险类型
+access-control
+
+### 影响
+参数不是常量，且不是函数自身的参数对象时告警。常量配置和纯参数传递不报。
+
+### 检测方式
+SSA 上匹配调用，保留非常量且非 param 的实参。
+### 参考
+- CWE-501
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+只把服务端生成或已校验的值写入会话。
+SOLUTION
+	alert_min: 1
+	"file://bad.java": <<<POS
+class Bad { void s(javax.servlet.http.HttpSession session, javax.servlet.http.HttpServletRequest req) { session.setAttribute("role", req.getParameter("role")); } }
+
+POS
+	"safefile://ok.java": <<<NEG
+class Ok { void s(javax.servlet.http.HttpSession session) { session.setAttribute("role", "user"); } }
+
+NEG
+)
+setAttribute(*?{!opcode: const && !opcode: param} as $dyn) as $call
+alert $dyn for {
+	level: "middle",
+	title: "数据流：Java 会话写入请求参数",
+	title_zh: "数据流：Java 会话写入请求参数",
+	message: "数据流：Java 会话写入请求参数",
+	risk: "access-control",
+}

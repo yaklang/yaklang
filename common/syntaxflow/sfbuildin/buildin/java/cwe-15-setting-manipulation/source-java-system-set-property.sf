@@ -1,0 +1,47 @@
+desc(
+	mode: "source"
+	language: "java"
+	title: "源码扫描：Java System.setProperty 接受外部值"
+	title_zh: "源码扫描：Java System.setProperty 接受外部值"
+	type: vuln
+	level: high
+	rule_id: "source-java-system-set-property"
+	risk: "security-misconfiguration"
+	cwe: "CWE-15"
+	desc: <<<DESC
+### 规则说明
+System.setProperty 会改变 JVM 全局配置。值来自请求时可以改写安全相关系统属性。
+
+### 风险类型
+security-misconfiguration
+
+### 影响
+命中说明代码里出现了该危险 API、配置或数据流入口。
+
+### 检测方式
+源码模式正则匹配，定位源码中的危险调用或配置。
+### 参考
+- CWE-15
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+不要用请求参数作为系统属性的值。只允许固定键和白名单值。
+SOLUTION
+	alert_min: 1
+	"file://bad.java": <<<POS
+class Bad { void c(String v) { System.setProperty("app.mode", v); } }
+
+POS
+	"safefile://ok.java": <<<NEG
+class Ok { void c() { String v = System.getProperty("java.version"); } }
+
+NEG
+)
+${*.java}.pattern_regex(/System\.setProperty\s*\(/) as $hit
+alert $hit for {
+	level: "high",
+	title: "源码扫描：Java System.setProperty 接受外部值",
+	title_zh: "源码扫描：Java System.setProperty 接受外部值",
+	message: "源码扫描：Java System.setProperty 接受外部值",
+	risk: "security-misconfiguration",
+}

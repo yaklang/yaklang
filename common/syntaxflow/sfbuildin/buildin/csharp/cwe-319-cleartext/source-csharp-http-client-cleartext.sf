@@ -1,0 +1,47 @@
+desc(
+	mode: "source"
+	language: "csharp"
+	title: "源码扫描：C# HttpClient 明文地址"
+	title_zh: "源码扫描：C# HttpClient 明文地址"
+	type: vuln
+	level: middle
+	rule_id: "source-csharp-http-client-cleartext"
+	risk: "cleartext-transmission"
+	cwe: "CWE-319"
+	desc: <<<DESC
+### 规则说明
+把 http:// 地址交给 HttpClient 会以明文发送请求和凭据。
+
+### 风险类型
+cleartext-transmission
+
+### 影响
+命中说明代码里出现了该危险 API、配置或数据流入口。
+
+### 检测方式
+源码模式正则匹配，定位源码中的危险调用或配置。
+### 参考
+- CWE-319
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+只使用 https:// 地址。
+SOLUTION
+	alert_min: 1
+	"file://bad.cs": <<<POS
+class Bad { void c(System.Net.Http.HttpClient client) { client.GetAsync("http://api.internal/users"); } }
+
+POS
+	"safefile://ok.cs": <<<NEG
+class Ok { void c(System.Net.Http.HttpClient client) { client.GetAsync("https://api.internal/users"); } }
+
+NEG
+)
+${*.cs}.pattern_regex(/GetAsync\s*\(\s*\"http:/) as $hit
+alert $hit for {
+	level: "middle",
+	title: "源码扫描：C# HttpClient 明文地址",
+	title_zh: "源码扫描：C# HttpClient 明文地址",
+	message: "源码扫描：C# HttpClient 明文地址",
+	risk: "cleartext-transmission",
+}

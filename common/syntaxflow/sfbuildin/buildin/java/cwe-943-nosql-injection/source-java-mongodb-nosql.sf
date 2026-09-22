@@ -1,0 +1,47 @@
+desc(
+	mode: "source"
+	language: "java"
+	title: "源码扫描：Java MongoDB 查询拼接"
+	title_zh: "源码扫描：Java MongoDB 查询拼接"
+	type: vuln
+	level: high
+	rule_id: "source-java-mongodb-nosql"
+	risk: "nosql-injection"
+	cwe: "CWE-943"
+	desc: <<<DESC
+### 规则说明
+把外部字符串拼进 MongoDB 查询条件（BasicDBObject、Filters.regex 或 $where）会造成 NoSQL 注入。
+
+### 风险类型
+nosql-injection
+
+### 影响
+命中说明代码里出现了该危险 API、配置或数据流入口。
+
+### 检测方式
+源码模式正则匹配，定位源码中的危险调用或配置。
+### 参考
+- CWE-943
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+使用驱动的参数化过滤器，禁止把请求参数拼进 `$where` 或正则。
+SOLUTION
+	alert_min: 1
+	"file://bad.java": <<<POS
+class Bad { void q(String id) { String q = "{$where: '" + id + "'}"; } }
+
+POS
+	"safefile://ok.java": <<<NEG
+class Ok { void q() { String q = "fixed"; } }
+
+NEG
+)
+${*.java}.pattern_regex(/BasicDBObject|Filters\.regex|\$where/) as $hit
+alert $hit for {
+	level: "high",
+	title: "源码扫描：Java MongoDB 查询拼接",
+	title_zh: "源码扫描：Java MongoDB 查询拼接",
+	message: "源码扫描：Java MongoDB 查询拼接",
+	risk: "nosql-injection",
+}

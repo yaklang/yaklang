@@ -1,0 +1,49 @@
+desc(
+	mode: "source"
+	language: "csharp"
+	title: "源码扫描：C# TryUpdateModel 批量绑定"
+	title_zh: "源码扫描：C# TryUpdateModel 批量绑定"
+	type: vuln
+	level: high
+	rule_id: "source-csharp-try-update-model"
+	risk: "mass-assignment"
+	cwe: "CWE-915"
+	desc: <<<DESC
+### 规则说明
+TryUpdateModel 或没有字段白名单的 Bind 会把请求里的敏感字段写进模型。
+
+### 风险类型
+mass-assignment
+
+### 影响
+命中说明代码里出现了该危险 API、配置或数据流入口。
+
+### 检测方式
+源码模式正则匹配，定位源码中的危险调用或配置。
+### 参考
+- CWE-915
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+使用单独的输入 DTO，或 Bind 只列出允许写入的字段。
+SOLUTION
+	alert_min: 1
+	"file://bad.cs": <<<POS
+class Bad { void u(System.Web.Mvc.Controller c, User user) { c.TryUpdateModel(user); } }
+class User { public bool IsAdmin; }
+
+POS
+	"safefile://ok.cs": <<<NEG
+class Ok { void u(UserInput input) { var name = input.Name; } }
+class UserInput { public string Name; }
+
+NEG
+)
+${*.cs}.pattern_regex(/TryUpdateModel\s*\(|\[Bind\(Include\s*=/) as $hit
+alert $hit for {
+	level: "high",
+	title: "源码扫描：C# TryUpdateModel 批量绑定",
+	title_zh: "源码扫描：C# TryUpdateModel 批量绑定",
+	message: "源码扫描：C# TryUpdateModel 批量绑定",
+	risk: "mass-assignment",
+}

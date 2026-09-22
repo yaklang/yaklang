@@ -1,0 +1,49 @@
+desc(
+	mode: "struct"
+	language: "java"
+	title: "结构扫描：Java Socket 主机来自外部"
+	title_zh: "结构扫描：Java Socket 主机来自外部"
+	type: vuln
+	level: high
+	rule_id: "struct-java-socket-host"
+	risk: "resource-injection"
+	cwe: "CWE-99"
+	desc: <<<DESC
+### 规则说明
+new Socket 或 InetSocketAddress 的主机名来自外部数据时，攻击者可以指定任意主机和端口。
+
+### 风险类型
+resource-injection
+
+### 影响
+命中说明编译单元里出现了该调用，而不是注释或字符串。
+
+### 检测方式
+结构扫描匹配真实调用。
+### 参考
+- CWE-99
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+主机名使用白名单，禁止把请求参数直接传给 Socket 构造器。
+SOLUTION
+	alert_min: 1
+	"file://bad.java": <<<POS
+import java.net.Socket;
+class Bad { void c(String host) throws Exception { new Socket(host, 80); } }
+
+POS
+	"safefile://ok.java": <<<NEG
+class Ok { void c() { int port = 80; } }
+
+NEG
+)
+Socket as $call
+Socket(* as $arg) as $call
+alert $call for {
+	level: "high",
+	title: "结构扫描：Java Socket 主机来自外部",
+	title_zh: "结构扫描：Java Socket 主机来自外部",
+	message: "结构扫描：Java Socket 主机来自外部",
+	risk: "resource-injection",
+}

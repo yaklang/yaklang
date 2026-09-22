@@ -1,0 +1,47 @@
+desc(
+	mode: "ssa"
+	language: "java"
+	title: "数据流：Java System.setProperty 接受外部值"
+	title_zh: "数据流：Java System.setProperty 接受外部值"
+	type: vuln
+	level: high
+	rule_id: "ssa-java-system-set-property"
+	risk: "security-misconfiguration"
+	cwe: "CWE-15"
+	desc: <<<DESC
+### 规则说明
+System.setProperty 会改变 JVM 全局配置。值来自请求时可以改写安全相关系统属性。
+
+### 风险类型
+security-misconfiguration
+
+### 影响
+实参本身来自另一次调用时告警。常量字符串不报。
+
+### 检测方式
+SSA 上匹配调用，保留非常量且非 param 的实参。
+### 参考
+- CWE-15
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+不要用请求参数作为系统属性的值。只允许固定键和白名单值。
+SOLUTION
+	alert_min: 1
+	"file://bad.java": <<<POS
+class Bad { void c(javax.servlet.http.HttpServletRequest req) { System.setProperty("app.mode", req.getParameter("mode")); } }
+
+POS
+	"safefile://ok.java": <<<NEG
+class Ok { void c() { System.setProperty("app.mode", "prod"); } }
+
+NEG
+)
+setProperty(*?{opcode: call} as $dyn) as $call
+alert $dyn for {
+	level: "high",
+	title: "数据流：Java System.setProperty 接受外部值",
+	title_zh: "数据流：Java System.setProperty 接受外部值",
+	message: "数据流：Java System.setProperty 接受外部值",
+	risk: "security-misconfiguration",
+}

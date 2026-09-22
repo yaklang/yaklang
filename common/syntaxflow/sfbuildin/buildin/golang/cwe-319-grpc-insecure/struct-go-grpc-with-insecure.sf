@@ -1,0 +1,50 @@
+desc(
+	mode: "struct"
+	language: "golang"
+	title: "结构扫描：Go grpc.WithInsecure"
+	title_zh: "结构扫描：Go grpc.WithInsecure"
+	type: vuln
+	level: high
+	rule_id: "struct-go-grpc-with-insecure"
+	risk: "cleartext-transmission"
+	cwe: "CWE-319"
+	desc: <<<DESC
+### 规则说明
+grpc.WithInsecure 关闭传输加密，令牌和业务数据以明文发送。
+
+### 风险类型
+cleartext-transmission
+
+### 影响
+命中说明编译单元里出现了该调用，而不是注释或字符串。
+
+### 检测方式
+结构扫描匹配真实调用。
+### 参考
+- CWE-319
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+使用 TLS 凭据 grpc.WithTransportCredentials。
+SOLUTION
+	alert_min: 1
+	"file://bad.go": <<<POS
+package main
+import "google.golang.org/grpc"
+func bad(target string) { grpc.Dial(target, grpc.WithInsecure()) }
+
+POS
+	"safefile://ok.go": <<<NEG
+package main
+func ok() { println("tls") }
+
+NEG
+)
+grpc.WithInsecure() as $call
+alert $call for {
+	level: "high",
+	title: "结构扫描：Go grpc.WithInsecure",
+	title_zh: "结构扫描：Go grpc.WithInsecure",
+	message: "结构扫描：Go grpc.WithInsecure",
+	risk: "cleartext-transmission",
+}

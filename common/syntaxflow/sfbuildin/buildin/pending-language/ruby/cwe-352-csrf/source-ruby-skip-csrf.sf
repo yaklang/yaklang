@@ -1,0 +1,49 @@
+desc(
+	mode: "source"
+	language: "ruby"
+	title: "源码扫描：Ruby 跳过 authenticity token"
+	title_zh: "源码扫描：Ruby 跳过 authenticity token"
+	type: vuln
+	level: high
+	rule_id: "source-ruby-skip-csrf"
+	risk: "csrf"
+	cwe: "CWE-352"
+	desc: <<<DESC
+### 规则说明
+skip_before_action :verify_authenticity_token 会关掉 Rails CSRF 校验。
+
+该语言的 struct/ssa 前端还没有接入。当前只保留 source 规则，builtin verify 会跳过 pending-language 目录。
+
+### 风险类型
+csrf
+
+### 影响
+命中说明文件中出现了该危险写法。
+
+### 检测方式
+源码模式正则匹配。
+### 参考
+- CWE-352
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+不要跳过 verify_authenticity_token，除非该动作确实不能携带令牌并且有其他校验。
+SOLUTION
+	alert_min: 1
+	"file://bad.rb": <<<POS
+class A; skip_before_action :verify_authenticity_token; end
+
+POS
+	"safefile://ok.rb": <<<NEG
+class A; before_action :verify; end
+
+NEG
+)
+${*.rb}.pattern_regex(/skip_before_action\s+:verify_authenticity_token/) as $hit
+alert $hit for {
+	level: "high",
+	title: "源码扫描：Ruby 跳过 authenticity token",
+	title_zh: "源码扫描：Ruby 跳过 authenticity token",
+	message: "源码扫描：Ruby 跳过 authenticity token",
+	risk: "csrf",
+}

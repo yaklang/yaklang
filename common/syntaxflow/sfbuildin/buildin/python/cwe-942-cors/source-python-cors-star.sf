@@ -1,0 +1,50 @@
+desc(
+	mode: "source"
+	language: "python"
+	title: "源码扫描：Python CORS 允许任意来源"
+	title_zh: "源码扫描：Python CORS 允许任意来源"
+	type: vuln
+	level: middle
+	rule_id: "source-python-cors-star"
+	risk: "cors"
+	cwe: "CWE-942"
+	desc: <<<DESC
+### 规则说明
+origins='*' 或 resources={r'*': ...} 会允许任意网站读取接口响应。
+
+### 风险类型
+cors
+
+### 影响
+命中说明代码里出现了该危险 API、配置或数据流入口。
+
+### 检测方式
+源码模式正则匹配，定位源码中的危险调用或配置。
+### 参考
+- CWE-942
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+列出明确的来源，不要使用星号。
+SOLUTION
+	alert_min: 1
+	"file://bad.py": <<<POS
+from flask_cors import CORS
+def bad(app):
+    CORS(app, origins="*")
+
+POS
+	"safefile://ok.py": <<<NEG
+def ok(app):
+    app.config["X"] = "https://app.example"
+
+NEG
+)
+${*.py}.pattern_regex(/CORS\s*\(|origins\s*=\s*[\"']\*[\"']/) as $hit
+alert $hit for {
+	level: "middle",
+	title: "源码扫描：Python CORS 允许任意来源",
+	title_zh: "源码扫描：Python CORS 允许任意来源",
+	message: "源码扫描：Python CORS 允许任意来源",
+	risk: "cors",
+}

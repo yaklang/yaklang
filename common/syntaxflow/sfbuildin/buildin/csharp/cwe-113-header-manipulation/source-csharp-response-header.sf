@@ -1,0 +1,47 @@
+desc(
+	mode: "source"
+	language: "csharp"
+	title: "源码扫描：C# 响应头写入外部值"
+	title_zh: "源码扫描：C# 响应头写入外部值"
+	type: vuln
+	level: high
+	rule_id: "source-csharp-response-header"
+	risk: "crlf-injection"
+	cwe: "CWE-113"
+	desc: <<<DESC
+### 规则说明
+Response.Headers.Add 或 AppendHeader 的值若含 CR/LF，可以注入额外响应头。
+
+### 风险类型
+crlf-injection
+
+### 影响
+命中说明代码里出现了该危险 API、配置或数据流入口。
+
+### 检测方式
+源码模式正则匹配，定位源码中的危险调用或配置。
+### 参考
+- CWE-113
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+去掉值里的回车和换行，或使用框架提供的已编码头部 API。
+SOLUTION
+	alert_min: 1
+	"file://bad.cs": <<<POS
+class Bad { void h(Microsoft.AspNetCore.Http.HttpResponse resp, string v) { resp.Headers.Add("X-Name", v); } }
+
+POS
+	"safefile://ok.cs": <<<NEG
+class Ok { void h() { string name = "X-Name"; } }
+
+NEG
+)
+${*.cs}.pattern_regex(/AppendHeader\s*\(|Headers\.Add\s*\(/) as $hit
+alert $hit for {
+	level: "high",
+	title: "源码扫描：C# 响应头写入外部值",
+	title_zh: "源码扫描：C# 响应头写入外部值",
+	message: "源码扫描：C# 响应头写入外部值",
+	risk: "crlf-injection",
+}

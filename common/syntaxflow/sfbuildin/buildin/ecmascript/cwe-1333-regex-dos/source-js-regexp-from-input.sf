@@ -1,0 +1,47 @@
+desc(
+	mode: "source"
+	language: "javascript"
+	title: "源码扫描：JavaScript 用外部字符串构造 RegExp"
+	title_zh: "源码扫描：JavaScript 用外部字符串构造 RegExp"
+	type: vuln
+	level: middle
+	rule_id: "source-js-regexp-from-input"
+	risk: "regex-dos"
+	cwe: "CWE-1333"
+	desc: <<<DESC
+### 规则说明
+new RegExp(用户输入) 可以提交回溯爆炸的模式。
+
+### 风险类型
+regex-dos
+
+### 影响
+命中说明代码里出现了该危险 API、配置或数据流入口。
+
+### 检测方式
+源码模式正则匹配，定位源码中的危险调用或配置。
+### 参考
+- CWE-1333
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+使用字面量正则。必须动态构造时限制长度和元字符。
+SOLUTION
+	alert_min: 1
+	"file://bad.js": <<<POS
+function bad(p) { return new RegExp(p); }
+
+POS
+	"safefile://ok.js": <<<NEG
+function ok() { return new RegExp("^[a-z]+$"); }
+
+NEG
+)
+${*.js}.pattern_regex(/new\s+RegExp\s*\(\s*[a-zA-Z]/) as $hit
+alert $hit for {
+	level: "middle",
+	title: "源码扫描：JavaScript 用外部字符串构造 RegExp",
+	title_zh: "源码扫描：JavaScript 用外部字符串构造 RegExp",
+	message: "源码扫描：JavaScript 用外部字符串构造 RegExp",
+	risk: "regex-dos",
+}

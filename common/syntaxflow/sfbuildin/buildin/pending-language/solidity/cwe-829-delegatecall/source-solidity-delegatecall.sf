@@ -1,0 +1,49 @@
+desc(
+	mode: "source"
+	language: "solidity"
+	title: "源码扫描：Solidity delegatecall"
+	title_zh: "源码扫描：Solidity delegatecall"
+	type: vuln
+	level: high
+	rule_id: "source-solidity-delegatecall"
+	risk: "code-injection"
+	cwe: "CWE-829"
+	desc: <<<DESC
+### 规则说明
+delegatecall 在当前合约上下文执行外部代码，目标地址可控时等于把控制权交出去。
+
+该语言的 struct/ssa 前端还没有接入。当前只保留 source 规则，builtin verify 会跳过 pending-language 目录。
+
+### 风险类型
+code-injection
+
+### 影响
+命中说明文件中出现了该危险写法。
+
+### 检测方式
+源码模式正则匹配。
+### 参考
+- CWE-829
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+只对固定、已审计的实现合约 delegatecall。
+SOLUTION
+	alert_min: 1
+	"file://bad.sol": <<<POS
+contract C { function f(address t, bytes data) public { t.delegatecall(data); } }
+
+POS
+	"safefile://ok.sol": <<<NEG
+contract C { function f(address t) public { t.call(""); } }
+
+NEG
+)
+${*.sol}.pattern_regex(/\.delegatecall\s*\(/) as $hit
+alert $hit for {
+	level: "high",
+	title: "源码扫描：Solidity delegatecall",
+	title_zh: "源码扫描：Solidity delegatecall",
+	message: "源码扫描：Solidity delegatecall",
+	risk: "code-injection",
+}
