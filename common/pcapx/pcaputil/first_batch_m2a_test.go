@@ -266,3 +266,27 @@ func TestFirstBatchM2AManifest(t *testing.T) {
 		require.Equal(t, f.SHA256, fmt.Sprintf("%x", sha256.Sum256(b)))
 	}
 }
+
+func TestFirstBatchM2ARedisErrorAndExpiredAuth(t *testing.T) {
+	t.Run("subscription-error-consumes-whole-request", func(t *testing.T) {
+		s := newReviewSession(t, ParserBudget{})
+		ts := time.Unix(1, 0)
+		r := s.Feed(0, ts, append(respCommand("SUBSCRIBE", "one", "two"), respCommand("PING")...))
+		require.Nil(t, r.Err)
+		ping := r.Events[1].ID
+		r = s.Feed(1, ts, []byte("-NOPERM subscription denied\r\n+PONG\r\n"))
+		require.Nil(t, r.Err)
+		require.Equal(t, ping, r.Events[1].ResponseTo)
+	})
+	t.Run("expired-context-still-redacts-auth", func(t *testing.T) {
+		s := newReviewSession(t, ParserBudget{})
+		ts := time.Unix(1, 0)
+		require.Nil(t, s.Feed(0, ts, respCommand("PING")).Err)
+		r := s.Feed(0, ts.Add(time.Minute), respCommand("AUTH", "private-test-secret"))
+		require.Nil(t, r.Err)
+		items := redisItems(r.Events[0].Session["Value"].(map[string]any))
+		require.Equal(t, true, items[1].(map[string]any)["Redacted"])
+		require.NotContains(t, items[1].(map[string]any), "Value")
+		require.Contains(t, string(r.Events[0].Raw), "private-test-secret")
+	})
+}

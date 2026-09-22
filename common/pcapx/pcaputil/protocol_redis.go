@@ -143,6 +143,24 @@ func redisSubscription(c string) bool {
 	}
 	return false
 }
+func redactRedisCommand(v map[string]any, cmd string) {
+	// The semantic display defaults to redacted authentication arguments. Raw is
+	// still explicit capture evidence, never a promise to sanitize saved PCAPs.
+	xs := redisItems(v)
+	redact := cmd == "AUTH"
+	for i := 1; i < len(xs); i++ {
+		if cmd == "HELLO" && strings.EqualFold(redisText(xs[i].(map[string]any)), "AUTH") {
+			for j := i + 1; j < len(xs) && j <= i+2; j++ {
+				xs[j] = map[string]any{"Type": "Bulk", "Redacted": true}
+			}
+			break
+		}
+		if redact {
+			xs[i] = map[string]any{"Type": "Bulk", "Redacted": true}
+		}
+	}
+}
+
 func (f *binFlow) consumeRedis(dir int, e *ProtocolEvent) (map[string]any, error) {
 	r := f.redis
 	v, err := DecodeRESPValue(e.Raw, f.a.budget)
@@ -189,6 +207,9 @@ func (f *binFlow) consumeRedis(dir int, e *ProtocolEvent) (map[string]any, error
 	if len(cmd) > 128 {
 		return nil, protocolError(ErrResourceExceeded, "Redis command name exceeds limit")
 	}
+	if r.client < 0 || r.client == dir {
+		redactRedisCommand(v, cmd)
+	}
 	if r.desynchronized {
 		info["Correlation Status"] = "expired-context"
 		return info, nil
@@ -218,21 +239,7 @@ func (f *binFlow) consumeRedis(dir int, e *ProtocolEvent) (map[string]any, error
 		e.TransactionID = e.ID
 		info["Command"] = cmd
 		info["Outstanding"] = true
-		// The semantic display defaults to redacted authentication arguments. Raw is
-		// still explicit capture evidence, never a promise to sanitize saved PCAPs.
-		xs := redisItems(v)
-		redact := cmd == "AUTH"
-		for i := 1; i < len(xs); i++ {
-			if cmd == "HELLO" && strings.EqualFold(redisText(xs[i].(map[string]any)), "AUTH") {
-				for j := i + 1; j < len(xs) && j <= i+2; j++ {
-					xs[j] = map[string]any{"Type": "Bulk", "Redacted": true}
-				}
-				break
-			}
-			if redact {
-				xs[i] = map[string]any{"Type": "Bulk", "Redacted": true}
-			}
-		}
+
 	} else if r.client >= 0 && dir != r.client {
 		xs := redisItems(v)
 		push := e.Raw[0] == '>'
@@ -297,6 +304,10 @@ func (f *binFlow) consumeRedis(dir int, e *ProtocolEvent) (map[string]any, error
 			info["Matched Request"] = true
 			info["Command"] = q.command
 			info["Latency NS"] = e.Timestamp.Sub(q.ts).Nanoseconds()
+			// A command error is one final reply, even for multiple subscription targets.
+			if v["Type"] == "Error" || v["Type"] == "BlobError" {
+				r.pending[0].remaining = 1
+			}
 			r.pending[0].remaining--
 			if r.pending[0].remaining <= 0 {
 				r.pending[0] = redisRequest{}
