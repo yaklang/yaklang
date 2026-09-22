@@ -2132,15 +2132,21 @@ func looksLikeBoundaryLeak(s string) bool {
 }
 
 // looksLikeDNSLabel checks the RFC 1035-friendly ASCII subset used by the
-// crawler without invoking another matcher engine.
+// crawler without invoking another matcher engine. Underscore is accepted
+// because real hostnames (AD / SRV / names like portal_zp_e.pdhr.com) use it.
 func looksLikeDNSLabel(label string) bool {
-	if len(label) == 0 || len(label) > 63 || !isASCIIAlphaNumeric(label[0]) || !isASCIIAlphaNumeric(label[len(label)-1]) {
+	if len(label) == 0 || len(label) > 63 {
 		return false
 	}
-	for index := 1; index < len(label)-1; index++ {
-		if !isASCIIAlphaNumeric(label[index]) && label[index] != '-' {
-			return false
+	if label[0] == '-' || label[len(label)-1] == '-' {
+		return false
+	}
+	for index := 0; index < len(label); index++ {
+		c := label[index]
+		if isASCIIAlphaNumeric(c) || c == '_' || c == '-' {
+			continue
 		}
+		return false
 	}
 	return true
 }
@@ -2266,7 +2272,12 @@ func aiJSModelScheduleTargetKey(raw, sourceURL string) (string, bool) {
 	} else {
 		asciiHost, asciiErr := idna.Lookup.ToASCII(hostname)
 		if asciiErr != nil || asciiHost == "" {
-			return "", false
+			// IDNA Lookup is LDH-only and rejects '_'. Keep the practical
+			// hostname when the crawler's own host check already accepts it.
+			if !looksLikeValidHost(hostname) {
+				return "", false
+			}
+			asciiHost = hostname
 		}
 		hostname = strings.ToLower(strings.TrimSuffix(asciiHost, "."))
 	}

@@ -13,7 +13,11 @@ import (
 
 func (s *TunnelServer) CheckServerReachable(ctx context.Context, req *tpb.CheckServerReachableRequest) (*tpb.CheckServerReachableResponse, error) {
 	urlIns := utils.ParseStringToUrl(req.GetUrl())
-	if !utils.IsValidHost(urlIns.Host) {
+	host := urlIns.Hostname()
+	if host == "" {
+		host = urlIns.Host
+	}
+	if !utils.IsValidHost(host) {
 		return nil, fmt.Errorf("invalid host")
 	}
 

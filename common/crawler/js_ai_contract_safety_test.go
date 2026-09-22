@@ -472,6 +472,11 @@ func TestAIJSContractAdaptiveLocalConflictVetoPreservesAssetScheduling(t *testin
 			left:  "https://bücher.example/api/destructive",
 			right: "https://xn--bcher-kva.example/api/destructive?model_variant=1",
 		},
+		{
+			name:  "underscore-hostname",
+			left:  "https://portal_zp_e.pdhr.com/api/destructive",
+			right: "https://portal_zp_e.pdhr.com/api/destructive?model_variant=1",
+		},
 	} {
 		left, leftOK := aiJSModelScheduleTargetKey(equivalent.left, "")
 		right, rightOK := aiJSModelScheduleTargetKey(equivalent.right, "")
