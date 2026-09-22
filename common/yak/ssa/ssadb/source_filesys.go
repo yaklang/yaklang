@@ -7,6 +7,7 @@ import (
 	"path"
 	"strconv"
 	"strings"
+	"sync"
 
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/filesys"
@@ -24,7 +25,11 @@ func SetGetAggregatedFileSystemFunc(fn func(programName string) filesys_interfac
 }
 
 type irSourceFS struct {
-	virtual map[string]*filesys.VirtualFS // echo program -> virtual fs
+	mu            sync.Mutex
+	virtual       map[string]*filesys.VirtualFS // program -> virtual fs
+	loadedDirs    map[string]struct{}           // directory paths already hydrated from DB
+	overlayLoaded map[string]struct{}           // overlay programs already copied into virtual fs
+	notOverlay    map[string]struct{}           // programs known not to use overlay
 }
 
 var IrSourceFsSeparators = '/'
@@ -33,9 +38,12 @@ var _ filesys_interface.ReadOnlyFileSystem = (*irSourceFS)(nil)
 var _ filesys_interface.FileSystem = (*irSourceFS)(nil)
 
 func NewIrSourceFs() *irSourceFS {
-	ret := &irSourceFS{}
-	ret.virtual = make(map[string]*filesys.VirtualFS)
-	return ret
+	return &irSourceFS{
+		virtual:       make(map[string]*filesys.VirtualFS),
+		loadedDirs:    make(map[string]struct{}),
+		overlayLoaded: make(map[string]struct{}),
+		notOverlay:    make(map[string]struct{}),
+	}
 }
 
 func (fs *irSourceFS) ReadFile(path string) ([]byte, error) {
@@ -153,7 +161,17 @@ func (f *irSourceFS) Delete(path string) error {
 	// if prog := CheckAndSwitchDB(programName); prog == nil {
 	// 	return utils.Errorf("program [%v] not exist", programName)
 	// }
+	f.mu.Lock()
 	delete(f.virtual, programName)
+	delete(f.overlayLoaded, programName)
+	delete(f.notOverlay, programName)
+	prefix := "/" + programName
+	for p := range f.loadedDirs {
+		if p == prefix || strings.HasPrefix(p, prefix+"/") {
+			delete(f.loadedDirs, p)
+		}
+	}
+	f.mu.Unlock()
 	// delete program
 	DeleteProgram(GetDB(), programName)
 	return nil
@@ -199,6 +217,9 @@ func (f *irSourceFS) String() string {
 	if f == nil {
 		return "<nil>"
 	}
+
+	f.mu.Lock()
+	defer f.mu.Unlock()
 
 	var builder strings.Builder
 	builder.WriteString("irSourceFS{")
@@ -262,6 +283,9 @@ func mergeExtraFileEntriesIntoVF(progName string, vf *filesys.VirtualFS) {
 }
 
 func (fs *irSourceFS) checkPath(path string, isDirs ...bool) (*filesys.VirtualFS, error) {
+	fs.mu.Lock()
+	defer fs.mu.Unlock()
+
 	progName, isProgram := fs.getProgram(path)
 	vf, ok := fs.virtual[progName]
 	if !ok {
@@ -282,98 +306,91 @@ func (fs *irSourceFS) checkPath(path string, isDirs ...bool) (*filesys.VirtualFS
 }
 
 func loadIrSourceFS(path, progName string, isDir bool, irfs *irSourceFS, vf *filesys.VirtualFS) {
-	// 检查是否是增量编译的 program，如果是，使用 overlay 的聚合文件系统
 	if progName != "" {
-		prog, err := GetApplicationProgram(progName)
-		if err == nil && prog != nil && prog.IsOverlay && len(prog.OverlayLayers) > 0 {
-			// 这是一个增量编译的 program，使用 overlay 的聚合文件系统
-			// 通过函数变量调用 GetAggregatedFileSystemForProgramName，避免循环导入
-			if GetAggregatedFileSystemFunc != nil {
-				log.Infof("loading aggregated file system for overlay program: %s", progName)
-				aggregatedFS := GetAggregatedFileSystemFunc(progName)
-				if aggregatedFS != nil {
-					log.Infof("successfully loaded aggregated file system for program: %s", progName)
-					// 从聚合文件系统复制所有文件到 VirtualFS（参考测试中的做法）
-					err := filesys.Recursive(".",
-						filesys.WithFileSystem(aggregatedFS),
-						filesys.WithFileStat(func(filePath string, info fs.FileInfo) error {
-							if info.IsDir() {
+		if _, ok := irfs.overlayLoaded[progName]; ok {
+			return
+		}
+		if _, skip := irfs.notOverlay[progName]; !skip {
+			prog, err := GetApplicationProgram(progName)
+			if err == nil && prog != nil && prog.IsOverlay && len(prog.OverlayLayers) > 0 {
+				if GetAggregatedFileSystemFunc != nil {
+					log.Debugf("loading aggregated file system for overlay program: %s", progName)
+					aggregatedFS := GetAggregatedFileSystemFunc(progName)
+					if aggregatedFS != nil {
+						err := filesys.Recursive(".",
+							filesys.WithFileSystem(aggregatedFS),
+							filesys.WithFileStat(func(filePath string, info fs.FileInfo) error {
+								if info.IsDir() {
+									return nil
+								}
+								content, err := aggregatedFS.ReadFile(filePath)
+								if err != nil {
+									log.Warnf("failed to read file %s from aggregatedFS: %v", filePath, err)
+									return nil
+								}
+								normalizedPath := strings.TrimPrefix(filePath, "/")
+								vf.AddFile("/"+progName+"/"+normalizedPath, string(content))
 								return nil
-							}
-							content, err := aggregatedFS.ReadFile(filePath)
-							if err != nil {
-								log.Warnf("failed to read file %s from aggregatedFS: %v", filePath, err)
-								return nil
-							}
-							normalizedPath := strings.TrimPrefix(filePath, "/")
-							vf.AddFile("/"+progName+"/"+normalizedPath, string(content))
-							return nil
-						}))
-					if err == nil {
-						mergeExtraFileEntriesIntoVF(progName, vf)
-						// 成功加载聚合文件系统，直接返回
-						return
+							}))
+						if err == nil {
+							mergeExtraFileEntriesIntoVF(progName, vf)
+							irfs.overlayLoaded[progName] = struct{}{}
+							return
+						}
+						log.Warnf("failed to copy files from aggregatedFS: %v, fallback to single program", err)
 					}
-					log.Warnf("failed to copy files from aggregatedFS: %v, fallback to single program", err)
 				}
+			} else {
+				irfs.notOverlay[progName] = struct{}{}
 			}
-			// 如果加载 overlay 失败，fallback 到原来的逻辑
 		}
 	}
 
-	// 原来的逻辑：从数据库加载单个 program 的文件
 	add2FS := func(source *IrSource) {
-		path := irfs.Join(source.FolderPath, source.FileName)
+		sourcePath := irfs.Join(source.FolderPath, source.FileName)
 		if source.QuotedCode == "" {
-			// fs.virtual.add dir
-			vf.AddDir(path)
+			vf.AddDir(sourcePath)
 		} else {
 			code, _ := strconv.Unquote(source.QuotedCode)
 			if code == "" {
 				code = source.QuotedCode
 			}
-
-			// fs.virtual.add file
-			vf.AddFile(path, code)
+			vf.AddFile(sourcePath, code)
 		}
 	}
 
-	addDir := func(path string) {
-		sources, err := GetIrSourceByPath(path)
+	addDir := func(dirPath string) {
+		if _, ok := irfs.loadedDirs[dirPath]; ok {
+			return
+		}
+		sources, err := GetIrSourceByPath(dirPath)
 		if err != nil {
 			return
 		}
 		for _, source := range sources {
 			add2FS(source)
 		}
+		irfs.loadedDirs[dirPath] = struct{}{}
 	}
 
-	// if _, err := vf.Stat(path); err == nil {
-	// 	return
-	// }
-
 	if isDir {
+		if _, ok := irfs.loadedDirs[path]; ok {
+			return
+		}
 		addDir(path)
 		mergeExtraFileEntriesIntoVF(progName, vf)
 		return
 	}
 
-	// other
-	path, name := irfs.PathSplit(path)
-	// if is program, this is root path
+	if _, err := vf.Stat(path); err == nil {
+		return
+	}
+
+	dir, name := irfs.PathSplit(path)
 	if name == "" {
-		// directory
-		sources, err := GetIrSourceByPath(path)
-		if err != nil {
-			mergeExtraFileEntriesIntoVF(progName, vf)
-			return
-		}
-		for _, source := range sources {
-			add2FS(source)
-		}
+		addDir(dir)
 	} else {
-		// file
-		source, err := GetIrSourceByPathAndName(path, name)
+		source, err := GetIrSourceByPathAndName(dir, name)
 		if err != nil {
 			mergeExtraFileEntriesIntoVF(progName, vf)
 			return
