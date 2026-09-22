@@ -855,6 +855,7 @@ func NewWebsocketClientByUpgradeRequest(req *http.Request, opt ...WebsocketClien
 	}
 
 	if rsp.StatusCode != 101 {
+		_ = conn.Close()
 		return nil, utils.Errorf("upgrade websocket failed(101 switch protocols failed): %s", rsp.Status)
 	}
 	if config.strictMode {
