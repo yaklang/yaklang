@@ -56,6 +56,9 @@ var (
 	// control response max content-length
 	GLOBAL_MAXSIZE_CONTENT_LENGTH = atomic.NewUint64(defaultGlobalContentLengthLimit)
 
+	// MITM/history list inline packet bytes. 0 = drop all packets (current Exclude* behavior).
+	GLOBAL_HTTPFLOW_LIST_INLINE_MAX_CONTENT_LENGTH = atomic.NewUint64(0)
+
 	OnceYakitHome = new(sync.Once)
 
 	GLOBAL_DB_SAVE_SYNC = utils.NewBool(false)
@@ -71,6 +74,11 @@ var (
 const (
 	defaultGlobalContentLengthLimit uint64 = 10 * 1024 * 1024
 	maximumGlobalContentLengthLimit uint64 = 50 * 1024 * 1024
+
+	// HTTPFlowListInlineMaxContentLengthKey is the profile KV written by Yakit settings.
+	HTTPFlowListInlineMaxContentLengthKey            = "YAKIT_HTTPFLOW_LIST_INLINE_MAX_CONTENT_LENGTH"
+	DefaultHTTPFlowListInlineMaxContentLength uint64 = 300 * 1024
+	MaximumHTTPFlowListInlineMaxContentLength uint64 = 500 * 1024
 )
 
 func SimpleYakGlobalConfig() {
@@ -137,6 +145,18 @@ func SetGlobalMaxContentLength(i uint64) {
 		return
 	}
 	GLOBAL_MAXSIZE_CONTENT_LENGTH.Store(i)
+}
+
+func GetHTTPFlowListInlineMaxContentLength() uint64 {
+	return GLOBAL_HTTPFLOW_LIST_INLINE_MAX_CONTENT_LENGTH.Load()
+}
+
+func SetHTTPFlowListInlineMaxContentLength(i uint64) {
+	if i > MaximumHTTPFlowListInlineMaxContentLength {
+		GLOBAL_HTTPFLOW_LIST_INLINE_MAX_CONTENT_LENGTH.Store(MaximumHTTPFlowListInlineMaxContentLength)
+		return
+	}
+	GLOBAL_HTTPFLOW_LIST_INLINE_MAX_CONTENT_LENGTH.Store(i)
 }
 
 func GetCurrentYakitPluginID() string {
