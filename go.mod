@@ -4,8 +4,6 @@ go 1.22.12
 
 replace github.com/yaklang/yaklang v0.0.0 => ./
 
-replace github.com/wenlng/go-captcha-assets v1.0.5 => github.com/wenlng/go-captcha-assets v1.0.4
-
 // Use the locally forked go-sqlite3 (FTS5 enabled by default) without rewriting imports.
 replace github.com/mattn/go-sqlite3 => github.com/yaklang/go-sqlite3 v0.0.1
 
@@ -102,7 +100,6 @@ require (
 	github.com/segmentio/ksuid v1.0.4
 	github.com/shirou/gopsutil/v4 v4.25.2
 	github.com/stacktitan/smb v0.0.0-20190531122847-da9a425dceb8
-	github.com/steambap/captcha v1.4.1
 	github.com/stretchr/testify v1.10.0
 	github.com/tatsushid/go-fastping v0.0.0-20160109021039-d7bb493dee3e
 	github.com/teambition/rrule-go v1.8.2
@@ -116,7 +113,7 @@ require (
 	github.com/xdg-go/scram v1.1.2
 	github.com/xdg-go/stringprep v1.0.4
 	github.com/xuri/excelize/v2 v2.9.0
-	github.com/yaklang/fastgocaptcha v1.0.4
+	github.com/yaklang/fastgocaptcha v1.1.0
 	github.com/yaklang/go-llvm v0.0.0-20260713075540-46cdfea08f33
 	// Yaklang's maintained hard fork combines goja and goja_nodejs in one Go 1.22 module.
 	github.com/yaklang/goja v0.1.0
@@ -168,7 +165,6 @@ require (
 	github.com/go-ole/go-ole v1.2.6 // indirect
 	github.com/go-sourcemap/sourcemap v2.1.4+incompatible // indirect
 	github.com/go-task/slim-sprig v0.0.0-20230315185526-52ccab3ef572 // indirect
-	github.com/golang/freetype v0.0.0-20170609003504-e2365dfdc4a0 // indirect
 	github.com/google/go-cmp v0.7.0 // indirect
 	github.com/gopherjs/gopherjs v1.12.80 // indirect
 	github.com/itchyny/timefmt-go v0.1.3 // indirect
@@ -203,8 +199,6 @@ require (
 	github.com/tklauser/go-sysconf v0.3.12 // indirect
 	github.com/tklauser/numcpus v0.6.1 // indirect
 	github.com/u-root/u-root v0.11.0 // indirect
-	github.com/wenlng/go-captcha-assets v1.0.5 // indirect
-	github.com/wenlng/go-captcha/v2 v2.0.3 // indirect
 	github.com/xanzy/ssh-agent v0.3.3 // indirect
 	github.com/xuri/efp v0.0.0-20240408161823-9ad904a10d6d // indirect
 	github.com/xuri/nfp v0.0.0-20240318013403-ab9948c2c4a7 // indirect
