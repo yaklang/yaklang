@@ -233,19 +233,6 @@ func (m *Timeline) batchCompressOldestWithRecent(toCompress []*TimelineItem, rec
 		return
 	}
 
-	// 收集要从活跃区删除的 id 列表（顺序与 toCompress 对齐，确保 lastCompressedId 是最末一个）
-	var idsToRemove []int64
-	for _, item := range toCompress {
-		if item == nil {
-			continue
-		}
-		idsToRemove = append(idsToRemove, item.GetID())
-	}
-
-	if len(idsToRemove) == 0 {
-		return
-	}
-
 	log.Infof("batch compress: compressing %d oldest items, keeping %d recent items as context",
 		len(toCompress), len(recentKeep))
 
@@ -278,12 +265,22 @@ func (m *Timeline) batchCompressOldestWithRecent(toCompress []*TimelineItem, rec
 	// The existing head is retained deterministically by the host below. Do not
 	// send it back to the reducer: asking the model to copy it and then prepending
 	// it again duplicates history and consumes an ever-growing prompt budget.
-	prompt := m.renderBatchCompressPrompt(toCompress, recentKeep, nonceStr, inputTokenEstimate, outputTokenBudget)
+	renderedPrompt := m.renderBatchCompressPromptWithCoverage(toCompress, recentKeep, nonceStr, inputTokenEstimate, outputTokenBudget)
+	prompt := renderedPrompt.Prompt
 	if prompt == "" {
 		// If prompt is empty, fall back to emergency compress
 		log.Warnf("batch compress: prompt is empty, falling back to emergency compress")
 		m.emergencyCompress(MaxTimelineSaveSize)
 		return
+	}
+	idsToRemove := renderedPrompt.CoveredItemIDs
+	if len(idsToRemove) == 0 {
+		log.Warnf("batch compress: reducer prompt covered no timeline items; leaving selected items active")
+		return
+	}
+	if len(idsToRemove) < len(toCompress) {
+		log.Warnf("batch compress: selected %d items, reducer received %d, safely covered %d; deferring %d items to a later cycle",
+			len(toCompress), renderedPrompt.ReducerItemCount, len(idsToRemove), len(toCompress)-len(idsToRemove))
 	}
 
 	// 调用 AI 进行批量压缩
@@ -388,7 +385,7 @@ func (m *Timeline) batchCompressOldestWithRecent(toCompress []*TimelineItem, rec
 		CoveredEndItemID: lastCompressedId,
 		CoveredEndAtMs:   lastCompressedTs,
 	})
-	log.Infof("batch compressed %d items into reducer at id: %v", len(toCompress), lastCompressedId)
+	log.Infof("batch compressed %d prompt-covered items into reducer at id: %v", len(idsToRemove), lastCompressedId)
 
 	// 标记被压缩的 items 为非活跃
 	for _, id := range idsToRemove {
@@ -410,6 +407,12 @@ const MaxBatchCompressRecentSize = 16 * 1024
 //go:embed prompts/timeline/batch_compress.txt
 var timelineBatchCompress string
 
+type batchCompressPromptRender struct {
+	Prompt           string
+	CoveredItemIDs   []int64
+	ReducerItemCount int
+}
+
 // renderBatchCompressPrompt 渲染双段 batch compress prompt:
 //
 //	RECENT_KEEP   - 最新保留段，作为压缩参考"现在 agent 在做什么"，AI 不修改它
@@ -422,14 +425,23 @@ var timelineBatchCompress string
 //
 // 关键词: renderBatchCompressPrompt, RECENT_KEEP, ITEMS_TO_COMPRESS, prompt 预算分配
 func (m *Timeline) renderBatchCompressPrompt(toCompress []*TimelineItem, recentKeep []*TimelineItem, nonceStr string, inputTokenEstimate int64, outputTokenBudget int64) string {
+	return m.renderBatchCompressPromptWithCoverage(toCompress, recentKeep, nonceStr, inputTokenEstimate, outputTokenBudget).Prompt
+}
+
+// renderBatchCompressPromptWithCoverage renders the reducer prompt and returns
+// the contiguous prefix of Timeline IDs that the host may safely deactivate
+// after a successful reducer response. Budget-truncated items are deliberately
+// excluded. Items removed by prompt projection remain covered because their
+// state is already materialized elsewhere in the prompt.
+func (m *Timeline) renderBatchCompressPromptWithCoverage(toCompress []*TimelineItem, recentKeep []*TimelineItem, nonceStr string, inputTokenEstimate int64, outputTokenBudget int64) batchCompressPromptRender {
 	if len(toCompress) == 0 {
-		return ""
+		return batchCompressPromptRender{}
 	}
 
 	ins, err := template.New("timeline-batch-compress").Parse(timelineBatchCompress)
 	if err != nil {
 		log.Errorf("BUG: batch compress prompt template failed: %v", err)
-		return ""
+		return batchCompressPromptRender{}
 	}
 
 	var buf bytes.Buffer
@@ -490,9 +502,36 @@ func (m *Timeline) renderBatchCompressPrompt(toCompress []*TimelineItem, recentK
 	})
 	if err != nil {
 		log.Errorf("BUG: batch compress prompt execution failed: %v", err)
-		return ""
+		return batchCompressPromptRender{}
 	}
-	return buf.String()
+	return batchCompressPromptRender{
+		Prompt:           buf.String(),
+		CoveredItemIDs:   batchCompressCoveredPrefixIDs(toCompress, actualItemCount),
+		ReducerItemCount: actualItemCount,
+	}
+}
+
+// batchCompressCoveredPrefixIDs maps the count of projected items actually
+// rendered into the reducer prompt back to the original Timeline order.
+// Projection-only bookkeeping may be crossed safely, but the first semantic
+// item omitted by the byte budget stops coverage. This keeps CoveredEndItemID
+// and the deleted flags aligned with what the reducer could actually observe.
+func batchCompressCoveredPrefixIDs(items []*TimelineItem, includedProjectedCount int) []int64 {
+	covered := make([]int64, 0, len(items))
+	remainingIncluded := includedProjectedCount
+	for _, item := range items {
+		if item == nil {
+			continue
+		}
+		if projectTimelineItemForPrompt(item) != nil {
+			if remainingIncluded <= 0 {
+				break
+			}
+			remainingIncluded--
+		}
+		covered = append(covered, item.GetID())
+	}
+	return covered
 }
 
 func (m *Timeline) getActiveTimelineItemIDs() []int64 {
