@@ -52,9 +52,13 @@ func TestAudit5013FetchV5LogStartOffsetIsInt64(t *testing.T) {
 		t.Fatalf("valid FetchRequest v5 rejected: %v", err)
 	}
 }
-func TestAudit5013ControlApiVersionsV1EnvelopeOnly(t *testing.T) {
+func TestAudit5013ControlApiVersionsV1Context(t *testing.T) {
 	// v1: error_code=0 + empty api_keys + throttle_time_ms=0.
-	_, err := ParseKafkaResponseBody(18, []byte{0, 0, 0, 0, 0, 0, 0, 0, 0, 0})
+	body := []byte{0, 0, 0, 0, 0, 0, 0, 0, 0, 0}
+	info, err := KafkaResponseBodyVersion(18, 1, body)
+	require.Equal(t, int32(0), info["Throttle Time"])
+	_, legacyErr := ParseKafkaResponseBody(18, body)
+	require.Error(t, legacyErr, "v1 tail must not be silently accepted as v0")
 	if err != nil {
 		t.Fatalf("valid ApiVersionsResponse v1 rejected: %v", err)
 	}

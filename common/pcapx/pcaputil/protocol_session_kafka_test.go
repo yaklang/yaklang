@@ -3,6 +3,7 @@ package pcaputil
 import (
 	"encoding/binary"
 	"fmt"
+	"hash/crc32"
 	"testing"
 	"time"
 
@@ -85,6 +86,7 @@ func kafkaRecordBatch(count int32, compressed bool) []byte {
 	rest = append(rest, 0xff, 0xff)
 	rest = append(rest, kafkaBE32(-1)...)
 	rest = append(rest, kafkaBE32(count)...)
+	binary.BigEndian.PutUint32(rest[5:9], crc32.Checksum(rest[9:], crc32.MakeTable(crc32.Castagnoli)))
 	batch := kafkaBE64(0)
 	batch = append(batch, kafkaBE32(int32(len(rest)))...)
 	return append(batch, rest...)

@@ -8,8 +8,6 @@ import (
 	"strings"
 )
 
-type binRedis struct{ values [2]uint64 }
-
 func probeRedis(w []byte, limit int) ProbeResult {
 	if len(w) < 1 {
 		return ProbeResult{Verdict: ProbeReject}
@@ -36,7 +34,7 @@ func probeRedis(w []byte, limit int) ProbeResult {
 
 func redisPrefix(b byte) bool {
 	switch b {
-	case '*', '$', '+', '-', ':', '_', '#', ',', '(', '!', '=', '%', '~', '>':
+	case '*', '$', '+', '-', ':', '_', '#', ',', '(', '!', '=', '%', '~', '>', '|':
 		return true
 	}
 	return false
@@ -44,7 +42,7 @@ func redisPrefix(b byte) bool {
 
 func redisVersion(b byte) string {
 	switch b {
-	case '_', '#', ',', '(', '!', '=', '%', '~', '>':
+	case '_', '#', ',', '(', '!', '=', '%', '~', '>', '|':
 		return "RESP3"
 	default:
 		return "RESP2"
@@ -77,7 +75,7 @@ func redisFrameLengthBudget(w []byte, depth int, budget ParserBudget, used *int)
 			if err := redisUnsignedPrefix(digits); err != nil {
 				return 0, err
 			}
-		case '$', '!', '=', '*', '%', '~', '>':
+		case '$', '!', '=', '*', '%', '~', '>', '|':
 			if err := redisLengthDigits(w[1:]); err != nil {
 				return 0, err
 			}
@@ -151,7 +149,7 @@ func redisFrameLengthBudget(w []byte, depth int, budget ParserBudget, used *int)
 		return need, nil
 	}
 	multiplier := uint64(1)
-	if w[0] == '%' {
+	if w[0] == '%' || w[0] == '|' {
 		multiplier = 2
 	}
 	if count > uint64(budget.MaxCollectionElements)/multiplier {
@@ -180,7 +178,7 @@ func (f *binFlow) frameRedis(w []byte) (int, *binSpec, error) {
 	if f.redis == nil {
 		return 0, nil, sessionContext("Redis session was not observed")
 	}
-	if err := f.reserveSession(256); err != nil {
+	if err := f.reserveSession(f.redis.storage()); err != nil {
 		return 0, nil, err
 	}
 	used := 0
@@ -195,27 +193,6 @@ func (f *binFlow) frameRedis(w []byte) (int, *binSpec, error) {
 		return f.a.config.MaxMessageBytes + 1, nil, nil
 	}
 	return n, f.spec("redis", "Redis"), nil
-}
-
-func (r *binRedis) consume(dir int, raw []byte) (map[string]any, error) {
-	if len(raw) == 0 {
-		return nil, fmt.Errorf("redis: empty value")
-	}
-	ver := redisVersion(raw[0])
-	info := map[string]any{
-		"RESP Type":     redisTypeName(raw[0]),
-		"Version":       ver,
-		"Context Level": "observed",
-	}
-	// An array may be either a command or a reply. Without an observed role,
-	// expose per-direction arrivals rather than inventing request correlation.
-	r.values[dir]++
-	info["Direction Value Index"] = r.values[dir]
-	info["Version Negotiated"] = false
-	if raw[0] == '>' {
-		info["Push"] = true
-	}
-	return info, nil
 }
 
 func redisTypeName(b byte) string {
@@ -248,6 +225,8 @@ func redisTypeName(b byte) string {
 		return "Set"
 	case '>':
 		return "Push"
+	case '|':
+		return "Attribute"
 	}
 	return "Unknown"
 }

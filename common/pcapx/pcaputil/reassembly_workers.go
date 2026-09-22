@@ -452,7 +452,7 @@ func (d *tcpWorkers) run(w *tcpWorker) {
 				r := &b.packets[i]
 				if r.raw {
 					decoder.link = r.link
-					decoder.feed(w.pool.ctx, r.data, withEvidence(gopacket.CaptureInfo{Timestamp: r.ts, CaptureLength: len(r.data), Length: len(r.data)}, r.evidence))
+					decoder.feedWithEvidence(w.pool.ctx, r.data, gopacket.CaptureInfo{Timestamp: r.ts, CaptureLength: len(r.data), Length: len(r.data)}, r.evidence)
 				} else {
 					tcp := layers.TCP{SrcPort: layers.TCPPort(r.sport), DstPort: layers.TCPPort(r.dport), Seq: r.seq, SYN: r.flags&1 != 0, ACK: r.flags&2 != 0, FIN: r.flags&4 != 0, RST: r.flags&8 != 0}
 					tcp.Payload = r.data
