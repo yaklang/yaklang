@@ -363,3 +363,94 @@ func TestMITMFilter_IsPassed_AllFilterTypesDelimiter(t *testing.T) {
 		}
 	})
 }
+
+func TestExpandURIFilterGroup_AbsoluteURL(t *testing.T) {
+	t.Run("full url expands to path", func(t *testing.T) {
+		got := expandURIFilterGroup([]string{"https://beacons.gvt2.com/domainreliability/upload"})
+		require.Equal(t, []string{
+			"https://beacons.gvt2.com/domainreliability/upload",
+			"/domainreliability/upload",
+		}, got)
+	})
+	t.Run("plain path stays unchanged", func(t *testing.T) {
+		got := expandURIFilterGroup([]string{"/domainreliability/upload"})
+		require.Equal(t, []string{"/domainreliability/upload"}, got)
+	})
+	t.Run("deduplicates expanded path", func(t *testing.T) {
+		got := expandURIFilterGroup([]string{
+			"https://beacons.gvt2.com/domainreliability/upload",
+			"/domainreliability/upload",
+		})
+		require.Equal(t, []string{
+			"https://beacons.gvt2.com/domainreliability/upload",
+			"/domainreliability/upload",
+		}, got)
+	})
+	t.Run("delimiter split then expand each url", func(t *testing.T) {
+		got := expandURIFilterGroup(expandGroupByDelimiter([]string{
+			"https://a.com/foo,https://b.com/bar",
+		}))
+		require.Equal(t, []string{
+			"https://a.com/foo",
+			"/foo",
+			"https://b.com/bar",
+			"/bar",
+		}, got)
+	})
+}
+
+// TestMITMFilter_IsPassed_FullURLInExcludeUri covers the quick-filter
+// regression: users add the History URL (scheme + host + path) into
+// 「排除 URL 路径」, which used to miss because IsPassed only matched
+// ExtractRawPath against the original glob.
+func TestMITMFilter_IsPassed_FullURLInExcludeUri(t *testing.T) {
+	fullURL := "https://beacons.gvt2.com/domainreliability/upload"
+	hostport := "beacons.gvt2.com:443"
+
+	t.Run("exclude full url filters the same request", func(t *testing.T) {
+		filter := NewMITMFilter(&ypb.MITMFilterData{
+			ExcludeUri: []*ypb.FilterDataItem{{
+				MatcherType: httptpl.MATCHER_TYPE_GLOB,
+				Group:       []string{fullURL},
+			}},
+		})
+		require.False(t, filter.IsPassed("POST", hostport, fullURL, ""))
+		require.False(t, filter.IsPassed("POST", hostport, "/domainreliability/upload", ""))
+		require.True(t, filter.IsPassed("POST", hostport, "https://beacons.gvt2.com/other", ""))
+		require.True(t, filter.IsPassed("GET", "example.com:443", "https://example.com/api", ""))
+	})
+
+	t.Run("exclude path still filters", func(t *testing.T) {
+		filter := NewMITMFilter(&ypb.MITMFilterData{
+			ExcludeUri: []*ypb.FilterDataItem{{
+				MatcherType: httptpl.MATCHER_TYPE_GLOB,
+				Group:       []string{"/domainreliability/upload"},
+			}},
+		})
+		require.False(t, filter.IsPassed("POST", hostport, fullURL, ""))
+		require.False(t, filter.IsPassed("POST", hostport, "/domainreliability/upload", ""))
+	})
+
+	t.Run("exclude hostname still filters by host only", func(t *testing.T) {
+		filter := NewMITMFilter(&ypb.MITMFilterData{
+			ExcludeHostnames: []*ypb.FilterDataItem{{
+				MatcherType: httptpl.MATCHER_TYPE_GLOB,
+				Group:       []string{"beacons.gvt2.com"},
+			}},
+		})
+		require.False(t, filter.IsPassed("POST", "beacons.gvt2.com", fullURL, ""))
+		require.True(t, filter.IsPassed("POST", "example.com", fullURL, ""))
+	})
+
+	t.Run("include full url still passes that request", func(t *testing.T) {
+		filter := NewMITMFilter(&ypb.MITMFilterData{
+			IncludeUri: []*ypb.FilterDataItem{{
+				MatcherType: httptpl.MATCHER_TYPE_GLOB,
+				Group:       []string{fullURL},
+			}},
+		})
+		require.True(t, filter.IsPassed("POST", hostport, fullURL, ""))
+		require.True(t, filter.IsPassed("POST", hostport, "/domainreliability/upload", ""))
+		require.False(t, filter.IsPassed("POST", hostport, "https://beacons.gvt2.com/other", ""))
+	})
+}
