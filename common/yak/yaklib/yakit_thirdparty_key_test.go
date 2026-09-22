@@ -1,26 +1,74 @@
 package yaklib
 
 import (
-	"os"
 	"testing"
 
 	"github.com/stretchr/testify/require"
+	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
-func TestGetThirdPartyAPIKeyEmptyType(t *testing.T) {
-	require.Equal(t, "", getThirdPartyAPIKey(""))
-	require.Equal(t, "", getThirdPartyAPIKey("   "))
+func isolateThirdPartyAppConfigs(t *testing.T) {
+	t.Helper()
+	original := consts.AllThirdPartyApplicationConfig()
+	t.Cleanup(func() {
+		consts.ClearThirdPartyApplicationConfig()
+		for _, cfg := range original {
+			consts.UpdateThirdPartyApplicationConfig(cfg)
+		}
+	})
+	consts.ClearThirdPartyApplicationConfig()
 }
 
-func TestGetThirdPartyAPIKeyGitHubEnvFallback(t *testing.T) {
-	if os.Getenv("CI") == "" {
-		// Local Yakit AppConfigs may already hold a GitHub key; only assert env wins when config is empty.
-	}
-	t.Setenv("GITHUB_TOKEN", "ghp_from_env_token")
+func TestGetGitHubAPIKeyEmpty(t *testing.T) {
+	isolateThirdPartyAppConfigs(t)
+	t.Setenv("GITHUB_TOKEN", "")
 	t.Setenv("GH_TOKEN", "")
-	got := getThirdPartyAPIKey("github")
-	require.NotEmpty(t, got, "github key should resolve from AppConfigs or GITHUB_TOKEN")
-	if got != "ghp_from_env_token" {
-		t.Logf("using configured AppConfigs key instead of env (len=%d)", len(got))
-	}
+	require.Equal(t, "", getGitHubAPIKey())
+}
+
+func TestGetGitHubAPIKeyEnvFallback(t *testing.T) {
+	isolateThirdPartyAppConfigs(t)
+	t.Setenv("GITHUB_TOKEN", "ghp_from_env_token")
+	t.Setenv("GH_TOKEN", "should_not_use")
+	require.Equal(t, "ghp_from_env_token", getGitHubAPIKey())
+}
+
+func TestGetGitHubAPIKeyGHTokenFallback(t *testing.T) {
+	isolateThirdPartyAppConfigs(t)
+	t.Setenv("GITHUB_TOKEN", "")
+	t.Setenv("GH_TOKEN", "gh_from_env_token")
+	require.Equal(t, "gh_from_env_token", getGitHubAPIKey())
+}
+
+func TestGetGitHubAPIKeyAppConfigWins(t *testing.T) {
+	isolateThirdPartyAppConfigs(t)
+	t.Setenv("GITHUB_TOKEN", "ghp_from_env_token")
+	consts.UpdateThirdPartyApplicationConfig(&ypb.ThirdPartyApplicationConfig{
+		Type:   "github",
+		APIKey: "ghp_from_app_config",
+	})
+	require.Equal(t, "ghp_from_app_config", getGitHubAPIKey())
+}
+
+func TestGetGiteeAPIKeyEmpty(t *testing.T) {
+	isolateThirdPartyAppConfigs(t)
+	t.Setenv("GITEE_TOKEN", "")
+	require.Equal(t, "", getGiteeAPIKey())
+}
+
+func TestGetGiteeAPIKeyEnvFallback(t *testing.T) {
+	isolateThirdPartyAppConfigs(t)
+	t.Setenv("GITEE_TOKEN", "gitee_from_env_token")
+	require.Equal(t, "gitee_from_env_token", getGiteeAPIKey())
+}
+
+func TestGetGiteeAPIKeyAppConfigWins(t *testing.T) {
+	isolateThirdPartyAppConfigs(t)
+	t.Setenv("GITEE_TOKEN", "gitee_from_env_token")
+	consts.UpdateThirdPartyApplicationConfig(&ypb.ThirdPartyApplicationConfig{
+		Type:   "gitee",
+		APIKey: "gitee_from_app_config",
+	})
+	require.Equal(t, "gitee_from_app_config", getGiteeAPIKey())
 }
