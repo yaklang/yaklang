@@ -44,7 +44,9 @@ go test ./common/yakgrpc -run '^$' -bench '^BenchmarkInMemoryClient$' -benchtime
 
 Essential Tests 复用已编译的测试二进制，新增独立的 deterministic boundaries 分组，不对这些测试重试；广泛回归分组跳过已分组的相同用例，避免重复执行。yakgrpc 与 coreplugin 的 prepared suites 设置 `SUITE_NEEDS_GRPC=0`，不再启动外部 yak grpc 或等待 ready 日志。需要同步规则的分组仍独立执行 `yak sync-rule`。
 
-编译 yakgrpc 之前检查源文件、模块声明和两个包的测试依赖图，阻止运行时补丁库重新进入。原有完整扫描、MITM、Fuzzer、SSA、coreplugin 分组继续运行，IPC/CLI 启动测试继续覆盖实际进程和端口。
+编译 yakgrpc 之前检查源文件、模块声明和两个包的测试依赖图，阻止运行时补丁库重新进入。MITM 插件生命周期测试在 MITM 分组独立执行、不重试，并从 Other 分组排除。通过 hook 清单确认加载/卸载完成，再发请求；使用回调通道核对六种 hook，避免 sleep 和未同步计数导致整个综合分组重跑。
+
+原有完整扫描、MITM、Fuzzer、SSA、coreplugin 分组继续运行，IPC/CLI 启动测试继续覆盖实际进程和端口。
 
 ## 回归测试揭示的功能问题
 
