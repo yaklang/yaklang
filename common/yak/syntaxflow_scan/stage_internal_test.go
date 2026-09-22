@@ -4,7 +4,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"sync"
+	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 )
@@ -232,4 +234,49 @@ func TestStageOutcomeRecorder_ConcurrentUpdates(t *testing.T) {
 	// depends on the interleaving; only the lower bound is deterministic.
 	require.GreaterOrEqual(t, outcome.RiskCount, int64(32))
 	require.Positive(t, recorder.Scale().TotalFiles)
+}
+
+// structScanCountsStub reports fixed struct-stage counts and records how often
+// it was queried, so the caller can be checked without a compiled program.
+type structScanCountsStub struct {
+	rules   int
+	results int
+	calls   atomic.Int64
+}
+
+func (s *structScanCountsStub) StructScanCounts() (int, int) {
+	s.calls.Add(1)
+	return s.rules, s.results
+}
+
+// observeStruct must take the recorder lock exactly once. Taking it twice
+// self-deadlocks on the non-reentrant sync.Mutex, which hangs the whole
+// ScanProject call: that is how this was caught on CI.
+func TestStageOutcomeRecorder_ObserveStructDoesNotSelfDeadlock(t *testing.T) {
+	recorder := newStageOutcomeRecorder()
+	prog := &structScanCountsStub{rules: 3, results: 7}
+
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		recorder.observeStruct(prog)
+	}()
+
+	select {
+	case <-done:
+	case <-time.After(5 * time.Second):
+		t.Fatal("observeStruct deadlocked: it must not lock the recorder mutex twice")
+	}
+
+	require.EqualValues(t, 1, prog.calls.Load(), "counts must be read once")
+	metrics := recorder.metrics[StageReview]
+	require.EqualValues(t, 3, metrics.ruleCount)
+	require.EqualValues(t, 7, metrics.riskCount)
+
+	// A later call with smaller counts keeps the maximum; observeStruct records
+	// the high-water mark rather than the latest sample.
+	recorder.observeStruct(&structScanCountsStub{rules: 1, results: 2})
+	metrics = recorder.metrics[StageReview]
+	require.EqualValues(t, 3, metrics.ruleCount)
+	require.EqualValues(t, 7, metrics.riskCount)
 }

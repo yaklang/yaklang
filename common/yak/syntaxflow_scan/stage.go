@@ -300,8 +300,6 @@ func (r *stageOutcomeRecorder) observeStruct(prog interface{ StructScanCounts() 
 	if r == nil || prog == nil {
 		return
 	}
-	r.mu.Lock()
-	defer r.mu.Unlock()
 	rules, results := prog.StructScanCounts()
 	r.mu.Lock()
 	defer r.mu.Unlock()
