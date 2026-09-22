@@ -884,6 +884,9 @@ func sharedScanCallbackOptions(cfg *Config) []ssaconfig.Option {
 	if cfg.ScanTaskCallback != nil && cfg.ProcessWithRule {
 		opts = append(opts, WithProcessRuleDetail(true))
 	}
+	if dir := strings.TrimSpace(cfg.GetDebugDir()); dir != "" {
+		opts = append(opts, ssaconfig.WithDebugDir(dir))
+	}
 	if cfg.resultCallback != nil {
 		opts = append(opts, WithScanResultCallback(cfg.resultCallback))
 	}
