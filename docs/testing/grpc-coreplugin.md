@@ -7,7 +7,9 @@
 - gRPC 契约：通过 `newInMemoryClient` / `NewLocalClientAndServerWithTempDatabase` 使用 bufconn。保留 protobuf、流、EOF、deadline、取消等行为，不抢占 TCP 端口，不固定 sleep。独立客户端由 `t.Cleanup` 关闭；临时数据库先关闭所有连接，再删除目录。
 - 完整插件：`NewLocalClient` 在本地与 CI 都使用进程内 gRPC。靶场 HTTP、DNSLog 协议服务等真实网络边界仍使用操作系统分配的端口。DNSLog 服务只返回本轮实际观察到的回连；未知 token 不会访问公网。Fastjson 使用靶场的 DNS 解析观察入口，运行原始插件源码，不改写 risk 调用。
 
-持久化 SSA 搜索测试在查询前移除当前程序的编译缓存，确保通过数据库重载进行验证。进程内服务和编译器共享缓存，不能把进程隔离当成隐含的测试前置条件。
+持久化 SSA 搜索测试在查询前移除当前程序的编译缓存，确保通过数据库重载进行验证。进程内服务和编译器共享缓存，不能把进程隔离当成隐含的测试前置条件。 对按结果 ID 查询的持久化测试，显式调用 Save，避免 QueryWithSave 的结果缓存绕过数据库加载。
+
+切换项目的测试必须传入正确的项目类型，并在 `t.Cleanup` 中恢复原项目；删除当前项目后同时检查元数据与数据库配置。仅检查项目列表会漏掉仍指向已删除 SQLite 文件的连接，导致后续测试偶发缺表或漏报风险。
 
 `NewLocalClient` 是包级共享客户端，适用于仍依赖全局数据库的旧集成测试，不应被单个测试关闭。新测试优先使用独立 Server 和数据库。不要在 `t.Parallel` 中修改全局配置；需要全局运行时配置的 AI 测试仍串行运行。
 
