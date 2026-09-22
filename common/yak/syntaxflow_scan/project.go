@@ -765,10 +765,9 @@ func loadNamedPrograms(cfg *Config) error {
 
 func structCompileOptions(cfg *Config) []ssaconfig.Option {
 	var opts []ssaconfig.Option
-	// Read-only scans must not persist struct-stage results; the flag has to be
-	// set here because this stage writes its own audit rows and risks.
-	if cfg != nil && cfg.IsSyntaxFlowResultNoDB() {
-		opts = append(opts, ssaapi.WithStructRuleNoResultDB(true))
+	// Struct rules use the same final SyntaxFlow result-save guard as SSA rules.
+	if cfg != nil && cfg.IsNoSaveRisk() {
+		opts = append(opts, ssaconfig.WithNoSaveRisk(true))
 	}
 	rules := cfg.customRules()
 	var structRaws []string
@@ -897,12 +896,9 @@ func sharedScanCallbackOptions(cfg *Config) []ssaconfig.Option {
 	if cfg.GetScanConcurrency() > 0 {
 		opts = append(opts, ssaconfig.WithScanConcurrency(cfg.GetScanConcurrency()))
 	}
-	// Propagate the read-only scan switch to every stage. ScanProject rebuilds
-	// its options per stage from this shared set, so a flag that is not listed
-	// here silently disappears and the stage writes results back into the IR
-	// database.
-	if cfg.IsSyntaxFlowResultNoDB() {
-		opts = append(opts, ssaconfig.WithSyntaxFlowNoResultDB(true))
+	// Propagate the risk-persistence setting to nested scan stages.
+	if cfg.IsNoSaveRisk() {
+		opts = append(opts, ssaconfig.WithNoSaveRisk(true))
 	}
 	return opts
 }

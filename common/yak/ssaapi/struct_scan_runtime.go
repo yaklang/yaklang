@@ -33,10 +33,6 @@ type structScanRuntime struct {
 	ruleStats     map[string]*structRuleStat
 	skipped       bool
 	skipReason    string
-	// noResultDB keeps struct-stage results out of the SSA database, matching
-	// the ssa stage's read-only scan mode. Without it a read-only scan still
-	// writes audit rows and risks from this stage.
-	noResultDB bool
 }
 
 // structRuleStat aggregates one struct-mode rule across compile units so
@@ -268,6 +264,7 @@ func (s *structScanRuntime) ScanStruct(progAPI *Program, unit *ssa.CompileUnit) 
 		res, err := QuerySyntaxflow(
 			QueryWithValue(target),
 			QueryWithResultProgram(progAPI),
+			QueryWithSSAConfig(progAPI.config.Config),
 			QueryWithStruct(unit),
 			QueryWithRuleContent(rule.Content),
 			QueryWithMemory(),
@@ -327,12 +324,6 @@ func (s *structScanRuntime) persistAfterProgramMeta(progAPI *Program) {
 		return
 	}
 	if progAPI.Program.DatabaseKind == ssa.ProgramCacheMemory {
-		return
-	}
-	// Read-only scans (--no-result-db) keep the analysed database untouched:
-	// results were already handed to the risk callback, so there is nothing
-	// left to persist.
-	if s.noResultDB {
 		return
 	}
 	for _, res := range s.results {

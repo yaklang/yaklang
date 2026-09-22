@@ -177,12 +177,6 @@ func (m *scanManager) SaveTask() error {
 	if m.taskRecorder == nil {
 		m.taskRecorder = &schema.SyntaxFlowScanTask{}
 	}
-	// A read-only scan (--no-result-db) must leave the analysed database
-	// untouched, and that includes the task bookkeeping row. The scan still
-	// runs normally; only the persisted record is skipped.
-	if m.Config != nil && m.Config.IsSyntaxFlowResultNoDB() {
-		return nil
-	}
 	m.taskRecorder.Programs = strings.Join(m.Config.GetProgramNames(), schema.SYNTAXFLOWSCAN_PROGRAM_SPLIT)
 	m.taskRecorder.TaskId = m.taskID
 	m.taskRecorder.Status = m.status
@@ -217,7 +211,12 @@ func (m *scanManager) SaveTask() error {
 					m.taskRecorder.LowCount = c.Count
 				}
 			}
-			m.taskRecorder.RiskCount = riskTotal
+			// A result stream can intentionally keep risks in memory. Preserve its
+			// count when the database has no matching rows; otherwise the persisted
+			// rows remain authoritative for ordinary database-backed scans.
+			if riskTotal > 0 || m.taskRecorder.RiskCount == 0 {
+				m.taskRecorder.RiskCount = riskTotal
+			}
 		}
 	}
 	err := schema.SaveSyntaxFlowScanTask(ssadb.GetDB(), m.taskRecorder)

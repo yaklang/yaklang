@@ -18,7 +18,6 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/syntaxflow/sfdb"
-	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/filesys"
 	"github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
@@ -43,16 +42,27 @@ type ruleFile struct {
 	name    string
 	content string
 	tags    []string
+	rule    *schema.SyntaxFlowRule
 }
 
 func SyncRuleFromFileSystemToDB(db *gorm.DB, fsInstance filesys_interface.FileSystem, buildin bool, notifies ...func(process float64, ruleName string)) (err error) {
+	return syncRuleFromFileSystemToDB(db, fsInstance, buildin, false, notifies...)
+}
+
+// replaceBuiltins is only used for the complete embedded snapshot. Imports of
+// individual files or directories must not delete other installed rules.
+func syncRuleFromFileSystemToDB(db *gorm.DB, fsInstance filesys_interface.FileSystem, buildin, replaceBuiltins bool, notifies ...func(process float64, ruleName string)) (err error) {
 	if db == nil {
 		return utils.Errorf("profile db is nil")
 	}
 	var notify func(process float64, ruleName string)
 	if len(notifies) != 0 {
 		notify = notifies[0]
-		defer notify(1, "同步SyntaxFlow规则成功！")
+		defer func() {
+			if err == nil && notify != nil {
+				notify(1, "同步SyntaxFlow规则成功！")
+			}
+		}()
 	}
 
 	// Collect the rule files first. The old single-pass version compiled and
@@ -81,22 +91,32 @@ func SyncRuleFromFileSystemToDB(db *gorm.DB, fsInstance filesys_interface.FileSy
 	}
 	totalCount := float64(len(files))
 
-	// Rules already stored with compiled opcodes are skipped outright:
-	// re-importing identical bytes only redoes the parse and rewrites rows that
-	// already exist. Only rules whose content changed (or that were stored
-	// before opcode caching) pay the ANTLR parse again.
-	stored, err := sfdb.LoadStoredContentHashesByRuleName(db, buildin)
+	// Reuse complete stored rules when their source content is unchanged. The
+	// stored rule already contains metadata produced by the SyntaxFlow AST and
+	// compiled opcodes, so there is no need for a parallel text parser or a
+	// partial fingerprint type.
+	stored, err := sfdb.LoadStoredRulesForSync(db, buildin)
 	if err != nil {
-		log.Warnf("load stored rule hashes failed, falling back to full sync: %s", err)
+		log.Warnf("load stored rules failed, falling back to full sync: %s", err)
 		stored = nil
 	}
-	// The stored fingerprint only covers the rule bytes, tags and mode. A
-	// change to the metadata enricher (groups, versions) without a content
-	// change would not be picked up by the skip below, so allow a full
-	// re-import when that needs to be forced.
-	if utils.InterfaceToBoolean(os.Getenv("YAK_SYNTAXFLOW_FORCE_RULE_SYNC")) {
+	storedByContent := make(map[string]*schema.SyntaxFlowRule, len(stored))
+	for _, rule := range stored {
+		if rule != nil && rule.Content != "" {
+			storedByContent[rule.Content] = rule
+		}
+	}
+	changed := len(stored) != len(files)
+	for i := range files {
+		if rule, ok := storedByContent[files[i].content]; ok {
+			files[i].rule = rule
+			continue
+		}
+		changed = true
+	}
+	forceSync := utils.InterfaceToBoolean(os.Getenv("YAK_SYNTAXFLOW_FORCE_RULE_SYNC"))
+	if forceSync {
 		log.Infof("YAK_SYNTAXFLOW_FORCE_RULE_SYNC set: re-importing every builtin rule")
-		stored = nil
 	}
 
 	var handledCount float64
@@ -112,28 +132,26 @@ func SyncRuleFromFileSystemToDB(db *gorm.DB, fsInstance filesys_interface.FileSy
 		}
 	}
 
-	// Split the embed into rules that need work and rules already cached. The
-	// cached ones still advance the progress callback, so callers keep seeing
-	// the same 0->1 progression.
 	scanStart := time.Now()
-	pending := make([]ruleFile, 0, len(files))
-	for _, f := range files {
-		if syncRuleAlreadyStored(stored, f, buildin) {
-			progress(f.name)
-			continue
+	needsWrite := make([]bool, len(files))
+	writeCount := 0
+	for i := range files {
+		needsWrite[i] = forceSync || files[i].rule == nil || (replaceBuiltins && changed)
+		if needsWrite[i] {
+			writeCount++
 		}
-		pending = append(pending, f)
 	}
-	if len(pending) == 0 {
+	if (writeCount == 0 && !replaceBuiltins) || (replaceBuiltins && !changed && !forceSync) {
+		for _, f := range files {
+			progress(f.name)
+		}
 		log.Infof("sync embed rules: total=%d skipped=%d cost=%v (all rules reused from database)",
 			len(files), len(files), time.Since(scanStart))
 		return nil
 	}
 
-	// Compile in parallel but keep every DB write on one goroutine: the profile
-	// DB is a single-writer SQLite, and concurrent writes here only trade
-	// parse time for `database is locked` retries. Bounded so a large embed
-	// does not spawn 1000 parser goroutines at once.
+	// Compile only files for which no complete stored rule exists. Parsing is
+	// parallel, while all database writes stay on one goroutine for SQLite.
 	workers := runtime.GOMAXPROCS(0)
 	if workers > 8 {
 		workers = 8
@@ -141,160 +159,118 @@ func SyncRuleFromFileSystemToDB(db *gorm.DB, fsInstance filesys_interface.FileSy
 	if workers < 1 {
 		workers = 1
 	}
-
 	type compileResult struct {
-		file ruleFile
-		rule *schema.SyntaxFlowRule
-		err  error
+		index int
+		rule  *schema.SyntaxFlowRule
+		err   error
 	}
-
-	compileAll := func(input []ruleFile) []compileResult {
-		out := make([]compileResult, 0, len(input))
-		if workers == 1 || len(input) <= 1 {
-			for _, f := range input {
-				rule, err := sfdb.CompileRuleForSync(f.content)
-				out = append(out, compileResult{file: f, rule: rule, err: err})
-			}
-			return out
+	compileIndexes := make([]int, 0, len(files))
+	for i := range files {
+		if needsWrite[i] && files[i].rule == nil {
+			compileIndexes = append(compileIndexes, i)
 		}
-		jobs := make(chan ruleFile)
+	}
+	compileAll := func(indexes []int) <-chan compileResult {
 		results := make(chan compileResult, workers)
+		if workers == 1 || len(indexes) <= 1 {
+			go func() {
+				defer close(results)
+				for _, index := range indexes {
+					rule, err := sfdb.CheckSyntaxFlowRuleContent(files[index].content)
+					results <- compileResult{index: index, rule: rule, err: err}
+				}
+			}()
+			return results
+		}
+		jobs := make(chan int)
 		var wg sync.WaitGroup
 		for i := 0; i < workers; i++ {
 			wg.Add(1)
 			go func() {
 				defer wg.Done()
-				for f := range jobs {
-					rule, err := sfdb.CompileRuleForSync(f.content)
-					results <- compileResult{file: f, rule: rule, err: err}
+				for index := range jobs {
+					rule, err := sfdb.CheckSyntaxFlowRuleContent(files[index].content)
+					results <- compileResult{index: index, rule: rule, err: err}
 				}
 			}()
 		}
 		go func() {
 			defer close(jobs)
-			for _, f := range input {
-				jobs <- f
+			for _, index := range indexes {
+				jobs <- index
 			}
 		}()
 		go func() {
 			wg.Wait()
 			close(results)
 		}()
-		for res := range results {
-			out = append(out, res)
-		}
-		return out
+		return results
 	}
 
-	var firstErr error
 	compileStart := time.Now()
-	compiled := compileAll(pending)
-	compileCost := time.Since(compileStart)
-	writeStart := time.Now()
-	for _, res := range compiled {
-		f := res.file
-		if res.err == nil {
-			res.err = sfdb.ImportCompiledRuleWithDB(db, f.name, f.content, f.path, buildin, res.rule, f.tags...)
-		}
+	compiled := compileAll(compileIndexes)
+	compileErrs := make(map[int]error, len(compileIndexes))
+	var firstErr error
+	for res := range compiled {
 		if res.err != nil {
-			log.Warnf("import rule %s error: %s", f.name, res.err)
+			compileErrs[res.index] = res.err
 			if firstErr == nil {
 				firstErr = res.err
+			}
+			continue
+		}
+		files[res.index].rule = res.rule
+	}
+	compileCost := time.Since(compileStart)
+	if replaceBuiltins && firstErr != nil {
+		for i := range files {
+			if err := compileErrs[i]; err != nil {
+				return utils.Wrapf(err, "compile builtin rule %s", files[i].name)
+			}
+		}
+	}
+	if replaceBuiltins {
+		if err := sfdb.DeleteBuildInRuleWithDB(db); err != nil {
+			return err
+		}
+	}
+
+	writeStart := time.Now()
+	for i := range files {
+		f := files[i]
+		if !needsWrite[i] {
+			progress(f.name)
+			continue
+		}
+		if err := compileErrs[i]; err != nil {
+			log.Warnf("compile rule %s error: %s", f.name, err)
+			continue
+		}
+		rule := cloneRuleForSync(f.rule)
+		if err := sfdb.ImportCompiledRuleWithDB(db, f.name, f.content, f.path, buildin, rule, f.tags...); err != nil {
+			log.Warnf("import rule %s error: %s", f.name, err)
+			if firstErr == nil {
+				firstErr = err
 			}
 			continue
 		}
 		progress(f.name)
 	}
 	log.Infof("sync embed rules: total=%d skipped=%d compiled=%d compile=%v write=%v",
-		len(files), len(files)-len(pending), len(pending), compileCost, time.Since(writeStart))
+		len(files), len(files)-writeCount, len(compileIndexes), compileCost, time.Since(writeStart))
 	return firstErr
 }
 
-// storedRuleName is the rule_name a sync pass produces for a file, used to
-// match the embed against rows already in the profile DB. Builtin rules are
-// stored under their title (title_zh first, then title, then the file name);
-// non-builtin imports keep the file's base name.
-func storedRuleName(fileName, content string, buildin bool) string {
-	if !buildin {
-		return fileName
+func cloneRuleForSync(rule *schema.SyntaxFlowRule) *schema.SyntaxFlowRule {
+	if rule == nil {
+		return nil
 	}
-	meta := extractRuleTitleMetadata(content)
-	if meta.TitleZh != "" {
-		return meta.TitleZh
-	}
-	if meta.Title != "" {
-		return meta.Title
-	}
-	return fileName
-}
-
-// syncRuleAlreadyStored reports whether the stored rule set already holds this
-// file's exact content with compiled opcodes. Both the title-derived name and
-// the raw file name are probed: the metadata scan is a fast path that cannot
-// cover every legal desc() spelling, and a false negative only costs one
-// recompile, while a false positive would drop rule updates.
-func syncRuleAlreadyStored(stored map[string]sfdb.StoredRuleFingerprint, f ruleFile, buildin bool) bool {
-	if stored == nil {
-		return false
-	}
-	hash := sfdb.RuleContentHash(f.content)
-	// The tag string is rebuilt from the directory path on every sync, so a
-	// rule moved between tag folders must be re-imported even though its bytes
-	// are unchanged.
-	mode := extractRuleMode(f.content)
-	tags := ruleTagString(f.tags, mode)
-	matches := func(got sfdb.StoredRuleFingerprint) bool {
-		return got.ContentHash == hash && got.Tag == tags && got.Mode == mode
-	}
-	if got, ok := stored[storedRuleName(f.name, f.content, buildin)]; ok && matches(got) {
-		return true
-	}
-	if got, ok := stored[f.name]; ok && matches(got) {
-		return true
-	}
-	return false
-}
-
-// extractRuleMode reads the `mode:` value out of a rule's desc() block without
-// compiling it, normalized the way schema.ValidRuleMode does (an absent or
-// unrecognized mode means ssa) plus the sfvm mode aliases the compiler folds
-// into the rule mode.
-func extractRuleMode(content string) string {
-	raw := ""
-	for _, item := range ruleDescItems(content) {
-		if item.key == "mode" && item.value != "" {
-			raw = strings.ToLower(item.value)
-			break
-		}
-	}
-	switch raw {
-	case "source", "pattern", "sfpattern":
-		return string(schema.SFR_MODE_SOURCE)
-	case "struct":
-		return string(schema.SFR_MODE_STRUCT)
-	default:
-		return string(schema.SFR_MODE_SSA)
-	}
-}
-
-// ruleTagString renders the tag string an import produces for a rule without
-// compiling it: the directory tags first, then the mode tag the compiler adds
-// for `desc(mode: source|struct)`. Content-level desc tags (cwe/tag keys) are
-// not visible to the line scan, so the sync treats a stored rule whose tag no
-// longer matches as changed and re-imports it. That costs one recompile for
-// such rules but can never drop a real rule update.
-func ruleTagString(tags []string, mode string) string {
-	merged := ""
-	for _, t := range tags {
-		merged = sfvm.AppendRuleTag(merged, t)
-	}
-	switch strings.ToLower(strings.TrimSpace(mode)) {
-	case string(schema.SFR_MODE_SOURCE):
-		merged = sfvm.AppendRuleTag(merged, sfvm.RuleModeSource)
-	case string(schema.SFR_MODE_STRUCT):
-		merged = sfvm.AppendRuleTag(merged, sfvm.RuleModeStruct)
-	}
-	return merged
+	cloned := *rule
+	cloned.Model = gorm.Model{}
+	cloned.Hash = ""
+	cloned.CWE = append(schema.StringArray(nil), rule.CWE...)
+	cloned.Groups = nil
+	return &cloned
 }
 
 // ruleTagsFromDir derives the tag list from the rule's directory path, the
@@ -357,13 +333,12 @@ func ForceSyncEmbedRuleToDB(db *gorm.DB, notifies ...func(process float64, ruleN
 		notify = notifies[0]
 	}
 	InitEmbedFSWithNotify(notify)
-	return utils.Wrapf(SyncRuleFromFileSystemToDB(db, ruleFSWithHash, true, notifies...), "init builtin rules to custom db error")
+	return utils.Wrapf(syncRuleFromFileSystemToDB(db, ruleFSWithHash, true, true, notifies...), "init builtin rules to custom db error")
 }
 
 // syncEmbedRuleInternal 内部同步实现（不处理 hash 更新，由调用者决定）
 func syncEmbedRuleInternal(notifies ...func(process float64, ruleName string)) (err error) {
 	log.Infof("start sync embed rule")
-	// sfdb.DeleteBuildInRule()
 
 	var notify func(process float64, ruleName string)
 	if len(notifies) > 0 {
@@ -374,7 +349,7 @@ func syncEmbedRuleInternal(notifies ...func(process float64, ruleName string)) (
 	// 注意：这需要在 GetRuleFileSystem() 之前调用
 	InitEmbedFSWithNotify(notify)
 
-	err = SyncRuleFromFileSystem(ruleFSWithHash, true, notifies...)
+	err = syncRuleFromFileSystemToDB(consts.GetGormProfileDatabase(), ruleFSWithHash, true, true, notifies...)
 
 	return utils.Wrapf(err, "init builtin rules error")
 }

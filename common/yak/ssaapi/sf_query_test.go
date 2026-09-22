@@ -39,6 +39,43 @@ println(123)
 	require.Equal(t, schema.SFResultKindDebug, auditResult.Kind)
 }
 
+func TestSFNoSaveRiskKeepsOutputWithoutPersistence(t *testing.T) {
+	progName := uuid.NewString()
+	taskID := uuid.NewString()
+	prog, err := ssaapi.Parse(`println(123)`,
+		ssaapi.WithLanguage(ssaconfig.Yak),
+		ssaapi.WithProgramName(progName),
+	)
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		ssadb.DeleteProgram(ssadb.GetDB(), progName)
+	})
+
+	config, err := ssaconfig.NewCLIScanConfig(ssaconfig.WithNoSaveRisk(true))
+	require.NoError(t, err)
+	res, err := prog.SyntaxFlowWithError(`
+desc(title: "no save risk")
+println(* as $target)
+alert $target
+`,
+		ssaapi.QueryWithSSAConfig(config),
+		ssaapi.QueryWithSave(schema.SFResultKindScan),
+		ssaapi.QueryWithTaskID(taskID),
+	)
+	require.NoError(t, err)
+	require.Greater(t, res.RiskCount(), 0)
+	require.Equal(t, ssaconfig.SFResultSaveMemory, res.GetResultSaveKind())
+
+	var auditRows int64
+	require.NoError(t, ssadb.GetDB().Model(&ssadb.AuditResult{}).
+		Where("program_name = ?", progName).Count(&auditRows).Error)
+	require.Zero(t, auditRows)
+	var riskRows int64
+	require.NoError(t, ssadb.GetDB().Model(&schema.SSARisk{}).
+		Where("runtime_id = ?", taskID).Count(&riskRows).Error)
+	require.Zero(t, riskRows)
+}
+
 func TestSFQueryWithCache(t *testing.T) {
 	progName := uuid.NewString()
 	code := `

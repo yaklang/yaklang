@@ -248,7 +248,11 @@ func QuerySyntaxflow(opt ...QueryOption) (*SyntaxFlowResult, error) {
 			if err != nil {
 				return ret, utils.Wrap(err, "SyntaxflowQuery: save to DB failed")
 			}
-			setResultToCache(kind, ret)
+			cacheKind := kind
+			if config.IsNoSaveRisk() {
+				cacheKind = ssaconfig.SFResultSaveMemory
+			}
+			setResultToCache(cacheKind, ret)
 		case ssaconfig.SFResultSaveMemory:
 			// save to memory
 			id := getResultCacheId()
@@ -394,13 +398,6 @@ func QueryWithFrame(f *sfvm.SFFrame) QueryOption {
 func QueryWithSave(kind schema.SyntaxflowResultKind) QueryOption {
 	return func(c *queryConfig) {
 		c.kind = kind
-		// A read-only scan (NoResultDB) keeps results in memory: the IR
-		// database must not be modified, but the caller still needs the result
-		// object (and its risks) for report output.
-		if c.IsSyntaxFlowResultNoDB() {
-			c.SetSyntaxFlowResultSaveMemory()
-			return
-		}
 		c.SetSyntaxFlowResultSaveDataBase()
 	}
 }
@@ -538,7 +535,19 @@ func QueryWithSourceResultCallback(callback func(*SyntaxFlowResult)) QueryOption
 
 func QueryWithSSAConfig(c *ssaconfig.Config) QueryOption {
 	return func(q *queryConfig) {
-		q.Config = c
+		if c == nil {
+			return
+		}
+		cloned := *c
+		if c.SyntaxFlow != nil {
+			syntaxFlow := *c.SyntaxFlow
+			cloned.SyntaxFlow = &syntaxFlow
+		}
+		if c.BaseInfo != nil {
+			baseInfo := *c.BaseInfo
+			cloned.BaseInfo = &baseInfo
+		}
+		q.Config = &cloned
 	}
 }
 

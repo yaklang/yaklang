@@ -1500,10 +1500,9 @@ Exports structured report (sarif/irify).`,
 		},
 
 		cli.BoolFlag{
-			Name: "no-result-db",
-			Usage: "do not persist scan results (risks / audit nodes and edges) into the SSA database; " +
-				"results are still produced in memory and written to --output. Use this when scanning an " +
-				"existing IR database that must not be modified, e.g. a shared or read-only project database",
+			Name: "no-save-risk",
+			Usage: "do not persist SyntaxFlow risks or audit result data; risks are still written to " +
+				"--output/report callbacks and scan task status is still recorded",
 		},
 
 		cli.StringFlag{

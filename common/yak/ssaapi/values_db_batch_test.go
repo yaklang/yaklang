@@ -25,7 +25,7 @@ func TestBatchSaveAuditNodesAndEdgesIsEquivalencePreserving(t *testing.T) {
 		_ = db.Close()
 	})
 
-	const rows = 25 // > batch boundaries at any sane per-statement limit
+	const rows = 205 // Cross multiple CreateInBatches chunks for both models.
 	nodes := make([]*ssadb.AuditNode, 0, rows)
 	for i := 0; i < rows; i++ {
 		node := ssadb.NewAuditNode()

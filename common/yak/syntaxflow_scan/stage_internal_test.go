@@ -144,6 +144,29 @@ func TestStageOutcomeRecorder_AccumulatesStreamedRisks(t *testing.T) {
 	require.EqualValues(t, 7, outcome.RiskCount)
 }
 
+func TestStageOutcomeRecorder_ConcurrentResults(t *testing.T) {
+	recorder := newStageOutcomeRecorder()
+	const workers = 32
+	const resultsPerWorker = 32
+	var wg sync.WaitGroup
+	for worker := 0; worker < workers; worker++ {
+		wg.Add(1)
+		go func(worker int) {
+			defer wg.Done()
+			for result := 0; result < resultsPerWorker; result++ {
+				recorder.addRule(StageInspect, fmt.Sprintf("rule-%d-%d", worker, result))
+				recorder.addRisk(StageInspect, 1)
+			}
+		}(worker)
+	}
+	wg.Wait()
+	recorder.record(StageInspect, nil)
+
+	outcome := recorder.Outcomes()[0]
+	require.EqualValues(t, workers*resultsPerWorker, outcome.RuleCount)
+	require.EqualValues(t, workers*resultsPerWorker, outcome.RiskCount)
+}
+
 func TestSkippedRequestedStages_DetectsUnstartedDetection(t *testing.T) {
 	mode := productModeSelection{source: true, review: true, analyze: true}
 	skipped := skippedRequestedStages(mode, []StageOutcome{
