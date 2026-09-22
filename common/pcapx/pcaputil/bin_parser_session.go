@@ -389,6 +389,9 @@ func (f *binFlow) invalidateSession(dir int) {
 }
 
 func (f *binFlow) closeSession() {
+	if f.protocol == "dns" || f.protocol == "dot" {
+		f.a.closeDNSFlow(f.id)
+	}
 	f.httpMethods, f.httpWSKeys, f.httpWSExtensions = nil, nil, nil
 	f.httpIDs, f.httpTimes = nil, nil
 	f.httpUpgrades, f.httpDoH, f.httpIPP = nil, nil, nil

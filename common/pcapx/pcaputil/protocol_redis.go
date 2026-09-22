@@ -25,10 +25,57 @@ type binRedis struct {
 	txn                    bool
 	pubsub, desynchronized bool
 	clock                  time.Time
+	replyOff, replySkip    bool
+	replyBoundaries        []int
+}
+
+// OFF/SKIP have no acknowledgement. Preserve the preceding reply boundary so
+// an ACL/command error cannot silently be assigned to a later request.
+func (r *binRedis) observeReplyMode(v map[string]any, cmd string, info map[string]any) (bool, error) {
+	xs := redisItems(v)
+	mode := ""
+	if cmd == "CLIENT" && len(xs) == 3 && strings.EqualFold(redisText(xs[1].(map[string]any)), "REPLY") {
+		mode = strings.ToUpper(redisText(xs[2].(map[string]any)))
+		if mode != "ON" && mode != "OFF" && mode != "SKIP" {
+			mode = ""
+		}
+	}
+	if mode != "" {
+		inTxn := r.txn
+		for _, p := range r.pending {
+			inTxn = inTxn || p.command == "MULTI"
+		}
+		if inTxn {
+			return false, protocolError(ErrContextRequired, "Redis CLIENT REPLY inside transaction")
+		}
+		info["Reply Mode Command"] = mode
+	}
+	silent := r.replyOff || r.replySkip
+	r.replySkip = false
+	switch mode {
+	case "ON":
+		r.replyOff = false
+		silent = false // ON clears both OFF and the current command's SKIP flag.
+	case "OFF", "SKIP":
+		if len(r.replyBoundaries) == 0 || r.replyBoundaries[len(r.replyBoundaries)-1] != len(r.pending) {
+			r.replyBoundaries = append(r.replyBoundaries, len(r.pending))
+		}
+		if mode == "OFF" {
+			r.replyOff = true
+		} else if !r.replyOff {
+			r.replySkip = true
+		}
+		silent = true
+	}
+	if silent {
+		info["Reply Expected"] = false
+		info["Correlation Status"] = "reply-suppressed-observed"
+	}
+	return silent, nil
 }
 
 func (r *binRedis) storage() int64 {
-	n := 256 + int64(len(r.pending))*128 + int64(r.attrBytes[0]+r.attrBytes[1])
+	n := 256 + int64(cap(r.replyBoundaries))*8 + int64(len(r.pending))*128 + int64(r.attrBytes[0]+r.attrBytes[1])
 	for key := range r.subscriptions {
 		n += 64 + int64(len(key))
 	}
@@ -222,6 +269,14 @@ func (f *binFlow) consumeRedis(dir int, e *ProtocolEvent) (map[string]any, error
 		e.ID = f.a.ids.Add(1)
 	}
 	if r.client == dir && cmd != "" {
+		info["Command"] = cmd
+		silent, err := r.observeReplyMode(v, cmd, info)
+		if err != nil {
+			return nil, err
+		}
+		if silent {
+			return info, f.reserveSession(r.storage())
+		}
 		if len(r.pending) >= f.a.budget.MaxCollectionElements {
 			return nil, protocolError(ErrResourceExceeded, "Redis pending requests")
 		}
@@ -253,6 +308,22 @@ func (f *binFlow) consumeRedis(dir int, e *ProtocolEvent) (map[string]any, error
 		}
 		if push {
 			info["Push"] = true
+		}
+		if !push && len(r.replyBoundaries) > 0 && r.replyBoundaries[0] == 0 {
+			if v["Type"] == "Error" || v["Type"] == "BlobError" || len(r.pending) == 0 {
+				// A denied mode switch and a later command error may be identical
+				// on the wire. Do not invent an association in that ambiguity.
+				r.desynchronized = true
+				r.pending = nil
+				r.txn = false
+				info["Correlation Status"] = "ambiguous-reply-mode"
+				return info, f.reserveSession(r.storage())
+			}
+			r.replyBoundaries = r.replyBoundaries[1:]
+			if len(r.replyBoundaries) == 0 {
+				r.replyBoundaries = nil
+			}
+			info["Reply Mode Evidence"] = "non-error-response"
 		}
 		match := len(r.pending) > 0 && (!push || redisSubscription(name) && r.pending[0].command == name)
 		if match {
@@ -310,6 +381,11 @@ func (f *binFlow) consumeRedis(dir int, e *ProtocolEvent) (map[string]any, error
 			}
 			r.pending[0].remaining--
 			if r.pending[0].remaining <= 0 {
+				for i := range r.replyBoundaries {
+					if r.replyBoundaries[i] > 0 {
+						r.replyBoundaries[i]--
+					}
+				}
 				r.pending[0] = redisRequest{}
 				r.pending = r.pending[1:]
 				if len(r.pending) == 0 {

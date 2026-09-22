@@ -3,6 +3,7 @@ package pcaputil
 import (
 	"bytes"
 	"encoding/binary"
+	"encoding/hex"
 	"fmt"
 	"net"
 	"strings"
@@ -41,7 +42,8 @@ func DecodeDNSMessage(w []byte, limit int) (map[string]any, error) {
 		}
 		rows := make([]map[string]any, 0, min(count, 16))
 		for j := 0; j < count; j++ {
-			nm, err := name(len(w))
+			nm, next, nameWire, err := dnsParseNameWire(w, pos)
+			pos = next
 			if err != nil {
 				return nil, err
 			}
@@ -57,6 +59,7 @@ func DecodeDNSMessage(w []byte, limit int) (map[string]any, error) {
 			row := map[string]any{"Name": nm, "Type": typ, "Class": class, "Class Base": class & 0x7fff}
 			if section == 0 {
 				row["QU"] = class&0x8000 != 0
+				row["Name Wire"] = nameWire
 				rows = append(rows, row)
 				continue
 			}
@@ -189,8 +192,11 @@ func DecodeDNSMessage(w []byte, limit int) (map[string]any, error) {
 }
 
 type dnsPending struct {
-	id uint64
-	ts time.Time
+	id         uint64
+	ts         time.Time
+	flow       uint64
+	cost       int64
+	responders map[string]struct{}
 }
 type dnsCorrelation struct {
 	pending map[string]dnsPending
@@ -201,10 +207,30 @@ func dnsQuestionKey(info map[string]any) string {
 	var b strings.Builder
 	fmt.Fprint(&b, info["ID"])
 	for _, q := range info["Questions"].([]map[string]any) {
-		fmt.Fprintf(&b, "/%s/%v/%v", strings.ToLower(q["Name"].(string)), q["Type"], q["Class Base"])
+		// Canonicalize only ASCII case; label lengths and all other octets remain
+		// part of the identity. Display escaping must not define association.
+		wire := bytes.Clone(q["Name Wire"].([]byte))
+		for i, c := range wire {
+			if c >= 'A' && c <= 'Z' {
+				wire[i] = c + ('a' - 'A')
+			}
+		}
+		fmt.Fprintf(&b, "/%s/%v/%v", hex.EncodeToString(wire), q["Type"], q["Class"])
 	}
 	return b.String()
 }
+
+func (a *binParser) closeDNSFlow(id uint64) {
+	a.dnsMu.Lock()
+	defer a.dnsMu.Unlock()
+	for k, p := range a.dns.pending {
+		if p.flow == id && id != 0 {
+			a.buffered.Add(-p.cost)
+			delete(a.dns.pending, k)
+		}
+	}
+}
+
 func (a *binParser) dnsEvent(e *ProtocolEvent, w []byte) error {
 	info, err := DecodeDNSMessage(w, a.budget.MaxCollectionElements)
 	if err != nil {
@@ -238,7 +264,7 @@ func (a *binParser) dnsEventDecoded(e *ProtocolEvent, info map[string]any) error
 	}
 	for k, v := range s.pending {
 		if s.clock.Sub(v.ts) > 30*time.Second {
-			a.buffered.Add(-int64(len(k) + 128))
+			a.buffered.Add(-v.cost)
 			delete(s.pending, k)
 		}
 	}
@@ -246,7 +272,33 @@ func (a *binParser) dnsEventDecoded(e *ProtocolEvent, info map[string]any) error
 	if info["Response"] == true {
 		src, dst = dst, src
 	}
-	key := fmt.Sprintf("%v/%s/%s/%s/%s", e.Domain, e.Transport, src, dst, dnsQuestionKey(info))
+	flow := uint64(0)
+	if e.Transport == "tcp" {
+		flow = e.FlowID
+		if flow == 0 {
+			e.Session["Association Status"] = "missing-connection"
+			return nil
+		}
+	}
+	keyFor := func(server string) string {
+		return fmt.Sprintf("%v/%s/%s/%d/%s/%s/%s", e.Domain, e.Protocol, e.Transport, flow, src, server, dnsQuestionKey(info))
+	}
+	key := keyFor(dst)
+	multicast := false
+	if e.Protocol == "llmnr" && e.Transport == "udp" {
+		host, port, _ := net.SplitHostPort(dst)
+		multicast = port == "5355" && (host == "224.0.0.252" || host == "ff02::1:3")
+		if multicast {
+			key = keyFor("multicast")
+		}
+		if info["Response"] == true {
+			_, responderPort, _ := net.SplitHostPort(e.Source)
+			if _, ok := s.pending[key]; !ok && responderPort == "5355" {
+				key = keyFor("multicast")
+				multicast = true
+			}
+		}
+	}
 	if e.ID == 0 {
 		e.ID = a.ids.Add(1)
 	}
@@ -259,8 +311,30 @@ func (a *binParser) dnsEventDecoded(e *ProtocolEvent, info map[string]any) error
 			}
 			e.Session["Latency"] = e.Timestamp.Sub(p.ts).Seconds()
 			e.Completeness = "transaction"
-			a.buffered.Add(-int64(len(key) + 128))
-			delete(s.pending, key)
+			if multicast {
+				if p.responders == nil {
+					p.responders = map[string]struct{}{}
+				}
+				if _, seen := p.responders[e.Source]; seen {
+					e.Session["Retransmission"] = true
+				} else {
+					cost := int64(len(e.Source) + 32)
+					if len(p.responders) >= a.budget.MaxCollectionElements || !a.reserveEvidence(cost) {
+						e.ResponseTo, e.TransactionID = 0, 0
+						e.Completeness = "message"
+						delete(e.Session, "Matched Request")
+						e.Session["Association Status"] = "limited"
+						return nil
+					}
+					p.responders[e.Source] = struct{}{}
+					p.cost += cost
+				}
+				e.Session["Responder Count"] = len(p.responders)
+				s.pending[key] = p
+			} else {
+				a.buffered.Add(-p.cost)
+				delete(s.pending, key)
+			}
 		} else {
 			e.Session["Association"] = "missing-request"
 			e.Session["Association Status"] = "missing-request"
@@ -272,7 +346,7 @@ func (a *binParser) dnsEventDecoded(e *ProtocolEvent, info map[string]any) error
 			e.Session["Retransmission"] = true
 		} else if len(s.pending) < a.budget.MaxCollectionElements && a.reserveEvidence(int64(len(key)+128)) {
 			e.TransactionID = e.ID
-			s.pending[key] = dnsPending{e.ID, e.Timestamp}
+			s.pending[key] = dnsPending{id: e.ID, ts: e.Timestamp, flow: flow, cost: int64(len(key) + 128)}
 		} else {
 			e.Session["Association"] = "limited"
 		}

@@ -152,7 +152,23 @@ func dnsQuestion(msg []byte) (name string, qtype uint16, err error) {
 }
 
 func dnsParseName(msg []byte, at int) (string, int, error) {
-	var labels []string
+	name, next, _, err := dnsParseNameDecoded(msg, at, false)
+	return name, next, err
+}
+
+func dnsParseNameWire(msg []byte, at int) (string, int, []byte, error) {
+	return dnsParseNameDecoded(msg, at, true)
+}
+
+func dnsParseNameDecoded(msg []byte, at int, keepWire bool) (string, int, []byte, error) {
+	var wire []byte
+	var name strings.Builder
+	if at >= 0 && at < len(msg) {
+		name.Grow(min(len(msg)-at, 255))
+		if keepWire {
+			wire = make([]byte, 0, min(len(msg)-at, 255))
+		}
+	}
 	next := at
 	jumped := false
 	var targets [128]int // cycles require a repeated compression-pointer target
@@ -160,21 +176,24 @@ func dnsParseName(msg []byte, at int) (string, int, error) {
 	jumps := 0
 	for {
 		if at < 0 || at >= len(msg) {
-			return "", 0, fmt.Errorf("dot: truncated QNAME")
+			return "", 0, nil, fmt.Errorf("dot: truncated QNAME")
 		}
 		l := int(msg[at])
 		if l == 0 {
 			if !jumped {
 				next = at + 1
 			}
-			return strings.Join(labels, "."), next, nil
+			if keepWire {
+				wire = append(wire, 0)
+			}
+			return name.String(), next, wire, nil
 		}
 		if l >= 0xc0 {
 			if jumps == len(targets) {
-				return "", 0, protocolError(ErrResourceExceeded, "DNS pointer budget")
+				return "", 0, nil, protocolError(ErrResourceExceeded, "DNS pointer budget")
 			}
 			if at+1 >= len(msg) {
-				return "", 0, fmt.Errorf("dot: truncated name pointer")
+				return "", 0, nil, fmt.Errorf("dot: truncated name pointer")
 			}
 			if !jumped {
 				next = at + 2
@@ -183,7 +202,7 @@ func dnsParseName(msg []byte, at int) (string, int, error) {
 			at = (l&0x3f)<<8 | int(msg[at+1])
 			for _, target := range targets[:jumps] {
 				if target == at {
-					return "", 0, fmt.Errorf("dot: DNS name pointer loop")
+					return "", 0, nil, fmt.Errorf("dot: DNS name pointer loop")
 				}
 			}
 			targets[jumps] = at
@@ -191,17 +210,37 @@ func dnsParseName(msg []byte, at int) (string, int, error) {
 			continue
 		}
 		if l > 63 {
-			return "", 0, fmt.Errorf("dot: invalid DNS label length")
+			return "", 0, nil, fmt.Errorf("dot: invalid DNS label length")
 		}
 		at++
 		if at+l > len(msg) {
-			return "", 0, fmt.Errorf("dot: truncated DNS label")
+			return "", 0, nil, fmt.Errorf("dot: truncated DNS label")
 		}
 		expanded += l + 1
 		if expanded > 255 {
-			return "", 0, fmt.Errorf("dot: DNS name exceeds 255 octets")
+			return "", 0, nil, fmt.Errorf("dot: DNS name exceeds 255 octets")
 		}
-		labels = append(labels, string(msg[at:at+l]))
+		if keepWire {
+			wire = append(wire, byte(l))
+			wire = append(wire, msg[at:at+l]...)
+		}
+		if name.Len() > 0 {
+			name.WriteByte('.')
+		}
+		for _, c := range msg[at : at+l] {
+			switch {
+			case c == '.' || c == '\\':
+				name.WriteByte('\\')
+				name.WriteByte(c)
+			case c < 0x21 || c > 0x7e:
+				name.WriteByte('\\')
+				name.WriteByte('0' + c/100)
+				name.WriteByte('0' + c/10%10)
+				name.WriteByte('0' + c%10)
+			default:
+				name.WriteByte(c)
+			}
+		}
 		at += l
 	}
 }
