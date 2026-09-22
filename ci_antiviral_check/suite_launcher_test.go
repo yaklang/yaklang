@@ -26,20 +26,23 @@ func TestSuiteLauncherEngineRequirement(t *testing.T) {
 	}
 	script := filepath.Join(repoRoot(t), "scripts", "ci", "test-run-suite.sh")
 	for _, tc := range []struct {
-		name, needs, engine, sync string
-		runnerExit, wantExit      int
-		wantEngine, wantRunner    bool
+		name, needs, engine, sync        string
+		runnerExit, wantExit             int
+		wantEngine, wantRunner, wantSync bool
 	}{
-		{"static pass", "0", "exit", "0", 0, 0, false, true},
-		{"static test failure", "0", "exit", "0", 7, 7, false, true},
-		{"static missing binary", "0", "missing", "0", 0, 0, false, true},
-		{"default ready", "", "ready", "0", 0, 0, true, true},
-		{"default test failure", "", "ready", "0", 7, 7, true, true},
-		{"default startup exit", "", "exit", "0", 0, 1, true, false},
-		{"default no ready event", "", "silent", "0", 0, 1, true, false},
-		{"default missing binary", "", "missing", "0", 0, 1, false, false},
-		{"static cannot sync rules", "0", "ready", "1", 0, 1, false, false},
-		{"invalid option", "typo", "ready", "0", 0, 1, false, false},
+		{"static pass", "0", "exit", "0", 0, 0, false, true, false},
+		{"static test failure", "0", "exit", "0", 7, 7, false, true, false},
+		{"static missing binary", "0", "missing", "0", 0, 0, false, true, false},
+		{"default ready", "", "ready", "0", 0, 0, true, true, false},
+		{"default test failure", "", "ready", "0", 7, 7, true, true, false},
+		{"default startup exit", "", "exit", "0", 0, 1, true, false, false},
+		{"default no ready event", "", "silent", "0", 0, 1, true, false, false},
+		{"default missing binary", "", "missing", "0", 0, 1, false, false, false},
+		{"in-process sync rules", "0", "ready", "1", 0, 0, false, true, true},
+		{"in-process sync failure", "0", "exit", "1", 0, 9, false, false, true},
+		{"in-process sync missing binary", "0", "missing", "1", 0, 1, false, false, false},
+		{"service and sync rules", "1", "ready", "1", 0, 0, true, true, true},
+		{"invalid option", "typo", "ready", "0", 0, 1, false, false, false},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			dir := t.TempDir()
@@ -52,6 +55,12 @@ func TestSuiteLauncherEngineRequirement(t *testing.T) {
 				return path
 			}
 			engine := write("engine", `#!/usr/bin/env bash
+if [[ "$1" == "sync-rule" ]]; then
+  echo called >> "$SYNC_CALLS"
+  [[ "$ENGINE_MODE" == "exit" ]] && exit 9
+  exit 0
+fi
+[[ "$1" == "grpc" ]] || exit 89
 echo called >> "$ENGINE_CALLS"
 [[ "$ENGINE_MODE" == "exit" ]] && exit 9
 [[ "$ENGINE_MODE" == "ready" ]] && echo 'yak grpc ready {}'
@@ -80,6 +89,7 @@ exec "$@"
 				"TEST_RUNNER="+runner, "SUITE_NEEDS_GRPC="+tc.needs, "SUITE_SYNC_RULE="+tc.sync,
 				"GRPC_READY_TIMEOUT=2", "SUITE_TIMEOUT=10s",
 				"ENGINE_MODE="+tc.engine, "ENGINE_CALLS="+filepath.Join(dir, "engine.calls"),
+				"SYNC_CALLS="+filepath.Join(dir, "sync.calls"),
 				"RUNNER_CALLS="+filepath.Join(dir, "runner.calls"), "RUNNER_EXIT="+strconv.Itoa(tc.runnerExit),
 			)
 			output, runErr := cmd.CombinedOutput()
@@ -97,7 +107,7 @@ exec "$@"
 			for _, check := range []struct {
 				file string
 				want bool
-			}{{"engine.calls", tc.wantEngine}, {"runner.calls", tc.wantRunner}} {
+			}{{"engine.calls", tc.wantEngine}, {"runner.calls", tc.wantRunner}, {"sync.calls", tc.wantSync}} {
 				b, err := os.ReadFile(filepath.Join(dir, check.file))
 				if check.want && (err != nil || strings.TrimSpace(string(b)) != "called") || !check.want && !os.IsNotExist(err) {
 					t.Fatalf("%s want invocation=%v, got %q err=%v\n%s", check.file, check.want, b, err, output)

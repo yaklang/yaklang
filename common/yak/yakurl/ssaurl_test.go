@@ -856,10 +856,18 @@ func TestHaveRange(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, prog)
 
-	result, err := prog.SyntaxFlowWithError(`__dependency__ as $main`, ssaapi.QueryWithSave(schema.SFResultKindDebug))
+	// Save explicitly so the request exercises a persisted result, without the
+	// query-result cache populated by QueryWithSave.
+	result, err := prog.SyntaxFlowWithError(`__dependency__ as $main`)
 	require.NoError(t, err)
-	resId := result.GetResultID()
+	resId, err := result.Save(schema.SFResultKindDebug)
+	require.NoError(t, err)
 	require.Greater(t, resId, uint(0))
+
+	// The assertions below concern persisted results. The compiler and local
+	// handler now share a process, so do not serve the compiler's cached IR.
+	ssaapi.ProgramCache.Remove(progID)
+	t.Cleanup(func() { ssaapi.ProgramCache.Remove(progID) })
 
 	// check  this value all empty
 	{
