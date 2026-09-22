@@ -458,5 +458,49 @@
     "arbitrary YAML/TOML 1.1",
     "SQLite WAL recovery",
     "host mutable filesystem race-proof sandbox"
+  ],
+  "additional_contracts": [
+    {
+      "id": "SCA-21",
+      "name": "NuGet lock",
+      "analyzer": "nuget-lang",
+      "status": "ADD",
+      "grammar": "packages.lock.json v1/v2; framework/RID-scoped, case-insensitive names; Direct/Transitive/CentralTransitive/Project; raw requested ranges and declared SHA-512",
+      "implementation": "analyzer/dep-parser/lockjson/nuget.go",
+      "fixtures_root": "testdata/modern/nuget_lock",
+      "tests": [
+        "ecosystem_lock_test.go"
+      ],
+      "identity": "ecosystem/name/version/source/architecture/variant/verification",
+      "occurrence": "snapshot/project/file/native ID/source ranges/evidence",
+      "unknown_version": "empty version, raw constraint in Requirement",
+      "failure": "structured Diagnostic plus Complete=false and non-nil error; partial evidence allowed",
+      "io": "caller-supplied immutable fs.FS; no acquisition",
+      "budget_policy": "resource-policy.json",
+      "additional_fixture_archives": [
+        "testdata/nuget_lock_v1_v2_corpus_v1.zip"
+      ]
+    },
+    {
+      "id": "SCA-22",
+      "name": "Swift resolved",
+      "analyzer": "swift-lang",
+      "status": "ADD",
+      "grammar": "Package.resolved v1/v2/v3; repository-derived v1 identity; v2/v3 explicit identity and pin kind; version/branch/revision evidence; pins only, no invented graph or directness",
+      "implementation": "analyzer/dep-parser/lockjson/swift.go",
+      "fixtures_root": "testdata/modern/swift_resolved",
+      "tests": [
+        "ecosystem_lock_test.go"
+      ],
+      "identity": "ecosystem/name/version/source/architecture/variant/verification",
+      "occurrence": "snapshot/project/file/native ID/source ranges/evidence",
+      "unknown_version": "empty version, raw constraint in Requirement",
+      "failure": "structured Diagnostic plus Complete=false and non-nil error; partial evidence allowed",
+      "io": "caller-supplied immutable fs.FS; no acquisition",
+      "budget_policy": "resource-policy.json",
+      "additional_fixture_archives": [
+        "testdata/swift_resolved_v1_v2_v3_corpus_v1.zip"
+      ]
+    }
   ]
 }

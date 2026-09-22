@@ -76,6 +76,15 @@ def main():
     contracts = json.loads((SCA / "function-contracts.json").read_text(encoding="utf-8"))["contracts"]
     if len(contracts) != 20 or len({x["analyzer"] for x in contracts}) != 20:
         errors.append("the frozen set must contain 20 distinct analyzers")
+    additional = json.loads((SCA / "function-contracts.json").read_text(encoding="utf-8")).get("additional_contracts", [])
+    if {x["analyzer"] for x in additional} != {"nuget-lang", "swift-lang"} or len(additional) != 2:
+        errors.append("expected two explicitly added lock analyzers")
+    for row in additional:
+        if row["analyzer"] in {x["analyzer"] for x in contracts}:
+            errors.append("additional analyzer replaces a frozen contract")
+        for path in [row["implementation"], *row["tests"], *row["additional_fixture_archives"]]:
+            if not (SCA / path).is_file():
+                errors.append("missing additional contract artifact: " + path)
     print(json.dumps({"passed": not errors, "sources": len(sources), "fixtures": len(fixtures), "test_candidates": len(candidates), "errors": errors,
                       "scope": "hashes and mapping targets only; not independent semantic acceptance"}, indent=2))
     return bool(errors)

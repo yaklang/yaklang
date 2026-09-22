@@ -1017,6 +1017,8 @@ func TestFilterAnalyzer(t *testing.T) {
 	}
 
 	wantLangAnalyzerTypes := []string{
+		getName(analyzer.NewNugetAnalyzer()),
+		getName(analyzer.NewSwiftAnalyzer()),
 		getName(analyzer.NewConanAnalyzer()),
 		getName(analyzer.NewGoBinaryAnalyzer()),
 		getName(analyzer.NewGoModAnalyzer()),

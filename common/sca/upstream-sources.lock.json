@@ -209,6 +209,22 @@
       "acquisition": "PINNED_RAW_FIXTURES_ONLY",
       "files": "testdata/manifest.json",
       "runtime_dependency": false
+    },
+    {
+      "repository": "https://github.com/NuGet/NuGet.Client",
+      "commit": "aa7eb9987d28e7169cfabfa484f2fdd22d2b91d2",
+      "version": "6.12.1.1",
+      "acquisition": "PINNED_SOURCE_TEST_LITERALS_AND_LICENSE_ONLY",
+      "files": "testdata/manifest.json",
+      "runtime_dependency": false
+    },
+    {
+      "repository": "https://github.com/swiftlang/swift-package-manager",
+      "commit": "5bd155f053b23664a8bb586f625aa9f8fa83ed86",
+      "version": "swift-6.0-RELEASE",
+      "acquisition": "PINNED_SOURCE_TEST_LITERALS_AND_LICENSE_ONLY",
+      "files": "testdata/manifest.json",
+      "runtime_dependency": false
     }
   ]
 }

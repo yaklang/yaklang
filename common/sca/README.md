@@ -4,7 +4,7 @@
 
 SCA 从调用方提供的只读文件系统快照提取组件、出现位置、依赖声明和诊断。`common/sca/...` 的生产及测试闭包仅使用标准库和仓库内部叶子包，不需要第三方模块或 CGO。
 
-`ScanReport(ctx, fs.FS, opts...)` 返回结构化报告；`ScanFilesystem` 保留旧包列表接口。20 类分析器及固定语法边界见 [function-contracts.json](function-contracts.json)。Docker、镜像、Git 获取入口已移除，调用方须先提供快照；POM 只访问快照中的父级、模块和显式仓库材料，JAR 不查询远端坐标。
+`ScanReport(ctx, fs.FS, opts...)` 返回结构化报告；`ScanFilesystem` 保留旧包列表接口。原有 20 类分析器加 NuGet/Swift 两类新增分析器，固定语法边界见 [function-contracts.json](function-contracts.json)。Docker、镜像、Git 获取入口已移除，调用方须先提供快照；POM 只访问快照中的父级、模块和显式仓库材料，JAR 不查询远端坐标。
 
 组件按生态、名称、版本、来源等完整身份归并；文件路径及原生实例分别保留。范围、markers、extras、校验和与未解析引用作为证据保留，不推断为确定版本或已安装组件。`go.sum` 只提供精确模块校验和，不生成组件清单。材料声明的 SRI/checksum 进入 `Verification` 和 SBOM hashes，冲突摘要不会无声合并。超限截取在稳定身份顺序下进行。缺失材料、语法错误、超限和取消返回诊断及不完整状态；`Diagnostic.Code` 可 `errors.Is/As`。SBOM 使用自有 CycloneDX 1.5 DTO。
 
@@ -26,6 +26,12 @@ SCA 从调用方提供的只读文件系统快照提取组件、出现位置、�
 - Pipfile.lock：只读 default 组的 index/hash/version；`_meta.sources` URL 与 develop 不扩张。
 - composer.lock 保留 source URL#ref 与原文 require；composer.json 声明是单独身份；空 dist shasum 与 autoload 不适用。
 
+新增生态边界（`TestEcosystemLockCorpora` / `TestEcosystemLockSemantics`）：
+
+- NuGet `packages.lock.json` v1/v2：按 framework/RID 分组解析，包名按大小写不敏感匹配；保留 Direct/Transitive/CentralTransitive/Project、requested 范围、resolved 版本和 contentHash。依赖只绑定同组已锁定记录，缺失引用保持声明；Project 为项目声明，不冒充已安装包。不推测包源、不运行 restore，不读取 csproj、assets.json、NuGet.Config 或 packages.config。摘要有值时必须是合法的 64 字节 base64 SHA-512。
+- Swift `Package.resolved` v1/v2/v3：保留 identity、source-control/registry 类型、location、version/branch/revision；v1 从仓库路径推导身份，旧显示名保留在原生记录标识中。分支与 revision 不伪装成发布版本或包内容哈希；registry 锁文件没有包源时不猜测 registry URL。只含 pins 的文件不提供依赖图和直接/间接关系，Observation.Scope 为 `directness:unknown`。originHash 属于文件级输入证据，不是包哈希；不读取或执行 Package.swift，不访问镜像/宿主 checkout。
+- 两类解析器接受严格 JSON，未知版本/类型、损坏结构、重复身份拒绝并返回不完整诊断；不接受上游部分读取器容忍的注释/尾逗号。新 ZIP 固定了上游语义案例（提取字符串、移除尾逗号；Swift originHash 插值固定为常量），并保留独立 JSON 投影、手写多框架/多状态案例、损坏摘要反例与许可。新增格式不套用原 20 类性能验收数字。
+
 资源默认值见 [resource-policy.json](resource-policy.json)。`MaxResultBytes` 是受控分配的逻辑预算：缓冲区扩容、固定字段转换、可执行文件/归档表及报告归一化均先预留再分配；0 用默认 256MiB，负值拒绝。它不等同于 Go 堆/RSS 硬顶，Go 运行时、固定启动/错误对象，以及调用方提供的文件系统与可信回调分配不包含在内。`MergePackages` 预算耗尽时保留原切片；需要错误信息时使用 `MergePackagesBudget`。
 
 802 项候选已逐项核对迁移或排除依据，范围包括 22 项显式 TOML 语法裁剪；相关字段、正例、拒绝行为和错误分类由迁移测试约束。macOS 的开发验证器会先校准文件、网络和进程拦截，再检查代表性扫描；其范围是当前 Go/Darwin libc 调用路径，不宣称覆盖任意原始内核系统调用。
@@ -40,7 +46,7 @@ SCA 从调用方提供的只读文件系统快照提取组件、出现位置、�
 
 上述清单描述锁文件中的材料，不表示每个包在当前宿主环境必然安装。组/marker 不在扫描器中求值；CycloneDX 的 `sca:observations`、`sca:requirements` 属性保留条件，使用方不能把跨环境图当作某个部署环境的安装证明。真实上游样例固定到 Cargo 仓库 tag `0.84.0`、pnpm `v9.15.9`、Poetry `2.1.1` 对应提交，另有编码身份、peer 隔离、组条件和破坏输入的自建反例；测试离线读取新 ZIP，不运行包管理器。历史旧新性能数字不覆盖新增格式。
 
-作为完整 SCA 产品，后续仍需单独建设：uv/Bun、NuGet/.NET、Swift 等生态覆盖；指定部署环境的条件求值与跨材料关系核实；更广的真实仓库/异常输入语料；SPDX 及更新 CycloneDX 版本的导出；漏洞情报匹配、VEX/可达性和许可证策略。依赖清除还需上层结合构建与使用证据；仅凭锁文件没有直接引用不能安全删除依赖。这些能力不属于当前只读分析内核已完成的承诺。
+作为完整 SCA 产品，后续仍需单独建设：uv/Bun 等生态覆盖，NuGet assets/config 与 Swift Package.swift 等补充材料；指定部署环境的条件求值与跨材料关系核实；更广的真实仓库/异常输入语料；SPDX 及更新 CycloneDX 版本的导出；漏洞情报匹配、VEX/可达性和许可证策略。依赖清除还需上层结合构建与使用证据；仅凭锁文件没有直接引用不能安全删除依赖。这些能力不属于当前只读分析内核已完成的承诺。
 
 ## 算法边界
 
@@ -94,7 +100,7 @@ macOS 隔离启动器禁止网络、写盘、以及除**当前测试二进制**�
 GOWORK=off CGO_ENABLED=0 go test ./common/sca/... -count=1 -exec "$PWD/scripts/sca/isolated-test-exec.sh"
 ```
 
-固定样例存储在 44 个版本化 ZIP 中，共 852 个逻辑文件（含随附许可与独立 oracle）；原有 830 个文件的内容和原路径保持不变。ZIP 仅由 `fixtures*_test.go` 的 `go:embed` 引入；测试按需在内存解压，支持目录遍历、Seek/ReadAt 和独立可变读取副本，不解压到工作目录。生产包没有 embed 声明，`yak.go` 不导入测试加载器。
+固定样例存储在 46 个版本化 ZIP 中，共 867 个逻辑文件（含随附许可与独立 oracle）；原有 830 个文件的内容和原路径保持不变。ZIP 仅由 `fixtures*_test.go` 的 `go:embed` 引入；测试按需在内存解压，支持目录遍历、Seek/ReadAt 和独立可变读取副本，不解压到工作目录。生产包没有 embed 声明，`yak.go` 不导入测试加载器。
 
 命名使用 `<格式及支持版本>_corpus_v<语料修订>.zip`，例如 `cargo_lock_le_v3_corpus_v1.zip`（包括 v3，故不写 lt_v3）、`pnpm_lock_v5_v6_corpus_v1.zip`、`toml_v1_0_and_rejected_v1_1_corpus_v1.zip`。格式版本与语料版本分开；未来新格式版本使用新归档，保留既有语料。ZIP 成员仍是该 `testdata` 下的相对路径，新增归档不能重复定义同一逻辑路径。
 
