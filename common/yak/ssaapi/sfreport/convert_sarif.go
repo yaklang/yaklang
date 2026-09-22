@@ -28,9 +28,10 @@ const (
 	// SarifFingerprintKey is the partial fingerprint name used to keep a
 	// finding matched to the same alert when a file moves or lines shift.
 	SarifFingerprintKey = "yaklangRiskFeatureHash"
-	// SarifRunAutomationID identifies this upload among the repository's
-	// scanners, so GitHub tracks its alerts as one set.
-	SarifRunAutomationID = "diff-code-check"
+	// SarifRunAutomationID is the analysis category for every yak upload, and it
+	// matches the workflow's `category:`. The trailing slash is required: the id
+	// is parsed as "category/run-id", so a slash-less id leaves it empty.
+	SarifRunAutomationID = "yaklang-diff-code-check/"
 )
 
 // sarifResultKind is the SARIF "kind" for every finding.
@@ -119,9 +120,6 @@ func NewSarifReport() (*SarifReport, error) {
 		WithVersion(consts.GetYakVersion())
 	run := sarif.NewRun(*sarif.NewTool(driver))
 	run.WithAutomationDetails(sarif.NewRunAutomationDetails().WithID(SarifRunAutomationID))
-	// A run is emitted even with zero results: GitHub closes the alerts of a
-	// (tool, category) upload whose results no longer contain them, so an empty
-	// run is what retires findings that were fixed.
 	sarifReport.Runs = []*sarif.Run{run}
 
 	return &SarifReport{
@@ -228,16 +226,13 @@ func (r *SarifReport) registerRule(ruleID string, rule *schema.SyntaxFlowRule, r
 		title = ruleID
 	}
 
-	// A non-empty shortDescription is required by the schema; rule content
-	// can be large, so it is only used when there is no description.
-	short := strings.TrimSpace(rule.Description)
-	if short == "" {
-		short = title
-	}
-
+	// shortDescription is the alert's one-line summary and is shown literally:
+	// GitHub only renders markdown that arrives in a `markdown` field, so a rule
+	// description placed here is printed as raw "### ..." text. Keep it plain
+	// and short; the description goes to fullDescription/help below.
 	descriptor := sarif.NewRule(ruleID).
 		WithName(title).
-		WithShortDescription(sarif.NewMultiformatMessageString(short)).
+		WithShortDescription(sarif.NewMultiformatMessageString(title)).
 		WithDefaultConfiguration(
 			sarif.NewReportingConfiguration().WithLevel(ToSarifLevel(risk.Severity)),
 		).
@@ -246,8 +241,17 @@ func (r *SarifReport) registerRule(ruleID string, rule *schema.SyntaxFlowRule, r
 			"security-severity": sarifSecuritySeverityFor(risk.Severity),
 		})
 
-	if text := strings.TrimSpace(rule.Description); text != "" {
-		descriptor = descriptor.WithFullDescription(sarif.NewMultiformatMessageString(text))
+	// The rule body is markdown. Put it in `markdown`, keeping `text` as a
+	// required plain-text fallback; GitHub renders the markdown on the alert
+	// page instead of dumping the source.
+	description := strings.TrimSpace(rule.Description)
+	if description != "" {
+		descriptor = descriptor.WithFullDescription(ruleMarkdownMessage(title, description))
+	}
+	// `help` is the remediation panel, so it carries the description plus the
+	// rule's solution when one is defined.
+	if help := ruleHelpMarkdown(description, rule.Solution); help != "" {
+		descriptor = descriptor.WithHelp(ruleMarkdownMessage(title, help))
 	}
 	if rule.RuleName != "" {
 		descriptor = descriptor.WithHelpURI(SarifInformationURI)
@@ -255,6 +259,32 @@ func (r *SarifReport) registerRule(ruleID string, rule *schema.SyntaxFlowRule, r
 
 	r.ruleByID[ruleID] = struct{}{}
 	r.driver.Rules = append(r.driver.Rules, descriptor)
+}
+
+// ruleMarkdownMessage builds a message whose markdown is rendered by GitHub.
+//
+// SARIF requires the plain-text `text` field, but GitHub displays `text`
+// literally and only renders `markdown`. Rule descriptions in yak are markdown,
+// so they are carried in `markdown` with the short title as the text fallback —
+// otherwise the alert page shows the raw source, e.g. a literal "### 漏洞描述".
+func ruleMarkdownMessage(fallback, markdown string) *sarif.MultiformatMessageString {
+	message := sarif.NewMultiformatMessageString(fallback)
+	if strings.TrimSpace(markdown) != "" {
+		message = message.WithMarkdown(markdown)
+	}
+	return message
+}
+
+// ruleHelpMarkdown joins the rule description with its remediation advice.
+func ruleHelpMarkdown(description, solution string) string {
+	parts := make([]string, 0, 2)
+	if text := strings.TrimSpace(description); text != "" {
+		parts = append(parts, text)
+	}
+	if fix := strings.TrimSpace(solution); fix != "" {
+		parts = append(parts, fix)
+	}
+	return strings.Join(parts, "\n\n")
 }
 
 func sarifSecuritySeverityFor(severity schema.SyntaxFlowSeverity) string {

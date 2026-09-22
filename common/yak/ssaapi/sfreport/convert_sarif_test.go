@@ -33,14 +33,37 @@ var sarifKindEnum = map[string]bool{
 	"informational": true,
 }
 
+// Mirrors the shape of the real CI rules (common/ssa_bootstrapping/ci_rule):
+// `desc:` carries markdown, and that markdown is what must reach the alert page
+// rendered rather than printed as source. The fixture avoids backticks so it can
+// live in a raw string literal.
 const weakDigestRule = `
-	.getInstance?{<typeName>?{have:'java.security'}}(*<slice(index=1)> as $algorithm);
-	$algorithm #{ until:` + "`*?{ opcode:const && have:/MD5/}`" + ` }-> as $sink;
-	alert $sink for {
-		title: "Use of a broken or risky hash algorithm",
-		level: "low",
-		risk: "weak-crypto"
-	}
+desc(
+	title: "Use of a broken or risky hash algorithm"
+	title_zh: "使用已破解或存在风险的哈希算法"
+	type: vuln
+	rule_id: "5d658a56-db56-4973-85b2-e2ad06ed09e8"
+	risk: "weak-crypto"
+	level: low
+	desc: <<<DESC
+### 漏洞描述
+
+1. **漏洞原理**
+   MessageDigest.getInstance("MD5") 使用的是已被证明不安全的哈希算法。
+
+2. **潜在影响**
+   - 攻击者可构造碰撞，伪造摘要。
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+
+改用 SHA-256 或更强的算法，并加盐处理。
+SOLUTION
+)
+
+.getInstance?{<typeName>?{have:'java.security'}}(*<slice(index=1)> as $algorithm);
+$algorithm #{ until:` + "`*?{ opcode:const && have:/MD5/}`" + ` }-> as $sink;
+alert $sink
 `
 
 // The file lives in a subdirectory on purpose: the emitted URI has to keep the
@@ -171,7 +194,53 @@ func TestSarifReport_ValidKindAndGitHubMetadata(t *testing.T) {
 	require.Equal(t, sfreport.SarifDriverName, driver["name"])
 	require.Equal(t, sfreport.SarifInformationURI, driver["informationUri"])
 	require.NotEmpty(t, driver["version"], "GitHub shows the tool version for each analysis")
-	require.Equal(t, "diff-code-check", run["automationDetails"].(map[string]interface{})["id"])
+}
+
+// The run reports a single fixed category, so successive uploads keep updating
+// the same alert set instead of opening a parallel one. The value must match
+// what the uploader writes for `category: yaklang-diff-code-check`, including
+// the trailing slash its getAutomationID appends: a run whose
+// automationDetails.id differs yields an empty recorded category, which
+// detaches the upload from its alert set.
+// The run reports one fixed category, so repeated uploads update the same
+// alerts; it must match the workflow's `category:` and keep the trailing slash
+// (GitHub parses the id as "category/run-id").
+func TestSarifReport_ReportsOneFixedAutomationID(t *testing.T) {
+	run := firstSarifRun(t, parseSarifDocument(t, renderSarif(t, scanJavaProject(t))))
+
+	automation, present := run["automationDetails"].(map[string]interface{})
+	require.True(t, present, "every upload must declare its alert category")
+	require.Equal(t, "yaklang-diff-code-check/", automation["id"],
+		"a slash-less id would leave the category empty")
+	require.Equal(t, sfreport.SarifRunAutomationID, automation["id"])
+}
+
+// GitHub shows shortDescription.text literally and only renders markdown that
+// arrives in a `markdown` field, so the rule body must not sit in `text`.
+func TestSarifReport_RuleDescriptionIsMarkdownNotRawText(t *testing.T) {
+	run := firstSarifRun(t, parseSarifDocument(t, renderSarif(t, scanJavaProject(t))))
+	rules := sarifEntries(t, sarifDriver(t, run)["rules"])
+	require.NotEmpty(t, rules)
+
+	for _, rule := range rules {
+		short := rule["shortDescription"].(map[string]interface{})
+		shortText, _ := short["text"].(string)
+		require.NotEmpty(t, shortText, "shortDescription.text is required by the schema")
+		require.NotContains(t, shortText, "\n",
+			"shortDescription is the alert's one-line summary")
+		require.NotContains(t, shortText, "#",
+			"markdown in shortDescription.text is displayed as raw source")
+
+		full := rule["fullDescription"].(map[string]interface{})
+		markdown, ok := full["markdown"].(string)
+		require.True(t, ok, "without `markdown` GitHub prints the description as raw text")
+		require.Contains(t, markdown, "#", "the rule body is markdown")
+		require.NotEmpty(t, full["text"], "SARIF requires a plain-text fallback")
+
+		help := rule["help"].(map[string]interface{})
+		_, hasHelpMarkdown := help["markdown"].(string)
+		require.True(t, hasHelpMarkdown, "the alert's details panel renders help markdown")
+	}
 }
 
 func TestSarifReport_RulesCarrySeverityAndTags(t *testing.T) {
