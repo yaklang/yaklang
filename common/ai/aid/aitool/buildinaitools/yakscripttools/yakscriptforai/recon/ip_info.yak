@@ -53,6 +53,85 @@ if len(ips) == 0 {
     return
 }
 
+getField = func(j, key) {
+    if j == nil { return "" }
+    v = j[key]
+    if v == nil { return "" }
+    s = str.TrimSpace(sprint(v))
+    if s == "<nil>" || s == "false" { return "" }
+    return s
+}
+
+// queryFreeGeoAPI 依次尝试 ipwho.is 与 ip-api.com 两个免费公开接口，输出国家/城市/ASN/ISP
+queryFreeGeoAPI = func(ip) {
+    // 1) ipwho.is（https，字段全，含 ASN）
+    try {
+        rsp, _, err := poc.Do("GET", sprintf("https://ipwho.is/%v", ip), poc.timeout(10 * 1000))
+        if err == nil && rsp != nil {
+            body = poc.GetHTTPPacketBody(rsp.RawPacket)
+            j = json.loads(string(body))
+            if j != nil && j["success"] == true {
+                country = getField(j, "country")
+                countryCode = getField(j, "country_code")
+                city = getField(j, "city")
+                if country != "" {
+                    yakit.Info("  [IPWHO] Country: %v (%v)", country, countryCode)
+                }
+                if city != "" {
+                    yakit.Info("  [IPWHO] City: %v", city)
+                }
+                conn = j["connection"]
+                if conn != nil {
+                    asn = conn["asn"]
+                    org = conn["org"]
+                    if asn != nil && asn != 0 {
+                        yakit.Info("  [IPWHO] ASN: AS%v (%v)", asn, org)
+                    }
+                }
+                if country != "" || countryCode != "" {
+                    return true
+                }
+            }
+        }
+    } catch err {
+        yakit.Info("  [IPWHO] free API failed: %v", err)
+    }
+
+    // 2) ip-api.com（http，国内直连可用）
+    try {
+        rsp2, _, err2 := poc.Do("GET", sprintf("http://ip-api.com/json/%v?fields=status,country,countryCode,city,isp,as", ip), poc.timeout(10 * 1000))
+        if err2 == nil && rsp2 != nil {
+            body2 = poc.GetHTTPPacketBody(rsp2.RawPacket)
+            j2 = json.loads(string(body2))
+            if j2 != nil && j2["status"] == "success" {
+                country2 = getField(j2, "country")
+                countryCode2 = getField(j2, "countryCode")
+                city2 = getField(j2, "city")
+                if country2 != "" {
+                    yakit.Info("  [IPAPI] Country: %v (%v)", country2, countryCode2)
+                }
+                if city2 != "" {
+                    yakit.Info("  [IPAPI] City: %v", city2)
+                }
+                isp2 = getField(j2, "isp")
+                as2 = getField(j2, "as")
+                if isp2 != "" {
+                    yakit.Info("  [IPAPI] ISP: %v", isp2)
+                }
+                if as2 != "" {
+                    yakit.Info("  [IPAPI] AS: %v", as2)
+                }
+                if country2 != "" || countryCode2 != "" {
+                    return true
+                }
+            }
+        }
+    } catch err2 {
+        yakit.Info("  [IPAPI] free API failed: %v", err2)
+    }
+    return false
+}
+
 yakit.Info("=== IP Geolocation & ASN Lookup ===")
 yakit.Info("Querying %d IP(s)...", len(ips))
 yakit.Info("")
@@ -164,13 +243,21 @@ for idx := 0; idx < len(ips); idx++ {
                 yakit.Info("  [AMAP] returned empty result")
             }
         } catch amapErr {
-            yakit.Info("  [AMAP] fallback also failed: %v", amapErr)
-            yakit.Info("  [HINT] No MMDB database found and amap API key not configured")
-            yakit.Info("  [HINT] Install GeoIP2-City.mmdb to yakit data directory, or configure amap API key in Yakit settings")
+            yakit.Info("  [AMAP] fallback failed: %v", amapErr)
         }
+    }
+
+    // 第三级 fallback：免费公开 geo 接口（ipwho.is → ip-api.com），无需任何 key。
+    // 背景：MMDB 需本地装库文件；amap 免费代理已被官方停用（403 free user amap proxy is currently disabled）。
+    if !geoOk {
+        geoOk = queryFreeGeoAPI(ip)
+    }
+
+    if !geoOk {
+        yakit.Info("  [HINT] All lookup paths failed (MMDB missing / amap 403 / free APIs unreachable)")
+        yakit.Info("  [HINT] Install GeoIP2-City.mmdb to yakit data directory for offline lookup")
     }
 
     yakit.Info("")
 }
-
 yakit.Info("=== Query Complete ===")
