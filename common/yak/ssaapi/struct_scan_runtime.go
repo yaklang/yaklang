@@ -20,19 +20,23 @@ import (
 
 type structScanRuntime struct {
 	enableBuiltin bool
-	extraDirs     []string
-	extraRaw      []string
-	rules         []*schema.SyntaxFlowRule
-	riskCB        func(*schema.SSARisk)
-	taskID        string
-	timeout       time.Duration
-	workLimit     int64
-	errs          []error
-	results       []*SyntaxFlowResult
-	ranHashes     []string
-	ruleStats     map[string]*structRuleStat
-	skipped       bool
-	skipReason    string
+	// includeSSA also runs ssa-mode rules on each compile unit. A later full
+	// SSA stage can cover those rows when it finishes; if it does not, the
+	// unit-level result stays.
+	includeSSA bool
+	extraDirs  []string
+	extraRaw   []string
+	rules      []*schema.SyntaxFlowRule
+	riskCB     func(*schema.SSARisk)
+	taskID     string
+	timeout    time.Duration
+	workLimit  int64
+	errs       []error
+	results    []*SyntaxFlowResult
+	ranHashes  []string
+	ruleStats  map[string]*structRuleStat
+	skipped    bool
+	skipReason string
 }
 
 // structRuleStat aggregates one struct-mode rule across compile units so
@@ -144,23 +148,29 @@ func (s *structScanRuntime) resolveRules() error {
 	}
 	var rules []*schema.SyntaxFlowRule
 	if s.enableBuiltin {
-		rules = append(rules, loadBuiltinStructRules()...)
+		rules = append(rules, loadBuiltinStructRules(s.includeSSA)...)
 	}
 	for _, dir := range s.extraDirs {
-		loaded, err := loadStructRulesFromDir(dir)
+		loaded, err := loadStructRulesFromDir(dir, s.includeSSA)
 		if err != nil {
 			return err
 		}
 		rules = append(rules, loaded...)
 	}
 	for _, raw := range s.extraRaw {
-		rule, err := compileStructRuleContent(raw)
+		rule, err := compileStructRuleContent(raw, s.includeSSA)
 		if err != nil {
 			return err
 		}
 		rules = append(rules, rule)
 	}
 	s.rules = append(s.rules, rules...)
+	sort.SliceStable(s.rules, func(i, j int) bool {
+		if s.rules[i] == nil || s.rules[j] == nil {
+			return s.rules[i] != nil
+		}
+		return schema.ScanModeRank(string(s.rules[i].Mode)) < schema.ScanModeRank(string(s.rules[j].Mode))
+	})
 	return s.validateRules()
 }
 
@@ -169,25 +179,33 @@ func (s *structScanRuntime) validateRules() error {
 		if rule == nil {
 			continue
 		}
-		if !rule.IsStructMode() {
-			return utils.Errorf("non-struct rule %s (mode=%s) cannot be used with withStructRule*", rule.RuleName, schema.ValidRuleMode(rule.Mode))
+		if rule.IsStructMode() {
+			continue
 		}
+		if s.includeSSA && schema.ValidRuleMode(rule.Mode) == schema.SFR_MODE_SSA {
+			continue
+		}
+		return utils.Errorf("non-struct rule %s (mode=%s) cannot be used with withStructRule*", rule.RuleName, schema.ValidRuleMode(rule.Mode))
 	}
 	return nil
 }
 
-func loadBuiltinStructRules() []*schema.SyntaxFlowRule {
+func loadBuiltinStructRules(includeSSA bool) []*schema.SyntaxFlowRule {
 	db := consts.GetGormProfileDatabase()
 	if db == nil {
 		return nil
 	}
+	modes := []string{string(schema.SFR_MODE_STRUCT)}
+	if includeSSA {
+		modes = append(modes, string(schema.SFR_MODE_SSA))
+	}
 	var rules []*schema.SyntaxFlowRule
-	_ = yakit.ApplySyntaxFlowRuleModeFilter(db.Model(&schema.SyntaxFlowRule{}), []string{string(schema.SFR_MODE_STRUCT)}).
+	_ = yakit.ApplySyntaxFlowRuleModeFilter(db.Model(&schema.SyntaxFlowRule{}), modes).
 		Find(&rules).Error
 	return rules
 }
 
-func loadStructRulesFromDir(dir string) ([]*schema.SyntaxFlowRule, error) {
+func loadStructRulesFromDir(dir string, allowSSA bool) ([]*schema.SyntaxFlowRule, error) {
 	var rules []*schema.SyntaxFlowRule
 	err := filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
@@ -200,7 +218,7 @@ func loadStructRulesFromDir(dir string) ([]*schema.SyntaxFlowRule, error) {
 		if err != nil {
 			return err
 		}
-		rule, err := compileStructRuleContent(string(raw))
+		rule, err := compileStructRuleContent(string(raw), allowSSA)
 		if err != nil {
 			log.Warnf("[struct_scan] skip %s: %v", path, err)
 			return nil
@@ -214,7 +232,7 @@ func loadStructRulesFromDir(dir string) ([]*schema.SyntaxFlowRule, error) {
 	return rules, err
 }
 
-func compileStructRuleContent(raw string) (*schema.SyntaxFlowRule, error) {
+func compileStructRuleContent(raw string, allowSSA bool) (*schema.SyntaxFlowRule, error) {
 	frame, err := sfvm.NewSyntaxFlowVirtualMachine().Compile(raw)
 	if err != nil {
 		return nil, err
@@ -225,10 +243,10 @@ func compileStructRuleContent(raw string) (*schema.SyntaxFlowRule, error) {
 	}
 	rule.Content = raw
 	rule.NormalizeMode()
-	if !rule.IsStructMode() {
-		return nil, utils.Errorf("rule mode %s is not struct", rule.Mode)
+	if rule.IsStructMode() || (allowSSA && schema.ValidRuleMode(rule.Mode) == schema.SFR_MODE_SSA) {
+		return rule, nil
 	}
-	return rule, nil
+	return nil, utils.Errorf("rule mode %s is not struct", rule.Mode)
 }
 
 func (s *structScanRuntime) ScanStruct(progAPI *Program, unit *ssa.CompileUnit) {

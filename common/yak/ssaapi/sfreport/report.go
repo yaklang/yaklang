@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 )
 
@@ -136,6 +137,13 @@ func (r *Report) AddRisks(risk ...*Risk) {
 		r.Risks = make(map[string]*Risk)
 	}
 	for _, risk := range risk {
+		if risk == nil {
+			continue
+		}
+		if r.dropIncomingRisk(risk) {
+			continue
+		}
+		r.dropCoveredRisks(risk)
 		// set program from risk if not set in report
 		// TODO:不同program的risk能放在一个报告吗？
 		if r.ProgramName == "" && risk.GetProgramName() != "" {
@@ -144,6 +152,69 @@ func (r *Report) AddRisks(risk ...*Risk) {
 
 		r.Risks[risk.GetHash()] = risk
 	}
+	r.RiskNums = len(r.Risks)
+}
+
+func reportRiskSchema(risk *Risk) *schema.SSARisk {
+	if risk == nil {
+		return nil
+	}
+	return &schema.SSARisk{
+		Hash:            risk.GetHash(),
+		ScanMode:        risk.ScanMode,
+		RiskFeatureHash: risk.RiskFeatureHash,
+		RiskType:        risk.RiskType,
+		CodeSourceUrl:   risk.CodeSourceURL,
+		Line:            risk.Line,
+		ProgramName:     risk.ProgramName,
+	}
+}
+
+// dropIncomingRisk reports whether a more precise finding is already stored.
+func (r *Report) dropIncomingRisk(risk *Risk) bool {
+	incoming := reportRiskSchema(risk)
+	for _, old := range r.Risks {
+		if schema.CoverActionFor(reportRiskSchema(old), incoming) == schema.CoverDropNew {
+			return true
+		}
+	}
+	return false
+}
+
+// dropCoveredRisks removes less precise findings that this risk replaces.
+func (r *Report) dropCoveredRisks(risk *Risk) {
+	incoming := reportRiskSchema(risk)
+	for hash, old := range r.Risks {
+		if schema.CoverActionFor(reportRiskSchema(old), incoming) != schema.CoverReplaceOld {
+			continue
+		}
+		delete(r.Risks, hash)
+		for _, file := range r.File {
+			if file == nil {
+				continue
+			}
+			file.Risks = removeRiskHash(file.Risks, hash)
+		}
+		for _, rule := range r.Rules {
+			if rule == nil {
+				continue
+			}
+			rule.Risks = removeRiskHash(rule.Risks, hash)
+		}
+	}
+}
+
+func removeRiskHash(hashes []string, hash string) []string {
+	if hash == "" {
+		return hashes
+	}
+	out := hashes[:0]
+	for _, item := range hashes {
+		if item != hash {
+			out = append(out, item)
+		}
+	}
+	return out
 }
 
 func (r *Report) GetRisk(hash string) *Risk {

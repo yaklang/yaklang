@@ -47,6 +47,26 @@ func WithStructRuleDir(dir string) ssaconfig.Option {
 	})(dir)
 }
 
+// WithStructIncludeSSARules runs ssa-mode rules on each compile unit together
+// with the struct rules. Product scans turn this on only when both struct and
+// ssa stages are selected.
+func WithStructIncludeSSARules(enable bool) ssaconfig.Option {
+	return ssaconfig.SetOption("ssa_compile/struct_include_ssa", func(c *Config, v bool) {
+		c.ensureStructScan().includeSSA = v
+	})(enable)
+}
+
+// WithStructTaskID sets the runtime id stored on risks from the compile-time
+// scan so a later SSA stage of the same project scan can cover them.
+func WithStructTaskID(id string) ssaconfig.Option {
+	return ssaconfig.SetOption("ssa_compile/struct_task_id", func(c *Config, v string) {
+		if strings.TrimSpace(v) == "" {
+			return
+		}
+		c.ensureStructScan().taskID = strings.TrimSpace(v)
+	})(id)
+}
+
 func WithStructRuleRaw(raw string) ssaconfig.Option {
 	return ssaconfig.SetOption("ssa_compile/struct_rule_raw", func(c *Config, v string) {
 		if strings.TrimSpace(v) == "" {

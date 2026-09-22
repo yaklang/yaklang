@@ -146,17 +146,14 @@ func buildSSARisk(
 		}
 	}
 
+	// Rule name, title and alert variable are omitted so source/struct/ssa
+	// siblings that alert the same value share one feature hash.
 	newSSARisk.RiskFeatureHash = utils.CalcSha1(
-		// SSA Feature
 		newSSARisk.FunctionName,
 		value.String(),
-		// SyntaxFlow Rule Feature
-		newSSARisk.FromRule,
-		newSSARisk.Variable,
-		string(newSSARisk.Severity),
 		newSSARisk.RiskType,
 		newSSARisk.Language,
-		newSSARisk.Title,
+		string(newSSARisk.Severity),
 	)
 	newSSARisk.Hash = newSSARisk.CalcHash()
 	return newSSARisk
