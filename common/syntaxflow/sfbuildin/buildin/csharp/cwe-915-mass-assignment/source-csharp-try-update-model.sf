@@ -10,22 +10,29 @@ desc(
 	cwe: "CWE-915"
 	desc: <<<DESC
 ### 规则说明
-TryUpdateModel 或没有字段白名单的 Bind 会把请求里的敏感字段写进模型。
+`TryUpdateModel` 按请求把值写进模型的可写属性。攻击者可以额外提交 `IsAdmin`、`Role`、`Price` 这类字段，只要模型上有这个属性就会被改掉。`[Bind(Include = ...)]` 本来是用来收窄字段的，但 Include 列表如果把敏感属性也列进去，问题还在。
 
 ### 风险类型
 mass-assignment
 
 ### 影响
-命中说明代码里出现了该危险 API、配置或数据流入口。
+用户可以修改自己不该改的账号属性、价格或权限标志，形成批量赋值。
 
 ### 检测方式
-源码模式正则匹配，定位源码中的危险调用或配置。
+这条规则使用 source 模式，用正则扫描源文件文本，不构建语法树或 SSA。命中只说明出现了对应写法，不能单独证明数据来自外部输入。注释、字符串和文档中的相同文本也会命中。
+正则同时匹配 `TryUpdateModel(` 和 `[Bind(Include =`。后者可能是已经限制字段的代码，不能一律当成漏洞，要看 Include 里有没有敏感属性。
+同一检查还有 ssa（数据流）。它们描述同一个问题，命中条件不同，修复时看实际告警来自哪一条。
+
 ### 参考
-- CWE-915
+- [CWE-915：动态决定的对象属性被不当修改](https://cwe.mitre.org/data/definitions/915.html)
+
 DESC
 	solution: <<<SOLUTION
 ### 修复建议
-使用单独的输入 DTO，或 Bind 只列出允许写入的字段。
+- 为输入单独建 DTO，只放允许写的字段，再手工映射到实体。
+- 使用 `[Bind(Include = "Title,Body")]` 时逐项看列表，不要把权限、价格、所有者放进去。
+- 不要对持久化实体直接调用 `TryUpdateModel`。
+
 SOLUTION
 	alert_min: 1
 	"file://bad.cs": <<<POS

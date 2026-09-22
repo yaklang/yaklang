@@ -10,22 +10,29 @@ desc(
 	cwe: "CWE-99"
 	desc: <<<DESC
 ### 规则说明
-new Socket 或 InetSocketAddress 的主机名来自外部数据时，攻击者可以指定任意主机和端口。
+`new Socket(host, port)` 和 `new InetSocketAddress(host, port)` 会向指定主机发起连接。主机或端口来自请求时，服务器会替攻击者连接任意地址，包括回环、云元数据地址和内网端口。
 
 ### 风险类型
 resource-injection
 
 ### 影响
-命中说明代码里出现了该危险 API、配置或数据流入口。
+这是资源注入，效果和让服务器代发请求相同。可以探测内网、读取云元数据，或把进程变成访问内网的跳板。
 
 ### 检测方式
-源码模式正则匹配，定位源码中的危险调用或配置。
+这条规则使用 source 模式，用正则扫描源文件文本，不构建语法树或 SSA。命中只说明出现了对应写法，不能单独证明数据来自外部输入。注释、字符串和文档中的相同文本也会命中。
+正则匹配任意 `new Socket(` 和 `new InetSocketAddress(`。连接固定地址的合法代码也会命中。
+同一检查还有 ssa（数据流）。它们描述同一个问题，命中条件不同，修复时看实际告警来自哪一条。
+
 ### 参考
-- CWE-99
+- [CWE-99：资源注入](https://cwe.mitre.org/data/definitions/99.html)
+
 DESC
 	solution: <<<SOLUTION
 ### 修复建议
-主机名使用白名单，禁止把请求参数直接传给 Socket 构造器。
+- 主机名只来自服务端配置，或来自精确的主机白名单。
+- 解析之后拒绝回环、链路本地和内网网段，除非业务明确要访问这些地址。
+- 不要把请求参数直接传给 `Socket` 或 `InetSocketAddress`。
+
 SOLUTION
 	alert_min: 1
 	"file://bad.java": <<<POS

@@ -10,22 +10,29 @@ desc(
 	cwe: "CWE-329"
 	desc: <<<DESC
 ### 规则说明
-GCMParameterSpec 使用写死的 nonce 时，同一密钥下重复 nonce 会破坏 GCM 的机密性。
+AES-GCM 要求同一把密钥下的 nonce 不能重复。`GCMParameterSpec` 用来传入标签长度和 nonce。nonce 如果是源码里的固定字节数组，相同明文会产生可被分析的密文，重复使用的 nonce 还会让密钥流被恢复。
 
 ### 风险类型
 weak-cryptographic-algorithm
 
 ### 影响
-命中说明编译单元里出现了该调用，而不是注释或字符串。
+重复 nonce 会同时破坏 GCM 的机密性和完整性。攻击者可以解密使用了同一个 nonce 的数据，或伪造能通过校验的密文。
 
 ### 检测方式
-结构扫描匹配真实调用。
+这条规则使用 struct 模式，匹配编译后真实存在的调用。注释和普通字符串不会命中。它不分析参数来源，出现该调用即告警。
+匹配名为 `GCMParameterSpec` 的真实构造。它不区分 nonce 来源，命中后要检查 nonce 字节是常量还是每次生成的。
+同一检查还有 source（源码正则）。它们描述同一个问题，命中条件不同，修复时看实际告警来自哪一条。
+
 ### 参考
-- CWE-329
+- [CWE-329：使用可预测的初始化向量](https://cwe.mitre.org/data/definitions/329.html)
+
 DESC
 	solution: <<<SOLUTION
 ### 修复建议
-每次加密使用 SecureRandom 生成 12 字节 nonce，并把 nonce 和密文一起保存。
+- 每次加密用 `SecureRandom` 生成 12 字节 nonce。
+- 把 nonce 和密文一起保存，解密时读出来。不要每次都写死同一个数组。
+- 轮换密钥不能代替 nonce 唯一。同一密钥的两次加密必须使用不同的 nonce。
+
 SOLUTION
 	alert_min: 1
 	"file://bad.java": <<<POS

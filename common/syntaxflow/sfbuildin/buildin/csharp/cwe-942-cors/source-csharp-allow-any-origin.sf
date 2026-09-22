@@ -10,22 +10,29 @@ desc(
 	cwe: "CWE-942"
 	desc: <<<DESC
 ### 规则说明
-AllowAnyOrigin 会把接口暴露给任意网站。配合凭据时浏览器同源策略失效。
+`AllowAnyOrigin()` 把 CORS 来源设为任意网站。浏览器会把接口响应交给任何网页。若再允许凭据，其他网站就能带着用户的 Cookie 读到响应。
 
 ### 风险类型
 cors
 
 ### 影响
-命中说明代码里出现了该危险 API、配置或数据流入口。
+跨站页面可以读取本应受同源策略保护的数据。和允许凭据一起使用时，已登录用户的接口等于对任意来源开放。
 
 ### 检测方式
-源码模式正则匹配，定位源码中的危险调用或配置。
+这条规则使用 source 模式，用正则扫描源文件文本，不构建语法树或 SSA。命中只说明出现了对应写法，不能单独证明数据来自外部输入。注释、字符串和文档中的相同文本也会命中。
+正则匹配 `AllowAnyOrigin(`。注释中的同名文本也会命中。
+同一检查还有 struct（真实调用）。它们描述同一个问题，命中条件不同，修复时看实际告警来自哪一条。
+
 ### 参考
-- CWE-942
+- [CWE-942：过于宽松的跨域策略](https://cwe.mitre.org/data/definitions/942.html)
+
 DESC
 	solution: <<<SOLUTION
 ### 修复建议
-用 WithOrigins 列出允许的来源，不要调用 AllowAnyOrigin。
+- 用 `WithOrigins` 列出具体来源，不要反射请求里的 Origin。
+- 不要同时调用 `AllowAnyOrigin` 和 `AllowCredentials`。
+- 敏感接口继续做认证。CORS 头不是访问控制的替代。
+
 SOLUTION
 	alert_min: 1
 	"file://bad.cs": <<<POS

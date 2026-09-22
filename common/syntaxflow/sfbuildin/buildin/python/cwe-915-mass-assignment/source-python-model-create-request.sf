@@ -10,22 +10,29 @@ desc(
 	cwe: "CWE-915"
 	desc: <<<DESC
 ### 规则说明
-把 request.json 或 request.POST 展开进 Model.objects.create，客户端可以提交本不该写的字段。
+`objects.create(**data)` 和 `objects.update(**data)` 把字典里的每个键写进模型。data 如果是请求 JSON 或表单，客户端可以提交模型上任意可写字段，包括 `is_staff`、`is_superuser`、价格和所有者。
 
 ### 风险类型
 mass-assignment
 
 ### 影响
-命中说明代码里出现了该危险 API、配置或数据流入口。
+批量赋值。普通用户可以把自己的账号改成管理员，或改写业务上不允许客户端决定的字段。
 
 ### 检测方式
-源码模式正则匹配，定位源码中的危险调用或配置。
+这条规则使用 source 模式，用正则扫描源文件文本，不构建语法树或 SSA。命中只说明出现了对应写法，不能单独证明数据来自外部输入。注释、字符串和文档中的相同文本也会命中。
+正则匹配 `objects.create(**` 和 `objects.update(**`。不用字典展开的普通 `create` 不会命中。
+同一检查还有 struct（真实调用）。它们描述同一个问题，命中条件不同，修复时看实际告警来自哪一条。
+
 ### 参考
-- CWE-915
+- [CWE-915：动态决定的对象属性被不当修改](https://cwe.mitre.org/data/definitions/915.html)
+
 DESC
 	solution: <<<SOLUTION
 ### 修复建议
-显式取出允许的字段，或使用只包含这些字段的 serializer。
+- 显式取出允许的字段，再构造或更新模型。
+- 使用 serializer 或 form，并在字段列表里排除权限、价格和所有者。
+- 不要对请求体做字典展开后直接 `create` 或 `update`。
+
 SOLUTION
 	alert_min: 1
 	"file://bad.py": <<<POS

@@ -10,24 +10,29 @@ desc(
 	cwe: "CWE-477"
 	desc: <<<DESC
 ### 规则说明
-用 tx.origin 做鉴权可以被中间合约转发调用绕过。
-
-该语言还没有 struct/ssa 前端。source 规则用正则扫描源码，builtin verify 会检查内嵌样例。
+`tx.origin` 是这笔交易最初的外部账户，不是当前这次调用的直接发送者。用 `tx.origin == owner` 做鉴权时，用户只要被诱骗去调用一个恶意的中间合约，中间合约再调用本合约，`tx.origin` 仍然是用户，检查会通过。
 
 ### 风险类型
 access-control
 
 ### 影响
-命中说明文件中出现了该危险写法。
+授权被绕过。攻击者通过一次钓鱼交易，代表用户执行只有所有者才能调用的函数。
 
 ### 检测方式
-源码模式正则匹配。
+这条规则使用 source 模式，用正则扫描源文件文本，不构建语法树或 SSA。命中只说明出现了对应写法，不能单独证明数据来自外部输入。注释、字符串和文档中的相同文本也会命中。
+在 `.sol` 文件里匹配 `tx.origin`。注释里的相同文本也会命中。
+该语言还没有 struct 或 ssa 前端，目前只有这条 source 规则。builtin verify 会用内嵌的正例和反例检查这条正则。
+
 ### 参考
-- CWE-477
+- [CWE-477：使用过时函数](https://cwe.mitre.org/data/definitions/477.html)
+
 DESC
 	solution: <<<SOLUTION
 ### 修复建议
-使用 msg.sender。
+- 鉴权使用 `msg.sender`。
+- 需要区分外部账户和合约时单独设计，不要用 `tx.origin` 代替调用者。
+- 已有用 `tx.origin` 判断所有者的函数要改掉，否则中间合约始终可以转发。
+
 SOLUTION
 	alert_min: 1
 	"file://bad.sol": <<<POS

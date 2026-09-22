@@ -10,24 +10,29 @@ desc(
 	cwe: "CWE-78"
 	desc: <<<DESC
 ### 规则说明
-Runtime.getRuntime().exec 执行外部命令。参数来自外部时造成命令注入。Kotlin 前端尚未接入，此规则只做源码匹配。
-
-该语言还没有 struct/ssa 前端。source 规则用正则扫描源码，builtin verify 会检查内嵌样例。
+`Runtime.getRuntime().exec` 启动操作系统进程。参数如果是拼出来的一整条字符串，shell 元字符会把一条命令变成多条。即使使用字符串数组，命令名和参数也必须来自受控集合，不能来自请求。
 
 ### 风险类型
 command-injection
 
 ### 影响
-命中说明文件中出现了该危险写法。
+可以造成远程命令执行。攻击者能读取文件、建立外连，或改写服务器上的数据。
 
 ### 检测方式
-源码模式正则匹配。
+这条规则使用 source 模式，用正则扫描源文件文本，不构建语法树或 SSA。命中只说明出现了对应写法，不能单独证明数据来自外部输入。注释、字符串和文档中的相同文本也会命中。
+在 `.kt` 文件里匹配 `Runtime.getRuntime().exec(`。参数是不是外部数据，要看调用点，这条规则不跟踪数据流。
+该语言还没有 struct 或 ssa 前端，目前只有这条 source 规则。builtin verify 会用内嵌的正例和反例检查这条正则。
+
 ### 参考
-- CWE-78
+- [CWE-78：操作系统命令注入](https://cwe.mitre.org/data/definitions/78.html)
+
 DESC
 	solution: <<<SOLUTION
 ### 修复建议
-使用参数数组并校验命令名，不要拼接 shell 字符串。
+- 使用参数数组，不要把整条命令交给 shell。
+- 命令名写死，参数做白名单校验。
+- 能用库完成的事情不要再起进程。
+
 SOLUTION
 	alert_min: 1
 	"file://bad.kt": <<<POS

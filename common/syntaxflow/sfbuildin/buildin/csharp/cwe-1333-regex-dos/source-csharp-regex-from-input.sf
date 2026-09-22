@@ -10,22 +10,28 @@ desc(
 	cwe: "CWE-1333"
 	desc: <<<DESC
 ### 规则说明
-new Regex 的模式来自外部输入时，可以触发灾难性回溯。
+`new System.Text.RegularExpressions.Regex(pattern)` 在 pattern 是变量而不是字符串字面量时，模式可能来自请求。带有大量嵌套量词的模式会触发灾难性回溯，很短的输入就能占满 CPU。
 
 ### 风险类型
 regex-dos
 
 ### 影响
-命中说明代码里出现了该危险 API、配置或数据流入口。
+一个请求可以把处理线程打满，形成正则拒绝服务。模式如果还用来做权限或过滤判断，攻击者也可以用自己的表达式改变匹配结果。
 
 ### 检测方式
-源码模式正则匹配，定位源码中的危险调用或配置。
+这条规则使用 source 模式，用正则扫描源文件文本，不构建语法树或 SSA。命中只说明出现了对应写法，不能单独证明数据来自外部输入。注释、字符串和文档中的相同文本也会命中。
+正则匹配 `RegularExpressions.Regex(` 后面紧跟标识符。`Regex("固定模式")` 这种以引号开头的字面量不会命中。没有对应的 ssa 规则。
+
 ### 参考
-- CWE-1333
+- [CWE-1333：正则表达式复杂度低效](https://cwe.mitre.org/data/definitions/1333.html)
+
 DESC
 	solution: <<<SOLUTION
 ### 修复建议
-使用固定正则，并设置匹配超时。
+- 模式使用源码里的常量，不要编译请求参数。
+- 必须接收模式时限制长度和允许的字符，并设置匹配超时 `matchTimeout`。
+- 避免在用户输入上使用嵌套量词。
+
 SOLUTION
 	alert_min: 1
 	"file://bad.cs": <<<POS

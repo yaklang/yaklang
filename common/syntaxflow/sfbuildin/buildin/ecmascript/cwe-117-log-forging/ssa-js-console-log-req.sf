@@ -10,22 +10,29 @@ desc(
 	cwe: "CWE-117"
 	desc: <<<DESC
 ### 规则说明
-把 req.query 或 req.body 直接写入日志可以伪造日志内容。
+`console.log`、`console.info`、`console.warn`、`console.error` 如果直接打印 `req` 上的字段，查询串和正文里的换行会伪造新的日志行。请求里的令牌、Cookie 也会被记下来。
 
 ### 风险类型
 log-forging
 
 ### 影响
-参数不是常量，且不是函数自身的参数对象时告警。常量配置和纯参数传递不报。
+日志可以被插入假记录，审计失效。敏感头部进入日志平台后，能读日志的人就能拿走会话。
 
 ### 检测方式
-SSA 上匹配调用，保留非常量且非 param 的实参。
+这条规则使用 ssa 模式，只保留非常量、且不是当前函数参数的实参。常量字符串不告警。实参如果只是函数形参，也不会命中。
+匹配名为 `log` 的调用，而且实参不是常量，也不是形参。任何叫 `log` 的函数都可能命中，不限于 `console.log`。是否真的在打印请求，要用 source 规则或调用点确认。
+同一检查还有 source（源码正则）。它们描述同一个问题，命中条件不同，修复时看实际告警来自哪一条。
+
 ### 参考
-- CWE-117
+- [CWE-117：日志输出未处理](https://cwe.mitre.org/data/definitions/117.html)
+
 DESC
 	solution: <<<SOLUTION
 ### 修复建议
-记录固定字段，并去掉换行。
+- 只记录固定字段，例如请求 id 和路由，不要打印整个 `req`。
+- 去掉消息中的换行，或使用结构化日志。
+- 记录前去掉令牌、口令和 Cookie。
+
 SOLUTION
 	alert_min: 1
 	"file://bad.js": <<<POS
