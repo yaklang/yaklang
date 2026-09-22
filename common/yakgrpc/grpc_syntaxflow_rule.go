@@ -7,7 +7,6 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/syntaxflow/sfdb"
 	"github.com/yaklang/yaklang/common/utils"
@@ -170,7 +169,7 @@ func (s *Server) SyntaxFlowRuleToOnline(req *ypb.SyntaxFlowRuleToOnlineRequest, 
 
 	sendProgress(stream, 0, "准备上传规则......", string(INFO))
 
-	client := yaklib.NewOnlineClient(consts.GetOnlineBaseUrl())
+	client := s.getOnlineClient()
 
 	var ruleIds []string
 	for _, r := range ret {
@@ -258,7 +257,7 @@ func (s *Server) SyntaxFlowRuleToOnline(req *ypb.SyntaxFlowRuleToOnlineRequest, 
 }
 
 // fetchRemoteRuleVersion 拉取远端同ID的规则（若不存在则返回空字符串）
-func fetchRemoteRuleVersion(ctx context.Context, client *yaklib.OnlineClient, token, ruleId string) (*yaklib.OnlineSyntaxFlowRule, error) {
+func fetchRemoteRuleVersion(ctx context.Context, client onlineService, token, ruleId string) (*yaklib.OnlineSyntaxFlowRule, error) {
 	if ruleId == "" {
 		return nil, utils.Error("ruleName is nil")
 	}
@@ -276,7 +275,7 @@ func fetchRemoteRuleVersion(ctx context.Context, client *yaklib.OnlineClient, to
 }
 
 // fetchRemoteRuleVersionMap 一次性拉取多个规则的远端版本
-func fetchRemoteRuleVersionMap(ctx context.Context, client *yaklib.OnlineClient, token string, ruleIds []string) (map[string]*yaklib.OnlineSyntaxFlowRule, error) {
+func fetchRemoteRuleVersionMap(ctx context.Context, client onlineService, token string, ruleIds []string) (map[string]*yaklib.OnlineSyntaxFlowRule, error) {
 	versionMap := make(map[string]*yaklib.OnlineSyntaxFlowRule)
 	if len(ruleIds) == 0 {
 		return versionMap, nil
@@ -294,7 +293,7 @@ func fetchRemoteRuleVersionMap(ctx context.Context, client *yaklib.OnlineClient,
 	return versionMap, nil
 }
 
-func uploadRule(ctx context.Context, client *yaklib.OnlineClient, token string, rule *schema.SyntaxFlowRule) error {
+func uploadRule(ctx context.Context, client onlineService, token string, rule *schema.SyntaxFlowRule) error {
 	content, err := json.Marshal(rule)
 	if err != nil {
 		return fmt.Errorf("序列化失败: %w", err)
@@ -346,7 +345,7 @@ func sendProgress(stream ProgressStream, progress float64, message, messageType 
 //   - true: 本地有修改，需要冲突处理，跳过更新
 //   - false: 本地未修改，可以安全覆盖
 func (s *Server) DownloadSyntaxFlowRule(req *ypb.DownloadSyntaxFlowRuleRequest, stream ypb.Yak_DownloadSyntaxFlowRuleServer) error {
-	client := yaklib.NewOnlineClient(consts.GetOnlineBaseUrl())
+	client := s.getOnlineClient()
 	var (
 		ch    *yaklib.OnlineDownloadFlowRuleStream
 		token string
@@ -431,7 +430,7 @@ func (s *Server) DownloadSyntaxFlowRule(req *ypb.DownloadSyntaxFlowRuleRequest, 
 		}
 
 		// 执行保存
-		err = client.SaveSyntaxFlowRule(s.GetProfileDatabase(), result)
+		err = (&yaklib.OnlineClient{}).SaveSyntaxFlowRule(s.GetProfileDatabase(), result)
 		if err != nil {
 			errorCount++
 			sendProgress(stream, progress, fmt.Sprintf("规则 [%s] 保存失败: %s", result.RuleName, err), string(ERROR))

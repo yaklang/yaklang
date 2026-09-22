@@ -52,7 +52,6 @@ cd /home/go0p/code/go/yaklang
 
 ```bash
 export YAKIT_HOME="$(mktemp -d)"
-export MOCKEY_CHECK_GCFLAGS=false
 ```
 
 测试结束后可以删除该临时目录。Autobahn runner 会自行创建和清理测试用
@@ -92,7 +91,6 @@ go test ./common/vulinbox \
   -count=1
 
 YAKIT_HOME="$(mktemp -d)" \
-MOCKEY_CHECK_GCFLAGS=false \
 go test ./common/yakgrpc \
   -run '^TestGRPCMUSTPASS_MITM_WebSocketChunkedUpgradeServerFirstFrame$' \
   -count=1 \
@@ -126,7 +124,6 @@ go test ./common/utils/lowhttp -count=1
 
 ```bash
 YAKIT_HOME="$(mktemp -d)" \
-MOCKEY_CHECK_GCFLAGS=false \
 go test ./common/yakgrpc \
   -run '^TestGRPCMUSTPASS_MITM_WebSocketVulinboxScenarios$' \
   -count=1 \
@@ -148,7 +145,6 @@ go test ./common/crep -run '^$'
 ```bash
 AUTOBAHN_PROFILE=core \
 AUTOBAHN_MODE=all \
-MOCKEY_CHECK_GCFLAGS=false \
 scripts/ws-autobahn/run.sh
 ```
 
@@ -175,7 +171,6 @@ runner 返回非零退出码：
 ```bash
 AUTOBAHN_PROFILE=compression-smoke \
 AUTOBAHN_MODE=all \
-MOCKEY_CHECK_GCFLAGS=false \
 scripts/ws-autobahn/run.sh
 ```
 
@@ -190,7 +185,6 @@ set -o pipefail
 
 AUTOBAHN_PROFILE=compression \
 AUTOBAHN_MODE=all \
-MOCKEY_CHECK_GCFLAGS=false \
 scripts/ws-autobahn/run.sh \
   2>&1 | tee /tmp/yak-websocket-autobahn-compression.log
 ```
@@ -312,7 +306,6 @@ WebSocket 专项 race 已完成；nightly CI 接入尚未完成。下一主线�
 go test -race ./common/utils/lowhttp -count=1
 
 YAKIT_HOME="$(mktemp -d)" \
-MOCKEY_CHECK_GCFLAGS=false \
 go test -race ./common/yakgrpc \
   -run '^TestGRPCMUSTPASS_MITM_WebSocketVulinboxScenarios$' \
   -count=1 \

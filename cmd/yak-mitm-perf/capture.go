@@ -314,7 +314,7 @@ func runRaceGate(r *report, options captureOptions) {
 		"test", "-p=1", "-race", "./common/yakgrpc",
 		"-run", `^TestQueryHTTPFlowsConcurrentWrite$`, "-count=1", "-timeout=90s",
 	}
-	env := append(options.commandEnv(), "MOCKEY_CHECK_GCFLAGS=false")
+	env := options.commandEnv()
 	result := runExternalCommandWithTimeout(20*time.Minute, options.backendDir, env, "go", args...)
 	_ = os.WriteFile(artifact, []byte(result.output), 0o644)
 	r.Artifacts = append(r.Artifacts, commandArtifact{

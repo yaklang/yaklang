@@ -6,10 +6,8 @@ import (
 
 	"github.com/yaklang/yaklang/common/ai"
 	"github.com/yaklang/yaklang/common/ai/aispec"
-	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
-	"github.com/yaklang/yaklang/common/yak/yaklib"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
@@ -121,7 +119,7 @@ func (s *Server) GetAIThirdPartyAppConfigTemplate(ctx context.Context, _ *ypb.Em
 func (s *Server) GetApiKeyByOnline(ctx context.Context, req *ypb.GetApiKeyByOnlineRequest) (*ypb.GetApiKeyByOnlineResponse, error) {
 	cancelCtx, cancel := context.WithCancel(ctx)
 	defer cancel()
-	client := yaklib.NewOnlineClient(consts.GetOnlineBaseUrl())
+	client := s.getOnlineClient()
 	apiKey, err := client.GetAIApiKeyByOnline(cancelCtx, req.Token)
 	if err != nil {
 		return nil, err
@@ -182,6 +180,10 @@ func (s *Server) UpdateApiKey(ctx context.Context, req *ypb.UpdateApiKeyRequest)
 }
 
 func (s *Server) ProbeReasoningEffort(ctx context.Context, req *ypb.ProbeReasoningEffortRequest) (*ypb.ProbeReasoningEffortResponse, error) {
+	return probeReasoningEffort(ctx, req, ai.Chat)
+}
+
+func probeReasoningEffort(ctx context.Context, req *ypb.ProbeReasoningEffortRequest, chat func(string, ...aispec.AIConfigOption) (string, error)) (*ypb.ProbeReasoningEffortResponse, error) {
 	if req == nil || req.Config == nil {
 		return nil, utils.Error("config is nil")
 	}
@@ -203,8 +205,8 @@ func (s *Server) ProbeReasoningEffort(ctx context.Context, req *ypb.ProbeReasoni
 		var errMsg string
 
 		opts := aispec.BuildOptionsFromConfig(&ypb.AIModelConfig{
-			Provider:    config,
-			ModelName:   model,
+			Provider:  config,
+			ModelName: model,
 		})
 		opts = append(opts,
 			// Override ThinkingLevel directly with the effort under probe.
@@ -223,7 +225,7 @@ func (s *Server) ProbeReasoningEffort(ctx context.Context, req *ypb.ProbeReasoni
 			}),
 		)
 
-		result, err := ai.Chat("hi", opts...)
+		result, err := chat("hi", opts...)
 		if err != nil {
 			return false, err.Error()
 		}

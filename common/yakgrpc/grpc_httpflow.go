@@ -8,8 +8,6 @@ import (
 	"encoding/csv"
 	"encoding/json"
 	"fmt"
-	"github.com/yaklang/yaklang/common/go-funk"
-	"golang.org/x/exp/slices"
 	"io"
 	"os"
 	"path"
@@ -17,6 +15,9 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/yaklang/yaklang/common/go-funk"
+	"golang.org/x/exp/slices"
 
 	"github.com/samber/lo"
 	"github.com/segmentio/ksuid"
@@ -1016,7 +1017,7 @@ func (s *Server) DoHTTPFlowsSync(ctx context.Context, db *gorm.DB, toOnlineReq *
 				mu.Unlock()
 				return
 			}
-			client := yaklib.NewOnlineClient(consts.GetOnlineBaseUrl())
+			client := s.getOnlineClient()
 			err = client.UploadHTTPFlowToOnline(cancelCtx, toOnlineReq, data)
 
 			mu.Lock()

@@ -36,8 +36,6 @@ github.com/bcicen/jstream v0.0.0-20190220045926-16c1f8af81c2 h1:M+TYzBcNIRyzPRg6
 github.com/bcicen/jstream v0.0.0-20190220045926-16c1f8af81c2/go.mod h1:RDu/qcrnpEdJC/p8tx34+YBFqqX71lB7dOX9QE+ZC4M=
 github.com/beevik/etree v1.5.0 h1:iaQZFSDS+3kYZiGoc9uKeOkUY3nYMXOKLl6KIJxiJWs=
 github.com/beevik/etree v1.5.0/go.mod h1:gPNJNaBGVZ9AwsidazFZyygnd+0pAU38N4D+WemwKNs=
-github.com/bytedance/mockey v1.4.6 h1:pPkAFB6yiaaybvgp7DP1Rj4Ztiew3nsaMizoNkzsvNA=
-github.com/bytedance/mockey v1.4.6/go.mod h1:1BPHF9sol5R1ud/+0VEHGQq/+i2lN+GTsr3O2Q9IENY=
 github.com/chzyer/logex v1.2.1 h1:XHDu3E6q+gdHgsdTPH6ImJMIp436vR6MPtH8gP05QzM=
 github.com/chzyer/logex v1.2.1/go.mod h1:JLbx6lG2kDbNRFnfkgvh4eRJRPX1QCoOIWomwysCBrQ=
 github.com/chzyer/readline v1.5.1 h1:upd/6fQk4src78LMRzh5vItIt361/o4uq553V8B5sGI=

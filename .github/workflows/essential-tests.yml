@@ -32,6 +32,7 @@ on:
       - ".github/workflows/reuse-build.yml"
       - ".github/workflows/exp-cross-build.yml"
       - "go.mod"
+      - "go.sum"
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
@@ -592,8 +593,6 @@ jobs:
             ${{ runner.os }}-essential-gobuild-
 
       - name: Slim gate test (irify_exclude)
-        env:
-          MOCKEY_CHECK_GCFLAGS: "false"
         run: go test -tags irify_exclude -run '^TestSlimGate_' -timeout 5m ./common/yakgrpc ./common/yak/cmd/yakcmds ./common/syntaxflow/sfdb
 
   prepare-yakgrpc:
@@ -642,6 +641,9 @@ jobs:
             ${{ runner.os }}-essential-gobuild-${{ hashFiles('go.sum') }}-any-
             ${{ runner.os }}-essential-gobuild-${{ hashFiles('go.sum') }}-
             ${{ runner.os }}-essential-gobuild-
+
+      - name: Reject runtime patching dependencies
+        run: ./scripts/ci/check-test-dependencies.sh
 
       - name: Generate prepare config
         run: |
@@ -1127,6 +1129,14 @@ jobs:
       fail-fast: false
       matrix:
         include:
+          - name: "Test gRPC deterministic boundaries"
+            artifact_name: "essential-tests-yakgrpc"
+            artifact_file: "essential-tests-yakgrpc.tar.gz"
+            test_configs: |
+              [
+                {"package": "./common/yakgrpc", "timeout": "2m", "run": "^(TestInMemoryClient|TestUploadPayloadToOnline|TestDownloadPayload|TestUploadHotPatchTemplateToOnline|TestDownloadHotPatchTemplate|TestProbeReasoningEffort.*|TestIsLikelyErrorResponse|TestUploadSyntaxFlowRule|TestDownloadSyntaxFlowRule|TestSyntaxFlowOnlineFailures|TestGetApiKey_ReplaceAPIKeys|TestDoHTTPFlowsToOnline|TestSSARiskFeedbackToOnline)$"}
+              ]
+
           - name: "Test gRPC MUSTPASS MITM"
             artifact_name: "essential-tests-yakgrpc"
             artifact_file: "essential-tests-yakgrpc.tar.gz"
@@ -1201,7 +1211,7 @@ jobs:
                 {"package": "./common/yakgrpc/yakit", "timeout": "2m", "run": "^TestMUSTPASS_(UpdateMCPServer|SyncAndCache|McpServerEndpoint|MCPServerToolFullName|MigrateMCPServer|MigrateMCPClientBridge|DeleteMCPServer|MCPServerUserJourney|GetMCPServerToolConfigByFullName).*$"},
                 {"package": "./common/yakgrpc/...", "timeout": "4m", "run": "^TestGRPCMUSTPASS_StartMcpServer_.*$", "retry": 1, "retry_delay": 5},
                 {"package": "./common/yakgrpc/yakit", "timeout": "10m", "skip": "^TestMUSTPASS.*$"},
-                {"package": "./common/yakgrpc/...", "timeout": "10m", "exclude_packages": ["./common/yakgrpc/yakit/...", "./common/yakgrpc/airaghttp/...", "./common/yakgrpc/aihttp/tests/..."], "skip": "^(TestGRPCMUSTPASS_PluginTrace.*|TestGRPCMUSTPASS_AnalyzeHTTPFlow.*|TestGRPCMUSTPASS_Fingerprint.*|TestGRPCMUSTPASS_HTTP_.*|TestGRPCMUSTPASS_HTTPFlowSlowSQL|TestGRPCMUSTPASS_HTTPFUZZER.*|TestGRPCMUSTPASS_HTTPFuzzer.*|TestAITaskWith.*|TestGRPCMUSTPASS_MITM.*|TestGRPCMUSTPASS_MITMV2.*|TestGRPCMUSTPASS_LANGUAGE.*|TestGRPCMUSTPASS_COMMON.*|TestGRPCMUSTPASS_HybridScan.*|TestLARGEGRPCMUSTPASS.*|TestGRPCMUSTPASS_SyntaxFlow.*|TestGRPCMUSTPASS_SSA.*|TestGRPCMUSTPASS_FuzzerConfig|TestGRPCMUSTPASS_MaxSize|TestPBTest|TestLargePayload|TestGRPCMUSTPASS_AIForge.*|TestGRPCMUSTPASS_RequestYakURL.*|TestGRPCMUSTPASS_StartMcpServer_.*)$", "retry": 1, "retry_delay": 5}
+                {"package": "./common/yakgrpc/...", "timeout": "10m", "exclude_packages": ["./common/yakgrpc/yakit/...", "./common/yakgrpc/airaghttp/...", "./common/yakgrpc/aihttp/tests/..."], "skip": "^(TestInMemoryClient|TestUploadPayloadToOnline|TestDownloadPayload|TestUploadHotPatchTemplateToOnline|TestDownloadHotPatchTemplate|TestProbeReasoningEffort.*|TestIsLikelyErrorResponse|TestUploadSyntaxFlowRule|TestDownloadSyntaxFlowRule|TestSyntaxFlowOnlineFailures|TestGetApiKey_ReplaceAPIKeys|TestDoHTTPFlowsToOnline|TestSSARiskFeedbackToOnline|TestGRPCMUSTPASS_PluginTrace.*|TestGRPCMUSTPASS_AnalyzeHTTPFlow.*|TestGRPCMUSTPASS_Fingerprint.*|TestGRPCMUSTPASS_HTTP_.*|TestGRPCMUSTPASS_HTTPFlowSlowSQL|TestGRPCMUSTPASS_HTTPFUZZER.*|TestGRPCMUSTPASS_HTTPFuzzer.*|TestAITaskWith.*|TestGRPCMUSTPASS_MITM.*|TestGRPCMUSTPASS_MITMV2.*|TestGRPCMUSTPASS_LANGUAGE.*|TestGRPCMUSTPASS_COMMON.*|TestGRPCMUSTPASS_HybridScan.*|TestLARGEGRPCMUSTPASS.*|TestGRPCMUSTPASS_SyntaxFlow.*|TestGRPCMUSTPASS_SSA.*|TestGRPCMUSTPASS_FuzzerConfig|TestGRPCMUSTPASS_MaxSize|TestPBTest|TestLargePayload|TestGRPCMUSTPASS_AIForge.*|TestGRPCMUSTPASS_RequestYakURL.*|TestGRPCMUSTPASS_StartMcpServer_.*)$", "retry": 1, "retry_delay": 5}
               ]
     steps:
       - name: Checkout
@@ -1254,6 +1264,7 @@ jobs:
           export TEST_VERBOSE="1"
           export TEST_CONFIG="${{ runner.temp }}/test_config.json"
           export SUITE_NAME="${{ matrix.name }}"
+          export SUITE_NEEDS_GRPC="0"
           export SUITE_SYNC_RULE="${{ matrix.sync_rule == '1' && '1' || '0' }}"
           ./scripts/ci/test-run-suite.sh
 
@@ -1288,7 +1299,7 @@ jobs:
             artifact_file: "essential-tests-coreplugin.tar.gz"
             test_configs: |
               [
-                {"package": "./common/coreplugin", "timeout": "1m", "run": "^(TestAnalyzeMustPASSCorePlugin|TestAnalyzeMustPASSCorePlugin_Debug)$"},
+                {"package": "./common/coreplugin", "timeout": "1m", "run": "^(TestLocalDNSLog|TestAnalyzeMustPASSCorePlugin|TestAnalyzeMustPASSCorePlugin_Debug)$"},
                 {"package": "./common/coreplugin", "timeout": "2m", "run": "TestGRPCMUSTPASS_MITM"},
                 {"package": "./common/coreplugin", "timeout": "3m", "run": "TestGRPCMUSTPASS_Fastjson"}
               ]
@@ -1314,7 +1325,7 @@ jobs:
             artifact_file: "essential-tests-coreplugin.tar.gz"
             test_configs: |
               [
-                {"package": "./common/coreplugin", "timeout": "6m", "skip": "^(TestAnalyzeMustPASSCorePlugin|TestAnalyzeMustPASSCorePlugin_Debug|TestGRPCMUSTPASS_MITM|TestGRPCMUSTPASS_Fastjson|TestGRPCMUSTPASS_SQL.*|TestGRPCMUSTPASS_XSS.*|TestGRPCMUSTPASS_Shiro.*|TestGRPCMUSTPASS_SSRF.*|TestGRPCMUSTPASS_SSTI.*|TestGRPCMUSTPASS_Smuggle.*|TestGRPCMUSTPASS_Pipeline_Negative_Chunked.*|TestGRPCMUSTPASS_CSRF.*|TestGRPCMUSTPASS_OPEN_REDIRECT.*|TestGRPCMUSTPASS_SwaggerJson.*|TestDEBUG_MITM|TestFastjson)$"}
+                {"package": "./common/coreplugin", "timeout": "6m", "skip": "^(TestLocalDNSLog|TestAnalyzeMustPASSCorePlugin|TestAnalyzeMustPASSCorePlugin_Debug|TestGRPCMUSTPASS_MITM|TestGRPCMUSTPASS_Fastjson|TestGRPCMUSTPASS_SQL.*|TestGRPCMUSTPASS_XSS.*|TestGRPCMUSTPASS_Shiro.*|TestGRPCMUSTPASS_SSRF.*|TestGRPCMUSTPASS_SSTI.*|TestGRPCMUSTPASS_Smuggle.*|TestGRPCMUSTPASS_Pipeline_Negative_Chunked.*|TestGRPCMUSTPASS_CSRF.*|TestGRPCMUSTPASS_OPEN_REDIRECT.*|TestGRPCMUSTPASS_SwaggerJson.*|TestDEBUG_MITM|TestFastjson)$"}
               ]
     steps:
       - name: Checkout
@@ -1367,6 +1378,7 @@ jobs:
           export TEST_VERBOSE="1"
           export TEST_CONFIG="${{ runner.temp }}/test_config.json"
           export SUITE_NAME="${{ matrix.name }}"
+          export SUITE_NEEDS_GRPC="0"
           export SUITE_SYNC_RULE="${{ matrix.sync_rule == '1' && '1' || '0' }}"
           ./scripts/ci/test-run-suite.sh
 

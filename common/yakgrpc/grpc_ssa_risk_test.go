@@ -5,13 +5,11 @@ package yakgrpc
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"testing"
 	"time"
 
-	"github.com/bytedance/mockey"
-	"github.com/yaklang/gorm"
-	"github.com/stretchr/testify/assert"
 	"github.com/yaklang/yaklang/common/yak/yaklib"
 
 	"github.com/google/uuid"
@@ -399,70 +397,31 @@ func TestSSARisk_NewSSARisk(t *testing.T) {
 }
 
 func TestSSARiskFeedbackToOnline(t *testing.T) {
-	taskID := uuid.NewString()
-
-	defer func() {
-		yakit.DeleteSSARisks(ssadb.GetDB(), &ypb.SSARisksFilter{
-			RuntimeID: []string{taskID},
-		})
-	}()
-	createRisk := func(filePath, serverity, risk_type string) {
-		yakit.CreateSSARisk(ssadb.GetDB(), &schema.SSARisk{
-			CodeSourceUrl: filePath,
-			Severity:      schema.ValidSeverityType(serverity),
-			RiskType:      risk_type,
-			RuntimeId:     taskID,
-		})
+	db := newOnlineTestDB(t, &schema.SSARisk{})
+	for _, runtimeID := range []string{"selected", "selected", "other"} {
+		require.NoError(t, yakit.CreateSSARisk(db, &schema.SSARisk{RuntimeId: runtimeID, Title: uuid.NewString(), Severity: "high", RiskType: "test"}))
 	}
-	createRisk("ssadb://prog1/1", "high", "risk1")
-	createRisk("ssadb://prog1/1", "low", "risk2")
-
-	checkCount := func(items chan *schema.SSARisk, expectedCount int) {
-		var results []*schema.SSARisk
-		for item := range items {
-			results = append(results, item)
-		}
-		fmt.Printf("Results: %+v\n", len(results))
-
-		require.Len(t, results, expectedCount)
-	}
-
-	{
-		data := yakit.YieldSSARisk(ssadb.GetDB(), context.Background())
-		checkCount(data, 2)
-	}
-
-	mockey.PatchConvey("Test SSARiskFeedbackToOnline", t, func() {
-		token := "valid_token"
-		req := &ypb.SSARiskFeedbackToOnlineRequest{
-			Token:  token,
-			Filter: &ypb.SSARisksFilter{},
-		}
-
-		mockey.Mock(yakit.FilterSSARisk).To(func(db *gorm.DB, filter *ypb.SSARisksFilter) *gorm.DB {
-			return db
-		}).Build()
-
-		mockey.Mock((*yaklib.OnlineClient).UploadToOnline).To(func(ctx context.Context, token string, raw []byte, urlStr string) error {
-			assert.Equal(t, token, "valid_token")
-
-			var reqBody yaklib.UploadOnlineRequest
-			err := json.Unmarshal(raw, &reqBody)
-			assert.NoError(t, err)
-			assert.NotNil(t, reqBody)
-			return nil
-		}).Build()
-
-		server := &TestServerWrapper{
-			onlineClient: yaklib.OnlineClient{},
-		}
-
-		resp, err := server.SSARiskFeedbackToOnline(context.Background(), req)
-
-		assert.NoError(t, err)
-		assert.NotNil(t, resp)
-	})
-
+	calls := 0
+	remote := &stubOnlineService{upload: func(ctx context.Context, token string, raw []byte, endpoint string) error {
+		calls++
+		require.Equal(t, "valid-token", token)
+		require.Equal(t, "api/ssa/risk/feed/back", endpoint)
+		var envelope yaklib.UploadOnlineRequest
+		require.NoError(t, json.Unmarshal(raw, &envelope))
+		var risk schema.SSARisk
+		require.NoError(t, json.Unmarshal(envelope.Content, &risk))
+		require.Equal(t, "selected", risk.RuntimeId)
+		return nil
+	}}
+	server := &Server{ssaDatabase: db, onlineClient: remote}
+	req := &ypb.SSARiskFeedbackToOnlineRequest{Token: "valid-token", Filter: &ypb.SSARisksFilter{RuntimeID: []string{"selected"}}}
+	resp, err := server.SSARiskFeedbackToOnline(context.Background(), req)
+	require.NoError(t, err)
+	require.NotNil(t, resp)
+	require.Equal(t, 2, calls)
+	remote.upload = func(context.Context, string, []byte, string) error { return errors.New("upstream rejected") }
+	_, err = server.SSARiskFeedbackToOnline(context.Background(), req)
+	require.ErrorContains(t, err, "upstream rejected")
 }
 
 func TestGRPCMUSTPASS_SSA_QuerySSARisks_LatestDisposalStatus(t *testing.T) {

@@ -226,7 +226,6 @@ Autobahn full compression 每个案例发送 1000 条消息，包含最大 13107
 ```bash
 AUTOBAHN_PROFILE=compression \
 AUTOBAHN_MODE=all \
-MOCKEY_CHECK_GCFLAGS=false \
 scripts/ws-autobahn/run.sh
 ```
 
@@ -237,7 +236,6 @@ scripts/ws-autobahn/run.sh
 ```bash
 AUTOBAHN_PROFILE=compression-smoke \
 AUTOBAHN_MODE=all \
-MOCKEY_CHECK_GCFLAGS=false \
 scripts/ws-autobahn/run.sh
 ```
 
@@ -247,7 +245,6 @@ scripts/ws-autobahn/run.sh
 AUTOBAHN_PROFILE=compression \
 AUTOBAHN_MODE=mitm \
 AUTOBAHN_MITM_DISABLE_FLOW_STORAGE=false \
-MOCKEY_CHECK_GCFLAGS=false \
 scripts/ws-autobahn/run.sh
 ```
 
