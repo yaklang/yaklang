@@ -1663,7 +1663,9 @@ func BuildHTTPFlowQuery(db *gorm.DB, params *ypb.QueryHTTPFlowRequest) *gorm.DB 
 LENGTH(response) > 512000 as is_response_oversize,
 CASE WHEN LENGTH(response) > 512000 THEN '' ELSE response END as response,`
 		if params.GetExcludeResponseRaw() {
-			responseSelectFields = `
+			inlineMax := consts.GetHTTPFlowListInlineMaxContentLength()
+			if inlineMax == 0 {
+				responseSelectFields = `
 -- New rows persist title once, so the live list does not read response at all.
 -- A NULL title identifies legacy rows and keeps their historical title fallback.
 0 as is_response_oversize,
@@ -1672,6 +1674,12 @@ CASE
   WHEN LENGTH(response) > 512000 THEN ''
   ELSE response
 END as response,`
+			} else {
+				responseSelectFields = fmt.Sprintf(`
+-- ExcludeResponseRaw + list-inline budget: keep packets at or under %d bytes.
+LENGTH(response) > %d as is_response_oversize,
+CASE WHEN LENGTH(response) > %d THEN '' ELSE response END as response,`, inlineMax, inlineMax, inlineMax)
+			}
 		}
 		maxReqPreview := GetMaxHTTPFlowRequestBodyInDBBytes()
 		requestSelectFields := fmt.Sprintf(`
@@ -1679,10 +1687,18 @@ END as response,`
 (is_too_large_request OR LENGTH(request) > %d) as is_request_oversize,
 CASE WHEN (is_too_large_request OR LENGTH(request) > %d) THEN '' ELSE request END as request,`, maxReqPreview, maxReqPreview)
 		if params.GetExcludeRequestRaw() {
-			requestSelectFields = `
+			inlineMax := consts.GetHTTPFlowListInlineMaxContentLength()
+			if inlineMax == 0 {
+				requestSelectFields = `
 -- Request metadata is stored separately; live lists load packet bytes by ID.
 0 as is_request_oversize,
 '' as request,`
+			} else {
+				requestSelectFields = fmt.Sprintf(`
+-- ExcludeRequestRaw + list-inline budget: keep packets at or under %d bytes.
+(is_too_large_request OR LENGTH(request) > %d) as is_request_oversize,
+CASE WHEN (is_too_large_request OR LENGTH(request) > %d) THEN '' ELSE request END as request,`, inlineMax, inlineMax, inlineMax)
+			}
 		}
 		// 只查询部分字段，主要是为了处理大的 response 和 request 的情况，同时告诉用户
 		// max request size follows GlobalMaxContentLength (「转储数据包大小」)

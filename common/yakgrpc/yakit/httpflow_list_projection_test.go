@@ -4,14 +4,19 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/yaklang/gorm"
 	"github.com/stretchr/testify/require"
+	"github.com/yaklang/gorm"
+	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/yakgrpc/model"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
 func TestHTTPFlowListProjectionUsesPersistedTitleWithoutResponse(t *testing.T) {
+	prev := consts.GetHTTPFlowListInlineMaxContentLength()
+	consts.SetHTTPFlowListInlineMaxContentLength(0)
+	t.Cleanup(func() { consts.SetHTTPFlowListInlineMaxContentLength(prev) })
+
 	db, err := gorm.Open("sqlite3", filepath.Join(t.TempDir(), "project.db"))
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = db.Close() })
@@ -74,6 +79,10 @@ func TestHTTPFlowListProjectionUsesPersistedTitleWithoutResponse(t *testing.T) {
 }
 
 func TestHTTPFlowListProjectionFallsBackForLegacyNullTitle(t *testing.T) {
+	prev := consts.GetHTTPFlowListInlineMaxContentLength()
+	consts.SetHTTPFlowListInlineMaxContentLength(0)
+	t.Cleanup(func() { consts.SetHTTPFlowListInlineMaxContentLength(prev) })
+
 	db, err := gorm.Open("sqlite3", filepath.Join(t.TempDir(), "project.db"))
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = db.Close() })
@@ -104,6 +113,10 @@ func TestHTTPFlowListProjectionFallsBackForLegacyNullTitle(t *testing.T) {
 }
 
 func TestHTTPFlowListProjectionMarksEmptyTitleAsComputed(t *testing.T) {
+	prev := consts.GetHTTPFlowListInlineMaxContentLength()
+	consts.SetHTTPFlowListInlineMaxContentLength(0)
+	t.Cleanup(func() { consts.SetHTTPFlowListInlineMaxContentLength(prev) })
+
 	db, err := gorm.Open("sqlite3", filepath.Join(t.TempDir(), "project.db"))
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = db.Close() })
@@ -127,6 +140,52 @@ func TestHTTPFlowListProjectionMarksEmptyTitleAsComputed(t *testing.T) {
 	require.Len(t, rows, 1)
 	require.True(t, rows[0].HtmlTitle.Valid)
 	require.Empty(t, rows[0].Response, "computed no-title rows must not fall back to response")
+}
+
+func TestHTTPFlowListProjectionInlinesSmallPacketsWithinBudget(t *testing.T) {
+	prev := consts.GetHTTPFlowListInlineMaxContentLength()
+	consts.SetHTTPFlowListInlineMaxContentLength(consts.DefaultHTTPFlowListInlineMaxContentLength)
+	t.Cleanup(func() { consts.SetHTTPFlowListInlineMaxContentLength(prev) })
+
+	db, err := gorm.Open("sqlite3", filepath.Join(t.TempDir(), "project.db"))
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = db.Close() })
+	require.NoError(t, db.AutoMigrate(&schema.HTTPFlow{}).Error)
+
+	request := []byte("GET /inline HTTP/1.1\r\nHost: example.test\r\n\r\n")
+	response := []byte("HTTP/1.1 200 OK\r\nContent-Type: text/html\r\n\r\n<html><title>inline title</title></html>")
+	flow, err := CreateHTTPFlowFromHTTPWithBodySavedFromRaw(
+		false,
+		request,
+		response,
+		schema.HTTPFlow_SourceType_MITM,
+		"http://example.test/inline",
+		"127.0.0.1:80",
+	)
+	require.NoError(t, err)
+	require.NoError(t, db.Create(flow).Error)
+
+	query := projectedHTTPFlowQuery(int64(flow.ID))
+	query.ExcludeRequestRaw = true
+	query.ExcludeResponseRaw = true
+	_, rows, err := QueryHTTPFlow(db, query)
+	require.NoError(t, err)
+	require.Len(t, rows, 1)
+	require.NotEmpty(t, rows[0].Request, "small request must stay inline under the 300K budget")
+	require.NotEmpty(t, rows[0].Response, "small response must stay inline under the 300K budget")
+
+	projected, err := model.ToHTTPFlowGRPCModelWithListProjection(rows[0], false, true, true)
+	require.NoError(t, err)
+	require.NotEmpty(t, projected.GetRequest())
+	require.NotEmpty(t, projected.GetResponse())
+	require.Equal(t, "inline title", projected.GetHtmlTitle())
+
+	consts.SetHTTPFlowListInlineMaxContentLength(8)
+	_, oversizeRows, err := QueryHTTPFlow(db, query)
+	require.NoError(t, err)
+	require.Len(t, oversizeRows, 1)
+	require.Empty(t, oversizeRows[0].Request, "packets above the inline budget must stay empty")
+	require.Empty(t, oversizeRows[0].Response, "packets above the inline budget must stay empty")
 }
 
 func projectedHTTPFlowQuery(id int64) *ypb.QueryHTTPFlowRequest {

@@ -14,6 +14,7 @@ import (
 
 	"github.com/samber/lo"
 	"github.com/yaklang/gorm"
+	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/domainextractor"
 	"github.com/yaklang/yaklang/common/jsonextractor"
 	"github.com/yaklang/yaklang/common/log"
@@ -275,6 +276,9 @@ func buildHTTPFlowGRPCModel(f *schema.HTTPFlow, full, useCache, excludeRequestRa
 
 	requireRequest := !excludeRequestRaw && (full || (!f.IsRequestOversize && !f.IsTooLargeRequest))
 	requireResponse := !excludeResponseRaw && (full || !f.IsResponseOversize)
+	inlineMax := consts.GetHTTPFlowListInlineMaxContentLength()
+	inlineRequest := excludeRequestRaw && inlineMax > 0 && unquotedRequest != "" && uint64(len(unquotedRequest)) <= inlineMax
+	inlineResponse := excludeResponseRaw && inlineMax > 0 && unquotedResponse != "" && uint64(len(unquotedResponse)) <= inlineMax
 	isStandardRequest := !flow.NoFixContentLength
 
 	haveRequest := lo.IsNotEmpty(unquotedRequest)
@@ -352,6 +356,8 @@ func buildHTTPFlowGRPCModel(f *schema.HTTPFlow, full, useCache, excludeRequestRa
 				flow.CookieParamsTotal = int64(len(flow.CookieParams))
 			}
 		}
+	} else if inlineRequest {
+		flow.Request = []byte(unquotedRequest)
 	}
 
 	haveResponse := lo.IsNotEmpty(unquotedResponse)
@@ -369,6 +375,8 @@ func buildHTTPFlowGRPCModel(f *schema.HTTPFlow, full, useCache, excludeRequestRa
 				return line
 			})
 		}
+	} else if inlineResponse {
+		flow.Response = []byte(unquotedResponse)
 	}
 
 	// 这里用来标记一下，UTF8 支持情况，要根据情况提供给用户合理 body 建议处理方案

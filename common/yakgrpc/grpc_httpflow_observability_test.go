@@ -8,6 +8,7 @@ import (
 
 	"github.com/yaklang/gorm"
 	"github.com/stretchr/testify/require"
+	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
@@ -15,6 +16,10 @@ import (
 )
 
 func TestQueryHTTPFlowsSystemTimingIsOptInAndBounded(t *testing.T) {
+	prev := consts.GetHTTPFlowListInlineMaxContentLength()
+	consts.SetHTTPFlowListInlineMaxContentLength(0)
+	t.Cleanup(func() { consts.SetHTTPFlowListInlineMaxContentLength(prev) })
+
 	db, err := gorm.Open("sqlite3", filepath.Join(t.TempDir(), "project.db"))
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = db.Close() })

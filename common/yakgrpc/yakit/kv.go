@@ -5,6 +5,7 @@ import (
 	"crypto/tls"
 	"encoding/json"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -125,7 +126,6 @@ func init() {
 	// 确保在 ConfigureNetWork 之后执行，避免配置被覆盖
 }
 
-
 // RefreshProcessEnv 在数据库初始化的时候执行这个，可以快速更新本进程的环境变量
 func RefreshProcessEnv(db *gorm.DB) {
 	refreshLock.Lock()
@@ -224,6 +224,24 @@ func GetKeyModel(db *gorm.DB, key interface{}) (*schema.GeneralStorage, error) {
 
 // yaklang was born in 2019
 var yakitZeroTime = time.Date(2018, 1, 1, 1, 1, 1, 0, time.UTC)
+
+func ApplyHTTPFlowListInlineMaxContentLength(raw string) {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		consts.SetHTTPFlowListInlineMaxContentLength(consts.DefaultHTTPFlowListInlineMaxContentLength)
+		return
+	}
+	n, err := strconv.ParseUint(raw, 10, 64)
+	if err != nil {
+		log.Errorf("parse HTTP flow list inline max content length %q failed: %s", raw, err)
+		return
+	}
+	consts.SetHTTPFlowListInlineMaxContentLength(n)
+}
+
+func LoadHTTPFlowListInlineMaxContentLength() {
+	ApplyHTTPFlowListInlineMaxContentLength(Get(consts.HTTPFlowListInlineMaxContentLengthKey))
+}
 
 func Get(key interface{}) string {
 	return GetKey(consts.GetGormProfileDatabase(), key)
@@ -350,7 +368,6 @@ func GetDefaultNetworkConfig() *ypb.GlobalNetworkConfig {
 		}
 	}
 
-
 	// ==================== Tiered AI Model Configuration ====================
 	// Enable tiered AI model configuration by default
 	defaultConfig.EnableTieredAIModelConfig = true
@@ -417,6 +434,7 @@ func ConfigureNetWork(c *ypb.GlobalNetworkConfig) {
 	consts.GLOBAL_DB_SAVE_SYNC.SetTo(c.GetDbSaveSync())
 	consts.SetGlobalHTTPAuthInfo(c.GetAuthInfos())
 	consts.SetGlobalMaxContentLength(c.GetMaxContentLength())
+	LoadHTTPFlowListInlineMaxContentLength()
 	consts.ClearThirdPartyApplicationConfig()
 	for _, r := range c.GetAppConfigs() {
 		consts.UpdateThirdPartyApplicationConfig(r)

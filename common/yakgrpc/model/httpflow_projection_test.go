@@ -6,10 +6,15 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
+	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/schema"
 )
 
 func TestHTTPFlowProjectionExcludesResponseWithoutMutatingCanonicalCache(t *testing.T) {
+	prev := consts.GetHTTPFlowListInlineMaxContentLength()
+	consts.SetHTTPFlowListInlineMaxContentLength(0)
+	t.Cleanup(func() { consts.SetHTTPFlowListInlineMaxContentLength(prev) })
+
 	DropHTTPFlowCacheGRPCModelByFlow()
 	t.Cleanup(DropHTTPFlowCacheGRPCModelByFlow)
 
