@@ -11834,6 +11834,229 @@
       "archive": "testdata/poetry_lock_v2_1_corpus_v1.zip",
       "member": "modern/poetry_v2_1/upstream.lock",
       "mode": 420
+    },
+    {
+      "path": "testdata/modern/nuget_lock/LICENSE.txt",
+      "sha256": "f1e3c903178e459ebd0c25d2dc65ebf11163c0a0d3ae46690943dffd5813040e",
+      "bytes": 594,
+      "source": {
+        "repo": "NuGet/NuGet.Client",
+        "revision": "aa7eb9987d28e7169cfabfa484f2fdd22d2b91d2",
+        "tag": "6.12.1.1",
+        "path": "LICENSE.txt",
+        "url": "https://raw.githubusercontent.com/NuGet/NuGet.Client/aa7eb9987d28e7169cfabfa484f2fdd22d2b91d2/LICENSE.txt",
+        "method": "unaltered upstream license"
+      },
+      "expectation": "TestEcosystemLockCorpora and TestEcosystemLockSemantics; licenses and independent oracle accompany fixtures.",
+      "archive": "testdata/nuget_lock_v1_v2_corpus_v1.zip",
+      "member": "modern/nuget_lock/LICENSE.txt",
+      "mode": 420
+    },
+    {
+      "path": "testdata/modern/nuget_lock/frameworks-v2.json",
+      "sha256": "338718e34b7abd5db57a464f9072628d56b5a83fc17c82b062c2681a6d64fc43",
+      "bytes": 1555,
+      "source": {
+        "producer": "yaklang SCA maintainers",
+        "method": "hand-authored semantic and rejection regression"
+      },
+      "expectation": "TestEcosystemLockCorpora and TestEcosystemLockSemantics; licenses and independent oracle accompany fixtures.",
+      "archive": "testdata/nuget_lock_v1_v2_corpus_v1.zip",
+      "member": "modern/nuget_lock/frameworks-v2.json",
+      "mode": 420
+    },
+    {
+      "path": "testdata/modern/nuget_lock/future.json",
+      "sha256": "e5abcbc3c4d47039c3497b9113d158c49cd3c50df3603f3338884a0a95285a62",
+      "bytes": 15,
+      "source": {
+        "producer": "yaklang SCA maintainers",
+        "method": "hand-authored semantic and rejection regression"
+      },
+      "expectation": "TestEcosystemLockCorpora and TestEcosystemLockSemantics; licenses and independent oracle accompany fixtures.",
+      "archive": "testdata/nuget_lock_v1_v2_corpus_v1.zip",
+      "member": "modern/nuget_lock/future.json",
+      "mode": 420
+    },
+    {
+      "path": "testdata/modern/nuget_lock/malformed.json",
+      "sha256": "669793e7ddf5dfd21938abdc6f13150b30df9d6d5e2cf56efa9d5602f38ec91d",
+      "bytes": 26,
+      "source": {
+        "producer": "yaklang SCA maintainers",
+        "method": "hand-authored semantic and rejection regression"
+      },
+      "expectation": "TestEcosystemLockCorpora and TestEcosystemLockSemantics; licenses and independent oracle accompany fixtures.",
+      "archive": "testdata/nuget_lock_v1_v2_corpus_v1.zip",
+      "member": "modern/nuget_lock/malformed.json",
+      "mode": 420
+    },
+    {
+      "path": "testdata/modern/nuget_lock/upstream-invalid-hash.json",
+      "sha256": "150d3745e5a90685224b9f016c34a94eeeebe7af98bb1664f095c7ad978ae399",
+      "bytes": 922,
+      "source": {
+        "repo": "NuGet/NuGet.Client",
+        "revision": "aa7eb9987d28e7169cfabfa484f2fdd22d2b91d2",
+        "tag": "6.12.1.1",
+        "path": "test/NuGet.Core.Tests/NuGet.ProjectModel.Test/PackagesLockFileFormatTests.cs",
+        "url": "https://raw.githubusercontent.com/NuGet/NuGet.Client/aa7eb9987d28e7169cfabfa484f2fdd22d2b91d2/test/NuGet.Core.Tests/NuGet.ProjectModel.Test/PackagesLockFileFormatTests.cs",
+        "method": "extracted PackagesLockFileFormat_Read C# string; remove trailing commas"
+      },
+      "expectation": "TestEcosystemLockCorpora and TestEcosystemLockSemantics; licenses and independent oracle accompany fixtures.",
+      "archive": "testdata/nuget_lock_v1_v2_corpus_v1.zip",
+      "member": "modern/nuget_lock/upstream-invalid-hash.json",
+      "mode": 420
+    },
+    {
+      "path": "testdata/modern/nuget_lock/upstream-oracle.json",
+      "sha256": "1751d04b81b6a75994a05ce0cbbb182dc4868e297e0dd2a84ed2a66b796e7aa9",
+      "bytes": 318,
+      "source": {
+        "producer": "Python standard-library json",
+        "method": "independent fixed field projection of upstream examples, not Go parser output"
+      },
+      "expectation": "TestEcosystemLockCorpora and TestEcosystemLockSemantics; licenses and independent oracle accompany fixtures.",
+      "archive": "testdata/nuget_lock_v1_v2_corpus_v1.zip",
+      "member": "modern/nuget_lock/upstream-oracle.json",
+      "mode": 420
+    },
+    {
+      "path": "testdata/modern/nuget_lock/upstream-v1.json",
+      "sha256": "ee9c86a04ce2adb61e3e8bda1bfb81c8db40b3ae08f05e217dfe7e95bc2b240f",
+      "bytes": 382,
+      "source": {
+        "repo": "NuGet/NuGet.Client",
+        "revision": "aa7eb9987d28e7169cfabfa484f2fdd22d2b91d2",
+        "tag": "6.12.1.1",
+        "path": "test/NuGet.Core.Tests/NuGet.ProjectModel.Test/PackagesLockFileFormatTests.cs",
+        "url": "https://raw.githubusercontent.com/NuGet/NuGet.Client/aa7eb9987d28e7169cfabfa484f2fdd22d2b91d2/test/NuGet.Core.Tests/NuGet.ProjectModel.Test/PackagesLockFileFormatTests.cs",
+        "method": "extracted PackagesLockFileFormat_Read C# string; remove trailing commas; retain PackageA and its original missing-target declaration; original full literal retained in upstream-invalid-hash.json (PackageB has a 66-byte fake digest)"
+      },
+      "expectation": "TestEcosystemLockCorpora and TestEcosystemLockSemantics; licenses and independent oracle accompany fixtures.",
+      "archive": "testdata/nuget_lock_v1_v2_corpus_v1.zip",
+      "member": "modern/nuget_lock/upstream-v1.json",
+      "mode": 420
+    },
+    {
+      "path": "testdata/modern/swift_resolved/LICENSE.txt",
+      "sha256": "186c5f0192a754714a7e542233ddaaad28745626e0ad32e358d3f5af00afb84a",
+      "bytes": 11757,
+      "source": {
+        "repo": "swiftlang/swift-package-manager",
+        "revision": "5bd155f053b23664a8bb586f625aa9f8fa83ed86",
+        "tag": "swift-6.0-RELEASE",
+        "path": "LICENSE.txt",
+        "url": "https://raw.githubusercontent.com/swiftlang/swift-package-manager/5bd155f053b23664a8bb586f625aa9f8fa83ed86/LICENSE.txt",
+        "method": "unaltered upstream license"
+      },
+      "expectation": "TestEcosystemLockCorpora and TestEcosystemLockSemantics; licenses and independent oracle accompany fixtures.",
+      "archive": "testdata/swift_resolved_v1_v2_v3_corpus_v1.zip",
+      "member": "modern/swift_resolved/LICENSE.txt",
+      "mode": 420
+    },
+    {
+      "path": "testdata/modern/swift_resolved/future.json",
+      "sha256": "e5abcbc3c4d47039c3497b9113d158c49cd3c50df3603f3338884a0a95285a62",
+      "bytes": 15,
+      "source": {
+        "producer": "yaklang SCA maintainers",
+        "method": "hand-authored semantic and rejection regression"
+      },
+      "expectation": "TestEcosystemLockCorpora and TestEcosystemLockSemantics; licenses and independent oracle accompany fixtures.",
+      "archive": "testdata/swift_resolved_v1_v2_v3_corpus_v1.zip",
+      "member": "modern/swift_resolved/future.json",
+      "mode": 420
+    },
+    {
+      "path": "testdata/modern/swift_resolved/malformed.json",
+      "sha256": "669793e7ddf5dfd21938abdc6f13150b30df9d6d5e2cf56efa9d5602f38ec91d",
+      "bytes": 26,
+      "source": {
+        "producer": "yaklang SCA maintainers",
+        "method": "hand-authored semantic and rejection regression"
+      },
+      "expectation": "TestEcosystemLockCorpora and TestEcosystemLockSemantics; licenses and independent oracle accompany fixtures.",
+      "archive": "testdata/swift_resolved_v1_v2_v3_corpus_v1.zip",
+      "member": "modern/swift_resolved/malformed.json",
+      "mode": 420
+    },
+    {
+      "path": "testdata/modern/swift_resolved/states-v3.json",
+      "sha256": "25c5f3e2971170c89ccce858cfd22e4f01a90afd8841630cbb2c80acf5fc465e",
+      "bytes": 941,
+      "source": {
+        "producer": "yaklang SCA maintainers",
+        "method": "hand-authored semantic and rejection regression"
+      },
+      "expectation": "TestEcosystemLockCorpora and TestEcosystemLockSemantics; licenses and independent oracle accompany fixtures.",
+      "archive": "testdata/swift_resolved_v1_v2_v3_corpus_v1.zip",
+      "member": "modern/swift_resolved/states-v3.json",
+      "mode": 420
+    },
+    {
+      "path": "testdata/modern/swift_resolved/upstream-oracle.json",
+      "sha256": "8d8aa6edbfe211d0d68a091f3fa807bc84377fee3a141612fa5fdc878eb50c9f",
+      "bytes": 1704,
+      "source": {
+        "producer": "Python standard-library json",
+        "method": "independent fixed field projection of upstream examples, not Go parser output"
+      },
+      "expectation": "TestEcosystemLockCorpora and TestEcosystemLockSemantics; licenses and independent oracle accompany fixtures.",
+      "archive": "testdata/swift_resolved_v1_v2_v3_corpus_v1.zip",
+      "member": "modern/swift_resolved/upstream-oracle.json",
+      "mode": 420
+    },
+    {
+      "path": "testdata/modern/swift_resolved/upstream-v1.json",
+      "sha256": "5c25f565d4cd6f5f551275afb46ed170431c5975758f95b80ab024d70f24133f",
+      "bytes": 587,
+      "source": {
+        "repo": "swiftlang/swift-package-manager",
+        "revision": "5bd155f053b23664a8bb586f625aa9f8fa83ed86",
+        "tag": "swift-6.0-RELEASE",
+        "path": "Tests/WorkspaceTests/PinsStoreTests.swift",
+        "url": "https://raw.githubusercontent.com/swiftlang/swift-package-manager/5bd155f053b23664a8bb586f625aa9f8fa83ed86/Tests/WorkspaceTests/PinsStoreTests.swift",
+        "method": "extracted testLoadingSchema literal; remove trailing commas; freeze interpolated originHash"
+      },
+      "expectation": "TestEcosystemLockCorpora and TestEcosystemLockSemantics; licenses and independent oracle accompany fixtures.",
+      "archive": "testdata/swift_resolved_v1_v2_v3_corpus_v1.zip",
+      "member": "modern/swift_resolved/upstream-v1.json",
+      "mode": 420
+    },
+    {
+      "path": "testdata/modern/swift_resolved/upstream-v2.json",
+      "sha256": "240baf024f6bb6f25ff9e1380bfd07c7aa01b00c45a989b90653153b0eeb7cde",
+      "bytes": 754,
+      "source": {
+        "repo": "swiftlang/swift-package-manager",
+        "revision": "5bd155f053b23664a8bb586f625aa9f8fa83ed86",
+        "tag": "swift-6.0-RELEASE",
+        "path": "Tests/WorkspaceTests/PinsStoreTests.swift",
+        "url": "https://raw.githubusercontent.com/swiftlang/swift-package-manager/5bd155f053b23664a8bb586f625aa9f8fa83ed86/Tests/WorkspaceTests/PinsStoreTests.swift",
+        "method": "extracted testLoadingSchema literal; remove trailing commas; freeze interpolated originHash"
+      },
+      "expectation": "TestEcosystemLockCorpora and TestEcosystemLockSemantics; licenses and independent oracle accompany fixtures.",
+      "archive": "testdata/swift_resolved_v1_v2_v3_corpus_v1.zip",
+      "member": "modern/swift_resolved/upstream-v2.json",
+      "mode": 420
+    },
+    {
+      "path": "testdata/modern/swift_resolved/upstream-v3.json",
+      "sha256": "7fe7ee7b11ebbc9dd08d934540572ac96ccb3e76d78dac3af6f995b841ebfb5a",
+      "bytes": 794,
+      "source": {
+        "repo": "swiftlang/swift-package-manager",
+        "revision": "5bd155f053b23664a8bb586f625aa9f8fa83ed86",
+        "tag": "swift-6.0-RELEASE",
+        "path": "Tests/WorkspaceTests/PinsStoreTests.swift",
+        "url": "https://raw.githubusercontent.com/swiftlang/swift-package-manager/5bd155f053b23664a8bb586f625aa9f8fa83ed86/Tests/WorkspaceTests/PinsStoreTests.swift",
+        "method": "extracted testLoadingSchema literal; remove trailing commas; freeze interpolated originHash"
+      },
+      "expectation": "TestEcosystemLockCorpora and TestEcosystemLockSemantics; licenses and independent oracle accompany fixtures.",
+      "archive": "testdata/swift_resolved_v1_v2_v3_corpus_v1.zip",
+      "member": "modern/swift_resolved/upstream-v3.json",
+      "mode": 420
     }
   ],
   "storage": "ZIP corpus archives; logical paths and per-entry hashes are unchanged",
@@ -12057,6 +12280,16 @@
       "path": "testdata/poetry_lock_v2_1_corpus_v1.zip",
       "sha256": "4b4936d8be405a692f6ac8cf55e2fe00e054b36d32c2344a386df0312269fffb",
       "bytes": 94375
+    },
+    {
+      "path": "testdata/nuget_lock_v1_v2_corpus_v1.zip",
+      "sha256": "a6f45aa3e69c94ac68a318c22395d6c94213f9f90b6b5a1ce8451039402e8215",
+      "bytes": 2689
+    },
+    {
+      "path": "testdata/swift_resolved_v1_v2_v3_corpus_v1.zip",
+      "sha256": "cee7fabdd69a79420950b951a505d2756b014a8b3234b78fd42626984ffc44bf",
+      "bytes": 6822
     }
   ]
 }

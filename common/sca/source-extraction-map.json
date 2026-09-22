@@ -875,6 +875,92 @@
       ]
     },
     {
+      "local_file": "common/sca/analyzer/dep-parser/lockjson/nuget.go",
+      "decision": "OWNED_IMPLEMENTATION",
+      "reason": "Static bounded NuGet/Swift lock records from published format contracts; no package-manager runtime or acquisition.",
+      "yak_baseline_sha256": null,
+      "upstream": [],
+      "maintenance_owner": "yaklang/yaklang SCA maintainers",
+      "review": "implementation self-review with pinned upstream test literals and independent JSON projections",
+      "tests": [
+        "ecosystem_lock_test.go"
+      ],
+      "sha256": "0a324c52cf8b676bf7efd287c7c4136a5c7ad4360961004a66d2f41fa3ef72df",
+      "symbols": [
+        {
+          "name": "Nuget",
+          "line": 20
+        },
+        {
+          "name": "nugetLock",
+          "line": 21
+        },
+        {
+          "name": "nugetPackage",
+          "line": 25
+        },
+        {
+          "name": "native",
+          "line": 35
+        },
+        {
+          "name": "malformed",
+          "line": 36
+        },
+        {
+          "name": "object",
+          "line": 37
+        },
+        {
+          "name": "array",
+          "line": 38
+        },
+        {
+          "name": "location",
+          "line": 39
+        },
+        {
+          "name": "Nuget.Parse",
+          "line": 44
+        }
+      ]
+    },
+    {
+      "local_file": "common/sca/analyzer/dep-parser/lockjson/swift.go",
+      "decision": "OWNED_IMPLEMENTATION",
+      "reason": "Static bounded NuGet/Swift lock records from published format contracts; no package-manager runtime or acquisition.",
+      "yak_baseline_sha256": null,
+      "upstream": [],
+      "maintenance_owner": "yaklang/yaklang SCA maintainers",
+      "review": "implementation self-review with pinned upstream test literals and independent JSON projections",
+      "tests": [
+        "ecosystem_lock_test.go"
+      ],
+      "sha256": "f8ed0ce01e55306cb34289b5e6bfc86456ae24842d4d091bcce93523bb6cf5d5",
+      "symbols": [
+        {
+          "name": "Swift",
+          "line": 15
+        },
+        {
+          "name": "swiftLock",
+          "line": 16
+        },
+        {
+          "name": "swiftPin",
+          "line": 24
+        },
+        {
+          "name": "value",
+          "line": 33
+        },
+        {
+          "name": "Swift.Parse",
+          "line": 40
+        }
+      ]
+    },
+    {
       "local_file": "common/sca/analyzer/dep-parser/nodejs/npm/parse.go",
       "sha256": "3b12459defa4a9fe436022a9ae60ca7081432e52d18392f830bf8698d93529ea",
       "symbols": [
@@ -2047,6 +2133,45 @@
         "analyzer/format_contract_test.go",
         "analyzer/upstream_jar_test.go",
         "analyzer/text_boundary_test.go"
+      ]
+    },
+    {
+      "local_file": "common/sca/analyzer/locked_json.go",
+      "decision": "OWNED_IMPLEMENTATION",
+      "reason": "Static bounded NuGet/Swift lock records from published format contracts; no package-manager runtime or acquisition.",
+      "yak_baseline_sha256": null,
+      "upstream": [],
+      "maintenance_owner": "yaklang/yaklang SCA maintainers",
+      "review": "implementation self-review with pinned upstream test literals and independent JSON projections",
+      "tests": [
+        "ecosystem_lock_test.go"
+      ],
+      "sha256": "cc87caf35ec483500ae5299c9b9b1070187fc26ae72b691a9c4fdb09a76569dd",
+      "symbols": [
+        {
+          "name": "lockedJSONAnalyzer",
+          "line": 14
+        },
+        {
+          "name": "init",
+          "line": 19
+        },
+        {
+          "name": "lockedJSONAnalyzer.Match",
+          "line": 23
+        },
+        {
+          "name": "lockedJSONAnalyzer.Analyze",
+          "line": 29
+        },
+        {
+          "name": "NewNugetAnalyzer",
+          "line": 33
+        },
+        {
+          "name": "NewSwiftAnalyzer",
+          "line": 36
+        }
       ]
     },
     {
@@ -4598,7 +4723,7 @@
     {
       "local_file": "common/sca/core/xmlrecord/pom.go",
       "sha256": "ea64c42ce86fcad235b1b5425aa3e23de15bf0443fe1111fb28014bd87cb3247",
-      "symbols": null,
+      "symbols": [],
       "decision": "REWRITE",
       "reason": "Fixed POM field layout; removes general reflection-based destination inference. Runtime token pass charges known slice/map destinations before standard XML mapping.",
       "yak_baseline_sha256": null,
@@ -4891,8 +5016,8 @@
     },
     {
       "local_file": "common/sca/exports.go",
-      "sha256": "21f0a3ab845a9b5ba86bc8271cb7f5333fc348c6d71969d6b9e6eb9b686a77de",
-      "symbols": null,
+      "sha256": "f6564d9f7e706ef035d501f25cc5647f480c3b6f9e99d410d0d6530e7f511372",
+      "symbols": [],
       "decision": "REWRITE",
       "reason": "Owned bounded implementation or compatibility conversion; no old runtime fallback.",
       "yak_baseline_sha256": "641123b2c0693698e8577ff3e3711efe79b2d12ab6bb59eceabba309812655c9",
@@ -5299,7 +5424,7 @@
     {
       "local_file": "common/sca/license/category.go",
       "sha256": "9081210a6599135f9f26850b64fffb95a86fbd5d4f84e54d432be51e1612d1dc",
-      "symbols": null,
+      "symbols": [],
       "decision": "REWRITE",
       "reason": "Owned bounded implementation or compatibility conversion; no old runtime fallback.",
       "yak_baseline_sha256": "9081210a6599135f9f26850b64fffb95a86fbd5d4f84e54d432be51e1612d1dc",
@@ -5533,7 +5658,7 @@
     {
       "local_file": "common/sca/ref.go",
       "sha256": "868791e3f78b065f9fd29f61ede8bb44ad57840fe16dcdf55845a9dc670e58ee",
-      "symbols": null,
+      "symbols": [],
       "decision": "REWRITE",
       "reason": "Owned bounded implementation or compatibility conversion; no old runtime fallback.",
       "yak_baseline_sha256": "868791e3f78b065f9fd29f61ede8bb44ad57840fe16dcdf55845a9dc670e58ee",

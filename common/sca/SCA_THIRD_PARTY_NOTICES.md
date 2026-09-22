@@ -19,3 +19,5 @@
 维护责任由 yaklang/yaklang SCA 维护者承担：升级不自动替换为上游 main；先固定新提交、检查上游修复是否影响保留符号、更新来源摘要与许可，再执行对应语义、破坏输入、fuzz、闭包及资源门禁。报告修复时必须关联来源提交与本地回归。没有声称这些派生片段完全原创，也没有把保留完整第三方框架称为接管维护。
 
 新增版本语料仅作为测试材料引入：pnpm/pnpm v9.15.9 (`d22a3f65ee047ecee7c89dd6f1971ecea4ecd4d4`)、python-poetry/poetry 2.1.1 (`6e61c8b25f034aea350284a426499c70be2fa816`)、rust-lang/cargo 0.84.0 (`5ffbef3211a8c378857905775a15c5b32a174d3b`)。对应的 MIT 许可原文分别保存在 `pnpm_lock_v9_corpus_v1.zip` 的 `modern/pnpm_v9/LICENSE`、`poetry_lock_v2_1_corpus_v1.zip` 的 `modern/poetry_v2_1/LICENSE`、`cargo_lock_v4_corpus_v1.zip` 的 `modern/cargo_v4/LICENSE-MIT`。逐文件来源 URL 与摘要见 manifest；未引入这些项目的运行时实现或依赖。
+
+NuGet/Swift 测试 ZIP 包含从官方测试字符串提取并规范为严格 JSON 的样例（转换说明在 manifest），不包含上游运行时实现。NuGet/NuGet.Client `aa7eb9987d28e7169cfabfa484f2fdd22d2b91d2`（6.12.1.1，Apache-2.0）及 swiftlang/swift-package-manager `5bd155f053b23664a8bb586f625aa9f8fa83ed86`（swift-6.0-RELEASE，Apache-2.0 with Swift exception）的原许可分别随 `nuget_lock_v1_v2_corpus_v1.zip` / `swift_resolved_v1_v2_v3_corpus_v1.zip` 保留。
