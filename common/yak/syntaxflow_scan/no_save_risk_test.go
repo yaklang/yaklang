@@ -79,6 +79,13 @@ func countAuditRowsForProgram(t *testing.T, programName string) int64 {
 	return resultCount + nodeCount + edgeCount
 }
 
+func defaultNoSaveModes(modes ...string) []string {
+	if len(modes) == 0 {
+		return []string{syntaxflow_scan.SSAMode}
+	}
+	return modes
+}
+
 // countSSARisksForRuntime counts risks attributed to this scan run.
 func countSSARisksForRuntime(t *testing.T, runtimeID string) int64 {
 	t.Helper()
@@ -103,7 +110,7 @@ func runNoSaveRiskScanWithRule(t *testing.T, programName string, noSaveRisk bool
 
 // runNoSaveRiskScanWithSource is the same scan with an explicit program body,
 // so a struct-mode rule can supply code its pattern actually matches.
-func runNoSaveRiskScanWithSource(t *testing.T, programName string, noSaveRisk bool, rule *ypb.SyntaxFlowRuleInput, src string) (risks int64, auditRows int64, emittedRisks int64, task *schema.SyntaxFlowScanTask) {
+func runNoSaveRiskScanWithSource(t *testing.T, programName string, noSaveRisk bool, rule *ypb.SyntaxFlowRuleInput, src string, modes ...string) (risks int64, auditRows int64, emittedRisks int64, task *schema.SyntaxFlowScanTask) {
 	t.Helper()
 
 	dir := t.TempDir()
@@ -124,9 +131,9 @@ func runNoSaveRiskScanWithSource(t *testing.T, programName string, noSaveRisk bo
 		ssaconfig.WithScanIgnoreLanguage(true),
 		ssaconfig.WithNoSaveRisk(noSaveRisk),
 		// Without a mode the pipeline is compile-only and runs no rules at all.
-		// The struct rule needs the struct stage explicitly selected to reach
-		// the persistence path this test guards.
-		syntaxflow_scan.WithMode(syntaxflow_scan.StructMode, syntaxflow_scan.SSAMode),
+		// Selecting both struct and ssa also runs an ssa rule during the struct
+		// stage, so callers pass only the stage this case is checking.
+		syntaxflow_scan.WithMode(defaultNoSaveModes(modes...)...),
 		syntaxflow_scan.WithScanResultCallback(func(r *syntaxflow_scan.ScanResult) {
 			if r != nil && r.TaskID != "" {
 				runtimeID = r.TaskID
@@ -179,7 +186,9 @@ func TestScanProject_NoSaveRisk_StructStageUsesFinalSaveGuard(t *testing.T) {
 		ssadb.DeleteProgram(ssadb.GetDB(), programName)
 	})
 
-	risks, auditRows, _, task := runNoSaveRiskScanWithSource(t, programName, true, noSaveRiskStructRule(), noSaveRiskStructProgram)
+	// SSA mode is on so the pipeline still records a scan task. The only rule is
+	// struct, so the struct stage does not also run an SSA copy of it.
+	risks, auditRows, _, task := runNoSaveRiskScanWithSource(t, programName, true, noSaveRiskStructRule(), noSaveRiskStructProgram, syntaxflow_scan.StructMode, syntaxflow_scan.SSAMode)
 	require.Zero(t, risks, "the struct stage may not write risk rows when results stay out of the database")
 	require.Zero(t, auditRows, "the struct stage may not write audit result, node, or edge rows")
 	require.NotNil(t, task)
