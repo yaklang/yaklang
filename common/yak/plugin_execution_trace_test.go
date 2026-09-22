@@ -3,8 +3,11 @@ package yak
 import (
 	"context"
 	"fmt"
+	"net/http"
+	"net/http/httptest"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -194,6 +197,70 @@ manager.CallByNameSync("__main__")
 		}
 	case <-time.After(3 * time.Second):
 		t.Fatal("child plugin loaded through hook.NewManager kept running after parent context cancellation")
+	}
+}
+
+func TestCrawlerStartInheritsPluginContextCancellation(t *testing.T) {
+	var hits atomic.Int64
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		n := hits.Add(1)
+		_, _ = fmt.Fprintf(w, `<a href="/p%d">next</a>`, n+1)
+	}))
+	defer ts.Close()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	engine := NewScriptEngine(1)
+	engine.RegisterEngineHooks(func(engine *antlr4yak.Engine) error {
+		BindYakitPluginContextToEngine(
+			engine,
+			CreateYakitPluginContext("crawler-runtime").
+				WithPluginName("basic-crawler").
+				WithContext(ctx).
+				WithContextCancel(cancel),
+		)
+		return nil
+	})
+
+	done := make(chan error, 1)
+	go func() {
+		code := fmt.Sprintf(`
+ch, err = crawler.Start(%q, crawler.maxRequest(100000), crawler.concurrent(5), crawler.forbiddenFromParent(true))
+die(err)
+for req = range ch {
+}
+`, ts.URL)
+		_, err := engine.ExecuteExWithContext(ctx, code, map[string]any{})
+		done <- err
+	}()
+
+	requireEventuallyHits := func() {
+		t.Helper()
+		deadline := time.Now().Add(2 * time.Second)
+		for time.Now().Before(deadline) {
+			if hits.Load() > 0 {
+				return
+			}
+			time.Sleep(20 * time.Millisecond)
+		}
+		t.Fatal("crawler.Start did not issue any request before cancellation")
+	}
+	requireEventuallyHits()
+	cancel()
+
+	select {
+	case err := <-done:
+		if err != nil && !strings.Contains(err.Error(), "context canceled") {
+			t.Fatalf("unexpected crawler plugin execution error: %v", err)
+		}
+	case <-time.After(3 * time.Second):
+		t.Fatal("crawler.Start kept running after plugin context cancellation")
+	}
+
+	time.Sleep(200 * time.Millisecond)
+	afterCancel := hits.Load()
+	time.Sleep(800 * time.Millisecond)
+	if grew := hits.Load() - afterCancel; grew > 4 {
+		t.Fatalf("crawler kept requesting after plugin stop: +%d hits", grew)
 	}
 }
 
