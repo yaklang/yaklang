@@ -245,6 +245,9 @@ func poetryPackageID(pkg poetryPackage) string {
 		return poetryNativeID(pkg.Name, pkg.Version, origin)
 	}
 	scope, condition := poetryQualifiers(pkg)
+	if pkg.Optional {
+		scope += "; optional"
+	}
 	raw, _ := json.Marshal([]string{pkg.Name, pkg.Version, origin, scope, condition})
 	return string(raw)
 }

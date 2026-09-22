@@ -486,3 +486,33 @@ func TestModernPoetrySameVersionConditions(t *testing.T) {
 		}
 	}
 }
+
+func TestModernPoetryOptionalOccurrences(t *testing.T) {
+	raw := `[[package]]
+name="same"
+version="1.0.0"
+groups=["main"]
+optional=false
+[[package]]
+name="same"
+version="1.0.0"
+groups=["main"]
+optional=true
+[metadata]
+lock-version="2.1"
+`
+	r, err := ScanReport(context.Background(), fstest.MapFS{"poetry.lock": {Data: []byte(raw)}}, WithSnapshotID("optional-occurrences"))
+	if err != nil || !r.Complete {
+		t.Fatal(err)
+	}
+	if len(r.Components) != 1 || len(r.Observations) != 2 {
+		t.Fatalf("optional occurrence overwritten: %+v", r)
+	}
+	scopes := map[string]bool{}
+	for _, o := range r.Observations {
+		scopes[o.Scope] = true
+	}
+	if !scopes[`groups:["main"]`] || !scopes[`groups:["main"]; optional`] {
+		t.Fatal(scopes)
+	}
+}
