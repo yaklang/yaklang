@@ -9,7 +9,8 @@ desc(
 	risk: "weak-randomness"
 	desc: <<<DESC
 ### 规则说明
-检测到 math/rand。该 PRNG 可预测，不能用于令牌或密钥。
+检测到 math/rand 被用于 token/session/secret 等安全取值。该 PRNG 可预测，不能用于令牌或密钥。
+仅匹配同一行把 rand 结果赋给安全相关变量的写法，不匹配单纯 import 或 ML/模板抽样。
 
 ### 风险类型
 weak-randomness
@@ -18,7 +19,7 @@ weak-randomness
 该用法属于已知危险 API 或弱密码学原语，若处理外部数据或用于安全场景，可能导致命令执行、代码执行、反序列化或机密性破坏。
 
 ### 检测方式
-源码模式正则匹配，定位源码中的危险调用或配置。
+源码模式正则匹配安全变量与 math/rand 调用出现在同一行。
 DESC
 	solution: <<<SOLUTION
 ### 修复建议
@@ -28,7 +29,7 @@ SOLUTION
 	"file://rnd.go": <<<POS
 package main
 import "math/rand"
-func bad() int { return rand.Int() }
+func bad() int { token := rand.Int(); return token }
 
 POS
 	"safefile://rnd-safe.go": <<<NEG
@@ -37,9 +38,15 @@ import "crypto/rand"
 func ok(b []byte) (int, error) { return rand.Read(b) }
 
 NEG
+	"safefile://sampling.go": <<<NEG
+package main
+import "math/rand"
+func sample(n int) int { return rand.Intn(n) }
+
+NEG
 )
 
-${*.go}.pattern_regex(/"math\/rand"/) as $hit
+${*.go}.pattern_regex(/(?i)(token|session|secret|password|passwd|apikey|otp|captcha|csrf|nonce)[^\n]{0,120}\brand\.(Int|Intn|Uint32|Read)\s*\(/) as $hit
 alert $hit for {
 	level: "medium",
 	title: "检测 Go math/rand 安全用途",

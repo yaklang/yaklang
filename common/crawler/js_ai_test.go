@@ -338,6 +338,8 @@ func TestSanitizeAIURL_AcceptsValidAbsolute(t *testing.T) {
 		{"HTTP://example.com/UpperScheme", "http://example.com/UpperScheme"},
 		{"https://[::1]:443/v6", "https://[::1]:443/v6"},
 		{"http://momentjs.com/guides/#/warnings/js-date/", "http://momentjs.com/guides/"},
+		{"https://portal_zp_e.pdhr.com/login", "https://portal_zp_e.pdhr.com/login"},
+		{"https://_sip._tcp.example.com/health", "https://_sip._tcp.example.com/health"},
 	}
 	for _, c := range cases {
 		got, ok := sanitizeAIURL(c.in)
