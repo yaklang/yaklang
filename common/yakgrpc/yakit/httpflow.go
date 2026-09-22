@@ -1657,45 +1657,29 @@ func BuildHTTPFlowQuery(db *gorm.DB, params *ypb.QueryHTTPFlowRequest) *gorm.DB 
 			extraSelectField = "payload,"
 		}
 		inlineMax := consts.GetHTTPFlowListInlineMaxContentLength()
-		responseSelectFields := `
--- response is larger than 500K, return empty string
-LENGTH(response) > 512000 as is_response_oversize,
-CASE WHEN LENGTH(response) > 512000 THEN '' ELSE response END as response,`
-		if inlineMax > 0 {
-			responseSelectFields = fmt.Sprintf(`
--- list-inline budget: keep packets at or under %d bytes, with or without Exclude*.
-LENGTH(response) > %d as is_response_oversize,
-CASE WHEN LENGTH(response) > %d THEN '' ELSE response END as response,`, inlineMax, inlineMax, inlineMax)
-		} else if params.GetExcludeResponseRaw() {
+		var responseSelectFields string
+		var requestSelectFields string
+		if inlineMax == 0 {
 			responseSelectFields = `
--- New rows persist title once, so the live list does not read response at all.
--- A NULL title identifies legacy rows and keeps their historical title fallback.
+-- list-inline budget 0: never return response bytes on list queries.
 0 as is_response_oversize,
-CASE
-  WHEN html_title IS NOT NULL THEN ''
-  WHEN LENGTH(response) > 512000 THEN ''
-  ELSE response
-END as response,`
-		}
-		maxReqPreview := GetMaxHTTPFlowRequestBodyInDBBytes()
-		requestSelectFields := fmt.Sprintf(`
--- request oversize (spill threshold / GlobalMaxContentLength) or marked too-large
-(is_too_large_request OR LENGTH(request) > %d) as is_request_oversize,
-CASE WHEN (is_too_large_request OR LENGTH(request) > %d) THEN '' ELSE request END as request,`, maxReqPreview, maxReqPreview)
-		if inlineMax > 0 {
-			requestSelectFields = fmt.Sprintf(`
--- list-inline budget: keep packets at or under %d bytes, with or without Exclude*.
-(is_too_large_request OR LENGTH(request) > %d) as is_request_oversize,
-CASE WHEN (is_too_large_request OR LENGTH(request) > %d) THEN '' ELSE request END as request,`, inlineMax, inlineMax, inlineMax)
-		} else if params.GetExcludeRequestRaw() {
+'' as response,`
 			requestSelectFields = `
--- Request metadata is stored separately; live lists load packet bytes by ID.
+-- list-inline budget 0: never return request bytes on list queries.
 0 as is_request_oversize,
 '' as request,`
+		} else {
+			responseSelectFields = fmt.Sprintf(`
+-- list-inline budget: omit packets larger than %d bytes.
+LENGTH(response) > %d as is_response_oversize,
+CASE WHEN LENGTH(response) > %d THEN '' ELSE response END as response,`, inlineMax, inlineMax, inlineMax)
+			requestSelectFields = fmt.Sprintf(`
+-- list-inline budget: omit packets larger than %d bytes.
+(is_too_large_request OR LENGTH(request) > %d) as is_request_oversize,
+CASE WHEN (is_too_large_request OR LENGTH(request) > %d) THEN '' ELSE request END as request,`, inlineMax, inlineMax, inlineMax)
 		}
 		// 只查询部分字段，主要是为了处理大的 response 和 request 的情况，同时告诉用户
-		// max request size follows GlobalMaxContentLength (「转储数据包大小」)
-		// max response size is 500K -> 500 * 1024 -> 512000
+		// list packet bytes follow YAKIT_HTTPFLOW_LIST_INLINE_MAX_CONTENT_LENGTH (0–500K)
 		db = db.Select(fmt.Sprintf(`id,created_at,updated_at,hidden_index,%s -- basic gorm fields
 body_length, -- handle body length should be careful, if it's big, no return response
 request_length, -- request body length

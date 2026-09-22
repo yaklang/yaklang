@@ -56,8 +56,8 @@ var (
 	// control response max content-length
 	GLOBAL_MAXSIZE_CONTENT_LENGTH = atomic.NewUint64(defaultGlobalContentLengthLimit)
 
-	// MITM/history list inline packet bytes. 0 = drop all packets (current Exclude* behavior).
-	GLOBAL_HTTPFLOW_LIST_INLINE_MAX_CONTENT_LENGTH = atomic.NewUint64(0)
+	// MITM/history list inline packet bytes. 0 = drop all list packets; default 300KiB.
+	GLOBAL_HTTPFLOW_LIST_INLINE_MAX_CONTENT_LENGTH = atomic.NewUint64(DefaultHTTPFlowListInlineMaxContentLength)
 
 	OnceYakitHome = new(sync.Once)
 

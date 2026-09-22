@@ -42,13 +42,14 @@ func TestHTTPFlowListProjectionUsesPersistedTitleWithoutResponse(t *testing.T) {
 	require.Len(t, rows, 1)
 	require.True(t, rows[0].HtmlTitle.Valid)
 	require.Equal(t, "persisted title", rows[0].HtmlTitle.String)
-	require.Empty(t, rows[0].Response, "persisted-title rows must not load response into Go")
+	require.Empty(t, rows[0].Request, "budget 0 must not return request bytes")
+	require.Empty(t, rows[0].Response, "budget 0 must not return response bytes")
 
-	projected, err := model.ToHTTPFlowGRPCModelWithoutResponseRaw(rows[0], false)
+	projected, err := model.ToHTTPFlowGRPCModelWithListProjection(rows[0], false, true, true)
 	require.NoError(t, err)
 	require.Equal(t, "persisted title", projected.GetHtmlTitle())
+	require.Empty(t, projected.GetRequest())
 	require.Empty(t, projected.GetResponse())
-	require.NotEmpty(t, projected.GetRequest())
 
 	packetQuery := projectedHTTPFlowQuery(int64(flow.ID))
 	packetQuery.ExcludeRequestRaw = true
@@ -67,15 +68,15 @@ func TestHTTPFlowListProjectionUsesPersistedTitleWithoutResponse(t *testing.T) {
 	require.Equal(t, flow.RequestLength, packetProjected.GetRequestLength())
 	require.Equal(t, "persisted title", packetProjected.GetHtmlTitle())
 
-	// The canonical query contract is unchanged and still returns both packets.
+	consts.SetHTTPFlowListInlineMaxContentLength(consts.DefaultHTTPFlowListInlineMaxContentLength)
 	canonicalQuery := projectedHTTPFlowQuery(int64(flow.ID))
 	canonicalQuery.ExcludeResponseRaw = false
 	canonicalQuery.ExcludeRequestRaw = false
 	_, canonicalRows, err := QueryHTTPFlow(db, canonicalQuery)
 	require.NoError(t, err)
 	require.Len(t, canonicalRows, 1)
-	require.NotEmpty(t, canonicalRows[0].Request)
-	require.NotEmpty(t, canonicalRows[0].Response)
+	require.NotEmpty(t, canonicalRows[0].Request, "small packets must return when the inline budget is 300K")
+	require.NotEmpty(t, canonicalRows[0].Response, "small packets must return when the inline budget is 300K")
 }
 
 func TestHTTPFlowListProjectionFallsBackForLegacyNullTitle(t *testing.T) {
@@ -104,12 +105,8 @@ func TestHTTPFlowListProjectionFallsBackForLegacyNullTitle(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, rows, 1)
 	require.False(t, rows[0].HtmlTitle.Valid)
-	require.NotEmpty(t, rows[0].Response, "legacy rows need response for title fallback")
-
-	projected, err := model.ToHTTPFlowGRPCModelWithoutResponseRaw(rows[0], false)
-	require.NoError(t, err)
-	require.Equal(t, "legacy title", projected.GetHtmlTitle())
-	require.Empty(t, projected.GetResponse())
+	require.Empty(t, rows[0].Request, "budget 0 must not return request bytes")
+	require.Empty(t, rows[0].Response, "budget 0 must not return response bytes, even for legacy null titles")
 }
 
 func TestHTTPFlowListProjectionMarksEmptyTitleAsComputed(t *testing.T) {
