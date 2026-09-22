@@ -11,6 +11,7 @@ type binPostgres struct {
 	pid      uint32
 	pending  int
 	ssl      bool
+	state    postgresState
 }
 
 func probePostgres(w []byte, limit int) ProbeResult {
@@ -48,7 +49,7 @@ func probePostgres(w []byte, limit int) ProbeResult {
 func postgresTyped(b byte) bool {
 	switch b {
 	case 'Q', 'P', 'B', 'D', 'E', 'S', 'C', 'X', 'H', 'p', 'F', 'd', 'c', 'f',
-		'R', 'K', 'Z', 'T', '1', '2', '3', 'N', 'A', 'G', 'I', 'V', 'W', 'n', 't', 'v':
+		'R', 'K', 'Z', 'T', '1', '2', '3', 'N', 'A', 'G', 'I', 'V', 'W', 'n', 't', 'v', 's':
 		return true
 	}
 	return false
@@ -59,7 +60,7 @@ func (f *binFlow) framePostgres(dir int, w []byte) (int, *binSpec, error) {
 	if p == nil {
 		return 0, nil, sessionContext("PostgreSQL session was not observed")
 	}
-	if err := f.reserveSession(256); err != nil {
+	if err := f.reserveSession(p.state.storage()); err != nil {
 		return 0, nil, err
 	}
 	if p.ssl && p.frontend >= 0 && dir != p.frontend && len(w) >= 1 {
@@ -92,6 +93,9 @@ func (f *binFlow) framePostgres(dir int, w []byte) (int, *binSpec, error) {
 	}
 	if n > len(w) {
 		return n, nil, nil
+	}
+	if err := f.reserveSession(p.state.storage() + int64(n)*8); err != nil {
+		return 0, nil, err
 	}
 	entry, err := p.entry(dir, w[:n], typed)
 	if err != nil {

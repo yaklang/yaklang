@@ -6,6 +6,7 @@ import (
 )
 
 type binMySQL struct {
+	prepared                                     mysqlPreparedState
 	server                                       int
 	phase                                        string
 	seq                                          byte
@@ -26,7 +27,7 @@ func (f *binFlow) frameMySQL(dir int, w []byte) (int, *binSpec, error) {
 	if m == nil {
 		return 0, nil, sessionContext("MySQL greeting was not observed")
 	}
-	if err := f.reserveSession(512); err != nil {
+	if err := f.reserveSession(m.preparedMemory()); err != nil {
 		return 0, nil, err
 	}
 	if len(w) < 4 {
@@ -44,6 +45,9 @@ func (f *binFlow) frameMySQL(dir int, w []byte) (int, *binSpec, error) {
 	}
 	if n == 4 && m.phase != "auth-client" {
 		return 0, nil, fmt.Errorf("mysql: empty packet outside authentication response")
+	}
+	if m.preparedPacket(w[:n]) {
+		return f.frameMySQLPrepared(dir, w[:n])
 	}
 	server := dir == m.server
 	entry := ""

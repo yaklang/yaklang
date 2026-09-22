@@ -219,13 +219,13 @@ func (r *postgresqlFieldsReader) frontend(info map[string]any, typ byte) {
 	switch typ {
 	case 'P':
 		info["Message Name"] = "Parse"
-		r.nul("Statement Name", "raw")
+		info["Statement"] = string(r.nul("Statement Name", "raw"))
 		r.nul("Query Bytes", "raw")
 		info["Parameter Type OIDs"] = r.oids("Parameter Types")
 	case 'B':
 		info["Message Name"] = "Bind"
-		r.nul("Portal Name", "raw")
-		r.nul("Statement Name", "raw")
+		info["Portal"] = string(r.nul("Portal Name", "raw"))
+		info["Statement"] = string(r.nul("Statement Name", "raw"))
 		formats := r.formats("Parameter Formats")
 		values := r.values("Parameters")
 		if len(formats) != 0 && len(formats) != 1 && len(formats) != len(values) {
@@ -252,10 +252,11 @@ func (r *postgresqlFieldsReader) frontend(info map[string]any, typ byte) {
 		if target != 'S' && target != 'P' {
 			r.fail("invalid statement/portal target")
 		}
-		r.nul("Target Name", "raw")
+		info["Target"] = string(r.nul("Target Name", "raw"))
+		info["Target Type"] = string([]byte{byte(target)})
 	case 'E':
 		info["Message Name"] = "Execute"
-		r.nul("Portal Name", "raw")
+		info["Portal"] = string(r.nul("Portal Name", "raw"))
 		n := r.sint("Maximum Rows", 4)
 		if n < 0 {
 			r.fail("negative maximum rows")
@@ -431,8 +432,8 @@ func (r *postgresqlFieldsReader) backend(info map[string]any, typ byte, scram bo
 	case 'A':
 		info["Message Name"] = "NotificationResponse"
 		info["Process ID"] = r.uint("Process ID", 4)
-		r.nul("Channel", "raw")
-		r.nul("Notification Bytes", "raw")
+		info["Channel"] = string(r.nul("Channel", "raw"))
+		info["Notification"] = bytes.Clone(r.nul("Notification Bytes", "raw"))
 	case 'G', 'H', 'W':
 		info["Message Name"] = map[byte]string{'G': "CopyInResponse", 'H': "CopyOutResponse", 'W': "CopyBothResponse"}[typ]
 		f := r.format("Overall Format", 1)
@@ -623,4 +624,11 @@ func parsePostgreSQLFields(node *base.Node, process func(*base.Node) (func(bool)
 	return parseCertificateFieldTree(node, process, func(w []byte) ([]tlsCertificateField, map[string]any, error) {
 		return decodePostgreSQLFields(w, profile)
 	}, "postgresql-fields")
+}
+
+// AnnotatePostgreSQLRow applies metadata from an observed statement/portal.
+// Unknown OIDs retain raw values; no database registry is inferred.
+func AnnotatePostgreSQLRow(row map[string]any, columns []map[string]any) {
+	postgresqlFieldsAnnotateRow(row, map[string]any{"Columns": columns})
+	delete(row, "Column Metadata Relative Byte Range")
 }

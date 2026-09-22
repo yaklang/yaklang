@@ -12,8 +12,9 @@ import (
 // fill table[D]; HEADERS from D are decoded against that table. SETTINGS
 // QPACK_MAX_TABLE_CAPACITY from D limits the peer encoder (1-D).
 type qpackConn struct {
-	table  [2]qpackTable
-	maxCap [2]uint64
+	table      [2]qpackTable
+	maxCap     [2]uint64
+	maxBlocked [2]uint64
 }
 
 type qpackEntry struct {

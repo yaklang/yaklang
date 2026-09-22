@@ -108,7 +108,7 @@ func TestLiveMySQLRejectsInvalidState(t *testing.T) {
 		{"unexpected-command", 2, []sessionStep{{0, mysqlTestPacket(0, []byte{3, 'x'})}}, "malformed"},
 		{"response-without-command", 6, []sessionStep{{1, mysqlTestPacket(1, []byte{0, 0, 0, 2, 0, 0, 0})}}, "context-required"},
 		{"command-sequence", 6, []sessionStep{{0, mysqlTestPacket(1, []byte{3, 'x'})}}, "malformed"},
-		{"prepared-statement", 6, []sessionStep{{0, mysqlTestPacket(0, []byte{0x16, 'x'})}}, "context-required"},
+		{"prepared-missing-response", 6, []sessionStep{{0, mysqlTestPacket(0, []byte{0x16, 'x'})}}, "incomplete"},
 		{"local-infile", 7, []sessionStep{{1, mysqlTestPacket(1, []byte{0xfb, 'x'})}}, "context-required"},
 		{"pipelined-command", 7, []sessionStep{{0, mysqlTestPacket(0, []byte{14})}}, "malformed"},
 		{"invalid-column-count", 7, []sessionStep{{1, mysqlTestPacket(1, []byte{0xfc, 1, 0x10})}}, "malformed"},

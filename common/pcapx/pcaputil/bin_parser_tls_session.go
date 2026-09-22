@@ -482,6 +482,21 @@ func (f *binFlow) deliverTLS(dir int, parent *ProtocolEvent) {
 	t.plaintext = nil
 	if t.child == nil {
 		t.child = &binFlow{a: f.a, id: f.id, endpoints: f.endpoints, ports: f.ports, domain: f.domain, byteSource: "decrypted", captureTCP: true}
+		// STARTTLS carries observed application state into authenticated plaintext.
+		// The new child owns that state; guessing from a port would lose the
+		// greeting capabilities and sequence number for MySQL.
+		if f.mysql != nil && f.mysql.phase == "tls" {
+			t.child.protocol = "mysql"
+			t.child.mysql = f.mysql
+			f.mysql = nil
+			t.child.mysql.phase = "handshake"
+		}
+		if f.pg != nil {
+			t.child.protocol = "postgresql"
+			t.child.pg = f.pg
+			f.pg = nil
+		}
+
 	}
 	t.child.parentID = parent.ID
 	d := &t.child.directions[dir]

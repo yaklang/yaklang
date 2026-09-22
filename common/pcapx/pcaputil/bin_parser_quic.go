@@ -10,6 +10,22 @@ import (
 // are parsed only after packet protection succeeds or through the explicitly
 // declared decrypted-stream API.
 type binQUIC struct {
+	eventID         uint64
+	keyPhase        [2]int
+	previousKey     [2]*quicTrafficKeys
+	controlSeen     [2]bool
+	qpackSeen       [2][2]bool
+	native          bool
+	zeroCID         [2]bool
+	byteLimit       int
+	provider        TLSSecretProvider
+	tls             *binTLS
+	loadedKeys      bool
+	alpn            string
+	cids            map[string]int
+	cidSequences    [2]map[uint64]string
+	cryptoData      [2][3]quicAssembler
+	cryptoRead      [2][3]int
 	decryptedSource string
 	dcid, scid      []byte
 	initialDCID     []byte
@@ -29,13 +45,16 @@ type quicPNSpace struct {
 }
 
 type quicStream struct {
-	id     uint64
-	maxOff uint64
-	fin    bool
-	reset  bool
-	stop   bool
-	h3     *h3StreamState
-	doq    *doqStreamState
+	reassembly     [2]quicAssembler
+	resetDirection [2]bool
+	requestPDU     uint64
+	id             uint64
+	maxOff         uint64
+	fin            bool
+	reset          bool
+	stop           bool
+	h3             *h3StreamState
+	doq            *doqStreamState
 }
 
 type quicRange struct {
@@ -120,15 +139,16 @@ func (f *binFlow) frameQUIC(w []byte) (int, *binSpec, error) {
 }
 
 func (q *binQUIC) consume(dir int, raw []byte, max int) (map[string]any, error) {
+	if dir < 0 || dir > 1 {
+		return nil, fmt.Errorf("quic: invalid direction")
+	}
+
 	if max <= 0 {
 		max = 64
 	}
-	h, err := quicParseHeader(raw, true)
+	h, err := q.wireHeader(raw, dir)
 	if err != nil {
 		return nil, err
-	}
-	if dir < 0 || dir > 1 {
-		return nil, fmt.Errorf("quic: invalid direction")
 	}
 	if h.size > len(raw) || h.payloadOff > h.size {
 		return nil, protocolError(ErrMalformedMessage, "truncated QUIC packet payload")
@@ -169,6 +189,9 @@ func (q *binQUIC) consume(dir int, raw []byte, max int) (map[string]any, error) 
 		info["Retry"] = true
 		info["Connection State"] = "retry-observed"
 		info["Authentication Verified"] = false
+		if q.native {
+			return info, protocolError(ErrUnsupportedFeature, "QUIC Retry requires original-DCID integrity context")
+		}
 		return info, nil
 	}
 	payload := raw[h.payloadOff:h.size]
@@ -210,12 +233,23 @@ func (q *binQUIC) consume(dir int, raw []byte, max int) (map[string]any, error) 
 		phaseKeys = candidate.keys.app[dir]
 	}
 	plain, pn, pnLen, first, phase, uerr := quicUnprotect(raw, h, tk, phaseKeys, q.space(dir, h.space).largest)
+	previous := false
+	if uerr != nil && !h.long && q.previousKey[dir] != nil {
+		old := phaseKeys
+		old[1-q.keyPhase[dir]] = q.previousKey[dir]
+		plain, pn, pnLen, first, phase, uerr = quicUnprotect(raw, h, tk, old, q.space(dir, h.space).largest)
+		previous = uerr == nil
+	}
+
 	if uerr != nil {
 		info["Encrypted"] = true
 		info["Protected Payload"] = true
 		info["Authentication Verified"] = false
 		info["Authentication Failure"] = "packet-protection-failed"
 		return info, protocolError(ErrAuthenticationFailed, "QUIC packet protection authentication failed")
+	}
+	if h.long && first&0x0c != 0 || !h.long && first&0x18 != 0 {
+		return info, protocolError(ErrMalformedMessage, "QUIC nonzero reserved bits")
 	}
 	info["Decrypted"] = true
 	info["Authentication Verified"] = true
@@ -236,8 +270,42 @@ func (q *binQUIC) consume(dir int, raw []byte, max int) (map[string]any, error) 
 	if err := quicValidateProtectedFrames(h.space, frames); err != nil {
 		return info, err
 	}
+	if quicSeen(q.space(dir, h.space), pn) {
+		info["Duplicate"] = true
+		info["Frames"] = frames // Retain authenticated wire evidence without delivering it twice.
+		return info, nil
+	}
+	if !h.long && !previous && phase != q.keyPhase[dir] {
+		next, err := quicNextPhase(candidate.keys.app[dir][phase])
+		if err != nil {
+			return info, err
+		}
+		q.previousKey[dir] = candidate.keys.app[dir][q.keyPhase[dir]]
+		candidate.keys.app[dir][1-phase] = next
+		q.keyPhase[dir] = phase
+	}
 	q.keys, q.initialDCID = candidate.keys, candidate.initialDCID
 	commitHeader()
+	if q.native {
+		if q.cids == nil {
+			q.cids = map[string]int{}
+			if len(q.initialDCID) > 0 {
+				q.cids[string(q.initialDCID)] = 1
+			}
+		}
+		if h.long && len(h.scid) == 0 {
+			q.zeroCID[dir] = true
+		}
+		if len(h.scid) > 0 {
+			if _, ok := q.cids[string(h.scid)]; !ok && len(q.cids) >= max {
+				return info, protocolError(ErrResourceExceeded, "QUIC CID budget")
+			}
+			if q.cidSequences[dir] == nil {
+				q.cidSequences[dir] = map[uint64]string{0: string(h.scid)}
+			}
+			q.cids[string(h.scid)] = dir
+		}
+	}
 	q.observePN(q.space(dir, h.space), pn, info)
 	return q.finishFrames(dir, h.space, frames, info, max)
 }
@@ -278,9 +346,50 @@ func (q *binQUIC) applyFrames(dir, space int, frames []map[string]any, info map[
 	for _, fr := range frames {
 		name, _ := fr["Frame Type"].(string)
 		switch name {
+
+		case "NEW_CONNECTION_ID":
+			if q.native {
+				cid := string(fr["CID"].([]byte))
+				seq := fr["Sequence"].(uint64)
+				retire := fr["Retire Prior To"].(uint64)
+				if q.cidSequences[dir] == nil {
+					q.cidSequences[dir] = map[uint64]string{}
+				}
+				if old, ok := q.cidSequences[dir][seq]; ok && old != cid {
+					return protocolError(ErrMalformedMessage, "QUIC CID sequence changed")
+				}
+				for n, old := range q.cidSequences[dir] {
+					if n < retire {
+						delete(q.cids, old)
+						delete(q.cidSequences[dir], n)
+					}
+				}
+				if _, ok := q.cids[cid]; !ok && len(q.cids) >= max {
+					return protocolError(ErrResourceExceeded, "QUIC CID budget")
+				}
+				q.cidSequences[dir][seq] = cid
+				q.cids[cid] = dir
+			}
+		case "RETIRE_CONNECTION_ID":
+			if q.native {
+				seq := fr["Sequence"].(uint64)
+				if cid, ok := q.cidSequences[1-dir][seq]; ok {
+					delete(q.cids, cid)
+					delete(q.cidSequences[1-dir], seq)
+				} else {
+					return sessionContext("QUIC retirement of unobserved CID")
+				}
+			}
+
 		case "CRYPTO":
 			off, _ := fr["Offset"].(uint64)
 			data, _ := fr["Crypto Data"].([]byte)
+			if q.native {
+				if err := q.feedCrypto(dir, space, off, data, info, max); err != nil {
+					return err
+				}
+				continue
+			}
 			end := off + uint64(len(data))
 			if quicOverlap(q.crypto[dir][space], off, end) {
 				fr["Retransmission"] = true
@@ -307,10 +416,36 @@ func (q *binQUIC) applyFrames(dir, space int, frames []map[string]any, info map[
 				st.fin = true
 				fr["Stream FIN"] = true
 			}
-			if err := q.feedHTTP3(dir, sid, off, data, fin, max, fr, info); err != nil {
-				return err
+			if q.native {
+				if sid&2 != 0 && int(sid&1) != dir {
+					return protocolError(ErrMalformedMessage, "QUIC unidirectional stream wrong sender")
+				}
+				var err error
+				data, off, fin, err = st.reassembly[dir].feed(off, data, fin, q.byteLimit, max)
+				if err != nil {
+					return err
+				}
+				fr["Contiguous Offset"] = off
+				fr["Delivered Bytes"] = len(data)
+				fr["Byte Source"] = map[string]any{"Kind": "quic-authenticated-plaintext", "Parent PDU": q.eventID, "Stream ID": sid, "Offset": off}
+				fr["Stream Complete"] = st.reassembly[dir].deliveredFIN
+				if st.resetDirection[dir] || len(data) == 0 && !fin {
+					continue
+				}
 			}
-			if info["HTTP3"] != true {
+			if q.native && sid&2 == 0 && dir == 0 && st.requestPDU == 0 {
+				st.requestPDU = q.eventID
+			}
+			if q.native {
+				fr["Request PDU ID"] = st.requestPDU
+				fr["Transaction ID"] = st.requestPDU
+			}
+			if !q.native || q.alpn == "h3" {
+				if err := q.feedHTTP3(dir, sid, off, data, fin, max, fr, info); err != nil {
+					return err
+				}
+			}
+			if info["HTTP3"] != true && (!q.native || q.alpn == "doq") {
 				if err := q.feedDoQ(dir, sid, off, data, fin, max, fr, info); err != nil {
 					return err
 				}
@@ -319,6 +454,17 @@ func (q *binQUIC) applyFrames(dir, space int, frames []map[string]any, info map[
 			sid, _ := fr["Stream ID"].(uint64)
 			st := q.stream(sid, max)
 			if st != nil {
+				if q.native {
+					final := fr["Final Size"].(uint64)
+					if _, _, _, err := st.reassembly[dir].feed(final, nil, true, q.byteLimit, max); err != nil {
+						return err
+					}
+					st.resetDirection[dir] = true
+					if st.h3 != nil {
+						st.h3.blocked[dir] = false
+						st.h3.parsed[dir] = len(st.h3.buf[dir])
+					}
+				}
 				st.reset = true
 				if st.h3 != nil && st.h3.kind != "" {
 					info["HTTP3"] = true
@@ -721,6 +867,10 @@ func quicParseFrame(b []byte) (map[string]any, int, error) {
 		if err != nil {
 			return nil, 0, err
 		}
+		if count > 4096 || first > largest {
+			return nil, 0, fmt.Errorf("quic: invalid ACK ranges")
+		}
+		remaining := largest - first
 		ranges := []map[string]any{{"Gap": uint64(0), "ACK Range": first}}
 		for i := uint64(0); i < count; i++ {
 			gap, err := take()
@@ -731,6 +881,10 @@ func quicParseFrame(b []byte) (map[string]any, int, error) {
 			if err != nil {
 				return nil, 0, err
 			}
+			if gap+2 > remaining || rng > remaining-gap-2 {
+				return nil, 0, fmt.Errorf("quic: invalid ACK range")
+			}
+			remaining -= gap + 2 + rng
 			ranges = append(ranges, map[string]any{"Gap": gap, "ACK Range": rng})
 		}
 		if t == 0x03 {
@@ -751,6 +905,59 @@ func quicParseFrame(b []byte) (map[string]any, int, error) {
 			"ACK Range Count":      count,
 			"ACK Ranges":           ranges,
 		}, off, nil
+	case t == 0x07:
+		n, err := take()
+		if err != nil {
+			return nil, 0, err
+		}
+		token, err := bytesN(n)
+		return map[string]any{"Frame Type": "NEW_TOKEN", "Token": token}, off, err
+	case t >= 0x10 && t <= 0x17:
+		names := []string{"MAX_DATA", "MAX_STREAM_DATA", "MAX_STREAMS_BIDI", "MAX_STREAMS_UNI", "DATA_BLOCKED", "STREAM_DATA_BLOCKED", "STREAMS_BLOCKED_BIDI", "STREAMS_BLOCKED_UNI"}
+		v, err := take()
+		if err != nil {
+			return nil, 0, err
+		}
+		fr := map[string]any{"Frame Type": names[t-0x10], "Value": v}
+		if t == 0x11 || t == 0x15 {
+			fr["Stream ID"] = v
+			v, err = take()
+			fr["Value"] = v
+		}
+		return fr, off, err
+	case t == 0x18:
+		seq, err := take()
+		if err != nil {
+			return nil, 0, err
+		}
+		retire, err := take()
+		if err != nil {
+			return nil, 0, err
+		}
+		if retire > seq || off >= len(b) {
+			return nil, 0, fmt.Errorf("quic: invalid CID sequence")
+		}
+		n := int(b[off])
+		off++
+		if n < 1 || n > 20 {
+			return nil, 0, fmt.Errorf("quic: invalid CID length")
+		}
+		cid, err := bytesN(uint64(n))
+		if err != nil {
+			return nil, 0, err
+		}
+		token, err := bytesN(16)
+		return map[string]any{"Frame Type": "NEW_CONNECTION_ID", "Sequence": seq, "Retire Prior To": retire, "CID": cid, "Reset Token": token}, off, err
+	case t == 0x19:
+		seq, err := take()
+		return map[string]any{"Frame Type": "RETIRE_CONNECTION_ID", "Sequence": seq}, off, err
+	case t == 0x1a || t == 0x1b:
+		data, err := bytesN(8)
+		name := "PATH_CHALLENGE"
+		if t == 0x1b {
+			name = "PATH_RESPONSE"
+		}
+		return map[string]any{"Frame Type": name, "Data": data}, off, err
 	case t == 0x04:
 		sid, err := take()
 		if err != nil {
@@ -972,6 +1179,33 @@ func quicValidateProtectedFrames(space int, frames []map[string]any) error {
 // without Handshake/Application keys. Include slice capacity in its reservation.
 func (q *binQUIC) initialMemory() int64 {
 	n := int64(4096)
+	for d := range q.cryptoData {
+		for sp := range q.cryptoData[d] {
+			n += q.cryptoData[d][sp].memory()
+		}
+	}
+	for _, st := range q.streams {
+		n += 512
+		if st.h3 != nil {
+			n += 256
+		}
+		if st.doq != nil {
+			n += 128
+		}
+		for d := 0; d < 2; d++ {
+			n += st.reassembly[d].memory()
+			if st.h3 != nil {
+				n += int64(cap(st.h3.buf[d]))
+			}
+			if st.doq != nil {
+				n += int64(cap(st.doq.buf[d]))
+			}
+		}
+	}
+	for d := 0; d < 2; d++ {
+		n += int64(q.qpack.table[d].size)
+	}
+	n += int64(len(q.cids) * 128)
 	for d := range q.spaces {
 		for s := range q.spaces[d] {
 			n += int64(cap(q.spaces[d][s].seen))*8 + int64(cap(q.crypto[d][s]))*16

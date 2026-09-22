@@ -78,3 +78,54 @@ func TestFirstBatchT05(t *testing.T) {
 		})
 	}
 }
+
+func TestFirstBatchM2SharkNative(t *testing.T) {
+	base := "../../../../pcapx/pcaputil/testdata/protocol-sessions"
+	key, err := os.ReadFile(filepath.Join(base, "m2b-quic.keys"))
+	require.NoError(t, err)
+	keys, err := pcaputil.ParseTLSKeyLog(string(key))
+	require.NoError(t, err)
+	for _, name := range []string{"m2b-quic-native.pcap", "m2b-database-native.pcap"} {
+		t.Run(name, func(t *testing.T) {
+			path := filepath.Join(base, name)
+			var expected []*pcaputil.ProtocolEvent
+			require.NoError(t, pcaputil.ReplayPcapFile(path, pcaputil.WithTLSSecrets(keys), pcaputil.WithOnProtocolMessage(func(e *pcaputil.ProtocolEvent) { expected = append(expected, e) })))
+			cfg := captureConfig{input: path, output: filepath.Join(t.TempDir(), "output.pcap"), snaplen: 65535, tlsSecrets: keys}
+			src, err := openCapture(cfg)
+			require.NoError(t, err)
+			defer src.Close()
+			s := startCapture(context.Background(), src, cfg, false)
+			var packets []*capturedPacket
+			for p := range s.packets {
+				packets = append(packets, p)
+			}
+			require.NoError(t, s.result())
+			got := map[uint64]*pcaputil.ProtocolEvent{}
+			for _, p := range packets {
+				for _, e := range p.protocolEvents() {
+					got[e.ID] = e
+				}
+			}
+			require.Len(t, got, len(expected))
+			for _, e := range expected {
+				actual := got[e.ID]
+				require.NotNil(t, actual)
+				require.Equal(t, e.Protocol, actual.Protocol)
+				require.Equal(t, e.DisplayFields(), actual.DisplayFields())
+				require.Equal(t, e.ResponseTo, actual.ResponseTo)
+				require.Equal(t, e.TransactionID, actual.TransactionID)
+			}
+			if name == "m2b-quic-native.pcap" {
+				f, err := pcaputil.CompileDisplayFilter(`protocol == "http3" and http.request.method == "GET"`)
+				require.NoError(t, err)
+				n := 0
+				for _, e := range got {
+					if f.Match(e) {
+						n++
+					}
+				}
+				require.Equal(t, 2, n)
+			}
+		})
+	}
+}

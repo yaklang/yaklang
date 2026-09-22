@@ -1,30 +1,37 @@
 package pcaputil
 
 import (
+	"bytes"
 	"container/list"
 	"encoding/binary"
+	"encoding/hex"
 	"time"
 )
 
-// A bounded UDP entrypoint for QUIC v1 long headers. Only authenticated packet
-// payloads can reach the existing frame engine. This does not claim CID-based
-// migration, multi-connection keylog selection or complete HTTP/3 wire support.
+// Native QUIC uses capture-domain/CID evidence, never a port or a payload guess.
 func (a *binParser) decodeQUICDatagram(base *ProtocolEvent, wire []byte) ([]*ProtocolEvent, bool) {
-	if len(wire) < 7 || wire[0]&0xc0 != 0xc0 || binary.BigEndian.Uint32(wire[1:5]) != 1 {
+	if len(wire) < 1 || wire[0]&0x40 == 0 {
 		return nil, false
 	}
-	if probeQUIC(wire, len(wire)).Verdict != ProbeAccept {
-		return nil, false
+	long := wire[0]&0x80 != 0
+	var first quicHdr
+	if long {
+		if len(wire) < 7 || binary.BigEndian.Uint32(wire[1:5]) != 1 {
+			return nil, false
+		}
+		var err error
+		first, err = quicParseHeader(wire, true)
+		if err != nil {
+			return nil, false
+		}
 	}
 	a.udpMu.Lock()
 	defer a.udpMu.Unlock()
-	key := binUDPKey{base.Source, base.Destination, base.Domain}
-	if key.a > key.b {
-		key.a, key.b = key.b, key.a
-	}
-	key.a = "quic/" + key.a
 	s := a.udpSessions
 	if s == nil {
+		if !long || first.typeName != "Initial" {
+			return nil, false
+		}
 		s = &binUDPStore{entries: map[binUDPKey]*list.Element{}, clock: base.Timestamp}
 		a.udpSessions = s
 	}
@@ -40,37 +47,72 @@ func (a *binParser) decodeQUICDatagram(base *ProtocolEvent, wire []byte) ([]*Pro
 		delete(s.entries, v.key)
 		s.lru.Remove(el)
 	}
-	el := s.entries[key]
+	var el *list.Element
+	dir := 0
+	for _, candidate := range s.entries {
+		v := candidate.Value.(*binUDPEntry)
+		q := v.flow.quic
+		if q == nil || v.key.domain != base.Domain {
+			continue
+		}
+		// Zero-length CIDs cannot migrate: retain the observed endpoint tuple.
+		for d := 0; d < 2; d++ {
+			if q.zeroCID[1-d] && (!long || len(first.dcid) == 0) && base.Source == v.flow.endpoints[d] && base.Destination == v.flow.endpoints[1-d] {
+				if el != nil && el != candidate {
+					return nil, false
+				}
+				el = candidate
+				dir = d
+			}
+		}
+		for cid, owner := range q.cids {
+			match := long && string(first.dcid) == cid || !long && len(wire) >= 1+len(cid) && string(wire[1:1+len(cid)]) == cid
+			if match {
+				if el != nil && el != candidate {
+					return nil, false
+				}
+				el = candidate
+				dir = 1 - owner
+			}
+		}
+	}
 	var f *binFlow
+	key := binUDPKey{}
 	if el != nil {
 		f = el.Value.(*binUDPEntry).flow
+		key = el.Value.(*binUDPEntry).key
 	} else {
-		f = &binFlow{a: a, protocol: "quic", quic: &binQUIC{}, endpoints: [2]string{base.Source, base.Destination}}
-	}
-	dir := 0
-	if base.Source != f.endpoints[0] {
-		dir = 1
+		if !long || first.typeName != "Initial" {
+			return nil, false
+		}
+		key = binUDPKey{"quic/" + base.Source + "/" + hex.EncodeToString(first.dcid), base.Destination, base.Domain}
+		f = &binFlow{a: a, protocol: "quic", quic: &binQUIC{native: true, byteLimit: a.budget.MaxMessageBytes, provider: a.tlsSecrets}, endpoints: [2]string{base.Source, base.Destination}}
 	}
 	var events []*ProtocolEvent
 	for off := 0; off < len(wire); {
+		if off > 0 && bytes.Count(wire[off:], []byte{0}) == len(wire)-off {
+			events[len(events)-1].Session["Unauthenticated Datagram Padding Bytes"] = len(wire) - off
+			break
+		}
 		e := *base
 		e.Protocol = "quic"
+		e.Profile = "quic-v1-native"
+		e.Admission = "authenticated-wire-and-observed-CID"
+		e.ID = a.ids.Add(1)
+		f.quic.eventID = e.ID
 		e.Direction = dir
-		h, err := quicParseHeader(wire[off:], true)
+		h, err := f.quic.wireHeader(wire[off:], dir)
 		size := len(wire) - off
-		if err == nil && (h.size <= 0 || h.size > size || h.version != 1 || !h.long) {
-			err = protocolError(ErrMalformedMessage, "invalid coalesced QUIC long packet")
+		if err == nil && (h.size <= 0 || h.size > size) {
+			err = protocolError(ErrMalformedMessage, "invalid coalesced QUIC length")
 		}
 		if err == nil {
 			size = h.size
 		}
 		raw := wire[off : off+size]
 		e.Length = size
-		if err == nil && len(events) >= a.budget.MaxCollectionElements {
-			err = protocolError(ErrResourceExceeded, "QUIC packets per datagram budget")
-		}
-		if err == nil && el == nil && len(s.entries) >= sessionCollectionLimit(a.budget.MaxCollectionElements) {
-			err = protocolError(ErrResourceExceeded, "UDP conversation budget")
+		if err == nil && (len(events) >= a.budget.MaxCollectionElements || el == nil && len(s.entries) >= sessionCollectionLimit(a.budget.MaxCollectionElements)) {
+			err = protocolError(ErrResourceExceeded, "QUIC packet/conversation budget")
 		}
 		if err == nil {
 			err = f.reserveSession(f.quic.initialMemory() + int64(len(raw))*32)
@@ -78,7 +120,10 @@ func (a *binParser) decodeQUICDatagram(base *ProtocolEvent, wire []byte) ([]*Pro
 		if err == nil {
 			e.Session, err = f.quic.consume(dir, raw, a.budget.MaxCollectionElements)
 		}
-		if err == nil && el == nil && e.Session["Authentication Verified"] == true {
+		if err == nil {
+			err = f.reserveSession(f.quic.initialMemory())
+		}
+		if el == nil && err == nil && e.Session["Authentication Verified"] == true {
 			f.id = a.flows.Add(1)
 			el = s.lru.PushBack(&binUDPEntry{key, f, s.clock})
 			s.entries[key] = el
@@ -90,12 +135,54 @@ func (a *binParser) decodeQUICDatagram(base *ProtocolEvent, wire []byte) ([]*Pro
 			e.FlowID = f.id
 		}
 		if e.Session != nil {
-			e.Session["Observation Scope"] = "UDP endpoint pair"
+			e.Session["Observation Scope"] = "UDP capture domain and observed CID"
 			e.Session["Datagram Offset"] = off
 			e.Session["Native Carrier"] = true
+			e.Session["ALPN"] = f.quic.alpn
+		}
+		if e.Session != nil {
+			var transaction uint64
+			multiple := false
+			frames, _ := e.Session["Frames"].([]map[string]any)
+			for _, fr := range frames {
+				if id, ok := fr["Request PDU ID"].(uint64); ok && id != 0 {
+					if transaction != 0 && transaction != id {
+						multiple = true
+					}
+					transaction = id
+				}
+			}
+			if !multiple && transaction != 0 {
+				e.TransactionID = transaction
+				if dir == 1 {
+					e.ResponseTo = transaction
+				}
+			}
+			if e.Session["Encrypted"] == true {
+				e.Completeness = "encrypted"
+				e.Session["Content Visibility"] = "encrypted"
+				e.Admission = "observed-CID-protected-payload"
+			}
+		}
+		if e.Session["HTTP3"] == true {
+			e.Protocol = "http3"
+			e.Profile = "http3-native"
+		}
+		if e.Session["DoQ"] == true {
+			e.Protocol = "doq"
+			e.Profile = "doq-native"
+			if d, ok := e.Session["DoQ Message"].(map[string]any); ok {
+				e.Session["DNS"] = d["DNS"]
+			}
 		}
 		a.finishProtocolDatagram(&e, raw, a.specs["application-layer.quic/QUIC"], err)
 		events = append(events, &e)
+		if e.sessionError != nil && e.sessionError.Kind == ErrResourceExceeded && el != nil {
+			f.closeSession()
+			delete(s.entries, key)
+			s.lru.Remove(el)
+			el = nil
+		}
 		off += size
 		if err != nil {
 			break
