@@ -244,6 +244,19 @@ func (r *stageOutcomeRecorder) addRisk(stage ProductStage, count int64) {
 	r.metrics[stage] = metrics
 }
 
+func (r *stageOutcomeRecorder) ensureMinRuleCount(stage ProductStage, n int64) {
+	if r == nil || n <= 0 {
+		return
+	}
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	metrics := r.metrics[stage]
+	if metrics.ruleCount < n {
+		metrics.ruleCount = n
+		r.metrics[stage] = metrics
+	}
+}
+
 func (r *stageOutcomeRecorder) addRule(stage ProductStage, name string) {
 	name = strings.TrimSpace(name)
 	if r == nil || name == "" {
@@ -279,6 +292,9 @@ func (r *stageOutcomeRecorder) observeScale(info *RuleProcessInfoList) {
 }
 
 func (r *stageOutcomeRecorder) observeScaleLocked(info *RuleProcessInfoList) {
+	if info == nil {
+		return
+	}
 	if info.TotalFiles > 0 {
 		r.scale.TotalFiles = info.TotalFiles
 	}

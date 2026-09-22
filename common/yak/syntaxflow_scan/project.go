@@ -23,6 +23,10 @@ import (
 // import ssa_compile (ssa_compile -> yakscript -> yak -> syntaxflow_scan).
 var CompileProject func(ctx context.Context, cfg *ssaconfig.Config, extra ...ssaconfig.Option) (*ssaapi.Program, error)
 
+// CollectCodeSourceDir clones or opens the project tree without compiling SSA.
+// Tests may stub this to avoid a real git clone.
+var CollectCodeSourceDir = ssaapi.CollectCodeSourceDir
+
 // ScanProjectFromJSON is the script/platform entry: one ssaconfig JSON blob
 // plus optional callbacks. CLI and gRPC parse their inputs into the same
 // JSON/options and call ScanProject. It returns the same ProjectResult.
@@ -42,7 +46,7 @@ func ScanProjectFromJSON(ctx context.Context, raw string, extra ...ssaconfig.Opt
 //   - struct: compile-time unit scan (-t) or intra application/library scan (-p, no compile)
 //   - ssa: always on a DB-loaded program (-t reloads after SaveToDatabase)
 //
-// Stages: 收集代码 → 代码检测 → 语义检测 → 深度分析.
+// Stages: 收集代码 → 代码检测 → 语义检测(编译中) → 深度分析.
 // Mode is selected by WithMode (stacked). An empty mode list is compile-only:
 // it persists IR, reports StageCompile, and skips every rule set so platforms
 // can reuse the program later. Callers that want rule sets (code-scan, gRPC)
@@ -59,6 +63,7 @@ func ScanProject(ctx context.Context, opts ...ssaconfig.Option) (ProjectResult, 
 	if err != nil {
 		return ProjectResult{}, err
 	}
+	defer cfg.Cleanup()
 	ssaconfig.ApplyExtraOptions(cfg, cfg.Config)
 	cfg.SetSyntaxFlowResultSaveMemory()
 	if cfg.SyntaxFlow != nil {
@@ -149,15 +154,28 @@ func ScanProject(ctx context.Context, opts ...ssaconfig.Option) (ProjectResult, 
 		hasLoaded = len(cfg.Programs) > 0
 	}
 	hasProgram := hasLoaded
-	needCompile := !hasLoaded && hasCode &&
-		(compileOnly || wantReview || wantAnalyze || (wantSource && localDir == ""))
+	needCompile := !hasLoaded && hasCode && (compileOnly || wantReview || wantAnalyze)
 
 	// Collect is "the project tree is here". A local directory or loaded IR is
 	// already collected; a remote URL is not collected until clone/extract
-	// succeeds inside compile. Reporting collect success before that made a
-	// clone failure look like a 语义检测 failure.
+	// succeeds. Inspect/source analysis must not compile SSA IR: clone the tree
+	// and scan files first. Compile is only for compile-only, review, or analyze,
+	// and when inspect also ran it reuses the collected directory.
 	sourceReady := hasProgram || localDir != ""
 	emit(StageCollect, 0, nil)
+	if !sourceReady && wantSource && hasCode {
+		dir, err := CollectCodeSourceDir(ctx, cfg.Config)
+		if err != nil {
+			report(StageCollect, err)
+			return finishScanProject(cfg, recorder, programName, err)
+		}
+		localDir = dir
+		sourceReady = true
+		if err := retargetCodeSourceToCollectedDir(cfg, dir); err != nil {
+			report(StageCollect, err)
+			return finishScanProject(cfg, recorder, programName, err)
+		}
+	}
 	if sourceReady {
 		emit(StageCollect, 1, nil)
 		report(StageCollect, nil)
@@ -170,6 +188,7 @@ func ScanProject(ctx context.Context, opts ...ssaconfig.Option) (ProjectResult, 
 		}
 		emit(StageInspect, 0, nil)
 		err := StartScan(ctx, inspectLiveSourceOptions(cfg, emit)...)
+		recorder.ensureMinRuleCount(StageInspect, countSourceRules(cfg))
 		report(StageInspect, err)
 		if err != nil {
 			return finishScanProject(cfg, recorder, programName, err)
@@ -296,6 +315,7 @@ func ScanProject(ctx context.Context, opts ...ssaconfig.Option) (ProjectResult, 
 		if runSource {
 			emit(StageInspect, 0, nil)
 			err := StartScan(ctx, inspectCompiledSourceOptions(cfg, emit)...)
+			recorder.ensureMinRuleCount(StageInspect, countSourceRules(cfg))
 			report(StageInspect, err)
 			if err == nil {
 				emit(StageInspect, 1, nil)
@@ -397,12 +417,24 @@ type productModeSelection struct {
 
 // resolveProductModes maps the stacked mode list onto product stages. An empty
 // list means compile-only: collect source and persist IR, run no rules.
+// If withMode was not applied, JSON rule_filter_mode is the product intent
+// (Legion inspect-only sends ["source"] that way).
 func resolveProductModes(cfg *Config) productModeSelection {
-	if cfg == nil || cfg.ScanTaskCallback == nil || len(cfg.scanModes) == 0 {
+	if cfg == nil {
+		return productModeSelection{compileOnly: true}
+	}
+	var modes []string
+	if cfg.ScanTaskCallback != nil {
+		modes = cfg.scanModes
+	}
+	if len(modes) == 0 {
+		modes = cfg.GetRuleFilterMode()
+	}
+	if len(modes) == 0 {
 		return productModeSelection{compileOnly: true}
 	}
 	var selection productModeSelection
-	for _, m := range cfg.scanModes {
+	for _, m := range modes {
 		switch strings.ToLower(strings.TrimSpace(m)) {
 		case SourceMode:
 			selection.source = true
@@ -513,15 +545,32 @@ func localSourceDir(cfg *Config) string {
 	if dir == "" {
 		return ""
 	}
-	// Live source inspection walks the path as a directory. Archives and plain
-	// files must fall through to the compile pipeline, which knows how to open
-	// zip/jar code sources; walking them here fails with
-	// "root path is not a directory".
+	// Live source inspection walks a real directory. Archives and remote
+	// sources are collected separately without compiling SSA IR.
 	info, err := os.Stat(dir)
 	if err != nil || !info.IsDir() {
 		return ""
 	}
 	return dir
+}
+
+// retargetCodeSourceToCollectedDir points later compile at the tree inspect
+// already cloned or extracted, so git/zip do not pay for a second fetch.
+func retargetCodeSourceToCollectedDir(cfg *Config, dir string) error {
+	if cfg == nil || cfg.Config == nil {
+		return nil
+	}
+	dir = strings.TrimSpace(dir)
+	if dir == "" {
+		return nil
+	}
+	if cfg.GetCodeSourceKind() == ssaconfig.CodeSourceLocal {
+		return nil
+	}
+	return cfg.Update(
+		ssaconfig.WithCodeSourceKind(ssaconfig.CodeSourceLocal),
+		ssaconfig.WithCodeSourceLocalFile(dir),
+	)
 }
 
 func emitStructResults(cfg *Config, prog *ssaapi.Program) {
@@ -787,6 +836,19 @@ func structCompileOptions(cfg *Config) []ssaconfig.Option {
 	}
 	opts = append(opts, ssaapi.WithStructRule(true))
 	return opts
+}
+
+func countSourceRules(cfg *Config) int64 {
+	if cfg == nil {
+		return 0
+	}
+	var n int64
+	for _, rule := range cfg.customRules() {
+		if rule != nil && rule.IsSourceMode() {
+			n++
+		}
+	}
+	return n
 }
 
 func attachLiveSourceTarget(cfg *Config, dir string) error {

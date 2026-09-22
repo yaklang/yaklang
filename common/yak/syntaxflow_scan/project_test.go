@@ -42,13 +42,21 @@ func writeTestZip(t *testing.T, files map[string]string) string {
 	return zipPath
 }
 
-// A local archive target must compile through the zip code source instead of
-// being walked as a directory: `-t ./fs.zip` used to fail with
+// A local archive target must open the zip as a code source instead of
+// walking it as a directory: `-t ./fs.zip` used to fail with
 // "root path is not a directory: ." and abort the whole scan.
+// Source-only analysis must inspect the snapshot and must not compile SSA IR.
 func TestScanProject_LocalZipTargetCompilesInsteadOfWalkingDirectory(t *testing.T) {
 	zipPath := writeTestZip(t, map[string]string{
 		"main.go": "package main\n\nvar key = \"AKIAIOSFODNN7EXAMPLE\"\n",
 	})
+
+	origCompile := syntaxflow_scan.CompileProject
+	t.Cleanup(func() { syntaxflow_scan.CompileProject = origCompile })
+	syntaxflow_scan.CompileProject = func(ctx context.Context, cfg *ssaconfig.Config, extra ...ssaconfig.Option) (*ssaapi.Program, error) {
+		t.Fatal("source-only zip analysis must not compile SSA IR")
+		return nil, fmt.Errorf("must not compile")
+	}
 
 	var alerts int
 	result, err := syntaxflow_scan.ScanProject(context.Background(),
@@ -73,6 +81,9 @@ alert $hit`,
 	require.NoError(t, err)
 	require.True(t, result.Succeeded)
 	require.Greater(t, alerts, 0, "source rules must run against the zip snapshot")
+	for _, outcome := range result.Stages {
+		require.NotEqual(t, syntaxflow_scan.StageCompile, outcome.Stage)
+	}
 }
 
 // A local jar target must compile through the jar code source (java archive),
@@ -265,6 +276,104 @@ alert $hit`,
 	require.Equal(t, "代码检测", syntaxflow_scan.StageInspect.DisplayName())
 	require.Equal(t, "语义检测", syntaxflow_scan.StageReview.DisplayName())
 	require.Equal(t, "深度分析", syntaxflow_scan.StageAnalyze.DisplayName())
+}
+
+func TestScanProject_SourceOnlyGitDoesNotCompileIR(t *testing.T) {
+	dir := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "app.py"), []byte("eval(user)\n"), 0o644))
+
+	origCollect := syntaxflow_scan.CollectCodeSourceDir
+	origCompile := syntaxflow_scan.CompileProject
+	t.Cleanup(func() {
+		syntaxflow_scan.CollectCodeSourceDir = origCollect
+		syntaxflow_scan.CompileProject = origCompile
+	})
+	syntaxflow_scan.CollectCodeSourceDir = func(ctx context.Context, cfg *ssaconfig.Config) (string, error) {
+		return dir, nil
+	}
+	syntaxflow_scan.CompileProject = func(ctx context.Context, cfg *ssaconfig.Config, extra ...ssaconfig.Option) (*ssaapi.Program, error) {
+		t.Fatal("source-only analysis must not compile SSA IR")
+		return nil, fmt.Errorf("must not compile")
+	}
+
+	var stages []string
+	result, err := syntaxflow_scan.ScanProject(context.Background(),
+		ssaconfig.WithCodeSourceKind(ssaconfig.CodeSourceGit),
+		ssaconfig.WithCodeSourceURL("https://example.invalid/repo.git"),
+		ssaconfig.WithProjectRawLanguage("python"),
+		ssaconfig.WithSetProgramName(t.Name()),
+		syntaxflow_scan.WithMode(syntaxflow_scan.SourceMode),
+		ssaconfig.WithRuleInput(&ypb.SyntaxFlowRuleInput{
+			Content: `desc(mode: "source", language: python, title: "source only")
+${*.py}.pattern_regex(/eval\s*\(/) as $hit
+alert $hit`,
+			Language: "python",
+		}),
+		syntaxflow_scan.WithStageCallback(func(stage syntaxflow_scan.ProductStage, overall, progress float64, info *syntaxflow_scan.RuleProcessInfoList) {
+			if progress == 0 || progress == 1 {
+				stages = append(stages, string(stage))
+			}
+		}),
+		ssaconfig.WithScanIgnoreLanguage(true),
+	)
+	require.NoError(t, err)
+	require.True(t, result.Succeeded)
+	require.Contains(t, stages, string(syntaxflow_scan.StageCollect))
+	require.Contains(t, stages, string(syntaxflow_scan.StageInspect))
+	require.NotContains(t, stages, string(syntaxflow_scan.StageCompile))
+	require.NotContains(t, stages, string(syntaxflow_scan.StageReview))
+	require.NotContains(t, stages, string(syntaxflow_scan.StageAnalyze))
+	for _, outcome := range result.Stages {
+		require.NotEqual(t, syntaxflow_scan.StageCompile, outcome.Stage)
+	}
+}
+
+// Legion inspect-only launches put rule_filter_mode=["source"] in JSON and may
+// omit withMode on older nodes. That must still inspect files, not compile IR.
+func TestScanProject_JSONRuleFilterModeSourceDoesNotCompileIR(t *testing.T) {
+	dir := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "app.py"), []byte("eval(user)\n"), 0o644))
+
+	origCollect := syntaxflow_scan.CollectCodeSourceDir
+	origCompile := syntaxflow_scan.CompileProject
+	t.Cleanup(func() {
+		syntaxflow_scan.CollectCodeSourceDir = origCollect
+		syntaxflow_scan.CompileProject = origCompile
+	})
+	syntaxflow_scan.CollectCodeSourceDir = func(ctx context.Context, cfg *ssaconfig.Config) (string, error) {
+		return dir, nil
+	}
+	syntaxflow_scan.CompileProject = func(ctx context.Context, cfg *ssaconfig.Config, extra ...ssaconfig.Option) (*ssaapi.Program, error) {
+		t.Fatal("JSON source rule_filter_mode must not compile SSA IR")
+		return nil, fmt.Errorf("must not compile")
+	}
+
+	result, err := syntaxflow_scan.ScanProject(context.Background(),
+		ssaconfig.WithCodeSourceKind(ssaconfig.CodeSourceGit),
+		ssaconfig.WithCodeSourceURL("https://example.invalid/repo.git"),
+		ssaconfig.WithProjectRawLanguage("python"),
+		ssaconfig.WithSetProgramName(t.Name()),
+		ssaconfig.WithRuleFilterMode(syntaxflow_scan.SourceMode),
+		ssaconfig.WithRuleInput(&ypb.SyntaxFlowRuleInput{
+			Content: `desc(mode: "source", language: python, title: "json source")
+${*.py}.pattern_regex(/eval\s*\(/) as $hit
+alert $hit`,
+			Language: "python",
+		}),
+		ssaconfig.WithScanIgnoreLanguage(true),
+	)
+	require.NoError(t, err)
+	require.True(t, result.Succeeded)
+	require.NotContains(t, stageNames(result), string(syntaxflow_scan.StageCompile))
+	require.Contains(t, stageNames(result), string(syntaxflow_scan.StageInspect))
+}
+
+func stageNames(result syntaxflow_scan.ProjectResult) []string {
+	names := make([]string, 0, len(result.Stages))
+	for _, outcome := range result.Stages {
+		names = append(names, string(outcome.Stage))
+	}
+	return names
 }
 
 func TestScanProject_ExternalStructRule(t *testing.T) {
@@ -644,10 +753,18 @@ alert $cmd`,
 // A remote clone failure is collect failing: the project tree never arrived,
 // so the run must not claim 语义检测 ran.
 func TestScanProject_RemoteCloneFailureReportsCollectFailed(t *testing.T) {
-	orig := syntaxflow_scan.CompileProject
-	t.Cleanup(func() { syntaxflow_scan.CompileProject = orig })
+	origCollect := syntaxflow_scan.CollectCodeSourceDir
+	origCompile := syntaxflow_scan.CompileProject
+	t.Cleanup(func() {
+		syntaxflow_scan.CollectCodeSourceDir = origCollect
+		syntaxflow_scan.CompileProject = origCompile
+	})
+	syntaxflow_scan.CollectCodeSourceDir = func(ctx context.Context, cfg *ssaconfig.Config) (string, error) {
+		return "", fmt.Errorf("SSA Git clone failed: workspace=%q: git clone: connection refused", t.TempDir())
+	}
 	syntaxflow_scan.CompileProject = func(ctx context.Context, cfg *ssaconfig.Config, extra ...ssaconfig.Option) (*ssaapi.Program, error) {
-		return nil, fmt.Errorf("SSA Git clone failed: workspace=%q: git clone: connection refused", t.TempDir())
+		t.Fatal("clone failure must stop at collect, before compile")
+		return nil, fmt.Errorf("must not compile")
 	}
 
 	result, err := syntaxflow_scan.ScanProject(context.Background(),

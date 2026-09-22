@@ -9,6 +9,8 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
+	"github.com/yaklang/yaklang/common/yak/ssaapi"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 )
 
 // A failing detection stage after a successful sibling keeps the run
@@ -84,6 +86,24 @@ func TestResolveProductModes(t *testing.T) {
 	require.True(t, selected.source)
 	require.False(t, selected.review)
 	require.True(t, selected.analyze)
+}
+
+// JSON rule_filter_mode is the product intent when withMode was not applied.
+func TestResolveProductModes_RuleFilterModeWithoutWithMode(t *testing.T) {
+	cfg := &Config{
+		Config: &ssaconfig.Config{
+			Mode: ssaconfig.ModeAll,
+			SyntaxFlowRule: &ssaconfig.SyntaxFlowRuleConfig{
+				RuleFilterMode: []string{SourceMode},
+			},
+		},
+		ScanTaskCallback: &ScanTaskCallback{},
+	}
+	selected := resolveProductModes(cfg)
+	require.False(t, selected.compileOnly, "inspect-only JSON must not become compile-only")
+	require.True(t, selected.source)
+	require.False(t, selected.review)
+	require.False(t, selected.analyze)
 }
 
 // Unknown mode values must not silently degrade into compile-only.
@@ -167,6 +187,84 @@ func TestStageOutcomeRecorder_ConcurrentResults(t *testing.T) {
 	outcome := recorder.Outcomes()[0]
 	require.EqualValues(t, workers*resultsPerWorker, outcome.RuleCount)
 	require.EqualValues(t, workers*resultsPerWorker, outcome.RiskCount)
+}
+
+// Source rules call addRule from parallel result callbacks. Concurrent map
+// writes here used to abort the whole scan with "fatal error: concurrent map writes".
+func TestStageOutcomeRecorder_ParallelSourceResults(t *testing.T) {
+	recorder := newStageOutcomeRecorder()
+	var wg sync.WaitGroup
+	const n = 64
+	for i := 0; i < n; i++ {
+		wg.Add(1)
+		go func(i int) {
+			defer wg.Done()
+			name := fmt.Sprintf("rule-%d", i)
+			recorder.enter(StageInspect)
+			recorder.addRule(StageInspect, name)
+			recorder.addRisk(StageInspect, 1)
+			recorder.observe(StageInspect, &RuleProcessInfoList{TotalQuery: 1, TotalFiles: int64(i + 1)})
+			recorder.observeScale(&RuleProcessInfoList{TotalLines: int64(i + 1)})
+			_ = recorder.Succeeded()
+			_ = recorder.Outcomes()
+			_ = recorder.Scale()
+		}(i)
+	}
+	wg.Wait()
+	recorder.record(StageInspect, nil)
+	outcomes := recorder.Outcomes()
+	require.Len(t, outcomes, 1)
+	require.EqualValues(t, n, outcomes[0].RuleCount)
+	require.EqualValues(t, n, outcomes[0].RiskCount)
+}
+
+func TestStageOutcomeRecorder_IgnoresBlankRuleNames(t *testing.T) {
+	recorder := newStageOutcomeRecorder()
+	recorder.addRule(StageInspect, " ")
+	recorder.addRule(StageInspect, "rule-a")
+	recorder.record(StageInspect, nil)
+
+	require.EqualValues(t, 1, recorder.Outcomes()[0].RuleCount)
+}
+
+func TestStageOutcomeRecorder_AnalyzedSourceKeepsExistingFileCount(t *testing.T) {
+	recorder := newStageOutcomeRecorder()
+	recorder.observeScale(&RuleProcessInfoList{TotalFiles: 12, TotalLines: 3})
+	recorder.observeAnalyzedSource(&ssaapi.SourceStatistics{AnalyzedLineCount: 80, AnalyzedFileCount: 4})
+
+	scale := recorder.Scale()
+	require.EqualValues(t, 12, scale.TotalFiles)
+	require.EqualValues(t, 80, scale.TotalLines)
+}
+
+func TestStageOutcomeRecorder_ParallelStagesStayIndependent(t *testing.T) {
+	recorder := newStageOutcomeRecorder()
+	var wg sync.WaitGroup
+	for i := 0; i < 32; i++ {
+		wg.Add(2)
+		go func(i int) {
+			defer wg.Done()
+			recorder.addRule(StageInspect, fmt.Sprintf("source-%d", i))
+			recorder.addRisk(StageInspect, 1)
+		}(i)
+		go func(i int) {
+			defer wg.Done()
+			recorder.addRule(StageReview, fmt.Sprintf("review-%d", i))
+			recorder.observe(StageReview, &RuleProcessInfoList{TotalQuery: int64(i + 1)})
+		}(i)
+	}
+	wg.Wait()
+	recorder.record(StageInspect, nil)
+	recorder.record(StageReview, nil)
+
+	outcomes := recorder.Outcomes()
+	require.Len(t, outcomes, 2)
+	require.Equal(t, StageInspect, outcomes[0].Stage)
+	require.EqualValues(t, 32, outcomes[0].RuleCount)
+	require.EqualValues(t, 32, outcomes[0].RiskCount)
+	require.Equal(t, StageReview, outcomes[1].Stage)
+	require.EqualValues(t, 32, outcomes[1].RuleCount)
+	require.Zero(t, outcomes[1].RiskCount)
 }
 
 func TestSkippedRequestedStages_DetectsUnstartedDetection(t *testing.T) {
