@@ -13,6 +13,7 @@ const (
 	capabilityKeyAIBindEpochV1              = "ai.session.bind_epoch.v1"
 	capabilityKeyAITurnLifecycleV1          = "ai.session.turn_lifecycle.v1"
 	capabilityKeyAIForgeReleaseV1           = "ai.forge_release.v1"
+	capabilityKeyAIForgeCustomToolsV1       = "ai.forge.custom_tools.v1"
 	capabilityKeyAIForgeEvidenceV1          = "ai.forge.evidence.v1"
 	capabilityKeyAIForgeDiscoveryV1         = "ai.forge.discovery.v1"
 	capabilityKeyAIForgeDiscoveryV2         = "ai.forge.discovery.v2"
@@ -39,7 +40,7 @@ func normalizeScanNodeCapabilityKeysForRuntime(input []string, runtimeMode strin
 		if (trimmed == capabilityKeyAICodeWorkspaceV1 || trimmed == capabilityKeyAIManagedInputV1 || trimmed == capabilityKeyAIForgeReleaseV1) && runtimeMode == aiSessionRuntimeModeStateful {
 			return
 		}
-		if (trimmed == capabilityKeyAIForgeEvidenceV1 || trimmed == capabilityKeyAIForgeDiscoveryV1 || trimmed == capabilityKeyAIForgeDiscoveryV2 || trimmed == capabilityKeyAIForgeHTTPAssessmentV2) && runtimeMode == aiSessionRuntimeModeStateful {
+		if (trimmed == capabilityKeyAIForgeCustomToolsV1 || trimmed == capabilityKeyAIForgeEvidenceV1 || trimmed == capabilityKeyAIForgeDiscoveryV1 || trimmed == capabilityKeyAIForgeDiscoveryV2 || trimmed == capabilityKeyAIForgeHTTPAssessmentV2) && runtimeMode == aiSessionRuntimeModeStateful {
 			return
 		}
 		if trimmed == capabilityKeyAIForgeEvidenceV1 && !inputresolver.Supported() {

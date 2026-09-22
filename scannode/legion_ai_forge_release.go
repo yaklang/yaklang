@@ -26,6 +26,7 @@ const (
 	legionForgeDiscoveryProfileV2 = "discovery.v2"
 	legionForgeHTTPProfileV2      = "http_assessment.v2"
 	legionForgeEvidenceProfile    = "evidence.v1"
+	legionForgeCustomToolsProfile = "custom_tools.v1"
 	maxLegionForgeParameters      = 64
 	maxLegionForgeTools           = 32
 	maxLegionForgeReleaseBytes    = 512 << 10
@@ -59,13 +60,17 @@ func validateContextForgeRelease(release *aiv1.ContextForgeRelease) error {
 		return fmt.Errorf("Forge release has unsupported executor %q", release.GetExecutorKind())
 	}
 	profile := strings.TrimSpace(release.GetCapabilityProfile())
-	if profile != legionForgeAdvisoryProfile && profile != legionForgeReportProfile && profile != legionForgeHTTPProfile && profile != legionForgeDiscoveryProfile && profile != legionForgeEvidenceProfile && profile != legionForgeDiscoveryProfileV2 && profile != legionForgeHTTPProfileV2 {
+	if profile != legionForgeCustomToolsProfile && profile != legionForgeAdvisoryProfile && profile != legionForgeReportProfile && profile != legionForgeHTTPProfile && profile != legionForgeDiscoveryProfile && profile != legionForgeEvidenceProfile && profile != legionForgeDiscoveryProfileV2 && profile != legionForgeHTTPProfileV2 {
 		return fmt.Errorf("Forge release capability profile %q is not supported by this node", release.GetCapabilityProfile())
 	}
 	if len(release.GetParameters()) > maxLegionForgeParameters || len(release.GetDeclaredToolNames()) > maxLegionForgeTools {
 		return fmt.Errorf("Forge release exceeds bounded input limits")
 	}
 	switch profile {
+	case legionForgeCustomToolsProfile:
+		if err := validateLegionForgeToolSnapshots(release); err != nil {
+			return err
+		}
 	case legionForgeDiscoveryProfile, legionForgeDiscoveryProfileV2:
 		if !equalContextForgeStrings(release.GetDeclaredToolNames(), legionForgeDiscoveryTools) {
 			return fmt.Errorf("discovery Forge release must declare exact discovery tools")
@@ -90,6 +95,9 @@ func validateContextForgeRelease(release *aiv1.ContextForgeRelease) error {
 			return fmt.Errorf("HTTP Forge release must declare the exact bounded HTTP tools")
 		}
 	}
+	if profile != legionForgeCustomToolsProfile && len(release.GetToolSnapshots()) != 0 {
+		return fmt.Errorf("tool snapshots require custom_tools.v1")
+	}
 	if len(release.GetInputSchemaJson()) > 0 && !json.Valid(release.GetInputSchemaJson()) {
 		return fmt.Errorf("Forge release input schema is invalid JSON")
 	}
@@ -99,7 +107,11 @@ func validateContextForgeRelease(release *aiv1.ContextForgeRelease) error {
 	if !normalizedContextForgeTools(release.GetDeclaredToolNames()) {
 		return fmt.Errorf("Forge release declared tools must be unique and sorted")
 	}
-	if proto.Size(release) > maxLegionForgeReleaseBytes {
+	definitionLimit := maxLegionForgeReleaseBytes
+	if profile == legionForgeCustomToolsProfile {
+		definitionLimit = 1 << 20
+	}
+	if proto.Size(release) > definitionLimit {
 		return fmt.Errorf("Forge release exceeds definition size limit")
 	}
 	definitionWant := strings.TrimSpace(release.GetDefinitionSha256())
@@ -175,7 +187,7 @@ func normalizedContextForgeParameters(values []*aiv1.ContextForgeParameter, prof
 		if key == "" || key != value.GetKey() || strings.TrimSpace(value.GetValue()) == "" || (kind != "string" && kind != "text" && kind != "resource") {
 			return false
 		}
-		if kind == "resource" && profile != legionForgeReportProfile && profile != legionForgeEvidenceProfile {
+		if kind == "resource" && profile != legionForgeReportProfile && profile != legionForgeEvidenceProfile && profile != legionForgeCustomToolsProfile {
 			return false
 		}
 		if _, exists := seen[key]; exists {

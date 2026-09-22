@@ -25,6 +25,9 @@ func legionForgeCapabilityOptions(
 	binding aiSessionBinding,
 ) ([]aicommon.ConfigOption, legionForgeMaterialRuntime, error) {
 	switch release.GetCapabilityProfile() {
+	case legionForgeCustomToolsProfile:
+		options, err := legionForgeCustomToolOptions(ctx, release, binding.InputWorkspace)
+		return options, nil, err
 	case legionForgeAdvisoryProfile:
 		return append(restrictedLegionForgeToolOptions(nil),
 			aicommon.WithDisableToolUse(true),
@@ -49,6 +52,14 @@ func legionForgeReportOptions(
 	release *aiv1.ContextForgeRelease,
 	workspace *inputresolver.Workspace,
 ) ([]aicommon.ConfigOption, error) {
+	tools, err := legionForgeReportToolObjects(ctx, release, workspace)
+	if err != nil {
+		return nil, err
+	}
+	return restrictedLegionForgeToolOptions(tools), nil
+}
+
+func legionForgeReportToolObjects(ctx context.Context, release *aiv1.ContextForgeRelease, workspace *inputresolver.Workspace) ([]*aitool.Tool, error) {
 	resources, err := legionForgeResourcePaths(release)
 	if err != nil {
 		return nil, err
@@ -112,7 +123,7 @@ func legionForgeReportOptions(
 		}
 		tools = append(tools, tool)
 	}
-	return restrictedLegionForgeToolOptions(tools), nil
+	return tools, nil
 }
 
 func legionForgeHTTPOptions(ctx context.Context, release *aiv1.ContextForgeRelease) ([]aicommon.ConfigOption, *legionServerFocusRuntime, error) {
