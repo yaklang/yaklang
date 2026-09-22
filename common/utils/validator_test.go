@@ -13,4 +13,8 @@ func TestIsValidDomain(t *testing.T) {
 	assert.Equal(t, true, IsValidDomain("xn--ccccc.cn"))
 	assert.Equal(t, false, IsValidDomain("-aa.example.cc"))
 	assert.Equal(t, true, IsValidDomain("localhost"))
+	assert.Equal(t, true, IsValidDomain("portal_zp_e.pdhr.com"))
+	assert.Equal(t, true, IsValidDomain("_sip._tcp.example.com"))
+	assert.Equal(t, false, IsValidDomain("-portal_zp_e.pdhr.com"))
+	assert.Equal(t, false, IsValidDomain("portal_zp_e..pdhr.com"))
 }

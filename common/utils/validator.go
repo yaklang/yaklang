@@ -27,12 +27,34 @@ func IsValidDomain(raw string) bool {
 		return strings.Trim(raw, ".-") == raw
 	}
 
+	// LDH (RFC 1123) rejects '_', but real hostnames use it: Windows AD,
+	// SRV-style labels, and names like portal_zp_e.pdhr.com.
+	if strings.Contains(raw, "_") {
+		return isPracticalUnderscoreHostname(raw)
+	}
+
 	result, err := domainRe.MatchString(raw)
 	if err != nil {
 		log.Errorf("domain match failed; %s", err)
 		return false
 	}
 	return result
+}
+
+func isPracticalUnderscoreHostname(raw string) bool {
+	if raw == "" || strings.HasPrefix(raw, ".") || strings.HasSuffix(raw, ".") {
+		return false
+	}
+	for _, label := range strings.Split(raw, ".") {
+		n := len(label)
+		if n == 0 || n > 63 {
+			return false
+		}
+		if label[0] == '-' || label[n-1] == '-' {
+			return false
+		}
+	}
+	return true
 }
 
 func IsValidCIDR(raw string) bool {
