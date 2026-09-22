@@ -48,8 +48,15 @@ No original captured packet bytes were rewritten to pass a new validator.
 | Fetch | 0..11; legacy low-version paths retained | 4..11 |
 
 Source schema: Apache Kafka tag 3.9.1, message JSON definitions. Modern flexible
-ApiVersions 3 / Metadata 9 / Produce 9 / Fetch 12 are a separate follow-up,
-not silently covered by these ranges. Admin/transaction APIs and snappy/lz4/zstd
+ApiVersions 3 / Metadata 9 / Produce 9 / Fetch 12 were delivered in the subsequent
+T15 flexible sub-milestone, separately from these legacy ranges. Its native Java
+codec/broker capture and offline tag/null/error oracles are pinned by
+`testdata/protocol-sessions/kafka-flex/manifest.json`; reproduction is in
+`scripts/protocol-tests/generate-kafka-flex/`. Request header v2 keeps the classic
+nullable client ID and adds header tags; response header v1 adds tags except
+ApiVersions v3, which deliberately retains header v0. Compact lengths, nested
+tag sections, known-tag windows and aggregate record budgets are validated.
+Unknown tags retain their bytes; unsupported adjacent versions remain explicit. Admin/transaction APIs and snappy/lz4/zstd
 are not added here. Redis streamed strings/aggregates remain unsupported.
 
 `testdata/protocol-sessions/first-batch-m2a/manifest.json` pins a 235-packet native

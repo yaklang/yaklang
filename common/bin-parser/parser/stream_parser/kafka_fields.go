@@ -141,13 +141,17 @@ func (r *kafkaReader) request(info map[string]any) {
 	if r.err != nil {
 		return
 	}
-	rng, ok := kafkaAPIVersions[api]
-	if !ok {
-		r.err = fmt.Errorf("kafka-fields: API key %d is not in the supported matrix", api)
+	if !KafkaVersionSupported(api, ver) {
+		r.err = fmt.Errorf("%w: API/version %d/%d", ErrKafkaUnsupported, api, ver)
 		return
 	}
-	if ver < rng[0] || ver > rng[1] {
-		r.err = fmt.Errorf("%w: API %d version %d is outside %d..%d", ErrKafkaUnsupported, api, ver, rng[0], rng[1])
+	info["Header Version"] = int16(1)
+	if KafkaFlexibleVersion(api, ver) {
+		info["Flexible"], info["Header Version"] = true, int16(2)
+		header := map[string]any{}
+		r.tags(header, nil)
+		info["Request Header"] = header
+		r.flexibleRequest(api, info)
 		return
 	}
 	switch api {

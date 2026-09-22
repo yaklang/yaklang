@@ -1,0 +1,60 @@
+{
+  "profile": "ZIP T15 modern flexible version sub-milestone",
+  "kafka_version": "3.9.1",
+  "native_client": "Kafka generated Java message codecs with a bounded raw TCP socket (not the high-level KafkaProducer)",
+  "broker": "Apache Kafka 3.9.1 KRaft on loopback TCP 19092; zip-flex topic with two partitions",
+  "capture": {
+    "file": "kafka-flex-native.pcap",
+    "packets": 50,
+    "kernel_drops": 0,
+    "requests": 9,
+    "responses": 8,
+    "pdus": 17,
+    "acks_zero_requests": 1
+  },
+  "profiles": {
+    "ApiVersions": 3,
+    "Metadata": 9,
+    "Produce": 9,
+    "Fetch": 12
+  },
+  "codecs": [
+    "none",
+    "gzip"
+  ],
+  "oracle": "java-oracle.json contains actual request/reply bytes and official generated-codec JSON; java-tags-oracle.json contains independently encoded/decoded offline boundary cases, not native captures",
+  "scope_exclusions": [
+    "Produce v8 and v10+",
+    "Metadata v10+",
+    "Fetch v13+",
+    "ApiVersions v4+",
+    "snappy/lz4/zstd",
+    "other Kafka APIs"
+  ],
+  "schema_source": "https://github.com/apache/kafka/tree/3.9.1/clients/src/main/resources/common/message",
+  "schema_sha256": {
+    "ApiVersionsRequest.json": "f4d14637bf39f3f44efcd7c21efdbe150d54e4529d24a1e8cc8057cd5bf15d2b",
+    "ApiVersionsResponse.json": "24bf9b4d3b1f25e4a281026a40d05f2e15208634300a341f8304f403d1024395",
+    "FetchRequest.json": "556074dc9896bd9fe33a85aa7bd8816bf1c22b9dc56f03a2b2b359560c31e4eb",
+    "FetchResponse.json": "61d3e92615763f6cf0b2482ac48f7cb3e61dbcf71f2978a403ec3a065ae70011",
+    "MetadataRequest.json": "789e5e00d7ac7c621162bb0e4036dca79005c68d0bb3434091af798ef655b077",
+    "MetadataResponse.json": "e55b72b04ac383894d216cb0dd03dbe3618123e9ce52c7df012735ef236af013",
+    "ProduceRequest.json": "96b36966cc0fab3b829f6cd81c2cec3b6b6b9781e265099760474b6645a9bf99",
+    "ProduceResponse.json": "b1c01c1cba74b7cc4b32a57c48c8fba54c12e7d64b93781da4431b11ad96bca1"
+  },
+  "client_jar_sha256": "25c5e4eb059c35766f645c0e0bd2fe623a1ebdc18250957506b1edbf476d1272",
+  "files": {
+    "java-oracle.json": {
+      "sha256": "cf1dde2ebd42f41f4daa7067357051b9fcc4e59ba1be7b32a0f48cfa564e797d",
+      "bytes": 24965
+    },
+    "java-tags-oracle.json": {
+      "sha256": "e9314ad6a3b1053cb41f2bb17447e47ead9cfc3dbedfa02c49a409d2c2ce3f16",
+      "bytes": 3539
+    },
+    "kafka-flex-native.pcap": {
+      "sha256": "98d6716e754bf60fdc835658296d5e44ddbf323aba33698cf4784b2128e0cbc0",
+      "bytes": 6921
+    }
+  }
+}
