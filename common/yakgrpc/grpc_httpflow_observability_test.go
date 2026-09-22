@@ -85,7 +85,7 @@ func TestQueryHTTPFlowsSystemTimingIsOptInAndBounded(t *testing.T) {
 	projected, err := server.QueryHTTPFlows(context.Background(), request)
 	require.NoError(t, err)
 	require.Len(t, projected.GetData(), 1)
-	require.NotEmpty(t, projected.GetData()[0].GetRequest())
+	require.Empty(t, projected.GetData()[0].GetRequest())
 	require.Empty(t, projected.GetData()[0].GetResponse())
 	require.Equal(t, "system timing", projected.GetData()[0].GetHtmlTitle())
 	require.Equal(t, int64(35), projected.GetData()[0].GetBodyLength())
@@ -99,10 +99,11 @@ func TestQueryHTTPFlowsSystemTimingIsOptInAndBounded(t *testing.T) {
 	require.Equal(t, int64(42), packetProjected.GetData()[0].GetRequestLength())
 	require.Equal(t, "system timing", packetProjected.GetData()[0].GetHtmlTitle())
 
+	consts.SetHTTPFlowListInlineMaxContentLength(consts.DefaultHTTPFlowListInlineMaxContentLength)
 	request.ExcludeRequestRaw = false
 	request.ExcludeResponseRaw = false
 	canonical, err := server.QueryHTTPFlows(context.Background(), request)
 	require.NoError(t, err)
-	require.NotEmpty(t, canonical.GetData()[0].GetRequest(), "list projection must not contaminate the normal request cache")
-	require.NotEmpty(t, canonical.GetData()[0].GetResponse(), "list projection must not contaminate the normal cache")
+	require.NotEmpty(t, canonical.GetData()[0].GetRequest(), "small packets must return when the inline budget is 300K")
+	require.NotEmpty(t, canonical.GetData()[0].GetResponse(), "small packets must return when the inline budget is 300K")
 }
