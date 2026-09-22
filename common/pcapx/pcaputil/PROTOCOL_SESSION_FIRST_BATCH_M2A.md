@@ -19,6 +19,8 @@ marked complete. No protocol inventory scores were inflated.
   messages do not consume ordinary requests. Subscription acknowledgments,
   unsubscribe-all, HELLO protocol observation, MULTI/EXEC/DISCARD and AUTH/HELLO
   AUTH semantic redaction are covered. Raw PCAP/Raw bytes remain explicit evidence.
+  Authentication display stays redacted after correlation expiry; a multi-channel
+  subscription error consumes one complete request, preserving the following reply.
 - Kafka pending context stores API, version, PDU and time. acks=0 creates no
   pending response. Duplicate outstanding IDs and timed-out ID reuse fail with
   context diagnostics. Responses without requests remain envelopes with explicit
