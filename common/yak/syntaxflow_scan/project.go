@@ -135,10 +135,8 @@ func ScanProject(ctx context.Context, opts ...ssaconfig.Option) (ProjectResult, 
 		}
 	}
 	// The reporter is one object shared by every stage scan below: results
-	// stream into it as each stage runs (see notifyResult), so the document is
-	// only complete after the last stage finishes. Stages must not write it;
-	// ScanProject saves the finished report once the pipeline returns.
-	cfg.deferReportSave = true
+	// stream into it as each stage runs (see notifyResult), and it keeps its
+	// document current so a stage can save a valid snapshot at any time.
 	hasLoaded := len(cfg.Programs) > 0
 	hasCode := hasCodeSource(cfg)
 	localDir := localSourceDir(cfg)
@@ -331,9 +329,9 @@ func ScanProject(ctx context.Context, opts ...ssaconfig.Option) (ProjectResult, 
 // stay visible through stage outcomes instead of turning an already-useful
 // result into a failed job.
 func finishScanProject(cfg *Config, recorder *stageOutcomeRecorder, programName string, err error) (ProjectResult, error) {
-	// Every stage has streamed its results into the shared reporter by now, so
-	// this is the one point where the document is complete. Saving here also
-	// covers the error paths, which used to leave a half-written report.
+	// Each stage already saved a snapshot on its way out; this final save is the
+	// authoritative one and also covers a run whose stages were skipped or
+	// failed before saving anything.
 	saveProjectReport(cfg)
 
 	result := ProjectResult{
@@ -673,10 +671,9 @@ func structRuleProcessInfoAll(progs []*ssaapi.Program) *RuleProcessInfoList {
 	return info
 }
 
-// saveProjectReport writes the report that every stage of this project scan has
-// streamed into. It runs once per ScanProject because the reporter only holds a
-// complete document after the last stage; it is a no-op when no reporter was
-// configured.
+// saveProjectReport writes the report the stages of this project scan have
+// streamed into. Every stage saves its own snapshot as it ends; this call
+// supersedes those with the finished document.
 func saveProjectReport(cfg *Config) {
 	if cfg == nil || cfg.Reporter == nil {
 		return
@@ -887,11 +884,6 @@ func sharedScanCallbackOptions(cfg *Config) []ssaconfig.Option {
 	}
 	if cfg.Reporter != nil {
 		opts = append(opts, WithReporter(cfg.Reporter))
-	}
-	// A stage scan only feeds the shared reporter; the owner of that report
-	// writes it once the whole pipeline is done.
-	if cfg.deferReportSave {
-		opts = append(opts, WithDeferredReportSave(true))
 	}
 	if cfg.GetScanIgnoreLanguage() {
 		opts = append(opts, ssaconfig.WithScanIgnoreLanguage(true))

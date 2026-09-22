@@ -769,17 +769,16 @@ func (s *reportSpy) SetWriter(writer io.Writer) error { return nil }
 
 func (s *reportSpy) Save() error {
 	s.saves++
-	// Snapshot how many results had streamed in at the moment of each save: a
-	// save taken before the pipeline finished would persist a partial report.
+	// Snapshot how many results had streamed in at the moment of each save, so
+	// the test can tell a mid-scan snapshot from the final one.
 	s.saveSeen = append(s.saveSeen, s.results)
 	return nil
 }
 
-// Results stream into one shared report across every product stage, and the
-// report is written exactly once, after the last stage. Saving per stage used
-// to publish a partial document and concatenate one document per stage into
-// the same file.
-func TestScanProject_StreamsResultsThenSavesOnce(t *testing.T) {
+// Results stream into one shared report as each stage runs; every stage saves a
+// snapshot of what it has so far, and the project saves the finished document
+// last. That is what keeps findings on disk when a later stage fails.
+func TestScanProject_SavesSnapshotPerStageThenFinal(t *testing.T) {
 	dir := t.TempDir()
 	require.NoError(t, os.WriteFile(filepath.Join(dir, "app.py"), []byte("eval(user)\n"), 0o644))
 
@@ -801,8 +800,13 @@ alert $hit`,
 	)
 	require.NoError(t, err)
 
-	require.Equal(t, 1, spy.saves, "the report must be saved once, by the project scan")
 	require.Positive(t, spy.results, "stage results must stream into the report")
-	require.Equal(t, []int{spy.results}, spy.saveSeen,
-		"the only save must happen after every streamed result has landed")
+	require.GreaterOrEqual(t, spy.saves, 2,
+		"the stage must save a snapshot and the project must save the finished report")
+	require.Equal(t, spy.results, spy.saveSeen[len(spy.saveSeen)-1],
+		"the last save must carry every streamed result")
+	for i := 1; i < len(spy.saveSeen); i++ {
+		require.GreaterOrEqual(t, spy.saveSeen[i], spy.saveSeen[i-1],
+			"snapshots may only grow: a later save must never lose earlier findings")
+	}
 }

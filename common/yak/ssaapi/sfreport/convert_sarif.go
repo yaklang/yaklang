@@ -28,9 +28,12 @@ const (
 	// SarifFingerprintKey is the partial fingerprint name used to keep a
 	// finding matched to the same alert when a file moves or lines shift.
 	SarifFingerprintKey = "yaklangRiskFeatureHash"
+	// SarifRunAutomationID identifies this upload among the repository's
+	// scanners, so GitHub tracks its alerts as one set.
+	SarifRunAutomationID = "diff-code-check"
 )
 
-// sarifKindByDefault is the SARIF "kind" for every finding.
+// sarifResultKind is the SARIF "kind" for every finding.
 //
 // SARIF only allows a fixed enum here (notApplicable/pass/fail/review/open/
 // informational). yak's risk_type (command-injection, xss, ...) is *not*
@@ -51,15 +54,25 @@ var sarifSecuritySeverity = map[schema.SyntaxFlowSeverity]string{
 	schema.SFR_SEVERITY_INFO:     "1.0",
 }
 
+// SarifReport accumulates findings and keeps the SARIF document it will emit
+// up to date as they stream in.
+//
+// The struct is serializable at any point, so a save taken mid-scan (one per
+// product stage, see ScanProject) is a complete, valid document describing
+// everything found so far. That is what makes a later stage failing harmless:
+// the artifact already holds the findings of the stages that finished.
 type SarifReport struct {
 	report *sarif.Report
 	writer io.Writer
 
-	// single-run accumulation
-	root     *SarifContext
-	ruleByID map[string]*sarif.ReportingDescriptor
-	ruleIDs  []string
-	results  []*sarif.Result
+	root *SarifContext
+	// run is the single run every finding is merged into. GitHub refuses a
+	// document whose runs share one tool name, which is what a run per rule
+	// used to produce.
+	run *sarif.Run
+	// driver is run.Tool.Driver, kept for O(1) rule registration.
+	driver   *sarif.ToolComponent
+	ruleByID map[string]struct{}
 }
 
 // SarifContext accumulates the SARIF entities one result contributes (files,
@@ -98,30 +111,49 @@ func NewSarifReport() (*SarifReport, error) {
 		log.Errorf("create sarif.New Report failed: %s", err)
 		return nil, err
 	}
+
+	driver := sarif.NewDriver(SarifDriverName).
+		WithFullName(SarifDriverFullName).
+		WithOrganization(SarifDriverOrganization).
+		WithInformationURI(SarifInformationURI).
+		WithVersion(consts.GetYakVersion())
+	run := sarif.NewRun(*sarif.NewTool(driver))
+	run.WithAutomationDetails(sarif.NewRunAutomationDetails().WithID(SarifRunAutomationID))
+	// A run is emitted even with zero results: GitHub closes the alerts of a
+	// (tool, category) upload whose results no longer contain them, so an empty
+	// run is what retires findings that were fixed.
+	sarifReport.Runs = []*sarif.Run{run}
+
 	return &SarifReport{
 		report:   sarifReport,
 		root:     NewSarifContext(),
-		ruleByID: map[string]*sarif.ReportingDescriptor{},
+		run:      run,
+		driver:   driver,
+		ruleByID: map[string]struct{}{},
 	}, nil
 }
 
 var _ IReport = (*SarifReport)(nil)
 
-// AddSyntaxFlowResult folds one SyntaxFlow result (one rule) into the single
-// output run. GitHub refuses a document whose runs share the same tool name,
-// and a run per rule used to produce that, so everything is merged here.
+// AddSyntaxFlowResult folds one SyntaxFlow result (one rule) into the run and
+// leaves the report ready to be serialized.
 func (r *SarifReport) AddSyntaxFlowResult(result *ssaapi.SyntaxFlowResult) bool {
 	if r == nil || result == nil {
 		return false
 	}
-	before := len(r.results)
+	before := len(r.run.Results)
 	r.appendResult(result)
-	return len(r.results) > before
+	// New findings can bring new artifacts (files) with them.
+	r.run.Artifacts = r.root.Artifacts()
+	return len(r.run.Results) > before
 }
 
-// Save writes the accumulated report. Callers that scan in several passes
-// (ScanProject runs one StartScan per product stage) hold a single report and
-// save once at the end, so this is expected to run once per report.
+// Save writes the current document.
+//
+// It runs at every stage boundary and once more when the whole pipeline is
+// done, and each call replaces the previous output rather than appending to
+// it. The struct is already current, so this is a plain encode of the
+// accumulated state.
 func (r *SarifReport) Save() error {
 	if r == nil {
 		return utils.Errorf("report is nil")
@@ -129,41 +161,18 @@ func (r *SarifReport) Save() error {
 	if r.writer == nil {
 		return nil
 	}
-	return r.finalize().PrettyWrite(r.writer)
+	if err := rewindReportOutput(r.writer); err != nil {
+		return err
+	}
+	return r.report.PrettyWrite(r.writer)
 }
 
-// finalize builds the single run that represents this scan. The run is
-// emitted even with zero results: GitHub closes the alerts of a
-// (tool, category) upload whose results no longer contain them, so an empty
-// run is what retires findings that were fixed.
-func (r *SarifReport) finalize() *sarif.Report {
-	r.report.Runs = nil
-
-	rules := make([]*sarif.ReportingDescriptor, 0, len(r.ruleIDs))
-	for _, id := range r.ruleIDs {
-		rules = append(rules, r.ruleByID[id])
+// Report exposes the accumulated document for callers that want to serialize
+// or inspect it directly. It is always a valid SARIF 2.1.0 log.
+func (r *SarifReport) Report() *sarif.Report {
+	if r == nil {
+		return nil
 	}
-
-	driver := sarif.NewDriver(SarifDriverName).
-		WithFullName(SarifDriverFullName).
-		WithOrganization(SarifDriverOrganization).
-		WithInformationURI(SarifInformationURI).
-		WithVersion(consts.GetYakVersion()).
-		WithRules(rules)
-
-	run := sarif.NewRun(*sarif.NewTool(driver))
-	// Distinguishes this upload from other scanners in the same repository.
-	run.WithAutomationDetails(sarif.NewRunAutomationDetails().WithID("diff-code-check"))
-	if artifacts := r.root.Artifacts(); len(artifacts) > 0 {
-		run.WithArtifacts(artifacts)
-	}
-	run.WithResults(r.results)
-
-	// Results is a required field on Run, so a run must always carry a slice.
-	if run.Results == nil {
-		run.Results = []*sarif.Result{}
-	}
-	r.report.AddRun(run)
 	return r.report
 }
 
@@ -201,7 +210,7 @@ func (r *SarifReport) appendResult(result *ssaapi.SyntaxFlowResult) {
 		}
 
 		r.registerRule(ruleID, SFRule, risk)
-		r.results = append(r.results, res)
+		r.run.Results = append(r.run.Results, res)
 	}
 }
 
@@ -244,8 +253,8 @@ func (r *SarifReport) registerRule(ruleID string, rule *schema.SyntaxFlowRule, r
 		descriptor = descriptor.WithHelpURI(SarifInformationURI)
 	}
 
-	r.ruleByID[ruleID] = descriptor
-	r.ruleIDs = append(r.ruleIDs, ruleID)
+	r.ruleByID[ruleID] = struct{}{}
+	r.driver.Rules = append(r.driver.Rules, descriptor)
 }
 
 func sarifSecuritySeverityFor(severity schema.SyntaxFlowSeverity) string {
@@ -544,9 +553,9 @@ func normalizeSarifURI(raw string) string {
 	return path.Clean(uri)
 }
 
-// ConvertSyntaxFlowResultToSarifRun is kept for callers that want a run from a
-// single result. Everything that ends up inside one SARIF document is merged
-// into a single run by the report, so this returns a run only for isolated use.
+// ConvertSyntaxFlowResultToSarifRun keeps the single-result helper for callers
+// that want a run rather than a whole log. Everything inside one SARIF document
+// is merged into a single run, so this is only meaningful in isolation.
 func ConvertSyntaxFlowResultToSarifRun(result *ssaapi.SyntaxFlowResult) *sarif.Run {
 	report, err := NewSarifReport()
 	if err != nil {
@@ -556,11 +565,7 @@ func ConvertSyntaxFlowResultToSarifRun(result *ssaapi.SyntaxFlowResult) *sarif.R
 	if !report.AddSyntaxFlowResult(result) {
 		return nil
 	}
-	finalized := report.finalize()
-	if len(finalized.Runs) == 0 {
-		return nil
-	}
-	return finalized.Runs[0]
+	return report.run
 }
 
 func ConvertSyntaxFlowResultsToSarif(results ...*ssaapi.SyntaxFlowResult) (*sarif.Report, error) {
@@ -571,7 +576,7 @@ func ConvertSyntaxFlowResultsToSarif(results ...*ssaapi.SyntaxFlowResult) (*sari
 	for _, result := range results {
 		report.AddSyntaxFlowResult(result)
 	}
-	return report.finalize(), nil
+	return report.Report(), nil
 }
 
 func ToSarifLevel(level schema.SyntaxFlowSeverity) string {

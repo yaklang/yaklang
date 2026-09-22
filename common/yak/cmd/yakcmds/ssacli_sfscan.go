@@ -67,6 +67,54 @@ func (config *ssaCliConfig) DeferFunc() {
 	}
 }
 
+// setReportOutput wires where this scan writes its report.
+//
+// A report is saved at every stage boundary and once more at the end, and each
+// save replaces the previous snapshot in full (see sfreport). A file can be
+// rewound to satisfy that; stdout cannot, so it is wrapped in a buffer that
+// keeps only the latest snapshot and publishes it when the scan is done.
+func setReportOutput(config *ssaCliConfig, outputFile string) error {
+	if outputFile == "" {
+		log.Infof("output file is not specified, use stdout")
+		buffered := sfreport.NewSnapshotBuffer(os.Stdout)
+		config.OutputWriter = buffered
+		config.deferFunc = append(config.deferFunc, func() {
+			if err := buffered.Flush(); err != nil {
+				log.Errorf("flush report to stdout failed: %v", err)
+			}
+		})
+		return nil
+	}
+
+	// Add appropriate file extension
+	if config.Format == sfreport.SarifReportType {
+		if filepath.Ext(outputFile) != ".sarif" {
+			outputFile += ".sarif"
+		}
+	} else {
+		if filepath.Ext(outputFile) != ".json" {
+			outputFile += ".json"
+		}
+	}
+
+	// Backup existing file
+	if utils.GetFirstExistedFile(outputFile) != "" {
+		backup := outputFile + ".bak"
+		os.Rename(outputFile, backup)
+		os.RemoveAll(outputFile)
+	}
+
+	file, err := os.OpenFile(outputFile, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0644)
+	if err != nil {
+		return utils.Errorf("failed to create output file: %v", err)
+	}
+	config.OutputWriter = file
+	config.deferFunc = append(config.deferFunc, func() {
+		file.Close()
+	})
+	return nil
+}
+
 func parseSFScanConfigFromCli(c *cli.Context) (res *ssaCliConfig, err error) {
 	log.Infof("================= parse config ================")
 	defer func() {
@@ -165,36 +213,8 @@ func parseSFScanConfigFromCli(c *cli.Context) (res *ssaCliConfig, err error) {
 
 	// 处理输出文件
 	outputFile = cfg.GetOutputFile()
-	if outputFile == "" {
-		log.Infof("output file is not specified, use stdout")
-		config.OutputWriter = os.Stdout
-	} else {
-		// Add appropriate file extension
-		if config.Format == sfreport.SarifReportType {
-			if filepath.Ext(outputFile) != ".sarif" {
-				outputFile += ".sarif"
-			}
-		} else {
-			if filepath.Ext(outputFile) != ".json" {
-				outputFile += ".json"
-			}
-		}
-
-		// Backup existing file
-		if utils.GetFirstExistedFile(outputFile) != "" {
-			backup := outputFile + ".bak"
-			os.Rename(outputFile, backup)
-			os.RemoveAll(outputFile)
-		}
-
-		file, err := os.OpenFile(outputFile, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0644)
-		if err != nil {
-			return nil, utils.Errorf("failed to create output file: %v", err)
-		}
-		config.OutputWriter = file
-		config.deferFunc = append(config.deferFunc, func() {
-			file.Close()
-		})
+	if err := setReportOutput(config, outputFile); err != nil {
+		return nil, err
 	}
 
 	return config, nil
@@ -361,37 +381,8 @@ func parseConfigFileWithCliFlagOverride(cliCtx *cli.Context) (res *ssaCliConfig,
 
 	// 处理输出文件：CLI 参数优先于配置文件
 	outputFile := cfg.GetOutputFile()
-
-	if outputFile == "" {
-		log.Infof("output file is not specified, use stdout")
-		config.OutputWriter = os.Stdout
-	} else {
-		// Add appropriate file extension
-		if config.Format == sfreport.SarifReportType {
-			if filepath.Ext(outputFile) != ".sarif" {
-				outputFile += ".sarif"
-			}
-		} else {
-			if filepath.Ext(outputFile) != ".json" {
-				outputFile += ".json"
-			}
-		}
-
-		// Backup existing file
-		if utils.GetFirstExistedFile(outputFile) != "" {
-			backup := outputFile + ".bak"
-			os.Rename(outputFile, backup)
-			os.RemoveAll(outputFile)
-		}
-
-		file, err := os.OpenFile(outputFile, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0644)
-		if err != nil {
-			return nil, utils.Errorf("failed to create output file: %v", err)
-		}
-		config.OutputWriter = file
-		config.deferFunc = append(config.deferFunc, func() {
-			file.Close()
-		})
+	if err := setReportOutput(config, outputFile); err != nil {
+		return nil, err
 	}
 
 	return config, nil
