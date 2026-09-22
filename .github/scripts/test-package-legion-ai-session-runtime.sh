@@ -108,6 +108,7 @@ jq -e \
     (.capabilities | index("ai.forge.discovery.v2")) != null and
     (.capabilities | index("ai.forge.http_assessment.v2")) != null and
     (.capabilities | index("ai.forge_release.v1")) != null and
+    (.capabilities | index("ai.forge.custom_tools.v1")) != null and
     (.capabilities | index("hids")) == null and
     .image.ref == $image_ref and
     .image.revision_label == $source_sha and
