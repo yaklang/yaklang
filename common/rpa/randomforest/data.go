@@ -27,10 +27,8 @@ func RandomNumberGenerate(start int, end int, count int) ([]int, error) {
 	for {
 		length = len(nums)
 		if length == count {
-			// fmt.Println(nums, cache)
 			return nums, nil
 		} else if length+count == all_length {
-			// fmt.Println(nums, cache)
 			return cache, nil
 		}
 		randInt = r.Intn(length)

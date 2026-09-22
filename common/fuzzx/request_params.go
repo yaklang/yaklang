@@ -6,13 +6,13 @@ import (
 	"strings"
 
 	"github.com/antchfx/xmlquery"
-	"github.com/asaskevich/govalidator"
 	"github.com/samber/lo"
 	"github.com/tidwall/gjson"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/mutate"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
+	"github.com/yaklang/yaklang/common/utils/textvalidate"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 )
 
@@ -264,7 +264,7 @@ func (f *FuzzRequest) GetQueryParams() []*FuzzParam {
 				})
 			}
 
-			if bs64Raw, ok := mutate.IsStrictBase64(value); ok && govalidator.IsPrintableASCII(bs64Raw) {
+			if bs64Raw, ok := mutate.IsStrictBase64(value); ok && textvalidate.IsPrintableASCII(bs64Raw) {
 				if raw, ok := utils.IsJSON(bs64Raw); ok {
 					fixRaw := strings.TrimSpace(raw)
 					walkJson([]byte(fixRaw), func(k, v gjson.Result, jsonPath string) {
@@ -322,7 +322,7 @@ func (f *FuzzRequest) GetCookieParams() []*FuzzParam {
 				})
 			})
 		}
-		if bs64Raw, ok := mutate.IsStrictBase64(c.Value); ok && govalidator.IsPrintableASCII(bs64Raw) {
+		if bs64Raw, ok := mutate.IsStrictBase64(c.Value); ok && textvalidate.IsPrintableASCII(bs64Raw) {
 			if raw, ok := utils.IsJSON(bs64Raw); ok {
 				fixRaw := strings.TrimSpace(raw)
 				walkJson([]byte(fixRaw), func(k, v gjson.Result, jsonPath string) {
@@ -451,7 +451,7 @@ func (f *FuzzRequest) GetPostParams() []*FuzzParam {
 				})
 			}
 
-			if bs64Raw, ok := mutate.IsStrictBase64(value); ok && govalidator.IsPrintableASCII(bs64Raw) {
+			if bs64Raw, ok := mutate.IsStrictBase64(value); ok && textvalidate.IsPrintableASCII(bs64Raw) {
 				if raw, ok := utils.IsJSON(bs64Raw); ok {
 					fixRaw := strings.TrimSpace(raw)
 					walkJson([]byte(fixRaw), func(k, v gjson.Result, jsonPath string) {

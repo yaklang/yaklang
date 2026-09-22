@@ -10,7 +10,6 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils/mixer"
 	"github.com/yaklang/yaklang/common/utils/ssdeep"
-	"gopkg.in/fatih/set.v0"
 )
 
 // CalcSimHash 计算并返回一段文本的 SimHash 值
@@ -325,7 +324,7 @@ func GetSameSubStrings(raw ...string) []string {
 		return nil
 	}
 
-	var results []set.Interface
+	var results []map[string]struct{}
 
 	var visited []string
 	for {
@@ -336,9 +335,9 @@ func GetSameSubStrings(raw ...string) []string {
 			visited = append(visited, hash)
 
 			subStrs := GetSameSubStringsRunes([]rune(res[0]), []rune(res[1]))
-			var tmp = set.New(set.ThreadSafe)
+			tmp := make(map[string]struct{})
 			for _, r := range subStrs {
-				tmp.Add(string(r))
+				tmp[string(r)] = struct{}{}
 			}
 			results = append(results, tmp)
 		}
@@ -348,17 +347,21 @@ func GetSameSubStrings(raw ...string) []string {
 			break
 		}
 	}
-	if len(results) > 2 {
-		return set.StringSlice(set.Intersection(results[0], results[1], results[2:]...))
+	if len(results) == 0 {
+		return nil
 	}
-
-	if len(results) == 2 {
-		return set.StringSlice(set.Intersection(results[0], results[1]))
+	intersection := results[0]
+	for _, next := range results[1:] {
+		for value := range intersection {
+			if _, ok := next[value]; !ok {
+				delete(intersection, value)
+			}
+		}
 	}
-
-	if len(results) == 1 {
-		return set.StringSlice(results[0])
+	// Empty intersections are non-nil; result order is unspecified.
+	out := make([]string, 0, len(intersection))
+	for value := range intersection {
+		out = append(out, value)
 	}
-
-	return nil
+	return out
 }

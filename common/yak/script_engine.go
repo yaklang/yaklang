@@ -25,11 +25,11 @@ import (
 	"github.com/yaklang/yaklang/common/utils/yakgit/yakdiff"
 
 	"github.com/pkg/errors"
-	"github.com/tevino/abool"
 	"github.com/yaklang/yaklang/common/mediautils"
 	"github.com/yaklang/yaklang/common/mimetype"
 	"github.com/yaklang/yaklang/common/minirehs"
 	"github.com/yaklang/yaklang/common/thirdparty_bin"
+	"github.com/yaklang/yaklang/common/utils/atomicbool"
 	"github.com/yaklang/yaklang/common/utils/imageutils"
 
 	"github.com/yaklang/yaklang/common/aireducer"
@@ -168,7 +168,6 @@ func initYaklangLib() {
 	initHIDSLib()
 	yaklang.Import("systemd", systemd.Exports)
 
-	// yaklang.Import("geojson", yaklib.GeoJsonExports)
 	yaklang.Import("mmdb", yaklib.MmdbExports)
 
 	yaklang.Import("crawler", crawler.Exports)
@@ -576,8 +575,8 @@ func (e *ScriptEngine) exec(ctx context.Context, id string, code string, params 
 	t := &Task{
 		TaskID:     id,
 		Code:       code,
-		isRunning:  abool.New(),
-		isFinished: abool.New(),
+		isRunning:  atomicbool.New(),
+		isFinished: atomicbool.New(),
 	}
 	err := e.SaveTask(t)
 	if err != nil {

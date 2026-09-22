@@ -6,7 +6,7 @@ import (
 	"github.com/yaklang/yaklang/common/amap"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/omnisearch/ostype"
-	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/appconfig"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
@@ -127,7 +127,7 @@ func buildThirdPartyAppConfigTemplates() ([]*ypb.GetThirdPartyAppConfigTemplate,
 	templates = append(templates, aiTemplates...)
 	templates = append(templates, buildSpaceEngineTemplates()...)
 
-	omniSearchOptions, err := utils.ParseAppTagToOptions(&ostype.YakitOmniSearchKeyConfig{})
+	omniSearchOptions, err := parseAppTagToOptions(&ostype.YakitOmniSearchKeyConfig{})
 	if err != nil {
 		log.Errorf("parse omnisearch app config tag to options failed: %v", err)
 	} else {
@@ -135,14 +135,14 @@ func buildThirdPartyAppConfigTemplates() ([]*ypb.GetThirdPartyAppConfigTemplate,
 		templates = append(templates, newThirdPartyAppConfigTemplate("tavily", "Tavily", "", omniSearchOptions...))
 	}
 
-	amapOptions, err := utils.ParseAppTagToOptions(&amap.YakitAmapConfig{})
+	amapOptions, err := parseAppTagToOptions(&amap.YakitAmapConfig{})
 	if err != nil {
 		log.Errorf("parse amap app config tag to options failed: %v", err)
 	} else {
 		templates = append(templates, newThirdPartyAppConfigTemplate("amap", "高德地图", "", amapOptions...))
 	}
 
-	embeddingOptions, err := utils.ParseAppTagToOptions(&plugins_rag.EmbeddingEndpointConfig{})
+	embeddingOptions, err := parseAppTagToOptions(&plugins_rag.EmbeddingEndpointConfig{})
 	if err != nil {
 		log.Errorf("parse embedding endpoint app config tag to options failed: %v", err)
 	} else {
@@ -163,7 +163,7 @@ func buildAIGatewayTemplates() ([]*ypb.GetThirdPartyAppConfigTemplate, error) {
 			extTag = profile.ExtTag
 		}
 
-		aiOptions, err := utils.ParseAppTagToOptions(&aispec.AIConfig{}, extTag)
+		aiOptions, err := parseAppTagToOptions(&aispec.AIConfig{}, extTag)
 		if err != nil {
 			return nil, err
 		}
@@ -229,4 +229,17 @@ func newThirdPartyAppConfigTemplate(name, verbose, typeName string, items ...*yp
 		Type:    typeName,
 		Items:   copiedItems,
 	}
+}
+
+// parseAppTagToOptions adapts the lightweight descriptors at the gRPC boundary.
+func parseAppTagToOptions(template any, ext ...map[string]string) ([]*ypb.ThirdPartyAppConfigItemTemplate, error) {
+	fields, err := appconfig.ParseAppTagToOptions(template, ext...)
+	if err != nil {
+		return nil, err
+	}
+	var options []*ypb.ThirdPartyAppConfigItemTemplate
+	for _, f := range fields {
+		options = append(options, &ypb.ThirdPartyAppConfigItemTemplate{Name: f.Name, Desc: f.Desc, Required: f.Required, Type: f.Type, DefaultValue: f.DefaultValue, Verbose: f.Verbose, Extra: f.Extra})
+	}
+	return options, nil
 }

@@ -846,12 +846,17 @@ jobs:
                 {"package": "./common/yak/cartesian", "timeout": "20s"},
                 {"package": "./common/utils/omap/...", "timeout": "30s", "race": true},
                 {"package": "./common/utils", "timeout": "1m"},
+                {"package": "./common/utils/appconfig", "timeout": "20s", "race": true},
+                {"package": "./common/utils/atomicbool", "timeout": "20s", "race": true},
+                {"package": "./common/utils/textvalidate", "timeout": "20s"},
+                {"package": "./common/rpa/randomforest/...", "timeout": "30s", "race": true},
                 {"package": "./common/utils/dbcache", "timeout": "1m", "retry": 1, "retry_delay": 5},
                 {"package": "./common/utils/imageutils/...", "timeout": "20s"},
                 {"package": "./common/utils/xml2", "timeout": "10s"},
                 {"package": "./common/utils/tlsutils/...", "timeout": "20s"},
                 {"package": "./common/utils/linktable/...", "timeout": "10s"},
                 {"package": "./common/yak/yaklib", "timeout": "20s", "run": "^TestMUSTPASS_.*$"},
+                {"package": "./common/vulinbox/verificationcode", "timeout": "20s", "run": "^TestCaptchaScenarioLifecycle$"},
                 {"package": "./common/yak/yaklib/tools", "timeout": "1m", "run": "^(TestMUSTPASS_Fp.*|TestOracle.*)$"},
                 {"package": "./common/utils/dot/...", "timeout": "10s"},
                 {"package": "./common/utils/filesys/...", "timeout": "30s"},
@@ -1059,6 +1064,14 @@ jobs:
           ARTIFACT_EXPECT_PATHS="yak" \
           ARTIFACT_EXECUTABLE_PATHS="yak" \
           ./scripts/ci/artifact-unpackage.sh
+
+      - name: Audit facade race tests
+        if: matrix.name == 'Test Utils Common / Yak Tooling USE gRPC'
+        run: |
+          time go test -race -count=1 -timeout=20s -v \
+            common/hids/audit_monitor.go \
+            common/hids/audit_types.go \
+            common/hids/audit_monitor_linux_test.go
 
       - name: Generate test config
         run: |

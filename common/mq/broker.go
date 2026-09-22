@@ -4,8 +4,8 @@ import (
 	"context"
 	"github.com/pkg/errors"
 	amqp "github.com/rabbitmq/amqp091-go"
-	"github.com/tevino/abool"
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils/atomicbool"
 	"io"
 	"sync"
 	"time"
@@ -37,7 +37,7 @@ type Broker struct {
 
 	// 是否正在运行中
 	wg        *sync.WaitGroup
-	isServing *abool.AtomicBool
+	isServing *atomicbool.AtomicBool
 
 	conn    *amqp.Connection
 	channel *amqp.Channel
@@ -58,7 +58,7 @@ func NewBroker(ctx context.Context, options ...BrokerConfigHandler) (*Broker, er
 		cancel:    cancel,
 		ctx:       rootCtx,
 		wg:        new(sync.WaitGroup),
-		isServing: abool.New(),
+		isServing: atomicbool.New(),
 	}
 	for _, option := range options {
 		option(broker)

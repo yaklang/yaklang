@@ -16,7 +16,7 @@ import (
 	"github.com/yaklang/yaklang/common/utils/yakunquote"
 	"golang.org/x/exp/maps"
 
-	"github.com/asaskevich/govalidator"
+	"github.com/yaklang/yaklang/common/utils/textvalidate"
 )
 
 type AutoDecodeResult struct {
@@ -244,7 +244,7 @@ func AutoDecode(i interface{}) []*AutoDecodeResult {
 	}
 	base64Detect := func(rawStr string) bool {
 		rawStr = Base64Padding(rawStr)
-		matched := govalidator.IsBase64(rawStr)
+		matched := textvalidate.IsBase64(rawStr)
 		if !matched {
 			return false
 		}
@@ -298,7 +298,7 @@ func AutoDecode(i interface{}) []*AutoDecodeResult {
 			if len(base64Decoded) <= 0 {
 				break
 			}
-			if govalidator.IsPrintableASCII(string(base64Decoded)) {
+			if textvalidate.IsPrintableASCII(string(base64Decoded)) {
 				jwtBuf.WriteString(EscapeInvalidUTF8Byte(base64Decoded))
 			} else {
 				jwtBuf.WriteString(i)

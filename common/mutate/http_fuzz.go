@@ -16,12 +16,12 @@ import (
 	"sync"
 
 	"github.com/antchfx/xmlquery"
-	"github.com/asaskevich/govalidator"
 	"github.com/tidwall/gjson"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"github.com/yaklang/yaklang/common/utils/lowhttp/http_struct"
+	"github.com/yaklang/yaklang/common/utils/textvalidate"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 )
 
@@ -664,7 +664,7 @@ func countQueryParams(raw string) int {
 		if jsonRaw, ok := utils.IsJSON(value); ok {
 			count += countJSONParams(gjson.Parse(jsonRaw))
 		}
-		if base64Raw, ok := IsStrictBase64(value); ok && govalidator.IsPrintableASCII(base64Raw) {
+		if base64Raw, ok := IsStrictBase64(value); ok && textvalidate.IsPrintableASCII(base64Raw) {
 			if jsonRaw, ok := utils.IsJSON(base64Raw); ok {
 				count += countJSONParams(gjson.Parse(jsonRaw))
 			}
@@ -705,7 +705,7 @@ func countCookieParams(req *http.Request) int {
 		if jsonRaw, ok := utils.IsJSON(cookie.Value); ok {
 			count += countJSONParams(gjson.Parse(jsonRaw))
 		}
-		if base64Raw, ok := IsStrictBase64(cookie.Value); ok && govalidator.IsPrintableASCII(base64Raw) {
+		if base64Raw, ok := IsStrictBase64(cookie.Value); ok && textvalidate.IsPrintableASCII(base64Raw) {
 			if jsonRaw, ok := utils.IsJSON(base64Raw); ok {
 				count += countJSONParams(gjson.Parse(jsonRaw))
 			}
@@ -758,7 +758,7 @@ func (f *FuzzHTTPRequest) GetGetQueryParams() []*FuzzHTTPRequestParam {
 			walk(gjson.ParseBytes([]byte(raw)), "", "$", call)
 		}
 
-		if bs64Raw, ok := IsStrictBase64(value); ok && govalidator.IsPrintableASCII(bs64Raw) {
+		if bs64Raw, ok := IsStrictBase64(value); ok && textvalidate.IsPrintableASCII(bs64Raw) {
 			if raw, ok := utils.IsJSON(bs64Raw); ok {
 				fixRaw := strings.TrimSpace(raw)
 				call := func(jk, jv gjson.Result, gPath, jPath string) {
@@ -1022,7 +1022,7 @@ func (f *FuzzHTTPRequest) getPostParamsFromBody(body []byte) []*FuzzHTTPRequestP
 			walk(gjson.Parse(raw), "", "$", call)
 		}
 
-		if bs64Raw, ok := IsStrictBase64(value); ok && govalidator.IsPrintableASCII(bs64Raw) {
+		if bs64Raw, ok := IsStrictBase64(value); ok && textvalidate.IsPrintableASCII(bs64Raw) {
 			if raw, ok := utils.IsJSON(bs64Raw); ok {
 				fixRaw := strings.TrimSpace(raw)
 				call := func(jk, jv gjson.Result, gPath, jPath string) {
@@ -1091,7 +1091,7 @@ func (f *FuzzHTTPRequest) GetCookieParams() []*FuzzHTTPRequestParam {
 			walk(gjson.ParseBytes([]byte(raw)), "", "$", call)
 		}
 
-		if bs64Raw, ok := IsStrictBase64(k.Value); ok && govalidator.IsPrintableASCII(bs64Raw) {
+		if bs64Raw, ok := IsStrictBase64(k.Value); ok && textvalidate.IsPrintableASCII(bs64Raw) {
 			if raw, ok := utils.IsJSON(bs64Raw); ok {
 				fixRaw := strings.TrimSpace(raw)
 				call := func(jk, jv gjson.Result, gPath, jPath string) {

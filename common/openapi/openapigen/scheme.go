@@ -1,9 +1,9 @@
 package openapigen
 
 import (
-	"github.com/asaskevich/govalidator"
 	"github.com/tidwall/gjson"
 	"github.com/yaklang/yaklang/common/openapi/openapi3"
+	"github.com/yaklang/yaklang/common/utils/textvalidate"
 	"github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 )
@@ -14,7 +14,7 @@ func gjsonResultToScheme(result gjson.Result) *openapi3.Schema {
 		return openapi3.NewStringSchema().WithExample(result.String())
 	case gjson.Number:
 		num := result.String()
-		if govalidator.IsFloat(num) {
+		if textvalidate.IsFloat(num) {
 			return openapi3.NewFloat64Schema().WithExample(result.Float())
 		}
 		return openapi3.NewIntegerSchema().WithExample(result.Int())

@@ -3,9 +3,9 @@ package sched
 import (
 	"context"
 	"github.com/stretchr/testify/assert"
-	"github.com/tevino/abool"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/atomicbool"
 	"testing"
 	"time"
 )
@@ -100,10 +100,10 @@ func TestTask_WithoutFirst(t *testing.T) {
 
 func TestTask_Hooks(t *testing.T) {
 	var (
-		executed        = abool.New()
-		worked          = abool.New()
-		finished        = abool.New()
-		beforeExecuting = abool.New()
+		executed        = atomicbool.New()
+		worked          = atomicbool.New()
+		finished        = atomicbool.New()
+		beforeExecuting = atomicbool.New()
 	)
 
 	task := NewTask(1*time.Second, "test", time.Now().Add(-1), time.Now().Add(4*time.Second), func() {

@@ -3,7 +3,7 @@ package utils
 import (
 	"errors"
 	"fmt"
-	"github.com/tevino/abool"
+	"github.com/yaklang/yaklang/common/utils/atomicbool"
 	"sync"
 	"time"
 )
@@ -46,7 +46,7 @@ func (c *CoolDownFetcher) Fetch(handler func() (any, error)) (any, error) {
 	}
 
 	c.mutex.Lock()
-	handledExecuted := abool.New()
+	handledExecuted := atomicbool.New()
 	defer func() {
 		if handledExecuted.IsSet() {
 			fmt.Println("wait cleaning cache")
@@ -66,7 +66,7 @@ func (c *CoolDownFetcher) Fetch(handler func() (any, error)) (any, error) {
 	}
 
 	result, errIns := handler()
-	handledExecuted = abool.NewBool(true)
+	handledExecuted = atomicbool.NewBool(true)
 	if errIns != nil {
 		c.cache.Store("error", errIns)
 		return nil, errIns

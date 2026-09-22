@@ -13,8 +13,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/elastic/go-libaudit"
-	"github.com/elastic/go-libaudit/auparse"
+	"github.com/elastic/go-libaudit/v2"
+	"github.com/elastic/go-libaudit/v2/auparse"
 )
 
 // uidToUsername 将 UID 映射到用户名
@@ -162,80 +162,73 @@ func (m *AuditMonitor) Start() error {
 		return err
 	}
 
-	m.running = true
-	m.stopCh = make(chan struct{})
-	m.mu.Unlock()
-
-	// 创建audit客户端 (多播模式，只读监听)
+	// Open the client before publishing the running state.
 	client, err := libaudit.NewMulticastAuditClient(nil)
 	if err != nil {
-		m.mu.Lock()
-		m.running = false
 		m.mu.Unlock()
 		return fmt.Errorf("failed to create audit client: %v", err)
 	}
+	m.running = true
+	stop := make(chan struct{})
+	m.stopCh = stop
+	m.mu.Unlock()
 
-	// 启动监控协程
 	go func() {
 		defer func() {
-			client.Close()
 			m.mu.Lock()
-			m.running = false
+			// A previous run must not overwrite a restarted monitor's state.
+			if m.stopCh == stop {
+				m.running = false
+			}
 			m.mu.Unlock()
 		}()
+		runAuditReceiveLoop(client, stop, &auditStream{monitor: m})
+	}()
+	return nil
+}
 
-		// 创建消息重组器
-		reassembler, err := libaudit.NewReassembler(100, 5*time.Second, &auditStream{
-			monitor: m,
-		})
-		if err != nil {
-			fmt.Printf("Failed to create reassembler: %v\n", err)
+type auditReceiver interface {
+	Receive(nonBlocking bool) (*libaudit.RawAuditMessage, error)
+	Close() error
+}
+
+// Keep receiving and reassembler maintenance in the same goroutine. Capturing
+// this run's stop channel also makes Stop/Start safe while the old run exits.
+func runAuditReceiveLoop(client auditReceiver, stop <-chan struct{}, stream libaudit.Stream) {
+	defer client.Close()
+	reassembler, err := libaudit.NewReassembler(100, 5*time.Second, stream)
+	if err != nil {
+		return
+	}
+	defer reassembler.Close()
+	ticker := time.NewTicker(500 * time.Millisecond)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-stop:
+			return
+		case <-ticker.C:
+			reassembler.Maintain()
+		default:
+		}
+		rawMsg, err := client.Receive(true)
+		if err == io.EOF {
 			return
 		}
-		defer reassembler.Close()
-
-		// 启动维护协程
-		maintainDone := make(chan struct{})
-		go func() {
-			ticker := time.NewTicker(500 * time.Millisecond)
-			defer ticker.Stop()
-			for {
-				select {
-				case <-m.stopCh:
-					close(maintainDone)
-					return
-				case <-ticker.C:
-					reassembler.Maintain()
-				}
-			}
-		}()
-
-		for {
+		if err != nil || rawMsg == nil {
+			// EAGAIN is expected for the nonblocking audit socket. Cancellation
+			// interrupts the retry delay even when no records are arriving.
 			select {
-			case <-m.stopCh:
-				<-maintainDone
+			case <-stop:
 				return
-			default:
-				// 接收audit消息
-				rawMsg, err := client.Receive(true)
-				if err != nil {
-					if err == io.EOF {
-						return
-					}
-					// 非阻塞模式下，EAGAIN是正常的
-					time.Sleep(100 * time.Millisecond)
-					continue
-				}
-
-				// 推送消息到重组器
-				if rawMsg != nil {
-					reassembler.Push(rawMsg.Type, rawMsg.Data)
-				}
+			case <-ticker.C:
+				reassembler.Maintain()
+			case <-time.After(100 * time.Millisecond):
 			}
+			continue
 		}
-	}()
-
-	return nil
+		reassembler.Push(rawMsg.Type, rawMsg.Data)
+	}
 }
 
 // Stop 停止监控
