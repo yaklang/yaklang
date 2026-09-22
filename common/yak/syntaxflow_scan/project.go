@@ -877,6 +877,13 @@ func sharedScanCallbackOptions(cfg *Config) []ssaconfig.Option {
 	if cfg == nil {
 		return opts
 	}
+	// ScanProject starts nested scans via StartScan, which rebuilds the
+	// config from the forwarded options only. Rule-detail reporting must be
+	// forwarded explicitly or every per-rule snapshot inside a product scan
+	// degrades to counter-only events.
+	if cfg.ScanTaskCallback != nil && cfg.ProcessWithRule {
+		opts = append(opts, WithProcessRuleDetail(true))
+	}
 	if cfg.resultCallback != nil {
 		opts = append(opts, WithScanResultCallback(cfg.resultCallback))
 	}

@@ -277,6 +277,11 @@ func (m *scanManager) Query(rule *schema.SyntaxFlowRule, target ssaapi.SyntaxFlo
 		} else if err == nil {
 			m.StatusTask(res)
 			m.markRuleSuccess()
+			// A finished rule must enter the process monitor's status table.
+			// Fast rules never fire an in-flight progress callback, so without
+			// this terminal update they stay invisible to every rule-detail
+			// snapshot (only the finished counter moves).
+			m.processMonitor.UpdateRuleStatus(targetName, rule.RuleName, 1, "")
 		} else {
 			m.processMonitor.UpdateRuleError(targetName, rule.RuleName, err)
 			m.StatusTask(nil)
