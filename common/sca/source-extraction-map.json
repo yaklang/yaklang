@@ -950,87 +950,95 @@
     },
     {
       "local_file": "common/sca/analyzer/dep-parser/nodejs/pnpm/parse.go",
-      "sha256": "93205615ff2b83971f462a52b6f76c3d9188768ca5f4a1dd7f42faea85c3943a",
+      "sha256": "16020c5985d7fc7be403178a93c6e487b9157203a93cad3e8a93f3edbaf0bfeb",
       "symbols": [
         {
           "name": "PackageResolution",
-          "line": 20
+          "line": 21
         },
         {
           "name": "PackageInfo",
-          "line": 25
+          "line": 26
         },
         {
           "name": "pnpmImporter",
-          "line": 35
+          "line": 36
         },
         {
           "name": "LockFile",
-          "line": 42
+          "line": 43
         },
         {
           "name": "Parser",
-          "line": 51
-        },
-        {
-          "name": "NewParser",
           "line": 53
         },
         {
+          "name": "NewParser",
+          "line": 55
+        },
+        {
           "name": "Parser.ID",
-          "line": 57
+          "line": 59
         },
         {
           "name": "Parser.Parse",
-          "line": 61
+          "line": 63
         },
         {
           "name": "Parser.parse",
-          "line": 99
+          "line": 111
         },
         {
           "name": "isImporterDirect",
-          "line": 188
+          "line": 216
         },
         {
           "name": "importerDeclarations",
-          "line": 202
+          "line": 230
         },
         {
           "name": "importerReqs",
-          "line": 254
+          "line": 282
         },
         {
           "name": "importerEntry",
-          "line": 277
+          "line": 305
         },
         {
           "name": "nestedSpecifier",
-          "line": 290
-        },
-        {
-          "name": "pnpmReqs",
-          "line": 299
-        },
-        {
-          "name": "resolvePnpmRef",
           "line": 318
         },
         {
+          "name": "pnpmReqs",
+          "line": 327
+        },
+        {
+          "name": "resolvePnpmRef",
+          "line": 346
+        },
+        {
           "name": "parseLockfileVersion",
-          "line": 350
+          "line": 383
         },
         {
           "name": "isIndirectLib",
-          "line": 385
+          "line": 419
         },
         {
           "name": "parsePackage",
-          "line": 391
+          "line": 425
         },
         {
           "name": "parseDepPath",
-          "line": 402
+          "line": 440
+        },
+        {
+          "name": "joinSnapshots",
+          "line": 481
+        },
+        {
+          "name": "validateV9Tree",
+          "line": 547
         }
       ],
       "decision": "TRIM_AND_REWRITE",
@@ -1047,8 +1055,10 @@
       "tests": [
         "analyzer/dep-parser/nodejs/pnpm/upstream_test.go",
         "analyzer/dep-parser/nodejs/pnpm/upstream_expectations_test.go",
-        "analyzer/dep-parser/nodejs/pnpm/qualifier_test.go"
-      ]
+        "analyzer/dep-parser/nodejs/pnpm/qualifier_test.go",
+        "modern_lock_test.go"
+      ],
+      "extensions": "Cargo v4, pnpm v9.0 or Poetry lock 2.1 as applicable; exact scope and frozen corpora in function-contracts.json and testdata/manifest.json."
     },
     {
       "local_file": "common/sca/analyzer/dep-parser/nodejs/yarn/parse.go",
@@ -1333,71 +1343,83 @@
     },
     {
       "local_file": "common/sca/analyzer/dep-parser/python/poetry/parse.go",
-      "sha256": "5ff7b8f59de50e0ea0480caee08bac896145894b86fc0f80f73ab86249275e67",
+      "sha256": "8c2a7fde6ab2d0b599a3e33026a7e19f49ecc876b39f94d1991e59a1dbd6996d",
       "symbols": [
         {
           "name": "poetrySource",
-          "line": 21
+          "line": 22
         },
         {
           "name": "poetryPackage",
-          "line": 29
+          "line": 30
         },
         {
           "name": "Lockfile",
-          "line": 45
+          "line": 48
         },
         {
           "name": "Parser",
-          "line": 49
-        },
-        {
-          "name": "NewParser",
-          "line": 51
-        },
-        {
-          "name": "Parser.Parse",
           "line": 55
         },
         {
+          "name": "NewParser",
+          "line": 57
+        },
+        {
+          "name": "Parser.Parse",
+          "line": 61
+        },
+        {
           "name": "poetryOrigin",
-          "line": 127
+          "line": 146
         },
         {
           "name": "poetryRequirements",
-          "line": 148
+          "line": 167
+        },
+        {
+          "name": "poetryQualifiers",
+          "line": 227
+        },
+        {
+          "name": "poetryPackageID",
+          "line": 242
         },
         {
           "name": "extrasText",
-          "line": 181
+          "line": 252
         },
         {
           "name": "poetryIdent",
-          "line": 212
+          "line": 283
         },
         {
           "name": "poetryNativeID",
-          "line": 216
+          "line": 287
         },
         {
           "name": "parseIndex",
-          "line": 221
+          "line": 292
         },
         {
           "name": "parseDependencies",
-          "line": 238
+          "line": 309
         },
         {
           "name": "parseDependency",
-          "line": 253
+          "line": 324
         },
         {
           "name": "normalizePkgName",
-          "line": 265
+          "line": 336
         },
         {
           "name": "decodeLock",
-          "line": 274
+          "line": 345
+        },
+        {
+          "name": "validateDependencies",
+          "line": 502
         }
       ],
       "decision": "TRIM_AND_REWRITE",
@@ -1414,8 +1436,10 @@
       "tests": [
         "analyzer/dep-parser/python/poetry/upstream_parse_testcase_test.go",
         "analyzer/dep-parser/python/poetry/upstream_parse_test.go",
-        "analyzer/dep-parser/python/poetry/qualifier_test.go"
-      ]
+        "analyzer/dep-parser/python/poetry/qualifier_test.go",
+        "modern_lock_test.go"
+      ],
+      "extensions": "Cargo v4, pnpm v9.0 or Poetry lock 2.1 as applicable; exact scope and frozen corpora in function-contracts.json and testdata/manifest.json."
     },
     {
       "local_file": "common/sca/analyzer/dep-parser/ruby/bundler/parse.go",
@@ -1544,7 +1568,7 @@
     },
     {
       "local_file": "common/sca/analyzer/dep-parser/rust/cargo/parse.go",
-      "sha256": "913c530d7f85f8b98c3230f22a6607aa44eb2951f15ead62bb0d699ee37c1c55",
+      "sha256": "7d0976312dba2768a493f7ac5af25401b1a7e249e6811f194247d0f639b08249",
       "symbols": [
         {
           "name": "cargoPkg",
@@ -1568,19 +1592,19 @@
         },
         {
           "name": "nativeID",
-          "line": 100
+          "line": 101
         },
         {
           "name": "parseDependencies",
-          "line": 104
+          "line": 105
         },
         {
           "name": "cargoIndex",
-          "line": 143
+          "line": 144
         },
         {
           "name": "decodeLock",
-          "line": 149
+          "line": 150
         }
       ],
       "decision": "TRIM_AND_REWRITE",
@@ -1596,8 +1620,10 @@
       "review": "implementation self-review; pinned upstream changes require re-evaluation",
       "tests": [
         "analyzer/dep-parser/rust/cargo/upstream_parse_test.go",
-        "analyzer/dep-parser/rust/cargo/requirements_test.go"
-      ]
+        "analyzer/dep-parser/rust/cargo/requirements_test.go",
+        "modern_lock_test.go"
+      ],
+      "extensions": "Cargo v4, pnpm v9.0 or Poetry lock 2.1 as applicable; exact scope and frozen corpora in function-contracts.json and testdata/manifest.json."
     },
     {
       "local_file": "common/sca/analyzer/dep-parser/types/types.go",
@@ -4047,7 +4073,7 @@
     },
     {
       "local_file": "common/sca/core/lockyaml/read.go",
-      "sha256": "e5c0fb4908612f7d9d58b2f161ebad5f6f337040c8cbf36b318327679376d8f9",
+      "sha256": "fbec0dfad18509a4dded046b8af7b0a35047cfa0ac472b1652eb44dd44035029",
       "symbols": [
         {
           "name": "line",
@@ -4117,8 +4143,10 @@
       "maintenance_owner": "yaklang/yaklang SCA maintainers",
       "review": "implementation self-review; pinned upstream changes require re-evaluation",
       "tests": [
-        "core/lockyaml/read_test.go"
-      ]
+        "core/lockyaml/read_test.go",
+        "modern_lock_test.go"
+      ],
+      "extensions": "Cargo v4, pnpm v9.0 or Poetry lock 2.1 as applicable; exact scope and frozen corpora in function-contracts.json and testdata/manifest.json."
     },
     {
       "local_file": "common/sca/core/pyrequire/read.go",

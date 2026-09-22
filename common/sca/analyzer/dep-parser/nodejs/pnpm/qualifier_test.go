@@ -2,6 +2,10 @@ package pnpm
 
 import (
 	"bytes"
+	"context"
+	"errors"
+	"github.com/yaklang/yaklang/common/sca/core/budget"
+	"github.com/yaklang/yaklang/common/sca/core/scanerr"
 	"strings"
 	"testing"
 
@@ -309,4 +313,21 @@ packages:
 			t.Fatalf("original specifier %q", libs[0].DeclaredVersion)
 		}
 	})
+}
+
+func TestV9SharedMetadataBudget(t *testing.T) {
+	lock := LockFile{Packages: map[string]PackageInfo{"x@1.0.0": {Resolution: PackageResolution{Integrity: strings.Repeat("x", 4096)}}}, Snapshots: map[string]PackageInfo{}}
+	for _, peer := range []string{"1.0.0", "2.0.0", "3.0.0", "4.0.0"} {
+		lock.Snapshots["x@1.0.0(peer@"+peer+")"] = PackageInfo{}
+	}
+	limits, _ := (budget.Limits{MaxResultBytes: 200000}).Normalize()
+	ctx := budget.Bind(context.Background(), limits)
+	if _, err := joinSnapshots(ctx, lock); !errors.Is(err, scanerr.ErrResourceLimit) {
+		t.Fatalf("shared metadata fanout escaped budget: %v", err)
+	}
+	canceled, cancel := context.WithCancel(context.Background())
+	cancel()
+	if _, err := joinSnapshots(budget.Ensure(canceled), lock); !errors.Is(err, context.Canceled) {
+		t.Fatalf("snapshot join ignored cancel: %v", err)
+	}
 }

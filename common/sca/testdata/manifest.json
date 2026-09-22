@@ -11514,6 +11514,326 @@
       "archive": "testdata/full_field_oracles_corpus_v1.zip",
       "member": "full_field/rpm-sqlite-raw-fields.json",
       "mode": 420
+    },
+    {
+      "path": "testdata/modern/cargo_v4/LICENSE-MIT",
+      "sha256": "23f18e03dc49df91622fe2a76176497404e46ced8a715d9d2b67a7446571cca3",
+      "bytes": 1023,
+      "source": {
+        "repo": "rust-lang/cargo",
+        "revision": "5ffbef3211a8c378857905775a15c5b32a174d3b",
+        "path": "LICENSE-MIT",
+        "url": "https://raw.githubusercontent.com/rust-lang/cargo/5ffbef3211a8c378857905775a15c5b32a174d3b/LICENSE-MIT",
+        "tree": "5ffbef3211a8c378857905775a15c5b32a174d3b",
+        "tag": "0.84.0"
+      },
+      "expectation": "Modern lock regression corpus: TestModernLockCorpora, TestModernLockSemantics and TestModernLockFailures; upstream license/oracle entries document provenance.",
+      "archive": "testdata/cargo_lock_v4_corpus_v1.zip",
+      "member": "modern/cargo_v4/LICENSE-MIT",
+      "mode": 420
+    },
+    {
+      "path": "testdata/modern/cargo_v4/encoded-sources.lock",
+      "sha256": "4337feef30618dacfb6cf5b440edbf19a0b91f27aeca2406311390ede280143a",
+      "bytes": 618,
+      "source": {
+        "producer": "yaklang regression fixture",
+        "method": "hand-authored from documented lock grammar; expected semantics asserted independently in modern_lock_test.go"
+      },
+      "expectation": "Modern lock regression corpus: TestModernLockCorpora, TestModernLockSemantics and TestModernLockFailures; upstream license/oracle entries document provenance.",
+      "archive": "testdata/cargo_lock_v4_corpus_v1.zip",
+      "member": "modern/cargo_v4/encoded-sources.lock",
+      "mode": 420
+    },
+    {
+      "path": "testdata/modern/cargo_v4/future.lock",
+      "sha256": "a09cf7d83cf402ccafd22f5dd7d74e347e518d9411ace909064f0e2882e17197",
+      "bytes": 620,
+      "source": {
+        "producer": "yaklang regression fixture",
+        "method": "hand-authored from documented lock grammar; expected semantics asserted independently in modern_lock_test.go"
+      },
+      "expectation": "Modern lock regression corpus: TestModernLockCorpora, TestModernLockSemantics and TestModernLockFailures; upstream license/oracle entries document provenance.",
+      "archive": "testdata/cargo_lock_v4_corpus_v1.zip",
+      "member": "modern/cargo_v4/future.lock",
+      "mode": 420
+    },
+    {
+      "path": "testdata/modern/cargo_v4/malformed.lock",
+      "sha256": "0ff8eb09f023e53d82436d17d3bc928ace55d8c3a23a9a0d30913ef494699f73",
+      "bytes": 623,
+      "source": {
+        "producer": "yaklang regression fixture",
+        "method": "hand-authored from documented lock grammar; expected semantics asserted independently in modern_lock_test.go"
+      },
+      "expectation": "Modern lock regression corpus: TestModernLockCorpora, TestModernLockSemantics and TestModernLockFailures; upstream license/oracle entries document provenance.",
+      "archive": "testdata/cargo_lock_v4_corpus_v1.zip",
+      "member": "modern/cargo_v4/malformed.lock",
+      "mode": 420
+    },
+    {
+      "path": "testdata/modern/cargo_v4/upstream-oracle.json",
+      "sha256": "21693aa969518369c98e60671aaa3bb805e24eeac5deca6bdfe5c583b0cc5fa5",
+      "bytes": 1491,
+      "source": {
+        "producer": "Python standard-library tomllib",
+        "input": "testdata/modern/cargo_v4/upstream.lock",
+        "method": "independent TOML decode and fixed field projection, not Go parser output"
+      },
+      "expectation": "Modern lock regression corpus: TestModernLockCorpora, TestModernLockSemantics and TestModernLockFailures; upstream license/oracle entries document provenance.",
+      "archive": "testdata/cargo_lock_v4_corpus_v1.zip",
+      "member": "modern/cargo_v4/upstream-oracle.json",
+      "mode": 420
+    },
+    {
+      "path": "testdata/modern/cargo_v4/upstream.lock",
+      "sha256": "3d4eb26349a81b585ebeebeb74dedf359b8fc6ea1cb98b1b9aa5058b9ab6b207",
+      "bytes": 1431,
+      "source": {
+        "repo": "rust-lang/cargo",
+        "revision": "5ffbef3211a8c378857905775a15c5b32a174d3b",
+        "path": "tests/testsuite/cargo_remove/update_lock_file/out/Cargo.lock",
+        "tag": "0.84.0",
+        "tree": "5ffbef3211a8c378857905775a15c5b32a174d3b",
+        "url": "https://raw.githubusercontent.com/rust-lang/cargo/5ffbef3211a8c378857905775a15c5b32a174d3b/tests/testsuite/cargo_remove/update_lock_file/out/Cargo.lock"
+      },
+      "expectation": "Modern lock regression corpus: TestModernLockCorpora, TestModernLockSemantics and TestModernLockFailures; upstream license/oracle entries document provenance.",
+      "archive": "testdata/cargo_lock_v4_corpus_v1.zip",
+      "member": "modern/cargo_v4/upstream.lock",
+      "mode": 420
+    },
+    {
+      "path": "testdata/modern/pnpm_v9/LICENSE",
+      "sha256": "e0a867ff513ea7be2a0ddc339ac6a031e459a38668e077b8f0e649544062f9f2",
+      "bytes": 1170,
+      "source": {
+        "repo": "pnpm/pnpm",
+        "revision": "d22a3f65ee047ecee7c89dd6f1971ecea4ecd4d4",
+        "path": "LICENSE",
+        "url": "https://raw.githubusercontent.com/pnpm/pnpm/d22a3f65ee047ecee7c89dd6f1971ecea4ecd4d4/LICENSE",
+        "tree": "d22a3f65ee047ecee7c89dd6f1971ecea4ecd4d4",
+        "tag": "v9.15.9"
+      },
+      "expectation": "Modern lock regression corpus: TestModernLockCorpora, TestModernLockSemantics and TestModernLockFailures; upstream license/oracle entries document provenance.",
+      "archive": "testdata/pnpm_lock_v9_corpus_v1.zip",
+      "member": "modern/pnpm_v9/LICENSE",
+      "mode": 420
+    },
+    {
+      "path": "testdata/modern/pnpm_v9/contexts.yaml",
+      "sha256": "b5ba783dd6174dccd28913cd8056ff6bb3960b46c6e71af310454ad2f288ea13",
+      "bytes": 905,
+      "source": {
+        "producer": "yaklang regression fixture",
+        "method": "hand-authored from documented lock grammar; expected semantics asserted independently in modern_lock_test.go"
+      },
+      "expectation": "Modern lock regression corpus: TestModernLockCorpora, TestModernLockSemantics and TestModernLockFailures; upstream license/oracle entries document provenance.",
+      "archive": "testdata/pnpm_lock_v9_corpus_v1.zip",
+      "member": "modern/pnpm_v9/contexts.yaml",
+      "mode": 420
+    },
+    {
+      "path": "testdata/modern/pnpm_v9/future.yaml",
+      "sha256": "d5456d4c0f22d65328dcdd824fb09161fa61822355ba1d7750ede10ca4dfdd60",
+      "bytes": 51,
+      "source": {
+        "producer": "yaklang regression fixture",
+        "method": "hand-authored from documented lock grammar; expected semantics asserted independently in modern_lock_test.go"
+      },
+      "expectation": "Modern lock regression corpus: TestModernLockCorpora, TestModernLockSemantics and TestModernLockFailures; upstream license/oracle entries document provenance.",
+      "archive": "testdata/pnpm_lock_v9_corpus_v1.zip",
+      "member": "modern/pnpm_v9/future.yaml",
+      "mode": 420
+    },
+    {
+      "path": "testdata/modern/pnpm_v9/malformed.yaml",
+      "sha256": "06100e699c4487f6aadc167ffaf1503de1f35bb0d1bb22b3e6162be839683410",
+      "bytes": 94,
+      "source": {
+        "producer": "yaklang regression fixture",
+        "method": "hand-authored from documented lock grammar; expected semantics asserted independently in modern_lock_test.go"
+      },
+      "expectation": "Modern lock regression corpus: TestModernLockCorpora, TestModernLockSemantics and TestModernLockFailures; upstream license/oracle entries document provenance.",
+      "archive": "testdata/pnpm_lock_v9_corpus_v1.zip",
+      "member": "modern/pnpm_v9/malformed.yaml",
+      "mode": 420
+    },
+    {
+      "path": "testdata/modern/pnpm_v9/missing-metadata.yaml",
+      "sha256": "bd28b2fb2d217aba97d631e93fff33f41932d6337f2febe9ddc4a93ebd7e6e0d",
+      "bytes": 61,
+      "source": {
+        "producer": "yaklang regression fixture",
+        "method": "hand-authored from documented lock grammar; expected semantics asserted independently in modern_lock_test.go"
+      },
+      "expectation": "Modern lock regression corpus: TestModernLockCorpora, TestModernLockSemantics and TestModernLockFailures; upstream license/oracle entries document provenance.",
+      "archive": "testdata/pnpm_lock_v9_corpus_v1.zip",
+      "member": "modern/pnpm_v9/missing-metadata.yaml",
+      "mode": 420
+    },
+    {
+      "path": "testdata/modern/pnpm_v9/missing-snapshots.yaml",
+      "sha256": "0be7016e1c1a9b8b304650ee6e41461446a2b956574490f742b8dbbb1c4063c2",
+      "bytes": 47,
+      "source": {
+        "producer": "yaklang regression fixture",
+        "method": "hand-authored from documented lock grammar; expected semantics asserted independently in modern_lock_test.go"
+      },
+      "expectation": "Modern lock regression corpus: TestModernLockCorpora, TestModernLockSemantics and TestModernLockFailures; upstream license/oracle entries document provenance.",
+      "archive": "testdata/pnpm_lock_v9_corpus_v1.zip",
+      "member": "modern/pnpm_v9/missing-snapshots.yaml",
+      "mode": 420
+    },
+    {
+      "path": "testdata/modern/pnpm_v9/pnpm-alias.yaml",
+      "sha256": "d6f90e6c43423209aa29695f96f76d940a7900db00ae8e34af65172de8aa05a4",
+      "bytes": 460,
+      "source": {
+        "repo": "pnpm/pnpm",
+        "revision": "d22a3f65ee047ecee7c89dd6f1971ecea4ecd4d4",
+        "path": "__fixtures__/with-aliased-dep/pnpm-lock.yaml",
+        "url": "https://raw.githubusercontent.com/pnpm/pnpm/d22a3f65ee047ecee7c89dd6f1971ecea4ecd4d4/__fixtures__/with-aliased-dep/pnpm-lock.yaml",
+        "tag": "v9.15.9",
+        "tree": "d22a3f65ee047ecee7c89dd6f1971ecea4ecd4d4"
+      },
+      "expectation": "Modern lock regression corpus: TestModernLockCorpora, TestModernLockSemantics and TestModernLockFailures; upstream license/oracle entries document provenance.",
+      "archive": "testdata/pnpm_lock_v9_corpus_v1.zip",
+      "member": "modern/pnpm_v9/pnpm-alias.yaml",
+      "mode": 420
+    },
+    {
+      "path": "testdata/modern/pnpm_v9/pnpm-peer.yaml",
+      "sha256": "6a9ed3c6a6e17cf4b2313561f37849be3af32ec19230f4212a007f9248e73a41",
+      "bytes": 1814,
+      "source": {
+        "repo": "pnpm/pnpm",
+        "revision": "d22a3f65ee047ecee7c89dd6f1971ecea4ecd4d4",
+        "path": "__fixtures__/with-peer/pnpm-lock.yaml",
+        "url": "https://raw.githubusercontent.com/pnpm/pnpm/d22a3f65ee047ecee7c89dd6f1971ecea4ecd4d4/__fixtures__/with-peer/pnpm-lock.yaml",
+        "tag": "v9.15.9",
+        "tree": "d22a3f65ee047ecee7c89dd6f1971ecea4ecd4d4"
+      },
+      "expectation": "Modern lock regression corpus: TestModernLockCorpora, TestModernLockSemantics and TestModernLockFailures; upstream license/oracle entries document provenance.",
+      "archive": "testdata/pnpm_lock_v9_corpus_v1.zip",
+      "member": "modern/pnpm_v9/pnpm-peer.yaml",
+      "mode": 420
+    },
+    {
+      "path": "testdata/modern/pnpm_v9/pnpm-workspace.yaml",
+      "sha256": "2927f50ec50d8c399241fd6f0367331ccce5b275a19b46d97252c7de9e34132c",
+      "bytes": 393,
+      "source": {
+        "repo": "pnpm/pnpm",
+        "revision": "d22a3f65ee047ecee7c89dd6f1971ecea4ecd4d4",
+        "path": "__fixtures__/workspace-with-different-deps/pnpm-lock.yaml",
+        "url": "https://raw.githubusercontent.com/pnpm/pnpm/d22a3f65ee047ecee7c89dd6f1971ecea4ecd4d4/__fixtures__/workspace-with-different-deps/pnpm-lock.yaml",
+        "tag": "v9.15.9",
+        "tree": "d22a3f65ee047ecee7c89dd6f1971ecea4ecd4d4"
+      },
+      "expectation": "Modern lock regression corpus: TestModernLockCorpora, TestModernLockSemantics and TestModernLockFailures; upstream license/oracle entries document provenance.",
+      "archive": "testdata/pnpm_lock_v9_corpus_v1.zip",
+      "member": "modern/pnpm_v9/pnpm-workspace.yaml",
+      "mode": 420
+    },
+    {
+      "path": "testdata/modern/poetry_v2_1/LICENSE",
+      "sha256": "1786f071a510648a24695f295117f02bae0bbf0fb7c6730aafe9c93a3e4bf7ee",
+      "bytes": 1070,
+      "source": {
+        "repo": "python-poetry/poetry",
+        "revision": "6e61c8b25f034aea350284a426499c70be2fa816",
+        "path": "LICENSE",
+        "url": "https://raw.githubusercontent.com/python-poetry/poetry/6e61c8b25f034aea350284a426499c70be2fa816/LICENSE",
+        "tree": "6e61c8b25f034aea350284a426499c70be2fa816",
+        "tag": "2.1.1"
+      },
+      "expectation": "Modern lock regression corpus: TestModernLockCorpora, TestModernLockSemantics and TestModernLockFailures; upstream license/oracle entries document provenance.",
+      "archive": "testdata/poetry_lock_v2_1_corpus_v1.zip",
+      "member": "modern/poetry_v2_1/LICENSE",
+      "mode": 420
+    },
+    {
+      "path": "testdata/modern/poetry_v2_1/bad-marker.lock",
+      "sha256": "0bec96c2f8dec93d0bb20301edfaff83197cfee97dc3e476ca5d57314dfe9443",
+      "bytes": 1038,
+      "source": {
+        "producer": "yaklang regression fixture",
+        "method": "hand-authored from documented lock grammar; expected semantics asserted independently in modern_lock_test.go"
+      },
+      "expectation": "Modern lock regression corpus: TestModernLockCorpora, TestModernLockSemantics and TestModernLockFailures; upstream license/oracle entries document provenance.",
+      "archive": "testdata/poetry_lock_v2_1_corpus_v1.zip",
+      "member": "modern/poetry_v2_1/bad-marker.lock",
+      "mode": 420
+    },
+    {
+      "path": "testdata/modern/poetry_v2_1/future.lock",
+      "sha256": "11f5e78dce186a7633d1ee6c12cdeb4e401e381381e5523ae431534db45bd101",
+      "bytes": 1058,
+      "source": {
+        "producer": "yaklang regression fixture",
+        "method": "hand-authored from documented lock grammar; expected semantics asserted independently in modern_lock_test.go"
+      },
+      "expectation": "Modern lock regression corpus: TestModernLockCorpora, TestModernLockSemantics and TestModernLockFailures; upstream license/oracle entries document provenance.",
+      "archive": "testdata/poetry_lock_v2_1_corpus_v1.zip",
+      "member": "modern/poetry_v2_1/future.lock",
+      "mode": 420
+    },
+    {
+      "path": "testdata/modern/poetry_v2_1/groups.lock",
+      "sha256": "de2502a6c6f2e07b6385eb677de72f6b972d3710f7efbd76e5b462e21305b125",
+      "bytes": 1058,
+      "source": {
+        "producer": "yaklang regression fixture",
+        "method": "hand-authored from documented lock grammar; expected semantics asserted independently in modern_lock_test.go"
+      },
+      "expectation": "Modern lock regression corpus: TestModernLockCorpora, TestModernLockSemantics and TestModernLockFailures; upstream license/oracle entries document provenance.",
+      "archive": "testdata/poetry_lock_v2_1_corpus_v1.zip",
+      "member": "modern/poetry_v2_1/groups.lock",
+      "mode": 420
+    },
+    {
+      "path": "testdata/modern/poetry_v2_1/malformed.lock",
+      "sha256": "a0aa7f266679eee08b45a5aff20f843856f073483bfd77a91706d1b8d8ef96f7",
+      "bytes": 1048,
+      "source": {
+        "producer": "yaklang regression fixture",
+        "method": "hand-authored from documented lock grammar; expected semantics asserted independently in modern_lock_test.go"
+      },
+      "expectation": "Modern lock regression corpus: TestModernLockCorpora, TestModernLockSemantics and TestModernLockFailures; upstream license/oracle entries document provenance.",
+      "archive": "testdata/poetry_lock_v2_1_corpus_v1.zip",
+      "member": "modern/poetry_v2_1/malformed.lock",
+      "mode": 420
+    },
+    {
+      "path": "testdata/modern/poetry_v2_1/upstream-oracle.json",
+      "sha256": "592b84f1cef72595c4fd07ff11409fb4c328e59cda382a01f0f1fb4b79042365",
+      "bytes": 174370,
+      "source": {
+        "producer": "Python standard-library tomllib",
+        "input": "testdata/modern/poetry_v2_1/upstream.lock",
+        "method": "independent TOML decode and fixed field projection, not Go parser output"
+      },
+      "expectation": "Modern lock regression corpus: TestModernLockCorpora, TestModernLockSemantics and TestModernLockFailures; upstream license/oracle entries document provenance.",
+      "archive": "testdata/poetry_lock_v2_1_corpus_v1.zip",
+      "member": "modern/poetry_v2_1/upstream-oracle.json",
+      "mode": 420
+    },
+    {
+      "path": "testdata/modern/poetry_v2_1/upstream.lock",
+      "sha256": "f77ad472c2022f621c4c258268db36d096de5df1b949a93c6cadf60fa7517fbc",
+      "bytes": 163353,
+      "source": {
+        "repo": "python-poetry/poetry",
+        "revision": "6e61c8b25f034aea350284a426499c70be2fa816",
+        "path": "poetry.lock",
+        "url": "https://raw.githubusercontent.com/python-poetry/poetry/6e61c8b25f034aea350284a426499c70be2fa816/poetry.lock",
+        "tag": "2.1.1",
+        "tree": "6e61c8b25f034aea350284a426499c70be2fa816"
+      },
+      "expectation": "Modern lock regression corpus: TestModernLockCorpora, TestModernLockSemantics and TestModernLockFailures; upstream license/oracle entries document provenance.",
+      "archive": "testdata/poetry_lock_v2_1_corpus_v1.zip",
+      "member": "modern/poetry_v2_1/upstream.lock",
+      "mode": 420
     }
   ],
   "storage": "ZIP corpus archives; logical paths and per-entry hashes are unchanged",
@@ -11722,6 +12042,21 @@
       "path": "testdata/yarn_classic_berry_corpus_v1.zip",
       "sha256": "dd52c15a534e0fb2eaffab3e2cdeb9b03ba3726089383abefa2f5bb838448284",
       "bytes": 3087
+    },
+    {
+      "path": "testdata/cargo_lock_v4_corpus_v1.zip",
+      "sha256": "c2af02e6828d2f52e4a7db2f63c86d6d400cf19b471827d49cdb51e5613de6fe",
+      "bytes": 3197
+    },
+    {
+      "path": "testdata/pnpm_lock_v9_corpus_v1.zip",
+      "sha256": "fba4a06e41f610bfe8465c34fa06d51835746c9ec5756d414ceda4514c3d9e00",
+      "bytes": 4010
+    },
+    {
+      "path": "testdata/poetry_lock_v2_1_corpus_v1.zip",
+      "sha256": "4b4936d8be405a692f6ac8cf55e2fe00e054b36d32c2344a386df0312269fffb",
+      "bytes": 94375
     }
   ]
 }

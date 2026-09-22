@@ -1,4 +1,4 @@
-// Package lockyaml reads the finite YAML data forms in pnpm v5/v6 lock files.
+// Package lockyaml reads the finite YAML data forms in pnpm v5/v6/v9 lock files.
 // Mappings, sequences, quoted/plain scalars, and flow collections are supported.
 // Tags, aliases, anchors, merge keys and multiple documents fail explicitly.
 // No reflection codec, emitter, resolver schema, or filesystem IO is provided.

@@ -1,6 +1,7 @@
 package pnpm
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"github.com/yaklang/yaklang/common/sca/core/textdecode"
@@ -46,6 +47,7 @@ type LockFile struct {
 	DevDependencies map[string]any          `json:"devDependencies,omitempty"`
 	Importers       map[string]pnpmImporter `json:"importers,omitempty"`
 	Packages        map[string]PackageInfo  `json:"packages,omitempty"`
+	Snapshots       map[string]PackageInfo  `json:"snapshots,omitempty"`
 }
 
 type Parser struct{}
@@ -86,6 +88,16 @@ func (p *Parser) Parse(fs fi.FileSystem, r types.ReadSeekerAt) ([]types.Library,
 	lockVer, err := parseLockfileVersion(lockFile)
 	if err != nil {
 		return nil, nil, err
+	}
+
+	if lockVer == 9 {
+		if err := validateV9Tree(tree); err != nil {
+			return nil, nil, err
+		}
+		lockFile, err = joinSnapshots(ctx, lockFile)
+		if err != nil {
+			return nil, nil, err
+		}
 	}
 
 	libs, deps, err := p.parse(lockVer, lockFile)
@@ -134,9 +146,25 @@ func (p *Parser) parse(lockVer int, lockFile LockFile) ([]types.Library, []types
 		recs = append(recs, rec{path: depPath, name: name, version: version, info: info})
 	}
 
+	directSnapshots := map[string]bool{}
+	if lockVer == 9 {
+		for _, importer := range lockFile.Importers {
+			for _, entries := range []map[string]any{importer.Dependencies, importer.OptionalDependencies} {
+				for name, raw := range entries {
+					_, version := importerEntry(raw)
+					if id := resolvePnpmRef(lockFile, lockVer, name, version, byName); id != "" {
+						directSnapshots[id] = true
+					}
+				}
+			}
+		}
+	}
 	for _, item := range recs {
 		declared := digest.ParseDeclared(item.info.Resolution.Integrity)
 		direct := isImporterDirect(item.name, lockFile)
+		if lockVer == 9 {
+			direct = directSnapshots[item.path]
+		}
 		lib := types.Library{
 			ID:                item.path,
 			Variant:           item.path,
@@ -330,6 +358,11 @@ func resolvePnpmRef(lockFile LockFile, lockVer int, name, ver string, byName map
 			}
 		}
 	}
+	// v9 references name an exact peer context. A missing key must not bind
+	// to a different context merely because it is the only matching version.
+	if lockVer == 9 {
+		return ""
+	}
 	var hits []string
 	for _, path := range byName[name] {
 		info := lockFile.Packages[path]
@@ -374,6 +407,7 @@ func parseLockfileVersion(lockFile LockFile) (int, error) {
 	allowed := map[string]int{
 		"5": 5, "5.0": 5, "5.1": 5, "5.2": 5, "5.3": 5, "5.4": 5,
 		"6": 6, "6.0": 6,
+		"9": 9, "9.0": 9,
 	}
 	major, ok := allowed[text]
 	if !ok {
@@ -389,6 +423,10 @@ func isIndirectLib(name string, directDeps map[string]interface{}) bool {
 
 // cf. https://github.com/pnpm/pnpm/blob/ce61f8d3c29eee46cee38d56ced45aea8a439a53/packages/dependency-path/src/index.ts#L112-L163
 func parsePackage(depPath string, lockFileVersion int) (string, string) {
+	if lockFileVersion == 9 {
+		// v9 keys no longer have the leading registry separator.
+		return parseDepPath("/"+depPath, "@")
+	}
 	// The version separator is different between v5 and v6+.
 	versionSep := "@"
 	if lockFileVersion < 6 {
@@ -436,4 +474,117 @@ func parseDepPath(depPath, versionSep string) (string, string) {
 		return "", ""
 	}
 	return name, version
+}
+
+// v9 stores shared metadata in packages and installed peer contexts in snapshots.
+// Join before the common projection; references keep the complete snapshot key.
+func joinSnapshots(ctx context.Context, lock LockFile) (LockFile, error) {
+	if len(lock.Packages) > 0 && len(lock.Snapshots) == 0 {
+		return lock, fmt.Errorf("evidence_insufficient: pnpm v9 packages without snapshots")
+	}
+	need, err := budget.SizeMul(len(lock.Snapshots), 384)
+	if err != nil {
+		return lock, err
+	}
+	if err = budget.From(ctx).Working(need + budget.SizeMap); err != nil {
+		return lock, err
+	}
+	joined := make(map[string]PackageInfo, len(lock.Snapshots))
+	for key, snapshot := range lock.Snapshots {
+		if err := ctx.Err(); err != nil {
+			return lock, err
+		}
+		base, _, _ := strings.Cut(key, "(")
+		metadata, ok := lock.Packages[base]
+		if !ok {
+			return lock, fmt.Errorf("evidence_insufficient: pnpm snapshot %q has no package metadata", key)
+		}
+		// Shared metadata may be expanded into many peer contexts; reserve each
+		// projected integrity/source copy before the common parser allocates it.
+		copies, e := budget.SizeMul(len(metadata.Name)+len(metadata.Version)+len(metadata.Resolution.Integrity)+len(metadata.Resolution.Tarball), 24)
+		if e != nil {
+			return lock, e
+		}
+		if e = budget.From(ctx).Working(copies); e != nil {
+			return lock, e
+		}
+		if metadata.Name == "" {
+			name, version := parsePackage(base, 9)
+			if name == "" || version == "" {
+				return lock, fmt.Errorf("unsupported_syntax: pnpm v9 identity %q", base)
+			}
+		} else if metadata.Version == "" {
+			return lock, fmt.Errorf("malformed_input: pnpm v9 missing version for %q", base)
+		}
+		// Validate balanced peer/patch suffixes without recursively interpreting them.
+		depth := 0
+		for _, c := range key[len(base):] {
+			if depth == 0 && c != '(' {
+				return lock, fmt.Errorf("malformed_input: pnpm snapshot suffix %q", key)
+			}
+			switch c {
+			case '(':
+				depth++
+			case ')':
+				depth--
+			}
+			if depth < 0 {
+				return lock, fmt.Errorf("malformed_input: pnpm snapshot suffix %q", key)
+			}
+		}
+		if depth != 0 {
+			return lock, fmt.Errorf("malformed_input: pnpm snapshot suffix %q", key)
+		}
+		metadata.Dependencies = snapshot.Dependencies
+		metadata.OptionalDependencies = snapshot.OptionalDependencies
+		metadata.DevDependencies = snapshot.DevDependencies
+		joined[key] = metadata
+	}
+	lock.Packages = joined
+	return lock, nil
+}
+
+func validateV9Tree(tree map[string]any) error {
+	for _, key := range []string{"packages", "snapshots", "importers"} {
+		value, present := tree[key]
+		if !present {
+			continue
+		}
+		entries, ok := value.(map[string]any)
+		if !ok {
+			return fmt.Errorf("malformed_input: pnpm v9 %s must be a mapping", key)
+		}
+		for name, value := range entries {
+			entry, ok := value.(map[string]any)
+			if !ok {
+				return fmt.Errorf("malformed_input: pnpm v9 %s entry %q must be a mapping", key, name)
+			}
+			if key != "importers" {
+				continue
+			}
+			for _, kind := range []string{"dependencies", "devDependencies", "optionalDependencies"} {
+				value, present := entry[kind]
+				if !present {
+					continue
+				}
+				deps, ok := value.(map[string]any)
+				if !ok {
+					return fmt.Errorf("malformed_input: pnpm v9 importer dependencies must be a mapping")
+				}
+				for dep, value := range deps {
+					ref, ok := value.(map[string]any)
+					if !ok {
+						return fmt.Errorf("malformed_input: pnpm v9 importer dependency %q must contain specifier/version", dep)
+					}
+					for _, field := range []string{"specifier", "version"} {
+						text, ok := ref[field].(string)
+						if !ok || text == "" {
+							return fmt.Errorf("malformed_input: pnpm v9 importer dependency %q missing %s", dep, field)
+						}
+					}
+				}
+			}
+		}
+	}
+	return nil
 }
