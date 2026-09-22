@@ -61,7 +61,7 @@ func (e *ProtocolEvent) Decode() (result map[string]any, err error) {
 			result = owned
 		}
 	}()
-	if (e.Protocol == "tls" || e.Protocol == "redis") && e.Session != nil {
+	if (e.Protocol == "tls" || e.Protocol == "redis" || e.Entry == "MySQLPreparedFields") && e.Session != nil {
 		return map[string]any{"fields": cloneSession(e.Session)}, nil
 	}
 	if e.semanticFields != nil {
@@ -603,7 +603,7 @@ func (f *binFlow) feed(dir int, data []byte, ts time.Time) {
 				} else {
 					result, err = f.consumeTLS(dir, e)
 				}
-			} else if f.protocol == "redis" {
+			} else if f.protocol == "redis" || e.Entry == "MySQLPreparedFields" {
 				result = map[string]any{}
 			} else if f.protocol == "websocket" && f.ws != nil && f.ws.deflate {
 				result = map[string]any{"fields": map[string]any{}}
@@ -615,7 +615,7 @@ func (f *binFlow) feed(dir int, data []byte, ts time.Time) {
 					e.Raw = rawCopy
 				}
 				err = f.consumeSession(dir, e, result)
-				if f.protocol == "redis" {
+				if f.protocol == "redis" || e.Entry == "MySQLPreparedFields" {
 					result = map[string]any{"fields": e.Session}
 				}
 				if e.Protocol == "websocket" && f.ws != nil && f.ws.deflate {

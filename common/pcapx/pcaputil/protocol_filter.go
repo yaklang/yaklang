@@ -60,10 +60,36 @@ func (e *ProtocolEvent) DisplayFields() map[string][]any {
 			m[alias] = []any{v}
 		}
 	}
+	if e.Protocol == "http3" {
+		frames, _ := e.Session["Frames"].([]map[string]any)
+		for _, fr := range frames {
+			if fr["HTTP3"] != true {
+				continue
+			}
+			if id, ok := fr["Stream ID"]; ok {
+				m["http3.streamid"] = append(m["http3.streamid"], id)
+			}
+			hf, _ := fr["HTTP3 Frames"].([]map[string]any)
+			for _, frame := range hf {
+				headers, _ := frame["Headers"].([]map[string]any)
+				for _, h := range headers {
+					if h["Name"] == ":method" {
+						m["http.request.method"] = append(m["http.request.method"], h["Value"])
+					}
+					if h["Name"] == ":status" {
+						if n, err := strconv.Atoi(fmt.Sprint(h["Value"])); err == nil {
+							m["http.response.code"] = append(m["http.response.code"], n)
+						}
+					}
+				}
+			}
+		}
+	}
+
 	return m
 }
 
-var displayAliases = map[string]bool{"protocol": true, "status": true, "pdu.id": true, "pdu.length": true, "source": true, "destination": true, "ip.addr": true, "dns.id": true, "dns.qry.name": true, "dns.qry.type": true, "tls.handshake.extensions_server_name": true, "tls.version": true, "tls.record.authenticated": true, "http.request.method": true, "http.response.code": true, "http2.streamid": true, "grpc.status": true}
+var displayAliases = map[string]bool{"protocol": true, "status": true, "pdu.id": true, "pdu.length": true, "source": true, "destination": true, "ip.addr": true, "dns.id": true, "dns.qry.name": true, "dns.qry.type": true, "tls.handshake.extensions_server_name": true, "tls.version": true, "tls.record.authenticated": true, "http.request.method": true, "http.response.code": true, "http3.streamid": true, "http2.streamid": true, "grpc.status": true}
 
 type DisplayFilter struct{ match func(map[string][]any) bool }
 

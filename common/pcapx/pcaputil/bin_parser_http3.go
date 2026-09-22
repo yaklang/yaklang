@@ -1,12 +1,19 @@
 package pcaputil
 
 import (
+	"errors"
 	"fmt"
+	"sort"
 )
 
-// h3StreamState is RFC 9114 HTTP/3 state on a QUIC stream. QPACK field
-// sections stay compressed (M5-D). Port 443 is never consulted.
+// h3StreamState tracks RFC 9114 framing and QPACK field sections on a QUIC stream.
+// Native admission requires authenticated ALPN; port 443 is never consulted.
 type h3StreamState struct {
+	blocked      [2]bool
+	blockedPDU   [2]uint64
+	seenSettings bool
+	headers      [2]int
+
 	kind                  string
 	seenType              bool
 	buf                   [2][]byte
@@ -27,6 +34,9 @@ func (q *binQUIC) feedHTTP3(dir int, sid, off uint64, data []byte, fin bool, max
 	h3 := st.h3
 	if dir != 0 && dir != 1 {
 		dir = 0
+	}
+	if q.native && fin {
+		h3.fin[dir] = true
 	}
 	if off != uint64(len(h3.buf[dir])) {
 		return nil
@@ -54,16 +64,37 @@ func (q *binQUIC) feedHTTP3(dir int, sid, off uint64, data []byte, fin bool, max
 		switch typ {
 		case 0:
 			h3.kind = "control"
+			if q.native {
+				if q.controlSeen[dir] {
+					return protocolError(ErrMalformedMessage, "HTTP3 duplicate control stream")
+				}
+				q.controlSeen[dir] = true
+			}
 		case 1:
 			h3.kind = "push"
 		case 2:
 			h3.kind = "encoder"
+			if q.native {
+				if q.qpackSeen[dir][0] {
+					return protocolError(ErrMalformedMessage, "HTTP3 duplicate QPACK encoder stream")
+				}
+				q.qpackSeen[dir][0] = true
+			}
 		case 3:
 			h3.kind = "decoder"
+			if q.native {
+				if q.qpackSeen[dir][1] {
+					return protocolError(ErrMalformedMessage, "HTTP3 duplicate QPACK decoder stream")
+				}
+				q.qpackSeen[dir][1] = true
+			}
 		default:
 			h3.kind = "unknown"
 		}
 		buf = h3.buf[dir][h3.parsed[dir]:]
+	}
+	if q.native && fin && (h3.kind == "control" || h3.kind == "encoder" || h3.kind == "decoder") {
+		return protocolError(ErrMalformedMessage, "HTTP3 critical stream closed")
 	}
 	if h3.kind == "encoder" {
 		n, inst, err := q.qpack.applyEncoder(dir, buf, max)
@@ -84,6 +115,33 @@ func (q *binQUIC) feedHTTP3(dir int, sid, off uint64, data []byte, fin bool, max
 			info["QPACK Table Size"] = q.qpack.table[dir].size
 			info["QPACK Capacity"] = q.qpack.table[dir].capacity
 		}
+
+		if q.native {
+			ids := make([]uint64, 0)
+			for id, other := range q.streams {
+				if other.h3 != nil && other.h3.blocked[dir] {
+					ids = append(ids, id)
+				}
+			}
+			sort.Slice(ids, func(i, j int) bool { return ids[i] < ids[j] })
+			var resumed []map[string]any
+			for _, id := range ids {
+				other := q.streams[id].h3
+				sf, si := map[string]any{}, map[string]any{}
+				err := q.feedHTTP3(dir, id, uint64(len(other.buf[dir])), nil, other.fin[dir], max, sf, si)
+				if err != nil {
+					return err
+				}
+				if !other.blocked[dir] {
+					si["Blocked PDU ID"] = other.blockedPDU[dir]
+					si["Transaction ID"] = q.streams[id].requestPDU
+					resumed = append(resumed, si)
+				}
+			}
+			if len(resumed) > 0 {
+				info["QPACK Resumed Streams"] = resumed
+			}
+		}
 		return nil
 	}
 	if h3.kind == "decoder" {
@@ -102,6 +160,10 @@ func (q *binQUIC) feedHTTP3(dir int, sid, off uint64, data []byte, fin bool, max
 			fr["QPACK Instructions"] = inst
 			info["QPACK Instructions"] = inst
 		}
+		return nil
+	}
+	if q.native && uni && (h3.kind == "unknown" || h3.kind == "push") {
+		info["HTTP3 Stream Kind"] = h3.kind
 		return nil
 	}
 	var frames []map[string]any
@@ -134,8 +196,42 @@ func (q *binQUIC) feedHTTP3(dir int, sid, off uint64, data []byte, fin bool, max
 			break
 		}
 		payload := buf[n1+n2 : need]
+		if q.native {
+			if h3.kind == "control" && !h3.seenSettings && ft != 4 {
+				return protocolError(ErrMalformedMessage, "HTTP3 SETTINGS must be first")
+			}
+			if h3.kind == "control" && h3.seenSettings && ft == 4 {
+				return protocolError(ErrMalformedMessage, "HTTP3 duplicate SETTINGS")
+			}
+			if !uni && ft == 0 && h3.headers[dir] != 1 {
+				return protocolError(ErrMalformedMessage, "HTTP3 DATA outside message body")
+			}
+			if !uni && ft == 4 {
+				return protocolError(ErrMalformedMessage, "HTTP3 SETTINGS on request stream")
+			}
+		}
 		hf, herr := q.h3DecodeFrame(dir, ft, payload, h3, uni)
 		if herr != nil {
+			var pe *ProtocolError
+			if q.native && errors.As(herr, &pe) && pe.Kind == ErrContextRequired {
+				blocked := 0
+				for _, other := range q.streams {
+					if other.h3 != nil && other.h3.blocked[dir] {
+						blocked++
+					}
+				}
+				if !h3.blocked[dir] && (blocked >= max || uint64(blocked) >= q.qpack.maxBlocked[dir]) {
+					return protocolError(ErrResourceExceeded, "QPACK blocked stream limit")
+				}
+				if !h3.blocked[dir] {
+					h3.blockedPDU[dir] = q.eventID
+				}
+				h3.blocked[dir] = true
+				info["QPACK Blocked"] = true
+				info["HTTP3 Stream ID"] = sid
+				info["HTTP3"] = true
+				return nil
+			}
 			if h3.kind == "request" || h3.kind == "control" {
 				return herr
 			}
@@ -150,7 +246,28 @@ func (q *binQUIC) feedHTTP3(dir int, sid, off uint64, data []byte, fin bool, max
 			}
 			h3.kind = "request"
 		}
-		if ft == 0x01 {
+		if ft == 4 {
+			h3.seenSettings = true
+		}
+		h3.blocked[dir] = false
+		informational := false
+		if ft == 1 && dir == 1 {
+			if headers, ok := hf["Headers"].([]map[string]any); ok {
+				for _, header := range headers {
+					status, _ := header["Value"].(string)
+					if header["Name"] == ":status" && len(status) == 3 && status[0] == '1' {
+						if status == "101" || h3.headers[dir] != 0 {
+							return protocolError(ErrMalformedMessage, "HTTP3 invalid informational response")
+						}
+						informational = true
+					}
+				}
+			}
+		}
+		if informational {
+			hf["Header Kind"] = "informational"
+		} else if ft == 0x01 {
+			h3.headers[dir]++
 			if dir == 0 {
 				h3.reqHeaders++
 				hf["Header Kind"] = "request"
@@ -162,6 +279,9 @@ func (q *binQUIC) feedHTTP3(dir int, sid, off uint64, data []byte, fin bool, max
 				}
 			}
 		}
+		if ft == 1 && h3.headers[dir] > 1 {
+			hf["Header Kind"] = "trailers"
+		}
 		if ft == 0x00 {
 			h3.dataBytes += uint64(len(payload))
 			hf["DATA Length"] = uint64(len(payload))
@@ -172,6 +292,12 @@ func (q *binQUIC) feedHTTP3(dir int, sid, off uint64, data []byte, fin bool, max
 		if len(frames) >= max {
 			return protocolError(ErrResourceExceeded, "HTTP/3 frame budget exceeded")
 		}
+	}
+	if q.native && fin && !uni && dir == 1 && h3.headers[dir] == 0 && !h3.blocked[dir] {
+		return protocolError(ErrMalformedMessage, "HTTP3 FIN before final response headers")
+	}
+	if q.native && fin && h3.parsed[dir] != len(h3.buf[dir]) {
+		return protocolError(ErrNeedMore, "HTTP3 FIN with incomplete frame")
 	}
 	if h3.kind == "" || h3.kind == "unknown" {
 		if len(frames) == 0 {
@@ -259,6 +385,9 @@ func (q *binQUIC) h3DecodeFrame(dir int, ft uint64, payload []byte, h3 *h3Stream
 		for _, s := range settings {
 			id, _ := s["ID"].(uint64)
 			val, _ := s["Value"].(uint64)
+			if id == 7 {
+				q.qpack.maxBlocked[peer] = val
+			}
 			if id == 0x01 {
 				q.qpack.maxCap[peer] = val
 			}
@@ -288,6 +417,7 @@ func (q *binQUIC) h3DecodeFrame(dir int, ft uint64, payload []byte, h3 *h3Stream
 
 func h3ParseSettings(payload []byte) ([]map[string]any, error) {
 	var out []map[string]any
+	seen := map[uint64]bool{}
 	off := 0
 	for off < len(payload) {
 		id, n, err := quicVarint(payload[off:])
@@ -300,6 +430,13 @@ func h3ParseSettings(payload []byte) ([]map[string]any, error) {
 			return nil, fmt.Errorf("http3: truncated SETTINGS value")
 		}
 		off += n
+		if seen[id] {
+			return nil, fmt.Errorf("http3: duplicate SETTINGS identifier")
+		}
+		seen[id] = true
+		if id >= 2 && id <= 5 {
+			return nil, fmt.Errorf("http3: prohibited HTTP2 SETTINGS identifier")
+		}
 		name := h3SettingName(id)
 		out = append(out, map[string]any{"ID": id, "Name": name, "Value": val})
 	}

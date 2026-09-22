@@ -185,14 +185,18 @@ func (f *binFlow) consumeSession(dir int, e *ProtocolEvent, result map[string]an
 			err = f.consumeDoHH2(dir, e, previous)
 		}
 	case "mysql":
-		e.Session, err = f.mysql.consume(dir, e.Raw, e.Entry, result)
+		if e.Entry == "MySQLPreparedFields" {
+			e.Session, err = f.consumeMySQLPrepared(dir, e)
+		} else {
+			e.Session, err = f.mysql.consume(dir, e.Raw, e.Entry, result)
+		}
 		if err == nil && f.mysql.phase == "tls" {
 			f.protocol = "tls"
 		}
 	case "postgresql":
-		e.Session, err = f.pg.consume(dir, e.Raw, e.Entry)
+		e.Session, err = f.consumePostgres(dir, e, result)
 		if err == nil && e.Session["Encrypted"] == true {
-			f.protocol, f.pg = "tls", nil
+			f.protocol = "tls"
 			e.Session["Protocol Transition"] = "postgresql->tls"
 		}
 	case "ldap":
@@ -580,6 +584,10 @@ func cloneSessionValue(v any) any {
 		return out
 	case []int32:
 		return append([]int32(nil), x...)
+	case []uint16:
+		return append(x[:0:0], x...)
+	case []uint64:
+		return append(x[:0:0], x...)
 	case []string:
 		return append([]string(nil), x...)
 	case []byte:
@@ -625,6 +633,10 @@ func sessionSnapshotSize(v any, byteCapacity bool) int {
 		return n
 	case []int32:
 		return 24 + len(x)*4
+	case []uint16:
+		return 24 + len(x)*2
+	case []uint64:
+		return 24 + len(x)*8
 	case []string:
 		n := 24 + len(x)*16
 		for _, v := range x {

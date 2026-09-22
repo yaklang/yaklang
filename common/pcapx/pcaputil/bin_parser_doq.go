@@ -13,6 +13,7 @@ type doqStreamState struct {
 	queryID   uint16
 	qname     string
 	haveQuery bool
+	fin       [2]bool
 }
 
 func (q *binQUIC) feedDoQ(dir int, sid, off uint64, data []byte, fin bool, max int, fr, info map[string]any) error {
@@ -41,12 +42,18 @@ func (q *binQUIC) feedDoQ(dir int, sid, off uint64, data []byte, fin bool, max i
 	}
 	d.buf[dir] = append(d.buf[dir], data...)
 	buf := d.buf[dir][d.parsed[dir]:]
+	if q.native && fin {
+		d.fin[dir] = true
+	}
 	if len(buf) < 2 {
+		if q.native && fin {
+			return protocolError(ErrNeedMore, "DoQ FIN before length")
+		}
 		return nil
 	}
 	n := int(binary.BigEndian.Uint16(buf[:2]))
 	if n < 12 || n > 65535 {
-		if d.haveQuery {
+		if q.native || d.haveQuery {
 			return protocolError(ErrMalformedMessage, "doq: DNS length %d is invalid", n)
 		}
 		return nil
@@ -56,11 +63,23 @@ func (q *binQUIC) feedDoQ(dir int, sid, off uint64, data []byte, fin bool, max i
 		return protocolError(ErrResourceExceeded, "DoQ message exceeds 1 MiB")
 	}
 	if len(buf) < need {
+		if q.native && fin {
+			return protocolError(ErrNeedMore, "DoQ FIN before complete DNS message")
+		}
 		return nil
+	}
+	if q.native {
+		if d.parsed[dir] != 0 || len(buf) > need {
+			return protocolError(ErrMalformedMessage, "DoQ permits one message per direction")
+		}
+		if !fin {
+			info["DoQ Incomplete"] = true
+			return nil
+		}
 	}
 	msg := buf[2:need]
 	if !dnsHeader(msg) {
-		if d.haveQuery {
+		if q.native || d.haveQuery {
 			return protocolError(ErrMalformedMessage, "doq: framed payload is not a DNS header")
 		}
 		return nil
@@ -70,12 +89,26 @@ func (q *binQUIC) feedDoQ(dir int, sid, off uint64, data []byte, fin bool, max i
 	qd := binary.BigEndian.Uint16(msg[4:6])
 	an := binary.BigEndian.Uint16(msg[6:8])
 	qr := flags>>15 != 0
+	if q.native && (id != 0 || qr != (dir == 1)) {
+		return protocolError(ErrMalformedMessage, "DoQ DNS ID or direction invalid")
+	}
 	qname, qtype, err := dnsQuestion(msg)
 	if err != nil {
-		if d.haveQuery {
+		if q.native || d.haveQuery {
 			return err
 		}
 		return nil
+	}
+	var semantic map[string]any
+	if q.native {
+		var err error
+		semantic, err = DecodeDNSMessage(msg, max)
+		if err != nil {
+			return err
+		}
+		if qd != 1 {
+			return protocolError(ErrMalformedMessage, "DoQ requires one question")
+		}
 	}
 	d.parsed[dir] += need
 	dns := map[string]any{
@@ -89,6 +122,9 @@ func (q *binQUIC) feedDoQ(dir int, sid, off uint64, data []byte, fin bool, max i
 		"QTYPE":          qtype,
 		"QTYPE Name":     dnsTypeName(qtype),
 		"Context Level":  "observed",
+	}
+	if semantic != nil {
+		dns["DNS"] = semantic
 	}
 	info["DoQ"] = true
 	info["Protocol Transition"] = "quic->doq"
@@ -105,7 +141,7 @@ func (q *binQUIC) feedDoQ(dir int, sid, off uint64, data []byte, fin bool, max i
 		}
 	} else {
 		dns["Packet Name"] = "Response"
-		if d.haveQuery && d.queryID == id {
+		if d.haveQuery && d.queryID == id && (!q.native || d.qname == qname) {
 			dns["Matched Request"] = d.qname
 			dns["Association Status"] = "matched"
 		} else {
@@ -141,7 +177,7 @@ func (q *binQUIC) feedDoQ(dir int, sid, off uint64, data []byte, fin bool, max i
 	}
 	if fin {
 		state := "half-closed"
-		if st.fin {
+		if (!q.native && st.fin) || (q.native && d.fin[0] && d.fin[1]) {
 			state = "closed"
 		}
 		info["DoQ Stream State"] = state

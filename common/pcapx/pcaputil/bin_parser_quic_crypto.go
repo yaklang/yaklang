@@ -129,6 +129,9 @@ func quicNextPhase(tk *quicTrafficKeys) (*quicTrafficKeys, error) {
 		return nil, err
 	}
 	out, err := quicDeriveTraffic(next, tk.aead)
+	if err == nil {
+		out.hp = append([]byte(nil), tk.hp...)
+	} // Header protection keys never update.
 	return out, err
 }
 

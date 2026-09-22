@@ -1,0 +1,65 @@
+{
+  "mysql.connector": [
+    [
+      [
+        42,
+        "fixture",
+        null,
+        "2026-09-22"
+      ]
+    ],
+    [
+      [
+        -7,
+        "second",
+        null,
+        "2000-01-02"
+      ]
+    ]
+  ],
+  "pg_prepared": [
+    [
+      [
+        1,
+        "first",
+        42
+      ],
+      [
+        2,
+        "second",
+        42
+      ]
+    ],
+    [
+      [
+        1,
+        "first",
+        7
+      ],
+      [
+        2,
+        "second",
+        7
+      ]
+    ]
+  ],
+  "pg_copy": "1\tfirst\n2\tsecond\n",
+  "pg_after_error": [
+    [
+      99
+    ]
+  ],
+  "pg_portal": [
+    [
+      1,
+      "first"
+    ],
+    [
+      2,
+      "second"
+    ]
+  ],
+  "pg_after_copy_abort": [
+    2
+  ]
+}

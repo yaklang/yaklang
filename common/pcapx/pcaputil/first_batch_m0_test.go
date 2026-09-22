@@ -231,6 +231,7 @@ func TestFirstBatchT14(t *testing.T) {
 	}
 }
 func TestFirstBatchT12(t *testing.T) {
+	t.Run("M2Native", testFirstBatchM2T12)
 	q := &binQUIC{}
 	missing := quicLongPacket(2, 1, quicTestDCID(), quicTestSCID(), nil, 0, []byte{1})
 	info, err := q.consume(0, missing, 64)
