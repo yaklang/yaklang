@@ -4974,12 +4974,6 @@
     "version": "20260914.0001"
   },
   {
-    "rule_id": "source-go-template-html-type",
-    "rule_name": "检测 Go template.HTML 转换",
-    "hash": "5db0828e2ffe32a0b325b6c043119c92da3ed102aa0748147d0fac2803f3a407",
-    "version": "20260914.0001"
-  },
-  {
     "rule_id": "source-java-aes-cbc-pkcs5",
     "rule_name": "检测 Java AES CBC PKCS5Padding",
     "hash": "3a9048dbf00c65aa847f9019bd08ec0690e5b05cd30963b8ee9beb43f203b812",
@@ -6580,5 +6574,611 @@
     "rule_name": "结构扫描：Python yaml.load",
     "hash": "4c51bea16f8d613bd8ba766e49dd26ce77c2ba757989187f2299ada424d8962a",
     "version": "20260916.0001"
+  },
+  {
+    "rule_id": "source-c-des-set-key",
+    "rule_name": "源码扫描：C DES_set_key",
+    "hash": "5dd68599c3cc5596edd58fcd3ccb72f20041b2e1efbca3b7f19fc45e94f4c727",
+    "version": "20260922.0001"
+  },
+  {
+    "rule_id": "source-c-ldap-search",
+    "rule_name": "源码扫描：C ldap_search 过滤器",
+    "hash": "f4f85dc97eaee0da67a98a416ad08fc297d5cbcb439ed471fca43cb6d1b6c53f",
+    "version": "20260922.0001"
+  },
+  {
+    "rule_id": "source-c-md5-init",
+    "rule_name": "源码扫描：C MD5_Init",
+    "hash": "c63fb882f7db1715c9d56e1bf8bc1648249fcba3538cf6c07ba83041618db4d2",
+    "version": "20260922.0001"
+  },
+  {
+    "rule_id": "source-c-rand-call",
+    "rule_name": "源码扫描：C rand 弱随机数",
+    "hash": "da9cec2e5a47bbe5fdefc3133dc8fa17424e7b1658101723af085f7f44ab0cc2",
+    "version": "20260922.0001"
+  },
+  {
+    "rule_id": "source-csharp-activator-create",
+    "rule_name": "源码扫描：C# Activator.CreateInstance 外部类型",
+    "hash": "9bbd4e5414cd0fa894ce9d182b82fb68add3e95fe29728eb7d6c92758fdf732a",
+    "version": "20260922.0001"
+  },
+  {
+    "rule_id": "source-csharp-allow-any-origin",
+    "rule_name": "源码扫描：C# CORS 允许任意来源",
+    "hash": "f144baa7d093d9b012a5631c133a0c46ed4610ef25f8d7cccfa9dc0010c4d421",
+    "version": "20260922.0001"
+  },
+  {
+    "rule_id": "source-csharp-exception-tostring",
+    "rule_name": "源码扫描：C# 把异常文本返回给客户端",
+    "hash": "5a7dca21ddc5642220b9689340f169aa098e8d02e3c1392f1ec3ba518d9fdc4a",
+    "version": "20260922.0001"
+  },
+  {
+    "rule_id": "source-csharp-http-client-cleartext",
+    "rule_name": "源码扫描：C# HttpClient 明文地址",
+    "hash": "882df80e530c67fb2a7195e09a966ee0a2ef53805162dd588fd972899c43d281",
+    "version": "20260922.0001"
+  },
+  {
+    "rule_id": "source-csharp-log-concat",
+    "rule_name": "源码扫描：C# 日志拼接外部数据",
+    "hash": "fbd9f3c7a6f47bfe1b3283de067b5560fba762d0199418478dbee9c37ee9d010",
+    "version": "20260922.0001"
+  },
+  {
+    "rule_id": "source-csharp-regex-from-input",
+    "rule_name": "源码扫描：C# 用外部字符串构造正则",
+    "hash": "4a9ff595d207d5ca65d8d815ef457468850bfb8fd87a5ed8494ce16f599ab583",
+    "version": "20260922.0001"
+  },
+  {
+    "rule_id": "source-csharp-response-header",
+    "rule_name": "源码扫描：C# 响应头写入外部值",
+    "hash": "9117ed9fbcd8606fe2ef95218d637a487844ed5d5e7aaacb299d94099c402b23",
+    "version": "20260922.0001"
+  },
+  {
+    "rule_id": "source-csharp-samesite-none",
+    "rule_name": "源码扫描：C# Cookie SameSite=None",
+    "hash": "2e88f89905afbc36a118fe2e00221e7eccf2b539a95b4824424caf1fe8756ebd",
+    "version": "20260922.0001"
+  },
+  {
+    "rule_id": "source-csharp-token-no-signing-key",
+    "rule_name": "源码扫描：C# 关闭令牌签名校验",
+    "hash": "8f7b44fbc0efcb4993350fe11d67512a05fb5ec4255ed76e8a76e350ccb594e5",
+    "version": "20260922.0001"
+  },
+  {
+    "rule_id": "source-csharp-try-update-model",
+    "rule_name": "源码扫描：C# TryUpdateModel 批量绑定",
+    "hash": "a8a9760350ce3428cfc12e19198ab2e2cf94402a84f291d4823f67d795850059",
+    "version": "20260922.0001"
+  },
+  {
+    "rule_id": "source-dockerfile-user-root",
+    "rule_name": "源码扫描：Dockerfile 最后以 root 运行",
+    "hash": "1a91e8434778aead788bb4f61cafa3e74369fc003c4c1655da01e707f8604144",
+    "version": "20260922.0001"
+  },
+  {
+    "rule_id": "source-go-createtemp-empty",
+    "rule_name": "源码扫描：Go CreateTemp 空目录",
+    "hash": "900eca6fccefd7b65b0474c435951037a28d58ad91c9da2c3c1fc84160e626ec",
+    "version": "20260922.0001"
+  },
+  {
+    "rule_id": "source-go-grpc-with-insecure",
+    "rule_name": "源码扫描：Go grpc.WithInsecure",
+    "hash": "3a7d565890c707b7930b730083ad3cf0301e3635ea94aa1e93a548bd3592c2ab",
+    "version": "20260922.0001"
+  },
+  {
+    "rule_id": "source-go-jwt-parse-unverified",
+    "rule_name": "源码扫描：Go JWT ParseUnverified",
+    "hash": "c8d78305ef1f4ea6d9ee284ab445e2d115753832a76683c7614d3dc5e7950fa8",
+    "version": "20260922.0001"
+  },
+  {
+    "rule_id": "source-go-log-printf-request",
+    "rule_name": "源码扫描：Go 日志写入请求数据",
+    "hash": "f8f234bf3768df8023b34e7f9881e7bf0e6adfb809a3f35aab571887986795f5",
+    "version": "20260922.0001"
+  },
+  {
+    "rule_id": "source-go-reflect-method-by-name",
+    "rule_name": "源码扫描：Go MethodByName 使用外部名字",
+    "hash": "e70f8c48f90147bcf9459f0c82f8cd68d9c9a740f4760bffc37960cd4fa88fed",
+    "version": "20260922.0001"
+  },
+  {
+    "rule_id": "source-go-samesite-none",
+    "rule_name": "源码扫描：Go Cookie SameSiteNoneMode",
+    "hash": "611930dfdca36258c8806821d1b7b202ea1a1a5c8f617ac5bc5682cfd0b2a75f",
+    "version": "20260922.0001"
+  },
+  {
+    "rule_id": "source-java-cell-formula",
+    "rule_name": "源码扫描：Java 单元格公式注入",
+    "hash": "1ae443b10e0ff6a3083f6d3e635813c7e64c966fdd89b018f7a421a92880cc1b",
+    "version": "20260922.0001"
+  },
+  {
+    "rule_id": "source-java-gcm-parameter-spec",
+    "rule_name": "源码扫描：Java 固定 GCM nonce",
+    "hash": "da9ce9d82044f24c141376343dd97edbcbb4745756aed6b12119572ddbf787b4",
+    "version": "20260922.0001"
+  },
+  {
+    "rule_id": "source-java-mongodb-nosql",
+    "rule_name": "源码扫描：Java MongoDB 查询拼接",
+    "hash": "51ad66c9dfa52e658b47198232ed650cf460ac33227410597beb9027330565b1",
+    "version": "20260922.0001"
+  },
+  {
+    "rule_id": "source-java-pattern-from-request",
+    "rule_name": "源码扫描：Java 用请求编译正则",
+    "hash": "ff60ed17d293a6da61ee3393430ce1137f9cfa7992049ffe69cc85d6261f2a71",
+    "version": "20260922.0001"
+  },
+  {
+    "rule_id": "source-java-requested-session-id",
+    "rule_name": "源码扫描：Java 使用客户端会话 ID",
+    "hash": "5dbf223860e0b46e5718d783f9247b57a0d4486ef7c1902229772a46ea3624e4",
+    "version": "20260922.0001"
+  },
+  {
+    "rule_id": "source-java-session-set-request",
+    "rule_name": "源码扫描：Java 会话写入请求参数",
+    "hash": "a4a6175e72f8a334831f37b1a3991cb0352b6dc4610e9d75977ff997b61693b0",
+    "version": "20260922.0001"
+  },
+  {
+    "rule_id": "source-java-socket-host",
+    "rule_name": "源码扫描：Java Socket 主机来自外部",
+    "hash": "5eca6df3e43b14b2959c8752b3be96b4b6df8acab22fedaba5aeb5cef1041456",
+    "version": "20260922.0001"
+  },
+  {
+    "rule_id": "source-java-system-set-property",
+    "rule_name": "源码扫描：Java System.setProperty 接受外部值",
+    "hash": "4b3c28ce018ed2b02a0cbb53c66e1e225931bc8613b98d791a35dbff3c7afa22",
+    "version": "20260922.0001"
+  },
+  {
+    "rule_id": "source-java-xml-string-concat",
+    "rule_name": "源码扫描：Java XML 字符串拼接",
+    "hash": "271d3ed6ef32c812fe22c4fd184dbbd925d646dffe5c879c7524299c95d3d820",
+    "version": "20260922.0001"
+  },
+  {
+    "rule_id": "source-js-console-log-req",
+    "rule_name": "源码扫描：JavaScript 日志写入请求数据",
+    "hash": "d7ef104607a53e469f5b0f70093f8ed276c081dc0e785194f3fede138ad24bc9",
+    "version": "20260922.0001"
+  },
+  {
+    "rule_id": "source-js-csrf-false",
+    "rule_name": "源码扫描：JavaScript 关闭 CSRF",
+    "hash": "744139399609a0894a71a637a5204df192999890ecc7465565bac04c5339a596",
+    "version": "20260922.0001"
+  },
+  {
+    "rule_id": "source-js-libxml-noent",
+    "rule_name": "源码扫描：JavaScript libxmljs noent",
+    "hash": "d181fc5d59b0cd94b00303d68b3e15af4dd6a61e38ebcd545131730fd423b01a",
+    "version": "20260922.0001"
+  },
+  {
+    "rule_id": "source-js-regexp-from-input",
+    "rule_name": "源码扫描：JavaScript 用外部字符串构造 RegExp",
+    "hash": "7b73d900bdbac26fd42262896b395cdd2ab7c7a969ef93aff800529c6e91e959",
+    "version": "20260922.0001"
+  },
+  {
+    "rule_id": "source-js-samesite-none",
+    "rule_name": "源码扫描：JavaScript Cookie sameSite none",
+    "hash": "33f3501c7f308318933aac208e3d73578c3ba3620532533d3a8052181de7b5ad",
+    "version": "20260922.0001"
+  },
+  {
+    "rule_id": "source-js-sax-ondoctype",
+    "rule_name": "源码扫描：JavaScript sax ondoctype",
+    "hash": "a286100c05d8c1e76bea39c6fda29f2122290c66ac144e25d5e4adb2ad864c74",
+    "version": "20260922.0001"
+  },
+  {
+    "rule_id": "source-js-set-header",
+    "rule_name": "源码扫描：JavaScript setHeader 写入外部值",
+    "hash": "7a1465e86f369cb6aa7b25c1e141f9bbd37f98f07046b41a4d5dc75d949b4f50",
+    "version": "20260922.0001"
+  },
+  {
+    "rule_id": "source-kotlin-runtime-exec",
+    "rule_name": "源码扫描：Kotlin Runtime.exec",
+    "hash": "b8cd35fa2e3ceca99c1ac9e1fbb5b855b48c5dcdac8bd3aea75c6335cd00cb63",
+    "version": "20260922.0001"
+  },
+  {
+    "rule_id": "source-kubernetes-privileged",
+    "rule_name": "源码扫描：Kubernetes privileged: true",
+    "hash": "d373e59840cdf1326b0b5e5bb88b32651df8c2cae325c9b8f8d48be886bfa5da",
+    "version": "20260922.0001"
+  },
+  {
+    "rule_id": "source-php-csrf-false",
+    "rule_name": "源码扫描：PHP 关闭 CSRF",
+    "hash": "b738cadaf3ba5b7ea12665c8d82b852b2c097f022c9fd87bd257f77446b2c9c5",
+    "version": "20260922.0001"
+  },
+  {
+    "rule_id": "source-php-error-log",
+    "rule_name": "源码扫描：PHP error_log 写入外部数据",
+    "hash": "b5385eb10afb372aeca44405c1e9f01c3269d795f8a22006e5dc08884d78395f",
+    "version": "20260922.0001"
+  },
+  {
+    "rule_id": "source-php-header-call",
+    "rule_name": "源码扫描：PHP header 写入外部值",
+    "hash": "b8c48c0e0b5a1629b77ba74caad42af750d05a8bf7ddc1f173de774e7871a55f",
+    "version": "20260922.0001"
+  },
+  {
+    "rule_id": "source-php-new-variable-class",
+    "rule_name": "源码扫描：PHP 可变类实例化",
+    "hash": "4feab18d8ecd62602fbf7829fd2bd026e1ec0a93f4c467b668419623b2043f29",
+    "version": "20260922.0001"
+  },
+  {
+    "rule_id": "source-php-samesite-none",
+    "rule_name": "源码扫描：PHP Cookie SameSite=None",
+    "hash": "599b330778d0c2c0b87cff3523fc898c7afd9c24b66c8b8b5f451bd38a9bedbc",
+    "version": "20260922.0001"
+  },
+  {
+    "rule_id": "source-php-xpath-query",
+    "rule_name": "源码扫描：PHP XPath query 拼接",
+    "hash": "477eb8f5354ae781c99cd322aed9066ae41edfbd7f818c3fc5723edddc4139ce",
+    "version": "20260922.0001"
+  },
+  {
+    "rule_id": "source-python-cors-star",
+    "rule_name": "源码扫描：Python CORS 允许任意来源",
+    "hash": "3590c3b63eafe71263fa7579fc00ca1b117d281830fa4caad7315610c0cfdd74",
+    "version": "20260922.0001"
+  },
+  {
+    "rule_id": "source-python-csv-writer",
+    "rule_name": "源码扫描：Python csv.writer 未转义公式",
+    "hash": "95e0e8b903f6a6fb69ed89728839df0ea2b36217100794408d15fbd8f4fda92d",
+    "version": "20260922.0001"
+  },
+  {
+    "rule_id": "source-python-log-concat",
+    "rule_name": "源码扫描：Python 日志拼接外部数据",
+    "hash": "e5189892e32f41c2bb2c6a8f7d9aaa60b8ce99580712d2f0c000392b6ad26614",
+    "version": "20260922.0001"
+  },
+  {
+    "rule_id": "source-python-model-create-request",
+    "rule_name": "源码扫描：Python 模型批量接收请求体",
+    "hash": "0d52b65d9687e6c0d8244883f94b4c56af80058656499579ad98b103a3212cc7",
+    "version": "20260922.0001"
+  },
+  {
+    "rule_id": "source-python-redirect-request",
+    "rule_name": "源码扫描：Python redirect 使用请求数据",
+    "hash": "64e7b133c0ac1a978f2d02548697003ae4b01cf8e74fdfe5e97086ab367ab483",
+    "version": "20260922.0001"
+  },
+  {
+    "rule_id": "source-python-response-header",
+    "rule_name": "源码扫描：Python 响应头写入外部值",
+    "hash": "b8c24894c2949b7c6512dee953e1b35e57a7ddee1a36a9233a3766af928e6eec",
+    "version": "20260922.0001"
+  },
+  {
+    "rule_id": "source-python-set-cookie-httponly-false",
+    "rule_name": "源码扫描：Python Cookie httponly=False",
+    "hash": "bf38af9ade3962580ba2848a2f7fd11fdccf9ab3f3bc09b0c4cc6695db93a91c",
+    "version": "20260922.0001"
+  },
+  {
+    "rule_id": "source-python-set-cookie-samesite-none",
+    "rule_name": "源码扫描：Python Cookie samesite=None",
+    "hash": "b7f99939d2bbe8606dbda61e9bfc80478ac70c5939c2bc151f3254f72d0bbdaf",
+    "version": "20260922.0001"
+  },
+  {
+    "rule_id": "source-python-set-cookie-secure-false",
+    "rule_name": "源码扫描：Python Cookie secure=False",
+    "hash": "307a4d0447c14a371fd237434cc25d7cebaa1315466f13663ddbed5229bdaadd",
+    "version": "20260922.0001"
+  },
+  {
+    "rule_id": "source-python-xpath-query",
+    "rule_name": "源码扫描：Python XPath 拼接",
+    "hash": "eae8ff96bbde44780174a7928a7806d34e4282b13eb42e5b1ef6ccdad773e8b6",
+    "version": "20260922.0001"
+  },
+  {
+    "rule_id": "source-ruby-html-safe",
+    "rule_name": "源码扫描：Ruby html_safe / raw",
+    "hash": "e8bfdfaf929465ab91f74fec66672f8c8cdf734b15823b4b09ce2508e4daecbd",
+    "version": "20260922.0001"
+  },
+  {
+    "rule_id": "source-ruby-skip-csrf",
+    "rule_name": "源码扫描：Ruby 跳过 authenticity token",
+    "hash": "1c2c94c50eee71e64e2ee8dc4e72c5cefcc51e328cd7d84246191ed6b872559d",
+    "version": "20260922.0001"
+  },
+  {
+    "rule_id": "source-scala-play-cookie",
+    "rule_name": "源码扫描：Scala Play Cookie 关闭 secure",
+    "hash": "ea86d7836c9be40c18d1945f0b1461d7877224e22dfc762221dca6b4af500103",
+    "version": "20260922.0001"
+  },
+  {
+    "rule_id": "source-secrets-aws-account-id",
+    "rule_name": "源码扫描：AWS 账号编号",
+    "hash": "e97f8cff40c025d2dc4a7d7ca6a1b7996a014e030d957a2965f10d639c530dd0",
+    "version": "20260922.0001"
+  },
+  {
+    "rule_id": "source-secrets-aws-session-token",
+    "rule_name": "源码扫描：AWS_SESSION_TOKEN",
+    "hash": "96d146eba91e14729bd974eb41dbbedae80735f92d2325df68802a22e036f840",
+    "version": "20260922.0001"
+  },
+  {
+    "rule_id": "source-secrets-etc-shadow",
+    "rule_name": "源码扫描：/etc/shadow 内容",
+    "hash": "3b6ab6986164fe7e2b3c2ce6461331ebdcb8688a32c4c601662e984d6656edc5",
+    "version": "20260922.0001"
+  },
+  {
+    "rule_id": "source-secrets-username-password-uri",
+    "rule_name": "源码扫描：URI 中的用户名和口令",
+    "hash": "c1a8177c8a44e361b62640ec310f532d7ce93e78182a3bcc629e10fc6df97fcc",
+    "version": "20260922.0001"
+  },
+  {
+    "rule_id": "source-solidity-delegatecall",
+    "rule_name": "源码扫描：Solidity delegatecall",
+    "hash": "b2c2d1b04a6eb8302044e4f7b1c977f4e2a0b4753298a7d962822aeeb0f381e7",
+    "version": "20260922.0001"
+  },
+  {
+    "rule_id": "source-solidity-tx-origin",
+    "rule_name": "源码扫描：Solidity tx.origin 鉴权",
+    "hash": "2cf779e73862db7f00f3d7e24b1fe9df4aaa8a73d3db1e4136768a6abe7138a4",
+    "version": "20260922.0001"
+  },
+  {
+    "rule_id": "source-swift-arbitrary-loads",
+    "rule_name": "源码扫描：Swift NSAllowsArbitraryLoads",
+    "hash": "e3e86999357354e687d20e3256915e250b3cc635a32423a97ed1ec4ff40f39de",
+    "version": "20260922.0001"
+  },
+  {
+    "rule_id": "source-terraform-open-cidr",
+    "rule_name": "源码扫描：Terraform 0.0.0.0/0",
+    "hash": "e338f3924256d7f8cbcb58caca978e886f09af6bdc5864e1324f6acbd767e62e",
+    "version": "20260922.0001"
+  },
+  {
+    "rule_id": "source-terraform-public-acl",
+    "rule_name": "源码扫描：Terraform 公开 ACL",
+    "hash": "0c7440a24793ae71cf688f91323ae2e3d6735ed919b7aa5ef8175852939a8241",
+    "version": "20260922.0001"
+  },
+  {
+    "rule_id": "ssa-c-ldap-search",
+    "rule_name": "数据流：C ldap_search 过滤器",
+    "hash": "1c32b2e3e473e436e6fd5d38d76440d3c55ed2cae3aa456b42b40bdf3cd9bb4d",
+    "version": "20260922.0001"
+  },
+  {
+    "rule_id": "ssa-csharp-activator-create",
+    "rule_name": "数据流：C# Activator.CreateInstance 外部类型",
+    "hash": "545eef780a93191271bd3a3029bec84944a2d376046eb46e115d6744e58cbcc0",
+    "version": "20260922.0001"
+  },
+  {
+    "rule_id": "ssa-csharp-load-xml",
+    "rule_name": "数据流：C# LoadXml 接受外部 XML",
+    "hash": "ffdee417c7918cf2badf775125858444c65b8d91bc809b30159e1cfb34aab4bc",
+    "version": "20260922.0001"
+  },
+  {
+    "rule_id": "ssa-csharp-log-concat",
+    "rule_name": "数据流：C# 日志拼接外部数据",
+    "hash": "2c2e69d364e3bc24c1d978dd7f1107f10d694aa7337fda6ccb2f7b67e6b5b2dc",
+    "version": "20260922.0001"
+  },
+  {
+    "rule_id": "ssa-csharp-response-header",
+    "rule_name": "数据流：C# 响应头写入外部值",
+    "hash": "eea9ad9e17d1e287f016df91af15be3cd40a7fc0db29689a31525eccb9247dc0",
+    "version": "20260922.0001"
+  },
+  {
+    "rule_id": "ssa-csharp-try-update-model",
+    "rule_name": "数据流：C# TryUpdateModel 批量绑定",
+    "hash": "0c64f3fe4e09d831dc9b5ec06ece649ffd865df0ca9d8cbc14c01efe18af9239",
+    "version": "20260922.0001"
+  },
+  {
+    "rule_id": "ssa-go-reflect-method-by-name",
+    "rule_name": "数据流：Go MethodByName 使用外部名字",
+    "hash": "540ee73a06656ffedf214b2072b45905c9225c63745629d97e003039cc1882ba",
+    "version": "20260922.0001"
+  },
+  {
+    "rule_id": "ssa-java-cell-formula",
+    "rule_name": "数据流：Java 单元格公式注入",
+    "hash": "94c7837ddd25a529a0e39e38833a9da4e1f034dd137cd3cd45b4d54cf1dc7416",
+    "version": "20260922.0001"
+  },
+  {
+    "rule_id": "ssa-java-mongodb-nosql",
+    "rule_name": "数据流：Java MongoDB 查询拼接",
+    "hash": "6e6615f191821d075c60e8e509850617f8ff9df5d89cf0d93fcb79ebb15f5fe7",
+    "version": "20260922.0001"
+  },
+  {
+    "rule_id": "ssa-java-pattern-from-request",
+    "rule_name": "数据流：Java 用请求编译正则",
+    "hash": "8244a91ed7c89f40a7fbc12c20b01f5dd254cc3d55529bf12674c70d84f3ef01",
+    "version": "20260922.0001"
+  },
+  {
+    "rule_id": "ssa-java-session-set-request",
+    "rule_name": "数据流：Java 会话写入请求参数",
+    "hash": "b5a95a4b5a6b3a54cb8863cae52f42e7dad972b43a59e425b29248133b8ddf8c",
+    "version": "20260922.0001"
+  },
+  {
+    "rule_id": "ssa-java-socket-host",
+    "rule_name": "数据流：Java Socket 主机来自外部",
+    "hash": "8e1309915bc029798842e18c769a550b917f79706aba206fbda97de3cd6a8806",
+    "version": "20260922.0001"
+  },
+  {
+    "rule_id": "ssa-java-system-set-property",
+    "rule_name": "数据流：Java System.setProperty 接受外部值",
+    "hash": "3b18cda2925058fd205a8befb6476db5d60f67acd2068fbebefa2fbc38967030",
+    "version": "20260922.0001"
+  },
+  {
+    "rule_id": "ssa-js-console-log-req",
+    "rule_name": "数据流：JavaScript 日志写入请求数据",
+    "hash": "a0f9c996bb8915326012c4e246052ebc54c223456731f1a30fd67251220a30c7",
+    "version": "20260922.0001"
+  },
+  {
+    "rule_id": "ssa-js-regexp-from-input",
+    "rule_name": "数据流：JavaScript 用外部字符串构造 RegExp",
+    "hash": "5557b89bb1959a526b41fe9a24e13cd06d87c8030f2378d3b68c579c4281291e",
+    "version": "20260922.0001"
+  },
+  {
+    "rule_id": "ssa-js-set-header",
+    "rule_name": "数据流：JavaScript setHeader 写入外部值",
+    "hash": "aad5dcc094f5af4f56b1a345f6c981e84e43457b84aefa8fa9c88b9cf2b4f720",
+    "version": "20260922.0001"
+  },
+  {
+    "rule_id": "ssa-php-error-log",
+    "rule_name": "数据流：PHP error_log 写入外部数据",
+    "hash": "950420d5a69e64410106097fe54b256a3687c6ced3bc6f3cca12458dfa33830d",
+    "version": "20260922.0001"
+  },
+  {
+    "rule_id": "ssa-php-header-call",
+    "rule_name": "数据流：PHP header 写入外部值",
+    "hash": "334b885fcdc1af31e3d6b4cf979d5da5d905e91ddf25eebbc1109be31c40b5d5",
+    "version": "20260922.0001"
+  },
+  {
+    "rule_id": "ssa-php-mysql-query",
+    "rule_name": "数据流：PHP mysql_query 接受外部 SQL",
+    "hash": "0280dcbcf3b6028b2e56e8877e97f8eca800ad9119e2d7a13cfea1bb63e17c4b",
+    "version": "20260922.0001"
+  },
+  {
+    "rule_id": "ssa-php-new-variable-class",
+    "rule_name": "数据流：PHP 可变类实例化",
+    "hash": "644ab562b563609a2a5d2e1355112a2a833070727220788234473a15581a3af2",
+    "version": "20260922.0001"
+  },
+  {
+    "rule_id": "ssa-php-xpath-query",
+    "rule_name": "数据流：PHP XPath query 拼接",
+    "hash": "0c44903b2e2c7beec80f0dfdbc1a63f7cce713459c8c4dcca7507432eff114a8",
+    "version": "20260922.0001"
+  },
+  {
+    "rule_id": "ssa-python-log-concat",
+    "rule_name": "数据流：Python 日志拼接外部数据",
+    "hash": "6d9dbe5f2bd56ebf50d8f82992a077839e0deb801a78b44322bd21b0adb40f52",
+    "version": "20260922.0001"
+  },
+  {
+    "rule_id": "ssa-python-redirect-request",
+    "rule_name": "数据流：Python redirect 使用请求数据",
+    "hash": "b6ef0f63ece3823a714523d7c0e7b52c2f28c8876d07b229535f07fac7a0d6fc",
+    "version": "20260922.0001"
+  },
+  {
+    "rule_id": "ssa-python-response-header",
+    "rule_name": "数据流：Python 响应头写入外部值",
+    "hash": "fadf2afb1b5c6740cf0518f07449224be6945807ec03e52ef60b68ba53ad8ba1",
+    "version": "20260922.0001"
+  },
+  {
+    "rule_id": "ssa-python-xpath-query",
+    "rule_name": "数据流：Python XPath 拼接",
+    "hash": "b7884822bc6c311c175a2e1cb83755ee0e5defefc93b21f5e21efec92842a39d",
+    "version": "20260922.0001"
+  },
+  {
+    "rule_id": "struct-c-des-set-key",
+    "rule_name": "结构扫描：C DES_set_key",
+    "hash": "f76a099fe2144ab2a67a39489fb2b6c8b2e00e7695fdcc21e852cc7befe7af9e",
+    "version": "20260922.0001"
+  },
+  {
+    "rule_id": "struct-c-md5-init",
+    "rule_name": "结构扫描：C MD5_Init",
+    "hash": "793a0a2e516e636e21d1490a19ead251d3f0fc29409298eb0cf1fd9ea9c39029",
+    "version": "20260922.0001"
+  },
+  {
+    "rule_id": "struct-c-rand-call",
+    "rule_name": "结构扫描：C rand 弱随机数",
+    "hash": "3a5b1579e18626bcf07c9ae8557653cc7e0cbed619da99734a7a8ac5935b84e4",
+    "version": "20260922.0001"
+  },
+  {
+    "rule_id": "struct-csharp-allow-any-origin",
+    "rule_name": "结构扫描：C# CORS 允许任意来源",
+    "hash": "f2418cf4a58bec26e6e5c8f2655e747162c2eb862de2d7813c7cf9fd096ed3f4",
+    "version": "20260922.0001"
+  },
+  {
+    "rule_id": "struct-go-grpc-with-insecure",
+    "rule_name": "结构扫描：Go grpc.WithInsecure",
+    "hash": "1237cdd62a2f90a010360629cc62d77b49305a3bf04b834ed857552d3d89db99",
+    "version": "20260922.0001"
+  },
+  {
+    "rule_id": "struct-go-jwt-parse-unverified",
+    "rule_name": "结构扫描：Go JWT ParseUnverified",
+    "hash": "ef46a0e9da71eb70bd3a89c17d7f4c1055006b098ffdf9c3b0d51905f405403a",
+    "version": "20260922.0001"
+  },
+  {
+    "rule_id": "struct-java-gcm-parameter-spec",
+    "rule_name": "结构扫描：Java 固定 GCM nonce",
+    "hash": "ee357abaeb72fac33e8d90d835e02f724109b42a3e6b3bf2ed619d3c106d4fc8",
+    "version": "20260922.0001"
+  },
+  {
+    "rule_id": "struct-java-requested-session-id",
+    "rule_name": "结构扫描：Java 使用客户端会话 ID",
+    "hash": "d28205af0b9ca545bca3b919ae3db75048ff793c41eaa4557ac06c75c518ddc9",
+    "version": "20260922.0001"
+  },
+  {
+    "rule_id": "struct-python-model-create-request",
+    "rule_name": "结构扫描：Python 模型批量接收请求体",
+    "hash": "001822d0d7ebb2cd9a6802cac3508e9cd12d247dbe444f618df2a30ca541905d",
+    "version": "20260922.0001"
   }
 ]
