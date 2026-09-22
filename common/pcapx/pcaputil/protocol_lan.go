@@ -137,7 +137,7 @@ func (a *binParser) dhcpObservation(e *ProtocolEvent) {
 	for k, v := range s.pending {
 		if s.clock.Sub(v.ts) > 30*time.Second {
 			delete(s.pending, k)
-			a.buffered.Add(-int64(len(k) + 128))
+			a.buffered.Add(-v.cost)
 		}
 	}
 	if e.ID == 0 {
@@ -147,7 +147,7 @@ func (a *binParser) dhcpObservation(e *ProtocolEvent) {
 		if p, ok := s.pending[key]; ok {
 			e.TransactionID = p.id
 		} else if len(s.pending) < a.budget.MaxCollectionElements && a.reserveEvidence(int64(len(key)+128)) {
-			s.pending[key] = dnsPending{e.ID, e.Timestamp}
+			s.pending[key] = dnsPending{id: e.ID, ts: e.Timestamp, cost: int64(len(key) + 128)}
 			e.TransactionID = e.ID
 		}
 	} else if typ == 2 || typ == 5 || typ == 6 {
@@ -209,7 +209,7 @@ func (a *binParser) dhcp6Observation(e *ProtocolEvent) {
 	for k, v := range s.pending {
 		if s.clock.Sub(v.ts) > 30*time.Second {
 			delete(s.pending, k)
-			a.buffered.Add(-int64(len(k) + 128))
+			a.buffered.Add(-v.cost)
 		}
 	}
 	if e.ID == 0 {
@@ -227,7 +227,7 @@ func (a *binParser) dhcp6Observation(e *ProtocolEvent) {
 		if p, ok := s.pending[key]; ok {
 			e.TransactionID = p.id
 		} else if len(s.pending) < a.budget.MaxCollectionElements && a.reserveEvidence(int64(len(key)+128)) {
-			s.pending[key] = dnsPending{e.ID, e.Timestamp}
+			s.pending[key] = dnsPending{id: e.ID, ts: e.Timestamp, cost: int64(len(key) + 128)}
 			e.TransactionID = e.ID
 		}
 	}

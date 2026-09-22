@@ -207,8 +207,8 @@ func (a *binParser) finishProtocolDatagram(e *ProtocolEvent, w []byte, spec *bin
 }
 func (a *binParser) closeUDPSessions() {
 	a.dnsMu.Lock()
-	for k := range a.dns.pending {
-		a.buffered.Add(-int64(len(k) + 128))
+	for _, p := range a.dns.pending {
+		a.buffered.Add(-p.cost)
 	}
 	a.dns.pending = nil
 	a.dnsMu.Unlock()

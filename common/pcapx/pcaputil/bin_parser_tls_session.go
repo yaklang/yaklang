@@ -73,25 +73,30 @@ func WithTLSSecrets(provider TLSSecretProvider) CaptureOption {
 }
 
 type binTLS struct {
-	client               int
-	random, serverRandom []byte
-	version, suite       uint16
-	sni, alpn            string
-	handshake            [2][]byte
-	seq                  [2]uint64
-	app                  [2]bool
-	ccs                  [2]bool
-	keys                 [2]cipher.AEAD
-	iv                   [2][]byte
-	secret               [2][]byte
-	child                *binFlow
-	plaintext            []byte
-	content              byte
+	client                                 int
+	random, serverRandom                   []byte
+	version, suite                         uint16
+	sni, alpn                              string
+	handshake                              [2][]byte
+	seq                                    [2]uint64
+	app                                    [2]bool
+	ccs                                    [2]bool
+	keys                                   [2]cipher.AEAD
+	iv                                     [2][]byte
+	secret                                 [2][]byte
+	child                                  *binFlow
+	plaintext                              []byte
+	content                                byte
+	firstHello, retryCookie                []byte
+	retrySeen, retryClientSeen, finalHello bool
+	retrySuite, retryGroup                 uint16
 }
 
-func newBinTLS() *binTLS         { return &binTLS{client: -1} }
-func (t *binTLS) storage() int64 { return 2048 + int64(cap(t.handshake[0])+cap(t.handshake[1])) }
-func tlsU24(b []byte) int        { return int(b[0])<<16 | int(b[1])<<8 | int(b[2]) }
+func newBinTLS() *binTLS { return &binTLS{client: -1} }
+func (t *binTLS) storage() int64 {
+	return 2048 + int64(cap(t.handshake[0])+cap(t.handshake[1])+cap(t.firstHello)+cap(t.retryCookie))
+}
+func tlsU24(b []byte) int { return int(b[0])<<16 | int(b[1])<<8 | int(b[2]) }
 func (f *binFlow) consumeTLS(dir int, e *ProtocolEvent) (map[string]any, error) {
 	t := f.tls
 	if t == nil {
@@ -102,7 +107,7 @@ func (f *binFlow) consumeTLS(dir int, e *ProtocolEvent) (map[string]any, error) 
 	typ, plain := w[0], w[5:]
 	info := map[string]any{"Record Type": typ, "Record Version": binary.BigEndian.Uint16(w[1:3]), "Record Length": len(plain), "Authentication Verified": false, "Certificate Trust": "not-evaluated"}
 	e.Session = info
-	if t.version == 0x304 && typ == 22 && t.suite != 0 {
+	if t.version == 0x304 && typ == 22 && t.finalHello {
 		return nil, protocolError(ErrMalformedMessage, "TLS 1.3 cleartext handshake after ServerHello")
 	}
 	encrypted := typ == 23 || t.ccs[dir] && t.version != 0x304
@@ -119,7 +124,7 @@ func (f *binFlow) consumeTLS(dir int, e *ProtocolEvent) (map[string]any, error) 
 
 	if encrypted {
 		info["Content Visibility"] = "encrypted"
-		if t.client < 0 || len(t.random) != 32 || t.version == 0 {
+		if t.client < 0 || len(t.random) != 32 || t.version == 0 || t.retrySeen && !t.finalHello {
 			info["Secret Lookup Status"] = "missing-context"
 			return map[string]any{"fields": info}, nil
 		}
@@ -178,6 +183,12 @@ func (f *binFlow) consumeTLS(dir int, e *ProtocolEvent) (map[string]any, error) 
 			if len(messages) >= f.a.budget.MaxCollectionElements {
 				return nil, protocolError(ErrResourceExceeded, "TLS handshake count limit")
 			}
+			// Hello snapshots and retry cookies survive this record. Reserve before copying.
+			if b[0] == 1 || b[0] == 2 {
+				if err := f.reserveSession(t.storage() + int64(n)); err != nil {
+					return nil, err
+				}
+			}
 			m, err := t.handshakeMessage(dir, b[:n], encrypted)
 			if err != nil {
 				return nil, err
@@ -208,8 +219,21 @@ func (f *binFlow) consumeTLS(dir int, e *ProtocolEvent) (map[string]any, error) 
 func (t *binTLS) handshakeMessage(dir int, b []byte, authenticated bool) (map[string]any, error) {
 	typ, body := b[0], b[4:]
 	m := map[string]any{"Type": typ, "Length": len(body), "Authenticated": authenticated}
+	if !authenticated && t.version == 0x304 && (t.finalHello || t.retrySeen && typ != 1 && typ != 2) {
+		return nil, protocolError(ErrMalformedMessage, "TLS 1.3 unexpected cleartext handshake")
+	}
 	switch typ {
 	case 1, 2:
+		retry, err := t.observeHello(dir, typ, body)
+		if err != nil {
+			return nil, err
+		}
+		if retry {
+			m["Hello Retry Request"] = true
+		}
+		if typ == 1 && t.retryClientSeen {
+			m["Retry ClientHello"] = true
+		}
 		if len(body) < 35 {
 			return nil, protocolError(ErrMalformedMessage, "truncated TLS hello")
 		}
