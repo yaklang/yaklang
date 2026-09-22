@@ -10,22 +10,28 @@ desc(
 	cwe: "CWE-377"
 	desc: <<<DESC
 ### 规则说明
-os.CreateTemp 或 ioutil.TempFile 的目录为空字符串时，文件落在共享临时目录，名字也可预测。
+`os.CreateTemp` 和 `ioutil.TempFile` 的目录参数是空字符串时，文件会创建在进程的默认临时目录。这个目录通常对所有本地用户可写。pattern 如果还可以预测，其他用户可以抢先放上同名符号链接。
 
 ### 风险类型
 security-misconfiguration
 
 ### 影响
-命中说明代码里出现了该危险 API、配置或数据流入口。
+本地用户可以劫持临时文件，读到程序写入的数据，或者让程序覆盖它不该写的路径。
 
 ### 检测方式
-源码模式正则匹配，定位源码中的危险调用或配置。
+这条规则使用 source 模式，用正则扫描源文件文本，不构建语法树或 SSA。命中只说明出现了对应写法，不能单独证明数据来自外部输入。注释、字符串和文档中的相同文本也会命中。
+正则只匹配目录参数是空字符串的 `os.CreateTemp` 和 `ioutil.TempFile`。传入了具体目录的调用不会命中。
+
 ### 参考
-- CWE-377
+- [CWE-377：不安全的临时文件](https://cwe.mitre.org/data/definitions/377.html)
+
 DESC
 	solution: <<<SOLUTION
 ### 修复建议
-传入应用私有目录，并使用足够随机的模式。
+- 第一个参数传应用私有目录，权限限制为当前用户。
+- pattern 里保留星号，让库生成随机文件名。
+- 用完关闭并删除，不要把临时路径返回给不可信用户。
+
 SOLUTION
 	alert_min: 1
 	"file://bad.go": <<<POS

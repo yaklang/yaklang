@@ -10,22 +10,28 @@ desc(
 	cwe: "CWE-1275"
 	desc: <<<DESC
 ### 规则说明
-SameSiteMode.None 允许浏览器在跨站请求里带上 Cookie。没有 Secure 时还会被浏览器拒绝或被滥用。
+`SameSiteMode.None` 让浏览器在跨站请求里继续带上这枚 Cookie。会话 Cookie 因此可以被其他网站发起的请求附带，跨站请求伪造更容易成功。当前浏览器还要求这种 Cookie 同时带 Secure，否则会丢弃它。
 
 ### 风险类型
 cookie-security
 
 ### 影响
-命中说明代码里出现了该危险 API、配置或数据流入口。
+已登录用户访问攻击者页面时，浏览器可能把会话 Cookie 发回本站，从而完成改口令、转账等状态变更。缺少 Secure 时，明文通道上也可能看到这枚 Cookie。
 
 ### 检测方式
-源码模式正则匹配，定位源码中的危险调用或配置。
+这条规则使用 source 模式，用正则扫描源文件文本，不构建语法树或 SSA。命中只说明出现了对应写法，不能单独证明数据来自外部输入。注释、字符串和文档中的相同文本也会命中。
+正则匹配 `SameSiteMode.None` 这个枚举值。这是配置字面量，没有 struct 或 ssa 版本。注释里的同名文本也会命中。
+
 ### 参考
-- CWE-1275
+- [CWE-1275：敏感 Cookie 的 SameSite 属性不当](https://cwe.mitre.org/data/definitions/1275.html)
+
 DESC
 	solution: <<<SOLUTION
 ### 修复建议
-会话 Cookie 使用 SameSite=Lax 或 Strict，并同时设置 Secure。
+- 会话 Cookie 使用 `SameSiteMode.Lax` 或 `SameSiteMode.Strict`。
+- 只有确实要被跨站页面携带、并且请求带凭证时才用 None，同时必须 `Secure = true`。
+- SameSite 只是补充。状态变更请求仍要校验 CSRF 令牌。
+
 SOLUTION
 	alert_min: 1
 	"file://bad.cs": <<<POS
