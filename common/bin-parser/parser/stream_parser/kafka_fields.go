@@ -145,7 +145,6 @@ func (r *kafkaReader) request(info map[string]any) {
 		r.err = fmt.Errorf("%w: API/version %d/%d", ErrKafkaUnsupported, api, ver)
 		return
 	}
-	info["Header Version"] = int16(1)
 	if KafkaFlexibleVersion(api, ver) {
 		info["Flexible"], info["Header Version"] = true, int16(2)
 		header := map[string]any{}
