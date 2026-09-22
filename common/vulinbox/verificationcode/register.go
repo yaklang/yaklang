@@ -6,13 +6,12 @@ import (
 	"net/http"
 	"os"
 	"strconv"
-	"strings"
 	"time"
 
 	"github.com/davecgh/go-spew/spew"
 	"github.com/gorilla/mux"
 	"github.com/segmentio/ksuid"
-	"github.com/steambap/captcha"
+	captcha "github.com/yaklang/fastgocaptcha"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/mutate"
 	"github.com/yaklang/yaklang/common/utils"
@@ -97,7 +96,7 @@ func Register(t *mux.Router) (*mux.Router, []string) {
 			log.Infof("data.Text: " + data.Text)
 			// var newData, _ = captcha.New(150, 50)
 			// val.(map[string]any)["code"] = newData
-			if strings.ToLower(data.Text) != strings.ToLower(code) {
+			if !data.Verify(code, true) {
 				writer.WriteHeader(500)
 				writer.Write([]byte(`verification code not match`))
 				return
@@ -193,7 +192,7 @@ func Register(t *mux.Router) (*mux.Router, []string) {
 			log.Infof("data.Text: " + data.Text)
 			// var newData, _ = captcha.New(150, 50)
 			// val.(map[string]any)["code"] = newData
-			if strings.ToLower(data.Text) != strings.ToLower(code) {
+			if !data.Verify(code, true) {
 				writer.WriteHeader(500)
 				writer.Write([]byte(`verification code not match`))
 				return
@@ -292,7 +291,7 @@ func Register(t *mux.Router) (*mux.Router, []string) {
 			}
 			log.Infof("safe captcha data.Text: " + data.Text)
 			delete(val, "code")
-			if strings.ToLower(data.Text) != strings.ToLower(code) {
+			if !data.Verify(code, true) {
 				writer.WriteHeader(500)
 				writer.Write([]byte(`verification code not match`))
 				return
