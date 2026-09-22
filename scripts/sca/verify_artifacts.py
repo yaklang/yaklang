@@ -77,8 +77,8 @@ def main():
     if len(contracts) != 20 or len({x["analyzer"] for x in contracts}) != 20:
         errors.append("the frozen set must contain 20 distinct analyzers")
     additional = json.loads((SCA / "function-contracts.json").read_text(encoding="utf-8")).get("additional_contracts", [])
-    if {x["analyzer"] for x in additional} != {"nuget-lang", "swift-lang"} or len(additional) != 2:
-        errors.append("expected two explicitly added lock analyzers")
+    if {x["analyzer"] for x in additional} != {"nuget-lang", "swift-lang", "python-uv-lang", "bun-lang"} or len(additional) != 4:
+        errors.append("expected four explicitly added lock analyzers")
     for row in additional:
         if row["analyzer"] in {x["analyzer"] for x in contracts}:
             errors.append("additional analyzer replaces a frozen contract")

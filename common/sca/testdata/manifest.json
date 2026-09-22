@@ -12057,6 +12057,228 @@
       "archive": "testdata/swift_resolved_v1_v2_v3_corpus_v1.zip",
       "member": "modern/swift_resolved/upstream-v3.json",
       "mode": 420
+    },
+    {
+      "path": "testdata/modern/uv_lock/LICENSE-APACHE",
+      "sha256": "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4",
+      "bytes": 11357,
+      "source": {
+        "repo": "astral-sh/uv",
+        "revision": "635500036e1705961315e86447f0fab0a8ddb309",
+        "tag": "0.12.17",
+        "path": "LICENSE-APACHE",
+        "url": "https://raw.githubusercontent.com/astral-sh/uv/635500036e1705961315e86447f0fab0a8ddb309/LICENSE-APACHE",
+        "method": "unaltered upstream license"
+      },
+      "expectation": "TestUVBunCorpora and TestUVBunSemantics; accompanying licenses and independent oracles",
+      "archive": "testdata/uv_lock_v1_rev0_3_corpus_v1.zip",
+      "member": "modern/uv_lock/LICENSE-APACHE",
+      "mode": 420
+    },
+    {
+      "path": "testdata/modern/uv_lock/LICENSE-MIT",
+      "sha256": "860e3d7a86b84e6a7012c7a635fc64df475cebc6cce34dfeb73a5982ec58176c",
+      "bytes": 1077,
+      "source": {
+        "repo": "astral-sh/uv",
+        "revision": "635500036e1705961315e86447f0fab0a8ddb309",
+        "tag": "0.12.17",
+        "path": "LICENSE-MIT",
+        "url": "https://raw.githubusercontent.com/astral-sh/uv/635500036e1705961315e86447f0fab0a8ddb309/LICENSE-MIT",
+        "method": "unaltered upstream license"
+      },
+      "expectation": "TestUVBunCorpora and TestUVBunSemantics; accompanying licenses and independent oracles",
+      "archive": "testdata/uv_lock_v1_rev0_3_corpus_v1.zip",
+      "member": "modern/uv_lock/LICENSE-MIT",
+      "mode": 420
+    },
+    {
+      "path": "testdata/modern/uv_lock/branches.lock",
+      "sha256": "af73f35ff7a72af9727bb8bfd1f0320da183429f954cc0f571c1c47c6a52c04e",
+      "bytes": 1915,
+      "source": {
+        "producer": "yaklang SCA maintainers",
+        "method": "hand-authored static SBOM semantic and rejection case"
+      },
+      "expectation": "TestUVBunCorpora and TestUVBunSemantics; accompanying licenses and independent oracles",
+      "archive": "testdata/uv_lock_v1_rev0_3_corpus_v1.zip",
+      "member": "modern/uv_lock/branches.lock",
+      "mode": 420
+    },
+    {
+      "path": "testdata/modern/uv_lock/upstream-oracle.json",
+      "sha256": "08ad7deee8e960562a454df929b2235f3cf83f913f005945e026789971e3d834",
+      "bytes": 426979,
+      "source": {
+        "producer": "Python standard-library tomllib/json",
+        "method": "independent projection of complete upstream inventory and declared edges, not Go parser output; known JSONC fixture trailing commas stripped for Python json"
+      },
+      "expectation": "TestUVBunCorpora and TestUVBunSemantics; accompanying licenses and independent oracles",
+      "archive": "testdata/uv_lock_v1_rev0_3_corpus_v1.zip",
+      "member": "modern/uv_lock/upstream-oracle.json",
+      "mode": 420
+    },
+    {
+      "path": "testdata/modern/uv_lock/upstream-rev0.lock",
+      "sha256": "91e26b12fcff7268e8688b6e759014bbc09b8731d3dd39e4fb8e199566a34786",
+      "bytes": 5481,
+      "source": {
+        "repo": "astral-sh/uv",
+        "revision": "8414e9f3dd1cf9d4d53063d2b539f4b5c2430f9c",
+        "tag": "0.6.17",
+        "path": "scripts/packages/built-by-uv/uv.lock",
+        "url": "https://raw.githubusercontent.com/astral-sh/uv/8414e9f3dd1cf9d4d53063d2b539f4b5c2430f9c/scripts/packages/built-by-uv/uv.lock",
+        "method": "unaltered upstream fixture"
+      },
+      "expectation": "TestUVBunCorpora and TestUVBunSemantics; accompanying licenses and independent oracles",
+      "archive": "testdata/uv_lock_v1_rev0_3_corpus_v1.zip",
+      "member": "modern/uv_lock/upstream-rev0.lock",
+      "mode": 420
+    },
+    {
+      "path": "testdata/modern/uv_lock/upstream-rev3.lock",
+      "sha256": "59be60d10c6f8d3b5cd97b972967fbab9d87c23bd87a24a07a60fb90bd7745b5",
+      "bytes": 347479,
+      "source": {
+        "repo": "astral-sh/uv",
+        "revision": "635500036e1705961315e86447f0fab0a8ddb309",
+        "tag": "0.12.17",
+        "path": "uv.lock",
+        "url": "https://raw.githubusercontent.com/astral-sh/uv/635500036e1705961315e86447f0fab0a8ddb309/uv.lock",
+        "method": "unaltered upstream fixture"
+      },
+      "expectation": "TestUVBunCorpora and TestUVBunSemantics; accompanying licenses and independent oracles",
+      "archive": "testdata/uv_lock_v1_rev0_3_corpus_v1.zip",
+      "member": "modern/uv_lock/upstream-rev3.lock",
+      "mode": 420
+    },
+    {
+      "path": "testdata/modern/bun_lock/LICENSE.md",
+      "sha256": "b9caf52728691b4057e371232c221a132883198be2f3d2ddf92c90404c984b1a",
+      "bytes": 5613,
+      "source": {
+        "repo": "oven-sh/bun",
+        "revision": "744846f844374847c902b5e7fd59b4342a51ef99",
+        "tag": "bun-v1.4.2",
+        "path": "LICENSE.md",
+        "url": "https://raw.githubusercontent.com/oven-sh/bun/744846f844374847c902b5e7fd59b4342a51ef99/LICENSE.md",
+        "method": "unaltered upstream license"
+      },
+      "expectation": "TestUVBunCorpora and TestUVBunSemantics; accompanying licenses and independent oracles",
+      "archive": "testdata/bun_lock_v0_v3_corpus_v1.zip",
+      "member": "modern/bun_lock/LICENSE.md",
+      "mode": 420
+    },
+    {
+      "path": "testdata/modern/bun_lock/contexts-v2.lock",
+      "sha256": "81940bdc21a8f3995b6f6dd0d778bac5a991535c24a4e24a865cf7a56b549108",
+      "bytes": 2389,
+      "source": {
+        "repo": "oven-sh/bun",
+        "revision": "744846f844374847c902b5e7fd59b4342a51ef99",
+        "tag": "bun-v1.4.2",
+        "path": "test/cli/install/lockfile-version-2.test.ts",
+        "url": "https://raw.githubusercontent.com/oven-sh/bun/744846f844374847c902b5e7fd59b4342a51ef99/test/cli/install/lockfile-version-2.test.ts",
+        "method": "hand-authored resolution graph following upstream v2 npm/workspace/git tuple forms; no network or install"
+      },
+      "expectation": "TestUVBunCorpora and TestUVBunSemantics; accompanying licenses and independent oracles",
+      "archive": "testdata/bun_lock_v0_v3_corpus_v1.zip",
+      "member": "modern/bun_lock/contexts-v2.lock",
+      "mode": 420
+    },
+    {
+      "path": "testdata/modern/bun_lock/scoped-overrides-v3.lock",
+      "sha256": "2fc4db21f7dd5084175d705e1b09aa71bea74320064331319d11a51d90c1dcbb",
+      "bytes": 2588,
+      "source": {
+        "repo": "oven-sh/bun",
+        "revision": "744846f844374847c902b5e7fd59b4342a51ef99",
+        "tag": "bun-v1.4.2",
+        "path": "test/cli/install/nested-overrides.test.ts",
+        "url": "https://raw.githubusercontent.com/oven-sh/bun/744846f844374847c902b5e7fd59b4342a51ef99/test/cli/install/nested-overrides.test.ts",
+        "method": "hand-authored v3 scoped override and patch declarations using official nested override layout; installed paths remain authoritative; patch file not opened"
+      },
+      "expectation": "TestUVBunCorpora and TestUVBunSemantics; accompanying licenses and independent oracles",
+      "archive": "testdata/bun_lock_v0_v3_corpus_v1.zip",
+      "member": "modern/bun_lock/scoped-overrides-v3.lock",
+      "mode": 420
+    },
+    {
+      "path": "testdata/modern/bun_lock/upstream-oracle.json",
+      "sha256": "0617612e2670cf786a241585195f0d39d0cdcbe176d21587eeb95d696cd4f0b9",
+      "bytes": 39758,
+      "source": {
+        "producer": "Python standard-library tomllib/json",
+        "method": "independent projection of complete upstream inventory and declared edges, not Go parser output; known JSONC fixture trailing commas stripped for Python json"
+      },
+      "expectation": "TestUVBunCorpora and TestUVBunSemantics; accompanying licenses and independent oracles",
+      "archive": "testdata/bun_lock_v0_v3_corpus_v1.zip",
+      "member": "modern/bun_lock/upstream-oracle.json",
+      "mode": 420
+    },
+    {
+      "path": "testdata/modern/bun_lock/upstream-v1-current.lock",
+      "sha256": "cbf7580281d42a634da110c60541cccdc91f3ef563f37c15684a6f15ade0ed38",
+      "bytes": 14782,
+      "source": {
+        "repo": "oven-sh/bun",
+        "revision": "744846f844374847c902b5e7fd59b4342a51ef99",
+        "tag": "bun-v1.4.2",
+        "path": "bun.lock",
+        "url": "https://raw.githubusercontent.com/oven-sh/bun/744846f844374847c902b5e7fd59b4342a51ef99/bun.lock",
+        "method": "unaltered upstream fixture"
+      },
+      "expectation": "TestUVBunCorpora and TestUVBunSemantics; accompanying licenses and independent oracles",
+      "archive": "testdata/bun_lock_v0_v3_corpus_v1.zip",
+      "member": "modern/bun_lock/upstream-v1-current.lock",
+      "mode": 420
+    },
+    {
+      "path": "testdata/modern/bun_lock/upstream-v1-old.lock",
+      "sha256": "aa467093c123e121290ef94dc46dc43a4d36740887727f7bbe3e6b9d24b9ca32",
+      "bytes": 7793,
+      "source": {
+        "repo": "oven-sh/bun",
+        "revision": "013fdddc6ed18bc849614ccb37a296fa0f69a5db",
+        "tag": "bun-v1.2.5",
+        "path": "bench/sqlite/bun.lock",
+        "url": "https://raw.githubusercontent.com/oven-sh/bun/013fdddc6ed18bc849614ccb37a296fa0f69a5db/bench/sqlite/bun.lock",
+        "method": "unaltered upstream fixture"
+      },
+      "expectation": "TestUVBunCorpora and TestUVBunSemantics; accompanying licenses and independent oracles",
+      "archive": "testdata/bun_lock_v0_v3_corpus_v1.zip",
+      "member": "modern/bun_lock/upstream-v1-old.lock",
+      "mode": 420
+    },
+    {
+      "path": "testdata/modern/bun_lock/upstream-v1-yaml.lock",
+      "sha256": "0f84df29799e202fb49a489a57dbcb362ed9000e8cd9ce19b6f6ad239c33d1b6",
+      "bytes": 973,
+      "source": {
+        "repo": "oven-sh/bun",
+        "revision": "744846f844374847c902b5e7fd59b4342a51ef99",
+        "tag": "bun-v1.4.2",
+        "path": "packages/bun-plugin-yaml/bun.lock",
+        "url": "https://raw.githubusercontent.com/oven-sh/bun/744846f844374847c902b5e7fd59b4342a51ef99/packages/bun-plugin-yaml/bun.lock",
+        "method": "unaltered upstream fixture"
+      },
+      "expectation": "TestUVBunCorpora and TestUVBunSemantics; accompanying licenses and independent oracles",
+      "archive": "testdata/bun_lock_v0_v3_corpus_v1.zip",
+      "member": "modern/bun_lock/upstream-v1-yaml.lock",
+      "mode": 420
+    },
+    {
+      "path": "testdata/modern/bun_lock/workspace-v0.lock",
+      "sha256": "dc721f743a319592f6e02874249a4b44a274ce59739da0d4aa26a94b5dbcc3a0",
+      "bytes": 303,
+      "source": {
+        "producer": "yaklang SCA maintainers",
+        "method": "hand-authored static SBOM semantic and rejection case"
+      },
+      "expectation": "TestUVBunCorpora and TestUVBunSemantics; accompanying licenses and independent oracles",
+      "archive": "testdata/bun_lock_v0_v3_corpus_v1.zip",
+      "member": "modern/bun_lock/workspace-v0.lock",
+      "mode": 420
     }
   ],
   "storage": "ZIP corpus archives; logical paths and per-entry hashes are unchanged",
@@ -12290,6 +12512,16 @@
       "path": "testdata/swift_resolved_v1_v2_v3_corpus_v1.zip",
       "sha256": "cee7fabdd69a79420950b951a505d2756b014a8b3234b78fd42626984ffc44bf",
       "bytes": 6822
+    },
+    {
+      "path": "testdata/uv_lock_v1_rev0_3_corpus_v1.zip",
+      "sha256": "292601a030b64173ce7f0af278a5af35118591f17606ca11d93607c8d0eff5f3",
+      "bytes": 221985
+    },
+    {
+      "path": "testdata/bun_lock_v0_v3_corpus_v1.zip",
+      "sha256": "b0fe45841349a2b4f5a27338435b5a50db486994600ad59667cc697c4f3871c8",
+      "bytes": 24923
     }
   ]
 }

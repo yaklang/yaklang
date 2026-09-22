@@ -656,7 +656,7 @@ func ecosystem(name string) string {
 		return "pypi"
 	case strings.HasPrefix(name, "ruby-"):
 		return "gem"
-	case name == "npm-lang" || name == "npmp-lang" || name == "yarm-lang":
+	case name == "npm-lang" || name == "npmp-lang" || name == "yarm-lang" || name == "bun-lang":
 		return "npm"
 	}
 	return strings.TrimSuffix(strings.TrimSuffix(name, "-lang"), "-pkg")

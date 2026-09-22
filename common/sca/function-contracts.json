@@ -501,6 +501,48 @@
       "additional_fixture_archives": [
         "testdata/swift_resolved_v1_v2_v3_corpus_v1.zip"
       ]
+    },
+    {
+      "id": "SCA-23",
+      "name": "uv lock",
+      "analyzer": "python-uv-lang",
+      "status": "ADD",
+      "grammar": "uv.lock v1 revisions 0-3; source-qualified package identities, raw Python/fork markers, extras and groups, declared artifact URL/hash sets; no host resolution",
+      "implementation": "analyzer/dep-parser/modernlock/uv.go",
+      "fixtures_root": "testdata/modern/uv_lock",
+      "tests": [
+        "uv_bun_lock_test.go"
+      ],
+      "identity": "ecosystem/name/version/source/architecture/variant/verification",
+      "occurrence": "snapshot/project/file/native ID/source ranges/evidence",
+      "unknown_version": "empty version, raw constraint in Requirement",
+      "failure": "structured Diagnostic plus Complete=false and non-nil error; partial evidence allowed",
+      "io": "caller-supplied immutable fs.FS; no acquisition",
+      "budget_policy": "resource-policy.json",
+      "additional_fixture_archives": [
+        "testdata/uv_lock_v1_rev0_3_corpus_v1.zip"
+      ]
+    },
+    {
+      "id": "SCA-24",
+      "name": "Bun text lock",
+      "analyzer": "bun-lang",
+      "status": "ADD",
+      "grammar": "bun.lock JSONC v0/v1/v2/v3; scoped override/patch declarations; workspaces, installation-path lookup, aliases, optional/dev/peer declarations and platform selectors; no binary bun.lockb or bundled dependencies",
+      "implementation": "analyzer/dep-parser/modernlock/bun.go",
+      "fixtures_root": "testdata/modern/bun_lock",
+      "tests": [
+        "uv_bun_lock_test.go"
+      ],
+      "identity": "ecosystem/name/version/source/architecture/variant/verification",
+      "occurrence": "snapshot/project/file/native ID/source ranges/evidence",
+      "unknown_version": "empty version, raw constraint in Requirement",
+      "failure": "structured Diagnostic plus Complete=false and non-nil error; partial evidence allowed",
+      "io": "caller-supplied immutable fs.FS; no acquisition",
+      "budget_policy": "resource-policy.json",
+      "additional_fixture_archives": [
+        "testdata/bun_lock_v0_v3_corpus_v1.zip"
+      ]
     }
   ]
 }

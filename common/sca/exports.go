@@ -21,6 +21,8 @@ var Exports = map[string]interface{}{
 	"MODE_LANGUAGE": analyzer.LanguageMode,
 
 	"ANALYZER_TYPE_NUGET":            analyzer.TypNuget,
+	"ANALYZER_TYPE_UV":               analyzer.TypUV,
+	"ANALYZER_TYPE_BUN":              analyzer.TypBun,
 	"ANALYZER_TYPE_SWIFT":            analyzer.TypSwift,
 	"ANALYZER_TYPE_DPKG":             analyzer.TypDPKG,
 	"ANALYZER_TYPE_RPM":              analyzer.TypRPM,
