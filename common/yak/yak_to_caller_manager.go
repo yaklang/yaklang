@@ -1665,7 +1665,7 @@ func BindYakitPluginContextToEngine(nIns *antlr4yak.Engine, pluginContext *Yakit
 		originFunc, ok := i.(func(string, ...crawler.ConfigOpt) (chan *crawler.Req, error))
 		if ok {
 			return func(url string, opts ...crawler.ConfigOpt) (chan *crawler.Req, error) {
-				opts = append(opts, crawler.WithRuntimeID(runtimeId)) // add runtimeID for crawler
+				opts = append(opts, crawler.WithRuntimeID(runtimeId), crawler.WithContext(streamContext))
 				return originFunc(url, opts...)
 			}
 		}
@@ -1677,7 +1677,7 @@ func BindYakitPluginContextToEngine(nIns *antlr4yak.Engine, pluginContext *Yakit
 		originFunc, ok := i.(func(string, ...crawlerx.ConfigOpt) (chan crawlerx.ReqInfo, error))
 		if ok {
 			return func(url string, opts ...crawlerx.ConfigOpt) (chan crawlerx.ReqInfo, error) {
-				opts = append(opts, crawlerx.WithRuntimeID(runtimeId))
+				opts = append(opts, crawlerx.WithRuntimeID(runtimeId), crawlerx.WithContext(streamContext))
 				return originFunc(url, opts...)
 			}
 		}
