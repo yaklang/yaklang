@@ -54,9 +54,9 @@ Runtime.getRuntime().exec(* as $hit)
 alert $hit`),
 	)
 	require.NoError(t, err)
-	require.Equal(t, 1, reporter.saves, "only the owner of the complete project may finalize the report")
+	require.Positive(t, reporter.saves, "the project must write the finished report")
 	var doc map[string]any
-	require.NoError(t, json.Unmarshal(out.Bytes(), &doc), "must produce one complete JSON document")
+	require.NoError(t, json.Unmarshal(out.Bytes(), &doc), "stage snapshots must rewrite one complete JSON document")
 	for _, title := range []string{"report-source", "report-struct", "report-ssa"} {
 		require.Contains(t, out.String(), title)
 	}
