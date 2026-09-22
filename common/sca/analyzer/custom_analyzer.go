@@ -1,8 +1,8 @@
 package analyzer
 
 import (
-	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/sca/dxtypes"
+	lo "github.com/yaklang/yaklang/common/sca/internal/collection"
 )
 
 type customAnalyzer struct {

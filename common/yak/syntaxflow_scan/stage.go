@@ -2,8 +2,10 @@ package syntaxflow_scan
 
 import (
 	"strings"
+	"sync"
 	"time"
 
+	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 )
 
@@ -157,7 +159,14 @@ func (o StageOutcome) Succeeded() bool { return o.Status == StageStatusSucceeded
 // stageOutcomeRecorder collects terminal stage results for one ScanProject run
 // and decides the aggregate result: any successful detection stage makes the
 // whole run successful even when a sibling stage failed.
+//
+// A stage streams its per-rule progress from several goroutines at once, so
+// every mutation and read of the counters is guarded by mu. Without it the
+// concurrent map writes aborted the whole process with a fatal error and the
+// report file was left empty.
 type stageOutcomeRecorder struct {
+	mu sync.Mutex
+
 	outcomes         []StageOutcome
 	started          map[ProductStage]time.Time
 	metrics          map[ProductStage]stageMetrics
@@ -196,6 +205,8 @@ func (r *stageOutcomeRecorder) enter(stage ProductStage) {
 	if r == nil {
 		return
 	}
+	r.mu.Lock()
+	defer r.mu.Unlock()
 	if _, seen := r.started[stage]; !seen {
 		r.started[stage] = time.Now()
 	}
@@ -206,6 +217,8 @@ func (r *stageOutcomeRecorder) observe(stage ProductStage, info *RuleProcessInfo
 	if r == nil || info == nil {
 		return
 	}
+	r.mu.Lock()
+	defer r.mu.Unlock()
 	metrics := r.metrics[stage]
 	if info.TotalQuery > metrics.ruleCount {
 		metrics.ruleCount = info.TotalQuery
@@ -216,7 +229,7 @@ func (r *stageOutcomeRecorder) observe(stage ProductStage, info *RuleProcessInfo
 		metrics.riskCount = info.RiskCount
 	}
 	r.metrics[stage] = metrics
-	r.observeScale(info)
+	r.observeScaleLocked(info)
 }
 
 // addRisk counts risks a stage streamed through the result callback.
@@ -224,6 +237,8 @@ func (r *stageOutcomeRecorder) addRisk(stage ProductStage, count int64) {
 	if r == nil || count <= 0 {
 		return
 	}
+	r.mu.Lock()
+	defer r.mu.Unlock()
 	metrics := r.metrics[stage]
 	metrics.riskCount += count
 	r.metrics[stage] = metrics
@@ -234,6 +249,8 @@ func (r *stageOutcomeRecorder) addRule(stage ProductStage, name string) {
 	if r == nil || name == "" {
 		return
 	}
+	r.mu.Lock()
+	defer r.mu.Unlock()
 	if r.ruleNames == nil {
 		r.ruleNames = map[ProductStage]map[string]struct{}{}
 	}
@@ -256,6 +273,12 @@ func (r *stageOutcomeRecorder) observeScale(info *RuleProcessInfoList) {
 	if r == nil || info == nil {
 		return
 	}
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.observeScaleLocked(info)
+}
+
+func (r *stageOutcomeRecorder) observeScaleLocked(info *RuleProcessInfoList) {
 	if info.TotalFiles > 0 {
 		r.scale.TotalFiles = info.TotalFiles
 	}
@@ -277,6 +300,8 @@ func (r *stageOutcomeRecorder) observeStruct(prog interface{ StructScanCounts() 
 	if r == nil || prog == nil {
 		return
 	}
+	r.mu.Lock()
+	defer r.mu.Unlock()
 	rules, results := prog.StructScanCounts()
 	metrics := r.metrics[StageReview]
 	if int64(rules) > metrics.ruleCount {
@@ -288,17 +313,49 @@ func (r *stageOutcomeRecorder) observeStruct(prog interface{ StructScanCounts() 
 	r.metrics[StageReview] = metrics
 }
 
-func (r *stageOutcomeRecorder) setSourceStatistics(stats any) {
+// observeAnalyzedSource records the analyzed source size reported by a compiled
+// program, filling in the scale the process callbacks may not have produced.
+func (r *stageOutcomeRecorder) observeAnalyzedSource(stats *ssaapi.SourceStatistics) {
 	if r == nil || stats == nil {
 		return
 	}
+	r.mu.Lock()
+	defer r.mu.Unlock()
 	r.sourceStatistics = stats
+	if stats.AnalyzedLineCount > 0 {
+		r.scale.TotalLines = stats.AnalyzedLineCount
+	}
+	if stats.AnalyzedFileCount > 0 && r.scale.TotalFiles == 0 {
+		r.scale.TotalFiles = stats.AnalyzedFileCount
+	}
+}
+
+// Scale returns the compile-scale snapshot recorded so far.
+func (r *stageOutcomeRecorder) Scale() compileScale {
+	if r == nil {
+		return compileScale{}
+	}
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return r.scale
+}
+
+// SourceStatistics returns the recorded source-size statistics.
+func (r *stageOutcomeRecorder) SourceStatistics() any {
+	if r == nil {
+		return nil
+	}
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return r.sourceStatistics
 }
 
 func (r *stageOutcomeRecorder) record(stage ProductStage, err error) {
 	if r == nil {
 		return
 	}
+	r.mu.Lock()
+	defer r.mu.Unlock()
 	outcome := StageOutcome{Stage: stage, Status: StageStatusSucceeded}
 	if err != nil {
 		outcome.Status = StageStatusFailed
@@ -323,6 +380,8 @@ func (r *stageOutcomeRecorder) Succeeded() bool {
 	if r == nil {
 		return false
 	}
+	r.mu.Lock()
+	defer r.mu.Unlock()
 	collected := false
 	detected := false
 	for _, outcome := range r.outcomes {
@@ -344,6 +403,8 @@ func (r *stageOutcomeRecorder) Outcomes() []StageOutcome {
 	if r == nil {
 		return nil
 	}
+	r.mu.Lock()
+	defer r.mu.Unlock()
 	return append([]StageOutcome(nil), r.outcomes...)
 }
 

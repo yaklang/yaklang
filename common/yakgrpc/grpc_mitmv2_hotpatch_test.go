@@ -884,3 +884,57 @@ hijackSaveHTTPFlow = func(flow /* *yakit.HTTPFlow */, modify /* func(modified *y
 		check(t, true)
 	})
 }
+
+func TestGRPCMUSTPASS_MITMV2_HotPatch_DropWebsocketUpgrade(t *testing.T) {
+	ctx, cancel := context.WithCancel(utils.TimeoutContextSeconds(20))
+	defer cancel()
+
+	host, port := utils.DebugMockEchoWs("hotpatch-drop-ws-v2")
+	mitmPort := utils.GetRandomAvailableTCPPort()
+	client, err := NewLocalClient()
+	require.NoError(t, err)
+	stream, err := client.MITMV2(ctx)
+	require.NoError(t, err)
+	require.NoError(t, stream.Send(&ypb.MITMV2Request{
+		Host: "127.0.0.1",
+		Port: uint32(mitmPort),
+	}))
+
+	for {
+		data, err := stream.Recv()
+		if err != nil {
+			break
+		}
+		if data.GetMessage().GetIsMessage() {
+			msg := string(data.GetMessage().GetMessage())
+			if !strings.Contains(msg, "starting mitm server") {
+				continue
+			}
+			require.NoError(t, stream.Send(&ypb.MITMV2Request{
+				SetYakScript: true,
+				YakScriptContent: `hijackHTTPRequest = func(isHttps, url, req, forward, drop) {
+	drop()
+}
+`,
+			}))
+		} else if data.GetCurrentHook && len(data.GetHooks()) > 0 {
+			packet := fmt.Sprintf(`GET /hotpatch-drop-ws-v2 HTTP/1.1
+Host: %s
+Origin: http://%s
+Connection: Upgrade
+Upgrade: websocket
+Sec-WebSocket-Version: 13
+Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==
+
+`, utils.HostPort(host, port), utils.HostPort(host, port))
+			_, err := lowhttp.NewWebsocketClient(
+				lowhttp.FixHTTPRequest([]byte(packet)),
+				lowhttp.WithWebsocketProxy("http://"+utils.HostPort("127.0.0.1", mitmPort)),
+				lowhttp.WithWebsocketWithContext(ctx),
+			)
+			require.Error(t, err)
+			require.Contains(t, err.Error(), "upgrade websocket failed")
+			cancel()
+		}
+	}
+}

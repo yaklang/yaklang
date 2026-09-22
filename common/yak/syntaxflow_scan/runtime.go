@@ -358,6 +358,12 @@ func (m *scanManager) notifyDone() {
 	})
 }
 
+// saveReport writes the findings collected so far.
+//
+// It runs at every stage boundary: each stage streams its results into the
+// shared report, so saving here keeps a complete snapshot on disk even when a
+// later stage fails. The report rewrites its output, so the final save (see
+// ScanProject) simply supersedes the intermediate ones.
 func (m *scanManager) saveReport() {
 	if m == nil || m.Config == nil || m.Config.Reporter == nil {
 		return

@@ -39,6 +39,12 @@ func (r *Report) Save() error {
 		if r.writer == nil {
 			return nil
 		}
+		// A scan saves at every stage boundary; rewinding makes each save a
+		// complete snapshot of what has been collected so far instead of
+		// concatenating one document per stage.
+		if err := rewindReportOutput(r.writer); err != nil {
+			return err
+		}
 		return r.PrettyWrite(r.writer)
 	case IRifyReactReportType:
 		return r.SaveForIRify()

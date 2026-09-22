@@ -1,24 +1,22 @@
 package analyzer
 
 import (
-	"bufio"
-	"io"
+	"context"
+	"fmt"
+	"github.com/yaklang/yaklang/common/sca/core/budget"
+	"github.com/yaklang/yaklang/common/sca/model"
 	"io/fs"
-	"os"
+	"sort"
 	"strings"
-	"sync"
 
-	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/sca/dxtypes"
 	"github.com/yaklang/yaklang/common/sca/lazyfile"
 	licenses "github.com/yaklang/yaklang/common/sca/license"
-	"github.com/yaklang/yaklang/common/utils/filesys"
 	fi "github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
 
 	"github.com/yaklang/yaklang/common/sca/analyzer/dep-parser/types"
 
-	"github.com/samber/lo"
-	"github.com/yaklang/yaklang/common/utils"
+	lo "github.com/yaklang/yaklang/common/sca/internal/collection"
 )
 
 const (
@@ -68,23 +66,6 @@ type MatchInfo struct {
 	fileSystem fi.FileSystem
 }
 
-type AnalyzerGroup struct {
-	fileSystem fi.FileSystem
-
-	analyzers []Analyzer
-
-	// consume
-	ch         chan AnalyzeFileInfo
-	numWorkers int
-
-	// return
-	pkgLock sync.Mutex
-	pkgs    []*dxtypes.Package
-
-	// matched file
-	matchedFileInfos map[string]*FileInfo
-}
-
 func RegisterAnalyzer(typ TypAnalyzer, a Analyzer) {
 	if _, ok := analyzers[typ]; ok {
 		return
@@ -93,192 +74,102 @@ func RegisterAnalyzer(typ TypAnalyzer, a Analyzer) {
 	analyzerTyp[a] = typ
 }
 
-func FilterAnalyzer(mode ScanMode, usedAnalyzers []TypAnalyzer) []Analyzer {
-	if mode == AllMode && len(usedAnalyzers) == 0 {
-		return lo.MapToSlice(analyzers, func(_ TypAnalyzer, a Analyzer) Analyzer {
-			return a
-		})
-	}
-
-	ret := make([]Analyzer, 0, len(analyzers))
-	for analyzerName, a := range analyzers {
-		// filter by ScanMode
-		if mode&PkgMode == PkgMode {
-			if strings.HasSuffix(string(analyzerName), "-pkg") {
-				ret = append(ret, a)
-				continue
-			}
-		}
-		if mode&LanguageMode == LanguageMode {
-			if strings.HasSuffix(string(analyzerName), "-lang") {
-				ret = append(ret, a)
-				continue
-			}
-		}
-
-	}
-
-	for _, typ := range usedAnalyzers {
-		if a, ok := analyzers[typ]; ok {
-			ret = append(ret, a)
+// FilterAnalyzer uses a stable type order and a set. Explicit types are unioned
+// with a nonzero mode; ALL with an explicit list selects only that list.
+func FilterAnalyzer(mode ScanMode, used []TypAnalyzer) []Analyzer {
+	selected := map[TypAnalyzer]bool{}
+	for typ := range analyzers {
+		if mode == AllMode && len(used) == 0 || mode&PkgMode != 0 && strings.HasSuffix(string(typ), "-pkg") || mode&LanguageMode != 0 && strings.HasSuffix(string(typ), "-lang") {
+			selected[typ] = true
 		}
 	}
-	return ret
+	for _, typ := range used {
+		if _, ok := analyzers[typ]; ok {
+			selected[typ] = true
+		}
+	}
+	names := make([]string, 0, len(selected))
+	for typ := range selected {
+		names = append(names, string(typ))
+	}
+	sort.Strings(names)
+	out := make([]Analyzer, 0, len(names))
+	for _, name := range names {
+		out = append(out, analyzers[TypAnalyzer(name)])
+	}
+	return out
 }
-
-func NewAnalyzerGroup(numWorkers int, scanMode ScanMode, usedAnalyzers []TypAnalyzer, customAnalyzers []Analyzer, fis ...fi.FileSystem) *AnalyzerGroup {
-	var fi fi.FileSystem
-	if len(fis) > 0 {
-		fi = fis[0]
-	}
-	if fi == nil {
-		fi = filesys.NewLocalFs()
-	}
-	ag := &AnalyzerGroup{
-		ch:               make(chan AnalyzeFileInfo),
-		numWorkers:       numWorkers,
-		matchedFileInfos: make(map[string]*FileInfo),
-		analyzers:        FilterAnalyzer(scanMode, usedAnalyzers),
-		pkgs:             make([]*dxtypes.Package, 0),
-		fileSystem:       fi,
-	}
-	if len(customAnalyzers) > 0 {
-		ag.AddAnalyzers(customAnalyzers...)
-	}
-	return ag
-}
-
-func (ag *AnalyzerGroup) AddAnalyzers(analyzers ...Analyzer) {
-	ag.analyzers = append(ag.analyzers, analyzers...)
-}
-
-func (ag *AnalyzerGroup) Packages() []*dxtypes.Package {
-	return MergePackages(ag.pkgs)
-}
-
-func (ag *AnalyzerGroup) Consume(wg *sync.WaitGroup) {
-	wg.Add(ag.numWorkers)
-
-	for i := 0; i < ag.numWorkers; i++ {
-		go func() {
-			defer func() {
-				if r := recover(); r != nil {
-					log.Errorf("analyzer worker panic: %v", r)
-					utils.PrintCurrentGoroutineRuntimeStack()
-				}
-			}()
-			defer wg.Done()
-			for fileInfo := range ag.ch {
-				pkgs, err := fileInfo.Self.Analyzer.Analyze(fileInfo)
-				if err == nil {
-					for _, pkg := range pkgs {
-						a := fileInfo.Self.Analyzer
-						if name, ok := analyzerTyp[a]; ok {
-							pkg.SetFrom(string(name), fileInfo.Self.Path)
-						} else {
-							pkg.SetFrom("custom", fileInfo.Self.Path)
-						}
-					}
-					ag.pkgLock.Lock()
-					ag.pkgs = append(ag.pkgs, pkgs...)
-					ag.pkgLock.Unlock()
-				}
-			}
-		}()
-	}
-}
-
-func (ag *AnalyzerGroup) Clear() {
-	for _, info := range ag.matchedFileInfos {
-		name := info.LazyFile.Name()
-		info.LazyFile.Close()
-		os.Remove(name)
-	}
-}
-
-func (ag *AnalyzerGroup) Match(path string, fi fs.FileInfo, r io.Reader) error {
-	var (
-		header []byte
-		err    error
-	)
-	br := bufio.NewReader(r)
-
-	for _, a := range ag.analyzers {
-		// if scanned, skip
-		if _, ok := ag.matchedFileInfos[path]; ok {
-			continue
-		}
-
-		if fi.Mode().IsRegular() {
-			header, err = br.Peek(headerSize)
-			if err != nil && err != io.EOF {
-				return utils.Errorf("read file header error: %v", err)
-			}
-		}
-
-		matchStatus := a.Match(MatchInfo{
-			Path:       path,
-			FileInfo:   fi,
-			FileHeader: header,
-			fileSystem: ag.fileSystem,
-		})
-
-		if matchStatus == 0 {
-			continue
-		}
-		// match type > 0 mean matched and need to analyze
-
-		// save to local instead of other file system
-		f, err := os.CreateTemp("", "fanal-file-*")
-		if err != nil {
-			return utils.Errorf("failed to create analyzer temporary file")
-		}
-		if _, err := io.Copy(f, br); err != nil {
-			return utils.Errorf("failed to copy the file: %v", err)
-		}
-		f.Close()
-
-		// add to scanned files, use local fs instead
-		fs := filesys.NewLocalFs()
-		ag.matchedFileInfos[path] = &FileInfo{
-			Path:        path,
-			Analyzer:    a,
-			LazyFile:    lazyfile.LazyOpenStreamByFile(fs, f),
-			MatchStatus: matchStatus,
-			filesystem:  fs,
-		}
-	}
-	return nil
-}
-
-func (ag *AnalyzerGroup) Analyze() error {
-	for _, info := range ag.matchedFileInfos {
-		ag.ch <- AnalyzeFileInfo{
-			Self:             info,
-			MatchedFileInfos: ag.matchedFileInfos,
-		}
-	}
-	close(ag.ch)
-	return nil
-}
-
 func ParseLanguageConfiguration(fi *FileInfo, parser types.Parser) ([]*dxtypes.Package, error) {
 	parsedLibs, parsedDeps, err := parser.Parse(fi.filesystem, fi.LazyFile)
 	if err != nil {
 		return nil, err
 	}
-	return handlerParsed(parsedLibs, parsedDeps)
+	ctx := context.Background()
+	if fi != nil && fi.LazyFile != nil {
+		ctx = fi.LazyFile.Context()
+	}
+	return handlerParsedBudget(ctx, parsedLibs, parsedDeps)
 }
 
 func handlerParsed(parsedLibs types.Libraries, parsedDeps types.Dependencies) ([]*dxtypes.Package, error) {
-	pkgIDMap := make(map[string]*dxtypes.Package, len(parsedLibs))
+	return handlerParsedBudget(context.Background(), parsedLibs, parsedDeps)
+}
+
+func handlerParsedBudget(ctx context.Context, parsedLibs types.Libraries, parsedDeps types.Dependencies) ([]*dxtypes.Package, error) {
+	ctx = budget.Ensure(ctx)
+	st := budget.From(ctx)
+	for _, lib := range parsedLibs {
+		need, err := budget.SizeAdd(budget.SizeMap+budget.SizePtr, int64(len(lib.Locations))*32, int64(len(lib.RawLicenses))*64, 32*int64(len(lib.License)), int64(len(lib.FilePath)+len(lib.Name)+len(lib.Version))+3)
+		if err != nil {
+			return nil, err
+		}
+		if err = st.Working(need); err != nil {
+			return nil, err
+		}
+	}
+	pkgIDMap := map[string]*dxtypes.Package{}
+	links := dxtypes.NewLinker(st)
 
 	for _, lib := range parsedLibs {
-		p := dxtypes.Package{
-			Name:    lib.Name,
-			Version: lib.Version,
+		if err := st.Result(budget.SizeOfPackage(lib.Name, lib.Version, lib.Verification)); err != nil {
+			return nil, err
 		}
-		if lib.License != "" {
+		p := dxtypes.Package{
+
+			IsVersionRange: lib.IsVersionRange,
+			Verification:   lib.Verification,
+
+			Name:    lib.Name,
+			Version: lib.Version, PackageDetails: &dxtypes.PackageDetails{Condition: lib.Condition, Scope: lib.Scope,
+
+				DeclaredCondition: lib.DeclaredCondition,
+				Diagnostics:       lib.Diagnostics,
+				DeclaredIntegrity: lib.DeclaredIntegrity,
+
+				Instance: lib.ID, Source: lib.Source, Variant: lib.Variant, Evidence: lib.Evidence, DeclaredName: lib.DeclaredName, DeclaredVersion: lib.DeclaredVersion, Indirect: lib.Indirect},
+		}
+		if lib.Dev {
+			p.Scope = "dev"
+		}
+		p.ArtifactPath = lib.FilePath
+		if p.Instance == "" && p.ArtifactPath != "" {
+			p.Instance = p.ArtifactPath + "#" + p.Name + "@" + p.Version
+		}
+		for _, loc := range lib.Locations {
+			if err := st.Result(budget.SizeOfObservation()); err != nil {
+				return nil, err
+			}
+			p.Locations = append(p.Locations, dxtypes.SourceRange{StartLine: loc.StartLine, EndLine: loc.EndLine})
+		}
+		if len(lib.Locations) > 0 {
+			p.StartLine = lib.Locations[0].StartLine
+			p.EndLine = lib.Locations[0].EndLine
+		}
+		if lib.RawLicenses != nil {
+			p.RawLicenses = append([]string(nil), lib.RawLicenses...)
+			p.License = lo.Map(lib.RawLicenses, func(license string, _ int) string { return licenses.Normalize(strings.TrimSpace(license)) })
+		} else if lib.License != "" {
+			p.RawLicenses = []string{lib.License}
 			p.License = lo.Map(strings.Split(lib.License, ","), func(license string, _ int) string {
 				return licenses.Normalize(strings.TrimSpace(license))
 			})
@@ -286,6 +177,45 @@ func handlerParsed(parsedLibs types.Libraries, parsedDeps types.Dependencies) ([
 		id := lib.ID
 		if id == "" {
 			id = p.Identifier()
+		}
+		if err := st.Result(budget.SizeMap + budget.SizePtr); err != nil {
+			return nil, err
+		}
+		if prior, exists := pkgIDMap[id]; exists {
+			if prior.Identifier() != p.Identifier() {
+				return nil, fmt.Errorf("malformed_input: conflicting native reference %q", id)
+			}
+			grown, err := budget.Grow(st, prior.Locations, len(p.Locations), 16)
+			if err != nil {
+				return nil, err
+			}
+			prior.Locations = append(grown, p.Locations...)
+			licenses, err := budget.Grow(st, prior.RawLicenses, len(p.RawLicenses), budget.SizeString)
+			if err != nil {
+				return nil, err
+			}
+			prior.RawLicenses = append(licenses, p.RawLicenses...)
+			diagnostics, err := budget.Grow(st, prior.Diagnostics, len(p.Diagnostics), 128)
+			if err != nil {
+				return nil, err
+			}
+			prior.Diagnostics = append(diagnostics, p.Diagnostics...)
+			if prior.DeclaredIntegrity == "" {
+				prior.DeclaredIntegrity = p.DeclaredIntegrity
+			} else if p.DeclaredIntegrity != "" && p.DeclaredIntegrity != prior.DeclaredIntegrity {
+				if err := st.Working(int64(len(prior.DeclaredIntegrity)) + int64(len(p.DeclaredIntegrity)) + 1); err != nil {
+					return nil, err
+				}
+				prior.DeclaredIntegrity = prior.DeclaredIntegrity + " " + p.DeclaredIntegrity
+			}
+			continue
+		}
+		if lib.DeclaredVersion != "" {
+			req := model.Requirement{Target: lib.Name, Constraint: lib.DeclaredVersion, Scope: p.Scope}
+			if err := st.Result(budget.SizeOfEdge() + budget.SizeOfString(req.Target) + budget.SizeOfString(req.Constraint)); err != nil {
+				return nil, err
+			}
+			p.Requirements = append(p.Requirements, req)
 		}
 		pkgIDMap[id] = &p
 	}
@@ -299,23 +229,78 @@ func handlerParsed(parsedLibs types.Libraries, parsedDeps types.Dependencies) ([
 		if !ok {
 			continue
 		}
+		for _, q := range dep.Requirements {
+			req := model.Requirement{Target: q.Target, Constraint: q.Constraint, Scope: q.Scope, Condition: q.Condition}
+			if up := pkgIDMap[q.Resolved]; q.Resolved != "" && up != nil {
+				if !reportOnly(ctx) {
+					if err := links.Link(pkg, up); err != nil {
+						return nil, err
+					}
+				}
+				if err := st.Working(budget.SizeSlice + budget.SizeString); err != nil {
+					return nil, err
+				}
+				req.Resolved = []string{up.Instance}
+			}
+			need, err := budget.SizeAdd(budget.SizeOfEdge(), budget.SizeOfString(q.Target), budget.SizeOfString(q.Constraint), budget.SizeOfString(q.Condition))
+			if err != nil {
+				return nil, err
+			}
+			if err := st.Result(need); err != nil {
+				return nil, err
+			}
+			grown, err := budget.Grow(st, pkg.Requirements, 1, 192)
+			if err != nil {
+				return nil, err
+			}
+			pkg.Requirements = append(grown, req)
+		}
 		for _, uid := range upStreamIDs {
 			upPkg, ok := pkgIDMap[uid]
 			if !ok {
-				data := strings.Split(uid, "@")
-				// name(data[0]) => version(data[1])
-				// pkg.DependsOn.And[data[0]] = data[1]
-				upPkg = &dxtypes.Package{
-					Name:    data[0],
-					Version: data[1],
+				grown, err := budget.Grow(st, pkg.UnresolvedDependencies, 1, budget.SizeString)
+				if err != nil {
+					return nil, err
 				}
-				pkgIDMap[uid] = upPkg
+				pkg.UnresolvedDependencies = append(grown, uid)
+				continue
 			}
-			pkg.LinkDepend(upPkg)
+			if err := links.Link(pkg, upPkg); err != nil {
+				return nil, err
+			}
 		}
 	}
 
-	return lo.MapToSlice(pkgIDMap, func(_ string, pkg *dxtypes.Package) *dxtypes.Package {
-		return pkg
-	}), nil
+	if err := st.Working(budget.SizeOfSortIndex(len(pkgIDMap)) + budget.SizeSlice); err != nil {
+		return nil, err
+	}
+	pkgs := make([]*dxtypes.Package, 0, len(pkgIDMap))
+	for _, pkg := range pkgIDMap {
+		pkgs = append(pkgs, pkg)
+	}
+	sort.Slice(pkgs, func(i, j int) bool {
+		a, b := pkgs[i], pkgs[j]
+		if a.Instance != b.Instance {
+			return a.Instance < b.Instance
+		}
+		if a.Name != b.Name {
+			return a.Name < b.Name
+		}
+		if a.Version != b.Version {
+			return a.Version < b.Version
+		}
+		return a.Verification < b.Verification
+	})
+	return pkgs, nil
+}
+
+func Name(a Analyzer) string {
+	if name, ok := analyzerTyp[a]; ok {
+		return string(name)
+	}
+	return "custom"
+}
+func MatchInSnapshot(a Analyzer, info MatchInfo, snapshot fi.FileSystem) int {
+	info.fileSystem = snapshot
+	return a.Match(info)
 }

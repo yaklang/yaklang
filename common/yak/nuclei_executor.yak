@@ -7,13 +7,16 @@ if customVars != nil {
 
 execNuclei = func(target) {
     nucleiPocName = nucleiPoC.ScriptName
-	// log.Info("start to execute: %s [%v]", nucleiPocName, target)
     var res
     var err
     opts = [
         nuclei.exactTemplateIns(nucleiPoC),
         nuclei.timeout(10),
+        nuclei.fromPlugin(nucleiPocName),
     ]
+    if RUNTIME_ID != undefined && RUNTIME_ID != "" {
+        opts.Append(nuclei.runtimeId(RUNTIME_ID))
+    }
     if customVars != nil {
         opts.Append(nuclei.vars(customVars))
     }
@@ -22,14 +25,17 @@ execNuclei = func(target) {
             mockResponse(mock_response)
         }))
     }
+    yakit.Info("nuclei scan start: %v -> %v runtime=%v", nucleiPocName, target, RUNTIME_ID)
     res, err = nuclei.Scan(target, opts...)
 	if err != nil {
 		yakit.Error("failed to scan[%v]: %s", target, err)
 		return
 	}
-    // log.Info("waiting results for: %v to: %v", nucleiPocName, target)
+    hit = 0
 	for pocVul = range res {
+        hit++
 		yakit.Output(pocVul)
 		yakit.Output(nuclei.PocVulToRisk(pocVul))
 	}
+    yakit.Info("nuclei scan finished: %v hits=%v", nucleiPocName, hit)
 }

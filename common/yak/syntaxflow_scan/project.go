@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/syntaxflow/sfpattern"
 	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
@@ -133,6 +134,9 @@ func ScanProject(ctx context.Context, opts ...ssaconfig.Option) (ProjectResult, 
 			userResultCallback(result)
 		}
 	}
+	// The reporter is one object shared by every stage scan below: results
+	// stream into it as each stage runs (see notifyResult), and it keeps its
+	// document current so a stage can save a valid snapshot at any time.
 	hasLoaded := len(cfg.Programs) > 0
 	hasCode := hasCodeSource(cfg)
 	localDir := localSourceDir(cfg)
@@ -325,18 +329,24 @@ func ScanProject(ctx context.Context, opts ...ssaconfig.Option) (ProjectResult, 
 // stay visible through stage outcomes instead of turning an already-useful
 // result into a failed job.
 func finishScanProject(cfg *Config, recorder *stageOutcomeRecorder, programName string, err error) (ProjectResult, error) {
+	// Each stage already saved a snapshot on its way out; this final save is the
+	// authoritative one and also covers a run whose stages were skipped or
+	// failed before saving anything.
+	saveProjectReport(cfg)
+
 	result := ProjectResult{
 		Stages:      recorder.Outcomes(),
 		ProgramName: programName,
 		Succeeded:   recorder.Succeeded(),
 	}
 	if recorder != nil {
-		result.TotalFiles = recorder.scale.TotalFiles
-		result.HandlerFiles = recorder.scale.HandlerFiles
-		result.PrehandlerFiles = recorder.scale.PrehandlerFiles
-		result.TotalBytes = recorder.scale.TotalBytes
-		result.TotalLines = recorder.scale.TotalLines
-		result.SourceStatistics = recorder.sourceStatistics
+		scale := recorder.Scale()
+		result.TotalFiles = scale.TotalFiles
+		result.HandlerFiles = scale.HandlerFiles
+		result.PrehandlerFiles = scale.PrehandlerFiles
+		result.TotalBytes = scale.TotalBytes
+		result.TotalLines = scale.TotalLines
+		result.SourceStatistics = recorder.SourceStatistics()
 	}
 	result.SkippedStages = skippedRequestedStages(resolveProductModes(cfg), result.Stages)
 	result.IncompleteStages = len(result.SkippedStages) > 0
@@ -661,19 +671,32 @@ func structRuleProcessInfoAll(progs []*ssaapi.Program) *RuleProcessInfoList {
 	return info
 }
 
+// saveProjectReport writes the report the stages of this project scan have
+// streamed into. Every stage saves its own snapshot as it ends; this call
+// supersedes those with the finished document.
+func saveProjectReport(cfg *Config) {
+	if cfg == nil || cfg.Reporter == nil {
+		return
+	}
+	if err := cfg.Reporter.Save(); err != nil {
+		log.Errorf("save report failed: %v", err)
+	}
+}
+
 func scaleInfoFromRecorder(recorder *stageOutcomeRecorder) *RuleProcessInfoList {
 	if recorder == nil {
 		return nil
 	}
-	if recorder.scale.TotalFiles <= 0 && recorder.scale.TotalBytes <= 0 && recorder.scale.TotalLines <= 0 {
+	scale := recorder.Scale()
+	if scale.TotalFiles <= 0 && scale.TotalBytes <= 0 && scale.TotalLines <= 0 {
 		return nil
 	}
 	return &RuleProcessInfoList{
-		TotalFiles:      recorder.scale.TotalFiles,
-		HandlerFiles:    recorder.scale.HandlerFiles,
-		PrehandlerFiles: recorder.scale.PrehandlerFiles,
-		TotalBytes:      recorder.scale.TotalBytes,
-		TotalLines:      recorder.scale.TotalLines,
+		TotalFiles:      scale.TotalFiles,
+		HandlerFiles:    scale.HandlerFiles,
+		PrehandlerFiles: scale.PrehandlerFiles,
+		TotalBytes:      scale.TotalBytes,
+		TotalLines:      scale.TotalLines,
 	}
 }
 
@@ -682,13 +705,7 @@ func captureProgramEvidence(recorder *stageOutcomeRecorder, prog *ssaapi.Program
 		return
 	}
 	if stats, err := prog.GetSourceStatistics(); err == nil && stats != nil {
-		recorder.setSourceStatistics(stats)
-		if stats.AnalyzedLineCount > 0 {
-			recorder.scale.TotalLines = stats.AnalyzedLineCount
-		}
-		if stats.AnalyzedFileCount > 0 && recorder.scale.TotalFiles == 0 {
-			recorder.scale.TotalFiles = stats.AnalyzedFileCount
-		}
+		recorder.observeAnalyzedSource(stats)
 	}
 }
 

@@ -4,14 +4,13 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"math"
 	"strings"
 
-	"github.com/docker/docker/api/types/container"
-	"github.com/docker/docker/api/types/filters"
-	"github.com/docker/docker/client"
+	"github.com/yaklang/yaklang/common/dockerhttp"
 )
 
-const runtimeHostDockerSocket = "unix:///var/run/docker.sock"
+const runtimeHostCleanupLabel = "legion.ai.runtime.cleanup_key"
 
 type runtimeHostContainer struct {
 	ID              string
@@ -47,13 +46,13 @@ type runtimeHostDocker interface {
 }
 
 type localRuntimeHostDocker struct {
-	client *client.Client
+	client *dockerhttp.Client
 }
 
 func newLocalRuntimeHostDocker() (*localRuntimeHostDocker, error) {
-	cli, err := client.NewClientWithOpts(
-		client.WithHost(runtimeHostDockerSocket),
-		client.WithAPIVersionNegotiation(),
+	cli, err := dockerhttp.New(
+		dockerhttp.FromEnv,
+		dockerhttp.WithAPIVersionNegotiation(),
 	)
 	if err != nil {
 		return nil, err
@@ -62,14 +61,13 @@ func newLocalRuntimeHostDocker() (*localRuntimeHostDocker, error) {
 }
 
 func (d *localRuntimeHostDocker) Ping(ctx context.Context) error {
-	_, err := d.client.Ping(ctx)
-	return err
+	return d.client.Ping(ctx)
 }
 
 func (d *localRuntimeHostDocker) ResolveImageID(ctx context.Context, selector string) (string, bool, error) {
-	image, _, err := d.client.ImageInspectWithRaw(ctx, strings.TrimSpace(selector))
+	image, err := d.client.ImageInspect(ctx, strings.TrimSpace(selector))
 	if err != nil {
-		if client.IsErrNotFound(err) {
+		if dockerhttp.IsNotFound(err) {
 			return "", false, nil
 		}
 		return "", false, err
@@ -81,19 +79,13 @@ func (d *localRuntimeHostDocker) ResolveImageID(ctx context.Context, selector st
 }
 
 func (d *localRuntimeHostDocker) LoadImage(ctx context.Context, archive io.Reader) error {
-	response, err := d.client.ImageLoad(ctx, archive, true)
-	if err != nil {
-		return err
-	}
-	defer response.Body.Close()
-	_, err = io.Copy(io.Discard, response.Body)
-	return err
+	return d.client.ImageLoad(ctx, archive)
 }
 
 func (d *localRuntimeHostDocker) FindContainer(ctx context.Context, cleanupKey string) (runtimeHostContainer, bool, error) {
-	items, err := d.client.ContainerList(ctx, container.ListOptions{
+	items, err := d.client.ContainerList(ctx, dockerhttp.ContainerListOptions{
 		All:     true,
-		Filters: filters.NewArgs(filters.Arg("label", runtimeHostCleanupLabel+"="+cleanupKey)),
+		Filters: dockerhttp.Filters{"label": {runtimeHostCleanupLabel + "=" + cleanupKey}},
 	})
 	if err != nil {
 		return runtimeHostContainer{}, false, err
@@ -108,50 +100,42 @@ func (d *localRuntimeHostDocker) FindContainer(ctx context.Context, cleanupKey s
 }
 
 func (d *localRuntimeHostDocker) CreateAndStart(ctx context.Context, input runtimeHostContainerInput) (runtimeHostContainer, error) {
-	response, err := d.client.ContainerCreate(ctx, &container.Config{
-		Image:  input.Image,
-		Env:    input.Env,
-		Cmd:    input.Args,
-		Labels: input.Labels,
-	}, &container.HostConfig{
-		NetworkMode:   container.NetworkMode(input.Network),
-		RestartPolicy: container.RestartPolicy{Name: container.RestartPolicyUnlessStopped},
-		Resources: container.Resources{
-			NanoCPUs:   int64(input.CPUMillicores * 1_000_000),
-			Memory:     int64(input.MemoryBytes),
-			MemorySwap: int64(input.MemorySwapBytes),
-		},
-	}, nil, nil, input.Name)
+	if input.CPUMillicores > math.MaxInt64/1_000_000 || input.MemoryBytes > math.MaxInt64 || input.MemorySwapBytes > math.MaxInt64 {
+		return runtimeHostContainer{}, fmt.Errorf("runtime container resource limit overflows int64")
+	}
+	info, err := d.client.CreateAndStart(ctx, &dockerhttp.ContainerConfig{
+		Image: input.Image, Env: input.Env, Cmd: input.Args, Labels: input.Labels,
+	}, &dockerhttp.HostConfig{
+		NetworkMode:   input.Network,
+		RestartPolicy: &dockerhttp.RestartPolicy{Name: "unless-stopped"},
+		NanoCPUs:      int64(input.CPUMillicores * 1_000_000),
+		Memory:        int64(input.MemoryBytes), MemorySwap: int64(input.MemorySwapBytes),
+	}, input.Name)
 	if err != nil {
 		return runtimeHostContainer{}, err
 	}
-	if err := d.client.ContainerStart(ctx, response.ID, container.StartOptions{}); err != nil {
-		_ = d.client.ContainerRemove(ctx, response.ID, container.RemoveOptions{Force: true})
-		return runtimeHostContainer{}, err
-	}
-	result, found, err := d.Inspect(ctx, response.ID)
-	if err != nil {
-		return runtimeHostContainer{}, err
-	}
-	if !found {
-		return runtimeHostContainer{}, fmt.Errorf("created runtime container disappeared")
-	}
-	return result, nil
+	return runtimeHostContainerFromInspect(info), nil
 }
 
 func (d *localRuntimeHostDocker) Inspect(ctx context.Context, containerID string) (runtimeHostContainer, bool, error) {
 	info, err := d.client.ContainerInspect(ctx, strings.TrimSpace(containerID))
 	if err != nil {
-		if client.IsErrNotFound(err) {
+		if dockerhttp.IsNotFound(err) {
 			return runtimeHostContainer{}, false, nil
 		}
 		return runtimeHostContainer{}, false, err
 	}
+	return runtimeHostContainerFromInspect(info), true, nil
+}
+
+func runtimeHostContainerFromInspect(info *dockerhttp.ContainerInspect) runtimeHostContainer {
 	result := runtimeHostContainer{
 		ID:      info.ID,
 		ImageID: strings.TrimSpace(info.Image),
 		Running: info.State != nil && info.State.Running,
-		Labels:  cloneStringMapValue(info.Config.Labels),
+	}
+	if info.Config != nil {
+		result.Labels = cloneStringMapValue(info.Config.Labels)
 	}
 	if info.HostConfig != nil {
 		if info.HostConfig.NanoCPUs > 0 {
@@ -164,16 +148,11 @@ func (d *localRuntimeHostDocker) Inspect(ctx context.Context, containerID string
 			result.MemorySwapBytes = uint64(info.HostConfig.MemorySwap)
 		}
 	}
-	return result, true, nil
+	return result
 }
 
 func (d *localRuntimeHostDocker) StopAndRemove(ctx context.Context, containerID string) error {
-	_ = d.client.ContainerStop(ctx, containerID, container.StopOptions{})
-	err := d.client.ContainerRemove(ctx, containerID, container.RemoveOptions{Force: true})
-	if client.IsErrNotFound(err) {
-		return nil
-	}
-	return err
+	return d.client.StopAndRemove(ctx, containerID)
 }
 
 func (d *localRuntimeHostDocker) Close() error { return d.client.Close() }

@@ -90,3 +90,17 @@ func TestModifyWebsocketOpeningHandshakeMarksOnlyCallbackWindow(t *testing.T) {
 	require.False(t, httpctx.IsWebsocketOpeningHandshake(req))
 	require.True(t, httpctx.GetContextBoolInfoFromRequest(req, httpctx.RESPONSE_CONTEXT_KEY_ShouldBeHijackedFromRequest))
 }
+
+func TestDroppedWebsocketUpgradeResponseBytesIsPlainHTTP(t *testing.T) {
+	req := websocketUpgradeTestRequest(t)
+	raw := droppedWebsocketUpgradeResponseBytes(req)
+	rsp, err := lowhttp.ParseBytesToHTTPResponse(raw)
+	require.NoError(t, err)
+	require.Equal(t, 200, rsp.StatusCode)
+	require.NotEqual(t, http.StatusSwitchingProtocols, rsp.StatusCode)
+}
+
+func TestWebsocketUpgradeResponseDroppedOnlyOnNilCandidate(t *testing.T) {
+	require.True(t, websocketUpgradeResponseDropped(nil))
+	require.False(t, websocketUpgradeResponseDropped([]byte("HTTP/1.1 101 Switching Protocols\r\n\r\n")))
+}

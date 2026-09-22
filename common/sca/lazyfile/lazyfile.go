@@ -1,18 +1,19 @@
 package lazyfile
 
 import (
+	"context"
+	"github.com/yaklang/yaklang/common/sca/core/budget"
 	"io"
 	"io/fs"
 	"sync"
 
-	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/utils/filesys"
-	fi "github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
-
-	"github.com/yaklang/yaklang/common/log"
+	"fmt"
+	"os"
 )
 
 type LazyFile struct {
+	ctx context.Context
+
 	fs.File
 	io.Seeker
 	io.ReaderAt
@@ -26,7 +27,7 @@ type LazyFile struct {
 
 func LazyOpenStreamByFilePath(fsIns fs.FS, name string) *LazyFile {
 	if fsIns == nil {
-		fsIns = filesys.NewLocalFs()
+		fsIns = localFS{}
 	}
 	lf := &LazyFile{
 		openOnce: new(sync.Once),
@@ -49,7 +50,7 @@ func LazyOpenStreamByFilePath(fsIns fs.FS, name string) *LazyFile {
 	return lf
 }
 
-func LazyOpenStreamByFile(f fi.FileSystem, rf fs.File) *LazyFile {
+func LazyOpenStreamByFile(f fs.FS, rf fs.File) *LazyFile {
 	var name string
 	info, _ := rf.Stat()
 	if info != nil {
@@ -64,11 +65,11 @@ func LazyOpenStreamByFile(f fi.FileSystem, rf fs.File) *LazyFile {
 }
 
 func (f *LazyFile) lazyOpen() error {
+	if err := f.Context().Err(); err != nil {
+		return err
+	}
 	f.openOnce.Do(func() {
-		_, err := f.finalOpen()
-		if err != nil {
-			log.Errorf("lazyOpen failed: %v", err)
-		}
+		_, f.finalErr = f.finalOpen()
 	})
 	return f.finalErr
 }
@@ -82,9 +83,13 @@ func (f *LazyFile) ReadAt(b []byte, off int64) (n int, err error) {
 	if ins, ok := f.File.(interface {
 		ReadAt([]byte, int64) (int, error)
 	}); ok {
-		return ins.ReadAt(b, off)
+		n, e := ins.ReadAt(b, off)
+		if err := budget.From(f.Context()).Read(int64(n)); err != nil {
+			return n, err
+		}
+		return n, e
 	}
-	return 0, utils.Wrap(fs.ErrInvalid, "ReadAt not supported")
+	return 0, fmt.Errorf("ReadAt not supported: %w", fs.ErrInvalid)
 }
 
 func (f *LazyFile) Read(b []byte) (int, error) {
@@ -92,7 +97,11 @@ func (f *LazyFile) Read(b []byte) (int, error) {
 	if err != nil {
 		return 0, err
 	}
-	return f.File.Read(b)
+	n, e := f.File.Read(b)
+	if err := budget.From(f.Context()).Read(int64(n)); err != nil {
+		return n, err
+	}
+	return n, e
 }
 
 func (f *LazyFile) Stat() (fs.FileInfo, error) {
@@ -141,5 +150,17 @@ func (f *LazyFile) Seek(offset int64, whence int) (int64, error) {
 	}); ok {
 		return ins.Seek(offset, whence)
 	}
-	return 0, utils.Wrap(fs.ErrInvalid, "Seek not supported")
+	return 0, fmt.Errorf("Seek not supported: %w", fs.ErrInvalid)
+}
+
+type localFS struct{}
+
+func (localFS) Open(name string) (fs.File, error) { return os.Open(name) }
+
+func (f *LazyFile) SetContext(ctx context.Context) { f.ctx = ctx }
+func (f *LazyFile) Context() context.Context {
+	if f.ctx == nil {
+		return context.Background()
+	}
+	return f.ctx
 }

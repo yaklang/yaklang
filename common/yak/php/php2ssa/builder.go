@@ -91,7 +91,6 @@ func (s *SSABuilder) PreHandlerProject(fileSystem fi.FileSystem, ast ssa.FrontAS
 		pkgs, err := sca.ScanFilesystem(vfs)
 		if err != nil {
 			log.Warnf("scan pom.xml error: %v", err)
-			return nil
 		}
 		prog.SCAPackages = append(prog.SCAPackages, pkgs...)
 		builder.GenerateDependence(pkgs, filename)

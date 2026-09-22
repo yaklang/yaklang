@@ -2,17 +2,17 @@ package conan
 
 import (
 	"fmt"
-	"io"
+	"github.com/yaklang/yaklang/common/sca/core/textdecode"
 	"strings"
 
-	"github.com/liamg/jfather"
+	"github.com/yaklang/yaklang/common/sca/core/budget"
+	"github.com/yaklang/yaklang/common/sca/core/jsonrecord"
 
-	"golang.org/x/exp/slices"
-	"golang.org/x/xerrors"
+	"slices"
 
-	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/sca/analyzer/dep-parser/types"
-	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/sca/model"
+
 	fi "github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
 )
 
@@ -38,13 +38,19 @@ func NewParser() types.Parser {
 }
 
 func (p *Parser) Parse(fs fi.FileSystem, r types.ReadSeekerAt) ([]types.Library, []types.Dependency, error) {
+	ctx := types.ContextOf(r)
 	var lock LockFile
-	input, err := io.ReadAll(r)
+	input, err := textdecode.ReadRaw(ctx, r, 16<<20)
 	if err != nil {
-		return nil, nil, utils.Errorf("failed to read canon lock file: %w", err)
+		return nil, nil, fmt.Errorf("failed to read canon lock file: %w", err)
 	}
-	if err := jfather.Unmarshal(input, &lock); err != nil {
-		return nil, nil, utils.Errorf("failed to decode canon lock file: %w", err)
+	nodes, err := jsonrecord.Decode(ctx, input, &lock)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to decode canon lock file: %w", err)
+	}
+	for k, v := range lock.GraphLock.Nodes {
+		v.StartLine, v.EndLine = nodes.Get("graph_lock", "nodes", k).Lines()
+		lock.GraphLock.Nodes[k] = v
 	}
 
 	// Get a list of direct dependencies
@@ -53,7 +59,7 @@ func (p *Parser) Parse(fs fi.FileSystem, r types.ReadSeekerAt) ([]types.Library,
 		directDeps = root.Requires
 	}
 
-	// Parse packages
+	st := budget.From(ctx)
 	parsed := map[string]types.Library{}
 	for i, node := range lock.GraphLock.Nodes {
 		if node.Ref == "" {
@@ -61,14 +67,17 @@ func (p *Parser) Parse(fs fi.FileSystem, r types.ReadSeekerAt) ([]types.Library,
 		}
 		lib, err := parseRef(node)
 		if err != nil {
-			log.Debug(err)
-			continue
+			return nil, nil, err
 		}
 
-		// Determine if the package is a direct dependency or not
 		direct := slices.Contains(directDeps, i)
 		lib.Indirect = !direct
 
+		if err := st.Result(budget.SizeOfPackage(lib.Name, lib.Version, node.Ref)); err != nil {
+			return nil, nil, err
+		}
+		lib.ID = i
+		lib.Source = node.Ref
 		parsed[i] = lib
 	}
 
@@ -82,21 +91,67 @@ func (p *Parser) Parse(fs fi.FileSystem, r types.ReadSeekerAt) ([]types.Library,
 		}
 
 		var childDeps []string
+		var reqs []types.Requirement
+		seen := map[string]struct{}{}
 		for _, req := range node.Requires {
-			if child, ok := parsed[req]; ok {
-				childDeps = append(childDeps, child.ID)
+			if _, dup := seen[req]; dup {
+				continue
 			}
+			if err := st.Insert(req); err != nil {
+				return nil, nil, err
+			}
+			seen[req] = struct{}{}
+			if child, ok := parsed[req]; ok {
+				q := types.Requirement{Target: child.Name, Constraint: child.Version, Condition: child.Source, Resolved: child.ID}
+				if err := chargeConanEdge(st, q); err != nil {
+					return nil, nil, err
+				}
+				childDeps = append(childDeps, child.ID)
+				reqs = append(reqs, q)
+				continue
+			}
+			q := types.Requirement{Condition: req}
+			if err := chargeConanEdge(st, q); err != nil {
+				return nil, nil, err
+			}
+			reqs = append(reqs, q)
+			suffix := " is missing"
+			if n, ok := lock.GraphLock.Nodes[req]; ok {
+				suffix = " has empty ref"
+				if n.Ref != "" {
+					suffix = " is not a package"
+				}
+			}
+			const prefix = "Conan node "
+			need, err := budget.SizeAdd(budget.SizeString, int64(len(prefix)+len(req)+len(suffix)))
+			if err != nil {
+				return nil, nil, err
+			}
+			if err := st.Result(need); err != nil {
+				return nil, nil, err
+			}
+			reason := prefix + req + suffix
+			lib.Diagnostics = append(lib.Diagnostics, model.Diagnostic{Code: "evidence_insufficient", Stage: "conan", Reason: reason, Incomplete: true})
 		}
-		if len(childDeps) != 0 {
+		if len(childDeps) != 0 || len(reqs) != 0 {
 			deps = append(deps, types.Dependency{
-				ID:        lib.ID,
-				DependsOn: childDeps,
+				ID:           lib.ID,
+				DependsOn:    childDeps,
+				Requirements: reqs,
 			})
 		}
 
 		libs = append(libs, lib)
 	}
 	return libs, deps, nil
+}
+
+func chargeConanEdge(st *budget.State, q types.Requirement) error {
+	need, err := budget.SizeAdd(budget.SizeOfEdge(), budget.SizeOfString(q.Target), budget.SizeOfString(q.Constraint), budget.SizeOfString(q.Condition))
+	if err != nil {
+		return err
+	}
+	return st.Result(need)
 }
 
 func parseRef(node Node) (types.Library, error) {
@@ -108,7 +163,7 @@ func parseRef(node Node) (types.Library, error) {
 	// 'pkgd/0.1.0#7dcb50c43a5a50d984c2e8fa5898bf18'
 	ss := strings.Split(strings.Split(strings.Split(node.Ref, "@")[0], "#")[0], "/")
 	if len(ss) != 2 {
-		return types.Library{}, xerrors.Errorf("Unable to determine conan dependency: %q", node.Ref)
+		return types.Library{}, fmt.Errorf("Unable to determine conan dependency: %q", node.Ref)
 	}
 	return types.Library{
 		ID:      fmt.Sprintf("%s/%s", ss[0], ss[1]),
@@ -121,15 +176,4 @@ func parseRef(node Node) (types.Library, error) {
 			},
 		},
 	}, nil
-}
-
-// UnmarshalJSONWithMetadata needed to detect start and end lines of deps
-func (n *Node) UnmarshalJSONWithMetadata(node jfather.Node) error {
-	if err := node.Decode(&n); err != nil {
-		return err
-	}
-	// Decode func will overwrite line numbers if we save them first
-	n.StartLine = node.Range().Start.Line
-	n.EndLine = node.Range().End.Line
-	return nil
 }

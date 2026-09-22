@@ -378,11 +378,19 @@ func (y *YakTemplate) makeSequenceSender(config *Config, ret *RequestBulk, opts 
 			packetOpt,
 			lowhttp.WithPacketBytes(raw),
 			lowhttp.WithHttps(req.IsHttps),
-			lowhttp.WithSource(y.Name),
+			// Keep SourceType=scan so Yakit plugin-debug HTTP 流量 can query it.
+			// Template name belongs in FromPlugin, not SourceType.
+			lowhttp.WithSource("scan"),
 			lowhttp.WithNoFixContentLength(ret.RequestConfig.NoFixContentLength),
 			lowhttp.WithRedirectTimes(redictTimes),
 			lowhttp.WithTimeout(req.Timeout),
 		)
+		if config != nil && config.RuntimeId != "" {
+			packetOpt = append(packetOpt, lowhttp.WithRuntimeId(config.RuntimeId))
+		}
+		if y.ScriptName != "" {
+			packetOpt = append(packetOpt, lowhttp.WithFromPlugin(y.ScriptName))
+		}
 
 		if req.Origin.CookieInherit {
 			packetOpt = append(packetOpt, lowhttp.WithSession(session))

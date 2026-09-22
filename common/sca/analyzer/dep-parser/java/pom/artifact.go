@@ -2,14 +2,11 @@ package pom
 
 import (
 	"fmt"
-	"os"
 	"regexp"
 	"strings"
 
-	"github.com/samber/lo"
-	"golang.org/x/exp/slices"
+	lo "github.com/yaklang/yaklang/common/sca/internal/collection"
 
-	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/sca/analyzer/dep-parser/types"
 )
 
@@ -26,6 +23,9 @@ type artifact struct {
 	Module bool
 	Root   bool
 	Direct bool
+
+	Type, Classifier, DeclaredConstraint string
+	Scope, Optional                      string
 
 	Locations types.Locations
 }
@@ -44,7 +44,7 @@ func (a artifact) IsEmpty() bool {
 }
 
 func (a artifact) Equal(o artifact) bool {
-	return a.GroupID == o.GroupID || a.ArtifactID == o.ArtifactID || a.Version.String() == o.Version.String()
+	return a.GroupID == o.GroupID && a.ArtifactID == o.ArtifactID && a.Version.String() == o.Version.String()
 }
 
 func (a artifact) JoinLicenses() string {
@@ -76,7 +76,21 @@ func (a artifact) Inherit(parent artifact) artifact {
 }
 
 func (a artifact) Name() string {
-	return fmt.Sprintf("%s:%s", a.GroupID, a.ArtifactID)
+	return mavenCoordinate(a.GroupID, a.ArtifactID, a.Type, a.Classifier)
+}
+
+func mavenCoordinate(group, artifact, typ, classifier string) string {
+	name := fmt.Sprintf("%s:%s", group, artifact)
+	if classifier != "" {
+		if typ == "" {
+			typ = "jar"
+		}
+		return name + ":" + typ + ":" + classifier
+	}
+	if typ != "" && typ != "jar" {
+		return name + ":" + typ
+	}
+	return name
 }
 
 func (a artifact) String() string {
@@ -91,14 +105,9 @@ type version struct {
 // Only soft and hard requirements for the specified version are supported at the moment.
 func newVersion(s string) version {
 	var hard bool
-	if strings.HasPrefix(s, "[") && strings.HasSuffix(s, "]") {
+	if strings.HasPrefix(s, "[") && strings.HasSuffix(s, "]") && !strings.Contains(s, ",") {
 		s = strings.Trim(s, "[]")
 		hard = true
-	}
-
-	// TODO: Other requirements are not supported
-	if strings.ContainsAny(s, ",()[]") {
-		s = ""
 	}
 
 	return version{
@@ -119,42 +128,40 @@ func (v1 version) String() string {
 }
 
 func evaluateVariable(s string, props map[string]string, seenProps []string) string {
-	if props == nil {
-		props = map[string]string{}
-	}
-
-	for _, m := range varRegexp.FindAllStringSubmatch(s, -1) {
-		var newValue string
-
-		// env.X: https://maven.apache.org/pom.html#Properties
-		// e.g. env.PATH
-		if strings.HasPrefix(m[1], "env.") {
-			newValue = os.Getenv(strings.TrimPrefix(m[1], "env."))
-		} else {
-			// <properties> might include another property.
-			// e.g. <animal.sniffer.skip>${skipTests}</animal.sniffer.skip>
-			ss, ok := props[m[1]]
-			if ok {
-				// search for looped properties
-				if slices.Contains(seenProps, ss) {
-					printLoopedPropertiesStack(m[0], seenProps)
-					return ""
-				}
-				seenProps = append(seenProps, ss) // save evaluated props to check if we get this prop again
-				newValue = evaluateVariable(ss, props, seenProps)
-				seenProps = []string{} // clear props if we returned from recursive. Required for correct work with 2 same props like ${foo}-${foo}
-			}
-
+	active := map[string]bool{}
+	steps := 0
+	var expand func(string, int) string
+	expand = func(text string, depth int) string {
+		if depth >= 64 || len(text) > 1<<20 {
+			return text
 		}
-		s = strings.ReplaceAll(s, m[0], newValue)
+		matches := varRegexp.FindAllStringSubmatchIndex(text, -1)
+		var out strings.Builder
+		last := 0
+		for _, m := range matches {
+			steps++
+			if steps > 10000 {
+				return text
+			}
+			key := text[m[2]:m[3]]
+			value := text[m[0]:m[1]]
+			if raw, ok := props[key]; ok && !active[key] && !strings.HasPrefix(key, "env.") {
+				active[key] = true
+				value = expand(raw, depth+1)
+				delete(active, key)
+			}
+			if out.Len()+m[0]-last+len(value) > 1<<20 {
+				return text
+			}
+			out.WriteString(text[last:m[0]])
+			out.WriteString(value)
+			last = m[1]
+		}
+		if out.Len()+len(text)-last > 1<<20 {
+			return text
+		}
+		out.WriteString(text[last:])
+		return out.String()
 	}
-	return s
-}
-
-func printLoopedPropertiesStack(env string, usedProps []string) {
-	var s string
-	for _, prop := range usedProps {
-		s += fmt.Sprintf("%s -> ", prop)
-	}
-	log.Warnf("Lopped properties were detected: %s%s", s, env)
+	return expand(s, 0)
 }

@@ -7,12 +7,14 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"testing"
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
+	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils/filesys"
 	_ "github.com/yaklang/yaklang/common/yak/ssa_compile"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
@@ -746,4 +748,65 @@ alert $hit`,
 	require.NoError(t, err)
 	require.True(t, result.Succeeded)
 	require.Greater(t, alerts, 0)
+}
+
+// reportSpy stands in for a real report (sfreport.SarifReport) and records how
+// the project scan feeds it.
+type reportSpy struct {
+	saves    int
+	results  int
+	saveSeen []int
+}
+
+func (s *reportSpy) AddSyntaxFlowResult(result *ssaapi.SyntaxFlowResult) bool {
+	s.results++
+	return true
+}
+
+func (s *reportSpy) AddSyntaxFlowRisks(...*schema.SSARisk) {}
+
+func (s *reportSpy) SetWriter(writer io.Writer) error { return nil }
+
+func (s *reportSpy) Save() error {
+	s.saves++
+	// Snapshot how many results had streamed in at the moment of each save, so
+	// the test can tell a mid-scan snapshot from the final one.
+	s.saveSeen = append(s.saveSeen, s.results)
+	return nil
+}
+
+// Results stream into one shared report as each stage runs; every stage saves a
+// snapshot of what it has so far, and the project saves the finished document
+// last. That is what keeps findings on disk when a later stage fails.
+func TestScanProject_SavesSnapshotPerStageThenFinal(t *testing.T) {
+	dir := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "app.py"), []byte("eval(user)\n"), 0o644))
+
+	spy := &reportSpy{}
+	_, err := syntaxflow_scan.ScanProject(context.Background(),
+		ssaconfig.WithCodeSourceKind(ssaconfig.CodeSourceLocal),
+		ssaconfig.WithCodeSourceLocalFile(dir),
+		ssaconfig.WithProjectRawLanguage("python"),
+		ssaconfig.WithSetProgramName(t.Name()),
+		syntaxflow_scan.WithMode(syntaxflow_scan.SourceMode),
+		ssaconfig.WithRuleInput(&ypb.SyntaxFlowRuleInput{
+			Content: `desc(mode: "source", language: python, title: "probe")
+${*.py}.pattern_regex(/eval\s*\(/) as $hit
+alert $hit`,
+			Language: "python",
+		}),
+		syntaxflow_scan.WithReporter(spy),
+		ssaconfig.WithScanIgnoreLanguage(true),
+	)
+	require.NoError(t, err)
+
+	require.Positive(t, spy.results, "stage results must stream into the report")
+	require.GreaterOrEqual(t, spy.saves, 2,
+		"the stage must save a snapshot and the project must save the finished report")
+	require.Equal(t, spy.results, spy.saveSeen[len(spy.saveSeen)-1],
+		"the last save must carry every streamed result")
+	for i := 1; i < len(spy.saveSeen); i++ {
+		require.GreaterOrEqual(t, spy.saveSeen[i], spy.saveSeen[i-1],
+			"snapshots may only grow: a later save must never lose earlier findings")
+	}
 }

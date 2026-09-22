@@ -7,6 +7,8 @@ import (
 	"testing"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
+	aiv1 "github.com/yaklang/yaklang/scannode/gen/legionpb/legion/ai/v1"
+	"google.golang.org/protobuf/proto"
 )
 
 func TestValidateYakRiskJudgementScopePinAcceptsExactPrivateCopy(t *testing.T) {
@@ -22,9 +24,9 @@ func TestValidateYakRiskJudgementScopePinAcceptsExactPrivateCopy(t *testing.T) {
 
 func TestValidateYakRiskJudgementScopePinRejectsMismatchAndUnknownFields(t *testing.T) {
 	resultContext := validAIRiskJudgementResultContext()
-	mismatched := *resultContext.RiskJudgementScope
+	mismatched := proto.Clone(resultContext.RiskJudgementScope).(*aiv1.AIFocusRiskJudgementScope)
 	mismatched.ProjectId = "project-other"
-	raw, err := json.Marshal(&mismatched)
+	raw, err := json.Marshal(mismatched)
 	if err != nil {
 		t.Fatal(err)
 	}
