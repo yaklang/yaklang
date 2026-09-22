@@ -454,3 +454,17 @@ func TestLLMNRResponderBudget(t *testing.T) {
 	a.closeUDPSessions()
 	require.Zero(t, a.buffered.Load())
 }
+
+func TestRedisSuppressedSubscriptionBoundary(t *testing.T) {
+	for _, mode := range []string{"OFF", "SKIP"} {
+		ev, _ := sessionTestFlow(t, "redis", []sessionStep{{0, reliabilityRESP("CLIENT", "REPLY", mode)}, {0, reliabilityRESP("SUBSCRIBE", "test")}, {0, reliabilityRESP("CLIENT", "REPLY", "ON")}, {1, []byte("*3\r\n$9\r\nsubscribe\r\n$4\r\ntest\r\n:1\r\n")}}, 1, false)
+		found := false
+		for _, e := range ev {
+			require.Zero(t, e.ResponseTo)
+			if e.ExpertCode == string(ErrContextRequired) {
+				found = true
+			}
+		}
+		require.True(t, found)
+	}
+}

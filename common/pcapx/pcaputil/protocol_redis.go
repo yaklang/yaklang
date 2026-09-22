@@ -275,6 +275,12 @@ func (f *binFlow) consumeRedis(dir int, e *ProtocolEvent) (map[string]any, error
 			return nil, err
 		}
 		if silent {
+			// Subscription acknowledgements bypass reply suppression, while RESP2
+			// subscribed mode can reject ON without a visible error. The ordinary
+			// reply ledger cannot safely recover that combination.
+			if redisSubscription(cmd) {
+				return nil, protocolError(ErrContextRequired, "Redis subscription under reply suppression")
+			}
 			return info, f.reserveSession(r.storage())
 		}
 		if len(r.pending) >= f.a.budget.MaxCollectionElements {
