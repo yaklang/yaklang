@@ -1,0 +1,49 @@
+desc(
+	mode: "source"
+	language: "python"
+	title: "源码扫描：Python 模型批量接收请求体"
+	title_zh: "源码扫描：Python 模型批量接收请求体"
+	type: vuln
+	level: high
+	rule_id: "source-python-model-create-request"
+	risk: "mass-assignment"
+	cwe: "CWE-915"
+	desc: <<<DESC
+### 规则说明
+把 request.json 或 request.POST 展开进 Model.objects.create，客户端可以提交本不该写的字段。
+
+### 风险类型
+mass-assignment
+
+### 影响
+命中说明代码里出现了该危险 API、配置或数据流入口。
+
+### 检测方式
+源码模式正则匹配，定位源码中的危险调用或配置。
+### 参考
+- CWE-915
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+显式取出允许的字段，或使用只包含这些字段的 serializer。
+SOLUTION
+	alert_min: 1
+	"file://bad.py": <<<POS
+def bad(request):
+    User.objects.create(**request.json)
+
+POS
+	"safefile://ok.py": <<<NEG
+def ok(request):
+    User.objects.create(name=request.json.get("name"))
+
+NEG
+)
+${*.py}.pattern_regex(/objects\.create\s*\(\s*\*\*|objects\.update\s*\(\s*\*\*/) as $hit
+alert $hit for {
+	level: "high",
+	title: "源码扫描：Python 模型批量接收请求体",
+	title_zh: "源码扫描：Python 模型批量接收请求体",
+	message: "源码扫描：Python 模型批量接收请求体",
+	risk: "mass-assignment",
+}

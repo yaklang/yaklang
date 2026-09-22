@@ -1,0 +1,47 @@
+desc(
+	mode: "source"
+	language: "csharp"
+	title: "源码扫描：C# Activator.CreateInstance 外部类型"
+	title_zh: "源码扫描：C# Activator.CreateInstance 外部类型"
+	type: vuln
+	level: high
+	rule_id: "source-csharp-activator-create"
+	risk: "reflection-abuse"
+	cwe: "CWE-470"
+	desc: <<<DESC
+### 规则说明
+按外部字符串创建类型可以加载意外类型并执行其构造逻辑。
+
+### 风险类型
+reflection-abuse
+
+### 影响
+命中说明代码里出现了该危险 API、配置或数据流入口。
+
+### 检测方式
+源码模式正则匹配，定位源码中的危险调用或配置。
+### 参考
+- CWE-470
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+只用白名单类型名，禁止把请求参数传给 Type.GetType 或 Activator.CreateInstance。
+SOLUTION
+	alert_min: 1
+	"file://bad.cs": <<<POS
+class Bad { object n(string name) { return System.Activator.CreateInstance(System.Type.GetType(name)); } }
+
+POS
+	"safefile://ok.cs": <<<NEG
+class Ok { object n() { return new object(); } }
+
+NEG
+)
+${*.cs}.pattern_regex(/Activator\.CreateInstance\s*\(|Type\.GetType\s*\(/) as $hit
+alert $hit for {
+	level: "high",
+	title: "源码扫描：C# Activator.CreateInstance 外部类型",
+	title_zh: "源码扫描：C# Activator.CreateInstance 外部类型",
+	message: "源码扫描：C# Activator.CreateInstance 外部类型",
+	risk: "reflection-abuse",
+}

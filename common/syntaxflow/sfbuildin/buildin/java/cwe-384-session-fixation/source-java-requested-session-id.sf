@@ -1,0 +1,47 @@
+desc(
+	mode: "source"
+	language: "java"
+	title: "源码扫描：Java 使用客户端会话 ID"
+	title_zh: "源码扫描：Java 使用客户端会话 ID"
+	type: vuln
+	level: high
+	rule_id: "source-java-requested-session-id"
+	risk: "session-fixation"
+	cwe: "CWE-384"
+	desc: <<<DESC
+### 规则说明
+getRequestedSessionId 返回客户端提交的会话标识。把它当作已认证会话会允许会话固定。
+
+### 风险类型
+session-fixation
+
+### 影响
+命中说明代码里出现了该危险 API、配置或数据流入口。
+
+### 检测方式
+源码模式正则匹配，定位源码中的危险调用或配置。
+### 参考
+- CWE-384
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+登录成功后调用 changeSessionId 或重新创建会话，不要信任请求里带来的会话 ID。
+SOLUTION
+	alert_min: 1
+	"file://bad.java": <<<POS
+class Bad { String id(javax.servlet.http.HttpServletRequest req) { return req.getRequestedSessionId(); } }
+
+POS
+	"safefile://ok.java": <<<NEG
+class Ok { void id(javax.servlet.http.HttpServletRequest req) { req.changeSessionId(); } }
+
+NEG
+)
+${*.java}.pattern_regex(/getRequestedSessionId\s*\(/) as $hit
+alert $hit for {
+	level: "high",
+	title: "源码扫描：Java 使用客户端会话 ID",
+	title_zh: "源码扫描：Java 使用客户端会话 ID",
+	message: "源码扫描：Java 使用客户端会话 ID",
+	risk: "session-fixation",
+}

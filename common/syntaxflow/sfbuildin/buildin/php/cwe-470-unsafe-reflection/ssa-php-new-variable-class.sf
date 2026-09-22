@@ -1,0 +1,49 @@
+desc(
+	mode: "ssa"
+	language: "php"
+	title: "数据流：PHP 可变类实例化"
+	title_zh: "数据流：PHP 可变类实例化"
+	type: vuln
+	level: high
+	rule_id: "ssa-php-new-variable-class"
+	risk: "reflection-abuse"
+	cwe: "CWE-470"
+	desc: <<<DESC
+### 规则说明
+new $class 按外部字符串创建对象，可以实例化意外类。
+
+### 风险类型
+reflection-abuse
+
+### 影响
+实参本身来自另一次调用时告警。常量字符串不报。
+
+### 检测方式
+SSA 上匹配调用，保留非常量且非 param 的实参。
+### 参考
+- CWE-470
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+用白名单映射类名，禁止直接 new 请求参数。
+SOLUTION
+	alert_min: 1
+	"file://bad.php": <<<POS
+<?php
+function bad() { return new ReflectionClass(input()); }
+
+POS
+	"safefile://ok.php": <<<NEG
+<?php
+function ok() { return new ReflectionClass("User"); }
+
+NEG
+)
+ReflectionClass(*?{opcode: call} as $dyn) as $call
+alert $dyn for {
+	level: "high",
+	title: "数据流：PHP 可变类实例化",
+	title_zh: "数据流：PHP 可变类实例化",
+	message: "数据流：PHP 可变类实例化",
+	risk: "reflection-abuse",
+}

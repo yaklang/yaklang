@@ -1,0 +1,48 @@
+desc(
+	mode: "source"
+	language: "c"
+	title: "源码扫描：C ldap_search 过滤器"
+	title_zh: "源码扫描：C ldap_search 过滤器"
+	type: vuln
+	level: high
+	rule_id: "source-c-ldap-search"
+	risk: "ldap-injection"
+	cwe: "CWE-90"
+	desc: <<<DESC
+### 规则说明
+ldap_search / ldap_search_s 的过滤器来自外部字符串时，可以改写 LDAP 查询。
+
+### 风险类型
+ldap-injection
+
+### 影响
+命中说明代码里出现了该危险 API、配置或数据流入口。
+
+### 检测方式
+源码模式正则匹配，定位源码中的危险调用或配置。
+### 参考
+- CWE-90
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+对过滤器特殊字符转义，或只允许白名单值。
+SOLUTION
+	alert_min: 1
+	"file://bad.c": <<<POS
+#include <ldap.h>
+void bad(LDAP *ld, char *filter) { ldap_search_s(ld, "dc=a", 2, filter, 0, 0, 0); }
+
+POS
+	"safefile://ok.c": <<<NEG
+void ok(void) { int n = 1; }
+
+NEG
+)
+${*.c}.pattern_regex(/ldap_search(_s|_ext|_ext_s)?\s*\(/) as $hit
+alert $hit for {
+	level: "high",
+	title: "源码扫描：C ldap_search 过滤器",
+	title_zh: "源码扫描：C ldap_search 过滤器",
+	message: "源码扫描：C ldap_search 过滤器",
+	risk: "ldap-injection",
+}

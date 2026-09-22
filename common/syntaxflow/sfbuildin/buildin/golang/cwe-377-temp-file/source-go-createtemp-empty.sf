@@ -1,0 +1,51 @@
+desc(
+	mode: "source"
+	language: "golang"
+	title: "源码扫描：Go CreateTemp 空目录"
+	title_zh: "源码扫描：Go CreateTemp 空目录"
+	type: vuln
+	level: middle
+	rule_id: "source-go-createtemp-empty"
+	risk: "security-misconfiguration"
+	cwe: "CWE-377"
+	desc: <<<DESC
+### 规则说明
+os.CreateTemp 或 ioutil.TempFile 的目录为空字符串时，文件落在共享临时目录，名字也可预测。
+
+### 风险类型
+security-misconfiguration
+
+### 影响
+命中说明代码里出现了该危险 API、配置或数据流入口。
+
+### 检测方式
+源码模式正则匹配，定位源码中的危险调用或配置。
+### 参考
+- CWE-377
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+传入应用私有目录，并使用足够随机的模式。
+SOLUTION
+	alert_min: 1
+	"file://bad.go": <<<POS
+package main
+import "os"
+func bad() { os.CreateTemp("", "app-") }
+
+POS
+	"safefile://ok.go": <<<NEG
+package main
+import "os"
+func ok() { os.CreateTemp("/var/app", "app-") }
+
+NEG
+)
+${*.go}.pattern_regex(/(os\.CreateTemp|ioutil\.TempFile)\s*\(\s*\"\"/) as $hit
+alert $hit for {
+	level: "middle",
+	title: "源码扫描：Go CreateTemp 空目录",
+	title_zh: "源码扫描：Go CreateTemp 空目录",
+	message: "源码扫描：Go CreateTemp 空目录",
+	risk: "security-misconfiguration",
+}

@@ -1,0 +1,47 @@
+desc(
+	mode: "source"
+	language: "javascript"
+	title: "源码扫描：JavaScript setHeader 写入外部值"
+	title_zh: "源码扫描：JavaScript setHeader 写入外部值"
+	type: vuln
+	level: high
+	rule_id: "source-js-set-header"
+	risk: "crlf-injection"
+	cwe: "CWE-113"
+	desc: <<<DESC
+### 规则说明
+res.setHeader 的值来自请求时，CR/LF 可以注入额外响应头。
+
+### 风险类型
+crlf-injection
+
+### 影响
+命中说明代码里出现了该危险 API、配置或数据流入口。
+
+### 检测方式
+源码模式正则匹配，定位源码中的危险调用或配置。
+### 参考
+- CWE-113
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+去掉头部值中的换行。
+SOLUTION
+	alert_min: 1
+	"file://bad.js": <<<POS
+function bad(res, v) { res.setHeader("X-Name", v); }
+
+POS
+	"safefile://ok.js": <<<NEG
+function ok(res) { res.status(200); }
+
+NEG
+)
+${*.js}.pattern_regex(/setHeader\s*\(/) as $hit
+alert $hit for {
+	level: "high",
+	title: "源码扫描：JavaScript setHeader 写入外部值",
+	title_zh: "源码扫描：JavaScript setHeader 写入外部值",
+	message: "源码扫描：JavaScript setHeader 写入外部值",
+	risk: "crlf-injection",
+}

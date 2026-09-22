@@ -1,0 +1,50 @@
+desc(
+	mode: "struct"
+	language: "golang"
+	title: "结构扫描：Go JWT ParseUnverified"
+	title_zh: "结构扫描：Go JWT ParseUnverified"
+	type: vuln
+	level: high
+	rule_id: "struct-go-jwt-parse-unverified"
+	risk: "improper-authentication"
+	cwe: "CWE-345"
+	desc: <<<DESC
+### 规则说明
+ParseUnverified 只解码 JWT，不校验签名。调用方会信任攻击者伪造的声明。
+
+### 风险类型
+improper-authentication
+
+### 影响
+命中说明编译单元里出现了该调用，而不是注释或字符串。
+
+### 检测方式
+结构扫描匹配真实调用。
+### 参考
+- CWE-345
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+使用 Parse 并限制允许的签名算法，提供密钥或公钥。
+SOLUTION
+	alert_min: 1
+	"file://bad.go": <<<POS
+package main
+func bad(p interface{ ParseUnverified(string, interface{}) }, s string, c interface{}) { p.ParseUnverified(s, c) }
+
+POS
+	"safefile://ok.go": <<<NEG
+package main
+func ok() { println("parse") }
+
+NEG
+)
+ParseUnverified as $call
+ParseUnverified(* as $arg) as $call
+alert $call for {
+	level: "high",
+	title: "结构扫描：Go JWT ParseUnverified",
+	title_zh: "结构扫描：Go JWT ParseUnverified",
+	message: "结构扫描：Go JWT ParseUnverified",
+	risk: "improper-authentication",
+}

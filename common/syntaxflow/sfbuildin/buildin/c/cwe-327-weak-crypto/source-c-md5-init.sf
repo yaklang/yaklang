@@ -1,0 +1,48 @@
+desc(
+	mode: "source"
+	language: "c"
+	title: "源码扫描：C MD5_Init"
+	title_zh: "源码扫描：C MD5_Init"
+	type: vuln
+	level: high
+	rule_id: "source-c-md5-init"
+	risk: "weak-cryptographic-algorithm"
+	cwe: "CWE-327"
+	desc: <<<DESC
+### 规则说明
+MD5 已不应用于完整性或口令。MD5_Init 表示代码仍在使用该算法。
+
+### 风险类型
+weak-cryptographic-algorithm
+
+### 影响
+命中说明代码里出现了该危险 API、配置或数据流入口。
+
+### 检测方式
+源码模式正则匹配，定位源码中的危险调用或配置。
+### 参考
+- CWE-327
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+改用 SHA-256 或专门的口令哈希。
+SOLUTION
+	alert_min: 1
+	"file://bad.c": <<<POS
+void MD5_Init(void *c);
+void bad(void *c) { MD5_Init(c); }
+
+POS
+	"safefile://ok.c": <<<NEG
+void ok(void) { int n = 1; }
+
+NEG
+)
+${*.c}.pattern_regex(/MD5_Init\s*\(/) as $hit
+alert $hit for {
+	level: "high",
+	title: "源码扫描：C MD5_Init",
+	title_zh: "源码扫描：C MD5_Init",
+	message: "源码扫描：C MD5_Init",
+	risk: "weak-cryptographic-algorithm",
+}

@@ -1,0 +1,47 @@
+desc(
+	mode: "source"
+	language: "csharp"
+	title: "源码扫描：C# CORS 允许任意来源"
+	title_zh: "源码扫描：C# CORS 允许任意来源"
+	type: vuln
+	level: middle
+	rule_id: "source-csharp-allow-any-origin"
+	risk: "cors"
+	cwe: "CWE-942"
+	desc: <<<DESC
+### 规则说明
+AllowAnyOrigin 会把接口暴露给任意网站。配合凭据时浏览器同源策略失效。
+
+### 风险类型
+cors
+
+### 影响
+命中说明代码里出现了该危险 API、配置或数据流入口。
+
+### 检测方式
+源码模式正则匹配，定位源码中的危险调用或配置。
+### 参考
+- CWE-942
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+用 WithOrigins 列出允许的来源，不要调用 AllowAnyOrigin。
+SOLUTION
+	alert_min: 1
+	"file://bad.cs": <<<POS
+class Bad { void c(Microsoft.AspNetCore.Cors.Infrastructure.CorsPolicyBuilder b) { b.AllowAnyOrigin(); } }
+
+POS
+	"safefile://ok.cs": <<<NEG
+class Ok { void c(Microsoft.AspNetCore.Cors.Infrastructure.CorsPolicyBuilder b) { b.WithOrigins("https://app.example"); } }
+
+NEG
+)
+${*.cs}.pattern_regex(/AllowAnyOrigin\s*\(/) as $hit
+alert $hit for {
+	level: "middle",
+	title: "源码扫描：C# CORS 允许任意来源",
+	title_zh: "源码扫描：C# CORS 允许任意来源",
+	message: "源码扫描：C# CORS 允许任意来源",
+	risk: "cors",
+}

@@ -1,0 +1,47 @@
+desc(
+	mode: "source"
+	language: "java"
+	title: "源码扫描：Java 单元格公式注入"
+	title_zh: "源码扫描：Java 单元格公式注入"
+	type: vuln
+	level: high
+	rule_id: "source-java-cell-formula"
+	risk: "formula-injection"
+	cwe: "CWE-1236"
+	desc: <<<DESC
+### 规则说明
+把外部数据写入表格公式（setCellFormula 或以 = 开头的单元格）时，电子表格软件会执行该公式。
+
+### 风险类型
+formula-injection
+
+### 影响
+命中说明代码里出现了该危险 API、配置或数据流入口。
+
+### 检测方式
+源码模式正则匹配，定位源码中的危险调用或配置。
+### 参考
+- CWE-1236
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+对以 =、+、-、@ 开头的单元格加前缀转义，或只写入已校验的纯文本。
+SOLUTION
+	alert_min: 1
+	"file://bad.java": <<<POS
+class Bad { void w(org.apache.poi.ss.usermodel.Cell c, String v) { c.setCellFormula(v); } }
+
+POS
+	"safefile://ok.java": <<<NEG
+class Ok { void w(org.apache.poi.ss.usermodel.Cell c) { c.setCellValue("text"); } }
+
+NEG
+)
+${*.java}.pattern_regex(/setCellFormula\s*\(/) as $hit
+alert $hit for {
+	level: "high",
+	title: "源码扫描：Java 单元格公式注入",
+	title_zh: "源码扫描：Java 单元格公式注入",
+	message: "源码扫描：Java 单元格公式注入",
+	risk: "formula-injection",
+}

@@ -1,0 +1,49 @@
+desc(
+	mode: "ssa"
+	language: "python"
+	title: "数据流：Python 日志拼接外部数据"
+	title_zh: "数据流：Python 日志拼接外部数据"
+	type: vuln
+	level: middle
+	rule_id: "ssa-python-log-concat"
+	risk: "log-forging"
+	cwe: "CWE-117"
+	desc: <<<DESC
+### 规则说明
+logging 调用里拼接外部字符串可以伪造日志行。
+
+### 风险类型
+log-forging
+
+### 影响
+参数不是常量，且不是函数自身的参数对象时告警。常量配置和纯参数传递不报。
+
+### 检测方式
+SSA 上匹配调用，保留非常量且非 param 的实参。
+### 参考
+- CWE-117
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+使用 logging 的 %s 占位符，并去掉换行。
+SOLUTION
+	alert_min: 1
+	"file://bad.py": <<<POS
+def bad(logging, request):
+    logging.info(request.args.get("user"))
+
+POS
+	"safefile://ok.py": <<<NEG
+def ok(logging):
+    logging.info("login ok")
+
+NEG
+)
+info(*?{!opcode: const && !opcode: param} as $dyn) as $call
+alert $dyn for {
+	level: "middle",
+	title: "数据流：Python 日志拼接外部数据",
+	title_zh: "数据流：Python 日志拼接外部数据",
+	message: "数据流：Python 日志拼接外部数据",
+	risk: "log-forging",
+}

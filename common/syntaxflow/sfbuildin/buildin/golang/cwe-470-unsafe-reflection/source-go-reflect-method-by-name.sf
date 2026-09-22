@@ -1,0 +1,50 @@
+desc(
+	mode: "source"
+	language: "golang"
+	title: "源码扫描：Go MethodByName 使用外部名字"
+	title_zh: "源码扫描：Go MethodByName 使用外部名字"
+	type: vuln
+	level: middle
+	rule_id: "source-go-reflect-method-by-name"
+	risk: "reflection-abuse"
+	cwe: "CWE-470"
+	desc: <<<DESC
+### 规则说明
+reflect.Value.MethodByName 的方法名来自外部时，可以调用本不该暴露的方法。
+
+### 风险类型
+reflection-abuse
+
+### 影响
+命中说明代码里出现了该危险 API、配置或数据流入口。
+
+### 检测方式
+源码模式正则匹配，定位源码中的危险调用或配置。
+### 参考
+- CWE-470
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+用白名单映射方法名，不要直接使用请求参数。
+SOLUTION
+	alert_min: 1
+	"file://bad.go": <<<POS
+package main
+import "reflect"
+func bad(v reflect.Value, name string) { v.MethodByName(name) }
+
+POS
+	"safefile://ok.go": <<<NEG
+package main
+func ok() { println("known") }
+
+NEG
+)
+${*.go}.pattern_regex(/MethodByName\s*\(/) as $hit
+alert $hit for {
+	level: "middle",
+	title: "源码扫描：Go MethodByName 使用外部名字",
+	title_zh: "源码扫描：Go MethodByName 使用外部名字",
+	message: "源码扫描：Go MethodByName 使用外部名字",
+	risk: "reflection-abuse",
+}

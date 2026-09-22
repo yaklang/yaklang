@@ -1,0 +1,50 @@
+desc(
+	mode: "struct"
+	language: "python"
+	title: "结构扫描：Python CORS 允许任意来源"
+	title_zh: "结构扫描：Python CORS 允许任意来源"
+	type: vuln
+	level: middle
+	rule_id: "struct-python-cors-star"
+	risk: "cors"
+	cwe: "CWE-942"
+	desc: <<<DESC
+### 规则说明
+origins='*' 或 resources={r'*': ...} 会允许任意网站读取接口响应。
+
+### 风险类型
+cors
+
+### 影响
+命中说明编译单元里出现了该调用，而不是注释或字符串。
+
+### 检测方式
+结构扫描匹配真实调用。
+### 参考
+- CWE-942
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+列出明确的来源，不要使用星号。
+SOLUTION
+	alert_min: 1
+	"file://bad.py": <<<POS
+def bad(app):
+    CORS(app)
+
+POS
+	"safefile://ok.py": <<<NEG
+def ok():
+    return 1
+
+NEG
+)
+CORS as $call
+CORS(* as $arg) as $call
+alert $call for {
+	level: "middle",
+	title: "结构扫描：Python CORS 允许任意来源",
+	title_zh: "结构扫描：Python CORS 允许任意来源",
+	message: "结构扫描：Python CORS 允许任意来源",
+	risk: "cors",
+}

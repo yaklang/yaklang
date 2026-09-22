@@ -1,0 +1,49 @@
+desc(
+	mode: "source"
+	language: "golang"
+	title: "源码扫描：Go JWT ParseUnverified"
+	title_zh: "源码扫描：Go JWT ParseUnverified"
+	type: vuln
+	level: high
+	rule_id: "source-go-jwt-parse-unverified"
+	risk: "improper-authentication"
+	cwe: "CWE-345"
+	desc: <<<DESC
+### 规则说明
+ParseUnverified 只解码 JWT，不校验签名。调用方会信任攻击者伪造的声明。
+
+### 风险类型
+improper-authentication
+
+### 影响
+命中说明代码里出现了该危险 API、配置或数据流入口。
+
+### 检测方式
+源码模式正则匹配，定位源码中的危险调用或配置。
+### 参考
+- CWE-345
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+使用 Parse 并限制允许的签名算法，提供密钥或公钥。
+SOLUTION
+	alert_min: 1
+	"file://bad.go": <<<POS
+package main
+func bad(p interface{ ParseUnverified(string, interface{}) }, s string, c interface{}) { p.ParseUnverified(s, c) }
+
+POS
+	"safefile://ok.go": <<<NEG
+package main
+func ok() { println("parse") }
+
+NEG
+)
+${*.go}.pattern_regex(/ParseUnverified\s*\(/) as $hit
+alert $hit for {
+	level: "high",
+	title: "源码扫描：Go JWT ParseUnverified",
+	title_zh: "源码扫描：Go JWT ParseUnverified",
+	message: "源码扫描：Go JWT ParseUnverified",
+	risk: "improper-authentication",
+}

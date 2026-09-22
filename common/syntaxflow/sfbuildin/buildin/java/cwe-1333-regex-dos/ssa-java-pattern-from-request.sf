@@ -1,0 +1,49 @@
+desc(
+	mode: "ssa"
+	language: "java"
+	title: "数据流：Java 用请求编译正则"
+	title_zh: "数据流：Java 用请求编译正则"
+	type: vuln
+	level: middle
+	rule_id: "ssa-java-pattern-from-request"
+	risk: "regex-dos"
+	cwe: "CWE-1333"
+	desc: <<<DESC
+### 规则说明
+Pattern.compile 的模式来自请求时，攻击者可以提交回溯爆炸的正则，造成拒绝服务。
+
+### 风险类型
+regex-dos
+
+### 影响
+实参本身来自另一次调用时告警。常量字符串不报。
+
+### 检测方式
+SSA 上匹配调用，保留非常量且非 param 的实参。
+### 参考
+- CWE-1333
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+只编译固定的正则。若必须接收模式，限制长度和字符集，并设置匹配超时。
+SOLUTION
+	alert_min: 1
+	"file://bad.java": <<<POS
+import java.util.regex.Pattern;
+class Bad { void c(javax.servlet.http.HttpServletRequest req) { Pattern.compile(req.getParameter("re")); } }
+
+POS
+	"safefile://ok.java": <<<NEG
+import java.util.regex.Pattern;
+class Ok { void c() { Pattern.compile("^[a-z]+$"); } }
+
+NEG
+)
+compile(*?{opcode: call} as $dyn) as $call
+alert $dyn for {
+	level: "middle",
+	title: "数据流：Java 用请求编译正则",
+	title_zh: "数据流：Java 用请求编译正则",
+	message: "数据流：Java 用请求编译正则",
+	risk: "regex-dos",
+}

@@ -1,0 +1,49 @@
+desc(
+	mode: "source"
+	language: "terraform"
+	title: "源码扫描：Terraform 0.0.0.0/0"
+	title_zh: "源码扫描：Terraform 0.0.0.0/0"
+	type: vuln
+	level: high
+	rule_id: "source-terraform-open-cidr"
+	risk: "security-misconfiguration"
+	cwe: "CWE-284"
+	desc: <<<DESC
+### 规则说明
+0.0.0.0/0 把安全组或防火墙开到全网。
+
+该语言的 struct/ssa 前端还没有接入。当前只保留 source 规则，builtin verify 会跳过 pending-language 目录。
+
+### 风险类型
+security-misconfiguration
+
+### 影响
+命中说明文件中出现了该危险写法。
+
+### 检测方式
+源码模式正则匹配。
+### 参考
+- CWE-284
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+收紧到需要访问的网段。
+SOLUTION
+	alert_min: 1
+	"file://bad.tf": <<<POS
+resource "aws_security_group_rule" "r" { cidr_blocks = ["0.0.0.0/0"] }
+
+POS
+	"safefile://ok.tf": <<<NEG
+resource "aws_security_group_rule" "r" { cidr_blocks = ["10.0.0.0/8"] }
+
+NEG
+)
+${*.tf}.pattern_regex(/0\.0\.0\.0/) as $hit
+alert $hit for {
+	level: "high",
+	title: "源码扫描：Terraform 0.0.0.0/0",
+	title_zh: "源码扫描：Terraform 0.0.0.0/0",
+	message: "源码扫描：Terraform 0.0.0.0/0",
+	risk: "security-misconfiguration",
+}

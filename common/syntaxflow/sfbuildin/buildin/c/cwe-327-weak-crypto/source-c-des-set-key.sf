@@ -1,0 +1,48 @@
+desc(
+	mode: "source"
+	language: "c"
+	title: "源码扫描：C DES_set_key"
+	title_zh: "源码扫描：C DES_set_key"
+	type: vuln
+	level: high
+	rule_id: "source-c-des-set-key"
+	risk: "weak-cryptographic-algorithm"
+	cwe: "CWE-327"
+	desc: <<<DESC
+### 规则说明
+DES 密钥长度不足。DES_set_key 表示仍在使用该算法。
+
+### 风险类型
+weak-cryptographic-algorithm
+
+### 影响
+命中说明代码里出现了该危险 API、配置或数据流入口。
+
+### 检测方式
+源码模式正则匹配，定位源码中的危险调用或配置。
+### 参考
+- CWE-327
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+改用 AES-GCM。
+SOLUTION
+	alert_min: 1
+	"file://bad.c": <<<POS
+void DES_set_key(void *k, void *s);
+void bad(void *k, void *s) { DES_set_key(k, s); }
+
+POS
+	"safefile://ok.c": <<<NEG
+void ok(void) { int n = 1; }
+
+NEG
+)
+${*.c}.pattern_regex(/DES_set_key\s*\(/) as $hit
+alert $hit for {
+	level: "high",
+	title: "源码扫描：C DES_set_key",
+	title_zh: "源码扫描：C DES_set_key",
+	message: "源码扫描：C DES_set_key",
+	risk: "weak-cryptographic-algorithm",
+}

@@ -1,0 +1,49 @@
+desc(
+	mode: "source"
+	language: "terraform"
+	title: "源码扫描：Terraform 公开 ACL"
+	title_zh: "源码扫描：Terraform 公开 ACL"
+	type: vuln
+	level: high
+	rule_id: "source-terraform-public-acl"
+	risk: "security-misconfiguration"
+	cwe: "CWE-732"
+	desc: <<<DESC
+### 规则说明
+acl = public-read 或 public-read-write 会把对象存储暴露到公网。
+
+该语言的 struct/ssa 前端还没有接入。当前只保留 source 规则，builtin verify 会跳过 pending-language 目录。
+
+### 风险类型
+security-misconfiguration
+
+### 影响
+命中说明文件中出现了该危险写法。
+
+### 检测方式
+源码模式正则匹配。
+### 参考
+- CWE-732
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+使用 private ACL，并通过显式策略授权。
+SOLUTION
+	alert_min: 1
+	"file://bad.tf": <<<POS
+resource "aws_s3_bucket" "b" { acl = "public-read" }
+
+POS
+	"safefile://ok.tf": <<<NEG
+resource "aws_s3_bucket" "b" { acl = "private" }
+
+NEG
+)
+${*.tf}.pattern_regex(/acl\s*=\s*\"public-read/) as $hit
+alert $hit for {
+	level: "high",
+	title: "源码扫描：Terraform 公开 ACL",
+	title_zh: "源码扫描：Terraform 公开 ACL",
+	message: "源码扫描：Terraform 公开 ACL",
+	risk: "security-misconfiguration",
+}

@@ -1,0 +1,47 @@
+desc(
+	mode: "ssa"
+	language: "java"
+	title: "数据流：Java MongoDB 查询拼接"
+	title_zh: "数据流：Java MongoDB 查询拼接"
+	type: vuln
+	level: high
+	rule_id: "ssa-java-mongodb-nosql"
+	risk: "nosql-injection"
+	cwe: "CWE-943"
+	desc: <<<DESC
+### 规则说明
+把外部字符串拼进 MongoDB 查询条件（BasicDBObject、Filters.regex 或 $where）会造成 NoSQL 注入。
+
+### 风险类型
+nosql-injection
+
+### 影响
+参数不是常量，且不是函数自身的参数对象时告警。常量配置和纯参数传递不报。
+
+### 检测方式
+SSA 上匹配调用，保留非常量且非 param 的实参。
+### 参考
+- CWE-943
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+使用驱动的参数化过滤器，禁止把请求参数拼进 `$where` 或正则。
+SOLUTION
+	alert_min: 1
+	"file://bad.java": <<<POS
+class Bad { void q(org.bson.Document d, javax.servlet.http.HttpServletRequest req) { d.put("$where", req.getParameter("id")); } }
+
+POS
+	"safefile://ok.java": <<<NEG
+class Ok { void q(org.bson.Document d) { d.put("name", "fixed"); } }
+
+NEG
+)
+put(*?{!opcode: const && !opcode: param} as $dyn) as $call
+alert $dyn for {
+	level: "high",
+	title: "数据流：Java MongoDB 查询拼接",
+	title_zh: "数据流：Java MongoDB 查询拼接",
+	message: "数据流：Java MongoDB 查询拼接",
+	risk: "nosql-injection",
+}

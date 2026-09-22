@@ -1,0 +1,49 @@
+desc(
+	mode: "struct"
+	language: "java"
+	title: "结构扫描：Java 用请求编译正则"
+	title_zh: "结构扫描：Java 用请求编译正则"
+	type: vuln
+	level: middle
+	rule_id: "struct-java-pattern-from-request"
+	risk: "regex-dos"
+	cwe: "CWE-1333"
+	desc: <<<DESC
+### 规则说明
+Pattern.compile 的模式来自请求时，攻击者可以提交回溯爆炸的正则，造成拒绝服务。
+
+### 风险类型
+regex-dos
+
+### 影响
+命中说明编译单元里出现了该调用，而不是注释或字符串。
+
+### 检测方式
+结构扫描匹配真实调用。
+### 参考
+- CWE-1333
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+只编译固定的正则。若必须接收模式，限制长度和字符集，并设置匹配超时。
+SOLUTION
+	alert_min: 1
+	"file://bad.java": <<<POS
+import java.util.regex.Pattern;
+class Bad { void c(String p) { Pattern.compile(p); } }
+
+POS
+	"safefile://ok.java": <<<NEG
+class Ok { void c() { int n = 1; } }
+
+NEG
+)
+compile as $call
+compile(* as $arg) as $call
+alert $call for {
+	level: "middle",
+	title: "结构扫描：Java 用请求编译正则",
+	title_zh: "结构扫描：Java 用请求编译正则",
+	message: "结构扫描：Java 用请求编译正则",
+	risk: "regex-dos",
+}

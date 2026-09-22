@@ -1,0 +1,50 @@
+desc(
+	mode: "source"
+	language: "golang"
+	title: "源码扫描：Go grpc.WithInsecure"
+	title_zh: "源码扫描：Go grpc.WithInsecure"
+	type: vuln
+	level: high
+	rule_id: "source-go-grpc-with-insecure"
+	risk: "cleartext-transmission"
+	cwe: "CWE-319"
+	desc: <<<DESC
+### 规则说明
+grpc.WithInsecure 关闭传输加密，令牌和业务数据以明文发送。
+
+### 风险类型
+cleartext-transmission
+
+### 影响
+命中说明代码里出现了该危险 API、配置或数据流入口。
+
+### 检测方式
+源码模式正则匹配，定位源码中的危险调用或配置。
+### 参考
+- CWE-319
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+使用 TLS 凭据 grpc.WithTransportCredentials。
+SOLUTION
+	alert_min: 1
+	"file://bad.go": <<<POS
+package main
+import "google.golang.org/grpc"
+func bad(target string) { grpc.Dial(target, grpc.WithInsecure()) }
+
+POS
+	"safefile://ok.go": <<<NEG
+package main
+func ok(target string) { _ = target }
+
+NEG
+)
+${*.go}.pattern_regex(/grpc\.WithInsecure\s*\(/) as $hit
+alert $hit for {
+	level: "high",
+	title: "源码扫描：Go grpc.WithInsecure",
+	title_zh: "源码扫描：Go grpc.WithInsecure",
+	message: "源码扫描：Go grpc.WithInsecure",
+	risk: "cleartext-transmission",
+}

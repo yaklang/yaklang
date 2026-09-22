@@ -1,0 +1,49 @@
+desc(
+	mode: "source"
+	language: "ruby"
+	title: "源码扫描：Ruby html_safe / raw"
+	title_zh: "源码扫描：Ruby html_safe / raw"
+	type: vuln
+	level: high
+	rule_id: "source-ruby-html-safe"
+	risk: "xss"
+	cwe: "CWE-79"
+	desc: <<<DESC
+### 规则说明
+html_safe 和 raw 会把字符串标记为已安全，跳过模板转义。
+
+该语言的 struct/ssa 前端还没有接入。当前只保留 source 规则，builtin verify 会跳过 pending-language 目录。
+
+### 风险类型
+xss
+
+### 影响
+命中说明文件中出现了该危险写法。
+
+### 检测方式
+源码模式正则匹配。
+### 参考
+- CWE-79
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+不要对外部数据调用 html_safe。需要 HTML 时用白名单净化库。
+SOLUTION
+	alert_min: 1
+	"file://bad.rb": <<<POS
+def bad(s); s.html_safe; end
+
+POS
+	"safefile://ok.rb": <<<NEG
+def ok(s); s.to_s; end
+
+NEG
+)
+${*.rb}.pattern_regex(/\.html_safe|raw\s*\(/) as $hit
+alert $hit for {
+	level: "high",
+	title: "源码扫描：Ruby html_safe / raw",
+	title_zh: "源码扫描：Ruby html_safe / raw",
+	message: "源码扫描：Ruby html_safe / raw",
+	risk: "xss",
+}

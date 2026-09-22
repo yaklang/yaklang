@@ -1,0 +1,51 @@
+desc(
+	mode: "source"
+	language: "python"
+	title: "源码扫描：Python 日志拼接外部数据"
+	title_zh: "源码扫描：Python 日志拼接外部数据"
+	type: vuln
+	level: middle
+	rule_id: "source-python-log-concat"
+	risk: "log-forging"
+	cwe: "CWE-117"
+	desc: <<<DESC
+### 规则说明
+logging 调用里拼接外部字符串可以伪造日志行。
+
+### 风险类型
+log-forging
+
+### 影响
+命中说明代码里出现了该危险 API、配置或数据流入口。
+
+### 检测方式
+源码模式正则匹配，定位源码中的危险调用或配置。
+### 参考
+- CWE-117
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+使用 logging 的 %s 占位符，并去掉换行。
+SOLUTION
+	alert_min: 1
+	"file://bad.py": <<<POS
+import logging
+def bad(user):
+    logging.info("login " + user)
+
+POS
+	"safefile://ok.py": <<<NEG
+import logging
+def ok():
+    logging.info("login ok")
+
+NEG
+)
+${*.py}.pattern_regex(/logging\.(info|warning|error|debug)\s*\([^)]*\+/) as $hit
+alert $hit for {
+	level: "middle",
+	title: "源码扫描：Python 日志拼接外部数据",
+	title_zh: "源码扫描：Python 日志拼接外部数据",
+	message: "源码扫描：Python 日志拼接外部数据",
+	risk: "log-forging",
+}

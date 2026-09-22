@@ -1,0 +1,47 @@
+desc(
+	mode: "source"
+	language: "java"
+	title: "源码扫描：Java 会话写入请求参数"
+	title_zh: "源码扫描：Java 会话写入请求参数"
+	type: vuln
+	level: middle
+	rule_id: "source-java-session-set-request"
+	risk: "access-control"
+	cwe: "CWE-501"
+	desc: <<<DESC
+### 规则说明
+把请求参数直接放进 HttpSession，等于让客户端数据跨过信任边界进入服务端会话。
+
+### 风险类型
+access-control
+
+### 影响
+命中说明代码里出现了该危险 API、配置或数据流入口。
+
+### 检测方式
+源码模式正则匹配，定位源码中的危险调用或配置。
+### 参考
+- CWE-501
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+只把服务端生成或已校验的值写入会话。
+SOLUTION
+	alert_min: 1
+	"file://bad.java": <<<POS
+class Bad { void s(javax.servlet.http.HttpSession session, javax.servlet.http.HttpServletRequest req) { session.setAttribute("role", req.getParameter("role")); } }
+
+POS
+	"safefile://ok.java": <<<NEG
+class Ok { void s(javax.servlet.http.HttpSession session) { session.setAttribute("role", "user"); } }
+
+NEG
+)
+${*.java}.pattern_regex(/setAttribute\s*\([^)]*getParameter/) as $hit
+alert $hit for {
+	level: "middle",
+	title: "源码扫描：Java 会话写入请求参数",
+	title_zh: "源码扫描：Java 会话写入请求参数",
+	message: "源码扫描：Java 会话写入请求参数",
+	risk: "access-control",
+}

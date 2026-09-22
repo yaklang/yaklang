@@ -1,0 +1,47 @@
+desc(
+	mode: "source"
+	language: "csharp"
+	title: "源码扫描：C# 用外部字符串构造正则"
+	title_zh: "源码扫描：C# 用外部字符串构造正则"
+	type: vuln
+	level: middle
+	rule_id: "source-csharp-regex-from-input"
+	risk: "regex-dos"
+	cwe: "CWE-1333"
+	desc: <<<DESC
+### 规则说明
+new Regex 的模式来自外部输入时，可以触发灾难性回溯。
+
+### 风险类型
+regex-dos
+
+### 影响
+命中说明代码里出现了该危险 API、配置或数据流入口。
+
+### 检测方式
+源码模式正则匹配，定位源码中的危险调用或配置。
+### 参考
+- CWE-1333
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+使用固定正则，并设置匹配超时。
+SOLUTION
+	alert_min: 1
+	"file://bad.cs": <<<POS
+class Bad { void c(string p) { var r = new System.Text.RegularExpressions.Regex(p); } }
+
+POS
+	"safefile://ok.cs": <<<NEG
+class Ok { void c() { var r = new System.Text.RegularExpressions.Regex("^[a-z]+$"); } }
+
+NEG
+)
+${*.cs}.pattern_regex(/RegularExpressions\.Regex\s*\(\s*[A-Za-z_]/) as $hit
+alert $hit for {
+	level: "middle",
+	title: "源码扫描：C# 用外部字符串构造正则",
+	title_zh: "源码扫描：C# 用外部字符串构造正则",
+	message: "源码扫描：C# 用外部字符串构造正则",
+	risk: "regex-dos",
+}

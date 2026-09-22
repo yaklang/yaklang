@@ -1,0 +1,48 @@
+desc(
+	mode: "source"
+	language: "java"
+	title: "源码扫描：Java Socket 主机来自外部"
+	title_zh: "源码扫描：Java Socket 主机来自外部"
+	type: vuln
+	level: high
+	rule_id: "source-java-socket-host"
+	risk: "resource-injection"
+	cwe: "CWE-99"
+	desc: <<<DESC
+### 规则说明
+new Socket 或 InetSocketAddress 的主机名来自外部数据时，攻击者可以指定任意主机和端口。
+
+### 风险类型
+resource-injection
+
+### 影响
+命中说明代码里出现了该危险 API、配置或数据流入口。
+
+### 检测方式
+源码模式正则匹配，定位源码中的危险调用或配置。
+### 参考
+- CWE-99
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+主机名使用白名单，禁止把请求参数直接传给 Socket 构造器。
+SOLUTION
+	alert_min: 1
+	"file://bad.java": <<<POS
+import java.net.Socket;
+class Bad { void c(String host) throws Exception { new Socket(host, 80); } }
+
+POS
+	"safefile://ok.java": <<<NEG
+class Ok { void c() { int port = 80; } }
+
+NEG
+)
+${*.java}.pattern_regex(/new\s+Socket\s*\(|new\s+InetSocketAddress\s*\(/) as $hit
+alert $hit for {
+	level: "high",
+	title: "源码扫描：Java Socket 主机来自外部",
+	title_zh: "源码扫描：Java Socket 主机来自外部",
+	message: "源码扫描：Java Socket 主机来自外部",
+	risk: "resource-injection",
+}

@@ -1,0 +1,47 @@
+desc(
+	mode: "source"
+	language: "csharp"
+	title: "源码扫描：C# Cookie SameSite=None"
+	title_zh: "源码扫描：C# Cookie SameSite=None"
+	type: vuln
+	level: middle
+	rule_id: "source-csharp-samesite-none"
+	risk: "cookie-security"
+	cwe: "CWE-1275"
+	desc: <<<DESC
+### 规则说明
+SameSiteMode.None 允许浏览器在跨站请求里带上 Cookie。没有 Secure 时还会被浏览器拒绝或被滥用。
+
+### 风险类型
+cookie-security
+
+### 影响
+命中说明代码里出现了该危险 API、配置或数据流入口。
+
+### 检测方式
+源码模式正则匹配，定位源码中的危险调用或配置。
+### 参考
+- CWE-1275
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+会话 Cookie 使用 SameSite=Lax 或 Strict，并同时设置 Secure。
+SOLUTION
+	alert_min: 1
+	"file://bad.cs": <<<POS
+class Bad { void c(Microsoft.AspNetCore.Http.CookieOptions o) { o.SameSite = Microsoft.AspNetCore.Http.SameSiteMode.None; } }
+
+POS
+	"safefile://ok.cs": <<<NEG
+class Ok { void c(Microsoft.AspNetCore.Http.CookieOptions o) { o.SameSite = Microsoft.AspNetCore.Http.SameSiteMode.Lax; } }
+
+NEG
+)
+${*.cs}.pattern_regex(/SameSiteMode\.None/) as $hit
+alert $hit for {
+	level: "middle",
+	title: "源码扫描：C# Cookie SameSite=None",
+	title_zh: "源码扫描：C# Cookie SameSite=None",
+	message: "源码扫描：C# Cookie SameSite=None",
+	risk: "cookie-security",
+}

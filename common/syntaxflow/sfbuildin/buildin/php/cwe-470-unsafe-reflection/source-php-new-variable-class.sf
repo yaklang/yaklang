@@ -1,0 +1,49 @@
+desc(
+	mode: "source"
+	language: "php"
+	title: "源码扫描：PHP 可变类实例化"
+	title_zh: "源码扫描：PHP 可变类实例化"
+	type: vuln
+	level: high
+	rule_id: "source-php-new-variable-class"
+	risk: "reflection-abuse"
+	cwe: "CWE-470"
+	desc: <<<DESC
+### 规则说明
+new $class 按外部字符串创建对象，可以实例化意外类。
+
+### 风险类型
+reflection-abuse
+
+### 影响
+命中说明代码里出现了该危险 API、配置或数据流入口。
+
+### 检测方式
+源码模式正则匹配，定位源码中的危险调用或配置。
+### 参考
+- CWE-470
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+用白名单映射类名，禁止直接 new 请求参数。
+SOLUTION
+	alert_min: 1
+	"file://bad.php": <<<POS
+<?php
+function bad($class) { return new $class(); }
+
+POS
+	"safefile://ok.php": <<<NEG
+<?php
+function ok() { return new User(); }
+
+NEG
+)
+${*.php}.pattern_regex(/new\s+\$[A-Za-z_]/) as $hit
+alert $hit for {
+	level: "high",
+	title: "源码扫描：PHP 可变类实例化",
+	title_zh: "源码扫描：PHP 可变类实例化",
+	message: "源码扫描：PHP 可变类实例化",
+	risk: "reflection-abuse",
+}

@@ -1,0 +1,49 @@
+desc(
+	mode: "struct"
+	language: "c"
+	title: "结构扫描：C MD5_Init"
+	title_zh: "结构扫描：C MD5_Init"
+	type: vuln
+	level: high
+	rule_id: "struct-c-md5-init"
+	risk: "weak-cryptographic-algorithm"
+	cwe: "CWE-327"
+	desc: <<<DESC
+### 规则说明
+MD5 已不应用于完整性或口令。MD5_Init 表示代码仍在使用该算法。
+
+### 风险类型
+weak-cryptographic-algorithm
+
+### 影响
+命中说明编译单元里出现了该调用，而不是注释或字符串。
+
+### 检测方式
+结构扫描匹配真实调用。
+### 参考
+- CWE-327
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+改用 SHA-256 或专门的口令哈希。
+SOLUTION
+	alert_min: 1
+	"file://bad.c": <<<POS
+void MD5_Init(void *c);
+void bad(void *c) { MD5_Init(c); }
+
+POS
+	"safefile://ok.c": <<<NEG
+void ok(void) { int n = 1; }
+
+NEG
+)
+MD5_Init as $call
+MD5_Init(* as $arg) as $call
+alert $call for {
+	level: "high",
+	title: "结构扫描：C MD5_Init",
+	title_zh: "结构扫描：C MD5_Init",
+	message: "结构扫描：C MD5_Init",
+	risk: "weak-cryptographic-algorithm",
+}

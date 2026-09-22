@@ -1,0 +1,49 @@
+desc(
+	mode: "source"
+	language: "python"
+	title: "源码扫描：Python Cookie httponly=False"
+	title_zh: "源码扫描：Python Cookie httponly=False"
+	type: vuln
+	level: middle
+	rule_id: "source-python-set-cookie-httponly-false"
+	risk: "cookie-security"
+	cwe: "CWE-1004"
+	desc: <<<DESC
+### 规则说明
+httponly=False 允许脚本读取 Cookie。页面一旦出现 XSS，会话就可以被带走。
+
+### 风险类型
+cookie-security
+
+### 影响
+命中说明代码里出现了该危险 API、配置或数据流入口。
+
+### 检测方式
+源码模式正则匹配，定位源码中的危险调用或配置。
+### 参考
+- CWE-1004
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+会话 Cookie 设置 httponly=True。
+SOLUTION
+	alert_min: 1
+	"file://bad.py": <<<POS
+def bad(resp):
+    resp.set_cookie("sid", "v", httponly=False)
+
+POS
+	"safefile://ok.py": <<<NEG
+def ok(resp):
+    resp.set_cookie("sid", "v", httponly=True)
+
+NEG
+)
+${*.py}.pattern_regex(/set_cookie\s*\([^)]*httponly\s*=\s*False/) as $hit
+alert $hit for {
+	level: "middle",
+	title: "源码扫描：Python Cookie httponly=False",
+	title_zh: "源码扫描：Python Cookie httponly=False",
+	message: "源码扫描：Python Cookie httponly=False",
+	risk: "cookie-security",
+}

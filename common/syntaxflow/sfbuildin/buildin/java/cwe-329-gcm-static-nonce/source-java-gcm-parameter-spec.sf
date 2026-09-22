@@ -1,0 +1,48 @@
+desc(
+	mode: "source"
+	language: "java"
+	title: "源码扫描：Java 固定 GCM nonce"
+	title_zh: "源码扫描：Java 固定 GCM nonce"
+	type: vuln
+	level: high
+	rule_id: "source-java-gcm-parameter-spec"
+	risk: "weak-cryptographic-algorithm"
+	cwe: "CWE-329"
+	desc: <<<DESC
+### 规则说明
+GCMParameterSpec 使用写死的 nonce 时，同一密钥下重复 nonce 会破坏 GCM 的机密性。
+
+### 风险类型
+weak-cryptographic-algorithm
+
+### 影响
+命中说明代码里出现了该危险 API、配置或数据流入口。
+
+### 检测方式
+源码模式正则匹配，定位源码中的危险调用或配置。
+### 参考
+- CWE-329
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+每次加密使用 SecureRandom 生成 12 字节 nonce，并把 nonce 和密文一起保存。
+SOLUTION
+	alert_min: 1
+	"file://bad.java": <<<POS
+import javax.crypto.spec.GCMParameterSpec;
+class Bad { void c() { byte[] iv = new byte[]{1,2,3,4,5,6,7,8,9,10,11,12}; new GCMParameterSpec(128, iv); } }
+
+POS
+	"safefile://ok.java": <<<NEG
+class Ok { void c() { String alg = "AES/GCM/NoPadding"; } }
+
+NEG
+)
+${*.java}.pattern_regex(/new\s+GCMParameterSpec\s*\(/) as $hit
+alert $hit for {
+	level: "high",
+	title: "源码扫描：Java 固定 GCM nonce",
+	title_zh: "源码扫描：Java 固定 GCM nonce",
+	message: "源码扫描：Java 固定 GCM nonce",
+	risk: "weak-cryptographic-algorithm",
+}

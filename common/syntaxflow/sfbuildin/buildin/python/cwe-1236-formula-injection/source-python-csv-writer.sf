@@ -1,0 +1,50 @@
+desc(
+	mode: "source"
+	language: "python"
+	title: "源码扫描：Python csv.writer 未转义公式"
+	title_zh: "源码扫描：Python csv.writer 未转义公式"
+	type: vuln
+	level: middle
+	rule_id: "source-python-csv-writer"
+	risk: "formula-injection"
+	cwe: "CWE-1236"
+	desc: <<<DESC
+### 规则说明
+csv.writer 会原样写出以 =、+、-、@ 开头的单元格，表格软件会把它当公式执行。
+
+### 风险类型
+formula-injection
+
+### 影响
+命中说明代码里出现了该危险 API、配置或数据流入口。
+
+### 检测方式
+源码模式正则匹配，定位源码中的危险调用或配置。
+### 参考
+- CWE-1236
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+使用 defusedcsv，或在这些字符前加单引号。
+SOLUTION
+	alert_min: 1
+	"file://bad.py": <<<POS
+import csv
+def bad(buf, row):
+    csv.writer(buf).writerow(row)
+
+POS
+	"safefile://ok.py": <<<NEG
+def ok(buf, row):
+    buf.write("name")
+
+NEG
+)
+${*.py}.pattern_regex(/csv\.writer\s*\(/) as $hit
+alert $hit for {
+	level: "middle",
+	title: "源码扫描：Python csv.writer 未转义公式",
+	title_zh: "源码扫描：Python csv.writer 未转义公式",
+	message: "源码扫描：Python csv.writer 未转义公式",
+	risk: "formula-injection",
+}

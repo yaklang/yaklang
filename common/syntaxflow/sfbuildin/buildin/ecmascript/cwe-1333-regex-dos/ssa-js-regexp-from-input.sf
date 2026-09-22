@@ -1,0 +1,47 @@
+desc(
+	mode: "ssa"
+	language: "javascript"
+	title: "数据流：JavaScript 用外部字符串构造 RegExp"
+	title_zh: "数据流：JavaScript 用外部字符串构造 RegExp"
+	type: vuln
+	level: middle
+	rule_id: "ssa-js-regexp-from-input"
+	risk: "regex-dos"
+	cwe: "CWE-1333"
+	desc: <<<DESC
+### 规则说明
+new RegExp(用户输入) 可以提交回溯爆炸的模式。
+
+### 风险类型
+regex-dos
+
+### 影响
+实参本身来自另一次调用时告警。常量字符串不报。
+
+### 检测方式
+SSA 上匹配调用，保留非常量且非 param 的实参。
+### 参考
+- CWE-1333
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+使用字面量正则。必须动态构造时限制长度和元字符。
+SOLUTION
+	alert_min: 1
+	"file://bad.js": <<<POS
+function bad(req) { return new RegExp(req.get("re")); }
+
+POS
+	"safefile://ok.js": <<<NEG
+function ok() { return new RegExp("^[a-z]+$"); }
+
+NEG
+)
+RegExp(*?{opcode: call} as $dyn) as $call
+alert $dyn for {
+	level: "middle",
+	title: "数据流：JavaScript 用外部字符串构造 RegExp",
+	title_zh: "数据流：JavaScript 用外部字符串构造 RegExp",
+	message: "数据流：JavaScript 用外部字符串构造 RegExp",
+	risk: "regex-dos",
+}

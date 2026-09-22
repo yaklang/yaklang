@@ -1,0 +1,47 @@
+desc(
+	mode: "source"
+	language: "javascript"
+	title: "源码扫描：JavaScript libxmljs noent"
+	title_zh: "源码扫描：JavaScript libxmljs noent"
+	type: vuln
+	level: high
+	rule_id: "source-js-libxml-noent"
+	risk: "xxe"
+	cwe: "CWE-611"
+	desc: <<<DESC
+### 规则说明
+libxml 的 noent: true 会展开实体。不可信 XML 因此可以触发 XXE。
+
+### 风险类型
+xxe
+
+### 影响
+命中说明代码里出现了该危险 API、配置或数据流入口。
+
+### 检测方式
+源码模式正则匹配，定位源码中的危险调用或配置。
+### 参考
+- CWE-611
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+解析不可信 XML 时设置 noent: false，并禁用网络实体。
+SOLUTION
+	alert_min: 1
+	"file://bad.js": <<<POS
+function bad(libxml, xml) { return libxml.parseXml(xml, { noent: true }); }
+
+POS
+	"safefile://ok.js": <<<NEG
+function ok(libxml, xml) { return libxml.parseXml(xml, { noent: false }); }
+
+NEG
+)
+${*.js}.pattern_regex(/noent\s*:\s*true/) as $hit
+alert $hit for {
+	level: "high",
+	title: "源码扫描：JavaScript libxmljs noent",
+	title_zh: "源码扫描：JavaScript libxmljs noent",
+	message: "源码扫描：JavaScript libxmljs noent",
+	risk: "xxe",
+}

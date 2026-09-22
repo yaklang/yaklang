@@ -1,0 +1,49 @@
+desc(
+	mode: "struct"
+	language: "c"
+	title: "结构扫描：C DES_set_key"
+	title_zh: "结构扫描：C DES_set_key"
+	type: vuln
+	level: high
+	rule_id: "struct-c-des-set-key"
+	risk: "weak-cryptographic-algorithm"
+	cwe: "CWE-327"
+	desc: <<<DESC
+### 规则说明
+DES 密钥长度不足。DES_set_key 表示仍在使用该算法。
+
+### 风险类型
+weak-cryptographic-algorithm
+
+### 影响
+命中说明编译单元里出现了该调用，而不是注释或字符串。
+
+### 检测方式
+结构扫描匹配真实调用。
+### 参考
+- CWE-327
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+改用 AES-GCM。
+SOLUTION
+	alert_min: 1
+	"file://bad.c": <<<POS
+void DES_set_key(void *k, void *s);
+void bad(void *k, void *s) { DES_set_key(k, s); }
+
+POS
+	"safefile://ok.c": <<<NEG
+void ok(void) { int n = 1; }
+
+NEG
+)
+DES_set_key as $call
+DES_set_key(* as $arg) as $call
+alert $call for {
+	level: "high",
+	title: "结构扫描：C DES_set_key",
+	title_zh: "结构扫描：C DES_set_key",
+	message: "结构扫描：C DES_set_key",
+	risk: "weak-cryptographic-algorithm",
+}

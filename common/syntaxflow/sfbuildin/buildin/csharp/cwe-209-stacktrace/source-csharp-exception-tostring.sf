@@ -1,0 +1,47 @@
+desc(
+	mode: "source"
+	language: "csharp"
+	title: "源码扫描：C# 把异常文本返回给客户端"
+	title_zh: "源码扫描：C# 把异常文本返回给客户端"
+	type: vuln
+	level: middle
+	rule_id: "source-csharp-exception-tostring"
+	risk: "information-exposure"
+	cwe: "CWE-209"
+	desc: <<<DESC
+### 规则说明
+把 Exception.ToString() 写入响应会泄露堆栈、路径和依赖版本。
+
+### 风险类型
+information-exposure
+
+### 影响
+命中说明代码里出现了该危险 API、配置或数据流入口。
+
+### 检测方式
+源码模式正则匹配，定位源码中的危险调用或配置。
+### 参考
+- CWE-209
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+对客户端返回通用错误号，把堆栈只写入服务端日志。
+SOLUTION
+	alert_min: 1
+	"file://bad.cs": <<<POS
+class Bad { string e(System.Exception ex) { return ex.ToString(); } }
+
+POS
+	"safefile://ok.cs": <<<NEG
+class Ok { string e() { return "error"; } }
+
+NEG
+)
+${*.cs}.pattern_regex(/ex\.ToString\s*\(/) as $hit
+alert $hit for {
+	level: "middle",
+	title: "源码扫描：C# 把异常文本返回给客户端",
+	title_zh: "源码扫描：C# 把异常文本返回给客户端",
+	message: "源码扫描：C# 把异常文本返回给客户端",
+	risk: "information-exposure",
+}

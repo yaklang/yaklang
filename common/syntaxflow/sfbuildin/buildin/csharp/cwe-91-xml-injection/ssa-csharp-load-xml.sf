@@ -1,0 +1,47 @@
+desc(
+	mode: "ssa"
+	language: "csharp"
+	title: "数据流：C# LoadXml 接受外部 XML"
+	title_zh: "数据流：C# LoadXml 接受外部 XML"
+	type: vuln
+	level: high
+	rule_id: "ssa-csharp-load-xml"
+	risk: "xml-injection"
+	cwe: "CWE-91"
+	desc: <<<DESC
+### 规则说明
+XmlDocument.LoadXml 直接解析外部字符串时，攻击者可以注入额外 XML 节点。
+
+### 风险类型
+xml-injection
+
+### 影响
+参数不是常量，且不是函数自身的参数对象时告警。常量配置和纯参数传递不报。
+
+### 检测方式
+SSA 上匹配调用，保留非常量且非 param 的实参。
+### 参考
+- CWE-91
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+关闭 DTD，并用 XML API 创建元素，不要拼接 XML 文本。
+SOLUTION
+	alert_min: 1
+	"file://bad.cs": <<<POS
+class Bad { void p(System.Xml.XmlDocument doc, Microsoft.AspNetCore.Http.HttpRequest req) { doc.LoadXml(req.Query["xml"]); } }
+
+POS
+	"safefile://ok.cs": <<<NEG
+class Ok { void p(System.Xml.XmlDocument doc) { doc.LoadXml("<a/>"); } }
+
+NEG
+)
+LoadXml(*?{!opcode: const && !opcode: param} as $dyn) as $call
+alert $dyn for {
+	level: "high",
+	title: "数据流：C# LoadXml 接受外部 XML",
+	title_zh: "数据流：C# LoadXml 接受外部 XML",
+	message: "数据流：C# LoadXml 接受外部 XML",
+	risk: "xml-injection",
+}

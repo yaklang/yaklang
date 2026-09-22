@@ -1,0 +1,50 @@
+desc(
+	mode: "ssa"
+	language: "c"
+	title: "数据流：C ldap_search 过滤器"
+	title_zh: "数据流：C ldap_search 过滤器"
+	type: vuln
+	level: high
+	rule_id: "ssa-c-ldap-search"
+	risk: "ldap-injection"
+	cwe: "CWE-90"
+	desc: <<<DESC
+### 规则说明
+ldap_search / ldap_search_s 的过滤器来自外部字符串时，可以改写 LDAP 查询。
+
+### 风险类型
+ldap-injection
+
+### 影响
+参数不是常量，且不是函数自身的参数对象时告警。常量配置和纯参数传递不报。
+
+### 检测方式
+SSA 上匹配调用，保留非常量且非 param 的实参。
+### 参考
+- CWE-90
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+对过滤器特殊字符转义，或只允许白名单值。
+SOLUTION
+	alert_min: 1
+	"file://bad.c": <<<POS
+#include <stdio.h>
+#include <ldap.h>
+void bad(LDAP *ld, const char *user) { char filter[64]; sprintf(filter, "(uid=%s)", user); ldap_search_s(ld, "dc=a", 2, filter, 0, 0, 0); }
+
+POS
+	"safefile://ok.c": <<<NEG
+#include <ldap.h>
+void ok(LDAP *ld) { ldap_search_s(ld, "dc=a", 2, "(uid=fixed)", 0, 0, 0); }
+
+NEG
+)
+ldap_search_s(*?{!opcode: const && !opcode: param} as $dyn) as $call
+alert $dyn for {
+	level: "high",
+	title: "数据流：C ldap_search 过滤器",
+	title_zh: "数据流：C ldap_search 过滤器",
+	message: "数据流：C ldap_search 过滤器",
+	risk: "ldap-injection",
+}
