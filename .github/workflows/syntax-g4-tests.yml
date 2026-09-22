@@ -4,6 +4,42 @@ name: Syntax G4 Tests
 # fixture through the antlr grammar and SSA frontend. They are CPU-heavy
 # (PHP alone ~190s) and only change when a grammar or its fixtures change, so
 # they run here instead of in Essential Tests on every PR.
+#
+# ---------------------------------------------------------------------------
+# When this workflow runs
+# ---------------------------------------------------------------------------
+# The four patterns below are the whole trigger; a PR has to touch one of them.
+# Each pattern is structural rather than a list of packages, so a new language
+# is picked up by following the same layout:
+#
+#   common/yak/**/*.g4          any grammar (antlr4c, antlr4go, antlr4JS,
+#                               antlr4Lua, antlr4nasl, antlr4yak, csharp,
+#                               csharp/asp, java, java/jsp, java/spel,
+#                               java/freemarker, php, python)
+#   common/yak/**/parser/**     the antlr-generated lexer/parser packages, which
+#                               also carry hand-maintained _base.go / utils.go
+#   common/yak/**/code/**       corpus fixtures
+#   common/yak/**/syntax/**     corpus fixtures (the php and python corpora use
+#                               this name)
+#   common/yak/**/syntax_*.go   the corpus drivers and their helpers, named
+#                               `syntax_<language>_test.go` (the glob also picks
+#                               up the legacy-named antlr4JS/syntax_test.go and
+#                               yaktest/syntax_test.go, which live in packages
+#                               this workflow does not run, and the csharp/tests
+#                               syntax_*_test.go helpers, which do belong to it)
+#
+# Deliberately NOT watched:
+#   - go.mod / go.sum: a dependency bump is covered by Essential Tests, and the
+#     corpus depends on the grammar plus its fixtures, not on the module graph;
+#   - everything a corpus test reads through `//go:embed` lives in `code/` or
+#     `syntax/`, and everything read off the working directory is either
+#     `parser/` or another package's `code/` (csharp/tests/g4_coverage_test.go
+#     reads ../asp/ASPParser.g4 and ../asp/tests/code).
+#
+# Adding a language: give its driver the `syntax_<language>_test.go` name, keep
+# its fixtures in `code/` or `syntax/`, and add its package to the job matrix.
+# No change to the trigger is needed.
+# ---------------------------------------------------------------------------
 
 on:
   workflow_dispatch:
@@ -11,15 +47,12 @@ on:
     branches: [main]
     paths:
       - "common/yak/**/*.g4"
-      - "common/yak/**/tests/syntax/**"
-      - "common/yak/**/tests/code/**"
-      - "common/yak/**/test/syntax/**"
-      - "common/yak/**/test/code/**"
-      - "common/yak/**/syntax/**"
+      - "common/yak/**/parser/**"
       - "common/yak/**/code/**"
-      - "common/yak/**/syntax_test.go"
-      - "go.mod"
-      - "go.sum"
+      - "common/yak/**/syntax/**"
+      - "common/yak/**/syntax_*.go"
+      # This workflow itself
+      - ".github/workflows/syntax-g4-tests.yml"
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
