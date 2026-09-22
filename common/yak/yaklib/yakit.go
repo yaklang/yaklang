@@ -33,31 +33,60 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
-func getThirdPartyAPIKey(appType string) string {
-	appType = strings.TrimSpace(strings.ToLower(appType))
-	if appType == "" {
+func thirdPartyAPIKeyFromAppConfig(appType string) string {
+	cfg, err := consts.GetCommonThirdPartyApplicationConfig(appType)
+	if err != nil || cfg == nil {
 		return ""
 	}
-	cfg := &ypb.ThirdPartyApplicationConfig{}
-	if err := consts.GetThirdPartyApplicationConfig(appType, cfg); err == nil {
-		if key := strings.TrimSpace(cfg.GetAPIKey()); key != "" {
-			return key
-		}
-		if key := strings.TrimSpace(cfg.GetUserSecret()); key != "" {
-			return key
-		}
+	if key := strings.TrimSpace(cfg.GetAPIKey()); key != "" {
+		return key
 	}
-	switch appType {
-	case "github":
-		if v := strings.TrimSpace(os.Getenv("GITHUB_TOKEN")); v != "" {
-			return v
-		}
-		return strings.TrimSpace(os.Getenv("GH_TOKEN"))
-	case "gitee":
-		return strings.TrimSpace(os.Getenv("GITEE_TOKEN"))
-	default:
-		return ""
+	return strings.TrimSpace(cfg.GetUserSecret())
+}
+
+// GetGitHubAPIKey 读取 GitHub API Token（导出名为 yakit.GetGitHubAPIKey）
+// 优先使用 Yakit 第三方应用配置里 Type=github 的 APIKey/UserSecret，
+// 未配置时回退环境变量 GITHUB_TOKEN，再回退 GH_TOKEN。
+//
+// 返回值:
+//   - GitHub token；未配置时返回空字符串
+//
+// Example:
+// ```
+// token = yakit.GetGitHubAPIKey()
+// if token == "" {
+//     yakit.Warn("github token not configured")
+// }
+// ```
+func getGitHubAPIKey() string {
+	if key := thirdPartyAPIKeyFromAppConfig("github"); key != "" {
+		return key
 	}
+	if v := strings.TrimSpace(os.Getenv("GITHUB_TOKEN")); v != "" {
+		return v
+	}
+	return strings.TrimSpace(os.Getenv("GH_TOKEN"))
+}
+
+// GetGiteeAPIKey 读取 Gitee API Token（导出名为 yakit.GetGiteeAPIKey）
+// 优先使用 Yakit 第三方应用配置里 Type=gitee 的 APIKey/UserSecret，
+// 未配置时回退环境变量 GITEE_TOKEN。
+//
+// 返回值:
+//   - Gitee token；未配置时返回空字符串
+//
+// Example:
+// ```
+// token = yakit.GetGiteeAPIKey()
+// if token == "" {
+//     yakit.Warn("gitee token not configured")
+// }
+// ```
+func getGiteeAPIKey() string {
+	if key := thirdPartyAPIKeyFromAppConfig("gitee"); key != "" {
+		return key
+	}
+	return strings.TrimSpace(os.Getenv("GITEE_TOKEN"))
 }
 
 var notifyEmtpyVirtualClientOnce = utils.NewOnce()
@@ -90,7 +119,8 @@ var YakitExports = map[string]interface{}{
 	"GetHomeTempDir":               consts.GetDefaultYakitBaseTempDir,
 	"GetOnlineBaseUrl":             consts.GetOnlineBaseUrl,
 	"SetOnlineBaseUrl":             consts.SetOnlineBaseUrl,
-	"GetThirdPartyAPIKey":          getThirdPartyAPIKey,
+	"GetGitHubAPIKey":              getGitHubAPIKey,
+	"GetGiteeAPIKey":               getGiteeAPIKey,
 
 	"MockHTTPFlowSlowSQL": mockHTTPFlowSlowSQL,
 
@@ -252,8 +282,9 @@ func GetExtYakitLibByClient(client *YakitClient) map[string]interface{} {
 		"SetProgressEx":       client.YakitSetProgressEx,
 		"Stream":              client.Stream,
 		"SSAStream":           client.SSAStream,
-		"EmitSSAResult":       client.EmitSSAResult,
-		"GetThirdPartyAPIKey": getThirdPartyAPIKey,
+		"EmitSSAResult":  client.EmitSSAResult,
+		"GetGitHubAPIKey": getGitHubAPIKey,
+		"GetGiteeAPIKey":  getGiteeAPIKey,
 	}
 	if os.Getenv("YAK_DISABLE") == "output" {
 		// YakitExports["Info"] = func(a string, b ...interface{}) {}
