@@ -35,15 +35,12 @@ source_hashes={}
 for name in ['go-dep-parser','toml','go-rpmdb','x-mod','cyclonedx-go']:
  for p in (ref/name).rglob('*'):
   if p.is_file() and '.git' not in p.parts and p.stat().st_size<50<<20:source_hashes.setdefault(sha(p),[]).append(name+'/'+str(p.relative_to(ref/name)))
-manifest=[]
-for p in sorted(sca.rglob('*')):
- if not p.is_file() or 'testdata' not in p.parts or p.name=='manifest.json':continue
- h=sha(p); rel=str(p.relative_to(sca));matches=source_hashes.get(h,[])
- source={'matched_pinned_files':matches} if matches else {'baseline_or_generated':baseline}
- if rel.startswith('core/rpm/testdata/'):
-  source={'pinned_source':'go-rpmdb@a8af76a6220fc762827743740291ab88943183be','transformation':'gzip -n database snapshot' if p.suffix=='.gz' else 'isolated old-reader full output; rpm-qa.json preserves independent upstream command expectations'}
- manifest.append(dict(path=rel,sha256=h,bytes=p.stat().st_size,source=source,expectation='Pinned upstream oracle plus independent contract assertions; see test-migration-map.json and README.md'))
-write('testdata/manifest.json',dict(schema_version=1,fixtures=manifest))
+# ZIP storage preserves the reviewed per-file provenance; do not replace it
+# with hashes of archive containers or rediscover a now-expanded checkout.
+from fixture_store import FixtureStore
+fixture_store = FixtureStore(sca)
+fixture_store.verify()
+manifest = list(fixture_store.rows.values())
 # Current production symbols and file-level provenance. Symbols remain tied to exact hashes.
 inv=json.loads(subprocess.check_output(['go','run','scripts/sca/source_audit.go'],text=True,encoding='utf-8'));entries=[]
 lock=json.loads((sca/'upstream-sources.lock.json').read_text())

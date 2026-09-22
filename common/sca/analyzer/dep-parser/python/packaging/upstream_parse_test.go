@@ -2,7 +2,6 @@
 package packaging_test
 
 import (
-	"os"
 	"testing"
 
 	assert "github.com/yaklang/yaklang/common/sca/internal/testcheck"
@@ -109,7 +108,7 @@ func TestParse(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			f, err := os.Open(tt.input)
+			f, err := fixtures.OpenReader(tt.input)
 			require.NoError(t, err)
 
 			got, _, err := packaging.NewParser().Parse(nil, f)

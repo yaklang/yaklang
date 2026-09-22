@@ -3,6 +3,7 @@
 import hashlib
 import json
 from pathlib import Path
+from fixture_store import FixtureStore
 
 ROOT = Path(__file__).resolve().parents[2]
 SCA = ROOT / "common/sca"
@@ -53,7 +54,11 @@ def main():
     errors = []
     sources = json.loads((SCA / "source-extraction-map.json").read_text(encoding="utf-8"))["entries"]
     fixtures = json.loads((SCA / "testdata/manifest.json").read_text(encoding="utf-8"))["fixtures"]
-    for base, rows, key in [(ROOT, sources, "local_file"), (SCA, fixtures, "path")]:
+    try:
+        FixtureStore(SCA).verify()
+    except (ValueError, OSError, KeyError) as exc:
+        errors.append(str(exc))
+    for base, rows, key in [(ROOT, sources, "local_file")]:
         for row in rows:
             path = base / row[key]
             if not path.is_file() or digest(path) != row["sha256"]:

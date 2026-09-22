@@ -2,7 +2,6 @@ package sca
 
 import (
 	"context"
-	"os"
 	"reflect"
 	"sort"
 	"strings"
@@ -136,7 +135,7 @@ func TestGemspecIllegalNotCompleteEmpty(t *testing.T) {
 }
 
 func TestPackagingRequiresDistReport(t *testing.T) {
-	raw, err := os.ReadFile("analyzer/dep-parser/python/packaging/testdata/zipp-3.12.1.METADATA")
+	raw, err := fixtures.ReadFile("analyzer/dep-parser/python/packaging/testdata/zipp-3.12.1.METADATA")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -162,11 +161,11 @@ func TestPackagingRequiresDistReport(t *testing.T) {
 }
 
 func TestPackagingDiscoveryAndIllegal(t *testing.T) {
-	meta, err := os.ReadFile("testdata/python_packaging/dist-info/METADATA")
+	meta, err := fixtures.ReadFile("testdata/python_packaging/dist-info/METADATA")
 	if err != nil {
 		t.Fatal(err)
 	}
-	egg, err := os.ReadFile("testdata/python_packaging/egg-info/PKG-INFO")
+	egg, err := fixtures.ReadFile("testdata/python_packaging/egg-info/PKG-INFO")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -218,7 +217,7 @@ func TestPackagingFoldedRequiresDistReport(t *testing.T) {
 
 func mustRead(t *testing.T, path string) string {
 	t.Helper()
-	b, err := os.ReadFile(path)
+	b, err := fixtures.ReadFile(path)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -2,7 +2,6 @@
 package gradle
 
 import (
-	"os"
 	"sort"
 	"strings"
 	"testing"
@@ -45,7 +44,7 @@ func TestParser_Parse(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			parser := NewParser()
-			f, err := os.Open(tt.inputFile)
+			f, err := fixtures.OpenReader(tt.inputFile)
 			assert.NoError(t, err)
 
 			libs, _, err := parser.Parse(nil, f)

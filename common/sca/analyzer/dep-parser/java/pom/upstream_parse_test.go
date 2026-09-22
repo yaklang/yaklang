@@ -3,7 +3,6 @@ package pom_test
 
 import (
 	"github.com/yaklang/yaklang/common/sca/internal/fsio"
-	"os"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -539,14 +538,14 @@ func TestPom_Parse(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			f, err := os.Open(tt.inputFile)
+			f, err := fixtures.OpenReader(tt.inputFile)
 			require.NoError(t, err)
 			defer f.Close()
 
 			// All former local/HTTP test-server materials are now explicit
 			// filesystem inputs. No host environment or HTTP listener is used.
 			p := pom.NewParser(strings.TrimPrefix(filepath.ToSlash(tt.inputFile), "testdata/"))
-			got, _, err := p.Parse(fsio.New(os.DirFS("testdata")), f)
+			got, _, err := p.Parse(fsio.New(fixtures.DirFS("testdata")), f)
 
 			if tt.wantErr != "" {
 				require.NotNil(t, err)

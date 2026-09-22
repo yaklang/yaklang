@@ -84,6 +84,19 @@ macOS 隔离启动器禁止网络、写盘、以及除**当前测试二进制**�
 GOWORK=off CGO_ENABLED=0 go test ./common/sca/... -count=1 -exec "$PWD/scripts/sca/isolated-test-exec.sh"
 ```
 
+固定样例存储在 41 个版本化 ZIP 中，830 个逻辑文件的内容和原路径保持不变。ZIP 仅由 `fixtures*_test.go` 的 `go:embed` 引入；测试按需在内存解压，支持目录遍历、Seek/ReadAt 和独立可变读取副本，不解压到工作目录。生产包没有 embed 声明，`yak.go` 不导入测试加载器。
+
+命名使用 `<格式及支持版本>_corpus_v<语料修订>.zip`，例如 `cargo_lock_le_v3_corpus_v1.zip`（包括 v3，故不写 lt_v3）、`pnpm_lock_v5_v6_corpus_v1.zip`、`toml_v1_0_and_rejected_v1_1_corpus_v1.zip`。格式版本与语料版本分开；未来新格式版本使用新归档，保留既有语料。ZIP 成员仍是该 `testdata` 下的相对路径，新增归档不能重复定义同一逻辑路径。
+
+增加样本时：选择版本化归档与独立逻辑路径，在 manifest 中补充 `archive/member/path/sha256/bytes/mode/source`，保留原有记录；从包含这些原路径的外部材料树用 `fixture_store.py --source-root <expanded-common-sca>` 打包，并更新对应 archive 的摘要/大小及测试专用 embed 列表。生成器固定排序、时间、权限和压缩级别，拒绝与逐文件摘要不符的输入。不要把展开目录提交到仓库。
+
+```sh
+python3 scripts/sca/fixture_store.py --check-reproducible
+python3 scripts/sca/verify_test_assets.py
+# 可额外检查实际 yak.go 构建产物：
+python3 scripts/sca/verify_test_assets.py --binary /path/to/yak
+```
+
 固定样例及其期望是测试输入，来源与摘要见 [testdata/manifest.json](testdata/manifest.json)。上游许可见 [SCA_THIRD_PARTY_NOTICES.md](SCA_THIRD_PARTY_NOTICES.md)，源码与测试映射分别见 [source-extraction-map.json](source-extraction-map.json) 和 [test-migration-map.json](test-migration-map.json)。映射校验检查摘要、目标文件，以及 ADAPTED/SEMANTIC_REPLACEMENT/MIGRATED_AS_IS 必须有非空 `local_tests`；不代替语义测试或独立审查。
 
 附加开发验收工具均写入调用方指定的输出目录，不修改 workflow、不下载依赖：

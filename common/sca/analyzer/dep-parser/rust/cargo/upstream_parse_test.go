@@ -3,7 +3,6 @@ package cargo
 
 import (
 	"fmt"
-	"os"
 	"path"
 	"sort"
 	"strings"
@@ -118,7 +117,7 @@ func TestParse(t *testing.T) {
 
 	for _, v := range vectors {
 		t.Run(path.Base(v.file), func(t *testing.T) {
-			f, err := os.Open(v.file)
+			f, err := fixtures.OpenReader(v.file)
 			require.NoError(t, err)
 
 			gotLibs, gotDeps, err := NewParser().Parse(nil, f)

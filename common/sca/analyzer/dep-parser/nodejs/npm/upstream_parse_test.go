@@ -3,7 +3,6 @@ package npm
 
 import (
 	"encoding/json"
-	"os"
 	"sort"
 	"strings"
 	"testing"
@@ -43,7 +42,7 @@ func TestParse(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			f, err := os.Open(tt.file)
+			f, err := fixtures.OpenReader(tt.file)
 			require.NoError(t, err)
 
 			got, deps, err := NewParser().Parse(nil, f)

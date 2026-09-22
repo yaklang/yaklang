@@ -7,7 +7,6 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
-	"os"
 	"reflect"
 	"runtime"
 	"sort"
@@ -20,7 +19,7 @@ import (
 // Full outputs come from isolated go-rpmdb v0.1.0, never from this reader.
 // rpm-qa.json additionally preserves upstream independent command expectations.
 func TestUpstreamDatabaseMatrix(t *testing.T) {
-	raw, err := os.ReadFile("testdata/expected.json")
+	raw, err := fixtures.ReadFile("testdata/expected.json")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -30,7 +29,7 @@ func TestUpstreamDatabaseMatrix(t *testing.T) {
 	}
 	for name, want := range expected {
 		t.Run(name, func(t *testing.T) {
-			raw, err := os.ReadFile("testdata/" + name + ".gz")
+			raw, err := fixtures.ReadFile("testdata/" + name + ".gz")
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -100,7 +99,7 @@ func TestMalformedHeader(t *testing.T) {
 }
 func FuzzDatabase(f *testing.F) {
 	for _, name := range []string{"libuuid", "sle15-bci", "cbl-mariner-2.0"} {
-		raw, err := os.ReadFile("testdata/" + name + ".gz")
+		raw, err := fixtures.ReadFile("testdata/" + name + ".gz")
 		if err != nil {
 			f.Fatal(err)
 		}
@@ -131,7 +130,7 @@ func FuzzDatabase(f *testing.F) {
 }
 
 func TestIndependentRPMCommandExpectations(t *testing.T) {
-	raw, err := os.ReadFile("testdata/rpm-qa.json")
+	raw, err := fixtures.ReadFile("testdata/rpm-qa.json")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -141,7 +140,7 @@ func TestIndependentRPMCommandExpectations(t *testing.T) {
 	}
 	for name, want := range expected {
 		t.Run(name, func(t *testing.T) {
-			raw, err := os.ReadFile("testdata/" + name + ".gz")
+			raw, err := fixtures.ReadFile("testdata/" + name + ".gz")
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -333,7 +332,7 @@ func TestHeaderDependencyArrayMismatch(t *testing.T) {
 }
 
 func TestFrozenMarinerRequireConstraint(t *testing.T) {
-	raw, err := os.ReadFile("testdata/cbl-mariner-2.0.gz")
+	raw, err := fixtures.ReadFile("testdata/cbl-mariner-2.0.gz")
 	if err != nil {
 		t.Fatal(err)
 	}

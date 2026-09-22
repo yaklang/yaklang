@@ -5,7 +5,6 @@ package analyzer
 
 import (
 	"github.com/yaklang/yaklang/common/sca/analyzer/dep-parser/types"
-	"os"
 	"reflect"
 	"sort"
 	"strings"
@@ -236,7 +235,7 @@ func TestUpstreamJarMaterial(t *testing.T) {
 	for _, v := range vectors {
 		t.Run(v.name, func(t *testing.T) {
 			file := strings.Replace(v.file, "testdata/", "testdata/upstream_jar/", 1)
-			f, err := os.Open(file)
+			f, err := fixtures.OpenReader(file)
 			if err != nil {
 				t.Fatal(err)
 			}

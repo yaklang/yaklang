@@ -1,7 +1,6 @@
 package pom
 
 import (
-	"os"
 	"strings"
 	"testing"
 
@@ -10,12 +9,12 @@ import (
 )
 
 func TestParsePOMHappyOriginalEdges(t *testing.T) {
-	f, err := os.Open("testdata/happy/pom.xml")
+	f, err := fixtures.OpenReader("testdata/happy/pom.xml")
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer f.Close()
-	libs, deps, err := NewParser("happy/pom.xml").Parse(fsio.New(os.DirFS("testdata")), f)
+	libs, deps, err := NewParser("happy/pom.xml").Parse(fsio.New(fixtures.DirFS("testdata")), f)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -109,12 +108,12 @@ func TestParsePOMOptionalAndRange(t *testing.T) {
 }
 
 func TestParsePOMMissingParentNoHostLookup(t *testing.T) {
-	f, err := os.Open("testdata/not-found-parent/pom.xml")
+	f, err := fixtures.OpenReader("testdata/not-found-parent/pom.xml")
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer f.Close()
-	libs, _, err := NewParser("not-found-parent/pom.xml").Parse(fsio.New(os.DirFS("testdata")), f)
+	libs, _, err := NewParser("not-found-parent/pom.xml").Parse(fsio.New(fixtures.DirFS("testdata")), f)
 	if err != nil {
 		t.Fatal(err)
 	}

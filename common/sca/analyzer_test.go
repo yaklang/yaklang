@@ -2,7 +2,6 @@ package sca
 
 import (
 	"context"
-	"embed"
 	"fmt"
 	"io/fs"
 	"path"
@@ -22,8 +21,7 @@ import (
 	lo "github.com/yaklang/yaklang/common/sca/internal/collection"
 )
 
-//go:embed testdata
-var testFS embed.FS
+var testFS = fixtures
 
 type testcase struct {
 	name           string

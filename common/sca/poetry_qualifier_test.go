@@ -2,7 +2,6 @@ package sca
 
 import (
 	"context"
-	"os"
 	"testing"
 	"testing/fstest"
 
@@ -137,7 +136,7 @@ resolved_reference = "abcdef"
 }
 
 func TestPoetryFrozenFlaskOriginalRanges(t *testing.T) {
-	raw, err := os.ReadFile("testdata/python_poetry/positive/poetry.lock")
+	raw, err := fixtures.ReadFile("testdata/python_poetry/positive/poetry.lock")
 	if err != nil {
 		t.Fatal(err)
 	}

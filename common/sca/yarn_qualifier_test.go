@@ -2,7 +2,6 @@ package sca
 
 import (
 	"context"
-	"os"
 	"strings"
 	"testing"
 	"testing/fstest"
@@ -203,7 +202,7 @@ bar@^2.0.0:
 }
 
 func TestYarnBerryFrozenProtocolRanges(t *testing.T) {
-	raw, err := os.ReadFile("testdata/node_yarn/positive_protocol/yarn.lock")
+	raw, err := fixtures.ReadFile("testdata/node_yarn/positive_protocol/yarn.lock")
 	if err != nil {
 		t.Fatal(err)
 	}
