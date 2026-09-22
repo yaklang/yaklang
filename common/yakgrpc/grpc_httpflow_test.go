@@ -1700,7 +1700,7 @@ Content-Length: 10
 }
 
 func TestDoHTTPFlowsToOnline(t *testing.T) {
-	db := newOnlineTestDB(t, &schema.HTTPFlow{})
+	db := newOnlineTestDB(t, &schema.HTTPFlow{}, &schema.ExtractedData{}, &schema.WebsocketFlow{}, &schema.ProjectGeneralStorage{})
 	token := utils.RandStringBytes(5)
 	url1 := "http://" + token + ".com"
 	flow1, err := yakit.CreateHTTPFlow(
@@ -1710,15 +1710,22 @@ func TestDoHTTPFlowsToOnline(t *testing.T) {
 
 	require.NoError(t, err)
 	require.NoError(t, yakit.InsertHTTPFlow(db, flow1))
-	defer yakit.DeleteHTTPFlowByID(db, int64(flow1.ID))
+	require.NoError(t, db.Create(&schema.ExtractedData{SourceType: "httpflow", TraceId: flow1.HiddenIndex, Data: "associated-data"}).Error)
 
 	calls := 0
 	remote := &stubOnlineService{uploadFlow: func(ctx context.Context, req *ypb.HTTPFlowsToOnlineRequest, data []byte) error {
 		calls++
-		require.Equal(t, "test-token", req.Token)
+		assert.Equal(t, "test-token", req.Token)
 		var tmp HTTPFlowShare
-		require.NoError(t, json.Unmarshal(data, &tmp))
-		require.Contains(t, string(data), token)
+		if err := json.Unmarshal(data, &tmp); err != nil {
+			return err
+		}
+		assert.Equal(t, flow1.Hash, tmp.HTTPFlow.Hash)
+		assert.Equal(t, url1, tmp.HTTPFlow.Url)
+		if assert.Len(t, tmp.ExtractedList, 1) {
+			assert.Equal(t, "associated-data", tmp.ExtractedList[0].Data)
+		}
+		assert.Contains(t, string(data), token)
 		return nil
 	}}
 	server := &Server{projectDatabase: db, onlineClient: remote}
