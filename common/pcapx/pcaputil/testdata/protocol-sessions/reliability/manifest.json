@@ -19,7 +19,7 @@
   ],
   "limitations": [
     "TLS HRR PSK binder changes explicitly unsupported; no certificate trust claim.",
-    "Redis CLIENT REPLY inside transactions requires context; ambiguous error responses do not get guessed associations.",
+    "Redis CLIENT REPLY inside transactions and subscriptions under reply suppression require context; ambiguous error responses do not get guessed associations.",
     "LLMNR responder matches are observations, not authenticated identities."
   ],
   "files": [
