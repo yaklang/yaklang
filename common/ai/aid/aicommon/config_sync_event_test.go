@@ -8,6 +8,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
+	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
@@ -82,6 +83,32 @@ func collectUntilSyncResponse(t *testing.T, ch <-chan *schema.AiOutputEvent, syn
 			t.Fatal("timed out waiting for recovery history sync response")
 		}
 	}
+}
+
+func TestHandleSyncConsumptionUsesUnifiedPayload(t *testing.T) {
+	events := make(chan *schema.AiOutputEvent, 4)
+	cfg := NewTestConfig(context.Background(),
+		WithSingleAIModelMode(true),
+		WithEventHandler(func(event *schema.AiOutputEvent) { events <- event }),
+	)
+	cfg.SetConsumptionUUID("consumption-test")
+	cfg.AddTierModelConsumption(consts.TierLightweight, ModelConsumptionIdentity{
+		ProviderType: "openai", ModelName: "gpt-5", ThinkingLevel: "none",
+	}, 10, 5, 2)
+
+	syncID := uuid.NewString()
+	require.NoError(t, cfg.HandleSyncConsumptionEvent(&ypb.AIInputEvent{SyncID: syncID}))
+	event := waitForOutputEvent(t, events, func(event *schema.AiOutputEvent) bool {
+		return event.IsSync && event.SyncID == syncID && event.Type == schema.EVENT_TYPE_CONSUMPTION
+	})
+
+	actual := decodeEventPayload(t, event)
+	rawExpected, err := json.Marshal(cfg.BuildConsumptionPayload())
+	require.NoError(t, err)
+	var expected map[string]any
+	require.NoError(t, json.Unmarshal(rawExpected, &expected))
+	require.Equal(t, expected, actual)
+	require.Equal(t, true, actual["effective_single_model_mode"])
 }
 
 func newRecoveryHistoryTestConfig(t *testing.T, ctx context.Context, handler func(*schema.AiOutputEvent)) (*Config, *recoveryHistorySeed) {
@@ -357,9 +384,9 @@ func TestHandleSyncUpdataConfigEvent_PersistSessionStartParams(t *testing.T) {
 	err = c.HandleSyncUpdataConfigEvent(&ypb.AIInputEvent{
 		SyncID: uuid.NewString(),
 		Params: &ypb.AIStartParams{
-			AIService:     "new-service",
-			AIModelName:   "new-model",
-			ReviewPolicy:  "ai",
+			AIService:    "new-service",
+			AIModelName:  "new-model",
+			ReviewPolicy: "ai",
 		},
 	})
 	require.NoError(t, err)

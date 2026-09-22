@@ -255,15 +255,18 @@ func tryCreateAIGateway(t string, disableProviderFallback bool, cb func(string, 
 
 func invokeModelInfoCallback(gateway aispec.AIClient, provider string) {
 	cfg := gateway.GetConfig()
-	if cfg != nil && cfg.ModelInfoCallback != nil {
-		cfg.ModelInfoCallback(provider, cfg.Model)
+	if cfg == nil {
+		return
+	}
+	if cfg.ModelInfoCallback != nil {
+		cfg.ModelInfoCallback(provider, cfg.Model, cfg.ThinkingLevel)
 	}
 }
 
 func invokeModelInfoConfirmCallback(gateway aispec.AIClient, provider string) {
 	cfg := gateway.GetConfig()
 	if cfg != nil && cfg.ModelInfoConfirmCallback != nil {
-		cfg.ModelInfoConfirmCallback(provider, cfg.Model)
+		cfg.ModelInfoConfirmCallback(provider, cfg.Model, cfg.ThinkingLevel)
 	}
 }
 
@@ -1133,8 +1136,8 @@ var Exports = map[string]any{
 	"ListModels":              ListModels,
 	"ListModelByProviderType": ListModelByProviderType,
 
-	"thinkingLevel":                   aispec.WithThinkingLevel,
-	"thinking":                        aispec.WithEnableThinking,
+	"thinkingLevel":                  aispec.WithThinkingLevel,
+	"thinking":                       aispec.WithEnableThinking,
 	"reasoningEffort":                aispec.WithReasoningEffort,
 	"timeout":                        aispec.WithTimeout,
 	"proxy":                          aispec.WithProxy,

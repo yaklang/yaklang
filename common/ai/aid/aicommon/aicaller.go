@@ -97,12 +97,13 @@ func AIChatToAICallbackType(cb func(prompt string, opts ...aispec.AIConfigOption
 					isStream = true
 					resp.EmitReasonStream(reader)
 				}),
-
-				aispec.WithModelInfoCallback(func(provider, model string) {
-					resp.SetModelInfo(provider, model) // not update config model info, just set for response
-				}),
-				aispec.WithModelInfoConfirmCallback(func(provider, model string) {
+				aispec.WithModelInfoCallback(func(provider, model, thinkingLevel string) {
 					resp.SetModelInfo(provider, model)
+					resp.SetThinkingLevel(thinkingLevel)
+				}),
+				aispec.WithModelInfoConfirmCallback(func(provider, model, thinkingLevel string) {
+					resp.SetModelInfo(provider, model)
+					resp.SetThinkingLevel(thinkingLevel)
 				}),
 				aispec.WithRawHTTPResponseHeaderCallback(func(headerBytes []byte) {
 					resp.SetRawHTTPResponseHeader(headerBytes)

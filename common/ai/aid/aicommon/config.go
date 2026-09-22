@@ -627,6 +627,9 @@ func NewConfig(ctx context.Context, opts ...ConfigOption) *Config {
 			log.Errorf("Failed to set AI callback: %v", err)
 		}
 	}
+	if consumptionState := config.ensureConsumptionState(); consumptionState != nil {
+		consumptionState.InitializeEffectiveSingleModelMode(config.IsSingleAIModelMode())
+	}
 	// Only create new Timeline if not already set via options (e.g., WithTimeline)
 	// This ensures that when a parent coordinator passes its Timeline to a child invoker,
 	// the child uses the same Timeline instance for proper timeline diff tracking
