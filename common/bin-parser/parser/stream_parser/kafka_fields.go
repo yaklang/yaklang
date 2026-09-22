@@ -2,10 +2,13 @@ package stream_parser
 
 import (
 	"encoding/binary"
+	"errors"
 	"fmt"
 
 	"github.com/yaklang/yaklang/common/bin-parser/parser/base"
 )
+
+var ErrKafkaUnsupported = errors.New("kafka: unsupported feature")
 
 const kafkaMaxBytes = 1 << 20
 
@@ -50,10 +53,12 @@ func decodeKafkaFields(wire []byte, profile string) ([]tlsCertificateField, map[
 }
 
 type kafkaReader struct {
-	wire   []byte
-	at     int
-	fields []tlsCertificateField
-	err    error
+	wire         []byte
+	at           int
+	fields       []tlsCertificateField
+	err          error
+	elements     int
+	recordBudget *kafkaRecordBudget
 }
 
 func (r *kafkaReader) take(name, typ string, n int) []byte {
@@ -104,6 +109,9 @@ func (r *kafkaReader) i64(name string) int64 {
 
 func (r *kafkaReader) str(name string) string {
 	n := int(r.i16(name + " Length"))
+	if n < -1 {
+		r.err = fmt.Errorf("kafka: invalid nullable string")
+	}
 	if n < 0 {
 		return ""
 	}
@@ -112,6 +120,9 @@ func (r *kafkaReader) str(name string) string {
 
 func (r *kafkaReader) bytes(name string) []byte {
 	n := int(r.i32(name + " Length"))
+	if n < -1 {
+		r.err = fmt.Errorf("kafka: invalid nullable bytes")
+	}
 	if n < 0 {
 		return nil
 	}
@@ -136,7 +147,7 @@ func (r *kafkaReader) request(info map[string]any) {
 		return
 	}
 	if ver < rng[0] || ver > rng[1] {
-		r.err = fmt.Errorf("kafka-fields: API %d version %d is outside %d..%d", api, ver, rng[0], rng[1])
+		r.err = fmt.Errorf("%w: API %d version %d is outside %d..%d", ErrKafkaUnsupported, api, ver, rng[0], rng[1])
 		return
 	}
 	switch api {
@@ -160,7 +171,7 @@ func (r *kafkaReader) response(info map[string]any) {
 }
 
 func (r *kafkaReader) metadataRequest(ver int16, info map[string]any) {
-	n := int(r.i32("Topics Count"))
+	n := r.count("Topics Count", true)
 	if n < -1 || (n == -1 && ver == 0) {
 		r.err = fmt.Errorf("kafka-fields: invalid nullable topics")
 		return
@@ -168,7 +179,7 @@ func (r *kafkaReader) metadataRequest(ver int16, info map[string]any) {
 	info["All Topics"] = n == -1 || (n == 0 && ver == 0)
 	var names []string
 	for i := 0; i < n && r.err == nil; i++ {
-		names = append(names, r.str("Topic Name"))
+		names = append(names, r.requiredString("Topic Name"))
 	}
 	info["Topics"] = names
 	if ver >= 4 {
@@ -193,16 +204,27 @@ func (r *kafkaReader) produceRequest(ver int16, info map[string]any) {
 		info["Transactional ID"] = r.str("Transactional ID")
 	}
 	info["Acks"] = r.i16("Acks")
+	if a := info["Acks"].(int16); a < -1 || a > 1 {
+		r.err = fmt.Errorf("kafka: invalid acks")
+		return
+	}
 	info["Timeout"] = r.i32("Timeout")
-	n := int(r.i32("Topics Count"))
+	var topics []map[string]any
+	n := r.count("Topics Count", false)
 	for i := 0; i < n && r.err == nil; i++ {
-		topic := r.str("Topic Name")
+		topic := r.requiredString("Topic Name")
 		info["Topic Name"] = topic
-		pc := int(r.i32("Partition Count"))
+		t := map[string]any{"Topic Name": topic}
+		var parts []map[string]any
+		pc := r.count("Partition Count", false)
 		for p := 0; p < pc && r.err == nil; p++ {
+			pinfo := map[string]any{}
 			info["Partition"] = r.i32("Partition")
+			pinfo["Partition"] = info["Partition"]
 			n := int(r.i32("Record Set Length"))
-			if n == 0 {
+			if n == 0 || n == -1 {
+				pinfo["Record Set Null"] = n == -1
+				parts = append(parts, pinfo)
 				continue
 			}
 			if n < 0 {
@@ -214,12 +236,27 @@ func (r *kafkaReader) produceRequest(ver int16, info map[string]any) {
 				r.err = fmt.Errorf("kafka-fields: truncated Record Set")
 				return
 			}
-			r.recordBatch(info)
+			if r.recordBudget == nil {
+				r.recordBudget = &kafkaRecordBudget{kafkaMaxBytes, 4096}
+			}
+			br := &kafkaReader{wire: r.wire[r.at:end], recordBudget: r.recordBudget}
+			br.recordBatch(info)
+			r.err = br.err
+			r.take("Record Set", "raw", n)
 			if r.err == nil && r.at != end {
 				r.err = fmt.Errorf("kafka-fields: Record Set boundary mismatch")
 			}
+			for k, v := range info {
+				if k == "Batches" || k == "Records Count" || k == "Magic" || k == "Compression" {
+					pinfo[k] = v
+				}
+			}
+			parts = append(parts, pinfo)
 		}
+		t["Partitions"] = parts
+		topics = append(topics, t)
 	}
+	info["Topic Results"] = topics
 }
 
 func (r *kafkaReader) fetchRequest(ver int16, info map[string]any) {
@@ -231,17 +268,26 @@ func (r *kafkaReader) fetchRequest(ver int16, info map[string]any) {
 	}
 	if ver >= 4 {
 		info["Isolation Level"] = r.i8("Isolation Level")
+		if x := info["Isolation Level"].(int8); x < 0 || x > 1 {
+			r.err = fmt.Errorf("kafka: invalid isolation level")
+			return
+		}
 	}
 	if ver >= 7 {
 		info["Session ID"] = r.i32("Session ID")
 		info["Session Epoch"] = r.i32("Session Epoch")
 	}
-	n := int(r.i32("Topics Count"))
+	var topics []map[string]any
+	n := r.count("Topics Count", false)
 	for i := 0; i < n && r.err == nil; i++ {
-		info["Topic Name"] = r.str("Topic Name")
-		pc := int(r.i32("Partition Count"))
+		info["Topic Name"] = r.requiredString("Topic Name")
+		t := map[string]any{"Topic Name": info["Topic Name"]}
+		var parts []map[string]any
+		pc := r.count("Partition Count", false)
 		for p := 0; p < pc && r.err == nil; p++ {
+			pinfo := map[string]any{}
 			info["Partition"] = r.i32("Partition")
+			pinfo["Partition"] = info["Partition"]
 			if ver >= 9 {
 				info["Current Leader Epoch"] = r.i32("Current Leader Epoch")
 			}
@@ -250,16 +296,25 @@ func (r *kafkaReader) fetchRequest(ver int16, info map[string]any) {
 				info["Log Start Offset"] = r.i64("Log Start Offset")
 			}
 			info["Partition Max Bytes"] = r.i32("Partition Max Bytes")
+			for _, key := range []string{"Fetch Offset", "Log Start Offset", "Current Leader Epoch", "Partition Max Bytes"} {
+				if v, ok := info[key]; ok {
+					pinfo[key] = v
+				}
+			}
+			parts = append(parts, pinfo)
 		}
+		t["Partitions"] = parts
+		topics = append(topics, t)
 	}
+	info["Topic Results"] = topics
 	if ver >= 7 {
-		n := r.i32("Forgotten Topics Count")
+		n := int32(r.count("Forgotten Topics Count", false))
 		if n < 0 {
 			r.err = fmt.Errorf("kafka-fields: negative forgotten topics")
 		}
 		for i := int32(0); i < n && r.err == nil; i++ {
 			r.str("Forgotten Topic Name")
-			pc := r.i32("Forgotten Partition Count")
+			pc := int32(r.count("Forgotten Partition Count", false))
 			if pc < 0 {
 				r.err = fmt.Errorf("kafka-fields: negative forgotten partitions")
 			}
@@ -269,48 +324,29 @@ func (r *kafkaReader) fetchRequest(ver int16, info map[string]any) {
 		}
 	}
 	if ver >= 11 {
-		info["Rack ID"] = r.str("Rack ID")
+		info["Rack ID"] = r.requiredString("Rack ID")
 	}
 
 }
 
 func (r *kafkaReader) recordBatch(info map[string]any) {
-	info["Base Offset"] = r.i64("Base Offset")
-	batchLen := int(r.i32("Batch Length"))
-	start := r.at
-	if batchLen < 49 || start+batchLen > len(r.wire) {
-		r.err = fmt.Errorf("kafka-fields: invalid RecordBatch length")
+	if r.recordBudget == nil {
+		r.recordBudget = &kafkaRecordBudget{kafkaMaxBytes, 4096}
+	}
+	batches, err := kafkaRecords(r.wire[r.at:], 0, &r.recordBudget.bytes, &r.recordBudget.count)
+	if err != nil {
+		r.err = err
 		return
 	}
-	r.i32("Partition Leader Epoch")
-	magic := r.i8("Magic")
-	r.take("CRC", "raw", 4)
-	attr := r.i16("Attributes")
-	comp := attr & 7
-	info["Magic"] = magic
-	info["Compression"] = comp
-	if magic != 2 {
-		r.err = fmt.Errorf("kafka-fields: RecordBatch magic %d is not 2", magic)
-		return
+	r.take("Record Set", "raw", len(r.wire)-r.at)
+	info["Batches"] = batches
+	if len(batches) > 0 {
+		for k, v := range batches[0] {
+			if k != "Batches" {
+				info[k] = v
+			}
+		}
 	}
-	if comp != 0 {
-		r.err = fmt.Errorf("kafka-fields: compressed RecordBatch is outside the supported matrix")
-		return
-	}
-	r.i32("Last Offset Delta")
-	r.i64("Base Timestamp")
-	r.i64("Max Timestamp")
-	r.i64("Producer ID")
-	r.i16("Producer Epoch")
-	r.i32("Base Sequence")
-	count := r.i32("Records Count")
-	info["Records Count"] = count
-	remain := start + batchLen - r.at
-	if remain < 0 {
-		r.err = fmt.Errorf("kafka-fields: RecordBatch boundary mismatch")
-		return
-	}
-	r.take("Records", "raw", remain)
 }
 
 func kafkaAPIName(api int16) string {
@@ -327,85 +363,8 @@ func kafkaAPIName(api int16) string {
 	return "Unknown"
 }
 
+// ParseKafkaResponseBody retains the legacy v0 entry point. Sessions must use
+// KafkaResponseBodyVersion with their observed request version.
 func ParseKafkaResponseBody(api int16, body []byte) (map[string]any, error) {
-	if len(body) == 0 {
-		return map[string]any{}, nil
-	}
-	r := &kafkaReader{wire: body}
-	info := map[string]any{"API Name": kafkaAPIName(api)}
-	switch api {
-	case 18:
-		info["Error Code"] = r.i16("Error Code")
-		n := int(r.i32("API Keys Count"))
-		var keys []int16
-		for i := 0; i < n && r.err == nil; i++ {
-			k := r.i16("API Key")
-			r.i16("Min Version")
-			r.i16("Max Version")
-			keys = append(keys, k)
-		}
-		info["API Keys"] = keys
-	case 3:
-		bc := int(r.i32("Broker Count"))
-		for i := 0; i < bc && r.err == nil; i++ {
-			r.i32("Node ID")
-			r.str("Host")
-			r.i32("Port")
-		}
-		tc := int(r.i32("Topic Count"))
-		var topics []string
-		for i := 0; i < tc && r.err == nil; i++ {
-			r.i16("Topic Error")
-			topics = append(topics, r.str("Topic Name"))
-			pc := int(r.i32("Partition Count"))
-			for p := 0; p < pc && r.err == nil; p++ {
-				r.i16("Partition Error")
-				r.i32("Partition")
-				r.i32("Leader")
-				rc := int(r.i32("Replica Count"))
-				for j := 0; j < rc && r.err == nil; j++ {
-					r.i32("Replica")
-				}
-				ic := int(r.i32("ISR Count"))
-				for j := 0; j < ic && r.err == nil; j++ {
-					r.i32("ISR")
-				}
-			}
-		}
-		info["Topics"] = topics
-	case 0:
-		n := int(r.i32("Topic Count"))
-		for i := 0; i < n && r.err == nil; i++ {
-			info["Topic Name"] = r.str("Topic Name")
-			pc := int(r.i32("Partition Count"))
-			for p := 0; p < pc && r.err == nil; p++ {
-				info["Partition"] = r.i32("Partition")
-				info["Error Code"] = r.i16("Error Code")
-				info["Base Offset"] = r.i64("Base Offset")
-			}
-		}
-	case 1:
-		n := int(r.i32("Topic Count"))
-		for i := 0; i < n && r.err == nil; i++ {
-			info["Topic Name"] = r.str("Topic Name")
-			pc := int(r.i32("Partition Count"))
-			for p := 0; p < pc && r.err == nil; p++ {
-				info["Partition"] = r.i32("Partition")
-				info["Error Code"] = r.i16("Error Code")
-				info["High Watermark"] = r.i64("High Watermark")
-				set := r.bytes("Record Set")
-				if len(set) > 0 && r.err == nil {
-					br := &kafkaReader{wire: set}
-					br.recordBatch(info)
-					if br.err != nil {
-						return nil, br.err
-					}
-				}
-			}
-		}
-	}
-	if r.err != nil {
-		return nil, r.err
-	}
-	return info, nil
+	return KafkaResponseBodyVersion(api, 0, body)
 }

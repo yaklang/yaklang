@@ -27,6 +27,9 @@ type binHTTPState struct {
 }
 
 func (h *binHTTPState) config() map[string]any {
+	if !h.response {
+		return nil
+	}
 	return map[string]any{"httpResponseToMethod": h.method, "httpCloseDelimited": h.closeDelimited}
 }
 

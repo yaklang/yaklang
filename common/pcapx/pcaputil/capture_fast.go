@@ -30,7 +30,13 @@ type offlineDecoder struct {
 
 func (d *offlineDecoder) SetTruncated() { d.truncated = true }
 
-func (d *offlineDecoder) feed(ctx context.Context, raw []byte, ci gopacket.CaptureInfo) (decoded bool) {
+func (d *offlineDecoder) feed(ctx context.Context, raw []byte, ci gopacket.CaptureInfo) bool {
+	return d.feedWithEvidence(ctx, raw, ci, evidenceFrom(ci))
+}
+
+// The internal TCP path carries evidence by value; only observable packet
+// metadata materializes an owned AncillaryData slice.
+func (d *offlineDecoder) feedWithEvidence(ctx context.Context, raw []byte, ci gopacket.CaptureInfo, evidence captureEvidence) (decoded bool) {
 	feeding := false
 	d.truncated = false
 	// Match packetHandler's callback isolation on the regular packet path.
@@ -51,7 +57,7 @@ func (d *offlineDecoder) feed(ctx context.Context, raw []byte, ci gopacket.Captu
 	}
 	fallback := func() bool {
 		packet := gopacket.NewPacket(raw, d.link, gopacket.DecodeOptions{Lazy: true, NoCopy: true, DecodeStreamsAsDatagrams: true})
-		packet.Metadata().CaptureInfo = ci
+		packet.Metadata().CaptureInfo = withEvidence(ci, evidence)
 		feeding = true
 		d.conf.packetHandler(ctx, packet)
 		_, tcp := packet.TransportLayer().(*layers.TCP)
@@ -111,13 +117,13 @@ func (d *offlineDecoder) feed(ctx context.Context, raw []byte, ci gopacket.Captu
 			return
 		}
 		feeding = true
-		d.conf.trafficPool.feedEvidence(ethernet, network, &d.tcp, evidenceFrom(ci), ci.Timestamp)
+		d.conf.trafficPool.feedEvidence(ethernet, network, &d.tcp, evidence, ci.Timestamp)
 		return true
 	}
 	if network != nil && transport == layers.IPProtocolUDP && d.conf.binParser != nil {
 		if err := d.udp.DecodeFromBytes(network.(gopacket.NetworkLayer).LayerPayload(), d); err == nil {
 			feeding = true
-			d.conf.binParser.datagramFields(network.(gopacket.NetworkLayer), &d.udp, ci, d.truncated)
+			d.conf.binParser.datagramFields(network.(gopacket.NetworkLayer), &d.udp, withEvidence(ci, evidence), d.truncated)
 			return false
 		}
 		// A partial UDP layer can still produce an incomplete event through
@@ -156,7 +162,7 @@ func openOfflineFast(conf *CaptureConfig, ctx context.Context, handler *PcapHand
 			return err
 		}
 		number++
-		ci = withEvidence(ci, captureEvidence{Ref: PacketReference{Number: number, Domain: CaptureDomain{Interface: ci.InterfaceIndex}}})
+		evidence := captureEvidence{Ref: PacketReference{Number: number, Domain: CaptureDomain{Interface: ci.InterfaceIndex}}}
 		conf.trafficPool.observeCapture(len(raw))
 		if conf.recorder != nil {
 			if err := conf.recorder.write(raw, ci, d.link); err != nil {
@@ -168,12 +174,12 @@ func openOfflineFast(conf *CaptureConfig, ctx context.Context, handler *PcapHand
 			if key, ok, err := rawFlowKey(raw, d.link); err != nil {
 				conf.trafficPool.malformedPacket(err.Error())
 			} else if ok {
-				conf.trafficPool.parallel.submit(workerPacket{data: raw, ts: ci.Timestamp, link: d.link, raw: true, key: key, evidence: evidenceFrom(ci)})
+				conf.trafficPool.parallel.submit(workerPacket{data: raw, ts: ci.Timestamp, link: d.link, raw: true, key: key, evidence: evidence})
 			} else if conf.binParser != nil {
-				d.feed(ctx, raw, ci)
+				d.feedWithEvidence(ctx, raw, ci, evidence)
 			}
 		} else {
-			d.feed(ctx, raw, ci)
+			d.feedWithEvidence(ctx, raw, ci, evidence)
 		}
 	}
 	return nil

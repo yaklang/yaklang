@@ -52,7 +52,7 @@ func (f *binFlow) detectDirection(dir int, w []byte) {
 	case "ldap":
 		f.protocol, f.ldap = "ldap", &binLDAP{pending: map[uint64]ldapRequest{}}
 	case "redis":
-		f.protocol, f.redis = "redis", &binRedis{}
+		f.protocol, f.redis = "redis", &binRedis{client: -1}
 	case "websocket":
 		client := dir
 		if w[1]&128 == 0 {
@@ -64,7 +64,7 @@ func (f *binFlow) detectDirection(dir int, w []byte) {
 	case "mongodb":
 		f.protocol, f.mongo = "mongodb", &binMongo{pending: map[uint32]string{}}
 	case "kafka":
-		f.protocol, f.kafka = "kafka", &binKafka{client: -1, pending: map[int32]int16{}}
+		f.protocol, f.kafka = "kafka", &binKafka{client: -1, pending: map[int32]kafkaPending{}}
 	case "tds":
 		f.protocol, f.tds = "tds", &binTDS{client: -1, encrypt: tdsEncryptUnknown}
 	case "amqp":
@@ -202,7 +202,7 @@ func (f *binFlow) consumeSession(dir int, e *ProtocolEvent, result map[string]an
 			e.Session["Protocol Transition"] = "ldap->tls"
 		}
 	case "redis":
-		e.Session, err = f.redis.consume(dir, e.Raw)
+		e.Session, err = f.consumeRedis(dir, e)
 	case "websocket":
 		if e.Entry == "WebSocket" {
 			e.Session, err = f.ws.consume(dir, e.Raw)
@@ -217,7 +217,7 @@ func (f *binFlow) consumeSession(dir int, e *ProtocolEvent, result map[string]an
 	case "mongodb":
 		e.Session, err = f.mongo.consume(e.Raw, result)
 	case "kafka":
-		e.Session, err = f.kafka.consume(dir, e.Raw, result)
+		e.Session, err = f.consumeKafka(dir, e, result)
 	case "tds":
 		e.Session, err = f.tds.consume(dir, e.Raw, result, f.a.budget.MaxCollectionElements)
 		if err == nil && e.Session["Encrypted"] == true {

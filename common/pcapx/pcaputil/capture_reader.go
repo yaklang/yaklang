@@ -116,6 +116,7 @@ func replayWithConfig(input io.Reader, conf *CaptureConfig) (resultErr error) {
 			}
 			link = iface.LinkType
 		}
+		e := captureEvidence{Ref: PacketReference{Number: r.number, Domain: CaptureDomain{Section: r.section, Interface: ci.InterfaceIndex}}}
 		d.link = link
 		pool.observeCapture(len(raw))
 		if conf.recorder != nil {
@@ -125,21 +126,20 @@ func replayWithConfig(input io.Reader, conf *CaptureConfig) (resultErr error) {
 		}
 		if len(conf.onEveryPacket) != 0 || conf.Output != nil || conf.Debug {
 			packet := gopacket.NewPacket(raw, link, gopacket.DecodeOptions{Lazy: true, NoCopy: false, DecodeStreamsAsDatagrams: true})
-			packet.Metadata().CaptureInfo = ci
+			packet.Metadata().CaptureInfo = withEvidence(ci, e)
 			conf.packetHandler(ctx, packet)
 		} else if pool.parallel != nil && !conf.DisableAssembly {
 			pool.parallel.checkTruncation(ci)
 			if key, ok, err := rawFlowKey(raw, link); err != nil {
 				pool.malformedPacket(err.Error())
 			} else if ok {
-				e := evidenceFrom(ci)
 				key.domain = e.Ref.Domain
 				pool.parallel.submit(workerPacket{data: raw, ts: ci.Timestamp, link: link, raw: true, key: key, evidence: e})
 			} else if conf.binParser != nil {
-				d.feed(ctx, raw, ci) // datagrams; TCP still uses the private worker path
+				d.feedWithEvidence(ctx, raw, ci, e) // datagrams; TCP still uses the private worker path
 			}
 		} else {
-			d.feed(ctx, raw, ci)
+			d.feedWithEvidence(ctx, raw, ci, e)
 		}
 	}
 	return nil

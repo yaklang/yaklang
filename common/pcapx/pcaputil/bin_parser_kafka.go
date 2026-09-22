@@ -3,13 +3,22 @@ package pcaputil
 import (
 	"encoding/binary"
 	"fmt"
+	"time"
 
 	"github.com/yaklang/yaklang/common/bin-parser/parser/stream_parser"
 )
 
 type binKafka struct {
 	client  int
-	pending map[int32]int16
+	pending map[int32]kafkaPending
+	expired map[int32]bool
+	clock   time.Time
+}
+
+type kafkaPending struct {
+	api, version int16
+	id           uint64
+	ts           time.Time
 }
 
 func kafkaSupported(api, ver uint16) bool {
@@ -58,7 +67,7 @@ func (f *binFlow) frameKafka(dir int, w []byte) (int, *binSpec, error) {
 	if k == nil {
 		return 0, nil, sessionContext("Kafka session was not observed")
 	}
-	if err := f.reserveSession(256 + int64(len(k.pending))*16); err != nil {
+	if err := f.reserveSession(256 + int64(len(k.pending))*64 + int64(len(k.expired))*24); err != nil {
 		return 0, nil, err
 	}
 	if len(w) < 4 {
@@ -82,13 +91,33 @@ func (f *binFlow) frameKafka(dir int, w []byte) (int, *binSpec, error) {
 	return n, f.spec("kafka_fields", entry), nil
 }
 
-func (k *binKafka) consume(dir int, raw []byte, result map[string]any) (map[string]any, error) {
+func (f *binFlow) consumeKafka(dir int, e *ProtocolEvent, result map[string]any) (map[string]any, error) {
+	k := f.kafka
+	raw := e.Raw
+	if e.Timestamp.After(k.clock) {
+		k.clock = e.Timestamp
+	}
+	for id, p := range k.pending {
+		if k.clock.Sub(p.ts) > 30*time.Second {
+			delete(k.pending, id)
+			if k.expired == nil {
+				k.expired = map[int32]bool{}
+			}
+			if len(k.expired) >= f.a.budget.MaxCollectionElements {
+				return nil, protocolError(ErrResourceExceeded, "Kafka expired correlation history")
+			}
+			k.expired[id] = true
+		}
+	}
+	if e.ID == 0 {
+		e.ID = f.a.ids.Add(1)
+	}
 	if len(raw) < 8 {
 		return nil, fmt.Errorf("kafka: truncated message")
 	}
 	info := map[string]any{"Context Level": "observed"}
 	if meta, ok := result["metadata"].(map[string]any); ok {
-		for _, key := range []string{"API Name", "API Key", "API Version", "Correlation ID", "Client ID", "Topic Name", "Magic", "Compression", "Records Count", "Base Offset", "Partition"} {
+		for _, key := range []string{"API Name", "API Key", "API Version", "Correlation ID", "Client ID", "Topic Name", "Magic", "Compression", "Records Count", "Base Offset", "Partition", "Topic Results", "Acks", "Timeout", "Batches"} {
 			if v, ok := meta[key]; ok {
 				info[key] = v
 			}
@@ -96,6 +125,11 @@ func (k *binKafka) consume(dir int, raw []byte, result map[string]any) (map[stri
 	}
 	request := k.client < 0 || dir == k.client
 	if request {
+		if len(raw) < 14 {
+			return nil, fmt.Errorf("kafka: truncated request header")
+		}
+		ver := int16(binary.BigEndian.Uint16(raw[6:8]))
+		info["API Version"] = ver
 		if k.client < 0 {
 			k.client = dir
 		}
@@ -104,23 +138,49 @@ func (k *binKafka) consume(dir int, raw []byte, result map[string]any) (map[stri
 		info["API Key"] = api
 		info["Correlation ID"] = corr
 		info["API Name"] = kafkaSessionAPIName(api)
-		k.pending[corr] = api
+		if k.expired[corr] {
+			return nil, sessionContext("Kafka correlation ID reused after timeout")
+		}
+		if _, ok := k.pending[corr]; ok {
+			return nil, sessionContext("Kafka correlation ID reused while pending")
+		}
+		if api == 0 && info["Acks"] == int16(0) {
+			info["Response Expected"] = false
+			return info, nil
+		}
+		if len(k.pending) >= f.a.budget.MaxCollectionElements {
+			return nil, protocolError(ErrResourceExceeded, "Kafka pending request count")
+		}
+		if err := f.reserveSession(256 + int64(len(k.pending)+1)*64 + int64(len(k.expired))*24); err != nil {
+			return nil, err
+		}
+		k.pending[corr] = kafkaPending{api, ver, e.ID, e.Timestamp}
+		e.TransactionID = e.ID
 		info["Outstanding"] = true
 		return info, nil
 	}
 	corr := int32(binary.BigEndian.Uint32(raw[4:8]))
 	info["Correlation ID"] = corr
-	api, ok := k.pending[corr]
+	pending, ok := k.pending[corr]
 	if !ok {
 		info["Unmatched"] = true
+		info["Context Level"] = "missing-request-version"
 		return info, nil
 	}
 	delete(k.pending, corr)
+	api := pending.api
+	e.ResponseTo = pending.id
+	e.TransactionID = pending.id
+	info["API Version"] = pending.version
+	info["Latency NS"] = e.Timestamp.Sub(pending.ts).Nanoseconds()
+	if err := f.reserveSession(256 + int64(len(k.pending))*64 + int64(len(k.expired))*24); err != nil {
+		return nil, err
+	}
 	info["Matched Request"] = true
 	info["API Name"] = kafkaSessionAPIName(api)
 	info["API Key"] = api
 	body := raw[8:]
-	parsed, err := stream_parser.ParseKafkaResponseBody(api, body)
+	parsed, err := stream_parser.KafkaResponseBodyVersion(api, pending.version, body)
 	if err != nil {
 		return nil, err
 	}

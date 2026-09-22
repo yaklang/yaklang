@@ -104,7 +104,9 @@ func (r *CaptureReader) readPacketData(owned bool) ([]byte, gopacket.CaptureInfo
 		return nil, ci, err
 	}
 	r.number++
-	ci = withEvidence(ci, captureEvidence{Ref: PacketReference{Number: r.number, Domain: CaptureDomain{Section: r.section, Interface: ci.InterfaceIndex}}})
+	if owned {
+		ci = withEvidence(ci, captureEvidence{Ref: PacketReference{Number: r.number, Domain: CaptureDomain{Section: r.section, Interface: ci.InterfaceIndex}}})
+	}
 	return b, ci, nil
 }
 

@@ -1,3 +1,5 @@
 common/bin-parser/rules/**/*.yaml text eol=lf
 common/bin-parser/rules/*.yaml text eol=lf
 *.zst binary
+
+common/pcapx/pcaputil/testdata/protocol-sessions/first-batch-m2a/*.tsv whitespace=-blank-at-eol

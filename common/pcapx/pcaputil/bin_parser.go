@@ -8,6 +8,7 @@ import (
 	"time"
 
 	binparser "github.com/yaklang/yaklang/common/bin-parser/parser"
+	"github.com/yaklang/yaklang/common/bin-parser/parser/stream_parser"
 )
 
 // ProtocolEvent owns its bytes and structured values. It never retains a
@@ -60,7 +61,7 @@ func (e *ProtocolEvent) Decode() (result map[string]any, err error) {
 			result = owned
 		}
 	}()
-	if e.Protocol == "tls" && e.Session != nil {
+	if (e.Protocol == "tls" || e.Protocol == "redis") && e.Session != nil {
 		return map[string]any{"fields": cloneSession(e.Session)}, nil
 	}
 	if e.semanticFields != nil {
@@ -602,6 +603,8 @@ func (f *binFlow) feed(dir int, data []byte, ts time.Time) {
 				} else {
 					result, err = f.consumeTLS(dir, e)
 				}
+			} else if f.protocol == "redis" {
+				result = map[string]any{}
 			} else if f.protocol == "websocket" && f.ws != nil && f.ws.deflate {
 				result = map[string]any{"fields": map[string]any{}}
 			} else {
@@ -612,6 +615,9 @@ func (f *binFlow) feed(dir int, data []byte, ts time.Time) {
 					e.Raw = rawCopy
 				}
 				err = f.consumeSession(dir, e, result)
+				if f.protocol == "redis" {
+					result = map[string]any{"fields": e.Session}
+				}
 				if e.Protocol == "websocket" && f.ws != nil && f.ws.deflate {
 					e.semanticFields = cloneSession(e.Session)
 					result = map[string]any{"fields": e.semanticFields}
@@ -624,6 +630,9 @@ func (f *binFlow) feed(dir int, data []byte, ts time.Time) {
 				}
 			}
 			if err != nil {
+				if errors.Is(err, stream_parser.ErrKafkaUnsupported) {
+					err = protocolError(ErrUnsupportedFeature, err.Error())
+				}
 				e.Status, e.sessionError = classifySessionError(err)
 				e.Error = err.Error()
 				switch e.Status {
