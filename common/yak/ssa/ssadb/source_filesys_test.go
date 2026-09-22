@@ -662,3 +662,29 @@ func TestIrSourceFS_File_URL(t *testing.T) {
 		require.NotEqual(t, source[0].SourceCodeHash, source[1].SourceCodeHash)
 	})
 }
+
+func TestIrSourceFS_RepeatedReadDirDoesNotReload(t *testing.T) {
+	vf := filesys.NewVirtualFs()
+	vf.AddFile("src/A.java", `package src; class A { void m(){} }`)
+	vf.AddFile("src/B.java", `package src; class B { void m(){} }`)
+	programID := "prog_" + uuid.NewString()
+	_, err := ssaapi.ParseProjectWithFS(vf, ssaapi.WithLanguage(ssaconfig.JAVA), ssaapi.WithProgramName(programID))
+	require.NoError(t, err)
+	t.Cleanup(func() { ssadb.DeleteProgram(ssadb.GetDB(), programID) })
+
+	dbfs := ssadb.NewIrSourceFs()
+	root := "/" + programID
+	first, err := dbfs.ReadDir(root)
+	require.NoError(t, err)
+	require.NotEmpty(t, first)
+
+	for i := 0; i < 20; i++ {
+		again, err := dbfs.ReadDir(root)
+		require.NoError(t, err)
+		require.Equal(t, len(first), len(again))
+	}
+
+	data, err := dbfs.ReadFile(root + "/src/A.java")
+	require.NoError(t, err)
+	require.Contains(t, string(data), "class A")
+}
