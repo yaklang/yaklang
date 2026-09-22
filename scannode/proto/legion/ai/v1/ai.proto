@@ -2096,6 +2096,16 @@ message ContextForgeParameter {
 // selected by Legion. Scan Node verifies sha256 before execution and builds a
 // Blueprint directly from these fields. It must never resolve a same-name
 // Forge from the node-local database or execute parameter_rule_yaklang_code.
+message ContextForgeTool {
+  string tool_id = 1;
+  string name = 2;
+  string description = 3;
+  string code = 4;
+  bytes params_json = 5;
+  string sha256 = 6;
+  string owner_user_id = 7;
+}
+
 message ContextForgeRelease {
   string schema_version = 1; // legion.ai-forge-release/v1
   string release_id = 2;
@@ -2114,6 +2124,7 @@ message ContextForgeRelease {
   repeated string declared_tool_names = 15;
   bytes input_schema_json = 16;
   string definition_sha256 = 17;
+  repeated ContextForgeTool tool_snapshots = 18;
 }
 
 // InputManifest pins authorized managed resources for one execution attempt.
