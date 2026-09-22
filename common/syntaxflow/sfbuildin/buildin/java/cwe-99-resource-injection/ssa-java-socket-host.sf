@@ -1,0 +1,49 @@
+desc(
+	mode: "ssa"
+	language: "java"
+	title: "数据流：Java Socket 主机来自外部"
+	title_zh: "数据流：Java Socket 主机来自外部"
+	type: vuln
+	level: high
+	rule_id: "ssa-java-socket-host"
+	risk: "resource-injection"
+	cwe: "CWE-99"
+	desc: <<<DESC
+### 规则说明
+new Socket 或 InetSocketAddress 的主机名来自外部数据时，攻击者可以指定任意主机和端口。
+
+### 风险类型
+resource-injection
+
+### 影响
+实参本身来自另一次调用时告警。常量字符串不报。
+
+### 检测方式
+SSA 上匹配调用，保留非常量且非 param 的实参。
+### 参考
+- CWE-99
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+主机名使用白名单，禁止把请求参数直接传给 Socket 构造器。
+SOLUTION
+	alert_min: 1
+	"file://bad.java": <<<POS
+import java.net.Socket;
+class Bad { void c(javax.servlet.http.HttpServletRequest req) throws Exception { new Socket(req.getParameter("host"), 80); } }
+
+POS
+	"safefile://ok.java": <<<NEG
+import java.net.Socket;
+class Ok { void c() throws Exception { new Socket("127.0.0.1", 80); } }
+
+NEG
+)
+Socket(*?{opcode: call} as $dyn) as $call
+alert $dyn for {
+	level: "high",
+	title: "数据流：Java Socket 主机来自外部",
+	title_zh: "数据流：Java Socket 主机来自外部",
+	message: "数据流：Java Socket 主机来自外部",
+	risk: "resource-injection",
+}

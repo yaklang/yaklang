@@ -1,0 +1,51 @@
+desc(
+	mode: "source"
+	language: "golang"
+	title: "源码扫描：Go Cookie SameSiteNoneMode"
+	title_zh: "源码扫描：Go Cookie SameSiteNoneMode"
+	type: vuln
+	level: middle
+	rule_id: "source-go-samesite-none"
+	risk: "cookie-security"
+	cwe: "CWE-1275"
+	desc: <<<DESC
+### 规则说明
+http.SameSiteNoneMode 允许跨站请求携带 Cookie。
+
+### 风险类型
+cookie-security
+
+### 影响
+命中说明代码里出现了该危险 API、配置或数据流入口。
+
+### 检测方式
+源码模式正则匹配，定位源码中的危险调用或配置。
+### 参考
+- CWE-1275
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+会话 Cookie 使用 SameSiteLaxMode 或 SameSiteStrictMode，并设置 Secure。
+SOLUTION
+	alert_min: 1
+	"file://bad.go": <<<POS
+package main
+import "net/http"
+func bad() { http.SetCookie(nil, &http.Cookie{Name: "sid", SameSite: http.SameSiteNoneMode}) }
+
+POS
+	"safefile://ok.go": <<<NEG
+package main
+import "net/http"
+func ok() { http.SetCookie(nil, &http.Cookie{Name: "sid", SameSite: http.SameSiteLaxMode}) }
+
+NEG
+)
+${*.go}.pattern_regex(/SameSiteNoneMode/) as $hit
+alert $hit for {
+	level: "middle",
+	title: "源码扫描：Go Cookie SameSiteNoneMode",
+	title_zh: "源码扫描：Go Cookie SameSiteNoneMode",
+	message: "源码扫描：Go Cookie SameSiteNoneMode",
+	risk: "cookie-security",
+}

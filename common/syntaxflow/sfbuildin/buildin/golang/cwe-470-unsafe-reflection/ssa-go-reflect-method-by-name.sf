@@ -1,0 +1,51 @@
+desc(
+	mode: "ssa"
+	language: "golang"
+	title: "数据流：Go MethodByName 使用外部名字"
+	title_zh: "数据流：Go MethodByName 使用外部名字"
+	type: vuln
+	level: middle
+	rule_id: "ssa-go-reflect-method-by-name"
+	risk: "reflection-abuse"
+	cwe: "CWE-470"
+	desc: <<<DESC
+### 规则说明
+reflect.Value.MethodByName 的方法名来自外部时，可以调用本不该暴露的方法。
+
+### 风险类型
+reflection-abuse
+
+### 影响
+参数不是常量，且不是函数自身的参数对象时告警。常量配置和纯参数传递不报。
+
+### 检测方式
+SSA 上匹配调用，保留非常量且非 param 的实参。
+### 参考
+- CWE-470
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+用白名单映射方法名，不要直接使用请求参数。
+SOLUTION
+	alert_min: 1
+	"file://bad.go": <<<POS
+package main
+import ("net/http"; "reflect")
+func bad(v reflect.Value, r *http.Request) { v.MethodByName(r.URL.Query().Get("m")) }
+
+POS
+	"safefile://ok.go": <<<NEG
+package main
+import "reflect"
+func ok(v reflect.Value) { v.MethodByName("Known") }
+
+NEG
+)
+MethodByName(*?{!opcode: const && !opcode: param} as $dyn) as $call
+alert $dyn for {
+	level: "middle",
+	title: "数据流：Go MethodByName 使用外部名字",
+	title_zh: "数据流：Go MethodByName 使用外部名字",
+	message: "数据流：Go MethodByName 使用外部名字",
+	risk: "reflection-abuse",
+}

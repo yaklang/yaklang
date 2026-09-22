@@ -1,0 +1,47 @@
+desc(
+	mode: "source"
+	language: "java"
+	title: "源码扫描：Java XML 字符串拼接"
+	title_zh: "源码扫描：Java XML 字符串拼接"
+	type: vuln
+	level: high
+	rule_id: "source-java-xml-string-concat"
+	risk: "xml-injection"
+	cwe: "CWE-91"
+	desc: <<<DESC
+### 规则说明
+把外部数据直接拼进 XML 文本，攻击者可以插入额外标签或闭合当前元素。
+
+### 风险类型
+xml-injection
+
+### 影响
+命中说明代码里出现了该危险 API、配置或数据流入口。
+
+### 检测方式
+源码模式正则匹配，定位源码中的危险调用或配置。
+### 参考
+- CWE-91
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+用 XML API 创建文本节点，或对 <、>、& 和引号转义后再拼接。
+SOLUTION
+	alert_min: 1
+	"file://bad.java": <<<POS
+class Bad { String x(String name) { return "<user>" + name + "</user>"; } }
+
+POS
+	"safefile://ok.java": <<<NEG
+class Ok { String x() { return "<user>fixed</user>"; } }
+
+NEG
+)
+${*.java}.pattern_regex(/<\w+[^>]*>\"\s*\+|\"\s*<\w+[^>]*>\"\s*\+/) as $hit
+alert $hit for {
+	level: "high",
+	title: "源码扫描：Java XML 字符串拼接",
+	title_zh: "源码扫描：Java XML 字符串拼接",
+	message: "源码扫描：Java XML 字符串拼接",
+	risk: "xml-injection",
+}

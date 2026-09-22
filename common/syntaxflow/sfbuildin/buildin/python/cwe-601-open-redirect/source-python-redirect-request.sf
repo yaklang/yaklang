@@ -1,0 +1,49 @@
+desc(
+	mode: "source"
+	language: "python"
+	title: "源码扫描：Python redirect 使用请求数据"
+	title_zh: "源码扫描：Python redirect 使用请求数据"
+	type: vuln
+	level: high
+	rule_id: "source-python-redirect-request"
+	risk: "open-redirect"
+	cwe: "CWE-601"
+	desc: <<<DESC
+### 规则说明
+把请求参数传给 Flask redirect 或 Django HttpResponseRedirect，可以把用户带到任意站点。
+
+### 风险类型
+open-redirect
+
+### 影响
+命中说明代码里出现了该危险 API、配置或数据流入口。
+
+### 检测方式
+源码模式正则匹配，定位源码中的危险调用或配置。
+### 参考
+- CWE-601
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+只允许站内相对路径，并用 url_has_allowed_host_and_scheme 校验主机。
+SOLUTION
+	alert_min: 1
+	"file://bad.py": <<<POS
+def bad(request):
+    return redirect(request.args.get("next"))
+
+POS
+	"safefile://ok.py": <<<NEG
+def ok():
+    return redirect("/home")
+
+NEG
+)
+${*.py}.pattern_regex(/redirect\s*\(\s*request\.|HttpResponseRedirect\s*\(\s*request\./) as $hit
+alert $hit for {
+	level: "high",
+	title: "源码扫描：Python redirect 使用请求数据",
+	title_zh: "源码扫描：Python redirect 使用请求数据",
+	message: "源码扫描：Python redirect 使用请求数据",
+	risk: "open-redirect",
+}

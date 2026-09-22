@@ -1,0 +1,48 @@
+desc(
+	mode: "struct"
+	language: "java"
+	title: "结构扫描：Java XML 字符串拼接"
+	title_zh: "结构扫描：Java XML 字符串拼接"
+	type: vuln
+	level: high
+	rule_id: "struct-java-xml-string-concat"
+	risk: "xml-injection"
+	cwe: "CWE-91"
+	desc: <<<DESC
+### 规则说明
+把外部数据直接拼进 XML 文本，攻击者可以插入额外标签或闭合当前元素。
+
+### 风险类型
+xml-injection
+
+### 影响
+命中说明编译单元里出现了该调用，而不是注释或字符串。
+
+### 检测方式
+结构扫描匹配真实调用。
+### 参考
+- CWE-91
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+用 XML API 创建文本节点，或对 <、>、& 和引号转义后再拼接。
+SOLUTION
+	alert_min: 1
+	"file://bad.java": <<<POS
+class Bad { void p(javax.xml.parsers.DocumentBuilder b, String name) throws Exception { b.parse(new org.xml.sax.InputSource(new java.io.StringReader("<user>" + name + "</user>"))); } }
+
+POS
+	"safefile://ok.java": <<<NEG
+class Ok { void p() { int n = 1; } }
+
+NEG
+)
+parse as $call
+parse(* as $arg) as $call
+alert $call for {
+	level: "high",
+	title: "结构扫描：Java XML 字符串拼接",
+	title_zh: "结构扫描：Java XML 字符串拼接",
+	message: "结构扫描：Java XML 字符串拼接",
+	risk: "xml-injection",
+}

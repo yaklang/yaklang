@@ -1,0 +1,48 @@
+desc(
+	mode: "source"
+	language: "c"
+	title: "源码扫描：C rand 弱随机数"
+	title_zh: "源码扫描：C rand 弱随机数"
+	type: vuln
+	level: middle
+	rule_id: "source-c-rand-call"
+	risk: "weak-randomness"
+	cwe: "CWE-338"
+	desc: <<<DESC
+### 规则说明
+rand 不是密码学随机数。用它生成令牌、密钥或会话标识可以被预测。
+
+### 风险类型
+weak-randomness
+
+### 影响
+命中说明代码里出现了该危险 API、配置或数据流入口。
+
+### 检测方式
+源码模式正则匹配，定位源码中的危险调用或配置。
+### 参考
+- CWE-338
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+使用 getrandom、/dev/urandom 或操作系统的 CSPRNG。
+SOLUTION
+	alert_min: 1
+	"file://bad.c": <<<POS
+#include <stdlib.h>
+int bad(void) { return rand(); }
+
+POS
+	"safefile://ok.c": <<<NEG
+int ok(void) { return 1; }
+
+NEG
+)
+${*.c}.pattern_regex(/\brand\s*\(/) as $hit
+alert $hit for {
+	level: "middle",
+	title: "源码扫描：C rand 弱随机数",
+	title_zh: "源码扫描：C rand 弱随机数",
+	message: "源码扫描：C rand 弱随机数",
+	risk: "weak-randomness",
+}

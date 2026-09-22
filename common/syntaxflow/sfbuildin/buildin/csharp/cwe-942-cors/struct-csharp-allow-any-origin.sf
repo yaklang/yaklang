@@ -1,0 +1,48 @@
+desc(
+	mode: "struct"
+	language: "csharp"
+	title: "结构扫描：C# CORS 允许任意来源"
+	title_zh: "结构扫描：C# CORS 允许任意来源"
+	type: vuln
+	level: middle
+	rule_id: "struct-csharp-allow-any-origin"
+	risk: "cors"
+	cwe: "CWE-942"
+	desc: <<<DESC
+### 规则说明
+AllowAnyOrigin 会把接口暴露给任意网站。配合凭据时浏览器同源策略失效。
+
+### 风险类型
+cors
+
+### 影响
+命中说明编译单元里出现了该调用，而不是注释或字符串。
+
+### 检测方式
+结构扫描匹配真实调用。
+### 参考
+- CWE-942
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+用 WithOrigins 列出允许的来源，不要调用 AllowAnyOrigin。
+SOLUTION
+	alert_min: 1
+	"file://bad.cs": <<<POS
+class Bad { void c(Microsoft.AspNetCore.Cors.Infrastructure.CorsPolicyBuilder b) { b.AllowAnyOrigin(); } }
+
+POS
+	"safefile://ok.cs": <<<NEG
+class Ok { void c() { int n = 1; } }
+
+NEG
+)
+AllowAnyOrigin as $call
+AllowAnyOrigin(* as $arg) as $call
+alert $call for {
+	level: "middle",
+	title: "结构扫描：C# CORS 允许任意来源",
+	title_zh: "结构扫描：C# CORS 允许任意来源",
+	message: "结构扫描：C# CORS 允许任意来源",
+	risk: "cors",
+}

@@ -1,0 +1,47 @@
+desc(
+	mode: "source"
+	language: "csharp"
+	title: "源码扫描：C# 关闭令牌签名校验"
+	title_zh: "源码扫描：C# 关闭令牌签名校验"
+	type: vuln
+	level: high
+	rule_id: "source-csharp-token-no-signing-key"
+	risk: "improper-authentication"
+	cwe: "CWE-347"
+	desc: <<<DESC
+### 规则说明
+ValidateIssuerSigningKey = false 时，JWT 可以在没有可信签名的情况下被接受。
+
+### 风险类型
+improper-authentication
+
+### 影响
+命中说明代码里出现了该危险 API、配置或数据流入口。
+
+### 检测方式
+源码模式正则匹配，定位源码中的危险调用或配置。
+### 参考
+- CWE-347
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+保持 ValidateIssuerSigningKey 为 true，并设置 IssuerSigningKey。
+SOLUTION
+	alert_min: 1
+	"file://bad.cs": <<<POS
+class Bad { void c() { var o = new Microsoft.IdentityModel.Tokens.TokenValidationParameters(); o.ValidateIssuerSigningKey = false; } }
+
+POS
+	"safefile://ok.cs": <<<NEG
+class Ok { void c() { var o = new Microsoft.IdentityModel.Tokens.TokenValidationParameters(); o.ValidateIssuerSigningKey = true; } }
+
+NEG
+)
+${*.cs}.pattern_regex(/ValidateIssuerSigningKey\s*=\s*false/) as $hit
+alert $hit for {
+	level: "high",
+	title: "源码扫描：C# 关闭令牌签名校验",
+	title_zh: "源码扫描：C# 关闭令牌签名校验",
+	message: "源码扫描：C# 关闭令牌签名校验",
+	risk: "improper-authentication",
+}

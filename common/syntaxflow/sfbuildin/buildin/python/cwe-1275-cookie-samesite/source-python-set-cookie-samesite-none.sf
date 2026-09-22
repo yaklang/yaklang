@@ -1,0 +1,49 @@
+desc(
+	mode: "source"
+	language: "python"
+	title: "源码扫描：Python Cookie samesite=None"
+	title_zh: "源码扫描：Python Cookie samesite=None"
+	type: vuln
+	level: middle
+	rule_id: "source-python-set-cookie-samesite-none"
+	risk: "cookie-security"
+	cwe: "CWE-1275"
+	desc: <<<DESC
+### 规则说明
+samesite=None 允许跨站请求携带 Cookie。
+
+### 风险类型
+cookie-security
+
+### 影响
+命中说明代码里出现了该危险 API、配置或数据流入口。
+
+### 检测方式
+源码模式正则匹配，定位源码中的危险调用或配置。
+### 参考
+- CWE-1275
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+使用 samesite='Lax' 或 'Strict'。
+SOLUTION
+	alert_min: 1
+	"file://bad.py": <<<POS
+def bad(resp):
+    resp.set_cookie("sid", "v", samesite="None")
+
+POS
+	"safefile://ok.py": <<<NEG
+def ok(resp):
+    resp.set_cookie("sid", "v", samesite="Lax")
+
+NEG
+)
+${*.py}.pattern_regex(/samesite\s*=\s*[\"']None[\"']/) as $hit
+alert $hit for {
+	level: "middle",
+	title: "源码扫描：Python Cookie samesite=None",
+	title_zh: "源码扫描：Python Cookie samesite=None",
+	message: "源码扫描：Python Cookie samesite=None",
+	risk: "cookie-security",
+}

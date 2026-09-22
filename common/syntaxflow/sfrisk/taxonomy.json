@@ -1,6 +1,6 @@
 {
   "schema_version": "yaklang_risk_type_taxonomy.v1",
-  "version": "2026.08.31.2",
+  "version": "2026.09.22.1",
   "categories": [
     {
       "id": "injection",
@@ -31,7 +31,10 @@
         {"name":"variable-overwrite","display_name":"变量覆盖","aliases":["变量覆盖","变量覆盖（Variable Coverage）"],"order":22},
         {"name":"reflection-abuse","display_name":"不安全反射","order":23},
         {"name":"prompt-injection","display_name":"提示词注入","order":24},
-        {"name":"tool-poisoning","display_name":"工具描述投毒","order":25}
+        {"name":"tool-poisoning","display_name":"工具描述投毒","order":25},
+        {"name":"nosql-injection","display_name":"NoSQL 注入","aliases":["NoSQL注入"],"order":26},
+        {"name":"formula-injection","display_name":"公式注入","aliases":["CSV注入","公式注入"],"order":27},
+        {"name":"xml-injection","display_name":"XML 注入","aliases":["XML注入"],"order":28}
       ]
     },
     {
@@ -63,6 +66,7 @@
         {"name":"path-manipulation","display_name":"路径操纵","aliases":["路径操纵"],"order":3},
         {"name":"path-traversal-file-read","display_name":"路径遍历与任意文件读取","aliases":["路径遍历 / 任意文件读取"],"order":4},
         {"name":"path-traversal-file-write","display_name":"路径遍历与任意文件写入","aliases":["任意文件写入/目录穿越"],"order":5},
+        {"name":"resource-injection","display_name":"资源注入","aliases":["资源注入"],"order":12},
         {"name":"arbitrary-file-write","display_name":"任意文件写入","aliases":["任意文件写入"],"order":6},
         {"name":"arbitrary-file-delete","display_name":"任意文件删除","aliases":["任意文件删除"],"order":7},
         {"name":"file-upload","display_name":"文件上传风险","aliases":["任意文件上传","文件上传","文件上传漏洞"],"order":8},
@@ -87,7 +91,8 @@
         {"name":"session-hijacking","display_name":"会话劫持","aliases":["会话劫持"],"order":9},
         {"name":"session-security","display_name":"会话安全","aliases":["会话安全问题"],"order":10},
         {"name":"cookie-security","display_name":"Cookie 安全配置","aliases":["cookie security","Cookie安全配置缺陷"],"order":11},
-        {"name":"session-cleartext","display_name":"会话劫持与明文传输","aliases":["会话劫持/敏感信息明文传输"],"order":12}
+        {"name":"session-cleartext","display_name":"会话劫持与明文传输","aliases":["会话劫持/敏感信息明文传输"],"order":12},
+        {"name":"mass-assignment","display_name":"批量赋值","aliases":["Mass Assignment","批量赋值"],"order":13}
       ]
     },
     {
@@ -143,7 +148,8 @@
       "risk_types": [
         {"name":"denial-of-service","display_name":"拒绝服务","aliases":["DDOS","ddos"],"order":1},
         {"name":"resource-leak","display_name":"资源泄漏","aliases":["资源泄漏"],"order":2},
-        {"name":"resource-cleanup","display_name":"资源清理不当","aliases":["资源未清理"],"order":3}
+        {"name":"resource-cleanup","display_name":"资源清理不当","aliases":["资源未清理"],"order":3},
+        {"name":"regex-dos","display_name":"正则拒绝服务","aliases":["ReDoS","正则拒绝服务"],"order":4}
       ]
     },
     {
