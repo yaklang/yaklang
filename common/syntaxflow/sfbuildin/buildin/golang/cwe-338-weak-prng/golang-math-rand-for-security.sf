@@ -18,11 +18,14 @@ REFERENCE
 )
 
 rand?{<fullTypeName>?{have: "math/rand"}} as $rand
-$rand.Int() as $mid
-$rand.Intn(*) as $mid
-$rand.Uint32() as $mid
-$rand.Read(*) as $mid
-$rand.NewSource(*) as $mid
+$rand.Int() as $randCall
+$rand.Intn(*) as $randCall
+$rand.Uint32() as $randCall
+$rand.Read(*) as $randCall
+
+// NewSource 只是播种。ML 抽样 / 模板 rand_int、rand_ip 不是安全场景。
+// 窄上下文：只认赋值给 token/session/nonce 等安全变量的调用。
+$randCall<sourceCode(context=3)>?{have: /(?i)token|session|secret|password|passwd|otp|captcha|csrf|apikey|nonce/} as $mid
 
 alert $mid for {
 	type: "vuln",
@@ -73,6 +76,28 @@ func main() {
 	b := make([]byte, 16)
 	_, _ = crand.Read(b)
 	_ = hex.EncodeToString(b)
+}
+SAFE
+)
+
+desc(
+	lang: golang
+	alert_min: 0
+	'safefile://safe_sampling.go': <<<SAFE
+package main
+
+import (
+	"math/rand"
+	"time"
+)
+
+func RandomNumberGenerate(start int, end int, count int) []int {
+	r := rand.New(rand.NewSource(time.Now().UnixNano()))
+	return []int{r.Intn(end - start)}
+}
+
+func rand_int(min, max int) int {
+	return min + rand.Intn(max-min)
 }
 SAFE
 )
