@@ -8,7 +8,7 @@ SCA 从调用方提供的只读文件系统快照提取组件、出现位置、�
 
 组件按生态、名称、版本、来源等完整身份归并；文件路径及原生实例分别保留。范围、markers、extras、校验和与未解析引用作为证据保留，不推断为确定版本或已安装组件。`go.sum` 只提供精确模块校验和，不生成组件清单。材料声明的 SRI/checksum 进入 `Verification` 和 SBOM hashes，冲突摘要不会无声合并。超限截取在稳定身份顺序下进行。缺失材料、语法错误、超限和取消返回诊断及不完整状态；`Diagnostic.Code` 可 `errors.Is/As`。SBOM 使用自有 CycloneDX 1.5 DTO。
 
-格式限制：pnpm 只接受冻结 v5/v6；Cargo.lock 只接受缺省或 v1/v2/v3；静态 gemspec 与 pip 声明不执行脚本或安装器；不支持任意 YAML 对象、TOML 1.1、pip includes 或 SQLite WAL 恢复。POM 父级坐标必须匹配，不读取宿主缓存和环境补全未知属性。
+格式限制：pnpm 接受冻结 v5/v6 和 v9.0；Cargo.lock 接受缺省或 v1/v2/v3/v4；Poetry 支持旧布局及 lock-version 2.1；静态 gemspec 与 pip 声明不执行脚本或安装器；不支持任意 YAML 对象、TOML 1.1、pip includes 或 SQLite WAL 恢复。POM 父级坐标必须匹配，不读取宿主缓存和环境补全未知属性。
 
 各格式保留字段由 `TestFourFormatFullFieldContract` 对照冻结旧 `ScanFilesystem` 转储和输入原文。名称版本投影相等不是字段等价，也不是 performance PASS。授权语义差单列，不是未声明的功能损失。
 
@@ -31,6 +31,16 @@ SCA 从调用方提供的只读文件系统快照提取组件、出现位置、�
 802 项候选已逐项核对迁移或排除依据，范围包括 22 项显式 TOML 语法裁剪；相关字段、正例、拒绝行为和错误分类由迁移测试约束。macOS 的开发验证器会先校准文件、网络和进程拦截，再检查代表性扫描；其范围是当前 Go/Darwin libc 调用路径，不宣称覆盖任意原始内核系统调用。
 
 旧新差异按输入原文及冻结旧结果核对：dpkg/RPM 的虚拟范围组件改为声明、APK/RPM 的猜测边保留为候选；原始许可证文本不再强制 SPDX 归一化。Cargo/Poetry/Yarn/pnpm/npm/go.mod/Go binary 补全原文摘要；gemspec 保留各个 license 数组元素，新增声明边。Pipfile.lock 修复旧入口零识别；pip 去除旧扫描顺序造成的漏报；composer.json 根声明单列。Gradle/JAR/packaging/Conan 与 Bundler 的旧字段保留；新增字段和解析边由输入原文测试约束。范围裁剪仍以 `function-contracts.json` 为准，不通过更新旧 golden 隐藏差异。
+
+## 新版本锁文件
+
+- **Cargo.lock v4**：保留经过 URL 编码的 source 原文，依赖按完整 name/version/source 绑定；`%2B` 与 `+` 不做解码合并。未来版本继续显式拒绝。
+- **pnpm lockfile v9.0**：将 `packages` 元数据与 `snapshots` 图关联，保留 scoped name、peer/patch 后缀、别名、workspace importer、dev/optional 声明和完整性摘要。快照缺少对应元数据时报材料不足，不生成虚假包；本地 `link:` 引用保留声明，不读取外部目录。不把包管理器版本号与 lockfile 版本号混用。
+- **Poetry lock-version 2.1**：保留全部已锁定分组（含 dev），`Scope` 使用 `groups:[...]`，组条件映射在 `Condition` 中以 `markers:{...}` 保留；字符串 marker 原样保留。多条件依赖展开为分别带 constraint/marker/extras 的声明；同名多版本不凭扫描顺序绑定。旧格式的既有 runtime/category 行为保留。
+
+上述清单描述锁文件中的材料，不表示每个包在当前宿主环境必然安装。组/marker 不在扫描器中求值；CycloneDX 的 `sca:observations`、`sca:requirements` 属性保留条件，使用方不能把跨环境图当作某个部署环境的安装证明。真实上游样例固定到 Cargo 仓库 tag `0.84.0`、pnpm `v9.15.9`、Poetry `2.1.1` 对应提交，另有编码身份、peer 隔离、组条件和破坏输入的自建反例；测试离线读取新 ZIP，不运行包管理器。历史旧新性能数字不覆盖新增格式。
+
+作为完整 SCA 产品，后续仍需单独建设：uv/Bun、NuGet/.NET、Swift 等生态覆盖；指定部署环境的条件求值与跨材料关系核实；更广的真实仓库/异常输入语料；SPDX 及更新 CycloneDX 版本的导出；漏洞情报匹配、VEX/可达性和许可证策略。依赖清除还需上层结合构建与使用证据；仅凭锁文件没有直接引用不能安全删除依赖。这些能力不属于当前只读分析内核已完成的承诺。
 
 ## 算法边界
 
@@ -84,7 +94,7 @@ macOS 隔离启动器禁止网络、写盘、以及除**当前测试二进制**�
 GOWORK=off CGO_ENABLED=0 go test ./common/sca/... -count=1 -exec "$PWD/scripts/sca/isolated-test-exec.sh"
 ```
 
-固定样例存储在 41 个版本化 ZIP 中，830 个逻辑文件的内容和原路径保持不变。ZIP 仅由 `fixtures*_test.go` 的 `go:embed` 引入；测试按需在内存解压，支持目录遍历、Seek/ReadAt 和独立可变读取副本，不解压到工作目录。生产包没有 embed 声明，`yak.go` 不导入测试加载器。
+固定样例存储在 44 个版本化 ZIP 中，共 852 个逻辑文件（含随附许可与独立 oracle）；原有 830 个文件的内容和原路径保持不变。ZIP 仅由 `fixtures*_test.go` 的 `go:embed` 引入；测试按需在内存解压，支持目录遍历、Seek/ReadAt 和独立可变读取副本，不解压到工作目录。生产包没有 embed 声明，`yak.go` 不导入测试加载器。
 
 命名使用 `<格式及支持版本>_corpus_v<语料修订>.zip`，例如 `cargo_lock_le_v3_corpus_v1.zip`（包括 v3，故不写 lt_v3）、`pnpm_lock_v5_v6_corpus_v1.zip`、`toml_v1_0_and_rejected_v1_1_corpus_v1.zip`。格式版本与语料版本分开；未来新格式版本使用新归档，保留既有语料。ZIP 成员仍是该 `testdata` 下的相对路径，新增归档不能重复定义同一逻辑路径。
 

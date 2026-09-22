@@ -184,5 +184,31 @@
     }
   ],
   "release_review": "REVIEWED_FIXED_SOURCE_AND_TEST_SCOPE",
-  "review_scope": "Pinned source commits/files/licenses and all 802 migration candidates reviewed against local implementation and original expectations. Source audit, artifact checks and semantic regressions are separate gates; this field does not assert CI or release approval."
+  "review_scope": "Pinned source commits/files/licenses and all 802 migration candidates reviewed against local implementation and original expectations. Source audit, artifact checks and semantic regressions are separate gates; this field does not assert CI or release approval.",
+  "additional_test_corpora": [
+    {
+      "repository": "https://github.com/pnpm/pnpm",
+      "commit": "d22a3f65ee047ecee7c89dd6f1971ecea4ecd4d4",
+      "version": "v9.15.9",
+      "acquisition": "PINNED_RAW_FIXTURES_ONLY",
+      "files": "testdata/manifest.json",
+      "runtime_dependency": false
+    },
+    {
+      "repository": "https://github.com/python-poetry/poetry",
+      "commit": "6e61c8b25f034aea350284a426499c70be2fa816",
+      "version": "2.1.1",
+      "acquisition": "PINNED_RAW_FIXTURES_ONLY",
+      "files": "testdata/manifest.json",
+      "runtime_dependency": false
+    },
+    {
+      "repository": "https://github.com/rust-lang/cargo",
+      "commit": "5ffbef3211a8c378857905775a15c5b32a174d3b",
+      "version": "0.84.0",
+      "acquisition": "PINNED_RAW_FIXTURES_ONLY",
+      "files": "testdata/manifest.json",
+      "runtime_dependency": false
+    }
+  ]
 }

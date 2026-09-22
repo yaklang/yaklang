@@ -365,7 +365,7 @@ func TestReview5149_SchemaLegalAndMoreInvalid(t *testing.T) {
 	invalid := []struct{ file, text string }{
 		{"pnpm-lock.yaml", "lockfileVersion: Inf\npackages:\n  /demo@1.0.0:\n    name: demo\n    version: 1.0.0\n"},
 		{"pnpm-lock.yaml", "lockfileVersion: true\npackages:\n  /demo@1.0.0:\n    name: demo\n    version: 1.0.0\n"},
-		{"Cargo.lock", "version = 4\n[[package]]\nname = 'demo'\nversion = '1.0.0'\n"},
+		{"Cargo.lock", "version = 999\n[[package]]\nname = 'demo'\nversion = '1.0.0'\n"},
 	}
 	for i, tc := range invalid {
 		r, err := ScanReport(context.Background(), extraFS(map[string]string{tc.file: tc.text}), WithSnapshotID("fixed"))

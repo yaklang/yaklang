@@ -17,3 +17,5 @@
 数据库 fixtures 保存包管理元数据，Go/JAR 测试文件含固定上游二进制材料；其内容来源与摘要逐一列入 `testdata/manifest.json`。该清单是技术来源记录，不宣称为材料内每个包重新授权。
 
 维护责任由 yaklang/yaklang SCA 维护者承担：升级不自动替换为上游 main；先固定新提交、检查上游修复是否影响保留符号、更新来源摘要与许可，再执行对应语义、破坏输入、fuzz、闭包及资源门禁。报告修复时必须关联来源提交与本地回归。没有声称这些派生片段完全原创，也没有把保留完整第三方框架称为接管维护。
+
+新增版本语料仅作为测试材料引入：pnpm/pnpm v9.15.9 (`d22a3f65ee047ecee7c89dd6f1971ecea4ecd4d4`)、python-poetry/poetry 2.1.1 (`6e61c8b25f034aea350284a426499c70be2fa816`)、rust-lang/cargo 0.84.0 (`5ffbef3211a8c378857905775a15c5b32a174d3b`)。对应的 MIT 许可原文分别保存在 `pnpm_lock_v9_corpus_v1.zip` 的 `modern/pnpm_v9/LICENSE`、`poetry_lock_v2_1_corpus_v1.zip` 的 `modern/poetry_v2_1/LICENSE`、`cargo_lock_v4_corpus_v1.zip` 的 `modern/cargo_v4/LICENSE-MIT`。逐文件来源 URL 与摘要见 manifest；未引入这些项目的运行时实现或依赖。

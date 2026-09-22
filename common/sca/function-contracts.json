@@ -89,21 +89,25 @@
       "name": "Rust Cargo",
       "analyzer": "cargo-lang",
       "status": "RETAIN",
-      "grammar": "Cargo.lock v1/v2/v3 package arrays; source-qualified refs",
+      "grammar": "Cargo.lock v1/v2/v3/v4 package arrays; exact encoded source-qualified refs",
       "implementation": "analyzer/dep-parser/rust/cargo",
       "fixtures_root": "testdata/rust_cargo",
       "tests": [
         "analyzer/dep-parser/rust/cargo/upstream_parse_test.go",
         "scan_contract_test.go",
         "report_contract_test.go",
-        "format_fuzz_test.go"
+        "format_fuzz_test.go",
+        "modern_lock_test.go"
       ],
       "identity": "ecosystem/name/version/source/architecture/variant/verification",
       "occurrence": "snapshot/project/file/native ID/source ranges/evidence",
       "unknown_version": "empty version, raw constraint in Requirement",
       "failure": "structured Diagnostic plus Complete=false and non-nil error; partial evidence allowed",
       "io": "caller-supplied immutable fs.FS; no acquisition",
-      "budget_policy": "resource-policy.json"
+      "budget_policy": "resource-policy.json",
+      "additional_fixture_archives": [
+        "testdata/cargo_lock_v4_corpus_v1.zip"
+      ]
     },
     {
       "id": "SCA-06",
@@ -134,7 +138,7 @@
       "name": "Python Poetry",
       "analyzer": "python-poetry-lang",
       "status": "RETAIN",
-      "grammar": "Poetry TOML package arrays, runtime scope, dependency declarations",
+      "grammar": "Poetry legacy layouts and lock-version 2.1; groups, group markers and dependency alternatives",
       "implementation": "analyzer/dep-parser/python/poetry",
       "fixtures_root": "testdata/python_poetry",
       "tests": [
@@ -142,14 +146,18 @@
         "analyzer/dep-parser/python/poetry/upstream_parse_test.go",
         "scan_contract_test.go",
         "report_contract_test.go",
-        "format_fuzz_test.go"
+        "format_fuzz_test.go",
+        "modern_lock_test.go"
       ],
       "identity": "ecosystem/name/version/source/architecture/variant/verification",
       "occurrence": "snapshot/project/file/native ID/source ranges/evidence",
       "unknown_version": "empty version, raw constraint in Requirement",
       "failure": "structured Diagnostic plus Complete=false and non-nil error; partial evidence allowed",
       "io": "caller-supplied immutable fs.FS; no acquisition",
-      "budget_policy": "resource-policy.json"
+      "budget_policy": "resource-policy.json",
+      "additional_fixture_archives": [
+        "testdata/poetry_lock_v2_1_corpus_v1.zip"
+      ]
     },
     {
       "id": "SCA-08",
@@ -266,7 +274,7 @@
       "name": "Node pnpm",
       "analyzer": "npmp-lang",
       "status": "RETAIN",
-      "grammar": "pnpm lock v5/v6 runtime package mappings including peer suffixes",
+      "grammar": "pnpm lock v5/v6 and v9.0; v9 metadata/snapshot join, peer contexts, aliases and importer declarations",
       "implementation": "analyzer/dep-parser/nodejs/pnpm",
       "fixtures_root": "testdata/node_pnpm",
       "tests": [
@@ -274,14 +282,18 @@
         "analyzer/dep-parser/nodejs/pnpm/upstream_expectations_test.go",
         "scan_contract_test.go",
         "report_contract_test.go",
-        "format_fuzz_test.go"
+        "format_fuzz_test.go",
+        "modern_lock_test.go"
       ],
       "identity": "ecosystem/name/version/source/architecture/variant/verification",
       "occurrence": "snapshot/project/file/native ID/source ranges/evidence",
       "unknown_version": "empty version, raw constraint in Requirement",
       "failure": "structured Diagnostic plus Complete=false and non-nil error; partial evidence allowed",
       "io": "caller-supplied immutable fs.FS; no acquisition",
-      "budget_policy": "resource-policy.json"
+      "budget_policy": "resource-policy.json",
+      "additional_fixture_archives": [
+        "testdata/pnpm_lock_v9_corpus_v1.zip"
+      ]
     },
     {
       "id": "SCA-14",

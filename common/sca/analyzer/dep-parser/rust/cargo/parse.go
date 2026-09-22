@@ -47,11 +47,12 @@ func (p *Parser) Parse(fs fi.FileSystem, r types.ReadSeekerAt) ([]types.Library,
 	if err != nil {
 		return nil, nil, fmt.Errorf("decode error: %w", err)
 	}
-	if lockfile.Version != 0 && lockfile.Version != 1 && lockfile.Version != 2 && lockfile.Version != 3 {
+	if lockfile.Version != 0 && lockfile.Version != 1 && lockfile.Version != 2 && lockfile.Version != 3 && lockfile.Version != 4 {
 		return nil, nil, fmt.Errorf("unsupported_syntax: cargo lock version %d", lockfile.Version)
 	}
 
-	// We need to get version for unique dependencies for lockfile v3 from lockfile.Packages
+	// v4 source URLs remain encoded exactly as written. Decode neither identity
+	// nor references: %2B and + must not collapse into the same source.
 	pkgs := cargoIndex{name: map[string][]cargoPkg{}, version: map[[2]string][]cargoPkg{}, full: map[[3]string][]cargoPkg{}}
 	for _, pkg := range lockfile.Packages {
 		pkgs.name[pkg.Name] = append(pkgs.name[pkg.Name], pkg)

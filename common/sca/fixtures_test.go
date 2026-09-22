@@ -35,6 +35,9 @@ import (
 //go:embed testdata/ruby_bundler_corpus_v1.zip
 //go:embed testdata/ruby_gemspec_corpus_v1.zip
 //go:embed testdata/yarn_classic_berry_corpus_v1.zip
+//go:embed testdata/cargo_lock_v4_corpus_v1.zip
+//go:embed testdata/pnpm_lock_v9_corpus_v1.zip
+//go:embed testdata/poetry_lock_v2_1_corpus_v1.zip
 var fixtureArchives embed.FS
 
 var fixtures = testcheck.MustLoadFixtures(fixtureArchives)
