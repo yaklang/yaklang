@@ -255,7 +255,8 @@ func NewLocalClientForceNew() (ypb.YakClient, error) {
 // and streaming semantics without binding a TCP port or sleeping for readiness.
 func newInMemoryClient(s *Server) (*Client, error) {
 	lis := bufconn.Listen(1024 * 1024)
-	transport := grpc.NewServer(grpc.MaxRecvMsgSize(100*1024*1024), grpc.MaxSendMsgSize(100*1024*1024))
+	// Stop must join handlers before callers close their databases or other resources.
+	transport := grpc.NewServer(grpc.WaitForHandlers(true), grpc.MaxRecvMsgSize(100*1024*1024), grpc.MaxSendMsgSize(100*1024*1024))
 	ypb.RegisterYakServer(transport, s)
 	done := make(chan struct{})
 	go func() { defer close(done); _ = transport.Serve(lis) }()
