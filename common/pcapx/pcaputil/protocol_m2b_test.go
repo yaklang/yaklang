@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/stretchr/testify/require"
+	binparser "github.com/yaklang/yaklang/common/bin-parser"
 	"os"
 	"sort"
 	"strconv"
@@ -474,5 +475,36 @@ func assertM2QUICOracle(t *testing.T, events []*ProtocolEvent) {
 	require.Len(t, got, len(oracle))
 	for _, want := range oracle {
 		require.Equal(t, want.ResponseHex, hex.EncodeToString(got[fmt.Sprintf("%s/%d", want.ALPN, want.StreamID)]))
+	}
+}
+
+func TestM2QUICWireViewParity(t *testing.T) {
+	for _, tokenLen := range []int{0, 1, 63, 64, 300} {
+		wire := append([]byte{0xc0, 0, 0, 0, 1, 0, 0}, quicPutVarint(uint64(tokenLen))...)
+		wire = append(wire, bytes.Repeat([]byte{'x'}, tokenLen)...)
+		wire = append(wire, 2, 0, 1)
+		want, err := binparser.ParseStructured(wire, "application-layer.quic", "QUIC")
+		require.NoError(t, err)
+		got, err := quicWireEnvelope(wire)
+		require.NoError(t, err)
+		require.Equal(t, want["fields"], got)
+	}
+
+	keys, err := ParseTLSKeyLog(string(m2bFixture(t, "m2b-quic.keys")))
+	require.NoError(t, err)
+	events := m2bReplay(t, "m2b-quic-native.pcap", true, 1, keys)
+	for _, e := range events {
+		want, err := binparser.ParseStructured(e.Raw, "application-layer.quic", "QUIC")
+		require.NoError(t, err)
+		got, err := e.GetFields()
+		require.NoError(t, err)
+		require.Equal(t, want["fields"], got, "native packet %d", e.ID)
+		// A caller owns its decoded view; mutation cannot rewrite wire or another view.
+		if payload, ok := got["Protected Payload"].([]any); ok && len(payload) > 0 {
+			payload[0] = byte(255)
+		}
+		again, err := e.GetFields()
+		require.NoError(t, err)
+		require.Equal(t, want["fields"], again)
 	}
 }
