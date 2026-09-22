@@ -11,18 +11,14 @@ import (
 	"github.com/yaklang/yaklang/common/utils/filesys"
 )
 
-// New dataflow rules are named ssa-*.sf. Pending-language rules are source-only
-// and are skipped here the same way builtin verify skips that directory.
+// Dataflow rules are named ssa-*.sf. Source rules for languages without a
+// frontend are checked by the source builtin verify, not here.
 func TestGapSSARules_VerifyFilesystem(t *testing.T) {
 	root := BuiltinRuleRoot(t)
 	local := filesys.NewLocalFs()
 	var paths []string
 	err := filesys.Recursive(root, filesys.WithFileStat(func(path string, info fs.FileInfo) error {
 		if info.IsDir() || !strings.HasSuffix(path, ".sf") {
-			return nil
-		}
-		slash := filepath.ToSlash(path)
-		if strings.Contains(slash, "/pending-language/") {
 			return nil
 		}
 		if !strings.HasPrefix(info.Name(), "ssa-") {

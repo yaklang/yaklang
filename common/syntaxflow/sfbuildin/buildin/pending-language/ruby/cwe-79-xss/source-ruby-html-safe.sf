@@ -12,7 +12,7 @@ desc(
 ### 规则说明
 html_safe 和 raw 会把字符串标记为已安全，跳过模板转义。
 
-该语言的 struct/ssa 前端还没有接入。当前只保留 source 规则，builtin verify 会跳过 pending-language 目录。
+该语言还没有 struct/ssa 前端。source 规则用正则扫描源码，builtin verify 会检查内嵌样例。
 
 ### 风险类型
 xss

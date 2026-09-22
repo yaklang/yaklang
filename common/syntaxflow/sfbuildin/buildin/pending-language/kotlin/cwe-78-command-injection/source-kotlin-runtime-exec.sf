@@ -12,7 +12,7 @@ desc(
 ### 规则说明
 Runtime.getRuntime().exec 执行外部命令。参数来自外部时造成命令注入。Kotlin 前端尚未接入，此规则只做源码匹配。
 
-该语言的 struct/ssa 前端还没有接入。当前只保留 source 规则，builtin verify 会跳过 pending-language 目录。
+该语言还没有 struct/ssa 前端。source 规则用正则扫描源码，builtin verify 会检查内嵌样例。
 
 ### 风险类型
 command-injection
