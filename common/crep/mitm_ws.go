@@ -121,7 +121,27 @@ func selectWebsocketUpgradeResponse(req *http.Request, originalRaw, candidateRaw
 func (w *WebSocketModifier) modifyWebsocketOpeningHandshake(req *http.Request, rsp *http.Response, rspRaw []byte) []byte {
 	httpctx.SetWebsocketOpeningHandshake(req, true)
 	defer httpctx.SetWebsocketOpeningHandshake(req, false)
+	if w.ResponseHijackCallback == nil {
+		return rspRaw
+	}
 	return w.ResponseHijackCallback(req, rsp, rspRaw)
+}
+
+func droppedWebsocketUpgradeResponseBytes(req *http.Request) []byte {
+	rsp := proxyutil.NewResponse(200, strings.NewReader(proxyutil.GetPrettyErrorRsp("响应被用户丢弃")), req)
+	raw, err := utils.DumpHTTPResponse(rsp, true)
+	if err != nil || len(raw) == 0 {
+		return []byte("HTTP/1.1 200 OK\r\nContent-Type: text/html;charset=utf-8\r\nConnection: close\r\n\r\n")
+	}
+	return raw
+}
+
+func websocketUpgradeRequestDropped(req *http.Request) bool {
+	return httpctx.GetContextBoolInfoFromRequest(req, httpctx.REQUEST_CONTEXT_KEY_IsDropped)
+}
+
+func websocketUpgradeResponseDropped(candidate []byte) bool {
+	return candidate == nil
 }
 
 func websocketTerminalError(err error) string {
@@ -151,8 +171,14 @@ func (w *WebSocketModifier) ModifyRequest(req *http.Request) error {
 	isHijack := w.websocketHijackMode != nil && w.websocketHijackMode.IsSet()
 
 	// hijack request
-	if err := w.RequestHijackCallback(req); err != nil {
-		return err
+	if w.RequestHijackCallback != nil {
+		if err := w.RequestHijackCallback(req); err != nil {
+			return err
+		}
+	}
+	if websocketUpgradeRequestDropped(req) {
+		log.Infof("websocket tunnel id=%d target=%s dropped by request hijack before upgrade", tunnelID, target)
+		return nil
 	}
 
 	ctx := minimartian.NewContext(req, w.ProxyGetter())
@@ -221,6 +247,7 @@ func (w *WebSocketModifier) ModifyRequest(req *http.Request) error {
 		responseHookDuration      time.Duration
 		downstreamWriteDuration   time.Duration
 		manualResponseBypassed    bool
+		upgradeResponseDropped    bool
 		upstreamResponseRaw       []byte
 		downstreamResponseRaw     []byte
 		downstreamWriteBytes      int
@@ -353,20 +380,31 @@ func (w *WebSocketModifier) ModifyRequest(req *http.Request) error {
 				responseHookStartedAt := time.Now()
 				fixRspRaw := w.modifyWebsocketOpeningHandshake(req, rsp, rspRaw)
 				responseHookDuration = time.Since(responseHookStartedAt)
-				selectedRaw, selectedRsp, selectionErr := selectWebsocketUpgradeResponse(req, rspRaw, fixRspRaw)
-				if selectionErr != nil {
-					if selectedRaw == nil {
-						downstreamUpgradeWriteErr = selectionErr
-						rsp = proxyutil.NewResponse(502, nil, req)
-						rspRaw, _ = utils.DumpHTTPResponse(rsp, true)
+				if websocketUpgradeResponseDropped(fixRspRaw) {
+					httpctx.SetContextValueInfoFromRequest(req, httpctx.RESPONSE_CONTEXT_KEY_IsDropped, true)
+					upgradeResponseDropped = true
+					rspRaw = droppedWebsocketUpgradeResponseBytes(req)
+					if parsed, parseErr := lowhttp.ParseBytesToHTTPResponse(rspRaw); parseErr == nil {
+						parsed.Request = req
+						rsp = parsed
+					}
+					downstreamUpgradeWriteErr = minimartian.IsDroppedError
+				} else {
+					selectedRaw, selectedRsp, selectionErr := selectWebsocketUpgradeResponse(req, rspRaw, fixRspRaw)
+					if selectionErr != nil {
+						if selectedRaw == nil {
+							downstreamUpgradeWriteErr = selectionErr
+							rsp = proxyutil.NewResponse(502, nil, req)
+							rspRaw, _ = utils.DumpHTTPResponse(rsp, true)
+						} else {
+							log.Warnf("websocket tunnel id=%d target=%s %v", tunnelID, target, selectionErr)
+							rspRaw = selectedRaw
+							rsp = selectedRsp
+						}
 					} else {
-						log.Warnf("websocket tunnel id=%d target=%s %v", tunnelID, target, selectionErr)
 						rspRaw = selectedRaw
 						rsp = selectedRsp
 					}
-				} else {
-					rspRaw = selectedRaw
-					rsp = selectedRsp
 				}
 			}
 
@@ -400,6 +438,13 @@ func (w *WebSocketModifier) ModifyRequest(req *http.Request) error {
 		toServerOptions = append(toServerOptions, lowhttp.WithWebsocketCompress(false))
 	}
 	toServer, err = lowhttp.NewWebsocketClientByUpgradeRequest(req, toServerOptions...)
+	if upgradeResponseDropped {
+		if toServer != nil {
+			_ = toServer.Close()
+		}
+		log.Infof("websocket tunnel id=%d target=%s dropped by response hijack during upgrade", tunnelID, target)
+		return nil
+	}
 	if err != nil {
 		return err
 	}
@@ -478,8 +523,13 @@ func (w *WebSocketModifier) legacyModifyRequest(req *http.Request) error {
 	isDeflate := false
 
 	// hijack request
-	if err := w.RequestHijackCallback(req); err != nil {
-		return err
+	if w.RequestHijackCallback != nil {
+		if err := w.RequestHijackCallback(req); err != nil {
+			return err
+		}
+	}
+	if websocketUpgradeRequestDropped(req) {
+		return nil
 	}
 
 	ctx := minimartian.NewContext(req, w.ProxyGetter())

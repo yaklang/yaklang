@@ -187,6 +187,9 @@ func (m *MITMServer) setHijackHandler(rootCtx context.Context) {
 		websocketResponseHijackHandler: m.websocketResponseHijackHandler,
 		websocketRequestMirror:         m.websocketRequestMirror,
 		websocketUpgradeRequestMirror: func(isHttps bool, req *http.Request, rsp *http.Response, startTs int64) {
+			if m.httpFlowMirror == nil {
+				return
+			}
 			wshash := httpctx.GetWebsocketRequestHash(req)
 			if wshash == "" {
 				wshash = utils.CalcSha1(fmt.Sprintf("%p", req), fmt.Sprintf("%p", rsp), time.Now())
@@ -201,17 +204,11 @@ func (m *MITMServer) setHijackHandler(rootCtx context.Context) {
 		},
 		websocketResponseMirror: m.websocketResponseMirror,
 		ProxyGetter:             m.GetMartianProxy,
-		RequestHijackCallback: func(req *http.Request) error {
-			var isHttps = req.TLS != nil || httpctx.GetRequestHTTPS(req)
-			hijackedRaw, err := utils.HttpDumpWithBody(req, true)
-			if err != nil {
-				log.Errorf("mitm-hijack marshal request to bytes failed: %s", err)
-				return nil
-			}
-			m.callHTTPRequestHijackHandler(isHttps, req, hijackedRaw)
-			return nil
-		},
+		RequestHijackCallback:   m.hijackWebsocketUpgradeRequest,
 		ResponseHijackCallback: func(req *http.Request, rsp *http.Response, rspRaw []byte) []byte {
+			if !m.hasHTTPResponseHijackHandler() {
+				return rspRaw
+			}
 			result, _ := m.callHTTPResponseHijackHandler(
 				httpctx.GetRequestHTTPS(req),
 				req,
@@ -219,6 +216,10 @@ func (m *MITMServer) setHijackHandler(rootCtx context.Context) {
 				rspRaw,
 				httpctx.GetRemoteAddr(req),
 			)
+			if result == nil {
+				httpctx.SetContextValueInfoFromRequest(req, httpctx.RESPONSE_CONTEXT_KEY_IsDropped, true)
+				return nil
+			}
 			return result
 		},
 	}
@@ -237,6 +238,35 @@ func (m *MITMServer) buildHijackRequestHandler(rootCtx context.Context, wsModifi
 	return func(r *http.Request) error {
 		return m.hijackRequestHandler(rootCtx, wsModifier, r)
 	}
+}
+
+func (m *MITMServer) hijackWebsocketUpgradeRequest(req *http.Request) error {
+	if req == nil || !m.hasHTTPRequestHijackHandler() {
+		return nil
+	}
+
+	isHttps := req.TLS != nil || httpctx.GetRequestHTTPS(req)
+	httpctx.SetRequestHTTPS(req, isHttps)
+	originalPort, _, originalPortOK := getRequestUpstreamPort(req, isHttps)
+	hijackedRaw := httpctx.GetBareRequestBytes(req)
+	if len(hijackedRaw) == 0 {
+		raw, err := dumpRequestToBareContext(req)
+		if err != nil {
+			log.Errorf("mitm-hijack marshal websocket upgrade request to bytes failed: %s", err)
+			return nil
+		}
+		hijackedRaw = raw
+	}
+
+	hijackedRequestRaw, modified := m.callHTTPRequestHijackHandler(isHttps, req, hijackedRaw)
+	if hijackedRequestRaw == nil || httpctx.GetContextBoolInfoFromRequest(req, httpctx.REQUEST_CONTEXT_KEY_IsDropped) {
+		httpctx.SetContextValueInfoFromRequest(req, httpctx.REQUEST_CONTEXT_KEY_IsDropped, true)
+		return nil
+	}
+	if err := applyHijackedRequestResult(req, isHttps, originalPort, originalPortOK, hijackedRaw, hijackedRequestRaw, modified); err != nil {
+		log.Errorf("mitm-hijacked websocket upgrade request to http.Request failed: %s", err)
+	}
+	return nil
 }
 
 func (m *MITMServer) hijackRequestHandler(rootCtx context.Context, wsModifier *WebSocketModifier, req *http.Request) error {
