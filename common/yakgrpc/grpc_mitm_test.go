@@ -9,8 +9,10 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"net/http/httptest"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -1592,132 +1594,125 @@ Host: example.com
 }
 
 func TestMiTMPlugins(t *testing.T) {
-	count, _count := 0, 0
-
-	host, port := utils.DebugMockHTTPHandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
-		if request.URL.Path == "/notify" {
-			count++
-		}
-		writer.Write([]byte(base64.StdEncoding.EncodeToString([]byte("123"))))
-	})
-	_host, _port := utils.DebugMockHTTPHandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
-		if request.URL.Path == "/notify" {
-			_count++
-		}
-		writer.Write([]byte(base64.StdEncoding.EncodeToString([]byte("123"))))
-	})
-	target := fmt.Sprintf("http://%s:%v/notify", host, port)
-	_target := fmt.Sprintf("http://%s:%v/notify", _host, _port)
+	var counts [2]atomic.Int64
+	events := [2]chan string{make(chan string, 32), make(chan string, 32)}
+	newTarget := func(index int) *httptest.Server {
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if r.URL.Path == "/notify" {
+				counts[index].Add(1)
+				select {
+				case events[index] <- r.URL.Query().Get("hook"):
+				default:
+				}
+			}
+			_, _ = w.Write([]byte(base64.StdEncoding.EncodeToString([]byte("123"))))
+		}))
+		t.Cleanup(server.Close)
+		return server
+	}
+	parameterTarget, defaultTarget := newTarget(0), newTarget(1)
 	client, err := NewLocalClient()
 	require.NoError(t, err)
-	ctx, cancel := context.WithCancel(utils.TimeoutContextSeconds(100))
-	script, err := client.SaveNewYakScript(ctx,
-		&ypb.SaveNewYakScriptRequest{
-			Params: []*ypb.YakScriptParam{{
-				Field:        "target",
-				DefaultValue: "1",
-				TypeVerbose:  "text",
-				FieldVerbose: "",
-				Help:         "",
-				Required:     true,
-				Group:        "",
-				ExtraSetting: "",
-				MethodType:   "",
-			}},
-			Type: "mitm",
-			Content: fmt.Sprintf(`target = cli.String("target",cli.setDefault("%v"))
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+	defer cancel()
+	script, err := client.SaveNewYakScript(ctx, &ypb.SaveNewYakScriptRequest{
+		Params: []*ypb.YakScriptParam{{Field: "target", DefaultValue: "1", TypeVerbose: "text", Required: true}},
+		Type:   "mitm",
+		Content: fmt.Sprintf(`target = cli.String("target",cli.setDefault("%v"))
 cli.check()
+notify = func(hook) { poc.Get(target + "?hook=" + hook)~ }
 
 
 hijackHTTPRequest = func(isHttps, url, req, forward /*func(modifiedRequest []byte)*/, drop /*func()*/) {
-   dump(target)
-   poc.Get(target)~
+   notify("hijackHTTPRequest")
    forward(req)
 }
 
 mirrorFilteredHTTPFlow = func(isHttps /*bool*/, url /*string*/, req /*[]byte*/, rsp /*[]byte*/, body /*[]byte*/) {
-	dump(target)
- 	poc.Get(target)~
+	notify("mirrorFilteredHTTPFlow")
 }
 mirrorNewWebsite = func(isHttps /*bool*/, url /*string*/, req /*[]byte*/, rsp /*[]byte*/, body /*[]byte*/) {
-	dump(target)
-	poc.Get(target)~
+	notify("mirrorNewWebsite")
 }
 mirrorNewWebsitePath = func(isHttps /*bool*/, url /*string*/, req /*[]byte*/, rsp /*[]byte*/, body /*[]byte*/) {
-	dump(target)
-	poc.Get(target)~
+	notify("mirrorNewWebsitePath")
 }
 mirrorNewWebsitePathParams = func(isHttps /*bool*/, url /*string*/, req /*[]byte*/, rsp /*[]byte*/, body /*[]byte*/) {
-	dump(target)
-	poc.Get(target)~
+	notify("mirrorNewWebsitePathParams")
 }
 hijackHTTPResponse = func(isHttps, url, rsp, forward, drop) {
-	dump(target)
-	poc.Get(target)~
+	notify("hijackHTTPResponse")
 }
-`, _target),
-			ScriptName: uuid.NewString(),
-		})
+`, defaultTarget.URL+"/notify"),
+		ScriptName: uuid.NewString(),
+	})
 	require.NoError(t, err)
-	defer func() {
-		time.Sleep(1 * time.Second)
-		cancel()
-		client.DeleteYakScript(context.Background(), &ypb.DeleteYakScriptRequest{
-			Id: script.Id,
-		})
-		require.True(t, count == 6)
-		require.True(t, _count == 6)
-	}()
+	t.Cleanup(func() {
+		_, err := client.DeleteYakScript(context.Background(), &ypb.DeleteYakScriptRequest{Id: script.Id})
+		require.NoError(t, err)
+	})
 	stream, err := client.MITM(ctx)
 	require.NoError(t, err)
 	mitmPort := utils.GetRandomAvailableTCPPort()
-	_ = mitmPort
-	err = stream.Send(&ypb.MITMRequest{
-		Host: "127.0.0.1",
-		Port: uint32(mitmPort),
-	})
-	require.NoError(t, err)
+	require.NoError(t, stream.Send(&ypb.MITMRequest{Host: "127.0.0.1", Port: uint32(mitmPort)}))
 	for {
-		recv, err := stream.Recv()
+		message, err := stream.Recv()
 		require.NoError(t, err)
-		if strings.Contains(string(recv.GetMessage().GetMessage()), `starting mitm server`) {
-			err = stream.Send(&ypb.MITMRequest{
-				SetYakScript:    true,
-				YakScriptID:     script.Id,
-				YakScriptParams: []*ypb.ExecParamItem{{Key: "target", Value: target}},
-			})
-			require.NoError(t, err)
-		} else if recv.GetCurrentHook && len(recv.GetHooks()) > 0 {
-			handler := func() {
-				packet := `GET /origin HTTP/1.1
-Host: ` + utils.HostPort(host, port) + `
-
-`
-				packetBytes := lowhttp.FixHTTPRequest([]byte(packet))
-				_, err = yak.Execute(`
-rsp, req, err = poc.HTTPEx(packet, poc.proxy(mitmProxy))
-`, map[string]any{
-					"packet":    string(packetBytes),
-					"mitmProxy": `http://` + utils.HostPort("127.0.0.1", mitmPort),
-				})
-				require.NoError(t, err)
-			}
-			handler()
-			time.Sleep(time.Second * 2)
-			err = stream.Send(&ypb.MITMRequest{
-				RemoveHook: true,
-				RemoveHookParams: &ypb.RemoveHookParams{
-					RemoveHookID: []string{script.ScriptName},
-				},
-			})
-			time.Sleep(time.Second)
-			err = stream.Send(&ypb.MITMRequest{
-				SetYakScript: true,
-				YakScriptID:  script.Id,
-			})
-			handler()
+		if strings.Contains(string(message.GetMessage().GetMessage()), "starting mitm server") {
 			break
 		}
+	}
+	// A successful Send does not mean the plugin has loaded or unloaded.
+	// Wait for the hook inventory acknowledgment before issuing traffic.
+	waitHooks := func(want int) {
+		t.Helper()
+		for {
+			message, err := stream.Recv()
+			require.NoError(t, err)
+			if !message.GetCurrentHook {
+				continue
+			}
+			count := 0
+			for _, group := range message.Hooks {
+				for _, hook := range group.Hooks {
+					if hook.YakScriptName == script.ScriptName {
+						count++
+					}
+				}
+			}
+			require.Equal(t, want, count)
+			return
+		}
+	}
+	wantHooks := []string{"hijackHTTPRequest", "hijackHTTPResponse", "mirrorFilteredHTTPFlow", "mirrorNewWebsite", "mirrorNewWebsitePath", "mirrorNewWebsitePathParams"}
+	for index := range events {
+		request := &ypb.MITMRequest{SetYakScript: true, YakScriptID: script.Id}
+		if index == 0 {
+			request.YakScriptParams = []*ypb.ExecParamItem{{Key: "target", Value: parameterTarget.URL + "/notify"}}
+		}
+		require.NoError(t, stream.Send(request))
+		waitHooks(len(wantHooks))
+		packet := fmt.Sprintf("GET /origin HTTP/1.1\r\nHost: %s\r\n\r\n", parameterTarget.Listener.Addr())
+		rsp, _, err := poc.HTTP(packet, poc.WithProxy("http://"+utils.HostPort("127.0.0.1", mitmPort)), poc.WithContext(ctx))
+		require.NoError(t, err)
+		require.Equal(t, "MTIz", string(lowhttp.GetHTTPPacketBody(rsp)))
+		var observed []string
+		for range wantHooks {
+			select {
+			case hook := <-events[index]:
+				observed = append(observed, hook)
+			case <-ctx.Done():
+				t.Fatalf("target %d received hooks %v: %v", index, observed, ctx.Err())
+			}
+		}
+		require.ElementsMatch(t, wantHooks, observed)
+		require.NoError(t, stream.Send(&ypb.MITMRequest{
+			RemoveHook: true, RemoveHookParams: &ypb.RemoveHookParams{RemoveHookID: []string{script.ScriptName}},
+		}))
+		waitHooks(0)
+	}
+	for index := range counts {
+		require.Equal(t, int64(len(wantHooks)), counts[index].Load(), "target %d callback count", index)
 	}
 }
 
