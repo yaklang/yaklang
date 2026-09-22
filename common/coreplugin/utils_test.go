@@ -5,20 +5,17 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"os"
 	"strings"
-	"sync"
 	"testing"
 	"time"
 
-	"github.com/yaklang/antlr/v4"
-	. "github.com/bytedance/mockey"
 	"github.com/stretchr/testify/require"
+	"github.com/yaklang/antlr/v4"
 	"github.com/yaklang/yaklang/common/coreplugin"
-	"github.com/yaklang/yaklang/common/cybertunnel/tpb"
 	yak "github.com/yaklang/yaklang/common/yak/antlr4yak/parser"
 
 	"github.com/yaklang/yaklang/common/consts"
-	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/vulinbox"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
@@ -54,68 +51,29 @@ type msg struct {
 }
 
 var (
-	vulAddr  string
-	server   VulServerInfo
-	mockOnce sync.Once
-
-	// mock DNSLog state must live at package level. mockOnce.Do only runs once
-	// for the whole package, so capturing per-call local maps inside the Once
-	// closure would freeze the mock onto the very first caller's maps and make
-	// later callers (including SSRF retries) share stale state. Keeping the
-	// state here makes every CoreMitmPlugTest call reuse the same live maps.
-	mockDNSLogMutex        sync.Mutex
-	mockDNSLogTokenResults = make(map[string]*tpb.DNSLogEvent)
+	vulAddr string
+	server  VulServerInfo
 )
 
-func init() {
+func TestMain(m *testing.M) {
+	ctx, cancel := context.WithCancel(context.Background())
 	var err error
-	vulAddr, err = vulinbox.NewVulinServer(context.Background())
+	vulAddr, err = vulinbox.NewVulinServer(ctx)
 	if err != nil {
-		panic("VULINBOX START ERROR")
+		panic(err)
 	}
-	server = VulServerInfo{
-		VulServerAddr: vulAddr,
-		IsHttps:       true,
-	}
+	server = VulServerInfo{VulServerAddr: vulAddr, IsHttps: true}
+	dns := startLocalDNSLog()
+	vulinbox.HandleDnsRequest = dns.ObserveDomain
+	code := m.Run()
+	dns.Close()
+	cancel()
+	os.Exit(code)
 }
 
 func CoreMitmPlugTest(pluginName string, vulServer VulServerInfo, vulInfo VulInfo, client ypb.YakClient, t *testing.T) bool {
+	t.Helper()
 	coreplugin.InitDBForTest()
-
-	// mock DNSLog server.
-	// NOTE: the mock must NEVER fall back to the real implementation. Previously
-	// CheckDNSLogByToken used .When(token recorded) which, on a lost race (the
-	// vulinbox failing to reach the local mock domain in time under CI load),
-	// fell through to the real function and dialed the public reverse server
-	// (ns1.cybertunnel.run). On CI that real call is slow/unreachable and, with
-	// retries and no overall deadline, accumulated into the 6m test timeout.
-	// Returning mock results unconditionally keeps the plugin fully deterministic:
-	// token recorded -> DNSLog hit; otherwise -> empty (a transient miss is then
-	// covered by the test-level retries instead of a real network call).
-	mockOnce.Do(func() {
-		Mock(yakit.NewDNSLogDomain).To(func() (domain string, token string, _ error) {
-			mockToken := utils.RandStringBytes(16)
-			host, port := utils.DebugMockHTTPEx(func(req []byte) []byte {
-				mockDNSLogMutex.Lock()
-				defer mockDNSLogMutex.Unlock()
-				mockDNSLogTokenResults[mockToken] = &tpb.DNSLogEvent{Domain: ""}
-				return []byte("HTTP/1.1 200 OK\r\nContent-Length: 0\r\n\r\n")
-			})
-			mockDomain := utils.HostPort(host, port)
-			log.Infof("mock domain: %v, token: %v", mockDomain, mockToken)
-			return mockDomain, mockToken, nil
-		}).Build()
-
-		Mock(yakit.CheckDNSLogByToken).To(func(token string, yakitInfo yakit.YakitPluginInfo, timeout ...float64) ([]*tpb.DNSLogEvent, error) {
-			mockDNSLogMutex.Lock()
-			events, ok := mockDNSLogTokenResults[token]
-			mockDNSLogMutex.Unlock()
-			if !ok {
-				return nil, nil
-			}
-			return []*tpb.DNSLogEvent{events}, nil
-		}).Build()
-	})
 
 	codeBytes := coreplugin.GetCorePluginDataWithHook(pluginName)
 	if codeBytes == nil {
@@ -168,7 +126,9 @@ func CoreMitmPlugTest(pluginName string, vulServer VulServerInfo, vulInfo VulInf
 				// means this attempt is aborted. Break out either way; never
 				// dereference exec when err != nil.
 				if err != io.EOF {
-					log.Warn(err)
+					cancel()
+					t.Errorf("DebugPlugin %s stream failed: %v", pluginName, err)
+					return false
 				}
 				break
 			}

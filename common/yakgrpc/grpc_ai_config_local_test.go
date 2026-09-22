@@ -2,14 +2,12 @@ package yakgrpc
 
 import (
 	"context"
-	"github.com/bytedance/mockey"
-	"github.com/yaklang/gorm"
-	"github.com/yaklang/yaklang/common/consts"
-	"github.com/yaklang/yaklang/common/schema"
-	"github.com/yaklang/yaklang/common/yak/yaklib"
-	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"os"
 	"testing"
+
+	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/schema"
+	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -139,9 +137,6 @@ func TestAIGlobalConfig_GRPC_Local(t *testing.T) {
 }
 
 func TestGetApiKey_ReplaceAPIKeys(t *testing.T) {
-	if isCI() {
-		t.Skip("skip in CI environment")
-	}
 
 	client, server, err := NewLocalClientAndServerWithTempDatabase(t)
 	require.NoError(t, err)
@@ -215,19 +210,13 @@ func TestGetApiKey_ReplaceAPIKeys(t *testing.T) {
 	_, err = client.SetAIGlobalConfig(ctx, cfg)
 	require.NoError(t, err)
 
-	mockey.PatchConvey("mock online client", t, func() {
+	t.Run("replace builtin provider keys", func(t *testing.T) {
 		newAPIKey := "mf-mock-created-key"
 
-		mockey.Mock(consts.GetGormProfileDatabase).To(func() *gorm.DB {
-			return db
-		}).Build()
-
-		mockey.Mock((*yaklib.OnlineClient).GetAIApiKeyByOnline).
-			To(func(_ *yaklib.OnlineClient, ctx context.Context, token string) (string, error) {
-				assert.Equal(t, "test-token", token)
-				return newAPIKey, nil
-			}).
-			Build()
+		server.onlineClient = &stubOnlineService{apiKey: func(ctx context.Context, token string) (string, error) {
+			assert.Equal(t, "test-token", token)
+			return newAPIKey, nil
+		}}
 
 		req := &ypb.GetApiKeyByOnlineRequest{Token: "test-token"}
 		resp, err := server.GetApiKeyByOnline(context.Background(), req)

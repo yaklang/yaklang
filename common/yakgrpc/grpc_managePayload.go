@@ -7,7 +7,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/yaklang/yaklang/common/yak/yaklib"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -16,6 +15,8 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"github.com/yaklang/yaklang/common/yak/yaklib"
 
 	"github.com/mattn/go-sqlite3"
 	"github.com/yaklang/yaklang/common/schema"
@@ -1474,7 +1475,7 @@ func (s *Server) UploadPayloadToOnline(req *ypb.UploadPayloadToOnlineRequest, st
 		errorCount   int32
 	)
 
-	client := yaklib.NewOnlineClient(consts.GetOnlineBaseUrl())
+	client := s.getOnlineClient()
 
 	for i, p := range payloads {
 		progress := float64(i) / float64(len(payloads))
@@ -1535,7 +1536,7 @@ func (s *Server) DownloadPayload(req *ypb.DownloadPayloadRequest, stream ypb.Yak
 	}
 
 	// 初始化下载客户端
-	client := yaklib.NewOnlineClient(consts.GetOnlineBaseUrl())
+	client := s.getOnlineClient()
 	ch := client.DownloadBatchPayloads(stream.Context(), req.Token, req.GetGroup(), req.GetFolder())
 	if ch == nil {
 		return utils.Error("download stream initialization failed")
@@ -1560,7 +1561,7 @@ func (s *Server) DownloadPayload(req *ypb.DownloadPayloadRequest, stream ypb.Yak
 		}
 		count++
 
-		err := client.SavePayload(s.GetProfileDatabase(), payloadIns.PayloadData)
+		err := (&yaklib.OnlineClient{}).SavePayload(s.GetProfileDatabase(), payloadIns.PayloadData)
 		if err != nil {
 			errorCount++
 			payloadSendProgress(stream, progress, fmt.Sprintf("保存失败 [%s]: %v", payloadIns.PayloadData.Group, err), "error")

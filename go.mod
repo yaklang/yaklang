@@ -22,7 +22,6 @@ require (
 	github.com/aymanbagabas/go-pty v0.2.2
 	github.com/bcicen/jstream v0.0.0-20190220045926-16c1f8af81c2
 	github.com/beevik/etree v1.5.0
-	github.com/bytedance/mockey v1.4.6
 	github.com/chzyer/readline v1.5.1
 	github.com/cilium/ebpf v0.17.3
 	github.com/cloudflare/circl v1.5.0

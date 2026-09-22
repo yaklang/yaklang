@@ -28,6 +28,8 @@ import (
 )
 
 type Server struct {
+	onlineClient onlineService
+	ssaDatabase  *gorm.DB
 	ypb.UnimplementedYakServer
 	homeDir             string
 	cacheDir            string
@@ -142,6 +144,9 @@ func (s *Server) getAIMemoryVectorSingleton() *aiMemoryVectorSessionSingleton {
 }
 
 func (s *Server) GetSSADatabase() *gorm.DB {
+	if s != nil && s.ssaDatabase != nil {
+		return s.ssaDatabase
+	}
 	return ssadb.GetDB()
 }
 

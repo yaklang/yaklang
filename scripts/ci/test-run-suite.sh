@@ -23,16 +23,12 @@ if [[ "$SUITE_NEEDS_GRPC" != "0" && "$SUITE_NEEDS_GRPC" != "1" ]]; then
   echo "ERROR: SUITE_NEEDS_GRPC must be 0 or 1"
   exit 1
 fi
-if [[ "$SUITE_NEEDS_GRPC" == "0" && "$SUITE_SYNC_RULE" == "1" ]]; then
-  echo "ERROR: rule synchronization requires the engine"
-  exit 1
-fi
 if [[ -z "$TEST_BIN_DIR" || -z "$TEST_CONFIG" ]]; then
   echo "ERROR: TEST_BIN_DIR and TEST_CONFIG must be set"
   exit 1
 fi
 
-if [[ "$SUITE_NEEDS_GRPC" == "1" && ! -x "$YAK_BINARY_PATH" ]]; then
+if [[ ( "$SUITE_NEEDS_GRPC" == "1" || "$SUITE_SYNC_RULE" == "1" ) && ! -x "$YAK_BINARY_PATH" ]]; then
   echo "ERROR: YAK binary is missing or not executable: $YAK_BINARY_PATH"
   exit 1
 fi
@@ -115,7 +111,7 @@ if [[ "$SUITE_NEEDS_GRPC" == "1" ]]; then
 
   echo "GRPC ready after ${waited}s"
 else
-  echo "Static suite: engine startup is not required"
+  echo "Suite uses in-process services: external gRPC engine startup is not required"
 fi
 
 if [[ "$SUITE_SYNC_RULE" == "1" ]]; then

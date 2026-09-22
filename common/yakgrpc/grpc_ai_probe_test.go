@@ -7,10 +7,9 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/bytedance/mockey"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/yaklang/yaklang/common/ai"
+
 	"github.com/yaklang/yaklang/common/ai/aispec"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
@@ -42,8 +41,8 @@ func TestIsLikelyErrorResponse(t *testing.T) {
 }
 
 func TestProbeReasoningEffort_BothSupported(t *testing.T) {
-	mockey.PatchConvey("xhigh and max both supported", t, func() {
-		mockey.Mock(ai.Chat).To(func(msg string, opts ...aispec.AIConfigOption) (string, error) {
+	t.Run("xhigh and max both supported", func(t *testing.T) {
+		chat := func(msg string, opts ...aispec.AIConfigOption) (string, error) {
 			cfg := aispec.NewDefaultAIConfig(opts...)
 			if cfg.RawHTTPRequestResponseCallback != nil {
 				cfg.RawHTTPRequestResponseCallback(
@@ -54,19 +53,16 @@ func TestProbeReasoningEffort_BothSupported(t *testing.T) {
 				)
 			}
 			return "hi", nil
-		}).Build()
+		}
 
-		_, server, err := NewLocalClientAndServerWithTempDatabase(t)
-		require.NoError(t, err)
-
-		resp, err := server.ProbeReasoningEffort(context.Background(), &ypb.ProbeReasoningEffortRequest{
+		resp, err := probeReasoningEffort(context.Background(), &ypb.ProbeReasoningEffortRequest{
 			Config: &ypb.ThirdPartyApplicationConfig{
 				Type:   "openai",
 				APIKey: "test-key",
 				Domain: "api.openai.com",
 			},
 			Model: "o3-mini",
-		})
+		}, chat)
 
 		require.NoError(t, err)
 		require.NotNil(t, resp)
@@ -78,9 +74,9 @@ func TestProbeReasoningEffort_BothSupported(t *testing.T) {
 }
 
 func TestProbeReasoningEffort_NeitherSupported(t *testing.T) {
-	mockey.PatchConvey("neither xhigh nor max supported", t, func() {
+	t.Run("neither xhigh nor max supported", func(t *testing.T) {
 		callCount := 0
-		mockey.Mock(ai.Chat).To(func(msg string, opts ...aispec.AIConfigOption) (string, error) {
+		chat := func(msg string, opts ...aispec.AIConfigOption) (string, error) {
 			callCount++
 			cfg := aispec.NewDefaultAIConfig(opts...)
 			if cfg.RawHTTPRequestResponseCallback != nil {
@@ -92,19 +88,16 @@ func TestProbeReasoningEffort_NeitherSupported(t *testing.T) {
 				)
 			}
 			return `{"error":{"message":"unsupported reasoning effort"}}`, nil
-		}).Build()
+		}
 
-		_, server, err := NewLocalClientAndServerWithTempDatabase(t)
-		require.NoError(t, err)
-
-		resp, err := server.ProbeReasoningEffort(context.Background(), &ypb.ProbeReasoningEffortRequest{
+		resp, err := probeReasoningEffort(context.Background(), &ypb.ProbeReasoningEffortRequest{
 			Config: &ypb.ThirdPartyApplicationConfig{
 				Type:   "openai",
 				APIKey: "test-key",
 				Domain: "api.openai.com",
 			},
 			Model: "gpt-4o",
-		})
+		}, chat)
 
 		require.NoError(t, err)
 		require.NotNil(t, resp)
@@ -117,8 +110,8 @@ func TestProbeReasoningEffort_NeitherSupported(t *testing.T) {
 }
 
 func TestProbeReasoningEffort_OnlyXhighSupported(t *testing.T) {
-	mockey.PatchConvey("only xhigh supported, max returns 400", t, func() {
-		mockey.Mock(ai.Chat).To(func(msg string, opts ...aispec.AIConfigOption) (string, error) {
+	t.Run("only xhigh supported, max returns 400", func(t *testing.T) {
+		chat := func(msg string, opts ...aispec.AIConfigOption) (string, error) {
 			cfg := aispec.NewDefaultAIConfig(opts...)
 			effort := cfg.ThinkingLevel
 			if cfg.RawHTTPRequestResponseCallback != nil {
@@ -142,19 +135,16 @@ func TestProbeReasoningEffort_OnlyXhighSupported(t *testing.T) {
 				return "hi", nil
 			}
 			return `{"error":{"message":"max not supported"}}`, nil
-		}).Build()
+		}
 
-		_, server, err := NewLocalClientAndServerWithTempDatabase(t)
-		require.NoError(t, err)
-
-		resp, err := server.ProbeReasoningEffort(context.Background(), &ypb.ProbeReasoningEffortRequest{
+		resp, err := probeReasoningEffort(context.Background(), &ypb.ProbeReasoningEffortRequest{
 			Config: &ypb.ThirdPartyApplicationConfig{
 				Type:   "openai",
 				APIKey: "test-key",
 				Domain: "api.openai.com",
 			},
 			Model: "o3-mini",
-		})
+		}, chat)
 
 		require.NoError(t, err)
 		require.NotNil(t, resp)
@@ -166,22 +156,19 @@ func TestProbeReasoningEffort_OnlyXhighSupported(t *testing.T) {
 }
 
 func TestProbeReasoningEffort_NetworkError(t *testing.T) {
-	mockey.PatchConvey("network error returns unsupported", t, func() {
-		mockey.Mock(ai.Chat).To(func(msg string, opts ...aispec.AIConfigOption) (string, error) {
+	t.Run("network error returns unsupported", func(t *testing.T) {
+		chat := func(msg string, opts ...aispec.AIConfigOption) (string, error) {
 			return "", errors.New("connection refused")
-		}).Build()
+		}
 
-		_, server, err := NewLocalClientAndServerWithTempDatabase(t)
-		require.NoError(t, err)
-
-		resp, err := server.ProbeReasoningEffort(context.Background(), &ypb.ProbeReasoningEffortRequest{
+		resp, err := probeReasoningEffort(context.Background(), &ypb.ProbeReasoningEffortRequest{
 			Config: &ypb.ThirdPartyApplicationConfig{
 				Type:   "openai",
 				APIKey: "test-key",
 				Domain: "api.openai.com",
 			},
 			Model: "o3-mini",
-		})
+		}, chat)
 
 		require.NoError(t, err)
 		require.NotNil(t, resp)
@@ -191,20 +178,18 @@ func TestProbeReasoningEffort_NetworkError(t *testing.T) {
 }
 
 func TestProbeReasoningEffort_NilConfig(t *testing.T) {
-	_, server, err := NewLocalClientAndServerWithTempDatabase(t)
-	require.NoError(t, err)
+	server := &Server{}
 
-	_, err = server.ProbeReasoningEffort(context.Background(), &ypb.ProbeReasoningEffortRequest{
+	_, err := server.ProbeReasoningEffort(context.Background(), &ypb.ProbeReasoningEffortRequest{
 		Config: nil,
 	})
 	assert.Error(t, err)
 }
 
 func TestProbeReasoningEffort_EmptyType(t *testing.T) {
-	_, server, err := NewLocalClientAndServerWithTempDatabase(t)
-	require.NoError(t, err)
+	server := &Server{}
 
-	_, err = server.ProbeReasoningEffort(context.Background(), &ypb.ProbeReasoningEffortRequest{
+	_, err := server.ProbeReasoningEffort(context.Background(), &ypb.ProbeReasoningEffortRequest{
 		Config: &ypb.ThirdPartyApplicationConfig{
 			APIKey: "test-key",
 		},

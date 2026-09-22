@@ -568,13 +568,16 @@ func CreateRuleWithDefaultGroup(rule *schema.SyntaxFlowRule, groups ...string) (
 }
 
 func CreateOrUpdateRuleWithGroup(rule *schema.SyntaxFlowRule, groups ...string) (*schema.SyntaxFlowRule, error) {
+	return CreateOrUpdateRuleWithGroupDB(consts.GetGormProfileDatabase(), rule, groups...)
+}
+
+func CreateOrUpdateRuleWithGroupDB(db *gorm.DB, rule *schema.SyntaxFlowRule, groups ...string) (*schema.SyntaxFlowRule, error) {
 	if rule == nil {
 		return nil, utils.Errorf("create syntaxFlow rule failed: rule is nil")
 	}
 	if rule.RuleName == "" {
 		return nil, utils.Errorf("create syntaxFlow rule failed: rule name is empty")
 	}
-	db := consts.GetGormProfileDatabase()
 	db = db.Model(&schema.SyntaxFlowRule{})
 	// 只是创建规则而不带着组去创建，后续再添加组。
 	// 因为多对多的表直接创建会导致和该组相关的规则都被更新。

@@ -3,164 +3,124 @@ package yakgrpc
 import (
 	"context"
 	"encoding/json"
-	"fmt"
-	"github.com/bytedance/mockey"
-	"github.com/yaklang/gorm"
-	"github.com/stretchr/testify/assert"
+	"errors"
+	"os"
+	"path/filepath"
+	"testing"
+
+	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/schema"
-	"github.com/yaklang/yaklang/common/utils/bizhelper"
 	"github.com/yaklang/yaklang/common/yak/yaklib"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"google.golang.org/grpc"
-	"testing"
 )
 
-func TestUploadPayloadToOnline(t *testing.T) {
-	mockey.PatchConvey("Test UploadPayloadToOnline", t, func() {
-		defer mockey.UnPatchAll()
-
-		server := &Server{}
-
-		mockPayloads := []*schema.Payload{
-			{
-				Group:   "test-group",
-				Folder:  pointer("test-folder"),
-				Content: pointer("test-content-path"),
-				IsFile:  pointer(true),
-			},
-		}
-
-		mockey.Mock((*Server).GetProfileDatabase).Return(&gorm.DB{}).Build()
-
-		mockey.Mock(bizhelper.ExactQueryString).To(func(db *gorm.DB, key, value string) *gorm.DB {
-			return db
-		}).Build()
-
-		mockey.Mock((*gorm.DB).Find).To(func(_ *gorm.DB, dest interface{}, conds ...interface{}) *gorm.DB {
-			ptr := dest.(*[]*schema.Payload)
-			*ptr = mockPayloads
-			return &gorm.DB{}
-		}).Build()
-
-		mockey.Mock(GetPayloadFile).To(func(ctx context.Context, path string) ([]byte, bool, error) {
-			assert.Equal(t, path, "test-content-path")
-			return []byte("mock file content"), false, nil
-		}).Build()
-
-		mockey.Mock((*yaklib.OnlineClient).UploadPayloadsToOnline).To(func(ctx context.Context, token string, data, fileContent []byte) error {
-			assert.Equal(t, token, "fake-token")
-			assert.Equal(t, string(fileContent), "mock file content")
-
-			var p schema.Payload
-			err := json.Unmarshal(data, &p)
-			assert.NoError(t, err)
-			assert.Equal(t, p.Group, "test-group")
-			return nil
-		}).Build()
-
-		stream := &fakeUploadStream{}
-
-		req := &ypb.UploadPayloadToOnlineRequest{
-			Token:  "fake-token",
-			Group:  "test-group",
-			Folder: "test-folder",
-		}
-
-		err := server.UploadPayloadToOnline(req, stream)
-		assert.NoError(t, err)
-
-		assert.NotEmpty(t, stream.SendMessages)
-	})
-}
-
-func pointer[T any](v T) *T {
-	return &v
-}
+func pointer[T any](v T) *T { return &v }
 
 type fakeUploadStream struct {
 	grpc.ServerStream
 	SendMessages []*ypb.DownloadProgress
+	sendErr      error
 }
 
 func (f *fakeUploadStream) Send(resp *ypb.DownloadProgress) error {
 	f.SendMessages = append(f.SendMessages, resp)
-	fmt.Printf("Progress: %.2f, Message: %s [%s]\n", resp.Progress, resp.Message, resp.MessageType)
-	return nil
+	return f.sendErr
 }
+func (f *fakeUploadStream) Context() context.Context { return context.Background() }
 
-func (f *fakeUploadStream) Context() context.Context {
-	return context.Background()
+type fakeDownloadStream = fakeUploadStream
+
+func TestUploadPayloadToOnline(t *testing.T) {
+	for _, scenario := range []string{"file", "inline", "missing file", "remote error", "empty selection"} {
+		t.Run(scenario, func(t *testing.T) {
+			db := newOnlineTestDB(t, &schema.Payload{})
+			filename := filepath.Join(t.TempDir(), "payload.txt")
+			require.NoError(t, os.WriteFile(filename, []byte("mock file content"), 0600))
+			content := filename
+			isFile := scenario != "inline"
+			if !isFile {
+				content = "inline content"
+			}
+			if scenario == "missing file" {
+				content += ".missing"
+			}
+			p := &schema.Payload{Group: "test-group", Folder: pointer("test-folder"), Content: &content, IsFile: &isFile}
+			require.NoError(t, db.Create(p).Error)
+			// A distractor detects accidentally dropped SQL predicates.
+			other := &schema.Payload{Group: "other", Folder: pointer("test-folder"), Content: pointer("other"), IsFile: pointer(false)}
+			require.NoError(t, db.Create(other).Error)
+			calls := 0
+			remote := &stubOnlineService{uploadPayload: func(ctx context.Context, token string, data, file []byte) error {
+				calls++
+				require.Equal(t, "fake-token", token)
+				var got schema.Payload
+				require.NoError(t, json.Unmarshal(data, &got))
+				require.Equal(t, "test-group", got.Group)
+				if isFile {
+					require.Equal(t, "mock file content", string(file))
+				} else {
+					require.Empty(t, file)
+					require.Equal(t, content, *got.Content)
+				}
+				if scenario == "remote error" {
+					return errors.New("remote unavailable")
+				}
+				return nil
+			}}
+			server := &Server{profileDatabase: db, onlineClient: remote}
+			req := &ypb.UploadPayloadToOnlineRequest{Token: "fake-token", Group: "test-group", Folder: "test-folder"}
+			if scenario == "empty selection" {
+				req.Folder = "absent"
+			}
+			stream := &fakeUploadStream{}
+			require.NoError(t, server.UploadPayloadToOnline(req, stream))
+			require.NotEmpty(t, stream.SendMessages)
+			final := stream.SendMessages[len(stream.SendMessages)-1]
+			require.Equal(t, 1.0, final.Progress)
+			switch scenario {
+			case "missing file":
+				require.Zero(t, calls)
+				require.Equal(t, "error", final.MessageType)
+			case "remote error":
+				require.Equal(t, 1, calls)
+				require.Equal(t, "error", final.MessageType)
+			case "empty selection":
+				require.Zero(t, calls)
+				require.Equal(t, "warning", final.MessageType)
+			default:
+				require.Equal(t, 1, calls)
+				require.Equal(t, "success", final.MessageType)
+			}
+		})
+	}
 }
 
 func TestDownloadPayload(t *testing.T) {
-	mockey.PatchConvey("Test DownloadPayload", t, func() {
-		defer mockey.UnPatchAll()
-
-		server := &Server{}
-
-		// 模拟下载到的 payload 数据
-		mockPayload := &yaklib.OnlinePayload{
-			Group:       "test-group",
-			Folder:      "test-folder",
-			Content:     "test content",
-			FileContent: nil,
-			IsFile:      false,
-			Hash:        "mockhash",
-		}
-
+	db := newOnlineTestDB(t, &schema.Payload{})
+	remote := &stubOnlineService{downloadPayload: func(ctx context.Context, token, group, folder string) *yaklib.OnlineDownloadPayloadStream {
+		require.Equal(t, "fake-token", token)
+		require.Equal(t, "test-group", group)
+		require.Equal(t, "test-folder", folder)
 		ch := make(chan *yaklib.OnlinePayloadItem, 1)
-		ch <- &yaklib.OnlinePayloadItem{
-			PayloadData: mockPayload,
-			Total:       1,
-		}
+		ch <- &yaklib.OnlinePayloadItem{PayloadData: &yaklib.OnlinePayload{Group: group, Folder: folder, Content: "test content", Hash: "mockhash"}, Total: 1}
 		close(ch)
-
-		mockey.Mock((*yaklib.OnlineClient).DownloadBatchPayloads).To(func(ctx context.Context, token, group, folder string) *yaklib.OnlineDownloadPayloadStream {
-			return &yaklib.OnlineDownloadPayloadStream{
-				Chan:  ch,
-				Total: 1,
-			}
-		}).Build()
-
-		mockey.Mock((*yaklib.OnlineClient).SavePayload).To(func(db *gorm.DB, payload ...*yaklib.OnlinePayload) error {
-			assert.Equal(t, "test-group", payload[0].Group)
-			assert.Equal(t, "test-folder", payload[0].Folder)
-			return nil
-		}).Build()
-
-		stream := &fakeDownloadStream{
-			SendMessages: make([]*ypb.DownloadProgress, 0),
-		}
-
-		req := &ypb.DownloadPayloadRequest{
-			Token:  "fake-token",
-			Group:  "test-group",
-			Folder: "test-folder",
-		}
-
-		err := server.DownloadPayload(req, stream)
-		assert.NoError(t, err)
-
-		assert := assert.New(t)
-		assert.GreaterOrEqual(len(stream.SendMessages), 2)
-
-		assert.Contains(stream.SendMessages[0].Message, "开始下载payload")
-		assert.Contains(stream.SendMessages[1].Message, "保存成功")
-		assert.Equal("success", stream.SendMessages[1].MessageType)
-	})
-}
-
-type fakeDownloadStream struct {
-	grpc.ServerStream
-	SendMessages []*ypb.DownloadProgress
-}
-
-func (f *fakeDownloadStream) Send(resp *ypb.DownloadProgress) error {
-	f.SendMessages = append(f.SendMessages, resp)
-	fmt.Printf("Progress: %.2f, Message: %s [%s]\n", resp.Progress, resp.Message, resp.MessageType)
-	return nil
-}
-
-func (f *fakeDownloadStream) Context() context.Context {
-	return context.Background()
+		return &yaklib.OnlineDownloadPayloadStream{Chan: ch, Total: 1}
+	}}
+	server := &Server{profileDatabase: db, onlineClient: remote}
+	stream := &fakeDownloadStream{}
+	req := &ypb.DownloadPayloadRequest{Token: "fake-token", Group: "test-group", Folder: "test-folder"}
+	require.NoError(t, server.DownloadPayload(req, stream))
+	require.Len(t, stream.SendMessages, 3)
+	require.Equal(t, "success", stream.SendMessages[2].MessageType)
+	var saved schema.Payload
+	require.NoError(t, db.First(&saved).Error)
+	require.Equal(t, req.Group, saved.Group)
+	require.Equal(t, req.Folder, *saved.Folder)
+	require.Contains(t, *saved.Content, "test content")
+	// A stream failure must be visible to the caller.
+	stream.sendErr = errors.New("stream closed")
+	require.ErrorContains(t, server.DownloadPayload(req, stream), "stream closed")
+	remote.downloadPayload = func(context.Context, string, string, string) *yaklib.OnlineDownloadPayloadStream { return nil }
+	require.ErrorContains(t, server.DownloadPayload(req, &fakeDownloadStream{}), "initialization failed")
 }

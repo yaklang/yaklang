@@ -3,15 +3,14 @@ package yakgrpc
 import (
 	"context"
 	"encoding/json"
-	"github.com/bytedance/mockey"
-	"github.com/yaklang/gorm"
+	"testing"
+	"time"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/yak/yaklib"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
-	"testing"
-	"time"
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
@@ -311,13 +310,8 @@ func TestGetHotPatchTemplateTags(t *testing.T) {
 	}, resp.GetTags())
 }
 
-type TestServerWrapper struct {
-	*Server
-	onlineClient yaklib.OnlineClient
-}
-
 func TestUploadHotPatchTemplateToOnline(t *testing.T) {
-	mockey.PatchConvey("Test UploadHotPatchTemplateToOnline", t, func() {
+	t.Run("upload", func(t *testing.T) {
 		token := "test-token"
 		template := &schema.HotPatchTemplate{
 			Name:    "test-template",
@@ -326,13 +320,13 @@ func TestUploadHotPatchTemplateToOnline(t *testing.T) {
 			Tags:    schema.StringSlice{"test-tag", "yak"},
 		}
 
-		mockey.Mock(yakit.GetHotPatchTemplate).To(func(database *gorm.DB, req *ypb.UploadHotPatchTemplateToOnlineRequest) (*schema.HotPatchTemplate, error) {
-			assert.Equal(t, req.Name, "test-template")
-			assert.Equal(t, req.Type, "test-type")
-			return template, nil
-		}).Build()
+		db := newOnlineTestDB(t, &schema.HotPatchTemplate{})
+		require.NoError(t, db.Create(template).Error)
+		remote := &stubOnlineService{}
+		calls := 0
 
-		mockey.Mock((*yaklib.OnlineClient).UploadHotPatchTemplateToOnline).To(func(ctx context.Context, token string, data []byte) error {
+		remote.uploadTemplate = func(ctx context.Context, token string, data []byte) error {
+			calls++
 			assert.Equal(t, token, "test-token")
 
 			var reqBody schema.HotPatchTemplate
@@ -347,11 +341,9 @@ func TestUploadHotPatchTemplateToOnline(t *testing.T) {
 			log.Infof("reqBody: %+v", reqBody)
 
 			return nil
-		}).Build()
-
-		server := &TestServerWrapper{
-			onlineClient: yaklib.OnlineClient{},
 		}
+
+		server := &Server{profileDatabase: db, onlineClient: remote}
 
 		req := &ypb.UploadHotPatchTemplateToOnlineRequest{
 			Token: token,
@@ -363,11 +355,12 @@ func TestUploadHotPatchTemplateToOnline(t *testing.T) {
 
 		assert.NoError(t, err)
 		assert.NotNil(t, resp)
+		require.Equal(t, 1, calls)
 	})
 }
 
 func TestDownloadHotPatchTemplate(t *testing.T) {
-	mockey.PatchConvey("Test DownloadHotPatchTemplate", t, func() {
+	t.Run("download", func(t *testing.T) {
 		token := "test-token"
 		name := "test-template"
 		templateType := "test-type"
@@ -378,24 +371,18 @@ func TestDownloadHotPatchTemplate(t *testing.T) {
 			Tags:         []string{"test-tag", "yak"},
 		}
 
-		mockey.Mock((*yaklib.OnlineClient).DownloadHotPatchTemplate).To(func(clientToken, clientName, clientTemplateType string) (*yaklib.HotPatchTemplate, error) {
+		db := newOnlineTestDB(t, &schema.HotPatchTemplate{})
+		remote := &stubOnlineService{}
+		calls := 0
+		remote.downloadTemplate = func(clientToken, clientName, clientTemplateType string) (*yaklib.HotPatchTemplate, error) {
+			calls++
 			assert.Equal(t, token, clientToken) // 验证传入的token
 			assert.Equal(t, name, clientName)
 			assert.Equal(t, templateType, clientTemplateType)
 			return template, nil
-		}).Build()
-
-		mockey.Mock(yakit.CreateOrUpdateHotPatchTemplate).To(func(db *gorm.DB, name, templateType, content string, tags []string) error {
-			assert.Equal(t, name, "test-template")
-			assert.Equal(t, templateType, "test-type")
-			assert.Equal(t, content, "test-content")
-			assert.ElementsMatch(t, []string{"test-tag", "yak"}, tags)
-			return nil
-		}).Build()
-
-		server := &TestServerWrapper{
-			onlineClient: yaklib.OnlineClient{},
 		}
+
+		server := &Server{profileDatabase: db, onlineClient: remote}
 
 		req := &ypb.DownloadHotPatchTemplateRequest{
 			Token: token, // 添加token到请求
@@ -407,5 +394,10 @@ func TestDownloadHotPatchTemplate(t *testing.T) {
 
 		assert.NoError(t, err)
 		assert.NotNil(t, resp)
+		require.Equal(t, 1, calls)
+		saved, err := yakit.GetHotPatchTemplate(db, &ypb.UploadHotPatchTemplateToOnlineRequest{Name: name, Type: templateType})
+		require.NoError(t, err)
+		require.Equal(t, template.Content, saved.Content)
+		require.ElementsMatch(t, template.Tags, []string(saved.Tags))
 	})
 }

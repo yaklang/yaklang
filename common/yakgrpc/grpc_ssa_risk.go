@@ -7,7 +7,6 @@ import (
 	"encoding/json"
 	"strings"
 
-	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/bizhelper"
@@ -156,21 +155,26 @@ func (s *Server) SSARiskFeedbackToOnline(ctx context.Context, req *ypb.SSARiskFe
 	}
 	db := s.GetSSADatabase()
 	db = yakit.FilterSSARisk(db, req.Filter)
-	data := yakit.YieldSSARisk(db, context.Background())
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+	data := yakit.YieldSSARisk(db, ctx)
 	for k := range data {
 		content, err := json.Marshal(k)
 		if err != nil {
 			continue
 		}
-		client := yaklib.NewOnlineClient(consts.GetOnlineBaseUrl())
+		client := s.getOnlineClient()
 
 		raw, err := json.Marshal(yaklib.UploadOnlineRequest{
 			content,
 		})
+		if err != nil {
+			return nil, err
+		}
 		err = client.UploadToOnline(ctx, req.Token, raw, "api/ssa/risk/feed/back")
 		if err != nil {
 			log.Errorf("uploadRiskToOnline failed: %s", err)
-			return &ypb.Empty{}, nil
+			return nil, utils.Errorf("upload SSA risk failed: %w", err)
 		}
 	}
 

@@ -181,7 +181,6 @@ func TestAITaskWithBreadth(t *testing.T) {
 	})
 
 	//
-	//mock := mockey.Mock(ai.Chat).To().Build()
 	//defer mock.Release()
 
 	existMarkdownReport := false

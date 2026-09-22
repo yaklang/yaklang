@@ -4,9 +4,7 @@ import (
 	"context"
 	"encoding/json"
 
-	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/yak/yaklib"
 
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/schema"
@@ -159,7 +157,7 @@ func (s *Server) UploadHotPatchTemplateToOnline(ctx context.Context, req *ypb.Up
 	if err != nil {
 		return nil, err
 	}
-	client := yaklib.NewOnlineClient(consts.GetOnlineBaseUrl())
+	client := s.getOnlineClient()
 	err = client.UploadHotPatchTemplateToOnline(ctx, req.Token, data)
 	if err != nil {
 		return nil, utils.Errorf("UploadHotPatchTemplate to online failed: %v", err)
@@ -174,7 +172,7 @@ func (s *Server) DownloadHotPatchTemplate(ctx context.Context, req *ypb.Download
 	if req.Type == "" || req.Name == "" {
 		return nil, utils.Errorf("params is empty")
 	}
-	client := yaklib.NewOnlineClient(consts.GetOnlineBaseUrl())
+	client := s.getOnlineClient()
 	template, err := client.DownloadHotPatchTemplate(req.Token, req.Name, req.Type)
 	if err != nil {
 		return nil, utils.Errorf("download HotPatchTemplate[%s] failed: %v", req.Name, err)
