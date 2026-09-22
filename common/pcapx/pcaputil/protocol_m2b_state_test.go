@@ -195,6 +195,7 @@ func FuzzFirstBatchM2B(f *testing.F) {
 		if len(w) > 4096 {
 			return
 		}
+		_, _ = quicWireEnvelope(w)
 		for _, typ := range []byte{1, 2, 3, 4, 5, 8, 10, 11, 12, 253} {
 			_, _, _ = stream_parser.DecodeMySQLBinaryValue(w, typ, false)
 		}

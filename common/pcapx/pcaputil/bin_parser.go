@@ -18,6 +18,7 @@ import (
 type ProtocolEvent struct {
 	Admission                                string
 	semanticFields                           map[string]any
+	nativeQUICWire                           bool
 	Domain                                   CaptureDomain
 	SourceBytes                              ByteSource
 	Profile, Completeness, ExpertCode        string
@@ -72,6 +73,10 @@ func (e *ProtocolEvent) Decode() (result map[string]any, err error) {
 	}
 	if e.Status != "deferred" && e.Status != "decoded" && e.Status != "malformed" {
 		return nil, fmt.Errorf("protocol parser: event is %s, not an exact message", e.Status)
+	}
+	if e.nativeQUICWire {
+		fields, decodeErr := quicWireEnvelope(e.Raw)
+		return map[string]any{"fields": fields, "metadata": nil}, decodeErr
 	}
 	if e.Rule == "" {
 		return nil, fmt.Errorf("protocol parser: no exact rule for this message")

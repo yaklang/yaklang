@@ -175,6 +175,9 @@ func (a *binParser) decodeQUICDatagram(base *ProtocolEvent, wire []byte) ([]*Pro
 				e.Session["DNS"] = d["DNS"]
 			}
 		}
+		// The authenticated session already parsed this header. Preserve the wire
+		// field view without executing a YAML operator for every ciphertext octet.
+		e.nativeQUICWire = err == nil
 		a.finishProtocolDatagram(&e, raw, a.specs["application-layer.quic/QUIC"], err)
 		events = append(events, &e)
 		if e.sessionError != nil && e.sessionError.Kind == ErrResourceExceeded && el != nil {
@@ -192,4 +195,48 @@ func (a *binParser) decodeQUICDatagram(base *ProtocolEvent, wire []byte) ([]*Pro
 		f.closeSession()
 	}
 	return events, true
+}
+
+// quicWireEnvelope preserves the existing QUIC YAML field shape and scalar types.
+// It is only selected after native wire authentication, never as a plaintext probe.
+func quicWireEnvelope(w []byte) (map[string]any, error) {
+	h, err := quicParseHeader(w, true)
+	if err != nil {
+		return nil, err
+	}
+	if h.size != len(w) {
+		return nil, protocolError(ErrMalformedMessage, "QUIC envelope length mismatch")
+	}
+	fields := map[string]any{"First Byte": w[0]}
+	off := 1
+	if h.long {
+		fields["Version"] = h.version
+		fields["DCID Length"], fields["SCID Length"] = uint8(len(h.dcid)), uint8(len(h.scid))
+		if len(h.dcid) > 0 {
+			fields["DCID"] = string(h.dcid)
+		}
+		if len(h.scid) > 0 {
+			fields["SCID"] = string(h.scid)
+		}
+		off = 7 + len(h.dcid) + len(h.scid)
+		// The legacy envelope exposes QUICToken only for its one-byte length
+		// profile. Full varint token semantics remain in the authenticated session.
+		if h.typeName == "Initial" && off < len(w) && w[off] < 64 {
+			token := map[string]any{"Token Length": w[off]}
+			off++
+			if len(h.token) > 0 {
+				token["Token"] = string(h.token)
+				off += len(h.token)
+			}
+			fields["QUICToken"] = token
+		}
+	}
+	if off < len(w) {
+		payload := make([]any, len(w)-off)
+		for i, b := range w[off:] {
+			payload[i] = b
+		}
+		fields["Protected Payload"] = payload
+	}
+	return fields, nil
 }
