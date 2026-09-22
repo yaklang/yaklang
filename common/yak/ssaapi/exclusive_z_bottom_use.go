@@ -119,10 +119,9 @@ users:
 		}
 	}
 	// log.Infof("current Value: %s", v)
-	if users := len(v.GetUsers()); users > 0 {
-		actx.traceUserFanout(users)
-	}
-	v.GetUsers().ForEach(func(value *Value) {
+	users := v.GetUsers()
+	actx.traceUserFanout(len(users))
+	users.ForEach(func(value *Value) {
 		// log.Infof("value %s", value)
 		if ret := value.getBottomUses(actx, opt...); len(ret) > 0 {
 			vals = append(vals, ret...)

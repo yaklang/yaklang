@@ -1,3 +1,5 @@
+//go:build !irify_exclude
+
 package sfbuildin
 
 import (
@@ -12,6 +14,7 @@ import (
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/syntaxflow/sfdb"
 	"github.com/yaklang/yaklang/common/utils/filesys"
+	"github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
 )
 
 func collectTestRuleFiles(t *testing.T) []ruleFile {
@@ -30,6 +33,103 @@ func collectTestRuleFiles(t *testing.T) []ruleFile {
 		return nil
 	})))
 	return files
+}
+
+func TestBuiltinSnapshotReplacement(t *testing.T) {
+	db, err := consts.CreateProfileDatabase(filepath.Join(t.TempDir(), "profile.db"))
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = db.Close() })
+	userFS := filesys.NewVirtualFs()
+	userFS.AddFile("user.sf", `desc(title: "user"); * as $a; alert $a;`)
+	require.NoError(t, SyncRuleFromFileSystemToDB(db, userFS, false))
+	get := func(name string) schema.SyntaxFlowRule {
+		var row schema.SyntaxFlowRule
+		require.NoError(t, db.Where("rule_name = ?", name).First(&row).Error)
+		return row
+	}
+	userID := get("user.sf").ID
+	fs := filesys.NewVirtualFs()
+	fs.AddFile("keep.sf", `desc(
+ title: "keep"
+)
+* as $a; alert $a;`)
+	fs.AddFile("remove.sf", `desc(
+ title: "remove"
+)
+* as $a; alert $a;`)
+	syncSnapshot := func(fs filesys_interface.FileSystem) error {
+		return syncRuleFromFileSystemToDB(db, fs, true, true)
+	}
+	require.NoError(t, syncSnapshot(fs))
+	old := get("keep")
+	removed := get("remove")
+	require.NoError(t, syncSnapshot(fs))
+	require.Equal(t, old.ID, get("keep").ID, "unchanged snapshot must not rewrite rules")
+
+	// Removing a file alone is also a snapshot change, even when no remaining
+	// rule needs recompilation according to the per-rule cache.
+	next := filesys.NewVirtualFs()
+	next.AddFile("keep.sf", `desc(
+ title: "keep"
+)
+* as $a; alert $a;`)
+	require.NoError(t, syncSnapshot(next))
+	require.NotEqual(t, old.ID, get("keep").ID)
+	var count int64
+	require.NoError(t, db.Unscoped().Model(&schema.SyntaxFlowRule{}).Where("id IN (?)", []uint{old.ID, removed.ID}).Count(&count).Error)
+	require.Zero(t, count)
+	require.NoError(t, db.Table("syntax_flow_rule_and_group").Where("syntax_flow_rule_id IN (?)", []uint{old.ID, removed.ID}).Count(&count).Error)
+	require.Zero(t, count)
+	require.Equal(t, userID, get("user.sf").ID)
+
+	updated := filesys.NewVirtualFs()
+	updated.AddFile("keep.sf", `desc(
+ title: "keep"
+)
+* as $b; alert $b;`)
+	require.NoError(t, syncSnapshot(updated))
+	require.Contains(t, get("keep").Content, "$b")
+	beforeFailure := get("keep")
+	invalid := filesys.NewVirtualFs()
+	invalid.AddFile("broken.sf", "desc(")
+	require.Error(t, syncSnapshot(invalid))
+	require.Equal(t, beforeFailure.ID, get("keep").ID, "compile failure must preserve installed rules")
+
+	require.NoError(t, syncSnapshot(filesys.NewVirtualFs()))
+	require.NoError(t, db.Unscoped().Model(&schema.SyntaxFlowRule{}).Where("is_build_in_rule = ?", true).Count(&count).Error)
+	require.Zero(t, count)
+	require.Equal(t, userID, get("user.sf").ID)
+}
+
+func TestSyncRuleFromFileSystemToDB_ReusesLegacyMode(t *testing.T) {
+	db, err := consts.CreateProfileDatabase(filepath.Join(t.TempDir(), "profile.db"))
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = db.Close() })
+	const content = `desc(title: "legacy probe"); * as $a; alert $a;`
+	fs := filesys.NewVirtualFs()
+	fs.AddFile("legacy.sf", content)
+	require.NoError(t, SyncRuleFromFileSystemToDB(db, fs, false))
+	var before schema.SyntaxFlowRule
+	require.NoError(t, db.Where("rule_name = ?", "legacy.sf").First(&before).Error)
+	require.NoError(t, db.Model(&schema.SyntaxFlowRule{}).Where("rule_name = ?", "legacy.sf").UpdateColumn("mode", nil).Error)
+	require.NoError(t, SyncRuleFromFileSystemToDB(db, fs, false))
+	var after schema.SyntaxFlowRule
+	require.NoError(t, db.Where("rule_name = ?", "legacy.sf").First(&after).Error)
+	require.Equal(t, before.ID, after.ID, "the complete stored rule should be reused")
+}
+
+func TestSyncRuleFromFileSystemToDB_RepairsMissingOpcodes(t *testing.T) {
+	db, err := consts.CreateProfileDatabase(filepath.Join(t.TempDir(), "profile.db"))
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = db.Close() })
+	fs := filesys.NewVirtualFs()
+	fs.AddFile("repair.sf", `desc(title: "repair probe"); * as $a; alert $a;`)
+	require.NoError(t, SyncRuleFromFileSystemToDB(db, fs, false))
+	require.NoError(t, db.Model(&schema.SyntaxFlowRule{}).Where("rule_name = ?", "repair.sf").UpdateColumn("op_codes", "").Error)
+	require.NoError(t, SyncRuleFromFileSystemToDB(db, fs, false))
+	var repaired schema.SyntaxFlowRule
+	require.NoError(t, db.Where("rule_name = ?", "repair.sf").First(&repaired).Error)
+	require.NotEmpty(t, repaired.OpCodes, "unchanged content must not prevent repairing missing opcodes")
 }
 
 // TestSyncRuleFromFileSystemToDB_ReusesStoredRules is the regression guard for
@@ -56,22 +156,23 @@ func TestSyncRuleFromFileSystemToDB_ReusesStoredRules(t *testing.T) {
 		Where("op_codes IS NOT NULL AND op_codes != ''").Count(&stored).Error)
 	require.Greater(t, stored, int64(0), "first sync must persist compiled opcodes")
 
-	hashes, err := sfdb.LoadStoredContentHashesByRuleName(profileDB, true)
+	storedRules, err := sfdb.LoadStoredRulesForSync(profileDB, true)
 	require.NoError(t, err)
-	require.Len(t, hashes, int(stored), "every stored rule must be discoverable by name")
-	for name, fingerprint := range hashes {
-		require.NotEmpty(t, fingerprint.ContentHash, "fingerprint for %s must carry a content hash", name)
+	require.Len(t, storedRules, int(stored), "every compiled rule must be reusable")
+	storedByContent := make(map[string]*schema.SyntaxFlowRule, len(storedRules))
+	for _, rule := range storedRules {
+		require.NotNil(t, rule)
+		require.NotEmpty(t, rule.Content)
+		require.NotEmpty(t, rule.OpCodes)
+		storedByContent[rule.Content] = rule
 	}
 
-	// Every embed rule must be recognized as already stored. The fingerprint
-	// compares content, the directory-derived tag string and the compiler's
-	// mode tag, so this also guards the tag/mode reconstruction the fast path
-	// relies on: a mismatch here would silently re-compile the whole embed.
+	// Every embed rule must resolve to a complete AST-derived stored rule.
 	files := collectTestRuleFiles(t)
 	require.NotEmpty(t, files)
 	for _, f := range files {
-		require.True(t, syncRuleAlreadyStored(hashes, f, true),
-			"rule %s was not recognized as stored (stored fingerprint missing or tag/mode mismatch)", f.name)
+		rule := storedByContent[f.content]
+		require.NotNil(t, rule, "rule %s was not recognized by exact content", f.name)
 	}
 
 	// Second sync: unchanged rules are reused from the database, so the pass
@@ -82,12 +183,10 @@ func TestSyncRuleFromFileSystemToDB_ReusesStoredRules(t *testing.T) {
 	require.Less(t, secondCost, firstCost/2,
 		"second sync reused nothing: first=%v second=%v", firstCost, secondCost)
 
-	// The forced re-import escape hatch must bypass the cache entirely.
+	// The forced re-import escape hatch rewrites the snapshot while reusing
+	// already parsed rule structures.
 	t.Setenv("YAK_SYNTAXFLOW_FORCE_RULE_SYNC", "true")
-	forceStart := time.Now()
 	require.NoError(t, SyncRuleFromFileSystemToDB(profileDB, ruleFSWithHash, true))
-	require.Greater(t, time.Since(forceStart), secondCost*10,
-		"force re-sync reused the cache instead of re-importing")
 	t.Setenv("YAK_SYNTAXFLOW_FORCE_RULE_SYNC", "")
 
 	// A changed rule must not be silently skipped: rewrite one embed rule in a

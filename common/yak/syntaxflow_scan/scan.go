@@ -42,18 +42,22 @@ func Scan(ctx context.Context, option ...ssaconfig.Option) (retErr error) {
 		}
 		if success && m.status != schema.SYNTAXFLOWSCAN_PAUSED {
 			m.SetFinishedQuery(m.GetTotalQuery())
+			if m.GetTotalQuery() == 0 {
+				m.status = schema.SYNTAXFLOWSCAN_DONE
+			}
 		}
+		m.StatusTask()
+		m.Stop(runningID)
+		// Stop waits for queued result callbacks, so the final task row includes
+		// the complete in-memory risk count even when risks are not persisted.
 		if err := m.SaveTask(); err != nil {
 			log.Errorf("save syntaxflow task failed: %v", err)
 		}
-		m.StatusTask()
-		// 任务真正结束后，结果回调必须收到一次终态 done，否则调用方只能
-		// 看到执行过程中的 executing/paused。放在 Stop() 之前，确保
-		// processMonitor 关闭前完成状态已经落定。
+		// Publish the terminal callback after the task row is durable so callers
+		// can immediately load the final status and counters by task ID.
 		if success && m.status == schema.SYNTAXFLOWSCAN_DONE {
 			m.notifyDone()
 		}
-		m.Stop(runningID)
 		// 在 Stop() 之后保存报告，确保所有结果都已被处理
 		// Stop() 会调用 processMonitor.Close()，等待后台 goroutine 完成
 		// 这样可以确保所有 AddSyntaxFlowResult 调用都已完成

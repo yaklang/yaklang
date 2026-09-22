@@ -303,6 +303,8 @@ func (r *stageOutcomeRecorder) observeStruct(prog interface{ StructScanCounts() 
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	rules, results := prog.StructScanCounts()
+	r.mu.Lock()
+	defer r.mu.Unlock()
 	metrics := r.metrics[StageReview]
 	if int64(rules) > metrics.ruleCount {
 		metrics.ruleCount = int64(rules)
