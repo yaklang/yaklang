@@ -10,9 +10,9 @@ import (
 
 	"github.com/davecgh/go-spew/spew"
 	"github.com/google/uuid"
-	"github.com/yaklang/gorm"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/yaklang/gorm"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
@@ -90,7 +90,7 @@ func TestServer_UpdateProject(t *testing.T) {
 }
 
 func TestServer_TestSSAProject(t *testing.T) {
-	client, err := NewLocalClient(true) // local grpc server not global
+	client, err := NewLocalClient()
 	require.NoError(t, err)
 
 	// create project
@@ -108,6 +108,12 @@ func TestServer_TestSSAProject(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, currentProject)
 	require.Greater(t, currentProject.Id, int64(0))
+	t.Cleanup(func() {
+		_, err := client.SetCurrentProject(context.Background(), &ypb.SetCurrentProjectRequest{
+			Id: currentProject.Id, Type: yakit.TypeSSAProject,
+		})
+		require.NoError(t, err)
+	})
 
 	// get default project
 	defaultProject, err := client.GetDefaultProjectEx(context.Background(), &ypb.GetDefaultProjectExRequest{Type: yakit.TypeSSAProject})
@@ -144,6 +150,7 @@ func TestServer_TestSSAProject(t *testing.T) {
 	// delete project
 	_, err = client.DeleteProject(context.Background(), &ypb.DeleteProjectRequest{
 		Id:            project.Id,
+		Type:          yakit.TypeSSAProject,
 		IsDeleteLocal: true,
 	})
 	require.NoError(t, err)
@@ -152,6 +159,8 @@ func TestServer_TestSSAProject(t *testing.T) {
 	afterDeleteCurrent, err := client.GetCurrentProjectEx(context.Background(), &ypb.GetCurrentProjectExRequest{Type: yakit.TypeSSAProject})
 	require.NoError(t, err)
 	require.Equal(t, defaultProject.Id, afterDeleteCurrent.Id)
+	// The metadata and live database must both switch before deleting the file.
+	require.Equal(t, defaultProject.DatabasePath, consts.SSA_PROJECT_DB_RAW)
 
 	// check file is deleted
 	// check projectDetail.DatabasePath  file exist
