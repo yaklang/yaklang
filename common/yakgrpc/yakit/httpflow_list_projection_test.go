@@ -188,6 +188,51 @@ func TestHTTPFlowListProjectionInlinesSmallPacketsWithinBudget(t *testing.T) {
 	require.Empty(t, oversizeRows[0].Response, "packets above the inline budget must stay empty")
 }
 
+func TestHTTPFlowListProjectionInlinesSmallPacketsWithoutExcludeFlags(t *testing.T) {
+	prev := consts.GetHTTPFlowListInlineMaxContentLength()
+	consts.SetHTTPFlowListInlineMaxContentLength(consts.DefaultHTTPFlowListInlineMaxContentLength)
+	t.Cleanup(func() { consts.SetHTTPFlowListInlineMaxContentLength(prev) })
+
+	db, err := gorm.Open("sqlite3", filepath.Join(t.TempDir(), "project.db"))
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = db.Close() })
+	require.NoError(t, db.AutoMigrate(&schema.HTTPFlow{}).Error)
+
+	request := []byte("GET /frontend HTTP/1.1\r\nHost: example.test\r\n\r\n")
+	response := []byte("HTTP/1.1 200 OK\r\nContent-Type: text/html\r\n\r\n<html><title>no exclude</title></html>")
+	flow, err := CreateHTTPFlowFromHTTPWithBodySavedFromRaw(
+		false,
+		request,
+		response,
+		schema.HTTPFlow_SourceType_MITM,
+		"http://example.test/frontend",
+		"127.0.0.1:80",
+	)
+	require.NoError(t, err)
+	require.NoError(t, db.Create(flow).Error)
+
+	query := projectedHTTPFlowQuery(int64(flow.ID))
+	query.ExcludeRequestRaw = false
+	query.ExcludeResponseRaw = false
+	_, rows, err := QueryHTTPFlow(db, query)
+	require.NoError(t, err)
+	require.Len(t, rows, 1)
+	require.NotEmpty(t, rows[0].Request, "current Yakit MITM list no longer sends Exclude*; small packets must still inline")
+	require.NotEmpty(t, rows[0].Response, "current Yakit MITM list no longer sends Exclude*; small packets must still inline")
+
+	projected, err := model.ToHTTPFlowGRPCModel(rows[0], false)
+	require.NoError(t, err)
+	require.NotEmpty(t, projected.GetRequest())
+	require.NotEmpty(t, projected.GetResponse())
+
+	consts.SetHTTPFlowListInlineMaxContentLength(8)
+	_, oversizeRows, err := QueryHTTPFlow(db, query)
+	require.NoError(t, err)
+	require.Len(t, oversizeRows, 1)
+	require.Empty(t, oversizeRows[0].Request, "over-budget packets must stay empty even without Exclude*")
+	require.Empty(t, oversizeRows[0].Response, "over-budget packets must stay empty even without Exclude*")
+}
+
 func projectedHTTPFlowQuery(id int64) *ypb.QueryHTTPFlowRequest {
 	return &ypb.QueryHTTPFlowRequest{
 		IncludeId:          []int64{id},
