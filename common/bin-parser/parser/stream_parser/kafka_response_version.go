@@ -5,6 +5,9 @@ import "fmt"
 // KafkaResponseBodyVersion uses the version from the observed request. A
 // response never carries that version itself. Flexible versions are separate.
 func KafkaResponseBodyVersion(api, ver int16, body []byte) (map[string]any, error) {
+	if KafkaFlexibleVersion(api, ver) {
+		return kafkaFlexibleResponse(api, ver, body, false)
+	}
 	rng, ok := kafkaAPIVersions[api]
 	if !ok || ver < rng[0] || ver > rng[1] {
 		return nil, fmt.Errorf("%w: API/version %d/%d", ErrKafkaUnsupported, api, ver)

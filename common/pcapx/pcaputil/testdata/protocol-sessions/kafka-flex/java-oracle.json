@@ -1,0 +1,873 @@
+[ {
+  "api" : 18,
+  "version" : 3,
+  "correlation" : 101,
+  "request_header_version" : 2,
+  "response_header_version" : 0,
+  "request_hex" : "000000360012000300000065000d7a69702d666c65782d6a61766101460209080e7a69702d666c65782d6a61766106332e392e31016303070605",
+  "request" : {
+    "clientSoftwareName" : "zip-flex-java",
+    "clientSoftwareVersion" : "3.9.1"
+  },
+  "response_hex" : "000001f30000006500003e00000000000b00000100000011000002000000090000030000000c000008000000090000090000000900000a0000000600000b0000000900000c0000000400000d0000000500000e0000000500000f000000050000100000000500001100000001000012000000040000130000000700001400000006000015000000020000160000000500001700000004000018000000050000190000000400001a0000000400001b0000000100001c0000000400001d0000000300001e0000000300001f000000030000200000000400002100000002000022000000020000230000000400002400000002000025000000030000260000000300002700000002000028000000020000290000000300002a0000000200002b0000000200002c0000000100002d0000000000002e0000000000002f0000000000003000000001000031000000010000320000000000003300000000000037000000020000390000000100003c0000000100003d00000000000040000000000000410000000000004200000001000044000000000000450000000000004a0000000000004b000000000000500000000000005100000000000000000003001702116d657461646174612e76657273696f6e000100150001080000000000000534021702116d657461646174612e76657273696f6e0015001500",
+  "response" : {
+    "errorCode" : 0,
+    "apiKeys" : [ {
+      "apiKey" : 0,
+      "minVersion" : 0,
+      "maxVersion" : 11
+    }, {
+      "apiKey" : 1,
+      "minVersion" : 0,
+      "maxVersion" : 17
+    }, {
+      "apiKey" : 2,
+      "minVersion" : 0,
+      "maxVersion" : 9
+    }, {
+      "apiKey" : 3,
+      "minVersion" : 0,
+      "maxVersion" : 12
+    }, {
+      "apiKey" : 8,
+      "minVersion" : 0,
+      "maxVersion" : 9
+    }, {
+      "apiKey" : 9,
+      "minVersion" : 0,
+      "maxVersion" : 9
+    }, {
+      "apiKey" : 10,
+      "minVersion" : 0,
+      "maxVersion" : 6
+    }, {
+      "apiKey" : 11,
+      "minVersion" : 0,
+      "maxVersion" : 9
+    }, {
+      "apiKey" : 12,
+      "minVersion" : 0,
+      "maxVersion" : 4
+    }, {
+      "apiKey" : 13,
+      "minVersion" : 0,
+      "maxVersion" : 5
+    }, {
+      "apiKey" : 14,
+      "minVersion" : 0,
+      "maxVersion" : 5
+    }, {
+      "apiKey" : 15,
+      "minVersion" : 0,
+      "maxVersion" : 5
+    }, {
+      "apiKey" : 16,
+      "minVersion" : 0,
+      "maxVersion" : 5
+    }, {
+      "apiKey" : 17,
+      "minVersion" : 0,
+      "maxVersion" : 1
+    }, {
+      "apiKey" : 18,
+      "minVersion" : 0,
+      "maxVersion" : 4
+    }, {
+      "apiKey" : 19,
+      "minVersion" : 0,
+      "maxVersion" : 7
+    }, {
+      "apiKey" : 20,
+      "minVersion" : 0,
+      "maxVersion" : 6
+    }, {
+      "apiKey" : 21,
+      "minVersion" : 0,
+      "maxVersion" : 2
+    }, {
+      "apiKey" : 22,
+      "minVersion" : 0,
+      "maxVersion" : 5
+    }, {
+      "apiKey" : 23,
+      "minVersion" : 0,
+      "maxVersion" : 4
+    }, {
+      "apiKey" : 24,
+      "minVersion" : 0,
+      "maxVersion" : 5
+    }, {
+      "apiKey" : 25,
+      "minVersion" : 0,
+      "maxVersion" : 4
+    }, {
+      "apiKey" : 26,
+      "minVersion" : 0,
+      "maxVersion" : 4
+    }, {
+      "apiKey" : 27,
+      "minVersion" : 0,
+      "maxVersion" : 1
+    }, {
+      "apiKey" : 28,
+      "minVersion" : 0,
+      "maxVersion" : 4
+    }, {
+      "apiKey" : 29,
+      "minVersion" : 0,
+      "maxVersion" : 3
+    }, {
+      "apiKey" : 30,
+      "minVersion" : 0,
+      "maxVersion" : 3
+    }, {
+      "apiKey" : 31,
+      "minVersion" : 0,
+      "maxVersion" : 3
+    }, {
+      "apiKey" : 32,
+      "minVersion" : 0,
+      "maxVersion" : 4
+    }, {
+      "apiKey" : 33,
+      "minVersion" : 0,
+      "maxVersion" : 2
+    }, {
+      "apiKey" : 34,
+      "minVersion" : 0,
+      "maxVersion" : 2
+    }, {
+      "apiKey" : 35,
+      "minVersion" : 0,
+      "maxVersion" : 4
+    }, {
+      "apiKey" : 36,
+      "minVersion" : 0,
+      "maxVersion" : 2
+    }, {
+      "apiKey" : 37,
+      "minVersion" : 0,
+      "maxVersion" : 3
+    }, {
+      "apiKey" : 38,
+      "minVersion" : 0,
+      "maxVersion" : 3
+    }, {
+      "apiKey" : 39,
+      "minVersion" : 0,
+      "maxVersion" : 2
+    }, {
+      "apiKey" : 40,
+      "minVersion" : 0,
+      "maxVersion" : 2
+    }, {
+      "apiKey" : 41,
+      "minVersion" : 0,
+      "maxVersion" : 3
+    }, {
+      "apiKey" : 42,
+      "minVersion" : 0,
+      "maxVersion" : 2
+    }, {
+      "apiKey" : 43,
+      "minVersion" : 0,
+      "maxVersion" : 2
+    }, {
+      "apiKey" : 44,
+      "minVersion" : 0,
+      "maxVersion" : 1
+    }, {
+      "apiKey" : 45,
+      "minVersion" : 0,
+      "maxVersion" : 0
+    }, {
+      "apiKey" : 46,
+      "minVersion" : 0,
+      "maxVersion" : 0
+    }, {
+      "apiKey" : 47,
+      "minVersion" : 0,
+      "maxVersion" : 0
+    }, {
+      "apiKey" : 48,
+      "minVersion" : 0,
+      "maxVersion" : 1
+    }, {
+      "apiKey" : 49,
+      "minVersion" : 0,
+      "maxVersion" : 1
+    }, {
+      "apiKey" : 50,
+      "minVersion" : 0,
+      "maxVersion" : 0
+    }, {
+      "apiKey" : 51,
+      "minVersion" : 0,
+      "maxVersion" : 0
+    }, {
+      "apiKey" : 55,
+      "minVersion" : 0,
+      "maxVersion" : 2
+    }, {
+      "apiKey" : 57,
+      "minVersion" : 0,
+      "maxVersion" : 1
+    }, {
+      "apiKey" : 60,
+      "minVersion" : 0,
+      "maxVersion" : 1
+    }, {
+      "apiKey" : 61,
+      "minVersion" : 0,
+      "maxVersion" : 0
+    }, {
+      "apiKey" : 64,
+      "minVersion" : 0,
+      "maxVersion" : 0
+    }, {
+      "apiKey" : 65,
+      "minVersion" : 0,
+      "maxVersion" : 0
+    }, {
+      "apiKey" : 66,
+      "minVersion" : 0,
+      "maxVersion" : 1
+    }, {
+      "apiKey" : 68,
+      "minVersion" : 0,
+      "maxVersion" : 0
+    }, {
+      "apiKey" : 69,
+      "minVersion" : 0,
+      "maxVersion" : 0
+    }, {
+      "apiKey" : 74,
+      "minVersion" : 0,
+      "maxVersion" : 0
+    }, {
+      "apiKey" : 75,
+      "minVersion" : 0,
+      "maxVersion" : 0
+    }, {
+      "apiKey" : 80,
+      "minVersion" : 0,
+      "maxVersion" : 0
+    }, {
+      "apiKey" : 81,
+      "minVersion" : 0,
+      "maxVersion" : 0
+    } ],
+    "throttleTimeMs" : 0,
+    "supportedFeatures" : [ {
+      "name" : "metadata.version",
+      "minVersion" : 1,
+      "maxVersion" : 21
+    } ],
+    "finalizedFeaturesEpoch" : 1332,
+    "finalizedFeatures" : [ {
+      "name" : "metadata.version",
+      "maxVersionLevel" : 21,
+      "minVersionLevel" : 21
+    } ]
+  }
+}, {
+  "api" : 3,
+  "version" : 9,
+  "correlation" : 102,
+  "request_header_version" : 2,
+  "response_header_version" : 1,
+  "request_hex" : "000000260003000900000066000d7a69702d666c65782d6a617661014602090801000000016303070605",
+  "request" : {
+    "topics" : [ ],
+    "allowAutoTopicCreation" : false,
+    "includeClusterAuthorizedOperations" : false,
+    "includeTopicAuthorizedOperations" : false
+  },
+  "response_hex" : "0000004000000066000000000002000000010a3132372e302e302e3100004a940000186d3173616d706c6563617074757245303132333435363700000001018000000000",
+  "response" : {
+    "throttleTimeMs" : 0,
+    "brokers" : [ {
+      "nodeId" : 1,
+      "host" : "127.0.0.1",
+      "port" : 19092,
+      "rack" : null
+    } ],
+    "clusterId" : "m1samplecapturE01234567",
+    "controllerId" : 1,
+    "topics" : [ ],
+    "clusterAuthorizedOperations" : -2147483648
+  }
+}, {
+  "api" : 3,
+  "version" : 9,
+  "correlation" : 103,
+  "request_header_version" : 2,
+  "response_header_version" : 1,
+  "request_hex" : "000000260003000900000067000d7a69702d666c65782d6a617661014602090800000000016303070605",
+  "request" : {
+    "topics" : null,
+    "allowAutoTopicCreation" : false,
+    "includeClusterAuthorizedOperations" : false,
+    "includeTopicAuthorizedOperations" : false
+  },
+  "response_hex" : "000000cd00000067000000000002000000010a3132372e302e302e3100004a940000186d3173616d706c6563617074757245303132333435363700000001030000097a69702d666c6578000300000000000100000001000000000200000001020000000101000000000000000000000100000000020000000102000000010100800000000000000a6d322d6e617469766500030000000000010000000100000002020000000102000000010100000000000000000000010000000202000000010200000001010080000000008000000000",
+  "response" : {
+    "throttleTimeMs" : 0,
+    "brokers" : [ {
+      "nodeId" : 1,
+      "host" : "127.0.0.1",
+      "port" : 19092,
+      "rack" : null
+    } ],
+    "clusterId" : "m1samplecapturE01234567",
+    "controllerId" : 1,
+    "topics" : [ {
+      "errorCode" : 0,
+      "name" : "zip-flex",
+      "isInternal" : false,
+      "partitions" : [ {
+        "errorCode" : 0,
+        "partitionIndex" : 1,
+        "leaderId" : 1,
+        "leaderEpoch" : 0,
+        "replicaNodes" : [ 1 ],
+        "isrNodes" : [ 1 ],
+        "offlineReplicas" : [ ]
+      }, {
+        "errorCode" : 0,
+        "partitionIndex" : 0,
+        "leaderId" : 1,
+        "leaderEpoch" : 0,
+        "replicaNodes" : [ 1 ],
+        "isrNodes" : [ 1 ],
+        "offlineReplicas" : [ ]
+      } ],
+      "topicAuthorizedOperations" : -2147483648
+    }, {
+      "errorCode" : 0,
+      "name" : "m2-native",
+      "isInternal" : false,
+      "partitions" : [ {
+        "errorCode" : 0,
+        "partitionIndex" : 1,
+        "leaderId" : 1,
+        "leaderEpoch" : 2,
+        "replicaNodes" : [ 1 ],
+        "isrNodes" : [ 1 ],
+        "offlineReplicas" : [ ]
+      }, {
+        "errorCode" : 0,
+        "partitionIndex" : 0,
+        "leaderId" : 1,
+        "leaderEpoch" : 2,
+        "replicaNodes" : [ 1 ],
+        "isrNodes" : [ 1 ],
+        "offlineReplicas" : [ ]
+      } ],
+      "topicAuthorizedOperations" : -2147483648
+    } ],
+    "clusterAuthorizedOperations" : -2147483648
+  }
+}, {
+  "api" : 3,
+  "version" : 9,
+  "correlation" : 104,
+  "request_header_version" : 2,
+  "response_header_version" : 1,
+  "request_hex" : "000000300003000900000068000d7a69702d666c65782d6a617661014602090802097a69702d666c657800000000016303070605",
+  "request" : {
+    "topics" : [ {
+      "name" : "zip-flex"
+    } ],
+    "allowAutoTopicCreation" : false,
+    "includeClusterAuthorizedOperations" : false,
+    "includeTopicAuthorizedOperations" : false
+  },
+  "response_hex" : "0000008600000068000000000002000000010a3132372e302e302e3100004a940000186d3173616d706c6563617074757245303132333435363700000001020000097a69702d666c657800030000000000010000000100000000020000000102000000010100000000000000000000010000000002000000010200000001010080000000008000000000",
+  "response" : {
+    "throttleTimeMs" : 0,
+    "brokers" : [ {
+      "nodeId" : 1,
+      "host" : "127.0.0.1",
+      "port" : 19092,
+      "rack" : null
+    } ],
+    "clusterId" : "m1samplecapturE01234567",
+    "controllerId" : 1,
+    "topics" : [ {
+      "errorCode" : 0,
+      "name" : "zip-flex",
+      "isInternal" : false,
+      "partitions" : [ {
+        "errorCode" : 0,
+        "partitionIndex" : 1,
+        "leaderId" : 1,
+        "leaderEpoch" : 0,
+        "replicaNodes" : [ 1 ],
+        "isrNodes" : [ 1 ],
+        "offlineReplicas" : [ ]
+      }, {
+        "errorCode" : 0,
+        "partitionIndex" : 0,
+        "leaderId" : 1,
+        "leaderEpoch" : 0,
+        "replicaNodes" : [ 1 ],
+        "isrNodes" : [ 1 ],
+        "offlineReplicas" : [ ]
+      } ],
+      "topicAuthorizedOperations" : -2147483648
+    } ],
+    "clusterAuthorizedOperations" : -2147483648
+  }
+}, {
+  "api" : 0,
+  "version" : 9,
+  "correlation" : 105,
+  "request_header_version" : 2,
+  "response_header_version" : 1,
+  "request_hex" : "000000f30000000900000069000d7a69702d666c65782d6a61766101460209080000010000138802097a69702d666c657803000000005a00000000000000000000004dffffffff02709d3e4100000000000000000000000000000000000000000000ffffffffffffffffffffffffffff0000000136000000012a7a69702d666c65782d70302d677a697066616c73650000000000015a00000000000000000000004dffffffff0241ecea7100000000000000000000000000000000000000000000ffffffffffffffffffffffffffff0000000136000000012a7a69702d666c65782d70312d677a697066616c7365000000016303070605",
+  "request" : {
+    "transactionalId" : null,
+    "acks" : 1,
+    "timeoutMs" : 5000,
+    "topicData" : [ {
+      "name" : "zip-flex",
+      "partitionData" : [ {
+        "index" : 0,
+        "records" : ""
+      }, {
+        "index" : 1,
+        "records" : ""
+      } ]
+    } ]
+  },
+  "response_hex" : "00000058000000690002097a69702d666c6578030000000000000000000000000000ffffffffffffffff00000000000000000100000000000100000000000000000000ffffffffffffffff0000000000000000010000000000000000",
+  "response" : {
+    "responses" : [ {
+      "name" : "zip-flex",
+      "partitionResponses" : [ {
+        "index" : 0,
+        "errorCode" : 0,
+        "baseOffset" : 0,
+        "logAppendTimeMs" : -1,
+        "logStartOffset" : 0,
+        "recordErrors" : [ ],
+        "errorMessage" : null
+      }, {
+        "index" : 1,
+        "errorCode" : 0,
+        "baseOffset" : 0,
+        "logAppendTimeMs" : -1,
+        "logStartOffset" : 0,
+        "recordErrors" : [ ],
+        "errorMessage" : null
+      } ]
+    } ],
+    "throttleTimeMs" : 0
+  }
+}, {
+  "api" : 0,
+  "version" : 9,
+  "correlation" : 106,
+  "request_header_version" : 2,
+  "response_header_version" : 1,
+  "request_hex" : "00000115000000090000006a000d7a69702d666c65782d6a61766101460209080000010000138802097a69702d666c657803000000006b00000000000000000000005effffffff0280b6aee300010000000000000000000000000000000000000000ffffffffffffffffffffffffffff000000011f8b08000000000000ff3361606060d4a8ca2cd04dcb49add02d30d04d07724a8a4a53190006dccfec1b00000000000000016b00000000000000000000005effffffff02a7ccadc800010000000000000000000000000000000000000000ffffffffffffffffffffffffffff000000011f8b08000000000000ff3361606060d4a8ca2cd04dcb49add02d30d44d07724a8a4a531900c603412d1b0000000000016303070605",
+  "request" : {
+    "transactionalId" : null,
+    "acks" : 1,
+    "timeoutMs" : 5000,
+    "topicData" : [ {
+      "name" : "zip-flex",
+      "partitionData" : [ {
+        "index" : 0,
+        "records" : ""
+      }, {
+        "index" : 1,
+        "records" : ""
+      } ]
+    } ]
+  },
+  "response_hex" : "000000580000006a0002097a69702d666c6578030000000000000000000000000001ffffffffffffffff00000000000000000100000000000100000000000000000001ffffffffffffffff0000000000000000010000000000000000",
+  "response" : {
+    "responses" : [ {
+      "name" : "zip-flex",
+      "partitionResponses" : [ {
+        "index" : 0,
+        "errorCode" : 0,
+        "baseOffset" : 1,
+        "logAppendTimeMs" : -1,
+        "logStartOffset" : 0,
+        "recordErrors" : [ ],
+        "errorMessage" : null
+      }, {
+        "index" : 1,
+        "errorCode" : 0,
+        "baseOffset" : 1,
+        "logAppendTimeMs" : -1,
+        "logStartOffset" : 0,
+        "recordErrors" : [ ],
+        "errorMessage" : null
+      } ]
+    } ],
+    "throttleTimeMs" : 0
+  }
+}, {
+  "api" : 1,
+  "version" : 12,
+  "correlation" : 107,
+  "request_header_version" : 2,
+  "response_header_version" : 1,
+  "request_hex" : "0000008b0001000c0000006b000d7a69702d666c65782d6a6176610146020908ffffffff0000006400000001001000000000000000ffffffff02097a69702d666c65780300000000ffffffff0000000000000000ffffffffffffffffffffffff001000000000000001ffffffff0000000000000000ffffffffffffffffffffffff0010000000000101016303070605",
+  "request" : {
+    "replicaId" : -1,
+    "maxWaitMs" : 100,
+    "minBytes" : 1,
+    "maxBytes" : 1048576,
+    "isolationLevel" : 0,
+    "sessionId" : 0,
+    "sessionEpoch" : -1,
+    "topics" : [ {
+      "topic" : "zip-flex",
+      "partitions" : [ {
+        "partition" : 0,
+        "currentLeaderEpoch" : -1,
+        "fetchOffset" : 0,
+        "lastFetchedEpoch" : -1,
+        "logStartOffset" : -1,
+        "partitionMaxBytes" : 1048576
+      }, {
+        "partition" : 1,
+        "currentLeaderEpoch" : -1,
+        "fetchOffset" : 0,
+        "lastFetchedEpoch" : -1,
+        "logStartOffset" : -1,
+        "partitionMaxBytes" : 1048576
+      } ]
+    } ],
+    "forgottenTopicsData" : [ ],
+    "rackId" : ""
+  },
+  "response_hex" : "000001ee0000006b000000000000000000000002097a69702d666c65780300000000000000000000000000020000000000000002000000000000000000ffffffffc40100000000000000000000004d0000000002709d3e4100000000000000000000000000000000000000000000ffffffffffffffffffffffffffff0000000136000000012a7a69702d666c65782d70302d677a697066616c73650000000000000000010000005e000000000280b6aee300010000000000000000000000000000000000000000ffffffffffffffffffffffffffff000000011f8b08000000000000ff3361606060d4a8ca2cd04dcb49add02d30d04d07724a8a4a53190006dccfec1b0000000000000001000000000000000000020000000000000002000000000000000000ffffffffc40100000000000000000000004d000000000241ecea7100000000000000000000000000000000000000000000ffffffffffffffffffffffffffff0000000136000000012a7a69702d666c65782d70312d677a697066616c73650000000000000000010000005e0000000002a7ccadc800010000000000000000000000000000000000000000ffffffffffffffffffffffffffff000000011f8b08000000000000ff3361606060d4a8ca2cd04dcb49add02d30d44d07724a8a4a531900c603412d1b000000000000",
+  "response" : {
+    "throttleTimeMs" : 0,
+    "errorCode" : 0,
+    "sessionId" : 0,
+    "responses" : [ {
+      "topic" : "zip-flex",
+      "partitions" : [ {
+        "partitionIndex" : 0,
+        "errorCode" : 0,
+        "highWatermark" : 2,
+        "lastStableOffset" : 2,
+        "logStartOffset" : 0,
+        "abortedTransactions" : null,
+        "preferredReadReplica" : -1,
+        "records" : ""
+      }, {
+        "partitionIndex" : 1,
+        "errorCode" : 0,
+        "highWatermark" : 2,
+        "lastStableOffset" : 2,
+        "logStartOffset" : 0,
+        "abortedTransactions" : null,
+        "preferredReadReplica" : -1,
+        "records" : ""
+      } ]
+    } ]
+  }
+}, {
+  "api" : 0,
+  "version" : 9,
+  "correlation" : 108,
+  "request_header_version" : 2,
+  "response_header_version" : 1,
+  "request_hex" : "000000f3000000090000006c000d7a69702d666c65782d6a61766101460209080000000000138802097a69702d666c657803000000005a00000000000000000000004dffffffff02709d3e4100000000000000000000000000000000000000000000ffffffffffffffffffffffffffff0000000136000000012a7a69702d666c65782d70302d677a697066616c73650000000000015a00000000000000000000004dffffffff0241ecea7100000000000000000000000000000000000000000000ffffffffffffffffffffffffffff0000000136000000012a7a69702d666c65782d70312d677a697066616c7365000000016303070605",
+  "request" : {
+    "transactionalId" : null,
+    "acks" : 0,
+    "timeoutMs" : 5000,
+    "topicData" : [ {
+      "name" : "zip-flex",
+      "partitionData" : [ {
+        "index" : 0,
+        "records" : ""
+      }, {
+        "index" : 1,
+        "records" : ""
+      } ]
+    } ]
+  },
+  "response_hex" : null
+}, {
+  "api" : 18,
+  "version" : 3,
+  "correlation" : 109,
+  "request_header_version" : 2,
+  "response_header_version" : 0,
+  "request_hex" : "00000036001200030000006d000d7a69702d666c65782d6a61766101460209080e7a69702d666c65782d6a61766106332e392e31016303070605",
+  "request" : {
+    "clientSoftwareName" : "zip-flex-java",
+    "clientSoftwareVersion" : "3.9.1"
+  },
+  "response_hex" : "000001f30000006d00003e00000000000b00000100000011000002000000090000030000000c000008000000090000090000000900000a0000000600000b0000000900000c0000000400000d0000000500000e0000000500000f000000050000100000000500001100000001000012000000040000130000000700001400000006000015000000020000160000000500001700000004000018000000050000190000000400001a0000000400001b0000000100001c0000000400001d0000000300001e0000000300001f000000030000200000000400002100000002000022000000020000230000000400002400000002000025000000030000260000000300002700000002000028000000020000290000000300002a0000000200002b0000000200002c0000000100002d0000000000002e0000000000002f0000000000003000000001000031000000010000320000000000003300000000000037000000020000390000000100003c0000000100003d00000000000040000000000000410000000000004200000001000044000000000000450000000000004a0000000000004b000000000000500000000000005100000000000000000003001702116d657461646174612e76657273696f6e000100150001080000000000000534021702116d657461646174612e76657273696f6e0015001500",
+  "response" : {
+    "errorCode" : 0,
+    "apiKeys" : [ {
+      "apiKey" : 0,
+      "minVersion" : 0,
+      "maxVersion" : 11
+    }, {
+      "apiKey" : 1,
+      "minVersion" : 0,
+      "maxVersion" : 17
+    }, {
+      "apiKey" : 2,
+      "minVersion" : 0,
+      "maxVersion" : 9
+    }, {
+      "apiKey" : 3,
+      "minVersion" : 0,
+      "maxVersion" : 12
+    }, {
+      "apiKey" : 8,
+      "minVersion" : 0,
+      "maxVersion" : 9
+    }, {
+      "apiKey" : 9,
+      "minVersion" : 0,
+      "maxVersion" : 9
+    }, {
+      "apiKey" : 10,
+      "minVersion" : 0,
+      "maxVersion" : 6
+    }, {
+      "apiKey" : 11,
+      "minVersion" : 0,
+      "maxVersion" : 9
+    }, {
+      "apiKey" : 12,
+      "minVersion" : 0,
+      "maxVersion" : 4
+    }, {
+      "apiKey" : 13,
+      "minVersion" : 0,
+      "maxVersion" : 5
+    }, {
+      "apiKey" : 14,
+      "minVersion" : 0,
+      "maxVersion" : 5
+    }, {
+      "apiKey" : 15,
+      "minVersion" : 0,
+      "maxVersion" : 5
+    }, {
+      "apiKey" : 16,
+      "minVersion" : 0,
+      "maxVersion" : 5
+    }, {
+      "apiKey" : 17,
+      "minVersion" : 0,
+      "maxVersion" : 1
+    }, {
+      "apiKey" : 18,
+      "minVersion" : 0,
+      "maxVersion" : 4
+    }, {
+      "apiKey" : 19,
+      "minVersion" : 0,
+      "maxVersion" : 7
+    }, {
+      "apiKey" : 20,
+      "minVersion" : 0,
+      "maxVersion" : 6
+    }, {
+      "apiKey" : 21,
+      "minVersion" : 0,
+      "maxVersion" : 2
+    }, {
+      "apiKey" : 22,
+      "minVersion" : 0,
+      "maxVersion" : 5
+    }, {
+      "apiKey" : 23,
+      "minVersion" : 0,
+      "maxVersion" : 4
+    }, {
+      "apiKey" : 24,
+      "minVersion" : 0,
+      "maxVersion" : 5
+    }, {
+      "apiKey" : 25,
+      "minVersion" : 0,
+      "maxVersion" : 4
+    }, {
+      "apiKey" : 26,
+      "minVersion" : 0,
+      "maxVersion" : 4
+    }, {
+      "apiKey" : 27,
+      "minVersion" : 0,
+      "maxVersion" : 1
+    }, {
+      "apiKey" : 28,
+      "minVersion" : 0,
+      "maxVersion" : 4
+    }, {
+      "apiKey" : 29,
+      "minVersion" : 0,
+      "maxVersion" : 3
+    }, {
+      "apiKey" : 30,
+      "minVersion" : 0,
+      "maxVersion" : 3
+    }, {
+      "apiKey" : 31,
+      "minVersion" : 0,
+      "maxVersion" : 3
+    }, {
+      "apiKey" : 32,
+      "minVersion" : 0,
+      "maxVersion" : 4
+    }, {
+      "apiKey" : 33,
+      "minVersion" : 0,
+      "maxVersion" : 2
+    }, {
+      "apiKey" : 34,
+      "minVersion" : 0,
+      "maxVersion" : 2
+    }, {
+      "apiKey" : 35,
+      "minVersion" : 0,
+      "maxVersion" : 4
+    }, {
+      "apiKey" : 36,
+      "minVersion" : 0,
+      "maxVersion" : 2
+    }, {
+      "apiKey" : 37,
+      "minVersion" : 0,
+      "maxVersion" : 3
+    }, {
+      "apiKey" : 38,
+      "minVersion" : 0,
+      "maxVersion" : 3
+    }, {
+      "apiKey" : 39,
+      "minVersion" : 0,
+      "maxVersion" : 2
+    }, {
+      "apiKey" : 40,
+      "minVersion" : 0,
+      "maxVersion" : 2
+    }, {
+      "apiKey" : 41,
+      "minVersion" : 0,
+      "maxVersion" : 3
+    }, {
+      "apiKey" : 42,
+      "minVersion" : 0,
+      "maxVersion" : 2
+    }, {
+      "apiKey" : 43,
+      "minVersion" : 0,
+      "maxVersion" : 2
+    }, {
+      "apiKey" : 44,
+      "minVersion" : 0,
+      "maxVersion" : 1
+    }, {
+      "apiKey" : 45,
+      "minVersion" : 0,
+      "maxVersion" : 0
+    }, {
+      "apiKey" : 46,
+      "minVersion" : 0,
+      "maxVersion" : 0
+    }, {
+      "apiKey" : 47,
+      "minVersion" : 0,
+      "maxVersion" : 0
+    }, {
+      "apiKey" : 48,
+      "minVersion" : 0,
+      "maxVersion" : 1
+    }, {
+      "apiKey" : 49,
+      "minVersion" : 0,
+      "maxVersion" : 1
+    }, {
+      "apiKey" : 50,
+      "minVersion" : 0,
+      "maxVersion" : 0
+    }, {
+      "apiKey" : 51,
+      "minVersion" : 0,
+      "maxVersion" : 0
+    }, {
+      "apiKey" : 55,
+      "minVersion" : 0,
+      "maxVersion" : 2
+    }, {
+      "apiKey" : 57,
+      "minVersion" : 0,
+      "maxVersion" : 1
+    }, {
+      "apiKey" : 60,
+      "minVersion" : 0,
+      "maxVersion" : 1
+    }, {
+      "apiKey" : 61,
+      "minVersion" : 0,
+      "maxVersion" : 0
+    }, {
+      "apiKey" : 64,
+      "minVersion" : 0,
+      "maxVersion" : 0
+    }, {
+      "apiKey" : 65,
+      "minVersion" : 0,
+      "maxVersion" : 0
+    }, {
+      "apiKey" : 66,
+      "minVersion" : 0,
+      "maxVersion" : 1
+    }, {
+      "apiKey" : 68,
+      "minVersion" : 0,
+      "maxVersion" : 0
+    }, {
+      "apiKey" : 69,
+      "minVersion" : 0,
+      "maxVersion" : 0
+    }, {
+      "apiKey" : 74,
+      "minVersion" : 0,
+      "maxVersion" : 0
+    }, {
+      "apiKey" : 75,
+      "minVersion" : 0,
+      "maxVersion" : 0
+    }, {
+      "apiKey" : 80,
+      "minVersion" : 0,
+      "maxVersion" : 0
+    }, {
+      "apiKey" : 81,
+      "minVersion" : 0,
+      "maxVersion" : 0
+    } ],
+    "throttleTimeMs" : 0,
+    "supportedFeatures" : [ {
+      "name" : "metadata.version",
+      "minVersion" : 1,
+      "maxVersion" : 21
+    } ],
+    "finalizedFeaturesEpoch" : 1332,
+    "finalizedFeatures" : [ {
+      "name" : "metadata.version",
+      "maxVersionLevel" : 21,
+      "minVersionLevel" : 21
+    } ]
+  }
+} ]

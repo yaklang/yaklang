@@ -22,8 +22,7 @@ type kafkaPending struct {
 }
 
 func kafkaSupported(api, ver uint16) bool {
-	rng, ok := map[uint16][2]uint16{0: {0, 7}, 1: {0, 11}, 3: {0, 8}, 18: {0, 2}}[api]
-	return ok && ver >= rng[0] && ver <= rng[1]
+	return stream_parser.KafkaVersionSupported(int16(api), int16(ver))
 }
 
 func probeKafka(w []byte, limit int) ProbeResult {
@@ -117,7 +116,7 @@ func (f *binFlow) consumeKafka(dir int, e *ProtocolEvent, result map[string]any)
 	}
 	info := map[string]any{"Context Level": "observed"}
 	if meta, ok := result["metadata"].(map[string]any); ok {
-		for _, key := range []string{"API Name", "API Key", "API Version", "Correlation ID", "Client ID", "Topic Name", "Magic", "Compression", "Records Count", "Base Offset", "Partition", "Topic Results", "Acks", "Timeout", "Batches"} {
+		for _, key := range []string{"Flexible", "Header Version", "Request Header", "Tagged Fields", "Client Software Name", "Client Software Version", "API Name", "API Key", "API Version", "Correlation ID", "Client ID", "Topic Name", "Magic", "Compression", "Records Count", "Base Offset", "Partition", "Topic Results", "Acks", "Timeout", "Batches"} {
 			if v, ok := meta[key]; ok {
 				info[key] = v
 			}
@@ -180,7 +179,7 @@ func (f *binFlow) consumeKafka(dir int, e *ProtocolEvent, result map[string]any)
 	info["API Name"] = kafkaSessionAPIName(api)
 	info["API Key"] = api
 	body := raw[8:]
-	parsed, err := stream_parser.KafkaResponseBodyVersion(api, pending.version, body)
+	parsed, err := stream_parser.KafkaResponsePayloadVersion(api, pending.version, body)
 	if err != nil {
 		return nil, err
 	}
