@@ -176,7 +176,7 @@ func (r *SarifReport) Report() *sarif.Report {
 
 func (r *SarifReport) appendResult(result *ssaapi.SyntaxFlowResult) {
 	SFRule := result.GetRule()
-	ruleID := codec.Sha256(SFRule.Content)
+	ruleID := sarifRuleID(SFRule)
 
 	for risk := range result.YieldRisk() {
 		value, err := result.GetValue(risk.Variable, int(risk.Index))
@@ -285,6 +285,22 @@ func ruleHelpMarkdown(description, solution string) string {
 		parts = append(parts, fix)
 	}
 	return strings.Join(parts, "\n\n")
+}
+
+// sarifRuleID is the identifier GitHub matches alerts by, so it must not change
+// when a rule is edited. A content-derived id re-keys every finding whenever the
+// rule text changes — including its markdown description — which surfaces as
+// duplicate alerts and duplicate pull request comments. Rules carry a stable
+// `rule_id`; the rule name and, for ad-hoc rules declaring neither, a content
+// hash are the fallbacks.
+func sarifRuleID(rule *schema.SyntaxFlowRule) string {
+	if id := strings.TrimSpace(rule.RuleId); id != "" {
+		return id
+	}
+	if name := strings.TrimSpace(rule.RuleName); name != "" {
+		return name
+	}
+	return codec.Sha256(rule.Content)
 }
 
 func sarifSecuritySeverityFor(severity schema.SyntaxFlowSeverity) string {

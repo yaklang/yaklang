@@ -372,14 +372,20 @@ func TestSarifReport_MergesMultipleResultsIntoOneRun(t *testing.T) {
 	require.NoError(t, err)
 	require.NotEmpty(t, progs)
 
-	// Same match, two distinct rule bodies -> two rule ids, one run.
-	for _, level := range []string{"low", "high"} {
+	// Same match, two distinct rule ids -> two rules, one run.
+	for _, ruleID := range []string{
+		"5d658a56-db56-4973-85b2-e2ad06ed09e8",
+		"0f2c1d34-9a7b-4c5e-8d10-6b3f5a2e7c91",
+	} {
 		rule := `
+	desc(
+		rule_id: "` + ruleID + `"
+	)
 	.getInstance?{<typeName>?{have:'java.security'}}(*<slice(index=1)> as $algorithm);
 	$algorithm #{ until:` + "`*?{ opcode:const && have:/MD5/}`" + ` }-> as $sink;
 	alert $sink for {
 		title: "Use of a broken or risky hash algorithm",
-		level: "` + level + `",
+		level: "low",
 		risk: "weak-crypto"
 	}
 `
@@ -435,6 +441,57 @@ func TestConvertSyntaxFlowResultToReport_SarifUsesCompatReport(t *testing.T) {
 
 	run := firstSarifRun(t, parseSarifDocument(t, buf.Bytes()))
 	require.Equal(t, sfreport.SarifDriverName, sarifDriver(t, run)["name"])
+}
+
+// GitHub matches an alert by (ruleId, fingerprints), so editing a rule must not
+// change its id: a content-derived id re-created every alert — and every pull
+// request comment — whenever the rule text changed. The rule's own `rule_id` is
+// used instead.
+func TestSarifReport_RuleIDSurvivesRuleEdits(t *testing.T) {
+	const ruleID = "5d658a56-db56-4973-85b2-e2ad06ed09e8"
+	body := `
+.getInstance?{<typeName>?{have:'java.security'}}(*<slice(index=1)> as $algorithm);
+$algorithm #{ until:` + "`*?{ opcode:const && have:/MD5/}`" + ` }-> as $sink;
+alert $sink
+`
+
+	// Same rule id, rewritten description: the alert identity must hold.
+	first := "desc(\n\trule_id: \"" + ruleID + "\"\n\tdesc: <<<DESC\n### 漏洞描述\nDESC\n)\n" + body
+	second := "desc(\n\trule_id: \"" + ruleID + "\"\n\tdesc: <<<DESC\n### 漏洞描述（重写）\n\n补充说明。\nDESC\n)\n" + body
+	require.NotEqual(t, first, second, "the two revisions must differ in content")
+
+	render := func(content string) string {
+		report, err := sfreport.NewSarifReport()
+		require.NoError(t, err)
+
+		vfs := filesys.NewVirtualFs()
+		vfs.AddFile("src/main/java/com/example/App.java", riskyJavaApp)
+		programName := "sarif-ruleid-" + uuid.NewString()
+		t.Cleanup(func() {
+			ssadb.DeleteProgram(ssadb.GetDB(), programName)
+			yakit.DeleteSSARisks(ssadb.GetDB(), &ypb.SSARisksFilter{ProgramName: []string{programName}})
+		})
+
+		progs, err := ssaapi.ParseProjectWithFS(vfs,
+			ssaapi.WithLanguage(ssaconfig.JAVA),
+			ssaapi.WithProgramName(programName),
+		)
+		require.NoError(t, err)
+		require.NotEmpty(t, progs)
+
+		result, err := progs[0].SyntaxFlowWithError(content, ssaapi.QueryWithEnableDebug(true))
+		require.NoError(t, err)
+		require.NoError(t, result.CreateRisk())
+		require.True(t, report.AddSyntaxFlowResult(result))
+
+		rules := report.Report().Runs[0].Tool.Driver.Rules
+		require.Len(t, rules, 1)
+		return rules[0].ID
+	}
+
+	require.Equal(t, ruleID, render(first))
+	require.Equal(t, ruleID, render(second),
+		"a rule edit must not re-key its alerts")
 }
 
 // A scan that finds nothing still has to declare the tool so GitHub can close
