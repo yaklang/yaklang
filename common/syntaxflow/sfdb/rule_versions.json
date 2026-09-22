@@ -380,8 +380,8 @@
   {
     "rule_id": "8bf92ed2-6abf-4f45-b3b2-14f06a88eb36",
     "rule_name": "检测Golang使用不安全随机源（math/rand）",
-    "hash": "36b4466bbdbb2111a57da53bb9966ac814ccb70f86aa23db0e373241c0d74e57",
-    "version": "20260901.0002"
+    "hash": "20b80d714224b2e37d62bc1a39daf2829f7847489c82acf56f80b5f64342aa95",
+    "version": "20260922.0001"
   },
   {
     "rule_id": "dfb88d4d-1459-4045-a0f3-5a98083fee81",
@@ -554,8 +554,8 @@
   {
     "rule_id": "e3c91f2a-8b47-5e1d-a012-9f8e7c654321",
     "rule_name": "检测 Go JWT（dgrijalva/jwt-go）硬编码签名密钥",
-    "hash": "ade4dd6020650c500032931eb198aa776300d75152e9bb761c7066fc7c377773",
-    "version": "20260901.0002"
+    "hash": "9cf64326305a243fdda44fb205b23edb04bae196a2edea9f52211f98969e22c9",
+    "version": "20260922.0001"
   },
   {
     "rule_id": "838bdd38-5913-46ed-88f7-8eced02db2bd",
@@ -4928,8 +4928,8 @@
   {
     "rule_id": "source-go-math-rand",
     "rule_name": "检测 Go math/rand 安全用途",
-    "hash": "fca180dfb134b4fd5dfd7593b0599f8cac6dc88969e4f1d18aae1d72a6a83246",
-    "version": "20260914.0001"
+    "hash": "2c03b25ac914335652c5a8a907ea2ee56a3915df635ea4212d15baa4c9c25f1a",
+    "version": "20260922.0001"
   },
   {
     "rule_id": "source-go-md5-sum",
