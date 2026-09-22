@@ -31,9 +31,10 @@ list_test_pkgs() {
   local pattern="$1" out errfile
   errfile="$(mktemp)"
   if ! out=$(go list -f '{{if or .TestGoFiles .XTestGoFiles}}{{.ImportPath}}{{end}}' "$pattern" 2>"$errfile"); then
+    # stdout is a temporary package list; diagnostics must survive its removal.
     printf '::error::go list failed for %s
-' "$pattern"
-    [[ -s "$errfile" ]] && cat "$errfile"
+' "$pattern" >&2
+    [[ -s "$errfile" ]] && cat "$errfile" >&2
     rm -f "$errfile"
     return 1
   fi
@@ -113,11 +114,12 @@ run_package() {
       }' "$log"
     # The last 60 lines can omit the slowest tests. Show their own durations,
     # including subtests, rather than buffered Actions log timestamps.
+    # Consume the sorted output fully so a large list does not cause SIGPIPE.
     echo "Slowest tests: $pkg"
     awk '/^[[:space:]]*--- (PASS|FAIL): / {
       duration = $NF; gsub(/[()s]/, "", duration)
       if (duration + 0 >= 0.1) printf "%.2fs %s\n", duration, $3
-    }' "$log" | sort -nr | head -5
+    }' "$log" | sort -nr | sed -n '1,5p'
     if (( code == 0 )); then
       echo "PASS: $pkg"
       rc=0
