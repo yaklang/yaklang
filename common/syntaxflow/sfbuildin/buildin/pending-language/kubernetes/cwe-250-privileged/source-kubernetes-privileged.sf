@@ -10,24 +10,29 @@ desc(
 	cwe: "CWE-250"
 	desc: <<<DESC
 ### 规则说明
-privileged: true 让容器接近宿主机权限。
-
-该语言还没有 struct/ssa 前端。source 规则用正则扫描源码，builtin verify 会检查内嵌样例。
+Pod 安全上下文里的 `privileged: true` 去掉容器的大部分隔离。容器里的进程接近宿主机上的高权限，可以访问设备、修改内核参数。
 
 ### 风险类型
 security-misconfiguration
 
 ### 影响
-命中说明文件中出现了该危险写法。
+容器被攻破后很容易影响同一节点上的其他负载，甚至控制宿主机。
 
 ### 检测方式
-源码模式正则匹配。
+这条规则使用 source 模式，用正则扫描源文件文本，不构建语法树或 SSA。命中只说明出现了对应写法，不能单独证明数据来自外部输入。注释、字符串和文档中的相同文本也会命中。
+正则在 `.yml` 文件里匹配 `privileged: true`。扩展名是 `.yaml` 的清单不在这条规则的文件范围内。注释里的相同文本也会命中。
+该语言还没有 struct 或 ssa 前端，目前只有这条 source 规则。builtin verify 会用内嵌的正例和反例检查这条正则。
+
 ### 参考
-- CWE-250
+- [CWE-250：以不必要的权限执行](https://cwe.mitre.org/data/definitions/250.html)
+
 DESC
 	solution: <<<SOLUTION
 ### 修复建议
-去掉 privileged，按需添加具体 Linux capability。
+- 删除 `privileged: true`。
+- 只添加业务必需的 Linux capability，并去掉其余默认能力。
+- 同时使用只读根文件系统，并把 `allowPrivilegeEscalation` 设为 false。
+
 SOLUTION
 	alert_min: 1
 	"file://pod.yml": <<<POS

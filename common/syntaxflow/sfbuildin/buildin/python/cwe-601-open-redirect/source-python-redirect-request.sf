@@ -10,22 +10,29 @@ desc(
 	cwe: "CWE-601"
 	desc: <<<DESC
 ### 规则说明
-把请求参数传给 Flask redirect 或 Django HttpResponseRedirect，可以把用户带到任意站点。
+Flask 的 `redirect` 和 Django 的 `HttpResponseRedirect` 如果直接使用请求里的地址，攻击者可以把参数换成外部网站。用户会从可信域名被带到钓鱼站点。
 
 ### 风险类型
 open-redirect
 
 ### 影响
-命中说明代码里出现了该危险 API、配置或数据流入口。
+开放重定向常被用来做钓鱼，也会帮助绕过只检查来源域名的校验。跳转地址如果再写入会话，影响会留到后面的请求。
 
 ### 检测方式
-源码模式正则匹配，定位源码中的危险调用或配置。
+这条规则使用 source 模式，用正则扫描源文件文本，不构建语法树或 SSA。命中只说明出现了对应写法，不能单独证明数据来自外部输入。注释、字符串和文档中的相同文本也会命中。
+正则匹配 `redirect(request.` 和 `HttpResponseRedirect(request.`。先放进变量再跳转的写法不会命中。
+同一检查还有 ssa（数据流）。它们描述同一个问题，命中条件不同，修复时看实际告警来自哪一条。
+
 ### 参考
-- CWE-601
+- [CWE-601：重定向到不受信任站点](https://cwe.mitre.org/data/definitions/601.html)
+
 DESC
 	solution: <<<SOLUTION
 ### 修复建议
-只允许站内相对路径，并用 url_has_allowed_host_and_scheme 校验主机。
+- 只允许站内相对路径，拒绝带协议和主机的地址。
+- Django 用 `url_has_allowed_host_and_scheme` 校验主机和协议。
+- 不要把用户提供的完整 URL 直接传给 `redirect` 或 `HttpResponseRedirect`。
+
 SOLUTION
 	alert_min: 1
 	"file://bad.py": <<<POS

@@ -10,24 +10,29 @@ desc(
 	cwe: "CWE-732"
 	desc: <<<DESC
 ### 规则说明
-acl = public-read 或 public-read-write 会把对象存储暴露到公网。
-
-该语言还没有 struct/ssa 前端。source 规则用正则扫描源码，builtin verify 会检查内嵌样例。
+对象存储的 `acl = "public-read"` 允许匿名读取。`public-read-write` 还允许匿名上传和覆盖。桶一旦公开，里面的备份、日志和误放进去的密钥都会被下载。
 
 ### 风险类型
 security-misconfiguration
 
 ### 影响
-命中说明文件中出现了该危险写法。
+数据对公网泄露。可写的公开 ACL 还允许外部放入恶意对象。
 
 ### 检测方式
-源码模式正则匹配。
+这条规则使用 source 模式，用正则扫描源文件文本，不构建语法树或 SSA。命中只说明出现了对应写法，不能单独证明数据来自外部输入。注释、字符串和文档中的相同文本也会命中。
+正则匹配 `acl = "public-read`，所以 `public-read` 和 `public-read-write` 都会命中。`private` 不会命中。
+该语言还没有 struct 或 ssa 前端，目前只有这条 source 规则。builtin verify 会用内嵌的正例和反例检查这条正则。
+
 ### 参考
-- CWE-732
+- [CWE-732：关键资源的权限分配错误](https://cwe.mitre.org/data/definitions/732.html)
+
 DESC
 	solution: <<<SOLUTION
 ### 修复建议
-使用 private ACL，并通过显式策略授权。
+- ACL 使用 `private`。
+- 确实要公开的对象单独授权，不要把整个桶设成 public-read。
+- 打开账号级的 Public Access Block，避免 ACL 再把桶公开。
+
 SOLUTION
 	alert_min: 1
 	"file://bad.tf": <<<POS

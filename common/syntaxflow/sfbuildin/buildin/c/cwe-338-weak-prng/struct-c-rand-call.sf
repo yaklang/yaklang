@@ -10,22 +10,29 @@ desc(
 	cwe: "CWE-338"
 	desc: <<<DESC
 ### 规则说明
-rand 不是密码学随机数。用它生成令牌、密钥或会话标识可以被预测。
+标准库 `rand` 是统计用的伪随机数，种子空间小，输出可以预测。用它生成会话标识、重置令牌、密钥、IV 或口令时，攻击者只要知道种子，或者看到前面几个输出，就能推算后面的值。`srand(time(NULL))` 这种按时间播种尤其容易复现。
 
 ### 风险类型
 weak-randomness
 
 ### 影响
-命中说明编译单元里出现了该调用，而不是注释或字符串。
+令牌和密钥可被预测，从而劫持会话、重置他人账号或破解加密。只用在洗牌、动画或测试数据上时风险较低，但规则仍会命中，需要按用途排除。
 
 ### 检测方式
-结构扫描匹配真实调用。
+这条规则使用 struct 模式，匹配编译后真实存在的调用。注释和普通字符串不会命中。它不分析参数来源，出现该调用即告警。
+匹配名为 `rand` 的真实调用。同名的封装函数也会命中，需要看它是不是标准库随机数。
+同一检查还有 source（源码正则）。它们描述同一个问题，命中条件不同，修复时看实际告警来自哪一条。
+
 ### 参考
-- CWE-338
+- [CWE-338：使用密码学上弱的伪随机数](https://cwe.mitre.org/data/definitions/338.html)
+
 DESC
 	solution: <<<SOLUTION
 ### 修复建议
-使用 getrandom、/dev/urandom 或操作系统的 CSPRNG。
+- 安全用途改用 `getrandom`、`getentropy`，或从 `/dev/urandom` 读取。
+- 已经链接 OpenSSL 时用 `RAND_bytes`。Windows 上用 `BCryptGenRandom`。
+- 不要用 `srand` 加当前时间作为种子，也不要把 `rand` 的结果截断后当作令牌。
+
 SOLUTION
 	alert_min: 1
 	"file://bad.c": <<<POS
