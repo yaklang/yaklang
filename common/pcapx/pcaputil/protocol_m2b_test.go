@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"os"
 	"sort"
+	"strconv"
 	"testing"
 )
 
@@ -21,11 +22,21 @@ func m2bFixture(t testing.TB, name string) []byte {
 func m2bReplay(t testing.TB, name string, deferred bool, workers int, secrets TLSSecretProvider) []*ProtocolEvent {
 	t.Helper()
 	var events []*ProtocolEvent
-	opts := []CaptureOption{WithProtocolDeferred(deferred), WithTCPReassemblyWorkers(workers), WithOnProtocolMessage(func(e *ProtocolEvent) { events = append(events, e) })}
+	var stats ProtocolStats
+	opts := []CaptureOption{WithOnProtocolStats(func(s ProtocolStats) { stats = s }), WithProtocolDeferred(deferred), WithTCPReassemblyWorkers(workers), WithOnProtocolMessage(func(e *ProtocolEvent) { events = append(events, e) })}
 	if secrets != nil {
 		opts = append(opts, WithTLSSecrets(secrets))
 	}
 	require.NoError(t, ReplayPcap(bytes.NewReader(m2bFixture(t, name)), opts...))
+	for _, e := range events {
+		require.NotEmpty(t, e.SourceBytes.PacketRefs, "native events need contributing packet references")
+		sum := sha256.Sum256(e.Raw)
+		require.Equal(t, hex.EncodeToString(sum[:]), e.SourceBytes.SHA256)
+		require.Equal(t, len(e.Raw), e.Length)
+	}
+	t.Logf("native replay %s workers=%d deferred=%v stats=%+v", name, workers, deferred, stats)
+	require.Zero(t, stats.BufferedBytes, "native replay must release retained state")
+	require.LessOrEqual(t, stats.PeakBufferedBytes, int64(DefaultParserBudget().MaxBufferedBytes))
 	return events
 }
 func m2bRows(events []*ProtocolEvent) []string {
@@ -47,6 +58,7 @@ func TestFirstBatchT16(t *testing.T) {
 		for _, deferred := range []bool{false, true} {
 			t.Run(fmt.Sprintf("native-workers%d-deferred%v", workers, deferred), func(t *testing.T) {
 				events := m2bReplay(t, "m2b-database-native.pcap", deferred, workers, nil)
+				assertM2DatabaseOracle(t, events)
 				prepared, execute, close, reset := 0, 0, 0, 0
 				clients := map[uint64]bool{}
 				for _, e := range events {
@@ -241,7 +253,9 @@ func TestFirstBatchT13(t *testing.T) {
 		for _, deferred := range []bool{false, true} {
 			t.Run(fmt.Sprintf("native-workers%d-deferred%v", workers, deferred), func(t *testing.T) {
 				requests, responses, trailers, dns := 0, 0, 0, 0
-				for _, e := range m2bReplay(t, "m2b-quic-native.pcap", deferred, workers, keys) {
+				events := m2bReplay(t, "m2b-quic-native.pcap", deferred, workers, keys)
+				assertM2QUICOracle(t, events)
+				for _, e := range events {
 					require.Contains(t, []string{"decoded", "deferred"}, e.Status, e.Error)
 					frames, _ := e.Session["Frames"].([]map[string]any)
 					for _, fr := range frames {
@@ -304,5 +318,161 @@ func TestM2FixtureManifest(t *testing.T) {
 	for _, f := range manifest.Files {
 		sum := sha256.Sum256(m2bFixture(t, f.Path))
 		require.Equal(t, f.SHA256, hex.EncodeToString(sum[:]), f.Path)
+	}
+}
+
+// Compare public replay output to results recorded by independent native clients.
+// The expected values are never produced by this parser.
+func assertM2DatabaseOracle(t *testing.T, events []*ProtocolEvent) {
+	t.Helper()
+	var oracle map[string]json.RawMessage
+	require.NoError(t, json.Unmarshal(m2bFixture(t, "m2b-database-oracle.json"), &oracle))
+	var mysqlWant, pgWant [][]any
+	var prepared [][][]any
+	require.NoError(t, json.Unmarshal(oracle["mysql.connector"], &prepared))
+	for _, rows := range prepared {
+		mysqlWant = append(mysqlWant, rows...)
+	}
+	var goRows [][]any
+	require.NoError(t, json.Unmarshal(m2bFixture(t, "m2b-mysql-go-oracle.json"), &goRows))
+	mysqlWant = append(mysqlWant, goRows...)
+	prepared = nil // json.Unmarshal can reuse nested slices; keep MySQL expectations immutable.
+	require.NoError(t, json.Unmarshal(oracle["pg_prepared"], &prepared))
+	for _, rows := range prepared {
+		pgWant = append(pgWant, rows...)
+	}
+	for _, key := range []string{"pg_after_error", "pg_portal"} {
+		var rows [][]any
+		require.NoError(t, json.Unmarshal(oracle[key], &rows))
+		pgWant = append(pgWant, rows...)
+	}
+	var afterAbort []any
+	require.NoError(t, json.Unmarshal(oracle["pg_after_copy_abort"], &afterAbort))
+	pgWant = append(pgWant, afterAbort)
+	var mysqlGot, pgGot [][]any
+	var copyOut []byte
+	byID := map[uint64]*ProtocolEvent{}
+	for _, e := range events {
+		byID[e.ID] = e
+	}
+	for _, e := range events {
+		if e.Protocol != "mysql" && e.Protocol != "postgresql" {
+			continue
+		}
+		if e.ResponseTo != 0 {
+			request := byID[e.ResponseTo]
+			require.NotNil(t, request)
+			require.Equal(t, e.FlowID, request.FlowID)
+			if e.Direction == 1 {
+				require.Equal(t, 0, request.Direction)
+			}
+		}
+		if e.Protocol == "postgresql" && e.Direction == 1 && e.Session["Message Name"] == "CopyData" {
+			require.GreaterOrEqual(t, len(e.Raw), 5)
+			copyOut = append(copyOut, e.Raw[5:]...)
+		}
+		vals, ok := e.Session["Values"].([]map[string]any)
+		if !ok {
+			continue
+		}
+		var row []any
+		for _, v := range vals {
+			var value any
+			if v["NULL"] != true {
+				value = v["Value"]
+				switch x := value.(type) {
+				case []byte:
+					value = string(x)
+					if e.Protocol == "postgresql" && (v["Type OID"] == uint64(23) || v["Type OID"] == uint64(20) || v["Type OID"] == uint64(21)) {
+						require.Equal(t, uint64(0), v["Format Code"])
+						n, err := strconv.ParseInt(string(x), 10, 64)
+						require.NoError(t, err)
+						value = n
+					}
+				case map[string]any:
+					require.Equal(t, byte(10), v["Type"])
+					value = fmt.Sprintf("%04d-%02d-%02d", x["Year"], x["Month"], x["Day"])
+				}
+			}
+			row = append(row, value)
+		}
+		if e.Protocol == "mysql" {
+			mysqlGot = append(mysqlGot, row)
+		} else {
+			pgGot = append(pgGot, row)
+		}
+	}
+	compare := func(want, got any) {
+		a, err := json.Marshal(want)
+		require.NoError(t, err)
+		b, err := json.Marshal(got)
+		require.NoError(t, err)
+		require.JSONEq(t, string(a), string(b))
+	}
+	sortRows := func(rows [][]any) {
+		sort.Slice(rows, func(i, j int) bool {
+			a, _ := json.Marshal(rows[i])
+			b, _ := json.Marshal(rows[j])
+			return string(a) < string(b)
+		})
+	}
+	// Worker scheduling may reorder different MySQL connections.
+	sortRows(mysqlWant)
+	sortRows(mysqlGot)
+	compare(mysqlWant, mysqlGot)
+	compare(pgWant, pgGot)
+	var copyWant string
+	require.NoError(t, json.Unmarshal(oracle["pg_copy"], &copyWant))
+	require.Equal(t, copyWant, string(copyOut))
+}
+
+func assertM2QUICOracle(t *testing.T, events []*ProtocolEvent) {
+	t.Helper()
+	var oracle []struct {
+		ALPN        string
+		StreamID    uint64 `json:"stream_id"`
+		ResponseHex string `json:"response_hex"`
+	}
+	require.NoError(t, json.Unmarshal(m2bFixture(t, "m2b-quic-oracle.json"), &oracle))
+	got := map[string][]byte{}
+	byID := map[uint64]*ProtocolEvent{}
+	for _, e := range events {
+		byID[e.ID] = e
+	}
+	for _, e := range events {
+		frames, _ := e.Session["Frames"].([]map[string]any)
+		for _, frame := range frames {
+			if frame["Frame Type"] != "STREAM" || e.Direction != 1 {
+				continue
+			}
+			sid, ok := frame["Stream ID"].(uint64)
+			require.True(t, ok)
+			alpn, _ := e.Session["ALPN"].(string)
+			key := fmt.Sprintf("%s/%d", alpn, sid)
+			headers, _ := frame["HTTP3 Frames"].([]map[string]any)
+			application := false
+			for _, h := range headers {
+				if h["Frame Type"] == "DATA" {
+					got[key] = append(got[key], h["Payload"].([]byte)...)
+					application = true
+				}
+			}
+			if frame["DoQ"] == true {
+				got[key] = append(got[key], frame["Stream Data"].([]byte)...)
+				application = true
+			}
+			if application {
+				reqID, ok := frame["Request PDU ID"].(uint64)
+				require.True(t, ok)
+				req := byID[reqID]
+				require.NotNil(t, req)
+				require.Equal(t, e.FlowID, req.FlowID)
+				require.Equal(t, 0, req.Direction)
+			}
+		}
+	}
+	require.Len(t, got, len(oracle))
+	for _, want := range oracle {
+		require.Equal(t, want.ResponseHex, hex.EncodeToString(got[fmt.Sprintf("%s/%d", want.ALPN, want.StreamID)]))
 	}
 }
