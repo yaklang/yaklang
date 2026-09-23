@@ -40,7 +40,7 @@ func TestProductManifestForgeCapabilitiesDoNotOverrideStatefulRuntime(t *testing
 		t.Fatal(err)
 	}
 	actual := normalizeScanNodeCapabilityKeysForRuntime(advertised, aiSessionRuntimeModeStateful)
-	for _, key := range []string{capabilityKeyAIForgeReleaseV1, capabilityKeyAIForgeEvidenceV1, capabilityKeyAIForgeDiscoveryV1, capabilityKeyAIForgeDiscoveryV2, capabilityKeyAIForgeHTTPAssessmentV2} {
+	for _, key := range []string{capabilityKeyAIForgeReleaseV1, capabilityKeyAIForgeCustomToolsV1, capabilityKeyAIForgeEvidenceV1, capabilityKeyAIForgeDiscoveryV1, capabilityKeyAIForgeDiscoveryV2, capabilityKeyAIForgeHTTPAssessmentV2} {
 		if slices.Contains(actual, key) {
 			t.Fatalf("stateful runtime inherited Forge capability %s", key)
 		}

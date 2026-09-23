@@ -1,5 +1,6 @@
 [
   "ai.code_workspace.v1",
+  "ai.forge.custom_tools.v1",
 	"ai.forge.discovery.v1",
 	"ai.forge.discovery.v2",
 	"ai.forge.evidence.v1",
