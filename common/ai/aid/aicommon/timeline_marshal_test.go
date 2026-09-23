@@ -146,6 +146,35 @@ func TestTimelineMarshalWithCompressedHead(t *testing.T) {
 	t.Log("Timeline marshal with compressed head test passed")
 }
 
+func TestUnmarshalTimelineLegacyReducers(t *testing.T) {
+	// This shape was written before compressed_head replaced reducers.
+	const legacy = `{"id_to_ts":{},"ts_to_timeline_item":{},"id_to_timeline_item":{},"reducers":{"11":"first memory","22":"second memory"},"reducer_ts":{"11":1700000000000,"22":1700000001000},"archive_refs":{},"per_dump_content_limit":100,"total_dump_content_limit":500}`
+
+	timeline, err := UnmarshalTimeline(legacy)
+	require.NoError(t, err)
+	require.Equal(t, &TimelineCompressedHead{
+		Text:             "second memory",
+		CoveredEndItemID: 22,
+		CoveredEndAtMs:   1700000001000,
+		Version:          2,
+	}, timeline.compressedHead)
+	require.Equal(t, []*TimelineCompressedHistoryNode{{
+		Version:          1,
+		PrevVersion:      0,
+		Text:             "first memory",
+		CoveredEndItemID: 11,
+		CoveredEndAtMs:   1700000000000,
+		CreatedAtMs:      1700000000000,
+	}}, timeline.compressedHistory)
+
+	serialized, err := MarshalTimeline(timeline)
+	require.NoError(t, err)
+	require.NotContains(t, serialized, `"reducers"`)
+	require.NotContains(t, serialized, `"reducer_ts"`)
+	require.Contains(t, serialized, `"compressed_head"`)
+	require.Contains(t, serialized, `"compressed_history"`)
+}
+
 func TestTimelineMarshalEmpty(t *testing.T) {
 	// 测试空 Timeline
 	originalTimeline := NewTimeline(nil, nil)
