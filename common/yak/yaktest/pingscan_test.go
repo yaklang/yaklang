@@ -1,30 +1,28 @@
 package yaktest
 
-import (
-	"fmt"
-	"testing"
-)
+import "testing"
 
 func TestMisc_PingScan(t *testing.T) {
-
-	cases := []YakTestCase{
+	Run("pingscan local regression tests", t, []YakTestCase{
 		{
-			Name: "测试 ping scan",
-			Src:  fmt.Sprintf(`loglevel("info");for result = range ping.Scan("47.52.100.0", ping.concurrent(20)) {if(result.Ok){println(result.Reason);};}`),
-		},
-	}
-
-	Run("pingscan 可用性测试", t, cases...)
+			Name: "loopback scan",
+			Src: `count = 0
+for result = range ping.Scan("127.0.0.1,127.0.0.2", ping.concurrent(2)) {
+ assert(result.Ok)
+ count++
 }
-
-func TestMisc_SynPingScan(t *testing.T) {
-
-	cases := []YakTestCase{
-		{
-			Name: "测试 ping scan",
-			Src:  fmt.Sprintf(`loglevel("info");for result = range ping.Scan("47.52.100.0", ping.concurrent(20)) {if(result.Ok){println(result.Reason);};}`),
+assert(count == 2)`,
 		},
-	}
-
-	Run("pingscan 可用性测试", t, cases...)
+		{
+			Name: "skip scan with zero concurrency",
+			Src: `count = 0
+for result = range ping.Scan("192.0.2.1,192.0.2.2", ping.skip(true), ping.concurrent(0)) {
+ assert(result.Ok)
+ assert(result.Reason == "skipped")
+ count++
+}
+assert(count == 2)
+assert(ping.Ping("192.0.2.1", ping.skip(true)).Ok)`,
+		},
+	}...)
 }

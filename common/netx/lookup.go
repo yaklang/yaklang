@@ -199,6 +199,11 @@ func LookupFirst(host string, opt ...DNSOption) string {
 	return lookupFirstWithContext(context.Background(), host, opt...)
 }
 
+// LookupFirstWithContext resolves the first address within the caller's deadline.
+func LookupFirstWithContext(ctx context.Context, host string, opt ...DNSOption) string {
+	return lookupFirstWithContext(ctx, host, opt...)
+}
+
 // Direct dialing must retain its parent's budget while waiting for DNS. Using
 // WithDNSContext alone is insufficient because LookupFirst owns this context.
 func lookupFirstWithContext(parent context.Context, host string, opt ...DNSOption) string {
