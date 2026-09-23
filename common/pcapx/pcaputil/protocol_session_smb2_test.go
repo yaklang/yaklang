@@ -1,9 +1,11 @@
 package pcaputil
 
 import (
+	"bytes"
 	"encoding/binary"
 	"encoding/hex"
 	"fmt"
+	"strings"
 	"testing"
 	"time"
 
@@ -166,11 +168,12 @@ func smb2CloseResp(mid, sid uint64, tid uint32, fid []byte) []byte {
 }
 
 func smb2Transform() []byte {
-	xf := make([]byte, 52)
+	xf := make([]byte, 52+64)
 	binary.LittleEndian.PutUint32(xf[0:], 0x424d53fd)
 	binary.LittleEndian.PutUint32(xf[36:], 64)
 	binary.LittleEndian.PutUint16(xf[42:], 1)
 	binary.LittleEndian.PutUint64(xf[44:], 0x11)
+	copy(xf[52:], bytes.Repeat([]byte{0xa5}, 64))
 	return smb2TCP(xf)
 }
 
@@ -263,12 +266,36 @@ func TestProtocolSessionSMB2CompoundAndTransform(t *testing.T) {
 	kbody := closeP[4:]
 	binary.LittleEndian.PutUint32(cbody[20:24], uint32(len(cbody)))
 	binary.LittleEndian.PutUint32(kbody[16:20], 4) // RELATED
+	binary.LittleEndian.PutUint32(kbody[36:40], ^uint32(0))
+	binary.LittleEndian.PutUint64(kbody[40:48], ^uint64(0))
+	copy(kbody[64+8:64+24], bytes.Repeat([]byte{0xff}, 16))
 	compound := smb2TCP(append(cbody, kbody...))
 	r := s.Feed(0, ts, compound)
 	require.Nil(t, r.Err, "%v", r.Err)
 	require.Equal(t, true, r.Events[0].Session["Compound"])
 	require.Equal(t, 2, r.Events[0].Session["Compound Count"])
 	require.Equal(t, []string{"CREATE", "CLOSE"}, r.Events[0].Session["Command Names"])
+	commands := r.Events[0].Session["Commands"].([]map[string]any)
+	require.Equal(t, uint64(0x11), commands[1]["Session ID"])
+	require.Equal(t, uint32(1), commands[1]["Tree ID"])
+	require.Equal(t, true, commands[1]["Inherited Session Context"])
+	require.Equal(t, true, commands[1]["Inherited Tree Context"])
+	require.Equal(t, true, commands[1]["Related File ID Placeholder"])
+
+	createResp := smb2CreateResp(10, 0x11, 1, fid)[4:]
+	closeResp := smb2CloseResp(11, 0x11, 1, bytes.Repeat([]byte{0xff}, 16))[4:]
+	binary.LittleEndian.PutUint32(createResp[20:24], uint32(len(createResp)))
+	binary.LittleEndian.PutUint32(closeResp[16:20], smb2FlagResp|smb2FlagRelated)
+	binary.LittleEndian.PutUint32(closeResp[36:40], ^uint32(0))
+	binary.LittleEndian.PutUint64(closeResp[40:48], ^uint64(0))
+	r = s.Feed(1, ts, smb2TCP(append(createResp, closeResp...)))
+	require.Nil(t, r.Err, "%v", r.Err)
+	responseCommands := r.Events[0].Session["Commands"].([]map[string]any)
+	require.Equal(t, hex.EncodeToString(fid), responseCommands[1]["FileId"])
+	require.Equal(t, true, responseCommands[1]["Inherited File ID"])
+	require.Equal(t, "closed", responseCommands[1]["File Context Status"])
+	require.Empty(t, s.(*captureSession).f.smb2.files, "related CLOSE inherits CREATE's reply FileId and releases that handle")
+	require.Empty(t, s.(*captureSession).f.smb2.pending)
 
 	s2, err := NewProtocolSession(DefaultParserBudget())
 	require.NoError(t, err)
@@ -276,6 +303,20 @@ func TestProtocolSessionSMB2CompoundAndTransform(t *testing.T) {
 	require.Nil(t, r.Err, "%v", r.Err)
 	require.Equal(t, true, r.Events[0].Session["Encrypted"])
 	require.Equal(t, "transform", r.Events[0].Session["Packet Name"])
+
+	transformPayload := smb2Transform()[4:]
+	transformFlow := s2.(*captureSession).f
+	for name, payload := range map[string][]byte{
+		"header-only":          transformPayload[:52],
+		"truncated-ciphertext": transformPayload[:52+8],
+	} {
+		t.Run("reject-"+name, func(t *testing.T) {
+			consumed, spec, err := transformFlow.frameSMB2(smb2TCP(payload))
+			require.Error(t, err)
+			require.Zero(t, consumed)
+			require.Nil(t, spec, "invalid ciphertext must not produce an opaque transform event")
+		})
+	}
 }
 
 func TestProtocolSessionSMB2FailClosed(t *testing.T) {
@@ -294,7 +335,7 @@ func TestProtocolSessionSMB2FailClosed(t *testing.T) {
 	r = s2.Feed(1, ts, smb2NegotiateResp(0x0311))
 	require.Nil(t, r.Err, "%v", r.Err)
 	require.Equal(t, true, r.Events[0].Session["Unmatched"])
-	require.Equal(t, "missing-request", r.Events[0].Session["Association Status"])
+	require.Equal(t, "missing-or-ambiguous-request", r.Events[0].Session["Association Status"])
 
 	s3, err := NewProtocolSession(DefaultParserBudget())
 	require.NoError(t, err)
@@ -311,6 +352,79 @@ func TestProtocolSessionSMB2FailClosed(t *testing.T) {
 	require.NoError(t, err)
 	r = s4.Feed(0, ts, smb2NegotiateReq(0x0311)[:6])
 	require.True(t, r.NeedMore || r.Err != nil && r.Err.Kind == ErrNeedMore)
+}
+
+func TestProtocolSessionSMB2RejectsCommandMismatchedResponse(t *testing.T) {
+	s, err := NewProtocolSession(DefaultParserBudget())
+	require.NoError(t, err)
+	t.Cleanup(func() { s.Close("FIN") })
+	ts := time.Unix(1, 0)
+	require.Nil(t, s.Feed(0, ts, smb2NegotiateReq(0x0311)).Err)
+
+	r := s.Feed(1, ts, smb2ReadResp(1, 0, 0, nil))
+	require.Nil(t, r.Err, "%v", r.Err)
+	require.Equal(t, true, r.Events[0].Session["Unmatched"])
+	require.Equal(t, "missing-or-ambiguous-request", r.Events[0].Session["Association Status"])
+	flow := s.(*captureSession).f
+	require.Len(t, flow.smb2.pending, 1, "a response with another command must not consume NEGOTIATE")
+
+	r = s.Feed(1, ts, smb2NegotiateResp(0x0311))
+	require.Nil(t, r.Err, "%v", r.Err)
+	require.Equal(t, "NEGOTIATE", r.Events[0].Session["Matched Request"])
+	require.Empty(t, flow.smb2.pending)
+}
+
+func TestProtocolSessionSMB2RequiresOppositeResponseDirection(t *testing.T) {
+	s, err := NewProtocolSession(DefaultParserBudget())
+	require.NoError(t, err)
+	t.Cleanup(func() { s.Close("FIN") })
+	ts := time.Unix(1, 0)
+	require.Nil(t, s.Feed(0, ts, smb2NegotiateReq(0x0311)).Err)
+
+	r := s.Feed(0, ts, smb2NegotiateResp(0x0311))
+	require.Nil(t, r.Err, "%v", r.Err)
+	require.Equal(t, true, r.Events[0].Session["Unmatched"])
+	require.Equal(t, "direction-mismatch", r.Events[0].Session["Association Status"])
+	flow := s.(*captureSession).f
+	require.Len(t, flow.smb2.pending, 1, "same-direction responses must not consume the request")
+
+	r = s.Feed(1, ts, smb2NegotiateResp(0x0311))
+	require.Nil(t, r.Err, "%v", r.Err)
+	require.Equal(t, "NEGOTIATE", r.Events[0].Session["Matched Request"])
+	require.Empty(t, flow.smb2.pending)
+}
+
+func TestSMB2RetainedPathBytesUseSessionBudget(t *testing.T) {
+	newState := func(maxBuffered int) (*binSMB2, *binFlow, *binParser) {
+		a := &binParser{config: BinParserConfig{MaxBufferedBytes: maxBuffered}}
+		f := &binFlow{a: a}
+		s := &binSMB2{
+			flow:    f,
+			pending: make(map[smb2PendingKey]smb2Pending),
+			async:   make(map[smb2AsyncKey]smb2PendingKey),
+			files:   make(map[smb2FileKey]string),
+		}
+		return s, f, a
+	}
+	request := func(path string) map[string]any {
+		return map[string]any{
+			"Message ID": uint64(1), "Packet Name": "CREATE", "Session ID": uint64(0x11),
+			"Tree ID": uint32(1), "Response": false, "File Name": path,
+		}
+	}
+
+	path := strings.Repeat("p", 100)
+	limited, limitedFlow, limitedParser := newState(500)
+	err := limited.associate(request(path), 8)
+	require.Error(t, err)
+	require.Empty(t, limited.pending, "over-budget paths must not be retained")
+	require.Zero(t, limitedFlow.sessionBytes)
+	require.Zero(t, limitedParser.buffered.Load())
+
+	accepted, acceptedFlow, _ := newState(600)
+	require.NoError(t, accepted.associate(request(path), 8))
+	require.Equal(t, path, accepted.pending[smb2PendingKey{sessionID: 0x11, treeID: 1, messageID: 1}].path)
+	require.Equal(t, int64(448+len(path)), acceptedFlow.sessionBytes, "path bytes are added to the retained-state reservation")
 }
 
 func TestProtocolSessionSMB2Fragmentation(t *testing.T) {

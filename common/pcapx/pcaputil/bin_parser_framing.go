@@ -92,6 +92,7 @@ var builtinBinSpecs = [][2]string{
 	{"onc_rpc", "ONCRPC"},
 	{"onc_rpc_tcp", "ONCRPCTCP"},
 	{"application-layer.snmpv3", "SNMPv3"},
+	{"application-layer.snmp", "SNMP"},
 	{"application-layer.msrdp", "RDP"},
 	{"application-layer.msrdp", "TPKT"},
 	{"application-layer.memcached_fields", "MemcachedStatsRequestFields"},
@@ -124,6 +125,7 @@ var builtinBinSpecs = [][2]string{
 	{"rtp", "RTP"},
 	{"rtp", "RTCP"},
 	{"application-layer.quic", "QUIC"},
+	{"syslog", "Syslog"},
 }
 
 func (f *binFlow) spec(family, entry string) *binSpec {
@@ -203,6 +205,10 @@ func (f *binFlow) detect(w []byte) {
 	}
 	if f.port(53) && len(w) >= 14 && binary.BigEndian.Uint16(w[:2]) >= 12 && dnsHeader(w[2:]) {
 		f.protocol = "dns"
+		return
+	}
+	if (f.captureTCP || f.syslogStreamProbe) && probeSyslogStreamStart(w) {
+		f.protocol, f.syslog = "syslog", &binSyslog{}
 		return
 	}
 }
@@ -316,6 +322,8 @@ func (f *binFlow) frame(w []byte) (int, *binSpec, error) {
 			return 0, nil, fmt.Errorf("DNS TCP record is shorter than header")
 		}
 		return n, f.spec("dns", "DNS"), nil
+	case "syslog":
+		return f.frameSyslog(w)
 	}
 	return 0, nil, fmt.Errorf("no stream framer for %s", f.protocol)
 }

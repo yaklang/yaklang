@@ -193,16 +193,19 @@ func TestMQTTPublishSubscribePing(t *testing.T) {
 }
 
 func TestDCERPCBindAckFaultAndSMB1AndX(t *testing.T) {
-	ackBody := make([]byte, 10)
+	ackBody := make([]byte, 12+4+24)
 	binary.LittleEndian.PutUint16(ackBody[0:], 5840)
 	binary.LittleEndian.PutUint16(ackBody[2:], 5840)
 	binary.LittleEndian.PutUint16(ackBody[8:], 0)
+	ackBody[12] = 1
+	copy(ackBody[20:36], []byte{0x04, 0x5d, 0x88, 0x8a, 0xeb, 0x1c, 0xc9, 0x11, 0x9f, 0xe8, 0x08, 0x00, 0x2b, 0x10, 0x48, 0x60})
+	binary.LittleEndian.PutUint32(ackBody[36:], 2)
 	raw := append(dcerpcHeader(12, uint16(16+len(ackBody)), 1), ackBody...)
 	n := parseRule(t, raw, "application-layer.dcerpc", "DCERPC")
 	require.Equal(t, uint64(12), uintVal(t, n.Child("PType")))
 	require.Equal(t, uint64(5840), uintVal(t, mustChild(t, n, "PDU", "BindAck", "Max Xmit Frag")))
 
-	nak := append(dcerpcHeader(13, 18, 1), 0, 0)
+	nak := append(dcerpcHeader(13, 19, 1), 0, 0, 0)
 	require.Equal(t, uint64(13), uintVal(t, parseRule(t, nak, "application-layer.dcerpc", "DCERPC").Child("PType")))
 
 	faultBody := make([]byte, 12)
@@ -570,4 +573,3 @@ func TestMSRPCInterfaceUUIDsAndPsExecOpnums(t *testing.T) {
 	parseMustFail(t, dcerpcHeader(0, 10, 1), "application-layer.dcerpc", "DCERPC")
 	parseMustFail(t, []byte{5, 0, 0}, "application-layer.dcerpc", "DCERPC")
 }
-

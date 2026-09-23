@@ -17,21 +17,22 @@ func TestRound5OriginalCaptureReplay(t *testing.T) {
 		path      string
 		protocols []string
 		success   map[string]int
+		contexts  map[string]int
 		errors    map[string]int
 		gap       bool
 	}{
-		{corpus + "ndpi/ndpi-stun.pcap", []string{"stun", "turn"}, map[string]int{"stun": 56, "turn": 104}, map[string]int{"stun/malformed": 1}, false},
-		{upstream + "stun_signal_tcp.pcapng", []string{"stun", "turn"}, map[string]int{"turn": 291}, nil, false},
-		{upstream + "stun_tcp_multiple_msgs_same_pkt.pcap", []string{"stun", "turn"}, map[string]int{"turn": 6}, nil, false},
-		{corpus + "ndpi/ndpi-tftp.pcap", []string{"tftp"}, map[string]int{"tftp": 107}, nil, false},
-		{corpus + "ndpi/ndpi-rtsp-http.pcapng", []string{"rtsp"}, map[string]int{"rtsp": 1}, nil, false},
-		{upstream + "rtsp.pcap", []string{"rtsp"}, map[string]int{"rtsp": 65}, nil, false},
-		{corpus + "ndpi/ndpi-ipp.pcap", []string{"ipp"}, map[string]int{"ipp": 8}, nil, false},
-		{corpus + "ndpi/ndpi-diameter.pcap", []string{"diameter"}, map[string]int{"diameter": 6}, nil, false},
-		{corpus + "ndpi/ndpi-s7comm.pcap", []string{"s7comm"}, map[string]int{"s7comm": 170}, nil, false},
-		{corpus + "ndpi/ndpi-iec104.pcap", []string{"iec104"}, map[string]int{"iec104": 8}, nil, false},
-		{corpus + "ndpi/ndpi-opcua.pcap", []string{"opcua"}, map[string]int{"opcua": 187}, nil, false},
-		{upstream + "vnc-sample.pcap", []string{"vnc"}, map[string]int{"vnc": 70}, map[string]int{"vnc/incomplete": 1}, true},
+		{path: corpus + "ndpi/ndpi-stun.pcap", protocols: []string{"stun", "turn"}, success: map[string]int{"stun": 56, "turn": 103}, contexts: map[string]int{"turn": 1}, errors: map[string]int{"stun/malformed": 1}},
+		{path: upstream + "stun_signal_tcp.pcapng", protocols: []string{"stun", "turn"}, success: map[string]int{"turn": 291}},
+		{path: upstream + "stun_tcp_multiple_msgs_same_pkt.pcap", protocols: []string{"stun", "turn"}, success: map[string]int{"turn": 6}},
+		{path: corpus + "ndpi/ndpi-tftp.pcap", protocols: []string{"tftp"}, success: map[string]int{"tftp": 107}},
+		{path: corpus + "ndpi/ndpi-rtsp-http.pcapng", protocols: []string{"rtsp"}, success: map[string]int{"rtsp": 1}},
+		{path: upstream + "rtsp.pcap", protocols: []string{"rtsp"}, success: map[string]int{"rtsp": 65}},
+		{path: corpus + "ndpi/ndpi-ipp.pcap", protocols: []string{"ipp"}, success: map[string]int{"ipp": 8}},
+		{path: corpus + "ndpi/ndpi-diameter.pcap", protocols: []string{"diameter"}, success: map[string]int{"diameter": 6}},
+		{path: corpus + "ndpi/ndpi-s7comm.pcap", protocols: []string{"s7comm"}, success: map[string]int{"s7comm": 170}},
+		{path: corpus + "ndpi/ndpi-iec104.pcap", protocols: []string{"iec104"}, success: map[string]int{"iec104": 8}},
+		{path: corpus + "ndpi/ndpi-opcua.pcap", protocols: []string{"opcua"}, success: map[string]int{"opcua": 187}},
+		{path: upstream + "vnc-sample.pcap", protocols: []string{"vnc"}, success: map[string]int{"vnc": 70}, errors: map[string]int{"vnc/incomplete": 1}, gap: true},
 	} {
 		for _, workers := range []int{1, 2} {
 			for _, deferred := range []bool{false, true} {
@@ -44,7 +45,7 @@ func TestRound5OriginalCaptureReplay(t *testing.T) {
 					} else {
 						require.NoError(t, err)
 					}
-					counts, warnings := map[string]int{}, map[string]int{}
+					counts, contexts, warnings := map[string]int{}, map[string]int{}, map[string]int{}
 					foundField := false
 					for _, e := range events {
 						selected := false
@@ -54,6 +55,11 @@ func TestRound5OriginalCaptureReplay(t *testing.T) {
 							}
 						}
 						if !selected {
+							continue
+						}
+						if e.Status == "context-required" {
+							contexts[e.Protocol]++
+							require.Contains(t, e.Error, string(ErrContextRequired))
 							continue
 						}
 						if e.Error != "" || e.Status != "decoded" && e.Status != "deferred" {
@@ -116,6 +122,11 @@ func TestRound5OriginalCaptureReplay(t *testing.T) {
 						}
 					}
 					require.Equal(t, tc.success, counts)
+					expectedContexts := tc.contexts
+					if expectedContexts == nil {
+						expectedContexts = map[string]int{}
+					}
+					require.Equal(t, expectedContexts, contexts)
 					expected := tc.errors
 					if expected == nil {
 						expected = map[string]int{}

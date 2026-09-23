@@ -97,11 +97,11 @@ func m1SessionSamples(t testing.TB) []m1Sample {
 		}},
 		{"dcerpc-epm-srvsvc", "dcerpc", 13500, []sessionStep{
 			{0, dcerpcBind(dcerpcEPM, 0, 1)},
-			{1, dcerpcBindAck(1)},
+			{1, dcerpcM1LegacyBindAck(1)},
 			{0, dcerpcRequest(2, 0, 3, []byte{1, 2, 3, 4})},
 			{1, dcerpcResponse(2, 0, []byte{9, 9})},
 			{0, dcerpcBind(dcerpcSRVSVC, 1, 3)},
-			{1, dcerpcBindAck(3)},
+			{1, dcerpcM1LegacyBindAck(3)},
 			{0, dcerpcRequest(4, 1, 15, []byte{0, 0, 0, 0})},
 			{1, dcerpcResponse(4, 1, nil)},
 		}},
@@ -330,7 +330,7 @@ func TestProtocolSessionM1PCAP(t *testing.T) {
 		source := "constructed Ethernet+IPv4+TCP from protocol_session_samples_test.go"
 		golden := sessionTestPCAP(t, sample.steps, sample.port, 0, false, false)
 		switch sample.protocol {
-		case "radius", "dhcp", "ntp", "coap":
+		case "radius", "dhcp", "ntp", "coap", "rtp":
 			golden = sessionDatagramPCAP(t, sample.steps, layers.UDPPort(sample.port))
 			source = "constructed Ethernet+IPv4+UDP from protocol_session_samples_test.go"
 		}
@@ -343,7 +343,13 @@ func TestProtocolSessionM1PCAP(t *testing.T) {
 		stored, err := os.ReadFile(path)
 		require.NoError(t, err, sample.name)
 		require.Equal(t, hex.EncodeToString(golden), hex.EncodeToString(stored), sample.name)
-		events, stats, err := binReplay(t, stored, 1)
+		var events []*ProtocolEvent
+		var stats BinParserStats
+		if sample.protocol == "rtp" {
+			events, stats, err = binReplay(t, stored, 1, WithProtocolDecodeAs("udp", uint16(sample.port), "rtp"))
+		} else {
+			events, stats, err = binReplay(t, stored, 1)
+		}
 		require.NoError(t, err, sample.name)
 		if sample.name == "websocket-upgrade-text" {
 			// Preserve this original historical PCAP: its key is only 10 bytes and
@@ -380,6 +386,10 @@ func TestProtocolSessionM1PCAP(t *testing.T) {
 			require.Len(t, events, len(sample.steps), sample.name)
 			session.Close("fixture-end")
 			require.Zero(t, session.Stats().BufferedBytes)
+		} else if !negativeWS && sample.protocol == "dcerpc" {
+			// The original M1 BindAck contains only fixed fields and omits the
+			// required result list. Preserve its bytes as a negative legacy sample.
+			require.Equal(t, uint64(1), stats.Malformed, sample.name)
 		} else if !negativeWS {
 			require.Zero(t, stats.Malformed, sample.name)
 		}
@@ -396,13 +406,19 @@ func TestProtocolSessionM1PCAP(t *testing.T) {
 		switch sample.protocol {
 		case "radius", "dhcp", "ntp", "coap":
 			transport = "udp"
-		case "quic", "http3", "doq", "goose", "rtp":
+		case "quic", "http3", "doq", "goose":
 			native = false
+		}
+		if sample.protocol == "rtp" {
+			transport, native = "udp", false
 		}
 		plaintextSource := ""
 		completeness := "algorithm-smoke; not native wire completeness"
 		if negativeWS {
 			completeness = "negative handshake: invalid key and absent accept; no upgrade"
+		}
+		if sample.protocol == "dcerpc" {
+			completeness = "algorithm-smoke; contains intentionally truncated BindAck negative"
 		}
 		if plaintext {
 			plaintextSource = "synthetic unprotected packet/frame fixture; not authenticated wire"

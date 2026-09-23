@@ -1,0 +1,12 @@
+frame.number	_ws.col.protocol	ldap.messageID	ldap.protocolOp	ldap.resultCode	ldap.baseObject	tls.handshake.type
+6	LDAP	1	0			
+8	LDAP	1	1	0		
+10	LDAP	2	3		dc=nodomain	
+11	LDAP	2	4			
+12	LDAP	2	4			
+13	LDAP	2	5	0		
+15	LDAP	3	2			
+24	LDAP	1	23			
+26	LDAP	1	24	0		
+28	TLSv1					1
+29	TLSv1.3					2

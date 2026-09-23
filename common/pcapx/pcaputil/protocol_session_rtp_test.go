@@ -46,6 +46,12 @@ func rtcpRR(reporter, source uint32, frac byte, lost uint32) []byte {
 	return b
 }
 
+func rtcpRRWithExtendedHighest(reporter, source uint32, frac byte, lost, extendedHighest uint32) []byte {
+	b := rtcpRR(reporter, source, frac, lost)
+	binary.BigEndian.PutUint32(b[16:20], extendedHighest)
+	return b
+}
+
 func TestProtocolSessionRTPSequenceJitterAndRTCP(t *testing.T) {
 	s, err := NewProtocolSession(DefaultParserBudget())
 	require.NoError(t, err)
@@ -98,6 +104,44 @@ func TestProtocolSessionRTPSequenceJitterAndRTCP(t *testing.T) {
 	require.Equal(t, true, blocks[0]["Associated RTP"])
 	require.Equal(t, true, blocks[0]["Reported Network Loss"])
 	require.Equal(t, false, r.Events[0].Session["Network Loss"])
+
+	negative := s.Feed(1, time.Unix(1, 160_000_000), rtcpRR(0xabcdef01, ssrc, 0, 0xffffff))
+	require.Nil(t, negative.Err, "%v", negative.Err)
+	negativeBlocks, _ := negative.Events[0].Session["Report Blocks"].([]map[string]any)
+	require.Len(t, negativeBlocks, 1)
+	require.Equal(t, int32(-1), negativeBlocks[0]["Cumulative Packets Lost"], "RFC 3550 cumulative loss is signed 24-bit")
+	require.Equal(t, false, negativeBlocks[0]["Reported Network Loss"], "negative cumulative loss is not positive network loss")
+}
+
+func TestProtocolSessionRTPSourceBudgetIncludesFixedRecentWindow(t *testing.T) {
+	const requiredBytes = 512 + 96 + 128*4
+	reserved := int64(0)
+	rtp := &binRTP{
+		sources:          map[uint32]*rtpSource{},
+		maxBufferedBytes: requiredBytes - 1,
+		reserveSessionMemory: func(target int64) error {
+			reserved = target
+			return nil
+		},
+	}
+	_, err := rtp.consumeRTP(rtpPkt(0, 1, 0, 0x12345678), time.Unix(1, 0), 8)
+	require.Error(t, err)
+	var pe *ProtocolError
+	require.ErrorAs(t, err, &pe)
+	require.Equal(t, ErrResourceExceeded, pe.Kind)
+	require.Empty(t, rtp.sources, "source and recent-history storage are reserved before allocation")
+	require.Zero(t, reserved, "a rejected reservation does not reach the shared allocator")
+
+	rtp.maxBufferedBytes = requiredBytes
+	for seq := uint16(1); seq <= 140; seq++ {
+		_, err = rtp.consumeRTP(rtpPkt(0, seq, uint32(seq)*160, 0x12345678), time.Unix(1, int64(seq)*20_000_000), 8)
+		require.NoError(t, err)
+	}
+	source := rtp.sources[0x12345678]
+	require.NotNil(t, source)
+	require.Len(t, source.recent, 128)
+	require.Equal(t, 128, cap(source.recent), "the rolling duplicate window must not grow beyond its reserved size")
+	require.EqualValues(t, requiredBytes, reserved)
 }
 
 func TestProtocolSessionRTPWrapMultipleSSRCAndSDPMap(t *testing.T) {
@@ -121,6 +165,39 @@ func TestProtocolSessionRTPWrapMultipleSSRCAndSDPMap(t *testing.T) {
 	require.Nil(t, r.Err, "%v", r.Err)
 	require.Equal(t, "opus", r.Events[0].Session["Payload Type Name"])
 	require.Equal(t, "dynamic-97", rtpPayloadName(97, nil))
+}
+
+func TestProtocolSessionRTCPReportLossBoundariesAndSequenceCycles(t *testing.T) {
+	s, err := NewProtocolSession(DefaultParserBudget())
+	require.NoError(t, err)
+	ssrc := uint32(0x12345678)
+	ts := time.Unix(6, 0)
+
+	first := s.Feed(0, ts, rtpPkt(0, 65535, 0, ssrc))
+	require.Nil(t, first.Err, "%v", first.Err)
+	wrapped := s.Feed(0, ts.Add(20*time.Millisecond), rtpPkt(0, 0, 160, ssrc))
+	require.Nil(t, wrapped.Err, "%v", wrapped.Err)
+	require.Equal(t, uint16(0), wrapped.Events[0].Session["Sequence"])
+	require.Nil(t, wrapped.Events[0].Session["Gap"], "the sequence number immediately after 65535 is contiguous")
+
+	positive := s.Feed(1, ts.Add(40*time.Millisecond), rtcpRRWithExtendedHighest(0xabcdef01, ssrc, 0, 0x7fffff, 0x00010000))
+	require.Nil(t, positive.Err, "%v", positive.Err)
+	positiveBlocks, ok := positive.Events[0].Session["Report Blocks"].([]map[string]any)
+	require.True(t, ok)
+	require.Len(t, positiveBlocks, 1)
+	require.Equal(t, int32(0x7fffff), positiveBlocks[0]["Cumulative Packets Lost"], "RFC 3550 cumulative loss is signed 24-bit")
+	require.Equal(t, true, positiveBlocks[0]["Reported Network Loss"])
+	require.Equal(t, uint32(0x00010000), positiveBlocks[0]["Extended Highest Sequence"], "one sequence cycle plus low sequence zero is 65536")
+	require.Equal(t, true, positiveBlocks[0]["Associated RTP"])
+
+	negative := s.Feed(1, ts.Add(60*time.Millisecond), rtcpRRWithExtendedHighest(0xabcdef01, ssrc, 0, 0x800000, 0x00010000))
+	require.Nil(t, negative.Err, "%v", negative.Err)
+	negativeBlocks, ok := negative.Events[0].Session["Report Blocks"].([]map[string]any)
+	require.True(t, ok)
+	require.Len(t, negativeBlocks, 1)
+	require.Equal(t, int32(-0x800000), negativeBlocks[0]["Cumulative Packets Lost"], "the 24-bit sign boundary must extend to -8388608")
+	require.Equal(t, false, negativeBlocks[0]["Reported Network Loss"], "negative cumulative loss is not positive network loss")
+	require.Equal(t, uint32(0x00010000), negativeBlocks[0]["Extended Highest Sequence"])
 }
 
 func TestProtocolSessionRTPFailClosedAndProbe(t *testing.T) {

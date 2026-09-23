@@ -32,7 +32,7 @@ Authentication bytes are dummy fixture data; no real credentials are present.
 | `dot-dns-tcp-length.pcap` | RFC 7858 DoT on TLS plaintext: 2-byte DNS length, Query/Response ID pairing on non-853 port 1853 |
 | `doh-http-get-post.pcap` | RFC 8484 DoH HTTP/1.1 POST and GET application/dns-message with DNS ID pairing on non-443 port 18443 |
 | `sip-invite-ack-bye.pcap` | RFC 3261 INVITE/100/200/ACK/BYE on non-5060 TCP 15060 with SDP audio |
-| `rtp-seq-sr-rr.pcap` | RFC 3550 RTP PCMU sequence plus RTCP SR/RR on non-5004 TCP 15004 |
+| `rtp-seq-sr-rr.pcap` | Synthetic RFC 3550 RTP PCMU sequence plus RTCP SR/RR on non-5004 UDP 15004; explicit DecodeAs smoke, not a live capture |
 | `quic-v1-crypto-stream.pcap` | RFC 9000 QUIC v1 Initial CRYPTO, Handshake CRYPTO, 0-RTT STREAM and CONNECTION_CLOSE on non-443 TCP 14443 |
 | `quic-v1-rfc9001-initial.pcap` | RFC 9001 A.2/A.3 Client/Server Initial with header protection removed and CRYPTO decrypted on non-443 TCP 14443 |
 | `http3-settings-headers-data.pcap` | RFC 9114 HTTP/3 control SETTINGS, request HEADERS+DATA and response HEADERS on QUIC streams, non-443 TCP 14443 |

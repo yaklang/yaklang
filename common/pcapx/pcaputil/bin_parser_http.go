@@ -89,7 +89,7 @@ func (f *binFlow) frameDirection(dir int, w []byte) (int, *binSpec, error) {
 		case "dot":
 			return f.frameDoT(w)
 		case "sip":
-			return f.frameSIP(w)
+			return f.frameSIP(dir, w)
 		case "rtp":
 			return f.frameRTP(w)
 		case "quic":
@@ -120,6 +120,8 @@ func (f *binFlow) frameDirection(dir int, w []byte) (int, *binSpec, error) {
 			return f.frameC37118(w)
 		case "goose":
 			return f.frameGOOSE(w)
+		case "syslog":
+			return f.frameSyslog(w)
 		}
 	}
 	if f.protocol != "http" || f.binding != nil {

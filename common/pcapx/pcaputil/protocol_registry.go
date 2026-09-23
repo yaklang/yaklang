@@ -14,7 +14,11 @@ func NativeProtocolProfiles() []ProtocolProfile {
 		{"mysql", "tcp", "classic packets", "observed greeting/capabilities; prepared metadata and binary rows"},
 		{"postgresql", "tcp", "protocol 3.0 messages", "observed direction, statement/portal cycles and COPY state"},
 
-		{"dns", "udp", "datagram", "question and endpoint transaction"}, {"mdns", "udp", "datagram", "multicast observation"}, {"llmnr", "udp", "datagram", "domain/requester/question; bounded multicast responders"}, {"dhcp", "udp", "datagram", "domain/client/xid observation"}, {"dhcpv6", "udp", "datagram", "domain/relay/client/xid observation"},
+		{"sip", "tcp/udp", "SIP message and observed transaction", "Via branch/CSeq plus Call-ID/tags; dialog remains observed, not authenticated"},
+		{"rtp", "udp", "one RTP datagram or bounded RTCP compound", "captured SIP/SDP endpoint and payload mapping, matched RTSP SETUP UDP port pair, or explicit DecodeAs; SRTP payload opaque"},
+		{"stun/turn", "udp/tcp", "STUN message or TURN ChannelData", "cookie/type or observed channel binding; ChannelData without prior binding is context-required"},
+		{"snmp", "udp", "SNMPv1/v2c/v3 datagram", "BER/version evidence and observed request IDs; v3 encrypted scoped PDU opaque"},
+		{"dns", "udp", "datagram", "question and endpoint transaction"}, {"mdns", "udp", "datagram", "multicast observation"}, {"llmnr", "udp", "datagram", "domain/requester/question; bounded multicast responders"}, {"dhcp", "udp", "datagram", "domain/client/xid observation"}, {"dhcpv6", "udp", "datagram", "domain/relay/client/xid observation"}, {"syslog", "udp/tcp", "RFC 5424 v1, bounded RFC 3164; UDP datagram or RFC 6587", "PRI signature/port hint or explicit DecodeAs; hostname is unverified message content"},
 		{"arp", "l2", "ethernet", "unverified neighbor"}, {"icmp", "network", "IP", "quoted packet observation"}, {"icmpv6", "network", "IPv6", "unverified neighbor"},
 		{"http", "tcp", "ordered bytes", "observed request method"}, {"websocket", "tcp", "ordered bytes", "validated HTTP upgrade"}, {"tls", "tcp", "records", "ClientRandom/direction/epoch; TLS 1.3 non-PSK HelloRetryRequest"}, {"http2", "tcp", "frames", "preface and HPACK state"}, {"grpc", "tcp", "HTTP2 DATA", "content-type and stream"},
 	}
@@ -29,7 +33,7 @@ func WithProtocolDecodeAs(transport string, port uint16, protocol string) Captur
 			return fmt.Errorf("DecodeAs requires UDP and a nonzero port")
 		}
 		switch protocol {
-		case "dns", "mdns", "llmnr", "dhcp", "dhcpv6":
+		case "dns", "mdns", "llmnr", "dhcp", "dhcpv6", "syslog", "snmp", "rtp", "sip", "stun", "turn":
 		default:
 			return fmt.Errorf("unsupported native DecodeAs profile")
 		}
@@ -56,7 +60,11 @@ var nativeDatagrams = []nativeDatagramProfile{
 	{"llmnr", []uint16{5355}, dnsHeader, DecodeDNSMessage},
 	{"dns", []uint16{53}, dnsHeader, DecodeDNSMessage},
 	{"dhcpv6", []uint16{546, 547}, func(w []byte) bool { return len(w) >= 4 && w[0] >= 1 && w[0] <= 13 }, func(w []byte, n int) (map[string]any, error) { return decodeDHCPv6(w, 0, n) }},
+	{"snmp", []uint16{161, 162}, func(w []byte) bool { return probeSNMP(w, len(w)).Verdict == ProbeAccept }, func(w []byte, n int) (map[string]any, error) { return (&binSNMP{}).consume(w, n, 0) }},
 	{"dhcp", nil, func(w []byte) bool { return len(w) >= 240 && probeDHCP(w, len(w)).Verdict == ProbeAccept }, decodeDHCP4},
+	{"syslog", []uint16{514}, syslogValidDatagramStart, func(w []byte, n int) (map[string]any, error) {
+		return (&binSyslog{}).consume(w, syslogDatagram, DefaultParserBudget().MaxMessageBytes, n)
+	}},
 }
 
 func (a *binParser) decodeNativeDatagram(e *ProtocolEvent, w []byte, src, dst uint16) bool {
@@ -64,13 +72,63 @@ func (a *binParser) decodeNativeDatagram(e *ProtocolEvent, w []byte, src, dst ui
 	if explicit == "" {
 		explicit = a.datagramDecodeAs[src]
 	}
+	if explicit == "rtp" {
+		match := sipMediaMatch{}
+		rtcp, pt, err := inspectRTPDatagram(w, a.config.MaxMessageBytes, a.budget.MaxCollectionElements)
+		if err == nil {
+			match = a.matchSDPMedia(e.Domain, e.Source, e.Destination, pt, rtcp, e.Timestamp)
+		}
+		return a.decodeRTPDatagram(e, w, true, rtcp, match)
+	}
+	if explicit == "stun" || explicit == "turn" {
+		if a.decodeSTUNDatagram(e, w, explicit == "turn") {
+			e.Admission = "explicit-decode-as"
+			return true
+		}
+		return false
+	}
+	if explicit == "sip" || explicit == "" && probeSIP(w, len(w)).Verdict == ProbeAccept {
+		return a.decodeSIPDatagram(e, w, explicit == "sip")
+	}
+	if explicit == "" {
+		// RTSP's matched SETUP response carries an exact bidirectional UDP
+		// port pair. Consult it before weak RTP/RTCP payload heuristics so that
+		// ambiguous mappings never get guessed into a media session.
+		if media := a.matchRTSPMedia(e.Domain, e.Source, e.Destination, e.Timestamp); media.association != nil || media.ambiguous {
+			return a.decodeRTSPMediaDatagram(e, w, media)
+		}
+	}
+	if rtpIsRTCP(w) {
+		// An RTP marker plus payload type 72-76 has the same second octet as
+		// RTCP types 200-204. Prefer a valid RTCP packet only when captured SDP
+		// signals this endpoint as RTCP; otherwise try a valid RTP packet on
+		// the separately signaled RTP endpoint, even when RTCP length parsing
+		// fails because those bytes are actually an RTP sequence number.
+		if _, _, err := inspectRTPDatagramAs(w, a.config.MaxMessageBytes, a.budget.MaxCollectionElements, true); err == nil {
+			match := a.matchSDPMedia(e.Domain, e.Source, e.Destination, 0, true, e.Timestamp)
+			if match.status == "matched" || match.status == "observed-offer" || match.status == "ambiguous-sdp-match" {
+				return a.decodeRTPDatagram(e, w, false, true, match)
+			}
+		}
+		if _, pt, err := inspectRTPDatagramAs(w, a.config.MaxMessageBytes, a.budget.MaxCollectionElements, false); err == nil {
+			match := a.matchSDPMedia(e.Domain, e.Source, e.Destination, pt, false, e.Timestamp)
+			if match.status == "matched" || match.status == "observed-offer" || match.status == "ambiguous-sdp-match" {
+				return a.decodeRTPDatagram(e, w, false, false, match)
+			}
+		}
+	} else if _, pt, err := inspectRTPDatagram(w, a.config.MaxMessageBytes, a.budget.MaxCollectionElements); err == nil {
+		match := a.matchSDPMedia(e.Domain, e.Source, e.Destination, pt, false, e.Timestamp)
+		if match.status == "matched" || match.status == "observed-offer" || match.status == "ambiguous-sdp-match" {
+			return a.decodeRTPDatagram(e, w, false, false, match)
+		}
+	}
 	for _, p := range nativeDatagrams {
 		hint := len(p.ports) == 0
 		for _, port := range p.ports {
 			hint = hint || src == port || dst == port
 		}
 		if explicit != "" {
-			if explicit != p.name {
+			if explicit != p.name || !p.validate(w) {
 				continue
 			}
 		} else if !hint || !p.validate(w) {
@@ -86,7 +144,32 @@ func (a *binParser) decodeNativeDatagram(e *ProtocolEvent, w []byte, src, dst ui
 			e.Admission = "explicit-decode-as"
 		}
 		e.Raw = append([]byte(nil), w...)
-		fields, err := p.decode(w, a.budget.MaxCollectionElements)
+		if p.name == "syslog" {
+			e.syslogFraming, e.syslogBudget = syslogDatagram, a.budget.MaxCollectionElements
+			e.syslogMaxBytes = a.config.MaxMessageBytes
+			e.Completeness = "message"
+			e.Profile = syslogProfileForWire(w, syslogDatagram)
+		}
+		if p.name == "snmp" {
+			return a.decodeSNMPDatagram(e, w, explicit)
+		}
+		if p.name == "syslog" && a.config.Deferred && len(w) <= a.config.MaxMessageBytes {
+			if spec := a.specs["syslog/Syslog"]; spec != nil {
+				e.Rule, e.Entry, e.plan = spec.rule, spec.entry, spec.plan
+			}
+			e.Status, e.Summary = "deferred", "syslog"
+			a.messages.Add(1)
+			a.messageBytes.Add(uint64(len(w)))
+			a.deferred.Add(1)
+			return true
+		}
+		var fields map[string]any
+		var err error
+		if p.name == "syslog" {
+			fields, err = (&binSyslog{}).consume(w, syslogDatagram, a.config.MaxMessageBytes, a.budget.MaxCollectionElements)
+		} else {
+			fields, err = p.decode(w, a.budget.MaxCollectionElements)
+		}
 		e.Session = fields
 		e.Completeness = "message"
 		if err == nil {
