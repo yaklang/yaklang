@@ -35,34 +35,4 @@ func TestScanxFromPingUtilsCancelBeforeFirstResult(t *testing.T) {
 	}
 }
 
-func TestChooseScanxRouteSamplePrefersNonLoopback(t *testing.T) {
-	tests := []struct {
-		name    string
-		targets string
-		want    string
-	}{
-		{
-			name:    "public first",
-			targets: "175.178.223.47,127.0.0.1",
-			want:    "175.178.223.47",
-		},
-		{
-			name:    "loopback first",
-			targets: "127.0.0.1,175.178.223.47",
-			want:    "175.178.223.47",
-		},
-		{
-			name:    "only loopback",
-			targets: "127.0.0.1",
-			want:    "127.0.0.1",
-		},
-	}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if got := chooseScanxRouteSample(tt.targets); got != tt.want {
-				t.Fatalf("chooseScanxRouteSample(%q) = %q, want %q", tt.targets, got, tt.want)
-			}
-		})
-	}
-}

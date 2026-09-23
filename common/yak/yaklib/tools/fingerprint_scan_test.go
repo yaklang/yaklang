@@ -12,7 +12,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/yaklang/yaklang/common/fp"
 	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/synscan"
+	"github.com/yaklang/yaklang/common/synscanx"
 	"github.com/yaklang/yaklang/common/utils"
 )
 
@@ -71,20 +71,8 @@ func Test_scanFingerprint1(t *testing.T) {
 		}
 	}
 
-	Scan := func(target string, port string, opts ...scanOpt) (chan *synscan.SynScanResult, error) {
-		config := &_yakPortScanConfig{
-			waiting:           1 * time.Second, // 将等待时间从5秒减少到1秒
-			rateLimitDelayMs:  1,
-			rateLimitDelayGap: 5,
-		}
-		for _, opt := range opts {
-			opt(config)
-		}
-		return _synScanDo(hostsToChan(target), port, config)
-	}
-
 	synScan := func(addr string) {
-		res, err := Scan(target, synPorts, _scanOptExcludePorts(tcpPorts))
+		res, err := _scanx(target, synPorts, synscanx.WithExcludePorts(tcpPorts), synscanx.WithWaiting(1))
 		if err != nil {
 			return
 		}

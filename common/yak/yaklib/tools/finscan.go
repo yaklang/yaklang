@@ -60,6 +60,75 @@ type finScanOpt func(config *_yakFinPortScanConfig)
 //	}
 //
 // ```
+func hostsToChan(hosts string) chan string {
+	c := make(chan string)
+	go func() {
+		defer close(c)
+		for _, h := range utils.ParseStringToHosts(hosts) {
+			c <- h
+		}
+	}()
+	return c
+}
+
+// filterTargetChannel keeps the first routable sample and drops excluded hosts.
+// FIN scan still uses this; the old SYN scanner that shared it has been removed.
+func filterTargetChannel(targetChan chan string, filterFunc func(string, int) bool) (chan string, string) {
+	var hasLoopback bool
+	var hasSampleTarget bool
+	sampleTargetChan := make(chan string, 1)
+	newTargetChan := make(chan string, 2)
+
+	firstResult := <-targetChan
+	if utils.IsLoopback(firstResult) {
+		newTargetChan <- "127.0.0.1"
+		hasLoopback = true
+	} else {
+		sampleTargetChan <- firstResult
+		hasSampleTarget = true
+		newTargetChan <- firstResult
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	go func() {
+		defer func() {
+			close(newTargetChan)
+			cancel()
+		}()
+		for {
+			select {
+			case result, ok := <-targetChan:
+				if !ok {
+					return
+				}
+				if filterFunc != nil && filterFunc(result, 0) {
+					continue
+				}
+				if !utils.IsLoopback(result) {
+					if !hasSampleTarget {
+						sampleTargetChan <- result
+						hasSampleTarget = true
+					}
+					newTargetChan <- result
+				} else if !hasLoopback {
+					newTargetChan <- "127.0.0.1"
+					hasLoopback = true
+				}
+			case <-ctx.Done():
+				return
+			}
+		}
+	}()
+
+	select {
+	case sampleTarget := <-sampleTargetChan:
+		close(sampleTargetChan)
+		return newTargetChan, sampleTarget
+	case <-ctx.Done():
+	}
+	return newTargetChan, firstResult
+}
+
 func FinScan(target string, port string, opts ...finScanOpt) (chan *finscan.FinScanResult, error) {
 	config := &_yakFinPortScanConfig{
 		waiting:           10 * time.Second,
