@@ -152,8 +152,12 @@ func TestShippedWireContracts(t *testing.T) {
 	var readInv, writeInv int
 	var sawRead, sawWrite, sawReadAck, sawWriteAck bool
 	for _, fr := range bacFrames {
-		if fr.IPProto != 17 || len(fr.L4) < 8 || fr.L4[0] != 0x81 {
+		if fr.IPProto != 17 || len(fr.L4) < 4 || fr.L4[0] != 0x81 {
 			continue
+		}
+		bvlcLen := int(binary.BigEndian.Uint16(fr.L4[2:4]))
+		if bvlcLen != len(fr.L4) || bvlcLen < 6 || fr.L4[4] != 0x01 {
+			t.Fatalf("BACnet BVLC length %d payload %d", bvlcLen, len(fr.L4))
 		}
 		apdu := fr.L4[6:]
 		if len(apdu) >= 11 && apdu[0] == 0x00 {
@@ -166,6 +170,11 @@ func TestShippedWireContracts(t *testing.T) {
 				sawRead = true
 			case 0x0F:
 				writeInv = int(apdu[2])
+				tail := apdu[11:]
+				want := []byte{0x3E, 0x44, 0x41, 0xB0, 0x00, 0x00, 0x3F}
+				if len(tail) < len(want) || !bytes.Equal(tail[:len(want)], want) {
+					t.Fatalf("WriteProperty present-value is %x, want real 22", tail)
+				}
 				sawWrite = true
 			default:
 				t.Fatalf("BACnet service %d", apdu[3])
@@ -174,6 +183,9 @@ func TestShippedWireContracts(t *testing.T) {
 		if len(apdu) >= 3 && apdu[0] == 0x30 {
 			if int(apdu[1]) != readInv || int(apdu[2]) != 12 {
 				t.Fatalf("ReadProperty ACK invoke/service = %d/%d, request invoke %d", apdu[1], apdu[2], readInv)
+			}
+			if !bytes.Contains(apdu, []byte{0x3E, 0x44, 0x41, 0xAC, 0x00, 0x00, 0x3F}) {
+				t.Fatalf("ReadProperty ACK missing real 21.5: %x", apdu)
 			}
 			sawReadAck = true
 		}
