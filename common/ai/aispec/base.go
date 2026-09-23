@@ -799,7 +799,6 @@ func chatBaseChatCompletions(url string, model string, msg string, ctx *ChatBase
 	} else if !hasImages && !hasVideos {
 		msgs = append(msgs, NewUserChatDetail(msg))
 	} else {
-		var contents []*ChatContent
 		if msg == "" {
 			if hasVideos {
 				// 视频默认提示，用户可通过 query 自行覆盖
@@ -809,51 +808,14 @@ func chatBaseChatCompletions(url string, model string, msg string, ctx *ChatBase
 				msg = "请描述图片内容"
 			}
 		}
-		// 拼装顺序: 通义 omni 官方示例要求 video_url 出现在 text 之前，
-		// 否则会报 "Multiple inputs of the same modality or mixed modality inputs are currently not applicable to the omni model"。
-		// image_url 路径保持原"text 在前"的顺序，避免影响既有图像通路行为。
-		// 关键词: 多模态 content 拼装顺序, omni video_url 顺序
 		// 注意: NewDefaultAIConfig 内部会对 opts 应用两次（先 type 后 user opts），
 		// 加上 ai.Chat -> legacyChat -> gateway.LoadOption 三层各调一次，
 		// 同一个 video/image 可能被 append 多次，会触发 omni 模型 "Multiple inputs of the same modality" 报错。
-		// 这里在拼装 content 时按 URL 去重，确保单视频单图像的稳定输出。
-		// 关键词: omni 多模态去重, multimodal dedup
-		seenVideo := map[string]bool{}
-		seenImage := map[string]bool{}
-		uniqVideos := make([]*VideoDescription, 0, len(ctx.VideoUrls))
-		for _, v := range ctx.VideoUrls {
-			if v == nil || v.Url == "" || seenVideo[v.Url] {
-				continue
-			}
-			seenVideo[v.Url] = true
-			uniqVideos = append(uniqVideos, v)
-		}
-		uniqImages := make([]*ImageDescription, 0, len(ctx.ImageUrls))
-		for _, im := range ctx.ImageUrls {
-			if im == nil || im.Url == "" || seenImage[im.Url] {
-				continue
-			}
-			seenImage[im.Url] = true
-			uniqImages = append(uniqImages, im)
-		}
+		// 沿用 RawMessages 路径的 URL 去重和部件顺序；默认文本仍按原始输入选择。
+		uniqVideos, uniqImages := dedupGatewayMedia(ctx)
 		hasVideos = len(uniqVideos) > 0
 		hasImages = len(uniqImages) > 0
-
-		if hasVideos {
-			for _, video := range uniqVideos {
-				contents = append(contents, NewUserChatContentVideoUrl(video.Url))
-			}
-			for _, image := range uniqImages {
-				contents = append(contents, NewUserChatContentImageUrl(image.Url))
-			}
-			contents = append(contents, NewUserChatContentText(msg))
-		} else {
-			contents = append(contents, NewUserChatContentText(msg))
-			for _, image := range uniqImages {
-				contents = append(contents, NewUserChatContentImageUrl(image.Url))
-			}
-		}
-		msgs = append(msgs, NewUserChatDetailEx(contents))
+		msgs = append(msgs, NewUserChatDetailEx(buildGatewayMultimodalUserParts(uniqVideos, uniqImages, msg)))
 	}
 	msgIns := NewChatMessage(model, msgs)
 	msgIns.Stream = !ctx.DisableStream
