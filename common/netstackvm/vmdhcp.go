@@ -13,6 +13,9 @@ import (
 )
 
 func (vm *NetStackVirtualMachineEntry) StartDHCP() error {
+	if vm.driver != nil && vm.driver.readOnly.Load() {
+		return ErrPassiveNetwork
+	}
 	if vm.dhcpStarted.IsSet() {
 		log.Warn("dhcp client already started, do not start again")
 		return nil

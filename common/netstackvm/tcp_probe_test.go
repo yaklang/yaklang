@@ -391,7 +391,7 @@ func TestHostPCAPDeviceOptional(t *testing.T) {
 			continue
 		}
 		t.Logf("opened %s", ifc.Name)
-		vm.GetStack().Close()
+		vm.Close()
 		return
 	}
 	t.Fatalf("no pcap device opened: %v", last)

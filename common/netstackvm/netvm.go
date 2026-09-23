@@ -17,9 +17,10 @@ import (
 )
 
 type NetStackVirtualMachine struct {
-	entries map[tcpip.NICID]*NetStackVirtualMachineEntry
-	mux     sync.Mutex
-	stack   *stack.Stack
+	closeOnce sync.Once
+	entries   map[tcpip.NICID]*NetStackVirtualMachineEntry
+	mux       sync.Mutex
+	stack     *stack.Stack
 }
 
 func (m *NetStackVirtualMachine) GetEntry(id tcpip.NICID) (*NetStackVirtualMachineEntry, bool) {
@@ -97,6 +98,9 @@ func (m *NetStackVirtualMachine) ListenTCP(addr string) (net.Listener, error) {
 	return entry.ListenTCP(utils.HostPort(host, port))
 }
 
+// NewSystemNetStackVM observes host interfaces without packet injection by default.
+// Active legacy operation requires WithPCAPReadOnly(false); prefer NewNetworkVM
+// for independent addresses, DHCP, or sharing host connectivity.
 func NewSystemNetStackVM(opts ...Option) (*NetStackVirtualMachine, error) {
 	m := &NetStackVirtualMachine{
 		entries: make(map[tcpip.NICID]*NetStackVirtualMachineEntry),
@@ -137,14 +141,14 @@ func NewSystemNetStackVM(opts ...Option) (*NetStackVirtualMachine, error) {
 			continue
 		}
 
-		vm, err := NewNetStackVirtualMachineEntry(append(opts, WithPcapDevice(nic.Name), WithNetStack(s))...)
+		vm, err := NewNetStackVirtualMachineEntry(append(append([]Option(nil), opts...), WithPcapDevice(nic.Name), WithNetStack(s), WithPCAPReadOnly(config.pcapReadOnly || config.ForceSystemNetStack))...)
 		if err != nil {
 			log.Errorf("failed to build netStackVM: %v", err)
 			continue
 		}
 
 		if selectDevice == nic.Name { // if the interface is the select interface, start dhcp, make sure gateway can use
-			if config.ForceSystemNetStack {
+			if config.ForceSystemNetStack || config.pcapReadOnly {
 				err = vm.InheritPcapInterfaceConfig()
 				if err != nil {
 					log.Errorf("nic[%s] failed to inherit public config: %v", nic.Name, err)
@@ -179,4 +183,24 @@ func NewSystemNetStackVM(opts ...Option) (*NetStackVirtualMachine, error) {
 		return nil, fmt.Errorf("no netStackVMManager build success")
 	}
 	return m, nil
+}
+
+// Close releases all interface subscriptions and the VM's shared stack.
+func (m *NetStackVirtualMachine) Close() error {
+	m.closeOnce.Do(func() {
+		m.mux.Lock()
+		entries := make([]*NetStackVirtualMachineEntry, 0, len(m.entries))
+		for _, entry := range m.entries {
+			entries = append(entries, entry)
+		}
+		m.mux.Unlock()
+		for _, entry := range entries {
+			entry.Close()
+		}
+		if m.stack != nil {
+			m.stack.Close()
+			m.stack.Wait()
+		}
+	})
+	return nil
 }

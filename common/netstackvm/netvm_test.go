@@ -7,12 +7,16 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/lowtun/netstack/gvisor/pkg/icmp"
 	"github.com/yaklang/yaklang/common/netstackvm"
+	"os"
 	"testing"
 	"time"
 )
 
 func TestNewSystemNetStackVM(t *testing.T) {
-	m, err := netstackvm.NewSystemNetStackVM()
+	if os.Getenv("NETSTACKVM_HOST_TESTS") != "1" {
+		t.Skip("manual host-network test; set NETSTACKVM_HOST_TESTS=1 explicitly")
+	}
+	m, err := netstackvm.NewSystemNetStackVM(netstackvm.WithPCAPReadOnly(false))
 	if err != nil {
 		t.Errorf("NewSystemNetStackVM() failed: %v", err)
 	}
@@ -32,7 +36,10 @@ func TestNewSystemNetStackVM(t *testing.T) {
 }
 
 func TestNewSystemNetStackVMTCP(t *testing.T) {
-	m, err := netstackvm.NewSystemNetStackVM()
+	if os.Getenv("NETSTACKVM_HOST_TESTS") != "1" {
+		t.Skip("manual host-network test; set NETSTACKVM_HOST_TESTS=1 explicitly")
+	}
+	m, err := netstackvm.NewSystemNetStackVM(netstackvm.WithPCAPReadOnly(false))
 	if err != nil {
 		t.Errorf("NewSystemNetStackVM() failed: %v", err)
 	}

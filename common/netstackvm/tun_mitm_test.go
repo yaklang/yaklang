@@ -7,11 +7,15 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/netstackvm"
 	"github.com/yaklang/yaklang/common/yak/yaklib"
+	"os"
 	"testing"
 )
 
 func TestMitmTun(t *testing.T) {
-	vm, err := netstackvm.NewSystemNetStackVM()
+	if os.Getenv("NETSTACKVM_HOST_TESTS") != "1" {
+		t.Skip("manual host-network test; set NETSTACKVM_HOST_TESTS=1 explicitly")
+	}
+	vm, err := netstackvm.NewSystemNetStackVM(netstackvm.WithPCAPReadOnly(false))
 	require.NoError(t, err)
 	server, err := yaklib.NewMITMServer(
 		yaklib.MITMConfigDialer(vm.DialTCP),

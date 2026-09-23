@@ -29,6 +29,9 @@ func (vm *NetStackVirtualMachineEntry) AllowTCPWithSrc(destinationAddr string, s
 }
 
 func (driver *PCAPEndpoint) sendRSTPacket(eth *layers.Ethernet, ip *layers.IPv4, rst *layers.TCP) (bool, error) {
+	if driver.readOnly.Load() {
+		return false, nil
+	}
 	buf := gopacket.NewSerializeBuffer()
 	opts := gopacket.SerializeOptions{
 		ComputeChecksums: true,
@@ -39,13 +42,16 @@ func (driver *PCAPEndpoint) sendRSTPacket(eth *layers.Ethernet, ip *layers.IPv4,
 		log.Errorf("序列化 RST 数据包失败: %v", err)
 		return false, err
 	}
-	if err := driver.adaptor.WritePacketData(buf.Bytes()); err != nil {
+	if err := driver.writeFrame(buf.Bytes(), layers.LayerTypeEthernet); err != nil {
 		log.Errorf("发送 RST 数据包失败: %v", err)
 		return false, err
 	}
 	return true, nil
 }
 func (driver *PCAPEndpoint) generateRSTFromPacket(pkt gopacket.Packet) (bool, error) {
+	if driver.readOnly.Load() {
+		return false, nil
+	}
 	tcpLayerRaw := pkt.Layer(layers.LayerTypeTCP)
 	if tcpLayerRaw == nil {
 		return false, errors.New("tcp layer not found")
@@ -201,6 +207,7 @@ func FastKillTCP(killDuration time.Duration, target ...string) error {
 	defer cancel()
 	userStack, err := NewNetStackVirtualMachineEntry(
 		WithPcapDevice(ifaceName),
+		WithPCAPReadOnly(false),
 		WithPCAPInboundFilter(func(packet gopacket.Packet) bool {
 			return true // filter all packets, just for killing tcp
 		}),
