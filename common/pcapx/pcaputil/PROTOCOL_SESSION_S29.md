@@ -138,12 +138,12 @@ Directory: `common/pcapx/pcaputil/testdata/protocol-sessions/`
 | dcerpc-epm-srvsvc.pcap | dcerpc | `c23f3bec06a192aafa7079ddfb38ba37510a14f33b562220a05100efdb3cdf75` | 1342 | 13500 |
 | ssh-kex-newkeys.pcap | ssh | `1d0e4bd4628c9e8bf66e3fcb97035d77a79529497b46a1b2a8626836768f4f59` | 1571 | 10022 |
 | nfsv3-lookup-read.pcap | nfs | `4776939711962023d859e1434eb33dfd39c743a43ee06bcec67d991facb024f0` | 1704 | 12049 |
-| snmpv3-get-response.pcap | snmp | `618af80452a61bf2eda8996c6ced70e9fe5638cc9d6d695cb363ab91e34f42ee` | 1936 | 1161 |
+| snmpv3-get-response.pcap | snmp | `25951764770867d46d56e1558ae71dce29ab7ea03289b99feefbbf7bb063926a` | 1936 | 1161 |
 | rdp-tpkt-negotiate-mcs.pcap | rdp | `5033da8288408b2bccc0443cc91661487c24eee99c64ed71fe5b4a5d4c64d6eb` | 1055 | 13389 |
 | dot-dns-tcp-length.pcap | dot | `ca073f1abebf0c0ded92297722a867db895ff3fe3a28a04084d25c7fa1ae5c92` | 910 | 1853 |
 | doh-http-get-post.pcap | doh | `6d4e1f15ec3f50fe9cc790d943272aeb56c1e0948804549516e52965e77702e9` | 1267 | 18443 |
 | sip-invite-ack-bye.pcap | sip | `06e06284db82ac3b5c6f0d7ec8e5b5c3391a9774c90c241a824bd268194f496c` | 2795 | 15060 |
-| rtp-seq-sr-rr.pcap | rtp | `a3199a0d2d5f585a52d12116065fcb7f03468c852ff0a4b5a3878972e390f893` | 926 | 15004 |
+| rtp-seq-sr-rr.pcap | rtp | `83dd2a449eefdd99b28b10c6959fb064cf55db70b2b3e2757671975dae6a6a92` | 428 | 15004 |
 | quic-v1-crypto-stream.pcap | quic | `3612ee02ab8b832a189fceba1b63dda67512011c6da9234043a62e7a41059028` | 882 | 14443 |
 | quic-v1-rfc9001-initial.pcap | quic | `a04715a7f0ff155411d6eefd3379563807d63c7b2154224a00f95f5ee287ab99` | 1955 | 14443 |
 | http3-settings-headers-data.pcap | http3 | `cb4c758077bc1b1b6c555215b86f9a4f9a8f2765d336572c75b44141651b28c0` | 910 | 14443 |
@@ -328,3 +328,50 @@ Fixes the session-test `append` calls `go vet` reported (`appends` check) in
 `protocol_session_kafka_test.go`, `protocol_session_samples_test.go`, and
 `mqtt_fields_test.go`. Does not change parse behavior. Does not flip catalog
 status.
+
+## 14. T20/T21 media and enterprise extensions (2026-09-23)
+
+The first-batch media and enterprise profiles are now exercised through
+`ReplayPcap` and listed in `NativeProtocolProfiles`; the binary sample/oracle
+hashes and capture provenance are in
+`testdata/protocol-sessions/first-batch-oracles/manifest.json`.
+
+| Profile | Observed behavior | Evidence limit |
+|---|---|---|
+| SIP/SDP | Transaction and dialog evidence are separate; the live loopback sample links 4 SIP messages to 126 bidirectional RTP packets using both SDP endpoint references. | A Call-ID, tag, address, or success response is not authenticated identity. No IMS extensions. |
+| RTP/RTCP | RTP endpoint/payload mappings use captured SDP or an explicit DecodeAs choice; RTCP compound framing is bounded and collision-tested. Payload-byte counts exclude RTP headers. | Unknown dynamic clock rates do not produce millisecond jitter; missing sequence ranges are capture-missing evidence, not network loss. SRTP remains opaque; RFC 4571 is unsupported. |
+| STUN/TURN | Native UDP admission is signature-based independent of standard port. ChannelData includes the peer only after observed ChannelBind; a valid ChannelData record without that state is `context-required`. | TURN inner media is not decrypted or inferred from the relay port; integrity is unverified without credentials. |
+| SMB2 | Live guest-share replay covers negotiate, session/tree scope, file create/read/write/close, compound responses, and async identifiers. | This capture does not verify credentials. SMB3 encrypted transform bodies and SMB Direct remain opaque/unsupported. |
+| LDAPv3 | Live anonymous search and StartTLS exchange cover multi-response search events; successful StartTLS hands the actual observed ClientHello to TLS parsing. | SASL-protected application data and TLS application data remain opaque. Attribute secrets are redacted; directory values are not trusted identity proof. |
+| Kerberos V5 | Upstream UDP records and TCP length-wrapped records are compared with TShark type/realm/principal/encryption-type fields. | Ticket ciphertext is not decrypted, checksums are not authenticated, and realm/principal strings are unverified observations. |
+| DCE/RPC CO v5 | Bind/context proposals are activated only by accepted BindAck results; calls and fragments are direction-, context-, and budget-bound. A deterministic generated full-session sample is checked against TShark frame/procedure output. | No live RPC-server interop sample. Unknown interface stubs stay opaque; NDR schemas, auth trailers, AlterContext reuse, and RPC application identity claims are unsupported. The historical M1 BindAck is intentionally truncated and must be rejected. |
+
+The checked-in live samples include SIPp 3.7.7 PCMU/8000Hz media, Samba
+4.17.12 guest traffic, OpenLDAP 2.5.13 anonymous StartTLS, and Net-SNMP
+5.9.3 SNMPv1 request/response and Trap traffic. The DCE/RPC full session is a
+deterministic synthetic fixture; its TShark output is an independent field
+oracle, not live-server interoperability. The Kerberos capture is the
+existing, unchanged nDPI LGPL-3.0 corpus item. TShark 4.4.8 TSV files are
+independent frame-level oracles, not generated by the parser. The Samba/LDAP
+test domains and SNMP community values are disposable fixtures; no private
+keys or reusable passwords are included.
+
+## 15. T18 SNMP and T19 Syslog (2026-09-23)
+
+SNMPv1 now has a captured Net-SNMP 5.9.3 exchange with Get, GetNext,
+noSuchName response, and a one-way enterprise-specific Trap; independent
+TShark output and capture provenance are pinned in the first-batch manifest.
+The generated SNMPv3 M1 response now carries the same request-id as its Get.
+BER signed INTEGER and OID subidentifiers must use minimal encodings; malformed
+privacy-mode data is not reported as successfully encrypted. USM privacy is
+still opaque without keys, and authentication is not asserted.
+
+The public `NewProtocolSession` entry point now recognizes RFC 3164 and
+RFC 5424 octet-counted TCP Syslog without capture-only flow metadata. Deferred
+events expose bounded framing/profile/completeness metadata, while semantic
+fields are produced only when `GetFields()` is requested. Full and deferred
+replays are compared for profile and field parity across one-byte fragments.
+The manifest also pins a live tcpdump capture at an rsyslog 8.2302.0 receiver:
+the captured UDP RFC 5424/RFC 3164 and TCP octet-counted messages are checked
+against the receiver's independent received.log. Additional deterministic
+inputs cover malformed framing and field-budget boundaries.

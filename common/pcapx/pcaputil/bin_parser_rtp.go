@@ -9,20 +9,27 @@ import (
 // binRTP is the M0 session state for RFC 3550 RTP/RTCP. Ports 5004/5005
 // are never consulted. A sequence gap is capture-missing, not network loss.
 type binRTP struct {
-	sources map[uint32]*rtpSource
-	payload map[uint8]string
+	sources              map[uint32]*rtpSource
+	retainedSourceBytes  int64
+	payload              map[uint8]string
+	clocks               map[uint8]int
+	maxBufferedBytes     int
+	reserveSessionMemory func(int64) error
 }
 
 type rtpSource struct {
-	ssrc     uint32
-	maxSeq   uint16
-	cycles   uint32
-	received uint32
-	lastTS   uint32
-	lastArr  time.Time
-	jitter   float64
-	recent   []uint32
-	init     bool
+	ssrc       uint32
+	maxSeq     uint16
+	cycles     uint32
+	received   uint32
+	lastTS     uint32
+	lastArr    time.Time
+	jitter     float64
+	recent     []uint32
+	recentNext int
+	init       bool
+	timing     bool
+	clock      int
 }
 
 func probeRTP(w []byte, limit int) ProbeResult {
@@ -96,7 +103,9 @@ func (f *binFlow) frameRTP(w []byte) (int, *binSpec, error) {
 	if r == nil {
 		return 0, nil, sessionContext("RTP session was not observed")
 	}
-	if err := f.reserveSession(256 + int64(len(r.sources))*96); err != nil {
+	r.maxBufferedBytes = f.a.config.MaxBufferedBytes
+	r.reserveSessionMemory = f.reserveSession
+	if err := r.reserveMemory(r.retainedBytes()); err != nil {
 		return 0, nil, err
 	}
 	if len(w) == 0 {
@@ -176,26 +185,55 @@ func (r *binRTP) consumeRTP(raw []byte, arr time.Time, max int) (map[string]any,
 	if max <= 0 {
 		max = 4096
 	}
+	if r.sources[ssrc] == nil && len(r.sources) < max {
+		// The source uses a fixed 128-entry duplicate window. Reserve both the
+		// source/map metadata and that retained backing array before allocation.
+		if err := r.reserveMemory(r.retainedBytes() + 96 + 128*4); err != nil {
+			return info, err
+		}
+	}
 	src := r.source(ssrc, max)
 	if src == nil {
 		return info, protocolError(ErrResourceExceeded, "RTP SSRC count exceeds budget")
 	}
-	for k, v := range src.observe(seq, ts, arr, rtpClock(pt)) {
+	clock := r.clockRate(pt)
+	for k, v := range src.observe(seq, ts, arr, clock) {
 		info[k] = v
 	}
-	info["Jitter"] = src.jitter
+	if clock > 0 {
+		info["Clock Rate"] = clock
+		info["Clock Rate Source"] = r.clockRateSource(pt)
+		info["Jitter"] = src.jitter
+		info["Jitter Unit"] = "seconds"
+	} else {
+		info["Timing Status"] = "clock-rate-unknown"
+	}
 	info["Received"] = src.received
 	return info, nil
 }
 
 func (r *binRTP) consumeRTCP(raw []byte) (map[string]any, error) {
+	return r.consumeRTCPBounded(raw, DefaultParserBudget().MaxCollectionElements)
+}
+
+func (r *binRTP) consumeRTCPBounded(raw []byte, maxElements int) (map[string]any, error) {
 	n := rtpRTCPSize(raw)
 	if n < 8 || len(raw) < n {
 		return nil, fmt.Errorf("rtcp: truncated packet")
 	}
+	if n != len(raw) {
+		return nil, protocolError(ErrMalformedMessage, "rtcp: packet length mismatch")
+	}
+	if err := validateRTCPPacket(raw); err != nil {
+		return nil, err
+	}
 	pt := raw[1]
 	ssrc := binary.BigEndian.Uint32(raw[4:8])
 	rc := int(raw[0] & 0x1f)
+	collectionLimit := sessionCollectionLimit(maxElements)
+	if (pt == 200 || pt == 201 || pt == 203) && rc > collectionLimit {
+		return nil, protocolError(ErrResourceExceeded, "rtcp: collection element budget exceeded")
+	}
 	info := map[string]any{
 		"Packet Name":   rtpRTCPName(pt),
 		"Version":       2,
@@ -213,6 +251,11 @@ func (r *binRTP) consumeRTCP(raw []byte) (map[string]any, error) {
 		info["Packet Count"] = binary.BigEndian.Uint32(raw[20:24])
 		info["Octet Count"] = binary.BigEndian.Uint32(raw[24:28])
 	}
+	padding := 0
+	if raw[0]&0x20 != 0 {
+		padding = int(raw[len(raw)-1])
+	}
+	dataEnd := len(raw) - padding
 	var reports []map[string]any
 	off := 8
 	if pt == 200 {
@@ -222,23 +265,65 @@ func (r *binRTP) consumeRTCP(raw []byte) (map[string]any, error) {
 		block := raw[off : off+24]
 		src := binary.BigEndian.Uint32(block[0:4])
 		frac := block[4]
-		cum := uint32(block[5])<<16 | uint32(block[6])<<8 | uint32(block[7])
+		cumBits := int32(uint32(block[5])<<16 | uint32(block[6])<<8 | uint32(block[7]))
+		if cumBits&0x800000 != 0 {
+			cumBits |= ^int32(0xffffff)
+		}
 		rep := map[string]any{
 			"Source SSRC":               src,
 			"Fraction Lost":             frac,
-			"Cumulative Packets Lost":   cum,
+			"Cumulative Packets Lost":   cumBits,
 			"Extended Highest Sequence": binary.BigEndian.Uint32(block[8:12]),
 			"Interarrival Jitter":       binary.BigEndian.Uint32(block[12:16]),
+			"Interarrival Jitter Unit":  "RTP timestamp ticks; clock rate required for time conversion",
 			"Last SR":                   binary.BigEndian.Uint32(block[16:20]),
 			"Delay Since Last SR":       binary.BigEndian.Uint32(block[20:24]),
 			"Associated RTP":            r.sources[src] != nil,
-			"Reported Network Loss":     frac > 0 || cum > 0,
+			"Reported Network Loss":     frac > 0 || cumBits > 0,
 		}
 		reports = append(reports, rep)
 		off += 24
 	}
 	if len(reports) > 0 {
 		info["Report Blocks"] = reports
+	}
+	switch pt {
+	case 202:
+		chunks, err := decodeRTCPSDES(raw, dataEnd, maxElements)
+		if err != nil {
+			return nil, err
+		}
+		info["SDES Chunks"] = chunks
+	case 203:
+		count := rc
+		if 4+4*count > dataEnd {
+			return nil, protocolError(ErrMalformedMessage, "rtcp: truncated BYE sources")
+		}
+		sources := make([]uint32, 0, count)
+		for i := 0; i < count; i++ {
+			at := 4 + 4*i
+			sources = append(sources, binary.BigEndian.Uint32(raw[at:at+4]))
+		}
+		info["Sources"] = sources
+		at := 4 + 4*count
+		if at < dataEnd {
+			reasonLen := int(raw[at])
+			at++
+			if reasonLen > dataEnd-at {
+				return nil, protocolError(ErrMalformedMessage, "rtcp: truncated BYE reason")
+			}
+			info["Reason"] = append([]byte(nil), raw[at:at+reasonLen]...)
+			at += reasonLen
+			for at < dataEnd {
+				if raw[at] != 0 {
+					return nil, protocolError(ErrMalformedMessage, "rtcp: invalid BYE alignment")
+				}
+				at++
+			}
+		}
+	case 204:
+		info["Name"] = string(raw[8:12])
+		info["Application Data"] = append([]byte(nil), raw[12:dataEnd]...)
 	}
 	if _, ok := r.sources[ssrc]; ok {
 		info["Associated RTP"] = true
@@ -256,9 +341,35 @@ func (r *binRTP) source(ssrc uint32, max int) *rtpSource {
 	if len(r.sources) >= max {
 		return nil
 	}
-	s := &rtpSource{ssrc: ssrc}
+	s := &rtpSource{ssrc: ssrc, recent: make([]uint32, 0, 128)}
 	r.sources[ssrc] = s
+	r.retainedSourceBytes += 96 + int64(cap(s.recent))*4
 	return s
+}
+
+func (r *binRTP) retainedBytes() int64 {
+	n := int64(512) + r.retainedSourceBytes
+	if r.payload != nil {
+		n += 64 + int64(len(r.payload))*32
+	}
+	if r.clocks != nil {
+		n += 64 + int64(len(r.clocks))*32
+	}
+	return n
+}
+
+func (r *binRTP) reserveMemory(target int64) error {
+	retained := r.retainedBytes()
+	if target < retained {
+		target = retained
+	}
+	if r.maxBufferedBytes > 0 && target > int64(r.maxBufferedBytes) {
+		return protocolError(ErrResourceExceeded, "RTP retained source state exceeds capture memory budget")
+	}
+	if r.reserveSessionMemory != nil {
+		return r.reserveSessionMemory(target)
+	}
+	return nil
 }
 
 func (s *rtpSource) observe(seq uint16, ts uint32, arr time.Time, clock int) map[string]any {
@@ -266,10 +377,9 @@ func (s *rtpSource) observe(seq uint16, ts uint32, arr time.Time, clock int) map
 	if !s.init {
 		s.init = true
 		s.maxSeq = seq
-		s.lastTS = ts
-		s.lastArr = arr
+		s.setTimingBaseline(ts, arr, clock)
 		s.received = 1
-		s.recent = []uint32{uint32(seq)}
+		s.recent = append(s.recent, uint32(seq))
 		return info
 	}
 	ext := s.cycles | uint32(seq)
@@ -309,7 +419,13 @@ func (s *rtpSource) observe(seq uint16, ts uint32, arr time.Time, clock int) map
 			s.maxSeq = seq
 		}
 	}
-	if clock > 0 && !s.lastArr.IsZero() {
+	if clock <= 0 {
+		s.timing, s.clock, s.jitter = false, 0, 0
+	} else if !s.timing || s.clock != clock {
+		// A renegotiated payload type/clock rate needs a fresh timing baseline;
+		// sequence accounting remains attached to the same observed SSRC.
+		s.setTimingBaseline(ts, arr, clock)
+	} else if !s.lastArr.IsZero() {
 		arrivalDelta := arr.Sub(s.lastArr).Seconds()
 		tsDelta := float64(int32(ts-s.lastTS)) / float64(clock)
 		d := arrivalDelta - tsDelta
@@ -318,14 +434,29 @@ func (s *rtpSource) observe(seq uint16, ts uint32, arr time.Time, clock int) map
 		}
 		s.jitter += (d - s.jitter) / 16
 	}
-	s.lastTS = ts
-	s.lastArr = arr
+	if clock > 0 {
+		s.lastTS = ts
+		s.lastArr = arr
+	}
 	s.received++
-	s.recent = append(s.recent, ext)
-	if len(s.recent) > 128 {
-		s.recent = s.recent[len(s.recent)-128:]
+	if len(s.recent) < cap(s.recent) {
+		s.recent = append(s.recent, ext)
+	} else {
+		s.recent[s.recentNext] = ext
+		s.recentNext = (s.recentNext + 1) % len(s.recent)
 	}
 	return info
+}
+
+func (s *rtpSource) setTimingBaseline(ts uint32, arr time.Time, clock int) {
+	s.clock = clock
+	s.timing = clock > 0
+	s.jitter = 0
+	if s.timing {
+		s.lastTS, s.lastArr = ts, arr
+	} else {
+		s.lastTS, s.lastArr = 0, time.Time{}
+	}
 }
 
 func rtpPayloadName(pt uint8, dynamic map[uint8]string) string {
@@ -364,15 +495,42 @@ func rtpPayloadName(pt uint8, dynamic map[uint8]string) string {
 	return fmt.Sprintf("PT-%d", pt)
 }
 
+func (r *binRTP) clockRate(pt uint8) int {
+	if r != nil && r.clocks != nil && r.clocks[pt] > 0 {
+		return r.clocks[pt]
+	}
+	return rtpClock(pt)
+}
+
+func (r *binRTP) clockRateSource(pt uint8) string {
+	if r != nil && r.clocks != nil && r.clocks[pt] > 0 {
+		return "observed SDP a=rtpmap"
+	}
+	if rtpClock(pt) > 0 {
+		return "RTP/AVP static payload assignment"
+	}
+	return "unknown"
+}
+
 func rtpClock(pt uint8) int {
 	switch pt {
-	case 26, 31, 32, 33, 34:
+	case 0, 3, 4, 5, 7, 8, 9, 12, 13, 15, 18:
+		return 8000
+	case 6:
+		return 16000
+	case 10, 11:
+		return 44100
+	case 14, 25, 26, 28, 31, 32, 33, 34:
 		return 90000
 	}
-	if pt >= 96 {
-		return 90000
+	if pt == 16 {
+		return 11025
 	}
-	return 8000
+	if pt == 17 {
+		return 22050
+	}
+	// Dynamic and unassigned payload types require a captured SDP rtpmap.
+	return 0
 }
 
 func rtpRTCPName(pt byte) string {

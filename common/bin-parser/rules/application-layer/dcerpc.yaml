@@ -50,6 +50,10 @@ Package:
           this.ProcessSubNode("BindAck")
           return
         }
+        if ptype == 15 {
+          this.ProcessSubNode("BindAck")
+          return
+        }
         if ptype == 13 {
           this.ProcessSubNode("BindNak")
           return
@@ -150,11 +154,13 @@ Package:
           this.ProcessSubNode("Cancel Count")
           this.ProcessSubNode("Reserved")
           this.ProcessSubNode("Status")
+          this.ProcessSubNode("Reserved2")
         Alloc Hint: uint32
         Context ID: uint16
         Cancel Count: uint8
         Reserved: uint8
         Status: uint32
+        Reserved2: uint32
       BindAck:
         operator: |
           this.ProcessSubNode("Max Xmit Frag")
@@ -169,23 +175,23 @@ Package:
             this.GetSubNode("Sec Addr").SetMaxLength(sl)
             this.ProcessSubNode("Sec Addr")
           }
-          if this.GetMaxLength() > this.Length() {
-            rest = this.GetMaxLength() - this.Length()
-            if rest > 0 && rest < 1048576 {
-              used = this.Length()
-              pad = (4 - (used % 4)) % 4
-              if pad > 0 && pad <= rest {
-                this.GetSubNode("Pad").SetMaxLength(pad)
-                this.ProcessSubNode("Pad")
+          rest = this.GetMaxLength() - this.Length()
+          if rest > 0 && rest < 1048576 {
+            used = this.Length()
+            pad = (4 - (used % 4)) % 4
+            if pad > 0 {
+              if pad > rest {
+                panic("dcerpc: truncated bind acknowledgement alignment padding")
               }
-              if this.GetMaxLength() > this.Length() {
-                r2 = this.GetMaxLength() - this.Length()
-                if r2 >= 4 && r2 < 1048576 {
-                  this.ProcessByType("DCERPCResults")
-                }
-              }
+              this.GetSubNode("Pad").SetMaxLength(pad)
+              this.ProcessSubNode("Pad")
             }
           }
+          r2 = this.GetMaxLength() - this.Length()
+          if r2 < 4 {
+            panic("dcerpc: truncated bind acknowledgement result list")
+          }
+          this.ProcessByType("DCERPCResults")
           return
         Max Xmit Frag: uint16
         Max Recv Frag: uint16
@@ -196,7 +202,22 @@ Package:
       BindNak:
         operator: |
           this.ProcessSubNode("Reject Reason")
+          this.ProcessSubNode("Num Versions")
+          n = getNodeResult("Num Versions").Value
+          if n > 20 {
+            panic("dcerpc: too many protocol versions")
+          }
+          if n > 0 {
+            this.ProcessSubNode("Versions")
+          }
         Reject Reason: uint16
+        Num Versions: uint8
+        Versions:
+          list: true
+          list-length-from-field: ../Num Versions
+          Version:
+            Major: uint8
+            Minor: uint8
 DCERPCv4:
   unpack: true
   operator: |
@@ -269,12 +290,23 @@ DCERPCv4:
 DCERPCResults:
   operator: |
     this.ProcessSubNode("Num Results")
+    n = getNodeResult("Num Results").Value
+    if n > 20 {
+      panic("dcerpc: too many presentation context results")
+    }
     this.ProcessSubNode("Reserved")
     this.ProcessSubNode("Reserved2")
-    this.ProcessSubNode("Ack Result")
-    this.ProcessSubNode("Ack Reason")
-    this.ProcessSubNode("Transfer Syntax")
-    this.ProcessSubNode("Transfer Version")
+    if n > 0 {
+      this.ProcessSubNode("Ack Result")
+      this.ProcessSubNode("Ack Reason")
+      this.ProcessSubNode("Transfer Syntax")
+      this.ProcessSubNode("Transfer Version")
+    }
+    if n > 1 {
+      remaining = (n - 1) * 24
+      this.GetSubNode("Additional Results").SetMaxLength(remaining)
+      this.ProcessSubNode("Additional Results")
+    }
     return
   Num Results: uint8
   Reserved: uint8
@@ -283,3 +315,4 @@ DCERPCResults:
   Ack Reason: uint16
   Transfer Syntax: raw,16
   Transfer Version: uint32
+  Additional Results: raw

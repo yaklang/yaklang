@@ -83,6 +83,22 @@ func krbTestTCP(w []byte) []byte {
 	return append(record, w...)
 }
 
+func TestFirstBatchT21(t *testing.T) {
+	t.Run("ap-reply-ciphertext-stays-opaque-and-observation-is-not-identity-validation", func(t *testing.T) {
+		wire := krbTestAP(15)
+		fields, info, err := decodeKerberosFields(wire, false)
+		require.NoError(t, err)
+		require.NotEmpty(t, fields)
+		require.Equal(t, false, info["Decryption Performed"])
+		require.Equal(t, false, info["Peer Identity Validated"])
+		require.Equal(t, false, info["Message Exchange Validated"])
+		require.Equal(t, 2, info["Cipher Byte Count"])
+		for _, field := range info["Decoded Fields"].([]map[string]any) {
+			require.NotContains(t, field, "Plaintext")
+		}
+	})
+}
+
 func TestKerberosFieldsLayouts(t *testing.T) {
 	checksum := krbTestTLV(0x30, krbTestCtx(0, krbTestInt(-138)), krbTestCtx(1, krbTestTLV(4, []byte{1, 2})))
 	fastReq := krbTestTLV(0xa0, krbTestTLV(0x30, krbTestCtx(1, checksum), krbTestCtx(2, krbTestEncrypted())))

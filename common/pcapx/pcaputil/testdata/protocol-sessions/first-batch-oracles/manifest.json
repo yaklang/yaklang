@@ -1,0 +1,593 @@
+{
+  "capture_method": "Per-sample source and representation are recorded below; this manifest includes live, upstream, and generated files.",
+  "captured_at_utc": "2026-09-23",
+  "samples": [
+    {
+      "id": "net-snmp-rsyslog-interop-v2c",
+      "path": "net-snmp-rsyslog-interop-v2c.pcap",
+      "sha256": "10087cb684d98acad8a2da7e95620edd8e9787176a84344d5b5ff69daa0dfb18",
+      "size_bytes": 1882,
+      "link_type": "Ethernet",
+      "observed_messages": {
+        "syslog": {
+          "rsyslog_received": 4,
+          "udp_port": 1514,
+          "tcp_port": 1515,
+          "tcp_messages": 2,
+          "one_message_contains_embedded_lf": true
+        },
+        "snmp": {
+          "udp_pdus": 5,
+          "pdu_names": [
+            "GetRequest",
+            "Response",
+            "TrapV2",
+            "InformRequest",
+            "Response"
+          ],
+          "versions": [
+            "2c"
+          ],
+          "native_well_known_ports": [
+            161,
+            162
+          ]
+        }
+      },
+      "producers": {
+        "server_container": "Debian bookworm; rsyslog 8.2302.0; Net-SNMP 5.9.3; tcpdump 4.99.3",
+        "client": "Net-SNMP snmpget/snmptrap 5.6.2.1 and a small RFC5424/RFC3164 UDP/TCP sender",
+        "capture": "tcpdump inside the receiving container on its live interface",
+        "oracle": "independent rsyslog received.log plus tshark field inspection"
+      },
+      "oracle_file": {
+        "path": "rsyslog-received.log",
+        "sha256": "3ee1e9ae15212925427765ed7a532c4b037ec4ea0d38f48ccfd5039d0efb0e36",
+        "size_bytes": 317
+      },
+      "secrets": "The v2c community is captured as protocol data and must not be exported. No private authentication material is included."
+    },
+    {
+      "id": "net-snmp-v3-security-boundaries",
+      "path": "net-snmp-v3-security-boundaries.pcap",
+      "sha256": "248aa80cf33f4b4b4f2ca8f42d9bd3d3468844c8cc98b2ad9909b898bad7f067",
+      "size_bytes": 1392,
+      "link_type": "Ethernet",
+      "observed_messages": {
+        "snmp": {
+          "udp_pdus": 8,
+          "pdu_names": [
+            "GetRequest",
+            "Report",
+            "GetRequest",
+            "Response",
+            "GetRequest",
+            "Report",
+            "EncryptedScopedPDU",
+            "EncryptedScopedPDU"
+          ],
+          "security_profiles": [
+            "noAuthNoPriv discovery",
+            "noAuthNoPriv",
+            "authPriv discovery",
+            "authPriv"
+          ],
+          "authpriv_plaintext_varbinds": 0
+        }
+      },
+      "producers": {
+        "agent": "Net-SNMP 5.9.3 snmpd in an isolated Debian bookworm container",
+        "client": "Net-SNMP 5.6.2.1 snmpget with noAuthNoPriv and test-only SHA/AES authPriv credentials",
+        "capture": "tcpdump inside the isolated agent container on its live interface",
+        "oracle": "tshark SNMPv3 version/message-id/message-flags/user-name/request-id/OID fields"
+      },
+      "secrets": "Test-only authPriv credentials were used by the producer and are not stored in this repository or PCAP. No keylog is supplied; authPriv scoped PDUs must remain opaque."
+    },
+    {
+      "id": "net-snmp-v1-live-get-getnext-error-trap",
+      "path": "net-snmp-v1-live.pcap",
+      "sha256": "e75ce61c2bd6d62c8169f45bdf21e70602b61724f34b4c8fe7cbde82b33fb5d7",
+      "size_bytes": 1067,
+      "link_type": "Ethernet",
+      "packet_count": 7,
+      "capture_method": "Live UDP exchange between separate client and agent containers on a disposable isolated Docker bridge; tcpdump captured the packets from the agent container eth0. The PCAP was captured from traffic and was not assembled or synthesized.",
+      "source": {
+        "kind": "live-isolated-net-snmp-exchange",
+        "network": "pr5013-snmpv1-net, isolated bridge 192.168.107.0/24",
+        "agent_ip": "192.168.107.2",
+        "client_ip": "192.168.107.3"
+      },
+      "producers": {
+        "agent": "Net-SNMP snmpd 5.9.3 (Debian 12 package 5.9.3+dfsg-2+deb12u1), configured with an isolated test-only read community scoped to system MIB OID .1.3.6.1.2.1.1",
+        "trap_receiver": "Net-SNMP snmptrapd 5.9.3 was launched on the agent container at UDP/162; the fixture/oracle verifies the transmitted one-way Trap PDU, not receiver logging.",
+        "client": "Net-SNMP 5.9.3 (Debian 12 package 5.9.3+dfsg-2+deb12u1): snmpget, snmpgetnext, and snmptrap",
+        "capture": "tcpdump 4.99.3-1 inside the agent container, interface eth0, Ethernet link type",
+        "container_runtime": "Docker client/server 29.4.0, Linux aarch64 container runtime",
+        "oracle": "Wireshark TShark 4.4.8 frame and SNMP field export; 2-pass decode"
+      },
+      "commands": [
+        "tcpdump -i eth0 -nn -s0 -U -w /capture/snmpv1-clean-live.pcap \"udp port 161 or udp port 162\"",
+        "snmpget -v1 -c t18-v1-read-only -On -t 1 -r 0 snmpv1-agent .1.3.6.1.2.1.1.1.0 .1.3.6.1.2.1.1.2.0 .1.3.6.1.2.1.1.3.0 .1.3.6.1.2.1.1.4.0",
+        "snmpgetnext -v1 -c t18-v1-read-only -On -t 1 -r 0 snmpv1-agent .1.3.6.1.2.1.1.1.0",
+        "snmpget -v1 -c t18-v1-read-only -On -t 1 -r 0 snmpv1-agent .1.3.6.1.2.1.1.99.0",
+        "snmptrap -v1 -c t18-v1-read-only -t 1 -r 0 snmpv1-agent .1.3.6.1.4.1.8072.9999 192.168.107.3 6 7 12345 .1.3.6.1.4.1.8072.9999.1 s t18-test-only",
+        "tshark -r net-snmp-v1-live.pcap -Y snmp -2 -T fields -E header=y -E separator=/t -E quote=d -E occurrence=a -E aggregator=, -e frame.number -e ip.src -e udp.srcport -e ip.dst -e udp.dstport -e snmp.version -e snmp.request_id -e snmp.error_status -e snmp.error_index -e snmp.get_request_element -e snmp.get_next_request_element -e snmp.get_response_element -e snmp.trap_element -e snmp.response_in -e snmp.response_to -e snmp.name -e snmp.value.octets -e snmp.value.oid -e snmp.value.timeticks -e snmp.enterprise -e snmp.agent_addr -e snmp.generic_trap -e snmp.specific_trap -e snmp.time_stamp"
+      ],
+      "observed_messages": {
+        "snmp": {
+          "version": "SNMPv1 (wire version integer 0)",
+          "pdus": 7,
+          "pdu_counts": {
+            "GetRequest": 2,
+            "GetNextRequest": 1,
+            "Response": 3,
+            "Trap": 1
+          },
+          "request_response_pairs": 3,
+          "error_response": {
+            "name": "noSuchName",
+            "wire_error_status": 2,
+            "error_index": 1,
+            "count": 1
+          },
+          "trap": {
+            "enterprise_oid": "1.3.6.1.4.1.8072.9999",
+            "agent_address": "192.168.107.3",
+            "generic_trap": 6,
+            "specific_trap": 7,
+            "time_ticks": 12345
+          },
+          "request_varbinds": [
+            4,
+            1,
+            1
+          ],
+          "test_community_is_scoped_to_system_group": true
+        }
+      },
+      "oracle_file": {
+        "path": "net-snmp-v1-tshark-oracle.tsv",
+        "sha256": "2a217b468ee799d2a68f5f7447da877c6623a1ea6731752da4522d640112753b",
+        "size_bytes": 1688,
+        "rows_including_header": 8,
+        "tool": "TShark 4.4.8"
+      },
+      "secrets": "The PCAP contains the isolated test-only SNMPv1 community in plaintext because SNMPv1 carries it on the wire; it is not a production credential. No production addresses, credentials, or key material are included.",
+      "setup": {
+        "network_command": "docker network create pr5013-snmpv1-net",
+        "agent_config": [
+          "agentaddress udp:161",
+          "rocommunity t18-v1-read-only default .1.3.6.1.2.1.1",
+          "sysLocation isolated-first-batch-capture",
+          "sysContact t18-test-fixture-only",
+          "sysName first-batch-snmpv1-agent"
+        ],
+        "trap_receiver_config": [
+          "authCommunity log t18-v1-read-only"
+        ],
+        "container_command": "docker run -d --name pr5013-snmpv1-server --network pr5013-snmpv1-net --network-alias snmpv1-agent -v /tmp/pr5013-snmpv1-attempt:/etc/snmp-capture -v /tmp/pr5013-snmpv1-attempt/capture:/capture --cap-add NET_RAW --cap-add NET_ADMIN --entrypoint /bin/bash pr5013-protocol-oracles:bookworm-v4 -lc 'snmpd -Lo -C -c /etc/snmp-capture/snmpd.conf && snmptrapd -Lo -C -c /etc/snmp-capture/snmptrapd.conf && tail -f /dev/null'",
+        "note": "The trap sender packet was observed entering the agent container eth0 on UDP/162. Traps are one-way; receiver-side logging is not part of the oracle."
+      }
+    },
+    {
+      "id": "sipp-sip-duplex-rtp-loopback",
+      "path": "sip-sipp-rtp-duplex-loopback.pcap",
+      "sha256": "1e59eebe6462dbf469fa3145597bd9251c4b0447b756845efc10ef48e4104798",
+      "size_bytes": 29601,
+      "link_type": "NULL/Loopback",
+      "packet_count": 130,
+      "capture_method": "Live loopback capture from the local SIPp client/server call and a deterministic PCMU/8000Hz RTP sender; packet bytes were captured, not assembled into a synthetic PCAP.",
+      "producers": {
+        "sip": "SIPp 3.7.7; TShark oracle confirms INVITE, 180, 200, and ACK in this captured PCAP",
+        "rtp": "scripts/protocol-tests/generate-sip-rtp-duplex/rtp_endpoint.py sends and echoes 63 deterministic 172-byte PCMU/8000Hz RTP datagrams per direction; the recipe source is hashed below.",
+        "capture": "Original sample is a live NULL/Loopback capture; the capture utility version was not preserved for this exact hash. The reproducible recipe below was independently re-run and validated with tcpdump 4.99.1 Apple build 133 and libpcap 1.10.1.",
+        "oracle": "Wireshark TShark 4.4.8 field export; independent frame-level SIP/RTP/SDP columns"
+      },
+      "observed_messages": {
+        "sip": {
+          "messages": 4,
+          "methods": [
+            "INVITE",
+            "ACK"
+          ],
+          "responses": [
+            180,
+            200
+          ],
+          "call_id": "1-54623@127.0.0.1",
+          "media_endpoints": {
+            "client_offer": "127.0.0.1:32300",
+            "server_answer": "127.0.0.1:32200"
+          }
+        },
+        "rtp": {
+          "datagrams": 126,
+          "directions": [
+            {
+              "source": "127.0.0.1:32300",
+              "destination": "127.0.0.1:32200",
+              "datagrams": 63
+            },
+            {
+              "source": "127.0.0.1:32200",
+              "destination": "127.0.0.1:32300",
+              "datagrams": 63
+            }
+          ],
+          "payload_type": 0,
+          "codec": "PCMU",
+          "clock_rate_hz": 8000,
+          "payload_bytes": 20160
+        }
+      },
+      "oracle_file": {
+        "path": "sip-sipp-rtp-tshark-oracle.tsv",
+        "sha256": "3b4862ccea0b25f62ec26515b4ae1d80b8698f49639d2dc2f1daebba6e542c6f",
+        "size_bytes": 52959,
+        "rows_including_header": 131,
+        "tool": "TShark 4.4.8"
+      },
+      "secrets": "No keylog, credential, or media decryption material is included; media payload is generated PCMU test audio.",
+      "reproduction_test": {
+        "repository_command": "CAPTURE_INTERFACE=lo0 sh scripts/protocol-tests/generate-sip-rtp-duplex/capture.sh /tmp/sip-sipp-rtp-duplex-loopback.pcap",
+        "capture_script": "scripts/protocol-tests/generate-sip-rtp-duplex/capture.sh",
+        "capture_script_sha256": "bacd5c10f0221e625852a90155c6de47579f96687dd6b1751f17c5c80b5a5f71",
+        "rtp_endpoint_script": "scripts/protocol-tests/generate-sip-rtp-duplex/rtp_endpoint.py",
+        "rtp_endpoint_script_sha256": "97ef93b8c096a1c0dbfbaa21dd86b8ff1b5e2e1074c5eece867303867ac7b2a4",
+        "validated_at_utc": "2026-09-23",
+        "environment": {
+          "os": "Darwin 23.1.0 arm64",
+          "cpu": "Apple M1 Max",
+          "go": "go1.22.12 darwin/arm64",
+          "python": "Python 3.14.0",
+          "sipp": "SIPp v3.7.7-TLS-PCAP-SHA256",
+          "capture": "tcpdump 4.99.1 Apple version 133; libpcap 1.10.1",
+          "oracle": "Wireshark TShark 4.4.8 (v4.4.8-0-g0d289c003bfb)"
+        },
+        "separate_validation_output": {
+          "capture_sha256": "17236efbc6f57f0298bc9b3ccdd0c27c910ee05ec49f831cf0891677173ec015",
+          "capture_size_bytes": 30366,
+          "packet_count": 132,
+          "link_type": "NULL/Loopback",
+          "tshark_oracle_sha256": "f2d1f33dea7298f56746fb2474c717ea5865e41fcc8fed664d4ea99951b79db3",
+          "tshark_oracle_size_bytes": 53149,
+          "oracle_rows_including_header": 133,
+          "sip_messages": 6,
+          "sip_exchange": [
+            "INVITE",
+            "180",
+            "200",
+            "ACK",
+            "BYE",
+            "200"
+          ],
+          "rtp_datagrams": 126,
+          "rtp_datagrams_each_direction": 63,
+          "payload_type": 0,
+          "payload_bytes_each": 160,
+          "distinct_direction_tuples": 2
+        },
+        "repeatability_note": "This is a semantic reproduction, not a byte-for-byte regeneration: SIP Call-ID and capture timestamps vary. The committed raw PCAP hash remains pinned independently and was not rewritten."
+      }
+    },
+    {
+      "id": "samba-smb2-live-guest-share",
+      "path": "smb2-samba-live.pcap",
+      "sha256": "647ee8d3b64a4e70d2b6964481c95fc26d17e8952944f1786b5005781ca1f503",
+      "size_bytes": 11423,
+      "link_type": "Ethernet",
+      "packet_count": 52,
+      "capture_method": "Live isolated client/server capture; guest/no-password SMB share used for query, list, read, write, and close exchanges.",
+      "producers": {
+        "server": "Samba 4.17.12 in an isolated Debian bookworm container",
+        "client": "smbclient against the isolated guest share",
+        "capture": "tcpdump on the container interface",
+        "oracle": "Wireshark TShark 4.4.8 SMB2 field export"
+      },
+      "observed_messages": {
+        "smb2": {
+          "pdus": 44,
+          "operations": [
+            "NEGOTIATE",
+            "SESSION_SETUP",
+            "TREE_CONNECT",
+            "CREATE",
+            "READ",
+            "WRITE",
+            "CLOSE"
+          ],
+          "identity_verified": false
+        }
+      },
+      "oracle_file": {
+        "path": "smb2-samba-tshark-oracle.tsv",
+        "sha256": "c21b4769902f1e7fcc9e0b0e1b3912138637dda2d1ef4232df3c0cb721343894",
+        "size_bytes": 2376,
+        "rows_including_header": 45,
+        "tool": "TShark 4.4.8"
+      },
+      "auth_oracle_file": {
+        "path": "smb2-samba-ntlmssp-tshark-oracle.tsv",
+        "sha256": "fcdc2f6edb484d66ead67aacecf00e97720ca2f6dbc412ba235d3d7b5c383196",
+        "size_bytes": 477,
+        "rows_including_header": 6,
+        "tool": "TShark 4.4.8"
+      },
+      "secrets": "Guest/no-password fixture. The capture does not demonstrate authenticated identity or SMB3 encrypted-payload decoding."
+    },
+    {
+      "id": "openldap-live-anonymous-search-starttls",
+      "path": "ldap-openldap-starttls-live.pcap",
+      "sha256": "37d18bd8d943f09c1bbc73b9b5e479996cf557703cb31903d94001c21b6c9065",
+      "size_bytes": 7063,
+      "link_type": "Ethernet",
+      "packet_count": 51,
+      "capture_method": "Live isolated OpenLDAP test-domain capture with anonymous bind, search, and successful StartTLS; actual subsequent TLS ClientHello bytes are replayed.",
+      "producers": {
+        "server": "OpenLDAP slapd 2.5.13 with disposable test entries and self-signed test certificate",
+        "client": "ldap-utils StartTLS client",
+        "capture": "tcpdump on the isolated container interface",
+        "oracle": "Wireshark TShark 4.4.8 LDAP/TLS field export"
+      },
+      "observed_messages": {
+        "ldap": {
+          "pdus": 9,
+          "operations": [
+            "BindRequest",
+            "BindResponse",
+            "SearchRequest",
+            "SearchResultEntry",
+            "SearchResultDone",
+            "ExtendedRequest",
+            "ExtendedResponse"
+          ],
+          "anonymous": true,
+          "tls_client_hello_frames": [
+            28,
+            29
+          ]
+        }
+      },
+      "oracle_file": {
+        "path": "ldap-openldap-tshark-oracle.tsv",
+        "sha256": "c0ab74e0499d8b1e29ae82af836cce58b8d8f68088dc1ba11b71f20fa885a96e",
+        "size_bytes": 293,
+        "rows_including_header": 12,
+        "tool": "TShark 4.4.8"
+      },
+      "secrets": "Disposable dummy directory entries; no credentials or private key is stored. TLS application data remains opaque."
+    },
+    {
+      "id": "ndpi-kerberos-login-upstream",
+      "repository_path": "common/bin-parser/testdata/protocol-corpus/captures/ndpi/ndpi-kerberos-login.pcap",
+      "sha256": "bccc9bf683c262c7dacc455c73133980db6233066f8f24305213da85103496c2",
+      "size_bytes": 37920,
+      "link_type": "Ethernet",
+      "packet_count": 39,
+      "source": {
+        "repository": "ntop/nDPI",
+        "commit": "4cae778e7e8f846b34f11d4f8392504cdebd3db8",
+        "upstream_path": "tests/cfgs/default/pcap/kerberos-login.pcap",
+        "url": "https://raw.githubusercontent.com/ntop/nDPI/4cae778e7e8f846b34f11d4f8392504cdebd3db8/tests/cfgs/default/pcap/kerberos-login.pcap",
+        "license": "LGPL-3.0",
+        "license_file": "common/bin-parser/testdata/protocol-corpus/licenses/ndpi-COPYING.txt"
+      },
+      "capture_method": "Unmodified upstream nDPI capture, replayed through the public bin-parser PCAP path; includes UDP Kerberos and TCP length-wrapped Kerberos messages.",
+      "producers": {
+        "oracle": "Wireshark TShark 4.4.8 Kerberos field export"
+      },
+      "observed_messages": {
+        "kerberos": {
+          "messages": 26,
+          "udp_frames": "1-24",
+          "tcp_wrapped_frames": [
+            31,
+            35
+          ],
+          "decryption_performed": false,
+          "peer_identity_validated": false,
+          "message_exchange_validated": false
+        }
+      },
+      "oracle_file": {
+        "path": "kerberos-ndpi-tshark-oracle.tsv",
+        "sha256": "d3eb4c09a5ee0f30e6852afabf4e49893f57fe95ec59798ec710a63b9dde741b",
+        "size_bytes": 991,
+        "rows_including_header": 27,
+        "tool": "TShark 4.4.8"
+      },
+      "secrets": "Upstream principal/realm strings are observed sample values only. No keytab, password, decrypted ticket, or identity validation evidence is included."
+    },
+    {
+      "id": "ndpi-dcerpc-upstream-v4-pnio-cm",
+      "repository_path": "common/bin-parser/testdata/protocol-corpus/captures/ndpi/ndpi-dcerpc.pcap",
+      "sha256": "6fd0ffc3562c4381126026f80388ae247ab1527e07ce83132e48445f2d52db04",
+      "size_bytes": 7146,
+      "link_type": "Ethernet",
+      "packet_count": 16,
+      "source": {
+        "repository": "ntop/nDPI",
+        "commit": "4cae778e7e8f846b34f11d4f8392504cdebd3db8",
+        "upstream_path": "tests/cfgs/default/pcap/dcerpc.pcap",
+        "url": "https://raw.githubusercontent.com/ntop/nDPI/4cae778e7e8f846b34f11d4f8392504cdebd3db8/tests/cfgs/default/pcap/dcerpc.pcap",
+        "license": "LGPL-3.0",
+        "license_file": "common/bin-parser/testdata/protocol-corpus/licenses/ndpi-COPYING.txt"
+      },
+      "capture_method": "Unmodified upstream nDPI PCAP. TShark decodes 16 connectionless DCE/RPC v4 PNIO-CM datagrams; the T21 stream profile is connection-oriented v5 and must reject these bytes.",
+      "observed_messages": {
+        "dcerpc": {
+          "pdus": 16,
+          "version": 4,
+          "tshark_protocol": "PNIO-CM",
+          "packet_types": [
+            "request",
+            "response"
+          ],
+          "parser_profile_supported": false
+        }
+      },
+      "oracle_file": {
+        "path": "dcerpc-ndpi-tshark-oracle.tsv",
+        "sha256": "b948227b44489499e4e55a25b73441469e6798866e30ce7a72c45e856fccd8c3",
+        "size_bytes": 1014,
+        "rows_including_header": 17,
+        "tool": "TShark 4.4.8"
+      },
+      "secrets": "No credentials or decryption material are included."
+    },
+    {
+      "id": "generated-local-msrpc-epm-bind",
+      "repository_path": "common/bin-parser/testdata/protocol-corpus/captures/generated-local/gen-msrpc-epm.pcap",
+      "sha256": "10136caf10d9c60d703c6b902683b8f6410439b60bd2d410f8a247cd1fa2098b",
+      "size_bytes": 376,
+      "link_type": "Ethernet",
+      "packet_count": 4,
+      "source": {
+        "generator": "Scapy generated-local corpus fixture",
+        "source_ref": "generated://scapy/a4153b185aa442f28211f01300067e95baa0c2dd/gen-msrpc-epm",
+        "repository_manifest": "common/bin-parser/testdata/protocol-corpus/manifest.json"
+      },
+      "capture_method": "Deterministic generated v5 Bind-only PCAP. This is generated-positive parser evidence, not a live or upstream capture; it contains no BindAck or procedure call.",
+      "observed_messages": {
+        "dcerpc": {
+          "pdus": 1,
+          "binds": 1,
+          "interface_uuid": "e1af8308-5d1f-11c9-91a4-08002b14a0fa",
+          "interface": "EPM",
+          "bind_ack": false,
+          "procedure_call": false
+        }
+      },
+      "oracle_file": {
+        "path": "dcerpc-gen-msrpc-epm-tshark-oracle.tsv",
+        "sha256": "78d1ab188b55aa326d75cab047f9d1a29f194d54c52e98c34020e9ccda6daadd",
+        "size_bytes": 170,
+        "rows_including_header": 2,
+        "tool": "TShark 4.4.8"
+      },
+      "secrets": "Generated protocol headers only; no credentials or application stub data are included."
+    },
+    {
+      "id": "generated-local-dcerpc-v5-full-epm-srvsvc-session",
+      "path": "dcerpc-generated-full-session.pcap",
+      "sha256": "b287eccc15c7501056c4ed87f652dff923ec9d7fa6670ba70b98241a800e9a75",
+      "size_bytes": 1402,
+      "link_type": "Ethernet",
+      "packet_count": 14,
+      "source": {
+        "generator": "common/pcapx/pcaputil/first_batch_t20_t21_test.go:t21DCERPCFullSessionSteps + bin_parser_session_test.go:sessionTestPCAP",
+        "source_ref": "generated://yaklang/pcaputil/dcerpc-v5-full-epm-srvsvc-session/v1",
+        "kind": "deterministic-generated-synthetic-not-real-capture"
+      },
+      "capture_method": "Deterministic generated Ethernet/IPv4/TCP session, not a live capture or interoperable client/server exchange. It carries two v5 Bind/BindAck exchanges and correlated EPM/SRVSVC request/response pairs.",
+      "observed_messages": {
+        "dcerpc": {
+          "pdus": 8,
+          "bind_frames": [
+            4,
+            8
+          ],
+          "bind_ack_frames": [
+            5,
+            9
+          ],
+          "accepted_context_ids": [
+            0,
+            1
+          ],
+          "interfaces": [
+            "EPM",
+            "SRVSVC"
+          ],
+          "request_frames": [
+            6,
+            10
+          ],
+          "request_opnums": [
+            3,
+            15
+          ],
+          "procedures": [
+            "EPM.ept_map",
+            "SRVSVC.NetrShareEnum"
+          ],
+          "response_frames": [
+            7,
+            11
+          ],
+          "response_call_ids": [
+            2,
+            4
+          ],
+          "identity_or_interoperability_verified": false
+        }
+      },
+      "oracle_file": {
+        "path": "dcerpc-generated-full-session-tshark-oracle.tsv",
+        "sha256": "755949e7a939c65f3e84f7eaa6fa60dc1b0117e00aa3d427e1beabfde16bcace",
+        "size_bytes": 633,
+        "rows_including_header": 9,
+        "tool": "TShark 4.4.8"
+      },
+      "secrets": "Synthetic protocol headers and opaque fixture stub bytes only; no credentials or production identities are included."
+    },
+    {
+      "id": "generated-local-dcerpc-epm-srvsvc-truncated-bindack",
+      "repository_path": "common/pcapx/pcaputil/testdata/protocol-sessions/dcerpc-epm-srvsvc.pcap",
+      "sha256": "c23f3bec06a192aafa7079ddfb38ba37510a14f33b562220a05100efdb3cdf75",
+      "size_bytes": 1342,
+      "link_type": "Ethernet",
+      "packet_count": 14,
+      "source": {
+        "generator": "protocol_session_samples_test.go:TestProtocolSessionM1PCAP",
+        "repository_manifest": "common/pcapx/pcaputil/testdata/protocol-sessions/m1-manifest.json",
+        "kind": "deterministic-generated-not-real-capture"
+      },
+      "capture_method": "Deterministic generated v5 session fixture, not an interop capture. TShark identifies eight DCE/RPC PDUs, but both BindAck payloads are truncated at 10 body bytes; the stream parser fails closed and does not establish the proposed contexts.",
+      "observed_messages": {
+        "dcerpc": {
+          "tshark_pdus": 8,
+          "bind_ack_frames": [
+            5,
+            9
+          ],
+          "bind_ack_status": "truncated",
+          "request_opnums": [
+            3,
+            15
+          ],
+          "parser_context_activated": false,
+          "procedure_linkage_verified": false
+        }
+      },
+      "oracle_file": {
+        "path": "dcerpc-epm-srvsvc-tshark-oracle.tsv",
+        "sha256": "eae744e6b7baef9b9557d3efe83b21f51f535ce3c18673d61c5366536fc9f614",
+        "size_bytes": 356,
+        "rows_including_header": 9,
+        "tool": "TShark 4.4.8"
+      },
+      "secrets": "Generated test stub data only; no credentials or production identities are included."
+    }
+  ],
+  "oracles": [
+    {
+      "tool": "Wireshark TShark 4.4.8",
+      "purpose": "Independent frame-level semantic comparison",
+      "files": [
+        "net-snmp-v1-tshark-oracle.tsv",
+        "sip-sipp-rtp-tshark-oracle.tsv",
+        "smb2-samba-tshark-oracle.tsv",
+        "smb2-samba-ntlmssp-tshark-oracle.tsv",
+        "ldap-openldap-tshark-oracle.tsv",
+        "stun-ndpi-tshark-oracle.tsv",
+        "kerberos-ndpi-tshark-oracle.tsv",
+        "dcerpc-ndpi-tshark-oracle.tsv",
+        "dcerpc-gen-msrpc-epm-tshark-oracle.tsv",
+        "dcerpc-generated-full-session-tshark-oracle.tsv",
+        "dcerpc-epm-srvsvc-tshark-oracle.tsv"
+      ],
+      "format": "UTF-8 TSV; first row is exact field-name header; one row per selected frame (all-frame files may include blank non-protocol rows)."
+    }
+  ]
+}

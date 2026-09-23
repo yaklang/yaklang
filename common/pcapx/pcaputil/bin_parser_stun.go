@@ -74,6 +74,10 @@ func stunFrameLength(w []byte, stream bool) (int, error) {
 		return 0, nil
 	}
 	if w[0]&0xc0 == 0x40 {
+		channel := binary.BigEndian.Uint16(w[:2])
+		if channel < 0x4000 || channel > 0x7fff {
+			return 0, protocolError(ErrMalformedMessage, "turn: invalid channel number")
+		}
 		n := 4 + int(binary.BigEndian.Uint16(w[2:4]))
 		if stream {
 			n = (n + 3) &^ 3
@@ -236,7 +240,7 @@ func (s *binSTUN) consume(dir int, ts time.Time, w []byte, max int, stream bool)
 	var id [12]byte
 	copy(id[:], w[8:20])
 	req := stunRequest{method: method, hash: sha256.Sum256(w), expires: s.clock.Add(40 * time.Second)}
-	out := map[string]any{"Packet Name": stunName(method), "Class": class, "Transaction ID": hex.EncodeToString(id[:]), "TURN": method != 1, "Integrity": "absent"}
+	out := map[string]any{"Packet Name": stunName(method), "Class": class, "Transaction ID": hex.EncodeToString(id[:]), "TURN": stunTURNMethod(method), "Integrity": "absent"}
 	attrs := []any{}
 	fingerprint := false
 	for at := 20; at < len(w); {
@@ -395,4 +399,15 @@ func (s *binSTUN) consume(dir int, ts time.Time, w []byte, max int, stream bool)
 	}
 	out["Pending Transactions"] = len(s.pending)
 	return out, nil
+}
+
+// Only methods defined for TURN carry TURN semantics. Unknown STUN methods
+// remain visible as STUN observations instead of being misclassified as TURN.
+func stunTURNMethod(method uint16) bool {
+	switch method {
+	case 3, 4, 6, 7, 8, 9, 10, 11, 12: // Allocate through ConnectionAttempt.
+		return true
+	default:
+		return false
+	}
 }

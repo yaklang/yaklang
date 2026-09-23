@@ -16,19 +16,155 @@ type rtspKey struct {
 	dir int
 	seq uint32
 }
+type rtspInterleavedOffer struct {
+	valid     bool
+	profile   string
+	rtp, rtcp byte
+}
 type rtspRequest struct {
-	method, session string
-	hash            [32]byte
+	method, session  string
+	hash             [32]byte
+	udpOffer         rtspUDPTransportOffer
+	interleavedOffer rtspInterleavedOffer
+	eventIDs         []uint64
+	packetRefs       []PacketReference
+	evidenceCost     int64
+	owner            *binRTSP
 }
 type rtspChannel struct {
 	session string
 	rtcp    bool
 }
 type binRTSP struct {
-	pending  map[rtspKey]rtspRequest
-	sessions map[string]string
-	channels map[byte]rtspChannel
-	media    *binRTP
+	pending                map[rtspKey]*rtspRequest
+	sessions               map[string]string
+	channels               map[byte]rtspChannel
+	media                  *binRTP
+	requestEvidenceBytes   int64
+	reserveRequestEvidence func(int64) error
+}
+
+const rtspInternalRequestEvidenceKey = "_rtsp_request_evidence"
+
+func parseRTSPChannelPair(value string) (byte, byte, bool) {
+	pair := strings.Split(value, "-")
+	if len(pair) != 2 || pair[0] == "" || pair[1] == "" {
+		return 0, 0, false
+	}
+	a, errA := strconv.ParseUint(pair[0], 10, 8)
+	b, errB := strconv.ParseUint(pair[1], 10, 8)
+	if errA != nil || errB != nil || a == b {
+		return 0, 0, false
+	}
+	return byte(a), byte(b), true
+}
+
+func parseRTSPInterleavedOffer(values []string) rtspInterleavedOffer {
+	fields, err := parseRTSPTransportFields(values)
+	if err != nil || fields.profile != "RTP/AVP/TCP" || fields.flags["multicast"] || fields.flags["rtcp-mux"] {
+		return rtspInterleavedOffer{}
+	}
+	value, ok := fields.params["interleaved"]
+	if !ok {
+		return rtspInterleavedOffer{}
+	}
+	rtp, rtcp, ok := parseRTSPChannelPair(value)
+	if !ok {
+		return rtspInterleavedOffer{}
+	}
+	return rtspInterleavedOffer{valid: true, profile: fields.profile, rtp: rtp, rtcp: rtcp}
+}
+
+func resolveRTSPInterleavedTransport(offer rtspInterleavedOffer, values []string) (string, byte, byte, bool) {
+	if len(values) == 0 {
+		return "transport-not-observed", 0, 0, false
+	}
+	fields, err := parseRTSPTransportFields(values)
+	if err != nil {
+		return "ambiguous-or-invalid-transport", 0, 0, false
+	}
+	if fields.profile != "RTP/AVP/TCP" {
+		return "non-interleaved-transport", 0, 0, false
+	}
+	if !offer.valid {
+		return "request-interleaved-offer-not-observed", 0, 0, false
+	}
+	if fields.flags["multicast"] || fields.flags["rtcp-mux"] {
+		return "unsupported-interleaved-transport-mode", 0, 0, false
+	}
+	value, ok := fields.params["interleaved"]
+	if !ok {
+		return "interleaved-channels-not-observed", 0, 0, false
+	}
+	rtp, rtcp, ok := parseRTSPChannelPair(value)
+	if !ok {
+		return "invalid-interleaved-channel-pair", 0, 0, false
+	}
+	if fields.profile != offer.profile || rtp != offer.rtp || rtcp != offer.rtcp {
+		return "interleaved-channel-offer-mismatch", 0, 0, false
+	}
+	return "matched", rtp, rtcp, true
+}
+
+func (s *binRTSP) recordRequestEvidence(req *rtspRequest, e *ProtocolEvent, max int) {
+	if req == nil || e == nil {
+		return
+	}
+	newIDs := make([]uint64, 0, 1)
+	if e.ID != 0 {
+		found := false
+		for _, id := range req.eventIDs {
+			found = found || id == e.ID
+		}
+		if !found {
+			newIDs = append(newIDs, e.ID)
+		}
+	}
+	newRefs := make([]PacketReference, 0, len(e.SourceBytes.PacketRefs))
+	for _, ref := range e.SourceBytes.PacketRefs {
+		found := false
+		for _, existing := range req.packetRefs {
+			if existing == ref {
+				found = true
+				break
+			}
+		}
+		for _, candidate := range newRefs {
+			if candidate == ref {
+				found = true
+				break
+			}
+		}
+		if !found {
+			newRefs = append(newRefs, ref)
+		}
+	}
+	if max > 0 && (len(req.eventIDs)+len(newIDs) > max || len(req.packetRefs)+len(newRefs) > max) {
+		e.Session["RTSP Request Evidence Status"] = "resource-limit"
+		return
+	}
+	delta := int64(len(newIDs))*8 + int64(len(newRefs))*24
+	if delta > 0 && req.owner != nil && req.owner.reserveRequestEvidence != nil {
+		if err := req.owner.reserveRequestEvidence(delta); err != nil {
+			e.Session["RTSP Request Evidence Status"] = "resource-limit"
+			return
+		}
+		req.owner.requestEvidenceBytes += delta
+	}
+	if len(newIDs) > 0 {
+		retained := make([]uint64, len(req.eventIDs)+len(newIDs))
+		copy(retained, req.eventIDs)
+		copy(retained[len(req.eventIDs):], newIDs)
+		req.eventIDs = retained
+	}
+	if len(newRefs) > 0 {
+		retained := make([]PacketReference, len(req.packetRefs)+len(newRefs))
+		copy(retained, req.packetRefs)
+		copy(retained[len(req.packetRefs):], newRefs)
+		req.packetRefs = retained
+	}
+	req.evidenceCost += delta
+	e.Session["RTSP Request Evidence Status"] = "retained"
 }
 
 var rtspMethods = []string{"OPTIONS", "DESCRIBE", "SETUP", "PLAY", "PAUSE", "TEARDOWN", "GET_PARAMETER", "SET_PARAMETER", "ANNOUNCE", "RECORD", "REDIRECT"}
@@ -96,11 +232,21 @@ func rtspHeader(w []byte, max int) (string, textproto.MIMEHeader, int, int, erro
 }
 func (f *binFlow) frameRTSP(w []byte) (int, *binSpec, error) {
 	s := f.rtsp
-	mediaBytes := int64(0)
+	mediaBytes := int64(512)
 	if s.media != nil {
-		mediaBytes = int64(len(s.media.sources)+1) * 512
+		s.media.maxBufferedBytes = f.a.config.MaxBufferedBytes
+		mediaBytes = s.media.retainedBytes()
 	}
-	if err := f.reserveSession(1024 + int64(len(s.pending)+1)*512 + int64(len(s.sessions)+1)*320 + int64(len(s.channels)+2)*128 + mediaBytes); err != nil {
+	rtspBase := int64(1024 + len(s.pending)*512 + len(s.sessions)*320 + len(s.channels)*128)
+	s.reserveRequestEvidence = func(delta int64) error {
+		return f.reserveSession(rtspBase + mediaBytes + s.requestEvidenceBytes + delta)
+	}
+	if s.media != nil {
+		s.media.reserveSessionMemory = func(target int64) error {
+			return f.reserveSession(rtspBase + s.requestEvidenceBytes + target)
+		}
+	}
+	if err := f.reserveSession(rtspBase + 512 + 320 + 2*128 + s.requestEvidenceBytes + mediaBytes); err != nil {
 		return 0, nil, err
 	}
 	if len(w) > 0 && w[0] == '$' {
@@ -117,7 +263,7 @@ func (f *binFlow) frameRTSP(w []byte) (int, *binSpec, error) {
 }
 func (s *binRTSP) consume(dir int, w []byte, ts time.Time, max int) (map[string]any, error) {
 	if s.pending == nil {
-		s.pending = map[rtspKey]rtspRequest{}
+		s.pending = map[rtspKey]*rtspRequest{}
 		s.sessions = map[string]string{}
 		s.channels = map[byte]rtspChannel{}
 		s.media = &binRTP{sources: map[uint32]*rtpSource{}}
@@ -133,10 +279,19 @@ func (s *binRTSP) consume(dir int, w []byte, ts time.Time, max int) (map[string]
 			return out, nil
 		}
 		out["Session ID"] = ch.session
-		if ch.rtcp != rtpIsRTCP(w[4:]) {
-			return nil, fmt.Errorf("rtsp: RTP/RTCP channel mismatch")
+		if ch.rtcp {
+			media, err := s.media.consumeRTCPCompound(w[4:], max)
+			out["Media"] = media
+			return out, err
 		}
-		media, err := s.media.consume(w[4:], ts, max)
+		_, pt, err := inspectRTPDatagramAs(w[4:], 1<<20, max, false)
+		if err != nil {
+			return nil, err
+		}
+		media, err := s.media.consumeRTP(w[4:], ts, max)
+		if err == nil {
+			media["Channel Payload Type"] = pt
+		}
 		out["Media"] = media
 		return out, err
 	}
@@ -184,17 +339,29 @@ func (s *binRTSP) consume(dir int, w []byte, ts time.Time, max int) (map[string]
 		if !known {
 			return nil, protocolError(ErrUnsupportedFeature, "RTSP method")
 		}
+		var request *rtspRequest
 		if old, ok := s.pending[key]; ok {
 			if old.hash != sha256.Sum256(w) {
 				return nil, protocolError(ErrDesynchronized, "RTSP CSeq reused")
 			}
+			request = old
 			out["Retransmission"] = true
 		} else if len(s.pending) >= max {
 			return nil, protocolError(ErrResourceExceeded, "RTSP pending requests")
 		}
-		s.pending[key] = rtspRequest{strings.Clone(parts[0]), strings.Clone(sid), sha256.Sum256(w)}
+		if request == nil {
+			request = &rtspRequest{method: strings.Clone(parts[0]), session: strings.Clone(sid), hash: sha256.Sum256(w), owner: s}
+			if parts[0] == "SETUP" {
+				request.udpOffer = parseRTSPClientTransportOffer(h.Values("Transport"))
+				request.interleavedOffer = parseRTSPInterleavedOffer(h.Values("Transport"))
+			}
+		}
+		s.pending[key] = request
 		out["Packet Name"] = parts[0]
 		out["URI"] = parts[1]
+		if request.method == "SETUP" {
+			out[rtspInternalRequestEvidenceKey] = request
+		}
 	} else {
 		status, err := strconv.Atoi(parts[1])
 		if err != nil || status < 100 || status > 599 {
@@ -220,35 +387,26 @@ func (s *binRTSP) consume(dir int, w []byte, ts time.Time, max int) (map[string]
 				}
 				switch req.method {
 				case "SETUP":
-					for _, part := range strings.Split(h.Get("Transport"), ";") {
-						kv := strings.SplitN(strings.TrimSpace(part), "=", 2)
-						if len(kv) != 2 || strings.ToLower(kv[0]) != "interleaved" {
-							continue
-						}
-						pair := strings.Split(kv[1], "-")
-						if len(pair) != 2 {
-							return nil, fmt.Errorf("rtsp: interleaved channel pair")
-						}
-						a, e1 := strconv.ParseUint(pair[0], 10, 8)
-						b, e2 := strconv.ParseUint(pair[1], 10, 8)
-						if e1 != nil || e2 != nil || a == b {
-							return nil, fmt.Errorf("rtsp: channel range")
-						}
-						extra := 0
-						for _, channel := range []byte{byte(a), byte(b)} {
-							if old, exists := s.channels[channel]; exists {
-								if old.session != sid {
-									return nil, protocolError(ErrDesynchronized, "RTSP channel already assigned")
-								}
-							} else {
-								extra++
+					interleavedStatus, rtpChannel, rtcpChannel, matched := resolveRTSPInterleavedTransport(req.interleavedOffer, h.Values("Transport"))
+					out["Interleaved Transport Status"] = interleavedStatus
+					if matched {
+						for _, channel := range []byte{rtpChannel, rtcpChannel} {
+							if _, exists := s.channels[channel]; exists {
+								return nil, protocolError(ErrDesynchronized, "RTSP channel already assigned")
 							}
 						}
-						if len(s.channels)+extra > max {
+						if len(s.channels)+2 > max {
 							return nil, protocolError(ErrResourceExceeded, "RTSP channels")
 						}
-						s.channels[byte(a)] = rtspChannel{sid, false}
-						s.channels[byte(b)] = rtspChannel{sid, true}
+						s.channels[rtpChannel] = rtspChannel{sid, false}
+						s.channels[rtcpChannel] = rtspChannel{sid, true}
+					}
+					out["RTSP SETUP Request Event IDs"] = append([]uint64(nil), req.eventIDs...)
+					out["RTSP SETUP Request Packet References"] = append([]PacketReference(nil), req.packetRefs...)
+					transportStatus, transport := resolveRTSPUDPTransport(req.udpOffer, h.Values("Transport"))
+					out["UDP Media Transport Status"] = transportStatus
+					if transport != nil {
+						out["UDP Media Transport"] = transport.sessionValue()
 					}
 					s.sessions[strings.Clone(sid)] = "ready"
 				case "PLAY":
@@ -259,6 +417,7 @@ func (s *binRTSP) consume(dir int, w []byte, ts time.Time, max int) (map[string]
 				case "PAUSE":
 					s.sessions[strings.Clone(sid)] = "ready"
 				case "TEARDOWN":
+					out["RTSP Session Teardown"] = true
 					delete(s.sessions, sid)
 					for ch, v := range s.channels {
 						if v.session == sid {
@@ -269,6 +428,9 @@ func (s *binRTSP) consume(dir int, w []byte, ts time.Time, max int) (map[string]
 			}
 			if status >= 200 {
 				delete(s.pending, key)
+				if req != nil && req.evidenceCost > 0 {
+					s.requestEvidenceBytes -= req.evidenceCost
+				}
 			}
 		}
 	}

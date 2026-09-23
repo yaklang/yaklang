@@ -58,6 +58,18 @@ func TestSTUNSessionAssociationAndBounds(t *testing.T) {
 	s.Close("done")
 	require.Zero(t, s.Stats().BufferedBytes)
 }
+
+func TestSTUNUnknownMethodIsNotMisclassifiedAsTURN(t *testing.T) {
+	s, err := NewProtocolSession(DefaultParserBudget())
+	require.NoError(t, err)
+	r := s.Feed(0, time.Unix(1, 0), stunTestMessage(0x155, 0, 9))
+	require.Nil(t, r.Err, "%v", r.Err)
+	require.Len(t, r.Events, 1)
+	require.Equal(t, "stun", r.Events[0].Protocol, "an unknown STUN method is not sufficient evidence for TURN")
+	require.NotEqual(t, "turn-rfc8656-udp", r.Events[0].Profile)
+	require.Equal(t, false, r.Events[0].Session["TURN"])
+}
+
 func TestTURNObservedChannelLifecycle(t *testing.T) {
 	s := &binSTUN{}
 	ts := time.Unix(100, 0)

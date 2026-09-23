@@ -40,6 +40,9 @@ type ProtocolEvent struct {
 	plan            *binparser.StructuredPlan
 	decodeSkip      int
 	decodeConfig    map[string]any
+	syslogFraming   syslogFrameKind
+	syslogBudget    int
+	syslogMaxBytes  int
 	historySequence uint64
 	ipp             bool
 	sessionError    *ProtocolError
@@ -77,6 +80,13 @@ func (e *ProtocolEvent) Decode() (result map[string]any, err error) {
 	if e.nativeQUICWire {
 		fields, decodeErr := quicWireEnvelope(e.Raw)
 		return map[string]any{"fields": fields, "metadata": nil}, decodeErr
+	}
+	if e.syslogFraming != "" {
+		fields, decodeErr := (&binSyslog{}).consume(e.Raw, e.syslogFraming, e.syslogMaxBytes, e.syslogBudget)
+		return map[string]any{"fields": fields}, decodeErr
+	}
+	if e.Entry == "LDAPProtectedRecord" {
+		return map[string]any{"fields": map[string]any{"Security Layer": "SASL protected record", "Payload": "opaque"}}, nil
 	}
 	if e.Rule == "" {
 		return nil, fmt.Errorf("protocol parser: no exact rule for this message")
@@ -209,6 +219,10 @@ type binParser struct {
 	tlsSecrets                                                                 TLSSecretProvider
 	udpMu                                                                      sync.Mutex
 	udpSessions                                                                *binUDPStore
+	mediaMu                                                                    sync.Mutex
+	mediaIndex                                                                 map[mediaEndpointKey][]*sipMediaAssociation
+	mediaEntries                                                               []*sipMediaAssociation
+	rtspMedia                                                                  *rtspMediaRegistry
 	budget                                                                     ParserBudget
 	bindings                                                                   map[uint16][]*BinParserBinding
 	contextRequired                                                            atomic.Uint64
@@ -243,7 +257,7 @@ func (c *CaptureConfig) prepareBinParser() error {
 	if config.MaxMessageBytes < 64 || config.MaxMessageBytes > 16<<20 || config.MaxBufferedBytes < config.MaxMessageBytes || config.ProbeBytes < 16 || config.ProbeBytes > config.MaxMessageBytes {
 		return fmt.Errorf("invalid protocol parser buffer/probe limits")
 	}
-	a := &binParser{config: config, specs: make(map[string]*binSpec), budget: DefaultParserBudget()}
+	a := &binParser{config: config, specs: make(map[string]*binSpec), budget: DefaultParserBudget(), rtspMedia: &rtspMediaRegistry{index: make(map[rtspMediaTuple][]rtspMediaBinding)}}
 	a.budget.MaxMessageBytes, a.budget.MaxFrameBytes = config.MaxMessageBytes, config.MaxMessageBytes
 	a.budget.MaxBufferedBytes, a.budget.ProbeBytes = config.MaxBufferedBytes, config.ProbeBytes
 	a.bindings = make(map[uint16][]*BinParserBinding)
@@ -289,6 +303,8 @@ func (c *CaptureConfig) finishBinParser() error {
 	}
 	a := c.binParser
 	a.closeUDPSessions()
+	a.closeMediaAssociations()
+	a.closeRTSPMedia()
 	a.closeFragments()
 	if a.config.OnStats != nil {
 		a.config.OnStats(a.stats())
@@ -300,13 +316,22 @@ func (c *CaptureConfig) finishBinParser() error {
 }
 
 func (a *binParser) emit(e *BinParserEvent) {
+	if e == nil {
+		return
+	}
+	if e.ID == 0 {
+		e.ID = a.ids.Add(1)
+	}
+	if e.Protocol == "sip" {
+		a.observeSIPMedia(e)
+	}
+	if e.Protocol == "rtsp" {
+		a.observeRTSPMedia(e)
+	}
 	if a.config.OnEvent == nil {
 		return
 	}
 	e.setStructured(e.Structured)
-	if e.ID == 0 {
-		e.ID = a.ids.Add(1)
-	}
 	e.finalizeEvidence()
 	defer func() {
 		if p := recover(); p != nil {
@@ -328,73 +353,75 @@ type binDirection struct {
 	stopped         bool
 }
 type binFlow struct {
-	domain           CaptureDomain
-	tls              *binTLS
-	byteSource       string
-	parentID         uint64
-	captureTCP       bool
-	lastSessionError *ProtocolError
-	sessionBytes     int64
-	h2               *binHTTP2
-	mysql            *binMySQL
-	pg               *binPostgres
-	ws               *binWebSocket
-	ldap             *binLDAP
-	redis            *binRedis
-	mqtt             *binMQTT
-	mongo            *binMongo
-	kafka            *binKafka
-	tds              *binTDS
-	amqp             *binAMQP
-	smb2             *binSMB2
-	dcerpc           *binDCERPC
-	ssh              *binSSH
-	nfs              *binNFS
-	snmp             *binSNMP
-	rdp              *binRDP
-	dot              *binDoT
-	doh              *binDoH
-	sip              *binSIP
-	rtp              *binRTP
-	quic             *binQUIC
-	smtp             *binSMTP
-	imap             *binIMAP
-	pop3             *binPOP3
-	ftp              *binFTP
-	tns              *binTNS
-	radius           *binRADIUS
-	dhcp             *binDHCP
-	ntp              *binNTP
-	coap             *binCoAP
-	modbus           *binModbus
-	rfb              *binRFB
-	diameter         *binDiameter
-	iec104           *binIEC104
-	s7               *binS7
-	opcua            *binOPCUA
-	ipp              *binIPP
-	rtsp             *binRTSP
-	stun             *binSTUN
-	tftp             *binTFTP
-	dnp3             *binDNP3
-	c37118           *binC37118
-	goose            *binGOOSE
-	httpUpgrades     []bool
-	httpDoH          []bool
-	httpIPP          []bool
-	httpIDs          []uint64
-	httpTimes        []time.Time
-	httpWSKeys       []string
-	httpWSExtensions []string
-	httpMethods      []string
-	a                *binParser
-	id               uint64
-	endpoints        [2]string
-	ports            [2]uint16
-	protocol         string
-	level            byte
-	binding          *BinParserBinding
-	directions       [2]binDirection
+	domain            CaptureDomain
+	tls               *binTLS
+	byteSource        string
+	parentID          uint64
+	captureTCP        bool
+	syslogStreamProbe bool
+	lastSessionError  *ProtocolError
+	sessionBytes      int64
+	h2                *binHTTP2
+	mysql             *binMySQL
+	pg                *binPostgres
+	ws                *binWebSocket
+	ldap              *binLDAP
+	redis             *binRedis
+	mqtt              *binMQTT
+	mongo             *binMongo
+	kafka             *binKafka
+	tds               *binTDS
+	amqp              *binAMQP
+	smb2              *binSMB2
+	dcerpc            *binDCERPC
+	ssh               *binSSH
+	nfs               *binNFS
+	snmp              *binSNMP
+	rdp               *binRDP
+	dot               *binDoT
+	doh               *binDoH
+	sip               *binSIP
+	rtp               *binRTP
+	quic              *binQUIC
+	smtp              *binSMTP
+	imap              *binIMAP
+	pop3              *binPOP3
+	ftp               *binFTP
+	tns               *binTNS
+	radius            *binRADIUS
+	dhcp              *binDHCP
+	ntp               *binNTP
+	coap              *binCoAP
+	modbus            *binModbus
+	rfb               *binRFB
+	diameter          *binDiameter
+	iec104            *binIEC104
+	s7                *binS7
+	opcua             *binOPCUA
+	ipp               *binIPP
+	rtsp              *binRTSP
+	stun              *binSTUN
+	tftp              *binTFTP
+	dnp3              *binDNP3
+	c37118            *binC37118
+	goose             *binGOOSE
+	syslog            *binSyslog
+	httpUpgrades      []bool
+	httpDoH           []bool
+	httpIPP           []bool
+	httpIDs           []uint64
+	httpTimes         []time.Time
+	httpWSKeys        []string
+	httpWSExtensions  []string
+	httpMethods       []string
+	a                 *binParser
+	id                uint64
+	endpoints         [2]string
+	ports             [2]uint16
+	protocol          string
+	level             byte
+	binding           *BinParserBinding
+	directions        [2]binDirection
 }
 
 func (a *binParser) newFlow(t *TrafficFlow) *binFlow {
@@ -549,6 +576,11 @@ func (f *binFlow) feed(dir int, data []byte, ts time.Time) {
 				break
 			}
 		}
+		if f.protocol == "snmp" && f.snmp != nil {
+			// Prune expired transactions before framing charges their retained
+			// slots against the per-flow memory budget.
+			f.snmp.expirePending(ts)
+		}
 		n, spec, err := f.frameDirection(dir, wire)
 		if err != nil {
 			status, typed := classifySessionError(err)
@@ -577,6 +609,13 @@ func (f *binFlow) feed(dir int, data []byte, ts time.Time) {
 		}
 		e := f.event(dir, wire[:n], "deferred", f.protocol)
 		e.Rule, e.Entry, e.plan = spec.rule, spec.entry, spec.plan
+		if f.protocol == "syslog" {
+			e.syslogFraming = syslogStreamFraming(e.Raw)
+			e.syslogBudget = a.budget.MaxCollectionElements
+			e.syslogMaxBytes = a.config.MaxMessageBytes
+			e.Completeness = "message"
+			e.Profile = syslogProfileForWire(e.Raw, e.syslogFraming)
+		}
 		if f.protocol == "dns" || f.protocol == "dot" {
 			e.decodeSkip = 2
 		}
@@ -595,6 +634,12 @@ func (f *binFlow) feed(dir int, data []byte, ts time.Time) {
 		a.messages.Add(1)
 		a.messageBytes.Add(uint64(n))
 		stateful := httpSession || f.protocol != "http" && f.hasSession()
+		// Syslog has no connection state. Deferred capture must retain only
+		// framed bytes and defer its semantic parser until the viewer calls
+		// Decode/GetFields.
+		if f.protocol == "syslog" && a.config.Deferred {
+			stateful = false
+		}
 		if !a.config.Deferred || stateful || f.protocol == "tls" {
 			rawCopy := e.Raw
 			if f.protocol == "quic" {
@@ -608,7 +653,7 @@ func (f *binFlow) feed(dir int, data []byte, ts time.Time) {
 				} else {
 					result, err = f.consumeTLS(dir, e)
 				}
-			} else if f.protocol == "redis" || e.Entry == "MySQLPreparedFields" {
+			} else if f.protocol == "redis" || f.protocol == "syslog" || f.protocol == "snmp" || f.protocol == "smb2" || e.Entry == "MySQLPreparedFields" {
 				result = map[string]any{}
 			} else if f.protocol == "websocket" && f.ws != nil && f.ws.deflate {
 				result = map[string]any{"fields": map[string]any{}}
@@ -620,8 +665,19 @@ func (f *binFlow) feed(dir int, data []byte, ts time.Time) {
 					e.Raw = rawCopy
 				}
 				err = f.consumeSession(dir, e, result)
-				if f.protocol == "redis" || e.Entry == "MySQLPreparedFields" {
+				if f.protocol == "redis" || f.protocol == "syslog" || e.Entry == "MySQLPreparedFields" {
 					result = map[string]any{"fields": e.Session}
+				}
+				if f.protocol == "smb2" && e.Session != nil {
+					e.semanticFields = cloneSession(e.Session)
+					result = map[string]any{"fields": e.semanticFields}
+				}
+				if f.protocol == "snmp" && e.Session != nil {
+					e.semanticFields = cloneSession(e.Session)
+					result = map[string]any{"fields": e.semanticFields}
+				}
+				if (e.Protocol == "ldap" || e.Entry == "LDAPProtectedRecord") && e.semanticFields != nil {
+					result = map[string]any{"fields": cloneSession(e.semanticFields)}
 				}
 				if e.Protocol == "websocket" && f.ws != nil && f.ws.deflate {
 					e.semanticFields = cloneSession(e.Session)

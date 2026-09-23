@@ -21,10 +21,10 @@ func (f *binFlow) detectDirection(dir int, w []byte) {
 	}
 	if f.captureTCP {
 		switch p.Protocol {
-		case "radius", "dhcp", "ntp", "coap", "websocket":
+		case "radius", "dhcp", "ntp", "coap", "websocket", "rtp":
 			// These profiles describe UDP datagrams, not their distinct TCP
-			// variants. Explicit ProtocolSession callers supply their own
-			// message framing; captured UDP is handled by datagramFields.
+			// variants. Raw RTP has no standalone TCP message delimiter; callers
+			// must select RFC4571 or RTSP interleaving as the carrier instead.
 			return
 		}
 	}
@@ -50,7 +50,7 @@ func (f *binFlow) detectDirection(dir int, w []byte) {
 	case "postgresql":
 		f.protocol, f.pg = "postgresql", &binPostgres{frontend: -1}
 	case "ldap":
-		f.protocol, f.ldap = "ldap", &binLDAP{pending: map[uint64]ldapRequest{}}
+		f.protocol, f.ldap = "ldap", &binLDAP{pending: map[ldapPendingKey]ldapRequest{}}
 	case "redis":
 		f.protocol, f.redis = "redis", &binRedis{client: -1}
 	case "websocket":
@@ -70,15 +70,19 @@ func (f *binFlow) detectDirection(dir int, w []byte) {
 	case "amqp":
 		f.protocol, f.amqp = "amqp", &binAMQP{client: -1, pending: map[uint16][]string{}, delivers: map[uint64]uint16{}, chans: map[uint16]*amqpChan{}}
 	case "smb2":
-		f.protocol, f.smb2 = "smb2", &binSMB2{client: dir, pending: map[uint64]string{}}
+		f.protocol, f.smb2 = "smb2", &binSMB2{client: dir, pending: map[smb2PendingKey]smb2Pending{}, async: map[smb2AsyncKey]smb2PendingKey{}, files: map[smb2FileKey]string{}}
 	case "dcerpc":
-		f.protocol, f.dcerpc = "dcerpc", &binDCERPC{client: dir, ctx: map[uint16]string{}, uuid: map[uint16][]byte{}, pending: map[uint32]string{}, frags: map[uint32][]byte{}}
+		f.protocol, f.dcerpc = "dcerpc", &binDCERPC{
+			client: dir, ctx: map[uint16]string{}, uuid: map[uint16][]byte{}, ctxVersion: map[uint16]uint32{},
+			pending: map[uint32]string{}, pendingDir: map[uint32]int{}, pendingContext: map[uint32]uint16{},
+			proposals: map[uint32][]dcerpcProposal{}, frags: map[dcerpcFragmentKey]dcerpcFragment{},
+		}
 	case "ssh":
 		f.protocol, f.ssh = "ssh", &binSSH{client: dir}
 	case "nfs":
 		f.protocol, f.nfs = "nfs", &binNFS{client: dir, pending: map[uint32]string{}}
 	case "snmp":
-		f.protocol, f.snmp = "snmp", &binSNMP{pending: map[int64]string{}}
+		f.protocol, f.snmp = "snmp", &binSNMP{pending: map[snmpPendingKey]snmpPendingRequest{}}
 	case "rdp":
 		f.protocol, f.rdp = "rdp", &binRDP{client: dir}
 	case "dot":
@@ -117,6 +121,8 @@ func (f *binFlow) detectDirection(dir int, w []byte) {
 		f.protocol, f.dnp3 = "dnp3", &binDNP3{pending: map[uint32]string{}}
 	case "c37118":
 		f.protocol, f.c37118 = "c37118", &binC37118{}
+	case "syslog":
+		f.protocol, f.syslog = "syslog", &binSyslog{}
 	case "goose":
 		f.protocol, f.goose = "goose", &binGOOSE{}
 	}
@@ -200,7 +206,17 @@ func (f *binFlow) consumeSession(dir int, e *ProtocolEvent, result map[string]an
 			e.Session["Protocol Transition"] = "postgresql->tls"
 		}
 	case "ldap":
-		e.Session, err = f.ldap.consume(dir, e.Raw, e.Entry, f.a.budget.MaxCollectionElements)
+		if e.Entry == "LDAPProtectedRecord" {
+			e.Session, err = f.ldap.consumeProtected(dir, e.Raw)
+			e.semanticFields = cloneSession(e.Session)
+		} else {
+			e.Session, err = f.ldap.consume(dir, e.Raw, e.Entry, f.a.budget.MaxCollectionElements)
+			if err == nil {
+				if fields, ok := result["fields"].(map[string]any); ok {
+					e.semanticFields, _ = ldapRedactedProjection(fields).(map[string]any)
+				}
+			}
+		}
 		if err == nil && e.Session["StartTLS"] == true && e.Session["Message Name"] == "ExtendedResponse" {
 			f.protocol, f.ldap = "tls", nil
 			e.Session["Protocol Transition"] = "ldap->tls"
@@ -230,15 +246,15 @@ func (f *binFlow) consumeSession(dir int, e *ProtocolEvent, result map[string]an
 	case "amqp":
 		e.Session, err = f.amqp.consume(dir, e.Raw, f.a.budget.MaxCollectionElements)
 	case "smb2":
-		e.Session, err = f.smb2.consume(e.Raw, f.a.budget.MaxCollectionElements)
+		e.Session, err = f.smb2.consumeFrom(dir, e.Raw, f.a.budget.MaxCollectionElements)
 	case "dcerpc":
-		e.Session, err = f.dcerpc.consume(e.Raw, f.a.budget.MaxCollectionElements)
+		e.Session, err = f.dcerpc.consumeFrom(dir, e.Raw, f.a.budget.MaxCollectionElements)
 	case "ssh":
 		e.Session, err = f.ssh.consume(dir, e.Raw)
 	case "nfs":
 		e.Session, err = f.nfs.consume(e.Raw, f.a.budget.MaxCollectionElements)
 	case "snmp":
-		e.Session, err = f.snmp.consume(e.Raw, f.a.budget.MaxCollectionElements)
+		e.Session, err = f.snmp.consumeAt(e.Raw, f.a.budget.MaxCollectionElements, dir, e.Timestamp)
 	case "rdp":
 		e.Session, err = f.rdp.consume(e.Raw)
 		if err == nil && e.Session["TLS Expected"] == true {
@@ -247,7 +263,16 @@ func (f *binFlow) consumeSession(dir int, e *ProtocolEvent, result map[string]an
 	case "dot":
 		e.Session, err = f.dot.consume(e.Raw, f.a.budget.MaxCollectionElements)
 	case "sip":
-		e.Session, err = f.sip.consume(e.Raw, f.a.budget.MaxCollectionElements)
+		e.Session, err = f.sip.consumeAt(e.Raw, f.a.budget.MaxCollectionElements, e.Timestamp, dir)
+		if e.Session != nil {
+			// SIP's session parser is the authoritative bounded parser. Keep its
+			// normalized result so legal header whitespace is not reinterpreted by
+			// the older field grammar during deferred/full event decoding.
+			e.semanticFields = cloneSession(e.Session)
+		}
+		if err == nil {
+			e.Profile, e.Completeness = "sip-transaction-observed", "message"
+		}
 	case "rtp":
 		e.Session, err = f.rtp.consume(e.Raw, f.directions[dir].ts, f.a.budget.MaxCollectionElements)
 	case "quic":
@@ -278,6 +303,20 @@ func (f *binFlow) consumeSession(dir int, e *ProtocolEvent, result map[string]an
 		e.Session, err = f.c37118.consume(e.Raw)
 	case "goose":
 		e.Session, err = f.goose.consume(e.Raw)
+	case "syslog":
+		framing := syslogStreamFraming(e.Raw)
+		e.Session, err = f.syslog.consume(e.Raw, framing, f.a.config.MaxMessageBytes, f.a.budget.MaxCollectionElements)
+		if e.Session != nil {
+			e.semanticFields = cloneSession(e.Session)
+		}
+		if err == nil {
+			e.Completeness = "message"
+			if e.Session["Version"] == nil {
+				e.Profile = "syslog-rfc3164-bounded"
+			} else {
+				e.Profile = "syslog-rfc5424-v1"
+			}
+		}
 	}
 	if e.Session != nil {
 		switch e.Protocol {
@@ -319,7 +358,7 @@ func (f *binFlow) consumeSession(dir int, e *ProtocolEvent, result map[string]an
 		case "nfs":
 			e.Summary = fmt.Sprintf("NFS %v xid %v", e.Session["Packet Name"], e.Session["XID"])
 		case "snmp":
-			e.Summary = fmt.Sprintf("SNMPv3 %v id %v", e.Session["Packet Name"], e.Session["Request ID"])
+			e.Summary = fmt.Sprintf("SNMPv%v %v id %v", e.Session["Version Name"], e.Session["Packet Name"], e.Session["Request ID"])
 		case "rdp":
 			e.Summary = fmt.Sprintf("RDP %v", e.Session["Packet Name"])
 		case "dot":
@@ -366,6 +405,8 @@ func (f *binFlow) consumeSession(dir int, e *ProtocolEvent, result map[string]an
 			e.Summary = fmt.Sprintf("C37.118 %v id %v", e.Session["Packet Name"], e.Session["ID Code"])
 		case "goose":
 			e.Summary = fmt.Sprintf("GOOSE st %v sq %v", e.Session["State Number"], e.Session["Sequence Number"])
+		case "syslog":
+			e.Summary = fmt.Sprintf("Syslog facility %v severity %v", e.Session["Facility"], e.Session["Severity"])
 		}
 		if e.Session["DoH"] == true {
 			e.Protocol = "doh"
@@ -402,7 +443,7 @@ func (f *binFlow) closeSession() {
 	f.stun, f.tftp, f.rtsp, f.ipp = nil, nil, nil, nil
 	f.diameter, f.iec104, f.s7, f.opcua = nil, nil, nil, nil
 	f.rfb = nil
-	f.dnp3, f.c37118, f.goose = nil, nil, nil
+	f.dnp3, f.c37118, f.goose, f.syslog = nil, nil, nil, nil
 	f.h2, f.mysql, f.pg, f.ws, f.ldap, f.redis, f.mqtt, f.mongo, f.kafka, f.tds, f.amqp, f.smb2, f.dcerpc, f.ssh, f.nfs, f.snmp, f.rdp, f.dot, f.doh, f.sip, f.rtp, f.quic, f.smtp, f.imap, f.pop3, f.ftp, f.tns, f.radius, f.dhcp, f.ntp, f.coap, f.modbus = nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil
 	f.a.buffered.Add(-f.sessionBytes)
 	f.sessionBytes = 0
