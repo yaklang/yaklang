@@ -93,3 +93,13 @@ func TestPingICMPUnavailableFallsBack(t *testing.T) {
 		t.Fatalf("missing TCP fallback: %+v", result)
 	}
 }
+
+func TestPingNoTCPPorts(t *testing.T) {
+	result := PingAuto("192.0.2.1", WithForceTcpPing(), WithDefaultTcpPort(""), WithTcpDialHandler(func(context.Context, string, ...string) (net.Conn, error) {
+		t.Error("unexpected TCP probe")
+		return nil, nil
+	}))
+	if result.Ok || result.Reason != "no TCP probe ports configured" {
+		t.Fatalf("unexpected result: %+v", result)
+	}
+}

@@ -7,6 +7,7 @@ import (
 	"sync"
 
 	"github.com/gopacket/gopacket"
+	"github.com/gopacket/gopacket/layers"
 	"github.com/segmentio/ksuid"
 	"github.com/yaklang/pcap"
 	"github.com/yaklang/yaklang/common/log"
@@ -166,6 +167,7 @@ func (p *pcapFanOut) CreatePCAPAdaptor() (*pcapAdaptor, error) {
 	broker := newPcapBroker(insChan, func() {
 		p.ClosePCAPAdaptor(id)
 	}, p.WritePacket)
+	broker.linkType = p.handle.LinkType()
 	return broker, nil
 }
 
@@ -193,10 +195,11 @@ func (p *pcapFanOut) ClosePCAPAdaptor(id string) {
 
 // pcapAdaptor represents a single consumer of packet data
 type pcapAdaptor struct {
-	m      sync.Mutex           // Protects access to adaptor
-	inChan chan gopacket.Packet // Channel for receiving packets
-	close  func()               // Function to call on close
-	writer func([]byte) error   // Function to write packets
+	linkType layers.LinkType
+	m        sync.Mutex           // Protects access to adaptor
+	inChan   chan gopacket.Packet // Channel for receiving packets
+	close    func()               // Function to call on close
+	writer   func([]byte) error   // Function to write packets
 }
 
 // newPcapBroker creates a new pcap adaptor instance

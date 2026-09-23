@@ -3,7 +3,9 @@ package netstackvm
 import (
 	"bytes"
 	"context"
+	"encoding/binary"
 	"net"
+	"runtime"
 	"sync"
 
 	"github.com/yaklang/yaklang/common/netx"
@@ -98,7 +100,7 @@ func NewPCAPEndpoint(ctx context.Context, stackIns *stack.Stack, device string, 
 		wg:           new(sync.WaitGroup),
 		ipToMac:      new(sync.Map),
 		gatewayFound: utils.NewAtomicBool(),
-		loopback:     iface.Flags&net.FlagLoopback != 0,
+		loopback:     adaptor.linkType == layers.LinkTypeNull || adaptor.linkType == layers.LinkTypeLoop,
 	}
 	return pcapEp, nil
 }
@@ -414,16 +416,25 @@ func (p *PCAPEndpoint) writePacket(pkt *stack.PacketBuffer) error {
 	var payloads = buf.Flatten()
 	var linkLayerType gopacket.LayerType
 	var err error
-	if p.loopback {
+	switch p.adaptor.linkType {
+	case layers.LinkTypeRaw, layers.LinkTypeIPv4, layers.LinkTypeIPv6:
+		switch header.IPVersion(payloads) {
+		case header.IPv4Version:
+			linkLayerType = layers.LayerTypeIPv4
+		case header.IPv6Version:
+			linkLayerType = layers.LayerTypeIPv6
+		default:
+			return utils.Errorf("non-IP packet on raw IP interface")
+		}
+	case layers.LinkTypeNull, layers.LinkTypeLoop:
 		payloads, linkLayerType, err = p.encapsulatePayloadLoopback(payloads)
-		if err != nil {
-			return err
-		}
-	} else {
+	case layers.LinkTypeEthernet:
 		payloads, linkLayerType, err = p.encapsulatePayload(payloads)
-		if err != nil {
-			return err
-		}
+	default:
+		return utils.Errorf("unsupported pcap link type: %v", p.adaptor.linkType)
+	}
+	if err != nil {
+		return err
 	}
 
 	if p.outboundFilter != nil {
@@ -522,21 +533,32 @@ func (p *PCAPEndpoint) encapsulatePayload(payloads []byte) ([]byte, gopacket.Lay
 }
 
 func (p *PCAPEndpoint) encapsulatePayloadLoopback(payloads []byte) ([]byte, gopacket.LayerType, error) {
-	buf := gopacket.NewSerializeBuffer()
-	opts := gopacket.SerializeOptions{
-		FixLengths:       true,
-		ComputeChecksums: true,
+	var family layers.ProtocolFamily
+	switch header.IPVersion(payloads) {
+	case header.IPv4Version:
+		family = layers.ProtocolFamilyIPv4
+	case header.IPv6Version:
+		switch runtime.GOOS {
+		case "darwin":
+			family = layers.ProtocolFamilyIPv6Darwin
+		case "freebsd":
+			family = layers.ProtocolFamilyIPv6FreeBSD
+		case "linux":
+			family = layers.ProtocolFamilyIPv6Linux
+		default:
+			family = layers.ProtocolFamilyIPv6BSD
+		}
+	default:
+		return nil, layers.LayerTypeLoopback, utils.Errorf("non-IP packet on loopback interface")
 	}
-	err := gopacket.SerializeLayers(buf, opts,
-		&layers.Loopback{
-			//TODO loopback ipv6 handle
-			Family: layers.ProtocolFamilyIPv4,
-		},
-		gopacket.Payload(payloads))
-	if err != nil {
-		return nil, layers.LayerTypeLoopback, utils.Errorf("failed to serialize layers: %v", err)
+	data := make([]byte, 4+len(payloads))
+	if p.adaptor != nil && p.adaptor.linkType == layers.LinkTypeLoop {
+		binary.BigEndian.PutUint32(data, uint32(family))
+	} else {
+		binary.NativeEndian.PutUint32(data, uint32(family))
 	}
-	return buf.Bytes(), layers.LayerTypeLoopback, nil
+	copy(data[4:], payloads)
+	return data, layers.LayerTypeLoopback, nil
 }
 
 func (p *PCAPEndpoint) Capabilities() stack.LinkEndpointCapabilities {
