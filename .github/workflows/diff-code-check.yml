@@ -293,9 +293,9 @@ jobs:
           # security-severity/tags、partialFingerprints），不需要后处理转换。
           # 要求 yak >= 1.4.8-alpha0922：该版本之前的 --format sarif 会输出
           # 非法 kind 和多个 run，上传会被 GitHub 拒绝。
-          # 但 alpha0922 仍**早于** #5164（category/stable ruleId/markdown 渲染），
-          # 所以它还不会把发现归入 yaklang-diff-code-check 组、markdown 也不渲染；
-          # 那三项要等 alpha0922 之后的下一个包。
+          # category / 稳定 ruleId / markdown 渲染需要 >= 1.4.8-alpha0923
+          # （#5164 在 alpha0922 构建之后才合并，alpha0922 输出的是无斜杠的
+          # automationDetails、sha256 ruleId，且 markdown 不渲染）。
           SCAN_OUTPUT=$(yak code-scan -t ./fs.zip -l golang --rule-keyword golang --format sarif -o results --memory --file-perf-log --rule-perf-log --exclude-file **/vendor/**,vendor/**,**/classes/**,**/target/**,**include/**,**caches/**,**cache/**,**tmp/**,**alipay/**,**includes/**,**temp/**,**zh_cn/**,**zh_en/**,**plugins/**,**PHPExcel/**,**/tests/**,**/test/**,*.pb.go,*_test.go,**vulinbox/** 2>&1) || SCAN_EXIT_CODE=$?
           
           if [ ! -z "$SCAN_EXIT_CODE" ] && [ "$SCAN_EXIT_CODE" != "0" ]; then
