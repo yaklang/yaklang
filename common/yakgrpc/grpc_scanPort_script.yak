@@ -9,7 +9,7 @@ proxies = cli.String("proxy", cli.setDefault("no"))
 probeTimeoutFloat = cli.Float("probe-timeout", cli.setDefault(5.0), cli.setRequired(false))
 probeMax = cli.Int("probe-max", cli.setRequired(false), cli.setDefault(4))
 fingerprintFiles = cli.String("fingerprint-files", cli.setRequired(false), cli.setDefault(""))
-openPortGuardLimit = cli.Int("open-port-guard-limit", cli.setRequired(false), cli.setDefault(0))
+openPortGuardLimit = cli.Int("open-port-guard-limit", cli.setRequired(false), cli.setDefault(150))
 disableOpenPortGuard = cli.Bool("disable-open-port-guard", cli.setDefault(false), cli.setRequired(false))
 
 // host alive scan
@@ -124,13 +124,10 @@ if concurrent > 0 {
     opts = append(opts, servicescan.concurrent(concurrent))
 }
 
-opts = append(opts, servicescan.disableOpenPortGuard())
-if openPortGuardLimit > 0 {
-    opts = append(opts, servicescan.disableOpenPortGuard(false))
-    opts = append(opts, servicescan.openPortGuardLimit(openPortGuardLimit))
-}
-if disableOpenPortGuard {
+if disableOpenPortGuard || openPortGuardLimit <= 0 {
     opts = append(opts, servicescan.disableOpenPortGuard())
+} else {
+    opts = append(opts, servicescan.openPortGuardLimit(openPortGuardLimit))
 }
 
 if protos != "" {
@@ -349,16 +346,20 @@ handleFpResult = func(result) {
         }()
     })
 
-	go func(){
-        defer func{
-            err = recover()
-            if err != nil { yakit.Error("call port-scan plugin failed: %s", err) }
-        }
-        manager.GetNativeCaller().CallByName("handle", result)
-    }()
+    if len(scriptNames) > 0 {
+        go func(){
+            defer func{
+                err = recover()
+                if err != nil { yakit.Error("call port-scan plugin failed: %s", err) }
+            }
+            manager.GetNativeCaller().CallByName("handle", result)
+        }()
+    }
 
-    go func{
-        handleCrawler(result)
+    if enableCrawler {
+        go func{
+            handleCrawler(result)
+        }
     }
 }
 
