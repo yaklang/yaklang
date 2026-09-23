@@ -4301,25 +4301,6 @@ func (c *Config) CallAITransaction(
 	return CallAITransaction(c, prompt, callAi, postHandler, requestOpts...)
 }
 
-//	func (c *Config) RegisterMirrorOfAIInputEvent(id string, f func(*ypb.AIInputEvent)) {
-//		r.mirrorMutex.Lock()
-//		defer r.mirrorMutex.Unlock()
-//		r.mirrorOfAIInputEvent[id] = f
-//	}
-//
-//	func (c *Config) CallMirrorOfAIInputEvent(event *ypb.AIInputEvent) {
-//		r.mirrorMutex.RLock()
-//		defer r.mirrorMutex.RUnlock()
-//		for _, f := range r.mirrorOfAIInputEvent {
-//			f(event)
-//		}
-//	}
-//
-//	func (c *Config) UnregisterMirrorOfAIInputEvent(id string) {
-//		r.mirrorMutex.Lock()
-//		defer r.mirrorMutex.Unlock()
-//		delete(r.mirrorOfAIInputEvent, id)
-//	}
 func ConvertConfigToOptions(i *Config) []ConfigOption {
 	// Return nil for nil input
 	if i == nil {
