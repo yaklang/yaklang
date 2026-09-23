@@ -656,13 +656,45 @@ func (h *memfitTTYHarness) ClickText(text string) {
 			break
 		}
 	}
-	cursorRow, cursorColumn := h.screen.row+1, h.screen.col+1
+	rawMark := h.raw.Len()
 	h.mu.Unlock()
 	require.Positive(h.t, targetRow, "could not find clickable text %q", text)
 	require.Positive(h.t, targetColumn)
 	h.Write(fmt.Sprintf("\x1b[<0;%d;%dM", targetColumn, targetRow))
-	time.Sleep(20 * time.Millisecond)
+	// A click asks for the composer row with CSI 6n and only then maps the
+	// mouse row onto an activity line. The report has to be sampled after that
+	// request is in the PTY stream: the frame's trailing cursor-up is written
+	// just before it, and answering with the footer row makes the hit miss.
+	h.waitForRawSuffix("\x1b[6n", rawMark)
+	h.mu.Lock()
+	cursorRow, cursorColumn := h.screen.row+1, h.screen.col+1
+	h.mu.Unlock()
+	require.Positive(h.t, cursorRow)
+	require.Positive(h.t, cursorColumn)
 	h.Write(fmt.Sprintf("\x1b[%d;%dR", cursorRow, cursorColumn))
+}
+
+func (h *memfitTTYHarness) waitForRawSuffix(want string, mark int) {
+	h.t.Helper()
+	deadline := time.Now().Add(4 * time.Second)
+	for time.Now().Before(deadline) {
+		h.mu.Lock()
+		raw := h.raw.String()
+		h.mu.Unlock()
+		if len(raw) >= mark && strings.Contains(raw[mark:], want) {
+			return
+		}
+		select {
+		case err := <-h.done:
+			h.t.Fatalf("TTY helper exited while waiting for %q: %v\nraw output:\n%s", want, err, visibleMemfitControlBytes(raw))
+		default:
+		}
+		time.Sleep(5 * time.Millisecond)
+	}
+	h.mu.Lock()
+	raw := h.raw.String()
+	h.mu.Unlock()
+	h.t.Fatalf("timed out waiting for %q\nraw output:\n%s", want, visibleMemfitControlBytes(raw))
 }
 
 func (h *memfitTTYHarness) Resize(width, height int) {
@@ -771,7 +803,8 @@ func assertMemfitTTYGolden(t *testing.T, name, got string) {
 	}
 	want, err := os.ReadFile(path)
 	require.NoError(t, err, "run with YAK_MEMFIT_UPDATE_TTY_GOLDEN=1 to create terminal snapshots")
-	require.Equal(t, strings.TrimSuffix(string(want), "\n"), got)
+	wantText := strings.ReplaceAll(string(want), "\r\n", "\n")
+	require.Equal(t, strings.TrimSuffix(wantText, "\n"), got)
 	if artifactDir := os.Getenv("YAK_MEMFIT_TTY_ARTIFACT_DIR"); artifactDir != "" {
 		require.NoError(t, os.MkdirAll(artifactDir, 0o755))
 		require.NoError(t, os.WriteFile(filepath.Join(artifactDir, name+".txt"), []byte(got+"\n"), 0o644))

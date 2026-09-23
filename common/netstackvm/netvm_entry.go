@@ -10,6 +10,7 @@ import (
 	"sync"
 
 	"github.com/yaklang/yaklang/common/lowtun/netstack/gvisor/pkg/tcpip/header"
+	"github.com/yaklang/yaklang/common/lowtun/netstack/gvisor/pkg/tcpip/link/channel"
 
 	"github.com/yaklang/yaklang/common/log"
 
@@ -26,6 +27,7 @@ func NewSystemNetStackVMWithoutDHCP(entryOption ...Option) (*NetStackVirtualMach
 }
 
 type NetStackVirtualMachineEntry struct {
+	closeOnce   sync.Once
 	systemIface *net.Interface
 	mtu         int
 
@@ -33,6 +35,9 @@ type NetStackVirtualMachineEntry struct {
 	config *Config
 
 	driver *PCAPEndpoint
+	// link is the userspace packet queue for a channel-backed entry.
+	// PCAP entries leave it nil; outboundLoop already drains that queue.
+	link *channel.Endpoint
 
 	mainNICID tcpip.NICID
 
@@ -94,6 +99,7 @@ func NewNetStackVirtualMachineEntry(opts ...Option) (*NetStackVirtualMachineEntr
 		return nil, err
 	}
 
+	pcapEp.readOnly.Store(config.pcapReadOnly || config.ForceSystemNetStack)
 	pcapEp.SetPCAPOutboundFilter(config.pcapOutboundFilter)
 	pcapEp.SetPCAPInboundFilter(config.pcapInboundFilter)
 	pcapEp.SetCapabilities(pcapEp.capabilities | config.pcapCapabilities)
@@ -152,7 +158,7 @@ func NewNetStackVirtualMachineEntry(opts ...Option) (*NetStackVirtualMachineEntr
 		}
 	}
 
-	if !config.DisableForwarding {
+	if !config.DisableForwarding && !config.pcapReadOnly && !config.ForceSystemNetStack {
 		if _, err := stackIns.SetNICForwarding(mainNicID, header.IPv4ProtocolNumber, true); err != nil {
 			return nil, utils.Errorf("set forwarding: %s", err)
 		}
@@ -232,4 +238,30 @@ func NewNetStackFromConfig(c *Config) (*stack.Stack, error) {
 		return nil, utils.Errorf("load stack options: %s", configStackErr)
 	}
 	return stackIns, nil
+}
+
+// Close releases this entry's capture, packet queues and NIC. A caller-supplied
+// shared stack remains owned by its caller.
+func (vm *NetStackVirtualMachineEntry) Close() error {
+	vm.closeOnce.Do(func() {
+		if vm.config != nil && vm.config.cancel != nil {
+			vm.config.cancel()
+		}
+		if vm.driver != nil {
+			vm.driver.Close()
+			vm.driver.Wait()
+		}
+		if vm.link != nil {
+			vm.link.Close()
+		}
+		if vm.stack != nil {
+			if vm.config == nil || vm.config.stack == nil {
+				vm.stack.Close()
+				vm.stack.Wait()
+			} else {
+				vm.stack.RemoveNIC(vm.mainNICID)
+			}
+		}
+	})
+	return nil
 }

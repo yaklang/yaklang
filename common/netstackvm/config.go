@@ -78,6 +78,7 @@ type Config struct {
 
 	stack *stack.Stack
 
+	pcapReadOnly       bool
 	pcapPromisc        bool
 	pcapDevice         string
 	pcapInboundFilter  func(packet gopacket.Packet) bool
@@ -230,6 +231,7 @@ func NewDefaultConfig() *Config {
 		ARPAnnouncementFastInterval: time.Second * 1,
 		ARPAnnouncementFastTimes:    2,
 		ARPAnnouncementSlowInterval: 30 * time.Second,
+		pcapReadOnly:                true,
 		pcapPromisc:                 true,
 		pcapCapabilities:            stack.CapabilityResolutionRequired,
 	}
@@ -406,6 +408,7 @@ func WithUDPDisabled(disabled bool) Option {
 
 func WithDisableForwarding(v bool) Option {
 	return func(s *Config) error {
+		s.DisableForwarding = v
 		return nil
 	}
 }
@@ -422,4 +425,11 @@ func WithOpenAllDeviceName(open bool) Option {
 		c.openAllPcapDevice = open
 		return nil
 	}
+}
+
+// WithPCAPReadOnly controls the final injection gate. The default is read-only.
+// Disabling it explicitly permits active injection, including the TCP killer.
+// An outbound filter cannot override this gate.
+func WithPCAPReadOnly(readOnly bool) Option {
+	return func(c *Config) error { c.pcapReadOnly = readOnly; return nil }
 }

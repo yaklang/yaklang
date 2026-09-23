@@ -2,6 +2,7 @@ package synscanx
 
 import (
 	"fmt"
+	"github.com/gopacket/gopacket"
 	"github.com/gopacket/gopacket/layers"
 	"github.com/yaklang/yaklang/common/fp"
 	"github.com/yaklang/yaklang/common/log"
@@ -17,10 +18,67 @@ func (s *Scannerx) useLoopbackLikeLinkLayer(host string) bool {
 	if utils.IsLoopback(host) {
 		return true
 	}
-	return !s.supportsARP()
+	if s != nil && s.config != nil && s.config.Iface != nil && s.config.Iface.Flags&net.FlagLoopback != 0 {
+		return true
+	}
+	return false
+}
+
+// sendsRawIP is true for point-to-point tunnels such as tun0. Npcap reports
+// those devices as link type Raw, so an Ethernet or loopback header is rejected
+// and the SYN never leaves the machine.
+func (s *Scannerx) sendsRawIP() bool {
+	if s == nil || s.config == nil || s.config.Iface == nil {
+		return false
+	}
+	iface := s.config.Iface
+	if iface.Flags&net.FlagLoopback != 0 {
+		return false
+	}
+	// sing-tun on Windows is link-type Raw and has no MAC, but it is not
+	// marked point-to-point. Ethernet framing cannot be used there.
+	if iface.Flags&net.FlagPointToPoint != 0 {
+		return true
+	}
+	return len(iface.HardwareAddr) == 0
+}
+
+func (s *Scannerx) assembleRawSynPacket(host string, port int) ([]byte, error) {
+	dst := net.ParseIP(host).To4()
+	src := s.config.SourceIP.To4()
+	if src == nil || dst == nil {
+		return nil, utils.Errorf("raw syn requires ipv4 src and dst")
+	}
+	ip4 := &layers.IPv4{
+		Version:  4,
+		TTL:      64,
+		Protocol: layers.IPProtocolTCP,
+		SrcIP:    src,
+		DstIP:    dst,
+		Flags:    layers.IPv4DontFragment,
+		Id:       uint16(40000 + rand.Intn(10000)),
+	}
+	tcp := &layers.TCP{
+		SrcPort: layers.TCPPort(rand.Intn(65534) + 1),
+		DstPort: layers.TCPPort(port),
+		SYN:     true,
+		Window:  1024,
+		Seq:     uint32(500000 + rand.Intn(10000)),
+	}
+	if err := tcp.SetNetworkLayerForChecksum(ip4); err != nil {
+		return nil, err
+	}
+	buf := gopacket.NewSerializeBuffer()
+	if err := gopacket.SerializeLayers(buf, gopacket.SerializeOptions{FixLengths: true, ComputeChecksums: true}, ip4, tcp); err != nil {
+		return nil, err
+	}
+	return buf.Bytes(), nil
 }
 
 func (s *Scannerx) assembleSynPacket(host string, port int) ([]byte, error) {
+	if s.sendsRawIP() && !utils.IsLoopback(host) {
+		return s.assembleRawSynPacket(host, port)
+	}
 	isLoopback := utils.IsLoopback(host)
 	useLoopbackLink := s.useLoopbackLikeLinkLayer(host)
 

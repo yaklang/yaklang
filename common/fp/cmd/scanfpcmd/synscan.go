@@ -3,16 +3,16 @@ package scanfpcmd
 import (
 	"context"
 	"fmt"
-	"github.com/yaklang/yaklang/common/urfavecli"
-	"github.com/yaklang/yaklang/common/fp"
-	"github.com/yaklang/yaklang/common/hybridscan"
-	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/synscan"
-	"github.com/yaklang/yaklang/common/utils"
-	"net"
 	"os"
 	"sync"
 	"time"
+
+	"github.com/yaklang/yaklang/common/fp"
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/synscan"
+	"github.com/yaklang/yaklang/common/synscanx"
+	"github.com/yaklang/yaklang/common/urfavecli"
+	"github.com/yaklang/yaklang/common/utils"
 )
 
 var SynScanCmd = cli.Command{
@@ -88,34 +88,6 @@ var SynScanCmd = cli.Command{
 			return
 		}
 
-		var sampleTarget string
-		if len(targetList) == 1 {
-			sampleTarget = targetList[0]
-		} else {
-			for _, target := range targetList {
-				if !utils.IsLoopback(target) {
-					sampleTarget = target
-					break
-				}
-			}
-			if sampleTarget == "" {
-				sampleTarget = targetList[1]
-			}
-		}
-
-		options, err := synscan.CreateConfigOptionsByTargetNetworkOrDomain(sampleTarget, 10*time.Second)
-		if err != nil {
-			log.Errorf("init syn scanner failed: %s", err)
-			return
-		}
-		synScanConfig, err := synscan.NewConfig(options...)
-		if err != nil {
-			log.Errorf("create synscan config failed: %s", err)
-			return
-		}
-
-		log.Infof("default config: \n    iface:%v src:%v gateway:%v", synScanConfig.Iface.Name, synScanConfig.SourceIP, synScanConfig.GatewayIP)
-
 		// 解析指纹配置
 		// web rule
 		webRules, _ := fp.GetDefaultWebFingerprintRules()
@@ -148,23 +120,6 @@ var SynScanCmd = cli.Command{
 		}
 		fpConfig := fp.NewConfig(fingerprintMatchConfigOptions...)
 
-		scanCenterConfig, err := hybridscan.NewDefaultConfigWithSynScanConfig(synScanConfig)
-		if err != nil {
-			log.Errorf("default config failed: %v", err)
-			return
-		}
-
-		// 指纹扫描开关
-		// 指纹扫描单独进行扫描
-		scanCenterConfig.DisableFingerprintMatch = true
-
-		log.Info("start create hyper scan center...")
-		scanCenter, err := hybridscan.NewHyperScanCenter(context.Background(), scanCenterConfig)
-		if err != nil {
-			log.Error(err)
-			return
-		}
-
 		log.Info("preparing for result collectors")
 		var fpLock = new(sync.Mutex)
 		var openPortLock = new(sync.Mutex)
@@ -191,6 +146,7 @@ var SynScanCmd = cli.Command{
 		//}
 
 		// outputfile
+		var err error
 		var outputFile *os.File
 		if c.String("output") != "" {
 			outputFile, err = os.OpenFile(c.String("output"), os.O_RDWR|os.O_CREATE, os.ModePerm)
@@ -203,20 +159,21 @@ var SynScanCmd = cli.Command{
 		}
 
 		log.Infof("start submit task and scan...")
-		err = scanCenter.Scan(
+		resultCh, err := synscanx.Scan(
 			context.Background(),
-			c.String("target"), c.String("port"), true, false,
-			func(ip net.IP, port int) {
+			c.String("target"),
+			c.String("port"),
+			synscanx.WithWaiting(float64(c.Int("waiting"))),
+			synscanx.WithCallback(func(result *synscan.SynScanResult) {
 				openPortLock.Lock()
 				defer openPortLock.Unlock()
 
 				openPortCount++
-				r := utils.HostPort(ip.String(), port)
+				r := utils.HostPort(result.Host, result.Port)
 				log.Debugf("found open port -> tcp://%v", r)
 				openResult = append(openResult, r)
 
 				if outputFile != nil {
-					//outputFile.Write([]byte(fmt.Sprintf("%v\n", r)))
 					outputFile.Write(
 						[]byte(fmt.Sprintf(
 							"%s%v\n",
@@ -225,11 +182,13 @@ var SynScanCmd = cli.Command{
 						)),
 					)
 				}
-			},
+			}),
 		)
 		if err != nil {
 			log.Error(err)
 			return
+		}
+		for range resultCh {
 		}
 		log.Infof("finished submitting.")
 
@@ -272,11 +231,6 @@ var SynScanCmd = cli.Command{
 		}
 
 		analysis := fp.MatcherResultsToAnalysis(fpResults)
-
-		log.Infof("waiting last packet (SYN) for %v seconds", c.Int("waiting"))
-		select {
-		case <-time.After(time.Second * time.Duration(c.Int("waiting"))):
-		}
 
 		hosts := utils.ParseStringToHosts(c.String("target"))
 		ports := utils.ParseStringToPorts(c.String("port"))

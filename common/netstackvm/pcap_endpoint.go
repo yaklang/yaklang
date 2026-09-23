@@ -3,8 +3,11 @@ package netstackvm
 import (
 	"bytes"
 	"context"
+	"encoding/binary"
 	"net"
+	"runtime"
 	"sync"
+	"sync/atomic"
 
 	"github.com/yaklang/yaklang/common/netx"
 	"golang.org/x/net/ipv6"
@@ -25,6 +28,9 @@ import (
 type PCAPEndpoint struct {
 	*channel.Endpoint
 
+	readOnly       atomic.Bool
+	filterMutex    sync.RWMutex
+	closeOnce      sync.Once
 	tcpKillMutex   sync.RWMutex
 	tcpKillMap     map[string]struct{}
 	inboundFilter  func(packet gopacket.Packet) bool
@@ -53,10 +59,14 @@ type PCAPEndpoint struct {
 const defaultOutQueueLen = 1 << 10
 
 func (p *PCAPEndpoint) SetPCAPInboundFilter(filter func(packet gopacket.Packet) bool) {
+	p.filterMutex.Lock()
+	defer p.filterMutex.Unlock()
 	p.inboundFilter = filter
 }
 
 func (p *PCAPEndpoint) SetPCAPOutboundFilter(filter func(packet gopacket.Packet) bool) {
+	p.filterMutex.Lock()
+	defer p.filterMutex.Unlock()
 	p.outboundFilter = filter
 }
 
@@ -98,8 +108,9 @@ func NewPCAPEndpoint(ctx context.Context, stackIns *stack.Stack, device string, 
 		wg:           new(sync.WaitGroup),
 		ipToMac:      new(sync.Map),
 		gatewayFound: utils.NewAtomicBool(),
-		loopback:     iface.Flags&net.FlagLoopback != 0,
+		loopback:     adaptor.linkType == layers.LinkTypeNull || adaptor.linkType == layers.LinkTypeLoop,
 	}
+	pcapEp.readOnly.Store(true)
 	return pcapEp, nil
 }
 
@@ -225,15 +236,18 @@ func (p *PCAPEndpoint) SetGatewayIP(g net.IP) {
 }
 
 func (p *PCAPEndpoint) Close() {
-	p.cancel()
-	p.adaptor.Close()
+	p.closeOnce.Do(func() {
+		p.cancel()
+		p.Endpoint.Close()
+		p.adaptor.Close()
+	})
 }
 
 func (p *PCAPEndpoint) Attach(dispatcher stack.NetworkDispatcher) {
 	p.Endpoint.Attach(dispatcher)
 	p.attachOnce.Do(func() {
 		log.Info("start to attach pcap endpoint outbound loop and inboundloop")
-		p.ctx, p.cancel = context.WithCancel(p.ctx)
+		// The context and cancel function are fixed before attachment.
 		p.wg.Add(2)
 		go func() {
 			defer func() {
@@ -293,7 +307,10 @@ func (p *PCAPEndpoint) inboundLoop(ctx context.Context) {
 			continue
 		}
 
-		if p.inboundFilter != nil && !p.inboundFilter(packet) {
+		p.filterMutex.RLock()
+		filter := p.inboundFilter
+		p.filterMutex.RUnlock()
+		if filter != nil && !filter(packet) {
 			continue
 		}
 
@@ -330,9 +347,6 @@ func (p *PCAPEndpoint) inboundLoop(ctx context.Context) {
 		pkt := stack.NewPacketBuffer(stack.PacketBufferOptions{
 			Payload: buffer.MakeWithData(networkPayloads),
 		})
-		defer func() {
-			pkt.DecRef()
-		}()
 
 		networklayer := packet.NetworkLayer()
 		if networklayer == nil {
@@ -341,6 +355,7 @@ func (p *PCAPEndpoint) inboundLoop(ctx context.Context) {
 			if arpLayer != nil {
 				arpPacket, ok := arpLayer.(*layers.ARP)
 				if !ok {
+					pkt.DecRef()
 					continue
 				}
 				if ok && len(arpPacket.SourceHwAddress) == 6 && !bytes.Equal(arpPacket.SourceHwAddress, []byte{0, 0, 0, 0, 0, 0}) && !bytes.Equal(arpPacket.SourceHwAddress, []byte{0xff, 0xff, 0xff, 0xff, 0xff, 0xff}) {
@@ -378,6 +393,7 @@ func (p *PCAPEndpoint) inboundLoop(ctx context.Context) {
 				log.Errorf("unknown network layer type: %s", networklayer.LayerType())
 			}
 		}
+		pkt.DecRef()
 	}
 }
 
@@ -389,6 +405,7 @@ func (p *PCAPEndpoint) outboundLoop(ctx context.Context) {
 			break
 		}
 		if !p.IsAttached() {
+			pkt.DecRef()
 			continue
 		}
 		err := p.writePacket(pkt)
@@ -407,6 +424,9 @@ func (p *PCAPEndpoint) fallbackDefaultMac() net.HardwareAddr {
 
 func (p *PCAPEndpoint) writePacket(pkt *stack.PacketBuffer) error {
 	defer pkt.DecRef()
+	if p.readOnly.Load() {
+		return nil
+	}
 
 	buf := pkt.ToBuffer()
 	defer buf.Release()
@@ -414,29 +434,45 @@ func (p *PCAPEndpoint) writePacket(pkt *stack.PacketBuffer) error {
 	var payloads = buf.Flatten()
 	var linkLayerType gopacket.LayerType
 	var err error
-	if p.loopback {
+	switch p.adaptor.linkType {
+	case layers.LinkTypeRaw, layers.LinkTypeIPv4, layers.LinkTypeIPv6:
+		switch header.IPVersion(payloads) {
+		case header.IPv4Version:
+			linkLayerType = layers.LayerTypeIPv4
+		case header.IPv6Version:
+			linkLayerType = layers.LayerTypeIPv6
+		default:
+			return utils.Errorf("non-IP packet on raw IP interface")
+		}
+	case layers.LinkTypeNull, layers.LinkTypeLoop:
 		payloads, linkLayerType, err = p.encapsulatePayloadLoopback(payloads)
-		if err != nil {
-			return err
-		}
-	} else {
+	case layers.LinkTypeEthernet:
 		payloads, linkLayerType, err = p.encapsulatePayload(payloads)
-		if err != nil {
-			return err
-		}
+	default:
+		return utils.Errorf("unsupported pcap link type: %v", p.adaptor.linkType)
+	}
+	if err != nil {
+		return err
 	}
 
-	if p.outboundFilter != nil {
-		packet := gopacket.NewPacket(payloads, linkLayerType, gopacket.Default)
-		if !p.outboundFilter(packet) {
-			return nil
-		}
-	}
+	return p.writeFrame(payloads, linkLayerType)
+}
 
-	if err := p.adaptor.WritePacketData(payloads); err != nil {
-		return utils.Errorf("adaptor.WritePacketData in PCAPEndpoint failed: %v", err)
+// writeFrame is the sole injection boundary, including manually generated RSTs.
+func (p *PCAPEndpoint) writeFrame(data []byte, linkType gopacket.LayerType) error {
+	if p.readOnly.Load() {
+		return nil
 	}
-	return nil
+	if p.ctx != nil && p.ctx.Err() != nil {
+		return p.ctx.Err()
+	}
+	p.filterMutex.RLock()
+	filter := p.outboundFilter
+	p.filterMutex.RUnlock()
+	if filter != nil && !filter(gopacket.NewPacket(data, linkType, gopacket.Default)) {
+		return nil
+	}
+	return p.adaptor.WritePacketData(data)
 }
 
 func (p *PCAPEndpoint) encapsulatePayload(payloads []byte) ([]byte, gopacket.LayerType, error) {
@@ -522,21 +558,32 @@ func (p *PCAPEndpoint) encapsulatePayload(payloads []byte) ([]byte, gopacket.Lay
 }
 
 func (p *PCAPEndpoint) encapsulatePayloadLoopback(payloads []byte) ([]byte, gopacket.LayerType, error) {
-	buf := gopacket.NewSerializeBuffer()
-	opts := gopacket.SerializeOptions{
-		FixLengths:       true,
-		ComputeChecksums: true,
+	var family layers.ProtocolFamily
+	switch header.IPVersion(payloads) {
+	case header.IPv4Version:
+		family = layers.ProtocolFamilyIPv4
+	case header.IPv6Version:
+		switch runtime.GOOS {
+		case "darwin":
+			family = layers.ProtocolFamilyIPv6Darwin
+		case "freebsd":
+			family = layers.ProtocolFamilyIPv6FreeBSD
+		case "linux":
+			family = layers.ProtocolFamilyIPv6Linux
+		default:
+			family = layers.ProtocolFamilyIPv6BSD
+		}
+	default:
+		return nil, layers.LayerTypeLoopback, utils.Errorf("non-IP packet on loopback interface")
 	}
-	err := gopacket.SerializeLayers(buf, opts,
-		&layers.Loopback{
-			//TODO loopback ipv6 handle
-			Family: layers.ProtocolFamilyIPv4,
-		},
-		gopacket.Payload(payloads))
-	if err != nil {
-		return nil, layers.LayerTypeLoopback, utils.Errorf("failed to serialize layers: %v", err)
+	data := make([]byte, 4+len(payloads))
+	if p.adaptor != nil && p.adaptor.linkType == layers.LinkTypeLoop {
+		binary.BigEndian.PutUint32(data, uint32(family))
+	} else {
+		binary.NativeEndian.PutUint32(data, uint32(family))
 	}
-	return buf.Bytes(), layers.LayerTypeLoopback, nil
+	copy(data[4:], payloads)
+	return data, layers.LayerTypeLoopback, nil
 }
 
 func (p *PCAPEndpoint) Capabilities() stack.LinkEndpointCapabilities {

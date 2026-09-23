@@ -262,13 +262,21 @@ jobs:
             exit 1
           fi
 
-          GO_FILE_COUNT=$(unzip -Z1 ./fs.zip | awk '/\.go$/ { count++ } END { print count + 0 }')
-          echo "Go files in diff: $GO_FILE_COUNT"
+          ALL_GO_COUNT=$(unzip -Z1 ./fs.zip | awk '/\.go$/ { count++ } END { print count + 0 }')
+          # code-scan drops *_test.go. A test-only diff still matches /\.go$/,
+          # then the scanner exits with "not found can compiled file".
+          GO_FILE_COUNT=$(unzip -Z1 ./fs.zip | awk '/\.go$/ && !/_test\.go$/ { count++ } END { print count + 0 }')
+          echo "Go files in diff: $ALL_GO_COUNT (compilable, excluding *_test.go: $GO_FILE_COUNT)"
           if [ "$GO_FILE_COUNT" -eq 0 ]; then
             echo "should_skip=true" >> "$GITHUB_OUTPUT"
-            echo "skip_reason=no_go_files" >> "$GITHUB_OUTPUT"
             echo "::endgroup::"
-            echo "::notice::No .go files found in diff; skipping compilation and security scan"
+            if [ "$ALL_GO_COUNT" -eq 0 ]; then
+              echo "skip_reason=no_go_files" >> "$GITHUB_OUTPUT"
+              echo "::notice::No .go files found in diff; skipping compilation and security scan"
+            else
+              echo "skip_reason=only_test_go_files" >> "$GITHUB_OUTPUT"
+              echo "::notice::Diff only changes *_test.go files; skipping compilation and security scan"
+            fi
             exit 0
           fi
           echo "should_skip=false" >> "$GITHUB_OUTPUT"
@@ -330,9 +338,9 @@ jobs:
             fi
             
             # 检查是否是编译失败错误（非严重错误）
-            if echo "$SCAN_OUTPUT" | grep -q "record not found\|have err\|get program failed\|parse project.*failed"; then
+            if echo "$SCAN_OUTPUT" | grep -q "record not found\|have err\|get program failed\|parse project.*failed\|not found can compiled file"; then
               echo "::warning::Project compilation failed, skipping security scan"
-              echo "::notice::This is usually caused by empty diff or compilation errors"
+              echo "::notice::This is usually caused by an empty diff, a test-only diff, or compilation errors"
               echo "scan_result=skipped_compilation_error" >> $GITHUB_OUTPUT
               echo "risk_count=0" >> $GITHUB_OUTPUT
               echo "::endgroup::"
@@ -515,6 +523,7 @@ jobs:
           echo "::notice::✅ Security scan was skipped due to compilation failure"
           echo "::notice::This is usually caused by:"
           echo "::notice::  - Empty diff (no Go files changed)"
+          echo "::notice::  - Diff that only changes *_test.go or other excluded files"
           echo "::notice::  - Compilation errors in the code"
           echo "::notice::  - Missing dependencies or broken imports"
           echo "::notice::This does not block the CI pipeline."

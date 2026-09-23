@@ -12,6 +12,9 @@ import (
 )
 
 func (vm *NetStackVirtualMachineEntry) ListenTCP(hostport string) (net.Listener, error) {
+	if vm.driver != nil && vm.driver.readOnly.Load() {
+		return nil, ErrPassiveNetwork
+	}
 	defer func() {
 		if err := recover(); err != nil {
 			log.Errorf("panic: %v", err)

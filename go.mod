@@ -94,7 +94,6 @@ require (
 	github.com/shirou/gopsutil/v4 v4.25.2
 	github.com/stacktitan/smb v0.0.0-20190531122847-da9a425dceb8
 	github.com/stretchr/testify v1.10.0
-	github.com/tatsushid/go-fastping v0.0.0-20160109021039-d7bb493dee3e
 	github.com/teambition/rrule-go v1.8.2
 	github.com/tidwall/gjson v1.14.4
 	github.com/tidwall/sjson v1.2.5

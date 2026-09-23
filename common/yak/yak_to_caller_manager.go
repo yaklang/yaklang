@@ -1991,19 +1991,13 @@ func BindYakitPluginContextToEngine(nIns *antlr4yak.Engine, pluginContext *Yakit
 		funcValue := reflect.ValueOf(f)
 		funcType := funcValue.Type()
 		hookFunc := reflect.MakeFunc(funcType, func(args []reflect.Value) (results []reflect.Value) {
-			synScanOpt := []synscanx.SynxConfigOption{synscanx.WithRuntimeId(runtimeId), synscanx.WithCtx(streamContext)}
-			index := len(args) - 1 // 获取 option 参数的 index
-			interfaceValue := args[index].Interface()
-			args = args[:index]
-			synScanExtraOpts, ok := interfaceValue.([]synscanx.SynxConfigOption)
-			if ok {
-				synScanExtraOpts = append(synScanOpt, synScanExtraOpts...)
-			}
-			for _, p := range synScanExtraOpts {
-				args = append(args, reflect.ValueOf(p))
-			}
-			res := funcValue.Call(args)
-			return res
+			// Runtime options are prepended. A later synscan.context from the
+			// script still overrides the stream context.
+			fixed := appendSynScanOptions(funcType, args, []synscanx.SynxConfigOption{
+				synscanx.WithRuntimeId(runtimeId),
+				synscanx.WithCtx(streamContext),
+			})
+			return funcValue.Call(fixed)
 		})
 		return hookFunc.Interface()
 	}

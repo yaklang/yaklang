@@ -159,7 +159,7 @@ func (m *AliveTargetMonitor) GetAliveDomain() []string {
 }
 
 func StartTargetMonitor() (*AliveTargetMonitor, error) {
-	vm, err := NewSystemNetStackVM(WithPcapCapabilities(stack.CapabilityRXChecksumOffload))
+	vm, err := NewSystemNetStackVM(WithForceSystemNetStack(true), WithPCAPReadOnly(true), WithPcapCapabilities(stack.CapabilityRXChecksumOffload))
 	if err != nil {
 		return nil, err
 	}
