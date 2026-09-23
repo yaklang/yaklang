@@ -27,8 +27,28 @@ func TestAssembleSynPacket_PointToPointInterfaceDoesNotRequireARP(t *testing.T) 
 	if err != nil {
 		t.Fatalf("assembleSynPacket returned error: %v", err)
 	}
-	if len(packet) == 0 {
-		t.Fatal("assembleSynPacket returned empty packet")
+	if len(packet) < 20 || packet[0]>>4 != 4 {
+		t.Fatalf("point-to-point SYN must be a raw IPv4 packet, got %x", packet)
+	}
+}
+
+func TestAssembleSynPacket_NoHardwareAddressIsRawIPv4(t *testing.T) {
+	scanner := &Scannerx{
+		ctx: context.Background(),
+		config: &SynxConfig{
+			Iface: &net.Interface{
+				Name:  "tun0",
+				Flags: net.FlagUp | net.FlagRunning,
+			},
+			SourceIP: net.ParseIP("172.18.0.1"),
+		},
+	}
+	packet, err := scanner.assembleSynPacket("1.1.1.1", 443)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(packet) < 20 || packet[0]>>4 != 4 {
+		t.Fatalf("expected raw IPv4, got %x", packet)
 	}
 }
 
