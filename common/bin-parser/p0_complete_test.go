@@ -208,11 +208,15 @@ func TestDCERPCBindAckFaultAndSMB1AndX(t *testing.T) {
 	nak := append(dcerpcHeader(13, 19, 1), 0, 0, 0)
 	require.Equal(t, uint64(13), uintVal(t, parseRule(t, nak, "application-layer.dcerpc", "DCERPC").Child("PType")))
 
-	faultBody := make([]byte, 12)
+	// A DCE/RPC Fault body has a fixed 16-byte prefix. Keep this success
+	// fixture complete; the protocol-session tests separately cover truncation.
+	faultBody := make([]byte, 16)
 	binary.LittleEndian.PutUint32(faultBody[8:], 0x00000005)
-	fr := append(dcerpcHeader(3, 28, 2), faultBody...)
+	fr := append(dcerpcHeader(3, 32, 2), faultBody...)
 	f := parseRule(t, fr, "application-layer.dcerpc", "DCERPC")
 	require.Equal(t, uint64(5), uintVal(t, mustChild(t, f, "PDU", "Fault", "Status")))
+	truncatedFault := append(dcerpcHeader(3, 28, 2), faultBody[:12]...)
+	parseMustFail(t, truncatedFault, "application-layer.dcerpc", "DCERPC")
 
 	respBody := make([]byte, 8)
 	rr := append(dcerpcHeader(2, 24, 2), respBody...)
