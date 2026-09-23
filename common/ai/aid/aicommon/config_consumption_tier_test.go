@@ -60,16 +60,52 @@ func TestConfig_AddTierModelConsumption(t *testing.T) {
 
 	models := cfg.GetTierModelConsumptionSnapshot()[string(consts.TierLightweight)]
 	require.Len(t, models, 2)
-	require.Equal(t, "high", models[0].ThinkingLevel)
-	require.Equal(t, int64(4), models[0].InputConsumption)
-	require.Equal(t, "none", models[1].ThinkingLevel)
-	require.Equal(t, int64(13), models[1].InputConsumption)
-	require.Equal(t, int64(7), models[1].OutputConsumption)
-	require.Equal(t, int64(3), models[1].CacheHitToken)
+	require.Equal(t, "none", models[0].ThinkingLevel)
+	require.Equal(t, int64(13), models[0].InputConsumption)
+	require.Equal(t, int64(7), models[0].OutputConsumption)
+	require.Equal(t, int64(3), models[0].CacheHitToken)
+	require.Equal(t, "high", models[1].ThinkingLevel)
+	require.Equal(t, int64(4), models[1].InputConsumption)
 
 	require.Equal(t, int64(17), cfg.GetInputConsumption())
 	require.Equal(t, int64(10), cfg.GetOutputConsumption())
 	require.Equal(t, int64(3), cfg.GetCacheHitToken())
+}
+
+func TestConfig_TierModelConsumptionSnapshotSortsByInputIncludingCache(t *testing.T) {
+	cfg := newConfig(context.Background())
+	tier := consts.TierLightweight
+	for _, entry := range []struct {
+		provider, model, thinking string
+		input, output, cache      int64
+	}{
+		{"z-provider", "small", "none", 2, 2000, 0},
+		{"openai", "model-a", "low", 3, 2, 7},
+		{"openai", "model-a", "high", 5, 1000, 5},
+		{"openai", "model-b", "auto", 0, 0, 10},
+		{"anthropic", "model-a", "auto", 10, 0, 0},
+		{"openai", "most-used", "auto", 4, 5, 7},
+		{"openai", "uncached-more", "auto", 8, 5, 0},
+	} {
+		cfg.AddTierModelConsumption(tier, ModelConsumptionIdentity{
+			ProviderType: entry.provider, ModelName: entry.model, ThinkingLevel: entry.thinking,
+		}, entry.input, entry.output, entry.cache)
+	}
+
+	models := cfg.GetTierModelConsumptionSnapshot()[string(tier)]
+	var order []string
+	for _, model := range models {
+		order = append(order, model.ProviderType+"/"+model.ModelName+"/"+model.ThinkingLevel)
+	}
+	require.Equal(t, []string{
+		"openai/most-used/auto",
+		"anthropic/model-a/auto",
+		"openai/model-a/high",
+		"openai/model-a/low",
+		"openai/model-b/auto",
+		"openai/uncached-more/auto",
+		"z-provider/small/none",
+	}, order)
 }
 
 func TestConsumptionPayloadSharesResolvedModeAndContainsNoProviderSecrets(t *testing.T) {
