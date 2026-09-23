@@ -392,14 +392,14 @@ jobs:
       # "Code scanning results" check plus annotations on the changed lines,
       # without needing to post a comment with a token.
       #
-      # The scan itself already writes results.sarif. A diff without Go files
-      # never runs it, so an empty run is written here, carrying just the tool
-      # identity. The category is left to the uploader, which derives it from
-      # the `category` input below; both paths therefore report the same
-      # (tool, category) pair and update one alert set.
+      # The scan itself already writes results.sarif. A diff with no compilable
+      # Go files (none at all, or only *_test.go) never runs it, so an empty run
+      # is written here, carrying just the tool identity. The category is left to
+      # the uploader, which derives it from the `category` input below, so both
+      # paths report the same (tool, category) pair and update one alert set.
 
-      - name: Write empty SARIF for no-Go diff
-        if: steps.validate.outputs.should_skip != 'true' && steps.generate_prog.outputs.should_skip == 'true' && steps.generate_prog.outputs.skip_reason == 'no_go_files'
+      - name: Write empty SARIF when the diff has nothing to scan
+        if: steps.validate.outputs.should_skip != 'true' && steps.generate_prog.outputs.should_skip == 'true'
         run: |
           cat > results.sarif <<'SARIF'
           {
@@ -423,7 +423,7 @@ jobs:
           jq -e '.runs[0].results | length == 0' results.sarif > /dev/null
 
       - name: Upload SARIF to code scanning
-        if: steps.validate.outputs.should_skip != 'true' && (steps.scan.outputs.scan_result == 'success' || (steps.generate_prog.outputs.should_skip == 'true' && steps.generate_prog.outputs.skip_reason == 'no_go_files'))
+        if: steps.validate.outputs.should_skip != 'true' && (steps.scan.outputs.scan_result == 'success' || steps.generate_prog.outputs.should_skip == 'true')
         uses: github/codeql-action/upload-sarif@v4
         with:
           sarif_file: results.sarif
