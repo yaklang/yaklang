@@ -168,6 +168,12 @@ func (f *Matcher) MatchWithContext(ctx context.Context, host string, port int, o
 				f.log("port is open, web fingerprint detection completed")
 				return result, nil
 			}
+			// Web 探测已经确认端口关闭时, 不再做服务指纹.
+			// 服务指纹会遍历全部探针规则并再拨一次号, 对 C 段里大量关闭端口会把 CPU 打满.
+			if result != nil && result.State == CLOSED {
+				f.log("port is closed, skip service detection")
+				return result, nil
+			}
 		}
 
 		//////////////////////////////////////////////////////////////////////////

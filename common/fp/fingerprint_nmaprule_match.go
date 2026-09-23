@@ -27,8 +27,8 @@ func (f *Matcher) matchWithContext(ctx context.Context, ip net.IP, port int, hos
 		State:  UNKNOWN,
 	}
 
-	// 获取需要匹配的指纹
-	firstBlock, blocks, bestMode := GetRuleBlockByConfig(port, config)
+	// 获取需要匹配的指纹. 同一 Matcher、同一端口的规则块可以复用.
+	firstBlock, blocks, bestMode := f.ruleBlocks(port, config)
 	if len(blocks) <= 0 && firstBlock == nil {
 		return nil, errors.New("empty rules is not allowed")
 	}

@@ -7,6 +7,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/yaklang/yaklang/common/fp/fingerprint"
@@ -31,6 +32,32 @@ type RuleBlock struct {
 type Matcher struct {
 	Config  *Config
 	matcher *fingerprint.Matcher
+
+	// ruleBlockCache 缓存「同一 Config、同一端口」的探针规则块.
+	// GetRuleBlockByConfig 会遍历全部指纹规则, 端口扫描对每个目标都调用一次,
+	// C 段扫描时相同端口会重复计算上万次, 把 CPU 打满.
+	ruleBlockCache sync.Map
+}
+
+type cachedRuleBlocks struct {
+	empty  *RuleBlock
+	blocks []*RuleBlock
+	ok     bool
+}
+
+// ruleBlocks 返回端口对应的探针规则. config 与 Matcher 上的 Config 是同一个对象时走缓存.
+func (f *Matcher) ruleBlocks(port int, config *Config) (*RuleBlock, []*RuleBlock, bool) {
+	if f != nil && config != nil && config == f.Config {
+		if v, ok := f.ruleBlockCache.Load(port); ok {
+			cached := v.(cachedRuleBlocks)
+			return cached.empty, cached.blocks, cached.ok
+		}
+	}
+	empty, blocks, ok := GetRuleBlockByConfig(port, config)
+	if f != nil && config != nil && config == f.Config {
+		f.ruleBlockCache.Store(port, cachedRuleBlocks{empty: empty, blocks: blocks, ok: ok})
+	}
+	return empty, blocks, ok
 }
 
 type PortState string
