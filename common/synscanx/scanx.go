@@ -54,6 +54,9 @@ type Scannerx struct {
 	Handle    *pcap.Handle
 	limiter   *rate.Limiter
 	startTime time.Time
+	// halfOpen sends TCP SYNs through netstackvm. UDP keeps the packet queues.
+	halfOpen         halfOpenSYN
+	keepPacketWriter bool
 	// onSubmitTaskCallback: 每提交一个数据包的时候，这个 callback 调用一次
 	onSubmitTaskCallback func(string, int)
 	FromPing             bool
@@ -252,6 +255,7 @@ func generateHostPort(ctx context.Context, nonExcludedHosts []string, nonExclude
 }
 
 func (s *Scannerx) SubmitTarget(targets, ports string) (<-chan *SynxTarget, error) {
+	s.notePorts(ports)
 	nonExcludedHosts := s.GetNonExcludedHosts(targets)
 	nonExcludedPorts := s.GetNonExcludedPorts(ports)
 	if len(nonExcludedHosts) == 0 || len(nonExcludedPorts) == 0 {
@@ -302,6 +306,7 @@ func (s *Scannerx) SubmitTarget(targets, ports string) (<-chan *SynxTarget, erro
 }
 
 func (s *Scannerx) SubmitTargetFromPing(res chan string, ports string) <-chan *SynxTarget {
+	s.notePorts(ports)
 	tgCh := make(chan *SynxTarget)
 	nonExcludedPorts := s.GetNonExcludedPorts(ports)
 
@@ -484,17 +489,28 @@ func (s *Scannerx) Scan(targetCh <-chan *SynxTarget) (chan *synscan.SynScanResul
 		}()
 		defer func() {
 			wCancel()
+			if s.halfOpen != nil {
+				_ = s.halfOpen.Close()
+			}
 			close(resultCh)
 			close(s.PacketChan)
 			close(s.LoopPacket)
 		}()
 
-		if err := s.initHandlerStart(wCtx); err != nil {
-			log.Debugf("synscanx handler start stopped: %v", err)
-			return
+		if err := s.startHalfOpen(wCtx); err != nil {
+			log.Errorf("synscanx netstackvm: %v", err)
+		}
+		// UDP, and TCP when the netstack session cannot open, still use the
+		// assembled packet writer. A TCP-only netstack session does not open
+		// a second capture.
+		if s.halfOpen == nil || s.keepPacketWriter {
+			if err := s.initHandlerStart(wCtx); err != nil {
+				log.Debugf("synscanx handler start stopped: %v", err)
+				return
+			}
 		}
 
-		if !s.FromPing {
+		if (s.halfOpen == nil || s.keepPacketWriter) && !s.FromPing {
 			s.arpScan()
 			if !s.waitOrCanceled(time.Second) {
 				return
@@ -525,6 +541,17 @@ func (s *Scannerx) sendPacket(targetCh <-chan *SynxTarget) {
 			host := target.Host
 			port := target.Port
 			proto := target.Mode
+			if proto == TCP && s.halfOpen != nil {
+				if err := s.halfOpen.Emit(s.ctx, host, port); err != nil {
+					if s.ctx.Err() != nil {
+						log.Error("send packet canceled")
+						return
+					}
+					log.Debugf("netstack syn %s:%d: %v", host, port, err)
+					continue
+				}
+				continue
+			}
 			packet, err := s.assemblePacket(host, port, proto)
 			if err != nil {
 				log.Debugf("assemble packet failed: %v", err)
@@ -585,5 +612,10 @@ func (s *Scannerx) assemblePacket(host string, port int, proto ProtocolType) ([]
 }
 
 func (s *Scannerx) Close() {
-	s.Handle.Close()
+	if s.halfOpen != nil {
+		_ = s.halfOpen.Close()
+	}
+	if s.Handle != nil {
+		s.Handle.Close()
+	}
 }
