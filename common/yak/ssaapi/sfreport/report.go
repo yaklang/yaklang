@@ -167,6 +167,9 @@ func reportRiskSchema(risk *Risk) *schema.SSARisk {
 		CodeSourceUrl:   risk.CodeSourceURL,
 		Line:            risk.Line,
 		ProgramName:     risk.ProgramName,
+		// CodeRange is what ties two rows to one spot when they share a feature
+		// hash; without it cover falls back to the line number.
+		CodeRange: risk.CodeRange,
 	}
 }
 

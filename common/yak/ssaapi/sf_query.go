@@ -56,6 +56,12 @@ type queryConfig struct {
 	// structBound, when set by QueryWithStruct, allows mode=struct frames to run.
 	structBound *structBound
 
+	// structAllowsSSA lets an ssa-mode rule run against a compile-unit target.
+	// Only the struct stage sets it, and only when struct and ssa are both
+	// selected, so an ssa rule can be recorded early and be covered by the deep
+	// stage later. Default false keeps QueryWithStruct struct-only as before.
+	structAllowsSSA bool
+
 	// runtime config
 	opts []sfvm.Option // config
 	// config       *sfvm.Config
@@ -224,8 +230,13 @@ func QuerySyntaxflow(opt ...QueryOption) (*SyntaxFlowResult, error) {
 		}
 		res, err = frame.Feed(value, config.opts...)
 	} else if config.structBound != nil {
-		// ssa rules may run on the compile-unit target. The unit value keeps
-		// the match inside the package; a later full SSA stage can cover it.
+		// An ssa rule on a compile-unit target needs QueryWithStructAllowSSA.
+		// The struct stage turns it on when both struct and ssa are selected so
+		// the unit hit can be covered by the deep stage; otherwise a struct
+		// target stays struct-only.
+		if !config.structAllowsSSA {
+			return nil, utils.Errorf("QueryWithStruct only accepts struct rules")
+		}
 		res, err = frame.Feed(value, config.opts...)
 	} else {
 		res, err = frame.Feed(value, config.opts...)
@@ -439,6 +450,20 @@ func QueryWithPersistRisk(enable bool) QueryOption {
 			return
 		}
 		c.persistRisk = enable
+	}
+}
+
+// QueryWithStructAllowSSA permits an ssa-mode rule to run against the
+// compile-unit target bound by QueryWithStruct. The struct stage enables this
+// only when struct and ssa are both selected, so the unit-level hit lands
+// early and the deep stage can cover it. Without it QueryWithStruct rejects
+// non-struct rules, which is the documented contract.
+func QueryWithStructAllowSSA(enable bool) QueryOption {
+	return func(c *queryConfig) {
+		if c == nil {
+			return
+		}
+		c.structAllowsSSA = enable
 	}
 }
 

@@ -284,6 +284,9 @@ func (s *structScanRuntime) ScanStruct(progAPI *Program, unit *ssa.CompileUnit) 
 			QueryWithResultProgram(progAPI),
 			QueryWithSSAConfig(progAPI.config.Config),
 			QueryWithStruct(unit),
+			// Only ssa rules loaded by includeSSA reach this query, and the
+			// compile-unit target is what confines them to the unit.
+			QueryWithStructAllowSSA(s.includeSSA),
 			QueryWithRuleContent(rule.Content),
 			QueryWithMemory(),
 			QueryWithTaskID(s.taskID),

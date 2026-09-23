@@ -219,8 +219,13 @@ func (r *SarifReport) appendResult(result *ssaapi.SyntaxFlowResult) {
 	}
 }
 
-// prepareCover drops less precise SARIF results that are the same finding.
-// It returns false when an already stored result is more precise.
+// prepareCover drops a less precise SARIF result when a more precise one for
+// the same finding is already stored, and removes earlier results the incoming
+// one replaces. It returns false when the incoming result should be skipped.
+//
+// Cover is a cross-mode rule. Two rows of one mode are separate findings that
+// happen to land on the same place, and a rule whose result streams in twice
+// contributes both, so only a row from a different mode takes part.
 func (r *SarifReport) prepareCover(risk *schema.SSARisk) bool {
 	if r == nil || risk == nil || r.run == nil {
 		return false
@@ -232,12 +237,18 @@ func (r *SarifReport) prepareCover(risk *schema.SSARisk) bool {
 	keptRisks := make([]*schema.SSARisk, 0, len(r.risks))
 	dropNew := false
 	for i, old := range r.risks {
+		if old != nil && schema.ScanModeRank(old.ScanMode) == schema.ScanModeRank(risk.ScanMode) {
+			keptResults = append(keptResults, r.run.Results[i])
+			keptRisks = append(keptRisks, old)
+			continue
+		}
 		switch schema.CoverActionFor(old, risk) {
 		case schema.CoverDropNew:
 			dropNew = true
 			keptResults = append(keptResults, r.run.Results[i])
 			keptRisks = append(keptRisks, old)
 		case schema.CoverReplaceOld:
+			// The earlier, less precise result for this finding is dropped.
 		default:
 			keptResults = append(keptResults, r.run.Results[i])
 			keptRisks = append(keptRisks, old)
