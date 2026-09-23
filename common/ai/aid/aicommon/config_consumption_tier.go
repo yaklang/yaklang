@@ -375,6 +375,12 @@ func (s *ConfigConsumptionState) GetTierModelConsumptionSnapshot() map[string][]
 			items = append(items, stats.Snapshot())
 		}
 		sort.Slice(items, func(i, j int) bool {
+			// Input consumption excludes cached tokens; sort by all input tokens.
+			inputI := items[i].InputConsumption + items[i].CacheHitToken
+			inputJ := items[j].InputConsumption + items[j].CacheHitToken
+			if inputI != inputJ {
+				return inputI > inputJ
+			}
 			if items[i].ProviderType != items[j].ProviderType {
 				return items[i].ProviderType < items[j].ProviderType
 			}
