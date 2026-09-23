@@ -66,6 +66,10 @@ func (f *binFlow) frameDirection(dir int, w []byte) (int, *binSpec, error) {
 			if f.mqtt != nil {
 				return f.frameMQTT(w)
 			}
+		case "socks5":
+			return f.frameSOCKS5(dir, w)
+		case "finger", "whois", "gopher", "dict":
+			return f.frameTextInternet(dir, w)
 		case "mongodb":
 			return f.frameMongo(w)
 		case "kafka":
@@ -114,6 +118,22 @@ func (f *binFlow) frameDirection(dir int, w []byte) (int, *binSpec, error) {
 			return f.frameCoAP(w)
 		case "modbus":
 			return f.frameModbus(w)
+		case "enip":
+			return f.frameENIP(w)
+		case "stratum":
+			return f.frameStratum(w)
+		case "gearman":
+			return f.frameGearman(w)
+		case "beanstalkd":
+			return f.frameBeanstalk(dir, w)
+		case "scgi":
+			return f.frameSCGI(dir, f.scgi.clientDir, w)
+		case "msgpack-rpc":
+			return f.frameMessagePackRPC(w)
+		case "zookeeper":
+			return f.frameZooKeeper(w)
+		case "clickhouse":
+			return f.frameClickHouse(dir, w)
 		case "dnp3":
 			return f.frameDNP3(w)
 		case "c37118":

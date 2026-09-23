@@ -1,5 +1,10 @@
 Package:
   ClientNegotiation:
+    operator: |
+      if this.ProcessSubNode("Version").Value != 5 { panic("socks5: invalid negotiation version") }
+      count = this.ProcessSubNode("NMethods").Value
+      if count == 0 { panic("socks5: empty method list") }
+      this.ProcessSubNode("Methods")
     Version: uint8
     NMethods: uint8
     Methods:
@@ -7,6 +12,9 @@ Package:
       list-length-from-field: "../NMethods"
       Method: uint8
   ServerNegotiation:
+    operator: |
+      if this.ProcessSubNode("Version").Value != 5 { panic("socks5: invalid selection version") }
+      this.ProcessSubNode("Method")
     Version: uint8
     Method: uint8
   AuthRequest:
@@ -23,6 +31,15 @@ Package:
     Version: uint8
     Status: uint8
   Request:
+    operator: |
+      if this.ProcessSubNode("Version").Value != 5 { panic("socks5: invalid request version") }
+      command = this.ProcessSubNode("Command").Value
+      if command < 1 || command > 3 { panic("socks5: invalid command") }
+      if this.ProcessSubNode("Reserved").Value != 0 { panic("socks5: invalid reserved byte") }
+      addressType = this.ProcessSubNode("AddressType").Value
+      if addressType != 1 && addressType != 3 && addressType != 4 { panic("socks5: invalid address type") }
+      this.ProcessSubNode("DstAddress")
+      this.ProcessSubNode("DstPort")
     Version: uint8
     Command: uint8
     Reserved: uint8
@@ -40,6 +57,14 @@ Package:
         }
     DstPort: uint16
   Replies:
+    operator: |
+      if this.ProcessSubNode("Version").Value != 5 { panic("socks5: invalid reply version") }
+      if this.ProcessSubNode("Reply").Value > 8 { panic("socks5: invalid reply code") }
+      if this.ProcessSubNode("Reserved").Value != 0 { panic("socks5: invalid reserved byte") }
+      addressType = this.ProcessSubNode("AddressType").Value
+      if addressType != 1 && addressType != 3 && addressType != 4 { panic("socks5: invalid address type") }
+      this.ProcessSubNode("BndAddress")
+      this.ProcessSubNode("BndPort")
     Version: uint8
     Reply: uint8
     Reserved: uint8
@@ -65,6 +90,9 @@ IPV6:
   length: 128
 
 Domain:
+  operator: |
+    if this.ProcessSubNode("Length").Value == 0 { panic("socks5: empty domain") }
+    this.ProcessSubNode("DomainName")
   Length: uint8
   DomainName:
     type: string

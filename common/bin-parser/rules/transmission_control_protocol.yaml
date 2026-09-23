@@ -37,7 +37,10 @@ Package:
                 bounded = maximum > 0 && maximum < 1048576
                 src = getNodeResult("@TCP/Source Port").Value
                 dst = getNodeResult("@TCP/Destination Port").Value
-                typeNameList = ["TLS", "HTTP", "SSH", "Redis", "MQTT", "FTP", "SMTP"]
+                // Unknown ports only admit protocols with a strong opening
+                // signature. Permissive text/binary decoders need port or
+                // caller context before they can claim an identification.
+                typeNameList = ["TLS", "HTTP", "SSH"]
                 if src == 22 || dst == 22 {
                   typeNameList = ["SSHPacket", "SSH"]
                 } else if src == 21 || dst == 21 {
@@ -84,8 +87,10 @@ Package:
                   typeNameList = ["IMAP"]
                 } else if src == 179 || dst == 179 {
                   typeNameList = ["BGP"]
-                } else if src == 1080 || dst == 1080 {
-                  typeNameList = ["SOCKS4", "SOCKS5Req"]
+                } else if dst == 1080 {
+                  typeNameList = ["SOCKS5Req", "SOCKS5ClientNegotiation", "SOCKS4"]
+                } else if src == 1080 {
+                  typeNameList = ["SOCKS5Reply", "SOCKS5ServerNegotiation", "SOCKS4"]
                 } else if src == 1723 || dst == 1723 {
                   typeNameList = ["PPTP"]
                 } else if src == 5900 || dst == 5900 {
@@ -132,6 +137,8 @@ Package:
                   typeNameList = ["AMQP"]
                 } else if src == 9092 || dst == 9092 {
                   typeNameList = ["Kafka"]
+                } else if src == 4730 || dst == 4730 {
+                  typeNameList = ["Gearman"]
                 } else if src == 465 || dst == 465 || src == 636 || dst == 636 || src == 853 || dst == 853 || src == 993 || dst == 993 || src == 995 || dst == 995 {
                   typeNameList = ["TLS"]
                 } else if src == 554 || dst == 554 {
@@ -191,6 +198,22 @@ Package:
                   typeNameList = ["Protobuf", "TLS", "HTTP"]
                 }
                 for typeName in typeNameList{
+                    if typeName == "TLS" {
+                      // tls.yaml is a stopList and can otherwise succeed
+                      // without accepting even one record. A port or a few
+                      // coincidental bytes are not a TLS signature.
+                      prefix,probe = this.TryProcessByType("XMPPTLSRecordHeader")
+                      tlsRecord = false
+                      if probe.OK {
+                        content = prefix.Value >> 32
+                        version = (prefix.Value >> 16) & 65535
+                        length = prefix.Value & 65535
+                        tlsRecord = content >= 20 && content <= 24 && version >= 0x0300 && version <= 0x0304 && length > 0 && length <= 18432 && (!bounded || length + 5 <= maximum)
+                      }
+                      err = probe.Recovery()
+                      if err != nil { panic(err) }
+                      if !tlsRecord { continue }
+                    }
                     res,op = this.TryProcessByType(typeName)
                     if op.OK {
                         err = op.Save()
@@ -307,6 +330,9 @@ IMAP: "import:imap.yaml;node:IMAP"
 BGP: "import:bgp.yaml;node:BGP"
 SOCKS4: "import:socks4.yaml;node:SOCKS4"
 SOCKS5Req: "import:application-layer/socks5.yaml;node:Request"
+SOCKS5ClientNegotiation: "import:application-layer/socks5.yaml;node:ClientNegotiation"
+SOCKS5ServerNegotiation: "import:application-layer/socks5.yaml;node:ServerNegotiation"
+SOCKS5Reply: "import:application-layer/socks5.yaml;node:Replies"
 PPTP: "import:application-layer/pptp.yaml;node:PPTP"
 VNC: "import:vnc.yaml;node:VNC"
 MongoDB: "import:mongodb.yaml;node:MongoDB"
@@ -316,6 +342,7 @@ HL7: "import:application-layer/hl7.yaml;node:HL7Messages"
 Memcached: "import:memcached.yaml;node:Memcached"
 AMQP: "import:amqp.yaml;node:AMQP"
 Kafka: "import:kafka.yaml;node:Kafka"
+Gearman: "import:application-layer/gearman.yaml;node:GearmanMessage"
 RTSP: "import:rtsp.yaml;node:RTSP"
 RTMP: "import:rtmp.yaml;node:RTMP"
 JDWP: "import:jdwp.yaml;node:JDWP"

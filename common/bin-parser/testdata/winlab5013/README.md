@@ -1,0 +1,9 @@
+# PR #5174 generated lab corpus
+
+This directory retains the six CC0-1.0 bundles from [PR #5174](https://github.com/yaklang/yaklang/pull/5174), commit `305f34eaa7eb54e59dd59cd1c9bc4a3cb6afc068`, as **30 individual pcapng captures**, six original field-oracle READMEs, and the original source generator/verifier. The six compressed archives are deliberately not committed here. `manifest.json` pins every capture and README by SHA-256 and records the packet count (692 in total).
+
+The captures are synthetic Ethernet/IPv4 sessions produced by the source generator with documentation addresses; they are not NIC captures or independent L1/L2 evidence. The embedded packet timestamp is 2025-09-23, despite the original generator comment and archive metadata saying 2026-09-23; the comment is corrected here without changing capture bytes. `go run . captures` reconstructs the application conversations and prints the critical fields. `go run . -pack <temporary-directory>` regenerates the six original archives from source. `TestWinlab5013Corpus` in the parent package checks every capture, every oracle block, and deterministic regeneration. Missing or truncated samples fail. Parser-specific assertions live separately and must call `parser.ParseBinary`; the verifier alone does not establish Yaklang protocol support or change roadmap scores.
+
+The original READMEs preserve the stated scope and the fields the lab intentionally does not cover. Passwords, if present in lab bytes, are fixture data only. Keep generated evidence labelled as such in reports.
+
+The original ClickHouse capture omits the Native server Hello packet type. It remains SHA-pinned as a malformed-server negative case; `corrected/15-clickhouse-valid.pcapng` is a separately labelled synthetic positive fixture with its provenance and SHA in `corrected/README.md`.

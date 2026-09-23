@@ -388,11 +388,21 @@ type binFlow struct {
 	pop3              *binPOP3
 	ftp               *binFTP
 	tns               *binTNS
+	socks5            *binSOCKS5
+	scgi              *binSCGI
+	msgpackRPC        *binMsgpackRPC
+	textInternet      *binTextInternet
 	radius            *binRADIUS
 	dhcp              *binDHCP
 	ntp               *binNTP
 	coap              *binCoAP
 	modbus            *binModbus
+	enip              *binENIP
+	stratum           *binStratum
+	gearman           *binGearman
+	beanstalk         *binBeanstalk
+	zookeeper         *binZooKeeper
+	clickhouse        *binClickHouse
 	rfb               *binRFB
 	diameter          *binDiameter
 	iec104            *binIEC104
@@ -566,10 +576,21 @@ func (f *binFlow) feed(dir int, data []byte, ts time.Time) {
 	for len(wire) > 0 {
 		if f.protocol == "" {
 			a.probes.Add(1)
-			f.detectDirection(dir, wire[:min(len(wire), a.config.ProbeBytes)])
+			f.detectDirection(dir, wire)
 			detected = f.protocol != ""
+			if detected && f.protocol == "gopher" && f.textInternet != nil && dir != f.textInternet.clientDir {
+				// Gopher replies carry no request identifier. Apply any buffered
+				// selector first so the response event can include its observed context.
+				client := &f.directions[f.textInternet.clientDir]
+				if len(client.buffer) > 0 && !client.stopped {
+					f.feed(f.textInternet.clientDir, nil, client.ts)
+				}
+			}
 			if f.protocol == "" {
 				if len(wire) >= a.config.ProbeBytes {
+					if needsMoreHTTPStartLine(wire) || f.needsMorePortProtocolPrefix(wire) {
+						break
+					}
 					f.stop(dir, wire, "unrecognized", "bounded detection exhausted; subsequent bytes are counted without VM retries")
 					return
 				}
@@ -653,7 +674,7 @@ func (f *binFlow) feed(dir int, data []byte, ts time.Time) {
 				} else {
 					result, err = f.consumeTLS(dir, e)
 				}
-			} else if f.protocol == "redis" || f.protocol == "syslog" || f.protocol == "snmp" || f.protocol == "smb2" || e.Entry == "MySQLPreparedFields" {
+			} else if f.protocol == "redis" || f.protocol == "syslog" || f.protocol == "snmp" || f.protocol == "smb2" || f.protocol == "enip" || f.protocol == "stratum" || f.protocol == "gearman" || f.protocol == "beanstalkd" || f.protocol == "scgi" || f.protocol == "msgpack-rpc" || f.protocol == "zookeeper" || f.protocol == "clickhouse" || f.textInternet != nil || e.Entry == "MySQLPreparedFields" {
 				result = map[string]any{}
 			} else if f.protocol == "websocket" && f.ws != nil && f.ws.deflate {
 				result = map[string]any{"fields": map[string]any{}}
@@ -673,6 +694,38 @@ func (f *binFlow) feed(dir int, data []byte, ts time.Time) {
 					result = map[string]any{"fields": e.semanticFields}
 				}
 				if f.protocol == "snmp" && e.Session != nil {
+					e.semanticFields = cloneSession(e.Session)
+					result = map[string]any{"fields": e.semanticFields}
+				}
+				if f.protocol == "enip" && e.Session != nil {
+					e.semanticFields = cloneSession(e.Session)
+					result = map[string]any{"fields": e.semanticFields}
+				}
+				if f.protocol == "stratum" && e.Session != nil {
+					e.semanticFields = cloneSession(e.Session)
+					result = map[string]any{"fields": e.semanticFields}
+				}
+				if f.protocol == "gearman" && e.Session != nil {
+					e.semanticFields = cloneSession(e.Session)
+					result = map[string]any{"fields": e.semanticFields}
+				}
+				if f.protocol == "beanstalkd" && e.Session != nil {
+					e.semanticFields = cloneSession(e.Session)
+					result = map[string]any{"fields": e.semanticFields}
+				}
+				if (f.protocol == "scgi" || f.protocol == "msgpack-rpc") && e.Session != nil {
+					e.semanticFields = cloneSession(e.Session)
+					result = map[string]any{"fields": e.semanticFields}
+				}
+				if f.protocol == "zookeeper" && e.Session != nil {
+					e.semanticFields = cloneSession(e.Session)
+					result = map[string]any{"fields": e.semanticFields}
+				}
+				if f.protocol == "clickhouse" && e.Session != nil {
+					e.semanticFields = cloneSession(e.Session)
+					result = map[string]any{"fields": e.semanticFields}
+				}
+				if f.textInternet != nil && e.Session != nil {
 					e.semanticFields = cloneSession(e.Session)
 					result = map[string]any{"fields": e.semanticFields}
 				}
@@ -705,7 +758,7 @@ func (f *binFlow) feed(dir int, data []byte, ts time.Time) {
 					a.malformed.Add(1)
 				}
 			} else if a.config.Deferred {
-				if e.Protocol == "tls" {
+				if e.Protocol == "tls" || e.Protocol == "enip" || e.Protocol == "stratum" || e.Protocol == "gearman" || e.Protocol == "beanstalkd" || e.Protocol == "scgi" || e.Protocol == "msgpack-rpc" {
 					e.Structured = result
 				}
 				a.deferred.Add(1)
@@ -752,7 +805,7 @@ func (f *binFlow) feed(dir int, data []byte, ts time.Time) {
 		// A peer SETTINGS already captured before a complete client preface
 		// must be applied before subsequent coalesced request header blocks.
 		// Never replay the peer after only a partial greeting/preface.
-		if detected || stateful && (e.Entry == "MySQLGreetingFields" || e.Entry == "HTTP2InitialClientStream" || e.Entry == "PostgreSQLStartupFields" || e.Entry == "PostgreSQLSSLRequestFields") {
+		if detected || stateful && (e.Entry == "MySQLGreetingFields" || e.Entry == "HTTP2InitialClientStream" || e.Entry == "PostgreSQLStartupFields" || e.Entry == "PostgreSQLSSLRequestFields" || e.Protocol == "socks5" && f.protocol == "") {
 			detected = false
 			other := &f.directions[1-dir]
 			if len(other.buffer) > 0 && !other.stopped {

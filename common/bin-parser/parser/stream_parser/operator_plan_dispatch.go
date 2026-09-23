@@ -18,6 +18,7 @@ type portDispatchPlan struct {
 	transport           string
 	source, destination map[uint16]*portPlanBranch
 	otherwise           *portPlanBranch
+	tlsGuard            bool
 }
 
 // Port maps retain source-order priority. Looking up src/dst independently and
@@ -108,8 +109,13 @@ func compilePortDispatchPlan(tokens string) *operatorPlan {
 		suffix = strings.Replace(suffix, "debug(op.Message)\n", "", 1)
 		suffix = strings.Replace(suffix, "// AFTER_RECOVERY", `debug("parse node %s failed: %v", typeName, op.Message)`, 1)
 	}
-	if strings.Join(parts, " ") != planTokens(suffix) {
-		return nil
+	actualSuffix := strings.Join(parts, " ")
+	if actualSuffix != planTokens(suffix) {
+		guarded := strings.Replace(suffix, "for typeName in typeNameList{", "for typeName in typeNameList{\n"+portDispatchTLSGuard, 1)
+		if p.transport != "TCP" || actualSuffix != planTokens(guarded) {
+			return nil
+		}
+		p.tlsGuard = true
 	}
 	return &operatorPlan{kind: "port-dispatch", run: p.execute, ports: p}
 }
@@ -180,6 +186,23 @@ func (p *portDispatchPlan) execute(e *planExecution) bool {
 		}
 	}
 	for _, name := range branch.candidates {
+		if name == "TLS" && p.tlsGuard {
+			e.at("this.TryProcessByType(\"XMPPTLSRecordHeader\")")
+			probe := e.this.tryProcessByTypeDiscard("XMPPTLSRecordHeader")
+			valid := false
+			if probe.ok {
+				value, ok := GetNodeResult(probe.parent.Children[len(probe.parent.Children)-1]).(uint64)
+				if ok {
+					content, version, length := value>>32, (value>>16)&65535, value&65535
+					valid = content >= 20 && content <= 24 && version >= 0x0300 && version <= 0x0304 && length > 0 && length <= 18432 && (!bounded || length+5 <= maximum)
+				}
+			}
+			e.at("probe.Recovery()")
+			probe.recovery()
+			if !valid {
+				continue
+			}
+		}
 		e.at("this.TryProcessByType(typeName)")
 		op := e.this.tryProcessByTypeDiscard(name)
 		if op.ok {
@@ -253,4 +276,20 @@ if bounded {
   tail.SetMaxLength(remaining)
   tail.Process()
  }
+}`
+
+// Keep this closed form in sync with the TCP rule. The native dispatch plan
+// must preserve TLS admission instead of falling back to the VM on all ports.
+const portDispatchTLSGuard = `if typeName == "TLS" {
+ prefix,probe = this.TryProcessByType("XMPPTLSRecordHeader")
+ tlsRecord = false
+ if probe.OK {
+  content = prefix.Value >> 32
+  version = (prefix.Value >> 16) & 65535
+  length = prefix.Value & 65535
+  tlsRecord = content >= 20 && content <= 24 && version >= 0x0300 && version <= 0x0304 && length > 0 && length <= 18432 && (!bounded || length + 5 <= maximum)
+ }
+ err = probe.Recovery()
+ if err != nil { panic(err) }
+ if !tlsRecord { continue }
 }`

@@ -23,6 +23,14 @@ func probeNTP(w []byte, limit int) ProbeResult {
 	if len(w) < 48 {
 		return ProbeResult{Verdict: ProbeReject}
 	}
+	// Stratum is an unsigned byte in the NTP header: 0 is unsynchronized or
+	// unspecified, 1-15 are synchronized strata, and 16 is unsynchronized. Values
+	// above 16 are invalid and commonly occur in unrelated text protocols. For
+	// example, bencoded KRPC starts with "d1:"; its leading 'd' resembles an
+	// NTPv4 server header unless this field is checked before admission.
+	if w[1] > 16 {
+		return ProbeResult{Verdict: ProbeReject}
+	}
 	_ = limit
 	return probeAccept("ntp", "4", 90)
 }

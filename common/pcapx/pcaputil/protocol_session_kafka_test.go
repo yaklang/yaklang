@@ -70,6 +70,63 @@ func TestKafkaProbeDefersPeerHTTP2Settings(t *testing.T) {
 	require.Equal(t, ProbeReject, probeKafka(bad, 64).Verdict)
 }
 
+func zookeeperConnectProbeFixture(password []byte) []byte {
+	body := make([]byte, 28+len(password)+1)
+	binary.BigEndian.PutUint32(body[12:16], 30000) // requested session timeout
+	binary.BigEndian.PutUint32(body[24:28], uint32(len(password)))
+	copy(body[28:], password)
+	body[len(body)-1] = 0 // read-only flag
+	return kafkaFrame(body)
+}
+
+func zookeeperConnectResponseProbeFixture(password []byte) []byte {
+	body := make([]byte, 20+len(password)+1)
+	binary.BigEndian.PutUint32(body[4:8], 30000) // negotiated session timeout
+	binary.BigEndian.PutUint64(body[8:16], 0x5013)
+	binary.BigEndian.PutUint32(body[16:20], uint32(len(password)))
+	copy(body[20:], password)
+	body[len(body)-1] = 0 // read-only flag
+	return kafkaFrame(body)
+}
+
+func kafkaProduceV0SimilarPrefixFixture() []byte {
+	header := []byte{0, 0, 0, 0, 0, 0, 0, 0, 0, 0} // API/version, correlation ID, empty client ID
+	body := kafkaBE16(0)                           // acks
+	body = append(body, kafkaBE32(30000)...)
+	body = append(body, kafkaBE32(1)...)
+	body = append(body, kafkaStr("abcdefghijk")...)
+	body = append(body, kafkaBE32(1)...)
+	body = append(body, kafkaBE32(0)...)
+	body = append(body, kafkaBE32(0)...) // empty record set
+	return kafkaFrame(append(header, body...))
+}
+
+func TestKafkaProbeRejectsZooKeeperConnectAndKeepsSimilarProduce(t *testing.T) {
+	for name, zookeeper := range map[string][]byte{
+		"client connect":  zookeeperConnectProbeFixture([]byte("winlab-session!!")),
+		"server response": zookeeperConnectResponseProbeFixture([]byte("winlab-session!!")),
+	} {
+		for n := 14; n < len(zookeeper); n++ {
+			p := probeKafka(zookeeper[:n], 64)
+			require.NotEqual(t, ProbeAccept, p.Verdict, "%s ZooKeeper prefix length=%d", name, n)
+		}
+		require.Equal(t, ProbeReject, probeKafka(zookeeper, 64).Verdict, "%s", name)
+	}
+
+	// A legal API 0 Produce request can share the exact 49-byte envelope and
+	// ambiguous zero-valued prefix; its bounded body fields must keep it Kafka.
+	produce := kafkaProduceV0SimilarPrefixFixture()
+	require.Len(t, produce, 49)
+	require.True(t, validKafkaProduceV0Request(produce))
+	require.Equal(t, ProbeAccept, probeKafka(produce, 64).Verdict)
+
+	// A same-length near-ZooKeeper frame with an inconsistent password length
+	// is neither a valid ZooKeeper handshake nor a valid Kafka Produce request.
+	near := append([]byte(nil), zookeeperConnectProbeFixture([]byte("winlab-session!!"))...)
+	binary.BigEndian.PutUint32(near[28:32], 15)
+	require.Equal(t, ProbeReject, probeKafka(near, 64).Verdict)
+}
+
 func kafkaRecordBatch(count int32, compressed bool) []byte {
 	rest := kafkaBE32(-1) // leader epoch
 	rest = append(rest, 2)

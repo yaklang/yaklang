@@ -18,15 +18,6 @@ func probeFTP(w []byte, limit int) ProbeResult {
 	if len(w) == 0 {
 		return ProbeResult{Verdict: ProbeReject}
 	}
-	if ftpCommandPrefix(w) {
-		if !bytes.Contains(w, []byte("\r\n")) {
-			if len(w) >= min(limit, mailLineMax) {
-				return ProbeResult{Verdict: ProbeReject}
-			}
-			return probeNeed("ftp", "rfc959", len(w), min(limit, 16))
-		}
-		return probeAccept("ftp", "rfc959", 91)
-	}
 	if w[0] == '2' {
 		line, ok := firstCRLF(w)
 		if !ok {
@@ -35,11 +26,63 @@ func probeFTP(w []byte, limit int) ProbeResult {
 			}
 			return ProbeResult{Verdict: ProbeReject}
 		}
-		if smtpReplyPrefix(line) && ftpBanner(line) && !mailHasToken(line, "ESMTP") && !mailHasToken(line, "SMTP") {
+		if len(line) >= 4 && smtpReplyPrefix(line) && (line[3] == ' ' || line[3] == '-') &&
+			ftpBanner(line) && !mailHasToken(line, "ESMTP") && !mailHasToken(line, "SMTP") {
 			return probeAccept("ftp", "rfc959", 90)
 		}
 	}
 	return ProbeResult{Verdict: ProbeReject}
+}
+
+// probeFTPControlExchange admits the ambiguous, but valid, initial FTP
+// exchange only when the capture identifies the server endpoint as port 21 and
+// observes a 220 greeting, USER command, and matching 331 reply. A port or any
+// one of those strings alone is not protocol evidence. This bounded fallback
+// handles servers whose greeting does not name FTP (including the WinLab
+// fixture); subsequent bytes are parsed by the normal FTP session state.
+func (f *binFlow) probeFTPControlExchange(dir int, current []byte) bool {
+	if !f.captureTCP {
+		return false
+	}
+	serverDir := -1
+	switch {
+	case f.ports[0] == 21 && f.ports[1] != 21:
+		serverDir = 0
+	case f.ports[1] == 21 && f.ports[0] != 21:
+		serverDir = 1
+	default:
+		return false
+	}
+	clientDir := 1 - serverDir
+	directionWire := func(want int) []byte {
+		if want == dir {
+			return current
+		}
+		return f.directions[want].buffer
+	}
+	server, client := directionWire(serverDir), directionWire(clientDir)
+	if len(server) == 0 || len(client) == 0 {
+		return false
+	}
+	// A single greeting plus one reply and one command are enough for this
+	// admission check. Bound scanning even when the capture contains a large
+	// coalesced write or malformed line.
+	server = server[:min(len(server), 2*mailLineMax)]
+	client = client[:min(len(client), mailLineMax)]
+	greeting, ok := firstCRLF(server)
+	if !ok || len(greeting) < 4 || !smtpReplyPrefix(greeting) || string(greeting[:3]) != "220" || greeting[3] != ' ' {
+		return false
+	}
+	clientLine, ok := firstCRLF(client)
+	if !ok || mailFirstWord(clientLine) != "USER" || len(bytes.Fields(clientLine)) < 2 {
+		return false
+	}
+	serverAfterGreeting := server[len(greeting)+2:]
+	userReply, ok := firstCRLF(serverAfterGreeting)
+	if !ok || len(userReply) < 4 || !smtpReplyPrefix(userReply) || string(userReply[:3]) != "331" || userReply[3] != ' ' {
+		return false
+	}
+	return true
 }
 
 func ftpBanner(line []byte) bool {
@@ -49,20 +92,6 @@ func ftpBanner(line []byte) bool {
 	for _, field := range strings.Fields(strings.ToUpper(string(line))) {
 		switch strings.Trim(field, "()[]:;") {
 		case "VSFTPD", "PROFTPD", "PURE-FTPD", "FILEZILLA":
-			return true
-		}
-	}
-	return false
-}
-
-func ftpCommandPrefix(w []byte) bool {
-	u := bytes.ToUpper(w)
-	for _, cmd := range []string{
-		"PASV\r", "PASV ", "PORT ", "EPSV", "EPRT ", "RETR ", "STOR ", "STOU",
-		"CWD ", "PWD\r", "XPWD", "SYST\r", "FEAT\r", "FEAT ", "AUTH TLS", "AUTH SSL",
-		"PBSZ ", "PROT ", "TYPE ", "MKD ", "RMD ", "DELE ", "RNFR ", "RNTO ",
-	} {
-		if bytes.HasPrefix(u, []byte(cmd)) {
 			return true
 		}
 	}

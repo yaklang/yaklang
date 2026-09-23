@@ -12,7 +12,9 @@ Package:
               bounded = maximum > 0 && maximum < 1048576
               src = getNodeResult("@UDP/Source Port").Value
               dst = getNodeResult("@UDP/Destination Port").Value
-              typeNameList = ["DNS", "DHCP", "NTP", "SNMP"]
+              // These decoders need a port or explicit caller context. In
+              // particular, arbitrary DHT bencoding resembles an NTP header.
+              typeNameList = []string{}
               if src == 53 || dst == 53 {
                 typeNameList = ["DNS"]
               } else if src == 5353 || dst == 5353 {
@@ -23,6 +25,8 @@ Package:
                 typeNameList = ["DHCPv6"]
               } else if src == 123 || dst == 123 {
                 typeNameList = ["NTP"]
+              } else if src == 8611 || dst == 8611 {
+                typeNameList = ["BJNP"]
               } else if src == 161 || dst == 161 || src == 162 || dst == 162 {
                 typeNameList = ["SNMPv3", "SNMP"]
               } else if src == 88 || dst == 88 {
@@ -147,6 +151,7 @@ MDNS: "import:application-layer/dns.yaml;node:DNS"
 DHCP: "import:application-layer/dhcp.yaml;node:DHCP"
 DHCPv6: "import:dhcpv6.yaml;node:DHCPv6"
 NTP: "import:application-layer/ntp.yaml;node:NTP"
+BJNP: "import:application-layer/bjnp.yaml;node:BJNP"
 SNMP: "import:application-layer/snmp.yaml;node:SNMP"
 SNMPv3: "import:application-layer/snmp.yaml;node:SNMPv3"
 Kerberos: "import:application-layer/kerberos.yaml;node:Kerberos"
