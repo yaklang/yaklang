@@ -67,6 +67,7 @@ func PingAutoConfig(ip string, opts ...PingConfigOpt) *PingResult {
 		log.Infof("tcp-ping[%s] too many ports, only test first 5 most", defaultTcpPort)
 	}
 
+	var icmpErr error
 	if !config.forceTcpPing && len(proxies) == 0 {
 		if config.pingNativeHandler != nil {
 			if result := config.pingNativeHandler(ip, timeout); result != nil {
@@ -79,12 +80,21 @@ func PingAutoConfig(ip string, opts ...PingConfigOpt) *PingResult {
 			if result != nil {
 				return result
 			}
+			icmpErr = err
 			log.Debugf("netstack ping failed: %v", err)
 		}
 	}
 
 	if err := parentCtx.Err(); err != nil {
 		return &PingResult{IP: ip, Reason: err.Error()}
+	}
+
+	if len(testPorts) == 0 {
+		reason := "no TCP probe ports configured"
+		if icmpErr != nil {
+			reason = icmpErr.Error()
+		}
+		return &PingResult{IP: ip, Reason: reason}
 	}
 
 	// tcp ping
