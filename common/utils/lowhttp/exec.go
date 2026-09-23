@@ -119,6 +119,18 @@ func HTTP(opts ...LowhttpOpt) (*LowhttpResponse, error) {
 
 	if redirectTimes > 0 {
 		lastPacket := raw
+		repairedMethodRejectedRedirect := false
+		recordRedirect := func(rsp *LowhttpResponse) *RedirectFlow {
+			flow := &RedirectFlow{
+				IsHttps:    rsp.Https,
+				Request:    rsp.RawRequest,
+				Response:   rsp.RawPacket,
+				RespRecord: rsp,
+			}
+			redirectRawPackets = append(redirectRawPackets, flow)
+			rsp.RedirectRawPackets = redirectRawPackets
+			return flow
+		}
 
 		for i := 0; i < redirectTimes; i++ {
 			target := GetRedirectFromHTTPResponse(lastPacket.Response, jsRedirect)
@@ -138,6 +150,7 @@ func HTTP(opts ...LowhttpOpt) (*LowhttpResponse, error) {
 
 			// should not extract response cookie
 			statusCode := GetStatusCodeFromResponse(lastPacket.Response)
+			originRequest := r
 			r, err = BuildRedirectRequest(targetUrl, r, lastPacket.IsHttps, statusCode)
 			if err != nil {
 				log.Errorf("met error in redirect: %v", err)
@@ -167,15 +180,34 @@ func HTTP(opts ...LowhttpOpt) (*LowhttpResponse, error) {
 				return response, nil
 			}
 
-			responseRaw := &RedirectFlow{
-				IsHttps:    response.Https,
-				Request:    response.RawRequest,
-				Response:   response.RawPacket,
-				RespRecord: response,
-			}
+			responseRaw := recordRedirect(response)
 
-			redirectRawPackets = append(redirectRawPackets, responseRaw)
-			response.RedirectRawPackets = redirectRawPackets
+			// Some servers reject the browser-style redirect method with a 400 or 405.
+			// Retry the same target once, using the opposite method policy and the
+			// request from before this redirect (including its original body).
+			// This attempt is part of the current hop, not another redirect.
+			redirectStatus := GetStatusCodeFromResponse(responseRaw.Response)
+			if !repairedMethodRejectedRedirect && (redirectStatus == http.StatusBadRequest || redirectStatus == http.StatusMethodNotAllowed) {
+				rewriteToGet := shouldRewriteRedirectToGet(statusCode, GetHTTPRequestMethod(originRequest))
+				repairRequest, repairErr := buildRedirectRequestWithMethod(targetUrl, originRequest, lastPacket.IsHttps, !rewriteToGet)
+				if repairErr != nil {
+					log.Errorf("cannot repair rejected redirect method: %v", repairErr)
+				} else if !bytes.Equal(repairRequest, r) {
+					repairedMethodRejectedRedirect = true
+					repairOpts := append(opts, WithHttps(forceHttps), WithHost(nextHost), WithPort(nextPort), WithRequest(repairRequest), WithNativeHTTPRequestInstance(nil))
+					repairResponse, repairErr := HTTPWithoutRedirect(repairOpts...)
+					if repairErr != nil {
+						log.Errorf("met error repairing rejected redirect method: %v", repairErr)
+						return response, nil
+					}
+					if repairResponse == nil {
+						return response, nil
+					}
+					r = repairRequest
+					response = repairResponse
+					responseRaw = recordRedirect(response)
+				}
+			}
 
 			// raw
 			lastPacket = responseRaw
