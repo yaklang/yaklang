@@ -822,7 +822,8 @@ func parseDHT(frames []Frame) (string, error) {
 			}
 		}
 	}
-	sawNodes := false
+	var nodeID, nodeIP string
+	var nodePort, nodesLen int
 	for _, p := range s2c {
 		v, rest, err := bdecode(string(p))
 		if err != nil || rest != "" {
@@ -839,15 +840,21 @@ func parseDHT(frames []Frame) (string, error) {
 		if err != nil {
 			return "", err
 		}
-		if nodes, ok := body["nodes"].(string); ok {
-			if len(nodes) == 0 || len(nodes)%26 != 0 {
-				return "", fmt.Errorf("dht nodes")
-			}
-			sawNodes = true
+		nodes, ok := body["nodes"].(string)
+		if !ok {
+			continue
 		}
+		if len(nodes) == 0 || len(nodes)%26 != 0 {
+			return "", fmt.Errorf("dht nodes")
+		}
+		nodesLen = len(nodes)
+		nodeID = nodes[:20]
+		ip := []byte(nodes[20:24])
+		nodeIP = fmt.Sprintf("%d.%d.%d.%d", ip[0], ip[1], ip[2], ip[3])
+		nodePort = int(binary.BigEndian.Uint16([]byte(nodes[24:26])))
 	}
-	if len(pingID) != 20 || len(target) != 20 || len(info) != 20 || token == "" || port == 0 || !sawNodes {
+	if len(pingID) != 20 || len(target) != 20 || len(info) != 20 || token == "" || port == 0 || nodesLen == 0 || nodePort == 0 {
 		return "", fmt.Errorf("dht fields")
 	}
-	return kv("protocol", "bittorrent-dht", "ping_id", pingID, "find_target", target, "info_hash", info, "announce_token", token, "announce_port", strconv.Itoa(port)), nil
+	return kv("protocol", "bittorrent-dht", "ping_id", pingID, "find_target", target, "info_hash", info, "announce_token", token, "announce_port", strconv.Itoa(port), "nodes_len", strconv.Itoa(nodesLen), "node_id", nodeID, "node_ip", nodeIP, "node_port", strconv.Itoa(nodePort)), nil
 }

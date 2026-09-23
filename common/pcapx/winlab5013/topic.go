@@ -178,7 +178,7 @@ func parseBACnet(frames []Frame) (string, error) {
 		return "", err
 	}
 	var device, readObj, readVal, writeObj, writeVal, readProp, writeProp string
-	var readInvoke, writeInvoke, readService, writeService int
+	var readInvoke, writeInvoke, readService, writeService, readPropID, writePropID int
 	objProp := func(rest []byte) (obj string, prop int, tail []byte, err error) {
 		if len(rest) < 7 || rest[0] != 0x0C {
 			return "", 0, nil, fmt.Errorf("bacnet context tag 0")
@@ -237,13 +237,13 @@ func parseBACnet(frames []Frame) (string, error) {
 			}
 			switch service {
 			case 12:
-				readInvoke, readService, readObj, readProp = invoke, service, obj, name
+				readInvoke, readService, readObj, readProp, readPropID = invoke, service, obj, name, prop
 			case 15:
 				val, err := realValue(tail)
 				if err != nil {
 					return err
 				}
-				writeInvoke, writeService, writeObj, writeProp, writeVal = invoke, service, obj, name, val
+				writeInvoke, writeService, writeObj, writeProp, writePropID, writeVal = invoke, service, obj, name, prop, val
 			default:
 				return fmt.Errorf("bacnet service %d", service)
 			}
@@ -282,10 +282,25 @@ func parseBACnet(frames []Frame) (string, error) {
 			return "", err
 		}
 	}
-	if device == "" || readVal == "" || writeVal == "" || readProp == "" || writeProp == "" || readService != 12 || writeService != 15 {
+	if device == "" || readVal == "" || writeVal == "" || readPropID == 0 || writePropID == 0 {
 		return "", fmt.Errorf("bacnet fields")
 	}
-	return kv("protocol", "bacnet", "device", device, "read_object", readObj, "read_property", readProp, "read_value", readVal, "write_object", writeObj, "write_property", writeProp, "write_value", writeVal), nil
+	return kv(
+		"protocol", "bacnet",
+		"device", device,
+		"read_service", strconv.Itoa(readService),
+		"read_invoke", strconv.Itoa(readInvoke),
+		"read_object", readObj,
+		"read_property_id", strconv.Itoa(readPropID),
+		"read_property", readProp,
+		"read_value", readVal,
+		"write_service", strconv.Itoa(writeService),
+		"write_invoke", strconv.Itoa(writeInvoke),
+		"write_object", writeObj,
+		"write_property_id", strconv.Itoa(writePropID),
+		"write_property", writeProp,
+		"write_value", writeVal,
+	), nil
 }
 
 func enip(cmd uint16, session uint32, data []byte) []byte {
@@ -850,7 +865,7 @@ func parseC37(frames []Frame) (string, error) {
 	if name == "" || real == "" || idcode == 0 || nominal == 0 || freq == "" {
 		return "", fmt.Errorf("c37 fields")
 	}
-	return kv("protocol", "c37.118", "idcode", strconv.Itoa(idcode), "phasor", name, "real", real, "imag", imag, "freq_off_hz", freq, "nominal_hz", strconv.Itoa(nominal)), nil
+	return kv("protocol", "c37.118", "idcode", strconv.Itoa(idcode), "format", fmt.Sprintf("0x%04x", format), "phasor", name, "real", real, "imag", imag, "freq_off_hz", freq, "nominal_hz", strconv.Itoa(nominal)), nil
 }
 
 func buildStratum(l *lab) {
