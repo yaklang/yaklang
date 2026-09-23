@@ -103,3 +103,13 @@ func (r *ForwarderRequest) CreateEndpoint(queue *waiter.Queue) (tcpip.Endpoint, 
 
 	return ep, nil
 }
+
+// Release releases the packet retained by the request. Call it after creating
+// the endpoint, or when rejecting the request. The request must not be used
+// after Release. It is safe to release an already released request.
+func (r *ForwarderRequest) Release() {
+	if r.pkt != nil {
+		r.pkt.DecRef()
+		r.pkt = nil
+	}
+}

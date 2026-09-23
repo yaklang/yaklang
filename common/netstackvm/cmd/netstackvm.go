@@ -21,8 +21,8 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/netutil"
 
-	"github.com/yaklang/yaklang/common/urfavecli"
 	"github.com/yaklang/yaklang/common/netstackvm"
+	"github.com/yaklang/yaklang/common/urfavecli"
 )
 
 var (
@@ -96,7 +96,7 @@ func main() {
 					_ = gateway
 					_ = srcIP
 				}
-				userStack, err := netstackvm.NewNetStackVirtualMachineEntry(netstackvm.WithPcapDevice(ifaceName))
+				userStack, err := netstackvm.NewNetStackVirtualMachineEntry(netstackvm.WithPCAPReadOnly(false), netstackvm.WithPcapDevice(ifaceName))
 				if err != nil {
 					return utils.Errorf("create netstack virtual machine failed: %v", err)
 				}
@@ -186,7 +186,7 @@ func main() {
 					_ = srcIP
 				}
 				vm, err := netstackvm.NewNetStackVirtualMachineEntry(
-					netstackvm.WithPcapDevice(ifaceName),
+					netstackvm.WithPCAPReadOnly(false), netstackvm.WithPcapDevice(ifaceName),
 				)
 				if err != nil {
 					return err
@@ -268,7 +268,7 @@ func main() {
 					_ = srcIP
 				}
 				vm, err := netstackvm.NewNetStackVirtualMachineEntry(
-					netstackvm.WithPcapDevice(ifaceName),
+					netstackvm.WithPCAPReadOnly(false), netstackvm.WithPcapDevice(ifaceName),
 				)
 				if err != nil {
 					return err
@@ -327,7 +327,7 @@ func main() {
 		}
 
 		vm, err := netstackvm.NewNetStackVirtualMachineEntry(
-			netstackvm.WithPcapDevice(ifaceName),
+			netstackvm.WithPCAPReadOnly(false), netstackvm.WithPcapDevice(ifaceName),
 			netstackvm.WithMainNICLinkAddress(vmac),
 		)
 		if err != nil {
@@ -376,7 +376,6 @@ func main() {
 			// conn.Close()
 			time.Sleep(500 * time.Millisecond)
 		}
-		return nil
 	}
 
 	err := app.Run(os.Args)

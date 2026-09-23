@@ -820,6 +820,7 @@ jobs:
                 {"package": "./common/thirdpartyservices", "timeout": "10s", "run": "^TestPullServiceImagesThroughEngineHTTP$"},
                 {"package": "./common/openapi/...", "timeout": "30s"},
                 {"package": "./common/pcapx/pcaputil/...", "timeout": "15s"},
+                {"package": "./common/netstackvm", "timeout": "90s", "race": true},
                 {"package": "./common/yso/...", "timeout": "20s"},
                 {"package": "./common/yserx", "timeout": "20s"},
                 {"package": "./common/twofa/...", "timeout": "20s"},

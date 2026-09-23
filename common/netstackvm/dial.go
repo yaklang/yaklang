@@ -13,6 +13,9 @@ import (
 )
 
 func (vm *NetStackVirtualMachineEntry) DialTCP(timeout time.Duration, hostport string) (net.Conn, error) {
+	if vm.driver != nil && vm.driver.readOnly.Load() {
+		return nil, ErrPassiveNetwork
+	}
 	defer func() {
 		if err := recover(); err != nil {
 			log.Errorf("panic: %v", err)
