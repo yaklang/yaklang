@@ -112,11 +112,21 @@ var builtinBinSpecs = [][2]string{
 	{"pop3", "POP3"},
 	{"application-layer.ftp", "FTP"},
 	{"application-layer.ftp", "FTPCommand"},
+	{"application-layer.socks5", "ClientNegotiation"},
+	{"application-layer.socks5", "ServerNegotiation"},
+	{"application-layer.socks5", "AuthRequest"},
+	{"application-layer.socks5", "AuthReply"},
+	{"application-layer.socks5", "Request"},
+	{"application-layer.socks5", "Replies"},
+	{"application-layer.stratum", "StratumLine"},
+	{"application-layer.gearman", "GearmanMessage"},
+	{"application-layer.beanstalkd", "BeanstalkMessage"},
 	{"application-layer.tns", "TNS"},
 	{"application-layer.radius", "RADIUS"},
 	{"application-layer.dhcp", "DHCP"},
 	{"application-layer.ntp", "NTP"},
 	{"application-layer.extended_protocols", "CoAP"},
+	{"application-layer.extended_protocols", "BACnetIP"},
 	{"application-layer.extended_protocols", "ModbusTCP"},
 	{"application-layer.extended_protocols", "DNP3"},
 	{"application-layer.c37118", "C37118"},
@@ -144,30 +154,17 @@ func (f *binFlow) detect(w []byte) {
 			}
 		}
 	}
-	for _, prefix := range []string{"GET ", "POST ", "PUT ", "DELETE ", "HEAD ", "OPTIONS ", "PATCH ", "CONNECT ", "TRACE ", "HTTP/1."} {
+	for _, prefix := range httpDetectionPrefixes {
 		if bytes.HasPrefix(w, []byte(prefix)) {
-			if prefix == "OPTIONS " {
-				rest := w[len("OPTIONS "):]
-				// OPTIONS is shared by HTTP and SIP. A fragmented method or
-				// ambiguous URI is not sufficient to select either protocol.
-				if len(rest) == 0 {
-					return
-				}
-				boundary := bytes.IndexByte(rest, ' ')
-				if boundary < 0 && (rest[0] == '*' || rest[0] == 's' || rest[0] == 'S' || rest[0] == 'r' || rest[0] == 'R') {
-					return
-				}
-				if boundary >= 0 {
-					version := rest[boundary+1:]
-					if bytes.HasPrefix(version, []byte("SIP/2.0")) || bytes.HasPrefix(version, []byte("RTSP/")) {
-						break
-					}
-					if bytes.HasPrefix([]byte("SIP/2.0"), version) || bytes.HasPrefix([]byte("RTSP/1.0"), version) {
-						return
-					}
-				}
+			if _, _, _, ok := parseHTTPRequestStartLine(w); ok {
+				f.protocol = "http"
+				return
 			}
-			f.protocol = "http"
+			if prefix == "OPTIONS " && isOtherOPTIONSStartLine(w) {
+				// OPTIONS is also a SIP and RTSP method. Let those strict
+				// protocol probes inspect their complete start line.
+				continue
+			}
 			return
 		}
 	}
@@ -211,6 +208,122 @@ func (f *binFlow) detect(w []byte) {
 		f.protocol, f.syslog = "syslog", &binSyslog{}
 		return
 	}
+}
+
+var httpDetectionPrefixes = []string{
+	"GET ", "POST ", "PUT ", "DELETE ", "HEAD ", "OPTIONS ", "PATCH ", "CONNECT ", "TRACE ",
+	"PROPFIND ", "PROPPATCH ", "MKCOL ", "COPY ", "MOVE ", "LOCK ", "UNLOCK ", "REPORT ", "HTTP/1.",
+}
+
+const httpStartLineMaxBytes = 8 << 10
+
+// isHTTPStartLineCandidate holds weak protocol probes while a recognized HTTP
+// method or response prefix is incomplete or malformed. Otherwise a short
+// fragment such as "GET " can be claimed by an unrelated binary signature
+// before the CRLF that proves the HTTP start line.
+func isHTTPStartLineCandidate(w []byte) bool {
+	if len(w) == 0 {
+		return false
+	}
+	if isOtherOPTIONSStartLine(w) {
+		return false
+	}
+	for _, prefix := range httpDetectionPrefixes {
+		candidate := []byte(prefix)
+		if bytes.HasPrefix(w, candidate) || len(w) <= len(candidate) && bytes.HasPrefix(candidate, w) {
+			return true
+		}
+	}
+	return false
+}
+
+func needsMoreHTTPStartLine(w []byte) bool {
+	return len(w) < httpStartLineMaxBytes && isHTTPStartLineCandidate(w) && bytes.Index(w, []byte("\r\n")) < 0
+}
+
+func isOtherOPTIONSStartLine(w []byte) bool {
+	if !bytes.HasPrefix(w, []byte("OPTIONS ")) {
+		return false
+	}
+	lineEnd := bytes.Index(w, []byte("\r\n"))
+	if lineEnd < 0 {
+		return false
+	}
+	line := w[:lineEnd]
+	lastSpace := bytes.LastIndexByte(line, ' ')
+	if lastSpace <= len("OPTIONS ") || lastSpace+1 >= len(line) {
+		return false
+	}
+	version := line[lastSpace+1:]
+	return bytes.Equal(version, []byte("SIP/2.0")) || bytes.Equal(version, []byte("RTSP/1.0"))
+}
+
+// parseHTTPRequestStartLine admits HTTP only after a complete, valid HTTP/1.x
+// start line. A method prefix alone is too weak: it can be arbitrary payload,
+// and PROPFIND is also used by WebDAV/CardDAV captures outside the usual HTTP
+// method set. Response lines are checked here too so malformed HTTP-looking
+// bytes do not enter the stateful HTTP parser.
+func parseHTTPRequestStartLine(w []byte) (method, target, version string, ok bool) {
+	lineEnd := bytes.Index(w, []byte("\r\n"))
+	if lineEnd < 0 {
+		return "", "", "", false
+	}
+	line := w[:lineEnd]
+	if bytes.HasPrefix(line, []byte("HTTP/")) {
+		firstSpace := bytes.IndexByte(line, ' ')
+		if firstSpace < 0 {
+			return "", "", "", false
+		}
+		version = string(line[:firstSpace])
+		if version != "HTTP/1.0" && version != "HTTP/1.1" {
+			return "", "", "", false
+		}
+		statusLine := line[firstSpace+1:]
+		if len(statusLine) < 4 || statusLine[3] != ' ' || statusLine[0] < '1' || statusLine[0] > '9' ||
+			statusLine[1] < '0' || statusLine[1] > '9' || statusLine[2] < '0' || statusLine[2] > '9' {
+			return "", "", "", false
+		}
+		for _, c := range statusLine[4:] {
+			if (c < 0x20 && c != '\t') || c == 0x7f {
+				return "", "", "", false
+			}
+		}
+		return "", "", version, true
+	}
+
+	firstSpace := bytes.IndexByte(line, ' ')
+	if firstSpace <= 0 || firstSpace+1 >= len(line) {
+		return "", "", "", false
+	}
+	secondSpaceRel := bytes.IndexByte(line[firstSpace+1:], ' ')
+	if secondSpaceRel <= 0 {
+		return "", "", "", false
+	}
+	secondSpace := firstSpace + 1 + secondSpaceRel
+	if secondSpace+1 >= len(line) || bytes.IndexByte(line[secondSpace+1:], ' ') >= 0 {
+		return "", "", "", false
+	}
+	methodBytes, targetBytes := line[:firstSpace], line[firstSpace+1:secondSpace]
+	for _, c := range methodBytes {
+		if !isHTTPTokenByte(c) {
+			return "", "", "", false
+		}
+	}
+	for _, c := range targetBytes {
+		if c <= 0x20 || c == 0x7f {
+			return "", "", "", false
+		}
+	}
+	version = string(line[secondSpace+1:])
+	if version != "HTTP/1.0" && version != "HTTP/1.1" {
+		return "", "", "", false
+	}
+	return string(methodBytes), string(targetBytes), version, true
+}
+
+func isHTTPTokenByte(c byte) bool {
+	return c >= 'A' && c <= 'Z' || c >= 'a' && c <= 'z' || c >= '0' && c <= '9' ||
+		bytes.IndexByte([]byte("!#$%&'*+-.^_`|~"), c) >= 0
 }
 
 func mqttLength(w []byte) (total, header int, err error) {

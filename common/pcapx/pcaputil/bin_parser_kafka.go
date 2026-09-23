@@ -25,6 +25,130 @@ func kafkaSupported(api, ver uint16) bool {
 	return stream_parser.KafkaVersionSupported(int16(api), int16(ver))
 }
 
+// kafkaZooKeeperConnectAmbiguity prevents the common ZooKeeper ConnectRequest
+// envelope from being admitted as a Kafka Produce v0 request. Both begin with
+// a four-byte length followed by zero-valued 32-bit fields, so wait for this
+// bounded packet only when its complete prefix still matches the ZooKeeper
+// field layout. ZooKeeper remains unsupported; this is only an exclusion from
+// Kafka detection.
+func kafkaZooKeeperConnectAmbiguity(w []byte, size, limit int) (ProbeResult, bool) {
+	total := size + 4
+	if size < 28 || total > limit {
+		return ProbeResult{}, false
+	}
+	if len(w) < 14 || binary.BigEndian.Uint32(w[4:8]) != 0 || binary.BigEndian.Uint16(w[12:14]) != 0 {
+		return ProbeResult{}, false
+	}
+	if len(w) < 20 {
+		return probeNeed("kafka", "ambiguous-zookeeper-connect", len(w), 20), true
+	}
+	requestTimeout := binary.BigEndian.Uint32(w[16:20])
+	requestPrefix := binary.BigEndian.Uint64(w[8:16]) == 0 && validZooKeeperSessionTimeout(requestTimeout)
+	responseTimeout := binary.BigEndian.Uint32(w[8:12])
+	responsePrefix := validZooKeeperSessionTimeout(responseTimeout)
+	if !requestPrefix && !responsePrefix {
+		return ProbeResult{}, false
+	}
+	if len(w) < total {
+		return probeNeed("kafka", "ambiguous-zookeeper-connect", len(w), total), true
+	}
+	packet := w[:total]
+	body := packet[4:]
+	if zooKeeperConnectRequest(body) || zooKeeperConnectResponse(body) {
+		return ProbeResult{Verdict: ProbeReject, Reason: "ZooKeeper connect handshake is unsupported"}, true
+	}
+	if validKafkaProduceV0Request(packet) {
+		return ProbeResult{}, false
+	}
+	return ProbeResult{Verdict: ProbeReject, Reason: "ambiguous API 0 frame does not match Kafka request framing"}, true
+}
+
+func validZooKeeperSessionTimeout(timeout uint32) bool { return timeout > 0 && timeout <= 120000 }
+
+func zooKeeperPasswordAndReadOnly(body []byte, passwordLengthOffset, passwordOffset int) bool {
+	if passwordLengthOffset+4 > len(body) {
+		return false
+	}
+	passwordLength := int(int32(binary.BigEndian.Uint32(body[passwordLengthOffset : passwordLengthOffset+4])))
+	if passwordLength < 0 || passwordLength > len(body)-passwordOffset {
+		return false
+	}
+	remaining := len(body) - passwordOffset - passwordLength
+	return remaining == 0 || remaining == 1 && body[passwordOffset+passwordLength] <= 1
+}
+
+func zooKeeperConnectRequest(body []byte) bool {
+	return len(body) >= 28 && binary.BigEndian.Uint32(body[:4]) == 0 &&
+		validZooKeeperSessionTimeout(binary.BigEndian.Uint32(body[12:16])) &&
+		zooKeeperPasswordAndReadOnly(body, 24, 28)
+}
+
+func zooKeeperConnectResponse(body []byte) bool {
+	return len(body) >= 20 && binary.BigEndian.Uint32(body[:4]) == 0 &&
+		validZooKeeperSessionTimeout(binary.BigEndian.Uint32(body[4:8])) &&
+		zooKeeperPasswordAndReadOnly(body, 16, 20)
+}
+
+func validKafkaProduceV0Request(packet []byte) bool {
+	if len(packet) < 24 || int(binary.BigEndian.Uint32(packet[:4])) != len(packet)-4 ||
+		binary.BigEndian.Uint16(packet[4:6]) != 0 || binary.BigEndian.Uint16(packet[6:8]) != 0 {
+		return false
+	}
+	at := 14 // length, request header, and a zero-length client ID
+	if int16(binary.BigEndian.Uint16(packet[12:14])) != 0 || len(packet)-at < 10 {
+		return false
+	}
+	acks := int16(binary.BigEndian.Uint16(packet[at : at+2]))
+	if acks < -1 || acks > 1 {
+		return false
+	}
+	at += 6 // acks and timeout
+	readCount := func() (int, bool) {
+		if len(packet)-at < 4 {
+			return 0, false
+		}
+		n := int(int32(binary.BigEndian.Uint32(packet[at : at+4])))
+		at += 4
+		return n, n >= 0 && n <= 4096
+	}
+	count, ok := readCount()
+	if !ok {
+		return false
+	}
+	elements := count
+	for i := 0; i < count; i++ {
+		if len(packet)-at < 2 {
+			return false
+		}
+		nameLength := int(int16(binary.BigEndian.Uint16(packet[at : at+2])))
+		at += 2
+		if nameLength < 0 || nameLength > len(packet)-at {
+			return false
+		}
+		at += nameLength
+		partitions, valid := readCount()
+		if !valid || elements+partitions > 4096 {
+			return false
+		}
+		elements += partitions
+		for p := 0; p < partitions; p++ {
+			if len(packet)-at < 8 {
+				return false
+			}
+			at += 4 // partition index
+			recordLength := int(int32(binary.BigEndian.Uint32(packet[at : at+4])))
+			at += 4
+			if recordLength < -1 || recordLength > len(packet)-at {
+				return false
+			}
+			if recordLength > 0 {
+				at += recordLength
+			}
+		}
+	}
+	return at == len(packet)
+}
+
 func probeKafka(w []byte, limit int) ProbeResult {
 	if len(w) < 8 {
 		if len(w) > 0 && w[0] == 0 {
@@ -49,6 +173,9 @@ func probeKafka(w []byte, limit int) ProbeResult {
 	clientLen := int(int16(binary.BigEndian.Uint16(w[12:14])))
 	if clientLen < -1 || clientLen > size-10 {
 		return ProbeResult{Verdict: ProbeReject}
+	}
+	if p, handled := kafkaZooKeeperConnectAmbiguity(w, size, limit); handled {
+		return p
 	}
 	// A Produce v0 prefix can still be indistinguishable from initial peer
 	// SETTINGS. Leave that frame unclassified until the client preface or

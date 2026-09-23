@@ -41,6 +41,13 @@ type fragmentStore struct {
 func (a *binParser) networkPacket(p gopacket.Packet) (gopacket.Packet, bool) {
 	e := packetEvidence(p)
 	ci := p.Metadata().CaptureInfo
+	if eth, ok := p.Layer(layers.LayerTypeEthernet).(*layers.Ethernet); ok && eth.EthernetType == layers.EthernetType(0x88b8) {
+		// 0x88b8 is a dedicated link-layer carrier. Consume near-matches too:
+		// otherwise gopacket reports an unknown-EtherType error after the strict
+		// GOOSE probe rejects them.
+		a.decodeGOOSEEthernet(eth, eth.Payload, e, ci)
+		return nil, true
+	}
 	// gopacket exposes the outer NetworkLayer and TransportLayer. Normalize a
 	// supported tunnel to its innermost IP before transport dispatch.
 	var inner gopacket.NetworkLayer
@@ -170,6 +177,74 @@ func (a *binParser) networkPacket(p gopacket.Packet) (gopacket.Packet, bool) {
 	}
 	return p, false
 }
+
+// decodeGOOSEEthernet admits IEC 61850 GOOSE only when the caller has matched
+// the dedicated Ethernet protocol identifier and the existing bounded
+// APPID/length/PDU probe accepts the payload. The PDU decoder then validates
+// the complete message before it can be reported as decoded. A failed probe
+// is consumed without a GOOSE claim so an EtherType by itself is insufficient.
+func (a *binParser) decodeGOOSEEthernet(eth *layers.Ethernet, payload []byte, evidence captureEvidence, ci gopacket.CaptureInfo) {
+	if probeGOOSE(payload, min(len(payload), a.config.ProbeBytes)).Verdict != ProbeAccept {
+		return
+	}
+
+	length := int(binary.BigEndian.Uint16(payload[2:4]))
+	e := &ProtocolEvent{
+		Timestamp:   ci.Timestamp,
+		Transport:   "ethernet",
+		Protocol:    "goose",
+		Profile:     "iec61850-goose",
+		Admission:   "ether-type-and-wire-signature",
+		Source:      eth.SrcMAC.String(),
+		Destination: eth.DstMAC.String(),
+		Domain:      evidence.Ref.Domain,
+		Length:      length,
+		Status:      "deferred",
+		Summary:     "GOOSE",
+		Raw:         bytes.Clone(payload),
+		SourceBytes: ByteSource{Kind: "captured", PacketRefs: []PacketReference{evidence.Ref}},
+	}
+	if length > a.config.MaxMessageBytes {
+		e.Status, e.Completeness = "limited", "limited"
+		e.ExpertCode, e.Error = "GOOSEMessageLimit", "GOOSE message exceeds parser limit"
+		a.limited.Add(uint64(length))
+		a.emit(e)
+		return
+	}
+	if length > len(payload) {
+		e.Status, e.Completeness = "incomplete", "incomplete"
+		e.ExpertCode, e.Error = "GOOSELengthTruncated", "GOOSE declared length exceeds captured Ethernet payload"
+		a.incomplete.Add(1)
+		a.emit(e)
+		return
+	}
+
+	// The IEC length excludes Ethernet padding. Feed only the declared GOOSE
+	// frame to both the YAML parser and the session-field decoder.
+	wire := payload[:length]
+	e.Raw = bytes.Clone(wire)
+	if spec := a.specs["iec61850/GOOSE"]; spec != nil {
+		e.Rule, e.Entry, e.plan = spec.rule, spec.entry, spec.plan
+	}
+	result, err := e.Decode()
+	if err == nil {
+		e.Session, err = (&binGOOSE{}).consume(wire)
+	}
+	if err != nil {
+		e.Status, e.Completeness = "malformed", "malformed"
+		e.ExpertCode, e.Error = "GOOSEMalformed", err.Error()
+		a.malformed.Add(1)
+	} else {
+		e.Status, e.Completeness = "decoded", "message"
+		e.Structured = result
+		e.Summary = fmt.Sprintf("GOOSE state %v sequence %v", e.Session["State Number"], e.Session["Sequence Number"])
+		a.messages.Add(1)
+		a.messageBytes.Add(uint64(length))
+		a.decoded.Add(1)
+	}
+	a.emit(e)
+}
+
 func (a *binParser) networkDiagnostic(e captureEvidence, ci gopacket.CaptureInfo, status, code string) {
 	a.emit(&ProtocolEvent{Timestamp: ci.Timestamp, Transport: "network", Protocol: "ip", Domain: e.Ref.Domain, Status: status, Completeness: status, ExpertCode: code, Error: code, SourceBytes: ByteSource{Kind: "captured", PacketRefs: []PacketReference{e.Ref}}})
 }

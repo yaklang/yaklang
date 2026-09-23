@@ -1,7 +1,11 @@
 package pcaputil
 
 import (
+	"bytes"
 	"encoding/binary"
+	"os"
+	"path/filepath"
+	"sync"
 	"testing"
 	"time"
 
@@ -217,8 +221,40 @@ func TestProtocolSessionNTPFailClosed(t *testing.T) {
 	bad := make([]byte, 48)
 	bad[0] = 3 << 3 // version 3
 	require.NotEqual(t, "ntp", s.Probe(bad).Protocol)
+	invalidStratum := ntpPkt(4, 17, make([]byte, 8), make([]byte, 8), make([]byte, 8))
+	require.NotEqual(t, "ntp", s.Probe(invalidStratum).Protocol)
 	r := s.Feed(0, ts, bad[:10])
 	require.True(t, r.Err != nil || r.State == "undetected" || r.NeedMore)
+}
+
+func TestProtocolSessionNTPDoesNotClaimBitTorrentDHTCorpus(t *testing.T) {
+	capture, err := os.ReadFile(filepath.Join("..", "..", "bin-parser", "testdata", "winlab5013", "captures", "16-bittorrent-dht.pcapng"))
+	require.NoError(t, err)
+
+	var mu sync.Mutex
+	var events []*ProtocolEvent
+	var stats BinParserStats
+	err = ReplayPcap(bytes.NewReader(capture), WithTCPReassemblyWorkers(1),
+		WithBinParser(func(event *ProtocolEvent) {
+			mu.Lock()
+			defer mu.Unlock()
+			events = append(events, event)
+		}),
+		WithBinParserStats(func(value BinParserStats) { stats = value }),
+	)
+	require.NoError(t, err)
+
+	mu.Lock()
+	defer mu.Unlock()
+	require.Len(t, events, 8)
+	for i, event := range events {
+		require.NotEqual(t, "ntp", event.Protocol, "event %d must not be assigned a false protocol", i)
+		require.Equal(t, "bittorrent-dht", event.Protocol, "event %d", i)
+		require.Equal(t, "decoded", event.Status, "event %d", i)
+	}
+	require.EqualValues(t, 8, stats.Decoded)
+	require.Zero(t, stats.ContextRequired)
+	require.Zero(t, stats.Unknown)
 }
 
 func coapMsg(typ, tkl, code byte, mid uint16, token []byte, opts, payload []byte) []byte {

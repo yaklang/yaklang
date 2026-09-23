@@ -1,0 +1,6 @@
+Package:
+  BeanstalkMessage:
+    # Framing and command/response semantics are validated by the native TCP
+    # session codec before this wire leaf is projected.
+    Header: "del:\r\n;type:string"
+    Body: raw

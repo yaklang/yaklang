@@ -1,0 +1,29 @@
+Package:
+  GearmanMessage:
+    operator: |
+      this.ProcessSubNode("Magic Zero")
+      if getNodeResult("Magic Zero").Value != 0 { panic("gearman: magic") }
+      this.ProcessSubNode("Magic Role")
+      role = string(getNodeResult("Magic Role").Value)
+      if role != "REQ" && role != "RES" { panic("gearman: role") }
+      this.ProcessSubNode("Type")
+      kind = getNodeResult("Type").Value
+      if kind != 1 && kind != 4 && kind != 6 && kind != 7 && kind != 8 && kind != 9 && kind != 10 && kind != 11 && kind != 13 { panic("gearman: unsupported type") }
+      if role == "REQ" && (kind == 6 || kind == 8 || kind == 10 || kind == 11) { panic("gearman: response type in request") }
+      if role == "RES" && (kind == 1 || kind == 4 || kind == 7 || kind == 9) { panic("gearman: request type in response") }
+      this.ProcessSubNode("Payload Length")
+      n = getNodeResult("Payload Length").Value
+      if n != this.GetMaxLength() - this.Length() { panic("gearman: length mismatch") }
+      if (kind == 4 || kind == 6 || kind == 9 || kind == 10) && n != 0 { panic("gearman: control payload") }
+      if (kind == 1 || kind == 8) && n == 0 { panic("gearman: empty identifier") }
+      if (kind == 7 || kind == 13) && n < 2 { panic("gearman: missing arguments") }
+      if kind == 11 && n < 3 { panic("gearman: missing assignment arguments") }
+      if n > 0 {
+        this.GetSubNode("Payload").SetMaxLength(n)
+        this.ProcessSubNode("Payload")
+      }
+    Magic Zero: uint8
+    Magic Role: string,3
+    Type: uint32
+    Payload Length: uint32
+    Payload: raw

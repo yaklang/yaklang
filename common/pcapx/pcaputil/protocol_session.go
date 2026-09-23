@@ -1,6 +1,7 @@
 package pcaputil
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"time"
@@ -181,6 +182,12 @@ func (s *captureSession) Probe(data []byte) ProbeResult {
 	if probe.protocol != "" {
 		return probeAccept(probe.protocol, "", 90)
 	}
+	if isHTTPStartLineCandidate(data) {
+		if bytes.Index(data, []byte("\r\n")) < 0 {
+			return ProbeResult{Verdict: ProbeNeedMore, NeedBytes: 1, Reason: "HTTP start line is incomplete"}
+		}
+		return ProbeResult{Verdict: ProbeReject, Reason: "invalid HTTP start line"}
+	}
 	return probeWire(data, limit)
 }
 
@@ -258,7 +265,7 @@ func sessionErrorFromEvents(events []*ProtocolEvent) *ProtocolError {
 }
 
 func (f *binFlow) hasSession() bool {
-	return f.tls != nil || f.dnp3 != nil || f.c37118 != nil || f.goose != nil || f.syslog != nil || f.rfb != nil || f.diameter != nil || f.iec104 != nil || f.s7 != nil || f.opcua != nil || f.ipp != nil || f.rtsp != nil || f.stun != nil || f.h2 != nil || f.mysql != nil || f.pg != nil || f.ws != nil || f.ldap != nil || f.redis != nil || f.mqtt != nil || f.mongo != nil || f.kafka != nil || f.tds != nil || f.amqp != nil || f.smb2 != nil || f.dcerpc != nil || f.ssh != nil || f.nfs != nil || f.snmp != nil || f.rdp != nil || f.dot != nil || f.doh != nil || f.sip != nil || f.rtp != nil || f.quic != nil || f.smtp != nil || f.imap != nil || f.pop3 != nil || f.ftp != nil || f.tns != nil || f.radius != nil || f.dhcp != nil || f.ntp != nil || f.coap != nil || f.modbus != nil
+	return f.tls != nil || f.dnp3 != nil || f.c37118 != nil || f.goose != nil || f.syslog != nil || f.rfb != nil || f.diameter != nil || f.iec104 != nil || f.s7 != nil || f.opcua != nil || f.ipp != nil || f.rtsp != nil || f.stun != nil || f.h2 != nil || f.mysql != nil || f.pg != nil || f.ws != nil || f.ldap != nil || f.redis != nil || f.mqtt != nil || f.mongo != nil || f.kafka != nil || f.tds != nil || f.amqp != nil || f.smb2 != nil || f.dcerpc != nil || f.ssh != nil || f.nfs != nil || f.snmp != nil || f.rdp != nil || f.dot != nil || f.doh != nil || f.sip != nil || f.rtp != nil || f.quic != nil || f.smtp != nil || f.imap != nil || f.pop3 != nil || f.ftp != nil || f.tns != nil || f.socks5 != nil || f.scgi != nil || f.msgpackRPC != nil || f.textInternet != nil || f.radius != nil || f.dhcp != nil || f.ntp != nil || f.coap != nil || f.modbus != nil || f.enip != nil || f.stratum != nil || f.gearman != nil || f.beanstalk != nil || f.zookeeper != nil || f.clickhouse != nil
 }
 
 func (f *binFlow) mailLike() bool {
@@ -281,6 +288,18 @@ func probeAccept(protocol, version string, conf uint8) ProbeResult {
 }
 
 func probeWire(w []byte, limit int) ProbeResult {
+	if p := probeGearman(w, limit); p.Verdict != ProbeReject {
+		return p
+	}
+	if p := probeZooKeeper(w, limit); p.Verdict != ProbeReject {
+		return p
+	}
+	if p := probeClickHouse(w, limit); p.Verdict != ProbeReject {
+		return p
+	}
+	if p := probeSOCKS5(w, limit); p.Verdict != ProbeReject {
+		return p
+	}
 	if p := probeRFB(w, limit); p.Verdict != ProbeReject {
 		return p
 	}
@@ -402,6 +421,9 @@ func probeWire(w []byte, limit int) ProbeResult {
 		return p
 	}
 	if p := probeQUIC(w, limit); p.Verdict != ProbeReject {
+		return p
+	}
+	if p := probeStratum(w, limit); p.Verdict != ProbeReject {
 		return p
 	}
 	return ProbeResult{Verdict: ProbeReject, Reason: "no protocol match"}

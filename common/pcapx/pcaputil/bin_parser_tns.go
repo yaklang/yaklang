@@ -34,8 +34,22 @@ func probeTNS(w []byte, limit int) ProbeResult {
 	if n < 8 || n > 8192 {
 		return ProbeResult{Verdict: ProbeReject}
 	}
-	if typ == 1 && n < 34 {
-		return ProbeResult{Verdict: ProbeReject}
+	if typ == 1 {
+		// A TNS CONNECT has a fixed 34-byte prefix. Validate the embedded
+		// connect-data span before admitting the stream: a SOCKS5 greeting
+		// followed by a CONNECT request can otherwise look like a large TNS
+		// length plus packet type 1.
+		if len(w) < 28 {
+			return probeNeed("tns", "connect", len(w), 28)
+		}
+		if n < 34 {
+			return ProbeResult{Verdict: ProbeReject}
+		}
+		dataLength := int(binary.BigEndian.Uint16(w[24:26]))
+		dataOffset := int(binary.BigEndian.Uint16(w[26:28]))
+		if dataOffset < 34 || dataOffset > n || dataLength > n-dataOffset {
+			return ProbeResult{Verdict: ProbeReject}
+		}
 	}
 	_ = limit
 	return probeAccept("tns", "connect", 90)

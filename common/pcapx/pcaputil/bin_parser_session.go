@@ -9,13 +9,47 @@ import (
 
 const binH2Preface = "PRI * HTTP/2.0\r\n\r\nSM\r\n\r\n"
 
-func (f *binFlow) detectDirection(dir int, w []byte) {
+func (f *binFlow) detectDirection(dir int, wire []byte) {
+	w := wire[:min(len(wire), f.a.config.ProbeBytes)]
 	// Explicit user bindings retain precedence.
-	f.detect(w)
+	f.detect(wire)
 	if f.binding != nil || f.protocol != "" {
 		return
 	}
-	p := probeWire(w, f.a.config.ProbeBytes)
+	if f.captureTCP {
+		if s := f.probeTextInternet(dir, w); s != nil {
+			f.protocol, f.textInternet = s.protocol, s
+			return
+		}
+	}
+	if isHTTPStartLineCandidate(wire) {
+		return
+	}
+	if f.captureTCP && f.port(11300) && probeBeanstalk(w, f.a.config.ProbeBytes).Verdict == ProbeAccept {
+		f.protocol, f.beanstalk = "beanstalkd", &binBeanstalk{client: dir}
+		return
+	}
+	if f.captureTCP && (f.ports[0] == 44818 || f.ports[1] == 44818) && probeENIP(w).Verdict == ProbeAccept {
+		f.protocol = "enip"
+		f.enip = &binENIP{clientDir: dir, maxPending: f.a.budget.MaxCollectionElements}
+		return
+	}
+	if f.captureTCP && f.port(4000) && probeSCGIRequest(wire) {
+		f.protocol = "scgi"
+		f.scgi = &binSCGI{clientDir: dir, maxPending: f.a.budget.MaxCollectionElements}
+		return
+	}
+	if f.captureTCP && f.port(19850) && probeMessagePackRPC(wire) {
+		f.protocol = "msgpack-rpc"
+		f.msgpackRPC = &binMsgpackRPC{clientDir: dir, pending: make(map[uint32]string), maxPending: f.a.budget.MaxCollectionElements}
+		return
+	}
+	var p ProbeResult
+	if f.probeFTPControlExchange(dir, wire) {
+		p = probeAccept("ftp", "rfc959", 99)
+	} else {
+		p = probeWire(w, f.a.config.ProbeBytes)
+	}
 	if p.Verdict != ProbeAccept {
 		return
 	}
@@ -29,6 +63,24 @@ func (f *binFlow) detectDirection(dir int, w []byte) {
 		}
 	}
 	switch p.Protocol {
+	case "zookeeper":
+		clientDir := dir
+		if p.Version == "jute-connect-v0/ConnectResponse" {
+			clientDir = 1 - dir
+		}
+		f.protocol, f.zookeeper = "zookeeper", &binZooKeeper{clientDir: clientDir}
+	case "clickhouse":
+		clientDir := dir
+		if p.Version == "native-23.8-r54401/server-hello" {
+			clientDir = 1 - dir
+		}
+		f.protocol, f.clickhouse = "clickhouse", &binClickHouse{clientDir: clientDir}
+	case "socks5":
+		f.protocol, f.socks5 = "socks5", &binSOCKS5{client: dir, phase: socks5Greeting}
+	case "stratum":
+		f.protocol, f.stratum = "stratum", &binStratum{client: dir, pending: map[string]string{}}
+	case "gearman":
+		f.protocol, f.gearman = "gearman", &binGearman{}
 	case "vnc":
 		f.protocol, f.rfb = "vnc", &binRFB{server: dir, phase: "server-version"}
 	case "diameter":
@@ -126,6 +178,16 @@ func (f *binFlow) detectDirection(dir int, w []byte) {
 	case "goose":
 		f.protocol, f.goose = "goose", &binGOOSE{}
 	}
+}
+
+func (f *binFlow) needsMorePortProtocolPrefix(wire []byte) bool {
+	if !f.captureTCP {
+		return false
+	}
+	if f.port(4000) && scgiRequestNeedsMore(wire) {
+		return true
+	}
+	return f.port(19850) && messagePackRPCRequestNeedsMore(wire)
 }
 
 func (f *binFlow) consumeSession(dir int, e *ProtocolEvent, result map[string]any) error {
@@ -285,6 +347,28 @@ func (f *binFlow) consumeSession(dir int, e *ProtocolEvent, result map[string]an
 		e.Session, err = f.pop3.consume(e.Raw)
 	case "ftp":
 		e.Session, err = f.ftp.consume(e.Raw)
+	case "finger", "whois", "gopher", "dict":
+		if f.textInternet == nil {
+			err = sessionContext("text protocol state was not initialized")
+			break
+		}
+		e.Session, err = f.textInternet.consume(dir, e.Raw)
+		if err == nil {
+			e.semanticFields = cloneSession(e.Session)
+			e.Profile, e.Completeness = e.Protocol+"-bounded", "message"
+			e.Admission = "wire-and-port-hint"
+		}
+	case "socks5":
+		e.Session, err = f.socks5.consume(dir, e.Raw, e.Entry, result)
+		if err == nil {
+			e.Profile, e.Completeness = "socks5-negotiated", "message"
+			if e.Entry == "Replies" && f.socks5.connectAccepted {
+				// After a successful CONNECT reply, subsequent bytes are the
+				// carried application protocol and return to normal detection.
+				f.socks5 = nil
+				f.protocol = ""
+			}
+		}
 	case "tns":
 		e.Session, err = f.tns.consume(e.Raw)
 	case "radius":
@@ -303,6 +387,56 @@ func (f *binFlow) consumeSession(dir int, e *ProtocolEvent, result map[string]an
 		e.Session, err = f.c37118.consume(e.Raw)
 	case "goose":
 		e.Session, err = f.goose.consume(e.Raw)
+	case "enip":
+		e.Session, err = f.enip.consume(dir, e.Raw, f.a.budget.MaxCollectionElements)
+		if err == nil {
+			e.semanticFields = cloneSession(e.Session)
+			e.Profile, e.Completeness = "ethernet-ip-cip-explicit", "message"
+		}
+	case "stratum":
+		e.Session, err = f.stratum.consume(dir, e.Raw, f.a.budget.MaxCollectionElements)
+		if err == nil {
+			e.semanticFields = cloneSession(e.Session)
+			e.Profile, e.Completeness = "mining-json-rpc-observed", "message"
+		}
+	case "gearman":
+		e.Session, err = f.gearman.consume(e.Raw, f.a.config.MaxMessageBytes)
+		if err == nil {
+			e.semanticFields = cloneSession(e.Session)
+			e.Profile, e.Completeness = "gearman-binary-message", "message"
+		}
+	case "beanstalkd":
+		e.Session, err = f.beanstalk.consume(dir, e.Raw, f.a.budget.MaxCollectionElements)
+		if err == nil {
+			e.semanticFields = cloneSession(e.Session)
+			e.Profile, e.Completeness = "beanstalkd-observed", "message"
+		}
+	case "scgi":
+		e.Session, err = f.scgi.consume(dir, e.Raw, f.a.config.MaxMessageBytes, f.a.budget.MaxCollectionElements)
+		if err == nil {
+			e.semanticFields = cloneSession(e.Session)
+			e.Profile, e.Completeness = "scgi-netstring-bounded", "message"
+			e.Admission = "wire-and-port-hint"
+		}
+	case "msgpack-rpc":
+		e.Session, err = f.msgpackRPC.consume(dir, e.Raw, f.a.budget.MaxCollectionElements)
+		if err == nil {
+			e.semanticFields = cloneSession(e.Session)
+			e.Profile, e.Completeness = "msgpack-rpc-array-bounded", "message"
+			e.Admission = "wire-and-port-hint"
+		}
+	case "zookeeper":
+		e.Session, err = f.zookeeper.consume(dir, e.Raw, f.a.budget.MaxCollectionElements)
+		if err == nil {
+			e.semanticFields = cloneSession(e.Session)
+			e.Profile, e.Completeness = "zookeeper-jute-v0-bounded", "message"
+		}
+	case "clickhouse":
+		e.Session, err = f.clickhouse.consume(dir, e.Raw)
+		if err == nil {
+			e.semanticFields = cloneSession(e.Session)
+			e.Profile, e.Completeness = "clickhouse-native-23-8-r54401-hello-ping", "message"
+		}
 	case "syslog":
 		framing := syslogStreamFraming(e.Raw)
 		e.Session, err = f.syslog.consume(e.Raw, framing, f.a.config.MaxMessageBytes, f.a.budget.MaxCollectionElements)
@@ -320,6 +454,33 @@ func (f *binFlow) consumeSession(dir int, e *ProtocolEvent, result map[string]an
 	}
 	if e.Session != nil {
 		switch e.Protocol {
+		case "enip":
+			if service, ok := e.Session["CIP Service"].(string); ok {
+				e.Summary = fmt.Sprintf("EtherNet/IP %s %s", service, e.Session["Tag"])
+			} else {
+				e.Summary = fmt.Sprintf("EtherNet/IP %s", e.Session["Role"])
+			}
+		case "stratum":
+			e.Summary = fmt.Sprintf("Stratum %s", e.Session["Packet Name"])
+		case "gearman":
+			e.Summary = fmt.Sprintf("Gearman %s", e.Session["Packet Name"])
+		case "beanstalkd":
+			e.Summary = fmt.Sprintf("Beanstalkd %s", e.Session["Packet Name"])
+		case "scgi":
+			if e.Session["Role"] == "request" {
+				e.Summary = fmt.Sprintf("SCGI %s %s", e.Session["Request Method"], e.Session["Request URI"])
+			} else {
+				e.Summary = fmt.Sprintf("SCGI response %v", e.Session["Status Code"])
+			}
+		case "msgpack-rpc":
+			e.Summary = fmt.Sprintf("MessagePack-RPC %s", e.Session["Message Type"])
+			if method, ok := e.Session["Method"].(string); ok {
+				e.Summary += " " + method
+			}
+		case "zookeeper":
+			e.Summary = fmt.Sprintf("ZooKeeper %s", e.Session["Packet Name"])
+		case "clickhouse":
+			e.Summary = fmt.Sprintf("ClickHouse %s", e.Session["Packet Name"])
 		case "http2":
 			e.Summary = fmt.Sprintf("HTTP/2 stream %v frame %v", e.Session["Stream ID"], e.Session["Frame Type"])
 			if kind, ok := e.Session["Header Kind"].(string); ok {
@@ -387,6 +548,8 @@ func (f *binFlow) consumeSession(dir int, e *ProtocolEvent, result map[string]an
 			e.Summary = fmt.Sprintf("FTP %v", e.Session["Packet Name"])
 		case "tns":
 			e.Summary = fmt.Sprintf("TNS %v", e.Session["Packet Name"])
+		case "socks5":
+			e.Summary = fmt.Sprintf("SOCKS5 %v", e.Session["Stage"])
 		case "radius":
 			e.Summary = fmt.Sprintf("RADIUS %v id %v", e.Session["Packet Name"], e.Session["Identifier"])
 		case "dhcp":
@@ -443,6 +606,12 @@ func (f *binFlow) closeSession() {
 	f.stun, f.tftp, f.rtsp, f.ipp = nil, nil, nil, nil
 	f.diameter, f.iec104, f.s7, f.opcua = nil, nil, nil, nil
 	f.rfb = nil
+	f.enip = nil
+	f.stratum = nil
+	f.gearman = nil
+	f.beanstalk = nil
+	f.scgi, f.msgpackRPC = nil, nil
+	f.textInternet = nil
 	f.dnp3, f.c37118, f.goose, f.syslog = nil, nil, nil, nil
 	f.h2, f.mysql, f.pg, f.ws, f.ldap, f.redis, f.mqtt, f.mongo, f.kafka, f.tds, f.amqp, f.smb2, f.dcerpc, f.ssh, f.nfs, f.snmp, f.rdp, f.dot, f.doh, f.sip, f.rtp, f.quic, f.smtp, f.imap, f.pop3, f.ftp, f.tns, f.radius, f.dhcp, f.ntp, f.coap, f.modbus = nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil
 	f.a.buffered.Add(-f.sessionBytes)
