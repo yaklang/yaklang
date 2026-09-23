@@ -59,6 +59,31 @@ func fuzzerRequestPreview(packet []byte) []byte {
 	return append(packet[:limit:limit], "...(request > 2M) show chunked by yakit web fuzzer"...)
 }
 
+// The main FuzzerResponse already represents the final redirect record.
+// Locate it by identity so an incomplete history cannot emit it twice.
+func splitFuzzerRedirectFlows(flows []*lowhttp.RedirectFlow, final *lowhttp.LowhttpResponse) ([]*lowhttp.LowhttpResponse, []byte) {
+	if len(flows) < 2 || final == nil {
+		return nil, nil
+	}
+	finalIndex := -1
+	for i := len(flows) - 1; i >= 0; i-- {
+		if flows[i] != nil && flows[i].RespRecord == final {
+			finalIndex = i
+			break
+		}
+	}
+	if finalIndex < 1 {
+		return nil, nil
+	}
+	var intermediates []*lowhttp.LowhttpResponse
+	for _, flow := range flows[:finalIndex] {
+		if flow != nil && flow.RespRecord != nil {
+			intermediates = append(intermediates, flow.RespRecord)
+		}
+	}
+	return intermediates, flows[finalIndex].Request
+}
+
 func ensureLowhttpHiddenIndex(r *lowhttp.LowhttpResponse) string {
 	if r == nil {
 		return uuid.NewString()
@@ -1643,6 +1668,9 @@ func (r *httpFuzzerRun) handleExecutionMode() error {
 				redirectPacket = result.LowhttpResponse.RedirectRawPackets
 				// redirect
 				for _, f := range redirectPacket {
+					if f == nil {
+						continue
+					}
 					rsp.RedirectFlows = append(rsp.RedirectFlows, &ypb.RedirectHTTPFlow{
 						IsHttps:  f.IsHttps,
 						Request:  f.Request,
@@ -1748,9 +1776,8 @@ func (r *httpFuzzerRun) handleExecutionMode() error {
 			}
 			// 自动重定向
 			if !req.GetNoFollowRedirect() {
-
-				for i := 0; i < len(redirectPacket)-1; i++ {
-					redirectRes := redirectPacket[i].RespRecord
+				intermediateRecords, finalRequest := splitFuzzerRedirectFlows(redirectPacket, result.LowhttpResponse)
+				for _, redirectRes := range intermediateRecords {
 					method, _, _ := lowhttp.GetHTTPPacketFirstLine(redirectRes.RawRequest)
 					var redirectMatchResult FuzzerMatcherResult
 					if haveHTTPTplMatcher {
@@ -1792,7 +1819,7 @@ func (r *httpFuzzerRun) handleExecutionMode() error {
 						RuntimeID:             runtimeID,
 						HiddenIndex:           ensureLowhttpHiddenIndex(redirectRes),
 					}
-					if redirectRes != nil && redirectRes.TraceInfo != nil {
+					if redirectRes.TraceInfo != nil {
 						SetFuzzerRespTraceInfo(redirectRsp, redirectRes.TraceInfo)
 						redirectRsp.Proxy = redirectRes.Proxy
 						redirectRsp.RemoteAddr = redirectRes.RemoteAddr
@@ -1856,9 +1883,22 @@ func (r *httpFuzzerRun) handleExecutionMode() error {
 						continue
 					}
 				}
-				// 如果重定向了,修正最后一个req
-				if len(redirectPacket) > 0 {
-					rsp.RequestRaw = fuzzerRequestPreview(redirectPacket[len(redirectPacket)-1].Request)
+				// The main response represents the final hop, not the original
+				// request that started the chain.
+				if len(finalRequest) > 0 && browserTransform == nil {
+					rsp.RequestRaw = fuzzerRequestPreview(finalRequest)
+					if method := lowhttp.GetHTTPRequestMethod(finalRequest); method != "" {
+						rsp.Method = utils.EscapeInvalidUTF8Byte([]byte(method))
+					}
+					if host := lowhttp.GetHTTPPacketHeader(finalRequest, "Host"); host != "" {
+						rsp.Host = utils.EscapeInvalidUTF8Byte([]byte(host))
+					}
+					if finalResponse := result.LowhttpResponse; finalResponse != nil {
+						if finalResponse.Url != "" {
+							rsp.Url = utils.EscapeInvalidUTF8Byte([]byte(finalResponse.Url))
+						}
+						rsp.IsHTTPS = finalResponse.Https
+					}
 				}
 			}
 			if browserTransform != nil {
