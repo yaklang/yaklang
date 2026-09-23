@@ -385,6 +385,7 @@ type Config struct {
 	DisablePerception                  bool // 禁用感知层（用于测试环境，避免异步 AI 调用干扰 mock 回调）
 	EnableFunctionCallMode             bool // 启用原生 functioncall (tool_calls) 模式
 	singleAIModelMode                  bool // 单模型简易模式：辅助任务统一调度，详见 config_auxiliary_scheduler.go
+	singleAIModelModeResolved          bool // NewConfig freezes the effective mode after applying options.
 	PerTaskUserInteractiveLimitedTimes int64
 
 	/*
@@ -607,6 +608,13 @@ func NewConfig(ctx context.Context, opts ...ConfigOption) *Config {
 		opt(config)
 	}
 	config.collectingToolManagerOptions = false
+	// The global switch is a construction-time default. Callback roles,
+	// auxiliary policy, subsystem gates, and consumption metadata must all use
+	// the same effective mode for the lifetime of this Config.
+	if !config.singleAIModelModeResolved {
+		config.singleAIModelMode = config.singleAIModelMode || consts.IsSingleAIModelMode()
+		config.singleAIModelModeResolved = true
+	}
 	config.originOptions = opts
 	callerToolManager := config.AiToolManager
 	isolateToolManager := len(config.ExtraMCPServers) > 0
@@ -2782,6 +2790,9 @@ func (c *Config) IsSingleAIModelMode() bool {
 	if c == nil {
 		return false
 	}
+	if c.singleAIModelModeResolved {
+		return c.singleAIModelMode
+	}
 	return c.singleAIModelMode || consts.IsSingleAIModelMode()
 }
 
@@ -4562,12 +4573,15 @@ func ConvertConfigToOptions(i *Config) []ConfigOption {
 		opts = append(opts, WithEnableFunctionCallMode(true))
 	}
 
-	// Propagate single-model simple mode flag so sub-loops inherit the setting.
-	// This ensures child agents (P&E task, plan, sub ReAct agents) also route
-	// auxiliary tasks through the scheduler and apply subsystem disable switches.
-	if i.IsSingleAIModelMode() {
-		opts = append(opts, WithSingleAIModelMode(true))
-	}
+	// A derived Config continues the parent's session even when a new global
+	// setting has taken effect since the parent was constructed. Keep the
+	// inherited effective mode separate from a new independent session's default.
+	inheritedSingleModelMode := i.IsSingleAIModelMode()
+	opts = append(opts, func(c *Config) error {
+		c.singleAIModelMode = inheritedSingleModelMode
+		c.singleAIModelModeResolved = true
+		return nil
+	})
 
 	// once init config flag
 	opts = append(opts, WithInitConfigStatus(i.InitStatus))

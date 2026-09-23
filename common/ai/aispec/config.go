@@ -6,6 +6,7 @@ import (
 	"context"
 	"io"
 	"os"
+	"reflect"
 	"strings"
 	"time"
 
@@ -1320,6 +1321,11 @@ func WithToolChoice(choice any) AIConfigOption {
 // println(opt)
 // ```
 func normalizeModelInfoCallback(cb any) ModelInfoCallback {
+	// A typed-nil function is not a nil interface. Wrapping it would defer a
+	// nil-function panic until the gateway actually selects a model.
+	if value := reflect.ValueOf(cb); value.IsValid() && value.Kind() == reflect.Func && value.IsNil() {
+		return nil
+	}
 	switch callback := cb.(type) {
 	case nil:
 		return nil
@@ -1340,6 +1346,15 @@ func normalizeModelInfoCallback(cb any) ModelInfoCallback {
 	case func(provider, model string, thinkingLevel ...string):
 		return ModelInfoCallback(callback)
 	default:
+		// Named legacy two-argument function types were accepted by the old
+		// strongly typed option. Convert only that exact signature.
+		legacyType := reflect.TypeOf((func(string, string))(nil))
+		if value := reflect.ValueOf(cb); value.IsValid() && value.Type().ConvertibleTo(legacyType) {
+			legacy := value.Convert(legacyType).Interface().(func(string, string))
+			return func(provider, model string, _ ...string) {
+				legacy(provider, model)
+			}
+		}
 		log.Warnf("unsupported model info callback type: %T", cb)
 		return nil
 	}

@@ -375,7 +375,15 @@ func (l *LiteForge) Execute(ctx context.Context, params []*ypb.ExecParamItem, op
 }
 
 func (l *LiteForge) ExecuteEx(ctx context.Context, params []*ypb.ExecParamItem, imageData []*aicommon.ImageData, opts ...aicommon.ConfigOption) (*ForgeResult, error) {
-	cod, err := aid.NewCoordinatorContext(ctx, l.Prompt, append(l.ExtendAIDOptions, opts...)...)
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	// A LiteForge invocation owns its Coordinator. Give its event and hotpatch
+	// loops a request-scoped lifetime while retaining the caller's deadline and
+	// cancellation. Stop it only after the response has been fully processed.
+	invocationCtx, stop := context.WithCancel(ctx)
+	defer stop()
+	cod, err := aid.NewCoordinatorContext(invocationCtx, l.Prompt, append(l.ExtendAIDOptions, opts...)...)
 	if err != nil {
 		return nil, utils.Errorf("cannot create coordinator: %v", err)
 	}
@@ -451,7 +459,7 @@ func (l *LiteForge) ExecuteEx(ctx context.Context, params []*ypb.ExecParamItem, 
 	// Inherited callbacks can close over the parent Agent config. Carry the
 	// invocation context on the request so its deadline reaches the Provider.
 	reqOpts = append(reqOpts,
-		aicommon.WithAIRequest_Context(ctx),
+		aicommon.WithAIRequest_Context(invocationCtx),
 		aicommon.WithAIRequest_CallerLabel(fmt.Sprintf("liteforge[%v]", forgeLabelName)),
 	)
 	if len(l.extraRequestOpts) > 0 {
@@ -515,7 +523,7 @@ func (l *LiteForge) ExecuteEx(ctx context.Context, params []*ypb.ExecParamItem, 
 			}
 			actionOpts = append(actionOpts, aicommon.WithActionAlias(actionNames...))
 
-			action, err = aicommon.ExtractValidActionFromStream(ctx, io.TeeReader(result, &mirrored), "object", actionOpts...)
+			action, err = aicommon.ExtractValidActionFromStream(invocationCtx, io.TeeReader(result, &mirrored), "object", actionOpts...)
 			if err != nil {
 				return utils.Errorf("extract action failed: %v", err)
 			}
