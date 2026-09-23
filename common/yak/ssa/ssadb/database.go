@@ -1,12 +1,15 @@
 package ssadb
 
 import (
+	"errors"
+	"fmt"
+	"strings"
+	"time"
+
 	"github.com/yaklang/gorm"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/schema"
-	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/ssa/reportstore"
-	"strings"
 )
 
 var SSAProjectTables = []any{
@@ -284,60 +287,99 @@ func SetDB(db *gorm.DB) {
 }
 
 func DeleteProgram(db *gorm.DB, program string) {
-	_ = DeleteProgramChecked(db, program)
+	if err := DeleteProgramChecked(db, program); err != nil {
+		log.Errorf("delete program %q: %v", program, err)
+	}
 }
 
-// DeleteProgramChecked removes one exact program and reports transaction
-// failures. Node-driven lifecycle cleanup uses this variant so it never
-// acknowledges a partially failed deletion as success.
+// DeleteProgramChecked retries each table independently and reports all
+// failures after attempting every child table. The program identity is removed
+// last, only after its children are gone, so node-driven cleanup can retry a
+// partial deletion instead of mistaking it for an already-absent program.
 func DeleteProgramChecked(db *gorm.DB, program string) error {
-	return utils.GormTransaction(db, func(tx *gorm.DB) error {
-		if err := tx.Model(&IrProgram{}).Where("program_name = ?", program).Unscoped().Delete(&IrProgram{}).Error; err != nil {
-			return err
-		}
-		if err := deleteProgramCodeOnly(tx, program); err != nil {
-			return err
-		}
-		if err := deleteProgramAuditResult(tx, program); err != nil {
-			return err
-		}
-		return deleteProgramRiskAndScanTask(tx, program)
+	if err := validateProgramDeletion(db, program); err != nil {
+		return err
+	}
+	err := errors.Join(
+		deleteProgramCodeOnly(db, program),
+		deleteProgramAuditResult(db, program),
+		deleteProgramRiskAndScanTask(db, program),
+	)
+	if err != nil {
+		return err
+	}
+	return retryProgramDelete(TableIrPrograms, func() error {
+		return db.Model(&IrProgram{}).Where("program_name = ?", program).Unscoped().Delete(&IrProgram{}).Error
 	})
 }
 
-func DeleteProgramIrCode(db *gorm.DB, program string) {
-	utils.GormTransaction(db, func(tx *gorm.DB) error {
-		if err := deleteProgramCodeOnly(tx, program); err != nil {
-			return err
-		}
-		return deleteProgramAuditResult(tx, program) // because audit result depends on ir code
-	})
+// DeleteProgramIrCode removes IR and dependent audit rows for recompilation.
+// It returns the collected failures only after all tables have been attempted.
+func DeleteProgramIrCode(db *gorm.DB, program string) error {
+	if err := validateProgramDeletion(db, program); err != nil {
+		return err
+	}
+	return errors.Join(
+		deleteProgramCodeOnly(db, program),
+		deleteProgramAuditResult(db, program), // audit results depend on IR code
+	)
 }
 
 func deleteProgramCodeOnly(db *gorm.DB, program string) error {
 	deleteCache(program)
-	// Batch all DELETEs into a single Exec call to reduce round-trips.
-	// Each DELETE is still a separate statement but they're sent in one
-	// batch to SQLite, cutting 7 round-trips to 1.
-	return db.Exec(`DELETE FROM `+TableIrCodes+` WHERE program_name = ?;
-DELETE FROM `+TableIrIndices+` WHERE program_name = ?;
-DELETE FROM `+TableIrNamePool+` WHERE program_name = ?;
-DELETE FROM `+TableIrSources+` WHERE program_name = ?;
-DELETE FROM `+TableIrSources+` WHERE folder_path = ? AND file_name = ?;
-DELETE FROM `+TableIrTypes+` WHERE program_name = ?;
-DELETE FROM `+TableIrOffsets+` WHERE program_name = ?;`,
-		program, program, program, program, "/", program, program, program).Error
+	return errors.Join(
+		deleteProgramRows(db, TableIrCodes, "program_name = ?", program),
+		deleteProgramRows(db, TableIrIndices, "program_name = ?", program),
+		deleteProgramRows(db, TableIrNamePool, "program_name = ?", program),
+		deleteProgramRows(db, TableIrSources, "program_name = ?", program),
+		deleteProgramRows(db, TableIrSources, "folder_path = ? AND file_name = ?", "/", program),
+		deleteProgramRows(db, TableIrTypes, "program_name = ?", program),
+		deleteProgramRows(db, TableIrOffsets, "program_name = ?", program),
+	)
 }
 
 func deleteProgramAuditResult(db *gorm.DB, program string) error {
-	return db.Exec(`DELETE FROM `+TableAuditResults+` WHERE program_name = ?;
-DELETE FROM `+TableAuditNodes+` WHERE program_name = ?;
-DELETE FROM `+TableAuditEdges+` WHERE program_name = ?;`,
-		program, program, program).Error
+	return errors.Join(
+		deleteProgramRows(db, TableAuditResults, "program_name = ?", program),
+		deleteProgramRows(db, TableAuditNodes, "program_name = ?", program),
+		deleteProgramRows(db, TableAuditEdges, "program_name = ?", program),
+	)
 }
 
 func deleteProgramRiskAndScanTask(db *gorm.DB, program string) error {
-	return db.Exec(`DELETE FROM `+schema.TableSSARisks+` WHERE program_name = ?;
-DELETE FROM `+schema.TableSyntaxFlowScanTask+` WHERE programs = ?;`,
-		program, program).Error
+	return errors.Join(
+		deleteProgramRows(db, schema.TableSSARisks, "program_name = ?", program),
+		deleteProgramRows(db, schema.TableSyntaxFlowScanTask, "programs = ?", program),
+	)
+}
+
+func validateProgramDeletion(db *gorm.DB, program string) error {
+	if db == nil {
+		return errors.New("SSA IR database is not configured")
+	}
+	if strings.TrimSpace(program) == "" {
+		return errors.New("SSA IR program name is required")
+	}
+	return nil
+}
+
+func deleteProgramRows(db *gorm.DB, table, condition string, args ...any) error {
+	return retryProgramDelete(table, func() error {
+		return db.Exec("DELETE FROM "+table+" WHERE "+condition, args...).Error
+	})
+}
+
+const programDeleteAttempts = 3
+
+func retryProgramDelete(name string, deleteFn func() error) error {
+	var err error
+	for attempt := 1; attempt <= programDeleteAttempts; attempt++ {
+		if err = deleteFn(); err == nil {
+			return nil
+		}
+		if attempt < programDeleteAttempts {
+			time.Sleep(time.Duration(attempt) * 50 * time.Millisecond)
+		}
+	}
+	return fmt.Errorf("%s: delete failed after %d attempts: %w", name, programDeleteAttempts, err)
 }
