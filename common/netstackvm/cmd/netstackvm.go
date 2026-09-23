@@ -376,7 +376,6 @@ func main() {
 			// conn.Close()
 			time.Sleep(500 * time.Millisecond)
 		}
-		return nil
 	}
 
 	err := app.Run(os.Args)
