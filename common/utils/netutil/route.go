@@ -292,7 +292,7 @@ func Route(timeout time.Duration, target string) (iface *net.Interface, gateway,
 
 			log.Debugf("Selecting route for target IP: %s from %d routes", targetIP.String(), len(rs))
 			for i, route := range rs {
-				if route.Destination.IP == nil || route.Destination.Mask == nil {
+				if route.Interface == nil || route.Destination.IP == nil || route.Destination.Mask == nil {
 					continue
 				}
 
@@ -314,7 +314,7 @@ func Route(timeout time.Duration, target string) (iface *net.Interface, gateway,
 
 			// 第一次遍历：找到包含目标IP的路由，优先考虑具体性
 			for i, route := range rs {
-				if route.Destination.IP == nil || route.Destination.Mask == nil {
+				if route.Interface == nil || route.Destination.IP == nil || route.Destination.Mask == nil {
 					continue
 				}
 
@@ -325,6 +325,9 @@ func Route(timeout time.Duration, target string) (iface *net.Interface, gateway,
 					// 首先检查此路由是否是直接连接的网络
 					isDirect := false
 					for _, iface := range rs {
+						if iface.Interface == nil {
+							continue
+						}
 						if iface.Interface.Name == route.Interface.Name {
 							interfaceAddrs, _ := iface.Interface.Addrs()
 							for _, addr := range interfaceAddrs {
@@ -378,7 +381,7 @@ func Route(timeout time.Duration, target string) (iface *net.Interface, gateway,
 			} else {
 				// 如果找不到匹配的路由，尝试默认路由（0.0.0.0/0）
 				for i, route := range rs {
-					if route.Destination.IP == nil || route.Destination.Mask == nil {
+					if route.Interface == nil || route.Destination.IP == nil || route.Destination.Mask == nil {
 						continue
 					}
 
