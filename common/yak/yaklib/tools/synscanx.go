@@ -205,50 +205,8 @@ func doFromPingUtils(res chan string, ports string, config *synscanx.SynxConfig)
 }
 
 func do(targets, ports string, config *synscanx.SynxConfig) (chan *synscan.SynScanResult, error) {
-	if config.Ctx == nil {
-		config.Ctx = context.Background()
-	}
-	ctx := config.Ctx
-
 	log.Debugf("targets: %s", targets)
-	sample := chooseScanxRouteSample(targets)
-	if sample == "" {
-		return nil, utils.Errorf("empty target")
-	}
-	scanner, err := synscanx.NewScannerx(ctx, sample, config)
-	if err != nil {
-		return nil, err
-	}
-
-	defer func() {
-		if err := recover(); err != nil {
-			utils.PrintCurrentGoroutineRuntimeStack()
-		}
-	}()
-	targetCh, err := scanner.SubmitTarget(targets, ports)
-	if err != nil {
-		return nil, err
-	}
-	resultCh, err := scanner.Scan(targetCh)
-	if err != nil {
-		log.Errorf("scan failed: %s", err)
-		return nil, err
-	}
-	return resultCh, nil
-
-}
-
-func chooseScanxRouteSample(targets string) string {
-	targetList := utils.ParseStringToHosts(targets)
-	if len(targetList) == 0 {
-		return ""
-	}
-	for _, target := range targetList {
-		if !utils.IsLoopback(target) {
-			return target
-		}
-	}
-	return targetList[0]
+	return synscanx.ScanWithConfig(targets, ports, config)
 }
 
 var SynxPortScanExports = map[string]interface{}{

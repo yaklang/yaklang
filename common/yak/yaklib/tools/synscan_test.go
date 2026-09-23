@@ -2,8 +2,8 @@ package tools
 
 import (
 	"testing"
-	"time"
 
+	"github.com/yaklang/yaklang/common/synscanx"
 	"github.com/yaklang/yaklang/common/utils"
 )
 
@@ -26,17 +26,7 @@ func TestHostPortFilter(t *testing.T) {
 func TestBasicSynScanIntegrate(t *testing.T) {
 	t.Skip("跳过测试：依赖外部IP 124.222.42.210，不符合测试不外连的原则")
 
-	//log.SetLevel(log.DebugLevel)
-	config := &_yakPortScanConfig{
-		waiting:           10 * time.Second,
-		rateLimitDelayMs:  1,
-		rateLimitDelayGap: 5,
-		//netInterface:      "\\Device\\NPF_{6E6F3FC9-4678-48E2-B746-C5DEEFE6CDF0}",
-		//netInterface: "WLAN 4",
-		netInterface: "Radmin VPN",
-	}
-
-	res, err := _synScanDo(hostsToChan("124.222.42.210"), "80", config)
+	res, err := _scanx("124.222.42.210", "80", synscanx.WithWaiting(10), synscanx.WithIface("Radmin VPN"))
 	if err != nil {
 		return
 	}

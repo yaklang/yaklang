@@ -2,14 +2,13 @@ package main
 
 import (
 	"context"
-	"github.com/yaklang/yaklang/common/urfavecli"
-	"github.com/yaklang/yaklang/common/fp"
-	"github.com/yaklang/yaklang/common/hybridscan"
-	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/utils"
-	"net"
 	"os"
 	"time"
+
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/synscanx"
+	"github.com/yaklang/yaklang/common/urfavecli"
+	"github.com/yaklang/yaklang/common/utils"
 )
 
 func main() {
@@ -22,11 +21,11 @@ func main() {
 			Name:  "ports,p",
 			Value: "80,443,8080",
 		},
-
 		cli.DurationFlag{
 			Name:  "timeout",
 			Value: 3 * time.Minute,
-		}}
+		},
+	}
 	app.Action = func(c *cli.Context) {
 		t := c.String("target")
 		p := c.String("ports")
@@ -35,40 +34,19 @@ func main() {
 			return
 		}
 
-		ctx, _ := context.WithTimeout(context.Background(), c.Duration("timeout"))
-		config, err := hybridscan.NewDefaultConfig()
-		if err != nil {
-			log.Errorf("create default config failed: %s", err)
-			return
-		}
-		center, err := hybridscan.NewHyperScanCenter(ctx, config)
+		ctx, cancel := context.WithTimeout(context.Background(), c.Duration("timeout"))
+		defer cancel()
+		resultCh, err := synscanx.Scan(ctx, t, p, synscanx.WithWaiting(c.Duration("timeout").Seconds()))
 		if err != nil {
 			log.Error(err)
 			return
 		}
-
-		_ = center.RegisterMatcherResultHandler("fpMatch", func(matcherResult *fp.MatchResult, err error) {
-			log.Infof("tcp://%v  service: %v", utils.HostPort(matcherResult.Target, matcherResult.Port), matcherResult.GetServiceName())
-		})
-
-		err = center.Scan(ctx, t, p, true, false, func(ip net.IP, port int) {
-			log.Infof("open port: %v:%v", ip.String(), port)
-		})
-		if err != nil {
-			log.Error(err)
-			return
+		for result := range resultCh {
+			log.Infof("open port: %v", utils.HostPort(result.Host, result.Port))
 		}
-
-		select {
-		case <-ctx.Done():
-		}
-
-		return
 	}
 
-	err := app.Run(os.Args)
-	if err != nil {
+	if err := app.Run(os.Args); err != nil {
 		log.Error(err)
-		return
 	}
 }
