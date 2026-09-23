@@ -34,9 +34,8 @@ import (
 )
 
 // DefaultPeriodicVerificationInterval 是 verification iter 门的基础节拍.
-// 调整自 5 -> 6, 与 verification_gate.go 中 token 门冷静期 (3 iter) +
-// 首次提前门 (iter=3) 配合, 形成 "6 iter 1 次基础 verify, 中间不超过 1 次
-// 加速器 verify, 首次反馈在 iter=3 提前到位" 的整体节流模型. 详见
+// 当前基础节拍为 20 iter；verification_gate.go 另有 token 门冷静期和
+// 首次提前门 (iter=3)。详见
 // reactloops/docs/16-verification-frequency-experiment.md.
 // 关键词: DefaultPeriodicVerificationInterval 20, iter 门基础节拍, verification 节流
 const DefaultPeriodicVerificationInterval = 20
@@ -756,7 +755,7 @@ func newConfig(ctx context.Context) *Config {
 		AiTransactionAutoRetry:             5,
 		TimelineContentSizeLimit:           50 * 1024, // Default limit for 50k tokens
 		Guardian:                           NewAsyncGuardian(ctx, id),
-		PerTaskUserInteractiveLimitedTimes: 1, // Default to 3 times
+		PerTaskUserInteractiveLimitedTimes: 1, // Default to 1 time
 		EnablePlanAndExec:                  true,
 		AllowRequireForUserInteract:        true,
 		ToolComposeConcurrency:             2,
