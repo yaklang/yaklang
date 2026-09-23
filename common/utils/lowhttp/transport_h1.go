@@ -84,21 +84,20 @@ func (t *h1Transport) RoundTrip(ctx context.Context, tr *transportRequest) (*tra
 		if !containsNoProxyAvailable(errMsg) {
 			return nil, err
 		}
-		conn, err = t.tryLegacyProxy(ctx, tr, connPool, withConnPool)
-		if err != nil {
-			return nil, err
-		}
-		// legacy proxy: rewrite packet
+		// Build the forward-proxy packet before dialing so a malformed request
+		// cannot leave a newly opened proxy connection behind.
 		requestPacket, err = BuildLegacyProxyRequest(requestPacket, tr.option.Https)
 		if err != nil {
 			return nil, err
 		}
-		withConnPool = false // legacy proxy cannot use pool
-	}
-
-	result := &transportResult{portIsOpen: true}
-	if conn != nil {
-		result.remoteAddr = conn.RemoteAddr().String()
+		conn, err = t.tryLegacyProxy(ctx, tr)
+		if err != nil {
+			return nil, err
+		}
+		// A forward-proxy request includes Connection: close. Never put this
+		// connection in the pool, including when the request fails midway.
+		defer conn.Close()
+		return t.roundTripDirect(ctx, tr, conn, requestPacket, canReconnect)
 	}
 
 	if withConnPool {
@@ -128,7 +127,7 @@ func hasExtraH1RequestBytes(packet []byte) bool {
 	return err != nil || length < 0 || int64(len(body)) > length
 }
 
-func (t *h1Transport) tryLegacyProxy(ctx context.Context, tr *transportRequest, connPool *LowHttpConnPool, withConnPool bool) (net.Conn, error) {
+func (t *h1Transport) tryLegacyProxy(ctx context.Context, tr *transportRequest) (net.Conn, error) {
 	noProxyDial := make([]netx.DialXOption, len(tr.dialOpts), len(tr.dialOpts)+1)
 	copy(noProxyDial, tr.dialOpts)
 	noProxyDial = append(noProxyDial, netx.DialX_WithDisableProxy(true))
@@ -138,17 +137,9 @@ func (t *h1Transport) tryLegacyProxy(ctx context.Context, tr *transportRequest, 
 			continue
 		}
 		addr := utils.ExtractHostPort(basicProxy)
-		if withConnPool {
-			tr.cacheKey.addr = addr
-			conn, err := connPool.getIdleConn(ctx, tr.cacheKey, noProxyDial...)
-			if err == nil {
-				return conn, nil
-			}
-		} else {
-			conn, err := dialXWithContext(ctx, addr, noProxyDial...)
-			if err == nil {
-				return conn, nil
-			}
+		conn, err := dialXWithContext(ctx, addr, noProxyDial...)
+		if err == nil {
+			return conn, nil
 		}
 	}
 	return nil, utils.Error("no proxy available")
