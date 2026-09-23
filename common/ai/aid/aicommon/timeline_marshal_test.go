@@ -177,3 +177,31 @@ func TestTimelineUnmarshalEmptyString(t *testing.T) {
 
 	t.Log("Empty string unmarshal test passed")
 }
+
+func TestTimelineUnmarshalLegacySummaryType(t *testing.T) {
+	for _, test := range []struct {
+		name    string
+		input   string
+		wantErr bool
+	}{
+		{name: "object", input: `{"summary":{"old":null}}`},
+		{name: "null", input: `{"summary":null}`},
+		{name: "array", input: `{"summary":[]}`, wantErr: true},
+		{name: "number", input: `{"summary":1}`, wantErr: true},
+		{name: "invalid item", input: `{"summary":{"old":1}}`, wantErr: true},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			timeline, err := UnmarshalTimeline(test.input)
+			if test.wantErr {
+				require.Error(t, err)
+				require.Nil(t, timeline)
+				return
+			}
+			require.NoError(t, err)
+			require.NotNil(t, timeline)
+			serialized, err := MarshalTimeline(timeline)
+			require.NoError(t, err)
+			require.NotContains(t, serialized, `"summary"`)
+		})
+	}
+}

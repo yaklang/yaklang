@@ -150,10 +150,7 @@ func UnmarshalTimeline(s string) (*Timeline, error) {
 		timeline.OrderInsertId(id, value)
 	}
 
-	// 关键词: UnmarshalTimeline, summary 向后兼容
-	// summary 字段已弃用：读到老数据中的 summary 内容时直接忽略，不再写入 Timeline
-	// （此处不需要解析 serializable.Summary，json.Unmarshal 已经把内容放到 serializable 里了，但我们不消费它）
-	_ = serializable.Summary
+	// summary 仍参与 typed JSON 解码以兼容旧数据，但恢复时不消费其内容。
 
 	timeline.compressedHead = cloneTimelineCompressedHead(serializable.CompressedHead)
 	timeline.compressedHistory = cloneTimelineCompressedHistory(serializable.CompressedHistory)

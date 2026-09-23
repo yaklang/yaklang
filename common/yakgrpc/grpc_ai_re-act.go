@@ -48,7 +48,6 @@ func (s *Server) startAIReActWithOptions(stream ypb.Yak_StartAIReActServer, load
 	}
 	startParams := firstMsg.GetParams()
 	var sendMu sync.Mutex
-	started := make(chan struct{})
 	// debugStreamPrinter 在 DEBUG=1 时把流式 delta 合并到单行，避免每个
 	// token 单独换行造成的刷屏；非流事件来临时先 FlushIfActive 收尾，让
 	// 后续 log / 普通事件都从新行开始，消除"夹心"现象。
@@ -58,8 +57,6 @@ func (s *Server) startAIReActWithOptions(stream ypb.Yak_StartAIReActServer, load
 	// 流缓冲刷出, 彻底消灭日志被夹在流中间的视觉混乱。
 	// 关键词: EnsureLogFlushWrapperInstalled grpc_ai_react entry
 	aicommon.EnsureLogFlushWrapperInstalled()
-	close(started)
-	_ = started
 
 	feedback := func(e *schema.AiOutputEvent) error {
 		if e == nil {
