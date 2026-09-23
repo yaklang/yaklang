@@ -19,7 +19,6 @@ require (
 	github.com/andybalholm/brotli v1.0.6
 	github.com/antchfx/xmlquery v1.3.1
 	github.com/antchfx/xpath v1.3.6
-	github.com/aymanbagabas/go-pty v0.2.2
 	github.com/bcicen/jstream v0.0.0-20190220045926-16c1f8af81c2
 	github.com/beevik/etree v1.5.0
 	github.com/chzyer/readline v1.5.1
@@ -139,6 +138,7 @@ require (
 	github.com/elastic/go-licenser v0.4.1 // indirect
 	github.com/kballard/go-shellquote v0.0.0-20180428030007-95032a82bc51 // indirect
 	github.com/rogpeppe/go-internal v1.13.1 // indirect
+	github.com/vishvananda/netlink v1.1.1-0.20211118161826-650dca95af54 // indirect
 	go.opentelemetry.io/otel/sdk v1.32.0 // indirect
 )
 
@@ -186,7 +186,6 @@ require (
 	github.com/tidwall/pretty v1.2.0 // indirect
 	github.com/tklauser/go-sysconf v0.3.12 // indirect
 	github.com/tklauser/numcpus v0.6.1 // indirect
-	github.com/u-root/u-root v0.11.0 // indirect
 	github.com/xanzy/ssh-agent v0.3.3 // indirect
 	github.com/xuri/efp v0.0.0-20240408161823-9ad904a10d6d // indirect
 	github.com/xuri/nfp v0.0.0-20240318013403-ab9948c2c4a7 // indirect
