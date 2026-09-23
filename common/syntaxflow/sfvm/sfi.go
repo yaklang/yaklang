@@ -28,18 +28,10 @@ func ToOpCodes(code string) (*OpCodes, bool) {
 		return nil, false
 	}
 
-	// OpCode payload is cache-only optimization:
-	// - runtime dev build: always ignore payload
-	// - payload marked dev: always ignore payload
-	// - version mismatch: ignore payload
+	// OpCode payload is a cache. Keep it when it was compiled by this same
+	// build, including a dev build. A missing or different version is stale.
 	runtimeVersion := consts.GetYakVersion()
-	if runtimeVersion == "" || runtimeVersion == "dev" {
-		return nil, false
-	}
-	if opcodes.Version == "" || opcodes.Version == "dev" {
-		return nil, false
-	}
-	if opcodes.Version != runtimeVersion {
+	if runtimeVersion == "" || opcodes.Version == "" || opcodes.Version != runtimeVersion {
 		return nil, false
 	}
 
