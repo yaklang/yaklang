@@ -1010,3 +1010,12 @@ func WithStatefulTaskBaseParent(parent AIStatefulTask) StatefulTaskBaseOption {
 		task.parentTask = parent
 	}
 }
+
+// GetParentTask returns the task that created this one via NewSubTaskBase.
+// A root user turn has no parent.
+func (s *AIStatefulTaskBase) GetParentTask() AIStatefulTask {
+	if s == nil {
+		return nil
+	}
+	return s.parentTask
+}

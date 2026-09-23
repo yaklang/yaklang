@@ -80,3 +80,47 @@ func TestExecuteWithExistedTask_PanicReturnsErrorAndPreservesTerminalStatus(t *t
 		})
 	}
 }
+
+func TestExecuteWithExistedTask_InitDoneStillRecordsRootUserInput(t *testing.T) {
+	ctx := context.Background()
+	invoker := newTimelineCapturingInvoker(ctx)
+	cfg := aicommon.NewConfig(ctx, aicommon.WithDisableAutoSkills(true))
+	invoker.SetConfig(cfg)
+
+	loop := NewMinimalReActLoop(cfg, invoker)
+	WithInitTask(func(_ *ReActLoop, _ aicommon.AIStatefulTask, op *InitTaskOperator) {
+		op.Done()
+	})(loop)
+
+	task := aicommon.NewStatefulTaskBase("root-audit", "开始审计", ctx, nil, true)
+	require.NoError(t, loop.ExecuteWithExistedTask(task))
+
+	var hits []timelineEntry
+	for _, entry := range invoker.Entries() {
+		if entry.Tag == aicommon.TIMELINE_ITEM_TYPE_CURRENT_TASK_USER_INPUT {
+			hits = append(hits, entry)
+		}
+	}
+	require.Len(t, hits, 1)
+	require.Equal(t, "开始审计", hits[0].Content)
+}
+
+func TestExecuteWithExistedTask_SubtaskDoesNotRepeatParentUserInput(t *testing.T) {
+	ctx := context.Background()
+	invoker := newTimelineCapturingInvoker(ctx)
+	cfg := aicommon.NewConfig(ctx, aicommon.WithDisableAutoSkills(true))
+	invoker.SetConfig(cfg)
+
+	loop := NewMinimalReActLoop(cfg, invoker)
+	WithInitTask(func(_ *ReActLoop, _ aicommon.AIStatefulTask, op *InitTaskOperator) {
+		op.Done()
+	})(loop)
+
+	parent := aicommon.NewStatefulTaskBase("root-audit", "开始审计", ctx, nil, true)
+	child := aicommon.NewSubTaskBase(parent, "phase1", parent.GetUserInput(), true)
+	require.NoError(t, loop.ExecuteWithExistedTask(child))
+
+	for _, entry := range invoker.Entries() {
+		require.NotEqual(t, aicommon.TIMELINE_ITEM_TYPE_CURRENT_TASK_USER_INPUT, entry.Tag)
+	}
+}

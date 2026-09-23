@@ -791,6 +791,40 @@ func (r *ReActLoop) LoadingStatus(i string) {
 	r.loadingStatus(i)
 }
 
+type taskParentGetter interface {
+	GetParentTask() aicommon.AIStatefulTask
+}
+
+func taskParent(task aicommon.AIStatefulTask) aicommon.AIStatefulTask {
+	if utils.IsNil(task) {
+		return nil
+	}
+	getter, ok := task.(taskParentGetter)
+	if !ok || getter == nil {
+		return nil
+	}
+	return getter.GetParentTask()
+}
+
+func sameOriginUserInputAsParent(task aicommon.AIStatefulTask) bool {
+	parent := taskParent(task)
+	if parent == nil || utils.IsNil(task) {
+		return false
+	}
+	return task.GetOriginUserInput() == parent.GetOriginUserInput()
+}
+
+func (r *ReActLoop) recordCurrentTaskUserInput(task aicommon.AIStatefulTask) {
+	if r == nil || utils.IsNil(task) {
+		return
+	}
+	invoker := r.GetInvoker()
+	if invoker == nil {
+		return
+	}
+	invoker.AddToTimeline(aicommon.TIMELINE_ITEM_TYPE_CURRENT_TASK_USER_INPUT, fmt.Sprintf("%v", task.GetOriginUserInput()))
+}
+
 func (r *ReActLoop) ExecuteWithExistedTask(task aicommon.AIStatefulTask) (finalError error) {
 	r.UserStatus(
 		"正在准备这次任务",
@@ -849,6 +883,17 @@ func (r *ReActLoop) ExecuteWithExistedTask(task aicommon.AIStatefulTask) (finalE
 
 	r.SetCurrentTask(task)
 	r.ensureLoopDirectory(task)
+
+	// Root turns must show the user's own words before init. Loops such as
+	// code_security_audit finish the whole pipeline inside init and then
+	// op.Done(), which returns before the main-loop timeline write. Subtasks
+	// that repeat the same utterance stay quiet here so the chat does not
+	// print the sentence once per phase.
+	userInputRecorded := false
+	if taskParent(task) == nil {
+		r.recordCurrentTaskUserInput(task)
+		userInputRecorded = true
+	}
 
 	// Emit loop-enter lifecycle marker. This records the loop name, the task it
 	// is executing on, and the parent task (if known) so that viz can reconstruct
@@ -1063,7 +1108,9 @@ func (r *ReActLoop) ExecuteWithExistedTask(task aicommon.AIStatefulTask) (finalE
 		}
 	}
 
-	r.GetInvoker().AddToTimeline(aicommon.TIMELINE_ITEM_TYPE_CURRENT_TASK_USER_INPUT, fmt.Sprintf("%v", task.GetOriginUserInput()))
+	if !userInputRecorded && !sameOriginUserInputAsParent(task) {
+		r.recordCurrentTaskUserInput(task)
+	}
 
 	// 启动主循环卡死兜底观察 goroutine: 周期性比对 lastIterationTickAt,
 	// 长时间无推进就 emit timeline + dump goroutine stack. 不会主动 abort
