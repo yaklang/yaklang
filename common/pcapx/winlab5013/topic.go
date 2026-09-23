@@ -138,12 +138,14 @@ func bvlc(fn byte, npdu []byte) []byte {
 func buildBACnet(l *lab) {
 	who := bvlc(0x0B, []byte{0x01, 0x00, 0x10, 0x08, 0x0A, 0x13, 0x95, 0x1A, 0x13, 0x95})
 	iam := bvlc(0x0B, []byte{0x01, 0x00, 0x10, 0x00, 0xC4, 0x02, 0x00, 0x13, 0x95, 0x22, 0x01, 0xE0, 0x91, 0x03, 0x22, 0x13, 0x95})
-	readReq := bvlc(0x0A, []byte{0x01, 0x04, 0x00, 0x05, 0x0C, 0x0C, 0x00, 0x80, 0x00, 0x07, 0x19, 0x55})
+	// Confirmed requests carry the max-segments/max-APDU byte before the invoke ID.
+	// 0x05 = unspecified segment count, 1476-octet APDU. ReadProperty is 12, WriteProperty is 15.
+	readReq := bvlc(0x0A, []byte{0x01, 0x04, 0x00, 0x05, 0x05, 0x0C, 0x0C, 0x00, 0x80, 0x00, 0x07, 0x19, 0x55})
 	ack := []byte{0x01, 0x00, 0x30, 0x05, 0x0C, 0x0C, 0x00, 0x80, 0x00, 0x07, 0x19, 0x55, 0x3E, 0x44}
 	ack = append(ack, f32be(21.5)...)
 	ack = append(ack, 0x3F)
 	readRep := bvlc(0x0A, ack)
-	wr := []byte{0x01, 0x04, 0x00, 0x06, 0x0F, 0x0C, 0x00, 0x80, 0x00, 0x07, 0x19, 0x55, 0x3E, 0x44}
+	wr := []byte{0x01, 0x04, 0x00, 0x05, 0x06, 0x0F, 0x0C, 0x00, 0x80, 0x00, 0x07, 0x19, 0x55, 0x3E, 0x44}
 	wr = append(wr, f32be(22)...)
 	wr = append(wr, 0x3F)
 	writeReq := bvlc(0x0A, wr)
@@ -175,7 +177,33 @@ func parseBACnet(frames []Frame) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	var device, readObj, readVal, writeObj, writeVal string
+	var device, readObj, readVal, writeObj, writeVal, readProp, writeProp string
+	var readInvoke, writeInvoke, readService, writeService int
+	objProp := func(rest []byte) (obj string, prop int, tail []byte, err error) {
+		if len(rest) < 7 || rest[0] != 0x0C {
+			return "", 0, nil, fmt.Errorf("bacnet context tag 0")
+		}
+		obj, err = bacObject(rest[1:5])
+		if err != nil {
+			return "", 0, nil, err
+		}
+		if rest[5] != 0x19 {
+			return "", 0, nil, fmt.Errorf("bacnet context tag 1")
+		}
+		return obj, int(rest[6]), rest[7:], nil
+	}
+	propName := func(id int) (string, error) {
+		if id != 85 {
+			return "", fmt.Errorf("bacnet property %d", id)
+		}
+		return "present-value", nil
+	}
+	realValue := func(tail []byte) (string, error) {
+		if len(tail) < 7 || tail[0] != 0x3E || tail[1] != 0x44 || tail[6] != 0x3F {
+			return "", fmt.Errorf("bacnet real")
+		}
+		return strconv.FormatFloat(float64(math.Float32frombits(binary.BigEndian.Uint32(tail[2:6]))), 'f', -1, 32), nil
+	}
 	parseAPDU := func(p []byte, fromClient bool) error {
 		if len(p) < 6 || p[0] != 0x81 {
 			return fmt.Errorf("bvlc")
@@ -196,36 +224,52 @@ func parseBACnet(frames []Frame) (string, error) {
 			device = obj
 			return nil
 		}
-		if len(apdu) >= 8 && apdu[0] == 0x00 && apdu[2] == 0x0C {
-			if apdu[3] != 0x0C {
-				return fmt.Errorf("read obj")
-			}
-			obj, err := bacObject(apdu[4:8])
+		if len(apdu) >= 4 && apdu[0] == 0x00 {
+			invoke := int(apdu[2])
+			service := int(apdu[3])
+			obj, prop, tail, err := objProp(apdu[4:])
 			if err != nil {
 				return err
 			}
-			readObj = obj
-			return nil
-		}
-		if len(apdu) >= 17 && apdu[0] == 0x30 && apdu[2] == 0x0C {
-			if apdu[3] != 0x0C || apdu[11] != 0x44 {
-				return fmt.Errorf("read ack")
-			}
-			readVal = strconv.FormatFloat(float64(math.Float32frombits(binary.BigEndian.Uint32(apdu[12:16]))), 'f', -1, 32)
-			return nil
-		}
-		if len(apdu) >= 16 && apdu[0] == 0x00 && apdu[2] == 0x0F {
-			if apdu[3] != 0x0C || apdu[11] != 0x44 {
-				return fmt.Errorf("write")
-			}
-			obj, err := bacObject(apdu[4:8])
+			name, err := propName(prop)
 			if err != nil {
 				return err
 			}
-			writeObj = obj
-			writeVal = strconv.FormatFloat(float64(math.Float32frombits(binary.BigEndian.Uint32(apdu[12:16]))), 'f', -1, 32)
+			switch service {
+			case 12:
+				readInvoke, readService, readObj, readProp = invoke, service, obj, name
+			case 15:
+				val, err := realValue(tail)
+				if err != nil {
+					return err
+				}
+				writeInvoke, writeService, writeObj, writeProp, writeVal = invoke, service, obj, name, val
+			default:
+				return fmt.Errorf("bacnet service %d", service)
+			}
 			return nil
 		}
+		if len(apdu) >= 3 && apdu[0] == 0x30 {
+			if readInvoke == 0 || int(apdu[1]) != readInvoke || int(apdu[2]) != readService {
+				return fmt.Errorf("bacnet read ack invoke")
+			}
+			_, prop, tail, err := objProp(apdu[3:])
+			if err != nil {
+				return err
+			}
+			if _, err = propName(prop); err != nil {
+				return err
+			}
+			readVal, err = realValue(tail)
+			return err
+		}
+		if len(apdu) >= 3 && apdu[0] == 0x20 {
+			if writeInvoke == 0 || int(apdu[1]) != writeInvoke || int(apdu[2]) != writeService {
+				return fmt.Errorf("bacnet write ack invoke")
+			}
+			return nil
+		}
+		_ = fromClient
 		return nil
 	}
 	for _, p := range c2s {
@@ -238,10 +282,10 @@ func parseBACnet(frames []Frame) (string, error) {
 			return "", err
 		}
 	}
-	if device == "" || readVal == "" || writeVal == "" {
+	if device == "" || readVal == "" || writeVal == "" || readProp == "" || writeProp == "" || readService != 12 || writeService != 15 {
 		return "", fmt.Errorf("bacnet fields")
 	}
-	return kv("protocol", "bacnet", "device", device, "read_object", readObj, "read_property", "present-value", "read_value", readVal, "write_object", writeObj, "write_property", "present-value", "write_value", writeVal), nil
+	return kv("protocol", "bacnet", "device", device, "read_object", readObj, "read_property", readProp, "read_value", readVal, "write_object", writeObj, "write_property", writeProp, "write_value", writeVal), nil
 }
 
 func enip(cmd uint16, session uint32, data []byte) []byte {
@@ -676,7 +720,10 @@ func buildC37(l *lab) {
 	put16(1)
 	body = append(body, stn...)
 	put16(7)
-	put16(0x0005)
+	// Wireshark synphasor: 0x0008 FREQ/DFREQ float, 0x0002 phasor float, 0x0001 polar.
+	// 0x000A is rectangular float phasors plus float frequency. 0x0005 is polar+analog-float
+	// and makes the dissector read FREQ as int16.
+	put16(0x000A)
 	put16(1)
 	put16(0)
 	put16(0)
@@ -722,7 +769,9 @@ func parseC37(frames []Frame) (string, error) {
 	}
 	var name string
 	var real, imag, freq string
-	var idcode int
+	var idcode, nominal int
+	var format uint16
+	var nph, nan, ndg int
 	check := func(b []byte) error {
 		for len(b) > 0 {
 			if len(b) < 4 || b[0] != 0xAA {
@@ -736,27 +785,57 @@ func parseC37(frames []Frame) (string, error) {
 			if crc16CCITT(frame[:n-2]) != binary.BigEndian.Uint16(frame[n-2:n]) {
 				return fmt.Errorf("c37 crc")
 			}
-			id := int(binary.BigEndian.Uint16(frame[4:6]))
-			idcode = id
+			idcode = int(binary.BigEndian.Uint16(frame[4:6]))
 			kind := frame[1] & 0x70
 			switch kind {
 			case 0x30:
-				// config2: skip to CHNAM. Fixed prefix after fracsec.
-				// sync2 size2 id2 soc4 frac4 timebase4 numpmu2 stn16 id2 format2 phnmr2 annmr2 dgnmr2 name16
-				off := 14
-				if len(frame) < off+4+2+16+2+2+2+2+2+16 {
+				// TIME_BASE is 1 reserved byte + 24-bit base at offset 14.
+				if len(frame) < 46+16 {
 					return fmt.Errorf("c37 config")
 				}
-				off += 4 + 2 + 16 + 2 + 2 + 2 + 2 + 2
-				name = strings.TrimRight(string(frame[off:off+16]), "\x00")
-			case 0x00:
-				off := 16
-				if len(frame) < off+16 {
-					return fmt.Errorf("c37 data")
+				format = binary.BigEndian.Uint16(frame[38:40])
+				nph = int(binary.BigEndian.Uint16(frame[40:42]))
+				nan = int(binary.BigEndian.Uint16(frame[42:44]))
+				ndg = int(binary.BigEndian.Uint16(frame[44:46]))
+				name = strings.TrimRight(string(frame[46:62]), "\x00")
+				fnomAt := 62 + nph*4 + nan*4 + ndg*4
+				if fnomAt+2 > len(frame) {
+					return fmt.Errorf("c37 fnom")
 				}
-				real = strconv.FormatFloat(float64(math.Float32frombits(binary.BigEndian.Uint32(frame[off:off+4]))), 'f', -1, 32)
-				imag = strconv.FormatFloat(float64(math.Float32frombits(binary.BigEndian.Uint32(frame[off+4:off+8]))), 'f', -1, 32)
-				freq = strconv.FormatFloat(float64(math.Float32frombits(binary.BigEndian.Uint32(frame[off+8:off+12]))), 'f', -1, 32)
+				if binary.BigEndian.Uint16(frame[fnomAt:fnomAt+2])&0x0001 != 0 {
+					nominal = 50
+				} else {
+					nominal = 60
+				}
+			case 0x00:
+				if format == 0 {
+					return fmt.Errorf("c37 data before config")
+				}
+				ph := 4
+				if format&0x0002 != 0 {
+					ph = 8
+				}
+				fr := 4
+				if format&0x0008 != 0 {
+					fr = 8
+				}
+				an := 2
+				if format&0x0004 != 0 {
+					an = 4
+				}
+				meas := 2 + nph*ph + fr + nan*an + ndg*2
+				if n != 14+meas+2 {
+					return fmt.Errorf("c37 width")
+				}
+				if format&0x0002 == 0 || format&0x0001 != 0 || len(frame) < 32 {
+					return fmt.Errorf("c37 phasor format")
+				}
+				real = strconv.FormatFloat(float64(math.Float32frombits(binary.BigEndian.Uint32(frame[16:20]))), 'f', -1, 32)
+				imag = strconv.FormatFloat(float64(math.Float32frombits(binary.BigEndian.Uint32(frame[20:24]))), 'f', -1, 32)
+				if format&0x0008 == 0 {
+					return fmt.Errorf("c37 freq format")
+				}
+				freq = strconv.FormatFloat(float64(math.Float32frombits(binary.BigEndian.Uint32(frame[24:28]))), 'f', -1, 32)
 			}
 			b = b[n:]
 		}
@@ -768,10 +847,10 @@ func parseC37(frames []Frame) (string, error) {
 	if err := check(cn.s2c); err != nil {
 		return "", err
 	}
-	if name == "" || real == "" || idcode == 0 {
+	if name == "" || real == "" || idcode == 0 || nominal == 0 || freq == "" {
 		return "", fmt.Errorf("c37 fields")
 	}
-	return kv("protocol", "c37.118", "idcode", strconv.Itoa(idcode), "phasor", name, "real", real, "imag", imag, "freq_off_hz", freq, "nominal_hz", "50"), nil
+	return kv("protocol", "c37.118", "idcode", strconv.Itoa(idcode), "phasor", name, "real", real, "imag", imag, "freq_off_hz", freq, "nominal_hz", strconv.Itoa(nominal)), nil
 }
 
 func buildStratum(l *lab) {

@@ -529,7 +529,11 @@ func buildDHT(l *lab) {
 	l.udp(46881, 6881, true, []byte(q("aa", "ping", bencDict([][2]string{{"id", self}}))))
 	l.udp(46881, 6881, false, []byte(r("aa", bencDict([][2]string{{"id", peer}}))))
 	l.udp(46881, 6881, true, []byte(q("ab", "find_node", bencDict([][2]string{{"id", self}, {"target", target}}))))
-	l.udp(46881, 6881, false, []byte(r("ab", bencDict([][2]string{{"id", peer}, {"nodes", bencStr(peer[len(peer)-20:])}}))))
+	nodes := make([]byte, 26)
+	copy(nodes[:20], []byte("lab-peer-node-5013!!"))
+	copy(nodes[20:24], []byte{198, 51, 100, 9})
+	binary.BigEndian.PutUint16(nodes[24:26], 6881)
+	l.udp(46881, 6881, false, []byte(r("ab", bencDict([][2]string{{"id", peer}, {"nodes", bencStr(string(nodes))}}))))
 	l.udp(46881, 6881, true, []byte(q("ac", "get_peers", bencDict([][2]string{{"id", self}, {"info_hash", info}}))))
 	l.udp(46881, 6881, false, []byte(r("ac", bencDict([][2]string{{"id", peer}, {"token", bencStr("lab")}}))))
 	ann := bencDict([][2]string{{"id", self}, {"implied_port", bencInt(0)}, {"info_hash", info}, {"port", bencInt(6881)}, {"token", bencStr("lab")}})
@@ -782,7 +786,7 @@ func dhtDict(v any) (map[string]any, error) {
 }
 
 func parseDHT(frames []Frame) (string, error) {
-	c2s, _, err := udpByPort(frames, 6881)
+	c2s, s2c, err := udpByPort(frames, 6881)
 	if err != nil {
 		return "", err
 	}
@@ -818,7 +822,31 @@ func parseDHT(frames []Frame) (string, error) {
 			}
 		}
 	}
-	if len(pingID) != 20 || len(target) != 20 || len(info) != 20 || token == "" || port == 0 {
+	sawNodes := false
+	for _, p := range s2c {
+		v, rest, err := bdecode(string(p))
+		if err != nil || rest != "" {
+			return "", fmt.Errorf("dht bencode")
+		}
+		m, err := dhtDict(v)
+		if err != nil {
+			return "", err
+		}
+		if m["y"] != "r" {
+			return "", fmt.Errorf("dht reply")
+		}
+		body, err := dhtDict(m["r"])
+		if err != nil {
+			return "", err
+		}
+		if nodes, ok := body["nodes"].(string); ok {
+			if len(nodes) == 0 || len(nodes)%26 != 0 {
+				return "", fmt.Errorf("dht nodes")
+			}
+			sawNodes = true
+		}
+	}
+	if len(pingID) != 20 || len(target) != 20 || len(info) != 20 || token == "" || port == 0 || !sawNodes {
 		return "", fmt.Errorf("dht fields")
 	}
 	return kv("protocol", "bittorrent-dht", "ping_id", pingID, "find_target", target, "info_hash", info, "announce_token", token, "announce_port", strconv.Itoa(port)), nil
