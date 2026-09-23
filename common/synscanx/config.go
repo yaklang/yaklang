@@ -304,7 +304,13 @@ func WithConcurrent(count int) SynxConfigOption {
 			count = 1000
 		}
 		config.rateLimitDelayMs = float64(time.Second) / float64(count) / float64(time.Millisecond)
-		config.rateLimitDelayGap = count / 10
+		// count/10 is 0 for concurrent(1)..concurrent(9). A zero burst limiter
+		// rejects every packet, so a small concurrency silently scans nothing.
+		gap := count / 10
+		if gap < 1 {
+			gap = 1
+		}
+		config.rateLimitDelayGap = gap
 		log.Debugf("rate limit delay ms: %v(ms)", config.rateLimitDelayMs)
 		log.Debugf("rate limit delay gap: %v", config.rateLimitDelayGap)
 	}

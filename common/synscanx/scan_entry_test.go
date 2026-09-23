@@ -162,6 +162,43 @@ func TestGenerateHostPortStopsWhenContextCanceled(t *testing.T) {
 	}
 }
 
+func TestLoopbackScanSubmitsEveryRequestedPort(t *testing.T) {
+	var submitted []string
+	ch, err := Scan(context.Background(), "127.0.0.1", "80,443,1",
+		WithWaiting(1),
+		WithShuffle(false),
+		WithSubmitTaskCallback(func(addr string) {
+			submitted = append(submitted, addr)
+		}),
+	)
+	if err != nil {
+		t.Skipf("packet capture is not available: %v", err)
+	}
+	for range ch {
+	}
+	want := []string{"127.0.0.1:1", "127.0.0.1:80", "127.0.0.1:443"}
+	if len(submitted) != len(want) {
+		t.Fatalf("submitted %v, want %v", submitted, want)
+	}
+	for i := range want {
+		if submitted[i] != want[i] {
+			t.Fatalf("submitted %v, want %v", submitted, want)
+		}
+	}
+}
+
+func TestConcurrentBelowTenStillHasBurst(t *testing.T) {
+	cfg := NewDefaultConfig()
+	WithConcurrent(4)(cfg)
+	if cfg.rateLimitDelayGap < 1 {
+		t.Fatalf("burst = %d, a zero burst limiter sends no packets", cfg.rateLimitDelayGap)
+	}
+	limiter := rate.NewLimiter(rate.Every(time.Duration(cfg.rateLimitDelayMs*float64(time.Millisecond))), cfg.rateLimitDelayGap)
+	if err := limiter.Wait(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+}
+
 func TestScanRejectsEmptyTargetBeforeCapture(t *testing.T) {
 	if _, err := Scan(context.Background(), "", "80"); err == nil {
 		t.Fatal("expected empty target error")
