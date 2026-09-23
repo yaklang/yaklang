@@ -80,10 +80,24 @@ func getCacheHTTPFlowGRPCModel(f *schema.HTTPFlow, full bool) *ypb.HTTPFlow {
 	}
 	cacheMu.RLock()
 	defer cacheMu.RUnlock()
-	if v, ok := GlobalHTTPFlowCache.Get(f.CalcCacheHash(full)); ok {
-		return v
+	v, ok := GlobalHTTPFlowCache.Get(f.CalcCacheHash(full))
+	if !ok {
+		return nil
 	}
-	return nil
+	// List SQL blanks request/response when they exceed the inline budget, but
+	// the cache key is only ID + content hash. Reject a hit whose packet
+	// presence does not match the row that was just loaded.
+	if !full && listCachePayloadMismatch(f, v) {
+		return nil
+	}
+	return v
+}
+
+func listCachePayloadMismatch(f *schema.HTTPFlow, cached *ypb.HTTPFlow) bool {
+	if cached == nil {
+		return true
+	}
+	return (f.Request != "") != (len(cached.Request) > 0) || (f.Response != "") != (len(cached.Response) > 0)
 }
 
 func FromHTTPFlowGRPCModel(f *ypb.HTTPFlow) (*schema.HTTPFlow, error) {
