@@ -155,17 +155,9 @@ func NewGateway() *Gateway {
 }
 
 func tryCreateAIGateway(t string, disableProviderFallback bool, cb func(string, aispec.AIClient) (bool, error)) error {
-	createAIGatewayByType := func(typ string) aispec.AIClient {
-		gw, ok := aispec.Lookup(typ)
-		if !ok {
-			return nil
-		}
-		return gw
-	}
-
 	total := aispec.RegisteredAIGateways()
 	if utils.StringArrayContains(total, t) {
-		gw := createAIGatewayByType(t)
+		gw := createAIGateway(t)
 		if gw != nil {
 			ok, err := cb(t, gw)
 			if ok {
@@ -201,7 +193,7 @@ func tryCreateAIGateway(t string, disableProviderFallback bool, cb func(string, 
 				if providerType == "" {
 					continue
 				}
-				agent := createAIGatewayByType(providerType)
+				agent := createAIGateway(providerType)
 				if agent == nil {
 					continue
 				}
@@ -239,7 +231,7 @@ func tryCreateAIGateway(t string, disableProviderFallback bool, cb func(string, 
 	}
 
 	for _, typ := range cfg.AiApiPriority {
-		agent := createAIGatewayByType(typ)
+		agent := createAIGateway(typ)
 		if agent != nil {
 			ok, _ := cb(typ, agent)
 			if ok {
@@ -255,15 +247,18 @@ func tryCreateAIGateway(t string, disableProviderFallback bool, cb func(string, 
 
 func invokeModelInfoCallback(gateway aispec.AIClient, provider string) {
 	cfg := gateway.GetConfig()
-	if cfg != nil && cfg.ModelInfoCallback != nil {
-		cfg.ModelInfoCallback(provider, cfg.Model)
+	if cfg == nil {
+		return
+	}
+	if cfg.ModelInfoCallback != nil {
+		cfg.ModelInfoCallback(provider, cfg.Model, cfg.ThinkingLevel)
 	}
 }
 
 func invokeModelInfoConfirmCallback(gateway aispec.AIClient, provider string) {
 	cfg := gateway.GetConfig()
 	if cfg != nil && cfg.ModelInfoConfirmCallback != nil {
-		cfg.ModelInfoConfirmCallback(provider, cfg.Model)
+		cfg.ModelInfoConfirmCallback(provider, cfg.Model, cfg.ThinkingLevel)
 	}
 }
 
@@ -1133,8 +1128,8 @@ var Exports = map[string]any{
 	"ListModels":              ListModels,
 	"ListModelByProviderType": ListModelByProviderType,
 
-	"thinkingLevel":                   aispec.WithThinkingLevel,
-	"thinking":                        aispec.WithEnableThinking,
+	"thinkingLevel":                  aispec.WithThinkingLevel,
+	"thinking":                       aispec.WithEnableThinking,
 	"reasoningEffort":                aispec.WithReasoningEffort,
 	"timeout":                        aispec.WithTimeout,
 	"proxy":                          aispec.WithProxy,

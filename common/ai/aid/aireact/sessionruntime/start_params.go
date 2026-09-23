@@ -6,26 +6,9 @@ import (
 	"github.com/yaklang/gorm"
 	"github.com/yaklang/yaklang/common/ai/aid"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
-	"github.com/yaklang/yaklang/common/ai/aid/aicommon/aiconfig"
-	"github.com/yaklang/yaklang/common/consts"
-	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
-
-// FixOptionsWithServiceName preserves the legacy AIService selection behavior
-// for every ReAct caller, rather than leaving it in the gRPC adapter.
-func FixOptionsWithServiceName(serviceName string, opts ...aicommon.ConfigOption) []aicommon.ConfigOption {
-	aiCb, err := aicommon.CreateCallbackFromConfig(aiconfig.GetGlobalManager().GetFirstConfigByTierAndProviderAndModel(consts.TierIntelligent, serviceName, ""))
-	if err != nil {
-		log.Errorf("load ai service failed: %v", err)
-	} else {
-		opts = append(opts, aicommon.WithAutoTieredAICallback(aiCb))
-	}
-	log.Warnf("AIStartParams.AIService/AIModelName for WithAIChatInfo is deprecated, " +
-		"model info is now auto-detected from the actual AI gateway call")
-	return opts
-}
 
 // ConvertStartParamsToReActConfig converts the shared protobuf input model to
 // ReAct config options. The protobuf model is retained because ReAct itself
@@ -35,6 +18,7 @@ func ConvertStartParamsToReActConfig(i *ypb.AIStartParams) []aicommon.ConfigOpti
 	if i == nil {
 		return opts
 	}
+	opts = append(opts, aicommon.WithSingleAIModelMode(i.GetSingleModelMode()))
 	enableMultiAgent, goalModeEnabled, goalMinIterations, maxSubAgents := resolveAIExecutionStrategy(i)
 	if i.DisallowRequireForUserPrompt {
 		opts = append(opts, aicommon.WithAllowRequireForUserInteract(false))
@@ -90,9 +74,6 @@ func ConvertStartParamsToReActConfig(i *ypb.AIStartParams) []aicommon.ConfigOpti
 	}
 	if len(i.GetIncludeSuggestedToolKeywords()) > 0 {
 		opts = append(opts, aicommon.WithKeywords(i.GetIncludeSuggestedToolKeywords()...))
-	}
-	if i.GetAIService() != "" {
-		opts = FixOptionsWithServiceName(i.GetAIService(), opts...)
 	}
 
 	if !i.GetDisableAISearchForge() {

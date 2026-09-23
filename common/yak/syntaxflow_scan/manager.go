@@ -211,7 +211,12 @@ func (m *scanManager) SaveTask() error {
 					m.taskRecorder.LowCount = c.Count
 				}
 			}
-			m.taskRecorder.RiskCount = riskTotal
+			// A result stream can intentionally keep risks in memory. Preserve its
+			// count when the database has no matching rows; otherwise the persisted
+			// rows remain authoritative for ordinary database-backed scans.
+			if riskTotal > 0 || m.taskRecorder.RiskCount == 0 {
+				m.taskRecorder.RiskCount = riskTotal
+			}
 		}
 	}
 	err := schema.SaveSyntaxFlowScanTask(ssadb.GetDB(), m.taskRecorder)

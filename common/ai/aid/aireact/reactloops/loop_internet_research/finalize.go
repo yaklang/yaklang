@@ -1,7 +1,6 @@
 package loop_internet_research
 
 import (
-	"context"
 	"fmt"
 	"os"
 	"strings"
@@ -138,6 +137,19 @@ type smartEvaluation struct {
 	Overall    string
 }
 
+var smartEvaluationOutputs = []aitool.ToolOption{
+	aitool.WithStringParam("specific", aitool.WithParam_Description("Specific: how specific are results"), aitool.WithParam_Required(true)),
+	aitool.WithStringParam("measurable", aitool.WithParam_Description("Measurable: verifiable data points"), aitool.WithParam_Required(true)),
+	aitool.WithStringParam("achievable", aitool.WithParam_Description("Achievable: did research achieve its goal"), aitool.WithParam_Required(true)),
+	aitool.WithStringParam("relevant", aitool.WithParam_Description("Relevant: relevance to user needs"), aitool.WithParam_Required(true)),
+	aitool.WithStringParam("time_bound", aitool.WithParam_Description("Time-bound: information timeliness"), aitool.WithParam_Required(true)),
+	aitool.WithStringParam("overall", aitool.WithParam_Description("Overall assessment in 1 sentence"), aitool.WithParam_Required(true)),
+}
+
+var insufficientReasonOutputs = []aitool.ToolOption{
+	aitool.WithStringParam("analysis", aitool.WithParam_Description("Analysis of why results are insufficient"), aitool.WithParam_Required(true)),
+}
+
 // smartEvaluationStaticInstruction 是 SMART 评估的系统侧静态指令
 // 通过 aicommon.WithLiteForgeStaticInstruction 进入 LiteForge 的 high-static 段，跨调用稳定哈希
 // 关键词: aicache, PROMPT_SECTION, StaticInstruction, smart-evaluation, B 档
@@ -151,70 +163,6 @@ For each S.M.A.R.T dimension, provide a brief evaluation (1-2 sentences) of the 
 - Time-bound: Is the information current and timely? Are the sources up-to-date?
 - Overall: A brief overall assessment of the research quality (1 sentence).`
 
-func evaluateSMART(ctx context.Context, invoker aicommon.AIInvokeRuntime, userQuery, searchResults, searchHistory string) *smartEvaluation {
-	resultPreview := searchResults
-	if len(resultPreview) > 4096 {
-		resultPreview = resultPreview[:4096] + "\n...(truncated)"
-	}
-
-	// 关键词: aicache, dynamic, smart-evaluation, B 档去 nonce
-	// 内层 user_query/search_history/search_results 不再带 nonce
-	// 外层 PROMPT_SECTION_dynamic_NONCE 已经屏蔽 prompt-injection
-	promptTemplate := `<user_query>
-{{ .userQuery }}
-</user_query>
-
-<search_history>
-{{ .searchHistory }}
-</search_history>
-
-<search_results>
-{{ .searchResults }}
-</search_results>
-`
-
-	materials, err := utils.RenderTemplate(promptTemplate, map[string]any{
-		"userQuery":     userQuery,
-		"searchHistory": searchHistory,
-		"searchResults": resultPreview,
-	})
-	if err != nil {
-		log.Warnf("SMART evaluation template render failed: %v", err)
-		return nil
-	}
-
-	forgeResult, err := invoker.InvokeSpeedPriorityLiteForge(
-		ctx,
-		"smart-evaluation",
-		materials,
-		[]aitool.ToolOption{
-			aitool.WithStringParam("specific", aitool.WithParam_Description("Specific: how specific are results"), aitool.WithParam_Required(true)),
-			aitool.WithStringParam("measurable", aitool.WithParam_Description("Measurable: verifiable data points"), aitool.WithParam_Required(true)),
-			aitool.WithStringParam("achievable", aitool.WithParam_Description("Achievable: did research achieve its goal"), aitool.WithParam_Required(true)),
-			aitool.WithStringParam("relevant", aitool.WithParam_Description("Relevant: relevance to user needs"), aitool.WithParam_Required(true)),
-			aitool.WithStringParam("time_bound", aitool.WithParam_Description("Time-bound: information timeliness"), aitool.WithParam_Required(true)),
-			aitool.WithStringParam("overall", aitool.WithParam_Description("Overall assessment in 1 sentence"), aitool.WithParam_Required(true)),
-		},
-		aicommon.WithLiteForgeStaticInstruction(smartEvaluationStaticInstruction),
-	)
-	if err != nil {
-		log.Warnf("SMART evaluation LiteForge failed: %v", err)
-		return nil
-	}
-	if forgeResult == nil {
-		return nil
-	}
-
-	return &smartEvaluation{
-		Specific:   strings.TrimSpace(forgeResult.GetString("specific")),
-		Measurable: strings.TrimSpace(forgeResult.GetString("measurable")),
-		Achievable: strings.TrimSpace(forgeResult.GetString("achievable")),
-		Relevant:   strings.TrimSpace(forgeResult.GetString("relevant")),
-		TimeBound:  strings.TrimSpace(forgeResult.GetString("time_bound")),
-		Overall:    strings.TrimSpace(forgeResult.GetString("overall")),
-	}
-}
-
 // insufficientReasonStaticInstruction 是 insufficient-reason 评估的系统侧静态指令
 // 通过 aicommon.WithLiteForgeStaticInstruction 进入 LiteForge 的 high-static 段，跨调用稳定哈希
 // 关键词: aicache, PROMPT_SECTION, StaticInstruction, insufficient-reason-analysis, B 档
@@ -226,51 +174,6 @@ Please analyze why the search results are insufficient. Consider:
 3. Possible reasons (topic too niche, information not publicly available, wrong search strategy, etc.)
 
 Provide a concise analysis (3-5 sentences) explaining why the collected information does not meet the user's needs.`
-
-func evaluateInsufficientReason(ctx context.Context, invoker aicommon.AIInvokeRuntime, userQuery, searchResults, searchHistory string) string {
-	resultPreview := searchResults
-	if len(resultPreview) > 2048 {
-		resultPreview = resultPreview[:2048] + "\n...(truncated)"
-	}
-
-	// 关键词: aicache, dynamic, insufficient-reason-analysis, B 档去 nonce
-	promptTemplate := `<user_query>
-{{ .userQuery }}
-</user_query>
-
-<search_history>
-{{ .searchHistory }}
-</search_history>
-
-<partial_results>
-{{ .searchResults }}
-</partial_results>
-`
-
-	materials, err := utils.RenderTemplate(promptTemplate, map[string]any{
-		"userQuery":     userQuery,
-		"searchHistory": searchHistory,
-		"searchResults": resultPreview,
-	})
-	if err != nil {
-		return ""
-	}
-
-	forgeResult, err := invoker.InvokeSpeedPriorityLiteForge(
-		ctx,
-		"insufficient-reason-analysis",
-		materials,
-		[]aitool.ToolOption{
-			aitool.WithStringParam("analysis", aitool.WithParam_Description("Analysis of why results are insufficient"), aitool.WithParam_Required(true)),
-		},
-		aicommon.WithLiteForgeStaticInstruction(insufficientReasonStaticInstruction),
-	)
-	if err != nil || forgeResult == nil {
-		return ""
-	}
-
-	return strings.TrimSpace(forgeResult.GetString("analysis"))
-}
 
 func collectResearchData(loop *reactloops.ReActLoop) (allCompressedResults []string, artifactFiles []string) {
 	maxIterations := loop.GetCurrentIterationIndex()
@@ -303,7 +206,8 @@ func generateAndOutputFinalReport(loop *reactloops.ReActLoop, invoker aicommon.A
 	allCompressedResults, artifactFiles := collectResearchData(loop)
 	hasResults := len(allCompressedResults) > 0 && searchResultsSummary != ""
 
-	ctx := loop.GetConfig().GetContext()
+	config := loop.GetConfig()
+	ctx := config.GetContext()
 
 	var report strings.Builder
 
@@ -350,18 +254,63 @@ func generateAndOutputFinalReport(loop *reactloops.ReActLoop, invoker aicommon.A
 		report.WriteString(mergedContent)
 		report.WriteString("\n\n")
 
-		smart := evaluateSMART(ctx, invoker, userQuery, searchResultsSummary, searchHistory)
 		report.WriteString("## S.M.A.R.T Evaluation\n\n")
-		if smart != nil {
-			report.WriteString("| Dimension | Evaluation |\n")
-			report.WriteString("|-----------|------------|\n")
-			report.WriteString(fmt.Sprintf("| **S**pecific | %s |\n", smart.Specific))
-			report.WriteString(fmt.Sprintf("| **M**easurable | %s |\n", smart.Measurable))
-			report.WriteString(fmt.Sprintf("| **A**chievable | %s |\n", smart.Achievable))
-			report.WriteString(fmt.Sprintf("| **R**elevant | %s |\n", smart.Relevant))
-			report.WriteString(fmt.Sprintf("| **T**ime-bound | %s |\n", smart.TimeBound))
-			report.WriteString(fmt.Sprintf("\n**Overall**: %s\n\n", smart.Overall))
-		} else {
+		smartEvalWritten := false
+		config.ScheduleAuxiliaryTask(ctx,
+			aicommon.CallerLabelSmartEvaluation,
+			func() string {
+				resultPreview := searchResultsSummary
+				if len(resultPreview) > 4096 {
+					resultPreview = resultPreview[:4096] + "\n...(truncated)"
+				}
+				promptTemplate := `<user_query>
+{{ .userQuery }}
+</user_query>
+
+<search_history>
+{{ .searchHistory }}
+</search_history>
+
+<search_results>
+{{ .searchResults }}
+</search_results>
+`
+				materials, err := utils.RenderTemplate(promptTemplate, map[string]any{
+					"userQuery":     userQuery,
+					"searchHistory": searchHistory,
+					"searchResults": resultPreview,
+				})
+				if err != nil {
+					log.Warnf("SMART evaluation template render failed: %v", err)
+					return ""
+				}
+				return materials
+			},
+			func(action *aicommon.Action) {
+				smartEvalWritten = true
+				smart := &smartEvaluation{
+					Specific:   strings.TrimSpace(action.GetString("specific")),
+					Measurable: strings.TrimSpace(action.GetString("measurable")),
+					Achievable: strings.TrimSpace(action.GetString("achievable")),
+					Relevant:   strings.TrimSpace(action.GetString("relevant")),
+					TimeBound:  strings.TrimSpace(action.GetString("time_bound")),
+					Overall:    strings.TrimSpace(action.GetString("overall")),
+				}
+				report.WriteString("| Dimension | Evaluation |\n")
+				report.WriteString("|-----------|------------|\n")
+				report.WriteString(fmt.Sprintf("| **S**pecific | %s |\n", smart.Specific))
+				report.WriteString(fmt.Sprintf("| **M**easurable | %s |\n", smart.Measurable))
+				report.WriteString(fmt.Sprintf("| **A**chievable | %s |\n", smart.Achievable))
+				report.WriteString(fmt.Sprintf("| **R**elevant | %s |\n", smart.Relevant))
+				report.WriteString(fmt.Sprintf("| **T**ime-bound | %s |\n", smart.TimeBound))
+				report.WriteString(fmt.Sprintf("\n**Overall**: %s\n\n", smart.Overall))
+			},
+			aicommon.WithAuxiliaryOutputs(smartEvaluationOutputs...),
+			aicommon.WithAuxiliaryOpts(
+				aicommon.WithLiteForgeStaticInstruction(smartEvaluationStaticInstruction),
+			),
+		)
+		if !smartEvalWritten {
 			report.WriteString("S.M.A.R.T evaluation could not be generated.\n\n")
 		}
 
@@ -410,10 +359,49 @@ func generateAndOutputFinalReport(loop *reactloops.ReActLoop, invoker aicommon.A
 		}
 
 		report.WriteString("## Analysis: Why Results Are Insufficient\n\n")
-		insufficientReason := evaluateInsufficientReason(ctx, invoker, userQuery, searchResultsSummary, searchHistory)
-		if insufficientReason != "" {
-			report.WriteString(insufficientReason)
-		} else {
+		insufficientReasonWritten := false
+		config.ScheduleAuxiliaryTask(ctx,
+			aicommon.CallerLabelInsufficientReasonAnalysis,
+			func() string {
+				resultPreview := searchResultsSummary
+				if len(resultPreview) > 2048 {
+					resultPreview = resultPreview[:2048] + "\n...(truncated)"
+				}
+				promptTemplate := `<user_query>
+{{ .userQuery }}
+</user_query>
+
+<search_history>
+{{ .searchHistory }}
+</search_history>
+
+<partial_results>
+{{ .searchResults }}
+</partial_results>
+`
+				materials, err := utils.RenderTemplate(promptTemplate, map[string]any{
+					"userQuery":     userQuery,
+					"searchHistory": searchHistory,
+					"searchResults": resultPreview,
+				})
+				if err != nil {
+					return ""
+				}
+				return materials
+			},
+			func(action *aicommon.Action) {
+				analysis := strings.TrimSpace(action.GetString("analysis"))
+				if analysis != "" {
+					insufficientReasonWritten = true
+					report.WriteString(analysis)
+				}
+			},
+			aicommon.WithAuxiliaryOutputs(insufficientReasonOutputs...),
+			aicommon.WithAuxiliaryOpts(
+				aicommon.WithLiteForgeStaticInstruction(insufficientReasonStaticInstruction),
+			),
+		)
+		if !insufficientReasonWritten {
 			report.WriteString("The search results did not contain sufficient information directly relevant to the user's question. ")
 			report.WriteString("This may be due to the topic being too niche, the information not being publicly available, ")
 			report.WriteString("or the search keywords not matching the available content.\n")

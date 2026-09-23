@@ -85,14 +85,17 @@ func (c *Config) finalizeTierConsumption(tier consts.ModelTier, estimatedInputTo
 	// InputTokens (PromptTokens) includes cached tokens; subtract them so
 	// the recorded input consumption reflects non-cached input only.
 	inputTokens := metrics.InputTokens - metrics.CacheHitTokens
-	c.AddTierConsumption(
+	c.AddTierModelConsumption(
 		tier,
+		ModelConsumptionIdentity{
+			ProviderType:  rsp.GetProviderName(),
+			ModelName:     rsp.GetModelName(),
+			ThinkingLevel: rsp.GetThinkingLevel(),
+		},
 		inputTokens,
 		metrics.OutputTokens,
+		metrics.CacheHitTokens,
 	)
-	if metrics.CacheHitTokens > 0 {
-		c.AddTierCacheHitToken(tier, metrics.CacheHitTokens)
-	}
 	return metrics
 }
 

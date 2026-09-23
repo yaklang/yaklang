@@ -2137,6 +2137,7 @@ message AIOutputEvent {
   string AIModelVerboseName = 23; // AI 模型展示名称（美化后的模型名）
 
   string TaskUUID = 21; // 任务的唯一ID
+  string SessionId = 26; // AI 会话的唯一ID
 }
 
 message I18n {
@@ -2340,6 +2341,8 @@ message AIStartParams {
   // 为 true 时禁用 Memory Triage（智能记忆处理），不创建 AIMemory 实例，
   // 跳过 embedding/DB/AI 调用。适用于轻量级或无状态会话。
   bool DisableMemoryTriage = 49;
+  // Session-local opt-in; a globally enabled single-model mode still wins.
+  bool SingleModelMode = 50;
 }
 
 message AIExecutionStrategy {
@@ -9505,6 +9508,8 @@ message AIModelConfig {
 }
 
 message AIGlobalConfig {
+  // Legacy compatibility field. Runtime routing is controlled by the presence
+  // of AIGlobalConfig and no longer reads this value.
   bool Enabled = 1;
   string RoutingPolicy = 2;
   bool DisableFallback = 3;
@@ -9515,6 +9520,8 @@ message AIGlobalConfig {
   repeated AIModelConfig VisionModels = 8;
   string AIPresetPrompt = 9;
   string AIPlanPrompt = 10;
+  // Single-model routing takes precedence over tier selection without deleting tier lists.
+  bool SingleModelMode = 11;
 }
 
 // Local Model Messages

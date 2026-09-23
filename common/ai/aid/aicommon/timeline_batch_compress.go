@@ -112,7 +112,7 @@ func (m *Timeline) compressForSizeLimitLocked() {
 	// Control-plane mutations must be materialized before ordinary facts are sent
 	// to a reducer. They are excluded from activeIDs and reducer prompts below.
 	m.forcePromoteAllLocked()
-	if m.ai == nil || m.totalDumpContentLimit <= 0 {
+	if m.config == nil || m.totalDumpContentLimit <= 0 {
 		return
 	}
 
@@ -209,9 +209,9 @@ func (m *Timeline) batchCompressOldestWithRecent(toCompress []*TimelineItem, rec
 		return
 	}
 
-	// If AI is nil, use emergency compress instead
-	if m.ai == nil {
-		log.Warnf("batch compress: AI is nil, using emergency compress")
+	// Compression is scheduled by the bound Config.
+	if m.config == nil {
+		log.Warnf("batch compress: Config is nil, using emergency compress")
 		m.emergencyCompress(MaxTimelineSaveSize)
 		return
 	}
@@ -273,128 +273,92 @@ func (m *Timeline) batchCompressOldestWithRecent(toCompress []*TimelineItem, rec
 		oldHeadText = strings.TrimSpace(m.compressedHead.Text)
 	}
 
-	// 生成压缩提示（双段：RECENT_KEEP + ITEMS_TO_COMPRESS + token 预算）
 	nonceStr := utils.RandStringBytes(4)
-	// The existing head is retained deterministically by the host below. Do not
-	// send it back to the reducer: asking the model to copy it and then prepending
-	// it again duplicates history and consumes an ever-growing prompt budget.
-	prompt := m.renderBatchCompressPrompt(toCompress, recentKeep, nonceStr, inputTokenEstimate, outputTokenBudget)
-	if prompt == "" {
-		// If prompt is empty, fall back to emergency compress
-		log.Warnf("batch compress: prompt is empty, falling back to emergency compress")
-		m.emergencyCompress(MaxTimelineSaveSize)
-		return
-	}
+	promptBuilt := false
+	m.config.ScheduleAuxiliaryTask(m.config.GetContext(),
+		CallerLabelTimelineBatchCompress,
+		func() string {
+			promptBuilt = true
+			prompt := m.renderBatchCompressPromptWithSchema(toCompress, recentKeep, nonceStr, inputTokenEstimate, outputTokenBudget, "")
+			if prompt == "" {
+				m.emergencyCompress(MaxTimelineSaveSize)
+			}
+			return prompt
+		},
+		func(action *Action) {
+			// 解析结构化字段，拼成分段文本
+			compressedMemory := buildStructuredCompressedMemory(action)
+			if compressedMemory == "" {
+				// 兜底：如果结构化字段全空，尝试旧格式 reducer_memory
+				compressedMemory = action.GetString("reducer_memory")
+			}
+			if compressedMemory == "" {
+				log.Warn("================================================================")
+				log.Warn("================================================================")
+				log.Warn("batch compress got empty compressed memory, action dumpped: ")
+				fmt.Println(action.GetParams())
+				log.Warn("================================================================")
+				log.Warn("================================================================")
+				return
+			}
 
-	// 调用 AI 进行批量压缩
-	var action *Action
-	err = CallAITransaction(m.config, prompt, m.ai.CallSpeedPriorityAI, func(response *AIResponse) error {
-		var boundEmitter *Emitter
-		if m.config != nil {
-			boundEmitter = response.BindEmitter(m.config.GetEmitter())
-		}
-		var r io.Reader
-		if m.config == nil {
-			r = response.GetUnboundStreamReader(false)
-		} else {
-			r = response.GetOutputStreamReader("batch-compress", true, m.config.GetEmitter())
-		}
+			// post-check: 如果 AI 输出超标，规则截断低优先级字段
+			compressedMemory = enforceOutputTokenBudget(compressedMemory, outputTokenBudget)
 
-		// 为每个结构化字段注册 stream handler，实时 emit 到 UI
-		fieldHandlers := []string{
-			"key_findings", "active_config", "completed_work",
-			"open_failures", "failed_and_resolved", "discarded", "user_directives",
-		}
-		streamHandlers := make([]ActionMakerOption, 0, len(fieldHandlers)+2)
-		streamHandlers = append(streamHandlers,
-			WithActionNonce(nonceStr),
-		)
-		for _, fieldName := range fieldHandlers {
-			fn := fieldName // capture
-			streamHandlers = append(streamHandlers, WithActionFieldStreamHandler(
-				[]string{fn},
-				func(key string, reader io.Reader) {
-					if boundEmitter == nil {
+			// 旧 head 前置拼接（不二次压缩）
+			finalText := compressedMemory
+			if oldHeadText != "" {
+				finalText = oldHeadText + "\n\n" + compressedMemory
+			}
+
+			// 如果拼接后 head 超预算，触发 head-only 精简
+			if TokenCountExceeds64(finalText, outputTokenBudget) {
+				finalText = m.refineCompressedHeadLocked(finalText, outputTokenBudget, nonceStr)
+			}
+
+			// 存储压缩结果（单有效压缩段）
+			lastCompressedId := idsToRemove[len(idsToRemove)-1]
+			var lastCompressedTs int64
+			if ts, ok := m.idToTs.Get(lastCompressedId); ok {
+				lastCompressedTs = ts
+			}
+			m.updateCompressedHead(&TimelineCompressedHead{
+				Text:             strings.TrimSpace(finalText),
+				CoveredEndItemID: lastCompressedId,
+				CoveredEndAtMs:   lastCompressedTs,
+			})
+			log.Infof("batch compressed %d items into reducer at id: %v", len(toCompress), lastCompressedId)
+
+			// 标记被压缩的 items 为非活跃
+			for _, id := range idsToRemove {
+				if item, ok := m.idToTimelineItem.Get(id); ok && item != nil {
+					item.deleted = true
+				}
+			}
+		},
+		WithAuxiliaryOutputSchema("timeline-reducer", timelineReducerSchema),
+		WithAuxiliaryOnError(func(err error) {
+			log.Warnf("batch compress call ai failed: %v", err)
+		}),
+		WithAuxiliaryOpts(
+			WithLiteForgeDisableTimeline(),
+			WithGeneralConfigExtraRequestOpts(WithAIRequest_CallerLabel(CallerLabelTimelineBatchCompress)),
+			WithGeneralConfigStreamableFieldResponseCallback(timelineReducerFields,
+				func(key string, reader io.Reader, response *AIResponse, emitter *Emitter) {
+					if emitter == nil {
 						io.Copy(io.Discard, reader)
 						return
 					}
-					boundEmitter.EmitDefaultSystemStreamEvent(
-						"memory-timeline",
-						utils.JSONStringReader(reader),
-						response.GetTaskIndex(),
-						func() {
-							log.Infof("memory-timeline field [%s] streamed", fn)
-						},
-					)
-				},
-			))
-		}
-
-		var extractErr error
-		action, extractErr = ExtractActionFromStream(
-			m.config.GetContext(),
-			r, "timeline-reducer",
-			streamHandlers...,
-		)
-		if extractErr != nil {
-			log.Errorf("extract timeline batch compress action failed: %v", extractErr)
-			return utils.Errorf("extract timeline reducer action failed: %v", extractErr)
-		}
-		return nil
-	}, WithAIRequest_CallerLabel("timeline-batch-compress"))
-	if err != nil {
-		log.Warnf("batch compress call ai failed: %v", err)
-		return
-	}
-
-	// 解析结构化字段，拼成分段文本
-	compressedMemory := buildStructuredCompressedMemory(action)
-	if compressedMemory == "" {
-		// 兜底：如果结构化字段全空，尝试旧格式 reducer_memory
-		compressedMemory = action.GetString("reducer_memory")
-	}
-	if compressedMemory == "" {
-		log.Warn("================================================================")
-		log.Warn("================================================================")
-		log.Warn("batch compress got empty compressed memory, action dumpped: ")
-		fmt.Println(action.GetParams())
-		log.Warn("================================================================")
-		log.Warn("================================================================")
-		return
-	}
-
-	// post-check: 如果 AI 输出超标，规则截断低优先级字段
-	compressedMemory = enforceOutputTokenBudget(compressedMemory, outputTokenBudget)
-
-	// 旧 head 前置拼接（不二次压缩）
-	finalText := compressedMemory
-	if oldHeadText != "" {
-		finalText = oldHeadText + "\n\n" + compressedMemory
-	}
-
-	// 如果拼接后 head 超预算，触发 head-only 精简
-	if TokenCountExceeds64(finalText, outputTokenBudget) {
-		finalText = m.refineCompressedHeadLocked(finalText, outputTokenBudget, nonceStr)
-	}
-
-	// 存储压缩结果（单有效压缩段）
-	lastCompressedId := idsToRemove[len(idsToRemove)-1]
-	var lastCompressedTs int64
-	if ts, ok := m.idToTs.Get(lastCompressedId); ok {
-		lastCompressedTs = ts
-	}
-	m.updateCompressedHead(&TimelineCompressedHead{
-		Text:             strings.TrimSpace(finalText),
-		CoveredEndItemID: lastCompressedId,
-		CoveredEndAtMs:   lastCompressedTs,
-	})
-	log.Infof("batch compressed %d items into reducer at id: %v", len(toCompress), lastCompressedId)
-
-	// 标记被压缩的 items 为非活跃
-	for _, id := range idsToRemove {
-		if item, ok := m.idToTimelineItem.Get(id); ok && item != nil {
-			item.deleted = true
-		}
+					emitter.EmitDefaultSystemStreamEvent("memory-timeline",
+						utils.JSONStringReader(reader), response.GetTaskIndex(), func() {
+							log.Infof("memory-timeline field [%s] streamed", key)
+						})
+				}),
+		),
+	)
+	if !promptBuilt {
+		// A skipped reducer must still enforce the storage bound.
+		m.emergencyCompress(MaxTimelineSaveSize)
 	}
 }
 
@@ -410,6 +374,14 @@ const MaxBatchCompressRecentSize = 16 * 1024
 //go:embed prompts/timeline/batch_compress.txt
 var timelineBatchCompress string
 
+//go:embed prompts/timeline/reducer.json
+var timelineReducerSchema string
+
+var timelineReducerFields = []string{
+	"key_findings", "active_config", "completed_work", "open_failures",
+	"failed_and_resolved", "discarded", "user_directives",
+}
+
 // renderBatchCompressPrompt 渲染双段 batch compress prompt:
 //
 //	RECENT_KEEP   - 最新保留段，作为压缩参考"现在 agent 在做什么"，AI 不修改它
@@ -422,6 +394,12 @@ var timelineBatchCompress string
 //
 // 关键词: renderBatchCompressPrompt, RECENT_KEEP, ITEMS_TO_COMPRESS, prompt 预算分配
 func (m *Timeline) renderBatchCompressPrompt(toCompress []*TimelineItem, recentKeep []*TimelineItem, nonceStr string, inputTokenEstimate int64, outputTokenBudget int64) string {
+	return m.renderBatchCompressPromptWithSchema(toCompress, recentKeep, nonceStr, inputTokenEstimate, outputTokenBudget, timelineReducerSchema)
+}
+
+// The LiteForge path supplies the schema separately; legacy prompt consumers
+// can still render a self-contained prompt through renderBatchCompressPrompt.
+func (m *Timeline) renderBatchCompressPromptWithSchema(toCompress []*TimelineItem, recentKeep []*TimelineItem, nonceStr string, inputTokenEstimate int64, outputTokenBudget int64, outputSchema string) string {
 	if len(toCompress) == 0 {
 		return ""
 	}
@@ -486,6 +464,7 @@ func (m *Timeline) renderBatchCompressPrompt(toCompress []*TimelineItem, recentK
 		"ItemCount":          actualItemCount,
 		"InputTokenEstimate": inputTokenEstimate,
 		"OutputTokenBudget":  outputTokenBudget,
+		"OutputSchema":       outputSchema,
 		"NONCE":              nonce,
 	})
 	if err != nil {
@@ -814,7 +793,7 @@ func joinCompressedHeadSections(sections []compressedHeadSection) string {
 // key_findings/open_failures/active_config/user_directives。
 // 关键词: refineCompressedHead, head-only 精简, head 累积控制
 func (m *Timeline) refineCompressedHeadLocked(headText string, budget int64, nonceStr string) string {
-	if m.ai == nil || headText == "" || budget <= 0 {
+	if headText == "" || budget <= 0 {
 		return headText
 	}
 
@@ -822,68 +801,39 @@ func (m *Timeline) refineCompressedHeadLocked(headText string, budget int64, non
 	if !TokenCountExceeds64(headText, budget) {
 		return headText
 	}
-
-	// 构建 head 精简 prompt
-	refinePrompt := buildRefineHeadPrompt(headText, budget, nonceStr)
-	if refinePrompt == "" {
+	if m.config == nil {
 		return enforceOutputTokenBudget(headText, budget)
 	}
 
-	var action *Action
-	err := CallAITransaction(m.config, refinePrompt, m.ai.CallSpeedPriorityAI, func(response *AIResponse) error {
-		var r io.Reader
-		if m.config == nil {
-			r = response.GetUnboundStreamReader(false)
-		} else {
-			r = response.GetOutputStreamReader("head-refine", true, m.config.GetEmitter())
-		}
-
-		fieldHandlers := []string{
-			"key_findings", "active_config", "completed_work",
-			"open_failures", "failed_and_resolved", "discarded", "user_directives",
-		}
-		streamHandlers := make([]ActionMakerOption, 0, len(fieldHandlers)+1)
-		streamHandlers = append(streamHandlers, WithActionNonce(nonceStr))
-		for _, fieldName := range fieldHandlers {
-			streamHandlers = append(streamHandlers, WithActionFieldStreamHandler(
-				[]string{fieldName},
-				func(key string, reader io.Reader) {
-					io.Copy(io.Discard, reader)
-				},
-			))
-		}
-
-		var extractErr error
-		action, extractErr = ExtractActionFromStream(
-			m.config.GetContext(),
-			r, "timeline-reducer",
-			streamHandlers...,
-		)
-		if extractErr != nil {
-			return utils.Errorf("extract head refine action failed: %v", extractErr)
-		}
-		return nil
-	}, WithAIRequest_CallerLabel("timeline-head-refine"))
-
-	if err != nil || action == nil {
-		log.Warnf("head refine AI call failed: %v, falling back to rule-based truncation", err)
-		return enforceOutputTokenBudget(headText, budget)
-	}
-
-	refined := buildStructuredCompressedMemory(action)
-	if refined == "" {
-		return enforceOutputTokenBudget(headText, budget)
-	}
-
-	// 确保 refined 不超过预算
-	if TokenCountExceeds64(refined, budget) {
-		refined = enforceOutputTokenBudget(refined, budget)
-	}
+	refined := enforceOutputTokenBudget(headText, budget)
+	m.config.ScheduleAuxiliaryTask(m.config.GetContext(),
+		CallerLabelTimelineHeadRefine,
+		func() string { return renderRefineHeadPrompt(headText, budget, nonceStr, "") },
+		func(action *Action) {
+			if text := buildStructuredCompressedMemory(action); text != "" {
+				refined = enforceOutputTokenBudget(text, budget)
+			}
+		},
+		WithAuxiliaryOutputSchema("timeline-reducer", timelineReducerSchema),
+		WithAuxiliaryOnError(func(err error) {
+			log.Warnf("head refine AI call failed: %v, falling back to rule-based truncation", err)
+		}),
+		WithAuxiliaryOpts(
+			WithLiteForgeDisableTimeline(),
+			WithGeneralConfigExtraRequestOpts(WithAIRequest_CallerLabel(CallerLabelTimelineHeadRefine)),
+			WithGeneralConfigStreamableFieldCallback(timelineReducerFields,
+				func(_ string, reader io.Reader) { io.Copy(io.Discard, reader) }),
+		),
+	)
 	return refined
 }
 
 // buildRefineHeadPrompt 构建 head-only 精简 prompt
 func buildRefineHeadPrompt(headText string, budget int64, nonceStr string) string {
+	return renderRefineHeadPrompt(headText, budget, nonceStr, timelineReducerSchema)
+}
+
+func renderRefineHeadPrompt(headText string, budget int64, nonceStr, outputSchema string) string {
 	const refineTemplate = `# 角色与核心目标
 
 你是一个 **AI 记忆精简模块**。当前的任务是对一段已压缩的历史摘要进行**精简**，使其 token 数不超过 {{ .OutputTokenBudget }}。
@@ -910,22 +860,7 @@ func buildRefineHeadPrompt(headText string, budget int64, nonceStr string) strin
 
 输出与原始压缩段相同的结构化 JSON 格式：
 
-` + "```schema" + `
-{
-  "type": "object",
-  "required": ["@action", "key_findings", "open_failures"],
-  "properties": {
-    "@action": { "const": "timeline-reducer" },
-    "key_findings": { "type": "array", "items": { "type": "string" }, "minItems": 1 },
-    "active_config": { "type": "string" },
-    "completed_work": { "type": "string" },
-    "open_failures": { "type": "string" },
-    "failed_and_resolved": { "type": "string" },
-    "discarded": { "type": "string" },
-    "user_directives": { "type": "string" }
-  }
-}
-` + "```" + `
+{{ .OutputSchema }}
 `
 
 	ins, err := template.New("timeline-head-refine").Parse(refineTemplate)
@@ -943,6 +878,7 @@ func buildRefineHeadPrompt(headText string, budget int64, nonceStr string) strin
 	err = ins.Execute(&buf, map[string]any{
 		"HeadText":          headText,
 		"OutputTokenBudget": budget,
+		"OutputSchema":      outputSchema,
 		"NONCE":             nonce,
 	})
 	if err != nil {

@@ -3,6 +3,7 @@ package ssaconfig
 import (
 	"time"
 
+	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
@@ -24,8 +25,12 @@ const (
 const DefaultScanRuleWorkLimit int64 = 50_000
 
 type SyntaxFlowConfig struct {
-	Memory          bool                  `json:"memory"`
-	ResultSaveKind  SFResultSaveKind      `json:"result_save_kind"`
+	Memory         bool             `json:"memory"`
+	ResultSaveKind SFResultSaveKind `json:"result_save_kind"`
+	// NoSaveRisk prevents SyntaxFlow risks and audit result data from being
+	// persisted. Scan task state is still recorded, and risks remain available
+	// to output/report callbacks.
+	NoSaveRisk      bool                  `json:"no_save_risk"`
 	ProcessCallback func(float64, string) `json:"-"`
 }
 
@@ -71,6 +76,15 @@ func (c *Config) GetSyntaxFlowResultKind() SFResultSaveKind {
 		return SFResultSaveNone
 	}
 	return c.SyntaxFlow.ResultSaveKind
+}
+
+// IsNoSaveRisk reports whether scan results must be kept out of the
+// SSA database. See SyntaxFlowConfig.NoSaveRisk.
+func (c *Config) IsNoSaveRisk() bool {
+	if c == nil || c.SyntaxFlow == nil {
+		return false
+	}
+	return c.SyntaxFlow.NoSaveRisk
 }
 
 func (c *Config) SetSyntaxFlowResultKind(resultKind SFResultSaveKind) {
@@ -203,6 +217,38 @@ func WithSyntaxFlowMemory(memory bool) Option {
 			return err
 		}
 		c.SyntaxFlow.Memory = memory
+		return nil
+	}
+}
+
+// WithSyntaxFlowResultKind declares how a scan result is persisted: database
+// (default for scan tasks), memory (kept in process only), or none.
+func WithSyntaxFlowResultKind(kind SFResultSaveKind) Option {
+	return func(c *Config) error {
+		if err := c.ensureSyntaxFlow("Result Save Kind"); err != nil {
+			return err
+		}
+		c.SyntaxFlow.ResultSaveKind = kind
+		return nil
+	}
+}
+
+// WithNoSaveRisk prevents risks and audit result data from being
+// persisted while keeping them available to output/report callbacks. It is
+// valid during compile mode because struct rules save through the same result
+// path after compilation.
+func WithNoSaveRisk(noSaveRisk bool) Option {
+	return func(c *Config) error {
+		if c == nil {
+			return nil
+		}
+		if c.Mode&(ModeSyntaxFlow|ModeSyntaxFlowScanManager|modeSSACompile) == 0 {
+			return utils.Errorf("Config: No Save Risk can only be set in Scan or Compile mode")
+		}
+		if c.SyntaxFlow == nil {
+			c.SyntaxFlow = defaultSyntaxFlowConfig()
+		}
+		c.SyntaxFlow.NoSaveRisk = noSaveRisk
 		return nil
 	}
 }

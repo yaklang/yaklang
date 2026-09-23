@@ -235,6 +235,10 @@ func SubmitValueFeedback(cfg *Config, record *ValueFeedbackRecord) {
 	if cfg == nil || record == nil {
 		return
 	}
+	// Single-model simple mode: skip value feedback AI calls.
+	if cfg.IsSingleAIModelMode() {
+		return
+	}
 	valueFeedbackSubmitterMu.RLock()
 	submitter := valueFeedbackSubmitter
 	valueFeedbackSubmitterMu.RUnlock()
@@ -286,7 +290,7 @@ func (c *Config) SubmitReviewValueFeedbackFromEndpoint(ep *Endpoint, focusMode s
 // 不预先下训练标签. trackChanged=true 时才精确比对参数是否被编辑 (仅工具审批可靠).
 // 全程 recover + 非阻塞, 绝不影响主流程.
 func (c *Config) submitReviewValueFeedback(ep *Endpoint, focusMode, reviewQuestion string, originalParams, finalParams aitool.InvokeParams, trackChanged bool) {
-	if c == nil || ep == nil {
+	if c == nil || ep == nil || c.IsSingleAIModelMode() {
 		return
 	}
 	defer func() {
@@ -404,7 +408,7 @@ func (c *Config) submitReviewValueFeedback(ep *Endpoint, focusMode, reviewQuesti
 // 确认交互时, 应组装 RiskFeedback.Source=RiskFeedbackSourceHuman 且 IsFalsePositive
 // 明确 (true/false) 的记录再调 SubmitValueFeedback 提交, 此处仅预留说明不落地代码.
 func (c *Config) SubmitToolRiskFeedback(focusMode string, risks []*schema.Risk) {
-	if c == nil || len(risks) == 0 {
+	if c == nil || len(risks) == 0 || c.IsSingleAIModelMode() {
 		return
 	}
 	defer func() {

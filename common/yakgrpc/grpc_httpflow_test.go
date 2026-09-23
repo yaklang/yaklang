@@ -16,9 +16,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/bytedance/mockey"
 	"github.com/stretchr/testify/assert"
-	"github.com/yaklang/yaklang/common/yak/yaklib"
 
 	"github.com/davecgh/go-spew/spew"
 	"github.com/google/uuid"
@@ -1702,7 +1700,7 @@ Content-Length: 10
 }
 
 func TestDoHTTPFlowsToOnline(t *testing.T) {
-	db := consts.GetGormProjectDatabase()
+	db := newOnlineTestDB(t, &schema.HTTPFlow{}, &schema.ExtractedData{}, &schema.WebsocketFlow{}, &schema.ProjectGeneralStorage{})
 	token := utils.RandStringBytes(5)
 	url1 := "http://" + token + ".com"
 	flow1, err := yakit.CreateHTTPFlow(
@@ -1712,42 +1710,39 @@ func TestDoHTTPFlowsToOnline(t *testing.T) {
 
 	require.NoError(t, err)
 	require.NoError(t, yakit.InsertHTTPFlow(db, flow1))
-	defer yakit.DeleteHTTPFlowByID(db, int64(flow1.ID))
+	require.NoError(t, db.Create(&schema.ExtractedData{SourceType: "httpflow", TraceId: flow1.HiddenIndex, Data: "associated-data"}).Error)
 
-	mockey.PatchConvey("skip token check", t, func() {
-		mockClient := new(yaklib.OnlineClient)
-
-		// 总是成功返回
-		mockey.Mock((*yaklib.OnlineClient).UploadHTTPFlowToOnline).
-			To(func(_ *yaklib.OnlineClient, ctx context.Context, req *ypb.HTTPFlowsToOnlineRequest, data []byte) error {
-				var tmp HTTPFlowShare
-				_ = json.Unmarshal(data, &tmp)
-				return nil
-			}).Build()
-
-		mockey.Mock(yaklib.NewOnlineClient).
-			To(func(baseUrl string) *yaklib.OnlineClient {
-				return mockClient
-			}).Build()
-
-		server := &TestServerWrapper{
-			Server:       &Server{},
-			onlineClient: yaklib.OnlineClient{},
+	calls := 0
+	remote := &stubOnlineService{uploadFlow: func(ctx context.Context, req *ypb.HTTPFlowsToOnlineRequest, data []byte) error {
+		calls++
+		assert.Equal(t, "test-token", req.Token)
+		var tmp HTTPFlowShare
+		if err := json.Unmarshal(data, &tmp); err != nil {
+			return err
 		}
-
-		toOnlineReq := &ypb.HTTPFlowsToOnlineRequest{
-			Token:       "test-token",
-			ProjectName: "test-project",
+		assert.Equal(t, flow1.Hash, tmp.HTTPFlow.Hash)
+		assert.Equal(t, url1, tmp.HTTPFlow.Url)
+		if assert.Len(t, tmp.ExtractedList, 1) {
+			assert.Equal(t, "associated-data", tmp.ExtractedList[0].Data)
 		}
+		assert.Contains(t, string(data), token)
+		return nil
+	}}
+	server := &Server{projectDatabase: db, onlineClient: remote}
 
-		success, failed, err := server.DoHTTPFlowsSync(context.Background(), db, toOnlineReq)
+	toOnlineReq := &ypb.HTTPFlowsToOnlineRequest{
+		Token:       "test-token",
+		ProjectName: "test-project",
+	}
 
-		// 验证结果
-		assert.NoError(t, err)
-		assert.NotNil(t, success)
-		assert.Contains(t, success, flow1.Hash)
-		assert.Empty(t, failed)
-	})
+	success, failed, err := server.DoHTTPFlowsSync(context.Background(), db, toOnlineReq)
+
+	// 验证结果
+	assert.NoError(t, err)
+	assert.NotNil(t, success)
+	assert.Contains(t, success, flow1.Hash)
+	assert.Empty(t, failed)
+	require.Equal(t, 1, calls)
 }
 
 // TestGRPCMUSTPASS_Export_HAR_WithFieldSelection 测试 HAR 导出的字段选择功能

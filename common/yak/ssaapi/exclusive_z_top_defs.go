@@ -35,12 +35,18 @@ func (i *Value) GetTopDefs(opt ...OperationOption) (ret Values) {
 	actx := NewAnalyzeContext(opt...)
 	actx.Self = i
 	actx.direct = TopDefAnalysis
+	if actx.widen != nil {
+		defer func() { lastWidenTrace.Store(actx.widen) }()
+	}
 	ret = i.getTopDefs(actx, opt...)
 	if actx.HasUntilNode() {
 		ret = actx.untilMatch
 	}
 	if ret.Count() > dataflowValueLimit {
 		log.Warnf("Value TopDef too many: %d: %s", ret.Count(), i.StringForDataflowWarn())
+		if report := actx.widenReport(); report != "" {
+			log.Warnf("Value TopDef widening: %s", report)
+		}
 		return nil
 	}
 	ret = MergeValues(ret)
@@ -116,6 +122,7 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) (result
 	defer func() {
 		actx.depth++
 	}()
+	actx.traceNodeVisit()
 
 	// if inst, ok := ssa.ToLazyInstruction(i.getValue()); ok {
 	// 	var ok bool
@@ -526,6 +533,7 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) (result
 		if actx.AllowIgnoreCallStack() && len(result) == 0 {
 			if fun := i.GetFunction(); fun != nil {
 				call2fun := fun.GetCalledBy()
+				actx.traceCalledByFanout(len(call2fun))
 				for index, call := range call2fun {
 					if index > dataflowValueLimit {
 						log.Warnf("Function %s CalledBy too many: %d", fun.StringForDataflowWarn(), len(call2fun))
@@ -688,9 +696,60 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) (result
 	case *ssa.Make:
 		var values Values
 		values = append(values, i)
+
+		// Field-sensitive fast path.
+		//
+		// Reaching a Make with a pushed (object, key) context means some site
+		// read `object.key` and the trace followed that field here. Resolving
+		// that key directly is both more precise and dramatically cheaper than
+		// enumerating every member: with the full walk each sibling field is
+		// traced in turn, and each of those traces can re-enter this object.
+		//
+		// When the key resolves to nothing here, fall through to the original
+		// enumeration so nothing that used to resolve is dropped.
+		// Only a data object (an instance) can be resolved field-wise. A class
+		// blueprint is a namespace: its members live under the class name and
+		// under derived keys such as "AA-destructor", and rules rely on those
+		// being reached, so blueprints keep the enumeration path.
+		if obj, key, member := actx.getCurrentObject(); obj != nil && obj.GetId() == i.GetId() &&
+			!isBlueprintValue(i) && !isCollectionLikeValue(i) {
+			if matched := resolveKeyedMembers(i, key); len(matched) > 0 {
+				var resolved Values
+				for _, m := range matched {
+					if utils.IsNil(m) {
+						continue
+					}
+					if ValueCompare(m, member) {
+						continue
+					}
+					if err := actx.pushObject(i, m.GetKey(), m); err != nil {
+						continue
+					}
+					resolved = append(resolved, m.getTopDefs(actx, opt...)...)
+					actx.popObject()
+				}
+				// If the keyed members resolve to no value, keep the original
+				// whole-table walk. Some compound initializations (notably C
+				// struct literals) expose positional members under a key that
+				// cannot be resolved field-wise; returning only the Make
+				// carrier here would drop the scalar field definitions.
+				if len(resolved) > 0 {
+					return append(values, resolved...)
+				}
+			}
+		}
+
 		var allmember map[ssa.Value]ssa.Value
 		allmember = inst.GetAllMember()
-		for key, member := range allmember {
+		actx.traceObjectExpansion(len(allmember))
+		// Deterministic order: GetAllMember is a map, and Go randomises map
+		// iteration. Downstream state (recursion budget, visited sets, the
+		// result cap) makes traversal order observable, so an unordered walk
+		// makes the same program produce different results run to run. Sorting
+		// by key id keeps each member visited exactly once and makes the
+		// descent reproducible.
+		for _, pair := range sortedMemberPairs(allmember) {
+			key, member := pair.key, pair.member
 			if utils.IsNil(key) || utils.IsNil(member) {
 				continue
 			}

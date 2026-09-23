@@ -1,14 +1,20 @@
 package yakurl
 
 import (
+	"bufio"
 	"fmt"
+	"io"
 	"io/fs"
 	"net/url"
+	"regexp"
+	"strconv"
 	"strings"
 
+	regexp2 "github.com/VillanCh/go-pcre2-lite/regexp2"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/filesys"
 	fi "github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
+	regexp_utils "github.com/yaklang/yaklang/common/utils/regexp-utils"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
@@ -16,6 +22,136 @@ import (
 
 type fileSystemAction struct {
 	fs fi.FileSystem
+}
+
+func getFirstQueryValue(query url.Values, keys ...string) string {
+	for _, key := range keys {
+		if value := query.Get(key); value != "" {
+			return value
+		}
+	}
+	return ""
+}
+
+func getBoolQueryValue(query url.Values, keys ...string) bool {
+	value := strings.TrimSpace(getFirstQueryValue(query, keys...))
+	return value == "1" || strings.EqualFold(value, "true") || strings.EqualFold(value, "yes")
+}
+
+func (f *fileSystemAction) searchFileContent(path string, matcher *regexp_utils.YakRegexpUtils) ([]*ypb.KVPair, error) {
+	file, err := f.fs.Open(path)
+	if err != nil {
+		return nil, err
+	}
+	defer file.Close()
+
+	reader := bufio.NewReader(file)
+	var matches []*ypb.KVPair
+	for lineNumber := 1; ; lineNumber++ {
+		line, readErr := reader.ReadString('\n')
+		if len(line) > 0 {
+			line = strings.TrimSuffix(line, "\n")
+			line = strings.TrimSuffix(line, "\r")
+			matched, err := matcher.MatchString(line)
+			if err != nil {
+				return nil, utils.Wrapf(err, "cannot match line %d", lineNumber)
+			}
+			if matched {
+				matches = append(matches, &ypb.KVPair{
+					Key:   strconv.Itoa(lineNumber),
+					Value: utils.EscapeInvalidUTF8Byte([]byte(line)),
+				})
+			}
+		}
+		if readErr != nil {
+			if readErr == io.EOF {
+				break
+			}
+			return nil, readErr
+		}
+	}
+	return matches, nil
+}
+
+func (f *fileSystemAction) searchFileResources(
+	originParam *ypb.YakURL,
+	query url.Values,
+	rootPath string,
+	rootInfo fs.FileInfo,
+) ([]*ypb.YakURLResource, error) {
+	keyword := getFirstQueryValue(query, "keyword", "search", "pattern", "query")
+	if keyword == "" {
+		return nil, utils.Error("keyword is required")
+	}
+
+	pattern := keyword
+	if !getBoolQueryValue(query, "regex", "regexp", "isRegex", "useRegex") {
+		pattern = regexp.QuoteMeta(pattern)
+	}
+	var regexpOptions []regexp_utils.YakRegexpUtilsOption
+	if getBoolQueryValue(query, "ignoreCase", "caseInsensitive", "ignore-case") {
+		regexpOptions = append(regexpOptions, regexp_utils.WithRegexpOption(regexp2.IgnoreCase))
+	}
+	matcher := regexp_utils.NewYakRegexpUtils(pattern, regexpOptions...)
+	if !matcher.CanUse() {
+		return nil, utils.Error("invalid search regular expression")
+	}
+
+	var resources []*ypb.YakURLResource
+	searchFile := func(path string, info fs.FileInfo) error {
+		matches, err := f.searchFileContent(path, matcher)
+		if err != nil {
+			return utils.Wrapf(err, "cannot search file[%s]", path)
+		}
+		if len(matches) == 0 {
+			return nil
+		}
+
+		resource := f.fileInfoToResource(originParam, query, info, path, true)
+		resource.Extra = append(resource.Extra, matches...)
+		resources = append(resources, resource)
+		return nil
+	}
+
+	if !rootInfo.IsDir() {
+		if err := searchFile(rootPath, rootInfo); err != nil {
+			return nil, err
+		}
+		return resources, nil
+	}
+
+	global := getBoolQueryValue(query, "global")
+	var searchDirectory func(string) error
+	searchDirectory = func(directory string) error {
+		entries, err := f.fs.ReadDir(directory)
+		if err != nil {
+			return utils.Wrapf(err, "cannot read dir[%s]", directory)
+		}
+		for _, entry := range entries {
+			path := f.fs.Join(directory, entry.Name())
+			if entry.IsDir() {
+				if global {
+					if err := searchDirectory(path); err != nil {
+						return err
+					}
+				}
+				continue
+			}
+
+			info, err := entry.Info()
+			if err != nil {
+				return utils.Wrapf(err, "cannot stat path[%s]", path)
+			}
+			if err := searchFile(path, info); err != nil {
+				return err
+			}
+		}
+		return nil
+	}
+	if err := searchDirectory(rootPath); err != nil {
+		return nil, err
+	}
+	return resources, nil
 }
 
 func (f *fileSystemAction) fileInfoToResource(originParam *ypb.YakURL, query url.Values, info fs.FileInfo, currentPath string, inDir bool) *ypb.YakURLResource {
@@ -95,6 +231,11 @@ func (f *fileSystemAction) fileInfoToResource(originParam *ypb.YakURL, query url
 func (f fileSystemAction) Get(params *ypb.RequestYakURLParams) (*ypb.RequestYakURLResponse, error) {
 	// available query:
 	// op=list # list directory
+	// op=search&keyword=xxx # search file content
+	// global=true # recursively search subdirectories
+	// regex=true # treat keyword as a Go regular expression
+	// ignoreCase=true # case-insensitive matching
+	// search result Extra: Key is the one-based line number, Value is the complete line
 	// detectPlainText=true # detect if file is plain text, return: IsPlainText:true/false
 	u := params.GetUrl()
 	fs := f.fs
@@ -129,6 +270,11 @@ func (f fileSystemAction) Get(params *ypb.RequestYakURLParams) (*ypb.RequestYakU
 				currentPath := fs.Join(params.GetUrl().Path, info.Name())
 				res = append(res, f.fileInfoToResource(params.GetUrl(), query, info, currentPath, true))
 			}
+		}
+	case "search":
+		res, err = f.searchFileResources(params.GetUrl(), query, absPath, info)
+		if err != nil {
+			return nil, err
 		}
 	default:
 		res = append(res, f.fileInfoToResource(params.GetUrl(), query, info, absPath, false))

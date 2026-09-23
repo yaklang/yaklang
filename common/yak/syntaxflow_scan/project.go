@@ -765,6 +765,10 @@ func loadNamedPrograms(cfg *Config) error {
 
 func structCompileOptions(cfg *Config) []ssaconfig.Option {
 	var opts []ssaconfig.Option
+	// Struct rules use the same final SyntaxFlow result-save guard as SSA rules.
+	if cfg != nil && cfg.IsNoSaveRisk() {
+		opts = append(opts, ssaconfig.WithNoSaveRisk(true))
+	}
 	rules := cfg.customRules()
 	var structRaws []string
 	for _, rule := range rules {
@@ -873,6 +877,16 @@ func sharedScanCallbackOptions(cfg *Config) []ssaconfig.Option {
 	if cfg == nil {
 		return opts
 	}
+	// ScanProject starts nested scans via StartScan, which rebuilds the
+	// config from the forwarded options only. Rule-detail reporting must be
+	// forwarded explicitly or every per-rule snapshot inside a product scan
+	// degrades to counter-only events.
+	if cfg.ScanTaskCallback != nil && cfg.ProcessWithRule {
+		opts = append(opts, WithProcessRuleDetail(true))
+	}
+	if dir := strings.TrimSpace(cfg.GetDebugDir()); dir != "" {
+		opts = append(opts, ssaconfig.WithDebugDir(dir))
+	}
 	if cfg.resultCallback != nil {
 		opts = append(opts, WithScanResultCallback(cfg.resultCallback))
 	}
@@ -891,6 +905,10 @@ func sharedScanCallbackOptions(cfg *Config) []ssaconfig.Option {
 	opts = append(opts, copySyntaxFlowRuleOptions(cfg)...)
 	if cfg.GetScanConcurrency() > 0 {
 		opts = append(opts, ssaconfig.WithScanConcurrency(cfg.GetScanConcurrency()))
+	}
+	// Propagate the risk-persistence setting to nested scan stages.
+	if cfg.IsNoSaveRisk() {
+		opts = append(opts, ssaconfig.WithNoSaveRisk(true))
 	}
 	return opts
 }

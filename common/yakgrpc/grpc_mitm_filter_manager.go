@@ -131,8 +131,10 @@ func (m *MITMFilter) updateMatcher() {
 	m.Filters.ExcludeHostnamesMatcher = FilterDataToMatchers(m.Data.ExcludeHostnames, true)
 	m.Filters.IncludeHostnamesMatcher = FilterDataToMatchers(m.Data.IncludeHostnames, true)
 
-	m.Filters.ExcludeUriMatcher = FilterDataToMatchers(m.Data.ExcludeUri, true)
-	m.Filters.IncludeUriMatcher = FilterDataToMatchers(m.Data.IncludeUri, true)
+	// URI 规则同时保留用户原文，并把绝对 URL 展开成 path。
+	// 快捷过滤会把完整 URL 写进「排除 URL 路径」，但 IsPassed 默认只拿 path 匹配。
+	m.Filters.ExcludeUriMatcher = FilterDataToMatchers(expandURIFilterData(m.Data.ExcludeUri), true)
+	m.Filters.IncludeUriMatcher = FilterDataToMatchers(expandURIFilterData(m.Data.IncludeUri), true)
 
 	m.Filters.ExcludeMethodsMatcher = FilterDataToMatchers(m.Data.ExcludeMethods, true)
 	m.Filters.ExcludeMIMEMatcher = FilterDataToMatchers(m.Data.ExcludeMIME, true)
@@ -204,6 +206,53 @@ func splitMultiValue(s string) []string {
 	}
 	parts = append(parts, s[start:])
 	return parts
+}
+
+// expandURIFilterData copies URI filter items and appends the path of any
+// absolute http(s) URL. Stored filter data is left unchanged so the UI still
+// shows the original URL the user added.
+func expandURIFilterData(data []*ypb.FilterDataItem) []*ypb.FilterDataItem {
+	if len(data) == 0 {
+		return data
+	}
+	result := make([]*ypb.FilterDataItem, 0, len(data))
+	for _, datum := range data {
+		if datum == nil {
+			continue
+		}
+		result = append(result, &ypb.FilterDataItem{
+			MatcherType: datum.MatcherType,
+			Group:       expandURIFilterGroup(expandGroupByDelimiter(datum.Group)),
+			RuleName:    datum.RuleName,
+		})
+	}
+	return result
+}
+
+func expandURIFilterGroup(group []string) []string {
+	if len(group) == 0 {
+		return group
+	}
+	result := make([]string, 0, len(group)*2)
+	seen := make(map[string]struct{}, len(group)*2)
+	add := func(s string) {
+		s = strings.TrimSpace(s)
+		if s == "" {
+			return
+		}
+		if _, ok := seen[s]; ok {
+			return
+		}
+		seen[s] = struct{}{}
+		result = append(result, s)
+	}
+	for _, s := range group {
+		add(s)
+		if path := utils.ExtractRawPath(s); path != "" && path != s {
+			add(path)
+		}
+	}
+	return result
 }
 
 func FilterDataToMatchers(data []*ypb.FilterDataItem, expandCommaSeparated ...bool) *httptpl.YakMatcher {
@@ -432,13 +481,35 @@ func (m *MITMFilter) SaveToDb(keys ...string) error {
 }
 
 func _FilterCheck(include *httptpl.YakMatcher, exclude *httptpl.YakMatcher, raw string) bool {
+	return _FilterCheckAny(include, exclude, raw)
+}
+
+// _FilterCheckAny treats exclude as "match any candidate" and include as
+// "match any candidate". This lets URI filters accept either the raw path
+// or the full URL that the quick-filter feature writes into ExcludeUri.
+func _FilterCheckAny(include *httptpl.YakMatcher, exclude *httptpl.YakMatcher, raws ...string) bool {
+	seen := make(map[string]struct{}, len(raws))
+	uniq := make([]string, 0, len(raws))
+	for _, raw := range raws {
+		if _, ok := seen[raw]; ok {
+			continue
+		}
+		seen[raw] = struct{}{}
+		uniq = append(uniq, raw)
+	}
+	if len(uniq) == 0 {
+		uniq = []string{""}
+	}
+
 	if exclude != nil {
-		excludeRes, err := exclude.ExecuteRaw([]byte(raw), nil)
-		if err != nil {
-			log.Errorf("filter exlude execute matcher failed: %s", err)
-			return false
-		} else if excludeRes {
-			return false
+		for _, raw := range uniq {
+			excludeRes, err := exclude.ExecuteRaw([]byte(raw), nil)
+			if err != nil {
+				log.Errorf("filter exlude execute matcher failed: %s", err)
+				return false
+			} else if excludeRes {
+				return false
+			}
 		}
 	}
 
@@ -446,12 +517,17 @@ func _FilterCheck(include *httptpl.YakMatcher, exclude *httptpl.YakMatcher, raw 
 		return true
 	}
 
-	includeRes, err := include.ExecuteRaw([]byte(raw), nil)
-	if err != nil {
-		log.Errorf("filter include execute matcher failed: %s", err)
-		return false
+	for _, raw := range uniq {
+		includeRes, err := include.ExecuteRaw([]byte(raw), nil)
+		if err != nil {
+			log.Errorf("filter include execute matcher failed: %s", err)
+			return false
+		}
+		if includeRes {
+			return true
+		}
 	}
-	return includeRes
+	return false
 }
 
 func (m *MITMFilter) IsMIMEPassed(ct string) bool {
@@ -491,7 +567,7 @@ func (m *MITMFilter) IsPassed(method string, hostport, urlStr string, ext string
 		return false
 	}
 
-	passed = _FilterCheck(matcher.IncludeUriMatcher, matcher.ExcludeUriMatcher, utils.ExtractRawPath(urlStr))
+	passed = _FilterCheckAny(matcher.IncludeUriMatcher, matcher.ExcludeUriMatcher, utils.ExtractRawPath(urlStr), urlStr)
 	if !passed {
 		log.Debugf("url: %s is filtered via uri(url)", truncate(urlStr))
 		return false

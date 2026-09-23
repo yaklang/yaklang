@@ -874,6 +874,16 @@ func (pm *PromptManager) GenerateIntervalReviewPromptWithContextForTask(
 	reviewCount int,
 	callExpectations string,
 ) (string, error) {
+	return pm.buildIntervalReviewPromptForTask(task, tool, params, stdoutSnapshot, stderrSnapshot, startTime, reviewCount, callExpectations, false)
+}
+
+// liteForgeMaterials omits the schema/instruction sections supplied separately
+// by LiteForge, while keeping the original bounded task and Timeline inputs.
+func (pm *PromptManager) buildIntervalReviewPromptForTask(
+	task aicommon.AIStatefulTask, tool *aitool.Tool, params aitool.InvokeParams,
+	stdoutSnapshot, stderrSnapshot []byte, startTime time.Time, reviewCount int,
+	callExpectations string, liteForgeMaterials bool,
+) (string, error) {
 	nonceString := nonce()
 	const (
 		intervalReviewMaxPromptTokens        = 9000
@@ -927,6 +937,22 @@ func (pm *PromptManager) GenerateIntervalReviewPromptWithContextForTask(
 	if err != nil {
 		return "", err
 	}
+	recentTimeline := ""
+	if pm.react != nil && pm.react.config != nil && pm.react.config.GetTimeline() != nil {
+		recentTimeline = stripLoopStallFromIntervalReviewTimeline(
+			pm.react.config.GetTimeline().DumpRecentForPrompt(intervalReviewTimelineTokens),
+		)
+	}
+	if recentTimeline == "" {
+		recentTimeline = "<|TIMELINE_RECENT|>\n(no recent Timeline items)\n<|TIMELINE_RECENT_END|>"
+	}
+	if liteForgeMaterials {
+		materials := recentTimeline + "\n\n" + dynamic
+		if tokens := aicommon.MeasureTokens(materials); tokens > intervalReviewMaxPromptTokens {
+			return "", fmt.Errorf("interval review materials exceed %d-token hard limit: %d", intervalReviewMaxPromptTokens, tokens)
+		}
+		return materials, nil
+	}
 	semiDynamic2, err := aicommon.RenderPromptTemplate(
 		"interval-review-semi-dynamic-2",
 		aicommon.SharedTaskInstructionSchemaExampleTemplate,
@@ -938,15 +964,6 @@ func (pm *PromptManager) GenerateIntervalReviewPromptWithContextForTask(
 	)
 	if err != nil {
 		return "", err
-	}
-	recentTimeline := ""
-	if pm.react != nil && pm.react.config != nil && pm.react.config.GetTimeline() != nil {
-		recentTimeline = stripLoopStallFromIntervalReviewTimeline(
-			pm.react.config.GetTimeline().DumpRecentForPrompt(intervalReviewTimelineTokens),
-		)
-	}
-	if recentTimeline == "" {
-		recentTimeline = "<|TIMELINE_RECENT|>\n(no recent Timeline items)\n<|TIMELINE_RECENT_END|>"
 	}
 	prompt := aicommon.BuildTaggedPromptSections(
 		"You are performing a bounded progress review for one running tool call.",

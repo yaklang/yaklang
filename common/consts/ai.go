@@ -55,7 +55,9 @@ const (
 
 // TieredAIConfig stores the tiered AI model configuration
 type TieredAIConfig struct {
-	// Enabled indicates whether tiered AI model configuration is enabled
+	SingleModelMode bool
+	// Enabled is retained for persisted-config compatibility. Runtime routing is
+	// enabled by the presence of TieredAIConfig and no longer reads this field.
 	Enabled bool
 	// RoutingPolicy defines how to route requests to different models
 	RoutingPolicy RoutingPolicy
@@ -98,14 +100,12 @@ func GetTieredAIConfig() *TieredAIConfig {
 	return tieredAIConfig
 }
 
-// IsTieredAIModelConfigEnabled checks if tiered AI model configuration is enabled
+// IsTieredAIModelConfigEnabled reports whether tiered AI model configuration is
+// present. Enabled is a legacy persisted field and is intentionally ignored.
 func IsTieredAIModelConfigEnabled() bool {
 	tieredAIConfigLock.RLock()
 	defer tieredAIConfigLock.RUnlock()
-	if tieredAIConfig == nil {
-		return false
-	}
-	return tieredAIConfig.Enabled
+	return tieredAIConfig != nil
 }
 
 // GetTieredAIRoutingPolicy returns the current routing policy
@@ -262,11 +262,11 @@ func cloneHTTPHeadersForAIConfig(headers []*ypb.KVPair) []*ypb.KVPair {
 }
 
 const (
-	RoutingPolicyAuto        = string(PolicyAuto)
-	RoutingPolicyPerformance = string(PolicyPerformance)
-	RoutingPolicyCost        = string(PolicyCost)
-	RoutingPolicyBalance     = string(PolicyBalance)
-	DefaultRoutingPolicy     = RoutingPolicyBalance
-	ModelExtraParamKey       = "model"
-	BuildinModelExtraParamKey       = "isBuildin"
+	RoutingPolicyAuto         = string(PolicyAuto)
+	RoutingPolicyPerformance  = string(PolicyPerformance)
+	RoutingPolicyCost         = string(PolicyCost)
+	RoutingPolicyBalance      = string(PolicyBalance)
+	DefaultRoutingPolicy      = RoutingPolicyBalance
+	ModelExtraParamKey        = "model"
+	BuildinModelExtraParamKey = "isBuildin"
 )

@@ -154,6 +154,11 @@ func parseSFScanConfigFromCli(c *cli.Context) (res *ssaCliConfig, err error) {
 		opts = append(opts, ssaconfig.WithSyntaxFlowMemory(true))
 	}
 
+	// Keep risks and audit result data out of the database while preserving task state.
+	if c.Bool("no-save-risk") {
+		opts = append(opts, ssaconfig.WithNoSaveRisk(true))
+	}
+
 	// Output file (auto-redirect to <debugDir>/report when --debug is set and --output is not)
 	outputFile := c.String("output")
 	if outputFile == "" && c.String("debug") != "" {
@@ -501,6 +506,9 @@ func applyCompileCliOverrides(cfg *ssaconfig.Config, cliCtx *cli.Context) error 
 			ssaconfig.WithCompileMemoryCompile(enable),
 			ssaconfig.WithSyntaxFlowMemory(enable),
 		)
+	}
+	if cliCtx.IsSet("no-save-risk") {
+		opts = append(opts, ssaconfig.WithNoSaveRisk(cliCtx.Bool("no-save-risk")))
 	}
 	if cliCtx.IsSet("re-compile") {
 		opts = append(opts, ssaconfig.WithCompileReCompile(cliCtx.Bool("re-compile")))

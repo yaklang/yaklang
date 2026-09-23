@@ -266,8 +266,6 @@ func callAITransaction(
 			if cp == nil {
 				emitter.EmitError("cannot save checkpoint")
 				return err
-			} else {
-				//emitter.EmitInfo("checkpoint cached in database: %v:%v", utils.ShrinkString(cp.CoordinatorUuid, 12), cp.Seq)
 			}
 		}
 		return nil

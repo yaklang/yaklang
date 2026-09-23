@@ -33,14 +33,37 @@ var sarifKindEnum = map[string]bool{
 	"informational": true,
 }
 
+// Mirrors the shape of the real CI rules (common/ssa_bootstrapping/ci_rule):
+// `desc:` carries markdown, and that markdown is what must reach the alert page
+// rendered rather than printed as source. The fixture avoids backticks so it can
+// live in a raw string literal.
 const weakDigestRule = `
-	.getInstance?{<typeName>?{have:'java.security'}}(*<slice(index=1)> as $algorithm);
-	$algorithm #{ until:` + "`*?{ opcode:const && have:/MD5/}`" + ` }-> as $sink;
-	alert $sink for {
-		title: "Use of a broken or risky hash algorithm",
-		level: "low",
-		risk: "weak-crypto"
-	}
+desc(
+	title: "Use of a broken or risky hash algorithm"
+	title_zh: "使用已破解或存在风险的哈希算法"
+	type: vuln
+	rule_id: "5d658a56-db56-4973-85b2-e2ad06ed09e8"
+	risk: "weak-crypto"
+	level: low
+	desc: <<<DESC
+### 漏洞描述
+
+1. **漏洞原理**
+   MessageDigest.getInstance("MD5") 使用的是已被证明不安全的哈希算法。
+
+2. **潜在影响**
+   - 攻击者可构造碰撞，伪造摘要。
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+
+改用 SHA-256 或更强的算法，并加盐处理。
+SOLUTION
+)
+
+.getInstance?{<typeName>?{have:'java.security'}}(*<slice(index=1)> as $algorithm);
+$algorithm #{ until:` + "`*?{ opcode:const && have:/MD5/}`" + ` }-> as $sink;
+alert $sink
 `
 
 // The file lives in a subdirectory on purpose: the emitted URI has to keep the
@@ -171,7 +194,53 @@ func TestSarifReport_ValidKindAndGitHubMetadata(t *testing.T) {
 	require.Equal(t, sfreport.SarifDriverName, driver["name"])
 	require.Equal(t, sfreport.SarifInformationURI, driver["informationUri"])
 	require.NotEmpty(t, driver["version"], "GitHub shows the tool version for each analysis")
-	require.Equal(t, "diff-code-check", run["automationDetails"].(map[string]interface{})["id"])
+}
+
+// The run reports a single fixed category, so successive uploads keep updating
+// the same alert set instead of opening a parallel one. The value must match
+// what the uploader writes for `category: yaklang-diff-code-check`, including
+// the trailing slash its getAutomationID appends: a run whose
+// automationDetails.id differs yields an empty recorded category, which
+// detaches the upload from its alert set.
+// The run reports one fixed category, so repeated uploads update the same
+// alerts; it must match the workflow's `category:` and keep the trailing slash
+// (GitHub parses the id as "category/run-id").
+func TestSarifReport_ReportsOneFixedAutomationID(t *testing.T) {
+	run := firstSarifRun(t, parseSarifDocument(t, renderSarif(t, scanJavaProject(t))))
+
+	automation, present := run["automationDetails"].(map[string]interface{})
+	require.True(t, present, "every upload must declare its alert category")
+	require.Equal(t, "yaklang-diff-code-check/", automation["id"],
+		"a slash-less id would leave the category empty")
+	require.Equal(t, sfreport.SarifRunAutomationID, automation["id"])
+}
+
+// GitHub shows shortDescription.text literally and only renders markdown that
+// arrives in a `markdown` field, so the rule body must not sit in `text`.
+func TestSarifReport_RuleDescriptionIsMarkdownNotRawText(t *testing.T) {
+	run := firstSarifRun(t, parseSarifDocument(t, renderSarif(t, scanJavaProject(t))))
+	rules := sarifEntries(t, sarifDriver(t, run)["rules"])
+	require.NotEmpty(t, rules)
+
+	for _, rule := range rules {
+		short := rule["shortDescription"].(map[string]interface{})
+		shortText, _ := short["text"].(string)
+		require.NotEmpty(t, shortText, "shortDescription.text is required by the schema")
+		require.NotContains(t, shortText, "\n",
+			"shortDescription is the alert's one-line summary")
+		require.NotContains(t, shortText, "#",
+			"markdown in shortDescription.text is displayed as raw source")
+
+		full := rule["fullDescription"].(map[string]interface{})
+		markdown, ok := full["markdown"].(string)
+		require.True(t, ok, "without `markdown` GitHub prints the description as raw text")
+		require.Contains(t, markdown, "#", "the rule body is markdown")
+		require.NotEmpty(t, full["text"], "SARIF requires a plain-text fallback")
+
+		help := rule["help"].(map[string]interface{})
+		_, hasHelpMarkdown := help["markdown"].(string)
+		require.True(t, hasHelpMarkdown, "the alert's details panel renders help markdown")
+	}
 }
 
 func TestSarifReport_RulesCarrySeverityAndTags(t *testing.T) {
@@ -303,14 +372,20 @@ func TestSarifReport_MergesMultipleResultsIntoOneRun(t *testing.T) {
 	require.NoError(t, err)
 	require.NotEmpty(t, progs)
 
-	// Same match, two distinct rule bodies -> two rule ids, one run.
-	for _, level := range []string{"low", "high"} {
+	// Same match, two distinct rule ids -> two rules, one run.
+	for _, ruleID := range []string{
+		"5d658a56-db56-4973-85b2-e2ad06ed09e8",
+		"0f2c1d34-9a7b-4c5e-8d10-6b3f5a2e7c91",
+	} {
 		rule := `
+	desc(
+		rule_id: "` + ruleID + `"
+	)
 	.getInstance?{<typeName>?{have:'java.security'}}(*<slice(index=1)> as $algorithm);
 	$algorithm #{ until:` + "`*?{ opcode:const && have:/MD5/}`" + ` }-> as $sink;
 	alert $sink for {
 		title: "Use of a broken or risky hash algorithm",
-		level: "` + level + `",
+		level: "low",
 		risk: "weak-crypto"
 	}
 `
@@ -366,6 +441,57 @@ func TestConvertSyntaxFlowResultToReport_SarifUsesCompatReport(t *testing.T) {
 
 	run := firstSarifRun(t, parseSarifDocument(t, buf.Bytes()))
 	require.Equal(t, sfreport.SarifDriverName, sarifDriver(t, run)["name"])
+}
+
+// GitHub matches an alert by (ruleId, fingerprints), so editing a rule must not
+// change its id: a content-derived id re-created every alert — and every pull
+// request comment — whenever the rule text changed. The rule's own `rule_id` is
+// used instead.
+func TestSarifReport_RuleIDSurvivesRuleEdits(t *testing.T) {
+	const ruleID = "5d658a56-db56-4973-85b2-e2ad06ed09e8"
+	body := `
+.getInstance?{<typeName>?{have:'java.security'}}(*<slice(index=1)> as $algorithm);
+$algorithm #{ until:` + "`*?{ opcode:const && have:/MD5/}`" + ` }-> as $sink;
+alert $sink
+`
+
+	// Same rule id, rewritten description: the alert identity must hold.
+	first := "desc(\n\trule_id: \"" + ruleID + "\"\n\tdesc: <<<DESC\n### 漏洞描述\nDESC\n)\n" + body
+	second := "desc(\n\trule_id: \"" + ruleID + "\"\n\tdesc: <<<DESC\n### 漏洞描述（重写）\n\n补充说明。\nDESC\n)\n" + body
+	require.NotEqual(t, first, second, "the two revisions must differ in content")
+
+	render := func(content string) string {
+		report, err := sfreport.NewSarifReport()
+		require.NoError(t, err)
+
+		vfs := filesys.NewVirtualFs()
+		vfs.AddFile("src/main/java/com/example/App.java", riskyJavaApp)
+		programName := "sarif-ruleid-" + uuid.NewString()
+		t.Cleanup(func() {
+			ssadb.DeleteProgram(ssadb.GetDB(), programName)
+			yakit.DeleteSSARisks(ssadb.GetDB(), &ypb.SSARisksFilter{ProgramName: []string{programName}})
+		})
+
+		progs, err := ssaapi.ParseProjectWithFS(vfs,
+			ssaapi.WithLanguage(ssaconfig.JAVA),
+			ssaapi.WithProgramName(programName),
+		)
+		require.NoError(t, err)
+		require.NotEmpty(t, progs)
+
+		result, err := progs[0].SyntaxFlowWithError(content, ssaapi.QueryWithEnableDebug(true))
+		require.NoError(t, err)
+		require.NoError(t, result.CreateRisk())
+		require.True(t, report.AddSyntaxFlowResult(result))
+
+		rules := report.Report().Runs[0].Tool.Driver.Rules
+		require.Len(t, rules, 1)
+		return rules[0].ID
+	}
+
+	require.Equal(t, ruleID, render(first))
+	require.Equal(t, ruleID, render(second),
+		"a rule edit must not re-key its alerts")
 }
 
 // A scan that finds nothing still has to declare the tool so GitHub can close

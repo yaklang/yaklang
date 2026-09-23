@@ -19,6 +19,7 @@ type AICallbackType func(i AICallerConfigIf, req *AIRequest) (*AIResponse, error
 type AICallerConfigIf interface {
 	AICaller
 	KeyValueConfigIf
+	AuxiliaryScheduler
 
 	// Interactivable
 	Interactivable
@@ -67,6 +68,9 @@ type AICallerConfigIf interface {
 
 	GetBrowserSessionTracker() BrowserSessionTracker
 
+	// IsSingleAIModelMode reports whether single-model simple mode is enabled.
+	IsSingleAIModelMode() bool
+
 	// Reported risks: session-level "已报告漏洞清单" accumulator.
 	// AppendReportedRisk is called from toolcall_invoke.go FeedBacker when a
 	// json-risk message is emitted, adding a compact summary to the store.
@@ -93,12 +97,13 @@ func AIChatToAICallbackType(cb func(prompt string, opts ...aispec.AIConfigOption
 					isStream = true
 					resp.EmitReasonStream(reader)
 				}),
-
-				aispec.WithModelInfoCallback(func(provider, model string) {
-					resp.SetModelInfo(provider, model) // not update config model info, just set for response
-				}),
-				aispec.WithModelInfoConfirmCallback(func(provider, model string) {
+				aispec.WithModelInfoCallback(func(provider, model, thinkingLevel string) {
 					resp.SetModelInfo(provider, model)
+					resp.SetThinkingLevel(thinkingLevel)
+				}),
+				aispec.WithModelInfoConfirmCallback(func(provider, model, thinkingLevel string) {
+					resp.SetModelInfo(provider, model)
+					resp.SetThinkingLevel(thinkingLevel)
 				}),
 				aispec.WithRawHTTPResponseHeaderCallback(func(headerBytes []byte) {
 					resp.SetRawHTTPResponseHeader(headerBytes)

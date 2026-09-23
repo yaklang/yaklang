@@ -172,6 +172,7 @@ func buildAIAgentOption(ctx context.Context, CoordinatorId string, agentEventHan
 
 func buildAIDOption(startParams *ypb.AIStartParams) []aicommon.ConfigOption {
 	aidOption := make([]aicommon.ConfigOption, 0)
+	aidOption = append(aidOption, aicommon.WithSingleAIModelMode(startParams.GetSingleModelMode()))
 
 	if startParams.GetEnableSystemFileSystemOperator() {
 		aidOption = append(aidOption, aicommon.WithSystemFileOperator())
@@ -202,9 +203,6 @@ func buildAIDOption(startParams *ypb.AIStartParams) []aicommon.ConfigOption {
 	//if startParams.GetAllowGenerateReport() {
 	//	aidOption = append(aidOption, aicommon.WithGenerateReport(startParams.GetAllowGenerateReport()))
 	//}
-	if serviceName := startParams.GetAIService(); serviceName != "" {
-		aidOption = fixOptionsWithServiceName(serviceName, aidOption...)
-	}
 
 	if mockedAIChat != nil {
 		aidOption = append(aidOption, aicommon.WithAICallback(aicommon.AIChatToAICallbackType(mockedAIChat)))

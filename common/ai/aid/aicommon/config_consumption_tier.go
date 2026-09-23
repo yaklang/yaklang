@@ -1,6 +1,8 @@
 package aicommon
 
 import (
+	"sort"
+	"strings"
 	"sync"
 	"sync/atomic"
 
@@ -12,6 +14,53 @@ type ConsumptionStats struct {
 	InputConsumption  int64 `json:"input_consumption"`
 	OutputConsumption int64 `json:"output_consumption"`
 	CacheHitToken     int64 `json:"cache_hit_token"`
+}
+
+// ModelConsumptionIdentity identifies the effective model configuration used by
+// one completed AI call. It intentionally contains no provider credentials or
+// endpoint fields.
+type ModelConsumptionIdentity struct {
+	ProviderType  string `json:"provider_type,omitempty"`
+	ModelName     string `json:"model_name,omitempty"`
+	ThinkingLevel string `json:"thinking_level,omitempty"`
+}
+
+type ModelConsumptionStats struct {
+	ModelConsumptionIdentity
+	ConsumptionStats
+}
+
+type ModelConsumptionSnapshot struct {
+	ModelConsumptionIdentity
+	InputConsumption  int64 `json:"input_consumption"`
+	OutputConsumption int64 `json:"output_consumption"`
+	CacheHitToken     int64 `json:"cache_hit_token"`
+}
+
+func normalizeModelConsumptionIdentity(identity ModelConsumptionIdentity) ModelConsumptionIdentity {
+	identity.ProviderType = strings.TrimSpace(identity.ProviderType)
+	identity.ModelName = strings.TrimSpace(identity.ModelName)
+	identity.ThinkingLevel = strings.ToLower(strings.TrimSpace(identity.ThinkingLevel))
+	if identity.ThinkingLevel == "" {
+		identity.ThinkingLevel = "auto"
+	}
+	return identity
+}
+
+func modelConsumptionIdentityKey(identity ModelConsumptionIdentity) string {
+	return identity.ProviderType + "\x00" + identity.ModelName + "\x00" + identity.ThinkingLevel
+}
+
+func (s *ModelConsumptionStats) Snapshot() ModelConsumptionSnapshot {
+	if s == nil {
+		return ModelConsumptionSnapshot{}
+	}
+	return ModelConsumptionSnapshot{
+		ModelConsumptionIdentity: s.ModelConsumptionIdentity,
+		InputConsumption:         atomic.LoadInt64(&s.InputConsumption),
+		OutputConsumption:        atomic.LoadInt64(&s.OutputConsumption),
+		CacheHitToken:            atomic.LoadInt64(&s.CacheHitToken),
+	}
 }
 
 func newConsumptionStats() *ConsumptionStats {
@@ -55,21 +104,25 @@ func (s *ConsumptionStats) Snapshot() map[string]int64 {
 }
 
 type ConfigConsumptionState struct {
-	InputConsumption    *int64
-	OutputConsumption   *int64
-	CacheHitToken       *int64
-	ConsumptionUUID     string
-	TierConsumptionStat *omap.OrderedMap[consts.ModelTier, *ConsumptionStats]
-	m                   *sync.Mutex
+	InputConsumption           *int64
+	OutputConsumption          *int64
+	CacheHitToken              *int64
+	ConsumptionUUID            string
+	TierConsumptionStat        *omap.OrderedMap[consts.ModelTier, *ConsumptionStats]
+	TierModelConsumptionStat   map[consts.ModelTier]map[string]*ModelConsumptionStats
+	EffectiveSingleModelMode   bool
+	effectiveModelModeResolved bool
+	m                          *sync.Mutex
 }
 
 func NewConfigConsumptionState() *ConfigConsumptionState {
 	return (&ConfigConsumptionState{
-		InputConsumption:    new(int64),
-		OutputConsumption:   new(int64),
-		CacheHitToken:       new(int64),
-		TierConsumptionStat: omap.NewOrderedMap(map[consts.ModelTier]*ConsumptionStats{}),
-		m:                   &sync.Mutex{},
+		InputConsumption:         new(int64),
+		OutputConsumption:        new(int64),
+		CacheHitToken:            new(int64),
+		TierConsumptionStat:      omap.NewOrderedMap(map[consts.ModelTier]*ConsumptionStats{}),
+		TierModelConsumptionStat: make(map[consts.ModelTier]map[string]*ModelConsumptionStats),
+		m:                        &sync.Mutex{},
 	}).ensure()
 }
 
@@ -92,7 +145,37 @@ func (s *ConfigConsumptionState) ensure() *ConfigConsumptionState {
 	if s.TierConsumptionStat == nil {
 		s.TierConsumptionStat = omap.NewOrderedMap(map[consts.ModelTier]*ConsumptionStats{})
 	}
+	if s.TierModelConsumptionStat == nil {
+		s.TierModelConsumptionStat = make(map[consts.ModelTier]map[string]*ModelConsumptionStats)
+	}
 	return s
+}
+
+// InitializeEffectiveSingleModelMode records the mode resolved by the root
+// Config. ConfigInitStatus is shared by child Configs, so the first resolved
+// value owns the session-level consumption state.
+func (s *ConfigConsumptionState) InitializeEffectiveSingleModelMode(enabled bool) {
+	if s == nil {
+		return
+	}
+	s.ensure()
+	s.m.Lock()
+	defer s.m.Unlock()
+	if s.effectiveModelModeResolved {
+		return
+	}
+	s.EffectiveSingleModelMode = enabled
+	s.effectiveModelModeResolved = true
+}
+
+func (s *ConfigConsumptionState) GetEffectiveSingleModelMode() bool {
+	if s == nil {
+		return false
+	}
+	s.ensure()
+	s.m.Lock()
+	defer s.m.Unlock()
+	return s.EffectiveSingleModelMode
 }
 
 func (s *ConfigConsumptionState) SetConsumptionPointers(input, output *int64) {
@@ -206,6 +289,14 @@ func (s *ConfigConsumptionState) AddTierOutputConsumption(tier consts.ModelTier,
 	atomic.AddInt64(s.OutputConsumption, outputDelta)
 }
 
+func (s *ConfigConsumptionState) AddTierConsumption(tier consts.ModelTier, inputDelta, outputDelta int64) {
+	if s == nil || (inputDelta == 0 && outputDelta == 0) {
+		return
+	}
+	s.AddTierOutputConsumption(tier, outputDelta)
+	s.AddTierInputConsumption(tier, inputDelta)
+}
+
 func (s *ConfigConsumptionState) AddTierCacheHitToken(tier consts.ModelTier, cacheHitDelta int64) {
 	if s == nil || cacheHitDelta == 0 {
 		return
@@ -221,6 +312,80 @@ func (s *ConfigConsumptionState) AddTierCacheHitToken(tier consts.ModelTier, cac
 	s.m.Unlock()
 	stats.AddCacheHit(cacheHitDelta)
 	atomic.AddInt64(s.CacheHitToken, cacheHitDelta)
+}
+
+// AddTierModelConsumption records one completed call in two dimensions: the
+// logical tier total and the concrete model bucket within that tier.
+func (s *ConfigConsumptionState) AddTierModelConsumption(
+	tier consts.ModelTier,
+	identity ModelConsumptionIdentity,
+	inputDelta, outputDelta, cacheHitDelta int64,
+) {
+	if s == nil {
+		return
+	}
+	s.AddTierConsumption(tier, inputDelta, outputDelta)
+	s.AddTierCacheHitToken(tier, cacheHitDelta)
+	s.addModelConsumption(tier, identity, inputDelta, outputDelta, cacheHitDelta)
+}
+
+// addModelConsumption only maintains the model breakdown. Tier and global
+// totals are owned by AddTierConsumption/AddTierCacheHitToken.
+func (s *ConfigConsumptionState) addModelConsumption(
+	tier consts.ModelTier,
+	identity ModelConsumptionIdentity,
+	inputDelta, outputDelta, cacheHitDelta int64,
+) {
+	identity = normalizeModelConsumptionIdentity(identity)
+	if identity.ProviderType == "" && identity.ModelName == "" {
+		return
+	}
+	s.ensure()
+	tier = normalizeConsumptionTier(tier)
+
+	s.m.Lock()
+	models := s.TierModelConsumptionStat[tier]
+	if models == nil {
+		models = make(map[string]*ModelConsumptionStats)
+		s.TierModelConsumptionStat[tier] = models
+	}
+	key := modelConsumptionIdentityKey(identity)
+	stats := models[key]
+	if stats == nil {
+		stats = &ModelConsumptionStats{ModelConsumptionIdentity: identity}
+		models[key] = stats
+	}
+	s.m.Unlock()
+
+	stats.Add(inputDelta, outputDelta)
+	stats.AddCacheHit(cacheHitDelta)
+}
+
+func (s *ConfigConsumptionState) GetTierModelConsumptionSnapshot() map[string][]ModelConsumptionSnapshot {
+	result := make(map[string][]ModelConsumptionSnapshot)
+	if s == nil {
+		return result
+	}
+	s.ensure()
+	s.m.Lock()
+	defer s.m.Unlock()
+	for tier, models := range s.TierModelConsumptionStat {
+		items := make([]ModelConsumptionSnapshot, 0, len(models))
+		for _, stats := range models {
+			items = append(items, stats.Snapshot())
+		}
+		sort.Slice(items, func(i, j int) bool {
+			if items[i].ProviderType != items[j].ProviderType {
+				return items[i].ProviderType < items[j].ProviderType
+			}
+			if items[i].ModelName != items[j].ModelName {
+				return items[i].ModelName < items[j].ModelName
+			}
+			return items[i].ThinkingLevel < items[j].ThinkingLevel
+		})
+		result[string(tier)] = items
+	}
+	return result
 }
 
 func normalizeConsumptionTier(tier consts.ModelTier) consts.ModelTier {
@@ -264,12 +429,8 @@ func (c *Config) ensureTierConsumptionStats() *omap.OrderedMap[consts.ModelTier,
 }
 
 func (c *Config) AddTierConsumption(tier consts.ModelTier, inputDelta, outputDelta int64) {
-	if inputDelta == 0 && outputDelta == 0 {
-		return
-	}
 	state := c.ensureConsumptionState()
-	state.AddTierOutputConsumption(tier, outputDelta)
-	state.AddTierInputConsumption(tier, inputDelta)
+	state.AddTierConsumption(tier, inputDelta, outputDelta)
 }
 
 func (c *Config) InputConsumptionCallback(tier consts.ModelTier, current int) {
@@ -299,6 +460,18 @@ func (c *Config) AddTierCacheHitToken(tier consts.ModelTier, cacheHitDelta int64
 	state.AddTierCacheHitToken(tier, cacheHitDelta)
 }
 
+func (c *Config) AddTierModelConsumption(
+	tier consts.ModelTier,
+	identity ModelConsumptionIdentity,
+	inputDelta, outputDelta, cacheHitDelta int64,
+) {
+	state := c.ensureConsumptionState()
+	if state == nil {
+		return
+	}
+	state.AddTierModelConsumption(tier, identity, inputDelta, outputDelta, cacheHitDelta)
+}
+
 func (c *Config) GetTierConsumptionSnapshot() map[string]map[string]int64 {
 	statsByTier := c.ensureTierConsumptionStats()
 	result := make(map[string]map[string]int64)
@@ -310,4 +483,29 @@ func (c *Config) GetTierConsumptionSnapshot() map[string]map[string]int64 {
 		return true
 	})
 	return result
+}
+
+func (c *Config) GetTierModelConsumptionSnapshot() map[string][]ModelConsumptionSnapshot {
+	state := c.ensureConsumptionState()
+	if state == nil {
+		return map[string][]ModelConsumptionSnapshot{}
+	}
+	return state.GetTierModelConsumptionSnapshot()
+}
+
+func (c *Config) BuildConsumptionPayload() map[string]any {
+	state := c.ensureConsumptionState()
+	effectiveSingleModelMode := false
+	if state != nil {
+		effectiveSingleModelMode = state.GetEffectiveSingleModelMode()
+	}
+	return map[string]any{
+		"input_consumption":           c.GetInputConsumption(),
+		"output_consumption":          c.GetOutputConsumption(),
+		"cache_hit_token":             c.GetCacheHitToken(),
+		"consumption_uuid":            c.GetConsumptionUUID(),
+		"effective_single_model_mode": effectiveSingleModelMode,
+		"tier_consumption":            c.GetTierConsumptionSnapshot(),
+		"tier_model_consumption":      c.GetTierModelConsumptionSnapshot(),
+	}
 }

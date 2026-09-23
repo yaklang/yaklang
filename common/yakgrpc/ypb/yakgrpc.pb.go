@@ -10233,6 +10233,7 @@ type AIOutputEvent struct {
 	AIModelName        string `protobuf:"bytes,22,opt,name=AIModelName,proto3" json:"AIModelName,omitempty"`               // AI 模型名称
 	AIModelVerboseName string `protobuf:"bytes,23,opt,name=AIModelVerboseName,proto3" json:"AIModelVerboseName,omitempty"` // AI 模型展示名称（美化后的模型名）
 	TaskUUID           string `protobuf:"bytes,21,opt,name=TaskUUID,proto3" json:"TaskUUID,omitempty"`                     // 任务的唯一ID
+	SessionId          string `protobuf:"bytes,26,opt,name=SessionId,proto3" json:"SessionId,omitempty"`                   // AI 会话的唯一ID
 	unknownFields      protoimpl.UnknownFields
 	sizeCache          protoimpl.SizeCache
 }
@@ -10438,6 +10439,13 @@ func (x *AIOutputEvent) GetAIModelVerboseName() string {
 func (x *AIOutputEvent) GetTaskUUID() string {
 	if x != nil {
 		return x.TaskUUID
+	}
+	return ""
+}
+
+func (x *AIOutputEvent) GetSessionId() string {
+	if x != nil {
+		return x.SessionId
 	}
 	return ""
 }
@@ -11034,8 +11042,10 @@ type AIStartParams struct {
 	// 为 true 时禁用 Memory Triage（智能记忆处理），不创建 AIMemory 实例，
 	// 跳过 embedding/DB/AI 调用。适用于轻量级或无状态会话。
 	DisableMemoryTriage bool `protobuf:"varint,49,opt,name=DisableMemoryTriage,proto3" json:"DisableMemoryTriage,omitempty"`
-	unknownFields       protoimpl.UnknownFields
-	sizeCache           protoimpl.SizeCache
+	// Session-local opt-in; a globally enabled single-model mode still wins.
+	SingleModelMode bool `protobuf:"varint,50,opt,name=SingleModelMode,proto3" json:"SingleModelMode,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
 }
 
 func (x *AIStartParams) Reset() {
@@ -11386,6 +11396,13 @@ func (x *AIStartParams) GetStrategy() *AIExecutionStrategy {
 func (x *AIStartParams) GetDisableMemoryTriage() bool {
 	if x != nil {
 		return x.DisableMemoryTriage
+	}
+	return false
+}
+
+func (x *AIStartParams) GetSingleModelMode() bool {
+	if x != nil {
+		return x.SingleModelMode
 	}
 	return false
 }
@@ -39085,13 +39102,13 @@ type StartBruteParams struct {
 	Concurrent int64 `protobuf:"varint,8,opt,name=Concurrent,proto3" json:"Concurrent,omitempty"`
 	Retry      int64 `protobuf:"varint,9,opt,name=Retry,proto3" json:"Retry,omitempty"`
 	// 目标任务内并发
-	TargetTaskConcurrent int64 `protobuf:"varint,10,opt,name=TargetTaskConcurrent,proto3" json:"TargetTaskConcurrent,omitempty"`
-	OkToStop         bool   `protobuf:"varint,11,opt,name=OkToStop,proto3" json:"OkToStop,omitempty"`
-	DelayMin         int64  `protobuf:"varint,12,opt,name=DelayMin,proto3" json:"DelayMin,omitempty"`
-	DelayMax         int64  `protobuf:"varint,13,opt,name=DelayMax,proto3" json:"DelayMax,omitempty"`
-	PluginScriptName string `protobuf:"bytes,14,opt,name=PluginScriptName,proto3" json:"PluginScriptName,omitempty"`
-	unknownFields    protoimpl.UnknownFields
-	sizeCache        protoimpl.SizeCache
+	TargetTaskConcurrent int64  `protobuf:"varint,10,opt,name=TargetTaskConcurrent,proto3" json:"TargetTaskConcurrent,omitempty"`
+	OkToStop             bool   `protobuf:"varint,11,opt,name=OkToStop,proto3" json:"OkToStop,omitempty"`
+	DelayMin             int64  `protobuf:"varint,12,opt,name=DelayMin,proto3" json:"DelayMin,omitempty"`
+	DelayMax             int64  `protobuf:"varint,13,opt,name=DelayMax,proto3" json:"DelayMax,omitempty"`
+	PluginScriptName     string `protobuf:"bytes,14,opt,name=PluginScriptName,proto3" json:"PluginScriptName,omitempty"`
+	unknownFields        protoimpl.UnknownFields
+	sizeCache            protoimpl.SizeCache
 }
 
 func (x *StartBruteParams) Reset() {
@@ -48725,8 +48742,8 @@ type ExecHistoryRecord struct {
 	// Uid
 	Id string `protobuf:"bytes,9,opt,name=Id,proto3" json:"Id,omitempty"`
 	// 展示界面内容
-	Stdout []byte `protobuf:"bytes,10,opt,name=Stdout,proto3" json:"Stdout,omitempty"`
-	Stderr []byte `protobuf:"bytes,11,opt,name=Stderr,proto3" json:"Stderr,omitempty"`
+	Stdout        []byte `protobuf:"bytes,10,opt,name=Stdout,proto3" json:"Stdout,omitempty"`
+	Stderr        []byte `protobuf:"bytes,11,opt,name=Stderr,proto3" json:"Stderr,omitempty"`
 	RuntimeId     string `protobuf:"bytes,12,opt,name=RuntimeId,proto3" json:"RuntimeId,omitempty"`
 	FromYakModule string `protobuf:"bytes,13,opt,name=FromYakModule,proto3" json:"FromYakModule,omitempty"`
 	StdoutLen     int64  `protobuf:"varint,14,opt,name=StdoutLen,proto3" json:"StdoutLen,omitempty"`
@@ -71276,8 +71293,10 @@ type AIGlobalConfig struct {
 	VisionModels      []*AIModelConfig       `protobuf:"bytes,8,rep,name=VisionModels,proto3" json:"VisionModels,omitempty"`
 	AIPresetPrompt    string                 `protobuf:"bytes,9,opt,name=AIPresetPrompt,proto3" json:"AIPresetPrompt,omitempty"`
 	AIPlanPrompt      string                 `protobuf:"bytes,10,opt,name=AIPlanPrompt,proto3" json:"AIPlanPrompt,omitempty"`
-	unknownFields     protoimpl.UnknownFields
-	sizeCache         protoimpl.SizeCache
+	// Single-model routing takes precedence over tier selection without deleting tier lists.
+	SingleModelMode bool `protobuf:"varint,11,opt,name=SingleModelMode,proto3" json:"SingleModelMode,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
 }
 
 func (x *AIGlobalConfig) Reset() {
@@ -71378,6 +71397,13 @@ func (x *AIGlobalConfig) GetAIPlanPrompt() string {
 		return x.AIPlanPrompt
 	}
 	return ""
+}
+
+func (x *AIGlobalConfig) GetSingleModelMode() bool {
+	if x != nil {
+		return x.SingleModelMode
+	}
+	return false
 }
 
 // Local Model Messages
@@ -79028,7 +79054,7 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\tInputPath\x18\x01 \x01(\tR\tInputPath\x12\x1c\n" +
 	"\tOverwrite\x18\x02 \x01(\bR\tOverwrite\x12 \n" +
 	"\vNewToolName\x18\x03 \x01(\tR\vNewToolName\x12\x1a\n" +
-	"\bPassword\x18\x04 \x01(\tR\bPassword\"\x80\x06\n" +
+	"\bPassword\x18\x04 \x01(\tR\bPassword\"\x9e\x06\n" +
 	"\rAIOutputEvent\x12\x0e\n" +
 	"\x02ID\x18\x18 \x01(\x03R\x02ID\x12$\n" +
 	"\rCoordinatorId\x18\x01 \x01(\tR\rCoordinatorId\x12\x12\n" +
@@ -79057,7 +79083,8 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\tAIService\x18\x14 \x01(\tR\tAIService\x12 \n" +
 	"\vAIModelName\x18\x16 \x01(\tR\vAIModelName\x12.\n" +
 	"\x12AIModelVerboseName\x18\x17 \x01(\tR\x12AIModelVerboseName\x12\x1a\n" +
-	"\bTaskUUID\x18\x15 \x01(\tR\bTaskUUID\"&\n" +
+	"\bTaskUUID\x18\x15 \x01(\tR\bTaskUUID\x12\x1c\n" +
+	"\tSessionId\x18\x1a \x01(\tR\tSessionId\"&\n" +
 	"\x04I18n\x12\x0e\n" +
 	"\x02Zh\x18\x01 \x01(\tR\x02Zh\x12\x0e\n" +
 	"\x02En\x18\x02 \x01(\tR\x02En\"\xab\x05\n" +
@@ -79098,7 +79125,7 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\x03Url\x18\x03 \x01(\tR\x03Url\"=\n" +
 	"\x13AIEnabledCapability\x12\x12\n" +
 	"\x04Name\x18\x01 \x01(\tR\x04Name\x12\x12\n" +
-	"\x04Type\x18\x02 \x01(\tR\x04Type\"\xbd\x11\n" +
+	"\x04Type\x18\x02 \x01(\tR\x04Type\"\xe7\x11\n" +
 	"\rAIStartParams\x12$\n" +
 	"\rCoordinatorId\x18\x11 \x01(\tR\rCoordinatorId\x12\x1a\n" +
 	"\bSequence\x18\x12 \x01(\x03R\bSequence\x12.\n" +
@@ -79150,7 +79177,8 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\x06Attach\x18. \x01(\bR\x06Attach\x12.\n" +
 	"\x12EnableDetachedPlan\x18/ \x01(\bR\x12EnableDetachedPlan\x124\n" +
 	"\bStrategy\x180 \x01(\v2\x18.ypb.AIExecutionStrategyR\bStrategy\x120\n" +
-	"\x13DisableMemoryTriage\x181 \x01(\bR\x13DisableMemoryTriage\"\xa5\x02\n" +
+	"\x13DisableMemoryTriage\x181 \x01(\bR\x13DisableMemoryTriage\x12(\n" +
+	"\x0fSingleModelMode\x182 \x01(\bR\x0fSingleModelMode\"\xa5\x02\n" +
 	"\x13AIExecutionStrategy\x12*\n" +
 	"\x10EnableMultiAgent\x18\x01 \x01(\bR\x10EnableMultiAgent\x12&\n" +
 	"\x0eEnableGoalMode\x18\x02 \x01(\bR\x0eEnableGoalMode\x12,\n" +
@@ -84372,7 +84400,7 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\vExtraParams\x18\x04 \x03(\v2\v.ypb.KVPairR\vExtraParams\x12\x1a\n" +
 	"\bIsOnline\x18\x05 \x01(\bR\bIsOnline\x124\n" +
 	"\x15ProbedExtendedEfforts\x18\x06 \x03(\tR\x15ProbedExtendedEfforts\x12\"\n" +
-	"\fEffortProbed\x18\a \x01(\bR\fEffortProbed\"\xce\x03\n" +
+	"\fEffortProbed\x18\a \x01(\bR\fEffortProbed\"\xf8\x03\n" +
 	"\x0eAIGlobalConfig\x12\x18\n" +
 	"\aEnabled\x18\x01 \x01(\bR\aEnabled\x12$\n" +
 	"\rRoutingPolicy\x18\x02 \x01(\tR\rRoutingPolicy\x12(\n" +
@@ -84384,7 +84412,8 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\fVisionModels\x18\b \x03(\v2\x12.ypb.AIModelConfigR\fVisionModels\x12&\n" +
 	"\x0eAIPresetPrompt\x18\t \x01(\tR\x0eAIPresetPrompt\x12\"\n" +
 	"\fAIPlanPrompt\x18\n" +
-	" \x01(\tR\fAIPlanPrompt\"D\n" +
+	" \x01(\tR\fAIPlanPrompt\x12(\n" +
+	"\x0fSingleModelMode\x18\v \x01(\bR\x0fSingleModelMode\"D\n" +
 	"\x1aIsLlamaServerReadyResponse\x12\x0e\n" +
 	"\x02Ok\x18\x01 \x01(\bR\x02Ok\x12\x16\n" +
 	"\x06Reason\x18\x02 \x01(\tR\x06Reason\"8\n" +

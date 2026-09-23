@@ -143,6 +143,12 @@ func NewSfSearch(fs filesys_interface.FileSystem, t *testing.T, opt ...ssaconfig
 			ssadb.DeleteProgram(ssadb.GetDB(), progName)
 		})
 	}
+	// These tests exercise persisted search results. With an in-process gRPC
+	// server the compiler and handler share the program cache; explicitly drop
+	// this program so the request reads the saved representation, as it did
+	// when the handler lived in a separate process.
+	ssaapi.ProgramCache.Remove(progName)
+	t.Cleanup(func() { ssaapi.ProgramCache.Remove(progName) })
 	_, err = ssaapi.FromDatabase(progName)
 	require.NoError(t, err)
 

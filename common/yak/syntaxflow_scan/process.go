@@ -76,6 +76,7 @@ type RuleProcessInfo struct {
 
 	// running status `json:""`
 	Finished  bool  `json:"finished"`
+	Skipped   bool  `json:"skipped"`
 	Error     error `json:"error"`
 	RiskCount int64 `json:"risk_count"`
 
@@ -269,14 +270,35 @@ func (p *processMonitor) snapshotInfoList(withRule bool) *RuleProcessInfoList {
 func (p *processMonitor) UpdateRuleError(program, rule string, err error) {
 	key := rule + "@" + program
 	ruleInfo, ok := p.Status.Get(key)
+	if !ok {
+		// Fast failures never fire an in-flight progress callback, so the
+		// success-path gap also applies here: create the row so the next
+		// with-rule snapshot can report the name and error.
+		ruleInfo = &RuleProcessInfo{
+			RuleName:    rule,
+			ProgramName: program,
+			StartTime:   time.Now().Unix(),
+		}
+	}
 
+	now := time.Now().Unix()
+	ruleInfo.UpdateTime = now
+	ruleInfo.Progress = 1
+	ruleInfo.Finished = true
+	ruleInfo.Error = err
+	ruleInfo.EndTime = now
+	p.Status.Set(key, ruleInfo)
+}
+
+func (p *processMonitor) UpdateRuleSkipped(program, rule, reason string) {
+	p.UpdateRuleStatus(program, rule, 1, reason)
+	key := rule + "@" + program
+	ruleInfo, ok := p.Status.Get(key)
 	if !ok {
 		return
 	}
-
-	ruleInfo.Progress = 1
-	ruleInfo.Error = err
-	ruleInfo.EndTime = time.Now().Unix()
+	ruleInfo.Skipped = true
+	ruleInfo.Finished = true
 	p.Status.Set(key, ruleInfo)
 }
 

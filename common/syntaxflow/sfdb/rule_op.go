@@ -111,8 +111,9 @@ func MigrateSyntaxFlowWithDB(db *gorm.DB, hash string, i *schema.SyntaxFlowRule)
 		i.Hash = i.CalcHash()
 		// only one rule, check and update
 		rule := rules[0]
-		if rule.Hash != hash {
-			// if same name, but different content, update
+		if rule.Hash != hash || (rule.OpCodes == "" && i.OpCodes != "") {
+			// Also repair legacy rows without opcodes: compiled opcodes are
+			// intentionally excluded from CalcHash.
 			return db.Model(&rule).Updates(i).Error
 		}
 		return nil
@@ -149,11 +150,17 @@ func DeleteRuleByRuleName(name string) error {
 }
 
 func DeleteBuildInRule() error {
-	db := consts.GetGormProfileDatabase()
+	return DeleteBuildInRuleWithDB(consts.GetGormProfileDatabase())
+}
+
+func DeleteBuildInRuleWithDB(db *gorm.DB) error {
+	if db == nil {
+		return utils.Error("profile db is nil")
+	}
 	return utils.GormTransaction(db, func(tx *gorm.DB) error {
 		// 1. 查询所有内置规则
 		var rules []*schema.SyntaxFlowRule
-		if err := tx.Preload("Groups").Where("is_build_in_rule = ?", true).Find(&rules).Error; err != nil {
+		if err := tx.Unscoped().Preload("Groups").Where("is_build_in_rule = ?", true).Find(&rules).Error; err != nil {
 			return err
 		}
 
@@ -221,6 +228,7 @@ func CreateRuleByContentExWithDB(db *gorm.DB, ruleFileName string, content strin
 	if db == nil {
 		return nil, utils.Errorf("profile db is nil")
 	}
+
 	ruleType, err := CheckSyntaxFlowRuleType(ruleFileName)
 	if err != nil {
 		log.Error(err)
@@ -228,6 +236,20 @@ func CreateRuleByContentExWithDB(db *gorm.DB, ruleFileName string, content strin
 	rule, err := CheckSyntaxFlowRuleContent(content)
 	if err != nil {
 		return nil, err
+	}
+	return FinalizeCompiledRuleWithDB(db, ruleFileName, content, filePath, buildIn, rule, ruleType, tags...)
+}
+
+// FinalizeCompiledRuleWithDB stores an already-compiled rule. The sync path
+// compiles rules in parallel (the ANTLR parse dominates a cold import) and then
+// funnels every rule through this single-writer path, so the profile DB is
+// never hit by concurrent writers.
+func FinalizeCompiledRuleWithDB(db *gorm.DB, ruleFileName string, content string, filePath string, buildIn bool, rule *schema.SyntaxFlowRule, ruleType schema.SyntaxFlowRuleType, tags ...string) (*schema.SyntaxFlowRule, error) {
+	if db == nil {
+		return nil, utils.Errorf("profile db is nil")
+	}
+	if rule == nil {
+		return nil, utils.Errorf("compiled syntax flow rule is nil")
 	}
 	applyFilenameLanguageFallback(rule, ruleFileName)
 
@@ -310,6 +332,38 @@ func ImportRuleWithoutValidExWithDB(db *gorm.DB, ruleName string, content string
 
 func ImportRuleWithoutValidEx(ruleName string, content string, filePath string, buildin bool, tags ...string) (*schema.SyntaxFlowRule, error) {
 	return ImportRuleWithoutValidExWithDB(consts.GetGormProfileDatabase(), ruleName, content, filePath, buildin, tags...)
+}
+
+// ImportCompiledRuleWithDB stores a rule that CheckSyntaxFlowRuleContent
+// already parsed.
+func ImportCompiledRuleWithDB(db *gorm.DB, ruleName string, content string, filePath string, buildin bool, rule *schema.SyntaxFlowRule, tags ...string) error {
+	ruleType, err := CheckSyntaxFlowRuleType(ruleName)
+	if err != nil {
+		log.Error(err)
+	}
+	if _, err := FinalizeCompiledRuleWithDB(db, ruleName, content, filePath, buildin, rule, ruleType, tags...); err != nil {
+		return utils.Wrapf(err, "create build in rule failed: %s", err)
+	}
+	return nil
+}
+
+// LoadStoredRulesForSync returns complete rules whose AST opcodes are already
+// available. Callers can reuse the rule directly when Content matches, without
+// maintaining a second, partial representation of parsed rule metadata.
+func LoadStoredRulesForSync(db *gorm.DB, buildin bool) ([]*schema.SyntaxFlowRule, error) {
+	if db == nil {
+		return nil, utils.Error("profile db is nil")
+	}
+	var rules []*schema.SyntaxFlowRule
+	if err := db.Where("is_build_in_rule = ?", buildin).
+		Where("op_codes IS NOT NULL AND op_codes != ''").
+		Find(&rules).Error; err != nil {
+		return nil, err
+	}
+	for _, rule := range rules {
+		rule.NormalizeMode()
+	}
+	return rules, nil
 }
 
 func ImportValidRule(system fi.FileSystem, ruleName string, content string) error {
@@ -568,13 +622,16 @@ func CreateRuleWithDefaultGroup(rule *schema.SyntaxFlowRule, groups ...string) (
 }
 
 func CreateOrUpdateRuleWithGroup(rule *schema.SyntaxFlowRule, groups ...string) (*schema.SyntaxFlowRule, error) {
+	return CreateOrUpdateRuleWithGroupDB(consts.GetGormProfileDatabase(), rule, groups...)
+}
+
+func CreateOrUpdateRuleWithGroupDB(db *gorm.DB, rule *schema.SyntaxFlowRule, groups ...string) (*schema.SyntaxFlowRule, error) {
 	if rule == nil {
 		return nil, utils.Errorf("create syntaxFlow rule failed: rule is nil")
 	}
 	if rule.RuleName == "" {
 		return nil, utils.Errorf("create syntaxFlow rule failed: rule name is empty")
 	}
-	db := consts.GetGormProfileDatabase()
 	db = db.Model(&schema.SyntaxFlowRule{})
 	// 只是创建规则而不带着组去创建，后续再添加组。
 	// 因为多对多的表直接创建会导致和该组相关的规则都被更新。

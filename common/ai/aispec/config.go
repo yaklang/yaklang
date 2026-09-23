@@ -6,6 +6,7 @@ import (
 	"context"
 	"io"
 	"os"
+	"reflect"
 	"strings"
 	"time"
 
@@ -28,6 +29,11 @@ import (
 // may not be fully buffered in memory.
 type RawHTTPRequestResponseCallback func(requestBytes []byte, responseHeaderBytes []byte, bodyPreview []byte, usageInfo *ChatUsage)
 type RawHTTPResponseHeaderCallback func(headerBytes []byte)
+
+// ModelInfoCallback receives the resolved provider/model and, for new callers,
+// the effective thinking level. The variadic form lets existing internal call
+// sites continue invoking it with provider/model only.
+type ModelInfoCallback func(provider, model string, thinkingLevel ...string)
 
 type AIConfig struct {
 	// gateway network config
@@ -103,10 +109,10 @@ type AIConfig struct {
 
 	// ModelInfoCallback is invoked after gateway CheckValid succeeds but before Chat,
 	// providing the resolved provider type and model name as early as possible.
-	ModelInfoCallback func(provider, model string)
+	ModelInfoCallback ModelInfoCallback
 	// ModelInfoConfirmCallback is invoked after Chat returns successfully,
 	// confirming the provider and model that actually produced the response.
-	ModelInfoConfirmCallback func(provider, model string)
+	ModelInfoConfirmCallback ModelInfoCallback
 
 	// RawHTTPResponseCallback is called with the raw HTTP response header and body preview
 	// when an AI response completes. Used for debugging AI call failures.
@@ -1300,7 +1306,9 @@ func WithToolChoice(choice any) AIConfigOption {
 	}
 }
 
-// WithModelInfoCallback 在选定模型并开始调用前触发的回调（导出名为 ai.modelInfoCallback）
+// WithModelInfoCallback 在选定模型并开始调用前触发的回调（导出名为 ai.modelInfoCallback）。
+// 兼容 func(provider, model string)；新调用方可使用
+// func(provider, model, thinkingLevel string) 获取最终思考强度。
 // 参数:
 //   - cb: 回调函数，参数为 (provider, model)
 //
@@ -1312,13 +1320,54 @@ func WithToolChoice(choice any) AIConfigOption {
 // opt = ai.modelInfoCallback(func(provider, model) { println(provider, model) })
 // println(opt)
 // ```
-func WithModelInfoCallback(cb func(provider, model string)) AIConfigOption {
-	return func(c *AIConfig) {
-		c.ModelInfoCallback = cb
+func normalizeModelInfoCallback(cb any) ModelInfoCallback {
+	// A typed-nil function is not a nil interface. Wrapping it would defer a
+	// nil-function panic until the gateway actually selects a model.
+	if value := reflect.ValueOf(cb); value.IsValid() && value.Kind() == reflect.Func && value.IsNil() {
+		return nil
+	}
+	switch callback := cb.(type) {
+	case nil:
+		return nil
+	case ModelInfoCallback:
+		return callback
+	case func(provider, model string):
+		return func(provider, model string, _ ...string) {
+			callback(provider, model)
+		}
+	case func(provider, model, thinkingLevel string):
+		return func(provider, model string, thinkingLevels ...string) {
+			thinkingLevel := ""
+			if len(thinkingLevels) > 0 {
+				thinkingLevel = thinkingLevels[0]
+			}
+			callback(provider, model, thinkingLevel)
+		}
+	case func(provider, model string, thinkingLevel ...string):
+		return ModelInfoCallback(callback)
+	default:
+		// Named legacy two-argument function types were accepted by the old
+		// strongly typed option. Convert only that exact signature.
+		legacyType := reflect.TypeOf((func(string, string))(nil))
+		if value := reflect.ValueOf(cb); value.IsValid() && value.Type().ConvertibleTo(legacyType) {
+			legacy := value.Convert(legacyType).Interface().(func(string, string))
+			return func(provider, model string, _ ...string) {
+				legacy(provider, model)
+			}
+		}
+		log.Warnf("unsupported model info callback type: %T", cb)
+		return nil
 	}
 }
 
-// WithModelInfoConfirmCallback 在模型调用成功确认后触发的回调（导出名为 ai.modelInfoConfirmCallback）
+func WithModelInfoCallback(cb any) AIConfigOption {
+	return func(c *AIConfig) {
+		c.ModelInfoCallback = normalizeModelInfoCallback(cb)
+	}
+}
+
+// WithModelInfoConfirmCallback 在模型调用成功确认后触发的回调（导出名为 ai.modelInfoConfirmCallback）。
+// 同时兼容二参数和包含 thinkingLevel 的三参数函数。
 // 参数:
 //   - cb: 回调函数，参数为 (provider, model)
 //
@@ -1330,9 +1379,9 @@ func WithModelInfoCallback(cb func(provider, model string)) AIConfigOption {
 // opt = ai.modelInfoConfirmCallback(func(provider, model) { println(provider, model) })
 // println(opt)
 // ```
-func WithModelInfoConfirmCallback(cb func(provider, model string)) AIConfigOption {
+func WithModelInfoConfirmCallback(cb any) AIConfigOption {
 	return func(c *AIConfig) {
-		c.ModelInfoConfirmCallback = cb
+		c.ModelInfoConfirmCallback = normalizeModelInfoCallback(cb)
 	}
 }
 

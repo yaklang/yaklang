@@ -1499,6 +1499,12 @@ Exports structured report (sarif/irify).`,
 			Usage: `exclude files by glob, e.g. targets/*, vendor/*`,
 		},
 
+		cli.BoolFlag{
+			Name: "no-save-risk",
+			Usage: "do not persist SyntaxFlow risks or audit result data; risks are still written to " +
+				"--output/report callbacks and scan task status is still recorded",
+		},
+
 		cli.StringFlag{
 			Name:  "syntaxflow,sf",
 			Usage: "custom rules: inline syntaxflow, .sf/.syntaxflow file, or directory",

@@ -381,11 +381,6 @@ func (r *ReActLoop) callAITransaction(streamWg *sync.WaitGroup, prompt string, n
 		"Understanding your request",
 		aicommon.WithStatusCode("reasoning.understanding"),
 	)
-	aiCallback := r.config.CallAI
-	if r.useSpeedPriorityAI {
-		aiCallback = r.config.CallSpeedPriorityAI
-	}
-
 	// Build request options common to both modes
 	requestOpts := []aicommon.AIRequestOption{
 		aicommon.WithAIRequest_CallerLabel(fmt.Sprintf("react-loop:%s", r.loopName)),
@@ -416,265 +411,281 @@ func (r *ReActLoop) callAITransaction(streamWg *sync.WaitGroup, prompt string, n
 		}
 	}
 
-	transactionErr := aicommon.CallAITransaction(
-		r.config,
-		prompt,
-		aiCallback,
-		func(resp *aicommon.AIResponse) error {
-			if ctxCanceled.IsSet() {
-				return nil
-			}
-			// The action parser can return after it has enough fields while the
-			// output stream is still draining. Capture the exact action response
-			// only after the stream finishes; assigning buf.String() immediately
-			// after ExtractActionFromStream can otherwise persist an empty or
-			// truncated action and make the replay record unusable.
-			// This also resets reasoning per concrete response, so rejected retry
-			// attempts cannot leak into the accepted replay record.
-			r.bindDecisionResponseCapture(resp)
-			boundEmitter := resp.BindEmitter(r.GetEmitter())
-			stream := resp.GetOutputStreamReader(
-				r.loopName,
-				true,
-				r.GetEmitter(),
-			)
-
-			buf := new(synchronizedResponseCapture)
-			stream = io.TeeReader(stream, buf)
-			tagOptions := r.buildActionTagOption(boundEmitter, streamWg, resp.GetTaskIndex(), nonce)
-			// The immediate assignment below is intentionally only a snapshot. Once
-			// the parser consumes EOF, replace it with the full response for
-			// diagnostics and action recovery.
-			tagOptions = append(tagOptions, aicommon.WithActionOnReaderFinished(func() {
-				r.Set("last_ai_decision_response", buf.String())
-			}))
-			streamFields := r.streamFields.Copy()
-
-			for _, i := range r.GetAllActions() {
-				for _, field := range i.StreamFields {
-					streamFields.Set(field.FieldName, field)
-				}
-			}
-			var actionErr error
-			options := append(tagOptions, aicommon.WithActionAlias(actionNames...),
-				aicommon.WithActionFieldStreamHandler(
-					streamFields.Keys(),
-					func(key string, reader io.Reader) {
-						streamWg.Add(1)
-						doneOnce := utils.NewOnce()
-						done := func() {
-							doneOnce.Do(func() {
-								log.Debugf("stream handler for field [%s] done, streamWg.Done() called", key)
-								streamWg.Done()
-							})
-						}
-
-						// Ensure done is always called even if something goes wrong
-						defer func() {
-							if rec := recover(); rec != nil {
-								log.Errorf("stream handler for field [%s] panic recovered: %v", key, rec)
-								done()
-							}
-						}()
-
-						log.Debugf("stream handler started for field [%s]", key)
-						jsonReader := utils.JSONStringReader(reader)
-
-						fieldIns, ok := streamFields.Get(key)
-						if !ok {
-							log.Warnf("stream field [%s] not found in streamFields, skipping", key)
-							done()
-							return
-						}
-
-						pr, pw := utils.NewPipe()
-						copyStartTime := time.Now()
-						go func(field *LoopStreamField) {
-							defer func() {
-								pw.Close()
-								log.Debugf("stream copy goroutine for field [%s] completed, took %v", key, time.Since(copyStartTime))
-							}()
-							if field.StreamHandler != nil {
-								field.StreamHandler(jsonReader, pw)
-								return
-							}
-							if field.Prefix != "" {
-								pw.WriteString(field.Prefix + ": ")
-							}
-							n, copyErr := io.Copy(pw, jsonReader)
-							if copyErr != nil {
-								log.Warnf("stream copy for field [%s] error: %v (copied %d bytes)", key, copyErr, n)
-							} else {
-								log.Debugf("stream copy for field [%s] success, copied %d bytes", key, n)
-							}
-						}(fieldIns)
-
-						defaultNodeId := "re-act-loop-thought"
-						if fieldIns.AINodeId != "" {
-							defaultNodeId = fieldIns.AINodeId
-						}
-						// 把字段名作为流来源记录到 VizSource，让 viz 前端能区分
-						// 这条 think/assistant 流来自 AI 响应中的哪个字段（如 human_readable_thought
-						// 还是 modify_code_reason）。不污染 ContentType，避免破坏前端按 MIME 主类型解析。
-						contentType := fieldIns.ContentType
-						preparedReader, readable, readableErr := waitReadableStream(pr)
-						if readableErr != nil {
-							log.Warnf("stream handler for field [%s] failed waiting first byte: %v", key, readableErr)
-							done()
-							return
-						}
-						if !readable {
-							log.Debugf("stream handler for field [%s] got empty stream, skipping empty emit", key)
-							done()
-							return
-						}
-
-						_, emitErr := boundEmitter.EmitStreamEventWithVizSource(
-							defaultNodeId,
-							preparedReader,
-							resp.GetTaskIndex(),
-							contentType,
-							fieldIns.FieldName,
-							fieldIns.IsSystem,
-							func() {
-								log.Debugf("stream emit callback for field [%s] triggered", key)
-								done()
-							},
-						)
-						if emitErr != nil {
-							log.Errorf("EmitStreamEvent for field [%s] failed: %v", key, emitErr)
-							done() // Ensure done is called even on error
-							return
-						}
-					}),
-			)
-
-			r.UserStatus(
-				"正在梳理思路",
-				"Organizing the next steps",
-				aicommon.WithStatusCode("reasoning.organizing"),
-			)
-			extractStart := time.Now()
-			action, actionErr = aicommon.ExtractActionFromStream(
-				activeTaskCtx,
-				stream,
-				"object",
-				options...,
-			)
-			log.Debugf("ExtractActionFromStream completed, took %v, error: %v", time.Since(extractStart), actionErr)
-			r.Set("last_ai_decision_nonce", nonce)
-
-			if actionErr != nil {
-				r.UserStatus(
-					"刚才的信息不够完整，正在重新整理",
-					"The previous response was incomplete; reorganizing it",
-					aicommon.WithStatusCode("reasoning.recovering"),
-					aicommon.WithStatusState(aicommon.StatusStateRecovering),
-				)
-				log.Errorf("ai response stream content before error: %s", buf.String())
-				if currentCtxCanceled() {
-					actionErr = utils.Wrap(actionErr, "task context canceled while parsing action")
-				}
-				return utils.Wrap(actionErr, "failed to parse action")
-			}
-			observedActionType := ""
-			admittedActionType := ""
-			if action != nil {
-				// ActionType waits until @action is admitted or parsing finishes.
-				// Read the raw observation afterwards so an unsupported value cannot
-				// race with the asynchronous parser and be mislabeled as missing.
-				admittedActionType = strings.TrimSpace(action.ActionType())
-				observedActionType = strings.TrimSpace(action.ObservedActionType())
-			}
-			actionType := getNextActionType(action)
-			if observedActionType != "" && admittedActionType == "" {
-				r.UserStatus(
-					"当前思路还不够合适，正在重新整理",
-					"The current approach needs adjustment; reorganizing it",
-					aicommon.WithStatusCode("reasoning.adjusting"),
-					aicommon.WithStatusState(aicommon.StatusStateRecovering),
-				)
-				log.Errorf("ai response stream content before error: %s", buf.String())
-				unsupportedErr := actionTypeResolutionError(
-					observedActionType,
-					actionNames,
-					"a non-empty @action or action value was parsed, but it did not exactly match any action registered in this loop",
-				)
-				if currentCtxCanceled() {
-					unsupportedErr = utils.Wrap(unsupportedErr, "task context canceled while parsing action")
-				}
-				return unsupportedErr
-			}
-			if actionType == "" {
-				r.UserStatus(
-					"正在重新确认下一步",
-					"Reconsidering the next step",
-					aicommon.WithStatusCode("reasoning.reconsidering"),
-					aicommon.WithStatusState(aicommon.StatusStateRecovering),
-				)
-				log.Errorf("ai response stream content before error: %s", buf.String())
-				missingErr := actionTypeResolutionError(
-					"",
-					actionNames,
-					"no non-empty @action or action value was found and legacy payload inference found no known action",
-				)
-				if currentCtxCanceled() {
-					missingErr = utils.Wrap(missingErr, "task context canceled while parsing action")
-				}
-				return missingErr
-			}
-			if !utils.StringArrayContains(actionNames, actionType) {
-				r.UserStatus(
-					"正在换一种方式继续",
-					"Switching to another approach",
-					aicommon.WithStatusCode("reasoning.fallback"),
-					aicommon.WithStatusState(aicommon.StatusStateRecovering),
-				)
-				return actionTypeResolutionError(
-					actionType,
-					actionNames,
-					"legacy payload inference produced an action type that has no handler in this loop",
-				)
-			}
-
-			r.UserStatus(
-				"已经找到下一步，正在准备执行",
-				"The next step is ready and being prepared",
-				aicommon.WithStatusCode("action.preparing"),
-			)
-			log.Infof("action type extracted: %s", actionType)
-
-			verifier, err := r.GetActionHandler(actionType)
-			if err != nil {
-				resolutionErr := actionTypeResolutionError(
-					actionType,
-					actionNames,
-					fmt.Sprintf("the action name was admitted but handler lookup failed: %v", err),
-				)
-				r.GetInvoker().AddToTimeline("error", resolutionErr.Error())
-				return resolutionErr
-			}
-			if utils.IsNil(verifier) {
-				return utils.Errorf("action[%s] verifier is nil", actionType)
-			}
-			// TODO validation must run first. Otherwise an invalid delta can
-			// masquerade as progress while an action verifier runs (notably the
-			// duplicate directly_answer guard), then be removed afterwards.
-			validateTodoDeltaBeforeActionVerifier(r, action)
-			if verifier.ActionVerifier != nil {
-				r.UserStatus(
-					"正在确认关键细节",
-					"Checking the important details",
-					aicommon.WithStatusCode("action.verifying"),
-				)
-				if err := verifier.ActionVerifier(r, action); err != nil {
-					return err
-				}
-			}
+	postHandler := func(resp *aicommon.AIResponse) error {
+		if ctxCanceled.IsSet() {
 			return nil
-		},
-		requestOpts...,
-	)
+		}
+		// The action parser can return after it has enough fields while the
+		// output stream is still draining. Capture the exact action response
+		// only after the stream finishes; assigning buf.String() immediately
+		// after ExtractActionFromStream can otherwise persist an empty or
+		// truncated action and make the replay record unusable.
+		// This also resets reasoning per concrete response, so rejected retry
+		// attempts cannot leak into the accepted replay record.
+		r.bindDecisionResponseCapture(resp)
+		boundEmitter := resp.BindEmitter(r.GetEmitter())
+		stream := resp.GetOutputStreamReader(
+			r.loopName,
+			true,
+			r.GetEmitter(),
+		)
+
+		buf := new(synchronizedResponseCapture)
+		stream = io.TeeReader(stream, buf)
+		tagOptions := r.buildActionTagOption(boundEmitter, streamWg, resp.GetTaskIndex(), nonce)
+		// The immediate assignment below is intentionally only a snapshot. Once
+		// the parser consumes EOF, replace it with the full response for
+		// diagnostics and action recovery.
+		tagOptions = append(tagOptions, aicommon.WithActionOnReaderFinished(func() {
+			r.Set("last_ai_decision_response", buf.String())
+		}))
+		streamFields := r.streamFields.Copy()
+
+		for _, i := range r.GetAllActions() {
+			for _, field := range i.StreamFields {
+				streamFields.Set(field.FieldName, field)
+			}
+		}
+		var actionErr error
+		options := append(tagOptions, aicommon.WithActionAlias(actionNames...),
+			aicommon.WithActionFieldStreamHandler(
+				streamFields.Keys(),
+				func(key string, reader io.Reader) {
+					streamWg.Add(1)
+					doneOnce := utils.NewOnce()
+					done := func() {
+						doneOnce.Do(func() {
+							log.Debugf("stream handler for field [%s] done, streamWg.Done() called", key)
+							streamWg.Done()
+						})
+					}
+
+					// Ensure done is always called even if something goes wrong
+					defer func() {
+						if rec := recover(); rec != nil {
+							log.Errorf("stream handler for field [%s] panic recovered: %v", key, rec)
+							done()
+						}
+					}()
+
+					log.Debugf("stream handler started for field [%s]", key)
+					jsonReader := utils.JSONStringReader(reader)
+
+					fieldIns, ok := streamFields.Get(key)
+					if !ok {
+						log.Warnf("stream field [%s] not found in streamFields, skipping", key)
+						done()
+						return
+					}
+
+					pr, pw := utils.NewPipe()
+					copyStartTime := time.Now()
+					go func(field *LoopStreamField) {
+						defer func() {
+							pw.Close()
+							log.Debugf("stream copy goroutine for field [%s] completed, took %v", key, time.Since(copyStartTime))
+						}()
+						if field.StreamHandler != nil {
+							field.StreamHandler(jsonReader, pw)
+							return
+						}
+						if field.Prefix != "" {
+							pw.WriteString(field.Prefix + ": ")
+						}
+						n, copyErr := io.Copy(pw, jsonReader)
+						if copyErr != nil {
+							log.Warnf("stream copy for field [%s] error: %v (copied %d bytes)", key, copyErr, n)
+						} else {
+							log.Debugf("stream copy for field [%s] success, copied %d bytes", key, n)
+						}
+					}(fieldIns)
+
+					defaultNodeId := "re-act-loop-thought"
+					if fieldIns.AINodeId != "" {
+						defaultNodeId = fieldIns.AINodeId
+					}
+					// 把字段名作为流来源记录到 VizSource，让 viz 前端能区分
+					// 这条 think/assistant 流来自 AI 响应中的哪个字段（如 human_readable_thought
+					// 还是 modify_code_reason）。不污染 ContentType，避免破坏前端按 MIME 主类型解析。
+					contentType := fieldIns.ContentType
+					preparedReader, readable, readableErr := waitReadableStream(pr)
+					if readableErr != nil {
+						log.Warnf("stream handler for field [%s] failed waiting first byte: %v", key, readableErr)
+						done()
+						return
+					}
+					if !readable {
+						log.Debugf("stream handler for field [%s] got empty stream, skipping empty emit", key)
+						done()
+						return
+					}
+
+					_, emitErr := boundEmitter.EmitStreamEventWithVizSource(
+						defaultNodeId,
+						preparedReader,
+						resp.GetTaskIndex(),
+						contentType,
+						fieldIns.FieldName,
+						fieldIns.IsSystem,
+						func() {
+							log.Debugf("stream emit callback for field [%s] triggered", key)
+							done()
+						},
+					)
+					if emitErr != nil {
+						log.Errorf("EmitStreamEvent for field [%s] failed: %v", key, emitErr)
+						done() // Ensure done is called even on error
+						return
+					}
+				}),
+		)
+
+		r.UserStatus(
+			"正在梳理思路",
+			"Organizing the next steps",
+			aicommon.WithStatusCode("reasoning.organizing"),
+		)
+		extractStart := time.Now()
+		action, actionErr = aicommon.ExtractActionFromStream(
+			activeTaskCtx,
+			stream,
+			"object",
+			options...,
+		)
+		log.Debugf("ExtractActionFromStream completed, took %v, error: %v", time.Since(extractStart), actionErr)
+		r.Set("last_ai_decision_nonce", nonce)
+
+		if actionErr != nil {
+			r.UserStatus(
+				"刚才的信息不够完整，正在重新整理",
+				"The previous response was incomplete; reorganizing it",
+				aicommon.WithStatusCode("reasoning.recovering"),
+				aicommon.WithStatusState(aicommon.StatusStateRecovering),
+			)
+			log.Errorf("ai response stream content before error: %s", buf.String())
+			if currentCtxCanceled() {
+				actionErr = utils.Wrap(actionErr, "task context canceled while parsing action")
+			}
+			return utils.Wrap(actionErr, "failed to parse action")
+		}
+		observedActionType := ""
+		admittedActionType := ""
+		if action != nil {
+			// ActionType waits until @action is admitted or parsing finishes.
+			// Read the raw observation afterwards so an unsupported value cannot
+			// race with the asynchronous parser and be mislabeled as missing.
+			admittedActionType = strings.TrimSpace(action.ActionType())
+			observedActionType = strings.TrimSpace(action.ObservedActionType())
+		}
+		actionType := getNextActionType(action)
+		if observedActionType != "" && admittedActionType == "" {
+			r.UserStatus(
+				"当前思路还不够合适，正在重新整理",
+				"The current approach needs adjustment; reorganizing it",
+				aicommon.WithStatusCode("reasoning.adjusting"),
+				aicommon.WithStatusState(aicommon.StatusStateRecovering),
+			)
+			log.Errorf("ai response stream content before error: %s", buf.String())
+			unsupportedErr := actionTypeResolutionError(
+				observedActionType,
+				actionNames,
+				"a non-empty @action or action value was parsed, but it did not exactly match any action registered in this loop",
+			)
+			if currentCtxCanceled() {
+				unsupportedErr = utils.Wrap(unsupportedErr, "task context canceled while parsing action")
+			}
+			return unsupportedErr
+		}
+		if actionType == "" {
+			r.UserStatus(
+				"正在重新确认下一步",
+				"Reconsidering the next step",
+				aicommon.WithStatusCode("reasoning.reconsidering"),
+				aicommon.WithStatusState(aicommon.StatusStateRecovering),
+			)
+			log.Errorf("ai response stream content before error: %s", buf.String())
+			missingErr := actionTypeResolutionError(
+				"",
+				actionNames,
+				"no non-empty @action or action value was found and legacy payload inference found no known action",
+			)
+			if currentCtxCanceled() {
+				missingErr = utils.Wrap(missingErr, "task context canceled while parsing action")
+			}
+			return missingErr
+		}
+		if !utils.StringArrayContains(actionNames, actionType) {
+			r.UserStatus(
+				"正在换一种方式继续",
+				"Switching to another approach",
+				aicommon.WithStatusCode("reasoning.fallback"),
+				aicommon.WithStatusState(aicommon.StatusStateRecovering),
+			)
+			return actionTypeResolutionError(
+				actionType,
+				actionNames,
+				"legacy payload inference produced an action type that has no handler in this loop",
+			)
+		}
+
+		r.UserStatus(
+			"已经找到下一步，正在准备执行",
+			"The next step is ready and being prepared",
+			aicommon.WithStatusCode("action.preparing"),
+		)
+		log.Infof("action type extracted: %s", actionType)
+
+		verifier, err := r.GetActionHandler(actionType)
+		if err != nil {
+			resolutionErr := actionTypeResolutionError(
+				actionType,
+				actionNames,
+				fmt.Sprintf("the action name was admitted but handler lookup failed: %v", err),
+			)
+			r.GetInvoker().AddToTimeline("error", resolutionErr.Error())
+			return resolutionErr
+		}
+		if utils.IsNil(verifier) {
+			return utils.Errorf("action[%s] verifier is nil", actionType)
+		}
+		// TODO validation must run first. Otherwise an invalid delta can
+		// masquerade as progress while an action verifier runs (notably the
+		// duplicate directly_answer guard), then be removed afterwards.
+		validateTodoDeltaBeforeActionVerifier(r, action)
+		if verifier.ActionVerifier != nil {
+			r.UserStatus(
+				"正在确认关键细节",
+				"Checking the important details",
+				aicommon.WithStatusCode("action.verifying"),
+			)
+			if err := verifier.ActionVerifier(r, action); err != nil {
+				return err
+			}
+		}
+		return nil
+	}
+	var transactionErr error
+	if r.useSpeedPriorityAI {
+		// Config owns execution, not just policy lookup. LiteForge runs each
+		// response through the existing streaming parser and verifier within its
+		// retry transaction; the loop never supplies an AI caller override.
+		r.config.ScheduleAuxiliaryTask(activeTaskCtx, fmt.Sprintf("react-loop:%s", r.loopName),
+			func() string { return prompt },
+			func(accepted *aicommon.Action) { action = accepted },
+			aicommon.WithAuxiliaryResponseHandler(func(resp *aicommon.AIResponse) (*aicommon.Action, error) {
+				action = nil
+				if err := postHandler(resp); err != nil {
+					return nil, err
+				}
+				return action, nil
+			}),
+			aicommon.WithAuxiliaryEmitter(r.GetEmitter()),
+			aicommon.WithAuxiliaryOpts(aicommon.WithGeneralConfigExtraRequestOpts(requestOpts...)),
+			aicommon.WithAuxiliaryOnError(func(err error) { transactionErr = err }),
+		)
+	} else {
+		transactionErr = aicommon.CallAITransaction(r.config, prompt, r.config.CallAI, postHandler, requestOpts...)
+	}
 	if transactionErr != nil {
 		r.UserStatus(
 			"暂时没能完成这一步",

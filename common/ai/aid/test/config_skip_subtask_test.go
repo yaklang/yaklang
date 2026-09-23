@@ -66,6 +66,8 @@ func SyncInputEventWithJSON(syncType string, syncId string, params map[string]an
 	}
 }
 
+// These fixtures use short task names: the assertions cover task selection and
+// interaction, while auxiliary_identifier_test.go covers AI naming and Skip.
 func TestCoordinator_SkipSubtaskInPlan(t *testing.T) {
 	inputChan := chanx.NewUnlimitedChan[*ypb.AIInputEvent](context.Background(), 100)
 	outputChan := make(chan *schema.AiOutputEvent, 100)
@@ -1403,7 +1405,7 @@ func TestCoordinator_SkipSubtaskInPlan_BySubtaskId(t *testing.T) {
 
 			planJSON := `{
     "@action": "plan_from_document",
-    "main_task": "测试通过 subtask_id 跳过子任务",
+    "main_task": "按subtask_id跳过",
     "main_task_goal": "验证通过 subtask_id 跳过子任务",
     "tasks": [
         {"subtask_name": "第一个任务", "subtask_goal": "执行第一个任务"},
@@ -1819,7 +1821,7 @@ func TestCoordinator_SkipSubtaskInPlan_NoIndexOrSubtaskId(t *testing.T) {
 
 			planJSON := `{
     "@action": "plan_from_document",
-    "main_task": "测试无 index 和 subtask_id",
+    "main_task": "测试缺少任务定位参数",
     "main_task_goal": "验证无定位参数时返回错误",
     "tasks": [
         {"subtask_name": "任务A", "subtask_goal": "目标A"}
@@ -1936,7 +1938,7 @@ func TestCoordinator_RedoSubtaskInPlan_BySubtaskId(t *testing.T) {
 
 			planJSON := `{
     "@action": "plan_from_document",
-    "main_task": "测试通过 subtask_id 重做子任务",
+    "main_task": "按subtask_id重做",
     "main_task_goal": "验证通过 subtask_id 重做子任务",
     "tasks": [
         {"subtask_name": "第一个任务", "subtask_goal": "执行第一个任务"},
@@ -2074,7 +2076,7 @@ func TestCoordinator_RedoSubtaskInPlan_SubtaskIdNotFound(t *testing.T) {
 
 			planJSON := `{
     "@action": "plan_from_document",
-    "main_task": "测试 redo subtask_id 不存在",
+    "main_task": "测试重做不存在的任务",
     "main_task_goal": "验证 redo subtask_id 不存在时返回错误",
     "tasks": [
         {"subtask_name": "任务A", "subtask_goal": "目标A"}

@@ -11,6 +11,7 @@ TEST_TIMEOUT="${TEST_TIMEOUT:-2m}"      # -test.timeout
 TEST_VERBOSE="${TEST_VERBOSE:-1}"       # 1=开启 -test.v
 TEST_PARALLEL="${TEST_PARALLEL:-}"      # -test.parallel（包内并发，留空则不设置）
 TEST_RUN_PATTERN="${TEST_RUN_PATTERN:-}"  # -test.run（用来选择子集）
+TEST_SHUFFLE="${TEST_SHUFFLE:-off}"  # on, off, or a reproducible Go test seed
 TEST_SKIP_PATTERN="${TEST_SKIP_PATTERN:-}"  # -test.skip（用来跳过某些测试）
 
 # 包级别配置文件路径
@@ -159,7 +160,7 @@ run_test() {
   local delay="${retry_delay:-5}"
   
   # 构建测试参数
-  local args=( "-test.timeout=$timeout" )
+  local args=( "-test.timeout=$timeout" "-test.shuffle=$TEST_SHUFFLE" )
   [[ -n "$parallel" ]] && args+=("-test.parallel=$parallel")
   [[ "$TEST_VERBOSE" = "1" ]] && args+=("-test.v")
   [[ -n "$run_pattern" ]] && args+=("-test.run=$run_pattern")

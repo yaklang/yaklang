@@ -124,6 +124,15 @@ func queryTargetName(target ssaapi.SyntaxFlowQueryInstance) string {
 	return target.GetProgramName()
 }
 
+func (m *scanManager) skipRule(program, rule, reason string) {
+	m.markRuleSkipped()
+	if m.processMonitor == nil {
+		return
+	}
+	m.processMonitor.UpdateRuleSkipped(program, rule, reason)
+	m.processMonitor.EmitEvent()
+}
+
 func ruleMatchesQueryTarget(rule *schema.SyntaxFlowRule, target ssaapi.SyntaxFlowQueryInstance) bool {
 	if rule == nil || target == nil {
 		return false
@@ -147,20 +156,21 @@ func ruleMatchesQueryTarget(rule *schema.SyntaxFlowRule, target ssaapi.SyntaxFlo
 }
 
 func (m *scanManager) Query(rule *schema.SyntaxFlowRule, target ssaapi.SyntaxFlowQueryInstance) {
+	targetName := queryTargetName(target)
 	if !ruleMatchesQueryTarget(rule, target) {
-		m.markRuleSkipped()
+		m.skipRule(targetName, rule.RuleName, "skipped: target-mode mismatch")
 		return
 	}
 	if rule.IsStructMode() {
 		if prog, ok := target.(*ssaapi.Program); ok && prog.StructRulesAlreadyRan(rule) {
-			m.markRuleSkipped()
+			m.skipRule(targetName, rule.RuleName, "skipped: struct already ran")
 			return
 		}
 	}
 	// 语言匹配检查（source 模式规则按文件 glob 过滤，不强制语言对齐）
 	if !m.Config.GetScanIgnoreLanguage() && !rule.IsSourceMode() {
 		if rule.Language != ssaconfig.General && rule.Language != target.GetLanguage() {
-			m.markRuleSkipped()
+			m.skipRule(targetName, rule.RuleName, "skipped: language mismatch")
 			return
 		}
 	}
@@ -195,7 +205,6 @@ func (m *scanManager) Query(rule *schema.SyntaxFlowRule, target ssaapi.SyntaxFlo
 	// for hours even within the wall-clock budget. Exceeding it cancels ruleCtx
 	// (via ruleCancel) so the existing ctx-bail path surfaces partial results.
 	// 0 means no work budget (only the wall-clock RuleTimeout applies).
-	targetName := queryTargetName(target)
 	baseWorkLimit := m.Config.GetScanRuleWorkLimit()
 	totalLines := 0
 	if lineCounter, ok := target.(interface{ TotalLines() int }); ok {
@@ -218,6 +227,7 @@ func (m *scanManager) Query(rule *schema.SyntaxFlowRule, target ssaapi.SyntaxFlo
 		var ruleRecorder *diagnostics.Recorder
 		option := []ssaapi.QueryOption{}
 		option = append(option,
+			ssaapi.QueryWithSSAConfig(m.Config.Config),
 			ssaapi.QueryWithContext(ruleCtx),
 			ssaapi.QueryWithTaskID(m.taskID),
 			ssaapi.QueryWithProcessCallback(func(f float64, info string) {
@@ -276,6 +286,11 @@ func (m *scanManager) Query(rule *schema.SyntaxFlowRule, target ssaapi.SyntaxFlo
 		} else if err == nil {
 			m.StatusTask(res)
 			m.markRuleSuccess()
+			// A finished rule must enter the process monitor's status table.
+			// Fast rules never fire an in-flight progress callback, so without
+			// this terminal update they stay invisible to every rule-detail
+			// snapshot (only the finished counter moves).
+			m.processMonitor.UpdateRuleStatus(targetName, rule.RuleName, 1, "")
 		} else {
 			m.processMonitor.UpdateRuleError(targetName, rule.RuleName, err)
 			m.StatusTask(nil)

@@ -19,9 +19,12 @@ func TestVerifyAIConfig(t *testing.T) {
 		ResetVerification()
 	}()
 
-	// Test with disabled config (should pass)
+	// The legacy Enabled field is ignored when a valid global config exists.
 	consts.SetTieredAIConfig(&consts.TieredAIConfig{
 		Enabled: false,
+		IntelligentConfigs: []*ypb.AIModelConfig{
+			{Provider: &ypb.ThirdPartyApplicationConfig{Type: "aibalance", APIKey: "test-key"}, ModelName: "test-model"},
+		},
 	})
 	err := VerifyAIConfig()
 	assert.NoError(t, err)
@@ -52,16 +55,15 @@ func TestVerifyAIConfig(t *testing.T) {
 	})
 	err = VerifyAIConfig()
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "no model configurations are available")
+	assert.Contains(t, err.Error(), "no model configurations available")
 
 	// Reset for next test
 	ResetVerification()
 
-	// Test with nil config but enabled flag (should fail via GetTieredAIConfig returning nil)
-	// This is a special case that shouldn't happen in practice
+	// No global config keeps the legacy AI path available and needs no verification.
 	consts.SetTieredAIConfig(nil)
 	err = VerifyAIConfig()
-	assert.NoError(t, err) // nil config means disabled, so no error
+	assert.NoError(t, err)
 }
 
 func TestVerifyOnce(t *testing.T) {

@@ -7,12 +7,13 @@ import (
 	"io"
 	"path/filepath"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/yaklang/gorm"
 	"github.com/stretchr/testify/require"
+	"github.com/yaklang/gorm"
 
 	"github.com/segmentio/ksuid"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
@@ -50,12 +51,45 @@ func (m *mockEmbeddingClient) EmbeddingRaw(text string) ([][]float32, error) {
 // MockAIMemoryInvoker wraps the ReAct instance and mocks InvokeLiteForge for memory triage
 type MockAIMemoryInvoker struct {
 	*ReAct
-	memoryTriageCallCount int
+	memoryTriageCallCount atomic.Int32
+}
+
+type memoryAuxiliaryTestConfig struct {
+	aicommon.AICallerConfigIf
+	invoker *MockAIMemoryInvoker
+}
+
+func (m *MockAIMemoryInvoker) GetConfig() aicommon.AICallerConfigIf {
+	return &memoryAuxiliaryTestConfig{AICallerConfigIf: m.ReAct.GetConfig(), invoker: m}
+}
+
+func (c *memoryAuxiliaryTestConfig) ScheduleAuxiliaryTask(ctx context.Context, name string, build func() string, onResult func(*aicommon.Action), opts ...aicommon.AuxiliaryTaskOption) {
+	spec := &aicommon.AuxiliaryTaskSpec{}
+	for _, opt := range opts {
+		opt(spec)
+	}
+	if !c.ResolveAuxiliaryTask(name).ShouldRun() {
+		return
+	}
+	prompt := build()
+	if prompt == "" {
+		return
+	}
+	action, err := c.invoker.InvokeLiteForge(ctx, name, prompt, spec.Outputs, spec.Opts...)
+	if err != nil {
+		if spec.OnError != nil {
+			spec.OnError(err)
+		}
+		return
+	}
+	if onResult != nil {
+		onResult(action)
+	}
 }
 
 func (m *MockAIMemoryInvoker) InvokeLiteForge(ctx context.Context, actionName string, prompt string, outputs []aitool.ToolOption, opts ...aicommon.GeneralKVConfigOption) (*aicommon.Action, error) {
 	if actionName == "memory-triage" {
-		m.memoryTriageCallCount++
+		m.memoryTriageCallCount.Add(1)
 		mockResponseJSON := `{
 			"@action": "memory-triage",
 			"memory_entities": [
@@ -360,9 +394,9 @@ LOOP:
 
 	var memoryEntities []schema.AIMemoryEntity
 	require.Eventually(t, func() bool {
-		return mockInvoker.memoryTriageCallCount > 0
+		return mockInvoker.memoryTriageCallCount.Load() > 0
 	}, 3*time.Second, 50*time.Millisecond, "Expected AIMemory mock to be called, but it was not")
-	fmt.Printf("AIMemory mock was called %d times\n", mockInvoker.memoryTriageCallCount)
+	fmt.Printf("AIMemory mock was called %d times\n", mockInvoker.memoryTriageCallCount.Load())
 
 	require.Eventually(t, func() bool {
 		memoryEntities = nil

@@ -88,7 +88,6 @@ func buildInitTask(r aicommon.AIInvokeRuntime, holder *searcherHolder, installCf
 		)
 
 		if needLiteforge {
-			renderedPrompt := buildYaklangAnalyzeRequirementPrompt(analyzeOpts)
 			toolOptions := buildYaklangAnalyzeRequirementToolOptions(analyzeOpts, hasSearcher)
 
 			forgeOptions := []aicommon.GeneralKVConfigOption{}
@@ -97,27 +96,31 @@ func buildInitTask(r aicommon.AIInvokeRuntime, holder *searcherHolder, installCf
 			}
 
 			reactloops.EmitStatusI18n(loop, "开始分析用户需求...", "Analyzing user requirements...")
-			step1Result, err := r.InvokeSpeedPriorityLiteForge(
+			analyzeErr := utils.Error("failed to analyze requirement: no result")
+			r.GetConfig().ScheduleAuxiliaryTask(
 				task.GetContext(),
-				"analyze-requirement-and-search",
-				renderedPrompt,
-				toolOptions,
-				forgeOptions...,
+				aicommon.CallerLabelAnalyzeRequirementAndSearch,
+				func() string { return buildYaklangAnalyzeRequirementPrompt(analyzeOpts) },
+				func(step1Result *aicommon.Action) {
+					analyzeErr = nil
+					if hasAttachedPath {
+						existed = step1Result.GetString("existed_filepath")
+					}
+					reason = step1Result.GetString("reason")
+					coreLibraries = step1Result.GetStringSlice("core_libraries")
+					if hasSearcher {
+						searchPatterns = step1Result.GetStringSlice("search_patterns")
+						semanticQuestions = step1Result.GetStringSlice("semantic_questions")
+					}
+				},
+				aicommon.WithAuxiliaryOnError(func(err error) { analyzeErr = err }),
+				aicommon.WithAuxiliaryOutputs(toolOptions...),
+				aicommon.WithAuxiliaryOpts(forgeOptions...),
 			)
-			if err != nil {
-				log.Errorf("failed to invoke liteforge step 1: %v", err)
-				operator.Failed(utils.Errorf("failed to analyze requirement: %v", err))
+			if analyzeErr != nil {
+				log.Errorf("failed to analyze requirement: %v", analyzeErr)
+				operator.Failed(analyzeErr)
 				return
-			}
-
-			if hasAttachedPath {
-				existed = step1Result.GetString("existed_filepath")
-			}
-			reason = step1Result.GetString("reason")
-			coreLibraries = step1Result.GetStringSlice("core_libraries")
-			if hasSearcher {
-				searchPatterns = step1Result.GetStringSlice("search_patterns")
-				semanticQuestions = step1Result.GetStringSlice("semantic_questions")
 			}
 		} else {
 			log.Infof("skip liteforge file detection: target path already attached (%s)", attachedPath)

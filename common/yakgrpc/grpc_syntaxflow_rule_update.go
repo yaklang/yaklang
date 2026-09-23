@@ -6,7 +6,6 @@ import (
 	"context"
 
 	"github.com/yaklang/yaklang/common/syntaxflow/sfbuildin"
-	"github.com/yaklang/yaklang/common/syntaxflow/sfdb"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
@@ -33,8 +32,9 @@ func (s *Server) ApplySyntaxFlowRuleUpdate(req *ypb.ApplySyntaxFlowRuleUpdateReq
 			Message: msg,
 		})
 	}
-	sfdb.DeleteBuildInRule()
-	// 前端手动更新按钮 → 使用强制同步
+	// 前端手动更新按钮 → 使用强制同步。
+	// ForceSyncEmbedRule 内部会先编译新快照，成功后再整体替换内置规则，
+	// 所以这里不需要先显式删除：那样做会在同步失败时清空已安装的内置规则。
 	err := sfbuildin.ForceSyncEmbedRule(notify)
 	if err != nil {
 		return err

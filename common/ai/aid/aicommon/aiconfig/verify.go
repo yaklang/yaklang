@@ -37,17 +37,18 @@ func ResetVerification() {
 
 // doVerifyAIConfig performs the actual verification logic
 func doVerifyAIConfig() error {
-	// Check if tiered config is enabled
+	if consts.IsSingleAIModelMode() {
+		return consts.ValidateSingleAIModel(consts.FirstIntelligentModel(consts.GetIntelligentAIConfigs()))
+	}
+	// No global config means the caller can still use the legacy AI path.
 	if !consts.IsTieredAIModelConfigEnabled() {
-		// If tiered config is not enabled, we don't need to verify it
-		// The system will fall back to legacy configuration
-		log.Debugf("Tiered AI config is not enabled, skipping tiered config verification")
+		log.Debugf("Tiered AI config is not present, skipping tiered config verification")
 		return nil
 	}
 
 	config := consts.GetTieredAIConfig()
 	if config == nil {
-		return utils.Error("tiered AI config is nil but enabled flag is set")
+		return utils.Error("tiered AI config disappeared during verification")
 	}
 
 	// Verify at least one model tier has configuration
@@ -56,7 +57,7 @@ func doVerifyAIConfig() error {
 	hasVision := len(config.VisionConfigs) > 0
 
 	if !hasIntelligent && !hasLightweight && !hasVision {
-		return utils.Error("tiered AI config is enabled but no model configurations are available")
+		return utils.Error("tiered AI config has no model configurations available")
 	}
 
 	// Verify each tier's configurations

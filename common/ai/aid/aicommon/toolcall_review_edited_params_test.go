@@ -11,10 +11,18 @@ import (
 	"github.com/segmentio/ksuid"
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
+	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/schema"
 )
 
 func TestToolCaller_ExplicitEditedParamsValueFeedback(t *testing.T) {
+	// This test verifies the normal-mode feedback path. Keep it independent of
+	// the user's persisted global single-model setting, which intentionally
+	// disables value-feedback AI work.
+	previousTieredConfig := consts.GetTieredAIConfig()
+	consts.SetTieredAIConfig(nil)
+	t.Cleanup(func() { consts.SetTieredAIConfig(previousTieredConfig) })
+
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 

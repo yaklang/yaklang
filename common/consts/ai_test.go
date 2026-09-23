@@ -41,10 +41,10 @@ func TestTieredAIConfig(t *testing.T) {
 	assert.True(t, IsTieredAIModelConfigEnabled())
 	assert.Equal(t, PolicyPerformance, GetTieredAIRoutingPolicy())
 
-	// Test disabled config
+	// The legacy Enabled field no longer disables a configured model set.
 	config.Enabled = false
 	SetTieredAIConfig(config)
-	assert.False(t, IsTieredAIModelConfigEnabled())
+	assert.True(t, IsTieredAIModelConfigEnabled())
 }
 
 func TestGetTieredAIConfigs(t *testing.T) {

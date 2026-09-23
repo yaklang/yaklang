@@ -3,6 +3,7 @@ package yakgrpc
 import (
 	"bufio"
 	"bytes"
+	"context"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -26,6 +27,7 @@ import (
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/test/bufconn"
 )
 
 const (
@@ -189,14 +191,13 @@ var (
 	localClient         ypb.YakClient
 	localClientInitErr  error
 	initLocalClientOnce sync.Once
-	ciClient            ypb.YakClient
-	ciClientInitErr     error
-	ciClientOnce        sync.Once
 )
 
 type Client struct {
 	ypb.YakClient
-	server *Server
+	server    *Server
+	closeOnce sync.Once
+	closeFunc func() error
 }
 
 func (c *Client) GetProfileDatabase() *gorm.DB {
@@ -219,142 +220,62 @@ func (c *Client) GetProjectDatabase() *gorm.DB {
 	return c.server.GetProjectDatabase()
 }
 
-func NewLocalClient(locals ...bool) (ypb.YakClient, error) {
-	local := false
-	if len(locals) > 0 {
-		local = locals[0]
-	}
-	return newLocalClientEx(local)
+// NewLocalClient returns the process-wide in-memory gRPC client. The optional
+// legacy argument is retained for source compatibility; CI uses the same path.
+func NewLocalClient(_ ...bool) (ypb.YakClient, error) {
+	initLocalClientOnce.Do(func() {
+		netx.UnsetProxyFromEnv()
+		yaklang.Import("test", map[string]any{"callhook": func(name string) any { return callHook(name) }})
+		localClient, localClientInitErr = NewLocalClientForceNew()
+	})
+	return localClient, localClientInitErr
 }
 
-func newLocalGRPCListener() (net.Listener, string, error) {
-	// Bind immediately instead of probing an available port and reopening it
-	// later. Server initialization can start other listeners, so the probe/reopen
-	// pattern lets those listeners (or another process) claim the gRPC port.
-	listener, err := net.Listen("tcp", "127.0.0.1:0")
-	if err != nil {
-		return nil, "", err
-	}
-	return listener, listener.Addr().String(), nil
+// Close releases an independently created local client's transport. Do not close
+// the shared client returned by NewLocalClient while other callers are using it.
+func (c *Client) Close() error {
+	var err error
+	c.closeOnce.Do(func() {
+		if c.closeFunc != nil {
+			err = c.closeFunc()
+		}
+	})
+	return err
 }
 
 func NewLocalClientForceNew() (ypb.YakClient, error) {
-	lis, addr, err := newLocalGRPCListener()
+	s, err := newServerEx(WithInitFacadeServer(false))
 	if err != nil {
 		return nil, err
 	}
-	grpcTrans := grpc.NewServer(
-		grpc.MaxRecvMsgSize(100*1024*1024),
-		grpc.MaxSendMsgSize(100*1024*1024),
-	)
-	opts := []ServerOpts{WithInitFacadeServer(true)}
-	var (
-		profileDatabasePath, projectDatabasePath string
-	)
-	s, err := newServerEx(opts...)
-	if err != nil {
-		_ = lis.Close()
-		log.Errorf("build yakit server failed: %s", err)
-		return nil, err
-	}
-	ypb.RegisterYakServer(grpcTrans, s)
-	go func() {
-		defer func() {
-			if profileDatabasePath != "" {
-				os.Remove(profileDatabasePath)
-			}
-			if projectDatabasePath != "" {
-				os.Remove(projectDatabasePath)
-			}
-		}()
-		if serveErr := grpcTrans.Serve(lis); serveErr != nil {
-			log.Error(serveErr)
-		}
-	}()
-	time.Sleep(1 * time.Second)
-	conn, err := grpc.Dial(addr, grpc.WithInsecure(), grpc.WithDefaultCallOptions(
-		grpc.MaxCallRecvMsgSize(100*1024*1045),
-		grpc.MaxCallRecvMsgSize(100*1024*1045),
-	))
-	return &Client{
-		YakClient: ypb.NewYakClient(conn),
-		server:    s,
-	}, err
+	return newInMemoryClient(s)
 }
 
-func newLocalClientEx(local bool) (ypb.YakClient, error) {
-	netx.UnsetProxyFromEnv()
-
-	dialServer := func(addr string, server *Server) (ypb.YakClient, error) {
-		conn, err := grpc.Dial(addr, grpc.WithInsecure(), grpc.WithDefaultCallOptions(
-			grpc.MaxCallRecvMsgSize(100*1024*1045),
-			grpc.MaxCallRecvMsgSize(100*1024*1045),
-		))
-		return &Client{
-			YakClient: ypb.NewYakClient(conn),
-			server:    server,
-		}, err
+// newInMemoryClient preserves protobuf serialization, interceptors, deadlines,
+// and streaming semantics without binding a TCP port or sleeping for readiness.
+func newInMemoryClient(s *Server) (*Client, error) {
+	lis := bufconn.Listen(1024 * 1024)
+	// Stop must join handlers before callers close their databases or other resources.
+	transport := grpc.NewServer(grpc.WaitForHandlers(true), grpc.MaxRecvMsgSize(100*1024*1024), grpc.MaxSendMsgSize(100*1024*1024))
+	ypb.RegisterYakServer(transport, s)
+	done := make(chan struct{})
+	go func() { defer close(done); _ = transport.Serve(lis) }()
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	conn, err := grpc.DialContext(ctx, "passthrough:///yak-local",
+		grpc.WithContextDialer(func(ctx context.Context, _ string) (net.Conn, error) { return lis.DialContext(ctx) }),
+		grpc.WithInsecure(), grpc.WithBlock(),
+		grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(100*1024*1024), grpc.MaxCallSendMsgSize(100*1024*1024)))
+	stop := func() { transport.Stop(); _ = lis.Close(); <-done }
+	if err != nil {
+		stop()
+		return nil, err
 	}
-
-	if local || !utils.InGithubActions() {
-		initLocalClientOnce.Do(func() {
-			yaklang.Import("test", map[string]any{
-				"callhook": func(name string) any {
-					return callHook(name)
-				},
-			})
-			lis, listenAddr, err := newLocalGRPCListener()
-			if err != nil {
-				localClientInitErr = err
-				return
-			}
-			grpcTrans := grpc.NewServer(
-				grpc.MaxRecvMsgSize(100*1024*1024),
-				grpc.MaxSendMsgSize(100*1024*1024),
-			)
-			opts := []ServerOpts{WithInitFacadeServer(true)}
-			var (
-				profileDatabasePath, projectDatabasePath string
-			)
-			s, err := newServerEx(opts...)
-			if err != nil {
-				_ = lis.Close()
-				log.Errorf("build yakit server failed: %s", err)
-				localClientInitErr = err
-				return
-			}
-			ypb.RegisterYakServer(grpcTrans, s)
-			go func() {
-				defer func() {
-					if profileDatabasePath != "" {
-						os.Remove(profileDatabasePath)
-					}
-					if projectDatabasePath != "" {
-						os.Remove(projectDatabasePath)
-					}
-				}()
-				if serveErr := grpcTrans.Serve(lis); serveErr != nil {
-					log.Error(serveErr)
-				}
-			}()
-			time.Sleep(1 * time.Second)
-			localClient, localClientInitErr = dialServer(listenAddr, s)
-		})
-		if localClientInitErr != nil {
-			return nil, localClientInitErr
-		}
-		return localClient, nil
-	} else {
-		ciClientOnce.Do(func() {
-			ciClient, ciClientInitErr = dialServer(utils.HostPort("127.0.0.1", 8087), nil)
-			// Keep package-level localClient in sync so legacy tests that still
-			// reference localClient work under GITHUB_ACTIONS (external yak grpc).
-			if ciClientInitErr == nil {
-				localClient = ciClient
-			}
-		})
-		return ciClient, ciClientInitErr
-	}
+	return &Client{YakClient: ypb.NewYakClient(conn), server: s, closeFunc: func() error {
+		err := conn.Close()
+		stop()
+		return err
+	}}, nil
 }
 
 type YamlMapBuilder struct {

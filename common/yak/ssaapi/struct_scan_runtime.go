@@ -264,6 +264,7 @@ func (s *structScanRuntime) ScanStruct(progAPI *Program, unit *ssa.CompileUnit) 
 		res, err := QuerySyntaxflow(
 			QueryWithValue(target),
 			QueryWithResultProgram(progAPI),
+			QueryWithSSAConfig(progAPI.config.Config),
 			QueryWithStruct(unit),
 			QueryWithRuleContent(rule.Content),
 			QueryWithMemory(),

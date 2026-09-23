@@ -133,6 +133,14 @@ func (r *SyntaxFlowResult) save(
 	if len(TaskIDs) > 0 {
 		r.TaskID = TaskIDs[0]
 	}
+	if r.IsNoSaveRisk() {
+		id := getResultCacheId()
+		r.SetResultID(id)
+		if err := r.CreateRisk(); err != nil {
+			return id, err
+		}
+		return id, nil
+	}
 	// result
 	result := ssadb.CreateResult(TaskIDs...)
 	r.id = result.ID

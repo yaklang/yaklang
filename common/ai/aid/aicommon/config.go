@@ -34,9 +34,8 @@ import (
 )
 
 // DefaultPeriodicVerificationInterval 是 verification iter 门的基础节拍.
-// 调整自 5 -> 6, 与 verification_gate.go 中 token 门冷静期 (3 iter) +
-// 首次提前门 (iter=3) 配合, 形成 "6 iter 1 次基础 verify, 中间不超过 1 次
-// 加速器 verify, 首次反馈在 iter=3 提前到位" 的整体节流模型. 详见
+// 当前基础节拍为 20 iter；verification_gate.go 另有 token 门冷静期和
+// 首次提前门 (iter=3)。详见
 // reactloops/docs/16-verification-frequency-experiment.md.
 // 关键词: DefaultPeriodicVerificationInterval 20, iter 门基础节拍, verification 节流
 const DefaultPeriodicVerificationInterval = 20
@@ -371,8 +370,8 @@ type Config struct {
 	MaxIterationCount        int64
 	EnableGoalMode           bool
 	GoalMinIterations        int64
-	GoalDurationSeconds      int64 // Goal mode time window in seconds; -1 = never auto-finish, 0 = disabled
-	GoalAcceptanceCriteria   string // Goal mode acceptance criteria; non-empty enables LLM review gate
+	GoalDurationSeconds      int64     // Goal mode time window in seconds; -1 = never auto-finish, 0 = disabled
+	GoalAcceptanceCriteria   string    // Goal mode acceptance criteria; non-empty enables LLM review gate
 	GoalDeadline             time.Time // Computed deadline for goal time window (zero = not started)
 	DisableIncreaseIteration bool
 
@@ -384,6 +383,8 @@ type Config struct {
 	SyncPerceptionTrigger              bool // 感知调度处同步调用 TriggerPerception（否则 goroutine 异步）
 	DisablePerception                  bool // 禁用感知层（用于测试环境，避免异步 AI 调用干扰 mock 回调）
 	EnableFunctionCallMode             bool // 启用原生 functioncall (tool_calls) 模式
+	singleAIModelMode                  bool // 单模型简易模式：辅助任务统一调度，详见 config_auxiliary_scheduler.go
+	singleAIModelModeResolved          bool // NewConfig freezes the effective mode after applying options.
 	PerTaskUserInteractiveLimitedTimes int64
 
 	/*
@@ -606,6 +607,13 @@ func NewConfig(ctx context.Context, opts ...ConfigOption) *Config {
 		opt(config)
 	}
 	config.collectingToolManagerOptions = false
+	// The global switch is a construction-time default. Callback roles,
+	// auxiliary policy, subsystem gates, and consumption metadata must all use
+	// the same effective mode for the lifetime of this Config.
+	if !config.singleAIModelModeResolved {
+		config.singleAIModelMode = config.singleAIModelMode || consts.IsSingleAIModelMode()
+		config.singleAIModelModeResolved = true
+	}
 	config.originOptions = opts
 	callerToolManager := config.AiToolManager
 	isolateToolManager := len(config.ExtraMCPServers) > 0
@@ -622,9 +630,12 @@ func NewConfig(ctx context.Context, opts ...ConfigOption) *Config {
 	config.Epm = NewEndpointManagerContext(ctx)
 	config.Epm.SetConfig(config)
 	if !config.AICallbackAvailable() {
-		if err := WithTieredAICallback()(config); err != nil || !config.AICallbackAvailable() {
+		if err := WithTieredAICallback(config.IsSingleAIModelMode())(config); err != nil || !config.AICallbackAvailable() {
 			log.Errorf("Failed to set AI callback: %v", err)
 		}
+	}
+	if consumptionState := config.ensureConsumptionState(); consumptionState != nil {
+		consumptionState.InitializeEffectiveSingleModelMode(config.IsSingleAIModelMode())
 	}
 	// Only create new Timeline if not already set via options (e.g., WithTimeline)
 	// This ensures that when a parent coordinator passes its Timeline to a child invoker,
@@ -695,6 +706,12 @@ func NewConfig(ctx context.Context, opts ...ConfigOption) *Config {
 
 	ensureCapabilityManagers(config)
 
+	// Single-model simple mode: automatically enable existing subsystem
+	// disable switches so their internal AI calls are not triggered.
+	if config.IsSingleAIModelMode() {
+		config.applySingleModelModeDefaults()
+	}
+
 	return config
 }
 
@@ -738,7 +755,7 @@ func newConfig(ctx context.Context) *Config {
 		AiTransactionAutoRetry:             5,
 		TimelineContentSizeLimit:           50 * 1024, // Default limit for 50k tokens
 		Guardian:                           NewAsyncGuardian(ctx, id),
-		PerTaskUserInteractiveLimitedTimes: 1, // Default to 3 times
+		PerTaskUserInteractiveLimitedTimes: 1, // Default to 1 time
 		EnablePlanAndExec:                  true,
 		AllowRequireForUserInteract:        true,
 		ToolComposeConcurrency:             2,
@@ -781,11 +798,7 @@ func newConfig(ctx context.Context) *Config {
 		return e, nil
 	})
 
-	if config.GetSpeedPriorityAICallback() != nil {
-		config.Emitter.SetStreamNodeIdI18nProvider(
-			config.buildStreamNodeIdI18nProvider(),
-		)
-	}
+	config.ensureAICallbacks()
 
 	// Sync EnableFunctionCallMode to KeyValueConfig so that NewReActLoop can
 	// read it via config.GetConfigBool("EnableFunctionCallMode").
@@ -1048,21 +1061,26 @@ func WithVisionPriorityAICallback(cb AICallbackType) ConfigOption {
 	}
 }
 
-// WithTieredAICallback configures quality, speed, and vision callbacks using tiered AI configuration.
-// It maps intelligent models to quality, lightweight models to speed, and vision models to image understanding.
-func WithTieredAICallback() ConfigOption {
+// WithTieredAICallback configures quality, speed, and vision callbacks using
+// tiered AI configuration. singleModelMode optionally overrides the Config
+// mode used only while constructing these callbacks.
+func WithTieredAICallback(singleModelMode ...bool) ConfigOption {
 	return func(c *Config) error {
 		if c.m == nil {
 			c.m = &sync.Mutex{}
 		}
+		single := c.IsSingleAIModelMode()
+		if len(singleModelMode) > 0 {
+			single = singleModelMode[0]
+		}
 
 		// Check if tiered AI config is enabled
-		if !consts.IsTieredAIModelConfigEnabled() {
+		if !single && !consts.IsTieredAIModelConfigEnabled() {
 			log.Debugf("Tiered AI config not enabled, skipping tiered callback configuration")
 			return nil
 		}
 
-		serviceName, modelName, err := GetIntelligentAIModelInfo()
+		serviceName, modelName, err := GetIntelligentAIModelInfo(single)
 		if err != nil {
 			log.Warnf("Failed to get service and model name from tiered config: %v", err)
 		} else {
@@ -1072,7 +1090,7 @@ func WithTieredAICallback() ConfigOption {
 		}
 
 		// Configure quality priority callback (uses intelligent model)
-		intelligentCB, err := GetIntelligentAIModelCallback()
+		intelligentCB, err := GetIntelligentAIModelCallback(single)
 		if err == nil {
 			c.m.Lock()
 			c.setQualityPriorityAICallbackLocked(intelligentCB)
@@ -1082,7 +1100,7 @@ func WithTieredAICallback() ConfigOption {
 			log.Warnf("Failed to load intelligent model callback: %v", err)
 		}
 
-		lightweightCB, err := GetLightweightAIModelCallback()
+		lightweightCB, err := GetLightweightAIModelCallback(single)
 		if err == nil {
 			c.m.Lock()
 			c.setSpeedPriorityAICallbackLocked(lightweightCB)
@@ -1092,7 +1110,7 @@ func WithTieredAICallback() ConfigOption {
 			log.Warnf("Failed to load lightweight model callback: %v", err)
 		}
 
-		visionCB, err := GetVisionAIModelCallback()
+		visionCB, err := GetVisionAIModelCallback(single)
 		if err == nil {
 			c.m.Lock()
 			c.setVisionPriorityAICallbackLocked(visionCB)
@@ -1200,9 +1218,9 @@ func WithAutoTieredAICallback(defaultCallback AICallbackType) ConfigOption {
 		}
 
 		// Check if tiered AI config is enabled
-		if consts.IsTieredAIModelConfigEnabled() {
+		if c.IsSingleAIModelMode() || consts.IsTieredAIModelConfigEnabled() {
 			// Try to configure tiered callbacks
-			if err := WithTieredAICallback()(c); err == nil {
+			if err := WithTieredAICallback(c.IsSingleAIModelMode())(c); err == nil {
 				// Also set the original callback if not already set
 				if defaultCallback != nil { // force set original callback to default if tiered config is enabled, to ensure async tasks have a valid callback
 					c.m.Lock()
@@ -2761,6 +2779,34 @@ func WithDisablePerception(disable bool) ConfigOption {
 	}
 }
 
+// IsSingleAIModelMode returns whether single-model simple mode is enabled.
+// In this mode, auxiliary AI tasks use the centralized Skip/Run policy.
+func (c *Config) IsSingleAIModelMode() bool {
+	if c == nil {
+		return false
+	}
+	if c.singleAIModelModeResolved {
+		return c.singleAIModelMode
+	}
+	return c.singleAIModelMode || consts.IsSingleAIModelMode()
+}
+
+// WithSingleAIModelMode enables or disables single-model simple mode.
+// When enabled, auxiliary AI calls (title generation, intent recognition,
+// knowledge compression, perception, etc.) use the centralized Skip/Run
+// policy. It does not rewrite callbacks configured by other options.
+func WithSingleAIModelMode(enable bool) ConfigOption {
+	return func(c *Config) error {
+		if c.m == nil {
+			c.m = &sync.Mutex{}
+		}
+		c.m.Lock()
+		c.singleAIModelMode = enable
+		c.m.Unlock()
+		return nil
+	}
+}
+
 // WithEnableFunctionCallMode enables native functioncall (tool_calls) mode for
 // ReAct loops created from this config. When enabled, each ReAct loop iteration
 // uses a single "execute_action" tool whose arguments are a complete action
@@ -4251,25 +4297,6 @@ func (c *Config) CallAITransaction(
 	return CallAITransaction(c, prompt, callAi, postHandler, requestOpts...)
 }
 
-//	func (c *Config) RegisterMirrorOfAIInputEvent(id string, f func(*ypb.AIInputEvent)) {
-//		r.mirrorMutex.Lock()
-//		defer r.mirrorMutex.Unlock()
-//		r.mirrorOfAIInputEvent[id] = f
-//	}
-//
-//	func (c *Config) CallMirrorOfAIInputEvent(event *ypb.AIInputEvent) {
-//		r.mirrorMutex.RLock()
-//		defer r.mirrorMutex.RUnlock()
-//		for _, f := range r.mirrorOfAIInputEvent {
-//			f(event)
-//		}
-//	}
-//
-//	func (c *Config) UnregisterMirrorOfAIInputEvent(id string) {
-//		r.mirrorMutex.Lock()
-//		defer r.mirrorMutex.Unlock()
-//		delete(r.mirrorOfAIInputEvent, id)
-//	}
 func ConvertConfigToOptions(i *Config) []ConfigOption {
 	// Return nil for nil input
 	if i == nil {
@@ -4522,6 +4549,16 @@ func ConvertConfigToOptions(i *Config) []ConfigOption {
 		opts = append(opts, WithEnableFunctionCallMode(true))
 	}
 
+	// A derived Config continues the parent's session even when a new global
+	// setting has taken effect since the parent was constructed. Keep the
+	// inherited effective mode separate from a new independent session's default.
+	inheritedSingleModelMode := i.IsSingleAIModelMode()
+	opts = append(opts, func(c *Config) error {
+		c.singleAIModelMode = inheritedSingleModelMode
+		c.singleAIModelModeResolved = true
+		return nil
+	})
+
 	// once init config flag
 	opts = append(opts, WithInitConfigStatus(i.InitStatus))
 
@@ -4558,43 +4595,31 @@ func (c *Config) AICallbackAvailable() bool {
 }
 
 func (c *Config) InvokeLiteForge(prompt string, opts ...any) (*ForgeResult, error) {
+	var callback AICallbackType
 	if cb := c.GetSpeedPriorityAICallback(); cb != nil {
-		opts = append(opts, WithFastAICallback(cb))
+		callback = cb
 	} else if cb := c.GetQualityPriorityAICallback(); cb != nil {
-		opts = append(opts, WithFastAICallback(cb))
+		callback = cb
 	} else {
-		opts = append(opts, WithFastAICallback(c.GetOriginalAICallback()))
+		callback = c.GetOriginalAICallback()
 	}
-	opts = append(opts, WithDisableCreateDBRuntime(true)) // Avoid creating runtime records for lite forge calls
-	return InvokeLiteForge(prompt, opts...)
+	return c.invokeLiteForgeWithCallback(prompt, callback, opts...)
 }
 
-func (c *Config) buildStreamNodeIdI18nProvider() func(nodeId string) *schema.I18n {
-	return func(nodeId string) *schema.I18n {
-		prompt := fmt.Sprintf(`You are a UI localization assistant for an AI agent system.
-Translate the following technical stream/node identifier into concise, user-friendly display names.
-The identifier uses underscores or hyphens as word separators.
-
-Identifier: %s
-
-Requirements:
-- Chinese (zh): A short, natural Chinese phrase (2-6 characters preferred)
-- English (en): A short, capitalized English phrase`, nodeId)
-
-		result, err := c.InvokeLiteForge(prompt,
-			WithLiteForgeOutputSchemaFromAIToolOptions(
-				aitool.WithStringParam("zh", aitool.WithParam_Description("Chinese user-friendly display name")),
-				aitool.WithStringParam("en", aitool.WithParam_Description("English user-friendly display name")),
-			))
-		if err != nil {
-			log.Infof("stream nodeId i18n provider skipped for %q: %v", nodeId, err)
-			return nil
-		}
-		zh := result.GetString("zh")
-		en := result.GetString("en")
-		if zh == "" && en == "" {
-			return nil
-		}
-		return &schema.I18n{Zh: zh, En: en}
+// invokeSpeedPriorityLiteForge preserves the auxiliary-task boundary: these
+// calls may use the configured Speed callback and fall back only to Original,
+// matching ReAct.InvokeSpeedPriorityLiteForge. It must never fall through to
+// the Quality/Intelligence callback.
+func (c *Config) invokeSpeedPriorityLiteForge(prompt string, opts ...any) (*ForgeResult, error) {
+	callback := c.GetSpeedPriorityAICallback()
+	if callback == nil {
+		callback = c.GetOriginalAICallback()
 	}
+	return c.invokeLiteForgeWithCallback(prompt, callback, opts...)
+}
+
+func (c *Config) invokeLiteForgeWithCallback(prompt string, callback AICallbackType, opts ...any) (*ForgeResult, error) {
+	opts = append(opts, WithFastAICallback(callback))
+	opts = append(opts, WithDisableCreateDBRuntime(true)) // Avoid creating runtime records for lite forge calls
+	return InvokeLiteForge(prompt, opts...)
 }

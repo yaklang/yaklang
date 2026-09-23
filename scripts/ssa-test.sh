@@ -21,6 +21,12 @@ trap cleanup_ssa_test_home EXIT INT TERM
 echo "Use isolated YAKIT_HOME: ${YAKIT_HOME}"
 go run ./common/yak/cmd sync-rule
 
+# Optional go test arguments allow focused regressions through the same setup.
+if [ "$#" -gt 0 ]; then
+  go test "$@"
+  exit "$?"
+fi
+
 echo "Start to Test AST to SSA"
 echo "Start to Test Yak SSA"
 go test -timeout 20s ./common/yak/yak2ssa/test/...

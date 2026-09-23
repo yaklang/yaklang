@@ -290,6 +290,35 @@ type auditDatabase struct {
 	editorSave *dbcache.Save[*ssadb.IrSource]
 }
 
+const (
+	// Keep batches bounded for SQLite and for the wide AuditNode model.
+	auditNodeWriteBatchSize = 50
+	auditEdgeWriteBatchSize = 90
+)
+
+func batchSaveAuditNodes(db *gorm.DB, items []*ssadb.AuditNode) error {
+	if db == nil || len(items) == 0 {
+		return nil
+	}
+	// dbcache.Save drops nil entries before they reach the batch callback, and
+	// CreateInBatches wraps the inserts in its own transaction, so neither a
+	// nil filter nor an outer transaction is needed here.
+	if result := db.CreateInBatches(items, auditNodeWriteBatchSize); result.Error != nil {
+		return utils.Errorf("save AuditNode failed: %w", result.Error)
+	}
+	return nil
+}
+
+func batchSaveAuditEdges(db *gorm.DB, items []*ssadb.AuditEdge) error {
+	if db == nil || len(items) == 0 {
+		return nil
+	}
+	if result := db.CreateInBatches(items, auditEdgeWriteBatchSize); result.Error != nil {
+		return utils.Errorf("save AuditEdge failed: %w", result.Error)
+	}
+	return nil
+}
+
 func (a *auditDatabase) SaveNode(node *ssadb.AuditNode) {
 	if node == nil {
 		return
@@ -340,28 +369,14 @@ func newAuditDatabase(ctx context.Context, db *gorm.DB, size int) *auditDatabase
 		if len(ae) == 0 {
 			return nil
 		}
-		return utils.GormTransaction(db, func(tx *gorm.DB) error {
-			for _, e := range ae {
-				if err := tx.Save(e).Error; err != nil {
-					return utils.Errorf("save AuditNode failed: %w", err)
-				}
-			}
-			return nil
-		})
+		return batchSaveAuditNodes(db, ae)
 	}, dbcache.WithContext(ctx), dbcache.WithSaveSize(saveSize), dbcache.WithName("AuditNode"))
 
 	ret.edgeSave = dbcache.NewSave[*ssadb.AuditEdge](func(ae []*ssadb.AuditEdge) error {
 		if len(ae) == 0 {
 			return nil
 		}
-		return utils.GormTransaction(db, func(tx *gorm.DB) error {
-			for _, e := range ae {
-				if err := tx.Save(e).Error; err != nil {
-					return utils.Errorf("save AuditEdge failed: %w", err)
-				}
-			}
-			return nil
-		})
+		return batchSaveAuditEdges(db, ae)
 	}, dbcache.WithContext(ctx), dbcache.WithSaveSize(saveSize), dbcache.WithName("AuditEdge"))
 
 	ret.editorSave = dbcache.NewSave[*ssadb.IrSource](func(ae []*ssadb.IrSource) error {

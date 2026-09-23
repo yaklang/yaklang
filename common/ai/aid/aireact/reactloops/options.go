@@ -454,8 +454,8 @@ func WithMemorySizeLimit(sizeLimit int) ReActLoopOption {
 	}
 }
 
-// WithUseSpeedPriorityAICallback makes the ReAct loop use config.CallSpeedPriorityAI
-// instead of config.CallAI for its main AI calls in CallAITransaction.
+// WithUseSpeedPriorityAICallback routes ReAct rounds through Config's auxiliary
+// scheduler and LiteForge instead of invoking config.CallAI directly.
 func WithUseSpeedPriorityAICallback(b ...bool) ReActLoopOption {
 	return func(r *ReActLoop) {
 		if len(b) > 0 {

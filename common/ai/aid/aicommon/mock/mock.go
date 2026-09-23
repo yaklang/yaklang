@@ -31,6 +31,8 @@ type MockedAIConfig struct {
 	TodoState *aicommon.SessionPromptState
 
 	TimelineContentSizeLimit int64
+
+	ScheduleAuxiliaryTaskFunc func(context.Context, string, func() string, func(*aicommon.Action), ...aicommon.AuxiliaryTaskOption)
 }
 
 func (m *MockedAIConfig) CallAI(request *aicommon.AIRequest) (*aicommon.AIResponse, error) {
@@ -47,6 +49,26 @@ func (m *MockedAIConfig) CallQualityPriorityAI(request *aicommon.AIRequest) (*ai
 }
 
 var _ aicommon.AICallerConfigIf = (*MockedAIConfig)(nil)
+
+func (m *MockedAIConfig) IsSingleAIModelMode() bool {
+	return false
+}
+
+func (m *MockedAIConfig) ScheduleAuxiliaryTask(
+	ctx context.Context,
+	name string,
+	promptBuilder func() string,
+	onResult func(*aicommon.Action),
+	opts ...aicommon.AuxiliaryTaskOption,
+) {
+	if m != nil && m.ScheduleAuxiliaryTaskFunc != nil {
+		m.ScheduleAuxiliaryTaskFunc(ctx, name, promptBuilder, onResult, opts...)
+	}
+}
+
+func (m *MockedAIConfig) ResolveAuxiliaryTask(_ string) aicommon.AuxiliaryTaskDecision {
+	return aicommon.AuxiliaryTaskDecision{Action: aicommon.SingleModelRun}
+}
 
 func NewMockedAIConfig(ctx context.Context) aicommon.AICallerConfigIf {
 	emitter := aicommon.NewEmitter("mock-emitter", func(e *schema.AiOutputEvent) (*schema.AiOutputEvent, error) {
@@ -252,10 +274,11 @@ type MockInvoker struct {
 }
 
 func NewMockInvoker(ctx context.Context) *MockInvoker {
-	return &MockInvoker{
-		ctx:    ctx,
-		config: NewMockedAIConfig(ctx),
-	}
+	m := &MockInvoker{ctx: ctx}
+	config := NewMockedAIConfig(ctx).(*MockedAIConfig)
+	config.ScheduleAuxiliaryTaskFunc = m.scheduleAuxiliaryTask
+	m.config = config
+	return m
 }
 
 func (m *MockInvoker) GetContext() context.Context {
@@ -622,4 +645,39 @@ func (m *MockInvoker) GetRuntimeTasks() []aicommon.AIStatefulTask {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 	return append([]aicommon.AIStatefulTask(nil), m.runtimeTask...)
+}
+
+func (m *MockInvoker) scheduleAuxiliaryTask(
+	ctx context.Context,
+	name string,
+	promptBuilder func() string,
+	onResult func(*aicommon.Action),
+	opts ...aicommon.AuxiliaryTaskOption,
+) {
+	// Mock: build prompt lazily, delegate to InvokeSpeedPriorityLiteForge, call onResult.
+	// No skip logic — mock always runs the task.
+	if promptBuilder == nil {
+		return
+	}
+	prompt := promptBuilder()
+	if prompt == "" {
+		return
+	}
+	spec := &aicommon.AuxiliaryTaskSpec{}
+	for _, opt := range opts {
+		opt(spec)
+	}
+	action, err := m.InvokeSpeedPriorityLiteForge(ctx, name, prompt, spec.Outputs, spec.Opts...)
+	if err != nil || action == nil {
+		if err == nil {
+			err = utils.Errorf("auxiliary task %q returned no action", name)
+		}
+		if spec.OnError != nil {
+			spec.OnError(err)
+		}
+		return
+	}
+	if onResult != nil {
+		onResult(action)
+	}
 }

@@ -6,6 +6,8 @@ import (
 	"github.com/yaklang/yaklang/common/ai/aispec"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
+	"google.golang.org/protobuf/proto"
 )
 
 // extractUserUsageCallbackOpts 从 wrapper 后的 i 取出 user 端注册的 UsageCallback,
@@ -51,7 +53,7 @@ func extractUserUsageCallbackOpts(i AICallerConfigIf) []aispec.AIConfigOption {
 func MustGetIntelligentAIModelCallback() AICallbackType {
 	callback, err := GetIntelligentAIModelCallback()
 	if err != nil {
-		log.Warnf("you are using aiconfig to get intelligent model callback, but got error: %v, fallback to legacy chat", err)
+		log.Warnf("you are using aiconfig to get intelligent model callback, but got error: %v", err)
 		return AIChatToAICallbackType(ai.Chat)
 	}
 	return callback
@@ -60,7 +62,7 @@ func MustGetIntelligentAIModelCallback() AICallbackType {
 func MustGetLightweightAIModelCallback() AICallbackType {
 	callback, err := GetLightweightAIModelCallback()
 	if err != nil {
-		log.Warnf("you are using aiconfig to get lightweight model callback, but got error: %v, fallback to legacy chat", err)
+		log.Warnf("you are using aiconfig to get lightweight model callback, but got error: %v", err)
 		return AIChatToAICallbackType(ai.Chat)
 	}
 	return callback
@@ -77,7 +79,7 @@ func MustGetSpeedPriorityAIModelCallback() AICallbackType {
 func MustGetVisionAIModelCallback() AICallbackType {
 	callback, err := GetVisionAIModelCallback()
 	if err != nil {
-		log.Warnf("you are using aiconfig to get vision model callback, but got error: %v, fallback to legacy chat", err)
+		log.Warnf("you are using aiconfig to get vision model callback, but got error: %v", err)
 		return AIChatToAICallbackType(ai.Chat)
 	}
 	return callback
@@ -86,7 +88,7 @@ func MustGetVisionAIModelCallback() AICallbackType {
 func MustGetDefaultAIModelCallback() AICallbackType {
 	callback, err := GetDefaultAIModelCallback()
 	if err != nil {
-		log.Warnf("you are using aiconfig to get default model callback, but got error: %v, fallback to legacy chat", err)
+		log.Warnf("you are using aiconfig to get default model callback, but got error: %v", err)
 		return AIChatToAICallbackType(ai.Chat)
 	}
 	return callback
@@ -95,145 +97,113 @@ func MustGetDefaultAIModelCallback() AICallbackType {
 func MustGetAIModelCallbackByTierAndProviderAndModel(tier consts.ModelTier, providerName, modelName string) AICallbackType {
 	callback, err := GetAIModelCallbackByTierAndProviderAndModel(tier, providerName, modelName)
 	if err != nil {
-		log.Warnf("you are using aiconfig to get model callback by tier/provider/model, but got error: %v, fallback to legacy chat", err)
+		log.Warnf("you are using aiconfig to get model callback by tier/provider/model, but got error: %v", err)
 		return AIChatToAICallbackType(ai.Chat)
 	}
 	return callback
 }
 
-// GetIntelligentAIModelCallback returns the AI callback for intelligent (high-quality) models
-// Suitable for complex reasoning, code generation, and other high-quality tasks
-func GetIntelligentAIModelCallback() (AICallbackType, error) {
-	if !aiconfig.IsTieredAIConfig() {
+// resolveTierCallbackMode fixes the callback role at construction. The bool is
+// supplied by Config initialization; without it, only the global mode applies.
+func resolveTierCallbackMode(modes ...bool) bool {
+	if len(modes) > 0 {
+		return modes[0]
+	}
+	return consts.IsSingleAIModelMode()
+}
+
+func resolveTierModelConfig(tier consts.ModelTier, single bool) (*ypb.AIModelConfig, error) {
+	liteCall := single && tier == consts.TierLightweight
+	if single {
+		tier = consts.TierIntelligent
+	}
+	config := aiconfig.GetGlobalManager().GetFirstConfig(tier)
+	if config == nil || config.GetProvider() == nil || config.GetProvider().GetType() == "" || config.GetModelName() == "" {
+		return nil, aiconfig.ErrNoConfigAvailable
+	}
+	config = proto.Clone(config).(*ypb.AIModelConfig)
+	if liteCall {
+		level := "none"
+		config.Provider.ReasoningEffort = &level
+	}
+	return config, nil
+}
+
+// newTierAIModelCallback performs the complete tier callback setup:
+// check routing availability, combine the requested tier with the explicit
+// single-model flag, then build an invocation callback. The invocation reads
+// the latest model config in the already selected tier.
+func newTierAIModelCallback(tier consts.ModelTier, modes ...bool) (AICallbackType, error) {
+	single := resolveTierCallbackMode(modes...)
+	if !single && !aiconfig.IsTieredAIConfig() {
 		return nil, aiconfig.ErrTieredConfigDisabled
 	}
-
-	return func(i AICallerConfigIf, req *AIRequest) (*AIResponse, error) {
-		mgr := aiconfig.GetGlobalManager()
-		config := mgr.GetFirstConfig(consts.TierIntelligent)
-		if config == nil {
-			return nil, aiconfig.ErrNoConfigAvailable
-		}
-
-		// 把用户脚本通过 ai.usageCallback(...) 注册的 UsageCallback 重新注入,
-		// 让上游 LLM 末帧 token usage (含 cached_tokens) 可以触达用户脚本.
-		extra := extractUserUsageCallbackOpts(i)
-		callback, err := CreateCallbackFromConfigWithExtraOpts(config, extra...)
+	return func(caller AICallerConfigIf, request *AIRequest) (*AIResponse, error) {
+		config, err := resolveTierModelConfig(tier, single)
 		if err != nil {
 			return nil, err
 		}
-		return callback(i, req)
+		callback, err := CreateCallbackFromConfigWithExtraOpts(config, extractUserUsageCallbackOpts(caller)...)
+		if err != nil {
+			return nil, err
+		}
+		return callback(caller, request)
 	}, nil
 }
 
-func GetIntelligentAIModelInfo() (string, string, error) {
-	if !aiconfig.IsTieredAIConfig() {
+// GetIntelligentAIModelCallback returns the AI callback for intelligent (high-quality) models.
+func GetIntelligentAIModelCallback(modes ...bool) (AICallbackType, error) {
+	return newTierAIModelCallback(consts.TierIntelligent, modes...)
+}
+
+func GetIntelligentAIModelInfo(modes ...bool) (string, string, error) {
+	single := resolveTierCallbackMode(modes...)
+	if !single && !aiconfig.IsTieredAIConfig() {
 		return "", "", aiconfig.ErrTieredConfigDisabled
 	}
-
-	mgr := aiconfig.GetGlobalManager()
-	config := mgr.GetFirstConfig(consts.TierIntelligent)
-	if config == nil {
-		return "", "", aiconfig.ErrNoConfigAvailable
+	config, err := resolveTierModelConfig(consts.TierIntelligent, single)
+	if err != nil {
+		return "", "", err
 	}
-
-	return config.Provider.Type, config.ModelName, nil
+	return config.GetProvider().GetType(), config.GetModelName(), nil
 }
 
-// GetLightweightAIModelCallback returns the AI callback for lightweight models
-// Suitable for simple conversations and fast responses
-func GetLightweightAIModelCallback() (AICallbackType, error) {
-	if !aiconfig.IsTieredAIConfig() {
-		return nil, aiconfig.ErrTieredConfigDisabled
-	}
-
-	return func(i AICallerConfigIf, req *AIRequest) (*AIResponse, error) {
-		mgr := aiconfig.GetGlobalManager()
-		config := mgr.GetFirstConfig(consts.TierLightweight)
-		if config == nil {
-			return nil, aiconfig.ErrNoConfigAvailable
-		}
-
-		extra := extractUserUsageCallbackOpts(i)
-		callback, err := CreateCallbackFromConfigWithExtraOpts(config, extra...)
-		if err != nil {
-			return nil, err
-		}
-		return callback(i, req)
-	}, nil
+// GetLightweightAIModelCallback returns the AI callback for lightweight models.
+func GetLightweightAIModelCallback(modes ...bool) (AICallbackType, error) {
+	return newTierAIModelCallback(consts.TierLightweight, modes...)
 }
 
-// GetVisionAIModelCallback returns the AI callback for vision models
-// Suitable for image understanding and image analysis tasks
-func GetVisionAIModelCallback() (AICallbackType, error) {
-	if !aiconfig.IsTieredAIConfig() {
-		return nil, aiconfig.ErrTieredConfigDisabled
-	}
-
-	return func(i AICallerConfigIf, req *AIRequest) (*AIResponse, error) {
-		mgr := aiconfig.GetGlobalManager()
-		config := mgr.GetFirstConfig(consts.TierVision)
-		if config == nil {
-			return nil, aiconfig.ErrNoConfigAvailable
-		}
-
-		extra := extractUserUsageCallbackOpts(i)
-		callback, err := CreateCallbackFromConfigWithExtraOpts(config, extra...)
-		if err != nil {
-			return nil, err
-		}
-		return callback(i, req)
-	}, nil
+// GetVisionAIModelCallback returns the AI callback for vision models.
+func GetVisionAIModelCallback(modes ...bool) (AICallbackType, error) {
+	return newTierAIModelCallback(consts.TierVision, modes...)
 }
 
-// GetDefaultAIModelCallback returns the default callback based on user-configured policy
-// - auto: automatically select based on context
-// - performance: use intelligent model
-// - cost: use lightweight model
-// - balance: use lightweight model by default
-func GetDefaultAIModelCallback() (AICallbackType, error) {
-	if !aiconfig.IsTieredAIConfig() {
-		return nil, aiconfig.ErrTieredConfigDisabled
+// GetDefaultAIModelCallback returns the callback selected by the current policy.
+func GetDefaultAIModelCallback(modes ...bool) (AICallbackType, error) {
+	tier := consts.TierLightweight
+	if aiconfig.GetCurrentPolicy() == consts.PolicyPerformance {
+		tier = consts.TierIntelligent
 	}
-
-	return func(i AICallerConfigIf, req *AIRequest) (*AIResponse, error) {
-		policy := aiconfig.GetCurrentPolicy()
-		config, err := aiconfig.GetModelByPolicy(policy)
-		if err != nil {
-			return nil, err
-		}
-
-		extra := extractUserUsageCallbackOpts(i)
-		callback, err := CreateCallbackFromConfigWithExtraOpts(config, extra...)
-		if err != nil {
-			return nil, err
-		}
-		return callback(i, req)
-	}, nil
+	return newTierAIModelCallback(tier, modes...)
 }
 
-// GetAIModelCallbackByTierAndProviderAndModel returns the AI callback for the first config
-// matching tier + provider name + model name.
+// GetAIModelCallbackByTierAndProviderAndModel preserves the legacy explicit
+// selector API. It is separate from single-model tier initialization.
 func GetAIModelCallbackByTierAndProviderAndModel(tier consts.ModelTier, providerName, modelName string) (AICallbackType, error) {
 	if !aiconfig.IsTieredAIConfig() {
 		return nil, aiconfig.ErrTieredConfigDisabled
 	}
-
-	return func(i AICallerConfigIf, req *AIRequest) (*AIResponse, error) {
-		mgr := aiconfig.GetGlobalManager()
-		config := mgr.GetFirstConfigByTierAndProviderAndModel(tier, providerName, modelName)
+	return func(caller AICallerConfigIf, request *AIRequest) (*AIResponse, error) {
+		config := aiconfig.GetGlobalManager().GetFirstConfigByTierAndProviderAndModel(tier, providerName, modelName)
 		if config == nil {
 			return nil, aiconfig.ErrNoConfigAvailable
 		}
-
-		extra := extractUserUsageCallbackOpts(i)
-		callback, err := CreateCallbackFromConfigWithExtraOpts(config, extra...)
+		callback, err := CreateCallbackFromConfigWithExtraOpts(config, extractUserUsageCallbackOpts(caller)...)
 		if err != nil {
 			return nil, err
 		}
-		return callback(i, req)
+		return callback(caller, request)
 	}, nil
-
 }
 
 // GetCallbackByTier returns the AI callback for a specific model tier

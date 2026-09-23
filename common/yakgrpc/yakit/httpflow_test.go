@@ -26,6 +26,8 @@ func TestLowHTTPFlowSourceTypePreservesNamedProducer(t *testing.T) {
 	require.Equal(t, "ai-browser-http", lowHTTPFlowSourceType(" ai-browser-http "))
 	require.Equal(t, schema.HTTPFlow_SourceType_CRAWLER, lowHTTPFlowSourceType("CrawlerX"))
 	require.Equal(t, schema.HTTPFlow_SourceType_SCAN, lowHTTPFlowSourceType(""))
+	require.Equal(t, schema.HTTPFlow_SourceType_SCAN, lowHTTPFlowSourceType("webfuzzer"))
+	require.Equal(t, schema.HTTPFlow_SourceType_SCAN, lowHTTPFlowSourceType("WebFuzzer"))
 }
 
 func TestCreateHTTPFlowEmptyJSONBodyPostParamsTotal(t *testing.T) {
@@ -303,6 +305,7 @@ func TestSaveLowHTTPFlow_WebFuzzerSystemTag(t *testing.T) {
 	}, true)
 
 	require.NotNil(t, savedFlow)
+	require.Equal(t, schema.HTTPFlow_SourceType_SCAN, savedFlow.SourceType)
 	require.Contains(t, savedFlow.Tags, HTTPFlowTagWebFuzzer)
 	require.Greater(t, int(savedFlow.ID), 0)
 

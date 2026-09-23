@@ -2,14 +2,12 @@ package yakgrpc
 
 import (
 	"context"
-	"github.com/bytedance/mockey"
-	"github.com/yaklang/gorm"
-	"github.com/yaklang/yaklang/common/consts"
-	"github.com/yaklang/yaklang/common/schema"
-	"github.com/yaklang/yaklang/common/yak/yaklib"
-	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"os"
 	"testing"
+
+	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/schema"
+	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -35,22 +33,13 @@ func isCI() bool {
 }
 
 func TestAIGlobalConfig_GRPC_Local(t *testing.T) {
-	if isCI() {
-		t.Skip("skip grpc ai config local test in CI environment")
-	}
+	preserveAIRuntimeConfig(t)
 
 	client, server, err := NewLocalClientAndServerWithTempDatabase(t)
 	require.NoError(t, err)
 	require.NotNil(t, client)
 	require.NotNil(t, server)
-	t.Cleanup(func() {
-		if server.profileDatabase != nil {
-			_ = server.profileDatabase.Close()
-		}
-		if server.projectDatabase != nil {
-			_ = server.projectDatabase.Close()
-		}
-	})
+
 	ctx := context.Background()
 
 	cfg := &ypb.AIGlobalConfig{
@@ -138,10 +127,57 @@ func TestAIGlobalConfig_GRPC_Local(t *testing.T) {
 	require.Error(t, err)
 }
 
+// Configuration calls replace both runtime values; retain them independently,
+// including nil. Register before the DB/client so handlers finish before restore.
+func preserveAIRuntimeConfig(t *testing.T) {
+	t.Helper()
+	cached := yakit.GetCachedAIGlobalConfig()
+	tiered := consts.GetTieredAIConfig()
+	t.Cleanup(func() {
+		yakit.SetCachedAIGlobalConfigForTest(cached)
+		consts.SetTieredAIConfig(tiered)
+	})
+}
+
 func TestGetApiKey_ReplaceAPIKeys(t *testing.T) {
-	if isCI() {
-		t.Skip("skip in CI environment")
+	preserveAIRuntimeConfig(t)
+	cached := &ypb.AIGlobalConfig{
+		Enabled: true, RoutingPolicy: "cost", DefaultModelId: "cache-sentinel", AIPresetPrompt: "preserve prompt",
+		IntelligentModels: []*ypb.AIModelConfig{{
+			ModelName: "cached-model", Provider: &ypb.ThirdPartyApplicationConfig{Type: "openai", APIKey: "cached-key"},
+		}},
 	}
+	tiered := &consts.TieredAIConfig{
+		Enabled: true, DisableFallback: true, RoutingPolicy: consts.PolicyBalance,
+		DefaultModelID: "tiered-sentinel", GlobalWeight: 0.37,
+		VisionConfigs: []*ypb.AIModelConfig{{
+			ModelName: "vision-sentinel", Provider: &ypb.ThirdPartyApplicationConfig{Type: "openai", APIKey: "tiered-key"},
+		}},
+	}
+	for _, tc := range []struct {
+		name   string
+		cached *ypb.AIGlobalConfig
+		tiered *consts.TieredAIConfig
+	}{
+		{"sentinels", cached, tiered},
+		{"nil", nil, nil},
+		{"nil cache", nil, tiered},
+		{"nil tiered", cached, nil},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			yakit.SetCachedAIGlobalConfigForTest(tc.cached)
+			consts.SetTieredAIConfig(tc.tiered)
+			t.Run("replace keys", testReplaceAPIKeys)
+			// These readers execute in the same process, after the inner cleanup.
+			assert.Equal(t, tc.cached, yakit.GetCachedAIGlobalConfig())
+			assert.Equal(t, tc.tiered, consts.GetTieredAIConfig())
+			assert.Equal(t, tc.tiered != nil && tc.tiered.Enabled, consts.IsTieredAIModelConfigEnabled())
+		})
+	}
+}
+
+func testReplaceAPIKeys(t *testing.T) {
+	preserveAIRuntimeConfig(t)
 
 	client, server, err := NewLocalClientAndServerWithTempDatabase(t)
 	require.NoError(t, err)
@@ -157,19 +193,6 @@ func TestGetApiKey_ReplaceAPIKeys(t *testing.T) {
 	}
 	err = db.Create(testRecord).Error
 	require.NoError(t, err)
-
-	t.Cleanup(func() {
-		if testRecord.ID != 0 {
-			db.Delete(&schema.AIThirdPartyConfig{}, testRecord.ID)
-		}
-		_ = yakit.SetKey(db, consts.AI_GLOBAL_CONFIG_KEY, "")
-		if server.profileDatabase != nil {
-			_ = server.profileDatabase.Close()
-		}
-		if server.projectDatabase != nil {
-			_ = server.projectDatabase.Close()
-		}
-	})
 
 	ctx := context.Background()
 
@@ -215,19 +238,13 @@ func TestGetApiKey_ReplaceAPIKeys(t *testing.T) {
 	_, err = client.SetAIGlobalConfig(ctx, cfg)
 	require.NoError(t, err)
 
-	mockey.PatchConvey("mock online client", t, func() {
+	t.Run("replace builtin provider keys", func(t *testing.T) {
 		newAPIKey := "mf-mock-created-key"
 
-		mockey.Mock(consts.GetGormProfileDatabase).To(func() *gorm.DB {
-			return db
-		}).Build()
-
-		mockey.Mock((*yaklib.OnlineClient).GetAIApiKeyByOnline).
-			To(func(_ *yaklib.OnlineClient, ctx context.Context, token string) (string, error) {
-				assert.Equal(t, "test-token", token)
-				return newAPIKey, nil
-			}).
-			Build()
+		server.onlineClient = &stubOnlineService{apiKey: func(ctx context.Context, token string) (string, error) {
+			assert.Equal(t, "test-token", token)
+			return newAPIKey, nil
+		}}
 
 		req := &ypb.GetApiKeyByOnlineRequest{Token: "test-token"}
 		resp, err := server.GetApiKeyByOnline(context.Background(), req)
@@ -255,22 +272,13 @@ func TestGetApiKey_ReplaceAPIKeys(t *testing.T) {
 }
 
 func TestUpdateApiKey_ReplaceAllAPIKeys(t *testing.T) {
-	if isCI() {
-		t.Skip("skip grpc ai config local test in CI environment")
-	}
+	preserveAIRuntimeConfig(t)
 
 	client, server, err := NewLocalClientAndServerWithTempDatabase(t)
 	require.NoError(t, err)
 	require.NotNil(t, client)
 	require.NotNil(t, server)
-	t.Cleanup(func() {
-		if server.profileDatabase != nil {
-			_ = server.profileDatabase.Close()
-		}
-		if server.projectDatabase != nil {
-			_ = server.projectDatabase.Close()
-		}
-	})
+
 	ctx := context.Background()
 
 	oldKey := "old-key-for-test"
@@ -324,6 +332,10 @@ func TestUpdateApiKey_ReplaceAllAPIKeys(t *testing.T) {
 		},
 	}
 
+	// The public configuration API rejects models without a provider.
+	_, err = client.SetAIGlobalConfig(ctx, cfg)
+	require.ErrorContains(t, err, "model config missing provider")
+	cfg.VisionModels = cfg.VisionModels[:1]
 	_, err = client.SetAIGlobalConfig(ctx, cfg)
 	require.NoError(t, err)
 
