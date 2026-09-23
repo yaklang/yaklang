@@ -17,10 +17,10 @@ import (
 	"time"
 	"unicode/utf8"
 
-	gopty "github.com/aymanbagabas/go-pty"
 	"github.com/mattn/go-runewidth"
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/schema"
+	gopty "github.com/yaklang/yaklang/common/utils/pty"
 )
 
 const (
