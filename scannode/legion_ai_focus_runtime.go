@@ -1035,7 +1035,11 @@ func renderServerFocusResponse(response *http.Response, body string) string {
 			lines = append(lines, name+": "+value)
 		}
 	}
-	return fmt.Sprintf("HTTP/1.1 %s\r\n%s\r\n\r\n%s", response.Status, strings.Join(lines, "\r\n"), body)
+	statusLine := response.Status
+	if proto := strings.TrimSpace(response.Proto); proto != "" {
+		statusLine = proto + " " + statusLine
+	}
+	return fmt.Sprintf("%s\r\n%s\r\n\r\n%s", statusLine, strings.Join(lines, "\r\n"), body)
 }
 
 func focusRuntimeString(params map[string]any, key string) string {

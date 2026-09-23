@@ -292,6 +292,19 @@ func (s *recordingServerFocusSink) SubmitRisk(
 	return aiFocusResultReceipt{ResultID: fmt.Sprintf("risk-%d", len(s.risks))}, nil
 }
 
+func TestLegionServerFocusResponseEvidencePreservesProtocol(t *testing.T) {
+	response := &http.Response{
+		Proto: "HTTP/1.0", Status: "200 OK",
+		Header: http.Header{"Server": []string{"test-server"}},
+	}
+	evidence := renderServerFocusResponse(response, "body")
+	if !strings.HasPrefix(evidence, "HTTP/1.0 200 OK\r\n") ||
+		strings.Contains(evidence, "HTTP/1.1 200 OK") ||
+		!strings.Contains(evidence, "Server: test-server\r\n") {
+		t.Fatalf("response evidence changed the observed protocol: %q", evidence)
+	}
+}
+
 func TestLegionServerFocusRuntimeExecutesBoundedCapabilities(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(response http.ResponseWriter, request *http.Request) {
 		switch request.URL.Path {
