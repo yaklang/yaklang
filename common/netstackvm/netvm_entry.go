@@ -10,6 +10,7 @@ import (
 	"sync"
 
 	"github.com/yaklang/yaklang/common/lowtun/netstack/gvisor/pkg/tcpip/header"
+	"github.com/yaklang/yaklang/common/lowtun/netstack/gvisor/pkg/tcpip/link/channel"
 
 	"github.com/yaklang/yaklang/common/log"
 
@@ -33,6 +34,9 @@ type NetStackVirtualMachineEntry struct {
 	config *Config
 
 	driver *PCAPEndpoint
+	// link is the userspace packet queue for a channel-backed entry.
+	// PCAP entries leave it nil; outboundLoop already drains that queue.
+	link *channel.Endpoint
 
 	mainNICID tcpip.NICID
 
