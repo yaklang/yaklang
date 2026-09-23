@@ -206,9 +206,8 @@ func ensureUniqueIrCodesProgramCodeIndex(db *gorm.DB) {
 	}
 }
 
-// ensureUniqueIrOffsetsIndex creates a UNIQUE INDEX with COALESCE on
-// (program_name, value_id, file_hash, start_offset, end_offset, COALESCE(variable_name, ''))
-// for the ir_offsets table. This prevents duplicate offset INSERTs.
+// ensureUniqueIrOffsetsIndex creates a UNIQUE INDEX for ir_offsets that treats
+// NULL variable names as empty strings. This prevents duplicate offset INSERTs.
 //
 // If an older non-COALESCE index with the same name exists, it is dropped and
 // recreated with COALESCE. If duplicate rows exist, the extras are removed
