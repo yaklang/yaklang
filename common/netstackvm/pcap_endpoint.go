@@ -415,6 +415,18 @@ func (p *PCAPEndpoint) outboundLoop(ctx context.Context) {
 	}
 }
 
+// rawIPLink reports both LINKTYPE_RAW (101) and the platform DLT_RAW value.
+// Npcap on Windows uses 12, which gopacket names "Raw" but does not equal
+// layers.LinkTypeRaw. OpenBSD uses 14. A tun device speaks raw IPv4.
+func rawIPLink(link layers.LinkType) bool {
+	switch link {
+	case layers.LinkTypeRaw, layers.LinkTypeIPv4, layers.LinkTypeIPv6, 12, 14:
+		return true
+	default:
+		return false
+	}
+}
+
 func (p *PCAPEndpoint) fallbackDefaultMac() net.HardwareAddr {
 	if p.gatewayFound.IsSet() {
 		return p.gatewayHardware
@@ -432,10 +444,20 @@ func (p *PCAPEndpoint) writePacket(pkt *stack.PacketBuffer) error {
 	defer buf.Release()
 
 	var payloads = buf.Flatten()
+	// gVisor resolves the next hop (the target on-link, otherwise the gateway).
+	// Ethernet framing looks the destination IP up in ipToMac, so remember that
+	// resolved MAC under the destination before encapsulation.
+	if p.ipToMac != nil && p.adaptor != nil && p.adaptor.linkType == layers.LinkTypeEthernet {
+		if mac := net.HardwareAddr(pkt.EgressRoute.RemoteLinkAddress); len(mac) == 6 {
+			if hdr, hdrErr := ipv4.ParseHeader(payloads); hdrErr == nil && hdr != nil && hdr.Dst != nil {
+				p.ipToMac.Store(hdr.Dst.String(), append(net.HardwareAddr(nil), mac...))
+			}
+		}
+	}
 	var linkLayerType gopacket.LayerType
 	var err error
-	switch p.adaptor.linkType {
-	case layers.LinkTypeRaw, layers.LinkTypeIPv4, layers.LinkTypeIPv6:
+	switch {
+	case rawIPLink(p.adaptor.linkType):
 		switch header.IPVersion(payloads) {
 		case header.IPv4Version:
 			linkLayerType = layers.LayerTypeIPv4
@@ -444,9 +466,9 @@ func (p *PCAPEndpoint) writePacket(pkt *stack.PacketBuffer) error {
 		default:
 			return utils.Errorf("non-IP packet on raw IP interface")
 		}
-	case layers.LinkTypeNull, layers.LinkTypeLoop:
+	case p.adaptor.linkType == layers.LinkTypeNull || p.adaptor.linkType == layers.LinkTypeLoop:
 		payloads, linkLayerType, err = p.encapsulatePayloadLoopback(payloads)
-	case layers.LinkTypeEthernet:
+	case p.adaptor.linkType == layers.LinkTypeEthernet:
 		payloads, linkLayerType, err = p.encapsulatePayload(payloads)
 	default:
 		return utils.Errorf("unsupported pcap link type: %v", p.adaptor.linkType)

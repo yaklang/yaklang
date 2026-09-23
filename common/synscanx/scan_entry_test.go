@@ -199,6 +199,43 @@ func TestConcurrentBelowTenStillHasBurst(t *testing.T) {
 	}
 }
 
+func TestPortsIncludeUDP(t *testing.T) {
+	if portsIncludeUDP("80,443") {
+		t.Fatal("tcp ports were treated as udp")
+	}
+	if !portsIncludeUDP("80,U:53") {
+		t.Fatal("udp port was missed")
+	}
+}
+
+type recordingEmitter struct {
+	got []string
+}
+
+func (r *recordingEmitter) Emit(ctx context.Context, host string, port int) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	r.got = append(r.got, host+":"+itoa(port))
+	return nil
+}
+
+func (r *recordingEmitter) Close() error { return nil }
+
+func TestSendPacketUsesHalfOpenEmitterForTCP(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	rec := &recordingEmitter{}
+	scanner := &Scannerx{ctx: ctx, halfOpen: rec}
+	targetCh := make(chan *SynxTarget, 1)
+	targetCh <- &SynxTarget{Host: "10.0.0.8", Port: 443, Mode: TCP}
+	close(targetCh)
+	scanner.sendPacket(targetCh)
+	if len(rec.got) != 1 || rec.got[0] != "10.0.0.8:443" {
+		t.Fatalf("emitted %v", rec.got)
+	}
+}
+
 func TestScanRejectsEmptyTargetBeforeCapture(t *testing.T) {
 	if _, err := Scan(context.Background(), "", "80"); err == nil {
 		t.Fatal("expected empty target error")
