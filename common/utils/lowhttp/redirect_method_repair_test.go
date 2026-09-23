@@ -4,12 +4,11 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"net/http/httptest"
-	"strings"
 	"sync/atomic"
 	"testing"
 
 	"github.com/stretchr/testify/require"
+	"github.com/yaklang/yaklang/common/utils"
 )
 
 func TestRedirectMethodRepairSwitchesMethodWithoutConsumingRedirect(t *testing.T) {
@@ -52,7 +51,7 @@ func TestRedirectMethodRepairSwitchesMethodWithoutConsumingRedirect(t *testing.T
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			host, port := utils.DebugMockHTTPHandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				switch r.URL.Path {
 				case "/start":
 					w.Header().Set("Location", "/protected")
@@ -78,11 +77,9 @@ func TestRedirectMethodRepairSwitchesMethodWithoutConsumingRedirect(t *testing.T
 				default:
 					w.WriteHeader(http.StatusNotFound)
 				}
-			}))
-			t.Cleanup(server.Close)
+			})
 
-			host := strings.TrimPrefix(server.URL, "http://")
-			request := fmt.Sprintf("POST /start HTTP/1.1\r\nHost: %s\r\nContent-Type: application/x-www-form-urlencoded\r\nContent-Length: 3\r\n\r\na=b", host)
+			request := fmt.Sprintf("POST /start HTTP/1.1\r\nHost: %s\r\nContent-Type: application/x-www-form-urlencoded\r\nContent-Length: 3\r\n\r\na=b", utils.HostPort(host, port))
 			response, err := HTTP(WithRequest(request), WithRedirectTimes(2), WithTimeoutFloat(3))
 			require.NoError(t, err)
 			require.NotNil(t, response)
@@ -104,9 +101,72 @@ func TestRedirectMethodRepairSwitchesMethodWithoutConsumingRedirect(t *testing.T
 	}
 }
 
+func TestRedirectMethodRepairUsesImmediate301RequestAfter302(t *testing.T) {
+	host, port := utils.DebugMockHTTPHandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/start":
+			w.Header().Set("Location", "/stage/step")
+			w.WriteHeader(http.StatusFound)
+		case "/stage/step":
+			if r.Method != http.MethodPatch {
+				w.WriteHeader(http.StatusTeapot)
+				return
+			}
+			w.Header().Set("Location", "final")
+			w.WriteHeader(http.StatusMovedPermanently)
+		case "/stage/step/final":
+			// The repair must use the request that received the 301, not /start.
+			if r.Header.Get("Referer") != "http://"+r.Host+"/stage/step" {
+				w.WriteHeader(http.StatusTeapot)
+				return
+			}
+			body, _ := io.ReadAll(r.Body)
+			switch r.Method {
+			case http.MethodPatch:
+				if string(body) != "a=b" {
+					w.WriteHeader(http.StatusTeapot)
+					return
+				}
+				w.WriteHeader(http.StatusBadRequest)
+			case http.MethodGet:
+				if len(body) != 0 {
+					w.WriteHeader(http.StatusTeapot)
+					return
+				}
+				w.WriteHeader(http.StatusOK)
+			default:
+				w.WriteHeader(http.StatusTeapot)
+			}
+		default:
+			w.WriteHeader(http.StatusNotFound)
+		}
+	})
+
+	request := fmt.Sprintf("PATCH /start HTTP/1.1\r\nHost: %s\r\nContent-Type: application/x-www-form-urlencoded\r\nContent-Length: 3\r\n\r\na=b", utils.HostPort(host, port))
+	response, err := HTTP(WithRequest(request), WithRedirectTimes(2), WithTimeoutFloat(3))
+	require.NoError(t, err)
+	require.NotNil(t, response)
+	require.Equal(t, http.StatusOK, GetStatusCodeFromResponse(response.RawPacket))
+	require.Len(t, response.RedirectRawPackets, 4, "repair must not consume another redirect")
+
+	wantPaths := []string{"/start", "/stage/step", "/stage/step/final", "/stage/step/final"}
+	wantMethods := []string{http.MethodPatch, http.MethodPatch, http.MethodPatch, http.MethodGet}
+	wantCodes := []int{302, 301, 400, 200}
+	for i, flow := range response.RedirectRawPackets {
+		require.NotNil(t, flow)
+		require.Equal(t, wantPaths[i], GetHTTPRequestPath(flow.Request))
+		require.Equal(t, wantMethods[i], GetHTTPRequestMethod(flow.Request))
+		require.Equal(t, wantCodes[i], GetStatusCodeFromResponse(flow.Response))
+	}
+	repairedRequest := response.RedirectRawPackets[3].Request
+	require.Equal(t, "http://"+utils.HostPort(host, port)+"/stage/step", GetHTTPPacketHeader(repairedRequest, "Referer"))
+	require.Empty(t, GetHTTPPacketBody(repairedRequest))
+	require.Same(t, response, response.RedirectRawPackets[3].RespRecord)
+}
+
 func TestRedirectMethodRepairOnlyOnceAcross400And405(t *testing.T) {
 	var secondRepairAttempts atomic.Int32
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	host, port := utils.DebugMockHTTPHandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case "/start":
 			w.Header().Set("Location", "/first")
@@ -128,10 +188,9 @@ func TestRedirectMethodRepairOnlyOnceAcross400And405(t *testing.T) {
 		default:
 			w.WriteHeader(http.StatusNotFound)
 		}
-	}))
-	t.Cleanup(server.Close)
+	})
 
-	request := fmt.Sprintf("POST /start HTTP/1.1\r\nHost: %s\r\nContent-Length: 3\r\n\r\na=b", strings.TrimPrefix(server.URL, "http://"))
+	request := fmt.Sprintf("POST /start HTTP/1.1\r\nHost: %s\r\nContent-Length: 3\r\n\r\na=b", utils.HostPort(host, port))
 	response, err := HTTP(WithRequest(request), WithRedirectTimes(3), WithTimeoutFloat(3))
 	require.NoError(t, err)
 	require.NotNil(t, response)
@@ -148,7 +207,7 @@ func TestRedirectMethodRepairOnlyOnceAcross400And405(t *testing.T) {
 
 func TestRedirectMethodRepairDoesNotRetryUnchangedGET(t *testing.T) {
 	var rejectedAttempts atomic.Int32
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	host, port := utils.DebugMockHTTPHandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/start" {
 			w.Header().Set("Location", "/protected")
 			w.WriteHeader(http.StatusFound)
@@ -156,10 +215,9 @@ func TestRedirectMethodRepairDoesNotRetryUnchangedGET(t *testing.T) {
 		}
 		rejectedAttempts.Add(1)
 		w.WriteHeader(http.StatusMethodNotAllowed)
-	}))
-	t.Cleanup(server.Close)
+	})
 
-	request := fmt.Sprintf("GET /start HTTP/1.1\r\nHost: %s\r\n\r\n", strings.TrimPrefix(server.URL, "http://"))
+	request := fmt.Sprintf("GET /start HTTP/1.1\r\nHost: %s\r\n\r\n", utils.HostPort(host, port))
 	response, err := HTTP(WithRequest(request), WithRedirectTimes(3), WithTimeoutFloat(3))
 	require.NoError(t, err)
 	require.NotNil(t, response)
@@ -170,7 +228,7 @@ func TestRedirectMethodRepairDoesNotRetryUnchangedGET(t *testing.T) {
 
 func TestRedirectMethodRepairDoesNotRetry401(t *testing.T) {
 	var repairAttempts atomic.Int32
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	host, port := utils.DebugMockHTTPHandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/start" {
 			w.Header().Set("Location", "/protected")
 			w.WriteHeader(http.StatusFound)
@@ -182,10 +240,9 @@ func TestRedirectMethodRepairDoesNotRetry401(t *testing.T) {
 			return
 		}
 		w.WriteHeader(http.StatusUnauthorized)
-	}))
-	t.Cleanup(server.Close)
+	})
 
-	request := fmt.Sprintf("POST /start HTTP/1.1\r\nHost: %s\r\nContent-Length: 3\r\n\r\na=b", strings.TrimPrefix(server.URL, "http://"))
+	request := fmt.Sprintf("POST /start HTTP/1.1\r\nHost: %s\r\nContent-Length: 3\r\n\r\na=b", utils.HostPort(host, port))
 	response, err := HTTP(WithRequest(request), WithRedirectTimes(3), WithTimeoutFloat(3))
 	require.NoError(t, err)
 	require.NotNil(t, response)
@@ -195,7 +252,7 @@ func TestRedirectMethodRepairDoesNotRetry401(t *testing.T) {
 }
 
 func TestRedirectMethodRepairDoesNotRestoreCrossOriginAuthorization(t *testing.T) {
-	target := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	targetHost, targetPort := utils.DebugMockHTTPHandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Header.Get("Authorization") != "" {
 			w.WriteHeader(http.StatusTeapot)
 			return
@@ -205,15 +262,13 @@ func TestRedirectMethodRepairDoesNotRestoreCrossOriginAuthorization(t *testing.T
 			return
 		}
 		w.WriteHeader(http.StatusOK)
-	}))
-	t.Cleanup(target.Close)
-	source := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Location", target.URL+"/protected")
+	})
+	sourceHost, sourcePort := utils.DebugMockHTTPHandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Location", "http://"+utils.HostPort(targetHost, targetPort)+"/protected")
 		w.WriteHeader(http.StatusFound)
-	}))
-	t.Cleanup(source.Close)
+	})
 
-	request := fmt.Sprintf("POST /start HTTP/1.1\r\nHost: %s\r\nAuthorization: Bearer secret\r\nContent-Length: 3\r\n\r\na=b", strings.TrimPrefix(source.URL, "http://"))
+	request := fmt.Sprintf("POST /start HTTP/1.1\r\nHost: %s\r\nAuthorization: Bearer secret\r\nContent-Length: 3\r\n\r\na=b", utils.HostPort(sourceHost, sourcePort))
 	response, err := HTTP(WithRequest(request), WithRedirectTimes(1), WithTimeoutFloat(3))
 	require.NoError(t, err)
 	require.NotNil(t, response)
