@@ -9,15 +9,16 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
 	"github.com/davecgh/go-spew/spew"
+	errorspkg "github.com/pkg/errors"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/netx"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp/httpctx"
-	errorspkg "github.com/pkg/errors"
 )
 
 // h1Transport implements Transport for HTTP/1.1.
@@ -106,11 +107,25 @@ func (t *h1Transport) RoundTrip(ctx context.Context, tr *transportRequest) (*tra
 	return t.roundTripDirect(ctx, tr, conn, requestPacket, canReconnect)
 }
 
-
 // containsNoProxyAvailable checks if the error message indicates no proxy
 // is available.
 func containsNoProxyAvailable(msg string) bool {
 	return strings.Contains(msg, `no proxy available`)
+}
+
+// Extra bytes after the declared request body may be another pipelined request.
+// Its response can arrive after the first response has already been parsed.
+func hasExtraH1RequestBytes(packet []byte) bool {
+	_, body := SplitHTTPHeadersAndBodyFromPacketView(packet)
+	if len(body) == 0 {
+		return false
+	}
+	contentLength := GetHTTPPacketHeader(packet, "Content-Length")
+	if contentLength == "" {
+		return !strings.Contains(strings.ToLower(GetHTTPPacketHeader(packet, "Transfer-Encoding")), "chunked")
+	}
+	length, err := strconv.ParseInt(strings.TrimSpace(contentLength), 10, 64)
+	return err != nil || length < 0 || int64(len(body)) > length
 }
 
 func (t *h1Transport) tryLegacyProxy(ctx context.Context, tr *transportRequest, connPool *LowHttpConnPool, withConnPool bool) (net.Conn, error) {
@@ -258,15 +273,30 @@ func (t *h1Transport) roundTripDirect(ctx context.Context, tr *transportRequest,
 	}
 
 	var mirrorWriter io.Writer = &responseRaw
+	var finishStreamHandler func()
+	defer func() {
+		if finishStreamHandler != nil {
+			finishStreamHandler()
+		}
+	}()
 
 	// BodyStreamReaderHandler for non-pool connection
 	if option != nil && option.BodyStreamReaderHandler != nil {
 		reader, writer := utils.NewBufPipe(nil)
-		defer writer.Close()
-
 		streamHandlerDone := make(chan struct{})
+		streamBodyReaderCh := make(chan io.ReadCloser, 1)
+		finished := false
+		finishStreamHandler = func() {
+			if finished {
+				return
+			}
+			finished = true
+			writer.Close()
+			waitStreamHandlerDone(streamHandlerDone, streamBodyReaderCh, 2*time.Second, "non-pool stream handler")
+		}
 		go func() {
 			bodyReader, bodyWriter := utils.NewBufPipe(nil)
+			streamBodyReaderCh <- bodyReader
 			defer func() {
 				if r := recover(); r != nil {
 					log.Errorf("BodyStreamReaderHandler panic: %v", r)
@@ -436,6 +466,19 @@ func (t *h1Transport) roundTripDirect(ctx context.Context, tr *transportRequest,
 				if errors.Is(nextErr, io.EOF) || errors.Is(nextErr, io.ErrUnexpectedEOF) {
 					break
 				}
+				// Preserve the remaining wire bytes for malformed or closing
+				// pipeline responses without delaying ordinary keep-alive replies.
+				stableTimeout := timeout
+				if nextRespClose && stableTimeout < time.Second {
+					stableTimeout = time.Second
+				}
+				restBytes, _ := utils.ReadUntilStable(httpResponseReader, conn, stableTimeout, 300*time.Millisecond)
+				if len(restBytes) > 0 {
+					if len(restBytes) > 256 {
+						restBytes = restBytes[:256]
+					}
+					log.Warnf("unhandled rest data in connection: %#v ...", string(restBytes))
+				}
 				break
 			}
 			if nextResponse != nil {
@@ -445,20 +488,17 @@ func (t *h1Transport) roundTripDirect(ctx context.Context, tr *transportRequest,
 		}
 	}
 
-	// Drain any remaining bytes from the bufio reader through the TeeReader
-	// so that responseRaw captures the full wire packet, including pipeline
-	// responses that were not consumed by ReadHTTPResponseFromBufioReader.
-	// Use a short stable timeout to avoid blocking on keep-alive connections
-	// that have no more data to send.
-	drainTimeout := 500 * time.Millisecond
-	if respClose {
-		drainTimeout = timeout
-		if drainTimeout < 1*time.Second {
-			drainTimeout = 1 * time.Second
-		}
+	if firstResponse != nil && !respClose && hasExtraH1RequestBytes(requestPacket) {
+		// A pipelined response may not have arrived by the time the first one
+		// finishes. Only wait for it when the request has extra wire bytes.
+		_, _ = utils.ReadUntilStable(httpResponseReader, conn, 500*time.Millisecond, 300*time.Millisecond)
 	}
-	restBytes, _ := utils.ReadUntilStable(httpResponseReader, conn, drainTimeout, 300*time.Millisecond)
-	_ = restBytes // bytes are already written to responseRaw via TeeReader
+
+	// Complete the stream handler before exposing responseRaw: with NoBodyBuffer
+	// it is the handler that writes the response headers into that buffer.
+	if finishStreamHandler != nil {
+		finishStreamHandler()
+	}
 
 	return &transportResult{
 		rawBytes:        responseRaw.Bytes(),

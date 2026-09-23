@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"io"
 	"net/http"
 	"net/url"
 	"strings"
@@ -393,12 +392,7 @@ func HTTPWithoutRetry(option *LowhttpExecConfig) (*LowhttpResponse, error) {
 	// 用于检查 BodyStreamReaderHandler 是否被正常调用
 	bodyStreamReaderHandled := utils.NewAtomicBool()
 	option.bodyStreamReaderHandled = bodyStreamReaderHandled
-	var streamBodyReaderCh chan io.ReadCloser
-	var streamHandlerDone chan struct{}
 	defer func() {
-		if option != nil && option.BodyStreamReaderHandler != nil {
-			waitStreamHandlerDone(streamHandlerDone, streamBodyReaderCh, 2*time.Second, "non-pool stream handler")
-		}
 		if option != nil && option.BodyStreamReaderHandler != nil && !bodyStreamReaderHandled.IsSet() {
 			func() {
 				defer func() {
@@ -700,6 +694,7 @@ func HTTPWithoutRetry(option *LowhttpExecConfig) (*LowhttpResponse, error) {
 		requestPacket = FixHTTPPacketQueryEscape(requestPacket)
 	}
 	response.RawRequest = requestPacket
+	response.Https = https
 	response.Http2 = enableHttp2
 	_ = withConnPool // transport reads option.WithConnPool directly
 
@@ -872,17 +867,17 @@ func HTTPWithoutRetry(option *LowhttpExecConfig) (*LowhttpResponse, error) {
 		return true
 	}
 	var (
-		rawBytes        []byte
-		firstResponse   *http.Response
-		multiResponses  []*http.Response
+		rawBytes         []byte
+		firstResponse    *http.Response
+		multiResponses   []*http.Response
 		isMultiResponses bool
 	)
-// ── Transport dispatch ────────────────────────────────────────────────────
-//
-// The orchestration layer selects a transport based on the requested protocol,
-// executes the request, and handles protocol-level downgrades (H2→H1) and
-// stale-connection reconnects.  Each transport owns its connection management
-// and stream lifecycle.
+	// ── Transport dispatch ────────────────────────────────────────────────────
+	//
+	// The orchestration layer selects a transport based on the requested protocol,
+	// executes the request, and handles protocol-level downgrades (H2→H1) and
+	// stale-connection reconnects.  Each transport owns its connection management
+	// and stream lifecycle.
 
 	tr := &transportRequest{
 		option:     option,
