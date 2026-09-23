@@ -8,7 +8,6 @@ import (
 	"net/http/httptest"
 	"sync"
 	"testing"
-	"time"
 
 	"github.com/yaklang/yaklang/common/utils/lowhttp/poc"
 )
@@ -201,6 +200,70 @@ func TestChatBase_BackwardCompat(t *testing.T) {
 	}
 }
 
+func TestLegacyGatewayMediaWire(t *testing.T) {
+	for _, test := range []struct {
+		name   string
+		msg    string
+		videos []*VideoDescription
+		images []*ImageDescription
+		direct bool
+		want   string
+	}{
+		{
+			name:   "invalid videos default text",
+			videos: []*VideoDescription{nil, {Url: ""}},
+			direct: true, // Exercise the legacy branch before option filtering.
+			want:   `{"model":"test-model","messages":[{"role":"user","content":[{"type":"text","text":"请描述视频内容"}]}],"stream":false}`,
+		},
+		{
+			name:   "whitespace text",
+			msg:    "  ",
+			images: []*ImageDescription{{Url: "https://example.com/a.png"}},
+			want:   `{"model":"test-model","messages":[{"role":"user","content":[{"type":"text","text":"  "},{"type":"image_url","image_url":{"url":"https://example.com/a.png"}}]}],"stream":false}`,
+		},
+		{
+			name:   "mixed duplicates",
+			videos: []*VideoDescription{{Url: "https://example.com/shared"}, {Url: "https://example.com/shared"}, nil},
+			images: []*ImageDescription{{Url: "https://example.com/shared"}, {Url: "https://example.com/b.png"}, {Url: "https://example.com/b.png"}},
+			want:   `{"model":"test-model","messages":[{"role":"user","content":[{"type":"video_url","video_url":{"url":"https://example.com/shared"}},{"type":"image_url","image_url":{"url":"https://example.com/shared"}},{"type":"image_url","image_url":{"url":"https://example.com/b.png"}},{"type":"text","text":"请描述视频内容"}]}],"stream":false,"modalities":["text"]}`,
+		},
+		{
+			name:   "image only default text",
+			images: []*ImageDescription{nil, {Url: ""}, {Url: "https://example.com/a.png"}, {Url: "https://example.com/a.png"}},
+			want:   `{"model":"test-model","messages":[{"role":"user","content":[{"type":"text","text":"请描述图片内容"},{"type":"image_url","image_url":{"url":"https://example.com/a.png"}}]}],"stream":false}`,
+		},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			url, get, closeFn := rawMessagesMockServer(t)
+			defer closeFn()
+			var err error
+			if test.direct {
+				ctx := NewChatBaseContext(
+					WithChatBase_DisableStream(true),
+					WithChatBase_PoCOptions(func() ([]poc.PocConfigOption, error) { return nil, nil }),
+				)
+				ctx.VideoUrls = test.videos
+				ctx.ImageUrls = test.images
+				_, err = chatBaseChatCompletions(url, "test-model", test.msg, ctx)
+			} else {
+				_, err = ChatBase(url, "test-model", test.msg,
+					WithChatBase_DisableStream(true),
+					WithChatBase_PoCOptions(func() ([]poc.PocConfigOption, error) { return nil, nil }),
+					WithChatBase_VideoRawInstance(test.videos...),
+					WithChatBase_ImageRawInstance(test.images...),
+				)
+			}
+			if err != nil {
+				t.Fatal(err)
+			}
+			raw, _ := get()
+			if string(raw) != test.want {
+				t.Fatalf("request body changed:\n got: %s\nwant: %s", raw, test.want)
+			}
+		})
+	}
+}
+
 // TestChatBase_MirrorReceivesSerializedMessages 验证 RawMessages 模式下，
 // 注册的 mirror observer 收到的不再是 prompt 字符串，而是 messages 的稳定
 // JSON 序列化结果。aicache 据此计算前缀 LCP 才能与上游 LLM 看到的请求体对齐。
@@ -209,14 +272,10 @@ func TestChatBase_MirrorReceivesSerializedMessages(t *testing.T) {
 	url, _, closeFn := rawMessagesMockServer(t)
 	defer closeFn()
 
-	// 注册 observer，捕获 model + msg
-	var (
-		obsMu  sync.Mutex
-		obsMsg string
-	)
+	ResetChatBaseMirrorObserversForTest()
+	t.Cleanup(ResetChatBaseMirrorObserversForTest)
+	var obsMsg string
 	RegisterChatBaseMirrorObserver(func(model string, msg string) *ChatBaseMirrorResult {
-		obsMu.Lock()
-		defer obsMu.Unlock()
 		if obsMsg == "" { // 取第一条即可
 			obsMsg = msg
 		}
@@ -229,21 +288,7 @@ func TestChatBase_MirrorReceivesSerializedMessages(t *testing.T) {
 	}
 	runChatBaseWithRawMessages(t, url, input)
 
-	// observer 是 goroutine 异步触发，最多等 1s
-	deadline := time.Now().Add(time.Second)
-	for time.Now().Before(deadline) {
-		obsMu.Lock()
-		if obsMsg != "" {
-			obsMu.Unlock()
-			break
-		}
-		obsMu.Unlock()
-		time.Sleep(10 * time.Millisecond)
-	}
-
-	obsMu.Lock()
 	got := obsMsg
-	obsMu.Unlock()
 	if got == "" {
 		t.Fatalf("mirror observer did not receive any msg")
 	}
