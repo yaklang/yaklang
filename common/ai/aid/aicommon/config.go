@@ -798,11 +798,7 @@ func newConfig(ctx context.Context) *Config {
 		return e, nil
 	})
 
-	if config.GetSpeedPriorityAICallback() != nil && !config.IsSingleAIModelMode() {
-		config.Emitter.SetStreamNodeIdI18nProvider(
-			config.buildStreamNodeIdI18nProvider(),
-		)
-	}
+	config.ensureAICallbacks()
 
 	// Sync EnableFunctionCallMode to KeyValueConfig so that NewReActLoop can
 	// read it via config.GetConfigBool("EnableFunctionCallMode").
@@ -4626,38 +4622,4 @@ func (c *Config) invokeLiteForgeWithCallback(prompt string, callback AICallbackT
 	opts = append(opts, WithFastAICallback(callback))
 	opts = append(opts, WithDisableCreateDBRuntime(true)) // Avoid creating runtime records for lite forge calls
 	return InvokeLiteForge(prompt, opts...)
-}
-
-func (c *Config) buildStreamNodeIdI18nProvider() func(nodeId string) *schema.I18n {
-	return func(nodeId string) *schema.I18n {
-		var result *schema.I18n
-		c.ScheduleAuxiliaryTask(c.GetContext(),
-			CallerLabelI18nTranslation,
-			func() string {
-				return fmt.Sprintf(`You are a UI localization assistant for an AI agent system.
-Translate the following technical stream/node identifier into concise, user-friendly display names.
-The identifier uses underscores or hyphens as word separators.
-
-Identifier: %s
-
-Requirements:
-- Chinese (zh): A short, natural Chinese phrase (2-6 characters preferred)
-- English (en): A short, capitalized English phrase`, nodeId)
-			},
-			func(action *Action) {
-				zh, en := action.GetString("zh"), action.GetString("en")
-				if zh != "" || en != "" {
-					result = &schema.I18n{Zh: zh, En: en}
-				}
-			},
-			WithAuxiliaryOnError(func(err error) {
-				log.Infof("stream nodeId i18n provider failed for %q: %v", nodeId, err)
-			}),
-			WithAuxiliaryOutputs(
-				aitool.WithStringParam("zh", aitool.WithParam_Description("Chinese user-friendly display name")),
-				aitool.WithStringParam("en", aitool.WithParam_Description("English user-friendly display name")),
-			),
-		)
-		return result
-	}
 }
