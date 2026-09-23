@@ -24,6 +24,7 @@ func mockPCAP(ctx context.Context, s *stack.Stack, writes *atomic.Int64) *PCAPEn
 	ch := make(chan gopacket.Packet, 32)
 	p := &PCAPEndpoint{Endpoint: channel.New(128, 1500, tcpip.LinkAddress("\x02\x00\x00\x00\x00\x01")), ctx: ctx, cancel: cancel, stack: s, wg: new(sync.WaitGroup), mtu: 1500, ipToMac: new(sync.Map), gatewayFound: utils.NewAtomicBool(), tcpKillMap: make(map[string]struct{}), netBridge: &pcapBridge{internal: net.HardwareAddr{2, 0, 0, 0, 0, 1}, external: net.HardwareAddr{2, 0, 0, 0, 0, 2}}}
 	p.adaptor = newPcapBroker(ch, func() { close(ch) }, func([]byte) error { writes.Add(1); return nil })
+	p.adaptor.linkType = layers.LinkTypeEthernet
 	p.readOnly.Store(true)
 	return p
 }

@@ -2,15 +2,16 @@ package tools
 
 import (
 	"context"
+	"strings"
+	"sync"
+	"time"
+
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/netx"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/hostsparser"
 	"github.com/yaklang/yaklang/common/utils/network"
 	"github.com/yaklang/yaklang/common/utils/pingutil"
-	"strings"
-	"sync"
-	"time"
 )
 
 type _pingConfig struct {
@@ -26,18 +27,18 @@ type _pingConfig struct {
 	tcpPingPort        string
 	proxies            []string
 	excludeHostsFilter *hostsparser.HostsParser
-	_cancel            func()
 	_onResult          func(result *pingutil.PingResult)
 }
 
 func NewDefaultPingConfig() *_pingConfig {
 	return &_pingConfig{
-		Ctx:         context.Background(),
-		dnsTimeout:  5 * time.Second,
-		timeout:     5 * time.Second,
-		scanCClass:  false,
-		concurrent:  50,
-		tcpPingPort: "22,80,443",
+		Ctx:                context.Background(),
+		linkResolveTimeout: 2 * time.Second,
+		dnsTimeout:         5 * time.Second,
+		timeout:            5 * time.Second,
+		scanCClass:         false,
+		concurrent:         50,
+		tcpPingPort:        "22,80,443",
 	}
 }
 
@@ -216,12 +217,6 @@ func _pingConfigOpt_scanCClass(i bool) PingConfigOpt {
 	}
 }
 
-func _pingConfigOpt_cancel(f func()) PingConfigOpt {
-	return func(config *_pingConfig) {
-		config._cancel = f
-	}
-}
-
 // Scan 对一个或一批目标执行存活探测(ping)，以 channel 形式流式返回每个目标的存活结果
 // 在 yak 中通过 ping.Scan 调用，target 支持 IP、域名、CIDR、逗号分隔或范围等多种写法
 // 参数:
@@ -254,15 +249,21 @@ func _pingScan(target string, opts ...PingConfigOpt) chan *pingutil.PingResult {
 		target = network.ParseStringToCClassHosts(target)
 	}
 
+	if config.Ctx == nil {
+		config.Ctx = context.Background()
+	}
+	if config.concurrent <= 0 {
+		config.concurrent = 1
+	}
 	ctx, cancel := context.WithCancel(config.Ctx)
-	config._cancel = cancel
-	opts = append(opts, _pingConfigOpt_cancel(config._cancel))
+	opts = append(opts, WithPingCtx(ctx))
 
 	resultChan := make(chan *pingutil.PingResult)
 	taskChan := make(chan string)
 
 	go func() {
 		defer close(resultChan)
+		defer cancel()
 
 		var wg sync.WaitGroup
 		for i := 0; i < config.concurrent; i++ {
@@ -270,39 +271,24 @@ func _pingScan(target string, opts ...PingConfigOpt) chan *pingutil.PingResult {
 			go func() {
 				defer wg.Done()
 				for hostRaw := range taskChan {
-					host := utils.ExtractHost(hostRaw)
-					targetHost := host
-
-					if config.skipped || config.IsFiltered(targetHost) {
-						select {
-						case <-ctx.Done():
-							return
-						case resultChan <- &pingutil.PingResult{
-							IP:     hostRaw,
-							Ok:     true,
-							Reason: "skipped",
-						}:
-						}
-						continue
-					}
-
-					result := _ping(targetHost, opts...)
 					if ctx.Err() != nil {
 						return
 					}
+					result := _ping(utils.ExtractHost(hostRaw), opts...)
+					if ctx.Err() != nil {
+						return
+					}
+					if result == nil {
+						continue
+					}
+					result.IP = hostRaw
 					if config._onResult != nil {
 						config._onResult(result)
 					}
-					if result != nil {
-						if result.IP != hostRaw {
-							result.IP = hostRaw
-						}
-						select {
-						case <-ctx.Done():
-							return
-						case resultChan <- result:
-						}
-
+					select {
+					case <-ctx.Done():
+						return
+					case resultChan <- result:
 					}
 				}
 			}()
@@ -346,6 +332,16 @@ func _ping(target string, opts ...PingConfigOpt) *pingutil.PingResult {
 		r(config)
 	}
 
+	if config.Ctx == nil {
+		config.Ctx = context.Background()
+	}
+	if err := config.Ctx.Err(); err != nil {
+		return &pingutil.PingResult{IP: target, Reason: err.Error()}
+	}
+	if config.skipped || config.IsFiltered(utils.ExtractHost(target)) {
+		return &pingutil.PingResult{IP: target, Ok: true, Reason: "skipped"}
+	}
+
 	pingOpts := []pingutil.PingConfigOpt{
 		pingutil.WithPingContext(config.Ctx),
 		pingutil.WithDefaultTcpPort(config.tcpPingPort),
@@ -370,9 +366,13 @@ func _ping(target string, opts ...PingConfigOpt) *pingutil.PingResult {
 		}
 		return _ping(result, opts...)
 	} else {
-		result := netx.LookupFirst(target, netx.WithTimeout(config.dnsTimeout), netx.WithDNSServers(config.dnsServers...))
+		dnsCtx, cancel := context.WithTimeout(config.Ctx, config.dnsTimeout)
+		defer cancel()
+		result := netx.LookupFirstWithContext(dnsCtx, target, netx.WithTimeout(config.dnsTimeout), netx.WithDNSServers(config.dnsServers...))
 		if result != "" && (utils.IsIPv4(result) || utils.IsIPv6(result)) {
-			return pingutil.PingAuto(target, pingOpts...)
+			res := pingutil.PingAuto(result, pingOpts...)
+			res.IP = target
+			return res
 		}
 		return &pingutil.PingResult{
 			IP:     target,

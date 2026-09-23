@@ -78,6 +78,7 @@ func (c *ProxyCredential) dialProxyTCP(ctx context.Context, target string) (net.
 		DialX_WithDisableProxy(true),
 		DialX_WithTLS(c.schema == "https"),
 		DialX_WithTimeout(timeout),
+		DialX_WithContext(ctx),
 		DialX_WithDialer(c.dialCfg.Dialer),
 	)
 }
@@ -112,6 +113,8 @@ func (c *ProxyCredential) httpProxyDial(ctx context.Context, target string) (net
 	if err != nil {
 		return nil, err
 	}
+	stopCancel := context.AfterFunc(ctx, func() { _ = conn.Close() })
+	defer stopCancel()
 	conn.SetDeadline(ddl)
 	if c.username != "" {
 		// 有密码
@@ -121,6 +124,10 @@ func (c *ProxyCredential) httpProxyDial(ctx context.Context, target string) (net
 		_, err = conn.Write(generateHTTPProxyConnect(target))
 	}
 	if err = isHTTPConnectWork(conn); err == nil {
+		if !stopCancel() {
+			_ = conn.Close()
+			return nil, ctx.Err()
+		}
 		conn.SetDeadline(time.Time{}) // 置空取消 deadline
 		return conn, nil
 	} else {
@@ -146,7 +153,8 @@ func connectForceProxy(ctx context.Context, target string, proxy string, config 
 	if ctx == nil {
 		ctx = context.Background()
 	}
-	ctx, _ = context.WithTimeout(ctx, config.Timeout)
+	ctx, cancel := context.WithTimeout(ctx, config.Timeout)
+	defer cancel()
 
 	host, port, _ := utils.ParseStringToHostPort(proxy)
 	if host == "" || port <= 0 {

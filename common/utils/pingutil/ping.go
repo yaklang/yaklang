@@ -3,19 +3,16 @@ package pingutil
 import (
 	"context"
 	"fmt"
+	"net"
+	"sync"
+	"time"
+
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/lowtun/netstack/gvisor/pkg/icmp"
 	"github.com/yaklang/yaklang/common/netstackvm"
 	"github.com/yaklang/yaklang/common/netx"
 	"github.com/yaklang/yaklang/common/utils"
-	"net"
-	"os"
-	"strings"
-	"sync"
-	"time"
 )
-
-import "github.com/tatsushid/go-fastping"
 
 type PingResult struct {
 	IP     string
@@ -23,8 +20,6 @@ type PingResult struct {
 	RTT    int64
 	Reason string
 }
-
-var promptICMPNotAvailableOnce = new(sync.Once)
 
 func PingAutoConfig(ip string, opts ...PingConfigOpt) *PingResult {
 	config := NewPingConfig()
@@ -38,6 +33,9 @@ func PingAutoConfig(ip string, opts ...PingConfigOpt) *PingResult {
 	proxies := config.proxies
 	timeout := config.timeout
 	parentCtx := config.Ctx
+	if err := parentCtx.Err(); err != nil {
+		return &PingResult{IP: ip, Reason: err.Error()}
+	}
 
 	// Loopback addresses (127.0.0.0/8, ::1) are always alive — they are the
 	// local machine itself. Running ICMP/TCP probing against them is unreliable:
@@ -69,17 +67,34 @@ func PingAutoConfig(ip string, opts ...PingConfigOpt) *PingResult {
 		log.Infof("tcp-ping[%s] too many ports, only test first 5 most", defaultTcpPort)
 	}
 
-	if !icmpPingIsNotAvailable.IsSet() && !config.forceTcpPing && len(proxies) == 0 {
+	var icmpErr error
+	if !config.forceTcpPing && len(proxies) == 0 {
 		if config.pingNativeHandler != nil {
-			return config.pingNativeHandler(ip, timeout)
+			if result := config.pingNativeHandler(ip, timeout); result != nil {
+				return result
+			}
 		} else {
-			subCtx, _ := context.WithTimeout(parentCtx, timeout)
+			subCtx, cancel := context.WithTimeout(parentCtx, timeout)
 			result, err := NetstackPing(subCtx, ip, config.linkAddressResolveTimeout)
+			cancel()
 			if result != nil {
 				return result
 			}
-			log.Errorf("netstack ping fail %v", err)
+			icmpErr = err
+			log.Debugf("netstack ping failed: %v", err)
 		}
+	}
+
+	if err := parentCtx.Err(); err != nil {
+		return &PingResult{IP: ip, Reason: err.Error()}
+	}
+
+	if len(testPorts) == 0 {
+		reason := "no TCP probe ports configured"
+		if icmpErr != nil {
+			reason = icmpErr.Error()
+		}
+		return &PingResult{IP: ip, Reason: reason}
 	}
 
 	// tcp ping
@@ -99,14 +114,14 @@ func PingAutoConfig(ip string, opts ...PingConfigOpt) *PingResult {
 			} else {
 				conn, err = netx.DialContext(ctx, utils.HostPort(ip, p), config.proxies...)
 			}
+			if conn != nil {
+				defer conn.Close()
+			}
 			if err != nil && !utils.IContains(err.Error(), "refused") { // if err is refused ,mean host is alive
 				return
 			}
 			isAlive.Set()
 			cancel()
-			if conn != nil {
-				_ = conn.Close()
-			}
 		}()
 	}
 	wg.Wait()
@@ -116,6 +131,9 @@ func PingAutoConfig(ip string, opts ...PingConfigOpt) *PingResult {
 			Ok:  true,
 			RTT: 0,
 		}
+	}
+	if err := parentCtx.Err(); err != nil {
+		return &PingResult{IP: ip, Reason: err.Error()}
 	}
 	return &PingResult{
 		IP:     ip,
@@ -129,78 +147,17 @@ func PingAuto(ip string, opts ...PingConfigOpt) *PingResult {
 	return PingAutoConfig(ip, opts...)
 }
 
-var icmpPingIsNotAvailable = utils.NewBool(false)
-
-func PingNativeBase(ip string, cxt context.Context, timeout time.Duration) *PingResult {
-	if icmpPingIsNotAvailable.IsSet() {
-		return &PingResult{
-			IP:     ip,
-			Ok:     false,
-			RTT:    0,
-			Reason: "raw:icmp is not available",
-		}
+// PingNativeBase probes ICMP through the shared netstack client.
+func PingNativeBase(ip string, ctx context.Context, timeout time.Duration) *PingResult {
+	if ctx == nil {
+		ctx = context.Background()
 	}
-	core := fastping.NewPinger()
-	err := core.AddIP(ip)
+	ctx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+	result, err := NetstackPing(ctx, ip, timeout)
 	if err != nil {
-		return &PingResult{
-			IP:     ip,
-			Ok:     false,
-			RTT:    0,
-			Reason: err.Error(),
-		}
+		return &PingResult{IP: ip, Reason: err.Error()}
 	}
-
-	var result = &PingResult{IP: ip, Reason: "initialized"}
-
-	core.OnRecv = func(addr *net.IPAddr, rtt time.Duration) {
-		if addr.String() == ip {
-			result.Ok = true
-			result.RTT = int64(rtt) / int64(time.Millisecond)
-			result.Reason = ""
-		}
-	}
-	core.OnIdle = func() {
-
-	}
-
-	errChan := make(chan error, 1)
-	go func() {
-		defer close(errChan)
-		err := core.Run()
-		if err != nil {
-			switch ret := err.(type) {
-			case *net.OpError:
-				if ret2, ok := ret.Err.(*os.SyscallError); ok {
-					if strings.Contains(strings.ToLower(ret2.Error()), "operation not permitted") {
-						icmpPingIsNotAvailable.Set()
-					}
-				}
-			}
-			result.Reason = err.Error()
-			return
-		}
-	}()
-
-	select {
-	case err, _ := <-errChan:
-		if err != nil {
-			log.Errorf("ping native mode failed: %s", err)
-			return &PingResult{
-				IP:     ip,
-				Ok:     false,
-				RTT:    0,
-				Reason: err.Error(),
-			}
-		}
-	case <-time.After(timeout):
-		log.Infof("timeout ping for %v", ip)
-		core.Stop()
-	case <-cxt.Done():
-		log.Infof("timeout ping for %v", ip)
-		core.Stop()
-	}
-
 	return result
 }
 
@@ -209,6 +166,9 @@ func PingNative(ip string, timeout time.Duration) *PingResult {
 }
 
 func NetstackPing(ctx context.Context, ip string, timeout time.Duration) (*PingResult, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
 	if client := netstackvm.GetDefaultICMPClient(); client != nil {
 		res, err := client.Ping(ctx, ip, timeout)
 		if err != nil {

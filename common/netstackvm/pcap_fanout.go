@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/gopacket/gopacket"
+	"github.com/gopacket/gopacket/layers"
 	"github.com/segmentio/ksuid"
 	"github.com/yaklang/pcap"
 	"github.com/yaklang/yaklang/common/pcapx/pcaputil"
@@ -53,7 +54,7 @@ func NewPCAPAdaptor(device string, mtu int32, promisc bool) (*pcapAdaptor, error
 	p.m.Lock()
 	p.chans[id] = ch
 	p.m.Unlock()
-	return newPcapBroker(ch, func() {
+	broker := newPcapBroker(ch, func() {
 		fanouts.Lock()
 		defer fanouts.Unlock()
 		p.m.Lock()
@@ -71,7 +72,9 @@ func NewPCAPAdaptor(device string, mtu int32, promisc bool) (*pcapAdaptor, error
 			p.handle = nil
 			p.wm.Unlock()
 		}
-	}, p.WritePacket), nil
+	}, p.WritePacket)
+	broker.linkType = p.handle.LinkType()
+	return broker, nil
 }
 
 func (p *pcapFanOut) WritePacket(data []byte) error {
@@ -117,10 +120,11 @@ func (p *pcapFanOut) dispatch(data []byte, ci gopacket.CaptureInfo, decoder gopa
 }
 
 type pcapAdaptor struct {
-	inChan chan gopacket.Packet
-	close  func()
-	writer func([]byte) error
-	once   sync.Once
+	linkType layers.LinkType
+	inChan   chan gopacket.Packet
+	close    func()
+	writer   func([]byte) error
+	once     sync.Once
 }
 
 func newPcapBroker(in chan gopacket.Packet, closeFunc func(), writer func([]byte) error) *pcapAdaptor {

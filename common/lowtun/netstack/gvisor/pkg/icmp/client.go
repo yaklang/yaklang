@@ -3,6 +3,12 @@ package icmp
 import (
 	"bytes"
 	"context"
+	"math/rand/v2"
+	"net"
+	"net/netip"
+	"sync/atomic"
+	"time"
+
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/lowtun/netstack/gvisor/pkg/sync"
 	"github.com/yaklang/yaklang/common/lowtun/netstack/gvisor/pkg/tcpip"
@@ -15,11 +21,6 @@ import (
 	"github.com/yaklang/yaklang/common/netx"
 	"github.com/yaklang/yaklang/common/utils"
 	"golang.org/x/time/rate"
-	"math/rand/v2"
-	"net"
-	"net/netip"
-	"sync/atomic"
-	"time"
 )
 
 type Client struct {
@@ -127,6 +128,13 @@ func (c *Client) PingScan(ctx context.Context, target string, opts ...ScanConfig
 		opt(config)
 	}
 
+	if config.Concurrent <= 0 {
+		return nil, utils.Errorf("ping concurrency must be positive")
+	}
+	if config.RetryTimes < 0 {
+		return nil, utils.Errorf("ping retry count must not be negative")
+	}
+
 	if config.Timeout == 0 {
 		config.Timeout = config.LinkAddressResolveTimeout + time.Second*4
 	}
@@ -137,6 +145,7 @@ func (c *Client) PingScan(ctx context.Context, target string, opts ...ScanConfig
 		targetList := utils.ParseStringToHosts(target)
 		pingLimiter := rate.NewLimiter(rate.Limit(config.Concurrent), 1)
 		wg := new(sync.WaitGroup)
+		defer wg.Wait()
 		for _, t := range targetList {
 			waitErr := pingLimiter.Wait(ctx)
 			if waitErr != nil {
@@ -147,27 +156,32 @@ func (c *Client) PingScan(ctx context.Context, target string, opts ...ScanConfig
 			go func() {
 				defer wg.Done()
 				for i := 0; i <= config.RetryTimes; i++ {
-					subCtx, _ := context.WithTimeout(ctx, config.Timeout)
-					v4, err := c.Ping(subCtx, t, config.LinkAddressResolveTimeout)
+					subCtx, cancel := context.WithTimeout(ctx, config.Timeout)
+					result, err := c.Ping(subCtx, t, config.LinkAddressResolveTimeout)
+					cancel()
 					if err != nil {
-						//log.Errorf("ping %s fail: %v", t, err)
 						continue
 					}
-					res <- v4
+					select {
+					case res <- result:
+					case <-ctx.Done():
+					}
 					return
 				}
 			}()
 		}
-		wg.Wait()
 	}()
 
 	return res, nil
 }
 
 func (c *Client) Ping(ctx context.Context, target string, connectTimeout time.Duration) (*Result, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
 	ip := net.ParseIP(target)
 	if ip == nil {
-		target = netx.LookupFirst(target)
+		target = netx.LookupFirstWithContext(ctx, target)
 		ip = net.ParseIP(target)
 		if ip == nil {
 			return nil, utils.Errorf("parse ip fail")
@@ -216,6 +230,11 @@ func (c *Client) Ping(ctx context.Context, target string, connectTimeout time.Du
 	echoRequest := c.newICMPEchoRequest(isIpv6)
 	r.Reset(echoRequest)
 
+	// Register before sending: local replies can arrive synchronously.
+	readWE, read := waiter.NewChannelEntry(waiter.EventIn)
+	e.EventRegister(&readWE)
+	defer e.EventUnregister(&readWE)
+
 	start := time.Now()
 	_, err = ep.Write(&r, tcpip.WriteOptions{
 		To: &remoteAddr,
@@ -223,11 +242,6 @@ func (c *Client) Ping(ctx context.Context, target string, connectTimeout time.Du
 	if err != nil {
 		return nil, utils.Errorf("endpoint write echo request fail: %v", err)
 	}
-
-	// register read able event
-	readWE, read := waiter.NewChannelEntry(waiter.EventIn)
-	e.EventRegister(&readWE)
-	defer e.EventUnregister(&readWE)
 
 	for {
 		select {
@@ -276,25 +290,9 @@ func (c *Client) Ping(ctx context.Context, target string, connectTimeout time.Du
 	}
 }
 
-//func (c *Client) GetPinger() func(ip string, timeout time.Duration) *pingutil.PingResult {
-//	return func(ip string, timeout time.Duration) *pingutil.PingResult {
-//		ctx, cancel := context.WithTimeout(context.Background(), timeout+4*time.Second)
-//		defer cancel()
-//		res, err := c.Ping(ctx, ip, timeout)
-//		if err != nil {
-//			return &pingutil.PingResult{
-//				IP:     ip,
-//				Reason: fmt.Sprintf("netstack ping %s fail: %v", ip, err),
-//			}
-//		}
-//		return CreatePingResult(res)
-//	}
-//}
-//
-
 func (c *Client) PingV4(ctx context.Context, target string, timeout time.Duration) (*Result, error) {
 	if !utils.IsIPv4(target) {
-		target = netx.LookupFirst(target)
+		target = netx.LookupFirstWithContext(ctx, target)
 	}
 
 	ipv4Ins, parseErr := netip.ParseAddr(target)
