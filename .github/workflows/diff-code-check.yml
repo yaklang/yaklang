@@ -8,7 +8,6 @@ on:
     paths:
       - "common/**"
       - ".github/workflows/diff-code-check.yml"
-      - ".github/actions/security-commenter/action.yml"
       - "common/ssa_bootstrapping/ci_rule/**"
       - "scripts/ssa-risk-tools/**"
       - "scripts/get-yak-version.sh"
@@ -45,9 +44,9 @@ jobs:
     if: needs.check-wip.outputs.should_run_tests == 'true'
     permissions:
       contents: read
-      pull-requests: write
-      issues: write
+      pull-requests: read
       actions: read
+      security-events: write
     outputs:
       should_skip: ${{ steps.validate.outputs.should_skip }}
       skip_reason: ${{ steps.validate.outputs.skip_reason }}
@@ -297,8 +296,15 @@ jobs:
           echo "::group::Running security scan"
           yak sync-rule
           
-          # 运行扫描并捕获输出
-          SCAN_OUTPUT=$(yak code-scan -t ./fs.zip -l golang --rule-keyword golang --format irify-full -o risk --memory --file-perf-log --rule-perf-log --exclude-file **/vendor/**,vendor/**,**/classes/**,**/target/**,**include/**,**caches/**,**cache/**,**tmp/**,**alipay/**,**includes/**,**temp/**,**zh_cn/**,**zh_en/**,**plugins/**,**PHPExcel/**,**/tests/**,**/test/**,*.pb.go,*_test.go,**vulinbox/** 2>&1) || SCAN_EXIT_CODE=$?
+          # 直接产出 SARIF：yak code-scan 现在输出的是 GitHub code scanning
+          # 可接受的单一文档（合法 kind 枚举、单一 run、仓库相对路径、
+          # security-severity/tags、partialFingerprints），不需要后处理转换。
+          # 要求 yak >= 1.4.8-alpha0922：该版本之前的 --format sarif 会输出
+          # 非法 kind 和多个 run，上传会被 GitHub 拒绝。
+          # 但 alpha0922 仍**早于** #5164（category/stable ruleId/markdown 渲染），
+          # 所以它还不会把发现归入 yaklang-diff-code-check 组、markdown 也不渲染；
+          # 那三项要等 alpha0922 之后的下一个包。
+          SCAN_OUTPUT=$(yak code-scan -t ./fs.zip -l golang --rule-keyword golang --format sarif -o results --memory --file-perf-log --rule-perf-log --exclude-file **/vendor/**,vendor/**,**/classes/**,**/target/**,**include/**,**caches/**,**cache/**,**tmp/**,**alipay/**,**includes/**,**temp/**,**zh_cn/**,**zh_en/**,**plugins/**,**PHPExcel/**,**/tests/**,**/test/**,*.pb.go,*_test.go,**vulinbox/** 2>&1) || SCAN_EXIT_CODE=$?
           
           if [ ! -z "$SCAN_EXIT_CODE" ] && [ "$SCAN_EXIT_CODE" != "0" ]; then
             echo "$SCAN_OUTPUT"
@@ -334,160 +340,41 @@ jobs:
           echo "::endgroup::"
           
           echo "::group::Processing scan results"
-          if [ ! -f "./risk.json" ]; then
-            echo "::error::risk.json was not generated"
+          if [ ! -s "./results.sarif" ]; then
+            echo "::error::results.sarif was not generated"
             exit 1
           fi
           
-          if ! NUM=$(cat risk.json | jq -r '.RiskNums // empty' 2>&1); then
-            echo "::error::Failed to parse risk.json"
-            echo "::error::jq error output: $NUM"
-            echo "::error::risk.json content (first 100 lines):"
-            head -n 100 risk.json
+          # 必须是单个合法 JSON 文档：拼接多个文档会被 upload-sarif 拒绝。
+          if ! RULE_COUNT=$(jq -r '.runs[0].tool.driver.rules | length // 0' results.sarif 2>&1); then
+            echo "::error::Failed to parse results.sarif"
+            echo "::error::jq error output: $RULE_COUNT"
+            head -n 40 results.sarif
             exit 1
           fi
           
-          if [ -z "$NUM" ] || [ "$NUM" = "null" ] || [ "$NUM" = "" ]; then
-            echo "::error::RiskNums field is missing, null, or empty in risk.json"
-            echo "::error::risk.json content (first 100 lines):"
-            head -n 100 risk.json
+          RUN_COUNT=$(jq -r '.runs | length' results.sarif)
+          if [ "$RUN_COUNT" != "1" ]; then
+            echo "::error::Expected exactly one SARIF run, got: $RUN_COUNT"
+            echo "::error::GitHub rejects a document whose runs share one tool name"
             exit 1
           fi
           
+          NUM=$(jq -r '[.runs[0].results[]?] | length' results.sarif)
           if ! [[ "$NUM" =~ ^[0-9]+$ ]]; then
-            echo "::error::Invalid risk count value: '$NUM' (expected a number)"
-            echo "::error::risk.json content (first 100 lines):"
-            head -n 100 risk.json
+            echo "::error::Invalid SARIF result count: '$NUM'"
             exit 1
           fi
           
-          echo "Found $NUM security risks"
+          echo "SARIF run: tool=$(jq -r '.runs[0].tool.driver.name' results.sarif) rules=$RULE_COUNT results=$NUM"
           echo "risk_count=$NUM" >> $GITHUB_OUTPUT
-          
+          echo "scan_result=success" >> $GITHUB_OUTPUT
           if [ "$NUM" -eq 0 ]; then
-            echo "scan_result=success" >> $GITHUB_OUTPUT
-            echo "::notice::No security risks found"
+            echo "::notice::No security risks found; uploading an empty SARIF result so stale alerts are closed"
           else
-            echo "scan_result=failure" >> $GITHUB_OUTPUT
-            echo "::warning::Found $NUM security risks"
+            echo "::notice::Found $NUM security risks; GitHub Code Scanning will classify and report them"
           fi
           echo "::endgroup::"
-
-      - name: Generate security report
-        if: steps.validate.outputs.should_skip != 'true' && steps.scan.outputs.scan_result == 'failure'
-        id: generate_report
-        run: |
-          echo "::group::Preparing report generation"
-          rm -rf results
-          
-          if [ ! -f "./risk.json" ]; then
-            echo "::error::Risk file not found: ./risk.json"
-            exit 1
-          fi
-          
-          if [ ! -f "./scripts/ssa-risk-tools/extract-risks-deserializer.awk" ]; then
-            echo "::error::AWK script not found: ./scripts/ssa-risk-tools/extract-risks-deserializer.awk"
-            exit 1
-          fi
-          echo "::endgroup::"
-          
-          echo "::group::Generating security report"
-          if ! awk -f scripts/ssa-risk-tools/extract-risks-deserializer.awk ./risk.json; then
-            echo "::error::Failed to generate security report with AWK script"
-            exit 1
-          fi
-          echo "::endgroup::"
-          
-          echo "::group::Analyzing report results"
-          if [ ! -d "results" ]; then
-            echo "::error::Results directory was not created"
-            exit 1
-          fi
-          
-          RISK_COUNT=0
-          if [ -f "results/scan_summary.txt" ]; then
-            echo "Scan summary generated successfully"
-            SUMMARY_COUNT=$(grep -E "^总风险数:" results/scan_summary.txt | tail -n1 | awk -F':' '{gsub(/^[ \t]+|[ \t]+$/, "", $2); print $2}')
-            if [[ "$SUMMARY_COUNT" =~ ^[0-9]+$ ]]; then
-              RISK_COUNT=$SUMMARY_COUNT
-            else
-              echo "::warning::Failed to parse total risk count from scan_summary.txt"
-              if ls results/risk_details_*.txt 1> /dev/null 2>&1; then
-                FILE_COUNT=$(ls results/risk_details_*.txt | wc -l | tr -d ' ')
-                if [[ "$FILE_COUNT" =~ ^[0-9]+$ ]]; then
-                  RISK_COUNT=$FILE_COUNT
-                else
-                  echo "::warning::Failed to derive risk count from detail files"
-                  RISK_COUNT=0
-                fi
-              else
-                echo "::notice::No risk detail files found"
-                RISK_COUNT=0
-              fi
-            fi
-          else
-            echo "::warning::Scan summary file not found"
-            RISK_COUNT=0
-          fi
-          
-          echo "Total risks found: $RISK_COUNT"
-          echo "RISK_COUNT=$RISK_COUNT" >> $GITHUB_OUTPUT
-          if [ "$RISK_COUNT" -eq 0 ]; then
-            echo "::notice::Risk count is 0. Skipping remaining risk processing steps."
-            echo "::endgroup::"
-          fi
-          echo "::endgroup::"
-
-      - name: Clean up old security comments (No vulnerabilities found)
-        if: steps.validate.outputs.should_skip != 'true' && (steps.scan.outputs.scan_result == 'success' || steps.scan.outputs.scan_result == 'skipped_compilation_error')
-        continue-on-error: true
-        uses: actions/github-script@v6
-        with:
-          github-token: ${{ secrets.COMMENT_TOKEN || secrets.GITHUB_TOKEN }}
-          script: |
-            try {
-              // 定义安全扫描评论的唯一标识符
-              const commentIdentifier = '<!-- security-scan-report:main -->';
-              
-              // 查询所有评论
-              const comments = await github.rest.issues.listComments({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                issue_number: Number(process.env.PR_NUMBER),
-                per_page: 100
-              });
-              
-              let deletedCount = 0;
-              
-              // 删除所有机器人自己的安全相关评论
-              for (const comment of comments.data) {
-                const isBotComment = comment.user.type === 'Bot' || 
-                                   comment.user.login === 'github-actions[bot]' ||
-                                   comment.user.login.endsWith('[bot]') ||
-                                   comment.body.includes('此评论由代码安全检查工具自动生成') ||
-                                   comment.body.includes('此报告由代码安全扫描工具自动生成');
-                
-                if (isBotComment && (comment.body.includes(commentIdentifier) || comment.body.includes('<!-- security-line-comment:'))) {
-                  await github.rest.issues.deleteComment({
-                    owner: context.repo.owner,
-                    repo: context.repo.repo,
-                    comment_id: comment.id
-                  });
-                  deletedCount++;
-                  console.log(`Cleaned up old security comment: ${comment.id}`);
-                }
-              }
-              
-              if (deletedCount > 0) {
-                console.log(`Cleaned up ${deletedCount} old security comments (no vulnerabilities found)`);
-              } else {
-                console.log('No old security comments found to clean up');
-              }
-              
-            } catch (error) {
-              console.error('Failed to clean up old security comments:', error);
-              // 不抛出错误，避免影响主流程
-            }
 
       - name: Notify compilation skip
         if: steps.validate.outputs.should_skip != 'true' && steps.scan.outputs.scan_result == 'skipped_compilation_error'
@@ -500,233 +387,47 @@ jobs:
           echo "::notice::  - Missing dependencies or broken imports"
           echo "::notice::This does not block the CI pipeline."
 
-      - name: Upload risk log
-        if: steps.validate.outputs.should_skip != 'true' && steps.scan.outputs.scan_result == 'failure'
-        uses: actions/upload-artifact@v4
+      # GitHub code scanning is the one write path that also works for pull
+      # requests from forks: the findings are published as a
+      # "Code scanning results" check plus annotations on the changed lines,
+      # without needing to post a comment with a token.
+      #
+      # The scan itself already writes results.sarif. A diff without Go files
+      # never runs it, so an empty run is written here, carrying just the tool
+      # identity. The category is left to the uploader, which derives it from
+      # the `category` input below; both paths therefore report the same
+      # (tool, category) pair and update one alert set.
+
+      - name: Write empty SARIF for no-Go diff
+        if: steps.validate.outputs.should_skip != 'true' && steps.generate_prog.outputs.should_skip == 'true' && steps.generate_prog.outputs.skip_reason == 'no_go_files'
+        run: |
+          cat > results.sarif <<'SARIF'
+          {
+            "$schema": "https://json.schemastore.org/sarif-2.1.0.json",
+            "version": "2.1.0",
+            "runs": [
+              {
+                "tool": {
+                  "driver": {
+                    "name": "yaklang-code-scan",
+                    "fullName": "Yaklang SyntaxFlow Static Analysis",
+                    "organization": "yaklang.io",
+                    "informationUri": "https://github.com/yaklang/yaklang"
+                  }
+                },
+                "results": []
+              }
+            ]
+          }
+          SARIF
+          jq -e '.runs[0].results | length == 0' results.sarif > /dev/null
+
+      - name: Upload SARIF to code scanning
+        if: steps.validate.outputs.should_skip != 'true' && (steps.scan.outputs.scan_result == 'success' || (steps.generate_prog.outputs.should_skip == 'true' && steps.generate_prog.outputs.skip_reason == 'no_go_files'))
+        uses: github/codeql-action/upload-sarif@v4
         with:
-          name: risk.json
-          path: risk.json
-          if-no-files-found: ignore
-
-      - name: Upload risk results
-        if: steps.validate.outputs.should_skip != 'true' && steps.scan.outputs.scan_result == 'failure'
-        uses: actions/upload-artifact@v4
-        with:
-          name: risk-results
-          path: results/
-          if-no-files-found: ignore
-
-      - name: Comment PR with security findings
-        if: steps.validate.outputs.should_skip != 'true' && steps.scan.outputs.scan_result == 'failure' && steps.generate_report.outputs.RISK_COUNT != '0'
-        continue-on-error: true
-        uses: actions/github-script@v6
-        with:
-          github-token: ${{ secrets.COMMENT_TOKEN || secrets.GITHUB_TOKEN }}
-          script: |
-            const fs = require('fs');
-            
-            try {
-              console.log('::group::Reading security report');
-              const path = require('path');
-              const resultsDir = path.join(process.cwd(), 'results');
-              console.log(`Results directory: ${resultsDir}`);
-              
-              let report = '';
-              const summaryFile = path.join(resultsDir, 'scan_summary.txt');
-              
-              if (!fs.existsSync(resultsDir)) {
-                core.error('Results directory does not exist');
-                throw new Error('Results directory not found');
-              }
-              
-              if (fs.existsSync(summaryFile)) {
-                report = fs.readFileSync(summaryFile, 'utf8');
-                console.log(`Successfully read summary file (${report.length} characters)`);
-              } else {
-                core.error(`Summary file not found: ${summaryFile}`);
-                report = '⚠️ 报告文件未找到';
-              }
-              console.log('::endgroup::');
-              
-              console.log('::group::Fetching existing PR comments');
-              const commentIdentifier = '<!-- security-scan-report:main -->';
-              
-              const comments = await github.rest.issues.listComments({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                issue_number: Number(process.env.PR_NUMBER),
-                per_page: 100
-              });
-              console.log(`Found ${comments.data.length} total comments on PR`);
-              
-              let existingMainComment = null;
-              for (const comment of comments.data) {
-                if (comment.user.type === 'Bot' && comment.body.includes(commentIdentifier)) {
-                  existingMainComment = comment;
-                  console.log(`Found existing main security comment (ID: ${comment.id})`);
-                  break;
-                }
-              }
-              
-              if (!existingMainComment) {
-                console.log('No existing main security comment found');
-              }
-              console.log('::endgroup::');
-              
-              console.log('::group::Posting/Updating main security report');
-              const reportWithIdentifier = commentIdentifier + '\n\n' + report;
-              
-              let riskSummary = [];
-              if (fs.existsSync(resultsDir)) {
-                const detailFiles = fs.readdirSync(resultsDir).filter(file => file.startsWith('risk_details_') && file.endsWith('.txt'));
-                for (const detailFile of detailFiles) {
-                  const detailPath = path.join(resultsDir, detailFile);
-                  const content = fs.readFileSync(detailPath, 'utf8');
-                  const lines = content.split('\n');
-                  let title = '';
-                  let filePath = '';
-                  let lineNum = '';
-                  for (const line of lines) {
-                    if (line.startsWith('中文标题:')) {
-                      title = line.replace('中文标题:', '').trim();
-                    } else if (line.startsWith('标题:') && !title) {
-                      title = line.replace('标题:', '').trim();
-                    } else if (line.startsWith('文件路径:')) {
-                      filePath = line.replace('文件路径:', '').trim();
-                    } else if (line.startsWith('行号:')) {
-                      lineNum = line.replace('行号:', '').trim();
-                    }
-                  }
-                  if (title && filePath && lineNum) {
-                    const commitSha = process.env.HEAD_SHA || context.sha;
-                    const normalizedPath = filePath.replace(/^\.\//, '');
-                    const lineAnchor = `#L${lineNum}`;
-                    const codeLink = `https://github.com/${context.repo.owner}/${context.repo.repo}/blob/${commitSha}/${normalizedPath}${lineAnchor}`;
-                    const linkText = `${normalizedPath}:${lineNum}`;
-                    riskSummary.push(`${riskSummary.length + 1}. ${title}: [${linkText}](${codeLink})`);
-                  }
-                }
-              }
-
-              const summarySection = riskSummary.length > 0
-                ? `\n\n${riskSummary.join('\n')}`
-                : '';
-              const artifactsUrl = `https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}#artifacts`;
-              const artifactsSection = `\n\n[下载 risk.json](${artifactsUrl})`;
-              const finalReport = reportWithIdentifier + summarySection + artifactsSection;
-
-              if (existingMainComment) {
-                await github.rest.issues.updateComment({
-                  owner: context.repo.owner,
-                  repo: context.repo.repo,
-                  comment_id: existingMainComment.id,
-                  body: finalReport
-                });
-                console.log(`✅ Security report comment updated (ID: ${existingMainComment.id})`);
-              } else {
-                const newComment = await github.rest.issues.createComment({
-                  issue_number: Number(process.env.PR_NUMBER),
-                  owner: context.repo.owner,
-                  repo: context.repo.repo,
-                  body: finalReport
-                });
-                console.log(`✅ Security report comment created (ID: ${newComment.data.id})`);
-              }
-              console.log('::endgroup::');
-              
-              // console.log('::group::Processing detailed risk files');
-              // 逐条风险评论逻辑已按要求注释，若需恢复，请取消以下整段注释
-              // try {
-              //   if (fs.existsSync(resultsDir)) {
-              //     const files = fs.readdirSync(resultsDir);
-              //     const detailFiles = files.filter(file => file.startsWith('risk_details_') && file.endsWith('.txt'));
-              //     console.log(`Found ${detailFiles.length} risk detail files`);
-              //     
-              //     let processedCount = 0;
-              //     let skippedCount = 0;
-              //     let commentedCount = 0;
-              //     
-              //     for (const detailFile of detailFiles) {
-              //       const detailPath = path.join(resultsDir, detailFile);
-              //       const content = fs.readFileSync(detailPath, 'utf8');
-              //       processedCount++;
-              //       
-              //       // 解析文件内容...
-              //     }
-              //   }
-              // } catch (resultsError) {
-              //   core.error(`Failed to process results directory: ${resultsError.message}`);
-              // }
-              // console.log('::endgroup::');
-              
-              console.log('::group::Cleaning up outdated comments');
-              try {
-                const activeRisks = new Set();
-                if (fs.existsSync(resultsDir)) {
-                  const files = fs.readdirSync(resultsDir);
-                  const detailFiles = files.filter(file => file.startsWith('risk_details_') && file.endsWith('.txt'));
-                  
-                  for (const detailFile of detailFiles) {
-                    const detailPath = path.join(resultsDir, detailFile);
-                    const content = fs.readFileSync(detailPath, 'utf8');
-                    const lines = content.split('\n');
-                    let filePath = '';
-                    let lineNum = '';
-                    let severity = '';
-                    
-                    for (const line of lines) {
-                      if (line.startsWith('文件路径:')) filePath = line.replace('文件路径:', '').trim();
-                      else if (line.startsWith('行号:')) lineNum = line.replace('行号:', '').trim();
-                      else if (line.startsWith('严重程度:')) severity = line.replace('严重程度:', '').trim();
-                      else if (line.startsWith('=== 扫描统计 ===')) break;
-                    }
-                    
-                    if (filePath && lineNum && severity) {
-                      activeRisks.add(`${filePath}:${lineNum}`);
-                    }
-                  }
-                  console.log(`Found ${activeRisks.size} active risks`);
-                } else {
-                  core.warning('Results directory not found for cleanup');
-                }
-                
-                let deletedCount = 0;
-                for (const comment of comments.data) {
-                  if (comment.user.type === 'Bot' && comment.body.includes('<!-- security-line-comment:')) {
-                    const match = comment.body.match(/<!-- security-line-comment:([^:]+:\d+) -->/);
-                    if (match && !activeRisks.has(match[1])) {
-                      await github.rest.issues.deleteComment({
-                        owner: context.repo.owner,
-                        repo: context.repo.repo,
-                        comment_id: comment.id
-                      });
-                      console.log(`  🗑️  Deleted outdated comment for ${match[1]}`);
-                      deletedCount++;
-                    }
-                  }
-                }
-                
-                if (deletedCount > 0) {
-                  console.log(`✅ Cleaned up ${deletedCount} outdated security comments`);
-                } else {
-                  console.log('No outdated comments to clean up');
-                }
-              } catch (cleanupError) {
-                core.warning(`Failed to cleanup outdated comments: ${cleanupError.message}`);
-                console.error(cleanupError);
-              }
-              console.log('::endgroup::');
-              
-              process.exit(1);
-              
-            } catch (error) {
-              console.error('Failed to post security comments:', error);
-              throw error;
-            }
-
-      - name: Display all risks
-        if: steps.validate.outputs.should_skip != 'true' && steps.scan.outputs.scan_result == 'failure'
-        run: yak ssa-risk --input ./risk.json --with-code
+          sarif_file: results.sarif
+          category: yaklang-diff-code-check
 
   post-check:
     name: Save Scan Results to Cache
