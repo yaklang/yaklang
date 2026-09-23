@@ -100,6 +100,13 @@ func legionForgeReportToolObjects(ctx context.Context, release *aiv1.ContextForg
 					return nil, context.Canceled
 				}
 				path := strings.TrimSpace(utils.InterfaceToString(params["path"]))
+				file := strings.TrimSpace(utils.InterfaceToString(params["file"]))
+				if file != "" {
+					if path != "" && path != file {
+						return nil, fmt.Errorf("managed input path arguments conflict")
+					}
+					path = file
+				}
 				switch name {
 				case "query_file_meta":
 					return workspace.List(callCtx, path)

@@ -130,6 +130,20 @@ func TestManagedForgeActualStatelessBindAndScopedTools(t *testing.T) {
 			if kind == "log" && !strings.Contains(fmt.Sprint(observed.Data), "authorized log marker") {
 				t.Fatal("scoped log read did not return uploaded content")
 			}
+			if kind == "log" {
+				reader, err := execution.GetAiToolManager().GetToolByName("read_file")
+				if err != nil {
+					t.Fatal(err)
+				}
+				alias, err := reader.InvokeWithParams(map[string]any{"file": release.Parameters[0].Value, "runtime_id": "file-alias-fixture"}, aitool.WithContext(context.Background()))
+				if err != nil || !alias.Success || !strings.Contains(fmt.Sprint(alias.Data), "authorized log marker") {
+					t.Fatalf("managed read_file file alias: %+v %v", alias, err)
+				}
+				conflict, err := reader.InvokeWithParams(map[string]any{"path": release.Parameters[0].Value, "file": "inputs/other", "runtime_id": "conflict-fixture"}, aitool.WithContext(context.Background()))
+				if err == nil && conflict.Success {
+					t.Fatal("managed read_file accepted conflicting path and file")
+				}
+			}
 			if _, err := execution.GetAiToolManager().GetToolByName("bash"); err == nil {
 				t.Fatal("Forge exposed unrestricted tool")
 			}
