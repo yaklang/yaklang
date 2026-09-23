@@ -1,0 +1,4 @@
+<165>1 2025-05-06T12:13:14.123456Z client.example testapp 123 ID47 [meta@32473 key="alpha"] udp-rfc5424
+<34>Oct 11 22:14:15 client.example su[42]: udp-rfc3164
+<165>1 2025-05-06T12:13:14Z client.example testapp 124 ID48 - tcp-octet-count-one#012continued
+<34>Oct 11 22:14:16 client.example su[42]: tcp-octet-count-two
