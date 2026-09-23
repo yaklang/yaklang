@@ -43,7 +43,9 @@ func lowHTTPFlowSourceType(source string) string {
 		return schema.HTTPFlow_SourceType_MITM
 	case "basic-crawler", "crawler", "crawlerx":
 		return schema.HTTPFlow_SourceType_CRAWLER
-	case "", "scan", "port-scan", "plugin":
+	// WebFuzzer（含序列）发出的流量仍归到插件来源。流量分析页按 source_type=scan 查询，
+	// 同时用 [WebFuzzer] tag 区分是不是 Fuzzer 发出的。
+	case "", "scan", "port-scan", "plugin", "webfuzzer":
 		return schema.HTTPFlow_SourceType_SCAN
 	default:
 		return source
