@@ -24,6 +24,11 @@ func TestHandleSyncTypeTaskSnapshotEvent_ReturnsMaterializedTask(t *testing.T) {
 	task := aicommon.NewStatefulTaskBase("task-snapshot-sync", "input", context.Background(), nil, true)
 	task.SetName("sync task")
 	ins.config.ResetSessionSnapshotExecution(task.GetName(), "processing", time.Now())
+	ins.config.MaterializeSessionSnapshot(task, &aicommon.SessionSnapshot{
+		Execution: ins.config.BuildSessionSnapshotExecution(task),
+	})
+	aicommon.ApplyTodoDeltaAndEmit(ins.config, nil, task, aicommon.BuildVerificationTodoScope(task), 1,
+		&aicommon.TodoDelta{Add: []aicommon.TodoAdd{{ID: "todo-1", Text: "task details todo"}}}, nil)
 	ins.config.FinalizeSessionSnapshotExecution("completed", time.Now())
 	ins.config.MaterializeSessionSnapshot(task, &aicommon.SessionSnapshot{
 		Execution: ins.config.BuildSessionSnapshotExecution(task),
@@ -45,4 +50,24 @@ func TestHandleSyncTypeTaskSnapshotEvent_ReturnsMaterializedTask(t *testing.T) {
 	require.Equal(t, task.GetId(), snapshot.TaskID)
 	require.Equal(t, "completed", snapshot.Status)
 	require.True(t, snapshot.IsFinal)
+	require.NotNil(t, snapshot.Todo)
+	require.Len(t, snapshot.Todo.Items, 1)
+	require.Equal(t, "task details todo", snapshot.Todo.Items[0].Content)
+}
+
+func TestHandleSyncTypeTaskSnapshotEvent_ReturnsSyncError(t *testing.T) {
+	var captured *schema.AiOutputEvent
+	ins, err := NewTestReAct(aicommon.WithEventHandler(func(event *schema.AiOutputEvent) {
+		if event != nil && event.NodeId == aicommon.SessionTaskSnapshotNodeID {
+			captured = event
+		}
+	}))
+	require.NoError(t, err)
+	require.NoError(t, ins.HandleSyncTypeTaskSnapshotEvent(&ypb.AIInputEvent{
+		IsSyncMessage: true, SyncID: "missing-task-sync", SyncJsonInput: `{"task_id":"does-not-exist"}`,
+	}))
+	require.NotNil(t, captured)
+	require.True(t, captured.IsSync)
+	require.Equal(t, "missing-task-sync", captured.SyncID)
+	require.Contains(t, string(captured.Content), "not found")
 }

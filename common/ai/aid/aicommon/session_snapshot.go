@@ -36,6 +36,7 @@ type SessionSnapshot struct {
 	Capabilities        []CapabilityInventoryItem          `json:"capabilities"`
 	BackgroundProcesses []SessionSnapshotBackgroundProcess `json:"background_processes"`
 	Tasks               []SessionSnapshotTaskSummary       `json:"tasks"`
+	Todo                *SessionSnapshotTodoSummary        `json:"todo"`
 }
 
 // SessionSnapshotBackgroundProcess describes a long-lived background resource owned by the session.
@@ -524,6 +525,9 @@ func NormalizeSessionSnapshot(snapshot *SessionSnapshot) {
 	if snapshot.Tasks == nil {
 		snapshot.Tasks = []SessionSnapshotTaskSummary{}
 	}
+	if snapshot.Todo == nil {
+		snapshot.Todo = &SessionSnapshotTodoSummary{ByTask: []SessionSnapshotTodoTaskSummary{}}
+	}
 }
 
 func (c *Config) BuildSessionSnapshotExecution(task AIStatefulTask) *SessionSnapshotExecution {
@@ -770,6 +774,7 @@ func BeginSessionSnapshotExecutionForTask(c *Config, task AIStatefulTask, starte
 	if taskName == "" {
 		taskName = "task"
 	}
+	c.RestoreSessionSnapshotTodos(task)
 	c.BeginSessionSnapshotTask(task)
 	c.ResetSessionSnapshotExecution(taskName, "processing", startedAt)
 	c.NotifySessionSnapshotEmit(true)
