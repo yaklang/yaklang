@@ -303,21 +303,18 @@ func (f *Matcher) fetchBannerFromHostPortWithTLSSkipped(checkedTls bool, baseCtx
 	portInt, _ := strconv.Atoi(fmt.Sprint(port))
 	target := utils2.HostPort(host, port)
 
-	// 先做一次 TCP 拨号. 端口关闭或被过滤时直接返回, 避免对每个关闭端口都做
-	// GMTLS + 标准 TLS 两次握手. 开放端口仍会继续做 TLS 识别和 HTTP 探测.
-	probeConn, dialErr := netx.DialTCPTimeout(connectTimeout, target, proxy...)
-	if dialErr != nil {
-		f.log("tcp dial %v failed, skip tls/http: %v", target, dialErr)
-		return false, false, nil, nil, utils2.Errorf("dial %s failed: %s", target, dialErr)
-	}
-	_ = probeConn.Close()
-
 	f.log("checking if target is TLS service: %v", target)
 	start := time.Now()
 
 	var isTls bool = len(tlsInspectResults) > 0
 	if !isTls && !checkedTls {
-		tlsInspectResults, _ = netx.TLSInspectContext(ctx, target)
+		var inspectErr error
+		tlsInspectResults, inspectErr = netx.TLSInspectContext(ctx, target)
+		if inspectErr != nil {
+			// TLS 探测自己会拨号. 拨号失败说明端口关闭, 不再做 HTTP, 也不再换一种 TLS 握手.
+			f.log("tls inspect dial %v failed, skip http: %v", target, inspectErr)
+			return false, false, nil, nil, utils2.Errorf("dial %s failed: %s", target, inspectErr)
+		}
 		isTls = len(tlsInspectResults) > 0
 		tlsChecked = true
 	}
