@@ -111,7 +111,7 @@ RECONNECT:
 	}
 
 	timeout := tr.timeout
-	resp, responsePacket, err := h2Stream.waitResponse(ctx, timeout)
+	resp, responsePacket, responseStarted, err := h2Stream.waitResponse(ctx, timeout)
 	if resp.StatusCode != 0 {
 		partial.firstResponse = &resp
 		partial.rawBytes = responsePacket
@@ -124,7 +124,7 @@ RECONNECT:
 		if shouldDowngradeH2(err) {
 			return partial, err
 		}
-		if h2RequestCanRetry(replayRequest, err) && (tr.option.bodyStreamReaderHandled == nil || !tr.option.bodyStreamReaderHandled.IsSet()) {
+		if !responseStarted && h2RequestCanRetry(replayRequest, err) && (tr.option.bodyStreamReaderHandled == nil || !tr.option.bodyStreamReaderHandled.IsSet()) {
 			if canReconnect(err) {
 				goto RECONNECT
 			}

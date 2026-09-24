@@ -125,7 +125,7 @@ func TestH2CanceledResponseKeepsSharedConnectionUsable(t *testing.T) {
 				result <- response{err: err}
 				return
 			}
-			_, packet, err := stream.waitResponse(ctx, 5*time.Second)
+			_, packet, _, err := stream.waitResponse(ctx, 5*time.Second)
 			result <- response{packet, err}
 		}()
 		return result

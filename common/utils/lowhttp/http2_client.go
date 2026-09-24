@@ -934,13 +934,13 @@ func (cs *http2ClientStream) doRequest() error {
 	return nil
 }
 
-func (cs *http2ClientStream) waitResponse(ctx context.Context, timeout time.Duration) (http.Response, []byte, error) {
+func (cs *http2ClientStream) waitResponse(ctx context.Context, timeout time.Duration) (http.Response, []byte, bool, error) {
 	// Check if h2Conn is nil to prevent panic
 	if cs.h2Conn == nil {
-		return http.Response{}, nil, utils.Error("h2 connection is nil")
+		return http.Response{}, nil, false, utils.Error("h2 connection is nil")
 	}
 	if cs.h2Conn.conn == nil {
-		return http.Response{}, nil, utils.Error("h2 underlying connection is nil")
+		return http.Response{}, nil, false, utils.Error("h2 underlying connection is nil")
 	}
 
 	flow := fmt.Sprintf("%v->%v", cs.h2Conn.conn.LocalAddr(), cs.h2Conn.conn.RemoteAddr())
@@ -982,6 +982,9 @@ func (cs *http2ClientStream) waitResponse(ctx context.Context, timeout time.Dura
 	// Wait for any frame handler using this stream before inspecting its response.
 	// Mark it ended even when the connection closed before END_STREAM arrived.
 	cs.h2Conn.streamReadMu.Lock()
+	// A valid informational or final HEADERS frame proves the peer has already
+	// processed this stream. Even REFUSED_STREAM cannot authorize replay then.
+	responseStarted := cs.interimResponses > 0 || cs.readHeaderEnd
 	if connectionClosed && cs.readEndStream.Load() && cs.readHeaderEnd {
 		// END_STREAM may race transport shutdown. A complete response wins.
 		err = cs.streamErr
@@ -1000,7 +1003,7 @@ func (cs *http2ClientStream) waitResponse(ctx context.Context, timeout time.Dura
 	resp := *cs.resp
 	responsePacket := cs.respPacket
 	cs.recycle()
-	return resp, responsePacket, err
+	return resp, responsePacket, responseStarted, err
 }
 
 // recycle drops every request-owned reference before returning the stream to
