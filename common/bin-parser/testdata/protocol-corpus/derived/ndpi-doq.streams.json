@@ -1,0 +1,129 @@
+{
+  "schema_version": 1,
+  "source_capture": "captures/ndpi/ndpi-doq.pcapng",
+  "source_capture_sha256": "62f2bfb0ef5c35401b9c93dab4069b37043280bcc7f61452d86e6f9c61c1129d",
+  "extraction": {
+    "tool": "TShark (Wireshark) 4.4.8 (v4.4.8-0-g0d289c003bfb).",
+    "command": [
+      "-r",
+      "captures/ndpi/ndpi-doq.pcapng",
+      "-o",
+      "tls.keylog_file:",
+      "-Y",
+      "quic.stream_data && !icmp && !icmpv6",
+      "-T",
+      "json",
+      "-J",
+      "frame ip ipv6 udp quic",
+      "--no-duplicate-keys"
+    ],
+    "input_keys": "public source capture embedded DSB; external TLS keylog disabled",
+    "coordinates": "decrypted QUIC stream byte offsets, not original packet wire offsets",
+    "binparser_decryption_performed": false,
+    "icmp_quotations_excluded": true
+  },
+  "fragment_count": 8,
+  "stream_count": 2,
+  "streams": [
+    {
+      "stream_id": 0,
+      "source_address": "::1",
+      "source_port": 47826,
+      "destination_address": "::1",
+      "destination_port": 784,
+      "fragments": [
+        {
+          "frame": 4,
+          "offset": 0,
+          "length": 40,
+          "fin": true,
+          "sha256": "aac33539f65e5d8ef7238dd9e26e235d741bb54a3acfa7db2cae9cbb1dfa3480",
+          "hex": "000000000001000000000001076578616d706c6503636f6d0000010001000029ffff000000000000",
+          "retransmission": false
+        }
+      ],
+      "length": 40,
+      "sha256": "aac33539f65e5d8ef7238dd9e26e235d741bb54a3acfa7db2cae9cbb1dfa3480",
+      "hex": "000000000001000000000001076578616d706c6503636f6d0000010001000029ffff000000000000",
+      "fin_observed": true,
+      "boundary": "observed FIN"
+    },
+    {
+      "stream_id": 0,
+      "source_address": "::1",
+      "source_port": 784,
+      "destination_address": "::1",
+      "destination_port": 47826,
+      "fragments": [
+        {
+          "frame": 8,
+          "offset": 0,
+          "length": 56,
+          "fin": true,
+          "sha256": "faef24df47e9c67787096df520b1e7611e676442e103f4574db83bfbaa5ebc85",
+          "hex": "000080800001000100000001076578616d706c6503636f6d0000010001c00c000100010000542c00045db8d8220000290200000000000000",
+          "retransmission": false
+        },
+        {
+          "frame": 9,
+          "offset": 0,
+          "length": 56,
+          "fin": true,
+          "sha256": "faef24df47e9c67787096df520b1e7611e676442e103f4574db83bfbaa5ebc85",
+          "hex": "000080800001000100000001076578616d706c6503636f6d0000010001c00c000100010000542c00045db8d8220000290200000000000000",
+          "retransmission": true
+        },
+        {
+          "frame": 11,
+          "offset": 0,
+          "length": 56,
+          "fin": true,
+          "sha256": "faef24df47e9c67787096df520b1e7611e676442e103f4574db83bfbaa5ebc85",
+          "hex": "000080800001000100000001076578616d706c6503636f6d0000010001c00c000100010000542c00045db8d8220000290200000000000000",
+          "retransmission": true
+        },
+        {
+          "frame": 13,
+          "offset": 0,
+          "length": 56,
+          "fin": true,
+          "sha256": "faef24df47e9c67787096df520b1e7611e676442e103f4574db83bfbaa5ebc85",
+          "hex": "000080800001000100000001076578616d706c6503636f6d0000010001c00c000100010000542c00045db8d8220000290200000000000000",
+          "retransmission": true
+        },
+        {
+          "frame": 15,
+          "offset": 0,
+          "length": 56,
+          "fin": true,
+          "sha256": "faef24df47e9c67787096df520b1e7611e676442e103f4574db83bfbaa5ebc85",
+          "hex": "000080800001000100000001076578616d706c6503636f6d0000010001c00c000100010000542c00045db8d8220000290200000000000000",
+          "retransmission": true
+        },
+        {
+          "frame": 17,
+          "offset": 0,
+          "length": 56,
+          "fin": true,
+          "sha256": "faef24df47e9c67787096df520b1e7611e676442e103f4574db83bfbaa5ebc85",
+          "hex": "000080800001000100000001076578616d706c6503636f6d0000010001c00c000100010000542c00045db8d8220000290200000000000000",
+          "retransmission": true
+        },
+        {
+          "frame": 19,
+          "offset": 0,
+          "length": 56,
+          "fin": true,
+          "sha256": "faef24df47e9c67787096df520b1e7611e676442e103f4574db83bfbaa5ebc85",
+          "hex": "000080800001000100000001076578616d706c6503636f6d0000010001c00c000100010000542c00045db8d8220000290200000000000000",
+          "retransmission": true
+        }
+      ],
+      "length": 56,
+      "sha256": "faef24df47e9c67787096df520b1e7611e676442e103f4574db83bfbaa5ebc85",
+      "hex": "000080800001000100000001076578616d706c6503636f6d0000010001c00c000100010000542c00045db8d8220000290200000000000000",
+      "fin_observed": true,
+      "boundary": "observed FIN"
+    }
+  ]
+}

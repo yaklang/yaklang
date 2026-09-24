@@ -33,6 +33,13 @@ type DeviceAdapter struct {
 }
 
 type CaptureConfig struct {
+	tlsSecrets            TLSSecretProvider
+	datagramDecodeAs      map[uint16]string
+	binParserConfig       *BinParserConfig
+	binParser             *binParser
+	recorder              *captureWriter
+	outputFile            string
+	captureBuffer         int
 	reassemblyOptions     TCPReassemblyOptions
 	requiresFullStream    bool
 	Context               context.Context
@@ -480,7 +487,7 @@ func (c *CaptureConfig) assemblyWithTS(flow gopacket.Packet, networkLayer gopack
 		}
 	}()
 	raw, _ := flow.Layer(layers.LayerTypeEthernet).(*layers.Ethernet)
-	c.trafficPool.Feed(raw, networkLayer, tcp, ts)
+	c.trafficPool.feedEvidence(raw, networkLayer, tcp, packetEvidence(flow), ts)
 }
 
 func (c *CaptureConfig) packetHandler(ctx context.Context, packet gopacket.Packet) {
@@ -502,10 +509,11 @@ func (c *CaptureConfig) packetHandler(ctx context.Context, packet gopacket.Packe
 		ts = time.Now()
 	}
 
+	originalPacket := packet
 	defer func() {
 		if c.onEveryPacket != nil {
 			for _, f := range c.onEveryPacket {
-				f(packet)
+				f(originalPacket)
 			}
 		}
 	}()
@@ -517,14 +525,30 @@ func (c *CaptureConfig) packetHandler(ctx context.Context, packet gopacket.Packe
 		c.trafficPool.parallel.checkTruncation(packet.Metadata().CaptureInfo)
 	}
 
+	if c.binParser != nil {
+		var consumed bool
+		packet, consumed = c.binParser.networkPacket(packet)
+		if consumed {
+			return
+		}
+	}
 	var matched bool
 	ret, isOk := packet.TransportLayer().(*layers.TCP)
 	if !isOk && packet.TransportLayer() != nil {
+		if c.binParser != nil {
+			if udp, ok := packet.TransportLayer().(*layers.UDP); ok {
+				c.binParser.datagram(packet, udp)
+			}
+		}
 		return // Do not decode unrelated UDP applications just to inspect errors.
 	}
 	// A decoder can expose a partially populated TCP layer before returning
 	// an option/header error. Never feed such a layer into stream state.
 	if failure := packet.ErrorLayer(); failure != nil {
+		if !isOk && c.binParser != nil && unsupportedNetworkDecode(packet) {
+			c.binParser.networkDiagnostic(packetEvidence(packet), packet.Metadata().CaptureInfo, "unrecognized", "UnsupportedOrMalformedNetworkLayer")
+			return
+		}
 		c.trafficPool.malformedPacket(failure.Error().Error())
 		return
 	}
@@ -562,7 +586,9 @@ func (c *CaptureConfig) packetHandler(ctx context.Context, packet gopacket.Packe
 }
 
 func NewDefaultConfig() *CaptureConfig {
-	return &CaptureConfig{wg: new(sync.WaitGroup)}
+	// Protocol analysis is built in. Preparing plans is deferred until a
+	// message or statistics consumer is attached, so raw capture stays cheap.
+	return &CaptureConfig{wg: new(sync.WaitGroup), binParserConfig: &BinParserConfig{}}
 }
 
 func WithCaptureStartedCallback(callback func()) CaptureOption {

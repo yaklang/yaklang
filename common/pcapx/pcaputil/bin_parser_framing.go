@@ -1,0 +1,592 @@
+package pcaputil
+
+import (
+	"bytes"
+	"encoding/binary"
+	"fmt"
+	"net"
+	"strconv"
+
+	"github.com/gopacket/gopacket"
+	"github.com/gopacket/gopacket/layers"
+)
+
+var builtinBinSpecs = [][2]string{
+	{"session_envelopes", "TPKT"},
+	{"session_envelopes", "UATCP"},
+	{"session_envelopes", "RFB"},
+	{"application-layer.extended_protocols", "Diameter"},
+	{"application-layer.extended_protocols", "ActiveMQOpenWire"},
+	{"application-layer.extended_protocols", "ActiveMQOpenWireOpaque"},
+	{"application-layer.extended_protocols", "IEC104"},
+	{"rtsp_session", "RTSP"},
+	{"rtsp_session", "Interleaved"},
+	{"stun_session", "STUN"},
+	{"tftp", "TFTP"},
+	{"stun_session", "ChannelData"},
+	{"application-layer.mysql_fields", "MySQLTextResultSetDeprecatedTrackFields"},
+	{"application-layer.mysql_fields", "MySQLGreetingFields"},
+	{"application-layer.mysql_fields", "MySQLHandshakeResponse41Fields"},
+	{"application-layer.mysql_fields", "MariaDBHandshakeResponse41Fields"},
+	{"application-layer.mysql_fields", "MySQLSSLRequestFields"},
+	{"application-layer.mysql_fields", "MariaDBSSLRequestFields"},
+	{"application-layer.mysql_fields", "MySQLCommandFields"},
+	{"application-layer.mysql_fields", "MySQLOK41Fields"},
+	{"application-layer.mysql_fields", "MySQLOKSessionTrackFields"},
+	{"application-layer.mysql_fields", "MySQLError41Fields"},
+	{"application-layer.mysql_fields", "MySQLTextResultSet41Fields"},
+	{"application-layer.mysql_fields", "MariaDBTextResultSetFields"},
+	{"application-layer.mysql_fields", "MySQLAuthSwitchFields"},
+	{"application-layer.mysql_fields", "MySQLAuthMoreFields"},
+	{"application-layer.mysql_fields", "MySQLAuthResponseFields"},
+	{"application-layer.mysql_fields", "MySQLTextResultSetDeprecatedFields"},
+	{"application-layer.http2_fields", "HTTP2FrameSequenceFields"},
+	{"application-layer.http2_fields", "HTTP2InitialClientStream"},
+	{"application-layer.http2_fields", "HTTP2InitialServerStream"},
+	{"application-layer.postgresql_fields", "PostgreSQLStartupFields"},
+	{"application-layer.postgresql_fields", "PostgreSQLSSLRequestFields"},
+	{"application-layer.postgresql_fields", "PostgreSQLCancelFields"},
+	{"application-layer.postgresql_fields", "PostgreSQLSSLResponseFields"},
+	{"application-layer.postgresql_fields", "PostgreSQLFrontendFields"},
+	{"application-layer.postgresql_fields", "PostgreSQLBackendFields"},
+	{"application-layer.ldap_fields", "LDAPBindRequestFields"},
+	{"application-layer.ldap_fields", "LDAPBindResponseFields"},
+	{"application-layer.ldap_fields", "LDAPUnbindRequestFields"},
+	{"application-layer.ldap_fields", "LDAPSearchRequestFields"},
+	{"application-layer.ldap_fields", "LDAPSearchEntryFields"},
+	{"application-layer.ldap_fields", "LDAPSearchDoneFields"},
+	{"application-layer.ldap_fields", "LDAPSearchReferenceFields"},
+	{"application-layer.ldap_fields", "LDAPModifyRequestFields"},
+	{"application-layer.ldap_fields", "LDAPModifyResponseFields"},
+	{"application-layer.ldap_fields", "LDAPAddRequestFields"},
+	{"application-layer.ldap_fields", "LDAPAddResponseFields"},
+	{"application-layer.ldap_fields", "LDAPDelRequestFields"},
+	{"application-layer.ldap_fields", "LDAPDelResponseFields"},
+	{"application-layer.ldap_fields", "LDAPModifyDNRequestFields"},
+	{"application-layer.ldap_fields", "LDAPModifyDNResponseFields"},
+	{"application-layer.ldap_fields", "LDAPCompareRequestFields"},
+	{"application-layer.ldap_fields", "LDAPCompareResponseFields"},
+	{"application-layer.ldap_fields", "LDAPAbandonRequestFields"},
+	{"application-layer.ldap_fields", "LDAPExtendedRequestFields"},
+	{"application-layer.ldap_fields", "LDAPExtendedResponseFields"},
+	{"application-layer.websocket", "WebSocket"},
+	{"application-layer.redis", "Redis"},
+	{"application-layer.http", "HTTPExact"},
+	{"application-layer.mqtt_fields", "MQTT31PacketFields"},
+	{"application-layer.mqtt_fields", "MQTT311PacketFields"},
+	{"application-layer.mqtt_fields", "MQTT5PacketFields"},
+	{"application-layer.mongodb_fields", "MongoDBFields"},
+	{"application-layer.kafka_fields", "KafkaRequestFields"},
+	{"application-layer.kafka_fields", "KafkaResponseFields"},
+	{"application-layer.tds", "TDS"},
+	{"application-layer.tds_fields", "TDSBatch71Fields"},
+	{"application-layer.tds_fields", "TDSBatch72Fields"},
+	{"application-layer.tds_fields", "TDSRPC71Fields"},
+	{"application-layer.tds_fields", "TDSRPC72Fields"},
+	{"application-layer.tds_fields", "TDSResponse71Fields"},
+	{"application-layer.tds_fields", "TDSResponse72Fields"},
+	{"amqp", "AMQP"},
+	{"application-layer.smb2", "SMB2"},
+	{"application-layer.smb3", "SMB3Transform"},
+	{"application-layer.dcerpc", "DCERPC"},
+	{"application-layer.ssh", "SSH"},
+	{"application-layer.ssh", "SSHPacket"},
+	{"onc_rpc", "ONCRPC"},
+	{"onc_rpc_tcp", "ONCRPCTCP"},
+	{"application-layer.snmpv3", "SNMPv3"},
+	{"application-layer.snmp", "SNMP"},
+	{"application-layer.msrdp", "RDP"},
+	{"application-layer.msrdp", "TPKT"},
+	{"application-layer.memcached_fields", "MemcachedStatsRequestFields"},
+	{"application-layer.memcached_fields", "MemcachedStatsResponseFields"},
+	{"application-layer.memcached_fields", "MemcachedBinaryGetRequestFields"},
+	{"application-layer.cassandra_fields", "CQLOptions4Fields"},
+	{"application-layer.cassandra_fields", "CQLSupported4Fields"},
+	{"application-layer.cassandra_fields", "CQLStartup4Fields"},
+	{"application-layer.kerberos_fields", "KerberosTCPFields"},
+	{"application-layer.kerberos_fields", "KerberosMessageFields"},
+	{"application-layer.dns", "DNS"},
+	{"application-layer.nats", "NATS"},
+	{"application-layer.nats", "NATSControlLine"},
+	{"application-layer.nats", "NATSPayloadFrame"},
+	{"application-layer.tls", ""},
+	{"application-layer.smtp", "SMTPCommand"},
+	{"application-layer.smtp_reply", "SMTPReply"},
+	{"application-layer.smtp_reply", "SMTPReplyCarrier"},
+	{"imap", "IMAP"},
+	{"pop3", "POP3"},
+	{"application-layer.ftp", "FTP"},
+	{"application-layer.ftp", "FTPCommand"},
+	{"application-layer.socks5", "ClientNegotiation"},
+	{"application-layer.socks5", "ServerNegotiation"},
+	{"application-layer.socks5", "AuthRequest"},
+	{"application-layer.socks5", "AuthReply"},
+	{"application-layer.socks5", "Request"},
+	{"application-layer.socks5", "Replies"},
+	{"application-layer.stratum", "StratumLine"},
+	{"application-layer.gearman", "GearmanMessage"},
+	{"application-layer.beanstalkd", "BeanstalkMessage"},
+	{"application-layer.tns", "TNS"},
+	{"application-layer.radius", "RADIUS"},
+	{"application-layer.dhcp", "DHCP"},
+	{"application-layer.ntp", "NTP"},
+	{"application-layer.extended_protocols", "CoAP"},
+	{"application-layer.extended_protocols", "BACnetIP"},
+	{"application-layer.extended_protocols", "ModbusTCP"},
+	{"application-layer.extended_protocols", "DNP3"},
+	{"application-layer.c37118", "C37118"},
+	{"iec61850", "GOOSE"},
+	{"sip", "SIP"},
+	{"rtp", "RTP"},
+	{"rtp", "RTCP"},
+	{"application-layer.quic", "QUIC"},
+	{"syslog", "Syslog"},
+}
+
+func (f *binFlow) spec(family, entry string) *binSpec {
+	return f.a.specs["application-layer."+family+"/"+entry]
+}
+func (f *binFlow) port(port uint16) bool { return f.ports[0] == port || f.ports[1] == port }
+
+func cassandraInitialExchangeHeader(w []byte, maxFrameBytes int) bool {
+	if len(w) < 9 || maxFrameBytes < 9 || binary.BigEndian.Uint16(w[2:4])&0x8000 != 0 {
+		return false
+	}
+	version, response, opcode := w[0]&0x7f, w[0]&0x80 != 0, w[4]
+	if version != 4 && version != 5 {
+		return false
+	}
+	bodyLength := uint64(binary.BigEndian.Uint32(w[5:9]))
+	if bodyLength > 1<<31-1 || bodyLength+9 > uint64(maxFrameBytes) {
+		return false
+	}
+	// v5 ignores the legacy compression bit. In v4, STARTUP itself cannot be
+	// compressed; other compressed candidates remain context-only because this
+	// profile does not decode compression.
+	if version == 4 && w[1]&1 != 0 {
+		if !response && opcode == 1 || bodyLength == 0 {
+			return false
+		}
+		if response {
+			return opcode == 0 || opcode == 2 || opcode == 3 || opcode == 6
+		}
+		return opcode == 5
+	}
+	if response {
+		// ERROR, READY, AUTHENTICATE, and SUPPORTED are the only server
+		// messages in the native-protocol initial exchange.
+		switch opcode {
+		case 0:
+			return bodyLength >= 6
+		case 2:
+			return bodyLength == 0
+		case 3, 6:
+			return bodyLength >= 2
+		default:
+			return false
+		}
+	}
+	// Only OPTIONS may precede STARTUP; all other requests need a negotiated
+	// connection context and must not be used as a first-message signature.
+	switch opcode {
+	case 1:
+		return bodyLength >= 2
+	case 5:
+		return bodyLength == 0
+	default:
+		return false
+	}
+}
+
+// Detection runs only on the bounded initial prefix. Ports narrow candidates;
+// they never choose a negotiated version, phase, or native decoder by themselves.
+func (f *binFlow) detect(w []byte) {
+	for _, port := range []uint16{0, f.ports[0], f.ports[1]} {
+		for _, b := range f.a.bindings[port] {
+			if b.Probe(w) {
+				f.protocol, f.binding = b.Protocol, b
+				return
+			}
+		}
+	}
+	for _, prefix := range httpDetectionPrefixes {
+		if bytes.HasPrefix(w, []byte(prefix)) {
+			if _, _, _, ok := parseHTTPRequestStartLine(w); ok {
+				f.protocol = "http"
+				return
+			}
+			if prefix == "OPTIONS " && isOtherOPTIONSStartLine(w) {
+				// OPTIONS is also a SIP and RTSP method. Let those strict
+				// protocol probes inspect their complete start line.
+				continue
+			}
+			return
+		}
+	}
+	if len(w) >= 5 && w[0] >= 20 && w[0] <= 23 && w[1] == 3 && w[2] <= 4 && binary.BigEndian.Uint16(w[3:5]) <= 18432 {
+		f.protocol = "tls"
+		return
+	}
+	if len(w) >= 2 && w[0] == 0x10 {
+		_, header, err := mqttLength(w)
+		if err == nil && header > 0 && len(w) >= header+3 {
+			n := int(binary.BigEndian.Uint16(w[header:]))
+			if n <= 6 && len(w) >= header+2+n+1 {
+				name, level := string(w[header+2:header+2+n]), w[header+2+n]
+				if (name == "MQTT" && level == 4) || (name == "MQIsdp" && level == 3) {
+					f.protocol, f.level = "mqtt", level
+					return
+				}
+			}
+		}
+	}
+	if bytes.HasPrefix(w, []byte("stats\r\n")) || bytes.HasPrefix(w, []byte("STAT ")) || (len(w) >= 24 && w[0] == 0x80 && w[1] == 0 && w[4] == 0 && w[5] == 0 && binary.BigEndian.Uint32(w[8:12]) >= uint32(binary.BigEndian.Uint16(w[2:4]))) {
+		f.protocol = "memcached"
+		return
+	}
+	// Recognize only the pre-READY native-protocol exchange on Cassandra's
+	// default port. This includes the v5 envelope format used for OPTIONS,
+	// STARTUP, and their unframed responses, but does not claim later v5
+	// framing or arbitrary CQL opcodes.
+	if f.port(9042) && cassandraInitialExchangeHeader(w, f.a.budget.MaxFrameBytes) {
+		f.protocol = "cassandra"
+		return
+	}
+	if f.port(88) && len(w) >= 6 && kerberosTag(w[4]) && binary.BigEndian.Uint32(w[:4]) >= 2 {
+		f.protocol = "kerberos"
+		return
+	}
+	if f.port(53) && len(w) >= 14 && binary.BigEndian.Uint16(w[:2]) >= 12 && dnsHeader(w[2:]) {
+		f.protocol = "dns"
+		return
+	}
+	if (f.captureTCP || f.syslogStreamProbe) && probeSyslogStreamStart(w) {
+		f.protocol, f.syslog = "syslog", &binSyslog{}
+		return
+	}
+}
+
+var httpDetectionPrefixes = []string{
+	"GET ", "POST ", "PUT ", "DELETE ", "HEAD ", "OPTIONS ", "PATCH ", "CONNECT ", "TRACE ",
+	"PROPFIND ", "PROPPATCH ", "MKCOL ", "COPY ", "MOVE ", "LOCK ", "UNLOCK ", "REPORT ", "HTTP/1.",
+}
+
+const httpStartLineMaxBytes = 8 << 10
+
+// isHTTPStartLineCandidate holds weak protocol probes while a recognized HTTP
+// method or response prefix is incomplete or malformed. Otherwise a short
+// fragment such as "GET " can be claimed by an unrelated binary signature
+// before the CRLF that proves the HTTP start line.
+func isHTTPStartLineCandidate(w []byte) bool {
+	if len(w) == 0 {
+		return false
+	}
+	if isOtherOPTIONSStartLine(w) {
+		return false
+	}
+	for _, prefix := range httpDetectionPrefixes {
+		candidate := []byte(prefix)
+		if bytes.HasPrefix(w, candidate) || len(w) <= len(candidate) && bytes.HasPrefix(candidate, w) {
+			return true
+		}
+	}
+	return false
+}
+
+func needsMoreHTTPStartLine(w []byte) bool {
+	return len(w) < httpStartLineMaxBytes && isHTTPStartLineCandidate(w) && bytes.Index(w, []byte("\r\n")) < 0
+}
+
+func isOtherOPTIONSStartLine(w []byte) bool {
+	if !bytes.HasPrefix(w, []byte("OPTIONS ")) {
+		return false
+	}
+	lineEnd := bytes.Index(w, []byte("\r\n"))
+	if lineEnd < 0 {
+		return false
+	}
+	line := w[:lineEnd]
+	lastSpace := bytes.LastIndexByte(line, ' ')
+	if lastSpace <= len("OPTIONS ") || lastSpace+1 >= len(line) {
+		return false
+	}
+	version := line[lastSpace+1:]
+	return bytes.Equal(version, []byte("SIP/2.0")) || bytes.Equal(version, []byte("RTSP/1.0"))
+}
+
+// parseHTTPRequestStartLine admits HTTP only after a complete, valid HTTP/1.x
+// start line. A method prefix alone is too weak: it can be arbitrary payload,
+// and PROPFIND is also used by WebDAV/CardDAV captures outside the usual HTTP
+// method set. Response lines are checked here too so malformed HTTP-looking
+// bytes do not enter the stateful HTTP parser.
+func parseHTTPRequestStartLine(w []byte) (method, target, version string, ok bool) {
+	lineEnd := bytes.Index(w, []byte("\r\n"))
+	if lineEnd < 0 {
+		return "", "", "", false
+	}
+	line := w[:lineEnd]
+	if bytes.HasPrefix(line, []byte("HTTP/")) {
+		firstSpace := bytes.IndexByte(line, ' ')
+		if firstSpace < 0 {
+			return "", "", "", false
+		}
+		version = string(line[:firstSpace])
+		if version != "HTTP/1.0" && version != "HTTP/1.1" {
+			return "", "", "", false
+		}
+		statusLine := line[firstSpace+1:]
+		if len(statusLine) < 4 || statusLine[3] != ' ' || statusLine[0] < '1' || statusLine[0] > '9' ||
+			statusLine[1] < '0' || statusLine[1] > '9' || statusLine[2] < '0' || statusLine[2] > '9' {
+			return "", "", "", false
+		}
+		for _, c := range statusLine[4:] {
+			if (c < 0x20 && c != '\t') || c == 0x7f {
+				return "", "", "", false
+			}
+		}
+		return "", "", version, true
+	}
+
+	firstSpace := bytes.IndexByte(line, ' ')
+	if firstSpace <= 0 || firstSpace+1 >= len(line) {
+		return "", "", "", false
+	}
+	secondSpaceRel := bytes.IndexByte(line[firstSpace+1:], ' ')
+	if secondSpaceRel <= 0 {
+		return "", "", "", false
+	}
+	secondSpace := firstSpace + 1 + secondSpaceRel
+	if secondSpace+1 >= len(line) || bytes.IndexByte(line[secondSpace+1:], ' ') >= 0 {
+		return "", "", "", false
+	}
+	methodBytes, targetBytes := line[:firstSpace], line[firstSpace+1:secondSpace]
+	for _, c := range methodBytes {
+		if !isHTTPTokenByte(c) {
+			return "", "", "", false
+		}
+	}
+	for _, c := range targetBytes {
+		if c <= 0x20 || c == 0x7f {
+			return "", "", "", false
+		}
+	}
+	version = string(line[secondSpace+1:])
+	if version != "HTTP/1.0" && version != "HTTP/1.1" {
+		return "", "", "", false
+	}
+	return string(methodBytes), string(targetBytes), version, true
+}
+
+func isHTTPTokenByte(c byte) bool {
+	return c >= 'A' && c <= 'Z' || c >= 'a' && c <= 'z' || c >= '0' && c <= '9' ||
+		bytes.IndexByte([]byte("!#$%&'*+-.^_`|~"), c) >= 0
+}
+
+func mqttLength(w []byte) (total, header int, err error) {
+	if len(w) < 2 {
+		return 0, 0, nil
+	}
+	n, m := 0, 1
+	for i := 1; i <= 4; i++ {
+		if len(w) <= i {
+			return 0, 0, nil
+		}
+		b := w[i]
+		n += int(b&127) * m
+		if b&128 == 0 {
+			if i > 1 && b == 0 {
+				return 0, 0, fmt.Errorf("MQTT non-canonical remaining length")
+			}
+			return i + 1 + n, i + 1, nil
+		}
+		m *= 128
+	}
+	return 0, 0, fmt.Errorf("MQTT remaining length exceeds four bytes")
+}
+
+func (f *binFlow) frame(w []byte) (int, *binSpec, error) {
+	if f.binding != nil {
+		n, err := f.binding.Frame(w)
+		return n, f.a.specs[f.binding.Rule+"/"+f.binding.Entry], err
+	}
+	switch f.protocol {
+	case "mqtt":
+		n, _, err := mqttLength(w)
+		entry := "MQTT311PacketFields"
+		if f.level == 3 {
+			entry = "MQTT31PacketFields"
+		}
+		return n, f.spec("mqtt_fields", entry), err
+	case "tls":
+		if len(w) < 5 {
+			return 0, nil, nil
+		}
+		if w[0] < 20 || w[0] > 23 || w[1] != 3 || w[2] > 4 {
+			return 0, nil, fmt.Errorf("invalid TLS record header")
+		}
+		n := 5 + int(binary.BigEndian.Uint16(w[3:5]))
+		if n > 18437 {
+			return 0, nil, fmt.Errorf("TLS ciphertext record exceeds limit")
+		}
+		return n, f.spec("tls", ""), nil
+	case "memcached":
+		if w[0] == 0x80 {
+			if len(w) < 24 {
+				return 0, nil, nil
+			}
+			n := 24 + int(binary.BigEndian.Uint32(w[8:12]))
+			if w[1] != 0 {
+				return n, nil, nil
+			}
+			return n, f.spec("memcached_fields", "MemcachedBinaryGetRequestFields"), nil
+		}
+		if bytes.HasPrefix(w, []byte("stats\r\n")) {
+			return 7, f.spec("memcached_fields", "MemcachedStatsRequestFields"), nil
+		}
+		if bytes.HasPrefix(w, []byte("END\r\n")) {
+			return 5, f.spec("memcached_fields", "MemcachedStatsResponseFields"), nil
+		}
+		if bytes.HasPrefix(w, []byte("STAT ")) {
+			if end := bytes.Index(w, []byte("\r\nEND\r\n")); end >= 0 {
+				return end + 7, f.spec("memcached_fields", "MemcachedStatsResponseFields"), nil
+			}
+			return 0, nil, nil
+		}
+		if len(w) < 7 {
+			return 0, nil, nil
+		}
+		return len(w), nil, nil
+	case "cassandra":
+		if len(w) < 9 {
+			return 0, nil, nil
+		}
+		n := 9 + int(binary.BigEndian.Uint32(w[5:9]))
+		if (w[0] != 4 && w[0] != 0x84) || w[1]&1 != 0 {
+			return n, nil, nil
+		}
+		entry := ""
+		switch w[4] {
+		case 1:
+			entry = "CQLStartup4Fields"
+		case 5:
+			entry = "CQLOptions4Fields"
+		case 6:
+			entry = "CQLSupported4Fields"
+		}
+		if entry == "" {
+			return n, nil, nil
+		}
+		return n, f.spec("cassandra_fields", entry), nil
+	case "kerberos":
+		if len(w) < 4 {
+			return 0, nil, nil
+		}
+		return 4 + int(binary.BigEndian.Uint32(w[:4])), f.spec("kerberos_fields", "KerberosTCPFields"), nil
+	case "dns":
+		if len(w) < 2 {
+			return 0, nil, nil
+		}
+		n := 2 + int(binary.BigEndian.Uint16(w[:2]))
+		if n < 14 {
+			return 0, nil, fmt.Errorf("DNS TCP record is shorter than header")
+		}
+		return n, f.spec("dns", "DNS"), nil
+	case "syslog":
+		return f.frameSyslog(w)
+	}
+	return 0, nil, fmt.Errorf("no stream framer for %s", f.protocol)
+}
+
+func kerberosTag(tag byte) bool {
+	return tag == 0x6a || tag == 0x6b || tag == 0x6c || tag == 0x6d || tag == 0x7e
+}
+func dnsHeader(w []byte) bool {
+	return len(w) >= 12 && (w[2]>>3)&15 <= 5 && binary.BigEndian.Uint16(w[4:6]) <= 256
+}
+
+func (a *binParser) datagram(packet gopacket.Packet, udp *layers.UDP) {
+	network := packet.NetworkLayer()
+	if network == nil {
+		return
+	}
+	if ip, ok := network.(*layers.IPv4); ok && (ip.Version != 4 || ip.FragOffset != 0 || ip.Flags&layers.IPv4MoreFragments != 0) {
+		return
+	}
+	if ip, ok := network.(*layers.IPv6); ok && (ip.Version != 6 || packet.Layer(layers.LayerTypeIPv6Fragment) != nil) {
+		return
+	}
+	a.datagramFields(network, udp, withEvidence(packet.Metadata().CaptureInfo, packetEvidence(packet)), packet.Metadata().Truncated)
+}
+
+// The caller has already excluded IP fragments and validated the network layer.
+func (a *binParser) datagramFields(network gopacket.NetworkLayer, udp *layers.UDP, ci gopacket.CaptureInfo, truncated bool) {
+	wire := udp.Payload
+	a.input.Add(uint64(len(wire)))
+	src, dst := network.NetworkFlow().Endpoints()
+	e := &BinParserEvent{Timestamp: ci.Timestamp, Transport: "udp", Source: net.JoinHostPort(src.String(), strconv.Itoa(int(udp.SrcPort))), Destination: net.JoinHostPort(dst.String(), strconv.Itoa(int(udp.DstPort))), Length: len(wire), Status: "unrecognized", Summary: "unrecognized UDP datagram"}
+	evidence := evidenceFrom(ci)
+	e.Domain = evidence.Ref.Domain
+	if evidence.Ref.Number != 0 {
+		e.SourceBytes.PacketRefs = []PacketReference{evidence.Ref}
+		if len(evidence.refs) > 0 {
+			e.SourceBytes.Kind = "reassembled"
+			e.SourceBytes.PacketRefs = append([]PacketReference(nil), evidence.refs...)
+		}
+	}
+	if truncated || ci.CaptureLength < ci.Length || udp.Length < 8 || int(udp.Length) != len(wire)+8 {
+		e.Status, e.Summary = "incomplete", "truncated or invalid UDP datagram"
+		a.incomplete.Add(1)
+	} else if len(wire) > a.config.MaxMessageBytes {
+		e.Status, e.Summary = "limited", "UDP datagram exceeds message limit"
+		a.limited.Add(uint64(len(wire)))
+	} else {
+		if events, ok := a.decodeQUICDatagram(e, wire); ok {
+			for _, event := range events {
+				a.emit(event)
+			}
+			return
+		}
+		if a.decodeNativeDatagram(e, wire, uint16(udp.SrcPort), uint16(udp.DstPort)) {
+			a.emit(e)
+			return
+		}
+		var spec *binSpec
+		if (udp.SrcPort == 88 || udp.DstPort == 88) && len(wire) >= 2 && kerberosTag(wire[0]) {
+			e.Protocol = "kerberos"
+			spec = a.specs["application-layer.kerberos_fields/KerberosMessageFields"]
+		}
+		if spec == nil && a.decodeSessionDatagram(e, wire) {
+			a.emit(e)
+			return
+		}
+		if spec != nil {
+			e.Rule, e.Entry, e.plan = spec.rule, spec.entry, spec.plan
+			e.Status, e.Summary = "deferred", e.Protocol
+			e.Raw = append([]byte(nil), wire...)
+			a.messages.Add(1)
+			a.messageBytes.Add(uint64(len(wire)))
+			if a.config.Deferred {
+				a.deferred.Add(1)
+			} else if result, err := e.Decode(); err != nil {
+				e.Status, e.Error = "malformed", err.Error()
+				a.malformed.Add(1)
+			} else {
+				e.Status, e.Structured = "decoded", result
+				a.decoded.Add(1)
+			}
+		} else {
+			a.unknown.Add(1)
+			a.unclassified.Add(uint64(len(wire)))
+		}
+	}
+	if e.Protocol == "dns" || e.Protocol == "mdns" || e.Protocol == "llmnr" {
+		if err := a.dnsEvent(e, wire); err != nil {
+			e.Status = "malformed"
+			e.Error = err.Error()
+		}
+	}
+	if e.Raw == nil {
+		e.Raw = append([]byte(nil), wire[:min(len(wire), a.config.ProbeBytes)]...)
+	}
+	a.emit(e)
+}

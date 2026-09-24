@@ -1,0 +1,69 @@
+# Explicit SDP advertisement fields, not T.38 media/UDPTL/IFP decoding.
+# Primary evidence: ITU-T T.38 (11/2015), D.2.3.1/D.2.3.3, V.3.3/V.3.4:
+# https://www.itu.int/rec/dologin_pub.asp?id=T-REC-T.38-201511-I%21%21PDF-E&lang=e&type=items
+# https://www.rfc-editor.org/rfc/rfc8866.html (sections 5 and 9)
+# https://www.rfc-editor.org/rfc/rfc3407.html (section 3)
+# https://www.rfc-editor.org/rfc/rfc3525.html (section 7.1.8)
+#
+# Full entry requires one v/o/s/t session, media and effective connection.
+# Observed line profile: v/o/s/i/c/b/t/m/a, strict CRLF and line ordering.
+# Other line kinds are explicitly unsupported; unknown attributes have raw
+# factual values and Attribute Semantics Decoded=false. Origin/connection
+# addresses stay unnormalized; endpoint/address validity is NOT inferred.
+# Image/t38 with udptl/UDPTL/tcp/TCP in m= or RFC3407 cdsc= is required.
+# The historical IANA UDPTL spelling is documented by T.38 V.3.4.
+# Media descriptions and capability declarations are distinct metadata;
+# capability completeness, required T38FaxRateManagement parameter set,
+# endpoint operation and offer/answer outcome are NOT validated. In particular,
+# the original audio SDP advertises only the additional image/t38 capability
+# and omits the complete RFC3407 media set; this entry does not certify it.
+# Known T.38 D.2.3.1 decimal/enumerated/boolean/vendor attribute declarations
+# are checked when present; no codec version or negotiated configuration is
+# inferred. Per V.3.3 a boolean with an older colon/value is preserved and
+# flagged noncanonical, with presence=true irrespective of its textual value.
+# RTP/fmtp T38 parameters, cpar and newer capability extensions stay opaque.
+#
+# H248 entry accepts Local/Remote descriptor syntax: optional v/o/s/t, CHOOSE
+# for supported scalar fields, at most one m per session, multiple complete
+# v=0-delimited alternatives. Per-value alternative lists are unsupported.
+# Descriptor edge whitespace has its own real wire leaves. Direction is not
+# inferred, so acceptance does not certify the more restrictive MG reply form.
+# Caller supplies the exact existing Megaco SDP Text or SIP Content-Length
+# body boundary; this rule neither strips an envelope nor parses SIP/Megaco.
+# Full consumed spans are physical offsets, including non-byte-aligned starts.
+# Limits: 64KiB, 1024 lines, 4096B per CRLF line, 32 alternatives, 64 media.
+# Structured GenerateBinary is unsupported; parsed NodeToBytes is exact.
+Package:
+  T38SDPAdvertisement:
+    operator: |
+      err = parseT38SDPAdvertisement(false)
+      if err != nil { panic(err) }
+  T38H248SDPAdvertisement:
+    operator: |
+      err = parseT38SDPAdvertisement(true)
+      if err != nil { panic(err) }
+  T38SDPCarrier:
+    operator: |
+      if !this.HasMaxLength() { panic("t38-sdp: explicit carrier boundary required") }
+      if this.GetMaxLength("bit") % 8 != 0 { panic("t38-sdp: explicit byte boundary required") }
+      if this.GetMaxLength() == 0 { panic("t38-sdp: empty advertisement") }
+      candidate, trial = this.TryProcessByType("T38SDPFrame")
+      if trial.OK { trial.Save(); return }
+      trial.Recovery()
+      raw = this.NewUnknownNode("Unparsed T38 SDP Advertisement")
+      raw.SetMaxLength(this.GetMaxLength())
+      raw.Process()
+  T38H248SDPCarrier:
+    operator: |
+      if !this.HasMaxLength() { panic("t38-sdp: explicit carrier boundary required") }
+      if this.GetMaxLength("bit") % 8 != 0 { panic("t38-sdp: explicit byte boundary required") }
+      if this.GetMaxLength() == 0 { panic("t38-sdp: empty advertisement") }
+      candidate, trial = this.TryProcessByType("T38H248SDPFrame")
+      if trial.OK { trial.Save(); return }
+      trial.Recovery()
+      raw = this.NewUnknownNode("Unparsed T38 SDP Advertisement")
+      raw.SetMaxLength(this.GetMaxLength())
+      raw.Process()
+
+T38SDPFrame: "import:application-layer/t38_sdp.yaml;node:T38SDPAdvertisement"
+T38H248SDPFrame: "import:application-layer/t38_sdp.yaml;node:T38H248SDPAdvertisement"

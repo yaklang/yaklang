@@ -17,6 +17,8 @@ import (
 // TCPReassemblyStats separates queue accounting from TCP stream completeness.
 // ProcessedPackets counts attempted packets; success also requires Err()==nil.
 type TCPReassemblyStats struct {
+	CaptureAccountingAvailable                          bool
+	CapturedPackets, CapturedBytes                      uint64 // all read packets, before protocol analysis; excludes file record headers
 	AccountingAvailable                                 bool
 	Workers                                             int
 	AcceptedPackets, ProcessedPackets, RejectedPackets  uint64
@@ -86,6 +88,7 @@ func (b *reassemblyBudget) release(bytes, segments int) {
 // Decoded submissions own addresses and just the TCP fields consumed by the
 // reassembler. Raw private capture paths move full decoding onto the worker.
 type workerPacket struct {
+	evidence       captureEvidence
 	data           []byte
 	ts             time.Time
 	link           layers.LinkType
@@ -184,10 +187,15 @@ func (p *TrafficPool) Err() error {
 func (p *TrafficPool) Stats() TCPReassemblyStats {
 	d := p.parallel
 	if d == nil {
-		return TCPReassemblyStats{Workers: 1}
+		p.deviceStatsMu.Lock()
+		devices := append([]TCPDeviceCaptureStats(nil), p.singleDevices...)
+		p.deviceStatsMu.Unlock()
+		return TCPReassemblyStats{Workers: 1, CaptureAccountingAvailable: p.captureAccountingAvailable, CapturedPackets: p.capturedPackets.Load(), CapturedBytes: p.capturedBytes.Load(), UnreassembledBytes: p.singleUnreassembledBytes.Load(), UnreassembledSegments: p.singleUnreassembledSegments.Load(), Devices: devices,
+			InvalidSegments: p.singleDiagnostics.invalid.Load(), DecodeErrors: p.singleDiagnostics.decodeErrors.Load(), CallbackPanics: p.singleDiagnostics.panics.Load(), ResourceLimitEvents: p.singleDiagnostics.limits.Load(), TruncatedCaptures: p.singleDiagnostics.truncated.Load()}
 	}
 	s := TCPReassemblyStats{Workers: len(d.workers), AcceptedPackets: d.stats.accepted.Load(), ProcessedPackets: d.stats.processed.Load(), RejectedPackets: d.stats.rejected.Load(), BackpressureEvents: d.stats.blocked.Load(), BackpressureTime: time.Duration(d.stats.blockedNS.Load()), QueueBufferBytes: int64(len(d.workers) * (d.root.options.WorkerQueueDepth + 2) * d.root.options.WorkerBatchBytes)}
 	s.AccountingAvailable = true
+	s.CaptureAccountingAvailable, s.CapturedPackets, s.CapturedBytes = p.captureAccountingAvailable, p.capturedPackets.Load(), p.capturedBytes.Load()
 	s.QueuePacketCapacity = len(d.workers) * (d.root.options.WorkerQueueDepth + 2) * d.root.options.WorkerBatchPackets
 	s.TruncatedCaptures = d.stats.truncated.Load()
 	s.DecodeErrors = d.stats.decodeErrors.Load()
@@ -209,7 +217,33 @@ func (p *TrafficPool) Stats() TCPReassemblyStats {
 	return s
 }
 
-// WithTCPReassemblyStats reports the final, drained multi-worker counters.
+// pcap_onTCPReassemblyStats 注册捕获及 TCP 重组的最终统计回调，支持单 worker 和多 worker。
+// 捕获启动后，在结束并处理完已接收任务时回调一次；初始化失败时不保证回调。
+// CapturedPackets/CapturedBytes 是已读取的包数/字节数；AcceptedPackets/ProcessedPackets
+// 是重组任务计数。它们均不是协议消息数，协议分析统计使用 pcap_onProtocolStats。
+// 实时抓包的 Devices 包含驱动统计；仅当 Available 为 true 时才能使用 Dropped 和
+// InterfaceDropped 判断丢包，false 不表示零丢包。纯 Go 文件回放没有驱动统计。
+//
+// 参数:
+//   - callback: 接收 TCPReassemblyStats 的函数。最后一次配置生效，nil 取消订阅。
+//
+// 返回值:
+//   - 抓包配置选项。
+//
+// Example:
+// ```
+//
+//	pcapx.OpenPcapFile("session.pcap", pcapx.pcap_onTCPReassemblyStats(func(stats) {
+//	    println(stats.CapturedPackets, stats.CapturedBytes)
+//	}))~
+//
+// ```
+func WithOnTCPReassemblyStats(callback func(stats TCPReassemblyStats)) CaptureOption {
+	return WithTCPReassemblyStats(callback)
+}
+
+// WithTCPReassemblyStats reports final capture and reassembly counters.
+// Deprecated: use WithOnTCPReassemblyStats (pcapx.pcap_onTCPReassemblyStats in Yak).
 func WithTCPReassemblyStats(h func(TCPReassemblyStats)) CaptureOption {
 	return func(c *CaptureConfig) error { c.onReassemblyStats = h; return nil }
 }
@@ -260,7 +294,7 @@ func (d *tcpWorkers) submit(packet workerPacket) {
 	}
 }
 
-func (d *tcpWorkers) submitLayers(eth *layers.Ethernet, network gopacket.SerializableLayer, tcp *layers.TCP, tss []time.Time) {
+func (d *tcpWorkers) submitLayers(eth *layers.Ethernet, network gopacket.SerializableLayer, tcp *layers.TCP, tss []time.Time, evidence ...captureEvidence) {
 	if tcp == nil {
 		return
 	}
@@ -288,6 +322,10 @@ func (d *tcpWorkers) submitLayers(eth *layers.Ethernet, network gopacket.Seriali
 	src, _ := netip.AddrFromSlice(srcIP)
 	dst, _ := netip.AddrFromSlice(dstIP)
 	r := workerPacket{data: tcp.Payload, ts: ts, key: key, src: src.As16(), dst: dst.As16(), sport: uint16(tcp.SrcPort), dport: uint16(tcp.DstPort), seq: tcp.Seq}
+	if len(evidence) > 0 {
+		r.evidence = evidence[0]
+		r.key.domain = evidence[0].Ref.Domain
+	}
 	if tcp.SYN {
 		r.flags |= 1
 	}
@@ -308,7 +346,7 @@ func (d *tcpWorkers) submitLayers(eth *layers.Ethernet, network gopacket.Seriali
 	d.submit(r)
 }
 
-func (d *tcpWorkers) deviceStats(h *PcapHandleWrapper) {
+func (p *TrafficPool) deviceStats(h *PcapHandleWrapper) {
 	s := TCPDeviceCaptureStats{Device: h.device}
 	h.mutex.RLock()
 	if h.isClose {
@@ -325,7 +363,18 @@ func (d *tcpWorkers) deviceStats(h *PcapHandleWrapper) {
 		}
 	}
 	h.mutex.RUnlock()
-	d.recordDeviceStats(s)
+	if p.parallel != nil {
+		p.parallel.recordDeviceStats(s)
+		return
+	}
+	p.deviceStatsMu.Lock()
+	p.singleDevices = append(p.singleDevices, s)
+	p.deviceStatsMu.Unlock()
+	if !s.Available {
+		p.reassemblyFailure("pcap final drop statistics unavailable: " + s.Error)
+	} else if s.Dropped > 0 || s.InterfaceDropped > 0 {
+		p.reassemblyFailure(fmt.Sprintf("pcap dropped packets: capture=%d interface=%d", s.Dropped, s.InterfaceDropped))
+	}
 }
 
 func (d *tcpWorkers) recordDeviceStats(s TCPDeviceCaptureStats) {
@@ -403,7 +452,7 @@ func (d *tcpWorkers) run(w *tcpWorker) {
 				r := &b.packets[i]
 				if r.raw {
 					decoder.link = r.link
-					decoder.feed(w.pool.ctx, r.data, gopacket.CaptureInfo{Timestamp: r.ts, CaptureLength: len(r.data), Length: len(r.data)})
+					decoder.feedWithEvidence(w.pool.ctx, r.data, gopacket.CaptureInfo{Timestamp: r.ts, CaptureLength: len(r.data), Length: len(r.data)}, r.evidence)
 				} else {
 					tcp := layers.TCP{SrcPort: layers.TCPPort(r.sport), DstPort: layers.TCPPort(r.dport), Seq: r.seq, SYN: r.flags&1 != 0, ACK: r.flags&2 != 0, FIN: r.flags&4 != 0, RST: r.flags&8 != 0}
 					tcp.Payload = r.data
@@ -415,7 +464,7 @@ func (d *tcpWorkers) run(w *tcpWorker) {
 					if r.ethernet {
 						eth = &layers.Ethernet{SrcMAC: net.HardwareAddr(r.macSrc[:]), DstMAC: net.HardwareAddr(r.macDst[:])}
 					}
-					w.pool.Feed(eth, network, &tcp, r.ts)
+					w.pool.feedEvidence(eth, network, &tcp, r.evidence, r.ts)
 				}
 			}()
 		}
@@ -458,6 +507,8 @@ func (d *tcpWorkers) close() {
 
 func (p *TrafficPool) notePanic(value any) {
 	if p.parallel == nil {
+		p.singleDiagnostics.panics.Add(1)
+		p.reassemblyFailure(fmt.Sprintf("TCP callback panic: %v", value))
 		return
 	}
 	if p.counters == nil {
@@ -520,7 +571,7 @@ func rawFlowKey(raw []byte, link layers.LinkType) (flowKey, bool, error) {
 	if !ok && packet.TransportLayer() != nil {
 		return flowKey{}, false, nil
 	}
-	if failure := packet.ErrorLayer(); failure != nil {
+	if failure := packet.ErrorLayer(); failure != nil && !unsupportedNetworkDecode(packet) {
 		return flowKey{}, false, failure.Error()
 	}
 	if !ok {

@@ -1,0 +1,151 @@
+# Bounded, stateless NCP datagrams. Primary Novell wire-format references:
+# Create/Destroy Service Connection (seven bytes, including ignored fields):
+# https://www.novell.com/documentation/developer/ncp/ncp__enu/data/sdk333.html
+# https://www.novell.com/documentation/developer/ncp/ncp__enu/data/sdk339.html
+# Request Being Processed / Request Processed reply headers:
+# https://www.novell.com/documentation/developer/ncp/ncp__enu/data/sdk443.html
+# https://www.novell.com/documentation/developer/ncp/ncp__enu/data/sdk447.html
+# Supported service request bodies: server date/time, internet address, buffer size.
+# https://www.novell.com/documentation/developer/ncp/ncp__enu/data/a1vzbg1.html
+# https://www.novell.com/documentation/developer/ncp/ncp__enu/data/sdk365.html
+# https://www.novell.com/documentation/developer/ncp/ncp__enu/data/sdk437.html
+#
+# The later split connection-number bytes (low at 3, high at 5) are confirmed by:
+# https://github.com/wireshark/wireshark/blob/411f78566bed622a2ca2e6480c659486175db129/epan/dissectors/packet-ncp.c
+# Byte 5 remains ignored/reserved for the connection controls and 0x9999.
+# Unknown function bodies and all operation-dependent reply bodies stay opaque.
+# No TCP wrapper, packet signature, burst, LIP echo, watchdog, NDS decoding,
+# request/reply association, retransmission, or connection-state validation.
+endian: big
+unit: byte
+Package:
+  NCP: NCPMessage
+
+  NCPCarrier:
+    operator: |
+      if !this.HasMaxLength() { panic("ncp: explicit carrier boundary required") }
+      if this.GetMaxLength("bit") % 8 != 0 { panic("ncp: carrier requires byte alignment") }
+      if this.GetMaxLength() == 0 { panic("ncp: empty carrier has no message") }
+      value, trial = this.TryProcessByType("NCPFrame")
+      if trial.OK { trial.Save(); return }
+      trial.Recovery()
+      raw = this.NewUnknownNode("Unparsed NCP Payload")
+      raw.SetMaxLength(this.GetMaxLength())
+      raw.Process()
+
+NCPFrame: "import:application-layer/ncp.yaml;node:NCP"
+
+NCPMessage:
+  operator: |
+    if !this.HasMaxLength() { panic("ncp: explicit datagram boundary required") }
+    if this.GetMaxLength("bit") % 8 != 0 { panic("ncp: datagram requires byte alignment") }
+    total = this.GetMaxLength()
+    // Implementation bound: the largest non-jumbo UDP payload, not an NCP
+    // length field or a claim that every underlying transport permits it.
+    if total < 7 || total > 65527 { panic("ncp: datagram size outside 7..65527 bytes") }
+    kind = this.ProcessSubNode("Packet Type").Value
+    if kind != 0x1111 && kind != 0x2222 && kind != 0x3333 && kind != 0x5555 && kind != 0x9999 {
+      panic("ncp: unsupported packet type")
+    }
+    sequence = this.ProcessSubNode("Sequence Number").Value
+    low = this.ProcessSubNode("Connection Number Low").Value
+    this.ProcessSubNode("Task Number")
+    if kind == 0x1111 || kind == 0x5555 || kind == 0x9999 {
+      this.ProcessSubNode("Reserved")
+      this.AddInfo("Connection Number", low)
+    } else {
+      high = this.ProcessSubNode("Connection Number High").Value
+      this.AddInfo("Connection Number", low + high*256)
+    }
+    name = ""
+    opaque = false
+    bodyValidated = true
+    replyContext = false
+    if kind == 0x1111 || kind == 0x5555 {
+      if total != 7 { panic("ncp: connection control must be exactly 7 bytes") }
+      this.ProcessSubNode("Request Code")
+      if kind == 0x1111 {
+        if sequence != 0 || low != 255 { panic("ncp: create requires sequence 0 and connection FF") }
+        name = "Create Service Connection"
+      } else {
+        name = "Destroy Service Connection"
+      }
+    } else if kind == 0x2222 {
+      fnCode = this.ProcessSubNode("Function Code").Value
+      name = "Service Request"
+      if fnCode == 20 {
+        if total != 7 { panic("ncp: date/time request must be exactly 7 bytes") }
+        name = "Get File Server Date And Time"
+      } else if fnCode == 33 {
+        if total != 9 { panic("ncp: buffer-size request must be exactly 9 bytes") }
+        size = this.ProcessSubNode("Proposed Buffer Size").Value
+        if size != 512 && size != 1024 && size != 2048 && size != 4096 && size != 8192 && size != 16384 && size != 32768 {
+          panic("ncp: unsupported proposed buffer size")
+        }
+        name = "Negotiate Buffer Size"
+      } else if fnCode == 23 {
+        if total < 10 { panic("ncp: function 23 requires length and subfunction") }
+        subLength = this.ProcessSubNode("Subfunction Structure Length").Value
+        if subLength != total-9 { panic("ncp: subfunction length does not match datagram") }
+        subfunction = this.ProcessSubNode("Subfunction Code").Value
+        if subfunction == 26 {
+          if subLength != 5 { panic("ncp: internet-address request requires length 5") }
+          this.ProcessSubNode("Target Connection")
+          name = "Get Internet Address"
+        } else {
+          bodyValidated = false
+          opaque = true
+        }
+      } else {
+        bodyValidated = false
+        opaque = true
+      }
+      if this.Length() < total {
+        this.GetSubNode("Function Data").SetMaxLength(total-this.Length())
+        this.ProcessSubNode("Function Data")
+      }
+    } else {
+      if total < 8 { panic("ncp: reply requires an 8-byte header") }
+      this.ProcessSubNode("Completion Code")
+      this.ProcessSubNode("Connection Status")
+      if kind == 0x9999 {
+        if total != 8 { panic("ncp: acknowledgement must be exactly 8 bytes") }
+        name = "Request Being Processed"
+        this.AddInfo("Completion Fields Applicable", false)
+      } else {
+        name = "Request Processed"
+        bodyValidated = false
+        replyContext = true
+        opaque = true
+        this.AddInfo("Completion Fields Applicable", true)
+        if this.Length() < total {
+          this.GetSubNode("Reply Data").SetMaxLength(total-this.Length())
+          this.ProcessSubNode("Reply Data")
+        }
+      }
+    }
+    if this.Length() != total { panic("ncp: message did not consume its datagram boundary") }
+    this.AddInfo("Message Kind", name)
+    this.AddInfo("Application Data Opaque", opaque)
+    this.AddInfo("Operation Body Validated", bodyValidated)
+    this.AddInfo("Reply Context Required", replyContext)
+    this.AddInfo("Conversation State Validated", false)
+
+  Packet Type: uint16
+  Sequence Number: uint8
+  Connection Number Low: uint8
+  Task Number: uint8
+  Reserved: uint8
+  Connection Number High: uint8
+  Request Code: uint8
+  Function Code: uint8
+  Subfunction Structure Length: uint16
+  Subfunction Code: uint8
+  Target Connection:
+    type: uint32
+    endian: little
+  Proposed Buffer Size: uint16
+  Function Data: raw
+  Completion Code: uint8
+  Connection Status: uint8
+  Reply Data: raw

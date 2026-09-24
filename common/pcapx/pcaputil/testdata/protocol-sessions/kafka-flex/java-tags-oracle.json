@@ -1,0 +1,131 @@
+[ {
+  "name" : "fetch-known-tags-null",
+  "api" : 1,
+  "version" : 12,
+  "request" : false,
+  "body_hex" : "000000000000000000000205746167730200000002000000000000000000c800000000000000be000000000000000300ffffffff0004001100000007000000000000007b012a0204020109000000050000000900020d000000000000007800000006003701050000",
+  "expected" : {
+    "throttleTimeMs" : 0,
+    "errorCode" : 0,
+    "sessionId" : 0,
+    "responses" : [ {
+      "topic" : "tags",
+      "partitions" : [ {
+        "partitionIndex" : 2,
+        "errorCode" : 0,
+        "highWatermark" : 200,
+        "lastStableOffset" : 190,
+        "logStartOffset" : 3,
+        "divergingEpoch" : {
+          "epoch" : 7,
+          "endOffset" : 123
+        },
+        "currentLeader" : {
+          "leaderId" : 5,
+          "leaderEpoch" : 9
+        },
+        "snapshotId" : {
+          "endOffset" : 120,
+          "epoch" : 6
+        },
+        "abortedTransactions" : null,
+        "preferredReadReplica" : -1,
+        "records" : null
+      } ]
+    } ]
+  }
+}, {
+  "name" : "fetch-known-tags-empty",
+  "api" : 1,
+  "version" : 12,
+  "request" : false,
+  "body_hex" : "000000000000000000000205746167730200000002000000000000000000c800000000000000be000000000000000301ffffffff0104001100000007000000000000007b012a0204020109000000050000000900020d000000000000007800000006003701050000",
+  "expected" : {
+    "throttleTimeMs" : 0,
+    "errorCode" : 0,
+    "sessionId" : 0,
+    "responses" : [ {
+      "topic" : "tags",
+      "partitions" : [ {
+        "partitionIndex" : 2,
+        "errorCode" : 0,
+        "highWatermark" : 200,
+        "lastStableOffset" : 190,
+        "logStartOffset" : 3,
+        "divergingEpoch" : {
+          "epoch" : 7,
+          "endOffset" : 123
+        },
+        "currentLeader" : {
+          "leaderId" : 5,
+          "leaderEpoch" : 9
+        },
+        "snapshotId" : {
+          "endOffset" : 120,
+          "epoch" : 6
+        },
+        "abortedTransactions" : [ ],
+        "preferredReadReplica" : -1,
+        "records" : ""
+      } ]
+    } ]
+  }
+}, {
+  "name" : "fetch-cluster-tag",
+  "api" : 1,
+  "version" : 12,
+  "request" : true,
+  "body_hex" : "ffffffff00000000000000007fffffff0000000000ffffffff0101077261636b2d6101000c0c636c75737465722d746167",
+  "expected" : {
+    "clusterId" : "cluster-tag",
+    "replicaId" : -1,
+    "maxWaitMs" : 0,
+    "minBytes" : 0,
+    "maxBytes" : 2147483647,
+    "isolationLevel" : 0,
+    "sessionId" : 0,
+    "sessionEpoch" : -1,
+    "topics" : [ ],
+    "forgottenTopicsData" : [ ],
+    "rackId" : "rack-a"
+  }
+}, {
+  "name" : "api-migration-tag",
+  "api" : 18,
+  "version" : 3,
+  "request" : false,
+  "body_hex" : "0000010000000001030101",
+  "expected" : {
+    "errorCode" : 0,
+    "apiKeys" : [ ],
+    "throttleTimeMs" : 0,
+    "zkMigrationReady" : true
+  }
+}, {
+  "name" : "produce-record-errors",
+  "api" : 0,
+  "version" : 9,
+  "request" : false,
+  "body_hex" : "020574616773020000000200570000000000000000ffffffffffffffffffffffffffffffff030000000300000000000401000972656a656374656400000000000000",
+  "expected" : {
+    "responses" : [ {
+      "name" : "tags",
+      "partitionResponses" : [ {
+        "index" : 2,
+        "errorCode" : 87,
+        "baseOffset" : 0,
+        "logAppendTimeMs" : -1,
+        "logStartOffset" : -1,
+        "recordErrors" : [ {
+          "batchIndex" : 3,
+          "batchIndexErrorMessage" : null
+        }, {
+          "batchIndex" : 4,
+          "batchIndexErrorMessage" : ""
+        } ],
+        "errorMessage" : "rejected"
+      } ]
+    } ],
+    "throttleTimeMs" : 0
+  }
+} ]

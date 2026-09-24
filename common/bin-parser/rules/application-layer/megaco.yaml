@@ -1,0 +1,38 @@
+# RFC 3525 (June 2003), Annex B.2 and sections 7/8:
+# https://www.rfc-editor.org/rfc/rfc3525.html#appendix-B
+# ITU-T H.248.1 (05/2002), Annex B pp.78-81: v2 header and command-only
+# Reply -> Context -> Add/Move/Modify/Subtract, with optional ImmAckRequired.
+# https://www.itu.int/rec/T-REC-H.248.1-200205-S
+# Parse-only v1 text structural subset. Explicit 1..65527-byte message,
+# 16384-node and 32-level implementation limits, not protocol wire limits.
+# Supports Transaction/Reply/Pending/ResponseAck/Error, Context properties,
+# eight command families, and selected actual descriptor grammars. Literal
+# long/compact tokens are case-insensitive; layout and original spelling remain.
+# Number leaves preserve decimal wire text; checked values are Numeric Value
+# metadata. Local/Remote SDP text and package values retain exact bytes.
+# Binary BER, optional authentication header, MTP identifiers, inline digit maps,
+# embedded Events, extension-parameter forms and Context termination audits
+# are unsupported and rejected, not accepted as generic balanced objects.
+# Version 2 has its own narrow profile: only command-only AMMS Replies;
+# v2 requests, other transactions/commands, errors, Context properties and
+# descriptors (including v2 individual auditing) are unsupported, not inferred
+# from the v1 grammar. No v2/v3 negotiation or capability compliance is claimed.
+# No package/SDP interpretation, stateful negotiation or command outcome is inferred.
+endian: big
+unit: byte
+Package:
+  Megaco:
+    operator: |
+      err = parseMegacoMessage()
+      if err != nil { panic(err) }
+  MegacoCarrier:
+    operator: |
+      if !this.HasMaxLength() || this.GetMaxLength("bit") == 0 { panic("megaco: explicit nonempty carrier boundary required") }
+      if this.GetMaxLength("bit") % 8 != 0 { panic("megaco: carrier requires a byte boundary") }
+      candidate, trial = this.TryProcessByType("MegacoExactMessage", "Megaco")
+      if trial.OK { trial.Save(); return }
+      trial.Recovery()
+      raw = this.NewUnknownNode("Unparsed Megaco Payload")
+      raw.SetMaxLength(this.GetMaxLength())
+      raw.Process()
+MegacoExactMessage: "import:application-layer/megaco.yaml;node:Megaco"

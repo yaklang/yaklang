@@ -1,0 +1,11 @@
+COMMAND ["/tmp/yak-protocol-round2/after-pcap.test", "-test.run=^$", "-test.bench=^BenchmarkPcapBinParser$/mixed=true/full", "-test.benchmem", "-test.benchtime=300ms", "-test.cpu=4", "-test.count=1"]
+goos: darwin
+goarch: arm64
+pkg: github.com/yaklang/yaklang/common/pcapx/pcaputil
+BenchmarkPcapBinParser/mixed=true/full/workers=1-4         	      39	   8729782 ns/op	 189.22 MB/s	        12.69 cpu-ms/batch	      4119 cpu-ns/message	         4.000 gomaxprocs	      3080 messages/batch	      2834 ns/message	19512205 B/op	   94989 allocs/op
+BenchmarkPcapBinParser/mixed=true/full/workers=2-4         	      55	   6540078 ns/op	 252.57 MB/s	        15.47 cpu-ms/batch	      5023 cpu-ns/message	         4.000 gomaxprocs	      3080 messages/batch	      2123 ns/message	22004007 B/op	   95056 allocs/op
+BenchmarkPcapBinParser/mixed=true/full/workers=4-4         	      57	   5578395 ns/op	 296.11 MB/s	        17.39 cpu-ms/batch	      5646 cpu-ns/message	         4.000 gomaxprocs	      3080 messages/batch	      1811 ns/message	24500938 B/op	   95109 allocs/op
+BenchmarkPcapBinParser/mixed=true/full-history/workers=1-4 	      37	   9789961 ns/op	 168.73 MB/s	        14.86 cpu-ms/batch	      4823 cpu-ns/message	         4.000 gomaxprocs	      3080 messages/batch	      3179 ns/message	22351408 B/op	  101152 allocs/op
+BenchmarkPcapBinParser/mixed=true/full-history/workers=2-4 	      52	   7301485 ns/op	 226.23 MB/s	        17.56 cpu-ms/batch	      5701 cpu-ns/message	         4.000 gomaxprocs	      3080 messages/batch	      2371 ns/message	24842927 B/op	  101218 allocs/op
+BenchmarkPcapBinParser/mixed=true/full-history/workers=4-4 	      51	   6492574 ns/op	 254.42 MB/s	        20.09 cpu-ms/batch	      6521 cpu-ns/message	         4.000 gomaxprocs	      3080 messages/batch	      2108 ns/message	27339748 B/op	  101271 allocs/op
+PASS

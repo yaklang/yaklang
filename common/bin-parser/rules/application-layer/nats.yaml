@@ -1,0 +1,24 @@
+# Bounded plaintext NATS client-protocol records. TCP framing, direction, and
+# payload lengths are enforced by pcapx before these exact message layouts run.
+Package:
+  # Compatibility entry for a single complete control line.
+  NATS:
+    operator: |
+      this.ProcessSubNode("Operation")
+      operation = getNodeResult("Operation").Value
+      if operation != "INFO" && operation != "CONNECT" {
+        panic("nats: a standalone generic control line cannot identify NATS")
+      }
+      this.ProcessSubNode("Arguments")
+    Operation: "del: ;type:string"
+    Arguments: "del:\r\n;type:string"
+
+  NATSControlLine:
+    Control Line: "del:\r\n;type:string"
+
+  # The length-delimited region is kept raw: it may contain arbitrary bytes,
+  # embedded CRLF, NATS headers, or application payload. The stream framer
+  # validates its declared length and the final CRLF.
+  NATSPayloadFrame:
+    Control Line: "del:\r\n;type:string"
+    Payload and Trailer: raw

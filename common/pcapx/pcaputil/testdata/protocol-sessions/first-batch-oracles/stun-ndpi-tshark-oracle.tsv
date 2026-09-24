@@ -1,0 +1,202 @@
+frame.number	frame.protocols	udp.srcport	udp.dstport	stun.type	stun.type.method	stun.type.class	stun.channel	stun.length
+1	eth:ethertype:vlan:ethertype:ip:tcp							
+2	eth:ethertype:vlan:ethertype:ip:tcp							
+3	eth:ethertype:vlan:ethertype:ip:tcp:stun			0x0001	0x0001	0x0000		84
+4	eth:ethertype:vlan:ethertype:ip:tcp:stun			0x0001	0x0001	0x0000		84
+5	eth:ethertype:vlan:ethertype:ip:tcp:stun			0x0101	0x0001	0x0010		76
+6	eth:ethertype:vlan:ethertype:ip:tcp:stun			0x0101	0x0001	0x0010		76
+7	eth:ethertype:vlan:ethertype:ip:tcp:stun			0x0001	0x0001	0x0000		92
+8	eth:ethertype:vlan:ethertype:ip:tcp:stun			0x0001	0x0001	0x0000		92
+9	eth:ethertype:vlan:ethertype:ip:tcp:stun			0x0001	0x0001	0x0000		84
+10	eth:ethertype:vlan:ethertype:ip:tcp:stun			0x0101	0x0001	0x0010		76
+11	eth:ethertype:vlan:ethertype:ip:tcp:stun			0x0001	0x0001	0x0000		92
+12	eth:ethertype:vlan:ethertype:ip:tcp:stun			0x0101	0x0001	0x0010		68
+13	eth:ethertype:vlan:ethertype:ip:tcp:stun			0x0101	0x0001	0x0010		68
+14	eth:ethertype:vlan:ethertype:ip:tcp:stun			0x0101	0x0001	0x0010		68
+15	eth:ethertype:vlan:ethertype:ip:tcp							
+16	eth:ethertype:ip:udp:stun	43016	3478	0x0001	0x0001	0x0000		0
+17	eth:ethertype:ip:udp:stun	43016	3478	0x0003	0x0003	0x0000		20
+18	eth:ethertype:ip:udp:stun	3478	43016	0x0101	0x0001	0x0010		12
+19	eth:ethertype:ip:udp:stun	3478	43016	0x0113	0x0003	0x0011		60
+20	eth:ethertype:ip:udp:stun	43016	3478	0x0003	0x0003	0x0000		136
+21	eth:ethertype:ip:udp:stun	3478	43016	0x0103	0x0003	0x0010		56
+22	eth:ethertype:ip:udp:stun	43016	3478	0x0004	0x0004	0x0000		124
+23	eth:ethertype:ip:udp:stun	3478	43016	0x0104	0x0004	0x0010		32
+24	eth:ethertype:ip:icmp:ip:udp:stun	3478	43016	0x0104	0x0004	0x0010		32
+25	eth:ethertype:ipv6:udp:stun	56880	3478	0x0001	0x0001	0x0000		0
+26	eth:ethertype:ipv6:udp:stun	3478	56880	0x0101	0x0001	0x0010		24
+27	eth:ethertype:ipv6:udp:stun	56880	3478	0x0001	0x0001	0x0000		0
+28	eth:ethertype:ipv6:udp:stun	3478	56880	0x0101	0x0001	0x0010		24
+29	eth:ethertype:ipv6:udp:stun	56880	3478	0x0001	0x0001	0x0000		0
+30	eth:ethertype:ipv6:udp:stun	56880	3478	0x0001	0x0001	0x0000		0
+31	eth:ethertype:ipv6:udp:stun	3478	56880	0x0101	0x0001	0x0010		24
+32	eth:ethertype:ipv6:udp:stun	3478	56880	0x0101	0x0001	0x0010		24
+33	eth:ethertype:ipv6:udp:stun	56880	3478	0x0001	0x0001	0x0000		0
+34	eth:ethertype:ipv6:udp:stun	3478	56880	0x0101	0x0001	0x0010		24
+35	eth:ethertype:ipv6:udp:stun	56880	3478	0x0001	0x0001	0x0000		0
+36	eth:ethertype:ipv6:udp:stun	3478	56880	0x0101	0x0001	0x0010		24
+37	eth:ethertype:ipv6:udp:stun	56880	3478	0x0001	0x0001	0x0000		0
+38	eth:ethertype:ipv6:udp:stun	3478	56880	0x0101	0x0001	0x0010		24
+39	eth:ethertype:ipv6:udp:stun	56880	3478	0x0001	0x0001	0x0000		0
+40	eth:ethertype:ipv6:udp:stun	3478	56880	0x0101	0x0001	0x0010		24
+41	eth:ethertype:ipv6:udp:stun	56880	3478	0x0001	0x0001	0x0000		0
+42	eth:ethertype:ipv6:udp:stun	3478	56880	0x0101	0x0001	0x0010		24
+43	eth:ethertype:ipv6:udp:stun	56880	3478	0x0001	0x0001	0x0000		0
+44	eth:ethertype:ipv6:udp:stun	3478	56880	0x0101	0x0001	0x0010		24
+45	eth:ethertype:ipv6:udp:stun	56880	3478	0x0001	0x0001	0x0000		0
+46	eth:ethertype:ipv6:udp:stun	3478	56880	0x0101	0x0001	0x0010		24
+47	eth:ethertype:ipv6:udp:stun	56880	3478	0x0001	0x0001	0x0000		0
+48	eth:ethertype:ipv6:udp:stun	3478	56880	0x0101	0x0001	0x0010		24
+49	eth:ethertype:ipv6:udp:stun	56880	3478	0x0001	0x0001	0x0000		0
+50	eth:ethertype:ipv6:udp:stun	3478	56880	0x0101	0x0001	0x0010		24
+51	eth:ethertype:ipv6:udp:stun	56880	3478	0x0001	0x0001	0x0000		0
+52	eth:ethertype:ipv6:udp:stun	3478	56880	0x0101	0x0001	0x0010		24
+53	eth:ethertype:ipv6:udp:stun	56880	3478	0x0001	0x0001	0x0000		0
+54	eth:ethertype:ipv6:udp:stun	3478	56880	0x0101	0x0001	0x0010		24
+55	eth:ethertype:ipv6:udp:stun	56880	3478	0x0001	0x0001	0x0000		0
+56	eth:ethertype:ipv6:udp:stun	3478	56880	0x0101	0x0001	0x0010		24
+57	eth:ethertype:ipv6:udp:stun	56880	3478	0x0001	0x0001	0x0000		0
+58	eth:ethertype:ipv6:udp:stun	3478	56880	0x0101	0x0001	0x0010		24
+59	eth:ethertype:ipv6:udp:stun	56880	3478	0x0001	0x0001	0x0000		0
+60	eth:ethertype:ipv6:udp:stun	3478	56880	0x0101	0x0001	0x0010		24
+61	eth:ethertype:ipv6:udp:stun	56880	3478	0x0001	0x0001	0x0000		0
+62	eth:ethertype:ipv6:udp:stun	3478	56880	0x0101	0x0001	0x0010		24
+63	eth:ethertype:ipv6:udp:stun	56880	3478	0x0001	0x0001	0x0000		0
+64	eth:ethertype:ipv6:udp:stun	3478	56880	0x0101	0x0001	0x0010		24
+65	eth:ethertype:ipv6:udp:stun	56880	3478	0x0001	0x0001	0x0000		0
+66	eth:ethertype:ipv6:udp:stun	3478	56880	0x0101	0x0001	0x0010		24
+67	eth:ethertype:ip:udp:stun	38123	40003	0x0003	0x0003	0x0000		8
+68	eth:ethertype:ip:udp:stun	40003	38123	0x0113	0x0003	0x0011		84
+69	eth:ethertype:ip:udp:stun	38123	40003	0x0003	0x0003	0x0000		116
+70	eth:ethertype:ip:udp:stun	40003	38123	0x0103	0x0003	0x0010		56
+71	eth:ethertype:ip:udp:stun	38123	40003	0x0008	0x0008	0x0000		120
+72	eth:ethertype:ip:udp:stun	38123	40003	0x0008	0x0008	0x0000		120
+73	eth:ethertype:ip:udp:stun	40003	38123	0x0118	0x0008	0x0011		92
+74	eth:ethertype:ip:udp:stun	38123	40003	0x0008	0x0008	0x0000		120
+75	eth:ethertype:ip:udp:stun	40003	38123	0x0118	0x0008	0x0011		92
+76	eth:ethertype:ip:udp:stun	40003	38123	0x0108	0x0008	0x0010		24
+77	eth:ethertype:ip:udp:stun:data	38123	40003	0x0016	0x0006	0x0001		116
+78	eth:ethertype:ip:udp:stun:data	38123	40003	0x0016	0x0006	0x0001		116
+79	eth:ethertype:ip:udp:stun:data	40003	38123	0x0017	0x0007	0x0001		112
+80	eth:ethertype:ip:udp:stun	38123	40003	0x0008	0x0008	0x0000		120
+81	eth:ethertype:ip:udp:stun:data	38123	40003	0x0016	0x0006	0x0001		80
+82	eth:ethertype:ip:udp:stun	40003	38123	0x0108	0x0008	0x0010		24
+83	eth:ethertype:ip:udp:stun:data	38123	40003	0x0016	0x0006	0x0001		116
+84	eth:ethertype:ip:udp:stun:data	40003	38123	0x0017	0x0007	0x0001		80
+85	eth:ethertype:ip:udp:stun:data	40003	38123	0x0017	0x0007	0x0001		112
+86	eth:ethertype:ip:udp:stun:data	38123	40003	0x0016	0x0006	0x0001		80
+87	eth:ethertype:ip:udp:stun:data	38123	40003	0x0016	0x0006	0x0001		116
+88	eth:ethertype:ip:udp:stun:data	40003	38123	0x0017	0x0007	0x0001		112
+89	eth:ethertype:ip:udp:stun:data	38123	40003	0x0016	0x0006	0x0001		80
+90	eth:ethertype:ip:udp:stun:data	38123	40003	0x0016	0x0006	0x0001		116
+91	eth:ethertype:ip:udp:stun:data	40003	38123	0x0017	0x0007	0x0001		80
+92	eth:ethertype:ip:udp:stun:data	40003	38123	0x0017	0x0007	0x0001		112
+93	eth:ethertype:ip:udp:stun:data	40003	38123	0x0017	0x0007	0x0001		80
+94	eth:ethertype:ip:udp:stun	38123	40003	0x0008	0x0008	0x0000		120
+95	eth:ethertype:ip:udp:stun:data	38123	40003	0x0016	0x0006	0x0001		80
+96	eth:ethertype:ip:udp:stun	40003	38123	0x0108	0x0008	0x0010		24
+97	eth:ethertype:ip:udp:stun:data	38123	40003	0x0016	0x0006	0x0001		112
+98	eth:ethertype:ip:udp:stun:data	40003	38123	0x0017	0x0007	0x0001		112
+99	eth:ethertype:ip:udp:stun:data	38123	40003	0x0016	0x0006	0x0001		112
+100	eth:ethertype:ip:udp:stun:data	38123	40003	0x0016	0x0006	0x0001		80
+101	eth:ethertype:ip:udp:stun:data	38123	40003	0x0016	0x0006	0x0001		112
+102	eth:ethertype:ip:udp:stun:data	40003	38123	0x0017	0x0007	0x0001		40
+103	eth:ethertype:ip:udp:stun:data	40003	38123	0x0017	0x0007	0x0001		40
+104	eth:ethertype:ip:udp:stun	38123	40003	0x0009	0x0009	0x0000		128
+105	eth:ethertype:ip:udp:stun:data	38123	40003	0x0016	0x0006	0x0001		68
+106	eth:ethertype:ip:udp:stun	40003	38123	0x0109	0x0009	0x0010		24
+107	eth:ethertype:ip:udp:stun:data	40003	38123	0x0017	0x0007	0x0001		112
+108	eth:ethertype:ip:udp:stun:data	38123	40003	0x0016	0x0006	0x0001		80
+109	eth:ethertype:ip:udp:stun:data	38123	40003	0x0016	0x0006	0x0001		112
+110	eth:ethertype:ip:udp:stun:data	40003	38123				0x4003	96
+111	eth:ethertype:ip:udp:stun:data	38123	40003				0x4003	100
+112	eth:ethertype:ip:udp:stun:data	38123	40003				0x4003	64
+113	eth:ethertype:ip:udp:stun:data	40003	38123				0x4003	22
+114	eth:ethertype:ip:udp:stun:data	40003	38123				0x4003	64
+115	eth:ethertype:ip:udp:stun:data	38123	40003				0x4003	50
+116	eth:ethertype:ip:udp:stun:data	40003	38123	0x0017	0x0007	0x0001		112
+117	eth:ethertype:ip:udp:stun:data	40003	38123				0x4003	22
+118	eth:ethertype:ip:udp:stun:data	38123	40003	0x0016	0x0006	0x0001		80
+119	eth:ethertype:ip:udp:stun	38123	40003	0x0008	0x0008	0x0000		120
+120	eth:ethertype:ip:udp:stun	40003	38123	0x0108	0x0008	0x0010		24
+121	eth:ethertype:ip:udp:stun:data	40003	38123	0x0017	0x0007	0x0001		112
+122	eth:ethertype:ip:udp:stun:data	38123	40003	0x0016	0x0006	0x0001		80
+123	eth:ethertype:ip:udp:stun:data	38123	40003				0x4003	50
+124	eth:ethertype:ip:udp:stun:data	38123	40003	0x0016	0x0006	0x0001		112
+125	eth:ethertype:ip:udp:stun:data	38123	40003	0x0016	0x0006	0x0001		112
+126	eth:ethertype:ip:udp:stun:data	40003	38123				0x4003	96
+127	eth:ethertype:ip:udp:stun:data	38123	40003				0x4003	64
+128	eth:ethertype:ip:udp:stun:data	38123	40003				0x4003	100
+129	eth:ethertype:ip:udp:stun:data	40003	38123	0x0017	0x0007	0x0001		80
+130	eth:ethertype:ip:udp:stun:data	38123	40003				0x4003	50
+131	eth:ethertype:ip:udp:stun:data	40003	38123	0x0017	0x0007	0x0001		112
+132	eth:ethertype:ip:udp:stun:data	40003	38123				0x4003	64
+133	eth:ethertype:ip:udp:stun:data	38123	40003	0x0016	0x0006	0x0001		80
+134	eth:ethertype:ip:udp:stun:data	38123	40003	0x0016	0x0006	0x0001		112
+135	eth:ethertype:ip:udp:stun:data	40003	38123				0x4003	22
+136	eth:ethertype:ip:udp:stun:data	40003	38123				0x4003	22
+137	eth:ethertype:ip:udp:stun:data	40003	38123				0x4003	22
+138	eth:ethertype:ip:udp:stun:data	40003	38123				0x4003	96
+139	eth:ethertype:ip:udp:stun:data	38123	40003				0x4003	64
+140	eth:ethertype:ip:udp:stun	38123	40003	0x0004	0x0004	0x0000		116
+141	eth:ethertype:ip:udp:stun	40003	38123	0x0104	0x0004	0x0010		32
+142	eth:ethertype:ip:tcp							
+143	eth:ethertype:ip:tcp:stun			0x0003	0x0003	0x0000		8
+144	eth:ethertype:ip:tcp:stun			0x0003	0x0003	0x0000		8
+145	eth:ethertype:ip:tcp:stun			0x0113	0x0003	0x0011		100
+146	eth:ethertype:ip:tcp:stun			0x0003	0x0003	0x0000		120
+147	eth:ethertype:ip:tcp:stun			0x0113	0x0003	0x0011		100
+148	eth:ethertype:ip:tcp:stun			0x0003	0x0003	0x0000		120
+149	eth:ethertype:ip:tcp:stun			0x0103	0x0003	0x0010		96
+150	eth:ethertype:ip:tcp:stun			0x0008	0x0008	0x0000		124
+151	eth:ethertype:ip:tcp:stun			0x0008	0x0008	0x0000		124
+152	eth:ethertype:ip:tcp:stun:data			0x0016	0x0006	0x0001		112
+153	eth:ethertype:ip:tcp:stun			0x0008	0x0008	0x0000		124
+154	eth:ethertype:ip:tcp:stun			0x0008	0x0008	0x0000		124
+155	eth:ethertype:ip:tcp:stun			0x0103	0x0003	0x0010		96
+156	eth:ethertype:ip:tcp:stun			0x0108	0x0008	0x0010		64
+157	eth:ethertype:ip:tcp:stun			0x0108	0x0008	0x0010		64
+158	eth:ethertype:ip:tcp:stun:data			0x0016	0x0006	0x0001		112
+159	eth:ethertype:ip:tcp:stun			0x0108	0x0008	0x0010		64
+160	eth:ethertype:ip:tcp:stun:data			0x0016	0x0006	0x0001		112
+161	eth:ethertype:ip:tcp:stun			0x0108	0x0008	0x0010		64
+162	eth:ethertype:ip:udp:stun	49153	3478	0x0001	0x0001	0x0000		88
+163	eth:ethertype:ip:udp:stun	3478	49153	0x0101	0x0001	0x0010		72
+164	eth:ethertype:ip:udp:dtls	49153	3478					
+165	eth:ethertype:ip:udp:rtp:stun	49153	3478	0x0001	0x0001	0x0000		92
+166	eth:ethertype:ip:udp:rtp:dtls:x509sat:x509sat	3478	49153					
+167	eth:ethertype:ip:udp:rtp:dtls:x509sat:x509sat:pkcs-1	49153	3478					
+168	eth:ethertype:ip:udp:rtp:stun	3478	49153	0x0101	0x0001	0x0010		72
+169	eth:ethertype:ip:udp:rtp:dtls	3478	49153					
+170	eth:ethertype:ip:udp:rtp:dtls	3478	49153					
+171	eth:ethertype:ip:udp:rtp:dtls	49153	3478					
+172	eth:ethertype:ip:udp:rtp:stun	49153	3478	0x0001	0x0001	0x0000		92
+173	eth:ethertype:ip:udp:rtp:dtls	3478	49153					
+174	eth:ethertype:ip:udp:rtp:dtls	49153	3478					
+175	eth:ethertype:ip:udp:rtp:stun	3478	49153	0x0101	0x0001	0x0010		72
+176	eth:ethertype:ip:udp:rtp:dtls	3478	49153					
+177	eth:ethertype:ip:udp:rtp:dtls	3478	49153					
+178	eth:ethertype:ip:udp:rtp:dtls	3478	49153					
+179	eth:ethertype:ip:udp:rtp:dtls	49153	3478					
+180	eth:ethertype:ip:udp:rtp:dtls	49153	3478					
+181	eth:ethertype:ip:udp:rtp:rtcp	3478	49153					
+182	eth:ethertype:ip:udp:rtp:dtls	3478	49153					
+183	eth:ethertype:ip:udp:rtp:stun	49153	3478	0x0001	0x0001	0x0000		92
+184	eth:ethertype:ip:udp:rtp:stun	3478	49153	0x0101	0x0001	0x0010		72
+185	eth:ethertype:ip:udp:rtp:rtcp	3478	49153					
+186	eth:ethertype:ip:udp:rtp:rtcp	49153	3478					
+187	eth:ethertype:ip:udp:rtp:stun	49153	3478	0x0001	0x0001	0x0000		92
+188	eth:ethertype:ip:udp:rtp:stun	3478	49153	0x0101	0x0001	0x0010		72
+189	eth:ethertype:ip:udp:rtp	49153	3478					
+190	eth:ethertype:ip:udp:rtp	49153	3478					
+191	eth:ethertype:ip:udp:rtp	49153	3478					
+192	eth:ethertype:ip:udp:rtp	49153	3478					
+193	eth:ethertype:ip:udp:rtp	49153	3478					
+194	eth:ethertype:ip:udp:rtp	49153	3478					
+195	eth:ethertype:ip:udp:stun	48854	8801	0x0001	0x0001	0x0000		136
+196	eth:ethertype:ip:udp:data	48854	8801					
+197	eth:ethertype:ip:udp:stun	8801	48854	0x0101	0x0001	0x0010		44
+198	eth:ethertype:ip:udp:dtls	48854	8801					
+199	eth:ethertype:ipv6:udp:stun	3478	48094	0x0109	0x0009	0x0010		32
+200	eth:ethertype:ipv6:udp:stun:data	3478	48094				0x4001	48
+201	eth:ethertype:ipv6:udp:stun	3478	48094	0x0101	0x0001	0x0010		104

@@ -1,0 +1,42 @@
+# Explicit complete TLS 1.2 Handshake messages, not TLS record streams.
+# https://www.rfc-editor.org/rfc/rfc5246.html#section-7.4.5
+# https://www.rfc-editor.org/rfc/rfc5077.html#section-3.3
+# Caller supplies TLS 1.2 plaintext context; no version/phase/direction inference.
+# A zero-length ticket is valid syntax; lifetime_hint=0 means unspecified.
+# Ticket bytes remain opaque. No Finished validation, ticket validation, expiry
+# calculation, resumption inference, TLS 1.3 ticket, or shared TLS dispatch.
+# Parse-only, bounded at 65545 bytes (4+4+2+65535). Carriers use the same bound,
+# including raw fallback. No TCP reassembly is performed by these entries.
+endian: big
+unit: byte
+Package:
+  TLS12ServerHelloDone:
+    operator: |
+      err = parseTLS12ControlHandshake(14)
+      if err != nil { panic(err) }
+  TLS12NewSessionTicket:
+    operator: |
+      err = parseTLS12ControlHandshake(4)
+      if err != nil { panic(err) }
+  TLS12ServerHelloDoneCarrier:
+    operator: |
+      if !this.HasMaxLength() || this.GetMaxLength("bit") == 0 || this.GetMaxLength("bit") % 8 != 0 { panic("tls12-control: explicit nonempty byte boundary required") }
+      if this.GetMaxLength() > 65545 { panic("tls12-control: carrier exceeds 65545-byte resource limit") }
+      candidate, trial = this.TryProcessByType("TLS12ServerHelloDoneExact", "TLS12ServerHelloDone")
+      if trial.OK { trial.Save(); return }
+      trial.Recovery()
+      raw = this.NewUnknownNode("Unparsed TLS Control Handshake")
+      raw.SetMaxLength(this.GetMaxLength())
+      raw.Process()
+  TLS12NewSessionTicketCarrier:
+    operator: |
+      if !this.HasMaxLength() || this.GetMaxLength("bit") == 0 || this.GetMaxLength("bit") % 8 != 0 { panic("tls12-control: explicit nonempty byte boundary required") }
+      if this.GetMaxLength() > 65545 { panic("tls12-control: carrier exceeds 65545-byte resource limit") }
+      candidate, trial = this.TryProcessByType("TLS12NewSessionTicketExact", "TLS12NewSessionTicket")
+      if trial.OK { trial.Save(); return }
+      trial.Recovery()
+      raw = this.NewUnknownNode("Unparsed TLS Control Handshake")
+      raw.SetMaxLength(this.GetMaxLength())
+      raw.Process()
+TLS12ServerHelloDoneExact: "import:application-layer/tls_control_handshake.yaml;node:TLS12ServerHelloDone"
+TLS12NewSessionTicketExact: "import:application-layer/tls_control_handshake.yaml;node:TLS12NewSessionTicket"

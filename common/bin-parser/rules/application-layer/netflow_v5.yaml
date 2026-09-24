@@ -1,0 +1,58 @@
+# Cisco NetFlow version 5: 24-byte header and 48-byte flow records.
+endian: big
+Package:
+  NetFlowV5:
+    operator: |
+      this.ProcessSubNode("Version")
+      this.ProcessSubNode("Count")
+      if getNodeResult("Version").Value != 5 { panic("netflow-v5: invalid version") }
+      count = getNodeResult("Count").Value
+      if count < 1 || count > 30 || this.GetMaxLength() != 24 + count*48 { panic("netflow-v5: record count or message length mismatch") }
+      this.ProcessSubNode("System Uptime")
+      this.ProcessSubNode("Unix Seconds")
+      this.ProcessSubNode("Unix Nanoseconds")
+      if getNodeResult("Unix Nanoseconds").Value >= 1000000000 { panic("netflow-v5: invalid nanoseconds") }
+      this.ProcessSubNode("Flow Sequence")
+      this.ProcessSubNode("Engine Type")
+      this.ProcessSubNode("Engine ID")
+      this.ProcessSubNode("Sampling Mode")
+      this.ProcessSubNode("Sampling Interval")
+      this.GetSubNode("Records").SetMaxLength(count*48)
+      this.ProcessSubNode("Records")
+    Version: uint16
+    Count: uint16
+    System Uptime: uint32
+    Unix Seconds: uint32
+    Unix Nanoseconds: uint32
+    Flow Sequence: uint32
+    Engine Type: uint8
+    Engine ID: uint8
+    Sampling Mode: uint8,2bit
+    Sampling Interval: uint16,14bit
+    Records:
+      list: true
+      Record: FlowRecordV5
+      operator: |
+        for i = range getNodeResult("../Count").Value { this.NewElement().Process() }
+
+FlowRecordV5:
+  Source Address: raw,4
+  Destination Address: raw,4
+  Next Hop: raw,4
+  Input Interface: uint16
+  Output Interface: uint16
+  Packet Count: uint32
+  Octet Count: uint32
+  First Uptime: uint32
+  Last Uptime: uint32
+  Source Port: uint16
+  Destination Port: uint16
+  Padding 1: uint8
+  TCP Flags: uint8
+  Protocol: uint8
+  Type Of Service: uint8
+  Source AS: uint16
+  Destination AS: uint16
+  Source Mask: uint8
+  Destination Mask: uint8
+  Padding 2: uint16

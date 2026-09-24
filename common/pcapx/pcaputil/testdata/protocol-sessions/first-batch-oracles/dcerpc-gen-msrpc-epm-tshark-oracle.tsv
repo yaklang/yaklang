@@ -1,0 +1,2 @@
+frame.number	_ws.col.protocol	dcerpc.ver	dcerpc.pkt_type	dcerpc.cn_call_id	dcerpc.cn_ctx_id	dcerpc.cn_bind_to_uuid
+4	DCERPC	5	11	1	0	e1af8308-5d1f-11c9-91a4-08002b14a0fa

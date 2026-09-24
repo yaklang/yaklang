@@ -1,0 +1,361 @@
+# MEF 16 E-LMI, IEEE 802.3 clause 57 information PDUs, and IEEE 802.1 MRP.
+# MRP vector layouts and fixed first-value lengths are cross-checked with
+# OpenAvnu mrpd and Wireshark. Application-specific extension data stays bytes.
+endian: big
+Package:
+  ELMI:
+    operator: |
+      if !this.HasMaxLength() { panic("elmi: message boundary is required") }
+      this.ProcessSubNode("Version")
+      if getNodeResult("Version").Value != 1 { panic("elmi: version must be one") }
+      this.ProcessSubNode("Message Type")
+      kind = getNodeResult("Message Type").Value
+      if kind != 117 && kind != 125 { panic("elmi: unsupported message type") }
+      this.ProcessSubNode("Information Elements")
+      elements = this.GetSubNode("Information Elements")
+      report = elements.GetInfo("Report Type")
+      if report == nil { panic("elmi: missing report type") }
+      if kind == 117 && report == 2 { panic("elmi: asynchronous report cannot be an enquiry") }
+      if report != 2 && (!elements.GetInfo("Sequence Numbers") || !elements.GetInfo("Data Instance")) { panic("elmi: missing sequence numbers or data instance") }
+    Version: uint8
+    Message Type: uint8
+    Information Elements:
+      list: true
+      Element: ELMIElement
+      operator: |
+        this.AddInfo("Sequence Numbers", false)
+        this.AddInfo("Data Instance", false)
+        for this.Length() < this.GetMaxLength() {
+          peek, op = this.TryProcessByType("PeekByte")
+          op.Recovery()
+          if !op.OK { panic("elmi: truncated element tag") }
+          if peek.Value == 0 {
+            padding = this.NewUnknownNode("Padding")
+            padding.SetMaxLength(this.GetMaxLength()-this.Length())
+            padding.Process()
+            return
+          }
+          ele = this.NewElement()
+          ele.Process()
+          item = ele
+          kind = item.GetSubNode("Tag").Result().Value
+          if kind == 1 {
+            if this.GetInfo("Report Type") != nil { panic("elmi: duplicate report type") }
+            this.AddInfo("Report Type", item.GetSubNode("Report Type").Result().Value)
+          }
+          if kind == 2 { this.AddInfo("Sequence Numbers", true) }
+          if kind == 3 { this.AddInfo("Data Instance", true) }
+        }
+
+  EOAM:
+    operator: |
+      if !this.HasMaxLength() { panic("eoam: message boundary is required") }
+      this.ProcessSubNode("Subtype")
+      if getNodeResult("Subtype").Value != 3 { panic("eoam: subtype must be three") }
+      this.ProcessSubNode("Reserved Flags")
+      this.ProcessSubNode("Remote Stable")
+      this.ProcessSubNode("Remote Evaluating")
+      this.ProcessSubNode("Local Stable")
+      this.ProcessSubNode("Local Evaluating")
+      this.ProcessSubNode("Critical Event")
+      this.ProcessSubNode("Dying Gasp")
+      this.ProcessSubNode("Link Fault")
+      this.ProcessSubNode("Code")
+      code = getNodeResult("Code").Value
+      if code == 0 {
+        this.ProcessSubNode("Information TLVs")
+        count = this.GetSubNode("Information TLVs").GetInfo("Local Information Count")
+        if count != 1 && getNodeResult("Link Fault").Value == 0 { panic("eoam: missing local information TLV") }
+        if count > 1 { panic("eoam: duplicate local information TLV") }
+      } else if code == 4 {
+        this.ProcessSubNode("Loopback Command")
+        cmd = getNodeResult("Loopback Command").Value
+        if cmd != 1 && cmd != 2 { panic("eoam: unsupported loopback command") }
+      } else {
+        remaining = this.GetMaxLength()-this.Length()
+        if remaining > 0 { this.GetSubNode("Code Data").SetMaxLength(remaining); this.ProcessSubNode("Code Data") }
+      }
+      remaining = this.GetMaxLength()-this.Length()
+      if remaining > 0 { this.GetSubNode("Padding").SetMaxLength(remaining); this.ProcessSubNode("Padding") }
+    Subtype: uint8
+    Reserved Flags: uint16,9bit
+    Remote Stable: uint8,1bit
+    Remote Evaluating: uint8,1bit
+    Local Stable: uint8,1bit
+    Local Evaluating: uint8,1bit
+    Critical Event: uint8,1bit
+    Dying Gasp: uint8,1bit
+    Link Fault: uint8,1bit
+    Code: uint8
+    Loopback Command: uint8
+    Code Data: raw
+    Padding: raw
+    Information TLVs:
+      list: true
+      TLV: EOAMInformation
+      operator: |
+        count = 0
+        for {
+          peek, op = this.TryProcessByType("PeekByte")
+          op.Recovery()
+          if !op.OK { panic("eoam: missing information terminator") }
+          if peek.Value == 0 { this.ProcessByType("PeekByte", "Information End"); break }
+          ele = this.NewElement()
+          ele.Process()
+          kind = ele.GetSubNode("Type").Result().Value
+          if kind == 1 { count++ }
+          if count == 0 { panic("eoam: first TLV must be local information") }
+        }
+        this.AddInfo("Local Information Count", count)
+
+  MMRP:
+    operator: |
+      if !this.HasMaxLength() { panic("mrp: message boundary is required") }
+      node = this.NewSubNode("MRP")
+      node.SetCfg("mrpFamily", 1)
+      node.Process()
+  MVRP:
+    operator: |
+      if !this.HasMaxLength() { panic("mrp: message boundary is required") }
+      node = this.NewSubNode("MRP")
+      node.SetCfg("mrpFamily", 2)
+      node.Process()
+  MSRP:
+    operator: |
+      if !this.HasMaxLength() { panic("mrp: message boundary is required") }
+      node = this.NewSubNode("MRP")
+      node.SetCfg("mrpFamily", 3)
+      node.Process()
+
+ELMIElement:
+  operator: |
+    this.ProcessSubNode("Tag")
+    this.ProcessSubNode("Length")
+    kind = getNodeResult("Tag").Value
+    length = getNodeResult("Length").Value
+    if length > this.GetMaxLength()-this.Length() { panic("elmi: element length exceeds message") }
+    switch kind {
+      case 1:
+        if length != 1 { panic("elmi: report type length must be one") }
+        this.ProcessSubNode("Report Type")
+        if getNodeResult("Report Type").Value > 3 { panic("elmi: invalid report type") }
+      case 2:
+        if length != 2 { panic("elmi: sequence length must be two") }
+        this.ProcessSubNode("Send Sequence")
+        this.ProcessSubNode("Receive Sequence")
+      case 3:
+        if length != 5 { panic("elmi: data instance length must be five") }
+        this.ProcessSubNode("Reserved")
+        this.ProcessSubNode("Data Instance")
+      default:
+        if length > 0 { this.GetSubNode("Element Data").SetMaxLength(length); this.ProcessSubNode("Element Data") }
+    }
+  Tag: uint8
+  Length: uint8
+  Report Type: uint8
+  Send Sequence: uint8
+  Receive Sequence: uint8
+  Reserved: uint8
+  Data Instance: uint32
+  Element Data: raw
+
+EOAMInformation:
+  operator: |
+    this.ProcessSubNode("Type")
+    this.ProcessSubNode("Length")
+    kind = getNodeResult("Type").Value
+    length = getNodeResult("Length").Value
+    if length < 2 || length-2 > this.GetMaxLength()-this.Length() { panic("eoam: information length exceeds message") }
+    if kind == 1 || kind == 2 {
+      if length != 16 { panic("eoam: local/remote information length must be sixteen") }
+      this.ProcessSubNode("OAM Version")
+      if getNodeResult("OAM Version").Value != 1 { panic("eoam: information version must be one") }
+      this.ProcessSubNode("Revision")
+      this.ProcessSubNode("Reserved State")
+      this.ProcessSubNode("Multiplexer Action")
+      this.ProcessSubNode("Parser Action")
+      this.ProcessSubNode("Reserved Configuration")
+      this.ProcessSubNode("Variable Response")
+      this.ProcessSubNode("Link Events")
+      this.ProcessSubNode("Loopback Support")
+      this.ProcessSubNode("Unidirectional Support")
+      this.ProcessSubNode("Mode")
+      this.ProcessSubNode("Reserved PDU Configuration")
+      this.ProcessSubNode("Maximum PDU Size")
+      this.ProcessSubNode("Organization ID")
+      this.ProcessSubNode("Vendor Information")
+    } else if length > 2 {
+      this.GetSubNode("Information Data").SetMaxLength(length-2)
+      this.ProcessSubNode("Information Data")
+    }
+  Type: uint8
+  Length: uint8
+  OAM Version: uint8
+  Revision: uint16
+  Reserved State: uint8,5bit
+  Multiplexer Action: uint8,1bit
+  Parser Action: uint8,2bit
+  Reserved Configuration: uint8,3bit
+  Variable Response: uint8,1bit
+  Link Events: uint8,1bit
+  Loopback Support: uint8,1bit
+  Unidirectional Support: uint8,1bit
+  Mode: uint8,1bit
+  Reserved PDU Configuration: uint8,5bit
+  Maximum PDU Size: uint16,11bit
+  Organization ID: raw,3
+  Vendor Information: raw,4
+  Information Data: raw
+
+MRP:
+  operator: |
+    this.ProcessSubNode("Protocol Version")
+    if getNodeResult("Protocol Version").Value != 0 { panic("mrp: unsupported protocol version") }
+    this.GetSubNode("Messages").SetCfg("mrpFamily", this.GetCfg("mrpFamily"))
+    this.ProcessSubNode("Messages")
+    remaining = this.GetMaxLength()-this.Length()
+    if remaining > 0 { this.GetSubNode("Padding").SetMaxLength(remaining); this.ProcessSubNode("Padding") }
+  Protocol Version: uint8
+  Padding: raw
+  Messages:
+    list: true
+    Message: MRPMessage
+    operator: |
+      for {
+        peek, op = this.TryProcessByType("PeekWord")
+        op.Recovery()
+        if !op.OK { panic("mrp: missing message-list end mark") }
+        if peek.Value == 0 { this.ProcessByType("PeekWord", "Message End"); return }
+        ele = this.NewElement()
+        ele.SetCfg("mrpFamily", this.GetCfg("mrpFamily"))
+        ele.Process()
+      }
+
+MRPMessage:
+  operator: |
+    this.ProcessSubNode("Attribute Type")
+    this.ProcessSubNode("Attribute Length")
+    family = this.GetCfg("mrpFamily")
+    kind = getNodeResult("Attribute Type").Value
+    length = getNodeResult("Attribute Length").Value
+    expected = 0
+    if family == 1 { if kind == 1 { expected = 1 }; if kind == 2 { expected = 6 } }
+    if family == 2 && kind == 1 { expected = 2 }
+    if family == 3 { if kind == 1 { expected = 25 }; if kind == 2 { expected = 34 }; if kind == 3 { expected = 8 }; if kind == 4 { expected = 4 } }
+    if expected == 0 { panic("mrp: unsupported attribute type") }
+    if length != expected { panic("mrp: invalid fixed attribute length") }
+    vectors = this.GetSubNode("Vectors")
+    vectors.SetCfg("mrpFamily", family)
+    vectors.SetCfg("attributeType", kind)
+    vectors.SetCfg("attributeLength", length)
+    if family == 3 {
+      this.ProcessSubNode("Attribute List Length")
+      listLength = getNodeResult("Attribute List Length").Value
+      if listLength < 2 || listLength > this.GetMaxLength()-this.Length() { panic("msrp: invalid attribute-list length") }
+      vectors.SetMaxLength(listLength)
+    }
+    this.ProcessSubNode("Vectors")
+    if family == 3 && vectors.Length() != getNodeResult("Attribute List Length").Value { panic("msrp: attribute list ends before declared length") }
+  Attribute Type: uint8
+  Attribute Length: uint8
+  Attribute List Length: uint16
+  Vectors:
+    list: true
+    Vector: MRPVector
+    operator: |
+      for {
+        peek, op = this.TryProcessByType("PeekWord")
+        op.Recovery()
+        if !op.OK { panic("mrp: missing vector-list end mark") }
+        if peek.Value == 0 { this.ProcessByType("PeekWord", "Vector End"); return }
+        ele = this.NewElement()
+        vector = ele
+        vector.SetCfg("mrpFamily", this.GetCfg("mrpFamily"))
+        vector.SetCfg("attributeType", this.GetCfg("attributeType"))
+        vector.SetCfg("attributeLength", this.GetCfg("attributeLength"))
+        ele.Process()
+      }
+
+MRPVector:
+  operator: |
+    this.ProcessSubNode("Leave All Event")
+    this.ProcessSubNode("Number of Values")
+    if getNodeResult("Leave All Event").Value > 1 { panic("mrp: invalid leave-all event") }
+    count = getNodeResult("Number of Values").Value
+    family = this.GetCfg("mrpFamily")
+    kind = this.GetCfg("attributeType")
+    length = this.GetCfg("attributeLength")
+    packedLength = (count+2)/3
+    declarationsLength = 0
+    if family == 3 && kind == 3 { declarationsLength = (count+3)/4 }
+    if length+packedLength+declarationsLength > this.GetMaxLength()-this.Length() { panic("mrp: vector exceeds message") }
+    if family == 1 && kind == 1 { this.ProcessSubNode("Service Requirement") }
+    if family == 1 && kind == 2 { this.ProcessSubNode("First MAC Address") }
+    if family == 2 { this.ProcessSubNode("First VLAN ID") }
+    if family == 3 && kind == 4 {
+      this.ProcessSubNode("Class ID")
+      this.ProcessSubNode("Class Priority")
+      this.ProcessSubNode("Class VLAN ID")
+    }
+    if family == 3 && kind != 4 {
+      this.ProcessSubNode("Stream ID")
+      if kind != 3 {
+        this.ProcessSubNode("Destination MAC")
+        this.ProcessSubNode("VLAN ID")
+        this.ProcessSubNode("Maximum Frame Size")
+        this.ProcessSubNode("Maximum Interval Frames")
+        this.ProcessSubNode("Priority")
+        this.ProcessSubNode("Rank")
+        this.ProcessSubNode("Reserved")
+        this.ProcessSubNode("Accumulated Latency")
+        if kind == 2 { this.ProcessSubNode("Bridge ID"); this.ProcessSubNode("Failure Code") }
+      }
+    }
+    events = []
+    if packedLength > 0 {
+      this.GetSubNode("Packed Events").SetMaxLength(packedLength)
+      this.ProcessSubNode("Packed Events")
+      packed = getNodeResult("Packed Events").Value
+      for _, value = range packed {
+        if value > 215 { panic("mrp: invalid packed event") }
+        for _, event = range [value/36, (value/6)%6, value%6] {
+          if len(events) < count { events.Append(event) }
+        }
+      }
+    }
+    this.AddInfo("Events", events)
+    declarations = []
+    if declarationsLength > 0 {
+      this.GetSubNode("Packed Declarations").SetMaxLength(declarationsLength)
+      this.ProcessSubNode("Packed Declarations")
+      for _, value = range getNodeResult("Packed Declarations").Value {
+        for _, declaration = range [value>>6, (value>>4)&3, (value>>2)&3, value&3] {
+          if len(declarations) < count { declarations.Append(declaration) }
+        }
+      }
+    }
+    this.AddInfo("Listener Declarations", declarations)
+  Leave All Event: uint8,3bit
+  Number of Values: uint16,13bit
+  Service Requirement: uint8
+  First MAC Address: raw,6
+  First VLAN ID: uint16
+  Class ID: uint8
+  Class Priority: uint8
+  Class VLAN ID: uint16
+  Stream ID: raw,8
+  Destination MAC: raw,6
+  VLAN ID: uint16
+  Maximum Frame Size: uint16
+  Maximum Interval Frames: uint16
+  Priority: uint8,3bit
+  Rank: uint8,1bit
+  Reserved: uint8,4bit
+  Accumulated Latency: uint32
+  Bridge ID: raw,8
+  Failure Code: uint8
+  Packed Events: raw
+  Packed Declarations: raw
+
+PeekByte: uint8
+PeekWord: uint16

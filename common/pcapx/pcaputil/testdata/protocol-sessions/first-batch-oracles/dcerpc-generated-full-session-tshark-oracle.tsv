@@ -1,0 +1,9 @@
+frame.number	_ws.col.protocol	dcerpc.ver	dcerpc.pkt_type	dcerpc.cn_frag_len	dcerpc.cn_call_id	dcerpc.cn_ctx_id	dcerpc.opnum	dcerpc.cn_num_ctx_items	dcerpc.cn_num_results	dcerpc.cn_ack_result	dcerpc.cn_ack_trans_id	dcerpc.cn_ack_trans_ver	dcerpc.cn_bind_to_uuid
+4	DCERPC	5	11	72	1	0		1					e1af8308-5d1f-11c9-91a4-08002b14a0fa
+5	DCERPC	5	12	56	1				1	0	8a885d04-1ceb-11c9-9fe8-08002b104860	2	
+6	EPM	5	0	28	2	0	3						
+7	EPM	5	2	26	2	0	3						
+8	DCERPC	5	11	72	3	1		1					4b324fc8-1670-01d3-1278-5a47bf6ee188
+9	DCERPC	5	12	56	3				1	0	8a885d04-1ceb-11c9-9fe8-08002b104860	2	
+10	SRVSVC	5	0	28	4	1	15						
+11	SRVSVC	5	2	24	4	1	15						

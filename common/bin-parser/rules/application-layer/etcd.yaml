@@ -1,0 +1,31 @@
+# Explicit passive etcd version endpoint profile, not general HTTP detection.
+# https://raw.githubusercontent.com/etcd-io/etcd/v3.5.21/server/etcdserver/api/etcdhttp/base.go
+# https://raw.githubusercontent.com/etcd-io/etcd/v3.5.21/api/version/version.go
+# https://raw.githubusercontent.com/etcd-io/etcd/v3.6.0/server/etcdserver/api/etcdhttp/version.go
+# https://raw.githubusercontent.com/etcd-io/etcd/v3.6.0/server/etcdserver/api/etcdhttp/version_test.go
+# https://raw.githubusercontent.com/etcd-io/etcd/v3.6.0/api/version/version.go
+# GET /version (not /v3/version) or HTTP/1.1 200 application/json with exact
+# Content-Length. Version JSON has nonempty string etcdserver/etcdcluster and
+# optional storage (v3.6 layout), duplicate/unknown members rejected. Reported
+# strings are not verified installed versions, peer identity, authenticated
+# sessions or request-response correlation. No operation is performed.
+# Limits: 64 KiB exact record, 256 headers, 4 KiB JSON, 256B member strings.
+# Other API routes, bodies, HTTP/2, TLS, chunking and content coding are outside
+# this deliberately caller-selected profile; original /v3/version stays raw.
+endian: big
+unit: byte
+Package:
+  EtcdVersionHTTP:
+    operator: |
+      err = parseEtcdVersionRecord()
+      if err != nil { panic(err) }
+  EtcdVersionCarrier:
+    operator: |
+      if !this.HasMaxLength() || this.GetMaxLength("bit") == 0 || this.GetMaxLength("bit") % 8 != 0 { panic("etcd: explicit nonempty byte boundary required") }
+      candidate, trial = this.TryProcessByType("EtcdVersionExact", "EtcdVersionHTTP")
+      if trial.OK { trial.Save(); return }
+      trial.Recovery()
+      raw = this.NewUnknownNode("Unparsed Etcd Version Record")
+      raw.SetMaxLength(this.GetMaxLength())
+      raw.Process()
+EtcdVersionExact: "import:application-layer/etcd.yaml;node:EtcdVersionHTTP"

@@ -1,0 +1,5 @@
+=== RUN   TestM2PerformanceSemanticDigest
+M2_SEMANTIC 3080 95cc27fd9e01eed45b16489264c69c23afe8312761086beb4a4d7825711cdd6f
+--- PASS: TestM2PerformanceSemanticDigest (0.04s)
+PASS
+ok  	github.com/yaklang/yaklang/common/pcapx/pcaputil	0.576s
