@@ -21,21 +21,21 @@ import (
 	"github.com/yaklang/yaklang/common/utils/lowhttp/httpctx"
 )
 
-// h1Transport implements Transport for HTTP/1.1.
+// h1Transport implements transport for HTTP/1.1.
 //
 // It supports two connection modes:
 //   - Pooled: requests are dispatched through persistConn's read/write loops.
 //   - Direct: a one-off connection is dialed, written, and read inline.
 //
-// Stale-connection retries are handled internally: a dead pooled connection is
-// closed and the request reconnects (bounded by maxReconnectTimes).
+// A stale pooled connection is closed and reported as reconnectError to the
+// orchestration layer, which owns the H1 retry policy.
 type h1Transport struct {
 	pool *LowHttpConnPool
 }
 
-// NewH1Transport returns a Transport that executes requests over HTTP/1.1.
+// newH1Transport returns a transport that executes requests over HTTP/1.1.
 // pool may be nil; it defaults to DefaultLowHttpConnPool.
-func NewH1Transport(pool *LowHttpConnPool) Transport {
+func newH1Transport(pool *LowHttpConnPool) transport {
 	if pool == nil {
 		pool = DefaultLowHttpConnPool
 	}
@@ -48,31 +48,20 @@ func (t *h1Transport) RoundTrip(ctx context.Context, tr *transportRequest) (*tra
 	if connPool == nil {
 		connPool = t.pool
 	}
-	withConnPool := connPool != nil && tr.option.WithConnPool
-
-	reconnectTimes := 0
-	maxReconnects := maxReconnectTimes
-
-	canReconnect := func(err error) bool {
-		var poolReadErr connPoolReadFromServerError
-		if errors.Is(err, errServerClosedIdle) || errors.As(err, &poolReadErr) {
-			return true
-		}
-		if reconnectTimes >= maxReconnects {
-			log.Warnf("h1 transport: giving up after %d reconnects to %v: %v", reconnectTimes, tr.cacheKey.addr, err)
-			return false
-		}
-		reconnectTimes++
-		return true
+	withConnPool := connPool != nil && tr.usePool
+	conn := tr.h1Conn
+	tr.h1Conn = nil // transfer ownership to this one attempt
+	if conn != nil {
+		withConnPool = false
 	}
-
-	var conn net.Conn
 	var err error
 
-	if withConnPool {
-		conn, err = connPool.getIdleConn(ctx, tr.cacheKey, tr.dialOpts...)
-	} else {
-		conn, err = dialXWithContext(ctx, tr.originAddr, tr.dialOpts...)
+	if conn == nil {
+		if withConnPool {
+			conn, err = connPool.getIdleConn(ctx, tr.cacheKey, tr.dialOpts...)
+		} else {
+			conn, err = dialXWithContext(ctx, tr.originAddr, tr.dialOpts...)
+		}
 	}
 
 	if err != nil {
@@ -97,13 +86,20 @@ func (t *h1Transport) RoundTrip(ctx context.Context, tr *transportRequest) (*tra
 		// A forward-proxy request includes Connection: close. Never put this
 		// connection in the pool, including when the request fails midway.
 		defer conn.Close()
-		return t.roundTripDirect(ctx, tr, conn, requestPacket, canReconnect)
+		if ctxErr := ctx.Err(); ctxErr != nil {
+			return &transportResult{remoteAddr: conn.RemoteAddr().String(), portIsOpen: true}, ctxErr
+		}
+		return t.roundTripDirect(ctx, tr, conn, requestPacket)
+	}
+	if ctxErr := ctx.Err(); ctxErr != nil {
+		conn.Close()
+		return &transportResult{remoteAddr: conn.RemoteAddr().String(), portIsOpen: true}, ctxErr
 	}
 
 	if withConnPool {
-		return t.roundTripPooled(ctx, tr, conn, requestPacket, canReconnect)
+		return t.roundTripPooled(ctx, tr, conn, requestPacket)
 	}
-	return t.roundTripDirect(ctx, tr, conn, requestPacket, canReconnect)
+	return t.roundTripDirect(ctx, tr, conn, requestPacket)
 }
 
 // containsNoProxyAvailable checks if the error message indicates no proxy
@@ -146,10 +142,9 @@ func (t *h1Transport) tryLegacyProxy(ctx context.Context, tr *transportRequest) 
 }
 
 // roundTripPooled executes an H1 request through the connection pool.
-func (t *h1Transport) roundTripPooled(ctx context.Context, tr *transportRequest, conn net.Conn, requestPacket []byte, canReconnect func(error) bool) (*transportResult, error) {
+func (t *h1Transport) roundTripPooled(ctx context.Context, tr *transportRequest, conn net.Conn, requestPacket []byte) (*transportResult, error) {
 	option := tr.option
 	reqIns := tr.reqIns
-	connPool := tr.connPool
 
 	pc, ok := conn.(*persistConn)
 	if !ok {
@@ -207,7 +202,6 @@ func (t *h1Transport) roundTripPooled(ctx context.Context, tr *transportRequest,
 		return nil, pc.closed
 	}
 
-	_ = connPool // used for future reconnection; kept for reference
 	return &transportResult{
 		rawBytes:       rawBytes,
 		firstResponse:  firstResponse,
@@ -218,12 +212,19 @@ func (t *h1Transport) roundTripPooled(ctx context.Context, tr *transportRequest,
 }
 
 // roundTripDirect executes an H1 request on a one-off (non-pooled) connection.
-func (t *h1Transport) roundTripDirect(ctx context.Context, tr *transportRequest, conn net.Conn, requestPacket []byte, canReconnect func(error) bool) (*transportResult, error) {
+func (t *h1Transport) roundTripDirect(ctx context.Context, tr *transportRequest, conn net.Conn, requestPacket []byte) (result *transportResult, resultErr error) {
 	option := tr.option
 	reqIns := tr.reqIns
 	timeout := tr.timeout
 
 	var responseRaw bytes.Buffer
+	partial := &transportResult{remoteAddr: conn.RemoteAddr().String(), portIsOpen: true}
+	defer func() {
+		if resultErr != nil && result == nil {
+			partial.rawBytes = responseRaw.Bytes()
+			result = partial
+		}
+	}()
 
 	if conn != nil {
 		readConnEndCtx, readConnEnd := context.WithCancel(ctx)
@@ -424,7 +425,7 @@ func (t *h1Transport) roundTripDirect(ctx context.Context, tr *transportRequest,
 		multiResponses = append(multiResponses, firstResponse)
 	}
 
-	noFixContentLength := tr.option.NoFixContentLength
+	noFixContentLength := tr.preserveLength
 	if firstResponse == nil || respClose {
 		if len(responseRaw.Bytes()) == 0 {
 			return nil, errorspkg.Wrap(err, "empty result.")
@@ -499,14 +500,6 @@ func (t *h1Transport) roundTripDirect(ctx context.Context, tr *transportRequest,
 		remoteAddr:      conn.RemoteAddr().String(),
 		portIsOpen:      true,
 	}, nil
-}
-
-func (t *h1Transport) CanRetry(req *http.Request, err error) bool {
-	// H1 stale-connection retries are handled inside the transport via
-	// shouldRetryRequest → reconnectError.  When an error reaches the
-	// orchestration layer, it means the transport already decided the error
-	// is not retryable (e.g. first-use connection timeout).  Do not retry.
-	return false
 }
 
 func (t *h1Transport) ShouldDowngrade(err error) bool {

@@ -11,7 +11,7 @@ import (
 	"github.com/yaklang/yaklang/common/utils/lowhttp/httpctx"
 )
 
-// h2Transport implements Transport for HTTP/2.
+// h2Transport implements transport for HTTP/2.
 //
 // It delegates connection management to H2ConnPool and stream lifecycle to
 // http2ClientConn.  The transport handles stale-connection retries internally
@@ -22,9 +22,9 @@ type h2Transport struct {
 	pool *LowHttpConnPool // owning pool (for h2Pool access and connPool default)
 }
 
-// NewH2Transport returns a Transport that executes requests over HTTP/2.
-// pool must be non-nil; it provides the H2ConnPool used for connection reuse.
-func NewH2Transport(pool *LowHttpConnPool) Transport {
+// newH2Transport returns a transport that executes requests over HTTP/2.
+// A nil pool uses DefaultLowHttpConnPool.
+func newH2Transport(pool *LowHttpConnPool) transport {
 	if pool == nil {
 		pool = DefaultLowHttpConnPool
 	}
@@ -32,6 +32,8 @@ func NewH2Transport(pool *LowHttpConnPool) Transport {
 }
 
 func (t *h2Transport) RoundTrip(ctx context.Context, tr *transportRequest) (*transportResult, error) {
+	method, _, _ := GetHTTPPacketFirstLine(tr.packet)
+	replayRequest := &http.Request{Method: method}
 	if tr.connPool == nil {
 		tr.connPool = t.pool
 	}
@@ -58,17 +60,20 @@ RECONNECT:
 		return nil, err
 	}
 
-	// Downgrade: ALPN did not negotiate h2, or preface failed.
+	// ALPN did not negotiate H2. No request bytes were sent, so transfer this
+	// already established H1 socket to the orchestration layer.
 	if !entry.IsH2() {
-		// The entry's conn is an H1 connection; the orchestration layer will
-		// detect the downgrade and retry with H1 transport.
-		entry.conn.Close()
-		return nil, ErrProtocolNotAvailable
+		return &transportResult{
+			h1Conn:     entry.conn,
+			remoteAddr: entry.conn.RemoteAddr().String(),
+			portIsOpen: true,
+		}, ErrProtocolNotAvailable
 	}
+	partial := &transportResult{remoteAddr: entry.conn.RemoteAddr().String(), portIsOpen: true}
 
 	h2Conn := entry.alt
 	if h2Conn == nil {
-		return nil, utils.Error("h2 transport: conn h2 processor is nil")
+		return partial, utils.Error("h2 transport: conn h2 processor is nil")
 	}
 
 	h2Stream, err := h2Conn.newStream(tr.reqIns, tr.packet, tr.option)
@@ -79,12 +84,12 @@ RECONNECT:
 				goto RECONNECT
 			}
 		}
-		return nil, err
+		return partial, err
 	}
 
 	if ctxErr := ctx.Err(); ctxErr != nil {
 		h2Stream.abort()
-		return nil, ctxErr
+		return partial, ctxErr
 	}
 
 	currentRPS.Add(1)
@@ -94,7 +99,7 @@ RECONNECT:
 	if err := h2Stream.doRequest(); err != nil && !errors.Is(err, errH2UploadAborted) {
 		h2Stream.abort()
 		if ctxErr := ctx.Err(); ctxErr != nil {
-			return nil, ctxErr
+			return partial, ctxErr
 		}
 		if err == CreateStreamAfterGoAwayErr {
 			h2Conn.retire()
@@ -102,26 +107,29 @@ RECONNECT:
 				goto RECONNECT
 			}
 		}
-		return nil, err
+		return partial, err
 	}
 
 	timeout := tr.timeout
 	resp, responsePacket, err := h2Stream.waitResponse(ctx, timeout)
-	_ = resp
+	if resp.StatusCode != 0 {
+		partial.firstResponse = &resp
+		partial.rawBytes = responsePacket
+	}
 	if err != nil {
 		if ctxErr := ctx.Err(); ctxErr != nil {
-			return nil, ctxErr
+			return partial, ctxErr
 		}
 		// Check for protocol-level downgrade conditions.
 		if shouldDowngradeH2(err) {
-			return nil, err
+			return partial, err
 		}
-		if h2RequestCanRetry(tr.reqIns, err) && (tr.option.bodyStreamReaderHandled == nil || !tr.option.bodyStreamReaderHandled.IsSet()) {
+		if h2RequestCanRetry(replayRequest, err) && (tr.option.bodyStreamReaderHandled == nil || !tr.option.bodyStreamReaderHandled.IsSet()) {
 			if canReconnect(err) {
 				goto RECONNECT
 			}
 		}
-		return nil, err
+		return partial, err
 	}
 
 	if tr.reqIns != nil {
@@ -134,18 +142,13 @@ RECONNECT:
 	}
 
 	return &transportResult{
-		rawBytes:     responsePacket,
-		remoteAddr:   remoteAddr,
-		portIsOpen:   true,
+		rawBytes:      responsePacket,
+		remoteAddr:    remoteAddr,
+		portIsOpen:    true,
 		firstResponse: &resp,
 	}, nil
-}
-
-func (t *h2Transport) CanRetry(req *http.Request, err error) bool {
-	return h2RequestCanRetry(req, err)
 }
 
 func (t *h2Transport) ShouldDowngrade(err error) bool {
 	return shouldDowngradeH2(err)
 }
-

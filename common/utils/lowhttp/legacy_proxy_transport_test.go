@@ -143,11 +143,12 @@ func TestLegacyProxyFallbackBuildsPacketBeforeDial(t *testing.T) {
 		dialOpts:   []netx.DialXOption{netx.DialX_WithForceProxy(true)},
 		cacheKey:   &connectKey{addr: "target.invalid:80", scheme: H1},
 		connPool:   pool,
+		usePool:    true,
 		traceInfo:  newLowhttpTraceInfo(),
 		originAddr: "target.invalid:80",
 		timeout:    time.Second,
 	}
-	_, err := NewH1Transport(pool).RoundTrip(context.Background(), tr)
+	_, err := newH1Transport(pool).RoundTrip(context.Background(), tr)
 	require.ErrorContains(t, err, "invalid http request for legacy proxy request")
 	require.Zero(t, opened.Load(), "invalid request must not open a proxy connection")
 	assertNoLegacyProxyPoolEntries(t, pool)
