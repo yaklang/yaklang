@@ -2,6 +2,8 @@ package lowhttp
 
 import (
 	"bufio"
+	"context"
+	"errors"
 	"fmt"
 	"io"
 	"net"
@@ -38,6 +40,62 @@ func TestTransportRequestDowngradeToH1(t *testing.T) {
 		len(tr.dialOpts) != len(h1DialOpts) || method != "POST" || uri != "/path" || proto != "HTTP/1.1" {
 		t.Fatalf("incorrect H1 downgrade state: request=%+v, original key=%+v, result=%+v", tr, key, result)
 	}
+}
+
+func TestTransportErrorsRetainExistingResponseFields(t *testing.T) {
+	t.Run("h1_dial", func(t *testing.T) {
+		rsp, err := HTTPWithoutRedirect(
+			WithPacketBytes([]byte("GET / HTTP/1.1\r\nHost: 127.0.0.1\r\n\r\n")),
+			WithHost("127.0.0.1"), WithPort(443), WithHttps(true),
+			WithEnableSystemProxyFromEnv(false), WithSaveHTTPFlow(false),
+			WithDialer(func(time.Duration, string) (net.Conn, error) {
+				return nil, errors.New("dial failed")
+			}),
+		)
+		if err == nil || rsp == nil || rsp.PortIsOpen || rsp.RemoteAddr != "" ||
+			!rsp.Https || rsp.Http2 || len(rsp.RawRequest) == 0 ||
+			rsp.TraceInfo == nil || rsp.TraceInfo.DialTraceInfo == nil {
+			t.Fatalf("H1 dial failure lost response fields: response=%+v, error=%v", rsp, err)
+		}
+	})
+
+	t.Run("h1_pooled_read", func(t *testing.T) {
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			conn, _, err := w.(http.Hijacker).Hijack()
+			if err == nil {
+				_ = conn.Close()
+			}
+		}))
+		defer server.Close()
+		pool := NewHttpConnPool(context.Background(), 1, 1)
+		defer pool.Clear()
+		addr := server.Listener.Addr().String()
+		rsp, err := HTTPWithoutRedirect(
+			WithPacketBytes([]byte(fmt.Sprintf("GET / HTTP/1.1\r\nHost: %s\r\n\r\n", addr))),
+			WithConnPool(true), ConnPool(pool), WithTimeout(time.Second),
+			WithEnableSystemProxyFromEnv(false), WithSaveHTTPFlow(false),
+		)
+		if err == nil || rsp == nil || !rsp.PortIsOpen || rsp.RemoteAddr == "" ||
+			rsp.Https || rsp.Http2 || len(rsp.RawRequest) == 0 || rsp.TraceInfo == nil {
+			t.Fatalf("H1 pooled read failure lost response fields: response=%+v, error=%v", rsp, err)
+		}
+	})
+
+	t.Run("h2_dial", func(t *testing.T) {
+		rsp, err := HTTPWithoutRedirect(
+			WithPacketBytes([]byte("GET / HTTP/2\r\nHost: 127.0.0.1\r\n\r\n")),
+			WithHost("127.0.0.1"), WithPort(80), WithHttp2(true),
+			WithEnableSystemProxyFromEnv(false), WithSaveHTTPFlow(false),
+			WithDialer(func(time.Duration, string) (net.Conn, error) {
+				return nil, errors.New("h2 dial failed")
+			}),
+		)
+		if err == nil || rsp == nil || rsp.PortIsOpen || rsp.RemoteAddr != "" ||
+			rsp.Https || !rsp.Http2 || len(rsp.RawRequest) == 0 ||
+			rsp.TraceInfo == nil || rsp.TraceInfo.DialTraceInfo == nil {
+			t.Fatalf("H2 dial failure lost response fields: response=%+v, error=%v", rsp, err)
+		}
+	})
 }
 
 type countedReadConn struct {
