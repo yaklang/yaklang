@@ -1,0 +1,54 @@
+desc(
+	mode: "source"
+	language: "ruby"
+	title: "源码扫描：Ruby html_safe / raw"
+	title_zh: "源码扫描：Ruby html_safe / raw"
+	type: vuln
+	level: high
+	rule_id: "source-ruby-html-safe"
+	risk: "xss"
+	cwe: "CWE-79"
+	desc: <<<DESC
+### 规则说明
+`html_safe` 把字符串标成已经安全，模板里的 `raw` 会直接输出原文。两者都跳过 Rails 的 HTML 转义。外部数据经过它们之后，脚本标签会原样进入页面。
+
+### 风险类型
+xss
+
+### 影响
+形成存储型或反射型跨站脚本。攻击者可以在受害者的浏览器里执行脚本并拿走会话。
+
+### 检测方式
+这条规则使用 source 模式，用正则扫描源文件文本，不构建语法树或 SSA。命中只说明出现了对应写法，不能单独证明数据来自外部输入。注释、字符串和文档中的相同文本也会命中。
+正则匹配 `.html_safe` 和 `raw(`。常量 HTML 被标成安全时也会命中，要确认这段字符串里没有外部数据。
+该语言还没有 struct 或 ssa 前端，目前只有这条 source 规则。builtin verify 会用内嵌的正例和反例检查这条正则。
+
+### 参考
+- [CWE-79：跨站脚本](https://cwe.mitre.org/data/definitions/79.html)
+
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+- 不要对请求参数或数据库里的不可信字段调用 `html_safe`。
+- 需要富文本时先用白名单净化，净化之后再标记为安全。
+- 模板里不要用 `raw` 输出不可信字符串。
+
+SOLUTION
+	alert_min: 1
+	"file://bad.rb": <<<POS
+def bad(s); s.html_safe; end
+
+POS
+	"safefile://ok.rb": <<<NEG
+def ok(s); s.to_s; end
+
+NEG
+)
+${*.rb}.pattern_regex(/\.html_safe|raw\s*\(/) as $hit
+alert $hit for {
+	level: "high",
+	title: "源码扫描：Ruby html_safe / raw",
+	title_zh: "源码扫描：Ruby html_safe / raw",
+	message: "源码扫描：Ruby html_safe / raw",
+	risk: "xss",
+}

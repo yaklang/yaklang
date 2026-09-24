@@ -1,0 +1,54 @@
+desc(
+	mode: "source"
+	language: "scala"
+	title: "源码扫描：Scala Play Cookie 关闭 secure"
+	title_zh: "源码扫描：Scala Play Cookie 关闭 secure"
+	type: vuln
+	level: middle
+	rule_id: "source-scala-play-cookie"
+	risk: "cookie-security"
+	cwe: "CWE-614"
+	desc: <<<DESC
+### 规则说明
+Play 的 Cookie 如果 `secure = false`，浏览器会在明文 HTTP 请求里带上它。会话标识因此暴露在网络路径上。
+
+### 风险类型
+cookie-security
+
+### 影响
+窃听者可以复用会话 Cookie，劫持登录状态。
+
+### 检测方式
+这条规则使用 source 模式，用正则扫描源文件文本，不构建语法树或 SSA。命中只说明出现了对应写法，不能单独证明数据来自外部输入。注释、字符串和文档中的相同文本也会命中。
+正则在 `.scala` 文件里匹配任意 `secure = false`，不限于 Cookie。其他配置项用了同样的赋值也会命中，要看它是不是 Cookie 的 Secure 标志。
+该语言还没有 struct 或 ssa 前端，目前只有这条 source 规则。builtin verify 会用内嵌的正例和反例检查这条正则。
+
+### 参考
+- [CWE-614：HTTPS 会话 Cookie 缺少 Secure](https://cwe.mitre.org/data/definitions/614.html)
+
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+- Cookie 设置 `secure = true`，站点只通过 HTTPS 提供。
+- 同时设置 `httpOnly = true`。SameSite 按会话需求选择 Lax 或 Strict。
+- 本地 HTTP 调试使用单独配置，不要把 `secure = false` 留在生产设置里。
+
+SOLUTION
+	alert_min: 1
+	"file://bad.scala": <<<POS
+object C { val secure = false }
+
+POS
+	"safefile://ok.scala": <<<NEG
+object C { val secure = true }
+
+NEG
+)
+${*.scala}.pattern_regex(/secure\s*=\s*false/) as $hit
+alert $hit for {
+	level: "middle",
+	title: "源码扫描：Scala Play Cookie 关闭 secure",
+	title_zh: "源码扫描：Scala Play Cookie 关闭 secure",
+	message: "源码扫描：Scala Play Cookie 关闭 secure",
+	risk: "cookie-security",
+}

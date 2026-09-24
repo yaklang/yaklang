@@ -1,0 +1,54 @@
+desc(
+	mode: "source"
+	language: "csharp"
+	title: "源码扫描：C# 响应头写入外部值"
+	title_zh: "源码扫描：C# 响应头写入外部值"
+	type: vuln
+	level: high
+	rule_id: "source-csharp-response-header"
+	risk: "crlf-injection"
+	cwe: "CWE-113"
+	desc: <<<DESC
+### 规则说明
+`Response.Headers.Add` 和 `AppendHeader` 把字符串写进 HTTP 响应头。值里面如果有回车或换行，一次写入会变成多行，攻击者可以多插入 `Set-Cookie`、`Location` 等头部，把响应拆开。值通常来自查询参数、表单或被转发的请求头。
+
+### 风险类型
+crlf-injection
+
+### 影响
+可以给浏览器种下额外 Cookie，把用户带到外部地址，或让缓存和下游看到被拆开的响应。日志里也会留下被污染的头部。
+
+### 检测方式
+这条规则使用 source 模式，用正则扫描源文件文本，不构建语法树或 SSA。命中只说明出现了对应写法，不能单独证明数据来自外部输入。注释、字符串和文档中的相同文本也会命中。
+正则匹配任意 `AppendHeader(` 和 `Headers.Add(`，值是常量的合法调用也会命中。它只说明出现了写头入口。
+同一检查还有 ssa（数据流）。它们描述同一个问题，命中条件不同，修复时看实际告警来自哪一条。
+
+### 参考
+- [CWE-113：HTTP 头中的回车换行未处理](https://cwe.mitre.org/data/definitions/113.html)
+
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+- 写入前拒绝或删除值里的回车和换行。
+- 头部名用固定枚举，不要让请求决定写哪个头。
+- 设置 Location、Content-Disposition 时用框架已经编码过的 API，不要自己拼字符串。
+
+SOLUTION
+	alert_min: 1
+	"file://bad.cs": <<<POS
+class Bad { void h(Microsoft.AspNetCore.Http.HttpResponse resp, string v) { resp.Headers.Add("X-Name", v); } }
+
+POS
+	"safefile://ok.cs": <<<NEG
+class Ok { void h() { string name = "X-Name"; } }
+
+NEG
+)
+${*.cs}.pattern_regex(/AppendHeader\s*\(|Headers\.Add\s*\(/) as $hit
+alert $hit for {
+	level: "high",
+	title: "源码扫描：C# 响应头写入外部值",
+	title_zh: "源码扫描：C# 响应头写入外部值",
+	message: "源码扫描：C# 响应头写入外部值",
+	risk: "crlf-injection",
+}

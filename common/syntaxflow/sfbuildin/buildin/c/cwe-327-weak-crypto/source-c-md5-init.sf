@@ -1,0 +1,55 @@
+desc(
+	mode: "source"
+	language: "c"
+	title: "源码扫描：C MD5_Init"
+	title_zh: "源码扫描：C MD5_Init"
+	type: vuln
+	level: high
+	rule_id: "source-c-md5-init"
+	risk: "weak-cryptographic-algorithm"
+	cwe: "CWE-327"
+	desc: <<<DESC
+### 规则说明
+MD5 已经不能抵抗碰撞，也不适合保存口令。`MD5_Init` 是 OpenSSL 在 EVP 接口之前的写法，出现它说明摘要上下文按 MD5 初始化。结果如果用于完整性、签名或口令存储，攻击者可以构造另一份内容得到同一摘要，或者用现成的表还原口令。
+
+### 风险类型
+weak-cryptographic-algorithm
+
+### 影响
+完整性校验可以被碰撞绕过。口令哈希可以被快速穷举。下载校验、令牌和指纹如果只依赖 MD5，就失去了鉴别能力。
+
+### 检测方式
+这条规则使用 source 模式，用正则扫描源文件文本，不构建语法树或 SSA。命中只说明出现了对应写法，不能单独证明数据来自外部输入。注释、字符串和文档中的相同文本也会命中。
+正则匹配 `MD5_Init(`。注释和文档里的同名文本也会命中。
+同一检查还有 struct（真实调用）。它们描述同一个问题，命中条件不同，修复时看实际告警来自哪一条。
+
+### 参考
+- [CWE-327：使用有风险的密码算法](https://cwe.mitre.org/data/definitions/327.html)
+
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+- 完整性校验改用 SHA-256 或 SHA-512。
+- 口令存储改用 bcrypt、scrypt 或 Argon2，并为每个用户单独加盐。
+- 需要兼容旧摘要时，只在迁移期内同时计算新算法，不要把 MD5 当作唯一校验。
+
+SOLUTION
+	alert_min: 1
+	"file://bad.c": <<<POS
+void MD5_Init(void *c);
+void bad(void *c) { MD5_Init(c); }
+
+POS
+	"safefile://ok.c": <<<NEG
+void ok(void) { int n = 1; }
+
+NEG
+)
+${*.c}.pattern_regex(/MD5_Init\s*\(/) as $hit
+alert $hit for {
+	level: "high",
+	title: "源码扫描：C MD5_Init",
+	title_zh: "源码扫描：C MD5_Init",
+	message: "源码扫描：C MD5_Init",
+	risk: "weak-cryptographic-algorithm",
+}

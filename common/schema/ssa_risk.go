@@ -62,8 +62,10 @@ type SSARisk struct {
 
 	// 最新处置状态
 	LatestDisposalStatus string `json:"latest_disposal_status" gorm:"index;default:'not_set'"`
-	// Risk 特征哈希，用于区分不同批次扫描的同一个漏洞
-	// 包含 SSA 信息(disam、function)、FileUrl、SfRule 信息(ruleId、variableName、level)
+	// RiskFeatureHash 标识同一次漏洞，不包含规则名。
+	// 同一函数、同一 SSA 值、同一风险类型在 source/struct/ssa 规则之间共用这个哈希，
+	// 同一次扫描据此用更靠后的模式覆盖更靠前的结果。文件路径不在哈希里，
+	// 覆盖时还要看是不是同一个文件。
 	RiskFeatureHash string `json:"risk_feature_hash" gorm:"index"`
 
 	SSAProjectID uint64 `json:"ssa_project_id" gorm:"index"`

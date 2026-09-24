@@ -1,0 +1,53 @@
+desc(
+	mode: "source"
+	language: "java"
+	title: "源码扫描：Java XML 字符串拼接"
+	title_zh: "源码扫描：Java XML 字符串拼接"
+	type: vuln
+	level: high
+	rule_id: "source-java-xml-string-concat"
+	risk: "xml-injection"
+	cwe: "CWE-91"
+	desc: <<<DESC
+### 规则说明
+用字符串拼接生成 XML，例如把外部数据接在开始标签后面，数据里的小于号、大于号和引号会提前闭合标签，并插入新的节点。
+
+### 风险类型
+xml-injection
+
+### 影响
+生成的 XML 结构被改写，下游会读到攻击者插入的元素。下游如果还展开实体，可能进一步变成 XXE。
+
+### 检测方式
+这条规则使用 source 模式，用正则扫描源文件文本，不构建语法树或 SSA。命中只说明出现了对应写法，不能单独证明数据来自外部输入。注释、字符串和文档中的相同文本也会命中。
+正则匹配标签字符串和加号拼在一起的写法。用 XML API 构建文档的代码不会命中。没有对应的 ssa 规则。
+
+### 参考
+- [CWE-91：XML 注入](https://cwe.mitre.org/data/definitions/91.html)
+
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+- 用 DOM、StAX 或 JAXB 创建文本节点，不要拼接标签。
+- 必须拼接时，转义小于号、大于号、与号和引号。
+- 对输出做 schema 校验，拒绝没有声明的元素。
+
+SOLUTION
+	alert_min: 1
+	"file://bad.java": <<<POS
+class Bad { String x(String name) { return "<user>" + name + "</user>"; } }
+
+POS
+	"safefile://ok.java": <<<NEG
+class Ok { String x() { return "<user>fixed</user>"; } }
+
+NEG
+)
+${*.java}.pattern_regex(/<\w+[^>]*>\"\s*\+|\"\s*<\w+[^>]*>\"\s*\+/) as $hit
+alert $hit for {
+	level: "high",
+	title: "源码扫描：Java XML 字符串拼接",
+	title_zh: "源码扫描：Java XML 字符串拼接",
+	message: "源码扫描：Java XML 字符串拼接",
+	risk: "xml-injection",
+}

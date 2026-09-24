@@ -21,6 +21,9 @@ type SyntaxFlowResult struct {
 	id       uint
 	saveKind ssaconfig.SFResultSaveKind
 	TaskID   string
+	// persistRisk writes risks during a memory-mode scan so the DB exit can
+	// cover an earlier mode in the same task.
+	persistRisk bool
 	// result
 	memResult *sfvm.SFFrameResult
 	dbResult  *ssadb.AuditResult

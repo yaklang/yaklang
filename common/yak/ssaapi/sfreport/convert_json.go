@@ -152,6 +152,10 @@ func (r *Report) ConvertSSARiskToReport(ssarisk *schema.SSARisk, results ...*ssa
 	// create risk with detailed structure
 	risk, toAddIrSourceHashes := NewRisk(ssarisk, r, value)
 	r.AddRisks(risk)
+	if r.GetRisk(risk.GetHash()) == nil {
+		r.RiskNums = len(r.Risks)
+		return
+	}
 
 	// update RiskNums after adding risk
 	r.RiskNums = len(r.Risks)
@@ -189,6 +193,10 @@ func (r *Report) convertSSARiskFromMetadata(ssarisk *schema.SSARisk, result *ssa
 	}
 	risk, _ := NewRisk(ssarisk, r)
 	r.AddRisks(risk)
+	if r.GetRisk(risk.GetHash()) == nil {
+		r.RiskNums = len(r.Risks)
+		return
+	}
 	r.RiskNums = len(r.Risks)
 	if file := r.firstOrCreateFileByPath(ssarisk.CodeSourceUrl); file != nil {
 		file.AddRisk(risk)

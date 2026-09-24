@@ -1,0 +1,54 @@
+desc(
+	mode: "ssa"
+	language: "csharp"
+	title: "数据流：C# TryUpdateModel 批量绑定"
+	title_zh: "数据流：C# TryUpdateModel 批量绑定"
+	type: vuln
+	level: high
+	rule_id: "ssa-csharp-try-update-model"
+	risk: "mass-assignment"
+	cwe: "CWE-915"
+	desc: <<<DESC
+### 规则说明
+`TryUpdateModel` 按请求把值写进模型的可写属性。攻击者可以额外提交 `IsAdmin`、`Role`、`Price` 这类字段，只要模型上有这个属性就会被改掉。`[Bind(Include = ...)]` 本来是用来收窄字段的，但 Include 列表如果把敏感属性也列进去，问题还在。
+
+### 风险类型
+mass-assignment
+
+### 影响
+用户可以修改自己不该改的账号属性、价格或权限标志，形成批量赋值。
+
+### 检测方式
+这条规则使用 ssa 模式，只保留非常量、且不是当前函数参数的实参。常量字符串不告警。实参如果只是函数形参，也不会命中。
+匹配 `TryUpdateModel`，而且实参不是常量，也不是当前函数形参。`Bind` 特性由 source 规则覆盖。
+同一检查还有 source（源码正则）。它们描述同一个问题，命中条件不同，修复时看实际告警来自哪一条。
+
+### 参考
+- [CWE-915：动态决定的对象属性被不当修改](https://cwe.mitre.org/data/definitions/915.html)
+
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+- 为输入单独建 DTO，只放允许写的字段，再手工映射到实体。
+- 使用 `[Bind(Include = "Title,Body")]` 时逐项看列表，不要把权限、价格、所有者放进去。
+- 不要对持久化实体直接调用 `TryUpdateModel`。
+
+SOLUTION
+	alert_min: 1
+	"file://bad.cs": <<<POS
+class Bad { void u(System.Web.Mvc.Controller c, Microsoft.AspNetCore.Http.HttpRequest req) { c.TryUpdateModel(req.Query["user"]); } }
+
+POS
+	"safefile://ok.cs": <<<NEG
+class Ok { void u(System.Web.Mvc.Controller c) { c.TryUpdateModel("fixed"); } }
+
+NEG
+)
+TryUpdateModel(*?{!opcode: const && !opcode: param} as $dyn) as $call
+alert $dyn for {
+	level: "high",
+	title: "数据流：C# TryUpdateModel 批量绑定",
+	title_zh: "数据流：C# TryUpdateModel 批量绑定",
+	message: "数据流：C# TryUpdateModel 批量绑定",
+	risk: "mass-assignment",
+}

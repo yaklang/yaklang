@@ -1,0 +1,53 @@
+desc(
+	mode: "source"
+	language: "javascript"
+	title: "源码扫描：JavaScript 关闭 CSRF"
+	title_zh: "源码扫描：JavaScript 关闭 CSRF"
+	type: vuln
+	level: high
+	rule_id: "source-js-csrf-false"
+	risk: "csrf"
+	cwe: "CWE-352"
+	desc: <<<DESC
+### 规则说明
+配置项 `csrf: false` 关掉框架的 CSRF 中间件。其他网站可以让已经登录的浏览器向本站发送状态变更请求，浏览器会自动带上 Cookie。
+
+### 风险类型
+csrf
+
+### 影响
+用户访问攻击页面时，可能在不知情的情况下改口令、改资料或提交订单。
+
+### 检测方式
+这条规则使用 source 模式，用正则扫描源文件文本，不构建语法树或 SSA。命中只说明出现了对应写法，不能单独证明数据来自外部输入。注释、字符串和文档中的相同文本也会命中。
+正则匹配 `csrf: false`。`csrf: true` 不会命中。注释里的相同配置也会命中。
+
+### 参考
+- [CWE-352：跨站请求伪造](https://cwe.mitre.org/data/definitions/352.html)
+
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+- 删除 `csrf: false`，保持中间件开启。
+- 对 POST、PUT、PATCH、DELETE 校验 CSRF 令牌。
+- Cookie 的 SameSite 只能作为补充，不能代替令牌。
+
+SOLUTION
+	alert_min: 1
+	"file://bad.js": <<<POS
+const app = { csrf: false };
+
+POS
+	"safefile://ok.js": <<<NEG
+const app = { csrf: true };
+
+NEG
+)
+${*.js}.pattern_regex(/csrf\s*:\s*false/) as $hit
+alert $hit for {
+	level: "high",
+	title: "源码扫描：JavaScript 关闭 CSRF",
+	title_zh: "源码扫描：JavaScript 关闭 CSRF",
+	message: "源码扫描：JavaScript 关闭 CSRF",
+	risk: "csrf",
+}

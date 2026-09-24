@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"strings"
 	"sync/atomic"
 	"time"
 
@@ -115,6 +116,18 @@ func (m *scanManager) StartQuerySF(startIndex ...int64) error {
 	}
 	swg.Wait()
 	return errs
+}
+
+// riskTaskID is the id written onto risks. A project scan shares one id
+// across source, struct and ssa stages so cover can see the whole scan.
+func (m *scanManager) riskTaskID() string {
+	if m == nil {
+		return ""
+	}
+	if m.Config != nil && strings.TrimSpace(m.Config.projectRiskTaskID) != "" {
+		return strings.TrimSpace(m.Config.projectRiskTaskID)
+	}
+	return m.taskID
 }
 
 func queryTargetName(target ssaapi.SyntaxFlowQueryInstance) string {
@@ -229,7 +242,7 @@ func (m *scanManager) Query(rule *schema.SyntaxFlowRule, target ssaapi.SyntaxFlo
 		option = append(option,
 			ssaapi.QueryWithSSAConfig(m.Config.Config),
 			ssaapi.QueryWithContext(ruleCtx),
-			ssaapi.QueryWithTaskID(m.taskID),
+			ssaapi.QueryWithTaskID(m.riskTaskID()),
 			ssaapi.QueryWithProcessCallback(func(f float64, info string) {
 				m.processMonitor.UpdateRuleStatus(targetName, rule.RuleName, f, info)
 			}),
@@ -246,6 +259,11 @@ func (m *scanManager) Query(rule *schema.SyntaxFlowRule, target ssaapi.SyntaxFlo
 		if m.Config != nil && (m.Config.GetSyntaxFlowMemory() ||
 			m.Config.GetSyntaxFlowResultKind() == ssaconfig.SFResultSaveMemory) {
 			option = append(option, ssaapi.QueryWithMemory())
+			// Memory scans still store risks so a later mode can cover an
+			// earlier one. --no-save-risk keeps that write off.
+			if !m.Config.IsNoSaveRisk() {
+				option = append(option, ssaapi.QueryWithPersistRisk(true))
+			}
 		} else {
 			option = append(option, ssaapi.QueryWithSave(m.kind))
 		}

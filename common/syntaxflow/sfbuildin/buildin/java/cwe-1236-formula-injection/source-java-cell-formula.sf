@@ -1,0 +1,54 @@
+desc(
+	mode: "source"
+	language: "java"
+	title: "源码扫描：Java 单元格公式注入"
+	title_zh: "源码扫描：Java 单元格公式注入"
+	type: vuln
+	level: high
+	rule_id: "source-java-cell-formula"
+	risk: "formula-injection"
+	cwe: "CWE-1236"
+	desc: <<<DESC
+### 规则说明
+`Cell.setCellFormula` 写入的是电子表格公式，不是普通文本。内容来自用户，并且以等号、加号、减号或 `@` 开头时，表格软件打开文件就会执行它。公式可以读取其他单元格，有的客户端还会按公式去访问外部地址。
+
+### 风险类型
+formula-injection
+
+### 影响
+打开报表的人会在自己的电脑上执行攻击者的公式，表格数据可能外泄。服务器上的导出代码本身通常不计算这个公式。
+
+### 检测方式
+这条规则使用 source 模式，用正则扫描源文件文本，不构建语法树或 SSA。命中只说明出现了对应写法，不能单独证明数据来自外部输入。注释、字符串和文档中的相同文本也会命中。
+正则匹配任意 `setCellFormula(`。服务端写死的常量公式也会命中，需要看参数是不是外部数据。
+同一检查还有 ssa（数据流）。它们描述同一个问题，命中条件不同，修复时看实际告警来自哪一条。
+
+### 参考
+- [CWE-1236：公式元素注入](https://cwe.mitre.org/data/definitions/1236.html)
+
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+- 用户数据用 `setCellValue` 写成文本，不要用 `setCellFormula`。
+- 必须导出公式时，对以等号、加号、减号或 `@` 开头的单元格加单引号前缀。
+- 公式只由服务端模板生成，不接收客户端提交的公式字符串。
+
+SOLUTION
+	alert_min: 1
+	"file://bad.java": <<<POS
+class Bad { void w(org.apache.poi.ss.usermodel.Cell c, String v) { c.setCellFormula(v); } }
+
+POS
+	"safefile://ok.java": <<<NEG
+class Ok { void w(org.apache.poi.ss.usermodel.Cell c) { c.setCellValue("text"); } }
+
+NEG
+)
+${*.java}.pattern_regex(/setCellFormula\s*\(/) as $hit
+alert $hit for {
+	level: "high",
+	title: "源码扫描：Java 单元格公式注入",
+	title_zh: "源码扫描：Java 单元格公式注入",
+	message: "源码扫描：Java 单元格公式注入",
+	risk: "formula-injection",
+}

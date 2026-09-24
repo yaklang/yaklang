@@ -1,0 +1,56 @@
+desc(
+	mode: "source"
+	language: "golang"
+	title: "源码扫描：Go JWT ParseUnverified"
+	title_zh: "源码扫描：Go JWT ParseUnverified"
+	type: vuln
+	level: high
+	rule_id: "source-go-jwt-parse-unverified"
+	risk: "improper-authentication"
+	cwe: "CWE-345"
+	desc: <<<DESC
+### 规则说明
+`ParseUnverified` 只把 JWT 拆成头部和载荷，不验证签名。后面的代码如果信任其中的用户、角色或过期时间，攻击者可以自己构造令牌，任意填写这些声明。
+
+### 风险类型
+improper-authentication
+
+### 影响
+认证和授权被绕过。未签名或签名错误的声明会被当成真的。
+
+### 检测方式
+这条规则使用 source 模式，用正则扫描源文件文本，不构建语法树或 SSA。命中只说明出现了对应写法，不能单独证明数据来自外部输入。注释、字符串和文档中的相同文本也会命中。
+正则匹配 `ParseUnverified(`。
+同一检查还有 struct（真实调用）。它们描述同一个问题，命中条件不同，修复时看实际告警来自哪一条。
+
+### 参考
+- [CWE-345：数据真实性校验不足](https://cwe.mitre.org/data/definitions/345.html)
+
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+- 使用 `Parse` 或 `ParseWithClaims`，在 keyfunc 里提供密钥或公钥。
+- 限制允许的签名算法，拒绝 `none`，也拒绝和密钥类型不符的算法。
+- 只有在别的层已经完成验签、这里仅仅读取非敏感字段时，才可以保留该调用，并在旁边写明原因。
+
+SOLUTION
+	alert_min: 1
+	"file://bad.go": <<<POS
+package main
+func bad(p interface{ ParseUnverified(string, interface{}) }, s string, c interface{}) { p.ParseUnverified(s, c) }
+
+POS
+	"safefile://ok.go": <<<NEG
+package main
+func ok() { println("parse") }
+
+NEG
+)
+${*.go}.pattern_regex(/ParseUnverified\s*\(/) as $hit
+alert $hit for {
+	level: "high",
+	title: "源码扫描：Go JWT ParseUnverified",
+	title_zh: "源码扫描：Go JWT ParseUnverified",
+	message: "源码扫描：Go JWT ParseUnverified",
+	risk: "improper-authentication",
+}

@@ -8,6 +8,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/google/uuid"
+
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/syntaxflow/sfpattern"
@@ -60,6 +62,9 @@ func ScanProject(ctx context.Context, opts ...ssaconfig.Option) (ProjectResult, 
 		return ProjectResult{}, err
 	}
 	ssaconfig.ApplyExtraOptions(cfg, cfg.Config)
+	if strings.TrimSpace(cfg.projectRiskTaskID) == "" {
+		cfg.projectRiskTaskID = uuid.NewString()
+	}
 	cfg.SetSyntaxFlowResultSaveMemory()
 	if cfg.SyntaxFlow != nil {
 		cfg.SyntaxFlow.Memory = true
@@ -525,14 +530,19 @@ func localSourceDir(cfg *Config) string {
 }
 
 func emitStructResults(cfg *Config, prog *ssaapi.Program) {
-	if cfg == nil || cfg.resultCallback == nil || prog == nil {
+	if cfg == nil || prog == nil {
 		return
 	}
 	for _, res := range prog.StructScanResults() {
 		if res == nil {
 			continue
 		}
-		cfg.resultCallback(&ScanResult{Status: "executing", Result: res})
+		if cfg.Reporter != nil {
+			cfg.Reporter.AddSyntaxFlowResult(res)
+		}
+		if cfg.resultCallback != nil {
+			cfg.resultCallback(&ScanResult{Status: "executing", Result: res})
+		}
 	}
 }
 
@@ -763,8 +773,27 @@ func loadNamedPrograms(cfg *Config) error {
 	return nil
 }
 
+func productModeEnabled(cfg *Config, mode string) bool {
+	if cfg == nil {
+		return false
+	}
+	for _, item := range cfg.scanModes {
+		if strings.EqualFold(strings.TrimSpace(item), mode) {
+			return true
+		}
+	}
+	return false
+}
+
 func structCompileOptions(cfg *Config) []ssaconfig.Option {
 	var opts []ssaconfig.Option
+	includeSSA := productModeEnabled(cfg, StructMode) && productModeEnabled(cfg, SSAMode)
+	if includeSSA {
+		opts = append(opts, ssaapi.WithStructIncludeSSARules(true))
+	}
+	if cfg != nil && strings.TrimSpace(cfg.projectRiskTaskID) != "" {
+		opts = append(opts, ssaapi.WithStructTaskID(cfg.projectRiskTaskID))
+	}
 	// Struct rules use the same final SyntaxFlow result-save guard as SSA rules.
 	if cfg != nil && cfg.IsNoSaveRisk() {
 		opts = append(opts, ssaconfig.WithNoSaveRisk(true))
@@ -772,7 +801,10 @@ func structCompileOptions(cfg *Config) []ssaconfig.Option {
 	rules := cfg.customRules()
 	var structRaws []string
 	for _, rule := range rules {
-		if rule != nil && rule.IsStructMode() && strings.TrimSpace(rule.Content) != "" {
+		if rule == nil || strings.TrimSpace(rule.Content) == "" {
+			continue
+		}
+		if rule.IsStructMode() || (includeSSA && schema.ValidRuleMode(rule.Mode) == schema.SFR_MODE_SSA) {
 			structRaws = append(structRaws, rule.Content)
 		}
 	}
@@ -901,6 +933,9 @@ func sharedScanCallbackOptions(cfg *Config) []ssaconfig.Option {
 	}
 	if cfg.GetScanIgnoreLanguage() {
 		opts = append(opts, ssaconfig.WithScanIgnoreLanguage(true))
+	}
+	if id := strings.TrimSpace(cfg.projectRiskTaskID); id != "" {
+		opts = append(opts, WithProjectRiskTaskID(id))
 	}
 	opts = append(opts, copySyntaxFlowRuleOptions(cfg)...)
 	if cfg.GetScanConcurrency() > 0 {

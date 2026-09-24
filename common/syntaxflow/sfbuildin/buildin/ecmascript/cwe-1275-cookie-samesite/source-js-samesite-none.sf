@@ -1,0 +1,52 @@
+desc(
+	mode: "source"
+	language: "javascript"
+	title: "源码扫描：JavaScript Cookie sameSite none"
+	title_zh: "源码扫描：JavaScript Cookie sameSite none"
+	type: vuln
+	level: middle
+	rule_id: "source-js-samesite-none"
+	risk: "cookie-security"
+	cwe: "CWE-1275"
+	desc: <<<DESC
+### 规则说明
+Cookie 选项 `sameSite: 'none'` 允许跨站请求携带这枚 Cookie。会话 Cookie 会跟着其他网站发起的请求回到本站。
+
+### 风险类型
+cookie-security
+
+### 影响
+跨站请求伪造更容易成功。没有同时设置 `secure: true` 时，浏览器会拒绝这枚 Cookie，旧客户端则可能通过明文把它发出去。
+
+### 检测方式
+这条规则使用 source 模式，用正则扫描源文件文本，不构建语法树或 SSA。命中只说明出现了对应写法，不能单独证明数据来自外部输入。注释、字符串和文档中的相同文本也会命中。
+正则匹配 `sameSite:` 后面引号里的 `none`，大小写按这条正则是小写。`lax` 和 `strict` 不会命中。
+
+### 参考
+- [CWE-1275：敏感 Cookie 的 SameSite 属性不当](https://cwe.mitre.org/data/definitions/1275.html)
+
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+- 会话 Cookie 使用 `sameSite: 'lax'` 或 `sameSite: 'strict'`。
+- 必须使用 none 时同时设置 `secure: true`，并保留 CSRF 令牌校验。
+
+SOLUTION
+	alert_min: 1
+	"file://bad.js": <<<POS
+function bad(res) { res.cookie("sid", "v", { sameSite: "none" }); }
+
+POS
+	"safefile://ok.js": <<<NEG
+function ok(res) { res.cookie("sid", "v", { sameSite: "lax" }); }
+
+NEG
+)
+${*.js}.pattern_regex(/sameSite\s*:\s*[\"']none[\"']/) as $hit
+alert $hit for {
+	level: "middle",
+	title: "源码扫描：JavaScript Cookie sameSite none",
+	title_zh: "源码扫描：JavaScript Cookie sameSite none",
+	message: "源码扫描：JavaScript Cookie sameSite none",
+	risk: "cookie-security",
+}

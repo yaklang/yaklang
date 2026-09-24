@@ -1,0 +1,54 @@
+desc(
+	mode: "ssa"
+	language: "javascript"
+	title: "数据流：JavaScript setHeader 写入外部值"
+	title_zh: "数据流：JavaScript setHeader 写入外部值"
+	type: vuln
+	level: high
+	rule_id: "ssa-js-set-header"
+	risk: "crlf-injection"
+	cwe: "CWE-113"
+	desc: <<<DESC
+### 规则说明
+`res.setHeader(name, value)` 把值写进 HTTP 响应头。value 来自查询参数或请求头、并且含有回车换行时，可以注入额外响应头，把一次响应拆成多次。
+
+### 风险类型
+crlf-injection
+
+### 影响
+可以添加 `Set-Cookie` 或改写 `Location`，造成会话注入和开放重定向。
+
+### 检测方式
+这条规则使用 ssa 模式，只保留非常量、且不是当前函数参数的实参。常量字符串不告警。实参如果只是函数形参，也不会命中。
+匹配 `setHeader`，而且实参不是常量，也不是当前函数形参。常量头值不告警。
+同一检查还有 source（源码正则）。它们描述同一个问题，命中条件不同，修复时看实际告警来自哪一条。
+
+### 参考
+- [CWE-113：HTTP 头中的回车换行未处理](https://cwe.mitre.org/data/definitions/113.html)
+
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+- 删除值里的回车和换行后再写入。
+- 头名使用固定字符串，不要用请求里的字段当头名。
+- 用 `res.cookie` 和框架的重定向方法，不要自己拼头部。
+
+SOLUTION
+	alert_min: 1
+	"file://bad.js": <<<POS
+function bad(res, req) { res.setHeader("X-Name", req.query.name); }
+
+POS
+	"safefile://ok.js": <<<NEG
+function ok(res) { res.setHeader("X-Name", "fixed"); }
+
+NEG
+)
+setHeader(*?{!opcode: const && !opcode: param} as $dyn) as $call
+alert $dyn for {
+	level: "high",
+	title: "数据流：JavaScript setHeader 写入外部值",
+	title_zh: "数据流：JavaScript setHeader 写入外部值",
+	message: "数据流：JavaScript setHeader 写入外部值",
+	risk: "crlf-injection",
+}

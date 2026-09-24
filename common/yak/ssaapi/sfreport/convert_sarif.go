@@ -74,6 +74,9 @@ type SarifReport struct {
 	// driver is run.Tool.Driver, kept for O(1) rule registration.
 	driver   *sarif.ToolComponent
 	ruleByID map[string]struct{}
+	// risks is parallel to run.Results so a later scan mode can drop the
+	// earlier finding before the document is saved.
+	risks []*schema.SSARisk
 }
 
 // SarifContext accumulates the SARIF entities one result contributes (files,
@@ -179,6 +182,9 @@ func (r *SarifReport) appendResult(result *ssaapi.SyntaxFlowResult) {
 	ruleID := sarifRuleID(SFRule)
 
 	for risk := range result.YieldRisk() {
+		if !r.prepareCover(risk) {
+			continue
+		}
 		value, err := result.GetValue(risk.Variable, int(risk.Index))
 		if err != nil {
 			log.Errorf("get value from result failed: resultId[%d: %s: %d] %s", result.GetResultID(), risk.Variable, risk.Index, err)
@@ -209,7 +215,48 @@ func (r *SarifReport) appendResult(result *ssaapi.SyntaxFlowResult) {
 
 		r.registerRule(ruleID, SFRule, risk)
 		r.run.Results = append(r.run.Results, res)
+		r.risks = append(r.risks, risk)
 	}
+}
+
+// prepareCover drops a less precise SARIF result when a more precise one for
+// the same finding is already stored, and removes earlier results the incoming
+// one replaces. It returns false when the incoming result should be skipped.
+//
+// Cover is a cross-mode rule. Two rows of one mode are separate findings that
+// happen to land on the same place, and a rule whose result streams in twice
+// contributes both, so only a row from a different mode takes part.
+func (r *SarifReport) prepareCover(risk *schema.SSARisk) bool {
+	if r == nil || risk == nil || r.run == nil {
+		return false
+	}
+	if len(r.risks) != len(r.run.Results) {
+		return true
+	}
+	keptResults := make([]*sarif.Result, 0, len(r.run.Results))
+	keptRisks := make([]*schema.SSARisk, 0, len(r.risks))
+	dropNew := false
+	for i, old := range r.risks {
+		if old != nil && schema.ScanModeRank(old.ScanMode) == schema.ScanModeRank(risk.ScanMode) {
+			keptResults = append(keptResults, r.run.Results[i])
+			keptRisks = append(keptRisks, old)
+			continue
+		}
+		switch schema.CoverActionFor(old, risk) {
+		case schema.CoverDropNew:
+			dropNew = true
+			keptResults = append(keptResults, r.run.Results[i])
+			keptRisks = append(keptRisks, old)
+		case schema.CoverReplaceOld:
+			// The earlier, less precise result for this finding is dropped.
+		default:
+			keptResults = append(keptResults, r.run.Results[i])
+			keptRisks = append(keptRisks, old)
+		}
+	}
+	r.run.Results = keptResults
+	r.risks = keptRisks
+	return !dropNew
 }
 
 // registerRule appends the result rule to the driver once per rule ID.
@@ -339,8 +386,8 @@ func sarifRuleTags(rule *schema.SyntaxFlowRule, risk *schema.SSARisk) []string {
 
 // sarifFingerprint gives GitHub a stable identity for a finding so re-running
 // the scan updates the existing alert instead of opening a new one when the
-// line number shifts. RiskFeatureHash is derived from the function, rule and
-// variable rather than the position, which is exactly the intent here.
+// line number shifts. RiskFeatureHash is derived from the function and SSA
+// value rather than the rule name or the line number.
 func sarifFingerprint(risk *schema.SSARisk) map[string]interface{} {
 	value := strings.TrimSpace(risk.RiskFeatureHash)
 	if value == "" {

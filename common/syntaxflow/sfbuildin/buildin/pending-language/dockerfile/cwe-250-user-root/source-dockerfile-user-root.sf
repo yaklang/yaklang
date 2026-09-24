@@ -1,0 +1,56 @@
+desc(
+	mode: "source"
+	language: "dockerfile"
+	title: "源码扫描：Dockerfile 最后以 root 运行"
+	title_zh: "源码扫描：Dockerfile 最后以 root 运行"
+	type: vuln
+	level: middle
+	rule_id: "source-dockerfile-user-root"
+	risk: "security-misconfiguration"
+	cwe: "CWE-250"
+	desc: <<<DESC
+### 规则说明
+Dockerfile 中的 `USER root` 让后面的指令和容器入口以 root 运行。进程一旦被攻破，容器里就是超级用户，更容易改系统文件。如果还挂了宿主机目录或打开了特权，影响会超出这个容器。
+
+### 风险类型
+security-misconfiguration
+
+### 影响
+容器被攻破后的提权条件更弱。镜像被复用时，所有部署都会以 root 启动。
+
+### 检测方式
+这条规则使用 source 模式，用正则扫描源文件文本，不构建语法树或 SSA。命中只说明出现了对应写法，不能单独证明数据来自外部输入。注释、字符串和文档中的相同文本也会命中。
+正则匹配行首的 `USER root`。`USER app` 不会命中。多阶段构建要看最后一个阶段，前面阶段的 `USER root` 仍会命中，但不一定是最终运行用户。
+该语言还没有 struct 或 ssa 前端，目前只有这条 source 规则。builtin verify 会用内嵌的正例和反例检查这条正则。
+
+### 参考
+- [CWE-250：以不必要的权限执行](https://cwe.mitre.org/data/definitions/250.html)
+
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+- 在镜像最后切换到专用的非 root 用户。
+- 运行时需要写的目录，在构建阶段就把所有者改成这个用户，不要在启动时用 root 修权限。
+- 完全没有 `USER` 指令的镜像默认也是 root，但这条规则匹配不到那种写法，需要单独检查最后一个阶段有没有非 root 用户。
+
+SOLUTION
+	alert_min: 1
+	"file://Dockerfile": <<<POS
+FROM alpine
+USER root
+
+POS
+	"safefile://Dockerfile.safe": <<<NEG
+FROM alpine
+USER app
+
+NEG
+)
+${*}.pattern_regex(/(?m)^USER\s+root\s*$/) as $hit
+alert $hit for {
+	level: "middle",
+	title: "源码扫描：Dockerfile 最后以 root 运行",
+	title_zh: "源码扫描：Dockerfile 最后以 root 运行",
+	message: "源码扫描：Dockerfile 最后以 root 运行",
+	risk: "security-misconfiguration",
+}

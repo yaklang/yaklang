@@ -1,0 +1,57 @@
+desc(
+	mode: "ssa"
+	language: "php"
+	title: "数据流：PHP mysql_query 接受外部 SQL"
+	title_zh: "数据流：PHP mysql_query 接受外部 SQL"
+	type: vuln
+	level: high
+	rule_id: "ssa-php-mysql-query"
+	risk: "sql-injection"
+	cwe: "CWE-89"
+	desc: <<<DESC
+### 规则说明
+`mysql_query` 会把传入的字符串交给 MySQL 执行。参数不是常量、也不是当前函数形参时，这条 SQL 是在别的地方拼出来的，外部数据可以改写查询条件。
+
+同目录的 source 规则只看到调用文本，struct 规则看到每一次真实调用。这条 ssa 规则只保留参数来自其他值的调用。常量 SQL 不报，直接传入的函数形参也不报。
+
+### 风险类型
+sql-injection
+
+### 影响
+攻击者可以改写查询，读出或修改其他行，在权限足够时还能继续执行额外语句。
+
+### 检测方式
+这条规则使用 ssa 模式，只保留非常量、且不是当前函数参数的实参。常量 SQL 不告警。实参如果只是函数形参，也不会命中。
+匹配 `mysql_query`，告警点是那个非常量参数。同一文件、同一行上的 struct 结果会被这条更精确的结果覆盖。
+
+### 参考
+- [CWE-89：SQL 注入](https://cwe.mitre.org/data/definitions/89.html)
+
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+- 使用 PDO 或 mysqli 的预处理语句，把外部数据只作为绑定参数。
+- 不要把请求参数拼进 SQL 文本。
+- 常量 SQL 可以保留，但 `mysql_*` 扩展已经废弃，新代码改用 mysqli 或 PDO。
+
+SOLUTION
+	alert_min: 1
+	"file://bad.php": <<<POS
+<?php
+function bad() { mysql_query($_GET["id"]); }
+
+POS
+	"safefile://ok.php": <<<NEG
+<?php
+function ok() { mysql_query("select 1"); }
+
+NEG
+)
+mysql_query(*?{!opcode: const && !opcode: param} as $dyn) as $call
+alert $dyn for {
+	level: "high",
+	title: "数据流：PHP mysql_query 接受外部 SQL",
+	title_zh: "数据流：PHP mysql_query 接受外部 SQL",
+	message: "数据流：PHP mysql_query 接受外部 SQL",
+	risk: "sql-injection",
+}

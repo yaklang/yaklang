@@ -1,0 +1,54 @@
+desc(
+	mode: "source"
+	language: "java"
+	title: "源码扫描：Java 会话写入请求参数"
+	title_zh: "源码扫描：Java 会话写入请求参数"
+	type: vuln
+	level: middle
+	rule_id: "source-java-session-set-request"
+	risk: "access-control"
+	cwe: "CWE-501"
+	desc: <<<DESC
+### 规则说明
+`HttpSession.setAttribute` 把数据放进服务端会话，后面的请求会把它当作已经可信的状态。值如果直接来自 `getParameter` 或其他请求数据，客户端就跨过了信任边界，可以污染角色、回跳地址或价格。
+
+### 风险类型
+access-control
+
+### 影响
+后续鉴权和业务逻辑会读到攻击者写入的会话属性，可能越权，或者被带到外部站点。
+
+### 检测方式
+这条规则使用 source 模式，用正则扫描源文件文本，不构建语法树或 SSA。命中只说明出现了对应写法，不能单独证明数据来自外部输入。注释、字符串和文档中的相同文本也会命中。
+正则匹配同一个括号内同时出现 `setAttribute(` 和 `getParameter`。先存进中间变量、或者参数跨行时，这条 source 规则会漏掉。
+同一检查还有 ssa（数据流）。它们描述同一个问题，命中条件不同，修复时看实际告警来自哪一条。
+
+### 参考
+- [CWE-501：信任边界违背](https://cwe.mitre.org/data/definitions/501.html)
+
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+- 只把服务端生成的值，或已经校验过的值，写入会话。
+- 请求参数先做白名单校验，再写入。不要原样 `setAttribute`。
+- 权限和价格以服务端记录为准，不要从会话里的客户端副本读取。
+
+SOLUTION
+	alert_min: 1
+	"file://bad.java": <<<POS
+class Bad { void s(javax.servlet.http.HttpSession session, javax.servlet.http.HttpServletRequest req) { session.setAttribute("role", req.getParameter("role")); } }
+
+POS
+	"safefile://ok.java": <<<NEG
+class Ok { void s(javax.servlet.http.HttpSession session) { session.setAttribute("role", "user"); } }
+
+NEG
+)
+${*.java}.pattern_regex(/setAttribute\s*\([^)]*getParameter/) as $hit
+alert $hit for {
+	level: "middle",
+	title: "源码扫描：Java 会话写入请求参数",
+	title_zh: "源码扫描：Java 会话写入请求参数",
+	message: "源码扫描：Java 会话写入请求参数",
+	risk: "access-control",
+}

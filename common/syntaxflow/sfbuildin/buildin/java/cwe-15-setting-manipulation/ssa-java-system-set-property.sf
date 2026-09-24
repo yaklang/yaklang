@@ -1,0 +1,54 @@
+desc(
+	mode: "ssa"
+	language: "java"
+	title: "数据流：Java System.setProperty 接受外部值"
+	title_zh: "数据流：Java System.setProperty 接受外部值"
+	type: vuln
+	level: high
+	rule_id: "ssa-java-system-set-property"
+	risk: "security-misconfiguration"
+	cwe: "CWE-15"
+	desc: <<<DESC
+### 规则说明
+`System.setProperty` 修改的是整个 JVM 的系统属性，所有线程都能看见。键或值来自请求时，一次请求就能改写代理、安全提供者、日志路径等全局配置，并影响后面的请求。
+
+### 风险类型
+security-misconfiguration
+
+### 影响
+进程级安全配置被请求改掉之后，后续流量可能走错误的代理、加载意外的提供者，或把日志写到攻击者指定的位置。
+
+### 检测方式
+这条规则使用 ssa 模式。只有实参本身来自另一次调用时告警，常量字符串不报。直接传入的函数参数也不在本次匹配范围内。
+匹配名为 `setProperty` 的调用，而且实参本身来自另一次调用。不限于 `System.setProperty`，其他 `setProperty` 也会命中。常量值不报，直接传入的形参也不报。
+同一检查还有 source（源码正则）。它们描述同一个问题，命中条件不同，修复时看实际告警来自哪一条。
+
+### 参考
+- [CWE-15：外部控制的系统或配置设置](https://cwe.mitre.org/data/definitions/15.html)
+
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+- 系统属性只在进程启动时从受控配置设置。
+- 不要用请求参数作为属性的键或值。
+- 只对当前请求有效的选项放进请求上下文，不要放进 `System`。
+
+SOLUTION
+	alert_min: 1
+	"file://bad.java": <<<POS
+class Bad { void c(javax.servlet.http.HttpServletRequest req) { System.setProperty("app.mode", req.getParameter("mode")); } }
+
+POS
+	"safefile://ok.java": <<<NEG
+class Ok { void c() { System.setProperty("app.mode", "prod"); } }
+
+NEG
+)
+setProperty(*?{opcode: call} as $dyn) as $call
+alert $dyn for {
+	level: "high",
+	title: "数据流：Java System.setProperty 接受外部值",
+	title_zh: "数据流：Java System.setProperty 接受外部值",
+	message: "数据流：Java System.setProperty 接受外部值",
+	risk: "security-misconfiguration",
+}

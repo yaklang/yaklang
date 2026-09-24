@@ -67,6 +67,11 @@ type ScanTaskCallback struct {
 	// scanModes is the product-stage filter (source/struct/ssa). Empty means all.
 	scanModes []string `json:"-"`
 
+	// projectRiskTaskID is the runtime id shared by every stage of one
+	// ScanProject. Risks use it so a later mode can cover an earlier one.
+	// Each StartScan still keeps its own syntaxflow task row.
+	projectRiskTaskID string `json:"-"`
+
 	parsedCustomRules     []*schema.SyntaxFlowRule
 	parsedCustomRulesDone bool
 }
@@ -179,6 +184,14 @@ func appendScanModes(dst []string, modes ...string) []string {
 // opt2 = syntaxflow.withMode(syntaxflow.SourceMode)
 // opt3 = syntaxflow.withMode(syntaxflow.StructMode)
 // ```
+// WithProjectRiskTaskID pins the risk runtime id for every stage of one
+// project scan. Empty lets each StartScan allocate its own.
+func WithProjectRiskTaskID(id string) ssaconfig.Option {
+	return ssaconfig.SetOption("syntaxflow-scan/projectRiskTaskID", func(c *Config, v string) {
+		c.projectRiskTaskID = strings.TrimSpace(v)
+	})(id)
+}
+
 func WithMode(modes ...string) ssaconfig.Option {
 	return ssaconfig.SetOption("syntaxflow-scan/productMode", func(c *Config, v []string) {
 		if c.ScanTaskCallback == nil {

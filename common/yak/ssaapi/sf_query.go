@@ -56,14 +56,21 @@ type queryConfig struct {
 	// structBound, when set by QueryWithStruct, allows mode=struct frames to run.
 	structBound *structBound
 
+	// structAllowsSSA lets an ssa-mode rule run against a compile-unit target.
+	// Only the struct stage sets it, and only when struct and ssa are both
+	// selected, so an ssa rule can be recorded early and be covered by the deep
+	// stage later. Default false keeps QueryWithStruct struct-only as before.
+	structAllowsSSA bool
+
 	// runtime config
 	opts []sfvm.Option // config
 	// config       *sfvm.Config
 	// parentResult *sfvm.SFFrameResult
 
 	// save
-	kind   schema.SyntaxflowResultKind
-	taskID string
+	kind        schema.SyntaxflowResultKind
+	taskID      string
+	persistRisk bool
 
 	// control
 	ctx context.Context
@@ -223,7 +230,14 @@ func QuerySyntaxflow(opt ...QueryOption) (*SyntaxFlowResult, error) {
 		}
 		res, err = frame.Feed(value, config.opts...)
 	} else if config.structBound != nil {
-		return nil, utils.Errorf("QueryWithStruct only accepts struct rules")
+		// An ssa rule on a compile-unit target needs QueryWithStructAllowSSA.
+		// The struct stage turns it on when both struct and ssa are selected so
+		// the unit hit can be covered by the deep stage; otherwise a struct
+		// target stays struct-only.
+		if !config.structAllowsSSA {
+			return nil, utils.Errorf("QueryWithStruct only accepts struct rules")
+		}
+		res, err = frame.Feed(value, config.opts...)
 	} else {
 		res, err = frame.Feed(value, config.opts...)
 	}
@@ -254,11 +268,12 @@ func QuerySyntaxflow(opt ...QueryOption) (*SyntaxFlowResult, error) {
 			}
 			setResultToCache(cacheKind, ret)
 		case ssaconfig.SFResultSaveMemory:
-			// save to memory
+			// save to memory; scans also persist risks so DB cover can run
 			id := getResultCacheId()
 			ret.SetResultID(id)
-			ret.CreateRisk()
 			ret.TaskID = config.taskID
+			ret.persistRisk = config.persistRisk
+			ret.CreateRisk()
 			setResultToCache(kind, ret)
 		}
 	}
@@ -283,6 +298,7 @@ func executeSourceFrameBatches(
 			result := CreateResultFromQuery(batchResult, config.Config)
 			result.program = config.program
 			result.TaskID = config.taskID
+			result.persistRisk = config.persistRisk
 			_ = result.CreateRisk()
 			config.sourceResultCallback(result)
 			_, _, total := root.SourceHitBatch()
@@ -426,6 +442,31 @@ func QueryWithRuleDiagnosticsRecorder(recorder ...*diagnostics.Recorder) QueryOp
 // opt = syntaxflow.withExecTaskID("task-uuid")
 // println(opt)
 // ```
+// QueryWithPersistRisk stores risks even when the syntaxflow result itself
+// stays in memory. Scan uses this so source, struct and ssa rows share a task.
+func QueryWithPersistRisk(enable bool) QueryOption {
+	return func(c *queryConfig) {
+		if c == nil {
+			return
+		}
+		c.persistRisk = enable
+	}
+}
+
+// QueryWithStructAllowSSA permits an ssa-mode rule to run against the
+// compile-unit target bound by QueryWithStruct. The struct stage enables this
+// only when struct and ssa are both selected, so the unit-level hit lands
+// early and the deep stage can cover it. Without it QueryWithStruct rejects
+// non-struct rules, which is the documented contract.
+func QueryWithStructAllowSSA(enable bool) QueryOption {
+	return func(c *queryConfig) {
+		if c == nil {
+			return
+		}
+		c.structAllowsSSA = enable
+	}
+}
+
 func QueryWithTaskID(taskID string) QueryOption {
 	return func(c *queryConfig) {
 		c.taskID = taskID

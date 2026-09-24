@@ -453,7 +453,12 @@ func DoRiskDiff(context context.Context, base, compare *ypb.SSARiskDiffItem) (<-
 			originHash string,
 			diffHash string,
 		) {
-			return risk.FromRule, risk.Hash, risk.RiskFeatureHash
+			// RiskFeatureHash no longer carries the rule name, so that one
+			// finding stays identifiable when source, struct and ssa rules
+			// report it. The risk diff compares two scans of possibly
+			// different rules, where a finding of another rule is a new
+			// finding, so the rule is put back into the comparison key.
+			return risk.FromRule, risk.Hash, risk.FromRule + ":" + risk.RiskFeatureHash
 		}),
 	)
 	return res, nil

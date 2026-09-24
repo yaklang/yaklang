@@ -1,0 +1,54 @@
+desc(
+	mode: "source"
+	language: "solidity"
+	title: "源码扫描：Solidity delegatecall"
+	title_zh: "源码扫描：Solidity delegatecall"
+	type: vuln
+	level: high
+	rule_id: "source-solidity-delegatecall"
+	risk: "code-injection"
+	cwe: "CWE-829"
+	desc: <<<DESC
+### 规则说明
+`delegatecall` 在当前合约的存储和余额上下文里执行另一段代码。目标地址或调用数据来自外部时，对方可以改写本合约的存储，包括所有者所在的槽，等于把控制权交出去。
+
+### 风险类型
+code-injection
+
+### 影响
+合约存储可以被任意改写，资金和权限会被夺走。代理合约如果允许用户指定实现地址，这就是典型后果。
+
+### 检测方式
+这条规则使用 source 模式，用正则扫描源文件文本，不构建语法树或 SSA。命中只说明出现了对应写法，不能单独证明数据来自外部输入。注释、字符串和文档中的相同文本也会命中。
+在 `.sol` 文件里匹配 `.delegatecall(`。
+该语言还没有 struct 或 ssa 前端，目前只有这条 source 规则。builtin verify 会用内嵌的正例和反例检查这条正则。
+
+### 参考
+- [CWE-829：从不受信任的控制范围引入功能](https://cwe.mitre.org/data/definitions/829.html)
+
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+- 只对部署时就确定、并且经过审计的实现合约做 `delegatecall`。
+- 不要把用户提供的地址传给 `delegatecall`。
+- 使用成熟的代理模式，并保持存储布局兼容。升级实现合约时不要让调用者选择目标。
+
+SOLUTION
+	alert_min: 1
+	"file://bad.sol": <<<POS
+contract C { function f(address t, bytes data) public { t.delegatecall(data); } }
+
+POS
+	"safefile://ok.sol": <<<NEG
+contract C { function f(address t) public { t.call(""); } }
+
+NEG
+)
+${*.sol}.pattern_regex(/\.delegatecall\s*\(/) as $hit
+alert $hit for {
+	level: "high",
+	title: "源码扫描：Solidity delegatecall",
+	title_zh: "源码扫描：Solidity delegatecall",
+	message: "源码扫描：Solidity delegatecall",
+	risk: "code-injection",
+}

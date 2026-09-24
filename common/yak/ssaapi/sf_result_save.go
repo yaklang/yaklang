@@ -2,6 +2,7 @@ package ssaapi
 
 import (
 	"context"
+	"strings"
 
 	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 
@@ -186,9 +187,10 @@ func (r *SyntaxFlowResult) CreateRisk() error {
 		return utils.Errorf("SyntaxFlowResult is nil")
 	}
 
+	save := r.persistRisk && strings.TrimSpace(r.TaskID) != "" && !r.IsNoSaveRisk()
 	r.GetAlertValues().ForEach(func(i string, v Values) bool {
 		for index, v := range v {
-			r.SaveRisk(i, index, v, false)
+			r.SaveRisk(i, index, v, save)
 		}
 		return true
 	})

@@ -1,0 +1,54 @@
+desc(
+	mode: "source"
+	language: "swift"
+	title: "源码扫描：Swift NSAllowsArbitraryLoads"
+	title_zh: "源码扫描：Swift NSAllowsArbitraryLoads"
+	type: vuln
+	level: high
+	rule_id: "source-swift-arbitrary-loads"
+	risk: "cleartext-transmission"
+	cwe: "CWE-319"
+	desc: <<<DESC
+### 规则说明
+`NSAllowsArbitraryLoads` 是 App Transport Security 的总开关。允许它之后，应用可以发起任意明文 HTTP 连接，系统不再强制 HTTPS。
+
+### 风险类型
+cleartext-transmission
+
+### 影响
+令牌和业务数据可以在明文通道上被窃听或篡改。
+
+### 检测方式
+这条规则使用 source 模式，用正则扫描源文件文本，不构建语法树或 SSA。命中只说明出现了对应写法，不能单独证明数据来自外部输入。注释、字符串和文档中的相同文本也会命中。
+正则在 `.swift` 文件里匹配 `NSAllowsArbitraryLoads`。Info.plist 不在这条规则的文件范围内。ATS 的真实开关通常在 plist 里，命中 Swift 源码只说明代码引用了这个键。
+该语言还没有 struct 或 ssa 前端，目前只有这条 source 规则。builtin verify 会用内嵌的正例和反例检查这条正则。
+
+### 参考
+- [CWE-319：敏感信息明文传输](https://cwe.mitre.org/data/definitions/319.html)
+
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+- 关闭 Arbitrary Loads。
+- 只对无法升级的个别域名配置例外，并写明原因和期限。
+- 应用里的 URL 也使用 https。不要在代码里绕过 ATS。
+
+SOLUTION
+	alert_min: 1
+	"file://bad.swift": <<<POS
+let k = "NSAllowsArbitraryLoads"
+
+POS
+	"safefile://ok.swift": <<<NEG
+let k = "NSAllowsLocalNetworking"
+
+NEG
+)
+${*.swift}.pattern_regex(/NSAllowsArbitraryLoads/) as $hit
+alert $hit for {
+	level: "high",
+	title: "源码扫描：Swift NSAllowsArbitraryLoads",
+	title_zh: "源码扫描：Swift NSAllowsArbitraryLoads",
+	message: "源码扫描：Swift NSAllowsArbitraryLoads",
+	risk: "cleartext-transmission",
+}

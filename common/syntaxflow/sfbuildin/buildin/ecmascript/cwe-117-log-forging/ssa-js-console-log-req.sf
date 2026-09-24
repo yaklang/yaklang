@@ -1,0 +1,54 @@
+desc(
+	mode: "ssa"
+	language: "javascript"
+	title: "数据流：JavaScript 日志写入请求数据"
+	title_zh: "数据流：JavaScript 日志写入请求数据"
+	type: vuln
+	level: low
+	rule_id: "ssa-js-console-log-req"
+	risk: "log-forging"
+	cwe: "CWE-117"
+	desc: <<<DESC
+### 规则说明
+`console.log`、`console.info`、`console.warn`、`console.error` 如果直接打印 `req` 上的字段，查询串和正文里的换行会伪造新的日志行。请求里的令牌、Cookie 也会被记下来。
+
+### 风险类型
+log-forging
+
+### 影响
+日志可以被插入假记录，审计失效。敏感头部进入日志平台后，能读日志的人就能拿走会话。
+
+### 检测方式
+这条规则使用 ssa 模式，只保留非常量、且不是当前函数参数的实参。常量字符串不告警。实参如果只是函数形参，也不会命中。
+匹配名为 `log` 的调用，而且实参不是常量，也不是形参。任何叫 `log` 的函数都可能命中，不限于 `console.log`。是否真的在打印请求，要用 source 规则或调用点确认。
+同一检查还有 source（源码正则）。它们描述同一个问题，命中条件不同，修复时看实际告警来自哪一条。
+
+### 参考
+- [CWE-117：日志输出未处理](https://cwe.mitre.org/data/definitions/117.html)
+
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+- 只记录固定字段，例如请求 id 和路由，不要打印整个 `req`。
+- 去掉消息中的换行，或使用结构化日志。
+- 记录前去掉令牌、口令和 Cookie。
+
+SOLUTION
+	alert_min: 1
+	"file://bad.js": <<<POS
+function bad(console, req) { console.log(req.query.user); }
+
+POS
+	"safefile://ok.js": <<<NEG
+function ok(console) { console.log("ready"); }
+
+NEG
+)
+log(*?{!opcode: const && !opcode: param} as $dyn) as $call
+alert $dyn for {
+	level: "low",
+	title: "数据流：JavaScript 日志写入请求数据",
+	title_zh: "数据流：JavaScript 日志写入请求数据",
+	message: "数据流：JavaScript 日志写入请求数据",
+	risk: "log-forging",
+}

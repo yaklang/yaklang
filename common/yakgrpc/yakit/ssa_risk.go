@@ -29,10 +29,69 @@ func CreateSSARisk(DB *gorm.DB, r *schema.SSARisk) error {
 	if r.TitleVerbose == "" {
 		r.TitleVerbose = r.Title
 	}
+	skip, err := coverEarlierSSARisk(DB, r)
+	if err != nil {
+		return err
+	}
+	if skip {
+		return nil
+	}
 	if db := DB.Create(r); db.Error != nil {
 		return db.Error
 	}
 	return nil
+}
+
+// coverEarlierSSARisk drops less precise rows from the same scan when the
+// incoming risk is the same error at the same place. A more precise row
+// already stored makes the incoming risk a no-op. Risks from another scan
+// (empty or different RuntimeId) are left alone.
+func coverEarlierSSARisk(db *gorm.DB, incoming *schema.SSARisk) (bool, error) {
+	if db == nil || incoming == nil {
+		return false, nil
+	}
+	if strings.TrimSpace(incoming.RuntimeId) == "" || strings.TrimSpace(incoming.ProgramName) == "" {
+		return false, nil
+	}
+	incoming.ScanMode = string(schema.ValidRuleMode(incoming.ScanMode))
+	q := db.Model(&schema.SSARisk{}).
+		Where("runtime_id = ? AND program_name = ?", incoming.RuntimeId, incoming.ProgramName)
+	switch {
+	case incoming.RiskFeatureHash != "" && incoming.Line > 0 && incoming.CodeSourceUrl != "" && incoming.RiskType != "":
+		q = q.Where(
+			"(risk_feature_hash <> '' AND risk_feature_hash = ?) OR (line = ? AND risk_type = ? AND code_source_url = ?)",
+			incoming.RiskFeatureHash, incoming.Line, incoming.RiskType, incoming.CodeSourceUrl,
+		)
+	case incoming.RiskFeatureHash != "":
+		q = q.Where("risk_feature_hash <> '' AND risk_feature_hash = ?", incoming.RiskFeatureHash)
+	case incoming.Line > 0 && incoming.CodeSourceUrl != "" && incoming.RiskType != "":
+		q = q.Where("line = ? AND risk_type = ? AND code_source_url = ?", incoming.Line, incoming.RiskType, incoming.CodeSourceUrl)
+	default:
+		return false, nil
+	}
+	var existing []*schema.SSARisk
+	if err := q.Find(&existing).Error; err != nil {
+		return false, utils.Errorf("cover ssa risk: %s", err)
+	}
+	dropNew := false
+	var replaceIDs []uint
+	for _, old := range existing {
+		if old == nil {
+			continue
+		}
+		switch schema.CoverActionFor(old, incoming) {
+		case schema.CoverDropNew:
+			dropNew = true
+		case schema.CoverReplaceOld:
+			replaceIDs = append(replaceIDs, old.ID)
+		}
+	}
+	for _, id := range replaceIDs {
+		if err := db.Unscoped().Delete(&schema.SSARisk{}, "id = ?", id).Error; err != nil {
+			return false, utils.Errorf("cover ssa risk delete: %s", err)
+		}
+	}
+	return dropNew, nil
 }
 
 func GetSSARiskByID(db *gorm.DB, id int64) (*schema.SSARisk, error) {
