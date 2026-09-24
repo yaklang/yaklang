@@ -684,6 +684,7 @@ func (c *Config) parseProjectWithFirstIncrementalCompile() (*Program, error) {
 		if err := ssadb.UpdateProgramWithError(irProgram); err != nil {
 			log.Errorf("update incremental base program overlay failed: name=%s err=%v", irProgram.ProgramName, err)
 		}
+		InvalidateProgramFileSystemCache(programName)
 		prog.irProgram = irProgram
 	}
 
@@ -716,6 +717,11 @@ func saveOverlayToDatabase(overlay *ProgramOverLay, diffProgram *Program) error 
 
 	if err := ssadb.UpdateProgramWithError(irProgram); err != nil {
 		log.Errorf("save overlay metadata failed: name=%s err=%v", irProgram.ProgramName, err)
+	}
+	// Drop any cached AggregatedFS for this top (and bump gen for all PFS instances).
+	InvalidateProgramFileSystemCache(irProgram.ProgramName)
+	for _, name := range layerNames {
+		InvalidateProgramFileSystemCache(name)
 	}
 
 	return nil
