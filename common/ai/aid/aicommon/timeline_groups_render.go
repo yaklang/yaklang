@@ -979,7 +979,7 @@ const (
 //     "semi-dynamic" 混淆 (frozen 是 cache 边界 nonce, semi-dynamic 是
 //     PROMPT_SECTION 段名 nonce, 两者历史上已经分开)
 //
-// 字面量必须与 aicache.semiBoundaryTagName / semiBoundaryNonce 严格一致 (两
+// 字面量必须与 aiprojection.semiBoundaryTagName / semiBoundaryNonce 严格一致 (两
 // 包互不 import 各自定义本地副本).
 //
 // 关键词: SemiDynamicCacheBoundaryTagName, AI_CACHE_SEMI, semi cache boundary,
@@ -1003,7 +1003,7 @@ const (
 // 一个合并 prefix 计算缓存; 但物理上仍是两条 user message, 让上游 UI 字节统计
 // 与 caller 端观测树能各自展示一组语义分块.
 //
-// 字面量必须与 aicache.semi2BoundaryTagName / semi2BoundaryNonce 严格一致.
+// 字面量必须与 aiprojection.semi2BoundaryTagName / semi2BoundaryNonce 严格一致.
 //
 // 关键词: SemiDynamicPart2CacheBoundaryTagName, AI_CACHE_SEMI2, P1.1,
 //

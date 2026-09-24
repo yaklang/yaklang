@@ -12,9 +12,9 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
-	"github.com/yaklang/yaklang/common/ai/aid/aicache"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon/mock"
+	"github.com/yaklang/yaklang/common/ai/aid/aiprojection"
 )
 
 type managedLoopBuilder func(*PreparedSubAgent) (*ReActLoop, error)
@@ -194,8 +194,8 @@ func TestBackgroundSubAgents_ParentContinuesAndFinishSeesInFlightResult(t *testi
 			case 4:
 				require.Contains(t, req.GetPrompt(), "PAYMENT_EVIDENCE")
 				var dynamic string
-				for _, chunk := range aicache.Split(req.GetPrompt()).Chunks {
-					if chunk.Section == aicache.SectionDynamic {
+				for _, chunk := range aiprojection.Split(req.GetPrompt()).Chunks {
+					if chunk.Section == aiprojection.SectionDynamic {
 						dynamic += chunk.Content
 					}
 				}

@@ -15,7 +15,7 @@
 
 **真正影响成本的是上游 (dashscope) 的 cache_creation 行为**:
 
-| dashscope 实测约束 (见 [TONGYI_CACHE_REPORT.md](../aicache/TONGYI_CACHE_REPORT.md) §4.4 / §4.12) | 含义 |
+| dashscope 缓存约束 | 含义 |
 | --- | --- |
 | 建块阈值 = 1024 token (≈4KB) | 前缀短于此不会建任何缓存块 |
 | **"部分命中 + 增量建块"机制不存在** (E12 决定性 FAIL) | frozen 字节序列每变一次, 整段 user1 按 125% cache_creation 计费**全段重建**, 没有"前缀命中 + 增量计费" |
@@ -255,7 +255,5 @@ go test -run "TestBucketSizer|TestPackTimeline|TestDefault64K" -v \
 
 ## 9. 引用
 
-- [TONGYI_CACHE_REPORT.md](../aicache/TONGYI_CACHE_REPORT.md) §4.4 (1024 token 阈值实测)
-  与 §4.12 (增量建块不存在实测)
-- [CACHE_BOUNDARY_GUIDE.md](../aicache/CACHE_BOUNDARY_GUIDE.md) §1-§3 (frozen 边界标签机制)
+- [aiprojection README](../aiprojection/README.md) (缓存切片与 frozen 边界)
 - [README_TIMELINE_GROUPS.md](README_TIMELINE_GROUPS.md) (Timeline 桶切分实现总览)

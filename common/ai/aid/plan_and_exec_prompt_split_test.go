@@ -6,16 +6,16 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
-	"github.com/yaklang/yaklang/common/ai/aid/aicache"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
+	"github.com/yaklang/yaklang/common/ai/aid/aiprojection"
 )
 
-func aidPromptChunksBySection(t *testing.T, prompt string) map[string][]*aicache.Chunk {
+func aidPromptChunksBySection(t *testing.T, prompt string) map[string][]*aiprojection.Chunk {
 	t.Helper()
 	require.NotEmpty(t, prompt)
-	res := aicache.Split(prompt)
+	res := aiprojection.Split(prompt)
 	require.NotNil(t, res)
-	out := make(map[string][]*aicache.Chunk)
+	out := make(map[string][]*aiprojection.Chunk)
 	for _, c := range res.Chunks {
 		require.NotNil(t, c)
 		out[c.Section] = append(out[c.Section], c)
@@ -23,7 +23,7 @@ func aidPromptChunksBySection(t *testing.T, prompt string) map[string][]*aicache
 	return out
 }
 
-func firstChunk(t *testing.T, sections map[string][]*aicache.Chunk, name string) *aicache.Chunk {
+func firstChunk(t *testing.T, sections map[string][]*aiprojection.Chunk, name string) *aiprojection.Chunk {
 	t.Helper()
 	require.NotEmpty(t, sections[name], "expected section %s", name)
 	return sections[name][0]
@@ -71,9 +71,9 @@ func renderDynamicPlanFixture(t *testing.T, task *AiTask, userInput string, froz
 	schema := task.ContextProvider.Schema()
 	materials := &aicommon.PromptMaterials{
 		TaskInstruction: strings.TrimSpace(__prompt_dynamicPlanInstruction),
-		Schema:            schema["RePlanJsonSchema"],
-		TimelineFrozen:    frozen,
-		TimelineOpen:      open,
+		Schema:          schema["RePlanJsonSchema"],
+		TimelineFrozen:  frozen,
+		TimelineOpen:    open,
 	}
 	prompt, err := aicommon.NewDefaultPromptPrefixBuilder().AssemblePromptWithDynamicSection(
 		materials,
@@ -102,21 +102,21 @@ func TestSplit_DeepThinkPlanPrompt_CacheSections(t *testing.T) {
 	sec1 := aidPromptChunksBySection(t, prompt1)
 	sec2 := aidPromptChunksBySection(t, prompt2)
 
-	require.NotEmpty(t, sec1[aicache.SectionHighStatic])
-	require.NotEmpty(t, sec1[aicache.SectionSemiDynamic1])
-	require.NotEmpty(t, sec1[aicache.SectionSemiDynamic2])
-	require.NotEmpty(t, sec1[aicache.SectionDynamic])
-	require.Empty(t, sec1[aicache.SectionRaw], "deepthink-plan should not produce raw chunks:\n%s", prompt1)
+	require.NotEmpty(t, sec1[aiprojection.SectionHighStatic])
+	require.NotEmpty(t, sec1[aiprojection.SectionSemiDynamic1])
+	require.NotEmpty(t, sec1[aiprojection.SectionSemiDynamic2])
+	require.NotEmpty(t, sec1[aiprojection.SectionDynamic])
+	require.Empty(t, sec1[aiprojection.SectionRaw], "deepthink-plan should not produce raw chunks:\n%s", prompt1)
 
-	require.Equal(t, firstChunk(t, sec1, aicache.SectionHighStatic).Hash, firstChunk(t, sec2, aicache.SectionHighStatic).Hash)
-	require.Equal(t, firstChunk(t, sec1, aicache.SectionSemiDynamic1).Hash, firstChunk(t, sec2, aicache.SectionSemiDynamic1).Hash)
-	require.Equal(t, firstChunk(t, sec1, aicache.SectionSemiDynamic2).Hash, firstChunk(t, sec2, aicache.SectionSemiDynamic2).Hash)
+	require.Equal(t, firstChunk(t, sec1, aiprojection.SectionHighStatic).Hash, firstChunk(t, sec2, aiprojection.SectionHighStatic).Hash)
+	require.Equal(t, firstChunk(t, sec1, aiprojection.SectionSemiDynamic1).Hash, firstChunk(t, sec2, aiprojection.SectionSemiDynamic1).Hash)
+	require.Equal(t, firstChunk(t, sec1, aiprojection.SectionSemiDynamic2).Hash, firstChunk(t, sec2, aiprojection.SectionSemiDynamic2).Hash)
 
-	require.NotContains(t, firstChunk(t, sec1, aicache.SectionHighStatic).Content, "<|PERSISTENT|>")
-	require.NotContains(t, firstChunk(t, sec1, aicache.SectionHighStatic).Content, "<|OUTPUT_EXAMPLE|>")
-	require.Contains(t, firstChunk(t, sec1, aicache.SectionSemiDynamic2).Content, "<|PERSISTENT|>")
-	require.Contains(t, firstChunk(t, sec1, aicache.SectionSemiDynamic2).Content, "<|SCHEMA|>")
-	require.Contains(t, firstChunk(t, sec1, aicache.SectionDynamic).Content, "## 规划任务帮助信息")
+	require.NotContains(t, firstChunk(t, sec1, aiprojection.SectionHighStatic).Content, "<|PERSISTENT|>")
+	require.NotContains(t, firstChunk(t, sec1, aiprojection.SectionHighStatic).Content, "<|OUTPUT_EXAMPLE|>")
+	require.Contains(t, firstChunk(t, sec1, aiprojection.SectionSemiDynamic2).Content, "<|PERSISTENT|>")
+	require.Contains(t, firstChunk(t, sec1, aiprojection.SectionSemiDynamic2).Content, "<|SCHEMA|>")
+	require.Contains(t, firstChunk(t, sec1, aiprojection.SectionDynamic).Content, "## 规划任务帮助信息")
 }
 
 func TestSplit_DynamicPlanPrompt_CacheSectionsAndFrozenOpen(t *testing.T) {
@@ -131,24 +131,24 @@ func TestSplit_DynamicPlanPrompt_CacheSectionsAndFrozenOpen(t *testing.T) {
 	sec1 := aidPromptChunksBySection(t, prompt1)
 	sec2 := aidPromptChunksBySection(t, prompt2)
 
-	require.NotEmpty(t, sec1[aicache.SectionHighStatic])
-	require.NotEmpty(t, sec1[aicache.SectionSemiDynamic1])
-	require.NotEmpty(t, sec1[aicache.SectionSemiDynamic2])
-	require.NotEmpty(t, sec1[aicache.SectionTimelineOpen])
-	require.NotEmpty(t, sec1[aicache.SectionDynamic])
-	require.Empty(t, sec1[aicache.SectionRaw], "dynamic-plan should not produce raw chunks:\n%s", prompt1)
+	require.NotEmpty(t, sec1[aiprojection.SectionHighStatic])
+	require.NotEmpty(t, sec1[aiprojection.SectionSemiDynamic1])
+	require.NotEmpty(t, sec1[aiprojection.SectionSemiDynamic2])
+	require.NotEmpty(t, sec1[aiprojection.SectionTimelineOpen])
+	require.NotEmpty(t, sec1[aiprojection.SectionDynamic])
+	require.Empty(t, sec1[aiprojection.SectionRaw], "dynamic-plan should not produce raw chunks:\n%s", prompt1)
 
 	require.Contains(t, prompt1, "<|AI_CACHE_FROZEN_semi-dynamic|>")
 	require.Contains(t, prompt1, "<|PROMPT_SECTION_timeline-open|>")
 	require.NotContains(t, prompt1, "<|PROMPT_SECTION_timeline|>")
 
-	require.Equal(t, firstChunk(t, sec1, aicache.SectionHighStatic).Hash, firstChunk(t, sec2, aicache.SectionHighStatic).Hash)
-	require.Equal(t, firstChunk(t, sec1, aicache.SectionSemiDynamic1).Hash, firstChunk(t, sec2, aicache.SectionSemiDynamic1).Hash)
-	require.Equal(t, firstChunk(t, sec1, aicache.SectionSemiDynamic2).Hash, firstChunk(t, sec2, aicache.SectionSemiDynamic2).Hash)
+	require.Equal(t, firstChunk(t, sec1, aiprojection.SectionHighStatic).Hash, firstChunk(t, sec2, aiprojection.SectionHighStatic).Hash)
+	require.Equal(t, firstChunk(t, sec1, aiprojection.SectionSemiDynamic1).Hash, firstChunk(t, sec2, aiprojection.SectionSemiDynamic1).Hash)
+	require.Equal(t, firstChunk(t, sec1, aiprojection.SectionSemiDynamic2).Hash, firstChunk(t, sec2, aiprojection.SectionSemiDynamic2).Hash)
 
-	require.NotContains(t, firstChunk(t, sec1, aicache.SectionHighStatic).Content, "<|PERSISTENT|>")
-	require.Contains(t, firstChunk(t, sec1, aicache.SectionSemiDynamic2).Content, "<|PERSISTENT|>")
-	require.Contains(t, firstChunk(t, sec1, aicache.SectionDynamic).Content, peTaskMarkerSharedEvidence)
+	require.NotContains(t, firstChunk(t, sec1, aiprojection.SectionHighStatic).Content, "<|PERSISTENT|>")
+	require.Contains(t, firstChunk(t, sec1, aiprojection.SectionSemiDynamic2).Content, "<|PERSISTENT|>")
+	require.Contains(t, firstChunk(t, sec1, aiprojection.SectionDynamic).Content, peTaskMarkerSharedEvidence)
 }
 
 func TestSplit_PlanReviewIncompletePrompt_CacheSections(t *testing.T) {
@@ -162,18 +162,18 @@ func TestSplit_PlanReviewIncompletePrompt_CacheSections(t *testing.T) {
 	sec1 := aidPromptChunksBySection(t, prompt1)
 	sec2 := aidPromptChunksBySection(t, prompt2)
 
-	require.NotEmpty(t, sec1[aicache.SectionHighStatic])
-	require.NotEmpty(t, sec1[aicache.SectionSemiDynamic1])
-	require.NotEmpty(t, sec1[aicache.SectionSemiDynamic2])
-	require.NotEmpty(t, sec1[aicache.SectionDynamic])
-	require.Empty(t, sec1[aicache.SectionRaw], "plan-incomplete should not produce raw chunks:\n%s", prompt1)
+	require.NotEmpty(t, sec1[aiprojection.SectionHighStatic])
+	require.NotEmpty(t, sec1[aiprojection.SectionSemiDynamic1])
+	require.NotEmpty(t, sec1[aiprojection.SectionSemiDynamic2])
+	require.NotEmpty(t, sec1[aiprojection.SectionDynamic])
+	require.Empty(t, sec1[aiprojection.SectionRaw], "plan-incomplete should not produce raw chunks:\n%s", prompt1)
 
-	require.Equal(t, firstChunk(t, sec1, aicache.SectionHighStatic).Hash, firstChunk(t, sec2, aicache.SectionHighStatic).Hash)
-	require.Equal(t, firstChunk(t, sec1, aicache.SectionSemiDynamic1).Hash, firstChunk(t, sec2, aicache.SectionSemiDynamic1).Hash)
-	require.Equal(t, firstChunk(t, sec1, aicache.SectionSemiDynamic2).Hash, firstChunk(t, sec2, aicache.SectionSemiDynamic2).Hash)
-	require.NotContains(t, firstChunk(t, sec1, aicache.SectionHighStatic).Content, "<|PERSISTENT|>")
-	require.Contains(t, firstChunk(t, sec1, aicache.SectionDynamic).Content, "## 规划任务帮助信息")
-	require.Contains(t, firstChunk(t, sec1, aicache.SectionDynamic).Content, "## 最原始用户输入")
+	require.Equal(t, firstChunk(t, sec1, aiprojection.SectionHighStatic).Hash, firstChunk(t, sec2, aiprojection.SectionHighStatic).Hash)
+	require.Equal(t, firstChunk(t, sec1, aiprojection.SectionSemiDynamic1).Hash, firstChunk(t, sec2, aiprojection.SectionSemiDynamic1).Hash)
+	require.Equal(t, firstChunk(t, sec1, aiprojection.SectionSemiDynamic2).Hash, firstChunk(t, sec2, aiprojection.SectionSemiDynamic2).Hash)
+	require.NotContains(t, firstChunk(t, sec1, aiprojection.SectionHighStatic).Content, "<|PERSISTENT|>")
+	require.Contains(t, firstChunk(t, sec1, aiprojection.SectionDynamic).Content, "## 规划任务帮助信息")
+	require.Contains(t, firstChunk(t, sec1, aiprojection.SectionDynamic).Content, "## 最原始用户输入")
 }
 
 func TestSplit_PlanFreedomReviewPrompt_CacheSections(t *testing.T) {
@@ -187,18 +187,18 @@ func TestSplit_PlanFreedomReviewPrompt_CacheSections(t *testing.T) {
 	sec1 := aidPromptChunksBySection(t, prompt1)
 	sec2 := aidPromptChunksBySection(t, prompt2)
 
-	require.NotEmpty(t, sec1[aicache.SectionHighStatic])
-	require.NotEmpty(t, sec1[aicache.SectionSemiDynamic1])
-	require.NotEmpty(t, sec1[aicache.SectionSemiDynamic2])
-	require.NotEmpty(t, sec1[aicache.SectionDynamic])
-	require.Empty(t, sec1[aicache.SectionRaw], "plan-freedom-review should not produce raw chunks:\n%s", prompt1)
+	require.NotEmpty(t, sec1[aiprojection.SectionHighStatic])
+	require.NotEmpty(t, sec1[aiprojection.SectionSemiDynamic1])
+	require.NotEmpty(t, sec1[aiprojection.SectionSemiDynamic2])
+	require.NotEmpty(t, sec1[aiprojection.SectionDynamic])
+	require.Empty(t, sec1[aiprojection.SectionRaw], "plan-freedom-review should not produce raw chunks:\n%s", prompt1)
 
-	require.Equal(t, firstChunk(t, sec1, aicache.SectionHighStatic).Hash, firstChunk(t, sec2, aicache.SectionHighStatic).Hash)
-	require.Equal(t, firstChunk(t, sec1, aicache.SectionSemiDynamic1).Hash, firstChunk(t, sec2, aicache.SectionSemiDynamic1).Hash)
-	require.Equal(t, firstChunk(t, sec1, aicache.SectionSemiDynamic2).Hash, firstChunk(t, sec2, aicache.SectionSemiDynamic2).Hash)
-	require.NotContains(t, firstChunk(t, sec1, aicache.SectionHighStatic).Content, "<|OUTPUT_EXAMPLE|>")
-	require.Contains(t, firstChunk(t, sec1, aicache.SectionDynamic).Content, "## 规划任务帮助信息")
-	require.Contains(t, firstChunk(t, sec1, aicache.SectionDynamic).Content, "## 最原始用户输入")
+	require.Equal(t, firstChunk(t, sec1, aiprojection.SectionHighStatic).Hash, firstChunk(t, sec2, aiprojection.SectionHighStatic).Hash)
+	require.Equal(t, firstChunk(t, sec1, aiprojection.SectionSemiDynamic1).Hash, firstChunk(t, sec2, aiprojection.SectionSemiDynamic1).Hash)
+	require.Equal(t, firstChunk(t, sec1, aiprojection.SectionSemiDynamic2).Hash, firstChunk(t, sec2, aiprojection.SectionSemiDynamic2).Hash)
+	require.NotContains(t, firstChunk(t, sec1, aiprojection.SectionHighStatic).Content, "<|OUTPUT_EXAMPLE|>")
+	require.Contains(t, firstChunk(t, sec1, aiprojection.SectionDynamic).Content, "## 规划任务帮助信息")
+	require.Contains(t, firstChunk(t, sec1, aiprojection.SectionDynamic).Content, "## 最原始用户输入")
 }
 
 func TestSplit_PlanCreateSubtaskPrompt_CacheSections(t *testing.T) {
@@ -212,20 +212,20 @@ func TestSplit_PlanCreateSubtaskPrompt_CacheSections(t *testing.T) {
 	sec1 := aidPromptChunksBySection(t, prompt1)
 	sec2 := aidPromptChunksBySection(t, prompt2)
 
-	require.NotEmpty(t, sec1[aicache.SectionHighStatic])
-	require.NotEmpty(t, sec1[aicache.SectionSemiDynamic1])
-	require.NotEmpty(t, sec1[aicache.SectionSemiDynamic2])
-	require.NotEmpty(t, sec1[aicache.SectionDynamic])
-	require.Empty(t, sec1[aicache.SectionRaw], "plan-create-subtask should not produce raw chunks:\n%s", prompt1)
+	require.NotEmpty(t, sec1[aiprojection.SectionHighStatic])
+	require.NotEmpty(t, sec1[aiprojection.SectionSemiDynamic1])
+	require.NotEmpty(t, sec1[aiprojection.SectionSemiDynamic2])
+	require.NotEmpty(t, sec1[aiprojection.SectionDynamic])
+	require.Empty(t, sec1[aiprojection.SectionRaw], "plan-create-subtask should not produce raw chunks:\n%s", prompt1)
 
 	require.Contains(t, prompt1, "## 重点拆分目标")
 	require.Contains(t, prompt1, "1-1: Analyze")
 	require.Contains(t, prompt1, "1-2: Verify")
 
-	require.Equal(t, firstChunk(t, sec1, aicache.SectionHighStatic).Hash, firstChunk(t, sec2, aicache.SectionHighStatic).Hash)
-	require.Equal(t, firstChunk(t, sec1, aicache.SectionSemiDynamic1).Hash, firstChunk(t, sec2, aicache.SectionSemiDynamic1).Hash)
-	require.Equal(t, firstChunk(t, sec1, aicache.SectionSemiDynamic2).Hash, firstChunk(t, sec2, aicache.SectionSemiDynamic2).Hash)
-	require.NotContains(t, firstChunk(t, sec1, aicache.SectionHighStatic).Content, "<|PERSISTENT|>")
+	require.Equal(t, firstChunk(t, sec1, aiprojection.SectionHighStatic).Hash, firstChunk(t, sec2, aiprojection.SectionHighStatic).Hash)
+	require.Equal(t, firstChunk(t, sec1, aiprojection.SectionSemiDynamic1).Hash, firstChunk(t, sec2, aiprojection.SectionSemiDynamic1).Hash)
+	require.Equal(t, firstChunk(t, sec1, aiprojection.SectionSemiDynamic2).Hash, firstChunk(t, sec2, aiprojection.SectionSemiDynamic2).Hash)
+	require.NotContains(t, firstChunk(t, sec1, aiprojection.SectionHighStatic).Content, "<|PERSISTENT|>")
 	require.Contains(t, prompt1, "## 规划任务帮助信息")
 	require.Contains(t, prompt1, "## 最原始用户输入")
 }

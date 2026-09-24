@@ -7,7 +7,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
-	"github.com/yaklang/yaklang/common/ai/aid/aicache"
+	"github.com/yaklang/yaklang/common/ai/aid/aiprojection"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
@@ -482,9 +482,9 @@ func TestReportedRisks_PromptPlacement_AtTimelineOpenEnd(t *testing.T) {
 	require.Contains(t, prompt, "sqli")
 	require.Contains(t, prompt, "example.com/login")
 
-	// Use aicache.Split to find section boundaries.
+	// Use aiprojection.Split to find section boundaries.
 	sections := promptBuilderChunksBySection(t, prompt)
-	timelineOpenChunks := sections[aicache.SectionTimelineOpen]
+	timelineOpenChunks := sections[aiprojection.SectionTimelineOpen]
 	require.NotEmpty(t, timelineOpenChunks, "timeline-open section should exist")
 
 	// The ReportedRisks content should be inside the timeline-open section.

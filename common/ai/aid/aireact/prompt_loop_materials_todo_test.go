@@ -6,8 +6,8 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
-	"github.com/yaklang/yaklang/common/ai/aid/aicache"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
+	"github.com/yaklang/yaklang/common/ai/aid/aiprojection"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 )
@@ -112,10 +112,10 @@ func TestPromptManager_AssembleLoopPrompt_TodoBlockSkippedWhenEmpty(t *testing.T
 }
 
 // TestPromptManager_AssembleLoopPrompt_TodoBlockStaysInTimelineOpenCacheBoundary
-// 验证 TODO_LIST 块通过 aicache.Split 后落在 timeline-open 段, 不会污染
+// 验证 TODO_LIST 块通过 aiprojection.Split 后落在 timeline-open 段, 不会污染
 // frozen / semi-dynamic / high-static 三段 prefix cache。
 //
-// 关键词: TodoSnapshot 缓存边界, aicache.Split timeline-open, prefix cache 保护
+// 关键词: TodoSnapshot 缓存边界, aiprojection.Split timeline-open, prefix cache 保护
 func TestPromptManager_AssembleLoopPrompt_TodoBlockStaysInTimelineOpenCacheBoundary(t *testing.T) {
 	react, err := NewTestReAct(
 		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
@@ -148,7 +148,7 @@ func TestPromptManager_AssembleLoopPrompt_TodoBlockStaysInTimelineOpenCacheBound
 	require.NoError(t, err)
 	require.NotNil(t, result)
 
-	splitRes := aicache.Split(result.Prompt)
+	splitRes := aiprojection.Split(result.Prompt)
 	require.NotNil(t, splitRes)
 
 	todoLandedInTimelineOpen := false
@@ -156,7 +156,7 @@ func TestPromptManager_AssembleLoopPrompt_TodoBlockStaysInTimelineOpenCacheBound
 		if !strings.Contains(chunk.Content, "<|TODO_LIST_ncache|>") {
 			continue
 		}
-		require.Equal(t, aicache.SectionTimelineOpen, chunk.Section,
+		require.Equal(t, aiprojection.SectionTimelineOpen, chunk.Section,
 			"TODO_LIST chunk must live in timeline-open section, not %s", chunk.Section)
 		todoLandedInTimelineOpen = true
 	}

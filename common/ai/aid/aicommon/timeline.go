@@ -94,8 +94,7 @@ const MaxTimelineSaveSize = 1536 * 1024
 // 用于在同一绝对时间桶内进一步切块，避免短时巨量 tool 输出拖垮单个 open 桶的前缀缓存。
 //
 // **调优历史 (2026-05)**: 默认值从 16KB 调整为 64KB。
-// 原因: dashscope/qwen 实测 "不存在部分命中 + 增量建块" (见 TONGYI_CACHE_REPORT.md
-// §4.12), frozen 段每变化一次, 整段 user1 需按 125% cache_creation 计费重建。
+// 原因: dashscope/qwen 的 frozen 段变化会触发整段 user1 重新建块。
 // 桶切得越小, 同一时间桶内触发 flush 越多, cache_create 次数越多。
 // 离线重放实验 (见 TIMELINE_BUCKET_TUNING.md) 在真实 session (90 events) 上显示:
 //   - 16K 默认: net_cost = -1.99M (基线)

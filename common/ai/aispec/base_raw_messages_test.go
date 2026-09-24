@@ -112,10 +112,10 @@ func TestChatBase_RawMessagesPriority(t *testing.T) {
 	}
 }
 
-// TestChatBase_RawMessagesByteStability 验证 serializeRawMessagesForMirror
+// TestChatBase_RawMessagesByteStability 验证 serializeRawMessagesForHook
 // 对相同输入产生相同 JSON 字节序列。aicache 等观测者基于字符串 LCP 计算缓存命中
 // 率，必须保证字节稳定，否则会出现"逻辑相同实际不命中"的统计噪音。
-// 关键词: RawMessages 字节稳定, mirror 序列化稳定性
+// 关键词: RawMessages 字节稳定, hook 输入序列化稳定性
 func TestChatBase_RawMessagesByteStability(t *testing.T) {
 	input := []ChatDetail{
 		{Role: "system", Content: "stable system prompt"},
@@ -123,9 +123,9 @@ func TestChatBase_RawMessagesByteStability(t *testing.T) {
 		{Role: "assistant", Content: "first assistant reply"},
 		{Role: "user", Content: "second user msg"},
 	}
-	first := serializeRawMessagesForMirror(input)
+	first := serializeRawMessagesForHook(input)
 	for i := 0; i < 50; i++ {
-		again := serializeRawMessagesForMirror(input)
+		again := serializeRawMessagesForHook(input)
 		if again != first {
 			t.Fatalf("serialization not stable at iteration %d: %q vs %q", i, again, first)
 		}
@@ -264,18 +264,18 @@ func TestLegacyGatewayMediaWire(t *testing.T) {
 	}
 }
 
-// TestChatBase_MirrorReceivesSerializedMessages 验证 RawMessages 模式下，
-// 注册的 mirror observer 收到的不再是 prompt 字符串，而是 messages 的稳定
+// TestChatBase_HookReceivesSerializedMessages 验证 RawMessages 模式下，
+// 注册的 hijack hook 收到的不再是 prompt 字符串，而是 messages 的稳定
 // JSON 序列化结果。aicache 据此计算前缀 LCP 才能与上游 LLM 看到的请求体对齐。
-// 关键词: mirror 序列化, RawMessages observer 对齐
-func TestChatBase_MirrorReceivesSerializedMessages(t *testing.T) {
+// 关键词: hook 输入序列化, RawMessages hook 对齐
+func TestChatBase_HookReceivesSerializedMessages(t *testing.T) {
 	url, _, closeFn := rawMessagesMockServer(t)
 	defer closeFn()
 
-	ResetChatBaseMirrorObserversForTest()
-	t.Cleanup(ResetChatBaseMirrorObserversForTest)
+	ResetChatBaseHijackHooksForTest()
+	t.Cleanup(ResetChatBaseHijackHooksForTest)
 	var obsMsg string
-	RegisterChatBaseMirrorObserver(func(model string, msg string) *ChatBaseMirrorResult {
+	RegisterChatBaseHijackHook(func(model string, msg string) *ChatBaseHijackResult {
 		if obsMsg == "" { // 取第一条即可
 			obsMsg = msg
 		}
@@ -290,13 +290,13 @@ func TestChatBase_MirrorReceivesSerializedMessages(t *testing.T) {
 
 	got := obsMsg
 	if got == "" {
-		t.Fatalf("mirror observer did not receive any msg")
+		t.Fatalf("hijack hook did not receive any msg")
 	}
-	expected := serializeRawMessagesForMirror(input)
+	expected := serializeRawMessagesForHook(input)
 	if got != expected {
-		t.Fatalf("mirror msg mismatch:\n got: %s\nwant: %s", got, expected)
+		t.Fatalf("hook input mismatch:\n got: %s\nwant: %s", got, expected)
 	}
 	if got == "ignored-prompt-string" {
-		t.Fatalf("mirror should NOT receive the legacy prompt string under RawMessages mode")
+		t.Fatalf("hook should NOT receive the legacy prompt string under RawMessages mode")
 	}
 }

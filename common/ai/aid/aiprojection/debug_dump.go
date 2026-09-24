@@ -1,0 +1,232 @@
+package aiprojection
+
+import (
+	"fmt"
+	"os"
+	"path/filepath"
+	"strings"
+	"sync"
+	"time"
+
+	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/log"
+)
+
+// dumpBaseDir 是调试落盘的基础目录，单进程内只解析一次
+// 关键词: aicache, dumpBaseDir, 调试目录
+var (
+	dumpBaseDir    string
+	dumpBaseDirErr error
+	dumpSessionId  string
+	dumpInitMu     sync.Mutex // 保护懒初始化与测试 reset，避免并发 reset sync.Once 导致 panic
+	dumpInited     bool
+	dumpMu         sync.Mutex // 保护落盘文件名序号
+)
+
+// resolveDumpBaseDir 解析并创建调试落盘根目录
+// 路径: <YakitBaseTempDir>/aicache/<sessionId>
+// sessionId 形如 20260503-100123-12345
+// 关键词: aicache, resolveDumpBaseDir
+func resolveDumpBaseDir() (string, error) {
+	dumpInitMu.Lock()
+	defer dumpInitMu.Unlock()
+	if dumpInited {
+		return dumpBaseDir, dumpBaseDirErr
+	}
+	base := consts.GetDefaultYakitBaseTempDir()
+	if base == "" {
+		base = os.TempDir()
+	}
+	dumpSessionId = fmt.Sprintf("%s-%d", time.Now().Format("20060102-150405"), os.Getpid())
+	full := filepath.Join(base, "aicache", dumpSessionId)
+	if err := os.MkdirAll(full, 0o755); err != nil {
+		dumpBaseDirErr = err
+		dumpInited = true
+		return dumpBaseDir, dumpBaseDirErr
+	}
+	dumpBaseDir = full
+	dumpInited = true
+	log.Infof("aicache debug dump dir: %s", dumpBaseDir)
+	return dumpBaseDir, dumpBaseDirErr
+}
+
+// SessionId 返回当前进程的 aicache 会话 ID（懒初始化）
+// 关键词: aicache, SessionId
+func SessionId() string {
+	_, _ = resolveDumpBaseDir()
+	return dumpSessionId
+}
+
+// SessionDir 返回当前进程 aicache 调试落盘根目录的绝对路径，
+// 供脚本侧（cachebench / 离线分析等）一行直接拿到 dump 目录路径，无需重做 mtime 扫描。
+// 第一次调用时会触发懒初始化（与 SessionId 共享 dumpInitMu），之后稳定返回同一路径。
+// 关键词: aicache, SessionDir, 脚本可读 dump 路径
+// 参数:
+//   - 无
+//
+// 返回值:
+//   - aicache 调试落盘根目录的绝对路径
+//
+// Example:
+// ```
+// sessionDir = ai.aicacheSession()
+// println(sessionDir)
+// ```
+func SessionDir() string {
+	dir, _ := resolveDumpBaseDir()
+	return dir
+}
+
+// dumpDebug 把一次缓存观测的完整快照落盘
+// 仅在 utils.InDebugMode() 或测试中触发
+// 关键词: aicache, dumpDebug, DEBUG 落盘
+func dumpDebug(rep *HitReport, split *PromptSplit, gc *globalCache) {
+	if rep == nil || split == nil {
+		return
+	}
+	dir, err := resolveDumpBaseDir()
+	if err != nil || dir == "" {
+		log.Warnf("aicache resolve dump dir failed: %v", err)
+		return
+	}
+
+	dumpMu.Lock()
+	defer dumpMu.Unlock()
+
+	filename := fmt.Sprintf("%06d.txt", rep.SeqId)
+	full := filepath.Join(dir, filename)
+
+	body := renderDebugDump(rep, split, gc)
+	if err := os.WriteFile(full, []byte(body), 0o644); err != nil {
+		log.Warnf("aicache write dump file failed: %v", err)
+	}
+}
+
+// renderDebugDump 把一次观测渲染成可读文本，格式参考 plan 第 8 节
+// 关键词: aicache, renderDebugDump
+func renderDebugDump(rep *HitReport, split *PromptSplit, gc *globalCache) string {
+	var sb strings.Builder
+
+	model := rep.Model
+	if model == "" {
+		model = "-"
+	}
+
+	sb.WriteString("# aicache prompt dump\n")
+	fmt.Fprintf(&sb, "seq:    %06d\n", rep.SeqId)
+	fmt.Fprintf(&sb, "time:   %s\n", rep.GeneratedAt.Format(time.RFC3339))
+	fmt.Fprintf(&sb, "model:  %s\n", model)
+	fmt.Fprintf(&sb, "total:  %d bytes / %d chunks\n", split.Bytes, len(split.Chunks))
+	sb.WriteString("\n")
+
+	sb.WriteString("## sections\n")
+	for i, ch := range split.Chunks {
+		var seenCount int64
+		var firstSeen time.Time
+		if gc != nil {
+			if info := gc.ChunkInfoByHash(ch.Hash); info != nil {
+				seenCount = info.HitCount
+				firstSeen = info.FirstSeen
+			}
+		}
+		hashShort := ch.Hash
+		if len(hashShort) > 16 {
+			hashShort = hashShort[:16]
+		}
+		fmt.Fprintf(&sb,
+			"[%d] section=%-13s nonce=%-24s bytes=%d hash=%s seen=%d first=%s\n",
+			i+1, ch.Section, truncate(ch.Nonce, 24), ch.Bytes, hashShort, seenCount, formatTimeRFC(firstSeen),
+		)
+	}
+	sb.WriteString("\n")
+
+	sb.WriteString("## hit report\n")
+	fmt.Fprintf(&sb, "prefix_hit_chunks: %d\n", rep.PrefixHitChunks)
+	fmt.Fprintf(&sb, "prefix_hit_bytes:  %d\n", rep.PrefixHitBytes)
+	fmt.Fprintf(&sb, "prefix_hit_ratio:  %.1f%%\n", rep.PrefixHitRatio*100)
+	fmt.Fprintf(&sb, "global_uniq_chunks: %d\n", rep.GlobalUniqueChunks)
+	fmt.Fprintf(&sb, "global_cache_bytes: %d\n", rep.GlobalCacheBytes)
+	fmt.Fprintf(&sb, "total_requests:    %d\n", rep.TotalRequests)
+	if len(rep.SectionHashCount) > 0 {
+		sb.WriteString("section_hash_count:\n")
+		for _, section := range orderedSections(rep.SectionHashCount) {
+			fmt.Fprintf(&sb, "  - %s: %d\n", section, rep.SectionHashCount[section])
+		}
+	}
+	if len(rep.SectionTotalUses) > 0 {
+		// total_uses 与 hash_count 配套, 用来算 reuse_rate, 帮诊断 distinct 多
+		// 但每个 forge 入口内部其实稳定的"伪不稳定"场景.
+		// 关键词: renderDebugDump section_total_uses, reuse_rate 数据源
+		sb.WriteString("section_total_uses:\n")
+		for _, section := range orderedSections(rep.SectionTotalUses) {
+			total := rep.SectionTotalUses[section]
+			distinct := rep.SectionHashCount[section]
+			reuseRate := 0.0
+			if total > 0 {
+				reuseRate = 1.0 - float64(distinct)/float64(total)
+			}
+			fmt.Fprintf(&sb, "  - %s: total=%d distinct=%d reuse_rate=%.0f%%\n",
+				section, total, distinct, reuseRate*100)
+		}
+	}
+	sb.WriteString("\n")
+
+	sb.WriteString("## advices\n")
+	if len(rep.Advices) == 0 {
+		sb.WriteString("- (none)\n")
+	} else {
+		for _, adv := range rep.Advices {
+			fmt.Fprintf(&sb, "- %s\n", adv)
+		}
+	}
+	sb.WriteString("\n")
+
+	fmt.Fprintf(&sb, "## raw prompt (%d bytes)\n", split.Bytes)
+	sb.WriteString(split.Original)
+	if !strings.HasSuffix(split.Original, "\n") {
+		sb.WriteString("\n")
+	}
+	return sb.String()
+}
+
+// orderedSections 按固定顺序输出 section 名，未知 section 字典序追加。
+// SectionTimelineOpen 紧随 SectionTimeline, 两者并列展示时视觉相邻便于人工核对。
+// 关键词: aicache, orderedSections, timeline / timeline-open 排序
+func orderedSections(m map[string]int) []string {
+	known := []string{SectionHighStatic, SectionSemiDynamic, SectionSemiDynamic1, SectionSemiDynamic2, SectionTimeline, SectionTimelineOpen, SectionDynamic, SectionRaw}
+	seen := make(map[string]bool, len(known))
+	var out []string
+	for _, s := range known {
+		if _, ok := m[s]; ok {
+			out = append(out, s)
+			seen[s] = true
+		}
+	}
+	for k := range m {
+		if !seen[k] {
+			out = append(out, k)
+		}
+	}
+	return out
+}
+
+// truncate 长字符串截断，便于 dump 行对齐
+// 关键词: aicache, truncate
+func truncate(s string, n int) string {
+	if len(s) <= n {
+		return s
+	}
+	if n <= 3 {
+		return s[:n]
+	}
+	return s[:n-3] + "..."
+}
+
+// formatTimeRFC 安全格式化时间，零值返回 "-"
+// 关键词: aicache, formatTimeRFC
+func formatTimeRFC(t time.Time) string {
+	if t.IsZero() {
+		return "-"
+	}
+	return t.Format(time.RFC3339)
+}
