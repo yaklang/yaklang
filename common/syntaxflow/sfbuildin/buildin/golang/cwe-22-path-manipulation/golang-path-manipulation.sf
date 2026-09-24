@@ -73,9 +73,7 @@ $user_input.URL.Path as $path
 // A bare strings.TrimPrefix(path, "/") used to normalize an internal logical
 // path is not this sink: dataflow through the shared strings package used to
 // connect that constant to an unrelated URL.Path.
-$strings.TrimPrefix<getCall>?{
-	<slice(index=0)>?{have: "URL.Path"} && <slice(index=1)>?{opcode: const}?{have: /\/"/}
-} as $low
+$strings.TrimPrefix<getCall>?{<slice(index=0)>?{have: "URL.Path"} && <slice(index=1)>?{opcode: const}?{have: /"*\/"/}} as $low
 
 alert $low for {
 	type: "vuln",
