@@ -2,6 +2,7 @@ package stream_parser
 
 import (
 	"bytes"
+	"fmt"
 	"strconv"
 	"strings"
 
@@ -19,6 +20,7 @@ type portDispatchPlan struct {
 	source, destination map[uint16]*portPlanBranch
 	otherwise           *portPlanBranch
 	tlsGuard            bool
+	opcuaAdmission      bool
 }
 
 // Port maps retain source-order priority. Looking up src/dst independently and
@@ -37,9 +39,27 @@ func compilePortDispatchPlan(tokens string) *operatorPlan {
 	if p.transport == "" {
 		return nil
 	}
-	defaultBody, rest, ok := strings.Cut(rest, " if ")
-	if !ok {
-		return nil
+	// TCP's OPC UA admission probe is deliberately evaluated before the
+	// ordinary port table: a complete UACP header may identify the protocol on
+	// a custom port, while port 4840 adds a strict client/server direction
+	// constraint. Keep this exact source shape in the native plan instead of
+	// falling back to the Yak VM for every TCP payload.
+	var defaultBody string
+	if strings.HasPrefix(rest, planTokens(opcuaPortDispatchPrelude)+" ") {
+		rest = strings.TrimPrefix(rest, planTokens(opcuaPortDispatchPrelude)+" ")
+		if !strings.HasPrefix(rest, planTokens(opcuaPortDispatchSelection)+" ") {
+			return nil
+		}
+		rest = strings.TrimPrefix(rest, planTokens(opcuaPortDispatchSelection)+" ")
+		rest = strings.TrimPrefix(rest, "if ")
+		p.opcuaAdmission = true
+		defaultBody = planTokens(`typeNameList = ["TLS", "HTTP", "SSH"]`)
+	} else {
+		var ok bool
+		defaultBody, rest, ok = strings.Cut(rest, " if ")
+		if !ok {
+			return nil
+		}
 	}
 	candidates, ok := portCandidates(defaultBody)
 	if !ok {
@@ -167,6 +187,9 @@ func (p *portDispatchPlan) execute(e *planExecution) bool {
 		return false
 	}
 	branch := p.choose(src, dst)
+	// An opaque selected branch is an intentional VM fallback. Let the VM run
+	// the complete operator once, including the optional OPC UA probe; probing
+	// here and then falling back would repeat parser callbacks and transactions.
 	if branch.legacy {
 		return false
 	}
@@ -183,6 +206,14 @@ func (p *portDispatchPlan) execute(e *planExecution) bool {
 		e.at("getNodeResult(" + strconv.Quote(path) + ")")
 		if _, err := getNodeByPath(e.this.origin, path).Result(); err != nil {
 			panic(err)
+		}
+	}
+	if p.opcuaAdmission {
+		candidate, standardPort := p.opcuaCandidate(e, src, dst, maximum)
+		if candidate {
+			branch = &portPlanBranch{candidates: []string{"OPCUATCPMessage"}}
+		} else if standardPort {
+			branch = &portPlanBranch{candidates: []string{}}
 		}
 	}
 	for _, name := range branch.candidates {
@@ -222,6 +253,64 @@ func (p *portDispatchPlan) execute(e *planExecution) bool {
 	}
 	p.tail(e, buffer, start, maximum, bounded, 1)
 	return true
+}
+
+// opcuaCandidate preserves the TCP operator's bounded OPCUAHeaderProbe and
+// its Recovery transaction. The admission criteria intentionally mirror the
+// rule's little-endian UACP header checks; the full OPCUATCPMessage parser
+// still validates every body field before a frame is accepted.
+func (p *portDispatchPlan) opcuaCandidate(e *planExecution, src, dst uint16, maximum uint64) (candidate, standardPort bool) {
+	e.at(`this.TryProcessByType("OPCUAHeaderProbe")`)
+	probe := e.this.tryProcessByTypeDiscard("OPCUAHeaderProbe")
+	if probe.ok {
+		e.at(`prefix.Child("OPCUA Header").Value`)
+		prefix, err := probe.parent.Children[len(probe.parent.Children)-1].Result()
+		if err != nil {
+			panic(err)
+		}
+		headerNode := prefix.Child("OPCUA Header")
+		if headerNode == nil {
+			panic("OPCUAHeaderProbe did not return OPCUA Header")
+		}
+		header, ok := headerNode.Value.(uint64)
+		if !ok {
+			panic(fmt.Sprintf("OPCUA Header has unexpected type %T", headerNode.Value))
+		}
+		messageType := header & 0xffffff
+		chunkType := (header >> 24) & 0xff
+		messageSize := header >> 32
+		var minimumSize uint64
+		directionOK := true
+		switch messageType {
+		case 0x4c4548: // HEL
+			minimumSize = 32
+			if src == 4840 || dst == 4840 {
+				directionOK = dst == 4840 && src != 4840
+			}
+		case 0x4b4341: // ACK
+			minimumSize = 28
+			if src == 4840 || dst == 4840 {
+				directionOK = src == 4840 && dst != 4840
+			}
+		case 0x525245: // ERR
+			minimumSize = 16
+			if src == 4840 || dst == 4840 {
+				directionOK = src == 4840 && dst != 4840
+			}
+		case 0x454852: // RHE
+			minimumSize = 16
+			if src == 4840 || dst == 4840 {
+				directionOK = src == 4840 && dst != 4840
+			}
+		case 0x4e504f: // OPN
+			minimumSize = 33
+			directionOK = src != dst
+		}
+		candidate = chunkType == 0x46 && minimumSize != 0 && messageSize >= minimumSize && messageSize <= maximum && messageSize <= 16777216 && directionOK
+	}
+	e.at("probe.Recovery()")
+	probe.recovery()
+	return candidate, src == 4840 || dst == 4840
 }
 
 func (p *portDispatchPlan) tail(e *planExecution, buffer *bytes.Buffer, start int, maximum uint64, bounded bool, occurrence int) {
@@ -293,3 +382,43 @@ const portDispatchTLSGuard = `if typeName == "TLS" {
  if err != nil { panic(err) }
  if !tlsRecord { continue }
 }`
+
+// This exact prelude is present only in the TCP transport operator. Keeping
+// the complete normalized token sequence here makes any future rule change
+// drop back to the VM until its semantics are deliberately added to the plan.
+const opcuaPortDispatchPrelude = `typeNameList = ["TLS", "HTTP", "SSH"]
+prefix,probe = this.TryProcessByType("OPCUAHeaderProbe")
+opcuaCandidate = false
+if probe.OK {
+  header = prefix.Child("OPCUA Header").Value
+  messageType = header & 16777215
+  chunkType = (header >> 24) & 255
+  messageSize = header >> 32
+  minimumSize = 0
+  directionOK = true
+  if messageType == 0x4c4548 {
+    minimumSize = 32
+    if src == 4840 || dst == 4840 { directionOK = dst == 4840 && src != 4840 }
+  } else if messageType == 0x4b4341 {
+    minimumSize = 28
+    if src == 4840 || dst == 4840 { directionOK = src == 4840 && dst != 4840 }
+  } else if messageType == 0x525245 {
+    minimumSize = 16
+    if src == 4840 || dst == 4840 { directionOK = src == 4840 && dst != 4840 }
+  } else if messageType == 0x454852 {
+    minimumSize = 16
+    if src == 4840 || dst == 4840 { directionOK = src == 4840 && dst != 4840 }
+  } else if messageType == 0x4e504f {
+    minimumSize = 33
+    directionOK = src != dst
+  }
+  opcuaCandidate = chunkType == 0x46 && minimumSize != 0 && messageSize >= minimumSize && messageSize <= maximum && messageSize <= 16777216 && directionOK
+}
+err = probe.Recovery()
+if err != nil { panic(err) }`
+
+const opcuaPortDispatchSelection = `if opcuaCandidate {
+  typeNameList = ["OPCUATCPMessage"]
+} else if src == 4840 || dst == 4840 {
+  typeNameList = []string{}
+} else`

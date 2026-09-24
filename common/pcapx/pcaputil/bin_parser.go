@@ -368,6 +368,7 @@ type binFlow struct {
 	ldap              *binLDAP
 	redis             *binRedis
 	mqtt              *binMQTT
+	nats              *binNATS
 	mongo             *binMongo
 	kafka             *binKafka
 	tds               *binTDS
@@ -403,6 +404,7 @@ type binFlow struct {
 	beanstalk         *binBeanstalk
 	zookeeper         *binZooKeeper
 	clickhouse        *binClickHouse
+	stomp             *binSTOMP
 	rfb               *binRFB
 	diameter          *binDiameter
 	iec104            *binIEC104
@@ -588,7 +590,7 @@ func (f *binFlow) feed(dir int, data []byte, ts time.Time) {
 			}
 			if f.protocol == "" {
 				if len(wire) >= a.config.ProbeBytes {
-					if needsMoreHTTPStartLine(wire) || f.needsMorePortProtocolPrefix(wire) {
+					if needsMoreHTTPStartLine(wire) || f.needsMorePortProtocolPrefix(wire) || natsNeedsMore(wire) || f.needsMoreOpenWire(wire) {
 						break
 					}
 					f.stop(dir, wire, "unrecognized", "bounded detection exhausted; subsequent bytes are counted without VM retries")
@@ -630,6 +632,14 @@ func (f *binFlow) feed(dir int, data []byte, ts time.Time) {
 		}
 		e := f.event(dir, wire[:n], "deferred", f.protocol)
 		e.Rule, e.Entry, e.plan = spec.rule, spec.entry, spec.plan
+		if f.protocol == "nats" {
+			e.Profile, e.Completeness = "nats-plaintext-client", "message"
+		}
+		if f.protocol == "openwire" {
+			e.Profile = "openwire-length-prefixed"
+			e.Completeness = "message"
+			e.Admission = "validated-wireformatinfo-first-frame"
+		}
 		if f.protocol == "syslog" {
 			e.syslogFraming = syslogStreamFraming(e.Raw)
 			e.syslogBudget = a.budget.MaxCollectionElements
@@ -674,7 +684,7 @@ func (f *binFlow) feed(dir int, data []byte, ts time.Time) {
 				} else {
 					result, err = f.consumeTLS(dir, e)
 				}
-			} else if f.protocol == "redis" || f.protocol == "syslog" || f.protocol == "snmp" || f.protocol == "smb2" || f.protocol == "enip" || f.protocol == "stratum" || f.protocol == "gearman" || f.protocol == "beanstalkd" || f.protocol == "scgi" || f.protocol == "msgpack-rpc" || f.protocol == "zookeeper" || f.protocol == "clickhouse" || f.textInternet != nil || e.Entry == "MySQLPreparedFields" {
+			} else if f.protocol == "redis" || f.protocol == "syslog" || f.protocol == "snmp" || f.protocol == "smb2" || f.protocol == "enip" || f.protocol == "stratum" || f.protocol == "gearman" || f.protocol == "beanstalkd" || f.protocol == "scgi" || f.protocol == "msgpack-rpc" || f.protocol == "zookeeper" || f.protocol == "clickhouse" || f.protocol == "stomp" || f.textInternet != nil || e.Entry == "MySQLPreparedFields" {
 				result = map[string]any{}
 			} else if f.protocol == "websocket" && f.ws != nil && f.ws.deflate {
 				result = map[string]any{"fields": map[string]any{}}
@@ -722,6 +732,10 @@ func (f *binFlow) feed(dir int, data []byte, ts time.Time) {
 					result = map[string]any{"fields": e.semanticFields}
 				}
 				if f.protocol == "clickhouse" && e.Session != nil {
+					e.semanticFields = cloneSession(e.Session)
+					result = map[string]any{"fields": e.semanticFields}
+				}
+				if f.protocol == "stomp" && e.Session != nil {
 					e.semanticFields = cloneSession(e.Session)
 					result = map[string]any{"fields": e.semanticFields}
 				}

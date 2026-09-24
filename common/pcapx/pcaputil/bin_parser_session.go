@@ -16,11 +16,25 @@ func (f *binFlow) detectDirection(dir int, wire []byte) {
 	if f.binding != nil || f.protocol != "" {
 		return
 	}
+	if p := probeOpenWire(wire, f.a.budget.MaxFrameBytes); p.Verdict == ProbeAccept {
+		f.protocol = "openwire"
+		return
+	}
 	if f.captureTCP {
 		if s := f.probeTextInternet(dir, w); s != nil {
 			f.protocol, f.textInternet = s.protocol, s
 			return
 		}
+	}
+	if verdict, op := natsAdmission(wire); verdict.Verdict == ProbeAccept {
+		clientDir := -1
+		if role := natsRole(op); role == "client" {
+			clientDir = dir
+		} else if role == "server" {
+			clientDir = 1 - dir
+		}
+		f.protocol, f.nats = "nats", &binNATS{clientDir: clientDir}
+		return
 	}
 	if isHTTPStartLineCandidate(wire) {
 		return
@@ -75,6 +89,8 @@ func (f *binFlow) detectDirection(dir int, wire []byte) {
 			clientDir = 1 - dir
 		}
 		f.protocol, f.clickhouse = "clickhouse", &binClickHouse{clientDir: clientDir}
+	case "stomp":
+		f.protocol, f.stomp = "stomp", &binSTOMP{clientDir: dir}
 	case "socks5":
 		f.protocol, f.socks5 = "socks5", &binSOCKS5{client: dir, phase: socks5Greeting}
 	case "stratum":
@@ -190,6 +206,11 @@ func (f *binFlow) needsMorePortProtocolPrefix(wire []byte) bool {
 	return f.port(19850) && messagePackRPCRequestNeedsMore(wire)
 }
 
+func (f *binFlow) needsMoreOpenWire(wire []byte) bool {
+	p := probeOpenWire(wire, f.a.budget.MaxFrameBytes)
+	return p.Protocol == "openwire" && p.Verdict == ProbeNeedMore && openWireInfoHeader(wire)
+}
+
 func (f *binFlow) consumeSession(dir int, e *ProtocolEvent, result map[string]any) error {
 	var err error
 	switch f.protocol {
@@ -296,6 +317,11 @@ func (f *binFlow) consumeSession(dir int, e *ProtocolEvent, result map[string]an
 		}
 	case "mqtt":
 		e.Session, err = f.mqtt.consume(dir, e.Raw, result)
+	case "nats":
+		if f.nats == nil {
+			f.nats = &binNATS{clientDir: -1}
+		}
+		e.Session, err = f.nats.consume(dir, e.Raw, f.a.config.MaxMessageBytes)
 	case "mongodb":
 		e.Session, err = f.mongo.consume(e.Raw, result)
 	case "kafka":
@@ -436,6 +462,11 @@ func (f *binFlow) consumeSession(dir int, e *ProtocolEvent, result map[string]an
 		if err == nil {
 			e.semanticFields = cloneSession(e.Session)
 			e.Profile, e.Completeness = "clickhouse-native-23-8-r54401-hello-ping", "message"
+		}
+	case "stomp":
+		err = f.consumeSTOMP(dir, e)
+		if err == nil {
+			e.Profile, e.Completeness = "stomp-bounded-frame", "message"
 		}
 	case "syslog":
 		framing := syslogStreamFraming(e.Raw)
@@ -614,6 +645,8 @@ func (f *binFlow) closeSession() {
 	f.textInternet = nil
 	f.dnp3, f.c37118, f.goose, f.syslog = nil, nil, nil, nil
 	f.h2, f.mysql, f.pg, f.ws, f.ldap, f.redis, f.mqtt, f.mongo, f.kafka, f.tds, f.amqp, f.smb2, f.dcerpc, f.ssh, f.nfs, f.snmp, f.rdp, f.dot, f.doh, f.sip, f.rtp, f.quic, f.smtp, f.imap, f.pop3, f.ftp, f.tns, f.radius, f.dhcp, f.ntp, f.coap, f.modbus = nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil
+	f.nats = nil
+	f.stomp = nil
 	f.a.buffered.Add(-f.sessionBytes)
 	f.sessionBytes = 0
 }

@@ -34,18 +34,64 @@ Package:
         panic("openwire: frame length does not match input")
       }
       this.ProcessSubNode("Data Type")
+      if getNodeResult("Data Type").Value != 1 {
+        panic("openwire: expected WireFormatInfo")
+      }
       this.ProcessSubNode("Magic")
+      if getNodeResult("Magic").Value != 0x4163746976654d51 {
+        panic("openwire: invalid WireFormatInfo magic")
+      }
       this.ProcessSubNode("Version")
-      remaining = this.GetMaxLength() - this.Length()
-      if remaining > 0 {
-        this.GetSubNode("Properties").SetMaxLength(remaining)
-        this.ProcessSubNode("Properties")
+      if getNodeResult("Version").Value == 0 {
+        panic("openwire: WireFormatInfo version must be positive")
+      }
+      this.ProcessSubNode("Properties Present")
+      present = getNodeResult("Properties Present").Value
+      if present > 1 {
+        panic("openwire: invalid WireFormatInfo properties marker")
+      }
+      if present == 0 {
+        if length != this.Length() - 4 {
+          panic("openwire: null WireFormatInfo properties have trailing bytes")
+        }
+      } else {
+        this.ProcessSubNode("Properties Length")
+        propertyLength = getNodeResult("Properties Length").Value
+        remaining = this.GetMaxLength() - this.Length()
+        if propertyLength > 4096 || propertyLength != remaining {
+          panic("openwire: WireFormatInfo properties length mismatch or limit")
+        }
+        if propertyLength > 0 {
+          this.GetSubNode("Properties").SetMaxLength(propertyLength)
+          this.ProcessSubNode("Properties")
+        }
       }
     Frame Length: uint32
     Data Type: uint8
-    Magic: raw,8
+    Magic: uint64
     Version: uint32
+    Properties Present: uint8
+    Properties Length: uint32
     Properties: raw
+
+  ActiveMQOpenWireOpaque:
+    operator: |
+      this.ProcessSubNode("Frame Length")
+      if getNodeResult("Frame Length").Value != this.GetMaxLength() - 4 {
+        panic("openwire: opaque frame length does not match input")
+      }
+      this.ProcessSubNode("Data Type")
+      if getNodeResult("Data Type").Value == 1 {
+        panic("openwire: WireFormatInfo requires its validated entry")
+      }
+      remaining = this.GetMaxLength() - this.Length()
+      if remaining > 0 {
+        this.GetSubNode("Payload").SetMaxLength(remaining)
+        this.ProcessSubNode("Payload")
+      }
+    Frame Length: uint32
+    Data Type: uint8
+    Payload: raw
 
   BFD:
     operator: |
@@ -460,9 +506,16 @@ Package:
     endian: little
     operator: |
       this.ProcessSubNode("Message Type")
+      if getNodeResult("Message Type").Value != "HEL" {
+        panic("opcua: HEL message required")
+      }
       this.ProcessSubNode("Chunk Type")
+      if getNodeResult("Chunk Type").Value != "F" {
+        panic("opcua: HEL must be a final chunk")
+      }
       this.ProcessSubNode("Message Size")
-      if getNodeResult("Message Size").Value != this.GetMaxLength() {
+      size = getNodeResult("Message Size").Value
+      if size != this.GetMaxLength() {
         panic("opcua: message size does not match input")
       }
       this.ProcessSubNode("Protocol Version")
@@ -472,7 +525,7 @@ Package:
       this.ProcessSubNode("Maximum Chunk Count")
       this.ProcessSubNode("Endpoint URL Length")
       length = getNodeResult("Endpoint URL Length").Value
-      if length > this.GetMaxLength() - this.Length() {
+      if length == 0 || length > 4096 || length > this.GetMaxLength() - this.Length() {
         panic("opcua: endpoint url exceeds message")
       }
       this.GetSubNode("Endpoint URL").SetMaxLength(length)
@@ -487,6 +540,154 @@ Package:
     Maximum Chunk Count: uint32
     Endpoint URL Length: uint32
     Endpoint URL: string
+
+  # OPC UA Part 6 defines the little-endian UACP message-size header and the
+  # HEL/ACK/RHE/ERR bodies; UASC defines OPN's asymmetric-security and sequence
+  # headers. This bounded slice leaves OPN's secured/service body opaque.
+  # https://reference.opcfoundation.org/specs/OPC-10000-6/7.1.2
+  # https://reference.opcfoundation.org/specs/OPC-10000-6/6.7.2
+  OPCUATCPMessage:
+    endian: little
+    operator: |
+      if !this.HasMaxLength() || this.GetMaxLength("bit") % 8 != 0 {
+        panic("opcua: explicit byte-aligned message boundary required")
+      }
+      available = this.GetMaxLength()
+      this.ProcessSubNode("Message Type")
+      messageType = getNodeResult("Message Type").Value
+      this.ProcessSubNode("Chunk Type")
+      chunkType = getNodeResult("Chunk Type").Value
+      this.ProcessSubNode("Message Size")
+      size = getNodeResult("Message Size").Value
+      if chunkType != "F" {
+        panic("opcua: only final control-message chunks are admitted")
+      }
+      if size < 8 || size > 16777216 || (this.HasMaxLength() && size > available) {
+        panic("opcua: declared message size is outside the bounded input")
+      }
+      this.SetMaxLength(size)
+      if messageType == "HEL" {
+        if size < 32 { panic("opcua: truncated HEL body") }
+        this.ProcessSubNode("Protocol Version")
+        this.ProcessSubNode("Receive Buffer Size")
+        this.ProcessSubNode("Send Buffer Size")
+        this.ProcessSubNode("Maximum Message Size")
+        this.ProcessSubNode("Maximum Chunk Count")
+        if getNodeResult("Receive Buffer Size").Value < 8192 || getNodeResult("Send Buffer Size").Value < 8192 {
+          panic("opcua: HEL receive/send buffers must be at least 8192 bytes")
+        }
+        this.ProcessSubNode("Endpoint URL Length")
+        length = getNodeResult("Endpoint URL Length").Value
+        if length == 0 || length > 4096 || length > size - this.Length() {
+          panic("opcua: invalid HEL endpoint URL length")
+        }
+        this.GetSubNode("Endpoint URL").SetMaxLength(length)
+        this.ProcessSubNode("Endpoint URL")
+      } else if messageType == "ACK" {
+        if size != 28 { panic("opcua: ACK must contain exactly five UInt32 fields") }
+        this.ProcessSubNode("Protocol Version")
+        this.ProcessSubNode("Receive Buffer Size")
+        this.ProcessSubNode("Send Buffer Size")
+        this.ProcessSubNode("Maximum Message Size")
+        this.ProcessSubNode("Maximum Chunk Count")
+        if getNodeResult("Receive Buffer Size").Value < 8192 || getNodeResult("Send Buffer Size").Value < 8192 {
+          panic("opcua: ACK receive/send buffers must be at least 8192 bytes")
+        }
+      } else if messageType == "ERR" {
+        if size < 16 { panic("opcua: truncated ERR body") }
+        this.ProcessSubNode("Error Code")
+        this.ProcessSubNode("Reason Length")
+        length = getNodeResult("Reason Length").Value
+        if length != 4294967295 {
+          if length > 4096 || length > size - this.Length() { panic("opcua: invalid ERR reason length") }
+          if length > 0 {
+            this.GetSubNode("Reason").SetMaxLength(length)
+            this.ProcessSubNode("Reason")
+          }
+        }
+      } else if messageType == "RHE" {
+        if size < 16 { panic("opcua: truncated RHE body") }
+        this.ProcessSubNode("Server URI Length")
+        length = getNodeResult("Server URI Length").Value
+        if length == 0 || length > 4096 || length > size - this.Length() { panic("opcua: invalid RHE server URI length") }
+        this.GetSubNode("Server URI").SetMaxLength(length)
+        this.ProcessSubNode("Server URI")
+        this.ProcessSubNode("Endpoint URL Length")
+        length = getNodeResult("Endpoint URL Length").Value
+        if length == 0 || length > 4096 || length > size - this.Length() { panic("opcua: invalid RHE endpoint URL length") }
+        this.GetSubNode("Endpoint URL").SetMaxLength(length)
+        this.ProcessSubNode("Endpoint URL")
+      } else if messageType == "OPN" {
+        if size < 33 { panic("opcua: truncated OPN secure conversation header or body") }
+        this.ProcessSubNode("Secure Channel ID")
+        this.ProcessSubNode("Security Policy URI Length")
+        length = getNodeResult("Security Policy URI Length").Value
+        if length == 0 || length > 4096 || length > size - this.Length() { panic("opcua: invalid OPN security policy URI length") }
+        this.GetSubNode("Security Policy URI").SetMaxLength(length)
+        this.ProcessSubNode("Security Policy URI")
+        policy = getNodeResult("Security Policy URI").Value
+        this.ProcessSubNode("Sender Certificate Length")
+        senderCertificateLength = getNodeResult("Sender Certificate Length").Value
+        if senderCertificateLength != 4294967295 {
+          length = senderCertificateLength
+          if length > 4194304 || length > size - this.Length() { panic("opcua: invalid OPN sender certificate length") }
+          if length > 0 {
+            this.GetSubNode("Sender Certificate").SetMaxLength(length)
+            this.ProcessSubNode("Sender Certificate")
+          }
+        }
+        this.ProcessSubNode("Receiver Thumbprint Length")
+        receiverThumbprintLength = getNodeResult("Receiver Thumbprint Length").Value
+        if receiverThumbprintLength != 4294967295 {
+          length = receiverThumbprintLength
+          if length > 4096 || length > size - this.Length() { panic("opcua: invalid OPN receiver thumbprint length") }
+          if length > 0 {
+            this.GetSubNode("Receiver Thumbprint").SetMaxLength(length)
+            this.ProcessSubNode("Receiver Thumbprint")
+          }
+        }
+        if policy == "http://opcfoundation.org/UA/SecurityPolicy#None" && ((senderCertificateLength != 4294967295 && senderCertificateLength != 0) || (receiverThumbprintLength != 4294967295 && receiverThumbprintLength != 0)) {
+          panic("opcua: None security policy cannot carry certificate data")
+        }
+        this.ProcessSubNode("Sequence Number")
+        this.ProcessSubNode("Request ID")
+        remaining = size - this.Length()
+        if remaining == 0 { panic("opcua: OPN has no opaque security/service bytes") }
+        this.GetSubNode("Opaque OPN Body").SetMaxLength(remaining)
+        this.ProcessSubNode("Opaque OPN Body")
+      } else {
+        panic("opcua: unsupported UACP message type")
+      }
+      if this.Length() != size { panic("opcua: fields do not consume the declared message size") }
+    Message Type: string,3
+    Chunk Type: string,1
+    Message Size: uint32
+    Protocol Version: uint32
+    Receive Buffer Size: uint32
+    Send Buffer Size: uint32
+    Maximum Message Size: uint32
+    Maximum Chunk Count: uint32
+    Endpoint URL Length: uint32
+    Endpoint URL: string
+    Error Code: uint32
+    Reason Length: uint32
+    Reason: string
+    Server URI Length: uint32
+    Server URI: string
+    Secure Channel ID: uint32
+    Security Policy URI Length: uint32
+    Security Policy URI: string
+    Sender Certificate Length: uint32
+    Sender Certificate: raw
+    Receiver Thumbprint Length: uint32
+    Receiver Thumbprint: raw
+    Sequence Number: uint32
+    Request ID: uint32
+    Opaque OPN Body: raw
+
+  OPCUAHeaderProbe:
+    endian: little
+    OPCUA Header: uint64
 
   OmronFINS:
     ICF: uint8

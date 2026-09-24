@@ -266,3 +266,32 @@ func TestProtocolSessionGOOSEFailClosed(t *testing.T) {
 	require.NotNil(t, r.Err)
 	require.NotEqual(t, ErrNeedMore, r.Err.Kind)
 }
+
+func TestGOOSEProbeRequiresConsistentBEREnvelope(t *testing.T) {
+	valid := goosePDU()
+	require.Equal(t, ProbeAccept, probeGOOSE(valid, DefaultParserBudget().ProbeBytes).Verdict)
+	require.NotEqual(t, ProbeAccept, probeGOOSE(valid[:9], DefaultParserBudget().ProbeBytes).Verdict)
+
+	badLength := append([]byte(nil), valid...)
+	badLength[9] ^= 1 // The encoded PDU length no longer matches the GOOSE header.
+	badFirstField := append([]byte(nil), valid...)
+	firstField := 10
+	if badFirstField[9]&0x80 != 0 {
+		firstField += int(badFirstField[9] & 0x7f)
+	}
+	badFirstField[firstField] = 0x81 // gocbRef must be the first GOOSE field.
+	for _, malformed := range [][]byte{badLength, badFirstField} {
+		require.NotEqual(t, ProbeAccept, probeGOOSE(malformed, DefaultParserBudget().ProbeBytes).Verdict)
+	}
+	// A legitimate gocbRef can exceed the stream's 64-byte probe preview.
+	// Ethernet receives a complete frame and checks its whole bounded field.
+	longRef := []byte("bay/voltage-transformer/GOOSE/control-block-ref-001234567890123456789")
+	inner := append([]byte{0x80, byte(len(longRef))}, longRef...)
+	inner = append(inner, valid[17:]...)
+	pdu := append([]byte{0x61, byte(len(inner))}, inner...)
+	long := make([]byte, 8+len(pdu))
+	copy(long, valid[:8])
+	binary.BigEndian.PutUint16(long[2:4], uint16(len(long)))
+	copy(long[8:], pdu)
+	require.Equal(t, ProbeAccept, probeGOOSE(long, len(long)).Verdict)
+}

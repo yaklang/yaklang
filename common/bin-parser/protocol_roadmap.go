@@ -418,7 +418,7 @@ var ProtocolRoadmap = []RoadmapItem{
 	{Name: "IEC 61850 MMS", Family: "ics", Sources: src(srcWireshark), Status: stTodo, Priority: priP2},
 	{Name: "IEC 61850 GOOSE", Family: "ics", Sources: src(srcWireshark), Status: stTodo, Priority: priP2},
 	{Name: "IEC 61850 SV", Family: "ics", Sources: src(srcWireshark), Status: stTodo, Priority: priP2},
-	{Name: "OPC UA", Family: "ics", Sources: src(srcWireshark), Status: stTodo, Priority: priP2},
+	{Name: "OPC UA", Family: "ics", Sources: src(srcWireshark), Status: stPartial, Priority: priP2},
 	{Name: "OPC DA", Family: "ics", Sources: src(srcPrivate), Status: stTodo, Priority: priP2},
 	{Name: "BACnet", Family: "ics", Sources: src(srcWireshark, srcColasoft), Status: stTodo, Priority: priP2},
 	{Name: "EtherNet/IP CIP", Family: "ics", Sources: src(srcWireshark, srcColasoft), Status: stTodo, Priority: priP2},

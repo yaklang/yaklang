@@ -1,6 +1,9 @@
 package pcaputil
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
+	"os"
 	"path/filepath"
 	"testing"
 
@@ -48,6 +51,12 @@ func TestWinlab5013SOCKS5CaptureIsNotMisclassifiedAsTNS(t *testing.T) {
 }
 
 func TestWinlab5013ZooKeeperCaptureIsRecognizedAsZooKeeper(t *testing.T) {
+	capturePath := filepath.Join("..", "..", "bin-parser", "testdata", "winlab5013", "captures", "07-zookeeper.pcapng")
+	capture, err := os.ReadFile(capturePath)
+	require.NoError(t, err)
+	digest := sha256.Sum256(capture)
+	require.Equal(t, "e2f09c6315c71e6335d2cd884d3d5919c74177b6626a95a3a0c472b0f9857fd8", hex.EncodeToString(digest[:]), "Winlab manifest capture changed")
+
 	var zooKeeper []*ProtocolEvent
 	for _, event := range replayWinlab5013Protocols(t, "07-zookeeper.pcapng") {
 		require.NotEqual(t, "kafka", event.Protocol, "%s %s: %s", event.Status, event.Protocol, event.Summary)
@@ -73,6 +82,13 @@ func TestWinlab5013ZooKeeperCaptureIsRecognizedAsZooKeeper(t *testing.T) {
 		zooKeeper[8].Fields["Packet Name"].(string),
 		zooKeeper[9].Fields["Packet Name"].(string),
 	})
+	for i, event := range zooKeeper {
+		require.Equal(t, i%2, event.Direction, "wrong client/server direction for %s", event.Fields["Packet Name"])
+	}
+	require.Equal(t, "observed", zooKeeper[3].Fields["Request Association"])
+	for _, i := range []int{5, 7, 9} {
+		require.Equal(t, "matched", zooKeeper[i].Fields["Request Association"], "response did not match its request: %s", zooKeeper[i].Fields["Packet Name"])
+	}
 	require.Equal(t, uint64(0x5013), zooKeeper[1].Fields["Session ID"])
 	require.Equal(t, []string{"lab", "znode"}, zooKeeper[5].Fields["Children"])
 	require.Equal(t, "/lab", zooKeeper[7].Fields["Path"])

@@ -184,7 +184,9 @@ func (a *binParser) networkPacket(p gopacket.Packet) (gopacket.Packet, bool) {
 // the complete message before it can be reported as decoded. A failed probe
 // is consumed without a GOOSE claim so an EtherType by itself is insufficient.
 func (a *binParser) decodeGOOSEEthernet(eth *layers.Ethernet, payload []byte, evidence captureEvidence, ci gopacket.CaptureInfo) {
-	if probeGOOSE(payload, min(len(payload), a.config.ProbeBytes)).Verdict != ProbeAccept {
+	// Ethernet GOOSE is a complete frame; inspect the bounded gocbRef even when
+	// it exceeds the TCP/UDP stream probe budget.
+	if probeGOOSE(payload, len(payload)).Verdict != ProbeAccept {
 		return
 	}
 

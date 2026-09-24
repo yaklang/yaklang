@@ -202,6 +202,7 @@ func FuzzRound5ProtocolBoundaries(f *testing.F) {
 			t.Skip()
 		}
 		for dir := 0; dir < 2; dir++ {
+			_ = probeGOOSE(w, 64)
 			_, _ = (&binSTUN{}).consume(dir, time.Time{}, w, 32, false)
 			_, _ = (&binTFTP{}).consume(dir, w, 32)
 			_, _ = (&binDiameter{}).consume(dir, w, 32, 8)

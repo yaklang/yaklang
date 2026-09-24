@@ -106,6 +106,22 @@ func TestProtocolSessionDoHHTTP2GET(t *testing.T) {
 	require.Equal(t, []string{"1.2.3.4"}, r.Events[0].Session["A Records"])
 }
 
+func TestProtocolSessionDoHHTTP2DoesNotUseAcceptAlone(t *testing.T) {
+	s, err := NewProtocolSession(DefaultParserBudget())
+	require.NoError(t, err)
+	ts := time.Unix(1, 0)
+	preface := append([]byte(binH2Preface), h2TestFrame(4, 0, 0, nil)...)
+	require.Nil(t, s.Feed(0, ts, preface).Err)
+	require.Nil(t, s.Feed(1, ts, h2TestFrame(4, 0, 0, nil)).Err)
+	headers := h2TestHeaders(t, ":method", "GET", ":scheme", "https", ":path", "/search?filter=dns=example.com", ":authority", "www.example.test", "accept", "application/dns-message")
+	r := s.Feed(0, ts, h2TestFrame(1, 5, 1, headers))
+	require.Nil(t, r.Err, "%v", r.Err)
+	require.Len(t, r.Events, 1)
+	require.Equal(t, "http2", r.Events[0].Protocol)
+	require.Equal(t, "decoded", r.Events[0].Status)
+	require.NotEqual(t, true, r.Events[0].Session["DoH"])
+}
+
 func TestProtocolSessionDoHFailClosed(t *testing.T) {
 	s, err := NewProtocolSession(DefaultParserBudget())
 	require.NoError(t, err)
@@ -119,8 +135,11 @@ func TestProtocolSessionDoHFailClosed(t *testing.T) {
 	require.NoError(t, err)
 	badCT := []byte("POST /dns-query HTTP/1.1\r\nHost: dns.example.test\r\nContent-Type: text/plain\r\nContent-Length: 12\r\n\r\n0123456789ab")
 	r = s2.Feed(0, ts, badCT)
-	require.NotNil(t, r.Err)
-	require.NotEqual(t, ErrNeedMore, r.Err.Kind)
+	require.Nil(t, r.Err, "%v", r.Err)
+	require.Len(t, r.Events, 1)
+	require.Equal(t, "http", r.Events[0].Protocol)
+	require.Equal(t, "decoded", r.Events[0].Status)
+	require.NotEqual(t, true, r.Events[0].Session["DoH"])
 
 	s3, err := NewProtocolSession(DefaultParserBudget())
 	require.NoError(t, err)
