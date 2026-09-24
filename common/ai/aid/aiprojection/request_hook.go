@@ -55,10 +55,11 @@ func ProjectAndObserve(model, msg string) *aispec.ChatBaseHijackResult {
 		projectionSections = Parse(projectedPrompt).Sections()
 	}
 	projection := Project(ProjectionInput{Sections: projectionSections, ActionTools: actionTools})
+	projectedMessages, actionResponsesProjected := expandActionResponseMessages(projection.Messages)
 	result := &aispec.ChatBaseHijackResult{}
-	if projection.Metadata.CacheProjected || len(actionTools) > 0 {
+	if projection.Metadata.CacheProjected || len(actionTools) > 0 || actionResponsesProjected {
 		result.IsHijacked = true
-		result.Messages = projection.Messages
+		result.Messages = projectedMessages
 		result.Tools = projection.Tools
 	}
 	if rep != nil && rep.SeqId > 0 {
