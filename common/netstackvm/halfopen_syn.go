@@ -33,7 +33,6 @@ type HalfOpenSYNConfig struct {
 	Retry            SYNRetryPolicy
 	MaxInFlight      int // Default 256; held through response/retry completion.
 	PacketsPerSecond int // Default 1000, burst 1; includes retransmissions.
-	OnResult         func(target string, synAck TCPSegment, err error)
 	Iface            *net.Interface
 	SourceIP         net.IP
 	Gateway          net.IP
@@ -41,9 +40,6 @@ type HalfOpenSYNConfig struct {
 	// A matching SYN-ACK on these interfaces is not evidence of an open remote
 	// port: a proxy may synthesize it even when the destination is closed.
 	AllowUnverifiedTransport bool
-	// OnOpen is called once per successful probe on its
-	// worker, outside the capture loop. It must return promptly.
-	OnOpen func(ip net.IP, port int)
 }
 
 // HalfOpenSYN emits TCP SYNs from a writable netstackvm capture and reports
@@ -54,14 +50,13 @@ type HalfOpenSYN struct {
 	ctx    context.Context
 	cancel context.CancelFunc
 
-	mu       sync.Mutex
-	wg       sync.WaitGroup
-	closed   bool
-	slots    chan struct{}
-	limiter  *rate.Limiter
-	retry    SYNRetryPolicy
-	onResult func(string, TCPSegment, error)
-	done     chan struct{}
+	mu      sync.Mutex
+	wg      sync.WaitGroup
+	closed  bool
+	slots   chan struct{}
+	limiter *rate.Limiter
+	retry   SYNRetryPolicy
+	done    chan struct{}
 
 	stack *stack.Stack
 	main  *NetStackVirtualMachineEntry
@@ -70,7 +65,6 @@ type HalfOpenSYN struct {
 	mainIsLoopback           bool
 	allowUnverifiedTransport bool
 	gateway                  net.IP
-	onOpen                   func(net.IP, int)
 
 	flights map[flightKey]*synFlight
 }
@@ -156,10 +150,9 @@ func OpenHalfOpenSYN(ctx context.Context, cfg HalfOpenSYNConfig) (*HalfOpenSYN, 
 		cancel:  cancel,
 		slots:   make(chan struct{}, cfg.MaxInFlight),
 		limiter: rate.NewLimiter(rate.Limit(cfg.PacketsPerSecond), 1),
-		retry:   cfg.Retry, onResult: cfg.OnResult, done: make(chan struct{}),
+		retry:   cfg.Retry, done: make(chan struct{}),
 		stack:                    stackIns,
 		gateway:                  ipv4Only(cfg.Gateway),
-		onOpen:                   cfg.OnOpen,
 		flights:                  make(map[flightKey]*synFlight),
 		mainIsLoopback:           cfg.Iface.Flags&net.FlagLoopback != 0,
 		allowUnverifiedTransport: cfg.AllowUnverifiedTransport,
@@ -376,56 +369,21 @@ func (h *HalfOpenSYN) StartTCPProbe(ctx context.Context, target string, options 
 	return p, nil
 }
 
-// Emit runs the same public stepped probe in a bounded worker. Admission
-// blocks under load. OnResult distinguishes cancellation, local send failure,
-// reset and inconclusive silence; only a validated SYN-ACK calls OnOpen.
-func (h *HalfOpenSYN) Emit(ctx context.Context, host string, port int) error {
-	h.mu.Lock()
-	if h.closed {
-		h.mu.Unlock()
-		return errHalfOpenClosed
-	}
-	h.wg.Add(1)
-	h.mu.Unlock()
-	target := net.JoinHostPort(host, strconv.Itoa(port))
-	probe, err := h.StartTCPProbe(ctx, target)
+// ProbeSYN synchronously probes one target without completing the handshake.
+// It owns and closes the probe on every return path, including cancellation.
+// The context bounds admission, sending, retries and response waiting. Callers
+// own batch concurrency and give each call its own context. Use StartTCPProbe
+// instead when individual steps or a longer-lived probe are needed.
+func (h *HalfOpenSYN) ProbeSYN(ctx context.Context, target string, options ...TCPProbeOption) (TCPSegment, error) {
+	probe, err := h.StartTCPProbe(ctx, target, options...)
 	if err != nil {
-		h.wg.Done()
-		return err
+		return TCPSegment{}, err
 	}
-	go func() {
-		defer h.wg.Done()
-		defer probe.Close()
-		var ack TCPSegment
-		_, err := probe.ProbeSYNContext(ctx)
-		if err == nil {
-			ack, err = probe.ReceiveSYNACKContext(ctx)
-		}
-		if err == nil && h.onOpen != nil {
-			h.onOpen(ack.RemoteIP, int(ack.RemotePort))
-		}
-		if h.onResult != nil {
-			h.onResult(target, ack, err)
-		}
-	}()
-	return nil
-}
-
-// Wait drains probes and result callbacks. Call after the last Emit; no new
-// StartTCPProbe/Emit may run concurrently with Wait. Cancellation does not
-// implicitly cancel the session; Close does.
-func (h *HalfOpenSYN) Wait(ctx context.Context) error {
-	if ctx == nil {
-		ctx = context.Background()
+	defer probe.Close()
+	if _, err = probe.ProbeSYNContext(ctx); err != nil {
+		return TCPSegment{}, err
 	}
-	done := make(chan struct{})
-	go func() { h.wg.Wait(); close(done) }()
-	select {
-	case <-ctx.Done():
-		return ctx.Err()
-	case <-done:
-		return nil
-	}
+	return probe.ReceiveSYNACKContext(ctx)
 }
 
 func (h *HalfOpenSYN) Close() error {

@@ -2,10 +2,15 @@ package synscanx
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"github.com/gopacket/gopacket"
 	"github.com/gopacket/gopacket/layers"
+	"github.com/yaklang/yaklang/common/netstackvm"
 	"net"
+	"os"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -232,32 +237,155 @@ func TestPortsIncludeUDP(t *testing.T) {
 	}
 }
 
-type recordingEmitter struct {
-	got []string
+type recordingProber struct {
+	mu       sync.Mutex
+	got      []string
+	contexts []context.Context
+	start    func(context.Context, string) (tcpSYNProbe, error)
 }
 
-func (r *recordingEmitter) Emit(ctx context.Context, host string, port int) error {
-	if err := ctx.Err(); err != nil {
-		return err
+func (r *recordingProber) startTCPProbe(ctx context.Context, target string) (tcpSYNProbe, error) {
+	r.mu.Lock()
+	r.got = append(r.got, target)
+	r.contexts = append(r.contexts, ctx)
+	r.mu.Unlock()
+	if r.start != nil {
+		return r.start(ctx, target)
 	}
-	r.got = append(r.got, host+":"+itoa(port))
+	return &stubSYNProbe{}, nil
+}
+func (r *recordingProber) Close() error { return nil }
+
+type stubSYNProbe struct {
+	send    func(context.Context) error
+	receive func(context.Context) (netstackvm.TCPSegment, error)
+	close   func()
+}
+
+func (p *stubSYNProbe) ProbeSYNContext(ctx context.Context) (netstackvm.TCPSegment, error) {
+	if p.send != nil {
+		return netstackvm.TCPSegment{}, p.send(ctx)
+	}
+	return netstackvm.TCPSegment{}, nil
+}
+func (p *stubSYNProbe) ReceiveSYNACKContext(ctx context.Context) (netstackvm.TCPSegment, error) {
+	if p.receive != nil {
+		return p.receive(ctx)
+	}
+	return netstackvm.TCPSegment{}, nil
+}
+func (p *stubSYNProbe) Close() error {
+	if p.close != nil {
+		p.close()
+	}
 	return nil
 }
 
-func (r *recordingEmitter) Close() error                   { return nil }
-func (r *recordingEmitter) Wait(ctx context.Context) error { return ctx.Err() }
-
-func TestSendPacketUsesHalfOpenEmitterForTCP(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-	rec := &recordingEmitter{}
-	scanner := &Scannerx{ctx: ctx, halfOpen: rec}
-	targetCh := make(chan *SynxTarget, 1)
-	targetCh <- &SynxTarget{Host: "10.0.0.8", Port: 443, Mode: TCP}
+func TestSendPacketUsesIndependentSynchronousProbes(t *testing.T) {
+	var closed, received, opened atomic.Int32
+	rec := &recordingProber{}
+	rec.start = func(lifetime context.Context, target string) (tcpSYNProbe, error) {
+		if _, ok := lifetime.Deadline(); !ok {
+			t.Error("probe has no independent deadline")
+		}
+		return &stubSYNProbe{
+			send: func(ctx context.Context) error {
+				if ctx != lifetime {
+					t.Error("send uses a different lifetime")
+				}
+				if target == "10.0.0.8:82" {
+					return netstackvm.ErrProbeSend
+				}
+				return nil
+			},
+			receive: func(ctx context.Context) (netstackvm.TCPSegment, error) {
+				received.Add(1)
+				if ctx != lifetime {
+					t.Error("receive uses a different lifetime")
+				}
+				if target == "10.0.0.8:81" {
+					<-ctx.Done()
+					return netstackvm.TCPSegment{}, ctx.Err()
+				}
+				return netstackvm.TCPSegment{RemoteIP: net.IPv4(10, 0, 0, 8), RemotePort: 80}, nil
+			}, close: func() { closed.Add(1) },
+		}, nil
+	}
+	scanner := &Scannerx{ctx: context.Background(), halfOpen: rec, config: &SynxConfig{tcpProbeTimeout: 30 * time.Millisecond, tcpProbeConcurrency: 2}, OpenPortHandlers: func(ip net.IP, port int) {
+		if port != 80 {
+			t.Errorf("unexpected open port %d", port)
+		}
+		opened.Add(1)
+	}}
+	targetCh := make(chan *SynxTarget, 3)
+	for _, port := range []int{81, 80, 82} {
+		targetCh <- &SynxTarget{Host: "10.0.0.8", Port: port, Mode: TCP}
+	}
 	close(targetCh)
 	scanner.sendPacket(targetCh)
-	if len(rec.got) != 1 || rec.got[0] != "10.0.0.8:443" {
-		t.Fatalf("emitted %v", rec.got)
+	if closed.Load() != 3 || received.Load() != 2 || opened.Load() != 1 {
+		t.Fatalf("closed=%d received=%d opened=%d", closed.Load(), received.Load(), opened.Load())
+	}
+	if len(rec.contexts) != 3 {
+		t.Fatalf("contexts=%d", len(rec.contexts))
+	}
+	for i, ctx := range rec.contexts {
+		if ctx.Err() == nil {
+			t.Error("probe context leaked")
+		}
+		for j := 0; j < i; j++ {
+			if ctx == rec.contexts[j] {
+				t.Error("targets shared a lifetime")
+			}
+		}
+	}
+}
+
+func TestSendPacketBoundsWorkersAndCancelsPendingProbes(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	started := make(chan struct{}, 10)
+	var closed atomic.Int32
+	rec := &recordingProber{start: func(context.Context, string) (tcpSYNProbe, error) {
+		started <- struct{}{}
+		return &stubSYNProbe{receive: func(ctx context.Context) (netstackvm.TCPSegment, error) {
+			<-ctx.Done()
+			return netstackvm.TCPSegment{}, ctx.Err()
+		}, close: func() { closed.Add(1) }}, nil
+	}}
+	scanner := &Scannerx{ctx: ctx, halfOpen: rec, config: &SynxConfig{tcpProbeConcurrency: 2}}
+	targets := make(chan *SynxTarget, 10)
+	for i := 0; i < 10; i++ {
+		targets <- &SynxTarget{Host: "10.0.0.8", Port: 80 + i, Mode: TCP}
+	}
+	close(targets)
+	done := make(chan struct{})
+	go func() { scanner.sendPacket(targets); close(done) }()
+	for i := 0; i < 2; i++ {
+		select {
+		case <-started:
+		case <-time.After(time.Second):
+			t.Fatal("worker did not start")
+		}
+	}
+	select {
+	case <-started:
+		t.Fatal("worker limit exceeded")
+	case <-time.After(20 * time.Millisecond):
+	}
+	cancel()
+	select {
+	case <-done:
+	case <-time.After(time.Second):
+		t.Fatal("cancellation did not drain workers")
+	}
+	if closed.Load() < 2 {
+		t.Fatal("active probes not closed")
+	}
+	for _, ctx := range rec.contexts {
+		if !errors.Is(ctx.Err(), context.Canceled) {
+			t.Errorf("context remained active: %v", ctx.Err())
+		}
 	}
 }
 
@@ -300,7 +428,7 @@ func itoa(n int) string {
 
 func TestUDPCaptureCannotBypassTCPProbeValidation(t *testing.T) {
 	reported := 0
-	s := &Scannerx{halfOpen: &recordingEmitter{}, OpenPortHandlers: func(net.IP, int) { reported++ }}
+	s := &Scannerx{halfOpen: &recordingProber{}, OpenPortHandlers: func(net.IP, int) { reported++ }}
 	buf := gopacket.NewSerializeBuffer()
 	ip := &layers.IPv4{Version: 4, TTL: 64, Protocol: layers.IPProtocolTCP, SrcIP: net.IPv4(192, 0, 2, 20), DstIP: net.IPv4(192, 0, 2, 10)}
 	tcp := &layers.TCP{SrcPort: 80, DstPort: 40000, SYN: true, ACK: true, Ack: 123}
@@ -325,5 +453,69 @@ func TestUDPCaptureCannotBypassTCPProbeValidation(t *testing.T) {
 	s.handlePacket(gopacket.NewPacket(buf.Bytes(), layers.LayerTypeIPv4, gopacket.Default))
 	if reported != 1 {
 		t.Fatal("UDP result path was lost")
+	}
+}
+
+func TestLoopbackScanDrainsSynchronousProbeResults(t *testing.T) {
+	device := os.Getenv("NETSTACKVM_PCAP_DEVICE")
+	if device == "" {
+		t.Skip("set NETSTACKVM_PCAP_DEVICE for real loopback scan")
+	}
+	iface, err := net.InterfaceByName(device)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if iface.Flags&net.FlagLoopback == 0 {
+		t.Fatal("test requires a loopback interface")
+	}
+	restore := stubRouteLookup(t, func(time.Duration, string) (*net.Interface, net.IP, net.IP, error) {
+		return iface, nil, net.IPv4(127, 0, 0, 1), nil
+	})
+	defer restore()
+	var listeners []*net.TCPListener
+	want := make(map[int]bool)
+	var ports string
+	for i := 0; i < 2; i++ {
+		listener, err := net.ListenTCP("tcp4", &net.TCPAddr{IP: net.IPv4(127, 0, 0, 1)})
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer listener.Close()
+		listeners = append(listeners, listener)
+		port := listener.Addr().(*net.TCPAddr).Port
+		want[port] = true
+		if ports != "" {
+			ports += ","
+		}
+		ports += fmt.Sprint(port)
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	results, err := Scan(ctx, "127.0.0.1", ports, WithWaiting(30), WithShuffle(false), WithTCPProbeConcurrency(2), WithTCPProbeTimeout(5*time.Second))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for result := range results {
+		if !want[result.Port] {
+			t.Fatalf("unexpected or duplicate result: %+v", result)
+		}
+		delete(want, result.Port)
+	}
+	if ctx.Err() != nil {
+		t.Fatal("TCP-only scan waited for the legacy packet window instead of finishing with its probes")
+	}
+	if len(want) != 0 {
+		t.Fatalf("result stream closed before probes completed: missing %v", want)
+	}
+	for _, listener := range listeners {
+		_ = listener.SetDeadline(time.Now().Add(50 * time.Millisecond))
+		conn, err := listener.Accept()
+		if conn != nil {
+			conn.Close()
+			t.Fatal("scan completed the handshake")
+		}
+		if err == nil {
+			t.Fatal("expected listener timeout")
+		}
 	}
 }
