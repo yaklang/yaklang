@@ -7,7 +7,7 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/filesys"
 	"github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
-	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
+	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
@@ -28,7 +28,7 @@ func (s *Server) ReadFile(req *ypb.ReadFileRequest, stream ypb.Yak_ReadFileServe
 		fs = filesys.NewLocalFs()
 	} else if req.GetFileSystem() == "ssadb" {
 		// return utils.Error("unsupported file system")
-		fs = ssadb.NewIrSourceFs()
+		fs = ssaapi.NewProgramFileSystem()
 	} else {
 		// default
 		fs = filesys.NewLocalFs()
