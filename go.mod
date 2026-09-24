@@ -89,7 +89,7 @@ require (
 	github.com/segmentio/ksuid v1.0.4
 	github.com/shirou/gopsutil/v4 v4.25.2
 	github.com/stacktitan/smb v0.0.0-20190531122847-da9a425dceb8
-	github.com/stretchr/testify v1.10.0
+	github.com/stretchr/testify v1.11.1
 	github.com/teambition/rrule-go v1.8.2
 	github.com/tidwall/gjson v1.14.4
 	github.com/tidwall/sjson v1.2.5
@@ -105,7 +105,7 @@ require (
 	// Yaklang's maintained hard fork combines goja and goja_nodejs in one Go 1.22 module.
 	github.com/yaklang/goja v0.1.0
 	github.com/yaklang/gorm v1.9.17-0.20261014094850-478163d62c38
-	github.com/yaklang/javajive v0.1.2
+	github.com/yaklang/javajive v0.4.1-0.20260920160508-81f8ef556034
 	github.com/yaklang/pcap v1.0.7-0.20261013042911-fa4332334a4a
 	github.com/ysmood/gson v0.7.3
 	github.com/ysmood/leakless v0.9.0
