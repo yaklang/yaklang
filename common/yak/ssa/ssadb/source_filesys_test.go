@@ -688,3 +688,30 @@ func TestIrSourceFS_RepeatedReadDirDoesNotReload(t *testing.T) {
 	require.NoError(t, err)
 	require.Contains(t, string(data), "class A")
 }
+
+func TestIrSourceFS_RecompileRefreshesCachedFile(t *testing.T) {
+	programID := "prog_" + uuid.NewString()
+	root := "/" + programID
+	compile := func(code string) {
+		vf := filesys.NewVirtualFs()
+		vf.AddFile("src/A.java", code)
+		_, err := ssaapi.ParseProjectWithFS(vf, ssaapi.WithLanguage(ssaconfig.JAVA), ssaapi.WithProgramName(programID))
+		require.NoError(t, err)
+	}
+	t.Cleanup(func() { ssadb.DeleteProgram(ssadb.GetDB(), programID) })
+
+	dbfs := ssadb.NewIrSourceFs()
+	compile(`package src; class A { void m(){} }`)
+	data, err := dbfs.ReadFile(root + "/src/A.java")
+	require.NoError(t, err)
+	require.Contains(t, string(data), "class A")
+
+	again, err := dbfs.ReadFile(root + "/src/A.java")
+	require.NoError(t, err)
+	require.Equal(t, string(data), string(again))
+
+	compile(`package src; class A2 { void renamed(){} }`)
+	data, err = dbfs.ReadFile(root + "/src/A.java")
+	require.NoError(t, err)
+	require.Contains(t, string(data), "class A2")
+}
