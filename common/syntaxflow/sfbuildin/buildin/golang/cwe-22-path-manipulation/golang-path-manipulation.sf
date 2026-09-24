@@ -69,11 +69,11 @@ REFERENCE
 strings?{<fullTypeName>?{have: "strings"}} as $strings
 
 $user_input.URL.Path as $path
-// Alert only when TrimPrefix's first argument is the request path itself.
-// A bare strings.TrimPrefix(path, "/") used to normalize an internal logical
-// path is not this sink: dataflow through the shared strings package used to
-// connect that constant to an unrelated URL.Path.
-$strings.TrimPrefix<getCall>?{<slice(index=0)>?{have: "URL.Path"} && <slice(index=1)>?{opcode: const}?{have: /"*\/"/}} as $low
+// Arg0 must be the request path value itself. until without `&` walks through
+// the shared strings package and treats TrimPrefix(path, "/") as a hit.
+// getActualParams reads that call's own arguments; slice(index=1) is the prefix.
+$strings.TrimPrefix<getCall> *?{<slice(index=0)>#{until: "* & $path"}->} as $trim
+$trim<getActualParams><slice(index=1)>?{opcode: const}?{have: /"*\/"/} as $low
 
 alert $low for {
 	type: "vuln",

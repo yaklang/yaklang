@@ -64,9 +64,9 @@ html?{<fullTypeName()>?{have: "html"}} as $html
 $html.EscapeString as $safe
 
 fmt?{<fullTypeName>?{have: "fmt"}} as $fmt
-$fmt.Fprintf(*<slice(index=0)> #{until:"* & $http"}-> ) as $sink
-
-$sink<getCallee()>(* ?{*<dataflow(exclude: $safe)>} ) as $mid
+// Keep the Fprintf call itself. Expanding it through getCallee also marked
+// unrelated strings, including generated import tables.
+$fmt.Fprintf(*<slice(index=0)> #{until:"* & $http"}-> ) as $mid
 
 alert $mid for {
 	title: "Direct Reflected Cross-Site Scripting (XSS) via User Input",
