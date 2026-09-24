@@ -73,6 +73,7 @@ func TestWrapDirectlyAnswerError_FullHint(t *testing.T) {
 	assert.Contains(t, msg, "<|FINAL_ANSWER_"+nonce+"|>")
 	assert.Contains(t, msg, "<|FINAL_ANSWER_END_"+nonce+"|>")
 	assert.Contains(t, msg, "MUST emit AITAG block")
+	assert.Contains(t, msg, "evidence_content and todo_delta are internal fields")
 	assert.Contains(t, msg, `{"@action":"directly_answer"}`)
 	assert.Contains(t, msg, "answer_payload is required for ActionDirectlyAnswer but empty")
 }
