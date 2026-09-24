@@ -282,6 +282,9 @@ func (s *Scannerx) handlePacket(packet gopacket.Packet) {
 	if transportLayer := packet.TransportLayer(); transportLayer != nil {
 		switch layer := transportLayer.(type) {
 		case *layers.TCP:
+			if s.halfOpen != nil {
+				return
+			} // Only the probe session may validate/report TCP.
 			if layer.SYN && layer.ACK {
 				if nl := packet.NetworkLayer(); nl != nil {
 					s.OpenPortHandlers(net.ParseIP(nl.NetworkFlow().Src().String()), int(layer.SrcPort))

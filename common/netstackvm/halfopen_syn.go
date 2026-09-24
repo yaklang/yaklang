@@ -5,8 +5,8 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"strconv"
 	"sync"
-	"time"
 
 	"github.com/gopacket/gopacket"
 	"github.com/gopacket/gopacket/layers"
@@ -15,41 +15,45 @@ import (
 	"github.com/yaklang/yaklang/common/lowtun/netstack/gvisor/pkg/tcpip/header"
 	"github.com/yaklang/yaklang/common/lowtun/netstack/gvisor/pkg/tcpip/stack"
 	"github.com/yaklang/yaklang/common/lowtun/netstack/gvisor/pkg/tcpip/transport/tcp"
-	"github.com/yaklang/yaklang/common/lowtun/netstack/gvisor/pkg/waiter"
 	"github.com/yaklang/yaklang/common/pcapx/pcaputil"
 	"github.com/yaklang/yaklang/common/utils/arptable"
+	"golang.org/x/time/rate"
 )
-
-const halfOpenSYNRetire = 3 * time.Second
 
 var errHalfOpenClosed = errors.New("half-open SYN session is closed")
 
 // HalfOpenSYNConfig is the host identity a half-open SYN session borrows.
 // The session does not run DHCP and does not invent a gateway.
 type HalfOpenSYNConfig struct {
-	Context  context.Context
-	Iface    *net.Interface
-	SourceIP net.IP
-	Gateway  net.IP
-	// OnOpen is called for a matching SYN-ACK. It runs on the capture loop
-	// and must not block for long.
+	Context          context.Context // Used when OpenHalfOpenSYN receives a nil context.
+	Retry            SYNRetryPolicy
+	MaxInFlight      int // Default 256; held through response/retry completion.
+	PacketsPerSecond int // Default 1000, burst 1; includes retransmissions.
+	OnResult         func(target string, synAck TCPSegment, err error)
+	Iface            *net.Interface
+	SourceIP         net.IP
+	Gateway          net.IP
+	// OnOpen is called once per successful probe on its
+	// worker, outside the capture loop. It must return promptly.
 	OnOpen func(ip net.IP, port int)
 }
 
 // HalfOpenSYN emits TCP SYNs from a writable netstackvm capture and reports
 // SYN-ACKs without completing the handshake.
 //
-// TCPProbe is not this path: it finishes a full handshake between two
-// channel-backed stacks. A SYN scan has to leave the ACK unsent, so the
-// SYN-ACK is observed and then dropped before gVisor can answer it.
+// Each scan uses TCPProbe with a real-interface transport and a SYN-only gate.
 type HalfOpenSYN struct {
 	ctx    context.Context
 	cancel context.CancelFunc
 
-	mu     sync.Mutex
-	wg     sync.WaitGroup
-	closed bool
-	slots  chan struct{}
+	mu       sync.Mutex
+	wg       sync.WaitGroup
+	closed   bool
+	slots    chan struct{}
+	limiter  *rate.Limiter
+	retry    SYNRetryPolicy
+	onResult func(string, TCPSegment, error)
+	done     chan struct{}
 
 	stack *stack.Stack
 	main  *NetStackVirtualMachineEntry
@@ -63,18 +67,31 @@ type HalfOpenSYN struct {
 }
 
 type flightKey struct {
-	local [4]byte
-	port  uint16
+	nic        tcpip.NICID
+	local      [4]byte
+	port       uint16
+	remote     [4]byte
+	remotePort uint16
 }
 
+type probeReply struct {
+	segment TCPSegment
+	raw     []byte
+}
+type synFrame struct {
+	segment  TCPSegment
+	data     []byte
+	linkType gopacket.LayerType
+}
 type synFlight struct {
-	dstIP    net.IP
-	dstPort  uint16
-	isn      uint32
-	haveISN  bool
-	signaled bool
-	reported bool
-	sent     chan struct{}
+	key       flightKey
+	ctx       context.Context
+	generated chan *synFrame
+	replies   chan probeReply
+	frame     *synFrame
+	permit    bool
+	sending   bool
+	sent      bool
 }
 
 // OpenHalfOpenSYN opens the host interface (and loopback, when that is a
@@ -88,8 +105,30 @@ func OpenHalfOpenSYN(ctx context.Context, cfg HalfOpenSYNConfig) (*HalfOpenSYN, 
 		return nil, fmt.Errorf("half-open syn: source %v is not ipv4", cfg.SourceIP)
 	}
 	if ctx == nil {
+		ctx = cfg.Context
+	}
+	if ctx == nil {
 		ctx = context.Background()
 	}
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	if cfg.Retry == (SYNRetryPolicy{}) {
+		cfg.Retry = DefaultSYNRetryPolicy()
+	}
+	if err := cfg.Retry.validate(); err != nil {
+		return nil, err
+	}
+	if cfg.MaxInFlight == 0 {
+		cfg.MaxInFlight = 256
+	}
+	if cfg.PacketsPerSecond == 0 {
+		cfg.PacketsPerSecond = 1000
+	}
+	if cfg.MaxInFlight < 1 || cfg.PacketsPerSecond < 1 {
+		return nil, fmt.Errorf("half-open SYN limits must be positive")
+	}
+
 	ctx, cancel := context.WithCancel(ctx)
 
 	stackCfg := NewDefaultConfig()
@@ -100,13 +139,15 @@ func OpenHalfOpenSYN(ctx context.Context, cfg HalfOpenSYNConfig) (*HalfOpenSYN, 
 		cancel()
 		return nil, err
 	}
-	synRetries := tcpip.TCPSynRetriesOption(1)
+	synRetries := tcpip.TCPSynRetriesOption(6)
 	_ = stackIns.SetTransportProtocolOption(tcp.ProtocolNumber, &synRetries)
 
 	h := &HalfOpenSYN{
-		ctx:            ctx,
-		cancel:         cancel,
-		slots:          make(chan struct{}, 256),
+		ctx:     ctx,
+		cancel:  cancel,
+		slots:   make(chan struct{}, cfg.MaxInFlight),
+		limiter: rate.NewLimiter(rate.Limit(cfg.PacketsPerSecond), 1),
+		retry:   cfg.Retry, onResult: cfg.OnResult, done: make(chan struct{}),
 		stack:          stackIns,
 		gateway:        ipv4Only(cfg.Gateway),
 		onOpen:         cfg.OnOpen,
@@ -147,7 +188,7 @@ func (h *HalfOpenSYN) openEntry(iface *net.Interface, ip net.IP, mask net.IPMask
 		WithContext(h.ctx),
 		WithNetStack(h.stack),
 		WithPcapDevice(iface.Name),
-		WithPCAPReadOnly(false),
+		WithPCAPReadOnly(true),
 		WithDisableForwarding(true),
 		WithPcapCapabilities(caps),
 	}
@@ -158,8 +199,14 @@ func (h *HalfOpenSYN) openEntry(iface *net.Interface, ip net.IP, mask net.IPMask
 	if err != nil {
 		return nil, err
 	}
-	vm.driver.SetPCAPOutboundFilter(h.observeOutbound)
-	vm.driver.SetPCAPInboundFilter(h.observeInbound)
+	nic := vm.MainNICID()
+	vm.driver.SetPCAPOutboundFilter(func(packet gopacket.Packet) bool { return h.allowOutbound(nic, packet) })
+	vm.driver.SetPCAPInboundFilter(func(packet gopacket.Packet) bool { return h.observeInbound(nic, packet) })
+	vm.driver.filterMutex.Lock()
+	vm.driver.stackFrame = func(data []byte, lt gopacket.LayerType) error { return h.captureStackFrame(vm, data, lt) }
+	vm.driver.filterMutex.Unlock()
+	// Install the immutable session policy before enabling any injection.
+	vm.driver.readOnly.Store(false)
 
 	if err := vm.SetMainNICv4(ip, &net.IPNet{IP: ip.Mask(mask), Mask: mask}, ip); err != nil {
 		vm.Close()
@@ -205,26 +252,110 @@ func (h *HalfOpenSYN) seedGateway(vm *NetStackVirtualMachineEntry, gateway net.I
 	}
 }
 
-// Emit starts one active open. The endpoint is closed after the SYN is on
-// the wire (or after a short wait) so gVisor does not keep retransmitting.
-// Closing the endpoint may generate a RST; the outbound filter drops it.
-func (h *HalfOpenSYN) Emit(ctx context.Context, host string, port int) error {
+// StartTCPProbe retains admission, the endpoint and response registration until
+// Close/cancellation. A live tuple registration is never overwritten.
+// It does not send until ProbeSYN[Context]. This backend cannot ProbeACK.
+func (h *HalfOpenSYN) StartTCPProbe(ctx context.Context, target string, options ...TCPProbeOption) (*TCPProbe, error) {
 	if ctx == nil {
 		ctx = context.Background()
 	}
-	dst := net.ParseIP(host).To4()
-	if dst == nil || port <= 0 || port > 65535 {
-		return fmt.Errorf("half-open syn: invalid target %s:%d", host, port)
+	host, portText, err := net.SplitHostPort(target)
+	if err != nil {
+		return nil, err
 	}
+	port, err := strconv.Atoi(portText)
+	dst := net.ParseIP(host).To4()
+	if err != nil || dst == nil || port < 1 || port > 65535 {
+		return nil, fmt.Errorf("invalid IPv4 TCP target %q", target)
+	}
+	policy := h.retry
+	for _, option := range options {
+		option(&policy)
+	}
+	if err := policy.validate(); err != nil {
+		return nil, err
+	}
+	h.mu.Lock()
+	if h.closed {
+		h.mu.Unlock()
+		return nil, errHalfOpenClosed
+	}
+	h.wg.Add(1)
+	h.mu.Unlock()
+	success := false
+	defer func() {
+		if !success {
+			h.wg.Done()
+		}
+	}()
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	select {
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	case <-h.ctx.Done():
+		return nil, h.ctx.Err()
+	case h.slots <- struct{}{}:
+	}
+	admitted := false
+	defer func() {
+		if !admitted {
+			<-h.slots
+		}
+	}()
 	vm := h.vmFor(dst)
 	if vm == nil {
-		return fmt.Errorf("half-open syn: no device for %s", host)
+		return nil, fmt.Errorf("no interface for %s", host)
+	}
+	ctx, cancel := context.WithCancel(ctx)
+	p := &TCPProbe{ctx: ctx, cancel: cancel, halfOpen: true, retry: policy, probeStep: make(chan struct{}, 1)}
+	ep, tcpErr := h.stack.NewEndpoint(tcp.ProtocolNumber, header.IPv4ProtocolNumber, &p.wq)
+	if tcpErr != nil {
+		cancel()
+		return nil, fmt.Errorf("new TCP endpoint: %s", tcpErr)
 	}
 	src := vm.mainNICIPv4Address.To4()
-	if src == nil {
-		return fmt.Errorf("half-open syn: device has no ipv4")
+	if tcpErr = ep.Bind(tcpip.FullAddress{NIC: vm.MainNICID(), Addr: tcpip.AddrFrom4(ip4key(src))}); tcpErr != nil {
+		ep.Close()
+		cancel()
+		return nil, fmt.Errorf("bind TCP endpoint: %s", tcpErr)
 	}
+	bound, tcpErr := ep.GetLocalAddress()
+	if tcpErr != nil || bound.Port == 0 {
+		ep.Close()
+		cancel()
+		return nil, fmt.Errorf("source port unavailable: %v", tcpErr)
+	}
+	key := flightKey{nic: vm.MainNICID(), local: ip4key(src), port: bound.Port, remote: ip4key(dst), remotePort: uint16(port)}
+	f := &synFlight{key: key, ctx: ctx, generated: make(chan *synFrame, 4), replies: make(chan probeReply, 1)}
+	h.mu.Lock()
+	if h.closed || h.flights[key] != nil {
+		h.mu.Unlock()
+		ep.Close()
+		cancel()
+		return nil, fmt.Errorf("probe session closed or tuple still reserved")
+	}
+	h.flights[key] = f
+	h.mu.Unlock()
+	p.ep = ep
+	p.remote = tcpip.FullAddress{NIC: vm.MainNICID(), Addr: tcpip.AddrFrom4(ip4key(dst)), Port: uint16(port)}
+	p.transport = &pcapProbeTransport{session: h, vm: vm, probe: p, flight: f}
+	success, admitted = true, true
+	go func() {
+		select {
+		case <-ctx.Done():
+		case <-h.ctx.Done():
+		}
+		p.Close()
+	}()
+	return p, nil
+}
 
+// Emit runs the same public stepped probe in a bounded worker. Admission
+// blocks under load. OnResult distinguishes cancellation, local send failure,
+// reset and inconclusive silence; only a validated SYN-ACK calls OnOpen.
+func (h *HalfOpenSYN) Emit(ctx context.Context, host string, port int) error {
 	h.mu.Lock()
 	if h.closed {
 		h.mu.Unlock()
@@ -232,119 +363,78 @@ func (h *HalfOpenSYN) Emit(ctx context.Context, host string, port int) error {
 	}
 	h.wg.Add(1)
 	h.mu.Unlock()
-	handed := false
-	defer func() {
-		if !handed {
-			h.wg.Done()
-		}
-	}()
-
-	select {
-	case <-ctx.Done():
-		return ctx.Err()
-	case <-h.ctx.Done():
-		return h.ctx.Err()
-	case h.slots <- struct{}{}:
-	}
-
-	ep, flight, err := h.connect(vm, src, dst, uint16(port))
+	target := net.JoinHostPort(host, strconv.Itoa(port))
+	probe, err := h.StartTCPProbe(ctx, target)
 	if err != nil {
-		<-h.slots
+		h.wg.Done()
 		return err
 	}
-
-	h.mu.Lock()
-	if h.closed {
-		h.mu.Unlock()
-		ep.Close()
-		<-h.slots
-		return errHalfOpenClosed
-	}
-	h.mu.Unlock()
-	handed = true
-	go h.retire(ctx, ep, flight)
+	go func() {
+		defer h.wg.Done()
+		defer probe.Close()
+		var ack TCPSegment
+		_, err := probe.ProbeSYNContext(ctx)
+		if err == nil {
+			ack, err = probe.ReceiveSYNACKContext(ctx)
+		}
+		if err == nil && h.onOpen != nil {
+			h.onOpen(ack.RemoteIP, int(ack.RemotePort))
+		}
+		if h.onResult != nil {
+			h.onResult(target, ack, err)
+		}
+	}()
 	return nil
 }
 
-func (h *HalfOpenSYN) connect(vm *NetStackVirtualMachineEntry, src, dst net.IP, port uint16) (tcpip.Endpoint, *synFlight, error) {
-	var wq waiter.Queue
-	ep, tcpErr := vm.stack.NewEndpoint(tcp.ProtocolNumber, header.IPv4ProtocolNumber, &wq)
-	if tcpErr != nil {
-		return nil, nil, fmt.Errorf("half-open syn: new endpoint: %s", tcpErr)
+// Wait drains probes and result callbacks. Call after the last Emit; no new
+// StartTCPProbe/Emit may run concurrently with Wait. Cancellation does not
+// implicitly cancel the session; Close does.
+func (h *HalfOpenSYN) Wait(ctx context.Context) error {
+	if ctx == nil {
+		ctx = context.Background()
 	}
-	ok := false
-	defer func() {
-		if !ok {
-			ep.Close()
-		}
-	}()
-	local := tcpip.FullAddress{NIC: vm.MainNICID(), Addr: tcpip.AddrFrom4([4]byte(src))}
-	if tcpErr = ep.Bind(local); tcpErr != nil {
-		return nil, nil, fmt.Errorf("half-open syn: bind: %s", tcpErr)
-	}
-	bound, tcpErr := ep.GetLocalAddress()
-	if tcpErr != nil || bound.Port == 0 {
-		return nil, nil, fmt.Errorf("half-open syn: local port unavailable: %v", tcpErr)
-	}
-	flight := h.register(src, bound.Port, dst, port)
-	remote := tcpip.FullAddress{NIC: vm.MainNICID(), Addr: tcpip.AddrFrom4([4]byte(dst)), Port: port}
-	tcpErr = ep.Connect(remote)
-	if _, started := tcpErr.(*tcpip.ErrConnectStarted); !started {
-		if tcpErr == nil {
-			return nil, nil, fmt.Errorf("half-open syn: connect finished before the SYN was sent")
-		}
-		return nil, nil, fmt.Errorf("half-open syn: connect: %s", tcpErr)
-	}
-	ok = true
-	return ep, flight, nil
-}
-
-func (h *HalfOpenSYN) retire(ctx context.Context, ep tcpip.Endpoint, flight *synFlight) {
-	defer h.wg.Done()
-	defer func() { <-h.slots }()
-	timer := time.NewTimer(halfOpenSYNRetire)
-	defer timer.Stop()
+	done := make(chan struct{})
+	go func() { h.wg.Wait(); close(done) }()
 	select {
-	case <-flight.sent:
-	case <-timer.C:
-	case <-h.ctx.Done():
 	case <-ctx.Done():
+		return ctx.Err()
+	case <-done:
+		return nil
 	}
-	ep.Close()
 }
 
-// Close stops new SYNs, aborts endpoints still in flight, and releases the capture.
 func (h *HalfOpenSYN) Close() error {
 	if h == nil {
 		return nil
 	}
 	h.mu.Lock()
 	if h.closed {
+		done := h.done
 		h.mu.Unlock()
+		<-done
 		return nil
 	}
 	h.closed = true
-	cancel := h.cancel
+	h.cancel()
 	h.mu.Unlock()
-	if cancel != nil {
-		cancel()
-	}
 	h.wg.Wait()
 	if h.loop != nil {
-		_ = h.loop.Close()
+		h.loop.Close()
 	}
 	if h.main != nil {
-		_ = h.main.Close()
+		h.main.Close()
 	}
 	if h.stack != nil {
 		h.stack.Close()
 		h.stack.Wait()
 	}
+	close(h.done)
 	return nil
 }
 
 func (h *HalfOpenSYN) vmFor(dst net.IP) *NetStackVirtualMachineEntry {
-	if dst != nil && dst.IsLoopback() {
+	if dst.IsLoopback() {
 		if h.loop != nil {
 			return h.loop
 		}
@@ -356,91 +446,108 @@ func (h *HalfOpenSYN) vmFor(dst net.IP) *NetStackVirtualMachineEntry {
 	return h.main
 }
 
-func (h *HalfOpenSYN) register(local net.IP, localPort uint16, dst net.IP, dstPort uint16) *synFlight {
-	key := flightKey{local: ip4key(local), port: localPort}
-	h.mu.Lock()
-	defer h.mu.Unlock()
-	f := &synFlight{
-		dstIP:   append(net.IP(nil), dst.To4()...),
-		dstPort: dstPort,
-		sent:    make(chan struct{}),
+func packetFlightKey(nic tcpip.NICID, ip *layers.IPv4, tcp *layers.TCP, inbound bool) flightKey {
+	if inbound {
+		return flightKey{nic, ip4key(ip.DstIP), uint16(tcp.DstPort), ip4key(ip.SrcIP), uint16(tcp.SrcPort)}
 	}
-	h.flights[key] = f
-	return f
+	return flightKey{nic, ip4key(ip.SrcIP), uint16(tcp.SrcPort), ip4key(ip.DstIP), uint16(tcp.DstPort)}
 }
 
-func (h *HalfOpenSYN) observeOutbound(packet gopacket.Packet) bool {
+// captureStackFrame never writes TCP. Automatic retransmits and abort RSTs
+// stay here; only the probe retry controller can authorize a SYN write.
+func (h *HalfOpenSYN) captureStackFrame(vm *NetStackVirtualMachineEntry, data []byte, lt gopacket.LayerType) error {
+	packet := gopacket.NewPacket(data, lt, gopacket.Default)
+	if packet.Layer(layers.LayerTypeARP) != nil {
+		return vm.driver.writeFrame(data, lt)
+	}
+	ip, tcp, ok := ipv4TCP(packet)
+	if !ok || !tcp.SYN || tcp.ACK || tcp.RST || tcp.FIN {
+		return nil
+	}
+	seg, err := parseTCPSegment(append(append([]byte(nil), ip.Contents...), ip.Payload...), false)
+	if err != nil {
+		return err
+	}
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	f := h.flights[packetFlightKey(vm.MainNICID(), ip, tcp, false)]
+	if f == nil || f.ctx.Err() != nil || f.frame != nil {
+		return nil
+	}
+	frame := &synFrame{seg, append([]byte(nil), data...), lt}
+	select {
+	case f.generated <- frame:
+	default:
+	}
+	return nil
+}
+
+// allowOutbound is the final injection gate, including manually generated RSTs.
+func (h *HalfOpenSYN) allowOutbound(nic tcpip.NICID, packet gopacket.Packet) bool {
 	if packet == nil {
 		return false
 	}
 	if packet.Layer(layers.LayerTypeARP) != nil {
-		return true
+		return h.ctx.Err() == nil
 	}
-	ip, tcpLayer, ok := ipv4TCP(packet)
-	if !ok || !tcpLayer.SYN || tcpLayer.ACK || tcpLayer.FIN || tcpLayer.RST {
+	ip, tcp, ok := ipv4TCP(packet)
+	if !ok || !tcp.SYN || tcp.ACK || tcp.RST || tcp.FIN || tcp.PSH || tcp.URG || len(tcp.Payload) != 0 {
 		return false
 	}
-	h.noteSYN(ip.SrcIP, uint16(tcpLayer.SrcPort), ip.DstIP, uint16(tcpLayer.DstPort), tcpLayer.Seq)
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	f := h.flights[packetFlightKey(nic, ip, tcp, false)]
+	if f == nil || f.ctx.Err() != nil || h.ctx.Err() != nil || f.frame == nil || !f.permit || tcp.Seq != f.frame.segment.Seq {
+		return false
+	}
+	f.permit = false
 	return true
 }
 
-func (h *HalfOpenSYN) observeInbound(packet gopacket.Packet) bool {
+func (h *HalfOpenSYN) observeInbound(nic tcpip.NICID, packet gopacket.Packet) bool {
 	if packet == nil {
 		return false
 	}
 	if packet.Layer(layers.LayerTypeARP) != nil {
-		return true
+		return h.ctx.Err() == nil
 	}
-	ip, tcpLayer, ok := ipv4TCP(packet)
-	if ok && tcpLayer.SYN && tcpLayer.ACK && !tcpLayer.RST {
-		h.noteSYNACK(ip.DstIP, uint16(tcpLayer.DstPort), ip.SrcIP, uint16(tcpLayer.SrcPort), tcpLayer.Ack)
+	ip, tcp, ok := ipv4TCP(packet)
+	if !ok || !tcp.ACK || (!tcp.SYN && !tcp.RST) || ip.FragOffset != 0 || ip.Flags&layers.IPv4MoreFragments != 0 || packet.Metadata().Truncated {
+		return false
 	}
-	// SYN-ACK stays out of gVisor. Delivering it would make the stack ACK
-	// and turn the probe into a full handshake.
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	f := h.flights[packetFlightKey(nic, ip, tcp, true)]
+	if f == nil || f.ctx.Err() != nil || h.ctx.Err() != nil || f.frame == nil || (!f.sent && !f.sending) {
+		return false
+	}
+	raw := append(append([]byte(nil), ip.Contents...), ip.Payload...)
+	seg, err := parseTCPSegment(raw, true)
+	if err != nil || !validProbeReply(f.frame.segment, seg) {
+		return false
+	}
+	// Host loopback captures may contain offload placeholders, not wire
+	// checksums (e.g. macOS lo0). Only a known loopback NIC gets this exception.
+	loopback := (h.loop != nil && nic == h.loop.MainNICID()) || (h.mainIsLoopback && h.main != nil && nic == h.main.MainNICID())
+	if !loopback {
+		ipv4hdr := header.IPv4(raw)
+		tcphdr := header.TCP(ipv4hdr.Payload())
+		if !ipv4hdr.IsChecksumValid() || !tcphdr.IsChecksumValid(ipv4hdr.SourceAddress(), ipv4hdr.DestinationAddress(), 0, 0) {
+			return false
+		}
+	}
+	select {
+	case f.replies <- probeReply{seg, raw}:
+	default:
+	}
+	// No TCP response ever enters gVisor, including RSTs.
 	return false
 }
 
-func (h *HalfOpenSYN) noteSYN(localIP net.IP, localPort uint16, dstIP net.IP, dstPort uint16, seq uint32) {
-	key := flightKey{local: ip4key(localIP), port: localPort}
-	h.mu.Lock()
-	defer h.mu.Unlock()
-	f := h.flights[key]
-	if f == nil || f.dstPort != dstPort || !sameIPv4(f.dstIP, dstIP) {
-		return
-	}
-	f.isn = seq
-	f.haveISN = true
-	if !f.signaled {
-		f.signaled = true
-		close(f.sent)
-	}
-}
-
-func (h *HalfOpenSYN) noteSYNACK(localIP net.IP, localPort uint16, remoteIP net.IP, remotePort uint16, ack uint32) {
-	key := flightKey{local: ip4key(localIP), port: localPort}
-	h.mu.Lock()
-	f := h.flights[key]
-	if f == nil || !f.haveISN || ack != f.isn+1 || f.dstPort != remotePort || !sameIPv4(f.dstIP, remoteIP) || f.reported {
-		h.mu.Unlock()
-		return
-	}
-	f.reported = true
-	cb := h.onOpen
-	h.mu.Unlock()
-	if cb != nil {
-		cb(append(net.IP(nil), remoteIP.To4()...), int(remotePort))
-	}
-}
-
 func ipv4TCP(packet gopacket.Packet) (*layers.IPv4, *layers.TCP, bool) {
-	ipLayer := packet.Layer(layers.LayerTypeIPv4)
-	tcpLayer := packet.Layer(layers.LayerTypeTCP)
-	ip, ipOK := ipLayer.(*layers.IPv4)
-	tcpHdr, tcpOK := tcpLayer.(*layers.TCP)
-	if !ipOK || !tcpOK || ip == nil || tcpHdr == nil {
-		return nil, nil, false
-	}
-	return ip, tcpHdr, true
+	ip, ipOK := packet.Layer(layers.LayerTypeIPv4).(*layers.IPv4)
+	tcp, tcpOK := packet.Layer(layers.LayerTypeTCP).(*layers.TCP)
+	return ip, tcp, ipOK && tcpOK && ip != nil && tcp != nil
 }
 
 func addConnectedRoute(vm *NetStackVirtualMachineEntry, ip net.IP, mask net.IPMask) error {

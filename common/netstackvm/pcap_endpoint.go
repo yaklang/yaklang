@@ -35,6 +35,8 @@ type PCAPEndpoint struct {
 	tcpKillMap     map[string]struct{}
 	inboundFilter  func(packet gopacket.Packet) bool
 	outboundFilter func(packet gopacket.Packet) bool
+	// stackFrame intercepts stack output before injection; used by stepped probes.
+	stackFrame func([]byte, gopacket.LayerType) error
 
 	adaptor         *pcapAdaptor
 	netBridge       *pcapBridge
@@ -477,11 +479,25 @@ func (p *PCAPEndpoint) writePacket(pkt *stack.PacketBuffer) error {
 		return err
 	}
 
+	p.filterMutex.RLock()
+	intercept := p.stackFrame
+	p.filterMutex.RUnlock()
+	if intercept != nil {
+		return intercept(payloads, linkLayerType)
+	}
 	return p.writeFrame(payloads, linkLayerType)
 }
 
 // writeFrame is the sole injection boundary, including manually generated RSTs.
 func (p *PCAPEndpoint) writeFrame(data []byte, linkType gopacket.LayerType) error {
+	ctx := p.ctx
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	return p.writeFrameContext(ctx, data, linkType)
+}
+
+func (p *PCAPEndpoint) writeFrameContext(ctx context.Context, data []byte, linkType gopacket.LayerType) error {
 	if p.readOnly.Load() {
 		return nil
 	}
@@ -494,7 +510,7 @@ func (p *PCAPEndpoint) writeFrame(data []byte, linkType gopacket.LayerType) erro
 	if filter != nil && !filter(gopacket.NewPacket(data, linkType, gopacket.Default)) {
 		return nil
 	}
-	return p.adaptor.WritePacketData(data)
+	return p.adaptor.WritePacketDataContext(ctx, data)
 }
 
 func (p *PCAPEndpoint) encapsulatePayload(payloads []byte) ([]byte, gopacket.LayerType, error) {
