@@ -242,7 +242,8 @@ func TestPrehandleUnitWorkerPinsApplicationAndHashesPackages(t *testing.T) {
 	prog := ssa.NewProgram(cfg, ssa.ProgramCacheMemory, ssa.Application, filesys.NewVirtualFs(), ".", 0)
 	env := &prehandleBatchEnv{prog: prog}
 	require.Equal(t, 0, env.unitWorker("resource:web", 8))
-	require.Equal(t, 0, env.unitWorker("dir:src", 8))
+	require.Equal(t, 0, env.unitWorker("dir:.", 8))
+	require.NotZero(t, env.unitWorker("dir:src", 8))
 	require.Equal(t, 0, env.unitWorker("", 8))
 	a := env.unitWorker("java:a", 8)
 	require.NotZero(t, a)
@@ -270,6 +271,61 @@ public class Top { String run() { println(C.n()); return C.n(); } }`)
 	result, err := program.SyntaxFlowWithError(`println(* #-> * as $source) as $call`)
 	require.NoError(t, err)
 	require.Equal(t, 1, result.GetValues("call").Len())
+	require.Contains(t, result.GetValues("source").String(), "p0")
+}
+
+func TestCompileUnitParallelPythonMemory(t *testing.T) {
+	vf := filesys.NewVirtualFs()
+	for i := 0; i < 8; i++ {
+		vf.AddFile(fmt.Sprintf("p%d/c.py", i), fmt.Sprintf("def n():\n    return \"p%d\"\n", i))
+	}
+	vf.AddFile("top/t.py", "from p0.c import n\nprint(n())\n")
+	cfg, err := DefaultConfig(WithFileSystem(vf), WithLanguage(ssaconfig.PYTHON), WithMemory(), ssaconfig.WithCompileConcurrency(8))
+	require.NoError(t, err)
+	program, err := cfg.parseProjectWithFSUnits(vf, func(float64, string, ...any) {})
+	require.NoError(t, err)
+	require.NotNil(t, program)
+}
+
+func TestCompileUnitGoMemory(t *testing.T) {
+	vf := filesys.NewVirtualFs()
+	for i := 0; i < 8; i++ {
+		vf.AddFile(fmt.Sprintf("p%d/c.go", i), fmt.Sprintf("package p%d\nfunc N() string { return \"p%d\" }\n", i, i))
+	}
+	cfg, err := DefaultConfig(WithFileSystem(vf), WithLanguage(ssaconfig.GO), WithMemory(), ssaconfig.WithCompileConcurrency(8))
+	require.NoError(t, err)
+	program, err := cfg.parseProjectWithFSUnits(vf, func(float64, string, ...any) {})
+	require.NoError(t, err)
+	require.NotNil(t, program)
+}
+
+func TestCompileUnitPHPDirectoryMemory(t *testing.T) {
+	vf := filesys.NewVirtualFs()
+	for i := 0; i < 8; i++ {
+		vf.AddFile(fmt.Sprintf("p%d/C.php", i), fmt.Sprintf("<?php\nnamespace P%d;\nclass C { public static function n() { return \"p%d\"; } }\n", i, i))
+	}
+	vf.AddFile("top/T.php", "<?php\nnamespace Top;\nuse P0\\C;\nclass T { public function run() { echo C::n(); } }\n")
+	cfg, err := DefaultConfig(WithFileSystem(vf), WithLanguage(ssaconfig.PHP), WithMemory(), ssaconfig.WithCompileConcurrency(8))
+	require.NoError(t, err)
+	program, err := cfg.parseProjectWithFSUnits(vf, func(float64, string, ...any) {})
+	require.NoError(t, err)
+	require.NotNil(t, program)
+}
+
+func TestCompileUnitParallelTypeScriptMemory(t *testing.T) {
+	vf := filesys.NewVirtualFs()
+	for i := 0; i < 8; i++ {
+		vf.AddFile(fmt.Sprintf("p%d/c.ts", i), fmt.Sprintf("export function n(): string { return \"p%d\"; }\n", i))
+	}
+	vf.AddFile("top/t.ts", "import { n } from \"../p0/c\";\nconsole.log(n());\n")
+	cfg, err := DefaultConfig(WithFileSystem(vf), WithLanguage(ssaconfig.TS), WithMemory(), ssaconfig.WithCompileConcurrency(8))
+	require.NoError(t, err)
+	program, err := cfg.parseProjectWithFSUnits(vf, func(float64, string, ...any) {})
+	require.NoError(t, err)
+	require.NotNil(t, program)
+	result, err := program.SyntaxFlowWithError(`console.log(* #-> * as $source) as $call`)
+	require.NoError(t, err)
+	require.NotEmpty(t, result.GetValues("call"))
 	require.Contains(t, result.GetValues("source").String(), "p0")
 }
 

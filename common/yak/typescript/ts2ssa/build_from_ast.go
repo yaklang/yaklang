@@ -52,7 +52,11 @@ func (b *builder) VisitSourceFile(sourcefile *ast.SourceFile) interface{} {
 
 		if subBuilder != nil {
 			subBuilder.SetBuildSupport(b.FunctionBuilder)
-			subBuilder.SetEditor(prog.GetApplication().GetCurrentEditor())
+			currentEditor := prog.GetApplication().GetCurrentEditor()
+			if currentEditor == nil {
+				currentEditor = b.GetEditor()
+			}
+			subBuilder.SetEditor(currentEditor)
 			currentBuilder := b.FunctionBuilder
 			b.FunctionBuilder = subBuilder
 			defer func() {
