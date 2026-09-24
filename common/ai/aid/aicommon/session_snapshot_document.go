@@ -12,27 +12,29 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 )
 
-const SessionSnapshotDocumentSchemaVersion = 1
+const SessionSnapshotDocumentSchemaVersion = 2
 
 // SessionSnapshotTaskSummary is the lightweight task index embedded in the
 // cumulative session snapshot. TaskIndex is display-only; TaskID is the stable
 // lookup key.
 type SessionSnapshotTaskSummary struct {
-	TaskID    string `json:"task_id"`
-	TaskIndex string `json:"task_index,omitempty"`
-	TaskName  string `json:"task_name,omitempty"`
-	Attempt   int    `json:"attempt"`
-	Status    string `json:"status"`
-	IsFinal   bool   `json:"is_final"`
-	UpdatedAt int64  `json:"updated_at"`
+	TaskID    string                `json:"task_id"`
+	TaskIndex string                `json:"task_index,omitempty"`
+	TaskName  string                `json:"task_name,omitempty"`
+	Attempt   int                   `json:"attempt"`
+	Status    string                `json:"status"`
+	IsFinal   bool                  `json:"is_final"`
+	UpdatedAt int64                 `json:"updated_at"`
+	TodoStats VerificationTodoStats `json:"todo_stats"`
 }
 
 type SessionTaskSnapshotAttempt struct {
-	Attempt   int              `json:"attempt"`
-	Status    string           `json:"status"`
-	Revision  int64            `json:"revision"`
-	UpdatedAt int64            `json:"updated_at"`
-	Snapshot  *SessionSnapshot `json:"snapshot"`
+	Attempt   int                      `json:"attempt"`
+	Status    string                   `json:"status"`
+	Revision  int64                    `json:"revision"`
+	UpdatedAt int64                    `json:"updated_at"`
+	Snapshot  *SessionSnapshot         `json:"snapshot"`
+	Todo      *SessionTaskTodoSnapshot `json:"todo"`
 }
 
 // SessionTaskSnapshot is the latest materialized projection for one logical
@@ -48,6 +50,7 @@ type SessionTaskSnapshot struct {
 	Revision         int64                        `json:"revision"`
 	UpdatedAt        int64                        `json:"updated_at"`
 	Snapshot         *SessionSnapshot             `json:"snapshot"`
+	Todo             *SessionTaskTodoSnapshot     `json:"todo"`
 	PreviousAttempts []SessionTaskSnapshotAttempt `json:"previous_attempts,omitempty"`
 }
 
@@ -74,12 +77,13 @@ type SessionSnapshotAccounting struct {
 // SessionSnapshotDocument is stored as one JSON value on ai_sessions_v1. It is
 // deliberately a materialized projection rather than a serialized task graph.
 type SessionSnapshotDocument struct {
-	SchemaVersion int                             `json:"schema_version"`
-	Revision      int64                           `json:"revision"`
-	UpdatedAt     int64                           `json:"updated_at"`
-	Session       *SessionSnapshot                `json:"session"`
-	Tasks         map[string]*SessionTaskSnapshot `json:"tasks"`
-	Accounting    SessionSnapshotAccounting       `json:"accounting"`
+	SchemaVersion int                                  `json:"schema_version"`
+	Revision      int64                                `json:"revision"`
+	UpdatedAt     int64                                `json:"updated_at"`
+	Session       *SessionSnapshot                     `json:"session"`
+	Tasks         map[string]*SessionTaskSnapshot      `json:"tasks"`
+	TodoScopes    map[string]*sessionSnapshotTodoScope `json:"todo_scopes,omitempty"`
+	Accounting    SessionSnapshotAccounting            `json:"accounting"`
 }
 
 type sessionSnapshotDocumentStore struct {
@@ -94,6 +98,7 @@ func newSessionSnapshotDocument() SessionSnapshotDocument {
 	return SessionSnapshotDocument{
 		SchemaVersion: SessionSnapshotDocumentSchemaVersion,
 		Tasks:         make(map[string]*SessionTaskSnapshot),
+		TodoScopes:    make(map[string]*sessionSnapshotTodoScope),
 		Accounting: SessionSnapshotAccounting{
 			ToolCalls:           make(map[string]sessionSnapshotToolAccounting),
 			RuntimeTasks:        make(map[string]string),
@@ -110,9 +115,19 @@ func normalizeSessionSnapshotDocument(doc *SessionSnapshotDocument) {
 	if doc.Tasks == nil {
 		doc.Tasks = make(map[string]*SessionTaskSnapshot)
 	}
-	for _, task := range doc.Tasks {
+	if doc.TodoScopes == nil {
+		doc.TodoScopes = make(map[string]*sessionSnapshotTodoScope)
+	}
+	for taskID, task := range doc.Tasks {
 		if task != nil && task.Attempt <= 0 {
 			task.Attempt = 1
+		}
+		if task != nil && task.Todo == nil {
+			if scope := doc.TodoScopes[taskID]; scope != nil {
+				task.Todo = buildSessionTaskTodo(scope.State)
+			} else {
+				task.Todo = buildSessionTaskTodo(nil)
+			}
 		}
 	}
 	if doc.Accounting.ToolCalls == nil {
@@ -323,6 +338,7 @@ func (c *Config) BeginSessionSnapshotTask(task AIStatefulTask) {
 	history = append(history, SessionTaskSnapshotAttempt{
 		Attempt: attempt, Status: existing.Status, Revision: existing.Revision,
 		UpdatedAt: existing.UpdatedAt, Snapshot: cloneSessionSnapshot(existing.Snapshot),
+		Todo: cloneSessionTaskTodo(existing.Todo),
 	})
 	store.document.Tasks[taskID] = &SessionTaskSnapshot{
 		TaskID: taskID, TaskIndex: taskIndex, TaskName: taskName,
@@ -405,6 +421,7 @@ func (s *sessionSnapshotDocumentStore) taskSummariesLocked() []SessionSnapshotTa
 		result = append(result, SessionSnapshotTaskSummary{
 			TaskID: task.TaskID, TaskIndex: task.TaskIndex, TaskName: task.TaskName,
 			Attempt: task.Attempt, Status: task.Status, IsFinal: task.IsFinal, UpdatedAt: task.UpdatedAt,
+			TodoStats: todoStatsForTask(task),
 		})
 	}
 	sort.SliceStable(result, func(i, j int) bool {
@@ -450,6 +467,7 @@ func (c *Config) MaterializeSessionSnapshot(task AIStatefulTask, latest *Session
 				Attempt: attempt, Status: status, IsFinal: isSessionSnapshotExecutionTerminal(status),
 				Revision: revision, UpdatedAt: now, Snapshot: cloneSessionSnapshot(latest),
 				PreviousAttempts: previousAttempts,
+				Todo:             store.taskTodoLocked(taskID),
 			}
 		}
 	}
@@ -465,20 +483,11 @@ func (c *Config) MaterializeSessionSnapshot(task AIStatefulTask, latest *Session
 	session.Execution = store.buildCumulativeExecutionLocked(c, latest)
 	session.Tasks = store.taskSummariesLocked()
 	session.BackgroundProcesses = store.backgroundProcessesLocked()
+	session.Todo = store.todoSummaryLocked()
 	NormalizeSessionSnapshot(session)
 	store.document.Session = cloneSessionSnapshot(session)
 
-	if store.sessionID != "" && c.GetDB() != nil && store.document.Revision > store.lastPersistedRev {
-		if raw, err := json.Marshal(&store.document); err != nil {
-			log.Warnf("encode session snapshot document failed: %v", err)
-		} else if _, err := yakit.EnsureAISessionMeta(c.GetDB(), store.sessionID); err != nil {
-			log.Warnf("ensure session metadata for snapshot failed: %v", err)
-		} else if err := yakit.UpdateAISessionMetaSnapshot(c.GetDB(), store.sessionID, string(raw)); err != nil {
-			log.Warnf("persist session snapshot document failed: %v", err)
-		} else {
-			store.lastPersistedRev = store.document.Revision
-		}
-	}
+	store.persistLocked(c)
 	return session
 }
 
@@ -502,6 +511,9 @@ func (c *Config) GetSessionTaskSnapshot(taskID string) *SessionTaskSnapshot {
 	var copied SessionTaskSnapshot
 	if err := json.Unmarshal(raw, &copied); err != nil {
 		return nil
+	}
+	if copied.Todo == nil {
+		copied.Todo = buildSessionTaskTodo(nil)
 	}
 	return &copied
 }
