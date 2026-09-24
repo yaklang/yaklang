@@ -7,14 +7,29 @@ import (
 	"path"
 	"strconv"
 	"strings"
+	"sync"
+	"time"
 
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/filesys"
 	"github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
 )
 
+// Directory trees stay in memory (small). File bodies use a separate TTL cache:
+// last access extends life; 10 minutes without ReadFile/Open drops that file's
+// content. The path tree itself is not TTL-evicted — only DropProgramCache /
+// Delete removes it.
+const (
+	irSourceFileContentTTL = 10 * time.Minute
+	irSourceFileContentCap = 512
+)
+
+// irSourceFS caches one VirtualFS per program that holds the full path tree
+// (directories + empty file stubs). File bodies live in fileContent, not in the tree.
 type irSourceFS struct {
-	virtual map[string]*filesys.VirtualFS // program -> virtual fs
+	mu          sync.Mutex
+	virtual     map[string]*filesys.VirtualFS // program -> path tree (long-lived)
+	fileContent *utils.CacheExWithKey[string, []byte]
 }
 
 var IrSourceFsSeparators = '/'
@@ -23,8 +38,14 @@ var _ filesys_interface.ReadOnlyFileSystem = (*irSourceFS)(nil)
 var _ filesys_interface.FileSystem = (*irSourceFS)(nil)
 
 func NewIrSourceFs() *irSourceFS {
+	content := utils.NewCacheExWithKey[string, []byte](
+		utils.WithCacheTTL(irSourceFileContentTTL),
+		utils.WithCacheCapacity(irSourceFileContentCap),
+	)
+	// Touch-on-hit (default): actively viewed files stay; idle 10m → evict.
 	return &irSourceFS{
-		virtual: make(map[string]*filesys.VirtualFS),
+		virtual:     make(map[string]*filesys.VirtualFS),
+		fileContent: content,
 	}
 }
 
@@ -33,40 +54,53 @@ func (fs *irSourceFS) ReadFile(path string) ([]byte, error) {
 		return nil, utils.Errorf("path [%v] is a program root path, not file.", path)
 	}
 
-	vf, err := fs.checkPath(path)
+	fs.mu.Lock()
+	vf, err := fs.programTreeLocked(path)
+	fs.mu.Unlock()
 	if err != nil {
 		return nil, err
 	}
-	return vf.ReadFile(path)
+	if ok, _ := vf.Exists(path); !ok {
+		return nil, utils.Errorf("file [%v] not found", path)
+	}
+	return fs.getFileContent(path)
 }
 
 func (fs *irSourceFS) Open(path string) (fs.File, error) {
 	if path == "/" {
 		return nil, utils.Errorf("path [%v] is a program root path, not file.", path)
 	}
-	vf, err := fs.checkPath(path)
+	fs.mu.Lock()
+	vf, err := fs.programTreeLocked(path)
+	fs.mu.Unlock()
 	if err != nil {
 		return nil, err
 	}
-	return vf.Open(path)
+	if ok, _ := vf.Exists(path); !ok {
+		return nil, utils.Errorf("file [%v] not found", path)
+	}
+	content, err := fs.getFileContent(path)
+	if err != nil {
+		return nil, err
+	}
+	// Do not write content into the shared tree — keep tree as structure only.
+	return filesys.NewVirtualFile(path, string(content)), nil
 }
 
 func (fs *irSourceFS) OpenFile(path string, flag int, perm os.FileMode) (fs.File, error) {
 	if path == "/" {
 		return nil, utils.Errorf("path [%v] is a program root path, not file.", path)
 	}
-	vf, err := fs.checkPath(path)
-	if err != nil {
-		return nil, err
-	}
-	return vf.OpenFile(path, flag, perm)
+	return fs.Open(path)
 }
 
 func (fs *irSourceFS) Stat(path string) (fs.FileInfo, error) {
 	if path == "/" {
 		return filesys.NewVirtualFileInfo("/", 0, true), nil
 	}
-	vf, err := fs.checkPath(path, false)
+	fs.mu.Lock()
+	defer fs.mu.Unlock()
+	vf, err := fs.programTreeLocked(path)
 	if err != nil {
 		return nil, err
 	}
@@ -81,7 +115,9 @@ func (isfs *irSourceFS) ReadDir(path string) ([]fs.DirEntry, error) {
 		}
 		return ret, nil
 	}
-	vf, err := isfs.checkPath(path, true)
+	isfs.mu.Lock()
+	defer isfs.mu.Unlock()
+	vf, err := isfs.programTreeLocked(path)
 	if err != nil {
 		return nil, err
 	}
@@ -138,9 +174,44 @@ func (f *irSourceFS) Delete(path string) error {
 	if !isProgram {
 		return utils.Errorf("path [%v] is not a program root path, can't delete", path)
 	}
-	delete(f.virtual, programName)
+	f.DropProgramCache(programName)
 	DeleteProgram(GetDB(), programName)
 	return nil
+}
+
+// DropProgramCache removes the path tree and any cached file bodies for programName.
+// Directory trees are otherwise retained; call this on program rewrite / delete.
+func (f *irSourceFS) DropProgramCache(programName string) {
+	if programName == "" {
+		return
+	}
+	f.mu.Lock()
+	delete(f.virtual, programName)
+	f.mu.Unlock()
+	f.dropFileContentPrefix("/" + programName)
+}
+
+func (f *irSourceFS) dropFileContentPrefix(prefix string) {
+	if f.fileContent == nil {
+		return
+	}
+	f.fileContent.ForEach(func(key string, _ []byte) {
+		if key == prefix || strings.HasPrefix(key, prefix+"/") {
+			f.fileContent.Remove(key)
+		}
+	})
+}
+
+func (fs *irSourceFS) getFileContent(filePath string) ([]byte, error) {
+	if data, ok := fs.fileContent.Get(filePath); ok {
+		return data, nil
+	}
+	data, err := readIrSourceFileContent(filePath)
+	if err != nil {
+		return nil, err
+	}
+	fs.fileContent.Set(filePath, data)
+	return data, nil
 }
 
 func (fs *irSourceFS) Ext(string) string {
@@ -184,9 +255,11 @@ func (f *irSourceFS) String() string {
 		return "<nil>"
 	}
 
+	f.mu.Lock()
+	defer f.mu.Unlock()
+
 	var builder strings.Builder
 	builder.WriteString("irSourceFS{")
-
 	first := true
 	for programName, virtualFS := range f.virtual {
 		if !first {
@@ -195,14 +268,116 @@ func (f *irSourceFS) String() string {
 		first = false
 		builder.WriteString(fmt.Sprintf("%s: %s", programName, virtualFS.String()))
 	}
-
 	builder.WriteString("}")
 	return builder.String()
 }
 
-// mergeExtraFileEntriesIntoVF ensures paths recorded only in IrProgram.extra_file appear in the
-// audit / ssadb virtual tree (e.g. duplicate content hash kept a single IrSource row, or legacy rows).
-func mergeExtraFileEntriesIntoVF(progName string, vf *filesys.VirtualFS) {
+// programTreeLocked requires fs.mu held.
+// First touch of a program builds the entire path tree once (no QuotedCode).
+func (fs *irSourceFS) programTreeLocked(anyPath string) (*filesys.VirtualFS, error) {
+	progName, _ := fs.getProgram(anyPath)
+	if progName == "" {
+		return nil, utils.Errorf("invalid path [%v]: missing program name", anyPath)
+	}
+	if vf, ok := fs.virtual[progName]; ok {
+		return vf, nil
+	}
+	vf := filesys.NewVirtualFs()
+	if err := buildProgramTree(progName, fs, vf); err != nil {
+		return nil, err
+	}
+	fs.virtual[progName] = vf
+	return vf, nil
+}
+
+func buildProgramTree(progName string, irfs *irSourceFS, vf *filesys.VirtualFS) error {
+	entries, err := GetIrSourceTreeByProgram(progName)
+	if err != nil {
+		return err
+	}
+	for _, entry := range entries {
+		sourcePath := irfs.Join(entry.FolderPath, entry.FileName)
+		if entry.IsDir {
+			vf.AddDir(sourcePath)
+			continue
+		}
+		vf.AddFile(sourcePath, "")
+	}
+	mergeExtraFileStubs(progName, vf)
+	return nil
+}
+
+func readIrSourceFileContent(filePath string) ([]byte, error) {
+	dir, name := pathSplit(filePath)
+	if name == "" {
+		return nil, utils.Errorf("path [%v] is a directory, not file", filePath)
+	}
+	source, err := GetIrSourceByPathAndName(dir, name)
+	if err != nil {
+		source, err = lookupExtraFileSource(progNameFromPath(filePath), filePath)
+		if err != nil {
+			return nil, err
+		}
+	}
+	if source.QuotedCode == "" {
+		return nil, utils.Errorf("path [%v] is a directory, not file", filePath)
+	}
+	code, e := strconv.Unquote(source.QuotedCode)
+	if e != nil || code == "" {
+		code = source.QuotedCode
+	}
+	return []byte(code), nil
+}
+
+func progNameFromPath(filePath string) string {
+	parts := strings.Split(strings.Trim(filePath, "/"), "/")
+	if len(parts) == 0 {
+		return ""
+	}
+	return parts[0]
+}
+
+func lookupExtraFileSource(progName, filePath string) (*IrSource, error) {
+	if progName == "" {
+		return nil, utils.Errorf("extra file lookup: empty program")
+	}
+	prog, err := GetApplicationProgram(progName)
+	if err != nil || prog == nil || len(prog.ExtraFile) == 0 {
+		return nil, utils.Errorf("extra file not found: %v", filePath)
+	}
+	hash := ""
+	for fileURL, h := range prog.ExtraFile {
+		if normalizeExtraFilePath(progName, fileURL) == filePath {
+			hash = h
+			break
+		}
+	}
+	if hash == "" {
+		return nil, utils.Errorf("extra file not found: %v", filePath)
+	}
+	db := GetDB()
+	var source IrSource
+	if err := db.Where("program_name = ? AND source_code_hash = ?", progName, hash).First(&source).Error; err != nil {
+		return nil, err
+	}
+	return &source, nil
+}
+
+func normalizeExtraFilePath(progName, fileURL string) string {
+	vfPath := strings.ReplaceAll(strings.TrimSpace(fileURL), "\\", "/")
+	if !strings.HasPrefix(vfPath, "/") {
+		vfPath = "/" + vfPath
+	}
+	vfPath = path.Clean(vfPath)
+	segs := strings.Split(strings.Trim(vfPath, "/"), "/")
+	if len(segs) == 0 || segs[0] != progName {
+		vfPath = path.Join("/", progName, strings.Trim(strings.TrimPrefix(vfPath, "/"), "/"))
+	}
+	return vfPath
+}
+
+// mergeExtraFileStubs adds ExtraFile paths as empty stubs (tree only).
+func mergeExtraFileStubs(progName string, vf *filesys.VirtualFS) {
 	if progName == "" || vf == nil {
 		return
 	}
@@ -210,110 +385,13 @@ func mergeExtraFileEntriesIntoVF(progName string, vf *filesys.VirtualFS) {
 	if err != nil || prog == nil || len(prog.ExtraFile) == 0 {
 		return
 	}
-	db := GetDB()
-	for fileURL, hash := range prog.ExtraFile {
-		if hash == "" || fileURL == "" {
-			continue
-		}
-		vfPath := strings.ReplaceAll(strings.TrimSpace(fileURL), "\\", "/")
-		if !strings.HasPrefix(vfPath, "/") {
-			vfPath = "/" + vfPath
-		}
-		vfPath = path.Clean(vfPath)
-		segs := strings.Split(strings.Trim(vfPath, "/"), "/")
-		if len(segs) == 0 || segs[0] != progName {
-			vfPath = path.Join("/", progName, strings.Trim(strings.TrimPrefix(vfPath, "/"), "/"))
-		}
+	for fileURL := range prog.ExtraFile {
+		vfPath := normalizeExtraFilePath(progName, fileURL)
 		if ok, err := vf.Exists(vfPath); err == nil && ok {
 			continue
 		}
-		var source IrSource
-		if err := db.Where("program_name = ? AND source_code_hash = ?", progName, hash).First(&source).Error; err != nil {
-			continue
-		}
-		if source.QuotedCode == "" {
-			continue
-		}
-		code, e := strconv.Unquote(source.QuotedCode)
-		if e != nil || code == "" {
-			code = source.QuotedCode
-		}
-		if code == "" {
-			continue
-		}
-		vf.AddFile(vfPath, code)
+		vf.AddFile(vfPath, "")
 	}
-}
-
-func (fs *irSourceFS) checkPath(path string, isDirs ...bool) (*filesys.VirtualFS, error) {
-	progName, isProgram := fs.getProgram(path)
-	vf, ok := fs.virtual[progName]
-	if !ok {
-		vf = filesys.NewVirtualFs()
-		fs.virtual[progName] = vf
-	}
-	isDir := false
-	if len(isDirs) > 0 {
-		isDir = isDirs[0]
-	}
-	if isProgram {
-		isDir = true
-	}
-	loadIrSourceFS(path, progName, isDir, fs, vf)
-	return vf, nil
-}
-
-// loadIrSourceFS hydrates a single program's VirtualFS from ir_sources.
-// Full vs incremental aggregation belongs in ssaapi, not here.
-func loadIrSourceFS(path, progName string, isDir bool, irfs *irSourceFS, vf *filesys.VirtualFS) {
-	add2FS := func(source *IrSource) {
-		sourcePath := irfs.Join(source.FolderPath, source.FileName)
-		if source.QuotedCode == "" {
-			vf.AddDir(sourcePath)
-		} else {
-			code, _ := strconv.Unquote(source.QuotedCode)
-			if code == "" {
-				code = source.QuotedCode
-			}
-			vf.AddFile(sourcePath, code)
-		}
-	}
-
-	addDir := func(dirPath string) {
-		sources, err := GetIrSourceByPath(dirPath)
-		if err != nil {
-			return
-		}
-		for _, source := range sources {
-			add2FS(source)
-		}
-	}
-
-	if isDir {
-		addDir(path)
-		mergeExtraFileEntriesIntoVF(progName, vf)
-		return
-	}
-
-	dir, name := irfs.PathSplit(path)
-	if name == "" {
-		sources, err := GetIrSourceByPath(dir)
-		if err != nil {
-			mergeExtraFileEntriesIntoVF(progName, vf)
-			return
-		}
-		for _, source := range sources {
-			add2FS(source)
-		}
-	} else {
-		source, err := GetIrSourceByPathAndName(dir, name)
-		if err != nil {
-			mergeExtraFileEntriesIntoVF(progName, vf)
-			return
-		}
-		add2FS(source)
-	}
-	mergeExtraFileEntriesIntoVF(progName, vf)
 }
 
 func irSourceJoin(element ...string) string {
