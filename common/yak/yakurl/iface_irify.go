@@ -3,7 +3,7 @@
 package yakurl
 
 import (
-	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
+	"github.com/yaklang/yaklang/common/yak/ssaapi"
 )
 
 // createIrifyAction 创建 Irify 专用的 action
@@ -14,7 +14,7 @@ func createIrifyAction(schema string) Action {
 		return NewSyntaxFlowAction()
 	case "ssadb":
 		return &fileSystemAction{
-			fs: ssadb.NewIrSourceFs(),
+			fs: ssaapi.NewProgramFileSystem(),
 		}
 	case "ssarisk":
 		return &riskTreeAction{
@@ -24,4 +24,3 @@ func createIrifyAction(schema string) Action {
 		return nil
 	}
 }
-
