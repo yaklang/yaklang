@@ -540,11 +540,11 @@ func TestGRPCMUSTPASS_MITMV2_HijackFilter_ConcurrentIsolation(t *testing.T) {
 func TestMITMHijackTaskSource(t *testing.T) {
 	require.Equal(t,
 		ypb.MITMHijackTaskSource_MITM_HIJACK_TASK_SOURCE_MANUAL,
-		resolveMITMHijackTaskSource(false),
+		resolveMITMHijackTaskSource(false, false),
 	)
 	require.Equal(t,
 		ypb.MITMHijackTaskSource_MITM_HIJACK_TASK_SOURCE_CONDITIONAL,
-		resolveMITMHijackTaskSource(true),
+		resolveMITMHijackTaskSource(true, false),
 	)
 }
 
