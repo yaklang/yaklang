@@ -451,7 +451,7 @@ func (c *Call) handleCalleeFunction() {
 				}
 			}
 
-			if res := checkCanMemberCallExist(object, actualKey, wantFunction); !res.exist {
+			if res := checkCanMemberCallExist(object, actualKey); !res.exist {
 				builder.NewErrorWithPos(Error, SSATAG,
 					p.GetRange(),
 					ValueNotMember(
