@@ -6,12 +6,12 @@ import (
 	"context"
 	"crypto/tls"
 	"fmt"
+	utls "github.com/yaklang/yaklang/common/third_party/utls"
 	"net"
 	"sync"
 	"sync/atomic"
 	"time"
 
-	utls "github.com/refraction-networking/utls"
 	"github.com/yaklang/yaklang/common/gmsm/gmtls"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/netx"
@@ -34,21 +34,21 @@ type H2ConnPool struct {
 	keepAliveTimeout time.Duration
 	maxIdleConn      int
 
-	mu          sync.Mutex
-	connMap     map[string]*h2ConnEntry // per-host cached H2 connection
-	idle        map[*h2ConnEntry]*list.Element
-	idleLRU     *list.List
-	dials       map[string]*h2DialCall
-	generation  uint64
-	tombstones  *tombstoneQueue
+	mu           sync.Mutex
+	connMap      map[string]*h2ConnEntry // per-host cached H2 connection
+	idle         map[*h2ConnEntry]*list.Element
+	idleLRU      *list.List
+	dials        map[string]*h2DialCall
+	generation   uint64
+	tombstones   *tombstoneQueue
 	debugEnabled int32 // atomic; mirrors LowHttpConnPool.debugEnabled
 }
 
 // h2ConnEntry is the H2 equivalent of persistConn: it wraps a single TCP/TLS
 // connection that speaks HTTP/2 and owns the http2ClientConn state machine.
 type h2ConnEntry struct {
-	conn     net.Conn       // underlying TCP/TLS connection
-	cacheKey *connectKey    // pool cache key (scheme == H2)
+	conn     net.Conn         // underlying TCP/TLS connection
+	cacheKey *connectKey      // pool cache key (scheme == H2)
 	alt      *http2ClientConn // H2 protocol state; nil after close
 
 	pool *H2ConnPool // back-reference for eviction
