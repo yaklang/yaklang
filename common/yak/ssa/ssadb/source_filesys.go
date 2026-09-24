@@ -7,39 +7,14 @@ import (
 	"path"
 	"strconv"
 	"strings"
-	"sync"
-	"time"
 
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/filesys"
 	"github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
 )
 
-// GetAggregatedFileSystemFunc 用于获取聚合文件系统的函数类型
-// 这个函数变量由 ssaapi 包在初始化时注册，避免循环导入
-var GetAggregatedFileSystemFunc func(programName string) filesys_interface.FileSystem
-
-// SetGetAggregatedFileSystemFunc 设置获取聚合文件系统的函数
-// 由 ssaapi 包在初始化时调用
-func SetGetAggregatedFileSystemFunc(fn func(programName string) filesys_interface.FileSystem) {
-	GetAggregatedFileSystemFunc = fn
-}
-
-// programRevision is ir_programs.id plus updated_at. Compile and overlay
-// saves update that row, so a new revision drops the listing cache. An
-// unchanged revision keeps ReadDir/Stat off QuotedCode and overlay copies.
-type programRevision struct {
-	id        uint
-	updatedAt int64
-}
-
 type irSourceFS struct {
-	mu            sync.Mutex
-	virtual       map[string]*filesys.VirtualFS // program -> virtual fs
-	loadedDirs    map[string]struct{}           // directory paths already hydrated from DB
-	overlayLoaded map[string]struct{}           // overlay programs already copied into virtual fs
-	notOverlay    map[string]struct{}           // programs known not to use overlay
-	revision      map[string]programRevision
+	virtual map[string]*filesys.VirtualFS // program -> virtual fs
 }
 
 var IrSourceFsSeparators = '/'
@@ -49,11 +24,7 @@ var _ filesys_interface.FileSystem = (*irSourceFS)(nil)
 
 func NewIrSourceFs() *irSourceFS {
 	return &irSourceFS{
-		virtual:       make(map[string]*filesys.VirtualFS),
-		loadedDirs:    make(map[string]struct{}),
-		overlayLoaded: make(map[string]struct{}),
-		notOverlay:    make(map[string]struct{}),
-		revision:      make(map[string]programRevision),
+		virtual: make(map[string]*filesys.VirtualFS),
 	}
 }
 
@@ -95,7 +66,6 @@ func (fs *irSourceFS) Stat(path string) (fs.FileInfo, error) {
 	if path == "/" {
 		return filesys.NewVirtualFileInfo("/", 0, true), nil
 	}
-	// handler path
 	vf, err := fs.checkPath(path, false)
 	if err != nil {
 		return nil, err
@@ -133,7 +103,7 @@ func pathSplit(p string) (string, string) {
 	return dir, name
 }
 
-// splitProjectPath传入全路径，会以路径分隔符分割，分割后的第一个元素为项目名，后面的元素为文件路径
+// splitProjectPath 传入全路径，会以路径分隔符分割，分割后的第一个元素为项目名，后面的元素为文件路径
 func splitProjectPath(p string) (projectPath string, fileName string) {
 	paths := strings.Split(p, string(IrSourceFsSeparators))
 	paths = utils.StringArrayFilterEmpty(paths)
@@ -168,14 +138,7 @@ func (f *irSourceFS) Delete(path string) error {
 	if !isProgram {
 		return utils.Errorf("path [%v] is not a program root path, can't delete", path)
 	}
-	// switch db path
-	// if prog := CheckAndSwitchDB(programName); prog == nil {
-	// 	return utils.Errorf("program [%v] not exist", programName)
-	// }
-	f.mu.Lock()
-	f.dropProgramCacheLocked(programName)
-	f.mu.Unlock()
-	// delete program
+	delete(f.virtual, programName)
 	DeleteProgram(GetDB(), programName)
 	return nil
 }
@@ -220,9 +183,6 @@ func (f *irSourceFS) String() string {
 	if f == nil {
 		return "<nil>"
 	}
-
-	f.mu.Lock()
-	defer f.mu.Unlock()
 
 	var builder strings.Builder
 	builder.WriteString("irSourceFS{")
@@ -285,76 +245,17 @@ func mergeExtraFileEntriesIntoVF(progName string, vf *filesys.VirtualFS) {
 	}
 }
 
-func (fs *irSourceFS) dropProgramCacheLocked(programName string) {
-	delete(fs.virtual, programName)
-	delete(fs.overlayLoaded, programName)
-	delete(fs.notOverlay, programName)
-	delete(fs.revision, programName)
-	prefix := "/" + programName
-	for p := range fs.loadedDirs {
-		if p == prefix || strings.HasPrefix(p, prefix+"/") {
-			delete(fs.loadedDirs, p)
-		}
-	}
-}
-
-func loadProgramRevision(name string) (programRevision, bool) {
-	var row struct {
-		ID        uint
-		UpdatedAt time.Time
-	}
-	err := GetDB().Model(&IrProgram{}).
-		Select("id, updated_at").
-		Where("program_name = ? AND program_kind = ?", name, Application).
-		Scan(&row).Error
-	if err != nil || row.ID == 0 {
-		return programRevision{}, false
-	}
-	return programRevision{id: row.ID, updatedAt: row.UpdatedAt.UTC().UnixNano()}, true
-}
-
-func (fs *irSourceFS) syncProgramRevision(progName string) {
-	if progName == "" {
-		return
-	}
-	rev, ok := loadProgramRevision(progName)
-	prev, has := fs.revision[progName]
-	if !ok {
-		if has && prev == (programRevision{}) {
-			return
-		}
-		if has || fs.virtual[progName] != nil {
-			fs.dropProgramCacheLocked(progName)
-		}
-		fs.revision[progName] = programRevision{}
-		return
-	}
-	if has && prev == rev {
-		return
-	}
-	if has || fs.virtual[progName] != nil {
-		fs.dropProgramCacheLocked(progName)
-	}
-	fs.revision[progName] = rev
-}
-
 func (fs *irSourceFS) checkPath(path string, isDirs ...bool) (*filesys.VirtualFS, error) {
-	fs.mu.Lock()
-	defer fs.mu.Unlock()
-
 	progName, isProgram := fs.getProgram(path)
-	fs.syncProgramRevision(progName)
 	vf, ok := fs.virtual[progName]
 	if !ok {
 		vf = filesys.NewVirtualFs()
 		fs.virtual[progName] = vf
 	}
-	// is directory parameter
 	isDir := false
 	if len(isDirs) > 0 {
 		isDir = isDirs[0]
 	}
-	// if "/programName" this is a program root path, is directory
 	if isProgram {
 		isDir = true
 	}
@@ -362,47 +263,9 @@ func (fs *irSourceFS) checkPath(path string, isDirs ...bool) (*filesys.VirtualFS
 	return vf, nil
 }
 
+// loadIrSourceFS hydrates a single program's VirtualFS from ir_sources.
+// Full vs incremental aggregation belongs in ssaapi, not here.
 func loadIrSourceFS(path, progName string, isDir bool, irfs *irSourceFS, vf *filesys.VirtualFS) {
-	if progName != "" {
-		if _, ok := irfs.overlayLoaded[progName]; ok {
-			return
-		}
-		if _, skip := irfs.notOverlay[progName]; !skip {
-			prog, err := GetApplicationProgram(progName)
-			if err == nil && prog != nil && prog.IsOverlay && len(prog.OverlayLayers) > 0 {
-				if GetAggregatedFileSystemFunc != nil {
-					log.Debugf("loading aggregated file system for overlay program: %s", progName)
-					aggregatedFS := GetAggregatedFileSystemFunc(progName)
-					if aggregatedFS != nil {
-						err := filesys.Recursive(".",
-							filesys.WithFileSystem(aggregatedFS),
-							filesys.WithFileStat(func(filePath string, info fs.FileInfo) error {
-								if info.IsDir() {
-									return nil
-								}
-								content, err := aggregatedFS.ReadFile(filePath)
-								if err != nil {
-									log.Warnf("failed to read file %s from aggregatedFS: %v", filePath, err)
-									return nil
-								}
-								normalizedPath := strings.TrimPrefix(filePath, "/")
-								vf.AddFile("/"+progName+"/"+normalizedPath, string(content))
-								return nil
-							}))
-						if err == nil {
-							mergeExtraFileEntriesIntoVF(progName, vf)
-							irfs.overlayLoaded[progName] = struct{}{}
-							return
-						}
-						log.Warnf("failed to copy files from aggregatedFS: %v, fallback to single program", err)
-					}
-				}
-			} else {
-				irfs.notOverlay[progName] = struct{}{}
-			}
-		}
-	}
-
 	add2FS := func(source *IrSource) {
 		sourcePath := irfs.Join(source.FolderPath, source.FileName)
 		if source.QuotedCode == "" {
@@ -417,9 +280,6 @@ func loadIrSourceFS(path, progName string, isDir bool, irfs *irSourceFS, vf *fil
 	}
 
 	addDir := func(dirPath string) {
-		if _, ok := irfs.loadedDirs[dirPath]; ok {
-			return
-		}
 		sources, err := GetIrSourceByPath(dirPath)
 		if err != nil {
 			return
@@ -427,25 +287,24 @@ func loadIrSourceFS(path, progName string, isDir bool, irfs *irSourceFS, vf *fil
 		for _, source := range sources {
 			add2FS(source)
 		}
-		irfs.loadedDirs[dirPath] = struct{}{}
 	}
 
 	if isDir {
-		if _, ok := irfs.loadedDirs[path]; ok {
-			return
-		}
 		addDir(path)
 		mergeExtraFileEntriesIntoVF(progName, vf)
 		return
 	}
 
-	if _, err := vf.Stat(path); err == nil {
-		return
-	}
-
 	dir, name := irfs.PathSplit(path)
 	if name == "" {
-		addDir(dir)
+		sources, err := GetIrSourceByPath(dir)
+		if err != nil {
+			mergeExtraFileEntriesIntoVF(progName, vf)
+			return
+		}
+		for _, source := range sources {
+			add2FS(source)
+		}
 	} else {
 		source, err := GetIrSourceByPathAndName(dir, name)
 		if err != nil {

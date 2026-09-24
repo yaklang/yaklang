@@ -14,6 +14,7 @@ import (
 	"github.com/yaklang/yaklang/common/utils/filesys"
 	"github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
+	"github.com/yaklang/yaklang/common/yak/ssaapi"
 )
 
 // CreateSSATools 创建所有 SSA 相关的 AI 工具
@@ -98,7 +99,7 @@ func projectInfoCallback(params aitool.InvokeParams, stdout io.Writer, stderr io
 	}
 
 	// 方法1: 尝试从 irSourceFS (数据库) 读取
-	irfs := ssadb.NewIrSourceFs()
+	irfs := ssaapi.NewProgramFileSystem()
 	programPath := "/" + programName
 
 	entries, err := irfs.ReadDir(programPath)
@@ -317,7 +318,7 @@ func listFilesCallback(params aitool.InvokeParams, stdout io.Writer, stderr io.W
 	}
 
 	// 方法1: 尝试从 irSourceFS (数据库) 读取
-	irfs := ssadb.NewIrSourceFs()
+	irfs := ssaapi.NewProgramFileSystem()
 	programPath := "/" + programName
 
 	entries, err := irfs.ReadDir(programPath)
@@ -487,7 +488,7 @@ func readFileCallback(params aitool.InvokeParams, stdout io.Writer, stderr io.Wr
 	}
 
 	// 方法1: 尝试从 irSourceFS (数据库) 读取
-	irfs := ssadb.NewIrSourceFs()
+	irfs := ssaapi.NewProgramFileSystem()
 	fullPath := "/" + programName + "/" + filePath
 
 	content, err := irfs.ReadFile(fullPath)
@@ -709,7 +710,7 @@ func grepCallback(params aitool.InvokeParams, stdout io.Writer, stderr io.Writer
 	}
 
 	// 方法1: 尝试从 irSourceFS (数据库) 读取
-	irfs := ssadb.NewIrSourceFs()
+	irfs := ssaapi.NewProgramFileSystem()
 	programPath := "/" + programName
 
 	entries, err := irfs.ReadDir(programPath)
