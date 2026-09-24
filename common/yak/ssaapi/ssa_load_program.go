@@ -4,7 +4,6 @@ import (
 	"time"
 
 	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
 	"github.com/yaklang/yaklang/common/yak/ssa"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 )
@@ -219,33 +218,6 @@ func LoadProgramRegexp(match string) []*Program {
 	return programs
 }
 
-// GetAggregatedFileSystemForProgramName 从 program name 获取聚合文件系统
-// 如果 program 是增量编译的（IsOverlay=true），返回聚合后的文件系统
-// 否则返回 nil
-// 这个函数专门用于 ssadb 包调用，避免循环导入
-func GetAggregatedFileSystemForProgramName(programName string) filesys_interface.FileSystem {
-	if programName == "" {
-		return nil
-	}
-
-	prog, err := FromDatabase(programName)
-	if err != nil {
-		log.Warnf("failed to load program %s from database: %v", programName, err)
-		return nil
-	}
-
-	if prog == nil {
-		return nil
-	}
-
-	overlay := prog.GetOverlay()
-	if overlay == nil {
-		return nil
-	}
-
-	return overlay.GetAggregatedFileSystem()
-}
-
 // NewProgramFromDB 从数据库加载程序并返回 SyntaxFlowQueryInstance 接口（导出名为 ssa.NewProgramFromDB）
 // 如果程序有 overlay（已保存的 overlay 或增量编译的 diff program），返回 *ProgramOverLay，否则返回 *Program
 // 参数:
@@ -271,9 +243,4 @@ func NewProgramFromDB(programName string) (SyntaxFlowQueryInstance, error) {
 		return nil, utils.Errorf("program %s is nil", programName)
 	}
 	return program.AsSyntaxFlowQueryInstance(), nil
-}
-
-func init() {
-	// 注册函数到 ssadb 包，避免循环导入
-	ssadb.SetGetAggregatedFileSystemFunc(GetAggregatedFileSystemForProgramName)
 }
