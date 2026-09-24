@@ -30,7 +30,11 @@ barrier.
    libraries waits for the deferred post-skeleton import task after every
    unit in the batch has registered its declarations.
 3. Frontends opt into library body parallelism through `ConcurrentUnitBuilder`.
-   Java supplies package dependencies and private execution builder views.
+   Java supplies package units. Python and JS/TS map directory units onto
+   libraries (`dir:helper` → library `helper`) so independent dirs can drain
+   together. Go and PHP keep serial drain until their package/global ownership
+   can be isolated safely.
+   The project-root directory and `resource:` keys stay on the application.
    Application-owned units execute exclusively. Each actual Program owner is
    drained once per batch, without recursively draining its upstream libraries;
    the scheduler controls when those library bodies run. Independent libraries

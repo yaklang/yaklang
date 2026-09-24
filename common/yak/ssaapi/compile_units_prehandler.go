@@ -112,7 +112,11 @@ func (env *prehandleBatchEnv) unitWorker(key string, workers int) int {
 		return 1
 	}
 	h := fnv.New32a()
-	_, _ = h.Write([]byte(key))
+	ownerKey := owner.Name
+	if ownerKey == "" {
+		ownerKey = key
+	}
+	_, _ = h.Write([]byte(ownerKey))
 	return int(h.Sum32()%uint32(workers-1)) + 1
 }
 

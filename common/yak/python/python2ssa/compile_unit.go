@@ -20,6 +20,8 @@ import (
 // "from ..pkg import y"), parenthesized/multi-line and semicolon-separated
 // forms, and literal dynamic imports (importlib.import_module("a.b") /
 // __import__("a.b")).
+func (*SSABuilder) SupportsConcurrentUnitBuild() bool { return true }
+
 func (*SSABuilder) CompileUnitDependencies(fs filesys_interface.FileSystem, units []*ssa.CompileUnit) []ssa.UnitRef {
 	pathToKey := pythonImportPathIndex(fs, units)
 	var edges []ssa.UnitRef

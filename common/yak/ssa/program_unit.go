@@ -7,6 +7,7 @@ import (
 
 	stdlog "github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils/memorybudget"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 )
 
 // BeginCompileUnit marks the start of a compile unit so deferred file builds
@@ -40,8 +41,8 @@ func (prog *Program) CurrentCompileUnit() string {
 }
 
 // EnsureLibraryForCompileUnit returns the Program that will own this unit.
-// Java package keys create the library before concurrent pre-handlers start
-// so NewLibrary is not called from worker goroutines.
+// Library-backed units are created before concurrent pre-handlers start so
+// NewLibrary is not called from worker goroutines.
 func (prog *Program) EnsureLibraryForCompileUnit(unitKey string) *Program {
 	if prog == nil {
 		return nil
@@ -50,7 +51,7 @@ func (prog *Program) EnsureLibraryForCompileUnit(unitKey string) *Program {
 	if app == nil {
 		app = prog
 	}
-	name := libraryNameFromCompileUnitKey(unitKey)
+	name := prog.libraryNameForCompileUnit(unitKey)
 	if name == "" {
 		return app
 	}
@@ -70,7 +71,7 @@ func (prog *Program) GetOrCreateUnitBuilder(unitKey string, parent *FunctionBuil
 	if prog == nil {
 		return parent
 	}
-	name := libraryNameFromCompileUnitKey(unitKey)
+	name := prog.libraryNameForCompileUnit(unitKey)
 	if name == "" {
 		if parent != nil {
 			return parent
@@ -113,9 +114,10 @@ func (prog *Program) GetOrCreateUnitBuilder(unitKey string, parent *FunctionBuil
 // Program that owns that unit's functions and classes.
 //
 // Language-prefixed keys encode the package/namespace after the first colon
-// (java:a.b → a.b, csharp:Foo.Bar → Foo.Bar). Unprefixed keys are used as-is
-// (tests, explicit NewLibrary names). Directory/resource keys have no library
-// name: their IR lives on the Application.
+// (java:a.b → a.b, csharp:Foo.Bar → Foo.Bar, php:App.Http → App.Http).
+// Directory keys (dir:helper/db) become library names so Python/JS/TS
+// directory units can drain concurrently. Go and PHP keep serial drain.
+// Resource keys and the project-root directory stay on the Application.
 func libraryNameFromCompileUnitKey(unitKey string) string {
 	if unitKey == "" {
 		return ""
@@ -125,11 +127,32 @@ func libraryNameFromCompileUnitKey(unitKey string) string {
 		return unitKey
 	}
 	switch strings.ToLower(prefix) {
-	case "dir", "resource", "unit":
+	case "resource":
 		return ""
+	case "dir", "unit":
+		rest = strings.Trim(strings.ReplaceAll(rest, "\\", "/"), "/")
+		if rest == "" || rest == "." {
+			return ""
+		}
+		return strings.ReplaceAll(rest, "/", ".")
 	default:
-		return rest
+		return strings.ReplaceAll(rest, "\\", ".")
 	}
+}
+
+// Go's frontend owns its package libraries by declared package name, which
+// cannot be recovered from a directory key. Keep directory units on the
+// application until the scheduler can map each key to its declared package.
+func (prog *Program) libraryNameForCompileUnit(unitKey string) string {
+	name := libraryNameFromCompileUnitKey(unitKey)
+	app := prog.GetApplication()
+	if app == nil {
+		app = prog
+	}
+	if app.Language == ssaconfig.GO && strings.HasPrefix(unitKey, "dir:") {
+		return ""
+	}
+	return name
 }
 
 // ProgramForCompileUnit returns the Program that owns this compile unit.
@@ -144,19 +167,23 @@ func (prog *Program) ProgramForCompileUnit(unitKey string) *Program {
 	if app == nil {
 		app = prog
 	}
-	if name := libraryNameFromCompileUnitKey(unitKey); name != "" {
+	if name := prog.libraryNameForCompileUnit(unitKey); name != "" {
 		if lib, _ := app.GetLibrary(name); lib != nil {
 			return lib
 		}
 		if lib, ok := app.UpStream.Get(name); ok && lib != nil {
 			return lib
 		}
+		prefix, _, _ := strings.Cut(unitKey, ":")
+		switch strings.ToLower(prefix) {
+		case "dir", "unit":
+			return app
+		}
 		return nil
 	}
 	if lib, ok := app.UpStream.Get(unitKey); ok && lib != nil {
 		return lib
 	}
-	// Directory-keyed units (python/go default) host IR on Application.
 	return app
 }
 

@@ -138,9 +138,17 @@ func (prog *Program) createSubProgram(name string, kind ssadb.ProgramKind, path 
 	subProg.Language = prog.Language
 
 	subProg.LibraryFile = prog.LibraryFile
-	subProg.FileList = prog.FileList
-	subProg.LineCount = prog.LineCount
+	fileOwner := prog.GetApplication()
+	if fileOwner == nil {
+		fileOwner = prog
+	}
+	fileOwner.fileListMu.Lock()
+	subProg.FileList = fileOwner.FileList
+	subProg.LineCount = fileOwner.LineCount
+	fileOwner.fileListMu.Unlock()
+	prog.editorStackMu.RLock()
 	subProg.editorStack = prog.editorStack.Copy()
+	prog.editorStackMu.RUnlock()
 	// subProg.editorStack = prog.editorStack
 	subProg.externType = prog.externType
 	subProg.externMethodBuilder = prog.externMethodBuilder
@@ -492,12 +500,16 @@ func (p *Program) GetIncludeFileNum() int {
 }
 
 func (p *Program) PushEditor(e *memedit.MemEditor) {
+	p.editorStackMu.Lock()
 	p.editorStack.Push(e)
+	p.editorStackMu.Unlock()
 	if !p.PreHandler() {
 		p.SetEditor(e.GetUrl(), e)
 	}
 }
 func (p *Program) GetCurrentEditor() *memedit.MemEditor {
+	p.editorStackMu.RLock()
+	defer p.editorStackMu.RUnlock()
 	if p.editorStack == nil || p.editorStack.Len() <= 0 {
 		return nil
 	}
@@ -509,10 +521,13 @@ func (p *Program) GetCurrentEditor() *memedit.MemEditor {
 }
 
 func (p *Program) PopEditor(save bool) {
+	p.editorStackMu.Lock()
 	if p.editorStack == nil || p.editorStack.Len() <= 0 {
+		p.editorStackMu.Unlock()
 		return
 	}
 	e := p.editorStack.Pop()
+	p.editorStackMu.Unlock()
 	if save && e != nil {
 		owner := p
 		if app := p.GetApplication(); app != nil {
