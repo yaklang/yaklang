@@ -91,6 +91,12 @@ func (p probePhase) String() string {
 // succeeded returns an error and does not mark the connection established
 // or cleanly closed.
 type TCPProbe struct {
+	transport tcpProbeTransport
+	retry     SYNRetryPolicy
+	attempts  int
+	probeStep chan struct{}
+	halfOpen  bool
+
 	ctx    context.Context
 	cancel context.CancelFunc
 
@@ -128,7 +134,7 @@ type TCPProbe struct {
 // StartTCPProbe binds a gVisor TCP endpoint on vm toward hostport.
 // peer is the channel-backed virtual machine that owns the listening stack.
 // The handshake does not start until ProbeSYN.
-func (vm *NetStackVirtualMachineEntry) StartTCPProbe(ctx context.Context, hostport string, peer *NetStackVirtualMachineEntry) (*TCPProbe, error) {
+func (vm *NetStackVirtualMachineEntry) StartTCPProbe(ctx context.Context, hostport string, peer *NetStackVirtualMachineEntry, options ...TCPProbeOption) (*TCPProbe, error) {
 	if vm == nil || vm.stack == nil {
 		return nil, fmt.Errorf("StartTCPProbe: virtual machine has no stack")
 	}
@@ -178,6 +184,16 @@ func (vm *NetStackVirtualMachineEntry) StartTCPProbe(ctx context.Context, hostpo
 			Port: uint16(port),
 		},
 	}
+	p.retry = SYNRetryPolicy{1, tcpProbeStepTimeout, tcpProbeStepTimeout, tcpProbeStepTimeout}
+	for _, option := range options {
+		option(&p.retry)
+	}
+	if err := p.retry.validate(); err != nil {
+		cancel()
+		return nil, err
+	}
+	p.probeStep = make(chan struct{}, 1)
+	p.transport = &channelProbeTransport{p: p}
 	ep, tcpErr := vm.stack.NewEndpoint(tcp.ProtocolNumber, header.IPv4ProtocolNumber, &p.wq)
 	if tcpErr != nil {
 		cancel()
@@ -251,6 +267,9 @@ func (p *TCPProbe) Close() error {
 		cancel()
 	}
 	p.pauseBridge()
+	if p.transport != nil {
+		return p.transport.close()
+	}
 	if ep != nil {
 		ep.Close()
 	}
@@ -259,73 +278,21 @@ func (p *TCPProbe) Close() error {
 
 // ProbeSYN starts the gVisor active open and returns the SYN it transmitted.
 func (p *TCPProbe) ProbeSYN() (TCPSegment, error) {
-	p.mu.Lock()
-	if err := p.beginStep("ProbeSYN", phaseInit); err != nil {
-		p.mu.Unlock()
-		return TCPSegment{}, err
-	}
-	ep := p.ep
-	remote := p.remote
-	p.mu.Unlock()
-
-	tcpErr := ep.Connect(remote)
-	if _, ok := tcpErr.(*tcpip.ErrConnectStarted); !ok {
-		if tcpErr == nil {
-			return TCPSegment{}, fmt.Errorf("ProbeSYN: connect finished before the handshake could be split")
-		}
-		return TCPSegment{}, fmt.Errorf("ProbeSYN: connect: %s", tcpErr)
-	}
-
-	ctx, cancel := p.stepCtx()
-	defer cancel()
-	seg, raw, err := p.readTCP(ctx, p.link, &p.clientStash, false, "SYN")
-	if err != nil {
-		return TCPSegment{}, fmt.Errorf("ProbeSYN: %w", err)
-	}
-	if !seg.SYN || seg.ACK || seg.FIN || seg.RST {
-		return TCPSegment{}, fmt.Errorf("ProbeSYN: expected SYN, got %s", seg)
-	}
-	injectIPv4(p.peerLink, raw)
-
-	p.mu.Lock()
-	p.syn = seg
-	p.phase = phaseSynSent
-	p.mu.Unlock()
-	return seg, nil
+	return p.ProbeSYNContext(p.ctx)
 }
 
-// ReceiveSYNACK waits for the peer's SYN-ACK and holds it.
-// The segment is not delivered to gVisor until ProbeACK, so the stack cannot
-// emit the final handshake ACK early.
+// ReceiveSYNACK is the compatibility form using the probe lifetime context.
+// Use ReceiveSYNACKContext to bound an individual operation.
 func (p *TCPProbe) ReceiveSYNACK() (TCPSegment, error) {
-	p.mu.Lock()
-	if err := p.beginStep("ReceiveSYNACK", phaseSynSent); err != nil {
-		p.mu.Unlock()
-		return TCPSegment{}, err
-	}
-	p.mu.Unlock()
-
-	ctx, cancel := p.stepCtx()
-	defer cancel()
-	seg, raw, err := p.readTCP(ctx, p.peerLink, &p.peerStash, true, "SYN-ACK")
-	if err != nil {
-		return TCPSegment{}, fmt.Errorf("ReceiveSYNACK: %w", err)
-	}
-	if seg.RST || !seg.SYN || !seg.ACK {
-		return TCPSegment{}, fmt.Errorf("ReceiveSYNACK: expected SYN-ACK, got %s", seg)
-	}
-
-	p.mu.Lock()
-	p.synAck = seg
-	p.heldSynAck = append([]byte(nil), raw...)
-	p.phase = phaseSynAckSeen
-	p.mu.Unlock()
-	return seg, nil
+	return p.ReceiveSYNACKContext(p.ctx)
 }
 
 // ProbeACK delivers the held SYN-ACK and returns the ACK gVisor sends.
 // Payload can flow only after this returns successfully.
 func (p *TCPProbe) ProbeACK() (TCPSegment, error) {
+	if p.halfOpen {
+		return TCPSegment{}, ErrHalfOpenACK
+	}
 	p.mu.Lock()
 	if err := p.beginStep("ProbeACK", phaseSynAckSeen); err != nil {
 		p.mu.Unlock()

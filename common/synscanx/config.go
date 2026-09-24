@@ -12,13 +12,15 @@ import (
 
 type SynxConfig struct {
 	// options
-	outputFile       string
-	outputFilePrefix string
-	waiting          time.Duration
-	initFilterPorts  string
-	initFilterHosts  string
-	netInterface     string // net interface name
-	shuffle          bool   // 是否打乱扫描顺序
+	outputFile          string
+	outputFilePrefix    string
+	waiting             time.Duration
+	tcpProbeTimeout     time.Duration
+	tcpProbeConcurrency int
+	initFilterPorts     string
+	initFilterHosts     string
+	netInterface        string // net interface name
+	shuffle             bool   // 是否打乱扫描顺序
 
 	rateLimitDelayMs  float64
 	rateLimitDelayGap int // 每隔多少数据包 delay 一次？
@@ -303,9 +305,12 @@ func WithConcurrent(count int) SynxConfigOption {
 		if count <= 0 {
 			count = 1000
 		}
+		// Outstanding ProbeSYN calls. The same value is the session admission
+		// limit; the delay below is the sustained SYN rate passed to netstackvm.
+		config.tcpProbeConcurrency = count
 		config.rateLimitDelayMs = float64(time.Second) / float64(count) / float64(time.Millisecond)
 		// count/10 is 0 for concurrent(1)..concurrent(9). A zero burst limiter
-		// rejects every packet, so a small concurrency silently scans nothing.
+		// rejects every UDP packet, so a small concurrency silently scans nothing.
 		gap := count / 10
 		if gap < 1 {
 			gap = 1
@@ -467,4 +472,17 @@ func WithCtx(ctx context.Context) SynxConfigOption {
 		config.Ctx = ctx
 	}
 
+}
+
+// WithTCPProbeTimeout sets each TCP target's independent total deadline, covering
+// admission, sending and retries. Non-positive values use the 15 second default.
+func WithTCPProbeTimeout(timeout time.Duration) SynxConfigOption {
+	return func(config *SynxConfig) { config.tcpProbeTimeout = timeout }
+}
+
+// WithTCPProbeConcurrency sets how many TCP probes may be in flight. The
+// session admission limit and the worker count both use this value.
+// Non-positive values keep the default of 256. Yak's synscan.concurrent sets it too.
+func WithTCPProbeConcurrency(concurrency int) SynxConfigOption {
+	return func(config *SynxConfig) { config.tcpProbeConcurrency = concurrency }
 }

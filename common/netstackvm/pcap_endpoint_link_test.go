@@ -27,7 +27,7 @@ func TestPCAPEndpointIPLinkTypes(t *testing.T) {
 			t.Fatal(err)
 		}
 		payload := bytes.Clone(buf.Bytes())
-		for _, link := range []layers.LinkType{layers.LinkTypeEthernet, layers.LinkTypeRaw, layers.LinkTypeNull, layers.LinkTypeLoop} {
+		for _, link := range []layers.LinkType{layers.LinkTypeEthernet, layers.LinkTypeRaw, 12, layers.LinkTypeNull, layers.LinkTypeLoop} {
 			t.Run(fmt.Sprintf("%s/ipv6=%t", link, ipv6), func(t *testing.T) {
 				var written []byte
 				p := &PCAPEndpoint{adaptor: &pcapAdaptor{linkType: link, writer: func(b []byte) error { written = bytes.Clone(b); return nil }}}
@@ -45,9 +45,10 @@ func TestPCAPEndpointIPLinkTypes(t *testing.T) {
 					t.Fatalf("invalid network payload for %v", link)
 				}
 				offset := 0
-				if link == layers.LinkTypeEthernet {
+				switch link {
+				case layers.LinkTypeEthernet:
 					offset = 14
-				} else if link != layers.LinkTypeRaw {
+				case layers.LinkTypeNull, layers.LinkTypeLoop:
 					offset = 4
 				}
 				if len(written) < offset+len(payload) || !bytes.Equal(written[offset:offset+len(payload)], payload) {

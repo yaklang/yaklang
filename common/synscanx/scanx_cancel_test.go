@@ -26,7 +26,7 @@ func TestSendPacketCancelUnblocksFullLoopbackQueue(t *testing.T) {
 	scanner.LoopPacket <- []byte("already queued")
 
 	targetCh := make(chan *SynxTarget, 1)
-	targetCh <- &SynxTarget{Host: "127.0.0.1", Port: 80, Mode: TCP}
+	targetCh <- &SynxTarget{Host: "127.0.0.1", Port: 53, Mode: UDP}
 	close(targetCh)
 
 	done := make(chan struct{})

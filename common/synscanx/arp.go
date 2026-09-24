@@ -134,7 +134,7 @@ func (s *Scannerx) arpScan() {
 	}
 }
 func (s *Scannerx) arp(target string) {
-	if !s.supportsARP() {
+	if !s.supportsARP() || (s.halfOpen != nil && !s.keepPacketWriter) {
 		return
 	}
 	packet, err := s.assemblePacket(target, 0, ARP)
