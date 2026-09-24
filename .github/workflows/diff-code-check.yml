@@ -281,6 +281,25 @@ jobs:
           echo "skip_reason=none" >> "$GITHUB_OUTPUT"
           echo "::endgroup::" 
 
+      - name: Prepare fs artifact
+        if: steps.validate.outputs.should_skip != 'true'
+        run: |
+          rm -rf fs-artifact
+          mkdir -p fs-artifact
+          # GitHub wraps every artifact in a zip. Upload the files inside fs.zip
+          # so the download is that zip, not a zip that contains fs.zip.
+          if [ -f ./fs.zip ]; then
+            unzip -q ./fs.zip -d fs-artifact
+          fi
+
+      - name: Upload fs.zip
+        if: steps.validate.outputs.should_skip != 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: fs.zip
+          path: fs-artifact/
+          if-no-files-found: ignore
+
       - name: Check With SyntaxFlow
         if: steps.validate.outputs.should_skip != 'true' && steps.generate_prog.outputs.should_skip != 'true'
         id: scan
