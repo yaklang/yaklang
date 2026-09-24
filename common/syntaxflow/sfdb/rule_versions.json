@@ -308,8 +308,8 @@
   {
     "rule_id": "b3a1227f-5d9b-4840-91c4-43a0eef85c32",
     "rule_name": "检测Golang路径操作漏洞",
-    "hash": "4de5d549ea06fc5af2c1a45a3437b4443746aa933d2f6c7ba8b32ca698e7e916",
-    "version": "20260901.0002"
+    "hash": "52b0ac01920febb08961e6f1c63533d7c69851e9979e3e37cc6cf9a8c05a01e4",
+    "version": "20260924.0001"
   },
   {
     "rule_id": "fd7f3adf-79c2-42b9-b89c-4199ae82d9a4",
@@ -518,8 +518,8 @@
   {
     "rule_id": "4bf06e42-5deb-47fe-bf75-5cadc4a98af2",
     "rule_name": "检测Go语言直接反射型XSS漏洞",
-    "hash": "ca1c094df14053df44aa80175c3d13b08ee5679f73f6d68160ed0d6306cf760e",
-    "version": "20260901.0002"
+    "hash": "342176ac683803b77b800587210bcf0dd0f275755b3dd84efac28409ef65d054",
+    "version": "20260924.0001"
   },
   {
     "rule_id": "023f453d-7d0c-4ef8-a105-a53188c9a31e",
@@ -4544,8 +4544,8 @@
   {
     "rule_id": "db4c6369-d6df-4f14-946f-6275f7c53f5f",
     "rule_name": "检测Golang外部参数参与的文件路径拼接",
-    "hash": "a9035d1c03afc70267a3e580c2edb073d0ae16f1e39be466f72daa23850e0f32",
-    "version": "20260908.0001"
+    "hash": "2899b08867d320dfd02da581f0d394c16d586e12d4c372df2f00f48b27e680c3",
+    "version": "20260924.0001"
   },
   {
     "rule_id": "29b47af1-bf11-4069-b8de-70364bc24ad4",
@@ -4940,8 +4940,8 @@
   {
     "rule_id": "source-go-pprof-import",
     "rule_name": "检测 Go 导入 net/http/pprof",
-    "hash": "526499f4cddab13abe5ffeefeb7331256abfd87ceb2d87d583559336782fe018",
-    "version": "20260914.0001"
+    "hash": "3b81df681b310a3062e77388efe7c6a977c128821f5c4d1512750613ed230a05",
+    "version": "20260924.0001"
   },
   {
     "rule_id": "source-go-rc4",
@@ -4958,8 +4958,8 @@
   {
     "rule_id": "source-go-ssh-insecure-ignore",
     "rule_name": "检测 Go SSH 忽略主机密钥",
-    "hash": "a1334cef2f3953f0f2717cba2e2fcf144c5b0430f1dffea700806965b8fdb65b",
-    "version": "20260914.0001"
+    "hash": "3a6cd9801c0943f4d44e72425e27b00caeb2294bb1f6a09315ce19cb88877182",
+    "version": "20260924.0001"
   },
   {
     "rule_id": "source-go-syscall-exec",
