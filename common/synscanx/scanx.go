@@ -18,6 +18,7 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/hostsparser"
 	"github.com/yaklang/yaklang/common/utils/netutil"
+	"github.com/yaklang/yaklang/common/utils/netutil/netroute"
 	"golang.org/x/time/rate"
 )
 
@@ -213,10 +214,11 @@ func (s *Scannerx) initEssentialInfo() error {
 		if srcIP == nil {
 			return utils.Errorf("iface: %s has no addrs", iface.Name)
 		}
-		// 通过网卡名获取到网卡的 IP 地址后，再通过路由获取网关 IP 地址，网关 IP 地址用于获取网关的 MAC 地址，用于外网扫描
-		_, gatewayIP, _, err = getRoute(s.sampleIP)
+		// The OS default route may leave through another NIC (a tunnel). The
+		// gateway has to sit on the interface that will actually send.
+		gatewayIP, err = gatewayForSelectedInterface(iface, srcIP, s.sampleIP)
 		if err != nil {
-			return utils.Errorf("get gateway failed: %s", err)
+			return utils.Errorf("get gateway for %s failed: %s", iface.Name, err)
 		}
 	}
 
@@ -228,6 +230,62 @@ func (s *Scannerx) initEssentialInfo() error {
 	// 不确定扫描目标中是否存在回环地址，所以这里先初始化一个回环地址的映射表
 	s.loopbackMap["127.0.0.1"] = s.config.SourceIP.String()
 	return nil
+}
+
+// gatewayForSelectedInterface asks for the route from srcIP. A next hop that
+// belongs to a different NIC is rejected so a tunnel default route cannot be
+// paired with a physical interface.
+func gatewayForSelectedInterface(iface *net.Interface, src net.IP, sample string) (net.IP, error) {
+	if iface == nil {
+		return nil, utils.Errorf("interface is nil")
+	}
+	dst := net.ParseIP(sample)
+	if dst == nil || dst.To4() == nil {
+		resolved := netx.LookupFirst(sample, netx.WithTimeout(3*time.Second))
+		dst = net.ParseIP(resolved)
+	}
+	if dst == nil || dst.To4() == nil {
+		return nil, utils.Errorf("sample %s is not ipv4", sample)
+	}
+	if src != nil {
+		src = src.To4()
+	}
+	router, err := netroute.New()
+	if err != nil {
+		return nil, err
+	}
+	got, gateway, _, err := router.RouteWithSrc(iface.HardwareAddr, src, dst.To4())
+	if err != nil {
+		return nil, err
+	}
+	if got != nil && iface.Name != "" && got.Name != "" && got.Name != iface.Name {
+		return nil, utils.Errorf("route from %s left via %s", iface.Name, got.Name)
+	}
+	if !gatewayOnInterface(iface, gateway) {
+		return nil, utils.Errorf("gateway %v is not on %s", gateway, iface.Name)
+	}
+	return gateway, nil
+}
+
+func gatewayOnInterface(iface *net.Interface, gateway net.IP) bool {
+	if gateway == nil || gateway.IsUnspecified() {
+		return true
+	}
+	gateway = gateway.To4()
+	if gateway == nil || iface == nil {
+		return false
+	}
+	addrs, err := iface.Addrs()
+	if err != nil {
+		return false
+	}
+	for _, addr := range addrs {
+		ipNet, ok := addr.(*net.IPNet)
+		if ok && ipNet.Contains(gateway) {
+			return true
+		}
+	}
+	return false
 }
 
 func (s *Scannerx) rateLimit() bool {
