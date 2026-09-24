@@ -265,13 +265,9 @@ type ReActLoop struct {
 	subAgentControlIterations int
 	subAgentControlRevision   uint64
 
-	// functionCallMode enables native functioncall (tool_calls) instead of
-	// the text-based @action JSON contract. When true, each LoopAction is
-	// converted to an aispec.Tool and injected via aispec.WithTools; the model
-	// responds with tool_calls deltas which are accumulated and converted back
-	// to aicommon.Action after the stream completes. This lets the model service
-	// set stop_reason="tool_calls" and naturally reduce thinking on subsequent
-	// calls.
+	// functionCallMode selects per-action function-call schema tags when
+	// generateLoopPrompt assembles the prompt. Provider projection and response
+	// handling are separate from this prompt-building step.
 	functionCallMode bool
 }
 

@@ -13,7 +13,8 @@
 <|OUTPUT_EXAMPLE|>
 {{ .OutputExample }}
 <|OUTPUT_EXAMPLE_END|>{{ end }}{{ if .AutoLoadedSkills }}
-{{ .AutoLoadedSkills }}{{ end }}{{ if .Schema }}
+{{ .AutoLoadedSkills }}{{ end }}{{ if .FunctionCallSchemas }}
+{{ .FunctionCallSchemas }}{{ else if .Schema }}
 
 当前任务循环中可以使用的Action和<|TAG...|>，如下 ：
 
