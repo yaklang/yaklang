@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/yaklang/yaklang/common/netx"
@@ -50,6 +51,23 @@ type transportRequest struct {
 	traceInfo      *LowhttpTraceInfo  // trace info for timing
 	originAddr     string             // target host:port
 	timeout        time.Duration      // per-request timeout
+}
+
+// downgradeToH1 prepares a fresh H1 attempt without changing the caller's
+// connection-pool option. An ALPN-negotiated H1 socket, if present, is handed
+// off once; the H2 pool keeps its original key for concurrent eviction.
+func (tr *transportRequest) downgradeToH1(result *transportResult, dialOpts []netx.DialXOption) {
+	tr.usePool = false
+	if result != nil {
+		tr.h1Conn = result.h1Conn
+		result.h1Conn = nil
+	}
+	h1Key := *tr.cacheKey
+	h1Key.scheme = H1
+	tr.cacheKey = &h1Key
+	tr.dialOpts = dialOpts
+	method, uri, _ := GetHTTPPacketFirstLine(tr.packet)
+	tr.packet = ReplaceHTTPPacketFirstLine(tr.packet, strings.Join([]string{method, uri, "HTTP/1.1"}, " "))
 }
 
 // transportResult carries everything the orchestration layer needs for

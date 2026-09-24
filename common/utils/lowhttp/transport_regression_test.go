@@ -11,7 +11,34 @@ import (
 	"sync/atomic"
 	"testing"
 	"time"
+
+	"github.com/yaklang/yaklang/common/netx"
 )
+
+func TestTransportRequestDowngradeToH1(t *testing.T) {
+	client, server := net.Pipe()
+	defer client.Close()
+	defer server.Close()
+
+	key := &connectKey{scheme: H2, addr: "example.test:443"}
+	option := &LowhttpExecConfig{WithConnPool: true}
+	tr := &transportRequest{
+		option:   option,
+		packet:   []byte("POST /path HTTP/2.0\r\nHost: example.test\r\n\r\n"),
+		cacheKey: key,
+		usePool:  true,
+	}
+	result := &transportResult{h1Conn: client}
+	h1DialOpts := []netx.DialXOption{netx.DialX_WithDisableProxy(true)}
+	tr.downgradeToH1(result, h1DialOpts)
+
+	method, uri, proto := GetHTTPPacketFirstLine(tr.packet)
+	if tr.usePool || !option.WithConnPool || tr.h1Conn != client || result.h1Conn != nil ||
+		tr.cacheKey == key || tr.cacheKey.scheme != H1 || key.scheme != H2 ||
+		len(tr.dialOpts) != len(h1DialOpts) || method != "POST" || uri != "/path" || proto != "HTTP/1.1" {
+		t.Fatalf("incorrect H1 downgrade state: request=%+v, original key=%+v, result=%+v", tr, key, result)
+	}
+}
 
 type countedReadConn struct {
 	net.Conn
