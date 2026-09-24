@@ -1274,20 +1274,17 @@ var (
 // assert string(result) == "中文", "GB18030/UTF8 should round-trip"
 // ```
 func GB18030ToUtf8(s []byte) ([]byte, error) {
-	if gb18030encoding != nil {
-		return gb18030encoding.NewDecoder().Bytes(s)
-	}
-
+	// Lookup publishes the shared encoding. The fast path used to read it
+	// without the lock, so two pcap error conversions raced.
 	gb18030encodingMutex.Lock()
 	defer gb18030encodingMutex.Unlock()
 
-	if gb18030encoding != nil {
-		return gb18030encoding.NewDecoder().Bytes(s)
-	}
-	var name string
-	gb18030encoding, name = charset.Lookup("gb18030")
 	if gb18030encoding == nil {
-		return nil, fmt.Errorf("failed to lookup gb18030 encoding: %s", name)
+		var name string
+		gb18030encoding, name = charset.Lookup("gb18030")
+		if gb18030encoding == nil {
+			return nil, fmt.Errorf("failed to lookup gb18030 encoding: %s", name)
+		}
 	}
 	return gb18030encoding.NewDecoder().Bytes(s)
 }
