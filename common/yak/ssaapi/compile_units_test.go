@@ -244,8 +244,9 @@ func TestCompileUnitPlanDynamicLanguageStillBuildsDirectoryUnits(t *testing.T) {
 	plan := buildPlanForLanguage(t, ssaconfig.PHP, vf, []string{"app/index.php", "app/lib/a.php"})
 
 	require.Len(t, plan.Units, 2)
-	require.Empty(t, plan.Edges)
-	require.Len(t, plan.Order, 2)
+	require.Contains(t, plan.Units, "dir:app")
+	require.Contains(t, plan.Units, "dir:app/lib")
+	require.Contains(t, plan.Edges, UnitRef{From: "dir:app", To: "dir:app/lib", Kind: "require", Raw: "./lib/a.php"})
 }
 
 func TestCompileUnitPlanPythonModuleFileImportTopoOrder(t *testing.T) {

@@ -135,7 +135,12 @@ func TestProgramForCompileUnitIsLibrary(t *testing.T) {
 	require.Equal(t, libA, prog.ProgramForCompileUnit("java:a"))
 	require.Equal(t, libA, prog.ProgramForCompileUnit("a"))
 	require.Nil(t, prog.ProgramForCompileUnit("java:missing"))
-	require.Equal(t, prog, prog.ProgramForCompileUnit("dir:pkg"))
+	require.Equal(t, prog, prog.ProgramForCompileUnit("dir:."))
+	require.Equal(t, prog, prog.ProgramForCompileUnit("resource:web"))
+	dirLib := prog.EnsureLibraryForCompileUnit("dir:pkg")
+	require.NotNil(t, dirLib)
+	require.NotEqual(t, prog, dirLib)
+	require.Equal(t, dirLib, prog.ProgramForCompileUnit("dir:pkg"))
 }
 
 func TestLazyBuildForUnitsOnlyRunsMatchingUnit(t *testing.T) {
