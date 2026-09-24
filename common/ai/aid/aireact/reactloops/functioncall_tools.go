@@ -2,101 +2,105 @@ package reactloops
 
 import (
 	"encoding/json"
-	"fmt"
+	"strings"
 
-	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
+	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/ai/aispec"
-	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 )
 
-// ActionToolName is the single tool name used in functioncall mode.
-// Instead of registering one tool per LoopAction, we register a single
-// "execute_action" tool whose parameters schema is the full action protocol
-// JSON Schema (including the @action enum field). The model calls this tool
-// with the complete action JSON as arguments, and we parse it using the
-// existing ExtractAction pipeline.
-const ActionToolName = "execute_action"
-
-// ActionToolDescription is the description for the single execute_action tool.
-const ActionToolDescription = "Call this tool to execute a ReAct loop action. " +
-	"The arguments must be a JSON object matching the action protocol schema, " +
-	"including the required @action field that selects the action type, plus " +
-	"the action-specific fields. Use the @action enum to choose the action; " +
-	"all other fields (identifier, human_readable_thought, todo_delta, and " +
-	"action-specific options) follow the same schema as described in the system prompt."
-
-// buildActionToolParameters builds the JSON Schema for the single execute_action
-// tool. It reuses buildSchema (the same function used in text mode) so the
-// model sees an identical schema whether in text mode or functioncall mode.
-// The schema includes the @action enum field, common fields (identifier,
-// human_readable_thought, todo_delta), and all action-specific options.
-func buildActionToolParameters(actions []*LoopAction) (any, error) {
-	schemaText := buildSchema(actions...)
-	// Also apply tool-batch max-items constraints, same as text mode.
-	maxBatchCalls := aicommon.DefaultToolBatchMaxCalls
-	schemaText, err := applyToolBatchSchemaMaxItems(schemaText, maxBatchCalls)
-	if err != nil {
-		return nil, utils.Wrap(err, "apply tool batch max items")
+// buildActionTools compiles each action into a native function. The function
+// name selects the action, so @action is intentionally absent from parameters.
+func buildActionTools(actions []*LoopAction, maxBatchCalls int) ([]aispec.Tool, error) {
+	tools := make([]aispec.Tool, 0, len(actions))
+	seen := make(map[string]struct{}, len(actions))
+	for _, action := range actions {
+		if action == nil {
+			continue
+		}
+		if !validActionToolName(action.ActionType) {
+			return nil, utils.Errorf("invalid native action tool name %q", action.ActionType)
+		}
+		if _, exists := seen[action.ActionType]; exists {
+			return nil, utils.Errorf("duplicate native action tool name %q", action.ActionType)
+		}
+		seen[action.ActionType] = struct{}{}
+		opts := make([]any, 0, len(action.Options)+3)
+		for _, opt := range commonActionSchemaOptions() {
+			opts = append(opts, opt)
+		}
+		for _, opt := range action.Options {
+			opts = append(opts, opt)
+		}
+		schemaText, err := applyToolBatchSchemaMaxItems(aitool.NewObjectSchema(opts...), maxBatchCalls)
+		if err != nil {
+			return nil, utils.Wrapf(err, "build schema for action %q", action.ActionType)
+		}
+		var parameters map[string]any
+		if err := json.Unmarshal([]byte(schemaText), &parameters); err != nil {
+			return nil, utils.Wrapf(err, "decode schema for action %q", action.ActionType)
+		}
+		// Tool APIs expect the schema object itself, not a draft-07 document.
+		delete(parameters, "$schema")
+		if properties, ok := parameters["properties"].(map[string]any); ok {
+			delete(properties, "@action")
+		}
+		if required, ok := parameters["required"].([]any); ok {
+			filtered := required[:0]
+			for _, field := range required {
+				if field != "@action" {
+					filtered = append(filtered, field)
+				}
+			}
+			parameters["required"] = filtered
+		}
+		tools = append(tools, aispec.Tool{
+			Type: "function",
+			Function: aispec.ToolFunction{
+				Name:        action.ActionType,
+				Description: actionDescription(action),
+				Parameters:  parameters,
+			},
+		})
 	}
-	var params any
-	if err := json.Unmarshal([]byte(schemaText), &params); err != nil {
-		return nil, utils.Wrapf(err, "failed to unmarshal action schema as tool parameters")
-	}
-	return params, nil
+	return tools, nil
 }
 
-// buildActionTool creates the single execute_action aispec.Tool from the
-// filtered actions list. The tool's parameters are the full action protocol
-// JSON Schema (with @action enum), so the model's tool_call arguments are a
-// complete action JSON that can be parsed by ExtractAction.
-func buildActionTool(actions []*LoopAction) ([]aispec.Tool, error) {
-	if len(actions) == 0 {
-		return nil, nil
+func validActionToolName(name string) bool {
+	if len(name) == 0 || len(name) > 64 || strings.HasPrefix(name, "END_") {
+		return false
 	}
-	params, err := buildActionToolParameters(actions)
-	if err != nil {
-		return nil, err
+	for _, c := range name {
+		if c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z' || c >= '0' && c <= '9' || c == '_' || c == '-' {
+			continue
+		}
+		return false
 	}
-	return []aispec.Tool{{
-		Type: "function",
-		Function: aispec.ToolFunction{
-			Name:        ActionToolName,
-			Description: ActionToolDescription,
-			Parameters:  params,
-		},
-	}}, nil
+	return true
 }
 
-// fmtToolCallSummary returns a short summary of a tool call for logging.
-func fmtToolCallSummary(tc *aispec.ToolCall) string {
-	if tc == nil {
-		return "<nil>"
+// renderFunctionCallSchemaTags places one AITAG per action in place of the text
+// SCHEMA slot. Projection into provider tools is a separate, later step.
+func renderFunctionCallSchemaTags(tools []aispec.Tool) (string, error) {
+	if len(tools) == 0 {
+		return "", nil
 	}
-	return fmt.Sprintf("name=%s args_len=%d", tc.Function.Name, len(tc.Function.Arguments))
-}
-
-// buildFunctionCallTools generates the single execute_action aispec.Tool for
-// native functioncall mode based on the current iteration's filtered actions.
-// It reuses the same filtering logic as generateSchemaString so both modes
-// see the same action set.
-func (r *ReActLoop) buildFunctionCallTools(operator *LoopActionHandlerOperator) []aispec.Tool {
-	if r == nil || !r.functionCallMode {
-		return nil
+	var out strings.Builder
+	for _, tool := range tools {
+		if !validActionToolName(tool.Function.Name) {
+			return "", utils.Errorf("invalid action tool name %q", tool.Function.Name)
+		}
+		encoded, err := json.Marshal(tool)
+		if err != nil {
+			return "", utils.Wrapf(err, "encode action tool %q", tool.Function.Name)
+		}
+		out.WriteString("<|FUNCTION_CALL_ACTION_SCHEMA_")
+		out.WriteString(tool.Function.Name)
+		out.WriteString("|>\n")
+		out.Write(encoded)
+		out.WriteString("\n<|FUNCTION_CALL_ACTION_SCHEMA_END_")
+		out.WriteString(tool.Function.Name)
+		out.WriteString("|>\n")
 	}
-	disallowExit := false
-	if operator != nil {
-		disallowExit = operator.disallowLoopExit
-	}
-	filteredActions := r.getFilteredActions(disallowExit, operator)
-	if len(filteredActions) == 0 {
-		return nil
-	}
-	tools, err := buildActionTool(filteredActions)
-	if err != nil {
-		log.Errorf("functioncall: failed to build action tool: %v", err)
-		return nil
-	}
-	log.Infof("functioncall: built 1 execute_action tool from %d filtered actions", len(filteredActions))
-	return tools
+	return strings.TrimSuffix(out.String(), "\n"), nil
 }

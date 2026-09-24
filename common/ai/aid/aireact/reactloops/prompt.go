@@ -30,11 +30,43 @@ func (r *ReActLoop) generateSchemaString(disallowExit bool, actionOperators ...*
 	filteredValues := r.getFilteredActions(disallowExit, actionOperators...)
 
 	// Mark init constraints as applied after first schema generation
-	if !r.initActionApplied && (len(r.initActionMustUse) > 0 || len(r.initActionDisabled) > 0) {
+	if !r.functionCallMode && !r.initActionApplied && (len(r.initActionMustUse) > 0 || len(r.initActionDisabled) > 0) {
 		r.initActionApplied = true
 	}
 
 	schemaText := buildSchema(filteredValues...)
+	return applyToolBatchSchemaMaxItems(schemaText, r.toolBatchMaxCalls())
+}
+
+// prepareLoopActionSchemas selects actions once and builds only the schema
+// representation used by this model turn.
+func (r *ReActLoop) prepareLoopActionSchemas(operator *LoopActionHandlerOperator) (string, string, error) {
+	filtered := r.getFilteredActions(operator != nil && operator.disallowLoopExit, operator)
+	maxBatchCalls := r.toolBatchMaxCalls()
+	var schema, functionCallSchemas string
+	if r.functionCallMode {
+		tools, err := buildActionTools(filtered, maxBatchCalls)
+		if err != nil {
+			return "", "", err
+		}
+		functionCallSchemas, err = renderFunctionCallSchemaTags(tools)
+		if err != nil {
+			return "", "", err
+		}
+	} else {
+		var err error
+		schema, err = applyToolBatchSchemaMaxItems(buildSchema(filtered...), maxBatchCalls)
+		if err != nil {
+			return "", "", err
+		}
+	}
+	if !r.initActionApplied && (len(r.initActionMustUse) > 0 || len(r.initActionDisabled) > 0) {
+		r.initActionApplied = true
+	}
+	return schema, functionCallSchemas, nil
+}
+
+func (r *ReActLoop) toolBatchMaxCalls() int {
 	maxBatchCalls := aicommon.DefaultToolBatchMaxCalls
 	if concrete, ok := r.config.(*aicommon.Config); !ok || concrete.KeyValueConfig != nil {
 		maxBatchCalls = r.config.GetConfigInt(aicommon.ConfigKeyToolBatchMaxCalls, maxBatchCalls)
@@ -45,13 +77,13 @@ func (r *ReActLoop) generateSchemaString(disallowExit bool, actionOperators ...*
 	if maxBatchCalls > aicommon.DefaultToolBatchMaxCalls {
 		maxBatchCalls = aicommon.DefaultToolBatchMaxCalls
 	}
-	return applyToolBatchSchemaMaxItems(schemaText, maxBatchCalls)
+	return maxBatchCalls
 }
 
 // getFilteredActions returns the list of LoopActions that should be visible
 // to the model in this iteration, after applying all disable/must-use filters.
-// Shared by generateSchemaString (text mode) and buildFunctionCallTools
-// (functioncall mode) so both modes see the same action set.
+// Shared by text schema generation and per-action tool generation so both
+// modes see the same action set.
 func (r *ReActLoop) getFilteredActions(disallowExit bool, actionOperators ...*LoopActionHandlerOperator) []*LoopAction {
 	// loop
 	// build in code
@@ -248,7 +280,7 @@ func (r *ReActLoop) generateLoopPrompt(
 		tools = r.toolsGetter()
 	}
 
-	schema, err := r.generateSchemaString(operator.disallowLoopExit, operator)
+	schema, functionCallSchemas, err := r.prepareLoopActionSchemas(operator)
 	if err != nil {
 		return "", err
 	}
@@ -348,6 +380,7 @@ func (r *ReActLoop) generateLoopPrompt(
 		TaskInstruction:          persistent,
 		OutputExample:            outputExample,
 		Schema:                   schema,
+		FunctionCallSchemas:      functionCallSchemas,
 		SkillsContext:            skillsContext,
 		ForcedSkills:             forcedSkillsBlock,
 		AutoLoadedSkills:         autoSkillsBlock,

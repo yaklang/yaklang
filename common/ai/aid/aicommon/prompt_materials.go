@@ -16,10 +16,11 @@ type PromptMaterials struct {
 	AllowPlanAndExec  bool
 	HasLoadCapability bool
 
-	TaskInstruction string
-	ExecutionPolicy string
-	Schema          string
-	OutputExample   string
+	TaskInstruction     string
+	ExecutionPolicy     string
+	Schema              string
+	FunctionCallSchemas string
+	OutputExample       string
 
 	// SemiDynamic 提示材料:
 	//   - aireact: SkillsContext
@@ -120,11 +121,12 @@ func (m *PromptMaterials) SemiDynamic2Data() map[string]any {
 		return map[string]any{}
 	}
 	return map[string]any{
-		"TaskInstruction":  m.TaskInstruction,
-		"ExecutionPolicy":  m.ExecutionPolicy,
-		"Schema":           m.Schema,
-		"OutputExample":    m.OutputExample,
-		"AutoLoadedSkills": m.AutoLoadedSkills,
+		"TaskInstruction":     m.TaskInstruction,
+		"ExecutionPolicy":     m.ExecutionPolicy,
+		"Schema":              m.Schema,
+		"FunctionCallSchemas": m.FunctionCallSchemas,
+		"OutputExample":       m.OutputExample,
+		"AutoLoadedSkills":    m.AutoLoadedSkills,
 	}
 }
 

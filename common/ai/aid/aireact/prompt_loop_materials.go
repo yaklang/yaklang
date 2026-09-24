@@ -323,6 +323,7 @@ func (pm *PromptManager) NewPromptMaterials(base *reactloops.LoopPromptBaseMater
 		materials.OutputExample = input.OutputExample
 		materials.SkillsContext = input.SkillsContext
 		materials.Schema = input.Schema
+		materials.FunctionCallSchemas = input.FunctionCallSchemas
 		// P1-C2: SessionEvidence / UserHistory 从 dynamic 段上移到 timeline-open 段
 		materials.SessionEvidence = input.SessionEvidence
 		if strings.TrimSpace(materials.SessionEvidenceOpen) == "" {
@@ -478,6 +479,7 @@ func (pm *PromptManager) buildLoopPromptSectionData(base *reactloops.LoopPromptB
 		data["TaskInstruction"] = input.TaskInstruction
 		data["OutputExample"] = input.OutputExample
 		data["Schema"] = input.Schema
+		data["FunctionCallSchemas"] = input.FunctionCallSchemas
 		data["SkillsContext"] = input.SkillsContext
 		data["ExtraCapabilities"] = input.ExtraCapabilities
 		data["SessionEvidence"] = input.SessionEvidence
