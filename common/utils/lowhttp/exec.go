@@ -952,13 +952,17 @@ RECONNECT:
 		tResult.h1Conn.Close()
 		tResult.h1Conn = nil
 	}
-	if tResult == nil {
-		return nil, err
-	}
-
 	// Populate trace info from dial (dialTraceInfo was filled during RoundTrip).
 	traceInfo.DNSTime = time.Unix(0, dnsEndNano.Load()).Sub(dnsStart)
 	traceInfo.ParseDialXTraceInfo(dialTraceInfo)
+	if tResult == nil {
+		// A dial can fail before the transport has response or connection
+		// details. The request, protocol flags, and dial trace are still useful.
+		if err == nil {
+			return response, utils.Error("lowhttp: transport returned no result")
+		}
+		return response, err
+	}
 
 	// Populate response fields from transport result.
 	rawBytes = tResult.rawBytes

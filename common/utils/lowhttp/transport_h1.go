@@ -96,10 +96,17 @@ func (t *h1Transport) RoundTrip(ctx context.Context, tr *transportRequest) (*tra
 		return &transportResult{remoteAddr: conn.RemoteAddr().String(), portIsOpen: true}, ctxErr
 	}
 
+	var result *transportResult
 	if withConnPool {
-		return t.roundTripPooled(ctx, tr, conn, requestPacket)
+		result, err = t.roundTripPooled(ctx, tr, conn, requestPacket)
+	} else {
+		result, err = t.roundTripDirect(ctx, tr, conn, requestPacket)
 	}
-	return t.roundTripDirect(ctx, tr, conn, requestPacket)
+	if result == nil {
+		// The dial succeeded even if the pooled read or write failed.
+		result = &transportResult{remoteAddr: conn.RemoteAddr().String(), portIsOpen: true}
+	}
+	return result, err
 }
 
 // containsNoProxyAvailable checks if the error message indicates no proxy
