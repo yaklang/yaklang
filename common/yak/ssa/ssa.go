@@ -278,10 +278,11 @@ type Program struct {
 	diagnosticsRecorder *diagnostics.Recorder
 
 	// TODO: this four map should need????!
-	editorStack *omap.OrderedMap[string, *memedit.MemEditor]
-	fileListMu  sync.Mutex
-	FileList    map[string]string // file-name and file hash
-	LineCount   int
+	editorStackMu sync.RWMutex
+	editorStack   *omap.OrderedMap[string, *memedit.MemEditor]
+	fileListMu    sync.Mutex
+	FileList      map[string]string // file-name and file hash
+	LineCount     int
 
 	LibraryFile           map[string][]string //library and file relation
 	CurrentIncludingStack *utils.Stack[string]
