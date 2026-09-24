@@ -8,6 +8,8 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/json"
+	"fmt"
+	"net"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -84,6 +86,18 @@ func TestManagedExtensionBridgePairsAuthenticatesAndRevokesDevice(t *testing.T) 
 
 	origin := "chrome-extension://managed-test-extension"
 	header := http.Header{"Origin": []string{origin}}
+	discoveryURL := strings.Replace(snapshot.URL, extensionBridgePath, extensionBridgeDiscoveryPath, 1)
+	discoveryConnection, _, err := websocket.DefaultDialer.Dial(discoveryURL, header)
+	require.NoError(t, err)
+	var discovered extensionBridgeDiscoveryEnvelope
+	require.NoError(t, discoveryConnection.ReadJSON(&discovered))
+	require.NoError(t, discoveryConnection.Close())
+	require.Equal(t, "engine", discovered.Type)
+	require.Equal(t, managedExtensionBridgeProtocolVersion, discovered.ProtocolVersion)
+	require.Equal(t, snapshot.EngineIdentityID, discovered.EngineIdentityID)
+	require.Equal(t, snapshot.EngineInstanceID, discovered.EngineInstanceID)
+	require.Equal(t, snapshot.URL, discovered.Endpoint)
+
 	pairingURL := strings.Replace(snapshot.URL, extensionBridgePath, extensionBridgePairingPath, 1)
 	pairingConnection, _, err := websocket.DefaultDialer.Dial(pairingURL, header)
 	require.NoError(t, err)
@@ -210,6 +224,36 @@ func TestManagedExtensionBridgePairsAuthenticatesAndRevokesDevice(t *testing.T) 
 	require.NoError(t, revokedConnection.ReadJSON(&rejection))
 	require.NotNil(t, rejection.Error)
 	require.Equal(t, "unauthorized", rejection.Error.Code)
+}
+
+func TestManagedExtensionBridgeFallsBackWhenPortIsInUse(t *testing.T) {
+	var occupied net.Listener
+	var port int
+	for candidate := 44000; candidate < 45000; candidate++ {
+		listener, err := net.Listen("tcp", fmt.Sprintf("127.0.0.1:%d", candidate))
+		if err != nil {
+			continue
+		}
+		probe, probeErr := net.Listen("tcp", fmt.Sprintf("127.0.0.1:%d", candidate+1))
+		if probeErr == nil {
+			_ = probe.Close()
+			occupied = listener
+			port = candidate
+			break
+		}
+		_ = listener.Close()
+	}
+	require.NotNil(t, occupied)
+	t.Cleanup(func() { _ = occupied.Close() })
+
+	manager, err := NewExtensionBridgeManager(
+		NewExtensionBridgeFileIdentityStore(filepath.Join(t.TempDir(), "identity.json")),
+		nil,
+	)
+	require.NoError(t, err)
+	require.NoError(t, manager.Start(port))
+	t.Cleanup(func() { require.NoError(t, manager.Close()) })
+	require.Contains(t, manager.Snapshot().URL, fmt.Sprintf(":%d%s", port+1, extensionBridgePath))
 }
 
 func ptrExtensionBridgeJWK(value ExtensionBridgeJWK) *ExtensionBridgeJWK {

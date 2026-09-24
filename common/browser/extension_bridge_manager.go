@@ -19,6 +19,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"syscall"
 	"time"
 )
 
@@ -28,6 +29,7 @@ const (
 	extensionPairingTTL                   = 2 * time.Minute
 	extensionPairingMaxPending            = 8
 	extensionPairingMaxPerMinute          = 5
+	extensionBridgePortFallbacks          = 15
 )
 
 type ExtensionBridgeJWK struct {
@@ -235,7 +237,18 @@ func loadOrCreateExtensionBridgeIdentity(store ExtensionBridgeIdentityStore) (*e
 }
 
 func (m *ExtensionBridgeManager) Start(port int) error {
-	server, err := newManagedExtensionBridgeServer(port, m)
+	var server *ExtensionBridgeServer
+	var err error
+	lastPort := port
+	if port > 0 {
+		lastPort = min(port+extensionBridgePortFallbacks, 65535)
+	}
+	for candidate := port; candidate <= lastPort; candidate++ {
+		server, err = newManagedExtensionBridgeServer(candidate, m)
+		if err == nil || !errors.Is(err, syscall.EADDRINUSE) {
+			break
+		}
+	}
 	m.mu.Lock()
 	previous := m.server
 	if err != nil {

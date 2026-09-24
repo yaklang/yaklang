@@ -28,6 +28,7 @@ const (
 	defaultExtensionBridgeHost     = "127.0.0.1"
 	extensionBridgePath            = "/extension"
 	extensionBridgePairingPath     = "/pairing"
+	extensionBridgeDiscoveryPath   = "/discovery"
 	extensionBridgeProtocolVersion = 2
 	extensionBridgeMaxMessageBytes = 16 << 20
 	extensionBridgeChunkThreshold  = 512 << 10
@@ -228,6 +229,7 @@ func newExtensionBridgeServer(port int, token string, manager *ExtensionBridgeMa
 	mux.HandleFunc(extensionBridgePath, bridge.handleWebSocket)
 	if manager != nil {
 		mux.HandleFunc(extensionBridgePairingPath, bridge.handlePairingWebSocket)
+		mux.HandleFunc(extensionBridgeDiscoveryPath, bridge.handleDiscoveryWebSocket)
 	}
 	bridge.server = &http.Server{
 		Handler:           mux,
@@ -241,6 +243,41 @@ func newExtensionBridgeServer(port int, token string, manager *ExtensionBridgeMa
 		}
 	}()
 	return bridge, nil
+}
+
+type extensionBridgeDiscoveryEnvelope struct {
+	Type             string `json:"type"`
+	ProtocolVersion  int    `json:"protocolVersion"`
+	EngineIdentityID string `json:"engineIdentityId"`
+	EngineInstanceID string `json:"engineInstanceId"`
+	Endpoint         string `json:"endpoint"`
+}
+
+func (s *ExtensionBridgeServer) handleDiscoveryWebSocket(writer http.ResponseWriter, request *http.Request) {
+	if s.manager == nil {
+		http.NotFound(writer, request)
+		return
+	}
+	upgrader := websocket.Upgrader{
+		HandshakeTimeout: 2 * time.Second,
+		CheckOrigin: func(r *http.Request) bool {
+			_, valid := NormalizeBrowserExtensionOrigin(r.Header.Get("Origin"))
+			return valid
+		},
+	}
+	connection, err := upgrader.Upgrade(writer, request, nil)
+	if err != nil {
+		return
+	}
+	defer connection.Close()
+	engineIdentityID, _ := s.manager.EngineIdentity()
+	_ = connection.WriteJSON(extensionBridgeDiscoveryEnvelope{
+		Type:             "engine",
+		ProtocolVersion:  managedExtensionBridgeProtocolVersion,
+		EngineIdentityID: engineIdentityID,
+		EngineInstanceID: s.engineInstanceID,
+		Endpoint:         s.URL(),
+	})
 }
 
 func (s *ExtensionBridgeServer) URL() string {
