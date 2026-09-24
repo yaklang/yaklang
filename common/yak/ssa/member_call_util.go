@@ -237,13 +237,15 @@ func checkCanMemberCallExistEx(value, key Value, objTyp Type, wantFunction bool,
 					mergedTypes = append(mergedTypes, subRes.typ)
 				}
 			}
-			ret.exist = found
-			if len(mergedTypes) == 1 {
-				ret.typ = mergedTypes[0]
-			} else if len(mergedTypes) > 1 {
-				ret.typ = NewOrType(mergedTypes...)
+			if found {
+				ret.exist = true
+				if len(mergedTypes) == 1 {
+					ret.typ = mergedTypes[0]
+				} else if len(mergedTypes) > 1 {
+					ret.typ = NewOrType(mergedTypes...)
+				}
+				return ret
 			}
-			return ret
 		}
 	}
 
