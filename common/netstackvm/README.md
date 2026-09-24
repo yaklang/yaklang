@@ -439,7 +439,7 @@ func probeOne(ctx context.Context, session *netstackvm.HalfOpenSYN, target strin
 
 半开会话已移除 `HalfOpenSYNConfig.OnOpen` / `OnResult`、`Emit` 和 `Wait`。旧调用迁移为 `ProbeSYN` 直接取结果，或自行组织 worker 并执行上述 probe 步骤；调用方等待自己的 worker 结束，再关闭 session。分步 API 仍需 `defer probe.Close()`，没有 `Wait` 替调用方释放遗忘关闭的 probe。
 
-`synscanx` 的 TCP 批量路径使用上层固定 worker（默认 256），每个目标默认独立 15 秒期限，可通过 Go 选项 `WithTCPProbeConcurrency(n)` / `WithTCPProbeTimeout(duration)` 调整。每个 worker 直接创建 probe、发送、等待结果并关闭，生产结束后等待 worker 全部退出，再关闭扫描结果流。纯 TCP 扫描不再额外睡眠 `WithWaiting` 的时间；混合 UDP 扫描仍保留 UDP 响应窗口。扫描器既有结果 channel / 兼容回调只在扫描器层处理，netstackvm 不存储或调用它们。混合 UDP 扫描的额外抓包器不会绕过 TCP 校验；主动会话初始化失败会明确返回错误。
+`synscanx` 的 TCP 发包只调用 `HalfOpenSYN.ProbeSYN`，不再自己组 SYN，也不再把 TCP 写入旧的 pcap 队列。会话的 `MaxInFlight` 与 worker 数相同，`PacketsPerSecond` 由 Yak 的 `concurrent` / `rateLimit` 换算（默认 256 个未完成探测、1000 SYN/s，重试计入这个速率）。每个目标使用独立 context，默认 15 秒，可用 `WithTCPProbeConcurrency` / `WithTCPProbeTimeout` 调整；`synscan.concurrent` 同时设置在途数量和速率。`ProbeSYN` 在返回前关闭 probe，worker 全部退出后才关闭结果流。纯 TCP 扫描不再额外睡眠 `WithWaiting`；混合 UDP 仍用原来的抓包队列发送 UDP，并保留响应窗口。Yak 的结果 channel 和回调只在扫描器层。UDP 抓包不能报告 TCP open；会话打开失败直接返回错误，不会退回旧的 SYN 组包发送。
 
 主动会话借用宿主机 IP，gVisor 的端口绑定并不等于预留了宿主机操作系统的端口；宿主栈仍可能发送自己的 RST。本接口约束的是本进程注入行为，不能承诺与宿主所有现有连接完全隔离。需要独立网络身份时应使用桥接 VM 的独立 IP/MAC，而不是把静默 pcap 当成独立虚拟机。
 
