@@ -30,19 +30,13 @@ func buildSchema(actions ...*LoopAction) string {
 	var actionNames []string
 	var actionDesc []string
 	for _, action := range actions {
-		actionNames = append(actionNames, action.ActionType)
-
-		// Build description with metadata if available
-		desc := action.ActionType + ": " + action.Description
-
-		// Check if this is a loop action and has metadata with usage prompt
-		if meta, ok := GetLoopMetadata(action.ActionType); ok && meta.UsagePrompt != "" {
-			desc = action.ActionType + ": " + meta.UsagePrompt
+		if action == nil {
+			continue
 		}
-
-		actionDesc = append(actionDesc, desc)
+		actionNames = append(actionNames, action.ActionType)
+		actionDesc = append(actionDesc, action.ActionType+": "+actionDescription(action))
 	}
-	var opts = []any{
+	opts := []any{
 		aitool.WithStringParam(
 			"@action",
 			aitool.WithParam_Description("required '@action' field to identify the action type"),
@@ -50,6 +44,33 @@ func buildSchema(actions ...*LoopAction) string {
 			aitool.WithParam_Required(true),
 			aitool.WithParam_Raw("x-@action-rules", actionDesc),
 		),
+	}
+	for _, opt := range commonActionSchemaOptions() {
+		opts = append(opts, opt)
+	}
+	for _, action := range actions {
+		if action != nil {
+			for _, opt := range action.Options {
+				opts = append(opts, opt)
+			}
+		}
+	}
+
+	return aitool.NewObjectSchema(opts...)
+}
+
+func actionDescription(action *LoopAction) string {
+	if meta, ok := GetLoopMetadata(action.ActionType); ok && meta.UsagePrompt != "" {
+		return meta.UsagePrompt
+	}
+	return action.Description
+}
+
+// The common fields have identical definitions in the text schema and each
+// native function tool. The action selector is deliberately text-only: a
+// native tool call selects its action through the function name.
+func commonActionSchemaOptions() []aitool.ToolOption {
+	return []aitool.ToolOption{
 		aitool.WithStringParam(
 			"identifier",
 			aitool.WithParam_Description(
@@ -67,25 +88,6 @@ func buildSchema(actions ...*LoopAction) string {
 		),
 		todoDeltaSchemaOption(),
 	}
-
-	existed := make(map[string]struct{})
-	existed["@action"] = struct{}{}
-	existed["identifier"] = struct{}{}
-	existed["human_readable_thought"] = struct{}{}
-
-	for _, action := range actions {
-		if action == nil {
-			continue
-		}
-		if len(action.Options) <= 0 {
-			continue
-		}
-		for _, opt := range action.Options {
-			opts = append(opts, opt)
-		}
-	}
-
-	return aitool.NewObjectSchema(opts...)
 }
 
 func todoDeltaSchemaOption() aitool.ToolOption {

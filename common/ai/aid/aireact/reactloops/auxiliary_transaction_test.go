@@ -29,7 +29,7 @@ func TestSpeedLoopAuxiliaryProtocol(t *testing.T) {
 				calls++
 				require.Same(t, loop.GetCurrentTask().GetContext(), req.GetContext())
 				require.Equal(t, "react-loop:test-auxiliary", req.GetCallerLabel())
-				require.Equal(t, mode == "functioncall", req.IsToolCallArgumentsStreamEnabled())
+				require.False(t, req.IsToolCallArgumentsStreamEnabled())
 				response := base.NewAIResponse()
 				response.EmitOutputStream(strings.NewReader(raw))
 				response.Close()

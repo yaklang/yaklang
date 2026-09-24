@@ -80,7 +80,7 @@ func TestBackgroundDispatchActions_ActualLoop(t *testing.T) {
 						body = `{"@action":"object","goal":"inspect payment log","result_contract":"return evidence"}`
 					} else {
 						step := requests.Add(1)
-						require.Equal(t, functionCall, req.IsToolCallArgumentsStreamEnabled())
+						require.False(t, req.IsToolCallArgumentsStreamEnabled())
 						switch step {
 						case 1:
 							body = fmt.Sprintf(`{"@action":"dispatch_sub_react_agents","dispatches":[{"goal":"inspect payment","loop_name":%q}]}`, childName)
