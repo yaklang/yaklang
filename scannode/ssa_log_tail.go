@@ -2,7 +2,6 @@ package scannode
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -10,46 +9,19 @@ import (
 	"time"
 
 	"github.com/yaklang/yaklang/common/log"
+	ssav1 "github.com/yaklang/yaklang/scannode/gen/legionpb/legion/ssa/v1"
+	"google.golang.org/protobuf/proto"
 )
 
 // ssaLogTailResultPrefix is the core-NATS subject prefix a node uses to
 // answer ssa.log.tail commands:
 //
-//	legion.realtime.ssa.log.tail.<query_id>
-const ssaLogTailResultPrefix = "legion.realtime.ssa.log.tail"
-
-// ssaLogTailPayload is the JSON body of an ssa.log.tail command. The platform
-// asks the node for a chunk of a scan task's log file, measured backwards from
-// the end of the file:
-//
-//	offset    = bytes to skip from the end of the file (0 = the very end)
-//	max_bytes = maximum bytes to return for this chunk
-//
-// The frontend starts at offset 0 (the tail) and walks backwards by increasing
-// offset, so a huge log can be inspected without ever shipping it fully.
-type ssaLogTailPayload struct {
-	QueryID    string `json:"query_id"`
-	JobID      string `json:"job_id"`
-	AttemptID  string `json:"attempt_id"`
-	Offset     int64  `json:"offset"`    // bytes to skip from the end of the file
-	MaxBytes   int64  `json:"max_bytes"` // requested chunk size (clamped by the node)
-	TaskStatus string `json:"task_status,omitempty"`
-	LogKind    string `json:"log_kind,omitempty"` // ""|"task"|"db"
-}
-
-// ssaLogTailResponse is the JSON body published back to the platform.
-type ssaLogTailResponse struct {
-	Found      bool   `json:"found"`
-	Reason     string `json:"reason,omitempty"`
-	TotalBytes int64  `json:"total_bytes"` // full file size at read time
-	Offset     int64  `json:"offset"`      // bytes skipped from the end for THIS chunk
-	HasMore    bool   `json:"has_more"`    // true when older content exists before this chunk
-	Content    string `json:"content,omitempty"`
-}
+//	legion.realtime.ssa.log.tail.v2.<query_id>
+const ssaLogTailResultPrefix = "legion.realtime.ssa.log.tail.v2"
 
 const (
 	ssaLogTailDefaultMaxBytes = 64 * 1024
-	ssaLogTailMaxBytesLimit   = 1024 * 1024
+	ssaLogTailMaxBytesLimit   = 768 * 1024 // keep protobuf envelope below NATS max payload
 )
 
 // handleSSALogTail reads the tail of the per-task log file of a scan attempt.
@@ -57,14 +29,14 @@ const (
 // openTaskLogWriter into <node>/logs/<jobID>_<subtaskID>_<attemptID>.log, so
 // this command works for any task state: running, cancelled or finished.
 func (b *legionJobBridge) handleSSALogTail(ctx context.Context, raw []byte) error {
-	var payload ssaLogTailPayload
-	if err := json.Unmarshal(raw, &payload); err != nil {
+	var payload ssav1.LogTailCommand
+	if err := proto.Unmarshal(raw, &payload); err != nil {
 		return fmt.Errorf("unmarshal ssa log tail: %w", err)
 	}
-	if strings.TrimSpace(payload.QueryID) == "" {
+	if strings.TrimSpace(payload.QueryId) == "" {
 		return fmt.Errorf("ssa log tail query_id is required")
 	}
-	if strings.TrimSpace(payload.JobID) == "" || strings.TrimSpace(payload.AttemptID) == "" {
+	if strings.TrimSpace(payload.JobId) == "" || strings.TrimSpace(payload.AttemptId) == "" {
 		return fmt.Errorf("ssa log tail job_id and attempt_id are required")
 	}
 	if payload.Offset < 0 {
@@ -78,22 +50,22 @@ func (b *legionJobBridge) handleSSALogTail(ctx context.Context, raw []byte) erro
 		maxBytes = ssaLogTailMaxBytesLimit
 	}
 
-	response := ssaLogTailResponse{Offset: payload.Offset}
-	logPath, reason := b.resolveLogTailPath(payload.JobID, payload.AttemptID, payload.LogKind)
+	response := &ssav1.LogTailResult{QueryId: payload.QueryId, Offset: payload.Offset}
+	logPath, reason := b.resolveLogTailPath(payload.JobId, payload.AttemptId, payload.LogKind)
 	if logPath == "" {
 		if reason == "" {
 			reason = "task log not found for this attempt"
 		}
 		response.Reason = reason
-		log.Infof("[log-tail] answered: job=%s attempt=%s kind=%s found=false (%s)", payload.JobID, payload.AttemptID, payload.LogKind, reason)
-		return b.publishLogTailResponse(ctx, payload.QueryID, response)
+		log.Infof("[log-tail] answered: job=%s attempt=%s kind=%s found=false (%s)", payload.JobId, payload.AttemptId, payload.LogKind, reason)
+		return b.publishLogTailResponse(ctx, payload.QueryId, response)
 	}
 
 	content, totalBytes, start, hasMore, err := tailLogFile(logPath, payload.Offset, maxBytes)
 	if err != nil {
 		response.Reason = fmt.Sprintf("read task log: %v", err)
-		log.Warnf("[log-tail] job=%s attempt=%s read failed: %v", payload.JobID, payload.AttemptID, err)
-		return b.publishLogTailResponse(ctx, payload.QueryID, response)
+		log.Warnf("[log-tail] job=%s attempt=%s read failed: %v", payload.JobId, payload.AttemptId, err)
+		return b.publishLogTailResponse(ctx, payload.QueryId, response)
 	}
 	response.Found = true
 	response.TotalBytes = totalBytes
@@ -102,12 +74,12 @@ func (b *legionJobBridge) handleSSALogTail(ctx context.Context, raw []byte) erro
 	response.Offset = totalBytes - start // bytes skipped from the end for this chunk
 
 	log.Infof("[log-tail] answered: job=%s attempt=%s total=%d chunk=%d offset=%d has_more=%v",
-		payload.JobID, payload.AttemptID, totalBytes, len(content), response.Offset, hasMore)
-	return b.publishLogTailResponse(ctx, payload.QueryID, response)
+		payload.JobId, payload.AttemptId, totalBytes, len(content), response.Offset, hasMore)
+	return b.publishLogTailResponse(ctx, payload.QueryId, response)
 }
 
-func (b *legionJobBridge) publishLogTailResponse(ctx context.Context, queryID string, response ssaLogTailResponse) error {
-	raw, err := json.Marshal(response)
+func (b *legionJobBridge) publishLogTailResponse(ctx context.Context, queryID string, response *ssav1.LogTailResult) error {
+	raw, err := proto.Marshal(response)
 	if err != nil {
 		return fmt.Errorf("marshal ssa log tail response: %w", err)
 	}

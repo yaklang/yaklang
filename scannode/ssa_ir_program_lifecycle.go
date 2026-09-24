@@ -3,7 +3,6 @@ package scannode
 import (
 	"context"
 	"crypto/sha256"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"path/filepath"
@@ -13,28 +12,14 @@ import (
 	"github.com/yaklang/gorm"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 	"github.com/yaklang/yaklang/common/yak/ssaproject"
+	ssav1 "github.com/yaklang/yaklang/scannode/gen/legionpb/legion/ssa/v1"
+	"google.golang.org/protobuf/proto"
 )
 
-const ssaIRProgramDeleteResultPrefix = "legion.realtime.ssa.ir_program.delete"
-
-type ssaIRProgramDeleteRequest struct {
-	RequestID     string `json:"request_id"`
-	StoreIdentity string `json:"store_identity"`
-	ProgramName   string `json:"program_name"`
-}
-
-type ssaIRProgramDeleteResponse struct {
-	RequestID     string `json:"request_id"`
-	StoreIdentity string `json:"store_identity"`
-	ProgramName   string `json:"program_name"`
-	Success       bool   `json:"success"`
-	Deleted       bool   `json:"deleted"`
-	AlreadyAbsent bool   `json:"already_absent,omitempty"`
-	Reason        string `json:"reason,omitempty"`
-}
+const ssaIRProgramDeleteResultPrefix = "legion.realtime.ssa.ir_program.delete.v2"
 
 type ssaIRProgramDeleteFunc func(context.Context, string, string) (deleted bool, alreadyAbsent bool, reason string, err error)
-type ssaIRProgramDeletePublishFunc func(context.Context, string, ssaIRProgramDeleteResponse) error
+type ssaIRProgramDeletePublishFunc func(context.Context, string, *ssav1.DeleteIRProgramResult) error
 
 func (b *legionJobBridge) handleSSAIRProgramDelete(ctx context.Context, raw []byte) error {
 	deleteProgram := deleteSSAIRProgramForLifecycle
@@ -66,14 +51,14 @@ func handleSSAIRProgramDeleteWith(
 	deleteProgram ssaIRProgramDeleteFunc,
 	publish ssaIRProgramDeletePublishFunc,
 ) error {
-	var request ssaIRProgramDeleteRequest
-	if err := json.Unmarshal(raw, &request); err != nil {
+	var request ssav1.DeleteIRProgramCommand
+	if err := proto.Unmarshal(raw, &request); err != nil {
 		return fmt.Errorf("unmarshal ssa IR program delete: %w", err)
 	}
-	request.RequestID = strings.TrimSpace(request.RequestID)
+	request.RequestId = strings.TrimSpace(request.RequestId)
 	request.StoreIdentity = strings.TrimSpace(request.StoreIdentity)
 	request.ProgramName = strings.TrimSpace(request.ProgramName)
-	if request.RequestID == "" {
+	if request.RequestId == "" {
 		return errors.New("ssa IR program delete request_id is required")
 	}
 	if request.ProgramName == "" {
@@ -87,8 +72,8 @@ func handleSSAIRProgramDeleteWith(
 	}
 
 	deleted, alreadyAbsent, reason, deleteErr := deleteProgram(ctx, request.StoreIdentity, request.ProgramName)
-	response := ssaIRProgramDeleteResponse{
-		RequestID:     request.RequestID,
+	response := &ssav1.DeleteIRProgramResult{
+		RequestId:     request.RequestId,
 		StoreIdentity: request.StoreIdentity,
 		ProgramName:   request.ProgramName,
 		Success:       deleteErr == nil,
@@ -101,7 +86,7 @@ func handleSSAIRProgramDeleteWith(
 	}
 	// A completed refusal is a terminal response, not a transport failure. The
 	// platform receives the reason and decides how to report or retry it.
-	return publish(ctx, request.RequestID, response)
+	return publish(ctx, request.RequestId, response)
 }
 
 func deleteSSAIRProgramForLifecycle(
@@ -229,9 +214,9 @@ func buildSSAIRStoreIdentity(parts ...string) string {
 func (b *legionJobBridge) publishSSAIRProgramDeleteResponse(
 	ctx context.Context,
 	requestID string,
-	response ssaIRProgramDeleteResponse,
+	response *ssav1.DeleteIRProgramResult,
 ) error {
-	raw, err := json.Marshal(response)
+	raw, err := proto.Marshal(response)
 	if err != nil {
 		return fmt.Errorf("marshal ssa IR program delete response: %w", err)
 	}
