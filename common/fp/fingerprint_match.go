@@ -168,9 +168,9 @@ func (f *Matcher) MatchWithContext(ctx context.Context, host string, port int, o
 				f.log("port is open, web fingerprint detection completed")
 				return result, nil
 			}
-			// Web 探测已经确认端口关闭时, 不再做服务指纹.
-			// 服务指纹会遍历全部探针规则并再拨一次号, 对 C 段里大量关闭端口会把 CPU 打满.
-			if result != nil && result.State == CLOSED {
+			// TCP 拨号失败时还没做 TLS 检查, CheckedTLS 为 false, 关闭端口不再做服务指纹.
+			// 拨号成功但 HTTP 失败(仅国密)时已经检查过 TLS, 仍要继续服务指纹才能标成开放.
+			if result != nil && result.State == CLOSED && (result.Fingerprint == nil || !result.Fingerprint.CheckedTLS) {
 				f.log("port is closed, skip service detection")
 				return result, nil
 			}
