@@ -480,6 +480,13 @@ func (s *Scannerx) Scan(targetCh <-chan *SynxTarget) (chan *synscan.SynScanResul
 	}
 
 	wCtx, wCancel := context.WithCancel(s.ctx)
+	if err := s.startHalfOpen(wCtx); err != nil {
+		wCancel()
+		if s.cancel != nil {
+			s.cancel()
+		}
+		return nil, fmt.Errorf("synscanx netstackvm: %w", err)
+	}
 	// 异步执行扫描流程
 	go func() {
 		defer func() {
@@ -497,26 +504,24 @@ func (s *Scannerx) Scan(targetCh <-chan *SynxTarget) (chan *synscan.SynScanResul
 			close(s.LoopPacket)
 		}()
 
-		if err := s.startHalfOpen(wCtx); err != nil {
-			log.Errorf("synscanx netstackvm: %v", err)
-		}
-		// UDP, and TCP when the netstack session cannot open, still use the
-		// assembled packet writer. A TCP-only netstack session does not open
-		// a second capture.
-		if s.halfOpen == nil || s.keepPacketWriter {
+		// The additional capture is UDP-only. TCP must use the correlated
+		// probe path; failing to open it cannot silently weaken validation.
+		if s.keepPacketWriter {
 			if err := s.initHandlerStart(wCtx); err != nil {
-				log.Debugf("synscanx handler start stopped: %v", err)
+				log.Errorf("synscanx UDP capture: %v", err)
 				return
 			}
-		}
-
-		if (s.halfOpen == nil || s.keepPacketWriter) && !s.FromPing {
-			s.arpScan()
-			if !s.waitOrCanceled(time.Second) {
-				return
+			if !s.FromPing {
+				s.arpScan()
+				if !s.waitOrCanceled(time.Second) {
+					return
+				}
 			}
 		}
 		s.sendPacket(targetCh)
+		if err := s.halfOpen.Wait(wCtx); err != nil {
+			return
+		}
 		if !s.waitOrCanceled(s.config.waiting) {
 			return
 		}
@@ -612,6 +617,9 @@ func (s *Scannerx) assemblePacket(host string, port int, proto ProtocolType) ([]
 }
 
 func (s *Scannerx) Close() {
+	if s.cancel != nil {
+		s.cancel()
+	}
 	if s.halfOpen != nil {
 		_ = s.halfOpen.Close()
 	}

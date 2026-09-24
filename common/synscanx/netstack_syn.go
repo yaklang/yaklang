@@ -2,6 +2,7 @@ package synscanx
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net"
 
@@ -14,6 +15,7 @@ import (
 type halfOpenSYN interface {
 	Emit(ctx context.Context, host string, port int) error
 	Close() error
+	Wait(context.Context) error
 }
 
 func (s *Scannerx) notePorts(ports string) {
@@ -38,6 +40,11 @@ func (s *Scannerx) startHalfOpen(ctx context.Context) error {
 		Iface:    s.config.Iface,
 		SourceIP: s.config.SourceIP,
 		Gateway:  s.config.GatewayIP,
+		OnResult: func(target string, _ netstackvm.TCPSegment, err error) {
+			if err != nil && !errors.Is(err, netstackvm.ErrProbeNoResponse) && !errors.Is(err, netstackvm.ErrProbeRefused) && !errors.Is(err, context.Canceled) {
+				log.Errorf("synscanx probe %s failed: %v", target, err)
+			}
+		},
 		OnOpen: func(ip net.IP, port int) {
 			if s.OpenPortHandlers != nil {
 				s.OpenPortHandlers(ip, port)

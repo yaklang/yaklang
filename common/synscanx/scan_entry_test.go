@@ -2,6 +2,9 @@ package synscanx
 
 import (
 	"context"
+	"github.com/gopacket/gopacket"
+	"github.com/gopacket/gopacket/layers"
+	"net"
 	"sync"
 	"testing"
 	"time"
@@ -163,6 +166,27 @@ func TestGenerateHostPortStopsWhenContextCanceled(t *testing.T) {
 }
 
 func TestLoopbackScanSubmitsEveryRequestedPort(t *testing.T) {
+	// This test exercises submission and loopback capture, not system routing.
+	// In particular Go 1.22's Darwin route parser can fail checkptr under -race.
+	ifaces, ifaceErr := net.Interfaces()
+	if ifaceErr != nil {
+		t.Skipf("interfaces unavailable: %v", ifaceErr)
+	}
+	var loop *net.Interface
+	for i := range ifaces {
+		if ifaces[i].Flags&net.FlagLoopback != 0 {
+			loop = &ifaces[i]
+			break
+		}
+	}
+	if loop == nil {
+		t.Skip("no loopback interface")
+	}
+	restore := stubRouteLookup(t, func(time.Duration, string) (*net.Interface, net.IP, net.IP, error) {
+		return loop, nil, net.IPv4(127, 0, 0, 1), nil
+	})
+	defer restore()
+
 	var submitted []string
 	ch, err := Scan(context.Background(), "127.0.0.1", "80,443,1",
 		WithWaiting(1),
@@ -220,7 +244,8 @@ func (r *recordingEmitter) Emit(ctx context.Context, host string, port int) erro
 	return nil
 }
 
-func (r *recordingEmitter) Close() error { return nil }
+func (r *recordingEmitter) Close() error                   { return nil }
+func (r *recordingEmitter) Wait(ctx context.Context) error { return ctx.Err() }
 
 func TestSendPacketUsesHalfOpenEmitterForTCP(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
@@ -271,4 +296,34 @@ func itoa(n int) string {
 		n /= 10
 	}
 	return string(buf[i:])
+}
+
+func TestUDPCaptureCannotBypassTCPProbeValidation(t *testing.T) {
+	reported := 0
+	s := &Scannerx{halfOpen: &recordingEmitter{}, OpenPortHandlers: func(net.IP, int) { reported++ }}
+	buf := gopacket.NewSerializeBuffer()
+	ip := &layers.IPv4{Version: 4, TTL: 64, Protocol: layers.IPProtocolTCP, SrcIP: net.IPv4(192, 0, 2, 20), DstIP: net.IPv4(192, 0, 2, 10)}
+	tcp := &layers.TCP{SrcPort: 80, DstPort: 40000, SYN: true, ACK: true, Ack: 123}
+	if err := tcp.SetNetworkLayerForChecksum(ip); err != nil {
+		t.Fatal(err)
+	}
+	if err := gopacket.SerializeLayers(buf, gopacket.SerializeOptions{FixLengths: true, ComputeChecksums: true}, ip, tcp); err != nil {
+		t.Fatal(err)
+	}
+	s.handlePacket(gopacket.NewPacket(buf.Bytes(), layers.LayerTypeIPv4, gopacket.Default))
+	if reported != 0 {
+		t.Fatal("uncorrelated TCP escaped via the UDP capture")
+	}
+	ip.Protocol = layers.IPProtocolUDP
+	udp := &layers.UDP{SrcPort: 53, DstPort: 40000}
+	if err := udp.SetNetworkLayerForChecksum(ip); err != nil {
+		t.Fatal(err)
+	}
+	if err := gopacket.SerializeLayers(buf, gopacket.SerializeOptions{FixLengths: true, ComputeChecksums: true}, ip, udp); err != nil {
+		t.Fatal(err)
+	}
+	s.handlePacket(gopacket.NewPacket(buf.Bytes(), layers.LayerTypeIPv4, gopacket.Default))
+	if reported != 1 {
+		t.Fatal("UDP result path was lost")
+	}
 }

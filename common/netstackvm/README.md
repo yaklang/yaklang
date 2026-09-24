@@ -266,7 +266,7 @@ DHCP 模式不能同时设置静态 `Address`、`Gateway` 或 `DNS`。`NewEthern
 
 ## 8. 分步 TCP 握手和挥手
 
-分步探测属于旧的 `NetStackVirtualMachineEntry` channel 接口，适合协议步骤验证；不能直接用在 pcap entry 上，也不是 `NetworkVM` 的方法。
+`TCPProbe` 支持 channel 双虚拟机的完整分步握手，以及下节的真实网卡半开探测。原有 `NetStackVirtualMachineEntry.StartTCPProbe` 使用 channel 后端，不能直接接收 pcap entry；它不是 `NetworkVM` 的方法。
 
 操作顺序：
 
@@ -279,6 +279,85 @@ DHCP 模式不能同时设置静态 `Address`、`Gateway` 或 `DNS`。`NewEthern
 步骤返回的 `TCPSegment` 包含真实地址、端口、序号、确认号和 flags。跳过步骤会返回错误。`ReceivePeerClose` 返回对端 ACK 和 FIN 两个报文结果。
 
 不要同时在同一对 entry 上运行 `BridgeChannelNetStacks` 和 `StartTCPProbe`，否则两者会竞争出站队列，破坏分步控制。完整的连接、载荷和挥手示例见 [tcp_probe_test.go](tcp_probe_test.go) 的 `TestTCPProbeHandshakePayloadAndClose`。
+
+### 真实网卡半开探测与重试
+
+真实网卡使用 `OpenHalfOpenSYN` 创建**主动探测会话**，再调用会话的 `StartTCPProbe`。返回的仍是 `*TCPProbe`，与 channel 后端共用步骤、响应校验和重试控制；该后端的 `ProbeACK` 固定返回 `ErrHalfOpenACK`。`NetworkPCAP` 的静默策略保持不变。
+
+下面是可编译的单目标示例。`device`、`source`、`gateway` 必须与实际接口、地址及路由一致；同网段或回环目标可不提供网关。本 API 当前只接受 IPv4 字面量目标。
+
+```go
+package examples
+
+import (
+    "context"
+    "fmt"
+    "net"
+    "time"
+
+    "github.com/yaklang/yaklang/common/netstackvm"
+)
+
+func HalfOpen(ctx context.Context, device, source, gateway, target string) error {
+    iface, err := net.InterfaceByName(device)
+    if err != nil { return err }
+    session, err := netstackvm.OpenHalfOpenSYN(ctx, netstackvm.HalfOpenSYNConfig{
+        Iface: iface,
+        SourceIP: net.ParseIP(source),
+        Gateway: net.ParseIP(gateway),
+        MaxInFlight: 256,
+        PacketsPerSecond: 1000,
+    })
+    if err != nil { return err }
+    defer session.Close()
+
+    probeCtx, cancel := context.WithTimeout(ctx, 8*time.Second)
+    defer cancel()
+    probe, err := session.StartTCPProbe(probeCtx, target,
+        netstackvm.WithSYNRetry(netstackvm.SYNRetryPolicy{
+            MaxAttempts: 3, // 首次发送也计算在内
+            SendTimeout: 3*time.Second,
+            ResponseTimeout: 500*time.Millisecond,
+            MaxResponseTimeout: 2*time.Second,
+        }))
+    if err != nil { return err }
+    defer probe.Close()
+    if _, err = probe.ProbeSYNContext(probeCtx); err != nil { return err }
+    synAck, err := probe.ReceiveSYNACKContext(probeCtx)
+    if err != nil { return err }
+    fmt.Printf("open: %s:%d\n", synAck.RemoteIP, synAck.RemotePort)
+    return nil // 不调用 ProbeACK；Close 不会注入 ACK/FIN/RST。
+}
+```
+
+`StartTCPProbe` 的 `ctx` 控制探测生命周期；`ProbeSYNContext`、`ReceiveSYNACKContext` 还可以接收各步骤的更短期限。等待并发名额、报文生成、速率配额、设备写入队列、响应及重试退避都响应取消。未完成的原生 libpcap 写入没有强制取消接口：已经进入该调用的操作必须等它返回，不能保证此处硬实时取消。会话关闭会取消探测并等待资源和回调退出。
+
+原来的 `ProbeSYN()`、`ReceiveSYNACK()` 仍可使用，采用创建 probe 时的生命周期 context。channel 后端默认只尝试一次，以保持原有分步握手行为；真实网卡后端默认总计尝试 3 次。两者都可通过 `WithSYNRetry` 调整。
+
+**如何区分结果：** 使用 `errors.Is` 检查返回错误。
+
+- 无错误：收到与接口、四元组、本次 SYN 序号匹配的 SYN-ACK，可报告 open。
+- `ErrProbeRefused`：收到匹配的 RST+ACK；是一次明确的拒绝响应。
+- `ErrProbeNoResponse`：尝试预算耗尽，未收到有效响应；可能丢包、被过滤或目标不可达，**不能据此判定 closed**。
+- `ErrProbeSend`：本地发送/生成失败，保留底层错误；不能解释为目标无响应。
+- `context.Canceled` / `context.DeadlineExceeded`：调用者或生命周期取消/超时。
+
+报文还需通过 flags、长度、分片检查。物理接口校验 IPv4/TCP 校验和；已知 loopback 接口允许宿主栈的校验和卸载占位值，例如 macOS `lo0`。SYN-ACK 和 RST 都不注入 gVisor。来源、目标、端口、ACK 不匹配的报文，以及旧探测的迟到响应不能直接生成结果；生成 SYN 时也核对 endpoint 自身的 ISN，防止队列中的旧 SYN 被误认成本次发送。
+
+**突发流量与算法：** “写成功”仅表示 libpcap 接受报文，不保证网卡、网络或对端收到。gVisor 的有界输出队列、pcap 每订阅者的 1000 包接收队列、内核捕获缓冲和远端设备都可能丢包。扩大队列不是可靠性保证。
+
+- 默认最多 256 个未完成 probe，名额保持到 `Close`/生命周期结束；超出后 `StartTCPProbe` 阻塞并可被 ctx 取消。
+- 会话默认最多 1000 个 SYN/秒，burst 为 1；首次发送和重试共同受限，防止超时后的重试突发。ARP 邻居解析不计入这个 SYN 配额。
+- 同一 probe 的重试重发完全相同的 SYN，保留四元组和 ISN，不重新分配源端口、不重建连接。gVisor 自己生成的重传和关闭报文不能直接出网。
+- 第 k 次尝试的响应窗口为 `min(MaxResponseTimeout, ResponseTimeout × 2^(k-1) × (1+U[0,0.2]))`。默认约为 0.5–0.6 秒、1–1.2 秒、2 秒。响应窗口从本地写入成功后开始。
+- 写入失败也消耗同一份 `MaxAttempts`，重发前按同样的退避公式等待；每次发送另受 `SendTimeout` 限制。总期限由 probe/步骤 ctx 收紧。不是“写入重试 3 次再叠加网络重试 3 次”。
+- 这是有上限的退避策略，不是自适应 RTT 估计器；没有有限次数重试可以保证不漏报。提高重试次数会增加扫描时间和对端负载；应按网络时延设置响应窗口。
+
+批量使用 `session.Emit(ctx, host, port)`，它在获得名额后启动 probe worker，返回 nil 仅代表接纳成功。通过 `HalfOpenSYNConfig.OnOpen` 接收开放结果，通过 `OnResult(target, synAck, err)` 接收每个已接纳 probe 的最终结果；接纳失败直接由 `Emit` 返回。两个回调在 worker 中执行，可能并发，不阻塞抓包线程；调用方需同步共享数据，且回调必须及时返回、不能同步调用该会话的 `Close`/`Wait`。
+
+提交结束后调用 `session.Wait(ctx)` 等待重试和回调全部结束，再 `Close()`。`Wait` 期间不能再开始新的提交；取消 Wait 本身不会取消会话。`synscanx` 已按此方式等待所有 TCP probe 完成，混合 UDP 扫描的额外抓包器不会再绕过 TCP 校验。打开主动会话失败会返回错误，不会静默退回未经相关性校验的 TCP 发包路径。
+
+主动会话借用宿主机 IP，gVisor 的端口绑定并不等于预留了宿主机操作系统的端口；宿主栈仍可能发送自己的 RST。本接口约束的是本进程注入行为，不能承诺与宿主所有现有连接完全隔离。需要独立网络身份时应使用桥接 VM 的独立 IP/MAC，而不是把静默 pcap 当成独立虚拟机。
 
 ## 9. 旧接口迁移
 
@@ -338,6 +417,14 @@ NETSTACK_TRY_NIC=1 go test ./common/netstackvm \
 - [network_usage_test.go](network_usage_test.go)：VM 内 DNS/HTTP 和可选实机 pcap 双订阅者。
 - [pcap_policy_test.go](pcap_policy_test.go)：自动 RST、手工写包、过滤器和旧接口均不能绕过只读限制。
 - [tcp_probe_test.go](tcp_probe_test.go)：分步握手、载荷、挥手及原有 DialTCP 回归。
+- [halfopen_syn_test.go](halfopen_syn_test.go)：丢包/写失败重试、错误响应/旧 ISN、ctx/背压、并发清理和可选回环半开测试。
+
+真实回环半开验证（会向测试临时启动的本机 TCP 端口主动发送 SYN）：
+
+```sh
+NETSTACKVM_PCAP_DEVICE=lo0 go test -race ./common/netstackvm \
+  -run '^TestHalfOpenPCAPLoopbackDoesNotAccept$' -count=1 -timeout=30s
+```
 
 ## 11. 常见问题
 
