@@ -330,7 +330,7 @@ func HalfOpen(ctx context.Context, device, source, gateway, target string) error
 }
 ```
 
-`StartTCPProbe` 的 `ctx` 控制探测生命周期；`ProbeSYNContext`、`ReceiveSYNACKContext` 还可以接收各步骤的更短期限。等待并发名额、报文生成、速率配额、设备写入队列、响应及重试退避都响应取消。未完成的原生 libpcap 写入没有强制取消接口：已经进入该调用的操作必须等它返回，不能保证此处硬实时取消。会话关闭会取消探测并等待资源和回调退出。
+`StartTCPProbe` 的 `ctx` 控制探测生命周期；`ProbeSYNContext`、`ReceiveSYNACKContext` 还可以接收各步骤的更短期限。等待并发名额、报文生成、速率配额、设备写入队列、响应及重试退避都响应取消。未完成的原生 libpcap 写入没有强制取消接口：已经进入该调用的操作必须等它返回，不能保证此处硬实时取消。会话关闭会取消探测并等待底层资源释放；调用方负责等待自己的 worker 退出。
 
 原来的 `ProbeSYN()`、`ReceiveSYNACK()` 仍可使用，采用创建 probe 时的生命周期 context。channel 后端默认只尝试一次，以保持原有分步握手行为；真实网卡后端默认总计尝试 3 次。两者都可通过 `WithSYNRetry` 调整。
 
@@ -358,9 +358,88 @@ func HalfOpen(ctx context.Context, device, source, gateway, target string) error
 - 写入失败也消耗同一份 `MaxAttempts`，重发前按同样的退避公式等待；每次发送另受 `SendTimeout` 限制。总期限由 probe/步骤 ctx 收紧。不是“写入重试 3 次再叠加网络重试 3 次”。
 - 这是有上限的退避策略，不是自适应 RTT 估计器；没有有限次数重试可以保证不漏报。提高重试次数会增加扫描时间和对端负载；应按网络时延设置响应窗口。
 
-批量使用 `session.Emit(ctx, host, port)`，它在获得名额后启动 probe worker，返回 nil 仅代表接纳成功。通过 `HalfOpenSYNConfig.OnOpen` 接收开放结果，通过 `OnResult(target, synAck, err)` 接收每个已接纳 probe 的最终结果；接纳失败直接由 `Emit` 返回。两个回调在 worker 中执行，可能并发，不阻塞抓包线程；调用方需同步共享数据，且回调必须及时返回、不能同步调用该会话的 `Close`/`Wait`。
+### 同步单次调用与上层批量并发
 
-提交结束后调用 `session.Wait(ctx)` 等待重试和回调全部结束，再 `Close()`。`Wait` 期间不能再开始新的提交；取消 Wait 本身不会取消会话。`synscanx` 已按此方式等待所有 TCP probe 完成，混合 UDP 扫描的额外抓包器不会再绕过 TCP 校验。打开主动会话失败会返回错误，不会静默退回未经相关性校验的 TCP 发包路径。
+不需要分步处理时，使用类似 `DialContext` 的同步调用：
+
+```go
+probeCtx, cancel := context.WithTimeout(ctx, 8*time.Second)
+defer cancel()
+synAck, err := session.ProbeSYN(probeCtx, "192.0.2.20:443")
+// 返回时已完成响应等待/重试，并释放 probe 和并发名额。
+// err == nil 表示匹配的 SYN-ACK；它没有完成三次握手，也不返回 net.Conn。
+```
+
+`ProbeSYN` 内部顺序执行 `StartTCPProbe` → `ProbeSYNContext` → `ReceiveSYNACKContext`，在所有返回路径上关闭 probe。返回错误保留上面的分类；只有最终结果，不存在“提交成功但结果稍后经回调返回”的歧义。单个 context 超时不会取消同会话的其他 probe，关闭 session 则取消全部 probe。
+
+批量并发由调用层控制，每个 worker 同步执行一次探测，每个目标有独立 context。下面的完整函数使用固定 worker 数量，按输入顺序返回结果；某个目标失败不取消其他目标，批量 context 取消则终止全部等待。
+
+```go
+package examples
+
+import (
+    "context"
+    "sync"
+    "time"
+
+    "github.com/yaklang/yaklang/common/netstackvm"
+)
+
+type ProbeResult struct {
+    Target string
+    SYNACK netstackvm.TCPSegment
+    Err error
+}
+
+func ProbeBatch(ctx context.Context, session *netstackvm.HalfOpenSYN,
+    targets []string, concurrency int, perTargetTimeout time.Duration) []ProbeResult {
+    if concurrency < 1 { concurrency = 1 }
+    if concurrency > len(targets) { concurrency = len(targets) }
+    results := make([]ProbeResult, len(targets))
+    jobs := make(chan int)
+    var wg sync.WaitGroup
+    for i := 0; i < concurrency; i++ {
+        wg.Add(1)
+        go func() {
+            defer wg.Done()
+            for index := range jobs {
+                target := targets[index]
+                probeCtx, cancel := context.WithTimeout(ctx, perTargetTimeout)
+                // 简单调用可直接用 session.ProbeSYN；这里展示上层管理分步 API。
+                ack, err := probeOne(probeCtx, session, target)
+                cancel() // 在本轮立即释放 timer，不能 defer 到 worker 退出。
+                results[index] = ProbeResult{Target: target, SYNACK: ack, Err: err}
+            }
+        }()
+    }
+    for index, target := range targets {
+        if ctx.Err() != nil {
+            results[index] = ProbeResult{Target: target, Err: ctx.Err()}
+            continue
+        }
+        select {
+        case jobs <- index:
+        case <-ctx.Done():
+            results[index] = ProbeResult{Target: target, Err: ctx.Err()}
+        }
+    }
+    close(jobs)
+    wg.Wait()
+    return results
+}
+
+func probeOne(ctx context.Context, session *netstackvm.HalfOpenSYN, target string) (netstackvm.TCPSegment, error) {
+    probe, err := session.StartTCPProbe(ctx, target)
+    if err != nil { return netstackvm.TCPSegment{}, err }
+    defer probe.Close()
+    if _, err = probe.ProbeSYNContext(ctx); err != nil { return netstackvm.TCPSegment{}, err }
+    return probe.ReceiveSYNACKContext(ctx)
+}
+```
+
+半开会话已移除 `HalfOpenSYNConfig.OnOpen` / `OnResult`、`Emit` 和 `Wait`。旧调用迁移为 `ProbeSYN` 直接取结果，或自行组织 worker 并执行上述 probe 步骤；调用方等待自己的 worker 结束，再关闭 session。分步 API 仍需 `defer probe.Close()`，没有 `Wait` 替调用方释放遗忘关闭的 probe。
+
+`synscanx` 的 TCP 批量路径使用上层固定 worker（默认 256），每个目标默认独立 15 秒期限，可通过 Go 选项 `WithTCPProbeConcurrency(n)` / `WithTCPProbeTimeout(duration)` 调整。每个 worker 直接创建 probe、发送、等待结果并关闭，生产结束后等待 worker 全部退出，再关闭扫描结果流。纯 TCP 扫描不再额外睡眠 `WithWaiting` 的时间；混合 UDP 扫描仍保留 UDP 响应窗口。扫描器既有结果 channel / 兼容回调只在扫描器层处理，netstackvm 不存储或调用它们。混合 UDP 扫描的额外抓包器不会绕过 TCP 校验；主动会话初始化失败会明确返回错误。
 
 主动会话借用宿主机 IP，gVisor 的端口绑定并不等于预留了宿主机操作系统的端口；宿主栈仍可能发送自己的 RST。本接口约束的是本进程注入行为，不能承诺与宿主所有现有连接完全隔离。需要独立网络身份时应使用桥接 VM 的独立 IP/MAC，而不是把静默 pcap 当成独立虚拟机。
 

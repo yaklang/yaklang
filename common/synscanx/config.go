@@ -12,13 +12,15 @@ import (
 
 type SynxConfig struct {
 	// options
-	outputFile       string
-	outputFilePrefix string
-	waiting          time.Duration
-	initFilterPorts  string
-	initFilterHosts  string
-	netInterface     string // net interface name
-	shuffle          bool   // 是否打乱扫描顺序
+	outputFile          string
+	outputFilePrefix    string
+	waiting             time.Duration
+	tcpProbeTimeout     time.Duration
+	tcpProbeConcurrency int
+	initFilterPorts     string
+	initFilterHosts     string
+	netInterface        string // net interface name
+	shuffle             bool   // 是否打乱扫描顺序
 
 	rateLimitDelayMs  float64
 	rateLimitDelayGap int // 每隔多少数据包 delay 一次？
@@ -467,4 +469,16 @@ func WithCtx(ctx context.Context) SynxConfigOption {
 		config.Ctx = ctx
 	}
 
+}
+
+// WithTCPProbeTimeout sets each TCP target's independent total deadline, covering
+// admission, sending and retries. Non-positive values use the 15 second default.
+func WithTCPProbeTimeout(timeout time.Duration) SynxConfigOption {
+	return func(config *SynxConfig) { config.tcpProbeTimeout = timeout }
+}
+
+// WithTCPProbeConcurrency sets the upper-level TCP worker count. Non-positive
+// values use the default of 256. netstackvm's admission and rate limits still apply.
+func WithTCPProbeConcurrency(concurrency int) SynxConfigOption {
+	return func(config *SynxConfig) { config.tcpProbeConcurrency = concurrency }
 }

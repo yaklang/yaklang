@@ -519,13 +519,14 @@ func (s *Scannerx) Scan(targetCh <-chan *SynxTarget) (chan *synscan.SynScanResul
 			}
 		}
 		s.sendPacket(targetCh)
-		if err := s.halfOpen.Wait(wCtx); err != nil {
-			return
+		// TCP workers have already received their final result. Only the
+		// asynchronous UDP capture needs an additional response window.
+		if s.keepPacketWriter {
+			if !s.waitOrCanceled(s.config.waiting) {
+				return
+			}
+			log.Debugf("waited for UDP packets for %0.2fs", s.config.waiting.Seconds())
 		}
-		if !s.waitOrCanceled(s.config.waiting) {
-			return
-		}
-		log.Debugf("waiting for all packet in %0.2fs", s.config.waiting.Seconds())
 		countOnce.Do(func() {
 			log.Infof("alive host count: %d open port count: %d cost: %v", len(ipCountMap), openPortCount, time.Since(s.startTime))
 		})
@@ -534,6 +535,23 @@ func (s *Scannerx) Scan(targetCh <-chan *SynxTarget) (chan *synscan.SynScanResul
 }
 
 func (s *Scannerx) sendPacket(targetCh <-chan *SynxTarget) {
+	// Fixed upper-level workers bound both goroutines and active probes. Each
+	// worker uses the synchronous stepped API with a fresh per-target context.
+	var tcpTargets chan *SynxTarget
+	var workers sync.WaitGroup
+	if s.halfOpen != nil {
+		concurrency := defaultTCPProbeConcurrency
+		if s.config != nil && s.config.tcpProbeConcurrency > 0 {
+			concurrency = s.config.tcpProbeConcurrency
+		}
+		tcpTargets = make(chan *SynxTarget)
+		for i := 0; i < concurrency; i++ {
+			workers.Add(1)
+			go func() { defer workers.Done(); s.runTCPProbes(tcpTargets) }()
+		}
+		defer func() { close(tcpTargets); workers.Wait() }()
+	}
+
 	for {
 		select {
 		case <-s.ctx.Done():
@@ -547,13 +565,10 @@ func (s *Scannerx) sendPacket(targetCh <-chan *SynxTarget) {
 			port := target.Port
 			proto := target.Mode
 			if proto == TCP && s.halfOpen != nil {
-				if err := s.halfOpen.Emit(s.ctx, host, port); err != nil {
-					if s.ctx.Err() != nil {
-						log.Error("send packet canceled")
-						return
-					}
-					log.Debugf("netstack syn %s:%d: %v", host, port, err)
-					continue
+				select {
+				case <-s.ctx.Done():
+					return
+				case tcpTargets <- target:
 				}
 				continue
 			}

@@ -105,7 +105,7 @@ func TestHalfOpenRetriesDroppedSYNWithoutChangingTupleOrCompletingHandshake(t *t
 	h.mu.Lock()
 	require.Empty(t, h.flights)
 	h.mu.Unlock()
-	require.NoError(t, h.Wait(context.Background()))
+	require.NoError(t, h.Close())
 	require.EqualValues(t, 3, writes.Load(), "Close must not inject RST/ACK")
 }
 
@@ -213,7 +213,7 @@ func TestHalfOpenContextCancelsReceiveAndAdmission(t *testing.T) {
 	require.ErrorIs(t, err, context.DeadlineExceeded)
 	require.EqualValues(t, 1, writes.Load())
 	p.Close()
-	require.NoError(t, h.Wait(context.Background()))
+	require.NoError(t, h.Close())
 }
 
 func TestHalfOpenContextCancelsRateWaitBeforeWrite(t *testing.T) {
@@ -362,7 +362,7 @@ func TestHalfOpenGenerationLossIsSendFailure(t *testing.T) {
 
 func TestHalfOpenLifetimeDeadlineCancelsBackgroundReceive(t *testing.T) {
 	h := mockHalfOpen(t, func(_ *HalfOpenSYN, _ []byte) error { return nil })
-	ctx, cancel := context.WithTimeout(context.Background(), 40*time.Millisecond)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
 	p, err := h.StartTCPProbe(ctx, "192.0.2.20:80", WithSYNRetry(SYNRetryPolicy{3, time.Second, time.Second, time.Second}))
 	require.NoError(t, err)
@@ -371,7 +371,7 @@ func TestHalfOpenLifetimeDeadlineCancelsBackgroundReceive(t *testing.T) {
 	require.NoError(t, err)
 	_, err = p.ReceiveSYNACKContext(context.Background())
 	require.ErrorIs(t, err, context.DeadlineExceeded)
-	require.NoError(t, h.Wait(context.Background()))
+	require.NoError(t, h.Close())
 	h.mu.Lock()
 	require.Empty(t, h.flights)
 	h.mu.Unlock()
@@ -402,39 +402,81 @@ func TestHalfOpenCorruptChecksumsAndStaleACKCannotReportOpen(t *testing.T) {
 	require.NoError(t, err)
 }
 
-func TestHalfOpenConcurrentEmitDrainsAllResults(t *testing.T) {
-	var opens, results atomic.Int32
+func TestHalfOpenConcurrentSynchronousProbesReleaseAllResources(t *testing.T) {
 	h := mockHalfOpen(t, func(h *HalfOpenSYN, b []byte) error {
 		h.observeInbound(h.main.MainNICID(), synReply(t, b, nil))
 		return nil
 	})
-	h.onOpen = func(net.IP, int) { opens.Add(1) }
-	h.onResult = func(_ string, _ TCPSegment, err error) {
-		if err != nil {
-			t.Errorf("probe failed: %v", err)
-		}
-		results.Add(1)
-	}
 	var wg sync.WaitGroup
 	for i := 0; i < 80; i++ {
 		wg.Add(1)
 		go func(port int) {
 			defer wg.Done()
-			if err := h.Emit(context.Background(), "192.0.2.20", port); err != nil {
-				t.Error(err)
+			ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+			defer cancel()
+			ack, err := h.ProbeSYN(ctx, fmt.Sprintf("192.0.2.20:%d", port))
+			if err != nil {
+				t.Errorf("probe %d: %v", port, err)
+				return
+			}
+			if int(ack.RemotePort) != port {
+				t.Errorf("probe %d got response for %d", port, ack.RemotePort)
 			}
 		}(10000 + i)
 	}
 	wg.Wait()
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
-	defer cancel()
-	require.NoError(t, h.Wait(ctx))
-	require.EqualValues(t, 80, opens.Load())
-	require.EqualValues(t, 80, results.Load())
 	h.mu.Lock()
 	require.Empty(t, h.flights)
 	h.mu.Unlock()
 	require.Empty(t, h.slots)
+}
+
+func TestHalfOpenSynchronousProbeCancellationDoesNotCancelSibling(t *testing.T) {
+	h := mockHalfOpen(t, func(h *HalfOpenSYN, b []byte) error {
+		_, tcp, _ := ipv4TCP(gopacket.NewPacket(b, layers.LayerTypeIPv4, gopacket.Default))
+		if tcp.DstPort == 80 {
+			h.observeInbound(h.main.MainNICID(), synReply(t, b, nil))
+		}
+		return nil
+	})
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Millisecond)
+	defer cancel()
+	done := make(chan error, 1)
+	go func() { _, err := h.ProbeSYN(ctx, "192.0.2.20:81"); done <- err }()
+	ack, err := h.ProbeSYN(context.Background(), "192.0.2.20:80")
+	require.NoError(t, err)
+	require.EqualValues(t, 80, ack.RemotePort)
+	require.ErrorIs(t, <-done, context.DeadlineExceeded)
+	// Cancellation releases its slot; the same session remains usable.
+	_, err = h.ProbeSYN(context.Background(), "192.0.2.20:80")
+	require.NoError(t, err)
+	h.mu.Lock()
+	require.Empty(t, h.flights)
+	h.mu.Unlock()
+	require.Empty(t, h.slots)
+}
+
+func TestHalfOpenSynchronousProbeErrorsReleaseResources(t *testing.T) {
+	for _, kind := range []string{"send", "silence", "refused"} {
+		t.Run(kind, func(t *testing.T) {
+			h := mockHalfOpen(t, func(h *HalfOpenSYN, b []byte) error {
+				if kind == "send" {
+					return errors.New("device write failed")
+				}
+				if kind == "refused" {
+					h.observeInbound(h.main.MainNICID(), synReply(t, b, func(_ *layers.IPv4, tcp *layers.TCP) { tcp.SYN = false; tcp.RST = true }))
+				}
+				return nil
+			})
+			_, err := h.ProbeSYN(context.Background(), "192.0.2.20:80")
+			want := map[string]error{"send": ErrProbeSend, "silence": ErrProbeNoResponse, "refused": ErrProbeRefused}[kind]
+			require.ErrorIs(t, err, want)
+			h.mu.Lock()
+			require.Empty(t, h.flights)
+			h.mu.Unlock()
+			require.Empty(t, h.slots)
+		})
+	}
 }
 
 func TestSYNRetryBackoffBounds(t *testing.T) {
@@ -507,25 +549,26 @@ func TestHalfOpenPCAPBatchPreservesHostConnection(t *testing.T) {
 	}
 	echo()
 	const count = 64
-	var opened atomic.Int32
 	results := make(chan error, count)
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
-	h, err := OpenHalfOpenSYN(ctx, HalfOpenSYNConfig{Iface: iface, SourceIP: net.IPv4(127, 0, 0, 1), MaxInFlight: 16, PacketsPerSecond: 200,
-		OnOpen: func(net.IP, int) { opened.Add(1) }, OnResult: func(_ string, _ TCPSegment, e error) { results <- e }})
+	h, err := OpenHalfOpenSYN(ctx, HalfOpenSYNConfig{Iface: iface, SourceIP: net.IPv4(127, 0, 0, 1), MaxInFlight: 16, PacketsPerSecond: 200})
 	require.NoError(t, err)
 	defer h.Close()
 	for i := 0; i < count; i++ {
-		require.NoError(t, h.Emit(ctx, "127.0.0.1", listener.Addr().(*net.TCPAddr).Port))
+		go func() {
+			probeCtx, probeCancel := context.WithTimeout(ctx, 5*time.Second)
+			defer probeCancel()
+			_, err := h.ProbeSYN(probeCtx, listener.Addr().String())
+			results <- err
+		}()
 		if i%8 == 0 {
 			echo()
 		}
 	}
-	require.NoError(t, h.Wait(ctx))
 	for i := 0; i < count; i++ {
 		require.NoError(t, <-results)
 	}
-	require.EqualValues(t, count, opened.Load())
 	echo()
 	require.NoError(t, h.Close())
 	echo()
@@ -608,7 +651,6 @@ func TestHalfOpenPCAPClosedPortAndCancellation(t *testing.T) {
 	require.ErrorIs(t, err, context.DeadlineExceeded)
 	require.Less(t, time.Since(started), time.Second)
 	p.Close()
-	require.NoError(t, h.Wait(ctx))
 	started = time.Now()
 	require.NoError(t, h.Close())
 	require.Less(t, time.Since(started), 2*time.Second)
@@ -646,26 +688,17 @@ func TestHalfOpenPCAPControlledPeer(t *testing.T) {
 	defer h.Close()
 	t.Logf("device=%s link=%d source=%s target=%s", iface.Name, h.main.driver.adaptor.linkType, source, target)
 	for i := 0; i < 16; i++ {
-		p, err := h.StartTCPProbe(ctx, target)
-		require.NoError(t, err)
-		_, err = p.ProbeSYNContext(ctx)
-		require.NoError(t, err)
-		_, err = p.ReceiveSYNACKContext(ctx)
-		p.Close()
+		probeCtx, probeCancel := context.WithTimeout(ctx, 5*time.Second)
+		_, err := h.ProbeSYN(probeCtx, target)
+		probeCancel()
 		require.NoError(t, err)
 	}
 	if closed := os.Getenv("NETSTACKVM_LIVE_CLOSED_TARGET"); closed != "" {
-		p, err := h.StartTCPProbe(ctx, closed)
-		require.NoError(t, err)
-		_, err = p.ProbeSYNContext(ctx)
-		require.NoError(t, err)
-		_, err = p.ReceiveSYNACKContext(ctx)
-		p.Close()
+		_, err := h.ProbeSYN(ctx, closed)
 		require.True(t, errors.Is(err, ErrProbeRefused) || errors.Is(err, ErrProbeNoResponse),
 			"a non-listening peer must never be reported open: %v", err)
 		t.Logf("non-listening peer result: %v", err)
 	}
-	require.NoError(t, h.Wait(ctx))
 	require.NoError(t, h.Close())
 	require.Equal(t, before, count(), "the capture transport completed remote TCP handshakes")
 	t.Logf("16 open probes and existing host connection passed without remote Accept")
@@ -720,4 +753,33 @@ func TestHalfOpenPCAPUnverifiedTransportRejected(t *testing.T) {
 	h, err := OpenHalfOpenSYN(ctx, HalfOpenSYNConfig{Iface: iface, SourceIP: net.ParseIP(source), AllowUnverifiedTransport: true})
 	require.NoError(t, err)
 	require.NoError(t, h.Close())
+}
+
+func TestHalfOpenSessionCloseCancelsSynchronousCall(t *testing.T) {
+	sent := make(chan struct{})
+	var once sync.Once
+	h := mockHalfOpen(t, func(_ *HalfOpenSYN, _ []byte) error {
+		once.Do(func() { close(sent) })
+		return nil
+	})
+	done := make(chan error, 1)
+	go func() {
+		_, err := h.ProbeSYN(context.Background(), "192.0.2.20:80", WithSYNRetry(SYNRetryPolicy{3, time.Second, time.Second, time.Second}))
+		done <- err
+	}()
+	select {
+	case <-sent:
+	case <-time.After(2 * time.Second):
+		t.Fatal("probe did not send")
+	}
+	require.NoError(t, h.Close())
+	select {
+	case err := <-done:
+		require.ErrorIs(t, err, context.Canceled)
+	case <-time.After(time.Second):
+		t.Fatal("session close did not interrupt synchronous call")
+	}
+	_, err := h.ProbeSYN(context.Background(), "192.0.2.20:80")
+	require.ErrorIs(t, err, errHalfOpenClosed)
+	require.Empty(t, h.slots)
 }
