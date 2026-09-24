@@ -1461,7 +1461,7 @@
       "roadmap_name": "STOMP",
       "display_filter": "data",
       "evidence_kind": "upstream-positive",
-      "notes": "nDPI classification regression; undecoded application payload in Wireshark defaults",
+      "notes": "nDPI classification evidence only: the STOMP 1.1 opening frame lacks the mandatory host header and a later command is lowercase. This capture is a negative fixture for strict STOMP wire admission, not a conformant session sample.",
       "source_sha256": "18c9a606bfd29c7759dea701ba960ea81e5d44acfea24e371349471f7a1b5c86"
     },
     {

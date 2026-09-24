@@ -2,8 +2,11 @@
 # IPFIXMessages accepts concatenated complete messages from ONE exporter/session.
 # Repeated IPFIX calls may share a caller-owned map[int]any via the
 # ipfixTemplates context; never share that map between transport sessions.
-# Template withdrawal/expiry and structured-list information elements are not
-# implemented. Unknown elements retain their explicit identifiers and bytes.
+# Template withdrawals require ipfixTransport="tcp" or "sctp" before they
+# mutate template state; UDP withdrawals are parsed but ignored per RFC 7011.
+# UDP template expiry is not implemented because the parser has no receive
+# clock or configured lifetime. Structured-list IEs remain opaque.
+# Unknown elements retain their explicit identifiers and bytes.
 endian: big
 Package:
   operator: |
@@ -32,6 +35,7 @@ IPFIXMessage:
     if length > 16 { this.ProcessSubNode("Sets") }
     if this.Length() != length { panic("ipfix: incomplete message") }
     # Only publish template changes after the whole message succeeds.
+    working = getCtx("ipfixWorkingTemplates")
     domains[domain] = working
   Header:
     Version: uint16
@@ -52,7 +56,8 @@ IPFIXSet:
     this.SetMaxLength(length)
     setCtx("ipfixSetID", id)
     if id == 2 || id == 3 {
-      minimum = id == 2 ? 4 : 6
+      # Options Template withdrawals contain only Template ID and Field Count.
+      minimum = 4
       for this.GetMaxLength()-this.Length() >= minimum { this.NewSubNode("Template").Process() }
     } else if id >= 256 {
       template = getCtx("ipfixWorkingTemplates")[id]
@@ -79,10 +84,44 @@ Template:
   operator: |
     id = this.ProcessSubNode("Template ID").Value
     count = this.ProcessSubNode("Field Count").Value
+    setID = getCtx("ipfixSetID")
+    if count == 0 {
+      if setID != 2 && setID != 3 { panic("ipfix: withdrawal outside a template set") }
+      if id < 256 && id != setID { panic("ipfix: reserved template withdrawal identifier") }
+      transport = getCtx("ipfixTransport")
+      if transport == "udp" {
+        this.AddInfo("Withdrawal Ignored", true)
+        return
+      }
+      if transport != "tcp" && transport != "sctp" {
+        panic("ipfix: template withdrawal requires ipfixTransport tcp or sctp")
+      }
+      working = getCtx("ipfixWorkingTemplates")
+      if id == setID {
+        remaining = map[int]any{}
+        for templateID, template = range working {
+          isOptions = template["scope"] > 0
+          keep = (setID == 2 && isOptions) || (setID == 3 && !isOptions)
+          if keep { remaining[templateID] = template }
+        }
+        setCtx("ipfixWorkingTemplates", remaining)
+      } else {
+        template = working[id]
+        if template != nil {
+          isOptions = template["scope"] > 0
+          if (setID == 3) != isOptions { panic("ipfix: withdrawal template kind mismatch") }
+          remaining = map[int]any{}
+          for templateID, value = range working { if templateID != id { remaining[templateID] = value } }
+          setCtx("ipfixWorkingTemplates", remaining)
+        }
+      }
+      this.AddInfo("Template Withdrawal", true)
+      this.AddInfo("Withdrawn Template ID", id)
+      return
+    }
     if id < 256 { panic("ipfix: reserved template identifier") }
-    if count == 0 { panic("ipfix: template withdrawal is not supported") }
     scope = 0
-    if getCtx("ipfixSetID") == 3 {
+    if setID == 3 {
       scope = this.ProcessSubNode("Scope Field Count").Value
       if scope == 0 || scope > count { panic("ipfix: invalid scope count") }
     }

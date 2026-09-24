@@ -40,6 +40,8 @@ func (f *binFlow) frameDirection(dir int, w []byte) (int, *binSpec, error) {
 			return f.frameRFB(dir, w)
 		case "diameter":
 			return f.frameDiameter(w)
+		case "openwire":
+			return f.frameOpenWire(w)
 		case "iec104":
 			return f.frameIEC104(w)
 		case "s7comm":
@@ -66,6 +68,8 @@ func (f *binFlow) frameDirection(dir int, w []byte) (int, *binSpec, error) {
 			if f.mqtt != nil {
 				return f.frameMQTT(w)
 			}
+		case "nats":
+			return f.frameNATS(w)
 		case "socks5":
 			return f.frameSOCKS5(dir, w)
 		case "finger", "whois", "gopher", "dict":
@@ -134,6 +138,8 @@ func (f *binFlow) frameDirection(dir int, w []byte) (int, *binSpec, error) {
 			return f.frameZooKeeper(w)
 		case "clickhouse":
 			return f.frameClickHouse(dir, w)
+		case "stomp":
+			return f.frameSTOMP(dir, w)
 		case "dnp3":
 			return f.frameDNP3(w)
 		case "c37118":
@@ -225,7 +231,7 @@ func (f *binFlow) frameDirection(dir int, w []byte) (int, *binSpec, error) {
 			// Reuse the parsed header so ordinary deferred HTTP does not need
 			// a second net/http parse or eager structured field decoding.
 			h.ipp = ippMedia(request.Header.Get("Content-Type"))
-			h.doh = dohPathEvidence(request.URL.RequestURI()) || dohMedia(request.Header.Get("Content-Type")) || dohMedia(request.Header.Get("Accept"))
+			h.doh = dohHTTP1RequestEvidence(request.Method, request.URL.RequestURI(), request.Header.Get("Content-Type"))
 			h.websocket = request.Method == "GET" && request.Header.Get("Sec-WebSocket-Version") == "13" && httpHeaderHasToken(request.Header, "Upgrade", "websocket") && httpHeaderHasToken(request.Header, "Connection", "upgrade")
 			if h.websocket {
 				h.wsKey = request.Header.Get("Sec-WebSocket-Key")

@@ -111,10 +111,39 @@ func protocolCorpusIPFIXMessage(domain uint32, id uint16, body []byte) []byte {
 	return data
 }
 
+func protocolCorpusIPFIXTemplate(domain uint32, setID, templateID, fieldCount, scopeCount, elementID, fieldLength uint16) []byte {
+	body := make([]byte, 4)
+	binary.BigEndian.PutUint16(body, templateID)
+	binary.BigEndian.PutUint16(body[2:], fieldCount)
+	if setID == 3 {
+		body = append(body[:4], 0, 0)
+		binary.BigEndian.PutUint16(body[4:], scopeCount)
+	}
+	fieldOffset := len(body)
+	body = append(body, 0, 0, 0, 0)
+	binary.BigEndian.PutUint16(body[fieldOffset:], elementID)
+	binary.BigEndian.PutUint16(body[fieldOffset+2:], fieldLength)
+	return protocolCorpusIPFIXMessage(domain, setID, body)
+}
+
+func protocolCorpusIPFIXWithdrawal(domain uint32, setID, templateID uint16) []byte {
+	body := make([]byte, 4)
+	binary.BigEndian.PutUint16(body, templateID)
+	return protocolCorpusIPFIXMessage(domain, setID, body)
+}
+
 func protocolCorpusIPFIXParseWithState(t *testing.T, data []byte, state map[int]any) (*base.Node, error) {
+	return protocolCorpusIPFIXParseWithTransport(t, data, state, "")
+}
+
+func protocolCorpusIPFIXParseWithTransport(t *testing.T, data []byte, state map[int]any, transport string) (*base.Node, error) {
 	t.Helper()
 	reader := newProtocolCorpusBoundedReader(data)
-	node, err := parser.ParseBinaryWithConfig(reader, "application-layer.ipfix", map[string]any{"ipfixTemplates": state}, "IPFIX")
+	ctx := map[string]any{"ipfixTemplates": state}
+	if transport != "" {
+		ctx["ipfixTransport"] = transport
+	}
+	node, err := parser.ParseBinaryWithConfig(reader, "application-layer.ipfix", ctx, "IPFIX")
 	if err == nil {
 		require.Zero(t, reader.Len())
 		covered, coverageErr := protocolCorpusTerminalCoverage(node, data)
@@ -158,6 +187,111 @@ func TestProtocolCorpusIPFIXSessionIsolationAndTransactionalTemplates(t *testing
 		}
 	}
 	require.Equal(t, original, state[0])
+}
+
+func TestProtocolCorpusIPFIXWithdrawalAndTransportRules(t *testing.T) {
+	// Withdrawal messages here are synthetic wire fixtures from RFC 7011 Section
+	// 8.1, not capture evidence. The independent Scapy capture used above is
+	// SHA-pinned as scapy-ipfix in the corpus manifest and sources file.
+	state := map[int]any{}
+	for _, template := range [][]byte{
+		protocolCorpusIPFIXTemplate(7, 2, 256, 1, 0, 8, 4),
+		protocolCorpusIPFIXTemplate(7, 2, 300, 1, 0, 12, 4),
+		protocolCorpusIPFIXTemplate(7, 3, 257, 1, 1, 149, 4),
+	} {
+		_, err := protocolCorpusIPFIXParseWithState(t, template, state)
+		require.NoError(t, err)
+	}
+
+	domain := state[7].(map[int]any)
+	require.Len(t, domain, 3)
+	original := map[int]any{}
+	for id, template := range domain {
+		original[id] = template
+	}
+
+	// A specific Template Withdrawal removes only that template on TCP.
+	_, err := protocolCorpusIPFIXParseWithTransport(t, protocolCorpusIPFIXWithdrawal(7, 2, 256), state, "tcp")
+	require.NoError(t, err)
+	domain = state[7].(map[int]any)
+	require.NotContains(t, domain, 256)
+	require.Contains(t, domain, 300)
+	require.Contains(t, domain, 257) // Options Templates share the OD namespace but not the withdrawal set.
+	_, err = protocolCorpusIPFIXParseWithState(t, protocolCorpusIPFIXMessage(7, 256, []byte{10, 0, 0, 1}), state)
+	require.ErrorContains(t, err, "missing template for data set")
+
+	// An all-templates withdrawal leaves Options Templates intact; an all-options
+	// withdrawal then removes those separately.
+	_, err = protocolCorpusIPFIXParseWithTransport(t, protocolCorpusIPFIXWithdrawal(7, 2, 2), state, "tcp")
+	require.NoError(t, err)
+	domain = state[7].(map[int]any)
+	require.Len(t, domain, 1)
+	require.Contains(t, domain, 257)
+	_, err = protocolCorpusIPFIXParseWithTransport(t, protocolCorpusIPFIXWithdrawal(7, 3, 3), state, "sctp")
+	require.NoError(t, err)
+	require.Empty(t, state[7].(map[int]any))
+
+	// UDP collectors ignore template withdrawals; unspecified transport is
+	// rejected so this parser cannot silently apply stream-only semantics.
+	state = map[int]any{7: original}
+	udpWithdrawal := protocolCorpusIPFIXWithdrawal(7, 2, 256)
+	_, err = protocolCorpusIPFIXParseWithTransport(t, udpWithdrawal, state, "udp")
+	require.NoError(t, err)
+	require.Equal(t, original, state[7])
+	_, err = protocolCorpusIPFIXParseWithState(t, protocolCorpusIPFIXMessage(7, 256, []byte{10, 0, 0, 1}), state)
+	require.NoError(t, err, "the UDP withdrawal must not remove the template")
+	_, err = protocolCorpusIPFIXParseWithState(t, udpWithdrawal, state)
+	require.ErrorContains(t, err, "requires ipfixTransport tcp or sctp")
+	require.Equal(t, original, state[7])
+
+	// A later invalid set aborts the whole message and preserves template state.
+	bad := bytes.Clone(udpWithdrawal)
+	bad = append(bad, 0, 4, 0, 4)
+	binary.BigEndian.PutUint16(bad[2:], uint16(len(bad)))
+	_, err = protocolCorpusIPFIXParseWithTransport(t, bad, state, "tcp")
+	require.ErrorContains(t, err, "reserved set identifier")
+	require.Equal(t, original, state[7])
+
+	// Every proper prefix of a withdrawal must fail without publishing changes.
+	for cut := 0; cut < len(udpWithdrawal); cut++ {
+		_, err := protocolCorpusIPFIXParseWithTransport(t, udpWithdrawal[:cut], state, "tcp")
+		require.Error(t, err, "truncated withdrawal accepted at %d", cut)
+	}
+	require.Equal(t, original, state[7])
+
+	// The wrong template set cannot withdraw an existing template of another kind.
+	wrongKind := protocolCorpusIPFIXWithdrawal(7, 2, 257)
+	_, err = protocolCorpusIPFIXParseWithTransport(t, wrongKind, state, "tcp")
+	require.ErrorContains(t, err, "withdrawal template kind mismatch")
+	require.Equal(t, original, state[7])
+}
+
+func TestProtocolCorpusIPFIXSameTemplateIDIsIsolatedByObservationDomain(t *testing.T) {
+	state := map[int]any{}
+	for _, template := range [][]byte{
+		protocolCorpusIPFIXTemplate(11, 2, 256, 1, 0, 8, 4),
+		protocolCorpusIPFIXTemplate(12, 2, 256, 1, 0, 12, 4),
+	} {
+		_, err := protocolCorpusIPFIXParseWithState(t, template, state)
+		require.NoError(t, err)
+	}
+
+	firstData := protocolCorpusIPFIXMessage(11, 256, []byte{10, 0, 0, 1})
+	first, err := protocolCorpusIPFIXParseWithState(t, firstData, state)
+	require.NoError(t, err)
+	firstField := protocolCorpusNodesNamed(first, "Field")
+	require.Len(t, firstField, 1)
+	require.EqualValues(t, 8, firstField[0].Cfg.GetItem("additionInfo").(map[string]any)["Information Element ID"])
+	protocolCorpusRequireValue(t, firstField[0], "Address", []byte{10, 0, 0, 1})
+
+	secondData := protocolCorpusIPFIXMessage(12, 256, []byte{203, 0, 113, 5})
+	second, err := protocolCorpusIPFIXParseWithState(t, secondData, state)
+	require.NoError(t, err)
+	secondField := protocolCorpusNodesNamed(second, "Field")
+	require.Len(t, secondField, 1)
+	require.EqualValues(t, 12, secondField[0].Cfg.GetItem("additionInfo").(map[string]any)["Information Element ID"])
+	protocolCorpusRequireValue(t, secondField[0], "Address", []byte{203, 0, 113, 5})
+	require.Len(t, state, 2)
 }
 
 func TestProtocolCorpusIPFIXEnterpriseVariableLengthAndScope(t *testing.T) {

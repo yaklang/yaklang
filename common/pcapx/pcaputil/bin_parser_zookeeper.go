@@ -52,6 +52,13 @@ func probeZooKeeper(w []byte, limit int) ProbeResult {
 		return ProbeResult{Verdict: ProbeReject}
 	}
 	total := bodyLen + 4
+	bodyPrefix := w[4:]
+	if len(bodyPrefix) > bodyLen {
+		bodyPrefix = bodyPrefix[:bodyLen]
+	}
+	if !zookeeperConnectRequestPrefixPossible(bodyPrefix, bodyLen) && !zookeeperConnectResponsePrefixPossible(bodyPrefix, bodyLen) {
+		return ProbeResult{Verdict: ProbeReject, Reason: "ZooKeeper Connect prefix contradicts both supported handshake layouts"}
+	}
 	if len(w) < total {
 		return probeNeed("zookeeper", "jute-connect-v0", len(w), total)
 	}
@@ -63,6 +70,71 @@ func probeZooKeeper(w []byte, limit int) ProbeResult {
 		return probeAccept("zookeeper", "jute-connect-v0/ConnectResponse", 98)
 	}
 	return ProbeResult{Verdict: ProbeReject, Reason: "not a supported ZooKeeper Connect handshake"}
+}
+
+// The Jute frame length is available before the Connect record is complete.
+// Use fields as they arrive to reject impossible prefixes early; otherwise an
+// unrelated length-prefixed stream can hold probe dispatch open until its
+// advertised frame is complete and hide a later Kafka/PostgreSQL signature.
+func zookeeperConnectRequestPrefixPossible(body []byte, bodyLen int) bool {
+	if bodyLen < 28 || bodyLen > zookeeperMaxConnectPassword+29 || !zeroInt32Prefix(body) {
+		return false
+	}
+	if len(body) >= 16 && !validZooKeeperSessionTimeout(binary.BigEndian.Uint32(body[12:16])) {
+		return false
+	}
+	if len(body) >= 24 && binary.BigEndian.Uint64(body[16:24]) != 0 {
+		return false
+	}
+	if len(body) >= 28 {
+		passwordLength := int(int32(binary.BigEndian.Uint32(body[24:28])))
+		if passwordLength < 0 || passwordLength > zookeeperMaxConnectPassword {
+			return false
+		}
+		base := 28 + passwordLength
+		if bodyLen != base && bodyLen != base+1 {
+			return false
+		}
+		if bodyLen == base+1 && len(body) > base && body[base] > 1 {
+			return false
+		}
+	}
+	return true
+}
+
+func zookeeperConnectResponsePrefixPossible(body []byte, bodyLen int) bool {
+	if bodyLen < 20 || bodyLen > zookeeperMaxConnectPassword+21 || !zeroInt32Prefix(body) {
+		return false
+	}
+	if len(body) >= 8 && !validZooKeeperSessionTimeout(binary.BigEndian.Uint32(body[4:8])) {
+		return false
+	}
+	if len(body) >= 16 && binary.BigEndian.Uint64(body[8:16]) == 0 {
+		return false
+	}
+	if len(body) >= 20 {
+		passwordLength := int(int32(binary.BigEndian.Uint32(body[16:20])))
+		if passwordLength < 0 || passwordLength > zookeeperMaxConnectPassword {
+			return false
+		}
+		base := 20 + passwordLength
+		if bodyLen != base && bodyLen != base+1 {
+			return false
+		}
+		if bodyLen == base+1 && len(body) > base && body[base] > 1 {
+			return false
+		}
+	}
+	return true
+}
+
+func zeroInt32Prefix(body []byte) bool {
+	for _, b := range body[:min(len(body), 4)] {
+		if b != 0 {
+			return false
+		}
+	}
+	return true
 }
 
 func parseZooKeeperConnectRequest(body []byte) (map[string]any, bool) {

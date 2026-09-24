@@ -1,6 +1,7 @@
 package pcaputil
 
 import (
+	"encoding/base64"
 	"fmt"
 	"testing"
 	"time"
@@ -31,6 +32,36 @@ func TestDoHHTTP1MixedPipeline(t *testing.T) {
 			})
 		}
 	}
+}
+
+func TestDoHAdmissionDoesNotClaimOrdinaryHTTPQueryText(t *testing.T) {
+	for _, target := range []string{
+		"/search?filter=dns=example.com",
+		"/search?dns=example.com",
+		"/guide/dns-query-reference",
+		"/dns-query",
+	} {
+		s, err := NewProtocolSession(DefaultParserBudget())
+		require.NoError(t, err)
+		wire := []byte("GET " + target + " HTTP/1.1\r\nHost: www.example.test\r\nAccept: application/dns-message\r\n\r\n")
+		r := s.Feed(0, time.Unix(1, 0), wire)
+		require.Nil(t, r.Err, "%v", r.Err)
+		require.Len(t, r.Events, 1)
+		require.Equal(t, "http", r.Events[0].Protocol, "target=%s", target)
+		require.Equal(t, "decoded", r.Events[0].Status, "target=%s: %s", target, r.Events[0].Error)
+		require.NotEqual(t, true, r.Events[0].Session["DoH"], "target=%s", target)
+	}
+}
+
+func TestDoHAdmissionAcceptsValidCustomURI(t *testing.T) {
+	s, err := NewProtocolSession(DefaultParserBudget())
+	require.NoError(t, err)
+	encoded := base64.RawURLEncoding.EncodeToString(dnsWire(dnsQuery(0x22, "example.com", 1)))
+	r := s.Feed(0, time.Unix(1, 0), []byte("GET /resolve?dns="+encoded+" HTTP/1.1\r\nHost: dns.example.test\r\n\r\n"))
+	require.Nil(t, r.Err, "%v", r.Err)
+	require.Len(t, r.Events, 1)
+	require.Equal(t, true, r.Events[0].Session["DoH"])
+	require.Equal(t, "example.com", r.Events[0].Session["QNAME"])
 }
 
 func BenchmarkHTTP1OrdinaryDeferred(b *testing.B) {

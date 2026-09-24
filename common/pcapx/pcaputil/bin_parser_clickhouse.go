@@ -210,8 +210,18 @@ func probeClickHouse(wire []byte, limit int) ProbeResult {
 	}
 	client, _, clientOK := parseClickHouseClientHello(wire)
 	if clientOK {
-		if client.consumed <= limit {
+		if client.consumed <= min(limit, clickHouseMaxHelloBytes) {
 			return probeAccept("clickhouse", "native-23.8-r54401/client-hello", 97)
+		}
+		return ProbeResult{Verdict: ProbeReject, Reason: "ClickHouse Hello exceeds probe limit"}
+	}
+	// Captures can begin midstream, after the client Hello has already passed.
+	// Recognize a server Hello from its full Native packet layout so direction
+	// can still be set correctly; a port number alone never selects this path.
+	server, _, serverOK := parseClickHouseServerHello(wire)
+	if serverOK {
+		if server.consumed <= min(limit, clickHouseMaxHelloBytes) {
+			return probeAccept("clickhouse", "native-23.8-r54401/server-hello", 97)
 		}
 		return ProbeResult{Verdict: ProbeReject, Reason: "ClickHouse Hello exceeds probe limit"}
 	}

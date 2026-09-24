@@ -1,12 +1,20 @@
 package pcaputil
 
 import (
+	"bytes"
 	"path/filepath"
+	"strings"
 	"testing"
 
+	"github.com/gopacket/gopacket/layers"
 	"github.com/stretchr/testify/require"
 )
 
+// These application messages are synthetic fixtures built from the packet
+// layouts in ClickHouse's official Native references:
+// https://github.com/ClickHouse/clickhouse-docs/blob/main/docs/native-protocol/client.md
+// https://github.com/ClickHouse/clickhouse-docs/blob/main/docs/native-protocol/server.md
+// The checked-in corrected pcap has separate provenance in winlab5013/corrected/README.md.
 func clickHouseTestVarUInt(value uint64) []byte {
 	var wire []byte
 	for value >= 0x80 {
@@ -89,6 +97,52 @@ func TestClickHouseProbeRequiresACompleteSupportedClientHello(t *testing.T) {
 	} {
 		require.NotEqual(t, "clickhouse", probeWire(wire, DefaultParserBudget().ProbeBytes).Protocol, name)
 	}
+}
+
+func TestClickHouseProbeAcceptsOnlyCompleteBoundedServerHello(t *testing.T) {
+	valid := clickHouseTestServerHello(23, 8, 54401)
+	p := probeClickHouse(valid, DefaultParserBudget().ProbeBytes)
+	require.Equal(t, ProbeAccept, p.Verdict)
+	require.Equal(t, "clickhouse", p.Protocol)
+	require.Equal(t, "native-23.8-r54401/server-hello", p.Version)
+
+	for n := 0; n < len(valid); n++ {
+		p := probeClickHouse(valid[:n], DefaultParserBudget().ProbeBytes)
+		require.NotEqual(t, ProbeAccept, p.Verdict, "accepted incomplete server Hello prefix length=%d", n)
+		require.NotEqual(t, "clickhouse", p.Protocol, "claimed incomplete server Hello prefix length=%d", n)
+	}
+
+	wrongRevision := clickHouseTestServerHello(23, 8, 54402)
+	wrongPacketType := append([]byte(nil), valid...)
+	wrongPacketType[0] = 1
+	wrongPatch := append([]byte(nil), valid...)
+	wrongPatch[len(wrongPatch)-1] = 2
+	emptyServerName := append([]byte(nil), valid...)
+	emptyServerName[1] = 0
+	for name, wire := range map[string][]byte{
+		"wrong revision":    wrongRevision,
+		"wrong packet type": wrongPacketType,
+		"wrong patch":       wrongPatch,
+		"empty server name": emptyServerName,
+	} {
+		require.NotEqual(t, ProbeAccept, probeClickHouse(wire, DefaultParserBudget().ProbeBytes).Verdict, name)
+		require.NotEqual(t, "clickhouse", probeWire(wire, DefaultParserBudget().ProbeBytes).Protocol, name)
+	}
+
+	// Even when the caller raises its general look-ahead budget, ClickHouse
+	// Hello recognition remains capped at the profile's 64-byte limit.
+	tooLong := clickHouseTestVarUInt(0)
+	tooLong = append(tooLong, clickHouseTestString(strings.Repeat("s", 48))...)
+	tooLong = append(tooLong, clickHouseTestVarUInt(23)...)
+	tooLong = append(tooLong, clickHouseTestVarUInt(8)...)
+	tooLong = append(tooLong, clickHouseTestVarUInt(54401)...)
+	tooLong = append(tooLong, clickHouseTestString(strings.Repeat("t", 24))...)
+	tooLong = append(tooLong, clickHouseTestString("lab")...)
+	tooLong = append(tooLong, clickHouseTestVarUInt(1)...)
+	_, _, serverOK := parseClickHouseServerHello(tooLong)
+	require.True(t, serverOK)
+	require.Greater(t, len(tooLong), clickHouseMaxHelloBytes)
+	require.NotEqual(t, ProbeAccept, probeClickHouse(tooLong, 256).Verdict)
 }
 
 func TestClickHouseNativeHelloPingAndPongWithCorrectServerType(t *testing.T) {
@@ -176,4 +230,54 @@ func TestWinlab5013CorrectedClickHouseCaptureDecodesNativeHelloPingPong(t *testi
 	require.Equal(t, "lab-clickhouse", events[2].Fields["Server Name"])
 	require.Equal(t, "UTC", events[2].Fields["Timezone"])
 	require.Equal(t, "matched", events[3].Fields["Request Association"])
+}
+
+func TestClickHouseNativeCaptureReassemblesOneByteSegments(t *testing.T) {
+	steps := []sessionStep{
+		{dir: 0, wire: clickHouseTestClientHello(23, 8, 54401)},
+		{dir: 1, wire: clickHouseTestServerHello(23, 8, 54401)},
+		{dir: 0, wire: clickHouseTestVarUInt(4)},
+		{dir: 1, wire: clickHouseTestVarUInt(4)},
+	}
+	raw := sessionTestPCAP(t, steps, layers.TCPPort(9000), 1, false, true)
+	var events []*ProtocolEvent
+	err := ReplayPcap(bytes.NewReader(raw),
+		WithTCPReassemblyWorkers(1),
+		WithOnProtocolMessage(func(event *ProtocolEvent) { events = append(events, event) }),
+	)
+	require.NoError(t, err)
+	require.Len(t, events, 4)
+	require.Equal(t, []string{"Hello", "Hello", "Ping", "Pong"}, []string{
+		events[0].Fields["Packet Name"].(string),
+		events[1].Fields["Packet Name"].(string),
+		events[2].Fields["Packet Name"].(string),
+		events[3].Fields["Packet Name"].(string),
+	})
+	for _, event := range events {
+		require.Equal(t, "clickhouse", event.Protocol)
+		require.Equal(t, "decoded", event.Status, "%s: %s", event.Status, event.Summary)
+	}
+	require.Equal(t, "client", events[0].Fields["Role"])
+	require.Equal(t, "server", events[1].Fields["Role"])
+	require.Equal(t, "matched", events[3].Fields["Request Association"])
+}
+
+func TestClickHouseNativeServerHelloCanStartMidstreamCapture(t *testing.T) {
+	// A midstream capture may begin with the response to an unseen client Hello.
+	// The synthetic pcap carries that complete server packet over single-byte TCP
+	// segments, exercising detection, direction selection, and reassembly.
+	steps := []sessionStep{{dir: 1, wire: clickHouseTestServerHello(23, 8, 54401)}}
+	raw := sessionTestPCAP(t, steps, layers.TCPPort(9000), 1, false, true)
+	var events []*ProtocolEvent
+	err := ReplayPcap(bytes.NewReader(raw),
+		WithTCPReassemblyWorkers(1),
+		WithOnProtocolMessage(func(event *ProtocolEvent) { events = append(events, event) }),
+	)
+	require.NoError(t, err)
+	require.Len(t, events, 1)
+	require.Equal(t, "clickhouse", events[0].Protocol)
+	require.Equal(t, "decoded", events[0].Status, "%s: %s", events[0].Status, events[0].Summary)
+	require.Equal(t, "Hello", events[0].Fields["Packet Name"])
+	require.Equal(t, "server", events[0].Fields["Role"])
+	require.Equal(t, uint64(54401), events[0].Fields["Revision"])
 }

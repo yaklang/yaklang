@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"strings"
 )
 
@@ -24,8 +25,45 @@ func dohMedia(v string) bool {
 }
 
 func dohPathEvidence(path string) bool {
-	p := strings.ToLower(path)
-	return strings.Contains(p, "dns-query") || strings.Contains(p, "dns=")
+	queryAt := strings.IndexByte(path, '?')
+	if queryAt < 0 {
+		return false
+	}
+	if !strings.Contains(path[queryAt+1:], "dns") {
+		return false
+	}
+	query, err := url.ParseQuery(path[queryAt+1:])
+	if err != nil {
+		return false
+	}
+	values, ok := query["dns"]
+	if !ok || len(values) != 1 {
+		return false
+	}
+	// The endpoint URI is configured out of band. A common /dns-query path
+	// gives enough context to report a malformed query; on an arbitrary HTTP
+	// path, require an actual DNS wire question to avoid claiming application
+	// parameters such as /search?dns=example.com.
+	if strings.HasSuffix(path[:queryAt], "/dns-query") {
+		return true
+	}
+	msg, err := base64.RawURLEncoding.DecodeString(values[0])
+	if err != nil || len(msg) < 12 || msg[2]&0x80 != 0 || binary.BigEndian.Uint16(msg[4:6]) == 0 {
+		return false
+	}
+	_, _, err = dnsQuestion(msg)
+	return err == nil
+}
+
+func dohHTTP1RequestEvidence(method, path, contentType string) bool {
+	switch method {
+	case http.MethodGet:
+		return dohPathEvidence(path)
+	case http.MethodPost:
+		return dohMedia(contentType)
+	default:
+		return false
+	}
 }
 
 func (f *binFlow) consumeDoHHTTP1(raw []byte) (map[string]any, error) {
@@ -43,7 +81,7 @@ func (f *binFlow) dohHTTP1Request(raw []byte) (map[string]any, error) {
 	defer req.Body.Close()
 	ctype := req.Header.Get("Content-Type")
 	path := req.URL.RequestURI()
-	if !dohPathEvidence(path) && !dohMedia(ctype) && !dohMedia(req.Header.Get("Accept")) {
+	if !dohHTTP1RequestEvidence(req.Method, path, ctype) {
 		return nil, nil
 	}
 	f.ensureDoH()
@@ -59,13 +97,9 @@ func (f *binFlow) dohHTTP1Request(raw []byte) (map[string]any, error) {
 	var msg []byte
 	switch req.Method {
 	case http.MethodGet:
-		q := req.URL.Query().Get("dns")
-		if q == "" {
-			return info, protocolError(ErrMalformedMessage, "DoH GET missing dns parameter")
-		}
-		msg, err = base64.RawURLEncoding.DecodeString(q)
+		msg, err = dohDecodeGET(path)
 		if err != nil {
-			return info, protocolError(ErrMalformedMessage, "DoH GET dns parameter is not base64url")
+			return info, err
 		}
 	case http.MethodPost:
 		if !dohMedia(ctype) {
@@ -147,13 +181,10 @@ func (f *binFlow) consumeDoHH2(dir int, e *ProtocolEvent, stream *binH2Stream) e
 			ctype = value
 		case ":method":
 			method = value
-		case "accept":
-			if dohMedia(value) {
-				stream.doh[dir] = true
-			}
 		}
 	}
-	if dohPathEvidence(path) || dohMedia(ctype) {
+	kind, _ := e.Session["Header Kind"].(string)
+	if kind == "request" && dohHTTP1RequestEvidence(method, path, ctype) || kind == "response" && dohMedia(ctype) {
 		stream.doh[dir] = true
 	}
 	if !stream.doh[0] && !stream.doh[1] && !stream.doh[dir] {
@@ -175,7 +206,6 @@ func (f *binFlow) consumeDoHH2(dir int, e *ProtocolEvent, stream *binH2Stream) e
 	if ctype != "" {
 		e.Session["Content Type"] = ctype
 	}
-	kind, _ := e.Session["Header Kind"].(string)
 	if kind == "request" && method == http.MethodGet {
 		msg, err := dohDecodeGET(path)
 		if err != nil {
@@ -241,24 +271,21 @@ func dohPseudo(headers []map[string]any, name string) (string, bool) {
 func dohDecodeGET(path string) ([]byte, error) {
 	i := strings.Index(path, "?")
 	if i < 0 {
-		if strings.Contains(strings.ToLower(path), "dns-query") {
-			return nil, protocolError(ErrMalformedMessage, "DoH GET missing dns parameter")
-		}
-		return nil, nil
+		return nil, protocolError(ErrMalformedMessage, "DoH GET missing dns parameter")
 	}
-	q := path[i+1:]
-	for _, part := range strings.Split(q, "&") {
-		k, v, ok := strings.Cut(part, "=")
-		if !ok || k != "dns" {
-			continue
-		}
-		msg, err := base64.RawURLEncoding.DecodeString(v)
-		if err != nil {
-			return nil, protocolError(ErrMalformedMessage, "DoH GET dns parameter is not base64url")
-		}
-		return msg, nil
+	query, err := url.ParseQuery(path[i+1:])
+	if err != nil {
+		return nil, protocolError(ErrMalformedMessage, "DoH GET query is malformed")
 	}
-	return nil, protocolError(ErrMalformedMessage, "DoH GET missing dns parameter")
+	values := query["dns"]
+	if len(values) != 1 || values[0] == "" {
+		return nil, protocolError(ErrMalformedMessage, "DoH GET requires exactly one dns parameter")
+	}
+	msg, err := base64.RawURLEncoding.DecodeString(values[0])
+	if err != nil {
+		return nil, protocolError(ErrMalformedMessage, "DoH GET dns parameter is not base64url")
+	}
+	return msg, nil
 }
 
 func (f *binFlow) ensureDoH() {

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"net"
+	"net/url"
 	"strconv"
 	"strings"
 	"time"
@@ -122,12 +123,34 @@ func sipRequestLine(line string) bool {
 	if !ok {
 		return false
 	}
-	uri := strings.ToLower(parts[1])
-	return strings.HasPrefix(uri, "sip:") || strings.HasPrefix(uri, "sips:") || uri == "*"
+	if parts[1] == "*" {
+		return parts[0] == "OPTIONS"
+	}
+	// RFC 3261 permits a general absolute URI (for example tel:), not only
+	// sip: and sips:. Require an absolute, nonempty URI so a relative HTTP
+	// target or malformed escape cannot gain SIP admission by its method.
+	for i := 0; i < len(parts[1]); i++ {
+		c := parts[1][i]
+		if c <= ' ' || c >= 0x7f || c == '<' || c == '>' || c == '"' || c == '\\' {
+			return false
+		}
+		if c == '%' {
+			if i+2 >= len(parts[1]) || !sipURIHex(parts[1][i+1]) || !sipURIHex(parts[1][i+2]) {
+				return false
+			}
+			i += 2
+		}
+	}
+	u, err := url.ParseRequestURI(parts[1])
+	return err == nil && u.IsAbs() && (u.Opaque != "" || u.Host != "" || u.Path != "")
+}
+
+func sipURIHex(c byte) bool {
+	return c >= '0' && c <= '9' || c >= 'a' && c <= 'f' || c >= 'A' && c <= 'F'
 }
 
 func sipResponseLine(line string) bool {
-	if !strings.HasPrefix(line, "SIP/2.0 ") || len(line) < 11 {
+	if !strings.HasPrefix(line, "SIP/2.0 ") || len(line) < 12 || line[11] != ' ' {
 		return false
 	}
 	code := line[8:11]

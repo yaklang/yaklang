@@ -22,8 +22,72 @@ func probeGOOSE(w []byte, limit int) ProbeResult {
 	if w[8] != 0x61 {
 		return ProbeResult{Verdict: ProbeReject}
 	}
-	_ = limit
+	outerLength, firstField, need, ok := gooseProbeBERLength(w, 9)
+	if !ok {
+		if need > 0 && need <= limit {
+			return probeNeed("goose", "iec61850", len(w), need)
+		}
+		return ProbeResult{Verdict: ProbeReject}
+	}
+	if firstField+outerLength != n || firstField >= n {
+		return ProbeResult{Verdict: ProbeReject}
+	}
+	if len(w) <= firstField {
+		if firstField+1 <= limit {
+			return probeNeed("goose", "iec61850", len(w), firstField+1)
+		}
+		return ProbeResult{Verdict: ProbeReject}
+	}
+	// The first field of the GOOSE PDU is its nonempty gocbRef (tag 0x80).
+	// A tag byte alone is too weak to admit unrelated binary traffic.
+	if w[firstField] != 0x80 {
+		return ProbeResult{Verdict: ProbeReject}
+	}
+	fieldLength, valueAt, need, ok := gooseProbeBERLength(w, firstField+1)
+	if !ok {
+		if need > 0 && need <= limit {
+			return probeNeed("goose", "iec61850", len(w), need)
+		}
+		return ProbeResult{Verdict: ProbeReject}
+	}
+	fieldEnd := valueAt + fieldLength
+	if fieldLength == 0 || fieldEnd > n || fieldEnd > limit {
+		return ProbeResult{Verdict: ProbeReject}
+	}
+	if len(w) < fieldEnd {
+		return probeNeed("goose", "iec61850", len(w), fieldEnd)
+	}
+	for _, c := range w[valueAt:fieldEnd] {
+		if c < 0x20 || c > 0x7e {
+			return ProbeResult{Verdict: ProbeReject}
+		}
+	}
 	return probeAccept("goose", "iec61850", 93)
+}
+
+// gooseProbeBERLength reads only a bounded BER length header. A full PDU is
+// often larger than ProbeBytes, so admission validates the envelope and its
+// first mandatory field without requiring the entire packet in the probe.
+func gooseProbeBERLength(w []byte, at int) (length, next, need int, ok bool) {
+	if at >= len(w) {
+		return 0, 0, at + 1, false
+	}
+	b := w[at]
+	at++
+	if b < 0x80 {
+		return int(b), at, 0, true
+	}
+	count := int(b & 0x7f)
+	if count == 0 || count > 2 {
+		return 0, 0, 0, false
+	}
+	if at+count > len(w) {
+		return 0, 0, at + count, false
+	}
+	for i := 0; i < count; i++ {
+		length = length<<8 | int(w[at+i])
+	}
+	return length, at + count, 0, true
 }
 
 func (f *binFlow) frameGOOSE(w []byte) (int, *binSpec, error) {

@@ -2,6 +2,7 @@ package pcaputil
 
 import (
 	"bytes"
+	"encoding/binary"
 	"errors"
 	"fmt"
 	"time"
@@ -173,6 +174,7 @@ func (s *captureSession) Probe(data []byte) ProbeResult {
 	if limit <= 0 {
 		limit = 64
 	}
+	input := data
 	if len(data) > limit {
 		data = data[:limit]
 	}
@@ -180,13 +182,25 @@ func (s *captureSession) Probe(data []byte) ProbeResult {
 	probe.protocol, probe.binding = "", nil
 	probe.detect(data)
 	if probe.protocol != "" {
+		if probe.protocol == "cassandra" && len(data) >= 9 {
+			total := 9 + int(binary.BigEndian.Uint32(data[5:9]))
+			if len(input) < total {
+				return ProbeResult{Verdict: ProbeNeedMore, Protocol: "cassandra", NeedBytes: total - len(input), Confidence: 40, Reason: "initial envelope body is incomplete"}
+			}
+		}
 		return probeAccept(probe.protocol, "", 90)
+	}
+	if result, _ := natsAdmission(data); result.Verdict != ProbeReject {
+		return result
 	}
 	if isHTTPStartLineCandidate(data) {
 		if bytes.Index(data, []byte("\r\n")) < 0 {
 			return ProbeResult{Verdict: ProbeNeedMore, NeedBytes: 1, Reason: "HTTP start line is incomplete"}
 		}
 		return ProbeResult{Verdict: ProbeReject, Reason: "invalid HTTP start line"}
+	}
+	if probe := probeOpenWire(input, s.f.a.budget.MaxFrameBytes); probe.Verdict != ProbeReject {
+		return probe
 	}
 	return probeWire(data, limit)
 }
@@ -265,7 +279,7 @@ func sessionErrorFromEvents(events []*ProtocolEvent) *ProtocolError {
 }
 
 func (f *binFlow) hasSession() bool {
-	return f.tls != nil || f.dnp3 != nil || f.c37118 != nil || f.goose != nil || f.syslog != nil || f.rfb != nil || f.diameter != nil || f.iec104 != nil || f.s7 != nil || f.opcua != nil || f.ipp != nil || f.rtsp != nil || f.stun != nil || f.h2 != nil || f.mysql != nil || f.pg != nil || f.ws != nil || f.ldap != nil || f.redis != nil || f.mqtt != nil || f.mongo != nil || f.kafka != nil || f.tds != nil || f.amqp != nil || f.smb2 != nil || f.dcerpc != nil || f.ssh != nil || f.nfs != nil || f.snmp != nil || f.rdp != nil || f.dot != nil || f.doh != nil || f.sip != nil || f.rtp != nil || f.quic != nil || f.smtp != nil || f.imap != nil || f.pop3 != nil || f.ftp != nil || f.tns != nil || f.socks5 != nil || f.scgi != nil || f.msgpackRPC != nil || f.textInternet != nil || f.radius != nil || f.dhcp != nil || f.ntp != nil || f.coap != nil || f.modbus != nil || f.enip != nil || f.stratum != nil || f.gearman != nil || f.beanstalk != nil || f.zookeeper != nil || f.clickhouse != nil
+	return f.tls != nil || f.dnp3 != nil || f.c37118 != nil || f.goose != nil || f.syslog != nil || f.rfb != nil || f.diameter != nil || f.iec104 != nil || f.s7 != nil || f.opcua != nil || f.ipp != nil || f.rtsp != nil || f.stun != nil || f.h2 != nil || f.mysql != nil || f.pg != nil || f.ws != nil || f.ldap != nil || f.redis != nil || f.mqtt != nil || f.nats != nil || f.mongo != nil || f.kafka != nil || f.tds != nil || f.amqp != nil || f.smb2 != nil || f.dcerpc != nil || f.ssh != nil || f.nfs != nil || f.snmp != nil || f.rdp != nil || f.dot != nil || f.doh != nil || f.sip != nil || f.rtp != nil || f.quic != nil || f.smtp != nil || f.imap != nil || f.pop3 != nil || f.ftp != nil || f.tns != nil || f.socks5 != nil || f.scgi != nil || f.msgpackRPC != nil || f.textInternet != nil || f.radius != nil || f.dhcp != nil || f.ntp != nil || f.coap != nil || f.modbus != nil || f.enip != nil || f.stratum != nil || f.gearman != nil || f.beanstalk != nil || f.zookeeper != nil || f.clickhouse != nil || f.stomp != nil
 }
 
 func (f *binFlow) mailLike() bool {
@@ -295,6 +309,9 @@ func probeWire(w []byte, limit int) ProbeResult {
 		return p
 	}
 	if p := probeClickHouse(w, limit); p.Verdict != ProbeReject {
+		return p
+	}
+	if p := probeSTOMP(w, limit); p.Verdict != ProbeReject {
 		return p
 	}
 	if p := probeSOCKS5(w, limit); p.Verdict != ProbeReject {

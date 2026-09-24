@@ -96,8 +96,11 @@ func TestZooKeeperProbeRequiresAValidConnectHandshake(t *testing.T) {
 	require.Equal(t, ProbeAccept, p.Verdict)
 	require.Equal(t, "zookeeper", p.Protocol)
 
-	for n := 0; n < len(connect); n++ {
-		require.NotEqual(t, ProbeAccept, s.Probe(connect[:n]).Verdict, "accepted incomplete connect prefix length=%d", n)
+	for n := 1; n < len(connect); n++ {
+		require.Equal(t, ProbeNeedMore, probeZooKeeper(connect[:n], 64).Verdict, "valid connect prefix contradicted at length=%d", n)
+	}
+	for n := 1; n < len(response); n++ {
+		require.Equal(t, ProbeNeedMore, probeZooKeeper(response[:n], 64).Verdict, "valid response prefix contradicted at length=%d", n)
 	}
 	for name, malformed := range map[string][]byte{
 		"nonzero protocol version": func() []byte {
@@ -144,6 +147,71 @@ func TestZooKeeperProbeRequiresAValidConnectHandshake(t *testing.T) {
 	}
 	gss := pgSessionUntyped(80877104, nil)
 	require.Equal(t, ProbeReject, probeZooKeeper(gss, len(gss)).Verdict, "PostgreSQL GSSENC request")
+}
+
+func TestZooKeeperProbeRejectsContradictedPartialHandshakeFields(t *testing.T) {
+	connect := zookeeperConnectProbeFixture([]byte("winlab-session!!"))
+	response := zookeeperConnectResponseProbeFixture([]byte("winlab-session!!"))
+	for name, candidate := range map[string]struct {
+		wire []byte
+		have int
+	}{
+		"client protocol version": {func() []byte { w := append([]byte(nil), connect...); w[7] = 1; return w }(), 8},
+		"client session timeout": {func() []byte {
+			w := append([]byte(nil), connect...)
+			w[16] = 0
+			w[17] = 0
+			w[18] = 0
+			w[19] = 0
+			return w
+		}(), 20},
+		"client reconnect id": {func() []byte { w := append([]byte(nil), connect...); w[27] = 1; return w }(), 28},
+		"client password length": {func() []byte {
+			w := append([]byte(nil), connect...)
+			binary.BigEndian.PutUint32(w[28:32], 15)
+			return w
+		}(), 32},
+		"server protocol version": {func() []byte { w := append([]byte(nil), response...); w[7] = 1; return w }(), 8},
+		"server session timeout": {func() []byte {
+			w := append([]byte(nil), response...)
+			w[8] = 0
+			w[9] = 0
+			w[10] = 0
+			w[11] = 0
+			return w
+		}(), 28},
+		"server session id": {func() []byte { w := append([]byte(nil), response...); clear(w[12:20]); return w }(), 20},
+		"server password length": {func() []byte {
+			w := append([]byte(nil), response...)
+			binary.BigEndian.PutUint32(w[20:24], 15)
+			return w
+		}(), 28},
+	} {
+		require.Equal(t, ProbeReject, probeZooKeeper(candidate.wire[:candidate.have], 64).Verdict, name)
+	}
+}
+
+func TestZooKeeperProbeRejectsHTTPKafkaAndPostgresNearMisses(t *testing.T) {
+	s, err := NewProtocolSession(DefaultParserBudget())
+	require.NoError(t, err)
+	http := []byte("GET /health HTTP/1.1\r\nHost: example.invalid\r\n\r\n")
+	cases := map[string]struct {
+		wire     []byte
+		protocol string
+	}{
+		"HTTP start line":                        {http, "http"},
+		"Kafka API request":                      {kafkaRequest(18, 0, 1, "", nil), "kafka"},
+		"Kafka Produce with Connect-like prefix": {kafkaProduceV0SimilarPrefixFixture(), "kafka"},
+		"PostgreSQL Startup":                     {pgSessionUntyped(196608, []byte("user\x00test\x00\x00")), "postgresql"},
+		"PostgreSQL SSL request":                 {pgSessionUntyped(80877103, nil), "postgresql"},
+		"PostgreSQL Cancel request":              {pgSessionUntyped(80877102, make([]byte, 8)), "postgresql"},
+	}
+	for name, candidate := range cases {
+		require.Equal(t, ProbeReject, probeZooKeeper(candidate.wire, 64).Verdict, name)
+		p := s.Probe(candidate.wire)
+		require.Equal(t, ProbeAccept, p.Verdict, name)
+		require.Equal(t, candidate.protocol, p.Protocol, name)
+	}
 }
 
 func TestZooKeeperSupportedSessionFieldsAndFragmentation(t *testing.T) {

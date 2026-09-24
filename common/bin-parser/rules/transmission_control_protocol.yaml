@@ -41,7 +41,45 @@ Package:
                 // signature. Permissive text/binary decoders need port or
                 // caller context before they can claim an identification.
                 typeNameList = ["TLS", "HTTP", "SSH"]
-                if src == 22 || dst == 22 {
+                // Recognize strict UACP control signatures on custom ports too.
+                // Port 4840 adds role/direction evidence, but never identifies a
+                // protocol by itself. The full candidate parser validates the
+                // body after this bounded header probe.
+                prefix,probe = this.TryProcessByType("OPCUAHeaderProbe")
+                opcuaCandidate = false
+                if probe.OK {
+                  header = prefix.Child("OPCUA Header").Value
+                  messageType = header & 16777215
+                  chunkType = (header >> 24) & 255
+                  messageSize = header >> 32
+                  minimumSize = 0
+                  directionOK = true
+                  if messageType == 0x4c4548 { // HEL
+                    minimumSize = 32
+                    if src == 4840 || dst == 4840 { directionOK = dst == 4840 && src != 4840 }
+                  } else if messageType == 0x4b4341 { // ACK
+                    minimumSize = 28
+                    if src == 4840 || dst == 4840 { directionOK = src == 4840 && dst != 4840 }
+                  } else if messageType == 0x525245 { // ERR
+                    minimumSize = 16
+                    if src == 4840 || dst == 4840 { directionOK = src == 4840 && dst != 4840 }
+                  } else if messageType == 0x454852 { // RHE
+                    minimumSize = 16
+                    if src == 4840 || dst == 4840 { directionOK = src == 4840 && dst != 4840 }
+                  } else if messageType == 0x4e504f { // OPN
+                    minimumSize = 33
+                    directionOK = src != dst
+                  }
+                  opcuaCandidate = chunkType == 0x46 && minimumSize != 0 && messageSize >= minimumSize && messageSize <= maximum && messageSize <= 16777216 && directionOK
+                }
+                err = probe.Recovery()
+                if err != nil { panic(err) }
+                if opcuaCandidate {
+                  typeNameList = ["OPCUATCPMessage"]
+                } else if src == 4840 || dst == 4840 {
+                  // Do not fall back to a looser decoder on the standard port.
+                  typeNameList = []string{}
+                } else if src == 22 || dst == 22 {
                   typeNameList = ["SSHPacket", "SSH"]
                 } else if src == 21 || dst == 21 {
                   typeNameList = ["FTP", "FTPCommand"]
@@ -253,6 +291,8 @@ XMPP: "import:application-layer/xmpp.yaml;node:XMPP"
 XMPPTLSRecordHeader: uint64,40bit
 EDonkey: "import:application-layer/edonkey.yaml;node:EDonkey"
 EDonkeyProtocolPrefix: uint8
+OPCUATCPMessage: "import:application-layer/extended_protocols.yaml;node:OPCUATCPMessage"
+OPCUAHeaderProbe: "import:application-layer/extended_protocols.yaml;node:OPCUAHeaderProbe"
 Option:
     operator: |
         this.ProcessSubNode("Kind")

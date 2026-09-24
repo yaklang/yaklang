@@ -16,6 +16,8 @@ var builtinBinSpecs = [][2]string{
 	{"session_envelopes", "UATCP"},
 	{"session_envelopes", "RFB"},
 	{"application-layer.extended_protocols", "Diameter"},
+	{"application-layer.extended_protocols", "ActiveMQOpenWire"},
+	{"application-layer.extended_protocols", "ActiveMQOpenWireOpaque"},
 	{"application-layer.extended_protocols", "IEC104"},
 	{"rtsp_session", "RTSP"},
 	{"rtsp_session", "Interleaved"},
@@ -104,6 +106,9 @@ var builtinBinSpecs = [][2]string{
 	{"application-layer.kerberos_fields", "KerberosTCPFields"},
 	{"application-layer.kerberos_fields", "KerberosMessageFields"},
 	{"application-layer.dns", "DNS"},
+	{"application-layer.nats", "NATS"},
+	{"application-layer.nats", "NATSControlLine"},
+	{"application-layer.nats", "NATSPayloadFrame"},
 	{"application-layer.tls", ""},
 	{"application-layer.smtp", "SMTPCommand"},
 	{"application-layer.smtp_reply", "SMTPReply"},
@@ -142,6 +147,56 @@ func (f *binFlow) spec(family, entry string) *binSpec {
 	return f.a.specs["application-layer."+family+"/"+entry]
 }
 func (f *binFlow) port(port uint16) bool { return f.ports[0] == port || f.ports[1] == port }
+
+func cassandraInitialExchangeHeader(w []byte, maxFrameBytes int) bool {
+	if len(w) < 9 || maxFrameBytes < 9 || binary.BigEndian.Uint16(w[2:4])&0x8000 != 0 {
+		return false
+	}
+	version, response, opcode := w[0]&0x7f, w[0]&0x80 != 0, w[4]
+	if version != 4 && version != 5 {
+		return false
+	}
+	bodyLength := uint64(binary.BigEndian.Uint32(w[5:9]))
+	if bodyLength > 1<<31-1 || bodyLength+9 > uint64(maxFrameBytes) {
+		return false
+	}
+	// v5 ignores the legacy compression bit. In v4, STARTUP itself cannot be
+	// compressed; other compressed candidates remain context-only because this
+	// profile does not decode compression.
+	if version == 4 && w[1]&1 != 0 {
+		if !response && opcode == 1 || bodyLength == 0 {
+			return false
+		}
+		if response {
+			return opcode == 0 || opcode == 2 || opcode == 3 || opcode == 6
+		}
+		return opcode == 5
+	}
+	if response {
+		// ERROR, READY, AUTHENTICATE, and SUPPORTED are the only server
+		// messages in the native-protocol initial exchange.
+		switch opcode {
+		case 0:
+			return bodyLength >= 6
+		case 2:
+			return bodyLength == 0
+		case 3, 6:
+			return bodyLength >= 2
+		default:
+			return false
+		}
+	}
+	// Only OPTIONS may precede STARTUP; all other requests need a negotiated
+	// connection context and must not be used as a first-message signature.
+	switch opcode {
+	case 1:
+		return bodyLength >= 2
+	case 5:
+		return bodyLength == 0
+	default:
+		return false
+	}
+}
 
 // Detection runs only on the bounded initial prefix. Ports narrow candidates;
 // they never choose a negotiated version, phase, or native decoder by themselves.
@@ -189,10 +244,11 @@ func (f *binFlow) detect(w []byte) {
 		f.protocol = "memcached"
 		return
 	}
-	// The v5 handshake shares the v4 header. Recognize its protocol even
-	// though frame() has no v5 profile, so it remains context-required
-	// instead of falling through to the much weaker RTP version-bit probe.
-	if f.port(9042) && len(w) >= 9 && (w[0] == 4 || w[0] == 0x84 || w[0] == 5 || w[0] == 0x85) && w[1]&1 == 0 && (w[4] == 1 || w[4] == 5 || w[4] == 6) {
+	// Recognize only the pre-READY native-protocol exchange on Cassandra's
+	// default port. This includes the v5 envelope format used for OPTIONS,
+	// STARTUP, and their unframed responses, but does not claim later v5
+	// framing or arbitrary CQL opcodes.
+	if f.port(9042) && cassandraInitialExchangeHeader(w, f.a.budget.MaxFrameBytes) {
 		f.protocol = "cassandra"
 		return
 	}

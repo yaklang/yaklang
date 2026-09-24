@@ -32,6 +32,7 @@ func TestOperatorPlanInventory(t *testing.T) {
 		}
 		if strings.HasPrefix(source, "payloadStart = getCurrentPosition()") && strings.Contains(source, "typeNameList") {
 			require.NotNil(t, plan, "transport dispatch must compile: %s", source[:200])
+			require.Equal(t, "port-dispatch", plan.kind, "transport dispatch must retain its native plan: %s", source[:200])
 		}
 	}
 	t.Logf("unique embedded operators: %d; declarative plans: %v", len(sources), counts)
