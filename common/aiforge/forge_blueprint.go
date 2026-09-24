@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
+	"github.com/yaklang/yaklang/common/ai/aispec"
 
 	"github.com/yaklang/yaklang/common/ai/aid"
 
@@ -409,7 +410,9 @@ type PluginParamSelectData struct {
 func generateForgeResult(cod *aid.Coordinator, prompt string) (string, error) {
 	config := cod.Config
 	return retryEmptyForgeResult(prompt, func(requestPrompt string) (string, error) {
-		rsp, err := config.CallAI(aicommon.NewAIRequest(requestPrompt, aicommon.WithAIRequest_CallerLabel("forge-blueprint")))
+		rsp, err := config.CallAI(aicommon.NewAIRequest(requestPrompt,
+			aicommon.WithAIRequest_CallerLabel("forge-blueprint"),
+			aicommon.WithAIRequest_ExtraSpecOpts(aispec.WithMaxTokens(4096))))
 		if err != nil {
 			return "", utils.Errorf("render result failed: %v", err)
 		}
