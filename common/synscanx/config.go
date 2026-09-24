@@ -305,9 +305,12 @@ func WithConcurrent(count int) SynxConfigOption {
 		if count <= 0 {
 			count = 1000
 		}
+		// Outstanding ProbeSYN calls. The same value is the session admission
+		// limit; the delay below is the sustained SYN rate passed to netstackvm.
+		config.tcpProbeConcurrency = count
 		config.rateLimitDelayMs = float64(time.Second) / float64(count) / float64(time.Millisecond)
 		// count/10 is 0 for concurrent(1)..concurrent(9). A zero burst limiter
-		// rejects every packet, so a small concurrency silently scans nothing.
+		// rejects every UDP packet, so a small concurrency silently scans nothing.
 		gap := count / 10
 		if gap < 1 {
 			gap = 1
@@ -477,8 +480,9 @@ func WithTCPProbeTimeout(timeout time.Duration) SynxConfigOption {
 	return func(config *SynxConfig) { config.tcpProbeTimeout = timeout }
 }
 
-// WithTCPProbeConcurrency sets the upper-level TCP worker count. Non-positive
-// values use the default of 256. netstackvm's admission and rate limits still apply.
+// WithTCPProbeConcurrency sets how many TCP probes may be in flight. The
+// session admission limit and the worker count both use this value.
+// Non-positive values keep the default of 256. Yak's synscan.concurrent sets it too.
 func WithTCPProbeConcurrency(concurrency int) SynxConfigOption {
 	return func(config *SynxConfig) { config.tcpProbeConcurrency = concurrency }
 }

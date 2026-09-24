@@ -273,7 +273,19 @@ func (s *Scannerx) SubmitTarget(targets, ports string) (<-chan *SynxTarget, erro
 			host := hp.Host
 			port := hp.Port
 
-			if !s.rateLimit() {
+			proto, p := utils.ParsePortToProtoPort(port)
+			target := &SynxTarget{
+				Host: host,
+				Port: p,
+				Mode: TCP, // 默认 TCP
+			}
+			if proto == "udp" {
+				target.Mode = UDP
+			}
+			// TCP pace and admission live in the half-open session, including
+			// retransmissions. The legacy limiter would also delay target
+			// submission and under-count those SYNs. UDP still uses it.
+			if target.Mode != TCP && !s.rateLimit() {
 				return
 			}
 			if s.config.maxOpenPorts > 0 {
@@ -284,15 +296,6 @@ func (s *Scannerx) SubmitTarget(targets, ports string) (<-chan *SynxTarget, erro
 			}
 
 			s.callOnSubmitTask(host, port)
-			proto, p := utils.ParsePortToProtoPort(port)
-			target := &SynxTarget{
-				Host: host,
-				Port: p,
-				Mode: TCP, // 默认 TCP
-			}
-			if proto == "udp" {
-				target.Mode = UDP
-			}
 
 			select {
 			case <-s.ctx.Done():
@@ -343,16 +346,6 @@ func (s *Scannerx) SubmitTargetFromPing(res chan string, ports string) <-chan *S
 					s.arp(host)
 				}
 				for _, port := range nonExcludedPorts {
-					if !s.rateLimit() {
-						return
-					}
-					if s.config.maxOpenPorts > 0 {
-						v, ok := s.ipOpenPortMap.Load(host)
-						if ok && toUint16(v) >= s.config.maxOpenPorts {
-							break
-						}
-					}
-					s.callOnSubmitTask(host, port)
 					proto, p := utils.ParsePortToProtoPort(port)
 					target := &SynxTarget{
 						Host: host,
@@ -362,6 +355,16 @@ func (s *Scannerx) SubmitTargetFromPing(res chan string, ports string) <-chan *S
 					if proto == "udp" {
 						target.Mode = UDP
 					}
+					if target.Mode != TCP && !s.rateLimit() {
+						return
+					}
+					if s.config.maxOpenPorts > 0 {
+						v, ok := s.ipOpenPortMap.Load(host)
+						if ok && toUint16(v) >= s.config.maxOpenPorts {
+							break
+						}
+					}
+					s.callOnSubmitTask(host, port)
 					select {
 					case <-s.ctx.Done():
 						log.Infof("SubmitTargetFromPing canceled")
@@ -535,17 +538,14 @@ func (s *Scannerx) Scan(targetCh <-chan *SynxTarget) (chan *synscan.SynScanResul
 }
 
 func (s *Scannerx) sendPacket(targetCh <-chan *SynxTarget) {
-	// Fixed upper-level workers bound both goroutines and active probes. Each
-	// worker uses the synchronous stepped API with a fresh per-target context.
+	// Worker count matches the session admission limit. Each worker blocks in
+	// ProbeSYN until that target is finished, so outstanding probes stay bounded.
+	_, inFlight := synPacketRate(s.config)
 	var tcpTargets chan *SynxTarget
 	var workers sync.WaitGroup
 	if s.halfOpen != nil {
-		concurrency := defaultTCPProbeConcurrency
-		if s.config != nil && s.config.tcpProbeConcurrency > 0 {
-			concurrency = s.config.tcpProbeConcurrency
-		}
 		tcpTargets = make(chan *SynxTarget)
-		for i := 0; i < concurrency; i++ {
+		for i := 0; i < inFlight; i++ {
 			workers.Add(1)
 			go func() { defer workers.Done(); s.runTCPProbes(tcpTargets) }()
 		}
@@ -561,10 +561,17 @@ func (s *Scannerx) sendPacket(targetCh <-chan *SynxTarget) {
 			if !ok {
 				return
 			}
+			if target == nil {
+				continue
+			}
 			host := target.Host
 			port := target.Port
 			proto := target.Mode
-			if proto == TCP && s.halfOpen != nil {
+			if proto == TCP {
+				if tcpTargets == nil {
+					log.Debugf("synscanx: skip TCP %s:%d, half-open session is not open", host, port)
+					continue
+				}
 				select {
 				case <-s.ctx.Done():
 					return
@@ -580,11 +587,6 @@ func (s *Scannerx) sendPacket(targetCh <-chan *SynxTarget) {
 			if !s.enqueuePacket(host, packet) {
 				return
 			}
-			//err = s.Handle.WritePacketData(packet)
-			//if err != nil {
-			//	log.Errorf("write to device syn failed: %v[%s:%d]", s.handleError(err), host, port)
-			//	continue
-			//}
 		}
 	}
 }
