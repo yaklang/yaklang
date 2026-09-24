@@ -131,7 +131,10 @@ func (b *FunctionBuilder) readMemberCallValueExWithVisited(object, key Value, wa
 			return b.getFieldValue(objectt, key, wantFunction)
 		}
 		if len(edgeValues) == 1 {
-			return edgeValues[0]
+			// A single resolved edge value would drop the phi's own dataflow
+			// sources; defer to the pre-existing field lookup so topdef
+			// analysis keeps walking the object edges.
+			return b.getFieldValue(objectt, key, wantFunction)
 		}
 		return b.EmitPhi(res.name, edgeValues)
 	}

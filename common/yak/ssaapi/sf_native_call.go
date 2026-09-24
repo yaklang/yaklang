@@ -767,7 +767,7 @@ func init() {
 						return
 					}
 					// GetCallArgs() 返回 Values，需要转换为 sfvm.ValueOperator
-					vals = append(vals, ValuesToSFValueList(call.GetCallArgs()))
+					vals = append(vals, ToSFVMValues(call.GetCallArgs())...)
 				})
 
 				if v.IsPhi() || v.IsSideEffect() {

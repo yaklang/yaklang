@@ -1,17 +1,26 @@
 package java2ssa
 
 import (
-	"context"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/utils/memedit"
 	"github.com/yaklang/yaklang/common/yak/ssa"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 )
+
+func newJavaUnitTestProgram(t *testing.T, name string) *ssa.Program {
+	t.Helper()
+	cfg, err := ssaconfig.New(ssaconfig.ModeSSACompile, ssaconfig.WithSetProgramName(name))
+	require.NoError(t, err)
+	prog := ssa.NewProgram(cfg, ssa.ProgramCacheMemory, ssa.Application, nil, "", 0)
+	require.NotNil(t, prog)
+	return prog
+}
 
 func TestResolveJavaMethodOverloadByType(t *testing.T) {
 	y := newJavaBuilderForUnitTest()
-	prog := ssa.NewProgram(context.Background(), "java-overload-test", ssa.ProgramCacheMemory, ssa.Application, nil, "", 0)
+	prog := newJavaUnitTestProgram(t, "java-overload-test")
 	class := ssa.NewBlueprint("Demo")
 
 	intMethod := prog.NewFunction("pick_int")
@@ -24,7 +33,7 @@ func TestResolveJavaMethodOverloadByType(t *testing.T) {
 		{key: "string", typ: ssa.CreateStringType()},
 	}, false)
 
-	fb := newJavaFunctionBuilderForUnitTest()
+	fb := newJavaFunctionBuilderForUnitTest(t)
 	argInt := fb.EmitConstInst(1)
 	argString := fb.EmitConstInst("a")
 	require.Equal(t, ssa.NumberTypeKind, argInt.GetType().GetTypeKind())
@@ -42,7 +51,7 @@ func TestResolveJavaMethodOverloadByType(t *testing.T) {
 
 func TestResolveJavaConstructorOverloadByType(t *testing.T) {
 	y := newJavaBuilderForUnitTest()
-	prog := ssa.NewProgram(context.Background(), "java-ctor-test", ssa.ProgramCacheMemory, ssa.Application, nil, "", 0)
+	prog := newJavaUnitTestProgram(t, "java-ctor-test")
 	class := ssa.NewBlueprint("DemoCtor")
 
 	intCtor := prog.NewFunction("ctor_int")
@@ -55,7 +64,7 @@ func TestResolveJavaConstructorOverloadByType(t *testing.T) {
 		{key: "string", typ: ssa.CreateStringType()},
 	}, false)
 
-	fb := newJavaFunctionBuilderForUnitTest()
+	fb := newJavaFunctionBuilderForUnitTest(t)
 	argInt := fb.EmitConstInst(2)
 	argString := fb.EmitConstInst("x")
 	require.Equal(t, ssa.NumberTypeKind, argInt.GetType().GetTypeKind())
@@ -91,7 +100,7 @@ func TestJavaStableCallableNameDeterministic(t *testing.T) {
 
 func TestResolveJavaMethodOverloadPreferFixedOverVariadic(t *testing.T) {
 	y := newJavaBuilderForUnitTest()
-	prog := ssa.NewProgram(context.Background(), "java-overload-variadic-test", ssa.ProgramCacheMemory, ssa.Application, nil, "", 0)
+	prog := newJavaUnitTestProgram(t, "java-overload-variadic-test")
 	class := ssa.NewBlueprint("DemoVariadic")
 
 	fixed := prog.NewFunction("pick_fixed")
@@ -104,7 +113,7 @@ func TestResolveJavaMethodOverloadPreferFixedOverVariadic(t *testing.T) {
 		{key: "number", typ: ssa.CreateNumberType()},
 	}, true)
 
-	fb := newJavaFunctionBuilderForUnitTest()
+	fb := newJavaFunctionBuilderForUnitTest(t)
 	arg := fb.EmitConstInst(7)
 
 	require.Equal(t, fixed, y.resolveJavaMethodOverload(class, "pick", []ssa.Value{arg}))
@@ -112,7 +121,7 @@ func TestResolveJavaMethodOverloadPreferFixedOverVariadic(t *testing.T) {
 
 func TestResolveJavaMethodOverloadFromParentBlueprint(t *testing.T) {
 	y := newJavaBuilderForUnitTest()
-	prog := ssa.NewProgram(context.Background(), "java-overload-parent-test", ssa.ProgramCacheMemory, ssa.Application, nil, "", 0)
+	prog := newJavaUnitTestProgram(t, "java-overload-parent-test")
 	parent := ssa.NewBlueprint("Parent")
 	child := ssa.NewBlueprint("Child")
 	child.AddParentBlueprint(parent)
@@ -126,7 +135,7 @@ func TestResolveJavaMethodOverloadFromParentBlueprint(t *testing.T) {
 		{key: "number", typ: ssa.CreateNumberType()},
 	}, false)
 
-	fb := newJavaFunctionBuilderForUnitTest()
+	fb := newJavaFunctionBuilderForUnitTest(t)
 	argInt := fb.EmitConstInst(1)
 	argString := fb.EmitConstInst("x")
 
@@ -136,7 +145,7 @@ func TestResolveJavaMethodOverloadFromParentBlueprint(t *testing.T) {
 
 func TestResolveJavaMethodOverloadTieBreakByDeclarationOrder(t *testing.T) {
 	y := newJavaBuilderForUnitTest()
-	prog := ssa.NewProgram(context.Background(), "java-overload-order-test", ssa.ProgramCacheMemory, ssa.Application, nil, "", 0)
+	prog := newJavaUnitTestProgram(t, "java-overload-order-test")
 	class := ssa.NewBlueprint("DemoOrder")
 
 	first := prog.NewFunction("pick_first")
@@ -149,7 +158,7 @@ func TestResolveJavaMethodOverloadTieBreakByDeclarationOrder(t *testing.T) {
 		{key: "number", typ: ssa.CreateNumberType()},
 	}, false)
 
-	fb := newJavaFunctionBuilderForUnitTest()
+	fb := newJavaFunctionBuilderForUnitTest(t)
 	arg := fb.EmitConstInst(3)
 	require.Equal(t, first, y.resolveJavaMethodOverload(class, "pick", []ssa.Value{arg}))
 }
@@ -162,8 +171,8 @@ func newJavaBuilderForUnitTest() *singleFileBuilder {
 	}
 }
 
-func newJavaFunctionBuilderForUnitTest() *ssa.FunctionBuilder {
-	prog := ssa.NewProgram(context.Background(), "java-arg-builder-test", ssa.ProgramCacheMemory, ssa.Application, nil, "", 0)
+func newJavaFunctionBuilderForUnitTest(t *testing.T) *ssa.FunctionBuilder {
+	prog := newJavaUnitTestProgram(t, "java-arg-builder-test")
 	editor := memedit.NewMemEditorWithFileUrl("class A {}", "/tmp/Test.java")
 	prog.PushEditor(editor)
 	builder := prog.GetAndCreateFunctionBuilder("", string(ssa.MainFunctionName))
