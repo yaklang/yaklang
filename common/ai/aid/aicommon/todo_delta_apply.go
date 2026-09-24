@@ -43,6 +43,12 @@ func ApplyTodoDeltaAndEmit(cfg AICallerConfigIf, emitter *Emitter, task AIStatef
 	if FormatVerificationTodoApplyErrors(results) == "" && !delta.HasChanges() {
 		return results
 	}
+	if FormatVerificationTodoApplyErrors(results) == "" {
+		if c := ConfigFromAICaller(cfg); c != nil {
+			c.RecordSessionSnapshotTodo(task, scope)
+			c.NotifySessionSnapshotEmit()
+		}
+	}
 	appliedOps := []TodoOperation{}
 	var appliedDelta *TodoDelta
 	if FormatVerificationTodoApplyErrors(results) == "" {

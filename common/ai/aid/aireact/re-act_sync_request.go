@@ -441,19 +441,23 @@ func (r *ReAct) HandleSyncTypeTaskSnapshotEvent(event *ypb.AIInputEvent) error {
 	if event == nil {
 		return errors.New("task snapshot sync event is nil")
 	}
+	emitError := func(err error) error {
+		_, emitErr := r.EmitSyncEventError(aicommon.SessionTaskSnapshotNodeID, err, event.SyncID)
+		return emitErr
+	}
 	var params struct {
 		TaskID string `json:"task_id"`
 	}
 	if err := json.Unmarshal([]byte(event.SyncJsonInput), &params); err != nil {
-		return fmt.Errorf("parse task snapshot sync input: %w", err)
+		return emitError(fmt.Errorf("parse task snapshot sync input: %w", err))
 	}
 	params.TaskID = strings.TrimSpace(params.TaskID)
 	if params.TaskID == "" {
-		return errors.New("task_id is required")
+		return emitError(errors.New("task_id is required"))
 	}
 	snapshot := r.config.GetSessionTaskSnapshot(params.TaskID)
 	if snapshot == nil {
-		return fmt.Errorf("task snapshot %q not found", params.TaskID)
+		return emitError(fmt.Errorf("task snapshot %q not found", params.TaskID))
 	}
 	_, _ = r.EmitSyncJSONWithTaskIndex(
 		schema.EVENT_TYPE_STRUCTURED,
