@@ -38,6 +38,10 @@ const (
 	pr5180GoAwayAcceptedNoResponse
 	pr5180RefuseFirstStream
 	pr5180ZeroLimitAfterFirst
+	pr5180HeadersThenRefused
+	pr5180HeadersThenCancel
+	pr5180InterimThenRefused
+	pr5180HeadersThenDrop
 )
 
 type pr5180Seen struct {
@@ -220,6 +224,29 @@ func (p *pr5180Peer) serve(c net.Conn) {
 				return
 			}
 			continue
+		case pr5180HeadersThenRefused, pr5180HeadersThenCancel, pr5180InterimThenRefused, pr5180HeadersThenDrop:
+			// A literal indexed-name :status=103 tests the no-final-response
+			// case. Final :status=200 uses HPACK static index 8.
+			block := []byte{0x88}
+			if p.mode == pr5180InterimThenRefused {
+				block = []byte{0x08, 0x03, '1', '0', '3'}
+			}
+			if err := fr.WriteHeaders(http2.HeadersFrameParam{
+				StreamID: id, EndHeaders: true, BlockFragment: block,
+			}); err != nil {
+				return
+			}
+			if p.mode == pr5180HeadersThenDrop {
+				return
+			}
+			code := http2.ErrCodeCancel
+			if p.mode == pr5180HeadersThenRefused || p.mode == pr5180InterimThenRefused {
+				code = http2.ErrCodeRefusedStream
+			}
+			if err := fr.WriteRSTStream(id, code); err != nil {
+				return
+			}
+			continue
 		case pr5180HoldFirstStream:
 			if n == 1 {
 				continue
@@ -320,6 +347,82 @@ func TestPR5180_H2RetryBudget(t *testing.T) {
 				t.Fatalf("logical request made %d stream attempts; reviewed default budget is initial+3=4, not 4*4", got)
 			}
 		})
+	}
+}
+
+// A peer that has already sent response headers contradicts its later claim
+// that the stream was refused before processing. Do not replay even when no
+// response callback was registered.
+func TestPR5180_HeadersBeforeRefusedStreamDoNotReplay(t *testing.T) {
+	for _, method := range []string{"GET", "POST"} {
+		t.Run(method, func(t *testing.T) {
+			p := pr5180NewPeer(t, pr5180HeadersThenRefused)
+			cfg := pr5180Config(t, p.ln.Addr().String(), method, "/possibly-committed", "HTTP/2", "operation", pr5180Pool(t, 2))
+			rsp, err := HTTPWithoutRetry(cfg)
+			var streamErr http2.StreamError
+			if !errors.As(err, &streamErr) || streamErr.Code != http2.ErrCodeRefusedStream {
+				t.Fatalf("want REFUSED_STREAM after response headers, got rsp=%v err=%v", rsp, err)
+			}
+			if got := p.h2.Load(); got != 1 || p.h1.Load() != 0 {
+				t.Fatalf("%s replayed after peer sent response headers: H2=%d H1=%d", method, got, p.h1.Load())
+			}
+			if rsp == nil || !rsp.PortIsOpen || GetStatusCodeFromResponse(rsp.RawPacket) != http.StatusOK {
+				t.Fatalf("partial response headers were lost: rsp=%v", rsp)
+			}
+		})
+	}
+}
+
+func TestPR5180_HeadersBeforeConnectionLossDoNotReplayGet(t *testing.T) {
+	p := pr5180NewPeer(t, pr5180HeadersThenDrop)
+	cfg := pr5180Config(t, p.ln.Addr().String(), "GET", "/partial", "HTTP/2", "", pr5180Pool(t, 2))
+	rsp, err := HTTPWithoutRetry(cfg)
+	if err == nil {
+		t.Fatalf("want connection loss after response headers, got rsp=%v", rsp)
+	}
+	if got := p.h2.Load(); got != 1 || p.h1.Load() != 0 {
+		t.Fatalf("GET replayed after connection dropped with response headers: H2=%d H1=%d", got, p.h1.Load())
+	}
+	if rsp == nil || !rsp.PortIsOpen || GetStatusCodeFromResponse(rsp.RawPacket) != http.StatusOK {
+		t.Fatalf("partial response headers were lost: rsp=%v", rsp)
+	}
+}
+
+func TestPR5180_HeadersBeforeCancelKeepPartialResponse(t *testing.T) {
+	p := pr5180NewPeer(t, pr5180HeadersThenCancel)
+	cfg := pr5180Config(t, p.ln.Addr().String(), "GET", "/partial", "HTTP/2", "", pr5180Pool(t, 2))
+	var callbacks atomic.Int32
+	cfg.BodyStreamReaderHandler = func(header []byte, body io.ReadCloser) {
+		defer body.Close()
+		callbacks.Add(1)
+		_, _ = io.Copy(io.Discard, body)
+	}
+	rsp, err := HTTPWithoutRetry(cfg)
+	var streamErr http2.StreamError
+	if !errors.As(err, &streamErr) || streamErr.Code != http2.ErrCodeCancel {
+		t.Fatalf("want CANCEL after response headers, got rsp=%v err=%v", rsp, err)
+	}
+	if rsp == nil || !rsp.PortIsOpen || GetStatusCodeFromResponse(rsp.RawPacket) != http.StatusOK {
+		t.Fatalf("partial response headers were lost: rsp=%v", rsp)
+	}
+	if got := callbacks.Load(); got != 1 {
+		t.Fatalf("response handler ran %d times; want once", got)
+	}
+}
+
+func TestPR5180_InformationalHeadersBeforeRefusedStreamDoNotReplayPost(t *testing.T) {
+	p := pr5180NewPeer(t, pr5180InterimThenRefused)
+	cfg := pr5180Config(t, p.ln.Addr().String(), "POST", "/possibly-committed", "HTTP/2", "operation", pr5180Pool(t, 2))
+	rsp, err := HTTPWithoutRetry(cfg)
+	var streamErr http2.StreamError
+	if !errors.As(err, &streamErr) || streamErr.Code != http2.ErrCodeRefusedStream {
+		t.Fatalf("want REFUSED_STREAM after 103 response, got rsp=%v err=%v", rsp, err)
+	}
+	if got := p.h2.Load(); got != 1 || p.h1.Load() != 0 {
+		t.Fatalf("POST replayed after peer sent 103 response: H2=%d H1=%d", got, p.h1.Load())
+	}
+	if rsp == nil || !rsp.PortIsOpen {
+		t.Fatalf("lost open-port diagnostic after informational response: rsp=%v", rsp)
 	}
 }
 

@@ -166,7 +166,7 @@ func TestH2HPACKDecodeErrorClosesConnectionAndWakesStreams(t *testing.T) {
 			}
 			other := newH2ReadLoopTestStream(t, conn, 3)
 			result := make(chan error, 1)
-			go func() { _, _, err := other.waitResponse(context.Background(), 5*time.Second); result <- err }()
+			go func() { _, _, _, err := other.waitResponse(context.Background(), 5*time.Second); result <- err }()
 			// Indexed field zero is invalid HPACK on both active and canceled streams.
 			rl.processHeaders(readHeadersFrameForCanceledStreamTest(t, 1, []byte{0x80}, true, true))
 			select {
