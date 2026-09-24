@@ -929,25 +929,11 @@ RECONNECT:
 			// ALPN mismatch has not sent a request. A preface timeout may have
 			// sent one, so only automatically replay idempotent methods.
 			downgrades++
-			enableHttp2 = false
 			response.Http2 = false
-			tr.usePool = false
-			if tResult != nil {
-				tr.h1Conn = tResult.h1Conn
-				tResult.h1Conn = nil
-			}
-			// The H2 pool entry may still be closing on another goroutine and
-			// hashes its original key during eviction. Give H1 a separate key.
-			h1Key := *tr.cacheKey
-			h1Key.scheme = H1
-			tr.cacheKey = &h1Key
 			// Rebuild dial options with http/1.1 ALPN so the new H1 connection
 			// does not negotiate h2 and hit the same tarpit/killing origin.
-			dialopts = buildDialOpts([]string{H1})
-			tr.dialOpts = dialopts
-			method, uri, _ := GetHTTPPacketFirstLine(requestPacket)
-			requestPacket = ReplaceHTTPPacketFirstLine(requestPacket, strings.Join([]string{method, uri, "HTTP/1.1"}, " "))
-			tr.packet = requestPacket
+			tr.downgradeToH1(tResult, buildDialOpts([]string{H1}))
+			requestPacket = tr.packet
 			response.RawRequest = requestPacket
 			activeTransport = newH1Transport(connPool)
 			goto RECONNECT
