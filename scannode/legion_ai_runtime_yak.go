@@ -748,6 +748,8 @@ func yakAISendFailureCode(err error) string {
 
 type yakRuntimeOptions struct {
 	InputManifestID          string `json:"input_manifest_id,omitempty"`
+	// SkillForgeID is a persisted selector only; ContextPackage carries the authorized ZIP.
+	SkillForgeID             string `json:"skill_forge_id,omitempty"`
 	AITaskRunID              string `json:"ai_task_run_id,omitempty"`
 	AITaskSessionRole        string `json:"ai_task_session_role,omitempty"`
 	AITaskKey                string `json:"ai_task_key,omitempty"`
