@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/filesys"
@@ -24,12 +25,21 @@ func SetGetAggregatedFileSystemFunc(fn func(programName string) filesys_interfac
 	GetAggregatedFileSystemFunc = fn
 }
 
+// programRevision is ir_programs.id plus updated_at. Compile and overlay
+// saves update that row, so a new revision drops the listing cache. An
+// unchanged revision keeps ReadDir/Stat off QuotedCode and overlay copies.
+type programRevision struct {
+	id        uint
+	updatedAt int64
+}
+
 type irSourceFS struct {
 	mu            sync.Mutex
 	virtual       map[string]*filesys.VirtualFS // program -> virtual fs
 	loadedDirs    map[string]struct{}           // directory paths already hydrated from DB
 	overlayLoaded map[string]struct{}           // overlay programs already copied into virtual fs
 	notOverlay    map[string]struct{}           // programs known not to use overlay
+	revision      map[string]programRevision
 }
 
 var IrSourceFsSeparators = '/'
@@ -43,6 +53,7 @@ func NewIrSourceFs() *irSourceFS {
 		loadedDirs:    make(map[string]struct{}),
 		overlayLoaded: make(map[string]struct{}),
 		notOverlay:    make(map[string]struct{}),
+		revision:      make(map[string]programRevision),
 	}
 }
 
@@ -162,15 +173,7 @@ func (f *irSourceFS) Delete(path string) error {
 	// 	return utils.Errorf("program [%v] not exist", programName)
 	// }
 	f.mu.Lock()
-	delete(f.virtual, programName)
-	delete(f.overlayLoaded, programName)
-	delete(f.notOverlay, programName)
-	prefix := "/" + programName
-	for p := range f.loadedDirs {
-		if p == prefix || strings.HasPrefix(p, prefix+"/") {
-			delete(f.loadedDirs, p)
-		}
-	}
+	f.dropProgramCacheLocked(programName)
 	f.mu.Unlock()
 	// delete program
 	DeleteProgram(GetDB(), programName)
@@ -282,11 +285,65 @@ func mergeExtraFileEntriesIntoVF(progName string, vf *filesys.VirtualFS) {
 	}
 }
 
+func (fs *irSourceFS) dropProgramCacheLocked(programName string) {
+	delete(fs.virtual, programName)
+	delete(fs.overlayLoaded, programName)
+	delete(fs.notOverlay, programName)
+	delete(fs.revision, programName)
+	prefix := "/" + programName
+	for p := range fs.loadedDirs {
+		if p == prefix || strings.HasPrefix(p, prefix+"/") {
+			delete(fs.loadedDirs, p)
+		}
+	}
+}
+
+func loadProgramRevision(name string) (programRevision, bool) {
+	var row struct {
+		ID        uint
+		UpdatedAt time.Time
+	}
+	err := GetDB().Model(&IrProgram{}).
+		Select("id, updated_at").
+		Where("program_name = ? AND program_kind = ?", name, Application).
+		Scan(&row).Error
+	if err != nil || row.ID == 0 {
+		return programRevision{}, false
+	}
+	return programRevision{id: row.ID, updatedAt: row.UpdatedAt.UTC().UnixNano()}, true
+}
+
+func (fs *irSourceFS) syncProgramRevision(progName string) {
+	if progName == "" {
+		return
+	}
+	rev, ok := loadProgramRevision(progName)
+	prev, has := fs.revision[progName]
+	if !ok {
+		if has && prev == (programRevision{}) {
+			return
+		}
+		if has || fs.virtual[progName] != nil {
+			fs.dropProgramCacheLocked(progName)
+		}
+		fs.revision[progName] = programRevision{}
+		return
+	}
+	if has && prev == rev {
+		return
+	}
+	if has || fs.virtual[progName] != nil {
+		fs.dropProgramCacheLocked(progName)
+	}
+	fs.revision[progName] = rev
+}
+
 func (fs *irSourceFS) checkPath(path string, isDirs ...bool) (*filesys.VirtualFS, error) {
 	fs.mu.Lock()
 	defer fs.mu.Unlock()
 
 	progName, isProgram := fs.getProgram(path)
+	fs.syncProgramRevision(progName)
 	vf, ok := fs.virtual[progName]
 	if !ok {
 		vf = filesys.NewVirtualFs()
