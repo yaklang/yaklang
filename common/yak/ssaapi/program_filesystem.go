@@ -7,6 +7,8 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
+	"time"
 
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/filesys"
@@ -14,13 +16,57 @@ import (
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 )
 
+// Overlay AggregatedFS is expensive to rebuild. Keep it while the user is
+// looking at that program (touch-on-hit); drop after 10 minutes idle so file
+// bodies do not stay forever. Directory trees for full programs live in
+// IrSourceFS and are retained separately (small).
+const (
+	programFSOverlayTTL = 10 * time.Minute
+	programFSOverlayCap = 64
+)
+
+// programFSGeneration bumps when an overlay program is rewritten / deleted so
+// in-flight TTL entries are dropped on the next resolve even before expiry.
+var programFSGeneration sync.Map // programName -> *atomic.Int64
+
+func programFSGen(progName string) *atomic.Int64 {
+	if progName == "" {
+		return nil
+	}
+	v, _ := programFSGeneration.LoadOrStore(progName, &atomic.Int64{})
+	return v.(*atomic.Int64)
+}
+
+// InvalidateProgramFileSystemCache drops cached overlay backends for progName
+// across all ProgramFileSystem instances (generation bump + optional local remove).
+func InvalidateProgramFileSystemCache(progName string) {
+	if progName == "" {
+		return
+	}
+	if g := programFSGen(progName); g != nil {
+		g.Add(1)
+	}
+}
+
+type overlayCacheEntry struct {
+	fs  fi.FileSystem
+	gen int64
+}
+
 // ProgramFileSystem is the final source tree for IRify / ssadb://.
 // Full programs are served from ssadb; incremental programs use
 // ProgramOverLay.GetAggregatedFileSystem under /programName.
+//
+// Lifecycle of overlay backends:
+//   - Only multi-layer AggregatedFS wrappers are cached (never the dbFS fallback).
+//   - TTL 10m with touch-on-hit: the project the user is viewing stays cached;
+//     10 minutes without access drops that overlay (file-heavy) entry.
+//   - Cap 64 programs.
+//   - InvalidateProgramFileSystemCache / Delete bump generation so a compile
+//     that finishes mid-TTL is visible on the next resolve.
 type ProgramFileSystem struct {
-	mu       sync.Mutex
-	dbFS     fi.FileSystem
-	resolved map[string]fi.FileSystem // programName -> backend
+	dbFS         fi.FileSystem
+	overlayCache *utils.CacheExWithKey[string, *overlayCacheEntry]
 }
 
 var (
@@ -29,9 +75,14 @@ var (
 )
 
 func NewProgramFileSystem() *ProgramFileSystem {
+	cache := utils.NewCacheExWithKey[string, *overlayCacheEntry](
+		utils.WithCacheTTL(programFSOverlayTTL),
+		utils.WithCacheCapacity(programFSOverlayCap),
+	)
+	// Touch-on-hit (default): active viewing extends life; idle 10m → evict.
 	return &ProgramFileSystem{
-		dbFS:     ssadb.NewIrSourceFs(),
-		resolved: make(map[string]fi.FileSystem),
+		dbFS:         ssadb.NewIrSourceFs(),
+		overlayCache: cache,
 	}
 }
 
@@ -39,23 +90,38 @@ func (p *ProgramFileSystem) resolve(progName string) fi.FileSystem {
 	if progName == "" {
 		return p.dbFS
 	}
-	p.mu.Lock()
-	defer p.mu.Unlock()
-	if fs, ok := p.resolved[progName]; ok {
-		return fs
+	gen := int64(0)
+	if g := programFSGen(progName); g != nil {
+		gen = g.Load()
 	}
+	if entry, ok := p.overlayCache.Get(progName); ok && entry != nil && entry.fs != nil && entry.gen == gen {
+		return entry.fs
+	}
+
 	prog, err := FromDatabase(progName)
 	if err == nil && prog != nil {
 		if overlay := prog.GetOverlay(); overlay != nil {
 			if agg := overlay.GetAggregatedFileSystem(); agg != nil {
 				wrapped := newPrefixedAggregatedFS(progName, agg, prog)
-				p.resolved[progName] = wrapped
+				p.overlayCache.Set(progName, &overlayCacheEntry{fs: wrapped, gen: gen})
 				return wrapped
 			}
 		}
 	}
-	p.resolved[progName] = p.dbFS
+	// Do NOT cache dbFS / negative results: a program may become a multi-layer
+	// overlay moments later; caching the fallback would pin a wrong tree.
 	return p.dbFS
+}
+
+func (p *ProgramFileSystem) Invalidate(progName string) {
+	if progName == "" {
+		return
+	}
+	InvalidateProgramFileSystemCache(progName)
+	p.overlayCache.Remove(progName)
+	if dropper, ok := p.dbFS.(interface{ DropProgramCache(string) }); ok {
+		dropper.DropProgramCache(progName)
+	}
 }
 
 func (p *ProgramFileSystem) programName(name string) string {
@@ -115,9 +181,7 @@ func (p *ProgramFileSystem) ExtraInfo(name string) map[string]any {
 func (p *ProgramFileSystem) Delete(name string) error {
 	progName := p.programName(name)
 	if progName != "" {
-		p.mu.Lock()
-		delete(p.resolved, progName)
-		p.mu.Unlock()
+		p.Invalidate(progName)
 	}
 	return p.dbFS.Delete(name)
 }
@@ -239,9 +303,7 @@ func (f *prefixedAggregatedFS) ensureExtraLoaded() {
 			if len(segs) == 0 || segs[0] != f.progName {
 				vfPath = path.Join("/", f.progName, strings.Trim(strings.TrimPrefix(vfPath, "/"), "/"))
 			}
-			if _, exists := f.extra[vfPath]; exists {
-				continue
-			}
+			// Last layer wins: Base is collected first, Diff layers overwrite.
 			var source ssadb.IrSource
 			if err := db.Where("program_name = ? AND source_code_hash = ?", src.progName, hash).First(&source).Error; err != nil {
 				continue
