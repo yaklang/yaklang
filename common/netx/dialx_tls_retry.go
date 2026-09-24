@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	utls "github.com/refraction-networking/utls"
+	utls "github.com/yaklang/yaklang/common/third_party/utls"
 	"github.com/yaklang/yaklang/common/gmsm/gmtls"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"

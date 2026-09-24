@@ -9,7 +9,7 @@ import (
 	"strings"
 	"testing"
 
-	utls "github.com/refraction-networking/utls"
+	utls "github.com/yaklang/yaklang/common/third_party/utls"
 )
 
 const chrome151JA4 = "t13d1516h2_8daaf6152771_806a8c22fdea"

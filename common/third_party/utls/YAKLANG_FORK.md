@@ -2,6 +2,7 @@
 
 This directory is based on `github.com/refraction-networking/utls` v1.6.7 and
 retains its BSD-3-Clause license.
+It is built as part of Yaklang's main Go module, not as a separate dependency.
 
 Yaklang carries a narrow backport of the ALPS codepoint 17613 support merged
 upstream in [refraction-networking/utls#333](https://github.com/refraction-networking/utls/pull/333).
