@@ -7,7 +7,7 @@ import (
 	"sort"
 
 	"github.com/cloudflare/circl/kem/hybrid"
-	utls "github.com/refraction-networking/utls"
+	utls "github.com/yaklang/yaklang/common/third_party/utls"
 )
 
 const (

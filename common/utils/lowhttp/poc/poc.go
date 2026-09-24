@@ -17,7 +17,7 @@ import (
 	"time"
 
 	"github.com/corpix/uarand"
-	utls "github.com/refraction-networking/utls"
+	utls "github.com/yaklang/yaklang/common/third_party/utls"
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/utils/cli"
 

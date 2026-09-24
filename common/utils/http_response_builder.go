@@ -13,7 +13,7 @@ import (
 	"strings"
 	"time"
 
-	utls2 "github.com/refraction-networking/utls"
+	utls2 "github.com/yaklang/yaklang/common/third_party/utls"
 
 	"github.com/pkg/errors"
 	"github.com/segmentio/ksuid"
