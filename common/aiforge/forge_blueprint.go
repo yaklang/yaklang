@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"strings"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 
@@ -279,19 +280,8 @@ func (f *ForgeBlueprint) GenerateFirstPromptWithMemoryOption(
 				f.ResultHandler("", utils.Errorf("render result prompt failed: %v", err))
 				return
 			}
-			config := cod.Config
-			rsp, err := config.CallAI(aicommon.NewAIRequest(prompt, aicommon.WithAIRequest_CallerLabel("forge-blueprint")))
-			if err != nil {
-				f.ResultHandler("", utils.Errorf("render result failed: %v", err))
-				return
-			}
-			rspReader := rsp.GetOutputStreamReader("forge", true, config.GetEmitter())
-			raw, err := io.ReadAll(rspReader)
-			if err == io.EOF {
-				f.ResultHandler(string(raw), nil)
-			} else {
-				f.ResultHandler(string(raw), err)
-			}
+			result, err := generateForgeResult(cod, prompt)
+			f.ResultHandler(result, err)
 		}))
 	}
 
@@ -341,19 +331,8 @@ func (f *ForgeBlueprint) GenerateFirstPromptWithMemoryOptionWithQueryAndParams(
 				f.ResultHandler("", utils.Errorf("render result prompt failed: %v", renderErr))
 				return
 			}
-			config := cod.Config
-			rsp, callErr := config.CallAI(aicommon.NewAIRequest(prompt, aicommon.WithAIRequest_CallerLabel("forge-blueprint")))
-			if callErr != nil {
-				f.ResultHandler("", utils.Errorf("render result failed: %v", callErr))
-				return
-			}
-			rspReader := rsp.GetOutputStreamReader("forge", true, config.GetEmitter())
-			raw, readErr := io.ReadAll(rspReader)
-			if readErr == io.EOF {
-				f.ResultHandler(string(raw), nil)
-			} else {
-				f.ResultHandler(string(raw), readErr)
-			}
+			result, err := generateForgeResult(cod, prompt)
+			f.ResultHandler(result, err)
 		}))
 	}
 	return initPrompt, opts, nil
@@ -423,4 +402,35 @@ type PluginParamSelectData struct {
 	Key   string `json:"key"`
 	Label string `json:"label"`
 	Value string `json:"value"`
+}
+
+// A model may consume its entire response in the reasoning channel. Retry once
+// for a deliverable final answer; never publish the reasoning text as a report.
+func generateForgeResult(cod *aid.Coordinator, prompt string) (string, error) {
+	config := cod.Config
+	return retryEmptyForgeResult(prompt, func(requestPrompt string) (string, error) {
+		rsp, err := config.CallAI(aicommon.NewAIRequest(requestPrompt, aicommon.WithAIRequest_CallerLabel("forge-blueprint")))
+		if err != nil {
+			return "", utils.Errorf("render result failed: %v", err)
+		}
+		raw, err := io.ReadAll(rsp.GetOutputStreamReader("forge", true, config.GetEmitter()))
+		if err != nil && err != io.EOF {
+			return "", err
+		}
+		return string(raw), nil
+	})
+}
+
+func retryEmptyForgeResult(prompt string, call func(string) (string, error)) (string, error) {
+	for attempt := 0; attempt < 2; attempt++ {
+		result, err := call(prompt)
+		if err != nil {
+			return "", err
+		}
+		if strings.TrimSpace(result) != "" {
+			return result, nil
+		}
+		prompt += "\n\n上一轮未生成可交付的正文。请在最终输出通道直接给出完整 Markdown 报告；不要只在思考内容中写报告。"
+	}
+	return "", utils.Errorf("forge result model returned empty final output after retry")
 }
