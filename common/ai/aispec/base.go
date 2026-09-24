@@ -525,6 +525,21 @@ func ChatBase(url string, model string, msg string, chatOpts ...ChatBaseOption) 
 	hijackResult := dispatchChatBaseHijackHooks(model, hookInput)
 	if len(ctx.RawMessages) == 0 && hijackResult != nil && hijackResult.IsHijacked && len(hijackResult.Messages) > 0 {
 		ctx.RawMessages = hijackResult.Messages
+		if len(hijackResult.Tools) > 0 {
+			// Explicit caller tools take precedence on name collisions. Keep
+			// projected action tools in prompt order after those caller tools.
+			seen := make(map[string]struct{}, len(ctx.Tools)+len(hijackResult.Tools))
+			for _, tool := range ctx.Tools {
+				seen[tool.Function.Name] = struct{}{}
+			}
+			for _, tool := range hijackResult.Tools {
+				if _, exists := seen[tool.Function.Name]; exists {
+					continue
+				}
+				ctx.Tools = append(ctx.Tools, tool)
+				seen[tool.Function.Name] = struct{}{}
+			}
+		}
 	}
 	// 把 hook 自定义的关联 ID 透传到 ctx, 并用闭包包装 UsageCallback,
 	// 让 SSE 末帧 usage 在抵达上层订阅者前自动盖上同一个 ID, 离线分析就能

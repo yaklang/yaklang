@@ -49,11 +49,17 @@ func ProjectAndObserve(model, msg string) *aispec.ChatBaseHijackResult {
 	// 用稳定 ID 把 dump 文件 (000XXX.txt 名为 SeqId) 与 token usage 精确 join,
 	// 避免之前按数组下标对齐时因 stream-finished 漏 callback 累计错位的归因 bug.
 	// 关键词: ProjectAndObserve CorrelationID, dump usage 精确 join
-	projection := Project(ProjectionInput{Sections: parsed.Sections()})
+	projectedPrompt, actionTools := projectActionSchemaTags(msg)
+	projectionSections := parsed.Sections()
+	if len(actionTools) > 0 {
+		projectionSections = Parse(projectedPrompt).Sections()
+	}
+	projection := Project(ProjectionInput{Sections: projectionSections, ActionTools: actionTools})
 	result := &aispec.ChatBaseHijackResult{}
-	if projection.Metadata.CacheProjected {
+	if projection.Metadata.CacheProjected || len(actionTools) > 0 {
 		result.IsHijacked = true
 		result.Messages = projection.Messages
+		result.Tools = projection.Tools
 	}
 	if rep != nil && rep.SeqId > 0 {
 		result.CorrelationID = strconv.FormatInt(rep.SeqId, 10)
