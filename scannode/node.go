@@ -99,6 +99,8 @@ func NewScanNode(cfg node.BaseConfig, options ...ScanNodeOption) (*ScanNode, err
 			cfg.CapabilityKeys,
 			"node.resource_policy.v1",
 			legionCapabilitySSAIRProgramDelete,
+			legionCapabilitySSADebugQuery,
+			legionCapabilitySSALogTail,
 		)
 	}
 	cfg.CapabilityKeys = normalizeScanNodeCapabilityKeys(cfg.CapabilityKeys)

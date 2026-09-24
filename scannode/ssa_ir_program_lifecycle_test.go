@@ -11,31 +11,55 @@ import (
 	"github.com/yaklang/gorm"
 	_ "github.com/yaklang/gorm/dialects/sqlite"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
+	ssav1 "github.com/yaklang/yaklang/scannode/gen/legionpb/legion/ssa/v1"
+	"google.golang.org/protobuf/proto"
 )
 
 func TestHandleSSAIRProgramDeleteWithPublishesBusinessRejection(t *testing.T) {
-	var published ssaIRProgramDeleteResponse
-	err := handleSSAIRProgramDeleteWith(
+	command, err := proto.Marshal(&ssav1.DeleteIRProgramCommand{
+		RequestId: "request-1", StoreIdentity: "ir-store-v1:test", ProgramName: "demo-old",
+	})
+	require.NoError(t, err)
+	var published *ssav1.DeleteIRProgramResult
+	err = handleSSAIRProgramDeleteWith(
 		context.Background(),
-		[]byte(`{"request_id":"request-1","store_identity":"ir-store-v1:test","program_name":"demo-old"}`),
+		command,
 		func(_ context.Context, storeIdentity, programName string) (bool, bool, string, error) {
 			require.Equal(t, "ir-store-v1:test", storeIdentity)
 			require.Equal(t, "demo-old", programName)
 			return false, false, "", errors.New("该 IR 程序仍是当前增量编译基线，未删除")
 		},
-		func(_ context.Context, requestID string, response ssaIRProgramDeleteResponse) error {
+		func(_ context.Context, requestID string, response *ssav1.DeleteIRProgramResult) error {
 			require.Equal(t, "request-1", requestID)
 			published = response
 			return nil
 		},
 	)
 	require.NoError(t, err)
-	require.Equal(t, "request-1", published.RequestID)
+	require.Equal(t, "request-1", published.RequestId)
 	require.Equal(t, "ir-store-v1:test", published.StoreIdentity)
 	require.Equal(t, "demo-old", published.ProgramName)
 	require.False(t, published.Success)
 	require.False(t, published.Deleted)
 	require.Contains(t, published.Reason, "当前增量编译基线")
+}
+
+func TestHandleSSAIRProgramDeleteRejectsLegacyJSON(t *testing.T) {
+	err := handleSSAIRProgramDeleteWith(
+		context.Background(),
+		[]byte(`{"request_id":"request-1","store_identity":"store","program_name":"demo"}`),
+		nil,
+		nil,
+	)
+	require.ErrorContains(t, err, "unmarshal ssa IR program delete")
+}
+
+func TestDeleteIRProgramCommandWireFixture(t *testing.T) {
+	raw, err := proto.Marshal(&ssav1.DeleteIRProgramCommand{
+		RequestId: "r", ProgramName: "p", StoreIdentity: "s",
+	})
+	require.NoError(t, err)
+	require.Equal(t, []byte{0x0a, 0x01, 'r', 0x12, 0x01, 'p', 0x1a, 0x01, 's'}, raw)
 }
 
 func TestDeleteSSAIRProgramForLifecycleKeepsNewestAndDeletesOlder(t *testing.T) {

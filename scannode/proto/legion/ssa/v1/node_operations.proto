@@ -1,0 +1,167 @@
+syntax = "proto3";
+
+package legion.ssa.v1;
+
+import "google/protobuf/timestamp.proto";
+
+option go_package = "github.com/yaklang/yaklang/scannode/gen/legionpb/legion/ssa/v1;ssav1";
+
+// These commands and results are protobuf payloads on versioned NATS subjects.
+// An unversioned/v1 subject carried JSON and must not be decoded as protobuf.
+message DeleteIRProgramCommand {
+  string request_id = 1;
+  string program_name = 2;
+  string store_identity = 3;
+}
+
+message DeleteIRProgramResult {
+  string request_id = 1;
+  string program_name = 2;
+  string store_identity = 3;
+  bool success = 4;
+  bool deleted = 5;
+  bool already_absent = 6;
+  string reason = 7;
+}
+
+message DebugQueryCommand {
+  string query_id = 1;
+  string job_id = 2;
+  string attempt_id = 3;
+  string task_status = 4;
+}
+
+message DebugQueryResult {
+  string query_id = 1;
+  bool found = 2;
+  string reason = 3;
+  DebugRunAnalysis analysis = 4;
+}
+
+message LogTailCommand {
+  string query_id = 1;
+  string job_id = 2;
+  string attempt_id = 3;
+  int64 offset = 4;
+  int64 max_bytes = 5;
+  string task_status = 6;
+  string log_kind = 7;
+}
+
+message LogTailResult {
+  string query_id = 1;
+  bool found = 2;
+  string reason = 3;
+  int64 total_bytes = 4;
+  int64 offset = 5;
+  bool has_more = 6;
+  string content = 7;
+}
+
+message DebugRunAnalysis {
+  string status = 1;
+  google.protobuf.Timestamp started_at = 2;
+  google.protobuf.Timestamp finished_at = 3;
+  string duration = 4;
+  repeated DebugPhaseAnalysis phases = 5;
+  repeated DebugSampleSummary samples = 6;
+  DebugRunSummary summary = 7;
+  repeated string errors = 8;
+  bool partial = 9;
+}
+
+message DebugPhaseAnalysis {
+  string phase = 1;
+  string source = 2;
+  google.protobuf.Timestamp started_at = 3;
+  google.protobuf.Timestamp finished_at = 4;
+  string duration = 5;
+  string status = 6;
+}
+
+message DebugSampleSummary {
+  int32 sequence = 1;
+  string label = 2;
+  google.protobuf.Timestamp timestamp = 3;
+  google.protobuf.Timestamp ended_at = 4;
+  int64 duration_ms = 5;
+  string phase = 6;
+  string phase_source = 7;
+  bool has_cpu = 8;
+  bool has_heap = 9;
+  bool has_goroutine = 10;
+  repeated DebugPprofTopFunction cpu_top = 11;
+  repeated DebugPprofTopFunction cpu_top_yaklang = 12;
+  repeated DebugPprofStackPath cpu_stacks = 13;
+  repeated DebugPprofStackPath cpu_stacks_yaklang = 14;
+  repeated DebugPprofTopFunction heap_top = 15;
+  repeated DebugPprofTopFunction heap_top_yaklang = 16;
+  repeated DebugPprofStackPath heap_stacks = 17;
+  repeated DebugPprofStackPath heap_stacks_yaklang = 18;
+  int32 goroutines = 19;
+  string log_excerpt = 20;
+  string status = 21;
+  DebugDBOpStatsSummary db_stats = 22;
+  DebugRuntimeStatsSummary runtime = 23;
+}
+
+message DebugRuntimeStatsSummary {
+  string timestamp = 1;
+  int32 num_cpu = 2;
+  double load1 = 3;
+  double host_cpu_percent = 4;
+  double process_cpu_percent = 5;
+  uint64 host_mem_total_bytes = 6;
+  uint64 host_mem_used_bytes = 7;
+  uint64 host_mem_available_bytes = 8;
+  uint64 process_rss_bytes = 9;
+  uint64 process_heap_alloc_bytes = 10;
+  uint64 process_heap_sys_bytes = 11;
+  int32 goroutines = 12;
+}
+
+message DebugDBOpStatsSummary {
+  string dialect = 1;
+  map<string, DebugDBOpBucketSummary> ops = 2;
+  int64 total_count = 3;
+  int64 total_ms = 4;
+  int64 window_ms = 5;
+  int64 error_count = 6;
+}
+
+message DebugDBOpBucketSummary {
+  int64 count = 1;
+  int64 total_ms = 2;
+  int64 min_ms = 3;
+  int64 max_ms = 4;
+  int64 avg_ms = 5;
+  int64 error_count = 6;
+}
+
+message DebugPprofTopFunction {
+  string name = 1;
+  int64 cum_value = 2;
+  string cum_pct = 3;
+  int64 flat_value = 4;
+  string flat_pct = 5;
+}
+
+message DebugPprofStackPath {
+  repeated string frames = 1;
+  int64 value = 2;
+  string pct = 3;
+}
+
+message DebugRunSummary {
+  int64 total_duration_ms = 1;
+  int32 cpu_profile_files = 2;
+  int32 heap_profile_files = 3;
+  int32 goroutine_files = 4;
+  bool has_log = 5;
+  bool has_report = 6;
+  bool has_ssadb = 7;
+  bool has_cmd = 8;
+  bool compile_phase_found = 9;
+  bool scan_phase_found = 10;
+  DebugDBOpStatsSummary db_stats_total = 11;
+}
