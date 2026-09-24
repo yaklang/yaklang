@@ -35,6 +35,20 @@ var (
 // so the caller can fall back to another protocol.
 const maxReconnectTimes = 3
 
+// A missing H2 server preface leaves the outcome of an already sent request
+// unknown. Only methods whose semantics permit automatic replay may fall back
+// to H1 in that case. The prepared packet keeps the request body replayable.
+func canReplayAfterUnknownH2Outcome(packet []byte) bool {
+	// The on-wire method is authoritative. NativeHTTPRequestInstance may be
+	// supplied separately and need not describe the packet being sent.
+	method, _, _ := GetHTTPPacketFirstLine(packet)
+	switch method {
+	case http.MethodGet, http.MethodHead, http.MethodOptions, http.MethodTrace, http.MethodPut, http.MethodDelete:
+		return true
+	}
+	return false
+}
+
 func GetSystemHostByName(domain string) (string, bool) {
 	systemEtcOnce.Do(func() {
 		_systemEtcHosts = GetSystemEtcHosts()
@@ -696,7 +710,6 @@ func HTTPWithoutRetry(option *LowhttpExecConfig) (*LowhttpResponse, error) {
 	response.RawRequest = requestPacket
 	response.Https = https
 	response.Http2 = enableHttp2
-	_ = withConnPool // transport reads option.WithConnPool directly
 
 	// https://github.com/mattn/go-ieproxy
 	if len(proxy) == 1 && proxy[0] == "" {
@@ -880,43 +893,54 @@ func HTTPWithoutRetry(option *LowhttpExecConfig) (*LowhttpResponse, error) {
 	// and stream lifecycle.
 
 	tr := &transportRequest{
-		option:     option,
-		reqIns:     reqIns,
-		packet:     requestPacket,
-		dialOpts:   dialopts,
-		cacheKey:   cacheKey,
-		connPool:   connPool,
-		traceInfo:  traceInfo,
-		originAddr: originAddr,
-		timeout:    timeout,
+		option:         option,
+		reqIns:         reqIns,
+		packet:         requestPacket,
+		dialOpts:       dialopts,
+		cacheKey:       cacheKey,
+		connPool:       connPool,
+		usePool:        withConnPool,
+		preserveLength: noFixContentLength,
+		traceInfo:      traceInfo,
+		originAddr:     originAddr,
+		timeout:        timeout,
 	}
 
 	// Select initial transport based on protocol flags.
-	var transport Transport
+	var activeTransport transport
 	if enableHttp3 {
-		transport = NewH3Transport()
+		activeTransport = newH3Transport()
 	} else if enableHttp2 {
-		transport = NewH2Transport(connPool)
+		activeTransport = newH2Transport(connPool)
 	} else {
-		transport = NewH1Transport(connPool)
+		activeTransport = newH1Transport(connPool)
 	}
 
 	// Execute request with downgrade and reconnect handling.
 	maxDowngrades := 1 // H2→H1 at most once
 	downgrades := 0
 RECONNECT:
-	tResult, err := transport.RoundTrip(ctx, tr)
+	tResult, err := activeTransport.RoundTrip(ctx, tr)
 	if err != nil {
 		if ctxErr := ctx.Err(); ctxErr != nil {
-			return nil, ctxErr
-		}
-		// Protocol downgrade: H2 not available on this server.
-		if transport.ShouldDowngrade(err) && downgrades < maxDowngrades {
+			err = ctxErr
+		} else if activeTransport.ShouldDowngrade(err) && downgrades < maxDowngrades &&
+			(errors.Is(err, ErrProtocolNotAvailable) || canReplayAfterUnknownH2Outcome(requestPacket)) {
+			// ALPN mismatch has not sent a request. A preface timeout may have
+			// sent one, so only automatically replay idempotent methods.
 			downgrades++
 			enableHttp2 = false
 			response.Http2 = false
-			withConnPool = false // legacy: downgrade bypasses pool; H1 transport re-reads option.WithConnPool
-			tr.cacheKey.scheme = H1
+			tr.usePool = false
+			if tResult != nil {
+				tr.h1Conn = tResult.h1Conn
+				tResult.h1Conn = nil
+			}
+			// The H2 pool entry may still be closing on another goroutine and
+			// hashes its original key during eviction. Give H1 a separate key.
+			h1Key := *tr.cacheKey
+			h1Key.scheme = H1
+			tr.cacheKey = &h1Key
 			// Rebuild dial options with http/1.1 ALPN so the new H1 connection
 			// does not negotiate h2 and hit the same tarpit/killing origin.
 			dialopts = buildDialOpts([]string{H1})
@@ -924,22 +948,25 @@ RECONNECT:
 			method, uri, _ := GetHTTPPacketFirstLine(requestPacket)
 			requestPacket = ReplaceHTTPPacketFirstLine(requestPacket, strings.Join([]string{method, uri, "HTTP/1.1"}, " "))
 			tr.packet = requestPacket
-			transport = NewH1Transport(connPool)
+			response.RawRequest = requestPacket
+			activeTransport = newH1Transport(connPool)
 			goto RECONNECT
-		}
-		// Reconnect: stale pooled connection or retryable stream error.
-		if isReconnectError(err) {
+		} else if isReconnectError(err) {
+			// H1 pooled connections signal their stale-connection retry here.
+			// H2 consumes its own stream retry budget inside RoundTrip.
 			underlying := reconnectErrorUnwrap(err)
 			if canReconnect(underlying) {
 				goto RECONNECT
 			}
-			return nil, underlying
+			err = underlying
 		}
-		if transport.CanRetry(reqIns, err) && (option.bodyStreamReaderHandled == nil || !option.bodyStreamReaderHandled.IsSet()) {
-			if canReconnect(err) {
-				goto RECONNECT
-			}
-		}
+	}
+	if tResult != nil && tResult.h1Conn != nil {
+		// A negotiated socket that was not handed to H1 remains ours to close.
+		tResult.h1Conn.Close()
+		tResult.h1Conn = nil
+	}
+	if tResult == nil {
 		return nil, err
 	}
 
@@ -960,6 +987,14 @@ RECONNECT:
 	}
 	response.MultiResponseInstances = multiResponses
 	response.ResponseBodySize = httpctx.GetResponseBodySize(reqIns)
+	if err != nil {
+		response.BareResponse = rawBytes
+		response.RawPacket = rawBytes
+		if haveNativeHTTPRequestInstance {
+			httpctx.SetBareResponseBytes(reqIns, rawBytes)
+		}
+		return response, err
+	}
 
 	if option.EnableMaxContentLength && maxContentLength > 0 {
 		if _, body := SplitHTTPHeadersAndBodyFromPacketView(rawBytes); len(body) > maxContentLength {

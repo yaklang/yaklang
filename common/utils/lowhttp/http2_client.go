@@ -972,7 +972,8 @@ func (cs *http2ClientStream) waitResponse(ctx context.Context, timeout time.Dura
 		} else if atomic.LoadInt32(&cs.h2Conn.serverPrefaceTimedOut) == 1 {
 			// Not a transport hiccup: this origin negotiated h2 and then never
 			// spoke it. Retrying rebuilds the same dead conn, so surface a
-			// non-retryable error and let the caller fall back to HTTP/1.1.
+			// non-retryable error and let the caller decide whether HTTP/1.1
+			// fallback can safely replay this request.
 			err = utils.Wrapf(errH2ServerPrefaceTimeout, "h2 stream-id %v never saw the server preface : %s", cs.ID, flow)
 		} else {
 			err = utils.Wrapf(errH2ConnClosed, "h2 stream-id %v wait response conn closed : %s", cs.ID, flow)

@@ -2,16 +2,15 @@ package lowhttp
 
 import (
 	"context"
-	"net/http"
 
 	"github.com/yaklang/yaklang/common/utils/lowhttp/httpctx"
 )
 
-// h3Transport implements Transport for HTTP/3 (QUIC).
+// h3Transport implements transport for HTTP/3 (QUIC).
 type h3Transport struct{}
 
-// NewH3Transport returns a Transport that executes requests over HTTP/3.
-func NewH3Transport() Transport { return &h3Transport{} }
+// newH3Transport returns a transport that executes requests over HTTP/3.
+func newH3Transport() transport { return &h3Transport{} }
 
 func (t *h3Transport) RoundTrip(ctx context.Context, tr *transportRequest) (*transportResult, error) {
 	http3Conn, err := getHTTP3Conn(ctx, tr.originAddr, tr.dialOpts...)
@@ -29,11 +28,6 @@ func (t *h3Transport) RoundTrip(ctx context.Context, tr *transportRequest) (*tra
 		portIsOpen:    true,
 		firstResponse: resp,
 	}, err
-}
-
-func (t *h3Transport) CanRetry(req *http.Request, err error) bool {
-	// H3 has no connection pool; a failed dial is a failed request.
-	return false
 }
 
 func (t *h3Transport) ShouldDowngrade(err error) bool {
