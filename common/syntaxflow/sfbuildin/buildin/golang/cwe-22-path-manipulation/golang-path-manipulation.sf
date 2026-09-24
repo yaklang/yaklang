@@ -69,8 +69,13 @@ REFERENCE
 strings?{<fullTypeName>?{have: "strings"}} as $strings
 
 $user_input.URL.Path as $path
-$strings.TrimPrefix(*?{<slice(index=0)> #{ until: "* $path"}->} as $key )
-$key?{opcode: const}?{have: /"*\/"/} as $low
+// Alert only when TrimPrefix's first argument is the request path itself.
+// A bare strings.TrimPrefix(path, "/") used to normalize an internal logical
+// path is not this sink: dataflow through the shared strings package used to
+// connect that constant to an unrelated URL.Path.
+$strings.TrimPrefix<getCall>?{
+	<slice(index=0)>?{have: "URL.Path"} && <slice(index=1)>?{opcode: const}?{have: /\/"/}
+} as $low
 
 alert $low for {
 	type: "vuln",
@@ -78,7 +83,7 @@ alert $low for {
 	title_zh: "检测到Golang路径操纵漏洞",
 	level: "low",
 	risk: "path-manipulation",
-	message: "检测到Golang路径操纵漏洞，但路径已包含过滤机制，通常无需处理",
+	message: "请求路径经过 TrimPrefix 去掉前缀后继续使用，建议确认前缀裁剪没有放宽目录边界",
 	solution: <<<SOLUTION
 ### 修复建议
 
@@ -381,4 +386,29 @@ func (s *VulinServer) registerSensitive() {
 }
 
 SAFE
+	'safefile://overlay_prefix.go': <<<OVERLAY
+package demo
+
+import (
+	"path/filepath"
+	"strings"
+)
+
+func normalizeOverlayFilePath(filePath, programName string) string {
+	path := filePath
+	if programName != "" {
+		path = removeProgramNamePrefix(filePath, programName)
+	}
+	path = strings.TrimPrefix(filepath.ToSlash(path), "/")
+	if path == "" || path == "." {
+		return "/"
+	}
+	return "/" + path
+}
+
+func removeProgramNamePrefix(filePath, programName string) string {
+	path := strings.TrimPrefix(filePath, "/")
+	return path
+}
+OVERLAY
 )

@@ -27,10 +27,11 @@ $path.Rel(* as $check);
 securejoin.SecureJoin(* as $check);
 
 $sink?{<getCall> #{ include: `* & $check` }->} as $safe;
-$sink?{<getCall> #{
-	include: `*?{have: ".Join"}`,
-	until: `*?{opcode:param}`,
-}->} as $all;
+// Only a path string that is itself a parameter counts. Walking until any
+// parameter also matches method calls on a config object, such as
+// filepath.Join(local, codeSource.GetCodeSourcePath()).
+$path.Join(*?{opcode: param}) as $join;
+$sink?{<getCall> #{ include: `* & $join` }->} as $all;
 $all - $safe as $low;
 
 alert $low for {
@@ -91,6 +92,33 @@ func DeleteFile(baseDir string, filename string) error {
 		return err
 	}
 	return os.Remove(cleanPath)
+}
+PARAM
+)
+
+desc(
+	lang: golang
+	'safefile://clone_stat.go': <<<PARAM
+package demo
+
+import (
+	"os"
+	"path/filepath"
+)
+
+type Config struct{}
+
+func (c *Config) GetCodeSourcePath() string { return "src" }
+func (c *Config) GetContext() interface{}    { return nil }
+
+func cloneGitSourceDir(codeSource *Config) (string, error) {
+	local := "/tmp/clone"
+	targetPath := filepath.Join(local, codeSource.GetCodeSourcePath())
+	_, err := os.Stat(targetPath)
+	if err != nil {
+		targetPath = local
+	}
+	return targetPath, nil
 }
 PARAM
 )
