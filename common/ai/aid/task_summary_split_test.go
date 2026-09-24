@@ -5,13 +5,13 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
-	"github.com/yaklang/yaklang/common/ai/aid/aicache"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
+	"github.com/yaklang/yaklang/common/ai/aid/aiprojection"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools"
 )
 
-// 关键词: aicache.Split 单测, P0-A5, task-summary.txt 段稳定性回归
+// 关键词: aiprojection.Split 单测, P0-A5, task-summary.txt 段稳定性回归
 //
 // task-summary prompt 通过 PromptPrefixBuilder 组装为多段 PROMPT_SECTION,
 // 这里通过 assembleTaskSummaryPrompt 验证:
@@ -60,12 +60,12 @@ func renderTaskSummaryFixture(t *testing.T, fixture taskSummaryFixture) string {
 	return prompt
 }
 
-func taskSummaryChunksBySection(t *testing.T, prompt string) map[string][]*aicache.Chunk {
+func taskSummaryChunksBySection(t *testing.T, prompt string) map[string][]*aiprojection.Chunk {
 	t.Helper()
 	require.NotEmpty(t, prompt)
-	res := aicache.Split(prompt)
+	res := aiprojection.Split(prompt)
 	require.NotNil(t, res)
-	out := make(map[string][]*aicache.Chunk)
+	out := make(map[string][]*aiprojection.Chunk)
 	for _, c := range res.Chunks {
 		require.NotNil(t, c)
 		out[c.Section] = append(out[c.Section], c)
@@ -85,25 +85,25 @@ func TestSplit_TaskSummaryPrompt_FourSections(t *testing.T) {
 	sec1 := taskSummaryChunksBySection(t, prompt1)
 	sec2 := taskSummaryChunksBySection(t, prompt2)
 
-	require.NotEmpty(t, sec1[aicache.SectionHighStatic], "task-summary prompt must expose high-static chunk")
-	require.NotEmpty(t, sec1[aicache.SectionDynamic], "task-summary prompt must expose dynamic chunk")
-	require.Empty(t, sec1[aicache.SectionRaw], "task-summary prompt should not produce raw/noise chunk; rendered:\n%s", prompt1)
+	require.NotEmpty(t, sec1[aiprojection.SectionHighStatic], "task-summary prompt must expose high-static chunk")
+	require.NotEmpty(t, sec1[aiprojection.SectionDynamic], "task-summary prompt must expose dynamic chunk")
+	require.Empty(t, sec1[aiprojection.SectionRaw], "task-summary prompt should not produce raw/noise chunk; rendered:\n%s", prompt1)
 	require.Contains(t, prompt1, "<|AI_CACHE_FROZEN_semi-dynamic|>")
 	require.Contains(t, prompt1, "# Tool Inventory")
 	require.Contains(t, prompt1, "`grep`: grep tool")
 	require.NotContains(t, prompt1, "# 牢记")
 
-	require.Equal(t, sec1[aicache.SectionHighStatic][0].Hash, sec2[aicache.SectionHighStatic][0].Hash,
+	require.Equal(t, sec1[aiprojection.SectionHighStatic][0].Hash, sec2[aiprojection.SectionHighStatic][0].Hash,
 		"task-summary high-static hash must be byte-stable across calls")
 
 	// 同一 schema 下, 不同 dynamic 输入仍保持 high-static / semi-dynamic 稳定。
 	stub.CurrentTaskInfo = "current task: scan /var"
 	prompt3 := renderTaskSummaryFixture(t, stub)
 	sec3 := taskSummaryChunksBySection(t, prompt3)
-	require.Equal(t, sec1[aicache.SectionHighStatic][0].Hash, sec3[aicache.SectionHighStatic][0].Hash,
+	require.Equal(t, sec1[aiprojection.SectionHighStatic][0].Hash, sec3[aiprojection.SectionHighStatic][0].Hash,
 		"task-summary high-static hash must remain stable across different dynamic inputs")
-	if len(sec1[aicache.SectionSemiDynamic1]) > 0 && len(sec3[aicache.SectionSemiDynamic1]) > 0 {
-		require.Equal(t, sec1[aicache.SectionSemiDynamic1][0].Hash, sec3[aicache.SectionSemiDynamic1][0].Hash,
+	if len(sec1[aiprojection.SectionSemiDynamic1]) > 0 && len(sec3[aiprojection.SectionSemiDynamic1]) > 0 {
+		require.Equal(t, sec1[aiprojection.SectionSemiDynamic1][0].Hash, sec3[aiprojection.SectionSemiDynamic1][0].Hash,
 			"task-summary semi-dynamic-1 hash should remain stable when only dynamic input changes")
 	}
 }

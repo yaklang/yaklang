@@ -27,6 +27,12 @@ func TestExportsReasoningEffortOption(t *testing.T) {
 	require.IsType(t, (func(string) aispec.AIConfigOption)(nil), option)
 }
 
+func TestExportsAICacheSessionKeepsLegacyNameAndDirectory(t *testing.T) {
+	sessionDir, ok := Exports["aicacheSession"].(func() string)
+	require.True(t, ok)
+	require.Equal(t, "aicache", filepath.Base(filepath.Dir(sessionDir())))
+}
+
 func TestModelInfoCallbacksIncludeThinkingLevelAndKeepLegacyCompatibility(t *testing.T) {
 	const provider = "test-resolved-model-info"
 	aispec.Register(provider, func() aispec.AIClient { return &TestGateway{} })

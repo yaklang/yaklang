@@ -1274,7 +1274,7 @@ func (pm *PromptManager) renderLoopDynamicSection(data map[string]any) (string, 
 //
 // 内层 PROMPT_SECTION_semi-dynamic-1 / -2 标签保留 (不会与 AI_CACHE_SEMI / SEMI2
 // 冲突, tagName 不同), 让 splitter 6 段切片仍能识别 semi-dynamic-1/2 段.
-// 字面量必须与 aicache.semiBoundaryTagName / semi2BoundaryTagName 严格一致.
+// 字面量必须与 aiprojection.semiBoundaryTagName / semi2BoundaryTagName 严格一致.
 //
 // 关键词: buildTaggedPromptSections, 6 段拼接, AI_CACHE_FROZEN, AI_CACHE_SEMI,
 //

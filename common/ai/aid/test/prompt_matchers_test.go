@@ -22,7 +22,7 @@ package test
 // timeline 里任意"abandon"字样组合误命中, 把 `directly_answer` prompt
 // 错判为"wrong-tool"分支, 导致 5 次 retry 后任务超时.
 //
-// 详见 common/ai/aid/aicache/LESSONS_LEARNED.md 第 6 节 "反例与教训"
+// 约束见 common/ai/aid/aiprojection/README.md
 // 以及 common/ai/aid/aireact/prompts/loop/README.md.
 //
 // 关键词: prompt-mock 分流, high-static 散文污染, schema 字面量解耦,

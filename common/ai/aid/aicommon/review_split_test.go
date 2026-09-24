@@ -7,11 +7,11 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
-	"github.com/yaklang/yaklang/common/ai/aid/aicache"
+	"github.com/yaklang/yaklang/common/ai/aid/aiprojection"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 )
 
-// 关键词: aicache.Split 单测, P0-A5, review 模板段稳定性回归
+// 关键词: aiprojection.Split 单测, P0-A5, review 模板段稳定性回归
 //
 // 这些测试覆盖 P0-A4 阶段重构后的 3 大 review prompt 模板:
 //
@@ -22,12 +22,12 @@ import (
 //  2. 至少包含 high-static 与 dynamic 两段
 //  3. high-static 段 hash 在跨调用 (不同 nonce) 下保持稳定
 
-func chunksBySection(t *testing.T, prompt string) map[string][]*aicache.Chunk {
+func chunksBySection(t *testing.T, prompt string) map[string][]*aiprojection.Chunk {
 	t.Helper()
 	require.NotEmpty(t, prompt, "split target prompt should not be empty")
-	res := aicache.Split(prompt)
+	res := aiprojection.Split(prompt)
 	require.NotNil(t, res)
-	out := make(map[string][]*aicache.Chunk)
+	out := make(map[string][]*aiprojection.Chunk)
 	for _, c := range res.Chunks {
 		require.NotNil(t, c)
 		out[c.Section] = append(out[c.Section], c)
@@ -52,11 +52,11 @@ func TestSplit_PlanReviewPrompt_FourSections(t *testing.T) {
 	sec1 := chunksBySection(t, prompt1)
 	sec2 := chunksBySection(t, prompt2)
 
-	require.NotEmpty(t, sec1[aicache.SectionHighStatic], "plan-review prompt must expose high-static chunk")
-	require.NotEmpty(t, sec1[aicache.SectionDynamic], "plan-review prompt must expose dynamic chunk")
-	require.Empty(t, sec1[aicache.SectionRaw], "plan-review prompt should not produce raw/noise chunk; rendered:\n%s", prompt1)
+	require.NotEmpty(t, sec1[aiprojection.SectionHighStatic], "plan-review prompt must expose high-static chunk")
+	require.NotEmpty(t, sec1[aiprojection.SectionDynamic], "plan-review prompt must expose dynamic chunk")
+	require.Empty(t, sec1[aiprojection.SectionRaw], "plan-review prompt should not produce raw/noise chunk; rendered:\n%s", prompt1)
 
-	require.Equal(t, sec1[aicache.SectionHighStatic][0].Hash, sec2[aicache.SectionHighStatic][0].Hash,
+	require.Equal(t, sec1[aiprojection.SectionHighStatic][0].Hash, sec2[aiprojection.SectionHighStatic][0].Hash,
 		"plan-review high-static hash must be byte-stable across calls")
 }
 
@@ -82,11 +82,11 @@ func TestSplit_TaskReviewPrompt_FourSections(t *testing.T) {
 	sec1 := chunksBySection(t, prompt1)
 	sec2 := chunksBySection(t, prompt2)
 
-	require.NotEmpty(t, sec1[aicache.SectionHighStatic], "task-review prompt must expose high-static chunk")
-	require.NotEmpty(t, sec1[aicache.SectionDynamic], "task-review prompt must expose dynamic chunk")
-	require.Empty(t, sec1[aicache.SectionRaw], "task-review prompt should not produce raw/noise chunk; rendered:\n%s", prompt1)
+	require.NotEmpty(t, sec1[aiprojection.SectionHighStatic], "task-review prompt must expose high-static chunk")
+	require.NotEmpty(t, sec1[aiprojection.SectionDynamic], "task-review prompt must expose dynamic chunk")
+	require.Empty(t, sec1[aiprojection.SectionRaw], "task-review prompt should not produce raw/noise chunk; rendered:\n%s", prompt1)
 
-	require.Equal(t, sec1[aicache.SectionHighStatic][0].Hash, sec2[aicache.SectionHighStatic][0].Hash,
+	require.Equal(t, sec1[aiprojection.SectionHighStatic][0].Hash, sec2[aiprojection.SectionHighStatic][0].Hash,
 		"task-review high-static hash must be byte-stable across calls")
 	require.Contains(t, prompt1, "<|AI_CACHE_FROZEN_semi-dynamic|>")
 	require.Contains(t, prompt1, "# Tool Inventory")
@@ -113,10 +113,10 @@ func TestSplit_ToolCallReviewPrompt_FourSections(t *testing.T) {
 	sec1 := chunksBySection(t, prompt1)
 	sec2 := chunksBySection(t, prompt2)
 
-	require.NotEmpty(t, sec1[aicache.SectionHighStatic], "tool-call review prompt must expose high-static chunk")
-	require.NotEmpty(t, sec1[aicache.SectionDynamic], "tool-call review prompt must expose dynamic chunk")
-	require.Empty(t, sec1[aicache.SectionRaw], "tool-call review prompt should not produce raw/noise chunk; rendered:\n%s", prompt1)
+	require.NotEmpty(t, sec1[aiprojection.SectionHighStatic], "tool-call review prompt must expose high-static chunk")
+	require.NotEmpty(t, sec1[aiprojection.SectionDynamic], "tool-call review prompt must expose dynamic chunk")
+	require.Empty(t, sec1[aiprojection.SectionRaw], "tool-call review prompt should not produce raw/noise chunk; rendered:\n%s", prompt1)
 
-	require.Equal(t, sec1[aicache.SectionHighStatic][0].Hash, sec2[aicache.SectionHighStatic][0].Hash,
+	require.Equal(t, sec1[aiprojection.SectionHighStatic][0].Hash, sec2[aiprojection.SectionHighStatic][0].Hash,
 		"tool-call review high-static hash must be byte-stable across calls")
 }

@@ -128,12 +128,10 @@ type ChatUsage struct {
 	// 关键词: 多模态 token 拆分, prompt_tokens_details, dashscope omni 计费
 	PromptTokensDetails *PromptTokensDetails `json:"prompt_tokens_details,omitempty"`
 
-	// MirrorCorrelationID 由 mirror observer (例如 aicache) 通过
-	// ChatBaseMirrorResult.MirrorCorrelationID 写入, ChatBase 在调用
-	// UsageCallback 前会把该 ID 复制到 usage 上, 让上层订阅者能用稳定 ID
-	// 把本次 SSE 末帧 usage 与 mirror 落盘 (aicache dump) 对齐.
-	// 不会下发到上游 LLM, 仅在进程内部 plumbing 与 cachebench 等订阅方使用.
-	// 关键词: ChatUsage MirrorCorrelationID, aicache dump usage 对齐
+	// MirrorCorrelationID is the existing usage field for request correlation.
+	// ChatBase copies ChatBaseHijackResult.CorrelationID into it before usage
+	// callbacks so a debug dump can be joined with provider token usage.
+	// It is not sent to the provider.
 	MirrorCorrelationID string `json:"mirror_correlation_id,omitempty"`
 }
 

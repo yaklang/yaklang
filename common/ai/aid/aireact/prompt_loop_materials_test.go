@@ -11,8 +11,8 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
-	"github.com/yaklang/yaklang/common/ai/aid/aicache"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
+	"github.com/yaklang/yaklang/common/ai/aid/aiprojection"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/ai/aispec"
@@ -137,9 +137,9 @@ func TestPromptManager_ModelReasoningReplayInterleavesTimelineFactsInFinalMessag
 	require.Contains(t, assembled.Prompt, "TIMELINE_MODEL_THINKING_V1_interleave1")
 	require.Contains(t, assembled.Prompt, "TIMELINE_MODEL_THINKING_V1_interleave2")
 
-	restoreThreshold := aicache.SetMinCachableUserSegmentBytesForTest(0)
+	restoreThreshold := aiprojection.SetMinCachableUserSegmentBytesForTest(0)
 	defer restoreThreshold()
-	hijacked := aicache.Observe("memfit-standard-thinking-free", assembled.Prompt)
+	hijacked := aiprojection.ProjectAndObserve("memfit-standard-thinking-free", assembled.Prompt)
 	require.NotNil(t, hijacked)
 	require.True(t, hijacked.IsHijacked)
 
@@ -685,7 +685,7 @@ func TestPromptManager_NewPromptMaterials_ConfigFrozenPartitionProducer(t *testi
 
 // TestPromptManager_AssembleLoopPrompt_HijackFiveSegment 验证 aireact 主路径
 // 产出的 prompt (SYSTEM + FROZEN + SEMI-1 + SEMI-2 + OPEN + DYNAMIC, 三 cache
-// 边界齐全) 经 aicache.Observe 后被 hijacker 切成 5 段:
+// 边界齐全) 经 aiprojection.ProjectAndObserve 后被 hijacker 切成 5 段:
 //   - system: 含 AI_CACHE_SYSTEM_high-static 包装, 主动 cc
 //   - user1: 含 AI_CACHE_FROZEN_semi-dynamic 完整闭合块 (Tool/Forge/Timeline-frozen),
 //     字节边界稳定, 主动 cc
@@ -707,7 +707,7 @@ func TestPromptManager_AssembleLoopPrompt_HijackFiveSegment(t *testing.T) {
 	// 一个 tool, 总字节数 << 1KB) 合并降级到 2 段, 与本测试断言的 5 段 happy
 	// path 不符. 显式关闭阈值合并以验证字节边界结构.
 	// 关键词: P2.1 阈值合并跨包关闭, aicache test helper, 5 段结构验证
-	restore := aicache.SetMinCachableUserSegmentBytesForTest(0)
+	restore := aiprojection.SetMinCachableUserSegmentBytesForTest(0)
 	defer restore()
 
 	react, err := NewTestReAct(
@@ -733,7 +733,7 @@ func TestPromptManager_AssembleLoopPrompt_HijackFiveSegment(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	hijack := aicache.Observe("test-model", result.Prompt)
+	hijack := aiprojection.ProjectAndObserve("test-model", result.Prompt)
 	require.NotNil(t, hijack, "loop prompt with high-static + frozen + semi-1 + semi-2 blocks should be hijacked")
 	require.True(t, hijack.IsHijacked)
 	require.Len(t, hijack.Messages, 5, "expect 5-segment hijack (system + user1 + user2 + user3 + user4)")
@@ -812,7 +812,7 @@ func TestPromptManager_AssembleLoopPrompt_HijackFiveSegment(t *testing.T) {
 }
 
 func TestPromptManager_AssembleLoopPrompt_DoesNotRenderSessionArtifacts(t *testing.T) {
-	restore := aicache.SetMinCachableUserSegmentBytesForTest(0)
+	restore := aiprojection.SetMinCachableUserSegmentBytesForTest(0)
 	defer restore()
 
 	workDir := t.TempDir()
@@ -846,7 +846,7 @@ func TestPromptManager_AssembleLoopPrompt_DoesNotRenderSessionArtifacts(t *testi
 	})
 	require.NoError(t, err)
 
-	hijack := aicache.Observe("test-model", result.Prompt)
+	hijack := aiprojection.ProjectAndObserve("test-model", result.Prompt)
 	require.NotNil(t, hijack)
 	require.True(t, hijack.IsHijacked)
 	require.Len(t, hijack.Messages, 5)
@@ -865,7 +865,7 @@ func TestPromptManager_AssembleLoopPrompt_DoesNotRenderSessionArtifacts(t *testi
 }
 
 func TestPromptManager_AssembleLoopPrompt_EmptySemiDynamic1StillKeepsWrapper(t *testing.T) {
-	restore := aicache.SetMinCachableUserSegmentBytesForTest(0)
+	restore := aiprojection.SetMinCachableUserSegmentBytesForTest(0)
 	defer restore()
 
 	react, err := NewTestReAct(
@@ -892,14 +892,14 @@ func TestPromptManager_AssembleLoopPrompt_EmptySemiDynamic1StillKeepsWrapper(t *
 	require.Contains(t, result.Prompt, "<|PROMPT_SECTION_semi-dynamic-1|>")
 	require.Contains(t, result.Prompt, "<|PROMPT_SECTION_END_semi-dynamic-1|>")
 
-	split := aicache.Split(result.Prompt)
+	split := aiprojection.Split(result.Prompt)
 	require.NotNil(t, split)
 	sectionsBySection := make(map[string]int)
 	for _, c := range split.Chunks {
 		sectionsBySection[c.Section]++
 	}
-	require.Equal(t, 1, sectionsBySection[aicache.SectionSemiDynamic1])
-	require.Zero(t, sectionsBySection[aicache.SectionRaw])
+	require.Equal(t, 1, sectionsBySection[aiprojection.SectionSemiDynamic1])
+	require.Zero(t, sectionsBySection[aiprojection.SectionRaw])
 }
 
 // requireMessageHasCacheControl 断言 ChatDetail 主动打了 ephemeral cc:
@@ -1045,7 +1045,7 @@ func chatDetailContentString(detail aispec.ChatDetail) string {
 }
 
 // TestPromptManager_AssembleLoopPrompt_AicacheSplitClassification 验证 aireact
-// 新"按稳定性分层"路径产出的 prompt 经 aicache.Split 后:
+// 新"按稳定性分层"路径产出的 prompt 经 aiprojection.Split 后:
 //   - high-static / semi-dynamic-1 / semi-dynamic-2 / timeline-open / dynamic
 //     各自被识别 (P1.1 拆 semi)
 //   - 老 SectionSemiDynamic 不再出现 (新路径已拆成 semi-dynamic-1 + semi-dynamic-2)
@@ -1079,7 +1079,7 @@ func TestPromptManager_AssembleLoopPrompt_AicacheSplitClassification(t *testing.
 	require.NoError(t, err)
 	require.NotEmpty(t, result.Prompt)
 
-	split := aicache.Split(result.Prompt)
+	split := aiprojection.Split(result.Prompt)
 	require.NotNil(t, split)
 	require.NotEmpty(t, split.Chunks)
 
@@ -1087,20 +1087,20 @@ func TestPromptManager_AssembleLoopPrompt_AicacheSplitClassification(t *testing.
 	for _, c := range split.Chunks {
 		sectionsBySection[c.Section]++
 	}
-	require.Equal(t, 1, sectionsBySection[aicache.SectionHighStatic],
+	require.Equal(t, 1, sectionsBySection[aiprojection.SectionHighStatic],
 		"expect exactly one high-static chunk, got: %v", sectionsBySection)
-	require.Equal(t, 1, sectionsBySection[aicache.SectionSemiDynamic1],
+	require.Equal(t, 1, sectionsBySection[aiprojection.SectionSemiDynamic1],
 		"expect exactly one semi-dynamic-1 chunk (P1.1 split), got: %v", sectionsBySection)
-	require.Equal(t, 1, sectionsBySection[aicache.SectionSemiDynamic2],
+	require.Equal(t, 1, sectionsBySection[aiprojection.SectionSemiDynamic2],
 		"expect exactly one semi-dynamic-2 chunk (P1.1 split), got: %v", sectionsBySection)
-	require.Equal(t, 1, sectionsBySection[aicache.SectionTimelineOpen],
+	require.Equal(t, 1, sectionsBySection[aiprojection.SectionTimelineOpen],
 		"expect exactly one timeline-open chunk, got: %v", sectionsBySection)
-	require.Equal(t, 1, sectionsBySection[aicache.SectionDynamic],
+	require.Equal(t, 1, sectionsBySection[aiprojection.SectionDynamic],
 		"expect exactly one dynamic chunk, got: %v", sectionsBySection)
 	// P1.1 后老 SectionSemiDynamic / SectionTimeline 段名都不应再出现.
-	require.Zero(t, sectionsBySection[aicache.SectionSemiDynamic],
+	require.Zero(t, sectionsBySection[aiprojection.SectionSemiDynamic],
 		"new path should not emit legacy semi-dynamic section after P1.1 split, got: %v", sectionsBySection)
-	require.Zero(t, sectionsBySection[aicache.SectionTimeline],
+	require.Zero(t, sectionsBySection[aiprojection.SectionTimeline],
 		"new path should not emit legacy timeline section, got: %v", sectionsBySection)
 }
 

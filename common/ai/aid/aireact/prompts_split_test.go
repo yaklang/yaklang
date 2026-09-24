@@ -6,12 +6,12 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
-	"github.com/yaklang/yaklang/common/ai/aid/aicache"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
+	"github.com/yaklang/yaklang/common/ai/aid/aiprojection"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 )
 
-// 关键词: aicache.Split 单测, P0-A5, 模板段稳定性回归
+// 关键词: aiprojection.Split 单测, P0-A5, 模板段稳定性回归
 //
 // 这些测试覆盖 P0-A 阶段重构后的 4 大 prompt 模板, 用于:
 //  1. 保证模板被 aicache splitter 识别为多段 chunk (不再出 raw/noise)
@@ -21,12 +21,12 @@ import (
 
 // chunkSections 把 splitter 输出的 chunks 收集成 section -> chunks 映射,
 // 方便断言。
-func chunkSections(t *testing.T, prompt string) map[string][]*aicache.Chunk {
+func chunkSections(t *testing.T, prompt string) map[string][]*aiprojection.Chunk {
 	t.Helper()
 	require.NotEmpty(t, prompt, "split target prompt should not be empty")
-	res := aicache.Split(prompt)
+	res := aiprojection.Split(prompt)
 	require.NotNil(t, res, "Split result should not be nil")
-	out := make(map[string][]*aicache.Chunk)
+	out := make(map[string][]*aiprojection.Chunk)
 	for _, c := range res.Chunks {
 		require.NotNil(t, c)
 		out[c.Section] = append(out[c.Section], c)
@@ -53,7 +53,7 @@ func newSplitTestReact(t *testing.T) *ReAct {
 //   - 不出现 raw/noise chunk
 //   - 跨调用下 high-static / semi-dynamic-1 / semi-dynamic-2 段 hash 稳定
 //
-// 关键词: verification prompt split, semi-dynamic-1, semi-dynamic-2, aicache.Split
+// 关键词: verification prompt split, semi-dynamic-1, semi-dynamic-2, aiprojection.Split
 func TestSplit_VerificationPrompt_StableSections(t *testing.T) {
 	react := newSplitTestReact(t)
 
@@ -69,18 +69,18 @@ func TestSplit_VerificationPrompt_StableSections(t *testing.T) {
 	sec1 := chunkSections(t, prompt1)
 	sec2 := chunkSections(t, prompt2)
 
-	require.NotEmpty(t, sec1[aicache.SectionHighStatic], "verification prompt must expose high-static chunk")
-	require.NotEmpty(t, sec1[aicache.SectionSemiDynamic1], "verification prompt must expose semi-dynamic-1 chunk")
-	require.NotEmpty(t, sec1[aicache.SectionSemiDynamic2], "verification prompt must expose semi-dynamic-2 chunk")
-	require.NotEmpty(t, sec1[aicache.SectionTimelineOpen], "verification prompt must expose timeline-open chunk")
-	require.NotEmpty(t, sec1[aicache.SectionDynamic], "verification prompt must expose dynamic chunk")
-	require.Empty(t, sec1[aicache.SectionRaw], "verification prompt should not produce raw/noise chunk; rendered output:\n%s", prompt1)
+	require.NotEmpty(t, sec1[aiprojection.SectionHighStatic], "verification prompt must expose high-static chunk")
+	require.NotEmpty(t, sec1[aiprojection.SectionSemiDynamic1], "verification prompt must expose semi-dynamic-1 chunk")
+	require.NotEmpty(t, sec1[aiprojection.SectionSemiDynamic2], "verification prompt must expose semi-dynamic-2 chunk")
+	require.NotEmpty(t, sec1[aiprojection.SectionTimelineOpen], "verification prompt must expose timeline-open chunk")
+	require.NotEmpty(t, sec1[aiprojection.SectionDynamic], "verification prompt must expose dynamic chunk")
+	require.Empty(t, sec1[aiprojection.SectionRaw], "verification prompt should not produce raw/noise chunk; rendered output:\n%s", prompt1)
 
-	require.Equal(t, sec1[aicache.SectionHighStatic][0].Hash, sec2[aicache.SectionHighStatic][0].Hash,
+	require.Equal(t, sec1[aiprojection.SectionHighStatic][0].Hash, sec2[aiprojection.SectionHighStatic][0].Hash,
 		"high-static hash must be byte-stable across calls")
-	require.Equal(t, sec1[aicache.SectionSemiDynamic1][0].Hash, sec2[aicache.SectionSemiDynamic1][0].Hash,
+	require.Equal(t, sec1[aiprojection.SectionSemiDynamic1][0].Hash, sec2[aiprojection.SectionSemiDynamic1][0].Hash,
 		"semi-dynamic-1 hash must be byte-stable across calls")
-	require.Equal(t, sec1[aicache.SectionSemiDynamic2][0].Hash, sec2[aicache.SectionSemiDynamic2][0].Hash,
+	require.Equal(t, sec1[aiprojection.SectionSemiDynamic2][0].Hash, sec2[aiprojection.SectionSemiDynamic2][0].Hash,
 		"semi-dynamic-2 hash must be byte-stable across calls")
 }
 
@@ -89,7 +89,7 @@ func TestSplit_VerificationPrompt_StableSections(t *testing.T) {
 //   - 不出现 raw/noise chunk
 //   - 跨调用下 high-static / semi-dynamic-2 段 hash 稳定
 //
-// 关键词: interval-review split, semi-dynamic-2, timeline-open, aicache.Split
+// 关键词: interval-review split, semi-dynamic-2, timeline-open, aiprojection.Split
 func TestSplit_IntervalReviewPrompt_StableSections(t *testing.T) {
 	react := newSplitTestReact(t)
 
@@ -121,17 +121,17 @@ func TestSplit_IntervalReviewPrompt_StableSections(t *testing.T) {
 	sec1 := chunkSections(t, prompt1)
 	sec2 := chunkSections(t, prompt2)
 
-	require.NotEmpty(t, sec1[aicache.SectionHighStatic], "interval-review prompt must expose high-static chunk")
-	require.NotEmpty(t, sec1[aicache.SectionSemiDynamic2], "interval-review prompt must expose semi-dynamic-2 chunk")
-	require.NotEmpty(t, sec1[aicache.SectionTimelineOpen], "interval-review prompt must expose timeline-open chunk")
-	require.NotEmpty(t, sec1[aicache.SectionDynamic], "interval-review prompt must expose dynamic chunk")
-	require.Empty(t, sec1[aicache.SectionRaw], "interval-review prompt should not produce raw/noise chunk; rendered:\n%s", prompt1)
-	require.Contains(t, sec1[aicache.SectionSemiDynamic2][0].Content, "must be concrete natural-language strings")
-	require.Contains(t, sec1[aicache.SectionSemiDynamic2][0].Content, "interval-toolcall-review")
-	require.Contains(t, sec1[aicache.SectionDynamic][0].Content, "partial output")
+	require.NotEmpty(t, sec1[aiprojection.SectionHighStatic], "interval-review prompt must expose high-static chunk")
+	require.NotEmpty(t, sec1[aiprojection.SectionSemiDynamic2], "interval-review prompt must expose semi-dynamic-2 chunk")
+	require.NotEmpty(t, sec1[aiprojection.SectionTimelineOpen], "interval-review prompt must expose timeline-open chunk")
+	require.NotEmpty(t, sec1[aiprojection.SectionDynamic], "interval-review prompt must expose dynamic chunk")
+	require.Empty(t, sec1[aiprojection.SectionRaw], "interval-review prompt should not produce raw/noise chunk; rendered:\n%s", prompt1)
+	require.Contains(t, sec1[aiprojection.SectionSemiDynamic2][0].Content, "must be concrete natural-language strings")
+	require.Contains(t, sec1[aiprojection.SectionSemiDynamic2][0].Content, "interval-toolcall-review")
+	require.Contains(t, sec1[aiprojection.SectionDynamic][0].Content, "partial output")
 
-	require.Equal(t, sec1[aicache.SectionHighStatic][0].Hash, sec2[aicache.SectionHighStatic][0].Hash,
+	require.Equal(t, sec1[aiprojection.SectionHighStatic][0].Hash, sec2[aiprojection.SectionHighStatic][0].Hash,
 		"high-static hash must be byte-stable across calls")
-	require.Equal(t, sec1[aicache.SectionSemiDynamic2][0].Hash, sec2[aicache.SectionSemiDynamic2][0].Hash,
+	require.Equal(t, sec1[aiprojection.SectionSemiDynamic2][0].Hash, sec2[aiprojection.SectionSemiDynamic2][0].Hash,
 		"semi-dynamic-2 hash must be byte-stable across calls")
 }

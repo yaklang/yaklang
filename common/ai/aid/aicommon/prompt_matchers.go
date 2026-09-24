@@ -15,7 +15,7 @@ import "strings"
 // kebab-case); use semantic Chinese placeholders instead.
 //
 // When static prompts are edited, the散文 (prose) MUST NOT contain any concrete
-// action literal. See common/ai/aid/aicache/LESSONS_LEARNED.md §6.
+// action literal. See common/ai/aid/aiprojection/README.md.
 
 // --- 参数生成场景识别 (R2 / R3 / R5) ---
 
