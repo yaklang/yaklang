@@ -336,13 +336,18 @@ func HalfOpen(ctx context.Context, device, source, gateway, target string) error
 
 **如何区分结果：** 使用 `errors.Is` 检查返回错误。
 
-- 无错误：收到与接口、四元组、本次 SYN 序号匹配的 SYN-ACK，可报告 open。
+- 无错误：收到与接口、四元组、本次 SYN 序号匹配的 SYN-ACK。在已确认不代答的网络路径上可报告 open；相关性校验不能识别透明代理伪造的远端响应。
 - `ErrProbeRefused`：收到匹配的 RST+ACK；是一次明确的拒绝响应。
 - `ErrProbeNoResponse`：尝试预算耗尽，未收到有效响应；可能丢包、被过滤或目标不可达，**不能据此判定 closed**。
+- `ErrUnverifiedSYNTransport`：所选非回环接口使用 raw-IP 或 point-to-point 传输，默认拒绝创建主动会话，避免代理 SYN-ACK 被直接解释为真实端口开放。
 - `ErrProbeSend`：本地发送/生成失败，保留底层错误；不能解释为目标无响应。
 - `context.Canceled` / `context.DeadlineExceeded`：调用者或生命周期取消/超时。
 
 报文还需通过 flags、长度、分片检查。物理接口校验 IPv4/TCP 校验和；已知 loopback 接口允许宿主栈的校验和卸载占位值，例如 macOS `lo0`。SYN-ACK 和 RST 都不注入 gVisor。来源、目标、端口、ACK 不匹配的报文，以及旧探测的迟到响应不能直接生成结果；生成 SYN 时也核对 endpoint 自身的 ISN，防止队列中的旧 SYN 被误认成本次发送。
+
+**TUN / 透明代理误报：** Windows 实机的 sing-tun `tun0`（Npcap DLT 12）会对未监听端口返回匹配的 SYN-ACK，而远端没有接受连接。这种代答同样可以通过四元组、ACK、校验和检查；重试无法解决，也不能通过发送第三次 ACK“验证”而仍称为半开扫描。
+
+因此会话默认只接纳 Ethernet 和已识别的主机 loopback；其他链路或 point-to-point 接口在启用注入之前返回 `ErrUnverifiedSYNTransport`。`synscanx` 沿用该默认策略，不会退回旧发包器或偷偷完成握手。路由选中代理 TUN 时，应显式选择物理接口及对应的源 IP/网关。`HalfOpenSYNConfig.AllowUnverifiedTransport: true` 仅为已核实路径的低层调用者保留；启用后必须自行解释结果，不能直接承诺远端 open。Ethernet 上也可能存在透明 SYN 代理，此策略不是响应来源的密码学认证。需要应用连通性证据时另做完整连接，并把结果与半开探测区分。
 
 **突发流量与算法：** “写成功”仅表示 libpcap 接受报文，不保证网卡、网络或对端收到。gVisor 的有界输出队列、pcap 每订阅者的 1000 包接收队列、内核捕获缓冲和远端设备都可能丢包。扩大队列不是可靠性保证。
 
@@ -398,7 +403,68 @@ NETSTACKVM_PCAP_DEVICE=lo0 go test -race ./common/netstackvm \
   -run '^TestPCAPLiveLoopbackOptional$' -count=3 -timeout=30s
 ```
 
-Linux 应选择实际的回环接口名，例如 `lo`，并确保具有抓包权限。Windows 需要匹配实际捕获设备及抓包环境；本手册不宣称已经完成 Windows 实机验证。
+Linux 应选择实际的回环接口名，例如 `lo`，并确保具有抓包权限。
+
+Windows 已在 Windows 11 / Go 1.22.12 amd64 / LLVM MinGW / Npcap 环境原生执行 race 检测和真实抓包测试。编译需要 CGO 和兼容的 C 编译器；`go test -c -race` 生成的二进制也可以复制到安装 Npcap 的 Windows 机器运行。PowerShell 示例（先确保 `go`、编译器在当前进程 PATH 中）：
+
+```powershell
+$env:CGO_ENABLED = '1'
+$env:CC = 'x86_64-w64-mingw32-clang.exe'
+$env:NETSTACKVM_PCAP_DEVICE = 'Loopback Pseudo-Interface 1'
+go test -race ./common/netstackvm ./common/synscanx -count=3 -shuffle=on -timeout=180s
+```
+
+`NETSTACKVM_PCAP_DEVICE` 使用 `net.InterfaceByName` 可识别的回环接口名。可选实机用例检查 64 次探测期间已有 TCP 连接保持可用、监听器没有接受半开连接、丢弃前两次捕获响应后重试成功、匹配 RST、ctx 取消和抓包关闭耗时。默认不设置变量时，这些实机测试跳过，mock 测试仍执行。
+
+对安装了代理 TUN 的机器，还可验证默认拒绝以及低层显式 opt-in 的生命周期；该测试不向远端发送 SYN：
+
+```powershell
+$env:NETSTACKVM_UNVERIFIED_DEVICE = 'tun0'
+$env:NETSTACKVM_UNVERIFIED_SOURCE = '172.18.0.1' # 改成接口的实际地址
+go test -race ./common/netstackvm -run '^TestHalfOpenPCAPUnverifiedTransportRejected$' -count=3 -timeout=60s
+```
+
+物理网卡可通过 `TestHalfOpenPCAPControlledPeer` 做双端验证：在受控对端保持一个普通 TCP 连接，读取服务的累计 Accept 数，探测 16 次，再检查 Accept 数不变且原连接仍可读写。对端协议为 `COUNT\n` 返回十进制累计连接数和换行。设置 `NETSTACKVM_LIVE_DEVICE`、`NETSTACKVM_LIVE_SOURCE`、`NETSTACKVM_LIVE_TARGET`（`IP:port`），跨网段时设置 `NETSTACKVM_LIVE_GATEWAY`；可另设 `NETSTACKVM_LIVE_CLOSED_TARGET` 指向确定未监听端口。后者允许匹配拒绝或无响应，绝不允许 open，因为防火墙可能丢弃 RST。
+
+```powershell
+$env:NETSTACKVM_LIVE_DEVICE = '以太网'
+$env:NETSTACKVM_LIVE_SOURCE = '192.168.0.140' # 改为测试机实际地址
+$env:NETSTACKVM_LIVE_TARGET = '192.168.0.135:59823' # 改为受控服务地址
+go test -race ./common/netstackvm -run '^TestHalfOpenPCAPControlledPeer$' -count=1 -timeout=60s
+```
+
+对端可用以下 Python 3 服务，运行时传入对端的 LAN IPv4。它打印两个端口：第一个监听并统计连接，第二个只绑定而不监听。将输出填入上面的 target 变量，验收后用 Ctrl-C 退出。
+
+```python
+# python3 peer.py <LAN_IP>
+import socket, sys, threading
+listener = socket.socket()
+listener.bind((sys.argv[1], 0))
+listener.listen(128)
+closed = socket.socket()
+closed.bind((sys.argv[1], 0))
+print("open:", listener.getsockname(), "non-listening:", closed.getsockname(), flush=True)
+lock, accepted = threading.Lock(), 0
+
+def serve(conn):
+    try:
+        with conn, conn.makefile("rwb", buffering=0) as stream:
+            for line in stream:
+                if line.strip() == b"COUNT":
+                    with lock:
+                        count = accepted
+                    stream.write((str(count) + "\n").encode())
+    except OSError:
+        pass
+
+while True:
+    conn, _ = listener.accept()
+    with lock:
+        accepted += 1
+    threading.Thread(target=serve, args=(conn,), daemon=True).start()
+```
+
+这些实机测试是有限流量的功能回归，不代表任意速率下不会丢包，也不证明所有 Npcap、VPN 或网卡驱动组合行为一致。
 
 只测试主机非回环接口能否打开，可显式运行已有的可选测试：
 
@@ -423,7 +489,7 @@ NETSTACK_TRY_NIC=1 go test ./common/netstackvm \
 
 ```sh
 NETSTACKVM_PCAP_DEVICE=lo0 go test -race ./common/netstackvm \
-  -run '^TestHalfOpenPCAPLoopbackDoesNotAccept$' -count=1 -timeout=30s
+  -run '^TestHalfOpenPCAP' -count=3 -timeout=90s
 ```
 
 ## 11. 常见问题

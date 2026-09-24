@@ -22,6 +22,10 @@ import (
 
 var errHalfOpenClosed = errors.New("half-open SYN session is closed")
 
+// ErrUnverifiedSYNTransport means the interface may terminate TCP locally and
+// synthesize SYN-ACKs without consulting the destination (for example a TUN proxy).
+var ErrUnverifiedSYNTransport = errors.New("half-open SYN requires a verified transport")
+
 // HalfOpenSYNConfig is the host identity a half-open SYN session borrows.
 // The session does not run DHCP and does not invent a gateway.
 type HalfOpenSYNConfig struct {
@@ -33,6 +37,10 @@ type HalfOpenSYNConfig struct {
 	Iface            *net.Interface
 	SourceIP         net.IP
 	Gateway          net.IP
+	// AllowUnverifiedTransport opts into raw-IP/point-to-point interfaces.
+	// A matching SYN-ACK on these interfaces is not evidence of an open remote
+	// port: a proxy may synthesize it even when the destination is closed.
+	AllowUnverifiedTransport bool
 	// OnOpen is called once per successful probe on its
 	// worker, outside the capture loop. It must return promptly.
 	OnOpen func(ip net.IP, port int)
@@ -59,9 +67,10 @@ type HalfOpenSYN struct {
 	main  *NetStackVirtualMachineEntry
 	loop  *NetStackVirtualMachineEntry
 	// mainIsLoopback is true when main itself is the host loopback device.
-	mainIsLoopback bool
-	gateway        net.IP
-	onOpen         func(net.IP, int)
+	mainIsLoopback           bool
+	allowUnverifiedTransport bool
+	gateway                  net.IP
+	onOpen                   func(net.IP, int)
 
 	flights map[flightKey]*synFlight
 }
@@ -148,11 +157,12 @@ func OpenHalfOpenSYN(ctx context.Context, cfg HalfOpenSYNConfig) (*HalfOpenSYN, 
 		slots:   make(chan struct{}, cfg.MaxInFlight),
 		limiter: rate.NewLimiter(rate.Limit(cfg.PacketsPerSecond), 1),
 		retry:   cfg.Retry, onResult: cfg.OnResult, done: make(chan struct{}),
-		stack:          stackIns,
-		gateway:        ipv4Only(cfg.Gateway),
-		onOpen:         cfg.OnOpen,
-		flights:        make(map[flightKey]*synFlight),
-		mainIsLoopback: cfg.Iface.Flags&net.FlagLoopback != 0,
+		stack:                    stackIns,
+		gateway:                  ipv4Only(cfg.Gateway),
+		onOpen:                   cfg.OnOpen,
+		flights:                  make(map[flightKey]*synFlight),
+		mainIsLoopback:           cfg.Iface.Flags&net.FlagLoopback != 0,
+		allowUnverifiedTransport: cfg.AllowUnverifiedTransport,
 	}
 	h.main, err = h.openEntry(cfg.Iface, src, maskFor(cfg.Iface, src), h.gateway, ifaceNeedsResolution(cfg.Iface))
 	if err != nil {
@@ -199,6 +209,10 @@ func (h *HalfOpenSYN) openEntry(iface *net.Interface, ip net.IP, mask net.IPMask
 	if err != nil {
 		return nil, err
 	}
+	if err := validateHalfOpenTransport(iface, vm.driver.adaptor.linkType, h.allowUnverifiedTransport); err != nil {
+		vm.Close()
+		return nil, err
+	}
 	nic := vm.MainNICID()
 	vm.driver.SetPCAPOutboundFilter(func(packet gopacket.Packet) bool { return h.allowOutbound(nic, packet) })
 	vm.driver.SetPCAPInboundFilter(func(packet gopacket.Packet) bool { return h.observeInbound(nic, packet) })
@@ -232,6 +246,16 @@ func (h *HalfOpenSYN) openEntry(iface *net.Interface, ip net.IP, mask net.IPMask
 		})
 	}
 	return vm, nil
+}
+
+func validateHalfOpenTransport(iface *net.Interface, link layers.LinkType, allowUnverified bool) error {
+	if iface.Flags&net.FlagLoopback != 0 || allowUnverified {
+		return nil
+	}
+	if link != layers.LinkTypeEthernet || iface.Flags&net.FlagPointToPoint != 0 {
+		return fmt.Errorf("%w: interface %q link type %d may synthesize SYN-ACKs; select a physical interface or explicitly set AllowUnverifiedTransport after verifying the path", ErrUnverifiedSYNTransport, iface.Name, link)
+	}
+	return nil
 }
 
 func (h *HalfOpenSYN) seedGateway(vm *NetStackVirtualMachineEntry, gateway net.IP) {

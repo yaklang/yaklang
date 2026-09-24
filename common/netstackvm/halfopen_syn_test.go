@@ -1,9 +1,11 @@
 package netstackvm
 
 import (
+	"bufio"
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"net"
 	"os"
 	"sync"
@@ -456,4 +458,266 @@ func TestPCAPWriteQueueWaitHonorsContext(t *testing.T) {
 	require.ErrorIs(t, fanout.WritePacketContext(ctx, []byte{1}), context.DeadlineExceeded)
 	<-fanout.writeGate
 	require.Empty(t, fanout.writeGate)
+}
+
+// These tests are opt-in and only contact listeners created by the test.
+func liveHalfOpenInterface(t *testing.T) *net.Interface {
+	t.Helper()
+	device := os.Getenv("NETSTACKVM_PCAP_DEVICE")
+	if device == "" {
+		t.Skip("set NETSTACKVM_PCAP_DEVICE to enable real loopback tests")
+	}
+	iface, err := net.InterfaceByName(device)
+	require.NoError(t, err)
+	if iface.Flags&net.FlagLoopback == 0 {
+		t.Skip("this live test only uses loopback")
+	}
+	return iface
+}
+
+func TestHalfOpenPCAPBatchPreservesHostConnection(t *testing.T) {
+	iface := liveHalfOpenInterface(t)
+	listener, err := net.ListenTCP("tcp4", &net.TCPAddr{IP: net.IPv4(127, 0, 0, 1)})
+	require.NoError(t, err)
+	defer listener.Close()
+	var accepted atomic.Int32
+	serverDone := make(chan struct{})
+	go func() {
+		defer close(serverDone)
+		for {
+			conn, err := listener.Accept()
+			if err != nil {
+				return
+			}
+			accepted.Add(1)
+			go func() { defer conn.Close(); _, _ = io.Copy(conn, conn) }()
+		}
+	}()
+	host, err := net.DialTimeout("tcp4", listener.Addr().String(), time.Second)
+	require.NoError(t, err)
+	defer host.Close()
+	echo := func() {
+		require.NoError(t, host.SetDeadline(time.Now().Add(2*time.Second)))
+		_, err := host.Write([]byte("host-health"))
+		require.NoError(t, err)
+		reply := make([]byte, len("host-health"))
+		_, err = io.ReadFull(host, reply)
+		require.NoError(t, err)
+		require.Equal(t, "host-health", string(reply))
+	}
+	echo()
+	const count = 64
+	var opened atomic.Int32
+	results := make(chan error, count)
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+	h, err := OpenHalfOpenSYN(ctx, HalfOpenSYNConfig{Iface: iface, SourceIP: net.IPv4(127, 0, 0, 1), MaxInFlight: 16, PacketsPerSecond: 200,
+		OnOpen: func(net.IP, int) { opened.Add(1) }, OnResult: func(_ string, _ TCPSegment, e error) { results <- e }})
+	require.NoError(t, err)
+	defer h.Close()
+	for i := 0; i < count; i++ {
+		require.NoError(t, h.Emit(ctx, "127.0.0.1", listener.Addr().(*net.TCPAddr).Port))
+		if i%8 == 0 {
+			echo()
+		}
+	}
+	require.NoError(t, h.Wait(ctx))
+	for i := 0; i < count; i++ {
+		require.NoError(t, <-results)
+	}
+	require.EqualValues(t, count, opened.Load())
+	echo()
+	require.NoError(t, h.Close())
+	echo()
+	// Only the ordinary host socket may have completed a handshake.
+	require.EqualValues(t, 1, accepted.Load())
+	host.Close()
+	listener.Close()
+	<-serverDone
+	h.mu.Lock()
+	require.Empty(t, h.flights)
+	h.mu.Unlock()
+	require.Empty(t, h.slots)
+}
+
+func TestHalfOpenPCAPRetryAfterCapturedReplyLoss(t *testing.T) {
+	iface := liveHalfOpenInterface(t)
+	listener, err := net.ListenTCP("tcp4", &net.TCPAddr{IP: net.IPv4(127, 0, 0, 1)})
+	require.NoError(t, err)
+	defer listener.Close()
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	h, err := OpenHalfOpenSYN(ctx, HalfOpenSYNConfig{Iface: iface, SourceIP: net.IPv4(127, 0, 0, 1), Retry: SYNRetryPolicy{4, time.Second, 200 * time.Millisecond, time.Second}})
+	require.NoError(t, err)
+	defer h.Close()
+	var replies atomic.Int32
+	h.main.driver.SetPCAPInboundFilter(func(packet gopacket.Packet) bool {
+		_, tcp, ok := ipv4TCP(packet)
+		if ok && tcp.SYN && tcp.ACK && int(tcp.SrcPort) == listener.Addr().(*net.TCPAddr).Port && replies.Add(1) <= 2 {
+			return false
+		}
+		return h.observeInbound(h.main.MainNICID(), packet)
+	})
+	p, err := h.StartTCPProbe(ctx, listener.Addr().String())
+	require.NoError(t, err)
+	defer p.Close()
+	_, err = p.ProbeSYNContext(ctx)
+	require.NoError(t, err)
+	_, err = p.ReceiveSYNACKContext(ctx)
+	require.NoError(t, err)
+	require.GreaterOrEqual(t, replies.Load(), int32(3))
+	require.GreaterOrEqual(t, p.attempts, 2)
+	require.LessOrEqual(t, p.attempts, 4)
+	require.NoError(t, listener.SetDeadline(time.Now().Add(100*time.Millisecond)))
+	conn, err := listener.Accept()
+	if conn != nil {
+		conn.Close()
+	}
+	require.Error(t, err, "retry must not complete a handshake")
+	t.Logf("captured replies=%d SYN attempts=%d", replies.Load(), p.attempts)
+}
+
+func TestHalfOpenPCAPClosedPortAndCancellation(t *testing.T) {
+	iface := liveHalfOpenInterface(t)
+	listener, err := net.ListenTCP("tcp4", &net.TCPAddr{IP: net.IPv4(127, 0, 0, 1)})
+	require.NoError(t, err)
+	target := listener.Addr().String()
+	listener.Close()
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	h, err := OpenHalfOpenSYN(ctx, HalfOpenSYNConfig{Iface: iface, SourceIP: net.IPv4(127, 0, 0, 1)})
+	require.NoError(t, err)
+	defer h.Close()
+	p, err := h.StartTCPProbe(ctx, target)
+	require.NoError(t, err)
+	_, err = p.ProbeSYNContext(ctx)
+	require.NoError(t, err)
+	_, err = p.ReceiveSYNACKContext(ctx)
+	require.ErrorIs(t, err, ErrProbeRefused)
+	p.Close()
+	// Discard captured responses to make cancellation deterministic on a real device.
+	h.main.driver.SetPCAPInboundFilter(func(gopacket.Packet) bool { return false })
+	p, err = h.StartTCPProbe(ctx, target)
+	require.NoError(t, err)
+	_, err = p.ProbeSYNContext(ctx)
+	require.NoError(t, err)
+	stepCtx, stepCancel := context.WithTimeout(ctx, 50*time.Millisecond)
+	defer stepCancel()
+	started := time.Now()
+	_, err = p.ReceiveSYNACKContext(stepCtx)
+	require.ErrorIs(t, err, context.DeadlineExceeded)
+	require.Less(t, time.Since(started), time.Second)
+	p.Close()
+	require.NoError(t, h.Wait(ctx))
+	started = time.Now()
+	require.NoError(t, h.Close())
+	require.Less(t, time.Since(started), 2*time.Second)
+	t.Logf("capture close took %s", time.Since(started))
+}
+
+// The opt-in peer must implement COUNT\n -> cumulative accepted TCP connections.
+// Comparing counts distinguishes wire-level half-open probes from a TUN proxy
+// that establishes a remote connection on behalf of a local SYN.
+func TestHalfOpenPCAPControlledPeer(t *testing.T) {
+	device, source, target := os.Getenv("NETSTACKVM_LIVE_DEVICE"), os.Getenv("NETSTACKVM_LIVE_SOURCE"), os.Getenv("NETSTACKVM_LIVE_TARGET")
+	if device == "" || source == "" || target == "" {
+		t.Skip("set NETSTACKVM_LIVE_DEVICE/SOURCE/TARGET for a controlled LAN peer")
+	}
+	iface, err := net.InterfaceByName(device)
+	require.NoError(t, err)
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+	defer cancel()
+	host, err := (&net.Dialer{}).DialContext(ctx, "tcp4", target)
+	require.NoError(t, err)
+	defer host.Close()
+	reader := bufio.NewReader(host)
+	count := func() int {
+		require.NoError(t, host.SetDeadline(time.Now().Add(2*time.Second)))
+		_, err := fmt.Fprintln(host, "COUNT")
+		require.NoError(t, err)
+		var n int
+		_, err = fmt.Fscanln(reader, &n)
+		require.NoError(t, err)
+		return n
+	}
+	before := count()
+	h, err := OpenHalfOpenSYN(ctx, HalfOpenSYNConfig{Iface: iface, SourceIP: net.ParseIP(source), Gateway: net.ParseIP(os.Getenv("NETSTACKVM_LIVE_GATEWAY"))})
+	require.NoError(t, err)
+	defer h.Close()
+	t.Logf("device=%s link=%d source=%s target=%s", iface.Name, h.main.driver.adaptor.linkType, source, target)
+	for i := 0; i < 16; i++ {
+		p, err := h.StartTCPProbe(ctx, target)
+		require.NoError(t, err)
+		_, err = p.ProbeSYNContext(ctx)
+		require.NoError(t, err)
+		_, err = p.ReceiveSYNACKContext(ctx)
+		p.Close()
+		require.NoError(t, err)
+	}
+	if closed := os.Getenv("NETSTACKVM_LIVE_CLOSED_TARGET"); closed != "" {
+		p, err := h.StartTCPProbe(ctx, closed)
+		require.NoError(t, err)
+		_, err = p.ProbeSYNContext(ctx)
+		require.NoError(t, err)
+		_, err = p.ReceiveSYNACKContext(ctx)
+		p.Close()
+		require.True(t, errors.Is(err, ErrProbeRefused) || errors.Is(err, ErrProbeNoResponse),
+			"a non-listening peer must never be reported open: %v", err)
+		t.Logf("non-listening peer result: %v", err)
+	}
+	require.NoError(t, h.Wait(ctx))
+	require.NoError(t, h.Close())
+	require.Equal(t, before, count(), "the capture transport completed remote TCP handshakes")
+	t.Logf("16 open probes and existing host connection passed without remote Accept")
+}
+
+func TestHalfOpenTransportPolicy(t *testing.T) {
+	for _, tc := range []struct {
+		name    string
+		flags   net.Flags
+		link    layers.LinkType
+		allowed bool
+	}{
+		{"ethernet", net.FlagUp, layers.LinkTypeEthernet, true},
+		{"npcap-loopback", net.FlagLoopback, layers.LinkTypeNull, true},
+		{"loopback-raw", net.FlagLoopback, 12, true},
+		{"tun", net.FlagUp, 12, false},
+		{"raw", net.FlagUp, layers.LinkTypeRaw, false},
+		{"point-to-point", net.FlagPointToPoint, layers.LinkTypeEthernet, false},
+		{"unknown", net.FlagUp, 255, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			iface := &net.Interface{Name: tc.name, Flags: tc.flags}
+			err := validateHalfOpenTransport(iface, tc.link, false)
+			if tc.allowed {
+				require.NoError(t, err)
+			} else {
+				require.ErrorIs(t, err, ErrUnverifiedSYNTransport)
+			}
+			require.NoError(t, validateHalfOpenTransport(iface, tc.link, true))
+		})
+	}
+}
+
+func TestHalfOpenPCAPUnverifiedTransportRejected(t *testing.T) {
+	device, source := os.Getenv("NETSTACKVM_UNVERIFIED_DEVICE"), os.Getenv("NETSTACKVM_UNVERIFIED_SOURCE")
+	if device == "" || source == "" {
+		t.Skip("set NETSTACKVM_UNVERIFIED_DEVICE/SOURCE for a raw-IP proxy interface")
+	}
+	iface, err := net.InterfaceByName(device)
+	require.NoError(t, err)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	for i := 0; i < 3; i++ {
+		h, err := OpenHalfOpenSYN(ctx, HalfOpenSYNConfig{Iface: iface, SourceIP: net.ParseIP(source)})
+		if h != nil {
+			h.Close()
+		}
+		require.Nil(t, h)
+		require.ErrorIs(t, err, ErrUnverifiedSYNTransport)
+	}
+	// The low-level API still permits a deliberate opt-in; opening it sends no SYN.
+	h, err := OpenHalfOpenSYN(ctx, HalfOpenSYNConfig{Iface: iface, SourceIP: net.ParseIP(source), AllowUnverifiedTransport: true})
+	require.NoError(t, err)
+	require.NoError(t, h.Close())
 }
