@@ -20,7 +20,7 @@ func TestResolveFunctionCallModeUsesProbeBeforePrompt(t *testing.T) {
 		resp.EmitOutputStream(strings.NewReader("plain text, no tool call"))
 		resp.Close()
 		return resp, nil
-	}))
+	}), aicommon.WithCheckToolCall(true))
 	loop := &ReActLoop{config: cfg, loopName: "probe", functionCallMode: true, functionCallModeRequested: true}
 	loop.resolveFunctionCallMode(context.Background())
 	require.False(t, loop.functionCallMode)

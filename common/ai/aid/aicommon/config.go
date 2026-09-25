@@ -384,6 +384,7 @@ type Config struct {
 	DisablePerception                  bool // 禁用感知层（用于测试环境，避免异步 AI 调用干扰 mock 回调）
 	EnableFunctionCallMode             bool // 启用原生 functioncall (tool_calls) 模式
 	CheckToolCall                      bool // 首次使用 AI 时探测原生工具调用能力；不暴露给 Yak 脚本
+	checkToolCallExplicit              bool // 自定义 callback 默认不探测；显式配置可覆盖
 	ToolCallProbeTimeout               time.Duration
 	ToolCallProbeCacheTTL              time.Duration
 	toolCallProbeCache                 *toolCallCapabilityCache
@@ -929,6 +930,11 @@ func WithAICallback(cb AICallbackType) ConfigOption {
 			c.m = &sync.Mutex{}
 		}
 
+		// A user callback may have a scripted first response. Probing it would
+		// consume that response, so keep its legacy behavior unless opted in.
+		if cb != nil && !c.checkToolCallExplicit {
+			c.CheckToolCall = false
+		}
 		// if callback is nil, use default ai.Chat
 		if cb == nil {
 			cb = AIChatToAICallbackType(ai.Chat)
@@ -954,6 +960,9 @@ func WithFastAICallback(cb AICallbackType) ConfigOption {
 
 		c.m.Lock()
 		defer c.m.Unlock()
+		if cb != nil && !c.checkToolCallExplicit {
+			c.CheckToolCall = false
+		}
 		c.setFastAICallbackLocked(cb)
 		return nil
 	}
@@ -965,6 +974,9 @@ func WithAICallbacks(callbacks *AICallbacks) ConfigOption {
 			c.m = &sync.Mutex{}
 		}
 		c.m.Lock()
+		if callbacks != nil && !c.checkToolCallExplicit {
+			c.CheckToolCall = false
+		}
 		c.setAICallbacksLocked(callbacks)
 		c.m.Unlock()
 		return nil
@@ -1024,6 +1036,9 @@ func WithQualityPriorityAICallback(cb AICallbackType) ConfigOption {
 			c.m = &sync.Mutex{}
 		}
 		c.m.Lock()
+		if cb != nil && !c.checkToolCallExplicit {
+			c.CheckToolCall = false
+		}
 		c.setQualityPriorityAICallbackLocked(cb)
 		c.m.Unlock()
 		return nil
@@ -1049,6 +1064,9 @@ func WithSpeedPriorityAICallback(cb AICallbackType) ConfigOption {
 			c.m = &sync.Mutex{}
 		}
 		c.m.Lock()
+		if cb != nil && !c.checkToolCallExplicit {
+			c.CheckToolCall = false
+		}
 		c.setSpeedPriorityAICallbackLocked(cb)
 		c.m.Unlock()
 		return nil

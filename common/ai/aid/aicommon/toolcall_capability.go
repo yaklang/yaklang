@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"strings"
 	"sync"
 	"time"
 
@@ -48,6 +47,7 @@ type toolCallCapabilityCache struct {
 func WithCheckToolCall(enabled bool) ConfigOption {
 	return func(c *Config) error {
 		c.CheckToolCall = enabled
+		c.checkToolCallExplicit = true
 		return nil
 	}
 }
@@ -185,7 +185,6 @@ func (c *Config) probeToolCall(parent context.Context, callback AICallbackType, 
 					"message": map[string]any{"type": "string"},
 				}, "required": []string{"message"}},
 			}}}),
-			aispec.WithToolChoice("auto"),
 			aispec.WithToolCallCallback(func(deltas []*aispec.ToolCall) {
 				callsMu.Lock()
 				defer callsMu.Unlock()
@@ -262,19 +261,11 @@ func classifyToolCallProbeFailure(err error, response *AIResponse) (ToolCallCapa
 		return ToolCallUnknown, nil
 	}
 	status := 0
-	message := strings.ToLower(err.Error())
 	if response != nil {
 		status = response.GetHTTPStatusCode()
-		// Inspect provider details for classification, but never return or log
-		// the response dump: it may contain request-specific private data.
-		message += strings.ToLower(response.GetRawHTTPResponseDump())
 	}
-	if (status == 400 || status == 422 || status == 501) &&
-		(strings.Contains(message, "tool") || strings.Contains(message, "function")) &&
-		(strings.Contains(message, "not support") || strings.Contains(message, "unsupported") ||
-			strings.Contains(message, "unknown field") || strings.Contains(message, "unrecognized")) {
-		return ToolCallUnsupported, fmt.Errorf("provider rejected tool calls (HTTP %d)", status)
-	}
+	// A 4xx may reject this probe's schema or a provider-specific option while
+	// still supporting tools. Error text is not a reliable capability signal.
 	if status > 0 {
 		return ToolCallUnknown, fmt.Errorf("tool-call probe request failed (HTTP %d)", status)
 	}

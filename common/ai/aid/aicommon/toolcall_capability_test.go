@@ -22,7 +22,7 @@ func toolCallProbeTestCallback(t *testing.T, count *atomic.Int32, reply string) 
 		spec := aispec.NewDefaultAIConfig(req.GetExtraSpecOpts()...)
 		require.Len(t, spec.Tools, 1)
 		require.Equal(t, toolCallProbeName, spec.Tools[0].Function.Name)
-		require.Equal(t, "auto", spec.ToolChoice)
+		require.Empty(t, spec.ToolChoice, "provider default avoids rejecting an optional tool_choice parameter")
 		resp := NewAIResponse(c)
 		switch reply {
 		case "tool":
@@ -41,7 +41,7 @@ func toolCallProbeTestCallback(t *testing.T, count *atomic.Int32, reply string) 
 
 func TestCheckToolCallCapabilityEchoAndCache(t *testing.T) {
 	var count atomic.Int32
-	cfg := NewConfig(context.Background(), WithAICallback(toolCallProbeTestCallback(t, &count, "tool")))
+	cfg := NewConfig(context.Background(), WithAICallback(toolCallProbeTestCallback(t, &count, "tool")), WithCheckToolCall(true))
 	for range 2 {
 		state, err := cfg.CheckToolCallCapability(context.Background(), false)
 		require.NoError(t, err)
@@ -63,7 +63,7 @@ func TestCheckToolCallCapabilityThroughAIChatAdapter(t *testing.T) {
 		}})
 		return "", nil
 	})
-	cfg := NewConfig(context.Background(), WithAICallback(adapter))
+	cfg := NewConfig(context.Background(), WithAICallback(adapter), WithCheckToolCall(true))
 	state, err := cfg.CheckToolCallCapability(context.Background(), false)
 	require.NoError(t, err)
 	require.Equal(t, ToolCallSupported, state)
@@ -76,11 +76,11 @@ func TestCheckToolCallCapabilityConservativeFallback(t *testing.T) {
 		want        ToolCallCapability
 	}{
 		{name: "plain text is inconclusive", reply: "text", want: ToolCallUnknown},
-		{name: "explicit tool rejection", reply: "unsupported", want: ToolCallUnsupported},
+		{name: "tool-related 400 is inconclusive", reply: "unsupported", want: ToolCallUnknown},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			var count atomic.Int32
-			cfg := NewConfig(context.Background(), WithAICallback(toolCallProbeTestCallback(t, &count, tc.reply)))
+			cfg := NewConfig(context.Background(), WithAICallback(toolCallProbeTestCallback(t, &count, tc.reply)), WithCheckToolCall(true))
 			state, err := cfg.CheckToolCallCapability(context.Background(), false)
 			require.Equal(t, tc.want, state)
 			require.Error(t, err)
@@ -91,13 +91,41 @@ func TestCheckToolCallCapabilityConservativeFallback(t *testing.T) {
 	}
 }
 
+func TestCheckToolCallCapabilityUnknownExpiresAndRecovers(t *testing.T) {
+	var count atomic.Int32
+	textCallback := toolCallProbeTestCallback(t, &count, "text")
+	toolCallback := toolCallProbeTestCallback(t, &count, "tool")
+	cfg := NewConfig(context.Background(),
+		WithToolCallProbeCacheTTL(20*time.Millisecond),
+		WithAICallback(func(c AICallerConfigIf, req *AIRequest) (*AIResponse, error) {
+			if count.Load() == 0 {
+				return textCallback(c, req)
+			}
+			return toolCallback(c, req)
+		}),
+		WithCheckToolCall(true),
+	)
+	state, err := cfg.CheckToolCallCapability(context.Background(), false)
+	require.Error(t, err)
+	require.Equal(t, ToolCallUnknown, state)
+	state, _ = cfg.CheckToolCallCapability(context.Background(), false)
+	require.Equal(t, ToolCallUnknown, state)
+	require.EqualValues(t, 1, count.Load())
+
+	time.Sleep(30 * time.Millisecond)
+	state, err = cfg.CheckToolCallCapability(context.Background(), false)
+	require.NoError(t, err)
+	require.Equal(t, ToolCallSupported, state)
+	require.EqualValues(t, 2, count.Load())
+}
+
 func TestCheckToolCallCapabilityFirstUseSingleFlight(t *testing.T) {
 	var count atomic.Int32
 	callback := toolCallProbeTestCallback(t, &count, "tool")
 	cfg := NewConfig(context.Background(), WithAICallback(func(c AICallerConfigIf, req *AIRequest) (*AIResponse, error) {
 		time.Sleep(25 * time.Millisecond)
 		return callback(c, req)
-	}))
+	}), WithCheckToolCall(true))
 	var wg sync.WaitGroup
 	for range 8 {
 		wg.Add(1)
@@ -115,6 +143,9 @@ func TestCheckToolCallCapabilityFirstUseSingleFlight(t *testing.T) {
 func TestCheckToolCallCapabilityExplicitDisable(t *testing.T) {
 	var count atomic.Int32
 	callback := toolCallProbeTestCallback(t, &count, "tool")
+	require.False(t, NewConfig(context.Background(), WithAICallback(callback)).CheckToolCall,
+		"custom callbacks keep their scripted first response unless probing is explicitly requested")
+	require.True(t, NewConfig(context.Background(), WithCheckToolCall(true), WithAICallback(callback)).CheckToolCall)
 	cfg := NewConfig(context.Background(), WithAICallback(callback), WithEnableFunctionCallMode(false))
 	state, err := cfg.CheckToolCallCapability(context.Background(), false)
 	require.NoError(t, err)
