@@ -52,6 +52,14 @@ func ReplaceValue(v Value, to Value, skip func(Instruction) bool) {
 					break
 				}
 			}
+			// Call.ArgMember is a use-def operand but is intentionally
+			// omitted from GetValues so TopDef does not treat captured
+			// object members (e.g. destructors) as call dataflow sources.
+			if !found {
+				if call, ok := ToCall(user); ok && call.hasOperandID(v.GetId()) {
+					found = true
+				}
+			}
 			if !found {
 				// 指令不再使用 v，记录为无效 user
 				invalidUsers = append(invalidUsers, user)
@@ -223,43 +231,71 @@ func (u *UnOp) ReplaceValue(v Value, to Value) {
 // ----------- Call
 func (c *Call) HasValues() bool { return true }
 func (c *Call) GetValues() Values {
+	// Method + Args + Binding only. ArgMember is a use-def operand for
+	// ReplaceValue, but including it here makes TopDef walk destructor /
+	// member captures as call sources.
 	ret := make(Values, 0, len(c.Args)+len(c.Binding)+1)
 	if method, ok := c.GetValueById(c.Method); ok {
 		ret = append(ret, method)
 	}
 	ret = append(ret, c.GetValuesByIDs(c.Args)...)
-	for _, v := range c.Binding {
-		if val, ok := c.GetValueById(v); ok {
+	for _, id := range c.Binding {
+		if val, ok := c.GetValueById(id); ok {
 			ret = append(ret, val)
 		}
 	}
 	return ret
 }
 
+func (c *Call) hasOperandID(id int64) bool {
+	if id <= 0 {
+		return false
+	}
+	if c.Method == id {
+		return true
+	}
+	for _, arg := range c.Args {
+		if arg == id {
+			return true
+		}
+	}
+	for _, member := range c.ArgMember {
+		if member == id {
+			return true
+		}
+	}
+	for _, bound := range c.Binding {
+		if bound == id {
+			return true
+		}
+	}
+	return false
+}
+
 func (c *Call) ReplaceValue(v Value, to Value) {
-	if c.Method == v.GetId() {
-		c.Method = to.GetId()
+	fromID := v.GetId()
+	toID := to.GetId()
+	if c.Method == fromID {
+		c.Method = toID
 		c.handlerObjectMethod()
 		c.handleCalleeFunction()
 		c.handlerReturnType()
 	}
-	lo.ForEach(c.Args, func(id int64, index int) {
-		if id == v.GetId() {
-			c.Args[index] = to.GetId()
+	for index, id := range c.Args {
+		if id == fromID {
+			c.Args[index] = toID
 		}
-		return
-	})
-
-	lo.ForEach(c.Args, func(id int64, index int) {
-		if id == v.GetId() {
-			c.Args[index] = to.GetId()
+	}
+	for index, id := range c.ArgMember {
+		if id == fromID {
+			c.ArgMember[index] = toID
 		}
-		return
-	})
-
-	lo.ForEach(c.ArgMember, func(id int64, index int) {
-		c.ArgMember[index] = to.GetId()
-	})
+	}
+	for name, id := range c.Binding {
+		if id == fromID {
+			c.Binding[name] = toID
+		}
+	}
 }
 
 // ------------ SideEffect
@@ -456,12 +492,14 @@ func (sw *Switch) GetValues() Values {
 	return ret
 }
 func (sw *Switch) ReplaceValue(v Value, to Value) {
-	if sw.Cond == v.GetId() {
-		sw.Cond = to.GetId()
+	fromID := v.GetId()
+	toID := to.GetId()
+	if sw.Cond == fromID {
+		sw.Cond = toID
 	}
-	for _, c := range sw.Label {
-		if c.Value == v.GetId() {
-			c.Value = to.GetId()
+	for i := range sw.Label {
+		if sw.Label[i].Value == fromID {
+			sw.Label[i].Value = toID
 		}
 	}
 }
