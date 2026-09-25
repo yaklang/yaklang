@@ -285,11 +285,13 @@ type loopToolCallParts struct {
 }
 
 type loopToolCallCollector struct {
-	mu       sync.Mutex
-	parts    map[int]*loopToolCallParts
-	callback LoopFunctionCallOutputCallback
-	wg       sync.WaitGroup
-	err      error
+	mu            sync.Mutex
+	parts         []*loopToolCallParts
+	byID          map[string]*loopToolCallParts
+	activeByIndex map[int]*loopToolCallParts
+	callback      LoopFunctionCallOutputCallback
+	wg            sync.WaitGroup
+	err           error
 }
 
 func invokeLoopGeneralOutputCallback(callback LoopGeneralOutputCallback, output, reason io.Reader) (err error) {
@@ -303,7 +305,10 @@ func invokeLoopGeneralOutputCallback(callback LoopGeneralOutputCallback, output,
 }
 
 func newLoopToolCallCollector(callback LoopFunctionCallOutputCallback) *loopToolCallCollector {
-	return &loopToolCallCollector{parts: make(map[int]*loopToolCallParts), callback: callback}
+	return &loopToolCallCollector{
+		byID: make(map[string]*loopToolCallParts), activeByIndex: make(map[int]*loopToolCallParts),
+		callback: callback,
+	}
 }
 
 func (c *loopToolCallCollector) add(deltas []*aispec.ToolCall) {
@@ -313,19 +318,36 @@ func (c *loopToolCallCollector) add(deltas []*aispec.ToolCall) {
 		if delta == nil {
 			continue
 		}
-		part := c.parts[delta.Index]
+		// Call ID is the identity. Some providers omit or reuse index (often 0)
+		// for distinct calls. Index only routes fragments that omit their ID.
+		var part *loopToolCallParts
+		if delta.ID != "" {
+			part = c.byID[delta.ID]
+			if part == nil {
+				if pending := c.activeByIndex[delta.Index]; pending != nil && pending.id == "" &&
+					(pending.name == "" || delta.Function.Name == "" || pending.name == delta.Function.Name) {
+					part = pending
+				}
+			}
+		} else {
+			part = c.activeByIndex[delta.Index]
+			if part != nil && delta.Function.Name != "" && part.name != "" && part.name != delta.Function.Name {
+				// A new named call may arrive before its ID. Keep its fragments
+				// separate even when the provider reused the same index.
+				part = nil
+			}
+		}
 		if part == nil {
 			part = &loopToolCallParts{index: delta.Index}
-			c.parts[delta.Index] = part
+			c.parts = append(c.parts, part)
 		}
-		if part.id != "" && delta.ID != "" && part.id != delta.ID {
-			c.err = utils.Errorf("tool call index %d changed id from %q to %q", delta.Index, part.id, delta.ID)
-		}
-		if part.name != "" && delta.Function.Name != "" && part.name != delta.Function.Name {
-			c.err = utils.Errorf("tool call index %d changed function from %q to %q", delta.Index, part.name, delta.Function.Name)
-		}
+		c.activeByIndex[delta.Index] = part
 		if delta.ID != "" {
 			part.id = delta.ID
+			c.byID[delta.ID] = part
+		}
+		if part.name != "" && delta.Function.Name != "" && part.name != delta.Function.Name {
+			c.err = utils.Errorf("tool call %q changed function from %q to %q", part.id, part.name, delta.Function.Name)
 		}
 		if delta.Function.Name != "" {
 			part.name = delta.Function.Name
@@ -378,9 +400,8 @@ func (c *loopToolCallCollector) add(deltas []*aispec.ToolCall) {
 
 func (c *loopToolCallCollector) finish() ([]*aispec.ToolCall, error) {
 	c.mu.Lock()
-	parts := make([]*loopToolCallParts, 0, len(c.parts))
-	for _, part := range c.parts {
-		parts = append(parts, part)
+	parts := append([]*loopToolCallParts(nil), c.parts...)
+	for _, part := range parts {
 		if part.started {
 			_ = part.descWriter.Close()
 			_ = part.argsWriter.Close()
@@ -394,7 +415,7 @@ func (c *loopToolCallCollector) finish() ([]*aispec.ToolCall, error) {
 	if err != nil {
 		return nil, err
 	}
-	sort.Slice(parts, func(i, j int) bool { return parts[i].index < parts[j].index })
+	sort.SliceStable(parts, func(i, j int) bool { return parts[i].index < parts[j].index })
 	calls := make([]*aispec.ToolCall, 0, len(parts))
 	seenIDs := make(map[string]struct{}, len(parts))
 	for _, part := range parts {
@@ -437,12 +458,37 @@ func (r *ReActLoop) callAIFunctionTransaction(
 	// that request prevents fragments from a rejected attempt entering the next.
 	captureOption := aicommon.AIRequestOption(func(req *aicommon.AIRequest) {
 		descriptor.resetProviderCompletion()
-		collector := newLoopToolCallCollector(functionCallOutputCallback)
 		collectorMu.Lock()
-		currentCollector = collector
+		currentCollector = newLoopToolCallCollector(functionCallOutputCallback)
 		collectorMu.Unlock()
 		aicommon.WithAIRequest_ExtraSpecOpts(
-			aispec.WithToolCallCallback(collector.add),
+			// A tiered provider may retry/fall back inside one AIRequest. Each
+			// response needs its own collector or calls from a discarded response
+			// can be executed together with the accepted response.
+			aispec.AIConfigOption(func(cfg *aispec.AIConfig) {
+				previous := cfg.RawHTTPResponseHeaderCallback
+				cfg.RawHTTPResponseHeaderCallback = func(header []byte) {
+					if previous != nil {
+						previous(header)
+					}
+					collectorMu.Lock()
+					old := currentCollector
+					currentCollector = newLoopToolCallCollector(functionCallOutputCallback)
+					collectorMu.Unlock()
+					if old != nil {
+						_, _ = old.finish() // close readers from the discarded response
+					}
+					descriptor.resetProviderCompletion()
+				}
+			}),
+			aispec.WithToolCallCallback(func(deltas []*aispec.ToolCall) {
+				collectorMu.Lock()
+				collector := currentCollector
+				collectorMu.Unlock()
+				if collector != nil {
+					collector.add(deltas)
+				}
+			}),
 			aispec.WithFinishReasonCallback(descriptor.setProviderFinishReason),
 		)(req)
 	})

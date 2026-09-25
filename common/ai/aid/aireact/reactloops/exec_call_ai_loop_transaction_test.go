@@ -208,6 +208,75 @@ func TestCallAILoopTransactionFunctionModeInterleavedCalls(t *testing.T) {
 	require.Equal(t, "Check B", secondCall["description"])
 }
 
+func TestLoopToolCallCollectorReusedIndexKeepsCallsByID(t *testing.T) {
+	streamed := make(map[string]string)
+	var mu sync.Mutex
+	collector := newLoopToolCallCollector(func(id, _ string, description, arguments io.Reader) {
+		var wg sync.WaitGroup
+		wg.Add(2)
+		go func() { defer wg.Done(); _, _ = io.Copy(io.Discard, description) }()
+		var payload []byte
+		go func() { defer wg.Done(); payload, _ = io.ReadAll(arguments) }()
+		wg.Wait()
+		mu.Lock()
+		streamed[id] = string(payload)
+		mu.Unlock()
+	})
+	// The provider reuses index 0, but each ID denotes a distinct call.
+	collector.add([]*aispec.ToolCall{{Index: 0, ID: "call_a", Function: aispec.FuncReturn{Name: "check_a", Arguments: `{"value":`}}})
+	collector.add([]*aispec.ToolCall{{Index: 0, ID: "call_b", Function: aispec.FuncReturn{Name: "check_b", Arguments: `{"value":`}}})
+	collector.add([]*aispec.ToolCall{{Index: 0, Function: aispec.FuncReturn{Arguments: `"B"}`}}})
+	// An ID-bearing delta can still return to the earlier call, even with a changed index.
+	collector.add([]*aispec.ToolCall{{Index: 1, ID: "call_a", Function: aispec.FuncReturn{Arguments: `"A"}`}}})
+	calls, err := collector.finish()
+	require.NoError(t, err)
+	require.Len(t, calls, 2)
+	require.Equal(t, "call_a", calls[0].ID)
+	require.JSONEq(t, `{"value":"A"}`, calls[0].Function.Arguments)
+	require.Equal(t, "call_b", calls[1].ID)
+	require.JSONEq(t, `{"value":"B"}`, calls[1].Function.Arguments)
+	require.Equal(t, calls[0].Function.Arguments, streamed["call_a"])
+	require.Equal(t, calls[1].Function.Arguments, streamed["call_b"])
+}
+
+func TestCallAILoopTransactionFunctionModeDiscardsEarlierProviderResponse(t *testing.T) {
+	loop := newCallAILoopTransactionTestLoop(t, true, func(_ *aicommon.AIRequest, cfg *aispec.AIConfig) (*aicommon.AIResponse, error) {
+		require.NotNil(t, cfg.RawHTTPResponseHeaderCallback)
+		require.NotNil(t, cfg.ToolCallCallback)
+		// A provider fallback can produce two HTTP responses within one
+		// AIRequest. Only the second response belongs to the accepted result.
+		cfg.RawHTTPResponseHeaderCallback([]byte("HTTP/1.1 200 OK\r\n\r\n"))
+		cfg.ToolCallCallback([]*aispec.ToolCall{{Index: 0, ID: "discarded", Type: "function",
+			Function: aispec.FuncReturn{Name: "accept", Arguments: `{"value":"old"}`}}})
+		cfg.FinishReasonCallback("tool_calls", []byte("discarded response"))
+		cfg.RawHTTPResponseHeaderCallback([]byte("HTTP/1.1 200 OK\r\n\r\n"))
+		cfg.ToolCallCallback([]*aispec.ToolCall{{Index: 0, ID: "accepted", Type: "function",
+			Function: aispec.FuncReturn{Name: "accept", Arguments: `{"value":"new"}`}}})
+		cfg.FinishReasonCallback("tool_calls", []byte("accepted response"))
+		resp := aicommon.NewAIResponse(nil)
+		resp.EmitOutputStream(strings.NewReader(""))
+		resp.Close()
+		return resp, nil
+	})
+	loop.actions.Set("accept", &LoopAction{ActionType: "accept"})
+	drain := func(a, b io.Reader) {
+		var wg sync.WaitGroup
+		wg.Add(2)
+		go func() { defer wg.Done(); _, _ = io.Copy(io.Discard, a) }()
+		go func() { defer wg.Done(); _, _ = io.Copy(io.Discard, b) }()
+		wg.Wait()
+	}
+	calls, stop, descriptor, err := loop.callAILoopTransaction(&sync.WaitGroup{}, "prompt", "nonce", nil,
+		drain, func(_, _ string, description, arguments io.Reader) { drain(description, arguments) })
+	require.NoError(t, err)
+	require.Equal(t, LoopStopToolCalls, stop)
+	require.Len(t, calls, 1)
+	require.Equal(t, "accepted", calls[0].ToolCallID)
+	require.Equal(t, "new", calls[0].Action.GetString("value"))
+	require.Equal(t, "accepted response", descriptor.Snapshot().RawResponseBody)
+	require.NotContains(t, descriptor.Snapshot().ResponseJSON, "discarded")
+}
+
 func TestCallAILoopTransactionFunctionModeRejectsMalformedResponses(t *testing.T) {
 	for _, tc := range []struct {
 		name    string
@@ -220,7 +289,7 @@ func TestCallAILoopTransactionFunctionModeRejectsMalformedResponses(t *testing.T
 		{"malformed arguments", "tool_calls", []*aispec.ToolCall{{Index: 0, ID: "a", Function: aispec.FuncReturn{Name: "accept", Arguments: `{`}}}, "invalid JSON arguments"},
 		{"unknown action", "tool_calls", []*aispec.ToolCall{{Index: 0, ID: "a", Function: aispec.FuncReturn{Name: "missing", Arguments: `{}`}}}, "native function has no registered loop action"},
 		{"missing id", "tool_calls", []*aispec.ToolCall{{Index: 0, Function: aispec.FuncReturn{Name: "accept", Arguments: `{}`}}}, "incomplete tool call"},
-		{"duplicate id", "tool_calls", []*aispec.ToolCall{{Index: 0, ID: "a", Function: aispec.FuncReturn{Name: "accept", Arguments: `{}`}}, {Index: 1, ID: "a", Function: aispec.FuncReturn{Name: "accept", Arguments: `{}`}}}, "duplicate tool call id"},
+		{"duplicate complete arguments", "tool_calls", []*aispec.ToolCall{{Index: 0, ID: "a", Function: aispec.FuncReturn{Name: "accept", Arguments: `{}`}}, {Index: 1, ID: "a", Function: aispec.FuncReturn{Name: "accept", Arguments: `{}`}}}, "trailing JSON arguments"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			loop := newCallAILoopTransactionTestLoop(t, true, func(_ *aicommon.AIRequest, cfg *aispec.AIConfig) (*aicommon.AIResponse, error) {
