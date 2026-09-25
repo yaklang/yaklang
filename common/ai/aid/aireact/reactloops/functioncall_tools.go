@@ -58,10 +58,7 @@ func buildActionTools(actions []*LoopAction, maxBatchCalls int) ([]aispec.Tool, 
 			}
 			parameters["required"] = filtered
 		}
-		description := actionDescription(action)
-		if action.NativeDescription != "" {
-			description = action.NativeDescription
-		}
+		description := nativeActionDescription(action)
 		tools = append(tools, aispec.Tool{
 			Type: "function",
 			Function: aispec.ToolFunction{

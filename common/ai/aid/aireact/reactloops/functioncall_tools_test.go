@@ -74,3 +74,23 @@ func TestBuildActionToolsDirectAnswerUsesArgumentsForLongContent(t *testing.T) {
 	require.Contains(t, parameters["required"], "answer_payload")
 	require.Contains(t, buildSchema(loopAction_DirectlyAnswer), "FINAL_ANSWER")
 }
+
+func TestBuildActionToolsUsesNativeDescription(t *testing.T) {
+	textAction := &LoopAction{
+		ActionType:        "inspect_result",
+		Description:       "Emit JSON with @action and then an AITAG block.",
+		NativeDescription: "Inspect the result using the query argument.",
+		Options:           []aitool.ToolOption{aitool.WithStringParam("query")},
+	}
+	plainAction := &LoopAction{ActionType: "search_notes", Description: "Search saved notes."}
+	registered := withNativeActionDescription(plainAction)
+	require.Equal(t, "Search saved notes.", registered.NativeDescription)
+	require.Empty(t, plainAction.NativeDescription)
+
+	tools, err := buildActionTools([]*LoopAction{textAction, plainAction, {ActionType: "empty_description"}}, aicommon.DefaultToolBatchMaxCalls)
+	require.NoError(t, err)
+	require.Equal(t, textAction.NativeDescription, tools[0].Function.Description)
+	require.Equal(t, plainAction.Description, tools[1].Function.Description)
+	require.Equal(t, "Run the empty_description action using its tool arguments.", tools[2].Function.Description)
+	require.NotContains(t, tools[0].Function.Description, "@action")
+}

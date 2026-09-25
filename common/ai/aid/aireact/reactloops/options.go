@@ -205,7 +205,7 @@ func WithRegisterLoopActionFromToolCustomized(tool *aitool.Tool, customize func(
 		if customize != nil {
 			customize(action)
 		}
-		r.actions.Set(name, action)
+		r.actions.Set(name, withNativeActionDescription(action))
 		if aitagParamNames := ToolParamAITagNames(tool); len(aitagParamNames) > 0 {
 			r.syncRecentToolParamAITagFields(aitagParamNames)
 		}
@@ -219,20 +219,21 @@ func WithRegisterLoopActionWithStreamField(actionName string, desc string, opts 
 			return
 		}
 		action := &LoopAction{
-			AsyncMode:      false,
-			ActionType:     actionName,
-			Description:    desc,
-			Options:        opts,
-			ActionVerifier: verifier,
-			ActionHandler:  handler,
-			StreamFields:   fields,
+			AsyncMode:         false,
+			ActionType:        actionName,
+			Description:       desc,
+			NativeDescription: desc,
+			Options:           opts,
+			ActionVerifier:    verifier,
+			ActionHandler:     handler,
+			StreamFields:      fields,
 		}
 		for _, apply := range customize {
 			if apply != nil {
 				apply(action)
 			}
 		}
-		r.actions.Set(actionName, action)
+		r.actions.Set(actionName, withNativeActionDescription(action))
 	}
 }
 
@@ -241,7 +242,7 @@ func WithRegisterLoopActionWithStreamField(actionName string, desc string, opts 
 func WithOverrideLoopAction(action *LoopAction) ReActLoopOption {
 	return func(r *ReActLoop) {
 		if action != nil {
-			r.actions.Set(action.ActionType, action)
+			r.actions.Set(action.ActionType, withNativeActionDescription(action))
 		}
 	}
 }

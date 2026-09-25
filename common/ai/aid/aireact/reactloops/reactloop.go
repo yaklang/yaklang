@@ -680,7 +680,7 @@ func NewReActLoop(name string, invoker aicommon.AIInvokeRuntime, options ...ReAc
 		loopAction_Finish,
 		loopAction_SaveEvidence,
 	} {
-		r.actions.Set(action.ActionType, action)
+		r.actions.Set(action.ActionType, withNativeActionDescription(action))
 	}
 
 	for _, streamField := range []*LoopStreamField{
