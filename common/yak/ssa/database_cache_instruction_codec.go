@@ -1,6 +1,8 @@
 package ssa
 
 import (
+	"errors"
+
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/memedit"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
@@ -209,6 +211,9 @@ func getIRCodeRange(prog *Program, ir *ssadb.IrCode) (*memedit.MemEditor, *memed
 		var err error
 		editor, _, _, err = ir.GetStartAndEndPositions()
 		if err != nil {
+			if errors.Is(err, ssadb.ErrSourceRangeAbsent) {
+				return nil, nil, nil
+			}
 			return nil, nil, err
 		}
 	}

@@ -13,8 +13,8 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 )
 
-// Environment knobs for the SSA compile adaptive GC/CPU profiling. All are opt-in;
-// when unset, compile runs with the Go runtime defaults.
+// Environment knobs for opt-in SSA compile GC overrides. Large-project parsing
+// also has an automatic soft memory limit; it must defer to these overrides.
 const (
 	ssaCompileAdaptiveGCEnv = "YAK_SSA_COMPILE_ADAPTIVE_GC"
 	ssaCompileGOGCEnv       = "YAK_SSA_COMPILE_GOGC"
@@ -27,6 +27,18 @@ const (
 )
 
 var ssaCompileGCMu sync.Mutex
+
+// Automatic large-project tuning must not replace an explicit environment or
+// adaptive compile policy. In particular adaptive GC installs its limit before
+// GetFileHandler runs; replacing it with 80% of host RAM defeats that policy.
+func automaticSSACompileMemoryLimit(totalMemory int64) (int64, bool) {
+	if totalMemory <= 0 || strings.TrimSpace(os.Getenv("GOMEMLIMIT")) != "" ||
+		strings.TrimSpace(os.Getenv(ssaCompileMemLimitEnv)) != "" ||
+		envFlagEnabled(ssaCompileAdaptiveGCEnv) {
+		return 0, false
+	}
+	return totalMemory / 5 * 4, true
+}
 
 // startSSACompileCPUProfile starts a CPU profile when YAK_SSA_CPU_PROFILE is
 // set to a writable path; otherwise it is a no-op. The returned func stops and

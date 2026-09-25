@@ -1,10 +1,10 @@
 package ssa
 
 import (
-	"bytes"
+	"crypto/sha256"
 	"encoding/json"
-	"strings"
 	"sync"
+	"time"
 
 	"github.com/yaklang/gorm"
 	"github.com/yaklang/yaklang/common/utils"
@@ -13,23 +13,17 @@ import (
 	"go.uber.org/atomic"
 )
 
-// irTypeJSONBufPool reuses the temporary JSON buffer used when marshaling
-// IrType.ExtraInformation. Hadoop pprof showed type2IrType allocating ~24GB
-// cumulatively; pooling the encoder buffer removes one allocation per type.
-var irTypeJSONBufPool = sync.Pool{
-	New: func() any {
-		return bytes.NewBuffer(nil)
-	},
-}
-
 type typeStore struct {
 	mode        ProgramCacheKind
 	program     *Program
 	db          *gorm.DB
 	programName string
 	saveSize    int
+	concurrency int
 	nextID      *atomic.Int64
 	resident    *utils.SafeMapWithKey[int64, Type]
+	flushMu     sync.Mutex
+	persisted   typeFingerprints
 }
 
 func newTypeStore(
@@ -46,6 +40,7 @@ func newTypeStore(
 		db:          db,
 		programName: programName,
 		saveSize:    resolveTypeSaveSize(cfg, min(max(saveSize, defaultSaveSize), maxSaveSize)),
+		concurrency: cfg.GetCompileConcurrency(),
 		nextID:      atomic.NewInt64(0),
 		resident:    utils.NewSafeMapWithKey[int64, Type](),
 	}
@@ -108,6 +103,11 @@ func (s *typeStore) flush() error {
 	if s == nil || s.mode != ProgramCacheDBWrite || s.db == nil {
 		return nil
 	}
+	s.flushMu.Lock()
+	defer s.flushMu.Unlock()
+	if s.persisted == nil {
+		s.persisted = make(typeFingerprints)
+	}
 
 	types := make([]Type, 0, s.resident.Count())
 	s.resident.ForEach(func(_ int64, typ Type) bool {
@@ -119,37 +119,52 @@ func (s *typeStore) flush() error {
 	if len(types) == 0 {
 		return nil
 	}
+	started := time.Now()
+	changed := 0
+	defer func() {
+		log.Debugf("[ssa-type-flush] checked=%d changed=%d skipped=%d duration=%s", len(types), changed, len(types)-changed, time.Since(started))
+	}()
 
 	saveBatch := saveIrType(s.program, s.db)
-	batch := make([]*ssadb.IrType, 0, s.saveSize)
+	batchSize := max(1, s.saveSize)
+	batch := make([]typePersistenceSnapshot, 0, batchSize)
+	fingerprints := make([][sha256.Size]byte, 0, batchSize)
 	var firstErr error
 	flush := func() {
 		if len(batch) == 0 {
 			return
 		}
-		if err := saveBatch(batch); err != nil {
+		// Snapshot String()/type metadata on this goroutine: some type
+		// String methods update recursion guards and caches. Only encoding
+		// these stable snapshots is safe to parallelize.
+		rows := marshalTypeSnapshots(s.programName, batch, s.concurrency)
+		if err := saveBatch(rows); err != nil {
 			log.Errorf("save ir type batch failed: %v", err)
 			if firstErr == nil {
 				firstErr = err
 			}
+		} else {
+			for i, typ := range batch {
+				s.persisted.set(typ.id, fingerprints[i])
+			}
 		}
-		batch = make([]*ssadb.IrType, 0, s.saveSize)
+		clear(batch)
+		batch = batch[:0]
+		fingerprints = fingerprints[:0]
 	}
 
 	for _, typ := range types {
-		irType, err := marshalIrType(s.programName)(typ, utils.EvictionReasonDeleted)
-		if err != nil {
-			log.Errorf("marshal ir type failed: %v", err)
-			if firstErr == nil {
-				firstErr = err
-			}
+		snapshot := snapshotTypePersistence(typ)
+		fingerprint := snapshot.fingerprint()
+		// Check ALL persisted fields before JSON encoding. ID/pointer-only
+		// checks would lose cross-unit updates, including in-place slice edits.
+		if previous, ok := s.persisted.get(snapshot.id); ok && previous == fingerprint {
 			continue
 		}
-		if utils.IsNil(irType) {
-			continue
-		}
-		batch = append(batch, irType)
-		if len(batch) >= s.saveSize {
+		changed++
+		batch = append(batch, snapshot)
+		fingerprints = append(fingerprints, fingerprint)
+		if len(batch) >= batchSize {
 			flush()
 		}
 	}
@@ -210,61 +225,7 @@ func marshalType(typ Type, irType *ssadb.IrType) bool {
 }
 
 func type2IrType(typ Type, ir *ssadb.IrType) {
-	kind := typ.GetTypeKind()
-	str := typ.String()
-	param := make(map[string]any)
-	switch t := typ.(type) {
-	case *FunctionType:
-		param["name"] = t.Name
-		param["fullTypeName"] = t.GetFullTypeNames()
-	case *ObjectType:
-		param["name"] = t.Name
-		param["fullTypeName"] = t.GetFullTypeNames()
-	case *BasicType:
-		param["name"] = t.name
-		param["kind"] = t.Kind
-		param["fullTypeName"] = t.GetFullTypeNames()
-	case *Blueprint:
-		var parentBlueprintIDs []int64
-		var interfaceBlueprintIDs []int64
-		param["name"] = t.Name
-		param["fullTypeName"] = t.GetFullTypeNames()
-		param["kind"] = t.Kind
-		for _, blueprint := range t.ParentBlueprints {
-			parentBlueprintIDs = append(parentBlueprintIDs, blueprint.GetId())
-		}
-		for _, blueprint := range t.InterfaceBlueprints {
-			interfaceBlueprintIDs = append(interfaceBlueprintIDs, blueprint.GetId())
-		}
-		param["parentBlueprints"] = parentBlueprintIDs
-		param["interfaceBlueprints"] = interfaceBlueprintIDs
-		container := t.Container()
-		if utils.IsNil(container) {
-			log.Infof("SaveTypeToDB: container is nil, type: %+v", t)
-			param["container"] = -1
-		} else {
-			param["container"] = container.GetId()
-		}
-	default:
-		param["fullTypeName"] = t.GetFullTypeNames()
-	}
-
-	buf := irTypeJSONBufPool.Get().(*bytes.Buffer)
-	buf.Reset()
-	err := json.NewEncoder(buf).Encode(param)
-	if err != nil {
-		log.Errorf("SaveTypeToDB: %v: param: %v", err, param)
-		buf.Reset()
-		irTypeJSONBufPool.Put(buf)
-		return
-	}
-	extra := strings.TrimSuffix(buf.String(), "\n")
-	buf.Reset()
-	irTypeJSONBufPool.Put(buf)
-	ir.TypeId = uint64(typ.GetId())
-	ir.Kind = int(kind)
-	ir.ExtraInformation = extra
-	ir.String = str
+	snapshotTypePersistence(typ).writeTo(ir)
 }
 
 func marshalIrType(name string) func(Type, utils.EvictionReason) (*ssadb.IrType, error) {

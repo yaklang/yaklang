@@ -440,13 +440,27 @@ func (s *SarifContext) createCodeFlowsFromPredecessor(v *ssaapi.Value) {
 	threadFlow := sarif.NewThreadFlow()
 	threadFlows := []*sarif.ThreadFlowLocation{}
 	visited := make(map[*ssaapi.Value]bool)
+	visitedAuditNodes := make(map[uint]bool)
 
 	// Function to add a value to the thread flow
 	addValueToFlow := func(val *ssaapi.Value) bool {
-		if visited[val] {
+		if val == nil {
 			return false
 		}
-		visited[val] = true
+		// DB reloads (including temporary values and expired cache entries)
+		// can return a new wrapper for the same node. Pointer identity alone
+		// revisits shared subgraphs and fails to terminate persisted cycles.
+		if id := val.GetAuditNodeId(); id != 0 {
+			if visitedAuditNodes[id] {
+				return false
+			}
+			visitedAuditNodes[id] = true
+		} else {
+			if visited[val] {
+				return false
+			}
+			visited[val] = true
+		}
 
 		rg := val.GetRange()
 		if rg == nil || rg.GetEditor() == nil {

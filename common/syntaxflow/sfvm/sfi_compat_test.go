@@ -15,7 +15,28 @@ func TestToOpCodesRejectLegacySchema(t *testing.T) {
 	require.False(t, ok)
 }
 
-func TestToOpCodesRejectDevPayloadVersion(t *testing.T) {
+func TestToOpCodesKeepsDevPayloadOnDevRuntime(t *testing.T) {
+	previous := consts.GetYakVersion()
+	consts.SetYakVersion("dev")
+	t.Cleanup(func() { consts.SetYakVersion(previous) })
+
+	current := fmt.Sprintf(
+		`{"version":"dev","schema_version":%d,"opcode":[{"op_code":%d}]}`,
+		CurrentOpcodeSchemaVersion,
+		OpEnterStatement,
+	)
+	opcodes, ok := ToOpCodes(current)
+	require.True(t, ok)
+	require.NotNil(t, opcodes)
+	require.Len(t, opcodes.Opcode, 1)
+	require.Equal(t, OpEnterStatement, opcodes.Opcode[0].OpCode)
+}
+
+func TestToOpCodesRejectsDevPayloadOnStableRuntime(t *testing.T) {
+	previous := consts.GetYakVersion()
+	consts.SetYakVersion("v1.0.0-test")
+	t.Cleanup(func() { consts.SetYakVersion(previous) })
+
 	current := fmt.Sprintf(
 		`{"version":"dev","schema_version":%d,"opcode":[{"op_code":%d}]}`,
 		CurrentOpcodeSchemaVersion,
@@ -35,8 +56,7 @@ func TestToOpCodesVersionPolicy(t *testing.T) {
 	)
 	opcodes, ok := ToOpCodes(current)
 
-	// Cache payload is only enabled for stable runtime with stable matching version.
-	expect := runtimeVersion != "" && runtimeVersion != "dev"
+	expect := runtimeVersion != ""
 	require.Equal(t, expect, ok)
 	if expect {
 		require.NotNil(t, opcodes)
@@ -65,7 +85,11 @@ func TestVMLoadFallbackCompileWhenLegacyOpcodePayload(t *testing.T) {
 	require.NotNil(t, result)
 }
 
-func TestVMLoadFallbackCompileWhenPayloadVersionIsDev(t *testing.T) {
+func TestVMLoadUsesDevPayloadWhenRuntimeIsDev(t *testing.T) {
+	previous := consts.GetYakVersion()
+	consts.SetYakVersion("dev")
+	t.Cleanup(func() { consts.SetYakVersion(previous) })
+
 	devPayload := fmt.Sprintf(
 		`{"version":"dev","schema_version":%d,"opcode":[{"op_code":%d}]}`,
 		CurrentOpcodeSchemaVersion,
@@ -79,8 +103,8 @@ func TestVMLoadFallbackCompileWhenPayloadVersionIsDev(t *testing.T) {
 	vm := NewSyntaxFlowVirtualMachine()
 	frame, compiledFromContent, err := vm.Load(rule)
 	require.NoError(t, err)
-	require.True(t, compiledFromContent)
+	require.False(t, compiledFromContent)
 	require.NotNil(t, frame)
-	require.Greater(t, len(frame.Codes), 1)
+	require.Len(t, frame.Codes, 1)
 	require.Equal(t, OpEnterStatement, frame.Codes[0].OpCode)
 }

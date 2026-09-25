@@ -1,9 +1,14 @@
 package ssaapi
 
 import (
+	"context"
+	"github.com/google/pprof/profile"
 	"net"
 	"net/http"
+	"os"
+	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 )
@@ -45,4 +50,30 @@ func TestCaptureRuntimeStats(t *testing.T) {
 	require.Greater(t, snapshot.ProcessRSSBytes, uint64(0))
 	require.GreaterOrEqual(t, snapshot.HostCPUPercent, 0.0)
 	require.GreaterOrEqual(t, snapshot.ProcessCPUPercent, 0.0)
+}
+
+// A finished scan must not wait for the remainder of a 5-minute sample.
+// Its partial profile must remain readable rather than being discarded.
+func TestCPUProfileCancellationFlushesPartialProfile(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	target := filepath.Join(t.TempDir(), "partial.cpu.prof")
+	done := make(chan error, 1)
+	go func() { done <- collectCPUProfile(ctx, target, 5*time.Minute) }()
+	time.Sleep(100 * time.Millisecond)
+	cancel()
+	select {
+	case err := <-done:
+		require.NoError(t, err)
+	case <-time.After(5 * time.Second):
+		t.Fatal("profile did not stop with the workload")
+	}
+	data, err := os.ReadFile(target)
+	require.NoError(t, err)
+	parsed, err := profile.ParseData(data)
+	require.NoError(t, err)
+	require.NoError(t, parsed.CheckValid())
+	require.Greater(t, parsed.DurationNanos, int64(0))
+	// Stopping must release the process-wide profiler for the next scan.
+	require.NoError(t, collectCPUProfile(context.Background(), filepath.Join(t.TempDir(), "next.cpu.prof"), time.Millisecond))
 }

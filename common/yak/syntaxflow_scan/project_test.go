@@ -232,6 +232,26 @@ alert $call`,
 	require.Equal(t, syntaxflow_scan.StageCompile, reported[1].Stage)
 }
 
+func TestScanProjectReportsRecoveredASTAsPartial(t *testing.T) {
+	dir := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "Bad.java"), []byte(`class Bad { void broken( { }`), 0o644))
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "Good.java"), []byte(`class Good { int value() { return 1; } }`), 0o644))
+	result, err := syntaxflow_scan.ScanProject(context.Background(),
+		ssaconfig.WithCodeSourceKind(ssaconfig.CodeSourceLocal),
+		ssaconfig.WithCodeSourceLocalFile(dir),
+		ssaconfig.WithProjectRawLanguage("java"),
+		ssaconfig.WithSetProgramName("partial-compile-"+uuid.NewString()),
+	)
+	require.NoError(t, err, "tolerant compilation should retain usable results")
+	require.True(t, result.Succeeded, "a compile that produced a program is a successful scan")
+	require.False(t, result.IncompleteStages)
+	require.Len(t, result.Stages, 2)
+	stage := result.Stages[1]
+	require.True(t, stage.Succeeded())
+	require.NotNil(t, stage.CompileDiagnostics)
+	require.Equal(t, 1, stage.CompileDiagnostics.ASTErrors)
+}
+
 func TestScanProject_EmitsProductStages(t *testing.T) {
 	dir := t.TempDir()
 	require.NoError(t, os.WriteFile(filepath.Join(dir, "app.py"), []byte("eval(user)\n"), 0o644))

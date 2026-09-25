@@ -3,6 +3,8 @@ package ssaapi
 import (
 	"context"
 
+	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
+
 	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 
 	"github.com/yaklang/yaklang/common/yak/ssa"
@@ -130,6 +132,8 @@ func (config *queryConfig) GetFrame() (*sfvm.SFFrame, error) {
 	return nil, utils.Errorf("SyntaxflowQuery: rule is nil")
 }
 
+type queryDatabaseContextKey struct{}
+
 func QuerySyntaxflow(opt ...QueryOption) (*SyntaxFlowResult, error) {
 	c, _ := ssaconfig.New(ssaconfig.ModeProjectBase | ssaconfig.ModeSyntaxFlow)
 	config := &queryConfig{
@@ -192,6 +196,29 @@ func QuerySyntaxflow(opt ...QueryOption) (*SyntaxFlowResult, error) {
 		return nil, err
 	}
 
+	// Nested dataflow queries may share a VM config with the parent. Restore
+	// its context before returning so cancelling this query cannot poison it.
+	parent := config.ctx
+	if parent == nil {
+		parent = frame.GetContext()
+	}
+	previousContext := frame.GetContext()
+	defer func() { sfvm.WithContext(previousContext)(frame.GetConfig()) }()
+	// All nested queries belong to one rule lifetime. Dataflow checks retain
+	// contexts while traversing subsequent paths, so a completed child must
+	// not cancel a context still needed by its siblings or parent.
+	queryCtx := parent
+	if parent.Value(queryDatabaseContextKey{}) == nil {
+		ctx, cancelQuery := context.WithCancelCause(parent)
+		defer cancelQuery(nil)
+		queryCtx = context.WithValue(ctx, queryDatabaseContextKey{}, true)
+		queryCtx = ssadb.WithQueryErrorHandler(queryCtx, func(err error) {
+			cancelQuery(utils.Wrap(err, "SSA database search failed"))
+		})
+	}
+	config.ctx = queryCtx
+	config.opts = append(config.opts, sfvm.WithContext(config.ctx))
+
 	// Overlay incremental scan uses dual-source IR routing (base exclude + owner
 	// include). Do NOT skip base IR or merge audit_results cache — effective
 	// scan scope remains the full aggregated file view (~4000 files).
@@ -226,6 +253,9 @@ func QuerySyntaxflow(opt ...QueryOption) (*SyntaxFlowResult, error) {
 		return nil, utils.Errorf("QueryWithStruct only accepts struct rules")
 	} else {
 		res, err = frame.Feed(value, config.opts...)
+	}
+	if cause := context.Cause(queryCtx); cause != nil {
+		return nil, utils.Wrap(cause, "SyntaxflowQuery: query interrupted (context done)")
 	}
 	if err != nil {
 		return nil, utils.Wrap(err, "SyntaxflowQuery: query rule failed")
@@ -453,7 +483,10 @@ func QueryWithSFOption(opt sfvm.Option) QueryOption {
 }
 
 func QueryWithSFConfig(config *sfvm.Config) QueryOption {
-	return QueryWithSFOption(sfvm.WithConfig(config))
+	return func(c *queryConfig) {
+		c.opts = append(c.opts, sfvm.WithConfig(config))
+		c.ctx = config.GetContext()
+	}
 }
 
 func QueryWithInitVar(result *omap.OrderedMap[string, sfvm.Values]) QueryOption {

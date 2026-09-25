@@ -120,6 +120,25 @@ func (sm *SafeMapWithKey[K, V]) ForEach(f func(key K, value V) bool) {
 	}
 }
 
+// ValuesMatching snapshots only values whose keys match. The predicate runs
+// under the read lock and must be a pure key test. Values are copied out
+// before return: the caller may re-enter this map, and a callback inside the
+// lock would deadlock on that write.
+func (sm *SafeMapWithKey[K, V]) ValuesMatching(match func(K) bool) []V {
+	if sm == nil || match == nil {
+		return nil
+	}
+	sm.mu.RLock()
+	defer sm.mu.RUnlock()
+	var values []V
+	for key, value := range sm.m {
+		if match(key) {
+			values = append(values, value)
+		}
+	}
+	return values
+}
+
 func (sm *SafeMapWithKey[K, V]) GetAll() map[K]V {
 	sm.mu.RLock()
 	defer sm.mu.RUnlock()

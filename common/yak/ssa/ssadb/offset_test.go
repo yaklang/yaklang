@@ -1,17 +1,17 @@
 package ssadb
 
-import "testing"
+import (
+	"errors"
+	"testing"
+)
 
 func TestIrOffsetGetStartAndEndPositions_EmptyFileHash(t *testing.T) {
 	t.Parallel()
 
 	offset := &IrOffset{FileHash: ""}
 	editor, start, end, err := offset.GetStartAndEndPositions()
-	if err != nil {
-		t.Fatalf("expected nil error, got: %v", err)
-	}
-	if editor != nil || start != nil || end != nil {
-		t.Fatalf("expected nil editor/start/end for empty file hash")
+	if !errors.Is(err, ErrSourceRangeAbsent) {
+		t.Fatalf("expected absent source range, got editor=%v start=%v end=%v err=%v", editor, start, end, err)
 	}
 }
 
@@ -20,11 +20,8 @@ func TestIrOffsetGetStartAndEndPositions_WhitespaceFileHash(t *testing.T) {
 
 	offset := &IrOffset{FileHash: "   "}
 	editor, start, end, err := offset.GetStartAndEndPositions()
-	if err != nil {
-		t.Fatalf("expected nil error, got: %v", err)
-	}
-	if editor != nil || start != nil || end != nil {
-		t.Fatalf("expected nil editor/start/end for whitespace file hash")
+	if !errors.Is(err, ErrSourceRangeAbsent) {
+		t.Fatalf("expected absent source range, got editor=%v start=%v end=%v err=%v", editor, start, end, err)
 	}
 }
 
@@ -33,10 +30,7 @@ func TestIrOffsetGetStartAndEndPositions_NilReceiver(t *testing.T) {
 
 	var offset *IrOffset
 	editor, start, end, err := offset.GetStartAndEndPositions()
-	if err != nil {
-		t.Fatalf("expected nil error, got: %v", err)
-	}
-	if editor != nil || start != nil || end != nil {
-		t.Fatalf("expected nil editor/start/end for nil receiver")
+	if !errors.Is(err, ErrSourceRangeAbsent) {
+		t.Fatalf("expected absent source range, got editor=%v start=%v end=%v err=%v", editor, start, end, err)
 	}
 }

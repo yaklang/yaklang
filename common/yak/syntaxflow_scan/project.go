@@ -56,9 +56,8 @@ func ScanProjectFromJSON(ctx context.Context, raw string, extra ...ssaconfig.Opt
 // metrics, aggregate success) or an error. A run whose useful stages succeeded
 // returns a result with Succeeded=true even when a sibling stage failed, so
 // callers render the outcome instead of re-deriving success from job state.
-func ScanProject(ctx context.Context, opts ...ssaconfig.Option) (ProjectResult, error) {
+func ScanProject(ctx context.Context, opts ...ssaconfig.Option) (result ProjectResult, err error) {
 	cfg := &Config{ScanTaskCallback: &ScanTaskCallback{}}
-	var err error
 	cfg.Config, err = ssaconfig.New(ssaconfig.ModeAll, opts...)
 	if err != nil {
 		return ProjectResult{}, err
@@ -267,6 +266,20 @@ func ScanProject(ctx context.Context, opts ...ssaconfig.Option) (ProjectResult, 
 			}
 		}
 		captureProgramEvidence(recorder, prog)
+		if prog != nil {
+			diagnostic := prog.Program.CompileDiagnostics()
+			if diagnostic.Incomplete() {
+				recorder.mu.Lock()
+				if recorder.compileDiagnostics == nil {
+					recorder.compileDiagnostics = make(map[ProductStage]ssa.CompileDiagnostics)
+				}
+				recorder.compileDiagnostics[compileStage] = diagnostic
+				if wantAnalyze {
+					recorder.compileDiagnostics[StageAnalyze] = diagnostic
+				}
+				recorder.mu.Unlock()
+			}
+		}
 		if wantReview && err == nil {
 			emitStructResults(cfg, prog)
 			recorder.observeStruct(prog)
@@ -580,6 +593,12 @@ func emitStructResults(cfg *Config, prog *ssaapi.Program) {
 	for _, res := range prog.StructScanResults() {
 		if res == nil {
 			continue
+		}
+		// Struct rules run inside compile, not StartScan, so they never reach
+		// notifyResult. Fold them into the shared report here; source and SSA
+		// results are added by the stage scan that owns the same reporter.
+		if cfg.Reporter != nil {
+			cfg.Reporter.AddSyntaxFlowResult(res)
 		}
 		cfg.resultCallback(&ScanResult{Status: "executing", Result: res})
 	}
@@ -968,6 +987,12 @@ func sharedScanCallbackOptions(cfg *Config) []ssaconfig.Option {
 	if cfg.GetScanConcurrency() > 0 {
 		opts = append(opts, ssaconfig.WithScanConcurrency(cfg.GetScanConcurrency()))
 	}
+	// Nested stage scans rebuild their config. Preserve both budgets, including
+	// explicit zero (disabled), instead of silently reverting to unlimited work.
+	opts = append(opts,
+		ssaconfig.WithScanRuleTimeout(cfg.GetScanRuleTimeout()),
+		ssaconfig.WithScanRuleWorkLimit(cfg.GetScanRuleWorkLimit()),
+	)
 	// Propagate the risk-persistence setting to nested scan stages.
 	if cfg.IsNoSaveRisk() {
 		opts = append(opts, ssaconfig.WithNoSaveRisk(true))
