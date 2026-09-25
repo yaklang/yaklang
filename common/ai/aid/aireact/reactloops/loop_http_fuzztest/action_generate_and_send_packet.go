@@ -96,6 +96,15 @@ var generateAndSendPacketAction = func(r aicommon.AIInvokeRuntime) reactloops.Re
 			)
 			applyFuzzVerificationOutcome(loop, operator, diffResult, verifyResult)
 		},
+		func(action *reactloops.LoopAction) {
+			action.NativeDescription = "Generate and send a complete raw HTTP request. Put the entire request in generated_packet_content; no external AITAG is read in function-call mode."
+			action.NativeOptions = []aitool.ToolOption{
+				aitool.WithStringParam("packet_type", aitool.WithParam_Description("mutation or synthetic"), aitool.WithParam_EnumString("mutation", "synthetic"), aitool.WithParam_Required(true)),
+				aitool.WithStringParam("target_purpose", aitool.WithParam_Description("Target and purpose of this request."), aitool.WithParam_Required(true)),
+				aitool.WithStringParam("reason", aitool.WithParam_Description("Why this request tests the current hypothesis."), aitool.WithParam_Required(true)),
+				aitool.WithStringParam(generatedPacketContentField, aitool.WithParam_Description("Complete raw HTTP request, including request line, headers, and body."), aitool.WithParam_Required(true)),
+			}
+		},
 	)
 }
 

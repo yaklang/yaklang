@@ -20,6 +20,9 @@ type promptCompareInvoker struct{ *mock.MockInvoker }
 
 func (i *promptCompareInvoker) AssembleLoopPrompt(_ []*aitool.Tool, input *aicommon.LoopPromptAssemblyInput) (*aicommon.LoopPromptAssemblyResult, error) {
 	materials := &aicommon.PromptMaterials{
+		FunctionCallMode:    input.FunctionCallMode,
+		TaskInstruction:     input.TaskInstruction,
+		OutputExample:       input.OutputExample,
 		Schema:              input.Schema,
 		FunctionCallSchemas: input.FunctionCallSchemas,
 	}
@@ -43,6 +46,12 @@ func generateComparedLoopPrompt(t *testing.T, functionCallMode bool) string {
 	loop := makeSchemaStabilityTestLoop(cfg)
 	loop.loopName = "prompt-compare"
 	loop.functionCallMode = functionCallMode
+	loop.persistentInstructionProvider = func(*ReActLoop, string) (string, error) {
+		return "Choose an available action.", nil
+	}
+	loop.outputExampleProvider = func(*ReActLoop, string) (string, error) {
+		return `{"@action":"compare"}`, nil
+	}
 	loop.invoker = &promptCompareInvoker{MockInvoker: mock.NewMockInvoker(ctx)}
 	prompt, err := loop.generateLoopPrompt("compare", "compare action schemas", "", nil, "", nil)
 	require.NoError(t, err)
@@ -67,6 +76,7 @@ func TestExecLoopPromptCompare_TextAndFunctionCallSchemas(t *testing.T) {
 	require.NotEqual(t, textPrompt, functionPrompt)
 
 	textSection := parseComparedSemiDynamic2(t, textPrompt)
+	require.Contains(t, textSection, `{"@action":"compare"}`)
 	require.NotContains(t, textSection, "<|FUNCTION_CALL_ACTION_SCHEMA_")
 	const schemaTag = "<|SCHEMA|>"
 	require.Equal(t, 2, strings.Count(textSection, schemaTag))
@@ -89,6 +99,8 @@ func TestExecLoopPromptCompare_TextAndFunctionCallSchemas(t *testing.T) {
 	require.NotEmpty(t, actionNames)
 
 	functionSection := parseComparedSemiDynamic2(t, functionPrompt)
+	require.NotContains(t, functionSection, `{"@action":"compare"}`)
+	require.Contains(t, functionSection, "通过原生工具调用选择 action")
 	require.NotContains(t, functionSection, schemaTag)
 	parsedTools, err := aitag.SplitViaTAG(functionSection, "FUNCTION_CALL_ACTION_SCHEMA")
 	require.NoError(t, err)
@@ -112,4 +124,28 @@ func TestExecLoopPromptCompare_TextAndFunctionCallSchemas(t *testing.T) {
 	for _, name := range actionNames {
 		require.True(t, seen[name.(string)], "missing action tool %q", name)
 	}
+}
+
+func TestExecLoopPromptCompare_HighStaticProtocol(t *testing.T) {
+	render := func(functionCallMode bool) string {
+		t.Helper()
+		materials := &aicommon.PromptMaterials{FunctionCallMode: functionCallMode}
+		prompt, err := aicommon.RenderPromptTemplate(
+			"loop-prompt-compare-high-static",
+			aicommon.SharedPlanAndExecHighStaticTemplate,
+			materials.HighStaticData(),
+		)
+		require.NoError(t, err)
+		return prompt
+	}
+	textPrompt := render(false)
+	functionPrompt := render(true)
+	require.NotEqual(t, textPrompt, functionPrompt)
+	require.Contains(t, textPrompt, "caller 每轮给 JSON SCHEMA")
+	require.Contains(t, textPrompt, "## NONCE 与 AITAG")
+	require.NotContains(t, textPrompt, "本轮使用原生 function call")
+	require.Contains(t, functionPrompt, "本轮使用原生 function call")
+	require.Contains(t, functionPrompt, "模型输出的 AITAG 不参与 function call 的 action 解析")
+	require.NotContains(t, functionPrompt, "caller 每轮给 JSON SCHEMA")
+	require.NotContains(t, functionPrompt, "## NONCE 与 AITAG")
 }

@@ -1,6 +1,8 @@
 package reactloops
 
 import (
+	"strings"
+
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 )
@@ -12,10 +14,15 @@ type LoopActionHandlerFunc func(loop *ReActLoop, action *aicommon.Action, operat
 
 type LoopAction struct {
 	// plan 与 forge executor 会允许支持异步执行，异步情况下仍然允许对话和其他功能
-	AsyncMode         bool
-	ActionType        string `json:"type"`
-	Description       string `json:"description"`
-	Options           []aitool.ToolOption
+	AsyncMode   bool
+	ActionType  string `json:"type"`
+	Description string `json:"description"`
+	Options     []aitool.ToolOption
+	// NativeDescription and NativeOptions replace text-output instructions when
+	// this action is exposed as a provider function. Nil NativeOptions keeps the
+	// ordinary Options; the text schema is never changed by these overrides.
+	NativeDescription string              `json:"-"`
+	NativeOptions     []aitool.ToolOption `json:"-"`
 	ActionVerifier    LoopActionVerifierFunc
 	ActionHandler     LoopActionHandlerFunc
 	StreamFields      []*LoopStreamField
@@ -45,7 +52,7 @@ func buildSchema(actions ...*LoopAction) string {
 			aitool.WithParam_Raw("x-@action-rules", actionDesc),
 		),
 	}
-	for _, opt := range commonActionSchemaOptions() {
+	for _, opt := range commonActionSchemaOptions(false) {
 		opts = append(opts, opt)
 	}
 	for _, action := range actions {
@@ -66,10 +73,13 @@ func actionDescription(action *LoopAction) string {
 	return action.Description
 }
 
-// The common fields have identical definitions in the text schema and each
-// native function tool. The action selector is deliberately text-only: a
-// native tool call selects its action through the function name.
-func commonActionSchemaOptions() []aitool.ToolOption {
+// The common fields retain the same shape in both protocols. Descriptions
+// referring to JSON action output are adjusted for native function tools.
+func commonActionSchemaOptions(native bool) []aitool.ToolOption {
+	thoughtDescription := "Optional. Omit this field when @action is 'directly_answer' or when the next step is already obvious. If you do provide it, keep it to one short, action-oriented sentence only (prefer <=12 Chinese characters or <=8 English words)."
+	if native {
+		thoughtDescription = "Optional. Omit for directly_answer or an obvious next step. Otherwise use one short, action-oriented sentence (prefer <=12 Chinese characters or <=8 English words)."
+	}
 	return []aitool.ToolOption{
 		aitool.WithStringParam(
 			"identifier",
@@ -82,17 +92,19 @@ func commonActionSchemaOptions() []aitool.ToolOption {
 		),
 		aitool.WithStringParam(
 			"human_readable_thought",
-			aitool.WithParam_Description(
-				"Optional. Omit this field when @action is 'directly_answer' or when the next step is already obvious. If you do provide it, keep it to one short, action-oriented sentence only (prefer <=12 Chinese characters or <=8 English words).",
-			),
+			aitool.WithParam_Description(thoughtDescription),
 		),
-		todoDeltaSchemaOption(),
+		todoDeltaSchemaOption(native),
 	}
 }
 
-func todoDeltaSchemaOption() aitool.ToolOption {
+func todoDeltaSchemaOption(native bool) aitool.ToolOption {
+	description := "The only write channel for the short-term TODO work set; TODO LIST, prose, and custom TODO tags are read-only and ignored for state changes. This field is optional only when state truly does not change. Add, refine, close, schedule a continuation, or switch TODOs in the same action JSON that advances the work. Apply order: add, update, close, current. Update, close, and current apply only to open items. Closed IDs are immutable audit history: to continue a deferred or weakly closed item, add a new TODO with a new ID and make that continuation current. Open items form the Frontier and one item is current. Before following one branch, record every concrete in-scope branch exposed by an Observation. A discovered link, form action, redirect, script route, documented endpoint, or response field is sufficient source evidence for a coverage TODO; require a falsifiable hypothesis only for a verification claim. Keep current while materially different experiments can gain information. A tool/parameter/transport/auth failure or one payload miss is not closure: correct it or vary the controllable channel first. When current completes, is discriminatively ruled out, is externally blocked, or temporarily has zero information gain, save its result or continuation condition and set the next Frontier item in the same delta. Never close or defer items merely to pass finish. Every close requires outcome and reason; refs is a sibling field and closure may use only observations already available before this action."
+	if native {
+		description = strings.Replace(description, "the same action JSON", "the same tool call arguments", 1)
+	}
 	return aitool.WithStructParam("todo_delta", []aitool.PropertyOption{
-		aitool.WithParam_Description("The only write channel for the short-term TODO work set; TODO LIST, prose, and custom TODO tags are read-only and ignored for state changes. This field is optional only when state truly does not change. Add, refine, close, schedule a continuation, or switch TODOs in the same action JSON that advances the work. Apply order: add, update, close, current. Update, close, and current apply only to open items. Closed IDs are immutable audit history: to continue a deferred or weakly closed item, add a new TODO with a new ID and make that continuation current. Open items form the Frontier and one item is current. Before following one branch, record every concrete in-scope branch exposed by an Observation. A discovered link, form action, redirect, script route, documented endpoint, or response field is sufficient source evidence for a coverage TODO; require a falsifiable hypothesis only for a verification claim. Keep current while materially different experiments can gain information. A tool/parameter/transport/auth failure or one payload miss is not closure: correct it or vary the controllable channel first. When current completes, is discriminatively ruled out, is externally blocked, or temporarily has zero information gain, save its result or continuation condition and set the next Frontier item in the same delta. Never close or defer items merely to pass finish. Every close requires outcome and reason; refs is a sibling field and closure may use only observations already available before this action."),
+		aitool.WithParam_Description(description),
 	},
 		aitool.WithRawParam("current", map[string]any{"type": []string{"string", "null"}, "description": "Optional unique open TODO id. Closed history cannot be selected; create a new continuation ID instead. Omit to keep focus; null or empty clears it."}),
 		aitool.WithStructArrayParam("add", nil, nil,

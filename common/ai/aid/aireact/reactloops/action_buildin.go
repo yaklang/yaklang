@@ -2,8 +2,8 @@ package reactloops
 
 import (
 	"fmt"
-	"time"
 	"strings"
+	"time"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
@@ -105,8 +105,21 @@ var loopAction_Finish = &LoopAction{
 	},
 }
 
+// NativeDirectlyAnswerOptions keeps the full answer inside tool arguments.
+// The function-call transaction does not parse an external FINAL_ANSWER tag.
+func NativeDirectlyAnswerOptions() []aitool.ToolOption {
+	return []aitool.ToolOption{
+		aitool.WithStringParam("answer_payload",
+			aitool.WithParam_Description("Complete answer to deliver to the user, including long Markdown or code when needed. Do not use an external AITAG."),
+			aitool.WithParam_Required(true),
+		),
+	}
+}
+
 var loopAction_DirectlyAnswer = &LoopAction{
-	ActionType: "directly_answer",
+	ActionType:        "directly_answer",
+	NativeDescription: "Deliver the complete answer to the user in answer_payload. For ordinary tasks this delivers an answer without ending the loop; use finish after all work is complete. Do not repeat an unchanged answer, and include todo_delta when scheduling follow-up work.",
+	NativeOptions:     NativeDirectlyAnswerOptions(),
 	Description: "Emit a direct answer to the user via 'answer_payload' or FINAL_ANSWER tag. For simple direct answers, omit 'human_readable_thought'. " +
 		"For ordinary tasks directly_answer ONLY delivers the answer; use 'finish' when the latest user input is fully answered and no open TODO remains. " +
 		"A classifier-approved simple_query with no effective todo_delta and no current-task TODO history is closed by the host immediately after delivery. " +

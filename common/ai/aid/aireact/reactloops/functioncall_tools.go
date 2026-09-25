@@ -26,10 +26,14 @@ func buildActionTools(actions []*LoopAction, maxBatchCalls int) ([]aispec.Tool, 
 		}
 		seen[action.ActionType] = struct{}{}
 		opts := make([]any, 0, len(action.Options)+3)
-		for _, opt := range commonActionSchemaOptions() {
+		for _, opt := range commonActionSchemaOptions(true) {
 			opts = append(opts, opt)
 		}
-		for _, opt := range action.Options {
+		actionOptions := action.Options
+		if action.NativeOptions != nil {
+			actionOptions = action.NativeOptions
+		}
+		for _, opt := range actionOptions {
 			opts = append(opts, opt)
 		}
 		schemaText, err := applyToolBatchSchemaMaxItems(aitool.NewObjectSchema(opts...), maxBatchCalls)
@@ -54,11 +58,15 @@ func buildActionTools(actions []*LoopAction, maxBatchCalls int) ([]aispec.Tool, 
 			}
 			parameters["required"] = filtered
 		}
+		description := actionDescription(action)
+		if action.NativeDescription != "" {
+			description = action.NativeDescription
+		}
 		tools = append(tools, aispec.Tool{
 			Type: "function",
 			Function: aispec.ToolFunction{
 				Name:        action.ActionType,
-				Description: actionDescription(action),
+				Description: description,
 				Parameters:  parameters,
 			},
 		})

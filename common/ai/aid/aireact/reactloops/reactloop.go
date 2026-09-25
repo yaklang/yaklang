@@ -70,13 +70,14 @@ type ReActLoop struct {
 
 	loopName string
 
-	persistentInstructionProvider ContextProviderFunc
-	lastLoopSchema                string
-	outputExampleProvider         ContextProviderFunc
-	reactiveDataBuilder           FeedbackProviderFunc
-	todoCheckpointMu              sync.Mutex
-	finishTodoCheckpointScope     string
-	currentTodoProgress           map[string]*currentTodoProgress
+	persistentInstructionProvider   ContextProviderFunc
+	functionCallInstructionProvider ContextProviderFunc
+	lastLoopSchema                  string
+	outputExampleProvider           ContextProviderFunc
+	reactiveDataBuilder             FeedbackProviderFunc
+	todoCheckpointMu                sync.Mutex
+	finishTodoCheckpointScope       string
+	currentTodoProgress             map[string]*currentTodoProgress
 
 	allowAIForge       func() bool
 	allowPlanAndExec   func() bool
