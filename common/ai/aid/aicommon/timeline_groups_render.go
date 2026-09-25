@@ -595,10 +595,9 @@ func renderTimelineEntryForPrompt(item *TimelineItem, bucketStart time.Time, sta
 	// reviewed source can all contain AITAG-looking literals. Escape their open
 	// delimiter before wrapping the item in real Timeline control tags, otherwise
 	// a literal can corrupt downstream section parsing or impersonate an internal
-	// reasoning replay record. PromptText-backed model replay is the sole internal
-	// projection allowed to retain a raw control envelope; its JSON fields are
-	// emitted with encoding/json and therefore escape '<' inside payload values.
-	if promptProjection && !isModelThinkingReplayProjection(item) {
+	// replay record. Only PromptText-backed model reasoning and action responses
+	// retain raw control envelopes. Their payload JSON escapes '<' in values.
+	if promptProjection && !isModelThinkingReplayProjection(item) && !isActionResponseReplayProjection(item) {
 		content = strings.ReplaceAll(content, "<|", "&lt;|")
 	}
 	if explicitTask && taskID != "" {
@@ -636,6 +635,17 @@ func isModelThinkingReplayProjection(item *TimelineItem) bool {
 	}
 	return strings.Contains(promptText, "<|TIMELINE_MODEL_THINKING_V1_") ||
 		strings.Contains(promptText, "<|TIMELINE_MODEL_THINKING_")
+}
+
+func isActionResponseReplayProjection(item *TimelineItem) bool {
+	textItem, ok := timelineTextItem(item)
+	if !ok || normalizeTimelinePromptCategory(extractTextEntryType(textItem.Text)) != "FUNCTION_CALL_ACTION_RESPONSE" {
+		return false
+	}
+	promptText := strings.TrimSpace(textItem.PromptText)
+	return promptText != "" && strings.TrimSpace(textItem.Text) == promptText &&
+		strings.Contains(promptText, "<|FUNCTION_CALL_ACTION_RESPONSE|>") &&
+		strings.Contains(promptText, "<|FUNCTION_CALL_ACTION_RESPONSE_END|>")
 }
 
 func timelineIntervalBlockRenderedByteLen(block *TimelineIntervalBlock) int {

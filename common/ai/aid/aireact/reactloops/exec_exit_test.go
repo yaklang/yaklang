@@ -35,6 +35,7 @@ func TestExecuteWithExistedTask_PanicReturnsErrorAndPreservesTerminalStatus(t *t
 			}
 			task := aicommon.NewStatefulTaskBase("panic-parent", "investigate incident", ctx, cfg.GetEmitter(), true)
 			loop, err := NewReActLoop("panic-exit", inv,
+				WithFunctionCallMode(false),
 				WithAllowToolCall(false), WithAllowRAG(false), WithAllowAIForge(false), WithAllowPlanAndExec(false), WithAllowUserInteract(false),
 				WithRegisterLoopAction("require_tool", "unused tool routing", nil, nil, nil),
 				WithDisableLoopPerception(true), WithDisablePeriodicVerification(true), WithDisableIncreaseIteration(true),

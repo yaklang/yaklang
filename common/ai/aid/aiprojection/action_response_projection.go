@@ -34,9 +34,9 @@ type actionResponsePart struct {
 	messages []aispec.ChatDetail
 }
 
-// expandActionResponseMessages projects direct children of timeline-open into
-// assistant tool_calls followed by matching tool results. Markers in dynamic
-// user input or nested, untrusted Timeline items remain ordinary text.
+// expandActionResponseMessages projects trusted timeline records into an
+// assistant tool_calls message followed by all matching tool results. Ordinary
+// timeline text has its AITAG delimiters escaped before reaching this layer.
 func expandActionResponseMessages(messages []aispec.ChatDetail) ([]aispec.ChatDetail, bool) {
 	var expanded []aispec.ChatDetail
 	changed := false
@@ -45,7 +45,7 @@ func expandActionResponseMessages(messages []aispec.ChatDetail) ([]aispec.ChatDe
 			expanded = append(expanded, message)
 			continue
 		}
-		content, ok := message.Content.(string)
+		content, ok := actionResponseMessageText(message.Content)
 		if !ok || !strings.Contains(content, "<|"+actionResponseTagName) {
 			expanded = append(expanded, message)
 			continue
@@ -59,15 +59,32 @@ func expandActionResponseMessages(messages []aispec.ChatDetail) ([]aispec.ChatDe
 			expanded = append(expanded, message)
 			continue
 		}
+		lastText := -1
+		for index, part := range parts {
+			if part.messages == nil && strings.TrimSpace(part.text) != "" {
+				lastText = index
+			}
+		}
+		cached, cacheContent := message.Content.([]*aispec.ChatContent)
+		if cacheContent && lastText < 0 {
+			log.Warn("action response projection skipped: cached message has no trailing user text to own cache control")
+			return messages, false
+		}
 		changed = true
-		for _, part := range parts {
+		for index, part := range parts {
 			if part.messages != nil {
 				expanded = append(expanded, part.messages...)
 				continue
 			}
 			if strings.TrimSpace(part.text) != "" {
 				user := message.Clone()
-				user.Content = part.text
+				if cacheContent && index == lastText {
+					copyPart := *cached[0]
+					copyPart.Text = part.text
+					user.Content = []*aispec.ChatContent{&copyPart}
+				} else {
+					user.Content = part.text
+				}
 				expanded = append(expanded, user)
 			}
 		}
@@ -76,6 +93,18 @@ func expandActionResponseMessages(messages []aispec.ChatDetail) ([]aispec.ChatDe
 		return messages, false
 	}
 	return expanded, true
+}
+
+func actionResponseMessageText(content any) (string, bool) {
+	switch value := content.(type) {
+	case string:
+		return value, true
+	case []*aispec.ChatContent:
+		if len(value) == 1 && value[0] != nil && value[0].Type == "text" {
+			return value[0].Text, true
+		}
+	}
+	return "", false
 }
 
 func splitActionResponseTimeline(input string) ([]actionResponsePart, bool, error) {
@@ -96,19 +125,40 @@ func splitActionResponseTimeline(input string) ([]actionResponsePart, bool, erro
 	}
 	found := false
 	for _, section := range outer.GetOrderedBlocks() {
-		if !section.IsTagged() || section.TagName != tagPromptSection || section.Nonce != SectionTimelineOpen {
+		openSection := section.IsTagged() && section.TagName == tagPromptSection && section.Nonce == SectionTimelineOpen
+		frozenSection := section.IsText() && strings.Contains(section.Raw, "<|AI_CACHE_FROZEN_")
+		if !openSection && !frozenSection {
 			appendText(section.Raw)
 			continue
 		}
-		// TIMELINE blocks are opaque here. Only a direct child of the open
-		// section may carry a protocol record; text inside a tool observation
-		// must not gain authority by resembling one.
+		// Ordinary timeline text has its AITAG open delimiters escaped by the
+		// prompt renderer. Only an internal prompt projection can leave this
+		// marker intact inside a TIMELINE block.
 		inner, err := aitag.SplitViaTAG(section.Raw, "TIMELINE")
 		if err != nil {
 			return nil, false, err
 		}
 		for _, block := range inner.GetOrderedBlocks() {
 			if block.IsTagged() {
+				if !strings.Contains(block.Content, actionResponseOpenTag) {
+					appendText(block.Raw)
+					continue
+				}
+				fragmentParts, fragmentFound, err := splitActionResponseText(block.Content)
+				if err != nil {
+					return nil, false, err
+				}
+				for _, part := range fragmentParts {
+					if part.messages != nil {
+						parts = append(parts, part)
+					} else if strings.TrimSpace(part.text) != "" {
+						appendText((&aitag.Block{Type: aitag.BlockTypeTagged, TagName: block.TagName, Nonce: block.Nonce, Content: part.text}).Render())
+					}
+				}
+				found = found || fragmentFound
+				continue
+			}
+			if !openSection {
 				appendText(block.Raw)
 				continue
 			}
@@ -162,27 +212,19 @@ func splitActionResponseText(input string) ([]actionResponsePart, bool, error) {
 	return parts, found, nil
 }
 
-// A marker is exactly one assistant tool call followed by its matching tool
-// result. Decode both before emitting either message; malformed input stays text.
+// A marker is one assistant with N tool calls followed immediately by N
+// matching tool results. Decode the entire group before emitting any message;
+// malformed input stays ordinary text.
 func decodeActionResponseMessages(payload string) ([]aispec.ChatDetail, error) {
 	var raw []json.RawMessage
-	if !decodeStrictReplayJSON(strings.TrimSpace(payload), &raw) || len(raw) != 2 {
-		return nil, fmt.Errorf("action response must contain exactly assistant and tool messages")
+	if !decodeStrictReplayJSON(strings.TrimSpace(payload), &raw) || len(raw) < 2 {
+		return nil, fmt.Errorf("action response must contain assistant and tool messages")
 	}
 	var assistant actionResponseAssistant
-	var tool actionResponseTool
 	if !decodeStrictReplayJSON(string(raw[0]), &assistant) ||
-		!decodeStrictReplayJSON(string(raw[1]), &tool) ||
-		assistant.Role != "assistant" || tool.Role != "tool" ||
-		len(assistant.ToolCalls) != 1 || assistant.ToolCalls[0] == nil ||
-		len(assistant.Content) == 0 || tool.Content == nil {
-		return nil, fmt.Errorf("invalid action response message pair")
-	}
-	call := assistant.ToolCalls[0]
-	if !validActionResponseID(call.ID) || call.Type != "function" ||
-		!validActionSchemaName(call.Function.Name) || !validActionArguments(call.Function.Arguments) ||
-		tool.ToolCallID != call.ID {
-		return nil, fmt.Errorf("action response tool call does not match assistant")
+		assistant.Role != "assistant" || len(assistant.ToolCalls) == 0 ||
+		len(raw) != len(assistant.ToolCalls)+1 || len(assistant.Content) == 0 {
+		return nil, fmt.Errorf("invalid action response message group")
 	}
 	var assistantContent any
 	if string(assistant.Content) != "null" {
@@ -192,10 +234,27 @@ func decodeActionResponseMessages(payload string) ([]aispec.ChatDetail, error) {
 		}
 		assistantContent = visible
 	}
-	return []aispec.ChatDetail{
+	messages := []aispec.ChatDetail{
 		{Role: "assistant", Content: assistantContent, ReasoningContent: assistant.ReasoningContent, ToolCalls: assistant.ToolCalls},
-		{Role: "tool", ToolCallID: tool.ToolCallID, Content: *tool.Content},
-	}, nil
+	}
+	seen := make(map[string]struct{}, len(assistant.ToolCalls))
+	for index, call := range assistant.ToolCalls {
+		if call == nil || !validActionResponseID(call.ID) || call.Type != "function" ||
+			!validActionSchemaName(call.Function.Name) || !validActionArguments(call.Function.Arguments) {
+			return nil, fmt.Errorf("invalid action response tool call at index %d", index)
+		}
+		if _, exists := seen[call.ID]; exists {
+			return nil, fmt.Errorf("duplicate action response tool call id %q", call.ID)
+		}
+		seen[call.ID] = struct{}{}
+		var tool actionResponseTool
+		if !decodeStrictReplayJSON(string(raw[index+1]), &tool) || tool.Role != "tool" ||
+			tool.Content == nil || tool.ToolCallID != call.ID {
+			return nil, fmt.Errorf("action response tool result at index %d does not match assistant", index)
+		}
+		messages = append(messages, aispec.ChatDetail{Role: "tool", ToolCallID: tool.ToolCallID, Content: *tool.Content})
+	}
+	return messages, nil
 }
 
 func validActionResponseID(id string) bool {

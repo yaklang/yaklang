@@ -81,6 +81,17 @@ func TestTimelinePromptProjectionPreservesRawBucketTopology(t *testing.T) {
 	}
 }
 
+func TestTimelinePromptProjectionKeepsActionResponseInLightweightMainPrompt(t *testing.T) {
+	timeline := NewTimeline(nil, nil)
+	marker := `<|FUNCTION_CALL_ACTION_RESPONSE|>[{"role":"assistant"}]<|FUNCTION_CALL_ACTION_RESPONSE_END|>`
+	display := "[FUNCTION_CALL_ACTION_RESPONSE]:\naccepted call_a"
+	timeline.PushTextWithPromptProjection(1, display, "[FUNCTION_CALL_ACTION_RESPONSE]:\n"+marker)
+
+	require.Contains(t, timeline.DumpRecentForPromptWithLatestModelReplay(10000), marker)
+	require.NotContains(t, timeline.DumpRecentForPrompt(10000), marker)
+	require.Contains(t, timeline.Dump(), "accepted call_a")
+}
+
 func TestTimelinePromptProjectionKeepsRealAndDropsOnlyRedundantErrorLines(t *testing.T) {
 	item := &TimelineItem{createdAt: time.Now(), value: &TextTimelineItem{
 		ID:   9,
