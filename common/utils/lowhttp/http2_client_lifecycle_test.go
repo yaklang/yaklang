@@ -57,7 +57,7 @@ func TestH2EarlyResponseClosesUploadHalf(t *testing.T) {
 	default:
 		t.Fatal("local upload half left open")
 	}
-	resp, _, err := cs.waitResponse(context.Background(), time.Second)
+	resp, _, _, err := cs.waitResponse(context.Background(), time.Second)
 	if err != nil || resp.StatusCode != 413 {
 		t.Fatalf("lost early response: %d %v", resp.StatusCode, err)
 	}
@@ -73,7 +73,7 @@ func TestH2CompleteResponseWinsConnectionClose(t *testing.T) {
 		rl := &http2ClientConnReadLoop{h2Conn: c}
 		rl.applyResponseHeaders(cs, []hpack.HeaderField{{Name: ":status", Value: "200"}}, true)
 		c.setClose()
-		resp, _, err := cs.waitResponse(context.Background(), time.Second)
+		resp, _, _, err := cs.waitResponse(context.Background(), time.Second)
 		if err != nil || resp.StatusCode != 200 {
 			t.Fatalf("complete response lost on close: %v", err)
 		}
@@ -178,9 +178,9 @@ func TestH2CancellationClosesSilentReadLoop(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
 		p := h2PoolFor(ctx, time.Minute)
 		client, peer := net.Pipe()
-		pc := &persistConn{conn: client, p: p}
-		pc.h2Conn()
-		c := pc.alt
+		entry := &h2ConnEntry{conn: client, cacheKey: &connectKey{scheme: H2}, pool: p.h2Pool}
+		p.h2Pool.initH2Conn(entry)
+		c := entry.alt
 		c.pc = nil
 		go c.readLoop()
 		cancel()
@@ -240,12 +240,11 @@ func TestH2StreamingHandlerReturnReleasesStream(t *testing.T) {
 	if !errors.As(err, &streamErr) || streamErr.Code != http2.ErrCodeCancel {
 		t.Fatalf("handler return did not cancel stream: %v", err)
 	}
-	p.h2Mu.Lock()
-	defer p.h2Mu.Unlock()
-	for _, pc := range p.h2ConnMap {
-		pc.alt.mu.Lock()
-		active, retained := pc.alt.activeStreams, len(pc.alt.streams)
-		pc.alt.mu.Unlock()
+	live, _ := p.h2Pool.Snapshot()
+	for _, entry := range live {
+		entry.alt.mu.Lock()
+		active, retained := entry.alt.activeStreams, len(entry.alt.streams)
+		entry.alt.mu.Unlock()
 		if active != 0 || retained != 0 {
 			t.Fatal("handler return retained stream")
 		}
@@ -256,9 +255,9 @@ func TestH2InvalidServerPrefaceClosesReadLoop(t *testing.T) {
 	for _, ack := range []bool{false, true} {
 		client, peer := net.Pipe()
 		p := h2PoolFor(context.Background(), time.Minute)
-		pc := &persistConn{conn: client, p: p}
-		pc.h2Conn()
-		c := pc.alt
+		entry := &h2ConnEntry{conn: client, cacheKey: &connectKey{scheme: H2}, pool: p.h2Pool}
+		p.h2Pool.initH2Conn(entry)
+		c := entry.alt
 		c.pc = nil
 		go c.readLoop()
 		fr := http2.NewFramer(peer, nil)
@@ -308,7 +307,7 @@ func TestH2LastStreamIDDrainsBeforeClosing(t *testing.T) {
 	}
 	rl := &http2ClientConnReadLoop{h2Conn: c}
 	rl.applyResponseHeaders(cs, []hpack.HeaderField{{Name: ":status", Value: "200"}}, true)
-	if _, _, err = cs.waitResponse(context.Background(), time.Second); err != nil {
+	if _, _, _, err = cs.waitResponse(context.Background(), time.Second); err != nil {
 		t.Fatal(err)
 	}
 	if !c.isClosed() {

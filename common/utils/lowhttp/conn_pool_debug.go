@@ -81,16 +81,6 @@ func (q *tombstoneQueue) snapshot() []h2ConnTombstone {
 
 // ── LowHttpConnPool debug methods ─────────────────────────────────────────────
 
-// recordH2Tombstone pushes t into the bounded tombstone queue.
-// It is a no-op when debug mode is disabled, so there is zero overhead in
-// production.  Must be called while holding l.h2Mu.
-func (l *LowHttpConnPool) recordH2Tombstone(t h2ConnTombstone) {
-	if atomic.LoadInt32(&l.debugEnabled) == 0 {
-		return
-	}
-	l.h2Tombstones.push(t)
-}
-
 // EnableConnPoolDebug turns the periodic connection-pool status printer on or
 // off. Disabling stops the goroutine immediately; enabling can start it again.
 func (l *LowHttpConnPool) EnableConnPoolDebug(on bool) {
@@ -102,6 +92,10 @@ func (l *LowHttpConnPool) EnableConnPoolDebug(on bool) {
 		l.startDebugPrinter()
 	} else {
 		atomic.StoreInt32(&l.debugEnabled, 0)
+	}
+	// Mirror the debug flag to the H2 pool so tombstones are recorded.
+	if l.h2Pool != nil {
+		l.h2Pool.SetDebugEnabled(on)
 	}
 	l.notifyDebugPrinter()
 }
@@ -191,25 +185,17 @@ func (l *LowHttpConnPool) debugState() {
 	}
 
 	// ── H2 live connections ───────────────────────────────────────────────────
-	l.h2Mu.Lock()
-	h2Snapshot := make(map[string]*persistConn, len(l.h2ConnMap))
-	for k, v := range l.h2ConnMap {
-		h2Snapshot[k] = v
-	}
-	// Snapshot tombstones (newest first) under the same lock so the two
-	// sections are consistent with each other.
-	tombstones := l.h2Tombstones.snapshot()
-	l.h2Mu.Unlock()
+	h2Snapshot, tombstones := l.h2Pool.Snapshot()
 
 	if len(h2Snapshot) == 0 {
 		sb.WriteString("║  H2  (no live connections)\n")
 	}
-	for host, pc := range h2Snapshot {
-		if pc.alt == nil {
+	for host, entry := range h2Snapshot {
+		if entry.alt == nil {
 			sb.WriteString(fmt.Sprintf("║  H2 %-38s  alt=nil\n", host))
 			continue
 		}
-		alt := pc.alt
+		alt := entry.alt
 		alt.mu.Lock()
 		active := alt.activeStreams
 		maxS := alt.maxStreamsCount
@@ -246,7 +232,7 @@ func (l *LowHttpConnPool) debugState() {
 		))
 	}
 
-	// ── Recent H2 closures (tombstones) ───────────────────────────────────────
+		// ── Recent H2 closures (tombstones) ───────────────────────────────────────
 	if len(tombstones) > 0 {
 		sb.WriteString("║─ Recent H2 closures ──────────────────────────────────\n")
 		for _, t := range tombstones {

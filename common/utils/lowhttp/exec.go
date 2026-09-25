@@ -1,12 +1,9 @@
 package lowhttp
 
 import (
-	"bufio"
 	"bytes"
 	"context"
 	"fmt"
-	"io"
-	"net"
 	"net/http"
 	"net/url"
 	"strings"
@@ -37,6 +34,20 @@ var (
 // tears down every connection on sight needs to surface as an error instead,
 // so the caller can fall back to another protocol.
 const maxReconnectTimes = 3
+
+// A missing H2 server preface leaves the outcome of an already sent request
+// unknown. Only methods whose semantics permit automatic replay may fall back
+// to H1 in that case. The prepared packet keeps the request body replayable.
+func canReplayAfterUnknownH2Outcome(packet []byte) bool {
+	// The on-wire method is authoritative. NativeHTTPRequestInstance may be
+	// supplied separately and need not describe the packet being sent.
+	method, _, _ := GetHTTPPacketFirstLine(packet)
+	switch method {
+	case http.MethodGet, http.MethodHead, http.MethodOptions, http.MethodTrace, http.MethodPut, http.MethodDelete:
+		return true
+	}
+	return false
+}
 
 func GetSystemHostByName(domain string) (string, bool) {
 	systemEtcOnce.Do(func() {
@@ -335,7 +346,6 @@ func HTTPWithoutRetry(option *LowhttpExecConfig) (*LowhttpResponse, error) {
 		sni                     = option.SNI
 		payloads                = option.Payloads
 		tags                    = option.Tags
-		firstAuth               = true
 		reqIns                  = option.NativeHTTPRequestInstance
 		maxContentLength        = option.MaxContentLength
 		randomJA3FingerPrint    = option.RandomJA3FingerPrint
@@ -396,12 +406,7 @@ func HTTPWithoutRetry(option *LowhttpExecConfig) (*LowhttpResponse, error) {
 	// 用于检查 BodyStreamReaderHandler 是否被正常调用
 	bodyStreamReaderHandled := utils.NewAtomicBool()
 	option.bodyStreamReaderHandled = bodyStreamReaderHandled
-	var streamBodyReaderCh chan io.ReadCloser
-	var streamHandlerDone chan struct{}
 	defer func() {
-		if option != nil && option.BodyStreamReaderHandler != nil {
-			waitStreamHandlerDone(streamHandlerDone, streamBodyReaderCh, 2*time.Second, "non-pool stream handler")
-		}
 		if option != nil && option.BodyStreamReaderHandler != nil && !bodyStreamReaderHandled.IsSet() {
 			func() {
 				defer func() {
@@ -703,12 +708,10 @@ func HTTPWithoutRetry(option *LowhttpExecConfig) (*LowhttpResponse, error) {
 		requestPacket = FixHTTPPacketQueryEscape(requestPacket)
 	}
 	response.RawRequest = requestPacket
+	response.Https = https
 	response.Http2 = enableHttp2
 
 	// https://github.com/mattn/go-ieproxy
-	var (
-		conn net.Conn
-	)
 	if len(proxy) == 1 && proxy[0] == "" {
 		proxy = proxy[1:]
 	}
@@ -728,99 +731,104 @@ func HTTPWithoutRetry(option *LowhttpExecConfig) (*LowhttpResponse, error) {
 		nextProto = []string{H1}
 	}
 
-	// 需要用于标识连接 https gmTLS
-	// configTLS
-	var dialopts []netx.DialXOption
-
-	dialopts = append(dialopts, netx.DialX_WithTimeout(connectTimeout), netx.DialX_WithAppendTLSNextProto(nextProto...))
-
-	if https {
-		if gmTLS {
-			gmCfg := &gmtls.Config{
-				GMSupport:          &gmtls.GMSupport{WorkMode: gmtls.ModeAutoSwitch},
-				NextProtos:         nextProto,
-				ServerName:         host,
-				InsecureSkipVerify: !option.VerifyCertificate,
-			}
-			if len(gmTLSCipherSuites) > 0 {
-				gmCfg.CipherSuites = gmTLSCipherSuites
-			}
-			dialopts = append(dialopts, netx.DialX_WithGMTLSConfig(gmCfg))
-		} else {
-			dialopts = append(dialopts, netx.DialX_WithTLSConfig(&gmtls.Config{
-				NextProtos:         nextProto,
-				ServerName:         host,
-				InsecureSkipVerify: !option.VerifyCertificate,
-			}))
-		}
-		dialopts = append(dialopts,
-			netx.DialX_WithGMTLSSupport(gmTLS),
-			netx.DialX_WithTLS(https),
-			netx.DialX_WithGMTLSOnly(onlyGMTLS),
-			netx.DialX_WithGMTLSPrefer(preferGMTLS),
-			netx.DialX_WithGMTLSDisableCompatMode(gmTLSDisableCompatMode),
-		)
-
-		if clientHelloSpec != nil {
-			dialopts = append(dialopts, netx.DialX_WithClientHelloSpec(clientHelloSpec))
-		} else if tlsFingerprint != "" {
-			dialopts = append(dialopts, netx.DialX_WithTLSFingerprint(tlsFingerprint))
-		}
-		if sni != nil {
-			dialopts = append(dialopts, netx.DialX_WithSNI(*sni))
-		}
-	}
-
-	if forceProxy {
-		dialopts = append(dialopts, netx.DialX_WithForceProxy(forceProxy))
-	}
-
-	if len(proxy) > 0 {
-		dialopts = append(dialopts, netx.DialX_WithProxy(proxy...))
-	}
-
-	// 初次连接需要的
-	// retry use DialX
+	// buildDialOpts constructs the dial option slice for the given ALPN
+	// next-protocol list.  It is called once for the initial request and
+	// again when a protocol downgrade (H2→H1) requires a fresh connection
+	// with http/1.1 ALPN instead of h2.
 	dnsStart := time.Now()
-	// dnsEnd 由异步 DNS 回调写入、主流程读取，必须原子化（修复数据竞态）
 	var dnsEndNano atomic.Int64
 	dnsEndNano.Store(time.Now().UnixNano())
 	var dnsEndOnce sync.Once
 	dialTraceInfo := netx.NewDialXTraceInfo()
-	dialopts = append(
-		dialopts,
-		netx.DialX_WithTimeoutRetry(maxRetryTimes),
-		netx.DialX_WithTimeoutRetryWaitRange(
-			retryWaitTime,
-			retryMaxWaitTime,
-		),
-		netx.DialX_WithDNSOptions(
-			netx.WithDNSOnFinished(func() {
-				dnsEndOnce.Do(func() {
-					dnsEndNano.Store(time.Now().UnixNano())
-				})
-			}),
-			netx.WithDNSServers(dnsServers...),
-			netx.WithTemporaryHosts(dnsHosts),
-		),
-		netx.DialX_WithDialTraceInfo(dialTraceInfo),
-	)
 
-	if dialer != nil {
-		dialopts = append(dialopts, netx.DialX_WithDialer(dialer))
+	buildDialOpts := func(np []string) []netx.DialXOption {
+		var opts []netx.DialXOption
+		opts = append(opts, netx.DialX_WithTimeout(connectTimeout), netx.DialX_WithAppendTLSNextProto(np...))
+
+		if https {
+			if gmTLS {
+				gmCfg := &gmtls.Config{
+					GMSupport:          &gmtls.GMSupport{WorkMode: gmtls.ModeAutoSwitch},
+					NextProtos:         np,
+					ServerName:         host,
+					InsecureSkipVerify: !option.VerifyCertificate,
+				}
+				if len(gmTLSCipherSuites) > 0 {
+					gmCfg.CipherSuites = gmTLSCipherSuites
+				}
+				opts = append(opts, netx.DialX_WithGMTLSConfig(gmCfg))
+			} else {
+				opts = append(opts, netx.DialX_WithTLSConfig(&gmtls.Config{
+					NextProtos:         np,
+					ServerName:         host,
+					InsecureSkipVerify: !option.VerifyCertificate,
+				}))
+			}
+			opts = append(opts,
+				netx.DialX_WithGMTLSSupport(gmTLS),
+				netx.DialX_WithTLS(https),
+				netx.DialX_WithGMTLSOnly(onlyGMTLS),
+				netx.DialX_WithGMTLSPrefer(preferGMTLS),
+				netx.DialX_WithGMTLSDisableCompatMode(gmTLSDisableCompatMode),
+			)
+
+			if clientHelloSpec != nil {
+				opts = append(opts, netx.DialX_WithClientHelloSpec(clientHelloSpec))
+			} else if tlsFingerprint != "" {
+				opts = append(opts, netx.DialX_WithTLSFingerprint(tlsFingerprint))
+			}
+			if sni != nil {
+				opts = append(opts, netx.DialX_WithSNI(*sni))
+			}
+		}
+
+		if forceProxy {
+			opts = append(opts, netx.DialX_WithForceProxy(forceProxy))
+		}
+
+		if len(proxy) > 0 {
+			opts = append(opts, netx.DialX_WithProxy(proxy...))
+		}
+
+		opts = append(
+			opts,
+			netx.DialX_WithTimeoutRetry(maxRetryTimes),
+			netx.DialX_WithTimeoutRetryWaitRange(
+				retryWaitTime,
+				retryMaxWaitTime,
+			),
+			netx.DialX_WithDNSOptions(
+				netx.WithDNSOnFinished(func() {
+					dnsEndOnce.Do(func() {
+						dnsEndNano.Store(time.Now().UnixNano())
+					})
+				}),
+				netx.WithDNSServers(dnsServers...),
+				netx.WithTemporaryHosts(dnsHosts),
+			),
+			netx.DialX_WithDialTraceInfo(dialTraceInfo),
+		)
+
+		if dialer != nil {
+			opts = append(opts, netx.DialX_WithDialer(dialer))
+		}
+
+		if option.OverrideEnableSystemProxyFromEnv {
+			opts = append(opts, netx.DialX_WithEnableSystemProxyFromEnv(option.EnableSystemProxyFromEnv))
+		}
+
+		if option.StrongHost != "" {
+			opts = append(opts, netx.DialX_WithStrongHostMode(option.StrongHost))
+		}
+
+		if len(option.ExtendDialOption) > 0 {
+			opts = append(opts, option.ExtendDialOption...)
+		}
+
+		return opts
 	}
 
-	if option.OverrideEnableSystemProxyFromEnv {
-		dialopts = append(dialopts, netx.DialX_WithEnableSystemProxyFromEnv(option.EnableSystemProxyFromEnv))
-	}
-
-	if option.StrongHost != "" {
-		dialopts = append(dialopts, netx.DialX_WithStrongHostMode(option.StrongHost))
-	}
-
-	if len(option.ExtendDialOption) > 0 {
-		dialopts = append(dialopts, option.ExtendDialOption...)
-	}
+	dialopts := buildDialOpts(nextProto)
 
 	cacheKey := &connectKey{
 		proxy:            proxy,
@@ -871,479 +879,111 @@ func HTTPWithoutRetry(option *LowhttpExecConfig) (*LowhttpResponse, error) {
 		reconnectTimes++
 		return true
 	}
-RECONNECT:
-	if enableHttp3 {
-		http3Conn, err := getHTTP3Conn(ctx, originAddr, dialopts...)
-		if err != nil {
-			return nil, err
-		}
-		_, responsePacket, err := doHttp3Request(ctx, http3Conn, requestPacket)
+	var (
+		rawBytes         []byte
+		firstResponse    *http.Response
+		multiResponses   []*http.Response
+		isMultiResponses bool
+	)
+	// ── Transport dispatch ────────────────────────────────────────────────────
+	//
+	// The orchestration layer selects a transport based on the requested protocol,
+	// executes the request, and handles protocol-level downgrades (H2→H1) and
+	// stale-connection reconnects.  Each transport owns its connection management
+	// and stream lifecycle.
 
-		httpctx.SetBareResponseBytes(reqIns, responsePacket)
-		response.RawPacket = responsePacket
-		return response, nil
-	} else if withConnPool {
-		conn, err = connPool.getIdleConn(ctx, cacheKey, dialopts...)
-	} else {
-		conn, err = dialXWithContext(ctx, originAddr, dialopts...)
+	tr := &transportRequest{
+		option:         option,
+		reqIns:         reqIns,
+		packet:         requestPacket,
+		dialOpts:       dialopts,
+		cacheKey:       cacheKey,
+		connPool:       connPool,
+		usePool:        withConnPool,
+		preserveLength: noFixContentLength,
+		traceInfo:      traceInfo,
+		originAddr:     originAddr,
+		timeout:        timeout,
 	}
 
-	traceInfo.DNSTime = time.Unix(0, dnsEndNano.Load()).Sub(dnsStart) // 原子读（修复竞态）
-	traceInfo.ParseDialXTraceInfo(dialTraceInfo)
-	response.Https = https
+	// Select initial transport based on protocol flags.
+	var activeTransport transport
+	if enableHttp3 {
+		activeTransport = newH3Transport()
+	} else if enableHttp2 {
+		activeTransport = newH2Transport(connPool)
+	} else {
+		activeTransport = newH1Transport(connPool)
+	}
 
-	// checking old proxy
-	oldVersionProxyChecking := false
-	var tryOldVersionProxy []string
+	// Execute request with downgrade and reconnect handling.
+	maxDowngrades := 1 // H2→H1 at most once
+	downgrades := 0
+RECONNECT:
+	tResult, err := activeTransport.RoundTrip(ctx, tr)
 	if err != nil {
 		if ctxErr := ctx.Err(); ctxErr != nil {
-			return response, ctxErr
-		}
-		errMsg := err.Error()
-		if strings.Contains(errMsg, `no proxy available`) {
-			noProxyDial := make([]netx.DialXOption, len(dialopts), len(dialopts)+1)
-			copy(noProxyDial, dialopts)
-			noProxyDial = append(noProxyDial, netx.DialX_WithDisableProxy(true))
-			tried := make(map[string]struct{})
-			merged := make([]string, len(legacyProxy)+len(proxy))
-			copy(merged, legacyProxy)
-			copy(merged[len(legacyProxy):], proxy)
-			for _, basicProxy := range lo.Filter(merged, func(item string, index int) bool {
-				return utils.IsHttpOrHttpsUrl(item)
-			}) {
-				if _, ok := tried[basicProxy]; ok {
-					continue
-				} else {
-					tried[basicProxy] = struct{}{}
-				}
-				if withConnPool {
-					cacheKey.addr = utils.ExtractHostPort(basicProxy)
-					conn, err = connPool.getIdleConn(ctx, cacheKey, noProxyDial...)
-				} else {
-					conn, err = dialXWithContext(ctx, utils.ExtractHostPort(basicProxy), noProxyDial...)
-				}
-				if err != nil {
-					log.Debugf("try old version proxy failed: %s", err)
-					continue
-				}
-				oldVersionProxyChecking = true
-				enableHttp2 = false
-				tryOldVersionProxy = append(tryOldVersionProxy, basicProxy)
-				break
+			err = ctxErr
+		} else if activeTransport.ShouldDowngrade(err) && downgrades < maxDowngrades &&
+			(errors.Is(err, ErrProtocolNotAvailable) || canReplayAfterUnknownH2Outcome(requestPacket)) {
+			// ALPN mismatch has not sent a request. A preface timeout may have
+			// sent one, so only automatically replay idempotent methods.
+			downgrades++
+			response.Http2 = false
+			// Rebuild dial options with http/1.1 ALPN so the new H1 connection
+			// does not negotiate h2 and hit the same tarpit/killing origin.
+			tr.downgradeToH1(tResult, buildDialOpts([]string{H1}))
+			requestPacket = tr.packet
+			response.RawRequest = requestPacket
+			activeTransport = newH1Transport(connPool)
+			goto RECONNECT
+		} else if isReconnectError(err) {
+			// H1 pooled connections signal their stale-connection retry here.
+			// H2 consumes its own stream retry budget inside RoundTrip.
+			underlying := reconnectErrorUnwrap(err)
+			if canReconnect(underlying) {
+				goto RECONNECT
 			}
-		}
-
-		if utils.IsNil(conn) {
-			return response, err
+			err = underlying
 		}
 	}
-	response.RemoteAddr = conn.RemoteAddr().String()
+	if tResult != nil && tResult.h1Conn != nil {
+		// A negotiated socket that was not handed to H1 remains ours to close.
+		tResult.h1Conn.Close()
+		tResult.h1Conn = nil
+	}
+	// Populate trace info from dial (dialTraceInfo was filled during RoundTrip).
+	traceInfo.DNSTime = time.Unix(0, dnsEndNano.Load()).Sub(dnsStart)
+	traceInfo.ParseDialXTraceInfo(dialTraceInfo)
+	if tResult == nil {
+		// A dial can fail before the transport has response or connection
+		// details. The request, protocol flags, and dial trace are still useful.
+		if err == nil {
+			return response, utils.Error("lowhttp: transport returned no result")
+		}
+		return response, err
+	}
+
+	// Populate response fields from transport result.
+	rawBytes = tResult.rawBytes
+	firstResponse = tResult.firstResponse
+	multiResponses = tResult.multiResponses
+	isMultiResponses = tResult.isMultiResponse
+	response.MultiResponse = isMultiResponses
+	response.RemoteAddr = tResult.remoteAddr
+	response.PortIsOpen = tResult.portIsOpen
 	if haveNativeHTTPRequestInstance {
 		httpctx.SetRemoteAddr(reqIns, response.RemoteAddr)
 	}
-	response.PortIsOpen = true
-
-	if enableHttp2 {
-		pc := conn.(*persistConn)
-		if pc.cacheKey.scheme != H2 { // http2 downgrade to http1.1
-			enableHttp2 = false
-			response.Http2 = false // reflect the actual wire protocol so callers can detect the downgrade
-			withConnPool = false   // downgrade can not with conn pool
-			method, uri, _ := GetHTTPPacketFirstLine(requestPacket)
-			requestPacket = ReplaceHTTPPacketFirstLine(requestPacket, strings.Join([]string{method, uri, "HTTP/1.1"}, " "))
-		} else {
-			h2Conn := pc.alt
-			if h2Conn == nil {
-				return nil, utils.Error("conn h2 Processor is nil")
-			}
-
-			h2Stream, err := h2Conn.newStream(reqIns, requestPacket, option)
-			if err != nil {
-				if err == CreateStreamAfterGoAwayErr {
-					h2Conn.retire()
-					if canReconnect(err) {
-						goto RECONNECT
-					}
-				}
-				return nil, err
-			}
-			if ctxErr := ctx.Err(); ctxErr != nil {
-				h2Stream.abort()
-				return nil, ctxErr
-			}
-			currentRPS.Add(1)
-			serverStart := time.Now()
-			h2Stream.SetReadFirstFrameCallback(func() { traceInfo.ServerTime = time.Since(serverStart) })
-			if err := h2Stream.doRequest(); err != nil && !errors.Is(err, errH2UploadAborted) {
-				h2Stream.abort()
-				if ctxErr := ctx.Err(); ctxErr != nil {
-					return nil, ctxErr
-				}
-				if err == CreateStreamAfterGoAwayErr {
-					h2Conn.retire()
-					if canReconnect(err) {
-						goto RECONNECT
-					}
-				}
-				// A partially written upload may already have been processed.
-				return nil, err
-			}
-
-			resp, responsePacket, err := h2Stream.waitResponse(ctx, timeout)
-			_ = resp
-			if err != nil {
-				if ctxErr := ctx.Err(); ctxErr != nil {
-					return nil, ctxErr
-				}
-				if h2RequestCanRetry(reqIns, err) && (option.bodyStreamReaderHandled == nil || !option.bodyStreamReaderHandled.IsSet()) {
-					// REFUSED_STREAM/GOAWAY rejected only this stream. Other accepted
-					// streams are still allowed to finish on the shared connection.
-					if canReconnect(err) {
-						goto RECONNECT
-					}
-				}
-				return nil, err
-			}
-			httpctx.SetBareResponseBytes(reqIns, responsePacket)
-			response.RawPacket = responsePacket
-
-			err = failureChecker(response)
-			return response, err
-		}
-	}
-	//log.Infof("dns time + dial time cost: %v", time.Since(dnsStart))
-	var multiResponses []*http.Response
-	var isMultiResponses bool
-	var firstResponse *http.Response
-	var responseRaw bytes.Buffer
-	var rawBytes []byte
-
-	if withConnPool {
-		// 连接池分支
-		pc := conn.(*persistConn)
-		writeErrCh := make(chan error, 2)
-		if option.BeforeDoRequest != nil {
-			requestPacket = option.BeforeDoRequest(requestPacket)
-		}
-		if oldVersionProxyChecking {
-			requestPacket, err = BuildLegacyProxyRequest(requestPacket, https)
-			if err != nil {
-				return nil, err
-			}
-		}
-
-		resc := make(chan responseInfo, 1)
-		pc.reqCh <- requestAndResponseCh{
-			reqPacket:   requestPacket,
-			ch:          resc,
-			reqInstance: reqIns,
-			option:      option,
-			writeErrCh:  writeErrCh,
-		}
-		pc.writeCh <- writeRequest{reqPacket: requestPacket, ch: writeErrCh, reqInstance: reqIns, options: option}
-		//beforeLog(option)
-		select {
-		case re := <-resc:
-			// get response
-			if re.err != nil && len(rawBytes) == 0 { // get some bytes but get error too
-				if pc.shouldRetryRequest(re.err) {
-					pc.closeConn(re.err) // close old connection to avoid goroutine leak
-					if canReconnect(re.err) {
-						goto RECONNECT
-					}
-				}
-				return nil, re.err
-			}
-			firstResponse = re.resp
-			rawBytes = re.respBytes
-			response.MultiResponse = false
-			traceInfo.ServerTime = re.info.ServerTime
-			// Mark BodyStreamReaderHandler as handled in conn pool mode
-			// to prevent the defer from calling it again
-			if option != nil && option.BodyStreamReaderHandler != nil {
-				bodyStreamReaderHandled.Set()
-			}
-		case <-ctx.Done():
-			// A pooled HTTP/1 connection has a dedicated read loop waiting for
-			// this response. Close that connection when the individual request is
-			// canceled so the read loop cannot outlive its caller.
-			pc.closeConn(ctx.Err())
-			return nil, ctx.Err()
-		case <-pc.ctx.Done(): // if persistConn closed before read response , check error can retry or not
-			if ctxErr := ctx.Err(); ctxErr != nil {
-				return nil, ctxErr
-			}
-			if pc.closed == nil {
-				return nil, utils.Error("BUG: closeCh but closed is nil")
-			}
-			if pc.shouldRetryRequest(pc.closed) && canReconnect(pc.closed) {
-				goto RECONNECT
-			}
-			return nil, pc.closed
-		}
-		//afterLog(option)
-
-	} else {
-		// 不使用连接池分支
-		if conn != nil {
-			readConnEndCtx, readConnEnd := context.WithCancel(ctx)
-			defer readConnEnd()
-			go func() {
-				<-readConnEndCtx.Done()
-				conn.Close()
-			}()
-		}
-		// 写报文
-		if option.BeforeDoRequest != nil {
-			requestPacket = option.BeforeDoRequest(requestPacket)
-		}
-
+	response.MultiResponseInstances = multiResponses
+	response.ResponseBodySize = httpctx.GetResponseBodySize(reqIns)
+	if err != nil {
+		response.BareResponse = rawBytes
+		response.RawPacket = rawBytes
 		if haveNativeHTTPRequestInstance {
-			httpctx.SetBareRequestBytes(reqIns, requestPacket)
+			httpctx.SetBareResponseBytes(reqIns, rawBytes)
 		}
-		currentRPS.Add(1)
-
-		if oldVersionProxyChecking {
-			requestPacket, err = BuildLegacyProxyRequest(requestPacket, https)
-			if err != nil {
-				return response, err
-			}
-		}
-
-		if option.EnableRandomChunked {
-			chunkSender, err := option.GetOrCreateChunkSender()
-			if err != nil {
-				return response, errors.Wrap(err, "get or create chunk sender failed")
-			}
-			err = chunkSender.Send(requestPacket, conn)
-		} else {
-			_, err = conn.Write(requestPacket)
-		}
-
-		if err != nil {
-			return response, errors.Wrap(err, "write request failed")
-		}
-		// TeeReader 用于畸形响应包: 即 ReadHTTPResponseFromBufioReader 无法解析但是conn中存在数据的情况
-		if option.DefaultBufferSize <= 0 {
-			option.DefaultBufferSize = 4096
-		}
-
-		var mirrorWriter io.Writer = &responseRaw
-
-		// BodyStreamReaderHandler for non-pool connection
-		// Note: connection pool mode also supports BodyStreamReaderHandler (see conn_pool.go readLoop)
-		if option != nil && option.BodyStreamReaderHandler != nil {
-			if streamBodyReaderCh == nil {
-				streamBodyReaderCh = make(chan io.ReadCloser, 1)
-			}
-			streamHandlerDone = make(chan struct{})
-			reader, writer := utils.NewBufPipe(nil)
-			defer func() {
-				// utils.Debug(func() {
-				// 	log.Infof("close reader and writer")
-				// })
-				writer.Close()
-			}()
-			//startHandlerStream := time.Now()
-			//onceForHeader := new(sync.Once)
-			//onceForBody := new(sync.Once)
-			go func() {
-				bodyReader, bodyWriter := utils.NewBufPipe(nil)
-				select {
-				case streamBodyReaderCh <- bodyReader:
-				default:
-				}
-				defer func() {
-					if r := recover(); r != nil {
-						log.Errorf("BodyStreamReaderHandler panic: %v", r)
-					}
-					bodyWriter.Close()
-					close(streamHandlerDone)
-				}()
-
-				packetReader := bufio.NewReader(reader)
-				responseHeader := bytes.NewBufferString("")
-				var responseHeaderWriter io.Writer = responseHeader
-				if option.NoBodyBuffer {
-					responseHeaderWriter = io.MultiWriter(responseHeaderWriter, &responseRaw)
-				}
-
-				for {
-					line, err := utils.BufioReadLine(packetReader)
-					if err != nil {
-						if err != io.EOF {
-							log.Errorf("BodyStreamReaderHandler read response failed: %s", err)
-						}
-						bodyWriter.Close()
-						break
-					}
-					//onceForHeader.Do(func() {
-					//	log.Infof("stream handler start to handle header: %v", time.Since(startHandlerStream))
-					//})
-
-					responseHeaderWriter.Write(line)
-					responseHeaderWriter.Write([]byte("\r\n"))
-					if len(line) == 0 {
-						go func() {
-							io.Copy(bodyWriter, packetReader)
-							//io.Copy(bodyWriter, io.TeeReader(packetReader, utils.FirstWriter(func(i []byte) {
-							//	onceForBody.Do(func() {
-							//		log.Infof("stream handler start to handle body: %v", time.Since(startHandlerStream))
-							//	})
-							//})))
-							bodyWriter.Close()
-						}()
-						break
-					}
-				}
-				if err != nil {
-					log.Warnf("Normal handle BodyStreamReaderHandler read response failed: %s", err)
-				} else {
-					bodyStreamReaderHandled.Set()
-					option.BodyStreamReaderHandler(responseHeader.Bytes(), bodyReader)
-				}
-			}()
-			if option.NoBodyBuffer {
-				mirrorWriter = writer
-			} else {
-				rawWriter := io.Writer(&responseRaw)
-				if option.AutoDetectSSE {
-					rawWriter = &responseRawCaptureWriter{
-						dst:           &responseRaw,
-						req:           reqIns,
-						autoDetectSSE: true,
-					}
-				}
-				mirrorWriter = io.MultiWriter(rawWriter, writer)
-			}
-		}
-
-		httpResponseReader := bufio.NewReaderSize(io.TeeReader(conn, mirrorWriter), option.DefaultBufferSize)
-		// Enforce a total timeout even when the server keeps streaming (reads may never block).
-		// For long-lived streaming use-cases (e.g. MITM), ExtendReadDeadline switches Timeout to idle-timeout semantics.
-		if timeout > 0 && option != nil && !option.ExtendReadDeadline {
-			hardTimeoutTimer := time.AfterFunc(timeout, func() {
-				_ = conn.SetReadDeadline(time.Now().Add(-1 * time.Second))
-			})
-			defer hardTimeoutTimer.Stop()
-		}
-
-		//log.Infof("dns time + dial time cost + write request finished: %v", time.Since(dnsStart))
-		// 服务器响应第一个字节
-	READ:
-		serverTimeStart := time.Now()
-		_ = conn.SetReadDeadline(serverTimeStart.Add(timeout))
-		firstByte, err := httpResponseReader.Peek(1)
-		if err != nil {
-			return response, errors.Wrap(err, "read first byte failed")
-		}
-		//log.Infof("dns time + dial time cost + write request finished + peek 1: %v", time.Since(dnsStart))
-		//log.Infof("[lowhttp] first byte in %v", time.Since(serverTimeStart))
-
-		// 检查是否是 TLS 握手错误的特定序列
-		if firstByte[0] == 0x15 {
-			// 尝试读取更多字节以确认是否是特定的 TLS 错误
-			tlsHeader, err := httpResponseReader.Peek(6)
-			if err == nil && bytes.Equal(tlsHeader, []byte("\x15\x03\x01\x00\x02\x02")) {
-				return response, utils.Errorf("tls record header error detected... raw: %v", spew.Sdump(tlsHeader))
-			}
-		}
-
-		traceInfo.ServerTime = time.Since(serverTimeStart)
-
-		if option.DiscardIntermediateResponseBody {
-			firstResponse, err = utils.ReadHTTPResponseMetadataFromBufioReader(httpResponseReader, reqIns, responseRaw.Grow)
-		} else {
-			firstResponse, err = utils.ReadHTTPResponseFromBufioReader(httpResponseReader, reqIns)
-		}
-		if err != nil {
-			log.Warnf("[lowhttp] read response failed: %s", err)
-		}
-		if utils.HTTPResponseHasDiscardedIntermediateBody(firstResponse) {
-			firstResponse.Body = http.NoBody
-		}
-
-		if firstAuth && firstResponse != nil && firstResponse.StatusCode == http.StatusUnauthorized {
-			if authHeader := IGetHeader(firstResponse, "WWW-Authenticate"); len(authHeader) > 0 {
-				if auth := GetHttpAuth(authHeader[0], option); auth != nil {
-					authReq, err := auth.Authenticate(conn, option)
-					if err == nil {
-						_, err := conn.Write(authReq)
-						responseRaw.Reset() // 发送认证请求成功，清空缓冲区
-						if err != nil {
-							return response, errors.Wrap(err, "write request failed")
-						}
-						firstAuth = false
-						goto READ
-					}
-				}
-			}
-		}
-
-		response.ResponseBodySize = httpctx.GetResponseBodySize(reqIns)
-		respClose := false
-		if firstResponse != nil {
-			respClose = firstResponse.Close
-		}
-		if firstResponse != nil {
-			multiResponses = append(multiResponses, firstResponse)
-		}
-
-		if firstResponse == nil || respClose {
-			if len(responseRaw.Bytes()) == 0 {
-				return response, errors.Wrap(err, "empty result.")
-			} else { // peek 到了数据,但是无法解析,说明是畸形响应包
-				stableTimeout := timeout
-				if respClose && timeout < 1*time.Second { // 取设置timeout与1s的较小值
-					stableTimeout = 1 * time.Second
-				}
-				restBytes, _ := utils.ReadUntilStable(httpResponseReader, conn, stableTimeout, 300*time.Millisecond)
-				if len(restBytes) > 0 {
-					if len(restBytes) > 256 {
-						restBytes = restBytes[:256]
-					}
-					log.Warnf("unhandled rest data in connection: %#v ...", string(restBytes))
-				}
-			}
-		} else {
-			firstResponse.Request = reqIns
-
-			// handle response
-			for noFixContentLength && !option.NoReadMultiResponse { // 尝试读取pipeline/smuggle响应包
-				// log.Infof("checking next(pipeline/smuggle) response...")
-				nextResponse, err := utils.ReadHTTPResponseFromBufioReaderConn(httpResponseReader, conn, nil)
-				var nextRespClose bool
-				if nextResponse != nil {
-					nextRespClose = nextResponse.Close
-				}
-				if err != nil || nextRespClose {
-					if errors.Is(err, io.EOF) || errors.Is(err, io.ErrUnexpectedEOF) { // 停止读取
-						break
-					}
-					// read second response rest in buffer
-					stableTimeout := timeout
-					if nextRespClose && timeout < 1*time.Second {
-						stableTimeout = 1 * time.Second
-					}
-					restBytes, _ := utils.ReadUntilStable(httpResponseReader, conn, stableTimeout, 300*time.Millisecond)
-					if len(restBytes) > 0 {
-						if len(restBytes) > 256 {
-							restBytes = restBytes[:256]
-						}
-						log.Errorf("unhandled rest data in connection: %#v ...", string(restBytes))
-					}
-					break
-				}
-
-				if nextResponse != nil {
-					multiResponses = append(multiResponses, nextResponse)
-					isMultiResponses = true
-					response.MultiResponse = true
-				}
-			}
-		}
-		response.MultiResponseInstances = multiResponses
-		rawBytes = responseRaw.Bytes()
+		return response, err
 	}
 
 	if option.EnableMaxContentLength && maxContentLength > 0 {

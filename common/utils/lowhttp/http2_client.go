@@ -126,9 +126,9 @@ type http2ClientConn struct {
 	closeReasonOnce sync.Once
 	closeReason     string // set before setClose(); read in removeConn()
 
-	// pc is the owning persistConn; used by setClose to evict the connection
-	// from h2ConnMap when it transitions to closed.
-	pc *persistConn
+	// pc is the owning h2ConnEntry; used by setClose to evict the connection
+	// from H2ConnPool when it transitions to closed.
+	pc *h2ConnEntry
 
 	hDec     *hpack.Decoder
 	hEnc     *hpack.Encoder // protected by frWriteMutex
@@ -419,7 +419,7 @@ func (h2Conn *http2ClientConn) setClose() {
 		// so the debug printer and getOrCreateH2Conn never see a CLOSED
 		// entry lingering in the map.
 		if h2Conn.pc != nil {
-			h2Conn.pc.removeConn()
+			h2Conn.pc.pool.removeEntry(h2Conn.pc)
 		}
 	})
 	// Wake all goroutines blocked in newStream waiting for a stream slot.
@@ -516,7 +516,7 @@ func (h2Conn *http2ClientConn) newStream(req *http.Request, packet []byte, optio
 	h2Conn.mu.Unlock()
 
 	if h2Conn.pc != nil {
-		h2Conn.pc.p.markH2Active(h2Conn.pc)
+		h2Conn.pc.pool.markActive(h2Conn.pc)
 	}
 	cs := h2Conn.http2StreamPool.Get().(*http2ClientStream)
 	// A stream returned by sync.Pool may contain state from its previous
@@ -934,13 +934,13 @@ func (cs *http2ClientStream) doRequest() error {
 	return nil
 }
 
-func (cs *http2ClientStream) waitResponse(ctx context.Context, timeout time.Duration) (http.Response, []byte, error) {
+func (cs *http2ClientStream) waitResponse(ctx context.Context, timeout time.Duration) (http.Response, []byte, bool, error) {
 	// Check if h2Conn is nil to prevent panic
 	if cs.h2Conn == nil {
-		return http.Response{}, nil, utils.Error("h2 connection is nil")
+		return http.Response{}, nil, false, utils.Error("h2 connection is nil")
 	}
 	if cs.h2Conn.conn == nil {
-		return http.Response{}, nil, utils.Error("h2 underlying connection is nil")
+		return http.Response{}, nil, false, utils.Error("h2 underlying connection is nil")
 	}
 
 	flow := fmt.Sprintf("%v->%v", cs.h2Conn.conn.LocalAddr(), cs.h2Conn.conn.RemoteAddr())
@@ -972,7 +972,8 @@ func (cs *http2ClientStream) waitResponse(ctx context.Context, timeout time.Dura
 		} else if atomic.LoadInt32(&cs.h2Conn.serverPrefaceTimedOut) == 1 {
 			// Not a transport hiccup: this origin negotiated h2 and then never
 			// spoke it. Retrying rebuilds the same dead conn, so surface a
-			// non-retryable error and let the caller fall back to HTTP/1.1.
+			// non-retryable error and let the caller decide whether HTTP/1.1
+			// fallback can safely replay this request.
 			err = utils.Wrapf(errH2ServerPrefaceTimeout, "h2 stream-id %v never saw the server preface : %s", cs.ID, flow)
 		} else {
 			err = utils.Wrapf(errH2ConnClosed, "h2 stream-id %v wait response conn closed : %s", cs.ID, flow)
@@ -981,6 +982,9 @@ func (cs *http2ClientStream) waitResponse(ctx context.Context, timeout time.Dura
 	// Wait for any frame handler using this stream before inspecting its response.
 	// Mark it ended even when the connection closed before END_STREAM arrived.
 	cs.h2Conn.streamReadMu.Lock()
+	// A valid informational or final HEADERS frame proves the peer has already
+	// processed this stream. Even REFUSED_STREAM cannot authorize replay then.
+	responseStarted := cs.interimResponses > 0 || cs.readHeaderEnd
 	if connectionClosed && cs.readEndStream.Load() && cs.readHeaderEnd {
 		// END_STREAM may race transport shutdown. A complete response wins.
 		err = cs.streamErr
@@ -999,7 +1003,7 @@ func (cs *http2ClientStream) waitResponse(ctx context.Context, timeout time.Dura
 	resp := *cs.resp
 	responsePacket := cs.respPacket
 	cs.recycle()
-	return resp, responsePacket, err
+	return resp, responsePacket, responseStarted, err
 }
 
 // recycle drops every request-owned reference before returning the stream to
@@ -1040,7 +1044,7 @@ func (cs *http2ClientStream) releaseSlot() {
 	if closeNow {
 		cs.h2Conn.setClose()
 	} else if idleNow && cs.h2Conn.pc != nil {
-		cs.h2Conn.pc.p.markH2Idle(cs.h2Conn.pc)
+		cs.h2Conn.pc.pool.markIdle(cs.h2Conn.pc)
 	}
 }
 
