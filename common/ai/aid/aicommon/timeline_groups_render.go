@@ -645,6 +645,17 @@ func isTrustedReplayProjection(item *TimelineItem) bool {
 	}
 }
 
+func isActionResponseReplayProjection(item *TimelineItem) bool {
+	textItem, ok := timelineTextItem(item)
+	if !ok || normalizeTimelinePromptCategory(extractTextEntryType(textItem.Text)) != "FUNCTION_CALL_ACTION_RESPONSE" {
+		return false
+	}
+	promptText := strings.TrimSpace(textItem.PromptText)
+	return promptText != "" && strings.TrimSpace(textItem.Text) == promptText &&
+		strings.Contains(promptText, "<|FUNCTION_CALL_ACTION_RESPONSE|>") &&
+		strings.Contains(promptText, "<|FUNCTION_CALL_ACTION_RESPONSE_END|>")
+}
+
 func timelineIntervalBlockRenderedByteLen(block *TimelineIntervalBlock) int {
 	if block == nil || len(block.Items) == 0 {
 		return 0

@@ -978,7 +978,9 @@ func (m *Timeline) dumpRecentForPrompt(tokenLimit int, includeLatestModelReplay 
 		if !ok || item == nil || item.deleted || isPromotableTimelineItem(item) {
 			continue
 		}
-		allowReplay := latestReplayID > 0 && item.GetID() == latestReplayID
+		textItem, isText := timelineTextItem(item)
+		isActionResponse := isText && normalizeTimelinePromptCategory(extractTextEntryType(textItem.Text)) == "FUNCTION_CALL_ACTION_RESPONSE"
+		allowReplay := includeLatestModelReplay && (latestReplayID > 0 && item.GetID() == latestReplayID || isActionResponse)
 		projected := projectTimelineItemForPromptWithModelReplay(item, allowReplay)
 		if projected == nil {
 			continue
