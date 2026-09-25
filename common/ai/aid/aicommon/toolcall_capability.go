@@ -173,6 +173,7 @@ func (c *Config) probeToolCall(parent context.Context, callback AICallbackType, 
 
 	var callsMu sync.Mutex
 	parts := make(map[int]*aispec.ToolCall)
+	var calls []*aispec.ToolCall
 	request := NewAIRequest(
 		"Call the yak_probe_echo tool exactly once with message yak_tool_call_probe_ok. Do not answer in text.",
 		WithAIRequest_Context(ctx),
@@ -193,9 +194,13 @@ func (c *Config) probeToolCall(parent context.Context, callback AICallbackType, 
 						continue
 					}
 					part := parts[delta.Index]
-					if part == nil {
+					// Some gateways reuse index 0 for separate tool calls. An ID
+					// change starts a new call; otherwise their JSON arguments would
+					// be concatenated and a valid echo would be misclassified.
+					if part == nil || (delta.ID != "" && part.ID != "" && delta.ID != part.ID) {
 						part = &aispec.ToolCall{Index: delta.Index}
 						parts[delta.Index] = part
+						calls = append(calls, part)
 					}
 					if delta.ID != "" {
 						part.ID = delta.ID
@@ -242,7 +247,7 @@ func (c *Config) probeToolCall(parent context.Context, callback AICallbackType, 
 	}
 	callsMu.Lock()
 	defer callsMu.Unlock()
-	for _, call := range parts {
+	for _, call := range calls {
 		if call.ID == "" || call.Function.Name != toolCallProbeName || (call.Type != "" && call.Type != "function") {
 			continue
 		}

@@ -28,6 +28,10 @@ func toolCallProbeTestCallback(t *testing.T, count *atomic.Int32, reply string) 
 		case "tool":
 			spec.ToolCallCallback([]*aispec.ToolCall{{Index: 0, ID: "probe-id", Type: "function", Function: aispec.FuncReturn{Name: toolCallProbeName, Arguments: `{"message":"yak_`}}})
 			spec.ToolCallCallback([]*aispec.ToolCall{{Index: 0, Function: aispec.FuncReturn{Arguments: `tool_call_probe_ok"}`}}})
+		case "tool-reused-index":
+			for _, id := range []string{"first-id", "second-id"} {
+				spec.ToolCallCallback([]*aispec.ToolCall{{Index: 0, ID: id, Type: "function", Function: aispec.FuncReturn{Name: toolCallProbeName, Arguments: `{"message":"yak_tool_call_probe_ok"}`}}})
+			}
 		case "text":
 			resp.EmitOutputStream(strings.NewReader("ordinary answer"))
 		case "unsupported":
@@ -47,6 +51,15 @@ func TestCheckToolCallCapabilityEchoAndCache(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, ToolCallSupported, state)
 	}
+	require.EqualValues(t, 1, count.Load())
+}
+
+func TestCheckToolCallCapabilityReusedIndex(t *testing.T) {
+	var count atomic.Int32
+	cfg := NewConfig(context.Background(), WithAICallback(toolCallProbeTestCallback(t, &count, "tool-reused-index")), WithCheckToolCall(true))
+	state, err := cfg.CheckToolCallCapability(context.Background(), false)
+	require.NoError(t, err)
+	require.Equal(t, ToolCallSupported, state)
 	require.EqualValues(t, 1, count.Load())
 }
 
