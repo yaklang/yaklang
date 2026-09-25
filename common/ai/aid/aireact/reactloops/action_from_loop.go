@@ -24,9 +24,10 @@ func ConvertReActLoopFactoryToActionFactory(
 		}
 
 		action := &LoopAction{
-			ActionType:   name,
-			Description:  description,
-			StreamFields: []*LoopStreamField{},
+			ActionType:        name,
+			Description:       description,
+			NativeDescription: description,
+			StreamFields:      []*LoopStreamField{},
 			ActionVerifier: func(oldLoop *ReActLoop, action *aicommon.Action) error {
 				_, ok := oldLoop.actions.Get(name)
 				if ok {
