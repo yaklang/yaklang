@@ -52,7 +52,7 @@ func TestCallAITransactionProjectsInterleavedActionSchemasAtSend(t *testing.T) {
 		body, _ := io.ReadAll(r.Body)
 		serverBodies <- body
 		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write([]byte(`{"choices":[{"message":{"content":"{\"action\":\"accept\",\"text\":\"ok\"}"}}]}`))
+		_, _ = w.Write([]byte(`{"choices":[{"message":{"role":"assistant","content":"Inspecting next","tool_calls":[{"id":"call_accept","type":"function","function":{"name":"accept","arguments":"{\"text\":\"ok\"}"}}]},"finish_reason":"tool_calls"}]}`))
 	}))
 	defer server.Close()
 
@@ -81,8 +81,11 @@ func TestCallAITransactionProjectsInterleavedActionSchemasAtSend(t *testing.T) {
 	config := &fcTestConfig{MockedAIConfig: base}
 	config.aiCallback = func(req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 		require.Equal(t, prompt, req.GetPrompt(), "AI callback receives the unprojected prompt")
+		cfg := aispec.NewDefaultAIConfig(req.GetExtraSpecOpts()...)
 		output, err := aispec.ChatBase(server.URL, "projection-test-model", req.GetPrompt(),
 			aispec.WithChatBase_DisableStream(true),
+			aispec.WithChatBase_ToolCallCallback(cfg.ToolCallCallback),
+			aispec.WithChatBase_FinishReasonCallback(cfg.FinishReasonCallback),
 			aispec.WithChatBase_PoCOptions(func() ([]poc.PocConfigOption, error) { return nil, nil }),
 			aispec.WithChatBase_RawHTTPRequestResponseCallback(func(packet, _, _ []byte, _ *aispec.ChatUsage) {
 				callbackPackets <- append([]byte(nil), packet...)
@@ -104,8 +107,11 @@ func TestCallAITransactionProjectsInterleavedActionSchemasAtSend(t *testing.T) {
 	loop.actions.Set("accept", &LoopAction{ActionType: "accept"})
 	loop.actions.Set("inspect", &LoopAction{ActionType: "inspect"})
 
-	action, handler, err := loop.callAITransaction(&sync.WaitGroup{}, prompt, "n", nil)
+	calls, _, _, err := loop.callAILoopTransaction(&sync.WaitGroup{}, prompt, "n", nil,
+		loop.emitLoopGeneralOutput, loop.emitLoopFunctionCallOutput)
 	require.NoError(t, err)
+	require.Len(t, calls, 1)
+	action, handler := calls[0].Action, calls[0].LoopAction
 	require.Equal(t, "accept", action.ActionType())
 	require.Equal(t, "accept", handler.ActionType)
 	require.EqualValues(t, 1, hookCalls.Load(), "ChatBase must dispatch ProjectAndObserve once")

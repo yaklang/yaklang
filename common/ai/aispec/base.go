@@ -221,7 +221,8 @@ type ChatBaseContext struct {
 	// ToolCallCallback is called when the AI response contains tool_calls.
 	// If set, tool_calls will NOT be converted to <|TOOL_CALL...|> format in the output stream.
 	// If not set, the original behavior (converting to <|TOOL_CALL...|> format) is preserved.
-	ToolCallCallback func([]*ToolCall)
+	ToolCallCallback     func([]*ToolCall)
+	FinishReasonCallback func(string, []byte)
 	// ToolCallArgumentsStreamHandler, when set, receives a reader that
 	// streams the incremental function_call arguments as raw (unescaped)
 	// bytes. This allows downstream consumers (e.g. the ReAct loop
@@ -447,6 +448,12 @@ func WithChatBase_Modalities(modalities ...string) ChatBaseOption {
 func WithChatBase_ToolCallCallback(cb func([]*ToolCall)) ChatBaseOption {
 	return func(c *ChatBaseContext) {
 		c.ToolCallCallback = cb
+	}
+}
+
+func WithChatBase_FinishReasonCallback(cb func(string, []byte)) ChatBaseOption {
+	return func(c *ChatBaseContext) {
+		c.FinishReasonCallback = cb
 	}
 }
 
@@ -1202,6 +1209,7 @@ type chatBaseStreamHandlerAppender func(
 	rawResponseHeaderCallback RawHTTPResponseHeaderCallback,
 	rawResponseCallback func([]byte, []byte, *ChatUsage),
 	usageCallback func(*ChatUsage),
+	finishReasonCallback ...func(string, []byte),
 ) (io.Reader, io.Reader, io.Reader, []poc.PocConfigOption, func(), streamReadErrGetter)
 
 func executeChatBaseRequest(
@@ -1271,7 +1279,7 @@ func executeChatBaseRequest(
 			ctx.RawHTTPRequestResponseCallback(requestPacket, headerBytes, bodyPreview, usageInfo)
 		}
 	}
-	pr, reasonPr, toolCallArgsReader, opts, cancel, getStreamReadErr = appendHandler(handleStream, opts, ctx.ToolCallCallback, ctx.RawHTTPResponseHeaderCallback, rawResponseCallback, ctx.UsageCallback)
+	pr, reasonPr, toolCallArgsReader, opts, cancel, getStreamReadErr = appendHandler(handleStream, opts, ctx.ToolCallCallback, ctx.RawHTTPResponseHeaderCallback, rawResponseCallback, ctx.UsageCallback, ctx.FinishReasonCallback)
 	requestPacket = poc.BuildRequest(
 		lowhttp.UrlToRequestPacket(
 			"POST",

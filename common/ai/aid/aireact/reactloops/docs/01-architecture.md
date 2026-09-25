@@ -178,7 +178,7 @@ sequenceDiagram
     Main->>Prompt: generateLoopPrompt(nonce, userInput, mem, operator)
     Prompt-->>Main: 完整 prompt 字符串
     Main->>Main: savePromptToFile (debug)
-    Main->>LLM: callAITransaction(streamWg, prompt, nonce)
+    Main->>LLM: callAILoopTransaction(streamWg, prompt, nonce, callbacks)
     LLM-->>Main: actionParams + handler
     Main->>Action: handler.ActionVerifier 已在 transaction 内做过<br/>handler.ActionHandler(loop, action, operator)
     Action-->>Main: operator 状态<br/>(Continue/Exit/Fail/Async/Feedback)

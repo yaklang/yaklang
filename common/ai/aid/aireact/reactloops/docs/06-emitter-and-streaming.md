@@ -160,7 +160,7 @@ invoker.EmitResultAfterStream(payload)
 
 ## 6.3 `AIResponse` 流（reactloops 主循环依赖的底层）
 
-主循环每轮调 `callAITransaction(streamWg, prompt, nonce)`，内部用 `aicommon.AIResponse` 包装 LLM 流式输出。结构：
+主循环每轮调 `callAILoopTransaction(streamWg, prompt, nonce, callbacks)`，内部用 `aicommon.AIResponse` 包装 LLM 流式输出。结构：
 
 ```go
 type AIResponse struct {
