@@ -115,6 +115,7 @@ func WithAllowToolCall(b ...bool) ReActLoopOption {
 //	reactloops.WithFunctionCallMode(false)
 func WithFunctionCallMode(b ...bool) ReActLoopOption {
 	return func(r *ReActLoop) {
+		r.functionCallModeExplicit = true
 		if len(b) > 0 {
 			r.functionCallMode = b[0]
 		} else {

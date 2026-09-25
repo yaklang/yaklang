@@ -383,6 +383,10 @@ type Config struct {
 	SyncPerceptionTrigger              bool // 感知调度处同步调用 TriggerPerception（否则 goroutine 异步）
 	DisablePerception                  bool // 禁用感知层（用于测试环境，避免异步 AI 调用干扰 mock 回调）
 	EnableFunctionCallMode             bool // 启用原生 functioncall (tool_calls) 模式
+	CheckToolCall                      bool // 首次使用 AI 时探测原生工具调用能力；不暴露给 Yak 脚本
+	ToolCallProbeTimeout               time.Duration
+	ToolCallProbeCacheTTL              time.Duration
+	toolCallProbeCache                 *toolCallCapabilityCache
 	singleAIModelMode                  bool // 单模型简易模式：辅助任务统一调度，详见 config_auxiliary_scheduler.go
 	singleAIModelModeResolved          bool // NewConfig freezes the effective mode after applying options.
 	PerTaskUserInteractiveLimitedTimes int64
@@ -768,7 +772,10 @@ func newConfig(ctx context.Context) *Config {
 		GoalMinIterations:                  DefaultGoalMinIterations,
 		MaxSubAgents:                       DefaultMaxSubAgentConcurrency,
 		GenerateReport:                     true,
-		EnableFunctionCallMode:             true,  // 默认开启原生 functioncall 模式
+		EnableFunctionCallMode:             true, // 默认开启原生 functioncall 模式
+		CheckToolCall:                      true,
+		ToolCallProbeTimeout:               8 * time.Second,
+		ToolCallProbeCacheTTL:              30 * time.Minute,
 		DisallowMCPServers:                 false, // 默认启用 MCP Servers
 		MemoryTriageId:                     "default",
 		m:                                  new(sync.Mutex),
@@ -4544,10 +4551,13 @@ func ConvertConfigToOptions(i *Config) []ConfigOption {
 		opts = append(opts, WithDisablePerception(true))
 	}
 
-	// Propagate functioncall mode flag so sub-loops inherit the setting.
-	if i.EnableFunctionCallMode {
-		opts = append(opts, WithEnableFunctionCallMode(true))
-	}
+	// Preserve both explicit disablement and the internal probe policy in child configs.
+	opts = append(opts,
+		WithEnableFunctionCallMode(i.EnableFunctionCallMode),
+		WithCheckToolCall(i.CheckToolCall),
+		WithToolCallProbeTimeout(i.ToolCallProbeTimeout),
+		WithToolCallProbeCacheTTL(i.ToolCallProbeCacheTTL),
+	)
 
 	// A derived Config continues the parent's session even when a new global
 	// setting has taken effect since the parent was constructed. Keep the

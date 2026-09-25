@@ -273,6 +273,10 @@ type ReActLoop struct {
 	// set stop_reason="tool_calls" and naturally reduce thinking on subsequent
 	// calls.
 	functionCallMode bool
+	// A loop option is an explicit override; the config default is probed only
+	// when no override was supplied. The requested mode survives later tasks.
+	functionCallModeExplicit  bool
+	functionCallModeRequested bool
 }
 
 // GetScenarioToolWhitelist 返回当前 loop 声明的 scenario 工具拉回名单.
@@ -695,9 +699,13 @@ func NewReActLoop(name string, invoker aicommon.AIInvokeRuntime, options ...ReAc
 		r.streamFields.Set(streamField.FieldName, streamField)
 	}
 
+	// Apply the config default first so WithFunctionCallMode(false) remains an
+	// explicit opt-out even when the session default is enabled.
+	r.functionCallMode = config.GetConfigBool("EnableFunctionCallMode")
 	for _, opt := range options {
 		opt(r)
 	}
+	r.functionCallModeRequested = r.functionCallMode
 
 	// 自动注入价值评估埋点 (默认开启, 暂无关闭开关). 该钩子在每轮结束
 	// (iteration_end) 与整循环结束 (loop_end) 组装 ValueFeedbackRecord 并经
@@ -708,11 +716,6 @@ func NewReActLoop(name string, invoker aicommon.AIInvokeRuntime, options ...ReAc
 	// Config-level perception disable (e.g. test environments via WithDisablePerception)
 	if config.GetConfigBool("DisablePerception") {
 		r.perception = nil
-	}
-
-	// Config-level functioncall mode enable (e.g. production via WithEnableFunctionCallMode)
-	if config.GetConfigBool("EnableFunctionCallMode") {
-		r.functionCallMode = true
 	}
 
 	// Auto-register perception context provider (nil-safe, skips if perception disabled)

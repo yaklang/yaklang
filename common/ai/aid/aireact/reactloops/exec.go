@@ -1049,6 +1049,9 @@ func (r *ReActLoop) ExecuteWithExistedTask(task aicommon.AIStatefulTask) (finalE
 	}
 
 	taskStartProcessing()
+	// Capability probing precedes prompt construction and timeline mutation.
+	// The request declares an echo tool but never executes a business action.
+	r.resolveFunctionCallMode(task.GetContext())
 
 	// Initialize timeline differ to track changes during this task execution
 	// This captures the baseline BEFORE any task-related timeline entries are added
