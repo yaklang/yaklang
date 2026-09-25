@@ -691,6 +691,12 @@ func NewReActLoop(name string, invoker aicommon.AIInvokeRuntime, options ...ReAc
 		r.streamFields.Set(streamField.FieldName, streamField)
 	}
 
+	// The config supplies the default; an explicit loop option must be able to
+	// override it, including WithFunctionCallMode(false).
+	if config.GetConfigBool("EnableFunctionCallMode") {
+		r.functionCallMode = true
+	}
+
 	for _, opt := range options {
 		opt(r)
 	}
@@ -704,11 +710,6 @@ func NewReActLoop(name string, invoker aicommon.AIInvokeRuntime, options ...ReAc
 	// Config-level perception disable (e.g. test environments via WithDisablePerception)
 	if config.GetConfigBool("DisablePerception") {
 		r.perception = nil
-	}
-
-	// Config-level functioncall mode enable (e.g. production via WithEnableFunctionCallMode)
-	if config.GetConfigBool("EnableFunctionCallMode") {
-		r.functionCallMode = true
 	}
 
 	// Auto-register perception context provider (nil-safe, skips if perception disabled)
