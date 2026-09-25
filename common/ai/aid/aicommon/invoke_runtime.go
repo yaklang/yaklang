@@ -240,6 +240,9 @@ func NewSelectedKnowledgeBaseResult(reason string, knowledgeBases []string) *Sel
 
 type LoopPromptAssemblyInput struct {
 	Nonce string
+	// FunctionCallMode describes this request's output protocol, not the loop's
+	// global preference. Auxiliary parameter-generation requests remain textual.
+	FunctionCallMode bool
 
 	// IncludeLatestModelReplay is set only by the primary ReAct decision loop.
 	// Helper prompts (tool parameter generation, verification, summaries, etc.)

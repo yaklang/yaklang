@@ -13,7 +13,9 @@ import (
 // loopAction_DirectlyAnswerSyntaxFlow is a custom directly_answer for write_syntaxflow_rule loop.
 // It enforces: verify must be called when sf_has_code_sample; 规则内容由 replace_payload 从文件读取展示。
 var loopAction_DirectlyAnswerSyntaxFlow = &reactloops.LoopAction{
-	ActionType: "directly_answer",
+	ActionType:        "directly_answer",
+	NativeDescription: "Deliver the complete answer in answer_payload. Verify first when a code sample requires it. Continue or finish according to Current/TODO state, and include todo_delta when scheduling follow-up work.",
+	NativeOptions:     reactloops.NativeDirectlyAnswerOptions(),
 	Description: "Directly answer with the 'answer_payload' field. " +
 		"For ordinary tasks, continue or finish according to Current/TODO state after delivery. " +
 		"Do not invoke directly_answer twice without an effective todo_delta in the same CURRENT-TASK. " +

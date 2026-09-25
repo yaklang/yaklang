@@ -57,3 +57,20 @@ func TestBuildActionToolsPromptTags(t *testing.T) {
 	}
 	require.NotContains(t, tags, "<|FUNCTION_CALL_SCHEMAS_")
 }
+
+func TestBuildActionToolsDirectAnswerUsesArgumentsForLongContent(t *testing.T) {
+	tools, err := buildActionTools([]*LoopAction{loopAction_DirectlyAnswer}, aicommon.DefaultToolBatchMaxCalls)
+	require.NoError(t, err)
+	require.Len(t, tools, 1)
+	tool := tools[0]
+	require.NotContains(t, tool.Function.Description, "FINAL_ANSWER")
+	parameters, ok := tool.Function.Parameters.(map[string]any)
+	require.True(t, ok)
+	properties, ok := parameters["properties"].(map[string]any)
+	require.True(t, ok)
+	answer, ok := properties["answer_payload"].(map[string]any)
+	require.True(t, ok)
+	require.Contains(t, answer["description"], "Complete answer")
+	require.Contains(t, parameters["required"], "answer_payload")
+	require.Contains(t, buildSchema(loopAction_DirectlyAnswer), "FINAL_ANSWER")
+}

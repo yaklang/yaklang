@@ -287,8 +287,12 @@ func (r *ReActLoop) generateLoopPrompt(
 	r.lastLoopSchema = schema
 
 	var persistent string
-	if r.persistentInstructionProvider != nil {
-		persistent, err = r.persistentInstructionProvider(r, "") // persistent context not use nonce
+	persistentProvider := r.persistentInstructionProvider
+	if r.functionCallMode && r.functionCallInstructionProvider != nil {
+		persistentProvider = r.functionCallInstructionProvider
+	}
+	if persistentProvider != nil {
+		persistent, err = persistentProvider(r, "") // persistent context not use nonce
 		if err != nil {
 			r.lastLoopSchema = schema
 			return "", utils.Wrap(err, "build persistent context failed")
@@ -296,7 +300,7 @@ func (r *ReActLoop) generateLoopPrompt(
 	}
 
 	var outputExample string
-	if r.outputExampleProvider != nil {
+	if !r.functionCallMode && r.outputExampleProvider != nil {
 		outputExample, err = r.outputExampleProvider(r, "") // persistent context not use nonce
 		if err != nil {
 			return "", utils.Wrap(err, "build output example failed")
@@ -372,6 +376,7 @@ func (r *ReActLoop) generateLoopPrompt(
 
 	result, err := r.invoker.AssembleLoopPrompt(tools, &LoopPromptAssemblyInput{
 		Nonce:                    nonce,
+		FunctionCallMode:         r.functionCallMode,
 		IncludeLatestModelReplay: true,
 		Lightweight:              r.useSpeedPriorityAI,
 		UserQuery:                userInput,

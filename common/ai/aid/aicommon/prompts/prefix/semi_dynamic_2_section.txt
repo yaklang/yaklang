@@ -8,13 +8,16 @@
 
 <|PERSISTENT|>
 {{ .TaskInstruction }}
-<|PERSISTENT_END|>{{ end }}{{ if .OutputExample }}
+<|PERSISTENT_END|>{{ end }}{{ if .FunctionCallMode }}{{ if .AutoLoadedSkills }}
+{{ .AutoLoadedSkills }}{{ end }}
+
+本轮通过原生工具调用选择 action。工具名即 action 名；所有执行所需内容必须写入该工具的 arguments，不输出外置 AITAG。以下每个标签供请求投影为一个原生工具：
+{{ .FunctionCallSchemas }}{{ else }}{{ if .OutputExample }}
 
 <|OUTPUT_EXAMPLE|>
 {{ .OutputExample }}
 <|OUTPUT_EXAMPLE_END|>{{ end }}{{ if .AutoLoadedSkills }}
-{{ .AutoLoadedSkills }}{{ end }}{{ if .FunctionCallSchemas }}
-{{ .FunctionCallSchemas }}{{ else if .Schema }}
+{{ .AutoLoadedSkills }}{{ end }}{{ if .Schema }}
 
 当前任务循环中可以使用的Action和<|TAG...|>，如下 ：
 
@@ -22,4 +25,4 @@
 ```jsonschema
 {{ .Schema }}
 ```
-<|SCHEMA|>{{ end }}
+<|SCHEMA|>{{ end }}{{ end }}
