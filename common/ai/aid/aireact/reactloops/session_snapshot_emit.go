@@ -11,16 +11,31 @@ func BuildSessionSnapshot(cfg *aicommon.Config, loop *ReActLoop, task aicommon.A
 	if cfg == nil {
 		return nil
 	}
+	execution := cfg.BuildSessionSnapshotExecution(task)
+	execution.ExecutionRounds = sessionSnapshotExecutionRounds(loop, task)
 	snapshot := &aicommon.SessionSnapshot{
 		Revision:            cfg.NextSessionSnapshotRevision(),
 		UpdatedAt:           time.Now().Unix(),
 		Capabilities:        aicommon.BuildCapabilityInventoryItems(cfg, loopCapabilityContext(loop)),
 		Perception:          buildSessionSnapshotPerception(loop, cfg),
-		Execution:           cfg.BuildSessionSnapshotExecution(task),
+		Execution:           execution,
 		BackgroundProcesses: cfg.BuildSessionSnapshotBackgroundProcesses(),
 	}
 	aicommon.NormalizeSessionSnapshot(snapshot)
-	return snapshot
+	return cfg.MaterializeSessionSnapshot(task, snapshot)
+}
+
+func sessionSnapshotExecutionRounds(loop *ReActLoop, task aicommon.AIStatefulTask) int {
+	if loop != nil {
+		return loop.GetCurrentIterationIndex()
+	}
+	if task == nil || task.GetReActLoop() == nil {
+		return 0
+	}
+	if iterationLoop, ok := task.GetReActLoop().(interface{ GetCurrentIterationIndex() int }); ok {
+		return iterationLoop.GetCurrentIterationIndex()
+	}
+	return 0
 }
 
 func loopCapabilityContext(loop *ReActLoop) aicommon.CapabilityInventoryLoopContext {

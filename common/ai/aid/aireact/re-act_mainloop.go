@@ -441,7 +441,15 @@ func (r *ReAct) ExecuteLoopTask(taskTypeName string, task aicommon.AIStatefulTas
 	}
 	aicommon.BeginSessionSnapshotExecutionForTask(r.config, task, time.Now())
 	err = mainloop.ExecuteWithExistedTask(task)
-	aicommon.FinalizeSessionSnapshotExecutionForTask(r.config, task, time.Now())
+	snapshotStatus := aicommon.SessionSnapshotStatusFromTask(task)
+	if snapshotStatus == "processing" {
+		if err != nil {
+			snapshotStatus = "aborted"
+		} else if !task.IsAsyncMode() {
+			snapshotStatus = "completed"
+		}
+	}
+	r.config.FinalizeSessionSnapshotExecution(snapshotStatus, time.Now())
 	reactloops.EmitSessionSnapshot(r.config, mainloop, task)
 	if err != nil {
 		return false, err

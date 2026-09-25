@@ -297,6 +297,37 @@ func (s *SessionPromptState) SetVerificationTodo(todoJSON string) {
 	s.todoJSON = todoJSON
 }
 
+// SnapshotVerificationTodoScopeState returns an independent canonical copy so
+// readers never observe a mixture of revisions or share mutable item pointers.
+func (s *SessionPromptState) SnapshotVerificationTodoScopeState(scope VerificationTodoScope) *TodoScopeState {
+	if s == nil || scope.IsZero() {
+		return nil
+	}
+	s.m.RLock()
+	defer s.m.RUnlock()
+	return UnmarshalVerificationTodoStore(s.todoJSON).findScope(scope)
+}
+
+func (s *SessionPromptState) MergeMissingVerificationTodoScopes(states []*TodoScopeState) {
+	if s == nil || len(states) == 0 {
+		return
+	}
+	s.m.Lock()
+	defer s.m.Unlock()
+	store := UnmarshalVerificationTodoStore(s.todoJSON)
+	changed := false
+	for _, state := range states {
+		if state == nil || state.TaskID == "" || store.findScope(state.scope()) != nil {
+			continue
+		}
+		store.Scopes = append(store.Scopes, cloneTodoScopeState(state))
+		changed = true
+	}
+	if changed {
+		s.todoJSON = store.Marshal()
+	}
+}
+
 // ApplyTodoDelta applies one normal ReAct action's optional todo_delta to the
 // persisted TODO store, then re-serializes back to todoJSON. It returns one
 // result entry per delta operation so callers can render a uniform summary;

@@ -142,7 +142,7 @@ func (c *Coordinator) ExecuteLoopTask(taskTypeName string, task aicommon.AIState
 	task.SetAsyncMode(false)
 	resetPlanTaskSessionSnapshot(invoker, task, time.Now())
 	err = mainloop.ExecuteWithExistedTask(task)
-	finalizeAndEmitPlanTaskSessionSnapshot(invoker, mainloop, task)
+	finalizeAndEmitPlanTaskSessionSnapshot(invoker, mainloop, task, err)
 	if err != nil {
 		return err
 	}
@@ -166,11 +166,19 @@ func resetPlanTaskSessionSnapshot(invoker aicommon.AITaskInvokeRuntime, task aic
 	aicommon.BeginSessionSnapshotExecutionForTask(childCfg, task, startedAt)
 }
 
-func finalizeAndEmitPlanTaskSessionSnapshot(invoker aicommon.AITaskInvokeRuntime, mainloop *reactloops.ReActLoop, task aicommon.AIStatefulTask) {
+func finalizeAndEmitPlanTaskSessionSnapshot(invoker aicommon.AITaskInvokeRuntime, mainloop *reactloops.ReActLoop, task aicommon.AIStatefulTask, executeErr error) {
 	childCfg := aicommon.ConfigFromAICaller(invoker.GetConfig())
 	if childCfg == nil || task == nil {
 		return
 	}
-	aicommon.FinalizeSessionSnapshotExecutionForTask(childCfg, task, time.Now())
+	status := aicommon.SessionSnapshotStatusFromTask(task)
+	if status == "processing" {
+		if executeErr != nil {
+			status = "aborted"
+		} else {
+			status = "completed"
+		}
+	}
+	childCfg.FinalizeSessionSnapshotExecution(status, time.Now())
 	reactloops.EmitSessionSnapshot(childCfg, mainloop, task)
 }
