@@ -73,6 +73,30 @@ func actionDescription(action *LoopAction) string {
 	return action.Description
 }
 
+// nativeActionDescription keeps provider tool descriptions independent of the
+// text-only UsagePrompt. Most actions have a protocol-neutral Description;
+// actions whose text description mentions JSON/AITAG override it explicitly.
+func nativeActionDescription(action *LoopAction) string {
+	if action.NativeDescription != "" {
+		return action.NativeDescription
+	}
+	if action.Description != "" {
+		return action.Description
+	}
+	return "Run the " + action.ActionType + " action using its tool arguments."
+}
+
+// withNativeActionDescription gives registered and dynamically constructed
+// actions an explicit native description without mutating shared templates.
+func withNativeActionDescription(action *LoopAction) *LoopAction {
+	if action == nil || action.NativeDescription != "" {
+		return action
+	}
+	copy := *action
+	copy.NativeDescription = nativeActionDescription(action)
+	return &copy
+}
+
 // The common fields retain the same shape in both protocols. Descriptions
 // referring to JSON action output are adjusted for native function tools.
 func commonActionSchemaOptions(native bool) []aitool.ToolOption {

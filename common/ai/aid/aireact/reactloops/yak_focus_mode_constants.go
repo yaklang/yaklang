@@ -113,6 +113,7 @@ const (
 	//   {
 	//     "type":       "scan_target",
 	//     "description": "扫描目标",
+	//     "native_description": "通过 scan_target 的工具参数扫描目标", // 可选；默认使用 description
 	//     "options":    [...aitool option desc...],
 	//     "stream_fields":  [...],
 	//     "output_examples": "...",
