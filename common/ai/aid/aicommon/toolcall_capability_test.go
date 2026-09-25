@@ -28,10 +28,10 @@ func toolCallProbeTestCallback(t *testing.T, count *atomic.Int32, reply string) 
 		case "tool":
 			spec.ToolCallCallback([]*aispec.ToolCall{{Index: 0, ID: "probe-id", Type: "function", Function: aispec.FuncReturn{Name: toolCallProbeName, Arguments: `{"message":"yak_`}}})
 			spec.ToolCallCallback([]*aispec.ToolCall{{Index: 0, Function: aispec.FuncReturn{Arguments: `tool_call_probe_ok"}`}}})
-		case "tool-reused-index":
-			for _, id := range []string{"first-id", "second-id"} {
-				spec.ToolCallCallback([]*aispec.ToolCall{{Index: 0, ID: id, Type: "function", Function: aispec.FuncReturn{Name: toolCallProbeName, Arguments: `{"message":"yak_tool_call_probe_ok"}`}}})
-			}
+		case "tool-incomplete":
+			spec.ToolCallCallback([]*aispec.ToolCall{{Index: 0}})
+		case "empty-event":
+			spec.ToolCallCallback([]*aispec.ToolCall{nil})
 		case "text":
 			resp.EmitOutputStream(strings.NewReader("ordinary answer"))
 		case "unsupported":
@@ -43,7 +43,7 @@ func toolCallProbeTestCallback(t *testing.T, count *atomic.Int32, reply string) 
 	}
 }
 
-func TestCheckToolCallCapabilityEchoAndCache(t *testing.T) {
+func TestCheckToolCallCapabilityCallAndCache(t *testing.T) {
 	var count atomic.Int32
 	cfg := NewConfig(context.Background(), WithAICallback(toolCallProbeTestCallback(t, &count, "tool")), WithCheckToolCall(true))
 	for range 2 {
@@ -54,9 +54,9 @@ func TestCheckToolCallCapabilityEchoAndCache(t *testing.T) {
 	require.EqualValues(t, 1, count.Load())
 }
 
-func TestCheckToolCallCapabilityReusedIndex(t *testing.T) {
+func TestCheckToolCallCapabilityAnyCall(t *testing.T) {
 	var count atomic.Int32
-	cfg := NewConfig(context.Background(), WithAICallback(toolCallProbeTestCallback(t, &count, "tool-reused-index")), WithCheckToolCall(true))
+	cfg := NewConfig(context.Background(), WithAICallback(toolCallProbeTestCallback(t, &count, "tool-incomplete")), WithCheckToolCall(true))
 	state, err := cfg.CheckToolCallCapability(context.Background(), false)
 	require.NoError(t, err)
 	require.Equal(t, ToolCallSupported, state)
@@ -89,6 +89,7 @@ func TestCheckToolCallCapabilityConservativeFallback(t *testing.T) {
 		want        ToolCallCapability
 	}{
 		{name: "plain text is inconclusive", reply: "text", want: ToolCallUnknown},
+		{name: "nil callback item is inconclusive", reply: "empty-event", want: ToolCallUnknown},
 		{name: "tool-related 400 is inconclusive", reply: "unsupported", want: ToolCallUnknown},
 	} {
 		t.Run(tc.name, func(t *testing.T) {

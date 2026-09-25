@@ -2,11 +2,11 @@ package aicommon
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/yaklang/yaklang/common/ai/aispec"
@@ -24,7 +24,6 @@ const (
 )
 
 const toolCallProbeName = "yak_probe_echo"
-const toolCallProbeValue = "yak_tool_call_probe_ok"
 
 type toolCallProbeKey struct {
 	service, model, tier string
@@ -171,9 +170,7 @@ func (c *Config) probeToolCall(parent context.Context, callback AICallbackType, 
 	ctx, cancel := context.WithTimeout(parent, timeout)
 	defer cancel()
 
-	var callsMu sync.Mutex
-	parts := make(map[int]*aispec.ToolCall)
-	var calls []*aispec.ToolCall
+	var sawToolCall atomic.Bool
 	request := NewAIRequest(
 		"Call the yak_probe_echo tool exactly once with message yak_tool_call_probe_ok. Do not answer in text.",
 		WithAIRequest_Context(ctx),
@@ -187,31 +184,11 @@ func (c *Config) probeToolCall(parent context.Context, callback AICallbackType, 
 				}, "required": []string{"message"}},
 			}}}),
 			aispec.WithToolCallCallback(func(deltas []*aispec.ToolCall) {
-				callsMu.Lock()
-				defer callsMu.Unlock()
 				for _, delta := range deltas {
-					if delta == nil {
-						continue
+					if delta != nil {
+						sawToolCall.Store(true)
+						return
 					}
-					part := parts[delta.Index]
-					// Some gateways reuse index 0 for separate tool calls. An ID
-					// change starts a new call; otherwise their JSON arguments would
-					// be concatenated and a valid echo would be misclassified.
-					if part == nil || (delta.ID != "" && part.ID != "" && delta.ID != part.ID) {
-						part = &aispec.ToolCall{Index: delta.Index}
-						parts[delta.Index] = part
-						calls = append(calls, part)
-					}
-					if delta.ID != "" {
-						part.ID = delta.ID
-					}
-					if delta.Type != "" {
-						part.Type = delta.Type
-					}
-					if delta.Function.Name != "" {
-						part.Function.Name = delta.Function.Name
-					}
-					part.Function.Arguments += delta.Function.Arguments
 				}
 			}),
 		),
@@ -245,20 +222,10 @@ func (c *Config) probeToolCall(parent context.Context, callback AICallbackType, 
 	if status := response.GetHTTPStatusCode(); status >= 400 {
 		return classifyToolCallProbeFailure(fmt.Errorf("HTTP %d", status), response)
 	}
-	callsMu.Lock()
-	defer callsMu.Unlock()
-	for _, call := range calls {
-		if call.ID == "" || call.Function.Name != toolCallProbeName || (call.Type != "" && call.Type != "function") {
-			continue
-		}
-		var args struct {
-			Message string `json:"message"`
-		}
-		if json.Unmarshal([]byte(call.Function.Arguments), &args) == nil && args.Message == toolCallProbeValue {
-			return ToolCallSupported, nil
-		}
+	if sawToolCall.Load() {
+		return ToolCallSupported, nil
 	}
-	return ToolCallUnknown, errors.New("tool-call probe received no valid echo tool call")
+	return ToolCallUnknown, errors.New("tool-call probe received no tool call")
 }
 
 func classifyToolCallProbeFailure(err error, response *AIResponse) (ToolCallCapability, error) {
