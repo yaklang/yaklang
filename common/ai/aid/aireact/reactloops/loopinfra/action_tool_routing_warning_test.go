@@ -43,7 +43,7 @@ func TestDirectlyCallToolVerifier_WarnsButAllowsBash(t *testing.T) {
 
 	action := buildDirectlyCallAction(`{"@action":"directly_call_tool","directly_call_tool_name":"bash"}`)
 	require.NoError(t, loopAction_directlyCallTool.ActionVerifier(loop, action))
-	assert.Equal(t, "bash", loop.Get("directly_call_tool_name"))
+	assert.Equal(t, "bash", action.GetExecutionValue("directly_call_tool_name"))
 	assert.Contains(t, invoker.getTimelineString(), "tool_routing_warning")
 	assert.Contains(t, invoker.getTimelineString(), "如果你继续使用 bash 也可以")
 }
@@ -65,7 +65,7 @@ func TestRequireToolVerifier_WarnsButAllowsBash(t *testing.T) {
 
 	action := buildRequireToolAction("bash")
 	require.NoError(t, loopAction_toolRequireAndCall.ActionVerifier(loop, action))
-	assert.Equal(t, "bash", loop.Get("tool_require_payload"))
+	assert.Equal(t, "bash", action.GetExecutionValue("tool_require_payload"))
 	assert.Contains(t, invoker.getTimelineString(), "tool_routing_warning")
 	assert.Contains(t, invoker.getTimelineString(), "modify_file")
 }

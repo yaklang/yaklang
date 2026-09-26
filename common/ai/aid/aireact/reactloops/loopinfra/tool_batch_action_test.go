@@ -135,8 +135,8 @@ func TestToolCallPromptExamples_ParseAndVerifyExactBytes(t *testing.T) {
 		action := parseToolBatchPromptExample(t, directlyCallToolScalarOutputExampleJSON, schema.AI_REACT_LOOP_ACTION_DIRECTLY_CALL_TOOL)
 
 		require.NoError(t, loopAction_directlyCallTool.ActionVerifier(loop, action))
-		assert.Nil(t, loop.GetVariable(loopVarDirectToolBatch))
-		assert.Equal(t, "read_file", loop.Get("directly_call_tool_name"))
+		assert.Nil(t, action.GetExecutionValue(actionStateDirectToolBatch))
+		assert.Equal(t, "read_file", action.GetExecutionValue("directly_call_tool_name"))
 		assert.Less(t,
 			strings.Index(loopAction_directlyCallTool.OutputExamples, directlyCallToolScalarOutputExampleJSON),
 			strings.Index(loopAction_directlyCallTool.OutputExamples, directlyCallToolBatchOutputExampleJSON),
@@ -152,7 +152,7 @@ func TestToolCallPromptExamples_ParseAndVerifyExactBytes(t *testing.T) {
 		action := parseToolBatchPromptExample(t, directlyCallToolBatchOutputExampleJSON, schema.AI_REACT_LOOP_ACTION_DIRECTLY_CALL_TOOL)
 
 		require.NoError(t, loopAction_directlyCallTool.ActionVerifier(loop, action))
-		request, ok := loop.GetVariable(loopVarDirectToolBatch).(*aicommon.ToolBatchRequest)
+		request, ok := action.GetExecutionValue(actionStateDirectToolBatch).(*aicommon.ToolBatchRequest)
 		require.True(t, ok)
 		require.Len(t, request.Calls, 2)
 		assert.Equal(t, aicommon.ToolCallModeDirect, request.Calls[0].Mode)
@@ -169,8 +169,8 @@ func TestToolCallPromptExamples_ParseAndVerifyExactBytes(t *testing.T) {
 		action := parseToolBatchPromptExample(t, requireToolScalarOutputExampleJSON, schema.AI_REACT_LOOP_ACTION_REQUIRE_TOOL)
 
 		require.NoError(t, loopAction_toolRequireAndCall.ActionVerifier(loop, action))
-		assert.Nil(t, loop.GetVariable(loopVarRequireToolBatch))
-		assert.Equal(t, "grep", loop.Get("tool_require_payload"))
+		assert.Nil(t, action.GetExecutionValue(actionStateRequireToolBatch))
+		assert.Equal(t, "grep", action.GetExecutionValue("tool_require_payload"))
 		assert.Less(t,
 			strings.Index(loopAction_toolRequireAndCall.OutputExamples, requireToolScalarOutputExampleJSON),
 			strings.Index(loopAction_toolRequireAndCall.OutputExamples, requireToolBatchOutputExampleJSON),
@@ -186,7 +186,7 @@ func TestToolCallPromptExamples_ParseAndVerifyExactBytes(t *testing.T) {
 		action := parseToolBatchPromptExample(t, requireToolBatchOutputExampleJSON, schema.AI_REACT_LOOP_ACTION_REQUIRE_TOOL)
 
 		require.NoError(t, loopAction_toolRequireAndCall.ActionVerifier(loop, action))
-		request, ok := loop.GetVariable(loopVarRequireToolBatch).(*aicommon.ToolBatchRequest)
+		request, ok := action.GetExecutionValue(actionStateRequireToolBatch).(*aicommon.ToolBatchRequest)
 		require.True(t, ok)
 		require.Len(t, request.Calls, 2)
 		assert.Equal(t, aicommon.ToolCallModeRequire, request.Calls[0].Mode)
@@ -415,7 +415,7 @@ func TestDirectToolBatchVerifier_RejectsAmbiguousOrInvalidBatchBeforeHandler(t *
 			action := parseToolBatchPromptExample(t, tt.payload, schema.AI_REACT_LOOP_ACTION_DIRECTLY_CALL_TOOL)
 			err := loopAction_directlyCallTool.ActionVerifier(loop, action)
 			require.ErrorContains(t, err, tt.errContain)
-			assert.Nil(t, loop.GetVariable(loopVarDirectToolBatch), "invalid batch must never reach the handler")
+			assert.Nil(t, action.GetExecutionValue(actionStateDirectToolBatch), "invalid batch must never reach the handler")
 		})
 	}
 }
@@ -459,7 +459,7 @@ func TestRequireToolBatchVerifier_RejectsParamsAndMixedForms(t *testing.T) {
 			action := parseToolBatchPromptExample(t, tt.payload, schema.AI_REACT_LOOP_ACTION_REQUIRE_TOOL)
 			err := loopAction_toolRequireAndCall.ActionVerifier(loop, action)
 			require.ErrorContains(t, err, tt.errContain)
-			assert.Nil(t, loop.GetVariable(loopVarRequireToolBatch))
+			assert.Nil(t, action.GetExecutionValue(actionStateRequireToolBatch))
 		})
 	}
 }
@@ -495,9 +495,9 @@ func TestToolScalarVerifier_PreservesLegacyPriorityWhenMalformedActionAlsoContai
 			loop, _ := newToolBatchTestLoop(t)
 			action := parseToolBatchPromptExample(t, test.payload, test.actionType)
 			require.NoError(t, test.verify(loop, action))
-			require.Equal(t, test.wantValue, loop.Get(test.stateKey))
-			require.Nil(t, loop.GetVariable(loopVarDirectToolBatch))
-			require.Nil(t, loop.GetVariable(loopVarRequireToolBatch))
+			require.Equal(t, test.wantValue, action.GetExecutionValue(test.stateKey))
+			require.Nil(t, action.GetExecutionValue(actionStateDirectToolBatch))
+			require.Nil(t, action.GetExecutionValue(actionStateRequireToolBatch))
 		})
 	}
 }
@@ -511,7 +511,7 @@ func TestToolBatchVerifier_RejectsTruncatedAction(t *testing.T) {
 	)
 	require.NoError(t, err)
 	require.Error(t, loopAction_directlyCallTool.ActionVerifier(loop, action))
-	assert.Nil(t, loop.GetVariable(loopVarDirectToolBatch))
+	assert.Nil(t, action.GetExecutionValue(actionStateDirectToolBatch))
 }
 
 type eofGateReader struct {
@@ -554,7 +554,7 @@ func TestToolBatchVerifier_WaitsForCompleteResponseEOF(t *testing.T) {
 
 	close(source.release)
 	require.NoError(t, <-verifyDone)
-	require.NotNil(t, loop.GetVariable(loopVarDirectToolBatch))
+	require.NotNil(t, action.GetExecutionValue(actionStateDirectToolBatch))
 }
 
 func TestToolScalarVerifier_ReturnsBeforeCompleteResponseEOF(t *testing.T) {
@@ -600,7 +600,7 @@ func TestToolScalarVerifier_ReturnsBeforeCompleteResponseEOF(t *testing.T) {
 			select {
 			case err := <-verifyDone:
 				require.NoError(t, err)
-				require.Equal(t, test.want, loop.Get(test.stateKey))
+				require.Equal(t, test.want, action.GetExecutionValue(test.stateKey))
 			case <-time.After(time.Second):
 				t.Fatal("legacy scalar verifier waited for response EOF")
 			}

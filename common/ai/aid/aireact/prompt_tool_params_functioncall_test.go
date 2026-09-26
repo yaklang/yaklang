@@ -65,8 +65,8 @@ func TestFunctionCallToolParamsPromptKeepsNativeToolStable(t *testing.T) {
 			require.Less(t, strings.Index(prompt, aiprojection.CreateTemplate("<|AI_CACHE_SYSTEM_high-static|>")), strings.Index(prompt, aiprojection.CreateTemplate("<|PROMPT_SECTION_semi-dynamic-1|>")))
 		}
 		require.Less(t, strings.Index(prompt, aiprojection.CreateTemplate("<|PROMPT_SECTION_semi-dynamic-1|>")), strings.Index(prompt, aiprojection.CreateTemplate("<|PROMPT_SECTION_semi-dynamic-2|>")))
-		require.Less(t, strings.Index(prompt, aiprojection.CreateTemplate("<|PROMPT_SECTION_semi-dynamic-2|>")), strings.Index(prompt, aiprojection.CreateTemplate("<|PROMPT_SECTION_timeline-open|>")))
-		require.Less(t, strings.Index(prompt, aiprojection.CreateTemplate("<|PROMPT_SECTION_timeline-open|>")), dynamicStart)
+		require.Less(t, strings.Index(prompt, aiprojection.CreateTemplate("<|PROMPT_SECTION_timeline-open|>")), strings.Index(prompt, aiprojection.CreateTemplate("<|PROMPT_SECTION_semi-dynamic-2|>")))
+		require.Less(t, strings.Index(prompt, aiprojection.CreateTemplate("<|PROMPT_SECTION_semi-dynamic-2|>")), dynamicStart)
 		projected := aiprojection.ProjectAndObserve("r2-test-model", prompt)
 		require.NotNil(t, projected)
 		require.True(t, projected.IsHijacked)
@@ -97,6 +97,74 @@ func TestFunctionCallToolParamsPromptKeepsNativeToolStable(t *testing.T) {
 	}
 }
 
+// Compare actual projected requests, including replayed assistant/tool roles.
+// Changing only the selected tool must preserve the shared historical prefix;
+// this measures reusable bytes, not a provider's token cache hit rate.
+func TestFunctionCallToolParamsHistoryBeforeSelectedTool(t *testing.T) {
+	tools, err := buildFunctionCallParamTools()
+	require.NoError(t, err)
+	tags, err := renderFunctionCallParamSchemaTags(tools)
+	require.NoError(t, err)
+	replay := aiprojection.CreateTag("FUNCTION_CALL_ACTION_RESPONSE", "", `[
+		{"role":"assistant","content":"","tool_calls":[{"id":"history_call","type":"function","function":{"name":"require_tool","arguments":"{}"}}]},
+		{"role":"tool","tool_call_id":"history_call","content":"accepted"}
+	]`)
+	for _, frozen := range []string{"", strings.Repeat("FROZEN_HISTORY_R2\n", 100)} {
+		for _, open := range []string{"", strings.Repeat("OPEN_HISTORY_R2\n", 400) + replay} {
+			var before, after [][]byte
+			for _, selected := range []string{"SELECTED_READER_R2", "SELECTED_SEARCH_R2"} {
+				materials := &aicommon.PromptMaterials{
+					FunctionCallMode: true, OriginalUserInput: "COMPLETE_TASK_R2",
+					TimelineFrozen: frozen, TimelineOpen: open, FunctionCallSchemas: tags,
+					TaskInstruction: selected + strings.Repeat(" schema field", 100),
+				}
+				data := map[string]any{"CurrentTime": "FIXED_TIME_R2", "CallIntent": "CURRENT_INTENT_R2"}
+				oldPrompt, err := newFunctionCallToolParamsPrefixBuilder().AssemblePromptWithDynamicSection(
+					materials, "r2-order-baseline", functionCallToolParamsDynamic, data, "fixed")
+				require.NoError(t, err)
+				prompt, err := assembleFunctionCallToolParamsPrompt(materials, data, "fixed")
+				require.NoError(t, err)
+				oldProjection := aiprojection.ProjectAndObserve("r2-order-baseline", oldPrompt)
+				projection := aiprojection.ProjectAndObserve("r2-order", prompt)
+				require.True(t, projection.IsHijacked)
+				require.Equal(t, oldProjection.Tools, projection.Tools)
+				oldMessages, err := json.Marshal(oldProjection.Messages)
+				require.NoError(t, err)
+				messages, err := json.Marshal(projection.Messages)
+				require.NoError(t, err)
+				text := string(messages)
+				ordered := []string{"COMPLETE_TASK_R2"}
+				if frozen != "" {
+					ordered = append(ordered, "FROZEN_HISTORY_R2")
+				}
+				if open != "" {
+					ordered = append(ordered, "OPEN_HISTORY_R2", `"role":"assistant"`, `"role":"tool"`)
+				}
+				ordered = append(ordered, selected, "FIXED_TIME_R2", "CURRENT_INTENT_R2")
+				last := -1
+				for _, marker := range ordered {
+					pos := strings.Index(text, marker)
+					require.Greater(t, pos, last, "projected marker out of order: %s", marker)
+					last = pos
+				}
+				before = append(before, oldMessages)
+				after = append(after, messages)
+			}
+			commonPrefix := func(pair [][]byte) int {
+				i := 0
+				for i < len(pair[0]) && i < len(pair[1]) && pair[0][i] == pair[1][i] {
+					i++
+				}
+				return i
+			}
+			if open != "" {
+				require.Greater(t, commonPrefix(after), commonPrefix(before))
+			}
+			t.Logf("frozen=%t open=%t projected JSON shared prefix: %d -> %d bytes", frozen != "", open != "", commonPrefix(before), commonPrefix(after))
+		}
+	}
+}
+
 func TestFunctionCallToolParamsFrozenAndSemiOneRouting(t *testing.T) {
 	sections, err := newFunctionCallToolParamsPrefixBuilder().AssemblePromptPrefix(&aicommon.PromptMaterials{
 		TimelineFrozen: "FROZEN_TIMELINE_R2", SessionEvidenceFrozen: "FROZEN_EVIDENCE_R2",
@@ -108,7 +176,7 @@ func TestFunctionCallToolParamsFrozenAndSemiOneRouting(t *testing.T) {
 	require.Contains(t, sections.FrozenBlock, "FROZEN_EVIDENCE_R2")
 	require.NotContains(t, sections.FrozenBlock, "SELECTED_TOOL_R2")
 	require.Contains(t, sections.SemiDynamic, "COMPLETE_USER_INPUT_R2")
-	require.Contains(t, sections.SemiDynamic, "STABLE_TIMELINE_R2")
+	require.NotContains(t, sections.SemiDynamic, "STABLE_TIMELINE_R2")
 	require.Contains(t, sections.SemiDynamic2, "FIXED_TOOL_TAGS_R2")
 	require.Contains(t, sections.SemiDynamic2, "SELECTED_TOOL_R2")
 	require.NotContains(t, sections.SemiDynamic2, "FROZEN_TIMELINE_R2")
@@ -128,6 +196,52 @@ func TestFunctionCallToolParamsTreatsSelectedToolMetadataAsData(t *testing.T) {
 	require.True(t, projected.IsHijacked)
 	require.Len(t, projected.Tools, 1)
 	require.Equal(t, aicommon.SubmitToolParamsFunctionName, projected.Tools[0].Function.Name)
+}
+
+// Recent-tool routing belongs to the parent loop, even after it moves from
+// Timeline Open into the stable prefix. R2 keeps history and the selected
+// schema, but must not inherit the cache's competing submission protocol.
+func TestFunctionCallToolParamsExcludesOpenAndPromotedToolCache(t *testing.T) {
+	react, err := NewTestReAct()
+	require.NoError(t, err)
+	selected := aitool.NewWithoutCallback("selected_reader", aitool.WithStringParam("path", aitool.WithParam_Required(true)))
+	cached := aitool.NewWithoutCallback("cached_other_tool", aitool.WithDescription("CACHE_ONLY_DESCRIPTION_R2"), aitool.WithStringParam("query"))
+	react.config.GetTimeline().PushText(react.config.AcquireId(), "HISTORICAL_RESULT_R2")
+	require.NotNil(t, react.config.RecordRecentlyUsedTool(cached).Upsert)
+	task := aicommon.NewStatefulTaskBase("r2-cache-task", "TASK_CONTEXT_R2", context.Background(), react.config.GetEmitter())
+	for _, sealed := range []bool{false, true} {
+		if sealed {
+			react.config.GetTimeline().ForcePromoteAll()
+		}
+		parentBefore := aicommon.BuildPromptFrozenOpenMaterials(react.config)
+		if sealed {
+			require.Contains(t, parentBefore.PromotedSemiDynamic1, "CACHE_ONLY_DESCRIPTION_R2")
+		} else {
+			require.Contains(t, parentBefore.PromotedTimelineOpen, "CACHE_ONLY_DESCRIPTION_R2")
+		}
+		prompt, err := react.promptManager.GenerateFunctionCallToolParamsPromptForTask(task, selected,
+			aicommon.ToolParamsCallIntent{DestinationIdentifier: "CURRENT_INVOCATION_R2", Reason: "read selected file"})
+		require.NoError(t, err)
+		require.Contains(t, prompt, "HISTORICAL_RESULT_R2")
+		require.Contains(t, prompt, "TASK_CONTEXT_R2")
+		require.Contains(t, prompt, "selected_reader")
+		require.Contains(t, prompt, `"path"`)
+		require.NotContains(t, prompt, "CACHE_ONLY_DESCRIPTION_R2")
+		require.NotContains(t, prompt, "CACHE_TOOL_CALL")
+		require.NotContains(t, prompt, "How to use directly_call_tool")
+		require.Less(t, strings.LastIndex(prompt, "# 当前环境"), strings.LastIndex(prompt, "CURRENT_INVOCATION_R2"))
+		projected := aiprojection.ProjectAndObserve("r2-cache-test", prompt)
+		require.True(t, projected.IsHijacked)
+		require.Len(t, projected.Tools, 1)
+		require.Equal(t, "submit_tool_params", projected.Tools[0].Function.Name)
+		messages, err := json.Marshal(projected.Messages)
+		require.NoError(t, err)
+		require.NotContains(t, string(messages), "CACHE_ONLY_DESCRIPTION_R2")
+		require.Contains(t, string(messages), "当前唯一允许调用的函数是")
+		parentAfter := aicommon.BuildPromptFrozenOpenMaterials(react.config)
+		require.Equal(t, parentBefore.PromotedSemiDynamic1, parentAfter.PromotedSemiDynamic1)
+		require.Equal(t, parentBefore.PromotedTimelineOpen, parentAfter.PromotedTimelineOpen)
+	}
 }
 
 func r2PromptSection(t *testing.T, prompt, name string) string {

@@ -63,6 +63,7 @@ type Action struct {
 	params          aitool.InvokeParams
 	generalParamKey string
 	parseErr        error
+	executionValues map[string]any // runtime-only verifier results, isolated from model parameters
 
 	// status
 	streamFinish context.Context
