@@ -145,6 +145,130 @@ func TestExecuteFunctionCallActionsFailureSkipsRemainingCalls(t *testing.T) {
 	require.Len(t, loop.actionHistory, 1)
 }
 
+func TestNativeAdjustTodolistAppliesBeforeAnswerAndCountsOneIteration(t *testing.T) {
+	loop, invoker, task := newActionExecutionTestLoop(t)
+	loop.functionCallMode = true
+	loop.Set(loopVarDirectlyAnswerDeliveredWithoutTodoDelta, true)
+	makeCalls := func() []LoopCall {
+		adjust := aicommon.NewSimpleAction(nativeAdjustTodolistActionName, aitool.InvokeParams{
+			"todo_delta": map[string]any{
+				"add":     []any{map[string]any{"id": "followup", "text": "Inspect the next file"}},
+				"current": "followup",
+			},
+		})
+		return []LoopCall{
+			{Action: adjust, LoopAction: loopAction_AdjustTodolistNative, ToolCallID: "call_todo", Index: 0,
+				ArgumentsJSON: `{"todo_delta":{"add":[{"id":"followup","text":"Inspect the next file"}],"current":"followup"}}`},
+			actionExecutionTestCall(1, "call_answer", "directly_answer", func(l *ReActLoop, a *aicommon.Action, op *LoopActionHandlerOperator) {
+				require.True(t, directlyAnswerHasTodoDelta(l, a))
+				op.Continue()
+			}),
+		}
+	}
+	calls := makeCalls()
+	require.NoError(t, loop.appendFunctionCallActionResponse(calls, actionExecutionTestDescriptor()))
+	result := loop.execCalls(calls, 1, task, "prompt", utils.NewOnce(), loop.appendFunctionCallActionEvent)
+	require.NoError(t, result.err)
+	require.Equal(t, loopActionsContinue, result.result)
+	require.Equal(t, 1, loop.effectiveIterationCount)
+	require.Nil(t, loop.GetVariable(loopVarNativeTodoBatchAdjusted))
+	open := loop.config.ActiveVerificationTodoItemsByScope(aicommon.BuildVerificationTodoScope(task))
+	require.Len(t, open, 1)
+	require.Equal(t, "followup", open[0].ID)
+	require.Contains(t, strings.Join(invoker.entries, "\n"), "TODO_DELTA")
+
+	// Repeating the same adjustment is a no-op. It must not authorize a second
+	// unchanged answer or consume another effective iteration.
+	answerRan := false
+	repeated := makeCalls()
+	repeated[1].LoopAction.ActionHandler = func(_ *ReActLoop, _ *aicommon.Action, _ *LoopActionHandlerOperator) { answerRan = true }
+	result = loop.execCalls(repeated, 2, task, "prompt", utils.NewOnce(), loop.appendFunctionCallActionEvent)
+	require.NoError(t, result.err)
+	require.True(t, result.skipPostIteration)
+	require.False(t, answerRan)
+	require.Equal(t, 1, loop.effectiveIterationCount)
+}
+
+func TestNativeAdjustTodolistStandaloneFocusAndMixedBatch(t *testing.T) {
+	loop, invoker, task := newActionExecutionTestLoop(t)
+	loop.functionCallMode = true
+	adjust := func(delta map[string]any, id string) LoopCall {
+		return LoopCall{
+			Action:     aicommon.NewSimpleAction(nativeAdjustTodolistActionName, aitool.InvokeParams{"todo_delta": delta}),
+			LoopAction: loopAction_AdjustTodolistNative, ToolCallID: id,
+		}
+	}
+	result := loop.execCalls([]LoopCall{adjust(map[string]any{}, "todo_noop")}, 0, task, "prompt", utils.NewOnce(), nil)
+	require.NoError(t, result.err)
+	require.Equal(t, 0, loop.effectiveIterationCount, "an empty maintenance call must not consume the work budget")
+	initial := adjust(map[string]any{
+		"add": []any{
+			map[string]any{"id": "inspect", "text": "Inspect the source"},
+			map[string]any{"id": "verify", "text": "Verify the result"},
+		},
+		"current": "inspect",
+	}, "todo_initial")
+	result = loop.execCalls([]LoopCall{initial}, 1, task, "prompt", utils.NewOnce(), nil)
+	require.NoError(t, result.err)
+	_, current, _ := loop.config.SnapshotCanonicalTodos(aicommon.BuildVerificationTodoScope(task))
+	require.Equal(t, "inspect", current)
+	require.Equal(t, 1, loop.effectiveIterationCount)
+
+	var order []string
+	business := actionExecutionTestCall(0, "business", "inspect", func(_ *ReActLoop, _ *aicommon.Action, op *LoopActionHandlerOperator) {
+		order = append(order, "business")
+		op.Continue()
+	})
+	focus := adjust(map[string]any{"current": "verify"}, "todo_focus")
+	focus.Index = 1
+	result = loop.execCalls([]LoopCall{business, focus}, 2, task, "prompt", utils.NewOnce(), nil)
+	require.NoError(t, result.err)
+	require.Equal(t, []string{"business"}, order)
+	_, current, _ = loop.config.SnapshotCanonicalTodos(aicommon.BuildVerificationTodoScope(task))
+	require.Equal(t, "verify", current)
+	require.Equal(t, 2, loop.effectiveIterationCount, "one batch consumes at most one effective iteration")
+
+	invalid := adjust(map[string]any{"current": "unknown"}, "todo_invalid")
+	result = loop.execCalls([]LoopCall{invalid, business}, 3, task, "prompt", utils.NewOnce(), nil)
+	require.NoError(t, result.err)
+	require.Equal(t, []string{"business", "business"}, order, "invalid TODO maintenance must not suppress another valid tool")
+	_, current, _ = loop.config.SnapshotCanonicalTodos(aicommon.BuildVerificationTodoScope(task))
+	require.Equal(t, "verify", current)
+	require.Equal(t, 2, loop.effectiveIterationCount)
+	require.Contains(t, strings.Join(invoker.entries, "\n"), "TODO_DELTA_ERROR")
+
+	loop.Set(loopVarDirectlyAnswerDeliveredWithoutTodoDelta, true)
+	answerRan := false
+	answer := actionExecutionTestCall(0, "answer", "directly_answer", func(l *ReActLoop, a *aicommon.Action, op *LoopActionHandlerOperator) {
+		answerRan = true
+		require.True(t, directlyAnswerHasTodoDelta(l, a), "a later adjustment keeps this batch active")
+		op.Continue()
+	})
+	lateFocus := adjust(map[string]any{"current": "inspect"}, "todo_after_answer")
+	lateFocus.Index = 1
+	result = loop.execCalls([]LoopCall{answer, lateFocus}, 4, task, "prompt", utils.NewOnce(), nil)
+	require.NoError(t, result.err)
+	require.True(t, answerRan)
+	_, current, _ = loop.config.SnapshotCanonicalTodos(aicommon.BuildVerificationTodoScope(task))
+	require.Equal(t, "inspect", current)
+	require.Equal(t, 3, loop.effectiveIterationCount)
+
+	addLater := adjust(map[string]any{"add": []any{map[string]any{"id": "followup", "text": "Inspect the follow-up"}}}, "todo_add")
+	focusLater := adjust(map[string]any{"current": "followup"}, "todo_focus_new")
+	result = loop.execCalls([]LoopCall{addLater, focusLater}, 5, task, "prompt", utils.NewOnce(), nil)
+	require.NoError(t, result.err)
+	_, current, _ = loop.config.SnapshotCanonicalTodos(aicommon.BuildVerificationTodoScope(task))
+	require.Equal(t, "followup", current)
+	require.Equal(t, 4, loop.effectiveIterationCount)
+
+	loop.Delete(loopVarDirectlyAnswerDeliveredWithoutTodoDelta)
+	failedLateFocus := adjust(map[string]any{"current": "unknown"}, "todo_failed_after_answer")
+	result = loop.execCalls([]LoopCall{answer, failedLateFocus}, 6, task, "prompt", utils.NewOnce(), nil)
+	require.NoError(t, result.err)
+	require.Equal(t, true, loop.GetVariable(loopVarDirectlyAnswerDeliveredWithoutTodoDelta),
+		"a failed later adjustment must not allow unlimited repeated answers")
+}
+
 func TestFunctionCallActionResponseRejectsUnprojectableCallBeforeRunning(t *testing.T) {
 	loop, invoker, _ := newActionExecutionTestLoop(t)
 	ran := false

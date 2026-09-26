@@ -10,7 +10,7 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 )
 
-func buildExitBlockedByTodoMessage(actionName string, items []aicommon.VerificationTodoItem) string {
+func buildExitBlockedByTodoMessage(actionName string, items []aicommon.VerificationTodoItem, functionCallMode bool) string {
 	if len(items) == 0 {
 		return ""
 	}
@@ -18,10 +18,18 @@ func buildExitBlockedByTodoMessage(actionName string, items []aicommon.Verificat
 	for _, item := range items {
 		lines = append(lines, aicommon.FormatVerificationTodoLine(item))
 	}
+	instruction := "only the action JSON's todo_delta field changes state"
+	closeInstruction := "in the next action"
+	if functionCallMode {
+		instruction = "only adjust_todolist.arguments.todo_delta changes state; call it alone or alongside another action"
+		closeInstruction = "in the next adjust_todolist call"
+	}
 	return fmt.Sprintf(
-		"current task still has %d open TODO item(s); %s cannot exit yet. Do not retry finish, bulk-close items, or express TODO changes in prose or custom tags: only the action JSON's todo_delta field changes state. Continue unresolved work with a tool action. When existing observations already prove an item terminal, close that exact open ID through todo_delta.close with an evidence-backed outcome, non-empty reason, and refs in the next action.\nRemaining TODOs:\n%s",
+		"current task still has %d open TODO item(s); %s cannot exit yet. Do not retry finish, bulk-close items, or express TODO changes in prose or custom tags: %s. Continue unresolved work with a tool action. When existing observations already prove an item terminal, close that exact open ID through todo_delta.close with an evidence-backed outcome, non-empty reason, and refs %s.\nRemaining TODOs:\n%s",
 		len(items),
 		actionName,
+		instruction,
+		closeInstruction,
 		strings.Join(lines, "\n"),
 	)
 }
@@ -39,7 +47,8 @@ func buildFinishBlockedByAcceptanceMessage(reason string) string {
 }
 
 var loopAction_Finish = &LoopAction{
-	ActionType: "finish",
+	ActionType:        "finish",
+	NativeDescription: "Finish the current task only after the evidence and TODO completion checks pass. If TODO state must change, complete adjust_todolist before finish, in this batch or an earlier one. Never close or defer TODOs merely to pass finish.",
 	Description: "Request completion of the current task. Exit immediately when no open TODO remains and the host completion gate permits it. " +
 		"This is the normal terminator for non-trivial ReAct tasks; the only narrow host exception is a classifier-approved simple_query with no effective todo_delta or current-task TODO history. " +
 		"Use it when evidence/results are already present in the timeline and no evidence-backed, in-scope, immediately executable next action would materially improve confidence, risk coverage, or impact assessment " +
@@ -91,7 +100,7 @@ var loopAction_Finish = &LoopAction{
 		// Only a finish request with remaining work needs a TODO checkpoint.
 		// Empty tasks must not spend another model turn confirming termination.
 		if items := aicommon.GetBlockingVerificationTodoItems(loop.GetConfig(), loop.GetCurrentTask()); len(items) > 0 {
-			msg := buildExitBlockedByTodoMessage("finish", items)
+			msg := buildExitBlockedByTodoMessage("finish", items, loop.functionCallMode)
 			loop.requestFinishTodoCheckpoint()
 			loop.invoker.AddToTimeline("[FINISH_BLOCKED_BY_TODO]", msg)
 			operator.Feedback(msg)
@@ -118,7 +127,7 @@ func NativeDirectlyAnswerOptions() []aitool.ToolOption {
 
 var loopAction_DirectlyAnswer = &LoopAction{
 	ActionType:        "directly_answer",
-	NativeDescription: "Deliver the complete answer to the user in answer_payload. For ordinary tasks this delivers an answer without ending the loop; use finish after all work is complete. Do not repeat an unchanged answer, and include todo_delta when scheduling follow-up work.",
+	NativeDescription: "Deliver the complete answer to the user in answer_payload. For ordinary tasks this delivers an answer without ending the loop; use finish after all work is complete. Do not repeat an unchanged answer. Adjust TODO state with adjust_todolist, alone or in the same batch.",
 	NativeOptions:     NativeDirectlyAnswerOptions(),
 	Description: "Emit a direct answer to the user via 'answer_payload' or FINAL_ANSWER tag. For simple direct answers, omit 'human_readable_thought'. " +
 		"For ordinary tasks directly_answer ONLY delivers the answer; use 'finish' when the latest user input is fully answered and no open TODO remains. " +

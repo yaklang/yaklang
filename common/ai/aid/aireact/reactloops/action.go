@@ -1,8 +1,6 @@
 package reactloops
 
 import (
-	"strings"
-
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 )
@@ -23,6 +21,9 @@ type LoopAction struct {
 	// ordinary Options; the text schema is never changed by these overrides.
 	NativeDescription string              `json:"-"`
 	NativeOptions     []aitool.ToolOption `json:"-"`
+	// NativeOnlyOptions omits common action metadata fields from a dedicated
+	// provider tool whose name already identifies its purpose.
+	NativeOnlyOptions bool `json:"-"`
 	ActionVerifier    LoopActionVerifierFunc
 	ActionHandler     LoopActionHandlerFunc
 	StreamFields      []*LoopStreamField
@@ -97,14 +98,14 @@ func withNativeActionDescription(action *LoopAction) *LoopAction {
 	return &copy
 }
 
-// The common fields retain the same shape in both protocols. Descriptions
-// referring to JSON action output are adjusted for native function tools.
+// Native functions keep common identity/display fields, while text actions
+// retain the optional TODO sidecar. Native TODO updates have one dedicated tool.
 func commonActionSchemaOptions(native bool) []aitool.ToolOption {
 	thoughtDescription := "Optional. Omit this field when @action is 'directly_answer' or when the next step is already obvious. If you do provide it, keep it to one short, action-oriented sentence only (prefer <=12 Chinese characters or <=8 English words)."
 	if native {
 		thoughtDescription = "Optional. Omit for directly_answer or an obvious next step. Otherwise use one short, action-oriented sentence (prefer <=12 Chinese characters or <=8 English words)."
 	}
-	return []aitool.ToolOption{
+	opts := []aitool.ToolOption{
 		aitool.WithStringParam(
 			"identifier",
 			aitool.WithParam_Description(
@@ -118,32 +119,53 @@ func commonActionSchemaOptions(native bool) []aitool.ToolOption {
 			"human_readable_thought",
 			aitool.WithParam_Description(thoughtDescription),
 		),
-		todoDeltaSchemaOption(native),
 	}
+	if !native {
+		opts = append(opts, todoDeltaSchemaOption(false, false))
+	}
+	return opts
 }
 
-func todoDeltaSchemaOption(native bool) aitool.ToolOption {
+func todoDeltaSchemaOption(native, required bool) aitool.ToolOption {
 	description := "The only write channel for the short-term TODO work set; TODO LIST, prose, and custom TODO tags are read-only and ignored for state changes. This field is optional only when state truly does not change. Add, refine, close, schedule a continuation, or switch TODOs in the same action JSON that advances the work. Apply order: add, update, close, current. Update, close, and current apply only to open items. Closed IDs are immutable audit history: to continue a deferred or weakly closed item, add a new TODO with a new ID and make that continuation current. Open items form the Frontier and one item is current. Before following one branch, record every concrete in-scope branch exposed by an Observation. A discovered link, form action, redirect, script route, documented endpoint, or response field is sufficient source evidence for a coverage TODO; require a falsifiable hypothesis only for a verification claim. Keep current while materially different experiments can gain information. A tool/parameter/transport/auth failure or one payload miss is not closure: correct it or vary the controllable channel first. When current completes, is discriminatively ruled out, is externally blocked, or temporarily has zero information gain, save its result or continuation condition and set the next Frontier item in the same delta. Never close or defer items merely to pass finish. Every close requires outcome and reason; refs is a sibling field and closure may use only observations already available before this action."
+	currentDescription := "Optional unique open TODO id. Closed history cannot be selected; create a new continuation ID instead. Omit to keep focus; null or empty clears it."
+	addIDDescription := "Optional stable id; the engine generates todo-N when omitted. Do not add an existing ID again. Use update only for an open item; use a new ID for continuation of closed history."
+	addTextDescription := "A short, actionable TODO. Preserve the concrete target, source evidence, and first resume action; add a falsifiable hypothesis when the item verifies a claim."
+	updateIDDescription := "ID of an open TODO only; closed history is immutable."
+	closeIDDescription := "ID of an open TODO only; never re-close terminal history to satisfy finish."
+	closeReasonDescription := "Required audit trail string based on observations already available in the current task before this action runs: verified result for resolved; attempts and stop reason for dismissed; attempts, unfinished work, and continuation condition for deferred. Keep refs outside this string as a sibling JSON field. Historical memory or another task's conclusion must be revalidated before resolved."
+	refsDescription := "Optional array of tool-call or observation references. This is a sibling of reason, not part of the reason key or string."
 	if native {
-		description = strings.Replace(description, "the same action JSON", "the same tool call arguments", 1)
+		// The shared high-static TODO policy already carries the full rules once.
+		// Keep the native schema focused on field shape and local constraints.
+		description = "Optional TODO changes in this action's arguments; omit when unchanged. The only TODO write channel."
+		currentDescription = "Open TODO id; omit to keep focus, null or empty clears it."
+		addIDDescription = "Optional new id; specify it when setting current in this call."
+		addTextDescription = "Concrete target, source, and acceptance or resume step."
+		updateIDDescription = "Open TODO id."
+		closeIDDescription = "Open TODO id."
+		closeReasonDescription = "Evidence-based reason for the outcome, using prior observations; put references in refs."
+		refsDescription = "Optional observation or tool-call references."
 	}
-	return aitool.WithStructParam("todo_delta", []aitool.PropertyOption{
-		aitool.WithParam_Description(description),
-	},
-		aitool.WithRawParam("current", map[string]any{"type": []string{"string", "null"}, "description": "Optional unique open TODO id. Closed history cannot be selected; create a new continuation ID instead. Omit to keep focus; null or empty clears it."}),
+	properties := []aitool.PropertyOption{aitool.WithParam_Description(description)}
+	if required {
+		properties = append(properties, aitool.WithParam_Required(true))
+	}
+	return aitool.WithStructParam("todo_delta", properties,
+		aitool.WithRawParam("current", map[string]any{"type": []string{"string", "null"}, "description": currentDescription}),
 		aitool.WithStructArrayParam("add", nil, nil,
-			aitool.WithStringParam("id", aitool.WithParam_Description("Optional stable id; the engine generates todo-N when omitted. Do not add an existing ID again. Use update only for an open item; use a new ID for continuation of closed history.")),
-			aitool.WithStringParam("text", aitool.WithParam_Required(true), aitool.WithParam_Description("A short, actionable TODO. Preserve the concrete target, source evidence, and first resume action; add a falsifiable hypothesis when the item verifies a claim.")),
+			aitool.WithStringParam("id", aitool.WithParam_Description(addIDDescription)),
+			aitool.WithStringParam("text", aitool.WithParam_Required(true), aitool.WithParam_Description(addTextDescription)),
 		),
 		aitool.WithStructArrayParam("update", nil, nil,
-			aitool.WithStringParam("id", aitool.WithParam_Required(true), aitool.WithParam_Description("ID of an open TODO only; closed history is immutable.")),
+			aitool.WithStringParam("id", aitool.WithParam_Required(true), aitool.WithParam_Description(updateIDDescription)),
 			aitool.WithStringParam("text", aitool.WithParam_Required(true)),
 		),
 		aitool.WithStructArrayParam("close", nil, nil,
-			aitool.WithStringParam("id", aitool.WithParam_Required(true), aitool.WithParam_Description("ID of an open TODO only; never re-close terminal history to satisfy finish.")),
+			aitool.WithStringParam("id", aitool.WithParam_Required(true), aitool.WithParam_Description(closeIDDescription)),
 			aitool.WithStringParam("outcome", aitool.WithParam_Required(true), aitool.WithParam_EnumString("resolved", "dismissed", "deferred")),
-			aitool.WithStringParam("reason", aitool.WithParam_Required(true), aitool.WithParam_Description("Required audit trail string based on observations already available in the current task before this action runs: verified result for resolved; attempts and stop reason for dismissed; attempts, unfinished work, and continuation condition for deferred. Keep refs outside this string as a sibling JSON field. Historical memory or another task's conclusion must be revalidated before resolved.")),
-			aitool.WithSimpleArrayParam("refs", "string", aitool.WithParam_Description("Optional array of tool-call or observation references. This is a sibling of reason, not part of the reason key or string.")),
+			aitool.WithStringParam("reason", aitool.WithParam_Required(true), aitool.WithParam_Description(closeReasonDescription)),
+			aitool.WithSimpleArrayParam("refs", "string", aitool.WithParam_Description(refsDescription)),
 		),
 	)
 }
