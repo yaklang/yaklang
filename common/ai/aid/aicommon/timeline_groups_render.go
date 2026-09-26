@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
+	"github.com/yaklang/yaklang/common/ai/aid/aiprojection"
 	"sort"
 	"strings"
 	"time"
@@ -652,8 +653,8 @@ func isActionResponseReplayProjection(item *TimelineItem) bool {
 	}
 	promptText := strings.TrimSpace(textItem.PromptText)
 	return promptText != "" && strings.TrimSpace(textItem.Text) == promptText &&
-		strings.Contains(promptText, "<|FUNCTION_CALL_ACTION_RESPONSE|>") &&
-		strings.Contains(promptText, "<|FUNCTION_CALL_ACTION_RESPONSE_END|>")
+		strings.Contains(promptText, "<|FUNCTION_CALL_ACTION_RESPONSE_"+aiprojection.Nonce()+"|>") &&
+		strings.HasSuffix(promptText, "<|FUNCTION_CALL_ACTION_RESPONSE_END_"+aiprojection.Nonce()+"|>")
 }
 
 func timelineIntervalBlockRenderedByteLen(block *TimelineIntervalBlock) int {
@@ -915,6 +916,7 @@ func (b *TimelineIntervalBlock) IsOpen() bool {
 }
 
 type TimelineCompressedHeadBlock struct {
+	promptProjection bool
 	CoveredEndItemID int64
 	CoveredEndAtMs   int64
 	Version          int64
@@ -1223,4 +1225,15 @@ func (bs TimelineRenderableBlocks) RenderOpenOnly(aitagName string) string {
 		return ""
 	}
 	return open.Render(aitagName)
+}
+
+func isPromptProjectionBlock(block TimelineRenderableBlock) bool {
+	switch b := block.(type) {
+	case *TimelineIntervalBlock:
+		return b != nil && b.promptProjection
+	case *TimelineCompressedHeadBlock:
+		return b != nil && b.promptProjection
+	default:
+		return false
+	}
 }

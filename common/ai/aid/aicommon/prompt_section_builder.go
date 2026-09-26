@@ -3,6 +3,7 @@ package aicommon
 import (
 	"bytes"
 	"fmt"
+	"github.com/yaklang/yaklang/common/ai/aid/aiprojection"
 	"strings"
 	"text/template"
 

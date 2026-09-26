@@ -74,6 +74,7 @@ func TestCallAITransactionProjectsInterleavedActionSchemasAtSend(t *testing.T) {
 		"<|PROMPT_SECTION_dynamic_n|>final-question<|PROMPT_SECTION_dynamic_END_n|>",
 	}, "\n\n")
 
+	prompt = aiprojection.CreateTemplate(prompt)
 	ctx := context.Background()
 	base := mock.NewMockedAIConfig(ctx).(*mock.MockedAIConfig)
 	base.SetConfig("AiTransactionAutoRetry", 1)

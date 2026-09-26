@@ -32,8 +32,8 @@ func TestFunctionCallToolParamsPromptKeepsNativeToolStable(t *testing.T) {
 	for _, tool := range tools {
 		prompt, err := react.promptManager.GenerateFunctionCallToolParamsPromptForTask(task, tool, intent)
 		require.NoError(t, err)
-		require.Contains(t, prompt, "<|AI_CACHE_SYSTEM_high-static|>")
-		require.Contains(t, prompt, "<|FUNCTION_CALL_TOOL_PARAM_SCHEMA_submit_tool_params|>")
+		require.Contains(t, prompt, aiprojection.CreateTemplate("<|AI_CACHE_SYSTEM_high-static|>"))
+		require.Contains(t, prompt, aiprojection.CreateTemplate("<|FUNCTION_CALL_TOOL_PARAM_SCHEMA_submit_tool_params|>"))
 		require.Contains(t, prompt, "# 已选业务工具")
 		require.Contains(t, prompt, tool.Name)
 		require.NotContains(t, prompt, "<|TOOL_PARAM_")
@@ -57,16 +57,16 @@ func TestFunctionCallToolParamsPromptKeepsNativeToolStable(t *testing.T) {
 		require.Contains(t, dynamic, "RECENT_USER_INPUT_R2")
 		require.NotContains(t, semi1, "SPECIFIC_INVOCATION_R2")
 		require.NotContains(t, semi1, "RECENT_USER_INPUT_R2")
-		frozenStart := strings.Index(prompt, "<|AI_CACHE_FROZEN_semi-dynamic|>")
+		frozenStart := strings.Index(prompt, aiprojection.CreateTemplate("<|AI_CACHE_FROZEN_semi-dynamic|>"))
 		if frozenStart >= 0 {
-			require.Less(t, strings.Index(prompt, "<|AI_CACHE_SYSTEM_high-static|>"), frozenStart)
-			require.Less(t, frozenStart, strings.Index(prompt, "<|PROMPT_SECTION_semi-dynamic-1|>"))
+			require.Less(t, strings.Index(prompt, aiprojection.CreateTemplate("<|AI_CACHE_SYSTEM_high-static|>")), frozenStart)
+			require.Less(t, frozenStart, strings.Index(prompt, aiprojection.CreateTemplate("<|PROMPT_SECTION_semi-dynamic-1|>")))
 		} else {
-			require.Less(t, strings.Index(prompt, "<|AI_CACHE_SYSTEM_high-static|>"), strings.Index(prompt, "<|PROMPT_SECTION_semi-dynamic-1|>"))
+			require.Less(t, strings.Index(prompt, aiprojection.CreateTemplate("<|AI_CACHE_SYSTEM_high-static|>")), strings.Index(prompt, aiprojection.CreateTemplate("<|PROMPT_SECTION_semi-dynamic-1|>")))
 		}
-		require.Less(t, strings.Index(prompt, "<|PROMPT_SECTION_semi-dynamic-1|>"), strings.Index(prompt, "<|PROMPT_SECTION_semi-dynamic-2|>"))
-		require.Less(t, strings.Index(prompt, "<|PROMPT_SECTION_semi-dynamic-2|>"), strings.Index(prompt, "<|PROMPT_SECTION_timeline-open|>"))
-		require.Less(t, strings.Index(prompt, "<|PROMPT_SECTION_timeline-open|>"), dynamicStart)
+		require.Less(t, strings.Index(prompt, aiprojection.CreateTemplate("<|PROMPT_SECTION_semi-dynamic-1|>")), strings.Index(prompt, aiprojection.CreateTemplate("<|PROMPT_SECTION_semi-dynamic-2|>")))
+		require.Less(t, strings.Index(prompt, aiprojection.CreateTemplate("<|PROMPT_SECTION_semi-dynamic-2|>")), strings.Index(prompt, aiprojection.CreateTemplate("<|PROMPT_SECTION_timeline-open|>")))
+		require.Less(t, strings.Index(prompt, aiprojection.CreateTemplate("<|PROMPT_SECTION_timeline-open|>")), dynamicStart)
 		projected := aiprojection.ProjectAndObserve("r2-test-model", prompt)
 		require.NotNil(t, projected)
 		require.True(t, projected.IsHijacked)
@@ -132,8 +132,8 @@ func TestFunctionCallToolParamsTreatsSelectedToolMetadataAsData(t *testing.T) {
 
 func r2PromptSection(t *testing.T, prompt, name string) string {
 	t.Helper()
-	startTag := "<|PROMPT_SECTION_" + name + "|>"
-	endTag := "<|PROMPT_SECTION_END_" + name + "|>"
+	startTag := aiprojection.CreateTemplate("<|PROMPT_SECTION_" + name + "|>")
+	endTag := aiprojection.CreateTemplate("<|PROMPT_SECTION_END_" + name + "|>")
 	start := strings.Index(prompt, startTag)
 	require.NotEqual(t, -1, start, "missing %s", name)
 	start += len(startTag)
