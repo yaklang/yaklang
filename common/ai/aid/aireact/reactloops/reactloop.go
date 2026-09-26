@@ -701,6 +701,12 @@ func NewReActLoop(name string, invoker aicommon.AIInvokeRuntime, options ...ReAc
 	for _, opt := range options {
 		opt(r)
 	}
+	if r.functionCallMode {
+		if r.actions.Have(nativeAdjustTodolistActionName) || r.loopActions.Have(nativeAdjustTodolistActionName) {
+			return nil, utils.Errorf("native action %q conflicts with an existing loop action", nativeAdjustTodolistActionName)
+		}
+		r.actions.Set(nativeAdjustTodolistActionName, loopAction_AdjustTodolistNative)
+	}
 
 	// 自动注入价值评估埋点 (默认开启, 暂无关闭开关). 该钩子在每轮结束
 	// (iteration_end) 与整循环结束 (loop_end) 组装 ValueFeedbackRecord 并经

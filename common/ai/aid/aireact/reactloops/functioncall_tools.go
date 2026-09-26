@@ -26,8 +26,10 @@ func buildActionTools(actions []*LoopAction, maxBatchCalls int) ([]aispec.Tool, 
 		}
 		seen[action.ActionType] = struct{}{}
 		opts := make([]any, 0, len(action.Options)+3)
-		for _, opt := range commonActionSchemaOptions(true) {
-			opts = append(opts, opt)
+		if !action.NativeOnlyOptions {
+			for _, opt := range commonActionSchemaOptions(true) {
+				opts = append(opts, opt)
+			}
 		}
 		actionOptions := action.Options
 		if action.NativeOptions != nil {

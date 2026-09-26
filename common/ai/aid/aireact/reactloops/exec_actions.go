@@ -27,6 +27,10 @@ type loopActionsResult struct {
 	operator *LoopActionHandlerOperator
 	result   loopActionsDisposition
 	err      error
+	// Internal execution facts are combined once per model response, even when
+	// the response contains several native function calls.
+	appliedTodoDelta         *aicommon.TodoDelta
+	countsEffectiveIteration bool
 	// An admission rejection starts another model iteration without a
 	// post-iteration callback, matching the existing single-action path.
 	skipPostIteration     bool
@@ -158,8 +162,51 @@ func (r *ReActLoop) execCalls(
 		result.result, result.err = loopActionsError, fmt.Errorf("AI loop returned no actions")
 		return result
 	}
+	r.Delete(loopVarNativeTodoBatchAdjusted)
+	defer r.Delete(loopVarNativeTodoBatchAdjusted)
+	remainingAdjustments := 0
+	if r.functionCallMode {
+		for _, call := range calls {
+			if call.Action == nil || call.Action.Name() != nativeAdjustTodolistActionName {
+				continue
+			}
+			if delta, err := aicommon.NormalizeTodoDelta(call.Action); err == nil && delta != nil {
+				remainingAdjustments++
+			}
+		}
+	}
+	appliedAdjustment := false
+	answerDelivered := false
+	countIteration := false
+	defer func() {
+		// An answer may precede a planned adjustment. If that adjustment later
+		// fails or is skipped, restore the ordinary duplicate-answer guard.
+		if r.functionCallMode && answerDelivered && !appliedAdjustment {
+			r.Set(loopVarDirectlyAnswerDeliveredWithoutTodoDelta, true)
+			r.subAgentAnswerSeen = r.subAgentModelSeen
+		}
+		if countIteration {
+			r.effectiveIterationCount++
+		}
+	}()
 	for index, call := range calls {
+		if appliedAdjustment || remainingAdjustments > 0 {
+			r.Set(loopVarNativeTodoBatchAdjusted, true)
+		} else {
+			r.Delete(loopVarNativeTodoBatchAdjusted)
+		}
 		outcome := r.execOneCall(call, iteration, task, prompt, done, index, len(calls), eventSink)
+		countIteration = countIteration || outcome.countsEffectiveIteration
+		if call.Action != nil && call.Action.Name() == nativeAdjustTodolistActionName {
+			if delta, err := aicommon.NormalizeTodoDelta(call.Action); err == nil && delta != nil {
+				remainingAdjustments--
+			}
+			appliedAdjustment = appliedAdjustment || outcome.appliedTodoDelta != nil && outcome.appliedTodoDelta.HasChanges()
+		}
+		if call.Action != nil && call.Action.Name() == loopAction_DirectlyAnswer.ActionType &&
+			outcome.err == nil && !outcome.skipPostIteration {
+			answerDelivered = true
+		}
 		if len(calls) == 1 {
 			result.operator = outcome.operator
 		} else {
@@ -230,10 +277,13 @@ func (r *ReActLoop) execOneCall(
 		r.emitActionExecutionRecord(task, action, iteration, prompt, artifactSuffix)
 	}
 	appliedTodoDelta := applyTodoDeltaBottomLine(r, task, iteration, action)
+	result.appliedTodoDelta = appliedTodoDelta
 	if IsSubAgentControlAction(actionName) {
 		r.subAgentControlIterations++
+	} else if actionName == nativeAdjustTodolistActionName {
+		result.countsEffectiveIteration = appliedTodoDelta != nil && appliedTodoDelta.HasChanges()
 	} else {
-		r.advanceEffectiveIteration(task, appliedTodoDelta)
+		result.countsEffectiveIteration = r.shouldAdvanceEffectiveIteration(task, appliedTodoDelta)
 	}
 	if handler.AsyncMode || actionName == schema.AI_REACT_LOOP_ACTION_REQUIRE_AI_BLUEPRINT ||
 		actionName == schema.AI_REACT_LOOP_ACTION_REQUEST_PLAN || actionName == schema.AI_REACT_LOOP_ACTION_REQUEST_PLAN_EXECUTION {
@@ -274,6 +324,18 @@ func (r *ReActLoop) execOneCall(
 		emitLoopActionEvent(eventSink, call, "failed", result.err.Error())
 		return result
 	}
+	// Transaction-time verification may accept an adjust_todolist that turns
+	// out to be idempotent at apply time. Recheck before delivering a repeated
+	// answer so a no-op adjustment cannot bypass the duplicate-output guard.
+	if r.functionCallMode && actionName == loopAction_DirectlyAnswer.ActionType {
+		if err := RejectDuplicateDirectlyAnswerWithoutTodoDelta(r, action); err != nil {
+			op.Feedback(err.Error())
+			op.Continue()
+			emitLoopActionEvent(eventSink, call, "rejected", err.Error())
+			result.skipPostIteration = true
+			return result
+		}
+	}
 	if err := task.GetContext().Err(); err != nil {
 		result.result, result.err = loopActionsError, fmt.Errorf("task context done before action handler: %w", err)
 		result.skipErrorFinalization, result.skipErrorSummary = true, true
@@ -295,7 +357,7 @@ func (r *ReActLoop) execOneCall(
 		emitLoopActionEvent(eventSink, call, "failed", err.Error())
 		return result
 	}
-	if handler.ActionType != loopAction_Finish.ActionType {
+	if handler.ActionType != loopAction_Finish.ActionType && handler.ActionType != nativeAdjustTodolistActionName {
 		r.recordCurrentTodoIteration(task)
 	}
 	if terminated, opErr := op.IsTerminated(); terminated {

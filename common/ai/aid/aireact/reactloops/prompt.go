@@ -160,6 +160,9 @@ func (r *ReActLoop) getFilteredActions(disallowExit bool, actionOperators ...*Lo
 
 	var filteredValues []*LoopAction
 	for _, v := range values {
+		if v.ActionType == nativeAdjustTodolistActionName && !r.functionCallMode {
+			continue
+		}
 		if !slices.Contains(disableActionList, v.ActionType) && filterFunc(v) {
 			filteredValues = append(filteredValues, v)
 		} else {

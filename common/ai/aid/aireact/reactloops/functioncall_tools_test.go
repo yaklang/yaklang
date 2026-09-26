@@ -2,6 +2,7 @@ package reactloops
 
 import (
 	"context"
+	"encoding/json"
 	"strings"
 	"testing"
 
@@ -31,16 +32,19 @@ func (c *fcTestConfig) CallQualityPriorityAI(req *aicommon.AIRequest) (*aicommon
 
 func TestBuildActionToolsPromptTags(t *testing.T) {
 	loop := makeSchemaStabilityTestLoop(aicommon.NewConfig(context.Background()))
+	loop.actions.Set(nativeAdjustTodolistActionName, loopAction_AdjustTodolistNative)
 	loop.functionCallMode = true
 	textSchema, actionTags, err := loop.prepareLoopActionSchemas(nil)
 	require.NoError(t, err)
 	require.Empty(t, textSchema)
 	require.NotEmpty(t, actionTags)
+	require.Contains(t, actionTags, "<|FUNCTION_CALL_ACTION_SCHEMA_adjust_todolist|>")
 	loop.functionCallMode = false
 	textSchema, actionTags, err = loop.prepareLoopActionSchemas(nil)
 	require.NoError(t, err)
 	require.NotEmpty(t, textSchema)
 	require.Empty(t, actionTags)
+	require.NotContains(t, textSchema, "adjust_todolist")
 
 	actions := []*LoopAction{
 		{ActionType: "find_files", Options: []aitool.ToolOption{aitool.WithStringParam("pattern")}},
@@ -93,4 +97,51 @@ func TestBuildActionToolsUsesNativeDescription(t *testing.T) {
 	require.Equal(t, plainAction.Description, tools[1].Function.Description)
 	require.Equal(t, "Run the empty_description action using its tool arguments.", tools[2].Function.Description)
 	require.NotContains(t, tools[0].Function.Description, "@action")
+}
+
+func TestNativeAdjustTodolistKeepsTodoShapeWithoutBusinessSidecars(t *testing.T) {
+	action := &LoopAction{ActionType: "todo_action"}
+	tools, err := buildActionTools([]*LoopAction{action, loopAction_AdjustTodolistNative}, aicommon.DefaultToolBatchMaxCalls)
+	require.NoError(t, err)
+	businessParameters := tools[0].Function.Parameters.(map[string]any)
+	require.NotContains(t, businessParameters["properties"], "todo_delta")
+	parameters := tools[1].Function.Parameters.(map[string]any)
+	nativeProperties := parameters["properties"].(map[string]any)
+	require.Len(t, nativeProperties, 1)
+	native := nativeProperties["todo_delta"].(map[string]any)
+	require.Contains(t, parameters["required"], "todo_delta")
+
+	var textSchema map[string]any
+	require.NoError(t, json.Unmarshal([]byte(buildSchema(action)), &textSchema))
+	text := textSchema["properties"].(map[string]any)["todo_delta"].(map[string]any)
+	require.Equal(t, withoutSchemaDescriptions(text), withoutSchemaDescriptions(native))
+	require.Contains(t, native["description"], "arguments")
+	require.NotContains(t, native["description"], "Open items form the Frontier")
+	require.Contains(t, text["description"], "Open items form the Frontier")
+	nativeJSON, err := json.Marshal(native)
+	require.NoError(t, err)
+	textJSON, err := json.Marshal(text)
+	require.NoError(t, err)
+	t.Logf("todo_delta schema bytes: native=%d text=%d", len(nativeJSON), len(textJSON))
+}
+
+func withoutSchemaDescriptions(value any) any {
+	switch v := value.(type) {
+	case map[string]any:
+		result := make(map[string]any, len(v))
+		for key, child := range v {
+			if key != "description" {
+				result[key] = withoutSchemaDescriptions(child)
+			}
+		}
+		return result
+	case []any:
+		result := make([]any, len(v))
+		for i, child := range v {
+			result[i] = withoutSchemaDescriptions(child)
+		}
+		return result
+	default:
+		return value
+	}
 }

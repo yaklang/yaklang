@@ -538,6 +538,8 @@ func (r *ReActLoop) callAIFunctionTransaction(
 		if len(rawCalls) == 0 {
 			return utils.Error("function-call response contained no tool calls")
 		}
+		r.Delete(loopVarNativeTodoBatchAdjusted)
+		defer r.Delete(loopVarNativeTodoBatchAdjusted)
 		calls := make([]LoopCall, 0, len(rawCalls))
 		for _, rawCall := range rawCalls {
 			if !validActionToolName(rawCall.Function.Name) {
@@ -561,17 +563,29 @@ func (r *ReActLoop) callAIFunctionTransaction(
 			}
 			params["@action"] = rawCall.Function.Name
 			action := aicommon.NewSimpleAction(rawCall.Function.Name, aitool.InvokeParams(params))
-			validateTodoDeltaBeforeActionVerifier(r, action)
-			if handler.ActionVerifier != nil {
-				if err := handler.ActionVerifier(r, action); err != nil {
-					return utils.Wrapf(err, "verify tool call %q", rawCall.ID)
-				}
-			}
 			calls = append(calls, LoopCall{
 				Action: action, LoopAction: handler, ToolCallID: rawCall.ID,
 				Index: rawCall.Index, Description: rawCall.Description,
 				ArgumentsJSON: rawCall.Function.Arguments,
 			})
+		}
+		// Normalize all deltas before action-specific verification. An adjustment
+		// may be independent or appear anywhere in a provider's tool-call batch;
+		// its presence lets an answer in that batch avoid premature auto-finish.
+		for _, call := range calls {
+			validateTodoDeltaBeforeActionVerifier(r, call.Action)
+			if call.Action.Name() == nativeAdjustTodolistActionName {
+				if delta, err := aicommon.NormalizeTodoDelta(call.Action); err == nil && delta != nil {
+					r.Set(loopVarNativeTodoBatchAdjusted, true)
+				}
+			}
+		}
+		for _, call := range calls {
+			if call.LoopAction.ActionVerifier != nil {
+				if err := call.LoopAction.ActionVerifier(r, call.Action); err != nil {
+					return utils.Wrapf(err, "verify tool call %q", call.ToolCallID)
+				}
+			}
 		}
 		acceptedCalls = calls
 		r.Set("last_ai_decision_nonce", nonce)

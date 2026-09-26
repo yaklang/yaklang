@@ -145,6 +145,8 @@ func TestExecLoopPromptCompare_HighStaticProtocol(t *testing.T) {
 	require.Contains(t, textPrompt, "## NONCE 与 AITAG")
 	require.NotContains(t, textPrompt, "本轮使用原生 function call")
 	require.Contains(t, functionPrompt, "本轮使用原生 function call")
+	require.Contains(t, functionPrompt, "仅 `adjust_todolist` 工具接收 `arguments.todo_delta`")
+	require.NotContains(t, textPrompt, "`adjust_todolist` 工具")
 	require.Contains(t, functionPrompt, "模型输出的 AITAG 不参与 function call 的 action 解析")
 	require.NotContains(t, functionPrompt, "caller 每轮给 JSON SCHEMA")
 	require.NotContains(t, functionPrompt, "## NONCE 与 AITAG")
