@@ -10,6 +10,7 @@
   "ai.runtime.host.v1",
   "ai.session.bind_epoch.v1",
   "ai.session.turn_lifecycle.v1",
+  "ai.skill_bundle.v1",
   "hids",
   "plugin.bundle.v1",
   "ssa.rule_snapshot.execution.v2",
