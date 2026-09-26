@@ -30,9 +30,9 @@ var functionCallToolParamsTimelineOpen string
 var functionCallToolParamsDynamic string
 
 // GenerateFunctionCallToolParamsPromptForTask builds R2's native prompt. It
-// reuses the main loop's frozen/open timeline rendering. The full task context
-// is in semi-dynamic-1, the selected business tool is in semi-dynamic-2, and
-// the open timeline plus current environment form the volatile tail.
+// reuses the main loop's frozen/open timeline rendering. Shared task/history
+// precede the selected tool, so changing tools does not invalidate that prefix.
+// The selected schema and invocation intent stay close to the response point.
 func (pm *PromptManager) GenerateFunctionCallToolParamsPromptForTask(
 	task aicommon.AIStatefulTask, tool *aitool.Tool, intent aicommon.ToolParamsCallIntent,
 ) (string, error) {
@@ -103,14 +103,37 @@ func (pm *PromptManager) GenerateFunctionCallToolParamsPromptForTask(
 		}
 		callIntent = escapeR2PromptControlTags(string(encoded))
 	}
-	builder := newFunctionCallToolParamsPrefixBuilder()
-	return builder.AssemblePromptWithDynamicSection(materials,
-		"r2-functioncall-dynamic", functionCallToolParamsDynamic,
+	return assembleFunctionCallToolParamsPrompt(materials,
 		map[string]any{
 			"RecentUserInput": escapeR2PromptControlTags(materials.UserHistory), "CallIntent": callIntent,
 			"CurrentTime": base.CurrentTime, "OSArch": base.OSArch,
 			"WorkingDir": base.WorkingDir, "WorkingDirGlance": base.WorkingDirGlance,
 		}, currentNonce)
+}
+
+func assembleFunctionCallToolParamsPrompt(materials *aicommon.PromptMaterials, dynamicData any, currentNonce string) (string, error) {
+	prefix, err := newFunctionCallToolParamsPrefixBuilder().AssemblePromptPrefix(materials)
+	if err != nil {
+		return "", err
+	}
+	dynamic, err := aicommon.RenderPromptTemplate("r2-functioncall-dynamic", functionCallToolParamsDynamic, dynamicData)
+	if err != nil {
+		return "", err
+	}
+	// Projection expects cache boundaries in frozen -> semi -> semi2 order.
+	// Keep that contract while placing R2's shared history before its selected
+	// tool. The open history is reusable only until the next timeline change;
+	// the full task stays ahead of growing or compressed historical records.
+	return aicommon.JoinPromptSections(
+		aicommon.WrapPromptMessageSection(aicommon.PromptSectionHighStatic, prefix.HighStatic, ""),
+		aicommon.WrapAICacheFrozen(aicommon.JoinPromptSections(
+			aicommon.WrapPromptMessageSection(aicommon.PromptSectionSemiDynamic1, prefix.SemiDynamic, ""),
+			prefix.FrozenBlock,
+		)),
+		aicommon.WrapAICacheSemi(aicommon.WrapPromptMessageSection(aicommon.PromptSectionTimelineOpen, prefix.TimelineOpen, "")),
+		aicommon.WrapAICacheSemi2(aicommon.WrapPromptMessageSection(aicommon.PromptSectionSemiDynamic2, prefix.SemiDynamic2, "")),
+		aicommon.WrapPromptMessageSection(aicommon.PromptSectionDynamic, dynamic, currentNonce),
+	), nil
 }
 
 func newFunctionCallToolParamsPrefixBuilder() *aicommon.PromptPrefixBuilder {

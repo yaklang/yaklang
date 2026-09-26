@@ -343,7 +343,7 @@ func TestDirectlyCallTool_Verifier_PassesThroughWhenNotCached(t *testing.T) {
 	require.NoError(t, loopAction_directlyCallTool.ActionVerifier(loop, action))
 
 	// 验证 directly_call_tool_name 仍然被设置（handler 正常处理）
-	assert.Equal(t, "scan_port", loop.Get("directly_call_tool_name"))
+	assert.Equal(t, "scan_port", action.GetExecutionValue("directly_call_tool_name"))
 
 	// 验证 timeline 记录了 cache miss 信息
 	timeline := invoker.getTimelineString()

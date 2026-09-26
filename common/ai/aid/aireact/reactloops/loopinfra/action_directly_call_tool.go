@@ -337,7 +337,8 @@ var loopAction_directlyCallTool = &reactloops.LoopAction{
 	},
 	OutputExamples: directlyCallToolOutputExamples,
 	ActionVerifier: func(loop *reactloops.ReActLoop, action *aicommon.Action) error {
-		loop.Delete(loopVarDirectToolBatch)
+		action.SetExecutionValue(actionStateDirectToolBatch, nil)
+		action.SetExecutionValue("directly_call_tool_name", nil)
 
 		// Keep the established scalar streaming contract. The legacy discriminator
 		// is readable before the root JSON object closes, so a valid one-call action
@@ -368,7 +369,7 @@ var loopAction_directlyCallTool = &reactloops.LoopAction{
 				)
 			}
 			reactloops.MaybeWarnBashBeforeEdit(loop, toolName)
-			loop.Set("directly_call_tool_name", toolName)
+			action.SetExecutionValue("directly_call_tool_name", toolName)
 			return nil
 		}
 
@@ -377,15 +378,14 @@ var loopAction_directlyCallTool = &reactloops.LoopAction{
 			return batchErr
 		}
 		if hasBatch {
-			loop.Set(loopVarDirectToolBatch, batch)
-			loop.Delete("directly_call_tool_name")
+			action.SetExecutionValue(actionStateDirectToolBatch, batch)
 			return nil
 		}
 
 		return utils.Error("directly_call_tool requires directly_call_tool_name or directly_call_tool_calls")
 	},
 	ActionHandler: func(loop *reactloops.ReActLoop, action *aicommon.Action, operator *reactloops.LoopActionHandlerOperator) {
-		if executeVerifiedToolBatch(loop, loopVarDirectToolBatch, operator) {
+		if executeVerifiedToolBatch(loop, action, actionStateDirectToolBatch, operator) {
 			return
 		}
 		invoker := loop.GetInvoker()
@@ -405,11 +405,11 @@ var loopAction_directlyCallTool = &reactloops.LoopAction{
 			invoker.AddToTimeline("DIRECT_CALL_PARAMS", msg)
 		}
 
-		toolName := loop.Get("directly_call_tool_name")
+		toolName, _ := action.GetExecutionValue("directly_call_tool_name").(string)
 		if toolName == "" {
 			loopInfraStatus(loop, "没有找到要使用的工具", "No suitable tool was found")
 			reportStatus(strings.TrimSpace(`
-Error: directly_call_tool_name is missing in loop state.
+Error: directly_call_tool_name is missing in verified action state.
 Fast-path directly_call_tool failed before execution and cannot be recovered in-place because the target tool is unknown.
 Next attempt MUST either switch to require_tool or retry directly_call_tool with both directly_call_tool_name and directly_call_tool_params.
 

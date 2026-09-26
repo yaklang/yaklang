@@ -1,5 +1,4 @@
-{{ if .OriginalUserInput }}# 完整任务输入
+{{ if .OriginalUserInput }}# 完整任务输入（背景）
+这是主循环负责的整体任务。当前只承担其中一次已选工具的参数生成，不在本阶段完成全部任务。
 {{ .OriginalUserInput }}
-{{ end }}{{ if .PromotedSemiDynamic1 }}# 稳定时间线上下文
-{{ .PromotedSemiDynamic1 }}
 {{ end }}

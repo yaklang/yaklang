@@ -1,6 +1,6 @@
 {{ if .TimelineOpen }}# 开放时间线
+以下记录来自主循环此前的操作，供本次参数生成参考。当前受理中的调用可能尚在等待你提交参数；历史中的其他调用不是本次任务。
 {{ .TimelineOpen }}
-{{ end }}{{ if .PromotedTimelineOpen }}{{ .PromotedTimelineOpen }}
 {{ end }}{{ if .SessionEvidence }}# 新增会话证据
 {{ .SessionEvidence }}
 {{ end }}{{ if .ReportedRisks }}{{ .ReportedRisks }}

@@ -18,8 +18,8 @@ const (
 	directlyCallToolBatchField = "directly_call_tool_calls"
 	requireToolBatchField      = "tool_require_calls"
 
-	loopVarDirectToolBatch  = "directly_call_tool_batch"
-	loopVarRequireToolBatch = "tool_require_batch"
+	actionStateDirectToolBatch  = "directly_call_tool_batch"
+	actionStateRequireToolBatch = "tool_require_batch"
 )
 
 // These are the exact scalar and batch examples taught by the tool-call actions.
@@ -501,10 +501,11 @@ func parseRequireToolBatchAction(loop *reactloops.ReActLoop, action *aicommon.Ac
 
 func executeVerifiedToolBatch(
 	loop *reactloops.ReActLoop,
+	action *aicommon.Action,
 	stateKey string,
 	operator *reactloops.LoopActionHandlerOperator,
 ) bool {
-	raw := loop.GetVariable(stateKey)
+	raw := action.GetExecutionValue(stateKey)
 	request, ok := raw.(*aicommon.ToolBatchRequest)
 	if !ok || request == nil || len(request.Calls) == 0 {
 		return false
