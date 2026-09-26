@@ -10,12 +10,14 @@ import (
 )
 
 const actionSchemaTagName = "FUNCTION_CALL_ACTION_SCHEMA"
+const toolParamSchemaTagName = "FUNCTION_CALL_TOOL_PARAM_SCHEMA"
 
 // projectActionSchemaTags removes action schema blocks from the trusted schema
 // slot and returns them as native tools. Any malformed block leaves the entire
 // prompt untouched; a partial tool set must never be sent.
 func projectActionSchemaTags(prompt string) (string, []aispec.Tool) {
-	if !strings.Contains(prompt, "<|"+actionSchemaTagName+"_") || strings.Contains(prompt, "<|SCHEMA|>") {
+	if (!strings.Contains(prompt, "<|"+actionSchemaTagName+"_") &&
+		!strings.Contains(prompt, "<|"+toolParamSchemaTagName+"_")) || strings.Contains(prompt, "<|SCHEMA|>") {
 		return prompt, nil
 	}
 	outer, err := aitag.SplitViaTAG(prompt, acceptedTagNames...)
@@ -32,7 +34,7 @@ func projectActionSchemaTags(prompt string) (string, []aispec.Tool) {
 			cleaned.WriteString(section.Raw)
 			continue
 		}
-		inner, err := aitag.SplitViaTAG(section.Raw, actionSchemaTagName)
+		inner, err := aitag.SplitViaTAG(section.Raw, actionSchemaTagName, toolParamSchemaTagName)
 		if err != nil {
 			log.Warnf("action schema projection skipped: invalid schema tag: %v", err)
 			return prompt, nil

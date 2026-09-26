@@ -8,9 +8,6 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 )
 
-//go:embed prompts/tool/tool-result-to-decision.txt
-var __prompt_ToolResultToDecisionPromptTemplate string
-
 //go:embed prompts/task/task-summary_instruction.txt
 var __prompt_TaskSummaryInstruction string
 
@@ -32,20 +29,8 @@ var __prompt_ToolsList string
 //go:embed prompts/plan/plan-help.txt
 var __prompt_PlanHelp string
 
-//go:embed prompts/tool/tool-re-select.txt
-var __prompt_toolReSelect string
-
-//go:embed prompts/tool/tool-param-regenerate.txt
-var __prompt_ParamsReGenerate string
-
 //go:embed prompts/search/aitool-keyword-search.txt
 var __prompt_KeywordSearchPrompt string
-
-//go:embed prompts/plan/deepthink/instruction.txt
-var __prompt_deepthinkInstruction string
-
-//go:embed prompts/plan/deepthink/dynamic.txt
-var __prompt_deepthinkDynamic string
 
 //go:embed prompts/plan/dynamic-plan/instruction.txt
 var __prompt_dynamicPlanInstruction string

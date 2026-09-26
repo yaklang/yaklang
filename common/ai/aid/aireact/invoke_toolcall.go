@@ -266,6 +266,9 @@ func (r *ReAct) newToolCallerForCall(ctx context.Context, currentTask aicommon.A
 			aicommon.WithToolCaller_GenerateToolParamsBuilderWithMeta(func(tool *aitool.Tool, toolName string) (*aicommon.ToolParamsPromptMeta, error) {
 				return r.generateToolParamsPromptWithMetaForTask(currentTask, tool, toolName)
 			}),
+			aicommon.WithToolCaller_FunctionCallParamsPromptBuilder(func(tool *aitool.Tool, _ string) (string, error) {
+				return r.promptManager.GenerateFunctionCallToolParamsPromptForTask(currentTask, tool)
+			}),
 		)
 	}
 

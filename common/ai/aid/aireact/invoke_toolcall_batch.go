@@ -407,6 +407,13 @@ func (r *ReAct) newToolCallerForBatchCall(
 				return r.generateToolParamsPromptWithMetaForTask(task, tool, toolName)
 			},
 		),
+		aicommon.WithToolCaller_FunctionCallParamsPromptBuilder(
+			func(tool *aitool.Tool, _ string) (string, error) {
+				promptMu.Lock()
+				defer promptMu.Unlock()
+				return r.promptManager.GenerateFunctionCallToolParamsPromptForTask(task, tool)
+			},
+		),
 	)
 	return aicommon.NewToolCaller(ctx, opts...)
 }

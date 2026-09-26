@@ -11,84 +11,6 @@ import (
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 )
 
-type promptRenderLoopStub struct {
-	iteration int
-}
-
-func (s *promptRenderLoopStub) Execute(taskId string, ctx context.Context, userInput string) error {
-	return nil
-}
-
-func (s *promptRenderLoopStub) ExecuteWithExistedTask(task aicommon.AIStatefulTask) error {
-	return nil
-}
-
-func (s *promptRenderLoopStub) GetCurrentTask() aicommon.AIStatefulTask {
-	return nil
-}
-
-func (s *promptRenderLoopStub) SetCurrentTask(t aicommon.AIStatefulTask) {}
-
-func (s *promptRenderLoopStub) GetInvoker() aicommon.AIInvokeRuntime {
-	return nil
-}
-
-func (s *promptRenderLoopStub) GetEmitter() *aicommon.Emitter {
-	return nil
-}
-
-func (s *promptRenderLoopStub) GetConfig() aicommon.AICallerConfigIf {
-	return nil
-}
-
-func (s *promptRenderLoopStub) GetMemoryTriage() aicommon.MemoryTriage {
-	return nil
-}
-
-func (s *promptRenderLoopStub) Set(key string, value any) {}
-
-func (s *promptRenderLoopStub) Get(key string) string {
-	return ""
-}
-
-func (s *promptRenderLoopStub) GetVariable(key string) any {
-	return nil
-}
-
-func (s *promptRenderLoopStub) GetStringSlice(key string) []string {
-	return nil
-}
-
-func (s *promptRenderLoopStub) GetInt(key string) int {
-	return 0
-}
-
-func (s *promptRenderLoopStub) RemoveAction(actionType string) {}
-
-func (s *promptRenderLoopStub) GetAllActionNames() []string {
-	return nil
-}
-
-func (s *promptRenderLoopStub) NoActions() bool {
-	return true
-}
-
-func (s *promptRenderLoopStub) PushMemory(result *aicommon.SearchMemoryResult) {}
-
-func (s *promptRenderLoopStub) GetCurrentMemoriesContent() string {
-	return ""
-}
-
-func (s *promptRenderLoopStub) DisallowAskForClarification() {}
-
-func (s *promptRenderLoopStub) GetTimelineDiff() (string, error) {
-	return "", nil
-}
-
-func (s *promptRenderLoopStub) GetCurrentIterationIndex() int {
-	return s.iteration
-}
-
 type promptRenderFixture struct {
 	coordinator *Coordinator
 	provider    *PromptContextProvider
@@ -103,7 +25,6 @@ func newPromptRenderFixture() *promptRenderFixture {
 	coordinator := &Coordinator{
 		Config: &aicommon.Config{
 			Ctx:             context.Background(),
-			MaxTaskContinue: 3,
 			Timeline:        provider.timeline,
 		},
 		ContextProvider: provider,
@@ -125,7 +46,6 @@ func newPromptRenderFixture() *promptRenderFixture {
 	taskB.Index = "2-1"
 	taskB.SetUserInput("input-from-task-B\n\n<EVIDENCE>\nB evidence marker\n</EVIDENCE>")
 	taskB.StatusSummary = "status from task B"
-	taskB.SetReActLoop(&promptRenderLoopStub{iteration: 99})
 
 	coordinator.rootTask = root
 	provider.StoreRootTask(root)
@@ -172,24 +92,6 @@ func TestGenerateDeepThinkPlanPrompt_UsesTaskLocalGoal(t *testing.T) {
 	require.NotContains(t, currentTask, "input-from-task-B")
 }
 
-func TestGenerateToolCallResponsePrompt_UsesTaskLocalContinueState(t *testing.T) {
-	fixture := newPromptRenderFixture()
-
-	prompt, err := fixture.taskA.generateToolCallResponsePrompt(
-		&aitool.ToolResult{ID: 303, Name: "result_tool", Success: true, Data: map[string]any{"ok": true}},
-		aitool.NewWithoutCallback("test_tool", aitool.WithDescription("test tool")),
-	)
-	require.NoError(t, err)
-
-	require.Contains(t, prompt, "当前任务可以继续")
-	require.NotContains(t, prompt, "当前任务已经超过了最大执行次数")
-	require.Contains(t, prompt, "execution_status=failed")
-	require.Contains(t, prompt, "调用协议结束、工具执行结果、当前任务验收")
-	require.Contains(t, prompt, "--- 当前任务 ---")
-	require.Contains(t, prompt, "input-from-task-A")
-	require.NotContains(t, prompt, "input-from-task-B")
-}
-
 func TestGenerateTaskSummaryPrompt_Timeline(t *testing.T) {
 	fixture := newPromptRenderFixture()
 
@@ -200,10 +102,4 @@ func TestGenerateTaskSummaryPrompt_Timeline(t *testing.T) {
 	require.True(t, strings.Contains(prompt, "input-from-task-A"))
 	require.Contains(t, prompt, "工具调用是否结束、工具执行是否成功、用户任务是否满足")
 	require.Contains(t, prompt, "所有未终结的 TODO")
-}
-
-func TestToolDecisionPromptDoesNotExposeIterationLimit(t *testing.T) {
-	require.NotContains(t, __prompt_ToolResultToDecisionPromptTemplate, "超过了最大执行次数")
-	require.NotContains(t, __prompt_ToolResultToDecisionPromptTemplate, "单任务的继续执行次数限制")
-	require.Contains(t, __prompt_ToolResultToDecisionPromptTemplate, "不要推测或提及任何内部迭代次数")
 }
