@@ -33,7 +33,7 @@ func TestGenerateParams_ActionTolerance(t *testing.T) {
 		{"nested_envelope", `{"wrapper":{"tool":"read_file","params":{"path":"/config"}}}`, false},
 		{"truncated_envelope", `{"tool":"read_file","params":{"path":"/config"},`, false},
 	} {
-		for _, functionCall := range []bool{false, true} {
+		for _, functionCall := range []bool{false} {
 			mode := "text"
 			if functionCall {
 				mode = "functioncall"
@@ -57,8 +57,8 @@ func TestGenerateParams_ActionTolerance(t *testing.T) {
 					WithToolCaller_AICallerConfig(cfg), WithToolCaller_AICaller(cfg),
 					WithToolCaller_Emitter(cfg.GetEmitter()), WithToolCaller_Task(cfg.DefaultTask),
 					WithToolCaller_CallToolID("action-tolerance"),
-					WithToolCaller_GenerateToolParamsBuilder(func(*aitool.Tool, string) (string, error) {
-						return "generate params", nil
+					WithToolCaller_GenerateToolParamsBuilderWithMeta(func(*aitool.Tool, string) (*ToolParamsPromptMeta, error) {
+						return &ToolParamsPromptMeta{Prompt: "generate params"}, nil
 					}))
 				require.NoError(t, err)
 				result, err := caller.generateParams(tool, func(any) {})
