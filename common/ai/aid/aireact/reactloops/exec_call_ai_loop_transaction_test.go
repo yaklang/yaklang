@@ -208,6 +208,80 @@ func TestCallAILoopTransactionFunctionModeInterleavedCalls(t *testing.T) {
 	require.Equal(t, "Check B", secondCall["description"])
 }
 
+func TestCallAILoopTransactionNativeTodoAdjustmentGuardsAnswer(t *testing.T) {
+	drain := func(a, b io.Reader) {
+		var wg sync.WaitGroup
+		wg.Add(2)
+		go func() { defer wg.Done(); _, _ = io.Copy(io.Discard, a) }()
+		go func() { defer wg.Done(); _, _ = io.Copy(io.Discard, b) }()
+		wg.Wait()
+	}
+	for _, tc := range []struct {
+		name      string
+		calls     []*aispec.ToolCall
+		wantNames []string
+	}{
+		{
+			name: "adjust before answer",
+			calls: []*aispec.ToolCall{
+				{Index: 0, ID: "todo", Type: "function", Function: aispec.FuncReturn{Name: nativeAdjustTodolistActionName, Arguments: `{"todo_delta":{"add":[{"id":"followup","text":"Inspect the next file"}],"current":"followup"}}`}},
+				{Index: 1, ID: "answer", Type: "function", Function: aispec.FuncReturn{Name: "directly_answer", Arguments: `{"answer_payload":"progress"}`}},
+			},
+			wantNames: []string{nativeAdjustTodolistActionName, "directly_answer"},
+		},
+		{
+			name: "adjust after answer",
+			calls: []*aispec.ToolCall{
+				{Index: 0, ID: "answer", Type: "function", Function: aispec.FuncReturn{Name: "directly_answer", Arguments: `{"answer_payload":"progress"}`}},
+				{Index: 1, ID: "todo", Type: "function", Function: aispec.FuncReturn{Name: nativeAdjustTodolistActionName, Arguments: `{"todo_delta":{"add":[{"id":"followup","text":"Inspect the next file"}]}}`}},
+			},
+			wantNames: []string{"directly_answer", nativeAdjustTodolistActionName},
+		},
+		{
+			name: "standalone empty adjustment is a no-op",
+			calls: []*aispec.ToolCall{
+				{Index: 0, ID: "todo", Type: "function", Function: aispec.FuncReturn{Name: nativeAdjustTodolistActionName, Arguments: `{"todo_delta":{}}`}},
+			},
+			wantNames: []string{nativeAdjustTodolistActionName},
+		},
+		{
+			name: "later adjustment may target earlier addition",
+			calls: []*aispec.ToolCall{
+				{Index: 0, ID: "todo_add", Type: "function", Function: aispec.FuncReturn{Name: nativeAdjustTodolistActionName, Arguments: `{"todo_delta":{"add":[{"id":"followup","text":"Inspect the next file"}]}}`}},
+				{Index: 1, ID: "todo_focus", Type: "function", Function: aispec.FuncReturn{Name: nativeAdjustTodolistActionName, Arguments: `{"todo_delta":{"current":"followup"}}`}},
+			},
+			wantNames: []string{nativeAdjustTodolistActionName, nativeAdjustTodolistActionName},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			loop := newCallAILoopTransactionTestLoop(t, true, func(_ *aicommon.AIRequest, cfg *aispec.AIConfig) (*aicommon.AIResponse, error) {
+				resp := aicommon.NewAIResponse(nil)
+				cfg.ToolCallCallback(tc.calls)
+				cfg.FinishReasonCallback("tool_calls", []byte(`{"finish_reason":"tool_calls"}`))
+				resp.Close()
+				return resp, nil
+			})
+			loop.SetCurrentTask(newMockSimpleTask("native-todo", "1"))
+			loop.Set(loopVarDirectlyAnswerDeliveredWithoutTodoDelta, true)
+			loop.actions.Set(nativeAdjustTodolistActionName, loopAction_AdjustTodolistNative)
+			loop.actions.Set("directly_answer", &LoopAction{ActionType: "directly_answer", ActionVerifier: RejectDuplicateDirectlyAnswerWithoutTodoDelta})
+			calls, _, _, err := loop.callAILoopTransaction(&sync.WaitGroup{}, "prompt", "nonce", nil,
+				drain, func(_, _ string, description, arguments io.Reader) { drain(description, arguments) })
+			require.NoError(t, err)
+			require.Len(t, calls, len(tc.wantNames))
+			for index, wantName := range tc.wantNames {
+				require.Equal(t, wantName, calls[index].Action.Name())
+			}
+			if tc.name == "later adjustment may target earlier addition" {
+				delta, parseErr := aicommon.NormalizeTodoDelta(calls[1].Action)
+				require.NoError(t, parseErr)
+				require.NotNil(t, delta)
+			}
+			require.Nil(t, loop.GetVariable(loopVarNativeTodoBatchAdjusted), "provisional batch state must not leak into another response")
+		})
+	}
+}
+
 func TestLoopToolCallCollectorReusedIndexKeepsCallsByID(t *testing.T) {
 	streamed := make(map[string]string)
 	var mu sync.Mutex
