@@ -1,0 +1,5 @@
+{{ if .OriginalUserInput }}# 完整任务输入
+{{ .OriginalUserInput }}
+{{ end }}{{ if .PromotedSemiDynamic1 }}# 稳定时间线上下文
+{{ .PromotedSemiDynamic1 }}
+{{ end }}

@@ -1,0 +1,9 @@
+# 已选业务工具
+名称: {{ .ToolName }}
+说明: {{ .ToolDescription }}
+{{ if .ToolUsage }}用法: {{ .ToolUsage }}
+{{ end }}
+参数 Schema（仅约束 `submit_tool_params.arguments.params`，不是另一项可调用工具）：
+```jsonschema
+{{ .ToolInputSchema }}
+```
