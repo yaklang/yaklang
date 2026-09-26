@@ -32,6 +32,13 @@ type File struct {
 	SHA256       string `json:"sha256"`
 }
 
+type MaterialReference struct {
+	ResourceID   string   `json:"resource_id"`
+	RelativePath string   `json:"relative_path"`
+	SHA256       string   `json:"sha256"`
+	Operations   []string `json:"operations"`
+}
+
 func (w *Workspace) Files() []File {
 	files := make([]File, 0, len(w.manifest.Resources))
 	for _, resource := range w.manifest.Resources {
@@ -94,6 +101,7 @@ func (w *Workspace) List(ctx context.Context, selection string) (map[string]any,
 		if selected(resource.RelativePath, selection) {
 			files = append(files, map[string]any{"path": resource.RelativePath, "relative_path": resource.RelativePath,
 				"resource_id": resource.ResourceId, "size": resource.SizeBytes, "size_bytes": resource.SizeBytes, "sha256": resource.Sha256})
+			w.event("input.file.access", Event{ResourceID: resource.ResourceId, Path: resource.RelativePath, Operation: "metadata"})
 		}
 	}
 	return map[string]any{"path": selection, "files": files, "count": len(files), "truncated": false}, nil
@@ -161,11 +169,20 @@ func (w *Workspace) Read(ctx context.Context, name string, offset, limit int64) 
 		return nil, err
 	}
 	readBytes := int64(len(content))
-	w.event("input.file.access", Event{ResourceID: resource.ResourceId, Path: name, Operation: "read", Offset: offset, EndOffset: offset + readBytes, BytesRead: readBytes})
 	// A page boundary may split a UTF-8 sequence. Trim at most three trailing
 	// bytes and return next_offset so callers can continue without losing data.
-	for i := 0; i < 3 && !utf8.Valid(content) && len(content) > 0; i++ {
-		content = content[:len(content)-1]
+	for validBytes := 0; validBytes < len(content); {
+		_, width := utf8.DecodeRune(content[validBytes:])
+		if width == 1 && content[validBytes] >= utf8.RuneSelf {
+			// Only an incomplete rune at a non-EOF page boundary can be
+			// omitted. Invalid bytes or a truncated rune at EOF are not text.
+			if uint64(offset+readBytes) >= resource.SizeBytes || utf8.FullRune(content[validBytes:]) {
+				return nil, fail("input_text_required", resource.ResourceId)
+			}
+			content = content[:validBytes]
+			break
+		}
+		validBytes += width
 	}
 	if len(content) == 0 && readBytes > 0 {
 		return nil, fail("input_range_invalid", resource.ResourceId)
@@ -174,6 +191,7 @@ func (w *Workspace) Read(ctx context.Context, name string, offset, limit int64) 
 		return nil, fail("input_text_required", resource.ResourceId)
 	}
 	sum := sha256.Sum256(content)
+	w.event("input.file.access", Event{ResourceID: resource.ResourceId, Path: name, Operation: "read", Offset: offset, EndOffset: offset + int64(len(content)), BytesRead: readBytes})
 	return map[string]any{"path": name, "resource_id": resource.ResourceId, "offset": offset,
 		"next_offset": offset + int64(len(content)), "content": string(content), "read_bytes": len(content),
 		"file_size": resource.SizeBytes, "sha256": hex.EncodeToString(sum[:]),

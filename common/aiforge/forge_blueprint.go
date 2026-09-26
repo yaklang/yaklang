@@ -6,8 +6,10 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"strings"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
+	"github.com/yaklang/yaklang/common/ai/aispec"
 
 	"github.com/yaklang/yaklang/common/ai/aid"
 
@@ -40,6 +42,10 @@ type ForgeBlueprint struct {
 	// ResultPrompt 是AI助手生成结果时使用的提示词，用于设置AI的输出格式和内容
 	ResultPrompt  string
 	ResultHandler func(string, error)
+
+	// ResultPolicy is opt-in; its zero value preserves caller model settings
+	// and the legacy single-request result behavior.
+	ResultPolicy ForgeResultPolicy
 
 	// Tools 是AI助手可以使用的工具列表，这些工具可以扩展AI的能力
 	Tools []*aitool.Tool
@@ -127,6 +133,23 @@ func WithInitializePrompt(prompt string) Option {
 func WithResultPrompt(prompt string) Option {
 	return func(f *ForgeBlueprint) {
 		f.ResultPrompt = prompt
+	}
+}
+
+// ForgeResultPolicy controls only the final result request of a Blueprint.
+// The zero value preserves the caller's model configuration and does not retry.
+type ForgeResultPolicy struct {
+	// MaxTokens overrides the result request budget only when positive.
+	MaxTokens int64
+	// RetryEmptyOutput permits one additional request when the model produces
+	// no final output. The retry retains the original output format instructions.
+	RetryEmptyOutput bool
+}
+
+// WithResultPolicy explicitly selects result generation behavior for a caller.
+func WithResultPolicy(policy ForgeResultPolicy) Option {
+	return func(f *ForgeBlueprint) {
+		f.ResultPolicy = policy
 	}
 }
 
@@ -279,19 +302,8 @@ func (f *ForgeBlueprint) GenerateFirstPromptWithMemoryOption(
 				f.ResultHandler("", utils.Errorf("render result prompt failed: %v", err))
 				return
 			}
-			config := cod.Config
-			rsp, err := config.CallAI(aicommon.NewAIRequest(prompt, aicommon.WithAIRequest_CallerLabel("forge-blueprint")))
-			if err != nil {
-				f.ResultHandler("", utils.Errorf("render result failed: %v", err))
-				return
-			}
-			rspReader := rsp.GetOutputStreamReader("forge", true, config.GetEmitter())
-			raw, err := io.ReadAll(rspReader)
-			if err == io.EOF {
-				f.ResultHandler(string(raw), nil)
-			} else {
-				f.ResultHandler(string(raw), err)
-			}
+			result, err := f.generateResult(cod, prompt)
+			f.ResultHandler(result, err)
 		}))
 	}
 
@@ -308,6 +320,44 @@ func (f *ForgeBlueprint) GenerateFirstPromptWithMemoryOptionWithQuery(
 		},
 	}
 	return f.GenerateFirstPromptWithMemoryOption(params)
+}
+
+func (f *ForgeBlueprint) GenerateFirstPromptWithMemoryOptionWithQueryAndParams(
+	query string,
+	params []*ypb.ExecParamItem,
+) (string, []aicommon.ConfigOption, error) {
+	initPrompt, err := f.renderInitPromptWithValidatedParams(query, params)
+	if err != nil {
+		return "", nil, utils.Errorf("render init prompt failed: %v", err)
+	}
+	persistentPrompt, err := f.renderPersistentPrompt(query)
+	if err != nil {
+		return "", nil, utils.Errorf("render persistent prompt failed: %v", err)
+	}
+
+	var opts []aicommon.ConfigOption
+	if persistentPrompt != "" {
+		opts = append(opts, aicommon.WithAppendPersistentContext(persistentPrompt))
+	}
+	if len(f.Tools) > 0 {
+		opts = append(opts, aicommon.WithTools(f.Tools...))
+	}
+	if f.PlanMocker != nil {
+		opts = append(opts, aid.WithPlanMocker(f.PlanMocker))
+	}
+	opts = append(opts, f.AIOptions...)
+	if f.ResultPrompt != "" && f.ResultHandler != nil {
+		opts = append(opts, aid.WithResultHandler(func(cod *aid.Coordinator) {
+			prompt, renderErr := f.renderValidatedResultPrompt(cod.ContextProvider)
+			if renderErr != nil {
+				f.ResultHandler("", utils.Errorf("render result prompt failed: %v", renderErr))
+				return
+			}
+			result, err := f.generateResult(cod, prompt)
+			f.ResultHandler(result, err)
+		}))
+	}
+	return initPrompt, opts, nil
 }
 
 func cliParam2grpc(params []*information.CliParameter) []*ypb.YakScriptParam {
@@ -374,4 +424,46 @@ type PluginParamSelectData struct {
 	Key   string `json:"key"`
 	Label string `json:"label"`
 	Value string `json:"value"`
+}
+
+func (f *ForgeBlueprint) generateResult(cod *aid.Coordinator, prompt string) (string, error) {
+	config := cod.Config
+	call := func(requestPrompt string) (string, error) {
+		requestOptions := []aicommon.AIRequestOption{
+			aicommon.WithAIRequest_CallerLabel("forge-blueprint"),
+		}
+		if f.ResultPolicy.MaxTokens > 0 {
+			requestOptions = append(requestOptions,
+				aicommon.WithAIRequest_ExtraSpecOpts(aispec.WithMaxTokens(f.ResultPolicy.MaxTokens)))
+		}
+		rsp, err := config.CallAI(aicommon.NewAIRequest(requestPrompt, requestOptions...))
+		if err != nil {
+			return "", utils.Errorf("render result failed: %v", err)
+		}
+		raw, err := io.ReadAll(rsp.GetOutputStreamReader("forge", true, config.GetEmitter()))
+		if err != nil && err != io.EOF {
+			return "", err
+		}
+		return string(raw), nil
+	}
+	if f.ResultPolicy.RetryEmptyOutput {
+		return retryEmptyForgeResult(prompt, call)
+	}
+	return call(prompt)
+}
+
+// A caller can opt into one retry when a model consumes its entire response in
+// the reasoning channel. Never publish the reasoning text as the final result.
+func retryEmptyForgeResult(prompt string, call func(string) (string, error)) (string, error) {
+	for attempt := 0; attempt < 2; attempt++ {
+		result, err := call(prompt)
+		if err != nil {
+			return "", err
+		}
+		if strings.TrimSpace(result) != "" {
+			return result, nil
+		}
+		prompt += "\n\n上一轮未生成可交付的正文。请在最终输出通道直接给出完整结果，并严格遵守原始指令要求的输出格式；不要只在思考内容中写结果。"
+	}
+	return "", utils.Errorf("forge result model returned empty final output after retry")
 }

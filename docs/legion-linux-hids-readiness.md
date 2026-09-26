@@ -19,6 +19,16 @@ This document describes how to build, validate, and operate the current Legion H
 
 Operational implication: a build that advertises `hids` must still be scheduled to Linux hosts only. Building with `-tags hids` on macOS or Windows advertises the capability key, but the runtime cannot start there.
 
+### Imported Skill runtime support
+
+The Node and AI session Runtime manifests include `ai.skill_bundle.v1`
+when built from this implementation. Only the stateless AI session runtime
+advertises this capability at runtime; stateful rollback mode removes it
+even when it is supplied through manifest or explicit capability metadata.
+Legion must require the capability before binding or recovering a session
+with an imported Skill. An older engine remains enrollable, but must not
+accept a Skill session by silently ignoring its context bundle.
+
 ## Build Commands
 
 Use the root `Taskfile.yml` tasks added for Legion HIDS work:

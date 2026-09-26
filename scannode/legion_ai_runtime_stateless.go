@@ -72,6 +72,7 @@ type statelessAITurn struct {
 	engine         statelessTurnEngine
 	turnID         string
 	directForge    bool
+	forgeRelease   *aiv1.ContextForgeRelease
 	focusSingleRun bool
 	focusReleaseID string
 	focusRuntime   *legionServerFocusRuntime
@@ -198,8 +199,45 @@ func (h *statelessAIEngineRuntimeHandle) SendInput(ctx context.Context, input ai
 	}
 
 	var contextFocusRelease *aiv1.ContextFocusRelease
+	var contextForgeRelease *aiv1.ContextForgeRelease
+	var contextSkillBundles []*aiv1.ContextSkillBundle
 	if input.ContextPackage != nil {
 		contextFocusRelease = input.ContextPackage.GetFocusRelease()
+		contextForgeRelease = input.ContextPackage.GetForgeRelease()
+		contextSkillBundles = input.ContextPackage.GetSkillBundles()
+	}
+	if contextFocusRelease != nil && contextForgeRelease != nil {
+		return fmt.Errorf("stateless sendinput: Turn cannot pin both Focus and Forge releases")
+	}
+	if len(contextSkillBundles) > 1 {
+		return fmt.Errorf("stateless sendinput: Turn supports at most one Skill bundle")
+	}
+	if len(contextSkillBundles) != 0 {
+		if contextFocusRelease != nil || contextForgeRelease != nil || strings.TrimSpace(h.runtime.ForgeName) != "" || h.authorizedFocusReleaseID != "" {
+			return fmt.Errorf("stateless sendinput: Skill bundle cannot be combined with Focus or Forge execution")
+		}
+		skillFS, err := contextSkillBundleFS(contextSkillBundles[0], h.binding.Ref.OwnerUserID)
+		if err != nil {
+			return fmt.Errorf("stateless sendinput: %w", err)
+		}
+		// Extend the existing option slice. WithExtOptions replaces it and would
+		// silently discard the provider/session settings cached at Bind.
+		options = append(options, func(config *aiengine.AIEngineConfig) {
+			config.ExtOptions = append(config.ExtOptions,
+				aicommon.WithDisableAutoSkills(true),
+				aicommon.WithSkillsFS(skillFS),
+			)
+		})
+	}
+	if contextForgeRelease != nil {
+		if strings.TrimSpace(h.runtime.ForgeName) != "" {
+			return fmt.Errorf("stateless sendinput: immutable Forge release cannot be combined with node-local Forge lookup")
+		}
+		if err := validateContextForgeRelease(contextForgeRelease); err != nil {
+			return fmt.Errorf("stateless sendinput: %w", err)
+		}
+	} else if strings.TrimSpace(h.runtime.AITaskRunID) != "" && strings.TrimSpace(h.runtime.ForgeName) != "" {
+		return fmt.Errorf("stateless sendinput: Professional Task Forge execution requires an immutable Forge release")
 	}
 	if h.authorizedFocusReleaseID != "" {
 		if contextFocusRelease == nil {
@@ -256,7 +294,7 @@ func (h *statelessAIEngineRuntimeHandle) SendInput(ctx context.Context, input ai
 		h.mu.Unlock()
 		return fmt.Errorf("stateless sendinput: new engine returned nil")
 	}
-	directForge := !h.forgeStarted && strings.TrimSpace(h.runtime.ForgeName) != ""
+	directForge := !h.forgeStarted && (contextForgeRelease != nil || strings.TrimSpace(h.runtime.ForgeName) != "")
 	if directForge {
 		h.forgeStarted = true
 	}
@@ -264,6 +302,7 @@ func (h *statelessAIEngineRuntimeHandle) SendInput(ctx context.Context, input ai
 		engine:         engine,
 		turnID:         strings.TrimSpace(input.Ref.CommandID),
 		directForge:    directForge,
+		forgeRelease:   contextForgeRelease,
 		focusSingleRun: runtimeFocusName != "" && strings.EqualFold(strings.TrimSpace(h.binding.ExecutionMode), "single_run"),
 		focusReleaseID: strings.TrimSpace(contextFocusRelease.GetReleaseId()),
 		focusRuntime:   focusRuntime,
@@ -546,6 +585,7 @@ func (h *statelessAIEngineRuntimeHandle) runTurn(
 			turn.forgeInput,
 			h.emitter,
 			userInput,
+			turn.forgeRelease,
 		)
 	} else {
 		err = turn.engine.SendMsg(userInput, options...)

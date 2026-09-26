@@ -1082,12 +1082,22 @@ func FunctionCall(input string, funcs any, opts ...aispec.AIConfigOption) (map[s
 }
 
 func LoadChater(name string, defaultOpts ...aispec.AIConfigOption) (aispec.GeneralChatter, error) {
-	gateway, ok := aispec.Lookup(name)
+	_, ok := aispec.Lookup(name)
 	if !ok {
 		return nil, errors.New("not found valid ai chatter type: " + name)
 	}
 	return func(msg string, opts ...aispec.AIConfigOption) (string, error) {
-		gateway.LoadOption(append(defaultOpts, append([]aispec.AIConfigOption{aispec.WithType(name)}, opts...)...)...)
+		// One chatter can serve overlapping execution and verification calls.
+		// A gateway holds mutable options and callbacks, so it must be per-call.
+		gateway, ok := aispec.Lookup(name)
+		if !ok {
+			return "", errors.New("not found valid ai chatter type: " + name)
+		}
+		callOpts := make([]aispec.AIConfigOption, 0, len(defaultOpts)+1+len(opts))
+		callOpts = append(callOpts, defaultOpts...)
+		callOpts = append(callOpts, aispec.WithType(name))
+		callOpts = append(callOpts, opts...)
+		gateway.LoadOption(callOpts...)
 		if err := gateway.CheckValid(); err != nil {
 			log.Warnf("check valid by %s failed: %s", name, err)
 			return "", err

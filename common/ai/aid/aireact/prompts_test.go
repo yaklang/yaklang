@@ -357,6 +357,7 @@ func TestPromptManager_GenerateToolParamsPromptWithMeta_UsesPromptSections(t *te
 		"<|TOOL_PARAM_path_"+result.Nonce+"|>",
 		`"tool":"query-file"`,
 		"每次响应必须独立提供所有必填参数",
+		"不要把标签或整块内容写进 JSON 字符串",
 		"<|TOOL_PARAM_script_CURRENT_NONCE|>",
 	) {
 		t.Fatalf("tool params prompt should be composed by prompt sections. Got:\n%s", prompt)

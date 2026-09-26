@@ -3,6 +3,7 @@ package node
 import (
 	"context"
 	"errors"
+	"net"
 	"strings"
 	"sync"
 	"time"
@@ -241,25 +242,49 @@ func (n *NodeBase) runDaemonLoop() {
 	defer heartbeatTicker.Stop()
 	defer tickerLoop.Stop()
 
+	consecutiveTimeouts := 0
 	for {
 		select {
 		case <-n.rootCtx.Done():
 			return
 		case <-heartbeatTicker.C:
-			if err := n.heartbeat(); err != nil {
-				n.logHeartbeatFailure(err)
-				n.clearSession()
-				if err := n.ensureSession(); err != nil {
-					if !errors.Is(err, context.Canceled) {
-						log.Errorf("re-establish node session failed: %v", err)
-					}
-					return
+			err := n.heartbeat()
+			if err == nil {
+				consecutiveTimeouts = 0
+				continue
+			}
+			if n.rootCtx.Err() != nil {
+				return
+			}
+			// A single timed-out request does not prove the server retired the
+			// node session. Keep its identity for one more heartbeat so active
+			// jobs are not interrupted by a transient control-plane delay.
+			if isHeartbeatTimeout(err) && consecutiveTimeouts == 0 {
+				consecutiveTimeouts = 1
+				log.Warnf("node heartbeat timed out; retrying existing session: node_id=%s err=%v", n.CurrentNodeID(), err)
+				continue
+			}
+			consecutiveTimeouts = 0
+			n.logHeartbeatFailure(err)
+			n.clearSession()
+			if err := n.ensureSession(); err != nil {
+				if !errors.Is(err, context.Canceled) {
+					log.Errorf("re-establish node session failed: %v", err)
 				}
+				return
 			}
 		case <-tickerLoop.C:
 			n.runTickerFuncs()
 		}
 	}
+}
+
+func isHeartbeatTimeout(err error) bool {
+	if errors.Is(err, context.DeadlineExceeded) {
+		return true
+	}
+	var networkErr net.Error
+	return errors.As(err, &networkErr) && networkErr.Timeout()
 }
 
 func (n *NodeBase) GetToken() string {

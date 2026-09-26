@@ -2,6 +2,7 @@ package scannode
 
 import (
 	"context"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -25,10 +26,12 @@ import (
 
 func inputBindingIdentity(command *aiv1.BindAISessionCommand) (inputresolver.Identity, error) {
 	var options struct {
-		TaskRunID  string          `json:"ai_task_run_id"`
-		TaskRole   string          `json:"ai_task_session_role"`
-		ManifestID string          `json:"input_manifest_id"`
-		Manifest   json.RawMessage `json:"input_manifest"`
+		TaskRunID            string          `json:"ai_task_run_id"`
+		TaskRole             string          `json:"ai_task_session_role"`
+		ApplicationAttempt   string          `json:"ai_application_attempt_id"`
+		ManifestID           string          `json:"input_manifest_id"`
+		Manifest             json.RawMessage `json:"input_manifest"`
+		ForgeReleaseSnapshot json.RawMessage `json:"forge_release_snapshot"`
 	}
 	if len(command.GetRuntimeOptionSnapshotJson()) > 0 {
 		if err := json.Unmarshal(command.GetRuntimeOptionSnapshotJson(), &options); err != nil {
@@ -46,8 +49,12 @@ func inputBindingIdentity(command *aiv1.BindAISessionCommand) (inputresolver.Ide
 		(options.TaskRole != "" && options.TaskRole != "execution") || (options.TaskRole == "execution" && options.TaskRunID == "") {
 		return inputresolver.Identity{}, &inputresolver.Error{Code: "input_identity_mismatch"}
 	}
+	attemptID := command.GetResultContext().GetJob().GetAttemptId()
+	if attemptID == "" {
+		attemptID = strings.TrimSpace(options.ApplicationAttempt)
+	}
 	return inputresolver.Identity{OwnerUserID: command.GetOwnerUserId(), SessionID: command.GetSession().GetSessionId(),
-		AttemptID: command.GetResultContext().GetJob().GetAttemptId(), RunID: options.TaskRunID}, nil
+		AttemptID: attemptID, RunID: options.TaskRunID}, nil
 }
 
 func validateInputWorkspaceBind(command *aiv1.BindAISessionCommand) error {
@@ -69,6 +76,18 @@ func validateInputWorkspaceBind(command *aiv1.BindAISessionCommand) error {
 		len(options.SessionMCPServers) > 0 || len(options.EnabledCapabilities) > 0 ||
 		(options.EnableSystemFileSystemOperator != nil && *options.EnableSystemFileSystemOperator) {
 		return &inputresolver.Error{Code: "input_runtime_policy_unsupported"}
+	}
+	if options.ApplicationAttemptID != "" {
+		checksum, checksumErr := hex.DecodeString(options.AITaskDefinitionChecksum)
+		// The release itself arrives in the immutable turn ContextPackage, not
+		// the opaque bind options. Bind only its authorized input identity here;
+		// native Forge execution validates the release before using the workspace.
+		if command.GetResultContext() != nil || options.AITaskSessionRole != "execution" ||
+			!strings.HasPrefix(options.AITaskKey, "forge:") || len(options.AITaskKey) <= len("forge:") ||
+			options.AITaskVersion == "" || checksumErr != nil || len(checksum) != 32 {
+			return &inputresolver.Error{Code: "input_runtime_policy_unsupported"}
+		}
+		return nil
 	}
 	if command.GetResultContext() == nil || command.GetResultContext().GetFocusReleaseId() == "" ||
 		command.GetResultContext().GetExecutionMode() != "single_run" {

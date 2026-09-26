@@ -226,6 +226,7 @@ func (c *YakForgeBlueprintConfig) Build() (*ForgeBlueprint, error) {
 				log.Errorf("Failed to get result: %v", err)
 				return
 			}
+			config.ForgeResult.Formated = s
 			actions := strings.Split(config.Actions, ",")
 			var actionName string
 			var alias []string

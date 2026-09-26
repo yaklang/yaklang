@@ -186,7 +186,8 @@ func WrapDirectlyAnswerError(loop *ReActLoop, err error) error {
 	return utils.Wrapf(err,
 		"AITAG retry hint: previous response missed answer_payload AND FINAL_ANSWER tag. "+
 			"For long/multi-line/markdown answers, you MUST emit AITAG block instead of "+
-			"answer_payload. Example:\n"+
+			"answer_payload. evidence_content and todo_delta are internal fields; they do not deliver an answer. "+
+			"Do not leave the final answer empty. Example:\n"+
 			`{"@action":"directly_answer"}`+"\n"+
 			"<|FINAL_ANSWER_%s|>\n"+
 			"# your markdown answer here\n"+

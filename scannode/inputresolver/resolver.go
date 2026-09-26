@@ -12,6 +12,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -205,6 +206,8 @@ type Workspace struct {
 	mu          sync.RWMutex
 	closed      bool
 	outputBytes uint64
+	accessMu    sync.Mutex
+	accessed    map[string]map[string]struct{}
 	cleanupOnce sync.Once
 	cleanupErr  error
 }
@@ -254,6 +257,17 @@ func (r *Resolver) Prepare(ctx context.Context, manifest *aiv1.InputManifest, id
 }
 
 func (w *Workspace) event(name string, event Event) {
+	if name == "input.file.access" && event.ResourceID != "" && event.Operation != "" {
+		w.accessMu.Lock()
+		if w.accessed == nil {
+			w.accessed = make(map[string]map[string]struct{})
+		}
+		if w.accessed[event.ResourceID] == nil {
+			w.accessed[event.ResourceID] = make(map[string]struct{})
+		}
+		w.accessed[event.ResourceID][event.Operation] = struct{}{}
+		w.accessMu.Unlock()
+	}
 	if w.emit == nil {
 		return
 	}
@@ -261,6 +275,34 @@ func (w *Workspace) event(name string, event Event) {
 	event.SessionID = w.manifest.SessionId
 	event.WorkspaceID, event.ManifestID = w.manifest.WorkspaceId, w.manifest.ManifestId
 	w.emit(name, event)
+}
+
+// MaterialReferences returns only resources that were actually touched by a
+// managed input tool. It is safe for persisted result provenance: paths are
+// manifest-relative and never expose the run-local host directory.
+func (w *Workspace) MaterialReferences() []MaterialReference {
+	if w == nil || w.manifest == nil {
+		return nil
+	}
+	w.accessMu.Lock()
+	defer w.accessMu.Unlock()
+	result := make([]MaterialReference, 0, len(w.accessed))
+	for _, resource := range w.manifest.Resources {
+		operations := w.accessed[resource.GetResourceId()]
+		if len(operations) == 0 {
+			continue
+		}
+		names := make([]string, 0, len(operations))
+		for operation := range operations {
+			names = append(names, operation)
+		}
+		sort.Strings(names)
+		result = append(result, MaterialReference{
+			ResourceID: resource.GetResourceId(), RelativePath: resource.GetRelativePath(),
+			SHA256: resource.GetSha256(), Operations: names,
+		})
+	}
+	return result
 }
 
 func (w *Workspace) failure(err error) {

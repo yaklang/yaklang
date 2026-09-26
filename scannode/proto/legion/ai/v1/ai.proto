@@ -81,6 +81,8 @@ message ContextPackage {
   bytes provider_policy_snapshot_json = 7;    // model provider config (API key, base URL, headers)
   bytes runtime_option_snapshot_json = 8;     // temperature, max_tokens, etc.
   ContextFocusRelease focus_release = 9;      // immutable server-published Yak Focus release selected for this Turn
+  ContextForgeRelease forge_release = 10;     // immutable server-published config Forge release selected for this Turn
+  repeated ContextSkillBundle skill_bundles = 11; // authorized SkillMD ZIPs for this Turn; at most one
 }
 
 // ContextMessage is one replayed conversation turn. Only user inputs and
@@ -2085,6 +2087,47 @@ message ContextFocusRelease {
   string execution_contract_json = 9; // checksummed engine capability/stage/result contract
 }
 
+message ContextForgeParameter {
+  string key = 1;
+  string value = 2;
+  string value_kind = 3; // string | text | resource
+}
+
+// ContextForgeRelease carries the exact immutable config Forge definition
+// selected by Legion. Scan Node verifies sha256 before execution and builds a
+// Blueprint directly from these fields. It must never resolve a same-name
+// Forge from the node-local database or execute parameter_rule_yaklang_code.
+message ContextForgeTool {
+  string tool_id = 1;
+  string name = 2;
+  string description = 3;
+  string code = 4;
+  bytes params_json = 5;
+  string sha256 = 6;
+  string owner_user_id = 7;
+}
+
+message ContextForgeRelease {
+  string schema_version = 1; // legion.ai-forge-release/v1
+  string release_id = 2;
+  string forge_id = 3;
+  string version = 4;
+  string name = 5;
+  string sha256 = 6;
+  string executor_kind = 7; // config_forge_v1
+  string capability_profile = 8; // advisory.v1 | report.v1 | http_assessment.v1
+  string init_prompt = 9;
+  string persistent_prompt = 10;
+  string plan_prompt = 11;
+  string result_prompt = 12;
+  string parameter_rule_yaklang_code = 13; // parse-only CLI declarations
+  repeated ContextForgeParameter parameters = 14;
+  repeated string declared_tool_names = 15;
+  bytes input_schema_json = 16;
+  string definition_sha256 = 17;
+  repeated ContextForgeTool tool_snapshots = 18;
+}
+
 // InputManifest pins authorized managed resources for one execution attempt.
 // It never carries download URLs, object-store locators or credentials.
 message InputManifest {
@@ -2116,4 +2159,14 @@ message InputResource {
   string media_type = 8;
   bool required = 9;
   bool read_only = 10;
+}
+
+// ContextSkillBundle carries a server-authorized SkillMD archive for one Turn.
+// It is separate from executable config Forge releases and grants no tools.
+message ContextSkillBundle {
+  string forge_id = 1;
+  string owner_user_id = 2; // authorized session owner, including system-scoped skills
+  string name = 3;
+  bytes archive_zip = 4;
+  string sha256 = 5; // lowercase SHA-256 of archive_zip
 }
