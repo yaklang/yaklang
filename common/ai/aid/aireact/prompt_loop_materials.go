@@ -1134,12 +1134,9 @@ func renderToolInventoryBlock(materials *reactloops.PromptPrefixMaterials) strin
 	var lines []string
 	if materials.FunctionCallMode {
 		lines = append(lines,
-			"# Tool Inventory — 下层业务工具目录",
-			"本段只给出业务工具的名称和简介，不提供完整参数 Schema，也不是原生 function 列表。`tool_calls[].function.name` 只能选请求中声明的 action；目录项名称只能放在 action 参数中。",
-			"优先查看 `CACHE_TOOL_CALL` 中近期工具的参数 Schema：",
-			"- 已获得该工具的完整参数 Schema，且能按它填齐本次参数：使用 `directly_call_tool`，将名称填入 `arguments.directly_call_tool_name`，参数填入 `arguments.directly_call_tool_params`。",
-			"- 尚未获得完整 Schema 或对参数不确定：使用 `require_tool`，将名称填入 `arguments.tool_require_payload`，由运行时读取工具定义并生成参数。",
-			"- 已使用工具的 Schema 可进入近期缓存供后续直调；缓存未命中不等于禁止直调，已有可靠完整 Schema 的已启用工具仍会由运行时校验并尝试执行。",
+			"# Tool Inventory — 业务工具目录",
+			"用法：下列仅是工具名称和简介，不含完整参数 Schema；原生 `tool_calls[].function.name` 只能选已声明的 action，目录名称要填在 action 参数中。",
+			"完整 Schema 已知（优先查 `CACHE_TOOL_CALL`）→ `directly_call_tool`：`directly_call_tool_name`=名称、`directly_call_tool_params`=参数；否则 → `require_tool`：`tool_require_payload`=名称，由运行时生成参数。缓存未命中但已知完整 Schema 时仍可直调，由运行时校验。",
 		)
 	} else {
 		lines = append(lines,
@@ -1163,11 +1160,7 @@ func renderToolInventoryBlock(materials *reactloops.PromptPrefixMaterials) strin
 		if tool == nil {
 			continue
 		}
-		if materials.FunctionCallMode {
-			lines = append(lines, fmt.Sprintf("* `require_tool.tool_require_payload` / `directly_call_tool.directly_call_tool_name` = `%s`: %s", tool.Name, tool.Description))
-		} else {
-			lines = append(lines, fmt.Sprintf("* `%s`: %s", tool.Name, tool.Description))
-		}
+		lines = append(lines, fmt.Sprintf("* `%s`: %s", tool.Name, tool.Description))
 	}
 	lines = append(lines,
 		"",
