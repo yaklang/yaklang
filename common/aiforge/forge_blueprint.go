@@ -43,6 +43,10 @@ type ForgeBlueprint struct {
 	ResultPrompt  string
 	ResultHandler func(string, error)
 
+	// ResultPolicy is opt-in; its zero value preserves caller model settings
+	// and the legacy single-request result behavior.
+	ResultPolicy ForgeResultPolicy
+
 	// Tools 是AI助手可以使用的工具列表，这些工具可以扩展AI的能力
 	Tools []*aitool.Tool
 
@@ -129,6 +133,23 @@ func WithInitializePrompt(prompt string) Option {
 func WithResultPrompt(prompt string) Option {
 	return func(f *ForgeBlueprint) {
 		f.ResultPrompt = prompt
+	}
+}
+
+// ForgeResultPolicy controls only the final result request of a Blueprint.
+// The zero value preserves the caller's model configuration and does not retry.
+type ForgeResultPolicy struct {
+	// MaxTokens overrides the result request budget only when positive.
+	MaxTokens int64
+	// RetryEmptyOutput permits one additional request when the model produces
+	// no final output. The retry retains the original output format instructions.
+	RetryEmptyOutput bool
+}
+
+// WithResultPolicy explicitly selects result generation behavior for a caller.
+func WithResultPolicy(policy ForgeResultPolicy) Option {
+	return func(f *ForgeBlueprint) {
+		f.ResultPolicy = policy
 	}
 }
 
@@ -281,7 +302,7 @@ func (f *ForgeBlueprint) GenerateFirstPromptWithMemoryOption(
 				f.ResultHandler("", utils.Errorf("render result prompt failed: %v", err))
 				return
 			}
-			result, err := generateForgeResult(cod, prompt)
+			result, err := f.generateResult(cod, prompt)
 			f.ResultHandler(result, err)
 		}))
 	}
@@ -332,7 +353,7 @@ func (f *ForgeBlueprint) GenerateFirstPromptWithMemoryOptionWithQueryAndParams(
 				f.ResultHandler("", utils.Errorf("render result prompt failed: %v", renderErr))
 				return
 			}
-			result, err := generateForgeResult(cod, prompt)
+			result, err := f.generateResult(cod, prompt)
 			f.ResultHandler(result, err)
 		}))
 	}
@@ -405,14 +426,17 @@ type PluginParamSelectData struct {
 	Value string `json:"value"`
 }
 
-// A model may consume its entire response in the reasoning channel. Retry once
-// for a deliverable final answer; never publish the reasoning text as a report.
-func generateForgeResult(cod *aid.Coordinator, prompt string) (string, error) {
+func (f *ForgeBlueprint) generateResult(cod *aid.Coordinator, prompt string) (string, error) {
 	config := cod.Config
-	return retryEmptyForgeResult(prompt, func(requestPrompt string) (string, error) {
-		rsp, err := config.CallAI(aicommon.NewAIRequest(requestPrompt,
+	call := func(requestPrompt string) (string, error) {
+		requestOptions := []aicommon.AIRequestOption{
 			aicommon.WithAIRequest_CallerLabel("forge-blueprint"),
-			aicommon.WithAIRequest_ExtraSpecOpts(aispec.WithMaxTokens(4096))))
+		}
+		if f.ResultPolicy.MaxTokens > 0 {
+			requestOptions = append(requestOptions,
+				aicommon.WithAIRequest_ExtraSpecOpts(aispec.WithMaxTokens(f.ResultPolicy.MaxTokens)))
+		}
+		rsp, err := config.CallAI(aicommon.NewAIRequest(requestPrompt, requestOptions...))
 		if err != nil {
 			return "", utils.Errorf("render result failed: %v", err)
 		}
@@ -421,9 +445,15 @@ func generateForgeResult(cod *aid.Coordinator, prompt string) (string, error) {
 			return "", err
 		}
 		return string(raw), nil
-	})
+	}
+	if f.ResultPolicy.RetryEmptyOutput {
+		return retryEmptyForgeResult(prompt, call)
+	}
+	return call(prompt)
 }
 
+// A caller can opt into one retry when a model consumes its entire response in
+// the reasoning channel. Never publish the reasoning text as the final result.
 func retryEmptyForgeResult(prompt string, call func(string) (string, error)) (string, error) {
 	for attempt := 0; attempt < 2; attempt++ {
 		result, err := call(prompt)
@@ -433,7 +463,7 @@ func retryEmptyForgeResult(prompt string, call func(string) (string, error)) (st
 		if strings.TrimSpace(result) != "" {
 			return result, nil
 		}
-		prompt += "\n\n上一轮未生成可交付的正文。请在最终输出通道直接给出完整 Markdown 报告；不要只在思考内容中写报告。"
+		prompt += "\n\n上一轮未生成可交付的正文。请在最终输出通道直接给出完整结果，并严格遵守原始指令要求的输出格式；不要只在思考内容中写结果。"
 	}
 	return "", utils.Errorf("forge result model returned empty final output after retry")
 }
