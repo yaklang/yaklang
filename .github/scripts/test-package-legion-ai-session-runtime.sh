@@ -103,6 +103,7 @@ jq -e \
     (.capabilities | index("ai.input.managed_attachment.v1")) != null and
     (.capabilities | index("ai.session.bind_epoch.v1")) != null and
     (.capabilities | index("ai.session.turn_lifecycle.v1")) != null and
+    (.capabilities | index("ai.skill_bundle.v1")) != null and
     (.capabilities | index("ai.session.runtime")) != null and
     (.capabilities | index("yak.execute")) != null and
     (.capabilities | index("ai.forge.discovery.v2")) != null and

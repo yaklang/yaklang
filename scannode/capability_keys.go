@@ -12,6 +12,7 @@ const (
 	capabilityKeySSARuleSnapshotExecutionV2 = ruleSnapshotExecutionV2
 	capabilityKeyAIBindEpochV1              = "ai.session.bind_epoch.v1"
 	capabilityKeyAITurnLifecycleV1          = "ai.session.turn_lifecycle.v1"
+	capabilityKeyAISkillBundleV1            = "ai.skill_bundle.v1"
 	capabilityKeyAIForgeReleaseV1           = "ai.forge_release.v1"
 	capabilityKeyAIForgeCustomToolsV1       = "ai.forge.custom_tools.v1"
 	capabilityKeyAIForgeEvidenceV1          = "ai.forge.evidence.v1"
@@ -37,7 +38,7 @@ func normalizeScanNodeCapabilityKeysForRuntime(input []string, runtimeMode strin
 		if trimmed == "" {
 			return
 		}
-		if (trimmed == capabilityKeyAICodeWorkspaceV1 || trimmed == capabilityKeyAIManagedInputV1 || trimmed == capabilityKeyAIForgeReleaseV1) && runtimeMode == aiSessionRuntimeModeStateful {
+		if (trimmed == capabilityKeyAICodeWorkspaceV1 || trimmed == capabilityKeyAIManagedInputV1 || trimmed == capabilityKeyAIForgeReleaseV1 || trimmed == capabilityKeyAISkillBundleV1) && runtimeMode == aiSessionRuntimeModeStateful {
 			return
 		}
 		if (trimmed == capabilityKeyAIForgeCustomToolsV1 || trimmed == capabilityKeyAIForgeEvidenceV1 || trimmed == capabilityKeyAIForgeDiscoveryV1 || trimmed == capabilityKeyAIForgeDiscoveryV2 || trimmed == capabilityKeyAIForgeHTTPAssessmentV2) && runtimeMode == aiSessionRuntimeModeStateful {
