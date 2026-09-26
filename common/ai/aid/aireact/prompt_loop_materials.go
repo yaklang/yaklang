@@ -1132,9 +1132,22 @@ func renderToolInventoryBlock(materials *reactloops.PromptPrefixMaterials) strin
 		return ""
 	}
 	var lines []string
+	if materials.FunctionCallMode {
+		lines = append(lines,
+			"# Tool Inventory — 下层业务工具目录",
+			"本段只给出业务工具的名称和简介，不提供完整参数 Schema，也不是原生 function 列表。`tool_calls[].function.name` 只能选请求中声明的 action；目录项名称只能放在 action 参数中。",
+			"优先查看 `CACHE_TOOL_CALL` 中近期工具的参数 Schema：",
+			"- 已获得该工具的完整参数 Schema，且能按它填齐本次参数：使用 `directly_call_tool`，将名称填入 `arguments.directly_call_tool_name`，参数填入 `arguments.directly_call_tool_params`。",
+			"- 尚未获得完整 Schema 或对参数不确定：使用 `require_tool`，将名称填入 `arguments.tool_require_payload`，由运行时读取工具定义并生成参数。",
+			"- 已使用工具的 Schema 可进入近期缓存供后续直调；缓存未命中不等于禁止直调，已有可靠完整 Schema 的已启用工具仍会由运行时校验并尝试执行。",
+		)
+	} else {
+		lines = append(lines,
+			"# Tool Inventory",
+			"下列是按优先级选出的可用业务工具，完整目录可按需检索。",
+		)
+	}
 	lines = append(lines,
-		"# Tool Inventory",
-		fmt.Sprintf("You have access to %d built-in tools. Below are %d prioritized entries selected within a token budget:", materials.ToolsCount, materials.TopToolsCount),
 		"",
 		"## 工具调用模式（单调用、可选并发批次或 tool_compose）",
 		"",
@@ -1150,14 +1163,16 @@ func renderToolInventoryBlock(materials *reactloops.PromptPrefixMaterials) strin
 		if tool == nil {
 			continue
 		}
-		lines = append(lines, fmt.Sprintf("* `%s`: %s", tool.Name, tool.Description))
+		if materials.FunctionCallMode {
+			lines = append(lines, fmt.Sprintf("* `require_tool.tool_require_payload` / `directly_call_tool.directly_call_tool_name` = `%s`: %s", tool.Name, tool.Description))
+		} else {
+			lines = append(lines, fmt.Sprintf("* `%s`: %s", tool.Name, tool.Description))
+		}
 	}
-	if materials.HasMoreTools {
-		lines = append(lines,
-			"",
-			fmt.Sprintf("> 还有 %d 个工具未列入上方清单. 不在列表中的工具 / AI 蓝图 / 技能 / Focus 模式, 通过 `search_capabilities` 按关键字检索后再加载使用.", materials.MoreToolsCount),
-		)
-	}
+	lines = append(lines,
+		"",
+		"> 此处为优先展示目录；完整能力范围可按需通过能力检索入口查询。",
+	)
 	return strings.Join(lines, "\n")
 }
 

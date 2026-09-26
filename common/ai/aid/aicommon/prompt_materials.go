@@ -140,6 +140,7 @@ func (m *PromptMaterials) FrozenBlockData() map[string]any {
 	}
 	return map[string]any{
 		"ForcedSkills":           m.ForcedSkills,
+		"FunctionCallMode":       m.FunctionCallMode,
 		"ToolInventory":          m.ToolInventory,
 		"ToolsCount":             m.ToolsCount,
 		"TopToolsCount":          m.TopToolsCount,

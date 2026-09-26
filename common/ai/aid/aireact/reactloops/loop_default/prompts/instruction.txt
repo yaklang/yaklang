@@ -82,7 +82,7 @@
 
 ## 3. action 使用技巧准则
 
-{{ if .FunctionCallMode }}所有 R1 action 都通过原生工具调用提交。选择工具名并填写其 `arguments`，不要输出 JSON action 文本、`<@action=...>` 标签、YAML 或外置 AITAG；这些内容不会被 function call 路径解析为 action。
+{{ if .FunctionCallMode }}所有 R1 action 都通过原生工具调用提交。`tool_calls[].function.name` 必须选择本轮请求中的 action 名；业务工具目录里的名称只能填入 `require_tool` 或 `directly_call_tool` 等 action 的 `arguments`，不能作为原生 function 名。不要输出 JSON action 文本、`<@action=...>` 标签、YAML 或外置 AITAG；这些内容不会被 function call 路径解析为 action。
 {{ else }}所有 R1 action 都必须直接输出一个使用 Schema 原始英文键名的 JSON object。严禁输出 `<@action=...>` / `<@action_end>` 标签、`标识符：` 等中文字段说明、YAML 或自然语言包装；这些格式无法被 action 解析器执行，会浪费整轮模型调用。{{ end }}
 
 R1 本轮输出 `require_tool` / `directly_call_tool` action 本身就是获得工具执行机会的方式。缺少完成任务所需的一手证据时，必须现在选择合适的工具 action；禁止回答“没有工具执行机会”“需要重发任务”或在尚未尝试工具时直接拒绝。
