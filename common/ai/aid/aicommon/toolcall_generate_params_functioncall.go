@@ -4,16 +4,26 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"sort"
 	"strings"
 	"sync"
 	"time"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/ai/aispec"
+	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 )
 
-const submitToolParamsFunctionName = "submit_tool_params"
+const SubmitToolParamsFunctionName = "submit_tool_params"
+
+// ToolParamsCallIntent distinguishes one invocation from other calls to the
+// same selected business tool. It belongs in the volatile prompt tail.
+type ToolParamsCallIntent struct {
+	Reason                string
+	DestinationIdentifier string
+	CallExpectations      string
+}
 
 // ToolParamGenerationAbandonedError means the model deliberately returned
 // ordinary content instead of calling submit_tool_params. It is terminal for
@@ -45,13 +55,30 @@ type nativeParamSubmission struct {
 	name      string
 	arguments strings.Builder
 	err       error
+	diagID    string
+	diagArgs  map[string]*strings.Builder
 }
 
 func (s *nativeParamSubmission) observe(calls []*aispec.ToolCall) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	for _, call := range calls {
-		if call == nil || s.err != nil {
+		if call == nil {
+			continue
+		}
+		if call.ID != "" {
+			s.diagID = call.ID
+		}
+		if s.diagID != "" {
+			if s.diagArgs == nil {
+				s.diagArgs = make(map[string]*strings.Builder)
+			}
+			if s.diagArgs[s.diagID] == nil {
+				s.diagArgs[s.diagID] = &strings.Builder{}
+			}
+			s.diagArgs[s.diagID].WriteString(call.Function.Arguments)
+		}
+		if s.err != nil {
 			continue
 		}
 		if s.seen && (call.Index != s.index || (call.ID != "" && s.id != "" && call.ID != s.id)) {
@@ -64,12 +91,12 @@ func (s *nativeParamSubmission) observe(calls []*aispec.ToolCall) {
 			s.id = call.ID
 		}
 		if part := call.Function.Name; part != "" {
-			if part == submitToolParamsFunctionName && strings.HasPrefix(submitToolParamsFunctionName, s.name) {
+			if part == SubmitToolParamsFunctionName && strings.HasPrefix(SubmitToolParamsFunctionName, s.name) {
 				s.name = part
 			} else {
 				s.name += part
 			}
-			if !strings.HasPrefix(submitToolParamsFunctionName, s.name) {
+			if !strings.HasPrefix(SubmitToolParamsFunctionName, s.name) {
 				s.err = fmt.Errorf("unexpected parameter submission function %q", s.name)
 			}
 		}
@@ -80,13 +107,21 @@ func (s *nativeParamSubmission) observe(calls []*aispec.ToolCall) {
 func (s *nativeParamSubmission) snapshot() (string, bool, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	var ids []string
+	for id := range s.diagArgs {
+		ids = append(ids, id)
+	}
+	sort.Strings(ids)
+	for _, id := range ids {
+		log.Warnf("R2 double-call diagnostic id=%q arguments=%q", id, s.diagArgs[id].String())
+	}
 	if s.err != nil {
 		return "", s.seen, s.err
 	}
 	if !s.seen {
 		return "", false, nil
 	}
-	if s.name != submitToolParamsFunctionName {
+	if s.name != SubmitToolParamsFunctionName {
 		return "", true, fmt.Errorf("incomplete parameter submission function %q", s.name)
 	}
 	return s.arguments.String(), true, nil
@@ -100,17 +135,13 @@ func (t *ToolCaller) functionCallGenerateParams(tool *aitool.Tool, handleError f
 		handleError(err)
 		return nil, err
 	}
-	prompt, err := t.generateFunctionCallParamsPrompt(tool, tool.Name)
+	prompt, err := t.generateFunctionCallParamsPrompt(tool, tool.Name, ToolParamsCallIntent{
+		Reason: t.reason, DestinationIdentifier: t.destinationIdentifier,
+		CallExpectations: t.callExpectations,
+	})
 	if err != nil {
 		handleError(err)
 		return nil, err
-	}
-	if t.reason != "" || t.destinationIdentifier != "" || t.callExpectations != "" {
-		intent, _ := json.Marshal(map[string]string{
-			"reason": t.reason, "identifier": t.destinationIdentifier,
-			"call_expectations": t.callExpectations,
-		})
-		prompt += "\n\nCurrent invocation intent: " + string(intent)
 	}
 
 	release := func() {}

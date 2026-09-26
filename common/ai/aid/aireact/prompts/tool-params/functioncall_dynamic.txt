@@ -1,0 +1,10 @@
+{{ if .RecentUserInput }}# 最近用户输入
+{{ .RecentUserInput }}
+{{ end }}{{ if .CallIntent }}# 本次调用意图
+{{ .CallIntent }}
+{{ end }}# 当前环境
+{{ if .CurrentTime }}时间: {{ .CurrentTime }}
+{{ end }}{{ if .OSArch }}系统: {{ .OSArch }}
+{{ end }}{{ if .WorkingDir }}工作目录: {{ .WorkingDir }}
+{{ end }}{{ if .WorkingDirGlance }}目录概览: {{ .WorkingDirGlance }}
+{{ end }}
