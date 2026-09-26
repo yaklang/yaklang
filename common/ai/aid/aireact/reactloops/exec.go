@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/yaklang/yaklang/common/ai/aid/aiprojection"
 	"io"
 	"os"
 	"path/filepath"
@@ -13,10 +14,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/yaklang/yaklang/common/schema"
-
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
-	"github.com/yaklang/yaklang/common/ai/aispec"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
@@ -338,429 +336,6 @@ func (r *ReActLoop) Execute(taskId string, ctx context.Context, userInput string
 	}
 	task.Finish(err)
 	return err
-}
-
-func (r *ReActLoop) callAITransaction(streamWg *sync.WaitGroup, prompt string, nonce string, operator *LoopActionHandlerOperator) (*aicommon.Action, *LoopAction, error) {
-	var action *aicommon.Action
-	var actionNames = r.GetAllActionNames()
-	// Bind the provider request to the immutable task that owns this
-	// transaction. ReAct.currentTask may temporarily point at a nested loop,
-	// while Stop cancels the queue-owned task context. If the request only uses
-	// the session config context, the runtime can emit a successful cancellation
-	// receipt yet continue streaming model output until the provider finishes.
-	activeTask := r.GetCurrentTask()
-	activeTaskCtx := r.config.GetContext()
-	if activeTask != nil && !utils.IsNil(activeTask.GetContext()) {
-		activeTaskCtx = activeTask.GetContext()
-	}
-
-	getNextActionType := func(a *aicommon.Action) string { //legacy support
-		return inferActionTypeFromPayload(a, r.Get("tag_final_answer"))
-	}
-
-	ctxCanceled := utils.NewBool(false)
-	currentCtxCanceled := func() bool {
-		if !utils.IsNil(activeTaskCtx) {
-			select {
-			case <-activeTaskCtx.Done():
-				ctxCanceled.SetTo(true)
-				return true
-			default:
-				return false
-			}
-		}
-		return false
-	}
-	currentCtxCanceled()
-
-	log.Infof("start to call aicommon.CallAITransaction in ReActLoop[%v]", r.loopName)
-	r.resetModelThinkingBuffer()
-	r.Set("last_ai_decision_response", "")
-	r.UserStatus(
-		"正在理解你的需求",
-		"Understanding your request",
-		aicommon.WithStatusCode("reasoning.understanding"),
-	)
-	// Build request options common to both modes
-	requestOpts := []aicommon.AIRequestOption{
-		aicommon.WithAIRequest_CallerLabel(fmt.Sprintf("react-loop:%s", r.loopName)),
-		aicommon.WithAIRequest_Context(activeTaskCtx),
-	}
-
-	// In functioncall mode, inject native tools and tool_call callback.
-	// Tool call arguments are streamed through toolCallArgumentsWriter
-	// (handled in stream.go) and merged into the output stream, so the
-	// postHandler can use the same ExtractActionFromStream path as text mode.
-	// The ToolCallCallback here is only for logging/debugging.
-	if r.functionCallMode {
-		specTools := r.buildFunctionCallTools(operator)
-		if len(specTools) > 0 {
-			requestOpts = append(requestOpts, aicommon.WithAIRequest_ExtraSpecOpts(
-				aispec.WithTools(specTools),
-				aispec.WithToolChoice("auto"),
-				aispec.WithToolCallCallback(func(toolCalls []*aispec.ToolCall) {
-					for _, tc := range toolCalls {
-						log.Debugf("functioncall: tool_call delta: %s", fmtToolCallSummary(tc))
-					}
-				}),
-			))
-			// Enable tool_call arguments streaming so the arguments flow
-			// through resp.EmitOutputStream → GetOutputStreamReader →
-			// ExtractActionFromStream, unifying the action parsing path.
-			requestOpts = append(requestOpts, aicommon.WithAIRequest_EnableToolCallArgumentsStream())
-		}
-	}
-
-	postHandler := func(resp *aicommon.AIResponse) error {
-		if ctxCanceled.IsSet() {
-			return nil
-		}
-		// The action parser can return after it has enough fields while the
-		// output stream is still draining. Capture the exact action response
-		// only after the stream finishes; assigning buf.String() immediately
-		// after ExtractActionFromStream can otherwise persist an empty or
-		// truncated action and make the replay record unusable.
-		// This also resets reasoning per concrete response, so rejected retry
-		// attempts cannot leak into the accepted replay record.
-		r.bindDecisionResponseCapture(resp)
-		boundEmitter := resp.BindEmitter(r.GetEmitter())
-		stream := resp.GetOutputStreamReader(
-			r.loopName,
-			true,
-			r.GetEmitter(),
-		)
-
-		buf := new(synchronizedResponseCapture)
-		stream = io.TeeReader(stream, buf)
-		tagOptions := r.buildActionTagOption(boundEmitter, streamWg, resp.GetTaskIndex(), nonce)
-		// The immediate assignment below is intentionally only a snapshot. Once
-		// the parser consumes EOF, replace it with the full response for
-		// diagnostics and action recovery.
-		tagOptions = append(tagOptions, aicommon.WithActionOnReaderFinished(func() {
-			r.Set("last_ai_decision_response", buf.String())
-		}))
-		streamFields := r.streamFields.Copy()
-
-		for _, i := range r.GetAllActions() {
-			for _, field := range i.StreamFields {
-				streamFields.Set(field.FieldName, field)
-			}
-		}
-		var actionErr error
-		options := append(tagOptions, aicommon.WithActionAlias(actionNames...),
-			aicommon.WithActionFieldStreamHandler(
-				streamFields.Keys(),
-				func(key string, reader io.Reader) {
-					streamWg.Add(1)
-					doneOnce := utils.NewOnce()
-					done := func() {
-						doneOnce.Do(func() {
-							log.Debugf("stream handler for field [%s] done, streamWg.Done() called", key)
-							streamWg.Done()
-						})
-					}
-
-					// Ensure done is always called even if something goes wrong
-					defer func() {
-						if rec := recover(); rec != nil {
-							log.Errorf("stream handler for field [%s] panic recovered: %v", key, rec)
-							done()
-						}
-					}()
-
-					log.Debugf("stream handler started for field [%s]", key)
-					jsonReader := utils.JSONStringReader(reader)
-
-					fieldIns, ok := streamFields.Get(key)
-					if !ok {
-						log.Warnf("stream field [%s] not found in streamFields, skipping", key)
-						done()
-						return
-					}
-
-					pr, pw := utils.NewPipe()
-					copyStartTime := time.Now()
-					go func(field *LoopStreamField) {
-						defer func() {
-							pw.Close()
-							log.Debugf("stream copy goroutine for field [%s] completed, took %v", key, time.Since(copyStartTime))
-						}()
-						if field.StreamHandler != nil {
-							field.StreamHandler(jsonReader, pw)
-							return
-						}
-						if field.Prefix != "" {
-							pw.WriteString(field.Prefix + ": ")
-						}
-						n, copyErr := io.Copy(pw, jsonReader)
-						if copyErr != nil {
-							log.Warnf("stream copy for field [%s] error: %v (copied %d bytes)", key, copyErr, n)
-						} else {
-							log.Debugf("stream copy for field [%s] success, copied %d bytes", key, n)
-						}
-					}(fieldIns)
-
-					defaultNodeId := "re-act-loop-thought"
-					if fieldIns.AINodeId != "" {
-						defaultNodeId = fieldIns.AINodeId
-					}
-					// 把字段名作为流来源记录到 VizSource，让 viz 前端能区分
-					// 这条 think/assistant 流来自 AI 响应中的哪个字段（如 human_readable_thought
-					// 还是 modify_code_reason）。不污染 ContentType，避免破坏前端按 MIME 主类型解析。
-					contentType := fieldIns.ContentType
-					preparedReader, readable, readableErr := waitReadableStream(pr)
-					if readableErr != nil {
-						log.Warnf("stream handler for field [%s] failed waiting first byte: %v", key, readableErr)
-						done()
-						return
-					}
-					if !readable {
-						log.Debugf("stream handler for field [%s] got empty stream, skipping empty emit", key)
-						done()
-						return
-					}
-
-					_, emitErr := boundEmitter.EmitStreamEventWithVizSource(
-						defaultNodeId,
-						preparedReader,
-						resp.GetTaskIndex(),
-						contentType,
-						fieldIns.FieldName,
-						fieldIns.IsSystem,
-						func() {
-							log.Debugf("stream emit callback for field [%s] triggered", key)
-							done()
-						},
-					)
-					if emitErr != nil {
-						log.Errorf("EmitStreamEvent for field [%s] failed: %v", key, emitErr)
-						done() // Ensure done is called even on error
-						return
-					}
-				}),
-		)
-
-		r.UserStatus(
-			"正在梳理思路",
-			"Organizing the next steps",
-			aicommon.WithStatusCode("reasoning.organizing"),
-		)
-		extractStart := time.Now()
-		action, actionErr = aicommon.ExtractActionFromStream(
-			activeTaskCtx,
-			stream,
-			"object",
-			options...,
-		)
-		log.Debugf("ExtractActionFromStream completed, took %v, error: %v", time.Since(extractStart), actionErr)
-		r.Set("last_ai_decision_nonce", nonce)
-
-		if actionErr != nil {
-			r.UserStatus(
-				"刚才的信息不够完整，正在重新整理",
-				"The previous response was incomplete; reorganizing it",
-				aicommon.WithStatusCode("reasoning.recovering"),
-				aicommon.WithStatusState(aicommon.StatusStateRecovering),
-			)
-			log.Errorf("ai response stream content before error: %s", buf.String())
-			if currentCtxCanceled() {
-				actionErr = utils.Wrap(actionErr, "task context canceled while parsing action")
-			}
-			return utils.Wrap(actionErr, "failed to parse action")
-		}
-		observedActionType := ""
-		admittedActionType := ""
-		if action != nil {
-			// ActionType waits until @action is admitted or parsing finishes.
-			// Read the raw observation afterwards so an unsupported value cannot
-			// race with the asynchronous parser and be mislabeled as missing.
-			admittedActionType = strings.TrimSpace(action.ActionType())
-			observedActionType = strings.TrimSpace(action.ObservedActionType())
-		}
-		actionType := getNextActionType(action)
-		if observedActionType != "" && admittedActionType == "" {
-			r.UserStatus(
-				"当前思路还不够合适，正在重新整理",
-				"The current approach needs adjustment; reorganizing it",
-				aicommon.WithStatusCode("reasoning.adjusting"),
-				aicommon.WithStatusState(aicommon.StatusStateRecovering),
-			)
-			log.Errorf("ai response stream content before error: %s", buf.String())
-			unsupportedErr := actionTypeResolutionError(
-				observedActionType,
-				actionNames,
-				"a non-empty @action or action value was parsed, but it did not exactly match any action registered in this loop",
-			)
-			if currentCtxCanceled() {
-				unsupportedErr = utils.Wrap(unsupportedErr, "task context canceled while parsing action")
-			}
-			return unsupportedErr
-		}
-		if actionType == "" {
-			r.UserStatus(
-				"正在重新确认下一步",
-				"Reconsidering the next step",
-				aicommon.WithStatusCode("reasoning.reconsidering"),
-				aicommon.WithStatusState(aicommon.StatusStateRecovering),
-			)
-			log.Errorf("ai response stream content before error: %s", buf.String())
-			missingErr := actionTypeResolutionError(
-				"",
-				actionNames,
-				"no non-empty @action or action value was found and legacy payload inference found no known action",
-			)
-			if currentCtxCanceled() {
-				missingErr = utils.Wrap(missingErr, "task context canceled while parsing action")
-			}
-			return missingErr
-		}
-		if !utils.StringArrayContains(actionNames, actionType) {
-			r.UserStatus(
-				"正在换一种方式继续",
-				"Switching to another approach",
-				aicommon.WithStatusCode("reasoning.fallback"),
-				aicommon.WithStatusState(aicommon.StatusStateRecovering),
-			)
-			return actionTypeResolutionError(
-				actionType,
-				actionNames,
-				"legacy payload inference produced an action type that has no handler in this loop",
-			)
-		}
-
-		r.UserStatus(
-			"已经找到下一步，正在准备执行",
-			"The next step is ready and being prepared",
-			aicommon.WithStatusCode("action.preparing"),
-		)
-		log.Infof("action type extracted: %s", actionType)
-
-		verifier, err := r.GetActionHandler(actionType)
-		if err != nil {
-			resolutionErr := actionTypeResolutionError(
-				actionType,
-				actionNames,
-				fmt.Sprintf("the action name was admitted but handler lookup failed: %v", err),
-			)
-			r.GetInvoker().AddToTimeline("error", resolutionErr.Error())
-			return resolutionErr
-		}
-		if utils.IsNil(verifier) {
-			return utils.Errorf("action[%s] verifier is nil", actionType)
-		}
-		// TODO validation must run first. Otherwise an invalid delta can
-		// masquerade as progress while an action verifier runs (notably the
-		// duplicate directly_answer guard), then be removed afterwards.
-		validateTodoDeltaBeforeActionVerifier(r, action)
-		if verifier.ActionVerifier != nil {
-			r.UserStatus(
-				"正在确认关键细节",
-				"Checking the important details",
-				aicommon.WithStatusCode("action.verifying"),
-			)
-			if err := verifier.ActionVerifier(r, action); err != nil {
-				return err
-			}
-		}
-		return nil
-	}
-	var transactionErr error
-	if r.useSpeedPriorityAI {
-		// Config owns execution, not just policy lookup. LiteForge runs each
-		// response through the existing streaming parser and verifier within its
-		// retry transaction; the loop never supplies an AI caller override.
-		r.config.ScheduleAuxiliaryTask(activeTaskCtx, fmt.Sprintf("react-loop:%s", r.loopName),
-			func() string { return prompt },
-			func(accepted *aicommon.Action) { action = accepted },
-			aicommon.WithAuxiliaryResponseHandler(func(resp *aicommon.AIResponse) (*aicommon.Action, error) {
-				action = nil
-				if err := postHandler(resp); err != nil {
-					return nil, err
-				}
-				return action, nil
-			}),
-			aicommon.WithAuxiliaryEmitter(r.GetEmitter()),
-			aicommon.WithAuxiliaryOpts(aicommon.WithGeneralConfigExtraRequestOpts(requestOpts...)),
-			aicommon.WithAuxiliaryOnError(func(err error) { transactionErr = err }),
-		)
-	} else {
-		transactionErr = aicommon.CallAITransaction(r.config, prompt, r.config.CallAI, postHandler, requestOpts...)
-	}
-	if transactionErr != nil {
-		r.UserStatus(
-			"暂时没能完成这一步",
-			"This step could not be completed",
-			aicommon.WithStatusCode("action.failed"),
-			aicommon.WithStatusState(aicommon.StatusStateError),
-		)
-		log.Errorf("AI transaction failed: %v", transactionErr)
-		return nil, nil, transactionErr
-	}
-
-	if ctxCanceled.IsSet() {
-		r.UserStatus(
-			"任务已停止",
-			"Task stopped",
-			aicommon.WithStatusCode("task.stopped"),
-			aicommon.WithStatusState(aicommon.StatusStateWarning),
-		)
-		return nil, nil, utils.Error("task context canceled before execute ReActLoop")
-	}
-
-	if utils.IsNil(action) {
-		r.UserStatus(
-			"没有得到完整的下一步信息",
-			"The next-step information was incomplete",
-			aicommon.WithStatusCode("action.empty"),
-			aicommon.WithStatusState(aicommon.StatusStateError),
-		)
-		return nil, nil, utils.Error("action is nil in ReActLoop")
-	}
-
-	r.UserStatus(
-		"正在推进下一步",
-		"Moving on to the next step",
-		aicommon.WithStatusCode("action.ready"),
-	)
-
-	handler, err := r.GetActionHandler(getNextActionType(action))
-	if err != nil {
-		return nil, nil, utils.Wrap(err, "GetActionHandler failed")
-	}
-	if utils.IsNil(handler) {
-		return nil, nil, utils.Errorf("action[%s] 's handler is nil in ReActLoop.actions", action.Name())
-	}
-
-	// Wait for all streams to complete with timeout (max 3 seconds)
-	// Don't block forever if streams are stuck
-	log.Infof("action.WaitStream starting for action [%s] with 3s timeout", action.Name())
-	waitStart := time.Now()
-
-	// Create a timeout context for stream waiting
-	streamWaitCtx, streamWaitCancel := context.WithTimeout(context.Background(), 3*time.Second)
-	defer streamWaitCancel()
-
-	// Wait with timeout
-	waitDone := make(chan struct{})
-	go func() {
-		defer close(waitDone)
-		action.WaitStream(activeTaskCtx)
-	}()
-
-	select {
-	case <-waitDone:
-		log.Infof("action.WaitStream completed normally for action [%s], took %v", action.Name(), time.Since(waitStart))
-	case <-streamWaitCtx.Done():
-		log.Warnf("action.WaitStream timeout (3s) for action [%s], continuing execution", action.Name())
-		r.UserStatus(
-			"这一步比预期久一些，仍在继续",
-			"This step is taking longer than expected, but is still progressing",
-			aicommon.WithStatusCode("action.slow"),
-			aicommon.WithStatusState(aicommon.StatusStateWarning),
-		)
-	}
-
-	return action, handler, nil
 }
 
 const ReActLoadingStatusKey = "re-act-loading-status-key"
@@ -1180,16 +755,15 @@ LOOP:
 
 		streamWg := new(sync.WaitGroup)
 		/* Generate AI Action */
-		actionParams, handler, transactionErr := r.callAITransaction(streamWg, prompt, nonce, operator)
-
+		loopCalls, stopReason, resultDescriptor, transactionErr := r.callAILoopTransaction(
+			streamWg, prompt, nonce, operator,
+			r.emitLoopGeneralOutput, r.emitLoopFunctionCallOutput,
+		)
+		if resultDescriptor != nil {
+			log.Debugf("AI loop transaction stop=%s provider_finish=%q", stopReason, resultDescriptor.Snapshot().ProviderFinishReason)
+		}
 		streamWg.Wait()
-
-		// Capture the pure model reasoning/thinking stream accumulated during
-		// this AI transaction. Failed/unparseable attempts remain display-only;
-		// a successful action is stored with a prompt-only replay projection that
-		// the aicache hijacker converts into assistant.reasoning_content.
 		iterationModelThinking := strings.TrimSpace(r.takeModelThinkingForTimeline())
-
 		if transactionErr != nil {
 			r.recordModelThinkingTimeline(iterationModelThinking, "", nonce, false)
 			r.finishIterationLoopWithError(iterationCount, task, transactionErr)
@@ -1197,334 +771,68 @@ LOOP:
 			needSummary.SetTo(true)
 			return transactionErr
 		}
-
-		utils.Debug(func() {
-			fmt.Println("<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<")
-			fmt.Printf("AI decide to exec action[%v]: %v", actionParams.ActionType(), actionParams.GetParams().Dump())
-			fmt.Println("<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<")
-		})
-
-		if utils.IsNil(actionParams) {
+		if len(loopCalls) == 0 {
 			r.recordModelThinkingTimeline(iterationModelThinking, "", nonce, false)
-			r.finishIterationLoopWithError(iterationCount, task, utils.Error("action is nil in ReActLoop"))
-			log.Error("action is nil in ReActLoop")
-			needSummary.SetTo(true)
-			return utils.Error("action is nil in ReActLoop")
-		}
-		r.recordModelThinkingTimeline(
-			iterationModelThinking,
-			r.Get("last_ai_decision_response"),
-			nonce,
-			true,
-		)
-		actionName := actionParams.Name()
-
-		r.UserStatus(
-			"正在执行下一步",
-			"Executing the next step",
-			aicommon.WithStatusCode("action.running"),
-		)
-
-		// 记录当前迭代索引和 Action 信息。
-		r.actionHistoryMutex.Lock()
-		toolNames := extractToolNamesFromAction(actionParams)
-		actionRecord := &ActionRecord{
-			ActionType:     actionParams.ActionType(),
-			ActionName:     actionName,
-			ActionParams:   cloneActionParams(actionParams.GetParams()),
-			IterationIndex: iterationCount,
-			ToolNames:      toolNames,
-			ToolCallCount:  len(toolNames),
-		}
-		if len(toolNames) > 0 {
-			actionRecord.ToolName = toolNames[0]
-		}
-		r.actionHistory = append(r.actionHistory, actionRecord)
-		r.actionHistoryMutex.Unlock()
-
-		r.emitActionExecutionRecord(task, actionParams, iterationCount, prompt)
-
-		// 落地 todo_delta 并判定本轮是否为有效推进 (空转轮不计入迭代预算).
-		appliedTodoDelta := applyTodoDeltaBottomLine(r, task, iterationCount, actionParams)
-		if IsSubAgentControlAction(actionName) {
-			r.subAgentControlIterations++
-		} else {
-			r.advanceEffectiveIteration(task, appliedTodoDelta)
-		}
-
-		// Handoffs can complete/cancel the same parent task inside their handler.
-		// Check before these side effects, even for synchronous blueprint/plan calls.
-		if handler.AsyncMode || actionName == schema.AI_REACT_LOOP_ACTION_REQUIRE_AI_BLUEPRINT ||
-			actionName == schema.AI_REACT_LOOP_ACTION_REQUEST_PLAN || actionName == schema.AI_REACT_LOOP_ACTION_REQUEST_PLAN_EXECUTION {
-			if reason := r.SubAgentFinishBlockReason(); reason != "" {
-				operator = newLoopActionHandlerOperator(task)
-				operator.Feedback(reason)
-				operator.Continue()
-				continue
-			}
-		}
-
-		if handler.AsyncMode {
-			r.UserStatus(
-				"这项工作已转入后台继续处理",
-				"This work is continuing in the background",
-				aicommon.WithStatusCode("task.background"),
-			)
-			if task.IsAsyncMode() {
-				r.UserStatus(
-					"这项工作正在后台继续处理",
-					"This work is continuing in the background",
-					aicommon.WithStatusCode("task.background"),
-				)
-				log.Warnf("ReactLoop[%v] rejecting static async action '%v' because the current task is already in async mode", r.loopName, actionName)
-				rejectMsg := fmt.Sprintf(
-					"REJECTED: action '%s' requires async mode, but the current task is already running asynchronously. "+
-						"You MUST NOT start another async operation while one is in progress. "+
-						"Wait for the current async task to complete, or choose a synchronous action instead.",
-					actionName)
-				r.GetInvoker().AddToTimeline("[ASYNC_ACTION_REJECTED]", rejectMsg)
-				operator = newLoopActionHandlerOperator(task)
-				operator.Feedback(rejectMsg)
-				operator.Continue()
-				continue
-			}
-			task.SetAsyncMode(true)
-			emitter.EmitJSON(schema.EVENT_TYPE_AI_TASK_SWITCHED_TO_ASYNC, `react_task_mode_changed`, map[string]any{
-				"task_id":         task.GetId(),
-				"loop_name":       r.loopName,
-				"task_index":      task.GetIndex(),
-				"task_user_input": task.GetUserInput(),
-			})
-
-			if r.onAsyncTaskTrigger != nil {
-				r.onAsyncTaskTrigger(handler, task)
-			}
-			done.Do(func() {
-				log.Infof("async mode, not update task status in mainloop")
-			})
-		}
-
-		// 重置上次操作状态对这次反应的影响
-		operator = newLoopActionHandlerOperator(task)
-		// 调用 ActionHandler
-		if handler.ActionHandler == nil {
-			// ActionHandler 必须存在
-			finalError = utils.Errorf("action[%s] has no ActionHandler", actionName)
+			finalError = utils.Error("AI loop returned no actions")
 			r.finishIterationLoopWithError(iterationCount, task, finalError)
 			needSummary.SetTo(true)
 			return finalError
 		}
 
-		select {
-		case <-task.GetContext().Done():
-			return utils.Errorf("task context done in executing ReActLoop(before ActionHandler): %v", task.GetContext().Err())
-		default:
-		}
-
-		// Temporarily sync the invoker's currentTask with this loop's task so that
-		// any tool call made inside the action handler (via ExecuteToolRequiredAndCallWithoutRequired)
-		// writes its tool-call Artifact bundle into the sub-task's directory instead of
-		// the top-level orchestrator task's directory.
-		func() {
-			invoker := r.GetInvoker()
-			prevInvokerTask := invoker.GetCurrentTask()
-			invoker.SetCurrentTask(task)
-			defer invoker.SetCurrentTask(prevInvokerTask)
-
-			r.UserStatus(
-				"正在执行下一步",
-				"Executing the next step",
-				aicommon.WithStatusCode("action.running"),
-			)
-			handler.ActionHandler(
-				r,
-				actionParams,
-				operator,
-			)
-		}()
-		// Tool names/count above describe the model proposal. Only the handler can
-		// know whether a plugin callback actually ran, so commit that independent
-		// fact after it settles. This keeps rejected/cancelled/zero-invoke batches
-		// in history without falsely turning them into iteration_end training data.
-		r.applyActionExecutionRecord(actionRecord, operator)
-		if err := r.recordSubAgentControl(actionName, operator, appliedTodoDelta); err != nil {
-			finalError = err
-			r.finishIterationLoopWithError(iterationCount, task, finalError)
-			return finalError
-		}
-		if handler.ActionType != loopAction_Finish.ActionType {
-			r.recordCurrentTodoIteration(task)
-		}
-
-		// 先检查 operator 状态，如果 operator 已经表明要终止（无论成功或失败），
-		// 则 context canceled 不应该被视为错误
-		// 这处理了 focus loop 正常完成后 context 被取消的情况
-		if isTerminated, opErr := operator.IsTerminated(); isTerminated {
-			// operator 已经决定终止，跳过 context canceled 检查
-			log.Infof("ReactLoop[%v] terminated by operator after action execution", r.loopName)
-			if opErr != nil {
-				finalError = opErr
-				utils.Debug(func() {
-					fmt.Println("<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<")
-					fmt.Printf("[IsTerminated-Early] action executed[%v]: \n%v\npreparing for end iteration\n", actionParams.ActionType(), actionParams.GetParams().Dump())
-					fmt.Println("<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<")
-				})
-				r.finishIterationLoopWithError(iterationCount, task, finalError)
-				return finalError
-			}
-
-			utils.Debug(func() {
-				fmt.Println("<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<")
-				fmt.Printf("[IsTerminated-Early] action executed[%v]: \n%v\npreparing for end iteration\n", actionParams.ActionType(), actionParams.GetParams().Dump())
-				fmt.Println("<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<")
-			})
-			if reason := r.admitSubAgentExit(operator); reason != "" {
-				operator = newLoopActionHandlerOperator(task)
-				operator.Feedback(reason)
-				operator.Continue()
-				continue
-			}
-			r.finishIterationLoopWithError(iterationCount, task, nil)
-			return nil
-		}
-
-		// 只有在 operator 没有明确终止时，才检查 context canceled.
-		// 例外: 动态 async 动作 (如 load_capability 触发 RequestAsyncMode) 已把
-		// task 置为 async, 并把 ctx 生命周期交给 forge 的异步执行. forge 若极快
-		// 完成会立刻 cancel 该 ctx, 此处若 early-return 就会跳过下面的 async 交接
-		// (effectiveAsyncMode 块里的 onAsyncTaskTrigger), 造成 async 生命周期事件
-		// 缺失 (与静态 async 路径不等价). 因此 async-mode 任务不在这里因 ctx done
-		// 提前返回, 交由 effectiveAsyncMode 块统一收口.
-		// 关键词: 动态 async ctx done 竞态, onAsyncTaskTrigger 漏触发, async 交接顺序
-		if !(operator.IsAsyncModeRequested() || task.IsAsyncMode()) {
-			select {
-			case <-task.GetContext().Done():
-				return utils.Errorf("task context done in executing execute ReActLoop(after ActionHandler): %v", task.GetContext().Err())
-			default:
-			}
-		}
-
-		// T1: perception after action execution (async, non-blocking)
-		r.MaybeTriggerPerceptionAfterAction(iterationCount)
-
-		// 检查 operator 状态
-		if isTerminated, err := operator.IsTerminated(); isTerminated {
-			log.Infof("ReactLoop[%v] terminated", r.loopName)
-			if err != nil {
-				finalError = err
-				utils.Debug(func() {
-					fmt.Println("<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<")
-					fmt.Printf("[IsTerminated] action executed[%v]: \n%v\npreparing for end iteration\n", actionParams.ActionType(), actionParams.GetParams().Dump())
-					fmt.Println("<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<")
-				})
-				r.finishIterationLoopWithError(iterationCount, task, finalError)
-				return finalError
-			}
-
-			utils.Debug(func() {
-				fmt.Println("<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<")
-				fmt.Printf("[IsTerminated] action executed[%v]: \n%v\npreparing for end iteration\n", actionParams.ActionType(), actionParams.GetParams().Dump())
-				fmt.Println("<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<")
-			})
-			if reason := r.admitSubAgentExit(operator); reason != "" {
-				operator = newLoopActionHandlerOperator(task)
-				operator.Feedback(reason)
-				operator.Continue()
-				continue
-			}
-			r.finishIterationLoopWithError(iterationCount, task, nil)
-			return nil
-		}
-
-		effectiveAsyncMode := handler.AsyncMode || operator.IsAsyncModeRequested()
-		if effectiveAsyncMode {
-			// 主循环进入 async 时, 当前任务残留的活跃 TODO 自动标记为 deferred,
-			// 避免异步子任务接手后主循环 TODO 仍阻塞 finish.
-			var asyncTodoTimelineHook func(category, line string)
-			if invoker := r.GetInvoker(); invoker != nil {
-				asyncTodoTimelineHook = func(category, line string) {
-					invoker.AddToTimeline(category, line)
-				}
-			}
-			aicommon.DeferOpenTodosOnAsyncHandoff(r.config, emitter, task, iterationCount, asyncTodoTimelineHook)
-
-			if !handler.AsyncMode {
-				// dynamic async mode requested by handler at runtime
-				task.SetAsyncMode(true)
-				emitter.EmitJSON(schema.EVENT_TYPE_AI_TASK_SWITCHED_TO_ASYNC, `react_task_mode_changed`, map[string]any{
-					"task_id":         task.GetId(),
-					"loop_name":       r.loopName,
-					"task_index":      task.GetIndex(),
-					"task_user_input": task.GetUserInput(),
-				})
-				if r.onAsyncTaskTrigger != nil {
-					r.onAsyncTaskTrigger(handler, task)
-				}
-				// Consume the done guard to prevent the deferred complete() from
-				// prematurely marking the task as Completed while the async forge
-				// is still running. This mirrors the static AsyncMode path (line 677).
-				done.Do(func() {
-					log.Infof("dynamic async mode, not update task status in mainloop")
-				})
-			}
-			r.UserStatus(
-				"这项工作已转入后台继续处理",
-				"This work is continuing in the background",
-				aicommon.WithStatusCode("task.background"),
-			)
-			finalError = nil
-			utils.Debug(func() {
-				fmt.Println("<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<")
-				fmt.Printf("[Async] action executed[%v]: \n%v\npreparing for end iteration\n", actionParams.ActionType(), actionParams.GetParams().Dump())
-				fmt.Println("<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<")
-			})
-			r.finishIterationLoopWithError(iterationCount, task, finalError)
-			return nil
-		}
-
-		// 非异步模式，继续下一次循环
-		if operator.IsContinued() {
-			utils.Debug(func() {
-				fmt.Println("<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<")
-				fmt.Printf("[Continue] action executed[%v]: \n%v\npreparing for next iteration\n", actionParams.ActionType(), actionParams.GetParams().Dump())
-				fmt.Println("<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<")
-			})
-			postOp := r.doneCurrentIteration(iterationCount, task)
-			// Check if post-iteration callback requested to end the loop
-			if postOp.ShouldEndIteration() {
-				if reason := r.tryFinishSubAgents(); reason != "" {
-					operator = newLoopActionHandlerOperator(task)
-					operator.Feedback(reason)
-					operator.Continue()
-					continue
-				}
-				log.Infof("Loop ending due to post-iteration operator request: %v", postOp.GetEndReason())
+		// A native tool-call response needs one assistant plus every matching tool
+		// acknowledgement before any action writes to the timeline. Execution below
+		// is the same for both response formats.
+		var eventSink loopActionEventSink
+		if stopReason == LoopStopToolCalls {
+			if err := r.appendFunctionCallActionResponse(loopCalls, resultDescriptor); err != nil {
+				r.finishIterationLoopWithError(iterationCount, task, err)
 				needSummary.SetTo(true)
-				break LOOP
+				return err
 			}
-			continue
+			eventSink = r.appendFunctionCallActionEvent
+		} else {
+			decision := r.Get("last_ai_decision_response")
+			if loopCalls[0].Action == nil {
+				decision = ""
+			}
+			r.recordModelThinkingTimeline(iterationModelThinking, decision, nonce, loopCalls[0].Action != nil)
 		}
 
-		// 如果既没有调用 Exit/Fail 也没有调用 Continue，默认继续
-		utils.Debug(func() {
-			fmt.Println("<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<")
-			fmt.Printf("[Default Continue] action executed[%v]: \n%v\npreparing for next iteration\n", actionParams.ActionType(), actionParams.GetParams().Dump())
-			fmt.Println("<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<")
-		})
+		batch := r.execCalls(loopCalls, iterationCount, task, prompt, done, eventSink)
+		operator = batch.operator
+		if batch.err != nil || batch.result == loopActionsError {
+			finalError = batch.err
+			if finalError == nil {
+				finalError = utils.Error("action batch failed")
+			}
+			if !batch.skipErrorFinalization {
+				r.finishIterationLoopWithError(iterationCount, task, finalError)
+			}
+			if !batch.skipErrorSummary {
+				needSummary.SetTo(true)
+			}
+			return finalError
+		}
+		if batch.result == loopActionsExit || batch.result == loopActionsAsync {
+			r.finishIterationLoopWithError(iterationCount, task, nil)
+			return nil
+		}
+		if batch.skipPostIteration {
+			continue LOOP
+		}
 		postOp := r.doneCurrentIteration(iterationCount, task)
-		// Check if post-iteration callback requested to end the loop
 		if postOp.ShouldEndIteration() {
 			if reason := r.tryFinishSubAgents(); reason != "" {
 				operator = newLoopActionHandlerOperator(task)
 				operator.Feedback(reason)
 				operator.Continue()
-				continue
+				continue LOOP
 			}
 			log.Infof("Loop ending due to post-iteration operator request: %v", postOp.GetEndReason())
 			needSummary.SetTo(true)
 			break LOOP
 		}
-		continue
+		continue LOOP
 	}
 	return nil
 }
@@ -1791,7 +1099,7 @@ func (r *ReActLoop) savePromptToFile(task aicommon.AIStatefulTask, iteration int
 	content.WriteString(fmt.Sprintf("**Loop Name:** %s\n\n", r.loopName))
 	content.WriteString(fmt.Sprintf("**Generated at:** %s\n\n", utils.DatetimePretty()))
 	content.WriteString("---\n\n")
-	content.WriteString(prompt)
+	content.WriteString(aiprojection.RedactNonce(prompt))
 
 	if err := os.WriteFile(filePath, []byte(content.String()), 0644); err != nil {
 		log.Errorf("failed to save prompt to file: %v", err)
@@ -1801,7 +1109,7 @@ func (r *ReActLoop) savePromptToFile(task aicommon.AIStatefulTask, iteration int
 	log.Infof("saved prompt to file: %s", filePath)
 }
 
-func (r *ReActLoop) emitActionExecutionRecord(task aicommon.AIStatefulTask, action *aicommon.Action, iteration int, prompt string) {
+func (r *ReActLoop) emitActionExecutionRecord(task aicommon.AIStatefulTask, action *aicommon.Action, iteration int, prompt string, callID ...string) {
 	if utils.IsNil(r) || utils.IsNil(task) || utils.IsNil(action) {
 		return
 	}
@@ -1822,6 +1130,9 @@ func (r *ReActLoop) emitActionExecutionRecord(task aicommon.AIStatefulTask, acti
 		actionName = action.ActionType()
 	}
 	filename := fmt.Sprintf("%d_%s.md", iteration, sanitizeActionFilename(actionName))
+	if len(callID) > 0 && callID[0] != "" {
+		filename = fmt.Sprintf("%d_%s_%s.md", iteration, sanitizeActionFilename(actionName), sanitizeActionFilename(callID[0]))
+	}
 	filePath := filepath.Join(actionDir, filename)
 
 	content := r.buildActionExecutionMarkdown(actionName, action.GetParams(), action.GetString("human_readable_thought"), prompt, r.isDebugModeEnabled())
@@ -1846,7 +1157,7 @@ func (r *ReActLoop) buildActionExecutionMarkdown(actionName string, params map[s
 	if includePrompt {
 		content.WriteString("## Prompt\n\n")
 		content.WriteString("```\n")
-		content.WriteString(prompt)
+		content.WriteString(aiprojection.RedactNonce(prompt))
 		content.WriteString("\n```\n")
 	}
 	return content.String()

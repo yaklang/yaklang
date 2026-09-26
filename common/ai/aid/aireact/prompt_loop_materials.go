@@ -319,10 +319,12 @@ func (pm *PromptManager) NewPromptMaterials(base *reactloops.LoopPromptBaseMater
 		materials.ExecutionPolicy = pm.react.config.GetExecutionPolicy()
 	}
 	if input != nil {
+		materials.FunctionCallMode = input.FunctionCallMode
 		materials.TaskInstruction = input.TaskInstruction
 		materials.OutputExample = input.OutputExample
 		materials.SkillsContext = input.SkillsContext
 		materials.Schema = input.Schema
+		materials.FunctionCallSchemas = input.FunctionCallSchemas
 		// P1-C2: SessionEvidence / UserHistory 从 dynamic 段上移到 timeline-open 段
 		materials.SessionEvidence = input.SessionEvidence
 		if strings.TrimSpace(materials.SessionEvidenceOpen) == "" {
@@ -421,6 +423,7 @@ func (pm *PromptManager) AssemblePromptPrefix(materials *aicommon.PromptMaterial
 func (pm *PromptManager) buildLoopPromptSectionData(base *reactloops.LoopPromptBaseMaterials, input *reactloops.LoopPromptAssemblyInput) map[string]any {
 	data := map[string]any{
 		"Nonce":              "",
+		"FunctionCallMode":   false,
 		"UserQuery":          "",
 		"TaskInstruction":    "",
 		"OutputExample":      "",
@@ -474,10 +477,12 @@ func (pm *PromptManager) buildLoopPromptSectionData(base *reactloops.LoopPromptB
 	}
 	if input != nil {
 		data["Nonce"] = input.Nonce
+		data["FunctionCallMode"] = input.FunctionCallMode
 		data["UserQuery"] = input.UserQuery
 		data["TaskInstruction"] = input.TaskInstruction
 		data["OutputExample"] = input.OutputExample
 		data["Schema"] = input.Schema
+		data["FunctionCallSchemas"] = input.FunctionCallSchemas
 		data["SkillsContext"] = input.SkillsContext
 		data["ExtraCapabilities"] = input.ExtraCapabilities
 		data["SessionEvidence"] = input.SessionEvidence
@@ -696,7 +701,7 @@ func (pm *PromptManager) buildSemiDynamic1Observation(
 }
 
 // buildSemiDynamic2Observation 给"PROMPT_SECTION_semi-dynamic-2 段"做观测树:
-// TaskInstruction + OutputExample + Schema. 物理上对应 hijacker 5 段切分中的
+// TaskInstruction + (OutputExample + Schema 或 FunctionCallSchemas)。物理上对应 hijacker 5 段切分中的
 // user3 (ephemeral cc), 与 buildSemiDynamic1Observation 一起被 dashscope 视作
 // 合并 prefix cache 计算 (cc 锚点落在本段末尾, prefix 跨过 semi-1).
 //
@@ -743,6 +748,13 @@ func (pm *PromptManager) buildSemiDynamic2Observation(
 			reactloops.PromptSectionRoleSemiDynamic2,
 			true,
 			renderSchemaBlock(materials.Schema),
+		),
+		reactloops.NewPromptSectionObservation(
+			"section.semi_dynamic_2.function_call_schemas",
+			"Action Tools",
+			reactloops.PromptSectionRoleSemiDynamic2,
+			true,
+			materials.FunctionCallSchemas,
 		),
 		// section.semi_dynamic_2.output_example 从 high-static 段迁入:
 		// OutputExample 是 caller-specific 字段, 不同 forge / loop 注入的内容
@@ -972,8 +984,8 @@ func (pm *PromptManager) buildDynamicObservation(
 }
 
 // renderHighStaticPreamble 渲染 high-static 段的"前导文" (TRAITS + 方法论
-// 协议块 + 能力系统介绍). 当前 high_static_section.txt 已重构为完全无变量的
-// 纯静态系统提示词, HighStaticData() 返回空 map, 这里只是把模板原文 trim 后返回.
+// 协议块 + 能力系统介绍). high_static_section.txt 只按输出协议切换文案,
+// HighStaticData() 不包含每轮易变内容, 同一模式内的前缀字节保持稳定.
 // 若以后又向 HighStaticData 注入 caller-specific 字段, 需要重新审视: 任何
 // caller-specific 内容都会破坏 AI_CACHE_SYSTEM 段的 prefix cache, 应优先放
 // SemiDynamic1Data / SemiDynamic2Data 而不是 HighStaticData.
@@ -1120,9 +1132,19 @@ func renderToolInventoryBlock(materials *reactloops.PromptPrefixMaterials) strin
 		return ""
 	}
 	var lines []string
+	if materials.FunctionCallMode {
+		lines = append(lines,
+			"# Tool Inventory — 业务工具目录",
+			"用法：下列仅是工具名称和简介，不含完整参数 Schema；原生 `tool_calls[].function.name` 只能选已声明的 action，目录名称要填在 action 参数中。",
+			"完整 Schema 已知（优先查 `CACHE_TOOL_CALL`）→ `directly_call_tool`：`directly_call_tool_name`=名称、`directly_call_tool_params`=参数；否则 → `require_tool`：`tool_require_payload`=名称，由运行时生成参数。缓存未命中但已知完整 Schema 时仍可直调，由运行时校验。",
+		)
+	} else {
+		lines = append(lines,
+			"# Tool Inventory",
+			"下列是按优先级选出的可用业务工具，完整目录可按需检索。",
+		)
+	}
 	lines = append(lines,
-		"# Tool Inventory",
-		fmt.Sprintf("You have access to %d built-in tools. Below are %d prioritized entries selected within a token budget:", materials.ToolsCount, materials.TopToolsCount),
 		"",
 		"## 工具调用模式（单调用、可选并发批次或 tool_compose）",
 		"",
@@ -1140,12 +1162,10 @@ func renderToolInventoryBlock(materials *reactloops.PromptPrefixMaterials) strin
 		}
 		lines = append(lines, fmt.Sprintf("* `%s`: %s", tool.Name, tool.Description))
 	}
-	if materials.HasMoreTools {
-		lines = append(lines,
-			"",
-			fmt.Sprintf("> 还有 %d 个工具未列入上方清单. 不在列表中的工具 / AI 蓝图 / 技能 / Focus 模式, 通过 `search_capabilities` 按关键字检索后再加载使用.", materials.MoreToolsCount),
-		)
-	}
+	lines = append(lines,
+		"",
+		"> 此处为优先展示目录；完整能力范围可按需通过能力检索入口查询。",
+	)
 	return strings.Join(lines, "\n")
 }
 

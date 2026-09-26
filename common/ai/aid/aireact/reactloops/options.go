@@ -205,28 +205,35 @@ func WithRegisterLoopActionFromToolCustomized(tool *aitool.Tool, customize func(
 		if customize != nil {
 			customize(action)
 		}
-		r.actions.Set(name, action)
+		r.actions.Set(name, withNativeActionDescription(action))
 		if aitagParamNames := ToolParamAITagNames(tool); len(aitagParamNames) > 0 {
 			r.syncRecentToolParamAITagFields(aitagParamNames)
 		}
 	}
 }
 
-func WithRegisterLoopActionWithStreamField(actionName string, desc string, opts []aitool.ToolOption, fields []*LoopStreamField, verifier LoopActionVerifierFunc, handler LoopActionHandlerFunc) ReActLoopOption {
+func WithRegisterLoopActionWithStreamField(actionName string, desc string, opts []aitool.ToolOption, fields []*LoopStreamField, verifier LoopActionVerifierFunc, handler LoopActionHandlerFunc, customize ...func(*LoopAction)) ReActLoopOption {
 	return func(r *ReActLoop) {
 		if r.actions.Have(actionName) {
 			log.Errorf("loop action %s already registered", actionName)
 			return
 		}
-		r.actions.Set(actionName, &LoopAction{
-			AsyncMode:      false,
-			ActionType:     actionName,
-			Description:    desc,
-			Options:        opts,
-			ActionVerifier: verifier,
-			ActionHandler:  handler,
-			StreamFields:   fields,
-		})
+		action := &LoopAction{
+			AsyncMode:         false,
+			ActionType:        actionName,
+			Description:       desc,
+			NativeDescription: desc,
+			Options:           opts,
+			ActionVerifier:    verifier,
+			ActionHandler:     handler,
+			StreamFields:      fields,
+		}
+		for _, apply := range customize {
+			if apply != nil {
+				apply(action)
+			}
+		}
+		r.actions.Set(actionName, withNativeActionDescription(action))
 	}
 }
 
@@ -235,7 +242,7 @@ func WithRegisterLoopActionWithStreamField(actionName string, desc string, opts 
 func WithOverrideLoopAction(action *LoopAction) ReActLoopOption {
 	return func(r *ReActLoop) {
 		if action != nil {
-			r.actions.Set(action.ActionType, action)
+			r.actions.Set(action.ActionType, withNativeActionDescription(action))
 		}
 	}
 }
@@ -295,6 +302,7 @@ func WithOutputExampleContextProvider(provider ContextProviderFunc) ReActLoopOpt
 func WithPersistentContextProvider(provider ContextProviderFunc) ReActLoopOption {
 	return func(r *ReActLoop) {
 		r.persistentInstructionProvider = provider
+		r.functionCallInstructionProvider = nil
 	}
 }
 
@@ -336,14 +344,23 @@ func WithOutputExample(example string) ReActLoopOption {
 }
 
 func WithPersistentInstruction(instruction string) ReActLoopOption {
-	return WithPersistentContextProvider(func(loop *ReActLoop, nonce string) (string, error) {
+	render := func(loop *ReActLoop, nonce string, functionCallMode bool) (string, error) {
 		_, result, err := loop.getRenderValues()
 		if err != nil {
 			return "", utils.Errorf("get basic prompt info failed: %v", err)
 		}
 		result["Nonce"] = nonce
+		result["FunctionCallMode"] = functionCallMode
 		return utils.RenderTemplate(instruction, result)
-	})
+	}
+	return func(r *ReActLoop) {
+		r.persistentInstructionProvider = func(loop *ReActLoop, nonce string) (string, error) {
+			return render(loop, nonce, false)
+		}
+		r.functionCallInstructionProvider = func(loop *ReActLoop, nonce string) (string, error) {
+			return render(loop, nonce, true)
+		}
+	}
 }
 
 func WithReactiveDataBuilder(provider FeedbackProviderFunc) ReActLoopOption {

@@ -19,6 +19,7 @@ func TestToolCaller_ParamTransactionReservedSeqIsConsumedOnce(t *testing.T) {
 		context.Background(),
 		WithID("param-seq-"+ksuid.New().String()),
 		WithSequence(1200),
+		WithEnableFunctionCallMode(false),
 		WithAICallback(func(config AICallerConfigIf, request *AIRequest) (*AIResponse, error) {
 			seqMu.Lock()
 			observedSeqs = append(observedSeqs, request.GetSeqId())
@@ -45,8 +46,8 @@ func TestToolCaller_ParamTransactionReservedSeqIsConsumedOnce(t *testing.T) {
 		WithToolCaller_Task(cfg.DefaultTask),
 		WithToolCaller_CallToolID("param-seq-call"),
 		WithToolCaller_ParamTransactionSeq(777),
-		WithToolCaller_GenerateToolParamsBuilder(func(_ *aitool.Tool, _ string) (string, error) {
-			return "generate params", nil
+		WithToolCaller_GenerateToolParamsBuilderWithMeta(func(_ *aitool.Tool, _ string) (*ToolParamsPromptMeta, error) {
+			return &ToolParamsPromptMeta{Prompt: "generate params"}, nil
 		}),
 	)
 	require.NoError(t, err)

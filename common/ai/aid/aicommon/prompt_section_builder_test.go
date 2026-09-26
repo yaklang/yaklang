@@ -101,7 +101,7 @@ func TestPromptPrefixBuilder_AssemblePromptWithDynamicSection_CustomSemiSectionN
 		"n2",
 	)
 	require.NoError(t, err)
-	require.Contains(t, prompt, "<|PROMPT_SECTION_semi-dynamic-1|>")
+	require.Contains(t, prompt, "<|PROMPT_SECTION_semi-dynamic-1_"+aiprojection.Nonce()+"|>")
 
 	sections := promptBuilderChunksBySection(t, prompt)
 	require.NotEmpty(t, sections[aiprojection.SectionSemiDynamic1])
@@ -123,8 +123,8 @@ func TestBuildTaggedPromptSectionsWithSectionNamesAndForce_KeepsEmptySemiWrapper
 		"n3",
 	)
 
-	require.Contains(t, prompt, "<|AI_CACHE_SEMI_semi|>")
-	require.Contains(t, prompt, "<|PROMPT_SECTION_semi-dynamic-1|>")
+	require.Contains(t, prompt, "<|AI_CACHE_SEMI_semi_"+aiprojection.Nonce()+"|>")
+	require.Contains(t, prompt, "<|PROMPT_SECTION_semi-dynamic-1_"+aiprojection.Nonce()+"|>")
 
 	sections := promptBuilderChunksBySection(t, prompt)
 	require.NotEmpty(t, sections[aiprojection.SectionSemiDynamic1])

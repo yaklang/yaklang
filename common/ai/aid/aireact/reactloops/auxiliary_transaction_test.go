@@ -10,6 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon/mock"
+	"github.com/yaklang/yaklang/common/ai/aispec"
 	"github.com/yaklang/yaklang/common/utils/omap"
 )
 
@@ -29,8 +30,14 @@ func TestSpeedLoopAuxiliaryProtocol(t *testing.T) {
 				calls++
 				require.Same(t, loop.GetCurrentTask().GetContext(), req.GetContext())
 				require.Equal(t, "react-loop:test-auxiliary", req.GetCallerLabel())
-				require.Equal(t, mode == "functioncall", req.IsToolCallArgumentsStreamEnabled())
+				require.False(t, req.IsToolCallArgumentsStreamEnabled())
 				response := base.NewAIResponse()
+				if mode == "functioncall" {
+					cfg := aispec.NewDefaultAIConfig(req.GetExtraSpecOpts()...)
+					cfg.ToolCallCallback([]*aispec.ToolCall{{Index: 0, ID: "call_accept", Type: "function",
+						Function: aispec.FuncReturn{Name: "accept", Arguments: `{"text":"streamed thought","body":"tag body"}`}}})
+					cfg.FinishReasonCallback("tool_calls", nil)
+				}
 				response.EmitOutputStream(strings.NewReader(raw))
 				response.Close()
 				return response, nil
@@ -85,7 +92,13 @@ func TestSpeedLoopAuxiliaryProtocol(t *testing.T) {
 				t.Fatal("no accepted response")
 			}
 			var wg sync.WaitGroup
-			action, handler, err := loop.callAITransaction(&wg, "protocol prompt", "nonce", nil)
+			loopCalls, _, _, err := loop.callAILoopTransaction(&wg, "protocol prompt", "nonce", nil,
+				loop.emitLoopGeneralOutput, loop.emitLoopFunctionCallOutput)
+			var action *aicommon.Action
+			var handler *LoopAction
+			if len(loopCalls) == 1 {
+				action, handler = loopCalls[0].Action, loopCalls[0].LoopAction
+			}
 			wg.Wait()
 			if mode == "intelligence" {
 				require.Zero(t, scheduled)

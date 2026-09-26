@@ -6,6 +6,7 @@ import (
 	"errors"
 	"io"
 	"strings"
+	"sync/atomic"
 
 	"github.com/yaklang/yaklang/common/ai/aispec"
 	"github.com/yaklang/yaklang/common/aibalanceclient"
@@ -85,6 +86,25 @@ var _ aispec.AIClient = (*GatewayClient)(nil)
 func (g *GatewayClient) Chat(s string, function ...any) (string, error) {
 	// 用于捕获 TOTP 错误的标志
 	var totpErrorDetected bool
+	var toolCallObserved atomic.Bool
+	var reasonObserved atomic.Bool
+	reasonStreamHandler := g.config.ReasonStreamHandler
+	if reasonStreamHandler != nil {
+		originalHandler := reasonStreamHandler
+		reasonStreamHandler = func(reader io.Reader) {
+			originalHandler(&observedReasonReader{Reader: reader, observed: &reasonObserved})
+		}
+	}
+	toolCallCallback := g.config.ToolCallCallback
+	if toolCallCallback != nil {
+		originalCallback := toolCallCallback
+		toolCallCallback = func(calls []*aispec.ToolCall) {
+			if len(calls) > 0 {
+				toolCallObserved.Store(true)
+			}
+			originalCallback(calls)
+		}
+	}
 
 	// 包装的错误处理器，用于检测 TOTP 错误
 	wrappedErrorHandler := func(err error) {
@@ -118,9 +138,9 @@ func (g *GatewayClient) Chat(s string, function ...any) (string, error) {
 			return true
 		}
 
-		// memfit 模型返回空结果时，尝试刷新 TOTP（可能是认证失败导致）
-		// 注意：这是一个保守策略，只对 memfit 模型生效
-		if result == "" && err == nil {
+		// ChatBase 的返回值只包含正文；独立的 reason 流和 tool call 也都是有效输出。
+		// 只有三者都为空时，才将空响应视为可能的 TOTP 认证失败。
+		if result == "" && err == nil && !reasonObserved.Load() && !toolCallObserved.Load() {
 			log.Debugf("Empty result for memfit model, may be TOTP auth issue, will try refresh")
 			return true
 		}
@@ -135,14 +155,15 @@ func (g *GatewayClient) Chat(s string, function ...any) (string, error) {
 		aispec.WithChatBase_Function(function),
 		aispec.WithChatBase_PoCOptions(g.BuildHTTPOptions),
 		aispec.WithChatBase_StreamHandler(g.config.StreamHandler),
-		aispec.WithChatBase_ReasonStreamHandler(g.config.ReasonStreamHandler),
+		aispec.WithChatBase_ReasonStreamHandler(reasonStreamHandler),
 		aispec.WithChatBase_ErrHandler(wrappedErrorHandler),
 		aispec.WithChatBase_ImageRawInstance(g.config.Images...),
 		aispec.ChatBaseThinkingOptions(g.config, g.targetUrl),
 		aispec.WithChatBase_AISamplingFromConfig(g.config),
 		aispec.WithChatBase_Tools(g.config.Tools),
 		aispec.WithChatBase_ToolChoice(g.config.ToolChoice),
-		aispec.WithChatBase_ToolCallCallback(g.config.ToolCallCallback),
+		aispec.WithChatBase_ToolCallCallback(toolCallCallback),
+		aispec.WithChatBase_FinishReasonCallback(g.config.FinishReasonCallback),
 		aispec.WithChatBase_ToolCallArgumentsStreamHandler(g.config.ToolCallArgumentsStreamHandler),
 		aispec.WithChatBase_RawHTTPResponseHeaderCallback(g.config.RawHTTPResponseHeaderCallback),
 		aispec.WithChatBase_RawHTTPResponseCallback(g.config.RawHTTPResponseCallback),
@@ -171,15 +192,16 @@ func (g *GatewayClient) Chat(s string, function ...any) (string, error) {
 			aispec.WithChatBase_Function(function),
 			aispec.WithChatBase_PoCOptions(g.BuildHTTPOptions),
 			aispec.WithChatBase_StreamHandler(g.config.StreamHandler),
-			aispec.WithChatBase_ReasonStreamHandler(g.config.ReasonStreamHandler),
+			aispec.WithChatBase_ReasonStreamHandler(reasonStreamHandler),
 			aispec.WithChatBase_ErrHandler(wrappedErrorHandler),
 			aispec.WithChatBase_ImageRawInstance(g.config.Images...),
 			aispec.ChatBaseThinkingOptions(g.config, g.targetUrl),
 			aispec.WithChatBase_AISamplingFromConfig(g.config),
 			aispec.WithChatBase_Tools(g.config.Tools),
 			aispec.WithChatBase_ToolChoice(g.config.ToolChoice),
-			aispec.WithChatBase_ToolCallCallback(g.config.ToolCallCallback),
-		aispec.WithChatBase_ToolCallArgumentsStreamHandler(g.config.ToolCallArgumentsStreamHandler),
+			aispec.WithChatBase_ToolCallCallback(toolCallCallback),
+			aispec.WithChatBase_FinishReasonCallback(g.config.FinishReasonCallback),
+			aispec.WithChatBase_ToolCallArgumentsStreamHandler(g.config.ToolCallArgumentsStreamHandler),
 			aispec.WithChatBase_RawHTTPResponseHeaderCallback(g.config.RawHTTPResponseHeaderCallback),
 			aispec.WithChatBase_RawHTTPResponseCallback(g.config.RawHTTPResponseCallback),
 			aispec.WithChatBase_RawHTTPRequestResponseCallback(g.config.RawHTTPRequestResponseCallback),
@@ -189,6 +211,19 @@ func (g *GatewayClient) Chat(s string, function ...any) (string, error) {
 	}
 
 	return result, err
+}
+
+type observedReasonReader struct {
+	io.Reader
+	observed *atomic.Bool
+}
+
+func (r *observedReasonReader) Read(p []byte) (int, error) {
+	n, err := r.Reader.Read(p)
+	if n > 0 {
+		r.observed.Store(true)
+	}
+	return n, err
 }
 
 func (g *GatewayClient) ExtractData(msg string, desc string, fields map[string]any) (map[string]any, error) {

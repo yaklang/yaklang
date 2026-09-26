@@ -70,13 +70,15 @@ type ReActLoop struct {
 
 	loopName string
 
-	persistentInstructionProvider ContextProviderFunc
-	lastLoopSchema                string
-	outputExampleProvider         ContextProviderFunc
-	reactiveDataBuilder           FeedbackProviderFunc
-	todoCheckpointMu              sync.Mutex
-	finishTodoCheckpointScope     string
-	currentTodoProgress           map[string]*currentTodoProgress
+	persistentInstructionProvider   ContextProviderFunc
+	functionCallInstructionProvider ContextProviderFunc
+	lastLoopSchema                  string
+	lastNativeActionNames           []string // nil until a native prompt is built; empty means no advertised actions
+	outputExampleProvider           ContextProviderFunc
+	reactiveDataBuilder             FeedbackProviderFunc
+	todoCheckpointMu                sync.Mutex
+	finishTodoCheckpointScope       string
+	currentTodoProgress             map[string]*currentTodoProgress
 
 	allowAIForge       func() bool
 	allowPlanAndExec   func() bool
@@ -265,13 +267,9 @@ type ReActLoop struct {
 	subAgentControlIterations int
 	subAgentControlRevision   uint64
 
-	// functionCallMode enables native functioncall (tool_calls) instead of
-	// the text-based @action JSON contract. When true, each LoopAction is
-	// converted to an aispec.Tool and injected via aispec.WithTools; the model
-	// responds with tool_calls deltas which are accumulated and converted back
-	// to aicommon.Action after the stream completes. This lets the model service
-	// set stop_reason="tool_calls" and naturally reduce thinking on subsequent
-	// calls.
+	// functionCallMode selects per-action function-call schema tags when
+	// generateLoopPrompt assembles the prompt. Provider projection and response
+	// handling are separate from this prompt-building step.
 	functionCallMode bool
 }
 
@@ -683,7 +681,7 @@ func NewReActLoop(name string, invoker aicommon.AIInvokeRuntime, options ...ReAc
 		loopAction_Finish,
 		loopAction_SaveEvidence,
 	} {
-		r.actions.Set(action.ActionType, action)
+		r.actions.Set(action.ActionType, withNativeActionDescription(action))
 	}
 
 	for _, streamField := range []*LoopStreamField{
@@ -695,8 +693,20 @@ func NewReActLoop(name string, invoker aicommon.AIInvokeRuntime, options ...ReAc
 		r.streamFields.Set(streamField.FieldName, streamField)
 	}
 
+	// The config supplies the default; an explicit loop option must be able to
+	// override it, including WithFunctionCallMode(false).
+	if config.GetConfigBool("EnableFunctionCallMode") {
+		r.functionCallMode = true
+	}
+
 	for _, opt := range options {
 		opt(r)
+	}
+	if r.functionCallMode {
+		if r.actions.Have(nativeAdjustTodolistActionName) || r.loopActions.Have(nativeAdjustTodolistActionName) {
+			return nil, utils.Errorf("native action %q conflicts with an existing loop action", nativeAdjustTodolistActionName)
+		}
+		r.actions.Set(nativeAdjustTodolistActionName, loopAction_AdjustTodolistNative)
 	}
 
 	// 自动注入价值评估埋点 (默认开启, 暂无关闭开关). 该钩子在每轮结束
@@ -708,11 +718,6 @@ func NewReActLoop(name string, invoker aicommon.AIInvokeRuntime, options ...ReAc
 	// Config-level perception disable (e.g. test environments via WithDisablePerception)
 	if config.GetConfigBool("DisablePerception") {
 		r.perception = nil
-	}
-
-	// Config-level functioncall mode enable (e.g. production via WithEnableFunctionCallMode)
-	if config.GetConfigBool("EnableFunctionCallMode") {
-		r.functionCallMode = true
 	}
 
 	// Auto-register perception context provider (nil-safe, skips if perception disabled)

@@ -18,13 +18,6 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 )
 
-var (
-	taskContinue    = "continue-current-task"
-	taskProceedNext = "proceed-next-task"
-	taskFailed      = "task-failed"
-	taskSkipped     = "task-skipped"
-)
-
 func (t *AiTask) execute() error {
 	t.ContextProvider.StoreCurrentTask(t)
 	taskUserInput := t.GetUserInput()

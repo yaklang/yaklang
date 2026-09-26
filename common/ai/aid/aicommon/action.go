@@ -63,6 +63,7 @@ type Action struct {
 	params          aitool.InvokeParams
 	generalParamKey string
 	parseErr        error
+	executionValues map[string]any // runtime-only verifier results, isolated from model parameters
 
 	// status
 	streamFinish context.Context
@@ -451,7 +452,24 @@ func (a *Action) DeleteParam(key string) {
 }
 
 func (a *Action) GetParams() aitool.InvokeParams {
-	return a.GetInvokeParams(a.generalParamKey)
+	if a == nil {
+		return make(aitool.InvokeParams)
+	}
+	if a.generalParamKey != "" {
+		// Streamed actions must still wait for the complete canonical object,
+		// rather than returning the incremental field callback cache.
+		return a.GetInvokeParams(a.generalParamKey)
+	}
+	// Native/programmatic actions already hold the complete object at the root.
+	// Return a shallow snapshot so tool defaults or metadata filtering cannot
+	// add/remove fields in the action retained for replay and diagnostics.
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	params := make(aitool.InvokeParams, len(a.params))
+	for key, value := range a.params {
+		params[key] = value
+	}
+	return params
 }
 
 func (a *Action) DumpRawParams() string {

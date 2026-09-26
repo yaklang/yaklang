@@ -36,6 +36,7 @@ const (
 	loopIntentHintSimpleQuery        = "simple_query"
 
 	loopVarDirectlyAnswerDeliveredWithoutTodoDelta = "directly_answer_delivered_without_todo_delta"
+	loopVarNativeTodoBatchAdjusted                 = "native_todo_batch_adjusted"
 
 	// TimelineEntryModelThinking is the timeline entry type for the pure AI
 	// reasoning/thinking stream captured during an iteration. It is display-only
@@ -45,11 +46,18 @@ const (
 
 const errDuplicateDirectlyAnswerWithoutTodoDelta = "assistant output was already delivered for this CURRENT-TASK without an effective todo_delta; " +
 	"do not emit another answer or rephrase the previous one. Use 'finish' if the latest user input is fully answered, " +
-	"or choose a tool action and maintain todo_delta if more work remains."
+	"or choose a tool action and maintain TODO state if more work remains."
 
-func directlyAnswerHasTodoDelta(action *aicommon.Action) bool {
+func directlyAnswerHasTodoDelta(loop *ReActLoop, action *aicommon.Action) bool {
 	delta, err := aicommon.NormalizeTodoDelta(action)
-	return err == nil && delta != nil
+	if err == nil && delta != nil {
+		return true
+	}
+	if loop == nil || !loop.functionCallMode {
+		return false
+	}
+	adjusted, _ := loop.GetVariable(loopVarNativeTodoBatchAdjusted).(bool)
+	return adjusted
 }
 
 func directlyAnswerDeliveredWithoutTodoDelta(loop *ReActLoop) bool {
@@ -65,7 +73,7 @@ func directlyAnswerDeliveredWithoutTodoDelta(loop *ReActLoop) bool {
 // state change. A directly_answer with an effective todo_delta remains valid:
 // it is a progress handoff rather than an accidental replay.
 func RejectDuplicateDirectlyAnswerWithoutTodoDelta(loop *ReActLoop, action *aicommon.Action) error {
-	if loop == nil || action == nil || directlyAnswerHasTodoDelta(action) || !directlyAnswerDeliveredWithoutTodoDelta(loop) || loop.subAgentModelSeen > loop.subAgentAnswerSeen {
+	if loop == nil || action == nil || directlyAnswerHasTodoDelta(loop, action) || !directlyAnswerDeliveredWithoutTodoDelta(loop) || loop.subAgentModelSeen > loop.subAgentAnswerSeen {
 		return nil
 	}
 	return utils.Error(errDuplicateDirectlyAnswerWithoutTodoDelta)
@@ -82,7 +90,7 @@ func FinishDirectlyAnswerVerification(loop *ReActLoop, action *aicommon.Action, 
 }
 
 func noteDirectlyAnswerDeliveredWithoutTodoDelta(loop *ReActLoop, action *aicommon.Action) {
-	if loop == nil || action == nil || directlyAnswerHasTodoDelta(action) {
+	if loop == nil || action == nil || directlyAnswerHasTodoDelta(loop, action) {
 		return
 	}
 	loop.Set(loopVarDirectlyAnswerDeliveredWithoutTodoDelta, true)
@@ -94,7 +102,7 @@ func noteDirectlyAnswerDeliveredWithoutTodoDelta(loop *ReActLoop, action *aicomm
 // inquiries. No extra model round is useful when the answer was delivered and
 // neither todo_delta nor the current task TODO history indicates work.
 func ShouldAutoFinishAfterSimpleQueryDirectlyAnswer(loop *ReActLoop, action *aicommon.Action) bool {
-	return action != nil && !directlyAnswerHasTodoDelta(action) && loop.isSimpleQueryWithoutWork() && loop.SubAgentFinishBlockReason() == ""
+	return action != nil && !directlyAnswerHasTodoDelta(loop, action) && loop.isSimpleQueryWithoutWork() && loop.SubAgentFinishBlockReason() == ""
 }
 
 // Share the trivial-turn boundary between automatic recall and completion.
@@ -126,7 +134,7 @@ func DirectlyAnswerContinue(loop *ReActLoop, action *aicommon.Action, operator *
 	}
 	noteDirectlyAnswerDeliveredWithoutTodoDelta(loop, action)
 	invoker := loop.GetInvoker()
-	if directlyAnswerHasTodoDelta(action) {
+	if directlyAnswerHasTodoDelta(loop, action) {
 		if !utils.IsNil(invoker) {
 			invoker.AddToTimeline(TimelineEntryAssistantOutputNote,
 				"assistant output delivered; the loop continues to honor the scheduled todo_delta. "+
@@ -145,9 +153,13 @@ func DirectlyAnswerContinue(loop *ReActLoop, action *aicommon.Action, operator *
 		return
 	}
 	if !utils.IsNil(invoker) {
+		maintenance := "add them through todo_delta"
+		if loop.functionCallMode {
+			maintenance = "add them through adjust_todolist"
+		}
 		invoker.AddToTimeline(TimelineEntryAssistantOutputNote,
 			"assistant output delivered. Do not repeat or rephrase the same answer. "+
-				"Audit the answer and recent observations for relevant objects not yet tracked in TODOs; add them through todo_delta and execute them. "+
+				"Audit the answer and recent observations for relevant objects not yet tracked in TODOs; "+maintenance+" and execute them. "+
 				"An empty TODO list is not completion evidence. Continue the existing Current and verify acceptance goals before requesting finish. "+
 				"The user does not need to reply 'continue'.")
 	}

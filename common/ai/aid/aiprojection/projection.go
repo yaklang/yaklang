@@ -36,6 +36,7 @@ type ProjectionSections struct {
 	Items    []ProjectionSection
 	cache    cacheProjectionSections
 	parsed   bool
+	escaped  bool
 }
 
 // cacheProjectionSections contains the cache-related views of Items. Parse
@@ -73,8 +74,8 @@ type ProjectionResult struct {
 // Project determines the provider-visible message layout without recording
 // cache statistics or changing action/tool availability. Unknown section kinds
 // remain ordinary prompt text; they are never dropped.
-func Project(input ProjectionInput) ProjectionResult {
-	result := ProjectionResult{Tools: append([]aispec.Tool(nil), input.ActionTools...)}
+func Project(input ProjectionInput) (result ProjectionResult) {
+	result = ProjectionResult{Tools: append([]aispec.Tool(nil), input.ActionTools...)}
 	if len(input.RawMessages) > 0 {
 		result.Messages = append([]aispec.ChatDetail(nil), input.RawMessages...)
 		result.Metadata.RawMessagesPreserved = true
@@ -97,6 +98,12 @@ func Project(input ProjectionInput) ProjectionResult {
 	}
 	if sections.Original == "" {
 		return result
+	}
+	if sections.escaped {
+		defer func() {
+			restored := &aispec.ChatBaseHijackResult{Messages: result.Messages, Tools: result.Tools}
+			restoreProjectionResult(restored)
+		}()
 	}
 
 	if projected := projectCache(sections); projected != nil && projected.IsHijacked {

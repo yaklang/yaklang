@@ -99,6 +99,10 @@ func buildActionOptionFromDict(caller *FocusModeYakHookCaller, raw any, override
 	if description == "" {
 		description = utils.MapGetString(entry, "desc")
 	}
+	nativeDescription := utils.MapGetString(entry, "native_description")
+	if nativeDescription == "" {
+		nativeDescription = description
+	}
 
 	asyncMode := utils.MapGetBool(entry, "async")
 	outputExamples := utils.MapGetString(entry, "output_examples")
@@ -168,14 +172,15 @@ func buildActionOptionFromDict(caller *FocusModeYakHookCaller, raw any, override
 	if override {
 		// 直接构造 LoopAction 然后 WithOverrideLoopAction 覆盖
 		loopAction := &LoopAction{
-			AsyncMode:      asyncMode,
-			ActionType:     actionType,
-			Description:    description,
-			Options:        optionList,
-			ActionVerifier: verifier,
-			ActionHandler:  handler,
-			StreamFields:   streamFields,
-			OutputExamples: outputExamples,
+			AsyncMode:         asyncMode,
+			ActionType:        actionType,
+			Description:       description,
+			NativeDescription: nativeDescription,
+			Options:           optionList,
+			ActionVerifier:    verifier,
+			ActionHandler:     handler,
+			StreamFields:      streamFields,
+			OutputExamples:    outputExamples,
 		}
 		return WithOverrideLoopAction(loopAction)
 	}
@@ -184,7 +189,9 @@ func buildActionOptionFromDict(caller *FocusModeYakHookCaller, raw any, override
 	if asyncMode {
 		log.Infof("yak focus mode: action %q registered as async mode", actionType)
 	}
-	opt := WithRegisterLoopActionWithStreamField(actionType, description, optionList, streamFields, verifier, handler)
+	opt := WithRegisterLoopActionWithStreamField(actionType, description, optionList, streamFields, verifier, handler, func(action *LoopAction) {
+		action.NativeDescription = nativeDescription
+	})
 	if asyncMode || outputExamples != "" {
 		// 包装一层用于额外补丁 AsyncMode / OutputExamples
 		return func(r *ReActLoop) {

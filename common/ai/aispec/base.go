@@ -221,7 +221,8 @@ type ChatBaseContext struct {
 	// ToolCallCallback is called when the AI response contains tool_calls.
 	// If set, tool_calls will NOT be converted to <|TOOL_CALL...|> format in the output stream.
 	// If not set, the original behavior (converting to <|TOOL_CALL...|> format) is preserved.
-	ToolCallCallback func([]*ToolCall)
+	ToolCallCallback     func([]*ToolCall)
+	FinishReasonCallback func(string, []byte)
 	// ToolCallArgumentsStreamHandler, when set, receives a reader that
 	// streams the incremental function_call arguments as raw (unescaped)
 	// bytes. This allows downstream consumers (e.g. the ReAct loop
@@ -450,6 +451,12 @@ func WithChatBase_ToolCallCallback(cb func([]*ToolCall)) ChatBaseOption {
 	}
 }
 
+func WithChatBase_FinishReasonCallback(cb func(string, []byte)) ChatBaseOption {
+	return func(c *ChatBaseContext) {
+		c.FinishReasonCallback = cb
+	}
+}
+
 // WithChatBase_ToolCallArgumentsStreamHandler sets a handler that receives a
 // reader streaming the incremental function_call arguments as raw bytes.
 // When set, tool_call arguments flow through this handler in addition to
@@ -525,6 +532,21 @@ func ChatBase(url string, model string, msg string, chatOpts ...ChatBaseOption) 
 	hijackResult := dispatchChatBaseHijackHooks(model, hookInput)
 	if len(ctx.RawMessages) == 0 && hijackResult != nil && hijackResult.IsHijacked && len(hijackResult.Messages) > 0 {
 		ctx.RawMessages = hijackResult.Messages
+		if len(hijackResult.Tools) > 0 {
+			// Explicit caller tools take precedence on name collisions. Keep
+			// projected action tools in prompt order after those caller tools.
+			seen := make(map[string]struct{}, len(ctx.Tools)+len(hijackResult.Tools))
+			for _, tool := range ctx.Tools {
+				seen[tool.Function.Name] = struct{}{}
+			}
+			for _, tool := range hijackResult.Tools {
+				if _, exists := seen[tool.Function.Name]; exists {
+					continue
+				}
+				ctx.Tools = append(ctx.Tools, tool)
+				seen[tool.Function.Name] = struct{}{}
+			}
+		}
 	}
 	// 把 hook 自定义的关联 ID 透传到 ctx, 并用闭包包装 UsageCallback,
 	// 让 SSE 末帧 usage 在抵达上层订阅者前自动盖上同一个 ID, 离线分析就能
@@ -1187,6 +1209,7 @@ type chatBaseStreamHandlerAppender func(
 	rawResponseHeaderCallback RawHTTPResponseHeaderCallback,
 	rawResponseCallback func([]byte, []byte, *ChatUsage),
 	usageCallback func(*ChatUsage),
+	finishReasonCallback ...func(string, []byte),
 ) (io.Reader, io.Reader, io.Reader, []poc.PocConfigOption, func(), streamReadErrGetter)
 
 func executeChatBaseRequest(
@@ -1256,7 +1279,7 @@ func executeChatBaseRequest(
 			ctx.RawHTTPRequestResponseCallback(requestPacket, headerBytes, bodyPreview, usageInfo)
 		}
 	}
-	pr, reasonPr, toolCallArgsReader, opts, cancel, getStreamReadErr = appendHandler(handleStream, opts, ctx.ToolCallCallback, ctx.RawHTTPResponseHeaderCallback, rawResponseCallback, ctx.UsageCallback)
+	pr, reasonPr, toolCallArgsReader, opts, cancel, getStreamReadErr = appendHandler(handleStream, opts, ctx.ToolCallCallback, ctx.RawHTTPResponseHeaderCallback, rawResponseCallback, ctx.UsageCallback, ctx.FinishReasonCallback)
 	requestPacket = poc.BuildRequest(
 		lowhttp.UrlToRequestPacket(
 			"POST",

@@ -1,0 +1,11 @@
+# 已选业务工具
+主循环已选定下面的业务工具。你正在为它的一次具体调用生成参数，尚未执行该工具；本次目标见动态区域末尾的“本次调用意图”。下面的名称、说明、用法和 Schema 是参数生成资料，不会增加当前允许调用的函数，也不要求你继续历史中的其他任务。
+名称: {{ .ToolName }}
+说明: {{ .ToolDescription }}
+{{ if .ToolUsage }}用法: {{ .ToolUsage }}
+{{ end }}
+请根据本次调用目的，按下面的 Schema 构造业务参数对象，并通过唯一函数 `submit_tool_params` 的 `arguments.params` 提交。不要以业务工具名称发起 function call，不要把工具说明中针对其他调用方式的示例当成本阶段输出协议。
+参数 Schema（仅约束 `submit_tool_params.arguments.params`，不是另一项可调用工具）：
+```jsonschema
+{{ .ToolInputSchema }}
+```

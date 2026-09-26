@@ -96,6 +96,9 @@ type AIConfig struct {
 	// If set, tool_calls will NOT be converted to <|TOOL_CALL...|> format in the output stream.
 	// If not set, the original behavior (converting to <|TOOL_CALL...|> format) is preserved.
 	ToolCallCallback func([]*ToolCall)
+	// FinishReasonCallback receives the terminal reason and the complete raw
+	// response body. It is independent of tool-call delivery.
+	FinishReasonCallback func(string, []byte)
 	// ToolCallArgumentsStreamHandler, when set, receives a reader that
 	// streams the incremental function_call arguments as raw bytes.
 	// Used by functioncall mode to feed tool_call arguments into the
@@ -1277,6 +1280,12 @@ func WithHTTPErrorHandler(h func(error)) AIConfigOption {
 func WithToolCallCallback(cb func([]*ToolCall)) AIConfigOption {
 	return func(c *AIConfig) {
 		c.ToolCallCallback = cb
+	}
+}
+
+func WithFinishReasonCallback(cb func(string, []byte)) AIConfigOption {
+	return func(c *AIConfig) {
+		c.FinishReasonCallback = cb
 	}
 }
 

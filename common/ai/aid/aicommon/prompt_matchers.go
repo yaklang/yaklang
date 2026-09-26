@@ -1,6 +1,9 @@
 package aicommon
 
-import "strings"
+import (
+	"github.com/yaklang/yaklang/common/ai/aid/aiprojection"
+	"strings"
+)
 
 // This file provides shared prompt-matcher helpers used by test mock AI
 // callbacks across packages (common/ai/aid/test, common/ai/aid/aireact, and
@@ -152,7 +155,9 @@ func IsPrimaryDecisionPrompt(prompt string) bool {
 	if IsToolParamGenPrompt(prompt) {
 		return false
 	}
-	hasHighStatic := strings.Contains(prompt, "<|AI_CACHE_SYSTEM_high-static|>") ||
+	hasHighStatic := strings.Contains(prompt, "<|AI_CACHE_SYSTEM_high-static_"+aiprojection.Nonce()+"|>") ||
+		strings.Contains(prompt, "<|PROMPT_SECTION_high-static_"+aiprojection.Nonce()+"|>") ||
+		strings.Contains(prompt, "<|AI_CACHE_SYSTEM_high-static|>") ||
 		strings.Contains(prompt, "<|PROMPT_SECTION_high-static|>")
 	if hasHighStatic &&
 		strings.Contains(prompt, "<|PROMPT_SECTION_dynamic_") &&

@@ -1,0 +1,12 @@
+{{ if .RecentUserInput }}# 最近用户输入（任务背景）
+{{ .RecentUserInput }}
+{{ end }}# 当前环境
+{{ if .CurrentTime }}时间: {{ .CurrentTime }}
+{{ end }}{{ if .OSArch }}系统: {{ .OSArch }}
+{{ end }}{{ if .WorkingDir }}工作目录: {{ .WorkingDir }}
+{{ end }}{{ if .WorkingDirGlance }}目录概览: {{ .WorkingDirGlance }}
+{{ end }}
+# 本次调用意图
+{{ if .CallIntent }}{{ .CallIntent }}
+{{ else }}未提供额外调用意图；仅依据当前任务中与已选业务工具相关的明确目的生成参数，必需信息不足时说明原因。
+{{ end }}当前只为上文已选业务工具的这一次调用生成参数，不处理同批次其他调用。信息充分时调用一次 `submit_tool_params`，把业务参数放入 `arguments.params`；不要等待本次工具执行结果。

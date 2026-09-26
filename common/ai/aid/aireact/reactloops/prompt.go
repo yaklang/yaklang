@@ -30,11 +30,51 @@ func (r *ReActLoop) generateSchemaString(disallowExit bool, actionOperators ...*
 	filteredValues := r.getFilteredActions(disallowExit, actionOperators...)
 
 	// Mark init constraints as applied after first schema generation
-	if !r.initActionApplied && (len(r.initActionMustUse) > 0 || len(r.initActionDisabled) > 0) {
+	if !r.functionCallMode && !r.initActionApplied && (len(r.initActionMustUse) > 0 || len(r.initActionDisabled) > 0) {
 		r.initActionApplied = true
 	}
 
 	schemaText := buildSchema(filteredValues...)
+	return applyToolBatchSchemaMaxItems(schemaText, r.toolBatchMaxCalls())
+}
+
+// prepareLoopActionSchemas selects actions once and builds only the schema
+// representation used by this model turn.
+func (r *ReActLoop) prepareLoopActionSchemas(operator *LoopActionHandlerOperator) (string, string, error) {
+	filtered := r.getFilteredActions(operator != nil && operator.disallowLoopExit, operator)
+	maxBatchCalls := r.toolBatchMaxCalls()
+	var schema, functionCallSchemas string
+	var nativeActionNames []string
+	if r.functionCallMode {
+		tools, err := buildActionTools(filtered, maxBatchCalls)
+		if err != nil {
+			return "", "", err
+		}
+		functionCallSchemas, err = renderFunctionCallSchemaTags(tools)
+		if err != nil {
+			return "", "", err
+		}
+		nativeActionNames = make([]string, 0, len(tools))
+		for _, tool := range tools {
+			nativeActionNames = append(nativeActionNames, tool.Function.Name)
+		}
+	} else {
+		var err error
+		schema, err = applyToolBatchSchemaMaxItems(buildSchema(filtered...), maxBatchCalls)
+		if err != nil {
+			return "", "", err
+		}
+	}
+	// Preserve this turn's exact tool set before consuming one-shot constraints.
+	// Recomputing filters during a retry could expose actions absent from its prompt.
+	r.lastNativeActionNames = nativeActionNames
+	if !r.initActionApplied && (len(r.initActionMustUse) > 0 || len(r.initActionDisabled) > 0) {
+		r.initActionApplied = true
+	}
+	return schema, functionCallSchemas, nil
+}
+
+func (r *ReActLoop) toolBatchMaxCalls() int {
 	maxBatchCalls := aicommon.DefaultToolBatchMaxCalls
 	if concrete, ok := r.config.(*aicommon.Config); !ok || concrete.KeyValueConfig != nil {
 		maxBatchCalls = r.config.GetConfigInt(aicommon.ConfigKeyToolBatchMaxCalls, maxBatchCalls)
@@ -45,13 +85,13 @@ func (r *ReActLoop) generateSchemaString(disallowExit bool, actionOperators ...*
 	if maxBatchCalls > aicommon.DefaultToolBatchMaxCalls {
 		maxBatchCalls = aicommon.DefaultToolBatchMaxCalls
 	}
-	return applyToolBatchSchemaMaxItems(schemaText, maxBatchCalls)
+	return maxBatchCalls
 }
 
 // getFilteredActions returns the list of LoopActions that should be visible
 // to the model in this iteration, after applying all disable/must-use filters.
-// Shared by generateSchemaString (text mode) and buildFunctionCallTools
-// (functioncall mode) so both modes see the same action set.
+// Shared by text schema generation and per-action tool generation so both
+// modes see the same action set.
 func (r *ReActLoop) getFilteredActions(disallowExit bool, actionOperators ...*LoopActionHandlerOperator) []*LoopAction {
 	// loop
 	// build in code
@@ -128,6 +168,9 @@ func (r *ReActLoop) getFilteredActions(disallowExit bool, actionOperators ...*Lo
 
 	var filteredValues []*LoopAction
 	for _, v := range values {
+		if v.ActionType == nativeAdjustTodolistActionName && !r.functionCallMode {
+			continue
+		}
 		if !slices.Contains(disableActionList, v.ActionType) && filterFunc(v) {
 			filteredValues = append(filteredValues, v)
 		} else {
@@ -248,23 +291,21 @@ func (r *ReActLoop) generateLoopPrompt(
 		tools = r.toolsGetter()
 	}
 
-	schema, err := r.generateSchemaString(operator.disallowLoopExit, operator)
-	if err != nil {
-		return "", err
-	}
-	r.lastLoopSchema = schema
-
+	var err error
 	var persistent string
-	if r.persistentInstructionProvider != nil {
-		persistent, err = r.persistentInstructionProvider(r, "") // persistent context not use nonce
+	persistentProvider := r.persistentInstructionProvider
+	if r.functionCallMode && r.functionCallInstructionProvider != nil {
+		persistentProvider = r.functionCallInstructionProvider
+	}
+	if persistentProvider != nil {
+		persistent, err = persistentProvider(r, "") // persistent context not use nonce
 		if err != nil {
-			r.lastLoopSchema = schema
 			return "", utils.Wrap(err, "build persistent context failed")
 		}
 	}
 
 	var outputExample string
-	if r.outputExampleProvider != nil {
+	if !r.functionCallMode && r.outputExampleProvider != nil {
 		outputExample, err = r.outputExampleProvider(r, "") // persistent context not use nonce
 		if err != nil {
 			return "", utils.Wrap(err, "build output example failed")
@@ -338,8 +379,18 @@ func (r *ReActLoop) generateLoopPrompt(
 		return "", utils.Error("invoker is nil in ReActLoop.generateLoopPrompt")
 	}
 
+	// Providers may change the available actions (for example, the last planning
+	// iteration removes exploration tools). Build both protocols only after those
+	// transitions so the emitted schema matches the handlers for this iteration.
+	schema, functionCallSchemas, err := r.prepareLoopActionSchemas(operator)
+	if err != nil {
+		return "", err
+	}
+	r.lastLoopSchema = schema
+
 	result, err := r.invoker.AssembleLoopPrompt(tools, &LoopPromptAssemblyInput{
 		Nonce:                    nonce,
+		FunctionCallMode:         r.functionCallMode,
 		IncludeLatestModelReplay: true,
 		Lightweight:              r.useSpeedPriorityAI,
 		UserQuery:                userInput,
@@ -348,6 +399,7 @@ func (r *ReActLoop) generateLoopPrompt(
 		TaskInstruction:          persistent,
 		OutputExample:            outputExample,
 		Schema:                   schema,
+		FunctionCallSchemas:      functionCallSchemas,
 		SkillsContext:            skillsContext,
 		ForcedSkills:             forcedSkillsBlock,
 		AutoLoadedSkills:         autoSkillsBlock,

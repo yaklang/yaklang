@@ -59,10 +59,11 @@ func ConvertAIToolToLoopAction(tool *aitool.Tool) *LoopAction {
 	}
 
 	return &LoopAction{
-		AsyncMode:   false,
-		ActionType:  tool.GetName(),
-		Description: tool.GetDescription(),
-		Options:     options,
+		AsyncMode:         false,
+		ActionType:        tool.GetName(),
+		Description:       tool.GetDescription(),
+		NativeDescription: tool.GetDescription(),
+		Options:           options,
 		ActionVerifier: func(loop *ReActLoop, action *aicommon.Action) error {
 			// Extract clean tool parameters
 			params := extractToolParams(action)

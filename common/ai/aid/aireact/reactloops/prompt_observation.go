@@ -4,6 +4,7 @@ import (
 	"crypto/sha1"
 	"encoding/hex"
 	"fmt"
+	"github.com/yaklang/yaklang/common/ai/aid/aiprojection"
 	"strings"
 	"sync"
 	"time"
@@ -182,7 +183,7 @@ func newPromptSectionObservation(
 		Role:         role,
 		RoleZh:       promptSectionRoleZH(role),
 		Compressible: compressible,
-		Content:      content,
+		Content:      aiprojection.RedactNonce(content),
 	}
 	section.refreshMetrics()
 	return section

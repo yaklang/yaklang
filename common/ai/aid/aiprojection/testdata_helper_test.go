@@ -27,7 +27,7 @@ func loadFixtureRawPrompt(t *testing.T, name string) *FixtureMeta {
 	}
 
 	meta := &FixtureMeta{File: name}
-	rest, err := parseFixtureMeta(string(data), meta)
+	rest, err := parseFixtureMeta(strings.ReplaceAll(string(data), "\r\n", "\n"), meta)
 	if err != nil {
 		t.Fatalf("parse fixture %s failed: %v", name, err)
 	}

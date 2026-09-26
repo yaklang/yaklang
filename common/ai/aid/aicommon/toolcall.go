@@ -2,7 +2,6 @@ package aicommon
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"io"
 	"strings"
@@ -20,7 +19,6 @@ import (
 	"github.com/yaklang/yaklang/common/ai/aid/aiddb"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools"
-	"github.com/yaklang/yaklang/common/ai/aispec"
 	"gopkg.in/yaml.v3"
 )
 
@@ -159,8 +157,8 @@ type ToolCaller struct {
 	ctx    context.Context
 	cancel context.CancelFunc
 
-	generateToolParamsBuilder         func(tool *aitool.Tool, toolName string) (string, error)
 	generateToolParamsBuilderWithMeta func(tool *aitool.Tool, toolName string) (*ToolParamsPromptMeta, error)
+	generateFunctionCallParamsPrompt  func(tool *aitool.Tool, toolName string, intent ToolParamsCallIntent) (string, error)
 
 	m               *sync.Mutex
 	onCallToolStart func(callToolId string)
@@ -577,73 +575,6 @@ func WithToolCaller_OnEnd(i func(callToolId string)) ToolCallerOption {
 	}
 }
 
-func WithToolCaller_GenerateToolParamsBuilder(
-	builder func(tool *aitool.Tool, toolName string) (string, error),
-) ToolCallerOption {
-	return func(tc *ToolCaller) {
-		tc.generateToolParamsBuilder = builder
-	}
-}
-
-// buildNativeToolForParamGen constructs an aispec.Tool for R2 (parameter
-// generation) in functioncall mode. The tool's parameters schema mirrors the
-// call-tool action protocol: {"@action":"call-tool","tool":"<name>",
-// "identifier":"...","params":{<InputSchema>},"call_expectations":"..."}.
-// The model outputs the complete action JSON as tool_call arguments, which
-// flows through the same fixed-tool normalization and schema validation as
-// text mode. The declared schema remains the preferred response format.
-func buildNativeToolForParamGen(tool *aitool.Tool) aispec.Tool {
-	props := map[string]any{
-		"@action": map[string]any{
-			"const":       "call-tool",
-			"description": "Action type identifier",
-		},
-		"tool": map[string]any{
-			"type":        "string",
-			"description": "The tool to call",
-			"const":       tool.Name,
-		},
-		"identifier": map[string]any{
-			"type":        "string",
-			"description": "Short snake_case identifier for this tool call",
-		},
-	}
-	paramSchema := map[string]any{
-		"type":        "object",
-		"description": "Tool parameters",
-	}
-	if tool.InputSchema.Properties != nil && tool.InputSchema.Properties.Len() > 0 {
-		paramSchema["properties"] = tool.InputSchema.Properties
-	}
-	if len(tool.InputSchema.Required) > 0 {
-		paramSchema["required"] = tool.InputSchema.Required
-	}
-	props["params"] = paramSchema
-	props["call_expectations"] = map[string]any{
-		"type":        "string",
-		"description": "Expected duration, success criteria, and exception handling",
-	}
-
-	params := map[string]any{
-		"type":                 "object",
-		"properties":           props,
-		"required":             []string{"@action", "tool", "params"},
-		"additionalProperties": false,
-	}
-	description := tool.Description
-	if description == "" {
-		description = tool.GetName()
-	}
-	return aispec.Tool{
-		Type: "function",
-		Function: aispec.ToolFunction{
-			Name:        tool.Name,
-			Description: description,
-			Parameters:  params,
-		},
-	}
-}
-
 // ToolParamsPromptMeta contains the generated prompt and metadata for AITAG parsing
 type ToolParamsPromptMeta struct {
 	Prompt     string
@@ -658,6 +589,17 @@ func WithToolCaller_GenerateToolParamsBuilderWithMeta(
 ) ToolCallerOption {
 	return func(tc *ToolCaller) {
 		tc.generateToolParamsBuilderWithMeta = builder
+	}
+}
+
+// WithToolCaller_FunctionCallParamsPromptBuilder supplies the R2 prompt used
+// only by the native submit_tool_params path. It must not contain the text-mode
+// action JSON or TOOL_PARAM AITAG protocol.
+func WithToolCaller_FunctionCallParamsPromptBuilder(
+	builder func(tool *aitool.Tool, toolName string, intent ToolParamsCallIntent) (string, error),
+) ToolCallerOption {
+	return func(tc *ToolCaller) {
+		tc.generateFunctionCallParamsPrompt = builder
 	}
 }
 
@@ -708,14 +650,6 @@ func (t *ToolCaller) GetIntervalReviewDuration() time.Duration {
 		return DefaultToolCallIntervalReviewDuration
 	}
 	return t.intervalReviewDuration
-}
-
-func (t *ToolCaller) GetParamGeneratingPrompt(tool *aitool.Tool, toolName string) (string, error) {
-	if t.generateToolParamsBuilder == nil {
-		return "", fmt.Errorf("generateToolParamsBuilder is nil")
-	}
-
-	return t.generateToolParamsBuilder(tool, toolName)
 }
 
 func (t *ToolCaller) CallTool(tool *aitool.Tool) (result *aitool.ToolResult, directlyAnswer bool, err error) {
@@ -921,245 +855,10 @@ type GenerateParamsResult struct {
 }
 
 func (t *ToolCaller) generateParams(tool *aitool.Tool, handleError func(i any)) (*GenerateParamsResult, error) {
-	emitter := t.emitter
-
-	t.emitter.EmitToolCallStatus(t.callToolId, schema.TOOL_CALL_STATUS_PROCESSING_PARAMS)
-	defer t.emitter.EmitToolCallStatus(t.callToolId, schema.TOOL_CALL_STATUS_RUNNING)
-
-	// Try to use the new builder with metadata first (for AITAG support)
-	var paramsPrompt string
-	var promptMeta *ToolParamsPromptMeta
-	var err error
-
-	if t.generateToolParamsBuilderWithMeta != nil {
-		promptMeta, err = t.generateToolParamsBuilderWithMeta(tool, tool.Name)
-		if err != nil {
-			emitter.EmitError("error generate tool[%v] params with meta in task: %v, err: %v", tool.Name, t.task.GetName(), err)
-			handleError(fmt.Sprintf("error generate tool[%v] params with meta in task: %v", tool.Name, t.task.GetName()))
-			return nil, err
-		}
-		paramsPrompt = promptMeta.Prompt
-	} else {
-		paramsPrompt, err = t.GetParamGeneratingPrompt(tool, tool.Name)
-		if err != nil {
-			emitter.EmitError("error generate tool[%v] params in task: %v", tool.Name, t.task.GetName())
-			handleError(fmt.Sprintf("error generate tool[%v] params in task: %v", tool.Name, t.task.GetName()))
-			return nil, err
-		}
+	if t.config.GetConfigBool("EnableFunctionCallMode") {
+		return t.functionCallGenerateParams(tool, handleError)
 	}
-
-	// Batch children share the task/timeline prompt, but each generates params
-	// for a different invocation. Carry the selected call's intent into R2 so
-	// repeated uses of the same tool do not all target the first task item.
-	if t.reason != "" || t.destinationIdentifier != "" || t.callExpectations != "" {
-		intent, _ := json.Marshal(map[string]string{
-			"tool":              tool.Name,
-			"reason":            t.reason,
-			"identifier":        t.destinationIdentifier,
-			"call_expectations": t.callExpectations,
-		})
-		paramsPrompt += "\n\nGenerate parameters for this specific tool invocation. Use its reason, identifier and expectations to distinguish it from other calls in the task:\n" + string(intent)
-	}
-
-	invokeParams := aitool.InvokeParams{}
-	var identifier string
-	var callExpectations string
-	var paramDuration time.Duration
-	var rawAIResponse string
-	releaseParamGeneration := func() {}
-	if t.paramGenerationGate != nil {
-		releaseParamGeneration, err = t.paramGenerationGate(t.ctx)
-		releaseParamGeneration = idempotentToolCallerRelease(releaseParamGeneration)
-		if err != nil {
-			handleError(err)
-			return nil, err
-		}
-		if err = toolCallerContextErr(t.ctx); err != nil {
-			releaseParamGeneration()
-			handleError(err)
-			return nil, err
-		}
-	}
-	defer releaseParamGeneration()
-	if err = toolCallerContextErr(t.ctx); err != nil {
-		handleError(err)
-		return nil, err
-	}
-	// A reserved batch sequence belongs only to the first parameter transaction.
-	// Review-driven recursive CallTool calls must allocate a fresh sequence
-	// instead of replaying the outer transaction checkpoint.
-	paramTransactionSeq := t.paramTransactionSeq
-	t.paramTransactionSeq = 0
-
-	// Check if functioncall mode is enabled. In functioncall mode, R2 injects
-	// a native tool whose parameters schema mirrors the call-tool action
-	// protocol (same as ToJSONSchema: {@action, tool, params, identifier,
-	// call_expectations}). The model outputs the complete action JSON as
-	// tool_call arguments, which flow through the same extractFixedToolParamResponse
-	// pipeline as text mode. The native tool uses the tool's real name (not
-	// R1's execute_action), so R2 never sees R1's big tool.
-	functionCallMode := t.config.GetConfigBool("EnableFunctionCallMode")
-	var requestOpts []AIRequestOption
-	if functionCallMode {
-		nativeTool := buildNativeToolForParamGen(tool)
-		requestOpts = append(requestOpts,
-			WithAIRequest_ExtraSpecOpts(
-				aispec.WithTools([]aispec.Tool{nativeTool}),
-				aispec.WithToolChoice("auto"),
-			),
-			WithAIRequest_EnableToolCallArgumentsStream(),
-		)
-	}
-
-	validateNativeIdentity := func() error { return nil }
-	err = CallAITransaction(t.config, paramsPrompt, func(request *AIRequest) (*AIResponse, error) {
-		if functionCallMode {
-			identity := &fixedToolCallIdentity{expected: tool.Name}
-			WithAIRequest_ExtraSpecOpts(aispec.WithToolCallCallback(identity.observe))(request)
-			validateNativeIdentity = identity.validate
-		}
-		request.SetTaskIndex(t.task.GetIndex())
-		return t.ai.CallAI(request)
-	}, func(rsp *AIResponse) error {
-		boundEmitter := rsp.BindEmitter(emitter)
-		// Stream the model's thinking as the tool-call reason (updating the card)
-		// during param generation — but only when no specific reason has already
-		// been finalized (via preset, LiteForge, or directly_call_reason). This
-		// prevents raw thinking fragments from overwriting a contextualized reason.
-		rsp.SetOnReasonChunk(func(b []byte) {
-			if len(b) == 0 || t.reasonFinalized {
-				return
-			}
-			boundEmitter.EmitToolCallReason(t.callToolId, string(b))
-		})
-		pr, pw := utils.NewPipe()
-
-		stream := rsp.GetOutputStreamReader("call-tools", true, emitter)
-
-		var paramNames []string
-
-		// Build action maker options for AITAG support
-		var actionOpts []ActionMakerOption
-		if promptMeta != nil && promptMeta.Nonce != "" && len(promptMeta.ParamNames) > 0 {
-			actionOpts = append(actionOpts, WithActionNonce(promptMeta.Nonce))
-			// Register AITAG handlers for each parameter
-			for _, paramName := range promptMeta.ParamNames {
-				paramNames = append(paramNames, paramName)
-				tagName := fmt.Sprintf("TOOL_PARAM_%s", paramName)
-				// Map the tag to a special key in params that we'll merge later
-				tagParamName := fmt.Sprintf("__aitag__%s", paramName)
-				paramNames = append(paramNames, tagParamName)
-				actionOpts = append(actionOpts, WithActionTagToKey(tagName, tagParamName))
-			}
-			log.Debugf("registered AITAG handlers for tool[%s] params: %v with nonce: %s", tool.Name, promptMeta.ParamNames, promptMeta.Nonce)
-		}
-
-		_, err := boundEmitter.EmitDefaultSystemStreamEvent("generating-tool-call-params", pr, t.task.GetIndex())
-		if err != nil {
-			boundEmitter.EmitError("error emit default stream event for tool[%s] params: %v", tool.Name, err)
-		}
-
-		pw.WriteString("[开始处理参数] → ")
-
-		start := time.Now()
-		actionOpts = append(
-			actionOpts,
-			WithActionFieldStreamHandler(paramNames, func(key string, r io.Reader) {
-				if !strings.HasPrefix(key, "__aitag__") {
-					pw.WriteString(key + ": ")
-					io.Copy(pw, r)
-				} else {
-					actKey := strings.TrimPrefix(key, "__aitag__")
-					pw.WriteString(actKey + "(BLOCK)")
-					io.Copy(pw, r)
-				}
-				pw.WriteString(" → ")
-			}),
-			WithActionFieldStreamHandler([]string{
-				"call_expectations",
-			}, func(key string, r io.Reader) {
-				peekedR := utils.NewPeekableReader(r)
-				_, err := peekedR.Peek(1)
-				if err != nil {
-					return
-				}
-				pw.WriteString(" [note] -> ")
-				io.Copy(pw, peekedR)
-			}),
-		)
-
-		parsed, err := extractFixedToolParamResponse(t.ctx, stream, tool, actionOpts...)
-		if err != nil {
-			boundEmitter.EmitError("error extract tool params: %v", err)
-			pw.Close()
-			return utils.Errorf("error extracting action params: %v", err)
-		}
-		// Parsing joins the source and field streams before exposing parameters.
-		cost := time.Since(start)
-		pw.WriteString(" [done] 耗时(Cost): " + fmt.Sprintf("%.2f", cost.Seconds()) + "s")
-		pw.Close()
-
-		// Extract identifier from action (destination identifier for this tool call)
-		callToolParams := parsed.Envelope
-		attemptIdentifier := sanitizeIdentifier(callToolParams.GetString("identifier"))
-		if attemptIdentifier != "" {
-			log.Debugf("extracted identifier[%s] for tool[%s]", attemptIdentifier, tool.Name)
-		}
-
-		attemptExpectations := callToolParams.GetString("call_expectations")
-		if attemptExpectations != "" {
-			log.Debugf("extracted call_expectations for tool[%s]: %s", tool.Name, attemptExpectations)
-		}
-
-		// Each attempt owns a fresh candidate. Commit only after the complete
-		// JSON + AITAG payload passes the selected tool schema.
-		attemptParams := make(aitool.InvokeParams)
-		// First, get params from JSON
-		for k, v := range callToolParams.GetObject("params") {
-			attemptParams.Set(k, v)
-		}
-
-		if promptMeta != nil {
-			for _, block := range parsed.Blocks {
-				if block.Nonce != promptMeta.Nonce {
-					message := fmt.Sprintf("tool[%s] generated mismatched AITAG nonce for param[%s], expected=%s observed=%s; applying bounded nonce recovery", tool.Name, block.ParamName, promptMeta.Nonce, block.Nonce)
-					log.Warn(message)
-					boundEmitter.EmitWarning(message)
-				}
-			}
-		}
-		if err := mergeFixedToolParamBlocks(attemptParams, parsed.Blocks, promptMeta); err != nil {
-			return err
-		}
-		if err := validateNativeIdentity(); err != nil {
-			return err
-		}
-
-		normalizeToolParamBooleans(tool, attemptParams)
-		if valid, errors := tool.ValidateParams(attemptParams); !valid {
-			return utils.Errorf("generated parameters for fixed tool %q failed schema validation: %s; regenerate the complete params object and all required AITAG blocks in this response", tool.Name, strings.Join(errors, "; "))
-		}
-		invokeParams = attemptParams
-		identifier = attemptIdentifier
-		callExpectations = attemptExpectations
-		paramDuration = cost
-		rawAIResponse = parsed.Raw
-
-		return nil
-	}, append(requestOpts, WithAIRequest_CallerLabel("toolcall-params"), WithAIRequest_Context(t.ctx), WithAIRequest_SeqId(paramTransactionSeq))...)
-	releaseParamGeneration()
-	if err != nil {
-		emitter.EmitError("error calling AI for tool[%v] params: %v", tool.Name, err)
-		handleError(fmt.Sprintf("error calling AI for tool[%v] params: %v", tool.Name, err))
-		return nil, err
-	}
-	return &GenerateParamsResult{
-		Params:           invokeParams,
-		Identifier:       identifier,
-		Duration:         paramDuration,
-		RawAIResponse:    rawAIResponse,
-		CallExpectations: callExpectations,
-	}, nil
+	return t.textStreamGenerateParams(tool, handleError)
 }
 
 // sanitizeIdentifier sanitizes the identifier to be safe for use in file paths
@@ -1369,7 +1068,7 @@ func (t *ToolCaller) CallToolWithExistedParams(tool *aitool.Tool, presetParams b
 	} else {
 		generateResult, err := t.generateParams(tool, handleError)
 		if err != nil {
-			return nil, false, utils.Errorf("error generating params for tool[%v]: %v", tool.Name, err)
+			return nil, false, fmt.Errorf("error generating params for tool[%v]: %w", tool.Name, err)
 		}
 		invokeParams = generateResult.Params
 		destinationIdentifier = generateResult.Identifier

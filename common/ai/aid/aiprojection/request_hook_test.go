@@ -43,7 +43,7 @@ func TestProjectAndObserveMessagesReachChatBaseRequest(t *testing.T) {
 
 	prompt := "<|AI_CACHE_SYSTEM_high-static|>stable<|AI_CACHE_SYSTEM_END_high-static|>" +
 		"<|PROMPT_SECTION_dynamic_n1|>question<|PROMPT_SECTION_dynamic_END_n1|>"
-	_, err := aispec.ChatBase(srv.URL, "test-model", prompt,
+	_, err := aispec.ChatBase(srv.URL, "test-model", CreateTemplate(prompt),
 		aispec.WithChatBase_DisableStream(true),
 		aispec.WithChatBase_PoCOptions(func() ([]poc.PocConfigOption, error) { return nil, nil }),
 	)
@@ -79,7 +79,7 @@ func TestProjectAndObserveMessagesReachResponsesRequest(t *testing.T) {
 	prompt := "<|AI_CACHE_SYSTEM_high-static|>stable<|AI_CACHE_SYSTEM_END_high-static|>" +
 		"<|PROMPT_SECTION_dynamic_n1|>question<|PROMPT_SECTION_dynamic_END_n1|>"
 	selected := []aispec.Tool{{Type: "function", Function: aispec.ToolFunction{Name: "approved"}}}
-	_, err := aispec.ChatBase(srv.URL+"/responses", "test-model", prompt,
+	_, err := aispec.ChatBase(srv.URL+"/responses", "test-model", CreateTemplate(prompt),
 		aispec.WithChatBase_DisableStream(true),
 		aispec.WithChatBase_Tools(selected),
 		aispec.WithChatBase_PoCOptions(func() ([]poc.PocConfigOption, error) { return nil, nil }),
@@ -106,7 +106,7 @@ func TestProjectAndObserve_SmokeWithFourSections(t *testing.T) {
 	ResetForTest()
 
 	prompt := buildFourSectionPrompt("nz", "qz", "tools", "static", "tl", "mem")
-	ProjectAndObserve("smoke-model", prompt)
+	ProjectAndObserve("smoke-model", CreateTemplate(prompt))
 
 	// Observe 内部直接同步调 Record，可以立即查
 	rep := gCache.Record(Split(prompt), "smoke-model")
@@ -175,7 +175,7 @@ func TestProjectAndObserve_HijackPathStillRecords(t *testing.T) {
 	ResetForTest()
 	prompt := buildFourSectionPrompt("hpath", "u", "tools", "static-body", "tl", "mem")
 
-	res := ProjectAndObserve("hp-model", prompt)
+	res := ProjectAndObserve("hp-model", CreateTemplate(prompt))
 	require.NotNil(t, res, "Observe should return hijack result for prompt with high-static")
 	assert.True(t, res.IsHijacked)
 	assert.Len(t, res.Messages, 2)
@@ -185,26 +185,27 @@ func TestProjectAndObserve_HijackPathStillRecords(t *testing.T) {
 	assert.Equal(t, 4, len(gCache.chunks), "all 4 chunks should be recorded in global cache table")
 
 	// 再来一发同样的 prompt：totalRequests==2，chunks 不增（hash 复用）
-	res2 := ProjectAndObserve("hp-model", prompt)
+	res2 := ProjectAndObserve("hp-model", CreateTemplate(prompt))
 	require.NotNil(t, res2)
 	assert.True(t, res2.IsHijacked)
 	assert.Equal(t, int64(2), gCache.totalRequests)
 	assert.Equal(t, 4, len(gCache.chunks), "second call should reuse hashes; chunk count unchanged")
 }
 
-// TestProjectAndObserve_NoHighStaticReturnsCorrelationOnly 没 high-static 时
+// TestProjectAndObserve_NoHighStaticStripsNonceAndReturnsCorrelation 没 high-static 时
 // 返回仅带 CorrelationID 的 result, 让 ChatBase 仍能
 // 把 SeqId 透传到 SSE 末帧 ChatUsage.MirrorCorrelationID, 与 dump 文件名精确 join.
 // IsHijacked 必为 false, Messages 必为空, 不影响默认拼装路径.
-func TestProjectAndObserve_NoHighStaticReturnsCorrelationOnly(t *testing.T) {
+func TestProjectAndObserve_NoHighStaticStripsNonceAndReturnsCorrelation(t *testing.T) {
 	ResetForTest()
 	prompt := "<|PROMPT_SECTION_semi-dynamic|>\nsd\n<|PROMPT_SECTION_END_semi-dynamic|>\n\n" +
 		"<|PROMPT_SECTION_dynamic_xx|>\nuq\n<|PROMPT_SECTION_dynamic_END_xx|>"
 
-	res := ProjectAndObserve("nh-model", prompt)
+	res := ProjectAndObserve("nh-model", CreateTemplate(prompt))
 	require.NotNil(t, res, "hook should still return a correlation ID")
-	assert.False(t, res.IsHijacked, "no high-static should not hijack")
-	assert.Empty(t, res.Messages, "no hijack means no Messages")
+	assert.True(t, res.IsHijacked, "authenticated envelopes must lose their nonce even without cache splitting")
+	require.Len(t, res.Messages, 1)
+	assert.Equal(t, prompt, res.Messages[0].Content)
 	assert.Equal(t, int64(1), gCache.totalRequests, "cache analysis should still record the request")
 	assert.NotEmpty(t, res.CorrelationID, "CorrelationID must be set")
 	// ID 必须等于本次 Record 的 SeqId 字符串, 让 dump (000XXX.txt 名为 SeqId)
@@ -220,7 +221,7 @@ func TestProjectAndObserve_HijackResultCarriesCorrelationID(t *testing.T) {
 	ResetForTest()
 	prompt := buildFourSectionPrompt("seq", "uu", "tools", "static-body", "tl", "mem")
 
-	res1 := ProjectAndObserve("seq-model", prompt)
+	res1 := ProjectAndObserve("seq-model", CreateTemplate(prompt))
 	require.NotNil(t, res1)
 	require.True(t, res1.IsHijacked)
 	require.NotEmpty(t, res1.CorrelationID)
@@ -229,7 +230,7 @@ func TestProjectAndObserve_HijackResultCarriesCorrelationID(t *testing.T) {
 	assert.Greater(t, id1, int64(0))
 
 	// 同 prompt 再来一发, 缓存 chunks 应复用, 但 SeqId 必递增, 即 ID 不同.
-	res2 := ProjectAndObserve("seq-model", prompt)
+	res2 := ProjectAndObserve("seq-model", CreateTemplate(prompt))
 	require.NotNil(t, res2)
 	require.NotEmpty(t, res2.CorrelationID)
 	id2, err := strconv.ParseInt(res2.CorrelationID, 10, 64)

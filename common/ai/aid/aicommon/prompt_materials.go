@@ -12,14 +12,16 @@ import "github.com/yaklang/yaklang/common/ai/aid/aitool"
 // 关键词: PromptMaterials, shared prefix materials, aireact + aid 共用
 type PromptMaterials struct {
 	Nonce             string
+	FunctionCallMode  bool
 	AllowToolCall     bool
 	AllowPlanAndExec  bool
 	HasLoadCapability bool
 
-	TaskInstruction string
-	ExecutionPolicy string
-	Schema          string
-	OutputExample   string
+	TaskInstruction     string
+	ExecutionPolicy     string
+	Schema              string
+	FunctionCallSchemas string
+	OutputExample       string
 
 	// SemiDynamic 提示材料:
 	//   - aireact: SkillsContext
@@ -90,9 +92,9 @@ type PromptMaterials struct {
 	ReportedRisks string
 }
 
-// HighStaticData 返回空 map: high-static 段是完全无变量的系统级共享 static。
+// HighStaticData only selects between two stable protocol prefixes.
 func (m *PromptMaterials) HighStaticData() map[string]any {
-	return map[string]any{}
+	return map[string]any{"FunctionCallMode": m != nil && m.FunctionCallMode}
 }
 
 // SemiDynamicData 供 caller-specific semi-dynamic 模板消费。
@@ -114,17 +116,20 @@ func (m *PromptMaterials) SemiDynamic1Data() map[string]any {
 	return m.SemiDynamicData()
 }
 
-// SemiDynamic2Data 供 TaskInstruction -> OutputExample -> Schema 半动态段消费, 尾部追加 AutoLoadedSkills (AI 意图驱动加载 SKILL).
+// SemiDynamic2Data selects either the text example/schema or native action
+// tags for this request. AutoLoadedSkills remain visible in both modes.
 func (m *PromptMaterials) SemiDynamic2Data() map[string]any {
 	if m == nil {
 		return map[string]any{}
 	}
 	return map[string]any{
-		"TaskInstruction":  m.TaskInstruction,
-		"ExecutionPolicy":  m.ExecutionPolicy,
-		"Schema":           m.Schema,
-		"OutputExample":    m.OutputExample,
-		"AutoLoadedSkills": m.AutoLoadedSkills,
+		"FunctionCallMode":    m.FunctionCallMode,
+		"TaskInstruction":     m.TaskInstruction,
+		"ExecutionPolicy":     m.ExecutionPolicy,
+		"Schema":              m.Schema,
+		"FunctionCallSchemas": m.FunctionCallSchemas,
+		"OutputExample":       m.OutputExample,
+		"AutoLoadedSkills":    m.AutoLoadedSkills,
 	}
 }
 
@@ -135,6 +140,7 @@ func (m *PromptMaterials) FrozenBlockData() map[string]any {
 	}
 	return map[string]any{
 		"ForcedSkills":           m.ForcedSkills,
+		"FunctionCallMode":       m.FunctionCallMode,
 		"ToolInventory":          m.ToolInventory,
 		"ToolsCount":             m.ToolsCount,
 		"TopToolsCount":          m.TopToolsCount,

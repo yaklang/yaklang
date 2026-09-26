@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
+	"github.com/yaklang/yaklang/common/ai/aid/aiprojection"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 )
 
@@ -79,6 +80,17 @@ func TestTimelinePromptProjectionPreservesRawBucketTopology(t *testing.T) {
 		require.Equal(t, rawBlock.TotalInBucket, projectedBlock.TotalInBucket)
 		require.Equal(t, rawBlock.StableNonce(), projectedBlock.StableNonce())
 	}
+}
+
+func TestTimelinePromptProjectionKeepsActionResponseInLightweightMainPrompt(t *testing.T) {
+	timeline := NewTimeline(nil, nil)
+	marker := aiprojection.CreateTag("FUNCTION_CALL_ACTION_RESPONSE", "", `[{"role":"assistant"}]`)
+	display := "[FUNCTION_CALL_ACTION_RESPONSE]:\naccepted call_a"
+	timeline.PushTextWithPromptProjection(1, display, "[FUNCTION_CALL_ACTION_RESPONSE]:\n"+marker)
+
+	require.Contains(t, timeline.DumpRecentForPromptWithLatestModelReplay(10000), marker)
+	require.NotContains(t, timeline.DumpRecentForPrompt(10000), marker)
+	require.Contains(t, timeline.Dump(), "accepted call_a")
 }
 
 func TestTimelinePromptProjectionKeepsRealAndDropsOnlyRedundantErrorLines(t *testing.T) {

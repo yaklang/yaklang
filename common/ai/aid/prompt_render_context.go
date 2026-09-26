@@ -53,13 +53,3 @@ func (t *AiTask) taskPromptContext() *PromptContextProvider {
 	}
 	return clonePromptContextForTask(nil, t)
 }
-
-func (t *AiTask) quickBuildTaskPrompt(tmp string, data map[string]any) (string, error) {
-	if data == nil {
-		data = make(map[string]any)
-	}
-	if _, ok := data["ContextProvider"]; !ok {
-		data["ContextProvider"] = t.taskPromptContext()
-	}
-	return t.quickBuildPrompt(tmp, data)
-}

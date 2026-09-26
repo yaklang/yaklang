@@ -1,7 +1,11 @@
 {{ if .ForcedSkills }}{{ .ForcedSkills }}
 
-{{ end }}{{ if .ToolInventory }}# Tool Inventory
-You have access to {{ .ToolsCount }} built-in tools. Below are {{ .TopToolsCount }} prioritized entries selected within a token budget:
+{{ end }}{{ if .ToolInventory }}{{ if .FunctionCallMode }}# Tool Inventory — 业务工具目录
+用法：下列仅是工具名称和简介，不含完整参数 Schema；原生 `tool_calls[].function.name` 只能选已声明的 action，目录名称要填在 action 参数中。
+完整 Schema 已知（优先查 `CACHE_TOOL_CALL`）→ `directly_call_tool`：`directly_call_tool_name`=名称、`directly_call_tool_params`=参数；否则 → `require_tool`：`tool_require_payload`=名称，由运行时生成参数。缓存未命中但已知完整 Schema 时仍可直调，由运行时校验。
+{{ else }}# Tool Inventory
+下列是按优先级选出的可用业务工具，完整目录可按需检索。
+{{ end }}
 
 ## 工具调用模式（单调用、可选并发批次或 tool_compose）
 
@@ -12,11 +16,11 @@ You have access to {{ .ToolsCount }} built-in tools. Below are {{ .TopToolsCount
 - 任一批次发生准入、Schema 或参数错误后，保留已成功结果，将失败调用改为修正后的单调用；禁止原样重试批次.
 
 ## Prioritized Tools
-{{ range .TopTools }}
+{{ range .TopTools -}}
 * `{{ .Name }}`: {{ .Description }}
-{{ end }}{{ if .HasMoreTools }}
-> 还有 {{ .MoreToolsCount }} 个工具未列入上方清单. 不在列表中的工具 / AI 蓝图 / 技能 / Focus 模式, 通过 `search_capabilities` 按关键字检索后再加载使用.
-{{ end }}{{ end }}
+{{ end }}
+> 此处为优先展示目录；完整能力范围可按需通过能力检索入口查询。
+{{ end }}
 
 {{ if .ForgeInventory }}# AI Blueprint Inventory
 以下是当前可直接调用的 AI 蓝图列表：

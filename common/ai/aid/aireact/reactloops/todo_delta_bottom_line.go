@@ -47,6 +47,12 @@ func validateTodoDeltaBeforeActionVerifier(r *ReActLoop, action *aicommon.Action
 	if delta == nil {
 		return
 	}
+	// Dedicated TODO calls execute in provider order. A later call in the same
+	// batch may refer to an item created by an earlier call, so state validation
+	// belongs to ApplyTodoDeltaAndEmit at execution time for this action.
+	if action.Name() == nativeAdjustTodolistActionName {
+		return
+	}
 	if err := r.config.ValidateTodoDelta(aicommon.BuildVerificationTodoScope(r.GetCurrentTask()), delta); err != nil {
 		suppressInvalidTodoDelta(r, action, err)
 	}
@@ -68,7 +74,10 @@ func applyTodoDeltaBottomLine(r *ReActLoop, task aicommon.AIStatefulTask, iterat
 	if invoker := r.GetInvoker(); invoker != nil {
 		timelineHook = invoker.AddToTimeline
 	}
-	aicommon.ApplyTodoDeltaAndEmit(r.config, r.GetEmitter(), task, aicommon.BuildVerificationTodoScope(task), iteration, delta, timelineHook)
+	results := aicommon.ApplyTodoDeltaAndEmit(r.config, r.GetEmitter(), task, aicommon.BuildVerificationTodoScope(task), iteration, delta, timelineHook)
+	if aicommon.FormatVerificationTodoApplyErrors(results) != "" {
+		return nil
+	}
 	return delta
 }
 
@@ -91,8 +100,14 @@ func applyTodoDeltaBottomLine(r *ReActLoop, task aicommon.AIStatefulTask, iterat
 //
 // 关键词: 有效迭代, todo 推进判定, 空转轮不计入
 func (r *ReActLoop) advanceEffectiveIteration(task aicommon.AIStatefulTask, delta *aicommon.TodoDelta) {
+	if r.shouldAdvanceEffectiveIteration(task, delta) {
+		r.effectiveIterationCount++
+	}
+}
+
+func (r *ReActLoop) shouldAdvanceEffectiveIteration(task aicommon.AIStatefulTask, delta *aicommon.TodoDelta) bool {
 	if r == nil || task == nil {
-		return
+		return false
 	}
 	scope := aicommon.BuildVerificationTodoScope(task)
 	hasActiveTodo := false
@@ -102,9 +117,5 @@ func (r *ReActLoop) advanceEffectiveIteration(task aicommon.AIStatefulTask, delt
 	}
 	progressed := delta != nil && delta.HasChanges()
 
-	if !hasActiveTodo || progressed {
-		// Effective: either we have no TODOs to advance (planning phase) or we
-		// actually advanced one this iteration.
-		r.effectiveIterationCount++
-	}
+	return !hasActiveTodo || progressed
 }

@@ -75,7 +75,10 @@ func WithVerboseNameZh(name string) LoopMetadataOption {
 }
 
 func RegisterAction(action *LoopAction) {
-	actions.Set(action.ActionType, action)
+	if action == nil {
+		return
+	}
+	actions.Set(action.ActionType, withNativeActionDescription(action))
 }
 
 func GetLoopAction(name string) (*LoopAction, bool) {
