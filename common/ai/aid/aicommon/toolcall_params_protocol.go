@@ -7,10 +7,8 @@ import (
 	"fmt"
 	"io"
 	"strings"
-	"sync"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
-	"github.com/yaklang/yaklang/common/ai/aispec"
 	"github.com/yaklang/yaklang/common/utils"
 )
 
@@ -237,60 +235,6 @@ func mergeFixedToolParamBlocks(params aitool.InvokeParams, blocks []toolParamAIT
 		if block.Content != "" && params.GetString(block.ParamName) == "" {
 			params[block.ParamName] = block.Content
 		}
-	}
-	return nil
-}
-
-// Native calls carry tool identity separately from their argument JSON.
-// Accept incremental name fragments and repeated full names, but never a
-// second call or a different function. A text response has no native metadata.
-type fixedToolCallIdentity struct {
-	mu                 sync.Mutex
-	expected, name, id string
-	index              int
-	seen               bool
-	err                error
-}
-
-func (s *fixedToolCallIdentity) observe(calls []*aispec.ToolCall) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	for _, call := range calls {
-		if call == nil || s.err != nil {
-			continue
-		}
-		if s.seen && (call.Index != s.index || (call.ID != "" && s.id != "" && call.ID != s.id)) {
-			s.err = fmt.Errorf("fixed-tool parameter generation returned multiple native calls")
-			continue
-		}
-		s.seen = true
-		s.index = call.Index
-		if call.ID != "" {
-			s.id = call.ID
-		}
-		part := call.Function.Name
-		if part == "" {
-			continue
-		}
-		if part == s.expected && strings.HasPrefix(s.expected, s.name) {
-			s.name = part
-		} else {
-			s.name += part
-		}
-		if !strings.HasPrefix(s.expected, s.name) {
-			s.err = fmt.Errorf("native parameter function %q does not match selected tool %q", s.name, s.expected)
-		}
-	}
-}
-
-func (s *fixedToolCallIdentity) validate() error {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	if s.err != nil {
-		return s.err
-	}
-	if s.seen && s.name != s.expected {
-		return fmt.Errorf("native parameter function is incomplete; expected selected tool %q", s.expected)
 	}
 	return nil
 }

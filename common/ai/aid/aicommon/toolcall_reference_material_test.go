@@ -18,6 +18,7 @@ func TestToolCaller_ParamsDoNotEmitModelExchangeReferences(t *testing.T) {
 	const prompt = "private parameter-generation prompt"
 	const rawResponse = `{"@action":"call-tool","params":{"id":42},"diagnostic_marker":"raw-response-only"}`
 	cfg := NewTestConfig(context.Background(),
+		WithEnableFunctionCallMode(false),
 		WithEventHandler(func(event *schema.AiOutputEvent) {
 			mu.Lock()
 			defer mu.Unlock()
@@ -40,7 +41,9 @@ func TestToolCaller_ParamsDoNotEmitModelExchangeReferences(t *testing.T) {
 		WithToolCaller_AICallerConfig(cfg), WithToolCaller_AICaller(cfg),
 		WithToolCaller_Emitter(cfg.GetEmitter()), WithToolCaller_Task(cfg.DefaultTask),
 		WithToolCaller_CallToolID("reference-test-call"),
-		WithToolCaller_GenerateToolParamsBuilder(func(*aitool.Tool, string) (string, error) { return prompt, nil }),
+		WithToolCaller_GenerateToolParamsBuilderWithMeta(func(*aitool.Tool, string) (*ToolParamsPromptMeta, error) {
+			return &ToolParamsPromptMeta{Prompt: prompt}, nil
+		}),
 	)
 	require.NoError(t, err)
 	result, err := caller.generateParams(tool, func(any) {})

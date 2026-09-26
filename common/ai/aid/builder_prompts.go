@@ -25,12 +25,6 @@ var __prompt_PlanHelp = promptloader.MustLoad("ai/aid/prompts/plan/plan-help.txt
 
 var __prompt_KeywordSearchPrompt = promptloader.MustLoad("ai/aid/prompts/search/aitool-keyword-search.txt")
 
-//go:embed prompts/plan/deepthink/instruction.txt
-var __prompt_deepthinkInstruction string
-
-//go:embed prompts/plan/deepthink/dynamic.txt
-var __prompt_deepthinkDynamic string
-
 var __prompt_dynamicPlanInstruction = promptloader.MustLoad("ai/aid/prompts/plan/dynamic-plan/instruction.txt")
 
 var __prompt_dynamicPlanDynamic = promptloader.MustLoad("ai/aid/prompts/plan/dynamic-plan/dynamic.txt")

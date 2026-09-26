@@ -8,13 +8,6 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 )
 
-type deepthinkDynamicData struct {
-	Progress        string
-	CurrentTaskGoal string
-	UserInput       string
-	PlanHelp        string
-}
-
 type dynamicPlanDynamicData struct {
 	CurrentTaskInfo   string
 	UserInput         string
@@ -104,25 +97,6 @@ func buildCreateSubtaskTargetPlansDetail(c *Coordinator, targetPlans []string) s
 		lines = append(lines, fmt.Sprintf("- %s: %s；目标：%s", index, task.Name, task.Goal))
 	}
 	return strings.Join(lines, "\n")
-}
-
-func (t *AiTask) buildDeepthinkPrompt(userInput string) (string, error) {
-	builder := aicommon.NewDefaultPromptPrefixBuilder()
-	nonce := utils.RandStringBytes(6)
-	materials := newAidPromptMaterialsForConfig(t.Config, __prompt_deepthinkInstruction, t.ContextProvider.Schema()["PlanJsonSchema"])
-	ctxProvider := t.taskPromptContext()
-	return builder.AssemblePromptWithDynamicSection(
-		materials,
-		"aid-deepthink-dynamic",
-		__prompt_deepthinkDynamic,
-		deepthinkDynamicData{
-			Progress:        ctxProvider.Progress(),
-			CurrentTaskGoal: t.Goal,
-			UserInput:       strings.TrimSpace(userInput),
-			PlanHelp:        ctxProvider.PlanHelp(),
-		},
-		nonce,
-	)
 }
 
 func (t *AiTask) buildDynamicPlanPrompt(userInput string) (string, error) {
