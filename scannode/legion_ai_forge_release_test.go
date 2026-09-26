@@ -1,9 +1,14 @@
 package scannode
 
 import (
+	"context"
 	"strings"
 	"testing"
+	"time"
 
+	"github.com/stretchr/testify/require"
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
+	"github.com/yaklang/yaklang/common/ai/aispec"
 	aiv1 "github.com/yaklang/yaklang/scannode/gen/legionpb/legion/ai/v1"
 )
 
@@ -127,4 +132,47 @@ func TestValidateContextForgeReleaseAllowsExactReportAndHTTPProfiles(t *testing.
 	if err := validateContextForgeRelease(httpRelease); err == nil || !strings.Contains(err.Error(), "exact") {
 		t.Fatalf("incomplete HTTP tool set error = %v", err)
 	}
+}
+
+func TestBuildContextForgeBlueprintOptsIntoResultPolicy(t *testing.T) {
+	release := testLegionContextForgeRelease(t)
+	config, blueprint, params, err := buildContextForgeBlueprint(release)
+	require.NoError(t, err)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	var prompts []string
+	var budgets []int64
+	coordinator, err := blueprint.CreateCoordinatorWithQueryAndParams(ctx, "summarize the supplied facts", params,
+		aicommon.WithDisableAutoSkills(true),
+		aicommon.WithDisableCreateDBRuntime(true),
+		aicommon.WithDisableMemoryTriage(true),
+		aicommon.WithAllowRequireForUserInteract(false),
+		aicommon.WithAIAutoRetry(1),
+		aicommon.WithAITransactionAutoRetry(1),
+		aicommon.WithAICallback(func(c aicommon.AICallerConfigIf, request *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+			prompts = append(prompts, request.GetPrompt())
+			model := &aispec.AIConfig{}
+			aispec.WithMaxTokens(8192)(model)
+			for _, option := range request.GetExtraSpecOpts() {
+				option(model)
+			}
+			budgets = append(budgets, *model.MaxTokens)
+			response := c.NewAIResponse()
+			response.EmitReasonStream(strings.NewReader("internal reasoning"))
+			output := ""
+			if len(prompts) == 2 {
+				output = "# Report\nOnly the supplied facts were reviewed."
+			}
+			response.EmitOutputStream(strings.NewReader(output))
+			response.Close()
+			return response, nil
+		}))
+	require.NoError(t, err)
+	require.NotNil(t, coordinator.ResultHandler)
+	coordinator.ResultHandler(coordinator)
+
+	require.Equal(t, []int64{4096, 4096}, budgets, "only the server adapter opts into the report budget and retry")
+	require.Contains(t, prompts[0], release.ResultPrompt)
+	require.Contains(t, prompts[1], "最终输出通道")
+	require.Equal(t, "# Report\nOnly the supplied facts were reviewed.", config.ForgeResult.Formated)
 }
