@@ -158,7 +158,7 @@ type ToolCaller struct {
 	cancel context.CancelFunc
 
 	generateToolParamsBuilderWithMeta func(tool *aitool.Tool, toolName string) (*ToolParamsPromptMeta, error)
-	generateFunctionCallParamsPrompt  func(tool *aitool.Tool, toolName string) (string, error)
+	generateFunctionCallParamsPrompt  func(tool *aitool.Tool, toolName string, intent ToolParamsCallIntent) (string, error)
 
 	m               *sync.Mutex
 	onCallToolStart func(callToolId string)
@@ -596,7 +596,7 @@ func WithToolCaller_GenerateToolParamsBuilderWithMeta(
 // only by the native submit_tool_params path. It must not contain the text-mode
 // action JSON or TOOL_PARAM AITAG protocol.
 func WithToolCaller_FunctionCallParamsPromptBuilder(
-	builder func(tool *aitool.Tool, toolName string) (string, error),
+	builder func(tool *aitool.Tool, toolName string, intent ToolParamsCallIntent) (string, error),
 ) ToolCallerOption {
 	return func(tc *ToolCaller) {
 		tc.generateFunctionCallParamsPrompt = builder

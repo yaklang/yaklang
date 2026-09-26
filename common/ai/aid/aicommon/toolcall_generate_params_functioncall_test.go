@@ -35,7 +35,7 @@ func TestFunctionCallGenerateParamsSubmissionAndAbandonment(t *testing.T) {
 					if tc.call {
 						options.ToolCallCallback([]*aispec.ToolCall{{
 							ID: "call-1", Type: "function",
-							Function: aispec.FuncReturn{Name: submitToolParamsFunctionName,
+							Function: aispec.FuncReturn{Name: SubmitToolParamsFunctionName,
 								Arguments: `{"params":{"path":"/tmp/report"},"identifier":"read_report"}`},
 						}})
 					} else {
@@ -49,7 +49,13 @@ func TestFunctionCallGenerateParamsSubmissionAndAbandonment(t *testing.T) {
 			caller, err := NewToolCaller(context.Background(),
 				WithToolCaller_AICallerConfig(cfg), WithToolCaller_AICaller(cfg),
 				WithToolCaller_Emitter(cfg.GetEmitter()), WithToolCaller_Task(cfg.DefaultTask),
-				WithToolCaller_FunctionCallParamsPromptBuilder(func(*aitool.Tool, string) (string, error) {
+				WithToolCaller_Reason("inspect report"),
+				WithToolCaller_DestinationIdentifier("report_path"),
+				WithToolCaller_CallExpectations("read report content"),
+				WithToolCaller_FunctionCallParamsPromptBuilder(func(_ *aitool.Tool, _ string, intent ToolParamsCallIntent) (string, error) {
+					require.Equal(t, "inspect report", intent.Reason)
+					require.Equal(t, "report_path", intent.DestinationIdentifier)
+					require.Equal(t, "read report content", intent.CallExpectations)
 					return "native prompt", nil
 				}),
 			)
@@ -76,8 +82,8 @@ func TestNativeParamSubmissionRejectsOtherOrMultipleCalls(t *testing.T) {
 	for _, calls := range [][]*aispec.ToolCall{
 		{{Function: aispec.FuncReturn{Name: "other_tool", Arguments: `{}`}}},
 		{
-			{Index: 0, ID: "one", Function: aispec.FuncReturn{Name: submitToolParamsFunctionName, Arguments: `{}`}},
-			{Index: 1, ID: "two", Function: aispec.FuncReturn{Name: submitToolParamsFunctionName, Arguments: `{}`}},
+			{Index: 0, ID: "one", Function: aispec.FuncReturn{Name: SubmitToolParamsFunctionName, Arguments: `{}`}},
+			{Index: 1, ID: "two", Function: aispec.FuncReturn{Name: SubmitToolParamsFunctionName, Arguments: `{}`}},
 		},
 	} {
 		collector := &nativeParamSubmission{}

@@ -1,0 +1,7 @@
+{{ if .TimelineOpen }}# 开放时间线
+{{ .TimelineOpen }}
+{{ end }}{{ if .PromotedTimelineOpen }}{{ .PromotedTimelineOpen }}
+{{ end }}{{ if .SessionEvidence }}# 新增会话证据
+{{ .SessionEvidence }}
+{{ end }}{{ if .ReportedRisks }}{{ .ReportedRisks }}
+{{ end }}

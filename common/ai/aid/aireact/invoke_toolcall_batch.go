@@ -408,10 +408,10 @@ func (r *ReAct) newToolCallerForBatchCall(
 			},
 		),
 		aicommon.WithToolCaller_FunctionCallParamsPromptBuilder(
-			func(tool *aitool.Tool, _ string) (string, error) {
+			func(tool *aitool.Tool, _ string, intent aicommon.ToolParamsCallIntent) (string, error) {
 				promptMu.Lock()
 				defer promptMu.Unlock()
-				return r.promptManager.GenerateFunctionCallToolParamsPromptForTask(task, tool)
+				return r.promptManager.GenerateFunctionCallToolParamsPromptForTask(task, tool, intent)
 			},
 		),
 	)
