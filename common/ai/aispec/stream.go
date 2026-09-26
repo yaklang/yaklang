@@ -250,14 +250,9 @@ func processAIResponse(r []byte, closer io.ReadCloser, outWriter io.Writer, reas
 	// 关键词: lastUsage, SSE 末帧 usage
 	var lastUsage *ChatUsage
 	var mirrorResponse bytes.Buffer
-	defer func() {
-		if len(finishReasonCallback) > 0 && finishReasonCallback[0] != nil {
-			finishReasonCallback[0](chatCompletionFinishReason(mirrorResponse.Bytes()), append([]byte(nil), mirrorResponse.Bytes()...))
-		}
-	}()
 	ensureUsageCaptured := func() {
 		if lastUsage == nil {
-			lastUsage = extractLastChatUsageFromPayload(mirrorResponse.Bytes())
+			lastUsage = extractLastChatUsageFromPayload(providerResponsePayload(r, mirrorResponse.Bytes()))
 		}
 	}
 	defer func() {
@@ -275,6 +270,14 @@ func processAIResponse(r []byte, closer io.ReadCloser, outWriter io.Writer, reas
 		utils.CallGeneralClose(reasonWriter)
 		utils.CallGeneralClose(outWriter)
 		utils.CallGeneralClose(toolCallArgumentsWriter)
+	}()
+	// Defers run in reverse order: publish completion before exposing EOF to
+	// native-call consumers. Usage keeps its existing after-close timing, and
+	// the separate cleanup defer still closes pipes if the finish callback panics.
+	defer func() {
+		if len(finishReasonCallback) > 0 && finishReasonCallback[0] != nil {
+			finishReasonCallback[0](chatCompletionFinishReason(providerResponsePayload(r, mirrorResponse.Bytes())), append([]byte(nil), mirrorResponse.Bytes()...))
+		}
 	}()
 
 	if rawResponseHeaderCallback != nil {
@@ -703,14 +706,9 @@ func processAIResponseForResponses(r []byte, closer io.ReadCloser, outWriter io.
 	// 关键词: responses 接口 usage 兜底提取
 	var lastUsage *ChatUsage
 	var mirrorResponse bytes.Buffer
-	defer func() {
-		if len(finishReasonCallback) > 0 && finishReasonCallback[0] != nil {
-			finishReasonCallback[0](responsesFinishReason(mirrorResponse.Bytes()), append([]byte(nil), mirrorResponse.Bytes()...))
-		}
-	}()
 	ensureUsageCaptured := func() {
 		if lastUsage == nil {
-			lastUsage = extractLastChatUsageFromPayload(mirrorResponse.Bytes())
+			lastUsage = extractLastChatUsageFromPayload(providerResponsePayload(r, mirrorResponse.Bytes()))
 		}
 	}
 	defer func() {
@@ -729,6 +727,12 @@ func processAIResponseForResponses(r []byte, closer io.ReadCloser, outWriter io.
 		utils.CallGeneralClose(reasonWriter)
 		utils.CallGeneralClose(outWriter)
 		utils.CallGeneralClose(toolCallArgumentsWriter)
+	}()
+	// Match Chat Completions: terminal metadata precedes EOF; usage follows it.
+	defer func() {
+		if len(finishReasonCallback) > 0 && finishReasonCallback[0] != nil {
+			finishReasonCallback[0](responsesFinishReason(providerResponsePayload(r, mirrorResponse.Bytes())), append([]byte(nil), mirrorResponse.Bytes()...))
+		}
 	}()
 
 	if rawResponseHeaderCallback != nil {
@@ -1269,6 +1273,19 @@ func responseToolCallDescription(call, function map[string]any) string {
 		}
 	}
 	return ""
+}
+
+// The diagnostic mirror retains HTTP chunk framing. Metadata parsers need the
+// decoded entity body, just like the streaming delta parser: a chunk boundary
+// can occur inside a JSON key or value. Keep the mirror unchanged for callbacks.
+func providerResponsePayload(header, body []byte) []byte {
+	if !utils.IContains(lowhttp.GetHTTPPacketHeader(header, "transfer-encoding"), "chunked") {
+		return body
+	}
+	// The stream reader reports transport errors. Here retain only the payload
+	// actually received, so incomplete metadata cannot be fabricated from framing.
+	payload, _ := io.ReadAll(httputil.NewChunkedReader(bytes.NewReader(body)))
+	return payload
 }
 
 // chatCompletionFinishReason reads the terminal choice from either a JSON

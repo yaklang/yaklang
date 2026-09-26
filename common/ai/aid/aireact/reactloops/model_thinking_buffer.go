@@ -3,6 +3,7 @@ package reactloops
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/yaklang/yaklang/common/ai/aid/aiprojection"
 	"strings"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
@@ -91,14 +92,7 @@ func buildModelThinkingReplayProjection(nonce, reasoning, content string) (strin
 	if err != nil {
 		return "", fmt.Errorf("marshal model thinking replay: %w", err)
 	}
-	return fmt.Sprintf(
-		"<|%s_%s|>\n%s\n<|%s_END_%s|>",
-		timelineModelThinkingReplayTagName,
-		nonce,
-		record,
-		timelineModelThinkingReplayTagName,
-		nonce,
-	), nil
+	return aiprojection.CreateTag(timelineModelThinkingReplayTagName, nonce, string(record)), nil
 }
 
 func sanitizeModelThinkingReplayNonce(nonce string) string {

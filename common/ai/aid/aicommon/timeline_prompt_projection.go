@@ -145,6 +145,7 @@ func projectTimelineRenderableBlocksForPromptWithModelReplay(blocks TimelineRend
 			}
 			copyBlock := *typed
 			copyBlock.Text = strings.ReplaceAll(copyBlock.Text, "<|", "&lt;|")
+			copyBlock.promptProjection = true
 			projected = append(projected, &copyBlock)
 		default:
 			// Preserve unknown renderable types byte-for-byte.

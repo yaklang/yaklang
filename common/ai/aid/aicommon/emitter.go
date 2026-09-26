@@ -3,6 +3,7 @@ package aicommon
 import (
 	"bytes"
 	"fmt"
+	"github.com/yaklang/yaklang/common/ai/aid/aiprojection"
 	"io"
 	"os"
 	"path/filepath"
@@ -438,6 +439,9 @@ func (r *Emitter) EmitLogWithLevel(level, name, fmtlog string, items ...any) (*s
 	if len(items) > 0 {
 		message = fmt.Sprintf(fmtlog, items...)
 	}
+	// Logs are also forwarded as user-visible events. Never expose the internal
+	// projection capability, including prompts emitted by transaction retries.
+	message = aiprojection.RedactNonce(message)
 
 	nodeName := name
 	if name == "" {
@@ -1091,7 +1095,7 @@ func (e *Emitter) EmitPrompt(step string, prompt string) (*schema.AiOutputEvent,
 	return e.EmitStructured("prompt", map[string]any{
 		"system": false,
 		"step":   step,
-		"prompt": prompt,
+		"prompt": aiprojection.RedactNonce(prompt),
 	})
 }
 
@@ -1099,7 +1103,7 @@ func (e *Emitter) EmitSystemPrompt(step string, prompt string) (*schema.AiOutput
 	return e.EmitStructured("prompt", map[string]any{
 		"system": true,
 		"step":   step,
-		"prompt": prompt,
+		"prompt": aiprojection.RedactNonce(prompt),
 	})
 }
 

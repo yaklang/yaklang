@@ -7,6 +7,7 @@ package aimem
 
 import (
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
+	"github.com/yaklang/yaklang/common/ai/aid/aiprojection"
 
 	"time"
 
@@ -89,7 +90,7 @@ func (r *AIMemoryTriage) buildRawTextPrompt(i string) (string, error) {
 	}
 	dynContext += existedTag
 
-	promptResult, err := utils.RenderTemplate(memoryTriagePrompt, map[string]any{
+	promptResult, err := utils.RenderTemplate(aiprojection.CreateTemplate(memoryTriagePrompt), map[string]any{
 		"Nonce":              nonce,
 		"Query":              i,
 		"HaveDynamicContext": dynContext != "",

@@ -73,6 +73,7 @@ type ReActLoop struct {
 	persistentInstructionProvider   ContextProviderFunc
 	functionCallInstructionProvider ContextProviderFunc
 	lastLoopSchema                  string
+	lastNativeActionNames           []string // nil until a native prompt is built; empty means no advertised actions
 	outputExampleProvider           ContextProviderFunc
 	reactiveDataBuilder             FeedbackProviderFunc
 	todoCheckpointMu                sync.Mutex

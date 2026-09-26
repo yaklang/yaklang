@@ -5,6 +5,7 @@ import (
 	"context"
 	_ "embed"
 	"fmt"
+	"github.com/yaklang/yaklang/common/ai/aid/aiprojection"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
@@ -263,7 +264,7 @@ func GenerateAIReviewPrompt(config *Config, userQuery, toolOrTitle, params strin
 		data.Timeline = t.Dump()
 	}
 	name := "ai-review"
-	tmpl, err := template.New(name).Parse(aiReviewPromptTemplate)
+	tmpl, err := template.New(name).Parse(aiprojection.CreateTemplate(aiReviewPromptTemplate))
 	if err != nil {
 		return "", fmt.Errorf("error parsing %s template: %w", name, err)
 	}

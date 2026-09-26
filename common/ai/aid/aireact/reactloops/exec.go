@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/yaklang/yaklang/common/ai/aid/aiprojection"
 	"io"
 	"os"
 	"path/filepath"
@@ -1098,7 +1099,7 @@ func (r *ReActLoop) savePromptToFile(task aicommon.AIStatefulTask, iteration int
 	content.WriteString(fmt.Sprintf("**Loop Name:** %s\n\n", r.loopName))
 	content.WriteString(fmt.Sprintf("**Generated at:** %s\n\n", utils.DatetimePretty()))
 	content.WriteString("---\n\n")
-	content.WriteString(prompt)
+	content.WriteString(aiprojection.RedactNonce(prompt))
 
 	if err := os.WriteFile(filePath, []byte(content.String()), 0644); err != nil {
 		log.Errorf("failed to save prompt to file: %v", err)
@@ -1156,7 +1157,7 @@ func (r *ReActLoop) buildActionExecutionMarkdown(actionName string, params map[s
 	if includePrompt {
 		content.WriteString("## Prompt\n\n")
 		content.WriteString("```\n")
-		content.WriteString(prompt)
+		content.WriteString(aiprojection.RedactNonce(prompt))
 		content.WriteString("\n```\n")
 	}
 	return content.String()

@@ -3,6 +3,7 @@ package mock
 import (
 	"context"
 	"fmt"
+	"github.com/yaklang/yaklang/common/ai/aid/aiprojection"
 	"os"
 	"strings"
 	"sync"
@@ -333,7 +334,7 @@ func wrapMockPromptSectionWithNonce(sectionName string, content string, nonce st
 	}
 	// Match production's tagName=PROMPT_SECTION_dynamic, nonce=<nonce>.
 	// END precedes the nonce, not the dynamic part of the tag name.
-	return fmt.Sprintf("<|PROMPT_SECTION_%s_%s|>\n%s\n<|PROMPT_SECTION_%s_END_%s|>", sectionName, nonce, content, sectionName, nonce)
+	return aiprojection.CreateTag("PROMPT_SECTION_"+sectionName, nonce, content)
 }
 
 func wrapMockPromptSection(sectionName string, content string) string {
@@ -341,7 +342,7 @@ func wrapMockPromptSection(sectionName string, content string) string {
 	if content == "" {
 		return ""
 	}
-	return fmt.Sprintf("<|PROMPT_SECTION_%s|>\n%s\n<|PROMPT_SECTION_END_%s|>", sectionName, content, sectionName)
+	return aiprojection.CreateTag("PROMPT_SECTION", sectionName, content)
 }
 
 func renderMockTitledBlock(title string, body string) string {

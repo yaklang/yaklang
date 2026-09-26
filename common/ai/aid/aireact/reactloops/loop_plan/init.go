@@ -139,15 +139,16 @@ func init() {
 						log.Infof("plan loop: last iteration (%d/%d) in simple mode, forcing generate_direct_plan", currentIter+1, maxIter)
 					}
 					renderMap := map[string]any{
-						"Help":           help,
-						"Nonce":          nonce,
-						"Enhance":        enhance,
-						"FileResults":    fileResults,
-						"WebResults":     webResults,
-						"ReconResults":   reconResults,
-						"Facts":          loop.Get(PLAN_FACTS_KEY),
-						"PlanMode":       loop.Get(PLAN_MODE_KEY),
-						"PlanModeReason": loop.Get(PLAN_MODE_REASON_KEY),
+						"ExplorationClosed": isLastIteration && isDeepPlanMode(loop),
+						"Help":              help,
+						"Nonce":             nonce,
+						"Enhance":           enhance,
+						"FileResults":       fileResults,
+						"WebResults":        webResults,
+						"ReconResults":      reconResults,
+						"Facts":             loop.Get(PLAN_FACTS_KEY),
+						"PlanMode":          loop.Get(PLAN_MODE_KEY),
+						"PlanModeReason":    loop.Get(PLAN_MODE_REASON_KEY),
 					}
 					return utils.RenderTemplate(reactiveData, renderMap)
 				}),

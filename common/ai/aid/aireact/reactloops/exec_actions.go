@@ -3,6 +3,7 @@ package reactloops
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/yaklang/yaklang/common/ai/aid/aiprojection"
 	"strings"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
@@ -108,7 +109,10 @@ func (r *ReActLoop) appendFunctionCallActionResponse(calls []LoopCall, descripto
 	if err != nil {
 		return fmt.Errorf("encode function-call action response: %w", err)
 	}
-	projection := "<|FUNCTION_CALL_ACTION_RESPONSE|>\n" + string(encoded) + "\n<|FUNCTION_CALL_ACTION_RESPONSE_END|>"
+	projection, err := aiprojection.CreateActionResponse(encoded)
+	if err != nil {
+		return err
+	}
 	projected.AddToTimelineWithPromptProjection(functionCallActionResponseTimelineEntry, display.String(), projection)
 	return nil
 }

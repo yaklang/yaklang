@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"github.com/yaklang/yaklang/common/ai/aid/aiprojection"
 	"io"
 	"strings"
 	"time"
@@ -151,7 +152,7 @@ func (c *Config) wrapper(i AICallbackType, tier consts.ModelTier) AICallbackType
 			)
 		}
 		if c.DebugPrompt {
-			log.Infof(strings.Repeat("=", 20)+"AIRequest"+strings.Repeat("=", 20)+"\n%v\n", request.GetPrompt())
+			log.Infof(strings.Repeat("=", 20)+"AIRequest"+strings.Repeat("=", 20)+"\n%v\n", aiprojection.RedactNonce(request.GetPrompt()))
 		}
 		tokenSize := ytoken.CalcTokenCount(request.GetPrompt())
 

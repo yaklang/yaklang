@@ -3,6 +3,7 @@ package reactloops
 import (
 	"context"
 	"encoding/json"
+	"github.com/yaklang/yaklang/common/ai/aid/aiprojection"
 	"strings"
 	"testing"
 
@@ -38,7 +39,7 @@ func TestBuildActionToolsPromptTags(t *testing.T) {
 	require.NoError(t, err)
 	require.Empty(t, textSchema)
 	require.NotEmpty(t, actionTags)
-	require.Contains(t, actionTags, "<|FUNCTION_CALL_ACTION_SCHEMA_adjust_todolist|>")
+	require.Contains(t, actionTags, "<|FUNCTION_CALL_ACTION_SCHEMA_adjust_todolist_"+aiprojection.Nonce()+"|>")
 	loop.functionCallMode = false
 	textSchema, actionTags, err = loop.prepareLoopActionSchemas(nil)
 	require.NoError(t, err)
@@ -56,8 +57,8 @@ func TestBuildActionToolsPromptTags(t *testing.T) {
 	tags, err := renderFunctionCallSchemaTags(tools)
 	require.NoError(t, err)
 	for _, action := range actions {
-		require.Equal(t, 1, strings.Count(tags, "<|FUNCTION_CALL_ACTION_SCHEMA_"+action.ActionType+"|>"))
-		require.Contains(t, tags, "<|FUNCTION_CALL_ACTION_SCHEMA_END_"+action.ActionType+"|>")
+		require.Equal(t, 1, strings.Count(tags, "<|FUNCTION_CALL_ACTION_SCHEMA_"+action.ActionType+"_"+aiprojection.Nonce()+"|>"))
+		require.Contains(t, tags, "<|FUNCTION_CALL_ACTION_SCHEMA_END_"+action.ActionType+"_"+aiprojection.Nonce()+"|>")
 	}
 	require.NotContains(t, tags, "<|FUNCTION_CALL_SCHEMAS_")
 }

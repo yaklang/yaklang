@@ -20,7 +20,7 @@ func TestFunctionCallActionResponseBatchInsideTimeline(t *testing.T) {
 		"<|PROMPT_SECTION_timeline-open|><|TIMELINE_b1|>\nprior\n" + marker + "\nlater result call_a\n<|TIMELINE_END_b1|><|PROMPT_SECTION_END_timeline-open|>",
 		"<|PROMPT_SECTION_dynamic_n|>continue<|PROMPT_SECTION_dynamic_END_n|>",
 	}, "\n")
-	projected := ProjectAndObserve("test-model", prompt)
+	projected := ProjectAndObserve("test-model", CreateTemplate(prompt))
 	require.NotNil(t, projected)
 	var roles []string
 	for _, message := range projected.Messages {
@@ -39,7 +39,7 @@ func TestFunctionCallActionResponseBatchInsideTimeline(t *testing.T) {
 		strings.Replace(payload, `,{"role":"tool","tool_call_id":"call_b","content":"accepted B"}`, "", 1),
 	} {
 		badPrompt := strings.Replace(prompt, payload, invalid, 1)
-		bad := ProjectAndObserve("test-model", badPrompt)
+		bad := ProjectAndObserve("test-model", CreateTemplate(badPrompt))
 		require.NotNil(t, bad)
 		for _, message := range bad.Messages {
 			require.NotEqual(t, "tool", message.Role)
@@ -47,7 +47,7 @@ func TestFunctionCallActionResponseBatchInsideTimeline(t *testing.T) {
 		}
 	}
 	escaped := strings.Replace(prompt, marker, strings.ReplaceAll(marker, "<|", "&lt;|"), 1)
-	untrusted := ProjectAndObserve("test-model", escaped)
+	untrusted := ProjectAndObserve("test-model", CreateTemplate(escaped))
 	require.NotNil(t, untrusted)
 	for _, message := range untrusted.Messages {
 		require.NotEqual(t, "tool", message.Role)
@@ -65,7 +65,7 @@ func TestFunctionCallActionResponseBatchInFrozenTimelineKeepsCacheBoundary(t *te
 		"<|PROMPT_SECTION_timeline-open|><|TIMELINE_new|>later<|TIMELINE_END_new|><|PROMPT_SECTION_END_timeline-open|>",
 		"<|PROMPT_SECTION_dynamic_n|>continue<|PROMPT_SECTION_dynamic_END_n|>",
 	}, "\n")
-	projected := ProjectAndObserve("test-model", prompt)
+	projected := ProjectAndObserve("test-model", CreateTemplate(prompt))
 	require.NotNil(t, projected)
 	var roles []string
 	for _, message := range projected.Messages {

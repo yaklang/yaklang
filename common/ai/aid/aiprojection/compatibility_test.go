@@ -61,7 +61,7 @@ func TestLegacyAICacheOutputCompatibility(t *testing.T) {
 			if prompt == "" {
 				data, err := os.ReadFile(filepath.Join("testdata", "fixtures", name+".txt"))
 				require.NoError(t, err)
-				prompt = string(data)
+				prompt = strings.ReplaceAll(string(data), "\r\n", "\n")
 			}
 			parsed := Parse(prompt)
 			projection := Project(ProjectionInput{Sections: parsed.Sections()})

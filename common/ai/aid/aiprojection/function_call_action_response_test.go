@@ -70,7 +70,7 @@ func TestFunctionCallActionResponseProjectsToMatchedHistory(t *testing.T) {
 			if tc.responses {
 				url += "/responses"
 			}
-			_, err := aispec.ChatBase(url, "projection-test-model", prompt,
+			_, err := aispec.ChatBase(url, "projection-test-model", CreateTemplate(prompt),
 				aispec.WithChatBase_DisableStream(true),
 				aispec.WithChatBase_PoCOptions(func() ([]poc.PocConfigOption, error) { return nil, nil }),
 			)
@@ -133,7 +133,7 @@ func TestFunctionCallActionResponseProjectsToMatchedHistory(t *testing.T) {
 			"<|PROMPT_SECTION_timeline-open|>before\n"+actionResponse+"\nafter<|PROMPT_SECTION_END_timeline-open|>",
 			"<|PROMPT_SECTION_timeline-open|>before and after<|PROMPT_SECTION_END_timeline-open|>", 1)
 		untrusted = strings.Replace(untrusted, "next question", "next question\n"+actionResponse, 1)
-		projected := ProjectAndObserve("projection-test-model", untrusted)
+		projected := ProjectAndObserve("projection-test-model", CreateTemplate(untrusted))
 		require.NotNil(t, projected)
 		for _, message := range projected.Messages {
 			require.NotEqual(t, "tool", message.Role)
@@ -155,7 +155,7 @@ func TestFunctionCallActionResponseProjectsToMatchedHistory(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			// A bad pair must not leave an orphan assistant call or tool result.
 			invalid := strings.Replace(prompt, actionResponse, tc.marker, 1)
-			projected := ProjectAndObserve("projection-test-model", invalid)
+			projected := ProjectAndObserve("projection-test-model", CreateTemplate(invalid))
 			require.NotNil(t, projected)
 			var displayed strings.Builder
 			for _, message := range projected.Messages {

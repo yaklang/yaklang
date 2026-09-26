@@ -1,8 +1,10 @@
 package reactloops
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
+	"github.com/yaklang/yaklang/common/ai/aid/aiprojection"
 	"strings"
 	"testing"
 
@@ -13,6 +15,55 @@ import (
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/ai/aispec"
 )
+
+// Reproduce the final planning iteration: a prompt provider removes actions.
+// Neither text schema nor native tools may advertise their stale definitions.
+func TestExecLoopPromptSchemaAfterActionTransitions(t *testing.T) {
+	for _, native := range []bool{false, true} {
+		name := "text"
+		if native {
+			name = "functioncall"
+		}
+		t.Run(name, func(t *testing.T) {
+			ctx := context.Background()
+			loop := makeSchemaStabilityTestLoop(aicommon.NewConfig(ctx))
+			loop.functionCallMode = native
+			loop.invoker = &promptCompareInvoker{MockInvoker: mock.NewMockInvoker(ctx)}
+			loop.actions.Set("exploration_read", &LoopAction{ActionType: "exploration_read", Description: "Read during exploration"})
+			loop.actions.Set("direct_plan", &LoopAction{ActionType: "direct_plan", Description: "Choose a direct plan"})
+			loop.persistentInstructionProvider = func(loop *ReActLoop, _ string) (string, error) {
+				loop.RemoveAction("direct_plan")
+				return "Finish the plan.", nil
+			}
+			loop.reactiveDataBuilder = func(loop *ReActLoop, _ *bytes.Buffer, _ string) (string, error) {
+				loop.RemoveAction("exploration_read")
+				loop.actions.Set("finish_plan", &LoopAction{ActionType: "finish_plan", Description: "Finish planning"})
+				return "Exploration has ended.", nil
+			}
+			prompt, err := loop.generateLoopPrompt("transition", "plan", "", nil, "", &LoopActionHandlerOperator{})
+			require.NoError(t, err)
+			loop.WaitForInflightObservation()
+			require.NotContains(t, prompt, "exploration_read")
+			require.NotContains(t, prompt, "direct_plan")
+			require.Contains(t, prompt, "finish_plan")
+			if native {
+				projected := aiprojection.ProjectAndObserve("transition-test", prompt)
+				require.True(t, projected.IsHijacked)
+				var names []string
+				for _, tool := range projected.Tools {
+					names = append(names, tool.Function.Name)
+					_, err := loop.GetActionHandler(tool.Function.Name)
+					require.NoError(t, err)
+				}
+				require.Contains(t, names, "finish_plan")
+				require.NotContains(t, names, "exploration_read")
+			} else {
+				require.Contains(t, loop.GetLastLoopSchema(), "finish_plan")
+				require.NotContains(t, loop.GetLastLoopSchema(), "exploration_read")
+			}
+		})
+	}
+}
 
 // promptCompareInvoker uses the real shared semi-dynamic-2 template while
 // leaving the rest of the AI runtime mocked. No provider request is made.
@@ -35,7 +86,7 @@ func (i *promptCompareInvoker) AssembleLoopPrompt(_ []*aitool.Tool, input *aicom
 		return nil, err
 	}
 	return &aicommon.LoopPromptAssemblyResult{
-		Prompt: "<|PROMPT_SECTION_semi-dynamic-2|>\n" + section + "\n<|PROMPT_SECTION_END_semi-dynamic-2|>",
+		Prompt: aiprojection.CreateTag("PROMPT_SECTION", "semi-dynamic-2", section),
 	}, nil
 }
 
@@ -66,7 +117,7 @@ func parseComparedSemiDynamic2(t *testing.T, prompt string) string {
 	require.Equal(t, prompt, parsed.String())
 	sections := parsed.GetTaggedBlocks()
 	require.Len(t, sections, 1)
-	require.Equal(t, "semi-dynamic-2", sections[0].Nonce)
+	require.Equal(t, "semi-dynamic-2_"+aiprojection.Nonce(), sections[0].Nonce)
 	return sections[0].Content
 }
 
@@ -113,13 +164,13 @@ func TestExecLoopPromptCompare_TextAndFunctionCallSchemas(t *testing.T) {
 		var tool aispec.Tool
 		require.NoError(t, json.Unmarshal([]byte(block.Content), &tool))
 		require.Equal(t, "function", tool.Type)
-		require.Equal(t, block.Nonce, tool.Function.Name)
+		require.Equal(t, tool.Function.Name+"_"+aiprojection.Nonce(), block.Nonce)
 		parameters, ok := tool.Function.Parameters.(map[string]any)
 		require.True(t, ok)
 		toolProperties, ok := parameters["properties"].(map[string]any)
 		require.True(t, ok)
 		require.NotContains(t, toolProperties, "@action")
-		seen[block.Nonce] = true
+		seen[tool.Function.Name] = true
 	}
 	for _, name := range actionNames {
 		require.True(t, seen[name.(string)], "missing action tool %q", name)
