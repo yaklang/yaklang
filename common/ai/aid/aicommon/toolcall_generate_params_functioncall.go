@@ -4,14 +4,12 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"sort"
 	"strings"
 	"sync"
 	"time"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/ai/aispec"
-	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 )
 
@@ -55,30 +53,13 @@ type nativeParamSubmission struct {
 	name      string
 	arguments strings.Builder
 	err       error
-	diagID    string
-	diagArgs  map[string]*strings.Builder
 }
 
 func (s *nativeParamSubmission) observe(calls []*aispec.ToolCall) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	for _, call := range calls {
-		if call == nil {
-			continue
-		}
-		if call.ID != "" {
-			s.diagID = call.ID
-		}
-		if s.diagID != "" {
-			if s.diagArgs == nil {
-				s.diagArgs = make(map[string]*strings.Builder)
-			}
-			if s.diagArgs[s.diagID] == nil {
-				s.diagArgs[s.diagID] = &strings.Builder{}
-			}
-			s.diagArgs[s.diagID].WriteString(call.Function.Arguments)
-		}
-		if s.err != nil {
+		if call == nil || s.err != nil {
 			continue
 		}
 		if s.seen && (call.Index != s.index || (call.ID != "" && s.id != "" && call.ID != s.id)) {
@@ -107,14 +88,6 @@ func (s *nativeParamSubmission) observe(calls []*aispec.ToolCall) {
 func (s *nativeParamSubmission) snapshot() (string, bool, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	var ids []string
-	for id := range s.diagArgs {
-		ids = append(ids, id)
-	}
-	sort.Strings(ids)
-	for _, id := range ids {
-		log.Warnf("R2 double-call diagnostic id=%q arguments=%q", id, s.diagArgs[id].String())
-	}
 	if s.err != nil {
 		return "", s.seen, s.err
 	}
