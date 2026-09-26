@@ -3,6 +3,7 @@ package aireact
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/yaklang/yaklang/common/ai/aid/aiprojection"
 	"strings"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
@@ -76,13 +77,12 @@ func renderFunctionCallParamSchemaTags(tools []aispec.Tool) (string, error) {
 		if tool.Type != "function" {
 			return "", fmt.Errorf("R2 native tool %q must be a function", name)
 		}
-		encoded, err := json.Marshal(tool)
+		block, err := aiprojection.CreateToolParamSchema(tool)
 		if err != nil {
-			return "", fmt.Errorf("marshal R2 native tool %q: %w", name, err)
+			return "", err
 		}
-		fmt.Fprintf(&out, "<|%s_%s|>\n%s\n<|%s_END_%s|>\n",
-			functionCallToolParamSchemaTag, name, encoded,
-			functionCallToolParamSchemaTag, name)
+		out.WriteString(block)
+		out.WriteByte('\n')
 	}
 	return strings.TrimSuffix(out.String(), "\n"), nil
 }

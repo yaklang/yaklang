@@ -108,7 +108,7 @@ func TestExecuteFunctionCallActionsSerialAndProjectsOneAssistantManyTools(t *tes
 		"<|PROMPT_SECTION_timeline-open|>" + parts.Open + "<|PROMPT_SECTION_END_timeline-open|>",
 		"<|PROMPT_SECTION_dynamic_n|>next instruction<|PROMPT_SECTION_dynamic_END_n|>",
 	}, "\n")
-	projected := aiprojection.ProjectAndObserve("test-model", prompt)
+	projected := aiprojection.ProjectAndObserve("test-model", aiprojection.CreateTemplate(prompt))
 	require.NotNil(t, projected)
 	var roles []string
 	for _, message := range projected.Messages {

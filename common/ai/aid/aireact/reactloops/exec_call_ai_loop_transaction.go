@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"slices"
 	"sort"
 	"strings"
 	"sync"
@@ -442,6 +443,14 @@ func (r *ReActLoop) callAIFunctionTransaction(
 	functionCallOutputCallback LoopFunctionCallOutputCallback,
 ) ([]LoopCall, LoopStopReason, *LoopResultDescriptor, error) {
 	descriptor := newLoopResultDescriptor("functioncall")
+	// Capture once for all retries. Registered handlers are not necessarily
+	// advertised tools (planning handoff, init constraints, disabled actions).
+	advertisedActions := slices.Clone(r.lastNativeActionNames)
+	availableActions := advertisedActions
+	if advertisedActions == nil {
+		// Compatibility for callers using a supplied prompt without loop assembly.
+		availableActions = r.GetAllActionNames()
+	}
 	activeTaskCtx := r.config.GetContext()
 	if task := r.GetCurrentTask(); task != nil && !utils.IsNil(task.GetContext()) {
 		activeTaskCtx = task.GetContext()
@@ -545,9 +554,13 @@ func (r *ReActLoop) callAIFunctionTransaction(
 			if !validActionToolName(rawCall.Function.Name) {
 				return utils.Errorf("invalid function-call action name %q", rawCall.Function.Name)
 			}
+			if advertisedActions != nil && !slices.Contains(advertisedActions, rawCall.Function.Name) {
+				return actionTypeResolutionError(rawCall.Function.Name, availableActions,
+					"native function was not advertised in this request; choose from this request's tools and their argument schemas")
+			}
 			handler, err := r.GetActionHandler(rawCall.Function.Name)
 			if err != nil || utils.IsNil(handler) {
-				return actionTypeResolutionError(rawCall.Function.Name, r.GetAllActionNames(), "native function has no registered loop action")
+				return actionTypeResolutionError(rawCall.Function.Name, availableActions, "native function has no registered loop action")
 			}
 			params := make(map[string]any)
 			dec := json.NewDecoder(strings.NewReader(rawCall.Function.Arguments))

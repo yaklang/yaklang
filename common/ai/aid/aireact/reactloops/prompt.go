@@ -43,6 +43,7 @@ func (r *ReActLoop) prepareLoopActionSchemas(operator *LoopActionHandlerOperator
 	filtered := r.getFilteredActions(operator != nil && operator.disallowLoopExit, operator)
 	maxBatchCalls := r.toolBatchMaxCalls()
 	var schema, functionCallSchemas string
+	var nativeActionNames []string
 	if r.functionCallMode {
 		tools, err := buildActionTools(filtered, maxBatchCalls)
 		if err != nil {
@@ -52,6 +53,10 @@ func (r *ReActLoop) prepareLoopActionSchemas(operator *LoopActionHandlerOperator
 		if err != nil {
 			return "", "", err
 		}
+		nativeActionNames = make([]string, 0, len(tools))
+		for _, tool := range tools {
+			nativeActionNames = append(nativeActionNames, tool.Function.Name)
+		}
 	} else {
 		var err error
 		schema, err = applyToolBatchSchemaMaxItems(buildSchema(filtered...), maxBatchCalls)
@@ -59,6 +64,9 @@ func (r *ReActLoop) prepareLoopActionSchemas(operator *LoopActionHandlerOperator
 			return "", "", err
 		}
 	}
+	// Preserve this turn's exact tool set before consuming one-shot constraints.
+	// Recomputing filters during a retry could expose actions absent from its prompt.
+	r.lastNativeActionNames = nativeActionNames
 	if !r.initActionApplied && (len(r.initActionMustUse) > 0 || len(r.initActionDisabled) > 0) {
 		r.initActionApplied = true
 	}
@@ -282,12 +290,7 @@ func (r *ReActLoop) generateLoopPrompt(
 		tools = r.toolsGetter()
 	}
 
-	schema, functionCallSchemas, err := r.prepareLoopActionSchemas(operator)
-	if err != nil {
-		return "", err
-	}
-	r.lastLoopSchema = schema
-
+	var err error
 	var persistent string
 	persistentProvider := r.persistentInstructionProvider
 	if r.functionCallMode && r.functionCallInstructionProvider != nil {
@@ -296,7 +299,6 @@ func (r *ReActLoop) generateLoopPrompt(
 	if persistentProvider != nil {
 		persistent, err = persistentProvider(r, "") // persistent context not use nonce
 		if err != nil {
-			r.lastLoopSchema = schema
 			return "", utils.Wrap(err, "build persistent context failed")
 		}
 	}
@@ -375,6 +377,15 @@ func (r *ReActLoop) generateLoopPrompt(
 	if r.invoker == nil {
 		return "", utils.Error("invoker is nil in ReActLoop.generateLoopPrompt")
 	}
+
+	// Providers may change the available actions (for example, the last planning
+	// iteration removes exploration tools). Build both protocols only after those
+	// transitions so the emitted schema matches the handlers for this iteration.
+	schema, functionCallSchemas, err := r.prepareLoopActionSchemas(operator)
+	if err != nil {
+		return "", err
+	}
+	r.lastLoopSchema = schema
 
 	result, err := r.invoker.AssembleLoopPrompt(tools, &LoopPromptAssemblyInput{
 		Nonce:                    nonce,

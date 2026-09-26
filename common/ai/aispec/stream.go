@@ -1286,6 +1286,19 @@ func responseToolCallDescription(call, function map[string]any) string {
 	return ""
 }
 
+// The diagnostic mirror retains HTTP chunk framing. Metadata parsers need the
+// decoded entity body, just like the streaming delta parser: a chunk boundary
+// can occur inside a JSON key or value. Keep the mirror unchanged for callbacks.
+func providerResponsePayload(header, body []byte) []byte {
+	if !utils.IContains(lowhttp.GetHTTPPacketHeader(header, "transfer-encoding"), "chunked") {
+		return body
+	}
+	// The stream reader reports transport errors. Here retain only the payload
+	// actually received, so incomplete metadata cannot be fabricated from framing.
+	payload, _ := io.ReadAll(httputil.NewChunkedReader(bytes.NewReader(body)))
+	return payload
+}
+
 // chatCompletionFinishReason reads the terminal choice from either a JSON
 // response or its SSE chunks. The stream parser already mirrors the entire
 // provider body, so this callback does not change when output can be consumed.

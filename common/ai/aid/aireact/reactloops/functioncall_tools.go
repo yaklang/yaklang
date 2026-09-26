@@ -2,6 +2,7 @@ package reactloops
 
 import (
 	"encoding/json"
+	"github.com/yaklang/yaklang/common/ai/aid/aiprojection"
 	"strings"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
@@ -97,17 +98,12 @@ func renderFunctionCallSchemaTags(tools []aispec.Tool) (string, error) {
 		if !validActionToolName(tool.Function.Name) {
 			return "", utils.Errorf("invalid action tool name %q", tool.Function.Name)
 		}
-		encoded, err := json.Marshal(tool)
+		block, err := aiprojection.CreateActionSchema(tool)
 		if err != nil {
-			return "", utils.Wrapf(err, "encode action tool %q", tool.Function.Name)
+			return "", err
 		}
-		out.WriteString("<|FUNCTION_CALL_ACTION_SCHEMA_")
-		out.WriteString(tool.Function.Name)
-		out.WriteString("|>\n")
-		out.Write(encoded)
-		out.WriteString("\n<|FUNCTION_CALL_ACTION_SCHEMA_END_")
-		out.WriteString(tool.Function.Name)
-		out.WriteString("|>\n")
+		out.WriteString(block)
+		out.WriteByte('\n')
 	}
 	return strings.TrimSuffix(out.String(), "\n"), nil
 }
