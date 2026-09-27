@@ -900,8 +900,8 @@ func TestToolBatchActionHandler_CachesOnlyProtocolCompleteChildren(t *testing.T)
 	require.False(t, manager.IsRecentlyUsedTool(grep.Name), "a failed child must not be promoted into the direct-call cache")
 	require.Equal(t, []string{readFile.Name}, manager.GetRecentToolNames())
 	materials := aicommon.RenderTimelineFrozenOpen(cfg.Timeline)
-	require.Contains(t, materials.PromotedOpen+materials.PromotedSemiDynamic1, readFile.Name)
-	require.NotContains(t, materials.PromotedOpen+materials.PromotedSemiDynamic1, grep.Name)
+	require.Contains(t, materials.Open+materials.PromotedSemiDynamic1, readFile.Name)
+	require.NotContains(t, materials.Open+materials.PromotedSemiDynamic1, grep.Name)
 	require.True(t, op.IsContinued())
 }
 

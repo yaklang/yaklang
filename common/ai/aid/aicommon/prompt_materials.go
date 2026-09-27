@@ -164,7 +164,6 @@ func (m *PromptMaterials) TimelineOpenData() map[string]any {
 	}
 	return map[string]any{
 		"TimelineOpen":           m.TimelineOpen,
-		"PromotedTimelineOpen":   m.PromotedTimelineOpen,
 		"TimelineFrozenTimeUnix": m.TimelineFrozenTimeUnix,
 		"TodoSnapshot":           m.TodoSnapshot,
 		"Workspace":              m.Workspace,
@@ -181,41 +180,62 @@ func (m *PromptMaterials) TimelineOpenData() map[string]any {
 type TimelineFrozenOpenBlocks struct {
 	Frozen               string
 	Open                 string
-	PromotedOpen         string
 	PromotedSemiDynamic1 string
 	FrozenTimeUnix       int64
 	EvidenceSemiDynamic  string
 }
 
 func RenderTimelineFrozenOpen(timeline *Timeline) TimelineFrozenOpenBlocks {
-	return renderTimelineFrozenOpen(timeline, false)
+	return RenderTimelineFrozenOpenWithOptions(timeline, TimelinePromptOptions{})
 }
 
 // RenderTimelineFrozenOpenWithLatestModelReplay is reserved for the main ReAct
 // decision prompt. Helper prompts use RenderTimelineFrozenOpen and therefore
 // never receive an internal replay marker.
 func RenderTimelineFrozenOpenWithLatestModelReplay(timeline *Timeline) TimelineFrozenOpenBlocks {
-	return renderTimelineFrozenOpen(timeline, true)
+	return RenderTimelineFrozenOpenWithOptions(timeline, TimelinePromptOptions{IncludeLatestModelReplay: true})
 }
 
-func renderTimelineFrozenOpen(timeline *Timeline, includeLatestModelReplay bool) TimelineFrozenOpenBlocks {
+// TimelinePromptOptions selects a read-only view, never new freeze boundaries.
+// ExcludeToolCache omits structured cache events and their semi snapshot, not
+// ordinary history mentioning tools or containing tool execution results.
+type TimelinePromptOptions struct {
+	IncludeLatestModelReplay bool
+	ExcludeToolCache         bool
+}
+
+func RenderTimelineFrozenOpenWithOptions(timeline *Timeline, options TimelinePromptOptions) TimelineFrozenOpenBlocks {
 	if timeline == nil {
 		return TimelineFrozenOpenBlocks{}
 	}
 	// Freeze is committed on writes/import, never as a rendering side effect.
 	timeline.mu.RLock()
 	defer timeline.mu.RUnlock()
-	rb := timeline.frozenPromptBlocksLocked()
-	promotedSemi1, openDeltas := timeline.projectPromotedLocked()
+	rb := timeline.frozenPromptBlocksLocked(options.ExcludeToolCache)
+	var promotedSemi1 string
+	if !options.ExcludeToolCache {
+		promotedSemi1 = renderPromotedRecentTools(timeline.promotedState)
+	}
 	evidenceSemi := timeline.projectEvidenceLocked()
 	promptBlocks := projectTimelineRenderableBlocksForPrompt(rb)
-	if includeLatestModelReplay {
+	if options.IncludeLatestModelReplay {
 		promptBlocks = projectTimelineRenderableBlocksForPromptWithLatestModelReplay(rb)
+	}
+	if options.ExcludeToolCache {
+		// Keep empty filtered intervals in rb for boundary metadata, but avoid
+		// sending an empty Timeline envelope to a parameter-generation prompt.
+		visible := make(TimelineRenderableBlocks, 0, len(promptBlocks))
+		for _, block := range promptBlocks {
+			if interval, ok := block.(*TimelineIntervalBlock); ok && len(interval.Items) == 0 {
+				continue
+			}
+			visible = append(visible, block)
+		}
+		promptBlocks = visible
 	}
 	return TimelineFrozenOpenBlocks{
 		Frozen:               promptBlocks.RenderFrozenOnly(TimelineDumpDefaultAITagName),
 		Open:                 promptBlocks.RenderOpenOnly(TimelineDumpDefaultAITagName),
-		PromotedOpen:         openDeltas,
 		PromotedSemiDynamic1: promotedSemi1,
 		FrozenTimeUnix:       timelineFrozenTimeUnixFromRenderable(rb),
 		EvidenceSemiDynamic:  evidenceSemi,
@@ -225,7 +245,6 @@ func renderTimelineFrozenOpen(timeline *Timeline, includeLatestModelReplay bool)
 type PromptFrozenOpenMaterials struct {
 	TimelineFrozen         string
 	TimelineOpen           string
-	PromotedTimelineOpen   string
 	PromotedSemiDynamic1   string
 	TimelineFrozenTimeUnix int64
 	FrozenPartitions       []FrozenBlockPartition
@@ -242,7 +261,7 @@ type PromptFrozenOpenMaterials struct {
 }
 
 func BuildPromptFrozenOpenMaterials(config *Config, openNonce ...string) PromptFrozenOpenMaterials {
-	return buildPromptFrozenOpenMaterials(config, false, openNonce...)
+	return BuildPromptFrozenOpenMaterialsWithOptions(config, TimelinePromptOptions{})
 }
 
 // BuildPromptFrozenOpenMaterialsWithLatestModelReplay is the main ReAct
@@ -250,22 +269,19 @@ func BuildPromptFrozenOpenMaterials(config *Config, openNonce ...string) PromptF
 // LiteForge, verification, summarizers and other shared prompt builders from
 // replaying a decision that belongs to the ReAct action protocol.
 func BuildPromptFrozenOpenMaterialsWithLatestModelReplay(config *Config, openNonce ...string) PromptFrozenOpenMaterials {
-	return buildPromptFrozenOpenMaterials(config, true, openNonce...)
+	return BuildPromptFrozenOpenMaterialsWithOptions(config, TimelinePromptOptions{IncludeLatestModelReplay: true})
 }
 
-func buildPromptFrozenOpenMaterials(config *Config, includeLatestModelReplay bool, openNonce ...string) PromptFrozenOpenMaterials {
+// BuildPromptFrozenOpenMaterialsWithOptions applies the same typed filter to Open and Semi.
+func BuildPromptFrozenOpenMaterialsWithOptions(config *Config, options TimelinePromptOptions) PromptFrozenOpenMaterials {
 	if config == nil {
 		return PromptFrozenOpenMaterials{}
 	}
-	timelineBlocks := RenderTimelineFrozenOpen(config.GetTimeline())
-	if includeLatestModelReplay {
-		timelineBlocks = RenderTimelineFrozenOpenWithLatestModelReplay(config.GetTimeline())
-	}
+	timelineBlocks := RenderTimelineFrozenOpenWithOptions(config.GetTimeline(), options)
 	reportedRisks := config.GetSessionPromptState().GetReportedRisksRendered()
 	return PromptFrozenOpenMaterials{
 		TimelineFrozen:             timelineBlocks.Frozen,
 		TimelineOpen:               timelineBlocks.Open,
-		PromotedTimelineOpen:       timelineBlocks.PromotedOpen,
 		PromotedSemiDynamic1:       timelineBlocks.PromotedSemiDynamic1,
 		TimelineFrozenTimeUnix:     timelineBlocks.FrozenTimeUnix,
 		FrozenPartitions:           FrozenBlockPartitionsFromConfig(config),
@@ -280,7 +296,6 @@ func ApplyPromptFrozenOpenMaterials(materials *PromptMaterials, frozenOpen Promp
 	}
 	materials.TimelineFrozen = frozenOpen.TimelineFrozen
 	materials.TimelineOpen = frozenOpen.TimelineOpen
-	materials.PromotedTimelineOpen = frozenOpen.PromotedTimelineOpen
 	materials.PromotedSemiDynamic1 = frozenOpen.PromotedSemiDynamic1
 	materials.TimelineFrozenTimeUnix = frozenOpen.TimelineFrozenTimeUnix
 	materials.FrozenPartitions = append([]FrozenBlockPartition(nil), NormalizeFrozenBlockPartitions(frozenOpen.FrozenPartitions)...)

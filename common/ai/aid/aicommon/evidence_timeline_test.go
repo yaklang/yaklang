@@ -28,7 +28,7 @@ func TestTimelineEvidenceFreezeUpdateDeleteAndReadOnlyPrompt(t *testing.T) {
 	before := BuildPromptFrozenOpenMaterials(c)
 	require.Contains(t, before.TimelineOpen, "first finding")
 	require.Empty(t, before.SessionEvidenceSemiDynamic)
-	require.Empty(t, before.PromotedTimelineOpen, "evidence must not create an empty tool-cache block")
+	require.NotContains(t, before.TimelineOpen, "CACHE_TOOL_CALL", "evidence must not create an empty tool-cache block")
 	raw, err := MarshalTimeline(c.Timeline)
 	require.NoError(t, err)
 	id := c.Timeline.GetMaxID()
@@ -75,7 +75,6 @@ func TestTimelineEvidenceAndToolPromoteInSameTransaction(t *testing.T) {
 	require.Contains(t, materials.SessionEvidenceSemiDynamic, "finding")
 	require.Contains(t, materials.PromotedSemiDynamic1, "TOOL_SCHEMA")
 	require.Empty(t, materials.TimelineOpen)
-	require.Empty(t, materials.PromotedTimelineOpen)
 	require.Empty(t, c.Timeline.getActiveTimelineItemIDs(), "neither evidence nor schema is AI reducer input")
 }
 

@@ -52,7 +52,10 @@ func (pm *PromptManager) GenerateFunctionCallToolParamsPromptForTask(
 	}
 	// R2 needs the same timeline buckets as the main decision loop, including
 	// the latest model turn, while its protocol and available function are its own.
-	base.PromptFrozenOpenMaterials = aicommon.BuildPromptFrozenOpenMaterialsWithLatestModelReplay(pm.react.config, currentNonce)
+	base.PromptFrozenOpenMaterials = aicommon.BuildPromptFrozenOpenMaterialsWithOptions(pm.react.config, aicommon.TimelinePromptOptions{
+		IncludeLatestModelReplay: true,
+		ExcludeToolCache:         true,
+	})
 	aicommon.ApplyPromptFrozenOpenMaterials(materials, base.PromptFrozenOpenMaterials)
 	materials.FunctionCallMode = true
 	materials.AllowToolCall = false

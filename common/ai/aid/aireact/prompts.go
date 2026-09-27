@@ -407,6 +407,8 @@ func (pm *PromptManager) generateToolParamsPromptWithMetaForQueryAndLoop(
 	if err != nil {
 		return nil, err
 	}
+	aicommon.ApplyPromptFrozenOpenMaterials(prefixMaterials,
+		aicommon.BuildPromptFrozenOpenMaterialsWithOptions(pm.react.config, aicommon.TimelinePromptOptions{ExcludeToolCache: true}))
 	prefixMaterials.AllowPlanAndExec = false
 	prefixMaterials.HasLoadCapability = false
 	pm.applyLoopInstructionAndExampleForLoop(prefixMaterials, loop, toolParamsInstructionText, toolParamsOutputExampleText)
@@ -603,6 +605,8 @@ func (pm *PromptManager) GenerateReGenerateToolParamsPromptWithMeta(
 	if err != nil {
 		return nil, err
 	}
+	aicommon.ApplyPromptFrozenOpenMaterials(prefixMaterials,
+		aicommon.BuildPromptFrozenOpenMaterialsWithOptions(pm.react.config, aicommon.TimelinePromptOptions{ExcludeToolCache: true}))
 	prefixMaterials.AllowPlanAndExec = false
 	prefixMaterials.HasLoadCapability = false
 	pm.applyLoopInstructionAndExample(prefixMaterials, toolParamsInstructionText, toolParamsOutputExampleText)

@@ -843,6 +843,8 @@ func renderItemTypeVerbose(item *TimelineItem) string {
 		return "raw/unknown"
 	}
 	switch v := item.value.(type) {
+	case *timelineToolCachePromptItem:
+		return "cache/tool"
 	case *aitool.ToolResult:
 		name := strings.TrimSpace(v.Name)
 		if name == "" {

@@ -45,7 +45,7 @@ func TestTimelineFreezePromotionPayloadTriggersBudget(t *testing.T) {
 			require.Equal(t, int64(1), result.Version)
 			require.Empty(t, result.NewlyFrozenIDs, "append already committed this batch")
 			rendered := RenderTimelineFrozenOpen(tl)
-			require.Empty(t, rendered.PromotedOpen)
+			require.Empty(t, rendered.Open)
 			require.Contains(t, rendered.PromotedSemiDynamic1, payload)
 			require.Empty(t, tl.getActiveTimelineItemIDs(), "schema must never enter AI compression")
 			require.Empty(t, tl.Dump(), "no control-plane noise in the ordinary dump")
@@ -137,12 +137,12 @@ func TestTimelineFreezeRestoreForkRollbackAndRemap(t *testing.T) {
 	require.Equal(t, frozen.PromotedSemiDynamic1, RenderTimelineFrozenOpen(tl).PromotedSemiDynamic1, "fork must not mutate parent's committed snapshot")
 	_, err = fork.MergeBack()
 	require.NoError(t, err)
-	require.Contains(t, RenderTimelineFrozenOpen(tl).PromotedOpen, "child schema", "a child freeze must not force parent promotion")
+	require.Contains(t, RenderTimelineFrozenOpen(tl).Open, "child schema", "a child freeze must not force parent promotion")
 	tl.FreezeAll()
 	require.Contains(t, RenderTimelineFrozenOpen(tl).PromotedSemiDynamic1, "child schema")
 	tl.TruncateAfter(2)
 	require.Equal(t, frozen.PromotedSemiDynamic1, RenderTimelineFrozenOpen(tl).PromotedSemiDynamic1)
-	require.Empty(t, RenderTimelineFrozenOpen(tl).PromotedOpen)
+	require.Empty(t, RenderTimelineFrozenOpen(tl).Open)
 }
 
 func TestTimelineFreezeLegacyRestorePreservesPromotion(t *testing.T) {
@@ -161,7 +161,7 @@ func TestTimelineFreezeLegacyRestorePreservesPromotion(t *testing.T) {
 	require.NoError(t, err)
 	result := RenderTimelineFrozenOpen(restored)
 	require.Contains(t, result.PromotedSemiDynamic1, "original")
-	require.Contains(t, result.PromotedOpen, "invalidated recent tool: alpha")
+	require.Contains(t, result.Open, "[DELETE] alpha")
 	require.Equal(t, int64(1), restored.Freeze().ThroughID)
 }
 
@@ -186,7 +186,7 @@ func TestTimelineFreezeOutOfOrderTimestampsNeverLoseItems(t *testing.T) {
 	importFreezeItem(tl, 2, ts, &TextTimelineItem{ID: 2, Text: "earlier time, later ID"})
 	require.Empty(t, tl.Freeze().NewlyFrozenIDs)
 	require.Contains(t, RenderTimelineFrozenOpen(tl).Open, "earlier time, later ID")
-	require.Contains(t, RenderTimelineFrozenOpen(tl).PromotedOpen, "later time, earlier ID")
+	require.Contains(t, RenderTimelineFrozenOpen(tl).Open, "later time, earlier ID")
 	tl.FreezeAll()
 	require.Contains(t, RenderTimelineFrozenOpen(tl).PromotedSemiDynamic1, "later time, earlier ID")
 	require.Contains(t, RenderTimelineFrozenOpen(tl).Frozen, "earlier time, later ID")
@@ -213,7 +213,7 @@ func TestTimelineFreezeConcurrentAppendAndRender(t *testing.T) {
 	wg.Wait()
 	tl.FreezeAll()
 	require.Equal(t, int64(40), tl.Freeze().ThroughID)
-	require.Empty(t, RenderTimelineFrozenOpen(tl).PromotedOpen)
+	require.Empty(t, RenderTimelineFrozenOpen(tl).Open)
 }
 
 func TestTimelineFreezeCarriesTaskContextAcrossCommittedByteBuckets(t *testing.T) {
@@ -244,5 +244,5 @@ func TestTimelineFreezeCompressionPrefixKeepsRecentTailOpen(t *testing.T) {
 	require.Contains(t, prompt.Open, "recent history")
 	require.Contains(t, prompt.PromotedSemiDynamic1, "old schema")
 	require.NotContains(t, prompt.PromotedSemiDynamic1, "pending new schema")
-	require.Contains(t, prompt.PromotedOpen, "pending new schema")
+	require.Contains(t, prompt.Open, "pending new schema")
 }
