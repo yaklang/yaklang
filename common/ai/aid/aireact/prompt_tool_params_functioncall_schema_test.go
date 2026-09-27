@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"testing"
 
+	"github.com/santhosh-tekuri/jsonschema/v6"
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon/aitag"
@@ -33,6 +34,13 @@ func TestFunctionCallParamToolsSchemaAndTagsAreStable(t *testing.T) {
 	require.Equal(t, true, params["additionalProperties"])
 	require.Equal(t, "string", properties["identifier"].(map[string]any)["type"])
 	require.Equal(t, "string", properties["call_expectations"].(map[string]any)["type"])
+	compiler := jsonschema.NewCompiler()
+	require.NoError(t, compiler.AddResource("submit-tool-params.json", parameters))
+	schema, err := compiler.Compile("submit-tool-params.json")
+	require.NoError(t, err)
+	require.NoError(t, schema.Validate(map[string]any{
+		"params": map[string]any{"path": "/tmp/report"},
+	}))
 
 	tags, err := renderFunctionCallParamSchemaTags(first)
 	require.NoError(t, err)
