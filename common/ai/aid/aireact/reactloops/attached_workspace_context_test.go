@@ -3,6 +3,7 @@ package reactloops
 import (
 	"context"
 	"encoding/json"
+	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -16,11 +17,11 @@ func TestParseWorkspaceAttachedContext_TargetOverridesDirectory(t *testing.T) {
 	}
 	ctx := ParseWorkspaceAttachedContext(attached, "skill_audit_target_path")
 	require.NotNil(t, ctx)
-	require.Equal(t, "/tmp/workspace", ctx.DirectoryPath)
-	require.Equal(t, "/tmp/skill/demo-skill", ctx.TargetPath)
-	require.Equal(t, "/tmp/skill/demo-skill", ctx.ResolveTargetPath())
-	require.Equal(t, "/tmp/skill/demo-skill", ctx.ResolveScanTarget())
-	require.Equal(t, "/tmp/skill/demo-skill", ctx.ResolveAttachedScanDirectory())
+	require.Equal(t, filepath.FromSlash("/tmp/workspace"), ctx.DirectoryPath)
+	require.Equal(t, filepath.FromSlash("/tmp/skill/demo-skill"), ctx.TargetPath)
+	require.Equal(t, filepath.FromSlash("/tmp/skill/demo-skill"), ctx.ResolveTargetPath())
+	require.Equal(t, filepath.FromSlash("/tmp/skill/demo-skill"), ctx.ResolveScanTarget())
+	require.Equal(t, filepath.FromSlash("/tmp/skill/demo-skill"), ctx.ResolveAttachedScanDirectory())
 }
 
 func TestParseWorkspaceAttachedContext_FallbackToDirectory(t *testing.T) {
@@ -29,7 +30,7 @@ func TestParseWorkspaceAttachedContext_FallbackToDirectory(t *testing.T) {
 	}
 	ctx := ParseWorkspaceAttachedContext(attached, "skill_audit_target_path")
 	require.NotNil(t, ctx)
-	require.Equal(t, "/tmp/skill/demo-skill", ctx.ResolveScanTarget())
+	require.Equal(t, filepath.FromSlash("/tmp/skill/demo-skill"), ctx.ResolveScanTarget())
 	require.Equal(t, "", ctx.ResolveTargetPath())
 }
 
@@ -41,8 +42,8 @@ func TestParseWorkspaceAttachedContext_FileAndSelectionDoNotInferScanPath(t *tes
 	ctx := ParseWorkspaceAttachedContext(attached, "skill_audit_target_path")
 	require.NotNil(t, ctx)
 	require.Equal(t, "", ctx.ResolveAttachedScanDirectory())
-	require.Equal(t, "/tmp/skill", ctx.ResolveScanTarget())
-	require.Equal(t, "/tmp/skill/SKILL.md", ctx.FilePath)
+	require.Equal(t, filepath.FromSlash("/tmp/skill"), ctx.ResolveScanTarget())
+	require.Equal(t, filepath.FromSlash("/tmp/skill/SKILL.md"), ctx.FilePath)
 	require.True(t, ctx.HasSelection())
 }
 
@@ -63,8 +64,8 @@ func TestParseWorkspaceAttachedContext_FileAndSelection(t *testing.T) {
 	ctx := ParseWorkspaceAttachedContext(attached, "skill_audit_target_path")
 	require.NotNil(t, ctx)
 	require.True(t, ctx.HasSelection())
-	require.Equal(t, "/tmp/skill/demo-skill/scripts/run.py", ctx.FilePath)
-	require.Equal(t, "/tmp/skill/demo-skill/scripts", ctx.ResolveScanTarget())
+	require.Equal(t, filepath.FromSlash("/tmp/skill/demo-skill/scripts/run.py"), ctx.FilePath)
+	require.Equal(t, filepath.FromSlash("/tmp/skill/demo-skill/scripts"), ctx.ResolveScanTarget())
 }
 
 func TestParseWorkspaceAttachedContext_LegacyTargetOnly(t *testing.T) {
@@ -74,8 +75,8 @@ func TestParseWorkspaceAttachedContext_LegacyTargetOnly(t *testing.T) {
 		}
 		ctx := ParseWorkspaceAttachedContext(attached, targetKey)
 		require.NotNil(t, ctx)
-		require.Equal(t, "/tmp/project", ctx.ResolveTargetPath())
-		require.Equal(t, "/tmp/project", ctx.ResolveScanTarget())
+		require.Equal(t, filepath.FromSlash("/tmp/project"), ctx.ResolveTargetPath())
+		require.Equal(t, filepath.FromSlash("/tmp/project"), ctx.ResolveScanTarget())
 	}
 }
 
@@ -89,8 +90,8 @@ func TestInitWorkspaceAttachedContext_SamePayloadForBothAudits(t *testing.T) {
 		task.SetAttachedDatas(attached)
 		ws := InitWorkspaceAttachedContext(nil, nil, task, targetKey)
 		require.NotNil(t, ws)
-		require.Equal(t, "/tmp/shared-root", ws.ResolveAttachedScanDirectory())
-		require.Equal(t, "/tmp/shared-root/main.go", ws.FilePath)
+		require.Equal(t, filepath.FromSlash("/tmp/shared-root"), ws.ResolveAttachedScanDirectory())
+		require.Equal(t, filepath.FromSlash("/tmp/shared-root/main.go"), ws.FilePath)
 	}
 }
 

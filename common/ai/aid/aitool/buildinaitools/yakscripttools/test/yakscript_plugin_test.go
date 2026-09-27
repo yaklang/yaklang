@@ -280,6 +280,7 @@ handle = func(result) {
 }
 
 func TestExistingAIToolsStillWork(t *testing.T) {
+	setupHTTPYakToolFixture(t)
 	tools := yakscripttools.GetAllYakScriptAiTools()
 	assert.Check(t, len(tools) > 0, "existing AI tools should still be available")
 
