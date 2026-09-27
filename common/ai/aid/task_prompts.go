@@ -7,22 +7,10 @@ import (
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 
-	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/utils"
 
 	_ "embed"
 )
-
-func (t *AiTask) generateToolCallResponsePrompt(result *aitool.ToolResult, targetTool *aitool.Tool) (string, error) {
-	return t.quickBuildTaskPrompt(__prompt_ToolResultToDecisionPromptTemplate, map[string]any{
-		"Tool":   targetTool,
-		"Result": result,
-	})
-}
-
-func (t *AiTask) generateStatusSummaryPrompt() (string, error) {
-	return t.quickBuildTaskPrompt(__prompt_ToolResultToDecisionPromptTemplate, nil)
-}
 
 func (t *AiTask) generateDynamicPlanPrompt(userInput string) (string, error) {
 	return t.buildDynamicPlanPrompt(userInput)
