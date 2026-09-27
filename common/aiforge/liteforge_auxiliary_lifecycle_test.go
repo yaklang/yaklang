@@ -83,6 +83,7 @@ func pr5128LifecycleConfig(ctx context.Context, single bool, callback aicommon.A
 		aicommon.WithDisallowMCPServers(true),
 		aicommon.WithAIAutoRetry(1),
 		aicommon.WithAITransactionAutoRetry(1),
+		aicommon.WithEnableFunctionCallMode(false), // This lifecycle fixture emits text actions.
 		aicommon.WithAIRetryWaitFunc(func(context.Context, time.Duration) error { return nil }),
 		aicommon.WithSpeedPriorityAICallback(callback),
 	}

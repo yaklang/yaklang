@@ -446,6 +446,7 @@ func (r *ReActLoop) callAIFunctionTransaction(
 	// Capture once for all retries. Registered handlers are not necessarily
 	// advertised tools (planning handoff, init constraints, disabled actions).
 	advertisedActions := slices.Clone(r.lastNativeActionNames)
+	advertisedTools := slices.Clone(r.lastNativeTools)
 	availableActions := advertisedActions
 	if advertisedActions == nil {
 		// Compatibility for callers using a supplied prompt without loop assembly.
@@ -477,6 +478,8 @@ func (r *ReActLoop) callAIFunctionTransaction(
 		currentCollector = newLoopToolCallCollector(functionCallOutputCallback)
 		collectorMu.Unlock()
 		aicommon.WithAIRequest_ExtraSpecOpts(
+			aispec.WithTools(advertisedTools),
+			aispec.WithToolChoice("required"),
 			// A tiered provider may retry/fall back inside one AIRequest. Each
 			// response needs its own collector or calls from a discarded response
 			// can be executed together with the accepted response.

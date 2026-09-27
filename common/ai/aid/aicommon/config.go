@@ -383,6 +383,8 @@ type Config struct {
 	SyncPerceptionTrigger              bool // 感知调度处同步调用 TriggerPerception（否则 goroutine 异步）
 	DisablePerception                  bool // 禁用感知层（用于测试环境，避免异步 AI 调用干扰 mock 回调）
 	EnableFunctionCallMode             bool // 启用原生 functioncall (tool_calls) 模式
+	functionCallModeExplicit           bool
+	legacyAICallbackConfigured         bool
 	singleAIModelMode                  bool // 单模型简易模式：辅助任务统一调度，详见 config_auxiliary_scheduler.go
 	singleAIModelModeResolved          bool // NewConfig freezes the effective mode after applying options.
 	PerTaskUserInteractiveLimitedTimes int64
@@ -607,6 +609,12 @@ func NewConfig(ctx context.Context, opts ...ConfigOption) *Config {
 		opt(config)
 	}
 	config.collectingToolManagerOptions = false
+	// A caller-supplied single callback has historically produced text actions.
+	// Keep that protocol unless the caller explicitly selects native tool calls.
+	if config.legacyAICallbackConfigured && !config.functionCallModeExplicit {
+		config.EnableFunctionCallMode = false
+		config.SetConfig("EnableFunctionCallMode", false)
+	}
 	// The global switch is a construction-time default. Callback roles,
 	// auxiliary policy, subsystem gates, and consumption metadata must all use
 	// the same effective mode for the lifetime of this Config.
@@ -920,6 +928,7 @@ func WithSessionTitle(title string) ConfigOption {
 // ```
 func WithAICallback(cb AICallbackType) ConfigOption {
 	return func(c *Config) error {
+		c.legacyAICallbackConfigured = true
 		if c.m == nil {
 			c.m = &sync.Mutex{}
 		}
@@ -2820,6 +2829,7 @@ func WithEnableFunctionCallMode(enable bool) ConfigOption {
 		}
 		c.m.Lock()
 		c.EnableFunctionCallMode = enable
+		c.functionCallModeExplicit = true
 		c.m.Unlock()
 		c.SetConfig("EnableFunctionCallMode", enable)
 		return nil
@@ -4552,9 +4562,7 @@ func ConvertConfigToOptions(i *Config) []ConfigOption {
 	}
 
 	// Propagate functioncall mode flag so sub-loops inherit the setting.
-	if i.EnableFunctionCallMode {
-		opts = append(opts, WithEnableFunctionCallMode(true))
-	}
+	opts = append(opts, WithEnableFunctionCallMode(i.EnableFunctionCallMode))
 
 	// A derived Config continues the parent's session even when a new global
 	// setting has taken effect since the parent was constructed. Keep the
