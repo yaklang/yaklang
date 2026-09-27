@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/yaklang/yaklang/common/schema"
-	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 )
 
 const sessionEvidenceTokenBudget = 15000
@@ -18,7 +17,8 @@ type SessionPromptState struct {
 
 	UserInputHistory []schema.AIAgentUserInputRecord
 
-	// evidenceJSON stores the serialized EvidenceStore JSON for session-level evidence.
+	// evidenceJSON is a business mirror / legacy import source. Timeline owns
+	// mutations, freeze boundaries and prompt rendering.
 	// Persisted to DB alongside UserInputHistory under the same persistent session.
 	evidenceJSON string
 
@@ -194,28 +194,8 @@ func (s *SessionPromptState) SetSessionEvidence(evidenceJSON string) {
 	s.evidenceJSON = evidenceJSON
 }
 
-// ApplySessionEvidenceOps deserializes the current evidence store, applies
-// the operations, shrinks to token budget, serializes back, and returns
-// the quoted string suitable for DB persistence.
-func (s *SessionPromptState) ApplySessionEvidenceOps(ops []EvidenceOperation) string {
-	if s == nil {
-		return ""
-	}
-	s.m.Lock()
-	defer s.m.Unlock()
-
-	store := UnmarshalEvidenceStore(s.evidenceJSON)
-	store.ApplyOperations(ops)
-	store.ShrinkToTokenBudget(sessionEvidenceTokenBudget)
-	s.evidenceJSON = store.Marshal()
-	return codec.StrConvQuote(s.evidenceJSON)
-}
-
-func (s *SessionPromptState) quoteEvidence(raw string) string {
-	return codec.StrConvQuote(raw)
-}
-
-// GetSessionEvidenceRendered returns markdown text ready for prompt injection.
+// GetSessionEvidenceRendered renders the business mirror for legacy restoration.
+// Prompt construction uses Timeline deltas and the frozen evidence snapshot.
 func (s *SessionPromptState) GetSessionEvidenceRendered() string {
 	if s == nil {
 		return ""

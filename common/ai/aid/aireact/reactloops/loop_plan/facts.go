@@ -4,11 +4,8 @@ import (
 	"fmt"
 	"io"
 	"strings"
-	"sync"
-	"unicode"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
-	"github.com/yaklang/yaklang/common/ai/aid/aicommon/aitag"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/log"
@@ -32,43 +29,6 @@ type factsSection struct {
 func normalizeFactsDocument(content string) string {
 	content = strings.ReplaceAll(content, "\r\n", "\n")
 	return strings.TrimSpace(content)
-}
-
-func extractEvidenceDocument(content string) string {
-	content = strings.TrimSpace(content)
-	if content == "" {
-		return ""
-	}
-	blocks := discoverEvidenceAITagBlocks(content, "EVIDENCE", "PLAN_EVIDENCE")
-	if len(blocks) == 0 {
-		return ""
-	}
-
-	results := make([]string, len(blocks))
-	options := make([]aitag.ParseOption, 0, len(blocks))
-	var mu sync.Mutex
-	for index, block := range blocks {
-		index := index
-		block := block
-		options = append(options, aitag.WithCallback(block.TagName, block.Nonce, func(reader io.Reader) {
-			contentBytes, err := io.ReadAll(reader)
-			if err != nil {
-				return
-			}
-			mu.Lock()
-			results[index] = strings.TrimSpace(string(contentBytes))
-			mu.Unlock()
-		}))
-	}
-	if err := aitag.Parse(strings.NewReader(content), options...); err != nil {
-		return ""
-	}
-	for _, result := range results {
-		if result != "" {
-			return result
-		}
-	}
-	return ""
 }
 
 // extractFactsAITagFromRawResponse 兜底从 AI 原始响应里把所有 FACTS AITag 块
@@ -130,7 +90,7 @@ type discoveredFactsAITagBlock struct {
 
 // discoverFactsAITagBlocks 扫描 content, 识别所有形如
 // `<|FACTS_<nonce>|>...<|FACTS_END_<nonce>|>` 的块, 返回每个块的 body 偏移.
-// 与通用 discoverEvidenceAITagBlocks 的关键差异: 这里把 tagName 锁死为
+// 这里把 tagName 锁死为
 // `FACTS_`, nonce 直接取剩余部分, 因此能正确处理 nonce 本身含下划线的
 // 字面量占位符 (例如 `CURRENT_NONCE`), 不会被误拆成 `FACTS_CURRENT` + `NONCE`.
 //
@@ -178,87 +138,6 @@ func discoverFactsAITagBlocks(content string) []discoveredFactsAITagBlock {
 		offset = bodyEnd + len(endTag)
 	}
 	return blocks
-}
-
-type discoveredEvidenceAITagBlock struct {
-	TagName string
-	Nonce   string
-}
-
-func discoverEvidenceAITagBlocks(content string, tagNames ...string) []discoveredEvidenceAITagBlock {
-	if content == "" || len(tagNames) == 0 {
-		return nil
-	}
-	allowedTags := make(map[string]struct{}, len(tagNames))
-	for _, tagName := range tagNames {
-		if tagName == "" {
-			continue
-		}
-		allowedTags[tagName] = struct{}{}
-	}
-
-	blocks := make([]discoveredEvidenceAITagBlock, 0, 2)
-	for offset := 0; offset < len(content); {
-		startOffset := strings.Index(content[offset:], "<|")
-		if startOffset < 0 {
-			break
-		}
-		start := offset + startOffset
-		tagCloseOffset := strings.Index(content[start:], "|>")
-		if tagCloseOffset < 0 {
-			break
-		}
-		tagClose := start + tagCloseOffset + 2
-		tagName, nonce, ok := parseEvidenceAITagStartToken(content[start+2 : tagClose-2])
-		if !ok {
-			offset = tagClose
-			continue
-		}
-		if _, exists := allowedTags[tagName]; !exists {
-			offset = tagClose
-			continue
-		}
-		endTag := fmt.Sprintf("<|%s_END_%s|>", tagName, nonce)
-		if endOffset := strings.Index(content[tagClose:], endTag); endOffset >= 0 {
-			blocks = append(blocks, discoveredEvidenceAITagBlock{TagName: tagName, Nonce: nonce})
-			offset = tagClose + endOffset + len(endTag)
-			continue
-		}
-		offset = tagClose
-	}
-	return blocks
-}
-
-func parseEvidenceAITagStartToken(token string) (string, string, bool) {
-	if token == "" || strings.Contains(token, "_END_") {
-		return "", "", false
-	}
-	underscore := strings.LastIndex(token, "_")
-	if underscore <= 0 || underscore >= len(token)-1 {
-		return "", "", false
-	}
-	tagName := token[:underscore]
-	nonce := token[underscore+1:]
-	for _, ch := range tagName {
-		if !unicode.IsLetter(ch) && !unicode.IsDigit(ch) && ch != '_' {
-			return "", "", false
-		}
-	}
-	return tagName, nonce, true
-}
-
-func getLoopTaskEvidenceDocument(loop *reactloops.ReActLoop) string {
-	if loop == nil {
-		return ""
-	}
-	if evidence := strings.TrimSpace(loop.Get(PLAN_EVIDENCE_KEY)); evidence != "" {
-		return evidence
-	}
-	task := loop.GetCurrentTask()
-	if task == nil {
-		return ""
-	}
-	return extractEvidenceDocument(task.GetUserInput())
 }
 
 func parseFactsSections(content string) []*factsSection {

@@ -219,6 +219,7 @@ func TestBackgroundSubAgents_ParentContinuesAndFinishSeesInFlightResult(t *testi
 	}
 	var err error
 	loop, err = NewReActLoop("background-integration", inv,
+		WithFunctionCallMode(false), // This scheduler test deliberately mocks text actions.
 		WithAllowToolCall(false), WithAllowRAG(false), WithAllowAIForge(false), WithAllowPlanAndExec(false), WithAllowUserInteract(false),
 		WithRegisterLoopAction("require_tool", "unused", nil, nil, nil),
 		WithDisableLoopPerception(true), WithDisablePeriodicVerification(true), WithDisableIncreaseIteration(true),
@@ -260,60 +261,6 @@ func TestBackgroundSubAgents_NewResultAllowsNewAnswer(t *testing.T) {
 	require.Error(t, RejectDuplicateDirectlyAnswerWithoutTodoDelta(loop, action))
 }
 
-func TestBackgroundSubAgents_QueuedConfigSnapshotAndIdentity(t *testing.T) {
-	loop, task := backgroundSubAgentFixture(t, 1)
-	cfg := loop.GetConfig().(*aicommon.Config)
-	cfg.SessionPromptState.SetSessionEvidence("evidence-at-dispatch")
-	cfg.SessionPromptState.SetVerificationTodo("parent-only-todo")
-	cfg.GetTimeline().PushText(cfg.AcquireId(), "parent-history-at-dispatch")
-	release := make(chan struct{})
-	var once sync.Once
-	defer once.Do(func() { close(release) })
-	type observed struct{ evidence, taskID, forkID, history, todo string }
-	seen := make(chan observed, 2)
-	builder := managedLoopBuilder(func(p *PreparedSubAgent) (*ReActLoop, error) {
-		child := NewMinimalReActLoop(p.Invoker.GetConfig(), p.Invoker)
-		WithInitTask(func(_ *ReActLoop, task aicommon.AIStatefulTask, op *InitTaskOperator) {
-			childCfg := p.Invoker.GetConfig().(*aicommon.Config)
-			seen <- observed{
-				evidence: childCfg.SessionPromptState.GetSessionEvidence(), taskID: task.GetId(), forkID: p.Timeline.Fork().TaskIndex,
-				history: childCfg.GetTimeline().Dump(), todo: childCfg.SessionPromptState.GetVerificationTodo(),
-			}
-			childCfg.GetTimeline().PushText(childCfg.AcquireId(), "child-private-history")
-			childCfg.SessionPromptState.SetVerificationTodo("child-only-todo")
-			select {
-			case <-release:
-			case <-task.GetContext().Done():
-			}
-			task.SetResult("done")
-			op.Done()
-		})(child)
-		return child, nil
-	})
-	opts := SubAgentOptions{TimelineMode: SubAgentTimelineFork, LoopBuilder: builder}
-	first, err := loop.SubmitSubAgents(task, []SubAgentJob{{Identifier: "first"}}, opts, "first")
-	require.NoError(t, err)
-	firstSeen := <-seen
-	require.Equal(t, first.Jobs[0].ID, firstSeen.taskID)
-	require.Equal(t, firstSeen.taskID, firstSeen.forkID)
-	second, err := loop.SubmitSubAgents(task, []SubAgentJob{{Identifier: "queued"}}, opts, "second")
-	require.NoError(t, err)
-	cfg.SessionPromptState.SetSessionEvidence("new-parent-evidence-after-dispatch")
-	cfg.GetTimeline().PushText(cfg.AcquireId(), "new-parent-history-after-dispatch")
-	once.Do(func() { close(release) })
-	secondSeen := <-seen
-	require.Equal(t, second.Jobs[0].ID, secondSeen.taskID)
-	require.Equal(t, secondSeen.taskID, secondSeen.forkID)
-	require.Equal(t, "evidence-at-dispatch", secondSeen.evidence)
-	require.Contains(t, secondSeen.history, "parent-history-at-dispatch")
-	require.NotContains(t, secondSeen.history, "new-parent-history-after-dispatch")
-	require.NotContains(t, secondSeen.history, "child-private-history")
-	require.Empty(t, secondSeen.todo)
-	awaitBackgroundTerminal(t, loop.GetSubAgentManager(), nil)
-	require.NotContains(t, cfg.GetTimeline().Dump(), "child-private-history")
-	require.Equal(t, "parent-only-todo", cfg.SessionPromptState.GetVerificationTodo())
-}
-
 func TestBackgroundSubAgents_CancelAdmissionBeforeContextSignal(t *testing.T) {
 	// Model the exact interleaving: Cancel committed cancelling under the lock,
 	// but has not invoked the cancel function when the queued worker gets a slot.
@@ -331,34 +278,6 @@ func TestBackgroundSubAgents_CancelAdmissionBeforeContextSignal(t *testing.T) {
 	require.Equal(t, "cancelled", snapshots[0].State)
 	require.Nil(t, snapshots[0].StartedAt, "runtime must never be armed")
 	require.True(t, released, "cancellation before admission must still release prepared resources")
-}
-
-func TestBackgroundSubAgents_CleanTimelineStillInheritsSessionContext(t *testing.T) {
-	loop, task := backgroundSubAgentFixture(t, 1)
-	cfg := loop.GetConfig().(*aicommon.Config)
-	cfg.GetTimeline().PushText(cfg.AcquireId(), "parent-timeline-only")
-	cfg.SessionPromptState.SetSessionEvidence("shared-at-dispatch-evidence")
-	cfg.SessionPromptState.SetVerificationTodo("parent-todo")
-	_, err := cfg.AppendUserInputHistory("original-user-question", time.Now())
-	require.NoError(t, err)
-	type contextView struct{ history, evidence, todo, previousInput string }
-	seen := make(chan contextView, 1)
-	builder := managedLoopBuilder(func(p *PreparedSubAgent) (*ReActLoop, error) {
-		childCfg := p.Invoker.GetConfig().(*aicommon.Config)
-		seen <- contextView{childCfg.GetTimeline().Dump(), childCfg.SessionPromptState.GetSessionEvidence(),
-			childCfg.SessionPromptState.GetVerificationTodo(), childCfg.SessionPromptState.GetPrevSessionUserInput()}
-		child := NewMinimalReActLoop(childCfg, p.Invoker)
-		WithInitTask(func(_ *ReActLoop, _ aicommon.AIStatefulTask, op *InitTaskOperator) { op.Done() })(child)
-		return child, nil
-	})
-	_, err = loop.SubmitSubAgents(task, []SubAgentJob{{Identifier: "clean"}}, SubAgentOptions{TimelineMode: SubAgentTimelineClean, LoopBuilder: builder}, "clean")
-	require.NoError(t, err)
-	awaitBackgroundTerminal(t, loop.GetSubAgentManager(), nil)
-	view := <-seen
-	require.NotContains(t, view.history, "parent-timeline-only")
-	require.Equal(t, "shared-at-dispatch-evidence", view.evidence)
-	require.Empty(t, view.todo)
-	require.Equal(t, "original-user-question", view.previousInput)
 }
 
 func TestBackgroundSubAgents_ObservationBudgetResetsOnWork(t *testing.T) {

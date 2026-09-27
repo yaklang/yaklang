@@ -8,12 +8,7 @@
 
 {{ .PromotedTimelineOpen }}{{ end }}
 
-{{ if .SessionEvidence }}
 
-会话级证据（SESSION EVIDENCE）是历轮工具实际执行后被显式写入的"已确认观测"，跨回合在整段会话中累积保留——它代表可能性空间中已被探明的边界：哪些路径已被排除、哪些路径产出过非基线信号。在做下一步规划时，请优先以这里给出的事实为准；详细的使用纪律见下方 SESSION_EVIDENCE 块内 "## 已知观测（Evidence）" 段。
-
-{{ .SessionEvidence }}
-{{ end }}
 
 {{ if .TodoSnapshot }}
 

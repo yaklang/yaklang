@@ -3713,23 +3713,6 @@ func (c *Config) ActiveVerificationTodoItemsByScope(scope VerificationTodoScope)
 	return c.GetSessionPromptState().ActiveVerificationTodoItemsByScope(scope)
 }
 
-// FlushRestoredSessionEvidence persists the in-memory session evidence (restored from
-// a previous runtime) to the current runtime's DB row. This must be called after
-// the runtime DB row is created, because restorePersistentSession runs before row creation.
-func (c *Config) FlushRestoredSessionEvidence() {
-	if c.PersistentSessionId == "" || c.GetDB() == nil {
-		return
-	}
-	raw := c.GetSessionPromptState().GetSessionEvidence()
-	if raw == "" {
-		return
-	}
-	quoted := c.GetSessionPromptState().quoteEvidence(raw)
-	if err := yakit.UpdateAIAgentRuntimeEvidence(c.GetDB(), c.PersistentSessionId, quoted); err != nil {
-		log.Warnf("flush restored session evidence failed: %v", err)
-	}
-}
-
 func (c *Config) FormatUserInputHistory() string {
 	history := c.GetUserInputHistory()
 	if len(history) == 0 {

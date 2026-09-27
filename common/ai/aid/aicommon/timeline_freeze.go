@@ -10,8 +10,10 @@ import (
 )
 
 // Freeze lifecycle:
-//   append ordinary/control items -> measure the shared open bucket
-//   -> commit batch membership and exact promotions together -> read-only prompt.
+//
+//	append ordinary/control items -> measure the shared open bucket
+//	-> commit batch membership and exact promotions together -> read-only prompt.
+//
 // AI compression is a separate consumer of ordinary facts; it cannot summarize
 // structured promotion payloads. Evidence can join the same journal later.
 //
@@ -184,8 +186,8 @@ func (m *Timeline) freezeLocked(all bool, throughLimit ...int64) TimelineFreezeR
 	return result
 }
 
-// frozenPromptBlocksLocked is read-only. Control items affect boundaries but
-// remain in the separate promoted view until the next prompt integration step.
+// frozenPromptBlocksLocked is read-only. Pending evidence is rendered in place;
+// sealed evidence is represented only by its promoted semi-dynamic snapshot.
 func (m *Timeline) frozenPromptBlocksLocked() TimelineRenderableBlocks {
 	var blocks TimelineRenderableBlocks
 	if m.compressedHead != nil && strings.TrimSpace(m.compressedHead.Text) != "" {
@@ -200,9 +202,18 @@ func (m *Timeline) frozenPromptBlocksLocked() TimelineRenderableBlocks {
 			frozenNonce: nonce, initialTaskID: initialTaskID}
 		for _, id := range ids {
 			item, ok := m.idToTimelineItem.Get(id)
-			if ok && item != nil && !item.deleted && !isPromotableTimelineItem(item) {
-				block.Items = append(block.Items, item)
+			if !ok || item == nil || item.deleted {
+				continue
 			}
+			if isPromotableTimelineItem(item) {
+				op := item.value.(*PromotableTimelineItem)
+				if !open || op == nil || op.Kind != TimelinePromotedKindEvidence {
+					continue
+				}
+				// A detached prompt view preserves the journal, reducer exclusion and UI audit.
+				item = &TimelineItem{createdAt: item.createdAt, value: &TextTimelineItem{ID: id, Text: timelineEvidenceDeltaPrompt(op)}}
+			}
+			block.Items = append(block.Items, item)
 		}
 		if len(block.Items) > 0 {
 			blocks = append(blocks, block)

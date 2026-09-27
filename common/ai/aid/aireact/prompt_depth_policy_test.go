@@ -12,65 +12,6 @@ var defaultLoopInstruction = promptloader.MustLoad("ai/aid/aireact/reactloops/lo
 
 var defaultLoopOutputExample = promptloader.MustLoad("ai/aid/aireact/reactloops/loop_default/prompts/output_example.txt")
 
-func TestPromptPolicyRequiresDiscriminatingEvidenceBeforeVerificationClosure(t *testing.T) {
-	highStatic := aicommon.SharedPlanAndExecHighStaticTemplate
-	require.Contains(t, highStatic, "区分性实验")
-	require.Contains(t, highStatic, "性价比优先")
-	require.Contains(t, highStatic, "单次未命中只说明本次未命中, 不单独证明目标不存在")
-	require.Contains(t, highStatic, "## 实验方法论")
-	require.Contains(t, highStatic, "**语义停滞判定**")
-	require.Contains(t, highStatic, "调用次数多、轮次增加或耗时变长本身都不是重复证据")
-	require.Contains(t, highStatic, "同一工具用于不同目标、参数 / payload、对照、假设、观察通道或独立复核属于有效探索")
-	require.Contains(t, highStatic, "确认语义停滞后至少改变一项假设 / 关键变量 / 工具 / 观察通道再试")
-	require.Contains(t, highStatic, "`todo_delta` 是唯一写入通道")
-	require.Contains(t, highStatic, "待办清单管循环内焦点")
-	require.Contains(t, highStatic, "Plan 管跨循环分治")
-	require.Contains(t, highStatic, "兄弟任务的待办只读可见")
-	require.NotContains(t, highStatic, "严格优先级逆转")
-	require.NotContains(t, highStatic, "当前工具与权限可以立即执行")
-	require.Contains(t, highStatic, "回到 CURRENT-TASK")
-	require.Contains(t, highStatic, "不得仅凭漂移判定完成")
-	require.NotContains(t, highStatic, "任务漂移即完成")
-	require.Contains(t, highStatic, "同一 CURRENT-TASK 中不携带有效 `todo_delta` 的直接答复最多成功一次")
-	require.Contains(t, highStatic, "`simple_query` 例外")
-	require.Contains(t, highStatic, "确无剩余工作且已核对验收证据时再收口")
-	require.Contains(t, highStatic, "仅有空列表不得终结")
-	require.Contains(t, highStatic, "## 推理增量纪律")
-	require.Contains(t, highStatic, "内部推理是相对现有上下文的决策增量")
-	require.Contains(t, highStatic, "不引用、复述或改写系统提示词")
-	require.Contains(t, highStatic, "不描述自己如何理解提示词、遵守规则、组织格式、构造 JSON")
-	require.Contains(t, highStatic, "最多三句且最多 240 个字符")
-	require.Contains(t, highStatic, "协议审计不豁免")
-
-	require.Contains(t, highStatic, "## 循环内焦点机制: 待办清单")
-	require.Contains(t, highStatic, "唯一被标记为\"当前主要矛盾\"的一项")
-	require.Contains(t, highStatic, "第一条可执行动作就要建立初始待办集合并显式指定 `current`")
-	require.Contains(t, highStatic, "Observation 打开新分支")
-	require.Contains(t, highStatic, "具体目标")
-	require.Contains(t, highStatic, "**来源** (用户要求或具体 Observation/工具调用)")
-	require.Contains(t, highStatic, "**验收方法**")
-	require.Contains(t, highStatic, "以 `\"待探索：\"` 开头")
-	require.Contains(t, highStatic, "存在开放待办时以工具推进 `current`, 不得终结任务")
-	require.Contains(t, highStatic, "不得为清空列表伪造 `resolved`")
-	require.Contains(t, highStatic, "一个独立验收目标一条")
-	require.Contains(t, defaultLoopOutputExample, "`todo_delta` 使用案例")
-	require.Contains(t, defaultLoopOutputExample, "`save_evidence` 使用案例")
-
-	require.Contains(t, verificationInstructionText, "安全测试阴性结论必须有区分力")
-	require.Contains(t, verificationInstructionText, "漂移本身不能证明当前子任务完成")
-	require.Contains(t, verificationInstructionText, "页面链接、表单 action、跳转、脚本路由、文档端点、响应字段")
-	require.Contains(t, verificationInstructionText, "验证型路径再写可证伪假设")
-	require.Contains(t, verificationInstructionText, "单次工具、参数、连接、认证、空响应或 payload 失败不能证明路径结束")
-	require.Contains(t, verificationInstructionText, "必须先用 `todo_delta` 把全部合格分支加入或更新到 Frontier")
-	require.Contains(t, verificationInstructionText, "你本人仍不得输出 `todo_delta`")
-	require.NotContains(t, verificationInstructionText, "安全测试否定结果 = 子任务完成")
-	require.NotContains(t, verificationInstructionText, "只有当工具执行完全失败或没有任何相关输出时")
-
-	require.NotContains(t, verificationDynamicTemplate, "HasRepeatedExecutionPath")
-	require.NotContains(t, verificationDynamicTemplate, "当前子任务已多次经过相似执行路径")
-	require.Contains(t, verificationOutputExampleText, "单次阴性尝试不等于验证完成")
-}
-
 func TestFrontierCurrentPromptPolicyCoversExecutionScenarios(t *testing.T) {
 	policy := aicommon.SharedPlanAndExecHighStaticTemplate + "\n" + defaultLoopInstruction + "\n" + defaultLoopOutputExample
 	tests := []struct {

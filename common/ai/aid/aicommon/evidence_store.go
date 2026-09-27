@@ -48,10 +48,6 @@ func BuildSessionEvidenceUpsert(id, content string) (EvidenceOperation, error) {
 	return EvidenceOperation{ID: id, Op: "add", Content: content}, nil
 }
 
-func (s *EvidenceStore) IsEmpty() bool {
-	return len(s.Items) == 0
-}
-
 func (s *EvidenceStore) ApplyOperations(ops []EvidenceOperation) {
 	s.ApplyOperationsAt(ops, time.Now().Unix())
 }
@@ -111,7 +107,8 @@ func (s *EvidenceStore) ApplyOperationsAt(ops []EvidenceOperation, nowUnix int64
 	}
 }
 
-// Render produces markdown for prompt injection, each item prefixed with [id: xxx].
+// Render returns the current business view, each item prefixed with [id: xxx].
+// Prompt placement is owned by the Timeline delta / frozen projection.
 func (s *EvidenceStore) Render() string {
 	return renderEvidenceItems(s.Items)
 }
@@ -152,15 +149,6 @@ func UnmarshalEvidenceStore(data string) *EvidenceStore {
 	return &EvidenceStore{
 		Items: []EvidenceItem{newLegacyEvidenceItem(data)},
 	}
-}
-
-func (s *EvidenceStore) SnapshotItems() []EvidenceItem {
-	if s == nil || len(s.Items) == 0 {
-		return nil
-	}
-	items := make([]EvidenceItem, len(s.Items))
-	copy(items, s.Items)
-	return items
 }
 
 func renderEvidenceItems(items []EvidenceItem) string {

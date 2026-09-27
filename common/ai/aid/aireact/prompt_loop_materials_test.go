@@ -219,7 +219,6 @@ func TestPromptManager_AssembleLoopPrompt_LightweightUsesBoundedRecentTimeline(t
 		ReactiveData:      strings.Repeat("reactive ", 5000),
 		InjectedMemory:    strings.Repeat("memory ", 5000),
 		TodoCheckpoint:    "[CURRENT TODO CHECKPOINT]\nkeep this dynamic tail",
-		SessionEvidence:   strings.Repeat("evidence ", 5000),
 		FrozenUserContext: strings.Repeat("plan ", 5000),
 	})
 	require.NoError(t, err)
@@ -345,14 +344,14 @@ func TestPromptManager_AssembleLoopPrompt_SectionOrder(t *testing.T) {
 	// Tool/Forge/Timeline-frozen -> AI_CACHE_FROZEN(END) ->
 	// PROMPT_SECTION_semi-dynamic-1 (Skills) ->
 	// PROMPT_SECTION_semi-dynamic-2 (ExecutionPolicy + Persistent + OutputExample + Schema) ->
-	// PROMPT_SECTION_timeline-open (Timeline open + SessionEvidence +
+	// PROMPT_SECTION_timeline-open (Timeline open（含 evidence delta）+
 	// Workspace + PREV_USER_INPUT + Current Time + PlanContext) ->
 	// Dynamic (UserQuery + AutoCtx + ...)
 	//
 	// timeline-open 段内子项顺序 (P1-C3):
-	//   Timeline (Open Tail) -> Session Evidence -> Workspace ->
+	//   Timeline (Open Tail, including evidence delta) -> Workspace ->
 	//   User History (PREV_USER_INPUT) -> Current Time -> Plan Context
-	// 排序原则: Timeline / SessionEvidence 形成"会话级实证"连续块在前;
+	// 排序原则: Timeline 与其 evidence delta 形成"会话级实证"连续块在前;
 	// Workspace 居中作为环境标识; UserHistory + Current Time 形成"用户输入
 	// 历史 -> 现在"时序前缀; PlanContext 末尾落在所有 cache 边界外。
 	// 关键词: P1-C3 timeline-open 段内顺序断言, currentTime 后置
@@ -429,7 +428,7 @@ func TestPromptManager_AssembleLoopPrompt_SectionOrder(t *testing.T) {
 	require.Equal(t, reactloops.PromptSectionRoleSemiDynamic2, sections[3].Children[2].Role)
 
 	// timeline_open 段子结构 (P1-C3 段内重排后):
-	//   timeline_open -> session_evidence (本用例 SessionEvidence 为空被过滤) ->
+	//   timeline_open ->
 	//   workspace -> user_history -> current_time -> plan_context (本用例
 	//   FrozenUserContext 为空被过滤).
 	// filterIncludedPromptSections 会过滤空段, 故实际剩 4 个 children:

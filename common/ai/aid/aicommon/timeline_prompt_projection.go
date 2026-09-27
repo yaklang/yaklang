@@ -29,6 +29,17 @@ func projectTimelineItemForPromptWithModelReplay(item *TimelineItem, allowModelR
 	switch category {
 	case "TODO_DELTA", "EVIDENCE_OPS":
 		return nil
+	case "SESSION_EVIDENCE_SAVED":
+		// Historical saves duplicated the complete evidence body in this receipt.
+		// Preserve the raw audit entry, but only project its identity/status.
+		content := strings.TrimSpace(extractTextTimelineContent(textItem.Text))
+		receipt := "Evidence save recorded."
+		if strings.HasPrefix(content, "[id: ") {
+			if end := strings.IndexByte(content, ']'); end >= 0 {
+				receipt = content[:end+1] + " saved."
+			}
+		}
+		return cloneTextTimelineItemForPrompt(item, textItem, replaceTimelineTextBody(textItem.Text, receipt))
 	case "MODEL_THINKING":
 		if !allowModelReplay || strings.TrimSpace(textItem.PromptText) == "" {
 			return nil

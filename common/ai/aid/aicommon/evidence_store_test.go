@@ -180,8 +180,9 @@ func TestSessionPromptState_GetSessionEvidenceFrozenOpenBlocksPrunesFrozenStateW
 }
 
 func TestSessionPromptState_EvidencePersistenceUsesLiveStoreOnly(t *testing.T) {
-	s := NewSessionPromptState()
-	s.ApplySessionEvidenceOps([]EvidenceOperation{
+	c := evidenceConfig(t)
+	s := c.GetSessionPromptState()
+	c.ApplySessionEvidenceOps([]EvidenceOperation{
 		{Op: "add", ID: "a", Content: "A"},
 		{Op: "add", ID: "b", Content: "B"},
 		{Op: "delete", ID: "a"},
