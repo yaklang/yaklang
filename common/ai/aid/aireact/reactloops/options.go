@@ -351,6 +351,7 @@ func WithPersistentInstruction(instruction string) ReActLoopOption {
 		}
 		result["Nonce"] = nonce
 		result["FunctionCallMode"] = functionCallMode
+		result["FunctionCallActionVariants"] = functionCallMode && loop.useFunctionCallActionVariants
 		return utils.RenderTemplate(instruction, result)
 	}
 	return func(r *ReActLoop) {

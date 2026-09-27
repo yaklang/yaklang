@@ -328,6 +328,10 @@ func deepCloneInvokeParams(params aitool.InvokeParams) (aitool.InvokeParams, err
 }
 
 func parseDirectToolBatchAction(loop *reactloops.ReActLoop, action *aicommon.Action) (*aicommon.ToolBatchRequest, bool, error) {
+	return parseDirectToolBatchActionWithMetadata(loop, action, false)
+}
+
+func parseDirectToolBatchActionWithMetadata(loop *reactloops.ReActLoop, action *aicommon.Action, allowMetadata bool) (*aicommon.ToolBatchRequest, bool, error) {
 	if err := action.WaitParseResult(toolBatchVerifierContext(loop)); err != nil {
 		return nil, false, utils.Wrap(err, "directly_call_tool action parse failed")
 	}
@@ -336,13 +340,8 @@ func parseDirectToolBatchAction(loop *reactloops.ReActLoop, action *aicommon.Act
 	if err != nil || !hasBatch {
 		return nil, hasBatch, err
 	}
-	if hasAnyCanonicalActionParam(action,
-		"directly_call_tool_name",
-		"directly_call_tool_params",
-		"directly_call_identifier",
-		"directly_call_expectations",
-		"directly_call_reason",
-	) {
+	if hasAnyCanonicalActionParam(action, "directly_call_tool_name", "directly_call_tool_params") ||
+		(!allowMetadata && hasAnyCanonicalActionParam(action, "directly_call_identifier", "directly_call_expectations", "directly_call_reason")) {
 		return nil, true, utils.Errorf("%s cannot be combined with legacy directly_call_tool_* fields", directlyCallToolBatchField)
 	}
 	if hasAnyCanonicalActionParam(action,
@@ -423,6 +422,21 @@ func parseDirectToolBatchAction(loop *reactloops.ReActLoop, action *aicommon.Act
 			Expectations: expectations,
 			Reason:       reason,
 		})
+	}
+	if allowMetadata {
+		var parentReason string
+		if raw, exists := lookupCanonicalActionParam(action, "directly_call_reason"); exists {
+			var err error
+			parentReason, err = strictBatchString(aitool.InvokeParams{"directly_call_reason": raw}, "directly_call_reason", false)
+			if err != nil {
+				return nil, true, err
+			}
+		}
+		for i := range request.Calls {
+			if request.Calls[i].Reason == "" {
+				request.Calls[i].Reason = parentReason
+			}
+		}
 	}
 	return request, true, nil
 }

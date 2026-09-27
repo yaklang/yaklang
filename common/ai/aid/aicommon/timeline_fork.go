@@ -38,7 +38,6 @@ func (m *Timeline) ForkForTask(taskIndex, taskName string, config AICallerConfig
 	}
 	branch.SoftBindConfig(config, ai)
 	branch.forkProtectedMaxID = baseMaxID
-	branch.compressing = utils.NewOnce()
 	branch.markBranchTimeline(true)
 
 	return &TimelineFork{

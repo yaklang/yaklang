@@ -11,8 +11,9 @@ import (
 )
 
 var loopAction_toolRequireAndCall = &reactloops.LoopAction{
-	ActionType:  schema.AI_REACT_LOOP_ACTION_REQUIRE_TOOL,
-	Description: "申请工具并由运行时阅读工具文档、生成参数。默认使用 tool_require_payload 单次生成参数；工具是参数未完整的嵌套 wrapper 时必须使用单调用。仅当 2-8 个调用低风险、互不依赖、互不干扰，且每个工具 Schema 都简单无歧义时，才可使用 tool_require_calls。若工具已在 CACHE_TOOL_CALL 且参数完整，改用 directly_call_tool。批量项严禁提供 params；严禁混用单调用和批量字段，也不要为了凑数量发明调用。",
+	FunctionCallAction: nativeToolSchemaLoadAction,
+	ActionType:         schema.AI_REACT_LOOP_ACTION_REQUIRE_TOOL,
+	Description:        "申请工具并由运行时阅读工具文档、生成参数。默认使用 tool_require_payload 单次生成参数；工具是参数未完整的嵌套 wrapper 时必须使用单调用。仅当 2-8 个调用低风险、互不依赖、互不干扰，且每个工具 Schema 都简单无歧义时，才可使用 tool_require_calls。若工具已在 CACHE_TOOL_CALL 且参数完整，改用 directly_call_tool。批量项严禁提供 params；严禁混用单调用和批量字段，也不要为了凑数量发明调用。",
 	Options: []aitool.ToolOption{
 		aitool.WithStringParam(
 			"tool_require_payload",

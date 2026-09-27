@@ -952,8 +952,14 @@ func (h *TimelineCompressedHeadBlock) Render() string {
 		return ""
 	}
 	var buf bytes.Buffer
-	buf.WriteString(fmt.Sprintf("# compressed_head covered_end_item_id=%d covered_end_at_ms=%d version=%d\n",
-		h.CoveredEndItemID, h.CoveredEndAtMs, h.Version))
+	if h.promptProjection {
+		// Coverage/version remain in the persisted head and diagnostic render.
+		// They must not invalidate the unchanged beginning of an appended summary.
+		buf.WriteString("# compressed_head\n")
+	} else {
+		buf.WriteString(fmt.Sprintf("# compressed_head covered_end_item_id=%d covered_end_at_ms=%d version=%d\n",
+			h.CoveredEndItemID, h.CoveredEndAtMs, h.Version))
+	}
 	buf.WriteString("[compressed/head]")
 	text := strings.TrimSpace(h.Text)
 	if text != "" {
@@ -979,6 +985,11 @@ func (h *TimelineCompressedHeadBlock) Render() string {
 func (h *TimelineCompressedHeadBlock) StableNonce() string {
 	if h == nil {
 		return ""
+	}
+	if h.promptProjection {
+		// A timeline has one active compressed head. This is its stable display
+		// identity, not the process nonce authenticating aiprojection controls.
+		return "compressedhead"
 	}
 	return fmt.Sprintf("h%dv%d", h.CoveredEndAtMs/1000, h.Version)
 }

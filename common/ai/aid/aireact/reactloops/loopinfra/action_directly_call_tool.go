@@ -308,7 +308,8 @@ func directlyCallParamKeys(params aitool.InvokeParams) []string {
 }
 
 var loopAction_directlyCallTool = &reactloops.LoopAction{
-	ActionType: schema.AI_REACT_LOOP_ACTION_DIRECTLY_CALL_TOOL,
+	FunctionCallAction: nativeDirectToolAction,
+	ActionType:         schema.AI_REACT_LOOP_ACTION_DIRECTLY_CALL_TOOL,
 	Description: "直接调用已启用且参数完整的工具，跳过申请和参数生成阶段。默认使用 directly_call_tool_name 和 directly_call_tool_params 的单调用形式。" +
 		"仅当存在 2-8 个低风险、互不依赖、互不干扰，且每层参数都已从真实 Schema 确定的调用时，才可用 directly_call_tool_calls 并发；" +
 		"优先使用 CACHE_TOOL_CALL 中已展示参数 Schema 的工具；已启用但未缓存的工具仍可解析并产生告警。" +
