@@ -785,6 +785,7 @@ LOOP:
 		var eventSink loopActionEventSink
 		if stopReason == LoopStopToolCalls {
 			if err := r.appendFunctionCallActionResponse(loopCalls, resultDescriptor); err != nil {
+				r.clearCallsExecutionValues(loopCalls)
 				r.finishIterationLoopWithError(iterationCount, task, err)
 				needSummary.SetTo(true)
 				return err
