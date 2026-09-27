@@ -505,7 +505,7 @@ func executeVerifiedToolBatch(
 	stateKey string,
 	operator *reactloops.LoopActionHandlerOperator,
 ) bool {
-	raw := action.GetExecutionValue(stateKey)
+	raw := loop.GetActionExecutionValue(action, stateKey)
 	request, ok := raw.(*aicommon.ToolBatchRequest)
 	if !ok || request == nil || len(request.Calls) == 0 {
 		return false

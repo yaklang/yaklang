@@ -161,6 +161,7 @@ func (r *ReActLoop) execCalls(
 	calls []LoopCall, iteration int, task aicommon.AIStatefulTask,
 	prompt string, done *utils.Once, eventSink loopActionEventSink,
 ) loopActionsResult {
+	defer r.clearCallsExecutionValues(calls)
 	result := loopActionsResult{operator: newLoopActionHandlerOperator(task), result: loopActionsContinue}
 	if len(calls) == 0 {
 		result.result, result.err = loopActionsError, fmt.Errorf("AI loop returned no actions")

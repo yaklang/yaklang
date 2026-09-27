@@ -337,8 +337,8 @@ var loopAction_directlyCallTool = &reactloops.LoopAction{
 	},
 	OutputExamples: directlyCallToolOutputExamples,
 	ActionVerifier: func(loop *reactloops.ReActLoop, action *aicommon.Action) error {
-		action.SetExecutionValue(actionStateDirectToolBatch, nil)
-		action.SetExecutionValue("directly_call_tool_name", nil)
+		loop.SetActionExecutionValue(action, actionStateDirectToolBatch, nil)
+		loop.SetActionExecutionValue(action, "directly_call_tool_name", nil)
 
 		// Keep the established scalar streaming contract. The legacy discriminator
 		// is readable before the root JSON object closes, so a valid one-call action
@@ -369,7 +369,7 @@ var loopAction_directlyCallTool = &reactloops.LoopAction{
 				)
 			}
 			reactloops.MaybeWarnBashBeforeEdit(loop, toolName)
-			action.SetExecutionValue("directly_call_tool_name", toolName)
+			loop.SetActionExecutionValue(action, "directly_call_tool_name", toolName)
 			return nil
 		}
 
@@ -378,7 +378,7 @@ var loopAction_directlyCallTool = &reactloops.LoopAction{
 			return batchErr
 		}
 		if hasBatch {
-			action.SetExecutionValue(actionStateDirectToolBatch, batch)
+			loop.SetActionExecutionValue(action, actionStateDirectToolBatch, batch)
 			return nil
 		}
 
@@ -405,7 +405,7 @@ var loopAction_directlyCallTool = &reactloops.LoopAction{
 			invoker.AddToTimeline("DIRECT_CALL_PARAMS", msg)
 		}
 
-		toolName, _ := action.GetExecutionValue("directly_call_tool_name").(string)
+		toolName, _ := loop.GetActionExecutionValue(action, "directly_call_tool_name").(string)
 		if toolName == "" {
 			loopInfraStatus(loop, "没有找到要使用的工具", "No suitable tool was found")
 			reportStatus(strings.TrimSpace(`

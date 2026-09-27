@@ -96,7 +96,7 @@ Example - Sequential file operations(With AI-Tag tags):
 	<|WORKFLOW_DAG_END_{{.Nonce}}|>
 `,
 	ActionVerifier: func(loop *reactloops.ReActLoop, action *aicommon.Action) error {
-		action.SetExecutionValue("tool_compose_payload", nil)
+		loop.SetActionExecutionValue(action, "tool_compose_payload", nil)
 		loopInfraStatus(loop, "正在安排多个工具协同工作", "Coordinating multiple tools for this task")
 		action.WaitStream(loop.GetCurrentTask().GetContext())
 
@@ -145,11 +145,11 @@ Example - Sequential file operations(With AI-Tag tags):
 			}
 		}
 
-		action.SetExecutionValue("tool_compose_payload", payload)
+		loop.SetActionExecutionValue(action, "tool_compose_payload", payload)
 		return nil
 	},
 	ActionHandler: func(loop *reactloops.ReActLoop, action *aicommon.Action, operator *reactloops.LoopActionHandlerOperator) {
-		payload, _ := action.GetExecutionValue("tool_compose_payload").(string)
+		payload, _ := loop.GetActionExecutionValue(action, "tool_compose_payload").(string)
 		if payload == "" {
 			operator.Feedback(utils.Error("tool_compose_payload is required for ActionToolCompose but empty"))
 			return

@@ -144,6 +144,10 @@ type ReActLoop struct {
 	actionHistory      []*ActionRecord
 	actionHistoryMutex *sync.Mutex
 
+	// Invocation-local verifier results belong to the loop, never Action data.
+	actionExecutionMu     sync.Mutex
+	actionExecutionValues map[*aicommon.Action]map[string]any
+
 	// modelThinkingBuf holds reason-stream deltas for the in-flight AI transaction;
 	// flushed into the timeline iteration line above the action summary.
 	modelThinkingBuf   bytes.Buffer
@@ -322,6 +326,11 @@ func (r *ReActLoop) Release() {
 	r.released = true
 	hooks := append([]func(){}, r.onRelease...)
 	r.onReleaseMutex.Unlock()
+	defer func() {
+		r.actionExecutionMu.Lock()
+		defer r.actionExecutionMu.Unlock()
+		r.actionExecutionValues = nil
+	}()
 
 	for _, h := range hooks {
 		func() {

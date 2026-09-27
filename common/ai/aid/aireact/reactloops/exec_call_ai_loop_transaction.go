@@ -460,6 +460,12 @@ func (r *ReActLoop) callAIFunctionTransaction(
 	var currentCollector *loopToolCallCollector
 	var collectorMu sync.Mutex
 	var acceptedCalls []LoopCall
+	keepExecutionState := false
+	defer func() {
+		if !keepExecutionState {
+			r.clearCallsExecutionValues(acceptedCalls)
+		}
+	}()
 	var acceptedResp *aicommon.AIResponse
 	var lastOutput, lastReason string
 	var lastRawCalls []*aispec.ToolCall
@@ -507,6 +513,8 @@ func (r *ReActLoop) callAIFunctionTransaction(
 		captureOption,
 	}
 	postHandler := func(resp *aicommon.AIResponse) error {
+		r.clearCallsExecutionValues(acceptedCalls)
+		acceptedCalls = nil
 		r.resetModelThinkingBuffer()
 		r.Set("last_ai_decision_response", "")
 		acceptedResp = resp
@@ -550,6 +558,12 @@ func (r *ReActLoop) callAIFunctionTransaction(
 		r.Delete(loopVarNativeTodoBatchAdjusted)
 		defer r.Delete(loopVarNativeTodoBatchAdjusted)
 		calls := make([]LoopCall, 0, len(rawCalls))
+		verified := false
+		defer func() {
+			if !verified {
+				r.clearCallsExecutionValues(calls)
+			}
+		}()
 		for _, rawCall := range rawCalls {
 			if !validActionToolName(rawCall.Function.Name) {
 				return utils.Errorf("invalid function-call action name %q", rawCall.Function.Name)
@@ -601,6 +615,7 @@ func (r *ReActLoop) callAIFunctionTransaction(
 			}
 		}
 		acceptedCalls = calls
+		verified = true
 		r.Set("last_ai_decision_nonce", nonce)
 		return nil
 	}
@@ -610,7 +625,6 @@ func (r *ReActLoop) callAIFunctionTransaction(
 			func() string { return prompt },
 			func(*aicommon.Action) {},
 			aicommon.WithAuxiliaryResponseHandler(func(resp *aicommon.AIResponse) (*aicommon.Action, error) {
-				acceptedCalls = nil
 				if err := postHandler(resp); err != nil {
 					return nil, err
 				}
@@ -641,11 +655,18 @@ func (r *ReActLoop) callAIFunctionTransaction(
 		return nil, failedLoopStopReason(descriptor, err), descriptor, err
 	}
 	descriptor.finish(acceptedResp, lastOutput, lastReason, lastRawCalls)
+	keepExecutionState = true
 	return acceptedCalls, LoopStopToolCalls, descriptor, nil
 }
 
 func (r *ReActLoop) callAINormalTransaction(streamWg *sync.WaitGroup, prompt string, nonce string, operator *LoopActionHandlerOperator, descriptor *LoopResultDescriptor) (*aicommon.Action, *LoopAction, error) {
 	var action *aicommon.Action
+	keepExecutionState := false
+	defer func() {
+		if !keepExecutionState {
+			r.ClearActionExecutionValues(action)
+		}
+	}()
 	var actionNames = r.GetAllActionNames()
 	// Bind the provider request to the immutable task that owns this
 	// transaction. ReAct.currentTask may temporarily point at a nested loop,
@@ -695,7 +716,13 @@ func (r *ReActLoop) callAINormalTransaction(streamWg *sync.WaitGroup, prompt str
 	}
 	var acceptedResp *aicommon.AIResponse
 
-	postHandler := func(resp *aicommon.AIResponse) error {
+	postHandler := func(resp *aicommon.AIResponse) (err error) {
+		r.ClearActionExecutionValues(action)
+		defer func() {
+			if err != nil {
+				r.ClearActionExecutionValues(action)
+			}
+		}()
 		acceptedResp = resp
 		if ctxCanceled.IsSet() {
 			return nil
@@ -958,6 +985,7 @@ func (r *ReActLoop) callAINormalTransaction(streamWg *sync.WaitGroup, prompt str
 			func() string { return prompt },
 			func(accepted *aicommon.Action) { action = accepted },
 			aicommon.WithAuxiliaryResponseHandler(func(resp *aicommon.AIResponse) (*aicommon.Action, error) {
+				r.ClearActionExecutionValues(action)
 				action = nil
 				if err := postHandler(resp); err != nil {
 					return nil, err
@@ -1051,5 +1079,6 @@ func (r *ReActLoop) callAINormalTransaction(streamWg *sync.WaitGroup, prompt str
 		}()
 	}
 
+	keepExecutionState = true
 	return action, handler, nil
 }
