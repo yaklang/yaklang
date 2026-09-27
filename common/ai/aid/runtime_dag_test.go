@@ -246,7 +246,7 @@ func TestRuntimeStageTimelineForkIsolation(t *testing.T) {
 	coordinator.Config = aicommon.NewConfig(context.Background(),
 		aicommon.WithPlanExecTaskConcurrency(2),
 		aicommon.WithDisableAutoSkills(true),
-		aicommon.WithPersistentSessionId("stage-timeline-without-midterm"),
+		aicommon.WithPersistentSessionId("stage-timeline-isolation"),
 	)
 
 	a := newStateTask(coordinator, "a")
@@ -290,7 +290,6 @@ func TestRuntimeStageTimelineForkIsolation(t *testing.T) {
 	mainDump := coordinator.Timeline.Dump()
 	require.Contains(t, mainDump, "task-A-marker")
 	require.Contains(t, mainDump, "task-B-marker")
-	require.Nil(t, coordinator.TimelineArchiveStore, "stage execution must not create a midterm parent or branch store")
 }
 
 func TestRuntimeStageTimelineForkMergePreservesGlobalIDOrder(t *testing.T) {

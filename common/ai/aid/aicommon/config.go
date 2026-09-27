@@ -309,10 +309,8 @@ type Config struct {
 	MemoryTriage        MemoryTriage
 	DisableMemoryTriage bool // 禁用 Memory Triage（智能记忆处理），默认为 false（即默认启用）
 
-	// Deprecated: retained for source compatibility; timeline archives are no longer written or recalled.
-	TimelineArchiveStore TimelineArchiveStore
-	MemoryPoolSize       int64
-	MemoryPool           *omap.OrderedMap[string, *MemoryEntity]
+	MemoryPoolSize int64
+	MemoryPool     *omap.OrderedMap[string, *MemoryEntity]
 	// other context
 	PersistentMemory []string
 
@@ -3472,26 +3470,6 @@ func WithMemoryTriageId(id string) ConfigOption {
 	}
 }
 
-// WithTimelineArchiveStore retains the legacy option for source compatibility.
-//
-// Deprecated: the store is no longer used by timeline compression or ReAct.
-func WithTimelineArchiveStore(store TimelineArchiveStore) ConfigOption {
-	return func(c *Config) error {
-		c.m.Lock()
-		c.TimelineArchiveStore = store
-		c.m.Unlock()
-		return nil
-	}
-}
-
-// Deprecated: the returned legacy store is not used by the runtime.
-func (c *Config) GetTimelineArchiveStore() TimelineArchiveStore {
-	if c == nil {
-		return nil
-	}
-	return c.TimelineArchiveStore
-}
-
 func (c *Config) GetPersistentSessionID() string {
 	if c == nil {
 		return ""
@@ -4442,9 +4420,6 @@ func ConvertConfigToOptions(i *Config) []ConfigOption {
 	}
 	if i.MemoryTriage != nil {
 		opts = append(opts, WithMemoryTriage(i.MemoryTriage))
-	}
-	if i.TimelineArchiveStore != nil {
-		opts = append(opts, WithTimelineArchiveStore(i.TimelineArchiveStore))
 	}
 
 	// Misc

@@ -73,7 +73,7 @@ func TestTimelineCompressionSummarySingleRequest(t *testing.T) {
 					if mode == "large_input" {
 						require.Contains(t, request.GetPrompt(), "LARGE_HISTORY_BEGIN")
 						require.Contains(t, request.GetPrompt(), "LARGE_HISTORY_END")
-						require.Greater(t, len(request.GetPrompt()), MaxBatchCompressPromptSize)
+						require.Greater(t, len(request.GetPrompt()), 80*1024)
 					}
 					if mode == "request_error" {
 						return nil, errors.New("provider context limit")
@@ -174,7 +174,6 @@ func TestTimelineCompressionSummaryExamples(t *testing.T) {
 	} {
 		t.Run(example.name, func(t *testing.T) {
 			tl := NewTimeline(nil, nil)
-			tl.autoCompressDisabled = true
 			if example.previous != "" {
 				tl.compressedHead = &TimelineCompressedHead{Text: example.previous, CoveredEndItemID: 1, Version: 1}
 			}

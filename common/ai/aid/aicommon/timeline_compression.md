@@ -1,118 +1,104 @@
-# Timeline 压缩现状
+# Timeline 压缩：一次检查、一次摘要、一次提交
 
-入口和实现集中在 `timeline_compression.go`，主 Timeline 的追加入口在 `timeline.go`，冻结和提升在 `timeline_freeze.go`，持久化格式在 `timeline_marshal.go`。压缩相关测试按 `timeline_compression*_test.go` 查找；evidence、toolcache 的生命周期断言仍在各自的专属测试中。
+## 当前生产路径
 
-## 正常的 AI 压缩
+主循环在 `generateLoopPrompt` 内、`AssembleLoopPrompt` 前调用 `compressTimelineBeforePrompt`，同步等待 `CompressBeforePrompt`。上一轮 actions 已完成，新一轮请求尚未组装。Push、渲染、Save、恢复、fork/merge 均不会自行发起 AI 压缩，也不会按时间或字节桶自动提升状态。
+
+阈值沿用 `WithTimelineContentLimit` / `SetTimelineContentLimit` 的 token 配置，默认 Config 为 50 × 1024。它表示**触发阈值**，不是压缩后的目标体积。计算范围是旧摘要 + 全部普通 Frozen/Open + 尚未提升的精确状态 delta；已经提升到 Semi 的精确状态不计入可压缩范围。非正阈值关闭自动检查。没有新普通条目或待提升 delta 时，不重复压缩同一个 head。
+
+本次没有改成 100K，也没有恢复“六分之一”或“保留最近原文”的算法。摘要按模板保留有用事实，不固定输出长度。256K 输入 / 16K 摘要是 Prompt 前压缩检查 的技术安全上限，可通过 `TimelineCompressionOptions` 覆盖；超过上限报错并保留完整原文，不截断、不拆批。
 
 ```mermaid
 sequenceDiagram
-    participant Writer as Timeline 写入方
-    participant TL as Timeline
-    participant Worker as 压缩任务
-    participant AI as 辅助 AI
-    participant Reader as 下一轮 Prompt
-    Writer->>TL: Push item（持有 Timeline.mu）
-    TL->>TL: freezeLocked(false)：按现有时间/字节桶冻结
-    TL->>TL: dumpSizeCheckLocked：统计普通活跃内容 token
-    alt 超过 totalDumpContentLimit，且没有任务占用
-        TL->>TL: 预占 compressing，选旧条目和 recentKeep
-        TL-->>Worker: 启动压缩任务
-        Worker->>TL: 快照旧 head、待压缩条目和最近条目
-        Worker->>Worker: 按完整条目分成受预算约束的批次
-        loop 每个批次
-            Worker->>AI: ScheduleAuxiliaryTask，附 recentKeep 和输出 schema
-            AI-->>Worker: 结构化摘要
+    participant W as Actions / Timeline 写入
+    participant L as 下一轮主循环
+    participant T as Timeline
+    participant A as 辅助 AI（mock 可替换）
+    participant P as Prompt 组装
+    W->>T: 追加普通历史和 evidence/toolcache delta
+    Note over T: 全部留在 Open；不自动冻结，不请求 AI
+    L->>T: CompressBeforePrompt（Prompt 组装前）
+    alt 未达阈值 / 没有新内容 / 失败退避
+        T-->>L: 无变更
+    else 达到阈值
+        T->>T: 完整快照与覆盖 ID，预占唯一事务
+        Note over T: 锁内取快照，锁外算 token 和请求 AI
+        T->>A: 旧摘要 + 全部普通 Frozen/Open + 实际保留上下文
+        W->>T: 并发追加更大 ID 的下一段 Open
+        A-->>T: 一份 timeline-summary
+        T->>T: 校验取消状态、来源、head、冻结版本
+        alt 来源未改变且输出有效
+            T->>T: 同一个写锁内提交全部状态
+            Note over T: 强制冻结快照范围 + 精确状态提升到 Semi<br/>替换 head + 退役普通原文 + 保存旧摘要档案
+        else 失败 / 取消 / 原范围被编辑或回滚
+            Note over T: 丢弃结果，保留原文、冻结边界和精确状态
         end
-        alt 全部批次有效，且来源没有变化
-            Worker->>TL: 持锁提交：freezeLocked(true, lastID)
-            TL->>TL: 提升该范围的 evidence/toolcache
-            Worker->>TL: 更新 compressedHead，标记已覆盖普通条目为 deleted
-        else 失败、空结果、超大单条或来源过期
-            Worker-->>TL: 保留原条目和旧 head
-        end
-        Worker->>TL: 释放 compressing
+        T-->>L: 完整提交结果或错误
     end
-    Reader->>TL: DumpFrozenOpen / DumpForPrompt
-    TL-->>Reader: 当前 head、冻结段、开放段
+    L->>P: 读取新 Frozen / Semi / Open，组装下一轮请求
+    Note over P: Frozen 为一份历史摘要；Semi 为精确数据；Open 为快照之后的新条目
 ```
 
-当前触发量取自 `calculateActualContentSizeLocked`：它统计普通活跃条目的缩减后文本，不计 promotable item 和旧 head。`SetTimelineContentLimit` 只设置阈值；追加条目时才执行检查。测试或内部调用方也可通过 `compressForSizeLimit()` 主动检查。触发后约保留最新 `currentSize / 6` 的原始内容。reducer 输入按完整条目切为最多约 80 KiB 的批次，recentKeep 参考内容最多约 16 KiB；所有批次成功才提交。历史摘要保存在 `compressedHead`，旧版 head 进入 `compressedHistory` 供追溯；投影中的 head 标签保持稳定。
+这不是“先 FreezeAll，再压缩”：事务提交前仍显示原布局，成功时只发布一次冻结版本。只有精确 delta、没有普通历史的特殊情况无需 AI，直接一次提交精确状态提升。
 
-**目前仍有独立冻结。** 每次追加先调用 `freezeLocked(false)`；3 分钟时间桶或 64 KiB 默认字节桶可在 AI 压缩前改变 Frozen/Open 分界。本次整理没有改变这些策略，也没有将正常冻结与压缩合并为唯一触发。压缩任务提交时的强制冻结、提升和条目退役则在同一把锁下完成。
+## 请求和输出
 
-## 保存体积的兜底
+模板：`prompts/timeline/compression.txt`；输出协议：`prompts/timeline/compression.json`。
 
-```mermaid
-sequenceDiagram
-    participant Save as Save
-    participant TL as Timeline
-    participant DB as 持久化
-    Save->>TL: marshalTimelineUnlocked
-    alt 序列化超过 1.5 MiB
-        Save->>TL: emergencyCompress(1.5 MiB)
-        TL->>TL: 冻结，逐条移除最旧的普通条目并重新计量
-        TL->>TL: 用简短的本地状态摘要更新 compressedHead
-        Save->>TL: 重新序列化
-    end
-    Save->>DB: 尝试保存完整 JSON
-```
+一次请求包含 `previous_summary`、`history_to_summarize` 和调用方传入的 `retained_context`。主循环传实际用户输入、冻结用户上下文、TODO、任务指令，避免摘要重复这些未被压缩的字段。evidence/tool schema 不进入待替换文本。历史中的 assistant + N tools 作为完整历史记录输入；只在请求副本去掉 projection nonce 并 JSON 编码，原 Timeline 不改写。
 
-紧急路径不调用 AI，只保留简短状态，因此语义损失比正常摘要大。它只作为保存体积兜底：AI 调度器缺失、请求失败或返回空结果，不再把普通压缩自动转为紧急删除。若紧急路径仍无法降到保存上限，`Save` 会明确记录这一点并尝试保存完整 JSON；代码没有截断 JSON。
+模型返回 `{"@action":"timeline-summary","summary":"历史摘要正文"}`。空值、非字符串、错误 action、超上限、带进程 projection nonce 的输出均拒绝。本实现只调度一次摘要任务，没有 batch/head-refine 二次调用；网络与解析重试仍服从原 Config 策略，因此不能把“一次事务”等同于所有异常下严格一次 HTTP 发包。
 
-## 后续调整的边界
+## 故障与并发边界
 
-### 新压缩方案：完整快照、单次摘要、原子提交（尚未切换生产入口）
+- 多个 Prompt 前压缩检查 遇到同一活动事务会等待；等待可取消。阈值计算之后再次核对快照，避免刚提交就被另一调用方重复压缩。
+- 失败退避在唤醒等待者之前发布。同一失败快照不自动重复；新增内容后至少冷却一分钟再尝试。`CompressOnce` 是显式重试入口。
+- 更大 ID 的并发追加留在下一段 Open；来源范围内插入、编辑、删除、回滚或 ID 重排导致旧摘要失效，拒绝提交。
+- AI 期间不持有 Timeline 写锁；调用异常会释放事务占用。未提交状态不进入序列化或 fork。
+- `TruncateAfter` 对落在当前摘要内部的回滚位置 返回错误并保持原状；摘要不能精确恢复某一部分原文。摘要之后的 Open 可正常回滚。删除采用双索引写时复制，避免恢复后幽灵条目和副本相互污染。
+- fork 边界来自同一份序列化快照。合并先检查全部 ID 冲突；分支摘要作为新增历史条目写入父 Timeline，不能覆盖父分支并行产生的摘要/事实。
+- 只有摘要、没有活跃原文的恢复仍保留并重排覆盖水位，避免新事件被错误归到 Frozen。
 
-`Timeline.CompressOnce(TimelineCompressionOptions)` 显式执行新流程。按最新确认，**旧摘要 + 全部普通 Frozen/Open 历史统一替换成一份摘要**，不保留最近原文，不再用六分之一或固定长度作为输出目标。
+## 保存约束
 
-- `MaxInputTokens` / `MaxSummaryTokens` 是调用方给出的技术安全上限，不是期望输出长度，不写入提示词。超限返回错误并保留历史，不分批、不截断。
-- `RetainedContext` 是下一轮仍独立保留的实际上下文（例如 USER_QUERY、TODO），由调用方提供；Timeline 不猜测主循环的字段。此阶段仅提供接口与 mock 验证，实际主循环接线在后续步骤。
-- 输入模板为 `prompts/timeline/compression.txt`，含一个示例，要求保留实际进展、依据、关键发现、独有约束、失败教训和未完成调用；避免抄写独立保留的上下文。输出 Schema 为同目录 `compression.json`，仅包含 `@action` 与非空 `summary`。
-- evidence/toolcache 的精确 journal 从摘要输入与退役列表中排除。当前上下文中提及相同工具或 evidence，不意味着相关历史调查结论可以删除。
+`Save` 只序列化完整当前状态并写数据库；已删除旧 1.5 MiB 应用层限制、紧急裁剪和历史摘要自动清空。存储错误记录日志，内存内容不变。SQLite 的真实保存测试写入超过该旧上限的数据，逐字比对保存和恢复内容；这不代表无限存储保证。
 
-```mermaid
-sequenceDiagram
-    participant Caller as 显式调用方
-    participant TL as Timeline
-    participant AI as 辅助 AI（Speed）
-    participant Writer as 并发写入方
-    participant Prompt as Prompt 读取方
-    Caller->>TL: CompressOnce(安全上限, RetainedContext)
-    TL->>TL: 锁内捕获旧摘要、普通历史、精确 journal 与水位，预占事务
-    TL->>AI: 锁外一次请求：完整资料 + 单次示例模板
-    Writer->>TL: 追加普通条目 / evidence / toolcache
-    Note over TL: 生成期间延后冻结，新写入留在 Open
-    AI-->>TL: timeline-summary
-    TL->>TL: 校验非空、类型、控制 token、安全上限、取消状态
-    TL->>TL: 持锁重核来源、旧摘要及冻结版本
-    alt 校验通过
-        TL->>TL: 一次提交：冻结捕获范围，提升精确状态，替换摘要，退役全部普通原文
-        Prompt->>TL: 一次读锁获取 Frozen、Semi 与 Open
-        TL-->>Prompt: Frozen=新摘要；Semi=精确状态；Open=捕获后新增内容
-    else 失败或来源过期
-        TL-->>Caller: 返回错误，不提交任何压缩结果
-    end
-    TL->>TL: 释放事务；后续写入恢复原有冻结行为
-```
+旧摘要档案仍完整保留，只用于追溯，不叠加到当前 prompt。没有新增自动清理策略。旧外部归档元数据不再读取或写入；旧 reducer 格式仍一次性迁移为当前摘要。
 
-快照包含完整原文，不复用单条 shrink，也不经可能丢失超长单行的展示渲染器。历史原生交互按专用条目校验完整 assistant + N tools；请求副本去除有效 projection nonce 并 JSON 编码，历史调用不能在辅助请求中展开。所有原文都进入摘要资料，不切分工具交互。
+## Timeline 接口审查
 
-来源校验覆盖捕获水位以内的修改、删除、回退、晚插入、精确状态更改、时间戳和旧摘要变化；水位以后的追加允许继续。失败不撤销调用方已做的更改，只是不覆盖它们。成功后旧 head 仍按现有机制归档追溯，不进入下一轮 Prompt；普通原文在两个索引中退役，保存恢复后也不会复活。
+| 接口组 | 审查结果与边界 |
+| --- | --- |
+| PushText / PushTextWithPromptProjection / PushToolResult / PushUserInteraction | 仅追加；移除自动冻结和压缩；时间戳碰撞递增，不在锁内 sleep |
+| PushPromotable / evidence 操作 / toolcache 写入与 reuse | 独立 delta 留在 Open；Prompt 前压缩检查 提交统一提升；精确数据不被摘要替代 |
+| Dump / DumpForPrompt / DumpFrozenOpen / RenderTimelineFrozenOpen / GroupByMinutes / 最近消息视图 / UI 输出 | 只读呈现；读操作不改变冻结版本，不请求 AI；最近视图的裁剪属于调用方视图预算，不是 Timeline 压缩 |
+| Freeze / FreezeAll / FreezeSnapshot | 保留显式导入/检查原语及兼容测试；全仓生产调用检索没有主链调用；Prompt 前压缩检查 不先调用这些方法，防止双提交 |
+| SetTimelineContentLimit / bucket 配置 | token 阈值控制 Prompt 前压缩检查；桶配置只影响布局或显式冻结，不独立触发生产冻结 |
+| SoftDelete / TruncateAfter | 双索引一致、写时复制；回滚跨摘要水位拒绝；会使活动压缩快照失效 |
+| CopyReducibleTimelineWithMemory / CreateSubTimeline | 不复制压缩中任务；提交和删除不修改共享条目；摘要历史单独克隆 |
+| ForkForTask / MergeBack / Diff | fork 水位与内容一致；冲突预检查；分支结果不覆盖父摘要；普通合并不自动冻结 |
+| MarshalTimeline / UnmarshalTimeline / ReassignIDs | 保留精确状态与冻结水位；事务句柄不持久化；重排先构造再发布，非法 generator 保留原状态 |
+| Save / ClearRuntimeConfig / SoftBindConfig / AICaller 配置 | Save 不压缩/裁剪；恢复绑定配置与调用器后，由下一轮 Prompt 前压缩检查 处理 |
+| OrderInsertId / OrderInsertTs / GetIdToTimelineItem | 底层索引入口保留内部构建用途；直接修改底层对象不属于受支持的并发写协议，生产写入应使用 Push/状态接口 |
 
-正常成功仅一次逻辑 AI 调度，没有分批或 head refine；底层失败重试仍由 Config 策略控制。没有接入 Push 或自动阈值，所以本轮不改变现有生产触发行为。
+## 文件与清理结果
 
-测试均为 Timeline 与 mock AI：
-- `timeline_compression_snapshot_test.go`：完整来源、旧摘要、精确状态隔离、完整工具交互、长正文、快照隔离。
-- `timeline_compression_summary_test.go`：新模板、资料分区、历史角色不投影、完整大输入、一次请求、无副作用与错误输出。
-- `timeline_compression_transaction_test.go`：原子提交、并发追加与冲突、取消/超限/失败保留、重复压缩、恢复与 fork 隔离。
+压缩实现集中在 `timeline_compression_{before_prompt,snapshot,summary,transaction,freeze,persistence,restore}.go`。主循环入口在 `reactloops/timeline_compression_before_prompt.go`。相关测试统一在 `timeline_compression_*_test.go`；普通 Timeline/evidence/toolcache 的非压缩生命周期测试仍留在自己的模块。
 
-设置 `YAK_TIMELINE_COMPRESSION_EXAMPLES_DIR` 并运行 `TestTimelineCompressionTransactionReviewExample` 可导出完整压缩前视图、实际 mock 请求、mock 响应与压缩后视图。它们验证状态转换，不代表真实模型摘要质量或远端缓存命中率。
+已移除：Push 异步 dumpSizeCheck、batch/recent-tail 切分、head-refine、旧 reducer 模板/结构化摘要裁剪、保存时 emergencyCompress、1.5 MiB 限制、无效 perDumpContentLimit、旧外部归档类型、存储配置及专用分表路径、旧 forkProtectedMaxID/autoCompressDisabled 开关。仅为旧算法断言批次数、固定比例、紧急裁剪、伪造压缩状态的测试删除，有效恢复/投影/精确状态断言迁移到新事务测试。
 
-### 当前生产路径仍待处理的边界
+## 测试定位
 
-- 压缩阈值是普通活跃条目的局部计数，不能直接当作整个模型请求的 token 上限。
-- `MaxTimelineSaveSize` 是独立的序列化体积上限。提高正常压缩阈值前，需要同步评估这个保护和数据库容量。
-- 大于单批输入预算的单个条目仍保持原文并报警，尚无可靠的条目内部拆分方案。
-- `compressedHistory` 会随摘要次数增长，并参与持久化，但不参与当前 Prompt。它过大时，逐条删除普通历史也未必能把保存体积降到上限；需要单独制定历史保留策略。
-- `perDumpContentLimit` 只在旧持久化结构和拷贝路径中保留，当前压缩触发不读取它；本轮没有改变旧存档的反序列化兼容。
-- 改动冻结周期时，要同时观察 evidence/toolcache 的提升时机，以及 Frozen/Open 布局对缓存的影响。
+| 验证范围 | 文件 |
+| --- | --- |
+| 阈值、增长、一次提交、退避、并发等待、重复检查 | `timeline_compression_before_prompt_test.go` |
+| 快照内容、完整 assistant/tools、nonce、超长原文 | `timeline_compression_snapshot_test.go` |
+| 模板、单次调度、输出协议与上限 | `timeline_compression_summary_test.go` |
+| 原子提交、并发追加、来源失效、取消、失败保持、mock 样例 | `timeline_compression_transaction_test.go` |
+| 精确 evidence/toolcache 的 Open→Semi 与恢复 | `timeline_compression_evidence_test.go`、`timeline_compression_toolcache_test.go` |
+| 实际 SQLite 大快照、保存失败、摘要水位、回滚/副本隔离 | `timeline_compression_persistence_test.go` |
+| ID 重排、显式冻结、历史视图/摘要渲染 | `timeline_compression_restore_test.go`、`timeline_compression_freeze_test.go`、`timeline_compression_views_test.go`、`timeline_compression_render_test.go` |
+| 压缩分支的合并、冲突无部分写入 | `timeline_compression_fork_test.go` |
+| 下一轮 Prompt 实际读取已提交摘要 | `reactloops/timeline_compression_before_prompt_test.go` |
+
+本轮只使用本地 mock 和 SQLite，不请求真实模型；缓存命中率提升需要后续实测，不能由这些测试直接推断。

@@ -147,7 +147,6 @@ func (m *Timeline) replaceEvidenceLocked(store *EvidenceStore, acquireID func() 
 		m.OrderInsertTs(ts, item)
 	}
 	m.evidenceInitialized = true
-	m.freezeLocked(false)
 	for _, op := range mutations {
 		if item, ok := m.idToTimelineItem.Get(op.ID); ok {
 			m.emitTimelineItemAsync(item)

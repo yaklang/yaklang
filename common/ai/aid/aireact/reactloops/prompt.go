@@ -390,6 +390,9 @@ func (r *ReActLoop) generateLoopPrompt(
 		return "", err
 	}
 	r.lastLoopSchema = schema
+	if err := r.compressTimelineBeforePrompt(userInput, frozenUserContext, todoSnapshot, persistent); err != nil {
+		return "", err
+	}
 
 	result, err := r.invoker.AssembleLoopPrompt(tools, &LoopPromptAssemblyInput{
 		Nonce:                    nonce,

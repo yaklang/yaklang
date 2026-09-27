@@ -83,7 +83,7 @@ sequenceDiagram
 | Open / Semi | 复用只追加小 delta；排序在对应 delta freeze 后变化；渲染不触发提升 | `timeline_toolcache_test.go`、`timeline_toolcache_lifecycle_test.go` |
 | 共同 freeze | evidence、普通历史和 cache delta 共用预算；边界与聚合同时提交 | `TestTimelineToolCacheInPlaceAndSharedFreeze`、`timeline_freeze_test.go` |
 | 恢复与淘汰 | 恢复待冻结 reuse/delete；清理缺失工具和预算淘汰；schema 更新写新 delta；文本历史不能复活缓存 | `timeline_toolcache_runtime_test.go` |
-| 压缩 | 补充真实 batch 和 emergency 路径；精确 schema 不进入摘要，恢复后仍能追加 REUSE | `timeline_toolcache_compression_test.go` |
+| 压缩 | 补充真实单次摘要与原子提交路径；精确 schema 不进入摘要，恢复后仍能追加 REUSE | `timeline_compression_toolcache_test.go` |
 | Fork / 回滚 | 测试明确包含历史操作后的显式缓存重建；不把底层 Timeline 操作误称为自动 Config 同步 | `TestTimelineToolCacheRuntimeForkMergeAndRollback` |
 | 投影与参数生成 | cache 不能声明原生工具；文本和 function-call 参数生成均排除缓存，普通文本相似标签不被误删 | `aireact/timeline_toolcache_prompt_test.go`、`prompt_tool_params_functioncall_test.go` |
 | 实际执行与持久化 | 文本与 native loop 都实际执行两次工具，产生一份 schema + REUSE；跨持久化会话 require→direct | `aireact/timeline_toolcache_execution_test.go`、`TestReAct_DirectlyCallTool_PersistentSession` |

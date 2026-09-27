@@ -15,13 +15,6 @@ import (
 	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools"
 )
 
-type perceptionMidtermSchedulerTestInvoker struct {
-	*mockcfg.MockInvoker
-	scheduledSummary  string
-	scheduledTopics   []string
-	scheduledKeywords []string
-}
-
 // Mock the Config-owned entry point instead of the retired runtime helper.
 // Embedding the original config preserves tool/context providers used below.
 type perceptionSchedulerTestConfig struct {
@@ -43,12 +36,6 @@ func (c *perceptionSchedulerTestConfig) ScheduleAuxiliaryTask(ctx context.Contex
 	}`, "perception")
 	require.NoError(c.t, err)
 	onResult(action)
-}
-
-func (i *perceptionMidtermSchedulerTestInvoker) ScheduleMidtermTimelineRecallFromPerception(summary string, topics []string, keywords []string) {
-	i.scheduledSummary = summary
-	i.scheduledTopics = append([]string{}, topics...)
-	i.scheduledKeywords = append([]string{}, keywords...)
 }
 
 type perceptionCapabilitySearchTestInvoker struct {
@@ -100,14 +87,12 @@ func (i *perceptionKnowledgeSearchTestInvoker) CompressLongTextWithDestination(c
 	return i.compressedResult, nil
 }
 
-func TestTriggerPerception_DoesNotScheduleLegacyMidtermRecall(t *testing.T) {
-	invoker := &perceptionMidtermSchedulerTestInvoker{
-		MockInvoker: mockcfg.NewMockInvoker(context.Background()),
-	}
+func TestTriggerPerceptionUpdatesSummaryAndTopics(t *testing.T) {
+	invoker := mockcfg.NewMockInvoker(context.Background())
 	invoker.SetConfig(&perceptionSchedulerTestConfig{AICallerConfigIf: invoker.GetConfig(), t: t})
 
 	loop := NewMinimalReActLoop(invoker.GetConfig(), invoker)
-	loop.loopName = "perception-midterm-test"
+	loop.loopName = "perception-state-test"
 	loop.perception = newPerceptionController(loop.periodicVerificationInterval)
 	loop.maxIterations = 100
 	loop.actionHistory = make([]*ActionRecord, 0)
@@ -116,10 +101,7 @@ func TestTriggerPerception_DoesNotScheduleLegacyMidtermRecall(t *testing.T) {
 	state := loop.TriggerPerception(PerceptionTriggerForced, true)
 	require.NotNil(t, state)
 	require.Equal(t, "focused summary from perception", state.OneLinerSummary)
-	require.Empty(t, invoker.scheduledSummary)
-	require.Empty(t, invoker.scheduledTopics)
 	require.Equal(t, []string{"http fuzzing"}, state.Topics)
-	require.Empty(t, invoker.scheduledKeywords)
 	require.Equal(t, []string{"header", "malformed"}, state.Keywords)
 }
 
@@ -541,11 +523,11 @@ func TestPerceptionState_FormatForContext_TokenLimit(t *testing.T) {
 }
 
 func TestMaybeTriggerPerceptionAfterAction_SyncPerceptionTriggerRunsInline(t *testing.T) {
-	invoker := &perceptionMidtermSchedulerTestInvoker{
-		MockInvoker: mockcfg.NewMockInvoker(context.Background()),
-	}
+	invoker := mockcfg.NewMockInvoker(context.Background())
 	cfg := invoker.GetConfig()
 	cfg.SetConfig("SyncPerceptionTrigger", true)
+	invoker.SetConfig(&perceptionSchedulerTestConfig{AICallerConfigIf: cfg, t: t})
+	cfg = invoker.GetConfig()
 
 	loop := NewMinimalReActLoop(cfg, invoker)
 	loop.loopName = "perception-sync-trigger-test"
@@ -558,7 +540,7 @@ func TestMaybeTriggerPerceptionAfterAction_SyncPerceptionTriggerRunsInline(t *te
 	loop.actionHistoryMutex = new(sync.Mutex)
 
 	loop.MaybeTriggerPerceptionAfterAction(2)
-	require.Empty(t, invoker.scheduledSummary)
+	require.Equal(t, "focused summary from perception", loop.perception.getCurrent().OneLinerSummary)
 }
 
 // TestPerceptionState_IsIntentPivot_ExplicitValues 验证三个枚举值的显式判定:

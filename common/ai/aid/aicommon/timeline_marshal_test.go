@@ -33,7 +33,6 @@ func TestTimelineMarshalUnmarshal(t *testing.T) {
 	originalTimeline.PushText(300, "test text content")
 
 	// 设置限制
-	originalTimeline.perDumpContentLimit = 1000
 	originalTimeline.totalDumpContentLimit = 5000
 
 	// 序列化
@@ -50,7 +49,6 @@ func TestTimelineMarshalUnmarshal(t *testing.T) {
 
 	// 验证数据完整性
 	require.Equal(t, originalTimeline.idToTimelineItem.Len(), restoredTimeline.idToTimelineItem.Len())
-	require.Equal(t, originalTimeline.perDumpContentLimit, restoredTimeline.perDumpContentLimit)
 	require.Equal(t, originalTimeline.totalDumpContentLimit, restoredTimeline.totalDumpContentLimit)
 
 	// 验证每个项目

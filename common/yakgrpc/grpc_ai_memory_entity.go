@@ -99,9 +99,9 @@ func (s *Server) DeleteAIMemoryEntity(ctx context.Context, req *ypb.DeleteAIMemo
 			return nil, err
 		}
 		return &ypb.DbOperateMessage{
-			TableName:  (&schema.AIMemoryEntity{}).TableName(),
-			Operation:  "delete",
-			EffectRows: 0, // rows not counted for DropRecreateTable fast path
+			TableName:    (&schema.AIMemoryEntity{}).TableName(),
+			Operation:    "delete",
+			EffectRows:   0, // rows not counted for DropRecreateTable fast path
 			ExtraMessage: "fast_path=drop_recreate_table",
 		}, nil
 	}
@@ -115,18 +115,6 @@ func (s *Server) DeleteAIMemoryEntity(ctx context.Context, req *ypb.DeleteAIMemo
 	count, err := yakit.DeleteAIMemoryEntityBatched(ctx, db, req.GetFilter(), 200, hook)
 	if err != nil {
 		return nil, err
-	}
-
-	// If the filter targets a midterm archive session (timeline-midterm:* prefix),
-	// also delete from the independent midterm archive table.
-	if filter := req.GetFilter(); filter != nil {
-		if sid := strings.TrimSpace(filter.GetSessionID()); sid != "" && strings.HasPrefix(sid, aimem.MidtermSessionPrefix) {
-			midtermCount, err := yakit.DeleteAIMidtermArchiveEntityBatched(ctx, db, filter, 200, hook)
-			if err != nil {
-				return nil, err
-			}
-			count += midtermCount
-		}
 	}
 
 	return &ypb.DbOperateMessage{
@@ -203,12 +191,10 @@ func (s *aiMemoryVectorSessionSingleton) GetHNSWBackend(sessionID string) (*aime
 	}
 	s.mu.Unlock()
 
-	midtermMode := strings.HasPrefix(sessionID, aimem.MidtermSessionPrefix)
 	backend, err := aimem.NewAIMemoryHNSWBackend(
 		aimem.WithHNSWSessionID(sessionID),
 		aimem.WithHNSWDatabase(s.db),
 		aimem.WithHNSWAutoSave(false),
-		aimem.WithHNSWMidtermMode(midtermMode),
 	)
 	if err != nil {
 		return nil, err
@@ -552,11 +538,9 @@ func syncAIMemoryVectors(ctx context.Context, db *gorm.DB, entity *schema.AIMemo
 		return nil
 	}
 
-	midtermMode := strings.HasPrefix(entity.SessionID, aimem.MidtermSessionPrefix)
 	hnswBackend, err := aimem.NewAIMemoryHNSWBackend(
 		aimem.WithHNSWSessionID(entity.SessionID),
 		aimem.WithHNSWDatabase(db),
-		aimem.WithHNSWMidtermMode(midtermMode),
 	)
 	if err == nil {
 		_ = hnswBackend.Update(toAIMemoryEntity(entity))

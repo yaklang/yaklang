@@ -65,7 +65,7 @@ func TestTimelineToolCacheOpenSealDeleteAndRollback(t *testing.T) {
 	// Control items do not alter ordinary buckets, nonces, diffs, stats or UI.
 	require.Equal(t, ordinaryBefore, tl.Dump())
 	require.Equal(t, []int64{1}, tl.GetTimelineItemIDs())
-	require.Len(t, tl.getActiveTimelineItemIDs(), 1)
+	require.Len(t, tl.GetTimelineItemIDs(), 1)
 	require.Len(t, tl.ToTimelineItemOutputLastN(10), 1)
 
 	first := RenderTimelineFrozenOpen(tl)

@@ -1,222 +1,97 @@
 package aisessioncleanup
 
 import (
-	"testing"
-
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/gorm"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
+	"testing"
 )
 
 func setupTestDB(t *testing.T) *gorm.DB {
 	t.Helper()
 	db, err := utils.CreateTempTestDatabaseInMemory()
 	require.NoError(t, err)
-	require.NoError(t, db.AutoMigrate(
-		&schema.AISession{},
-		&schema.AIAgentRuntime{},
-		&schema.AIMemoryEntity{},
-		&schema.AIMemoryCollection{},
-		&schema.AIMidtermArchiveEntity{},
-		&schema.AIMidtermArchiveCollection{},
-		&schema.VectorStoreCollection{},
-		&schema.VectorStoreDocument{},
-		&schema.EntityRepository{},
-		&schema.ERModelEntity{},
-		&schema.ERModelRelationship{},
-		&schema.KnowledgeBaseInfo{},
-		&schema.KnowledgeBaseEntry{},
-	).Error)
+	t.Cleanup(func() { db.Close() })
+	require.NoError(t, db.AutoMigrate(&schema.AIMemoryEntity{}, &schema.AIMemoryCollection{},
+		&schema.VectorStoreCollection{}, &schema.VectorStoreDocument{}).Error)
 	return db
 }
 
-func TestDeleteSessionArtifacts_RemovesMidtermSessionAndFork(t *testing.T) {
-	db := setupTestDB(t)
-
-	persistentSessionID := "Fp4wxob9ZAhrAsctD4owIdtW5TYtnEDK7SULK1Xi"
-	otherPersistentSessionID := uuid.NewString()
-	midtermSessionID := memoryMidtermSessionID(persistentSessionID)
-	forkSessionID := midtermSessionID + "@fork1-1"
-	forkRAGName := ragMidtermTableName(persistentSessionID) + "@fork1-1"
-	baseRAGName := ragMidtermTableName(persistentSessionID)
-	otherRAGName := ragMidtermTableName(otherPersistentSessionID)
-
-	seedMidtermSessionArtifacts(t, db, persistentSessionID, midtermSessionID, baseRAGName, forkSessionID, forkRAGName)
-	seedMidtermSessionArtifacts(t, db, otherPersistentSessionID, memoryMidtermSessionID(otherPersistentSessionID), otherRAGName, "", "")
-
-	result, err := DeleteSessionArtifacts(db, persistentSessionID)
-	require.NoError(t, err)
-	require.Equal(t, int64(2), result.DeletedMemoryEntities)
-	require.Equal(t, int64(2), result.DeletedMemoryCollections)
-	require.Equal(t, int64(2), result.DeletedRAGCollections)
-	require.Equal(t, int64(2), result.DeletedRAGDocuments)
-	require.Equal(t, int64(2), result.DeletedEntityRepositories)
-	require.Equal(t, int64(2), result.DeletedEntityRelationships)
-	require.Equal(t, int64(1), result.DeletedERModelEntities)
-	require.Equal(t, int64(2), result.DeletedKnowledgeBases)
-	require.Equal(t, int64(2), result.DeletedKnowledgeEntries)
-
-	assertZeroCount(t, db.Model(&schema.AIMidtermArchiveEntity{}).Where("session_id IN (?)", []string{persistentSessionID, midtermSessionID, forkSessionID}))
-	assertZeroCount(t, db.Model(&schema.AIMidtermArchiveCollection{}).Where("session_id IN (?)", []string{persistentSessionID, midtermSessionID, forkSessionID}))
-	assertZeroCount(t, db.Model(&schema.VectorStoreCollection{}).Where("name IN (?)", []string{baseRAGName, forkRAGName}))
-	assertOneCount(t, db.Model(&schema.VectorStoreCollection{}).Where("name = ?", otherRAGName))
-	assertOneCount(t, db.Model(&schema.AIMidtermArchiveEntity{}).Where("session_id = ?", memoryMidtermSessionID(otherPersistentSessionID)))
+func seedMemory(t *testing.T, db *gorm.DB, session string) {
+	t.Helper()
+	require.NoError(t, db.Create(&schema.AIMemoryEntity{MemoryID: uuid.NewString(), SessionID: session, Content: "memory"}).Error)
+	require.NoError(t, db.Create(&schema.AIMemoryCollection{SessionID: session}).Error)
+	collection := &schema.VectorStoreCollection{Name: "ai-memory-" + session}
+	require.NoError(t, db.Create(collection).Error)
+	require.NoError(t, db.Create(&schema.VectorStoreDocument{DocumentID: uuid.NewString(), CollectionID: collection.ID, Content: "document"}).Error)
 }
 
-func TestDeleteSessionArtifacts_EmptySessionID(t *testing.T) {
+func assertCount(t *testing.T, q *gorm.DB, want int64) {
+	t.Helper()
+	var count int64
+	require.NoError(t, q.Count(&count).Error)
+	require.Equal(t, want, count)
+}
+
+func TestDeleteSessionArtifactsExactSession(t *testing.T) {
 	db := setupTestDB(t)
-	_, err := DeleteSessionArtifacts(db, "")
+	// Neither LIKE wildcards nor prefix collisions can widen the deletion.
+	for _, session := range []string{"session_%", "session_%other", "session_AB"} {
+		seedMemory(t, db, session)
+	}
+	result, err := DeleteSessionArtifacts(db, "session_%")
+	require.NoError(t, err)
+	require.Equal(t, &SessionCleanupResult{DeletedMemoryEntities: 1, DeletedMemoryCollections: 1, DeletedRAGCollections: 1, DeletedRAGDocuments: 1}, result)
+	assertCount(t, db.Model(&schema.AIMemoryEntity{}).Where("session_id = ?", "session_%"), 0)
+	assertCount(t, db.Model(&schema.AIMemoryEntity{}), 2)
+	assertCount(t, db.Model(&schema.AIMemoryCollection{}), 2)
+	assertCount(t, db.Model(&schema.VectorStoreCollection{}), 2)
+	assertCount(t, db.Model(&schema.VectorStoreDocument{}), 2)
+	result, err = DeleteSessionArtifacts(db, "session_%")
+	require.NoError(t, err)
+	require.Equal(t, &SessionCleanupResult{}, result)
+}
+
+func TestDeleteSessionArtifactsValidatesInput(t *testing.T) {
+	db := setupTestDB(t)
+	_, err := DeleteSessionArtifacts(db, " ")
+	require.Error(t, err)
+	_, err = DeleteSessionArtifacts(nil, "session")
+	require.Error(t, err)
+	_, err = DeleteAllAIMemoryArtifacts(nil)
 	require.Error(t, err)
 }
 
-func TestDeleteSessionArtifacts_NoData(t *testing.T) {
+func TestDeleteAllAIMemoryArtifactsKeepsUnrelatedVectors(t *testing.T) {
 	db := setupTestDB(t)
-	result, err := DeleteSessionArtifacts(db, uuid.NewString())
+	seedMemory(t, db, "one")
+	seedMemory(t, db, "two")
+	other := &schema.VectorStoreCollection{Name: "knowledge-base-keep"}
+	require.NoError(t, db.Create(other).Error)
+	require.NoError(t, db.Create(&schema.VectorStoreDocument{DocumentID: uuid.NewString(), CollectionID: other.ID}).Error)
+	result, err := DeleteAllAIMemoryArtifacts(db)
 	require.NoError(t, err)
-	require.Equal(t, int64(0), result.DeletedMemoryEntities)
-	require.Equal(t, int64(0), result.DeletedMemoryCollections)
-	require.Equal(t, int64(0), result.DeletedRAGCollections)
+	require.Equal(t, &SessionCleanupResult{DeletedMemoryEntities: 2, DeletedMemoryCollections: 2, DeletedRAGCollections: 2, DeletedRAGDocuments: 2}, result)
+	assertCount(t, db.Model(&schema.AIMemoryEntity{}), 0)
+	assertCount(t, db.Model(&schema.AIMemoryCollection{}), 0)
+	assertCount(t, db.Model(&schema.VectorStoreCollection{}).Where("name = ?", other.Name), 1)
+	assertCount(t, db.Model(&schema.VectorStoreDocument{}), 1)
+	// Ordinary storage remains usable after cleanup.
+	seedMemory(t, db, "next")
+	assertCount(t, db.Model(&schema.AIMemoryEntity{}), 1)
 }
 
-func TestDeleteAllSessionArtifacts_RemovesAllMidtermRAG(t *testing.T) {
+func TestDeleteSessionArtifactsRollsBackOnStorageError(t *testing.T) {
 	db := setupTestDB(t)
-
-	sessA := uuid.NewString()
-	sessB := uuid.NewString()
-	seedMidtermSessionArtifacts(t, db, sessA, memoryMidtermSessionID(sessA), ragMidtermTableName(sessA), memoryMidtermSessionID(sessA)+"@fork1-1", ragMidtermTableName(sessA)+"@fork1-1")
-	seedMidtermSessionArtifacts(t, db, sessB, memoryMidtermSessionID(sessB), ragMidtermTableName(sessB), "", "")
-
-	// 历史遗留：分表前写入旧 ai_memory_* 表的中期数据，DeleteAll 也应一并清空
-	require.NoError(t, db.Create(&schema.AIMemoryEntity{
-		MemoryID: uuid.NewString(), SessionID: memoryMidtermSessionID(sessB), Content: "legacy-midterm",
-	}).Error)
-	require.NoError(t, db.Create(&schema.AIMemoryCollection{SessionID: memoryMidtermSessionID(sessB)}).Error)
-
-	unrelatedRepo := &schema.EntityRepository{EntityBaseName: "knowledge-base-keep", Uuid: uuid.NewString()}
-	require.NoError(t, db.Create(unrelatedRepo).Error)
-	require.NoError(t, db.Create(&schema.ERModelRelationship{
-		RepositoryUUID: unrelatedRepo.Uuid, Uuid: uuid.NewString(),
-		SourceEntityIndex: uuid.NewString(), TargetEntityIndex: uuid.NewString(),
-		RelationshipType: "rel",
-	}).Error)
-
-	unrelatedKB := &schema.KnowledgeBaseInfo{KnowledgeBaseName: "knowledge-base-keep", KnowledgeBaseType: "kb"}
-	require.NoError(t, db.Create(unrelatedKB).Error)
-	require.NoError(t, db.Create(&schema.KnowledgeBaseEntry{
-		KnowledgeBaseID: int64(unrelatedKB.ID),
-		KnowledgeTitle:  "keep-knowledge",
-		KnowledgeType:   "fact",
-		HiddenIndex:     uuid.NewString(),
-	}).Error)
-
-	unrelatedCol := &schema.VectorStoreCollection{Name: "knowledge-base-keep"}
-	require.NoError(t, db.Create(unrelatedCol).Error)
-	require.NoError(t, db.Create(&schema.VectorStoreDocument{DocumentID: "kb-doc", CollectionID: unrelatedCol.ID}).Error)
-
-	result, err := DeleteAllSessionArtifacts(db)
-	require.NoError(t, err)
-	require.Equal(t, int64(4), result.DeletedMemoryEntities)
-	require.Equal(t, int64(4), result.DeletedMemoryCollections)
-	require.Equal(t, int64(3), result.DeletedRAGCollections)
-	require.Equal(t, int64(3), result.DeletedRAGDocuments)
-	require.Equal(t, int64(3), result.DeletedEntityRepositories)
-	require.Equal(t, int64(3), result.DeletedEntityRelationships)
-	require.Equal(t, int64(2), result.DeletedERModelEntities)
-	require.Equal(t, int64(3), result.DeletedKnowledgeBases)
-	require.Equal(t, int64(3), result.DeletedKnowledgeEntries)
-
-	assertZeroCount(t, db.Model(&schema.VectorStoreCollection{}).Where("name LIKE ?", ragMidtermTableNamePrefix+"%"))
-	// 记忆表被 drop + recreate，中期归档表与旧表都应为空
-	assertZeroCount(t, db.Model(&schema.AIMidtermArchiveEntity{}).Where("session_id LIKE ?", memoryMidtermSessionIDPrefix+"%"))
-	assertZeroCount(t, db.Model(&schema.AIMidtermArchiveCollection{}).Where("session_id LIKE ?", memoryMidtermSessionIDPrefix+"%"))
-	assertZeroCount(t, db.Model(&schema.AIMemoryEntity{}).Where("session_id LIKE ?", memoryMidtermSessionIDPrefix+"%"))
-	assertZeroCount(t, db.Model(&schema.AIMemoryCollection{}).Where("session_id LIKE ?", memoryMidtermSessionIDPrefix+"%"))
-	assertOneCount(t, db.Model(&schema.VectorStoreCollection{}).Where("name = ?", "knowledge-base-keep"))
-	assertOneCount(t, db.Model(&schema.EntityRepository{}).Where("uuid = ?", unrelatedRepo.Uuid))
-	assertOneCount(t, db.Model(&schema.KnowledgeBaseInfo{}).Where("id = ?", unrelatedKB.ID))
-}
-
-func seedMidtermSessionArtifacts(
-	t *testing.T,
-	db *gorm.DB,
-	persistentSessionID, midtermSessionID, baseRAGName, forkSessionID, forkRAGName string,
-) {
-	t.Helper()
-
-	// 中期记忆已分表：写入独立的归档表 ai_midterm_archive_entities_v1
-	require.NoError(t, db.Create(&schema.AIMidtermArchiveEntity{AIMemoryEntity: schema.AIMemoryEntity{
-		MemoryID: uuid.NewString(), SessionID: midtermSessionID, Content: "midterm",
-	}}).Error)
-
-	baseCol := &schema.VectorStoreCollection{Name: baseRAGName}
-	require.NoError(t, db.Create(baseCol).Error)
-	require.NoError(t, db.Create(&schema.VectorStoreDocument{
-		DocumentID: uuid.NewString(), CollectionID: baseCol.ID, Content: "base-doc",
-	}).Error)
-
-	baseRepo := &schema.EntityRepository{EntityBaseName: baseRAGName, Uuid: uuid.NewString()}
-	require.NoError(t, db.Create(baseRepo).Error)
-	require.NoError(t, db.Create(&schema.ERModelEntity{
-		RepositoryUUID: baseRepo.Uuid, EntityName: "base-entity", Uuid: uuid.NewString(),
-	}).Error)
-	require.NoError(t, db.Create(&schema.ERModelRelationship{
-		RepositoryUUID: baseRepo.Uuid, Uuid: uuid.NewString(),
-		SourceEntityIndex: uuid.NewString(), TargetEntityIndex: uuid.NewString(),
-		RelationshipType: "rel",
-	}).Error)
-
-	baseKB := &schema.KnowledgeBaseInfo{KnowledgeBaseName: baseRAGName, KnowledgeBaseType: "session"}
-	require.NoError(t, db.Create(baseKB).Error)
-	require.NoError(t, db.Create(&schema.KnowledgeBaseEntry{
-		KnowledgeBaseID: int64(baseKB.ID), KnowledgeTitle: "base-knowledge",
-		KnowledgeType: "fact", HiddenIndex: uuid.NewString(),
-	}).Error)
-
-	require.NoError(t, db.Create(&schema.AIMidtermArchiveCollection{AIMemoryCollection: schema.AIMemoryCollection{SessionID: midtermSessionID}}).Error)
-
-	if forkSessionID == "" || forkRAGName == "" {
-		return
-	}
-
-	require.NoError(t, db.Create(&schema.AIMidtermArchiveEntity{AIMemoryEntity: schema.AIMemoryEntity{
-		MemoryID: uuid.NewString(), SessionID: forkSessionID, Content: "fork",
-	}}).Error)
-	require.NoError(t, db.Create(&schema.AIMidtermArchiveCollection{AIMemoryCollection: schema.AIMemoryCollection{SessionID: forkSessionID}}).Error)
-
-	forkCol := &schema.VectorStoreCollection{Name: forkRAGName}
-	require.NoError(t, db.Create(forkCol).Error)
-	require.NoError(t, db.Create(&schema.VectorStoreDocument{
-		DocumentID: uuid.NewString(), CollectionID: forkCol.ID, Content: "fork-doc",
-	}).Error)
-
-	forkRepo := &schema.EntityRepository{EntityBaseName: forkRAGName, Uuid: uuid.NewString()}
-	require.NoError(t, db.Create(forkRepo).Error)
-	require.NoError(t, db.Create(&schema.ERModelRelationship{
-		RepositoryUUID: forkRepo.Uuid, Uuid: uuid.NewString(),
-		SourceEntityIndex: uuid.NewString(), TargetEntityIndex: uuid.NewString(),
-		RelationshipType: "rel",
-	}).Error)
-
-	forkKB := &schema.KnowledgeBaseInfo{KnowledgeBaseName: forkRAGName, KnowledgeBaseType: "session"}
-	require.NoError(t, db.Create(forkKB).Error)
-	require.NoError(t, db.Create(&schema.KnowledgeBaseEntry{
-		KnowledgeBaseID: int64(forkKB.ID), KnowledgeTitle: "fork-knowledge",
-		KnowledgeType: "fact", HiddenIndex: uuid.NewString(),
-	}).Error)
-}
-
-func assertZeroCount(t *testing.T, q *gorm.DB) {
-	t.Helper()
-	var count int64
-	require.NoError(t, q.Count(&count).Error)
-	require.Equal(t, int64(0), count)
-}
-
-func assertOneCount(t *testing.T, q *gorm.DB) {
-	t.Helper()
-	var count int64
-	require.NoError(t, q.Count(&count).Error)
-	require.Equal(t, int64(1), count)
+	seedMemory(t, db, "one")
+	require.NoError(t, db.Exec("CREATE TRIGGER reject_memory_delete BEFORE DELETE ON ai_memory_entities_v1 BEGIN SELECT RAISE(ABORT, 'injected failure'); END").Error)
+	result, err := DeleteSessionArtifacts(db, "one")
+	require.Error(t, err)
+	require.Equal(t, &SessionCleanupResult{}, result)
+	assertCount(t, db.Model(&schema.AIMemoryEntity{}), 1)
+	assertCount(t, db.Model(&schema.AIMemoryCollection{}), 1)
+	assertCount(t, db.Model(&schema.VectorStoreCollection{}), 1)
+	assertCount(t, db.Model(&schema.VectorStoreDocument{}), 1)
 }

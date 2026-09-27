@@ -43,11 +43,11 @@ func TestTimelineFreezePromotionPayloadTriggersBudget(t *testing.T) {
 			result := tl.Freeze()
 			require.Equal(t, int64(1), result.ThroughID)
 			require.Equal(t, int64(1), result.Version)
-			require.Empty(t, result.NewlyFrozenIDs, "append already committed this batch")
+			require.Equal(t, []int64{1}, result.NewlyFrozenIDs, "only the explicit freeze commits, never append")
 			rendered := RenderTimelineFrozenOpen(tl)
 			require.Empty(t, rendered.Open)
 			require.Contains(t, rendered.PromotedSemiDynamic1, payload)
-			require.Empty(t, tl.getActiveTimelineItemIDs(), "schema must never enter AI compression")
+			require.Empty(t, tl.GetTimelineItemIDs(), "schema must never enter AI compression")
 			require.Empty(t, tl.Dump(), "no control-plane noise in the ordinary dump")
 		})
 	}
@@ -225,24 +225,4 @@ func TestTimelineFreezeCarriesTaskContextAcrossCommittedByteBuckets(t *testing.T
 	require.Contains(t, RenderTimelineFrozenOpen(tl).Open, "task=1-2")
 	tl.FreezeAll()
 	require.Contains(t, RenderTimelineFrozenOpen(tl).Frozen, "task=1-2")
-}
-
-func TestTimelineFreezeCompressionPrefixKeepsRecentTailOpen(t *testing.T) {
-	tl := NewTimeline(nil, nil)
-	ts := time.Date(2026, 9, 27, 10, 0, 0, 0, time.UTC)
-	injectTimelineItem(tl, 1, ts, freezeMutation(1, "old schema"))
-	injectTimelineItem(tl, 2, ts.Add(time.Second), &TextTimelineItem{ID: 2, Text: "old history"})
-	injectTimelineItem(tl, 3, ts.Add(2*time.Second), freezeMutation(3, "pending new schema"))
-	injectTimelineItem(tl, 4, ts.Add(3*time.Second), &TextTimelineItem{ID: 4, Text: "recent history"})
-	tl.mu.Lock()
-	result := tl.freezeLocked(true, 2)
-	tl.mu.Unlock()
-	require.Equal(t, []int64{1, 2}, result.NewlyFrozenIDs)
-	require.Positive(t, result.PendingBytes)
-	prompt := RenderTimelineFrozenOpen(tl)
-	require.Contains(t, prompt.Frozen, "old history")
-	require.Contains(t, prompt.Open, "recent history")
-	require.Contains(t, prompt.PromotedSemiDynamic1, "old schema")
-	require.NotContains(t, prompt.PromotedSemiDynamic1, "pending new schema")
-	require.Contains(t, prompt.Open, "pending new schema")
 }
