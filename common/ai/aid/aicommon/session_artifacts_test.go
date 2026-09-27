@@ -19,20 +19,6 @@ func writeArtifactFile(t *testing.T, root string, rel string, body string, mod t
 	require.NoError(t, os.Chtimes(path, mod, mod))
 }
 
-func requireDumpSizeNearSixth(t *testing.T, before string, after string, stage string) {
-	t.Helper()
-	require.NotEmpty(t, before, "%s: before dump must not be empty", stage)
-	require.NotEmpty(t, after, "%s: after dump must not be empty", stage)
-	require.Less(t, len(after), len(before), "%s: after dump should be smaller than before dump", stage)
-
-	ratio := float64(len(after)) / float64(len(before))
-	// 目标是压缩后 timeline dump 接近原始 1/6；考虑头块/标签开销，容差放宽到 ±0.15。
-	require.InDelta(t, 0.1667, ratio, 0.15,
-		"%s: dump size ratio should be close to 1/6 (before=%d after=%d ratio=%.4f)",
-		stage, len(before), len(after), ratio,
-	)
-}
-
 func TestRenderSessionArtifactsFrozenOpenEmpty(t *testing.T) {
 	dir := t.TempDir()
 	cfg := NewConfig(context.Background())
