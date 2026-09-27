@@ -65,6 +65,7 @@ func TestAsyncMemoryDoesNotBlockIterationsAndReachesLaterPrompt(t *testing.T) {
 	invoker.SetConfig(cfg)
 	steps := 0
 	loop, err := NewReActLoop("async-memory-test", invoker,
+		WithFunctionCallMode(false),
 		WithAllowToolCall(false),
 		WithAllowRAG(false),
 		WithAllowAIForge(false),

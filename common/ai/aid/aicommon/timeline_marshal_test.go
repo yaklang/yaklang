@@ -84,7 +84,7 @@ func TestTimelineMarshalUnmarshal(t *testing.T) {
 	t.Log("Timeline marshal/unmarshal test passed")
 }
 
-func TestTimelineMarshalPreservesPromptOnlyTextWithoutChangingDisplay(t *testing.T) {
+func TestTimelineMarshalDropsInvalidPromptOnlyReplayWithoutChangingDisplay(t *testing.T) {
 	timeline := NewTimeline(nil, nil)
 	projection := "[model_thinking]:\n" + aiprojection.CreateTag("TIMELINE_MODEL_THINKING_V1", "n1", `{"v":1,"reasoning_content":"payload","content":"historical answer"}`)
 	timeline.PushTextWithPromptProjection(

@@ -10,8 +10,11 @@ import (
 // explicit preloads. Runtime LRU changes immediately; prompt state changes only
 // through immutable Open events, then joins the next Timeline freeze.
 func (c *Config) RecordRecentlyUsedTool(tool *aitool.Tool) buildinaitools.RecentToolCacheMutation {
-	if c == nil || tool == nil || c.GetTimeline() == nil || c.GetAiToolManager() == nil {
+	if c == nil || tool == nil || c.GetAiToolManager() == nil {
 		return buildinaitools.RecentToolCacheMutation{}
+	}
+	if c.GetTimeline() == nil {
+		return c.GetAiToolManager().AddRecentlyUsedTool(tool)
 	}
 	tl := c.GetTimeline()
 	tl.toolCacheMu.Lock()
