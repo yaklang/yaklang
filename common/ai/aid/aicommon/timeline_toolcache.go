@@ -3,6 +3,8 @@ package aicommon
 import (
 	"fmt"
 	"strings"
+
+	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools"
 )
 
 // This ephemeral type labels cache entries in the prompt without changing the

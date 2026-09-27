@@ -19,7 +19,6 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/utils/omap"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 )
 
@@ -720,6 +719,7 @@ const recentToolEntryTemplate = `<|TOOL_{{ .Name }}_{{ .Nonce }}|>
 ## Tool: {{ .Name }}
 Description: {{ .Description }}
 Direct Params Schema (for directly_call_tool only):
+Pass this object as directly_call_tool_params; do not add an action/tool wrapper.
 {{ .DisplaySchemaSnippet }}
 {{ if .Usage }}__USAGE__: {{ .Usage }}
 {{ end }}<|TOOL_{{ .Name }}_END_{{ .Nonce }}|>
@@ -735,11 +735,14 @@ func extractDirectlyCallParamsSchema(schemaSnippet string) aitool.InvokeParams {
 		return nil
 	}
 
-	if paramsSchema := fullSchema.GetObject("properties").GetObject("params"); len(paramsSchema) > 0 {
-		return paramsSchema
+	properties := fullSchema.GetObject("properties")
+	if properties.GetObject("@action").GetString("const") == "call-tool" && properties.GetObject("tool").GetString("const") != "" {
+		if paramsSchema := properties.GetObject("params"); len(paramsSchema) > 0 {
+			return paramsSchema
+		}
 	}
 
-	if fullSchema.GetString("type") == "object" && len(fullSchema.GetObject("properties")) > 0 {
+	if fullSchema.GetString("type") == "object" {
 		return fullSchema
 	}
 
@@ -771,21 +774,10 @@ func renderDirectlyCallParamsSchema(schemaSnippet string) string {
 		return schemaSnippet
 	}
 
-	rendered := omap.NewEmptyOrderedMap[string, any]()
-	rendered.Set("$schema", "http://json-schema.org/draft-07/schema#")
-	rendered.Set("type", "object")
-	rendered.Set("description", "Only for directly_call_tool. Pass this object directly as directly_call_tool_params. Do not include @action, tool, or params wrapper. For multi-line content, use TOOL_PARAM_* AITAG blocks with the literal nonce \""+RecentToolCacheStableNonce+"\" (a fixed string, NOT the per-turn nonce that other tags in this prompt use).")
-	if properties, ok := paramsSchema["properties"]; ok {
-		rendered.Set("properties", properties)
-	}
-	if required, ok := paramsSchema["required"]; ok {
-		rendered.Set("required", required)
-	}
-	if additionalProperties, ok := paramsSchema["additionalProperties"]; ok {
-		rendered.Set("additionalProperties", additionalProperties)
-	}
-
-	jsonBytes, err := json.MarshalIndent(rendered, "", "  ")
+	// Preserve the entire parameter contract, including allOf/oneOf/$defs and
+	// descriptions. Output-protocol instructions belong to the loop, not here.
+	// encoding/json sorts map keys, keeping the rendered bytes deterministic.
+	jsonBytes, err := json.MarshalIndent(paramsSchema, "", "  ")
 	if err != nil {
 		return schemaSnippet
 	}

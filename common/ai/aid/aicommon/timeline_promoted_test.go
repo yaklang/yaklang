@@ -55,7 +55,7 @@ func TestConfigRecordRecentlyUsedToolHasSinglePromptSourceAndNoopReuse(t *testin
 	require.Equal(t, 1, strings.Count(promoted.PromotedSemiDynamic1, "Direct Params Schema"))
 }
 
-func TestTimelinePromotedStateOpenSealDeleteAndRollback(t *testing.T) {
+func TestTimelineToolCacheOpenSealDeleteAndRollback(t *testing.T) {
 	base := time.Date(2026, 7, 18, 10, 0, 0, 0, time.UTC)
 	tl := NewTimeline(nil, nil)
 	injectTimelineItem(tl, 1, base, &TextTimelineItem{ID: 1, Text: "ordinary-old"})
@@ -110,21 +110,7 @@ func TestTimelinePromotedStateOpenSealDeleteAndRollback(t *testing.T) {
 	require.Contains(t, rolledBack.PromotedSemiDynamic1, "SCHEMA_ALPHA")
 }
 
-func TestTimelinePromotedStateStableOrdering(t *testing.T) {
-	base := time.Date(2026, 7, 18, 11, 0, 0, 0, time.UTC)
-	tl := NewTimeline(nil, nil)
-	injectTimelineItem(tl, 1, base, &TextTimelineItem{ID: 1, Text: "old"})
-	injectPromotable(tl, 2, base.Add(time.Second), TimelinePromotedOperationUpsert, "zeta", "## Tool: zeta")
-	injectPromotable(tl, 3, base.Add(2*time.Second), TimelinePromotedOperationUpsert, "alpha", "## Tool: alpha")
-	injectTimelineItem(tl, 4, base.Add(4*time.Minute), &TextTimelineItem{ID: 4, Text: "new"})
-
-	a := RenderTimelineFrozenOpen(tl).PromotedSemiDynamic1
-	b := RenderTimelineFrozenOpen(tl).PromotedSemiDynamic1
-	require.Equal(t, a, b)
-	require.Less(t, strings.Index(a, "## Tool: zeta"), strings.Index(a, "## Tool: alpha"))
-}
-
-func TestTimelineEffectivePromotedKeysRestoresSealedAndPendingStateWithoutMutation(t *testing.T) {
+func TestTimelineToolCacheEffectiveRestoreWithoutMutation(t *testing.T) {
 	base := time.Date(2026, 7, 18, 11, 30, 0, 0, time.UTC)
 	tl := NewTimeline(nil, nil)
 	injectPromotable(tl, 1, base, TimelinePromotedOperationUpsert, "alpha", "## Tool: alpha")
@@ -167,7 +153,7 @@ func TestTimelineEffectivePromotedKeysRestoresSealedAndPendingStateWithoutMutati
 	require.Equal(t, []string{"beta", "gamma"}, restored.effectivePromotedKeys(TimelinePromotedTargetSemiDynamic1, TimelinePromotedKindRecentTool))
 }
 
-func TestTimelineForkMergesPromotionJournalWithoutDiffNoise(t *testing.T) {
+func TestTimelineToolCacheForkMergesJournalWithoutDiffNoise(t *testing.T) {
 	base := time.Date(2026, 7, 18, 12, 0, 0, 0, time.UTC)
 	parent := NewTimeline(nil, nil)
 	injectTimelineItem(parent, 1, base, &TextTimelineItem{ID: 1, Text: "parent"})

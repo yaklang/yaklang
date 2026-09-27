@@ -12,6 +12,17 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 )
 
+// A failed or unsettled call cannot warm the execution cache. Scalar require,
+// scalar direct and batch children use the same result boundary.
+func recordSuccessfulToolCache(config aicommon.AICallerConfigIf, name string, result *aitool.ToolResult, callErr error) {
+	if config == nil || config.GetAiToolManager() == nil || callErr != nil || result == nil || !result.Success {
+		return
+	}
+	if tool, err := config.GetAiToolManager().GetToolByName(name); err == nil && tool != nil {
+		config.RecordRecentlyUsedTool(tool)
+	}
+}
+
 // resolveToolCallReason extracts the human-readable reason for a tool call from
 // the action: it prefers the action-specific reason field (e.g. tool_call_reason)
 // and falls back to human_readable_thought when the AI omitted the dedicated
