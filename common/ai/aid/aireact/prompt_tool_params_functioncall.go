@@ -4,7 +4,6 @@ import (
 	_ "embed"
 	"encoding/json"
 	"fmt"
-	"strings"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
@@ -67,7 +66,7 @@ func (pm *PromptManager) GenerateFunctionCallToolParamsPromptForTask(
 	materials.OutputExample = ""
 	materials.Schema = ""
 	materials.ExecutionPolicy = ""
-	materials.OriginalUserInput = escapeR2PromptControlTags(query)
+	materials.OriginalUserInput = query
 
 	inputSchema, err := json.MarshalIndent(tool.InputSchema, "", "  ")
 	if err != nil {
@@ -94,7 +93,7 @@ func (pm *PromptManager) GenerateFunctionCallToolParamsPromptForTask(
 		return "", err
 	}
 	materials.FunctionCallSchemas = toolTags
-	materials.TaskInstruction = escapeR2PromptControlTags(selectedTool)
+	materials.TaskInstruction = selectedTool
 	callIntent := ""
 	if intent.Reason != "" || intent.DestinationIdentifier != "" || intent.CallExpectations != "" {
 		encoded, err := json.Marshal(map[string]string{
@@ -104,11 +103,11 @@ func (pm *PromptManager) GenerateFunctionCallToolParamsPromptForTask(
 		if err != nil {
 			return "", fmt.Errorf("marshal tool invocation intent: %w", err)
 		}
-		callIntent = escapeR2PromptControlTags(string(encoded))
+		callIntent = string(encoded)
 	}
 	return assembleFunctionCallToolParamsPrompt(materials,
 		map[string]any{
-			"RecentUserInput": escapeR2PromptControlTags(materials.UserHistory), "CallIntent": callIntent,
+			"RecentUserInput": materials.UserHistory, "CallIntent": callIntent,
 			"CurrentTime": base.CurrentTime, "OSArch": base.OSArch,
 			"WorkingDir": base.WorkingDir, "WorkingDirGlance": base.WorkingDirGlance,
 		}, currentNonce)
@@ -150,21 +149,4 @@ func newFunctionCallToolParamsPrefixBuilder() *aicommon.PromptPrefixBuilder {
 	builder.TimelineOpenTemplateName = "r2-functioncall-timeline-open"
 	builder.TimelineOpenTemplate = functionCallToolParamsTimelineOpen
 	return builder
-}
-
-// Selected tool metadata and user input are data, never a source of projection
-// tags. Escape only control-tag openers; other AITAGs (such as task context)
-// remain readable by the model.
-func escapeR2PromptControlTags(content string) string {
-	replacer := strings.NewReplacer(
-		"<|SCHEMA|>", "&lt;|SCHEMA|>",
-		"<|FUNCTION_CALL_TOOL_PARAM_SCHEMA_", "&lt;|FUNCTION_CALL_TOOL_PARAM_SCHEMA_",
-		"<|FUNCTION_CALL_ACTION_SCHEMA_", "&lt;|FUNCTION_CALL_ACTION_SCHEMA_",
-		"<|PROMPT_SECTION_", "&lt;|PROMPT_SECTION_",
-		"<|AI_CACHE_SYSTEM_", "&lt;|AI_CACHE_SYSTEM_",
-		"<|AI_CACHE_FROZEN_", "&lt;|AI_CACHE_FROZEN_",
-		"<|AI_CACHE_SEMI2_", "&lt;|AI_CACHE_SEMI2_",
-		"<|AI_CACHE_SEMI_", "&lt;|AI_CACHE_SEMI_",
-	)
-	return replacer.Replace(content)
 }

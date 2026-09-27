@@ -5,14 +5,9 @@ import (
 	"strings"
 )
 
-// This private, ephemeral type cannot be restored from user/history text. Only
-// its generated cache envelope may bypass the ordinary Timeline tag escaping;
-// all embedded metadata is escaped before constructing it.
+// This ephemeral type labels cache entries in the prompt without changing the
+// persisted journal. Its informational tags have no projection authority.
 type timelineToolCachePromptItem struct{ TextTimelineItem }
-
-func escapeToolCacheData(content string) string {
-	return strings.ReplaceAll(content, "<|", "&lt;|")
-}
 
 // timelineToolCacheDeltaPrompt renders one immutable event at its journal
 // position. The stable tag suffix is informational, not a projection nonce:
@@ -24,11 +19,11 @@ func timelineToolCacheDeltaPrompt(item *PromotableTimelineItem) string {
 	var body string
 	switch item.Operation {
 	case TimelinePromotedOperationUpsert:
-		body = fmt.Sprintf("[UPSERT] %s\n%s", escapeToolCacheData(item.Key), escapeToolCacheData(strings.TrimSpace(item.Payload)))
+		body = fmt.Sprintf("[UPSERT] %s\n%s", item.Key, strings.TrimSpace(item.Payload))
 	case TimelinePromotedOperationReuse:
-		body = fmt.Sprintf("[REUSE] %s", escapeToolCacheData(item.Key))
+		body = fmt.Sprintf("[REUSE] %s", item.Key)
 	case TimelinePromotedOperationDelete:
-		body = fmt.Sprintf("[DELETE] %s", escapeToolCacheData(item.Key))
+		body = fmt.Sprintf("[DELETE] %s", item.Key)
 	default:
 		return ""
 	}

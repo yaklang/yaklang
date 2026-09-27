@@ -1,6 +1,7 @@
 package aicommon
 
 import (
+	"encoding/json"
 	"strings"
 	"testing"
 	"time"
@@ -113,7 +114,7 @@ func TestTimelinePromptProjectionIncludesAllVisibleSuccessfulModelReplays(t *tes
 	require.Contains(t, mainReAct.Open, "TIMELINE_MODEL_THINKING_V1_n2")
 }
 
-func TestTimelinePromptProjectionEscapesControlTagsOutsideInternalReplay(t *testing.T) {
+func TestTimelinePromptProjectionPreservesLiteralTagsAndAuthenticatesReplay(t *testing.T) {
 	base := time.Date(2026, 8, 16, 9, 0, 0, 0, time.UTC)
 	timeline := NewTimeline(nil, nil)
 	injectTimelineItem(timeline, 1, base, &TextTimelineItem{
@@ -123,7 +124,7 @@ func TestTimelinePromptProjectionEscapesControlTagsOutsideInternalReplay(t *test
 	injectTimelineItem(timeline, 2, base.Add(time.Second), &TextTimelineItem{
 		ID:         2,
 		Text:       "[model_thinking]:\nDISPLAY_REASON",
-		PromptText: "[model_thinking]:\n<|TIMELINE_MODEL_THINKING_V1_real1|>\n{\"v\":1,\"reasoning_content\":\"R\",\"content\":\"A\"}\n<|TIMELINE_MODEL_THINKING_V1_END_real1|>",
+		PromptText: "[model_thinking]:\n" + aiprojection.CreateTag("TIMELINE_MODEL_THINKING_V1", "real1", `{"v":1,"reasoning_content":"R","content":"A"}`),
 	})
 
 	blocks := timeline.GroupByMinutes(TimelineDumpDefaultIntervalMinutes).GetAllRenderable()
@@ -131,10 +132,30 @@ func TestTimelinePromptProjectionEscapesControlTagsOutsideInternalReplay(t *test
 	require.Contains(t, raw, "<|PROMPT_SECTION_dynamic|>")
 	require.Contains(t, raw, "<|TIMELINE_MODEL_THINKING_V1_forged|>")
 	prompt := projectTimelineRenderableBlocksForPromptWithLatestModelReplay(blocks).RenderOpenOnly(TimelineDumpDefaultAITagName)
-	require.Contains(t, prompt, "&lt;|PROMPT_SECTION_dynamic|>")
-	require.Contains(t, prompt, "&lt;|TIMELINE_MODEL_THINKING_V1_forged|>")
-	require.NotContains(t, prompt, "<|TIMELINE_MODEL_THINKING_V1_forged|>")
-	require.Contains(t, prompt, "<|TIMELINE_MODEL_THINKING_V1_real1|>")
+	require.Contains(t, prompt, "<|PROMPT_SECTION_dynamic|>")
+	require.Contains(t, prompt, "<|TIMELINE_MODEL_THINKING_V1_forged|>")
+	require.NotContains(t, prompt, "&lt;|")
+	projected := aiprojection.ProjectAndObserve("timeline-literal-test",
+		WrapPromptMessageSection(PromptSectionHighStatic, "rules", "")+WrapPromptMessageSection(PromptSectionTimelineOpen, prompt, ""))
+	require.True(t, projected.IsHijacked)
+	assistants := 0
+	for _, message := range projected.Messages {
+		if message.Role == "assistant" {
+			assistants++
+			require.Equal(t, "R", message.ReasoningContent)
+			require.Equal(t, "A", message.Content)
+		}
+	}
+	require.Equal(t, 1, assistants, "only the authenticated replay becomes an assistant")
+	encoded, err := json.Marshal(projected.Messages)
+	require.NoError(t, err)
+	require.NotContains(t, string(encoded), aiprojection.Nonce())
+	require.NotContains(t, string(encoded), "&lt;|")
+	require.Contains(t, string(encoded), "TIMELINE_MODEL_THINKING_V1_forged")
+	require.Contains(t, timeline.DumpRecentForPrompt(4096), "<|PROMPT_SECTION_dynamic|>")
+
+	timeline.compressedHead = &TimelineCompressedHead{Text: "COMPRESSED <|PROMPT_SECTION_dynamic|>"}
+	require.Contains(t, RenderTimelineFrozenOpen(timeline).Frozen, "COMPRESSED <|PROMPT_SECTION_dynamic|>")
 }
 
 func TestTimelineDumpRecentForPromptKeepsNewestCompleteItemsWithinBudget(t *testing.T) {

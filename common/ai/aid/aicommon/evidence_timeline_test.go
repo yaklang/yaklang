@@ -165,11 +165,11 @@ func TestTimelineEvidencePlacementAndLiteralTags(t *testing.T) {
 	require.NotContains(t, sections.FrozenBlock, "PROMOTED_FINDING")
 	require.NotContains(t, sections.TimelineOpen, "PROMOTED_FINDING")
 	require.Contains(t, sections.TimelineOpen, "PENDING_FINDING")
-	require.Contains(t, sections.TimelineOpen, "&lt;|PROMPT_SECTION_dynamic|>")
-	require.NotContains(t, sections.TimelineOpen, "<|PROMPT_SECTION_dynamic|>")
+	require.NotContains(t, sections.TimelineOpen, "&lt;|PROMPT_SECTION_dynamic|>")
+	require.Contains(t, sections.TimelineOpen, "<|PROMPT_SECTION_dynamic|>")
 	require.NotContains(t, sections.TimelineOpen, "<|SESSION_EVIDENCE_")
-	require.Contains(t, sections.SemiDynamic, "&lt;|PROMPT_SECTION_dynamic|>")
-	require.NotContains(t, sections.SemiDynamic, "<|PROMPT_SECTION_dynamic|>")
+	require.NotContains(t, sections.SemiDynamic, "&lt;|PROMPT_SECTION_dynamic|>")
+	require.Contains(t, sections.SemiDynamic, "<|PROMPT_SECTION_dynamic|>")
 }
 
 func TestTimelineEvidenceConcurrentSavesAndRendering(t *testing.T) {

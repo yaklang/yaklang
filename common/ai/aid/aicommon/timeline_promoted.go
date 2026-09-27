@@ -341,7 +341,7 @@ func renderPromotedRecentTools(state *TimelinePromotedState) string {
 	out.WriteString("# Recently Used Tools (available for directly_call_tool)\n\n")
 	for _, key := range keys {
 		if entry := entries[key]; entry != nil {
-			out.WriteString(escapeToolCacheData(strings.TrimSpace(entry.Payload)))
+			out.WriteString(strings.TrimSpace(entry.Payload))
 			out.WriteString("\n\n")
 		}
 	}

@@ -132,8 +132,8 @@ func projectTimelineRenderableBlocksForPrompt(blocks TimelineRenderableBlocks) T
 // existing bucket topology while allowing every successful model replay still
 // present in the visible frozen/open interval blocks into the prompt. Reduced
 // or evicted items are never reconstructed; compressed heads remain ordinary
-// historical facts, with control-looking delimiters escaped only in their
-// ephemeral prompt copy.
+// historical facts. Literal tags remain data; only aiprojection's nonce-bearing
+// envelopes can change the outgoing message structure.
 func projectTimelineRenderableBlocksForPromptWithLatestModelReplay(blocks TimelineRenderableBlocks) TimelineRenderableBlocks {
 	return projectTimelineRenderableBlocksForPromptWithModelReplay(blocks, true)
 }
@@ -155,7 +155,7 @@ func projectTimelineRenderableBlocksForPromptWithModelReplay(blocks TimelineRend
 				continue
 			}
 			copyBlock := *typed
-			copyBlock.Text = strings.ReplaceAll(copyBlock.Text, "<|", "&lt;|")
+			copyBlock.Text = typed.Text
 			copyBlock.promptProjection = true
 			projected = append(projected, &copyBlock)
 		default:
