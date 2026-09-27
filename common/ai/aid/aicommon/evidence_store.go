@@ -228,13 +228,3 @@ func (i *EvidenceItem) touch(ts int64) {
 	}
 	i.UpdatedUnix = ts
 }
-
-func (i EvidenceItem) EffectiveUpdatedUnix() int64 {
-	if i.UpdatedUnix > 0 {
-		return i.UpdatedUnix
-	}
-	if i.CreatedUnix > 0 {
-		return i.CreatedUnix
-	}
-	return 1
-}

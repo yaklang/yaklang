@@ -325,7 +325,7 @@ func (pm *PromptManager) NewPromptMaterials(base *reactloops.LoopPromptBaseMater
 		materials.FunctionCallSchemas = input.FunctionCallSchemas
 		// P1-C2: SessionEvidence / UserHistory 从 dynamic 段上移到 timeline-open 段
 		materials.SessionEvidence = input.SessionEvidence
-		if strings.TrimSpace(materials.SessionEvidenceOpen) == "" {
+		if strings.TrimSpace(materials.SessionEvidenceOpen) == "" && materials.SessionEvidenceSemiDynamic == "" {
 			materials.SessionEvidenceOpen = input.SessionEvidence
 		}
 		// 全局 TODO 块: 与 SessionEvidence 平行透传, 物理位置在 timeline-open 段
@@ -600,13 +600,6 @@ func (pm *PromptManager) buildFrozenBlockObservation(
 	}
 	children = append(children,
 		reactloops.NewPromptSectionObservation(
-			"section.frozen_block.session_evidence_frozen",
-			"Session Evidence (Frozen)",
-			reactloops.PromptSectionRoleFrozenBlock,
-			true,
-			renderSessionEvidenceFrozenBlock(materials),
-		),
-		reactloops.NewPromptSectionObservation(
 			"section.frozen_block.timeline_frozen",
 			"Timeline (Frozen Prefix)",
 			reactloops.PromptSectionRoleFrozenBlock,
@@ -694,6 +687,7 @@ func (pm *PromptManager) buildSemiDynamic1Observation(
 			true,
 			materials.PromotedSemiDynamic1,
 		),
+		reactloops.NewPromptSectionObservation("section.semi_dynamic_1.evidence", "Session Evidence", reactloops.PromptSectionRoleSemiDynamic1, true, materials.SessionEvidenceSemiDynamic),
 	}
 	section.Children = filterIncludedPromptSections(children)
 	if strings.TrimSpace(rendered) != "" {
@@ -830,7 +824,7 @@ func (pm *PromptManager) buildTimelineOpenObservation(
 			"Session Evidence",
 			reactloops.PromptSectionRoleTimelineOpen,
 			true,
-			materials.SessionEvidence,
+			materials.TimelineOpenData()["SessionEvidence"].(string),
 		),
 		// 全局 TODO 块: 紧跟 SessionEvidence, 让 loop prompt 始终能看到当前
 		// TODO 列表; 数据来源是 SessionPromptState.VerificationTodoStore,
@@ -1059,17 +1053,6 @@ func renderFrozenPartitionBlock(partition aicommon.FrozenBlockPartition) string 
 	)
 }
 
-func renderSessionEvidenceFrozenBlock(materials *reactloops.PromptPrefixMaterials) string {
-	if materials == nil || strings.TrimSpace(materials.SessionEvidenceFrozen) == "" {
-		return ""
-	}
-	return "# Session Evidence (Frozen)\n" + materials.SessionEvidenceFrozen
-}
-
-// renderToolInventoryBlock 是给 observation 树 (UI / 调试) 用的镜像渲染, 必须
-// 与 frozen_block_section.txt 模板保持字节级一致, 否则面板里看到的与 LLM 真正
-// 收到的会错位. 任何模板改动都要同步本函数, 反之亦然.
-// 关键词: renderToolInventoryBlock, observation 镜像, frozen_block_section 对齐
 func renderToolInventoryBlock(materials *reactloops.PromptPrefixMaterials) string {
 	if materials == nil || !materials.ToolInventory || materials.ToolsCount <= 0 || len(materials.TopTools) == 0 {
 		return ""

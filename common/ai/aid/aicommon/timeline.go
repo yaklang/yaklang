@@ -37,10 +37,11 @@ type Timeline struct {
 	// compressedHead 是运行态唯一有效压缩段（single source of truth）
 	compressedHead *TimelineCompressedHead
 	// compressedHistory 仅用于追溯，不参与当前并列渲染
-	compressedHistory []*TimelineCompressedHistoryNode
-	archiveRefs       *omap.OrderedMap[int64, *TimelineArchiveRef]
-	promotedState     *TimelinePromotedState
-	freezeState       *TimelineFreezeState
+	compressedHistory   []*TimelineCompressedHistoryNode
+	archiveRefs         *omap.OrderedMap[int64, *TimelineArchiveRef]
+	promotedState       *TimelinePromotedState
+	freezeState         *TimelineFreezeState
+	evidenceInitialized bool // namespace survives rollback and empty serialized journals
 
 	// this limit is used to limit the timeline dump content size (in tokens).
 	perDumpContentLimit   int64
@@ -268,6 +269,7 @@ func (m *Timeline) CopyReducibleTimelineWithMemory() *Timeline {
 		archiveRefs:           m.archiveRefs.Copy(),
 		promotedState:         cloneTimelinePromotedState(m.promotedState),
 		freezeState:           cloneTimelineFreezeState(m.freezeState),
+		evidenceInitialized:   m.evidenceInitialized,
 		perDumpContentLimit:   m.perDumpContentLimit,
 		totalDumpContentLimit: m.totalDumpContentLimit,
 		bucketByteSize:        m.bucketByteSize,

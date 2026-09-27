@@ -1,10 +1,7 @@
 package aicommon
 
 import (
-	"context"
-	"strings"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/ai/aid/aiprojection"

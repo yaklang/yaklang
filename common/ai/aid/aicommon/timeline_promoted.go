@@ -294,7 +294,9 @@ func (m *Timeline) projectPromotedLocked() (string, string) {
 		if !ok || control == nil || id <= watermark {
 			continue
 		}
-		pending = append(pending, control)
+		if control.Kind == TimelinePromotedKindRecentTool {
+			pending = append(pending, control)
+		}
 	}
 	return semi, renderPromotableOpenDeltas(pending, semi == "")
 }
