@@ -61,17 +61,52 @@ sequenceDiagram
 
 ## 后续调整的边界
 
-### 新压缩方案第 1 步：范围和预算（尚未接入生产）
+### 新压缩方案：完整快照、单次摘要、原子提交（尚未切换生产入口）
 
-`buildCompressionSnapshot(summaryReserve)` 只构建独立快照，不冻结、不提升、不删除，也不调用 AI。生产仍使用上文的原有入口。
+`Timeline.CompressOnce(TimelineCompressionOptions)` 显式执行新流程。按最新确认，**旧摘要 + 全部普通 Frozen/Open 历史统一替换成一份摘要**，不保留最近原文，不再用六分之一或固定长度作为输出目标。
 
-1. 读锁内复制当前摘要、普通 Frozen/Open 条目和覆盖水位 `ThroughID`；条目按 ID 排序，并保存原始序列化内容，供后续提交阶段检查来源是否变化。Evidence/toolcache 的 promotable 条目只记录在 `ExactItemIDs`，不进入摘要输入和候选删除列表。
-2. 释放锁后计算预算：`TargetTokens = InputTokens / 6`，其中 `InputTokens` 包含旧摘要和完整普通历史。计量使用本地 tokenizer，不是网关账单，也不包含未来最终块的外层包装。
-3. 先扣除调用方显式指定的摘要最低预算，再从末尾按完整条目选择连续最近原文；剩余预算全部留给摘要。原文保留完整正文，不使用旧的单条 shrink 结果，也不经过可能丢失超长单行的展示渲染器。
-4. 当前原生交互的一个 assistant 和全部 N 个 tool 回执已经存于同一专用条目。快照校验其完整协议，再整条保留或整条进入待摘要区；普通用户文本中的标签不解释成协议。最近完整条目放不下、回放损坏或预算不足时返回错误，原 Timeline 不变。
-5. 未来提交只能处理 `Items[:RecentStart]` 中明确列出的普通条目，不能直接删除所有 `ID <= ThroughID`。快照建立后追加的条目不在该范围，留给下一段 Open。真正冻结及原子提交留到后续步骤实现。
+- `MaxInputTokens` / `MaxSummaryTokens` 是调用方给出的技术安全上限，不是期望输出长度，不写入提示词。超限返回错误并保留历史，不分批、不截断。
+- `RetainedContext` 是下一轮仍独立保留的实际上下文（例如 USER_QUERY、TODO），由调用方提供；Timeline 不猜测主循环的字段。此阶段仅提供接口与 mock 验证，实际主循环接线在后续步骤。
+- 输入模板为 `prompts/timeline/compression.txt`，含一个示例，要求保留实际进展、依据、关键发现、独有约束、失败教训和未完成调用；避免抄写独立保留的上下文。输出 Schema 为同目录 `compression.json`，仅包含 `@action` 与非空 `summary`。
+- evidence/toolcache 的精确 journal 从摘要输入与退役列表中排除。当前上下文中提及相同工具或 evidence，不意味着相关历史调查结论可以删除。
 
-验收集中在 `timeline_compression_snapshot_test.go`：旧摘要参与预算、精确状态排除、快照与后续追加隔离、完整 assistant + 多 tool 的真实投影、超长正文与错误边界。最终摘要生成后仍需校验实际输出和最终块包装的总预算；本步骤不承诺模型输出必然符合六分之一目标。
+```mermaid
+sequenceDiagram
+    participant Caller as 显式调用方
+    participant TL as Timeline
+    participant AI as 辅助 AI（Speed）
+    participant Writer as 并发写入方
+    participant Prompt as Prompt 读取方
+    Caller->>TL: CompressOnce(安全上限, RetainedContext)
+    TL->>TL: 锁内捕获旧摘要、普通历史、精确 journal 与水位，预占事务
+    TL->>AI: 锁外一次请求：完整资料 + 单次示例模板
+    Writer->>TL: 追加普通条目 / evidence / toolcache
+    Note over TL: 生成期间延后冻结，新写入留在 Open
+    AI-->>TL: timeline-summary
+    TL->>TL: 校验非空、类型、控制 token、安全上限、取消状态
+    TL->>TL: 持锁重核来源、旧摘要及冻结版本
+    alt 校验通过
+        TL->>TL: 一次提交：冻结捕获范围，提升精确状态，替换摘要，退役全部普通原文
+        Prompt->>TL: 一次读锁获取 Frozen、Semi 与 Open
+        TL-->>Prompt: Frozen=新摘要；Semi=精确状态；Open=捕获后新增内容
+    else 失败或来源过期
+        TL-->>Caller: 返回错误，不提交任何压缩结果
+    end
+    TL->>TL: 释放事务；后续写入恢复原有冻结行为
+```
+
+快照包含完整原文，不复用单条 shrink，也不经可能丢失超长单行的展示渲染器。历史原生交互按专用条目校验完整 assistant + N tools；请求副本去除有效 projection nonce 并 JSON 编码，历史调用不能在辅助请求中展开。所有原文都进入摘要资料，不切分工具交互。
+
+来源校验覆盖捕获水位以内的修改、删除、回退、晚插入、精确状态更改、时间戳和旧摘要变化；水位以后的追加允许继续。失败不撤销调用方已做的更改，只是不覆盖它们。成功后旧 head 仍按现有机制归档追溯，不进入下一轮 Prompt；普通原文在两个索引中退役，保存恢复后也不会复活。
+
+正常成功仅一次逻辑 AI 调度，没有分批或 head refine；底层失败重试仍由 Config 策略控制。没有接入 Push 或自动阈值，所以本轮不改变现有生产触发行为。
+
+测试均为 Timeline 与 mock AI：
+- `timeline_compression_snapshot_test.go`：完整来源、旧摘要、精确状态隔离、完整工具交互、长正文、快照隔离。
+- `timeline_compression_summary_test.go`：新模板、资料分区、历史角色不投影、完整大输入、一次请求、无副作用与错误输出。
+- `timeline_compression_transaction_test.go`：原子提交、并发追加与冲突、取消/超限/失败保留、重复压缩、恢复与 fork 隔离。
+
+设置 `YAK_TIMELINE_COMPRESSION_EXAMPLES_DIR` 并运行 `TestTimelineCompressionTransactionReviewExample` 可导出完整压缩前视图、实际 mock 请求、mock 响应与压缩后视图。它们验证状态转换，不代表真实模型摘要质量或远端缓存命中率。
 
 ### 当前生产路径仍待处理的边界
 

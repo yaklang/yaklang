@@ -98,13 +98,16 @@ func registerTimelineTestLiteForge(t testing.TB) {
 				configOpts = append(configOpts, value)
 			}
 		}
-		if req == nil || (req.ActionName != CallerLabelTimelineBatchCompress && req.ActionName != CallerLabelTimelineHeadRefine) {
+		if req == nil || (req.ActionName != CallerLabelTimelineBatchCompress && req.ActionName != CallerLabelTimelineHeadRefine && req.ActionName != CallerLabelTimelineCompress) {
 			if previous != nil {
 				return previous(prompt, opts...)
 			}
 			return nil, errors.New("no test LiteForge adapter for this task")
 		}
 		cfg := NewConfig(req.Context, append([]ConfigOption{WithDisableAutoSkills(true)}, configOpts...)...)
+		if req.ActionName == CallerLabelTimelineCompress {
+			require.True(t, NewGeneralKVConfig(req.Options...).GetLiteForgeDisableTimeline(), "the snapshot is the only history source")
+		}
 		request := NewAIRequest(prompt+"\n"+req.OutputSchema,
 			NewGeneralKVConfig(req.Options...).GetExtraRequestOpts()...)
 		response, err := cfg.CallAI(request)

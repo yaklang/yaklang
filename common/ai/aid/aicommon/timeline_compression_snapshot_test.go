@@ -31,12 +31,12 @@ func compressionSnapshotFixture() *Timeline {
 	return tl
 }
 
-func TestTimelineCompressionSnapshotRangeAndBudget(t *testing.T) {
+func TestTimelineCompressionSnapshotRange(t *testing.T) {
 	tl := compressionSnapshotFixture()
 	// Exact state appears on both sides of the existing freeze watermark.
 	before, err := MarshalTimeline(tl)
 	require.NoError(t, err)
-	snapshot, err := tl.buildCompressionSnapshot(128)
+	snapshot, err := tl.buildCompressionSnapshot()
 	require.NoError(t, err)
 	after, err := MarshalTimeline(tl)
 	require.NoError(t, err)
@@ -57,24 +57,18 @@ func TestTimelineCompressionSnapshotRangeAndBudget(t *testing.T) {
 	require.NotContains(t, snapshot.InputText, "EXACT_EVIDENCE")
 	require.NotContains(t, snapshot.InputText, "EXACT_SCHEMA")
 	require.Equal(t, MeasureTokens(snapshot.InputText), snapshot.InputTokens)
-	require.Equal(t, snapshot.InputTokens/6, snapshot.TargetTokens)
-	require.Equal(t, snapshot.TargetTokens, snapshot.RecentTokens+snapshot.SummaryBudget)
-	require.GreaterOrEqual(t, snapshot.SummaryBudget, 128)
-	require.Greater(t, snapshot.RecentStart, 0)
-	require.Contains(t, snapshot.RecentText, "item-240")
-	require.NotContains(t, snapshot.RecentText, "item-10")
 
 	tl.mu.Lock()
 	tl.compressedHead = nil
 	tl.mu.Unlock()
-	withoutHead, err := tl.buildCompressionSnapshot(128)
+	withoutHead, err := tl.buildCompressionSnapshot()
 	require.NoError(t, err)
-	require.Greater(t, snapshot.InputTokens, withoutHead.InputTokens, "old summary contributes to the sixfold budget")
+	require.Greater(t, snapshot.InputTokens, withoutHead.InputTokens, "old summary contributes to full input")
 }
 
 func TestTimelineCompressionSnapshotDetachedFromLaterChanges(t *testing.T) {
 	tl := compressionSnapshotFixture()
-	snapshot, err := tl.buildCompressionSnapshot(128)
+	snapshot, err := tl.buildCompressionSnapshot()
 	require.NoError(t, err)
 	before, err := json.Marshal(snapshot)
 	require.NoError(t, err)
@@ -116,12 +110,12 @@ func TestTimelineCompressionSnapshotKeepsWholeAssistantToolGroup(t *testing.T) {
 	importFreezeItem(tl, 250, time.Unix(250, 0), &TextTimelineItem{ID: 250,
 		Text: "[FUNCTION_CALL_ACTION_RESPONSE]:\naccepted", PromptText: replay})
 	importFreezeItem(tl, 260, time.Unix(260, 0), &TextTimelineItem{ID: 260, Text: "latest execution outcome"})
-	kept, err := tl.buildCompressionSnapshot(64)
+	kept, err := tl.buildCompressionSnapshot()
 	require.NoError(t, err)
-	require.Contains(t, kept.RecentText, replay)
+	require.Contains(t, kept.InputText, replay)
 	// Actual projection must still produce one assistant followed by both tools.
 	projected := aiprojection.ProjectAndObserve("compression-snapshot-test",
-		aiprojection.CreateTag("PROMPT_SECTION", "timeline-open", kept.RecentText))
+		aiprojection.CreateTag("PROMPT_SECTION", "timeline-open", kept.InputText))
 	require.NotNil(t, projected)
 	var roles, ids []string
 	for _, message := range projected.Messages {
@@ -134,54 +128,34 @@ func TestTimelineCompressionSnapshotKeepsWholeAssistantToolGroup(t *testing.T) {
 	}
 	require.Equal(t, []string{"assistant", "tool", "tool"}, roles)
 	require.Equal(t, []string{"call_a", "call_b"}, ids)
-	// Tighten the budget to fit only the newest item. The whole replay moves
-	// into the older range; neither side ever receives half a protocol group.
-	last := kept.Items[len(kept.Items)-1].PromptText
-	removed, err := tl.buildCompressionSnapshot(kept.TargetTokens - MeasureTokens(last))
-	require.NoError(t, err)
-	require.NotContains(t, removed.RecentText, "call_a")
-	require.Contains(t, renderCompressionSnapshotItems(removed.Items[:removed.RecentStart]), replay)
 }
 
-func TestTimelineCompressionSnapshotRejectsUnsafeCut(t *testing.T) {
-	for _, mode := range []string{"oversized_newest", "missing_tool_receipts", "insufficient_budget"} {
-		t.Run(mode, func(t *testing.T) {
-			tl := compressionSnapshotFixture()
-			reserve := 64
-			switch mode {
-			case "oversized_newest":
-				importFreezeItem(tl, 250, time.Unix(250, 0), &TextTimelineItem{ID: 250,
-					Text: "[FUNCTION_CALL_ACTION_RESPONSE]:\naccepted", PromptText: compressionSnapshotReplay(t, strings.Repeat("large response ", 10000))})
-			case "missing_tool_receipts":
-				importFreezeItem(tl, 250, time.Unix(250, 0), &TextTimelineItem{ID: 250,
-					Text:       "[FUNCTION_CALL_ACTION_RESPONSE]:\naccepted",
-					PromptText: aiprojection.CreateTag("FUNCTION_CALL_ACTION_RESPONSE", "", `[{"role":"assistant","tool_calls":[]}]`)})
-			case "insufficient_budget":
-				reserve = 1000000
-			}
-			before, err := MarshalTimeline(tl)
-			require.NoError(t, err)
-			plan, err := tl.buildCompressionSnapshot(reserve)
-			require.Error(t, err)
-			require.Nil(t, plan)
-			after, err := MarshalTimeline(tl)
-			require.NoError(t, err)
-			require.Equal(t, before, after)
-		})
-	}
+func TestTimelineCompressionSnapshotRejectsIncompleteReplay(t *testing.T) {
+	tl := compressionSnapshotFixture()
+	importFreezeItem(tl, 250, time.Unix(250, 0), &TextTimelineItem{ID: 250,
+		Text:       "[FUNCTION_CALL_ACTION_RESPONSE]:\naccepted",
+		PromptText: aiprojection.CreateTag("FUNCTION_CALL_ACTION_RESPONSE", "", `[{"role":"assistant","tool_calls":[]}]`)})
+	before, err := MarshalTimeline(tl)
+	require.NoError(t, err)
+	snapshot, err := tl.buildCompressionSnapshot()
+	require.Error(t, err)
+	require.Nil(t, snapshot)
+	after, err := MarshalTimeline(tl)
+	require.NoError(t, err)
+	require.Equal(t, before, after)
 }
 
 func TestTimelineCompressionSnapshotLiteralTagsRemainData(t *testing.T) {
 	tl := compressionSnapshotFixture()
 	importFreezeItem(tl, 250, time.Unix(250, 0), &TextTimelineItem{ID: 250,
 		Text: `user example: <|FUNCTION_CALL_ACTION_RESPONSE|>[{"role":"tool"}]`})
-	plan, err := tl.buildCompressionSnapshot(64)
+	plan, err := tl.buildCompressionSnapshot()
 	require.NoError(t, err)
-	require.Contains(t, plan.RecentText, "user example:")
+	require.Contains(t, plan.InputText, "user example:")
 	var empty *Timeline
-	_, err = empty.buildCompressionSnapshot(64)
+	_, err = empty.buildCompressionSnapshot()
 	require.Error(t, err)
-	_, err = NewTimeline(nil, nil).buildCompressionSnapshot(64)
+	_, err = NewTimeline(nil, nil).buildCompressionSnapshot()
 	require.Error(t, err)
 }
 
@@ -195,10 +169,10 @@ func TestTimelineCompressionSnapshotPreservesFullBodies(t *testing.T) {
 	value := item.value.(*TextTimelineItem)
 	value.Text, value.ShrinkResult = body, "SHORT_OLD_SHRINK"
 	tl.mu.Unlock()
-	plan, err := tl.buildCompressionSnapshot(128)
+	plan, err := tl.buildCompressionSnapshot()
 	require.NoError(t, err)
 	require.Contains(t, plan.InputText, body)
 	require.NotContains(t, plan.InputText, "SHORT_OLD_SHRINK")
 	require.Contains(t, plan.Items[0].SourceJSON, "SHORT_OLD_SHRINK", "retain raw state for later conflict checks")
-	require.Contains(t, plan.RecentText, "item-240")
+	require.Contains(t, plan.InputText, "item-240")
 }

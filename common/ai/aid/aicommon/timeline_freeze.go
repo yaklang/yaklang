@@ -129,6 +129,15 @@ func (m *Timeline) freezeBudgetGroupsLocked(useSizer bool, throughLimit ...int64
 }
 
 func (m *Timeline) freezeLocked(all bool, throughLimit ...int64) TimelineFreezeResult {
+	// A one-shot compression publishes its captured freeze and summary together.
+	// Writes remain append-only during generation, including exact-state deltas.
+	if m.compressionSnapshot != nil {
+		version := int64(0)
+		if m.freezeState != nil {
+			version = m.freezeState.Version
+		}
+		return TimelineFreezeResult{Version: version, ThroughID: m.frozenThroughLocked()}
+	}
 	if m.freezeState == nil {
 		m.freezeState = &TimelineFreezeState{}
 	}
