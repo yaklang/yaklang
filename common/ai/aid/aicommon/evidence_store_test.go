@@ -191,3 +191,13 @@ func TestSessionPromptState_EvidencePersistenceUsesLiveStoreOnly(t *testing.T) {
 	require.Len(t, store.Items, 1)
 	require.Equal(t, "b", store.Items[0].ID)
 }
+
+func TestConfigEvidenceWithoutTimelineKeepsMirror(t *testing.T) {
+	c := &Config{SessionPromptState: NewSessionPromptState()}
+	c.ApplySessionEvidenceOps([]EvidenceOperation{{Op: "add", ID: "read", Content: "observed first"}})
+	require.Contains(t, c.GetSessionEvidenceRendered(), "observed first")
+	c.ApplySessionEvidenceOps([]EvidenceOperation{{Op: "add", ID: "read", Content: "observed last"}})
+	require.NotContains(t, c.GetSessionEvidenceRendered(), "observed first")
+	require.Contains(t, c.GetSessionEvidenceRendered(), "observed last")
+	require.Len(t, UnmarshalEvidenceStore(c.GetSessionPromptState().GetSessionEvidence()).Items, 1)
+}

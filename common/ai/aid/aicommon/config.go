@@ -3637,14 +3637,28 @@ func (c *Config) AppendUserInputHistory(userInput string, timestamp time.Time) (
 }
 
 func (c *Config) GetSessionEvidenceRendered() string {
-	if store, found := c.GetTimeline().evidenceStore(); found {
-		return store.Render()
+	if c != nil {
+		if timeline := c.GetTimeline(); timeline != nil {
+			if store, found := timeline.evidenceStore(); found {
+				return store.Render()
+			}
+		}
 	}
 	return c.GetSessionPromptState().GetSessionEvidenceRendered()
 }
 
 func (c *Config) ApplySessionEvidenceOps(ops []EvidenceOperation) {
-	if len(ops) == 0 {
+	if c == nil || len(ops) == 0 {
+		return
+	}
+	if c.GetTimeline() == nil {
+		state := c.GetSessionPromptState()
+		state.m.Lock()
+		defer state.m.Unlock()
+		store := UnmarshalEvidenceStore(state.evidenceJSON)
+		store.ApplyOperations(ops)
+		store.ShrinkToTokenBudget(sessionEvidenceTokenBudget)
+		state.evidenceJSON = store.Marshal()
 		return
 	}
 	c.applyEvidenceToTimeline(ops)
