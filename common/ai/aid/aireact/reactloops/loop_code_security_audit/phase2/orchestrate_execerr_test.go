@@ -63,6 +63,7 @@ func newResumePropagationHarness(t *testing.T) (
 		aicommon.WithTimeline(aicommon.NewTimeline(nil, nil)),
 		aicommon.WithEmitter(parentEmitter),
 		aicommon.WithDisableAutoSkills(true),
+		aicommon.WithEnableFunctionCallMode(false), // The failure fixture emits text, not tool calls.
 		aicommon.WithAICallbacks(&aicommon.AICallbacks{
 			Original:           aiCB,
 			QualityPriorityRaw: aiCB,

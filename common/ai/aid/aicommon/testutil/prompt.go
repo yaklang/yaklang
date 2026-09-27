@@ -47,7 +47,9 @@ func ExtractPromptSectionNonce(prompt string, sectionName string) string {
 }
 
 func ExtractDynamicSectionNonce(prompt string) string {
-	return ExtractPromptSectionNonce(prompt, dynamicSectionName)
+	// Projection signs the section marker with a process nonce. AI response
+	// tags use only the turn nonce preceding that signature.
+	return strings.TrimSuffix(ExtractPromptSectionNonce(prompt, dynamicSectionName), "_"+aiprojection.Nonce())
 }
 
 func IsLegalNonce(data string) bool {
@@ -96,7 +98,11 @@ func MustExtractPromptSectionNonce(t TestingT, prompt string, sectionName string
 
 func MustExtractDynamicSectionNonce(t TestingT, prompt string) string {
 	t.Helper()
-	return MustExtractPromptSectionNonce(t, prompt, dynamicSectionName)
+	nonce := ExtractDynamicSectionNonce(prompt)
+	if nonce == "" {
+		t.Fatalf("failed to find dynamic prompt section nonce in prompt:\n%s", prompt)
+	}
+	return nonce
 }
 
 func MustExtractAITagBlock(t TestingT, prompt string, tagName string) AITagBlock {

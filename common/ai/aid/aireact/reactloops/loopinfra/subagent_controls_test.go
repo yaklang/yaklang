@@ -15,8 +15,15 @@ import (
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon/mock"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
+	"github.com/yaklang/yaklang/common/ai/aispec"
 	"github.com/yaklang/yaklang/common/schema"
 )
+
+type backgroundProjectedInvoker struct{ *mock.MockInvoker }
+
+func (i *backgroundProjectedInvoker) AddToTimelineWithPromptProjection(entry, display, _ string) {
+	i.AddToTimeline(entry, display)
+}
 
 func TestBackgroundDispatchActions_RejectMalformedSelectors(t *testing.T) {
 	inv := mock.NewMockInvoker(context.Background())
@@ -76,10 +83,11 @@ func TestBackgroundDispatchActions_ActualLoop(t *testing.T) {
 				aicommon.WithWorkdir(t.TempDir()), aicommon.WithEnableMultiAgentMode(true), aicommon.WithEnableFunctionCallMode(functionCall),
 				aicommon.WithAICallback(func(c aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 					body := ""
+					var step int32
 					if strings.Contains(req.GetPrompt(), "You are preparing a task brief") {
 						body = `{"@action":"object","goal":"inspect payment log","result_contract":"return evidence"}`
 					} else {
-						step := requests.Add(1)
+						step = requests.Add(1)
 						require.False(t, req.IsToolCallArgumentsStreamEnabled())
 						switch step {
 						case 1:
@@ -145,11 +153,25 @@ func TestBackgroundDispatchActions_ActualLoop(t *testing.T) {
 						}
 					}
 					response := c.NewAIResponse()
-					response.EmitOutputStream(bytes.NewBufferString(body))
+					if functionCall && step > 0 {
+						var params map[string]any
+						require.NoError(t, json.Unmarshal([]byte(body), &params))
+						name, ok := params["@action"].(string)
+						require.True(t, ok)
+						delete(params, "@action")
+						arguments, err := json.Marshal(params)
+						require.NoError(t, err)
+						spec := aispec.NewDefaultAIConfig(req.GetExtraSpecOpts()...)
+						spec.ToolCallCallback([]*aispec.ToolCall{{Index: 0, ID: fmt.Sprintf("call_%d", step), Type: "function",
+							Function: aispec.FuncReturn{Name: name, Arguments: string(arguments)}}})
+						spec.FinishReasonCallback("tool_calls", nil)
+					} else {
+						response.EmitOutputStream(bytes.NewBufferString(body))
+					}
 					response.Close()
 					return response, nil
 				}))
-			inv := mock.NewMockInvoker(ctx)
+			inv := &backgroundProjectedInvoker{MockInvoker: mock.NewMockInvoker(ctx)}
 			inv.SetConfig(cfg)
 			original := aicommon.AIRuntimeInvokerGetter
 			defer func() { aicommon.AIRuntimeInvokerGetter = original }()
