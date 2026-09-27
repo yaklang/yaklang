@@ -137,6 +137,11 @@ func (m *Timeline) PushPromotable(id int64, kind, targetSection, key, operation,
 	ts := now.UnixMilli()
 	m.mu.Lock()
 	defer m.mu.Unlock()
+	// Journal entries are immutable, including tombstones retained for rollback.
+	// Reusing an ID would also leave a second timestamp index pointing at it.
+	if m.idToTimelineItem.Have(id) {
+		return false
+	}
 	// Reuse is a reference, never a way to create or resurrect a cache entry.
 	// The caller must submit a full upsert if this returns false.
 	if operation == TimelinePromotedOperationReuse && !m.hasToolCacheBeforeLocked(id, key) {

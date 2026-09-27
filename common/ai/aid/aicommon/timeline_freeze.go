@@ -15,7 +15,7 @@ import (
 //	-> commit batch membership and exact promotions together -> read-only prompt.
 //
 // AI compression is a separate consumer of ordinary facts; it cannot summarize
-// structured promotion payloads. Evidence can join the same journal later.
+// structured promotion payloads. Evidence and tool schemas share this journal.
 //
 // TimelineFreezeResult is a detached receipt for one freeze transaction. An
 // unchanged Version means nothing was committed. Promotions contains exact

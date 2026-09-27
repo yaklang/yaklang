@@ -43,19 +43,7 @@ func TestRecentToolCache_AddAndGet(t *testing.T) {
 	assert.Equal(t, names[0], "sleep_test")
 }
 
-func TestRecentToolCache_Dedup(t *testing.T) {
-	mgr := newManagerWithCache(0)
-
-	tool := makeTool("read_file", "Read file content")
-	mgr.AddRecentlyUsedTool(tool)
-	mgr.AddRecentlyUsedTool(tool)
-	mgr.AddRecentlyUsedTool(tool)
-
-	names := mgr.GetRecentToolNames()
-	assert.Equal(t, len(names), 1, "duplicate adds should not create multiple entries")
-}
-
-func TestRecentToolCacheMutationOnlyChangesPromptStateWhenContentChanges(t *testing.T) {
+func TestRecentToolCacheMutationReportsUpsertAndReuse(t *testing.T) {
 	mgr := newManagerWithCache(0)
 	original := makeTool("read_file", "Read file", aitool.WithStringParam("path"))
 	first := mgr.AddRecentlyUsedTool(original)
@@ -70,6 +58,7 @@ func TestRecentToolCacheMutationOnlyChangesPromptStateWhenContentChanges(t *test
 	updated := mgr.AddRecentlyUsedTool(changed)
 	assert.Check(t, updated.Upsert != nil, "schema change must emit upsert")
 	assert.Check(t, strings.Contains(RenderRecentToolEntryForPromotion(updated.Upsert), `"raw"`))
+	assert.Equal(t, len(mgr.GetRecentToolNames()), 1, "reuse and schema replacement must not duplicate entries")
 }
 
 func TestRecentToolCacheMutationReportsEviction(t *testing.T) {

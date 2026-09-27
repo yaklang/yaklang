@@ -124,7 +124,7 @@ func requireToolCacheOrder(t *testing.T, tl *Timeline, first, second string) str
 // A/B schemas are frozen first. Reusing A and then B only appends small Open
 // events. Freezing A's event changes Semi to B/A; B's still-open reuse cannot
 // change that prefix until its own freeze. Neither reuse copies a schema.
-func TestToolCacheReuseOnlyReordersFrozenEvents(t *testing.T) {
+func TestTimelineToolCacheReuseOnlyReordersFrozenEvents(t *testing.T) {
 	tl := NewTimeline(nil, nil)
 	base := time.Date(2026, 9, 27, 10, 0, 0, 0, time.UTC)
 	importToolCacheEvent(tl, 1, base, TimelinePromotedOperationUpsert, "alpha", "SCHEMA_ALPHA")
@@ -170,7 +170,7 @@ func TestToolCacheReuseOnlyReordersFrozenEvents(t *testing.T) {
 	require.Equal(t, final, RenderTimelineFrozenOpen(tl).PromotedSemiDynamic1)
 }
 
-func TestToolCacheReuseValidation(t *testing.T) {
+func TestTimelineToolCacheReuseValidation(t *testing.T) {
 	tl := NewTimeline(nil, nil)
 	push := func(id int64, operation, payload string) bool {
 		return tl.PushPromotable(id, TimelinePromotedKindRecentTool, TimelinePromotedTargetSemiDynamic1, "alpha", operation, payload)
@@ -191,7 +191,7 @@ func TestToolCacheReuseValidation(t *testing.T) {
 	require.Equal(t, int64(8), entry.LastUsedItemID)
 }
 
-func TestToolCacheReuseRestoreReassignAndRollback(t *testing.T) {
+func TestTimelineToolCacheReuseRestoreReassignAndRollback(t *testing.T) {
 	tl := NewTimeline(nil, nil)
 	base := time.Date(2026, 9, 27, 10, 0, 0, 0, time.UTC)
 	importToolCacheEvent(tl, 1, base, TimelinePromotedOperationUpsert, "alpha", "SCHEMA_ALPHA")
@@ -218,7 +218,7 @@ func TestToolCacheReuseRestoreReassignAndRollback(t *testing.T) {
 	require.Equal(t, []string{"alpha", "beta"}, restored.effectivePromotedKeys(TimelinePromotedTargetSemiDynamic1, TimelinePromotedKindRecentTool))
 }
 
-func TestToolCacheReuseMalformedJournalDoesNotResurrect(t *testing.T) {
+func TestTimelineToolCacheReuseMalformedJournalDoesNotResurrect(t *testing.T) {
 	tl := NewTimeline(nil, nil)
 	base := time.Date(2026, 9, 27, 10, 0, 0, 0, time.UTC)
 	importToolCacheEvent(tl, 1, base, TimelinePromotedOperationUpsert, "alpha", "SCHEMA_ALPHA")
@@ -232,7 +232,7 @@ func TestToolCacheReuseMalformedJournalDoesNotResurrect(t *testing.T) {
 	require.Empty(t, tl.effectivePromotedKeys(TimelinePromotedTargetSemiDynamic1, TimelinePromotedKindRecentTool))
 }
 
-func TestToolCacheLegacyOrderUsesSourceAndDeterministicTieBreak(t *testing.T) {
+func TestTimelineToolCacheLegacyOrderUsesSourceAndDeterministicTieBreak(t *testing.T) {
 	state := newTimelinePromotedState()
 	state.Entries[TimelinePromotedTargetSemiDynamic1] = map[string]map[string]*PromotedTimelineEntry{
 		TimelinePromotedKindRecentTool: {
