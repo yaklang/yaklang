@@ -98,13 +98,10 @@ func withNativeActionDescription(action *LoopAction) *LoopAction {
 	return &copy
 }
 
-// Native functions keep common identity/display fields, while text actions
+// Native functions keep common identity fields, while text actions
 // retain the optional TODO sidecar. Native TODO updates have one dedicated tool.
 func commonActionSchemaOptions(native bool) []aitool.ToolOption {
 	thoughtDescription := "Optional. Omit this field when @action is 'directly_answer' or when the next step is already obvious. If you do provide it, keep it to one short, action-oriented sentence only (prefer <=12 Chinese characters or <=8 English words)."
-	if native {
-		thoughtDescription = "Optional. Omit for directly_answer or an obvious next step. Otherwise use one short, action-oriented sentence (prefer <=12 Chinese characters or <=8 English words)."
-	}
 	opts := []aitool.ToolOption{
 		aitool.WithStringParam(
 			"identifier",
@@ -115,13 +112,9 @@ func commonActionSchemaOptions(native bool) []aitool.ToolOption {
 			),
 			aitool.WithParam_Required(true),
 		),
-		aitool.WithStringParam(
-			"human_readable_thought",
-			aitool.WithParam_Description(thoughtDescription),
-		),
 	}
 	if !native {
-		opts = append(opts, todoDeltaSchemaOption(false, false))
+		opts = append(opts, aitool.WithStringParam("human_readable_thought", aitool.WithParam_Description(thoughtDescription)), todoDeltaSchemaOption(false, false))
 	}
 	return opts
 }
