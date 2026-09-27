@@ -18,7 +18,8 @@ const (
 
 // PromotableTimelineItem is a control-plane timeline entry. It is persisted and
 // follows fork/merge/checkpoint semantics, but is deliberately excluded from the
-// user timeline, ordinary dump buckets, diffs and reducers. Its payload does
+// ordinary dump buckets, diffs and reducers. Evidence has a separate readable
+// UI view. Its payload does
 // participate in the prompt freeze budget.
 type PromotableTimelineItem struct {
 	ID            int64  `json:"id"`
@@ -39,6 +40,9 @@ func (p *PromotableTimelineItem) SetShrinkResult(string)         {}
 // OpenPromptText is the exact, non-reducible payload used for open-bucket
 // accounting. String remains empty for ordinary history/UI compatibility.
 func (p *PromotableTimelineItem) OpenPromptText() string {
+	if p != nil && p.Kind == TimelinePromotedKindEvidence {
+		return timelineEvidenceDeltaPrompt(p)
+	}
 	if p == nil {
 		return ""
 	}

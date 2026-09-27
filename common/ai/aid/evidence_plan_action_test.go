@@ -14,7 +14,7 @@ import (
 
 func TestPlanExecutionEvidenceActionsShareSessionStore(t *testing.T) {
 	ctx := context.Background()
-	invoker := mock.NewMockInvoker(ctx)
+	invoker := &evidencePlanInvoker{MockInvoker: mock.NewMockInvoker(ctx)}
 	task := mock.NewMockStatefulTask(ctx, "pe-evidence-test", "execute planned task")
 	invoker.SetCurrentTask(task)
 
@@ -48,5 +48,20 @@ func TestPlanExecutionEvidenceActionsShareSessionStore(t *testing.T) {
 	op := reactloops.NewActionHandlerOperator(task)
 	compatHandler.ActionHandler(loop, action, op)
 	require.True(t, op.IsContinued())
+	require.Len(t, invoker.receipts, 1)
+	require.NotContains(t, invoker.receipts[0], "generated artifact passes")
+	cfg := invoker.GetConfig().(*mock.MockedAIConfig).EvidenceState
+	require.Contains(t, aicommon.BuildPromptFrozenOpenMaterials(cfg).TimelineOpen, "generated artifact passes")
+	cfg.GetTimeline().FreezeAll()
+	require.Contains(t, aicommon.BuildPromptFrozenOpenMaterials(cfg).SessionEvidenceSemiDynamic, "generated artifact passes")
 	require.Contains(t, invoker.GetConfig().GetSessionEvidenceRendered(), "generated artifact passes its regression test")
+}
+
+type evidencePlanInvoker struct {
+	*mock.MockInvoker
+	receipts []string
+}
+
+func (i *evidencePlanInvoker) AddToTimeline(entry, content string) {
+	i.receipts = append(i.receipts, entry+":"+content)
 }

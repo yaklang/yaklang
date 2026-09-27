@@ -66,6 +66,13 @@ func ParseTimelineItemHumanReadable(item *TimelineItem) *TimelineItemHumanReadab
 		ID:        item.GetID(),
 	}
 
+	if content, ok := timelineEvidenceDisplay(item); ok {
+		result.Type = "text"
+		result.EntryType = "evidence"
+		result.Content = content
+		return result
+	}
+
 	if item.value == nil {
 		result.Type = "raw"
 		return result

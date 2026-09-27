@@ -35,7 +35,6 @@ func newPlanExecPromptFixture(t *testing.T) (*Coordinator, *AiTask, *PlanRespons
 	mem := GetDefaultContextProvider()
 	mem.StoreQuery("请规划并执行这个任务")
 	mem.StoreToolsKeywords(func() []string { return []string{"grep", "read_file"} })
-	mem.SetPersistentData(planEvidencePersistentKey, "## 共享事实\n- /tmp/report.md 已存在")
 
 	cod := &Coordinator{
 		Config: &aicommon.Config{

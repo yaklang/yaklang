@@ -528,6 +528,10 @@ func (m *Timeline) pushTimelineItem(ts int64, id int64, item *TimelineItem) {
 	m.freezeLocked(false)
 	m.dumpSizeCheckLocked()
 
+	m.emitTimelineItemAsync(item)
+}
+
+func (m *Timeline) emitTimelineItemAsync(item *TimelineItem) {
 	// Emit timeline item asynchronously to avoid blocking when EventHandler
 	// writes to an unbuffered channel that hasn't been consumed yet
 	//
@@ -536,7 +540,8 @@ func (m *Timeline) pushTimelineItem(ts int64, id int64, item *TimelineItem) {
 	// 的高发路径之一: pushTimelineItem 在主流程已结束、outputChan 已被测试关
 	// 闭后仍可能被触发. 即便 Emitter.emit 自身已 defer recover, 这里再加一
 	// 层 recover 形成 belt-and-suspenders, 杜绝因 channel 关闭引起的进程退出.
-	if !isPromotableTimelineItem(item) && m.config != nil && m.config.GetEmitter() != nil {
+	_, evidence := timelineEvidenceDisplay(item)
+	if (!isPromotableTimelineItem(item) || evidence) && m.config != nil && m.config.GetEmitter() != nil {
 		emitter := m.config.GetEmitter()
 		go func() {
 			defer func() {
@@ -1370,7 +1375,8 @@ func (m *Timeline) ToTimelineItemOutputLastN(n int) []*TimelineItemOutput {
 	result := make([]*TimelineItemOutput, 0, n)
 	for i := l - 1; i >= 0 && len(result) < n; i-- {
 		item, ok := m.tsToTimelineItem.GetByIndex(i)
-		if !ok || item == nil || item.deleted || isPromotableTimelineItem(item) {
+		_, evidence := timelineEvidenceDisplay(item)
+		if !ok || item == nil || item.deleted || (isPromotableTimelineItem(item) && !evidence) {
 			continue
 		}
 		result = append([]*TimelineItemOutput{item.ToTimelineItemOutput()}, result...)

@@ -18,24 +18,7 @@ func (c *Config) applyEvidenceToTimeline(ops []EvidenceOperation) {
 		log.Warnf("journal session evidence: %v", err)
 		return
 	}
-	timeline.mu.RLock()
-	store, _ := timeline.evidenceStoreLocked()
-	s.evidenceJSON = store.Marshal()
-	if c.PersistentSessionId == "" || c.GetDB() == nil || timeline.branchTimeline {
-		timeline.mu.RUnlock()
-		return
-	}
-	raw, err := marshalTimelineUnlocked(timeline)
-	timeline.mu.RUnlock()
-	if err != nil {
-		log.Warnf("marshal evidence timeline: %v", err)
-		return
-	}
-	if err := c.GetDB().Model(&schema.AIAgentRuntime{}).Where("persistent_session = ?", c.PersistentSessionId).Updates(map[string]any{
-		"quoted_evidence": codec.StrConvQuote(s.evidenceJSON), "quoted_timeline": codec.StrConvQuote(raw),
-	}).Error; err != nil {
-		log.Warnf("persist session evidence and timeline failed: %v", err)
-	}
+	c.persistEvidenceTimelineLocked(s, timeline)
 }
 
 // The journal is authoritative once migrated, including an empty state after
@@ -59,4 +42,35 @@ func (c *Config) restoreEvidenceTimeline() {
 		return
 	}
 	s.evidenceJSON = store.Marshal()
+}
+
+// FlushRestoredSessionEvidence is called after the new runtime row exists.
+// Preserve journal and freeze metadata even if no new evidence is saved this run.
+func (c *Config) FlushRestoredSessionEvidence() {
+	s := c.GetSessionPromptState()
+	s.m.Lock()
+	defer s.m.Unlock()
+	c.persistEvidenceTimelineLocked(s, c.GetTimeline())
+}
+
+// Caller holds the session lock; the DB mirror and journal use one snapshot.
+func (c *Config) persistEvidenceTimelineLocked(s *SessionPromptState, timeline *Timeline) {
+	timeline.mu.RLock()
+	store, _ := timeline.evidenceStoreLocked()
+	s.evidenceJSON = store.Marshal()
+	if c.PersistentSessionId == "" || c.GetDB() == nil || timeline.branchTimeline {
+		timeline.mu.RUnlock()
+		return
+	}
+	raw, err := marshalTimelineUnlocked(timeline)
+	timeline.mu.RUnlock()
+	if err != nil {
+		log.Warnf("marshal evidence timeline: %v", err)
+		return
+	}
+	if err := c.GetDB().Model(&schema.AIAgentRuntime{}).Where("persistent_session = ?", c.PersistentSessionId).Updates(map[string]any{
+		"quoted_evidence": codec.StrConvQuote(s.evidenceJSON), "quoted_timeline": codec.StrConvQuote(raw),
+	}).Error; err != nil {
+		log.Warnf("persist session evidence and timeline failed: %v", err)
+	}
 }

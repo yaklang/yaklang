@@ -14,9 +14,7 @@ import (
 
 const (
 	planFactsPersistentKey    = "plan_facts"
-	planEvidencePersistentKey = "plan_evidence"
 	planDocumentPersistentKey = "plan_document"
-	planEvidenceTokenBudget   = 15000
 )
 
 var (
@@ -35,10 +33,6 @@ type discoveredAITagBlock struct {
 
 func extractPlanFactsFromText(content string) string {
 	return extractPlanContextFromText(content, planFactsAITags...)
-}
-
-func extractPlanEvidenceFromText(content string) string {
-	return extractPlanContextFromText(content, planEvidenceAITags...)
 }
 
 func extractPlanDocumentFromText(content string) string {
@@ -184,88 +178,10 @@ func parseAITagStartToken(token string) (string, string, bool) {
 }
 
 func getTaskPlanEvidence(task *AiTask) string {
-	return getTaskPlanPersistentMarkdown(task, planEvidencePersistentKey, extractPlanEvidenceFromText)
-}
-
-func getTaskPlanPersistentMarkdown(task *AiTask, key string, extractor func(string) string) string {
-	if task == nil {
+	if task == nil || task.Coordinator == nil || task.Coordinator.Config == nil {
 		return ""
 	}
-	if task.Coordinator != nil && task.Coordinator.ContextProvider != nil {
-		if content, ok := task.Coordinator.ContextProvider.GetPersistentData(key); ok {
-			content = strings.TrimSpace(content)
-			if content != "" {
-				return content
-			}
-		}
-	}
-	root := task
-	for root.ParentTask != nil {
-		root = root.ParentTask
-	}
-	if root.AIStatefulTaskBase != nil {
-		if content := extractor(root.AIStatefulTaskBase.GetUserInput()); content != "" {
-			return content
-		}
-	}
-	return ""
-}
-
-func mergePlanContextDocuments(existing string, incoming string) string {
-	existing = strings.TrimSpace(existing)
-	incoming = strings.TrimSpace(incoming)
-	if incoming == "" {
-		return existing
-	}
-	if existing == "" {
-		return incoming
-	}
-	if strings.Contains(existing, incoming) {
-		return existing
-	}
-	if strings.Contains(incoming, existing) {
-		return incoming
-	}
-	return strings.TrimSpace(existing + "\n\n" + incoming)
-}
-
-func appendTaskPlanEvidence(task *AiTask, incoming string) (string, bool) {
-	incoming = aicommon.NormalizeConcreteEvidenceMarkdown(incoming)
-	if task == nil || incoming == "" {
-		return getTaskPlanEvidence(task), false
-	}
-	existing := getTaskPlanEvidence(task)
-	merged := mergePlanContextDocuments(existing, incoming)
-	merged = strings.TrimSpace(aicommon.ShrinkTextBlockByTokens(merged, planEvidenceTokenBudget))
-	if merged == existing {
-		return merged, false
-	}
-	if task.Coordinator != nil && task.Coordinator.ContextProvider != nil {
-		task.Coordinator.ContextProvider.SetPersistentData(planEvidencePersistentKey, merged)
-	}
-	return merged, true
-}
-
-func buildTaskPlanVerificationCarryoverMarkdown(task *AiTask, reasoning string) string {
-	sections := make([]string, 0, 2)
-	taskLabel := formatTaskPlanEvidenceLabel(task)
-	reasoning = strings.TrimSpace(reasoning)
-
-	if reasoning != "" {
-		parts := []string{fmt.Sprintf("## %s 核实结果", taskLabel)}
-		parts = append(parts, "### 判定", reasoning)
-		sections = append(sections, strings.TrimSpace(strings.Join(parts, "\n\n")))
-	}
-
-	return strings.TrimSpace(strings.Join(sections, "\n\n"))
-}
-
-func buildTaskPlanSummaryCarryoverMarkdown(task *AiTask, summary string) string {
-	summary = strings.TrimSpace(summary)
-	if summary == "" {
-		return ""
-	}
-	return strings.TrimSpace(fmt.Sprintf("## %s 任务总结\n\n%s", formatTaskPlanEvidenceLabel(task), summary))
+	return task.Coordinator.GetSessionEvidenceRendered()
 }
 
 func formatTaskPlanEvidenceLabel(task *AiTask) string {
@@ -314,89 +230,4 @@ func buildSummaryEvidenceOps(task *AiTask, summary string) []aicommon.EvidenceOp
 			Content: fmt.Sprintf("[%s] 总结: %s", taskLabel, summary),
 		},
 	}
-}
-
-func applyTaskPlanEvidenceOps(task *AiTask, ops []aicommon.EvidenceOperation) (string, bool) {
-	if task == nil || len(ops) == 0 {
-		return getTaskPlanEvidence(task), false
-	}
-
-	existing := getTaskPlanEvidence(task)
-	lines := parseEvidenceLines(existing)
-
-	for _, op := range ops {
-		id := strings.TrimSpace(op.ID)
-		content := strings.TrimSpace(op.Content)
-		switch strings.ToLower(strings.TrimSpace(op.Op)) {
-		case "add":
-			if content == "" {
-				continue
-			}
-			if id != "" {
-				if idx := findEvidenceLineByID(lines, id); idx >= 0 {
-					lines[idx] = formatEvidenceLine(id, content)
-					continue
-				}
-			}
-			lines = append(lines, formatEvidenceLine(id, content))
-		case "update":
-			if id == "" || content == "" {
-				continue
-			}
-			if idx := findEvidenceLineByID(lines, id); idx >= 0 {
-				lines[idx] = formatEvidenceLine(id, content)
-			} else {
-				lines = append(lines, formatEvidenceLine(id, content))
-			}
-		case "delete":
-			if id == "" {
-				continue
-			}
-			if idx := findEvidenceLineByID(lines, id); idx >= 0 {
-				lines = append(lines[:idx], lines[idx+1:]...)
-			}
-		}
-	}
-
-	merged := strings.TrimSpace(strings.Join(lines, "\n"))
-	merged = strings.TrimSpace(aicommon.ShrinkTextBlockByTokens(merged, planEvidenceTokenBudget))
-	if merged == existing {
-		return merged, false
-	}
-	if task.Coordinator != nil && task.Coordinator.ContextProvider != nil {
-		task.Coordinator.ContextProvider.SetPersistentData(planEvidencePersistentKey, merged)
-	}
-	return merged, true
-}
-
-func parseEvidenceLines(content string) []string {
-	content = strings.TrimSpace(content)
-	if content == "" {
-		return nil
-	}
-	raw := strings.Split(content, "\n")
-	lines := make([]string, 0, len(raw))
-	for _, line := range raw {
-		if trimmed := strings.TrimSpace(line); trimmed != "" {
-			lines = append(lines, trimmed)
-		}
-	}
-	return lines
-}
-
-func findEvidenceLineByID(lines []string, id string) int {
-	prefix := fmt.Sprintf("- [%s] ", id)
-	for i, line := range lines {
-		if strings.HasPrefix(line, prefix) {
-			return i
-		}
-	}
-	return -1
-}
-
-func formatEvidenceLine(id, content string) string {
-	if id == "" {
-		return "- " + content
-	}
-	return fmt.Sprintf("- [%s] %s", id, content)
 }

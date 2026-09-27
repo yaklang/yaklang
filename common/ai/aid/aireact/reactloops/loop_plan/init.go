@@ -42,7 +42,6 @@ var PLAN_FILE_RESULTS_KEY = "plan_file_results"
 var PLAN_WEB_RESULTS_KEY = "plan_web_results"
 var PLAN_RECON_RESULTS_KEY = "plan_recon_results"
 var PLAN_FACTS_KEY = "plan_facts"
-var PLAN_EVIDENCE_KEY = "plan_evidence"
 var PLAN_DOCUMENT_KEY = "plan_document"
 
 const PlanMaxIterations = 4

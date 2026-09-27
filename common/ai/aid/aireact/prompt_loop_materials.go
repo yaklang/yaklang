@@ -268,7 +268,6 @@ func (pm *PromptManager) projectLightweightLoopMaterials(
 	lightInput.AutoLoadedSkills = boundedLightweightPromptBlock(input.AutoLoadedSkills, lightweightLoopSkillBodyTokens, "auto-loaded skill body")
 	lightInput.FrozenUserContext = boundedLightweightPromptBlock(input.FrozenUserContext, lightweightLoopPlanContextTokens, "plan context")
 	lightInput.FrozenPartitions = nil
-	lightInput.SessionEvidence = ""
 	lightInput.TodoSnapshot = boundedLightweightPromptBlock(input.TodoSnapshot, lightweightLoopTodoTokens, "TODO snapshot")
 	lightInput.ExtraCapabilities = aicommon.ShrinkTextBlockByTokens(input.ExtraCapabilities, lightweightLoopExtraTokens)
 	lightInput.ReactiveData = aicommon.ShrinkTextBlockByTokens(input.ReactiveData, lightweightLoopReactiveTokens)
@@ -323,15 +322,10 @@ func (pm *PromptManager) NewPromptMaterials(base *reactloops.LoopPromptBaseMater
 		materials.SkillsContext = input.SkillsContext
 		materials.Schema = input.Schema
 		materials.FunctionCallSchemas = input.FunctionCallSchemas
-		// P1-C2: SessionEvidence / UserHistory 从 dynamic 段上移到 timeline-open 段
-		materials.SessionEvidence = input.SessionEvidence
-		if strings.TrimSpace(materials.SessionEvidenceOpen) == "" && materials.SessionEvidenceSemiDynamic == "" {
-			materials.SessionEvidenceOpen = input.SessionEvidence
-		}
-		// 全局 TODO 块: 与 SessionEvidence 平行透传, 物理位置在 timeline-open 段
-		// section.timeline_open.todo_list (在 session_evidence 之后), 让 loop
+		// 全局 TODO 块: 在普通 Timeline 之后透传, 物理位置在 timeline-open 段
+		// section.timeline_open.todo_list (在普通 Timeline 之后), 让 loop
 		// prompt 任何一次 iteration 都能看到当前 TODO 全貌.
-		// 关键词: TodoSnapshot 透传, timeline-open, SessionEvidence 之后
+		// 关键词: TodoSnapshot 透传, timeline-open, Timeline 中的 evidence delta 之后
 		materials.TodoSnapshot = input.TodoSnapshot
 		// PE-TASK PLAN 产物 (PARENT_TASK + CURRENT_TASK + INSTRUCTION) 通过
 		// FrozenUserContext 字段透传, 渲染时位于 timeline-open 段最末尾
@@ -428,7 +422,6 @@ func (pm *PromptManager) buildLoopPromptSectionData(base *reactloops.LoopPromptB
 		"Schema":             "",
 		"SkillsContext":      "",
 		"ExtraCapabilities":  "",
-		"SessionEvidence":    "",
 		"TodoSnapshot":       "",
 		"ReactiveData":       "",
 		"InjectedMemory":     "",
@@ -483,7 +476,6 @@ func (pm *PromptManager) buildLoopPromptSectionData(base *reactloops.LoopPromptB
 		data["FunctionCallSchemas"] = input.FunctionCallSchemas
 		data["SkillsContext"] = input.SkillsContext
 		data["ExtraCapabilities"] = input.ExtraCapabilities
-		data["SessionEvidence"] = input.SessionEvidence
 		data["TodoSnapshot"] = input.TodoSnapshot
 		data["ReactiveData"] = input.ReactiveData
 		data["InjectedMemory"] = input.InjectedMemory
@@ -797,7 +789,7 @@ func (pm *PromptManager) buildTimelineOpenObservation(
 	// "Timeline Open & Workspace" 已经表达层级.
 	// 关键词: section.timeline_open 子节点 Name 去前缀, UI 信息密度
 	//
-	// 子节点排列顺序: timeline_open -> promoted_state_updates -> session_evidence -> todo_list -> workspace ->
+	// 子节点排列顺序: timeline_open（含 evidence delta）-> promoted_state_updates -> todo_list -> workspace ->
 	// session_artifacts_open -> user_history -> current_time -> plan_context. 该顺序与 timeline_open_section.txt
 	// 模板渲染顺序严格一致, 让"上下文成分"面板看到的层级与实际 prompt 字节
 	// 流顺序保持同步.
@@ -817,20 +809,11 @@ func (pm *PromptManager) buildTimelineOpenObservation(
 			true,
 			materials.PromotedTimelineOpen,
 		),
-		// P1-C3: SessionEvidence 紧跟 Timeline (Open Tail), 与时间线末桶
-		// 形成"会话级实证"连续块.
-		reactloops.NewPromptSectionObservation(
-			"section.timeline_open.session_evidence",
-			"Session Evidence",
-			reactloops.PromptSectionRoleTimelineOpen,
-			true,
-			materials.TimelineOpenData()["SessionEvidence"].(string),
-		),
-		// 全局 TODO 块: 紧跟 SessionEvidence, 让 loop prompt 始终能看到当前
+		// 全局 TODO 块: 紧跟 Timeline 中的 evidence delta, 让 loop prompt 始终能看到当前
 		// TODO 列表; 数据来源是 SessionPromptState.VerificationTodoStore,
 		// 由 VerifyUserSatisfaction 通过 ApplyTodoDelta 增量写入.
 		// 段位仍属 timeline-open, 落在所有 cache 边界外, 不污染上游 prefix cache.
-		// 关键词: section.timeline_open.todo_list, 全局 TODO, SessionEvidence 之后
+		// 关键词: section.timeline_open.todo_list, 全局 TODO, Timeline 中的 evidence delta 之后
 		reactloops.NewPromptSectionObservation(
 			"section.timeline_open.todo_list",
 			"Todo List",
@@ -912,7 +895,6 @@ func (pm *PromptManager) buildDynamicObservation(
 			true,
 			renderTaggedBlock("EXTRA_CAPABILITIES", input.Nonce, input.ExtraCapabilities),
 		),
-		// P1-C2: session_evidence 已上移到 section.timeline_open.session_evidence,
 		// 此处 dynamic 段不再渲染 SESSION_ARTIFACTS.
 		reactloops.NewPromptSectionObservation(
 			"section.dynamic.reactive_data",

@@ -71,12 +71,8 @@ type PromptMaterials struct {
 
 	// Deprecated: Session Artifacts no longer participate in prompt construction.
 	SessionArtifactsListing string
-	// Deprecated: SessionEvidence 保留给旧调用路径 fallback。新主路径使用
-	// SessionEvidenceSemiDynamic / SessionEvidenceOpen 两个一级字段。
-	SessionEvidence string
 	// TodoSnapshot 是会话级 TODO 列表渲染结果 (含 <|TODO_LIST_<nonce>|>...
-	// 边界标签的整段块). 物理位置紧跟 SessionEvidence, 与 SessionEvidence
-	// 一样落在 timeline-open 段, 不被 AI_CACHE_FROZEN / AI_CACHE_SEMI 任何
+	// 边界标签的整段块). 物理位置在普通 Timeline 之后，落在 timeline-open 段, 不被 AI_CACHE_FROZEN / AI_CACHE_SEMI 任何
 	// 缓存边界包裹, 避免污染上游 prefix cache.
 	//
 	// 关键词: TodoSnapshot, 全局 TODO 块, timeline-open 段位
@@ -166,15 +162,10 @@ func (m *PromptMaterials) TimelineOpenData() map[string]any {
 	if m == nil {
 		return map[string]any{}
 	}
-	sessionEvidenceOpen := m.SessionEvidenceOpen
-	if sessionEvidenceOpen == "" && m.SessionEvidenceSemiDynamic == "" {
-		sessionEvidenceOpen = m.SessionEvidence
-	}
 	return map[string]any{
 		"TimelineOpen":           m.TimelineOpen,
 		"PromotedTimelineOpen":   m.PromotedTimelineOpen,
 		"TimelineFrozenTimeUnix": m.TimelineFrozenTimeUnix,
-		"SessionEvidence":        sessionEvidenceOpen,
 		"TodoSnapshot":           m.TodoSnapshot,
 		"Workspace":              m.Workspace,
 		"OSArch":                 m.OSArch,
@@ -194,7 +185,6 @@ type TimelineFrozenOpenBlocks struct {
 	PromotedSemiDynamic1 string
 	FrozenTimeUnix       int64
 	EvidenceSemiDynamic  string
-	EvidenceOpen         string
 }
 
 func RenderTimelineFrozenOpen(timeline *Timeline) TimelineFrozenOpenBlocks {
@@ -217,7 +207,7 @@ func renderTimelineFrozenOpen(timeline *Timeline, includeLatestModelReplay bool)
 	defer timeline.mu.RUnlock()
 	rb := timeline.frozenPromptBlocksLocked()
 	promotedSemi1, openDeltas := timeline.projectPromotedLocked()
-	evidenceSemi, evidenceOpen := timeline.projectEvidenceLocked()
+	evidenceSemi := timeline.projectEvidenceLocked()
 	promptBlocks := projectTimelineRenderableBlocksForPrompt(rb)
 	if includeLatestModelReplay {
 		promptBlocks = projectTimelineRenderableBlocksForPromptWithLatestModelReplay(rb)
@@ -229,7 +219,6 @@ func renderTimelineFrozenOpen(timeline *Timeline, includeLatestModelReplay bool)
 		PromotedSemiDynamic1: promotedSemi1,
 		FrozenTimeUnix:       timelineFrozenTimeUnixFromRenderable(rb),
 		EvidenceSemiDynamic:  evidenceSemi,
-		EvidenceOpen:         evidenceOpen,
 	}
 }
 
@@ -246,7 +235,6 @@ type PromptFrozenOpenMaterials struct {
 	SessionArtifactsOpen   string
 
 	SessionEvidenceSemiDynamic string
-	SessionEvidenceOpen        string
 
 	// ReportedRisks is the rendered "已报告漏洞清单" block for the
 	// timeline-open section. Populated from SessionPromptState.
@@ -282,7 +270,6 @@ func buildPromptFrozenOpenMaterials(config *Config, includeLatestModelReplay boo
 		TimelineFrozenTimeUnix:     timelineBlocks.FrozenTimeUnix,
 		FrozenPartitions:           FrozenBlockPartitionsFromConfig(config),
 		SessionEvidenceSemiDynamic: timelineBlocks.EvidenceSemiDynamic,
-		SessionEvidenceOpen:        timelineBlocks.EvidenceOpen,
 		ReportedRisks:              reportedRisks,
 	}
 }
@@ -298,7 +285,6 @@ func ApplyPromptFrozenOpenMaterials(materials *PromptMaterials, frozenOpen Promp
 	materials.TimelineFrozenTimeUnix = frozenOpen.TimelineFrozenTimeUnix
 	materials.FrozenPartitions = append([]FrozenBlockPartition(nil), NormalizeFrozenBlockPartitions(frozenOpen.FrozenPartitions)...)
 	materials.SessionEvidenceSemiDynamic = frozenOpen.SessionEvidenceSemiDynamic
-	materials.SessionEvidenceOpen = frozenOpen.SessionEvidenceOpen
 	materials.ReportedRisks = frozenOpen.ReportedRisks
 }
 
