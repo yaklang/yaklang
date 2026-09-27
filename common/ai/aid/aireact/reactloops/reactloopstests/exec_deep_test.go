@@ -29,7 +29,7 @@ func TestExec_CreateMirrors_SingleAITag(t *testing.T) {
 
 			if aiCallCount == 1 {
 				// 第一次调用：从prompt中提取nonce并返回带正确nonce的AITag
-				nonceStr := aicommon_testutil.MustExtractDynamicSectionNonce(t, prompt)
+				nonceStr := aicommon_testutil.MustExtractPromptNonce(t, prompt, "USER_QUERY")
 
 				// 调试输出
 				t.Logf("Extracted nonce: '%s' from prompt", nonceStr)
@@ -559,7 +559,7 @@ func TestExec_EdgeCase_VeryLongResponse(t *testing.T) {
 			// 检查是否是reactloops的调用（包含AITag模板）
 			if utils.MatchAllOfSubString(prompt, "write_code", "@action", "GEN_CODE") {
 				// 提取nonce
-				nonceStr := aicommon_testutil.MustExtractDynamicSectionNonce(t, prompt)
+				nonceStr := aicommon_testutil.MustExtractPromptNonce(t, prompt, "USER_QUERY")
 
 				// 生成一个很长的代码响应（>5KB）
 				var longCode strings.Builder

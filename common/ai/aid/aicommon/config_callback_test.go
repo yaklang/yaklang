@@ -51,6 +51,32 @@ func TestWithAICallback_WrapsTieredCallbacks(t *testing.T) {
 	require.Equal(t, consts.TierVision, visionCfg.tier)
 }
 
+func TestWithAICallback_FunctionCallMode(t *testing.T) {
+	callback := func(i AICallerConfigIf, _ *AIRequest) (*AIResponse, error) {
+		response := NewAIResponse(i)
+		response.Close()
+		return response, nil
+	}
+	for _, tc := range []struct {
+		name string
+		opts []ConfigOption
+		want bool
+	}{
+		{name: "provider default", want: true},
+		{name: "legacy callback", opts: []ConfigOption{WithAICallback(callback)}},
+		{name: "explicit native before callback", opts: []ConfigOption{WithEnableFunctionCallMode(true), WithAICallback(callback)}, want: true},
+		{name: "explicit native after callback", opts: []ConfigOption{WithAICallback(callback), WithEnableFunctionCallMode(true)}, want: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			cfg := NewConfig(context.Background(), tc.opts...)
+			require.Equal(t, tc.want, cfg.EnableFunctionCallMode)
+			require.Equal(t, tc.want, cfg.GetConfigBool("EnableFunctionCallMode"))
+			derived := NewConfig(context.Background(), ConvertConfigToOptions(cfg)...)
+			require.Equal(t, tc.want, derived.GetConfigBool("EnableFunctionCallMode"))
+		})
+	}
+}
+
 func TestWithAICallback_WithAICallbackNegative(t *testing.T) {
 	consts.SetTieredAIConfig(&consts.TieredAIConfig{
 		Enabled:       true,

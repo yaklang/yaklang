@@ -13,6 +13,7 @@ import (
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon/aiskillloader"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
+	"github.com/yaklang/yaklang/common/ai/aispec"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/omap"
@@ -74,6 +75,7 @@ type ReActLoop struct {
 	functionCallInstructionProvider ContextProviderFunc
 	lastLoopSchema                  string
 	lastNativeActionNames           []string // nil until a native prompt is built; empty means no advertised actions
+	lastNativeTools                 []aispec.Tool
 	outputExampleProvider           ContextProviderFunc
 	reactiveDataBuilder             FeedbackProviderFunc
 	todoCheckpointMu                sync.Mutex

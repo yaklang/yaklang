@@ -9,6 +9,7 @@ import (
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon/promptloader"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
+	"github.com/yaklang/yaklang/common/ai/aispec"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
@@ -44,6 +45,7 @@ func (r *ReActLoop) prepareLoopActionSchemas(operator *LoopActionHandlerOperator
 	maxBatchCalls := r.toolBatchMaxCalls()
 	var schema, functionCallSchemas string
 	var nativeActionNames []string
+	var nativeTools []aispec.Tool
 	if r.functionCallMode {
 		tools, err := buildActionTools(filtered, maxBatchCalls)
 		if err != nil {
@@ -57,6 +59,7 @@ func (r *ReActLoop) prepareLoopActionSchemas(operator *LoopActionHandlerOperator
 		for _, tool := range tools {
 			nativeActionNames = append(nativeActionNames, tool.Function.Name)
 		}
+		nativeTools = tools
 	} else {
 		var err error
 		schema, err = applyToolBatchSchemaMaxItems(buildSchema(filtered...), maxBatchCalls)
@@ -67,6 +70,7 @@ func (r *ReActLoop) prepareLoopActionSchemas(operator *LoopActionHandlerOperator
 	// Preserve this turn's exact tool set before consuming one-shot constraints.
 	// Recomputing filters during a retry could expose actions absent from its prompt.
 	r.lastNativeActionNames = nativeActionNames
+	r.lastNativeTools = nativeTools
 	if !r.initActionApplied && (len(r.initActionMustUse) > 0 || len(r.initActionDisabled) > 0) {
 		r.initActionApplied = true
 	}
