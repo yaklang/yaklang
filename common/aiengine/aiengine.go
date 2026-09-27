@@ -740,7 +740,7 @@ func buildReActOptions(ctx context.Context, config *AIEngineConfig, outputChan c
 
 	// S3c: 会话持久化 ID + 无状态模式短路。
 	// 有状态(默认):传 config.SessionID,re-act.go 正常落盘
-	//   (EnsureAISessionMeta/TimelineArchiveStore/SaveTimeline/DB MemoryTriage)。
+	//   (EnsureAISessionMeta/SaveTimeline/DB MemoryTriage)。
 	// 无状态(Stateless=true):传空 ID,四个落盘分支因 ID 为空跳过;
 	//   再注入 no-op MemoryTriage,阻止 re-act.go:246-256 在 MemoryTriageId 为空时
 	//   退回 NewAIMemory("default") 构建 DB-backed memory。

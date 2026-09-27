@@ -27,8 +27,6 @@ type timelineSerializable struct {
 	CompressedHistory     []*TimelineCompressedHistoryNode `json:"compressed_history,omitempty"`
 	Reducers              map[string]string                `json:"reducers,omitempty"`   // legacy read only: migrated to CompressedHead on unmarshal
 	ReducerTs             map[string]int64                 `json:"reducer_ts,omitempty"` // legacy read only
-	ArchiveRefs           map[string]*TimelineArchiveRef   `json:"archive_refs"`
-	PerDumpContentLimit   int64                            `json:"per_dump_content_limit"`
 	TotalDumpContentLimit int64                            `json:"total_dump_content_limit"`
 	PromotedState         *TimelinePromotedState           `json:"promoted_state,omitempty"`
 	FreezeState           *TimelineFreezeState             `json:"freeze_state,omitempty"`
@@ -81,12 +79,6 @@ func marshalTimelineUnlocked(i *Timeline) (string, error) {
 		return true
 	})
 
-	archiveRefsMap := make(map[string]*TimelineArchiveRef)
-	i.archiveRefs.ForEach(func(id int64, ref *TimelineArchiveRef) bool {
-		archiveRefsMap[fmt.Sprintf("%d", id)] = ref
-		return true
-	})
-
 	serializable := &timelineSerializable{
 		ProjectionNonce:       aiprojection.Nonce(),
 		IdToTs:                idToTsMap,
@@ -94,8 +86,6 @@ func marshalTimelineUnlocked(i *Timeline) (string, error) {
 		IdToTimelineItem:      idToTimelineItemMap,
 		CompressedHead:        cloneTimelineCompressedHead(i.compressedHead),
 		CompressedHistory:     cloneTimelineCompressedHistory(i.compressedHistory),
-		ArchiveRefs:           archiveRefsMap,
-		PerDumpContentLimit:   i.perDumpContentLimit,
 		TotalDumpContentLimit: i.totalDumpContentLimit,
 		PromotedState:         cloneTimelinePromotedState(i.promotedState),
 		FreezeState:           cloneTimelineFreezeState(i.freezeState),
@@ -125,7 +115,6 @@ func UnmarshalTimeline(s string) (*Timeline, error) {
 
 	// 恢复 Timeline 结构体
 	timeline := &Timeline{
-		perDumpContentLimit:   serializable.PerDumpContentLimit,
 		totalDumpContentLimit: serializable.TotalDumpContentLimit,
 		branchTimeline:        false,
 		promotedState:         cloneTimelinePromotedState(serializable.PromotedState),
@@ -166,71 +155,7 @@ func UnmarshalTimeline(s string) (*Timeline, error) {
 
 	// summary 仍参与 typed JSON 解码以兼容旧数据，但恢复时不消费其内容。
 
-	timeline.compressedHead = cloneTimelineCompressedHead(serializable.CompressedHead)
-	timeline.compressedHistory = cloneTimelineCompressedHistory(serializable.CompressedHistory)
-
-	// Legacy migration: if no compressed_head but old reducers data exists, migrate to head+history view
-	if timeline.compressedHead == nil && len(serializable.Reducers) > 0 {
-		type legacyReducerItem struct {
-			id   int64
-			text string
-			ts   int64
-		}
-		var legacyItems []legacyReducerItem
-		for key, value := range serializable.Reducers {
-			if value == "" {
-				continue
-			}
-			id, err := strconv.ParseInt(key, 10, 64)
-			if err != nil {
-				continue
-			}
-			var ts int64
-			if v, ok := serializable.ReducerTs[key]; ok {
-				ts = v
-			}
-			legacyItems = append(legacyItems, legacyReducerItem{id: id, text: value, ts: ts})
-		}
-		// sort by id ascending
-		for i := 0; i < len(legacyItems); i++ {
-			for j := i + 1; j < len(legacyItems); j++ {
-				if legacyItems[i].id > legacyItems[j].id {
-					legacyItems[i], legacyItems[j] = legacyItems[j], legacyItems[i]
-				}
-			}
-		}
-		if len(legacyItems) > 0 {
-			for idx, item := range legacyItems {
-				version := int64(idx + 1)
-				if idx == len(legacyItems)-1 {
-					timeline.compressedHead = &TimelineCompressedHead{
-						Text:             item.text,
-						CoveredEndItemID: item.id,
-						CoveredEndAtMs:   item.ts,
-						Version:          version,
-					}
-					break
-				}
-				timeline.compressedHistory = append(timeline.compressedHistory, &TimelineCompressedHistoryNode{
-					Version:          version,
-					PrevVersion:      version - 1,
-					Text:             item.text,
-					CoveredEndItemID: item.id,
-					CoveredEndAtMs:   item.ts,
-					CreatedAtMs:      item.ts,
-				})
-			}
-		}
-	}
-
-	timeline.archiveRefs = omap.NewOrderedMap(map[int64]*TimelineArchiveRef{})
-	for key, value := range serializable.ArchiveRefs {
-		id, err := strconv.ParseInt(key, 10, 64)
-		if err != nil || value == nil {
-			continue
-		}
-		timeline.archiveRefs.Set(id, value)
-	}
+	timeline.restoreCompressionHistory(&serializable)
 
 	timeline.restoreFreezeStateLocked()
 	return timeline, nil

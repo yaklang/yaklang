@@ -256,15 +256,3 @@ func BenchmarkSemanticOrphanBacklog(b *testing.B) {
 		})
 	}
 }
-
-func TestMUSTPASS_SemanticOrphanMidtermUsesArchiveTable(t *testing.T) {
-	mem := orphanSearchMemory(t, 1, 1)
-	mem.midtermArchiveMode = true
-	require.NoError(t, mem.db.Table(mem.entityTableName()).AutoMigrate(&schema.AIMemoryEntity{}).Error)
-	require.NoError(t, mem.db.Table(mem.entityTableName()).Create(&schema.AIMemoryEntity{MemoryID: "memory-000", SessionID: "default", Content: "restored"}).Error)
-	results, err := mem.SearchBySemanticsMemoryIDs("query", 8)
-	require.NoError(t, err)
-	require.Len(t, results, 1)
-	require.Equal(t, "memory-000", results[0].Entity.Id, "archive validity must not depend on regular memory rows")
-	require.False(t, mem.rag.VectorStore.Has("memory-001"))
-}

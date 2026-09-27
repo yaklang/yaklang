@@ -75,17 +75,7 @@ func TestTimelineEvidenceAndToolPromoteInSameTransaction(t *testing.T) {
 	require.Contains(t, materials.SessionEvidenceSemiDynamic, "finding")
 	require.Contains(t, materials.PromotedSemiDynamic1, "TOOL_SCHEMA")
 	require.Empty(t, materials.TimelineOpen)
-	require.Empty(t, c.Timeline.getActiveTimelineItemIDs(), "neither evidence nor schema is AI reducer input")
-}
-
-func TestTimelineEvidencePayloadTriggersFreeze(t *testing.T) {
-	c := evidenceConfig(t)
-	c.Timeline.SetTimelineBucketByteSize(256)
-	saveTestEvidence(c, "large", strings.Repeat("confirmed observation ", 100))
-	blocks := BuildPromptFrozenOpenMaterials(c)
-	require.NotEmpty(t, blocks.SessionEvidenceSemiDynamic)
-	require.Empty(t, blocks.TimelineOpen)
-	require.NotEmpty(t, c.Timeline.FreezeSnapshot().Batches)
+	require.Empty(t, c.Timeline.GetTimelineItemIDs(), "neither evidence nor schema is AI reducer input")
 }
 
 func TestTimelineEvidenceBudgetEvictionWaitsForFreeze(t *testing.T) {
@@ -357,7 +347,7 @@ func TestTimelineEvidenceMixedHistoryPromotionLifecycle(t *testing.T) {
 	require.Equal(t, int64(5), aggregate["auth"].SourceItemID)
 	require.Equal(t, int64(7), aggregate["health"].SourceItemID)
 	require.Equal(t, audit, tl.GetTimelineOutput(), "promotion must preserve the user's original audit trail")
-	require.Equal(t, []int64{1, 3, 8}, tl.getActiveTimelineItemIDs(), "AI compression only receives ordinary facts")
+	require.Equal(t, []int64{1, 3, 8}, tl.GetTimelineItemIDs(), "AI compression only receives ordinary facts")
 	t.Logf("步骤 3：一次 freeze 后，semi 中聚合为 auth 和 health 两条有效证据：\n%s", semi)
 
 	// 4. New edits remain open without rewriting the stable snapshot until the next freeze.

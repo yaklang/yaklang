@@ -9,13 +9,10 @@ import (
 	"github.com/yaklang/yaklang/common/utils/omap"
 )
 
-// Freeze lifecycle:
-//
-//	append ordinary/control items -> measure the shared open bucket
-//	-> commit batch membership and exact promotions together -> read-only prompt.
-//
-// AI compression is a separate consumer of ordinary facts; it cannot summarize
-// structured promotion payloads. Evidence and tool schemas share this journal.
+// The production before-prompt check publishes freeze membership, precise promotions
+// and the summary in one transaction. Explicit Freeze APIs below are primitives
+// for imported histories; writes/rendering never invoke them automatically.
+// Evidence and tool schemas remain exact and never enter the AI summary.
 //
 // TimelineFreezeResult is a detached receipt for one freeze transaction. An
 // unchanged Version means nothing was committed. Promotions contains exact
@@ -73,8 +70,8 @@ func (m *Timeline) frozenThroughLocked() int64 {
 	return through
 }
 
-// Freeze seals complete time/byte buckets. Appending an item calls this same
-// operation; callers importing a batch can call it explicitly after insertion.
+// Freeze explicitly seals complete time/byte buckets in an imported history.
+// The production before-prompt check does not call this primitive.
 // The last bucket stays open unless its own rendered size reaches the budget.
 func (m *Timeline) Freeze() TimelineFreezeResult {
 	if m == nil {
@@ -99,12 +96,12 @@ func (m *Timeline) FreezeAll() TimelineFreezeResult {
 // freezeBudgetGroupsLocked uses the existing fixed/adaptive bucket algorithm
 // on a private view. Promotion payloads count as non-reducible entries;
 // the raw journal, ordinary dump, UI and reducer views stay unchanged.
-func (m *Timeline) freezeBudgetGroupsLocked(useSizer bool, throughLimit ...int64) TimelineIntervalBlocks {
+func (m *Timeline) freezeBudgetGroupsLocked(useSizer bool) TimelineIntervalBlocks {
 	view := &Timeline{idToTimelineItem: omap.NewOrderedMap(map[int64]*TimelineItem{}), idToTs: m.idToTs}
 	through := m.frozenThroughLocked()
 	for _, id := range m.idToTimelineItem.Keys() {
 		item, ok := m.idToTimelineItem.Get(id)
-		if !ok || item == nil || item.deleted || id <= through || (len(throughLimit) > 0 && id > throughLimit[0]) {
+		if !ok || item == nil || item.deleted || id <= through {
 			continue
 		}
 		if control, ok := item.value.(*PromotableTimelineItem); ok {
@@ -128,7 +125,7 @@ func (m *Timeline) freezeBudgetGroupsLocked(useSizer bool, throughLimit ...int64
 	return view.groupByMinutesAndBytesLocked(TimelineDumpDefaultIntervalMinutes, budget, seed).blocks
 }
 
-func (m *Timeline) freezeLocked(all bool, throughLimit ...int64) TimelineFreezeResult {
+func (m *Timeline) freezeLocked(all bool) TimelineFreezeResult {
 	// A one-shot compression publishes its captured freeze and summary together.
 	// Writes remain append-only during generation, including exact-state deltas.
 	if m.compressionSnapshot != nil {
@@ -142,7 +139,7 @@ func (m *Timeline) freezeLocked(all bool, throughLimit ...int64) TimelineFreezeR
 		m.freezeState = &TimelineFreezeState{}
 	}
 	result := TimelineFreezeResult{Version: m.freezeState.Version, ThroughID: m.frozenThroughLocked()}
-	groups := m.freezeBudgetGroupsLocked(true, throughLimit...)
+	groups := m.freezeBudgetGroupsLocked(true)
 	for i, block := range groups {
 		if len(block.Items) == 0 {
 			continue
@@ -333,7 +330,6 @@ func (m *Timeline) restoreFreezeStateLocked() {
 			m.freezeState.Version++
 		}
 	}
-	m.freezeLocked(false)
 }
 
 // A byte split can start with tool output lacking an explicit task label.

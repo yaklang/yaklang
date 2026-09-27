@@ -241,7 +241,6 @@ func TestTimelineCompressionTransactionRepeatAndRestore(t *testing.T) {
 	require.NoError(t, err)
 	tl, err = UnmarshalTimeline(raw)
 	require.NoError(t, err)
-	tl.autoCompressDisabled = true
 	calls := 0
 	bindCompressionMock(t, tl, func(request *AIRequest) (string, error) {
 		calls++
@@ -271,7 +270,6 @@ func TestTimelineCompressionTransactionRepeatAndRestore(t *testing.T) {
 
 func TestTimelineCompressionTransactionReplacesWholeReplay(t *testing.T) {
 	tl := NewTimeline(nil, nil)
-	tl.autoCompressDisabled = true
 	replay := compressionSnapshotReplay(t, "inspect both targets")
 	importFreezeItem(tl, 1, time.Unix(1, 0), &TextTimelineItem{ID: 1,
 		Text: "[FUNCTION_CALL_ACTION_RESPONSE]:\naccepted", PromptText: replay})
@@ -318,11 +316,25 @@ func TestTimelineCompressionTransactionInvalidInput(t *testing.T) {
 	require.Nil(t, tl.compressionSnapshot)
 }
 
+func TestTimelineCompressionInvalidSourceDoesNotHoldLock(t *testing.T) {
+	tl := NewTimeline(nil, nil)
+	tl.SetTimelineContentLimit(1)
+	tl.idToTimelineItem.Set(1, &TimelineItem{value: (*TextTimelineItem)(nil)})
+	_, err := tl.CompressBeforePrompt(compressionTestOptions())
+	require.Error(t, err)
+	// Replacing the invalid entry must still acquire the lock and allow retry.
+	tl.PushText(1, "repaired history")
+	bindCompressionMock(t, tl, func(*AIRequest) (string, error) { return compressionMockSummary("repaired summary"), nil })
+	tl.SetTimelineContentLimit(1)
+	_, err = tl.CompressBeforePrompt(compressionTestOptions())
+	require.NoError(t, err)
+	require.Contains(t, RenderTimelineFrozenOpen(tl).Frozen, "repaired summary")
+}
+
 // Export a small complete BEFORE -> request -> mock answer -> AFTER example.
 // This demonstrates state transitions, not the semantic quality of a live AI.
 func TestTimelineCompressionTransactionReviewExample(t *testing.T) {
 	tl := NewTimeline(nil, nil)
-	tl.autoCompressDisabled = true
 	tl.compressedHead = &TimelineCompressedHead{Text: "已定位配置合并入口，尚未确认根因。", CoveredEndItemID: 1, Version: 1}
 	for i, text := range []string{
 		"已确认 merge.go 把显式空值当作缺失值，修改了内部判断；公开接口未改。",

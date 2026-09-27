@@ -27,7 +27,6 @@ func (m *Timeline) ForkForTask(taskIndex, taskName string, config AICallerConfig
 		return nil, nil
 	}
 
-	baseMaxID := m.GetMaxID()
 	raw, err := MarshalTimeline(m)
 	if err != nil {
 		return nil, err
@@ -36,8 +35,10 @@ func (m *Timeline) ForkForTask(taskIndex, taskName string, config AICallerConfig
 	if err != nil {
 		return nil, err
 	}
+	// Derive the fork boundary from the same serialized snapshot, not a second
+	// parent read that can race an append or compression commit.
+	baseMaxID := branch.GetMaxID()
 	branch.SoftBindConfig(config, ai)
-	branch.forkProtectedMaxID = baseMaxID
 	branch.markBranchTimeline(true)
 
 	return &TimelineFork{
@@ -68,13 +69,9 @@ func (f *TimelineFork) MergeBack() (*TimelineMergeResult, error) {
 		ts   int64
 		item *TimelineItem
 	}
-	type compressedHeadSnapshot struct {
-		head *TimelineCompressedHead
-		ref  *TimelineArchiveRef
-	}
 
 	var activeItems []activeSnapshot
-	var compressedHead *compressedHeadSnapshot
+	var compressedHead *TimelineCompressedHead
 	f.Branch.mu.RLock()
 	for _, id := range f.Branch.idToTimelineItem.Keys() {
 		if id <= f.BaseMaxID {
@@ -94,12 +91,7 @@ func (f *TimelineFork) MergeBack() (*TimelineMergeResult, error) {
 	// whose covered end is still inside BaseMaxID belongs to the inherited prefix.
 	// Only a head covering IDs produced by the branch is merged back to the parent.
 	if head := f.Branch.compressedHead; head != nil && head.CoveredEndItemID > f.BaseMaxID && strings.TrimSpace(head.Text) != "" {
-		s := &compressedHeadSnapshot{head: cloneTimelineCompressedHead(head)}
-		if ref, ok := f.Branch.archiveRefs.Get(head.CoveredEndItemID); ok && ref != nil {
-			refCopy := *ref
-			s.ref = &refCopy
-		}
-		compressedHead = s
+		compressedHead = cloneTimelineCompressedHead(head)
 	}
 	f.Branch.mu.RUnlock()
 
@@ -123,16 +115,26 @@ func (f *TimelineFork) MergeBack() (*TimelineMergeResult, error) {
 	// 3) regenerate timestamps as a monotonic merge sequence when branch timestamps
 	//    would break parent ordering.
 	for _, active := range activeItems {
+		if compressedHead != nil && active.id == compressedHead.CoveredEndItemID {
+			return nil, utils.Errorf("timeline fork merge: summary id %d collides with active branch entry", active.id)
+		}
 		if _, exists := parent.idToTimelineItem.Get(active.id); exists {
 			return nil, utils.Errorf("timeline fork merge: id %d already exists in parent timeline", active.id)
 		}
+	}
+	if compressedHead != nil && parent.idToTimelineItem.Have(compressedHead.CoveredEndItemID) {
+		return nil, utils.Errorf("timeline fork merge: summary id %d already exists", compressedHead.CoveredEndItemID)
+	}
+	for _, active := range activeItems {
 		parent.invalidateFreezeFromLocked(active.id)
 		ts := nextTS
 		if active.ts > 0 && active.ts >= nextTS {
 			ts = active.ts
 		}
 		nextTS = ts + 1
-		active.item.createdAt = time.Unix(0, ts*int64(time.Millisecond))
+		copy := *active.item
+		copy.createdAt = time.Unix(0, ts*int64(time.Millisecond))
+		active.item = &copy
 		parent.idToTimelineItem.OrderInsert(active.id, active.item, lessInt64)
 		parent.idToTs.Set(active.id, ts)
 		parent.tsToTimelineItem.OrderInsert(ts, active.item, lessInt64)
@@ -141,20 +143,23 @@ func (f *TimelineFork) MergeBack() (*TimelineMergeResult, error) {
 		}
 	}
 
-	if compressedHead != nil && compressedHead.head != nil {
+	if compressedHead != nil {
 		// CoveredEndItemID references the last compressed item in the branch; it was
 		// allocated by the shared global ID provider and must not be remapped here.
-		coveredID := compressedHead.head.CoveredEndItemID
-		parent.updateCompressedHead(compressedHead.head)
-		if compressedHead.ref != nil {
-			compressedHead.ref.ReducerKeyID = coveredID
-			parent.archiveRefs.Set(coveredID, compressedHead.ref)
-		}
+		coveredID := compressedHead.CoveredEndItemID
+		// A branch summary is a new observation, not a replacement for the
+		// parent's current head (which may include work unknown to this fork).
+		parent.invalidateFreezeFromLocked(coveredID)
+		item := &TimelineItem{createdAt: time.UnixMilli(nextTS), value: &TextTimelineItem{
+			ID: coveredID, Text: "[subtask_summary]:\n" + compressedHead.Text,
+		}}
+		parent.idToTimelineItem.OrderInsert(coveredID, item, lessInt64)
+		parent.idToTs.Set(coveredID, nextTS)
+		parent.tsToTimelineItem.OrderInsert(nextTS, item, lessInt64)
+
 		result.CompressedHeadsMerged++
 	}
 
-	parent.freezeLocked(false)
-	parent.dumpSizeCheckLocked()
 	return result, nil
 }
 

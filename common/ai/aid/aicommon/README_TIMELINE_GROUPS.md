@@ -415,22 +415,11 @@ prompt := timeline.GroupByMinutes(3).GetAllRenderable().Render("TIMELINE")
 
 - **包含 reducer**：是（以独立的 `<|TIMELINE_r<id>t<sec>|>...<|TIMELINE_END_...|>` 块出现）
 - **包含 interval**：是（以独立的 `<|TIMELINE_b<N>t<sec>|>` 或 `<|TIMELINE_b<N>t<sec>s<seq>|>` ... `<|TIMELINE_END_...|>` 块出现）
-- **包含 archive**：**否**。`Timeline.archiveRefs` 字段仍照常写入与序列化，但**不再渲染到 Dump**。
-  如果上层需要展示归档信息，请：
-  1. 通过 `Timeline.archiveRefs` 直接访问，或
-  2. 走 midterm 检索（详见 `aireact/midterm_context_provider.go`）
 - **时间格式**：每个 entry 的行头使用 `HH:MM:SS`；block 首行 `# bucket=YYYY/MM/DD ...` 或
   `# reducer key=<id> ts=<unixSec>` 提供完整时间。
 - **条目内容**：优先使用 `GetShrinkResult()` / `GetShrinkSimilarResult()`；缺失时回退 `item.String()`。
 - **缓存稳定性**：与 `GroupByMinutes` 完全一致，前面的 frozen block 字节级不变。
 
-### 已知瑕疵（待后续处理）
-
-- **Midterm prefix 与 Dump 输出格式混合**：
-  `aireact/midterm_context_provider.go` 中的 `buildTimelineDumpWithMidtermMemory`
-  仍按旧字符串拼接生成 `--[time] midterm-memory:` 行式前缀，再直接拼上 aitag 风格的
-  `Timeline.Dump()`。Prompt 整体仍可读，但格式不统一。本次改动**未触及**该函数，
-  留作下一轮独立处理。
 
 ---
 

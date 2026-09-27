@@ -562,7 +562,7 @@ func liteForgeRecentTimeline(timeline *aicommon.Timeline) string {
 //
 // aicache 5 段稳定性分层 (P0-B1 / P0-B3) 必填字段:
 //   - TimelineFrozenBlock: timeline 的 reducer + 非末 interval (frozen 前缀, 字节稳定)
-//   - TimelineOpen: timeline 的最末 interval + midterm (易变尾段)
+//   - TimelineOpen: timeline 的开放内容 (易变尾段)
 //   - TimelineDump: 兼容字段, 仅当 TimelineFrozenBlock + TimelineOpen 全为空
 //     时回退到 legacy 渲染路径
 //

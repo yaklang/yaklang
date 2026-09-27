@@ -243,7 +243,7 @@ func NewTemporaryRAGDB() (*gorm.DB, error) {
 var ragSchemaMigrationMu sync.Mutex
 
 func autoMigrateRAGSystem(db *gorm.DB) error {
-	// Runtime memory and timeline archive initialize concurrently. Gorm's
+	// Concurrent memory instances can initialize the shared schema. Gorm's
 	// check-then-create migration is not atomic, even with one SQL connection.
 	ragSchemaMigrationMu.Lock()
 	defer ragSchemaMigrationMu.Unlock()

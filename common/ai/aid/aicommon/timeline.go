@@ -3,16 +3,11 @@ package aicommon
 import (
 	"cmp"
 	"fmt"
-	"sort"
-	"strconv"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon/promptloader"
 	"strings"
 	"sync"
 	"text/template"
 	"time"
-
-	"github.com/yaklang/gorm"
-	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 
 	"github.com/yaklang/yaklang/common/log"
 
@@ -37,13 +32,11 @@ type Timeline struct {
 	compressedHead *TimelineCompressedHead
 	// compressedHistory 仅用于追溯，不参与当前并列渲染
 	compressedHistory   []*TimelineCompressedHistoryNode
-	archiveRefs         *omap.OrderedMap[int64, *TimelineArchiveRef]
 	promotedState       *TimelinePromotedState
 	freezeState         *TimelineFreezeState
 	evidenceInitialized bool // namespace survives rollback and empty serialized journals
 
 	// this limit is used to limit the timeline dump content size (in tokens).
-	perDumpContentLimit   int64
 	totalDumpContentLimit int64
 
 	// bucketByteSize 为 GroupByMinutes 子桶的字节预算（渲染后的紧凑 Render 字节）。
@@ -58,11 +51,12 @@ type Timeline struct {
 	// 关键词: bucketSizer, 动态桶大小, 主动缓存调优
 	bucketSizer BucketSizer
 
-	compressing          bool                         // guarded by mu; reserved before freezing or starting a reducer
-	compressionSnapshot  *timelineCompressionSnapshot // explicit one-shot transaction; never persisted or forked
-	forkProtectedMaxID   int64
-	autoCompressDisabled bool
-	branchTimeline       bool
+	compressing            bool                         // guarded by mu; reserved before freezing or starting a reducer
+	compressionSnapshot    *timelineCompressionSnapshot // explicit one-shot transaction; never persisted or forked
+	compressionDone        chan struct{}
+	compressionLastFailure string
+	compressionRetryAfter  time.Time
+	branchTimeline         bool
 }
 
 func (m *Timeline) OrderInsertId(id int64, item *TimelineItem) {
@@ -96,52 +90,6 @@ const TimelineDumpDefaultBucketByteSize = 64 * 1024
 // value for callers that explicitly configure the historical 16 KiB bucket.
 // Deprecated: use an explicit bucket size with SetTimelineBucketByteSize.
 const TimelineDumpLegacyBucketByteSize = 16 * 1024
-
-func (m *Timeline) Save(db *gorm.DB, persistentId string) {
-	if utils.IsNil(m) {
-		log.Warnf("try to save nil timeline for persistentId: %v", persistentId)
-		return
-	}
-	if m.IsBranchTimeline() {
-		return
-	}
-
-	// Check and emergency compress if timeline is too large before saving
-	m.mu.RLock()
-	tlstr, err := marshalTimelineUnlocked(m)
-	m.mu.RUnlock()
-	if err != nil {
-		log.Warnf("save(/marshal) timeline failed: %v", err)
-		return
-	}
-
-	// If timeline is too large, perform emergency compression
-	if len(tlstr) > MaxTimelineSaveSize {
-		log.Warnf("timeline size %d exceeds max save size %d, performing emergency compression before save", len(tlstr), MaxTimelineSaveSize)
-		m.emergencyCompress(MaxTimelineSaveSize)
-
-		// Re-marshal after emergency compression
-		m.mu.RLock()
-		tlstr, err = marshalTimelineUnlocked(m)
-		m.mu.RUnlock()
-		if err != nil {
-			log.Warnf("save(/marshal) timeline after emergency compress failed: %v", err)
-			return
-		}
-
-		// The save path does not truncate JSON. Report the remaining size
-		// honestly and let the persistence layer attempt the complete snapshot.
-		if len(tlstr) > MaxTimelineSaveSize {
-			log.Warnf("timeline still too large (%d) after emergency compression, attempting to save complete snapshot", len(tlstr))
-		}
-	}
-
-	result := strconv.Quote(tlstr)
-	if err := yakit.UpdateAIAgentRuntimeTimelineWithPersistentId(db, persistentId, result); err != nil {
-		log.Errorf("ReAct: save timeline to db failed: %v", err)
-		return
-	}
-}
 
 func (m *Timeline) Valid() bool {
 	if m == nil {
@@ -184,7 +132,7 @@ func (m *Timeline) GetMaxID() int64 {
 
 func (m *Timeline) getMaxIDLocked() int64 {
 	ids := m.idToTimelineItem.Keys()
-	var maxID int64
+	maxID := m.frozenThroughLocked()
 	for _, id := range ids {
 		if id > maxID {
 			maxID = id
@@ -201,22 +149,39 @@ func (m *Timeline) getMaxIDLocked() int64 {
 	return maxID
 }
 
-// TruncateAfter 软删除所有 ID 严格大于 checkpointID 的 timeline 条目。
-// 用于在串行 sub-agent 结束后恢复 timeline 状态，实现 agent 间上下文隔离。
-func (m *Timeline) TruncateAfter(checkpointID int64) {
+// TruncateAfter retires entries after a checkpoint. A checkpoint inside the
+// current summary cannot be restored exactly, so reject it without mutation.
+func (m *Timeline) TruncateAfter(checkpointID int64) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
+	if m.compressedHead != nil && checkpointID < m.compressedHead.CoveredEndItemID {
+		err := fmt.Errorf("cannot truncate timeline at %d inside compressed history through %d", checkpointID, m.compressedHead.CoveredEndItemID)
+		log.Warn(err)
+		return err
+	}
 	for _, id := range m.idToTimelineItem.Keys() {
 		if id > checkpointID {
-			if v, ok := m.idToTimelineItem.Get(id); ok {
-				v.deleted = true
-			}
+			m.retireTimelineItemLocked(id)
 		}
 	}
 	if checkpointID < m.frozenThroughLocked() {
 		m.invalidateFreezeFromLocked(checkpointID + 1)
 	}
 	m.rebuildPromotedStateLocked(m.frozenThroughLocked())
+	return nil
+}
+
+// Indexes may hold separate objects after restore, or share objects with a
+// read view. Replace both references instead of mutating shared tombstones.
+func (m *Timeline) retireTimelineItemLocked(id int64) {
+	if item, ok := m.idToTimelineItem.Get(id); ok && item != nil {
+		copy := *item
+		copy.deleted = true
+		m.idToTimelineItem.Set(id, &copy)
+		if ts, ok := m.idToTs.Get(id); ok {
+			m.tsToTimelineItem.Set(ts, &copy)
+		}
+	}
 }
 
 func (m *Timeline) ClearRuntimeConfig() {
@@ -240,6 +205,8 @@ func (m *Timeline) GetAICaller() AICaller {
 }
 
 func (m *Timeline) CopyReducibleTimelineWithMemory() *Timeline {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
 	tl := &Timeline{
 		config:                m.config,
 		idToTs:                m.idToTs.Copy(),
@@ -247,16 +214,12 @@ func (m *Timeline) CopyReducibleTimelineWithMemory() *Timeline {
 		idToTimelineItem:      m.idToTimelineItem.Copy(),
 		compressedHead:        cloneTimelineCompressedHead(m.compressedHead),
 		compressedHistory:     cloneTimelineCompressedHistory(m.compressedHistory),
-		archiveRefs:           m.archiveRefs.Copy(),
 		promotedState:         cloneTimelinePromotedState(m.promotedState),
 		freezeState:           cloneTimelineFreezeState(m.freezeState),
 		evidenceInitialized:   m.evidenceInitialized,
-		perDumpContentLimit:   m.perDumpContentLimit,
 		totalDumpContentLimit: m.totalDumpContentLimit,
 		bucketByteSize:        m.bucketByteSize,
 		bucketSizer:           m.bucketSizer,
-		forkProtectedMaxID:    m.forkProtectedMaxID,
-		autoCompressDisabled:  m.autoCompressDisabled,
 		branchTimeline:        m.branchTimeline,
 	}
 	return tl
@@ -267,11 +230,9 @@ func (m *Timeline) SoftDelete(id ...int64) {
 	defer m.mu.Unlock()
 	for _, i := range id {
 		m.invalidateFreezeFromLocked(i)
-		if v, ok := m.idToTimelineItem.Get(i); ok {
-			v.deleted = true
-		}
+		m.retireTimelineItemLocked(i)
 	}
-	m.freezeLocked(false)
+	m.rebuildPromotedStateLocked(m.frozenThroughLocked())
 }
 
 // CreateSubTimeline 用入参 ids 限定活跃 item 集合，构造一个新的 sub-timeline
@@ -347,8 +308,8 @@ func NewTimeline(ai AICaller, extraMetaInfo func() string) *Timeline {
 		tsToTimelineItem: omap.NewOrderedMap(map[int64]*TimelineItem{}),
 		idToTimelineItem: omap.NewOrderedMap(map[int64]*TimelineItem{}),
 		idToTs:           omap.NewOrderedMap(map[int64]int64{}),
-		archiveRefs:      omap.NewOrderedMap(map[int64]*TimelineArchiveRef{}),
 		promotedState:    newTimelinePromotedState(),
+		freezeState:      &TimelineFreezeState{},
 		branchTimeline:   false,
 	}
 }
@@ -426,10 +387,8 @@ func (m *Timeline) PushToolResult(toolResult *aitool.ToolResult) {
 	defer m.mu.Unlock()
 	now := time.Now()
 	ts := now.UnixMilli()
-	if m.tsToTimelineItem.Have(ts) {
-		time.Sleep(time.Millisecond * 10)
-		now = time.Now()
-		ts = now.UnixMilli()
+	for m.tsToTimelineItem.Have(ts) {
+		ts++
 	}
 	id := toolResult.GetID()
 	if id <= 0 {
@@ -453,8 +412,6 @@ func (m *Timeline) pushTimelineItem(ts int64, id int64, item *TimelineItem) {
 	m.invalidateFreezeFromLocked(id)
 	m.OrderInsertId(id, item)
 	m.OrderInsertTs(ts, item)
-	m.freezeLocked(false)
-	m.dumpSizeCheckLocked()
 
 	m.emitTimelineItemAsync(item)
 }
@@ -487,10 +444,8 @@ func (m *Timeline) PushUserInteraction(stage UserInteractionStage, id int64, sys
 	defer m.mu.Unlock()
 	now := time.Now()
 	ts := now.UnixMilli()
-	if m.tsToTimelineItem.Have(ts) {
-		time.Sleep(time.Millisecond * 10)
-		now = time.Now()
-		ts = now.UnixMilli()
+	for m.tsToTimelineItem.Have(ts) {
+		ts++
 	}
 	m.idToTs.Set(id, ts)
 
@@ -779,16 +734,6 @@ func (m *Timeline) DumpBefore(beforeId int64) string {
 	return sub.Dump()
 }
 
-func (m *Timeline) attachArchiveRef(reducerKeyID int64, ref *TimelineArchiveRef) {
-	if reducerKeyID <= 0 || ref == nil {
-		return
-	}
-	if m.archiveRefs == nil {
-		m.archiveRefs = omap.NewOrderedMap(map[int64]*TimelineArchiveRef{})
-	}
-	m.archiveRefs.Set(reducerKeyID, ref)
-}
-
 var toolResultHistory = promptloader.MustLoad("ai/aid/aicommon/prompts/timeline/tool_result_history.txt")
 
 func (m *Timeline) PromptForToolCallResultsForLastN(n int) string {
@@ -850,10 +795,8 @@ func (m *Timeline) pushTextWithPromptProjection(id int64, text, promptText strin
 	defer m.mu.Unlock()
 	now := time.Now()
 	ts := now.UnixMilli()
-	if m.tsToTimelineItem.Have(ts) {
-		time.Sleep(time.Millisecond * 10)
-		now = time.Now()
-		ts = now.UnixMilli()
+	for m.tsToTimelineItem.Have(ts) {
+		ts++
 	}
 	m.idToTs.Set(id, ts)
 
@@ -878,127 +821,6 @@ type TimelineItemOutput struct {
 
 func (m *TimelineItemOutput) String() string {
 	return fmt.Sprintf("[%v][%s] %s", m.Timestamp, m.Type, m.Content)
-}
-
-// ReassignIDs reassigns sequential IDs to all timeline items starting from the given startID
-// This is used when restoring from persistent session to avoid ID conflicts
-// Returns the next available ID after reassignment
-func (m *Timeline) ReassignIDs(idGenerator func() int64) int64 {
-	if m == nil || idGenerator == nil {
-		return 0
-	}
-
-	// Collect all items ordered by their original timestamp to maintain order
-	type itemWithTs struct {
-		ts   int64
-		item *TimelineItem
-	}
-	var orderedItems []itemWithTs
-
-	// Iterate through items in timestamp order
-	m.tsToTimelineItem.ForEach(func(ts int64, item *TimelineItem) bool {
-		orderedItems = append(orderedItems, itemWithTs{ts: ts, item: item})
-		return true
-	})
-	// UnmarshalTimeline rebuilds this ordered map from JSON object keys, whose
-	// iteration order is intentionally undefined. Sort explicitly so restored
-	// IDs, promotion watermarks and pending journal order remain deterministic.
-	sort.SliceStable(orderedItems, func(i, j int) bool {
-		if orderedItems[i].ts == orderedItems[j].ts {
-			return orderedItems[i].item.GetID() < orderedItems[j].item.GetID()
-		}
-		return orderedItems[i].ts < orderedItems[j].ts
-	})
-
-	if len(orderedItems) == 0 {
-		return 0
-	}
-
-	// Create new mappings
-	newIdToTs := omap.NewOrderedMap(map[int64]int64{})
-	newIdToTimelineItem := omap.NewOrderedMap(map[int64]*TimelineItem{})
-
-	// Track old ID to new ID mapping for compressedHead remapping
-	oldToNewID := make(map[int64]int64)
-	oldPromotionWatermark := int64(0)
-	if m.promotedState != nil {
-		oldPromotionWatermark = m.promotedState.Watermark
-	}
-
-	var lastID int64
-	// Reassign IDs in order, skipping soft-deleted (inactive) items
-	for _, itemWithTs := range orderedItems {
-		item := itemWithTs.item
-		if item.deleted {
-			continue
-		}
-		ts := itemWithTs.ts
-		oldID := item.GetID()
-		newID := idGenerator()
-		lastID = newID
-
-		// Update the ID in the underlying value
-		switch v := item.value.(type) {
-		case *aitool.ToolResult:
-			v.ID = newID
-		case *UserInteraction:
-			v.ID = newID
-		case *TextTimelineItem:
-			v.ID = newID
-		case *PromotableTimelineItem:
-			v.ID = newID
-		default:
-			log.Warnf("unknown timeline item value type: %T", v)
-		}
-
-		// Store mapping
-		oldToNewID[oldID] = newID
-
-		// Add to new mappings
-		newIdToTs.Set(newID, ts)
-		newIdToTimelineItem.Set(newID, item)
-	}
-
-	// Replace old mappings with new ones
-	m.idToTs = newIdToTs
-	m.idToTimelineItem = newIdToTimelineItem
-	if m.compressedHead != nil {
-		if mapped, ok := oldToNewID[m.compressedHead.CoveredEndItemID]; ok {
-			m.compressedHead.CoveredEndItemID = mapped
-		}
-	}
-	for _, h := range m.compressedHistory {
-		if h == nil {
-			continue
-		}
-		if mapped, ok := oldToNewID[h.CoveredEndItemID]; ok {
-			h.CoveredEndItemID = mapped
-		}
-	}
-	if oldPromotionWatermark > 0 {
-		var newWatermark int64
-		for oldID, newID := range oldToNewID {
-			if oldID <= oldPromotionWatermark && newID > newWatermark {
-				newWatermark = newID
-			}
-		}
-		m.rebuildPromotedStateLocked(newWatermark)
-	}
-	if m.freezeState != nil {
-		for _, batch := range m.freezeState.Batches {
-			var ids []int64
-			for _, id := range batch.IDs {
-				if mapped, ok := oldToNewID[id]; ok {
-					ids = append(ids, mapped)
-				}
-			}
-			batch.IDs = ids
-		}
-		m.pruneEmptyFreezeBatchesLocked()
-	}
-
-	log.Infof("reassigned IDs for %d timeline items, last ID: %d", len(orderedItems), lastID)
-	return lastID
 }
 
 func (m *Timeline) GetTimelineOutput() []*TimelineItemOutput {

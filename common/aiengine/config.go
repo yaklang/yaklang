@@ -45,7 +45,7 @@ type AIEngineConfig struct {
 	// Stateless 为 true 时,引擎不持久化会话历史/memory/timeline 到本地 DB。
 	// 每轮由服务端打包 ContextPackage 注入历史,turn 完销毁引擎实例。
 	// 用于 S3c 无状态引擎路径。buildReActOptions 据此短路 PersistentSessionId/
-	// MemoryTriageId/TimelineArchiveStore/SaveTimeline 四个落盘分支。
+	// MemoryTriageId/SaveTimeline 三个落盘分支。
 	Stateless bool
 
 	// 工具配置

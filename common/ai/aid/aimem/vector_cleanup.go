@@ -111,13 +111,10 @@ func getOrCreateHNSWBackend(cache map[string]*AIMemoryHNSWBackend, db *gorm.DB, 
 	if backend := cache[sessionID]; backend != nil {
 		return backend, nil
 	}
-	// Midterm archive sessions use independent HNSW collection tables.
-	midtermMode := strings.HasPrefix(sessionID, MidtermSessionPrefix)
 	backend, err := NewAIMemoryHNSWBackend(
 		WithHNSWSessionID(sessionID),
 		WithHNSWDatabase(db),
 		WithHNSWAutoSave(false),
-		WithHNSWMidtermMode(midtermMode),
 	)
 	if err != nil {
 		return nil, err
@@ -195,11 +192,7 @@ func BatchCleanupMemories(ctx context.Context, db *gorm.DB, sessionID string, me
 }
 
 func cleanupMemoryBatch(ctx context.Context, db *gorm.DB, sessionID string, memoryIDs []string) error {
-	midtermMode := strings.HasPrefix(sessionID, MidtermSessionPrefix)
 	entityTable := "ai_memory_entities_v1"
-	if midtermMode {
-		entityTable = "ai_midterm_archive_entities_v1"
-	}
 	var entities []schema.AIMemoryEntity
 	if err := db.Table(entityTable).Select("memory_id, session_id, potential_questions").
 		Where("memory_id IN (?) AND session_id = ?", memoryIDs, sessionID).
@@ -230,7 +223,7 @@ func cleanupMemoryBatch(ctx context.Context, db *gorm.DB, sessionID string, memo
 	}
 	backend, err := NewAIMemoryHNSWBackend(
 		WithHNSWSessionID(sessionID), WithHNSWDatabase(db),
-		WithHNSWAutoSave(false), WithHNSWMidtermMode(midtermMode))
+		WithHNSWAutoSave(false))
 	if err != nil {
 		return err
 	}
