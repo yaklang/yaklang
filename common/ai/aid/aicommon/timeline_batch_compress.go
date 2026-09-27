@@ -109,9 +109,6 @@ func (m *Timeline) compressForSizeLimit() {
 }
 
 func (m *Timeline) compressForSizeLimitLocked() {
-	// Control-plane mutations must be materialized before ordinary facts are sent
-	// to a reducer. They are excluded from activeIDs and reducer prompts below.
-	m.forcePromoteAllLocked()
 	if m.config == nil || m.totalDumpContentLimit <= 0 {
 		return
 	}
@@ -170,6 +167,9 @@ func (m *Timeline) compressForSizeLimitLocked() {
 	if len(toCompress) == 0 {
 		return
 	}
+	// Freeze the selected prefix before scheduling a reducer. The recent tail
+	// stays open; exact control payloads never enter the AI summary candidates.
+	m.freezeLocked(true, toCompress[len(toCompress)-1].GetID())
 
 	log.Infof("content size %d > limit %d, compress oldest %d items, keep recent %d items (~%d tokens)",
 		currentSize, m.totalDumpContentLimit, len(toCompress), len(recentKeep), keepTokens)

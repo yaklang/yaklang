@@ -127,6 +127,7 @@ func (f *TimelineFork) MergeBack() (*TimelineMergeResult, error) {
 		if _, exists := parent.idToTimelineItem.Get(active.id); exists {
 			return nil, utils.Errorf("timeline fork merge: id %d already exists in parent timeline", active.id)
 		}
+		parent.invalidateFreezeFromLocked(active.id)
 		ts := nextTS
 		if active.ts > 0 && active.ts >= nextTS {
 			ts = active.ts
@@ -153,6 +154,7 @@ func (f *TimelineFork) MergeBack() (*TimelineMergeResult, error) {
 		result.CompressedHeadsMerged++
 	}
 
+	parent.freezeLocked(false)
 	parent.dumpSizeCheckLocked()
 	return result, nil
 }

@@ -18,7 +18,8 @@ const (
 
 // PromotableTimelineItem is a control-plane timeline entry. It is persisted and
 // follows fork/merge/checkpoint semantics, but is deliberately excluded from the
-// user timeline, ordinary buckets, diffs and reducers.
+// user timeline, ordinary dump buckets, diffs and reducers. Its payload does
+// participate in the prompt freeze budget.
 type PromotableTimelineItem struct {
 	ID            int64  `json:"id"`
 	Kind          string `json:"kind"`
@@ -34,6 +35,18 @@ func (p *PromotableTimelineItem) GetID() int64                   { return p.ID }
 func (p *PromotableTimelineItem) GetShrinkResult() string        { return "" }
 func (p *PromotableTimelineItem) GetShrinkSimilarResult() string { return "" }
 func (p *PromotableTimelineItem) SetShrinkResult(string)         {}
+
+// OpenPromptText is the exact, non-reducible payload used for open-bucket
+// accounting. String remains empty for ordinary history/UI compatibility.
+func (p *PromotableTimelineItem) OpenPromptText() string {
+	if p == nil {
+		return ""
+	}
+	if p.Operation == TimelinePromotedOperationDelete {
+		return fmt.Sprintf("[state %s/%s deleted]", p.Kind, p.Key)
+	}
+	return fmt.Sprintf("[state %s/%s]\n%s", p.Kind, p.Key, p.Payload)
+}
 
 type PromotedTimelineEntry struct {
 	Kind          string `json:"kind"`
@@ -118,7 +131,7 @@ func (m *Timeline) PushPromotable(id int64, kind, targetSection, key, operation,
 	return true
 }
 
-func (m *Timeline) rebuildPromotedStateLocked(sealedBeforeID int64, forceAll bool) {
+func (m *Timeline) rebuildPromotedStateLocked(throughID int64) {
 	state := newTimelinePromotedState()
 	if m == nil {
 		return
@@ -136,7 +149,7 @@ func (m *Timeline) rebuildPromotedStateLocked(sealedBeforeID int64, forceAll boo
 		if !ok || control == nil {
 			continue
 		}
-		if !forceAll && (sealedBeforeID <= 0 || id >= sealedBeforeID) {
+		if id > throughID {
 			continue
 		}
 		if control.TargetSection != TimelinePromotedTargetSemiDynamic1 {
@@ -167,17 +180,11 @@ func (m *Timeline) rebuildPromotedStateLocked(sealedBeforeID int64, forceAll boo
 	m.promotedState = state
 }
 
-func (m *Timeline) forcePromoteAllLocked() {
-	m.rebuildPromotedStateLocked(0, true)
-}
-
+// ForcePromoteAll is retained for callers of the old API. Promotion now always
+// commits a freeze boundary, including the ordinary items in the same batch.
+// Deprecated: use FreezeAll and its transaction receipt.
 func (m *Timeline) ForcePromoteAll() {
-	if m == nil {
-		return
-	}
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	m.forcePromoteAllLocked()
+	m.FreezeAll()
 }
 
 func (m *Timeline) HasPromotableKind(kind string) bool {
@@ -268,21 +275,15 @@ func (m *Timeline) effectivePromotedKeys(targetSection, kind string) []string {
 	return keys
 }
 
-func (m *Timeline) projectPromoted(sealedBeforeID int64) (string, string) {
+func (m *Timeline) projectPromotedLocked() (string, string) {
 	if m == nil {
 		return "", ""
 	}
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	// A previously materialized watermark never moves backwards during ordinary
-	// rendering. This also preserves force-promotion performed before compression
-	// and one-time legacy bootstrap.
-	effectiveLimit := sealedBeforeID
-	if m.promotedState != nil && m.promotedState.Watermark > 0 && m.promotedState.Watermark+1 > effectiveLimit {
-		effectiveLimit = m.promotedState.Watermark + 1
-	}
-	m.rebuildPromotedStateLocked(effectiveLimit, false)
 	semi := renderPromotedRecentTools(m.promotedState)
+	watermark := int64(0)
+	if m.promotedState != nil {
+		watermark = m.promotedState.Watermark
+	}
 	var pending []*PromotableTimelineItem
 	for _, id := range m.idToTimelineItem.Keys() {
 		item, ok := m.idToTimelineItem.Get(id)
@@ -290,7 +291,7 @@ func (m *Timeline) projectPromoted(sealedBeforeID int64) (string, string) {
 			continue
 		}
 		control, ok := item.value.(*PromotableTimelineItem)
-		if !ok || control == nil || id <= m.promotedState.Watermark {
+		if !ok || control == nil || id <= watermark {
 			continue
 		}
 		pending = append(pending, control)

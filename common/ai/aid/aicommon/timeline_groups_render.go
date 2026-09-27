@@ -34,6 +34,9 @@ type TimelineIntervalBlock struct {
 	// promptProjection is set only on ephemeral copies produced for prompt
 	// rendering. Raw Timeline dumps and UI-facing values remain byte-identical.
 	promptProjection bool
+	// Explicit freeze batches keep their identity across later tail appends.
+	frozenNonce  string
+	freezeBudget int64 // budget selected by the packer; never recomputed when sealing
 }
 
 // TimelineIntervalBlocks 是按时间顺序排列的 block 切片
@@ -103,7 +106,7 @@ func (m *Timeline) GroupByMinutes(minutes int) *TimelineGroups {
 
 // groupByMinutesWithSizer 用动态 sizer 决策每个 flush 临界的桶大小。
 // 关键词: groupByMinutesWithSizer, 动态桶切分
-func (m *Timeline) groupByMinutesWithSizer(minutes int, sizer BucketSizer) *TimelineGroups {
+func (m *Timeline) groupByMinutesWithSizer(minutes int, sizer BucketSizer, taskSeed ...string) *TimelineGroups {
 	if m == nil || minutes <= 0 || sizer == nil {
 		return &TimelineGroups{intervalMinutes: 0}
 	}
@@ -156,8 +159,9 @@ func (m *Timeline) groupByMinutesWithSizer(minutes int, sizer BucketSizer) *Time
 		if cb == nil || len(cb.items) == 0 {
 			continue
 		}
-		subs := packTimelineIntervalSubBlocksWithSizer(cb.start, cb.end, minutes, cb.items, sizer)
+		subs := packTimelineIntervalSubBlocksWithSizer(cb.start, cb.end, minutes, cb.items, sizer, taskSeed...)
 		orderedBuckets = append(orderedBuckets, subs...)
+		taskSeed = nil
 	}
 	if len(orderedBuckets) > 0 {
 		orderedBuckets[len(orderedBuckets)-1].Open = true
@@ -179,7 +183,7 @@ func (m *Timeline) GroupByMinutesAndBytes(minutes int, bytesPerBucket int64) *Ti
 	return m.groupByMinutesAndBytesLocked(minutes, bytesPerBucket)
 }
 
-func (m *Timeline) groupByMinutesAndBytesLocked(minutes int, bytesPerBucket int64) *TimelineGroups {
+func (m *Timeline) groupByMinutesAndBytesLocked(minutes int, bytesPerBucket int64, taskSeed ...string) *TimelineGroups {
 	if m == nil || minutes <= 0 {
 		return &TimelineGroups{intervalMinutes: 0}
 	}
@@ -250,9 +254,14 @@ func (m *Timeline) groupByMinutesAndBytesLocked(minutes int, bytesPerBucket int6
 			continue
 		}
 		if byteSplit {
-			subs := packTimelineIntervalSubBlocks(cb.start, cb.end, minutes, cb.items, budget)
+			subs := packTimelineIntervalSubBlocks(cb.start, cb.end, minutes, cb.items, budget, taskSeed...)
 			orderedBuckets = append(orderedBuckets, subs...)
+			taskSeed = nil
 		} else {
+			initialTaskID := ""
+			if len(taskSeed) > 0 {
+				initialTaskID = taskSeed[0]
+			}
 			orderedBuckets = append(orderedBuckets, &TimelineIntervalBlock{
 				BucketStart:     cb.start,
 				BucketEnd:       cb.end,
@@ -261,7 +270,9 @@ func (m *Timeline) groupByMinutesAndBytesLocked(minutes int, bytesPerBucket int6
 				Open:            false,
 				SeqInBucket:     0,
 				TotalInBucket:   1,
+				initialTaskID:   initialTaskID,
 			})
+			taskSeed = nil
 		}
 	}
 
@@ -292,7 +303,7 @@ func (m *Timeline) collectReducerGroups(minutes int, orderedBuckets []*TimelineI
 
 // packTimelineIntervalSubBlocks 在同一日历时间桶内按字节预算切分为多个 TimelineIntervalBlock。
 // 关键词: packTimelineIntervalSubBlocks, 字节子桶打包
-func packTimelineIntervalSubBlocks(bs, be time.Time, intervalMinutes int, items []*TimelineItem, bytesPerBucket int64) []*TimelineIntervalBlock {
+func packTimelineIntervalSubBlocks(bs, be time.Time, intervalMinutes int, items []*TimelineItem, bytesPerBucket int64, taskSeed ...string) []*TimelineIntervalBlock {
 	if len(items) == 0 {
 		return nil
 	}
@@ -302,6 +313,9 @@ func packTimelineIntervalSubBlocks(bs, be time.Time, intervalMinutes int, items 
 	var curInitialTaskID string
 	var curRenderState timelineTaskRenderState
 	var carriedTaskID string
+	if len(taskSeed) > 0 {
+		carriedTaskID = taskSeed[0]
+	}
 
 	flush := func() {
 		if len(cur) == 0 {
@@ -314,6 +328,7 @@ func packTimelineIntervalSubBlocks(bs, be time.Time, intervalMinutes int, items 
 			Items:           append([]*TimelineItem(nil), cur...),
 			Open:            false,
 			initialTaskID:   curInitialTaskID,
+			freezeBudget:    bytesPerBucket,
 		}
 		out = append(out, blk)
 		cur = nil
@@ -367,7 +382,7 @@ func packTimelineIntervalSubBlocks(bs, be time.Time, intervalMinutes int, items 
 // 单条 item 超过当次 budget 时仍按原规则独占一个子桶 (不在 entry 内部切)。
 //
 // 关键词: packTimelineIntervalSubBlocksWithSizer, 动态切桶
-func packTimelineIntervalSubBlocksWithSizer(bs, be time.Time, intervalMinutes int, items []*TimelineItem, sizer BucketSizer) []*TimelineIntervalBlock {
+func packTimelineIntervalSubBlocksWithSizer(bs, be time.Time, intervalMinutes int, items []*TimelineItem, sizer BucketSizer, taskSeed ...string) []*TimelineIntervalBlock {
 	if len(items) == 0 {
 		return nil
 	}
@@ -377,9 +392,13 @@ func packTimelineIntervalSubBlocksWithSizer(bs, be time.Time, intervalMinutes in
 	var out []*TimelineIntervalBlock
 	var cur []*TimelineItem
 	var curBytes int
+	var selectedBudget int64
 	var curInitialTaskID string
 	var curRenderState timelineTaskRenderState
 	var carriedTaskID string
+	if len(taskSeed) > 0 {
+		carriedTaskID = taskSeed[0]
+	}
 	// recentEntrySamples 用于让 sizer 看到最近若干 entry 的平均字节
 	const recentN = 8
 	var recentSizes []int
@@ -395,6 +414,7 @@ func packTimelineIntervalSubBlocksWithSizer(bs, be time.Time, intervalMinutes in
 			Items:           append([]*TimelineItem(nil), cur...),
 			Open:            false,
 			initialTaskID:   curInitialTaskID,
+			freezeBudget:    selectedBudget,
 		}
 		out = append(out, blk)
 		cur = nil
@@ -453,6 +473,7 @@ func packTimelineIntervalSubBlocksWithSizer(bs, be time.Time, intervalMinutes in
 
 		if len(cur) == 0 {
 			start(item)
+			selectedBudget = budget
 			continue
 		}
 		candidateState := curRenderState
@@ -460,8 +481,10 @@ func packTimelineIntervalSubBlocksWithSizer(bs, be time.Time, intervalMinutes in
 		if int64(curBytes+len(entry)) > budget {
 			flush()
 			start(item)
+			selectedBudget = budget
 			continue
 		}
+		selectedBudget = budget
 		cur = append(cur, item)
 		curBytes += len(entry)
 		curRenderState = candidateState
@@ -720,6 +743,9 @@ func (b *TimelineIntervalBlock) Render() string {
 func (b *TimelineIntervalBlock) StableNonce() string {
 	if b == nil {
 		return ""
+	}
+	if b.frozenNonce != "" {
+		return b.frozenNonce
 	}
 	// 用秒级 unix 时间足够区分（桶最小粒度 1 分钟），加 interval 避免不同 interval 重合
 	base := fmt.Sprintf("b%dt%d", b.IntervalMinutes, b.BucketStart.Unix())
