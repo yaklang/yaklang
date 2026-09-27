@@ -14,6 +14,7 @@ const (
 	TimelinePromotedKindRecentTool     = "recent-tool-cache"
 	TimelinePromotedOperationUpsert    = "upsert"
 	TimelinePromotedOperationDelete    = "delete"
+	TimelinePromotedOperationReuse     = "reuse"
 )
 
 // PromotableTimelineItem is a control-plane timeline entry. It is persisted and
@@ -49,6 +50,9 @@ func (p *PromotableTimelineItem) OpenPromptText() string {
 	if p.Operation == TimelinePromotedOperationDelete {
 		return fmt.Sprintf("[state %s/%s deleted]", p.Kind, p.Key)
 	}
+	if p.Operation == TimelinePromotedOperationReuse {
+		return fmt.Sprintf("[state %s/%s reused]", p.Kind, p.Key)
+	}
 	return fmt.Sprintf("[state %s/%s]\n%s", p.Kind, p.Key, p.Payload)
 }
 
@@ -59,6 +63,9 @@ type PromotedTimelineEntry struct {
 	Payload       string `json:"payload"`
 	PayloadHash   string `json:"payload_hash"`
 	SourceItemID  int64  `json:"source_item_id"`
+	// LastUsedItemID is independent of the schema source. Older snapshots fall
+	// back to SourceItemID until their journal is replayed.
+	LastUsedItemID int64 `json:"last_used_item_id,omitempty"`
 }
 
 // TimelinePromotedState is the materialized, long-lived projection of sealed
@@ -114,7 +121,10 @@ func (m *Timeline) PushPromotable(id int64, kind, targetSection, key, operation,
 	if m == nil || id <= 0 || targetSection != TimelinePromotedTargetSemiDynamic1 || strings.TrimSpace(kind) == "" || strings.TrimSpace(key) == "" {
 		return false
 	}
-	if operation != TimelinePromotedOperationUpsert && operation != TimelinePromotedOperationDelete {
+	if operation != TimelinePromotedOperationUpsert && operation != TimelinePromotedOperationDelete && operation != TimelinePromotedOperationReuse {
+		return false
+	}
+	if operation == TimelinePromotedOperationReuse && (kind != TimelinePromotedKindRecentTool || payload != "") {
 		return false
 	}
 	if operation == TimelinePromotedOperationDelete {
@@ -124,6 +134,11 @@ func (m *Timeline) PushPromotable(id int64, kind, targetSection, key, operation,
 	ts := now.UnixMilli()
 	m.mu.Lock()
 	defer m.mu.Unlock()
+	// Reuse is a reference, never a way to create or resurrect a cache entry.
+	// The caller must submit a full upsert if this returns false.
+	if operation == TimelinePromotedOperationReuse && !m.hasToolCacheBeforeLocked(id, key) {
+		return false
+	}
 	for m.tsToTimelineItem.Have(ts) {
 		ts++
 	}
@@ -176,9 +191,21 @@ func (m *Timeline) rebuildPromotedStateLocked(throughID int64) {
 			delete(entries, control.Key)
 			continue
 		}
+		if control.Operation == TimelinePromotedOperationReuse {
+			if entry := entries[control.Key]; control.Kind == TimelinePromotedKindRecentTool && entry != nil {
+				entry.LastUsedItemID = id
+			}
+			continue
+		}
+		if control.Operation != TimelinePromotedOperationUpsert {
+			continue
+		}
 		entries[control.Key] = &PromotedTimelineEntry{
 			Kind: control.Kind, TargetSection: control.TargetSection, Key: control.Key,
 			Payload: control.Payload, PayloadHash: control.PayloadHash, SourceItemID: id,
+		}
+		if control.Kind == TimelinePromotedKindRecentTool {
+			entries[control.Key].LastUsedItemID = id
 		}
 	}
 	m.promotedState = state
@@ -214,9 +241,8 @@ func (m *Timeline) HasPromotableKind(kind string) bool {
 // It is deliberately read-only: session restore must not seal buckets or move
 // the promotion watermark merely to rebuild execution-side authorization.
 //
-// Ordering follows the latest mutation source ID. Reuse of an unchanged tool
-// does not create a prompt mutation, so exact execution-side LRU touches are
-// intentionally not persisted across process restarts.
+// Ordering includes pending reuse events for runtime restoration, without
+// changing the frozen prompt's content or ordering.
 func (m *Timeline) effectivePromotedKeys(targetSection, kind string) []string {
 	if m == nil || strings.TrimSpace(targetSection) == "" || strings.TrimSpace(kind) == "" {
 		return nil
@@ -237,7 +263,7 @@ func (m *Timeline) effectivePromotedKeys(targetSection, kind string) []string {
 				if entry == nil {
 					continue
 				}
-				active[key] = activePromotion{key: key, sourceID: entry.SourceItemID}
+				active[key] = activePromotion{key: key, sourceID: promotedToolLastUsedID(entry)}
 			}
 		}
 	}
@@ -257,6 +283,13 @@ func (m *Timeline) effectivePromotedKeys(targetSection, kind string) []string {
 		}
 		if control.Operation == TimelinePromotedOperationDelete {
 			delete(active, control.Key)
+			continue
+		}
+		if control.Operation == TimelinePromotedOperationReuse {
+			if _, exists := active[control.Key]; !exists || kind != TimelinePromotedKindRecentTool {
+				continue
+			}
+		} else if control.Operation != TimelinePromotedOperationUpsert {
 			continue
 		}
 		active[control.Key] = activePromotion{key: control.Key, sourceID: id}
@@ -314,10 +347,18 @@ func renderPromotedRecentTools(state *TimelinePromotedState) string {
 		return ""
 	}
 	keys := make([]string, 0, len(entries))
-	for key := range entries {
-		keys = append(keys, key)
+	for key, entry := range entries {
+		if entry != nil {
+			keys = append(keys, key)
+		}
 	}
-	sort.Strings(keys)
+	sort.Slice(keys, func(i, j int) bool {
+		left, right := promotedToolLastUsedID(entries[keys[i]]), promotedToolLastUsedID(entries[keys[j]])
+		if left == right {
+			return keys[i] < keys[j]
+		}
+		return left < right // Most recently used tools appear last, after freeze.
+	})
 	var out strings.Builder
 	out.WriteString("<|CACHE_TOOL_CALL_[current-nonce]|>\n")
 	out.WriteString("# Recently Used Tools (available for directly_call_tool)\n\n")
@@ -345,6 +386,10 @@ func renderPromotableOpenDeltas(items []*PromotableTimelineItem, includeInstruct
 		}
 		if item.Operation == TimelinePromotedOperationDelete {
 			fmt.Fprintf(&out, "- invalidated recent tool: %s\n", item.Key)
+			continue
+		}
+		if item.Operation == TimelinePromotedOperationReuse {
+			fmt.Fprintf(&out, "- reused recent tool: %s\n", item.Key)
 			continue
 		}
 		out.WriteString(strings.TrimSpace(item.Payload))

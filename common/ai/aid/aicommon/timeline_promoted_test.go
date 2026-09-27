@@ -123,7 +123,7 @@ func TestTimelinePromotedStateStableOrdering(t *testing.T) {
 	a := RenderTimelineFrozenOpen(tl).PromotedSemiDynamic1
 	b := RenderTimelineFrozenOpen(tl).PromotedSemiDynamic1
 	require.Equal(t, a, b)
-	require.Less(t, strings.Index(a, "## Tool: alpha"), strings.Index(a, "## Tool: zeta"))
+	require.Less(t, strings.Index(a, "## Tool: zeta"), strings.Index(a, "## Tool: alpha"))
 }
 
 func TestTimelineEffectivePromotedKeysRestoresSealedAndPendingStateWithoutMutation(t *testing.T) {
