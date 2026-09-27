@@ -1,0 +1,14 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "required": ["@action", "summary"],
+  "additionalProperties": false,
+  "properties": {
+    "@action": { "type": "string", "const": "timeline-summary" },
+    "summary": {
+      "type": "string",
+      "minLength": 1,
+      "description": "替换旧摘要及全部普通历史的新摘要：保留有依据的进展、关键发现、独有约束、未解决问题与衔接线索，避免重复独立保留的上下文。"
+    }
+  }
+}

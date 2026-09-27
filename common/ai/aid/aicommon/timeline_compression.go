@@ -6,6 +6,8 @@ package aicommon
 
 import (
 	"bytes"
+	"crypto/sha256"
+	_ "embed"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -50,13 +52,11 @@ type timelineCompressionSnapshot struct {
 	FrozenThroughID int64
 	Items           []timelineCompressionSnapshotItem // all live ordinary items, in ID order
 	ExactItemIDs    []int64                           // never candidates for summary/deletion
-	RecentStart     int                               // only Items[:RecentStart] may be retired
 	InputText       string                            // old head + ordinary Frozen/Open content
-	RecentText      string                            // complete suffix, never truncated
 	InputTokens     int
-	TargetTokens    int // ordinary content target: InputTokens / 6
-	RecentTokens    int
-	SummaryBudget   int // TargetTokens - RecentTokens, at least the requested reserve
+	RetainedContext map[string]string // caller-owned prompt parts, copied before the AI request
+	SourceState     string            // ordinary + exact journal entries through ThroughID, including tombstones
+	FreezeVersion   int64
 }
 
 type timelineCompressionSnapshotItem struct {
@@ -67,20 +67,34 @@ type timelineCompressionSnapshotItem struct {
 	PromptText string // detached, rendered prompt view; empty for omitted bookkeeping
 }
 
-// buildCompressionSnapshot budgets the old head and ALL live ordinary history,
-// including the open tail. Exact evidence/tool-cache journals are excluded.
-// summaryReserve is explicit: this step introduces no new runtime policy.
-// Counts use the local tokenizer over this normalized snapshot, not provider
-// billing tokens. Final block framing must be checked again at commit/render.
-func (m *Timeline) buildCompressionSnapshot(summaryReserve int) (*timelineCompressionSnapshot, error) {
-	if m == nil || summaryReserve <= 0 {
-		return nil, fmt.Errorf("compression snapshot requires a timeline and positive summary reserve")
+// buildCompressionSnapshot includes the old summary and all ordinary Frozen/Open
+// history. There is no retained suffix or fixed compression ratio.
+func (m *Timeline) buildCompressionSnapshot() (*timelineCompressionSnapshot, error) {
+	if m == nil {
+		return nil, fmt.Errorf("compression snapshot requires a timeline")
 	}
 	snapshot, err := m.captureCompressionSnapshot()
 	if err != nil {
 		return nil, err
 	}
-	return budgetCompressionSnapshot(snapshot, summaryReserve)
+	if err := prepareCompressionSnapshot(snapshot); err != nil {
+		return nil, err
+	}
+	return snapshot, nil
+}
+
+func prepareCompressionSnapshot(snapshot *timelineCompressionSnapshot) error {
+	previous := ""
+	if snapshot.Head != nil {
+		previous = snapshot.Head.Text
+	}
+	ordinary := renderCompressionSnapshotItems(snapshot.Items)
+	if strings.TrimSpace(previous) == "" && strings.TrimSpace(ordinary) == "" {
+		return fmt.Errorf("compression snapshot has no visible ordinary history")
+	}
+	snapshot.InputText = strings.TrimSpace(previous + "\n" + ordinary)
+	snapshot.InputTokens = MeasureTokens(snapshot.InputText)
+	return nil
 }
 
 // Copy under the read lock; tokenization happens after releasing it so writers
@@ -88,9 +102,21 @@ func (m *Timeline) buildCompressionSnapshot(summaryReserve int) (*timelineCompre
 func (m *Timeline) captureCompressionSnapshot() (*timelineCompressionSnapshot, error) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
+	return m.captureCompressionSnapshotLocked()
+}
+
+func (m *Timeline) captureCompressionSnapshotLocked() (*timelineCompressionSnapshot, error) {
 	snapshot := &timelineCompressionSnapshot{
 		Head:      cloneTimelineCompressedHead(m.compressedHead),
 		ThroughID: m.getMaxIDLocked(), FrozenThroughID: m.frozenThroughLocked(),
+	}
+	if m.freezeState != nil {
+		snapshot.FreezeVersion = m.freezeState.Version
+	}
+	var err error
+	snapshot.SourceState, err = m.compressionSourceStateLocked(snapshot.ThroughID)
+	if err != nil {
+		return nil, err
 	}
 	ids := append([]int64(nil), m.idToTimelineItem.Keys()...)
 	sort.Slice(ids, func(i, j int) bool { return ids[i] < ids[j] })
@@ -142,49 +168,12 @@ func (m *Timeline) captureCompressionSnapshot() (*timelineCompressionSnapshot, e
 			// Keep the entire prompt body, including long single-line replay JSON.
 			// The presentation renderer uses a bounded line scanner and may omit
 			// oversized lines; it must not determine compression cuts or budgets.
-			// Do not substitute previous per-item shrink results for recent originals.
+			// Do not substitute previous per-item shrink results for full originals.
 			entry.PromptText = fmt.Sprintf("# item=%d timestamp_ms=%d [%s]\n%s",
 				id, ts, renderItemTypeVerbose(projected), projected.value.String())
 		}
 		snapshot.Items = append(snapshot.Items, entry)
 	}
-	return snapshot, nil
-}
-
-func budgetCompressionSnapshot(snapshot *timelineCompressionSnapshot, summaryReserve int) (*timelineCompressionSnapshot, error) {
-	var input []string
-	if snapshot.Head != nil && strings.TrimSpace(snapshot.Head.Text) != "" {
-		input = append(input, "# Previous timeline summary\n"+snapshot.Head.Text)
-	}
-	ordinary := renderCompressionSnapshotItems(snapshot.Items)
-	if ordinary == "" {
-		return nil, fmt.Errorf("compression snapshot has no visible ordinary history")
-	}
-	input = append(input, ordinary)
-	snapshot.InputText = strings.Join(input, "\n\n")
-	snapshot.InputTokens = MeasureTokens(snapshot.InputText)
-	snapshot.TargetTokens = snapshot.InputTokens / 6
-	if snapshot.TargetTokens <= summaryReserve {
-		return nil, fmt.Errorf("compression target %d cannot fit summary reserve %d and recent history", snapshot.TargetTokens, summaryReserve)
-	}
-	// Choose a contiguous suffix. If the newest visible item/group cannot fit,
-	// fail instead of truncating it or skipping it to retain older history.
-	snapshot.RecentStart = len(snapshot.Items)
-	for i := len(snapshot.Items) - 1; i >= 0; i-- {
-		text := renderCompressionSnapshotItems(snapshot.Items[i:])
-		tokens := MeasureTokens(text)
-		if tokens > snapshot.TargetTokens-summaryReserve {
-			break
-		}
-		snapshot.RecentStart, snapshot.RecentText, snapshot.RecentTokens = i, text, tokens
-	}
-	if snapshot.RecentText == "" {
-		return nil, fmt.Errorf("newest complete timeline item exceeds recent-history budget %d", snapshot.TargetTokens-summaryReserve)
-	}
-	if snapshot.RecentStart == 0 && (snapshot.Head == nil || strings.TrimSpace(snapshot.Head.Text) == "") {
-		return nil, fmt.Errorf("compression snapshot has no older content to summarize")
-	}
-	snapshot.SummaryBudget = snapshot.TargetTokens - snapshot.RecentTokens
 	return snapshot, nil
 }
 
@@ -196,6 +185,285 @@ func renderCompressionSnapshotItems(items []timelineCompressionSnapshotItem) str
 		}
 	}
 	return strings.Join(texts, "\n")
+}
+
+//go:embed prompts/timeline/compression.txt
+var timelineCompressionTemplate string
+
+//go:embed prompts/timeline/compression.json
+var timelineCompressionSchema string
+
+// TimelineCompressionOptions describes one explicit compression, not automatic
+// scheduling policy. Safety limits reject oversized input/output without loss;
+// they are never requested target lengths or compression ratios in the prompt.
+type TimelineCompressionOptions struct {
+	MaxInputTokens   int
+	MaxSummaryTokens int
+	RetainedContext  map[string]string // actual independent prompt fields, not inferred from their names
+}
+
+type TimelineCompressionResult struct {
+	ThroughID     int64
+	RetiredIDs    []int64
+	Summary       string
+	InputTokens   int
+	SummaryTokens int
+}
+
+// compressionSourceStateLocked detects edits, rollback, late insertions and
+// exact-state changes inside the captured range. Appends beyond it are allowed.
+func (m *Timeline) compressionSourceStateLocked(through int64) (string, error) {
+	type source struct {
+		ID           int64
+		Timestamp    int64
+		HasTimestamp bool
+		Item         *TimelineItem
+	}
+	var sources []source
+	ids := append([]int64(nil), m.idToTimelineItem.Keys()...)
+	sort.Slice(ids, func(i, j int) bool { return ids[i] < ids[j] })
+	for _, id := range ids {
+		if id > through {
+			break
+		}
+		item, _ := m.idToTimelineItem.Get(id)
+		ts, ok := m.idToTs.Get(id)
+		sources = append(sources, source{id, ts, ok, item})
+	}
+	raw, err := json.Marshal(sources)
+	if err != nil {
+		return "", fmt.Errorf("snapshot compression source: %w", err)
+	}
+	return fmt.Sprintf("%x", sha256.Sum256(raw)), nil
+}
+
+// CompressOnce is the explicit step-2/3 entry. No production write/threshold
+// path calls it yet. It reserves a snapshot, invokes the configured auxiliary AI
+// outside Timeline.mu, then publishes all state changes under one write lock.
+func (m *Timeline) CompressOnce(options TimelineCompressionOptions) (result *TimelineCompressionResult, err error) {
+	if m == nil || options.MaxInputTokens <= 0 || options.MaxSummaryTokens <= 0 {
+		return nil, fmt.Errorf("compression requires a timeline and positive input/summary safety limits")
+	}
+	m.mu.Lock()
+	if m.compressing {
+		m.mu.Unlock()
+		return nil, fmt.Errorf("timeline compression is already running")
+	}
+	snapshot, err := m.captureCompressionSnapshotLocked()
+	if err != nil {
+		m.mu.Unlock()
+		return nil, err
+	}
+	m.compressing, m.compressionSnapshot = true, snapshot
+	m.mu.Unlock()
+	defer func() {
+		m.mu.Lock()
+		m.compressing, m.compressionSnapshot = false, nil
+		m.mu.Unlock()
+		if recovered := recover(); recovered != nil {
+			result, err = nil, fmt.Errorf("timeline compression panicked: %v", recovered)
+		}
+	}()
+	snapshot.RetainedContext = make(map[string]string, len(options.RetainedContext))
+	for key, value := range options.RetainedContext {
+		snapshot.RetainedContext[key] = value
+	}
+	if err := prepareCompressionSnapshot(snapshot); err != nil {
+		return nil, err
+	}
+	summary, err := m.summarizeCompressionSnapshot(snapshot, options)
+	if err != nil {
+		return nil, err
+	}
+	if err := m.config.GetContext().Err(); err != nil {
+		return nil, err
+	}
+	return m.commitCompressionSnapshot(snapshot, summary)
+}
+
+func (m *Timeline) commitCompressionSnapshot(snapshot *timelineCompressionSnapshot, summary string) (*TimelineCompressionResult, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if snapshot == nil || m.compressionSnapshot != snapshot || strings.TrimSpace(summary) == "" {
+		return nil, fmt.Errorf("invalid or inactive compression transaction")
+	}
+	version := int64(0)
+	if m.freezeState != nil {
+		version = m.freezeState.Version
+	}
+	state, err := m.compressionSourceStateLocked(snapshot.ThroughID)
+	if err != nil {
+		return nil, err
+	}
+	if version != snapshot.FreezeVersion || !sameTimelineCompressedHead(m.compressedHead, snapshot.Head) || state != snapshot.SourceState {
+		return nil, fmt.Errorf("timeline changed inside compression snapshot; discarding stale summary")
+	}
+	result := &TimelineCompressionResult{ThroughID: snapshot.ThroughID, Summary: summary,
+		InputTokens: snapshot.InputTokens, SummaryTokens: MeasureTokens(summary)}
+	head := &TimelineCompressedHead{Text: summary}
+	if snapshot.Head != nil {
+		head.CoveredEndItemID, head.CoveredEndAtMs = snapshot.Head.CoveredEndItemID, snapshot.Head.CoveredEndAtMs
+	}
+	for _, item := range snapshot.Items {
+		result.RetiredIDs = append(result.RetiredIDs, item.ID)
+		if item.ID >= head.CoveredEndItemID {
+			head.CoveredEndItemID, head.CoveredEndAtMs = item.ID, item.Timestamp
+		}
+	}
+	// Exact journals retain freeze membership. The watermark sentinel survives
+	// serialization even when every ordinary original has been retired.
+	ids := append([]int64(nil), snapshot.ExactItemIDs...)
+	ids = append(ids, snapshot.ThroughID)
+	sort.Slice(ids, func(i, j int) bool { return ids[i] < ids[j] })
+	unique := ids[:0]
+	for _, id := range ids {
+		if len(unique) == 0 || unique[len(unique)-1] != id {
+			unique = append(unique, id)
+		}
+	}
+	var start, end time.Time
+	for _, id := range unique {
+		if ts, ok := m.idToTs.Get(id); ok {
+			at := time.UnixMilli(ts)
+			if start.IsZero() || at.Before(start) {
+				start = at
+			}
+			if end.IsZero() || at.After(end) {
+				end = at
+			}
+		}
+	}
+	batch := &TimelineFreezeBatch{IDs: unique, BucketStart: start, BucketEnd: end,
+		Nonce: fmt.Sprintf("c%dv%d", snapshot.ThroughID, version+1)}
+	// Everything below is local, non-failing state publication; no callback or
+	// AI call is allowed between freezing/promoting and publishing the new head.
+	m.freezeState = &TimelineFreezeState{Version: version + 1, Batches: []*TimelineFreezeBatch{batch}}
+	m.rebuildPromotedStateLocked(snapshot.ThroughID)
+	m.updateCompressedHead(head)
+	retired := make(map[int64]struct{}, len(result.RetiredIDs))
+	for _, id := range result.RetiredIDs {
+		item, _ := m.idToTimelineItem.Get(id)
+		item.deleted = true
+		retired[id] = struct{}{}
+	}
+	// Restoring JSON creates separate values in the ID and timestamp indexes.
+	// Retire both views so save/dump cannot resurrect summarized originals.
+	m.tsToTimelineItem.ForEach(func(_ int64, item *TimelineItem) bool {
+		if item != nil && item.value != nil {
+			if _, ok := retired[item.GetID()]; ok {
+				item.deleted = true
+			}
+		}
+		return true
+	})
+	return result, nil
+}
+
+// renderCompressionSummaryPrompt renders one complete reduction request. Native
+// replay is historical data here, not messages to execute/project in this helper.
+// Redact the process nonce on this request-only copy, then JSON-encode the source
+// so embedded tags cannot become projection controls or source delimiters.
+// The output schema is supplied once by the auxiliary scheduler.
+func renderCompressionSummaryPrompt(snapshot *timelineCompressionSnapshot) (string, error) {
+	if snapshot == nil {
+		return "", fmt.Errorf("invalid timeline compression snapshot")
+	}
+	previous := ""
+	if snapshot.Head != nil {
+		previous = snapshot.Head.Text
+	}
+	history := renderCompressionSnapshotItems(snapshot.Items)
+	if strings.TrimSpace(previous) == "" && strings.TrimSpace(history) == "" {
+		return "", fmt.Errorf("timeline compression has no history to summarize")
+	}
+	source, err := json.MarshalIndent(struct {
+		RetainedContext map[string]string `json:"retained_context,omitempty"`
+		PreviousSummary string            `json:"previous_summary"`
+		OlderHistory    string            `json:"history_to_summarize"`
+	}{snapshot.RetainedContext, aiprojection.RedactNonce(previous), aiprojection.RedactNonce(history)}, "", "  ")
+	if err != nil {
+		return "", fmt.Errorf("encode compression source: %w", err)
+	}
+	tmpl, err := template.New("timeline-compression").Parse(timelineCompressionTemplate)
+	if err != nil {
+		return "", err
+	}
+	var buf bytes.Buffer
+	err = tmpl.Execute(&buf, struct {
+		Source string
+	}{aiprojection.RedactNonce(string(source))})
+	if err != nil {
+		return "", err
+	}
+	return buf.String(), nil
+}
+
+// summarizeCompressionSnapshot is intentionally not wired to the production
+// trigger. It schedules one complete reduction, without chunks, refinement or
+// truncation. Transport/parser retries still follow the existing Config policy.
+// It never commits, freezes, promotes or retires any Timeline content.
+func (m *Timeline) summarizeCompressionSnapshot(snapshot *timelineCompressionSnapshot, limits ...TimelineCompressionOptions) (string, error) {
+	if m == nil || m.config == nil {
+		return "", fmt.Errorf("timeline compression requires an auxiliary scheduler")
+	}
+	prompt, err := renderCompressionSummaryPrompt(snapshot)
+	if err != nil {
+		return "", err
+	}
+	// Capture the safety limits before invoking callbacks; don't reread mutable state
+	// or the caller's snapshot after the request has started.
+	var limit TimelineCompressionOptions
+	if len(limits) > 0 {
+		limit = limits[0]
+	}
+	if limit.MaxInputTokens > 0 && TokenCountExceeds(prompt+"\n"+timelineCompressionSchema, limit.MaxInputTokens) {
+		return "", fmt.Errorf("timeline compression input exceeds safety limit %d; source preserved", limit.MaxInputTokens)
+	}
+	var summary string
+	resultErr := fmt.Errorf("timeline compression skipped or returned no result")
+	m.config.ScheduleAuxiliaryTask(m.config.GetContext(), CallerLabelTimelineCompress,
+		func() string { return prompt },
+		func(action *Action) {
+			if action == nil {
+				resultErr = fmt.Errorf("timeline compression returned no action")
+				return
+			}
+			if err := action.WaitParseResult(m.config.GetContext()); err != nil {
+				resultErr = fmt.Errorf("parse timeline compression: %w", err)
+				return
+			}
+			if !action.ValidCheck("timeline-summary") {
+				resultErr = fmt.Errorf("timeline compression returned an unexpected action")
+				return
+			}
+			raw, exists := action.LookupCanonicalParam("summary")
+			text, isString := raw.(string)
+			if !exists || !isString {
+				resultErr = fmt.Errorf("timeline compression summary must be a root string field")
+				return
+			}
+			text = strings.TrimSpace(text)
+			if text == "" {
+				resultErr = fmt.Errorf("timeline compression returned an empty summary")
+				return
+			}
+			if strings.Contains(text, aiprojection.Nonce()) {
+				resultErr = fmt.Errorf("timeline compression returned a projection control token")
+				return
+			}
+			if limit.MaxSummaryTokens > 0 && TokenCountExceeds(text, limit.MaxSummaryTokens) {
+				resultErr = fmt.Errorf("timeline compression summary exceeds safety limit %d", limit.MaxSummaryTokens)
+				return
+			}
+			summary, resultErr = text, nil
+		},
+		WithAuxiliaryOutputSchema("timeline-summary", timelineCompressionSchema),
+		WithAuxiliaryOnError(func(err error) { resultErr = fmt.Errorf("timeline compression request failed: %w", err) }),
+		WithAuxiliaryOpts(WithLiteForgeDisableTimeline(),
+			WithLiteForgeMaxPromptTokens(limit.MaxInputTokens),
+			WithGeneralConfigExtraRequestOpts(WithAIRequest_CallerLabel(CallerLabelTimelineCompress))),
+	)
+	return summary, resultErr
 }
 
 // MaxTimelineSaveSize is the maximum size (1.5MB storage limit) for timeline data when saving to database

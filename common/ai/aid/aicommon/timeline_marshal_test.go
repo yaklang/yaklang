@@ -84,7 +84,7 @@ func TestTimelineMarshalUnmarshal(t *testing.T) {
 	t.Log("Timeline marshal/unmarshal test passed")
 }
 
-func TestTimelineMarshalDropsInvalidPromptOnlyReplayWithoutChangingDisplay(t *testing.T) {
+func TestTimelineMarshalPreservesPromptOnlyTextWithoutChangingDisplay(t *testing.T) {
 	timeline := NewTimeline(nil, nil)
 	projection := "[model_thinking]:\n" + aiprojection.CreateTag("TIMELINE_MODEL_THINKING_V1", "n1", `{"v":1,"reasoning_content":"payload","content":"historical answer"}`)
 	timeline.PushTextWithPromptProjection(
@@ -250,4 +250,26 @@ func TestTimelineUnmarshalLegacySummaryType(t *testing.T) {
 			require.NotContains(t, serialized, `"summary"`)
 		})
 	}
+}
+
+func TestTimelineMarshalDropsInvalidPromptOnlyReplayWithoutChangingDisplay(t *testing.T) {
+	timeline := NewTimeline(nil, nil)
+	timeline.PushTextWithPromptProjection(
+		301,
+		"[model_thinking]:\ndisplay-only reasoning",
+		"[model_thinking]:\n<|TIMELINE_MODEL_THINKING_n1|>payload<|TIMELINE_MODEL_THINKING_END_n1|>",
+	)
+
+	serialized, err := MarshalTimeline(timeline)
+	require.NoError(t, err)
+	restored, err := UnmarshalTimeline(serialized)
+	require.NoError(t, err)
+
+	item, ok := restored.idToTimelineItem.Get(301)
+	require.True(t, ok)
+	require.Equal(t, "[model_thinking]:\ndisplay-only reasoning", item.String())
+	textItem, ok := item.GetValue().(*TextTimelineItem)
+	require.True(t, ok)
+	require.Empty(t, textItem.PromptText, "replay tags with a nonce unrelated to the saved projection must be discarded")
+	require.NotContains(t, item.String(), "TIMELINE_MODEL_THINKING_n1")
 }

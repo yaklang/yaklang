@@ -44,6 +44,7 @@ const (
 	CallerLabelScanPlan                       = "scan_plan"
 	CallerLabelLLMRerank                      = "llm-rerank"
 	CallerLabelTimelineBatchCompress          = "timeline-batch-compress"
+	CallerLabelTimelineCompress               = "timeline-compress"
 	CallerLabelTimelineHeadRefine             = "timeline-head-refine"
 	CallerLabelGoalAcceptanceReview           = "goal-acceptance-review"
 	CallerLabelHttpFlowAnalyzeFinalizeSummary = "http_flow_analyze_finalize_summary"
