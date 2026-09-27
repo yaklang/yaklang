@@ -41,6 +41,9 @@ func (p *PromotableTimelineItem) SetShrinkResult(string)         {}
 // OpenPromptText is the exact, non-reducible payload used for open-bucket
 // accounting. String remains empty for ordinary history/UI compatibility.
 func (p *PromotableTimelineItem) OpenPromptText() string {
+	if p != nil && p.Kind == TimelinePromotedKindRecentTool {
+		return timelineToolCacheDeltaPrompt(p)
+	}
 	if p != nil && p.Kind == TimelinePromotedKindEvidence {
 		return timelineEvidenceDeltaPrompt(p)
 	}
@@ -312,32 +315,6 @@ func (m *Timeline) effectivePromotedKeys(targetSection, kind string) []string {
 	return keys
 }
 
-func (m *Timeline) projectPromotedLocked() (string, string) {
-	if m == nil {
-		return "", ""
-	}
-	semi := renderPromotedRecentTools(m.promotedState)
-	watermark := int64(0)
-	if m.promotedState != nil {
-		watermark = m.promotedState.Watermark
-	}
-	var pending []*PromotableTimelineItem
-	for _, id := range m.idToTimelineItem.Keys() {
-		item, ok := m.idToTimelineItem.Get(id)
-		if !ok || item == nil || item.deleted {
-			continue
-		}
-		control, ok := item.value.(*PromotableTimelineItem)
-		if !ok || control == nil || id <= watermark {
-			continue
-		}
-		if control.Kind == TimelinePromotedKindRecentTool {
-			pending = append(pending, control)
-		}
-	}
-	return semi, renderPromotableOpenDeltas(pending, semi == "")
-}
-
 func renderPromotedRecentTools(state *TimelinePromotedState) string {
 	if state == nil {
 		return ""
@@ -364,46 +341,10 @@ func renderPromotedRecentTools(state *TimelinePromotedState) string {
 	out.WriteString("# Recently Used Tools (available for directly_call_tool)\n\n")
 	for _, key := range keys {
 		if entry := entries[key]; entry != nil {
-			out.WriteString(strings.TrimSpace(entry.Payload))
+			out.WriteString(escapeToolCacheData(strings.TrimSpace(entry.Payload)))
 			out.WriteString("\n\n")
 		}
 	}
-	out.WriteString(recentToolRoutingInstructions)
 	out.WriteString("\n<|CACHE_TOOL_CALL_END_[current-nonce]|>")
 	return strings.TrimSpace(out.String())
 }
-
-func renderPromotableOpenDeltas(items []*PromotableTimelineItem, includeInstructions bool) string {
-	if len(items) == 0 {
-		return ""
-	}
-	var out strings.Builder
-	out.WriteString("<|CACHE_TOOL_CALL_[current-nonce]|>\n")
-	out.WriteString("# Prompt State Updates (pending Timeline seal)\n\n")
-	for _, item := range items {
-		if item == nil || item.Kind != TimelinePromotedKindRecentTool {
-			continue
-		}
-		if item.Operation == TimelinePromotedOperationDelete {
-			fmt.Fprintf(&out, "- invalidated recent tool: %s\n", item.Key)
-			continue
-		}
-		if item.Operation == TimelinePromotedOperationReuse {
-			fmt.Fprintf(&out, "- reused recent tool: %s\n", item.Key)
-			continue
-		}
-		out.WriteString(strings.TrimSpace(item.Payload))
-		out.WriteString("\n\n")
-	}
-	if includeInstructions {
-		out.WriteString(recentToolRoutingInstructions)
-	}
-	out.WriteString("\n<|CACHE_TOOL_CALL_END_[current-nonce]|>")
-	return strings.TrimSpace(out.String())
-}
-
-const recentToolRoutingInstructions = `## How to use directly_call_tool
-
-If the exact tool you need is already listed above, prefer directly_call_tool for faster execution.
-The schemas above are params-only shapes. Pass one directly as directly_call_tool_params; do not wrap it with @action, tool, or params.
-For multiline values, TOOL_PARAM_{param_name}_[current-nonce] AITAG blocks may be used. AITAG values override same-named JSON params.`

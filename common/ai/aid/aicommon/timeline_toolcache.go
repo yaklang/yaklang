@@ -1,5 +1,40 @@
 package aicommon
 
+import (
+	"fmt"
+	"strings"
+)
+
+// This private, ephemeral type cannot be restored from user/history text. Only
+// its generated cache envelope may bypass the ordinary Timeline tag escaping;
+// all embedded metadata is escaped before constructing it.
+type timelineToolCachePromptItem struct{ TextTimelineItem }
+
+func escapeToolCacheData(content string) string {
+	return strings.ReplaceAll(content, "<|", "&lt;|")
+}
+
+// timelineToolCacheDeltaPrompt renders one immutable event at its journal
+// position. The stable tag suffix is informational, not a projection nonce:
+// these schemas describe business-tool params and never declare native tools.
+func timelineToolCacheDeltaPrompt(item *PromotableTimelineItem) string {
+	if item == nil || item.Kind != TimelinePromotedKindRecentTool {
+		return ""
+	}
+	var body string
+	switch item.Operation {
+	case TimelinePromotedOperationUpsert:
+		body = fmt.Sprintf("[UPSERT] %s\n%s", escapeToolCacheData(item.Key), escapeToolCacheData(strings.TrimSpace(item.Payload)))
+	case TimelinePromotedOperationReuse:
+		body = fmt.Sprintf("[REUSE] %s", escapeToolCacheData(item.Key))
+	case TimelinePromotedOperationDelete:
+		body = fmt.Sprintf("[DELETE] %s", escapeToolCacheData(item.Key))
+	default:
+		return ""
+	}
+	return "<|CACHE_TOOL_CALL_[current-nonce]|>\n" + body + "\n<|CACHE_TOOL_CALL_END_[current-nonce]|>"
+}
+
 // promotedToolLastUsedID accepts snapshots written before reuse was recorded.
 func promotedToolLastUsedID(entry *PromotedTimelineEntry) int64 {
 	if entry.LastUsedItemID > 0 {

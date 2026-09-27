@@ -111,6 +111,9 @@ func (m *Timeline) freezeBudgetGroupsLocked(useSizer bool, throughLimit ...int64
 			item = &TimelineItem{createdAt: item.createdAt, value: &TextTimelineItem{
 				ID: id, Text: control.OpenPromptText(),
 			}}
+			if control.Kind == TimelinePromotedKindRecentTool {
+				item.value = &timelineToolCachePromptItem{TextTimelineItem{ID: id, Text: control.OpenPromptText()}}
+			}
 		}
 		view.idToTimelineItem.OrderInsert(id, item, lessInt64)
 	}
@@ -186,9 +189,11 @@ func (m *Timeline) freezeLocked(all bool, throughLimit ...int64) TimelineFreezeR
 	return result
 }
 
-// frozenPromptBlocksLocked is read-only. Pending evidence is rendered in place;
-// sealed evidence is represented only by its promoted semi-dynamic snapshot.
-func (m *Timeline) frozenPromptBlocksLocked() TimelineRenderableBlocks {
+// frozenPromptBlocksLocked is read-only. Pending evidence/tool-cache events are
+// rendered in place; frozen controls appear only in semi-dynamic snapshots.
+// Filtering occurs after bucket selection, so helper prompts share the same
+// freeze boundaries without receiving unrelated tool-cache schemas.
+func (m *Timeline) frozenPromptBlocksLocked(excludeToolCache bool) TimelineRenderableBlocks {
 	var blocks TimelineRenderableBlocks
 	if m.compressedHead != nil && strings.TrimSpace(m.compressedHead.Text) != "" {
 		blocks = append(blocks, &TimelineCompressedHeadBlock{
@@ -200,6 +205,7 @@ func (m *Timeline) frozenPromptBlocksLocked() TimelineRenderableBlocks {
 		block := &TimelineIntervalBlock{BucketStart: start, BucketEnd: end,
 			IntervalMinutes: TimelineDumpDefaultIntervalMinutes, Open: open,
 			frozenNonce: nonce, initialTaskID: initialTaskID}
+		filteredToolCache := false
 		for _, id := range ids {
 			item, ok := m.idToTimelineItem.Get(id)
 			if !ok || item == nil || item.deleted {
@@ -207,15 +213,25 @@ func (m *Timeline) frozenPromptBlocksLocked() TimelineRenderableBlocks {
 			}
 			if isPromotableTimelineItem(item) {
 				op := item.value.(*PromotableTimelineItem)
-				if !open || op == nil || op.Kind != TimelinePromotedKindEvidence {
+				if !open || op == nil {
+					continue
+				}
+				if op.Kind == TimelinePromotedKindRecentTool && excludeToolCache {
+					filteredToolCache = true
+					continue
+				}
+				if op.Kind != TimelinePromotedKindEvidence && op.Kind != TimelinePromotedKindRecentTool {
 					continue
 				}
 				// A detached prompt view preserves the journal, reducer exclusion and UI audit.
-				item = &TimelineItem{createdAt: item.createdAt, value: &TextTimelineItem{ID: id, Text: timelineEvidenceDeltaPrompt(op)}}
+				item = &TimelineItem{createdAt: item.createdAt, value: &TextTimelineItem{ID: id, Text: op.OpenPromptText()}}
+				if op.Kind == TimelinePromotedKindRecentTool {
+					item.value = &timelineToolCachePromptItem{TextTimelineItem{ID: id, Text: op.OpenPromptText()}}
+				}
 			}
 			block.Items = append(block.Items, item)
 		}
-		if len(block.Items) > 0 {
+		if len(block.Items) > 0 || filteredToolCache {
 			blocks = append(blocks, block)
 		}
 	}

@@ -32,8 +32,7 @@ func TestConfigRecordRecentlyUsedToolHasSinglePromptSourceAndNoopReuse(t *testin
 	mutation := cfg.RecordRecentlyUsedTool(tool)
 	require.NotNil(t, mutation.Upsert)
 	first := BuildPromptFrozenOpenMaterials(cfg)
-	require.Empty(t, first.TimelineOpen)
-	require.Contains(t, first.PromotedTimelineOpen, "## Tool: alpha_tool")
+	require.Contains(t, first.TimelineOpen, "## Tool: alpha_tool")
 	require.Empty(t, first.PromotedSemiDynamic1)
 	materials := &PromptMaterials{}
 	ApplyPromptFrozenOpenMaterials(materials, first)
@@ -48,11 +47,10 @@ func TestConfigRecordRecentlyUsedToolHasSinglePromptSourceAndNoopReuse(t *testin
 	require.Equal(t, maxID, cfg.GetTimeline().GetMaxID())
 	second := BuildPromptFrozenOpenMaterials(cfg)
 	require.Equal(t, first.TimelineOpen, second.TimelineOpen)
-	require.Equal(t, first.PromotedTimelineOpen, second.PromotedTimelineOpen)
 
 	cfg.GetTimeline().ForcePromoteAll()
 	promoted := BuildPromptFrozenOpenMaterials(cfg)
-	require.NotContains(t, promoted.PromotedTimelineOpen, "## Tool: alpha_tool")
+	require.NotContains(t, promoted.TimelineOpen, "## Tool: alpha_tool")
 	require.Contains(t, promoted.PromotedSemiDynamic1, "## Tool: alpha_tool")
 	require.Equal(t, 1, strings.Count(promoted.PromotedSemiDynamic1, "Direct Params Schema"))
 }
@@ -72,8 +70,8 @@ func TestTimelinePromotedStateOpenSealDeleteAndRollback(t *testing.T) {
 
 	first := RenderTimelineFrozenOpen(tl)
 	require.Empty(t, first.PromotedSemiDynamic1)
-	require.Contains(t, first.PromotedOpen, "SCHEMA_ALPHA")
-	require.Equal(t, 1, strings.Count(first.PromotedOpen, "How to use directly_call_tool"))
+	require.Contains(t, first.Open, "SCHEMA_ALPHA")
+	require.Equal(t, 1, strings.Count(first.Open, "<|CACHE_TOOL_CALL_[current-nonce]|>"))
 
 	// A successor bucket seals the old narrative bucket and jointly promotes its
 	// control mutation into stable Semi1.
@@ -83,9 +81,9 @@ func TestTimelinePromotedStateOpenSealDeleteAndRollback(t *testing.T) {
 	require.NotContains(t, sealed.Frozen, "SCHEMA_ALPHA")
 	require.Contains(t, sealed.Open, "ordinary-new")
 	require.NotContains(t, sealed.Open, "SCHEMA_ALPHA")
-	require.Empty(t, sealed.PromotedOpen)
+	require.NotContains(t, sealed.Open, "CACHE_TOOL_CALL")
 	require.Contains(t, sealed.PromotedSemiDynamic1, "SCHEMA_ALPHA")
-	require.Equal(t, 1, strings.Count(sealed.PromotedSemiDynamic1, "How to use directly_call_tool"))
+	require.Equal(t, 1, strings.Count(sealed.PromotedSemiDynamic1, "SCHEMA_ALPHA"))
 
 	// Serialization preserves both journal and materialized watermark.
 	raw, err := MarshalTimeline(tl)
@@ -99,13 +97,13 @@ func TestTimelinePromotedStateOpenSealDeleteAndRollback(t *testing.T) {
 	injectPromotable(tl, 4, base.Add(4*time.Minute+time.Second), TimelinePromotedOperationDelete, "alpha", "")
 	pendingDelete := RenderTimelineFrozenOpen(tl)
 	require.Contains(t, pendingDelete.PromotedSemiDynamic1, "SCHEMA_ALPHA")
-	require.Contains(t, pendingDelete.PromotedOpen, "invalidated recent tool: alpha")
-	require.Equal(t, 1, strings.Count(pendingDelete.PromotedSemiDynamic1+pendingDelete.PromotedOpen, "How to use directly_call_tool"))
+	require.Contains(t, pendingDelete.Open, "[DELETE] alpha")
+	require.Equal(t, 1, strings.Count(pendingDelete.PromotedSemiDynamic1+pendingDelete.Open, "SCHEMA_ALPHA"))
 
 	injectTimelineItem(tl, 5, base.Add(8*time.Minute), &TextTimelineItem{ID: 5, Text: "ordinary-later"})
 	deleted := RenderTimelineFrozenOpen(tl)
 	require.Empty(t, deleted.PromotedSemiDynamic1)
-	require.NotContains(t, deleted.PromotedOpen, "invalidated recent tool")
+	require.NotContains(t, deleted.Open, "[DELETE]")
 
 	tl.TruncateAfter(3)
 	rolledBack := RenderTimelineFrozenOpen(tl)
@@ -184,5 +182,5 @@ func TestTimelineForkMergesPromotionJournalWithoutDiffNoise(t *testing.T) {
 	merged, err := fork.MergeBack()
 	require.NoError(t, err)
 	require.Equal(t, 0, merged.ActiveItemsMerged, "control entries must not inflate ordinary event statistics")
-	require.Contains(t, RenderTimelineFrozenOpen(parent).PromotedOpen, "## Tool: branch_tool")
+	require.Contains(t, RenderTimelineFrozenOpen(parent).Open, "## Tool: branch_tool")
 }

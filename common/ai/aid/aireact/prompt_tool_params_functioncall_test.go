@@ -189,23 +189,28 @@ func TestFunctionCallToolParamsExcludesOpenAndPromotedToolCache(t *testing.T) {
 	require.NoError(t, err)
 	selected := aitool.NewWithoutCallback("selected_reader", aitool.WithStringParam("path", aitool.WithParam_Required(true)))
 	cached := aitool.NewWithoutCallback("cached_other_tool", aitool.WithDescription("CACHE_ONLY_DESCRIPTION_R2"), aitool.WithStringParam("query"))
+	react.config.GetTimeline().SetTimelineBucketByteSize(-1)
 	react.config.GetTimeline().PushText(react.config.AcquireId(), "HISTORICAL_RESULT_R2")
+	react.config.ApplySessionEvidenceOps([]aicommon.EvidenceOperation{{Op: "add", ID: "cache-test-finding", Content: "KEEP_EVIDENCE_R2"}})
 	require.NotNil(t, react.config.RecordRecentlyUsedTool(cached).Upsert)
 	task := aicommon.NewStatefulTaskBase("r2-cache-task", "TASK_CONTEXT_R2", context.Background(), react.config.GetEmitter())
 	for _, sealed := range []bool{false, true} {
 		if sealed {
 			react.config.GetTimeline().ForcePromoteAll()
 		}
+		rawBefore, err := aicommon.MarshalTimeline(react.config.GetTimeline())
+		require.NoError(t, err)
 		parentBefore := aicommon.BuildPromptFrozenOpenMaterials(react.config)
 		if sealed {
 			require.Contains(t, parentBefore.PromotedSemiDynamic1, "CACHE_ONLY_DESCRIPTION_R2")
 		} else {
-			require.Contains(t, parentBefore.PromotedTimelineOpen, "CACHE_ONLY_DESCRIPTION_R2")
+			require.Contains(t, parentBefore.TimelineOpen, "CACHE_ONLY_DESCRIPTION_R2")
 		}
 		prompt, err := react.promptManager.GenerateFunctionCallToolParamsPromptForTask(task, selected,
 			aicommon.ToolParamsCallIntent{DestinationIdentifier: "CURRENT_INVOCATION_R2", Reason: "read selected file"})
 		require.NoError(t, err)
 		require.Contains(t, prompt, "HISTORICAL_RESULT_R2")
+		require.Contains(t, prompt, "KEEP_EVIDENCE_R2")
 		require.Contains(t, prompt, "TASK_CONTEXT_R2")
 		require.Contains(t, prompt, "selected_reader")
 		require.Contains(t, prompt, `"path"`)
@@ -221,9 +226,12 @@ func TestFunctionCallToolParamsExcludesOpenAndPromotedToolCache(t *testing.T) {
 		require.NoError(t, err)
 		require.NotContains(t, string(messages), "CACHE_ONLY_DESCRIPTION_R2")
 		require.Contains(t, string(messages), "当前唯一允许调用的函数是")
+		rawAfter, err := aicommon.MarshalTimeline(react.config.GetTimeline())
+		require.NoError(t, err)
+		require.Equal(t, rawBefore, rawAfter)
 		parentAfter := aicommon.BuildPromptFrozenOpenMaterials(react.config)
 		require.Equal(t, parentBefore.PromotedSemiDynamic1, parentAfter.PromotedSemiDynamic1)
-		require.Equal(t, parentBefore.PromotedTimelineOpen, parentAfter.PromotedTimelineOpen)
+		require.Equal(t, parentBefore.TimelineOpen, parentAfter.TimelineOpen)
 	}
 }
 

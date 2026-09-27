@@ -789,7 +789,7 @@ func (pm *PromptManager) buildTimelineOpenObservation(
 	// "Timeline Open & Workspace" 已经表达层级.
 	// 关键词: section.timeline_open 子节点 Name 去前缀, UI 信息密度
 	//
-	// 子节点排列顺序: timeline_open（含 evidence delta）-> promoted_state_updates -> todo_list -> workspace ->
+	// 子节点排列顺序: timeline_open（含 evidence/tool-cache delta）-> todo_list -> workspace ->
 	// session_artifacts_open -> user_history -> current_time -> plan_context. 该顺序与 timeline_open_section.txt
 	// 模板渲染顺序严格一致, 让"上下文成分"面板看到的层级与实际 prompt 字节
 	// 流顺序保持同步.
@@ -802,13 +802,7 @@ func (pm *PromptManager) buildTimelineOpenObservation(
 			true,
 			renderTimelineOpenBlock(materials),
 		),
-		reactloops.NewPromptSectionObservation(
-			"section.timeline_open.promoted_state_updates",
-			"Promoted State Updates",
-			reactloops.PromptSectionRoleTimelineOpen,
-			true,
-			materials.PromotedTimelineOpen,
-		),
+
 		// 全局 TODO 块: 紧跟 Timeline 中的 evidence delta, 让 loop prompt 始终能看到当前
 		// TODO 列表; 数据来源是 SessionPromptState.VerificationTodoStore,
 		// 由 VerifyUserSatisfaction 通过 ApplyTodoDelta 增量写入.
