@@ -2,11 +2,55 @@ package aicommon
 
 import (
 	"context"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 )
+
+// The emergency path runs only when persistence exceeds its storage bound.
+// Once one large item is gone, further removals would unnecessarily discard
+// user history; every removal must therefore be measured before continuing.
+func TestTimelineCompressionEmergencyStopsAfterReachingTarget(t *testing.T) {
+	timeline := NewTimeline(nil, nil)
+	timeline.autoCompressDisabled = true
+	for id := int64(1); id <= 12; id++ {
+		timeline.PushText(id, strings.Repeat("evidence ", 120))
+	}
+	serialized, err := MarshalTimeline(timeline)
+	require.NoError(t, err)
+	timeline.emergencyCompress(len(serialized) - 500)
+	require.Len(t, timeline.getActiveTimelineItemIDs(), 11)
+	require.NotNil(t, timeline.compressedHead)
+}
+
+func TestTimelineCompressionWithoutSchedulerPreservesHistory(t *testing.T) {
+	timeline := NewTimeline(nil, nil)
+	timeline.autoCompressDisabled = true
+	for id := int64(1); id <= 3; id++ {
+		timeline.PushText(id, strings.Repeat("large original evidence ", 50000))
+	}
+	items := timeline.idToTimelineItem.Values()
+	timeline.batchCompressOldestWithRecent(items[:2], items[2:])
+	require.Len(t, timeline.getActiveTimelineItemIDs(), 3)
+	require.Nil(t, timeline.compressedHead)
+}
+
+func TestTimelineCompressionEmergencySummaryBoundsToolError(t *testing.T) {
+	timeline := NewTimeline(nil, nil)
+	timeline.autoCompressDisabled = true
+	result := &aitool.ToolResult{
+		ID: 1, Name: "example", Success: true,
+		Data: map[string]any{"result": map[string]any{"transport_error": strings.Repeat("long error detail ", 5000)}},
+	}
+	timeline.PushToolResult(result)
+	item, ok := timeline.idToTimelineItem.Get(1)
+	require.True(t, ok)
+	summary := timeline.createEmergencySummary(item, 1)
+	require.Contains(t, summary, "execution-failed")
+	require.Less(t, len(summary), 1024)
+}
 
 type mockTimelineArchiveStore struct {
 	batches []*TimelineArchiveBatch

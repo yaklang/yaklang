@@ -79,6 +79,7 @@ func init() {
 		schema.AI_REACT_LOOP_NAME_DEFAULT,
 		func(r aicommon.AIInvokeRuntime, opts ...reactloops.ReActLoopOption) (*reactloops.ReActLoop, error) {
 			preset := []reactloops.ReActLoopOption{
+				reactloops.WithFunctionCallActionVariants(),
 				reactloops.WithAllowRAG(true),
 				reactloops.WithAllowToolCall(true),
 				reactloops.WithAllowAIForge(true),

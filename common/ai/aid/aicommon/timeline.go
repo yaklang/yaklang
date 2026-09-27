@@ -1,7 +1,6 @@
 package aicommon
 
 import (
-	"bytes"
 	"cmp"
 	"fmt"
 	"sort"
@@ -59,26 +58,10 @@ type Timeline struct {
 	// 关键词: bucketSizer, 动态桶大小, 主动缓存调优
 	bucketSizer BucketSizer
 
-	compressing          *utils.Once
+	compressing          bool // guarded by mu; reserved before freezing or starting a reducer
 	forkProtectedMaxID   int64
 	autoCompressDisabled bool
 	branchTimeline       bool
-}
-
-type TimelineCompressedHead struct {
-	Text             string `json:"text"`
-	CoveredEndItemID int64  `json:"covered_end_item_id"`
-	CoveredEndAtMs   int64  `json:"covered_end_at_ms"`
-	Version          int64  `json:"version"`
-}
-
-type TimelineCompressedHistoryNode struct {
-	Version          int64  `json:"version"`
-	PrevVersion      int64  `json:"prev_version"`
-	Text             string `json:"text"`
-	CoveredEndItemID int64  `json:"covered_end_item_id"`
-	CoveredEndAtMs   int64  `json:"covered_end_at_ms"`
-	CreatedAtMs      int64  `json:"created_at_ms"`
 }
 
 func (m *Timeline) OrderInsertId(id int64, item *TimelineItem) {
@@ -88,9 +71,6 @@ func (m *Timeline) OrderInsertId(id int64, item *TimelineItem) {
 func (m *Timeline) OrderInsertTs(ts int64, item *TimelineItem) {
 	m.tsToTimelineItem.OrderInsert(ts, item, cmp.Less[int64])
 }
-
-// MaxTimelineSaveSize is the maximum size (1.5MB storage limit) for timeline data when saving to database
-const MaxTimelineSaveSize = 1536 * 1024
 
 // TimelineDumpDefaultBucketByteSize 是 Dump / GroupByMinutes 默认的字节子桶上限（64KB）。
 // 用于在同一绝对时间桶内进一步切块，避免短时巨量 tool 输出拖垮单个 open 桶的前缀缓存。
@@ -111,10 +91,9 @@ const MaxTimelineSaveSize = 1536 * 1024
 // 关键词: TimelineDumpDefaultBucketByteSize, 字节子桶默认, 主动缓存调优, 64K
 const TimelineDumpDefaultBucketByteSize = 64 * 1024
 
-// TimelineDumpLegacyBucketByteSize 是 2026-05 调优前的旧默认值 (16KB)。
-// 仅作历史标记保留: 老 fixture 测试 / 显式回滚场景可以引用该常量明示语义,
-// 避免与新默认 (64KB) 混淆。生产代码不应直接使用。
-// 关键词: TimelineDumpLegacyBucketByteSize, 16K 旧默认
+// TimelineDumpLegacyBucketByteSize is the former default. Keep this exported
+// value for callers that explicitly configure the historical 16 KiB bucket.
+// Deprecated: use an explicit bucket size with SetTimelineBucketByteSize.
 const TimelineDumpLegacyBucketByteSize = 16 * 1024
 
 func (m *Timeline) Save(db *gorm.DB, persistentId string) {
@@ -149,9 +128,10 @@ func (m *Timeline) Save(db *gorm.DB, persistentId string) {
 			return
 		}
 
-		// If still too large after emergency compression, truncate and log warning
+		// The save path does not truncate JSON. Report the remaining size
+		// honestly and let the persistence layer attempt the complete snapshot.
 		if len(tlstr) > MaxTimelineSaveSize {
-			log.Warnf("timeline still too large (%d) after emergency compression, will save truncated version", len(tlstr))
+			log.Warnf("timeline still too large (%d) after emergency compression, attempting to save complete snapshot", len(tlstr))
 		}
 	}
 
@@ -274,7 +254,6 @@ func (m *Timeline) CopyReducibleTimelineWithMemory() *Timeline {
 		totalDumpContentLimit: m.totalDumpContentLimit,
 		bucketByteSize:        m.bucketByteSize,
 		bucketSizer:           m.bucketSizer,
-		compressing:           utils.NewOnce(),
 		forkProtectedMaxID:    m.forkProtectedMaxID,
 		autoCompressDisabled:  m.autoCompressDisabled,
 		branchTimeline:        m.branchTimeline,
@@ -369,65 +348,8 @@ func NewTimeline(ai AICaller, extraMetaInfo func() string) *Timeline {
 		idToTs:           omap.NewOrderedMap(map[int64]int64{}),
 		archiveRefs:      omap.NewOrderedMap(map[int64]*TimelineArchiveRef{}),
 		promotedState:    newTimelinePromotedState(),
-		compressing:      utils.NewOnce(),
 		branchTimeline:   false,
 	}
-}
-
-func cloneTimelineCompressedHead(head *TimelineCompressedHead) *TimelineCompressedHead {
-	if head == nil {
-		return nil
-	}
-	cp := *head
-	return &cp
-}
-
-func cloneTimelineCompressedHistory(history []*TimelineCompressedHistoryNode) []*TimelineCompressedHistoryNode {
-	if len(history) == 0 {
-		return nil
-	}
-	out := make([]*TimelineCompressedHistoryNode, 0, len(history))
-	for _, h := range history {
-		if h == nil {
-			continue
-		}
-		cp := *h
-		out = append(out, &cp)
-	}
-	return out
-}
-
-func (m *Timeline) updateCompressedHead(newHead *TimelineCompressedHead) {
-	if m == nil || newHead == nil {
-		return
-	}
-	newHead.Text = strings.TrimSpace(newHead.Text)
-	if newHead.Text == "" {
-		return
-	}
-	if m.compressedHead != nil {
-		prev := m.compressedHead
-		prevVersion := prev.Version - 1
-		if prevVersion < 0 {
-			prevVersion = 0
-		}
-		m.compressedHistory = append(m.compressedHistory, &TimelineCompressedHistoryNode{
-			Version:          prev.Version,
-			PrevVersion:      prevVersion,
-			Text:             prev.Text,
-			CoveredEndItemID: prev.CoveredEndItemID,
-			CoveredEndAtMs:   prev.CoveredEndAtMs,
-			CreatedAtMs:      time.Now().UnixMilli(),
-		})
-	}
-	if newHead.Version <= 0 {
-		if m.compressedHead == nil {
-			newHead.Version = 1
-		} else {
-			newHead.Version = m.compressedHead.Version + 1
-		}
-	}
-	m.compressedHead = cloneTimelineCompressedHead(newHead)
 }
 
 func (m *Timeline) ExtraMetaInfo() string {
@@ -438,6 +360,11 @@ func (m *Timeline) ExtraMetaInfo() string {
 }
 
 func (m *Timeline) SetTimelineContentLimit(contentSize int64) {
+	if m == nil {
+		return
+	}
+	m.mu.Lock()
+	defer m.mu.Unlock()
 	m.totalDumpContentLimit = contentSize
 }
 
@@ -577,291 +504,6 @@ func (m *Timeline) PushUserInteraction(stage UserInteractionStage, id int64, sys
 	}
 
 	m.pushTimelineItem(ts, id, item)
-}
-
-// 关键词: timeline_batch_compress 已迁出
-// 以下批量压缩相关代码已迁移至 timeline_batch_compress.go：
-//   - estimateItemContentTokens
-//   - findCompressSplitByRecentKeepTokens
-//   - compressForSizeLimit
-//   - batchCompressOldestWithRecent
-//   - renderBatchCompressPrompt / buildRecentKeptString / buildItemsToCompressString
-//   - MaxBatchCompressPromptSize / MaxBatchCompressRecentSize / timelineBatchCompress (embed)
-// timeline.go 仅保留: calculateActualContentSize / dumpSizeCheck / emergencyCompress / createEmergencySummary
-
-func (m *Timeline) calculateActualContentSize() int64 {
-	m.mu.RLock()
-	defer m.mu.RUnlock()
-	return m.calculateActualContentSizeLocked()
-}
-
-func (m *Timeline) calculateActualContentSizeLocked() int64 {
-	buf := bytes.NewBuffer(nil)
-	initOnce := sync.Once{}
-	count := 0
-
-	m.idToTimelineItem.ForEach(func(id int64, item *TimelineItem) bool {
-		if isPromotableTimelineItem(item) {
-			return true
-		}
-		initOnce.Do(func() {
-			buf.WriteString("timeline:\n")
-		})
-
-		ts, ok := m.idToTs.Get(item.GetID())
-		if !ok {
-			log.Warnf("BUG: timeline id %v not found", item.GetID())
-		}
-		t := time.Unix(0, ts*int64(time.Millisecond))
-		timeStr := t.Format(utils.DefaultTimeFormat3)
-
-		if item.deleted {
-			return true
-		}
-
-		buf.WriteString(fmt.Sprintf("--[%s]\n", timeStr))
-		raw := selectShrunkContent(item)
-		for _, line := range utils.ParseStringToRawLines(raw) {
-			buf.WriteString(fmt.Sprintf("     %s\n", line))
-		}
-		count++
-		return true
-	})
-	if count > 0 {
-		return int64(ytoken.CalcTokenCount(buf.String()))
-	}
-	return 0
-}
-
-func (m *Timeline) dumpSizeCheck() {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	m.dumpSizeCheckLocked()
-}
-
-func (m *Timeline) dumpSizeCheckLocked() {
-	// 在 push 时检查内容大小，如果超过限制就压缩
-	if m.totalDumpContentLimit <= 0 || m.autoCompressDisabled {
-		return
-	}
-
-	// 获取当前内容大小（不包括reducer）
-	contentSize := m.calculateActualContentSizeLocked()
-	if contentSize <= m.totalDumpContentLimit {
-		return // 内容大小正常
-	}
-
-	log.Infof("timeline content too large (%d > %d), triggering batch compression", contentSize, m.totalDumpContentLimit)
-
-	// 压缩到合适的大小
-	m.compressForSizeLimitLocked()
-}
-
-// emergencyCompress performs non-AI compression by removing oldest items
-// This is used when timeline is too large and needs to be compressed without AI assistance
-func (m *Timeline) emergencyCompress(targetSize int) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	m.emergencyCompressLocked(targetSize)
-}
-
-func (m *Timeline) emergencyCompressLocked(targetSize int) {
-	if m == nil {
-		return
-	}
-
-	// Calculate current size
-	tlstr, err := marshalTimelineUnlocked(m)
-	if err != nil {
-		log.Errorf("emergency compress: failed to marshal timeline: %v", err)
-		return
-	}
-	currentSize := len(tlstr)
-	if currentSize <= targetSize {
-		return // Already small enough
-	}
-	m.freezeLocked(true)
-
-	log.Warnf("emergency compress: current size %d, target size %d", currentSize, targetSize)
-
-	// Get all item IDs ordered by timestamp (oldest first)
-	var itemIDs []int64
-	m.idToTimelineItem.ForEach(func(id int64, item *TimelineItem) bool {
-		if item == nil || item.deleted || isPromotableTimelineItem(item) {
-			return true
-		}
-		itemIDs = append(itemIDs, id)
-		return true
-	})
-
-	if len(itemIDs) <= 1 {
-		log.Warnf("emergency compress: only %d items left, cannot compress further", len(itemIDs))
-		return
-	}
-
-	// Keep removing oldest items until we're under target size
-	// We need to keep at least 1 item
-	removedCount := 0
-	var removedIDs []int64
-	var emergencySummaries []string
-	var lastRemovedID int64
-	for len(itemIDs) > 1 && currentSize > targetSize {
-		// Remove the oldest item (first in the list)
-		oldestID := itemIDs[0]
-		itemIDs = itemIDs[1:]
-
-		// Get the item for summary before removing
-		item, ok := m.idToTimelineItem.Get(oldestID)
-		if !ok {
-			continue
-		}
-
-		// Create a brief summary of what was removed (without AI)
-		briefSummary := m.createEmergencySummary(item, oldestID)
-		removedIDs = append(removedIDs, oldestID)
-		if briefSummary != "" {
-			emergencySummaries = append(emergencySummaries, briefSummary)
-		}
-		lastRemovedID = oldestID
-
-		if item != nil {
-			item.deleted = true
-		}
-
-		removedCount++
-
-		// Recalculate size periodically (every 10 items for performance)
-		if removedCount%10 == 0 {
-			tlstr, err = marshalTimelineUnlocked(m)
-			if err != nil {
-				continue
-			}
-			currentSize = len(tlstr)
-		}
-	}
-	if len(removedIDs) > 0 {
-		lastRemovedID = removedIDs[len(removedIDs)-1]
-		var coveredEndAtMs int64
-		if ts, ok := m.idToTs.Get(lastRemovedID); ok {
-			coveredEndAtMs = ts
-		}
-		headText := strings.TrimSpace(strings.Join(emergencySummaries, "\n"))
-		if m.compressedHead != nil && strings.TrimSpace(m.compressedHead.Text) != "" {
-			if headText == "" {
-				headText = m.compressedHead.Text
-			} else {
-				headText = m.compressedHead.Text + "\n" + headText
-			}
-		}
-		if headText != "" {
-			m.updateCompressedHead(&TimelineCompressedHead{
-				Text:             headText,
-				CoveredEndItemID: lastRemovedID,
-				CoveredEndAtMs:   coveredEndAtMs,
-			})
-		}
-	}
-
-	// Final size check
-	tlstr, _ = marshalTimelineUnlocked(m)
-	log.Infof("emergency compress completed: removed %d items, final size: %d (target: %d)", removedCount, len(tlstr), targetSize)
-}
-
-// createEmergencySummary creates a brief summary of an item without AI assistance
-func (m *Timeline) createEmergencySummary(item *TimelineItem, id int64) string {
-	if item == nil {
-		return ""
-	}
-
-	// Get timestamp
-	ts, ok := m.idToTs.Get(id)
-	if !ok {
-		return ""
-	}
-	t := time.Unix(0, ts*int64(time.Millisecond))
-	timeStr := t.Format(utils.DefaultTimeFormat3)
-
-	// Create a very brief summary based on item type
-	var summary string
-	switch v := item.value.(type) {
-	case *aitool.ToolResult:
-		executionStatus, detail := v.GetExecutionStatus()
-		switch {
-		case !v.Success:
-			summary = fmt.Sprintf("[%s] tool:%s protocol-error", timeStr, v.Name)
-		case executionStatus == aitool.ToolExecutionStatusFailed:
-			summary = fmt.Sprintf("[%s] tool:%s execution-failed", timeStr, v.Name)
-		case executionStatus == aitool.ToolExecutionStatusSucceeded:
-			summary = fmt.Sprintf("[%s] tool:%s execution-succeeded", timeStr, v.Name)
-		default:
-			summary = fmt.Sprintf("[%s] tool:%s protocol-completed; execution-outcome-unknown", timeStr, v.Name)
-		}
-		if detail != "" {
-			summary += " (" + detail + ")"
-		}
-	case *UserInteraction:
-		summary = fmt.Sprintf("[%s] user-interaction stage:%v", timeStr, v.Stage)
-	case *TextTimelineItem:
-		// Truncate text to 50 chars
-		text := v.Text
-		if len(text) > 50 {
-			text = text[:47] + "..."
-		}
-		summary = fmt.Sprintf("[%s] text:%s", timeStr, text)
-	default:
-		summary = fmt.Sprintf("[%s] item removed (emergency compress)", timeStr)
-	}
-
-	return summary
-}
-
-// MaxSummaryPromptTimelineSize is the maximum size (60KB) for timeline content in summary prompt
-// This leaves room for Input, ExtraMetaInfo, and template overhead
-const MaxSummaryPromptTimelineSize = 60 * 1024
-
-// MaxSummaryPromptInputSize is the maximum size (30KB) for input content in summary prompt
-const MaxSummaryPromptInputSize = 30 * 1024
-
-var timelineSummary = promptloader.MustLoad("ai/aid/aicommon/prompts/timeline/shrink_tool_result.txt")
-
-func (m *Timeline) renderSummaryPrompt(result *TimelineItem) string {
-	ins, err := template.New("timeline-tool-result").Parse(timelineSummary)
-	if err != nil {
-		log.Warnf("BUG: dump summary prompt failed: %v", err)
-		return ""
-	}
-	var buf bytes.Buffer
-	var nonce = strings.ToLower(utils.RandStringBytes(6))
-
-	// Get timeline dump and truncate if too large
-	timelineDump := m.DumpForPrompt()
-	if len(timelineDump) > MaxSummaryPromptTimelineSize {
-		log.Warnf("summary prompt: timeline dump too large (%d > %d), truncating",
-			len(timelineDump), MaxSummaryPromptTimelineSize)
-		// Keep the end of timeline (more recent items are more important)
-		timelineDump = "... [earlier timeline truncated due to size] ...\n" +
-			timelineDump[len(timelineDump)-MaxSummaryPromptTimelineSize+50:]
-	}
-
-	// Get input and truncate if too large
-	inputStr := result.String()
-	if len(inputStr) > MaxSummaryPromptInputSize {
-		log.Warnf("summary prompt: input too large (%d > %d), truncating",
-			len(inputStr), MaxSummaryPromptInputSize)
-		inputStr = inputStr[:MaxSummaryPromptInputSize-50] + "\n... [content truncated due to size] ..."
-	}
-
-	err = ins.Execute(&buf, map[string]any{
-		"ExtraMetaInfo": m.ExtraMetaInfo(),
-		"Timeline":      timelineDump,
-		"Input":         inputStr,
-		"NONCE":         nonce,
-	})
-	if err != nil {
-		log.Errorf("BUG: dump summary prompt failed: %v", err)
-		return ""
-	}
-	return buf.String()
 }
 
 // TimelineDumpDefaultIntervalMinutes 是 Dump / String / DumpBefore 默认使用的分桶分钟数

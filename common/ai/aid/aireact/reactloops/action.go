@@ -24,10 +24,13 @@ type LoopAction struct {
 	// NativeOnlyOptions omits common action metadata fields from a dedicated
 	// provider tool whose name already identifies its purpose.
 	NativeOnlyOptions bool `json:"-"`
-	ActionVerifier    LoopActionVerifierFunc
-	ActionHandler     LoopActionHandlerFunc
-	StreamFields      []*LoopStreamField
-	AITagStreamFields []*LoopAITagField
+	// FunctionCallAction is a static protocol variant, selected only by loops
+	// that explicitly opt into native action behavior (not merely native tools).
+	FunctionCallAction *LoopAction `json:"-"`
+	ActionVerifier     LoopActionVerifierFunc
+	ActionHandler      LoopActionHandlerFunc
+	StreamFields       []*LoopStreamField
+	AITagStreamFields  []*LoopAITagField
 
 	// OutputExamples provides usage examples for this action, describing when and how to use it.
 	// This field helps AI understand the appropriate scenarios for selecting this action.

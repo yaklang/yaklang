@@ -163,7 +163,7 @@ go test -tags bucketbench -v -run TestBucketBench \
    - 默认行为升级, 所有走 `GroupByMinutes` 的路径自动受益
    - 在真实数据上节省 1.13M (从 -1.99M -> -3.12M, **57% 提升**)
    - 在所有测过的场景里都不弱于 16K
-2. **保留 `TimelineDumpLegacyBucketByteSize = 16K` 常量**, 用作历史标记 / 显式回滚锚点
+2. 旧默认值为 16K；导出的 `TimelineDumpLegacyBucketByteSize` 仅为旧调用方保留，新代码直接设置数值
 3. **新增 `DefaultBucketSizer()` 工厂** ([bucket_bench.go](bucket_bench.go))
    - 等价于 `EntryAdaptiveBucketSizer(8, 32K, 256K)`
    - 主动缓存敏感的调用方可显式开启:
@@ -209,11 +209,8 @@ go test -tags bucketbench -v -run TestBucketBench \
 如果发现新默认值在某个场景下意外劣化:
 
 ```go
-// 全局回退到旧默认:
-aicommon.SetTimelineBucketByteSize(aicommon.TimelineDumpLegacyBucketByteSize)
-
-// 单 timeline 回退:
-tl.SetTimelineBucketByteSize(aicommon.TimelineDumpLegacyBucketByteSize)
+// 单个 Timeline 使用旧的 16 KiB 桶:
+tl.SetTimelineBucketByteSize(16 * 1024)
 
 // 完全关闭字节切分 (退回纯时间桶):
 tl.SetTimelineBucketByteSize(-1)

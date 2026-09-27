@@ -276,7 +276,8 @@ type ReActLoop struct {
 	// functionCallMode selects per-action function-call schema tags when
 	// generateLoopPrompt assembles the prompt. Provider projection and response
 	// handling are separate from this prompt-building step.
-	functionCallMode bool
+	functionCallMode              bool
+	useFunctionCallActionVariants bool
 }
 
 // GetScenarioToolWhitelist 返回当前 loop 声明的 scenario 工具拉回名单.
@@ -995,7 +996,7 @@ func (r *ReActLoop) GetActionHandler(actionName string) (*LoopAction, error) {
 	}
 	ac, ok := r.actions.Get(actionName)
 	if ok {
-		return ac, nil
+		return r.actionForProtocol(ac), nil
 	}
 	fac, ok := r.loopActions.Get(actionName)
 	if ok {
@@ -1003,7 +1004,7 @@ func (r *ReActLoop) GetActionHandler(actionName string) (*LoopAction, error) {
 		if err != nil {
 			return nil, utils.Errorf("cannot create loop action[%s] instance: %v", r.loopName, err)
 		}
-		return ac, nil
+		return r.actionForProtocol(ac), nil
 	}
 	return nil, utils.Errorf("loop handler[%s] action[%s] not found in loop or actions", r.loopName, actionName)
 }
@@ -1031,7 +1032,7 @@ func (r *ReActLoop) GetAllActions() []*LoopAction {
 	var actions []*LoopAction
 	for _, action := range r.actions.Values() {
 		if aicommon.IsReActActionAllowed(r.GetConfig(), r.loopName, action.ActionType) {
-			actions = append(actions, action)
+			actions = append(actions, r.actionForProtocol(action))
 		}
 	}
 	for _, actionName := range r.loopActions.Keys() {
@@ -1048,7 +1049,7 @@ func (r *ReActLoop) GetAllActions() []*LoopAction {
 			log.Errorf("create loopAction[%s] instance failed when getting all actions: %v", actionName, err)
 			continue
 		}
-		actions = append(actions, actionInstance)
+		actions = append(actions, r.actionForProtocol(actionInstance))
 	}
 	return actions
 }

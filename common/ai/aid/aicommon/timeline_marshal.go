@@ -127,7 +127,6 @@ func UnmarshalTimeline(s string) (*Timeline, error) {
 	timeline := &Timeline{
 		perDumpContentLimit:   serializable.PerDumpContentLimit,
 		totalDumpContentLimit: serializable.TotalDumpContentLimit,
-		compressing:           utils.NewOnce(),
 		branchTimeline:        false,
 		promotedState:         cloneTimelinePromotedState(serializable.PromotedState),
 		freezeState:           cloneTimelineFreezeState(serializable.FreezeState),

@@ -1,23 +1,17 @@
 package aicommon
 
-// 关键词: timeline_batch_compress, batch compress, RECENT_KEEP, ITEMS_TO_COMPRESS
-//
-// 本文件聚合 Timeline 的"基于 AI 的批量压缩"全流程：
-//   - 触发判断 (compressForSizeLimit)
-//   - 切点计算 (estimateItemContentTokens / findCompressSplitByRecentKeepTokens)
-//   - prompt 渲染 (renderBatchCompressPrompt + buildRecentKeptString + buildItemsToCompressString)
-//   - 实际压缩 (batchCompressOldestWithRecent)
-//
-// 注意:
-//   - 与 batch_compress 强相关但**不**属于本文件的代码:
-//       calculateActualContentSize / dumpSizeCheck / emergencyCompress / createEmergencySummary
-//     它们是基础度量与非 AI 兜底压缩，仍位于 timeline.go。
+// Timeline compression: size checks, AI reduction, compressed history, and
+// the storage emergency path live together here. Freeze membership is in
+// timeline_freeze.go; persistence is in timeline_marshal.go.
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"io"
+	"sort"
 	"strings"
+	"sync"
 	"text/template"
 	"time"
 
@@ -25,9 +19,465 @@ import (
 
 	"github.com/yaklang/yaklang/common/utils"
 
+	"github.com/yaklang/yaklang/common/ai/aid/aiprojection"
+	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/ai/ytoken"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon/promptloader"
 )
+
+type TimelineCompressedHead struct {
+	Text             string `json:"text"`
+	CoveredEndItemID int64  `json:"covered_end_item_id"`
+	CoveredEndAtMs   int64  `json:"covered_end_at_ms"`
+	Version          int64  `json:"version"`
+}
+
+type TimelineCompressedHistoryNode struct {
+	Version          int64  `json:"version"`
+	PrevVersion      int64  `json:"prev_version"`
+	Text             string `json:"text"`
+	CoveredEndItemID int64  `json:"covered_end_item_id"`
+	CoveredEndAtMs   int64  `json:"covered_end_at_ms"`
+	CreatedAtMs      int64  `json:"created_at_ms"`
+}
+
+// timelineCompressionSnapshot is a detached plan, not a running compression.
+// It contains no references to mutable TimelineItem values and never freezes,
+// deletes, promotes or calls AI. The production trigger still uses the old path.
+type timelineCompressionSnapshot struct {
+	Head            *TimelineCompressedHead
+	ThroughID       int64 // captured watermark, including exact state and tombstones
+	FrozenThroughID int64
+	Items           []timelineCompressionSnapshotItem // all live ordinary items, in ID order
+	ExactItemIDs    []int64                           // never candidates for summary/deletion
+	RecentStart     int                               // only Items[:RecentStart] may be retired
+	InputText       string                            // old head + ordinary Frozen/Open content
+	RecentText      string                            // complete suffix, never truncated
+	InputTokens     int
+	TargetTokens    int // ordinary content target: InputTokens / 6
+	RecentTokens    int
+	SummaryBudget   int // TargetTokens - RecentTokens, at least the requested reserve
+}
+
+type timelineCompressionSnapshotItem struct {
+	ID         int64
+	Timestamp  int64
+	Frozen     bool
+	SourceJSON string // original content, PromptText and shrink fields for later conflict checks
+	PromptText string // detached, rendered prompt view; empty for omitted bookkeeping
+}
+
+// buildCompressionSnapshot budgets the old head and ALL live ordinary history,
+// including the open tail. Exact evidence/tool-cache journals are excluded.
+// summaryReserve is explicit: this step introduces no new runtime policy.
+// Counts use the local tokenizer over this normalized snapshot, not provider
+// billing tokens. Final block framing must be checked again at commit/render.
+func (m *Timeline) buildCompressionSnapshot(summaryReserve int) (*timelineCompressionSnapshot, error) {
+	if m == nil || summaryReserve <= 0 {
+		return nil, fmt.Errorf("compression snapshot requires a timeline and positive summary reserve")
+	}
+	snapshot, err := m.captureCompressionSnapshot()
+	if err != nil {
+		return nil, err
+	}
+	return budgetCompressionSnapshot(snapshot, summaryReserve)
+}
+
+// Copy under the read lock; tokenization happens after releasing it so writers
+// can append the next open segment while this detached snapshot is budgeted.
+func (m *Timeline) captureCompressionSnapshot() (*timelineCompressionSnapshot, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	snapshot := &timelineCompressionSnapshot{
+		Head:      cloneTimelineCompressedHead(m.compressedHead),
+		ThroughID: m.getMaxIDLocked(), FrozenThroughID: m.frozenThroughLocked(),
+	}
+	ids := append([]int64(nil), m.idToTimelineItem.Keys()...)
+	sort.Slice(ids, func(i, j int) bool { return ids[i] < ids[j] })
+	for _, id := range ids {
+		item, ok := m.idToTimelineItem.Get(id)
+		if !ok || item == nil || item.deleted {
+			continue
+		}
+		if item.value == nil || item.GetID() != id {
+			return nil, fmt.Errorf("invalid compression source item %d", id)
+		}
+		if isPromotableTimelineItem(item) {
+			snapshot.ExactItemIDs = append(snapshot.ExactItemIDs, id)
+			continue
+		}
+		ts, ok := m.idToTs.Get(id)
+		if !ok {
+			return nil, fmt.Errorf("compression source item %d has no timestamp", id)
+		}
+		// Native action replay is written as one validated assistant + N tools
+		// envelope in PromptText. Reject a broken envelope instead of choosing
+		// a cut through an incomplete protocol group. Literal tags in ordinary
+		// tool/user data are not interpreted here.
+		if text, ok := timelineTextItem(item); ok &&
+			normalizeTimelinePromptCategory(extractTextEntryType(text.Text)) == "FUNCTION_CALL_ACTION_RESPONSE" &&
+			strings.TrimSpace(text.PromptText) != "" {
+			body := text.PromptText
+			if normalizeTimelinePromptCategory(extractTextEntryType(body)) == "FUNCTION_CALL_ACTION_RESPONSE" {
+				location := withTaskRegex.FindStringIndex(body)
+				if location == nil {
+					location = withoutTaskRegex.FindStringIndex(body)
+				}
+				if location != nil {
+					body = body[location[1]:]
+				}
+			}
+			if _, err := aiprojection.RebindReplayNonce(body, aiprojection.Nonce()); err != nil {
+				return nil, fmt.Errorf("incomplete action replay at timeline item %d: %w", id, err)
+			}
+		}
+		raw, err := json.Marshal(item)
+		if err != nil {
+			return nil, fmt.Errorf("snapshot timeline item %d: %w", id, err)
+		}
+		entry := timelineCompressionSnapshotItem{
+			ID: id, Timestamp: ts, Frozen: id <= snapshot.FrozenThroughID, SourceJSON: string(raw),
+		}
+		if projected := projectTimelineItemForPromptWithModelReplay(item, true); projected != nil {
+			// Keep the entire prompt body, including long single-line replay JSON.
+			// The presentation renderer uses a bounded line scanner and may omit
+			// oversized lines; it must not determine compression cuts or budgets.
+			// Do not substitute previous per-item shrink results for recent originals.
+			entry.PromptText = fmt.Sprintf("# item=%d timestamp_ms=%d [%s]\n%s",
+				id, ts, renderItemTypeVerbose(projected), projected.value.String())
+		}
+		snapshot.Items = append(snapshot.Items, entry)
+	}
+	return snapshot, nil
+}
+
+func budgetCompressionSnapshot(snapshot *timelineCompressionSnapshot, summaryReserve int) (*timelineCompressionSnapshot, error) {
+	var input []string
+	if snapshot.Head != nil && strings.TrimSpace(snapshot.Head.Text) != "" {
+		input = append(input, "# Previous timeline summary\n"+snapshot.Head.Text)
+	}
+	ordinary := renderCompressionSnapshotItems(snapshot.Items)
+	if ordinary == "" {
+		return nil, fmt.Errorf("compression snapshot has no visible ordinary history")
+	}
+	input = append(input, ordinary)
+	snapshot.InputText = strings.Join(input, "\n\n")
+	snapshot.InputTokens = MeasureTokens(snapshot.InputText)
+	snapshot.TargetTokens = snapshot.InputTokens / 6
+	if snapshot.TargetTokens <= summaryReserve {
+		return nil, fmt.Errorf("compression target %d cannot fit summary reserve %d and recent history", snapshot.TargetTokens, summaryReserve)
+	}
+	// Choose a contiguous suffix. If the newest visible item/group cannot fit,
+	// fail instead of truncating it or skipping it to retain older history.
+	snapshot.RecentStart = len(snapshot.Items)
+	for i := len(snapshot.Items) - 1; i >= 0; i-- {
+		text := renderCompressionSnapshotItems(snapshot.Items[i:])
+		tokens := MeasureTokens(text)
+		if tokens > snapshot.TargetTokens-summaryReserve {
+			break
+		}
+		snapshot.RecentStart, snapshot.RecentText, snapshot.RecentTokens = i, text, tokens
+	}
+	if snapshot.RecentText == "" {
+		return nil, fmt.Errorf("newest complete timeline item exceeds recent-history budget %d", snapshot.TargetTokens-summaryReserve)
+	}
+	if snapshot.RecentStart == 0 && (snapshot.Head == nil || strings.TrimSpace(snapshot.Head.Text) == "") {
+		return nil, fmt.Errorf("compression snapshot has no older content to summarize")
+	}
+	snapshot.SummaryBudget = snapshot.TargetTokens - snapshot.RecentTokens
+	return snapshot, nil
+}
+
+func renderCompressionSnapshotItems(items []timelineCompressionSnapshotItem) string {
+	var texts []string
+	for _, item := range items {
+		if item.PromptText != "" {
+			texts = append(texts, item.PromptText)
+		}
+	}
+	return strings.Join(texts, "\n")
+}
+
+// MaxTimelineSaveSize is the maximum size (1.5MB storage limit) for timeline data when saving to database
+const MaxTimelineSaveSize = 1536 * 1024
+
+func cloneTimelineCompressedHead(head *TimelineCompressedHead) *TimelineCompressedHead {
+	if head == nil {
+		return nil
+	}
+	cp := *head
+	return &cp
+}
+
+func cloneTimelineCompressedHistory(history []*TimelineCompressedHistoryNode) []*TimelineCompressedHistoryNode {
+	if len(history) == 0 {
+		return nil
+	}
+	out := make([]*TimelineCompressedHistoryNode, 0, len(history))
+	for _, h := range history {
+		if h == nil {
+			continue
+		}
+		cp := *h
+		out = append(out, &cp)
+	}
+	return out
+}
+
+func (m *Timeline) updateCompressedHead(newHead *TimelineCompressedHead) {
+	if m == nil || newHead == nil {
+		return
+	}
+	newHead.Text = strings.TrimSpace(newHead.Text)
+	if newHead.Text == "" {
+		return
+	}
+	if m.compressedHead != nil {
+		prev := m.compressedHead
+		prevVersion := prev.Version - 1
+		if prevVersion < 0 {
+			prevVersion = 0
+		}
+		m.compressedHistory = append(m.compressedHistory, &TimelineCompressedHistoryNode{
+			Version:          prev.Version,
+			PrevVersion:      prevVersion,
+			Text:             prev.Text,
+			CoveredEndItemID: prev.CoveredEndItemID,
+			CoveredEndAtMs:   prev.CoveredEndAtMs,
+			CreatedAtMs:      time.Now().UnixMilli(),
+		})
+	}
+	if newHead.Version <= 0 {
+		if m.compressedHead == nil {
+			newHead.Version = 1
+		} else {
+			newHead.Version = m.compressedHead.Version + 1
+		}
+	}
+	m.compressedHead = cloneTimelineCompressedHead(newHead)
+}
+
+func (m *Timeline) calculateActualContentSize() int64 {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	return m.calculateActualContentSizeLocked()
+}
+
+func (m *Timeline) calculateActualContentSizeLocked() int64 {
+	buf := bytes.NewBuffer(nil)
+	initOnce := sync.Once{}
+	count := 0
+
+	m.idToTimelineItem.ForEach(func(id int64, item *TimelineItem) bool {
+		if isPromotableTimelineItem(item) {
+			return true
+		}
+		initOnce.Do(func() {
+			buf.WriteString("timeline:\n")
+		})
+
+		ts, ok := m.idToTs.Get(item.GetID())
+		if !ok {
+			log.Warnf("BUG: timeline id %v not found", item.GetID())
+		}
+		t := time.Unix(0, ts*int64(time.Millisecond))
+		timeStr := t.Format(utils.DefaultTimeFormat3)
+
+		if item.deleted {
+			return true
+		}
+
+		buf.WriteString(fmt.Sprintf("--[%s]\n", timeStr))
+		raw := selectShrunkContent(item)
+		for _, line := range utils.ParseStringToRawLines(raw) {
+			buf.WriteString(fmt.Sprintf("     %s\n", line))
+		}
+		count++
+		return true
+	})
+	if count > 0 {
+		return int64(ytoken.CalcTokenCount(buf.String()))
+	}
+	return 0
+}
+
+func (m *Timeline) dumpSizeCheck() {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.dumpSizeCheckLocked()
+}
+
+func (m *Timeline) dumpSizeCheckLocked() {
+	// 在 push 时检查内容大小，如果超过限制就压缩
+	if m.totalDumpContentLimit <= 0 || m.autoCompressDisabled || m.compressing {
+		return
+	}
+
+	// 获取当前内容大小（不包括reducer）
+	contentSize := m.calculateActualContentSizeLocked()
+	if contentSize <= m.totalDumpContentLimit {
+		return // 内容大小正常
+	}
+
+	log.Infof("timeline content too large (%d > %d), triggering batch compression", contentSize, m.totalDumpContentLimit)
+
+	// 压缩到合适的大小
+	m.compressForSizeLimitLocked()
+}
+
+// emergencyCompress performs non-AI compression by removing oldest items
+// This is used when timeline is too large and needs to be compressed without AI assistance
+func (m *Timeline) emergencyCompress(targetSize int) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.emergencyCompressLocked(targetSize)
+}
+
+func (m *Timeline) emergencyCompressLocked(targetSize int) {
+	if m == nil {
+		return
+	}
+
+	// Calculate current size
+	tlstr, err := marshalTimelineUnlocked(m)
+	if err != nil {
+		log.Errorf("emergency compress: failed to marshal timeline: %v", err)
+		return
+	}
+	currentSize := len(tlstr)
+	if currentSize <= targetSize {
+		return // Already small enough
+	}
+
+	log.Warnf("emergency compress: current size %d, target size %d", currentSize, targetSize)
+
+	// Get all item IDs ordered by timestamp (oldest first)
+	var itemIDs []int64
+	m.idToTimelineItem.ForEach(func(id int64, item *TimelineItem) bool {
+		if item == nil || item.deleted || isPromotableTimelineItem(item) {
+			return true
+		}
+		itemIDs = append(itemIDs, id)
+		return true
+	})
+
+	if len(itemIDs) <= 1 {
+		log.Warnf("emergency compress: only %d items left, cannot compress further", len(itemIDs))
+		return
+	}
+	m.freezeLocked(true)
+
+	// Keep at least one original item. Recheck after every removal: checking only
+	// every ten items could discard nine more items than the storage bound needs.
+	removedCount := 0
+	var emergencySummaries []string
+	var lastRemovedID int64
+	for len(itemIDs) > 1 && currentSize > targetSize {
+		// Remove the oldest item (first in the list)
+		oldestID := itemIDs[0]
+		itemIDs = itemIDs[1:]
+
+		// Get the item for summary before removing
+		item, ok := m.idToTimelineItem.Get(oldestID)
+		if !ok || item == nil || item.deleted {
+			continue
+		}
+
+		// Create a brief summary of what was removed (without AI)
+		briefSummary := m.createEmergencySummary(item, oldestID)
+		if briefSummary != "" {
+			emergencySummaries = append(emergencySummaries, briefSummary)
+		}
+		lastRemovedID = oldestID
+		item.deleted = true
+
+		removedCount++
+
+		tlstr, err = marshalTimelineUnlocked(m)
+		if err != nil {
+			log.Warnf("emergency compress: failed to measure after removal: %v", err)
+			break
+		}
+		currentSize = len(tlstr)
+	}
+	if removedCount > 0 {
+		var coveredEndAtMs int64
+		if ts, ok := m.idToTs.Get(lastRemovedID); ok {
+			coveredEndAtMs = ts
+		}
+		headText := strings.TrimSpace(strings.Join(emergencySummaries, "\n"))
+		if m.compressedHead != nil && strings.TrimSpace(m.compressedHead.Text) != "" {
+			if headText == "" {
+				headText = m.compressedHead.Text
+			} else {
+				headText = m.compressedHead.Text + "\n" + headText
+			}
+		}
+		if headText != "" {
+			m.updateCompressedHead(&TimelineCompressedHead{
+				Text:             headText,
+				CoveredEndItemID: lastRemovedID,
+				CoveredEndAtMs:   coveredEndAtMs,
+			})
+		}
+	}
+
+	// Final size check
+	tlstr, _ = marshalTimelineUnlocked(m)
+	log.Infof("emergency compress completed: removed %d items, final size: %d (target: %d)", removedCount, len(tlstr), targetSize)
+}
+
+// createEmergencySummary creates a brief summary of an item without AI assistance
+func (m *Timeline) createEmergencySummary(item *TimelineItem, id int64) string {
+	if item == nil {
+		return ""
+	}
+
+	// Get timestamp
+	ts, ok := m.idToTs.Get(id)
+	if !ok {
+		return ""
+	}
+	t := time.Unix(0, ts*int64(time.Millisecond))
+	timeStr := t.Format(utils.DefaultTimeFormat3)
+
+	// Create a very brief summary based on item type
+	var summary string
+	switch v := item.value.(type) {
+	case *aitool.ToolResult:
+		executionStatus, detail := v.GetExecutionStatus()
+		switch {
+		case !v.Success:
+			summary = fmt.Sprintf("[%s] tool:%s protocol-error", timeStr, v.Name)
+		case executionStatus == aitool.ToolExecutionStatusFailed:
+			summary = fmt.Sprintf("[%s] tool:%s execution-failed", timeStr, v.Name)
+		case executionStatus == aitool.ToolExecutionStatusSucceeded:
+			summary = fmt.Sprintf("[%s] tool:%s execution-succeeded", timeStr, v.Name)
+		default:
+			summary = fmt.Sprintf("[%s] tool:%s protocol-completed; execution-outcome-unknown", timeStr, v.Name)
+		}
+		if detail != "" {
+			// A tool can put arbitrarily large error text in status details.
+			// Emergency summaries must remain smaller than the removed item.
+			detail = ShrinkByTokens(detail, 64)
+			summary += " (" + detail + ")"
+		}
+	case *UserInteraction:
+		summary = fmt.Sprintf("[%s] user-interaction stage:%v", timeStr, v.Stage)
+	case *TextTimelineItem:
+		// Preserve UTF-8 when shortening user-visible text.
+		runes := []rune(v.Text)
+		text := v.Text
+		if len(runes) > 50 {
+			text = string(runes[:47]) + "..."
+		}
+		summary = fmt.Sprintf("[%s] text:%s", timeStr, text)
+	default:
+		summary = fmt.Sprintf("[%s] item removed (emergency compress)", timeStr)
+	}
+
+	return summary
+}
 
 // estimateItemContentTokens 按 calculateActualContentSize 一致的 wrap 格式估算单个 item 的 token 数
 // 用于 batchCompress 切点：从最新端反向累加 token 找到保留区起点
@@ -109,7 +559,7 @@ func (m *Timeline) compressForSizeLimit() {
 }
 
 func (m *Timeline) compressForSizeLimitLocked() {
-	if m.config == nil || m.totalDumpContentLimit <= 0 {
+	if m.config == nil || m.totalDumpContentLimit <= 0 || m.compressing {
 		return
 	}
 
@@ -167,35 +617,24 @@ func (m *Timeline) compressForSizeLimitLocked() {
 	if len(toCompress) == 0 {
 		return
 	}
-	// Freeze the selected prefix before scheduling a reducer. The recent tail
-	// stays open; exact control payloads never enter the AI summary candidates.
-	m.freezeLocked(true, toCompress[len(toCompress)-1].GetID())
+	// Reserve while holding Timeline.mu. Reduction itself must not advance
+	// freeze/promotions until a complete summary is ready to commit.
+	m.compressing = true
 
 	log.Infof("content size %d > limit %d, compress oldest %d items, keep recent %d items (~%d tokens)",
 		currentSize, m.totalDumpContentLimit, len(toCompress), len(recentKeep), keepTokens)
 
-	if m.compressing.Done() {
-		m.compressing.Reset()
-	}
-
 	go func() {
 		defer func() {
+			m.mu.Lock()
+			m.compressing = false
+			m.mu.Unlock()
 			if err := recover(); err != nil {
 				log.Errorf("batch compress panic: %v", err)
 				utils.PrintCurrentGoroutineRuntimeStack()
 			}
 		}()
-		m.compressing.DoOr(func() {
-			defer func() {
-				if err := recover(); err != nil {
-					log.Errorf("batch compress panic: %v", err)
-					utils.PrintCurrentGoroutineRuntimeStack()
-				}
-			}()
-			m.batchCompressOldestWithRecent(toCompress, recentKeep)
-		}, func() {
-			log.Info("batch compress is already running, skip this compress request")
-		})
+		m.batchCompressOldestWithRecent(toCompress, recentKeep)
 	}()
 }
 
@@ -209,132 +648,175 @@ func (m *Timeline) batchCompressOldestWithRecent(toCompress []*TimelineItem, rec
 		return
 	}
 
-	// Compression is scheduled by the bound Config.
+	// A missing scheduler cannot produce a faithful summary. The storage
+	// emergency path is reserved for Save, not for a failed AI reduction.
 	if m.config == nil {
-		log.Warnf("batch compress: Config is nil, using emergency compress")
-		m.emergencyCompress(MaxTimelineSaveSize)
+		log.Warn("batch compress: Config is nil; preserving original timeline")
 		return
 	}
 
+	m.mu.RLock()
 	total := int64(len(m.getActiveTimelineItemIDs()))
+	m.mu.RUnlock()
 	if total <= 1 {
 		return
 	}
 
-	// Check if current timeline is already too large for AI processing
-	// If so, do emergency compress first to bring it to a manageable size
-	tlstr, err := MarshalTimeline(m)
-	if err == nil && len(tlstr) > MaxTimelineSaveSize*2 {
-		log.Warnf("batch compress: timeline too large (%d), performing emergency compress first", len(tlstr))
-		m.emergencyCompress(MaxTimelineSaveSize)
-		// emergencyCompress 已经动了活跃区，本次切片 (toCompress / recentKeep) 已失效，
-		// 直接返回，等下一次 push 触发 dumpSizeCheck 再切
-		log.Warnf("batch compress: aborting current cycle after emergency compress, will retry next cycle")
-		return
-	}
-
-	// 收集要从活跃区删除的 id 列表（顺序与 toCompress 对齐，确保 lastCompressedId 是最末一个）
-	var idsToRemove []int64
-	for _, item := range toCompress {
-		if item == nil {
-			continue
-		}
-		idsToRemove = append(idsToRemove, item.GetID())
-	}
-
-	if len(idsToRemove) == 0 {
-		return
-	}
-
-	log.Infof("batch compress: compressing %d oldest items, keeping %d recent items as context",
-		len(toCompress), len(recentKeep))
-
-	// 计算 token 预算
-	inputTokenEstimate := int64(0)
+	// Capture coverage and the existing head before invoking callbacks. All
+	// chunks must succeed before any item is retired or the head is replaced.
+	m.mu.RLock()
+	oldHead := cloneTimelineCompressedHead(m.compressedHead)
+	var sources []timelineCompressionSource
 	for _, item := range toCompress {
 		if item != nil {
-			inputTokenEstimate += m.estimateItemContentTokens(item.GetID(), item)
+			sources = append(sources, timelineCompressionSource{id: item.GetID(), item: item, text: item.String()})
 		}
 	}
-
-	// OutputTokenBudget: 压缩后 head 的目标 token 上限
-	// 目标是 head + recentKeep <= totalDumpContentLimit
-	// headBudget = totalDumpContentLimit - keepTokens - headOverhead(渲染 header 约 50 token)
-	const headRenderOverhead = 50
-	keepTokens := m.calculateActualContentSizeLocked() / 6
-	outputTokenBudget := m.totalDumpContentLimit - keepTokens - headRenderOverhead
+	limit := m.totalDumpContentLimit
+	keepTokens := int64(0)
+	for _, item := range recentKeep {
+		if item != nil {
+			keepTokens += m.estimateItemContentTokens(item.GetID(), item)
+		}
+	}
+	promptItems := timelineCompressionPromptSnapshot(toCompress)
+	promptRecent := timelineCompressionPromptSnapshot(recentKeep)
+	m.mu.RUnlock()
+	chunks, err := splitTimelineCompressionInput(promptItems, promptRecent)
+	if err != nil {
+		log.Warnf("batch compress: preserving timeline: %v", err)
+		return
+	}
+	outputTokenBudget := limit - keepTokens - 50
 	if outputTokenBudget < 200 {
 		outputTokenBudget = 200
 	}
-
-	// 旧 head 文本：不送 AI 二次压缩，最终直接前置拼接
-	oldHeadText := ""
-	if m.compressedHead != nil {
-		oldHeadText = strings.TrimSpace(m.compressedHead.Text)
+	finalText := ""
+	if oldHead != nil {
+		finalText = strings.TrimSpace(oldHead.Text)
+	}
+	nonceStr := utils.RandStringBytes(4)
+	for _, chunk := range chunks {
+		memory := m.summarizeTimelineChunk(chunk, promptRecent, nonceStr, outputTokenBudget)
+		if memory == "" {
+			return // Failed/skipped/empty result: keep the entire original range.
+		}
+		if finalText != "" {
+			finalText += "\n\n"
+		}
+		finalText += memory
+	}
+	if strings.TrimSpace(finalText) == "" {
+		return
+	}
+	if TokenCountExceeds64(finalText, outputTokenBudget) {
+		finalText = m.refineCompressedHeadLocked(finalText, outputTokenBudget, nonceStr)
 	}
 
-	nonceStr := utils.RandStringBytes(4)
-	promptBuilt := false
-	m.config.ScheduleAuxiliaryTask(m.config.GetContext(),
-		CallerLabelTimelineBatchCompress,
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	// Rollback, emergency reduction or a merge may have changed the head or
+	// candidate range while the AI was running. Never commit a stale snapshot.
+	if !sameTimelineCompressedHead(m.compressedHead, oldHead) {
+		log.Warn("batch compress: head changed, discarding stale result")
+		return
+	}
+	var idsToRemove []int64
+	for _, source := range sources {
+		current, ok := m.idToTimelineItem.Get(source.id)
+		if !ok || current != source.item || current.deleted || current.GetID() != source.id || current.String() != source.text {
+			log.Warn("batch compress: candidate range changed, discarding stale result")
+			return
+		}
+		idsToRemove = append(idsToRemove, source.id)
+	}
+	if len(idsToRemove) == 0 {
+		return
+	}
+	lastID := idsToRemove[len(idsToRemove)-1]
+	lastTs, _ := m.idToTs.Get(lastID)
+	// Publish exact promotions, frozen membership and the summary in one
+	// transaction. Readers must not see an intermediate forced-freeze layout
+	// immediately followed by another prefix rewrite when reduction finishes.
+	m.freezeLocked(true, lastID)
+	m.updateCompressedHead(&TimelineCompressedHead{
+		Text: strings.TrimSpace(finalText), CoveredEndItemID: lastID, CoveredEndAtMs: lastTs,
+	})
+	for _, id := range idsToRemove {
+		item, _ := m.idToTimelineItem.Get(id)
+		item.deleted = true
+	}
+	log.Infof("batch compressed %d items into reducer at id: %v (%d complete input chunks)", len(idsToRemove), lastID, len(chunks))
+}
+
+// Opaque, detached reducer input: projection has already filtered bookkeeping.
+// A concurrent history edit must not change chunk sizes/content mid-request.
+type timelineCompressionPromptItem struct{ TextTimelineItem }
+
+type timelineCompressionSource struct {
+	id   int64
+	item *TimelineItem
+	text string
+}
+
+func timelineCompressionPromptSnapshot(items []*TimelineItem) []*TimelineItem {
+	projected := projectTimelineItemsForPrompt(items)
+	for i, item := range projected {
+		projected[i] = &TimelineItem{createdAt: item.createdAt, value: &timelineCompressionPromptItem{
+			TextTimelineItem{ID: item.GetID(), Text: item.String()},
+		}}
+	}
+	return projected
+}
+
+func sameTimelineCompressedHead(a, b *TimelineCompressedHead) bool {
+	if a == nil || b == nil {
+		return a == nil && b == nil
+	}
+	return *a == *b
+}
+
+// Split at complete item boundaries. A truncated prefix must never authorize
+// deletion of unseen history. Overlarge single items remain active for now.
+func splitTimelineCompressionInput(items, recent []*TimelineItem) ([][]*TimelineItem, error) {
+	recentText, _, _ := buildRecentKeptString(recent, MaxBatchCompressRecentSize)
+	budget := MaxBatchCompressPromptSize - len(recentText) - 1024
+	var chunks [][]*TimelineItem
+	for len(items) > 0 {
+		_, count, _ := buildItemsToCompressString(items, budget)
+		if count == 0 {
+			return nil, utils.Errorf("one timeline item exceeds the reducer input budget (%d bytes)", budget)
+		}
+		chunks = append(chunks, items[:count])
+		items = items[count:]
+	}
+	return chunks, nil
+}
+
+func (m *Timeline) summarizeTimelineChunk(items, recent []*TimelineItem, nonce string, outputBudget int64) string {
+	var memory string
+	var inputTokens int64
+	for _, item := range items {
+		inputTokens += m.estimateItemContentTokens(item.GetID(), item)
+	}
+	m.config.ScheduleAuxiliaryTask(m.config.GetContext(), CallerLabelTimelineBatchCompress,
 		func() string {
-			promptBuilt = true
-			prompt := m.renderBatchCompressPromptWithSchema(toCompress, recentKeep, nonceStr, inputTokenEstimate, outputTokenBudget, "")
-			if prompt == "" {
-				m.emergencyCompress(MaxTimelineSaveSize)
-			}
-			return prompt
+			return m.renderBatchCompressPromptWithSchema(items, recent, nonce, inputTokens, outputBudget, "")
 		},
 		func(action *Action) {
-			// 解析结构化字段，拼成分段文本
-			compressedMemory := buildStructuredCompressedMemory(action)
-			if compressedMemory == "" {
-				// 兜底：如果结构化字段全空，尝试旧格式 reducer_memory
-				compressedMemory = action.GetString("reducer_memory")
-			}
-			if compressedMemory == "" {
-				log.Warn("================================================================")
-				log.Warn("================================================================")
-				log.Warn("batch compress got empty compressed memory, action dumpped: ")
-				fmt.Println(action.GetParams())
-				log.Warn("================================================================")
-				log.Warn("================================================================")
+			if action == nil {
+				log.Warn("batch compress: nil AI result; preserving original timeline")
 				return
 			}
-
-			// post-check: 如果 AI 输出超标，规则截断低优先级字段
-			compressedMemory = enforceOutputTokenBudget(compressedMemory, outputTokenBudget)
-
-			// 旧 head 前置拼接（不二次压缩）
-			finalText := compressedMemory
-			if oldHeadText != "" {
-				finalText = oldHeadText + "\n\n" + compressedMemory
+			memory = buildStructuredCompressedMemory(action)
+			if memory == "" {
+				memory = strings.TrimSpace(action.GetString("reducer_memory"))
 			}
-
-			// 如果拼接后 head 超预算，触发 head-only 精简
-			if TokenCountExceeds64(finalText, outputTokenBudget) {
-				finalText = m.refineCompressedHeadLocked(finalText, outputTokenBudget, nonceStr)
+			if memory == "" {
+				log.Warn("batch compress: empty summary, keeping original timeline")
+				return
 			}
-
-			// 存储压缩结果（单有效压缩段）
-			lastCompressedId := idsToRemove[len(idsToRemove)-1]
-			var lastCompressedTs int64
-			if ts, ok := m.idToTs.Get(lastCompressedId); ok {
-				lastCompressedTs = ts
-			}
-			m.updateCompressedHead(&TimelineCompressedHead{
-				Text:             strings.TrimSpace(finalText),
-				CoveredEndItemID: lastCompressedId,
-				CoveredEndAtMs:   lastCompressedTs,
-			})
-			log.Infof("batch compressed %d items into reducer at id: %v", len(toCompress), lastCompressedId)
-
-			// 标记被压缩的 items 为非活跃
-			for _, id := range idsToRemove {
-				if item, ok := m.idToTimelineItem.Get(id); ok && item != nil {
-					item.deleted = true
-				}
-			}
+			memory = enforceOutputTokenBudget(memory, outputBudget)
 		},
 		WithAuxiliaryOutputSchema("timeline-reducer", timelineReducerSchema),
 		WithAuxiliaryOnError(func(err error) {
@@ -356,10 +838,7 @@ func (m *Timeline) batchCompressOldestWithRecent(toCompress []*TimelineItem, rec
 				}),
 		),
 	)
-	if !promptBuilt {
-		// A skipped reducer must still enforce the storage bound.
-		m.emergencyCompress(MaxTimelineSaveSize)
-	}
+	return memory
 }
 
 // MaxBatchCompressPromptSize is the maximum size (in bytes) for batch compress prompt
@@ -435,14 +914,8 @@ func (m *Timeline) renderBatchCompressPromptWithSchema(toCompress []*TimelineIte
 			itemsStr = "[system bookkeeping omitted from prompt projection]"
 			itemsTruncated = false
 		} else {
-			log.Warnf("batch compress: no items could fit within size limit, using truncated first item")
-			firstItem := promptToCompress[0].String()
-			if len(firstItem) > remainingBudget-100 {
-				firstItem = firstItem[:remainingBudget-100] + "... [truncated]"
-			}
-			itemsStr = fmt.Sprintf("[1] %s", firstItem)
-			actualItemCount = 1
-			itemsTruncated = true
+			log.Warn("batch compress: no complete item fits in prompt budget; preserving original timeline")
+			return ""
 		}
 	}
 

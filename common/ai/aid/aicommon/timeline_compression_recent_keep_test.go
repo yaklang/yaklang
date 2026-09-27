@@ -297,3 +297,13 @@ func TestRenderBatchCompressPrompt_EmptyToCompress(t *testing.T) {
 	out := tl.renderBatchCompressPrompt(nil, nil, "EMPTY", 0, 0)
 	require.Empty(t, out, "empty toCompress should produce empty prompt")
 }
+
+func TestRenderBatchCompressPrompt_OversizedSourceIsNotTruncated(t *testing.T) {
+	tl := NewTimeline(nil, nil)
+	id := int64(1)
+	injectTimelineItem(tl, id, time.Date(2024, 6, 1, 10, 0, 0, 0, time.UTC),
+		makeToolResult(id, "large", true, strings.Repeat("X", MaxBatchCompressPromptSize*2)))
+	item, ok := tl.idToTimelineItem.Get(id)
+	require.True(t, ok)
+	require.Empty(t, tl.renderBatchCompressPrompt([]*TimelineItem{item}, nil, "OVERSIZED", 0, 0))
+}
