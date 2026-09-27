@@ -210,17 +210,11 @@ func renderTimelineFrozenOpen(timeline *Timeline, includeLatestModelReplay bool)
 	if timeline == nil {
 		return TimelineFrozenOpenBlocks{}
 	}
-	rb := timeline.GroupByMinutes(TimelineDumpDefaultIntervalMinutes).GetAllRenderable()
-	var sealedBeforeID int64
-	for _, block := range rb {
-		interval, ok := block.(*TimelineIntervalBlock)
-		if !ok || interval == nil || !interval.Open || len(interval.Items) == 0 {
-			continue
-		}
-		sealedBeforeID = interval.Items[0].GetID()
-		break
-	}
-	promotedSemi1, openDeltas := timeline.projectPromoted(sealedBeforeID)
+	// Freeze is committed on writes/import, never as a rendering side effect.
+	timeline.mu.RLock()
+	defer timeline.mu.RUnlock()
+	rb := timeline.frozenPromptBlocksLocked()
+	promotedSemi1, openDeltas := timeline.projectPromotedLocked()
 	promptBlocks := projectTimelineRenderableBlocksForPrompt(rb)
 	if includeLatestModelReplay {
 		promptBlocks = projectTimelineRenderableBlocksForPromptWithLatestModelReplay(rb)
@@ -230,7 +224,9 @@ func renderTimelineFrozenOpen(timeline *Timeline, includeLatestModelReplay bool)
 		Open:                 promptBlocks.RenderOpenOnly(TimelineDumpDefaultAITagName),
 		PromotedOpen:         openDeltas,
 		PromotedSemiDynamic1: promotedSemi1,
-		FrozenTimeUnix:       timelineFrozenTimeUnixFromRenderable(rb),
+		// Evidence still uses its legacy calendar boundary until it joins the
+		// promotion journal. A full byte bucket must not freeze future evidence.
+		FrozenTimeUnix: timelineFrozenTimeUnixFromRenderable(timeline.groupByMinutesAndBytesLocked(TimelineDumpDefaultIntervalMinutes, -1).GetAllRenderable()),
 	}
 }
 

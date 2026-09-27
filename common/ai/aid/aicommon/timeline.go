@@ -40,6 +40,7 @@ type Timeline struct {
 	compressedHistory []*TimelineCompressedHistoryNode
 	archiveRefs       *omap.OrderedMap[int64, *TimelineArchiveRef]
 	promotedState     *TimelinePromotedState
+	freezeState       *TimelineFreezeState
 
 	// this limit is used to limit the timeline dump content size (in tokens).
 	perDumpContentLimit   int64
@@ -230,15 +231,10 @@ func (m *Timeline) TruncateAfter(checkpointID int64) {
 			}
 		}
 	}
-	limit := int64(0)
-	if m.promotedState != nil && m.promotedState.Watermark > 0 {
-		watermark := m.promotedState.Watermark
-		if watermark > checkpointID {
-			watermark = checkpointID
-		}
-		limit = watermark + 1
+	if checkpointID < m.frozenThroughLocked() {
+		m.invalidateFreezeFromLocked(checkpointID + 1)
 	}
-	m.rebuildPromotedStateLocked(limit, false)
+	m.rebuildPromotedStateLocked(m.frozenThroughLocked())
 }
 
 func (m *Timeline) ClearRuntimeConfig() {
@@ -271,6 +267,7 @@ func (m *Timeline) CopyReducibleTimelineWithMemory() *Timeline {
 		compressedHistory:     cloneTimelineCompressedHistory(m.compressedHistory),
 		archiveRefs:           m.archiveRefs.Copy(),
 		promotedState:         cloneTimelinePromotedState(m.promotedState),
+		freezeState:           cloneTimelineFreezeState(m.freezeState),
 		perDumpContentLimit:   m.perDumpContentLimit,
 		totalDumpContentLimit: m.totalDumpContentLimit,
 		bucketByteSize:        m.bucketByteSize,
@@ -287,10 +284,12 @@ func (m *Timeline) SoftDelete(id ...int64) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	for _, i := range id {
+		m.invalidateFreezeFromLocked(i)
 		if v, ok := m.idToTimelineItem.Get(i); ok {
 			v.deleted = true
 		}
 	}
+	m.freezeLocked(false)
 }
 
 // CreateSubTimeline 用入参 ids 限定活跃 item 集合，构造一个新的 sub-timeline
@@ -521,8 +520,10 @@ func (m *Timeline) PushToolResult(toolResult *aitool.ToolResult) {
 }
 
 func (m *Timeline) pushTimelineItem(ts int64, id int64, item *TimelineItem) {
+	m.invalidateFreezeFromLocked(id)
 	m.OrderInsertId(id, item)
 	m.OrderInsertTs(ts, item)
+	m.freezeLocked(false)
 	m.dumpSizeCheckLocked()
 
 	// Emit timeline item asynchronously to avoid blocking when EventHandler
@@ -661,7 +662,6 @@ func (m *Timeline) emergencyCompressLocked(targetSize int) {
 	if m == nil {
 		return
 	}
-	m.forcePromoteAllLocked()
 
 	// Calculate current size
 	tlstr, err := marshalTimelineUnlocked(m)
@@ -673,6 +673,7 @@ func (m *Timeline) emergencyCompressLocked(targetSize int) {
 	if currentSize <= targetSize {
 		return // Already small enough
 	}
+	m.freezeLocked(true)
 
 	log.Warnf("emergency compress: current size %d, target size %d", currentSize, targetSize)
 
@@ -1331,7 +1332,19 @@ func (m *Timeline) ReassignIDs(idGenerator func() int64) int64 {
 				newWatermark = newID
 			}
 		}
-		m.rebuildPromotedStateLocked(newWatermark+1, false)
+		m.rebuildPromotedStateLocked(newWatermark)
+	}
+	if m.freezeState != nil {
+		for _, batch := range m.freezeState.Batches {
+			var ids []int64
+			for _, id := range batch.IDs {
+				if mapped, ok := oldToNewID[id]; ok {
+					ids = append(ids, mapped)
+				}
+			}
+			batch.IDs = ids
+		}
+		m.pruneEmptyFreezeBatchesLocked()
 	}
 
 	log.Infof("reassigned IDs for %d timeline items, last ID: %d", len(orderedItems), lastID)

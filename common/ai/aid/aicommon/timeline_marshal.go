@@ -31,6 +31,8 @@ type timelineSerializable struct {
 	PerDumpContentLimit   int64                            `json:"per_dump_content_limit"`
 	TotalDumpContentLimit int64                            `json:"total_dump_content_limit"`
 	PromotedState         *TimelinePromotedState           `json:"promoted_state,omitempty"`
+	FreezeState           *TimelineFreezeState             `json:"freeze_state,omitempty"`
+	BucketByteSize        int64                            `json:"bucket_byte_size,omitempty"`
 }
 
 // MarshalTimeline serializes a Timeline into a string.
@@ -95,6 +97,8 @@ func marshalTimelineUnlocked(i *Timeline) (string, error) {
 		PerDumpContentLimit:   i.perDumpContentLimit,
 		TotalDumpContentLimit: i.totalDumpContentLimit,
 		PromotedState:         cloneTimelinePromotedState(i.promotedState),
+		FreezeState:           cloneTimelineFreezeState(i.freezeState),
+		BucketByteSize:        i.bucketByteSize,
 	}
 
 	data, err := json.Marshal(serializable)
@@ -124,6 +128,8 @@ func UnmarshalTimeline(s string) (*Timeline, error) {
 		compressing:           utils.NewOnce(),
 		branchTimeline:        false,
 		promotedState:         cloneTimelinePromotedState(serializable.PromotedState),
+		freezeState:           cloneTimelineFreezeState(serializable.FreezeState),
+		bucketByteSize:        serializable.BucketByteSize,
 	}
 
 	// 恢复 idToTs
@@ -224,6 +230,7 @@ func UnmarshalTimeline(s string) (*Timeline, error) {
 		timeline.archiveRefs.Set(id, value)
 	}
 
+	timeline.restoreFreezeStateLocked()
 	return timeline, nil
 }
 
