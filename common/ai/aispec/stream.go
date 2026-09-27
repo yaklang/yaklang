@@ -244,7 +244,7 @@ func normalizeUsageMap(usage map[string]any) map[string]any {
 // SSE/body payload (Qwen Omni stream_options.include_usage=true). It is
 // called with nil when no usage block was observed.
 // 关键词: processAIResponse, SSE usage 抽取, 视频 token 用量解析
-func processAIResponse(r []byte, closer io.ReadCloser, outWriter io.Writer, reasonWriter io.Writer, toolCallArgumentsWriter io.Writer, toolCallCallback func([]*ToolCall), rawResponseHeaderCallback RawHTTPResponseHeaderCallback, rawResponseCallback func([]byte, []byte, *ChatUsage), usageCallback func(*ChatUsage)) error {
+func processAIResponse(r []byte, closer io.ReadCloser, outWriter io.Writer, reasonWriter io.Writer, toolCallArgumentsWriter io.Writer, toolCallCallback func([]*ToolCall), rawResponseHeaderCallback RawHTTPResponseHeaderCallback, rawResponseCallback func([]byte, []byte, *ChatUsage), usageCallback func(*ChatUsage), finishReasonCallback ...func(string, []byte)) error {
 	// lastUsage 始终持有响应里最后一次出现的 usage 字段；对于 dashscope omni
 	// 等 SSE 接口，真实 token 数通常出现在末帧，前面的 chunk usage 多为 null。
 	// 关键词: lastUsage, SSE 末帧 usage
@@ -252,7 +252,7 @@ func processAIResponse(r []byte, closer io.ReadCloser, outWriter io.Writer, reas
 	var mirrorResponse bytes.Buffer
 	ensureUsageCaptured := func() {
 		if lastUsage == nil {
-			lastUsage = extractLastChatUsageFromPayload(mirrorResponse.Bytes())
+			lastUsage = extractLastChatUsageFromPayload(providerResponsePayload(r, mirrorResponse.Bytes()))
 		}
 	}
 	defer func() {
@@ -270,6 +270,13 @@ func processAIResponse(r []byte, closer io.ReadCloser, outWriter io.Writer, reas
 		utils.CallGeneralClose(reasonWriter)
 		utils.CallGeneralClose(outWriter)
 		utils.CallGeneralClose(toolCallArgumentsWriter)
+	}()
+
+	// Publish terminal metadata before stream EOF; usage retains its after-EOF timing.
+	defer func() {
+		if len(finishReasonCallback) > 0 && finishReasonCallback[0] != nil {
+			finishReasonCallback[0](chatCompletionFinishReason(providerResponsePayload(r, mirrorResponse.Bytes())), append([]byte(nil), mirrorResponse.Bytes()...))
+		}
 	}()
 
 	if rawResponseHeaderCallback != nil {
@@ -630,7 +637,7 @@ func processAIResponse(r []byte, closer io.ReadCloser, outWriter io.Writer, reas
 	}
 }
 
-func appendStreamHandlerPoCOptionEx(isStream bool, opts []poc.PocConfigOption, toolCallCallback func([]*ToolCall), rawResponseHeaderCallback RawHTTPResponseHeaderCallback, rawResponseCallback func([]byte, []byte, *ChatUsage), usageCallback func(*ChatUsage)) (io.Reader, io.Reader, io.Reader, []poc.PocConfigOption, func(), streamReadErrGetter) {
+func appendStreamHandlerPoCOptionEx(isStream bool, opts []poc.PocConfigOption, toolCallCallback func([]*ToolCall), rawResponseHeaderCallback RawHTTPResponseHeaderCallback, rawResponseCallback func([]byte, []byte, *ChatUsage), usageCallback func(*ChatUsage), finishReasonCallback ...func(string, []byte)) (io.Reader, io.Reader, io.Reader, []poc.PocConfigOption, func(), streamReadErrGetter) {
 	outReader, outWriter := utils.NewBufPipe(nil)
 	reasonReader, reasonWriter := utils.NewBufPipe(nil)
 	toolCallArgsReader, toolCallArgsWriter := utils.NewBufPipe(nil)
@@ -643,7 +650,7 @@ func appendStreamHandlerPoCOptionEx(isStream bool, opts []poc.PocConfigOption, t
 	}
 
 	opts = append(opts, poc.WithBodyStreamReaderHandler(func(r []byte, closer io.ReadCloser) {
-		if err := processAIResponse(r, closer, outWriter, reasonWriter, toolCallArgsWriter, toolCallCallback, rawResponseHeaderCallback, rawResponseCallback, usageCallback); err != nil {
+		if err := processAIResponse(r, closer, outWriter, reasonWriter, toolCallArgsWriter, toolCallCallback, rawResponseHeaderCallback, rawResponseCallback, usageCallback, finishReasonCallback...); err != nil {
 			streamErrBox.set(err)
 		}
 	}))
@@ -660,7 +667,7 @@ func appendStreamHandlerPoCOptionEx(isStream bool, opts []poc.PocConfigOption, t
 	return outReader, reasonReader, toolCallArgsReader, opts, cancelFunc, streamErrBox.get
 }
 
-func appendResponsesStreamHandlerPoCOptionEx(isStream bool, opts []poc.PocConfigOption, toolCallCallback func([]*ToolCall), rawResponseHeaderCallback RawHTTPResponseHeaderCallback, rawResponseCallback func([]byte, []byte, *ChatUsage), usageCallback func(*ChatUsage)) (io.Reader, io.Reader, io.Reader, []poc.PocConfigOption, func(), streamReadErrGetter) {
+func appendResponsesStreamHandlerPoCOptionEx(isStream bool, opts []poc.PocConfigOption, toolCallCallback func([]*ToolCall), rawResponseHeaderCallback RawHTTPResponseHeaderCallback, rawResponseCallback func([]byte, []byte, *ChatUsage), usageCallback func(*ChatUsage), finishReasonCallback ...func(string, []byte)) (io.Reader, io.Reader, io.Reader, []poc.PocConfigOption, func(), streamReadErrGetter) {
 	outReader, outWriter := utils.NewBufPipe(nil)
 	reasonReader, reasonWriter := utils.NewBufPipe(nil)
 	toolCallArgsReader, toolCallArgsWriter := utils.NewBufPipe(nil)
@@ -682,7 +689,7 @@ func appendResponsesStreamHandlerPoCOptionEx(isStream bool, opts []poc.PocConfig
 	}
 
 	opts = append(opts, poc.WithBodyStreamReaderHandler(func(r []byte, closer io.ReadCloser) {
-		if err := processAIResponseForResponses(r, closer, outWriter, reasonWriter, toolCallArgsWriter, toolCallCallback, rawResponseHeaderCallback, rawResponseCallback, usageCallback); err != nil {
+		if err := processAIResponseForResponses(r, closer, outWriter, reasonWriter, toolCallArgsWriter, toolCallCallback, rawResponseHeaderCallback, rawResponseCallback, usageCallback, finishReasonCallback...); err != nil {
 			streamErrBox.set(err)
 		}
 	}))
@@ -690,7 +697,7 @@ func appendResponsesStreamHandlerPoCOptionEx(isStream bool, opts []poc.PocConfig
 	return outReader, reasonReader, toolCallArgsReader, opts, cancelFunc, streamErrBox.get
 }
 
-func processAIResponseForResponses(r []byte, closer io.ReadCloser, outWriter io.Writer, reasonWriter io.Writer, toolCallArgumentsWriter io.Writer, toolCallCallback func([]*ToolCall), rawResponseHeaderCallback RawHTTPResponseHeaderCallback, rawResponseCallback func([]byte, []byte, *ChatUsage), usageCallback func(*ChatUsage)) error {
+func processAIResponseForResponses(r []byte, closer io.ReadCloser, outWriter io.Writer, reasonWriter io.Writer, toolCallArgumentsWriter io.Writer, toolCallCallback func([]*ToolCall), rawResponseHeaderCallback RawHTTPResponseHeaderCallback, rawResponseCallback func([]byte, []byte, *ChatUsage), usageCallback func(*ChatUsage), finishReasonCallback ...func(string, []byte)) error {
 	// /responses 接口的 usage 目前仍以兜底扫描原始 payload 为主，
 	// 保持与 chat_completions 路径一致的系统态回调签名。
 	// 关键词: responses 接口 usage 兜底提取
@@ -698,7 +705,7 @@ func processAIResponseForResponses(r []byte, closer io.ReadCloser, outWriter io.
 	var mirrorResponse bytes.Buffer
 	ensureUsageCaptured := func() {
 		if lastUsage == nil {
-			lastUsage = extractLastChatUsageFromPayload(mirrorResponse.Bytes())
+			lastUsage = extractLastChatUsageFromPayload(providerResponsePayload(r, mirrorResponse.Bytes()))
 		}
 	}
 	defer func() {
@@ -717,6 +724,13 @@ func processAIResponseForResponses(r []byte, closer io.ReadCloser, outWriter io.
 		utils.CallGeneralClose(reasonWriter)
 		utils.CallGeneralClose(outWriter)
 		utils.CallGeneralClose(toolCallArgumentsWriter)
+	}()
+
+	// Publish terminal metadata before stream EOF; usage retains its after-EOF timing.
+	defer func() {
+		if len(finishReasonCallback) > 0 && finishReasonCallback[0] != nil {
+			finishReasonCallback[0](responsesFinishReason(providerResponsePayload(r, mirrorResponse.Bytes())), append([]byte(nil), mirrorResponse.Bytes()...))
+		}
 	}()
 
 	if rawResponseHeaderCallback != nil {
@@ -1223,6 +1237,109 @@ func parseResponsesFunctionCall(item map[string]any, defaultIndex int) *ToolCall
 			Arguments: args,
 		},
 	}
+}
+
+// The diagnostic mirror retains HTTP chunk framing. Metadata parsers need the
+// decoded entity body, just like the streaming delta parser: a chunk boundary
+// can occur inside a JSON key or value. Keep the mirror unchanged for callbacks.
+func providerResponsePayload(header, body []byte) []byte {
+	if !utils.IContains(lowhttp.GetHTTPPacketHeader(header, "transfer-encoding"), "chunked") {
+		return body
+	}
+	// The stream reader reports transport errors. Here retain only the payload
+	// actually received, so incomplete metadata cannot be fabricated from framing.
+	payload, _ := io.ReadAll(httputil.NewChunkedReader(bytes.NewReader(body)))
+	return payload
+}
+
+// chatCompletionFinishReason reads the terminal choice from either a JSON
+// response or its SSE chunks. The stream parser already mirrors the entire
+// provider body, so this callback does not change when output can be consumed.
+func chatCompletionFinishReason(body []byte) string {
+	if json.Valid(bytes.TrimSpace(body)) {
+		var compact bytes.Buffer
+		if json.Compact(&compact, body) == nil {
+			body = compact.Bytes()
+		}
+	}
+	for _, line := range bytes.Split(body, []byte{'\n'}) {
+		line = bytes.TrimSpace(line)
+		line = bytes.TrimSpace(bytes.TrimPrefix(line, []byte("data:")))
+		if len(line) == 0 || bytes.Equal(line, []byte("[DONE]")) {
+			continue
+		}
+		var payload struct {
+			Choices []struct {
+				FinishReason string `json:"finish_reason"`
+			} `json:"choices"`
+		}
+		if json.Unmarshal(line, &payload) == nil && len(payload.Choices) > 0 && payload.Choices[0].FinishReason != "" {
+			return payload.Choices[0].FinishReason
+		}
+	}
+	return ""
+}
+
+func responsesFinishReason(body []byte) string {
+	if json.Valid(bytes.TrimSpace(body)) {
+		var compact bytes.Buffer
+		if json.Compact(&compact, body) == nil {
+			body = compact.Bytes()
+		}
+	}
+	var status, incompleteReason string
+	hasFunctionCall := false
+	for _, line := range bytes.Split(body, []byte{'\n'}) {
+		line = bytes.TrimSpace(line)
+		line = bytes.TrimSpace(bytes.TrimPrefix(line, []byte("data:")))
+		if len(line) == 0 || bytes.Equal(line, []byte("[DONE]")) {
+			continue
+		}
+		var payload map[string]any
+		if json.Unmarshal(line, &payload) != nil {
+			continue
+		}
+		eventType := utils.MapGetString(payload, "type")
+		if strings.HasPrefix(eventType, "response.function_call") {
+			hasFunctionCall = true
+		}
+		if item := utils.MapGetMapRaw(payload, "item"); utils.MapGetString(item, "type") == "function_call" {
+			hasFunctionCall = true
+		}
+		response := utils.MapGetMapRaw(payload, "response")
+		if len(response) == 0 {
+			response = payload
+		}
+		for _, raw := range utils.InterfaceToSliceInterface(response["output"]) {
+			if utils.MapGetString(utils.InterfaceToGeneralMap(raw), "type") == "function_call" {
+				hasFunctionCall = true
+			}
+		}
+		if next := utils.MapGetString(response, "status"); next != "" {
+			status = next
+		}
+		if details := utils.MapGetMapRaw(response, "incomplete_details"); len(details) > 0 {
+			incompleteReason = utils.MapGetString(details, "reason")
+		}
+		switch eventType {
+		case "response.completed":
+			status = "completed"
+		case "response.incomplete":
+			status = "incomplete"
+		case "response.failed":
+			status = "failed"
+		}
+	}
+	if status == "incomplete" && incompleteReason != "" {
+		return incompleteReason
+	}
+	if status == "completed" {
+		if hasFunctionCall {
+			return "tool_calls"
+		}
+		return "stop"
+	}
+	return status
 }
 
 func writeLegacyToolCall(outWriter io.Writer, tc *ToolCall) {
