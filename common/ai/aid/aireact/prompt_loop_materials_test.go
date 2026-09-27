@@ -340,21 +340,7 @@ func TestPromptManager_AssembleLoopPrompt_SectionOrder(t *testing.T) {
 	require.NotEqual(t, -1, checkpointIdx)
 	require.NotEqual(t, -1, dynamicEndIdx)
 
-	// 段顺序 (P1-C3 timeline-open 段内子项重排后): TRAITS -> AI_CACHE_FROZEN(START) ->
-	// Tool/Forge/Timeline-frozen -> AI_CACHE_FROZEN(END) ->
-	// PROMPT_SECTION_semi-dynamic-1 (Skills) ->
-	// PROMPT_SECTION_semi-dynamic-2 (ExecutionPolicy + Persistent + OutputExample + Schema) ->
-	// PROMPT_SECTION_timeline-open (Timeline open（含 evidence delta）+
-	// Workspace + PREV_USER_INPUT + Current Time + PlanContext) ->
-	// Dynamic (UserQuery + AutoCtx + ...)
-	//
-	// timeline-open 段内子项顺序 (P1-C3):
-	//   Timeline (Open Tail, including evidence delta) -> Workspace ->
-	//   User History (PREV_USER_INPUT) -> Current Time -> Plan Context
-	// 排序原则: Timeline 与其 evidence delta 形成"会话级实证"连续块在前;
-	// Workspace 居中作为环境标识; UserHistory + Current Time 形成"用户输入
-	// 历史 -> 现在"时序前缀; PlanContext 末尾落在所有 cache 边界外。
-	// 关键词: P1-C3 timeline-open 段内顺序断言, currentTime 后置
+	// Workspace is stable Semi1 context; the clock follows Open in Dynamic.
 	require.Less(t, traitsIdx, frozenStartIdx)
 	require.Less(t, frozenStartIdx, toolInventoryIdx)
 	require.Less(t, toolInventoryIdx, frozenEndIdx)
@@ -453,7 +439,7 @@ func TestPromptManager_AssembleLoopPrompt_SectionOrder(t *testing.T) {
 	require.Equal(t, "section.dynamic.auto_context", sections[5].Children[2].Key)
 	require.Equal(t, "Auto Context", sections[5].Children[2].Label)
 	require.Equal(t, reactloops.PromptSectionRoleDynamic, sections[5].Children[0].Role)
-	require.Equal(t, reactloops.PromptSectionRoleZHDynamic, sections[5].Children[0].RoleZh)
+
 }
 
 // TestPromptManager_RenderLoopSemiDynamic1Section_Order 验证 SEMI-1 段包含

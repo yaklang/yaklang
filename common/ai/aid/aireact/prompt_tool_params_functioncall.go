@@ -108,8 +108,7 @@ func (pm *PromptManager) GenerateFunctionCallToolParamsPromptForTask(
 	return assembleFunctionCallToolParamsPrompt(materials,
 		map[string]any{
 			"RecentUserInput": materials.UserHistory, "CallIntent": callIntent,
-			"CurrentTime": base.CurrentTime, "OSArch": base.OSArch,
-			"WorkingDir": base.WorkingDir, "WorkingDirGlance": base.WorkingDirGlance,
+			"CurrentTime": base.CurrentTime,
 		}, currentNonce)
 }
 

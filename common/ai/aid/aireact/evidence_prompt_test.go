@@ -62,8 +62,8 @@ func TestPromptManager_AssembleLoopPrompt_TodoBlockAfterTimelineEvidenceDelta(t 
 		"evidence delta must live inside the timeline-open section")
 	require.Less(t, sessionEvidenceIdx, todoListIdx,
 		"TODO_LIST must follow the ordinary Open Timeline")
-	require.Less(t, todoListIdx, workspaceIdx,
-		"TODO_LIST block must come before Workspace section")
+	require.Less(t, workspaceIdx, timelineOpenSectionIdx,
+		"stable workspace must precede Open Timeline")
 
 	require.Contains(t, prompt, "- [ ]: [id: verify_target]: 复现目标错误码")
 	require.Contains(t, prompt, "- [ ]: [id: collect_signal]: 采集响应特征")

@@ -13,8 +13,6 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 
-	"github.com/yaklang/yaklang/common/utils/filesys"
-
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/utils"
 )
@@ -84,13 +82,6 @@ func NewPromptManager(react *ReAct, workdir string) *PromptManager {
 		react:   react,
 		workdir: workdir,
 	}
-}
-
-// GetGlanceWorkdir returns a fresh directory listing snapshot. Keeping the
-// snapshot on PromptManager made concurrent batch prompt builders race on one
-// shared string, while no caller relied on that value after the return.
-func (pm *PromptManager) GetGlanceWorkdir(wd string) string {
-	return filesys.Glance(wd)
 }
 
 // GetAvailableAIForgeBlueprints returns the forge inventory rendered for the
@@ -206,7 +197,10 @@ func (pm *PromptManager) GetBasicPromptInfo(tools []*aitool.Tool) (string, map[s
 	result["CurrentTime"] = time.Now().Format("2006-01-02 15:04")
 	result["OSArch"] = fmt.Sprintf("%s/%s", runtime.GOOS, runtime.GOARCH)
 	result["WorkingDir"] = pm.workdir
-	result["WorkingDirGlance"] = pm.GetGlanceWorkdir(pm.workdir)
+	// Legacy caller templates may still reference this key; never scan the
+	// workspace while building prompt context.
+	result["WorkingDirGlance"] = ""
+	result["AIArtifactsDir"] = pm.react.config.GetConfiguredWorkDir()
 	generatedNonce := nonce()
 	result["Nonce"] = generatedNonce
 	result["DynamicContext"] = pm.DynamicContextWithNonce(generatedNonce)

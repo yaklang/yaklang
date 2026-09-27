@@ -27,7 +27,7 @@ const (
 	// 关键词: promptSectionTimeline, 老 timeline 段名, 兼容
 	promptSectionTimeline = "timeline"
 	// promptSectionTimelineOpen 是 "按稳定性分层" 拆分后的 timeline 易变尾段:
-	// 仅含最末 interval 桶 + 当前时间 + 工作目录。
+	// 包含开放历史及当前 TODO / 用户历史；工作区在 Semi，时钟在 Dynamic。
 	// 关键词: promptSectionTimelineOpen, timeline open
 	promptSectionTimelineOpen = "timeline-open"
 	promptSectionDynamic      = "dynamic"
@@ -785,15 +785,6 @@ func (pm *PromptManager) buildTimelineOpenObservation(
 		"Timeline Open",
 		reactloops.PromptSectionRoleTimelineOpen,
 	)
-	// 子节点 Name 已去掉 "Timeline Open / " 前缀: UI 字节统计面板里父容器
-	// "Timeline Open & Workspace" 已经表达层级.
-	// 关键词: section.timeline_open 子节点 Name 去前缀, UI 信息密度
-	//
-	// 子节点排列顺序: timeline_open（含 evidence/tool-cache delta）-> todo_list -> workspace ->
-	// session_artifacts_open -> user_history -> current_time -> plan_context. 该顺序与 timeline_open_section.txt
-	// 模板渲染顺序严格一致, 让"上下文成分"面板看到的层级与实际 prompt 字节
-	// 流顺序保持同步.
-	// 关键词: P1-C3 子节点顺序, observation 与模板对齐
 	children := []*reactloops.PromptSectionObservation{
 		reactloops.NewPromptSectionObservation(
 			"section.timeline_open.timeline_open",
