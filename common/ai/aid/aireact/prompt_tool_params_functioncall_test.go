@@ -167,13 +167,14 @@ func TestFunctionCallToolParamsHistoryBeforeSelectedTool(t *testing.T) {
 
 func TestFunctionCallToolParamsFrozenAndSemiOneRouting(t *testing.T) {
 	sections, err := newFunctionCallToolParamsPrefixBuilder().AssemblePromptPrefix(&aicommon.PromptMaterials{
-		TimelineFrozen: "FROZEN_TIMELINE_R2", SessionEvidenceFrozen: "FROZEN_EVIDENCE_R2",
+		TimelineFrozen: "FROZEN_TIMELINE_R2", SessionEvidenceSemiDynamic: "PROMOTED_EVIDENCE_R2",
 		OriginalUserInput: "COMPLETE_USER_INPUT_R2", PromotedSemiDynamic1: "STABLE_TIMELINE_R2",
 		FunctionCallSchemas: "FIXED_TOOL_TAGS_R2", TaskInstruction: "SELECTED_TOOL_R2",
 	})
 	require.NoError(t, err)
 	require.Contains(t, sections.FrozenBlock, "FROZEN_TIMELINE_R2")
-	require.Contains(t, sections.FrozenBlock, "FROZEN_EVIDENCE_R2")
+	require.Contains(t, sections.SemiDynamic, "PROMOTED_EVIDENCE_R2")
+	require.NotContains(t, sections.FrozenBlock, "PROMOTED_EVIDENCE_R2")
 	require.NotContains(t, sections.FrozenBlock, "SELECTED_TOOL_R2")
 	require.Contains(t, sections.SemiDynamic, "COMPLETE_USER_INPUT_R2")
 	require.NotContains(t, sections.SemiDynamic, "STABLE_TIMELINE_R2")

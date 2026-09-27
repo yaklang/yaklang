@@ -34,8 +34,7 @@
 {{ end }}
 {{ end }}
 
-{{ if .SessionEvidenceFrozen }}# Session Evidence (Frozen)
-{{ .SessionEvidenceFrozen }}{{ end }}
+
 
 {{ if .TimelineFrozen }}# Timeline Memory (Frozen Prefix)
 {{ .TimelineFrozen }}{{ end }}

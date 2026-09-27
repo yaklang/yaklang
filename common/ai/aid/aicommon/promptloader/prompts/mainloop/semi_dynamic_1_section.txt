@@ -4,3 +4,5 @@
 {{ if .PromotedSemiDynamic1 }}
 
 {{ .PromotedSemiDynamic1 }}{{ end }}
+
+{{ if .SessionEvidenceSemiDynamic }}{{ .SessionEvidenceSemiDynamic }}{{ end }}

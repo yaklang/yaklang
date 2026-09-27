@@ -33,6 +33,7 @@ type timelineSerializable struct {
 	PromotedState         *TimelinePromotedState           `json:"promoted_state,omitempty"`
 	FreezeState           *TimelineFreezeState             `json:"freeze_state,omitempty"`
 	BucketByteSize        int64                            `json:"bucket_byte_size,omitempty"`
+	EvidenceInitialized   bool                             `json:"evidence_initialized,omitempty"`
 }
 
 // MarshalTimeline serializes a Timeline into a string.
@@ -98,6 +99,7 @@ func marshalTimelineUnlocked(i *Timeline) (string, error) {
 		TotalDumpContentLimit: i.totalDumpContentLimit,
 		PromotedState:         cloneTimelinePromotedState(i.promotedState),
 		FreezeState:           cloneTimelineFreezeState(i.freezeState),
+		EvidenceInitialized:   i.evidenceInitialized,
 		BucketByteSize:        i.bucketByteSize,
 	}
 
@@ -129,6 +131,7 @@ func UnmarshalTimeline(s string) (*Timeline, error) {
 		branchTimeline:        false,
 		promotedState:         cloneTimelinePromotedState(serializable.PromotedState),
 		freezeState:           cloneTimelineFreezeState(serializable.FreezeState),
+		evidenceInitialized:   serializable.EvidenceInitialized,
 		bucketByteSize:        serializable.BucketByteSize,
 	}
 

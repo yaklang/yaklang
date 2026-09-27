@@ -72,7 +72,7 @@ type PromptMaterials struct {
 	// Deprecated: Session Artifacts no longer participate in prompt construction.
 	SessionArtifactsListing string
 	// Deprecated: SessionEvidence 保留给旧调用路径 fallback。新主路径使用
-	// SessionEvidenceFrozen / SessionEvidenceOpen 两个一级字段。
+	// SessionEvidenceSemiDynamic / SessionEvidenceOpen 两个一级字段。
 	SessionEvidence string
 	// TodoSnapshot 是会话级 TODO 列表渲染结果 (含 <|TODO_LIST_<nonce>|>...
 	// 边界标签的整段块). 物理位置紧跟 SessionEvidence, 与 SessionEvidence
@@ -141,18 +141,18 @@ func (m *PromptMaterials) FrozenBlockData() map[string]any {
 		return map[string]any{}
 	}
 	return map[string]any{
-		"ForcedSkills":           m.ForcedSkills,
-		"FunctionCallMode":       m.FunctionCallMode,
-		"ToolInventory":          m.ToolInventory,
-		"ToolsCount":             m.ToolsCount,
-		"TopToolsCount":          m.TopToolsCount,
-		"TopTools":               m.TopTools,
-		"HasMoreTools":           m.HasMoreTools,
-		"MoreToolsCount":         m.MoreToolsCount,
-		"ForgeInventory":         m.ForgeInventory,
-		"AIForgeList":            m.AIForgeList,
-		"FrozenPartitions":       NormalizeFrozenBlockPartitions(m.FrozenPartitions),
-		"SessionEvidenceFrozen":  m.SessionEvidenceFrozen,
+		"ForcedSkills":     m.ForcedSkills,
+		"FunctionCallMode": m.FunctionCallMode,
+		"ToolInventory":    m.ToolInventory,
+		"ToolsCount":       m.ToolsCount,
+		"TopToolsCount":    m.TopToolsCount,
+		"TopTools":         m.TopTools,
+		"HasMoreTools":     m.HasMoreTools,
+		"MoreToolsCount":   m.MoreToolsCount,
+		"ForgeInventory":   m.ForgeInventory,
+		"AIForgeList":      m.AIForgeList,
+		"FrozenPartitions": NormalizeFrozenBlockPartitions(m.FrozenPartitions),
+
 		"TimelineFrozen":         m.TimelineFrozen,
 		"TimelineFrozenTimeUnix": m.TimelineFrozenTimeUnix,
 	}
@@ -167,7 +167,7 @@ func (m *PromptMaterials) TimelineOpenData() map[string]any {
 		return map[string]any{}
 	}
 	sessionEvidenceOpen := m.SessionEvidenceOpen
-	if sessionEvidenceOpen == "" {
+	if sessionEvidenceOpen == "" && m.SessionEvidenceSemiDynamic == "" {
 		sessionEvidenceOpen = m.SessionEvidence
 	}
 	return map[string]any{
@@ -193,6 +193,8 @@ type TimelineFrozenOpenBlocks struct {
 	PromotedOpen         string
 	PromotedSemiDynamic1 string
 	FrozenTimeUnix       int64
+	EvidenceSemiDynamic  string
+	EvidenceOpen         string
 }
 
 func RenderTimelineFrozenOpen(timeline *Timeline) TimelineFrozenOpenBlocks {
@@ -215,6 +217,7 @@ func renderTimelineFrozenOpen(timeline *Timeline, includeLatestModelReplay bool)
 	defer timeline.mu.RUnlock()
 	rb := timeline.frozenPromptBlocksLocked()
 	promotedSemi1, openDeltas := timeline.projectPromotedLocked()
+	evidenceSemi, evidenceOpen := timeline.projectEvidenceLocked()
 	promptBlocks := projectTimelineRenderableBlocksForPrompt(rb)
 	if includeLatestModelReplay {
 		promptBlocks = projectTimelineRenderableBlocksForPromptWithLatestModelReplay(rb)
@@ -224,9 +227,9 @@ func renderTimelineFrozenOpen(timeline *Timeline, includeLatestModelReplay bool)
 		Open:                 promptBlocks.RenderOpenOnly(TimelineDumpDefaultAITagName),
 		PromotedOpen:         openDeltas,
 		PromotedSemiDynamic1: promotedSemi1,
-		// Evidence still uses its legacy calendar boundary until it joins the
-		// promotion journal. A full byte bucket must not freeze future evidence.
-		FrozenTimeUnix: timelineFrozenTimeUnixFromRenderable(timeline.groupByMinutesAndBytesLocked(TimelineDumpDefaultIntervalMinutes, -1).GetAllRenderable()),
+		FrozenTimeUnix:       timelineFrozenTimeUnixFromRenderable(rb),
+		EvidenceSemiDynamic:  evidenceSemi,
+		EvidenceOpen:         evidenceOpen,
 	}
 }
 
@@ -242,8 +245,8 @@ type PromptFrozenOpenMaterials struct {
 	SessionArtifactsFrozen string
 	SessionArtifactsOpen   string
 
-	SessionEvidenceFrozen string
-	SessionEvidenceOpen   string
+	SessionEvidenceSemiDynamic string
+	SessionEvidenceOpen        string
 
 	// ReportedRisks is the rendered "已报告漏洞清单" block for the
 	// timeline-open section. Populated from SessionPromptState.
@@ -266,26 +269,21 @@ func buildPromptFrozenOpenMaterials(config *Config, includeLatestModelReplay boo
 	if config == nil {
 		return PromptFrozenOpenMaterials{}
 	}
-	nonce := ""
-	if len(openNonce) > 0 {
-		nonce = openNonce[0]
-	}
 	timelineBlocks := RenderTimelineFrozenOpen(config.GetTimeline())
 	if includeLatestModelReplay {
 		timelineBlocks = RenderTimelineFrozenOpenWithLatestModelReplay(config.GetTimeline())
 	}
-	evidenceBlocks := config.GetSessionPromptState().GetSessionEvidenceFrozenOpenBlocks(timelineBlocks.FrozenTimeUnix, nonce)
 	reportedRisks := config.GetSessionPromptState().GetReportedRisksRendered()
 	return PromptFrozenOpenMaterials{
-		TimelineFrozen:         timelineBlocks.Frozen,
-		TimelineOpen:           timelineBlocks.Open,
-		PromotedTimelineOpen:   timelineBlocks.PromotedOpen,
-		PromotedSemiDynamic1:   timelineBlocks.PromotedSemiDynamic1,
-		TimelineFrozenTimeUnix: timelineBlocks.FrozenTimeUnix,
-		FrozenPartitions:       FrozenBlockPartitionsFromConfig(config),
-		SessionEvidenceFrozen:  evidenceBlocks.Frozen,
-		SessionEvidenceOpen:    evidenceBlocks.Open,
-		ReportedRisks:          reportedRisks,
+		TimelineFrozen:             timelineBlocks.Frozen,
+		TimelineOpen:               timelineBlocks.Open,
+		PromotedTimelineOpen:       timelineBlocks.PromotedOpen,
+		PromotedSemiDynamic1:       timelineBlocks.PromotedSemiDynamic1,
+		TimelineFrozenTimeUnix:     timelineBlocks.FrozenTimeUnix,
+		FrozenPartitions:           FrozenBlockPartitionsFromConfig(config),
+		SessionEvidenceSemiDynamic: timelineBlocks.EvidenceSemiDynamic,
+		SessionEvidenceOpen:        timelineBlocks.EvidenceOpen,
+		ReportedRisks:              reportedRisks,
 	}
 }
 
@@ -299,7 +297,7 @@ func ApplyPromptFrozenOpenMaterials(materials *PromptMaterials, frozenOpen Promp
 	materials.PromotedSemiDynamic1 = frozenOpen.PromotedSemiDynamic1
 	materials.TimelineFrozenTimeUnix = frozenOpen.TimelineFrozenTimeUnix
 	materials.FrozenPartitions = append([]FrozenBlockPartition(nil), NormalizeFrozenBlockPartitions(frozenOpen.FrozenPartitions)...)
-	materials.SessionEvidenceFrozen = frozenOpen.SessionEvidenceFrozen
+	materials.SessionEvidenceSemiDynamic = frozenOpen.SessionEvidenceSemiDynamic
 	materials.SessionEvidenceOpen = frozenOpen.SessionEvidenceOpen
 	materials.ReportedRisks = frozenOpen.ReportedRisks
 }

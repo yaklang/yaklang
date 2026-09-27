@@ -687,6 +687,8 @@ func NewConfig(ctx context.Context, opts ...ConfigOption) *Config {
 		config.restorePersistentSession()
 	}
 
+	config.restoreEvidenceTimeline()
+
 	// Auto-load skills from all well-known directories unless explicitly disabled.
 	// Scanned dirs: ~/yakit-projects/ai-skills, ~/.cursor/skills, $CWD/.cursor/skills
 	// RefreshFromDirs is protected by a 60-second cooldown inside AutoSkillLoader.
@@ -3635,6 +3637,9 @@ func (c *Config) AppendUserInputHistory(userInput string, timestamp time.Time) (
 }
 
 func (c *Config) GetSessionEvidenceRendered() string {
+	if store, found := c.GetTimeline().evidenceStore(); found {
+		return store.Render()
+	}
 	return c.GetSessionPromptState().GetSessionEvidenceRendered()
 }
 
@@ -3642,12 +3647,7 @@ func (c *Config) ApplySessionEvidenceOps(ops []EvidenceOperation) {
 	if len(ops) == 0 {
 		return
 	}
-	quotedEvidence := c.GetSessionPromptState().ApplySessionEvidenceOps(ops)
-	if c.PersistentSessionId != "" && c.GetDB() != nil {
-		if err := yakit.UpdateAIAgentRuntimeEvidence(c.GetDB(), c.PersistentSessionId, quotedEvidence); err != nil {
-			log.Warnf("persist session evidence failed: %v", err)
-		}
-	}
+	c.applyEvidenceToTimeline(ops)
 }
 
 // GetVerificationTodoRendered returns the rendered TODO snapshot for the
