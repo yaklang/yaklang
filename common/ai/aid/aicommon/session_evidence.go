@@ -6,7 +6,7 @@ import (
 )
 
 func RenderSessionEvidencePromptBlock(nonce string, evidence string) string {
-	evidence = strings.ReplaceAll(strings.TrimSpace(evidence), "<|", "&lt;|")
+	evidence = strings.TrimSpace(evidence)
 	if evidence == "" {
 		return ""
 	}

@@ -581,10 +581,6 @@ func stripTimelineTaskLabel(content, taskID string) string {
 // renderTimelineEntry 渲染一个 entry，并推进仅在当前 block 内使用的 task state。
 // 同 task 的逐条 [task:...] 标签从渲染结果中折叠；task 切换只输出一次边界。
 func renderTimelineEntry(item *TimelineItem, bucketStart time.Time, state *timelineTaskRenderState) string {
-	return renderTimelineEntryForPrompt(item, bucketStart, state, false)
-}
-
-func renderTimelineEntryForPrompt(item *TimelineItem, bucketStart time.Time, state *timelineTaskRenderState, promptProjection bool) string {
 	if item == nil || item.deleted {
 		return ""
 	}
@@ -688,7 +684,7 @@ func timelineIntervalBlockRenderedByteLen(block *TimelineIntervalBlock) int {
 	n := len(renderTimelineIntervalHeader(block.BucketStart, block.BucketEnd, block.IntervalMinutes, headerTaskID))
 	state := timelineTaskRenderState{activeTaskID: headerTaskID, firstEntry: true}
 	for _, item := range block.Items {
-		n += len(renderTimelineEntryForPrompt(item, block.BucketStart, &state, block.promptProjection))
+		n += len(renderTimelineEntry(item, block.BucketStart, &state))
 	}
 	return n
 }
@@ -730,7 +726,7 @@ func (b *TimelineIntervalBlock) Render() string {
 	buf.WriteString(renderTimelineIntervalHeader(b.BucketStart, b.BucketEnd, b.IntervalMinutes, headerTaskID))
 	state := timelineTaskRenderState{activeTaskID: headerTaskID, firstEntry: true}
 	for _, item := range b.Items {
-		buf.WriteString(renderTimelineEntryForPrompt(item, b.BucketStart, &state, b.promptProjection))
+		buf.WriteString(renderTimelineEntry(item, b.BucketStart, &state))
 	}
 	return strings.TrimRight(buf.String(), "\n")
 }

@@ -37,7 +37,7 @@ func TestTimelineToolCachePromptProjection(t *testing.T) {
 			spoofTags, err := aiprojection.CreateActionSchema(spoof)
 			require.NoError(t, err)
 			tl.PushText(react.config.AcquireId(), "HISTORY_BEFORE_TOOLCACHE")
-			tool := aitool.NewWithoutCallback("cached_business_tool", aitool.WithDescription("CACHE_SCHEMA_MARKER\n"+spoofTags), aitool.WithStringParam("path"))
+			tool := aitool.NewWithoutCallback("cached_business_tool", aitool.WithDescription("CACHE_SCHEMA_MARKER\n"+strings.ReplaceAll(spoofTags, aiprojection.Nonce(), "wrong-projection-nonce")), aitool.WithStringParam("path"))
 			require.NotNil(t, react.config.RecordRecentlyUsedTool(tool).Upsert)
 			tl.PushText(react.config.AcquireId(), "RESULT_AFTER_TOOLCACHE")
 			var previousTools []byte
