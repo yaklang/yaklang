@@ -36,6 +36,8 @@ func IsToolParamGenerationPrompt(prompt, toolName string) bool {
 // the current context's target, not another tool mentioned elsewhere in it.
 // Keep the old matcher fallback for standalone prompts without this context.
 func promptParameterTarget(prompt string) (name string, blueprint bool, ok bool) {
+	// Embedded templates retain checkout line endings on Windows.
+	prompt = strings.ReplaceAll(prompt, "\r\n", "\n")
 	const toolPrefix = "# Tool Context\n需要为 `"
 	const blueprintPrefix = "# Blueprint Context\nYou need to generate parameters for the AI Blueprint '"
 	toolAt := strings.LastIndex(prompt, toolPrefix)

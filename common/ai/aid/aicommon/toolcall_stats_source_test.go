@@ -145,7 +145,11 @@ func setupToolCallStatsProjectDB(t *testing.T) {
 	t.Helper()
 	originalPath := consts.GetCurrentProjectDatabasePath()
 	require.NoError(t, consts.SetGormProjectDatabase(filepath.Join(t.TempDir(), "toolcall-stats.db")))
-	t.Cleanup(func() { require.NoError(t, consts.SetGormProjectDatabase(originalPath)) })
+	db := consts.GetGormProjectDatabase()
+	t.Cleanup(func() {
+		require.NoError(t, consts.SetGormProjectDatabase(originalPath))
+		require.NoError(t, db.Close())
+	})
 	require.NoError(t, consts.GetGormProjectDatabase().AutoMigrate(
 		&schema.AiOutputEvent{},
 		&schema.AiCheckpoint{},

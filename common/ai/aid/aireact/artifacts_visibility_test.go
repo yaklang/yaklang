@@ -3,6 +3,7 @@ package aireact
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -415,7 +416,11 @@ WAIT:
 
 	foundPinForWorkdir := false
 	for _, evt := range pinDirEvents {
-		if strings.Contains(evt, workDir) {
+		var pin struct {
+			Path string `json:"path"`
+		}
+		require.NoError(t, json.Unmarshal([]byte(evt), &pin))
+		if pin.Path == workDir {
 			foundPinForWorkdir = true
 			break
 		}

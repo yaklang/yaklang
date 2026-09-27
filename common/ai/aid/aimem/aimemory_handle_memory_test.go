@@ -18,6 +18,7 @@ func TestAddRawText_BoundsMemoryTriageInput(t *testing.T) {
 
 	mockInvoker := NewAdvancedMockInvoker(context.Background())
 	mockInvoker.SetPromptValidator("memory-triage", func(prompt string) bool {
+		prompt = strings.ReplaceAll(prompt, "\r\n", "\n")
 		queryStart := strings.Index(prompt, "<|QUERY_")
 		if queryStart < 0 {
 			return false
@@ -163,6 +164,7 @@ func TestHandleMemory_PromptContainsDurableMemoryRules(t *testing.T) {
 
 	mockInvoker := NewAdvancedMockInvoker(context.Background())
 	mockInvoker.SetPromptValidator("memory-triage", func(prompt string) bool {
+		prompt = strings.ReplaceAll(prompt, "\r\n", "\n")
 		return strings.Contains(prompt, "Do NOT create memory for one-off events") &&
 			strings.Contains(prompt, "Do NOT use pronouns or deictic references") &&
 			strings.Contains(prompt, "return an empty memory_entities array")

@@ -16,12 +16,17 @@ import (
 	"github.com/yaklang/yaklang/common/ai/aid/aimem"
 	"github.com/yaklang/yaklang/common/ai/rag"
 	"github.com/yaklang/yaklang/common/ai/rag/vectorstore"
+	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/schema"
 )
 
 // Exercise the actual memory -> Config scheduler -> LiteForge validator path.
 // An otherwise valid prefix of a malformed array must never be persisted.
 func TestAuxiliaryMemoryValidationRetriesBeforePersistence(t *testing.T) {
+	// Exercise the ordinary scheduler regardless of saved user model settings.
+	previous := consts.GetTieredAIConfig()
+	consts.SetTieredAIConfig(nil)
+	t.Cleanup(func() { consts.SetTieredAIConfig(previous) })
 	for _, mode := range []string{"invalid", "repair-empty", "repair-valid"} {
 		t.Run(mode, func(t *testing.T) {
 			db, err := gorm.Open("sqlite3", filepath.Join(t.TempDir(), "memory.db"))
