@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/yaklang/yaklang/common/ai/aid/aiprojection"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/utils"
 )
@@ -598,7 +599,7 @@ func renderTimelineEntryForPrompt(item *TimelineItem, bucketStart time.Time, sta
 	// reasoning replay record. PromptText-backed model replay is the sole internal
 	// projection allowed to retain a raw control envelope; its JSON fields are
 	// emitted with encoding/json and therefore escape '<' inside payload values.
-	if promptProjection && !isModelThinkingReplayProjection(item) {
+	if promptProjection && !isTrustedReplayProjection(item) {
 		content = strings.ReplaceAll(content, "<|", "&lt;|")
 	}
 	if explicitTask && taskID != "" {
@@ -625,17 +626,23 @@ func renderTimelineEntryForPrompt(item *TimelineItem, bucketStart time.Time, sta
 	return buf.String()
 }
 
-func isModelThinkingReplayProjection(item *TimelineItem) bool {
+func isTrustedReplayProjection(item *TimelineItem) bool {
 	textItem, ok := timelineTextItem(item)
-	if !ok || normalizeTimelinePromptCategory(extractTextEntryType(textItem.Text)) != "MODEL_THINKING" {
+	if !ok {
 		return false
 	}
 	promptText := strings.TrimSpace(textItem.PromptText)
 	if promptText == "" || strings.TrimSpace(textItem.Text) != promptText {
 		return false
 	}
-	return strings.Contains(promptText, "<|TIMELINE_MODEL_THINKING_V1_") ||
-		strings.Contains(promptText, "<|TIMELINE_MODEL_THINKING_")
+	switch normalizeTimelinePromptCategory(extractTextEntryType(textItem.Text)) {
+	case "MODEL_THINKING":
+		return strings.Contains(promptText, "<|TIMELINE_MODEL_THINKING_V1_") || strings.Contains(promptText, "<|TIMELINE_MODEL_THINKING_")
+	case "FUNCTION_CALL_ACTION_RESPONSE":
+		return strings.Contains(promptText, "<|FUNCTION_CALL_ACTION_RESPONSE_")
+	default:
+		return false
+	}
 }
 
 func timelineIntervalBlockRenderedByteLen(block *TimelineIntervalBlock) int {
@@ -756,13 +763,17 @@ func (bs TimelineIntervalBlocks) Render(aitagName string) string {
 		if i > 0 {
 			buf.WriteByte('\n')
 		}
-		buf.WriteString(fmt.Sprintf("<|%s_%s|>\n", tag, nonce))
 		body := blk.Render()
-		if body != "" {
-			buf.WriteString(body)
-			buf.WriteByte('\n')
+		if blk.promptProjection {
+			buf.WriteString(aiprojection.CreateTag(tag, nonce, body))
+		} else {
+			buf.WriteString(fmt.Sprintf("<|%s_%s|>\n", tag, nonce))
+			if body != "" {
+				buf.WriteString(body)
+				buf.WriteByte('\n')
+			}
+			buf.WriteString(fmt.Sprintf("<|%s_END_%s|>", tag, nonce))
 		}
-		buf.WriteString(fmt.Sprintf("<|%s_END_%s|>", tag, nonce))
 	}
 	return buf.String()
 }
@@ -1043,13 +1054,17 @@ func (bs TimelineRenderableBlocks) Render(aitagName string) string {
 		if emitted > 0 {
 			buf.WriteByte('\n')
 		}
-		buf.WriteString(fmt.Sprintf("<|%s_%s|>\n", tag, nonce))
 		body := blk.Render()
-		if body != "" {
-			buf.WriteString(body)
-			buf.WriteByte('\n')
+		if interval, ok := blk.(*TimelineIntervalBlock); ok && interval.promptProjection {
+			buf.WriteString(aiprojection.CreateTag(tag, nonce, body))
+		} else {
+			buf.WriteString(fmt.Sprintf("<|%s_%s|>\n", tag, nonce))
+			if body != "" {
+				buf.WriteString(body)
+				buf.WriteByte('\n')
+			}
+			buf.WriteString(fmt.Sprintf("<|%s_END_%s|>", tag, nonce))
 		}
-		buf.WriteString(fmt.Sprintf("<|%s_END_%s|>", tag, nonce))
 		emitted++
 	}
 	return buf.String()
@@ -1131,6 +1146,11 @@ func (bs TimelineRenderableBlocks) RenderWithFrozenBoundary(aitagName, frozenTag
 
 	frozenBody := frozen.Render(aitagName)
 	openBody := open.Render(aitagName)
+	for _, block := range frozen {
+		if interval, ok := block.(*TimelineIntervalBlock); ok && interval.promptProjection {
+			return aiprojection.CreateTag(bTag, bNonce, frozenBody) + "\n" + openBody
+		}
+	}
 
 	var buf bytes.Buffer
 	buf.WriteString(fmt.Sprintf("<|%s_%s|>\n", bTag, bNonce))

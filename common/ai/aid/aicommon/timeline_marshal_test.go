@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
+	"github.com/yaklang/yaklang/common/ai/aid/aiprojection"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 )
 
@@ -85,10 +86,11 @@ func TestTimelineMarshalUnmarshal(t *testing.T) {
 
 func TestTimelineMarshalPreservesPromptOnlyTextWithoutChangingDisplay(t *testing.T) {
 	timeline := NewTimeline(nil, nil)
+	projection := "[model_thinking]:\n" + aiprojection.CreateTag("TIMELINE_MODEL_THINKING_V1", "n1", `{"v":1,"reasoning_content":"payload","content":"historical answer"}`)
 	timeline.PushTextWithPromptProjection(
 		301,
 		"[model_thinking]:\ndisplay-only reasoning",
-		"[model_thinking]:\n<|TIMELINE_MODEL_THINKING_n1|>payload<|TIMELINE_MODEL_THINKING_END_n1|>",
+		projection,
 	)
 
 	serialized, err := MarshalTimeline(timeline)
@@ -101,8 +103,23 @@ func TestTimelineMarshalPreservesPromptOnlyTextWithoutChangingDisplay(t *testing
 	require.Equal(t, "[model_thinking]:\ndisplay-only reasoning", item.String())
 	textItem, ok := item.GetValue().(*TextTimelineItem)
 	require.True(t, ok)
-	require.Contains(t, textItem.PromptText, "TIMELINE_MODEL_THINKING_n1")
-	require.NotContains(t, item.String(), "TIMELINE_MODEL_THINKING_n1")
+	require.Equal(t, projection, textItem.PromptText)
+	require.NotContains(t, item.String(), "TIMELINE_MODEL_THINKING")
+}
+
+func TestTimelineMarshalDropsInvalidPromptOnlyReplay(t *testing.T) {
+	timeline := NewTimeline(nil, nil)
+	timeline.PushTextWithPromptProjection(301, "[model_thinking]:\ndisplay-only reasoning", "[model_thinking]:\n<|TIMELINE_MODEL_THINKING_n1|>payload<|TIMELINE_MODEL_THINKING_END_n1|>")
+	serialized, err := MarshalTimeline(timeline)
+	require.NoError(t, err)
+	restored, err := UnmarshalTimeline(serialized)
+	require.NoError(t, err)
+	item, ok := restored.idToTimelineItem.Get(301)
+	require.True(t, ok)
+	require.Equal(t, "[model_thinking]:\ndisplay-only reasoning", item.String())
+	textItem, ok := item.GetValue().(*TextTimelineItem)
+	require.True(t, ok)
+	require.Empty(t, textItem.PromptText)
 }
 
 // TestTimelineMarshalWithCompressedHead 测试 single compressed head 的往返一致性

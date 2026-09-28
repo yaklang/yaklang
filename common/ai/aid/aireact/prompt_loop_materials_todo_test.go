@@ -56,7 +56,7 @@ func TestPromptManager_AssembleLoopPrompt_TodoBlockAfterSessionEvidence(t *testi
 	prompt := result.Prompt
 	sessionEvidenceIdx := strings.Index(prompt, "<|SESSION_EVIDENCE_ntodo|>")
 	todoListIdx := strings.Index(prompt, "<|TODO_LIST_ntodo|>")
-	timelineOpenSectionIdx := strings.Index(prompt, "<|PROMPT_SECTION_timeline-open|>")
+	timelineOpenSectionIdx := strings.Index(prompt, aiprojection.CreateTemplate("<|PROMPT_SECTION_timeline-open|>"))
 	workspaceIdx := strings.Index(prompt, "# Workspace Context")
 
 	require.NotEqual(t, -1, sessionEvidenceIdx, "loop prompt must expose SESSION_EVIDENCE block when evidence is non-empty")
@@ -68,8 +68,8 @@ func TestPromptManager_AssembleLoopPrompt_TodoBlockAfterSessionEvidence(t *testi
 		"SESSION_EVIDENCE block must live inside the timeline-open section, not above it")
 	require.Less(t, sessionEvidenceIdx, todoListIdx,
 		"TODO_LIST block must come AFTER SESSION_EVIDENCE block (the user-requested physical layout)")
-	require.Less(t, todoListIdx, workspaceIdx,
-		"TODO_LIST block must come before Workspace section")
+	require.Less(t, workspaceIdx, timelineOpenSectionIdx,
+		"Workspace coordinates belong to the stable semi-dynamic prefix")
 
 	require.Contains(t, prompt, "- [ ]: [id: verify_target]: 复现目标错误码")
 	require.Contains(t, prompt, "- [ ]: [id: collect_signal]: 采集响应特征")
@@ -153,7 +153,7 @@ func TestPromptManager_AssembleLoopPrompt_TodoBlockStaysInTimelineOpenCacheBound
 
 	todoLandedInTimelineOpen := false
 	for _, chunk := range splitRes.Chunks {
-		if !strings.Contains(chunk.Content, "<|TODO_LIST_ncache|>") {
+		if !strings.Contains(chunk.Content, "## 待办清单（TODO）") {
 			continue
 		}
 		require.Equal(t, aiprojection.SectionTimelineOpen, chunk.Section,

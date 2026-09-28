@@ -34,6 +34,11 @@ func projectTimelineItemForPromptWithModelReplay(item *TimelineItem, allowModelR
 			return nil
 		}
 		return cloneTextTimelineItemForPrompt(item, textItem, textItem.PromptText)
+	case "FUNCTION_CALL_ACTION_RESPONSE":
+		if !allowModelReplay || strings.TrimSpace(textItem.PromptText) == "" {
+			return item
+		}
+		return cloneTextTimelineItemForPrompt(item, textItem, textItem.PromptText)
 	case "ITERATION":
 		return item
 	case "TODO_DELTA_ERROR":

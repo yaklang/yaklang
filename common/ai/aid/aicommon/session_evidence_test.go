@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
+	"github.com/yaklang/yaklang/common/ai/aid/aiprojection"
 )
 
 func TestEvidenceStore_ApplyOperationsAtMetadataAndLegacyUnmarshal(t *testing.T) {
@@ -150,7 +151,7 @@ func TestSessionEvidencePromptPlacement_FrozenAndOpenSections(t *testing.T) {
 	frozenStartIdx := strings.Index(prompt, "<|AI_CACHE_FROZEN_")
 	frozenEndIdx := strings.Index(prompt, "<|AI_CACHE_FROZEN_END_")
 	frozenEvidenceIdx := strings.Index(prompt, "<|SESSION_EVIDENCE_FROZEN_")
-	timelineOpenIdx := strings.Index(prompt, "<|PROMPT_SECTION_timeline-open|>")
+	timelineOpenIdx := strings.Index(prompt, aiprojection.CreateTemplate("<|PROMPT_SECTION_timeline-open|>"))
 	openEvidenceIdx := strings.Index(prompt, "<|SESSION_EVIDENCE_nsevid|>")
 	require.NotEqual(t, -1, frozenStartIdx)
 	require.NotEqual(t, -1, frozenEndIdx)

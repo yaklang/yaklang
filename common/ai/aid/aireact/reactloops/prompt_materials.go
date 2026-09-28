@@ -27,6 +27,7 @@ type LoopPromptBaseMaterials struct {
 	OSArch             string
 	WorkingDir         string
 	WorkingDirGlance   string
+	AIArtifactsDir     string
 	AutoContext        string
 	UserHistory        string
 	ToolsCount         int

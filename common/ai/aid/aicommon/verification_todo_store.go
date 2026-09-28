@@ -11,7 +11,7 @@ import (
 	"github.com/yaklang/yaklang/common/ai/ytoken"
 )
 
-const VerificationTodoSnapshotLimit = 10 * 1024
+const VerificationTodoSnapshotLimit = 5 * 1024
 
 type VerificationTodoStatus string
 
@@ -619,17 +619,17 @@ func (s *VerificationTodoStore) CanonicalSnapshot(scope VerificationTodoScope) (
 }
 
 func (s *VerificationTodoStore) Render() string {
-	return renderTodoItems(s.SnapshotItems(), VerificationTodoScope{})
+	return renderTodoItems(s.SnapshotItems())
 }
 
 func (s *VerificationTodoStore) RenderWithCurrentScope(scope VerificationTodoScope) string {
 	if s == nil || s.IsEmpty() {
-		return "- no tracked TODO items"
+		return formatVerificationTodoCurrentTaskHeader(scope) + "\n- (无 TODO；空清单不代表任务完成)"
 	}
-	lines := []string{formatVerificationTodoCurrentTaskHeader(scope), "- TODOs are a short-term work set. Maintain only the current task section; other scopes are read-only."}
+	lines := []todoRenderLine{{text: formatVerificationTodoCurrentTaskHeader(scope)}}
 	current := s.SnapshotItemsByScope(scope)
 	if len(current) == 0 {
-		lines = append(lines, "- (no TODO items tracked for the current task yet)")
+		lines = append(lines, todoRenderLine{text: "- (当前任务无 TODO；空清单不代表任务完成)"})
 	} else {
 		lines = append(lines, renderTodoProjection(current)...)
 	}
@@ -637,34 +637,63 @@ func (s *VerificationTodoStore) RenderWithCurrentScope(scope VerificationTodoSco
 		if state == nil || state.TaskID == scope.normalize().TaskID {
 			continue
 		}
-		lines = append(lines, "", "### OTHER TASK (read-only) "+formatScope(state.scope()))
+		lines = append(lines, todoRenderLine{}, todoRenderLine{text: "### OTHER TASK (read-only) " + formatScope(state.scope())})
 		lines = append(lines, renderTodoProjection(projectScope(state))...)
 	}
 	return truncateVerificationTodoLines(lines)
 }
 
-func renderTodoItems(items []VerificationTodoItem, scope VerificationTodoScope) string {
+func renderTodoItems(items []VerificationTodoItem) string {
 	if len(items) == 0 {
 		return "- no tracked TODO items"
 	}
 	return truncateVerificationTodoLines(renderTodoProjection(items))
 }
 
-func renderTodoProjection(items []VerificationTodoItem) []string {
-	sort.SliceStable(items, func(i, j int) bool { return items[i].UpdatedAt > items[j].UpdatedAt })
-	lines := make([]string, 0, len(items))
+type todoRenderLine struct {
+	text     string
+	resolved bool
+}
+
+func renderTodoProjection(items []VerificationTodoItem) []todoRenderLine {
+	sort.SliceStable(items, func(i, j int) bool {
+		if todoRenderPriority(items[i]) != todoRenderPriority(items[j]) {
+			return todoRenderPriority(items[i]) < todoRenderPriority(items[j])
+		}
+		return items[i].UpdatedAt > items[j].UpdatedAt
+	})
+	lines := make([]todoRenderLine, 0, len(items))
 	for _, item := range items {
 		content := strings.Join(strings.Fields(item.Content), " ")
+		line := todoRenderLine{resolved: item.Outcome == TodoOutcomeResolved}
 		switch item.Status {
 		case VerificationTodoStatusPending:
-			lines = append(lines, fmt.Sprintf("- [ ] [id: %s]: %s", item.ID, content))
+			line.text = fmt.Sprintf("- [ ] [id: %s]: %s", item.ID, content)
 		case VerificationTodoStatusDoing:
-			lines = append(lines, fmt.Sprintf("- [CURRENT] [id: %s]: %s", item.ID, content))
+			line.text = fmt.Sprintf("- [CURRENT] [id: %s]: %s", item.ID, content)
 		default:
-			lines = append(lines, fmt.Sprintf("- [%s] [id: %s]: %s; reason: %s; refs: %s", item.Outcome, item.ID, content, item.Reason, strings.Join(item.Refs, ", ")))
+			line.text = fmt.Sprintf("- [%s] [id: %s]: %s; reason: %s", item.Outcome, item.ID, content, item.Reason)
+			if len(item.Refs) > 0 {
+				line.text += "; refs: " + strings.Join(item.Refs, ", ")
+			}
 		}
+		lines = append(lines, line)
 	}
 	return lines
+}
+
+func todoRenderPriority(item VerificationTodoItem) int {
+	switch item.Status {
+	case VerificationTodoStatusDoing:
+		return 0
+	case VerificationTodoStatusPending:
+		return 1
+	default:
+		if item.Outcome == TodoOutcomeResolved {
+			return 3
+		}
+		return 2
+	}
 }
 
 func formatVerificationTodoCurrentTaskHeader(scope VerificationTodoScope) string {
@@ -676,14 +705,50 @@ func formatScope(scope VerificationTodoScope) string {
 	return fmt.Sprintf("[task_index=%s, task_id=%s]", scope.TaskIndex, scope.TaskID)
 }
 
-func truncateVerificationTodoLines(lines []string) string {
+func truncateVerificationTodoLines(lines []todoRenderLine) string {
 	if len(lines) == 0 {
 		return "- no tracked TODO items"
 	}
-	for len(lines) > 1 && ytoken.CalcTokenCount(strings.Join(lines, "\n")) > VerificationTodoSnapshotLimit {
-		lines = lines[:len(lines)-1]
+	omittedLines := make([]bool, len(lines))
+	render := func(omitted int) string {
+		text := make([]string, 0, len(lines)+1)
+		for index, line := range lines {
+			if !omittedLines[index] {
+				text = append(text, line.text)
+			}
+			if index == 0 && omitted > 0 {
+				text = append(text, fmt.Sprintf("- (预算不足，省略 %d 项 resolved)", omitted))
+			}
+		}
+		return strings.Join(text, "\n")
 	}
-	return strings.Join(lines, "\n")
+	result := render(0)
+	if !ytoken.TokenCountExceeds(result, VerificationTodoSnapshotLimit) {
+		return result
+	}
+	resolvedTokens := make([]int, len(lines))
+	for i, line := range lines {
+		if line.resolved {
+			resolvedTokens[i] = ytoken.CalcTokenCount(line.text)
+		}
+	}
+	for omitted := 1; ; omitted++ {
+		largest := -1
+		for i, line := range lines {
+			if line.resolved && !omittedLines[i] && (largest < 0 || resolvedTokens[i] >= resolvedTokens[largest]) {
+				largest = i
+			}
+		}
+		if largest < 0 {
+			break
+		}
+		omittedLines[largest] = true
+		result = render(omitted)
+		if !ytoken.TokenCountExceeds(result, VerificationTodoSnapshotLimit) {
+			return result
+		}
+	}
+	return ShrinkByTokens(result, VerificationTodoSnapshotLimit)
 }
 
 func (s *VerificationTodoStore) RenderMarkdownDelta(scope VerificationTodoScope, delta *TodoDelta) string {
@@ -810,7 +875,7 @@ func parseTodoNumber(id string) (int, bool) {
 }
 
 func FormatVerificationTodoLine(item VerificationTodoItem) string {
-	return strings.TrimPrefix(strings.Join(renderTodoProjection([]VerificationTodoItem{item}), ""), "- ")
+	return strings.TrimPrefix(renderTodoProjection([]VerificationTodoItem{item})[0].text, "- ")
 }
 
 func FormatVerificationTodoMarkdownLine(item VerificationTodoItem, marker string) string {

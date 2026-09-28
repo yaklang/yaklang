@@ -65,6 +65,7 @@ type PromptMaterials struct {
 	OSArch                 string
 	WorkingDir             string
 	WorkingDirGlance       string
+	AIArtifactsDir         string
 
 	// Deprecated: Session Artifacts no longer participate in prompt construction.
 	SessionArtifactsListing string
@@ -101,6 +102,7 @@ func (m *PromptMaterials) SemiDynamicData() map[string]any {
 		return map[string]any{}
 	}
 	return map[string]any{
+		"WorkspaceContext":     m.WorkspaceContext(),
 		"SkillsContext":        m.SkillsContext,
 		"PromotedSemiDynamic1": m.PromotedSemiDynamic1,
 		"PlanHelp":             m.PlanHelp,
@@ -150,37 +152,10 @@ func (m *PromptMaterials) FrozenBlockData() map[string]any {
 	}
 }
 
-// TimelineOpenData 供 timeline-open 模板消费, 模板字段渲染顺序 (P1-C3):
-//
-//	Timeline (Open Tail) -> SessionEvidence -> TodoSnapshot -> Workspace ->
-//	UserHistory -> Current Time -> PlanContext (末尾)
-//
-// 段内排序原则:
-//  1. Timeline (Open Tail) 在最前: 时间线最末桶是模型理解"刚发生了什么"的
-//     首要信息源, 顶到段首让 LLM 第一时间看到。
-//  2. SessionEvidence 紧跟 Timeline: SESSION_ARTIFACTS 是 Config 级持久化
-//     观测 (跨 turn 累积的工件证据), 与 Timeline 末桶共同构成"会话级实证"
-//     连续语料块, 物理上贴近 Timeline 让两者形成连续语义。
-//  3. Workspace 居中: OS/Arch + working dir + glance 是相对静态的环境标识,
-//     既不属于"刚发生", 也不属于"用户视角", 居中过渡。
-//  4. UserHistory 在 Workspace 之后: PREV_USER_INPUT 是用户历史输入轨迹,
-//     与下方 Current Time 一起构成"时序前缀"。
-//  5. Current Time 紧跟 UserHistory: 当前时间是最末稳定的时序锚点, 形成
-//     "历史输入 -> 现在"时间递进, 同时与下方 PlanContext 形成"时间 ->
-//     任务"语义衔接。
-//  6. PlanContext (PE-TASK PLAN 产物 PARENT_TASK + CURRENT_TASK + INSTRUCTION)
-//     在段最末尾。本段不被 AI_CACHE_FROZEN /
-//     AI_CACHE_SEMI 任何缓存边界包裹, 是 prompt 的"易变尾段", 让 PlanContext
-//     的子任务切换抖动不会污染上游 system / frozen / semi 三段缓存命中。
-//
-// 注: Go map literal 的 key 顺序不影响模板渲染 (template 按 key 取值),
-// 这里 key 顺序与上面文档中的渲染顺序保持一致只是为了源码可读性, 真正的
-// 渲染顺序由 prompts/prefix/timeline_open_section.txt 决定。
-//
-// 关键词: TimelineOpenData, Timeline 末桶, SessionEvidence, Workspace,
-//
-//	UserHistory, Current Time, PlanContext 末尾注入, P1-C3 段内顺序,
-//	缓存边界外
+// TimelineOpenData supplies the variable tail. The main ReAct loop places
+// workspace coordinates in SemiDynamic1 and clears CurrentTime here before
+// rendering, then emits the clock in Dynamic. Other callers retain their
+// existing clock behavior.
 func (m *PromptMaterials) TimelineOpenData() map[string]any {
 	if m == nil {
 		return map[string]any{}

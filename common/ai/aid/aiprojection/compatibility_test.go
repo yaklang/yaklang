@@ -61,10 +61,15 @@ func TestLegacyAICacheOutputCompatibility(t *testing.T) {
 			if prompt == "" {
 				data, err := os.ReadFile(filepath.Join("testdata", "fixtures", name+".txt"))
 				require.NoError(t, err)
-				prompt = string(data)
+				prompt = strings.ReplaceAll(string(data), "\r\n", "\n")
 			}
 			parsed := Parse(prompt)
-			projection := Project(ProjectionInput{Sections: parsed.Sections()})
+			// Exercise the historical policy directly for offline fixture comparison.
+			// Public Project now requires authenticated boundaries.
+			projection := projectCache(parsed.Sections())
+			if projection == nil {
+				projection = &aispec.ChatBaseHijackResult{Messages: []aispec.ChatDetail{aispec.NewUserChatDetail(prompt)}}
+			}
 			payload, err := json.Marshal(struct {
 				Split    *PromptSplit
 				Messages []aispec.ChatDetail

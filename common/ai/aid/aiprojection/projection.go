@@ -30,12 +30,15 @@ type ProjectionSection struct {
 
 // ProjectionSections is the parser-to-projection representation. Items retain
 // source order; cache contains typed, byte-exact candidates for cache policy.
-// Manually constructed Items are normalized by Parse before projection.
+// Manually constructed Items pass the nonce gate before projection. Legacy
+// parser output is suitable for offline analysis, not live boundary authority.
 type ProjectionSections struct {
 	Original string
 	Items    []ProjectionSection
 	cache    cacheProjectionSections
 	parsed   bool
+	escaped  bool
+	legacy   bool // Unsigned offline analysis; must pass the nonce gate before projection.
 }
 
 // cacheProjectionSections contains the cache-related views of Items. Parse
@@ -72,9 +75,10 @@ type ProjectionResult struct {
 
 // Project determines the provider-visible message layout without recording
 // cache statistics or changing action/tool availability. Unknown section kinds
-// remain ordinary prompt text; they are never dropped.
-func Project(input ProjectionInput) ProjectionResult {
-	result := ProjectionResult{Tools: append([]aispec.Tool(nil), input.ActionTools...)}
+// remain ordinary prompt text; they are never dropped. Prompt strings and
+// caller-built sections require the same nonce as the pre-send hook.
+func Project(input ProjectionInput) (result ProjectionResult) {
+	result = ProjectionResult{Tools: append([]aispec.Tool(nil), input.ActionTools...)}
 	if len(input.RawMessages) > 0 {
 		result.Messages = append([]aispec.ChatDetail(nil), input.RawMessages...)
 		result.Metadata.RawMessagesPreserved = true
@@ -83,7 +87,7 @@ func Project(input ProjectionInput) ProjectionResult {
 
 	sections := input.Sections
 	if sections == nil {
-		sections = Parse(input.Prompt).Sections()
+		sections = parseForProjection(input.Prompt).Sections()
 	} else if !sections.parsed {
 		prompt := sections.Original
 		if len(sections.Items) > 0 {
@@ -93,10 +97,18 @@ func Project(input ProjectionInput) ProjectionResult {
 			}
 			prompt = builder.String()
 		}
-		sections = Parse(prompt).Sections()
+		sections = parseForProjection(prompt).Sections()
+	} else if sections.legacy {
+		sections = parseForProjection(sections.Original).Sections()
 	}
 	if sections.Original == "" {
 		return result
+	}
+	if sections.escaped {
+		defer func() {
+			restored := &aispec.ChatBaseHijackResult{Messages: result.Messages, Tools: result.Tools}
+			restoreProjectionResult(restored)
+		}()
 	}
 
 	if projected := projectCache(sections); projected != nil && projected.IsHijacked {

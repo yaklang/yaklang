@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"strings"
 	"text/template"
+
+	"github.com/yaklang/yaklang/common/ai/aid/aiprojection"
 )
 
 const (
@@ -73,7 +75,7 @@ func RenderPromptTemplate(name, templateContent string, data any) (string, error
 	if strings.TrimSpace(templateContent) == "" {
 		return "", nil
 	}
-	tmpl, err := template.New(name).Parse(templateContent)
+	tmpl, err := template.New(name).Parse(aiprojection.CreateTemplate(templateContent))
 	if err != nil {
 		return "", fmt.Errorf("error parsing %s template: %w", name, err)
 	}
@@ -223,14 +225,7 @@ func WrapAICacheFrozen(content string) string {
 	if content == "" {
 		return ""
 	}
-	return fmt.Sprintf(
-		"<|%s_%s|>\n%s\n<|%s_END_%s|>",
-		TimelineFrozenBoundaryTagName,
-		TimelineFrozenBoundaryNonce,
-		content,
-		TimelineFrozenBoundaryTagName,
-		TimelineFrozenBoundaryNonce,
-	)
+	return aiprojection.CreateTag(TimelineFrozenBoundaryTagName, TimelineFrozenBoundaryNonce, content)
 }
 
 func WrapAICacheSemi(content string) string {
@@ -238,14 +233,7 @@ func WrapAICacheSemi(content string) string {
 	if content == "" {
 		return ""
 	}
-	return fmt.Sprintf(
-		"<|%s_%s|>\n%s\n<|%s_END_%s|>",
-		SemiDynamicCacheBoundaryTagName,
-		SemiDynamicCacheBoundaryNonce,
-		content,
-		SemiDynamicCacheBoundaryTagName,
-		SemiDynamicCacheBoundaryNonce,
-	)
+	return aiprojection.CreateTag(SemiDynamicCacheBoundaryTagName, SemiDynamicCacheBoundaryNonce, content)
 }
 
 func WrapAICacheSemi2(content string) string {
@@ -253,14 +241,7 @@ func WrapAICacheSemi2(content string) string {
 	if content == "" {
 		return ""
 	}
-	return fmt.Sprintf(
-		"<|%s_%s|>\n%s\n<|%s_END_%s|>",
-		SemiDynamicPart2CacheBoundaryTagName,
-		SemiDynamicPart2CacheBoundaryNonce,
-		content,
-		SemiDynamicPart2CacheBoundaryTagName,
-		SemiDynamicPart2CacheBoundaryNonce,
-	)
+	return aiprojection.CreateTag(SemiDynamicPart2CacheBoundaryTagName, SemiDynamicPart2CacheBoundaryNonce, content)
 }
 
 func WrapPromptMessageSection(sectionName string, content string, nonce string) string {
@@ -274,12 +255,12 @@ func wrapPromptMessageSectionWithForce(sectionName string, content string, nonce
 	}
 	if sectionName == PromptSectionDynamic && nonce != "" {
 		tagName := fmt.Sprintf("%s_%s", promptMessageSectionTagName, sectionName)
-		return fmt.Sprintf("<|%s_%s|>\n%s\n<|%s_END_%s|>", tagName, nonce, content, tagName, nonce)
+		return aiprojection.CreateTag(tagName, nonce, content)
 	}
 	if sectionName == PromptSectionHighStatic {
-		return fmt.Sprintf("<|%s_%s|>\n%s\n<|%s_END_%s|>", aiCacheSystemSectionTagName, sectionName, content, aiCacheSystemSectionTagName, sectionName)
+		return aiprojection.CreateTag(aiCacheSystemSectionTagName, sectionName, content)
 	}
-	return fmt.Sprintf("<|%s_%s|>\n%s\n<|%s_END_%s|>", promptMessageSectionTagName, sectionName, content, promptMessageSectionTagName, sectionName)
+	return aiprojection.CreateTag(promptMessageSectionTagName, sectionName, content)
 }
 
 func JoinPromptSections(parts ...string) string {

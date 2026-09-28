@@ -3,8 +3,11 @@ package aicommon
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/yaklang/yaklang/common/utils"
 	"strconv"
+
+	"github.com/yaklang/yaklang/common/ai/aid/aiprojection"
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils"
 
 	"github.com/yaklang/yaklang/common/utils/omap"
 )
@@ -15,6 +18,7 @@ import (
 //   - Summary 字段已废弃（dead code），新数据不再写入；仅在反序列化老数据时容忍其存在并静默忽略。
 //   - Reducers/ReducerTs 字段已废弃，新数据不再写入；仅在反序列化老数据时做一次性迁移为 CompressedHead。
 type timelineSerializable struct {
+	ProjectionNonce       string                           `json:"projection_nonce,omitempty"`
 	IdToTs                map[string]int64                 `json:"id_to_ts"`
 	TsToTimelineItem      map[string]*TimelineItem         `json:"ts_to_timeline_item"`
 	IdToTimelineItem      map[string]*TimelineItem         `json:"id_to_timeline_item"`
@@ -81,6 +85,7 @@ func marshalTimelineUnlocked(i *Timeline) (string, error) {
 	})
 
 	serializable := &timelineSerializable{
+		ProjectionNonce:       aiprojection.Nonce(),
 		IdToTs:                idToTsMap,
 		TsToTimelineItem:      tsToTimelineItemMap,
 		IdToTimelineItem:      idToTimelineItemMap,
@@ -110,6 +115,7 @@ func UnmarshalTimeline(s string) (*Timeline, error) {
 	if err != nil {
 		return nil, err
 	}
+	rebindTimelineProjectionNonce(&serializable)
 
 	// 恢复 Timeline 结构体
 	timeline := &Timeline{
@@ -219,4 +225,47 @@ func UnmarshalTimeline(s string) (*Timeline, error) {
 	}
 
 	return timeline, nil
+}
+
+// Only system-owned alternate prompt records can carry replay envelopes.
+// Rebind their envelope tokens after restore without changing the visible
+// timeline entry or any bytes inside its JSON payload.
+func rebindTimelineProjectionNonce(saved *timelineSerializable) {
+	updated := make(map[string]string)
+	for _, index := range []map[string]*TimelineItem{saved.IdToTimelineItem, saved.TsToTimelineItem} {
+		for _, item := range index {
+			text, ok := timelineTextItem(item)
+			if !ok || text.PromptText == "" {
+				continue
+			}
+			category := normalizeTimelinePromptCategory(extractTextEntryType(text.Text))
+			if category != "FUNCTION_CALL_ACTION_RESPONSE" && category != "MODEL_THINKING" {
+				continue
+			}
+			if rebound, ok := updated[text.PromptText]; ok {
+				text.PromptText = rebound
+				continue
+			}
+			original := text.PromptText
+			prefix, body := "", original
+			if normalizeTimelinePromptCategory(extractTextEntryType(original)) == category {
+				location := withTaskRegex.FindStringIndex(original)
+				if location == nil {
+					location = withoutTaskRegex.FindStringIndex(original)
+				}
+				if location != nil {
+					prefix, body = original[:location[1]], original[location[1]:]
+				}
+			}
+			rebound, err := aiprojection.RebindReplayNonce(body, saved.ProjectionNonce)
+			if err != nil {
+				log.Warnf("timeline replay restore skipped for item %d: %v", text.ID, err)
+				rebound = ""
+			} else {
+				rebound = prefix + rebound
+			}
+			updated[original] = rebound
+			text.PromptText = rebound
+		}
+	}
 }

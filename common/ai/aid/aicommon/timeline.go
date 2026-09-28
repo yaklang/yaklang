@@ -987,7 +987,7 @@ func (m *Timeline) dumpRecentForPrompt(tokenLimit int, includeLatestModelReplay 
 		if content == "" {
 			continue
 		}
-		if !isModelThinkingReplayProjection(projected) {
+		if !isTrustedReplayProjection(projected) {
 			content = strings.ReplaceAll(content, "<|", "&lt;|")
 		}
 		cost := MeasureTokens(content)
