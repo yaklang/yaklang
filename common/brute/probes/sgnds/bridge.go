@@ -8,6 +8,7 @@ import (
 	"io"
 	"net"
 	"net/url"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -86,6 +87,24 @@ func (c *BridgeClient) Query(ctx context.Context, connID, sql string, params []s
 		}
 	}
 	return qr, nil
+}
+
+// Exec 在指定连接上执行非查询语句。
+func (c *BridgeClient) Exec(ctx context.Context, connID, sql string, params []string) (int64, error) {
+	req := fmt.Sprintf("action=exec&connId=%s&sql=%s", escape(connID), escape(sql))
+	if len(params) > 0 {
+		req += "&params=" + escape(strings.Join(params, ","))
+	}
+	res, err := c.call(ctx, req)
+	if err != nil {
+		return 0, err
+	}
+	if res["ok"] != "true" {
+		return 0, bridgeError(res)
+	}
+	// Java 端返回 affectedRows=N
+	n, _ := strconv.ParseInt(res["affectedRows"], 10, 64)
+	return n, nil
 }
 
 // QueryResult 是查询结果的最小表示。
