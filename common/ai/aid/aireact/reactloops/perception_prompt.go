@@ -1,13 +1,12 @@
 package reactloops
 
 import (
-	_ "embed"
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon/promptloader"
 
 	"github.com/yaklang/yaklang/common/utils"
 )
 
-//go:embed prompts/perception.txt
-var perceptionPromptTemplate string
+var perceptionPromptTemplate = promptloader.MustLoad("ai/aid/aireact/reactloops/prompts/perception.txt")
 
 func buildPerceptionPrompt(input string, extra map[string]string) (string, error) {
 	data := map[string]any{

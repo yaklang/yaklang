@@ -1,9 +1,9 @@
 package reactloops
 
 import (
-	_ "embed"
 	"encoding/json"
 	"fmt"
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon/promptloader"
 	"slices"
 	"strings"
 
@@ -23,8 +23,7 @@ func (r *ReActLoop) shouldRenderTodoSnapshot() bool {
 	return true
 }
 
-//go:embed prompts/todo_list.txt
-var todoListTemplate string
+var todoListTemplate = promptloader.MustLoad("ai/aid/aireact/reactloops/prompts/todo_list.txt")
 
 func (r *ReActLoop) generateSchemaString(disallowExit bool, actionOperators ...*LoopActionHandlerOperator) (string, error) {
 	filteredValues := r.getFilteredActions(disallowExit, actionOperators...)

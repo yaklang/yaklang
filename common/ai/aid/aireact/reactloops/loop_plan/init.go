@@ -2,7 +2,7 @@ package loop_plan
 
 import (
 	"bytes"
-	_ "embed"
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon/promptloader"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
@@ -53,23 +53,17 @@ var infoGatheringActions = []string{
 	schema.AI_REACT_LOOP_ACTION_LOADING_SKILLS,
 }
 
-//go:embed prompts/output_example.txt
-var outputExample string
+var outputExample = promptloader.MustLoad("ai/aid/aireact/reactloops/loop_plan/prompts/output_example.txt")
 
-//go:embed prompts/reactive_data.txt
-var reactiveData string
+var reactiveData = promptloader.MustLoad("ai/aid/aireact/reactloops/loop_plan/prompts/reactive_data.txt")
 
-//go:embed prompts/persistent_instruction.txt
-var persistentInstruction string
+var persistentInstruction = promptloader.MustLoad("ai/aid/aireact/reactloops/loop_plan/prompts/persistent_instruction.txt")
 
-//go:embed prompts/guidance_document.txt
-var guidanceDocumentPrompt string
+var guidanceDocumentPrompt = promptloader.MustLoad("ai/aid/aireact/reactloops/loop_plan/prompts/guidance_document.txt")
 
-//go:embed prompts/plan_from_document.txt
-var planFromDocumentPrompt string
+var planFromDocumentPrompt = promptloader.MustLoad("ai/aid/aireact/reactloops/loop_plan/prompts/plan_from_document.txt")
 
-//go:embed prompts/plan_direct.txt
-var planDirectPrompt string
+var planDirectPrompt = promptloader.MustLoad("ai/aid/aireact/reactloops/loop_plan/prompts/plan_direct.txt")
 
 func init() {
 	err := reactloops.RegisterLoopFactory(

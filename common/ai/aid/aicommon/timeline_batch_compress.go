@@ -15,7 +15,6 @@ package aicommon
 
 import (
 	"bytes"
-	_ "embed"
 	"fmt"
 	"io"
 	"strings"
@@ -27,6 +26,7 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 
 	"github.com/yaklang/yaklang/common/ai/ytoken"
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon/promptloader"
 )
 
 // estimateItemContentTokens 按 calculateActualContentSize 一致的 wrap 格式估算单个 item 的 token 数
@@ -371,11 +371,9 @@ const MaxBatchCompressPromptSize = 80 * 1024
 // 关键词: MaxBatchCompressRecentSize, recent keep prompt budget
 const MaxBatchCompressRecentSize = 16 * 1024
 
-//go:embed prompts/timeline/batch_compress.txt
-var timelineBatchCompress string
+var timelineBatchCompress = promptloader.MustLoad("ai/aid/aicommon/prompts/timeline/batch_compress.txt")
 
-//go:embed prompts/timeline/reducer.json
-var timelineReducerSchema string
+var timelineReducerSchema = promptloader.MustLoad("ai/aid/aicommon/prompts/timeline/reducer.json")
 
 var timelineReducerFields = []string{
 	"key_findings", "active_config", "completed_work", "open_failures",

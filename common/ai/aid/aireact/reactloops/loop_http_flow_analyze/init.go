@@ -2,7 +2,7 @@ package loop_http_flow_analyze
 
 import (
 	"bytes"
-	_ "embed"
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon/promptloader"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
@@ -12,14 +12,11 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 )
 
-//go:embed prompts/persistent_instruction.txt
-var persistentInstruction string
+var persistentInstruction = promptloader.MustLoad("ai/aid/aireact/reactloops/loop_http_flow_analyze/prompts/persistent_instruction.txt")
 
-//go:embed prompts/reactive_data.txt
-var reactiveData string
+var reactiveData = promptloader.MustLoad("ai/aid/aireact/reactloops/loop_http_flow_analyze/prompts/reactive_data.txt")
 
-//go:embed prompts/output_example.txt
-var outputExample string
+var outputExample = promptloader.MustLoad("ai/aid/aireact/reactloops/loop_http_flow_analyze/prompts/output_example.txt")
 
 func init() {
 	err := reactloops.RegisterLoopFactory(

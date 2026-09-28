@@ -2,7 +2,7 @@ package loop_syntaxflow_rule
 
 import (
 	"bytes"
-	_ "embed"
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon/promptloader"
 	"strings"
 
 	"github.com/yaklang/gorm"
@@ -74,14 +74,11 @@ func createDocumentSearcherByRag(db *gorm.DB, collectionName string, aikbPath st
 	return rag.Get(collectionName, rag.WithDB(db), rag.WithImportFile(aikbPath))
 }
 
-//go:embed prompts/persistent_instruction.txt
-var instruction string
+var instruction = promptloader.MustLoad("ai/aid/aireact/reactloops/loop_syntaxflow_rule/prompts/persistent_instruction.txt")
 
-//go:embed prompts/output_example.txt
-var outputExample string
+var outputExample = promptloader.MustLoad("ai/aid/aireact/reactloops/loop_syntaxflow_rule/prompts/output_example.txt")
 
-//go:embed prompts/reactive_data.txt
-var reactiveData string
+var reactiveData = promptloader.MustLoad("ai/aid/aireact/reactloops/loop_syntaxflow_rule/prompts/reactive_data.txt")
 
 func init() {
 	err := reactloops.RegisterLoopFactory(
