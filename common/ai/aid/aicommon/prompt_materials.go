@@ -53,21 +53,22 @@ type PromptMaterials struct {
 	ForgeInventory bool
 	AIForgeList    string
 
-	TimelineFrozen         string
-	TimelineOpen           string
-	PromotedTimelineOpen   string
-	TimelineFrozenTimeUnix int64
-	FrozenPartitions       []FrozenBlockPartition
-	SessionArtifactsFrozen string
-	SessionArtifactsOpen   string
-	SessionEvidenceFrozen  string
-	SessionEvidenceOpen    string
-	CurrentTime            string
-	Workspace              bool
-	OSArch                 string
-	WorkingDir             string
-	WorkingDirGlance       string
-	AIArtifactsDir         string
+	TimelineFrozen             string
+	TimelineOpen               string
+	PromotedTimelineOpen       string
+	TimelineFrozenTimeUnix     int64
+	FrozenPartitions           []FrozenBlockPartition
+	SessionArtifactsFrozen     string
+	SessionArtifactsOpen       string
+	SessionEvidenceFrozen      string
+	SessionEvidenceOpen        string
+	SessionEvidenceSemiDynamic string
+	CurrentTime                string
+	Workspace                  bool
+	OSArch                     string
+	WorkingDir                 string
+	WorkingDirGlance           string
+	AIArtifactsDir             string
 
 	// Deprecated: Session Artifacts no longer participate in prompt construction.
 	SessionArtifactsListing string
@@ -100,12 +101,13 @@ func (m *PromptMaterials) SemiDynamicData() map[string]any {
 		return map[string]any{}
 	}
 	return map[string]any{
-		"WorkspaceContext":     m.WorkspaceContext(),
-		"SkillsContext":        m.SkillsContext,
-		"PromotedSemiDynamic1": m.PromotedSemiDynamic1,
-		"PlanHelp":             m.PlanHelp,
-		"OriginalUserInput":    m.OriginalUserInput,
-		"StableInstruction":    m.StableInstruction,
+		"WorkspaceContext":           m.WorkspaceContext(),
+		"SkillsContext":              m.SkillsContext,
+		"PromotedSemiDynamic1":       m.PromotedSemiDynamic1,
+		"SessionEvidenceSemiDynamic": m.SessionEvidenceSemiDynamic,
+		"PlanHelp":                   m.PlanHelp,
+		"OriginalUserInput":          m.OriginalUserInput,
+		"StableInstruction":          m.StableInstruction,
 	}
 }
 

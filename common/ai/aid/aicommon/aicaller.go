@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/yaklang/yaklang/common/ai"
+	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools"
 	"github.com/yaklang/yaklang/common/ai/aispec"
 	"github.com/yaklang/yaklang/common/log"
@@ -44,6 +45,7 @@ type AICallerConfigIf interface {
 	NewAIResponse() *AIResponse
 	CallAIResponseOutputFinishedCallback(string)
 	GetAiToolManager() *buildinaitools.AiToolManager
+	RecordRecentlyUsedTool(*aitool.Tool) buildinaitools.RecentToolCacheMutation
 	OriginOptions() []ConfigOption
 	GetOrCreateWorkDir() string
 	GetContextProviderManager() *ContextProviderManager

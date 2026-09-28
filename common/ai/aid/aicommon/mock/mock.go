@@ -110,6 +110,10 @@ func (m *MockedAIConfig) GetAiToolManager() *buildinaitools.AiToolManager {
 	return nil
 }
 
+func (m *MockedAIConfig) RecordRecentlyUsedTool(*aitool.Tool) buildinaitools.RecentToolCacheMutation {
+	return buildinaitools.RecentToolCacheMutation{}
+}
+
 func (m *MockedAIConfig) GetOrCreateWorkDir() string {
 	dir, _ := os.MkdirTemp("", "mock-workdir-*")
 	return dir

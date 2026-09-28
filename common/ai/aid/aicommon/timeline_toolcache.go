@@ -2,6 +2,7 @@ package aicommon
 
 import (
 	"fmt"
+	"sort"
 	"strings"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools"
@@ -29,7 +30,7 @@ func timelineToolCacheDeltaPrompt(item *PromotableTimelineItem) string {
 	default:
 		return ""
 	}
-	return "<|CACHE_TOOL_CALL_[current-nonce]|>\n" + body + "\n<|CACHE_TOOL_CALL_END_[current-nonce]|>"
+	return "<|CACHE_TOOL_CALL_" + buildinaitools.RecentToolCacheStableNonce + "|>\n" + body + "\n<|CACHE_TOOL_CALL_END_" + buildinaitools.RecentToolCacheStableNonce + "|>"
 }
 
 // promotedToolLastUsedID accepts snapshots written before reuse was recorded.
@@ -67,4 +68,38 @@ func (m *Timeline) hasToolCacheBeforeLocked(id int64, key string) bool {
 		}
 	}
 	return exists
+}
+
+func renderPromotedRecentTools(state *TimelinePromotedState) string {
+	if state == nil {
+		return ""
+	}
+	entries := state.Entries[TimelinePromotedTargetSemiDynamic1][TimelinePromotedKindRecentTool]
+	if len(entries) == 0 {
+		return ""
+	}
+	keys := make([]string, 0, len(entries))
+	for key, entry := range entries {
+		if entry != nil {
+			keys = append(keys, key)
+		}
+	}
+	sort.Slice(keys, func(i, j int) bool {
+		left, right := promotedToolLastUsedID(entries[keys[i]]), promotedToolLastUsedID(entries[keys[j]])
+		if left == right {
+			return keys[i] < keys[j]
+		}
+		return left < right // Most recently used tools appear last, after freeze.
+	})
+	var out strings.Builder
+	out.WriteString("<|CACHE_TOOL_CALL_" + buildinaitools.RecentToolCacheStableNonce + "|>\n")
+	out.WriteString("# Recently Used Tools (available for directly_call_tool)\n\n")
+	for _, key := range keys {
+		if entry := entries[key]; entry != nil {
+			out.WriteString(strings.TrimSpace(entry.Payload))
+			out.WriteString("\n\n")
+		}
+	}
+	out.WriteString("\n<|CACHE_TOOL_CALL_END_" + buildinaitools.RecentToolCacheStableNonce + "|>")
+	return strings.TrimSpace(out.String())
 }

@@ -247,3 +247,27 @@ func TestTimelineToolCacheLegacyOrderUsesSourceAndDeterministicTieBreak(t *testi
 	require.Less(t, strings.Index(semi, "SCHEMA_ALPHA"), strings.Index(semi, "SCHEMA_BETA"))
 	require.Equal(t, semi, renderPromotedRecentTools(state))
 }
+
+func (m *Timeline) effectivePromotedKeys(target, kind string) []string {
+	var keys []string
+	for _, entry := range m.effectivePromotedEntries(target, kind) {
+		keys = append(keys, entry.Key)
+	}
+	return keys
+}
+
+func TestTimelineToolCacheRejectsOverwriteOfExistingID(t *testing.T) {
+	for _, frozen := range []bool{false, true} {
+		tl := NewTimeline(nil, nil)
+		require.True(t, tl.PushPromotable(1, TimelinePromotedKindRecentTool, TimelinePromotedTargetSemiDynamic1, "alpha", TimelinePromotedOperationUpsert, "ORIGINAL_SCHEMA"))
+		if frozen {
+			tl.FreezeAll()
+		}
+		before, err := MarshalTimeline(tl)
+		require.NoError(t, err)
+		require.False(t, tl.PushPromotable(1, TimelinePromotedKindRecentTool, TimelinePromotedTargetSemiDynamic1, "beta", TimelinePromotedOperationUpsert, "REPLACEMENT"))
+		after, err := MarshalTimeline(tl)
+		require.NoError(t, err)
+		require.Equal(t, before, after)
+	}
+}

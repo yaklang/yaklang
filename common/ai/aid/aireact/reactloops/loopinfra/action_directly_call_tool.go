@@ -390,18 +390,6 @@ var loopAction_directlyCallTool = &reactloops.LoopAction{
 			return
 		}
 		invoker := loop.GetInvoker()
-		cacheSuccessfulTool := func(name string, result *aitool.ToolResult, callErr error) {
-			if callErr != nil || result == nil || !result.Success {
-				return
-			}
-			if cachedTool, lookupErr := loop.GetConfig().GetAiToolManager().GetToolByName(name); lookupErr == nil {
-				if realCfg, ok := loop.GetConfig().(*aicommon.Config); ok {
-					realCfg.RecordRecentlyUsedTool(cachedTool)
-				} else {
-					loop.GetConfig().GetAiToolManager().AddRecentlyUsedTool(cachedTool)
-				}
-			}
-		}
 		reportStatus := func(msg string) {
 			invoker.AddToTimeline("DIRECT_CALL_PARAMS", msg)
 		}

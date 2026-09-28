@@ -5,7 +5,6 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
-	"github.com/yaklang/yaklang/common/ai/aid/aiprojection"
 	"sort"
 	"strings"
 	"time"
@@ -612,16 +611,8 @@ func renderTimelineEntry(item *TimelineItem, bucketStart time.Time, state *timel
 		state.activeTaskID = taskID
 	}
 	content := selectShrunkContent(item)
-	// Timeline facts are untrusted prompt data: tool output, user input, and
-	// reviewed source can all contain AITAG-looking literals. Escape their open
-	// delimiter before wrapping the item in real Timeline control tags, otherwise
-	// a literal can corrupt downstream section parsing or impersonate an internal
-	// reasoning replay record. PromptText-backed model replay is the sole internal
-	// projection allowed to retain a raw control envelope; its JSON fields are
-	// emitted with encoding/json and therefore escape '<' inside payload values.
-	if promptProjection && !isTrustedReplayProjection(item) {
-		content = strings.ReplaceAll(content, "<|", "&lt;|")
-	}
+	// Preserve literal AITAGs in data. aiprojection authenticates control tags
+	// with its process nonce before any cache/schema/replay parser runs.
 	if explicitTask && taskID != "" {
 		content = stripTimelineTaskLabel(content, taskID)
 	}

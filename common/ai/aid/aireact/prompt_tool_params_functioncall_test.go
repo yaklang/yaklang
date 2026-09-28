@@ -196,7 +196,7 @@ func TestFunctionCallToolParamsExcludesOpenAndPromotedToolCache(t *testing.T) {
 	task := aicommon.NewStatefulTaskBase("r2-cache-task", "TASK_CONTEXT_R2", context.Background(), react.config.GetEmitter())
 	for _, sealed := range []bool{false, true} {
 		if sealed {
-			react.config.GetTimeline().ForcePromoteAll()
+			react.config.GetTimeline().FreezeAll()
 		}
 		rawBefore, err := aicommon.MarshalTimeline(react.config.GetTimeline())
 		require.NoError(t, err)
