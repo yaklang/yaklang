@@ -8,6 +8,7 @@ import (
 
 	"github.com/yaklang/gorm"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon/promptloader"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/ai/aispec"
 	"github.com/yaklang/yaklang/common/ai/rag/vectorstore"
@@ -305,19 +306,7 @@ func Query(db *gorm.DB, query string, opts ...QueryOption) (chan *SearchKnowledg
 				}
 			}
 			docStr := strings.Join(docStrs, "\n\n")
-			prompt := `你是一名严谨的知识助手。请仅基于下方“知识库条目”的内容回答“用户问题”，不要引入外部知识或主观推断；若无法从条目中得到答案，请直接回复“未在知识库中找到相关信息”。
-
-作答要求：
-- 优先给出简明结论，其后用要点说明依据；
-- 多条目信息需去重、合并，避免冲突；如存在冲突，说明取舍依据；
-- 严禁编造、兜圈或输出与问题无关的内容；
-
-知识库条目：
-%s
-
-用户问题：
-%s
-	`
+			prompt := promptloader.MustLoad("inline/ai/rag/knowledgebase/query/prompt.txt")
 			prompt = fmt.Sprintf(prompt, docStr, query)
 			knowledgeBaseMsgCallback(&SearchKnowledgebaseResult{
 				Message: prompt,

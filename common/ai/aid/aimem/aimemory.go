@@ -2,22 +2,20 @@ package aimem
 
 import (
 	"context"
-	_ "embed"
 	"fmt"
 	"time"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon/promptloader"
 	"github.com/yaklang/yaklang/common/ai/rag"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 )
 
-//go:embed memory_triage.txt
-var memoryTriagePrompt string
+var memoryTriagePrompt = promptloader.MustLoad("ai/aid/aimem/memory_triage.txt")
 
-//go:embed corepact_principle.txt
-var corepactPrinciplesPrompt string
+var corepactPrinciplesPrompt = promptloader.MustLoad("ai/aid/aimem/corepact_principle.txt")
 
 func Session2MemoryName(sessionId string) string {
 	return fmt.Sprintf("ai-memory-%s", sessionId)

@@ -2,7 +2,6 @@ package aiforge
 
 import (
 	"bytes"
-	_ "embed"
 	"fmt"
 	"io"
 	"math"
@@ -11,6 +10,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon/promptloader"
 	"github.com/yaklang/yaklang/common/ai/rag"
 	"github.com/yaklang/yaklang/common/ai/rag/entityrepos"
 	"github.com/yaklang/yaklang/common/chunkmaker"
@@ -22,14 +22,11 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 )
 
-//go:embed liteforge_schema/liteforge_refine.schema.json
-var refineSchema string
+var refineSchema = promptloader.MustLoad("aiforge/liteforge_schema/liteforge_refine.schema.json")
 
-//go:embed liteforge_prompt/liteforge_refine_prompt.txt
-var refinePrompt string
+var refinePrompt = promptloader.MustLoad("aiforge/liteforge_prompt/liteforge_refine_prompt.txt")
 
-//go:embed liteforge_prompt/liteforge_refine_erm.txt
-var refineERMPrompt string
+var refineERMPrompt = promptloader.MustLoad("aiforge/liteforge_prompt/liteforge_refine_erm.txt")
 
 func Action2RagKnowledgeEntries(
 	action *aicommon.Action,

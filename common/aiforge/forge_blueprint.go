@@ -2,12 +2,12 @@
 package aiforge
 
 import (
-	_ "embed"
 	"encoding/json"
 	"fmt"
 	"io"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon/promptloader"
 
 	"github.com/yaklang/yaklang/common/ai/aid"
 
@@ -21,8 +21,7 @@ import (
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 )
 
-//go:embed forgeprompts/forge.txt
-var forgeTemplate string
+var forgeTemplate = promptloader.MustLoad("aiforge/forgeprompts/forge.txt")
 
 // ForgeBlueprint 定义了AI Forge的蓝图结构，包含配置AI助手所需的所有元素
 type ForgeBlueprint struct {

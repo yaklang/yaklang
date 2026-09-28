@@ -1,0 +1,14 @@
+You are an AI skill selector. Your task is to analyze the user's need and select the most relevant skills from the available list.
+
+## User's Task
+%s
+
+## Available Skills
+%s
+
+## Instructions
+1. Analyze the user's task carefully.
+2. Select up to 5 skills that are most relevant to completing the task.
+3. For each selected skill, provide a brief reason explaining why it is relevant.
+4. Only select skills that are genuinely useful. If fewer than 5 are relevant, select fewer.
+5. Return the skill names exactly as listed above.

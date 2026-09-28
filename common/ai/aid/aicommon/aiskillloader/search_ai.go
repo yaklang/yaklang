@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon/promptloader"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 )
@@ -63,21 +64,7 @@ var skillSelectSchemaJSON = `{
 }`
 
 // skillSelectPromptTemplate is the prompt template for AI skill selection.
-const skillSelectPromptTemplate = `You are an AI skill selector. Your task is to analyze the user's need and select the most relevant skills from the available list.
-
-## User's Task
-%s
-
-## Available Skills
-%s
-
-## Instructions
-1. Analyze the user's task carefully.
-2. Select up to 5 skills that are most relevant to completing the task.
-3. For each selected skill, provide a brief reason explaining why it is relevant.
-4. Only select skills that are genuinely useful. If fewer than 5 are relevant, select fewer.
-5. Return the skill names exactly as listed above.
-`
+var skillSelectPromptTemplate = promptloader.MustLoad("inline/ai/aid/aicommon/aiskillloader/search_ai/skillSelectPromptTemplate.txt")
 
 // BuildSearchByAIPrompt builds the prompt for AI skill search.
 // Exported for use by callers who need to construct the prompt externally.

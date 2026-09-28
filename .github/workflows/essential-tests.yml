@@ -540,14 +540,14 @@ jobs:
       - name: Test lazy cache and archive tooling
         run: go test -race -timeout 3m ./common/utils/gzip_embed/... ./common/utils/resources_monitor
       - name: Test development resource contents
-        run: go test -race -run 'TestCompressed' -timeout 3m ./embed ./common/crep ./common/thirdparty_bin ./common/syntaxflow/sfbuildin/standards ./common/syntaxflow/sfdb
+        run: go test -race -run 'TestCompressed' -timeout 3m ./embed ./common/crep ./common/thirdparty_bin ./common/syntaxflow/sfbuildin/standards ./common/syntaxflow/sfdb ./common/ai/aid/aicommon/promptloader
       - name: Generate release assets with the current native tool
         run: |
           GZIP_EMBED="$(bash scripts/build-gzip-embed.sh)"
           export GZIP_EMBED
           bash scripts/generate-compressed-assets.sh
       - name: Test release resource contents and HTTP semantics
-        run: go test -race -tags gzip_embed -run 'TestCompressed' -timeout 3m ./embed ./common/crep ./common/thirdparty_bin ./common/syntaxflow/sfbuildin/standards ./common/syntaxflow/sfdb
+        run: go test -race -tags gzip_embed -run 'TestCompressed' -timeout 3m ./embed ./common/crep ./common/thirdparty_bin ./common/syntaxflow/sfbuildin/standards ./common/syntaxflow/sfdb ./common/ai/aid/aicommon/promptloader
 
   slim-gate:
     timeout-minutes: 15

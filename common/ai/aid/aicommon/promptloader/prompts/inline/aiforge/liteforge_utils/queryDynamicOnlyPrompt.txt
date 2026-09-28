@@ -1,0 +1,11 @@
+{{ if .EXTRA }}<extra>
+{{.EXTRA}}
+</extra>
+
+{{ end }}{{ if .OVERLAP }}<overlap>
+{{.OVERLAP}}
+</overlap>
+
+{{ end }}<input>
+{{.INPUT}}
+</input>

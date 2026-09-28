@@ -1,7 +1,7 @@
 package aiforge
 
 import (
-	_ "embed"
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon/promptloader"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
@@ -10,8 +10,7 @@ import (
 	"text/template"
 )
 
-//go:embed forgeprompts/forge-arguments.txt
-var _promptArguments string
+var _promptArguments = promptloader.MustLoad("aiforge/forgeprompts/forge-arguments.txt")
 
 type ForgeArgument struct {
 	Help  string

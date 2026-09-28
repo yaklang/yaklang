@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/yaklang/yaklang/common/ai"
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon/promptloader"
 	"github.com/yaklang/yaklang/common/ai/aispec"
 	"github.com/yaklang/yaklang/common/jsonextractor"
 	"github.com/yaklang/yaklang/common/log"
@@ -610,23 +611,9 @@ func VideoOmniPresetPlus() VideoOmniOption {
 }
 
 // 默认中文专业知识抽取提示，针对 omni 视频
-const defaultOmniVideoSystemPrompt = `你是一位资深的安全研究/技术教学视频知识抽取助手。
-你将看到一段连续视频（含画面与音频）。请把这一段视频里的内容浓缩为可入库的专业知识。
-要求：
-1) 准确，只描述真实出现的内容，不要编造。
-2) 专注于该段中可形成"知识"的部分（概念、命令、攻击/防御步骤、要点、易错点等）。
-3) 回答必须严格使用 JSON 输出，不要任何其他多余文字。`
+var defaultOmniVideoSystemPrompt = promptloader.MustLoad("inline/aiforge/liteforge_analyze_video_omni/defaultOmniVideoSystemPrompt.txt")
 
-const defaultOmniVideoQueryPrompt = `请按下面 JSON Schema 严格输出该视频段的知识抽取结果：
-{
-  "title": "用一句中文概括本段主题",
-  "storyline": "本段画面+音频的连贯叙述（200~400 字中文）",
-  "visible_text": ["画面中出现的关键文本/命令/代码片段，按出现顺序"],
-  "speakers": ["音频中重要的解说原文（中文，每条一句）"],
-  "key_knowledge": ["可作为单条知识库 entry 的专业知识点（中文，每条一句话精炼）"],
-  "tags": ["主题标签，例如 XSS、Stored XSS、过滤绕过 等"]
-}
-仅输出 JSON，不要 Markdown 代码块包裹。`
+var defaultOmniVideoQueryPrompt = promptloader.MustLoad("inline/aiforge/liteforge_analyze_video_omni/defaultOmniVideoQueryPrompt.txt")
 
 // AnalyzeVideoOmni 把视频切片送进 omni 模型做端到端理解，按段返回 AnalysisResult。
 //

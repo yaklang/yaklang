@@ -2,9 +2,9 @@ package aicommon
 
 import (
 	"context"
-	_ "embed"
 	"encoding/json"
 	"fmt"
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon/promptloader"
 	"io"
 	"runtime"
 	"strings"
@@ -22,29 +22,21 @@ import (
 // Returning an error causes fallback to the default auto-continue behavior.
 type PlanningReviewControl func(ctx context.Context, config *Config, ep *Endpoint) (aitool.InvokeParams, error)
 
-//go:embed prompts/review/ai-review-plan.txt
-var aiPlanReviewPromptTemplate string
+var aiPlanReviewPromptTemplate = promptloader.MustLoad("ai/aid/aicommon/prompts/review/ai-review-plan.txt")
 
-//go:embed prompts/review/ai-review-plan_instruction.txt
-var aiPlanReviewInstructionTemplate string
+var aiPlanReviewInstructionTemplate = promptloader.MustLoad("ai/aid/aicommon/prompts/review/ai-review-plan_instruction.txt")
 
-//go:embed prompts/review/ai-review-plan_schema.json
-var aiPlanReviewSchemaTemplate string
+var aiPlanReviewSchemaTemplate = promptloader.MustLoad("ai/aid/aicommon/prompts/review/ai-review-plan_schema.json")
 
-//go:embed prompts/review/ai-review-plan_output_example.txt
-var aiPlanReviewOutputExampleTemplate string
+var aiPlanReviewOutputExampleTemplate = promptloader.MustLoad("ai/aid/aicommon/prompts/review/ai-review-plan_output_example.txt")
 
-//go:embed prompts/review/ai-review-task.txt
-var aiTaskReviewPromptTemplate string
+var aiTaskReviewPromptTemplate = promptloader.MustLoad("ai/aid/aicommon/prompts/review/ai-review-task.txt")
 
-//go:embed prompts/review/ai-review-task_instruction.txt
-var aiTaskReviewInstructionTemplate string
+var aiTaskReviewInstructionTemplate = promptloader.MustLoad("ai/aid/aicommon/prompts/review/ai-review-task_instruction.txt")
 
-//go:embed prompts/review/ai-review-task_output_example.txt
-var aiTaskReviewOutputExampleTemplate string
+var aiTaskReviewOutputExampleTemplate = promptloader.MustLoad("ai/aid/aicommon/prompts/review/ai-review-task_output_example.txt")
 
-//go:embed prompts/review/ai-review-task_schema.json
-var aiTaskReviewSchemaTemplate string
+var aiTaskReviewSchemaTemplate = promptloader.MustLoad("ai/aid/aicommon/prompts/review/ai-review-task_schema.json")
 
 type PlanReviewPromptData struct {
 	Nonce       string
