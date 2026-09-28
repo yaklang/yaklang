@@ -15,6 +15,8 @@ if err != nil {
 }
 
 // 检测是否是增量编译的 program
+// 注意：非增量 program 若所属项目当前配置已启用增量编译（例如首次全量编译后才开启该选项），
+// 后端 Recompile 会自动转为增量重编译（以当前 program 为 base），并自动生成新的 diff program 名。
 isIncremental := prog.IsIncrementalCompile()
 if isIncremental {
     isBaseProgram = prog.IsBaseProgram()

@@ -800,6 +800,17 @@ if config == nil {
         return
     }
     yakit.Info("更新 SSAConfig 成功")
+    // 项目已存在：把更新后的配置持久化到数据库。
+    // 否则（例如首次全量编译后才勾选"启用增量编译"）选项只影响当次编译，
+    // 数据库里仍是旧配置，之后从项目管理触发的编译会回退为全量编译。
+    if projectExists && existingSSAProject != nil {
+        err := existingSSAProject.SaveToDB()
+        if err != nil {
+            yakit.Warn("保存项目配置到数据库失败: %v", err)
+        } else {
+            yakit.Info("已保存更新后的项目配置到数据库")
+        }
+    }
 }
 
 // 确保 config 不为 nil（防御性检查，帮助静态分析器识别）
