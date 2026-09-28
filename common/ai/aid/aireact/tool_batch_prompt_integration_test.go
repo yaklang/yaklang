@@ -8,6 +8,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
+	"github.com/yaklang/yaklang/common/ai/aid/aiprojection"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
 	_ "github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops/loopinfra"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
@@ -115,8 +116,8 @@ func TestToolCallExamplesAreInAssembledMainLoopSchema(t *testing.T) {
 	require.Contains(t, result.Prompt, "禁止原样重试批次")
 	require.NotContains(t, result.Prompt, "必须批量提交")
 
-	sectionStart := strings.Index(result.Prompt, "<|PROMPT_SECTION_semi-dynamic-2|>")
-	sectionEnd := strings.Index(result.Prompt, "<|PROMPT_SECTION_END_semi-dynamic-2|>")
+	sectionStart := strings.Index(result.Prompt, aiprojection.CreateTemplate("<|PROMPT_SECTION_semi-dynamic-2|>"))
+	sectionEnd := strings.Index(result.Prompt, aiprojection.CreateTemplate("<|PROMPT_SECTION_END_semi-dynamic-2|>"))
 	require.NotEqual(t, -1, sectionStart)
 	require.Greater(t, sectionEnd, sectionStart)
 
