@@ -83,12 +83,12 @@ func TestPromptManager_ModelReasoningReplayInterleavesTimelineFactsInFinalMessag
 	)
 	require.NoError(t, err)
 
-	const firstReplay = `<|TIMELINE_MODEL_THINKING_V1_interleave1|>
+	firstReplay := aiprojection.CreateTemplate(`<|TIMELINE_MODEL_THINKING_V1_interleave1|>
 {"v":1,"reasoning_content":"reason-one","content":"{\"@action\":\"require_tool\"}"}
-<|TIMELINE_MODEL_THINKING_V1_END_interleave1|>`
-	const secondReplay = `<|TIMELINE_MODEL_THINKING_V1_interleave2|>
+<|TIMELINE_MODEL_THINKING_V1_END_interleave1|>`)
+	secondReplay := aiprojection.CreateTemplate(`<|TIMELINE_MODEL_THINKING_V1_interleave2|>
 {"v":1,"reasoning_content":"reason-two","content":"{\"@action\":\"directly_call_tool\"}"}
-<|TIMELINE_MODEL_THINKING_V1_END_interleave2|>`
+<|TIMELINE_MODEL_THINKING_V1_END_interleave2|>`)
 
 	timeline := aicommon.NewTimeline(nil, nil)
 	timeline.PushTextWithPromptProjection(1, "[model_thinking]:\nreason-one", "[model_thinking]:\n"+firstReplay)

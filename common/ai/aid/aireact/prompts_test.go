@@ -13,6 +13,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	aicommon_testutil "github.com/yaklang/yaklang/common/ai/aid/aicommon/testutil"
+	"github.com/yaklang/yaklang/common/ai/aid/aiprojection"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/schema"
@@ -345,10 +346,10 @@ func TestPromptManager_GenerateToolParamsPromptWithMeta_UsesPromptSections(t *te
 		}
 	}
 	if !utils.MatchAllOfSubString(prompt,
-		"<|AI_CACHE_SYSTEM_high-static|>",
-		"<|PROMPT_SECTION_semi-dynamic-1|>",
-		"<|PROMPT_SECTION_semi-dynamic-2|>",
-		"<|PROMPT_SECTION_timeline-open|>",
+		aiprojection.CreateTemplate("<|AI_CACHE_SYSTEM_high-static|>"),
+		aiprojection.CreateTemplate("<|PROMPT_SECTION_semi-dynamic-1|>"),
+		aiprojection.CreateTemplate("<|PROMPT_SECTION_semi-dynamic-2|>"),
+		aiprojection.CreateTemplate("<|PROMPT_SECTION_timeline-open|>"),
 		"<|PROMPT_SECTION_dynamic_",
 		"<|TOOL_SCHEMA_"+result.Nonce+"|>",
 		"<|TOOL_DESC|>",
@@ -520,11 +521,11 @@ func TestPromptManager_GenerateDirectlyAnswerPrompt_UsesPromptSections(t *testin
 	}
 
 	if !utils.MatchAllOfSubString(prompt,
-		"<|AI_CACHE_SYSTEM_high-static|>",
-		"<|PROMPT_SECTION_semi-dynamic-1|>",
-		"<|PROMPT_SECTION_semi-dynamic-2|>",
-		"<|PROMPT_SECTION_timeline-open|>",
-		"<|PROMPT_SECTION_dynamic_"+nonce+"|>",
+		aiprojection.CreateTemplate("<|AI_CACHE_SYSTEM_high-static|>"),
+		aiprojection.CreateTemplate("<|PROMPT_SECTION_semi-dynamic-1|>"),
+		aiprojection.CreateTemplate("<|PROMPT_SECTION_semi-dynamic-2|>"),
+		aiprojection.CreateTemplate("<|PROMPT_SECTION_timeline-open|>"),
+		aiprojection.CreateTemplate("<|PROMPT_SECTION_dynamic_"+nonce+"|>"),
 		"<|SCHEMA|>",
 		"<|USER_QUERY_"+nonce+"|>",
 		"<|FINAL_ANSWER_"+nonce+"|>",
@@ -558,10 +559,10 @@ func TestPromptManager_GenerateToolReSelectPrompt_UsesPromptSections(t *testing.
 	}
 
 	if !utils.MatchAllOfSubString(prompt,
-		"<|AI_CACHE_SYSTEM_high-static|>",
-		"<|PROMPT_SECTION_semi-dynamic-1|>",
-		"<|PROMPT_SECTION_semi-dynamic-2|>",
-		"<|PROMPT_SECTION_timeline-open|>",
+		aiprojection.CreateTemplate("<|AI_CACHE_SYSTEM_high-static|>"),
+		aiprojection.CreateTemplate("<|PROMPT_SECTION_semi-dynamic-1|>"),
+		aiprojection.CreateTemplate("<|PROMPT_SECTION_semi-dynamic-2|>"),
+		aiprojection.CreateTemplate("<|PROMPT_SECTION_timeline-open|>"),
 		"<|PROMPT_SECTION_dynamic_",
 		"# Tool Inventory",
 		"<|SCHEMA|>",
@@ -601,10 +602,10 @@ func TestPromptManager_GenerateReGenerateToolParamsPromptWithMeta_UsesPromptSect
 	}
 
 	if !utils.MatchAllOfSubString(result.Prompt,
-		"<|AI_CACHE_SYSTEM_high-static|>",
-		"<|PROMPT_SECTION_semi-dynamic-1|>",
-		"<|PROMPT_SECTION_semi-dynamic-2|>",
-		"<|PROMPT_SECTION_timeline-open|>",
+		aiprojection.CreateTemplate("<|AI_CACHE_SYSTEM_high-static|>"),
+		aiprojection.CreateTemplate("<|PROMPT_SECTION_semi-dynamic-1|>"),
+		aiprojection.CreateTemplate("<|PROMPT_SECTION_semi-dynamic-2|>"),
+		aiprojection.CreateTemplate("<|PROMPT_SECTION_timeline-open|>"),
 		"<|PROMPT_SECTION_dynamic_",
 		"<|TOOL_SCHEMA_"+result.Nonce+"|>",
 		"<|OLD_PARAMS_"+result.Nonce+"|>",
@@ -642,10 +643,10 @@ func TestPromptManager_GenerateChangeAIBlueprintPrompt_UsesPromptSections(t *tes
 	}
 
 	if !utils.MatchAllOfSubString(prompt,
-		"<|AI_CACHE_SYSTEM_high-static|>",
-		"<|PROMPT_SECTION_semi-dynamic-1|>",
-		"<|PROMPT_SECTION_semi-dynamic-2|>",
-		"<|PROMPT_SECTION_timeline-open|>",
+		aiprojection.CreateTemplate("<|AI_CACHE_SYSTEM_high-static|>"),
+		aiprojection.CreateTemplate("<|PROMPT_SECTION_semi-dynamic-1|>"),
+		aiprojection.CreateTemplate("<|PROMPT_SECTION_semi-dynamic-2|>"),
+		aiprojection.CreateTemplate("<|PROMPT_SECTION_timeline-open|>"),
 		"<|PROMPT_SECTION_dynamic_",
 		"# AI Blueprint Inventory",
 		"<|SCHEMA|>",
@@ -678,10 +679,10 @@ func TestPromptManager_GenerateAIBlueprintForgeParamsPrompt_UsesPromptSections(t
 	}
 
 	if !utils.MatchAllOfSubString(prompt,
-		"<|AI_CACHE_SYSTEM_high-static|>",
-		"<|PROMPT_SECTION_semi-dynamic-1|>",
-		"<|PROMPT_SECTION_semi-dynamic-2|>",
-		"<|PROMPT_SECTION_timeline-open|>",
+		aiprojection.CreateTemplate("<|AI_CACHE_SYSTEM_high-static|>"),
+		aiprojection.CreateTemplate("<|PROMPT_SECTION_semi-dynamic-1|>"),
+		aiprojection.CreateTemplate("<|PROMPT_SECTION_semi-dynamic-2|>"),
+		aiprojection.CreateTemplate("<|PROMPT_SECTION_timeline-open|>"),
 		"<|PROMPT_SECTION_dynamic_",
 		"<|SCHEMA|>",
 		"Parameter Generation",
@@ -1050,11 +1051,11 @@ func TestPromptManager_GenerateVerificationPrompt_UsesPromptSections(t *testing.
 	}
 
 	if !utils.MatchAllOfSubString(prompt,
-		"<|AI_CACHE_SYSTEM_high-static|>",
-		"<|PROMPT_SECTION_semi-dynamic-1|>",
-		"<|PROMPT_SECTION_semi-dynamic-2|>",
-		"<|PROMPT_SECTION_timeline-open|>",
-		"<|PROMPT_SECTION_dynamic_"+nonce+"|>",
+		aiprojection.CreateTemplate("<|AI_CACHE_SYSTEM_high-static|>"),
+		aiprojection.CreateTemplate("<|PROMPT_SECTION_semi-dynamic-1|>"),
+		aiprojection.CreateTemplate("<|PROMPT_SECTION_semi-dynamic-2|>"),
+		aiprojection.CreateTemplate("<|PROMPT_SECTION_timeline-open|>"),
+		aiprojection.CreateTemplate("<|PROMPT_SECTION_dynamic_"+nonce+"|>"),
 		"<|SCHEMA|>",
 		"<|USER_ORIGINAL_QUERY_"+nonce+"|>",
 		"<|INPUT_"+nonce+"|>",
@@ -1114,10 +1115,10 @@ func TestPromptManager_GenerateIntervalReviewPrompt_UsesPromptSections(t *testin
 
 	nonce := aicommon_testutil.MustExtractDynamicSectionNonce(t, prompt)
 	if !utils.MatchAllOfSubString(prompt,
-		"<|AI_CACHE_SYSTEM_high-static|>",
-		"<|PROMPT_SECTION_semi-dynamic-2|>",
-		"<|PROMPT_SECTION_timeline-open|>",
-		"<|PROMPT_SECTION_dynamic_"+nonce+"|>",
+		aiprojection.CreateTemplate("<|AI_CACHE_SYSTEM_high-static|>"),
+		aiprojection.CreateTemplate("<|PROMPT_SECTION_semi-dynamic-2|>"),
+		aiprojection.CreateTemplate("<|PROMPT_SECTION_timeline-open|>"),
+		aiprojection.CreateTemplate("<|PROMPT_SECTION_dynamic_"+nonce+"|>"),
 		"<|SCHEMA|>",
 		"<|OUTPUT_EXAMPLE|>",
 		"network_diagnose",
