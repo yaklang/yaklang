@@ -5,32 +5,25 @@ import (
 	_ "embed"
 	"text/template"
 
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon/promptloader"
 	"github.com/yaklang/yaklang/common/utils"
 )
 
-//go:embed prompts/task/task-summary_instruction.txt
-var __prompt_TaskSummaryInstruction string
+var __prompt_TaskSummaryInstruction = promptloader.MustLoad("ai/aid/prompts/task/task-summary_instruction.txt")
 
-//go:embed prompts/task/task-summary_output_example.txt
-var __prompt_TaskSummaryOutputExample string
+var __prompt_TaskSummaryOutputExample = promptloader.MustLoad("ai/aid/prompts/task/task-summary_output_example.txt")
 
-//go:embed prompts/task/task-summary.txt
-var __prompt_TaskSummary string
+var __prompt_TaskSummary = promptloader.MustLoad("ai/aid/prompts/task/task-summary.txt")
 
-//go:embed prompts/task/current_task_info/stable.txt
-var __prompt_currentTaskInfoStable string
+var __prompt_currentTaskInfoStable = promptloader.MustLoad("ai/aid/prompts/task/current_task_info/stable.txt")
 
-//go:embed prompts/task/current_task_info/dynamic.txt
-var __prompt_currentTaskInfoDynamic string
+var __prompt_currentTaskInfoDynamic = promptloader.MustLoad("ai/aid/prompts/task/current_task_info/dynamic.txt")
 
-//go:embed prompts/tool/tools-list.txt
-var __prompt_ToolsList string
+var __prompt_ToolsList = promptloader.MustLoad("ai/aid/prompts/tool/tools-list.txt")
 
-//go:embed prompts/plan/plan-help.txt
-var __prompt_PlanHelp string
+var __prompt_PlanHelp = promptloader.MustLoad("ai/aid/prompts/plan/plan-help.txt")
 
-//go:embed prompts/search/aitool-keyword-search.txt
-var __prompt_KeywordSearchPrompt string
+var __prompt_KeywordSearchPrompt = promptloader.MustLoad("ai/aid/prompts/search/aitool-keyword-search.txt")
 
 //go:embed prompts/plan/deepthink/instruction.txt
 var __prompt_deepthinkInstruction string
@@ -38,29 +31,21 @@ var __prompt_deepthinkInstruction string
 //go:embed prompts/plan/deepthink/dynamic.txt
 var __prompt_deepthinkDynamic string
 
-//go:embed prompts/plan/dynamic-plan/instruction.txt
-var __prompt_dynamicPlanInstruction string
+var __prompt_dynamicPlanInstruction = promptloader.MustLoad("ai/aid/prompts/plan/dynamic-plan/instruction.txt")
 
-//go:embed prompts/plan/dynamic-plan/dynamic.txt
-var __prompt_dynamicPlanDynamic string
+var __prompt_dynamicPlanDynamic = promptloader.MustLoad("ai/aid/prompts/plan/dynamic-plan/dynamic.txt")
 
-//go:embed prompts/plan-review/plan-incomplete/instruction.txt
-var __prompt_planIncompleteInstruction string
+var __prompt_planIncompleteInstruction = promptloader.MustLoad("ai/aid/prompts/plan-review/plan-incomplete/instruction.txt")
 
-//go:embed prompts/plan-review/plan-incomplete/dynamic.txt
-var __prompt_planIncompleteDynamic string
+var __prompt_planIncompleteDynamic = promptloader.MustLoad("ai/aid/prompts/plan-review/plan-incomplete/dynamic.txt")
 
-//go:embed prompts/plan-review/plan-freedom-review/instruction.txt
-var __prompt_planFreedomReviewInstruction string
+var __prompt_planFreedomReviewInstruction = promptloader.MustLoad("ai/aid/prompts/plan-review/plan-freedom-review/instruction.txt")
 
-//go:embed prompts/plan-review/plan-freedom-review/dynamic.txt
-var __prompt_planFreedomReviewDynamic string
+var __prompt_planFreedomReviewDynamic = promptloader.MustLoad("ai/aid/prompts/plan-review/plan-freedom-review/dynamic.txt")
 
-//go:embed prompts/plan-review/plan-create-subtask/instruction.txt
-var __prompt_planCreateSubtaskInstruction string
+var __prompt_planCreateSubtaskInstruction = promptloader.MustLoad("ai/aid/prompts/plan-review/plan-create-subtask/instruction.txt")
 
-//go:embed prompts/plan-review/plan-create-subtask/dynamic.txt
-var __prompt_planCreateSubtaskDynamic string
+var __prompt_planCreateSubtaskDynamic = promptloader.MustLoad("ai/aid/prompts/plan-review/plan-create-subtask/dynamic.txt")
 
 func (c *Coordinator) quickBuildPrompt(tmp string, i map[string]any) (string, error) {
 	tmpl, err := template.New("prompt").Parse(tmp)

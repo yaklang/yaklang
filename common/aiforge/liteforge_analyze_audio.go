@@ -1,12 +1,12 @@
 package aiforge
 
 import (
-	_ "embed"
 	"fmt"
 	"os"
 	"strings"
 
 	"github.com/yaklang/yaklang/common/ai/aid"
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon/promptloader"
 	"github.com/yaklang/yaklang/common/aireducer"
 	"github.com/yaklang/yaklang/common/chunkmaker"
 	"github.com/yaklang/yaklang/common/go-funk"
@@ -15,8 +15,7 @@ import (
 	"github.com/yaklang/yaklang/common/utils/chanx"
 )
 
-//go:embed liteforge_schema/liteforge_audio.schema.json
-var AUDIO_OUTPUT_SCHEMA string
+var AUDIO_OUTPUT_SCHEMA = promptloader.MustLoad("aiforge/liteforge_schema/liteforge_audio.schema.json")
 
 type TimelineSegment struct {
 	StartSeconds   float64 `json:"start_seconds"`
@@ -95,52 +94,7 @@ func AnalyzeAudioFile(audio string, opts ...any) (<-chan *AudioAnalysisResult, e
 	}
 	srtReader := utils.NewCRLFtoLFReader(fp)
 
-	prompt := `# Role: Expert Iterative Content Analyst
-
-You are an expert AI assistant designed to work within an iterative processing loop. Your specialty is analyzing sequential fragments of a transcribed video, progressively building a summary, and identifying the informational value of each time segment.
-
-## Operational Context
-
-You will be invoked repeatedly in a loop. In each iteration, you will receive two inputs:
-1.  **"current_srt_chunk"**: A small, continuous fragment of a larger SRT transcript.
-2.  **"previous_cumulative_summary"**: The summary generated from all preceding chunks. For the very first chunk, this will be an empty string.
-
-Your task is to analyze the "current_srt_chunk" in the context of the "previous_cumulative_summary" and generate an updated JSON output.
-
-## Task
-
-Analyze the provided "current_srt_chunk". Classify its time segments as either "fine" (high-value) or "ignore" (low-value) based on the substance of the text. Then, generate a JSON object containing an updated cumulative summary and a timeline for **only the current chunk**.
-
-## Rules for Classification
-
-1.  **"fine" (重点区间):** Classify segments as "fine" if they contain:
-    *   Core arguments, theses, or main points.
-    *   Key conclusions or summaries.
-    *   New concepts, definitions, or critical explanations.
-    *   Actionable advice, steps, or instructions.
-    *   Data, statistics, or strong evidence.
-    *   Novel questions or profound insights.
-
-2.  **"ignore" (忽略区间):** Classify segments as "ignore" if they contain:
-    *   Filler content (e.g., "um," "ah," "you know," "so," "well").
-    *   Greetings, introductions, and closing pleasantries.
-    *   Redundant phrases or self-corrections.
-    *   Simple transitional sentences (e.g., "Now, let's move on to...", "And another thing is...").
-    *   Off-topic remarks or personal anecdotes that don't support the main point.
-
-## Output Format Requirements
-
-1.  **"cumulative_summary" (string):**
-    *   This is an **updated** summary.
-    *   Synthesize the key information from the "fine" segments of the "srt_chunk" and **integrate it** with the provided "cumulative_summary".
-    *   The result should be a single, coherent, and progressively refined summary. Avoid simple concatenation; aim for a true synthesis that merges new insights with existing knowledge without becoming redundant.
-
-2.  **"timeline_segments" (array of objects):**
-    *   This array represents **only the segments from the "srt_chunk"**.
-    *   **Crucially, the "start_seconds" and "end_seconds" for each segment MUST directly correspond to the literal timestamps found in the provided "srt_chunk". Do not re-normalize, re-index, or start the timeline from 0.0.**
-    *   The segments within this chunk's timeline should be continuous and cover the entire duration of the chunk (the "end_seconds" of one segment must equal the "start_seconds" of the next).
-
-` + analyzeConfig.ExtraPrompt
+	prompt := promptloader.MustLoad("inline/aiforge/liteforge_analyze_audio/prompt.txt") + analyzeConfig.ExtraPrompt
 
 	allResult := make([]*AudioAnalysisResult, 0)
 	resultChan := chanx.NewUnlimitedChan[*AudioAnalysisResult](analyzeConfig.Ctx, 100)

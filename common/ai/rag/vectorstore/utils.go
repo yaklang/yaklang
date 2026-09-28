@@ -14,6 +14,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/yaklang/gorm"
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon/promptloader"
 	"github.com/yaklang/yaklang/common/ai/rag/hnsw"
 	"github.com/yaklang/yaklang/common/ai/rag/hnsw/hnswspec"
 	"github.com/yaklang/yaklang/common/log"
@@ -129,14 +130,7 @@ func TextToDocuments(text string, maxChunkSize int, overlap int, metadata map[st
 // FormatRagPrompt 格式化 RAG 提示，结合用户问题和检索到的文档
 func FormatRagPrompt(query string, results []SearchResult, promptTemplate string) string {
 	if promptTemplate == "" {
-		promptTemplate = `使用以下信息来回答问题。如果你不知道答案，只需说你不知道，不要试图编造信息。
-
-参考信息:
-%s
-
-问题: %s
-
-回答:`
+		promptTemplate = promptloader.MustLoad("inline/ai/rag/vectorstore/utils/promptTemplate.txt")
 	}
 
 	// 格式化检索到的文档

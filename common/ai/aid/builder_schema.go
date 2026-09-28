@@ -1,41 +1,31 @@
 package aid
 
 import (
-	_ "embed"
 	"fmt"
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon/promptloader"
 	"strings"
 	"text/template"
 )
 
-//go:embed jsonschema/plan/plan.json
-var planJsonSchema string
+var planJsonSchema = promptloader.MustLoad("ai/aid/jsonschema/plan/plan.json")
 
-//go:embed jsonschema/plan/plan-or-interact.json
-var planWithUserInteractJsonSchema string
+var planWithUserInteractJsonSchema = promptloader.MustLoad("ai/aid/jsonschema/plan/plan-or-interact.json")
 
-//go:embed jsonschema/plan/re-plan.json
-var rePlanSchema string
+var rePlanSchema = promptloader.MustLoad("ai/aid/jsonschema/plan/re-plan.json")
 
-//go:embed jsonschema/task/task-summary.json
-var taskSummarySchema string
+var taskSummarySchema = promptloader.MustLoad("ai/aid/jsonschema/task/task-summary.json")
 
-//go:embed jsonschema/tool/tool-desc-require.json
-var toolDescRequireSchema string
+var toolDescRequireSchema = promptloader.MustLoad("ai/aid/jsonschema/tool/tool-desc-require.json")
 
-//go:embed jsonschema/task/task-direct-answer.json
-var directAnswerSchema string
+var directAnswerSchema = promptloader.MustLoad("ai/aid/jsonschema/task/task-direct-answer.json")
 
-//go:embed jsonschema/tool/tool-execute-check.json
-var toolExecuteCheckSchema string
+var toolExecuteCheckSchema = promptloader.MustLoad("ai/aid/jsonschema/tool/tool-execute-check.json")
 
-//go:embed jsonschema/tool/tool-execute-check-without-continue.json
-var toolExecuteCheckSchemaWithoutContinue string
+var toolExecuteCheckSchemaWithoutContinue = promptloader.MustLoad("ai/aid/jsonschema/tool/tool-execute-check-without-continue.json")
 
-//go:embed jsonschema/plan-review/create-subtask.json
-var planReviewCreateSubtasksSchema string
+var planReviewCreateSubtasksSchema = promptloader.MustLoad("ai/aid/jsonschema/plan-review/create-subtask.json")
 
-//go:embed jsonschema/search/keyword_search.json
-var keywordSearchSchema string
+var keywordSearchSchema = promptloader.MustLoad("ai/aid/jsonschema/search/keyword_search.json")
 
 func planJSONSchema(toolNames []string) map[string]string {
 	var toolNamesStrs []string

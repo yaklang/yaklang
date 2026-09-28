@@ -3,8 +3,8 @@ package genmetadata
 import (
 	"bytes"
 	"context"
-	_ "embed"
 	"fmt"
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon/promptloader"
 	"html/template"
 	"strings"
 
@@ -15,8 +15,7 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
-//go:embed prompt/generate_keyword.txt
-var aitool_generate_key_word_prompt string
+var aitool_generate_key_word_prompt = promptloader.MustLoad("ai/aid/aitool/buildinaitools/yakscripttools/metadata/genmetadata/prompt/generate_keyword.txt")
 
 // 定义结构体来存储结果
 type GenerateResult struct {
