@@ -2,7 +2,6 @@ package aid
 
 import (
 	"bytes"
-	"github.com/yaklang/yaklang/common/ai/aid/aicommon/promptloader"
 	"text/template"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon/promptloader"

@@ -3,12 +3,12 @@ package aicommon
 import (
 	"cmp"
 	"fmt"
-	"github.com/yaklang/yaklang/common/ai/aid/aicommon/promptloader"
 	"strings"
 	"sync"
 	"text/template"
 	"time"
 
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon/promptloader"
 	"github.com/yaklang/yaklang/common/log"
 
 	"github.com/yaklang/yaklang/common/utils"

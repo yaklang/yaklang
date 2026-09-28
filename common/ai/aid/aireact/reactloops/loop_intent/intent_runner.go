@@ -3,7 +3,6 @@ package loop_intent
 import (
 	"context"
 	"fmt"
-	"github.com/yaklang/yaklang/common/ai/aid/aicommon/promptloader"
 	"strings"
 	"time"
 

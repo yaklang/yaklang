@@ -4,7 +4,6 @@ package aiforge
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/yaklang/yaklang/common/ai/aid/aicommon/promptloader"
 	"io"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"

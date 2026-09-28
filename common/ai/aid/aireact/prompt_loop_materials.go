@@ -2,7 +2,6 @@ package aireact
 
 import (
 	"fmt"
-	"github.com/yaklang/yaklang/common/ai/aid/aicommon/promptloader"
 	"runtime"
 	"strings"
 	"time"

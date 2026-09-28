@@ -3,7 +3,6 @@ package generate_index_tool
 import (
 	"context"
 	"fmt"
-	"github.com/yaklang/yaklang/common/ai/aid/aicommon/promptloader"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon/promptloader"

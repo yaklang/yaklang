@@ -3,7 +3,6 @@ package aiforge
 import (
 	"bytes"
 	"fmt"
-	"github.com/yaklang/yaklang/common/ai/aid/aicommon/promptloader"
 	"io"
 	"math"
 	"strings"

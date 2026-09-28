@@ -3,7 +3,6 @@ package loop_default
 import (
 	"bytes"
 	"fmt"
-	"github.com/yaklang/yaklang/common/ai/aid/aicommon/promptloader"
 	"strings"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"

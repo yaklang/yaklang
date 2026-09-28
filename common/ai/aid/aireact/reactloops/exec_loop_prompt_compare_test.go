@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"github.com/yaklang/yaklang/common/ai/aid/aiprojection"
 	"strings"
 	"testing"
 
@@ -12,6 +11,7 @@ import (
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon/aitag"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon/mock"
+	"github.com/yaklang/yaklang/common/ai/aid/aiprojection"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/ai/aispec"
 )
@@ -79,7 +79,7 @@ func (i *promptCompareInvoker) AssembleLoopPrompt(_ []*aitool.Tool, input *aicom
 	}
 	section, err := aicommon.RenderPromptTemplate(
 		"loop-prompt-compare-semi-dynamic-2",
-		aicommon.SharedTaskInstructionSchemaExampleTemplate,
+		aicommon.MainloopSemiDynamic2Template(input.FunctionCallMode),
 		materials.SemiDynamic2Data(),
 	)
 	if err != nil {
@@ -183,7 +183,7 @@ func TestExecLoopPromptCompare_HighStaticProtocol(t *testing.T) {
 		materials := &aicommon.PromptMaterials{FunctionCallMode: functionCallMode}
 		prompt, err := aicommon.RenderPromptTemplate(
 			"loop-prompt-compare-high-static",
-			aicommon.SharedPlanAndExecHighStaticTemplate,
+			aicommon.MainloopHighStaticTemplate(functionCallMode),
 			materials.HighStaticData(),
 		)
 		require.NoError(t, err)
@@ -192,6 +192,8 @@ func TestExecLoopPromptCompare_HighStaticProtocol(t *testing.T) {
 	textPrompt := render(false)
 	functionPrompt := render(true)
 	require.NotEqual(t, textPrompt, functionPrompt)
+	require.NotContains(t, aicommon.MainloopHighStaticTemplate(false), "FunctionCallMode")
+	require.NotContains(t, aicommon.MainloopHighStaticTemplate(true), "FunctionCallMode")
 	require.Contains(t, textPrompt, "caller 每轮给 JSON SCHEMA")
 	require.Contains(t, textPrompt, "## NONCE 与 AITAG")
 	require.NotContains(t, textPrompt, "本轮使用原生 function call")
