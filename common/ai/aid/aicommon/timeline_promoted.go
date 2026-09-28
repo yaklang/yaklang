@@ -219,59 +219,22 @@ func (m *Timeline) rebuildPromotedStateLocked(throughID int64) {
 	m.promotedState = state
 }
 
-// ForcePromoteAll is retained for callers of the old API. Promotion now always
-// commits a freeze boundary, including the ordinary items in the same batch.
-// Deprecated: use FreezeAll and its transaction receipt.
-func (m *Timeline) ForcePromoteAll() {
-	m.FreezeAll()
-}
-
-func (m *Timeline) HasPromotableKind(kind string) bool {
+// effectivePromotedEntries overlays Open deltas on the frozen snapshot without
+// freezing or rewriting either view. Returned entries are private copies.
+func (m *Timeline) effectivePromotedEntries(targetSection, kind string) []*PromotedTimelineEntry {
 	if m == nil {
-		return false
-	}
-	m.mu.RLock()
-	defer m.mu.RUnlock()
-	for _, id := range m.idToTimelineItem.Keys() {
-		item, ok := m.idToTimelineItem.Get(id)
-		if !ok || item == nil || item.deleted {
-			continue
-		}
-		if control, ok := item.value.(*PromotableTimelineItem); ok && control != nil && control.Kind == kind {
-			return true
-		}
-	}
-	return false
-}
-
-// effectivePromotedKeys returns the current materialized membership for one
-// promotion namespace, including mutations that are still in Timeline Open.
-// It is deliberately read-only: session restore must not seal buckets or move
-// the promotion watermark merely to rebuild execution-side authorization.
-//
-// Ordering includes pending reuse events for runtime restoration, without
-// changing the frozen prompt's content or ordering.
-func (m *Timeline) effectivePromotedKeys(targetSection, kind string) []string {
-	if m == nil || strings.TrimSpace(targetSection) == "" || strings.TrimSpace(kind) == "" {
 		return nil
 	}
 	m.mu.RLock()
 	defer m.mu.RUnlock()
-
-	type activePromotion struct {
-		key      string
-		sourceID int64
-	}
-	active := make(map[string]activePromotion)
+	active := make(map[string]*PromotedTimelineEntry)
 	watermark := int64(0)
 	if m.promotedState != nil {
 		watermark = m.promotedState.Watermark
-		if kinds := m.promotedState.Entries[targetSection]; kinds != nil {
-			for key, entry := range kinds[kind] {
-				if entry == nil {
-					continue
-				}
-				active[key] = activePromotion{key: key, sourceID: promotedToolLastUsedID(entry)}
+		for key, entry := range m.promotedState.Entries[targetSection][kind] {
+			if entry != nil {
+				cp := *entry
+				active[key] = &cp
 			}
 		}
 	}
@@ -285,71 +248,32 @@ func (m *Timeline) effectivePromotedKeys(targetSection, kind string) []string {
 		if !ok || item == nil || item.deleted {
 			continue
 		}
-		control, ok := item.value.(*PromotableTimelineItem)
-		if !ok || control == nil || control.TargetSection != targetSection || control.Kind != kind {
+		op, ok := item.value.(*PromotableTimelineItem)
+		if !ok || op == nil || op.TargetSection != targetSection || op.Kind != kind {
 			continue
 		}
-		if control.Operation == TimelinePromotedOperationDelete {
-			delete(active, control.Key)
-			continue
-		}
-		if control.Operation == TimelinePromotedOperationReuse {
-			if _, exists := active[control.Key]; !exists || kind != TimelinePromotedKindRecentTool {
-				continue
+		switch op.Operation {
+		case TimelinePromotedOperationDelete:
+			delete(active, op.Key)
+		case TimelinePromotedOperationReuse:
+			if entry := active[op.Key]; entry != nil && kind == TimelinePromotedKindRecentTool {
+				entry.LastUsedItemID = id
 			}
-		} else if control.Operation != TimelinePromotedOperationUpsert {
-			continue
+		case TimelinePromotedOperationUpsert:
+			active[op.Key] = &PromotedTimelineEntry{Kind: kind, TargetSection: targetSection, Key: op.Key,
+				Payload: op.Payload, PayloadHash: op.PayloadHash, SourceItemID: id, LastUsedItemID: id}
 		}
-		active[control.Key] = activePromotion{key: control.Key, sourceID: id}
 	}
-
-	ordered := make([]activePromotion, 0, len(active))
+	entries := make([]*PromotedTimelineEntry, 0, len(active))
 	for _, entry := range active {
-		ordered = append(ordered, entry)
+		entries = append(entries, entry)
 	}
-	sort.Slice(ordered, func(i, j int) bool {
-		if ordered[i].sourceID == ordered[j].sourceID {
-			return ordered[i].key < ordered[j].key
-		}
-		return ordered[i].sourceID < ordered[j].sourceID
-	})
-	keys := make([]string, 0, len(ordered))
-	for _, entry := range ordered {
-		keys = append(keys, entry.key)
-	}
-	return keys
-}
-
-func renderPromotedRecentTools(state *TimelinePromotedState) string {
-	if state == nil {
-		return ""
-	}
-	entries := state.Entries[TimelinePromotedTargetSemiDynamic1][TimelinePromotedKindRecentTool]
-	if len(entries) == 0 {
-		return ""
-	}
-	keys := make([]string, 0, len(entries))
-	for key, entry := range entries {
-		if entry != nil {
-			keys = append(keys, key)
-		}
-	}
-	sort.Slice(keys, func(i, j int) bool {
-		left, right := promotedToolLastUsedID(entries[keys[i]]), promotedToolLastUsedID(entries[keys[j]])
+	sort.Slice(entries, func(i, j int) bool {
+		left, right := promotedToolLastUsedID(entries[i]), promotedToolLastUsedID(entries[j])
 		if left == right {
-			return keys[i] < keys[j]
+			return entries[i].Key < entries[j].Key
 		}
-		return left < right // Most recently used tools appear last, after freeze.
+		return left < right
 	})
-	var out strings.Builder
-	out.WriteString("<|CACHE_TOOL_CALL_[current-nonce]|>\n")
-	out.WriteString("# Recently Used Tools (available for directly_call_tool)\n\n")
-	for _, key := range keys {
-		if entry := entries[key]; entry != nil {
-			out.WriteString(strings.TrimSpace(entry.Payload))
-			out.WriteString("\n\n")
-		}
-	}
-	out.WriteString("\n<|CACHE_TOOL_CALL_END_[current-nonce]|>")
-	return strings.TrimSpace(out.String())
+	return entries
 }

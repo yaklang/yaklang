@@ -1033,7 +1033,7 @@ func TestPromptManager_GenerateVerificationPrompt_UsesPromptSections(t *testing.
 		aitool.WithDescription("sentinel sealed promoted tool"),
 		aitool.WithStringParam("value"),
 	))
-	react.config.GetTimeline().ForcePromoteAll()
+	react.config.GetTimeline().FreezeAll()
 	react.config.RecordRecentlyUsedTool(aitool.NewWithoutCallback(
 		"open_promoted_tool_must_not_leak",
 		aitool.WithDescription("sentinel open promoted tool"),

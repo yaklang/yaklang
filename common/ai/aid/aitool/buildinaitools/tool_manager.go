@@ -34,10 +34,11 @@ type RecentToolEntry struct {
 }
 
 // RecentToolCacheMutation is the prompt-visible delta caused by an LRU update.
-// Reusing an unchanged tool may still refresh execution-side LRU order, but
-// intentionally returns no Upsert so the prompt prefix remains byte-stable.
+// Reuse carries the unchanged entry for journal recovery, but the Timeline
+// normally records only its name. Deleted entries are immediate runtime evictions.
 type RecentToolCacheMutation struct {
 	Upsert  *RecentToolEntry
+	Reuse   *RecentToolEntry
 	Deleted []*RecentToolEntry
 }
 
@@ -67,6 +68,12 @@ type AiToolManager struct {
 
 // ToolManagerOption 定义工具管理器的配置选项
 type ToolManagerOption func(*AiToolManager)
+
+// WithRecentToolCacheMaxTokens sets the recent-schema LRU budget. Non-positive
+// values use the default. One oversized newest entry is retained for progress.
+func WithRecentToolCacheMaxTokens(tokens int) ToolManagerOption {
+	return func(m *AiToolManager) { m.maxCacheTokens = tokens }
+}
 
 // WithAIToolsSearcher 设置搜索器
 func WithAIToolsSearcher(searcher searchtools.AISearcher[*aitool.Tool]) ToolManagerOption {
@@ -616,6 +623,11 @@ func (m *AiToolManager) AddRecentlyUsedTool(tool *aitool.Tool) RecentToolCacheMu
 	m.recentToolsMu.Lock()
 	defer m.recentToolsMu.Unlock()
 
+	return m.addRecentlyUsedToolLocked(tool)
+}
+
+func (m *AiToolManager) addRecentlyUsedToolLocked(tool *aitool.Tool) RecentToolCacheMutation {
+	var mutation RecentToolCacheMutation
 	name := tool.GetName()
 	desc := tool.GetDescription()
 	schemaStr := tool.ToJSONSchemaString()
@@ -645,6 +657,9 @@ func (m *AiToolManager) AddRecentlyUsedTool(tool *aitool.Tool) RecentToolCacheMu
 	if previous == nil || previous.Description != newEntry.Description || previous.SchemaSnippet != newEntry.SchemaSnippet || previous.Usage != newEntry.Usage {
 		cp := *newEntry
 		mutation.Upsert = &cp
+	} else {
+		cp := *newEntry
+		mutation.Reuse = &cp
 	}
 
 	maxTokens := m.getMaxCacheTokens()
@@ -657,6 +672,26 @@ func (m *AiToolManager) AddRecentlyUsedTool(tool *aitool.Tool) RecentToolCacheMu
 		}
 	}
 	return mutation
+}
+
+// RestoreRecentlyUsedTools replaces runtime membership in oldest-to-newest order.
+// It does not append journal events; the session owner reconciles the returned
+// bounded snapshot with its persisted Timeline. Returned entries are copies.
+func (m *AiToolManager) RestoreRecentlyUsedTools(tools []*aitool.Tool) []*RecentToolEntry {
+	m.recentToolsMu.Lock()
+	defer m.recentToolsMu.Unlock()
+	m.recentToolsCache = nil
+	for _, tool := range tools {
+		if tool != nil {
+			m.addRecentlyUsedToolLocked(tool)
+		}
+	}
+	entries := make([]*RecentToolEntry, 0, len(m.recentToolsCache))
+	for _, entry := range m.recentToolsCache {
+		cp := *entry
+		entries = append(entries, &cp)
+	}
+	return entries
 }
 
 // RenderRecentToolEntryForPromotion renders one stable, params-only schema.
@@ -702,17 +737,8 @@ func (m *AiToolManager) HasRecentlyUsedTools() bool {
 	return len(m.recentToolsCache) > 0
 }
 
-// RecentToolCacheStableNonce 是 CACHE_TOOL_CALL 块及其内部所有 AITAG (TOOL_xxx /
-// TOOL_PARAM_xxx) 渲染时使用的稳定 nonce 字面量. 跨 react turn 不变, 让承载
-// 该块的 prompt 段保持字节级稳定, 进入 prefix cache.
-//
-// 字面量必须与 aicommon.RecentToolCacheStableNonce 严格一致 (两边互不 import,
-// 各自定义本地副本; 不一致会导致渲染端写一种, 解析端注册另一种, callback
-// 不命中, 内容丢失). 当前两边都是 "[current-nonce]".
-//
-// 关键词: RecentToolCacheStableNonce, [current-nonce], 占位符语义,
-//
-//	与 aicommon.RecentToolCacheStableNonce 字面量严格一致
+// RecentToolCacheStableNonce is a literal suffix shared by cache rendering
+// and text-mode parameter parsing. It never authorizes aiprojection splitting.
 const RecentToolCacheStableNonce = "[current-nonce]"
 
 const recentToolEntryTemplate = `<|TOOL_{{ .Name }}_{{ .Nonce }}|>

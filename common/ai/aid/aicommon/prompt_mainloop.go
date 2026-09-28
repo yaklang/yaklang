@@ -11,7 +11,6 @@ var (
 	SharedTaskInstructionFunctionCallTemplate       = promptloader.MustLoad("mainloop/functioncall/semi_dynamic_2_section.txt")
 	SharedSemiDynamic1Template                      = promptloader.MustLoad("mainloop/semi_dynamic_1_section.txt")
 	SharedTimelineOpenTemplate                      = promptloader.MustLoad("mainloop/timeline_open_section.txt")
-	workspacePromptTemplate                         = promptloader.MustLoad("mainloop/workspace.txt")
 )
 
 func MainloopHighStaticTemplate(functionCallMode bool) string {

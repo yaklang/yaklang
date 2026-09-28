@@ -113,7 +113,7 @@ func TestSplit_DeepThinkPlanPrompt_CacheSections(t *testing.T) {
 
 	require.NotContains(t, firstChunk(t, sec1, aiprojection.SectionHighStatic).Content, "<|PERSISTENT|>")
 	require.NotContains(t, firstChunk(t, sec1, aiprojection.SectionHighStatic).Content, "<|OUTPUT_EXAMPLE|>")
-	require.Contains(t, firstChunk(t, sec1, aiprojection.SectionSemiDynamic2).Content, "# 任务重规划引导")
+	require.Contains(t, firstChunk(t, sec1, aiprojection.SectionSemiDynamic2).Content, "任务重规划引导")
 	require.Contains(t, firstChunk(t, sec1, aiprojection.SectionSemiDynamic2).Content, "jsonschema")
 	require.Contains(t, firstChunk(t, sec1, aiprojection.SectionDynamic).Content, "## 规划任务帮助信息")
 }
@@ -137,8 +137,8 @@ func TestSplit_DynamicPlanPrompt_CacheSectionsAndFrozenOpen(t *testing.T) {
 	require.NotEmpty(t, sec1[aiprojection.SectionDynamic])
 	require.Empty(t, sec1[aiprojection.SectionRaw], "dynamic-plan should not produce raw chunks:\n%s", prompt1)
 
-	require.Contains(t, prompt1, aiprojection.CreateTemplate("<|AI_CACHE_FROZEN_semi-dynamic|>"))
-	require.Contains(t, prompt1, aiprojection.CreateTemplate("<|PROMPT_SECTION_timeline-open|>"))
+	require.Contains(t, prompt1, "<|AI_CACHE_FROZEN_semi-dynamic_")
+	require.Contains(t, prompt1, "<|PROMPT_SECTION_timeline-open_")
 	require.NotContains(t, prompt1, "<|PROMPT_SECTION_timeline|>")
 
 	require.Equal(t, firstChunk(t, sec1, aiprojection.SectionHighStatic).Hash, firstChunk(t, sec2, aiprojection.SectionHighStatic).Hash)
@@ -146,8 +146,8 @@ func TestSplit_DynamicPlanPrompt_CacheSectionsAndFrozenOpen(t *testing.T) {
 	require.Equal(t, firstChunk(t, sec1, aiprojection.SectionSemiDynamic2).Hash, firstChunk(t, sec2, aiprojection.SectionSemiDynamic2).Hash)
 
 	require.NotContains(t, firstChunk(t, sec1, aiprojection.SectionHighStatic).Content, "<|PERSISTENT|>")
-	require.Contains(t, firstChunk(t, sec1, aiprojection.SectionSemiDynamic2).Content, "# 任务重规划引导")
-	require.Contains(t, firstChunk(t, sec1, aiprojection.SectionDynamic).Content, peTaskMarkerSharedEvidence)
+	require.Contains(t, firstChunk(t, sec1, aiprojection.SectionSemiDynamic2).Content, "任务重规划引导")
+	require.NotContains(t, firstChunk(t, sec1, aiprojection.SectionDynamic).Content, "--- 共享执行证据 ---")
 }
 
 func TestSplit_PlanReviewIncompletePrompt_CacheSections(t *testing.T) {

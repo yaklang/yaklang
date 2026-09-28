@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
@@ -25,6 +26,10 @@ type transactionTestConfig struct {
 	idSeq     int64
 	retryMax  int64
 	retryWait func(context.Context, time.Duration) error
+}
+
+func (t *transactionTestConfig) RecordRecentlyUsedTool(*aitool.Tool) buildinaitools.RecentToolCacheMutation {
+	return buildinaitools.RecentToolCacheMutation{}
 }
 
 var _ AICallerConfigIf = (*transactionTestConfig)(nil)

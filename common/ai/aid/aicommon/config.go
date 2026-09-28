@@ -1487,50 +1487,6 @@ func (c *Config) SaveLoadedSkillNames(skillNames []string) {
 	}
 }
 
-// RecordRecentlyUsedTool keeps execution authorization in AiToolManager while
-// recording only prompt-visible mutations in Timeline Open.
-func (c *Config) RecordRecentlyUsedTool(tool *aitool.Tool) buildinaitools.RecentToolCacheMutation {
-	var mutation buildinaitools.RecentToolCacheMutation
-	if c == nil || tool == nil || c.GetAiToolManager() == nil {
-		return mutation
-	}
-	mutation = c.GetAiToolManager().AddRecentlyUsedTool(tool)
-	timeline := c.GetTimeline()
-	promptMutated := false
-	if timeline != nil && mutation.Upsert != nil {
-		promptMutated = timeline.PushPromotable(c.AcquireId(), TimelinePromotedKindRecentTool, TimelinePromotedTargetSemiDynamic1,
-			mutation.Upsert.Name, TimelinePromotedOperationUpsert,
-			buildinaitools.RenderRecentToolEntryForPromotion(mutation.Upsert)) || promptMutated
-	}
-	if timeline != nil {
-		for _, deleted := range mutation.Deleted {
-			if deleted == nil {
-				continue
-			}
-			promptMutated = timeline.PushPromotable(c.AcquireId(), TimelinePromotedKindRecentTool, TimelinePromotedTargetSemiDynamic1,
-				deleted.Name, TimelinePromotedOperationDelete, "") || promptMutated
-		}
-	}
-	if promptMutated && c.PersistentSessionId != "" && c.GetDB() != nil {
-		timeline.Save(c.GetDB(), c.PersistentSessionId)
-	}
-	return mutation
-}
-
-func (c *Config) restoreRecentToolsFromTimeline() {
-	if c == nil || c.GetTimeline() == nil || c.GetAiToolManager() == nil {
-		return
-	}
-	for _, name := range c.GetTimeline().effectivePromotedKeys(TimelinePromotedTargetSemiDynamic1, TimelinePromotedKindRecentTool) {
-		tool, err := c.GetAiToolManager().GetToolByName(name)
-		if err != nil || tool == nil {
-			log.Warnf("failed to restore promoted recent tool [%s] for session [%s]: %v", name, c.PersistentSessionId, err)
-			continue
-		}
-		c.GetAiToolManager().AddRecentlyUsedTool(tool)
-	}
-}
-
 func (c *Config) AppendRelatedRuntimeID(runtimeID string) {
 	if c == nil || c.PersistentSessionId == "" {
 		return

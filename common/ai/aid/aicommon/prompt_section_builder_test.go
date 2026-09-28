@@ -52,16 +52,19 @@ func TestPromptPrefixBuilder_AssemblePromptWithDynamicSection_DefaultSections(t 
 
 func TestSharedToolCallModePromptsUseOneConsistentBatchContract(t *testing.T) {
 	tests := []struct {
-		name   string
-		prompt string
+		name           string
+		prompt         string
+		singleCallRule string
 	}{
 		{
-			name:   "high static",
-			prompt: SharedPlanAndExecHighStaticTemplate,
+			name:           "high static",
+			prompt:         SharedPlanAndExecHighStaticFunctionCallTemplate,
+			singleCallRule: "简单无歧义",
 		},
 		{
-			name:   "frozen tool inventory",
-			prompt: SharedFrozenBlockTemplate,
+			name:           "frozen tool inventory",
+			prompt:         SharedFrozenBlockFunctionCallTemplate,
+			singleCallRule: "单工具入口",
 		},
 	}
 
@@ -70,7 +73,7 @@ func TestSharedToolCallModePromptsUseOneConsistentBatchContract(t *testing.T) {
 			require.Contains(t, test.prompt, "默认")
 			require.Contains(t, test.prompt, "directly_call_tool_calls")
 			require.Contains(t, test.prompt, "tool_require_calls")
-			require.Contains(t, test.prompt, "简单无歧义")
+			require.Contains(t, test.prompt, test.singleCallRule)
 			require.Contains(t, test.prompt, "嵌套 wrapper")
 			require.NotContains(t, test.prompt, "不要先默认单工具")
 			require.NotContains(t, test.prompt, "不得仅为沿用单工具而拆成多轮")

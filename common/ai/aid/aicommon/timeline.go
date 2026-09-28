@@ -20,6 +20,8 @@ import (
 
 type Timeline struct {
 	mu sync.RWMutex
+	// Serializes runtime cache updates and their journal deltas across shared configs.
+	toolCacheMu sync.Mutex
 
 	extraMetaInfo func() string // extra meta info for timeline, like runtime id, etc.
 	config        AICallerConfigIf
@@ -594,9 +596,6 @@ func (m *Timeline) dumpRecentForPrompt(tokenLimit int, includeLatestModelReplay 
 		content := strings.TrimSpace(projected.String())
 		if content == "" {
 			continue
-		}
-		if !isTrustedReplayProjection(projected) {
-			content = strings.ReplaceAll(content, "<|", "&lt;|")
 		}
 		cost := MeasureTokens(content)
 		if len(selected) > 0 {
