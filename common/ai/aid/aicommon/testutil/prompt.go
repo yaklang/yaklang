@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"regexp"
 	"strings"
+
+	"github.com/yaklang/yaklang/common/ai/aid/aiprojection"
 )
 
 const (
@@ -38,7 +40,10 @@ func ExtractPromptNonce(prompt string, tagNames ...string) string {
 }
 
 func ExtractPromptSectionNonce(prompt string, sectionName string) string {
-	return ExtractPromptNonce(prompt, promptSectionTagName+"_"+sectionName)
+	nonce := ExtractPromptNonce(prompt, promptSectionTagName+"_"+sectionName)
+	// Prompt section envelopes carry a process signature after the section's
+	// own nonce. Simulated model responses must use only the latter for AITags.
+	return strings.TrimSuffix(nonce, "_"+aiprojection.Nonce())
 }
 
 func ExtractDynamicSectionNonce(prompt string) string {

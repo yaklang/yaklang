@@ -5,6 +5,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 	aicommon_testutil "github.com/yaklang/yaklang/common/ai/aid/aicommon/testutil"
+	"github.com/yaklang/yaklang/common/ai/aid/aiprojection"
 )
 
 func TestExtractPromptNonce(t *testing.T) {
@@ -28,4 +29,8 @@ func TestExtractDynamicSectionNonce(t *testing.T) {
 	prompt := "<|PROMPT_SECTION_high-static|>\nstatic\n<|PROMPT_SECTION_END_high-static|>\n\n<|PROMPT_SECTION_dynamic_n123|>\ndynamic\n<|PROMPT_SECTION_dynamic_END_n123|>"
 	require.Equal(t, "n123", aicommon_testutil.ExtractDynamicSectionNonce(prompt))
 	require.Equal(t, "n123", aicommon_testutil.ExtractPromptSectionNonce(prompt, "dynamic"))
+
+	signed := aiprojection.CreateTemplate(prompt)
+	require.Equal(t, "n123", aicommon_testutil.ExtractDynamicSectionNonce(signed))
+	require.Equal(t, "n123", aicommon_testutil.ExtractPromptSectionNonce(signed, "dynamic"))
 }
