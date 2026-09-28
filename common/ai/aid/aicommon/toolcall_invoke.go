@@ -17,6 +17,7 @@ import (
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"github.com/yaklang/yaklang/common/yak/yaklib"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
@@ -224,6 +225,11 @@ func (a *ToolCaller) invoke(
 	// suppress session/stat notifications when no plugin callback ran.
 	a.checkpointReplayed = false
 	c := a.config
+	if policy, ok := c.(interface{ IsReadOnlyEvidence() bool }); ok && policy.IsReadOnlyEvidence() {
+		return nil, fmt.Errorf("external tool execution is disabled for evidence-only analysis")
+	}
+	unbindAttemptObserver := lowhttp.BindHTTPAttemptObserver(c.GetContext(), a.callToolId, c.GetRuntimeId())
+	defer unbindAttemptObserver()
 	e := a.emitter
 	if err := toolCallerContextErr(a.ctx); err != nil {
 		return nil, err

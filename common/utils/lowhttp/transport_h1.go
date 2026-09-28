@@ -42,7 +42,13 @@ func newH1Transport(pool *LowHttpConnPool) transport {
 	return &h1Transport{pool: pool}
 }
 
-func (t *h1Transport) RoundTrip(ctx context.Context, tr *transportRequest) (*transportResult, error) {
+func (t *h1Transport) RoundTrip(ctx context.Context, tr *transportRequest) (result *transportResult, err error) {
+	tr.attemptFinish = observeHTTPAttempt(tr)
+	defer func() { tr.attemptFinish(result, err); tr.attemptFinish = nil }()
+	return t.roundTripAttempt(ctx, tr)
+}
+
+func (t *h1Transport) roundTripAttempt(ctx context.Context, tr *transportRequest) (*transportResult, error) {
 	requestPacket := tr.packet
 	connPool := tr.connPool
 	if connPool == nil {
@@ -162,6 +168,7 @@ func (t *h1Transport) roundTripPooled(ctx context.Context, tr *transportRequest,
 	if option.BeforeDoRequest != nil {
 		requestPacket = option.BeforeDoRequest(requestPacket)
 	}
+	tr.attemptRequestPacket = requestPacket
 
 	resc := make(chan responseInfo, 1)
 	pc.reqCh <- requestAndResponseCh{
@@ -245,6 +252,7 @@ func (t *h1Transport) roundTripDirect(ctx context.Context, tr *transportRequest,
 	if option.BeforeDoRequest != nil {
 		requestPacket = option.BeforeDoRequest(requestPacket)
 	}
+	tr.attemptRequestPacket = requestPacket
 
 	if reqIns != nil {
 		httpctx.SetBareRequestBytes(reqIns, requestPacket)
@@ -399,8 +407,16 @@ func (t *h1Transport) roundTripDirect(ctx context.Context, tr *transportRequest,
 	if tr.option != nil && firstResponse != nil && firstResponse.StatusCode == http.StatusUnauthorized {
 		if authHeader := IGetHeader(firstResponse, "WWW-Authenticate"); len(authHeader) > 0 {
 			if auth := GetHttpAuth(authHeader[0], tr.option); auth != nil {
+				// The challenge and authenticated retry are independent HTTP attempts.
+				if tr.attemptFinish != nil {
+					tr.attemptFinish(&transportResult{rawBytes: responseRaw.Bytes(), firstResponse: firstResponse}, err)
+					tr.attemptFinish = func(*transportResult, error) {}
+				}
 				authReq, authErr := auth.Authenticate(conn, tr.option)
 				if authErr == nil {
+					authAttempt := *tr
+					authAttempt.packet = authReq
+					tr.attemptFinish = observeHTTPAttempt(&authAttempt)
 					_, wErr := conn.Write(authReq)
 					responseRaw.Reset()
 					if wErr != nil {

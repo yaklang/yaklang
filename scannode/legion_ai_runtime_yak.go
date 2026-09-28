@@ -51,6 +51,9 @@ func (yakAIEngineRuntimeDriver) Bind(
 	binding aiSessionBinding,
 	emitter aiSessionRuntimeEmitter,
 ) (aiSessionRuntimeHandle, error) {
+	if binding.TrafficAnalysis != nil {
+		return nil, fmt.Errorf("read-only traffic analysis requires the stateless runtime")
+	}
 	if strings.EqualFold(strings.TrimSpace(binding.ExecutionMode), "single_run") {
 		return nil, fmt.Errorf("single_run requires the stateless runtime; LEGION_AI_RUNTIME=stateful is rollback-only")
 	}
@@ -229,6 +232,11 @@ func (h *yakAIEngineRuntimeHandle) sendMessage(queued yakAIQueuedMessage) {
 		return
 	}
 	h.currentTurn = queued.turnID
+	if collector := h.binding.TrafficCollector; collector != nil {
+		collector.mu.Lock()
+		collector.currentTurn = queued.turnID
+		collector.mu.Unlock()
+	}
 	h.mu.Unlock()
 	defer func() {
 		h.mu.Lock()
@@ -691,6 +699,12 @@ func buildYakAIEngineOptions(
 	if err != nil {
 		return nil, fmt.Errorf("decode runtime options: %w", err)
 	}
+	if binding.TrafficAnalysis != nil {
+		if err := validateTrafficAnalysisBinding(binding, options); err != nil {
+			return nil, err
+		}
+		applyTrafficAnalysisRuntimeOptions(&options)
+	}
 	attachmentTask := isLegionAttachmentTarget(binding.AuthorizedTargetURL) || isLegionAttachmentTarget(options.FocusTargetURL) || isAttachmentWorkspace(options.SourceWorkspace)
 	if attachmentTask {
 		if binding.ProjectID != "" || binding.ExecutionMode != "single_run" || binding.LegionResultRuntime == nil || binding.LegionResultRuntime.AuthorizedTarget() != binding.AuthorizedTargetURL {
@@ -820,6 +834,9 @@ func buildYakAIEngineOptions(
 	}
 	if callbacks.Speed != nil {
 		config = append(config, aiengine.WithSpeedPriorityAICallback(callbacks.Speed))
+	}
+	if binding.TrafficAnalysis != nil {
+		config = append(config, trafficAnalysisEnginePolicy())
 	}
 	return config, nil
 }

@@ -2,12 +2,14 @@ package lowhttp
 
 import (
 	"bufio"
+	"bytes"
 	"encoding/base64"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/bruteutils/grdp/protocol/nla"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
+	"io"
 	"net"
 	"strings"
 )
@@ -56,15 +58,19 @@ type NtlmAuthentication struct {
 	Domain   string
 }
 
-func (na *NtlmAuthentication) Authenticate(conn net.Conn, config *LowhttpExecConfig) ([]byte, error) {
+func (na *NtlmAuthentication) Authenticate(conn net.Conn, config *LowhttpExecConfig) (result []byte, resultErr error) {
 	ntv2 := nla.NewNTLMv2(na.Domain, na.Username, na.Password)
 	negotiation := ntv2.GetNegotiateMessage()
 	negotiationReq := ReplaceHTTPPacketHeader(config.Packet, "Authorization", "NTLM "+codec.EncodeBase64(negotiation.Serialize()))
+	observed := &transportRequest{option: config, packet: negotiationReq}
+	finish := observeHTTPAttempt(observed)
+	var negotiationRaw bytes.Buffer
+	defer func() { finish(&transportResult{rawBytes: negotiationRaw.Bytes()}, resultErr) }()
 	_, err := conn.Write(negotiationReq)
 	if err != nil {
 		return nil, utils.Wrap(err, "write negotiation request failed")
 	}
-	httpResponseReader := bufio.NewReader(conn)
+	httpResponseReader := bufio.NewReader(io.TeeReader(conn, &negotiationRaw))
 	_, err = httpResponseReader.Peek(1)
 	if err != nil {
 		return nil, utils.Wrap(err, "peek http response failed")

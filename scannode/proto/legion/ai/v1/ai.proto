@@ -48,6 +48,9 @@ message BindAISessionCommand {
   uint64 bind_epoch = 12;
   // Requires the ai.input.managed_attachment.v1 node capability.
   InputManifest input_manifest = 13;
+  AITrafficCapturePolicy traffic_capture = 14;
+  // Server-owned policy; retained for every turn and never read from user options.
+  AITrafficAnalysisContext traffic_analysis = 15;
 }
 
 message PushAISessionInputCommand {
@@ -80,6 +83,7 @@ message ContextPackage {
   string user_input = 6;                      // this turn's user input text
   bytes provider_policy_snapshot_json = 7;    // model provider config (API key, base URL, headers)
   bytes runtime_option_snapshot_json = 8;     // temperature, max_tokens, etc.
+  AITrafficAnalysisContext traffic_analysis = 10;
   ContextFocusRelease focus_release = 9;      // immutable server-published Yak Focus release selected for this Turn
 }
 
@@ -2116,4 +2120,92 @@ message InputResource {
   string media_type = 8;
   bool required = 9;
   bool read_only = 10;
+}
+
+
+// Version 1 captures Yaklang-instrumented HTTP transport attempts only.
+message AITrafficCapturePolicy {
+  uint32 protocol_version = 1;
+  string upload_base_url = 2;
+  uint64 packet_limit_bytes = 3;
+  uint64 session_limit_bytes = 4;
+}
+
+message AITrafficAnalysisContext {
+  string source_session_id = 1;
+  repeated string flow_ids = 2;
+  string evidence_text = 3;
+  bool read_only = 4;
+}
+
+// This metadata never contains request headers, bodies, URL queries or errors
+// copied from the target. Raw evidence is sent only through authenticated HTTP.
+message AITrafficRecord {
+  uint32 protocol_version = 1;
+  string flow_id = 2;
+  string session_id = 3;
+  string turn_id = 4;
+  string tool_call_id = 5;
+  string agent_id = 6;
+  string node_id = 7;
+  string node_session_id = 8;
+  uint64 bind_epoch = 9;
+  string phase = 10; // started | terminal
+  string outcome = 11; // pending | success | network_failed | cancelled
+  int64 started_at_ms = 12;
+  int64 finished_at_ms = 13;
+  string method = 14;
+  string scheme = 15;
+  string host = 16;
+  int32 status_code = 17;
+  uint64 request_size_bytes = 18;
+  uint64 response_size_bytes = 19;
+  string request_sha256 = 20;
+  string response_sha256 = 21;
+  bool request_truncated = 22;
+  bool response_truncated = 23;
+  string capture_error = 24; // fixed code only
+}
+
+message AITrafficBatch {
+  uint32 protocol_version = 1;
+  repeated AITrafficRecord records = 2;
+}
+
+message AITrafficUpload {
+  AITrafficRecord record = 1;
+  bytes raw_request = 2;
+  bytes raw_response = 3;
+}
+
+// Receipt is sent only after both metadata and admitted packet bytes are durable.
+message AITrafficReceipt {
+  uint32 protocol_version = 1;
+  string flow_id = 2;
+  string phase = 3;
+  string upload_sha256 = 4;
+  bool durable = 5;
+  string storage_status = 6; // stored | quota_dropped
+}
+
+message DrainAITrafficCommand {
+  legion.node.v1.CommandMetadata metadata = 1;
+  AISessionRef session = 2;
+  string expected_node_session_id = 3;
+  uint32 timeout_ms = 4; // capped by the runtime at 30000
+}
+
+message AITrafficDrainResult {
+  uint32 protocol_version = 1;
+  AISessionRef session = 2;
+  string node_session_id = 3;
+  uint64 pending_records = 4;
+  bool complete = 5;
+  string command_id = 6;
+}
+
+message AITrafficCapability {
+  uint32 protocol_version = 1;
+  repeated string supported_transports = 2;
+  repeated string unsupported_sources = 3;
 }

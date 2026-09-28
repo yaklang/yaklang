@@ -590,6 +590,8 @@ func (b *legionJobBridge) handleMessagePayload(
 		return b.handlePluginStoreSyncStatusQuery(ctx, message.Data)
 	case strings.HasSuffix(message.Subject, "."+legionCommandPluginStoreImport):
 		return b.handlePluginStoreImport(ctx, message.Data)
+	case strings.HasSuffix(message.Subject, "."+legionCommandAITrafficDrain):
+		return b.handleAITrafficDrain(ctx, message.Data)
 	case strings.HasSuffix(message.Subject, "."+legionCommandAISessionBind):
 		return b.handleAISessionBind(ctx, message.Data)
 	case strings.HasSuffix(message.Subject, "."+legionCommandAISessionInput):

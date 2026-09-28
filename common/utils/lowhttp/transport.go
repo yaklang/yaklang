@@ -39,18 +39,20 @@ type transport interface {
 // transportRequest carries everything a transport needs from the common
 // pre-processing in HTTPWithoutRetry.
 type transportRequest struct {
-	option         *LowhttpExecConfig
-	reqIns         *http.Request      // parsed request instance (for httpctx)
-	packet         []byte             // prepared request packet (CRLF fixed, cookie injected)
-	dialOpts       []netx.DialXOption // assembled dial options (TLS, proxy, DNS, etc.)
-	cacheKey       *connectKey        // pool cache key (scheme set by caller)
-	connPool       *LowHttpConnPool   // connection pool for H1 reuse and H2 connections
-	usePool        bool               // final H1 connection policy for this attempt
-	preserveLength bool               // final NoFixContentLength value after pipeline detection
-	h1Conn         net.Conn           // negotiated H1 socket handed off by H2; consumed once
-	traceInfo      *LowhttpTraceInfo  // trace info for timing
-	originAddr     string             // target host:port
-	timeout        time.Duration      // per-request timeout
+	attemptFinish        func(*transportResult, error)
+	attemptRequestPacket []byte
+	option               *LowhttpExecConfig
+	reqIns               *http.Request      // parsed request instance (for httpctx)
+	packet               []byte             // prepared request packet (CRLF fixed, cookie injected)
+	dialOpts             []netx.DialXOption // assembled dial options (TLS, proxy, DNS, etc.)
+	cacheKey             *connectKey        // pool cache key (scheme set by caller)
+	connPool             *LowHttpConnPool   // connection pool for H1 reuse and H2 connections
+	usePool              bool               // final H1 connection policy for this attempt
+	preserveLength       bool               // final NoFixContentLength value after pipeline detection
+	h1Conn               net.Conn           // negotiated H1 socket handed off by H2; consumed once
+	traceInfo            *LowhttpTraceInfo  // trace info for timing
+	originAddr           string             // target host:port
+	timeout              time.Duration      // per-request timeout
 }
 
 // downgradeToH1 prepares a fresh H1 attempt without changing the caller's

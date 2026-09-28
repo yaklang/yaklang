@@ -13,6 +13,7 @@ func TestNormalizeScanNodeCapabilityKeysAddsHIDSCapabilityWhenCompiled(t *testin
 
 	got := normalizeScanNodeCapabilityKeys(nil)
 	want := []string{
+		aiTrafficCapabilityV1, aiTrafficAnalysisCapabilityV1,
 		"yak.execute",
 		"hids",
 		capabilityKeySSARuleSyncExport,
@@ -50,6 +51,7 @@ func TestNormalizeScanNodeCapabilityKeysDeduplicatesCompiledHIDSCapability(t *te
 		"extra.capability",
 	})
 	want := []string{
+		aiTrafficCapabilityV1, aiTrafficAnalysisCapabilityV1,
 		"yak.execute",
 		"hids",
 		capabilityKeySSARuleSyncExport,
