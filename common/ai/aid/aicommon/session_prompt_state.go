@@ -22,14 +22,8 @@ type SessionPromptState struct {
 	// Persisted to DB alongside UserInputHistory under the same persistent session.
 	evidenceJSON string
 
-	// todoJSON stores the serialized VerificationTodoStore JSON for the global
-	// task-scoped TODO work set maintained by normal ReAct actions. The list is rendered
-	// into every loop prompt (timeline-open section, right after
-	// SessionEvidence) so the model can see its own pending TODOs on every
-	// iteration, not only at Verify checkpoints.
-	//
-	// 关键词: todoJSON, VerificationTodoStore 序列化, SessionEvidence 同构,
-	//        全局 TODO 持久态
+	// todoJSON is the session's in-memory, task-scoped TODO work set. Normal
+	// ReAct actions update it; main-loop prompts project it after the Open Timeline.
 	todoJSON string
 
 	// sessionArtifactsState keeps the sealed frozen artifact snapshots for the
@@ -207,9 +201,7 @@ func (s *SessionPromptState) GetSessionEvidenceRendered() string {
 	return store.Render()
 }
 
-// GetVerificationTodo returns the raw serialized VerificationTodoStore JSON
-// (no quoting). Suitable for DB persistence callers that want to manage their
-// own quoting strategy.
+// GetVerificationTodo returns the raw serialized in-memory TODO state.
 func (s *SessionPromptState) GetVerificationTodo() string {
 	if s == nil {
 		return ""
@@ -219,8 +211,7 @@ func (s *SessionPromptState) GetVerificationTodo() string {
 	return s.todoJSON
 }
 
-// SetVerificationTodo replaces the in-memory TODO state with the given JSON
-// payload. Used during session restore from DB.
+// SetVerificationTodo replaces the in-memory TODO state with the given JSON.
 func (s *SessionPromptState) SetVerificationTodo(todoJSON string) {
 	if s == nil {
 		return
@@ -231,11 +222,11 @@ func (s *SessionPromptState) SetVerificationTodo(todoJSON string) {
 }
 
 // ApplyTodoDelta applies one normal ReAct action's optional todo_delta to the
-// persisted TODO store, then re-serializes back to todoJSON. It returns one
+// session TODO store, then re-serializes back to todoJSON. It returns one
 // result entry per delta operation so callers can render a uniform summary;
 // failures carry a non-empty Reason.
 //
-// 关键词: ApplyTodoDelta, 增量更新, DB 持久化, per-op 结果
+// 关键词: ApplyTodoDelta, 增量更新, per-op 结果
 func (s *SessionPromptState) ApplyTodoDelta(scope VerificationTodoScope, delta *TodoDelta) []VerificationTodoApplyResult {
 	if s == nil {
 		return nil
@@ -275,7 +266,7 @@ func (s *SessionPromptState) GetVerificationTodoRendered(currentScope Verificati
 }
 
 // GetVerificationTodoMarkdownDelta returns the markdown snapshot computed
-// against the current persisted state without mutating it. Callers should
+// against the current session state without mutating it. Callers should
 // invoke this BEFORE ApplyTodoDelta when a caller needs a non-mutating preview.
 //
 // 关键词: GetVerificationTodoMarkdownDelta, 预览模式, 不变更状态
