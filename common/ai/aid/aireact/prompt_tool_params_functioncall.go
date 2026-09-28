@@ -1,32 +1,26 @@
 package aireact
 
 import (
-	_ "embed"
 	"encoding/json"
 	"fmt"
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon/promptloader"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 )
 
-//go:embed prompts/tool-params/functioncall_high_static.txt
-var functionCallToolParamsHighStatic string
+var functionCallToolParamsHighStatic = promptloader.MustLoad("ai/aid/aireact/prompts/tool-params/functioncall_high_static.txt")
 
-//go:embed prompts/tool-params/functioncall_semi_dynamic_2.txt
-var functionCallToolParamsSemiDynamic2 string
+var functionCallToolParamsSemiDynamic2 = promptloader.MustLoad("ai/aid/aireact/prompts/tool-params/functioncall_semi_dynamic_2.txt")
 
-//go:embed prompts/tool-params/functioncall_semi_dynamic_1.txt
-var functionCallToolParamsSemiDynamic1 string
+var functionCallToolParamsSemiDynamic1 = promptloader.MustLoad("ai/aid/aireact/prompts/tool-params/functioncall_semi_dynamic_1.txt")
 
-//go:embed prompts/tool-params/functioncall_selected_tool.txt
-var functionCallToolParamsSelectedTool string
+var functionCallToolParamsSelectedTool = promptloader.MustLoad("ai/aid/aireact/prompts/tool-params/functioncall_selected_tool.txt")
 
-//go:embed prompts/tool-params/functioncall_timeline_open.txt
-var functionCallToolParamsTimelineOpen string
+var functionCallToolParamsTimelineOpen = promptloader.MustLoad("ai/aid/aireact/prompts/tool-params/functioncall_timeline_open.txt")
 
-//go:embed prompts/tool-params/functioncall_dynamic.txt
-var functionCallToolParamsDynamic string
+var functionCallToolParamsDynamic = promptloader.MustLoad("ai/aid/aireact/prompts/tool-params/functioncall_dynamic.txt")
 
 // GenerateFunctionCallToolParamsPromptForTask builds R2's native prompt. It
 // reuses the main loop's frozen/open timeline rendering. Shared task/history

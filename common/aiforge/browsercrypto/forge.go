@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon/promptloader"
 	"strings"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"

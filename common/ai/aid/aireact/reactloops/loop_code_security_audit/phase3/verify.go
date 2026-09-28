@@ -2,6 +2,7 @@ package phase3
 
 import (
 	"fmt"
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon/promptloader"
 	"math"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"

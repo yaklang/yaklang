@@ -3,6 +3,7 @@ package loop_dir_explore
 import (
 	"bytes"
 	"fmt"
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon/promptloader"
 	"os"
 	"path/filepath"
 	"strings"

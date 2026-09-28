@@ -1,9 +1,0 @@
-{{ if .Workspace }}# Workspace Context
-
-以下仅为会话的固定路径，不代表目录内容或文件已存在。
-{{ if .OSArch }}OS/Arch: {{ .OSArch }}
-{{ end }}{{ if .WorkingDir }}working dir: {{ .WorkingDir }}
-{{ end }}{{ if .AIArtifactsDir }}AI Artifacts dir: {{ .AIArtifactsDir }}
-{{ end }}相对路径以 working dir 为基准；AI Artifacts dir 用于保存本次会话的产物，不要混淆两者。需要了解目录或确认文件时，按需调用工具查看相关路径；使用适合当前系统和 shell 的目录命令，限制范围和输出，避免全盘递归。
-注意 Windows 盘符、绝对路径和路径分隔符，不要套用其他系统的路径。命令中的路径应按实际 shell 正确引用，JSON 字符串中的反斜杠应正确转义；不要把路径当作命令拼接执行。
-{{ end }}
