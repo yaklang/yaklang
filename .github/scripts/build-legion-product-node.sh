@@ -55,7 +55,7 @@ version="${NODE_PACKAGE_VERSION:-sha-${source_sha:0:12}}"
 [[ ! -e "$package_path" ]] || die "package archive already exists: $package_path"
 
 binary="$package_dir/$binary_name"
-build_tags="hids"
+build_tags="hids,osusergo"
 module_go_version="$(awk '$1 == "go" { gsub(/\r/, "", $2); print $2; exit }' "$repo_root/go.mod")"
 [[ -n "$module_go_version" ]] || die "go.mod does not declare a Go version"
 toolchain_version="$(go env GOVERSION)"

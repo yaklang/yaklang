@@ -289,7 +289,7 @@ jobs:
           GOCACHE: ${{ env.GOCACHE }}
           GOMODCACHE: ${{ env.GOMODCACHE }}
         run: |
-          go build -o "$RUNNER_TEMP/yak" common/yak/cmd/yak.go
+          go build -tags osusergo -o "$RUNNER_TEMP/yak" common/yak/cmd/yak.go
 
       - name: Package yak artifact
         run: |

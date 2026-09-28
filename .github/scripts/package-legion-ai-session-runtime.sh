@@ -178,7 +178,7 @@ jq -n \
       goarch: $target_arch,
       cgo_enabled: true,
       link_mode: "dynamic-container",
-      build_tags: "",
+      build_tags: "osusergo",
       module_go_version: $module_go_version,
       go_version: $runtime_go_version
     },

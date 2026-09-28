@@ -37,6 +37,12 @@ git push origin refs/tags/legion-runtime-alpha-0212
 Candidate artifacts expire after seven days. A formal release must rebuild the
 Runtime through `legion-node-v*`; candidate bytes are never promoted in place.
 
+## Linux user lookup
+
+Linux Runtime builds use `osusergo`, retaining CGO for native dependencies.
+The manifest records this tag. See [Linux build portability](linux-build-portability.md)
+for local-account semantics and artifact regression scope.
+
 ## Provenance contract
 
 `SESSION_RUNTIME_MANIFEST.json` binds the Yaklang source commit, producing

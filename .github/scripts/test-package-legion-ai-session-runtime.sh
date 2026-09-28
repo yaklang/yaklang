@@ -93,6 +93,7 @@ jq -e \
   --arg target_arch "$target_arch" '
     .schema_version == "1" and
     .artifact_type == "legion-ai-session-runtime" and
+    .recipe.build_tags == "osusergo" and
     .source.commit == $source_sha and
     .recipe.packaging_source_sha == $source_sha and
     .recipe.goos == "linux" and

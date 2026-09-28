@@ -122,7 +122,7 @@ jobs:
               .source.dirty == false and
               .recipe.goos == "linux" and
               .recipe.goarch == $goarch and
-              .recipe.build_tags == "hids" and
+              .recipe.build_tags == "hids,osusergo" and
               .ci.workflow == "Build Trusted Legion Product Node" and
               (.capabilities | index("hids") != null) and
               (.capabilities | index("ai.code_workspace.v1") != null) and
@@ -132,6 +132,11 @@ jobs:
               (.capabilities | index("ai.session.turn_lifecycle.v1") != null) and
               (.capabilities | index("ssa.rule_snapshot.execution.v2") != null)
             ' PRODUCT_NODE_MANIFEST.json >/dev/null
+
+      - name: Verify glibc 2.28 NSS startup
+        if: matrix.goarch == 'amd64'
+        shell: bash
+        run: bash .github/scripts/verify-linux-nss-startup.sh "dist/${NODE_PACKAGE_NAME}/legion-smoke-node" node "${RUNNER_TEMP}/nss-node"
 
       - name: Stage architecture-specific artifact contract
         shell: bash
@@ -223,7 +228,7 @@ jobs:
           (cd dist/artifact && sha256sum -c "$(basename "$engine_bundle").sha256")
 
       - name: Build repository-owned OSS uploader
-        run: go build -trimpath -o "${RUNNER_TEMP}/yak-oss-upload" ./common/yak/cmd/yak.go
+        run: go build -tags osusergo -trimpath -o "${RUNNER_TEMP}/yak-oss-upload" ./common/yak/cmd/yak.go
 
       - name: Publish immutable Product Node release to OSS
         shell: bash
@@ -295,7 +300,7 @@ jobs:
             echo "- Package: \`${NODE_PACKAGE_NAME}.tar.gz\`"
             echo "- Legion engine import: \`yaklang-node-engine_${NODE_PACKAGE_VERSION}_${NODE_GOOS}_${NODE_GOARCH}.tar.gz\`"
             echo "- Target: \`linux/${NODE_GOARCH}\`"
-            echo "- Build tags: \`hids\`"
+            echo "- Build tags: \`hids,osusergo\`"
             echo "- OSS index: \`${{ steps.oss-release.outputs.index_url }}\`"
             echo "- OSS index SHA256: \`${{ steps.oss-release.outputs.index_sha256 }}\`"
           } >>"$GITHUB_STEP_SUMMARY"

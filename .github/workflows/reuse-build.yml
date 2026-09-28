@@ -454,6 +454,11 @@ jobs:
         if: startsWith(inputs.os, 'linux')
         run: bash .github/scripts/verify-glibc-baseline.sh "./${{ env.OUTPUT_NAME }}"
 
+      - name: Verify glibc 2.28 NSS startup
+        if: inputs.os == 'linux-amd64'
+        shell: bash
+        run: bash .github/scripts/verify-linux-nss-startup.sh "./${{ env.OUTPUT_NAME }}" engine "${RUNNER_TEMP}/nss-engine"
+
       - name: Generate Checksums
         shell: bash
         run: |

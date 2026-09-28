@@ -5,7 +5,8 @@ set -euo pipefail
 
 MANYLINUX_IMAGE="${1:?manylinux image required}"
 OUTPUT_BINARY="${2:?output binary required}"
-BUILD_TAGS="${3:-gzip_embed}"
+BUILD_TAGS="${3:-gzip_embed},osusergo"
+# All Linux engine variants use local-file user lookup, including yakslim.
 YAK_TAG="${4:?yak tag required}"
 
 WORKSPACE="${GITHUB_WORKSPACE:-$(pwd)}"

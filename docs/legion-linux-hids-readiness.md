@@ -1,5 +1,9 @@
 # Legion Linux HIDS Readiness
 
+Official Linux Product Node builds use `hids,osusergo`. See
+[Linux build portability](linux-build-portability.md) for user/group lookup
+semantics and the glibc/NSS artifact regression.
+
 This document describes how to build, validate, and operate the current Legion HIDS capability in `yaklang-scannode-refactor`.
 
 ## Scope

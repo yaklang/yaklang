@@ -40,6 +40,7 @@ RUN --mount=type=cache,target=/go/pkg/mod \
     && CGO_ENABLED=1 GOOS="$TARGETOS" GOARCH="$TARGETARCH" go build \
       -trimpath \
       -buildvcs=false \
+      -tags osusergo \
       -ldflags "-s -w -buildid=" \
       -o /out/legion-session-runtime \
       ./cmd/legion-smoke-node

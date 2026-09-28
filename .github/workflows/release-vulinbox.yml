@@ -51,14 +51,14 @@ jobs:
           if [ "$RUNNER_OS" = "Windows" ]; then EXT=".exe"; fi
           # relative -o matches the existing "Build For Windows" step and avoids
           # MSYS path conversion when the tool is launched from Git Bash.
-          go build -o "./yak-hash-tool$EXT" ./common/yak/cmd/yak.go
+          go build -tags "${{ runner.os == 'Linux' && 'osusergo' || '' }}" -o "./yak-hash-tool$EXT" ./common/yak/cmd/yak.go
           YAK="./yak-hash-tool$EXT" bash scripts/generate-embed-fs-hash.sh
           rm -f "yak-hash-tool$EXT"
 
       - name: Build For Linux
         if: runner.os == 'Linux'
         run: |
-          go build -ldflags "-linkmode external -extldflags '-static' -s -w -X 'main.goVersion=$(go version)' -X 'main.gitHash=$(git show -s --format=%H)' -X 'main.buildTime=$(git show -s --format=%cd)' -X 'main.yakVersion=${{ env.VULINBOX_VERSION }}' -X 'main.releaseVersion=${{ env.VULINBOX_VERSION_TEXT }}'" -o "./vulinbox_$(go env GOOS)_$(go env GOARCH)" -v common/vulinboxrunner/vulinbox.go
+          go build -tags osusergo -ldflags "-linkmode external -extldflags '-static' -s -w -X 'main.goVersion=$(go version)' -X 'main.gitHash=$(git show -s --format=%H)' -X 'main.buildTime=$(git show -s --format=%cd)' -X 'main.yakVersion=${{ env.VULINBOX_VERSION }}' -X 'main.releaseVersion=${{ env.VULINBOX_VERSION_TEXT }}'" -o "./vulinbox_$(go env GOOS)_$(go env GOARCH)" -v common/vulinboxrunner/vulinbox.go
 
       - name: Build For MacOS
         if: runner.os == 'macOS'

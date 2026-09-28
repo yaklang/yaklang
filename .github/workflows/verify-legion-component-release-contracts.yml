@@ -6,6 +6,8 @@ on:
       - ".github/scripts/build-legion-component-oss-index.sh"
       - ".github/scripts/build-legion-node-engine-import-bundle.sh"
       - ".github/scripts/build-legion-product-node.sh"
+      - ".github/scripts/verify-linux-nss-startup.sh"
+      - "common/hids/enrich/file_identity_linux_test.go"
       - ".github/scripts/package-legion-ai-session-runtime.sh"
       - ".github/scripts/sign-legion-node-release-index.go"
       - ".github/scripts/test-build-legion-component-oss-index.sh"
@@ -45,6 +47,7 @@ jobs:
             .github/scripts/build-legion-component-oss-index.sh
             .github/scripts/build-legion-node-engine-import-bundle.sh
             .github/scripts/build-legion-product-node.sh
+            .github/scripts/verify-linux-nss-startup.sh
             .github/scripts/package-legion-ai-session-runtime.sh
             .github/scripts/test-build-legion-component-oss-index.sh
             .github/scripts/test-build-legion-node-engine-import-bundle.sh
@@ -88,6 +91,9 @@ jobs:
           go-version-file: go.mod
           cache: false
 
+      - name: Test HIDS local and unknown account identity
+        run: go test -tags hids,osusergo ./common/hids/enrich -run '^TestFileIdentity' -count=1
+
       - name: Compile Product Node without packaging
         shell: bash
         env:
@@ -100,7 +106,7 @@ jobs:
           CGO_ENABLED=1 GOOS=linux GOARCH="$TARGET_ARCH" go build \
             -trimpath \
             -buildvcs=true \
-            -tags hids \
+            -tags hids,osusergo \
             -ldflags '-s -w -buildid= -linkmode external -extldflags "-static"' \
             -o "$binary" \
             ./cmd/legion-smoke-node
@@ -110,6 +116,11 @@ jobs:
             echo "node binary declares dynamic library dependencies" >&2
             exit 1
           fi
+
+      - name: Verify glibc 2.28 NSS startup
+        if: matrix.goarch == 'amd64'
+        shell: bash
+        run: bash .github/scripts/verify-linux-nss-startup.sh "${RUNNER_TEMP}/legion-smoke-node-amd64" node "${RUNNER_TEMP}/nss-node"
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
@@ -189,7 +200,10 @@ jobs:
           set -euo pipefail
           export GOTOOLCHAIN=local
           binary="${RUNNER_TEMP}/legion-smoke-node-${TARGET_OS}-${TARGET_ARCH}"
+          build_tags=""
+          if [[ "$TARGET_OS" == linux ]]; then build_tags="osusergo"; fi
           CGO_ENABLED=1 GOOS="$TARGET_OS" GOARCH="$TARGET_ARCH" go build \
+            -tags "$build_tags" \
             -trimpath \
             -buildvcs=true \
             -ldflags '-s -w -buildid=' \

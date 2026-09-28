@@ -34,7 +34,7 @@ jobs:
 
       - name: Build yak
         run: |
-          go build -o ./yak ./common/yak/cmd/yak.go
+          go build -tags osusergo -o ./yak ./common/yak/cmd/yak.go
           chmod +x ./yak
 
       - name: Create output directory

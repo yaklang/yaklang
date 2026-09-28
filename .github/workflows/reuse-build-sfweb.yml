@@ -82,8 +82,10 @@ jobs:
           export GOARCH=$(echo ${{ inputs.os }} | cut -d'-' -f2)
           export OUTPUT_NAME="sfweb_${GOOS}_${GOARCH}"
           export CGO_ENABLED=1
+          build_tags=""
+          if [[ "$GOOS" == linux ]]; then build_tags="osusergo"; fi
 
-          go build -ldflags "-s -w -X 'main.goVersion=$(go version)' -X 'main.gitHash=$(git show -s --format=%H)' -X 'main.buildTime=$(git show -s --format=%cd)'" -o "$OUTPUT_NAME" -v common/sfwebrunner/main.go
+          go build -tags "$build_tags" -ldflags "-s -w -X 'main.goVersion=$(go version)' -X 'main.gitHash=$(git show -s --format=%H)' -X 'main.buildTime=$(git show -s --format=%cd)'" -o "$OUTPUT_NAME" -v common/sfwebrunner/main.go
           ls -lh "$OUTPUT_NAME"
 
           echo "OUTPUT_NAME=$OUTPUT_NAME" >> "$GITHUB_ENV"

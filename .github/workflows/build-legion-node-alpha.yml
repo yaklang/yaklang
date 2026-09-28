@@ -136,7 +136,10 @@ jobs:
           export GOTOOLCHAIN=local
           mkdir -p dist/legion-node-portable
           binary="dist/legion-node-portable/${BINARY_NAME}"
+          build_tags=""
+          if [[ "$TARGET_OS" == linux ]]; then build_tags="osusergo"; fi
           CGO_ENABLED=1 GOOS="$TARGET_OS" GOARCH="$TARGET_ARCH" go build \
+            -tags "$build_tags" \
             -trimpath \
             -buildvcs=true \
             -ldflags '-s -w -buildid=' \
@@ -166,6 +169,7 @@ jobs:
             --arg source_sha "$SOURCE_SHA" \
             --arg go_version "$(go version)" \
             --arg target_os "$TARGET_OS" \
+            --arg build_tags "$build_tags" \
             --arg target_arch "$TARGET_ARCH" \
             --arg binary_name "$BINARY_NAME" \
             --arg binary_sha "$binary_sha" \
@@ -186,7 +190,7 @@ jobs:
                   goos: $target_os,
                   goarch: $target_arch,
                   cgo_enabled: true,
-                  build_tags: "",
+                  build_tags: $build_tags,
                   go_version: $go_version
                 },
                 capabilities: ["ssa.rule_sync.export", "yak.execute"],
