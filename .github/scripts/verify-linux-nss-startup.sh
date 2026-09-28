@@ -24,6 +24,7 @@ cp "$binary" "$fixture/binary"
 chmod 755 "$fixture/binary"
 printf 'println("NSS_STARTUP_OK")\n' >"$fixture/smoke.yak"
 sha256sum "$binary" >"$evidence/binary.sha256"
+go version -m "$binary" >"$evidence/build-info.txt"
 printf '%s\n' "$image" >"$evidence/image.txt"
 for scenario in files-nohome compat-home compat-nohome; do
   backend="${scenario%%-*}"
@@ -51,7 +52,9 @@ for scenario in files-nohome compat-home compat-nohome; do
     ' sh "$scenario" "$kind" >"$evidence/$scenario.log" 2>&1 || status=$?
   printf '%s exit=%s\n' "$scenario" "$status" | tee -a "$evidence/results.txt"
   if grep -Eq 'SIGABRT|Assertion .*failed|symbol lookup error|Segmentation fault' "$evidence/$scenario.log"; then
-    echo "libc/startup failure: $evidence/$scenario.log" >&2; exit 1
+    echo "libc/startup failure: $evidence/$scenario.log" >&2
+    tail -n 30 "$evidence/$scenario.log" >&2
+    exit 1
   fi
   if [[ "$kind" == node ]]; then
     # Deliberately stop after main, before any enrollment; exit 1 alone is not a pass.
@@ -63,4 +66,14 @@ for scenario in files-nohome compat-home compat-nohome; do
     grep -Fxq 'NSS_STARTUP_OK' "$evidence/$scenario.log"
   fi
 done
+# A compatible old libc may pass startup even without the intended build tag.
+# Check the artifact itself, not only the workflow source spelling.
+awk '
+  $1 == "build" && $2 ~ /^-tags=/ {
+    sub(/^-tags=/, "", $2)
+    count = split($2, tags, ",")
+    for (i = 1; i <= count; i++) if (tags[i] == "osusergo") found = 1
+  }
+  END { exit !found }
+' "$evidence/build-info.txt" || { echo 'artifact is missing osusergo' >&2; exit 1; }
 echo 'glibc 2.28 NSS startup regression passed (not registration/HIDS acceptance)'
