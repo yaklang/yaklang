@@ -75,11 +75,12 @@ func GetRAGCollectionInfoByID(db *gorm.DB, id int64) (*schema.VectorStoreCollect
 }
 
 func GetRAGDocumentByID(db *gorm.DB, name string, id string) (*schema.VectorStoreDocument, error) {
-	collection, err := GetRAGCollectionInfoByName(db, name)
-	if err != nil {
-		return nil, err
+	var doc schema.VectorStoreDocument
+	db = db.Where("document_id = ?", id).First(&doc)
+	if db.Error != nil {
+		return nil, db.Error
 	}
-	return GetRAGDocumentByCollectionIDAndKey(db, collection.ID, id)
+	return &doc, nil
 }
 
 func GetRAGDocumentsByCollectionNameAnd(db *gorm.DB, name string) ([]*schema.VectorStoreDocument, error) {
