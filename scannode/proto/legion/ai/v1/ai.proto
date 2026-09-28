@@ -2185,7 +2185,7 @@ message AITrafficReceipt {
   string phase = 3;
   string upload_sha256 = 4;
   bool durable = 5;
-  string storage_status = 6; // stored | quota_dropped
+  string storage_status = 6; // stored | quota_dropped | metadata_only (durable metadata, no packet bytes)
 }
 
 message DrainAITrafficCommand {

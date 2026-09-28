@@ -20051,7 +20051,7 @@ type AITrafficReceipt struct {
 	Phase           string                 `protobuf:"bytes,3,opt,name=phase,proto3" json:"phase,omitempty"`
 	UploadSha256    string                 `protobuf:"bytes,4,opt,name=upload_sha256,json=uploadSha256,proto3" json:"upload_sha256,omitempty"`
 	Durable         bool                   `protobuf:"varint,5,opt,name=durable,proto3" json:"durable,omitempty"`
-	StorageStatus   string                 `protobuf:"bytes,6,opt,name=storage_status,json=storageStatus,proto3" json:"storage_status,omitempty"` // stored | quota_dropped
+	StorageStatus   string                 `protobuf:"bytes,6,opt,name=storage_status,json=storageStatus,proto3" json:"storage_status,omitempty"` // stored | quota_dropped | metadata_only (durable metadata, no packet bytes)
 	unknownFields   protoimpl.UnknownFields
 	sizeCache       protoimpl.SizeCache
 }
