@@ -10,6 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 )
 
 func TestMUSTPASS_LoadCollectionWithInvalidGraphBinary(t *testing.T) {
@@ -183,4 +184,48 @@ func TestMUSTPASS_RecordNotFoundError(t *testing.T) {
 	assert.NoError(t, err, "should create new collection when record not found")
 	assert.True(t, HasCollection(testDB, collectionName), "collection should exist")
 	assert.NotNil(t, collectionMg, "collection should not be nil")
+}
+
+func TestMUSTPASS_GetDocumentIsolatedByCollection(t *testing.T) {
+	db, err := createTempTestDatabase()
+	require.NoError(t, err)
+	defer db.Close()
+	first, err := GetCollection(db, utils.RandStringBytes(12), WithEmbeddingClient(NewDefaultMockEmbedding()))
+	require.NoError(t, err)
+	second, err := GetCollection(db, utils.RandStringBytes(12), WithEmbeddingClient(NewDefaultMockEmbedding()))
+	require.NoError(t, err)
+	require.NoError(t, first.AddWithOptions("shared-id", "first collection"))
+	doc, exists, err := second.Get("shared-id")
+	require.NoError(t, err)
+	require.False(t, exists)
+	require.Nil(t, doc)
+	require.NoError(t, second.AddWithOptions("shared-id", "second collection"))
+	for _, tc := range []struct {
+		store   *SQLiteVectorStoreHNSW
+		content string
+	}{{first, "first collection"}, {second, "second collection"}} {
+		doc, exists, err := tc.store.Get("shared-id")
+		require.NoError(t, err)
+		require.True(t, exists)
+		require.Equal(t, tc.content, doc.Content)
+		stored, err := yakit.GetRAGDocumentByID(db, tc.store.collection.Name, "shared-id")
+		require.NoError(t, err)
+		require.Equal(t, tc.content, stored.Content)
+		var visited bool
+		results, err := tc.store.SearchWithFilter(tc.content, 1, 10, func(key string, getDoc func() *Document) bool {
+			visited = true
+			doc := getDoc()
+			require.NotNil(t, doc)
+			require.Equal(t, tc.content, doc.Content, "filter must see this collection's document")
+			return doc.Content == tc.content
+		})
+		require.NoError(t, err)
+		require.True(t, visited)
+		require.Len(t, results, 1)
+		require.Equal(t, tc.content, results[0].Document.Content)
+	}
+	require.NoError(t, db.Close())
+	_, exists, err = first.Get("shared-id")
+	require.Error(t, err, "database errors must not look like missing documents")
+	require.False(t, exists)
 }
