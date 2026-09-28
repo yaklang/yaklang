@@ -1,6 +1,7 @@
 package lowhttp
 
 import (
+	"bytes"
 	"context"
 	"github.com/yaklang/yaklang/common/utils/lowhttp/httpctx"
 	"sync"
@@ -68,19 +69,22 @@ func observeHTTPAttempt(tr *transportRequest) func(*transportResult, error) {
 		httpctx.SetResponseTooLargeHeaderFile(tr.reqIns, "")
 		httpctx.SetResponseTooLargeBodyFile(tr.reqIns, "")
 	}
-	event := HTTPAttempt{RuntimeID: tr.option.RuntimeId, ToolCallID: scoped.toolCallID, AgentID: scoped.agentID, StartedAt: time.Now(), HTTPS: tr.option.Https, Request: tr.packet}
+	event := HTTPAttempt{RuntimeID: tr.option.RuntimeId, ToolCallID: scoped.toolCallID, AgentID: scoped.agentID, StartedAt: time.Now(), HTTPS: tr.option.Https, Request: bytes.Clone(tr.packet)}
 	finish := scoped.observer(event)
 	return func(result *transportResult, err error) {
 		if finish == nil {
 			return
 		}
-		event.Request = tr.attemptRequestPacket
+		// Authentication and reconnect paths reuse transport buffers. Observers
+		// own immutable snapshots after the callback returns, not those buffers.
+		event.Request = bytes.Clone(tr.attemptRequestPacket)
 		event.FinishedAt = time.Now()
 		event.Error = err
-		event.Response = tr.attemptResponsePacket
+		response := tr.attemptResponsePacket
 		if result != nil && len(result.rawBytes) > 0 {
-			event.Response = result.rawBytes
+			response = result.rawBytes
 		}
+		event.Response = bytes.Clone(response)
 		if tr.reqIns != nil {
 			event.RequestHeaderFile = httpctx.GetRequestTooLargeHeaderFile(tr.reqIns)
 			event.RequestBodyFile = httpctx.GetRequestTooLargeBodyFile(tr.reqIns)

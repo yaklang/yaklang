@@ -119,10 +119,36 @@ func TestHTTPAttemptObserverSeparatesAuthenticationRetry(t *testing.T) {
 		t.Fatal("authentication failed")
 	}
 	if len(ends) != 2 || GetStatusCodeFromResponse(ends[0].Response) != 401 || GetStatusCodeFromResponse(ends[1].Response) != 200 {
-		t.Fatalf("challenge and retry were not independently captured: %d", len(ends))
+		var statuses []int
+		for _, end := range ends {
+			statuses = append(statuses, GetStatusCodeFromResponse(end.Response))
+		}
+		t.Fatalf("challenge and retry were not independently captured: count=%d statuses=%v", len(ends), statuses)
 	}
 	if strings.Contains(string(ends[0].Request), "Authorization:") || !strings.Contains(string(ends[1].Request), "Authorization:") {
 		t.Fatal("captured request did not match the actual authenticated retry")
+	}
+}
+
+func TestHTTPAttemptObserverOwnsPacketSnapshotsAcrossBufferReuse(t *testing.T) {
+	var started, ended HTTPAttempt
+	unbind := BindHTTPAttemptObserver(WithHTTPAttemptObserver(context.Background(), func(start HTTPAttempt) func(HTTPAttempt) {
+		started = start
+		return func(end HTTPAttempt) { ended = end }
+	}), "buffer-tool", "")
+	defer unbind()
+	request := []byte("GET /original HTTP/1.1\r\nHost: example.invalid\r\n\r\n")
+	response := []byte("HTTP/1.1 401 Unauthorized\r\nContent-Length: 0\r\n\r\n")
+	wantRequest, wantResponse := string(request), string(response)
+	tr := &transportRequest{option: &LowhttpExecConfig{RuntimeId: "buffer-tool"}, packet: request}
+	finish := observeHTTPAttempt(tr)
+	finish(&transportResult{rawBytes: response}, nil)
+	// bytes.Buffer.Reset retains its backing array. A later retry writing into
+	// it must not rewrite an already completed attempt (or its start packet).
+	copy(request, []byte("GET /replaced HTTP/1.1"))
+	copy(response, []byte("HTTP/1.1 200 OK          "))
+	if string(started.Request) != wantRequest || string(ended.Request) != wantRequest || string(ended.Response) != wantResponse {
+		t.Fatalf("transport buffer reuse rewrote captured evidence: start=%q request=%q response=%q", started.Request, ended.Request, ended.Response)
 	}
 }
 
