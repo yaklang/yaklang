@@ -3,6 +3,7 @@ package loop_ai_skill_audit
 import (
 	"bytes"
 	"fmt"
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon/promptloader"
 	"math"
 	"os"
 	"path/filepath"

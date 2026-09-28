@@ -3,6 +3,7 @@ package loop_http_fuzztest
 import (
 	"bytes"
 	"fmt"
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon/promptloader"
 	"regexp"
 	"strings"
 

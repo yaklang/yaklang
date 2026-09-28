@@ -2,19 +2,17 @@ package aicommon
 
 import (
 	"bytes"
-	_ "embed"
 	"encoding/json"
 	"fmt"
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon/promptloader"
 	"github.com/yaklang/yaklang/common/ai/aid/aiprojection"
 	"strings"
 	"text/template"
 )
 
-//go:embed prompts/timeline/compression.txt
-var timelineCompressionTemplate string
+var timelineCompressionTemplate = promptloader.MustLoad("ai/aid/aicommon/prompts/timeline/compression.txt")
 
-//go:embed prompts/timeline/compression.json
-var timelineCompressionSchema string
+var timelineCompressionSchema = promptloader.MustLoad("ai/aid/aicommon/prompts/timeline/compression.json")
 
 // renderCompressionSummaryPrompt renders one complete reduction request. Native
 // replay is historical data here, not messages to execute/project in this helper.

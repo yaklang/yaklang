@@ -2,6 +2,7 @@ package loop_http_fuzztest
 
 import (
 	"fmt"
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon/promptloader"
 	"html"
 	"sort"
 	"strings"

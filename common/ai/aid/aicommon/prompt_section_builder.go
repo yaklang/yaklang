@@ -97,11 +97,28 @@ func (b *PromptPrefixBuilder) AssemblePromptPrefix(materials *PromptMaterials) (
 	}
 	materials.FrozenPartitions = NormalizeFrozenBlockPartitions(materials.FrozenPartitions)
 
-	highStatic, err := RenderPromptTemplate(b.HighStaticTemplateName, b.HighStaticTemplate, materials.HighStaticData())
+	// Only the shared main-loop templates switch mode. Callers that replace a
+	// template (for example, tool-parameter generation) retain their override.
+	highStaticTemplate := b.HighStaticTemplate
+	frozenBlockTemplate := b.FrozenBlockTemplate
+	semiDynamic2Template := b.SemiDynamic2Template
+	if materials.FunctionCallMode {
+		if highStaticTemplate == SharedPlanAndExecHighStaticTemplate {
+			highStaticTemplate = SharedPlanAndExecHighStaticFunctionCallTemplate
+		}
+		if frozenBlockTemplate == SharedFrozenBlockTemplate {
+			frozenBlockTemplate = SharedFrozenBlockFunctionCallTemplate
+		}
+		if semiDynamic2Template == SharedTaskInstructionSchemaExampleTemplate {
+			semiDynamic2Template = SharedTaskInstructionFunctionCallTemplate
+		}
+	}
+
+	highStatic, err := RenderPromptTemplate(b.HighStaticTemplateName, highStaticTemplate, materials.HighStaticData())
 	if err != nil {
 		return nil, err
 	}
-	frozenBlock, err := RenderPromptTemplate(b.FrozenBlockTemplateName, b.FrozenBlockTemplate, materials.FrozenBlockData())
+	frozenBlock, err := RenderPromptTemplate(b.FrozenBlockTemplateName, frozenBlockTemplate, materials.FrozenBlockData())
 	if err != nil {
 		return nil, err
 	}
@@ -109,7 +126,7 @@ func (b *PromptPrefixBuilder) AssemblePromptPrefix(materials *PromptMaterials) (
 	if err != nil {
 		return nil, err
 	}
-	semiDynamic2, err := RenderPromptTemplate(b.SemiDynamic2TemplateName, b.SemiDynamic2Template, materials.SemiDynamic2Data())
+	semiDynamic2, err := RenderPromptTemplate(b.SemiDynamic2TemplateName, semiDynamic2Template, materials.SemiDynamic2Data())
 	if err != nil {
 		return nil, err
 	}

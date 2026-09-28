@@ -3,6 +3,7 @@ package loop_knowledge_enhance
 import (
 	"bytes"
 	"fmt"
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon/promptloader"
 	"os"
 	"path/filepath"
 	"strings"

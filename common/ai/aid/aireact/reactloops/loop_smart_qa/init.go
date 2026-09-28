@@ -3,6 +3,7 @@ package loop_smart_qa
 import (
 	"bytes"
 	"fmt"
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon/promptloader"
 	"strings"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"

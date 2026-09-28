@@ -2,6 +2,7 @@ package aireact
 
 import (
 	"fmt"
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon/promptloader"
 	"runtime"
 	"strings"
 	"time"
@@ -922,7 +923,7 @@ func (pm *PromptManager) renderHighStaticPreamble(materials *reactloops.PromptPr
 	if materials == nil {
 		return ""
 	}
-	rendered, err := aicommon.RenderPromptTemplate("loop-high-static-preamble", aicommon.SharedPlanAndExecHighStaticTemplate, materials.HighStaticData())
+	rendered, err := aicommon.RenderPromptTemplate("loop-high-static-preamble", aicommon.MainloopHighStaticTemplate(materials.FunctionCallMode), materials.HighStaticData())
 	if err != nil {
 		return ""
 	}
@@ -1131,7 +1132,7 @@ func renderInjectedMemoryBlock(nonce string, memory string) string {
 }
 
 func (pm *PromptManager) renderLoopHighStaticSection(materials *reactloops.PromptPrefixMaterials) (string, error) {
-	return aicommon.RenderPromptTemplate("loop-high-static", aicommon.SharedPlanAndExecHighStaticTemplate, materials.HighStaticData())
+	return aicommon.RenderPromptTemplate("loop-high-static", aicommon.MainloopHighStaticTemplate(materials.FunctionCallMode), materials.HighStaticData())
 }
 
 // renderLoopSemiDynamic1Section 渲染 P1.1 拆分后的 semi-dynamic 第一块:
@@ -1152,7 +1153,7 @@ func (pm *PromptManager) renderLoopSemiDynamic1Section(materials *reactloops.Pro
 //
 //	AI_CACHE_SEMI2 cc
 func (pm *PromptManager) renderLoopSemiDynamic2Section(materials *reactloops.PromptPrefixMaterials) (string, error) {
-	return aicommon.RenderPromptTemplate("loop-semi-dynamic-2", aicommon.SharedTaskInstructionSchemaExampleTemplate, materials.SemiDynamic2Data())
+	return aicommon.RenderPromptTemplate("loop-semi-dynamic-2", aicommon.MainloopSemiDynamic2Template(materials.FunctionCallMode), materials.SemiDynamic2Data())
 }
 
 // renderLoopFrozenBlockSection 渲染"按稳定性分层"路径下的 FrozenBlock 段
@@ -1160,7 +1161,7 @@ func (pm *PromptManager) renderLoopSemiDynamic2Section(materials *reactloops.Pro
 //
 // 关键词: renderLoopFrozenBlockSection, frozen_block_section.txt
 func (pm *PromptManager) renderLoopFrozenBlockSection(materials *reactloops.PromptPrefixMaterials) (string, error) {
-	return aicommon.RenderPromptTemplate("loop-frozen-block", aicommon.SharedFrozenBlockTemplate, materials.FrozenBlockData())
+	return aicommon.RenderPromptTemplate("loop-frozen-block", aicommon.MainloopFrozenBlockTemplate(materials.FunctionCallMode), materials.FrozenBlockData())
 }
 
 func (pm *PromptManager) renderLoopDynamicSection(data map[string]any) (string, error) {
