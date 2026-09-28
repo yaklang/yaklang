@@ -5451,6 +5451,9 @@ message Risk {
   string TagReason = 36;
   int64 FixTime = 37;
   string  FixSuggestion = 38;
+
+  // Persistent AI conversation that produced this risk (may span runtimes).
+  string AISessionID = 39;
 }
 
 message QueryRisksRequest {
