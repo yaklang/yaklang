@@ -258,8 +258,36 @@ func (r *ReActLoop) execOneCall(
 		return result
 	}
 	actionName := action.Name()
+	zhRunning, enRunning := actionStatusText(actionName)
+	label := statusNameForAction(actionName)
+	actionProgress := label.zh
+	actionProgressEn := label.en
+	if callCount > 1 {
+		suffix := fmt.Sprintf(" (%d/%d)", position+1, callCount)
+		actionProgress += suffix
+		actionProgressEn += suffix
+		zhRunning += suffix
+		enRunning += suffix
+	}
+	statusOptions := []aicommon.StatusOption{
+		aicommon.WithStatusDetail(fmt.Sprintf("动作 %s", actionName), fmt.Sprintf("Action %s", actionName)),
+		aicommon.WithStatusProgress(int64(position+1), int64(callCount), "action"),
+	}
+	defer func() {
+		switch {
+		case result.err != nil || result.result == loopActionsError:
+			r.UserStatus(fmt.Sprintf("%s失败", actionProgress), fmt.Sprintf("%s failed", actionProgressEn), append(statusOptions,
+				aicommon.WithStatusCode("action.failed"), aicommon.WithStatusState(aicommon.StatusStateError))...)
+		case result.skipPostIteration:
+			r.UserStatus(fmt.Sprintf("%s未通过检查，正在重新确认", actionProgress), fmt.Sprintf("%s was rejected; reconsidering", actionProgressEn), append(statusOptions,
+				aicommon.WithStatusCode("action.rejected"), aicommon.WithStatusState(aicommon.StatusStateRecovering))...)
+		case result.result != loopActionsAsync:
+			r.UserStatus(fmt.Sprintf("%s已完成", actionProgress), fmt.Sprintf("%s completed", actionProgressEn), append(statusOptions,
+				aicommon.WithStatusCode("action.completed"), aicommon.WithStatusState(aicommon.StatusStateSuccess))...)
+		}
+	}()
 	emitLoopActionEvent(eventSink, call, "started", "Executing action.")
-	r.UserStatus("正在执行下一步", "Executing the next step", aicommon.WithStatusCode("action.running"))
+	r.UserStatus(zhRunning, enRunning, append(statusOptions, aicommon.WithStatusCode("action.running"))...)
 	toolNames := extractToolNamesFromAction(action)
 	record := &ActionRecord{
 		ActionType: action.ActionType(), ActionName: actionName,
@@ -352,7 +380,6 @@ func (r *ReActLoop) execOneCall(
 	invoker.SetCurrentTask(task)
 	func() {
 		defer invoker.SetCurrentTask(previousTask)
-		r.UserStatus("正在执行下一步", "Executing the next step", aicommon.WithStatusCode("action.running"))
 		handler.ActionHandler(r, action, op)
 	}()
 	r.applyActionExecutionRecord(record, op)

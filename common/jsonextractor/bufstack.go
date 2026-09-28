@@ -122,27 +122,6 @@ func (m *bufStackManager) getParentPath() []string {
 	return parents
 }
 
-func (m *bufStackManager) getPrefixKey() []string { // get parent path and current path prefix key
-	prefix := m.getParentPath()
-
-	// 需要检查当前正在处理的键
-	if m.base != nil && m.base.currentStack != nil {
-		// 获取stack中的所有键，除了最后一个（当前正在处理的值）
-		size := m.base.currentStack.Len()
-		for i := 0; i < size-1; i++ {
-			if key := m.base.currentStack.PeekN(size - i); key != nil {
-				if keyStr, ok := key.(string); ok {
-					// 清理键名中的引号和空格
-					cleanKey := strings.Trim(strings.TrimSpace(keyStr), `"`)
-					prefix = append(prefix, cleanKey)
-				}
-			}
-		}
-	}
-
-	return prefix
-}
-
 func (m *bufStackManager) PushValue(v string) {
 	// 字符级流式写入现在在状态机中处理，这里不再写入
 	// 清理当前栈的字段写入器（如果有的话）

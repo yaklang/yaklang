@@ -3,6 +3,7 @@ package reactloops
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"strings"
 	"sync"
@@ -13,6 +14,7 @@ import (
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon/mock"
 	"github.com/yaklang/yaklang/common/ai/aispec"
+	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils/omap"
 )
 
@@ -208,6 +210,380 @@ func TestCallAILoopTransactionFunctionModeInterleavedCalls(t *testing.T) {
 	require.Len(t, response["tool_calls"], 2)
 	secondCall := response["tool_calls"].([]any)[1].(map[string]any)
 	require.Equal(t, "Check B", secondCall["description"])
+}
+
+func TestNativeFunctionCallStatusNamesAppearBeforeProviderFinishes(t *testing.T) {
+	var statusMu sync.Mutex
+	var statuses []aicommon.StatusPayload
+	var sawFirst, sawBatch bool
+	loop := newCallAILoopTransactionTestLoop(t, true, func(_ *aicommon.AIRequest, cfg *aispec.AIConfig) (*aicommon.AIResponse, error) {
+		resp := aicommon.NewAIResponse(nil)
+		cfg.ToolCallCallback([]*aispec.ToolCall{{Index: 0, Type: "function",
+			Function: aispec.FuncReturn{Name: nativeAdjustTodolistActionName}}})
+		statusMu.Lock()
+		sawFirst = len(statuses) > 0 && statuses[len(statuses)-1].Value == "正在准备调整待办事项"
+		statusMu.Unlock()
+		cfg.ToolCallCallback([]*aispec.ToolCall{{Index: 0, ID: "todo", Function: aispec.FuncReturn{Arguments: `{"todo_delta":{}`}}})
+		cfg.ToolCallCallback([]*aispec.ToolCall{{Index: 1, ID: "answer", Type: "function",
+			Function: aispec.FuncReturn{Name: "directly_answer", Arguments: `{"answer_payload":"你好"}`}}})
+		statusMu.Lock()
+		sawBatch = len(statuses) > 0 && statuses[len(statuses)-1].Code == "action.batch.preparing" &&
+			strings.Contains(statuses[len(statuses)-1].Value, "调整待办事项、回复用户")
+		statusMu.Unlock()
+		cfg.ToolCallCallback([]*aispec.ToolCall{{Index: 0, Function: aispec.FuncReturn{Arguments: `}`}}})
+		cfg.FinishReasonCallback("tool_calls", nil)
+		resp.Close()
+		return resp, nil
+	})
+	loop.actions.Set(nativeAdjustTodolistActionName, loopAction_AdjustTodolistNative)
+	loop.actions.Set("directly_answer", &LoopAction{ActionType: "directly_answer"})
+	loop.emitter = aicommon.NewEmitter("native-status-test", func(event *schema.AiOutputEvent) (*schema.AiOutputEvent, error) {
+		if event.NodeId == "status" {
+			var status aicommon.StatusPayload
+			if err := json.Unmarshal(event.Content, &status); err != nil {
+				return nil, err
+			}
+			statusMu.Lock()
+			statuses = append(statuses, status)
+			statusMu.Unlock()
+		}
+		return event, nil
+	})
+	calls, _, _, err := loop.callAILoopTransaction(&sync.WaitGroup{}, "prompt", "nonce", nil,
+		func(io.Reader, io.Reader) {}, func(_, _ string, description, arguments io.Reader) {
+			_, _ = io.Copy(io.Discard, description)
+			_, _ = io.Copy(io.Discard, arguments)
+		})
+	require.NoError(t, err)
+	require.Len(t, calls, 2)
+	require.True(t, sawFirst, "first action should be visible during argument generation")
+	require.True(t, sawBatch, "batch names should be visible before provider completion")
+	statusMu.Lock()
+	defer statusMu.Unlock()
+	var batchPreparing int
+	var localizedAction bool
+	for _, status := range statuses {
+		require.NotEqual(t, "正在梳理思路", status.Value)
+		if status.Value == "正在准备调整待办事项" {
+			require.NotNil(t, status.ValueI18n)
+			require.Equal(t, "Preparing: updating the task list", status.ValueI18n.En)
+			localizedAction = true
+		}
+		if status.Code == "action.batch.preparing" {
+			batchPreparing++
+		}
+	}
+	require.True(t, localizedAction)
+	require.Equal(t, 2, batchPreparing, "one update on discovery and one after validation")
+}
+
+func TestCallAILoopTransactionNativeArgumentsEmitDeclaredFields(t *testing.T) {
+	loop := newCallAILoopTransactionTestLoop(t, true, func(_ *aicommon.AIRequest, cfg *aispec.AIConfig) (*aicommon.AIResponse, error) {
+		resp := aicommon.NewAIResponse(nil)
+		cfg.ToolCallCallback([]*aispec.ToolCall{
+			{Index: 0, ID: "answer", Type: "function", Function: aispec.FuncReturn{Name: "directly_answer", Arguments: `{"identifier":"greet_reply","human_readable_thought":"planning","nested":{"answer_payload":"do not show"},"answer_payload":"你好，\n# 报告"}`}},
+			{Index: 1, ID: "status", Type: "function", Function: aispec.FuncReturn{Name: "status", Arguments: `{"status_payload":{"message":"ready"}}`}},
+		})
+		cfg.FinishReasonCallback("tool_calls", []byte(`{"finish_reason":"tool_calls"}`))
+		resp.Close()
+		return resp, nil
+	})
+	loop.SetCurrentTask(newMockSimpleTask("native-answer", "1"))
+	loop.streamFields = omap.NewEmptyOrderedMap[string, *LoopStreamField]()
+	loop.streamFields.Set("human_readable_thought", &LoopStreamField{FieldName: "human_readable_thought", AINodeId: "re-act-loop-thought"})
+	loop.actions.Set("directly_answer", &LoopAction{ActionType: "directly_answer", StreamFields: loopAction_DirectlyAnswer.StreamFields})
+	loop.actions.Set("status", &LoopAction{ActionType: "status", StreamFields: []*LoopStreamField{{
+		FieldName: "message", AINodeId: "native-status", Prefix: "state", ContentType: aicommon.TypeTextPlain,
+	}}})
+	var mu sync.Mutex
+	var events []*schema.AiOutputEvent
+	loop.emitter = aicommon.NewEmitter("native-fields", func(event *schema.AiOutputEvent) (*schema.AiOutputEvent, error) {
+		mu.Lock()
+		events = append(events, event)
+		mu.Unlock()
+		return event, nil
+	})
+	drain := func(a, b io.Reader) {
+		var wg sync.WaitGroup
+		wg.Add(2)
+		go func() { defer wg.Done(); _, _ = io.Copy(io.Discard, a) }()
+		go func() { defer wg.Done(); _, _ = io.Copy(io.Discard, b) }()
+		wg.Wait()
+	}
+	calls, _, _, err := loop.callAILoopTransaction(&sync.WaitGroup{}, "prompt", "nonce", nil,
+		drain, func(_, _ string, description, arguments io.Reader) { drain(description, arguments) })
+	require.NoError(t, err)
+	require.Len(t, calls, 2)
+	mu.Lock()
+	defer mu.Unlock()
+	var answer, status, thought string
+	var answerStarts, statusStarts, thoughtStarts int
+	for _, event := range events {
+		switch event.NodeId {
+		case "re-act-loop-answer-payload":
+			require.Equal(t, aicommon.TypeTextMarkdown, event.ContentType)
+			require.Equal(t, "answer_payload", event.VizSource)
+			require.Equal(t, "1", event.TaskIndex)
+			if event.Type == schema.EVENT_TYPE_STREAM_START {
+				answerStarts++
+			}
+			answer += string(event.StreamDelta)
+		case "native-status":
+			if event.Type == schema.EVENT_TYPE_STREAM_START {
+				statusStarts++
+			}
+			status += string(event.StreamDelta)
+		case "re-act-loop-thought":
+			require.Equal(t, "human_readable_thought", event.VizSource)
+			if event.Type == schema.EVENT_TYPE_STREAM_START {
+				thoughtStarts++
+			}
+			thought += string(event.StreamDelta)
+		}
+	}
+	require.Equal(t, 1, answerStarts)
+	require.Equal(t, "你好，\n# 报告", answer)
+	require.Equal(t, 1, statusStarts)
+	require.Equal(t, "state: ready", status)
+	require.Equal(t, 1, thoughtStarts)
+	require.Equal(t, "planning", thought)
+}
+
+func TestCallAILoopTransactionNativeRejectedArgumentsReportFailure(t *testing.T) {
+	loop := newCallAILoopTransactionTestLoop(t, true, func(_ *aicommon.AIRequest, cfg *aispec.AIConfig) (*aicommon.AIResponse, error) {
+		resp := aicommon.NewAIResponse(nil)
+		cfg.ToolCallCallback([]*aispec.ToolCall{{Index: 0, ID: "answer", Type: "function",
+			Function: aispec.FuncReturn{Name: "directly_answer", Arguments: `{"answer_payload":"candidate answer"}`}}})
+		cfg.FinishReasonCallback("tool_calls", []byte(`{"finish_reason":"tool_calls"}`))
+		resp.Close()
+		return resp, nil
+	})
+	loop.actions.Set("directly_answer", &LoopAction{ActionType: "directly_answer",
+		StreamFields:   loopAction_DirectlyAnswer.StreamFields,
+		ActionVerifier: func(*ReActLoop, *aicommon.Action) error { return fmt.Errorf("rejected") },
+	})
+	var mu sync.Mutex
+	var events []*schema.AiOutputEvent
+	loop.emitter = aicommon.NewEmitter("native-rejected", func(event *schema.AiOutputEvent) (*schema.AiOutputEvent, error) {
+		mu.Lock()
+		events = append(events, event)
+		mu.Unlock()
+		return event, nil
+	})
+	drain := func(a, b io.Reader) {
+		var wg sync.WaitGroup
+		wg.Add(2)
+		go func() { defer wg.Done(); _, _ = io.Copy(io.Discard, a) }()
+		go func() { defer wg.Done(); _, _ = io.Copy(io.Discard, b) }()
+		wg.Wait()
+	}
+	_, _, _, err := loop.callAILoopTransaction(&sync.WaitGroup{}, "prompt", "nonce", nil,
+		drain, func(_, _ string, description, arguments io.Reader) { drain(description, arguments) })
+	require.ErrorContains(t, err, "rejected")
+	mu.Lock()
+	defer mu.Unlock()
+	var failureStatus bool
+	for _, event := range events {
+		if event.NodeId == "status" && strings.Contains(string(event.Content), `"code":"action.failed"`) {
+			failureStatus = true
+		}
+		require.NotEqual(t, schema.EVENT_TYPE_RESULT, event.Type)
+	}
+	require.True(t, failureStatus)
+}
+
+func TestCallAILoopTransactionNativeArgumentsStreamBeforeFinish(t *testing.T) {
+	firstDelta := make(chan string, 1)
+	loop := newCallAILoopTransactionTestLoop(t, true, func(_ *aicommon.AIRequest, cfg *aispec.AIConfig) (*aicommon.AIResponse, error) {
+		resp := aicommon.NewAIResponse(nil)
+		cfg.ToolCallCallback([]*aispec.ToolCall{{Index: 0, ID: "answer", Type: "function",
+			Function: aispec.FuncReturn{Name: "directly_answer", Arguments: `{"answer_payload":"first `}}})
+		select {
+		case got := <-firstDelta:
+			require.Equal(t, "first", got)
+		case <-time.After(2 * time.Second):
+			t.Error("first argument fragment was not emitted before the provider finished")
+		}
+		cfg.ToolCallCallback([]*aispec.ToolCall{{Index: 0, ID: "answer",
+			Function: aispec.FuncReturn{Arguments: `second"}`}}})
+		cfg.FinishReasonCallback("tool_calls", []byte(`{"finish_reason":"tool_calls"}`))
+		resp.Close()
+		return resp, nil
+	})
+	loop.SetCurrentTask(newMockSimpleTask("native-progressive", "1"))
+	loop.actions.Set("directly_answer", &LoopAction{ActionType: "directly_answer", StreamFields: loopAction_DirectlyAnswer.StreamFields})
+	var mu sync.Mutex
+	var events []*schema.AiOutputEvent
+	loop.emitter = aicommon.NewEmitter("native-progressive", func(event *schema.AiOutputEvent) (*schema.AiOutputEvent, error) {
+		mu.Lock()
+		events = append(events, event)
+		mu.Unlock()
+		if event.NodeId == "re-act-loop-answer-payload" && event.Type == schema.EVENT_TYPE_STREAM {
+			select {
+			case firstDelta <- string(event.StreamDelta):
+			default:
+			}
+		}
+		return event, nil
+	})
+	drain := func(a, b io.Reader) {
+		var wg sync.WaitGroup
+		wg.Add(2)
+		go func() { defer wg.Done(); _, _ = io.Copy(io.Discard, a) }()
+		go func() { defer wg.Done(); _, _ = io.Copy(io.Discard, b) }()
+		wg.Wait()
+	}
+	_, _, _, err := loop.callAILoopTransaction(&sync.WaitGroup{}, "prompt", "nonce", nil,
+		drain, func(_, _ string, description, arguments io.Reader) { drain(description, arguments) })
+	require.NoError(t, err)
+	mu.Lock()
+	defer mu.Unlock()
+	var answer string
+	var deltas, finishes int
+	for _, event := range events {
+		if event.NodeId == "re-act-loop-answer-payload" && event.Type == schema.EVENT_TYPE_STREAM {
+			answer += string(event.StreamDelta)
+			deltas++
+		}
+		if event.NodeId == "stream-finished" && strings.Contains(string(event.Content), `"node_id":"re-act-loop-answer-payload"`) {
+			finishes++
+		}
+	}
+	require.Equal(t, "first second", answer)
+	require.GreaterOrEqual(t, deltas, 2)
+	require.Equal(t, 1, finishes)
+}
+
+func TestCallAILoopTransactionNativeArgumentsFragmentedEscapesMatchAcceptedAction(t *testing.T) {
+	const arguments = `{"answer_payload":"\u4f60\u597d\n# \"quoted\" \\ path \ud83d\ude00"}`
+	const expected = "你好\n# \"quoted\" \\ path 😀"
+	loop := newCallAILoopTransactionTestLoop(t, true, func(_ *aicommon.AIRequest, cfg *aispec.AIConfig) (*aicommon.AIResponse, error) {
+		resp := aicommon.NewAIResponse(nil)
+		// Split even inside escapes and Unicode surrogate pairs, as providers
+		// can choose arbitrary tool-call argument chunk boundaries.
+		for i := 0; i < len(arguments); i++ {
+			delta := &aispec.ToolCall{Index: 0, ID: "answer", Function: aispec.FuncReturn{Arguments: arguments[i : i+1]}}
+			if i == 0 {
+				delta.Type = "function"
+				delta.Function.Name = "directly_answer"
+			}
+			cfg.ToolCallCallback([]*aispec.ToolCall{delta})
+		}
+		cfg.FinishReasonCallback("tool_calls", nil)
+		resp.Close()
+		return resp, nil
+	})
+	var verified string
+	loop.actions.Set("directly_answer", &LoopAction{ActionType: "directly_answer",
+		StreamFields: loopAction_DirectlyAnswer.StreamFields,
+		ActionVerifier: func(_ *ReActLoop, action *aicommon.Action) error {
+			verified = action.GetString("answer_payload")
+			return nil
+		},
+	})
+	var mu sync.Mutex
+	var events []*schema.AiOutputEvent
+	loop.emitter = aicommon.NewEmitter("native-fragmented", func(event *schema.AiOutputEvent) (*schema.AiOutputEvent, error) {
+		mu.Lock()
+		events = append(events, event)
+		mu.Unlock()
+		return event, nil
+	})
+	drain := func(a, b io.Reader) {
+		var wg sync.WaitGroup
+		wg.Add(2)
+		go func() { defer wg.Done(); _, _ = io.Copy(io.Discard, a) }()
+		go func() { defer wg.Done(); _, _ = io.Copy(io.Discard, b) }()
+		wg.Wait()
+	}
+	calls, _, _, err := loop.callAILoopTransaction(&sync.WaitGroup{}, "prompt", "nonce", nil,
+		drain, func(_, _ string, description, arguments io.Reader) { drain(description, arguments) })
+	require.NoError(t, err)
+	require.Len(t, calls, 1)
+	require.Equal(t, expected, verified)
+	require.Equal(t, expected, calls[0].Action.GetString("answer_payload"))
+	mu.Lock()
+	defer mu.Unlock()
+	var displayed string
+	var starts, finishes int
+	for _, event := range events {
+		if event.NodeId == "re-act-loop-answer-payload" {
+			require.Equal(t, aicommon.TypeTextMarkdown, event.ContentType)
+			require.Equal(t, "answer_payload", event.VizSource)
+			if event.Type == schema.EVENT_TYPE_STREAM_START {
+				starts++
+			}
+			if event.Type == schema.EVENT_TYPE_STREAM {
+				displayed += string(event.StreamDelta)
+			}
+		}
+		if event.NodeId == "stream-finished" && strings.Contains(string(event.Content), `"node_id":"re-act-loop-answer-payload"`) {
+			finishes++
+		}
+	}
+	require.Equal(t, expected, displayed)
+	require.Equal(t, 1, starts)
+	require.Equal(t, 1, finishes)
+}
+
+func TestCallAILoopTransactionNativeArgumentsRejectDuplicateVisibleField(t *testing.T) {
+	loop := newCallAILoopTransactionTestLoop(t, true, func(_ *aicommon.AIRequest, cfg *aispec.AIConfig) (*aicommon.AIResponse, error) {
+		resp := aicommon.NewAIResponse(nil)
+		cfg.ToolCallCallback([]*aispec.ToolCall{{Index: 0, ID: "answer", Type: "function",
+			Function: aispec.FuncReturn{Name: "directly_answer", Arguments: `{"answer_payload":"first","answer_payload":"second"}`}}})
+		cfg.FinishReasonCallback("tool_calls", nil)
+		resp.Close()
+		return resp, nil
+	})
+	loop.actions.Set("directly_answer", &LoopAction{ActionType: "directly_answer", StreamFields: loopAction_DirectlyAnswer.StreamFields})
+	drain := func(a, b io.Reader) {
+		var wg sync.WaitGroup
+		wg.Add(2)
+		go func() { defer wg.Done(); _, _ = io.Copy(io.Discard, a) }()
+		go func() { defer wg.Done(); _, _ = io.Copy(io.Discard, b) }()
+		wg.Wait()
+	}
+	calls, _, _, err := loop.callAILoopTransaction(&sync.WaitGroup{}, "prompt", "nonce", nil,
+		drain, func(_, _ string, description, arguments io.Reader) { drain(description, arguments) })
+	require.ErrorContains(t, err, `duplicate top-level native argument "answer_payload"`)
+	require.Empty(t, calls, "the action must not execute with a different value from its displayed field")
+}
+
+func TestCallAILoopTransactionNativeArgumentsDoNotDisplayUnadvertisedAction(t *testing.T) {
+	loop := newCallAILoopTransactionTestLoop(t, true, func(_ *aicommon.AIRequest, cfg *aispec.AIConfig) (*aicommon.AIResponse, error) {
+		resp := aicommon.NewAIResponse(nil)
+		cfg.ToolCallCallback([]*aispec.ToolCall{{Index: 0, ID: "answer", Type: "function",
+			Function: aispec.FuncReturn{Name: "directly_answer", Arguments: `{"answer_payload":"unadvertised"}`}}})
+		cfg.FinishReasonCallback("tool_calls", nil)
+		resp.Close()
+		return resp, nil
+	})
+	loop.lastNativeActionNames = []string{"finish"}
+	loop.actions.Set("directly_answer", &LoopAction{ActionType: "directly_answer", StreamFields: loopAction_DirectlyAnswer.StreamFields})
+	var mu sync.Mutex
+	var displayed bool
+	loop.emitter = aicommon.NewEmitter("native-unadvertised", func(event *schema.AiOutputEvent) (*schema.AiOutputEvent, error) {
+		if event.NodeId == "re-act-loop-answer-payload" {
+			mu.Lock()
+			displayed = true
+			mu.Unlock()
+		}
+		return event, nil
+	})
+	drain := func(a, b io.Reader) {
+		var wg sync.WaitGroup
+		wg.Add(2)
+		go func() { defer wg.Done(); _, _ = io.Copy(io.Discard, a) }()
+		go func() { defer wg.Done(); _, _ = io.Copy(io.Discard, b) }()
+		wg.Wait()
+	}
+	calls, _, _, err := loop.callAILoopTransaction(&sync.WaitGroup{}, "prompt", "nonce", nil,
+		drain, func(_, _ string, description, arguments io.Reader) { drain(description, arguments) })
+	require.ErrorContains(t, err, "native function was not advertised")
+	require.Empty(t, calls)
+	mu.Lock()
+	defer mu.Unlock()
+	require.False(t, displayed)
 }
 
 func TestCallAILoopTransactionNativeTodoAdjustmentGuardsAnswer(t *testing.T) {

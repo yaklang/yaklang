@@ -156,7 +156,7 @@ func directlyCallToolBatchSchemaOption() aitool.ToolOption {
 		aitool.WithStringParam("expectations",
 			aitool.WithParam_Description("可选。该 child 调用的预计耗时和回退策略。")),
 		aitool.WithStringParam("reason",
-			aitool.WithParam_Description("可选。用简短短语说明该 child 调用具体做什么。")),
+			aitool.WithParam_Description("可选。直接展示在该工具卡片上；用简短短语说明这个 child 具体做什么，同名工具的不同调用也要分别描述，不能照搬整批任务的理由。")),
 	)
 }
 
@@ -177,7 +177,7 @@ func requireToolBatchSchemaOption() aitool.ToolOption {
 		aitool.WithStringParam("identifier",
 			aitool.WithParam_Description("可选。该 child 调用的唯一 snake_case 目的标识。")),
 		aitool.WithStringParam("reason",
-			aitool.WithParam_Description("可选。用简短短语说明该 child 调用具体做什么。")),
+			aitool.WithParam_Description("可选。直接展示在该工具卡片上；用简短短语说明这个 child 具体做什么，同名工具的不同调用也要分别描述。")),
 	)
 }
 
@@ -424,19 +424,14 @@ func parseDirectToolBatchActionWithMetadata(loop *reactloops.ReActLoop, action *
 		})
 	}
 	if allowMetadata {
-		var parentReason string
 		if raw, exists := lookupCanonicalActionParam(action, "directly_call_reason"); exists {
-			var err error
-			parentReason, err = strictBatchString(aitool.InvokeParams{"directly_call_reason": raw}, "directly_call_reason", false)
-			if err != nil {
+			if _, err := strictBatchString(aitool.InvokeParams{"directly_call_reason": raw}, "directly_call_reason", false); err != nil {
 				return nil, true, err
 			}
 		}
-		for i := range request.Calls {
-			if request.Calls[i].Reason == "" {
-				request.Calls[i].Reason = parentReason
-			}
-		}
+		// Accept the old top-level field for compatibility, but never turn a
+		// batch-wide reason into each child's visible reason. A missing child
+		// reason is generated with that child's identifier as context.
 	}
 	return request, true, nil
 }
@@ -537,6 +532,7 @@ func executeVerifiedToolBatch(
 		toolNames = append(toolNames, call.ToolName)
 	}
 	emitToolsPreparingStatus(loop, toolNames)
+	emitToolBatchRunningStatus(loop, toolNames)
 	batchRuntime, supported := invoker.(aicommon.ToolBatchInvokeRuntime)
 	var (
 		result *aicommon.ToolBatchResult

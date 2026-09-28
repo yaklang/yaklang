@@ -92,6 +92,21 @@ func emitToolsPreparingStatus(loop *reactloops.ReActLoop, names []string) {
 	)
 }
 
+func emitToolBatchRunningStatus(loop *reactloops.ReActLoop, names []string) {
+	tools := buildStatusTools(loop, names, aicommon.StatusStateRunning)
+	if len(tools) == 0 {
+		return
+	}
+	reactloops.EmitStatusI18n(
+		loop,
+		fmt.Sprintf("正在批量执行 %d 个工具：%s", len(tools), statusToolNames(tools, false)),
+		fmt.Sprintf("Running %d tools: %s", len(tools), statusToolNames(tools, true)),
+		aicommon.WithStatusCode("tool.batch.running"),
+		aicommon.WithStatusProgress(0, int64(len(tools)), "tool"),
+		aicommon.WithStatusTools(tools...),
+	)
+}
+
 func buildToolBatchResultTools(
 	loop *reactloops.ReActLoop,
 	request *aicommon.ToolBatchRequest,

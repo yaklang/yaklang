@@ -2,6 +2,7 @@ package reactloops
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"strings"
 	"sync"
@@ -12,6 +13,7 @@ import (
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon/mock"
 	"github.com/yaklang/yaklang/common/ai/aid/aiprojection"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
+	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 )
 
@@ -74,6 +76,17 @@ func actionExecutionTestCall(index int, id, name string, handler LoopActionHandl
 
 func TestExecuteFunctionCallActionsSerialAndProjectsOneAssistantManyTools(t *testing.T) {
 	loop, invoker, task := newActionExecutionTestLoop(t)
+	var statuses []aicommon.StatusPayload
+	loop.emitter = aicommon.NewEmitter("action-status-test", func(event *schema.AiOutputEvent) (*schema.AiOutputEvent, error) {
+		if event.NodeId == "status" {
+			var status aicommon.StatusPayload
+			if err := json.Unmarshal(event.Content, &status); err != nil {
+				return nil, err
+			}
+			statuses = append(statuses, status)
+		}
+		return event, nil
+	})
 	var order []string
 	calls := []LoopCall{
 		actionExecutionTestCall(0, "call_a", "accept", func(_ *ReActLoop, _ *aicommon.Action, op *LoopActionHandlerOperator) {
@@ -94,6 +107,15 @@ func TestExecuteFunctionCallActionsSerialAndProjectsOneAssistantManyTools(t *tes
 	require.NoError(t, result.err)
 	require.Equal(t, loopActionsContinue, result.result)
 	require.Equal(t, []string{"a", "b"}, order)
+	require.Len(t, statuses, 4)
+	require.Equal(t, "action.running", statuses[0].Code)
+	require.Equal(t, "正在执行「accept」动作 (1/2)", statuses[0].Value)
+	require.Equal(t, &aicommon.StatusProgress{Current: 1, Total: 2, Unit: "action"}, statuses[0].Progress)
+	require.Equal(t, "action.completed", statuses[1].Code)
+	require.Equal(t, "action.running", statuses[2].Code)
+	require.Equal(t, "正在执行「inspect」动作 (2/2)", statuses[2].Value)
+	require.Equal(t, &aicommon.StatusProgress{Current: 2, Total: 2, Unit: "action"}, statuses[2].Progress)
+	require.Equal(t, "action.completed", statuses[3].Code)
 	require.Len(t, loop.actionHistory, 2)
 	require.Contains(t, result.operator.GetFeedback().String(), "feedback A")
 	require.Contains(t, result.operator.GetFeedback().String(), "feedback B")
