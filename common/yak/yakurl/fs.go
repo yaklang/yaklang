@@ -228,9 +228,24 @@ func (f *fileSystemAction) fileInfoToResource(originParam *ypb.YakURL, query url
 	return src
 }
 
+// readDir lists rawPath. With diffOnly=true on an fs that supports the
+// last-diff-only view (ProgramFileSystem), incremental programs list only
+// their own last diff layer; everything else lists normally.
+func (f fileSystemAction) readDir(rawPath string, backend fi.FileSystem, absPath string, query url.Values) ([]fs.DirEntry, error) {
+	if getBoolQueryValue(query, "diffOnly") {
+		if dfs, ok := backend.(interface {
+			ReadDirDiffOnly(string) ([]fs.DirEntry, error)
+		}); ok {
+			return dfs.ReadDirDiffOnly(absPath)
+		}
+	}
+	return backend.ReadDir(absPath)
+}
+
 func (f fileSystemAction) Get(params *ypb.RequestYakURLParams) (*ypb.RequestYakURLResponse, error) {
 	// available query:
 	// op=list # list directory
+	// diffOnly=true # list an incremental program with only its last diff layer (default aggregate view otherwise)
 	// op=search&keyword=xxx # search file content
 	// global=true # recursively search subdirectories
 	// regex=true # treat keyword as a Go regular expression
@@ -258,7 +273,7 @@ func (f fileSystemAction) Get(params *ypb.RequestYakURLParams) (*ypb.RequestYakU
 	switch query.Get("op") {
 	case "list":
 		if info.IsDir() {
-			infos, err := fs.ReadDir(absPath)
+			infos, err := f.readDir(params.GetUrl().Path, fs, absPath, query)
 			if err != nil {
 				return nil, utils.Wrapf(err, "cannot read dir[%s]", u.GetPath())
 			}
