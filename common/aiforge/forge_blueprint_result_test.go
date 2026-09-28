@@ -4,8 +4,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"strings"
 	"testing"
+	"testing/iotest"
 	"time"
 
 	"github.com/stretchr/testify/require"
@@ -169,4 +171,30 @@ func newForgeResultTestCoordinator(t *testing.T, blueprint *ForgeBlueprint, call
 	require.NoError(t, err)
 	require.NotNil(t, coordinator.ResultHandler)
 	return coordinator
+}
+
+func TestForgeResultPreservesPartialReadFailure(t *testing.T) {
+	failure := errors.New("result stream interrupted")
+	for _, retry := range []bool{false, true} {
+		t.Run(fmt.Sprintf("retry=%t", retry), func(t *testing.T) {
+			calls := 0
+			read := func(string) (string, error) {
+				calls++
+				return readForgeResult(io.MultiReader(strings.NewReader("partial report"), iotest.ErrReader(failure)))
+			}
+			var result string
+			var err error
+			if retry {
+				result, err = retryEmptyForgeResult("report", read)
+			} else {
+				result, err = read("report")
+			}
+			require.Equal(t, "partial report", result)
+			require.ErrorIs(t, err, failure)
+			require.Equal(t, 1, calls, "read errors must not trigger empty-output retries")
+		})
+	}
+	result, err := readForgeResult(strings.NewReader("complete report"))
+	require.NoError(t, err)
+	require.Equal(t, "complete report", result)
 }

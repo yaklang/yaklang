@@ -279,34 +279,7 @@ func (f *ForgeBlueprint) GenerateFirstPromptWithMemoryOption(
 		return "", nil, utils.Errorf("render persistent prompt failed: %v", err)
 	}
 
-	var opts []aicommon.ConfigOption
-	_ = persistentPrompt
-	if persistentPrompt != "" {
-		opts = append(opts, aicommon.WithAppendPersistentContext(persistentPrompt))
-	}
-
-	if len(f.Tools) > 0 {
-		opts = append(opts, aicommon.WithTools(f.Tools...))
-	}
-
-	if f.PlanMocker != nil {
-		opts = append(opts, aid.WithPlanMocker(f.PlanMocker))
-	}
-
-	opts = append(opts, f.AIOptions...)
-	if f.ResultPrompt != "" && f.ResultHandler != nil {
-		opts = append(opts, aid.WithResultHandler(func(cod *aid.Coordinator) {
-			prompt, err := f.renderResultPrompt(cod.ContextProvider)
-			if err != nil {
-				f.ResultHandler("", utils.Errorf("render result prompt failed: %v", err))
-				return
-			}
-			result, err := f.generateResult(cod, prompt)
-			f.ResultHandler(result, err)
-		}))
-	}
-
-	return initPrompt, opts, nil
+	return initPrompt, f.coordinatorOptions(persistentPrompt, f.renderResultPrompt), nil
 }
 
 func (f *ForgeBlueprint) GenerateFirstPromptWithMemoryOptionWithQuery(
@@ -334,6 +307,15 @@ func (f *ForgeBlueprint) GenerateFirstPromptWithMemoryOptionWithQueryAndParams(
 		return "", nil, utils.Errorf("render persistent prompt failed: %v", err)
 	}
 
+	return initPrompt, f.coordinatorOptions(persistentPrompt, f.renderValidatedResultPrompt), nil
+}
+
+// Keep option ordering shared while each entrypoint retains its own rendering
+// and parameter-validation boundary.
+func (f *ForgeBlueprint) coordinatorOptions(
+	persistentPrompt string,
+	renderResult func(*aid.PromptContextProvider) (string, error),
+) []aicommon.ConfigOption {
 	var opts []aicommon.ConfigOption
 	if persistentPrompt != "" {
 		opts = append(opts, aicommon.WithAppendPersistentContext(persistentPrompt))
@@ -347,16 +329,16 @@ func (f *ForgeBlueprint) GenerateFirstPromptWithMemoryOptionWithQueryAndParams(
 	opts = append(opts, f.AIOptions...)
 	if f.ResultPrompt != "" && f.ResultHandler != nil {
 		opts = append(opts, aid.WithResultHandler(func(cod *aid.Coordinator) {
-			prompt, renderErr := f.renderValidatedResultPrompt(cod.ContextProvider)
-			if renderErr != nil {
-				f.ResultHandler("", utils.Errorf("render result prompt failed: %v", renderErr))
+			prompt, err := renderResult(cod.ContextProvider)
+			if err != nil {
+				f.ResultHandler("", utils.Errorf("render result prompt failed: %v", err))
 				return
 			}
 			result, err := f.generateResult(cod, prompt)
 			f.ResultHandler(result, err)
 		}))
 	}
-	return initPrompt, opts, nil
+	return opts
 }
 
 func cliParam2grpc(params []*information.CliParameter) []*ypb.YakScriptParam {
@@ -439,16 +421,21 @@ func (f *ForgeBlueprint) generateResult(cod *aid.Coordinator, prompt string) (st
 		if err != nil {
 			return "", utils.Errorf("render result failed: %v", err)
 		}
-		raw, err := io.ReadAll(rsp.GetOutputStreamReader("forge", true, config.GetEmitter()))
-		if err != nil && err != io.EOF {
-			return "", err
-		}
-		return string(raw), nil
+		return readForgeResult(rsp.GetOutputStreamReader("forge", true, config.GetEmitter()))
 	}
 	if f.ResultPolicy.RetryEmptyOutput {
 		return retryEmptyForgeResult(prompt, call)
 	}
 	return call(prompt)
+}
+
+// Preserve partial output alongside read failures for legacy ResultHandler callers.
+func readForgeResult(reader io.Reader) (string, error) {
+	raw, err := io.ReadAll(reader)
+	if err == io.EOF {
+		err = nil
+	}
+	return string(raw), err
 }
 
 // A caller can opt into one retry when a model consumes its entire response in
@@ -457,7 +444,7 @@ func retryEmptyForgeResult(prompt string, call func(string) (string, error)) (st
 	for attempt := 0; attempt < 2; attempt++ {
 		result, err := call(prompt)
 		if err != nil {
-			return "", err
+			return result, err
 		}
 		if strings.TrimSpace(result) != "" {
 			return result, nil

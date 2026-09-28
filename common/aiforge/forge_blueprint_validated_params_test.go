@@ -1,6 +1,8 @@
 package aiforge
 
 import (
+	"github.com/stretchr/testify/require"
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"strings"
 	"testing"
 
@@ -83,5 +85,34 @@ func TestGenerateFirstPromptWithQueryRetainsLegacyCLIValidation(t *testing.T) {
 	}
 	if !strings.Contains(prompt, "legacy query") {
 		t.Fatalf("legacy query was not rendered through CLI parameters: %q", prompt)
+	}
+}
+
+func TestForgeEntrypointsPreserveOptionOrder(t *testing.T) {
+	for _, validated := range []bool{false, true} {
+		t.Run(map[bool]string{false: "legacy", true: "validated"}[validated], func(t *testing.T) {
+			blueprint := &ForgeBlueprint{
+				InitializePrompt: "Analyze supplied data",
+				PersistentPrompt: "base context",
+				AIOptions: []aicommon.ConfigOption{func(config *aicommon.Config) error {
+					require.Equal(t, []string{"base context"}, config.PersistentMemory)
+					config.PersistentMemory = append(config.PersistentMemory, "caller context")
+					return nil
+				}},
+			}
+			var opts []aicommon.ConfigOption
+			var err error
+			if validated {
+				_, opts, err = blueprint.GenerateFirstPromptWithMemoryOptionWithQueryAndParams("query", nil)
+			} else {
+				_, opts, err = blueprint.GenerateFirstPromptWithMemoryOption(nil)
+			}
+			require.NoError(t, err)
+			config := &aicommon.Config{}
+			for _, opt := range opts {
+				require.NoError(t, opt(config))
+			}
+			require.Equal(t, []string{"base context", "caller context"}, config.PersistentMemory)
+		})
 	}
 }
