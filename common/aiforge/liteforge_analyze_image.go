@@ -2,7 +2,6 @@ package aiforge
 
 import (
 	"fmt"
-	"github.com/yaklang/yaklang/common/ai/aid/aicommon/promptloader"
 	"os"
 	"strings"
 

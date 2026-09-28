@@ -3,7 +3,6 @@ package aimem
 import (
 	"context"
 	"fmt"
-	"github.com/yaklang/yaklang/common/ai/aid/aicommon/promptloader"
 	"time"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
