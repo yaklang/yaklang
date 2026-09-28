@@ -340,9 +340,6 @@ func (s *SessionPromptState) GetVerificationTodoRendered(currentScope Verificati
 	s.m.RLock()
 	defer s.m.RUnlock()
 	store := UnmarshalVerificationTodoStore(s.todoJSON)
-	if store.IsEmpty() {
-		return ""
-	}
 	return store.RenderWithCurrentScope(currentScope)
 }
 

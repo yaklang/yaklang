@@ -88,14 +88,14 @@ func TestSplit_TaskReviewPrompt_FourSections(t *testing.T) {
 
 	require.Equal(t, sec1[aiprojection.SectionHighStatic][0].Hash, sec2[aiprojection.SectionHighStatic][0].Hash,
 		"task-review high-static hash must be byte-stable across calls")
-	require.Contains(t, prompt1, "<|AI_CACHE_FROZEN_semi-dynamic|>")
+	require.Contains(t, prompt1, aiprojection.CreateTemplate("<|AI_CACHE_FROZEN_semi-dynamic|>"))
 	require.Contains(t, prompt1, "# Tool Inventory")
 	require.NotContains(t, prompt1, "You have access to 0 built-in tools")
 	require.Contains(t, prompt1, "frozen task review timeline")
-	require.Contains(t, prompt1, "<|PROMPT_SECTION_timeline-open|>")
+	require.Contains(t, prompt1, aiprojection.CreateTemplate("<|PROMPT_SECTION_timeline-open|>"))
 	require.Contains(t, prompt1, "open task review timeline")
-	frozenEnd := strings.Index(prompt1, "<|AI_CACHE_FROZEN_END_semi-dynamic|>")
-	openStart := strings.Index(prompt1, "<|PROMPT_SECTION_timeline-open|>")
+	frozenEnd := strings.Index(prompt1, aiprojection.CreateTemplate("<|AI_CACHE_FROZEN_END_semi-dynamic|>"))
+	openStart := strings.Index(prompt1, aiprojection.CreateTemplate("<|PROMPT_SECTION_timeline-open|>"))
 	require.Greater(t, frozenEnd, 0)
 	require.Greater(t, openStart, frozenEnd, "frozen timeline must be outside and before timeline-open")
 }

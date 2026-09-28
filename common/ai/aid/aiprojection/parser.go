@@ -50,6 +50,28 @@ func (p *ParsedPrompt) Sections() *ProjectionSections {
 // Parse produces the common input for cache observation and request projection.
 // Malformed or untagged prompts retain their original bytes as a raw chunk.
 func Parse(prompt string) *ParsedPrompt {
+	// Parse also reads historical unsigned dumps for offline cache analysis.
+	// Live requests MUST pass through ProjectAndObserve's nonce gate.
+	if prepared, found := prepareProjection(prompt, projectionNonce); found {
+		parsed := parseCanonical(prepared)
+		parsed.sections.escaped = true
+		return parsed
+	}
+	parsed := parseCanonical(prompt)
+	parsed.sections.legacy = true
+	return parsed
+}
+
+// parseForProjection has no unsigned compatibility fallback. Legacy dump
+// analysis may recognize old boundaries, but cannot authorize live splitting.
+func parseForProjection(prompt string) *ParsedPrompt {
+	prepared, _ := prepareProjection(prompt, projectionNonce)
+	parsed := parseCanonical(prepared)
+	parsed.sections.escaped = true
+	return parsed
+}
+
+func parseCanonical(prompt string) *ParsedPrompt {
 	parsed := &ParsedPrompt{
 		sections: &ProjectionSections{Original: prompt, parsed: true},
 		cacheSplit: &PromptSplit{

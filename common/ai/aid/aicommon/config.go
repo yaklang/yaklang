@@ -3842,6 +3842,16 @@ func (c *Config) CreateOrUpdateRuntimeRecord(runtime *schema.AIAgentRuntime) err
 	return nil
 }
 
+// GetConfiguredWorkDir returns the configured artifacts path without creating it.
+func (c *Config) GetConfiguredWorkDir() string {
+	c.workDirMu.RLock()
+	defer c.workDirMu.RUnlock()
+	if c.workDir != "" {
+		return c.workDir
+	}
+	return c.Workdir
+}
+
 // IsWorkDirReady checks if the working directory has been created
 func (c *Config) IsWorkDirReady() bool {
 	c.workDirMu.RLock()

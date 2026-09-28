@@ -7,13 +7,15 @@ import (
 )
 
 // ChatBaseHijackResult lets a pre-send hook observe a request and optionally
-// replace its messages. ChatBase sends Messages when IsHijacked is true and
-// Messages is nonempty; otherwise it keeps the caller's request shape.
+// replace its messages and add tools. ChatBase applies the result when
+// IsHijacked is true and Messages is nonempty.
 type ChatBaseHijackResult struct {
 	// IsHijacked marks whether this hook replaces the outgoing messages.
 	IsHijacked bool
 	// Messages is the provider-visible message list when IsHijacked is true.
 	Messages []ChatDetail
+	// Tools contains function definitions projected from trusted prompt tags.
+	Tools []Tool
 	// CorrelationID is copied to ChatUsage.MirrorCorrelationID, allowing debug
 	// dumps and upstream token usage to be joined by request.
 	CorrelationID string

@@ -212,6 +212,7 @@ func isInsideReasoningReplayContainer(input string, markerStart int) bool {
 		fixedNonce string
 	}{
 		{openPrefix: "<|TIMELINE_b"},
+		{openPrefix: "<|TIMELINE_f"},
 		{openPrefix: "<|TIMELINE_RECENT|>", fixedNonce: "RECENT"},
 	} {
 		searchFrom := 0
@@ -235,7 +236,7 @@ func isInsideReasoningReplayContainer(input string, markerStart int) bool {
 				}
 				openEnd = openStart + relativeEnd + len("|>")
 				nonce = input[openStart+len("<|TIMELINE_") : openStart+relativeEnd]
-				if !isReasoningReplayNonce(nonce) || !strings.HasPrefix(nonce, "b") {
+				if !isReasoningReplayNonce(nonce) || !(strings.HasPrefix(nonce, "b") || strings.HasPrefix(nonce, "f")) {
 					continue
 				}
 			}

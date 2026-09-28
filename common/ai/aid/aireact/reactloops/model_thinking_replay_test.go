@@ -3,6 +3,7 @@ package reactloops
 import (
 	"context"
 	"encoding/json"
+	"github.com/yaklang/yaklang/common/ai/aid/aiprojection"
 	"io"
 	"strings"
 	"testing"
@@ -40,7 +41,7 @@ func TestBuildModelThinkingReplayProjection(t *testing.T) {
 		` {"@action":"finish"} `,
 	)
 	require.NoError(t, err)
-	require.Contains(t, projection, "<|TIMELINE_MODEL_THINKING_V1_turnbadnonce1|>")
+	require.Contains(t, projection, "<|TIMELINE_MODEL_THINKING_V1_turnbadnonce1_"+aiprojection.Nonce()+"|>")
 	result, err := aitag.SplitViaTAG(projection, timelineModelThinkingReplayTagName)
 	require.NoError(t, err)
 	require.Len(t, result.GetTaggedBlocks(), 1)

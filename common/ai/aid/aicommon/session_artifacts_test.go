@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
+	"github.com/yaklang/yaklang/common/ai/aid/aiprojection"
 )
 
 func writeArtifactFile(t *testing.T, root string, rel string, body string, mod time.Time) {
@@ -169,12 +170,15 @@ func TestSessionArtifactsAreNotRenderedByPromptTemplates(t *testing.T) {
 	require.NoError(t, err)
 	open, err := RenderPromptTemplate("test-open-artifacts", SharedTimelineOpenTemplate, materials.TimelineOpenData())
 	require.NoError(t, err)
+	semi, err := RenderPromptTemplate("test-semi-artifacts", SharedSemiDynamic1Template, materials.SemiDynamic1Data())
+	require.NoError(t, err)
 
 	require.NotContains(t, frozen, "Session Artifacts")
 	require.NotContains(t, frozen, "task_1-1_done")
 	require.NotContains(t, open, "Session Artifacts")
 	require.NotContains(t, open, "task_1-2_open")
-	require.Contains(t, open, "# Workspace Context")
+	require.NotContains(t, open, "# Workspace Context")
+	require.Contains(t, semi, "# Workspace Context")
 }
 
 func TestPromptTimelineAfterCompression_KeepsSixthAndSingleHead(t *testing.T) {
@@ -277,7 +281,7 @@ func TestPromptTimelineAfterCompression_KeepsSixthAndSingleHead(t *testing.T) {
 	require.Contains(t, prompt, summaryMarker1)
 	require.Contains(t, prompt, recentMarker)
 	require.NotContains(t, prompt, oldMarker)
-	require.Contains(t, prompt, "<|PROMPT_SECTION_timeline-open|>")
+	require.Contains(t, prompt, aiprojection.CreateTemplate("<|PROMPT_SECTION_timeline-open|>"))
 }
 
 func TestPromptTimelineAfterCompression_SecondCompressionRollsHeadAndHistory(t *testing.T) {

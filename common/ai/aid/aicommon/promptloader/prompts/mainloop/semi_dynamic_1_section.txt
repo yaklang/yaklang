@@ -1,4 +1,6 @@
-{{ if .SkillsContext }}{{ .SkillsContext }}{{ end }}
+{{ if .WorkspaceContext }}{{ .WorkspaceContext }}
+
+{{ end }}{{ if .SkillsContext }}{{ .SkillsContext }}{{ end }}
 {{ if .PromotedSemiDynamic1 }}
 
 {{ .PromotedSemiDynamic1 }}{{ end }}

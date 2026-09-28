@@ -6,6 +6,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/ai/rag/vectorstore"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/schema"
@@ -29,7 +30,7 @@ func TestNewKnowledgeBase(t *testing.T) {
 	// 创建临时数据库
 	path := filepath.Join(consts.GetDefaultYakitBaseTempDir(), uuid.New().String())
 	db, err := vectorstore.NewVectorStoreDatabase(path)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer db.Close()
 
 	// 创建知识库，使用 mock 嵌入器
@@ -42,14 +43,14 @@ func TestNewKnowledgeBase(t *testing.T) {
 		vectorstore.WithModelDimension(3),
 		vectorstore.WithEmbeddingClient(vectorstore.NewMockEmbedder(testEmbedder)),
 	)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.NotNil(t, kb)
 
 	// 验证 KnowledgeBaseInfo 被创建
-	kbInfo, err := LoadKnowledgeBase(db, "test-kb-with-info")
-	assert.NoError(t, err)
+	kbInfo, err := LoadKnowledgeBase(db, "test-kb-with-info", vectorstore.WithEmbeddingClient(vectorstore.NewMockEmbedder(testEmbedder)))
+	require.NoError(t, err)
 	info, err := kbInfo.GetInfo()
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, "test-kb-with-info", info.KnowledgeBaseName)
 	assert.Equal(t, "测试知识库", info.KnowledgeBaseDescription)
 	assert.Equal(t, "test", info.KnowledgeBaseType)
@@ -65,14 +66,14 @@ func TestNewKnowledgeBase(t *testing.T) {
 		"不应该被使用的类型",
 		vectorstore.WithEmbeddingClient(vectorstore.NewMockEmbedder(testEmbedder)),
 	)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.NotNil(t, kb2)
 
 	// 验证数据库中的信息没有被更新
-	kbInfo2, err := LoadKnowledgeBase(db, "test-kb-with-info")
-	assert.NoError(t, err)
+	kbInfo2, err := LoadKnowledgeBase(db, "test-kb-with-info", vectorstore.WithEmbeddingClient(vectorstore.NewMockEmbedder(testEmbedder)))
+	require.NoError(t, err)
 	info2, err := kbInfo2.GetInfo()
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, "测试知识库", info2.KnowledgeBaseDescription) // 应该还是原来的描述
 }
 
@@ -81,7 +82,7 @@ func TestCreateKnowledgeBase(t *testing.T) {
 	// 创建临时数据库
 	path := filepath.Join(consts.GetDefaultYakitBaseTempDir(), uuid.New().String())
 	db, err := vectorstore.NewVectorStoreDatabase(path)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer db.Close()
 
 	// 创建全新知识库
@@ -94,12 +95,12 @@ func TestCreateKnowledgeBase(t *testing.T) {
 		vectorstore.WithModelDimension(3),
 		vectorstore.WithEmbeddingClient(vectorstore.NewMockEmbedder(testEmbedder)),
 	)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.NotNil(t, kb)
 
 	// 验证创建成功
-	kbInfo, err := LoadKnowledgeBase(db, "new-kb")
-	assert.NoError(t, err)
+	kbInfo, err := LoadKnowledgeBase(db, "new-kb", vectorstore.WithEmbeddingClient(vectorstore.NewMockEmbedder(testEmbedder)))
+	require.NoError(t, err)
 	assert.Equal(t, "new-kb", kbInfo.name)
 
 	// 再次尝试创建同名知识库，应该失败
@@ -120,7 +121,7 @@ func TestLoadKnowledgeBase(t *testing.T) {
 	// 创建临时数据库
 	path := filepath.Join(consts.GetDefaultYakitBaseTempDir(), uuid.New().String())
 	db, err := vectorstore.NewVectorStoreDatabase(path)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer db.Close()
 
 	// 先创建一个知识库
@@ -133,7 +134,7 @@ func TestLoadKnowledgeBase(t *testing.T) {
 		vectorstore.WithModelDimension(3),
 		vectorstore.WithEmbeddingClient(vectorstore.NewMockEmbedder(testEmbedder)),
 	)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.NotNil(t, kb1)
 
 	// 加载已存在的知识库
@@ -142,7 +143,7 @@ func TestLoadKnowledgeBase(t *testing.T) {
 		"load-test-kb",
 		vectorstore.WithEmbeddingClient(vectorstore.NewMockEmbedder(testEmbedder)),
 	)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.NotNil(t, kb2)
 	assert.Equal(t, "load-test-kb", kb2.GetName())
 
@@ -150,7 +151,7 @@ func TestLoadKnowledgeBase(t *testing.T) {
 	kb3, err := LoadKnowledgeBase(db, "non-existent-kb")
 	assert.Error(t, err)
 	assert.Nil(t, kb3)
-	assert.Contains(t, err.Error(), "不存在")
+	assert.Contains(t, err.Error(), "record not found")
 }
 
 // TestKnowledgeBaseOperations 测试知识库的基本操作
@@ -158,7 +159,7 @@ func TestKnowledgeBaseOperations(t *testing.T) {
 	// 创建临时数据库
 	path := filepath.Join(consts.GetDefaultYakitBaseTempDir(), uuid.New().String())
 	db, err := vectorstore.NewVectorStoreDatabase(path)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer db.Close()
 
 	// 创建知识库
@@ -171,7 +172,7 @@ func TestKnowledgeBaseOperations(t *testing.T) {
 		vectorstore.WithModelDimension(3),
 		vectorstore.WithEmbeddingClient(vectorstore.NewMockEmbedder(testEmbedder)),
 	)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// 添加知识条目
 	entry := &schema.KnowledgeBaseEntry{
@@ -187,22 +188,22 @@ func TestKnowledgeBaseOperations(t *testing.T) {
 	}
 
 	err = kb.AddKnowledgeEntry(entry)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// 搜索知识条目
 	results, err := kb.SearchKnowledgeEntries("测试", 5)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.True(t, len(results) > 0)
 	assert.Equal(t, "测试知识条目", results[0].KnowledgeTitle)
 
 	// 获取知识条目列表
 	entries, err := kb.ListKnowledgeEntries("", 1, 10)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.True(t, len(entries) > 0)
 
 	// 获取同步状态
 	status, err := kb.GetSyncStatus()
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.True(t, status.InSync)
 	assert.Equal(t, 1, status.DatabaseEntries)
 	assert.Equal(t, 1, status.RAGDocuments)
@@ -213,7 +214,7 @@ func TestAddLargeDocument(t *testing.T) {
 	// 创建临时数据库
 	db, err := utils.CreateTempTestDatabaseInMemory()
 	db.AutoMigrate(&schema.KnowledgeBaseEntry{}, &schema.KnowledgeBaseInfo{}, &schema.VectorStoreCollection{}, &schema.VectorStoreDocument{})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer db.Close()
 
 	// 创建知识库
@@ -224,8 +225,9 @@ func TestAddLargeDocument(t *testing.T) {
 		"large-doc",
 		vectorstore.WithEmbeddingModel("mock-model"),
 		vectorstore.WithModelDimension(3),
+		vectorstore.WithEmbeddingClient(vectorstore.NewMockEmbedder(testEmbedder)),
 	)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.NotNil(t, kb)
 
 	// 添加一个超大文档
@@ -242,7 +244,7 @@ func TestAddLargeDocument(t *testing.T) {
 	}
 
 	err = kb.AddKnowledgeEntry(doc)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	doc2 := &schema.KnowledgeBaseEntry{
 		KnowledgeBaseID:    1,
@@ -257,9 +259,9 @@ func TestAddLargeDocument(t *testing.T) {
 	}
 
 	err = kb.AddKnowledgeEntry(doc2)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	results, err := kb.SearchKnowledgeEntries("检索增强", 2)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Len(t, results, 2)
 }

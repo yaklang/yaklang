@@ -5,6 +5,9 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"strings"
+
+	"github.com/google/uuid"
 
 	"github.com/yaklang/gorm"
 	"github.com/yaklang/yaklang/common/ai/rag/vectorstore"
@@ -12,6 +15,11 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/bizhelper"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
+)
+
+const (
+	knowledgeBaseMagicV1 = "YAKKNOWLEDGEBASE"
+	knowledgeBaseMagicV2 = "YAKKNOWLEDGEBAS2"
 )
 
 type ExportKnowledgeBaseOptions struct {
@@ -25,7 +33,8 @@ type ExportKnowledgeBaseOptions struct {
 
 func ExportKnowledgeBase(ctx context.Context, db *gorm.DB, opts *ExportKnowledgeBaseOptions) (io.Reader, error) {
 	var buf bytes.Buffer
-	buf.WriteString("YAKKNOWLEDGEBASE")
+	// V2 preserves entry identity, which vector documents use for lookup.
+	buf.WriteString(knowledgeBaseMagicV2)
 
 	// 进度回调辅助函数
 	reportProgress := func(percent float64, message string, messageType string) {
@@ -99,6 +108,9 @@ func ExportKnowledgeBase(ctx context.Context, db *gorm.DB, opts *ExportKnowledge
 			}
 			if err := writeEntryToBinary(&buf, entry); err != nil {
 				return nil, utils.Wrap(err, "write knowledge base entry")
+			}
+			if err := pbWriteBytes(&buf, []byte(entry.HiddenIndex)); err != nil {
+				return nil, utils.Wrap(err, "write knowledge entry identity")
 			}
 			processedEntries++
 
@@ -244,7 +256,8 @@ func ImportKnowledgeBase(ctx context.Context, db *gorm.DB, reader io.Reader, opt
 	if _, err := io.ReadFull(reader, magic); err != nil {
 		return utils.Wrap(err, "read magic header")
 	}
-	if string(magic) != "YAKKNOWLEDGEBASE" {
+	version2 := string(magic) == knowledgeBaseMagicV2
+	if !version2 && string(magic) != knowledgeBaseMagicV1 {
 		return utils.Error("invalid magic header")
 	}
 
@@ -323,12 +336,23 @@ func ImportKnowledgeBase(ctx context.Context, db *gorm.DB, reader io.Reader, opt
 
 	reportProgress(20, fmt.Sprintf("知识库信息处理完成，开始导入 %d 个条目", entryCount), "info")
 
+	// Keep vector references consistent when importing a second copy or when
+	// an entry handler assigns a new identity.
+	entryIdentities := make(map[string]string)
 	// 逐个读取并创建知识库条目
 	for i := uint64(0); i < entryCount; i++ {
 		entry, err := readEntryFromBinary(reader)
 		if err != nil {
 			return utils.Wrap(err, "read knowledge base entry")
 		}
+		if version2 {
+			identity, err := consumeBytes(reader)
+			if err != nil {
+				return utils.Wrap(err, "read knowledge entry identity")
+			}
+			entry.HiddenIndex = string(identity)
+		}
+		originalIdentity := entry.HiddenIndex
 		entry.KnowledgeBaseID = int64(kbInfo.ID)
 
 		if opts.ImportKnowledgeBaseEntryHandler != nil {
@@ -338,8 +362,21 @@ func ImportKnowledgeBase(ctx context.Context, db *gorm.DB, reader io.Reader, opt
 			}
 			entry = &newEntry
 		}
+		if entry.HiddenIndex != "" {
+			var count int
+			if err := db.Unscoped().Model(&schema.KnowledgeBaseEntry{}).Where("hidden_index = ?", entry.HiddenIndex).Count(&count).Error; err != nil {
+				return utils.Wrap(err, "check knowledge entry identity")
+			}
+			if count > 0 {
+				entry.HiddenIndex = uuid.NewString()
+			}
+		}
 		if err := yakit.CreateKnowledgeBaseEntry(db, entry); err != nil {
 			return utils.Wrap(err, "create knowledge base entry")
+		}
+
+		if originalIdentity != "" && originalIdentity != entry.HiddenIndex {
+			entryIdentities[originalIdentity] = entry.HiddenIndex
 		}
 
 		// 每处理10个条目或最后一个条目报告进度
@@ -366,7 +403,30 @@ func ImportKnowledgeBase(ctx context.Context, db *gorm.DB, reader io.Reader, opt
 			vectorstore.WithImportExportDB(db),
 			vectorstore.WithOverwriteExisting(opts.OverwriteExisting),
 			vectorstore.WithCollectionName(finalKbName),
-			vectorstore.WithDocumentHandler(opts.ImportRAGDocumentHandler),
+			vectorstore.WithDocumentHandler(func(doc schema.VectorStoreDocument) (schema.VectorStoreDocument, error) {
+				for oldID, newID := range entryIdentities {
+					if doc.DocumentID == oldID || strings.HasPrefix(doc.DocumentID, oldID+"_question_") {
+						doc.DocumentID = newID + strings.TrimPrefix(doc.DocumentID, oldID)
+						doc.UID = vectorstore.GetLazyNodeUIDByMd5(finalKbName, doc.DocumentID)
+						break
+					}
+				}
+				if doc.Metadata != nil {
+					if oldID, ok := doc.Metadata[schema.META_Data_UUID].(string); ok {
+						if newID, changed := entryIdentities[oldID]; changed {
+							doc.Metadata[schema.META_Data_UUID] = newID
+						}
+					}
+					if _, ok := doc.Metadata["knowledge_base_id"]; ok {
+						doc.Metadata["knowledge_base_id"] = int64(kbInfo.ID)
+					}
+				}
+				if opts.ImportRAGDocumentHandler != nil {
+					return opts.ImportRAGDocumentHandler(doc)
+				}
+				return doc, nil
+			}),
+			vectorstore.WithRebuildHNSWIndex(len(entryIdentities) > 0),
 			vectorstore.WithRAGID(opts.RAGID),
 			vectorstore.WithProgressHandler(func(percent float64, message string, messageType string) {
 				ragProgress := 75 + (percent/100)*15

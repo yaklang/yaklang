@@ -72,6 +72,21 @@ func TestExpandReasoningReplayMessagesStringOrdering(t *testing.T) {
 	}
 }
 
+func TestExpandReasoningReplayMessagesFrozenTimeline(t *testing.T) {
+	tag := buildReasoningReplayTag(t, "frozen1", "reason", `{"@action":"finish"}`)
+	result := expandReasoningReplayMessages(&aispec.ChatBaseHijackResult{
+		IsHijacked: true,
+		Messages: []aispec.ChatDetail{
+			aispec.NewSystemChatDetail("system"),
+			aispec.NewUserChatDetail("<|TIMELINE_f1t1786870800|>\n" + tag + "\nobservation\n<|TIMELINE_END_f1t1786870800|>"),
+		},
+	})
+	require.Len(t, result.Messages, 4)
+	require.Equal(t, "assistant", result.Messages[2].Role)
+	require.Equal(t, "reason", result.Messages[2].ReasoningContent)
+	require.Contains(t, messageText(t, result.Messages[3]), "observation")
+}
+
 func TestExpandReasoningReplayMessagesChatContentPreservesCacheControl(t *testing.T) {
 	tag := buildReasoningReplayTag(t, "cc1", "cache-reason", `{"@action":"finish"}`)
 	cacheControl := map[string]any{"type": "ephemeral"}

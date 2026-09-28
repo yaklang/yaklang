@@ -271,7 +271,6 @@ func processAIResponse(r []byte, closer io.ReadCloser, outWriter io.Writer, reas
 		utils.CallGeneralClose(outWriter)
 		utils.CallGeneralClose(toolCallArgumentsWriter)
 	}()
-
 	// Publish terminal metadata before stream EOF; usage retains its after-EOF timing.
 	defer func() {
 		if len(finishReasonCallback) > 0 && finishReasonCallback[0] != nil {
@@ -409,9 +408,10 @@ func processAIResponse(r []byte, closer io.ReadCloser, outWriter io.Writer, reas
 									}
 								}
 								tc := &ToolCall{
-									Index: index,
-									ID:    utils.MapGetString(toolcallMap, "id"),
-									Type:  utils.MapGetString(toolcallMap, "type"),
+									Index:       index,
+									ID:          utils.MapGetString(toolcallMap, "id"),
+									Type:        utils.MapGetString(toolcallMap, "type"),
+									Description: responseToolCallDescription(toolcallMap, funcMap),
 									Function: FuncReturn{
 										Name:      name,
 										Arguments: utils.MapGetString(funcMap, "arguments"),
@@ -534,7 +534,7 @@ func processAIResponse(r []byte, closer io.ReadCloser, outWriter io.Writer, reas
 							name := utils.MapGetString(funcMap, "name")
 							args := utils.MapGetString(funcMap, "arguments")
 							// In streaming, tool_calls come incrementally - we may only have partial data
-							if name == "" && args == "" {
+							if name == "" && args == "" && utils.MapGetString(toolcallMap, "id") == "" && responseToolCallDescription(toolcallMap, funcMap) == "" {
 								continue
 							}
 							// Extract index from response, default to array position if not present
@@ -547,9 +547,10 @@ func processAIResponse(r []byte, closer io.ReadCloser, outWriter io.Writer, reas
 								}
 							}
 							tc := &ToolCall{
-								Index: index,
-								ID:    utils.MapGetString(toolcallMap, "id"),
-								Type:  utils.MapGetString(toolcallMap, "type"),
+								Index:       index,
+								ID:          utils.MapGetString(toolcallMap, "id"),
+								Type:        utils.MapGetString(toolcallMap, "type"),
+								Description: responseToolCallDescription(toolcallMap, funcMap),
 								Function: FuncReturn{
 									Name:      name,
 									Arguments: args,
@@ -725,7 +726,6 @@ func processAIResponseForResponses(r []byte, closer io.ReadCloser, outWriter io.
 		utils.CallGeneralClose(outWriter)
 		utils.CallGeneralClose(toolCallArgumentsWriter)
 	}()
-
 	// Publish terminal metadata before stream EOF; usage retains its after-EOF timing.
 	defer func() {
 		if len(finishReasonCallback) > 0 && finishReasonCallback[0] != nil {
@@ -1065,7 +1065,7 @@ func handleResponsesOutputItem(item map[string]any, outputIndex int, eventType s
 			reasonWriter.Write([]byte(reason))
 		}
 	case "function_call":
-		tc := parseResponsesFunctionCall(item, utils.InterfaceToInt(item["output_index"]))
+		tc := parseResponsesFunctionCall(item, outputIndex)
 		if tc == nil {
 			return
 		}
@@ -1080,10 +1080,18 @@ func handleResponsesOutputItem(item map[string]any, outputIndex int, eventType s
 		if tc.Function.Name != "" {
 			streamTC.Function.Name = tc.Function.Name
 		}
+		if tc.Description != "" {
+			streamTC.Description = tc.Description
+		}
 		if tc.Function.Arguments != "" {
 			streamTC.Function.Arguments = tc.Function.Arguments
 		}
 		if eventType != "response.output_item.done" {
+			if toolCallCallback != nil {
+				metadata := streamTC.Clone()
+				metadata.Function.Arguments = ""
+				toolCallCallback([]*ToolCall{metadata})
+			}
 			return
 		}
 		// If this item's arguments were already streamed incrementally via
@@ -1095,6 +1103,11 @@ func handleResponsesOutputItem(item map[string]any, outputIndex int, eventType s
 		// only upstreams), preserving the legacy completed-event path.
 		// 关键词: output_item.done 跳过已流式, 避免全量重发双重累积
 		if toolState.streamedArgsIDs[toolState.buildKey(itemID, tc.Index)] {
+			if toolCallCallback != nil {
+				metadata := streamTC.Clone()
+				metadata.Function.Arguments = ""
+				toolCallCallback([]*ToolCall{metadata})
+			}
 			return
 		}
 		if toolCallCallback != nil {
@@ -1229,9 +1242,10 @@ func parseResponsesFunctionCall(item map[string]any, defaultIndex int) *ToolCall
 		id = utils.MapGetString(item, "id")
 	}
 	return &ToolCall{
-		Index: index,
-		ID:    id,
-		Type:  "function",
+		Index:       index,
+		ID:          id,
+		Type:        "function",
+		Description: responseToolCallDescription(item, nil),
 		Function: FuncReturn{
 			Name:      name,
 			Arguments: args,
@@ -1250,6 +1264,26 @@ func providerResponsePayload(header, body []byte) []byte {
 	// actually received, so incomplete metadata cannot be fabricated from framing.
 	payload, _ := io.ReadAll(httputil.NewChunkedReader(bytes.NewReader(body)))
 	return payload
+}
+
+func responseToolCallDescription(call, function map[string]any) string {
+	for _, source := range []map[string]any{call, function} {
+		for _, key := range []string{"description", "title", "summary"} {
+			if value, ok := source[key].(string); ok && value != "" {
+				return value
+			}
+			var parts []string
+			for _, raw := range utils.InterfaceToSliceInterface(source[key]) {
+				if text := utils.MapGetString(utils.InterfaceToGeneralMap(raw), "text"); text != "" {
+					parts = append(parts, text)
+				}
+			}
+			if len(parts) > 0 {
+				return strings.Join(parts, "\n")
+			}
+		}
+	}
+	return ""
 }
 
 // chatCompletionFinishReason reads the terminal choice from either a JSON

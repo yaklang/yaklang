@@ -89,14 +89,12 @@ func (pm *PromptManager) GetLoopPromptBaseMaterialsForLoop(
 	}
 
 	materials := &reactloops.LoopPromptBaseMaterials{
-		Nonce:       nonce,
-		Language:    pm.react.config.GetLanguage(),
-		CurrentTime: time.Now().Format("2006-01-02 15:04:05"),
-		OSArch:      fmt.Sprintf("%s/%s", runtime.GOOS, runtime.GOARCH),
-		WorkingDir:  pm.workdir,
-	}
-	if pm.workdir != "" {
-		materials.WorkingDirGlance = pm.GetGlanceWorkdir(pm.workdir)
+		Nonce:          nonce,
+		Language:       pm.react.config.GetLanguage(),
+		CurrentTime:    time.Now().Format("2006-01-02 15:04:05"),
+		OSArch:         fmt.Sprintf("%s/%s", runtime.GOOS, runtime.GOARCH),
+		WorkingDir:     pm.workdir,
+		AIArtifactsDir: pm.react.config.GetConfiguredWorkDir(),
 	}
 
 	taskType := "react"
@@ -180,6 +178,7 @@ func (pm *PromptManager) AssembleLoopPrompt(tools []*aitool.Tool, input *reactlo
 	}
 
 	prefixMaterials := pm.NewPromptMaterials(base, effectiveInput)
+	prefixMaterials.CurrentTime = ""
 	prefix, err := pm.AssemblePromptPrefix(prefixMaterials)
 	if err != nil {
 		return nil, err
@@ -311,8 +310,8 @@ func (pm *PromptManager) NewPromptMaterials(base *reactloops.LoopPromptBaseMater
 		materials.CurrentTime = base.CurrentTime
 		materials.OSArch = base.OSArch
 		materials.WorkingDir = base.WorkingDir
-		materials.WorkingDirGlance = base.WorkingDirGlance
-		materials.Workspace = strings.TrimSpace(base.OSArch+base.WorkingDir+base.WorkingDirGlance) != ""
+		materials.AIArtifactsDir = base.AIArtifactsDir
+		materials.Workspace = strings.TrimSpace(base.OSArch+base.WorkingDir+base.AIArtifactsDir) != ""
 	}
 	if pm != nil && pm.react != nil && pm.react.config != nil {
 		materials.ExecutionPolicy = pm.react.config.GetExecutionPolicy()
@@ -438,7 +437,7 @@ func (pm *PromptManager) buildLoopPromptSectionData(base *reactloops.LoopPromptB
 		"CurrentTime":        "",
 		"OSArch":             "",
 		"WorkingDir":         "",
-		"WorkingDirGlance":   "",
+		"AIArtifactsDir":     "",
 		"Workspace":          false,
 		"AutoContext":        "",
 		"UserHistory":        "",
@@ -459,8 +458,8 @@ func (pm *PromptManager) buildLoopPromptSectionData(base *reactloops.LoopPromptB
 		data["CurrentTime"] = base.CurrentTime
 		data["OSArch"] = base.OSArch
 		data["WorkingDir"] = base.WorkingDir
-		data["WorkingDirGlance"] = base.WorkingDirGlance
-		data["Workspace"] = strings.TrimSpace(base.OSArch+base.WorkingDir+base.WorkingDirGlance) != ""
+		data["AIArtifactsDir"] = base.AIArtifactsDir
+		data["Workspace"] = strings.TrimSpace(base.OSArch+base.WorkingDir+base.AIArtifactsDir) != ""
 		data["AutoContext"] = base.AutoContext
 		data["UserHistory"] = base.UserHistory
 		data["ToolsCount"] = base.ToolsCount
@@ -673,6 +672,10 @@ func (pm *PromptManager) buildSemiDynamic1Observation(
 	// 关键词: section.semi_dynamic_1 子节点 Name 去前缀, UI 信息密度
 	children := []*reactloops.PromptSectionObservation{
 		reactloops.NewPromptSectionObservation(
+			"section.semi_dynamic_1.workspace", "Workspace",
+			reactloops.PromptSectionRoleSemiDynamic1, false, renderWorkspaceBlock(materials),
+		),
+		reactloops.NewPromptSectionObservation(
 			"section.semi_dynamic_1.skills_context",
 			"Skills Context",
 			reactloops.PromptSectionRoleSemiDynamic1,
@@ -773,42 +776,15 @@ func (pm *PromptManager) buildSemiDynamic2Observation(
 	return reactloops.FinalizePromptContainerSection(section)
 }
 
-// buildTimelineOpenObservation 给"PROMPT_SECTION_timeline-open 段"做观测树:
-// Timeline 末桶 + SessionEvidence + TodoSnapshot + Workspace +
-// UserHistory + Current Time + PlanContext (末尾)。
-//
-// 段内排序原则 (P1-C3 调整):
-//  1. Timeline (Open Tail) 在最前: 时间线最末桶是模型理解"刚发生了什么"的
-//     首要信息源, 顶到段首让 LLM 第一时间看到。
-//  2. Session Evidence 紧跟其后: SESSION_ARTIFACTS 是 Config 级持久化观测
-//     (跨 turn 累积的工件证据), 与 Timeline 末桶共同构成"会话级实证"语料,
-//     物理上贴近 Timeline 让两者形成连续语义块。
-//  3. TodoSnapshot 紧跟 SessionEvidence, 暴露全局待办状态。
-//  4. Workspace 居中: OS/Arch + working dir + glance 是相对静态的环境标识,
-//     既不属于"刚发生", 也不属于"用户视角", 居中过渡。
-//  5. User History 在 Workspace 之后: PREV_USER_INPUT 是用户历史输入轨迹,
-//     与 Current Time 一起构成"时序前缀", 紧贴当前时间。
-//  6. Current Time 紧跟 User History: 当前时间是最末稳定的时序锚点, 放在
-//     User History 之后形成"历史输入 -> 现在"的时间递进, 同时与下方
-//     PlanContext (任务规划) 形成"时间 -> 任务"的语义衔接。
-//  7. Plan Context 末尾: PE-TASK PLAN 产物本质易变 (子任务切换),
-//     放最末让其落在所有 cache
-//     边界外, 不污染上游 system / frozen / semi 三段缓存命中率。
-//
-// timeline-open 整段位于 system / frozen / semi 三段缓存之外, 是 prompt 的
-// "易变尾段", 段内子块顺序不影响上游 prefix cache, 仅影响 LLM 理解顺序。
-//
-// 关键词: buildTimelineOpenObservation, Timeline 末桶, SessionEvidence,
-//
-//	Workspace, UserHistory, Current Time, PlanContext 末尾,
-//	段内排序原则, P1-C3 顺序调整, 缓存边界外
+// buildTimelineOpenObservation mirrors the variable timeline-open template.
+// Workspace is observed in SemiDynamic1; the main-loop clock is in Dynamic.
 func (pm *PromptManager) buildTimelineOpenObservation(
 	materials *reactloops.PromptPrefixMaterials,
 	rendered string,
 ) *reactloops.PromptSectionObservation {
 	section := reactloops.NewPromptContainerSection(
 		"section.timeline_open",
-		"Timeline Open & Workspace",
+		"Timeline Open",
 		reactloops.PromptSectionRoleTimelineOpen,
 	)
 	// 子节点 Name 已去掉 "Timeline Open / " 前缀: UI 字节统计面板里父容器
@@ -856,13 +832,6 @@ func (pm *PromptManager) buildTimelineOpenObservation(
 			true,
 			materials.TodoSnapshot,
 		),
-		reactloops.NewPromptSectionObservation(
-			"section.timeline_open.workspace",
-			"Workspace",
-			reactloops.PromptSectionRoleTimelineOpen,
-			true,
-			renderWorkspaceBlock(materials),
-		),
 		// P1-C3: UserHistory 在 Workspace 之后, 与下方 Current Time 共同
 		// 构成"用户输入历史 -> 现在"的时序前缀.
 		reactloops.NewPromptSectionObservation(
@@ -874,13 +843,6 @@ func (pm *PromptManager) buildTimelineOpenObservation(
 		),
 		// P1-C3: Current Time 紧跟 User History, 充当时序末端锚点;
 		// 同时与下方 PlanContext (任务规划) 形成"现在 -> 任务"语义衔接.
-		reactloops.NewPromptSectionObservation(
-			"section.timeline_open.current_time",
-			"Current Time",
-			reactloops.PromptSectionRoleTimelineOpen,
-			false,
-			renderCurrentTimeBlock(materials),
-		),
 		// PlanContext (PE-TASK PLAN 产物) 末尾注入: 该字段仅 PE-TASK 子任务
 		// 非空, 内容随子任务切换抖动, 不适合放任何 cache 边界内。
 		// 放 timeline-open 段最末让其落在所有
@@ -916,6 +878,11 @@ func (pm *PromptManager) buildDynamicObservation(
 	// "Pure Dynamic" 已经表达层级.
 	// 关键词: section.dynamic 子节点 Name 去前缀, UI 信息密度
 	children := []*reactloops.PromptSectionObservation{
+		reactloops.NewPromptSectionObservation(
+			"section.dynamic.current_time", "Current Time",
+			reactloops.PromptSectionRoleDynamic, false,
+			renderCurrentTimeBlock(&aicommon.PromptMaterials{CurrentTime: base.CurrentTime}),
+		),
 		reactloops.NewPromptSectionObservation(
 			"section.dynamic.user_query",
 			"User Query",
@@ -1051,32 +1018,9 @@ func renderSchemaBlock(schema string) string {
 	return fmt.Sprintf("响应格式输出JSON和<|TAG...|>，请遵守如下Schema ：\n\n<|SCHEMA|>\n```jsonschema\n%s\n```\n<|SCHEMA|>", schema)
 }
 
-// renderWorkspaceBlock 渲染 timeline-open 段中 Workspace 子块.
-//
-// Session Artifacts no longer participate in prompt construction. Workspace
-// only contains OS / working dir / glance.
+// renderWorkspaceBlock observes the same read-only coordinates as the template.
 func renderWorkspaceBlock(materials *reactloops.PromptPrefixMaterials) string {
-	if materials == nil {
-		return ""
-	}
-	hasEnv := strings.TrimSpace(materials.OSArch) != "" ||
-		strings.TrimSpace(materials.WorkingDir) != "" ||
-		strings.TrimSpace(materials.WorkingDirGlance) != ""
-	if !materials.Workspace || !hasEnv {
-		return ""
-	}
-	var lines []string
-	lines = append(lines, "# Workspace Context")
-	if materials.OSArch != "" {
-		lines = append(lines, "OS/Arch: "+materials.OSArch)
-	}
-	if materials.WorkingDir != "" {
-		lines = append(lines, "working dir: "+materials.WorkingDir)
-	}
-	if materials.WorkingDirGlance != "" {
-		lines = append(lines, "working dir glance: "+materials.WorkingDirGlance)
-	}
-	return strings.Join(lines, "\n")
+	return materials.WorkspaceContext()
 }
 
 func renderFrozenPartitionBlock(partition aicommon.FrozenBlockPartition) string {

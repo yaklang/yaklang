@@ -273,12 +273,22 @@ func findNextAcceptedStartTag(input string, from int, accepted map[string]bool) 
 			continue
 		}
 
-		tagStr := input[idx : closeAt+2]
-		tagName, nonce := parseStartTagLiteral(tagStr)
-
-		// parseStartTagLiteral 在最后一个下划线处切分，会把 <|FOO_END_xyz|> 解析成 tagName="FOO_END" / nonce="xyz"
-		// accepted 集合自然过滤掉这种情况；这里无需额外排除 _END
-		if tagName != "" && nonce != "" && accepted[tagName] {
+		inner := input[idx+2 : closeAt]
+		// Match the longest accepted tag name so a nonce such as
+		// directly_answer remains intact. End tags are never start tags.
+		var tagName, nonce string
+		for name := range accepted {
+			prefix := name + "_"
+			if !strings.HasPrefix(inner, prefix) || len(name) <= len(tagName) {
+				continue
+			}
+			candidate := inner[len(prefix):]
+			if candidate == "" || strings.HasPrefix(candidate, "END_") {
+				continue
+			}
+			tagName, nonce = name, candidate
+		}
+		if tagName != "" {
 			return idx, tagName, nonce, closeAt + 2
 		}
 

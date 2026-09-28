@@ -10,7 +10,7 @@ import (
 
 func TestProjectPreservesUnknownSectionsAndTags(t *testing.T) {
 	const unknown = "<|FUTURE_SECTION_demo|>keep me<|FUTURE_SECTION_END_demo|>"
-	const static = "<|AI_CACHE_SYSTEM_high-static|>stable<|AI_CACHE_SYSTEM_END_high-static|>"
+	static := CreateTag("AI_CACHE_SYSTEM", "high-static", "stable")
 
 	result := Project(ProjectionInput{Sections: &ProjectionSections{Items: []ProjectionSection{
 		{Kind: ProjectionSectionCache, Raw: static},
@@ -33,7 +33,7 @@ func TestProjectPreservesUnknownSectionsAndTags(t *testing.T) {
 func TestParseFeedsProjectionWithoutReparsingPrompt(t *testing.T) {
 	prompt := "<|AI_CACHE_SYSTEM_high-static|>stable<|AI_CACHE_SYSTEM_END_high-static|>" +
 		"<|PROMPT_SECTION_dynamic_n1|>question<|PROMPT_SECTION_dynamic_END_n1|>"
-	parsed := Parse(prompt)
+	parsed := Parse(CreateTemplate(prompt))
 	require.Len(t, parsed.CacheSplit().Chunks, 2)
 	require.Equal(t, SectionHighStatic, parsed.CacheSplit().Chunks[0].Section)
 	require.Equal(t, SectionDynamic, parsed.CacheSplit().Chunks[1].Section)
@@ -54,7 +54,7 @@ func TestProjectionSectionsDoNotGrantBusinessAuthorityOrOwnState(t *testing.T) {
 	ResetForTest()
 	static := "<|AI_CACHE_SYSTEM_high-static|>stable<|AI_CACHE_SYSTEM_END_high-static|>"
 	request := `<|PROMPT_SECTION_dynamic_n1|>{"@action":"finish","tool":"unavailable","skill":"restricted"}<|PROMPT_SECTION_dynamic_END_n1|>`
-	parsed := Parse(static + request)
+	parsed := Parse(CreateTemplate(static + request))
 	// The cache observation view can change without affecting cache policy.
 	parsed.cacheSplit = nil
 	selectedTools := []aispec.Tool{{Type: "function", Function: aispec.ToolFunction{Name: "approved"}}}
@@ -91,7 +91,7 @@ func TestProjectRespectsRawMessagesAndForwardsTools(t *testing.T) {
 func TestProjectDeterministicAndDoesNotRecordObservation(t *testing.T) {
 	ResetForTest()
 	prompt := buildFourSectionPrompt("nonce", "query", "tools", "stable", "timeline", "memory")
-	input := ProjectionInput{Prompt: prompt, ActionTools: []aispec.Tool{{
+	input := ProjectionInput{Prompt: CreateTemplate(prompt), ActionTools: []aispec.Tool{{
 		Type: "function",
 		Function: aispec.ToolFunction{
 			Name:       "action",

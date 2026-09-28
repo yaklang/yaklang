@@ -1,4 +1,7 @@
-{{ if .UserQuery }}<|USER_QUERY_{{ .Nonce }}|>
+{{ if .CurrentTime }}# Current Time
+{{ .CurrentTime }}
+
+{{ end }}{{ if .UserQuery }}<|USER_QUERY_{{ .Nonce }}|>
 {{ .UserQuery }}
 <|USER_QUERY_END_{{ .Nonce }}|>
 {{ end }}{{ if .AutoContext }}{{ if .UserQuery }}
