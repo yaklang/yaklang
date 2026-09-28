@@ -263,9 +263,7 @@ func (s *SessionPromptState) ValidateTodoDelta(scope VerificationTodoScope, delt
 }
 
 // GetVerificationTodoRendered returns the plain-text TODO snapshot ready for
-// loop prompt injection. When currentScope is set, the snapshot groups items
-// into CURRENT TASK vs OTHER TASKS sections. Empty string when no TODO has been
-// tracked yet, so the prompt template can naturally skip the block.
+// loop prompt injection. It includes an explicit empty current-task state.
 func (s *SessionPromptState) GetVerificationTodoRendered(currentScope VerificationTodoScope) string {
 	if s == nil {
 		return ""

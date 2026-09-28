@@ -93,6 +93,8 @@ func TestPromptManager_AssembleLoopPrompt_TodoBlockSkippedWhenEmpty(t *testing.T
 		}),
 	)
 	require.NoError(t, err)
+	emptySnapshot := react.config.GetVerificationTodoRendered(aicommon.VerificationTodoScope{TaskID: "task-empty"})
+	require.Contains(t, emptySnapshot, "an empty list does not establish task completion")
 
 	result, err := react.promptManager.AssembleLoopPrompt(
 		[]*aitool.Tool{},
@@ -102,13 +104,14 @@ func TestPromptManager_AssembleLoopPrompt_TodoBlockSkippedWhenEmpty(t *testing.T
 			TaskInstruction: "follow task rules",
 			OutputExample:   "example output",
 			Schema:          `{"type":"object","properties":{"@action":{"type":"string"}}}`,
+			TodoSnapshot:    "<|TODO_LIST_nempty|>" + emptySnapshot + "<|TODO_LIST_END_nempty|>",
 		},
 	)
 	require.NoError(t, err)
 	require.NotNil(t, result)
 
-	require.NotContains(t, result.Prompt, "<|TODO_LIST_nempty|>",
-		"empty TODO state should NOT render the TODO_LIST block")
+	require.Contains(t, result.Prompt, "<|TODO_LIST_nempty|>")
+	require.Contains(t, result.Prompt, "an empty list does not establish task completion")
 }
 
 // TestPromptManager_AssembleLoopPrompt_TodoBlockStaysInTimelineOpenCacheBoundary
