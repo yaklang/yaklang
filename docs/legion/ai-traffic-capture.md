@@ -10,7 +10,9 @@ each other's implementations.
 
 An opted-in session receives `BindAISessionCommand.traffic_capture`. The tool
 caller temporarily associates its immutable call ID with the owning engine's
-observer. HTTP/1, HTTP/2 and HTTP/3 `lowhttp` transports notify that observer for
+observer. Captured tool parameters use that same call ID for `runtime_id`, even
+when ReAct supplies a shared session runtime ID or a caller provides that parameter.
+HTTP/1, HTTP/2 and HTTP/3 `lowhttp` transports notify that observer for
 each transport attempt, including status retries, redirects, authentication
 retries, protocol fallback, connection failures and cancellation. HTTP/2's
 internal stream retries are separate observations. A saved HTTPFlow is never
@@ -68,7 +70,10 @@ attempts and queued receipts. `ai_traffic_drain` contains
 `AITrafficDrainResult`, including command ID, pending count and completion.
 The dedicated acknowledgement is published even if the engine has retired.
 Normal runtime Close/Cancel closes the engine then attempts the same bounded
-drain. Unacknowledged local data is retained. Forced process/container loss
+drain. Automatic completion and failure drain before publishing the terminal
+event; manager cleanup also drains before removing the runtime or workspace.
+The drain is idempotent and does not close the engine from its own callback.
+Unacknowledged local data is retained. Forced process/container loss
 cannot manufacture a receipt; the platform must retain an incomplete state.
 
 ## Read-only evidence analysis
@@ -81,7 +86,8 @@ interactive overrides, executable Focus/Forge, MCP, managed workspaces,
 attachments and credentials are rejected. Engine setup disables tools, search,
 planning, perception and automatic skills. An immutable config flag additionally
 rejects the tool invocation entry point and propagates to child agents. User
-prompts and mutable runtime flags cannot clear it. Evidence text is bounded and
+prompts and mutable runtime flags cannot clear it. Evidence text is bounded to
+1 MiB of UTF-8 bytes; the platform also reserves command transport overhead. It is
 untrusted; findings are instructed to cite exact `[flow:<flow_id>]` references.
 
 ## Focused verification
@@ -91,7 +97,7 @@ worktree commit. These tests do not claim deployment/provider acceptance:
 
 ```sh
 go test ./common/utils/lowhttp -run '^TestHTTPAttemptObserver' -count=1
-go test ./common/ai/aid/aicommon -run '^TestReadOnlyEvidence' -count=1
+go test ./common/ai/aid/aicommon -run '^(TestReadOnlyEvidence|TestToolCallerHTTPAttemptObserver)' -count=1
 go test ./scannode -run '^(TestResilienceAITraffic|TestAITraffic|TestProductNodeManifestCapabilitiesMatchCompiledSurface)' -count=1
 ```
 
