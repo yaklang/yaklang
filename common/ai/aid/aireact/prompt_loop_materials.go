@@ -218,7 +218,6 @@ const (
 	lightweightLoopSkillsTokens          = 1024
 	lightweightLoopSkillBodyTokens       = 2048
 	lightweightLoopPlanContextTokens     = 2048
-	lightweightLoopTodoTokens            = 2048
 	lightweightLoopExtraTokens           = 1024
 	lightweightLoopReactiveTokens        = 3072
 	lightweightLoopMemoryTokens          = 1024
@@ -268,7 +267,9 @@ func (pm *PromptManager) projectLightweightLoopMaterials(
 	lightInput.AutoLoadedSkills = boundedLightweightPromptBlock(input.AutoLoadedSkills, lightweightLoopSkillBodyTokens, "auto-loaded skill body")
 	lightInput.FrozenUserContext = boundedLightweightPromptBlock(input.FrozenUserContext, lightweightLoopPlanContextTokens, "plan context")
 	lightInput.FrozenPartitions = nil
-	lightInput.TodoSnapshot = boundedLightweightPromptBlock(input.TodoSnapshot, lightweightLoopTodoTokens, "TODO snapshot")
+	// TODO already has a single store-level budget. Do not omit the entire work
+	// set under a second, smaller lightweight-only limit.
+	lightInput.TodoSnapshot = input.TodoSnapshot
 	lightInput.ExtraCapabilities = aicommon.ShrinkTextBlockByTokens(input.ExtraCapabilities, lightweightLoopExtraTokens)
 	lightInput.ReactiveData = aicommon.ShrinkTextBlockByTokens(input.ReactiveData, lightweightLoopReactiveTokens)
 	lightInput.InjectedMemory = aicommon.ShrinkTextBlockByTokens(input.InjectedMemory, lightweightLoopMemoryTokens)

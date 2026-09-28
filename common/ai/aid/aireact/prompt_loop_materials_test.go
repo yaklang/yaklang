@@ -227,6 +227,8 @@ func TestPromptManager_AssembleLoopPrompt_LightweightUsesBoundedRecentTimeline(t
 	require.NotContains(t, result.Prompt, "evidence evidence evidence")
 	require.NotContains(t, result.Prompt, "Timeline Memory (Frozen)")
 	require.Contains(t, result.Prompt, "[CURRENT TODO CHECKPOINT]\nkeep this dynamic tail")
+	require.Contains(t, result.Prompt, strings.Repeat("todo ", 100))
+	require.NotContains(t, result.Prompt, "TODO snapshot omitted from lightweight prompt")
 	require.Less(t, strings.Index(result.Prompt, "[CURRENT TODO CHECKPOINT]"), strings.Index(result.Prompt, aiprojection.CreateTemplate("<|PROMPT_SECTION_dynamic_END_light-1|>")))
 	promptTokens := ytoken.CalcTokenCount(result.Prompt)
 	t.Logf("bounded lightweight loop prompt tokens: %d", promptTokens)

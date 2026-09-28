@@ -9,7 +9,7 @@
 
 {{ if .TodoSnapshot }}
 
-TODO LIST 是 `todo_delta` 累计维护后的只读快照。分组规则、投影属性和使用方法见任务指令段 `## TODO 状态维护（todo_delta）` 末尾的"TODO LIST 只读投影"。
+TODO LIST 是当前任务的只读状态快照；执行和写入规则见 High Static 的 TODO 状态维护。优先推进 CURRENT，新发现先登记。
 
 {{ .TodoSnapshot }}
 {{ end }}
