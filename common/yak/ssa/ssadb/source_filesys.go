@@ -195,11 +195,15 @@ func (f *irSourceFS) dropFileContentPrefix(prefix string) {
 	if f.fileContent == nil {
 		return
 	}
+	var toRemove []string
 	f.fileContent.ForEach(func(key string, _ []byte) {
 		if key == prefix || strings.HasPrefix(key, prefix+"/") {
-			f.fileContent.Remove(key)
+			toRemove = append(toRemove, key)
 		}
 	})
+	for _, key := range toRemove {
+		f.fileContent.Remove(key)
+	}
 }
 
 func (fs *irSourceFS) getFileContent(filePath string) ([]byte, error) {
