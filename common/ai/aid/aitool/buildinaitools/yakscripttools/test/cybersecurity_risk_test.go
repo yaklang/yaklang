@@ -126,7 +126,8 @@ func TestCybersecurityRisk_UsesRuntimeRiskSinkInsteadOfLocalDatabase(t *testing.
 			"response":     "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\n\r\n<script>alert(1)</script>",
 		},
 		aitool.WithRuntimeConfig(&aitool.ToolRuntimeConfig{
-			RuntimeID: runtimeID,
+			RuntimeID:           runtimeID,
+			PersistentSessionID: "session-for-" + runtimeID,
 			RiskSaveHandler: func(_ context.Context, risk *schema.Risk) error {
 				copy := *risk
 				submitted = &copy
@@ -154,6 +155,9 @@ func TestCybersecurityRisk_UsesRuntimeRiskSinkInsteadOfLocalDatabase(t *testing.
 	response, err := strconv.Unquote(submitted.QuotedResponse)
 	assert.NilError(t, err)
 	assert.Assert(t, strings.Contains(response, "<script>alert(1)</script>"))
+	if submitted.AISessionID != "session-for-"+runtimeID {
+		t.Fatalf("missing AI session identity: %#v", submitted)
+	}
 	localRisks, err := yakit.GetRisksByRuntimeId(consts.GetGormProjectDatabase(), runtimeID)
 	if err != nil {
 		t.Fatalf("query local risk database: %v", err)

@@ -27,9 +27,11 @@ import (
 // Example:
 // ```
 // risk.NewRisk("http://example.com",
-//     risk.title("SQL Injection"),
-//     risk.type("sqli"),
-//     risk.severity("high"),
+//
+//	risk.title("SQL Injection"),
+//	risk.type("sqli"),
+//	risk.severity("high"),
+//
 // )
 // // 写入后可用 risk.YieldRiskByTarget 等查询（示意性示例）
 // ```
@@ -612,6 +614,7 @@ var (
 		"request":                          yakit.WithRiskParam_Request,
 		"response":                         yakit.WithRiskParam_Response,
 		"runtimeId":                        yakit.WithRiskParam_RuntimeId,
+		"aiSessionId":                      yakit.WithRiskParam_AISessionID,
 		"potential":                        yakit.WithRiskParam_Potential,
 		"cve":                              yakit.WithRiskParam_CVE,
 		"severity":                         yakit.WithRiskParam_Severity,

@@ -711,6 +711,7 @@ func handleRiskMessage(result *ypb.ExecResult) (*schema.Risk, error) {
 				RiskType        string `json:"RiskType"`
 				RiskTypeVerbose string `json:"RiskTypeVerbose"`
 				RuntimeId       string `json:"RuntimeId"`
+				AISessionID     string `json:"AISessionID"`
 				Severity        string `json:"Severity"`
 				Title           string `json:"Title"`
 				TitleVerbose    string `json:"TitleVerbose"`
@@ -737,6 +738,7 @@ func handleRiskMessage(result *ypb.ExecResult) (*schema.Risk, error) {
 				RiskType:        riskData.RiskType,
 				RiskTypeVerbose: riskData.RiskTypeVerbose,
 				RuntimeId:       riskData.RuntimeId,
+				AISessionID:     riskData.AISessionID,
 				Severity:        riskData.Severity,
 				Parameter:       riskData.Parameter,
 				Payload:         riskData.Payload,

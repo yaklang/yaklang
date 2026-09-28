@@ -165,9 +165,11 @@ func executeNativeYakPlugin(ctx context.Context, script *schema.YakScript, param
 	defer cancel()
 
 	var runtimeId string
+	var aiSessionID string
 	var runtimeFeedBacker func(result *ypb.ExecResult) error
 	if runtimeConfig != nil {
 		runtimeId = runtimeConfig.RuntimeID
+		aiSessionID = runtimeConfig.PersistentSessionID
 		runtimeFeedBacker = runtimeConfig.FeedBacker
 	}
 
@@ -221,10 +223,11 @@ func executeNativeYakPlugin(ctx context.Context, script *schema.YakScript, param
 	})
 
 	_, err := engine.ExecuteExWithContext(ctx, script.Content, map[string]interface{}{
-		"RUNTIME_ID":   runtimeId,
-		"CTX":          ctx,
-		"PLUGIN_NAME":  script.ScriptName + ".yak",
-		"YAK_FILENAME": script.ScriptName + ".yak",
+		"RUNTIME_ID":    runtimeId,
+		"AI_SESSION_ID": aiSessionID,
+		"CTX":           ctx,
+		"PLUGIN_NAME":   script.ScriptName + ".yak",
+		"YAK_FILENAME":  script.ScriptName + ".yak",
 	})
 	if err != nil {
 		log.Errorf("execute native yak plugin %q failed: %v", script.ScriptName, err)

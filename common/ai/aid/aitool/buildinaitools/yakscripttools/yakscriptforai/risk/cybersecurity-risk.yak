@@ -220,6 +220,7 @@ if finalSolution == "" && riskType != "info" {
 
 details = {
     "title_input": titleInput,
+    "target_input": target,
     "summary": summary,
 }
 if reproduction != "" {
@@ -294,6 +295,13 @@ opts.Push(risk.severity(severity))
 opts.Push(risk.description(description))
 opts.Push(risk.solution(finalSolution))
 opts.Push(risk.details(details))
+
+# AI_SESSION_ID is supplied by the trusted tool runtime, not a model parameter.
+# Multiple tool runtime IDs can belong to this same persistent conversation.
+aiSessionID = getParam("AI_SESSION_ID")
+if aiSessionID != "" {
+    opts.Push(risk.aiSessionId(aiSessionID))
+}
 
 if parameter != "" {
     opts.Push(risk.parameter(parameter))
