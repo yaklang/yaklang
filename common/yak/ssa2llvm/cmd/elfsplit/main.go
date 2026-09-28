@@ -1201,6 +1201,11 @@ func buildModulePackageMap(modules []string) map[string][]string {
 			"github.com/yaklang/yaklang/common/minimartian",
 			"github.com/yaklang/yaklang/common/mutate",
 			"github.com/yaklang/yaklang/common/netx",
+			// notify/drivers/feishu registers a protobuf file in its init,
+			// which reaches google.golang.org/protobuf in the shared
+			// closure below. Staying in the base .text would make that
+			// call hit the shared stub whenever shared is pruned.
+			"github.com/yaklang/yaklang/common/notify/drivers/feishu",
 			"github.com/yaklang/yaklang/common/pcapx",
 			"github.com/yaklang/yaklang/common/sca",
 			"github.com/yaklang/yaklang/common/schema",
