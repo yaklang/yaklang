@@ -12,7 +12,7 @@ import (
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
 )
 
-func TestChatTOTPRecoveryDoesNotPublishIntermediateFailure(t *testing.T) {
+func TestChatTOTPRecoveryPreservesRawAttempts(t *testing.T) {
 	testChatAuthRecovery(t, true, true)
 }
 
@@ -49,11 +49,13 @@ func testChatAuthRecovery(t *testing.T, totpFailure, recoverySucceeds bool) {
 		fmt.Fprint(w, "data: {\"choices\":[{\"delta\":{\"content\":\"recovered\"}}]}\n\ndata: [DONE]\n\n")
 	}))
 	defer server.Close()
+	var callbackErrors []error
 	var statuses []int
 	var responseStatuses []int
 	var requestStatuses []int
 	client := &GatewayClient{}
 	client.LoadOption(aispec.WithAPIKey("test-key"), aispec.WithModel("memfit-test"),
+		aispec.WithHTTPErrorHandler(func(err error) { callbackErrors = append(callbackErrors, err) }),
 		aispec.WithRawHTTPResponseHeaderCallback(func(header []byte) {
 			statuses = append(statuses, lowhttp.GetStatusCodeFromResponse(header))
 		}), aispec.WithRawHTTPResponseCallback(func(header, body []byte) {
@@ -76,7 +78,16 @@ func testChatAuthRecovery(t *testing.T, totpFailure, recoverySucceeds bool) {
 		expectedRequests = 2
 	}
 	require.Equal(t, expectedRequests, requests)
-	require.Equal(t, []int{expectedStatus}, statuses)
-	require.Equal(t, []int{expectedStatus}, responseStatuses)
-	require.Equal(t, []int{expectedStatus}, requestStatuses)
+	expectedStatuses := []int{http.StatusUnauthorized}
+	if totpFailure {
+		expectedStatuses = append(expectedStatuses, expectedStatus)
+	}
+	require.Equal(t, expectedStatuses, statuses)
+	require.Equal(t, expectedStatuses, responseStatuses)
+	require.Equal(t, expectedStatuses, requestStatuses)
+	if recoverySucceeds {
+		require.Empty(t, callbackErrors)
+	} else {
+		require.Len(t, callbackErrors, 1)
+	}
 }

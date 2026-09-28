@@ -84,14 +84,6 @@ func (g *GatewayClient) StructuredStream(s string, function ...any) (chan *aispe
 var _ aispec.AIClient = (*GatewayClient)(nil)
 
 func (g *GatewayClient) Chat(s string, function ...any) (string, error) {
-	// A Memfit 401 may be recovered inside this gateway. Do not publish its
-	// headers to an async caller before deciding whether it is terminal.
-	firstAttemptConfig := g.config
-	flushAuthFailure := func() {}
-	if g.isMemfitModel() {
-		firstAttemptConfig, flushAuthFailure = deferAuthResponseCallbacks(g.config)
-	}
-	finalAttempt := false
 	// 用于捕获 TOTP 错误的标志
 	var totpErrorDetected bool
 	var toolCallObserved atomic.Bool
@@ -118,9 +110,8 @@ func (g *GatewayClient) Chat(s string, function ...any) (string, error) {
 	wrappedErrorHandler := func(err error) {
 		if err != nil && g.isMemfitModel() && g.isMemfitTOTPError(err) {
 			totpErrorDetected = true
-			if !finalAttempt {
-				return
-			}
+			// The gateway owns recovery; only the final attempt reports this error.
+			return
 		}
 		if g.config.HTTPErrorHandler != nil {
 			g.config.HTTPErrorHandler(err)
@@ -176,9 +167,9 @@ func (g *GatewayClient) Chat(s string, function ...any) (string, error) {
 		aispec.WithChatBase_ToolCallCallback(toolCallCallback),
 		aispec.WithChatBase_FinishReasonCallback(g.config.FinishReasonCallback),
 		aispec.WithChatBase_ToolCallArgumentsStreamHandler(g.config.ToolCallArgumentsStreamHandler),
-		aispec.WithChatBase_RawHTTPResponseHeaderCallback(firstAttemptConfig.RawHTTPResponseHeaderCallback),
-		aispec.WithChatBase_RawHTTPResponseCallback(firstAttemptConfig.RawHTTPResponseCallback),
-		aispec.WithChatBase_RawHTTPRequestResponseCallback(firstAttemptConfig.RawHTTPRequestResponseCallback),
+		aispec.WithChatBase_RawHTTPResponseHeaderCallback(g.config.RawHTTPResponseHeaderCallback),
+		aispec.WithChatBase_RawHTTPResponseCallback(g.config.RawHTTPResponseCallback),
+		aispec.WithChatBase_RawHTTPRequestResponseCallback(g.config.RawHTTPRequestResponseCallback),
 		aispec.WithChatBase_RawMessages(g.config.RawMessages),
 		// UsageCallback 透传：yak 用户脚本通过 ai.type("aibalance") + ai.usageCallback(...)
 		// 注册的回调，需要这里透传到 ChatBase，才能在 SSE 末帧解析出 usage 时被回调，
@@ -189,7 +180,6 @@ func (g *GatewayClient) Chat(s string, function ...any) (string, error) {
 
 	// 检查是否是 TOTP 认证失败（需要刷新密钥并重试）
 	if shouldRefreshAndRetry(result, err) {
-		finalAttempt = true
 		log.Debugf("TOTP authentication issue for memfit model, refreshing secret and retrying...")
 		g.refreshTOTPSecretAndSave()
 
@@ -205,7 +195,7 @@ func (g *GatewayClient) Chat(s string, function ...any) (string, error) {
 			aispec.WithChatBase_PoCOptions(g.BuildHTTPOptions),
 			aispec.WithChatBase_StreamHandler(g.config.StreamHandler),
 			aispec.WithChatBase_ReasonStreamHandler(reasonStreamHandler),
-			aispec.WithChatBase_ErrHandler(wrappedErrorHandler),
+			aispec.WithChatBase_ErrHandler(g.config.HTTPErrorHandler),
 			aispec.WithChatBase_ImageRawInstance(g.config.Images...),
 			aispec.ChatBaseThinkingOptions(g.config, g.targetUrl),
 			aispec.WithChatBase_AISamplingFromConfig(g.config),
@@ -222,7 +212,6 @@ func (g *GatewayClient) Chat(s string, function ...any) (string, error) {
 		)
 	}
 
-	flushAuthFailure()
 	return result, err
 }
 
