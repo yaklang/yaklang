@@ -17,6 +17,7 @@ import (
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	aiv1 "github.com/yaklang/yaklang/scannode/gen/legionpb/legion/ai/v1"
 	"github.com/yaklang/yaklang/scannode/inputresolver"
 )
@@ -123,6 +124,10 @@ type aiSessionRuntimeFocusTurnReporter interface {
 }
 
 type aiSessionBinding struct {
+	TrafficCapture             *aiv1.AITrafficCapturePolicy
+	TrafficCollector           *aiTrafficCollector
+	TrafficAnalysis            *aiv1.AITrafficAnalysisContext
+	NodeID                     string
 	InputWorkspace             *inputresolver.Workspace
 	Ref                        aiSessionCommandRef
 	ProjectID                  string
@@ -332,6 +337,19 @@ func (m *aiSessionRuntimeManager) Bind(
 	options aiSessionRuntimeBindOptions,
 ) (aiSessionCommandRef, error) {
 	ref := aiSessionRefFromBindCommand(command)
+	if command.GetTrafficAnalysis() != nil {
+		checkBinding := aiSessionBinding{Ref: ref, TrafficAnalysis: command.GetTrafficAnalysis(), ProviderPolicySnapshotJSON: command.GetProviderPolicySnapshotJson(), RuntimeOptionSnapshotJSON: command.GetRuntimeOptionSnapshotJson(), AuthorizedFocusReleaseID: command.GetResultContext().GetFocusReleaseId(), Attachments: legacyAISessionAttachmentRefs(command), CredentialRefs: cloneAISessionCredentialRefs(command.GetCredentialRefs())}
+		checkOptions, err := mergedYakRuntimeOptions(checkBinding)
+		if err != nil {
+			return ref, err
+		}
+		if command.GetInputManifest() != nil {
+			return ref, fmt.Errorf("traffic analysis forbids managed input workspaces")
+		}
+		if err = validateTrafficAnalysisBinding(checkBinding, checkOptions); err != nil {
+			return ref, err
+		}
+	}
 	if err := validateInputWorkspaceBind(command); err != nil {
 		return ref, err
 	}
@@ -605,7 +623,10 @@ func (m *aiSessionRuntimeManager) Bind(
 		serverRuntime.inputWorkspace = inputWorkspace
 		serverRuntime.authorizedFocusReleaseID = strings.TrimSpace(command.GetResultContext().GetFocusReleaseId())
 	}
-	handle, err := m.driver.Bind(ctx, aiSessionBinding{
+	binding := aiSessionBinding{
+		TrafficCapture:             command.GetTrafficCapture(),
+		TrafficAnalysis:            command.GetTrafficAnalysis(),
+		NodeID:                     command.GetTargetNodeId(),
 		InputWorkspace:             inputWorkspace,
 		Ref:                        ref,
 		ProjectID:                  runtime.projectID,
@@ -622,7 +643,24 @@ func (m *aiSessionRuntimeManager) Bind(
 		ExecutionMode:              strings.TrimSpace(command.GetResultContext().GetExecutionMode()),
 		AuthorizedFocusReleaseID:   strings.TrimSpace(command.GetResultContext().GetFocusReleaseId()),
 		AuthorizedTargetURL:        strings.TrimSpace(command.GetResultContext().GetTargetUrl()),
-	}, managedEmitter)
+	}
+	collector, err := newAITrafficCollector(binding, managedEmitter, "")
+	if err != nil {
+		cancel()
+		_ = codeWorkspace.Cleanup()
+		return ref, m.finishBindError(ref, err)
+	}
+	if collector != nil {
+		ctx = lowhttp.WithHTTPAttemptObserver(ctx, collector.observe)
+		binding.TrafficCollector = collector
+	}
+	handle, err := m.driver.Bind(ctx, binding, managedEmitter)
+	if err != nil && collector != nil {
+		collector.stopped.Do(func() { close(collector.stop) })
+	}
+	if err == nil && collector != nil {
+		handle = &aiTrafficRuntimeHandle{aiSessionRuntimeHandle: handle, collector: collector}
+	}
 	if err != nil {
 		cancel()
 		if handle != nil {
@@ -716,6 +754,9 @@ func (m *aiSessionRuntimeManager) Bind(
 			}
 			replaced.emissionWG.Wait()
 		}()
+	}
+	if collector != nil {
+		collector.emit("ai_traffic_capability", &aiv1.AITrafficCapability{ProtocolVersion: 1, SupportedTransports: []string{"yaklang_lowhttp"}, UnsupportedSources: []string{"external_process", "browser", "uninstrumented_http_client"}})
 	}
 	if err := m.publishWorkspaceReady(ctx, runtime, publisher); err != nil {
 		return ref, err

@@ -12,7 +12,13 @@ type h3Transport struct{}
 // newH3Transport returns a transport that executes requests over HTTP/3.
 func newH3Transport() transport { return &h3Transport{} }
 
-func (t *h3Transport) RoundTrip(ctx context.Context, tr *transportRequest) (*transportResult, error) {
+func (t *h3Transport) RoundTrip(ctx context.Context, tr *transportRequest) (result *transportResult, err error) {
+	finish := observeHTTPAttempt(tr)
+	defer func() { finish(result, err) }()
+	return t.roundTripAttempt(ctx, tr)
+}
+
+func (t *h3Transport) roundTripAttempt(ctx context.Context, tr *transportRequest) (*transportResult, error) {
 	http3Conn, err := getHTTP3Conn(ctx, tr.originAddr, tr.dialOpts...)
 	if err != nil {
 		return nil, err
