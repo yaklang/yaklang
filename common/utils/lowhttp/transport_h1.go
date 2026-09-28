@@ -184,6 +184,7 @@ func (t *h1Transport) roundTripPooled(ctx context.Context, tr *transportRequest,
 	var firstResponse *http.Response
 	select {
 	case re := <-resc:
+		tr.attemptResponsePacket = re.respBytes
 		if re.err != nil && len(rawBytes) == 0 {
 			if pc.shouldRetryRequest(re.err) {
 				pc.closeConn(re.err)

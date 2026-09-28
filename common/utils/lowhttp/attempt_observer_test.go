@@ -125,3 +125,17 @@ func TestHTTPAttemptObserverSeparatesAuthenticationRetry(t *testing.T) {
 		t.Fatal("captured request did not match the actual authenticated retry")
 	}
 }
+
+func TestHTTPAttemptObserverRetainsPooledPartialResponse(t *testing.T) {
+	var terminal HTTPAttempt
+	unbind := BindHTTPAttemptObserver(WithHTTPAttemptObserver(context.Background(), func(HTTPAttempt) func(HTTPAttempt) { return func(end HTTPAttempt) { terminal = end } }), "partial-tool", "")
+	defer unbind()
+	request := &transportRequest{option: &LowhttpExecConfig{RuntimeId: "partial-tool"}, packet: []byte("GET / HTTP/1.1\r\nHost: example.invalid\r\n\r\n")}
+	finish := observeHTTPAttempt(request)
+	partial := []byte("HTTP/1.1 200 OK\r\nContent-Length: 50\r\n\r\npartial")
+	request.attemptResponsePacket = partial
+	finish(nil, fmt.Errorf("server closed during body"))
+	if string(terminal.Response) != string(partial) || terminal.Error == nil {
+		t.Fatal("partial response disappeared on the pooled error path")
+	}
+}

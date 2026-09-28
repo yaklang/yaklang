@@ -58,6 +58,7 @@ func observeHTTPAttempt(tr *transportRequest) func(*transportResult, error) {
 	}
 	scoped := entry.(*scopedAttemptObserver)
 	tr.attemptRequestPacket = tr.packet
+	tr.attemptResponsePacket = nil
 	if tr.reqIns != nil {
 		httpctx.SetResponseTooLargeHeaderFile(tr.reqIns, "")
 		httpctx.SetResponseTooLargeBodyFile(tr.reqIns, "")
@@ -71,7 +72,8 @@ func observeHTTPAttempt(tr *transportRequest) func(*transportResult, error) {
 		event.Request = tr.attemptRequestPacket
 		event.FinishedAt = time.Now()
 		event.Error = err
-		if result != nil {
+		event.Response = tr.attemptResponsePacket
+		if result != nil && len(result.rawBytes) > 0 {
 			event.Response = result.rawBytes
 		}
 		if tr.reqIns != nil {
