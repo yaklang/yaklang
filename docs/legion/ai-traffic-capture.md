@@ -57,6 +57,8 @@ Legion returns `AITrafficReceipt` only after the admitted metadata and bytes are
 durable. The receipt must match protocol version, flow ID, phase and SHA-256 of
 the exact uploaded protobuf bytes, and have `durable=true`. A quota rejection
 uses `storage_status=quota_dropped`, preserving metadata and ending retries.
+`storage_status=metadata_only` confirms durable metadata without packet bytes;
+it also ends retries without claiming that a packet object exists.
 The runtime persists this receipt before removing the upload. A process restart
 with the same binding identity reuses queued bytes and receipts; ambiguous acknowledgement never deletes data.
 Upload failure retains the queue and retries in subsequent worker cycles.
@@ -75,6 +77,9 @@ event; manager cleanup also drains before removing the runtime or workspace.
 The drain is idempotent and does not close the engine from its own callback.
 Unacknowledged local data is retained. Forced process/container loss
 cannot manufacture a receipt; the platform must retain an incomplete state.
+Capture errors and terminal metadata-only/quota receipts persist an incomplete
+coverage marker. Even after restart, an empty queue then returns `complete=false`
+immediately; uploading metadata does not repair unavailable packet evidence.
 
 ## Read-only evidence analysis
 

@@ -94,6 +94,9 @@ func newAITrafficCollector(binding aiSessionBinding, emitter aiSessionRuntimeEmi
 	if raw, readErr := os.ReadFile(filepath.Join(directory, "admitted-bytes")); readErr == nil {
 		fmt.Sscan(string(raw), &c.used)
 	}
+	if _, markerErr := os.Stat(filepath.Join(directory, "capture-incomplete")); !errors.Is(markerErr, os.ErrNotExist) {
+		c.failed = true
+	}
 	aiTrafficCollectors.Store(c.key(), c)
 	go c.run()
 	c.signal()
@@ -301,6 +304,9 @@ func (c *aiTrafficCollector) enqueue(upload *aiv1.AITrafficUpload) {
 			c.failed = true
 		}
 	}
+	if upload.Record.CaptureError != "" {
+		_ = c.markIncompleteLocked()
+	}
 	raw, err := proto.Marshal(upload)
 	if err == nil {
 		err = trafficAtomicWrite(filepath.Join(c.dir, upload.Record.FlowId+"."+upload.Record.Phase+".pb"), raw)
@@ -315,6 +321,13 @@ func (c *aiTrafficCollector) enqueue(upload *aiv1.AITrafficUpload) {
 		c.emit("ai_traffic_batch", &aiv1.AITrafficBatch{ProtocolVersion: 1, Records: []*aiv1.AITrafficRecord{failure}})
 	}
 	c.signal()
+}
+
+func (c *aiTrafficCollector) markIncompleteLocked() error {
+	c.failed = true
+	// Keep evidence coverage separate from whether the upload queue is empty.
+	// A durable metadata-only receipt cannot restore missing/truncated packets.
+	return trafficAtomicWrite(filepath.Join(c.dir, "capture-incomplete"), []byte("incomplete\n"))
 }
 
 func trafficAtomicWrite(path string, raw []byte) error {
@@ -423,6 +436,14 @@ func (c *aiTrafficCollector) flush(ctx context.Context) {
 				return
 			}
 		}
+		if upload.Record.CaptureError != "" || (upload.Record.Phase == "terminal" && receipt.StorageStatus != "stored") {
+			c.mu.Lock()
+			markerErr := c.markIncompleteLocked()
+			c.mu.Unlock()
+			if markerErr != nil {
+				return
+			}
+		}
 		// Receipt is fsynced before queue removal; restart replays this step safely.
 		if err = os.Remove(path); err == nil {
 			if dir, e := os.Open(c.dir); e == nil {
@@ -434,7 +455,7 @@ func (c *aiTrafficCollector) flush(ctx context.Context) {
 }
 
 func validAITrafficReceipt(receipt *aiv1.AITrafficReceipt, upload *aiv1.AITrafficUpload, raw []byte) bool {
-	return receipt.GetProtocolVersion() == 1 && receipt.GetDurable() && receipt.GetFlowId() == upload.GetRecord().GetFlowId() && receipt.GetPhase() == upload.GetRecord().GetPhase() && receipt.GetUploadSha256() == trafficSHA(raw) && (receipt.GetStorageStatus() == "stored" || receipt.GetStorageStatus() == "quota_dropped")
+	return receipt.GetProtocolVersion() == 1 && receipt.GetDurable() && receipt.GetFlowId() == upload.GetRecord().GetFlowId() && receipt.GetPhase() == upload.GetRecord().GetPhase() && receipt.GetUploadSha256() == trafficSHA(raw) && (receipt.GetStorageStatus() == "stored" || receipt.GetStorageStatus() == "quota_dropped" || receipt.GetStorageStatus() == "metadata_only")
 }
 func (c *aiTrafficCollector) upload(ctx context.Context, upload *aiv1.AITrafficUpload, raw []byte) (*aiv1.AITrafficReceipt, error) {
 	endpoint := strings.TrimRight(c.policy.UploadBaseUrl, "/") + "/" + url.PathEscape(c.binding.Ref.SessionID) + "/records"
@@ -500,7 +521,7 @@ func (c *aiTrafficCollector) drain(ctx context.Context, commandID string) *aiv1.
 			active = unresolved
 		}
 		result := &aiv1.AITrafficDrainResult{ProtocolVersion: 1, Session: &aiv1.AISessionRef{SessionId: c.binding.Ref.SessionID, RunId: c.binding.Ref.RunID, BindEpoch: c.binding.Ref.BindEpoch}, NodeSessionId: c.binding.NodeSessionID, PendingRecords: uint64(len(paths)) + active, Complete: err == nil && len(paths) == 0 && active == 0 && !failed, CommandId: commandID}
-		if result.Complete || ctx.Err() != nil {
+		if (err == nil && len(paths) == 0 && active == 0) || ctx.Err() != nil {
 			c.emit("ai_traffic_drain", result)
 			return result
 		}

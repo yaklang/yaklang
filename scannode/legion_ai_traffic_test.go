@@ -181,6 +181,55 @@ func TestResilienceAITrafficAcknowledgedStartRemainsIncompleteAfterRestart(t *te
 	}
 }
 
+func TestResilienceAITrafficReceiptPreservesIncompleteCoverageAfterRestart(t *testing.T) {
+	for _, test := range []struct{ status, captureError string }{
+		{"metadata_only", "local_packet_unavailable"},
+		{"quota_dropped", ""},
+		{"stored", "packet_limit"},
+	} {
+		t.Run(test.status, func(t *testing.T) {
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				raw, _ := io.ReadAll(r.Body)
+				upload := new(aiv1.AITrafficUpload)
+				if err := proto.Unmarshal(raw, upload); err != nil {
+					t.Error(err)
+					w.WriteHeader(http.StatusBadRequest)
+					return
+				}
+				receipt, _ := proto.Marshal(&aiv1.AITrafficReceipt{ProtocolVersion: 1, FlowId: upload.Record.FlowId, Phase: upload.Record.Phase, Durable: true, UploadSha256: trafficSHA(raw), StorageStatus: test.status})
+				_, _ = w.Write(receipt)
+			}))
+			defer server.Close()
+			c := trafficTestCollector(t, server.URL)
+			c.enqueue(&aiv1.AITrafficUpload{Record: &aiv1.AITrafficRecord{ProtocolVersion: 1, FlowId: "flow", SessionId: "session", Phase: "terminal", CaptureError: test.captureError}})
+			c.flush(context.Background())
+			paths, err := c.pending()
+			if err != nil || len(paths) != 0 {
+				t.Fatalf("durably acknowledged metadata stayed queued: paths=%v err=%v", paths, err)
+			}
+			ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+			defer cancel()
+			result := c.drain(ctx, "before-restart")
+			if ctx.Err() != nil || result.Complete || result.PendingRecords != 0 {
+				t.Fatalf("acknowledgement hid missing evidence or drain waited unnecessarily: %+v", result)
+			}
+			binding := c.binding
+			binding.PlatformAPIBaseURL = server.URL
+			binding.TrafficCapture = c.policy
+			restarted, err := newAITrafficCollector(binding, &trafficTestEmitter{}, c.dir)
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer restarted.stopped.Do(func() { close(restarted.stop) })
+			defer aiTrafficCollectors.Delete(restarted.key())
+			result = restarted.drain(ctx, "after-restart")
+			if ctx.Err() != nil || result.Complete || result.PendingRecords != 0 {
+				t.Fatalf("restart cleared persisted incomplete coverage: %+v", result)
+			}
+		})
+	}
+}
+
 func trafficReceiptTestServer(t *testing.T) *httptest.Server {
 	t.Helper()
 	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
