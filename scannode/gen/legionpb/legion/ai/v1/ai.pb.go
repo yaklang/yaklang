@@ -254,9 +254,12 @@ type BindAISessionCommand struct {
 	// Nodes fence delayed/redelivered binds by epoch; issued_at is diagnostic.
 	BindEpoch uint64 `protobuf:"varint,12,opt,name=bind_epoch,json=bindEpoch,proto3" json:"bind_epoch,omitempty"`
 	// Requires the ai.input.managed_attachment.v1 node capability.
-	InputManifest *InputManifest `protobuf:"bytes,13,opt,name=input_manifest,json=inputManifest,proto3" json:"input_manifest,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	InputManifest  *InputManifest          `protobuf:"bytes,13,opt,name=input_manifest,json=inputManifest,proto3" json:"input_manifest,omitempty"`
+	TrafficCapture *AITrafficCapturePolicy `protobuf:"bytes,14,opt,name=traffic_capture,json=trafficCapture,proto3" json:"traffic_capture,omitempty"`
+	// Server-owned policy; retained for every turn and never read from user options.
+	TrafficAnalysis *AITrafficAnalysisContext `protobuf:"bytes,15,opt,name=traffic_analysis,json=trafficAnalysis,proto3" json:"traffic_analysis,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
 }
 
 func (x *BindAISessionCommand) Reset() {
@@ -380,6 +383,20 @@ func (x *BindAISessionCommand) GetInputManifest() *InputManifest {
 	return nil
 }
 
+func (x *BindAISessionCommand) GetTrafficCapture() *AITrafficCapturePolicy {
+	if x != nil {
+		return x.TrafficCapture
+	}
+	return nil
+}
+
+func (x *BindAISessionCommand) GetTrafficAnalysis() *AITrafficAnalysisContext {
+	if x != nil {
+		return x.TrafficAnalysis
+	}
+	return nil
+}
+
 type PushAISessionInputCommand struct {
 	state       protoimpl.MessageState `protogen:"open.v1"`
 	Metadata    *v1.CommandMetadata    `protobuf:"bytes,1,opt,name=metadata,proto3" json:"metadata,omitempty"`
@@ -498,18 +515,19 @@ func (x *PushAISessionInputCommand) GetExpectedNodeSessionId() string {
 // ai_session_event history + aiyaktool definitions + provider config, and
 // sends it inline on PushAISessionInputCommand. See S3 spec §4.
 type ContextPackage struct {
-	state                      protoimpl.MessageState `protogen:"open.v1"`
-	SessionId                  string                 `protobuf:"bytes,1,opt,name=session_id,json=sessionId,proto3" json:"session_id,omitempty"`                                                        // log/trace only; engine does not store
-	SystemPrompt               string                 `protobuf:"bytes,2,opt,name=system_prompt,json=systemPrompt,proto3" json:"system_prompt,omitempty"`                                               // empty in MVP → engine uses its PromptPrefixBuilder
-	Messages                   []*ContextMessage      `protobuf:"bytes,3,rep,name=messages,proto3" json:"messages,omitempty"`                                                                           // replayed conversation history (user + assistant only)
-	Tools                      []*ContextTool         `protobuf:"bytes,4,rep,name=tools,proto3" json:"tools,omitempty"`                                                                                 // tool definitions enabled for this session (metadata only)
-	KbFragments                []*ContextKbFragment   `protobuf:"bytes,5,rep,name=kb_fragments,json=kbFragments,proto3" json:"kb_fragments,omitempty"`                                                  // RAG retrieval results; always empty in S3 MVP
-	UserInput                  string                 `protobuf:"bytes,6,opt,name=user_input,json=userInput,proto3" json:"user_input,omitempty"`                                                        // this turn's user input text
-	ProviderPolicySnapshotJson []byte                 `protobuf:"bytes,7,opt,name=provider_policy_snapshot_json,json=providerPolicySnapshotJson,proto3" json:"provider_policy_snapshot_json,omitempty"` // model provider config (API key, base URL, headers)
-	RuntimeOptionSnapshotJson  []byte                 `protobuf:"bytes,8,opt,name=runtime_option_snapshot_json,json=runtimeOptionSnapshotJson,proto3" json:"runtime_option_snapshot_json,omitempty"`    // temperature, max_tokens, etc.
-	FocusRelease               *ContextFocusRelease   `protobuf:"bytes,9,opt,name=focus_release,json=focusRelease,proto3" json:"focus_release,omitempty"`                                               // immutable server-published Yak Focus release selected for this Turn
-	ForgeRelease               *ContextForgeRelease   `protobuf:"bytes,10,opt,name=forge_release,json=forgeRelease,proto3" json:"forge_release,omitempty"`                                              // immutable server-published config Forge release selected for this Turn
-	SkillBundles               []*ContextSkillBundle  `protobuf:"bytes,11,rep,name=skill_bundles,json=skillBundles,proto3" json:"skill_bundles,omitempty"`                                              // authorized SkillMD ZIPs for this Turn; at most one
+	state                      protoimpl.MessageState    `protogen:"open.v1"`
+	SessionId                  string                    `protobuf:"bytes,1,opt,name=session_id,json=sessionId,proto3" json:"session_id,omitempty"`                                                        // log/trace only; engine does not store
+	SystemPrompt               string                    `protobuf:"bytes,2,opt,name=system_prompt,json=systemPrompt,proto3" json:"system_prompt,omitempty"`                                               // empty in MVP → engine uses its PromptPrefixBuilder
+	Messages                   []*ContextMessage         `protobuf:"bytes,3,rep,name=messages,proto3" json:"messages,omitempty"`                                                                           // replayed conversation history (user + assistant only)
+	Tools                      []*ContextTool            `protobuf:"bytes,4,rep,name=tools,proto3" json:"tools,omitempty"`                                                                                 // tool definitions enabled for this session (metadata only)
+	KbFragments                []*ContextKbFragment      `protobuf:"bytes,5,rep,name=kb_fragments,json=kbFragments,proto3" json:"kb_fragments,omitempty"`                                                  // RAG retrieval results; always empty in S3 MVP
+	UserInput                  string                    `protobuf:"bytes,6,opt,name=user_input,json=userInput,proto3" json:"user_input,omitempty"`                                                        // this turn's user input text
+	ProviderPolicySnapshotJson []byte                    `protobuf:"bytes,7,opt,name=provider_policy_snapshot_json,json=providerPolicySnapshotJson,proto3" json:"provider_policy_snapshot_json,omitempty"` // model provider config (API key, base URL, headers)
+	RuntimeOptionSnapshotJson  []byte                    `protobuf:"bytes,8,opt,name=runtime_option_snapshot_json,json=runtimeOptionSnapshotJson,proto3" json:"runtime_option_snapshot_json,omitempty"`    // temperature, max_tokens, etc.
+	TrafficAnalysis            *AITrafficAnalysisContext `protobuf:"bytes,12,opt,name=traffic_analysis,json=trafficAnalysis,proto3" json:"traffic_analysis,omitempty"`
+	FocusRelease               *ContextFocusRelease      `protobuf:"bytes,9,opt,name=focus_release,json=focusRelease,proto3" json:"focus_release,omitempty"`  // immutable server-published Yak Focus release selected for this Turn
+	ForgeRelease               *ContextForgeRelease      `protobuf:"bytes,10,opt,name=forge_release,json=forgeRelease,proto3" json:"forge_release,omitempty"` // immutable server-published config Forge release selected for this Turn
+	SkillBundles               []*ContextSkillBundle     `protobuf:"bytes,11,rep,name=skill_bundles,json=skillBundles,proto3" json:"skill_bundles,omitempty"` // authorized SkillMD ZIPs for this Turn; at most one
 	unknownFields              protoimpl.UnknownFields
 	sizeCache                  protoimpl.SizeCache
 }
@@ -596,6 +614,13 @@ func (x *ContextPackage) GetProviderPolicySnapshotJson() []byte {
 func (x *ContextPackage) GetRuntimeOptionSnapshotJson() []byte {
 	if x != nil {
 		return x.RuntimeOptionSnapshotJson
+	}
+	return nil
+}
+
+func (x *ContextPackage) GetTrafficAnalysis() *AITrafficAnalysisContext {
+	if x != nil {
+		return x.TrafficAnalysis
 	}
 	return nil
 }
@@ -19979,6 +20004,782 @@ func (x *ContextSkillBundle) GetSha256() string {
 	return ""
 }
 
+// Version 1 captures Yaklang-instrumented HTTP transport attempts only.
+type AITrafficCapturePolicy struct {
+	state             protoimpl.MessageState `protogen:"open.v1"`
+	ProtocolVersion   uint32                 `protobuf:"varint,1,opt,name=protocol_version,json=protocolVersion,proto3" json:"protocol_version,omitempty"`
+	UploadBaseUrl     string                 `protobuf:"bytes,2,opt,name=upload_base_url,json=uploadBaseUrl,proto3" json:"upload_base_url,omitempty"`
+	PacketLimitBytes  uint64                 `protobuf:"varint,3,opt,name=packet_limit_bytes,json=packetLimitBytes,proto3" json:"packet_limit_bytes,omitempty"`
+	SessionLimitBytes uint64                 `protobuf:"varint,4,opt,name=session_limit_bytes,json=sessionLimitBytes,proto3" json:"session_limit_bytes,omitempty"`
+	unknownFields     protoimpl.UnknownFields
+	sizeCache         protoimpl.SizeCache
+}
+
+func (x *AITrafficCapturePolicy) Reset() {
+	*x = AITrafficCapturePolicy{}
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[244]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AITrafficCapturePolicy) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AITrafficCapturePolicy) ProtoMessage() {}
+
+func (x *AITrafficCapturePolicy) ProtoReflect() protoreflect.Message {
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[244]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AITrafficCapturePolicy.ProtoReflect.Descriptor instead.
+func (*AITrafficCapturePolicy) Descriptor() ([]byte, []int) {
+	return file_legion_ai_v1_ai_proto_rawDescGZIP(), []int{244}
+}
+
+func (x *AITrafficCapturePolicy) GetProtocolVersion() uint32 {
+	if x != nil {
+		return x.ProtocolVersion
+	}
+	return 0
+}
+
+func (x *AITrafficCapturePolicy) GetUploadBaseUrl() string {
+	if x != nil {
+		return x.UploadBaseUrl
+	}
+	return ""
+}
+
+func (x *AITrafficCapturePolicy) GetPacketLimitBytes() uint64 {
+	if x != nil {
+		return x.PacketLimitBytes
+	}
+	return 0
+}
+
+func (x *AITrafficCapturePolicy) GetSessionLimitBytes() uint64 {
+	if x != nil {
+		return x.SessionLimitBytes
+	}
+	return 0
+}
+
+type AITrafficAnalysisContext struct {
+	state           protoimpl.MessageState `protogen:"open.v1"`
+	SourceSessionId string                 `protobuf:"bytes,1,opt,name=source_session_id,json=sourceSessionId,proto3" json:"source_session_id,omitempty"`
+	FlowIds         []string               `protobuf:"bytes,2,rep,name=flow_ids,json=flowIds,proto3" json:"flow_ids,omitempty"`
+	EvidenceText    string                 `protobuf:"bytes,3,opt,name=evidence_text,json=evidenceText,proto3" json:"evidence_text,omitempty"`
+	ReadOnly        bool                   `protobuf:"varint,4,opt,name=read_only,json=readOnly,proto3" json:"read_only,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
+}
+
+func (x *AITrafficAnalysisContext) Reset() {
+	*x = AITrafficAnalysisContext{}
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[245]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AITrafficAnalysisContext) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AITrafficAnalysisContext) ProtoMessage() {}
+
+func (x *AITrafficAnalysisContext) ProtoReflect() protoreflect.Message {
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[245]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AITrafficAnalysisContext.ProtoReflect.Descriptor instead.
+func (*AITrafficAnalysisContext) Descriptor() ([]byte, []int) {
+	return file_legion_ai_v1_ai_proto_rawDescGZIP(), []int{245}
+}
+
+func (x *AITrafficAnalysisContext) GetSourceSessionId() string {
+	if x != nil {
+		return x.SourceSessionId
+	}
+	return ""
+}
+
+func (x *AITrafficAnalysisContext) GetFlowIds() []string {
+	if x != nil {
+		return x.FlowIds
+	}
+	return nil
+}
+
+func (x *AITrafficAnalysisContext) GetEvidenceText() string {
+	if x != nil {
+		return x.EvidenceText
+	}
+	return ""
+}
+
+func (x *AITrafficAnalysisContext) GetReadOnly() bool {
+	if x != nil {
+		return x.ReadOnly
+	}
+	return false
+}
+
+// This metadata never contains request headers, bodies, URL queries or errors
+// copied from the target. Raw evidence is sent only through authenticated HTTP.
+type AITrafficRecord struct {
+	state             protoimpl.MessageState `protogen:"open.v1"`
+	ProtocolVersion   uint32                 `protobuf:"varint,1,opt,name=protocol_version,json=protocolVersion,proto3" json:"protocol_version,omitempty"`
+	FlowId            string                 `protobuf:"bytes,2,opt,name=flow_id,json=flowId,proto3" json:"flow_id,omitempty"`
+	SessionId         string                 `protobuf:"bytes,3,opt,name=session_id,json=sessionId,proto3" json:"session_id,omitempty"`
+	TurnId            string                 `protobuf:"bytes,4,opt,name=turn_id,json=turnId,proto3" json:"turn_id,omitempty"`
+	ToolCallId        string                 `protobuf:"bytes,5,opt,name=tool_call_id,json=toolCallId,proto3" json:"tool_call_id,omitempty"`
+	AgentId           string                 `protobuf:"bytes,6,opt,name=agent_id,json=agentId,proto3" json:"agent_id,omitempty"`
+	NodeId            string                 `protobuf:"bytes,7,opt,name=node_id,json=nodeId,proto3" json:"node_id,omitempty"`
+	NodeSessionId     string                 `protobuf:"bytes,8,opt,name=node_session_id,json=nodeSessionId,proto3" json:"node_session_id,omitempty"`
+	BindEpoch         uint64                 `protobuf:"varint,9,opt,name=bind_epoch,json=bindEpoch,proto3" json:"bind_epoch,omitempty"`
+	Phase             string                 `protobuf:"bytes,10,opt,name=phase,proto3" json:"phase,omitempty"`     // started | terminal
+	Outcome           string                 `protobuf:"bytes,11,opt,name=outcome,proto3" json:"outcome,omitempty"` // pending | success | network_failed | cancelled
+	StartedAtMs       int64                  `protobuf:"varint,12,opt,name=started_at_ms,json=startedAtMs,proto3" json:"started_at_ms,omitempty"`
+	FinishedAtMs      int64                  `protobuf:"varint,13,opt,name=finished_at_ms,json=finishedAtMs,proto3" json:"finished_at_ms,omitempty"`
+	Method            string                 `protobuf:"bytes,14,opt,name=method,proto3" json:"method,omitempty"`
+	Scheme            string                 `protobuf:"bytes,15,opt,name=scheme,proto3" json:"scheme,omitempty"`
+	Host              string                 `protobuf:"bytes,16,opt,name=host,proto3" json:"host,omitempty"`
+	StatusCode        int32                  `protobuf:"varint,17,opt,name=status_code,json=statusCode,proto3" json:"status_code,omitempty"`
+	RequestSizeBytes  uint64                 `protobuf:"varint,18,opt,name=request_size_bytes,json=requestSizeBytes,proto3" json:"request_size_bytes,omitempty"`
+	ResponseSizeBytes uint64                 `protobuf:"varint,19,opt,name=response_size_bytes,json=responseSizeBytes,proto3" json:"response_size_bytes,omitempty"`
+	RequestSha256     string                 `protobuf:"bytes,20,opt,name=request_sha256,json=requestSha256,proto3" json:"request_sha256,omitempty"`
+	ResponseSha256    string                 `protobuf:"bytes,21,opt,name=response_sha256,json=responseSha256,proto3" json:"response_sha256,omitempty"`
+	RequestTruncated  bool                   `protobuf:"varint,22,opt,name=request_truncated,json=requestTruncated,proto3" json:"request_truncated,omitempty"`
+	ResponseTruncated bool                   `protobuf:"varint,23,opt,name=response_truncated,json=responseTruncated,proto3" json:"response_truncated,omitempty"`
+	CaptureError      string                 `protobuf:"bytes,24,opt,name=capture_error,json=captureError,proto3" json:"capture_error,omitempty"` // fixed code only
+	unknownFields     protoimpl.UnknownFields
+	sizeCache         protoimpl.SizeCache
+}
+
+func (x *AITrafficRecord) Reset() {
+	*x = AITrafficRecord{}
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[246]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AITrafficRecord) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AITrafficRecord) ProtoMessage() {}
+
+func (x *AITrafficRecord) ProtoReflect() protoreflect.Message {
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[246]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AITrafficRecord.ProtoReflect.Descriptor instead.
+func (*AITrafficRecord) Descriptor() ([]byte, []int) {
+	return file_legion_ai_v1_ai_proto_rawDescGZIP(), []int{246}
+}
+
+func (x *AITrafficRecord) GetProtocolVersion() uint32 {
+	if x != nil {
+		return x.ProtocolVersion
+	}
+	return 0
+}
+
+func (x *AITrafficRecord) GetFlowId() string {
+	if x != nil {
+		return x.FlowId
+	}
+	return ""
+}
+
+func (x *AITrafficRecord) GetSessionId() string {
+	if x != nil {
+		return x.SessionId
+	}
+	return ""
+}
+
+func (x *AITrafficRecord) GetTurnId() string {
+	if x != nil {
+		return x.TurnId
+	}
+	return ""
+}
+
+func (x *AITrafficRecord) GetToolCallId() string {
+	if x != nil {
+		return x.ToolCallId
+	}
+	return ""
+}
+
+func (x *AITrafficRecord) GetAgentId() string {
+	if x != nil {
+		return x.AgentId
+	}
+	return ""
+}
+
+func (x *AITrafficRecord) GetNodeId() string {
+	if x != nil {
+		return x.NodeId
+	}
+	return ""
+}
+
+func (x *AITrafficRecord) GetNodeSessionId() string {
+	if x != nil {
+		return x.NodeSessionId
+	}
+	return ""
+}
+
+func (x *AITrafficRecord) GetBindEpoch() uint64 {
+	if x != nil {
+		return x.BindEpoch
+	}
+	return 0
+}
+
+func (x *AITrafficRecord) GetPhase() string {
+	if x != nil {
+		return x.Phase
+	}
+	return ""
+}
+
+func (x *AITrafficRecord) GetOutcome() string {
+	if x != nil {
+		return x.Outcome
+	}
+	return ""
+}
+
+func (x *AITrafficRecord) GetStartedAtMs() int64 {
+	if x != nil {
+		return x.StartedAtMs
+	}
+	return 0
+}
+
+func (x *AITrafficRecord) GetFinishedAtMs() int64 {
+	if x != nil {
+		return x.FinishedAtMs
+	}
+	return 0
+}
+
+func (x *AITrafficRecord) GetMethod() string {
+	if x != nil {
+		return x.Method
+	}
+	return ""
+}
+
+func (x *AITrafficRecord) GetScheme() string {
+	if x != nil {
+		return x.Scheme
+	}
+	return ""
+}
+
+func (x *AITrafficRecord) GetHost() string {
+	if x != nil {
+		return x.Host
+	}
+	return ""
+}
+
+func (x *AITrafficRecord) GetStatusCode() int32 {
+	if x != nil {
+		return x.StatusCode
+	}
+	return 0
+}
+
+func (x *AITrafficRecord) GetRequestSizeBytes() uint64 {
+	if x != nil {
+		return x.RequestSizeBytes
+	}
+	return 0
+}
+
+func (x *AITrafficRecord) GetResponseSizeBytes() uint64 {
+	if x != nil {
+		return x.ResponseSizeBytes
+	}
+	return 0
+}
+
+func (x *AITrafficRecord) GetRequestSha256() string {
+	if x != nil {
+		return x.RequestSha256
+	}
+	return ""
+}
+
+func (x *AITrafficRecord) GetResponseSha256() string {
+	if x != nil {
+		return x.ResponseSha256
+	}
+	return ""
+}
+
+func (x *AITrafficRecord) GetRequestTruncated() bool {
+	if x != nil {
+		return x.RequestTruncated
+	}
+	return false
+}
+
+func (x *AITrafficRecord) GetResponseTruncated() bool {
+	if x != nil {
+		return x.ResponseTruncated
+	}
+	return false
+}
+
+func (x *AITrafficRecord) GetCaptureError() string {
+	if x != nil {
+		return x.CaptureError
+	}
+	return ""
+}
+
+type AITrafficBatch struct {
+	state           protoimpl.MessageState `protogen:"open.v1"`
+	ProtocolVersion uint32                 `protobuf:"varint,1,opt,name=protocol_version,json=protocolVersion,proto3" json:"protocol_version,omitempty"`
+	Records         []*AITrafficRecord     `protobuf:"bytes,2,rep,name=records,proto3" json:"records,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
+}
+
+func (x *AITrafficBatch) Reset() {
+	*x = AITrafficBatch{}
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[247]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AITrafficBatch) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AITrafficBatch) ProtoMessage() {}
+
+func (x *AITrafficBatch) ProtoReflect() protoreflect.Message {
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[247]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AITrafficBatch.ProtoReflect.Descriptor instead.
+func (*AITrafficBatch) Descriptor() ([]byte, []int) {
+	return file_legion_ai_v1_ai_proto_rawDescGZIP(), []int{247}
+}
+
+func (x *AITrafficBatch) GetProtocolVersion() uint32 {
+	if x != nil {
+		return x.ProtocolVersion
+	}
+	return 0
+}
+
+func (x *AITrafficBatch) GetRecords() []*AITrafficRecord {
+	if x != nil {
+		return x.Records
+	}
+	return nil
+}
+
+type AITrafficUpload struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Record        *AITrafficRecord       `protobuf:"bytes,1,opt,name=record,proto3" json:"record,omitempty"`
+	RawRequest    []byte                 `protobuf:"bytes,2,opt,name=raw_request,json=rawRequest,proto3" json:"raw_request,omitempty"`
+	RawResponse   []byte                 `protobuf:"bytes,3,opt,name=raw_response,json=rawResponse,proto3" json:"raw_response,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AITrafficUpload) Reset() {
+	*x = AITrafficUpload{}
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[248]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AITrafficUpload) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AITrafficUpload) ProtoMessage() {}
+
+func (x *AITrafficUpload) ProtoReflect() protoreflect.Message {
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[248]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AITrafficUpload.ProtoReflect.Descriptor instead.
+func (*AITrafficUpload) Descriptor() ([]byte, []int) {
+	return file_legion_ai_v1_ai_proto_rawDescGZIP(), []int{248}
+}
+
+func (x *AITrafficUpload) GetRecord() *AITrafficRecord {
+	if x != nil {
+		return x.Record
+	}
+	return nil
+}
+
+func (x *AITrafficUpload) GetRawRequest() []byte {
+	if x != nil {
+		return x.RawRequest
+	}
+	return nil
+}
+
+func (x *AITrafficUpload) GetRawResponse() []byte {
+	if x != nil {
+		return x.RawResponse
+	}
+	return nil
+}
+
+// Receipt is sent only after both metadata and admitted packet bytes are durable.
+type AITrafficReceipt struct {
+	state           protoimpl.MessageState `protogen:"open.v1"`
+	ProtocolVersion uint32                 `protobuf:"varint,1,opt,name=protocol_version,json=protocolVersion,proto3" json:"protocol_version,omitempty"`
+	FlowId          string                 `protobuf:"bytes,2,opt,name=flow_id,json=flowId,proto3" json:"flow_id,omitempty"`
+	Phase           string                 `protobuf:"bytes,3,opt,name=phase,proto3" json:"phase,omitempty"`
+	UploadSha256    string                 `protobuf:"bytes,4,opt,name=upload_sha256,json=uploadSha256,proto3" json:"upload_sha256,omitempty"`
+	Durable         bool                   `protobuf:"varint,5,opt,name=durable,proto3" json:"durable,omitempty"`
+	StorageStatus   string                 `protobuf:"bytes,6,opt,name=storage_status,json=storageStatus,proto3" json:"storage_status,omitempty"` // stored | quota_dropped | metadata_only (durable metadata, no packet bytes)
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
+}
+
+func (x *AITrafficReceipt) Reset() {
+	*x = AITrafficReceipt{}
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[249]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AITrafficReceipt) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AITrafficReceipt) ProtoMessage() {}
+
+func (x *AITrafficReceipt) ProtoReflect() protoreflect.Message {
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[249]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AITrafficReceipt.ProtoReflect.Descriptor instead.
+func (*AITrafficReceipt) Descriptor() ([]byte, []int) {
+	return file_legion_ai_v1_ai_proto_rawDescGZIP(), []int{249}
+}
+
+func (x *AITrafficReceipt) GetProtocolVersion() uint32 {
+	if x != nil {
+		return x.ProtocolVersion
+	}
+	return 0
+}
+
+func (x *AITrafficReceipt) GetFlowId() string {
+	if x != nil {
+		return x.FlowId
+	}
+	return ""
+}
+
+func (x *AITrafficReceipt) GetPhase() string {
+	if x != nil {
+		return x.Phase
+	}
+	return ""
+}
+
+func (x *AITrafficReceipt) GetUploadSha256() string {
+	if x != nil {
+		return x.UploadSha256
+	}
+	return ""
+}
+
+func (x *AITrafficReceipt) GetDurable() bool {
+	if x != nil {
+		return x.Durable
+	}
+	return false
+}
+
+func (x *AITrafficReceipt) GetStorageStatus() string {
+	if x != nil {
+		return x.StorageStatus
+	}
+	return ""
+}
+
+type DrainAITrafficCommand struct {
+	state                 protoimpl.MessageState `protogen:"open.v1"`
+	Metadata              *v1.CommandMetadata    `protobuf:"bytes,1,opt,name=metadata,proto3" json:"metadata,omitempty"`
+	Session               *AISessionRef          `protobuf:"bytes,2,opt,name=session,proto3" json:"session,omitempty"`
+	ExpectedNodeSessionId string                 `protobuf:"bytes,3,opt,name=expected_node_session_id,json=expectedNodeSessionId,proto3" json:"expected_node_session_id,omitempty"`
+	TimeoutMs             uint32                 `protobuf:"varint,4,opt,name=timeout_ms,json=timeoutMs,proto3" json:"timeout_ms,omitempty"` // capped by the runtime at 30000
+	unknownFields         protoimpl.UnknownFields
+	sizeCache             protoimpl.SizeCache
+}
+
+func (x *DrainAITrafficCommand) Reset() {
+	*x = DrainAITrafficCommand{}
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[250]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DrainAITrafficCommand) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DrainAITrafficCommand) ProtoMessage() {}
+
+func (x *DrainAITrafficCommand) ProtoReflect() protoreflect.Message {
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[250]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DrainAITrafficCommand.ProtoReflect.Descriptor instead.
+func (*DrainAITrafficCommand) Descriptor() ([]byte, []int) {
+	return file_legion_ai_v1_ai_proto_rawDescGZIP(), []int{250}
+}
+
+func (x *DrainAITrafficCommand) GetMetadata() *v1.CommandMetadata {
+	if x != nil {
+		return x.Metadata
+	}
+	return nil
+}
+
+func (x *DrainAITrafficCommand) GetSession() *AISessionRef {
+	if x != nil {
+		return x.Session
+	}
+	return nil
+}
+
+func (x *DrainAITrafficCommand) GetExpectedNodeSessionId() string {
+	if x != nil {
+		return x.ExpectedNodeSessionId
+	}
+	return ""
+}
+
+func (x *DrainAITrafficCommand) GetTimeoutMs() uint32 {
+	if x != nil {
+		return x.TimeoutMs
+	}
+	return 0
+}
+
+type AITrafficDrainResult struct {
+	state           protoimpl.MessageState `protogen:"open.v1"`
+	ProtocolVersion uint32                 `protobuf:"varint,1,opt,name=protocol_version,json=protocolVersion,proto3" json:"protocol_version,omitempty"`
+	Session         *AISessionRef          `protobuf:"bytes,2,opt,name=session,proto3" json:"session,omitempty"`
+	NodeSessionId   string                 `protobuf:"bytes,3,opt,name=node_session_id,json=nodeSessionId,proto3" json:"node_session_id,omitempty"`
+	PendingRecords  uint64                 `protobuf:"varint,4,opt,name=pending_records,json=pendingRecords,proto3" json:"pending_records,omitempty"`
+	Complete        bool                   `protobuf:"varint,5,opt,name=complete,proto3" json:"complete,omitempty"`
+	CommandId       string                 `protobuf:"bytes,6,opt,name=command_id,json=commandId,proto3" json:"command_id,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
+}
+
+func (x *AITrafficDrainResult) Reset() {
+	*x = AITrafficDrainResult{}
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[251]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AITrafficDrainResult) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AITrafficDrainResult) ProtoMessage() {}
+
+func (x *AITrafficDrainResult) ProtoReflect() protoreflect.Message {
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[251]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AITrafficDrainResult.ProtoReflect.Descriptor instead.
+func (*AITrafficDrainResult) Descriptor() ([]byte, []int) {
+	return file_legion_ai_v1_ai_proto_rawDescGZIP(), []int{251}
+}
+
+func (x *AITrafficDrainResult) GetProtocolVersion() uint32 {
+	if x != nil {
+		return x.ProtocolVersion
+	}
+	return 0
+}
+
+func (x *AITrafficDrainResult) GetSession() *AISessionRef {
+	if x != nil {
+		return x.Session
+	}
+	return nil
+}
+
+func (x *AITrafficDrainResult) GetNodeSessionId() string {
+	if x != nil {
+		return x.NodeSessionId
+	}
+	return ""
+}
+
+func (x *AITrafficDrainResult) GetPendingRecords() uint64 {
+	if x != nil {
+		return x.PendingRecords
+	}
+	return 0
+}
+
+func (x *AITrafficDrainResult) GetComplete() bool {
+	if x != nil {
+		return x.Complete
+	}
+	return false
+}
+
+func (x *AITrafficDrainResult) GetCommandId() string {
+	if x != nil {
+		return x.CommandId
+	}
+	return ""
+}
+
+type AITrafficCapability struct {
+	state               protoimpl.MessageState `protogen:"open.v1"`
+	ProtocolVersion     uint32                 `protobuf:"varint,1,opt,name=protocol_version,json=protocolVersion,proto3" json:"protocol_version,omitempty"`
+	SupportedTransports []string               `protobuf:"bytes,2,rep,name=supported_transports,json=supportedTransports,proto3" json:"supported_transports,omitempty"`
+	UnsupportedSources  []string               `protobuf:"bytes,3,rep,name=unsupported_sources,json=unsupportedSources,proto3" json:"unsupported_sources,omitempty"`
+	unknownFields       protoimpl.UnknownFields
+	sizeCache           protoimpl.SizeCache
+}
+
+func (x *AITrafficCapability) Reset() {
+	*x = AITrafficCapability{}
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[252]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AITrafficCapability) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AITrafficCapability) ProtoMessage() {}
+
+func (x *AITrafficCapability) ProtoReflect() protoreflect.Message {
+	mi := &file_legion_ai_v1_ai_proto_msgTypes[252]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AITrafficCapability.ProtoReflect.Descriptor instead.
+func (*AITrafficCapability) Descriptor() ([]byte, []int) {
+	return file_legion_ai_v1_ai_proto_rawDescGZIP(), []int{252}
+}
+
+func (x *AITrafficCapability) GetProtocolVersion() uint32 {
+	if x != nil {
+		return x.ProtocolVersion
+	}
+	return 0
+}
+
+func (x *AITrafficCapability) GetSupportedTransports() []string {
+	if x != nil {
+		return x.SupportedTransports
+	}
+	return nil
+}
+
+func (x *AITrafficCapability) GetUnsupportedSources() []string {
+	if x != nil {
+		return x.UnsupportedSources
+	}
+	return nil
+}
+
 var File_legion_ai_v1_ai_proto protoreflect.FileDescriptor
 
 const file_legion_ai_v1_ai_proto_rawDesc = "" +
@@ -20003,7 +20804,7 @@ const file_legion_ai_v1_ai_proto_rawDesc = "" +
 	"\x16AISessionCredentialRef\x12#\n" +
 	"\rcredential_id\x18\x01 \x01(\tR\fcredentialId\x12'\n" +
 	"\x0fcredential_type\x18\x02 \x01(\tR\x0ecredentialType\x12\x14\n" +
-	"\x05scope\x18\x03 \x01(\tR\x05scope\"\xd1\x05\n" +
+	"\x05scope\x18\x03 \x01(\tR\x05scope\"\xf3\x06\n" +
 	"\x14BindAISessionCommand\x12;\n" +
 	"\bmetadata\x18\x01 \x01(\v2\x1f.legion.node.v1.CommandMetadataR\bmetadata\x12$\n" +
 	"\x0etarget_node_id\x18\x02 \x01(\tR\ftargetNodeId\x124\n" +
@@ -20020,7 +20821,9 @@ const file_legion_ai_v1_ai_proto_rawDesc = "" +
 	"\x0eresult_context\x18\v \x01(\v2\".legion.ai.v1.AIFocusResultContextR\rresultContext\x12\x1d\n" +
 	"\n" +
 	"bind_epoch\x18\f \x01(\x04R\tbindEpoch\x12B\n" +
-	"\x0einput_manifest\x18\r \x01(\v2\x1b.legion.ai.v1.InputManifestR\rinputManifest\"\xa6\x03\n" +
+	"\x0einput_manifest\x18\r \x01(\v2\x1b.legion.ai.v1.InputManifestR\rinputManifest\x12M\n" +
+	"\x0ftraffic_capture\x18\x0e \x01(\v2$.legion.ai.v1.AITrafficCapturePolicyR\x0etrafficCapture\x12Q\n" +
+	"\x10traffic_analysis\x18\x0f \x01(\v2&.legion.ai.v1.AITrafficAnalysisContextR\x0ftrafficAnalysis\"\xa6\x03\n" +
 	"\x19PushAISessionInputCommand\x12;\n" +
 	"\bmetadata\x18\x01 \x01(\v2\x1f.legion.node.v1.CommandMetadataR\bmetadata\x124\n" +
 	"\asession\x18\x02 \x01(\v2\x1a.legion.ai.v1.AISessionRefR\asession\x12\"\n" +
@@ -20032,7 +20835,7 @@ const file_legion_ai_v1_ai_proto_rawDesc = "" +
 	"\x0fcontext_package\x18\x06 \x01(\v2\x1c.legion.ai.v1.ContextPackageR\x0econtextPackage\x12\x1b\n" +
 	"\treview_id\x18\a \x01(\tR\breviewId\x12\x17\n" +
 	"\aturn_id\x18\b \x01(\tR\x06turnId\x127\n" +
-	"\x18expected_node_session_id\x18\t \x01(\tR\x15expectedNodeSessionId\"\xfd\x04\n" +
+	"\x18expected_node_session_id\x18\t \x01(\tR\x15expectedNodeSessionId\"\xd0\x05\n" +
 	"\x0eContextPackage\x12\x1d\n" +
 	"\n" +
 	"session_id\x18\x01 \x01(\tR\tsessionId\x12#\n" +
@@ -20043,7 +20846,8 @@ const file_legion_ai_v1_ai_proto_rawDesc = "" +
 	"\n" +
 	"user_input\x18\x06 \x01(\tR\tuserInput\x12A\n" +
 	"\x1dprovider_policy_snapshot_json\x18\a \x01(\fR\x1aproviderPolicySnapshotJson\x12?\n" +
-	"\x1cruntime_option_snapshot_json\x18\b \x01(\fR\x19runtimeOptionSnapshotJson\x12F\n" +
+	"\x1cruntime_option_snapshot_json\x18\b \x01(\fR\x19runtimeOptionSnapshotJson\x12Q\n" +
+	"\x10traffic_analysis\x18\f \x01(\v2&.legion.ai.v1.AITrafficAnalysisContextR\x0ftrafficAnalysis\x12F\n" +
 	"\rfocus_release\x18\t \x01(\v2!.legion.ai.v1.ContextFocusReleaseR\ffocusRelease\x12F\n" +
 	"\rforge_release\x18\n" +
 	" \x01(\v2!.legion.ai.v1.ContextForgeReleaseR\fforgeRelease\x12E\n" +
@@ -21887,7 +22691,80 @@ const file_legion_ai_v1_ai_proto_rawDesc = "" +
 	"\x04name\x18\x03 \x01(\tR\x04name\x12\x1f\n" +
 	"\varchive_zip\x18\x04 \x01(\fR\n" +
 	"archiveZip\x12\x16\n" +
-	"\x06sha256\x18\x05 \x01(\tR\x06sha256B$Z\"legion/gen/proto/legion/ai/v1;aiv1b\x06proto3"
+	"\x06sha256\x18\x05 \x01(\tR\x06sha256\"\xc9\x01\n" +
+	"\x16AITrafficCapturePolicy\x12)\n" +
+	"\x10protocol_version\x18\x01 \x01(\rR\x0fprotocolVersion\x12&\n" +
+	"\x0fupload_base_url\x18\x02 \x01(\tR\ruploadBaseUrl\x12,\n" +
+	"\x12packet_limit_bytes\x18\x03 \x01(\x04R\x10packetLimitBytes\x12.\n" +
+	"\x13session_limit_bytes\x18\x04 \x01(\x04R\x11sessionLimitBytes\"\xa3\x01\n" +
+	"\x18AITrafficAnalysisContext\x12*\n" +
+	"\x11source_session_id\x18\x01 \x01(\tR\x0fsourceSessionId\x12\x19\n" +
+	"\bflow_ids\x18\x02 \x03(\tR\aflowIds\x12#\n" +
+	"\revidence_text\x18\x03 \x01(\tR\fevidenceText\x12\x1b\n" +
+	"\tread_only\x18\x04 \x01(\bR\breadOnly\"\xb8\x06\n" +
+	"\x0fAITrafficRecord\x12)\n" +
+	"\x10protocol_version\x18\x01 \x01(\rR\x0fprotocolVersion\x12\x17\n" +
+	"\aflow_id\x18\x02 \x01(\tR\x06flowId\x12\x1d\n" +
+	"\n" +
+	"session_id\x18\x03 \x01(\tR\tsessionId\x12\x17\n" +
+	"\aturn_id\x18\x04 \x01(\tR\x06turnId\x12 \n" +
+	"\ftool_call_id\x18\x05 \x01(\tR\n" +
+	"toolCallId\x12\x19\n" +
+	"\bagent_id\x18\x06 \x01(\tR\aagentId\x12\x17\n" +
+	"\anode_id\x18\a \x01(\tR\x06nodeId\x12&\n" +
+	"\x0fnode_session_id\x18\b \x01(\tR\rnodeSessionId\x12\x1d\n" +
+	"\n" +
+	"bind_epoch\x18\t \x01(\x04R\tbindEpoch\x12\x14\n" +
+	"\x05phase\x18\n" +
+	" \x01(\tR\x05phase\x12\x18\n" +
+	"\aoutcome\x18\v \x01(\tR\aoutcome\x12\"\n" +
+	"\rstarted_at_ms\x18\f \x01(\x03R\vstartedAtMs\x12$\n" +
+	"\x0efinished_at_ms\x18\r \x01(\x03R\ffinishedAtMs\x12\x16\n" +
+	"\x06method\x18\x0e \x01(\tR\x06method\x12\x16\n" +
+	"\x06scheme\x18\x0f \x01(\tR\x06scheme\x12\x12\n" +
+	"\x04host\x18\x10 \x01(\tR\x04host\x12\x1f\n" +
+	"\vstatus_code\x18\x11 \x01(\x05R\n" +
+	"statusCode\x12,\n" +
+	"\x12request_size_bytes\x18\x12 \x01(\x04R\x10requestSizeBytes\x12.\n" +
+	"\x13response_size_bytes\x18\x13 \x01(\x04R\x11responseSizeBytes\x12%\n" +
+	"\x0erequest_sha256\x18\x14 \x01(\tR\rrequestSha256\x12'\n" +
+	"\x0fresponse_sha256\x18\x15 \x01(\tR\x0eresponseSha256\x12+\n" +
+	"\x11request_truncated\x18\x16 \x01(\bR\x10requestTruncated\x12-\n" +
+	"\x12response_truncated\x18\x17 \x01(\bR\x11responseTruncated\x12#\n" +
+	"\rcapture_error\x18\x18 \x01(\tR\fcaptureError\"t\n" +
+	"\x0eAITrafficBatch\x12)\n" +
+	"\x10protocol_version\x18\x01 \x01(\rR\x0fprotocolVersion\x127\n" +
+	"\arecords\x18\x02 \x03(\v2\x1d.legion.ai.v1.AITrafficRecordR\arecords\"\x8c\x01\n" +
+	"\x0fAITrafficUpload\x125\n" +
+	"\x06record\x18\x01 \x01(\v2\x1d.legion.ai.v1.AITrafficRecordR\x06record\x12\x1f\n" +
+	"\vraw_request\x18\x02 \x01(\fR\n" +
+	"rawRequest\x12!\n" +
+	"\fraw_response\x18\x03 \x01(\fR\vrawResponse\"\xd2\x01\n" +
+	"\x10AITrafficReceipt\x12)\n" +
+	"\x10protocol_version\x18\x01 \x01(\rR\x0fprotocolVersion\x12\x17\n" +
+	"\aflow_id\x18\x02 \x01(\tR\x06flowId\x12\x14\n" +
+	"\x05phase\x18\x03 \x01(\tR\x05phase\x12#\n" +
+	"\rupload_sha256\x18\x04 \x01(\tR\fuploadSha256\x12\x18\n" +
+	"\adurable\x18\x05 \x01(\bR\adurable\x12%\n" +
+	"\x0estorage_status\x18\x06 \x01(\tR\rstorageStatus\"\xe2\x01\n" +
+	"\x15DrainAITrafficCommand\x12;\n" +
+	"\bmetadata\x18\x01 \x01(\v2\x1f.legion.node.v1.CommandMetadataR\bmetadata\x124\n" +
+	"\asession\x18\x02 \x01(\v2\x1a.legion.ai.v1.AISessionRefR\asession\x127\n" +
+	"\x18expected_node_session_id\x18\x03 \x01(\tR\x15expectedNodeSessionId\x12\x1d\n" +
+	"\n" +
+	"timeout_ms\x18\x04 \x01(\rR\ttimeoutMs\"\x83\x02\n" +
+	"\x14AITrafficDrainResult\x12)\n" +
+	"\x10protocol_version\x18\x01 \x01(\rR\x0fprotocolVersion\x124\n" +
+	"\asession\x18\x02 \x01(\v2\x1a.legion.ai.v1.AISessionRefR\asession\x12&\n" +
+	"\x0fnode_session_id\x18\x03 \x01(\tR\rnodeSessionId\x12'\n" +
+	"\x0fpending_records\x18\x04 \x01(\x04R\x0ependingRecords\x12\x1a\n" +
+	"\bcomplete\x18\x05 \x01(\bR\bcomplete\x12\x1d\n" +
+	"\n" +
+	"command_id\x18\x06 \x01(\tR\tcommandId\"\xa4\x01\n" +
+	"\x13AITrafficCapability\x12)\n" +
+	"\x10protocol_version\x18\x01 \x01(\rR\x0fprotocolVersion\x121\n" +
+	"\x14supported_transports\x18\x02 \x03(\tR\x13supportedTransports\x12/\n" +
+	"\x13unsupported_sources\x18\x03 \x03(\tR\x12unsupportedSourcesB$Z\"legion/gen/proto/legion/ai/v1;aiv1b\x06proto3"
 
 var (
 	file_legion_ai_v1_ai_proto_rawDescOnce sync.Once
@@ -21901,7 +22778,7 @@ func file_legion_ai_v1_ai_proto_rawDescGZIP() []byte {
 	return file_legion_ai_v1_ai_proto_rawDescData
 }
 
-var file_legion_ai_v1_ai_proto_msgTypes = make([]protoimpl.MessageInfo, 245)
+var file_legion_ai_v1_ai_proto_msgTypes = make([]protoimpl.MessageInfo, 254)
 var file_legion_ai_v1_ai_proto_goTypes = []any{
 	(*AISessionRef)(nil),                                // 0: legion.ai.v1.AISessionRef
 	(*AISessionAttachmentRef)(nil),                      // 1: legion.ai.v1.AISessionAttachmentRef
@@ -22147,348 +23024,365 @@ var file_legion_ai_v1_ai_proto_goTypes = []any{
 	(*InputManifest)(nil),                               // 241: legion.ai.v1.InputManifest
 	(*InputResource)(nil),                               // 242: legion.ai.v1.InputResource
 	(*ContextSkillBundle)(nil),                          // 243: legion.ai.v1.ContextSkillBundle
-	nil,                                                 // 244: legion.ai.v1.AIProviderPreviewConfigSnapshot.HeadersEntry
-	(*v1.CommandMetadata)(nil),                          // 245: legion.node.v1.CommandMetadata
-	(*v1.EventMetadata)(nil),                            // 246: legion.node.v1.EventMetadata
-	(*timestamppb.Timestamp)(nil),                       // 247: google.protobuf.Timestamp
-	(*v11.JobRef)(nil),                                  // 248: legion.job.v1.JobRef
+	(*AITrafficCapturePolicy)(nil),                      // 244: legion.ai.v1.AITrafficCapturePolicy
+	(*AITrafficAnalysisContext)(nil),                    // 245: legion.ai.v1.AITrafficAnalysisContext
+	(*AITrafficRecord)(nil),                             // 246: legion.ai.v1.AITrafficRecord
+	(*AITrafficBatch)(nil),                              // 247: legion.ai.v1.AITrafficBatch
+	(*AITrafficUpload)(nil),                             // 248: legion.ai.v1.AITrafficUpload
+	(*AITrafficReceipt)(nil),                            // 249: legion.ai.v1.AITrafficReceipt
+	(*DrainAITrafficCommand)(nil),                       // 250: legion.ai.v1.DrainAITrafficCommand
+	(*AITrafficDrainResult)(nil),                        // 251: legion.ai.v1.AITrafficDrainResult
+	(*AITrafficCapability)(nil),                         // 252: legion.ai.v1.AITrafficCapability
+	nil,                                                 // 253: legion.ai.v1.AIProviderPreviewConfigSnapshot.HeadersEntry
+	(*v1.CommandMetadata)(nil),                          // 254: legion.node.v1.CommandMetadata
+	(*v1.EventMetadata)(nil),                            // 255: legion.node.v1.EventMetadata
+	(*timestamppb.Timestamp)(nil),                       // 256: google.protobuf.Timestamp
+	(*v11.JobRef)(nil),                                  // 257: legion.job.v1.JobRef
 }
 var file_legion_ai_v1_ai_proto_depIdxs = []int32{
-	245, // 0: legion.ai.v1.BindAISessionCommand.metadata:type_name -> legion.node.v1.CommandMetadata
+	254, // 0: legion.ai.v1.BindAISessionCommand.metadata:type_name -> legion.node.v1.CommandMetadata
 	0,   // 1: legion.ai.v1.BindAISessionCommand.session:type_name -> legion.ai.v1.AISessionRef
 	1,   // 2: legion.ai.v1.BindAISessionCommand.attachments:type_name -> legion.ai.v1.AISessionAttachmentRef
 	2,   // 3: legion.ai.v1.BindAISessionCommand.credential_refs:type_name -> legion.ai.v1.AISessionCredentialRef
 	234, // 4: legion.ai.v1.BindAISessionCommand.result_context:type_name -> legion.ai.v1.AIFocusResultContext
 	241, // 5: legion.ai.v1.BindAISessionCommand.input_manifest:type_name -> legion.ai.v1.InputManifest
-	245, // 6: legion.ai.v1.PushAISessionInputCommand.metadata:type_name -> legion.node.v1.CommandMetadata
-	0,   // 7: legion.ai.v1.PushAISessionInputCommand.session:type_name -> legion.ai.v1.AISessionRef
-	5,   // 8: legion.ai.v1.PushAISessionInputCommand.context_package:type_name -> legion.ai.v1.ContextPackage
-	6,   // 9: legion.ai.v1.ContextPackage.messages:type_name -> legion.ai.v1.ContextMessage
-	7,   // 10: legion.ai.v1.ContextPackage.tools:type_name -> legion.ai.v1.ContextTool
-	8,   // 11: legion.ai.v1.ContextPackage.kb_fragments:type_name -> legion.ai.v1.ContextKbFragment
-	237, // 12: legion.ai.v1.ContextPackage.focus_release:type_name -> legion.ai.v1.ContextFocusRelease
-	240, // 13: legion.ai.v1.ContextPackage.forge_release:type_name -> legion.ai.v1.ContextForgeRelease
-	243, // 14: legion.ai.v1.ContextPackage.skill_bundles:type_name -> legion.ai.v1.ContextSkillBundle
-	245, // 15: legion.ai.v1.AppendAISessionContextCommand.metadata:type_name -> legion.node.v1.CommandMetadata
-	0,   // 16: legion.ai.v1.AppendAISessionContextCommand.session:type_name -> legion.ai.v1.AISessionRef
-	1,   // 17: legion.ai.v1.AppendAISessionContextCommand.attachments:type_name -> legion.ai.v1.AISessionAttachmentRef
-	2,   // 18: legion.ai.v1.AppendAISessionContextCommand.credential_refs:type_name -> legion.ai.v1.AISessionCredentialRef
-	245, // 19: legion.ai.v1.CancelAISessionCommand.metadata:type_name -> legion.node.v1.CommandMetadata
-	0,   // 20: legion.ai.v1.CancelAISessionCommand.session:type_name -> legion.ai.v1.AISessionRef
-	245, // 21: legion.ai.v1.CloseAISessionCommand.metadata:type_name -> legion.node.v1.CommandMetadata
-	0,   // 22: legion.ai.v1.CloseAISessionCommand.session:type_name -> legion.ai.v1.AISessionRef
-	245, // 23: legion.ai.v1.UpdateAISessionTitleCommand.metadata:type_name -> legion.node.v1.CommandMetadata
-	0,   // 24: legion.ai.v1.UpdateAISessionTitleCommand.session:type_name -> legion.ai.v1.AISessionRef
-	246, // 25: legion.ai.v1.AISessionTitleUpdated.metadata:type_name -> legion.node.v1.EventMetadata
-	0,   // 26: legion.ai.v1.AISessionTitleUpdated.session:type_name -> legion.ai.v1.AISessionRef
-	246, // 27: legion.ai.v1.AISessionTitleUpdateFailed.metadata:type_name -> legion.node.v1.EventMetadata
-	0,   // 28: legion.ai.v1.AISessionTitleUpdateFailed.session:type_name -> legion.ai.v1.AISessionRef
-	245, // 29: legion.ai.v1.DeleteAISessionCommand.metadata:type_name -> legion.node.v1.CommandMetadata
-	0,   // 30: legion.ai.v1.DeleteAISessionCommand.session:type_name -> legion.ai.v1.AISessionRef
-	246, // 31: legion.ai.v1.AISessionDeleteCompleted.metadata:type_name -> legion.node.v1.EventMetadata
-	0,   // 32: legion.ai.v1.AISessionDeleteCompleted.session:type_name -> legion.ai.v1.AISessionRef
-	246, // 33: legion.ai.v1.AISessionDeleteFailed.metadata:type_name -> legion.node.v1.EventMetadata
-	0,   // 34: legion.ai.v1.AISessionDeleteFailed.session:type_name -> legion.ai.v1.AISessionRef
-	244, // 35: legion.ai.v1.AIProviderPreviewConfigSnapshot.headers:type_name -> legion.ai.v1.AIProviderPreviewConfigSnapshot.HeadersEntry
-	245, // 36: legion.ai.v1.ListAIProviderModelsCommand.metadata:type_name -> legion.node.v1.CommandMetadata
-	18,  // 37: legion.ai.v1.ListAIProviderModelsCommand.provider:type_name -> legion.ai.v1.AIProviderPreviewConfigSnapshot
-	246, // 38: legion.ai.v1.AIProviderModelsListed.metadata:type_name -> legion.node.v1.EventMetadata
-	20,  // 39: legion.ai.v1.AIProviderModelsListed.items:type_name -> legion.ai.v1.AIProviderPreviewModel
-	246, // 40: legion.ai.v1.AIProviderModelsFailed.metadata:type_name -> legion.node.v1.EventMetadata
-	245, // 41: legion.ai.v1.HealthCheckAIProviderCommand.metadata:type_name -> legion.node.v1.CommandMetadata
-	18,  // 42: legion.ai.v1.HealthCheckAIProviderCommand.provider:type_name -> legion.ai.v1.AIProviderPreviewConfigSnapshot
-	246, // 43: legion.ai.v1.AIProviderHealthCheckCompleted.metadata:type_name -> legion.node.v1.EventMetadata
-	18,  // 44: legion.ai.v1.AIProviderHealthCheckCompleted.recommend_config:type_name -> legion.ai.v1.AIProviderPreviewConfigSnapshot
-	246, // 45: legion.ai.v1.AIProviderHealthCheckFailed.metadata:type_name -> legion.node.v1.EventMetadata
-	26,  // 46: legion.ai.v1.AIThirdPartyApplicationConfigSnapshot.extra_params:type_name -> legion.ai.v1.AIConfigKVPair
-	26,  // 47: legion.ai.v1.AIThirdPartyApplicationConfigSnapshot.headers:type_name -> legion.ai.v1.AIConfigKVPair
-	27,  // 48: legion.ai.v1.AIModelConfigSnapshot.provider:type_name -> legion.ai.v1.AIThirdPartyApplicationConfigSnapshot
-	26,  // 49: legion.ai.v1.AIModelConfigSnapshot.extra_params:type_name -> legion.ai.v1.AIConfigKVPair
-	28,  // 50: legion.ai.v1.AIGlobalConfigSnapshot.intelligent_models:type_name -> legion.ai.v1.AIModelConfigSnapshot
-	28,  // 51: legion.ai.v1.AIGlobalConfigSnapshot.lightweight_models:type_name -> legion.ai.v1.AIModelConfigSnapshot
-	28,  // 52: legion.ai.v1.AIGlobalConfigSnapshot.vision_models:type_name -> legion.ai.v1.AIModelConfigSnapshot
-	245, // 53: legion.ai.v1.GetAIGlobalConfigCommand.metadata:type_name -> legion.node.v1.CommandMetadata
-	245, // 54: legion.ai.v1.SetAIGlobalConfigCommand.metadata:type_name -> legion.node.v1.CommandMetadata
-	29,  // 55: legion.ai.v1.SetAIGlobalConfigCommand.config:type_name -> legion.ai.v1.AIGlobalConfigSnapshot
-	246, // 56: legion.ai.v1.AIGlobalConfigFetched.metadata:type_name -> legion.node.v1.EventMetadata
-	29,  // 57: legion.ai.v1.AIGlobalConfigFetched.config:type_name -> legion.ai.v1.AIGlobalConfigSnapshot
-	246, // 58: legion.ai.v1.AIGlobalConfigFetchFailed.metadata:type_name -> legion.node.v1.EventMetadata
-	246, // 59: legion.ai.v1.AIGlobalConfigUpdated.metadata:type_name -> legion.node.v1.EventMetadata
-	29,  // 60: legion.ai.v1.AIGlobalConfigUpdated.config:type_name -> legion.ai.v1.AIGlobalConfigSnapshot
-	246, // 61: legion.ai.v1.AIGlobalConfigUpdateFailed.metadata:type_name -> legion.node.v1.EventMetadata
-	245, // 62: legion.ai.v1.QueryAIFocusCommand.metadata:type_name -> legion.node.v1.CommandMetadata
-	246, // 63: legion.ai.v1.AIFocusQueried.metadata:type_name -> legion.node.v1.EventMetadata
-	36,  // 64: legion.ai.v1.AIFocusQueried.items:type_name -> legion.ai.v1.AIFocus
-	246, // 65: legion.ai.v1.AIFocusQueryFailed.metadata:type_name -> legion.node.v1.EventMetadata
-	245, // 66: legion.ai.v1.GetRandomAIMaterialsCommand.metadata:type_name -> legion.node.v1.CommandMetadata
-	246, // 67: legion.ai.v1.AIMaterialsRandomQueried.metadata:type_name -> legion.node.v1.EventMetadata
-	164, // 68: legion.ai.v1.AIMaterialsRandomQueried.knowledge_base_entries:type_name -> legion.ai.v1.AIKnowledgeBaseEntryRecord
-	123, // 69: legion.ai.v1.AIMaterialsRandomQueried.ai_tools:type_name -> legion.ai.v1.AIToolRecord
-	99,  // 70: legion.ai.v1.AIMaterialsRandomQueried.ai_forges:type_name -> legion.ai.v1.AIForgeRecord
-	246, // 71: legion.ai.v1.AIMaterialsRandomQueryFailed.metadata:type_name -> legion.node.v1.EventMetadata
-	44,  // 72: legion.ai.v1.AIMCPServerTool.params:type_name -> legion.ai.v1.AIMCPServerToolParam
-	45,  // 73: legion.ai.v1.AIMCPServerRecord.tools:type_name -> legion.ai.v1.AIMCPServerTool
-	26,  // 74: legion.ai.v1.AIMCPServerRecord.envs:type_name -> legion.ai.v1.AIConfigKVPair
-	26,  // 75: legion.ai.v1.AIMCPServerRecord.headers:type_name -> legion.ai.v1.AIConfigKVPair
-	245, // 76: legion.ai.v1.ListAIMCPServersCommand.metadata:type_name -> legion.node.v1.CommandMetadata
-	43,  // 77: legion.ai.v1.ListAIMCPServersCommand.pagination:type_name -> legion.ai.v1.AIMCPServerPagination
-	246, // 78: legion.ai.v1.AIMCPServersListed.metadata:type_name -> legion.node.v1.EventMetadata
-	46,  // 79: legion.ai.v1.AIMCPServersListed.items:type_name -> legion.ai.v1.AIMCPServerRecord
-	43,  // 80: legion.ai.v1.AIMCPServersListed.pagination:type_name -> legion.ai.v1.AIMCPServerPagination
-	246, // 81: legion.ai.v1.AIMCPServersListFailed.metadata:type_name -> legion.node.v1.EventMetadata
-	245, // 82: legion.ai.v1.CreateAIMCPServerCommand.metadata:type_name -> legion.node.v1.CommandMetadata
-	26,  // 83: legion.ai.v1.CreateAIMCPServerCommand.envs:type_name -> legion.ai.v1.AIConfigKVPair
-	26,  // 84: legion.ai.v1.CreateAIMCPServerCommand.headers:type_name -> legion.ai.v1.AIConfigKVPair
-	246, // 85: legion.ai.v1.AIMCPServerCreated.metadata:type_name -> legion.node.v1.EventMetadata
-	46,  // 86: legion.ai.v1.AIMCPServerCreated.item:type_name -> legion.ai.v1.AIMCPServerRecord
-	246, // 87: legion.ai.v1.AIMCPServerCreateFailed.metadata:type_name -> legion.node.v1.EventMetadata
-	245, // 88: legion.ai.v1.UpdateAIMCPServerCommand.metadata:type_name -> legion.node.v1.CommandMetadata
-	26,  // 89: legion.ai.v1.UpdateAIMCPServerCommand.envs:type_name -> legion.ai.v1.AIConfigKVPair
-	26,  // 90: legion.ai.v1.UpdateAIMCPServerCommand.headers:type_name -> legion.ai.v1.AIConfigKVPair
-	246, // 91: legion.ai.v1.AIMCPServerUpdated.metadata:type_name -> legion.node.v1.EventMetadata
-	46,  // 92: legion.ai.v1.AIMCPServerUpdated.item:type_name -> legion.ai.v1.AIMCPServerRecord
-	246, // 93: legion.ai.v1.AIMCPServerUpdateFailed.metadata:type_name -> legion.node.v1.EventMetadata
-	245, // 94: legion.ai.v1.DeleteAIMCPServerCommand.metadata:type_name -> legion.node.v1.CommandMetadata
-	246, // 95: legion.ai.v1.AIMCPServerDeleted.metadata:type_name -> legion.node.v1.EventMetadata
-	46,  // 96: legion.ai.v1.AIMCPServerDeleted.item:type_name -> legion.ai.v1.AIMCPServerRecord
-	246, // 97: legion.ai.v1.AIMCPServerDeleteFailed.metadata:type_name -> legion.node.v1.EventMetadata
-	59,  // 98: legion.ai.v1.AILocalModelRecord.status:type_name -> legion.ai.v1.AILocalModelStatus
-	245, // 99: legion.ai.v1.ListAILocalModelsCommand.metadata:type_name -> legion.node.v1.CommandMetadata
-	246, // 100: legion.ai.v1.AILocalModelsListed.metadata:type_name -> legion.node.v1.EventMetadata
-	60,  // 101: legion.ai.v1.AILocalModelsListed.items:type_name -> legion.ai.v1.AILocalModelRecord
-	246, // 102: legion.ai.v1.AILocalModelsListFailed.metadata:type_name -> legion.node.v1.EventMetadata
-	245, // 103: legion.ai.v1.CheckAILlamaServerReadyCommand.metadata:type_name -> legion.node.v1.CommandMetadata
-	246, // 104: legion.ai.v1.AILlamaServerReadyChecked.metadata:type_name -> legion.node.v1.EventMetadata
-	246, // 105: legion.ai.v1.AILlamaServerReadyCheckFailed.metadata:type_name -> legion.node.v1.EventMetadata
-	245, // 106: legion.ai.v1.InstallAILlamaServerCommand.metadata:type_name -> legion.node.v1.CommandMetadata
-	246, // 107: legion.ai.v1.AILocalModelOperationAccepted.metadata:type_name -> legion.node.v1.EventMetadata
-	68,  // 108: legion.ai.v1.AILocalModelOperationAccepted.operation:type_name -> legion.ai.v1.AILocalModelOperation
-	246, // 109: legion.ai.v1.AILocalModelOperationProgressed.metadata:type_name -> legion.node.v1.EventMetadata
-	68,  // 110: legion.ai.v1.AILocalModelOperationProgressed.operation:type_name -> legion.ai.v1.AILocalModelOperation
-	246, // 111: legion.ai.v1.AILocalModelOperationCompleted.metadata:type_name -> legion.node.v1.EventMetadata
-	68,  // 112: legion.ai.v1.AILocalModelOperationCompleted.operation:type_name -> legion.ai.v1.AILocalModelOperation
-	60,  // 113: legion.ai.v1.AILocalModelOperationCompleted.item:type_name -> legion.ai.v1.AILocalModelRecord
-	246, // 114: legion.ai.v1.AILocalModelOperationCancelled.metadata:type_name -> legion.node.v1.EventMetadata
-	68,  // 115: legion.ai.v1.AILocalModelOperationCancelled.operation:type_name -> legion.ai.v1.AILocalModelOperation
-	246, // 116: legion.ai.v1.AILocalModelOperationFailed.metadata:type_name -> legion.node.v1.EventMetadata
-	68,  // 117: legion.ai.v1.AILocalModelOperationFailed.operation:type_name -> legion.ai.v1.AILocalModelOperation
-	246, // 118: legion.ai.v1.AILlamaServerInstalled.metadata:type_name -> legion.node.v1.EventMetadata
-	246, // 119: legion.ai.v1.AILlamaServerInstallFailed.metadata:type_name -> legion.node.v1.EventMetadata
-	245, // 120: legion.ai.v1.CreateAILocalModelCommand.metadata:type_name -> legion.node.v1.CommandMetadata
-	246, // 121: legion.ai.v1.AILocalModelCreated.metadata:type_name -> legion.node.v1.EventMetadata
-	60,  // 122: legion.ai.v1.AILocalModelCreated.item:type_name -> legion.ai.v1.AILocalModelRecord
-	246, // 123: legion.ai.v1.AILocalModelCreateFailed.metadata:type_name -> legion.node.v1.EventMetadata
-	245, // 124: legion.ai.v1.UpdateAILocalModelCommand.metadata:type_name -> legion.node.v1.CommandMetadata
-	246, // 125: legion.ai.v1.AILocalModelUpdated.metadata:type_name -> legion.node.v1.EventMetadata
-	60,  // 126: legion.ai.v1.AILocalModelUpdated.item:type_name -> legion.ai.v1.AILocalModelRecord
-	246, // 127: legion.ai.v1.AILocalModelUpdateFailed.metadata:type_name -> legion.node.v1.EventMetadata
-	245, // 128: legion.ai.v1.DeleteAILocalModelCommand.metadata:type_name -> legion.node.v1.CommandMetadata
-	246, // 129: legion.ai.v1.AILocalModelDeleted.metadata:type_name -> legion.node.v1.EventMetadata
-	60,  // 130: legion.ai.v1.AILocalModelDeleted.item:type_name -> legion.ai.v1.AILocalModelRecord
-	246, // 131: legion.ai.v1.AILocalModelDeleteFailed.metadata:type_name -> legion.node.v1.EventMetadata
-	245, // 132: legion.ai.v1.StartAILocalModelCommand.metadata:type_name -> legion.node.v1.CommandMetadata
-	246, // 133: legion.ai.v1.AILocalModelStarted.metadata:type_name -> legion.node.v1.EventMetadata
-	60,  // 134: legion.ai.v1.AILocalModelStarted.item:type_name -> legion.ai.v1.AILocalModelRecord
-	246, // 135: legion.ai.v1.AILocalModelStartFailed.metadata:type_name -> legion.node.v1.EventMetadata
-	245, // 136: legion.ai.v1.StopAILocalModelCommand.metadata:type_name -> legion.node.v1.CommandMetadata
-	246, // 137: legion.ai.v1.AILocalModelStopped.metadata:type_name -> legion.node.v1.EventMetadata
-	60,  // 138: legion.ai.v1.AILocalModelStopped.item:type_name -> legion.ai.v1.AILocalModelRecord
-	246, // 139: legion.ai.v1.AILocalModelStopFailed.metadata:type_name -> legion.node.v1.EventMetadata
-	245, // 140: legion.ai.v1.DownloadAILocalModelCommand.metadata:type_name -> legion.node.v1.CommandMetadata
-	245, // 141: legion.ai.v1.CancelAILocalModelOperationCommand.metadata:type_name -> legion.node.v1.CommandMetadata
-	246, // 142: legion.ai.v1.AILocalModelDownloaded.metadata:type_name -> legion.node.v1.EventMetadata
-	60,  // 143: legion.ai.v1.AILocalModelDownloaded.item:type_name -> legion.ai.v1.AILocalModelRecord
-	246, // 144: legion.ai.v1.AILocalModelDownloadFailed.metadata:type_name -> legion.node.v1.EventMetadata
-	245, // 145: legion.ai.v1.ClearAILocalModelsCommand.metadata:type_name -> legion.node.v1.CommandMetadata
-	246, // 146: legion.ai.v1.AILocalModelsCleared.metadata:type_name -> legion.node.v1.EventMetadata
-	246, // 147: legion.ai.v1.AILocalModelsClearFailed.metadata:type_name -> legion.node.v1.EventMetadata
-	245, // 148: legion.ai.v1.ListAIForgesCommand.metadata:type_name -> legion.node.v1.CommandMetadata
-	98,  // 149: legion.ai.v1.ListAIForgesCommand.pagination:type_name -> legion.ai.v1.AIForgePagination
-	246, // 150: legion.ai.v1.AIForgesListed.metadata:type_name -> legion.node.v1.EventMetadata
-	99,  // 151: legion.ai.v1.AIForgesListed.items:type_name -> legion.ai.v1.AIForgeRecord
-	98,  // 152: legion.ai.v1.AIForgesListed.pagination:type_name -> legion.ai.v1.AIForgePagination
-	246, // 153: legion.ai.v1.AIForgesListFailed.metadata:type_name -> legion.node.v1.EventMetadata
-	245, // 154: legion.ai.v1.CreateAIForgeCommand.metadata:type_name -> legion.node.v1.CommandMetadata
-	246, // 155: legion.ai.v1.AIForgeCreated.metadata:type_name -> legion.node.v1.EventMetadata
-	99,  // 156: legion.ai.v1.AIForgeCreated.item:type_name -> legion.ai.v1.AIForgeRecord
-	246, // 157: legion.ai.v1.AIForgeCreateFailed.metadata:type_name -> legion.node.v1.EventMetadata
-	245, // 158: legion.ai.v1.UpdateAIForgeCommand.metadata:type_name -> legion.node.v1.CommandMetadata
-	246, // 159: legion.ai.v1.AIForgeUpdated.metadata:type_name -> legion.node.v1.EventMetadata
-	99,  // 160: legion.ai.v1.AIForgeUpdated.item:type_name -> legion.ai.v1.AIForgeRecord
-	246, // 161: legion.ai.v1.AIForgeUpdateFailed.metadata:type_name -> legion.node.v1.EventMetadata
-	245, // 162: legion.ai.v1.DeleteAIForgeCommand.metadata:type_name -> legion.node.v1.CommandMetadata
-	246, // 163: legion.ai.v1.AIForgeDeleted.metadata:type_name -> legion.node.v1.EventMetadata
-	246, // 164: legion.ai.v1.AIForgeDeleteFailed.metadata:type_name -> legion.node.v1.EventMetadata
-	245, // 165: legion.ai.v1.ExportAIForgeCommand.metadata:type_name -> legion.node.v1.CommandMetadata
-	246, // 166: legion.ai.v1.AIForgeExportProgressed.metadata:type_name -> legion.node.v1.EventMetadata
-	246, // 167: legion.ai.v1.AIForgeExported.metadata:type_name -> legion.node.v1.EventMetadata
-	246, // 168: legion.ai.v1.AIForgeExportFailed.metadata:type_name -> legion.node.v1.EventMetadata
-	245, // 169: legion.ai.v1.ImportAIForgeCommand.metadata:type_name -> legion.node.v1.CommandMetadata
-	116, // 170: legion.ai.v1.ImportAIForgeCommand.attachment:type_name -> legion.ai.v1.AIForgeImportAttachment
-	246, // 171: legion.ai.v1.AIForgeImportProgressed.metadata:type_name -> legion.node.v1.EventMetadata
-	246, // 172: legion.ai.v1.AIForgeImported.metadata:type_name -> legion.node.v1.EventMetadata
-	119, // 173: legion.ai.v1.AIForgeImported.items:type_name -> legion.ai.v1.AIForgeImportItem
-	246, // 174: legion.ai.v1.AIForgeImportFailed.metadata:type_name -> legion.node.v1.EventMetadata
-	245, // 175: legion.ai.v1.ListAIToolsCommand.metadata:type_name -> legion.node.v1.CommandMetadata
-	122, // 176: legion.ai.v1.ListAIToolsCommand.pagination:type_name -> legion.ai.v1.AIToolPagination
-	246, // 177: legion.ai.v1.AIToolsListed.metadata:type_name -> legion.node.v1.EventMetadata
-	123, // 178: legion.ai.v1.AIToolsListed.items:type_name -> legion.ai.v1.AIToolRecord
-	122, // 179: legion.ai.v1.AIToolsListed.pagination:type_name -> legion.ai.v1.AIToolPagination
-	246, // 180: legion.ai.v1.AIToolsListFailed.metadata:type_name -> legion.node.v1.EventMetadata
-	245, // 181: legion.ai.v1.CreateAIToolCommand.metadata:type_name -> legion.node.v1.CommandMetadata
-	246, // 182: legion.ai.v1.AIToolCreated.metadata:type_name -> legion.node.v1.EventMetadata
-	123, // 183: legion.ai.v1.AIToolCreated.item:type_name -> legion.ai.v1.AIToolRecord
-	246, // 184: legion.ai.v1.AIToolCreateFailed.metadata:type_name -> legion.node.v1.EventMetadata
-	245, // 185: legion.ai.v1.UpdateAIToolCommand.metadata:type_name -> legion.node.v1.CommandMetadata
-	246, // 186: legion.ai.v1.AIToolUpdated.metadata:type_name -> legion.node.v1.EventMetadata
-	123, // 187: legion.ai.v1.AIToolUpdated.item:type_name -> legion.ai.v1.AIToolRecord
-	246, // 188: legion.ai.v1.AIToolUpdateFailed.metadata:type_name -> legion.node.v1.EventMetadata
-	245, // 189: legion.ai.v1.GenerateAIToolMetadataCommand.metadata:type_name -> legion.node.v1.CommandMetadata
-	246, // 190: legion.ai.v1.AIToolMetadataGenerated.metadata:type_name -> legion.node.v1.EventMetadata
-	246, // 191: legion.ai.v1.AIToolMetadataGenerateFailed.metadata:type_name -> legion.node.v1.EventMetadata
-	245, // 192: legion.ai.v1.ToggleAIToolFavoriteCommand.metadata:type_name -> legion.node.v1.CommandMetadata
-	246, // 193: legion.ai.v1.AIToolFavoriteToggled.metadata:type_name -> legion.node.v1.EventMetadata
-	246, // 194: legion.ai.v1.AIToolFavoriteToggleFailed.metadata:type_name -> legion.node.v1.EventMetadata
-	245, // 195: legion.ai.v1.DeleteAIToolsCommand.metadata:type_name -> legion.node.v1.CommandMetadata
-	246, // 196: legion.ai.v1.AIToolsDeleted.metadata:type_name -> legion.node.v1.EventMetadata
-	246, // 197: legion.ai.v1.AIToolsDeleteFailed.metadata:type_name -> legion.node.v1.EventMetadata
-	245, // 198: legion.ai.v1.ListAIKnowledgeBasesCommand.metadata:type_name -> legion.node.v1.CommandMetadata
-	142, // 199: legion.ai.v1.ListAIKnowledgeBasesCommand.pagination:type_name -> legion.ai.v1.AIKnowledgeBasePagination
-	246, // 200: legion.ai.v1.AIKnowledgeBasesListed.metadata:type_name -> legion.node.v1.EventMetadata
-	143, // 201: legion.ai.v1.AIKnowledgeBasesListed.items:type_name -> legion.ai.v1.AIKnowledgeBaseRecord
-	142, // 202: legion.ai.v1.AIKnowledgeBasesListed.pagination:type_name -> legion.ai.v1.AIKnowledgeBasePagination
-	246, // 203: legion.ai.v1.AIKnowledgeBasesListFailed.metadata:type_name -> legion.node.v1.EventMetadata
-	245, // 204: legion.ai.v1.CreateAIKnowledgeBaseCommand.metadata:type_name -> legion.node.v1.CommandMetadata
-	246, // 205: legion.ai.v1.AIKnowledgeBaseCreated.metadata:type_name -> legion.node.v1.EventMetadata
-	143, // 206: legion.ai.v1.AIKnowledgeBaseCreated.item:type_name -> legion.ai.v1.AIKnowledgeBaseRecord
-	246, // 207: legion.ai.v1.AIKnowledgeBaseCreateFailed.metadata:type_name -> legion.node.v1.EventMetadata
-	245, // 208: legion.ai.v1.ImportAIKnowledgeBaseCommand.metadata:type_name -> legion.node.v1.CommandMetadata
-	148, // 209: legion.ai.v1.ImportAIKnowledgeBaseCommand.attachment:type_name -> legion.ai.v1.AIKnowledgeBaseImportAttachment
-	246, // 210: legion.ai.v1.AIKnowledgeBaseImported.metadata:type_name -> legion.node.v1.EventMetadata
-	143, // 211: legion.ai.v1.AIKnowledgeBaseImported.item:type_name -> legion.ai.v1.AIKnowledgeBaseRecord
-	246, // 212: legion.ai.v1.AIKnowledgeBaseImportFailed.metadata:type_name -> legion.node.v1.EventMetadata
-	245, // 213: legion.ai.v1.UpdateAIKnowledgeBaseCommand.metadata:type_name -> legion.node.v1.CommandMetadata
-	246, // 214: legion.ai.v1.AIKnowledgeBaseUpdated.metadata:type_name -> legion.node.v1.EventMetadata
-	143, // 215: legion.ai.v1.AIKnowledgeBaseUpdated.item:type_name -> legion.ai.v1.AIKnowledgeBaseRecord
-	246, // 216: legion.ai.v1.AIKnowledgeBaseUpdateFailed.metadata:type_name -> legion.node.v1.EventMetadata
-	245, // 217: legion.ai.v1.DeleteAIKnowledgeBaseCommand.metadata:type_name -> legion.node.v1.CommandMetadata
-	246, // 218: legion.ai.v1.AIKnowledgeBaseDeleted.metadata:type_name -> legion.node.v1.EventMetadata
-	143, // 219: legion.ai.v1.AIKnowledgeBaseDeleted.item:type_name -> legion.ai.v1.AIKnowledgeBaseRecord
-	246, // 220: legion.ai.v1.AIKnowledgeBaseDeleteFailed.metadata:type_name -> legion.node.v1.EventMetadata
-	245, // 221: legion.ai.v1.ExportAIKnowledgeBaseCommand.metadata:type_name -> legion.node.v1.CommandMetadata
-	246, // 222: legion.ai.v1.AIKnowledgeBaseExported.metadata:type_name -> legion.node.v1.EventMetadata
-	143, // 223: legion.ai.v1.AIKnowledgeBaseExported.item:type_name -> legion.ai.v1.AIKnowledgeBaseRecord
-	246, // 224: legion.ai.v1.AIKnowledgeBaseExportFailed.metadata:type_name -> legion.node.v1.EventMetadata
-	245, // 225: legion.ai.v1.SearchAIKnowledgeBaseEntriesCommand.metadata:type_name -> legion.node.v1.CommandMetadata
-	163, // 226: legion.ai.v1.SearchAIKnowledgeBaseEntriesCommand.filter:type_name -> legion.ai.v1.AIKnowledgeBaseEntryFilter
-	142, // 227: legion.ai.v1.SearchAIKnowledgeBaseEntriesCommand.pagination:type_name -> legion.ai.v1.AIKnowledgeBasePagination
-	246, // 228: legion.ai.v1.AIKnowledgeBaseEntriesSearched.metadata:type_name -> legion.node.v1.EventMetadata
-	164, // 229: legion.ai.v1.AIKnowledgeBaseEntriesSearched.items:type_name -> legion.ai.v1.AIKnowledgeBaseEntryRecord
-	142, // 230: legion.ai.v1.AIKnowledgeBaseEntriesSearched.pagination:type_name -> legion.ai.v1.AIKnowledgeBasePagination
-	246, // 231: legion.ai.v1.AIKnowledgeBaseEntriesSearchFailed.metadata:type_name -> legion.node.v1.EventMetadata
-	245, // 232: legion.ai.v1.QueryAIKnowledgeBaseByAICommand.metadata:type_name -> legion.node.v1.CommandMetadata
-	245, // 233: legion.ai.v1.CancelAIKnowledgeBaseByAIQueryCommand.metadata:type_name -> legion.node.v1.CommandMetadata
-	246, // 234: legion.ai.v1.AIKnowledgeBaseQueryByAIChunk.metadata:type_name -> legion.node.v1.EventMetadata
-	246, // 235: legion.ai.v1.AIKnowledgeBaseQueryByAICompleted.metadata:type_name -> legion.node.v1.EventMetadata
-	246, // 236: legion.ai.v1.AIKnowledgeBaseQueryByAIFailed.metadata:type_name -> legion.node.v1.EventMetadata
-	245, // 237: legion.ai.v1.GenerateAIKnowledgeBaseQuestionIndexCommand.metadata:type_name -> legion.node.v1.CommandMetadata
-	245, // 238: legion.ai.v1.CancelAIKnowledgeBaseQuestionIndexCommand.metadata:type_name -> legion.node.v1.CommandMetadata
-	246, // 239: legion.ai.v1.AIKnowledgeBaseQuestionIndexProgress.metadata:type_name -> legion.node.v1.EventMetadata
-	246, // 240: legion.ai.v1.AIKnowledgeBaseQuestionIndexCompleted.metadata:type_name -> legion.node.v1.EventMetadata
-	246, // 241: legion.ai.v1.AIKnowledgeBaseQuestionIndexFailed.metadata:type_name -> legion.node.v1.EventMetadata
-	245, // 242: legion.ai.v1.CreateAIKnowledgeBaseEntryCommand.metadata:type_name -> legion.node.v1.CommandMetadata
-	246, // 243: legion.ai.v1.AIKnowledgeBaseEntryCreated.metadata:type_name -> legion.node.v1.EventMetadata
-	164, // 244: legion.ai.v1.AIKnowledgeBaseEntryCreated.item:type_name -> legion.ai.v1.AIKnowledgeBaseEntryRecord
-	246, // 245: legion.ai.v1.AIKnowledgeBaseEntryCreateFailed.metadata:type_name -> legion.node.v1.EventMetadata
-	245, // 246: legion.ai.v1.UpdateAIKnowledgeBaseEntryCommand.metadata:type_name -> legion.node.v1.CommandMetadata
-	246, // 247: legion.ai.v1.AIKnowledgeBaseEntryUpdated.metadata:type_name -> legion.node.v1.EventMetadata
-	164, // 248: legion.ai.v1.AIKnowledgeBaseEntryUpdated.item:type_name -> legion.ai.v1.AIKnowledgeBaseEntryRecord
-	246, // 249: legion.ai.v1.AIKnowledgeBaseEntryUpdateFailed.metadata:type_name -> legion.node.v1.EventMetadata
-	245, // 250: legion.ai.v1.DeleteAIKnowledgeBaseEntryCommand.metadata:type_name -> legion.node.v1.CommandMetadata
-	246, // 251: legion.ai.v1.AIKnowledgeBaseEntryDeleted.metadata:type_name -> legion.node.v1.EventMetadata
-	246, // 252: legion.ai.v1.AIKnowledgeBaseEntryDeleteFailed.metadata:type_name -> legion.node.v1.EventMetadata
-	245, // 253: legion.ai.v1.BuildAIKnowledgeBaseVectorIndexCommand.metadata:type_name -> legion.node.v1.CommandMetadata
-	246, // 254: legion.ai.v1.AIKnowledgeBaseVectorIndexBuilt.metadata:type_name -> legion.node.v1.EventMetadata
-	246, // 255: legion.ai.v1.AIKnowledgeBaseVectorIndexBuildFailed.metadata:type_name -> legion.node.v1.EventMetadata
-	245, // 256: legion.ai.v1.BuildAIKnowledgeBaseEntryVectorIndexCommand.metadata:type_name -> legion.node.v1.CommandMetadata
-	246, // 257: legion.ai.v1.AIKnowledgeBaseEntryVectorIndexBuilt.metadata:type_name -> legion.node.v1.EventMetadata
-	246, // 258: legion.ai.v1.AIKnowledgeBaseEntryVectorIndexBuildFailed.metadata:type_name -> legion.node.v1.EventMetadata
-	193, // 259: legion.ai.v1.AIMemoryEntityFilter.c_score:type_name -> legion.ai.v1.AIMemoryFloatRange
-	193, // 260: legion.ai.v1.AIMemoryEntityFilter.o_score:type_name -> legion.ai.v1.AIMemoryFloatRange
-	193, // 261: legion.ai.v1.AIMemoryEntityFilter.r_score:type_name -> legion.ai.v1.AIMemoryFloatRange
-	193, // 262: legion.ai.v1.AIMemoryEntityFilter.e_score:type_name -> legion.ai.v1.AIMemoryFloatRange
-	193, // 263: legion.ai.v1.AIMemoryEntityFilter.p_score:type_name -> legion.ai.v1.AIMemoryFloatRange
-	193, // 264: legion.ai.v1.AIMemoryEntityFilter.a_score:type_name -> legion.ai.v1.AIMemoryFloatRange
-	193, // 265: legion.ai.v1.AIMemoryEntityFilter.t_score:type_name -> legion.ai.v1.AIMemoryFloatRange
-	194, // 266: legion.ai.v1.AIMemoryEntityFilter.created_at:type_name -> legion.ai.v1.AIMemoryInt64Range
-	194, // 267: legion.ai.v1.AIMemoryEntityFilter.updated_at:type_name -> legion.ai.v1.AIMemoryInt64Range
-	245, // 268: legion.ai.v1.CreateAIMemoryEntityCommand.metadata:type_name -> legion.node.v1.CommandMetadata
-	246, // 269: legion.ai.v1.AIMemoryEntityCreated.metadata:type_name -> legion.node.v1.EventMetadata
-	246, // 270: legion.ai.v1.AIMemoryEntityCreateFailed.metadata:type_name -> legion.node.v1.EventMetadata
-	245, // 271: legion.ai.v1.GetAIMemoryEntityCommand.metadata:type_name -> legion.node.v1.CommandMetadata
-	246, // 272: legion.ai.v1.AIMemoryEntityFetched.metadata:type_name -> legion.node.v1.EventMetadata
-	197, // 273: legion.ai.v1.AIMemoryEntityFetched.item:type_name -> legion.ai.v1.AIMemoryEntityRecord
-	246, // 274: legion.ai.v1.AIMemoryEntityFetchFailed.metadata:type_name -> legion.node.v1.EventMetadata
-	245, // 275: legion.ai.v1.QueryAIMemoryEntitiesCommand.metadata:type_name -> legion.node.v1.CommandMetadata
-	195, // 276: legion.ai.v1.QueryAIMemoryEntitiesCommand.pagination:type_name -> legion.ai.v1.AIMemoryPagination
-	198, // 277: legion.ai.v1.QueryAIMemoryEntitiesCommand.filter:type_name -> legion.ai.v1.AIMemoryEntityFilter
-	246, // 278: legion.ai.v1.AIMemoryEntitiesQueried.metadata:type_name -> legion.node.v1.EventMetadata
-	195, // 279: legion.ai.v1.AIMemoryEntitiesQueried.pagination:type_name -> legion.ai.v1.AIMemoryPagination
-	197, // 280: legion.ai.v1.AIMemoryEntitiesQueried.items:type_name -> legion.ai.v1.AIMemoryEntityRecord
-	246, // 281: legion.ai.v1.AIMemoryEntitiesQueryFailed.metadata:type_name -> legion.node.v1.EventMetadata
-	245, // 282: legion.ai.v1.UpdateAIMemoryEntityCommand.metadata:type_name -> legion.node.v1.CommandMetadata
-	197, // 283: legion.ai.v1.UpdateAIMemoryEntityCommand.item:type_name -> legion.ai.v1.AIMemoryEntityRecord
-	246, // 284: legion.ai.v1.AIMemoryEntityUpdated.metadata:type_name -> legion.node.v1.EventMetadata
-	197, // 285: legion.ai.v1.AIMemoryEntityUpdated.item:type_name -> legion.ai.v1.AIMemoryEntityRecord
-	246, // 286: legion.ai.v1.AIMemoryEntityUpdateFailed.metadata:type_name -> legion.node.v1.EventMetadata
-	245, // 287: legion.ai.v1.DeleteAIMemoryEntitiesCommand.metadata:type_name -> legion.node.v1.CommandMetadata
-	198, // 288: legion.ai.v1.DeleteAIMemoryEntitiesCommand.filter:type_name -> legion.ai.v1.AIMemoryEntityFilter
-	246, // 289: legion.ai.v1.AIMemoryEntitiesDeleted.metadata:type_name -> legion.node.v1.EventMetadata
-	246, // 290: legion.ai.v1.AIMemoryEntitiesDeleteFailed.metadata:type_name -> legion.node.v1.EventMetadata
-	245, // 291: legion.ai.v1.CountAIMemoryEntityTagsCommand.metadata:type_name -> legion.node.v1.CommandMetadata
-	246, // 292: legion.ai.v1.AIMemoryEntityTagsCounted.metadata:type_name -> legion.node.v1.EventMetadata
-	196, // 293: legion.ai.v1.AIMemoryEntityTagsCounted.tags_count:type_name -> legion.ai.v1.AIMemoryTagCount
-	246, // 294: legion.ai.v1.AIMemoryEntityTagsCountFailed.metadata:type_name -> legion.node.v1.EventMetadata
-	245, // 295: legion.ai.v1.QueryAIHTTPFlowsCommand.metadata:type_name -> legion.node.v1.CommandMetadata
-	217, // 296: legion.ai.v1.QueryAIHTTPFlowsCommand.pagination:type_name -> legion.ai.v1.AIRuntimePagination
-	246, // 297: legion.ai.v1.AIHTTPFlowsQueried.metadata:type_name -> legion.node.v1.EventMetadata
-	218, // 298: legion.ai.v1.AIHTTPFlowsQueried.items:type_name -> legion.ai.v1.AIHTTPFlowRecord
-	217, // 299: legion.ai.v1.AIHTTPFlowsQueried.pagination:type_name -> legion.ai.v1.AIRuntimePagination
-	246, // 300: legion.ai.v1.AIHTTPFlowsQueryFailed.metadata:type_name -> legion.node.v1.EventMetadata
-	245, // 301: legion.ai.v1.QueryAIRisksCommand.metadata:type_name -> legion.node.v1.CommandMetadata
-	217, // 302: legion.ai.v1.QueryAIRisksCommand.pagination:type_name -> legion.ai.v1.AIRuntimePagination
-	246, // 303: legion.ai.v1.AIRisksQueried.metadata:type_name -> legion.node.v1.EventMetadata
-	222, // 304: legion.ai.v1.AIRisksQueried.items:type_name -> legion.ai.v1.AIRiskRecord
-	217, // 305: legion.ai.v1.AIRisksQueried.pagination:type_name -> legion.ai.v1.AIRuntimePagination
-	246, // 306: legion.ai.v1.AIRisksQueryFailed.metadata:type_name -> legion.node.v1.EventMetadata
-	245, // 307: legion.ai.v1.ExportAILogsCheckpointsCommand.metadata:type_name -> legion.node.v1.CommandMetadata
-	246, // 308: legion.ai.v1.AILogsCheckpointsExported.metadata:type_name -> legion.node.v1.EventMetadata
-	246, // 309: legion.ai.v1.AILogsCheckpointsExportFailed.metadata:type_name -> legion.node.v1.EventMetadata
-	246, // 310: legion.ai.v1.AISessionReady.metadata:type_name -> legion.node.v1.EventMetadata
-	0,   // 311: legion.ai.v1.AISessionReady.session:type_name -> legion.ai.v1.AISessionRef
-	247, // 312: legion.ai.v1.AISessionReady.ready_at:type_name -> google.protobuf.Timestamp
-	246, // 313: legion.ai.v1.AISessionEvent.metadata:type_name -> legion.node.v1.EventMetadata
-	0,   // 314: legion.ai.v1.AISessionEvent.session:type_name -> legion.ai.v1.AISessionRef
-	246, // 315: legion.ai.v1.AISessionDone.metadata:type_name -> legion.node.v1.EventMetadata
-	0,   // 316: legion.ai.v1.AISessionDone.session:type_name -> legion.ai.v1.AISessionRef
-	247, // 317: legion.ai.v1.AISessionDone.finished_at:type_name -> google.protobuf.Timestamp
-	246, // 318: legion.ai.v1.AISessionFailed.metadata:type_name -> legion.node.v1.EventMetadata
-	0,   // 319: legion.ai.v1.AISessionFailed.session:type_name -> legion.ai.v1.AISessionRef
-	247, // 320: legion.ai.v1.AISessionFailed.finished_at:type_name -> google.protobuf.Timestamp
-	246, // 321: legion.ai.v1.AISessionCancelled.metadata:type_name -> legion.node.v1.EventMetadata
-	0,   // 322: legion.ai.v1.AISessionCancelled.session:type_name -> legion.ai.v1.AISessionRef
-	247, // 323: legion.ai.v1.AISessionCancelled.finished_at:type_name -> google.protobuf.Timestamp
-	248, // 324: legion.ai.v1.AIFocusResultContext.job:type_name -> legion.job.v1.JobRef
-	235, // 325: legion.ai.v1.AIFocusResultContext.risk_judgement_scope:type_name -> legion.ai.v1.AIFocusRiskJudgementScope
-	236, // 326: legion.ai.v1.ContextFocusRelease.sidekicks:type_name -> legion.ai.v1.ContextFocusSidekick
-	238, // 327: legion.ai.v1.ContextForgeRelease.parameters:type_name -> legion.ai.v1.ContextForgeParameter
-	239, // 328: legion.ai.v1.ContextForgeRelease.tool_snapshots:type_name -> legion.ai.v1.ContextForgeTool
-	242, // 329: legion.ai.v1.InputManifest.resources:type_name -> legion.ai.v1.InputResource
-	330, // [330:330] is the sub-list for method output_type
-	330, // [330:330] is the sub-list for method input_type
-	330, // [330:330] is the sub-list for extension type_name
-	330, // [330:330] is the sub-list for extension extendee
-	0,   // [0:330] is the sub-list for field type_name
+	244, // 6: legion.ai.v1.BindAISessionCommand.traffic_capture:type_name -> legion.ai.v1.AITrafficCapturePolicy
+	245, // 7: legion.ai.v1.BindAISessionCommand.traffic_analysis:type_name -> legion.ai.v1.AITrafficAnalysisContext
+	254, // 8: legion.ai.v1.PushAISessionInputCommand.metadata:type_name -> legion.node.v1.CommandMetadata
+	0,   // 9: legion.ai.v1.PushAISessionInputCommand.session:type_name -> legion.ai.v1.AISessionRef
+	5,   // 10: legion.ai.v1.PushAISessionInputCommand.context_package:type_name -> legion.ai.v1.ContextPackage
+	6,   // 11: legion.ai.v1.ContextPackage.messages:type_name -> legion.ai.v1.ContextMessage
+	7,   // 12: legion.ai.v1.ContextPackage.tools:type_name -> legion.ai.v1.ContextTool
+	8,   // 13: legion.ai.v1.ContextPackage.kb_fragments:type_name -> legion.ai.v1.ContextKbFragment
+	245, // 14: legion.ai.v1.ContextPackage.traffic_analysis:type_name -> legion.ai.v1.AITrafficAnalysisContext
+	237, // 15: legion.ai.v1.ContextPackage.focus_release:type_name -> legion.ai.v1.ContextFocusRelease
+	240, // 16: legion.ai.v1.ContextPackage.forge_release:type_name -> legion.ai.v1.ContextForgeRelease
+	243, // 17: legion.ai.v1.ContextPackage.skill_bundles:type_name -> legion.ai.v1.ContextSkillBundle
+	254, // 18: legion.ai.v1.AppendAISessionContextCommand.metadata:type_name -> legion.node.v1.CommandMetadata
+	0,   // 19: legion.ai.v1.AppendAISessionContextCommand.session:type_name -> legion.ai.v1.AISessionRef
+	1,   // 20: legion.ai.v1.AppendAISessionContextCommand.attachments:type_name -> legion.ai.v1.AISessionAttachmentRef
+	2,   // 21: legion.ai.v1.AppendAISessionContextCommand.credential_refs:type_name -> legion.ai.v1.AISessionCredentialRef
+	254, // 22: legion.ai.v1.CancelAISessionCommand.metadata:type_name -> legion.node.v1.CommandMetadata
+	0,   // 23: legion.ai.v1.CancelAISessionCommand.session:type_name -> legion.ai.v1.AISessionRef
+	254, // 24: legion.ai.v1.CloseAISessionCommand.metadata:type_name -> legion.node.v1.CommandMetadata
+	0,   // 25: legion.ai.v1.CloseAISessionCommand.session:type_name -> legion.ai.v1.AISessionRef
+	254, // 26: legion.ai.v1.UpdateAISessionTitleCommand.metadata:type_name -> legion.node.v1.CommandMetadata
+	0,   // 27: legion.ai.v1.UpdateAISessionTitleCommand.session:type_name -> legion.ai.v1.AISessionRef
+	255, // 28: legion.ai.v1.AISessionTitleUpdated.metadata:type_name -> legion.node.v1.EventMetadata
+	0,   // 29: legion.ai.v1.AISessionTitleUpdated.session:type_name -> legion.ai.v1.AISessionRef
+	255, // 30: legion.ai.v1.AISessionTitleUpdateFailed.metadata:type_name -> legion.node.v1.EventMetadata
+	0,   // 31: legion.ai.v1.AISessionTitleUpdateFailed.session:type_name -> legion.ai.v1.AISessionRef
+	254, // 32: legion.ai.v1.DeleteAISessionCommand.metadata:type_name -> legion.node.v1.CommandMetadata
+	0,   // 33: legion.ai.v1.DeleteAISessionCommand.session:type_name -> legion.ai.v1.AISessionRef
+	255, // 34: legion.ai.v1.AISessionDeleteCompleted.metadata:type_name -> legion.node.v1.EventMetadata
+	0,   // 35: legion.ai.v1.AISessionDeleteCompleted.session:type_name -> legion.ai.v1.AISessionRef
+	255, // 36: legion.ai.v1.AISessionDeleteFailed.metadata:type_name -> legion.node.v1.EventMetadata
+	0,   // 37: legion.ai.v1.AISessionDeleteFailed.session:type_name -> legion.ai.v1.AISessionRef
+	253, // 38: legion.ai.v1.AIProviderPreviewConfigSnapshot.headers:type_name -> legion.ai.v1.AIProviderPreviewConfigSnapshot.HeadersEntry
+	254, // 39: legion.ai.v1.ListAIProviderModelsCommand.metadata:type_name -> legion.node.v1.CommandMetadata
+	18,  // 40: legion.ai.v1.ListAIProviderModelsCommand.provider:type_name -> legion.ai.v1.AIProviderPreviewConfigSnapshot
+	255, // 41: legion.ai.v1.AIProviderModelsListed.metadata:type_name -> legion.node.v1.EventMetadata
+	20,  // 42: legion.ai.v1.AIProviderModelsListed.items:type_name -> legion.ai.v1.AIProviderPreviewModel
+	255, // 43: legion.ai.v1.AIProviderModelsFailed.metadata:type_name -> legion.node.v1.EventMetadata
+	254, // 44: legion.ai.v1.HealthCheckAIProviderCommand.metadata:type_name -> legion.node.v1.CommandMetadata
+	18,  // 45: legion.ai.v1.HealthCheckAIProviderCommand.provider:type_name -> legion.ai.v1.AIProviderPreviewConfigSnapshot
+	255, // 46: legion.ai.v1.AIProviderHealthCheckCompleted.metadata:type_name -> legion.node.v1.EventMetadata
+	18,  // 47: legion.ai.v1.AIProviderHealthCheckCompleted.recommend_config:type_name -> legion.ai.v1.AIProviderPreviewConfigSnapshot
+	255, // 48: legion.ai.v1.AIProviderHealthCheckFailed.metadata:type_name -> legion.node.v1.EventMetadata
+	26,  // 49: legion.ai.v1.AIThirdPartyApplicationConfigSnapshot.extra_params:type_name -> legion.ai.v1.AIConfigKVPair
+	26,  // 50: legion.ai.v1.AIThirdPartyApplicationConfigSnapshot.headers:type_name -> legion.ai.v1.AIConfigKVPair
+	27,  // 51: legion.ai.v1.AIModelConfigSnapshot.provider:type_name -> legion.ai.v1.AIThirdPartyApplicationConfigSnapshot
+	26,  // 52: legion.ai.v1.AIModelConfigSnapshot.extra_params:type_name -> legion.ai.v1.AIConfigKVPair
+	28,  // 53: legion.ai.v1.AIGlobalConfigSnapshot.intelligent_models:type_name -> legion.ai.v1.AIModelConfigSnapshot
+	28,  // 54: legion.ai.v1.AIGlobalConfigSnapshot.lightweight_models:type_name -> legion.ai.v1.AIModelConfigSnapshot
+	28,  // 55: legion.ai.v1.AIGlobalConfigSnapshot.vision_models:type_name -> legion.ai.v1.AIModelConfigSnapshot
+	254, // 56: legion.ai.v1.GetAIGlobalConfigCommand.metadata:type_name -> legion.node.v1.CommandMetadata
+	254, // 57: legion.ai.v1.SetAIGlobalConfigCommand.metadata:type_name -> legion.node.v1.CommandMetadata
+	29,  // 58: legion.ai.v1.SetAIGlobalConfigCommand.config:type_name -> legion.ai.v1.AIGlobalConfigSnapshot
+	255, // 59: legion.ai.v1.AIGlobalConfigFetched.metadata:type_name -> legion.node.v1.EventMetadata
+	29,  // 60: legion.ai.v1.AIGlobalConfigFetched.config:type_name -> legion.ai.v1.AIGlobalConfigSnapshot
+	255, // 61: legion.ai.v1.AIGlobalConfigFetchFailed.metadata:type_name -> legion.node.v1.EventMetadata
+	255, // 62: legion.ai.v1.AIGlobalConfigUpdated.metadata:type_name -> legion.node.v1.EventMetadata
+	29,  // 63: legion.ai.v1.AIGlobalConfigUpdated.config:type_name -> legion.ai.v1.AIGlobalConfigSnapshot
+	255, // 64: legion.ai.v1.AIGlobalConfigUpdateFailed.metadata:type_name -> legion.node.v1.EventMetadata
+	254, // 65: legion.ai.v1.QueryAIFocusCommand.metadata:type_name -> legion.node.v1.CommandMetadata
+	255, // 66: legion.ai.v1.AIFocusQueried.metadata:type_name -> legion.node.v1.EventMetadata
+	36,  // 67: legion.ai.v1.AIFocusQueried.items:type_name -> legion.ai.v1.AIFocus
+	255, // 68: legion.ai.v1.AIFocusQueryFailed.metadata:type_name -> legion.node.v1.EventMetadata
+	254, // 69: legion.ai.v1.GetRandomAIMaterialsCommand.metadata:type_name -> legion.node.v1.CommandMetadata
+	255, // 70: legion.ai.v1.AIMaterialsRandomQueried.metadata:type_name -> legion.node.v1.EventMetadata
+	164, // 71: legion.ai.v1.AIMaterialsRandomQueried.knowledge_base_entries:type_name -> legion.ai.v1.AIKnowledgeBaseEntryRecord
+	123, // 72: legion.ai.v1.AIMaterialsRandomQueried.ai_tools:type_name -> legion.ai.v1.AIToolRecord
+	99,  // 73: legion.ai.v1.AIMaterialsRandomQueried.ai_forges:type_name -> legion.ai.v1.AIForgeRecord
+	255, // 74: legion.ai.v1.AIMaterialsRandomQueryFailed.metadata:type_name -> legion.node.v1.EventMetadata
+	44,  // 75: legion.ai.v1.AIMCPServerTool.params:type_name -> legion.ai.v1.AIMCPServerToolParam
+	45,  // 76: legion.ai.v1.AIMCPServerRecord.tools:type_name -> legion.ai.v1.AIMCPServerTool
+	26,  // 77: legion.ai.v1.AIMCPServerRecord.envs:type_name -> legion.ai.v1.AIConfigKVPair
+	26,  // 78: legion.ai.v1.AIMCPServerRecord.headers:type_name -> legion.ai.v1.AIConfigKVPair
+	254, // 79: legion.ai.v1.ListAIMCPServersCommand.metadata:type_name -> legion.node.v1.CommandMetadata
+	43,  // 80: legion.ai.v1.ListAIMCPServersCommand.pagination:type_name -> legion.ai.v1.AIMCPServerPagination
+	255, // 81: legion.ai.v1.AIMCPServersListed.metadata:type_name -> legion.node.v1.EventMetadata
+	46,  // 82: legion.ai.v1.AIMCPServersListed.items:type_name -> legion.ai.v1.AIMCPServerRecord
+	43,  // 83: legion.ai.v1.AIMCPServersListed.pagination:type_name -> legion.ai.v1.AIMCPServerPagination
+	255, // 84: legion.ai.v1.AIMCPServersListFailed.metadata:type_name -> legion.node.v1.EventMetadata
+	254, // 85: legion.ai.v1.CreateAIMCPServerCommand.metadata:type_name -> legion.node.v1.CommandMetadata
+	26,  // 86: legion.ai.v1.CreateAIMCPServerCommand.envs:type_name -> legion.ai.v1.AIConfigKVPair
+	26,  // 87: legion.ai.v1.CreateAIMCPServerCommand.headers:type_name -> legion.ai.v1.AIConfigKVPair
+	255, // 88: legion.ai.v1.AIMCPServerCreated.metadata:type_name -> legion.node.v1.EventMetadata
+	46,  // 89: legion.ai.v1.AIMCPServerCreated.item:type_name -> legion.ai.v1.AIMCPServerRecord
+	255, // 90: legion.ai.v1.AIMCPServerCreateFailed.metadata:type_name -> legion.node.v1.EventMetadata
+	254, // 91: legion.ai.v1.UpdateAIMCPServerCommand.metadata:type_name -> legion.node.v1.CommandMetadata
+	26,  // 92: legion.ai.v1.UpdateAIMCPServerCommand.envs:type_name -> legion.ai.v1.AIConfigKVPair
+	26,  // 93: legion.ai.v1.UpdateAIMCPServerCommand.headers:type_name -> legion.ai.v1.AIConfigKVPair
+	255, // 94: legion.ai.v1.AIMCPServerUpdated.metadata:type_name -> legion.node.v1.EventMetadata
+	46,  // 95: legion.ai.v1.AIMCPServerUpdated.item:type_name -> legion.ai.v1.AIMCPServerRecord
+	255, // 96: legion.ai.v1.AIMCPServerUpdateFailed.metadata:type_name -> legion.node.v1.EventMetadata
+	254, // 97: legion.ai.v1.DeleteAIMCPServerCommand.metadata:type_name -> legion.node.v1.CommandMetadata
+	255, // 98: legion.ai.v1.AIMCPServerDeleted.metadata:type_name -> legion.node.v1.EventMetadata
+	46,  // 99: legion.ai.v1.AIMCPServerDeleted.item:type_name -> legion.ai.v1.AIMCPServerRecord
+	255, // 100: legion.ai.v1.AIMCPServerDeleteFailed.metadata:type_name -> legion.node.v1.EventMetadata
+	59,  // 101: legion.ai.v1.AILocalModelRecord.status:type_name -> legion.ai.v1.AILocalModelStatus
+	254, // 102: legion.ai.v1.ListAILocalModelsCommand.metadata:type_name -> legion.node.v1.CommandMetadata
+	255, // 103: legion.ai.v1.AILocalModelsListed.metadata:type_name -> legion.node.v1.EventMetadata
+	60,  // 104: legion.ai.v1.AILocalModelsListed.items:type_name -> legion.ai.v1.AILocalModelRecord
+	255, // 105: legion.ai.v1.AILocalModelsListFailed.metadata:type_name -> legion.node.v1.EventMetadata
+	254, // 106: legion.ai.v1.CheckAILlamaServerReadyCommand.metadata:type_name -> legion.node.v1.CommandMetadata
+	255, // 107: legion.ai.v1.AILlamaServerReadyChecked.metadata:type_name -> legion.node.v1.EventMetadata
+	255, // 108: legion.ai.v1.AILlamaServerReadyCheckFailed.metadata:type_name -> legion.node.v1.EventMetadata
+	254, // 109: legion.ai.v1.InstallAILlamaServerCommand.metadata:type_name -> legion.node.v1.CommandMetadata
+	255, // 110: legion.ai.v1.AILocalModelOperationAccepted.metadata:type_name -> legion.node.v1.EventMetadata
+	68,  // 111: legion.ai.v1.AILocalModelOperationAccepted.operation:type_name -> legion.ai.v1.AILocalModelOperation
+	255, // 112: legion.ai.v1.AILocalModelOperationProgressed.metadata:type_name -> legion.node.v1.EventMetadata
+	68,  // 113: legion.ai.v1.AILocalModelOperationProgressed.operation:type_name -> legion.ai.v1.AILocalModelOperation
+	255, // 114: legion.ai.v1.AILocalModelOperationCompleted.metadata:type_name -> legion.node.v1.EventMetadata
+	68,  // 115: legion.ai.v1.AILocalModelOperationCompleted.operation:type_name -> legion.ai.v1.AILocalModelOperation
+	60,  // 116: legion.ai.v1.AILocalModelOperationCompleted.item:type_name -> legion.ai.v1.AILocalModelRecord
+	255, // 117: legion.ai.v1.AILocalModelOperationCancelled.metadata:type_name -> legion.node.v1.EventMetadata
+	68,  // 118: legion.ai.v1.AILocalModelOperationCancelled.operation:type_name -> legion.ai.v1.AILocalModelOperation
+	255, // 119: legion.ai.v1.AILocalModelOperationFailed.metadata:type_name -> legion.node.v1.EventMetadata
+	68,  // 120: legion.ai.v1.AILocalModelOperationFailed.operation:type_name -> legion.ai.v1.AILocalModelOperation
+	255, // 121: legion.ai.v1.AILlamaServerInstalled.metadata:type_name -> legion.node.v1.EventMetadata
+	255, // 122: legion.ai.v1.AILlamaServerInstallFailed.metadata:type_name -> legion.node.v1.EventMetadata
+	254, // 123: legion.ai.v1.CreateAILocalModelCommand.metadata:type_name -> legion.node.v1.CommandMetadata
+	255, // 124: legion.ai.v1.AILocalModelCreated.metadata:type_name -> legion.node.v1.EventMetadata
+	60,  // 125: legion.ai.v1.AILocalModelCreated.item:type_name -> legion.ai.v1.AILocalModelRecord
+	255, // 126: legion.ai.v1.AILocalModelCreateFailed.metadata:type_name -> legion.node.v1.EventMetadata
+	254, // 127: legion.ai.v1.UpdateAILocalModelCommand.metadata:type_name -> legion.node.v1.CommandMetadata
+	255, // 128: legion.ai.v1.AILocalModelUpdated.metadata:type_name -> legion.node.v1.EventMetadata
+	60,  // 129: legion.ai.v1.AILocalModelUpdated.item:type_name -> legion.ai.v1.AILocalModelRecord
+	255, // 130: legion.ai.v1.AILocalModelUpdateFailed.metadata:type_name -> legion.node.v1.EventMetadata
+	254, // 131: legion.ai.v1.DeleteAILocalModelCommand.metadata:type_name -> legion.node.v1.CommandMetadata
+	255, // 132: legion.ai.v1.AILocalModelDeleted.metadata:type_name -> legion.node.v1.EventMetadata
+	60,  // 133: legion.ai.v1.AILocalModelDeleted.item:type_name -> legion.ai.v1.AILocalModelRecord
+	255, // 134: legion.ai.v1.AILocalModelDeleteFailed.metadata:type_name -> legion.node.v1.EventMetadata
+	254, // 135: legion.ai.v1.StartAILocalModelCommand.metadata:type_name -> legion.node.v1.CommandMetadata
+	255, // 136: legion.ai.v1.AILocalModelStarted.metadata:type_name -> legion.node.v1.EventMetadata
+	60,  // 137: legion.ai.v1.AILocalModelStarted.item:type_name -> legion.ai.v1.AILocalModelRecord
+	255, // 138: legion.ai.v1.AILocalModelStartFailed.metadata:type_name -> legion.node.v1.EventMetadata
+	254, // 139: legion.ai.v1.StopAILocalModelCommand.metadata:type_name -> legion.node.v1.CommandMetadata
+	255, // 140: legion.ai.v1.AILocalModelStopped.metadata:type_name -> legion.node.v1.EventMetadata
+	60,  // 141: legion.ai.v1.AILocalModelStopped.item:type_name -> legion.ai.v1.AILocalModelRecord
+	255, // 142: legion.ai.v1.AILocalModelStopFailed.metadata:type_name -> legion.node.v1.EventMetadata
+	254, // 143: legion.ai.v1.DownloadAILocalModelCommand.metadata:type_name -> legion.node.v1.CommandMetadata
+	254, // 144: legion.ai.v1.CancelAILocalModelOperationCommand.metadata:type_name -> legion.node.v1.CommandMetadata
+	255, // 145: legion.ai.v1.AILocalModelDownloaded.metadata:type_name -> legion.node.v1.EventMetadata
+	60,  // 146: legion.ai.v1.AILocalModelDownloaded.item:type_name -> legion.ai.v1.AILocalModelRecord
+	255, // 147: legion.ai.v1.AILocalModelDownloadFailed.metadata:type_name -> legion.node.v1.EventMetadata
+	254, // 148: legion.ai.v1.ClearAILocalModelsCommand.metadata:type_name -> legion.node.v1.CommandMetadata
+	255, // 149: legion.ai.v1.AILocalModelsCleared.metadata:type_name -> legion.node.v1.EventMetadata
+	255, // 150: legion.ai.v1.AILocalModelsClearFailed.metadata:type_name -> legion.node.v1.EventMetadata
+	254, // 151: legion.ai.v1.ListAIForgesCommand.metadata:type_name -> legion.node.v1.CommandMetadata
+	98,  // 152: legion.ai.v1.ListAIForgesCommand.pagination:type_name -> legion.ai.v1.AIForgePagination
+	255, // 153: legion.ai.v1.AIForgesListed.metadata:type_name -> legion.node.v1.EventMetadata
+	99,  // 154: legion.ai.v1.AIForgesListed.items:type_name -> legion.ai.v1.AIForgeRecord
+	98,  // 155: legion.ai.v1.AIForgesListed.pagination:type_name -> legion.ai.v1.AIForgePagination
+	255, // 156: legion.ai.v1.AIForgesListFailed.metadata:type_name -> legion.node.v1.EventMetadata
+	254, // 157: legion.ai.v1.CreateAIForgeCommand.metadata:type_name -> legion.node.v1.CommandMetadata
+	255, // 158: legion.ai.v1.AIForgeCreated.metadata:type_name -> legion.node.v1.EventMetadata
+	99,  // 159: legion.ai.v1.AIForgeCreated.item:type_name -> legion.ai.v1.AIForgeRecord
+	255, // 160: legion.ai.v1.AIForgeCreateFailed.metadata:type_name -> legion.node.v1.EventMetadata
+	254, // 161: legion.ai.v1.UpdateAIForgeCommand.metadata:type_name -> legion.node.v1.CommandMetadata
+	255, // 162: legion.ai.v1.AIForgeUpdated.metadata:type_name -> legion.node.v1.EventMetadata
+	99,  // 163: legion.ai.v1.AIForgeUpdated.item:type_name -> legion.ai.v1.AIForgeRecord
+	255, // 164: legion.ai.v1.AIForgeUpdateFailed.metadata:type_name -> legion.node.v1.EventMetadata
+	254, // 165: legion.ai.v1.DeleteAIForgeCommand.metadata:type_name -> legion.node.v1.CommandMetadata
+	255, // 166: legion.ai.v1.AIForgeDeleted.metadata:type_name -> legion.node.v1.EventMetadata
+	255, // 167: legion.ai.v1.AIForgeDeleteFailed.metadata:type_name -> legion.node.v1.EventMetadata
+	254, // 168: legion.ai.v1.ExportAIForgeCommand.metadata:type_name -> legion.node.v1.CommandMetadata
+	255, // 169: legion.ai.v1.AIForgeExportProgressed.metadata:type_name -> legion.node.v1.EventMetadata
+	255, // 170: legion.ai.v1.AIForgeExported.metadata:type_name -> legion.node.v1.EventMetadata
+	255, // 171: legion.ai.v1.AIForgeExportFailed.metadata:type_name -> legion.node.v1.EventMetadata
+	254, // 172: legion.ai.v1.ImportAIForgeCommand.metadata:type_name -> legion.node.v1.CommandMetadata
+	116, // 173: legion.ai.v1.ImportAIForgeCommand.attachment:type_name -> legion.ai.v1.AIForgeImportAttachment
+	255, // 174: legion.ai.v1.AIForgeImportProgressed.metadata:type_name -> legion.node.v1.EventMetadata
+	255, // 175: legion.ai.v1.AIForgeImported.metadata:type_name -> legion.node.v1.EventMetadata
+	119, // 176: legion.ai.v1.AIForgeImported.items:type_name -> legion.ai.v1.AIForgeImportItem
+	255, // 177: legion.ai.v1.AIForgeImportFailed.metadata:type_name -> legion.node.v1.EventMetadata
+	254, // 178: legion.ai.v1.ListAIToolsCommand.metadata:type_name -> legion.node.v1.CommandMetadata
+	122, // 179: legion.ai.v1.ListAIToolsCommand.pagination:type_name -> legion.ai.v1.AIToolPagination
+	255, // 180: legion.ai.v1.AIToolsListed.metadata:type_name -> legion.node.v1.EventMetadata
+	123, // 181: legion.ai.v1.AIToolsListed.items:type_name -> legion.ai.v1.AIToolRecord
+	122, // 182: legion.ai.v1.AIToolsListed.pagination:type_name -> legion.ai.v1.AIToolPagination
+	255, // 183: legion.ai.v1.AIToolsListFailed.metadata:type_name -> legion.node.v1.EventMetadata
+	254, // 184: legion.ai.v1.CreateAIToolCommand.metadata:type_name -> legion.node.v1.CommandMetadata
+	255, // 185: legion.ai.v1.AIToolCreated.metadata:type_name -> legion.node.v1.EventMetadata
+	123, // 186: legion.ai.v1.AIToolCreated.item:type_name -> legion.ai.v1.AIToolRecord
+	255, // 187: legion.ai.v1.AIToolCreateFailed.metadata:type_name -> legion.node.v1.EventMetadata
+	254, // 188: legion.ai.v1.UpdateAIToolCommand.metadata:type_name -> legion.node.v1.CommandMetadata
+	255, // 189: legion.ai.v1.AIToolUpdated.metadata:type_name -> legion.node.v1.EventMetadata
+	123, // 190: legion.ai.v1.AIToolUpdated.item:type_name -> legion.ai.v1.AIToolRecord
+	255, // 191: legion.ai.v1.AIToolUpdateFailed.metadata:type_name -> legion.node.v1.EventMetadata
+	254, // 192: legion.ai.v1.GenerateAIToolMetadataCommand.metadata:type_name -> legion.node.v1.CommandMetadata
+	255, // 193: legion.ai.v1.AIToolMetadataGenerated.metadata:type_name -> legion.node.v1.EventMetadata
+	255, // 194: legion.ai.v1.AIToolMetadataGenerateFailed.metadata:type_name -> legion.node.v1.EventMetadata
+	254, // 195: legion.ai.v1.ToggleAIToolFavoriteCommand.metadata:type_name -> legion.node.v1.CommandMetadata
+	255, // 196: legion.ai.v1.AIToolFavoriteToggled.metadata:type_name -> legion.node.v1.EventMetadata
+	255, // 197: legion.ai.v1.AIToolFavoriteToggleFailed.metadata:type_name -> legion.node.v1.EventMetadata
+	254, // 198: legion.ai.v1.DeleteAIToolsCommand.metadata:type_name -> legion.node.v1.CommandMetadata
+	255, // 199: legion.ai.v1.AIToolsDeleted.metadata:type_name -> legion.node.v1.EventMetadata
+	255, // 200: legion.ai.v1.AIToolsDeleteFailed.metadata:type_name -> legion.node.v1.EventMetadata
+	254, // 201: legion.ai.v1.ListAIKnowledgeBasesCommand.metadata:type_name -> legion.node.v1.CommandMetadata
+	142, // 202: legion.ai.v1.ListAIKnowledgeBasesCommand.pagination:type_name -> legion.ai.v1.AIKnowledgeBasePagination
+	255, // 203: legion.ai.v1.AIKnowledgeBasesListed.metadata:type_name -> legion.node.v1.EventMetadata
+	143, // 204: legion.ai.v1.AIKnowledgeBasesListed.items:type_name -> legion.ai.v1.AIKnowledgeBaseRecord
+	142, // 205: legion.ai.v1.AIKnowledgeBasesListed.pagination:type_name -> legion.ai.v1.AIKnowledgeBasePagination
+	255, // 206: legion.ai.v1.AIKnowledgeBasesListFailed.metadata:type_name -> legion.node.v1.EventMetadata
+	254, // 207: legion.ai.v1.CreateAIKnowledgeBaseCommand.metadata:type_name -> legion.node.v1.CommandMetadata
+	255, // 208: legion.ai.v1.AIKnowledgeBaseCreated.metadata:type_name -> legion.node.v1.EventMetadata
+	143, // 209: legion.ai.v1.AIKnowledgeBaseCreated.item:type_name -> legion.ai.v1.AIKnowledgeBaseRecord
+	255, // 210: legion.ai.v1.AIKnowledgeBaseCreateFailed.metadata:type_name -> legion.node.v1.EventMetadata
+	254, // 211: legion.ai.v1.ImportAIKnowledgeBaseCommand.metadata:type_name -> legion.node.v1.CommandMetadata
+	148, // 212: legion.ai.v1.ImportAIKnowledgeBaseCommand.attachment:type_name -> legion.ai.v1.AIKnowledgeBaseImportAttachment
+	255, // 213: legion.ai.v1.AIKnowledgeBaseImported.metadata:type_name -> legion.node.v1.EventMetadata
+	143, // 214: legion.ai.v1.AIKnowledgeBaseImported.item:type_name -> legion.ai.v1.AIKnowledgeBaseRecord
+	255, // 215: legion.ai.v1.AIKnowledgeBaseImportFailed.metadata:type_name -> legion.node.v1.EventMetadata
+	254, // 216: legion.ai.v1.UpdateAIKnowledgeBaseCommand.metadata:type_name -> legion.node.v1.CommandMetadata
+	255, // 217: legion.ai.v1.AIKnowledgeBaseUpdated.metadata:type_name -> legion.node.v1.EventMetadata
+	143, // 218: legion.ai.v1.AIKnowledgeBaseUpdated.item:type_name -> legion.ai.v1.AIKnowledgeBaseRecord
+	255, // 219: legion.ai.v1.AIKnowledgeBaseUpdateFailed.metadata:type_name -> legion.node.v1.EventMetadata
+	254, // 220: legion.ai.v1.DeleteAIKnowledgeBaseCommand.metadata:type_name -> legion.node.v1.CommandMetadata
+	255, // 221: legion.ai.v1.AIKnowledgeBaseDeleted.metadata:type_name -> legion.node.v1.EventMetadata
+	143, // 222: legion.ai.v1.AIKnowledgeBaseDeleted.item:type_name -> legion.ai.v1.AIKnowledgeBaseRecord
+	255, // 223: legion.ai.v1.AIKnowledgeBaseDeleteFailed.metadata:type_name -> legion.node.v1.EventMetadata
+	254, // 224: legion.ai.v1.ExportAIKnowledgeBaseCommand.metadata:type_name -> legion.node.v1.CommandMetadata
+	255, // 225: legion.ai.v1.AIKnowledgeBaseExported.metadata:type_name -> legion.node.v1.EventMetadata
+	143, // 226: legion.ai.v1.AIKnowledgeBaseExported.item:type_name -> legion.ai.v1.AIKnowledgeBaseRecord
+	255, // 227: legion.ai.v1.AIKnowledgeBaseExportFailed.metadata:type_name -> legion.node.v1.EventMetadata
+	254, // 228: legion.ai.v1.SearchAIKnowledgeBaseEntriesCommand.metadata:type_name -> legion.node.v1.CommandMetadata
+	163, // 229: legion.ai.v1.SearchAIKnowledgeBaseEntriesCommand.filter:type_name -> legion.ai.v1.AIKnowledgeBaseEntryFilter
+	142, // 230: legion.ai.v1.SearchAIKnowledgeBaseEntriesCommand.pagination:type_name -> legion.ai.v1.AIKnowledgeBasePagination
+	255, // 231: legion.ai.v1.AIKnowledgeBaseEntriesSearched.metadata:type_name -> legion.node.v1.EventMetadata
+	164, // 232: legion.ai.v1.AIKnowledgeBaseEntriesSearched.items:type_name -> legion.ai.v1.AIKnowledgeBaseEntryRecord
+	142, // 233: legion.ai.v1.AIKnowledgeBaseEntriesSearched.pagination:type_name -> legion.ai.v1.AIKnowledgeBasePagination
+	255, // 234: legion.ai.v1.AIKnowledgeBaseEntriesSearchFailed.metadata:type_name -> legion.node.v1.EventMetadata
+	254, // 235: legion.ai.v1.QueryAIKnowledgeBaseByAICommand.metadata:type_name -> legion.node.v1.CommandMetadata
+	254, // 236: legion.ai.v1.CancelAIKnowledgeBaseByAIQueryCommand.metadata:type_name -> legion.node.v1.CommandMetadata
+	255, // 237: legion.ai.v1.AIKnowledgeBaseQueryByAIChunk.metadata:type_name -> legion.node.v1.EventMetadata
+	255, // 238: legion.ai.v1.AIKnowledgeBaseQueryByAICompleted.metadata:type_name -> legion.node.v1.EventMetadata
+	255, // 239: legion.ai.v1.AIKnowledgeBaseQueryByAIFailed.metadata:type_name -> legion.node.v1.EventMetadata
+	254, // 240: legion.ai.v1.GenerateAIKnowledgeBaseQuestionIndexCommand.metadata:type_name -> legion.node.v1.CommandMetadata
+	254, // 241: legion.ai.v1.CancelAIKnowledgeBaseQuestionIndexCommand.metadata:type_name -> legion.node.v1.CommandMetadata
+	255, // 242: legion.ai.v1.AIKnowledgeBaseQuestionIndexProgress.metadata:type_name -> legion.node.v1.EventMetadata
+	255, // 243: legion.ai.v1.AIKnowledgeBaseQuestionIndexCompleted.metadata:type_name -> legion.node.v1.EventMetadata
+	255, // 244: legion.ai.v1.AIKnowledgeBaseQuestionIndexFailed.metadata:type_name -> legion.node.v1.EventMetadata
+	254, // 245: legion.ai.v1.CreateAIKnowledgeBaseEntryCommand.metadata:type_name -> legion.node.v1.CommandMetadata
+	255, // 246: legion.ai.v1.AIKnowledgeBaseEntryCreated.metadata:type_name -> legion.node.v1.EventMetadata
+	164, // 247: legion.ai.v1.AIKnowledgeBaseEntryCreated.item:type_name -> legion.ai.v1.AIKnowledgeBaseEntryRecord
+	255, // 248: legion.ai.v1.AIKnowledgeBaseEntryCreateFailed.metadata:type_name -> legion.node.v1.EventMetadata
+	254, // 249: legion.ai.v1.UpdateAIKnowledgeBaseEntryCommand.metadata:type_name -> legion.node.v1.CommandMetadata
+	255, // 250: legion.ai.v1.AIKnowledgeBaseEntryUpdated.metadata:type_name -> legion.node.v1.EventMetadata
+	164, // 251: legion.ai.v1.AIKnowledgeBaseEntryUpdated.item:type_name -> legion.ai.v1.AIKnowledgeBaseEntryRecord
+	255, // 252: legion.ai.v1.AIKnowledgeBaseEntryUpdateFailed.metadata:type_name -> legion.node.v1.EventMetadata
+	254, // 253: legion.ai.v1.DeleteAIKnowledgeBaseEntryCommand.metadata:type_name -> legion.node.v1.CommandMetadata
+	255, // 254: legion.ai.v1.AIKnowledgeBaseEntryDeleted.metadata:type_name -> legion.node.v1.EventMetadata
+	255, // 255: legion.ai.v1.AIKnowledgeBaseEntryDeleteFailed.metadata:type_name -> legion.node.v1.EventMetadata
+	254, // 256: legion.ai.v1.BuildAIKnowledgeBaseVectorIndexCommand.metadata:type_name -> legion.node.v1.CommandMetadata
+	255, // 257: legion.ai.v1.AIKnowledgeBaseVectorIndexBuilt.metadata:type_name -> legion.node.v1.EventMetadata
+	255, // 258: legion.ai.v1.AIKnowledgeBaseVectorIndexBuildFailed.metadata:type_name -> legion.node.v1.EventMetadata
+	254, // 259: legion.ai.v1.BuildAIKnowledgeBaseEntryVectorIndexCommand.metadata:type_name -> legion.node.v1.CommandMetadata
+	255, // 260: legion.ai.v1.AIKnowledgeBaseEntryVectorIndexBuilt.metadata:type_name -> legion.node.v1.EventMetadata
+	255, // 261: legion.ai.v1.AIKnowledgeBaseEntryVectorIndexBuildFailed.metadata:type_name -> legion.node.v1.EventMetadata
+	193, // 262: legion.ai.v1.AIMemoryEntityFilter.c_score:type_name -> legion.ai.v1.AIMemoryFloatRange
+	193, // 263: legion.ai.v1.AIMemoryEntityFilter.o_score:type_name -> legion.ai.v1.AIMemoryFloatRange
+	193, // 264: legion.ai.v1.AIMemoryEntityFilter.r_score:type_name -> legion.ai.v1.AIMemoryFloatRange
+	193, // 265: legion.ai.v1.AIMemoryEntityFilter.e_score:type_name -> legion.ai.v1.AIMemoryFloatRange
+	193, // 266: legion.ai.v1.AIMemoryEntityFilter.p_score:type_name -> legion.ai.v1.AIMemoryFloatRange
+	193, // 267: legion.ai.v1.AIMemoryEntityFilter.a_score:type_name -> legion.ai.v1.AIMemoryFloatRange
+	193, // 268: legion.ai.v1.AIMemoryEntityFilter.t_score:type_name -> legion.ai.v1.AIMemoryFloatRange
+	194, // 269: legion.ai.v1.AIMemoryEntityFilter.created_at:type_name -> legion.ai.v1.AIMemoryInt64Range
+	194, // 270: legion.ai.v1.AIMemoryEntityFilter.updated_at:type_name -> legion.ai.v1.AIMemoryInt64Range
+	254, // 271: legion.ai.v1.CreateAIMemoryEntityCommand.metadata:type_name -> legion.node.v1.CommandMetadata
+	255, // 272: legion.ai.v1.AIMemoryEntityCreated.metadata:type_name -> legion.node.v1.EventMetadata
+	255, // 273: legion.ai.v1.AIMemoryEntityCreateFailed.metadata:type_name -> legion.node.v1.EventMetadata
+	254, // 274: legion.ai.v1.GetAIMemoryEntityCommand.metadata:type_name -> legion.node.v1.CommandMetadata
+	255, // 275: legion.ai.v1.AIMemoryEntityFetched.metadata:type_name -> legion.node.v1.EventMetadata
+	197, // 276: legion.ai.v1.AIMemoryEntityFetched.item:type_name -> legion.ai.v1.AIMemoryEntityRecord
+	255, // 277: legion.ai.v1.AIMemoryEntityFetchFailed.metadata:type_name -> legion.node.v1.EventMetadata
+	254, // 278: legion.ai.v1.QueryAIMemoryEntitiesCommand.metadata:type_name -> legion.node.v1.CommandMetadata
+	195, // 279: legion.ai.v1.QueryAIMemoryEntitiesCommand.pagination:type_name -> legion.ai.v1.AIMemoryPagination
+	198, // 280: legion.ai.v1.QueryAIMemoryEntitiesCommand.filter:type_name -> legion.ai.v1.AIMemoryEntityFilter
+	255, // 281: legion.ai.v1.AIMemoryEntitiesQueried.metadata:type_name -> legion.node.v1.EventMetadata
+	195, // 282: legion.ai.v1.AIMemoryEntitiesQueried.pagination:type_name -> legion.ai.v1.AIMemoryPagination
+	197, // 283: legion.ai.v1.AIMemoryEntitiesQueried.items:type_name -> legion.ai.v1.AIMemoryEntityRecord
+	255, // 284: legion.ai.v1.AIMemoryEntitiesQueryFailed.metadata:type_name -> legion.node.v1.EventMetadata
+	254, // 285: legion.ai.v1.UpdateAIMemoryEntityCommand.metadata:type_name -> legion.node.v1.CommandMetadata
+	197, // 286: legion.ai.v1.UpdateAIMemoryEntityCommand.item:type_name -> legion.ai.v1.AIMemoryEntityRecord
+	255, // 287: legion.ai.v1.AIMemoryEntityUpdated.metadata:type_name -> legion.node.v1.EventMetadata
+	197, // 288: legion.ai.v1.AIMemoryEntityUpdated.item:type_name -> legion.ai.v1.AIMemoryEntityRecord
+	255, // 289: legion.ai.v1.AIMemoryEntityUpdateFailed.metadata:type_name -> legion.node.v1.EventMetadata
+	254, // 290: legion.ai.v1.DeleteAIMemoryEntitiesCommand.metadata:type_name -> legion.node.v1.CommandMetadata
+	198, // 291: legion.ai.v1.DeleteAIMemoryEntitiesCommand.filter:type_name -> legion.ai.v1.AIMemoryEntityFilter
+	255, // 292: legion.ai.v1.AIMemoryEntitiesDeleted.metadata:type_name -> legion.node.v1.EventMetadata
+	255, // 293: legion.ai.v1.AIMemoryEntitiesDeleteFailed.metadata:type_name -> legion.node.v1.EventMetadata
+	254, // 294: legion.ai.v1.CountAIMemoryEntityTagsCommand.metadata:type_name -> legion.node.v1.CommandMetadata
+	255, // 295: legion.ai.v1.AIMemoryEntityTagsCounted.metadata:type_name -> legion.node.v1.EventMetadata
+	196, // 296: legion.ai.v1.AIMemoryEntityTagsCounted.tags_count:type_name -> legion.ai.v1.AIMemoryTagCount
+	255, // 297: legion.ai.v1.AIMemoryEntityTagsCountFailed.metadata:type_name -> legion.node.v1.EventMetadata
+	254, // 298: legion.ai.v1.QueryAIHTTPFlowsCommand.metadata:type_name -> legion.node.v1.CommandMetadata
+	217, // 299: legion.ai.v1.QueryAIHTTPFlowsCommand.pagination:type_name -> legion.ai.v1.AIRuntimePagination
+	255, // 300: legion.ai.v1.AIHTTPFlowsQueried.metadata:type_name -> legion.node.v1.EventMetadata
+	218, // 301: legion.ai.v1.AIHTTPFlowsQueried.items:type_name -> legion.ai.v1.AIHTTPFlowRecord
+	217, // 302: legion.ai.v1.AIHTTPFlowsQueried.pagination:type_name -> legion.ai.v1.AIRuntimePagination
+	255, // 303: legion.ai.v1.AIHTTPFlowsQueryFailed.metadata:type_name -> legion.node.v1.EventMetadata
+	254, // 304: legion.ai.v1.QueryAIRisksCommand.metadata:type_name -> legion.node.v1.CommandMetadata
+	217, // 305: legion.ai.v1.QueryAIRisksCommand.pagination:type_name -> legion.ai.v1.AIRuntimePagination
+	255, // 306: legion.ai.v1.AIRisksQueried.metadata:type_name -> legion.node.v1.EventMetadata
+	222, // 307: legion.ai.v1.AIRisksQueried.items:type_name -> legion.ai.v1.AIRiskRecord
+	217, // 308: legion.ai.v1.AIRisksQueried.pagination:type_name -> legion.ai.v1.AIRuntimePagination
+	255, // 309: legion.ai.v1.AIRisksQueryFailed.metadata:type_name -> legion.node.v1.EventMetadata
+	254, // 310: legion.ai.v1.ExportAILogsCheckpointsCommand.metadata:type_name -> legion.node.v1.CommandMetadata
+	255, // 311: legion.ai.v1.AILogsCheckpointsExported.metadata:type_name -> legion.node.v1.EventMetadata
+	255, // 312: legion.ai.v1.AILogsCheckpointsExportFailed.metadata:type_name -> legion.node.v1.EventMetadata
+	255, // 313: legion.ai.v1.AISessionReady.metadata:type_name -> legion.node.v1.EventMetadata
+	0,   // 314: legion.ai.v1.AISessionReady.session:type_name -> legion.ai.v1.AISessionRef
+	256, // 315: legion.ai.v1.AISessionReady.ready_at:type_name -> google.protobuf.Timestamp
+	255, // 316: legion.ai.v1.AISessionEvent.metadata:type_name -> legion.node.v1.EventMetadata
+	0,   // 317: legion.ai.v1.AISessionEvent.session:type_name -> legion.ai.v1.AISessionRef
+	255, // 318: legion.ai.v1.AISessionDone.metadata:type_name -> legion.node.v1.EventMetadata
+	0,   // 319: legion.ai.v1.AISessionDone.session:type_name -> legion.ai.v1.AISessionRef
+	256, // 320: legion.ai.v1.AISessionDone.finished_at:type_name -> google.protobuf.Timestamp
+	255, // 321: legion.ai.v1.AISessionFailed.metadata:type_name -> legion.node.v1.EventMetadata
+	0,   // 322: legion.ai.v1.AISessionFailed.session:type_name -> legion.ai.v1.AISessionRef
+	256, // 323: legion.ai.v1.AISessionFailed.finished_at:type_name -> google.protobuf.Timestamp
+	255, // 324: legion.ai.v1.AISessionCancelled.metadata:type_name -> legion.node.v1.EventMetadata
+	0,   // 325: legion.ai.v1.AISessionCancelled.session:type_name -> legion.ai.v1.AISessionRef
+	256, // 326: legion.ai.v1.AISessionCancelled.finished_at:type_name -> google.protobuf.Timestamp
+	257, // 327: legion.ai.v1.AIFocusResultContext.job:type_name -> legion.job.v1.JobRef
+	235, // 328: legion.ai.v1.AIFocusResultContext.risk_judgement_scope:type_name -> legion.ai.v1.AIFocusRiskJudgementScope
+	236, // 329: legion.ai.v1.ContextFocusRelease.sidekicks:type_name -> legion.ai.v1.ContextFocusSidekick
+	238, // 330: legion.ai.v1.ContextForgeRelease.parameters:type_name -> legion.ai.v1.ContextForgeParameter
+	239, // 331: legion.ai.v1.ContextForgeRelease.tool_snapshots:type_name -> legion.ai.v1.ContextForgeTool
+	242, // 332: legion.ai.v1.InputManifest.resources:type_name -> legion.ai.v1.InputResource
+	246, // 333: legion.ai.v1.AITrafficBatch.records:type_name -> legion.ai.v1.AITrafficRecord
+	246, // 334: legion.ai.v1.AITrafficUpload.record:type_name -> legion.ai.v1.AITrafficRecord
+	254, // 335: legion.ai.v1.DrainAITrafficCommand.metadata:type_name -> legion.node.v1.CommandMetadata
+	0,   // 336: legion.ai.v1.DrainAITrafficCommand.session:type_name -> legion.ai.v1.AISessionRef
+	0,   // 337: legion.ai.v1.AITrafficDrainResult.session:type_name -> legion.ai.v1.AISessionRef
+	338, // [338:338] is the sub-list for method output_type
+	338, // [338:338] is the sub-list for method input_type
+	338, // [338:338] is the sub-list for extension type_name
+	338, // [338:338] is the sub-list for extension extendee
+	0,   // [0:338] is the sub-list for field type_name
 }
 
 func init() { file_legion_ai_v1_ai_proto_init() }
@@ -22502,7 +23396,7 @@ func file_legion_ai_v1_ai_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_legion_ai_v1_ai_proto_rawDesc), len(file_legion_ai_v1_ai_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   245,
+			NumMessages:   254,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

@@ -35,7 +35,7 @@ func normalizeScanNodeCapabilityKeysForRuntime(input []string, runtimeMode strin
 		if trimmed == "" {
 			return
 		}
-		if (trimmed == capabilityKeyAICodeWorkspaceV1 || trimmed == capabilityKeyAIManagedInputV1 || trimmed == capabilityKeyAIForgeReleaseV1 || trimmed == capabilityKeyAISkillBundleV1) && runtimeMode == aiSessionRuntimeModeStateful {
+		if (trimmed == aiTrafficAnalysisCapabilityV1 || trimmed == capabilityKeyAICodeWorkspaceV1 || trimmed == capabilityKeyAIManagedInputV1 || trimmed == capabilityKeyAIForgeReleaseV1 || trimmed == capabilityKeyAISkillBundleV1) && runtimeMode == aiSessionRuntimeModeStateful {
 			return
 		}
 		// Retired scene-specific keys may arrive from an older enrollment manifest.

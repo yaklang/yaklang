@@ -21,6 +21,7 @@ const (
 	legionCommandPluginStoreSync                      = "plugin.store.sync"
 	legionCommandPluginStoreSyncStatusQuery           = "plugin.store.sync.status"
 	legionCommandPluginStoreImport                    = "plugin.store.import"
+	legionCommandAITrafficDrain                       = "ai.session.traffic.drain"
 	legionCommandAISessionBind                        = "ai.session.bind"
 	legionCommandAISessionInput                       = "ai.session.input"
 	legionCommandAISessionAppend                      = "ai.session.context.append"
