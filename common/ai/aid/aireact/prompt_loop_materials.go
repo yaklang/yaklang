@@ -795,11 +795,8 @@ func (pm *PromptManager) buildTimelineOpenObservation(
 			renderTimelineOpenBlock(materials),
 		),
 
-		// 全局 TODO 块: 紧跟 Timeline 中的 evidence delta, 让 loop prompt 始终能看到当前
-		// TODO 列表; 数据来源是 SessionPromptState.VerificationTodoStore,
-		// 由 VerifyUserSatisfaction 通过 ApplyTodoDelta 增量写入.
+		// TODO 快照紧跟 Open Timeline；状态由普通 ReAct action 更新。
 		// 段位仍属 timeline-open, 落在所有 cache 边界外, 不污染上游 prefix cache.
-		// 关键词: section.timeline_open.todo_list, 全局 TODO, Timeline 中的 evidence delta 之后
 		reactloops.NewPromptSectionObservation(
 			"section.timeline_open.todo_list",
 			"Todo List",

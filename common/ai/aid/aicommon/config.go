@@ -3654,7 +3654,7 @@ func (c *Config) ApplySessionEvidenceOps(ops []EvidenceOperation) {
 
 // GetVerificationTodoRendered returns the rendered TODO snapshot for the
 // current session, suitable for prompt injection (loop prompt timeline-open
-// section). Returns empty string when no TODO has been tracked yet.
+// section). An empty work set renders an explicit empty-list marker.
 //
 // 关键词: GetVerificationTodoRendered, prompt 注入, 全局 TODO
 func (c *Config) GetVerificationTodoRendered(currentScope VerificationTodoScope) string {
@@ -3662,8 +3662,7 @@ func (c *Config) GetVerificationTodoRendered(currentScope VerificationTodoScope)
 }
 
 // ApplyTodoDelta applies one normal ReAct action's optional todo_delta to the
-// persisted TODO store. When the persistent session id is configured, the
-// resulting canonical JSON is retained by the shared SessionPromptState.
+// in-memory TODO store in the shared SessionPromptState.
 //
 // 关键词: ApplyTodoDelta, ReAct 增量写入, SessionPromptState 同步
 func (c *Config) ApplyTodoDelta(scope VerificationTodoScope, delta *TodoDelta) []VerificationTodoApplyResult {
