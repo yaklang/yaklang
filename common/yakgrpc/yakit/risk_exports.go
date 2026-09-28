@@ -505,6 +505,15 @@ func WithRiskParam_RuntimeId(i string) RiskParamsOpt {
 	}
 }
 
+// WithRiskParam_AISessionID associates a risk with its persistent AI session.
+// It is not part of the deduplication key: one finding can be rediscovered in
+// another session without creating a second record.
+func WithRiskParam_AISessionID(id string) RiskParamsOpt {
+	return func(r *schema.Risk) {
+		r.AISessionID = id
+	}
+}
+
 // potential 是一个选项参数，用于标记风险记录是否为潜在(疑似)风险
 // 参数:
 //   - i: 是否为潜在风险

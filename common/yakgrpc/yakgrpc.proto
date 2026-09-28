@@ -5441,6 +5441,9 @@ message Risk {
 
   // 关联的请求/响应报文对列表
   repeated PacketPair PacketPairs = 34;
+
+  // Persistent AI conversation that produced this risk (may span runtimes).
+  string AISessionID = 35;
 }
 
 message QueryRisksRequest {

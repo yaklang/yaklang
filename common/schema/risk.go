@@ -52,7 +52,9 @@ type Risk struct {
 	ReverseToken string `json:"reverse_token"`
 
 	// 设置运行时 ID 为了关联具体漏洞
-	RuntimeId      string `json:"runtime_id" gorm:"index"`
+	RuntimeId string `json:"runtime_id" gorm:"index"`
+	// AISessionID links AI-created risks to all tool runtimes in the same conversation.
+	AISessionID    string `json:"ai_session_id" gorm:"index"`
 	QuotedRequest  string `json:"quoted_request"`
 	QuotedResponse string `json:"quoted_response"`
 
@@ -212,11 +214,12 @@ func (p *Risk) ToGRPCModel() *ypb.Risk {
 		Response:    response,
 		PacketPairs: packetPairs,
 
-		RuntimeId: utils.EscapeInvalidUTF8Byte([]byte(p.RuntimeId)),
-		CVE:       utils.EscapeInvalidUTF8Byte([]byte(p.CVE)),
-		TaskName:  utils.EscapeInvalidUTF8Byte([]byte(p.TaskName)),
-		Tags:      p.Tags,
-		IsRead:    p.IsRead,
+		RuntimeId:   utils.EscapeInvalidUTF8Byte([]byte(p.RuntimeId)),
+		AISessionID: utils.EscapeInvalidUTF8Byte([]byte(p.AISessionID)),
+		CVE:         utils.EscapeInvalidUTF8Byte([]byte(p.CVE)),
+		TaskName:    utils.EscapeInvalidUTF8Byte([]byte(p.TaskName)),
+		Tags:        p.Tags,
+		IsRead:      p.IsRead,
 
 		YakScriptUUID: p.YakScriptUUID,
 		// for syntaxflow risk
