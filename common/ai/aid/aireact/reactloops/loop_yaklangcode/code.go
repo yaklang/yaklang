@@ -2,11 +2,11 @@ package loop_yaklangcode
 
 import (
 	"bytes"
-	"github.com/yaklang/yaklang/common/ai/aid/aicommon/promptloader"
 	"strings"
 	"sync"
 
 	"github.com/yaklang/gorm"
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon/promptloader"
 	"github.com/yaklang/yaklang/common/ai/rag"
 	"github.com/yaklang/yaklang/common/ai/rag/vectorstore"
 

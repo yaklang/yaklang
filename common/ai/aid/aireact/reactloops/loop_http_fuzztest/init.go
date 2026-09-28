@@ -3,12 +3,12 @@ package loop_http_fuzztest
 import (
 	"bytes"
 	"fmt"
-	"github.com/yaklang/yaklang/common/ai/aid/aicommon/promptloader"
 	"regexp"
 	"strings"
 
 	"github.com/yaklang/gorm"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon/promptloader"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/ai/rag"
@@ -158,18 +158,7 @@ func buildInitTask(r aicommon.AIInvokeRuntime) func(loop *reactloops.ReActLoop, 
 					if userInput == "" {
 						return ""
 					}
-					prompt := `
-请从用户输入中提取可用于 HTTP 安全测试的请求信息。
-
-输出规则：
-1) 如果用户提供了原始 HTTP 请求报文（请求行 + Host 头），将完整报文放到 raw_http_request。
-2) 如果没有原始报文但有 URL，提取到 url，并给出 method（无明确时使用 GET）。
-3) 若无法提取，返回空字符串。
-
-<|USER_INPUT_{{ .nonce }}|>
-{{ .userInput }}
-<|USER_INPUT_END_{{ .nonce }}|>
-`
+					prompt := promptloader.MustLoad("inline/ai/aid/aireact/reactloops/loop_http_fuzztest/init/prompt.txt")
 					return utils.MustRenderTemplate(prompt, map[string]any{
 						"nonce":     utils.RandStringBytes(4),
 						"userInput": userInput,

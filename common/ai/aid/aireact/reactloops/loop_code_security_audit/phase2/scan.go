@@ -4,13 +4,13 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"github.com/yaklang/yaklang/common/ai/aid/aicommon/promptloader"
 	"math"
 	"os"
 	"strings"
 	"sync"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon/promptloader"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops/loop_code_security_audit/internal/emit"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops/loop_code_security_audit/internal/model"
@@ -929,37 +929,7 @@ func buildSingleCategoryScanLoop(r aicommon.AIInvokeRuntime, state *model.AuditS
 // runs buildSingleCategoryScanLoop via forked sub-agents, then hands off to Phase 3.
 // ─────────────────────────────────────────────────────────────────────
 
-const planPromptTemplate = `你是代码安全审计专家。现在需要确定本次审计的漏洞扫描计划。
-
-## 默认扫描类别（%d 个：Web/应用层 + 基础设施常见面）
-
-%s
-
-## Phase1 技术栈与语言画像（决定审计侧重点）
-
-%s
-
-## 用户需求
-
-%s
-
-## 任务
-
-1. **按语言画像区分侧重点（侧重 ≠ 只扫一类）**：
-   - C/C++/类 C 原生项目：主攻 memory_safety / resource_exhaustion / race_condition 等**内存与解析器**面；网络注入类仅在有 HTTP/管理面时保留
-   - Java/PHP/Python/Node/C# 等托管语言：主攻 sql/auth/ssrf/deserialization/expression/xss 等**网络入口与鉴权注入**面；memory_safety 通常低优先（除非 JNI/native）
-   - Go：主攻鉴权、SSRF、路径/命令、竞态、资源耗尽；unsafe/cgo 才升级内存类
-2. selected_category_ids：**主攻类必须包含且靠前**；次要类建议保留；低优先类无信号时可省略但须符合画像，不要无故全选或无故砍掉主攻类
-3. 如果用户提到了默认类别之外的特殊漏洞关注点，为每个额外关注点生成一个扫描类别
-
-对于 extra_categories 中的每项，格式如下：
-- id：类别标识（小写字母+下划线）
-- name：中文名称
-- sink_patterns：grep 关键词列表（逗号分隔）
-- instruction：针对该类别的扫描指南（2-3句话）
-
-如果用户没有提到额外的漏洞类型，extra_categories 返回空字符串 ""。
-`
+var planPromptTemplate = promptloader.MustLoad("inline/ai/aid/aireact/reactloops/loop_code_security_audit/phase2/scan/planPromptTemplate.txt")
 
 // BuildAllCategoriesLoop 构建 Phase 2 编排 Loop
 func BuildAllCategoriesLoop(r aicommon.AIInvokeRuntime, state *model.AuditState, overrideCategories []model.VulnCategory, opts ...reactloops.ReActLoopOption) (*reactloops.ReActLoop, error) {

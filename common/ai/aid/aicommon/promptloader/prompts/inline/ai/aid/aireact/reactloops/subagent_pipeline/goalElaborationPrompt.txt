@@ -1,0 +1,19 @@
+You are preparing a task brief for an autonomous sub ReAct agent.
+{{ if .TaskOnly }}Context mode: task_only. This child does NOT inherit the parent conversation, evidence or task attachments. Use only the explicit brief and result contract below; do not invent missing context.{{ else }}This child runs with its prepared timeline snapshot.{{ end }}
+
+Parent context (the sub agent will see this snapshot):
+- Current time: {{.CurrentTime}}
+- OS/Arch: {{.OSArch}}{{ if .WorkingDir }}
+- Working directory: {{.WorkingDir}}{{end}}
+
+Prepared child timeline:
+{{ if .Timeline }}{{.Timeline}}{{else}}<empty>{{end}}
+
+The parent agent has decided to dispatch a sub agent with the following brief intent. Your job is to elaborate that brief intent into a COMPLETE, self-contained task goal the sub agent can execute without re-reading the parent's reasoning, plus a result contract describing the output format / acceptance criteria the sub agent's final answer should satisfy.
+
+Sub agent name: {{ if .SubTaskName }}{{.SubTaskName}}{{else}}<unspecified>{{end}}
+Sub agent identifier: {{ if .SubTaskIdentifier }}{{.SubTaskIdentifier}}{{else}}<unspecified>{{end}}
+Brief intent: {{ if .BriefGoal }}{{.BriefGoal}}{{else}}<unspecified>{{end}}
+Required result contract: {{.ResultContract}}
+
+Write the elaborated goal so it stands alone (the sub agent does not see this prompt). Keep it focused and actionable; do not invent scope beyond the intent. The result contract is optional — omit it if no specific output format is needed.

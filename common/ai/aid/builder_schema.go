@@ -2,9 +2,10 @@ package aid
 
 import (
 	"fmt"
-	"github.com/yaklang/yaklang/common/ai/aid/aicommon/promptloader"
 	"strings"
 	"text/template"
+
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon/promptloader"
 )
 
 var planJsonSchema = promptloader.MustLoad("ai/aid/jsonschema/plan/plan.json")

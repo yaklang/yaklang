@@ -2,7 +2,6 @@ package reactloops
 
 import (
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon/promptloader"
-
 	"github.com/yaklang/yaklang/common/utils"
 )
 
