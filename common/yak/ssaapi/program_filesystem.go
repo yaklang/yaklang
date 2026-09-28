@@ -65,8 +65,11 @@ type overlayCacheEntry struct {
 //   - InvalidateProgramFileSystemCache / Delete bump generation so a compile
 //     that finishes mid-TTL is visible on the next resolve.
 type ProgramFileSystem struct {
-	dbFS         fi.FileSystem
+	dbFS fi.FileSystem
+	// overlayCache caches prefixedAggregatedFS wrappers (full base+diffs view).
 	overlayCache *utils.CacheExWithKey[string, *overlayCacheEntry]
+	// diffOnlyCache caches last-diff stub trees (listing-only view, no bodies).
+	diffOnlyCache *utils.CacheExWithKey[string, *overlayCacheEntry]
 }
 
 var (
@@ -79,10 +82,15 @@ func NewProgramFileSystem() *ProgramFileSystem {
 		utils.WithCacheTTL(programFSOverlayTTL),
 		utils.WithCacheCapacity(programFSOverlayCap),
 	)
+	diffOnlyCache := utils.NewCacheExWithKey[string, *overlayCacheEntry](
+		utils.WithCacheTTL(programFSOverlayTTL),
+		utils.WithCacheCapacity(programFSOverlayCap),
+	)
 	// Touch-on-hit (default): active viewing extends life; idle 10m → evict.
 	return &ProgramFileSystem{
-		dbFS:         ssadb.NewIrSourceFs(),
-		overlayCache: cache,
+		dbFS:          ssadb.NewIrSourceFs(),
+		overlayCache:  cache,
+		diffOnlyCache: diffOnlyCache,
 	}
 }
 
@@ -119,9 +127,86 @@ func (p *ProgramFileSystem) Invalidate(progName string) {
 	}
 	InvalidateProgramFileSystemCache(progName)
 	p.overlayCache.Remove(progName)
+	p.diffOnlyCache.Remove(progName)
 	if dropper, ok := p.dbFS.(interface{ DropProgramCache(string) }); ok {
 		dropper.DropProgramCache(progName)
 	}
+}
+
+// ReadDirDiffOnly lists name using the last-diff-only view: an incremental
+// (diff) program shows only the files its own last compile touched, instead of
+// the full base+diffs aggregate. Non-incremental programs fall back to the
+// regular aggregated / dbFS view, so callers can pass diffOnly unconditionally.
+// ReadFile/Stat are NOT affected: file bodies still resolve through the
+// aggregate (a superset), so e.g. audit results jumping into base files work.
+func (p *ProgramFileSystem) ReadDirDiffOnly(name string) ([]fs.DirEntry, error) {
+	if name == "/" {
+		return p.dbFS.ReadDir("/")
+	}
+	return p.diffOnlyBackend(name).ReadDir(name)
+}
+
+// diffOnlyBackend resolves the listing backend for name. Diff stub trees are
+// cached per program with the same generation check as overlayCache.
+func (p *ProgramFileSystem) diffOnlyBackend(name string) fi.FileSystem {
+	progName := p.programName(name)
+	if progName == "" {
+		return p.dbFS
+	}
+	gen := int64(0)
+	if g := programFSGen(progName); g != nil {
+		gen = g.Load()
+	}
+	if entry, ok := p.diffOnlyCache.Get(progName); ok && entry != nil && entry.fs != nil && entry.gen == gen {
+		return entry.fs
+	}
+
+	// Read only the program metadata (single ir_programs row): building the
+	// last-diff tree must not load the SSA program nor aggregate the overlay.
+	irProg, err := ssadb.GetProgram(progName, ssadb.Application)
+	if err != nil || irProg == nil || !isIncrementalDiffProgram(irProg) {
+		// Not an incremental diff program (or load failed): fall back to the
+		// regular view. Do NOT cache the fallback, same reasoning as resolve().
+		return p.resolve(progName)
+	}
+	stub, err := buildLastDiffStubTree(progName, irProg)
+	if err != nil {
+		return p.resolve(progName)
+	}
+	p.diffOnlyCache.Set(progName, &overlayCacheEntry{fs: stub, gen: gen})
+	return stub
+}
+
+// isIncrementalDiffProgram reports whether irProg is an incremental diff layer
+// (i.e. compiled against a base program and owns a FileHashMap).
+func isIncrementalDiffProgram(irProg *ssadb.IrProgram) bool {
+	if irProg == nil {
+		return false
+	}
+	// A pure delete-only diff may carry FileHashMap without FileList; the
+	// caller still expects an (empty) diff view rather than the aggregate.
+	return irProg.BaseProgramName != "" && len(irProg.FileHashMap) > 0
+}
+
+// buildLastDiffStubTree builds a listing-only tree for the last diff program:
+// every file of that diff's own compile, as empty stubs under /progName/... .
+// Directory nodes are created implicitly by VirtualFS.AddFile; the program
+// root is added explicitly so delete-only diffs (empty FileList) still list
+// as an empty directory instead of erroring.
+func buildLastDiffStubTree(progName string, irProg *ssadb.IrProgram) (fi.FileSystem, error) {
+	if irProg == nil {
+		return nil, utils.Errorf("build last diff tree: program [%v] has no ir program", progName)
+	}
+	vf := filesys.NewVirtualFs()
+	vf.AddDir("/" + progName)
+	for filePath := range irProg.FileList {
+		normalized := normalizeOverlayFilePath(filePath, progName)
+		if normalized == "" || normalized == "/" {
+			continue
+		}
+		vf.AddFile(path.Join("/", progName, normalized), "")
+	}
+	return vf, nil
 }
 
 func (p *ProgramFileSystem) programName(name string) string {
