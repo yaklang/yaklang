@@ -260,7 +260,19 @@ func (p *ProgramFileSystem) ReadDir(name string) ([]fs.DirEntry, error) {
 }
 
 func (p *ProgramFileSystem) ExtraInfo(name string) map[string]any {
-	return p.dbFS.ExtraInfo(name)
+	m := p.dbFS.ExtraInfo(name)
+	if m == nil {
+		m = make(map[string]any)
+	}
+	// Expose incrementality on the program root so clients can decide whether
+	// the last-diff-only view (diffOnly=true) is meaningful for this program.
+	progName := p.programName(name)
+	if progName != "" && progName == strings.Trim(strings.TrimPrefix(name, "/"), "/") {
+		if irProg, err := ssadb.GetProgram(progName, ssadb.Application); err == nil && irProg != nil {
+			m["IsIncremental"] = isIncrementalDiffProgram(irProg)
+		}
+	}
+	return m
 }
 
 func (p *ProgramFileSystem) Delete(name string) error {
