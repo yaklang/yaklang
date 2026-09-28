@@ -95,6 +95,14 @@ func CompileDiffProgramAndSaveToDB(
 	if progressReporter != nil {
 		progressReporter(0.3, "file system diff calculated")
 	}
+	// 文件系统没有任何变更（无新增/修改/删除）：无需编译 diff program，
+	// 返回 nil, nil，由调用方决定后续行为（如增量重编译时直接复用 base program）。
+	if len(fileHashMap) == 0 {
+		if progressReporter != nil {
+			progressReporter(1, "no file system changes, skip diff compile")
+		}
+		return nil, nil
+	}
 
 	diffOpts := []ssaconfig.Option{
 		WithLanguage(language),
@@ -612,6 +620,16 @@ func (c *Config) parseProjectWithIncrementalCompile() (*Program, error) {
 	)
 	if err != nil {
 		return nil, utils.Wrap(err, "failed to compile diff program")
+	}
+	// 文件系统无变更（CompileDiffProgramAndSaveToDB 返回 nil）：
+	// 跳过 diff 编译，直接复用 base program 作为结果。
+	// 同时把 program 名重置回 base，避免外层 SaveConfig 按不存在的
+	// diff 名查询失败；SaveConfig 还会把 base 标记为 IsOverlay
+	//（项目已启用增量编译），使后续重编译自动走增量分支。
+	if diffProgram == nil {
+		c.Config.SetProgramName(baseProgram.GetProgramName())
+		c.Processf(1, "no file system changes, reuse base program: %s", baseProgram.GetProgramName())
+		return baseProgram, nil
 	}
 	c.Processf(0.8, "diff program compiled: %s", diffProgram.GetProgramName())
 
