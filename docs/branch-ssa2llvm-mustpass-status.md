@@ -55,8 +55,38 @@
 
 ## 当前状态
 
-- 全量 mustpass：**55/115 通过**（旧 CLI 数据；新 CLI 下 misc/fuzztag_test/eval/grammar_test 已单独验证通过，实际更高，需重跑确认）
+- **rebase 到 main 之后的实测基线（2026-09-28）：54/115 通过，61 失败。**
+  命令与产物见下一节；这是当前唯一有效的全量数字，取代此前的 55/115 旧数据。
+- 失败分类：崩溃 crash(exit -1) 23 个、exit 255 21 个、超时 9 个、
+  编译失败 5 个（`nuclei_network_runtime`、`poc_download`、`udp`、
+  `waitAllAsyncCallFinish`、`waitAllAsyncCallFinish2`）、runtime panic 3 个。
 - 回归测试（mustpass_simple + closure + DualRun + ZeroDep）全绿
+
+### 2026-09-28 rebase + 实测基线（本机复现步骤）
+
+本机为 Arch，`go` 1.27.1 会产生 `final textsectmap len/cap mismatch`，
+必须用 1.26.6 工具链。依赖与产物按 §6.1 放在 `/mnt/data` 下：
+
+```sh
+export PATH=/mnt/data/ssa2llvm-deps/go1.26.6/go/bin:$PATH GOTOOLCHAIN=local
+bash common/yak/ssa2llvm/scripts/build_tiers.sh /mnt/data/ssa2llvm-deps/tiers
+CGO_ENABLED=1 go build -o /mnt/data/ssa2llvm-deps/ssa2llvm ./common/yak/ssa2llvm/cmd/ssa2llvm
+
+mkdir -p /mnt/data/ssa2llvm-deps/tmp /mnt/data/ssa2llvm-deps/yakit-all
+TMPDIR=/mnt/data/ssa2llvm-deps/tmp YAKIT_HOME=/mnt/data/ssa2llvm-deps/yakit-all \
+  bash scripts/ssa-test.sh ./common/yak/ssa2llvm/tests/ \
+  -run '^TestMustPass_SSA2LLVM_AllScripts$' -count=1 -timeout 3h -v
+```
+
+全量耗时约 39 分钟（2331s）。分层结果、失败清单与分类存放在
+`/mnt/data/ssa2llvm-deps/mustpass-all.log`、`fail-map.tsv`、`fail-list.txt`。
+
+- 本机没有静态 `libgc.a`（Arch 的 gc 包只提供 `.so`），已从 bdwgc 8.2.12
+  现场编译并放在 `/mnt/data/ssa2llvm-deps/gc-prefix/lib/libgc.a`，
+  再拷回 `common/yak/ssa2llvm/runtime/runtime_go/libs/libgc.a`。
+- rebase 引入的集成问题已修：`common/notify/drivers/feishu` 的 init 会调用
+  shared 组里的 protobuf，原先未被任何分组认领；已把它归入 shared 组，
+  否则 `staticanalyze` 层会因 elfsplit 启动路径泄漏而构建失败。
 
 ## 剩余工作（60 个失败脚本，按优先级）
 
