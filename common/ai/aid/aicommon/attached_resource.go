@@ -9,6 +9,7 @@ const (
 	// Distinct from Type=file, which is read-only reference/@mention context used across loops.
 	AttachedResourceTypeCode            = "code"
 	AttachedResourceTypeHTTPFlowID      = "http_flow_id"
+	AttachedResourceTypeRiskID          = "risk_id"
 	AttachedResourceTypeKnowledgeBase   = "knowledge_base"
 	AttachedResourceTypeSelected        = "selected"
 	AttachedResourceTypeHTTPFuzzRequest = "http_fuzz_request"
