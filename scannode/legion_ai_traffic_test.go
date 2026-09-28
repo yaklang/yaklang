@@ -16,6 +16,7 @@ import (
 
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	aiv1 "github.com/yaklang/yaklang/scannode/gen/legionpb/legion/ai/v1"
+	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -177,6 +178,170 @@ func TestResilienceAITrafficAcknowledgedStartRemainsIncompleteAfterRestart(t *te
 	result := c.drain(ctx, "drain-after-restart")
 	if result.Complete || result.PendingRecords != 1 {
 		t.Fatalf("orphaned started attempt was hidden: %+v", result)
+	}
+}
+
+func trafficReceiptTestServer(t *testing.T) *httptest.Server {
+	t.Helper()
+	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		raw, err := io.ReadAll(r.Body)
+		if err != nil {
+			t.Error(err)
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
+		upload := new(aiv1.AITrafficUpload)
+		if err = proto.Unmarshal(raw, upload); err != nil {
+			t.Error(err)
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
+		receipt := &aiv1.AITrafficReceipt{ProtocolVersion: 1, FlowId: upload.Record.FlowId, Phase: upload.Record.Phase, Durable: true, UploadSha256: trafficSHA(raw), StorageStatus: "stored"}
+		body, _ := proto.Marshal(receipt)
+		_, _ = w.Write(body)
+	}))
+}
+
+func waitForAITrafficDrainStart(t *testing.T, c *aiTrafficCollector) {
+	t.Helper()
+	deadline := time.Now().Add(time.Second)
+	for time.Now().Before(deadline) {
+		c.mu.Lock()
+		accepting := c.accepting
+		c.mu.Unlock()
+		if !accepting {
+			return
+		}
+		time.Sleep(time.Millisecond)
+	}
+	t.Fatal("terminal path did not start traffic drain")
+}
+
+func TestResilienceAITrafficAutomaticTerminalWaitsForReceipts(t *testing.T) {
+	for _, kind := range []string{"done", "failed", "root_plan"} {
+		t.Run(kind, func(t *testing.T) {
+			bridge, fakeJS, driver := newTestAISessionBridge(t)
+			if err := bridge.handleAISessionBind(context.Background(), mustMarshalProto(t, validAISessionBindCommand())); err != nil {
+				t.Fatal(err)
+			}
+			driver.mu.Lock()
+			emitter := driver.emitters[0].(*managedAISessionRuntimeEmitter)
+			driver.mu.Unlock()
+			server := trafficReceiptTestServer(t)
+			defer server.Close()
+			c := trafficTestCollector(t, server.URL)
+			c.binding.Ref = emitter.runtime.ref
+			c.emitter = emitter
+			c.enqueue(&aiv1.AITrafficUpload{Record: &aiv1.AITrafficRecord{ProtocolVersion: 1, FlowId: "flow", SessionId: c.binding.Ref.SessionID, Phase: "terminal", Outcome: "success"}})
+			// The worker is intentionally withheld until the pre-receipt assertions.
+			defer c.flush(context.Background())
+			emitter.runtime.mu.Lock()
+			emitter.runtime.trafficCollector = c
+			emitter.runtime.executionMode = "single_run"
+			emitter.runtime.mu.Unlock()
+			resetPublishedMessages(fakeJS)
+			done := make(chan struct{})
+			go func() {
+				defer close(done)
+				switch kind {
+				case "done":
+					emitter.DoneTurn("turn", []byte(`{"status":"done"}`))
+				case "failed":
+					emitter.FailTurn("turn", "runtime_failed", "failed", nil)
+				case "root_plan":
+					emitter.Emit("ai_runtime", []byte(`{"type":"end_plan_and_execution","content_json":{}}`))
+				}
+			}()
+			waitForAITrafficDrainStart(t, c)
+			if publishedMessageCount(fakeJS) != 0 || !hasAISessionRuntime(bridge.aiRuntime, c.binding.Ref.SessionID) {
+				t.Fatal("terminal publication or runtime removal preceded the durable receipt")
+			}
+			c.flush(context.Background())
+			select {
+			case <-done:
+			case <-time.After(2 * time.Second):
+				t.Fatal("automatic terminal did not finish after receipt")
+			}
+			if hasAISessionRuntime(bridge.aiRuntime, c.binding.Ref.SessionID) {
+				t.Fatal("runtime retained after receipt and terminal publication")
+			}
+			select {
+			case <-c.stop:
+			default:
+				t.Fatal("collector worker was not stopped")
+			}
+			fakeJS.mu.Lock()
+			defer fakeJS.mu.Unlock()
+			drainIndex, terminalIndex := -1, -1
+			var lastSequence uint64
+			for index, msg := range fakeJS.publish {
+				if msg.Subject == "legion.event."+legionEventAISessionDone || msg.Subject == "legion.event."+legionEventAISessionFailed {
+					terminalIndex = index
+				}
+				if msg.Subject != "legion.event."+legionEventAISessionEvent {
+					continue
+				}
+				event := new(aiv1.AISessionEvent)
+				if err := proto.Unmarshal(msg.Data, event); err != nil {
+					t.Fatal(err)
+				}
+				if event.Seq <= lastSequence {
+					t.Fatal("terminal traffic events were published with decreasing sequence")
+				}
+				lastSequence = event.Seq
+				if event.EventType == "ai_traffic_drain" {
+					result := new(aiv1.AITrafficDrainResult)
+					if err := protojson.Unmarshal(event.PayloadJson, result); err != nil || !result.Complete {
+						t.Fatalf("missing completed coverage: %v %v", result, err)
+					}
+					drainIndex = index
+				}
+				if kind == "root_plan" && event.EventType == "ai_runtime" {
+					terminalIndex = index
+				}
+			}
+			if drainIndex < 0 || terminalIndex <= drainIndex {
+				t.Fatal("coverage completion did not precede terminal publication")
+			}
+		})
+	}
+}
+
+func TestResilienceAITrafficManagerDrainsBeforeWorkspaceCleanup(t *testing.T) {
+	server := trafficReceiptTestServer(t)
+	defer server.Close()
+	c := trafficTestCollector(t, server.URL)
+	c.enqueue(&aiv1.AITrafficUpload{Record: &aiv1.AITrafficRecord{ProtocolVersion: 1, FlowId: "flow", SessionId: "session", Phase: "terminal"}})
+	defer c.flush(context.Background())
+	manager := newAISessionRuntimeManager(nil)
+	ref := aiSessionCommandRef{SessionID: "session", CommandID: "turn", BindEpoch: 7, OwnerUserID: "owner"}
+	cleaned := make(chan struct{})
+	runtime := &aiSessionRuntime{ref: ref, bindEpoch: 7, terminalCommandID: "turn", terminalKind: "auto", trafficCollector: c, codeWorkspace: &legionCodeWorkspaceRuntime{cleanup: func() error { close(cleaned); return nil }}}
+	manager.sessions[ref.SessionID] = runtime
+	done := make(chan error, 1)
+	go func() { done <- manager.CompleteTerminal(ref, "auto") }()
+	waitForAITrafficDrainStart(t, c)
+	if !hasAISessionRuntime(manager, ref.SessionID) {
+		t.Fatal("manager removed runtime before traffic receipt")
+	}
+	select {
+	case <-cleaned:
+		t.Fatal("workspace was cleaned before traffic receipt")
+	default:
+	}
+	c.flush(context.Background())
+	select {
+	case err := <-done:
+		if err != nil {
+			t.Fatal(err)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("manager cleanup deadlocked after receipt")
+	}
+	select {
+	case <-cleaned:
+	default:
+		t.Fatal("workspace cleanup was skipped")
 	}
 }
 

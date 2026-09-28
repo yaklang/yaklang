@@ -2,6 +2,7 @@ package scannode
 
 import (
 	"context"
+	"strings"
 	"testing"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
@@ -66,5 +67,26 @@ func TestAITrafficAnalysisClampsProviderAndMessageOptions(t *testing.T) {
 	common := aicommon.NewConfig(context.Background(), config.ExtOptions...)
 	if !common.IsReadOnlyEvidence() || !common.DisableToolUse || !common.DisableWebSearch {
 		t.Fatal("execution-level policy was not applied")
+	}
+}
+
+func TestAITrafficAnalysisEvidenceByteLimit(t *testing.T) {
+	for _, test := range []struct {
+		name      string
+		size      int
+		wantError bool
+	}{
+		{"near_limit", (1 << 20) - 1, false},
+		{"at_limit", 1 << 20, false},
+		{"over_limit", (1 << 20) + 1, true},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			input := trafficAnalysisTestInput()
+			input.ContextPackage.TrafficAnalysis.EvidenceText = strings.Repeat("e", test.size)
+			err := validateTrafficAnalysisInput(trafficAnalysisTestBinding(), input)
+			if (err != nil) != test.wantError {
+				t.Fatalf("evidence bytes=%d: err=%v, wantError=%v", test.size, err, test.wantError)
+			}
+		})
 	}
 }
