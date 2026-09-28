@@ -392,8 +392,9 @@ var toolCallReasonOutputs = []aitool.ToolOption{
 // reason for a tool call, given the tool, its (possibly empty) params, and the
 // owning task's user input / name for intent context. It also includes a brief
 // summary of recent tool-call results so the generated reason can reference the
-// specific progress that motivates this call.
-func buildToolCallReasonPrompt(tool *aitool.Tool, params aitool.InvokeParams, task AITask) string {
+// specific progress that motivates this call. The optional intent identifier
+// distinguishes siblings that use the same tool and have no explicit reason.
+func buildToolCallReasonPrompt(tool *aitool.Tool, params aitool.InvokeParams, task AITask, intentIdentifier string) string {
 	var sb strings.Builder
 	sb.WriteString("Generate a terse reason (under 15 words) stating WHAT this tool call does right now. " +
 		"Focus on the concrete current action, not on prior steps or transitions. " +
@@ -402,6 +403,10 @@ func buildToolCallReasonPrompt(tool *aitool.Tool, params aitool.InvokeParams, ta
 	sb.WriteString(fmt.Sprintf("Tool: %s\n", tool.Name))
 	if desc := strings.TrimSpace(tool.Description); desc != "" {
 		sb.WriteString(fmt.Sprintf("Tool description: %s\n", desc))
+	}
+	if intentIdentifier != "" {
+		sb.WriteString(fmt.Sprintf("This call's intent identifier: %s\n", intentIdentifier))
+		sb.WriteString("Use this intent to distinguish this call from other calls of the same tool; express it naturally rather than copying snake_case.\n")
 	}
 	if task != nil {
 		if name := strings.TrimSpace(task.GetName()); name != "" {
@@ -686,6 +691,27 @@ func (t *ToolCaller) emitReason(reason string) {
 	}
 }
 
+// emitIdentifierReasonFallback keeps batch cards distinguishable when the model
+// omitted a child reason and the auxiliary reason generator is skipped or fails.
+// The tool's localized verbose name is already shown as the card title.
+func (t *ToolCaller) emitIdentifierReasonFallback() {
+	reason := strings.Join(strings.Fields(strings.ReplaceAll(t.destinationIdentifier, "_", " ")), " ")
+	if reason == "" {
+		return
+	}
+	t.m.Lock()
+	if strings.TrimSpace(t.reason) != "" {
+		t.m.Unlock()
+		return
+	}
+	t.reason = reason
+	t.reasonFinalized = true
+	t.m.Unlock()
+	if t.emitter != nil {
+		t.emitter.EmitToolCallReason(t.callToolId, reason)
+	}
+}
+
 // resetReasonForReview clears the reason state so the recursive CallTool
 // (after review changed the tool or params) may generate a fresh reason once
 // more from the unified reason-handling point. This is the only legitimate
@@ -721,12 +747,20 @@ func (t *ToolCaller) generateReasonIfNeeded(tool *aitool.Tool, params aitool.Inv
 		return
 	}
 	if t.config == nil || utils.IsNil(t.config) || tool == nil {
+		t.emitIdentifierReasonFallback()
 		return
 	}
+	if !t.config.ResolveAuxiliaryTask(CallerLabelToolCallReason).ShouldRun() {
+		t.emitIdentifierReasonFallback()
+		return
+	}
+	// Show the per-call intent immediately. A later auxiliary result may
+	// replace it, but must never be overwritten by a delayed fallback emit.
+	t.emitIdentifierReasonFallback()
 	t.config.ScheduleAuxiliaryTask(t.ctx,
 		CallerLabelToolCallReason,
 		func() string {
-			return buildToolCallReasonPrompt(tool, params, t.task)
+			return buildToolCallReasonPrompt(tool, params, t.task, t.destinationIdentifier)
 		},
 		func(action *Action) {
 			reason := strings.TrimSpace(action.GetString("reason"))

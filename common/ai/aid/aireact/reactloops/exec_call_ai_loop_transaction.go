@@ -280,6 +280,7 @@ type loopToolCallParts struct {
 	typ         string
 	description string
 	arguments   strings.Builder
+	announced   bool
 	started     bool
 	descWriter  io.WriteCloser
 	argsWriter  io.WriteCloser
@@ -291,6 +292,7 @@ type loopToolCallCollector struct {
 	byID          map[string]*loopToolCallParts
 	activeByIndex map[int]*loopToolCallParts
 	callback      LoopFunctionCallOutputCallback
+	onCallStarted func(string)
 	wg            sync.WaitGroup
 	err           error
 }
@@ -305,16 +307,20 @@ func invokeLoopGeneralOutputCallback(callback LoopGeneralOutputCallback, output,
 	return nil
 }
 
-func newLoopToolCallCollector(callback LoopFunctionCallOutputCallback) *loopToolCallCollector {
+func newLoopToolCallCollector(callback LoopFunctionCallOutputCallback, onCallStarted ...func(string)) *loopToolCallCollector {
+	var started func(string)
+	if len(onCallStarted) > 0 {
+		started = onCallStarted[0]
+	}
 	return &loopToolCallCollector{
 		byID: make(map[string]*loopToolCallParts), activeByIndex: make(map[int]*loopToolCallParts),
-		callback: callback,
+		callback: callback, onCallStarted: started,
 	}
 }
 
 func (c *loopToolCallCollector) add(deltas []*aispec.ToolCall) {
 	c.mu.Lock()
-	defer c.mu.Unlock()
+	var startedNames []string
 	for _, delta := range deltas {
 		if delta == nil {
 			continue
@@ -352,6 +358,10 @@ func (c *loopToolCallCollector) add(deltas []*aispec.ToolCall) {
 		}
 		if delta.Function.Name != "" {
 			part.name = delta.Function.Name
+		}
+		if !part.announced && part.name != "" {
+			part.announced = true
+			startedNames = append(startedNames, part.name)
 		}
 		if delta.Type != "" {
 			part.typ = delta.Type
@@ -395,6 +405,12 @@ func (c *loopToolCallCollector) add(deltas []*aispec.ToolCall) {
 			}
 		} else if part.started && delta.Function.Arguments != "" {
 			_, _ = io.WriteString(part.argsWriter, delta.Function.Arguments)
+		}
+	}
+	c.mu.Unlock()
+	if c.onCallStarted != nil {
+		for _, name := range startedNames {
+			c.onCallStarted(name)
 		}
 	}
 }
@@ -459,6 +475,7 @@ func (r *ReActLoop) callAIFunctionTransaction(
 	r.resetModelThinkingBuffer()
 	r.Set("last_ai_decision_response", "")
 	var currentCollector *loopToolCallCollector
+	var currentFieldStream *nativeFieldStreamAttempt
 	var collectorMu sync.Mutex
 	var acceptedCalls []LoopCall
 	keepExecutionState := false
@@ -470,12 +487,55 @@ func (r *ReActLoop) callAIFunctionTransaction(
 	var acceptedResp *aicommon.AIResponse
 	var lastOutput, lastReason string
 	var lastRawCalls []*aispec.ToolCall
+	r.UserStatus("正在选择下一步操作", "Choosing the next action", aicommon.WithStatusCode("action.selecting"))
+	newCollector := func() *loopToolCallCollector {
+		attempt := newNativeFieldStreamAttempt(r, advertisedActions)
+		currentFieldStream = attempt
+		var discoveredMu sync.Mutex
+		var discoveredNames []string
+		return newLoopToolCallCollector(func(id, name string, description, arguments io.Reader) {
+			// Preserve the caller's raw-stream callback while JSON fields are
+			// decoded from the same bytes as they arrive. The buffered pipe
+			// prevents a slow UI consumer from blocking the provider callback.
+			callbackReader, callbackWriter := utils.NewBufPipe(nil)
+			callbackDone := make(chan struct{})
+			go func() {
+				defer close(callbackDone)
+				defer func() {
+					if recovered := recover(); recovered != nil {
+						attempt.setError(utils.Errorf("function-call output callback panicked: %v", recovered))
+					}
+					_, _ = io.Copy(io.Discard, description)
+					_, _ = io.Copy(io.Discard, callbackReader)
+				}()
+				functionCallOutputCallback(id, name, description, callbackReader)
+			}()
+			attempt.stream(id, name, io.TeeReader(arguments, callbackWriter))
+			_ = callbackWriter.Close()
+			<-callbackDone
+		}, func(name string) {
+			discoveredMu.Lock()
+			defer discoveredMu.Unlock()
+			discoveredNames = append(discoveredNames, name)
+			if len(discoveredNames) == 1 {
+				zh, en := preparingActionStatusText(name)
+				r.UserStatus(zh, en, aicommon.WithStatusCode("action.preparing"),
+					aicommon.WithStatusDetail("动作 "+name, "Action "+name))
+				return
+			}
+			zh, en := actionBatchStatusNames(discoveredNames)
+			r.UserStatus(fmt.Sprintf("正在准备 %d 个动作：%s", len(discoveredNames), zh),
+				fmt.Sprintf("Preparing %d actions: %s", len(discoveredNames), en),
+				aicommon.WithStatusCode("action.batch.preparing"),
+				aicommon.WithStatusProgress(int64(len(discoveredNames)), 0, "action"))
+		})
+	}
 	// AIRequestOption is applied for each retry. Keeping the collector scoped to
 	// that request prevents fragments from a rejected attempt entering the next.
 	captureOption := aicommon.AIRequestOption(func(req *aicommon.AIRequest) {
 		descriptor.resetProviderCompletion()
 		collectorMu.Lock()
-		currentCollector = newLoopToolCallCollector(functionCallOutputCallback)
+		currentCollector = newCollector()
 		collectorMu.Unlock()
 		aicommon.WithAIRequest_ExtraSpecOpts(
 			aispec.WithTools(advertisedTools),
@@ -491,7 +551,7 @@ func (r *ReActLoop) callAIFunctionTransaction(
 					}
 					collectorMu.Lock()
 					old := currentCollector
-					currentCollector = newLoopToolCallCollector(functionCallOutputCallback)
+					currentCollector = newCollector()
 					collectorMu.Unlock()
 					if old != nil {
 						_, _ = old.finish() // close readers from the discarded response
@@ -523,6 +583,7 @@ func (r *ReActLoop) callAIFunctionTransaction(
 		acceptedResp = resp
 		collectorMu.Lock()
 		collector := currentCollector
+		fieldStream := currentFieldStream
 		collectorMu.Unlock()
 		if collector == nil {
 			return utils.Error("function-call collector missing for AI response")
@@ -550,6 +611,9 @@ func (r *ReActLoop) callAIFunctionTransaction(
 			return callbackErr
 		}
 		if err != nil {
+			return err
+		}
+		if err := fieldStream.error(); err != nil {
 			return err
 		}
 		if descriptor.Snapshot().ProviderFinishReason != "tool_calls" {
@@ -599,6 +663,20 @@ func (r *ReActLoop) callAIFunctionTransaction(
 				ArgumentsJSON: rawCall.Function.Arguments,
 			})
 		}
+		actionNames := make([]string, 0, len(calls))
+		for _, call := range calls {
+			actionNames = append(actionNames, call.Action.Name())
+		}
+		zhNames, enNames := actionBatchStatusNames(actionNames)
+		if len(calls) == 1 {
+			zh, en := preparingActionStatusText(calls[0].Action.Name())
+			r.UserStatus(zh, en, aicommon.WithStatusCode("action.preparing"))
+		} else {
+			r.UserStatus(fmt.Sprintf("正在准备 %d 个动作：%s", len(calls), zhNames),
+				fmt.Sprintf("Preparing %d actions: %s", len(calls), enNames),
+				aicommon.WithStatusCode("action.batch.preparing"),
+				aicommon.WithStatusProgress(0, int64(len(calls)), "action"))
+		}
 		// Normalize all deltas before action-specific verification. An adjustment
 		// may be independent or appear anywhere in a provider's tool-call batch;
 		// its presence lets an answer in that batch avoid premature auto-finish.
@@ -610,12 +688,20 @@ func (r *ReActLoop) callAIFunctionTransaction(
 				}
 			}
 		}
-		for _, call := range calls {
+		for index, call := range calls {
 			if call.LoopAction.ActionVerifier != nil {
+				label := statusNameForAction(call.Action.Name())
+				r.UserStatus(fmt.Sprintf("正在确认%s（%d/%d）", label.zh, index+1, len(calls)),
+					fmt.Sprintf("Checking %s (%d/%d)", label.en, index+1, len(calls)),
+					aicommon.WithStatusCode("action.verifying"),
+					aicommon.WithStatusProgress(int64(index+1), int64(len(calls)), "action"))
 				if err := call.LoopAction.ActionVerifier(r, call.Action); err != nil {
 					return utils.Wrapf(err, "verify tool call %q", call.ToolCallID)
 				}
 			}
+		}
+		if err := r.emitNativeActionStreamFields(resp, calls, fieldStream); err != nil {
+			return err
 		}
 		acceptedCalls = calls
 		verified = true
@@ -641,6 +727,7 @@ func (r *ReActLoop) callAIFunctionTransaction(
 		transactionErr = aicommon.CallAITransaction(r.config, prompt, r.config.CallAI, postHandler, requestOpts...)
 	}
 	if transactionErr != nil {
+		r.UserStatus("暂时没能完成这一步", "This step could not be completed", aicommon.WithStatusCode("action.failed"), aicommon.WithStatusState(aicommon.StatusStateError))
 		descriptor.setError(transactionErr)
 		descriptor.finish(acceptedResp, lastOutput, lastReason, lastRawCalls)
 		return nil, failedLoopStopReason(descriptor, transactionErr), descriptor, transactionErr
@@ -653,11 +740,26 @@ func (r *ReActLoop) callAIFunctionTransaction(
 	}
 	if activeTaskCtx != nil && activeTaskCtx.Err() != nil {
 		err := activeTaskCtx.Err()
+		r.UserStatus("任务已停止", "Task stopped", aicommon.WithStatusCode("task.stopped"), aicommon.WithStatusState(aicommon.StatusStateWarning))
 		descriptor.setError(err)
 		descriptor.finish(acceptedResp, lastOutput, lastReason, lastRawCalls)
 		return nil, failedLoopStopReason(descriptor, err), descriptor, err
 	}
 	descriptor.finish(acceptedResp, lastOutput, lastReason, lastRawCalls)
+	readyNames := make([]string, 0, len(acceptedCalls))
+	for _, call := range acceptedCalls {
+		readyNames = append(readyNames, call.Action.Name())
+	}
+	if len(readyNames) == 1 {
+		zh, en := actionStatusText(readyNames[0])
+		r.UserStatus(zh, en, aicommon.WithStatusCode("action.ready"))
+	} else {
+		zh, en := actionBatchStatusNames(readyNames)
+		r.UserStatus(fmt.Sprintf("即将执行 %d 个动作：%s", len(readyNames), zh),
+			fmt.Sprintf("About to execute %d actions: %s", len(readyNames), en),
+			aicommon.WithStatusCode("action.ready"),
+			aicommon.WithStatusProgress(0, int64(len(readyNames)), "action"))
+	}
 	keepExecutionState = true
 	return acceptedCalls, LoopStopToolCalls, descriptor, nil
 }
@@ -856,9 +958,9 @@ func (r *ReActLoop) callAINormalTransaction(streamWg *sync.WaitGroup, prompt str
 		)
 
 		r.UserStatus(
-			"正在梳理思路",
-			"Organizing the next steps",
-			aicommon.WithStatusCode("reasoning.organizing"),
+			"正在解析下一步动作",
+			"Reading the next action",
+			aicommon.WithStatusCode("action.parsing"),
 		)
 		extractStart := time.Now()
 		action, actionErr = aicommon.ExtractActionFromStream(
@@ -943,11 +1045,8 @@ func (r *ReActLoop) callAINormalTransaction(streamWg *sync.WaitGroup, prompt str
 			)
 		}
 
-		r.UserStatus(
-			"已经找到下一步，正在准备执行",
-			"The next step is ready and being prepared",
-			aicommon.WithStatusCode("action.preparing"),
-		)
+		zhPreparing, enPreparing := preparingActionStatusText(actionType)
+		r.UserStatus(zhPreparing, enPreparing, aicommon.WithStatusCode("action.preparing"))
 		log.Infof("action type extracted: %s", actionType)
 
 		verifier, err := r.GetActionHandler(actionType)
@@ -968,9 +1067,10 @@ func (r *ReActLoop) callAINormalTransaction(streamWg *sync.WaitGroup, prompt str
 		// duplicate directly_answer guard), then be removed afterwards.
 		validateTodoDeltaBeforeActionVerifier(r, action)
 		if verifier.ActionVerifier != nil {
+			label := statusNameForAction(actionType)
 			r.UserStatus(
-				"正在确认关键细节",
-				"Checking the important details",
+				"正在确认"+label.zh,
+				"Checking "+label.en,
 				aicommon.WithStatusCode("action.verifying"),
 			)
 			if err := verifier.ActionVerifier(r, action); err != nil {
@@ -1033,11 +1133,8 @@ func (r *ReActLoop) callAINormalTransaction(streamWg *sync.WaitGroup, prompt str
 		return nil, nil, utils.Error("action is nil in ReActLoop")
 	}
 
-	r.UserStatus(
-		"正在推进下一步",
-		"Moving on to the next step",
-		aicommon.WithStatusCode("action.ready"),
-	)
+	zhReady, enReady := actionStatusText(getNextActionType(action))
+	r.UserStatus(zhReady, enReady, aicommon.WithStatusCode("action.ready"))
 
 	handler, err := r.GetActionHandler(getNextActionType(action))
 	if err != nil {

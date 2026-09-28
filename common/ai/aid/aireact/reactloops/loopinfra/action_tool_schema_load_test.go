@@ -66,12 +66,14 @@ func TestNativeToolSchemaLoadRejectsMalformedRequests(t *testing.T) {
 
 func TestNativeDirectToolMetadataAndNoParameterFallback(t *testing.T) {
 	loop, _ := newToolBatchTestLoop(t)
-	batch := parseToolBatchPromptExample(t, `{"@action":"directly_call_tool","directly_call_reason":"inspect files","directly_call_tool_calls":[{"tool_name":"read_file","params":{"file":"a"}},{"tool_name":"read_file","params":{"file":"b"},"reason":"specific"}]}`, "directly_call_tool")
+	batch := parseToolBatchPromptExample(t, `{"@action":"directly_call_tool","directly_call_reason":"inspect files","directly_call_tool_calls":[{"tool_name":"read_file","params":{"file":"a"},"identifier":"read_a"},{"tool_name":"read_file","params":{"file":"b"},"identifier":"read_b","reason":"specific"}]}`, "directly_call_tool")
 	require.NoError(t, nativeDirectToolAction.ActionVerifier(loop, batch))
 	request, ok := loop.GetActionExecutionValue(batch, actionStateDirectToolBatch).(*aicommon.ToolBatchRequest)
 	require.True(t, ok)
-	require.Equal(t, "inspect files", request.Calls[0].Reason)
+	require.Empty(t, request.Calls[0].Reason)
+	require.Equal(t, "read_a", request.Calls[0].Identifier)
 	require.Equal(t, "specific", request.Calls[1].Reason)
+	require.Equal(t, "read_b", request.Calls[1].Identifier)
 	// The old text path retains its historical validation behavior.
 	require.Error(t, loopAction_directlyCallTool.ActionVerifier(loop, batch))
 	invalid := parseToolBatchPromptExample(t, `{"@action":"directly_call_tool","directly_call_tool_name":"read_file","directly_call_tool_params":{}}`, "directly_call_tool")
