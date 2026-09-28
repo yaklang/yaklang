@@ -77,3 +77,27 @@ new AI session before provisioning, loads the exact admitted image when it is
 missing, and keeps existing sessions on their persisted release. A real model
 conversation still requires deployed Legion, License and Provider
 configuration; producing the package alone is not end-to-end acceptance.
+
+## Forge tool capability contract
+
+New Node and Session Runtime manifests declare `ai.forge_release.v1` for immutable
+Forge execution, `ai.forge.custom_tools.v1` for custom script/schema snapshots,
+and `ai.tools.builtin.v1` for the existing bounded built-in tool adapters.
+The aggregate tool key covers DNS/TCP discovery, native HTTP/crawler/fingerprint,
+and evidence adapters. Evidence file access additionally requires
+`ai.input.managed_attachment.v1` on a supported platform. None of these keys grants
+a task additional tool or target permissions; the server-owned immutable profile,
+input manifest and execution scope still control each invocation.
+
+Do not advertise `ai.forge.discovery.v1/v2`, `ai.forge.evidence.v1`, or
+`ai.forge.http_assessment.v2` in new manifests. Node normalization drops those
+retired keys even when an older enrollment record supplies them. Stateful rollback
+mode advertises neither Forge protocols nor the aggregate built-in tool key.
+Published profile values and their adapter semantics remain unchanged.
+
+Deploy the compatible Legion server before these binaries. Legion accepts the
+new aggregate protocol or the exact legacy profile capability from older
+releases; an old subset does not imply aggregate support. An older server may
+reject the new capability surface. Do not forge legacy declarations to bypass
+that admission check. Packaging tests bind the declared capability set to the
+compiled Node surface and Runtime manifest fixture.

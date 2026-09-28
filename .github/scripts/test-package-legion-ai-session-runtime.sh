@@ -106,8 +106,8 @@ jq -e \
     (.capabilities | index("ai.skill_bundle.v1")) != null and
     (.capabilities | index("ai.session.runtime")) != null and
     (.capabilities | index("yak.execute")) != null and
-    (.capabilities | index("ai.forge.discovery.v2")) != null and
-    (.capabilities | index("ai.forge.http_assessment.v2")) != null and
+    (.capabilities | index("ai.tools.builtin.v1")) != null and
+    (.capabilities | map(select(startswith("ai.forge.discovery.") or startswith("ai.forge.evidence.") or startswith("ai.forge.http_assessment."))) | length == 0) and
     (.capabilities | index("ai.forge_release.v1")) != null and
     (.capabilities | index("ai.forge.custom_tools.v1")) != null and
     (.capabilities | index("hids")) == null and

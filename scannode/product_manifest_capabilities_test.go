@@ -40,9 +40,24 @@ func TestProductManifestApplicationCapabilitiesDoNotOverrideStatefulRuntime(t *t
 		t.Fatal(err)
 	}
 	actual := normalizeScanNodeCapabilityKeysForRuntime(advertised, aiSessionRuntimeModeStateful)
-	for _, key := range []string{capabilityKeyAISkillBundleV1, capabilityKeyAIForgeReleaseV1, capabilityKeyAIForgeCustomToolsV1, capabilityKeyAIForgeEvidenceV1, capabilityKeyAIForgeDiscoveryV1, capabilityKeyAIForgeDiscoveryV2, capabilityKeyAIForgeHTTPAssessmentV2} {
+	for _, key := range []string{capabilityKeyAISkillBundleV1, capabilityKeyAIForgeReleaseV1, capabilityKeyAIForgeCustomToolsV1, capabilityKeyAIToolsBuiltinV1} {
 		if slices.Contains(actual, key) {
 			t.Fatalf("stateful runtime inherited unsupported application capability %s", key)
+		}
+	}
+}
+
+func TestNormalizeScanNodeCapabilityKeysDropsLegacyForgeProfiles(t *testing.T) {
+	legacy := []string{"ai.forge.evidence.v1", "ai.forge.discovery.v1", "ai.forge.discovery.v2", "ai.forge.http_assessment.v2"}
+	for _, mode := range []string{aiSessionRuntimeModeStateful, aiSessionRuntimeModeStateless} {
+		actual := normalizeScanNodeCapabilityKeysForRuntime(legacy, mode)
+		for _, key := range legacy {
+			if slices.Contains(actual, key) {
+				t.Fatalf("legacy key advertised: %s", key)
+			}
+		}
+		if slices.Contains(actual, capabilityKeyAIToolsBuiltinV1) != (mode == aiSessionRuntimeModeStateless) {
+			t.Fatalf("built-in tool capability does not match runtime mode: %s", mode)
 		}
 	}
 }

@@ -15,10 +15,7 @@ func compiledScanNodeCapabilityKeys() []string {
 		capabilityKeyAIForgeCustomToolsV1,
 		capabilityKeyAICodeWorkspaceV1,
 		capabilityKeyAIManagedInputV1,
-		capabilityKeyAIForgeEvidenceV1,
-		capabilityKeyAIForgeDiscoveryV1,
-		capabilityKeyAIForgeDiscoveryV2,
-		capabilityKeyAIForgeHTTPAssessmentV2,
+		capabilityKeyAIToolsBuiltinV1,
 		capabilityKeyPluginBundleV1,
 	}
 }
