@@ -3,12 +3,12 @@ package loop_dir_explore
 import (
 	"bytes"
 	"fmt"
-	"github.com/yaklang/yaklang/common/ai/aid/aicommon/promptloader"
 	"os"
 	"path/filepath"
 	"strings"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon/promptloader"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops/loopinfra"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
@@ -117,21 +117,7 @@ func BuildDirExploreLoop(r aicommon.AIInvokeRuntime, opts ...reactloops.ReActLoo
 				r.GetConfig().ScheduleAuxiliaryTask(task.GetContext(),
 					aicommon.CallerLabelExtractExploreTargetPath,
 					func() string {
-						promptTpl := `分析用户的请求，提取需要探索的目标目录路径。
-
-## 用户输入
-<|USER_INPUT_{{ .Nonce }}|>
-{{ .UserInput }}
-<|USER_INPUT_END_{{ .Nonce }}|>
-
-## 提取规则
-1. 找到用户希望 AI 探索/分析的目录的绝对路径
-2. 路径通常是一个本地文件系统路径，例如 "/home/user/myproject" 或 "/Users/me/code/app"
-3. 如果用户提到多个路径，选择最主要/最明确的那个
-4. 如果没有找到任何目录路径，返回空字符串
-5. 输出路径必须是绝对路径（以 / 或 驱动器字母 开头）
-
-请返回目标路径。`
+						promptTpl := promptloader.MustLoad("inline/ai/aid/aireact/reactloops/loop_dir_explore/explore/promptTpl.txt")
 						rendered, err := utils.RenderTemplate(promptTpl, map[string]any{
 							"Nonce":     utils.RandStringBytes(4),
 							"UserInput": userInput,

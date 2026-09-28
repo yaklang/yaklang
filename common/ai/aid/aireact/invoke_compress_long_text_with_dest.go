@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/davecgh/go-spew/spew"
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon/promptloader"
 	"io"
 	"sort"
 	"strconv"
@@ -242,44 +243,7 @@ func compressKnowledgeChunkWithScore(
 `, dNonce, alreadyExtracted, dNonce)
 			}
 
-			promptTemplate := `<|USER_QUERY_{{ .nonce }}|>
-{{ .userQuery }}
-<|USER_QUERY_END_{{ .nonce }}|>
-
-{{ .alreadyExtractedSection }}<|KNOWLEDGE_CHUNK_{{ .nonce }}|>
-{{ .samples }}
-<|KNOWLEDGE_CHUNK_END_{{ .nonce }}|>
-
-<|INSTRUCT_{{ .nonce }}|>
-【智能知识筛选】请从当前分片中提取与用户问题最相关的知识片段。
-
-【核心任务】
-从上述带行号的知识内容中，提取与用户问题直接相关的片段。
-{{ if .hasAlreadyExtracted }}
-【重要：去重要求】
-ALREADY_EXTRACTED 部分包含了之前已经提取过的内容。请注意：
-- 如果当前分片中的内容与已提取内容完全相同或高度重复，应大幅降低评分或不提取
-- 如果内容仅部分重复但有新的补充信息，可以适当降低评分后提取
-- 优先提取与已提取内容不重复的新信息
-{{ end }}
-【输出要求】
-1. 最多提取 %d 个片段
-2. 每个片段 %d-%d 行
-3. 使用原始行号（第一列数字）
-4. 给出 0.00-1.00 的相关性评分（score），越高越相关
-
-【评分标准】
-- 0.80-1.00: 直接回答用户问题的核心内容（且未被提取过）
-- 0.60-0.80: 相关背景/技术细节（且未被提取过）
-- 0.40-0.60: 补充性信息（或与已提取内容部分重复但有新信息）
-- 0.30-0.40: 弱相关但有线索价值（如包含目标库/函数名片段、用户可据此追问）
-- 0.00-0.30: 无关内容或与已提取内容完全重复（不输出）
-
-尽量使用，精确到小数点后两位来表示
-
-请输出 ranges 数组。
-<|INSTRUCT_END_{{ .nonce }}|>
-`
+			promptTemplate := promptloader.MustLoad("inline/ai/aid/aireact/invoke_compress_long_text_with_dest/promptTemplate.txt")
 
 			materials, err := utils.RenderTemplate(fmt.Sprintf(promptTemplate, maxRanges, minLines, maxLines), map[string]any{
 				"nonce":                   dNonce,

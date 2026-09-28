@@ -2,9 +2,9 @@ package loop_http_flow_analyze
 
 import (
 	"bytes"
-	"github.com/yaklang/yaklang/common/ai/aid/aicommon/promptloader"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon/promptloader"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
 	_ "github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops/loop_http_fuzztest"
 	"github.com/yaklang/yaklang/common/log"

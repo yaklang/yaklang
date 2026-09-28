@@ -1,11 +1,11 @@
 package aireact
 
 import (
-	"github.com/yaklang/yaklang/common/ai/aid/aicommon/promptloader"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon/promptloader"
 )
 
 var defaultLoopInstruction = promptloader.MustLoad("ai/aid/aireact/reactloops/loop_default/prompts/instruction.txt")

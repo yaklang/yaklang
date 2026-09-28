@@ -13,6 +13,7 @@ import (
 
 	"github.com/yaklang/gorm"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon/promptloader"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/ai/rag"
 	"github.com/yaklang/yaklang/common/ai/rag/vectorstore"
@@ -270,21 +271,7 @@ func LLMRerankTopK(
 				}
 			}
 
-			promptTemplate := `<|USER_QUERY_%s|>
-%s
-<|USER_QUERY_END_%s|>
-
-<|CANDIDATES_%s|>
-%s
-<|CANDIDATES_END_%s|>
-
-<|INSTRUCT_%s|>
-Rate the relevance of each candidate to the user query.
-Output a JSON array "scores" with objects {index, score} where score is 0.00-1.00.
-Only include candidates with score >= 0.10.
-Sort by score descending.
-<|INSTRUCT_END_%s|>
-`
+			promptTemplate := promptloader.MustLoad("inline/ai/aid/aireact/knowledgebench/bench_runner/promptTemplate.txt")
 
 			prompt := fmt.Sprintf(promptTemplate,
 				dNonce, query, dNonce,
