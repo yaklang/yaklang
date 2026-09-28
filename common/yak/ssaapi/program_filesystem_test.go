@@ -212,8 +212,8 @@ public class New {
 						"diff-only view must not list untouched base files")
 					require.False(t, hasProgramFSFileBySuffix(diffFiles, "Base.java"))
 
-					// Aggregate view keeps untouched base files.
-					aggFiles := collectProgramFiles(t, progFS, root)
+				// Aggregate view keeps untouched base files.
+				aggFiles := collectProgramFiles(t, progFS, root)
 					require.True(t, hasProgramFSFileBySuffix(aggFiles, "Utils.java"))
 					require.True(t, hasProgramFSFileBySuffix(aggFiles, "New.java"))
 
@@ -239,6 +239,14 @@ public class New {
 					require.NotContains(t, diffList, root+"/Utils.java")
 					aggList := yakurlListProgramDir(t, root)
 					require.Contains(t, aggList, root+"/Utils.java")
+
+					// ExtraInfo exposes incrementality so clients know whether
+					// the diffOnly view is meaningful for this program.
+					extra := progFS.ExtraInfo(root)
+					require.Equal(t, true, extra["IsIncremental"])
+					// Base (full compile) programs are not incremental.
+					baseExtra := progFS.ExtraInfo("/" + names[0])
+					require.NotEqual(t, true, baseExtra["IsIncremental"])
 				},
 			},
 			ssatest.IncrementalStep{
