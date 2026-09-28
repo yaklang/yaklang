@@ -286,6 +286,7 @@ type aiSessionRuntime struct {
 	seq                      uint64
 	cancel                   context.CancelFunc
 	handle                   aiSessionRuntimeHandle
+	trafficCollector         *aiTrafficCollector
 	resultSink               *aiSessionResultSinkProxy
 	processedInputCommands   map[string]processedAISessionInput
 	processedInputOrder      []string
@@ -651,6 +652,7 @@ func (m *aiSessionRuntimeManager) Bind(
 		return ref, m.finishBindError(ref, err)
 	}
 	if collector != nil {
+		runtime.trafficCollector = collector
 		ctx = lowhttp.WithHTTPAttemptObserver(ctx, collector.observe)
 		binding.TrafficCollector = collector
 	}
@@ -1364,6 +1366,22 @@ func (m *aiSessionRuntimeManager) CompleteTerminal(
 			kind,
 			currentKind,
 		)
+	}
+	// Keep the runtime and its spill files addressable until the bounded receipt
+	// drain completes. Network I/O and emitter callbacks must not hold these locks.
+	session.mu.Unlock()
+	m.mu.Unlock()
+	session.finishTrafficCapture()
+	m.mu.Lock()
+	if m.sessions[ref.SessionID] != session {
+		m.mu.Unlock()
+		return nil
+	}
+	session.mu.Lock()
+	if session.terminalCommandID != ref.CommandID || session.terminalKind != kind {
+		session.mu.Unlock()
+		m.mu.Unlock()
+		return fmt.Errorf("ai session terminal ownership changed during traffic drain: %s", ref.SessionID)
 	}
 	delete(m.sessions, ref.SessionID)
 	m.recordTerminalTombstoneLocked(ref.SessionID, aiSessionTerminalTombstone{
@@ -2236,6 +2254,12 @@ func (e *managedAISessionRuntimeEmitter) emitForRef(
 	if rootTerminal {
 		ref, claimed = e.runtime.claimRootPlanTerminal(ref.CommandID)
 	}
+	if claimed {
+		e.runtime.finishTrafficCapture()
+		// The drain emits metadata/coverage events. The terminal must follow their
+		// sequence numbers as well as their actual publication order.
+		ref, seq = e.runtime.nextEventRefAndSeqFor(ref)
+	}
 	publish := func(ctx context.Context) error {
 		if claimed {
 			if err := e.runtime.resultSink.Succeed(ctx, payloadJSON); err != nil {
@@ -2276,6 +2300,7 @@ func (e *managedAISessionRuntimeEmitter) Done(resultJSON []byte) {
 	}
 	defer e.runtime.endEmission()
 	ref := e.runtime.currentRef()
+	e.runtime.finishTrafficCapture()
 	if err := retryAISessionTerminalPublish(e.ctx, func(ctx context.Context) error {
 		if err := e.runtime.resultSink.Succeed(ctx, resultJSON); err != nil {
 			return err
@@ -2298,6 +2323,7 @@ func (e *managedAISessionRuntimeEmitter) DoneTurn(turnID string, resultJSON []by
 		e.runtime.endEmission()
 		return
 	}
+	e.runtime.finishTrafficCapture()
 	if err := retryAISessionTerminalPublish(e.ctx, func(ctx context.Context) error {
 		if err := e.runtime.resultSink.Succeed(ctx, resultJSON); err != nil {
 			return err
@@ -2332,6 +2358,7 @@ func (e *managedAISessionRuntimeEmitter) FailTurn(
 		e.runtime.endEmission()
 		return
 	}
+	e.runtime.finishTrafficCapture()
 	if err := retryAISessionTerminalPublish(e.ctx, func(ctx context.Context) error {
 		if err := e.runtime.resultSink.Fail(ctx, code, message, detailJSON); err != nil {
 			return err
@@ -2490,6 +2517,7 @@ func (e *managedAISessionRuntimeEmitter) Failed(code string, message string, det
 	}
 	defer e.runtime.endEmission()
 	ref := e.runtime.currentRef()
+	e.runtime.finishTrafficCapture()
 	if err := retryAISessionTerminalPublish(e.ctx, func(ctx context.Context) error {
 		if err := e.runtime.resultSink.Fail(ctx, code, message, detailJSON); err != nil {
 			return err

@@ -39,6 +39,11 @@ func WithHTTPAttemptObserver(ctx context.Context, observer HTTPAttemptObserver) 
 	return context.WithValue(ctx, attemptObserverContextKey{}, observer)
 }
 
+func HasHTTPAttemptObserver(ctx context.Context) bool {
+	observer, _ := ctx.Value(attemptObserverContextKey{}).(HTTPAttemptObserver)
+	return observer != nil
+}
+
 // BindHTTPAttemptObserver bridges tool runtime IDs to the owning engine context.
 // It is deliberately opt-in: ordinary clients and model-provider traffic are excluded.
 func BindHTTPAttemptObserver(ctx context.Context, runtimeID, agentID string) func() {

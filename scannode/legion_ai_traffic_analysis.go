@@ -9,6 +9,7 @@ import (
 )
 
 const aiTrafficAnalysisCapabilityV1 = "ai.traffic.analysis.readonly.v1"
+const aiTrafficAnalysisMaxEvidenceBytes = 1 << 20
 
 func validateTrafficAnalysisBinding(binding aiSessionBinding, options yakRuntimeOptions) error {
 	analysis := binding.TrafficAnalysis
@@ -49,7 +50,7 @@ func validateTrafficAnalysisInput(binding aiSessionBinding, input aiSessionInput
 		return fmt.Errorf("traffic analysis permits evidence-backed message turns only")
 	}
 	analysis := input.ContextPackage.GetTrafficAnalysis()
-	if analysis == nil || !analysis.ReadOnly || analysis.SourceSessionId != binding.TrafficAnalysis.SourceSessionId || analysis.EvidenceText == "" || len(analysis.EvidenceText) > 256<<10 || input.ContextPackage.GetFocusRelease() != nil || len(input.ContextPackage.Tools) > 0 {
+	if analysis == nil || !analysis.ReadOnly || analysis.SourceSessionId != binding.TrafficAnalysis.SourceSessionId || analysis.EvidenceText == "" || len(analysis.EvidenceText) > aiTrafficAnalysisMaxEvidenceBytes || input.ContextPackage.GetFocusRelease() != nil || len(input.ContextPackage.Tools) > 0 {
 		return fmt.Errorf("traffic analysis requires server-assembled read-only evidence context")
 	}
 	allowed := make(map[string]bool, len(binding.TrafficAnalysis.FlowIds))

@@ -363,7 +363,12 @@ func (a *ToolCaller) invoke(
 	}()
 
 	noRuntimeId := !params.Has("runtime_id")
-	if noRuntimeId {
+	if lowhttp.HasHTTPAttemptObserver(c.GetContext()) {
+		// ReAct may share a.runtimeId between concurrent tools. Captured HTTP must
+		// use the same invocation ID as the observer and ToolRuntimeConfig, even
+		// when a caller supplied a runtime_id parameter.
+		params.Set("runtime_id", a.callToolId)
+	} else if noRuntimeId {
 		params.Set("runtime_id", a.runtimeId)
 	}
 

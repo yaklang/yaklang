@@ -44,6 +44,7 @@ type aiTrafficCollector struct {
 	wake        chan struct{}
 	stop        chan struct{}
 	stopped     sync.Once
+	finished    sync.Once
 	uploadMu    sync.Mutex
 	mu          sync.Mutex
 	currentTurn string
@@ -534,10 +535,26 @@ func (h *aiTrafficRuntimeHandle) Cancel(reason string) {
 	h.finish()
 }
 func (h *aiTrafficRuntimeHandle) finish() {
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-	defer cancel()
-	h.collector.drain(ctx, "")
-	h.collector.stopped.Do(func() { close(h.collector.stop) })
+	h.collector.finish()
+}
+func (c *aiTrafficCollector) finish() {
+	c.finished.Do(func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+		c.drain(ctx, "")
+		c.stopped.Do(func() { close(c.stop) })
+	})
+}
+
+// Automatic terminal events originate inside the engine. Drain evidence without
+// calling engine.Close here: it may wait for that same engine goroutine to exit.
+func (r *aiSessionRuntime) finishTrafficCapture() {
+	r.mu.Lock()
+	collector := r.trafficCollector
+	r.mu.Unlock()
+	if collector != nil {
+		collector.finish()
+	}
 }
 
 func (b *legionJobBridge) handleAITrafficDrain(ctx context.Context, raw []byte) error {
