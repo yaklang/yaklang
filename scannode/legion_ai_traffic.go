@@ -137,17 +137,7 @@ func (c *aiTrafficCollector) observe(start lowhttp.HTTPAttempt) func(lowhttp.HTT
 	if start.HTTPS {
 		record.Scheme = "https"
 	}
-	if req, err := http.ReadRequest(bufio.NewReader(bytes.NewReader(start.Request))); err == nil {
-		record.Method = req.Method
-		record.Host = req.Host
-		if strings.ContainsAny(record.Host, "\r\n@") || len(record.Host) > 300 {
-			record.Host = ""
-		}
-		req.Body.Close()
-	}
-	if len(record.Method) > 16 {
-		record.Method = ""
-	}
+	trafficRequestMetadata(record, start.Request)
 	c.enqueue(&aiv1.AITrafficUpload{Record: record})
 	var once sync.Once
 	return func(end lowhttp.HTTPAttempt) {
@@ -165,6 +155,7 @@ func (c *aiTrafficCollector) observe(start lowhttp.HTTPAttempt) func(lowhttp.HTT
 			}
 			request, requestSize, requestTruncated, reqErr := trafficPacket(end.Request, end.RequestHeaderFile, end.RequestBodyFile, int64(c.policy.PacketLimitBytes))
 			response, responseSize, responseTruncated, rspErr := trafficPacket(end.Response, end.ResponseHeaderFile, end.ResponseBodyFile, int64(c.policy.PacketLimitBytes))
+			trafficRequestMetadata(terminal, request)
 			terminal.RequestSizeBytes = uint64(requestSize)
 			terminal.ResponseSizeBytes = uint64(responseSize)
 			terminal.RequestTruncated = requestTruncated
@@ -180,6 +171,20 @@ func (c *aiTrafficCollector) observe(start lowhttp.HTTPAttempt) func(lowhttp.HTT
 			terminal.ResponseSha256 = trafficSHA(response)
 			c.enqueue(&aiv1.AITrafficUpload{Record: terminal, RawRequest: request, RawResponse: response})
 		})
+	}
+}
+
+func trafficRequestMetadata(record *aiv1.AITrafficRecord, packet []byte) {
+	if req, err := http.ReadRequest(bufio.NewReader(bytes.NewReader(packet))); err == nil {
+		record.Method = req.Method
+		record.Host = req.Host
+		if strings.ContainsAny(record.Host, "\r\n@") || len(record.Host) > 300 {
+			record.Host = ""
+		}
+		req.Body.Close()
+	}
+	if len(record.Method) > 16 {
+		record.Method = ""
 	}
 }
 
