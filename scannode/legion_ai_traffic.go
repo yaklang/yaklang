@@ -30,6 +30,8 @@ const aiTrafficProtocolVersion = 1
 const aiTrafficCapabilityV1 = "ai.traffic.capture.v1"
 const aiTrafficDefaultPacketLimit = 10 << 20
 const aiTrafficDefaultSessionLimit = 1 << 30
+const aiTrafficMaxPacketLimit = 64 << 20
+const aiTrafficMaxSessionLimit = 64 << 30
 
 var aiTrafficCollectors sync.Map
 
@@ -68,12 +70,8 @@ func newAITrafficCollector(binding aiSessionBinding, emitter aiSessionRuntimeEmi
 		return nil, fmt.Errorf("traffic capture requires authenticated node session")
 	}
 	policy = proto.Clone(policy).(*aiv1.AITrafficCapturePolicy)
-	if policy.PacketLimitBytes == 0 || policy.PacketLimitBytes > aiTrafficDefaultPacketLimit {
-		policy.PacketLimitBytes = aiTrafficDefaultPacketLimit
-	}
-	if policy.SessionLimitBytes == 0 || policy.SessionLimitBytes > aiTrafficDefaultSessionLimit {
-		policy.SessionLimitBytes = aiTrafficDefaultSessionLimit
-	}
+	policy.PacketLimitBytes = trafficCaptureLimit(policy.PacketLimitBytes, aiTrafficDefaultPacketLimit, aiTrafficMaxPacketLimit)
+	policy.SessionLimitBytes = trafficCaptureLimit(policy.SessionLimitBytes, aiTrafficDefaultSessionLimit, aiTrafficMaxSessionLimit)
 	if directory == "" {
 		// Neither remote session IDs nor tool IDs are allowed to select local paths.
 		identity := trafficSHA([]byte(fmt.Sprintf("%s/%d/%s", binding.Ref.SessionID, binding.Ref.BindEpoch, binding.NodeSessionID)))
@@ -99,6 +97,16 @@ func newAITrafficCollector(binding aiSessionBinding, emitter aiSessionRuntimeEmi
 	go c.run()
 	c.signal()
 	return c, nil
+}
+
+func trafficCaptureLimit(configured, defaultLimit, hardLimit uint64) uint64 {
+	if configured == 0 {
+		return defaultLimit
+	}
+	if configured > hardLimit {
+		return hardLimit
+	}
+	return configured
 }
 
 func (c *aiTrafficCollector) key() string {
@@ -155,6 +163,16 @@ func (c *aiTrafficCollector) observe(start lowhttp.HTTPAttempt) func(lowhttp.HTT
 			}
 			request, requestSize, requestTruncated, reqErr := trafficPacket(end.Request, end.RequestHeaderFile, end.RequestBodyFile, int64(c.policy.PacketLimitBytes))
 			response, responseSize, responseTruncated, rspErr := trafficPacket(end.Response, end.ResponseHeaderFile, end.ResponseBodyFile, int64(c.policy.PacketLimitBytes))
+			request, response, packetLimitReason := trafficBoundPacketPair(request, response, int(c.policy.PacketLimitBytes))
+			requestTruncated = requestTruncated || int64(len(request)) < requestSize
+			responseTruncated = responseTruncated || int64(len(response)) < responseSize
+			if (requestTruncated && len(request) > 0 && !trafficHeadersComplete(request)) || (responseTruncated && len(response) > 0 && !trafficHeadersComplete(response)) {
+				terminal.CaptureError = "packet_headers_limit"
+			} else if packetLimitReason != "" {
+				terminal.CaptureError = packetLimitReason
+			} else if requestTruncated || responseTruncated {
+				terminal.CaptureError = "packet_limit"
+			}
 			trafficRequestMetadata(terminal, request)
 			terminal.RequestSizeBytes = uint64(requestSize)
 			terminal.ResponseSizeBytes = uint64(responseSize)
@@ -172,6 +190,45 @@ func (c *aiTrafficCollector) observe(start lowhttp.HTTPAttempt) func(lowhttp.HTT
 			c.enqueue(&aiv1.AITrafficUpload{Record: terminal, RawRequest: request, RawResponse: response})
 		})
 	}
+}
+
+// trafficBoundPacketPair uses one budget for the complete flow. Reserve both
+// headers before dividing the remaining bytes between request/response bodies.
+// If the headers alone exceed the budget, preserve bounded prefixes of both
+// sides and explicitly report that complete headers could not be retained.
+func trafficBoundPacketPair(request, response []byte, limit int) ([]byte, []byte, string) {
+	if len(request)+len(response) <= limit {
+		return request, response, ""
+	}
+	requestHeader, responseHeader := trafficHeaderLength(request), trafficHeaderLength(response)
+	if requestHeader+responseHeader > limit {
+		requestLimit, responseLimit := trafficSplitBudget(limit, requestHeader, responseHeader)
+		return request[:requestLimit], response[:responseLimit], "packet_headers_limit"
+	}
+	requestBody, responseBody := trafficSplitBudget(limit-requestHeader-responseHeader, len(request)-requestHeader, len(response)-responseHeader)
+	return request[:requestHeader+requestBody], response[:responseHeader+responseBody], "packet_limit"
+}
+
+func trafficHeadersComplete(packet []byte) bool {
+	return bytes.Contains(packet, []byte("\r\n\r\n")) || bytes.Contains(packet, []byte("\n\n"))
+}
+
+func trafficHeaderLength(packet []byte) int {
+	if end := bytes.Index(packet, []byte("\r\n\r\n")); end >= 0 {
+		return end + 4
+	}
+	if end := bytes.Index(packet, []byte("\n\n")); end >= 0 {
+		return end + 2
+	}
+	// A partial or malformed header must never be mistaken for body space.
+	return len(packet)
+}
+
+func trafficSplitBudget(limit, leftSize, rightSize int) (int, int) {
+	left := min(leftSize, limit/2)
+	right := min(rightSize, limit-left)
+	left += min(leftSize-left, limit-left-right)
+	return left, right
 }
 
 func trafficRequestMetadata(record *aiv1.AITrafficRecord, packet []byte) {

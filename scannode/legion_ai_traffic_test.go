@@ -179,3 +179,105 @@ func TestResilienceAITrafficAcknowledgedStartRemainsIncompleteAfterRestart(t *te
 		t.Fatalf("orphaned started attempt was hidden: %+v", result)
 	}
 }
+
+func TestAITrafficCombinedPacketBudgetRetainsBothHeaders(t *testing.T) {
+	c := trafficTestCollector(t, "http://unused.invalid")
+	c.policy.PacketLimitBytes = aiTrafficDefaultPacketLimit
+	c.policy.SessionLimitBytes = aiTrafficDefaultSessionLimit
+	requestHeader := []byte("POST /upload HTTP/1.1\r\nHost: example.invalid\r\nContent-Type: application/octet-stream\r\n\r\n")
+	responseHeader := []byte("HTTP/1.1 200 OK\r\nContent-Type: application/octet-stream\r\n\r\n")
+	request := append(append([]byte(nil), requestHeader...), bytes.Repeat([]byte("q"), (6<<20)-len(requestHeader))...)
+	response := append(append([]byte(nil), responseHeader...), bytes.Repeat([]byte("s"), (6<<20)-len(responseHeader))...)
+	finish := c.observe(lowhttp.HTTPAttempt{StartedAt: time.Now(), Request: request})
+	finish(lowhttp.HTTPAttempt{FinishedAt: time.Now(), Request: request, Response: response})
+	paths, _ := filepath.Glob(filepath.Join(c.dir, "*.terminal.pb"))
+	if len(paths) != 1 {
+		t.Fatalf("terminal record count=%d", len(paths))
+	}
+	raw, err := os.ReadFile(paths[0])
+	if err != nil {
+		t.Fatal(err)
+	}
+	upload := new(aiv1.AITrafficUpload)
+	if err = proto.Unmarshal(raw, upload); err != nil {
+		t.Fatal(err)
+	}
+	if len(upload.RawRequest)+len(upload.RawResponse) != aiTrafficDefaultPacketLimit {
+		t.Fatal("combined flow exceeded or wasted packet budget")
+	}
+	if len(raw) > aiTrafficDefaultPacketLimit+(128<<10) {
+		t.Fatal("upload would exceed the platform HTTP request-body limit")
+	}
+	if !bytes.HasPrefix(upload.RawRequest, requestHeader) || !bytes.HasPrefix(upload.RawResponse, responseHeader) {
+		t.Fatal("body allocation displaced one side's headers")
+	}
+	if upload.Record.RequestSizeBytes != 6<<20 || upload.Record.ResponseSizeBytes != 6<<20 || !upload.Record.RequestTruncated || !upload.Record.ResponseTruncated || upload.Record.CaptureError != "packet_limit" {
+		t.Fatalf("original sizes or combined truncation reason lost: %v", upload.Record)
+	}
+}
+
+func TestAITrafficCombinedBudgetExplainsOversizeHeaders(t *testing.T) {
+	request := []byte("GET / HTTP/1.1\r\nHost: example.invalid\r\nX-Padding: " + strings.Repeat("r", 700) + "\r\n\r\nrequest-body")
+	response := []byte("HTTP/1.1 200 OK\r\nX-Padding: " + strings.Repeat("s", 700) + "\r\n\r\nresponse-body")
+	keptRequest, keptResponse, reason := trafficBoundPacketPair(request, response, 1024)
+	if len(keptRequest)+len(keptResponse) > 1024 || len(keptRequest) == 0 || len(keptResponse) == 0 || reason != "packet_headers_limit" {
+		t.Fatalf("oversize headers were not explicitly bounded: req=%d rsp=%d reason=%s", len(keptRequest), len(keptResponse), reason)
+	}
+	if !bytes.HasPrefix(keptRequest, []byte("GET / HTTP/1.1\r\n")) || !bytes.HasPrefix(keptResponse, []byte("HTTP/1.1 200 OK\r\n")) {
+		t.Fatal("one side lost its first line")
+	}
+	if bytes.Contains(keptRequest, []byte("request-body")) || bytes.Contains(keptResponse, []byte("response-body")) {
+		t.Fatal("body retained while headers did not fit")
+	}
+}
+
+func TestAITrafficCombinedBudgetReallocatesUnusedBodySpace(t *testing.T) {
+	request := []byte("GET / HTTP/1.1\r\nHost: example.invalid\r\n\r\n")
+	response := []byte("HTTP/1.1 200 OK\r\n\r\n" + strings.Repeat("b", 4096))
+	keptRequest, keptResponse, reason := trafficBoundPacketPair(request, response, 1024)
+	if !bytes.Equal(request, keptRequest) || len(keptRequest)+len(keptResponse) != 1024 || reason != "packet_limit" {
+		t.Fatal("unused request body quota was not allocated to response")
+	}
+}
+
+func TestAITrafficConfigHonorsIncreasedLimitsAndHardCaps(t *testing.T) {
+	for _, test := range []struct {
+		name                                      string
+		configured, defaultLimit, hardLimit, want uint64
+	}{
+		{"packet default", 0, aiTrafficDefaultPacketLimit, aiTrafficMaxPacketLimit, 10 << 20},
+		{"larger packet", 32 << 20, aiTrafficDefaultPacketLimit, aiTrafficMaxPacketLimit, 32 << 20},
+		{"packet hard cap", 128 << 20, aiTrafficDefaultPacketLimit, aiTrafficMaxPacketLimit, 64 << 20},
+		{"session default", 0, aiTrafficDefaultSessionLimit, aiTrafficMaxSessionLimit, 1 << 30},
+		{"larger session", 8 << 30, aiTrafficDefaultSessionLimit, aiTrafficMaxSessionLimit, 8 << 30},
+		{"session hard cap", 128 << 30, aiTrafficDefaultSessionLimit, aiTrafficMaxSessionLimit, 64 << 30},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			if got := trafficCaptureLimit(test.configured, test.defaultLimit, test.hardLimit); got != test.want {
+				t.Fatalf("limit=%d want=%d", got, test.want)
+			}
+		})
+	}
+}
+
+func TestAITrafficSingleHeaderBeyondPacketLimitIsExplicit(t *testing.T) {
+	c := trafficTestCollector(t, "http://unused.invalid")
+	request := []byte("GET / HTTP/1.1\r\nHost: example.invalid\r\nX-Padding: " + strings.Repeat("r", 2048) + "\r\n\r\n")
+	finish := c.observe(lowhttp.HTTPAttempt{StartedAt: time.Now(), Request: request})
+	finish(lowhttp.HTTPAttempt{FinishedAt: time.Now(), Request: request})
+	paths, _ := filepath.Glob(filepath.Join(c.dir, "*.terminal.pb"))
+	if len(paths) != 1 {
+		t.Fatal("missing terminal upload")
+	}
+	raw, err := os.ReadFile(paths[0])
+	if err != nil {
+		t.Fatal(err)
+	}
+	upload := new(aiv1.AITrafficUpload)
+	if err = proto.Unmarshal(raw, upload); err != nil {
+		t.Fatal(err)
+	}
+	if len(upload.RawRequest) != int(c.policy.PacketLimitBytes) || upload.Record.CaptureError != "packet_headers_limit" || !upload.Record.RequestTruncated {
+		t.Fatal("single oversized header was mistaken for body truncation")
+	}
+}
