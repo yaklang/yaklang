@@ -3,7 +3,10 @@ package ssaapi
 import (
 	"context"
 	"fmt"
+	"io/fs"
 	"os"
+	"path"
+	"sort"
 	"strings"
 
 	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
@@ -307,53 +310,6 @@ func addFileToAggregatedFS(vfs *filesys.VirtualFS, canonicalPath, content string
 	vfs.AddFile(vfsPath, content)
 }
 
-func deleteFileFromAggregatedFS(vfs *filesys.VirtualFS, canonicalPath string) {
-	if vfs == nil || canonicalPath == "" {
-		return
-	}
-	vfsPath := overlayAggregatedFSPath(canonicalPath)
-	if vfsPath == "" {
-		return
-	}
-	if exists, _ := vfs.Exists(vfsPath); exists {
-		_ = vfs.Delete(vfsPath)
-	}
-}
-
-// cloneAndPatchAggregatedFS copies prev FS then applies newLayer FileHashMap (-1 delete, else upsert).
-func cloneAndPatchAggregatedFS(prev fi.FileSystem, newLayer *Program) (*filesys.VirtualFS, error) {
-	out := filesys.NewVirtualFs()
-	if prev != nil {
-		err := filesys.Recursive(".", filesys.WithFileSystem(prev), filesys.WithFileStat(func(path string, info os.FileInfo) error {
-			content, err := prev.ReadFile(path)
-			if err != nil {
-				return nil
-			}
-			addFileToAggregatedFS(out, overlayPathFromAggregatedFS(path), string(content))
-			return nil
-		}))
-		if err != nil {
-			return nil, err
-		}
-	}
-	if newLayer == nil || newLayer.Program == nil {
-		return out, nil
-	}
-	fileHashMap := newLayer.Program.FileHashMap
-	progName := newLayer.GetProgramName()
-	for filePath, hash := range fileHashMap {
-		path := normalizeOverlayFilePath(filePath, progName)
-		if hash == -1 {
-			deleteFileFromAggregatedFS(out, path)
-			continue
-		}
-		if content, ok := readProgramFileContent(newLayer, path); ok {
-			addFileToAggregatedFS(out, path, content)
-		}
-	}
-	return out, nil
-}
-
 // applyLayerFileHashMap appends a Diff layer and applies its FileHashMap directly:
 //   - add/mod  → strip from older Diff.File, own on new layer.File, add to ExcludeFile
 //   - delete   → strip from older Diff.File, add to ExcludeFile (not owned)
@@ -458,42 +414,21 @@ func extendOverlayWithNewLayer(baseOverlay *ProgramOverLay, newLayerProgram *Pro
 	}
 
 	wireOverlayPrograms(overlay)
-	if baseOverlay.AggregatedFS != nil {
-		patched, err := cloneAndPatchAggregatedFS(baseOverlay.AggregatedFS, newLayerProgram)
-		if err != nil {
-			log.Warnf("patch AggregatedFS failed, falling back to full rebuild: %v", err)
-			overlay.rebuildAggregatedFS()
-		} else {
-			overlay.AggregatedFS = patched
-		}
-	} else {
-		overlay.rebuildAggregatedFS()
-	}
+	// AggregatedFS is lazy (built from ownership metadata on demand), so no
+	// clone/patch of the previous overlay's FS is needed here: the new overlay
+	// simply owns Base + copied layers + the new diff.
 
 	log.Infof("ProgramOverLay: Extended base+%d diffs, exclude=%d files",
 		len(overlay.Diff), len(overlay.ExcludeFile))
 	return overlay
 }
 
-// finishBuild wires programs and builds AggregatedFS from Diff.File + Base − ExcludeFile.
+// finishBuild wires programs; AggregatedFS stays lazy (metadata only).
 func (p *ProgramOverLay) finishBuild() {
 	if p == nil {
 		return
 	}
 	wireOverlayPrograms(p)
-	p.rebuildAggregatedFS()
-}
-
-func (p *ProgramOverLay) rebuildAggregatedFS() {
-	if p == nil {
-		return
-	}
-	aggregatedFS, err := p.aggregateFileSystems()
-	if err != nil {
-		log.Errorf("failed to aggregate file systems: %v", err)
-		return
-	}
-	p.AggregatedFS = aggregatedFS
 }
 
 func NewProgramOverLay(layers ...*Program) *ProgramOverLay {
@@ -513,6 +448,267 @@ func NewProgramOverLay(layers ...*Program) *ProgramOverLay {
 	return createOverlayFromLayers(valid...)
 }
 
+// lazyOverlayFS is the aggregated view of a ProgramOverLay without materializing
+// file bodies: ownership (Diff[].File + Base.FileList − ExcludeFile) is plain
+// metadata, and ReadFile resolves content on demand through each layer's
+// editors (O(1) lookups). Building the overlay therefore never walks/copies
+// file contents; the first ReadFile/Stat pays the per-file lookup instead.
+type lazyOverlayFS struct {
+	overlay *ProgramOverLay
+	// entries: canonical path ("/"-prefixed, no program name) -> owning layer index.
+	// index -1 means owned by Base.
+	entries map[string]int
+	// dirs caches the derived parent-dir set for ReadDir/Stat of directories.
+	dirs map[string]bool
+}
+
+var (
+	_ fi.FileSystem         = (*lazyOverlayFS)(nil)
+	_ fi.ReadOnlyFileSystem = (*lazyOverlayFS)(nil)
+)
+
+// buildLazyOverlayFS derives the path→owner index from the overlay's
+// ownership structure. Paths are canonical overlay paths ("/"-prefixed,
+// program-name prefix stripped), matching the legacy materialized layout.
+func buildLazyOverlayFS(o *ProgramOverLay) *lazyOverlayFS {
+	fs := &lazyOverlayFS{
+		overlay: o,
+		entries: make(map[string]int),
+		dirs:    map[string]bool{"/": true},
+	}
+	if o == nil {
+		return fs
+	}
+	for i, layer := range o.Diff {
+		if layer == nil || layer.Program == nil {
+			continue
+		}
+		for _, filePath := range layer.File {
+			path := ensureOverlayPathSlash(filePath)
+			if path == "" || path == "/" {
+				continue
+			}
+			fs.entries[path] = i
+		}
+	}
+	if o.Base != nil && o.Base.Program != nil {
+		exclude := overlayPathSet(o.ExcludeFile)
+		progName := o.Base.GetProgramName()
+		for filePath := range o.Base.Program.FileList {
+			normalized := normalizeOverlayFilePath(filePath, progName)
+			if normalized == "" || normalized == "/" {
+				continue
+			}
+			if _, skip := exclude[normalized]; skip {
+				continue
+			}
+			if _, owned := fs.entries[normalized]; owned {
+				continue
+			}
+			fs.entries[normalized] = -1
+		}
+	}
+	for p := range fs.entries {
+		for dir := path.Dir(p); dir != "/" && dir != "."; dir = path.Dir(dir) {
+			fs.dirs[dir] = true
+		}
+	}
+	return fs
+}
+
+// owner resolves which layer owns canonical path.
+func (f *lazyOverlayFS) owner(name string) (int, bool) {
+	owner, ok := f.entries[name]
+	return owner, ok
+}
+
+// contentAt reads the file content for canonical path from its owning layer.
+func (f *lazyOverlayFS) contentAt(name string, owner int) ([]byte, error) {
+	if f.overlay == nil {
+		return nil, utils.Errorf("overlay file system: overlay is nil")
+	}
+	// Diff layers (and Base) resolve content through their own editors;
+	// later layers never own a path owned earlier (applyLayerFileHashMap strips).
+	var prog *Program
+	if owner >= 0 {
+		if layer := f.overlay.Diff[owner]; layer != nil {
+			prog = layer.Program
+		}
+	} else {
+		prog = f.overlay.Base
+	}
+	if prog == nil {
+		return nil, utils.Errorf("overlay file system: no owner program for [%v]", name)
+	}
+	if content, ok := readProgramFileContent(prog, name); ok {
+		return []byte(content), nil
+	}
+	return nil, utils.Errorf("overlay file system: file [%v] not found", name)
+}
+
+func (f *lazyOverlayFS) clean(name string) string {
+	name = path.Clean("/" + strings.TrimPrefix(name, "/"))
+	if name == "" || name == "." {
+		return "/"
+	}
+	return name
+}
+
+func (f *lazyOverlayFS) ReadFile(name string) ([]byte, error) {
+	name = f.clean(name)
+	owner, ok := f.owner(name)
+	if !ok {
+		return nil, utils.Errorf("file [%v] not exist", name)
+	}
+	return f.contentAt(name, owner)
+}
+
+func (f *lazyOverlayFS) Stat(name string) (os.FileInfo, error) {
+	name = f.clean(name)
+	if owner, ok := f.owner(name); ok {
+		data, err := f.contentAt(name, owner)
+		if err != nil {
+			return nil, err
+		}
+		return filesys.NewVirtualFileInfo(path.Base(name), int64(len(data)), false), nil
+	}
+	if f.dirs[name] {
+		return filesys.NewVirtualFileInfo(path.Base(name), 0, true), nil
+	}
+	return nil, utils.Errorf("path [%v] not exist", name)
+}
+
+func (f *lazyOverlayFS) ReadDir(name string) ([]fs.DirEntry, error) {
+	name = f.clean(name)
+	if !f.dirs[name] {
+		if _, ok := f.entries[name]; !ok {
+			return nil, utils.Errorf("directory [%v] not exist", name)
+		}
+		return nil, utils.Errorf("path [%v] is a file, not a directory", name)
+	}
+	// Listing "/" must strip the leading "/" so first-segment names don't
+	// trip the "contains /" filter below.
+	prefix := "/"
+	if name != "/" {
+		prefix = name + "/"
+	}
+	seen := make(map[string]bool)
+	var out []fs.DirEntry
+	for p := range f.entries {
+		if !strings.HasPrefix(p, prefix) {
+			continue
+		}
+		base := strings.TrimSuffix(strings.TrimPrefix(p, prefix), "/")
+		if base == "" || strings.Contains(base, "/") {
+			continue
+		}
+		if seen[base] {
+			continue
+		}
+		seen[base] = true
+		out = append(out, filesys.NewVirtualFileInfo(base, int64(len(p)), false))
+	}
+	for dir := range f.dirs {
+		if dir == "/" || !strings.HasPrefix(dir, prefix) {
+			continue
+		}
+		base := strings.TrimSuffix(strings.TrimPrefix(dir, prefix), "/")
+		if base == "" || strings.Contains(base, "/") || seen[base] {
+			continue
+		}
+		seen[base] = true
+		out = append(out, filesys.NewVirtualFileInfo(base, 0, true))
+	}
+	// Deterministic order keeps tree listings stable across rebuilds.
+	sort.Slice(out, func(i, j int) bool { return out[i].Name() < out[j].Name() })
+	return out, nil
+}
+
+func (f *lazyOverlayFS) Open(name string) (fs.File, error) {
+	data, err := f.ReadFile(name)
+	if err != nil {
+		if f.dirs[f.clean(name)] {
+			return &lazyOverlayDir{fs: f, name: f.clean(name)}, nil
+		}
+		return nil, err
+	}
+	vf := filesys.NewVirtualFs()
+	vf.AddFile(f.clean(name), string(data))
+	return vf.Open(f.clean(name))
+}
+
+func (f *lazyOverlayFS) OpenFile(name string, _ int, _ os.FileMode) (fs.File, error) {
+	return f.Open(name)
+}
+
+func (f *lazyOverlayFS) ExtraInfo(string) map[string]any { return nil }
+func (f *lazyOverlayFS) Delete(string) error {
+	return utils.Error("overlay aggregated file system is read-only")
+}
+func (f *lazyOverlayFS) GetSeparators() rune { return '/' }
+func (f *lazyOverlayFS) Join(elem ...string) string {
+	return path.Join(elem...)
+}
+func (f *lazyOverlayFS) Base(name string) string { return path.Base(name) }
+func (f *lazyOverlayFS) PathSplit(name string) (string, string) {
+	dir, file := path.Split(name)
+	if len(dir) > 1 && strings.HasSuffix(dir, "/") {
+		dir = dir[:len(dir)-1]
+	}
+	return dir, file
+}
+func (f *lazyOverlayFS) Ext(name string) string  { return path.Ext(name) }
+func (f *lazyOverlayFS) IsAbs(name string) bool  { return len(name) > 0 && name[0] == '/' }
+func (f *lazyOverlayFS) Getwd() (string, error)  { return "", nil }
+func (f *lazyOverlayFS) Exists(name string) (bool, error) {
+	name = f.clean(name)
+	if _, ok := f.entries[name]; ok {
+		return true, nil
+	}
+	return f.dirs[name], nil
+}
+func (f *lazyOverlayFS) Rel(from, to string) (string, error) {
+	if from == "" || to == "" {
+		return "", utils.Error("Rel requires non-empty paths")
+	}
+	// Best-effort relative resolution over the canonical tree.
+	from, to = f.clean(from), f.clean(to)
+	if from == to {
+		return ".", nil
+	}
+	if strings.HasPrefix(to, from+"/") {
+		return strings.TrimPrefix(to, from+"/"), nil
+	}
+	if strings.HasPrefix(from, to+"/") {
+		depth := strings.Count(strings.TrimPrefix(from, to+"/"), "/") + 1
+		return strings.Repeat("../", depth), nil
+	}
+	return "", utils.Errorf("cannot make [%v] relative to [%v]", to, from)
+}
+func (f *lazyOverlayFS) Rename(string, string) error {
+	return utils.Error("overlay aggregated file system is read-only")
+}
+func (f *lazyOverlayFS) WriteFile(string, []byte, os.FileMode) error {
+	return utils.Error("overlay aggregated file system is read-only")
+}
+func (f *lazyOverlayFS) MkdirAll(string, os.FileMode) error {
+	return utils.Error("overlay aggregated file system is read-only")
+}
+
+// lazyOverlayDir adapts a lazyOverlayFS directory to fs.File (Open on a dir).
+type lazyOverlayDir struct {
+	fs   *lazyOverlayFS
+	name string
+}
+
+func (d *lazyOverlayDir) Stat() (fs.FileInfo, error) {
+	return d.fs.Stat(d.name)
+}
+func (d *lazyOverlayDir) Read([]byte) (int, error) {
+	return 0, utils.Error("directory is not readable")
+}
+func (d *lazyOverlayDir) Close() error { return nil }
+
 // aggregateFileSystems builds the effective FS from ownership:
 // Diff[i].File → that layer; base FileList − ExcludeFile → Base.
 func (p *ProgramOverLay) aggregateFileSystems() (fi.FileSystem, error) {
@@ -522,41 +718,7 @@ func (p *ProgramOverLay) aggregateFileSystems() (fi.FileSystem, error) {
 	if len(p.Diff) == 0 {
 		return nil, utils.Errorf("aggregateFileSystems requires at least one Diff layer")
 	}
-
-	aggregated := filesys.NewVirtualFs()
-	for _, layer := range p.Diff {
-		if layer == nil || layer.Program == nil {
-			continue
-		}
-		for _, filePath := range layer.File {
-			path := ensureOverlayPathSlash(filePath)
-			if path == "" {
-				continue
-			}
-			if content, ok := readProgramFileContent(layer.Program, path); ok {
-				addFileToAggregatedFS(aggregated, path, content)
-			}
-		}
-	}
-	if p.Base.Program != nil {
-		progName := p.Base.GetProgramName()
-		exclude := overlayPathSet(p.ExcludeFile)
-		for filePath, hash := range p.Base.Program.FileList {
-			normalized := normalizeOverlayFilePath(filePath, progName)
-			if normalized == "" {
-				continue
-			}
-			if _, skip := exclude[normalized]; skip {
-				continue
-			}
-			ed, err := p.Base.getEditor(filePath, hash)
-			if err != nil || ed == nil {
-				continue
-			}
-			addFileToAggregatedFS(aggregated, normalized, ed.GetSourceCode())
-		}
-	}
-	return aggregated, nil
+	return buildLazyOverlayFS(p), nil
 }
 
 // ProgramCount returns the program-stack size: 1(base)+len(Diff).
