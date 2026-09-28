@@ -2,9 +2,9 @@ package phase2
 
 import (
 	"bytes"
-	_ "embed"
 	"encoding/json"
 	"fmt"
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon/promptloader"
 	"math"
 	"os"
 	"strings"
@@ -21,11 +21,9 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 )
 
-//go:embed prompts/scan_instruction.txt
-var phase2ScanInstruction string
+var phase2ScanInstruction = promptloader.MustLoad("ai/aid/aireact/reactloops/loop_code_security_audit/phase2/prompts/scan_instruction.txt")
 
-//go:embed prompts/output_example.txt
-var phase2OutputExample string
+var phase2OutputExample = promptloader.MustLoad("ai/aid/aireact/reactloops/loop_code_security_audit/phase2/prompts/output_example.txt")
 
 // ─────────────────────────────────────────────────────────────────────
 // 两阶段扫描状态（极简）

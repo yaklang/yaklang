@@ -2,7 +2,7 @@ package loop_fast_context
 
 import (
 	"bytes"
-	_ "embed"
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon/promptloader"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
@@ -11,14 +11,11 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 )
 
-//go:embed prompts/persistent_instruction.txt
-var persistentInstructionTpl string
+var persistentInstructionTpl = promptloader.MustLoad("ai/aid/aireact/reactloops/loop_fast_context/prompts/persistent_instruction.txt")
 
-//go:embed prompts/output_example.txt
-var outputExample string
+var outputExample = promptloader.MustLoad("ai/aid/aireact/reactloops/loop_fast_context/prompts/output_example.txt")
 
-//go:embed prompts/reactive_data.txt
-var reactiveDataTpl string
+var reactiveDataTpl = promptloader.MustLoad("ai/aid/aireact/reactloops/loop_fast_context/prompts/reactive_data.txt")
 
 // allowedActions for the exploration subagent.
 var allowedActions = []string{

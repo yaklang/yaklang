@@ -2,7 +2,7 @@ package loop_yaklangcode
 
 import (
 	"bytes"
-	_ "embed"
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon/promptloader"
 	"strings"
 	"sync"
 
@@ -131,14 +131,11 @@ func createDocumentSearcherByRag(db *gorm.DB, collectionName string, aikbPath st
 	return rag.Get(collectionName, rag.WithDB(db), rag.WithImportFile(aikbPath))
 }
 
-//go:embed prompts/persistent_instruction.txt
-var instruction string
+var instruction = promptloader.MustLoad("ai/aid/aireact/reactloops/loop_yaklangcode/prompts/persistent_instruction.txt")
 
-//go:embed prompts/output_example.txt
-var outputExample string
+var outputExample = promptloader.MustLoad("ai/aid/aireact/reactloops/loop_yaklangcode/prompts/output_example.txt")
 
-//go:embed prompts/reactive_data.txt
-var reactiveData string
+var reactiveData = promptloader.MustLoad("ai/aid/aireact/reactloops/loop_yaklangcode/prompts/reactive_data.txt")
 
 func yaklangPromptRenderMap(loop *reactloops.ReActLoop, feedbacker *bytes.Buffer, nonce string) map[string]any {
 	yakCode := loop.Get("full_code")

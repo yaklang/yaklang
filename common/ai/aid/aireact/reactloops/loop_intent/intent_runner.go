@@ -2,8 +2,8 @@ package loop_intent
 
 import (
 	"context"
-	_ "embed"
 	"fmt"
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon/promptloader"
 	"strings"
 	"time"
 
@@ -15,11 +15,9 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 )
 
-//go:embed prompts/intent_prompt.txt
-var intentPromptTpl string
+var intentPromptTpl = promptloader.MustLoad("ai/aid/aireact/reactloops/loop_intent/prompts/intent_prompt.txt")
 
-//go:embed prompts/recommend_prompt.txt
-var recommendPromptTpl string
+var recommendPromptTpl = promptloader.MustLoad("ai/aid/aireact/reactloops/loop_intent/prompts/recommend_prompt.txt")
 
 // needRecommendThreshold controls when a second LiteForge AI call is made for
 // capability recommendation. When the matched tool/forge/skill count exceeds

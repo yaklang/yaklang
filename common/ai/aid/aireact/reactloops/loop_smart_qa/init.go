@@ -2,8 +2,8 @@ package loop_smart_qa
 
 import (
 	"bytes"
-	_ "embed"
 	"fmt"
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon/promptloader"
 	"strings"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
@@ -13,14 +13,11 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 )
 
-//go:embed prompts/persistent_instruction.txt
-var instruction string
+var instruction = promptloader.MustLoad("ai/aid/aireact/reactloops/loop_smart_qa/prompts/persistent_instruction.txt")
 
-//go:embed prompts/output_example.txt
-var outputExample string
+var outputExample = promptloader.MustLoad("ai/aid/aireact/reactloops/loop_smart_qa/prompts/output_example.txt")
 
-//go:embed prompts/reactive_data.txt
-var reactiveData string
+var reactiveData = promptloader.MustLoad("ai/aid/aireact/reactloops/loop_smart_qa/prompts/reactive_data.txt")
 
 var allowedActions = []string{
 	"search_knowledge",

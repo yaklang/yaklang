@@ -1,8 +1,8 @@
 package aireact
 
 import (
-	_ "embed"
 	"fmt"
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon/promptloader"
 	"runtime"
 	"sort"
 	"strings"
@@ -25,71 +25,49 @@ func nonce() string {
 	return utils.RandAlphaNumStringBytes(5)
 }
 
-//go:embed prompts/tool-params/instruction.txt
-var toolParamsInstructionText string
+var toolParamsInstructionText = promptloader.MustLoad("ai/aid/aireact/prompts/tool-params/instruction.txt")
 
-//go:embed prompts/tool-params/output_example.txt
-var toolParamsOutputExampleText string
+var toolParamsOutputExampleText = promptloader.MustLoad("ai/aid/aireact/prompts/tool-params/output_example.txt")
 
-//go:embed prompts/tool-params/dynamic.txt
-var toolParamsDynamicTemplate string
+var toolParamsDynamicTemplate = promptloader.MustLoad("ai/aid/aireact/prompts/tool-params/dynamic.txt")
 
-//go:embed prompts/verification/instruction.txt
-var verificationInstructionText string
+var verificationInstructionText = promptloader.MustLoad("ai/aid/aireact/prompts/verification/instruction.txt")
 
-//go:embed prompts/verification/output_example.txt
-var verificationOutputExampleText string
+var verificationOutputExampleText = promptloader.MustLoad("ai/aid/aireact/prompts/verification/output_example.txt")
 
-//go:embed prompts/verification/dynamic.txt
-var verificationDynamicTemplate string
+var verificationDynamicTemplate = promptloader.MustLoad("ai/aid/aireact/prompts/verification/dynamic.txt")
 
-//go:embed prompts/verification/verification.json
-var verificationSchemaJSON string
+var verificationSchemaJSON = promptloader.MustLoad("ai/aid/aireact/prompts/verification/verification.json")
 
-//go:embed prompts/answer/instruction.txt
-var directlyAnswerInstructionText string
+var directlyAnswerInstructionText = promptloader.MustLoad("ai/aid/aireact/prompts/answer/instruction.txt")
 
-//go:embed prompts/answer/output_example.txt
-var directlyAnswerOutputExampleText string
+var directlyAnswerOutputExampleText = promptloader.MustLoad("ai/aid/aireact/prompts/answer/output_example.txt")
 
-//go:embed prompts/answer/dynamic.txt
-var directlyAnswerDynamicTemplate string
+var directlyAnswerDynamicTemplate = promptloader.MustLoad("ai/aid/aireact/prompts/answer/dynamic.txt")
 
-//go:embed prompts/tool/wrong-tool_instruction.txt
-var wrongToolInstructionText string
+var wrongToolInstructionText = promptloader.MustLoad("ai/aid/aireact/prompts/tool/wrong-tool_instruction.txt")
 
-//go:embed prompts/tool/wrong-tool_output_example.txt
-var wrongToolOutputExampleText string
+var wrongToolOutputExampleText = promptloader.MustLoad("ai/aid/aireact/prompts/tool/wrong-tool_output_example.txt")
 
-//go:embed prompts/tool/wrong-tool_dynamic.txt
-var wrongToolDynamicTemplate string
+var wrongToolDynamicTemplate = promptloader.MustLoad("ai/aid/aireact/prompts/tool/wrong-tool_dynamic.txt")
 
-//go:embed prompts/tool/interval-review_instruction.txt
-var intervalReviewInstructionText string
+var intervalReviewInstructionText = promptloader.MustLoad("ai/aid/aireact/prompts/tool/interval-review_instruction.txt")
 
-//go:embed prompts/tool/interval-review_output_example.txt
-var intervalReviewOutputExampleText string
+var intervalReviewOutputExampleText = promptloader.MustLoad("ai/aid/aireact/prompts/tool/interval-review_output_example.txt")
 
-//go:embed prompts/tool/interval-review_dynamic.txt
-var intervalReviewDynamicTemplate string
+var intervalReviewDynamicTemplate = promptloader.MustLoad("ai/aid/aireact/prompts/tool/interval-review_dynamic.txt")
 
-//go:embed prompts/tool/interval-review.json
-var intervalReviewSchemaJSON string
+var intervalReviewSchemaJSON = promptloader.MustLoad("ai/aid/aireact/prompts/tool/interval-review.json")
 
-//go:embed prompts/change-blueprint/instruction.txt
-var changeBlueprintInstructionText string
+var changeBlueprintInstructionText = promptloader.MustLoad("ai/aid/aireact/prompts/change-blueprint/instruction.txt")
 
-//go:embed prompts/change-blueprint/output_example.txt
-var changeBlueprintOutputExampleText string
+var changeBlueprintOutputExampleText = promptloader.MustLoad("ai/aid/aireact/prompts/change-blueprint/output_example.txt")
 
-//go:embed prompts/change-blueprint/dynamic.txt
-var changeBlueprintDynamicTemplate string
+var changeBlueprintDynamicTemplate = promptloader.MustLoad("ai/aid/aireact/prompts/change-blueprint/dynamic.txt")
 
-//go:embed prompts/base/base.txt
-var basePrompt string
+var basePrompt = promptloader.MustLoad("ai/aid/aireact/prompts/base/base.txt")
 
-//go:embed prompts/utils/conversation_title.txt
-var conversationTitlePrompt string
+var conversationTitlePrompt = promptloader.MustLoad("ai/aid/aireact/prompts/utils/conversation_title.txt")
 
 // PromptManager owns the embedded ReAct prompt templates and produces the
 // five-section prefix + dynamic prompt for every AI call path in the engine.

@@ -1,18 +1,16 @@
 package aireact
 
 import (
-	_ "embed"
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon/promptloader"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 )
 
-//go:embed reactloops/loop_default/prompts/instruction.txt
-var defaultLoopInstruction string
+var defaultLoopInstruction = promptloader.MustLoad("ai/aid/aireact/reactloops/loop_default/prompts/instruction.txt")
 
-//go:embed reactloops/loop_default/prompts/output_example.txt
-var defaultLoopOutputExample string
+var defaultLoopOutputExample = promptloader.MustLoad("ai/aid/aireact/reactloops/loop_default/prompts/output_example.txt")
 
 func TestPromptPolicyRequiresDiscriminatingEvidenceBeforeVerificationClosure(t *testing.T) {
 	highStatic := aicommon.SharedPlanAndExecHighStaticTemplate

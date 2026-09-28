@@ -1,8 +1,8 @@
 package aireact
 
 import (
-	_ "embed"
 	"fmt"
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon/promptloader"
 	"runtime"
 	"strings"
 	"time"
@@ -38,8 +38,7 @@ const (
 	aiCacheSystemTagName = "AI_CACHE_SYSTEM"
 )
 
-//go:embed prompts/loop/dynamic_section.txt
-var loopDynamicSectionTemplate string
+var loopDynamicSectionTemplate = promptloader.MustLoad("ai/aid/aireact/prompts/loop/dynamic_section.txt")
 
 func (r *ReAct) GetLoopPromptBaseMaterials(tools []*aitool.Tool, nonce string) (*reactloops.LoopPromptBaseMaterials, error) {
 	if r == nil || r.promptManager == nil {

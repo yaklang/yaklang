@@ -2,7 +2,6 @@ package aicommon
 
 import (
 	"bytes"
-	_ "embed"
 	"fmt"
 	"strings"
 	"text/template"
@@ -19,31 +18,6 @@ const (
 	promptMessageSectionTagName = "PROMPT_SECTION"
 	aiCacheSystemSectionTagName = "AI_CACHE_SYSTEM"
 )
-
-// SharedPlanAndExecHighStaticTemplate 是 plan/execution 系统级共享 high-static。
-// 它必须完全无模板变量，避免污染 AI_CACHE_SYSTEM。
-//
-//go:embed prompts/prefix/high_static_section.txt
-var SharedPlanAndExecHighStaticTemplate string
-
-//go:embed prompts/prefix/semi_dynamic_1_section.txt
-var SharedSemiDynamic1Template string
-
-// SharedTaskInstructionSchemaExampleTemplate 复用 aireact 的
-// TaskInstruction -> OutputExample -> Schema 半动态槽位顺序。
-//
-//go:embed prompts/prefix/semi_dynamic_2_section.txt
-var SharedTaskInstructionSchemaExampleTemplate string
-
-// SharedFrozenBlockTemplate 复用 aireact 的 frozen-block 段模板。
-//
-//go:embed prompts/prefix/frozen_block_section.txt
-var SharedFrozenBlockTemplate string
-
-// SharedTimelineOpenTemplate 复用 aireact 的 timeline-open 段模板。
-//
-//go:embed prompts/prefix/timeline_open_section.txt
-var SharedTimelineOpenTemplate string
 
 type PromptPrefixBuilder struct {
 	HighStaticTemplateName string

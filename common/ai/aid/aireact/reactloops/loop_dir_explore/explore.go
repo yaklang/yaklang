@@ -2,8 +2,8 @@ package loop_dir_explore
 
 import (
 	"bytes"
-	_ "embed"
 	"fmt"
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon/promptloader"
 	"os"
 	"path/filepath"
 	"strings"
@@ -16,11 +16,9 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 )
 
-//go:embed prompts/explore_instruction.txt
-var exploreInstruction string
+var exploreInstruction = promptloader.MustLoad("ai/aid/aireact/reactloops/loop_dir_explore/prompts/explore_instruction.txt")
 
-//go:embed prompts/explore_output_example.txt
-var exploreOutputExample string
+var exploreOutputExample = promptloader.MustLoad("ai/aid/aireact/reactloops/loop_dir_explore/prompts/explore_output_example.txt")
 
 const exploreReactiveDataTpl = `## 当前探索状态
 <|EXPLORE_STATUS_{{ .Nonce }}|>

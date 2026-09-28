@@ -3,10 +3,10 @@ package aicommon
 import (
 	"bytes"
 	"cmp"
-	_ "embed"
 	"fmt"
 	"sort"
 	"strconv"
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon/promptloader"
 	"strings"
 	"sync"
 	"text/template"
@@ -814,8 +814,7 @@ const MaxSummaryPromptTimelineSize = 60 * 1024
 // MaxSummaryPromptInputSize is the maximum size (30KB) for input content in summary prompt
 const MaxSummaryPromptInputSize = 30 * 1024
 
-//go:embed prompts/timeline/shrink_tool_result.txt
-var timelineSummary string
+var timelineSummary = promptloader.MustLoad("ai/aid/aicommon/prompts/timeline/shrink_tool_result.txt")
 
 func (m *Timeline) renderSummaryPrompt(result *TimelineItem) string {
 	ins, err := template.New("timeline-tool-result").Parse(timelineSummary)
@@ -1137,8 +1136,7 @@ func (m *Timeline) attachArchiveRef(reducerKeyID int64, ref *TimelineArchiveRef)
 	m.archiveRefs.Set(reducerKeyID, ref)
 }
 
-//go:embed prompts/timeline/tool_result_history.txt
-var toolResultHistory string
+var toolResultHistory = promptloader.MustLoad("ai/aid/aicommon/prompts/timeline/tool_result_history.txt")
 
 func (m *Timeline) PromptForToolCallResultsForLastN(n int) string {
 	m.mu.RLock()

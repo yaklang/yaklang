@@ -1,7 +1,7 @@
 package loop_intent
 
 import (
-	_ "embed"
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon/promptloader"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
@@ -9,14 +9,11 @@ import (
 	"github.com/yaklang/yaklang/common/schema"
 )
 
-//go:embed prompts/persistent_instruction.txt
-var instruction string
+var instruction = promptloader.MustLoad("ai/aid/aireact/reactloops/loop_intent/prompts/persistent_instruction.txt")
 
-//go:embed prompts/output_example.txt
-var outputExample string
+var outputExample = promptloader.MustLoad("ai/aid/aireact/reactloops/loop_intent/prompts/output_example.txt")
 
-//go:embed prompts/reactive_data.txt
-var reactiveData string
+var reactiveData = promptloader.MustLoad("ai/aid/aireact/reactloops/loop_intent/prompts/reactive_data.txt")
 
 func init() {
 	err := reactloops.RegisterLoopFactory(
