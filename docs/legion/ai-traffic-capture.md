@@ -33,8 +33,13 @@ headers, bodies, response error text, credentials or local packet file paths.
 
 The runtime writes each upload to a private `legion-ai-traffic/<identity-hash>`
 directory under `YAKIT_HOME`, using temporary file, fsync, rename and directory
-fsync. Packet defaults are 10 MiB per request/response and 1 GiB admitted bytes
-per session generation. The runtime bounds its admission; Legion is the final
+fsync. Packet defaults are 10 MiB per combined request/response and 1 GiB admitted
+bytes per session generation. Server configuration may raise these values up
+to hard limits of 64 MiB per combined packet and 64 GiB per session. Both HTTP
+headers take priority over bodies within the combined budget. Remaining bytes
+are shared between bodies, reallocating unused space to the larger side. If
+the two headers alone exceed the limit, bounded prefixes are retained with
+`packet_headers_limit`; ordinary body truncation uses `packet_limit`. The runtime bounds its admission; Legion is the final
 quota authority. Oversize local header/body files are read as actual bytes,
 never uploaded as local path placeholders. Size and truncation remain explicit.
 
