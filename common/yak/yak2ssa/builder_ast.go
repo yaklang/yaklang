@@ -1806,6 +1806,7 @@ func (b *astbuilder) buildOrdinaryArguments(stmt *yak.OrdinaryArgumentsContext) 
 			// placeholders (Undefined members) and negative-index reads
 			// (a[-1] merged into the Make's pair list) that are not literal
 			// members of the container.
+			expanded := 0
 			for i := len(memberPairs) - 1; i >= 0; i-- {
 				pair := memberPairs[i]
 				if pair.Member == nil || pair.Member.GetId() <= 0 {
@@ -1822,6 +1823,16 @@ func (b *astbuilder) buildOrdinaryArguments(stmt *yak.OrdinaryArgumentsContext) 
 					}
 				}
 				values = append(values, pair.Member)
+				expanded++
+			}
+			// A container built at runtime (a.Push(x) rather than a literal)
+			// has a pair list whose members are all read placeholders, so the
+			// loop above expands nothing. Falling through with an empty
+			// argument list would drop the argument entirely — dictutil.Mix(a...)
+			// then received zero dictionaries. Pass the container itself in
+			// that case, which keeps the value available to the callee.
+			if expanded == 0 {
+				values = append(values, ellipsisValue)
 			}
 		}
 		hasEll = true
