@@ -25,6 +25,7 @@ import (
 	"github.com/yaklang/yaklang/common/mcp/mcp-go/mcp"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/yak/antlr4yak"
+	"github.com/yaklang/yaklang/common/yak/yaklang/lib/builtin"
 	"github.com/yaklang/yaklang/common/yak/yaklib"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
@@ -164,6 +165,10 @@ func YakTool2AITool(aitools []*schema.AIYakTool) []*aitool.Tool {
 				}
 				registerBrowserSessionHooks(engine, browserTracker)
 				engine.RegisterEngineHooks(func(ae *antlr4yak.Engine) error {
+					// Bind only this invocation; never redirect the process or global builtins.
+					ae.SetVars(map[string]any{"println": func(values ...any) (int, error) {
+						return builtin.PrintlnTo(stdout, values...)
+					}})
 					pluginContext := CreateYakitPluginContext(
 						runtimeId,
 					).WithContext(
