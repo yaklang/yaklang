@@ -5,13 +5,13 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/yaklang/yaklang/common/utils"
+	"io"
 	"net"
 	"net/url"
 	"strconv"
 	"time"
 
-	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils"
 )
 
 type requestBuilder struct {
@@ -116,7 +116,7 @@ func parse(proxyURI string) (*config, error) {
 		cfg.Proto = SOCKS4
 	case "socks4a":
 		cfg.Proto = SOCKS4A
-	case "socks5":
+	case "socks5", "socks5h":
 		cfg.Proto = SOCKS5
 	default:
 		return nil, fmt.Errorf("unknown SOCKS protocol %s", uri.Scheme)
@@ -146,7 +146,6 @@ func parse(proxyURI string) (*config, error) {
 }
 
 func (cfg *config) dialSocks5(targetAddr string) (_ net.Conn, err error) {
-RECON:
 	ctx := cfg.Context
 
 	// dial TCP
@@ -159,38 +158,51 @@ RECON:
 			conn.Close()
 		}
 	}()
+	stopCancel := func() bool { return true }
+	if ctx != nil {
+		stopCancel = context.AfterFunc(ctx, func() { _ = conn.Close() })
+		defer stopCancel()
+		if deadline, ok := ctx.Deadline(); ok {
+			if err = conn.SetDeadline(deadline); err != nil {
+				return nil, err
+			}
+		}
+	} else if cfg.Timeout > 0 {
+		if err = conn.SetDeadline(time.Now().Add(cfg.Timeout)); err != nil {
+			return nil, err
+		}
+	}
+	defer conn.SetDeadline(time.Time{})
+	writeRead := func(req []byte, size int) ([]byte, error) {
+		if _, err := io.Copy(conn, bytes.NewReader(req)); err != nil {
+			return nil, err
+		}
+		resp := make([]byte, size)
+		_, err := io.ReadFull(conn, resp)
+		return resp, err
+	}
 
 	var req requestBuilder
 
 	version := byte(5) // socks version 5
-	method := byte(0)  // method 0: no authentication (only anonymous access supported for now)
+	// Offer both methods when credentials are configured. Some proxies allow
+	// unauthenticated connections even when credentials were supplied.
+	req.add(version, 1, 0)
 	if cfg.Auth != nil {
-		method = 2 // method 2: username/password
+		req.Reset()
+		req.add(version, 2, 0, 2)
 	}
 
 	// version identifier/method selection request
-	req.add(
-		version, // socks version
-		1,       // number of methods
-		method,
-	)
-
-	resp, err := cfg.sendReceive(conn, req.Bytes())
+	resp, err := writeRead(req.Bytes(), 2)
 	if err != nil {
 		return nil, err
-	} else if len(resp) != 2 {
-		return nil, errors.New("server does not respond properly")
 	} else if resp[0] != 5 {
 		return nil, errors.New("server does not support Socks 5")
-	} else if resp[1] != method {
-		if cfg.Auth != nil {
-			log.Warn("remote socks5 proxy do not have authentication, try fall back using no authentication")
-			cfg.Auth = nil
-			goto RECON
-		}
+	} else if resp[1] != 0 && (cfg.Auth == nil || resp[1] != 2) {
 		return nil, errors.New("socks method negotiation failed")
 	}
-	if cfg.Auth != nil {
+	if resp[1] == 2 {
 		version := byte(1) // user/password version 1
 		req.Reset()
 		req.add(
@@ -200,11 +212,9 @@ RECON:
 		req.add([]byte(cfg.Auth.Username)...)
 		req.add(byte(len(cfg.Auth.Password)))
 		req.add([]byte(cfg.Auth.Password)...)
-		resp, err := cfg.sendReceive(conn, req.Bytes())
+		resp, err := writeRead(req.Bytes(), 2)
 		if err != nil {
 			return nil, err
-		} else if len(resp) != 2 {
-			return nil, errors.New("server does not respond properly")
 		} else if resp[0] != version {
 			return nil, errors.New("server does not support user/password version 1")
 		} else if resp[1] != 0 { // not success
@@ -213,6 +223,9 @@ RECON:
 	}
 
 	if cfg.Check { // s5 just auth ok
+		if !stopCancel() {
+			return nil, ctx.Err()
+		}
 		return conn, nil
 	}
 	if targetAddr == "" {
@@ -242,6 +255,9 @@ RECON:
 	} else if aType == 0x4 {
 		req.add(net.ParseIP(host).To16()...)
 	} else {
+		if len(host) > 255 {
+			return nil, errors.New("SOCKS5 domain name exceeds 255 bytes")
+		}
 		req.add(byte(len(host))) // length of domain name
 		req.add([]byte(host)...)
 	}
@@ -250,11 +266,34 @@ RECON:
 		byte(port>>8), // higher byte of destination port
 		byte(port),    // lower byte of destination port (big endian)
 	)
-	resp, err = cfg.sendReceive(conn, req.Bytes())
+	resp, err = writeRead(req.Bytes(), 4)
 	if err != nil {
-		return
+		return nil, err
+	} else if resp[0] != 5 || resp[2] != 0 {
+		return nil, errors.New("invalid SOCKS5 connect reply")
 	} else if resp[1] != 0 {
 		return nil, errors.New("can't complete SOCKS5 connection")
+	}
+	var addressSize int
+	switch resp[3] {
+	case 1:
+		addressSize = net.IPv4len
+	case 4:
+		addressSize = net.IPv6len
+	case 3:
+		length := make([]byte, 1)
+		if _, err = io.ReadFull(conn, length); err != nil {
+			return nil, err
+		}
+		addressSize = int(length[0])
+	default:
+		return nil, errors.New("invalid SOCKS5 reply address type")
+	}
+	if _, err = io.CopyN(io.Discard, conn, int64(addressSize+2)); err != nil {
+		return nil, err
+	}
+	if !stopCancel() {
+		return nil, ctx.Err()
 	}
 
 	return conn, nil
