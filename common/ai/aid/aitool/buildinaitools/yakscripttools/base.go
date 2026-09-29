@@ -3,6 +3,7 @@ package yakscripttools
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -19,7 +20,6 @@ import (
 	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools/yakscripttools/metadata"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/mcp/yakcliconvert"
-	"github.com/yaklang/yaklang/common/utils/filesys"
 	fi "github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
 	utils "github.com/yaklang/yaklang/common/utils/resources_monitor"
 	"github.com/yaklang/yaklang/common/yak/static_analyzer"
@@ -95,24 +95,34 @@ func BuildInAIToolHash() (string, error) {
 	return yakScriptFS.GetHash()
 }
 
-var overrideYakScriptAiToolsOnce sync.Once
+var overrideYakScriptAiToolsMu sync.Mutex
 
 func OverrideYakScriptAiTools() error {
-	db := consts.GetGormProfileDatabase()
-	if err := removeRetiredBuiltInAITools(db); err != nil {
-		return err
+	overrideYakScriptAiToolsMu.Lock()
+	defer overrideYakScriptAiToolsMu.Unlock()
+	return overrideYakScriptAiTools(consts.GetGormProfileDatabase())
+}
+
+func overrideYakScriptAiTools(db *gorm.DB) error {
+	if db == nil {
+		return fmt.Errorf("AI tool profile database is not initialized")
 	}
-	overrideYakScriptAiToolsOnce.Do(func() {
-		aiTools, err := loadAllYakScriptFromEmbedFS()
-		if err != nil {
-			log.Errorf("load all yak script from embed fs failed: %v", err)
-			return
+	aiTools, err := loadAllYakScriptFromEmbedFS()
+	if err != nil {
+		return fmt.Errorf("load builtin AI tools: %w", err)
+	}
+	// Roll back failed syncs so the resource monitor can retry safely.
+	return db.Transaction(func(tx *gorm.DB) error {
+		if err := removeRetiredBuiltInAITools(tx); err != nil {
+			return fmt.Errorf("remove retired builtin AI tools: %w", err)
 		}
 		for _, aiTool := range aiTools {
-			yakit.SaveAIYakTool(db, aiTool)
+			if _, err := yakit.SaveAIYakTool(tx, aiTool); err != nil {
+				return fmt.Errorf("save builtin AI tool %q: %w", aiTool.Name, err)
+			}
 		}
+		return nil
 	})
-	return nil
 }
 
 // 清理升级前写入 profile 数据库的内置工具，保留同名的用户自定义工具。
@@ -123,15 +133,23 @@ func removeRetiredBuiltInAITools(db *gorm.DB) error {
 		"send_http_request_by_url",
 		"send_http_request_packet",
 	}
-	return db.Where("name IN (?) AND (is_builtin = ? OR author = ?)", retiredNames, true, schema.AIResourceAuthorBuiltin).
+	// Editing a builtin clears IsBuiltin but preserves Author. Author alone
+	// cannot distinguish a retired builtin from user-owned content.
+	return db.Where("name IN (?) AND is_builtin = ?", retiredNames, true).
 		Unscoped().Delete(&schema.AIYakTool{}).Error
 }
 
 func loadAllYakScriptFromEmbedFS() ([]*schema.AIYakTool, error) {
 	aiTools := []*schema.AIYakTool{}
 	efs := yakScriptFS
-	err := filesys.Recursive(".", filesys.WithFileSystem(yakScriptFS), filesys.WithFileStat(func(s string, info fs.FileInfo) error {
-		filename := info.Name()
+	err := fs.WalkDir(efs, ".", func(s string, entry fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if entry.IsDir() {
+			return nil
+		}
+		filename := entry.Name()
 		_, filename = efs.PathSplit(filename)
 		dirname, _ := efs.PathSplit(s)
 		if efs.Ext(filename) != ".yak" {
@@ -141,11 +159,11 @@ func loadAllYakScriptFromEmbedFS() ([]*schema.AIYakTool, error) {
 
 		content, err := efs.ReadFile(s)
 		if err != nil {
-			return nil
+			return fmt.Errorf("read builtin AI tool %q: %w", s, err)
 		}
 		aiTool := LoadYakScriptToAiTools(toolname, string(content))
 		if aiTool == nil {
-			return nil
+			return fmt.Errorf("parse builtin AI tool %q", s)
 		}
 		aiTool.Author = schema.AIResourceAuthorBuiltin
 		aiTool.IsBuiltin = true
@@ -160,7 +178,7 @@ func loadAllYakScriptFromEmbedFS() ([]*schema.AIYakTool, error) {
 
 		aiTools = append(aiTools, aiTool)
 		return nil
-	}))
+	})
 	return aiTools, err
 }
 

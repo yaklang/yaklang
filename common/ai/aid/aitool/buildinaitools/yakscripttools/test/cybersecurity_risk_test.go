@@ -14,6 +14,7 @@ import (
 	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools/yakscripttools"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/schema"
+	"github.com/yaklang/yaklang/common/utils"
 	_ "github.com/yaklang/yaklang/common/yak"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"gotest.tools/v3/assert"
@@ -164,7 +165,7 @@ func TestCybersecurityRisk_UsesRuntimeRiskSinkInsteadOfLocalDatabase(t *testing.
 
 func TestCybersecurityRisk_InsightCanBeRecordedWithoutPackets(t *testing.T) {
 	var submitted *schema.Risk
-	_, err := getCybersecurityRiskTool(t).InvokeWithParams(aitool.InvokeParams{
+	result, err := getCybersecurityRiskTool(t).InvokeWithParams(aitool.InvokeParams{
 		"target":       "example.test:443",
 		"title":        "暴露的调试入口",
 		"summary":      "调试入口可从公网访问，需确认其信息范围。",
@@ -188,6 +189,56 @@ func TestCybersecurityRisk_InsightCanBeRecordedWithoutPackets(t *testing.T) {
 	assert.Assert(t, strings.Contains(submitted.Description, "触发入口/观察对象：example.test:443"))
 	assert.Assert(t, strings.Contains(submitted.Description, "复现/观察方法：\n在未登录会话访问 /debug/"))
 	assert.Equal(t, submitted.Solution, "")
+	status, _ := result.GetExecutionStatus()
+	assert.Equal(t, status, aitool.ToolExecutionStatusSucceeded)
+	execution, ok := result.Data.(*aitool.ToolExecutionResult)
+	assert.Assert(t, ok)
+	assert.Equal(t, utils.InterfaceToString(utils.InterfaceToGeneralMap(execution.Result)["risk_hash"]), submitted.Hash)
+}
+
+func TestCybersecurityRisk_IndependentInsightsPersistAndUpdateSeparately(t *testing.T) {
+	db, err := utils.CreateTempTestDatabaseInMemory()
+	assert.NilError(t, err)
+	t.Cleanup(func() { _ = db.Close() })
+	assert.NilError(t, db.AutoMigrate(&schema.Risk{}).Error)
+	tool := getCybersecurityRiskTool(t)
+	var submitted []*schema.Risk
+	for _, input := range []struct{ target, title, evidence string }{
+		{"https://127.0.0.1/debug", "公开调试入口", "first observation"},
+		{"https://127.0.0.1/debug", "缺少 HSTS", "second observation"},
+		{"https://127.0.0.1/other", "公开调试入口", "different endpoint"},
+		{"https://127.0.0.1/debug", "公开调试入口", "updated evidence"},
+	} {
+		result, err := tool.InvokeWithParams(aitool.InvokeParams{
+			"target": input.target, "title": input.title, "summary": input.evidence,
+			"evidence": input.evidence,
+		}, aitool.WithRuntimeConfig(&aitool.ToolRuntimeConfig{
+			RiskSaveHandler: func(_ context.Context, record *schema.Risk) error {
+				if err := yakit.CreateOrUpdateRisk(db, record.Hash, record); err != nil {
+					return err
+				}
+				copy := *record
+				submitted = append(submitted, &copy)
+				return nil
+			},
+		}))
+		assert.NilError(t, err)
+		status, _ := result.GetExecutionStatus()
+		assert.Equal(t, status, aitool.ToolExecutionStatusSucceeded)
+	}
+	assert.Equal(t, len(submitted), 4)
+	assert.Assert(t, submitted[0].Hash != submitted[1].Hash, "different insights on one target must remain distinct")
+	assert.Assert(t, submitted[0].Hash != submitted[2].Hash, "different endpoint paths must remain distinct")
+	assert.Equal(t, submitted[0].Hash, submitted[3].Hash)
+	assert.Equal(t, submitted[0].ID, submitted[3].ID)
+	var rows []schema.Risk
+	assert.NilError(t, db.Find(&rows).Error)
+	assert.Equal(t, len(rows), 3)
+	for _, row := range rows {
+		if row.Hash == submitted[0].Hash {
+			assert.Assert(t, strings.Contains(row.Description, "updated evidence"))
+		}
+	}
 }
 
 func TestCybersecurityRisk_ReadsPacketFilesOverInlineEvidence(t *testing.T) {
@@ -234,22 +285,35 @@ func TestCybersecurityRisk_ReadsPacketFilesOverInlineEvidence(t *testing.T) {
 	assert.Equal(t, details["response_source"], "file")
 }
 
-func TestCybersecurityRisk_EmptyPacketFileDoesNotSubmit(t *testing.T) {
-	requestFile := t.TempDir() + "/empty-request.txt"
-	assert.NilError(t, os.WriteFile(requestFile, nil, 0600))
-	called := false
-	_, _ = getCybersecurityRiskTool(t).InvokeWithParams(aitool.InvokeParams{
-		"target":       "https://example.test/empty",
-		"title":        "测试风险",
-		"summary":      "有验证证据。",
-		"request-file": requestFile,
-	}, aitool.WithRuntimeConfig(&aitool.ToolRuntimeConfig{
-		RiskSaveHandler: func(context.Context, *schema.Risk) error {
-			called = true
-			return nil
-		},
-	}))
-	assert.Assert(t, !called, "empty packet file must not create a risk record")
+func TestCybersecurityRisk_InvalidEvidenceReturnsFailure(t *testing.T) {
+	emptyFile := t.TempDir() + "/empty.txt"
+	assert.NilError(t, os.WriteFile(emptyFile, nil, 0600))
+	for _, tc := range []struct{ name, field, value, message string }{
+		{"empty request", "request-file", emptyFile, "request-file is empty"},
+		{"empty response", "response-file", emptyFile, "response-file is empty"},
+		{"missing request", "request-file", emptyFile + ".missing", "failed to read request-file"},
+		{"missing response", "response-file", emptyFile + ".missing", "failed to read response-file"},
+		{"blank summary", "summary", " \n\t", "summary is required"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			called := false
+			params := aitool.InvokeParams{
+				"target": "https://example.test/empty", "title": "测试风险", "summary": "有验证证据。",
+				"request":  "GET /inline HTTP/1.1\r\nHost: example.test\r\n\r\n",
+				"response": "HTTP/1.1 200 OK\r\n\r\ninline",
+			}
+			params[tc.field] = tc.value
+			result, err := getCybersecurityRiskTool(t).InvokeWithParams(params, aitool.WithRuntimeConfig(&aitool.ToolRuntimeConfig{
+				RiskSaveHandler: func(context.Context, *schema.Risk) error {
+					called = true
+					return nil
+				},
+			}))
+			assert.Assert(t, err != nil && strings.Contains(err.Error(), tc.message), "expected actionable error, got %v", err)
+			assert.Assert(t, result == nil || !result.Success, "invalid evidence must not complete successfully")
+			assert.Assert(t, !called, "invalid evidence must not create a risk record or fall back to inline packets")
+		})
+	}
 }
 
 func TestCybersecurityRisk_PropagatesRuntimeRiskSinkFailure(t *testing.T) {

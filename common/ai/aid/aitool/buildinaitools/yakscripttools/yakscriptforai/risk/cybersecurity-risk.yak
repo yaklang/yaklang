@@ -37,7 +37,7 @@ Content-Type: application/json
 <|TOOL_PARAM_response_END_{NONCE}|>
 [[- end -]]
 
-已有完整报文文件时，把实际路径填入 `request-file`、`response-file`；不要求为了填这两个参数而新建文件。提交后核对工具结果。
+已有完整报文文件时，把实际路径填入 `request-file`、`response-file`；不要求为了填这两个参数而新建文件。`info` 见解按目标、输入点和标题区分，补充同一见解的证据时保持这些字段一致。提交后核对工具结果中的保存状态。
 USAGE_BLOCK
 
 yakit.AutoInitYakit()
@@ -190,9 +190,8 @@ requestFile := cli.String("request-file", cli.setHelp("existing path to a comple
 responseFile := cli.String("response-file", cli.setHelp("existing path to a complete HTTP response packet; read and store its content; takes priority over response"))
 cli.check()
 
-if summary == "" {
-    yakit.Error("summary is required and must not be empty")
-    return
+if str.TrimSpace(summary) == "" {
+    die("summary is required and must not be empty")
 }
 
 // Normalize before creating risk options so the stored fields and dedup hash
@@ -243,12 +242,10 @@ requestSource = ""
 if requestFile != "" {
     req, err := file.ReadFile(requestFile)
     if err != nil {
-        yakit.Error("failed to read request-file %s: %v", requestFile, err)
-        return
+        die(sprintf("failed to read request-file %s: %v", requestFile, err))
     }
     if len(req) == 0 {
-        yakit.Error("request-file is empty: %s", requestFile)
-        return
+        die(sprintf("request-file is empty: %s", requestFile))
     }
     requestRaw = string(req)
     requestSource = "file"
@@ -260,12 +257,10 @@ responseSource = ""
 if responseFile != "" {
     rsp, err := file.ReadFile(responseFile)
     if err != nil {
-        yakit.Error("failed to read response-file %s: %v", responseFile, err)
-        return
+        die(sprintf("failed to read response-file %s: %v", responseFile, err))
     }
     if len(rsp) == 0 {
-        yakit.Error("response-file is empty: %s", responseFile)
-        return
+        die(sprintf("response-file is empty: %s", responseFile))
     }
     responseRaw = string(rsp)
     responseSource = "file"
@@ -315,8 +310,19 @@ if responseRaw != "" {
     opts.Push(risk.response(responseRaw))
 }
 
-// Normalize the target before risk.NewRisk computes the dedup hash.
+// Preserve the existing target normalization for vulnerability records.
 target = normalizeTarget(target)
 
 // @ssa-ignore
-risk.NewRisk(target, opts...)
+record = risk.CreateRisk(target, opts...)
+if riskType == "info" {
+    // Independent observations often have no parameter. Retain their target
+    // path and title in the identity, while evidence updates reuse the record.
+    record.Hash = codec.Sha256(json.dumps(["cybersecurity-risk:info", target, parameter, title]))[:32]
+}
+// Save returns local database and runtime sink errors to the tool caller.
+saveErr = risk.Save(record)
+if saveErr != nil {
+    die(saveErr)
+}
+RESULT = {"operation": "save_risk", "operation_status": "completed", "risk_hash": record.Hash}

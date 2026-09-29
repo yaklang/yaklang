@@ -387,28 +387,33 @@ if maxRequests < 1 || maxRequests > 500 {
     die("max-requests must be between 1 and 500")
 }
 
-// Render only the documented, bounded subset of Fuzztag. Unknown {{...}}
-// must fail instead of silently becoming an empty string in a live request.
+// Scan the original template only. Inserted paths and variables are data, not
+// new templates; ordinary JSON closing braces must also remain untouched.
 renderTemplateVariants = fn(templateText, path, allowPath) {
-    source = templateText
-    if allowPath {
-        source = str.ReplaceAll(source, "{{PATH}}", path)
-    }
-    outsideTags = source
-    estimate = 1
-    for _, tag := range re.FindAll(source, `\{\{[^{}]*\}\}`) {
-        outsideTags = str.ReplaceAll(outsideTags, tag, "")
+    rendered = []string{""}
+    offset = 0
+    for _, location := range re.FindAllIndex(templateText, `\{\{[^{}]*\}\}`) {
+        literal = templateText[offset:location[0]]
+        if str.Contains(literal, "{{") {
+            die("malformed {{...}} template tag")
+        }
+        tag = templateText[location[0]:location[1]]
+        offset = location[1]
         name = tag[2:len(tag)-2]
-        if str.MatchAllOfRegexp(name, `^[A-Za-z_][A-Za-z0-9_]*$`) {
+        values = []string{}
+        if allowPath && name == "PATH" {
+            values = []string{path}
+        } elif str.MatchAllOfRegexp(name, `^[A-Za-z_][A-Za-z0-9_]*$`) {
             if !(name in variables) {
                 die(sprintf("unknown template variable %s", tag))
             }
-            source = str.ReplaceAll(source, tag, "{{params(" + name + ")}}")
+            values = []string{variables[name]}
         } elif str.MatchAllOfRegexp(name, `^params\([A-Za-z_][A-Za-z0-9_]*\)$`) {
             key = name[7:len(name)-1]
             if !(key in variables) {
                 die(sprintf("unknown template variable %s", tag))
             }
+            values = []string{variables[key]}
         } elif str.MatchAllOfRegexp(name, `^int\([0-9]{1,6}-[0-9]{1,6}\)$`) {
             bounds = str.Split(name[4:len(name)-1], "-")
             first = parseInt(bounds[0])
@@ -416,23 +421,33 @@ renderTemplateVariants = fn(templateText, path, allowPath) {
             if last < first || last-first+1 > maxRequests {
                 die(sprintf("template range %s exceeds max-requests", tag))
             }
-            estimate = estimate * (last-first+1)
+            values = fuzz.Strings(tag)
         } elif str.MatchAllOfRegexp(name, `^list\([^{}]*\)$`) {
             alternatives = str.Split(name[5:len(name)-1], "|")
-            estimate = estimate * len(alternatives)
+            if len(alternatives) > maxRequests {
+                die("template expansion exceeds max-requests")
+            }
+            values = fuzz.Strings(tag)
         } else {
             die(sprintf("unsupported template tag %s; use {{PATH}}, {{name}}, {{int(1-3)}} or {{list(a|b)}}", tag))
         }
-        if estimate > maxRequests {
+        if len(values) == 0 || len(rendered) * len(values) > maxRequests {
             die("template expansion exceeds max-requests")
         }
+        next = []string{}
+        for _, prefix := range rendered {
+            for _, value := range values {
+                next.Push(prefix + literal + value)
+            }
+        }
+        rendered = next
     }
-    if str.Contains(outsideTags, "{{") || str.Contains(outsideTags, "}}") {
+    tail = templateText[offset:]
+    if str.Contains(tail, "{{") {
         die("malformed {{...}} template tag")
     }
-    rendered = fuzz.StringsWithParam(source, variables)
-    if len(rendered) == 0 || len(rendered) > maxRequests {
-        die("template expansion is empty or exceeds max-requests")
+    for i, prefix := range rendered {
+        rendered[i] = prefix + tail
     }
     return rendered
 }
