@@ -16,46 +16,6 @@ import (
 	"github.com/yaklang/yaklang/common/ai/aispec"
 )
 
-func TestRetryEmptyForgeResult(t *testing.T) {
-	calls := 0
-	result, err := retryEmptyForgeResult("original report instructions", func(prompt string) (string, error) {
-		calls++
-		if calls == 1 {
-			if prompt != "original report instructions" {
-				t.Fatalf("first prompt changed: %q", prompt)
-			}
-			return " \n", nil
-		}
-		if !strings.Contains(prompt, "最终输出通道") {
-			t.Fatalf("retry did not request a final output: %q", prompt)
-		}
-		return "# Report", nil
-	})
-	if err != nil || result != "# Report" || calls != 2 {
-		t.Fatalf("result=%q err=%v calls=%d", result, err, calls)
-	}
-}
-
-func TestRetryEmptyForgeResultNeverPublishesReasoningOrLoops(t *testing.T) {
-	calls := 0
-	result, err := retryEmptyForgeResult("report", func(string) (string, error) {
-		calls++
-		return "", nil
-	})
-	if err == nil || result != "" || calls != 2 {
-		t.Fatalf("result=%q err=%v calls=%d", result, err, calls)
-	}
-	calls = 0
-	want := errors.New("provider failed")
-	result, err = retryEmptyForgeResult("report", func(string) (string, error) {
-		calls++
-		return "", want
-	})
-	if !errors.Is(err, want) || result != "" || calls != 1 {
-		t.Fatalf("result=%q err=%v calls=%d", result, err, calls)
-	}
-}
-
 // Exercise the legacy Blueprint result handler through the same request-to-chat
 // adapter used by model callbacks, while keeping the provider fully in process.
 func TestForgeResultDefaultPreservesModelBudgetAndStructuredAction(t *testing.T) {
@@ -101,61 +61,6 @@ func TestForgeResultDefaultPreservesModelBudgetAndStructuredAction(t *testing.T)
 	}
 }
 
-func TestForgeResultEmptyOutputRetryIsOptIn(t *testing.T) {
-	for _, test := range []struct {
-		name      string
-		retry     bool
-		second    string
-		wantCalls int
-		wantError bool
-	}{
-		{name: "legacy", wantCalls: 1},
-		{name: "retry_json", retry: true, second: `{"@action":"result","value":"kept"}`, wantCalls: 2},
-		{name: "retry_exhausted", retry: true, wantCalls: 2, wantError: true},
-	} {
-		t.Run(test.name, func(t *testing.T) {
-			const prompt = "Return only JSON with @action=result and a value field."
-			var result string
-			var resultErr error
-			blueprint := NewForgeBlueprint("result-retry", WithResultPrompt(prompt),
-				WithResultHandler(func(value string, err error) { result, resultErr = value, err }))
-			if test.retry {
-				WithResultPolicy(ForgeResultPolicy{RetryEmptyOutput: true})(blueprint)
-			}
-			var prompts []string
-			coordinator := newForgeResultTestCoordinator(t, blueprint,
-				func(config aicommon.AICallerConfigIf, request *aicommon.AIRequest) (*aicommon.AIResponse, error) {
-					prompts = append(prompts, request.GetPrompt())
-					response := config.NewAIResponse()
-					response.EmitReasonStream(strings.NewReader("private reasoning, never a final result"))
-					output := ""
-					if len(prompts) > 1 {
-						output = test.second
-					}
-					response.EmitOutputStream(strings.NewReader(output))
-					response.Close()
-					return response, nil
-				})
-			coordinator.ResultHandler(coordinator)
-
-			require.Len(t, prompts, test.wantCalls)
-			if test.wantError {
-				require.ErrorContains(t, resultErr, "empty final output after retry")
-			} else {
-				require.NoError(t, resultErr)
-			}
-			require.Equal(t, test.second, result)
-			for _, got := range prompts {
-				require.Contains(t, got, prompt)
-				require.NotContains(t, got, "Markdown", "retry must preserve structured output instructions")
-			}
-			if test.retry {
-				require.Contains(t, prompts[1], "最终输出通道")
-			}
-		})
-	}
-}
-
 func newForgeResultTestCoordinator(t *testing.T, blueprint *ForgeBlueprint, callback aicommon.AICallbackType) *aid.Coordinator {
 	t.Helper()
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
@@ -175,26 +80,33 @@ func newForgeResultTestCoordinator(t *testing.T, blueprint *ForgeBlueprint, call
 
 func TestForgeResultPreservesPartialReadFailure(t *testing.T) {
 	failure := errors.New("result stream interrupted")
-	for _, retry := range []bool{false, true} {
-		t.Run(fmt.Sprintf("retry=%t", retry), func(t *testing.T) {
-			calls := 0
-			read := func(string) (string, error) {
-				calls++
-				return readForgeResult(io.MultiReader(strings.NewReader("partial report"), iotest.ErrReader(failure)))
-			}
-			var result string
-			var err error
-			if retry {
-				result, err = retryEmptyForgeResult("report", read)
-			} else {
-				result, err = read("report")
-			}
-			require.Equal(t, "partial report", result)
-			require.ErrorIs(t, err, failure)
-			require.Equal(t, 1, calls, "read errors must not trigger empty-output retries")
-		})
-	}
-	result, err := readForgeResult(strings.NewReader("complete report"))
+	result, err := readForgeResult(io.MultiReader(strings.NewReader("partial report"), iotest.ErrReader(failure)))
+	require.Equal(t, "partial report", result)
+	require.ErrorIs(t, err, failure)
+	result, err = readForgeResult(strings.NewReader("complete report"))
 	require.NoError(t, err)
 	require.Equal(t, "complete report", result)
+}
+
+func TestForgeResultGeneratorDeliversOnce(t *testing.T) {
+	for _, failure := range []error{nil, errors.New("generation failed")} {
+		var callbacks, generations int
+		blueprint := NewForgeBlueprint("custom-generator", WithResultPrompt("original format"), WithResultHandler(func(value string, err error) {
+			callbacks++
+			require.Equal(t, "partial or complete", value)
+			require.ErrorIs(t, err, failure)
+		}))
+		blueprint.ResultGenerator = func(_ *aid.Coordinator, prompt string) (string, error) {
+			generations++
+			require.Contains(t, prompt, "original format")
+			return "partial or complete", failure
+		}
+		coordinator := newForgeResultTestCoordinator(t, blueprint, func(aicommon.AICallerConfigIf, *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+			t.Fatal("custom generator must replace the default request")
+			return nil, nil
+		})
+		coordinator.ResultHandler(coordinator)
+		require.Equal(t, 1, generations)
+		require.Equal(t, 1, callbacks)
+	}
 }

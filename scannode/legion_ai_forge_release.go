@@ -251,11 +251,9 @@ func buildContextForgeBlueprint(
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("build immutable Forge release: %w", err)
 	}
-	// Legion pins the final-output retry policy in this invocation snapshot.
-	// Missing/false preserves single-call behavior and caller model settings.
-	aiforge.WithResultPolicy(aiforge.ForgeResultPolicy{
-		RetryEmptyOutput: release.GetRetryEmptyOutput(),
-	})(blueprint)
+	if release.GetRetryEmptyOutput() {
+		blueprint.ResultGenerator = legionForgeResultGenerator(blueprint.GenerateResult)
+	}
 	params := make([]aiforge.Parameter, 0, len(release.GetParameters()))
 	for _, parameter := range release.GetParameters() {
 		params = append(params, aiforge.Parameter{Key: parameter.GetKey(), Value: parameter.GetValue()})

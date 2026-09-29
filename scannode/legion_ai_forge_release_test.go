@@ -134,16 +134,31 @@ func TestValidateContextForgeReleaseAllowsExactReportAndHTTPProfiles(t *testing.
 	}
 }
 
-func TestBuildContextForgeBlueprintOptsIntoResultPolicy(t *testing.T) {
-	for _, retry := range []bool{false, true} {
-		t.Run(map[bool]string{false: "disabled", true: "enabled"}[retry], func(t *testing.T) {
+func TestBuildContextForgeBlueprintUsesPlatformResultGenerator(t *testing.T) {
+	for _, test := range []struct {
+		name      string
+		retry     bool
+		output    string
+		wantCalls int
+		wantError bool
+	}{
+		{name: "disabled", wantCalls: 1},
+		{name: "enabled_json", retry: true, output: `{"report":"complete"}`, wantCalls: 2},
+		{name: "exhausted", retry: true, wantCalls: 2, wantError: true},
+	} {
+		t.Run(test.name, func(t *testing.T) {
 			release := testLegionContextForgeRelease(t)
-			release.RetryEmptyOutput = retry
+			release.RetryEmptyOutput = test.retry
+			release.ResultPrompt = "Return only JSON with a report field."
 			rehashLegionContextForgeRelease(t, release)
 			config, blueprint, params, err := buildContextForgeBlueprint(release)
 			require.NoError(t, err)
 			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 			defer cancel()
+			callbacks := 0
+			var deliveredErr error
+			originalHandler := blueprint.ResultHandler
+			blueprint.ResultHandler = func(value string, err error) { callbacks++; deliveredErr = err; originalHandler(value, err) }
 			var prompts []string
 			var budgets []int64
 			coordinator, err := blueprint.CreateCoordinatorWithQueryAndParams(ctx, "summarize the supplied facts", params,
@@ -165,7 +180,7 @@ func TestBuildContextForgeBlueprintOptsIntoResultPolicy(t *testing.T) {
 					response.EmitReasonStream(strings.NewReader("internal reasoning"))
 					output := ""
 					if len(prompts) == 2 {
-						output = "# Report\nOnly the supplied facts were reviewed."
+						output = test.output
 					}
 					response.EmitOutputStream(strings.NewReader(output))
 					response.Close()
@@ -174,16 +189,30 @@ func TestBuildContextForgeBlueprintOptsIntoResultPolicy(t *testing.T) {
 			require.NoError(t, err)
 			require.NotNil(t, coordinator.ResultHandler)
 			coordinator.ResultHandler(coordinator)
+			require.Equal(t, 1, callbacks, "deliver only the final generation result")
 
 			wantBudgets := []int64{8192}
-			if retry {
+			if test.wantCalls == 2 {
 				wantBudgets = append(wantBudgets, 8192)
 			}
 			require.Equal(t, wantBudgets, budgets, "platform policy controls requests without overriding model budget")
 			require.Contains(t, prompts[0], release.ResultPrompt)
-			if retry {
+			if test.wantError {
+				require.ErrorContains(t, deliveredErr, "empty final output after retry")
+			} else {
+				require.NoError(t, deliveredErr)
+			}
+			for _, prompt := range prompts {
+				require.Contains(t, prompt, release.ResultPrompt)
+				require.NotContains(t, prompt, "Markdown")
+			}
+			if test.wantCalls == 2 {
 				require.Contains(t, prompts[1], "最终输出通道")
-				require.Equal(t, "# Report\nOnly the supplied facts were reviewed.", config.ForgeResult.Formated)
+				if test.wantError {
+					require.Empty(t, config.ForgeResult.Formated)
+				} else {
+					require.Equal(t, test.output, config.ForgeResult.Formated)
+				}
 			} else {
 				require.Empty(t, config.ForgeResult.Formated)
 			}
@@ -196,7 +225,7 @@ func TestForgeResultPolicyBoundToInvocation(t *testing.T) {
 	require.False(t, release.GetRetryEmptyOutput())
 	_, blueprint, _, err := buildContextForgeBlueprint(release)
 	require.NoError(t, err)
-	require.False(t, blueprint.ResultPolicy.RetryEmptyOutput)
+	require.Nil(t, blueprint.ResultGenerator)
 	definitionHash := release.DefinitionSha256
 	invocationHash := release.Sha256
 	release.RetryEmptyOutput = true

@@ -105,7 +105,7 @@ compiled Node surface and Runtime manifest fixture.
 ## Platform-owned Forge final-output recovery
 
 Legion pins `ContextForgeRelease.retry_empty_output` in each invocation. The
-runtime honors that value: true permits one extra final-report request on empty
+Legion adapter honors that value: true permits one extra final-report request on empty
 output, while absent/false disables that retry. It never reruns tools or the task
 plan. Client model token settings are preserved; there is no Forge token override.
 The invocation digest includes the policy; the published definition digest does
@@ -116,3 +116,9 @@ runtimes retain field 19 as an unknown field during definition hashing and can
 reject policy-bearing invocations. Deploy these paired changes together; an old
 runtime cannot enforce a platform-disabled policy. No extra capability key or
 user-facing setting is introduced.
+
+The retry loop belongs to the `scannode` Legion adapter. The shared `aiforge`
+package owns one result-generation request and exposes an optional
+`ResultGenerator` callback receiving the rendered prompt. The adapter wraps
+single generation before result delivery, so `ResultHandler` runs once after
+recovery completes. Core Forge has no retry-policy fields or recovery loop.
