@@ -9,7 +9,7 @@ import (
 
 func TestTodoDeltaIsSharedOptionalFieldNotStandaloneAction(t *testing.T) {
 	var schema map[string]any
-	require.NoError(t, json.Unmarshal([]byte(buildSchema(loopAction_Finish, loopAction_DirectlyAnswer)), &schema))
+	require.NoError(t, json.Unmarshal([]byte(BuildSchema(loopAction_Finish, loopAction_DirectlyAnswer)), &schema))
 	properties := schema["properties"].(map[string]any)
 	require.Contains(t, properties, "todo_delta")
 

@@ -36,7 +36,7 @@ func TestPromptGeneration_Integration(t *testing.T) {
 		},
 	}
 
-	schema := buildSchema(actions...)
+	schema := BuildSchema(actions...)
 
 	if schema == "" {
 		t.Error("Schema should not be empty")
@@ -151,7 +151,7 @@ func TestSchemaGeneration_WithDisallowExit(t *testing.T) {
 	const finishEnumToken = `"finish"`
 
 	// 正常 schema
-	normalSchema := buildSchema(actions...)
+	normalSchema := BuildSchema(actions...)
 	if !strings.Contains(normalSchema, finishEnumToken) {
 		t.Error("Normal schema should contain finish action enum")
 	}
@@ -164,7 +164,7 @@ func TestSchemaGeneration_WithDisallowExit(t *testing.T) {
 		}
 	}
 
-	filteredSchema := buildSchema(filteredActions...)
+	filteredSchema := BuildSchema(filteredActions...)
 	if strings.Contains(filteredSchema, finishEnumToken) {
 		t.Error("Filtered schema should not contain finish action enum")
 	}
@@ -393,7 +393,7 @@ func TestSchemaFormatValidation(t *testing.T) {
 		Description: "测试格式化输出",
 	}
 
-	schema := buildSchema(action)
+	schema := BuildSchema(action)
 
 	// 验证schema包含必要的元素
 	if !strings.Contains(schema, "test_format") {

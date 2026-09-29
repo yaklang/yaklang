@@ -76,35 +76,27 @@ func (r *ReAct) executeToolCallInternal(ctx context.Context, toolName string, pa
 			return nil, false, err
 		}
 
-		if skipRequire {
-			log.Infof("preparing tool with preset params: %s - %s", tool.Name, tool.Description)
-		} else {
-			log.Infof("preparing tool: %s - %s", tool.Name, tool.Description)
+		if !skipRequire {
+			// New flow: load schema → AI uses directly_call_tool → verify & execute
+			log.Infof("forced directly_call_tool: %s - %s", tool.Name, tool.Description)
+			return r.executeForcedDirectlyCall(ctx, currentTask, tool, toolName, opt...)
 		}
 
-		// Only the require path needs AI to generate params; the preset path skips it.
-		toolCaller, err := r.newToolCallerForCall(ctx, currentTask, toolName, !skipRequire, opt...)
+		log.Infof("preparing tool with preset params: %s - %s", tool.Name, tool.Description)
+
+		// Preset-params path: skip param generation, execute directly
+		toolCaller, err := r.newToolCallerForCall(ctx, currentTask, toolName, false, opt...)
 		if err != nil {
 			return nil, false, err
 		}
 
-		// Call the tool with appropriate method
-		var result *aitool.ToolResult
-		var directlyAnswer bool
-		if skipRequire {
-			if currentLoop := r.GetCurrentLoop(); currentLoop != nil {
-				if allow, guardMsg := reactloops.CheckToolInvokeGuard(currentLoop, toolName, params); !allow {
-					return nil, false, utils.Error(guardMsg)
-				}
-				params = reactloops.ApplyToolInvokeParamsMutators(currentLoop, toolName, params)
+		if currentLoop := r.GetCurrentLoop(); currentLoop != nil {
+			if allow, guardMsg := reactloops.CheckToolInvokeGuard(currentLoop, toolName, params); !allow {
+				return nil, false, utils.Error(guardMsg)
 			}
-			// Call with preset parameters, skipping the require phase
-			result, directlyAnswer, err = toolCaller.CallToolWithExistedParams(tool, true, params)
-		} else {
-			// Call with AI parameter generation (require phase included)
-			result, directlyAnswer, err = toolCaller.CallTool(tool)
+			params = reactloops.ApplyToolInvokeParamsMutators(currentLoop, toolName, params)
 		}
-
+		result, directlyAnswer, err := toolCaller.CallToolWithExistedParams(tool, true, params)
 		if err != nil {
 			return nil, false, utils.Errorf("tool call failed: %v", err)
 		}

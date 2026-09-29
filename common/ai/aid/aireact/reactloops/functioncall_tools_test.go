@@ -77,7 +77,7 @@ func TestBuildActionToolsDirectAnswerUsesArgumentsForLongContent(t *testing.T) {
 	require.True(t, ok)
 	require.Contains(t, answer["description"], "Complete answer")
 	require.Contains(t, parameters["required"], "answer_payload")
-	require.Contains(t, buildSchema(loopAction_DirectlyAnswer), "FINAL_ANSWER")
+	require.Contains(t, BuildSchema(loopAction_DirectlyAnswer), "FINAL_ANSWER")
 }
 
 func TestBuildActionToolsUsesNativeDescription(t *testing.T) {
@@ -113,7 +113,7 @@ func TestNativeAdjustTodolistKeepsTodoShapeWithoutBusinessSidecars(t *testing.T)
 	require.Contains(t, parameters["required"], "todo_delta")
 
 	var textSchema map[string]any
-	require.NoError(t, json.Unmarshal([]byte(buildSchema(action)), &textSchema))
+	require.NoError(t, json.Unmarshal([]byte(BuildSchema(action)), &textSchema))
 	text := textSchema["properties"].(map[string]any)["todo_delta"].(map[string]any)
 	require.Equal(t, withoutSchemaDescriptions(text), withoutSchemaDescriptions(native))
 	require.Contains(t, native["description"], "arguments")

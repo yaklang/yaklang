@@ -37,7 +37,7 @@ type LoopAction struct {
 	OutputExamples string `json:"output_examples,omitempty"`
 }
 
-func buildSchema(actions ...*LoopAction) string {
+func BuildSchema(actions ...*LoopAction) string {
 	var actionNames []string
 	var actionDesc []string
 	for _, action := range actions {
