@@ -260,7 +260,20 @@ func QuerySyntaxflow(opt ...QueryOption) (*SyntaxFlowResult, error) {
 		res, err = executeSourceFrameBatches(frame, root, config)
 	} else if sfvm.FrameIsStructMode(frame) {
 		if config.structBound == nil {
-			return nil, utils.Errorf("struct rule requires QueryWithStruct")
+			if config.program == nil {
+				return nil, utils.Errorf("struct rule requires QueryWithStruct")
+			}
+			// A rule-object query and a rule-content query both land here
+			// after the frame is compiled, so the program dispatches the
+			// struct rule to its own units and returns one merged result.
+			merged, merr := config.program.queryProgramStructRule(config, frame.GetRule())
+			if merr != nil {
+				return nil, merr
+			}
+			if ferr := finalizeProgramRuleResult(merged); ferr != nil {
+				return merged, ferr
+			}
+			return merged, nil
 		}
 		res, err = frame.Feed(value, config.opts...)
 	} else if config.structBound != nil {
@@ -777,24 +790,12 @@ func (ps Programs) SyntaxFlowRuleName(ruleName string, opts ...QueryOption) (*Sy
 }
 
 // SyntaxFlowRule runs one rule against the program, whichever mode the rule
-// declares: an SSA rule feeds on the program, a source rule runs on the
-// program's own source snapshot, and a struct rule runs over the program's
+// declares: QuerySyntaxflow compiles the frame and dispatches it by the mode
+// it carries -- an SSA rule feeds on the program, a source rule runs on the
+// program's source snapshot, and a struct rule runs over the program's
 // application/library units. Everything else (runtime, task, callbacks,
 // budget) travels through opts unchanged.
 func (p *Program) SyntaxFlowRule(rule *schema.SyntaxFlowRule, opts ...QueryOption) (*SyntaxFlowResult, error) {
-	if rule != nil && rule.IsSourceMode() {
-		return p.queryProgramSourceRule(rule, opts...)
-	}
-	if rule != nil && rule.IsStructMode() {
-		res, err := p.queryProgramStructRule(rule, opts...)
-		if err != nil {
-			return nil, err
-		}
-		if err := finalizeProgramRuleResult(res); err != nil {
-			return res, err
-		}
-		return res, nil
-	}
 	opts = append(opts, QueryWithProgram(p), QueryWithRule(rule))
 	return QuerySyntaxflow(opts...)
 }

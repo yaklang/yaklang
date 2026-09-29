@@ -4,44 +4,23 @@ import (
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 )
 
-// queryConfigOf applies query options to a throwaway config. A helper that
-// builds its own result uses it to keep the caller's scan wiring (runtime,
-// task, callbacks) instead of starting a second one.
-func queryConfigOf(opts ...QueryOption) *queryConfig {
-	cfg := &queryConfig{}
-	for _, opt := range opts {
-		if opt != nil {
-			opt(cfg)
-		}
-	}
-	return cfg
-}
-
-// queryProgramSourceRule runs a source rule against the program's own source
-// snapshot (FileList / ExtraFile / IrSource editors), so a compiled program can
-// execute source rules without a live source path.
-func (p *Program) queryProgramSourceRule(rule *schema.SyntaxFlowRule, opts ...QueryOption) (*SyntaxFlowResult, error) {
-	if p == nil || p.Program == nil {
-		return nil, utils.Error("source rule: nil program")
-	}
-	target := NewSourceQueryTargetFromProgram(p)
-	if target == nil || len(target.Files()) == 0 {
-		return nil, utils.Errorf(
-			"source rule %s: program %s has no source snapshot to scan",
-			ruleGetRuleName(rule), p.GetProgramName(),
-		)
-	}
-	return target.SyntaxFlowRule(rule, opts...)
-}
-
 // queryProgramStructRule runs a struct rule over every application/library unit
-// of the program. Each unit runs without finalizing, and the unit frames merge
-// into one result so the rule reports a single result per program.
-func (p *Program) queryProgramStructRule(rule *schema.SyntaxFlowRule, opts ...QueryOption) (*SyntaxFlowResult, error) {
+// of the program and merges the unit frames into one result.
+//
+// The caller is a query that already compiled the rule's frame (rule object or
+// rule content); base carries its context, runtime, task and sfvm options so
+// each unit runs exactly like the caller's query would. The unit runs do not
+// finalize (QueryWithNoFinalize), so risks are built and consumers are
+// notified once, by the caller, through finalizeProgramRuleResult.
+func (p *Program) queryProgramStructRule(base *queryConfig, rule *schema.SyntaxFlowRule) (*SyntaxFlowResult, error) {
 	if p == nil || p.Program == nil {
 		return nil, utils.Error("struct rule: nil program")
+	}
+	if rule == nil {
+		return nil, utils.Error("struct rule: nil rule")
 	}
 	units := programStructUnits(p)
 	if len(units) == 0 {
@@ -50,8 +29,8 @@ func (p *Program) queryProgramStructRule(rule *schema.SyntaxFlowRule, opts ...Qu
 			ruleGetRuleName(rule), p.GetProgramName(),
 		)
 	}
-	base := queryConfigOf(opts...)
 	var accumulated *sfvm.SFFrameResult
+	var sharedConfig *ssaconfig.Config
 	for _, unit := range units {
 		if unit == nil {
 			continue
@@ -60,15 +39,28 @@ func (p *Program) queryProgramStructRule(rule *schema.SyntaxFlowRule, opts ...Qu
 		if err != nil {
 			return nil, utils.Wrapf(err, "struct rule %s: load frame failed", ruleGetRuleName(rule))
 		}
-		unitOpts := append([]QueryOption{}, opts...)
-		unitOpts = append(unitOpts,
+		unitOpts := []QueryOption{
 			QueryWithValue(NewStructQueryTarget(p, unit, nil)),
 			QueryWithResultProgram(p),
 			QueryWithStruct(unit),
 			QueryWithFrame(frame),
 			QueryWithRule(rule),
 			QueryWithNoFinalize(),
-		)
+		}
+		if base != nil {
+			sharedConfig = base.Config
+			unitOpts = append(unitOpts,
+				QueryWithContext(base.ctx),
+				QueryWithTaskID(base.taskID),
+				QueryWithSSAConfig(base.Config),
+			)
+			if base.scanRuntime != nil {
+				unitOpts = append(unitOpts, QueryWithScanRuntime(base.scanRuntime))
+			}
+			for _, opt := range base.opts {
+				unitOpts = append(unitOpts, QueryWithSFOption(opt))
+			}
+		}
 		res, err := QuerySyntaxflow(unitOpts...)
 		if err != nil {
 			return nil, err
@@ -85,18 +77,20 @@ func (p *Program) queryProgramStructRule(rule *schema.SyntaxFlowRule, opts ...Qu
 	if accumulated == nil {
 		return nil, nil
 	}
-	merged := CreateResultFromQuery(accumulated, base.Config)
+	merged := CreateResultFromQuery(accumulated, sharedConfig)
 	merged.program = p
 	merged.rule = rule
-	merged.TaskID = base.taskID
-	merged.scanRuntime = base.scanRuntime
+	if base != nil {
+		merged.TaskID = base.taskID
+		merged.scanRuntime = base.scanRuntime
+	}
 	return merged, nil
 }
 
 // finalizeProgramRuleResult publishes a merged result the way a normal query
 // would: a scan runtime owns the risk decision and the consumers, and a result
 // outside a scan keeps its risks in memory only. The result is emitted before
-// its risks are built so a database consumer can write the row first and the
+// its risks are built so a database consumer writes the row first and the
 // stored risk carries the row id.
 func finalizeProgramRuleResult(res *SyntaxFlowResult) error {
 	if res == nil {
