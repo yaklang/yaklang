@@ -412,6 +412,16 @@ func (f *Function) Finish() {
 				if modify == nil {
 					continue
 				}
+				// 自反成员别名（成员当前值又解析回该成员本身，如 this.State =>
+				// this.State）不携带任何调用方可用的写入信息，却会在调用点被当成
+				// “构造过程写了这个成员”，覆盖构造函数里真实的嵌套成员写入
+				// （C# nested receiver 回归），因此不再为它补记录。
+				// 注意：形参别名（this.A = a 且 a 来自调用方）必须保留。
+				if paramMember, ok := ToParameterMember(modify); ok {
+					if name := paramMember.GetVerboseName(); name != "" && name == verbose {
+						continue
+					}
+				}
 				ses = append(ses, &FunctionSideEffect{
 					Name:        variable.GetName(),
 					VerboseName: verbose,
