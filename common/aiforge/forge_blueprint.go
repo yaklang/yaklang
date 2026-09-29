@@ -40,6 +40,11 @@ type ForgeBlueprint struct {
 	ResultPrompt  string
 	ResultHandler func(string, error)
 
+	// ResultGenerator optionally replaces final-result generation using the rendered
+	// prompt. The default calls GenerateResult once; ResultHandler receives the
+	// completed result exactly once regardless of the generator implementation.
+	ResultGenerator func(*aid.Coordinator, string) (string, error)
+
 	// Tools 是AI助手可以使用的工具列表，这些工具可以扩展AI的能力
 	Tools []*aitool.Tool
 
@@ -256,45 +261,7 @@ func (f *ForgeBlueprint) GenerateFirstPromptWithMemoryOption(
 		return "", nil, utils.Errorf("render persistent prompt failed: %v", err)
 	}
 
-	var opts []aicommon.ConfigOption
-	_ = persistentPrompt
-	if persistentPrompt != "" {
-		opts = append(opts, aicommon.WithAppendPersistentContext(persistentPrompt))
-	}
-
-	if len(f.Tools) > 0 {
-		opts = append(opts, aicommon.WithTools(f.Tools...))
-	}
-
-	if f.PlanMocker != nil {
-		opts = append(opts, aid.WithPlanMocker(f.PlanMocker))
-	}
-
-	opts = append(opts, f.AIOptions...)
-	if f.ResultPrompt != "" && f.ResultHandler != nil {
-		opts = append(opts, aid.WithResultHandler(func(cod *aid.Coordinator) {
-			prompt, err := f.renderResultPrompt(cod.ContextProvider)
-			if err != nil {
-				f.ResultHandler("", utils.Errorf("render result prompt failed: %v", err))
-				return
-			}
-			config := cod.Config
-			rsp, err := config.CallAI(aicommon.NewAIRequest(prompt, aicommon.WithAIRequest_CallerLabel("forge-blueprint")))
-			if err != nil {
-				f.ResultHandler("", utils.Errorf("render result failed: %v", err))
-				return
-			}
-			rspReader := rsp.GetOutputStreamReader("forge", true, config.GetEmitter())
-			raw, err := io.ReadAll(rspReader)
-			if err == io.EOF {
-				f.ResultHandler(string(raw), nil)
-			} else {
-				f.ResultHandler(string(raw), err)
-			}
-		}))
-	}
-
-	return initPrompt, opts, nil
+	return initPrompt, f.coordinatorOptions(persistentPrompt, f.renderResultPrompt), nil
 }
 
 func (f *ForgeBlueprint) GenerateFirstPromptWithMemoryOptionWithQuery(
@@ -307,6 +274,57 @@ func (f *ForgeBlueprint) GenerateFirstPromptWithMemoryOptionWithQuery(
 		},
 	}
 	return f.GenerateFirstPromptWithMemoryOption(params)
+}
+
+func (f *ForgeBlueprint) GenerateFirstPromptWithMemoryOptionWithQueryAndParams(
+	query string,
+	params []Parameter,
+) (string, []aicommon.ConfigOption, error) {
+	initPrompt, err := f.renderInitPromptWithParams(query, params)
+	if err != nil {
+		return "", nil, utils.Errorf("render init prompt failed: %v", err)
+	}
+	persistentPrompt, err := f.renderPersistentPromptWithParams(query, params)
+	if err != nil {
+		return "", nil, utils.Errorf("render persistent prompt failed: %v", err)
+	}
+
+	return initPrompt, f.coordinatorOptions(persistentPrompt, f.renderResultPrompt), nil
+}
+
+// Keep option ordering shared while each entrypoint retains its own rendering
+// and parameter-validation boundary.
+func (f *ForgeBlueprint) coordinatorOptions(
+	persistentPrompt string,
+	renderResult func(*aid.PromptContextProvider) (string, error),
+) []aicommon.ConfigOption {
+	var opts []aicommon.ConfigOption
+	if persistentPrompt != "" {
+		opts = append(opts, aicommon.WithAppendPersistentContext(persistentPrompt))
+	}
+	if len(f.Tools) > 0 {
+		opts = append(opts, aicommon.WithTools(f.Tools...))
+	}
+	if f.PlanMocker != nil {
+		opts = append(opts, aid.WithPlanMocker(f.PlanMocker))
+	}
+	opts = append(opts, f.AIOptions...)
+	if f.ResultPrompt != "" && f.ResultHandler != nil {
+		opts = append(opts, aid.WithResultHandler(func(cod *aid.Coordinator) {
+			prompt, err := renderResult(cod.ContextProvider)
+			if err != nil {
+				f.ResultHandler("", utils.Errorf("render result prompt failed: %v", err))
+				return
+			}
+			generate := f.ResultGenerator
+			if generate == nil {
+				generate = f.GenerateResult
+			}
+			result, err := generate(cod, prompt)
+			f.ResultHandler(result, err)
+		}))
+	}
+	return opts
 }
 
 func cliParam2grpc(params []*information.CliParameter) []*ypb.YakScriptParam {
@@ -373,4 +391,24 @@ type PluginParamSelectData struct {
 	Key   string `json:"key"`
 	Label string `json:"label"`
 	Value string `json:"value"`
+}
+
+// GenerateResult issues one final-result request for a rendered prompt without
+// invoking ResultHandler. Callers retain ownership of request configuration.
+func (f *ForgeBlueprint) GenerateResult(cod *aid.Coordinator, prompt string) (string, error) {
+	config := cod.Config
+	rsp, err := config.CallAI(aicommon.NewAIRequest(prompt, aicommon.WithAIRequest_CallerLabel("forge-blueprint")))
+	if err != nil {
+		return "", utils.Errorf("render result failed: %v", err)
+	}
+	return readForgeResult(rsp.GetOutputStreamReader("forge", true, config.GetEmitter()))
+}
+
+// Preserve partial output alongside read failures for legacy ResultHandler callers.
+func readForgeResult(reader io.Reader) (string, error) {
+	raw, err := io.ReadAll(reader)
+	if err == io.EOF {
+		err = nil
+	}
+	return string(raw), err
 }

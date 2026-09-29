@@ -152,6 +152,53 @@ func (f *ForgeBlueprint) renderInitPrompt(query string, params ...*ypb.ExecParam
 	return buf.String(), nil
 }
 
+// renderInitPromptWithParams renders caller-supplied parameters without CLI
+// interpretation. The caller owns parameter validation before this boundary.
+func (f *ForgeBlueprint) renderInitPromptWithParams(query string, params []Parameter) (string, error) {
+	tmpl, err := template.New("init").Parse(f.InitializePrompt)
+	if err != nil {
+		return "", err
+	}
+	forgePromptParams := f.promptParams(query, params)
+	var buf bytes.Buffer
+	if err := tmpl.Execute(&buf, map[string]any{"Forge": forgePromptParams}); err != nil {
+		return "", err
+	}
+	if ret := f.ToolPrompt(); ret != "" {
+		buf.WriteString("\n")
+		buf.WriteString(ret)
+	}
+	if ret := f.KeywordPrompt(); ret != "" {
+		buf.WriteString("\n")
+		buf.WriteString(ret)
+	}
+	return buf.String(), nil
+}
+
+// promptParams supplies the same caller-owned values to invocation templates.
+func (f *ForgeBlueprint) promptParams(query string, params []Parameter) *ForgePromptParams {
+	rawParams := parametersToPromptString(params)
+	nonce := utils.RandStringBytes(8)
+	return &ForgePromptParams{
+		UserParams:       fmt.Sprintf("<user_params_%s>\n%s\n</user_params_%s>", nonce, rawParams, nonce),
+		UserQuery:        query,
+		InitPrompt:       f.InitializePrompt,
+		PersistentPrompt: f.PersistentPrompt,
+	}
+}
+
+func (f *ForgeBlueprint) renderPersistentPromptWithParams(query string, params []Parameter) (string, error) {
+	tmpl, err := template.New("persistent").Parse(f.PersistentPrompt)
+	if err != nil {
+		return "", err
+	}
+	var buf bytes.Buffer
+	if err := tmpl.Execute(&buf, map[string]any{"Forge": f.promptParams(query, params)}); err != nil {
+		return "", err
+	}
+	return buf.String(), nil
+}
+
 func (f *ForgeBlueprint) renderPersistentPrompt(query string) (string, error) {
 	tmpl, err := template.New("persistent").Parse(f.PersistentPrompt)
 	if err != nil {

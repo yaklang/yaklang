@@ -100,6 +100,10 @@ func normalizeEmptyObjectParams(tool *mcp.Tool, params aitool.InvokeParams) (ait
 }
 
 func YakTool2AITool(aitools []*schema.AIYakTool) []*aitool.Tool {
+	return yakTool2AITool(aitools, false)
+}
+
+func yakTool2AITool(aitools []*schema.AIYakTool, invokeForgeHandle bool) []*aitool.Tool {
 	tools := []*aitool.Tool{}
 	for _, aiTool := range aitools {
 		tool := mcp.NewTool(aiTool.Name)
@@ -236,6 +240,9 @@ func YakTool2AITool(aitools []*schema.AIYakTool) []*aitool.Tool {
 				if executedEngine != nil {
 					if result, ok := executedEngine.GetVar("RESULT"); ok {
 						return result, nil
+					}
+					if invokeForgeHandle {
+						return invokeForgeToolHandler(ctx, executedEngine, params)
 					}
 				}
 				return nil, nil

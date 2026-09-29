@@ -77,3 +77,60 @@ new AI session before provisioning, loads the exact admitted image when it is
 missing, and keeps existing sessions on their persisted release. A real model
 conversation still requires deployed Legion, License and Provider
 configuration; producing the package alone is not end-to-end acceptance.
+
+## Forge tool capability contract
+
+New Node and Session Runtime manifests declare `ai.forge_release.v1` for immutable
+Forge execution, `ai.forge.custom_tools.v1` for custom script/schema snapshots,
+and `ai.tools.builtin.v1` for the existing bounded built-in tool adapters.
+The aggregate tool key covers DNS/TCP discovery, native HTTP/crawler/fingerprint,
+and evidence adapters. Evidence file access additionally requires
+`ai.input.managed_attachment.v1` on a supported platform. None of these keys grants
+a task additional tool or target permissions; the server-owned immutable profile,
+input manifest and execution scope still control each invocation.
+
+Do not advertise `ai.forge.discovery.v1/v2`, `ai.forge.evidence.v1`, or
+`ai.forge.http_assessment.v2` in new manifests. Node normalization drops those
+retired keys even when an older enrollment record supplies them. Stateful rollback
+mode advertises neither Forge protocols nor the aggregate built-in tool key.
+Published profile values and their adapter semantics remain unchanged.
+
+Deploy the compatible Legion server before these binaries. Legion accepts the
+new aggregate protocol or the exact legacy profile capability from older
+releases; an old subset does not imply aggregate support. An older server may
+reject the new capability surface. Do not forge legacy declarations to bypass
+that admission check. Packaging tests bind the declared capability set to the
+compiled Node surface and Runtime manifest fixture.
+
+## Platform-owned Forge final-output recovery
+
+Legion pins `ContextForgeRelease.retry_empty_output` in each invocation. The
+Legion adapter honors that value: true permits one extra final-report request on empty
+output, while absent/false disables that retry. It never reruns tools or the task
+plan. Client model token settings are preserved; there is no Forge token override.
+The invocation digest includes the policy; the published definition digest does
+not. Imported definitions do not choose this runtime policy.
+
+Upgrade the Yaklang runtime before enabling the new Legion producer. Older
+runtimes retain field 19 as an unknown field during definition hashing and can
+reject policy-bearing invocations. Deploy these paired changes together; an old
+runtime cannot enforce a platform-disabled policy. No extra capability key or
+user-facing setting is introduced.
+
+The retry loop belongs to the `scannode` Legion adapter. The shared `aiforge`
+package owns one result-generation request and exposes an optional
+`ResultGenerator` callback receiving the rendered prompt. The adapter wraps
+single generation before result delivery, so `ResultHandler` runs once after
+recovery completes. Core Forge has no retry-policy fields or recovery loop.
+
+The adapter also owns the initial invocation appendix and final report grounding
+instructions. It snapshots original user input and normalized parameters when
+building the blueprint; rendered coordinator instructions are not original user
+input. These appendices apply independently of the retry flag. The shared core
+renders the declared templates without adding platform reporting requirements.
+
+Forge tool adapters do not intercept printing or convert observations into return
+values. Standalone scripts execute their own handler and may finish without an
+explicit result. Generic print/printf/println/dump routing is provided separately
+by Yaklang PR #5215; deployments relying on native printed tool observations
+must include that change. Existing Yakit feedback continues through tool stdout.

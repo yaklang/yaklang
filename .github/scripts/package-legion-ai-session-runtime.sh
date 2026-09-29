@@ -182,7 +182,7 @@ jq -n \
       module_go_version: $module_go_version,
       go_version: $runtime_go_version
     },
-    capabilities: ["ai.input.managed_attachment.v1", "ai.session.bind_epoch.v1", "ai.session.runtime", "ai.session.turn_lifecycle.v1", "yak.execute"],
+    capabilities: ["ai.forge.custom_tools.v1", "ai.forge_release.v1", "ai.input.managed_attachment.v1", "ai.session.bind_epoch.v1", "ai.session.runtime", "ai.session.turn_lifecycle.v1", "ai.skill_bundle.v1", "ai.tools.builtin.v1", "yak.execute"],
     binary: {
       path: "/usr/local/bin/legion-session-runtime",
       sha256: $binary_sha,
