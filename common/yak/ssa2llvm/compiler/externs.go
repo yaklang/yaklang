@@ -57,6 +57,14 @@ var defaultExternBindings = map[string]ExternBinding{
 		Return:     ExternTypeVoid,
 		DispatchID: abi.IDRuntimeChanSend,
 	},
+	// waitAllAsyncCallFinish blocks until every `go func` has returned. It is a
+	// yak global builtin rather than a yaklib module function, so without a
+	// binding the compiler emitted a call to an undefined symbol and the
+	// in-process lld died with SIGSEGV while reporting it.
+	"waitAllAsyncCallFinish": {
+		Return:     ExternTypeVoid,
+		DispatchID: abi.IDRuntimeWaitAsync,
+	},
 }
 
 func cloneExternBindings(src map[string]ExternBinding) map[string]ExternBinding {
