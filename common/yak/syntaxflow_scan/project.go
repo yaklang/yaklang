@@ -19,8 +19,10 @@ import (
 	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 )
 
-// CompileProject is registered by ssa_compile init so this package does not
-// import ssa_compile (ssa_compile -> yakscript -> yak -> syntaxflow_scan).
+// CompileProject optionally overrides how a project scan compiles its source.
+// It exists for tests and for callers that need a different compile pipeline;
+// production scans call CompileProjectDefault when it is nil. Nothing needs to
+// register it.
 var CompileProject func(ctx context.Context, cfg *ssaconfig.Config, extra ...ssaconfig.Option) (*ssaapi.Program, error)
 
 // CollectCodeSourceDir clones or opens the project tree without compiling SSA.
@@ -81,6 +83,10 @@ func ScanProject(ctx context.Context, opts ...ssaconfig.Option) (result ProjectR
 
 	recorder := newStageOutcomeRecorder()
 	report := func(stage ProductStage, err error) { recorder.record(stage, err) }
+	// One runtime for the whole project scan: the source, struct and SSA
+	// stages submit their findings to the same collect so a later mode
+	// replaces an earlier one, and the report saver is registered once.
+	ensureScanRuntime(cfg)
 	// programName is published through ProjectResult so compile-only runs can
 	// hand the persisted IR name back to the platform.
 	programName := strings.TrimSpace(cfg.GetProgramName())
@@ -778,10 +784,59 @@ func captureProgramEvidence(recorder *stageOutcomeRecorder, prog *ssaapi.Program
 }
 
 func compileProductProject(ctx context.Context, cfg *ssaconfig.Config, extra ...ssaconfig.Option) (*ssaapi.Program, error) {
-	if CompileProject == nil {
-		return nil, utils.Errorf("ScanProject: compiler is not registered")
+	if cfg == nil {
+		return nil, utils.Errorf("ScanProject: compile config is nil")
 	}
-	return CompileProject(ctx, cfg, extra...)
+	if CompileProject != nil {
+		return CompileProject(ctx, cfg, extra...)
+	}
+	return CompileProjectDefault(ctx, cfg, extra...)
+}
+
+// CompileProjectDefault compiles a project through ssaapi without any
+// registration side effect.
+func CompileProjectDefault(ctx context.Context, cfg *ssaconfig.Config, extra ...ssaconfig.Option) (*ssaapi.Program, error) {
+	if cfg == nil {
+		return nil, utils.Errorf("ScanProject: compile config is nil")
+	}
+	// Compile through ssaapi directly: it owns the compile pipeline, so this
+	// package no longer depends on a registration side effect that ssa_compile
+	// performs (ssa_compile -> yakscript -> yak -> this package makes the
+	// reverse import impossible).
+	raw, err := cfg.ToJSONString()
+	if err != nil {
+		return nil, utils.Wrapf(err, "ScanProject: serialize compile config failed")
+	}
+	opts := []ssaconfig.Option{
+		ssaconfig.WithConfigJson(raw),
+		ssaconfig.WithContext(ctx),
+		copyExtraInfoOption(cfg),
+	}
+	opts = append(opts, extra...)
+	progs, err := ssaapi.ParseProject(opts...)
+	if err != nil {
+		return nil, err
+	}
+	if len(progs) == 0 || progs[0] == nil {
+		return nil, utils.Errorf("ScanProject: compile result is empty")
+	}
+	return progs[0], nil
+}
+
+// copyExtraInfoOption forwards options that must stay in-process (struct
+// rules, process callbacks) onto the compile config.
+func copyExtraInfoOption(src *ssaconfig.Config) ssaconfig.Option {
+	return func(dst *ssaconfig.Config) error {
+		if src == nil || dst == nil {
+			return nil
+		}
+		for key, values := range src.ExtraInfo {
+			for _, value := range values {
+				dst.SetExtraInfo(key, value)
+			}
+		}
+		return nil
+	}
 }
 
 func reloadCompiledProgram(prog *ssaapi.Program) *ssaapi.Program {
@@ -833,6 +888,11 @@ func loadNamedPrograms(cfg *Config) error {
 
 func structCompileOptions(cfg *Config) []ssaconfig.Option {
 	var opts []ssaconfig.Option
+	// Compile-time struct rules submit their findings to the same scan runtime
+	// as the source and SSA stages.
+	if cfg != nil && cfg.scanRuntime != nil {
+		opts = append(opts, ssaapi.WithScanRuntime(cfg.scanRuntime))
+	}
 	// Struct rules use the same final SyntaxFlow result-save guard as SSA rules.
 	if cfg != nil && cfg.IsNoSaveRisk() {
 		opts = append(opts, ssaconfig.WithNoSaveRisk(true))
@@ -996,6 +1056,12 @@ func sharedScanCallbackOptions(cfg *Config) []ssaconfig.Option {
 	// Propagate the risk-persistence setting to nested scan stages.
 	if cfg.IsNoSaveRisk() {
 		opts = append(opts, ssaconfig.WithNoSaveRisk(true))
+	}
+	// Nested stage scans rebuild their config from these options only; without
+	// the runtime they would start a second collect and could not cover an
+	// earlier mode's finding.
+	if cfg.scanRuntime != nil {
+		opts = append(opts, WithScanRuntime(cfg.scanRuntime))
 	}
 	return opts
 }

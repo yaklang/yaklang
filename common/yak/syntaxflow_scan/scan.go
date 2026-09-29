@@ -25,6 +25,25 @@ func Scan(ctx context.Context, option ...ssaconfig.Option) (retErr error) {
 		return err
 	}
 
+	// Every scan gets one runtime: it owns the risk collect and decides which
+	// finding each mode keeps. A database scan also registers the saver that
+	// writes result rows, the audit graph and risk rows; a memory scan streams
+	// its findings instead.
+	rt := ensureScanRuntime(config)
+	if config.GetSyntaxFlowMemory() ||
+		config.GetSyntaxFlowResultKind() == ssaconfig.SFResultSaveMemory {
+		rt.SetNoRiskDB(true)
+	}
+	// The database consumer must be registered before the scan starts: a
+	// resumed or freshly created task can run queries immediately.
+	bindManagerSaver := func(m *scanManager) {
+		if rt == nil || m == nil || config.GetSyntaxFlowMemory() ||
+			config.GetSyntaxFlowResultKind() == ssaconfig.SFResultSaveMemory {
+			return
+		}
+		bindDBSaver(rt, schema.SFResultKindScan, m.taskID, config.IsNoSaveRisk())
+	}
+
 	// Wire up debug/pprof output when debug_dir is set.
 	// Keep the shared Postgres SSA IR DB (redirectSSADB=false) for platform
 	// two-job compile -> scan reuse; CLI --debug redirects SSADB separately.
@@ -71,6 +90,7 @@ func Scan(ctx context.Context, option ...ssaconfig.Option) (retErr error) {
 		if err != nil {
 			return err
 		}
+		bindManagerSaver(m)
 		log.Info("start to create syntaxflow scan")
 		go func() {
 			err := m.ScanNewTask()
@@ -85,6 +105,7 @@ func Scan(ctx context.Context, option ...ssaconfig.Option) (retErr error) {
 		if err != nil {
 			return err
 		}
+		bindManagerSaver(m)
 		m.StatusTask()
 		close(errC)
 	case ssaconfig.ControlModeResume:
@@ -93,6 +114,7 @@ func Scan(ctx context.Context, option ...ssaconfig.Option) (retErr error) {
 		if err != nil {
 			return err
 		}
+		bindManagerSaver(m)
 		go func() {
 			err := m.ResumeTask()
 			if err != nil {

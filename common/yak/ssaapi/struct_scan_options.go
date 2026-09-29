@@ -63,6 +63,16 @@ func WithStructRuleCallback(cb func(*schema.SSARisk)) ssaconfig.Option {
 	})(cb)
 }
 
+// WithScanRuntime attaches the control point of one scan. Compile-time struct
+// scans and syntaxflow queries that share this runtime submit their risks to
+// the same collect, so a later mode replaces an earlier finding, and result
+// and risk consumers are notified instead of the query writing rows itself.
+func WithScanRuntime(rt *ScanRuntime) ssaconfig.Option {
+	return ssaconfig.SetOption("ssa/scan_runtime", func(c *Config, v *ScanRuntime) {
+		c.scanRuntime = v
+	})(rt)
+}
+
 func WithStructRuleTimeout(d time.Duration) ssaconfig.Option {
 	return ssaconfig.SetOption("ssa_compile/struct_rule_timeout", func(c *Config, v time.Duration) {
 		c.ensureStructScan().timeout = v

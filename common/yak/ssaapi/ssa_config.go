@@ -58,6 +58,10 @@ type Config struct {
 	diagnosticsEnabled  bool
 	diagnosticsRecorder *diagnostics.Recorder
 	structScan          *structScanRuntime
+	// scanRuntime is the control point of the scan this program belongs to.
+	// Nil means this program is used outside a scan and callers keep their
+	// previous result/risk behavior.
+	scanRuntime *ScanRuntime
 	// file performance recorder
 	filePerformanceRecorder *diagnostics.Recorder
 

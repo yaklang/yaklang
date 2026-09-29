@@ -240,6 +240,9 @@ func (m *scanManager) Query(rule *schema.SyntaxFlowRule, target ssaapi.SyntaxFlo
 			}),
 			ssaapi.QueryWithProjectId(m.Config.GetProjectID()),
 		)
+		if m.Config != nil && m.Config.scanRuntime != nil {
+			option = append(option, ssaapi.QueryWithScanRuntime(m.Config.scanRuntime))
+		}
 		if workBudget != nil {
 			option = append(option, ssaapi.QueryWithWorkBudget(workBudget))
 		}
