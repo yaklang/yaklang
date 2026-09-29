@@ -470,7 +470,11 @@ func (p *TCPProbe) SendFinalACK() (TCPSegment, error) {
 
 func (p *TCPProbe) beginStep(step string, want probePhase) error {
 	if p.closed {
-		return fmt.Errorf("%s: probe is closed", step)
+		cause := error(context.Canceled)
+		if p.ctx != nil && p.ctx.Err() != nil {
+			cause = context.Cause(p.ctx)
+		}
+		return fmt.Errorf("%s: probe is closed: %w", step, cause)
 	}
 	if p.phase != want {
 		return fmt.Errorf("%s: connection is %s, need %s", step, p.phase, want)

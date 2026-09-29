@@ -14,9 +14,13 @@ import (
 var (
 	// ErrProbeNoResponse is inconclusive: loss/filtering is not a closed port.
 	ErrProbeNoResponse = errors.New("TCP probe received no valid response")
-	ErrProbeRefused    = errors.New("TCP probe received a matching reset")
-	ErrProbeSend       = errors.New("TCP probe could not send SYN")
-	ErrHalfOpenACK     = errors.New("ACK is disabled for a half-open probe")
+	// ErrProbeChecksum accompanies ErrProbeNoResponse when correlated replies
+	// were rejected for invalid checksums. Capture offload is one possible cause;
+	// this is not permission to accept the reply or classify the port as closed.
+	ErrProbeChecksum = errors.New("correlated TCP reply checksum invalid; check capture offload or packet corruption")
+	ErrProbeRefused  = errors.New("TCP probe received a matching reset")
+	ErrProbeSend     = errors.New("TCP probe could not send SYN")
+	ErrHalfOpenACK   = errors.New("ACK is disabled for a half-open probe")
 )
 
 // SYNRetryPolicy bounds the whole probe, including failed local sends.
@@ -250,6 +254,9 @@ func (p *TCPProbe) ReceiveSYNACKContext(ctx context.Context) (TCPSegment, error)
 			return TCPSegment{}, err
 		}
 		if p.attempts >= p.retry.MaxAttempts {
+			if errors.Is(err, ErrProbeChecksum) {
+				return TCPSegment{}, fmt.Errorf("%w after %d attempts: %w", ErrProbeNoResponse, p.attempts, ErrProbeChecksum)
+			}
 			return TCPSegment{}, fmt.Errorf("%w after %d attempts", ErrProbeNoResponse, p.attempts)
 		}
 		if _, err = p.sendWithRetry(ctx); err != nil {

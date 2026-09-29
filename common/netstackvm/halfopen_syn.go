@@ -16,7 +16,6 @@ import (
 	"github.com/yaklang/yaklang/common/lowtun/netstack/gvisor/pkg/tcpip/stack"
 	"github.com/yaklang/yaklang/common/lowtun/netstack/gvisor/pkg/tcpip/transport/tcp"
 	"github.com/yaklang/yaklang/common/pcapx/pcaputil"
-	"github.com/yaklang/yaklang/common/utils/arptable"
 	"golang.org/x/time/rate"
 )
 
@@ -87,14 +86,15 @@ type synFrame struct {
 	linkType gopacket.LayerType
 }
 type synFlight struct {
-	key       flightKey
-	ctx       context.Context
-	generated chan *synFrame
-	replies   chan probeReply
-	frame     *synFrame
-	permit    bool
-	sending   bool
-	sent      bool
+	key         flightKey
+	ctx         context.Context
+	generated   chan *synFrame
+	replies     chan probeReply
+	frame       *synFrame
+	permit      bool
+	sending     bool
+	sent        bool
+	badChecksum bool
 }
 
 // OpenHalfOpenSYN opens the host interface (and loopback, when that is a
@@ -103,9 +103,25 @@ func OpenHalfOpenSYN(ctx context.Context, cfg HalfOpenSYNConfig) (*HalfOpenSYN, 
 	if cfg.Iface == nil {
 		return nil, fmt.Errorf("half-open syn: interface is nil")
 	}
+	iface, err := net.InterfaceByName(cfg.Iface.Name)
+	if err != nil {
+		return nil, err
+	}
+	if iface.Flags&net.FlagUp == 0 {
+		return nil, fmt.Errorf("half-open syn: interface %s is down", iface.Name)
+	}
+	cfg.Iface = iface // Use current OS identity, not caller-supplied flags/MAC.
 	src := ipv4Only(cfg.SourceIP)
-	if src == nil {
-		return nil, fmt.Errorf("half-open syn: source %v is not ipv4", cfg.SourceIP)
+	addrs, err := iface.Addrs()
+	if err != nil {
+		return nil, fmt.Errorf("half-open syn: interface addresses: %w", err)
+	}
+	subnet, err := halfOpenSourceNetwork(src, addrs)
+	if err != nil {
+		return nil, err
+	}
+	if err := validateHalfOpenGateway(src, subnet, cfg.Gateway); err != nil {
+		return nil, err
 	}
 	if ctx == nil {
 		ctx = cfg.Context
@@ -157,7 +173,7 @@ func OpenHalfOpenSYN(ctx context.Context, cfg HalfOpenSYNConfig) (*HalfOpenSYN, 
 		mainIsLoopback:           cfg.Iface.Flags&net.FlagLoopback != 0,
 		allowUnverifiedTransport: cfg.AllowUnverifiedTransport,
 	}
-	h.main, err = h.openEntry(cfg.Iface, src, maskFor(cfg.Iface, src), h.gateway, ifaceNeedsResolution(cfg.Iface))
+	h.main, err = h.openEntry(cfg.Iface, src, subnet.Mask, h.gateway, ifaceNeedsResolution(cfg.Iface))
 	if err != nil {
 		h.Close()
 		return nil, err
@@ -224,14 +240,20 @@ func (h *HalfOpenSYN) openEntry(iface *net.Interface, ip net.IP, mask net.IPMask
 		return nil, err
 	}
 	if gateway != nil && !gateway.Equal(ip) {
+		// /32 uplinks may have an explicitly configured on-link next hop.
+		if err := addConnectedRoute(vm, gateway, net.CIDRMask(32, 32)); err != nil {
+			vm.Close()
+			return nil, err
+		}
 		vm.stack.AddRoute(tcpip.Route{
 			Destination: header.IPv4EmptySubnet,
 			Gateway:     tcpip.AddrFrom4([4]byte(gateway)),
 			NIC:         vm.MainNICID(),
 			MTU:         uint32(vm.mtu),
 		})
-		h.seedGateway(vm, gateway)
-	} else if !ip.IsLoopback() {
+		// Resolve on this NIC; the host ARP cache is keyed only by IP and can
+		// belong to another interface with an overlapping gateway address.
+	} else if !resolve && !ip.IsLoopback() {
 		vm.stack.AddRoute(tcpip.Route{
 			Destination: header.IPv4EmptySubnet,
 			NIC:         vm.MainNICID(),
@@ -251,24 +273,6 @@ func validateHalfOpenTransport(iface *net.Interface, link layers.LinkType, allow
 	return nil
 }
 
-func (h *HalfOpenSYN) seedGateway(vm *NetStackVirtualMachineEntry, gateway net.IP) {
-	mac, err := arptable.SearchHardware(gateway.String())
-	if err != nil || len(mac) != 6 {
-		return
-	}
-	mac = append(net.HardwareAddr(nil), mac...)
-	vm.driver.SetGatewayHardwareAddr(mac)
-	tcpErr := vm.stack.AddStaticNeighbor(
-		vm.MainNICID(),
-		header.IPv4ProtocolNumber,
-		tcpip.AddrFrom4([4]byte(gateway)),
-		tcpip.LinkAddress(mac),
-	)
-	if tcpErr != nil {
-		log.Debugf("half-open syn: static neighbor %s: %v", gateway, tcpErr)
-	}
-}
-
 // StartTCPProbe retains admission, the endpoint and response registration until
 // Close/cancellation. A live tuple registration is never overwritten.
 // It does not send until ProbeSYN[Context]. This backend cannot ProbeACK.
@@ -282,7 +286,7 @@ func (h *HalfOpenSYN) StartTCPProbe(ctx context.Context, target string, options 
 	}
 	port, err := strconv.Atoi(portText)
 	dst := net.ParseIP(host).To4()
-	if err != nil || dst == nil || port < 1 || port > 65535 {
+	if err != nil || !usableProbeIPv4(dst) || port < 1 || port > 65535 {
 		return nil, fmt.Errorf("invalid IPv4 TCP target %q", target)
 	}
 	policy := h.retry
@@ -324,6 +328,12 @@ func (h *HalfOpenSYN) StartTCPProbe(ctx context.Context, target string, options 
 	vm := h.vmFor(dst)
 	if vm == nil {
 		return nil, fmt.Errorf("no interface for %s", host)
+	}
+	if subnet := vm.mainNICIPv4Netmask; subnet != nil {
+		ones, bits := subnet.Mask.Size()
+		if bits == 32 && ones < 31 && (dst.Equal(subnet.IP.Mask(subnet.Mask)) || isIPv4Broadcast(dst, subnet)) {
+			return nil, fmt.Errorf("invalid TCP target %s: selected subnet boundary", host)
+		}
 	}
 	ctx, cancel := context.WithCancel(ctx)
 	p := &TCPProbe{ctx: ctx, cancel: cancel, halfOpen: true, retry: policy, probeStep: make(chan struct{}, 1)}
@@ -515,6 +525,7 @@ func (h *HalfOpenSYN) observeInbound(nic tcpip.NICID, packet gopacket.Packet) bo
 		ipv4hdr := header.IPv4(raw)
 		tcphdr := header.TCP(ipv4hdr.Payload())
 		if !ipv4hdr.IsChecksumValid() || !tcphdr.IsChecksumValid(ipv4hdr.SourceAddress(), ipv4hdr.DestinationAddress(), 0, 0) {
+			f.badChecksum = true
 			return false
 		}
 	}
@@ -558,25 +569,64 @@ func ifaceNeedsResolution(iface *net.Interface) bool {
 	return len(iface.HardwareAddr) > 0
 }
 
-func maskFor(iface *net.Interface, ip net.IP) net.IPMask {
-	if iface != nil {
-		addrs, err := iface.Addrs()
-		if err == nil {
-			for _, addr := range addrs {
-				ipNet, ok := addr.(*net.IPNet)
-				if !ok || ipNet == nil || ipNet.IP.To4() == nil {
-					continue
-				}
-				if ipNet.IP.To4().Equal(ip) && len(ipNet.Mask) == net.IPv4len {
-					return ipNet.Mask
-				}
-			}
+// halfOpenSourceNetwork never guesses a /24 when interface discovery fails.
+// Multiple assigned prefixes are disambiguated by the exact selected source IP.
+func halfOpenSourceNetwork(src net.IP, addrs []net.Addr) (*net.IPNet, error) {
+	if !usableProbeIPv4(src) {
+		return nil, fmt.Errorf("half-open syn: invalid IPv4 source %v", src)
+	}
+	for _, addr := range addrs {
+		n, ok := addr.(*net.IPNet)
+		if !ok || n == nil || !n.IP.Equal(src) {
+			continue
+		}
+		ones, bits := n.Mask.Size()
+		if bits != 32 {
+			continue
+		}
+		subnet := &net.IPNet{IP: src.Mask(n.Mask), Mask: append(net.IPMask(nil), n.Mask...)}
+		if ones < 31 && (src.Equal(subnet.IP) || isIPv4Broadcast(src, subnet)) {
+			return nil, fmt.Errorf("half-open syn: source %s is a subnet boundary", src)
+		}
+		return subnet, nil
+	}
+	return nil, fmt.Errorf("half-open syn: source %s is not assigned to the selected interface", src)
+}
+
+func usableProbeIPv4(ip net.IP) bool {
+	ip = ip.To4()
+	return ip != nil && !ip.IsUnspecified() && !ip.IsMulticast() && !ip.Equal(net.IPv4bcast)
+}
+
+func isIPv4Broadcast(ip net.IP, subnet *net.IPNet) bool {
+	ip = ip.To4()
+	if ip == nil || len(subnet.Mask) != 4 {
+		return false
+	}
+	for i := range ip {
+		if ip[i] != (subnet.IP.To4()[i] | ^subnet.Mask[i]) {
+			return false
 		}
 	}
-	if ip.IsLoopback() {
-		return net.CIDRMask(8, 32)
+	return true
+}
+
+func validateHalfOpenGateway(src net.IP, subnet *net.IPNet, gateway net.IP) error {
+	if len(gateway) == 0 {
+		return nil
 	}
-	return net.CIDRMask(24, 32)
+	gw := gateway.To4()
+	if !usableProbeIPv4(gw) || gw.Equal(src) || gw.IsLoopback() {
+		return fmt.Errorf("half-open syn: invalid IPv4 gateway %v", gateway)
+	}
+	ones, _ := subnet.Mask.Size()
+	if ones != 32 && !subnet.Contains(gw) {
+		return fmt.Errorf("half-open syn: gateway %s is outside the selected source subnet %s", gw, subnet)
+	}
+	if ones < 31 && (gw.Equal(subnet.IP) || isIPv4Broadcast(gw, subnet)) {
+		return fmt.Errorf("half-open syn: gateway %s is a subnet boundary", gw)
+	}
+	return nil
 }
 
 func ipv4Only(ip net.IP) net.IP {

@@ -286,6 +286,10 @@ DHCP 模式不能同时设置静态 `Address`、`Gateway` 或 `DNS`。`NewEthern
 
 下面是可编译的单目标示例。`device`、`source`、`gateway` 必须与实际接口、地址及路由一致；同网段或回环目标可不提供网关。本 API 当前只接受 IPv4 字面量目标。
 
+会话按接口名重新读取系统状态，源地址必须实际绑定在该接口上，使用该地址对应的真实前缀（支持多地址、`/31` 和 `/32`），不会在查找失败时猜测 `/24`。网关必须是有效 IPv4 单播地址；一般要求与所选源地址同网段，`/32` 上联允许显式的链路直达下一跳。Ethernet 未提供网关时只配置直连路由，不替调用者推断默认路由。网关 MAC 在所选接口上解析，不从仅按 IP 索引的全局 ARP 缓存复制。多网卡或重叠子网应分别创建会话。
+
+目标不能是未指定地址、组播、有限广播或所选子网的网络/广播地址；`/31` 的两个端点不按网络/广播地址拒绝。
+
 ```go
 package examples
 
@@ -339,6 +343,7 @@ func HalfOpen(ctx context.Context, device, source, gateway, target string) error
 - 无错误：收到与接口、四元组、本次 SYN 序号匹配的 SYN-ACK。在已确认不代答的网络路径上可报告 open；相关性校验不能识别透明代理伪造的远端响应。
 - `ErrProbeRefused`：收到匹配的 RST+ACK；是一次明确的拒绝响应。
 - `ErrProbeNoResponse`：尝试预算耗尽，未收到有效响应；可能丢包、被过滤或目标不可达，**不能据此判定 closed**。
+- `ErrProbeChecksum`：与 `ErrProbeNoResponse` 同时出现，表示收到匹配四元组和 ACK 的响应，但校验和无效。可能是抓包卸载占位值，也可能是报文损坏；重试预算照常执行，不能报告 open 或 closed。
 - `ErrUnverifiedSYNTransport`：所选非回环接口使用 raw-IP 或 point-to-point 传输，默认拒绝创建主动会话，避免代理 SYN-ACK 被直接解释为真实端口开放。
 - `ErrProbeSend`：本地发送/生成失败，保留底层错误；不能解释为目标无响应。
 - `context.Canceled` / `context.DeadlineExceeded`：调用者或生命周期取消/超时。
@@ -482,7 +487,20 @@ NETSTACKVM_PCAP_DEVICE=lo0 go test -race ./common/netstackvm \
   -run '^TestPCAPLiveLoopbackOptional$' -count=3 -timeout=30s
 ```
 
-Linux 应选择实际的回环接口名，例如 `lo`，并确保具有抓包权限。
+Linux 应选择实际的回环接口名，例如 `lo`，并确保具有抓包权限。Linux 的 IPv4 回环主动发送在策略检查后使用绑定回环设备的非阻塞原始 IP socket；pcap 继续负责接收。socket 按需打开、与共享捕获句柄一起关闭，需要 `CAP_NET_RAW` 或对应权限。`NetworkPCAP` 保持静默，不会因此开启注入。Linux 的 AF_PACKET 回环注入与本地 IPv4 收包的差异也见 [Scapy 的回环说明](https://scapy.readthedocs.io/en/latest/troubleshooting.html)。
+
+Linux 的 `any` 是只读捕获伪设备，可以作为 `NetworkPCAP.Device`，不能用于 `OpenHalfOpenSYN`。验证多个接口的聚合观察：
+
+```sh
+NETSTACKVM_PCAP_DEVICE=any go test -race ./common/netstackvm \
+  -run '^TestPCAPLiveLoopbackOptional$' -count=3 -timeout=30s
+```
+
+接收端支持 Ethernet、VLAN/QinQ、NULL/LOOP、raw IP（含平台 DLT 12/14）、Linux SLL/SLL2 封装；截断帧不交给协议栈或主动 RST 逻辑。这里的封装兼容不代表任意设备都可以主动半开探测。VLAN 主动探测应选择操作系统配置好的 VLAN 子接口，包本身不由会话额外插入 VLAN 标签。协议栈 MTU 取设备实际 MTU，抓包缓冲的额外链路头空间不计入 MTU。
+
+**虚拟网卡校验和卸载：** 同宿主机的 veth/虚拟交换机可能把尚未完成 TCP 校验和的 SYN-ACK 直接交给抓包接口。当前 pcap 元数据不提供足够的卸载校验依据，因此不会把校验失败自动视为可信响应。遇到 `ErrProbeChecksum`，先对照抓包与接口卸载配置；受控测试网络可临时关闭发送端的 TX checksum offload 后复测，记录原值并在测试后恢复。库不会修改宿主机卸载配置，也不提供忽略任意非回环校验和的开关。TUN 的代理代答属于另一种问题，关闭卸载不能解决它。
+
+真实设备验证不能由 mock 替代：桥接/DHCP 的默认回归使用可控以太网帧设备和 DHCP 对端；它不证明某个 Hyper-V、VMware、TAP、Wi-Fi 驱动或交换机允许独立 MAC/DHCP。部署时仍需在实际网络上运行双端验证，确认允许额外网络身份、路由正确且没有代理代答。
 
 Windows 已在 Windows 11 / Go 1.22.12 amd64 / LLVM MinGW / Npcap 环境原生执行 race 检测和真实抓包测试。编译需要 CGO 和兼容的 C 编译器；`go test -c -race` 生成的二进制也可以复制到安装 Npcap 的 Windows 机器运行。PowerShell 示例（先确保 `go`、编译器在当前进程 PATH 中）：
 

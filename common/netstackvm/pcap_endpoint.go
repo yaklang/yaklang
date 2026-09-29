@@ -12,7 +12,6 @@ import (
 	"github.com/yaklang/yaklang/common/netx"
 	"golang.org/x/net/ipv6"
 
-	"github.com/davecgh/go-spew/spew"
 	"github.com/gopacket/gopacket"
 	"github.com/gopacket/gopacket/layers"
 	"github.com/yaklang/yaklang/common/log"
@@ -78,19 +77,29 @@ func (p *PCAPEndpoint) SetLoopback(b bool) {
 
 func NewPCAPEndpoint(ctx context.Context, stackIns *stack.Stack, device string, macAddr net.HardwareAddr, promisc bool) (*PCAPEndpoint, error) {
 	iface, err := net.InterfaceByName(device)
-	if err != nil {
+	// Linux's cooked "any" capture is a passive pseudo-device, not a net.Interface.
+	if err != nil && !(runtime.GOOS == "linux" && device == "any") {
 		return nil, err
 	}
-	mtu := iface.MTU + 200
-	if iface.Flags&net.FlagLoopback != 0 {
-		mtu = 65535 // loopback mtu
+	mtu := 65535
+	var externalMacAddr net.HardwareAddr
+	if iface != nil {
+		mtu = iface.MTU
+		externalMacAddr = iface.HardwareAddr
+	}
+	// Linux lo has Ethernet capture headers but no hardware address. libpcap
+	// expects a complete synthetic Ethernet header with a six-byte source.
+	if iface != nil && iface.Flags&net.FlagLoopback != 0 && len(externalMacAddr) == 0 {
+		externalMacAddr = make(net.HardwareAddr, 6)
+	}
+	if mtu <= 0 || mtu > 65535 {
+		mtu = 65535
 	}
 
 	internalMacAddr := macAddr
-	externalMacAddr := iface.HardwareAddr
 	bridge := &pcapBridge{internal: internalMacAddr, external: externalMacAddr}
 
-	adaptor, err := NewPCAPAdaptor(device, int32(mtu), promisc)
+	adaptor, err := NewPCAPAdaptor(device, int32(mtu+256), promisc)
 	if err != nil {
 		return nil, utils.Errorf("create pcap adaptor failed: %v", err)
 	}
@@ -305,10 +314,6 @@ func (p *PCAPEndpoint) inboundLoop(ctx context.Context) {
 			continue
 		}
 
-		if dropped, _ := p.generateRSTFromPacket(packet); dropped {
-			continue
-		}
-
 		p.filterMutex.RLock()
 		filter := p.inboundFilter
 		p.filterMutex.RUnlock()
@@ -316,35 +321,27 @@ func (p *PCAPEndpoint) inboundLoop(ctx context.Context) {
 			continue
 		}
 
-		var srcMac net.HardwareAddr
-		var dstMac net.HardwareAddr
-		data := packet.Data()
-		offset := 0
-		if p.loopback {
-			loopbackLayer := packet.Layer(layers.LayerTypeLoopback)
-			if loopbackLayer != nil {
-				offset = len(loopbackLayer.LayerContents())
-			}
-		} else {
-			linkLayer := packet.LinkLayer()
-			if linkLayer != nil {
-				offset = len(linkLayer.LayerContents())
-				switch eth := linkLayer.(type) {
-				case *layers.Ethernet:
-					eth = p.netBridge.handleInbound(eth)
-					srcMac = eth.SrcMAC
-					dstMac = eth.DstMAC
-					_ = dstMac
-				}
-			}
-		}
-
-		// 检查数据是否有效
-		if len(data) < offset {
-			log.Errorf("invalid packet data: offset %d exceeds data length %d", offset, len(data))
+		if packet.Metadata().Truncated {
 			continue
 		}
-		networkPayloads := data[offset:]
+		if dropped, _ := p.generateRSTFromPacket(packet); dropped {
+			continue
+		}
+
+		// Select the decoded L3 header, not an assumed Ethernet/loopback offset.
+		// This also strips VLAN/QinQ, Linux SLL and other capture encapsulations.
+		var payloadLayer gopacket.Layer = packet.NetworkLayer()
+		if payloadLayer == nil {
+			payloadLayer = packet.Layer(layers.LayerTypeARP)
+		}
+		if payloadLayer == nil {
+			continue
+		}
+		networkPayloads := append(append([]byte(nil), payloadLayer.LayerContents()...), payloadLayer.LayerPayload()...)
+		var srcMac net.HardwareAddr
+		if eth, ok := packet.LinkLayer().(*layers.Ethernet); ok {
+			srcMac = eth.SrcMAC
+		}
 
 		pkt := stack.NewPacketBuffer(stack.PacketBufferOptions{
 			Payload: buffer.MakeWithData(networkPayloads),
@@ -369,8 +366,6 @@ func (p *PCAPEndpoint) inboundLoop(ctx context.Context) {
 					}
 				}
 				p.InjectInbound(header.ARPProtocolNumber, pkt)
-			} else {
-				log.Infof("recv non network layer packet: \n%s", spew.Sdump(data))
 			}
 		} else {
 			switch networklayer.LayerType() {

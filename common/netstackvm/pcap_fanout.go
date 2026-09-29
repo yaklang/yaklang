@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/gopacket/gopacket"
@@ -23,13 +24,15 @@ var fanouts = struct {
 }{entries: make(map[string]*pcapFanOut)}
 
 type pcapFanOut struct {
-	m         sync.Mutex
-	writeGate chan struct{}
-	handle    *pcap.Handle
-	device    string
-	chans     map[string]chan gopacket.Packet
-	stop      chan struct{}
-	done      chan struct{}
+	m           sync.Mutex
+	writeGate   chan struct{}
+	handle      *pcap.Handle
+	inject      func([]byte) error
+	closeInject func()
+	device      string
+	chans       map[string]chan gopacket.Packet
+	stop        chan struct{}
+	done        chan struct{}
 }
 
 func NewPCAPAdaptor(device string, mtu int32, promisc bool) (*pcapAdaptor, error) {
@@ -47,6 +50,7 @@ func NewPCAPAdaptor(device string, mtu int32, promisc bool) (*pcapAdaptor, error
 			return nil, err
 		}
 		p = &pcapFanOut{writeGate: make(chan struct{}, 1), handle: h, device: name, chans: make(map[string]chan gopacket.Packet), stop: make(chan struct{}), done: make(chan struct{})}
+		p.inject, p.closeInject = newPCAPLoopbackWriter(device, h.LinkType(), h.WritePacketData)
 		fanouts.entries[key] = p
 		go p.background()
 	}
@@ -69,6 +73,7 @@ func NewPCAPAdaptor(device string, mtu int32, promisc bool) (*pcapAdaptor, error
 			// ReadPacketData is bounded by the capture timeout; no orphan packet-source goroutine.
 			<-p.done
 			p.writeGate <- struct{}{}
+			p.closeInject()
 			p.handle.Close()
 			p.handle = nil
 			<-p.writeGate
@@ -101,11 +106,14 @@ func (p *pcapFanOut) WritePacketContext(ctx context.Context, data []byte) error 
 	}
 	// libpcap has no cancellable injection call. The gate wait is cancellable;
 	// an injection already executing must return before the handle is closed.
+	if p.inject != nil {
+		return p.inject(data)
+	}
 	return p.handle.WritePacketData(data)
 }
 func (p *pcapFanOut) background() {
 	defer close(p.done)
-	linkType := p.handle.LinkType()
+	decoder := pcapCaptureDecoder(p.handle.LinkType())
 	for {
 		select {
 		case <-p.stop:
@@ -119,9 +127,24 @@ func (p *pcapFanOut) background() {
 		if err != nil {
 			return
 		}
-		p.dispatch(data, ci, linkType)
+		p.dispatch(data, ci, decoder)
 	}
 }
+
+// gopacket does not register every platform DLT_RAW / LINKTYPE_IP variant.
+func pcapCaptureDecoder(link layers.LinkType) gopacket.Decoder {
+	switch link {
+	case layers.LinkTypeIPv4:
+		return layers.LayerTypeIPv4
+	case layers.LinkTypeIPv6:
+		return layers.LayerTypeIPv6
+	case 12, 14:
+		return layers.LinkTypeRaw
+	default:
+		return link
+	}
+}
+
 func (p *pcapFanOut) dispatch(data []byte, ci gopacket.CaptureInfo, decoder gopacket.Decoder) {
 	p.m.Lock()
 	defer p.m.Unlock()
@@ -130,6 +153,7 @@ func (p *pcapFanOut) dispatch(data []byte, ci gopacket.CaptureInfo, decoder gopa
 		// race with or corrupt another consumer of the same captured packet.
 		packet := gopacket.NewPacket(data, decoder, gopacket.Default)
 		packet.Metadata().CaptureInfo = ci
+		packet.Metadata().Truncated = packet.Metadata().Truncated || ci.CaptureLength < ci.Length
 		select {
 		case ch <- packet:
 		default:
@@ -143,17 +167,45 @@ type pcapAdaptor struct {
 	close         func()
 	writer        func([]byte) error
 	contextWriter func(context.Context, []byte) error
+	writeGate     chan struct{}
 	once          sync.Once
+	closed        atomic.Bool
+	ctx           context.Context
+	cancel        context.CancelFunc
 }
 
 func newPcapBroker(in chan gopacket.Packet, closeFunc func(), writer func([]byte) error) *pcapAdaptor {
-	return &pcapAdaptor{inChan: in, close: closeFunc, writer: writer}
+	ctx, cancel := context.WithCancel(context.Background())
+	return &pcapAdaptor{inChan: in, close: closeFunc, writer: writer, ctx: ctx, cancel: cancel, writeGate: make(chan struct{}, 1)}
 }
 func (p *pcapAdaptor) PacketSource() chan gopacket.Packet { return p.inChan }
 func (p *pcapAdaptor) WritePacketData(data []byte) error {
 	return p.WritePacketDataContext(context.Background(), data)
 }
 func (p *pcapAdaptor) WritePacketDataContext(ctx context.Context, data []byte) error {
+	if p.closed.Load() {
+		return io.ErrClosedPipe
+	}
+	if p.ctx != nil {
+		joined, cancel := context.WithCancel(ctx)
+		stop := context.AfterFunc(p.ctx, cancel)
+		defer func() { stop(); cancel() }()
+		if p.ctx.Err() != nil {
+			return io.ErrClosedPipe
+		}
+		ctx = joined
+	}
+	if p.writeGate != nil {
+		select {
+		case p.writeGate <- struct{}{}:
+		case <-ctx.Done():
+			return ctx.Err()
+		}
+		defer func() { <-p.writeGate }()
+	}
+	if p.closed.Load() {
+		return io.ErrClosedPipe
+	}
 	if err := ctx.Err(); err != nil {
 		return err
 	}
@@ -167,6 +219,16 @@ func (p *pcapAdaptor) WritePacketDataContext(ctx context.Context, data []byte) e
 }
 func (p *pcapAdaptor) Close() {
 	p.once.Do(func() {
+		p.closed.Store(true)
+		if p.cancel != nil {
+			p.cancel()
+		}
+		// Close must not return with this subscriber still inside a write,
+		// even while other subscribers keep the shared handle alive.
+		if p.writeGate != nil {
+			p.writeGate <- struct{}{}
+			defer func() { <-p.writeGate }()
+		}
 		if p.close != nil {
 			p.close()
 		}
