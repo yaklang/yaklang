@@ -2,6 +2,8 @@ package netstackvm
 
 import (
 	"context"
+	"encoding/binary"
+	"fmt"
 	"net"
 	"sync"
 	"sync/atomic"
@@ -153,4 +155,141 @@ func TestPCAPLegacyAPIsFailBeforeHostFallback(t *testing.T) {
 	require.ErrorIs(t, e, ErrPassiveNetwork)
 	require.ErrorIs(t, entry.StartDHCP(), ErrPassiveNetwork)
 	require.Zero(t, writes.Load())
+}
+
+func TestPCAPClosedSubscriberCannotWriteSharedHandle(t *testing.T) {
+	var writes atomic.Int64
+	writer := func([]byte) error { writes.Add(1); return nil }
+	closed := newPcapBroker(nil, nil, writer)
+	live := newPcapBroker(nil, nil, writer)
+	defer live.Close()
+	closed.Close()
+	require.Error(t, closed.WritePacketData([]byte{1}), "a closed subscriber must not inject via the still-open shared handle")
+	require.NoError(t, live.WritePacketData([]byte{2}))
+	require.EqualValues(t, 1, writes.Load())
+}
+
+func TestPCAPCaptureEncapsulationsReachStack(t *testing.T) {
+	var writes atomic.Int64
+	var p *PCAPEndpoint
+	v, err := newNetworkVM(context.Background(), NetworkVMConfig{Mode: NetworkPCAP, Device: "mock"}, func(ctx context.Context, s *stack.Stack, _ string, _ net.HardwareAddr, _ bool) (*PCAPEndpoint, error) {
+		p = mockPCAP(ctx, s, &writes)
+		return p, nil
+	})
+	require.NoError(t, err)
+	defer v.Close()
+	require.NoError(t, eToStd(v.stack.AddProtocolAddress(v.nic, tcpip.ProtocolAddress{Protocol: header.IPv4ProtocolNumber, AddressWithPrefix: tcpip.AddressWithPrefix{Address: tcpip.AddrFrom4([4]byte{10, 80, 0, 1}), PrefixLen: 24}}, stack.AddressProperties{})))
+	v.stack.SetRouteTable([]tcpip.Route{{Destination: header.IPv4EmptySubnet, NIC: v.nic}})
+	packets := make(map[string]gopacket.Packet)
+	for _, tags := range []int{1, 2} {
+		packet := tcpCapture(t, 2)
+		eth := packet.LinkLayer().(*layers.Ethernet)
+		eth.EthernetType = layers.EthernetTypeDot1Q
+		parts := []gopacket.SerializableLayer{eth}
+		for i := 0; i < tags; i++ {
+			typ := layers.EthernetTypeDot1Q
+			if i == tags-1 {
+				typ = layers.EthernetTypeIPv4
+			}
+			parts = append(parts, &layers.Dot1Q{VLANIdentifier: uint16(100 + i), Type: typ})
+		}
+		require.NoError(t, packet.TransportLayer().(*layers.TCP).SetNetworkLayerForChecksum(packet.NetworkLayer().(*layers.IPv4)))
+		parts = append(parts, packet.NetworkLayer().(*layers.IPv4), packet.TransportLayer().(*layers.TCP))
+		buf := gopacket.NewSerializeBuffer()
+		require.NoError(t, gopacket.SerializeLayers(buf, gopacket.SerializeOptions{FixLengths: true, ComputeChecksums: true}, parts...))
+		packets[fmt.Sprintf("VLAN/%d", tags)] = gopacket.NewPacket(buf.Bytes(), layers.LayerTypeEthernet, gopacket.Default)
+	}
+	network := tcpCapture(t, 2).NetworkLayer()
+	raw := append(append([]byte(nil), network.LayerContents()...), network.LayerPayload()...)
+	for _, link := range []layers.LinkType{layers.LinkTypeRaw, 12, 14, layers.LinkTypeIPv4, layers.LinkTypeNull, layers.LinkTypeLoop, layers.LinkTypeLinuxSLL, layers.LinkTypeLinuxSLL2} {
+		var prefix []byte
+		switch link {
+		case layers.LinkTypeNull:
+			prefix = []byte{2, 0, 0, 0}
+		case layers.LinkTypeLoop:
+			prefix = []byte{0, 0, 0, 2}
+		case layers.LinkTypeLinuxSLL:
+			prefix = make([]byte, 16)
+			binary.BigEndian.PutUint16(prefix[2:4], 1)
+			binary.BigEndian.PutUint16(prefix[14:16], 0x0800)
+		case layers.LinkTypeLinuxSLL2:
+			prefix = make([]byte, 20)
+			binary.BigEndian.PutUint16(prefix[:2], 0x0800)
+			binary.BigEndian.PutUint16(prefix[8:10], 1)
+		}
+		packets[fmt.Sprintf("DLT/%d", link)] = gopacket.NewPacket(append(prefix, raw...), pcapCaptureDecoder(link), gopacket.Default)
+	}
+	for name, packet := range packets {
+		t.Run(name, func(t *testing.T) {
+			require.NotNil(t, packet.NetworkLayer())
+			before := v.stack.Stats().TCP.SegmentsSent.Value()
+			p.adaptor.inChan <- packet
+			require.Eventually(t, func() bool { return v.stack.Stats().TCP.SegmentsSent.Value() > before }, time.Second, time.Millisecond, "IP payload must reach the passive stack")
+		})
+	}
+	// A truncated capture can contain valid L3 bytes (e.g. missing padding).
+	// Queue it before a valid sentinel; only the sentinel may elicit a response.
+	before := v.stack.Stats().TCP.SegmentsSent.Value()
+	truncated := tcpCapture(t, 2)
+	truncated.Metadata().Truncated = true
+	p.adaptor.inChan <- truncated
+	p.adaptor.inChan <- gopacket.NewPacket([]byte{0, 1}, layers.LinkTypeEthernet, gopacket.Default)
+	p.adaptor.inChan <- tcpCapture(t, 2)
+	require.Eventually(t, func() bool { return v.stack.Stats().TCP.SegmentsSent.Value() > before }, time.Second, time.Millisecond)
+	require.Equal(t, before+1, v.stack.Stats().TCP.SegmentsSent.Value())
+	require.Zero(t, writes.Load(), "stack response must remain passive")
+}
+
+func TestPCAPSubscriberCloseCancelsQueuedWrite(t *testing.T) {
+	entered := make(chan struct{})
+	p := newPcapBroker(nil, nil, nil)
+	p.contextWriter = func(ctx context.Context, _ []byte) error {
+		close(entered)
+		<-ctx.Done()
+		return ctx.Err()
+	}
+	done := make(chan error, 1)
+	go func() { done <- p.WritePacketData([]byte{1}) }()
+	<-entered
+	p.Close()
+	select {
+	case err := <-done:
+		require.ErrorIs(t, err, context.Canceled)
+	case <-time.After(time.Second):
+		t.Fatal("closed subscription left a queued writer alive")
+	}
+}
+
+func TestPCAPFanoutPreservesCaptureTruncation(t *testing.T) {
+	ch := make(chan gopacket.Packet, 1)
+	p := &pcapFanOut{chans: map[string]chan gopacket.Packet{"test": ch}}
+	raw := tcpCapture(t, 2).Data()
+	p.dispatch(raw, gopacket.CaptureInfo{CaptureLength: len(raw), Length: len(raw) + 8}, layers.LinkTypeEthernet)
+	require.True(t, (<-ch).Metadata().Truncated)
+}
+
+func TestPCAPSubscriberCloseWaitsForNativeWrite(t *testing.T) {
+	entered, release, written, closed := make(chan struct{}), make(chan struct{}), make(chan struct{}), make(chan struct{})
+	p := newPcapBroker(nil, nil, func([]byte) error {
+		close(entered)
+		<-release // An executing native injection cannot be forcibly canceled.
+		return nil
+	})
+	go func() { _ = p.WritePacketData([]byte{1}); close(written) }()
+	<-entered
+	go func() { p.Close(); close(closed) }()
+	require.Eventually(t, p.closed.Load, time.Second, time.Millisecond)
+	select {
+	case <-closed:
+		t.Error("Close returned while this subscriber was still writing")
+	default:
+	}
+	close(release)
+	select {
+	case <-closed:
+	case <-time.After(time.Second):
+		t.Fatal("Close did not finish after native write")
+	}
+	<-written
+	require.Error(t, p.WritePacketData([]byte{2}))
 }

@@ -783,3 +783,100 @@ func TestHalfOpenSessionCloseCancelsSynchronousCall(t *testing.T) {
 	require.ErrorIs(t, err, errHalfOpenClosed)
 	require.Empty(t, h.slots)
 }
+
+func TestHalfOpenSourceAndGatewayBoundaries(t *testing.T) {
+	addrs := []net.Addr{
+		&net.IPNet{IP: net.ParseIP("192.0.2.130"), Mask: net.CIDRMask(25, 32)},
+		&net.IPNet{IP: net.ParseIP("198.51.100.10"), Mask: net.CIDRMask(31, 32)},
+		&net.IPNet{IP: net.ParseIP("203.0.113.7"), Mask: net.CIDRMask(32, 32)},
+	}
+	for _, tc := range []struct {
+		src, gw, network string
+		valid            bool
+	}{
+		{"192.0.2.130", "192.0.2.129", "192.0.2.128/25", true},
+		{"192.0.2.130", "", "192.0.2.128/25", true},
+		{"192.0.2.130", "192.0.2.1", "192.0.2.128/25", false},
+		{"192.0.2.130", "192.0.2.128", "192.0.2.128/25", false},
+		{"192.0.2.130", "192.0.2.255", "192.0.2.128/25", false},
+		{"192.0.2.130", "192.0.2.130", "192.0.2.128/25", false},
+		{"192.0.2.130", "2001:db8::1", "192.0.2.128/25", false},
+		{"198.51.100.10", "198.51.100.11", "198.51.100.10/31", true},
+		{"203.0.113.7", "203.0.113.1", "203.0.113.7/32", true},
+	} {
+		t.Run(tc.src+"/"+tc.gw, func(t *testing.T) {
+			src := net.ParseIP(tc.src)
+			n, err := halfOpenSourceNetwork(src, addrs)
+			require.NoError(t, err)
+			require.Equal(t, tc.network, n.String())
+			err = validateHalfOpenGateway(src, n, net.ParseIP(tc.gw))
+			if tc.valid {
+				require.NoError(t, err)
+			} else {
+				require.Error(t, err)
+			}
+		})
+	}
+	for _, bad := range []string{"192.0.2.131", "0.0.0.0", "224.0.0.1", "255.255.255.255", "::1"} {
+		_, err := halfOpenSourceNetwork(net.ParseIP(bad), addrs)
+		require.Error(t, err, bad)
+	}
+	_, err := halfOpenSourceNetwork(net.ParseIP("192.0.2.130"), nil)
+	require.Error(t, err, "missing addresses must not silently imply /24")
+	_, err = halfOpenSourceNetwork(net.ParseIP("192.0.2.130"), []net.Addr{&net.IPNet{IP: net.ParseIP("192.0.2.130"), Mask: net.IPMask{255, 0, 255, 0}}})
+	require.Error(t, err)
+}
+
+func TestHalfOpenRejectsNonUnicastTargetsBeforeSending(t *testing.T) {
+	var writes atomic.Int32
+	h := mockHalfOpen(t, func(*HalfOpenSYN, []byte) error { writes.Add(1); return nil })
+	for _, target := range []string{"0.0.0.0:80", "224.0.0.1:80", "255.255.255.255:80", "192.0.2.0:80", "192.0.2.255:80", "[::1]:80", "192.0.2.20:0", "192.0.2.20:65536"} {
+		p, err := h.StartTCPProbe(context.Background(), target)
+		require.Error(t, err, target)
+		require.Nil(t, p)
+	}
+	require.Zero(t, writes.Load())
+	require.Empty(t, h.slots)
+}
+
+func TestHalfOpenChecksumFailureIsInconclusiveAndRetryable(t *testing.T) {
+	for _, recoverReply := range []bool{false, true} {
+		t.Run(fmt.Sprint(recoverReply), func(t *testing.T) {
+			var attempts int
+			h := mockHalfOpen(t, func(h *HalfOpenSYN, b []byte) error {
+				attempts++
+				packet := synReply(t, b, nil)
+				if !recoverReply || attempts < 3 {
+					data := append([]byte(nil), packet.Data()...)
+					data[36] ^= 0xff // Corrupt TCP checksum, retaining tuple and ACK.
+					packet = gopacket.NewPacket(data, layers.LayerTypeIPv4, gopacket.Default)
+				}
+				h.observeInbound(h.main.MainNICID(), packet)
+				return nil
+			})
+			_, err := h.ProbeSYN(context.Background(), "192.0.2.20:80")
+			if recoverReply {
+				require.NoError(t, err)
+			} else {
+				require.ErrorIs(t, err, ErrProbeNoResponse)
+				require.ErrorIs(t, err, ErrProbeChecksum)
+				require.NotErrorIs(t, err, ErrProbeRefused)
+				require.NotErrorIs(t, err, context.DeadlineExceeded)
+			}
+			require.Equal(t, 3, attempts)
+		})
+	}
+}
+
+func TestHalfOpenCloseBetweenStepsPreservesContextCause(t *testing.T) {
+	h := mockHalfOpen(t, func(*HalfOpenSYN, []byte) error { return nil })
+	p := startMockProbe(t, h)
+	_, err := p.ProbeSYN()
+	require.NoError(t, err)
+	require.NoError(t, p.Close())
+	// Exercise the state check even if Close races context propagation.
+	p.mu.Lock()
+	err = p.beginStep("ReceiveSYNACK", phaseSynSent)
+	p.mu.Unlock()
+	require.ErrorIs(t, err, context.Canceled)
+}

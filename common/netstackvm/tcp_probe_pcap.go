@@ -102,6 +102,12 @@ func (t *pcapProbeTransport) sendSYN(ctx context.Context) (TCPSegment, error) {
 func (t *pcapProbeTransport) receive(ctx context.Context) (TCPSegment, []byte, error) {
 	select {
 	case <-ctx.Done():
+		t.session.mu.Lock()
+		badChecksum := t.flight.badChecksum
+		t.session.mu.Unlock()
+		if badChecksum {
+			return TCPSegment{}, nil, fmt.Errorf("%w: %w", ctx.Err(), ErrProbeChecksum)
+		}
 		return TCPSegment{}, nil, ctx.Err()
 	case r := <-t.flight.replies:
 		return r.segment, r.raw, nil
