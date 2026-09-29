@@ -31,13 +31,6 @@ func (c *Compiler) addMainWrapperToModule(entryFunc string, printEntryResult boo
 		gcType := llvm.FunctionType(c.LLVMCtx.VoidType(), nil, false)
 		gcFn = llvm.AddFunction(mod, gcName, gcType)
 	}
-	waitName := c.runtimeSymName(abi.RuntimeWaitAsyncSymbol)
-	waitAsyncFn := mod.NamedFunction(waitName)
-	if waitAsyncFn.IsNil() {
-		waitType := llvm.FunctionType(c.LLVMCtx.VoidType(), nil, false)
-		waitAsyncFn = llvm.AddFunction(mod, waitName, waitType)
-	}
-
 	var printFn llvm.Value
 	var printType llvm.Type
 	if printEntryResult {
@@ -85,7 +78,14 @@ func (c *Compiler) addMainWrapperToModule(entryFunc string, printEntryResult boo
 		c.Builder.CreateCall(printType, printFn, []llvm.Value{ret}, "")
 	}
 
-	c.Builder.CreateCall(waitAsyncFn.GlobalValueType(), waitAsyncFn, nil, "")
+	// Deliberately do NOT wait for outstanding `go func` goroutines here.
+	//
+	// The yak VM returns from a script as soon as its main flow ends and leaves
+	// background goroutines running; waitAllAsyncCallFinish() exists precisely
+	// because that wait is not implicit. Waiting unconditionally deadlocks every
+	// script that leaves a long-lived goroutine behind — the common "start a
+	// server, drive it, return" shape never finishes its serve loop, so the
+	// process hung forever instead of exiting like the VM does.
 	c.Builder.CreateCall(gcFn.GlobalValueType(), gcFn, nil, "")
 
 	// Propagate an unhandled top-level panic (e.g. a failed assert or an

@@ -1,0 +1,14 @@
+// Regression: the generated main wrapper used to call the runtime async wait
+// unconditionally after the entry function returned. The yak VM has no such
+// implicit wait — it returns as soon as the main flow ends and leaves
+// background goroutines running; that is exactly why waitAllAsyncCallFinish()
+// exists. The unconditional wait deadlocked every "start a server, drive it,
+// return" script, whose serve loop never finishes on its own (mitm_*,
+// http_lowhttp, head_chunked_test, ...), turning them into 90s timeouts.
+//
+// This script leaves a goroutine sleeping far longer than the process should
+// live, so the test only passes if the wrapper really does not wait.
+go func {
+    time.sleep(600)
+}
+println("main flow finished")
