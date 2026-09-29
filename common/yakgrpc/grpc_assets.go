@@ -1235,7 +1235,7 @@ func (s *Server) BatchSetRiskTags(ctx context.Context, req *ypb.BatchSetRiskTags
 	if req.GetToken() != "" && len(syncHashes) > 0 {
 		client := yaklib.NewOnlineClient(consts.GetOnlineBaseUrl())
 		if err := client.SetRiskTagsToOnline(ctx, req.GetToken(), syncHashes, tags, req.VerifierUid, req.FixSuggestion, tagReason, req.RiskTypeVerbose, req.SetSeverity, req.FixTime, req.SeverityScore); err != nil {
-			return nil, err
+			log.Errorf("set risk tags to online failed: %s", err)
 		}
 	}
 

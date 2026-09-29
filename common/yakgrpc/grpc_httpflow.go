@@ -902,6 +902,10 @@ func (s *Server) HTTPFlowsData(ctx context.Context, httpFlow *schema.HTTPFlow) (
 		TooLargeRequestHeaderFile:  httpFlow.TooLargeRequestHeaderFile,
 		TooLargeRequestBodyFile:    httpFlow.TooLargeRequestBodyFile,
 		Host:                       httpFlow.Host,
+		IssueType:                  httpFlow.IssueType,
+		Severity:                   httpFlow.Severity,
+		Status:                     httpFlow.Status,
+		StatusReason:               httpFlow.StatusReason,
 	}
 	projectStoragesWhere := []string{strconv.Quote(strconv.FormatInt(int64(httpFlow.ID), 10) + "_response"), strconv.Quote(strconv.FormatInt(int64(httpFlow.ID), 10) + "_request")}
 	projectStorages, _ := yakit.GetProjectKeyByWhere(s.GetProjectDatabase(), projectStoragesWhere)
@@ -1079,12 +1083,9 @@ func (s *Server) BatchSetHTTPFlowIssueFields(ctx context.Context, req *ypb.Batch
 		return nil, utils.Errorf("匹配 %d 条，超过批量上限 %d，请缩小筛选条件", count, batchMaxLimit)
 	}
 
-	// 查出受影响的 hash 用于同步到 online
-	var syncHashes []string
-	if req.GetToken() != "" {
-		if err := db.Pluck("hash", &syncHashes).Error; err != nil {
-			return nil, utils.Errorf("pluck httpflow hashes for online sync failed: %s", err)
-		}
+	var affected []*schema.HTTPFlow
+	if err := db.Select("id, hash").Find(&affected).Error; err != nil {
+		return nil, utils.Errorf("collect affected httpflow keys failed: %s", err)
 	}
 
 	result := db.Updates(updates)
@@ -1092,7 +1093,15 @@ func (s *Server) BatchSetHTTPFlowIssueFields(ctx context.Context, req *ypb.Batch
 		return nil, utils.Errorf("batch set httpflow issue fields failed: %s", result.Error)
 	}
 
-	if req.GetToken() != "" && len(syncHashes) > 0 {
+	for _, flow := range affected {
+		model.DeleteHTTPFlowCacheGRPCModel(flow)
+	}
+
+	if req.GetToken() != "" && len(affected) > 0 {
+		syncHashes := make([]string, 0, len(affected))
+		for _, flow := range affected {
+			syncHashes = append(syncHashes, flow.Hash)
+		}
 		client := yaklib.NewOnlineClient(consts.GetOnlineBaseUrl())
 		if err := client.SetHTTPFlowTagsToOnline(ctx, req.GetToken(), syncHashes,
 			req.SetIssueType, req.SetSeverity, req.SetStatus, req.StatusReason); err != nil {

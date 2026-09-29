@@ -1697,6 +1697,7 @@ ip_address, remote_addr, ip_integer,
 tags, is_websocket, websocket_hash, runtime_id, from_plugin,
 process_name,
 is_read_too_slow_response, html_title,
+issue_type, severity, status, status_reason,
 
 %s
 

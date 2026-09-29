@@ -37384,6 +37384,10 @@ type Risk struct {
 	IsPotential        bool   `protobuf:"varint,33,opt,name=IsPotential,proto3" json:"IsPotential,omitempty"`
 	// 关联的请求/响应报文对列表
 	PacketPairs   []*PacketPair `protobuf:"bytes,34,rep,name=PacketPairs,proto3" json:"PacketPairs,omitempty"`
+	SeverityScore float64       `protobuf:"fixed64,35,opt,name=SeverityScore,proto3" json:"SeverityScore,omitempty"`
+	TagReason     string        `protobuf:"bytes,36,opt,name=TagReason,proto3" json:"TagReason,omitempty"`
+	FixTime       int64         `protobuf:"varint,37,opt,name=FixTime,proto3" json:"FixTime,omitempty"`
+	FixSuggestion string        `protobuf:"bytes,38,opt,name=FixSuggestion,proto3" json:"FixSuggestion,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -37654,6 +37658,34 @@ func (x *Risk) GetPacketPairs() []*PacketPair {
 		return x.PacketPairs
 	}
 	return nil
+}
+
+func (x *Risk) GetSeverityScore() float64 {
+	if x != nil {
+		return x.SeverityScore
+	}
+	return 0
+}
+
+func (x *Risk) GetTagReason() string {
+	if x != nil {
+		return x.TagReason
+	}
+	return ""
+}
+
+func (x *Risk) GetFixTime() int64 {
+	if x != nil {
+		return x.FixTime
+	}
+	return 0
+}
+
+func (x *Risk) GetFixSuggestion() string {
+	if x != nil {
+		return x.FixSuggestion
+	}
+	return ""
 }
 
 type QueryRisksRequest struct {
@@ -54593,6 +54625,10 @@ type HTTPFlow struct {
 	// 前端据此渲染「查看/下载 xxx 文件」下拉，而非整块 body。
 	// 非空时 GetHTTPFlowBodyById 可带 PartIndex 流式返回单个文件内容。
 	MultipartFiles []*MultipartFileInfo `protobuf:"bytes,58,rep,name=MultipartFiles,proto3" json:"MultipartFiles,omitempty"`
+	IssueType      string               `protobuf:"bytes,59,opt,name=IssueType,proto3" json:"IssueType,omitempty"`
+	Severity       string               `protobuf:"bytes,60,opt,name=Severity,proto3" json:"Severity,omitempty"`
+	Status         string               `protobuf:"bytes,61,opt,name=Status,proto3" json:"Status,omitempty"`
+	StatusReason   string               `protobuf:"bytes,62,opt,name=StatusReason,proto3" json:"StatusReason,omitempty"`
 	unknownFields  protoimpl.UnknownFields
 	sizeCache      protoimpl.SizeCache
 }
@@ -55017,6 +55053,34 @@ func (x *HTTPFlow) GetMultipartFiles() []*MultipartFileInfo {
 		return x.MultipartFiles
 	}
 	return nil
+}
+
+func (x *HTTPFlow) GetIssueType() string {
+	if x != nil {
+		return x.IssueType
+	}
+	return ""
+}
+
+func (x *HTTPFlow) GetSeverity() string {
+	if x != nil {
+		return x.Severity
+	}
+	return ""
+}
+
+func (x *HTTPFlow) GetStatus() string {
+	if x != nil {
+		return x.Status
+	}
+	return ""
+}
+
+func (x *HTTPFlow) GetStatusReason() string {
+	if x != nil {
+		return x.StatusReason
+	}
+	return ""
 }
 
 // MultipartFileInfo 描述一个落盘的 multipart 文件 part 元数据。
@@ -81977,7 +82041,7 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"HttpflowId\x12\x10\n" +
 	"\x03Url\x18\x02 \x01(\tR\x03Url\x12\x18\n" +
 	"\aRequest\x18\x03 \x01(\tR\aRequest\x12\x1a\n" +
-	"\bResponse\x18\x04 \x01(\tR\bResponse\"\xe7\a\n" +
+	"\bResponse\x18\x04 \x01(\tR\bResponse\"\xeb\b\n" +
 	"\x04Risk\x12\x12\n" +
 	"\x04Hash\x18\x01 \x01(\tR\x04Hash\x12\x0e\n" +
 	"\x02IP\x18\x02 \x01(\tR\x02IP\x12\x10\n" +
@@ -82013,7 +82077,11 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\x12SyntaxFlowVariable\x18\x1f \x01(\tR\x12SyntaxFlowVariable\x12 \n" +
 	"\vProgramName\x18  \x01(\tR\vProgramName\x12 \n" +
 	"\vIsPotential\x18! \x01(\bR\vIsPotential\x121\n" +
-	"\vPacketPairs\x18\" \x03(\v2\x0f.ypb.PacketPairR\vPacketPairs\"\xc0\x04\n" +
+	"\vPacketPairs\x18\" \x03(\v2\x0f.ypb.PacketPairR\vPacketPairs\x12$\n" +
+	"\rSeverityScore\x18# \x01(\x01R\rSeverityScore\x12\x1c\n" +
+	"\tTagReason\x18$ \x01(\tR\tTagReason\x12\x18\n" +
+	"\aFixTime\x18% \x01(\x03R\aFixTime\x12$\n" +
+	"\rFixSuggestion\x18& \x01(\tR\rFixSuggestion\"\xc0\x04\n" +
 	"\x11QueryRisksRequest\x12+\n" +
 	"\n" +
 	"Pagination\x18\x01 \x01(\v2\v.ypb.PagingR\n" +
@@ -83530,7 +83598,7 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\x06Header\x18\x01 \x01(\tR\x06Header\x12\x14\n" +
 	"\x05Value\x18\x02 \x01(\tR\x05Value\".\n" +
 	"\tHTTPFlows\x12!\n" +
-	"\x04Data\x18\x01 \x03(\v2\r.ypb.HTTPFlowR\x04Data\"\xa6\x11\n" +
+	"\x04Data\x18\x01 \x03(\v2\r.ypb.HTTPFlowR\x04Data\"\x9c\x12\n" +
 	"\bHTTPFlow\x12\x18\n" +
 	"\aIsHTTPS\x18\x02 \x01(\bR\aIsHTTPS\x12\x10\n" +
 	"\x03Url\x18\x03 \x01(\tR\x03Url\x125\n" +
@@ -83602,7 +83670,11 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\x19TooLargeRequestHeaderFile\x187 \x01(\tR\x19TooLargeRequestHeaderFile\x128\n" +
 	"\x17TooLargeRequestBodyFile\x188 \x01(\tR\x17TooLargeRequestBodyFile\x12,\n" +
 	"\x11IsRequestOversize\x189 \x01(\bR\x11IsRequestOversize\x12>\n" +
-	"\x0eMultipartFiles\x18: \x03(\v2\x16.ypb.MultipartFileInfoR\x0eMultipartFiles\"\xbd\x01\n" +
+	"\x0eMultipartFiles\x18: \x03(\v2\x16.ypb.MultipartFileInfoR\x0eMultipartFiles\x12\x1c\n" +
+	"\tIssueType\x18; \x01(\tR\tIssueType\x12\x1a\n" +
+	"\bSeverity\x18< \x01(\tR\bSeverity\x12\x16\n" +
+	"\x06Status\x18= \x01(\tR\x06Status\x12\"\n" +
+	"\fStatusReason\x18> \x01(\tR\fStatusReason\"\xbd\x01\n" +
 	"\x11MultipartFileInfo\x12\x1c\n" +
 	"\tPartIndex\x18\x01 \x01(\x05R\tPartIndex\x12\x1c\n" +
 	"\tFieldName\x18\x02 \x01(\tR\tFieldName\x12\x1a\n" +
