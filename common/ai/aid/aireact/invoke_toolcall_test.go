@@ -34,17 +34,9 @@ func mockedToolCalling(i aicommon.AICallerConfigIf, req *aicommon.AIRequest, too
 	if isPrimaryDecisionPrompt(prompt) {
 		rsp := i.NewAIResponse()
 		rsp.EmitOutputStream(bytes.NewBufferString(`
-{"@action": "object", "next_action": { "type": "require_tool", "tool_require_payload": "` + toolName + `" },
+{"@action": "directly_call_tool", "directly_call_tool_name": "` + toolName + `", "directly_call_tool_params": { "seconds": 0.1 },
 "human_readable_thought": "mocked thought for tool calling", "cumulative_summary": "..cumulative-mocked for tool calling.."}
 `))
-		rsp.Close()
-		return rsp, nil
-	}
-
-	if isToolParamGenerationPrompt(prompt, toolName) {
-		rsp := i.NewAIResponse()
-		// Include identifier field for new directory structure
-		rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "call-tool", "identifier": "sleep_test", "params": { "seconds" : 0.1 }}`))
 		rsp.Close()
 		return rsp, nil
 	}
@@ -631,7 +623,7 @@ func TestReAct_ToolUse_WithNoToolsCache(t *testing.T) {
 			}
 			rsp := i.NewAIResponse()
 			rsp.EmitOutputStream(bytes.NewBufferString(`
-{"@action": "object", "next_action": { "type": "require_tool", "tool_require_payload": "` + toolName + `" },
+{"@action": "directly_call_tool", "directly_call_tool_name": "` + toolName + `", "directly_call_tool_params": { "seconds": 0.1 },
 "human_readable_thought": "mocked thought for tool calling", "cumulative_summary": "..cumulative-mocked for tool calling.."}
 `))
 			rsp.Close()
@@ -718,13 +710,18 @@ LOOP1:
 		case e := <-out:
 			fmt.Println(e.String())
 
-			// Detect protocol failure (tool not found). Timeline rendering is free to
-			// normalize the legacy title, so assert the model-visible semantic text.
+			// Detect tool-not-found. In the new flow, directly_call_tool reports
+			// a cached-tool lookup failure and suggests switching to require_tool;
+			// require_tool then reports "Tool unavailable" when loading the schema.
+			// Either signal confirms the tool was not found.
 			if e.NodeId == "timeline_item" {
 				content := string(e.GetContent())
-				if strings.Contains(content, "invocation protocol failed") && strings.Contains(content, toolName) {
+				if strings.Contains(content, toolName) &&
+					(strings.Contains(content, "invocation protocol failed") ||
+						strings.Contains(content, "cached tool lookup failed") ||
+						strings.Contains(content, "Tool unavailable")) {
 					toolExecutionErrorDetected = true
-					fmt.Printf("✓ Detected tool invocation protocol failure for '%s'\n", toolName)
+					fmt.Printf("✓ Detected tool-not-found for '%s'\n", toolName)
 					// Once we detect the error, we can break out of the loop
 					// The AI will keep retrying since verification returns false
 					break LOOP1
@@ -1243,7 +1240,7 @@ yakit.Info("Enable: %v", enableValue)
 		if isPrimaryDecisionPrompt(prompt) {
 			rsp := i.NewAIResponse()
 			rsp.EmitOutputStream(bytes.NewBufferString(`
-{"@action": "object", "next_action": { "type": "require_tool", "tool_require_payload": "` + toolName + `" },
+{"@action": "directly_call_tool", "directly_call_tool_name": "` + toolName + `", "directly_call_tool_params": { "seconds": 0.1 },
 "human_readable_thought": "mocked thought for tool calling", "cumulative_summary": "..cumulative-mocked for tool calling.."}
 `))
 			rsp.Close()

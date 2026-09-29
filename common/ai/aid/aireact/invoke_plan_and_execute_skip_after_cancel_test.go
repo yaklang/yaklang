@@ -148,8 +148,7 @@ func TestReAct_PlanAndExecute_SkipAfterCancel(t *testing.T) {
 			if utils.MatchAllOfSubString(prompt, "PROGRESS_TASK_", planFlag) {
 				rsp := i.NewAIResponse()
 				rsp.EmitOutputStream(bytes.NewBufferString(`
-{"@action": "require_tool", "tool_require_payload": "` + mockToolName + `", 
-"human_readable_thought": "using mock tool to trigger cancel and skip sequence"}
+{"@action": "directly_call_tool", "directly_call_tool_name": "` + mockToolName + `", "directly_call_tool_params": { "seconds": 0.1 }, "human_readable_thought": "using mock tool to trigger cancel and skip sequence"}
 `))
 				rsp.Close()
 				return rsp, nil

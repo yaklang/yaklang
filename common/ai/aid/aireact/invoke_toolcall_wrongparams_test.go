@@ -51,7 +51,7 @@ func mockedToolCallingWrongParam_Normal(i aicommon.AICallerConfigIf, req *aicomm
 		}
 		rsp := i.NewAIResponse()
 		rsp.EmitOutputStream(bytes.NewBufferString(`
-{"@action": "object", "next_action": { "type": "require_tool", "tool_require_payload": "` + toolName + `" },
+{"@action": "directly_call_tool", "directly_call_tool_name": "` + toolName + `", "directly_call_tool_params": { "input" : "mocked-echo-params" },
 "human_readable_thought": "mocked thought for tool calling", "cumulative_summary": "..cumulative-mocked for tool calling.."}
 `))
 		rsp.Close()
@@ -326,7 +326,7 @@ func TestReAct_ToolUse_EmitFinalInvokeParams(t *testing.T) {
 				}
 				rsp := i.NewAIResponse()
 				rsp.EmitOutputStream(bytes.NewBufferString(`
-{"@action": "object", "next_action": { "type": "require_tool", "tool_require_payload": "` + toolName + `" },
+{"@action": "directly_call_tool", "directly_call_tool_name": "` + toolName + `", "directly_call_tool_params": { "input" : "` + expectedInput + `" },
 "human_readable_thought": "mocked thought for final param emit", "cumulative_summary": "..cumulative-mocked for final param emit.."}
 `))
 				rsp.Close()
