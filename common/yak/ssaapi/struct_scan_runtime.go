@@ -25,19 +25,22 @@ type structScanRuntime struct {
 	extraRaw      []string
 	rules         []*schema.SyntaxFlowRule
 	riskCB        func(*schema.SSARisk)
-	taskID        string
-	timeout       time.Duration
-	workLimit     int64
-	errs          []error
-	mu            sync.Mutex
-	results       []*SyntaxFlowResult
-	saveReady     bool
-	saveToDB      bool
-	saves         sync.WaitGroup
-	ranHashes     []string
-	ruleStats     map[string]*structRuleStat
-	skipped       bool
-	skipReason    string
+	// scanRuntime is the scan this compile-time struct stage belongs to. When
+	// set, struct findings join the same collect as the source and SSA stages.
+	scanRuntime *ScanRuntime
+	taskID      string
+	timeout     time.Duration
+	workLimit   int64
+	errs        []error
+	mu          sync.Mutex
+	results     []*SyntaxFlowResult
+	saveReady   bool
+	saveToDB    bool
+	saves       sync.WaitGroup
+	ranHashes   []string
+	ruleStats   map[string]*structRuleStat
+	skipped     bool
+	skipReason  string
 }
 
 // structRuleStat aggregates one struct-mode rule across compile units so
@@ -94,6 +97,9 @@ func (c *Config) prepareStructScan(plan *UnitPlan) error {
 		return nil
 	}
 	s := c.structScan
+	if s.scanRuntime == nil {
+		s.scanRuntime = c.scanRuntime
+	}
 	if s.riskCB != nil && !s.wantsScan() {
 		return utils.Errorf("withStructRuleCallback requires withStructRule(true|rule) or withStructRuleDir/Raw")
 	}
@@ -315,7 +321,7 @@ func (s *structScanRuntime) ScanStruct(progAPI *Program, unit *ssa.CompileUnit) 
 			found = append(found, res)
 			s.ranHashes = append(s.ranHashes, ruleContentHash(rule))
 			s.noteRule(rule, programName, start, end, int64(res.RiskCount()), nil)
-			if s.riskCB != nil {
+			if s.riskCB != nil || s.scanRuntime != nil {
 				risks := res.GetRisks()
 				if len(risks) == 0 {
 					for _, name := range res.GetAlertVariables() {
@@ -327,7 +333,7 @@ func (s *structScanRuntime) ScanStruct(progAPI *Program, unit *ssa.CompileUnit) 
 					}
 				}
 				for _, risk := range risks {
-					s.riskCB(risk)
+					s.submitRisk(res, risk)
 				}
 			}
 			log.Infof("[struct_scan] package=%s rule=%s alerts=%d", unit.Key, rule.RuleName, len(res.GetAlertVariables()))
@@ -335,6 +341,34 @@ func (s *structScanRuntime) ScanStruct(progAPI *Program, unit *ssa.CompileUnit) 
 		progAPI.ResetInterRuleState()
 	}
 	s.keepResults(found)
+}
+
+// submitRisk delivers one struct finding. A scan runtime owns the decision and
+// the persistence; the legacy callback still fires for callers that predate
+// the runtime. Either way the risk is registered on its result so persisting
+// that result later does not submit the same finding twice.
+func (s *structScanRuntime) submitRisk(res *SyntaxFlowResult, risk *schema.SSARisk) {
+	if risk == nil {
+		return
+	}
+	if res != nil {
+		risk.SSAProjectID = res.GetProjectID()
+		risk.RuntimeId = res.TaskID
+		risk.ResultID = uint64(res.GetResultID())
+		risk.ResultUUID = res.GetResultUUID()
+		if res.riskMap == nil {
+			res.riskMap = map[string]*schema.SSARisk{}
+		}
+		if name := ssaRiskName(risk.Variable, int(risk.Index)); name != "" {
+			res.riskMap[name] = risk
+		}
+	}
+	if s.scanRuntime != nil {
+		s.scanRuntime.SubmitRisk(risk)
+	}
+	if s.riskCB != nil {
+		s.riskCB(risk)
+	}
 }
 
 // frameForRule builds an execution frame from the rule. Sync stores compiled
@@ -392,6 +426,14 @@ func (s *structScanRuntime) keepResults(found []*SyntaxFlowResult) {
 				log.Warnf("[struct_scan] persist result failed: %v", err)
 				s.addErr(err)
 				continue
+			}
+			// The row id is known only after the result is written. Re-submit
+			// the findings so a persisted struct risk carries its result id and
+			// a covered row is rewritten with the same decision.
+			if s.scanRuntime != nil {
+				for _, risk := range res.GetRisks() {
+					s.scanRuntime.SubmitRisk(risk)
+				}
 			}
 			res.memResult = nil
 			res.symbol = make(map[string]Values)

@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 )
 
@@ -17,6 +18,10 @@ type Report struct {
 	// fileByHash accelerates FirstOrCreateFile* and allows adding risks to existing files.
 	// It must not be serialized into JSON.
 	fileByHash map[string]*File `json:"-"`
+	// keeper answers whether the scan kept this risk. A rich result added by
+	// AddSyntaxFlowResult uses it to skip a finding a later mode already
+	// covered, so the thin update from the scan stays authoritative.
+	keeper func(*schema.SSARisk) (string, bool) `json:"-"`
 	// info
 	ReportType    ReportType `json:"report_type"`
 	EngineVersion string     `json:"engine_version"`
@@ -144,6 +149,61 @@ func (r *Report) AddRisks(risk ...*Risk) {
 
 		r.Risks[risk.GetHash()] = risk
 	}
+}
+
+// SetKeeper attaches the scan's decision. AddSyntaxFlowResult skips a risk the
+// scan did not keep, and ApplyRiskUpdate replaces the previous body.
+func (r *Report) SetKeeper(fn func(*schema.SSARisk) (string, bool)) {
+	if r == nil {
+		return
+	}
+	r.mu.Lock()
+	r.keeper = fn
+	r.mu.Unlock()
+}
+
+// ApplyRiskUpdate applies one decision of the scan. The report never decides
+// which mode wins; the scan runtime already did.
+//
+// A covered finding drops the body of the row it replaced, so the report keeps
+// one entry per finding instead of one per mode. The rich result of the new
+// mode adds its own detailed body, and a created finding needs no work here.
+func (r *Report) ApplyRiskUpdate(item schema.RiskUpdateItem) error {
+	if r == nil || item.Risk == nil || item.OldHash == "" {
+		return nil
+	}
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if item.OldHash != item.Risk.Hash {
+		r.dropRiskLocked(item.OldHash)
+	}
+	return nil
+}
+
+// dropRiskLocked removes a replaced finding from the map and from the file and
+// rule references that were built from the rich result.
+func (r *Report) dropRiskLocked(hash string) {
+	if hash == "" {
+		return
+	}
+	delete(r.Risks, hash)
+	for _, file := range r.File {
+		file.Risks = dropHash(file.Risks, hash)
+	}
+	for _, rule := range r.Rules {
+		rule.Risks = dropHash(rule.Risks, hash)
+	}
+	r.RiskNums = len(r.Risks)
+}
+
+func dropHash(list []string, hash string) []string {
+	out := list[:0]
+	for _, item := range list {
+		if item != hash {
+			out = append(out, item)
+		}
+	}
+	return out
 }
 
 func (r *Report) GetRisk(hash string) *Risk {

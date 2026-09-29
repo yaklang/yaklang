@@ -74,6 +74,12 @@ type SarifReport struct {
 	// driver is run.Tool.Driver, kept for O(1) rule registration.
 	driver   *sarif.ToolComponent
 	ruleByID map[string]struct{}
+	// keeper answers whether the scan kept this risk. A rich result may still
+	// carry an earlier mode's finding; adding it back would undo the cover.
+	keeper func(*schema.SSARisk) (string, bool)
+	// resultByHash remembers where each appended finding sits so a covered
+	// finding is replaced instead of reported twice.
+	resultByHash map[string]int
 }
 
 // SarifContext accumulates the SARIF entities one result contributes (files,
@@ -179,6 +185,9 @@ func (r *SarifReport) appendResult(result *ssaapi.SyntaxFlowResult) {
 	ruleID := sarifRuleID(SFRule)
 
 	for risk := range result.YieldRisk() {
+		if !r.keepRisk(risk) {
+			continue
+		}
 		value, err := result.GetValue(risk.Variable, int(risk.Index))
 		if err != nil {
 			log.Errorf("get value from result failed: resultId[%d: %s: %d] %s", result.GetResultID(), risk.Variable, risk.Index, err)
@@ -208,8 +217,79 @@ func (r *SarifReport) appendResult(result *ssaapi.SyntaxFlowResult) {
 		}
 
 		r.registerRule(ruleID, SFRule, risk)
+		r.rememberResult(risk, res)
 		r.run.Results = append(r.run.Results, res)
 	}
+}
+
+// SetKeeper attaches the scan's decision so a risk the scan dropped is not
+// reported again by its rich result.
+func (r *SarifReport) SetKeeper(fn func(*schema.SSARisk) (string, bool)) {
+	if r == nil {
+		return
+	}
+	r.keeper = fn
+}
+
+func (r *SarifReport) keepRisk(risk *schema.SSARisk) bool {
+	if r == nil || risk == nil || r.keeper == nil {
+		return true
+	}
+	_, kept := r.keeper(risk)
+	return kept
+}
+
+// rememberResult records the slot of a finding keyed by its feature hash (its
+// SARIF fingerprint) so a later scan mode replaces it.
+func (r *SarifReport) rememberResult(risk *schema.SSARisk, res *sarif.Result) {
+	if r == nil || risk == nil || res == nil {
+		return
+	}
+	key := strings.TrimSpace(risk.RiskFeatureHash)
+	if key == "" {
+		key = strings.TrimSpace(risk.Hash)
+	}
+	if key == "" {
+		return
+	}
+	if r.resultByHash == nil {
+		r.resultByHash = map[string]int{}
+	}
+	r.resultByHash[key] = len(r.run.Results)
+}
+
+// ApplyRiskUpdate applies one decision of the scan. A finding that moves to a
+// later mode drops its earlier SARIF result here; the rich result of the new
+// mode appends its own entry, so the document keeps one alert per finding.
+// A created finding needs no work: its rich result adds the full entry.
+func (r *SarifReport) ApplyRiskUpdate(item schema.RiskUpdateItem) error {
+	if r == nil || item.Risk == nil || item.OldHash == "" {
+		return nil
+	}
+	r.removeResultByFeatureHash(item.Risk.RiskFeatureHash)
+	return nil
+}
+
+// removeResultByFeatureHash drops the alert of a covered finding, keyed by the
+// same feature hash the fingerprint uses.
+func (r *SarifReport) removeResultByFeatureHash(feature string) {
+	feature = strings.TrimSpace(feature)
+	if feature == "" || r == nil || r.run == nil {
+		return
+	}
+	out := r.run.Results[:0]
+	for _, res := range r.run.Results {
+		if res == nil {
+			continue
+		}
+		if fp, ok := res.PartialFingerprints[SarifFingerprintKey]; ok {
+			if text, ok := fp.(string); ok && text == feature {
+				continue
+			}
+		}
+		out = append(out, res)
+	}
+	r.run.Results = out
 }
 
 // registerRule appends the result rule to the driver once per rule ID.

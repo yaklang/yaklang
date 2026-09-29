@@ -67,6 +67,10 @@ type queryConfig struct {
 	kind   schema.SyntaxflowResultKind
 	taskID string
 
+	// scanRuntime is the control point of the scan this query belongs to.
+	// When set, risks are submitted to it instead of being written here.
+	scanRuntime *ScanRuntime
+
 	// control
 	ctx context.Context
 
@@ -141,6 +145,11 @@ func QuerySyntaxflow(opt ...QueryOption) (*SyntaxFlowResult, error) {
 	}
 	for _, o := range opt {
 		o(config)
+	}
+	// A program carries the runtime of its scan; an explicit query option wins
+	// so a caller can also drive a standalone program through one scan.
+	if config.scanRuntime == nil && config.program != nil && config.program.config != nil {
+		config.scanRuntime = config.program.config.scanRuntime
 	}
 	process := func(f float64, msg string) {
 		if callBack := config.GetSyntaxFlowProcessCallback(); callBack != nil {
@@ -266,6 +275,7 @@ func QuerySyntaxflow(opt ...QueryOption) (*SyntaxFlowResult, error) {
 
 	var ret *SyntaxFlowResult
 	ret = CreateResultFromQuery(res, config.Config)
+	ret.scanRuntime = config.scanRuntime
 
 	defer process(1, "end query syntaxflow")
 	if config.program != nil {
@@ -273,10 +283,19 @@ func QuerySyntaxflow(opt ...QueryOption) (*SyntaxFlowResult, error) {
 		switch kind := config.GetSyntaxFlowResultKind(); kind {
 		case ssaconfig.SFResultSaveDatabase:
 			process(float64(total-1)/float64(total), "save result")
-			resultID, err := ret.SaveWithContext(config.ctx, config.kind, config.taskID)
-			_ = resultID
-			if err != nil {
-				return ret, utils.Wrap(err, "SyntaxflowQuery: save to DB failed")
+			if config.scanRuntime != nil {
+				// The runtime owns persistence: its result consumers decide how
+				// the row and the audit graph are written. The query itself does
+				// not touch the database.
+				if err := config.scanRuntime.EmitResult(ret); err != nil {
+					return ret, utils.Wrap(err, "SyntaxflowQuery: emit result failed")
+				}
+			} else {
+				resultID, err := ret.SaveWithContext(config.ctx, config.kind, config.taskID)
+				_ = resultID
+				if err != nil {
+					return ret, utils.Wrap(err, "SyntaxflowQuery: save to DB failed")
+				}
 			}
 			cacheKind := kind
 			if config.IsNoSaveRisk() {
@@ -313,6 +332,7 @@ func executeSourceFrameBatches(
 			result := CreateResultFromQuery(batchResult, config.Config)
 			result.program = config.program
 			result.TaskID = config.taskID
+			result.scanRuntime = config.scanRuntime
 			_ = result.CreateRisk()
 			config.sourceResultCallback(result)
 			_, _, total := root.SourceHitBatch()
@@ -459,6 +479,17 @@ func QueryWithRuleDiagnosticsRecorder(recorder ...*diagnostics.Recorder) QueryOp
 func QueryWithTaskID(taskID string) QueryOption {
 	return func(c *queryConfig) {
 		c.taskID = taskID
+	}
+}
+
+// QueryWithScanRuntime attaches the control point of one scan. Every risk the
+// query produces is submitted to the runtime, which decides whether the row is
+// created or replaces an earlier mode, and notifies the registered consumers.
+func QueryWithScanRuntime(rt *ScanRuntime) QueryOption {
+	return func(c *queryConfig) {
+		if rt != nil {
+			c.scanRuntime = rt
+		}
 	}
 }
 

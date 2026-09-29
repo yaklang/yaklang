@@ -67,6 +67,12 @@ type ScanTaskCallback struct {
 	// scanModes is the product-stage filter (source/struct/ssa). Empty means all.
 	scanModes []string `json:"-"`
 
+	// scanRuntime is the control point of one scan. It owns the risk collect
+	// and the registered consumers (database saver, report writer). Every
+	// stage of a project scan shares one runtime so a later mode can replace
+	// an earlier finding.
+	scanRuntime *ssaapi.ScanRuntime `json:"-"`
+
 	parsedCustomRules     []*schema.SyntaxFlowRule
 	parsedCustomRulesDone bool
 }
@@ -82,6 +88,13 @@ const (
 var WithReporter = ssaconfig.SetOption(reporterKey, func(c *Config, reporter sfreport.IReport) {
 	c.Reporter = reporter
 })
+
+// WithScanRuntime shares one scan runtime across every stage of a scan.
+func WithScanRuntime(rt *ssaapi.ScanRuntime) ssaconfig.Option {
+	return ssaconfig.SetOption("syntaxflow-scan/scanRuntime", func(c *Config, v *ssaapi.ScanRuntime) {
+		c.scanRuntime = v
+	})(rt)
+}
 
 var WithPauseFunc = ssaconfig.SetOption(pauseFuncKey, func(c *Config, pause func() bool) {
 	c.pauseCheck = pause

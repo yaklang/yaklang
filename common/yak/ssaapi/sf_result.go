@@ -5,6 +5,8 @@ import (
 	"sort"
 	"time"
 
+	"github.com/google/uuid"
+
 	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 
 	"go.uber.org/atomic"
@@ -21,6 +23,12 @@ type SyntaxFlowResult struct {
 	id       uint
 	saveKind ssaconfig.SFResultSaveKind
 	TaskID   string
+	// resultUUID identifies this result even when it is never persisted. Risks
+	// carry it so the scan can tell two in-memory results apart.
+	resultUUID string
+	// scanRuntime is the control point of the scan this result belongs to.
+	// When set, risks are submitted to it instead of being written here.
+	scanRuntime *ScanRuntime
 	// result
 	memResult *sfvm.SFFrameResult
 	dbResult  *ssadb.AuditResult
@@ -53,7 +61,18 @@ func createEmptyResult() *SyntaxFlowResult {
 		symbol:       make(map[string]Values),
 		riskMap:      make(map[string]*schema.SSARisk),
 		riskCountMap: make(map[string]int64),
+		resultUUID:   uuid.NewString(),
 	}
+}
+
+// GetResultUUID returns the stable identity of this result. It exists for
+// results that are never persisted, so risks of one scan stay distinguishable
+// without a database row.
+func (r *SyntaxFlowResult) GetResultUUID() string {
+	if r == nil {
+		return ""
+	}
+	return r.resultUUID
 }
 
 var resultCacheId = atomic.NewInt64(1)
