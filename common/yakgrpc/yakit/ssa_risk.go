@@ -35,6 +35,35 @@ func CreateSSARisk(DB *gorm.DB, r *schema.SSARisk) error {
 	return nil
 }
 
+// CreateSSARisksInBatches writes many risk rows in one statement. A scan
+// accumulates its decisions and flushes them in batches instead of paying a
+// database round trip per finding.
+func CreateSSARisksInBatches(DB *gorm.DB, risks []*schema.SSARisk) error {
+	if len(risks) == 0 {
+		return nil
+	}
+	if DB == nil {
+		return utils.Error("save error: db is nil")
+	}
+	rows := make([]*schema.SSARisk, 0, len(risks))
+	for _, risk := range risks {
+		if risk == nil {
+			continue
+		}
+		if risk.TitleVerbose == "" {
+			risk.TitleVerbose = risk.Title
+		}
+		rows = append(rows, risk)
+	}
+	if len(rows) == 0 {
+		return nil
+	}
+	if db := DB.CreateInBatches(rows, len(rows)); db.Error != nil {
+		return db.Error
+	}
+	return nil
+}
+
 func GetSSARiskByID(db *gorm.DB, id int64) (*schema.SSARisk, error) {
 	var r schema.SSARisk
 	if db := db.Model(&schema.SSARisk{}).Where("id = ?", id).First(&r); db.Error != nil {

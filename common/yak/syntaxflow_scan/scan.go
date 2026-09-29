@@ -36,12 +36,13 @@ func Scan(ctx context.Context, option ...ssaconfig.Option) (retErr error) {
 	}
 	// The database consumer must be registered before the scan starts: a
 	// resumed or freshly created task can run queries immediately.
+	var dbSaver *dbSaver
 	bindManagerSaver := func(m *scanManager) {
 		if rt == nil || m == nil || config.GetSyntaxFlowMemory() ||
 			config.GetSyntaxFlowResultKind() == ssaconfig.SFResultSaveMemory {
 			return
 		}
-		bindDBSaver(rt, schema.SFResultKindScan, m.taskID, config.IsNoSaveRisk())
+		dbSaver = bindDBSaver(rt, schema.SFResultKindScan, m.taskID, config.IsNoSaveRisk())
 	}
 
 	// Wire up debug/pprof output when debug_dir is set.
@@ -67,6 +68,14 @@ func Scan(ctx context.Context, option ...ssaconfig.Option) (retErr error) {
 		}
 		m.StatusTask()
 		m.Stop(runningID)
+		// Stop waited for every queued result and risk callback, so the pending
+		// batch is complete. Write it before the task row so a caller that sees
+		// the finished task can also read every finding.
+		if dbSaver != nil {
+			if err := dbSaver.Flush(); err != nil {
+				log.Errorf("flush risk batch failed: %v", err)
+			}
+		}
 		// Stop waits for queued result callbacks, so the final task row includes
 		// the complete in-memory risk count even when risks are not persisted.
 		if err := m.SaveTask(); err != nil {
