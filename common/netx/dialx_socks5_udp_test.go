@@ -349,3 +349,59 @@ func TestSocks5AddressEncodingCompatibility(t *testing.T) {
 		}
 	}
 }
+
+func TestSocks5UDPMalformedDatagramsAndRecovery(t *testing.T) {
+	client, err := net.ListenUDP("udp4", &net.UDPAddr{IP: net.IPv4(127, 0, 0, 1)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer client.Close()
+	relay, err := net.ListenUDP("udp4", &net.UDPAddr{IP: net.IPv4(127, 0, 0, 1)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer relay.Close()
+	attacker, err := net.ListenUDP("udp4", &net.UDPAddr{IP: net.IPv4(127, 0, 0, 1)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer attacker.Close()
+	association := &Socks5UDPConn{udp: client, remote: relay.LocalAddr().(*net.UDPAddr)}
+	_ = client.SetReadDeadline(time.Now().Add(2 * time.Second))
+	for _, tc := range []struct {
+		name   string
+		packet []byte
+		source *net.UDPConn
+	}{
+		{name: "short", packet: []byte{0, 0, 0}, source: relay},
+		{name: "reserved", packet: []byte{1, 0, 0, 1, 127, 0, 0, 1, 0, 53}, source: relay},
+		{name: "fragment", packet: []byte{0, 0, 1, 1, 127, 0, 0, 1, 0, 53}, source: relay},
+		{name: "unknown address type", packet: []byte{0, 0, 0, 9}, source: relay},
+		{name: "short address", packet: []byte{0, 0, 0, 1, 127}, source: relay},
+		{name: "empty domain", packet: []byte{0, 0, 0, 3, 0, 0, 53}, source: relay},
+		{name: "wrong source", packet: []byte{0, 0, 0, 1, 127, 0, 0, 1, 0, 53}, source: attacker},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			if _, err := tc.source.WriteToUDP(tc.packet, client.LocalAddr().(*net.UDPAddr)); err != nil {
+				t.Fatal(err)
+			}
+			var response [16]byte
+			if _, err := association.Read(response[:]); err == nil {
+				t.Fatal("malformed SOCKS5 UDP packet accepted")
+			}
+		})
+	}
+	address, err := socks5Address("127.0.0.1:53")
+	if err != nil {
+		t.Fatal(err)
+	}
+	valid := append(append([]byte{0, 0, 0}, address...), 'o', 'k')
+	if _, err := relay.WriteToUDP(valid, client.LocalAddr().(*net.UDPAddr)); err != nil {
+		t.Fatal(err)
+	}
+	var response [16]byte
+	n, err := association.Read(response[:])
+	if err != nil || string(response[:n]) != "ok" {
+		t.Fatalf("valid packet after errors: response=%q err=%v", response[:n], err)
+	}
+}
