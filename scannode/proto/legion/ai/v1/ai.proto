@@ -2126,6 +2126,9 @@ message ContextForgeRelease {
   bytes input_schema_json = 16;
   string definition_sha256 = 17;
   repeated ContextForgeTool tool_snapshots = 18;
+  // Platform-authored policy: allow one extra final-result request on empty output.
+  // Absent/false disables this retry; never reruns tools or the whole task.
+  bool retry_empty_output = 19;
 }
 
 // InputManifest pins authorized managed resources for one execution attempt.

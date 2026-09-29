@@ -152,6 +152,7 @@ func contextForgeDefinitionSHA256(release *aiv1.ContextForgeRelease) (string, er
 	clone.Sha256 = ""
 	clone.DefinitionSha256 = ""
 	clone.Parameters = nil
+	clone.RetryEmptyOutput = false // Invocation policy is not part of the published definition.
 	raw, err := (proto.MarshalOptions{Deterministic: true}).Marshal(clone)
 	if err != nil {
 		return "", fmt.Errorf("encode Forge release definition: %w", err)
@@ -250,10 +251,10 @@ func buildContextForgeBlueprint(
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("build immutable Forge release: %w", err)
 	}
-	// Empty-output recovery is invocation policy; client Blueprints keep
-	// their single-call behavior. All callers retain their model token settings.
+	// Legion pins the final-output retry policy in this invocation snapshot.
+	// Missing/false preserves single-call behavior and caller model settings.
 	aiforge.WithResultPolicy(aiforge.ForgeResultPolicy{
-		RetryEmptyOutput: true,
+		RetryEmptyOutput: release.GetRetryEmptyOutput(),
 	})(blueprint)
 	params := make([]aiforge.Parameter, 0, len(release.GetParameters()))
 	for _, parameter := range release.GetParameters() {

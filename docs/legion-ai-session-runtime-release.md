@@ -101,3 +101,18 @@ releases; an old subset does not imply aggregate support. An older server may
 reject the new capability surface. Do not forge legacy declarations to bypass
 that admission check. Packaging tests bind the declared capability set to the
 compiled Node surface and Runtime manifest fixture.
+
+## Platform-owned Forge final-output recovery
+
+Legion pins `ContextForgeRelease.retry_empty_output` in each invocation. The
+runtime honors that value: true permits one extra final-report request on empty
+output, while absent/false disables that retry. It never reruns tools or the task
+plan. Client model token settings are preserved; there is no Forge token override.
+The invocation digest includes the policy; the published definition digest does
+not. Imported definitions do not choose this runtime policy.
+
+Upgrade the Yaklang runtime before enabling the new Legion producer. Older
+runtimes retain field 19 as an unknown field during definition hashing and can
+reject policy-bearing invocations. Deploy these paired changes together; an old
+runtime cannot enforce a platform-disabled policy. No extra capability key or
+user-facing setting is introduced.

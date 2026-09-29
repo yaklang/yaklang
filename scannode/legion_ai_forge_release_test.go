@@ -135,44 +135,74 @@ func TestValidateContextForgeReleaseAllowsExactReportAndHTTPProfiles(t *testing.
 }
 
 func TestBuildContextForgeBlueprintOptsIntoResultPolicy(t *testing.T) {
-	release := testLegionContextForgeRelease(t)
-	config, blueprint, params, err := buildContextForgeBlueprint(release)
-	require.NoError(t, err)
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-	var prompts []string
-	var budgets []int64
-	coordinator, err := blueprint.CreateCoordinatorWithQueryAndParams(ctx, "summarize the supplied facts", params,
-		aicommon.WithDisableAutoSkills(true),
-		aicommon.WithDisableCreateDBRuntime(true),
-		aicommon.WithDisableMemoryTriage(true),
-		aicommon.WithAllowRequireForUserInteract(false),
-		aicommon.WithAIAutoRetry(1),
-		aicommon.WithAITransactionAutoRetry(1),
-		aicommon.WithAICallback(func(c aicommon.AICallerConfigIf, request *aicommon.AIRequest) (*aicommon.AIResponse, error) {
-			prompts = append(prompts, request.GetPrompt())
-			model := &aispec.AIConfig{}
-			aispec.WithMaxTokens(8192)(model)
-			for _, option := range request.GetExtraSpecOpts() {
-				option(model)
-			}
-			budgets = append(budgets, *model.MaxTokens)
-			response := c.NewAIResponse()
-			response.EmitReasonStream(strings.NewReader("internal reasoning"))
-			output := ""
-			if len(prompts) == 2 {
-				output = "# Report\nOnly the supplied facts were reviewed."
-			}
-			response.EmitOutputStream(strings.NewReader(output))
-			response.Close()
-			return response, nil
-		}))
-	require.NoError(t, err)
-	require.NotNil(t, coordinator.ResultHandler)
-	coordinator.ResultHandler(coordinator)
+	for _, retry := range []bool{false, true} {
+		t.Run(map[bool]string{false: "disabled", true: "enabled"}[retry], func(t *testing.T) {
+			release := testLegionContextForgeRelease(t)
+			release.RetryEmptyOutput = retry
+			rehashLegionContextForgeRelease(t, release)
+			config, blueprint, params, err := buildContextForgeBlueprint(release)
+			require.NoError(t, err)
+			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer cancel()
+			var prompts []string
+			var budgets []int64
+			coordinator, err := blueprint.CreateCoordinatorWithQueryAndParams(ctx, "summarize the supplied facts", params,
+				aicommon.WithDisableAutoSkills(true),
+				aicommon.WithDisableCreateDBRuntime(true),
+				aicommon.WithDisableMemoryTriage(true),
+				aicommon.WithAllowRequireForUserInteract(false),
+				aicommon.WithAIAutoRetry(1),
+				aicommon.WithAITransactionAutoRetry(1),
+				aicommon.WithAICallback(func(c aicommon.AICallerConfigIf, request *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+					prompts = append(prompts, request.GetPrompt())
+					model := &aispec.AIConfig{}
+					aispec.WithMaxTokens(8192)(model)
+					for _, option := range request.GetExtraSpecOpts() {
+						option(model)
+					}
+					budgets = append(budgets, *model.MaxTokens)
+					response := c.NewAIResponse()
+					response.EmitReasonStream(strings.NewReader("internal reasoning"))
+					output := ""
+					if len(prompts) == 2 {
+						output = "# Report\nOnly the supplied facts were reviewed."
+					}
+					response.EmitOutputStream(strings.NewReader(output))
+					response.Close()
+					return response, nil
+				}))
+			require.NoError(t, err)
+			require.NotNil(t, coordinator.ResultHandler)
+			coordinator.ResultHandler(coordinator)
 
-	require.Equal(t, []int64{8192, 8192}, budgets, "initial and retry requests must preserve the caller model budget")
-	require.Contains(t, prompts[0], release.ResultPrompt)
-	require.Contains(t, prompts[1], "最终输出通道")
-	require.Equal(t, "# Report\nOnly the supplied facts were reviewed.", config.ForgeResult.Formated)
+			wantBudgets := []int64{8192}
+			if retry {
+				wantBudgets = append(wantBudgets, 8192)
+			}
+			require.Equal(t, wantBudgets, budgets, "platform policy controls requests without overriding model budget")
+			require.Contains(t, prompts[0], release.ResultPrompt)
+			if retry {
+				require.Contains(t, prompts[1], "最终输出通道")
+				require.Equal(t, "# Report\nOnly the supplied facts were reviewed.", config.ForgeResult.Formated)
+			} else {
+				require.Empty(t, config.ForgeResult.Formated)
+			}
+		})
+	}
+}
+
+func TestForgeResultPolicyBoundToInvocation(t *testing.T) {
+	release := testLegionContextForgeRelease(t)
+	require.False(t, release.GetRetryEmptyOutput())
+	_, blueprint, _, err := buildContextForgeBlueprint(release)
+	require.NoError(t, err)
+	require.False(t, blueprint.ResultPolicy.RetryEmptyOutput)
+	definitionHash := release.DefinitionSha256
+	invocationHash := release.Sha256
+	release.RetryEmptyOutput = true
+	require.Error(t, validateContextForgeRelease(release), "policy tampering must fail checksum validation")
+	rehashLegionContextForgeRelease(t, release)
+	require.Equal(t, definitionHash, release.DefinitionSha256, "runtime policy must not change the published definition")
+	require.NotEqual(t, invocationHash, release.Sha256)
+	require.NoError(t, validateContextForgeRelease(release))
 }

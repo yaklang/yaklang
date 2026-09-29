@@ -19485,8 +19485,11 @@ type ContextForgeRelease struct {
 	InputSchemaJson          []byte                   `protobuf:"bytes,16,opt,name=input_schema_json,json=inputSchemaJson,proto3" json:"input_schema_json,omitempty"`
 	DefinitionSha256         string                   `protobuf:"bytes,17,opt,name=definition_sha256,json=definitionSha256,proto3" json:"definition_sha256,omitempty"`
 	ToolSnapshots            []*ContextForgeTool      `protobuf:"bytes,18,rep,name=tool_snapshots,json=toolSnapshots,proto3" json:"tool_snapshots,omitempty"`
-	unknownFields            protoimpl.UnknownFields
-	sizeCache                protoimpl.SizeCache
+	// Platform-authored policy: allow one extra final-result request on empty output.
+	// Absent/false disables this retry; never reruns tools or the whole task.
+	RetryEmptyOutput bool `protobuf:"varint,19,opt,name=retry_empty_output,json=retryEmptyOutput,proto3" json:"retry_empty_output,omitempty"`
+	unknownFields    protoimpl.UnknownFields
+	sizeCache        protoimpl.SizeCache
 }
 
 func (x *ContextForgeRelease) Reset() {
@@ -19643,6 +19646,13 @@ func (x *ContextForgeRelease) GetToolSnapshots() []*ContextForgeTool {
 		return x.ToolSnapshots
 	}
 	return nil
+}
+
+func (x *ContextForgeRelease) GetRetryEmptyOutput() bool {
+	if x != nil {
+		return x.RetryEmptyOutput
+	}
+	return false
 }
 
 // InputManifest pins authorized managed resources for one execution attempt.
@@ -21810,7 +21820,7 @@ const file_legion_ai_v1_ai_proto_rawDesc = "" +
 	"\vparams_json\x18\x05 \x01(\fR\n" +
 	"paramsJson\x12\x16\n" +
 	"\x06sha256\x18\x06 \x01(\tR\x06sha256\x12\"\n" +
-	"\rowner_user_id\x18\a \x01(\tR\vownerUserId\"\xf8\x05\n" +
+	"\rowner_user_id\x18\a \x01(\tR\vownerUserId\"\xa6\x06\n" +
 	"\x13ContextForgeRelease\x12%\n" +
 	"\x0eschema_version\x18\x01 \x01(\tR\rschemaVersion\x12\x1d\n" +
 	"\n" +
@@ -21835,7 +21845,8 @@ const file_legion_ai_v1_ai_proto_rawDesc = "" +
 	"\x13declared_tool_names\x18\x0f \x03(\tR\x11declaredToolNames\x12*\n" +
 	"\x11input_schema_json\x18\x10 \x01(\fR\x0finputSchemaJson\x12+\n" +
 	"\x11definition_sha256\x18\x11 \x01(\tR\x10definitionSha256\x12E\n" +
-	"\x0etool_snapshots\x18\x12 \x03(\v2\x1e.legion.ai.v1.ContextForgeToolR\rtoolSnapshots\"\x9e\x03\n" +
+	"\x0etool_snapshots\x18\x12 \x03(\v2\x1e.legion.ai.v1.ContextForgeToolR\rtoolSnapshots\x12,\n" +
+	"\x12retry_empty_output\x18\x13 \x01(\bR\x10retryEmptyOutput\"\x9e\x03\n" +
 	"\rInputManifest\x12%\n" +
 	"\x0eschema_version\x18\x01 \x01(\tR\rschemaVersion\x12\x1f\n" +
 	"\vmanifest_id\x18\x02 \x01(\tR\n" +
