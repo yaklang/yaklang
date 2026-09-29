@@ -134,10 +134,13 @@ func TestBatchDoHTTPRequest_MetadataContainsIntentHints(t *testing.T) {
 func TestBatchDoHTTPRequestUsageExplainsSurveyAndRecovery(t *testing.T) {
 	usage := getBatchDoHTTPRequestTool(t).Usage
 	assert.Assert(t, strings.Contains(usage, "发现新入口先记入待办"))
-	assert.Assert(t, strings.Contains(usage, "调整请求条件继续验证"))
-	assert.Assert(t, strings.Contains(usage, "不能据此判定被过滤路径安全"))
-	assert.Assert(t, strings.Contains(usage, "对选中的单个端点用 do_http_request 深测"))
+	assert.Assert(t, strings.Contains(usage, "核对实际请求包"))
+	assert.Assert(t, strings.Contains(usage, "不证明目标安全"))
+	assert.Assert(t, strings.Contains(usage, "用 do_http_request 深测"))
 	assert.Assert(t, strings.Contains(usage, "response_received_count"))
+	assert.Assert(t, strings.Contains(usage, "{{int(1-3)}}"))
+	assert.Assert(t, strings.Contains(usage, "{{PATH}}"))
+	assert.Assert(t, strings.Contains(usage, "{{tenant}}"))
 }
 
 // Test 1: Basic batch GET requests - verify summary output
@@ -592,6 +595,91 @@ func TestBatchDoHTTPRequest_PacketMode(t *testing.T) {
 	assert.Assert(t, strings.Contains(stdout, "packet_path:/pkt_a"), "packet mode should substitute path_a")
 	assert.Assert(t, strings.Contains(stdout, "packet_path:/pkt_b"), "packet mode should substitute path_b")
 	assert.Assert(t, strings.Contains(stdout, "Responses: 2"), "both packet mode requests should receive responses")
+}
+
+func TestBatchDoHTTPRequest_ExpandsPathRange(t *testing.T) {
+	seen := map[string]bool{}
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		seen[r.URL.Path] = true
+		_, _ = w.Write([]byte(r.URL.Path))
+	}))
+	defer server.Close()
+
+	result := execBatchHTTPToolResult(t, aitool.InvokeParams{
+		"base-url":     server.URL,
+		"paths":        "/{{segment}}/{{int(1-3)}}",
+		"variables":    map[string]any{"segment": "users"},
+		"concurrent":   1,
+		"max-requests": 3,
+	})
+	assert.Equal(t, utils.InterfaceToInt(result["request_count"]), 3)
+	assert.Equal(t, utils.InterfaceToInt(result["response_received_count"]), 3)
+	for _, path := range []string{"/users/1", "/users/2", "/users/3"} {
+		assert.Assert(t, seen[path], "missing rendered path %s", path)
+	}
+}
+
+func TestBatchDoHTTPRequest_ExpandsPathListAfterPrefix(t *testing.T) {
+	seen := map[string]bool{}
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		seen[r.URL.Path] = true
+		_, _ = w.Write([]byte("ok"))
+	}))
+	defer server.Close()
+	result := execBatchHTTPToolResult(t, aitool.InvokeParams{
+		"base-url":     server.URL,
+		"prefix":       "/v1",
+		"paths":        "/api/{{list(users|orders)}}",
+		"concurrent":   1,
+		"max-requests": 2,
+	})
+	assert.Equal(t, utils.InterfaceToInt(result["request_count"]), 2)
+	assert.Assert(t, seen["/v1/api/users"] && seen["/v1/api/orders"], "prefix/list paths were not rendered: %#v", seen)
+}
+
+func TestBatchDoHTTPRequest_ExpandsPacketWithPathAndVariables(t *testing.T) {
+	seen := map[string]bool{}
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		seen[r.URL.Path+"?view="+r.URL.Query().Get("view")+";tenant="+r.Header.Get("X-Tenant")] = true
+		_, _ = w.Write([]byte("ok"))
+	}))
+	defer server.Close()
+	host := strings.TrimPrefix(server.URL, "http://")
+
+	result := execBatchHTTPToolResult(t, aitool.InvokeParams{
+		"paths":        "/orders/{{int(1001-1002)}}",
+		"packet":       "GET {{PATH}}?view={{list(summary|detail)}} HTTP/1.1\r\nHost: " + host + "\r\nX-Tenant: {{tenant}}\r\n\r\n",
+		"variables":    map[string]any{"tenant": "demo"},
+		"https":        "no",
+		"concurrent":   1,
+		"max-requests": 4,
+	})
+	assert.Equal(t, utils.InterfaceToInt(result["request_count"]), 4)
+	assert.Equal(t, utils.InterfaceToInt(result["response_received_count"]), 4)
+	for _, id := range []string{"1001", "1002"} {
+		for _, view := range []string{"summary", "detail"} {
+			key := "/orders/" + id + "?view=" + view + ";tenant=demo"
+			assert.Assert(t, seen[key], "missing rendered packet %s", key)
+		}
+	}
+}
+
+func TestBatchDoHTTPRequest_RejectsUnknownAndOversizedTemplatesBeforeSending(t *testing.T) {
+	requests := 0
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requests++
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer server.Close()
+	host := strings.TrimPrefix(server.URL, "http://")
+	for _, params := range []aitool.InvokeParams{
+		{"paths": "/a", "packet": "GET {{PATH}} HTTP/1.1\r\nHost: " + host + "\r\nX-Test: {{missing}}\r\n\r\n", "https": "no"},
+		{"base-url": server.URL, "paths": "/a/{{int(1-4)}}", "max-requests": 3},
+	} {
+		_, err := getBatchDoHTTPRequestTool(t).InvokeWithParams(params)
+		assert.Assert(t, err != nil, "invalid template should fail before sending")
+	}
+	assert.Equal(t, requests, 0)
 }
 
 // Test 22: Full URLs in paths (no base-url needed)
