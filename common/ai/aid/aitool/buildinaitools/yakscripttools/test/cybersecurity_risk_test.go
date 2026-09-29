@@ -56,13 +56,11 @@ func getCybersecurityRiskTool(t *testing.T) *aitool.Tool {
 func TestCybersecurityRisk_MetadataUsesCompactDisclosure(t *testing.T) {
 	aiTool := loadCybersecurityRiskAITool(t)
 
-	assert.Assert(t, strings.Contains(aiTool.Usage, "`summary` is mandatory"), "usage should require summary")
-	assert.Assert(t, strings.Contains(aiTool.Usage, "title-only"), "usage should forbid title-only risks")
+	assert.Assert(t, strings.Contains(aiTool.Usage, "`target`、`title`、`summary` 必填"), "usage should require complete finding")
+	assert.Assert(t, strings.Contains(aiTool.Usage, "避免只有标题或只有猜测"), "usage should forbid unsupported risks")
 	assert.Assert(t, strings.Contains(aiTool.Usage, "中文标题 / English title"), "usage should document bilingual compact title format")
-	assert.Assert(t, strings.Contains(aiTool.Usage, "request  -> <|TOOL_PARAM_request_{NONCE}|>"), "usage should document inline request AITAG")
-	assert.Assert(t, strings.Contains(aiTool.Usage, "response -> <|TOOL_PARAM_response_{NONCE}|>"), "usage should document inline response AITAG")
 	assert.Assert(t, strings.Contains(aiTool.Usage, "request-file"), "usage should document request-file")
-	assert.Assert(t, strings.Contains(aiTool.Usage, "Do not use JSON/object-style complex parameters."), "usage should explicitly avoid object-style params")
+	assert.Assert(t, strings.Contains(aiTool.Usage, "参数均为普通字符串"), "usage should keep the schema simple")
 }
 
 func TestCybersecurityRisk_SchemaUsesCompactFields(t *testing.T) {
@@ -166,5 +164,36 @@ func TestCybersecurityRisk_PropagatesRuntimeRiskSinkFailure(t *testing.T) {
 	)
 	if err == nil || !strings.Contains(err.Error(), "platform unavailable") {
 		t.Fatalf("expected platform submission error, got %v", err)
+	}
+}
+
+func TestCybersecurityRisk_NormalizesTypeAndParameterBeforeDedupHash(t *testing.T) {
+	tool := getCybersecurityRiskTool(t)
+	var submitted []*schema.Risk
+	for _, params := range []aitool.InvokeParams{
+		{"target": "https://example.test/search", "title": "反射型 XSS", "summary": "q 参数未经编码回显。", "type": " XSS ", "parameter": " q "},
+		{"target": "https://example.test/search", "title": "反射型 XSS", "summary": "q 参数未经编码回显。", "type": "xss", "parameter": "q"},
+	} {
+		_, err := tool.InvokeWithParams(params, aitool.WithRuntimeConfig(&aitool.ToolRuntimeConfig{
+			RiskSaveHandler: func(_ context.Context, risk *schema.Risk) error {
+				copy := *risk
+				submitted = append(submitted, &copy)
+				return nil
+			},
+		}))
+		if err != nil {
+			t.Fatalf("InvokeWithParams() error = %v", err)
+		}
+	}
+	if len(submitted) != 2 {
+		t.Fatalf("expected two risk submissions, got %d", len(submitted))
+	}
+	for _, risk := range submitted {
+		if risk.RiskType != "xss" || risk.Parameter != "q" {
+			t.Fatalf("risk options were not normalized: %#v", risk)
+		}
+	}
+	if submitted[0].Hash == "" || submitted[0].Hash != submitted[1].Hash {
+		t.Fatalf("equivalent risk keys produced different hashes: %q and %q", submitted[0].Hash, submitted[1].Hash)
 	}
 }

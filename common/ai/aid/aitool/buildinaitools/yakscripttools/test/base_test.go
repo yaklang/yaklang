@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"os"
+	"regexp"
 	"strconv"
 	"strings"
 	"testing"
@@ -61,4 +62,30 @@ func TestSearchYakScript(t *testing.T) {
 	tools := yakscripttools.GetYakScriptAiTools("http")
 	assert.Equal(t, len(tools), 1)
 	assert.Equal(t, tools[0].Name, "send_http_request_by_url")
+}
+
+func TestSendHTTPRequestByURLSavesRequestContent(t *testing.T) {
+	setupHTTPYakToolFixture(t)
+	host, port := utils.DebugMockHTTP([]byte("ok"))
+	for _, tool := range yakscripttools.GetAllYakScriptAiTools() {
+		if tool.Name != "send_http_request_by_url" {
+			continue
+		}
+		stdout := bytes.NewBuffer(nil)
+		_, err := tool.Callback(context.Background(), aitool.InvokeParams{
+			"url":          "http://" + host + ":" + strconv.Itoa(port) + "/request-check",
+			"show-request": "yes",
+		}, nil, stdout, bytes.NewBuffer(nil))
+		assert.NilError(t, err)
+		match := regexp.MustCompile(`req packet saved to (\S+)`).FindStringSubmatch(stdout.String())
+		if len(match) != 2 {
+			t.Fatalf("saved request path missing: %s", stdout.String())
+		}
+		t.Cleanup(func() { _ = os.Remove(match[1]) })
+		data, err := os.ReadFile(match[1])
+		assert.NilError(t, err)
+		assert.Assert(t, strings.Contains(string(data), "GET /request-check HTTP/1.1"), "saved file should contain raw request, got %q", data)
+		return
+	}
+	t.Fatal("send_http_request_by_url not found")
 }

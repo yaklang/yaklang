@@ -1,331 +1,42 @@
-__DESC__ = "Create structured security risk records from a compact set of plain string parameters. This tool is for persisting verified or strongly-supported security findings while avoiding title-only records. It keeps the disclosure simple: target, title, summary, optional type/severity, small proof fields, and optional direct raw request/response or file references."
+__DESC__ = "将已验证或有充分证据支持的安全问题写入风险记录；提供目标、标题、问题摘要和简短证据，可附原始请求/响应或已有文件路径，每个独立风险调用一次。"
 __VERBOSE_NAME__ = "Risk Output"
 __VERBOSE_NAME_ZH__ = "风险输出"
 __KEYWORDS__ = "security risk,vulnerability report,risk output,security audit,risk management,pentest finding,sqli,xss,rce,security finding,evidence,remediation"
 
 __USAGE__ = <<<USAGE_BLOCK
-Cybersecurity Risk Output Tool - Compact Parameter Disclosure Guide
+风险记录：确认安全问题或取得足够强的一手证据后及时调用；每个独立风险一条。`target`、`title`、`summary` 必填，摘要写清触发位置、现象和影响，避免只有标题或只有猜测。不要把多个问题合成一条，也不要重复报告同一目标、类型和参数的问题；继续测试得到的新证据要先核对已有记录。
 
-Use this tool to persist a security finding into the risk database.
-The goal is **not** to expose every internal risk field. Instead, provide a
-small set of inputs that still makes the saved record actionable.
+参数均为普通字符串：`type` 为风险类型，缺省为 info；`severity` 可取 high/middle/low/info/debug，默认 low；`parameter`、`payload`、`evidence` 只放必要的触发点和可复核证据。`title` 可写“中文标题 / English title”，工具会拆成两个标题字段；`solution` 可选，未提供时按类型生成建议。避免在证据中重复粘贴整份响应或无关敏感数据。
 
-##############################################################################
-# HARD RULES FOR AI PARAMETER GENERATION                                     #
-##############################################################################
+`request`/`response` 可直接给原始报文；若已保存完整报文，传 `request-file`/`response-file` 的现有路径。对应的内联报文优先于文件路径；文件读取失败则不会成功记录。提交后核对工具结果，确认风险确实写入。
 
-0. WHEN TO CALL (resident tool, report immediately).
-   This is a super-important resident reporting tool. Call it the moment a
-   vulnerability or any potentially harmful security risk is confirmed by
-   first-hand evidence (request/response diff, command echo, sensitive data
-   returned, scan result, file evidence) - do NOT wait until the test phase or
-   whole task is finished.
-   - Report each independent risk instance with its own separate call. Never
-     batch multiple findings into one record and never defer reporting into a
-     separate "fill-in-later" task.
-   - During bulk enumeration (e.g. IDOR over many IDs), report the first
-     confirmed instance immediately, then keep enumerating.
-   - For large raw traffic, persist it via request-file / response-file (or a
-     result file) so nothing is lost if the session is interrupted.
-   - A confirmed risk that is neither saved here nor written to an output file
-     counts as NOT delivered.
-   - DO NOT report the same vulnerability twice. The same target + same type +
-     same parameter = the same vulnerability. If you have new evidence (e.g. a
-     different payload confirming the same issue), attach it via evidence
-     instead of creating a new risk record. Check the "已报告漏洞清单" in the
-     prompt context before calling this tool.
-
-1. Never create a title-only risk.
-   `summary` is mandatory. It must explain:
-   - what is vulnerable
-   - where the issue is triggered
-   - why it matters / possible impact
-
-2. Use a single top-level title.
-   Do not split titles into separate `title-en` / `title-zh` parameters.
-   If bilingual output is useful, format it as:
-       "中文标题 / English title"
-   The tool will compact it into the internal title fields automatically.
-
-3. Do not use JSON/object-style complex parameters.
-   Use plain string parameters only. Keep the compact set:
-   - summary      required
-   - parameter    optional
-   - payload      optional
-   - evidence     optional
-
-   Put endpoint details, impact, CVE, tags, and other supporting context into
-   `summary` or `evidence` instead of building nested objects.
-
-4. Use AITAG for multi-line `evidence`, `solution`, `request`, and `response`.
-   If a value contains multiple lines, code blocks, or request/response excerpts,
-   keep it outside JSON params:
-
-   evidence -> <|TOOL_PARAM_evidence_{NONCE}|> ... <|TOOL_PARAM_evidence_END_{NONCE}|>
-   solution -> <|TOOL_PARAM_solution_{NONCE}|> ... <|TOOL_PARAM_solution_END_{NONCE}|>
-   request  -> <|TOOL_PARAM_request_{NONCE}|> ... <|TOOL_PARAM_request_END_{NONCE}|>
-   response -> <|TOOL_PARAM_response_{NONCE}|> ... <|TOOL_PARAM_response_END_{NONCE}|>
-
-5. Prefer file references for large raw traffic.
-   If the full HTTP request/response is already saved by another tool
-   (for example do_http_request), pass:
-   - request-file
-   - response-file
-
-   Keep `evidence` for concise proof, excerpts, observations, or payload notes.
-
-## Top-Level Parameters
-
-Required:
-    target          (string)  Affected target. URL, host, IP, or host:port.
-    title           (string)  One-line vulnerability title. Prefer Chinese, or
-                              `中文 / English` when bilingual context is helpful.
-    summary         (string)  Short but complete finding summary.
-
-Optional:
-    type            (string)  Risk type such as sqli, xss, rce, ssrf, auth-bypass,
-                              unauth-access, weak-pass, info-exposure, path-traversal.
-                              If omitted, the backend falls back to a generic info risk.
-    severity        (string)  high / middle / low / info / debug. Default: low.
-    parameter       (string)  Triggering parameter / header / input point.
-    payload         (string)  Payload or verification input.
-    evidence        (string)  Multi-line proof, key observations, short traffic excerpts,
-                              payload notes, or verification steps. Use AITAG.
-    solution        (string)  Explicit remediation guidance. Use AITAG.
-    request         (string)  Raw HTTP request content. Use AITAG for multi-line packets.
-    response        (string)  Raw HTTP response content. Use AITAG for multi-line packets.
-    request-file    (string)  Path to a saved raw HTTP request file.
-    response-file   (string)  Path to a saved raw HTTP response file.
-
-## Suggested Minimal Call
-
-If you only know the essentials, these 5 inputs are usually enough:
-    target + title + summary + type + severity
-
-The tool will:
-    - map a bilingual title into internal title/titleVerbose fields
-    - build a readable description from summary/parameter/payload/evidence
-    - store compact structured context in risk details
-    - accept direct raw request/response text when AI already has the packets
-    - generate a reasonable fallback solution when you did not provide one
-
-## Few-Shot Examples
-
-Replace {NONCE} with the actual nonce from the response format section.
-
-### Example 1: Minimal but complete SQL injection record
-
+典型案例：携带简短证据记录一个已验证问题：
 ```json
-{
-  "@action": "call-tool",
-  "tool": "cybersecurity-risk",
-  "identifier": "sqli_login_finding",
-  "params": {
-    "target": "https://example.com/login",
-    "title": "登录接口 SQL 注入 / SQL Injection in Login Endpoint",
-    "type": "sqli",
-    "severity": "high",
-    "summary": "登录接口对 username 参数的输入未做安全约束，拼接进入 SQL 查询，导致可以通过构造输入绕过认证。",
-    "parameter": "username",
-    "payload": "' OR '1'='1"
-  }
-}
+{"target":"https://example.com/search","title":"搜索参数反射型 XSS / Reflected XSS in Search","summary":"q 参数未编码进入 HTML；测试输入在浏览器中执行，可影响访问该页面的用户。","type":"xss","severity":"high","parameter":"q","payload":"<script>alert(1)</script>","evidence":"响应正文含未转义的 script 标签，浏览器执行已复现。"}
 ```
 
-### Example 2: Add multi-line proof with AITAG
-
+[[- if .FunctionCallMode -]]
+附原始请求和响应：所有参数直接放入 JSON，多行报文用 `\r\n` 转义：
 ```json
-{
-  "@action": "call-tool",
-  "tool": "cybersecurity-risk",
-  "identifier": "xss_search_finding",
-  "params": {
-    "target": "https://example.com/search",
-    "title": "搜索参数存在反射型 XSS",
-    "type": "xss",
-    "severity": "high",
-    "summary": "q 参数内容被原样回显到 HTML 响应中，未进行上下文相关编码，可执行任意脚本并影响用户会话安全。",
-    "parameter": "q",
-    "payload": "<script>alert(1)</script>"
-  }
-}
+{"target":"https://example.com/orders/1002","title":"订单越权访问","summary":"将订单 ID 改为 1002 后返回其他用户的订单摘要，已与当前用户订单对比。","type":"unauth-access","severity":"high","parameter":"orderId","request":"GET /orders/1002 HTTP/1.1\r\nHost: example.com\r\n\r\n","response":"HTTP/1.1 200 OK\r\nContent-Type: application/json\r\n\r\n{\"id\":1002,\"owner\":\"other-user\"}"}
 ```
-
-<|TOOL_PARAM_evidence_{NONCE}|>
-Baseline request reflects harmless input normally.
-
-When q=<script>alert(1)</script>, the response body contains the same script tag
-inside the rendered HTML without escaping.
-
-Browser execution was observed during verification.
-<|TOOL_PARAM_evidence_END_{NONCE}|>
-
-### Example 3: Attach full traffic by file path
-
+[[- else -]]
+附原始报文：JSON 传单行参数，多行 `request`/`response` 使用本次 nonce 的 AITAG：
 ```json
-{
-  "@action": "call-tool",
-  "tool": "cybersecurity-risk",
-  "identifier": "auth_bypass_with_files",
-  "params": {
-    "target": "https://api.example.com/admin",
-    "title": "管理员接口存在认证绕过",
-    "type": "auth-bypass",
-    "severity": "high",
-    "summary": "通过伪造来源头部后，/admin 接口返回 200 且泄露管理数据，形成未授权访问。",
-    "parameter": "X-Forwarded-For",
-    "payload": "127.0.0.1",
-    "request-file": "/tmp/http-request-123.txt",
-    "response-file": "/tmp/http-response-123.txt"
-  }
-}
+{"target":"https://example.com/orders/1002","title":"订单越权访问","summary":"将订单 ID 改为 1002 后返回其他用户的订单摘要，已与当前用户订单对比。","type":"unauth-access","severity":"high","parameter":"orderId"}
 ```
-
-### Example 4: Write raw request/response directly
-
-```json
-{
-  "@action": "call-tool",
-  "tool": "cybersecurity-risk",
-  "identifier": "idor_with_inline_packets",
-  "params": {
-    "target": "https://api.example.com/orders/1001",
-    "title": "订单接口存在越权访问",
-    "type": "unauth-access",
-    "severity": "high",
-    "summary": "将订单 ID 从 1001 改为 1002 后，接口直接返回其他用户订单数据，存在对象级越权访问。",
-    "parameter": "orderId"
-  }
-}
-```
-
 <|TOOL_PARAM_request_{NONCE}|>
 GET /orders/1002 HTTP/1.1
-Host: api.example.com
-Authorization: Bearer eyJ...
-Accept: application/json
+Host: example.com
 
 <|TOOL_PARAM_request_END_{NONCE}|>
-
 <|TOOL_PARAM_response_{NONCE}|>
 HTTP/1.1 200 OK
 Content-Type: application/json
 
-{"id":1002,"owner":"other-user","amount":199}
+{"id":1002,"owner":"other-user"}
 <|TOOL_PARAM_response_END_{NONCE}|>
-
-### Example 5: Weak password finding without HTTP traffic
-
-```json
-{
-  "@action": "call-tool",
-  "tool": "cybersecurity-risk",
-  "identifier": "ssh_weak_password",
-  "params": {
-    "target": "192.168.1.10:22",
-    "title": "SSH 服务存在弱口令",
-    "type": "weak-pass",
-    "severity": "high",
-    "summary": "SSH 服务允许使用弱口令登录，攻击者可通过已知弱凭据直接获得服务器访问权限。",
-    "parameter": "password",
-    "payload": "admin:admin123"
-  }
-}
-```
-
-### Example 6: SSRF with explicit remediation
-
-```json
-{
-  "@action": "call-tool",
-  "tool": "cybersecurity-risk",
-  "identifier": "ssrf_webhook_endpoint",
-  "params": {
-    "target": "https://example.com/api/webhook/test",
-    "title": "Webhook 测试接口存在 SSRF",
-    "type": "ssrf",
-    "severity": "high",
-    "summary": "url 参数可控制服务端发起请求，且能够访问内网地址与云元数据地址，存在服务端请求伪造风险。",
-    "parameter": "url",
-    "payload": "http://169.254.169.254/latest/meta-data/"
-  }
-}
-```
-
-<|TOOL_PARAM_solution_{NONCE}|>
-1. 对目标地址建立协议、端口、域名/IP 白名单
-2. 拦截内网、回环、链路本地与云元数据地址访问
-3. 禁止跟随任意重定向到非白名单目标
-4. 为出站请求增加审计与超时限制
-<|TOOL_PARAM_solution_END_{NONCE}|>
-
-### Example 7: Information exposure with inline response only
-
-```json
-{
-  "@action": "call-tool",
-  "tool": "cybersecurity-risk",
-  "identifier": "env_file_exposure",
-  "params": {
-    "target": "https://example.com/.env",
-    "title": ".env 文件敏感信息泄露",
-    "type": "info-exposure",
-    "severity": "high",
-    "summary": "公开可访问的 .env 文件泄露数据库和应用密钥配置，攻击者可直接获取敏感凭据。"
-  }
-}
-```
-
-<|TOOL_PARAM_response_{NONCE}|>
-HTTP/1.1 200 OK
-Content-Type: text/plain
-
-APP_ENV=production
-DB_PASSWORD=super-secret
-JWT_SECRET=very-secret-value
-<|TOOL_PARAM_response_END_{NONCE}|>
-
-### Example 8: Path traversal with inline request only
-
-```json
-{
-  "@action": "call-tool",
-  "tool": "cybersecurity-risk",
-  "identifier": "download_path_traversal",
-  "params": {
-    "target": "https://example.com/download",
-    "title": "下载接口存在路径遍历",
-    "type": "path-traversal",
-    "severity": "high",
-    "summary": "下载接口对 file 参数缺少路径约束，可读取站点目录外的系统文件。",
-    "parameter": "file",
-    "payload": "../../../../etc/passwd"
-  }
-}
-```
-
-<|TOOL_PARAM_request_{NONCE}|>
-GET /download?file=../../../../etc/passwd HTTP/1.1
-Host: example.com
-Accept: */*
-
-<|TOOL_PARAM_request_END_{NONCE}|>
-
-### Example 9: Informational baseline item with default low severity
-
-```json
-{
-  "@action": "call-tool",
-  "tool": "cybersecurity-risk",
-  "identifier": "missing_security_headers",
-  "params": {
-    "target": "https://example.com/",
-    "title": "站点缺少关键安全响应头",
-    "type": "insecure-default",
-    "summary": "首页响应中缺少 Content-Security-Policy、X-Frame-Options 和 Referrer-Policy 等关键安全头，降低整体安全基线。"
-  }
-}
-```
+[[- end -]]
 USAGE_BLOCK
 
 yakit.AutoInitYakit()
@@ -462,11 +173,11 @@ summary := cli.Text("summary", cli.setHelp("required summary: what is vulnerable
 riskType := cli.String("type", cli.setHelp("risk type such as sqli/xss/rce/ssrf/auth-bypass/unauth-access/path-traversal/info-exposure/weak-pass"), cli.setRequired(false))
 severity := cli.String("severity", cli.setHelp("risk severity: high/middle/low/info/debug"), cli.setDefault("low"))
 parameter := cli.String("parameter", cli.setHelp("triggering parameter, header, or input point"))
-payload := cli.Text("payload", cli.setHelp("payload or verification input; use AITAG when multi-line"))
-evidence := cli.Text("evidence", cli.setHelp("multi-line proof, verification notes, or concise traffic excerpts; use AITAG when needed"))
-solution := cli.Text("solution", cli.setHelp("optional explicit remediation guidance; use AITAG when multi-line"))
-requestRaw := cli.HTTPPacket("request", cli.setHelp("raw HTTP request content; use AITAG when multi-line"))
-responseRaw := cli.HTTPPacket("response", cli.setHelp("raw HTTP response content; use AITAG when multi-line"))
+payload := cli.Text("payload", cli.setHelp("payload or verification input"))
+evidence := cli.Text("evidence", cli.setHelp("concise proof, verification notes, or traffic excerpts"))
+solution := cli.Text("solution", cli.setHelp("optional explicit remediation guidance"))
+requestRaw := cli.HTTPPacket("request", cli.setHelp("raw HTTP request content"))
+responseRaw := cli.HTTPPacket("response", cli.setHelp("raw HTTP response content"))
 requestFile := cli.String("request-file", cli.setHelp("path to a saved raw HTTP request file"))
 responseFile := cli.String("response-file", cli.setHelp("path to a saved raw HTTP response file"))
 cli.check()
@@ -475,6 +186,11 @@ if summary == "" {
     yakit.Error("summary is required and must not be empty")
     return
 }
+
+// Normalize before creating risk options so the stored fields and dedup hash
+// use the same canonical type and parameter.
+riskType = normalizeType(riskType)
+parameter = normalizeParameter(parameter)
 
 title, titleVerbose = normalizeTitle(titleInput)
 description = buildDescription(summary, parameter, payload, evidence)
@@ -549,11 +265,8 @@ if responseRaw != "" {
     opts.Push(risk.response(rsp))
 }
 
-// Normalize inputs before passing to risk.NewRisk so that the same
-// logical vulnerability always produces the same deterministic hash.
+// Normalize the target before risk.NewRisk computes the dedup hash.
 target = normalizeTarget(target)
-riskType = normalizeType(riskType)
-parameter = normalizeParameter(parameter)
 
 // @ssa-ignore
 risk.NewRisk(target, opts...)
