@@ -92,6 +92,20 @@ func runSSA2LLVMCLI(t *testing.T, args ...string) processResult {
 }
 
 func runSSA2LLVMCLIInDir(t *testing.T, dir string, args ...string) processResult {
+	return runSSA2LLVMCLIInDirEnv(t, dir, nil, args...)
+}
+
+// runSSA2LLVMCLIInDirScratch is like runSSA2LLVMCLIInDir but gives the CLI its
+// own $TMPDIR, removed when the test ends. One compile writes ~600 MB of
+// scratch (a copy of the runtime archive plus the linked binary) and callers
+// that force a rebuild cannot reuse it anyway, so a per-invocation directory is
+// what keeps a long run — 115 mustpass scripts — from piling up tens of
+// gigabytes in the shared temp dir.
+func runSSA2LLVMCLIInDirScratch(t *testing.T, args ...string) processResult {
+	return runSSA2LLVMCLIInDirEnv(t, "", map[string]string{"TMPDIR": t.TempDir()}, args...)
+}
+
+func runSSA2LLVMCLIInDirEnv(t *testing.T, dir string, extraEnv map[string]string, args ...string) processResult {
 	t.Helper()
 
 	if len(args) == 0 {
@@ -118,9 +132,11 @@ func runSSA2LLVMCLIInDir(t *testing.T, dir string, args ...string) processResult
 
 	cliPath := buildSSA2LLVMCLI(t)
 	yakitHome := filepath.Join(t.TempDir(), ".db")
-	return runProcessInDir(t, dir, cliPath, map[string]string{
-		"YAKIT_HOME": yakitHome,
-	}, args...)
+	env := map[string]string{"YAKIT_HOME": yakitHome}
+	for k, v := range extraEnv {
+		env[k] = v
+	}
+	return runProcessInDir(t, dir, cliPath, env, args...)
 }
 
 func insertBeforeArgSeparator(args []string, item string) []string {
