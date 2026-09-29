@@ -94,43 +94,58 @@ __INPUT_CONSTRAINTS__ = `{
   }
 }`
 
-__DESC__ = "按换行分隔的 paths 并发发送同形 HTTP 请求，返回每条请求的状态和摘要；用于端点探测、接口批量验证和 IDOR 对比。普通请求用 base-url 或完整 URL，精确报文用含 {{PATH}} 的 packet 模板，并发数由 concurrent 控制。"
+__DESC__ = "批量发送 HTTP 请求并汇总每条结果，用于多路径探测、接口批量验证和 IDOR 对比：paths 是逐行路径/URL，也可用 {{int(...)}}、{{list(...)}} 展开；URL 模式配 base-url，原始报文模式用 packet 中的 {{PATH}} 和变量占位符渲染后发送，并发由 concurrent 控制。"
 __VERBOSE_NAME__ = "Batch HTTP Request"
 __VERBOSE_NAME_ZH__ = "批量HTTP请求"
 __KEYWORDS__ = "batch http,request multiple,concurrent,batch request,multi path,path scan,batch url,parallel request,mass request,http flood,path enumeration,directory scan,batch get,batch post,api endpoint validation,endpoint probing,api batch testing,request replay,template replay,unauthorized access check,authorization bypass verification,idor validation,horizontal privilege check,batch interface check,批量请求,并发请求,批量HTTP,多路径探测,路径枚举,目录扫描,接口批量验证,API批量测试,接口探测,端点探测,未授权访问验证,越权验证,水平越权验证,IDOR验证,批量验证接口,请求重放,模板请求,多接口测试"
 
 __USAGE__ = <<<USAGE_BLOCK
-批量 HTTP 请求：`paths` 必须是换行分隔的字符串，不能传数组；URL 模式使用 `base-url` 加相对路径，或在 `paths` 中逐行给完整 URL。需要精确报文时，用含字面量 `{{PATH}}` 的 `packet` 模板；每条路径会替换该标记，路径和查询需预先编码。
+批量 HTTP：`paths` 是换行分隔的单个字符串，每行一个相对路径或完整 URL；不能传数组。URL 模式用 `base-url` 加相对路径，也可不传 `base-url` 而逐行传完整 URL。`prefix` 给相对路径统一加前缀；`concurrent` 控制并发（默认 5）。`query`/`form` 传原始值对象，由工具编码一次；`body` 覆盖 `form`。
 
-`query`/`form` 传未转义的 JSON 对象，由工具各编码一次；`body` 为原始请求体，会覆盖 `form`。控制并发使用 `concurrent`（默认 5），不是 concurrency；默认 `timeout=10` 秒，`max-body-size=4096` 字节。可用 `delay-seconds` 控制批次节奏。
+模板只作用于 `paths` 和 `packet`：`{{int(1-3)}}` 展开 1、2、3；`{{list(a|b)}}` 展开 a、b；多个标签生成组合。Packet 模式中，`{{PATH}}` 放入当前渲染路径，`{{name}}` 从 `variables` 对象读取同名字符串（也可写 `{{params(name)}}`）。同一路径的 packet 中有 `list/int` 时会继续展开为多条请求。替换值直接进入原始报文，查询、路径、Body 中的特殊字符需先按目标格式编码；未知标签或缺失变量会报错。总请求数由 `max-requests` 限制，默认 100，最多 500；先用小范围验证模板，核对输出中的最终 request packet。
 
-查看 `RESULT.request_count`、`response_received_count`、`transport_error_count`、`status_code_distribution` 和 `items`，区分收到 404/500 与未收到响应；`include-code`、`exclude-code`、`exclude-size` 只过滤展示，不能据此判定被过滤路径安全。先做正常基线，再比较状态、长度、正文和响应头；若请求无效、认证失败或结果一致，调整请求条件继续验证。发现新入口先记入待办，对选中的单个端点用 do_http_request 深测。
-
-典型案例：两个路径提交相同表单，`paths` 在 JSON 中用 `\n` 分隔：
+典型案例 1：普通路径，每行一条；JSON 中用 `\n` 表示换行：
 ```json
-{"base-url":"https://target.example","paths":"/submit-a\n/submit-b","method":"POST","form":{"name":"a & b"},"concurrent":3}
+{"base-url":"https://target.example","paths":"/health\n/api/users\n/admin","concurrent":3}
+```
+
+典型案例 2：不同站点的完整 URL，不需要 `base-url`：
+```json
+{"paths":"https://a.example/status\nhttps://b.example/status","concurrent":2}
+```
+
+典型案例 3：路径变量加范围；实际发送 /users/1、/users/2、/users/3：
+```json
+{"base-url":"https://target.example","paths":"/{{segment}}/{{int(1-3)}}","variables":{"segment":"users"},"max-requests":3}
+```
+
+典型案例 4：列表配合统一前缀；实际发送 /v1/api/users 和 /v1/api/orders：
+```json
+{"base-url":"https://target.example","prefix":"/v1","paths":"/api/{{list(users|orders)}}","max-requests":2}
 ```
 
 [[- if .FunctionCallMode -]]
-精确报文：`packet` 与 `paths` 直接作为 JSON 字符串，多行用转义：
+典型案例 5：原始报文同时使用路径范围、报文变量和列表，2 个 ID × 2 个 view = 4 条；多行 `packet` 放在 JSON 字符串中：
 ```json
-{"packet":"GET {{PATH}} HTTP/1.1\r\nHost: target.example\r\n\r\n","paths":"/a?id=1\n/b?id=2","https":"yes","concurrent":3}
+{"paths":"/orders/{{int(1001-1002)}}","packet":"GET {{PATH}}?view={{list(summary|detail)}} HTTP/1.1\r\nHost: target.example\r\nX-Tenant: {{tenant}}\r\n\r\n","variables":{"tenant":"demo"},"https":"yes","concurrent":2,"max-requests":4}
 ```
 [[- else -]]
-精确报文：JSON 传控制参数，多行内容用本次 nonce 的 AITAG：
+典型案例 5：原始报文同时使用路径范围、报文变量和列表，2 个 ID × 2 个 view = 4 条；JSON 传控制参数，多行 `paths`/`packet` 用本次 nonce 的 AITAG：
 ```json
-{"https":"yes","concurrent":3}
+{"variables":{"tenant":"demo"},"https":"yes","concurrent":2,"max-requests":4}
 ```
+<|TOOL_PARAM_paths_{NONCE}|>
+/orders/{{int(1001-1002)}}
+<|TOOL_PARAM_paths_END_{NONCE}|>
 <|TOOL_PARAM_packet_{NONCE}|>
-GET {{PATH}} HTTP/1.1
+GET {{PATH}}?view={{list(summary|detail)}} HTTP/1.1
 Host: target.example
+X-Tenant: {{tenant}}
 
 <|TOOL_PARAM_packet_END_{NONCE}|>
-<|TOOL_PARAM_paths_{NONCE}|>
-/a?id=1
-/b?id=2
-<|TOOL_PARAM_paths_END_{NONCE}|>
 [[- end -]]
+
+`RESULT.request_count` 是展开后请求数；结合 `response_received_count`、`transport_error_count`、`status_code_distribution` 和 `items` 看每条结果。404/500 也表示收到了响应；过滤参数只影响展示，不证明目标安全。先留正常基线；结果异常时核对实际请求包，调整认证、编码或变量后再验证，发现新入口先记入待办。选出有差异的单个端点后用 do_http_request 深测。
 USAGE_BLOCK
 
 yakit.AutoInitYakit()
@@ -138,7 +153,7 @@ yakit.AutoInitYakit()
 // --- parse parameters ---
 // URL mode params
 baseUrl = cli.String("base-url", cli.setHelp("base URL or domain for URL mode"), cli.setRequired(false))
-pathsStr = cli.String("paths", cli.setHelp("paths to test as one newline-separated string, not an array; use base-url or full URLs in URL mode. Packet mode paths and query strings must already be encoded"), cli.setRequired(false))
+pathsStr = cli.String("paths", cli.setHelp("one newline-separated string of paths or full URLs; basic {{int(1-3)}} and {{list(a|b)}} tags expand paths; packet-mode request targets must already be encoded"), cli.setRequired(false))
 method = cli.String("method", cli.setHelp("HTTP method"), cli.setJsonSchema(`{"type":"string","pattern":"^[!#$%&'*+.^_~\u00600-9A-Za-z|-]+$"}`), cli.setDefault("GET"))
 headers = cli.String("headers", cli.setHelp("custom headers, one per line: 'Key: Value'; ALSO accepts a JSON object {key:value} (AI may pass either); omit when empty"), cli.setJsonSchema(`{
     "oneOf": [
@@ -174,8 +189,10 @@ prefix = cli.String("prefix", cli.setHelp("path prefix to prepend to all paths, 
 curlHeaders = cli.StringSlice("H", cli.setHelp("curl-style headers, can be used multiple times: -H 'Content-Type: application/json' -H 'Authorization: Bearer token'"), cli.setRequired(false))
 
 // Packet mode params
-packet = cli.String("packet", cli.setHelp("raw HTTP request template with {{PATH}} placeholder; substituted path/query must already be encoded"), cli.setRequired(false))
+packet = cli.String("packet", cli.setHelp("raw HTTP request template; {{PATH}} inserts each rendered path, {{name}} reads variables, and {{int(...)}}/{{list(...)}} generate packet variants"), cli.setRequired(false))
 baseHost = cli.String("base-host", cli.setHelp("host header value for packet mode"), cli.setRequired(false))
+variables = cli.Json("variables", cli.setHelp("named scalar values for {{name}} in paths or packet; values are inserted literally, so encode request-target values first"), cli.setJsonSchema(`{"type":"object","additionalProperties":{"type":"string"}}`), cli.setDefault("{}"))
+maxRequests = cli.Int("max-requests", cli.setHelp("maximum requests after path and packet template expansion; default 100, hard limit 500"), cli.setDefault(100), cli.setJsonSchema(`{"type":"integer","minimum":1,"maximum":500}`))
 
 // Common params
 httpsMode = cli.String("https", cli.setHelp("force HTTPS: yes/no/auto"), cli.setDefault("auto"))
@@ -370,6 +387,78 @@ if len(paths) == 0 {
     die("no valid paths provided")
 }
 
+if maxRequests < 1 || maxRequests > 500 {
+    die("max-requests must be between 1 and 500")
+}
+
+// Render only the documented, bounded subset of Fuzztag. Unknown {{...}}
+// must fail instead of silently becoming an empty string in a live request.
+renderTemplateVariants = fn(templateText, path, allowPath) {
+    source = templateText
+    if allowPath {
+        source = str.ReplaceAll(source, "{{PATH}}", path)
+    }
+    outsideTags = source
+    estimate = 1
+    for _, tag := range re.FindAll(source, `\{\{[^{}]*\}\}`) {
+        outsideTags = str.ReplaceAll(outsideTags, tag, "")
+        name = tag[2:len(tag)-2]
+        if str.MatchAllOfRegexp(name, `^[A-Za-z_][A-Za-z0-9_]*$`) {
+            if !(name in variables) {
+                die(sprintf("unknown template variable %s", tag))
+            }
+            source = str.ReplaceAll(source, tag, "{{params(" + name + ")}}")
+        } elif str.MatchAllOfRegexp(name, `^params\([A-Za-z_][A-Za-z0-9_]*\)$`) {
+            key = name[7:len(name)-1]
+            if !(key in variables) {
+                die(sprintf("unknown template variable %s", tag))
+            }
+        } elif str.MatchAllOfRegexp(name, `^int\([0-9]{1,6}-[0-9]{1,6}\)$`) {
+            bounds = str.Split(name[4:len(name)-1], "-")
+            first = parseInt(bounds[0])
+            last = parseInt(bounds[1])
+            if last < first || last-first+1 > maxRequests {
+                die(sprintf("template range %s exceeds max-requests", tag))
+            }
+            estimate = estimate * (last-first+1)
+        } elif str.MatchAllOfRegexp(name, `^list\([^{}]*\)$`) {
+            alternatives = str.Split(name[5:len(name)-1], "|")
+            estimate = estimate * len(alternatives)
+        } else {
+            die(sprintf("unsupported template tag %s; use {{PATH}}, {{name}}, {{int(1-3)}} or {{list(a|b)}}", tag))
+        }
+        if estimate > maxRequests {
+            die("template expansion exceeds max-requests")
+        }
+    }
+    if str.Contains(outsideTags, "{{") || str.Contains(outsideTags, "}}") {
+        die("malformed {{...}} template tag")
+    }
+    rendered = fuzz.StringsWithParam(source, variables)
+    if len(rendered) == 0 || len(rendered) > maxRequests {
+        die("template expansion is empty or exceeds max-requests")
+    }
+    return rendered
+}
+
+// Every rendered path and packet variant is one request. A packet without a
+// Fuzztag still produces exactly one request per path, preserving old calls.
+requestItems = make([]map[string]any)
+for _, p := range paths {
+    for _, expandedPath := range renderTemplateVariants(p, "", false) {
+        if packet != "" {
+            for _, renderedPacket := range renderTemplateVariants(packet, expandedPath, true) {
+                requestItems = append(requestItems, {"path": expandedPath, "packet": renderedPacket})
+            }
+        } else {
+            requestItems = append(requestItems, {"path": expandedPath, "packet": ""})
+        }
+        if len(requestItems) > maxRequests {
+            die("total rendered requests exceed max-requests")
+        }
+    }
+}
+
 // --- merge curl-style headers with headers ---
 if len(curlHeaders) > 0 {
     curlHeadersStr = ""
@@ -404,7 +493,7 @@ if len(curlHeaders) > 0 {
 }
 
 yakit.Info("=== Batch HTTP Request Tool ===")
-yakit.Info("Total paths to test: %d", len(paths))
+yakit.Info("Total paths to test: %d", len(requestItems))
 yakit.Info("Concurrency: %d, Delay: %.2fs, Timeout: %ds", concurrent, delaySeconds, timeout)
 
 // If delay > 0, force sequential execution
@@ -593,8 +682,8 @@ buildRequestFromUrlMode = fn(path, base) {
 }
 
 // --- build request from packet mode ---
-buildRequestFromPacketMode = fn(path) {
-    rawPacket = []byte(str.ReplaceAll(packet, "{{PATH}}", path))
+buildRequestFromPacketMode = fn(renderedPacket) {
+    rawPacket = []byte(renderedPacket)
 
     // Extract host from packet if not provided
     host = baseHost
@@ -626,7 +715,7 @@ printRequestPacket = fn(idx, path, requestPacket) {
 }
 
 // --- execute single request ---
-executeRequest = fn(idx, path, base) {
+executeRequest = fn(idx, path, base, renderedPacket) {
     opts = buildOpts()
 
     isHttps = false
@@ -634,7 +723,7 @@ executeRequest = fn(idx, path, base) {
     err = undefined
 
     if packet != "" {
-        isHttps, rawPacket, err = buildRequestFromPacketMode(path)
+        isHttps, rawPacket, err = buildRequestFromPacketMode(renderedPacket)
     } else {
         isHttps, rawPacket, err = buildRequestFromUrlMode(path, base)
     }
@@ -699,12 +788,13 @@ if concurrent > 1 {
     yakit.Info("Starting concurrent batch requests...")
     swg = sync.NewSizedWaitGroup(concurrent)
 
-    for i, p := range paths {
+    for i, item := range requestItems {
         swg.Add()
-        go fn(idx, path) {
+        go fn(idx, requestItem) {
             defer swg.Done()
 
-            result = executeRequest(idx+1, path, baseUrl)
+            path = requestItem["path"]
+            result = executeRequest(idx+1, path, baseUrl, requestItem["packet"])
 
             resultsLock.Lock()
             results = append(results, result)
@@ -722,16 +812,17 @@ if concurrent > 1 {
             if result["filtered"] != true && result["response_received"] == true {
                 status = result["status"]
                 size = result["size"]
-                yakit.Info("[%d/%d] %s -> Status: %d, Size: %d bytes", idx+1, len(paths), path, status, size)
+                yakit.Info("[%d/%d] %s -> Status: %d, Size: %d bytes", idx+1, len(requestItems), path, status, size)
             }
-        }(i, p)
+        }(i, item)
     }
 
     swg.Wait()
 } else {
     yakit.Info("Starting sequential batch requests...")
-    for i, p := range paths {
-        result = executeRequest(i+1, p, baseUrl)
+    for i, item := range requestItems {
+        p = item["path"]
+        result = executeRequest(i+1, p, baseUrl, item["packet"])
 
         results = append(results, result)
         if result["response_received"] == true {
@@ -747,18 +838,18 @@ if concurrent > 1 {
         if result["filtered"] != true && result["response_received"] == true {
             status = result["status"]
             size = result["size"]
-            yakit.Info("[%d/%d] %s -> Status: %d, Size: %d bytes", i+1, len(paths), p, status, size)
+            yakit.Info("[%d/%d] %s -> Status: %d, Size: %d bytes", i+1, len(requestItems), p, status, size)
         }
 
         // Delay between requests
-        if delaySeconds > 0 && i < len(paths)-1 {
+        if delaySeconds > 0 && i < len(requestItems)-1 {
             sleep(delaySeconds)
         }
     }
 }
 
 yakit.Info("=== Batch Request Summary ===")
-yakit.Info("Total: %d, Responses: %d, Filtered: %d, Transport errors: %d", len(paths), responseCount, filteredCount, errorCount)
+yakit.Info("Total: %d, Responses: %d, Filtered: %d, Transport errors: %d", len(requestItems), responseCount, filteredCount, errorCount)
 
 // Save complete response bytes before rendering previews. Never replay a request
 // because presentation or artifact persistence failed.
@@ -780,7 +871,7 @@ if err != nil {
     yakit.Error("Failed to create output file: %v", err)
 } else {
     outputContent = sprintf("=== Batch HTTP Request Results ===\n")
-    outputContent += sprintf("Total Requests: %d\n", len(paths))
+    outputContent += sprintf("Total Requests: %d\n", len(requestItems))
     outputContent += sprintf("Responses received: %d\n", responseCount)
     outputContent += sprintf("Filtered: %d\n", filteredCount)
     outputContent += sprintf("Errors: %d\n\n", errorCount)
@@ -908,7 +999,7 @@ for _, item := range results {
 }
 
 RESULT = {
-    "request_count": len(paths),
+    "request_count": len(requestItems),
     "request_completed_count": len(results),
     "response_received_count": responseCount,
     "filtered_count": filteredCount,
