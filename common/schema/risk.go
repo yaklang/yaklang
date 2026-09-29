@@ -61,18 +61,18 @@ type Risk struct {
 	// 潜在威胁：用于输出合规性质的漏洞内容
 	IsPotential bool `json:"is_potential"`
 
-	CVE                 string  `json:"cve"`
-	IsRead              bool    `json:"is_read"`
-	Ignore              bool    `json:"ignore"`
-	UploadOnline        bool    `json:"upload_online"`
-	TaskName            string  `json:"task_name"`
-	CveAccessVector     string  `json:"cve_access_vector"`
-	CveAccessComplexity string  `json:"cve_access_complexity"`
+	CVE                 string    `json:"cve"`
+	IsRead              bool      `json:"is_read"`
+	Ignore              bool      `json:"ignore"`
+	UploadOnline        bool      `json:"upload_online"`
+	TaskName            string    `json:"task_name"`
+	CveAccessVector     string    `json:"cve_access_vector"`
+	CveAccessComplexity string    `json:"cve_access_complexity"`
 	Tags                string    `json:"tags"`
-	VerifierUid            string    `json:"verifierUid"`        // 验证人
-	FixTime             time.Time `json:"fix_time"`        // 修复时间
-	FixSuggestion       string    `json:"fix_suggestion"`  // 修复建议
-	TagReason        string    `json:"tag_reason"`  // 处置原因
+	VerifierUid         string    `json:"verifierUid"`    // 验证人
+	FixTime             time.Time `json:"fix_time"`       // 修复时间
+	FixSuggestion       string    `json:"fix_suggestion"` // 修复建议
+	TagReason           string    `json:"tag_reason"`     // 处置原因
 	SeverityScore       float64   `json:"severity_score"`
 
 	// SyntaxFlow
@@ -230,6 +230,10 @@ func (p *Risk) ToGRPCModel() *ypb.Risk {
 		ProgramName:        p.ProgramName,
 		SyntaxFlowVariable: p.Variable,
 		IsPotential:        p.IsPotential,
+		SeverityScore:      p.SeverityScore,
+		TagReason:          p.TagReason,
+		FixTime:            p.FixTime.Unix(),
+		FixSuggestion:      p.FixSuggestion,
 	}
 }
 

@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -2218,51 +2219,58 @@ func TestBatchSetHTTPFlowIssueFields(t *testing.T) {
 	require.NoError(t, yakit.InsertHTTPFlow(db, flow))
 	defer yakit.DeleteHTTPFlowByID(db, int64(flow.ID))
 
-	mockey.PatchConvey("skip online sync, test local batch update", t, func() {
-		mockClient := new(yaklib.OnlineClient)
-
-		mockey.Mock((*yaklib.OnlineClient).SetHTTPFlowTagsToOnline).
-			To(func(_ *yaklib.OnlineClient, ctx context.Context, tk string, hashes []string, issueType, severity, status, statusReason string) error {
-				assert.NotEmpty(t, hashes)
-				assert.Equal(t, "sql-injection", issueType)
-				assert.Equal(t, "high", severity)
-				assert.Equal(t, "confirmed", status)
-				assert.Equal(t, "verified by admin", statusReason)
-				return nil
-			}).Build()
-
-		mockey.Mock(yaklib.NewOnlineClient).
-			To(func(baseUrl string) *yaklib.OnlineClient {
-				return mockClient
-			}).Build()
-
-		server := &TestServerWrapper{
-			Server:       &Server{},
-			onlineClient: yaklib.OnlineClient{},
+	var gotIssueType, gotSeverity, gotStatus, gotStatusReason string
+	var gotHashes []string
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		require.Equal(t, "/api/set/httpflow/tags", r.URL.Path)
+		require.Equal(t, "test-token", r.Header.Get("Authorization"))
+		var body struct {
+			Hash         string `json:"hash"`
+			SetIssueType string `json:"setIssueType"`
+			SetSeverity  string `json:"setSeverity"`
+			SetStatus    string `json:"setStatus"`
+			StatusReason string `json:"statusReason"`
 		}
+		require.NoError(t, json.NewDecoder(r.Body).Decode(&body))
+		gotHashes = strings.Split(body.Hash, ",")
+		gotIssueType, gotSeverity, gotStatus, gotStatusReason =
+			body.SetIssueType, body.SetSeverity, body.SetStatus, body.StatusReason
+		_, _ = w.Write([]byte(`{}`))
+	}))
+	defer ts.Close()
+	oldBase := consts.GetOnlineBaseUrl()
+	consts.SetOnlineBaseUrl(ts.URL)
+	t.Cleanup(func() { consts.SetOnlineBaseUrl(oldBase) })
 
-		req := &ypb.BatchSetHTTPFlowIssueFieldsRequest{
-			Hashes:       []string{flow.Hash},
-			SetIssueType: "sql-injection",
-			SetSeverity:  "high",
-			SetStatus:    "confirmed",
-			StatusReason: "verified by admin",
-			Token:        "test-token",
-		}
+	server := &Server{}
 
-		resp, err := server.BatchSetHTTPFlowIssueFields(context.Background(), req)
-		require.NoError(t, err)
-		require.NotNil(t, resp)
-		assert.Greater(t, resp.UpdatedCount, int64(0))
+	req := &ypb.BatchSetHTTPFlowIssueFieldsRequest{
+		Hashes:       []string{flow.Hash},
+		SetIssueType: "sql-injection",
+		SetSeverity:  "high",
+		SetStatus:    "confirmed",
+		StatusReason: "verified by admin",
+		Token:        "test-token",
+	}
 
-		// 验证本地数据已更新
-		updated, err := yakit.GetHTTPFlowByHash(db, flow.Hash)
-		require.NoError(t, err)
-		assert.Equal(t, "sql-injection", updated.IssueType)
-		assert.Equal(t, "high", updated.Severity)
-		assert.Equal(t, "confirmed", updated.Status)
-		assert.Equal(t, "verified by admin", updated.StatusReason)
-	})
+	resp, err := server.BatchSetHTTPFlowIssueFields(context.Background(), req)
+	require.NoError(t, err)
+	require.NotNil(t, resp)
+	assert.Greater(t, resp.UpdatedCount, int64(0))
+
+	assert.NotEmpty(t, gotHashes)
+	assert.Contains(t, gotHashes, flow.Hash)
+	assert.Equal(t, "sql-injection", gotIssueType)
+	assert.Equal(t, "high", gotSeverity)
+	assert.Equal(t, "confirmed", gotStatus)
+	assert.Equal(t, "verified by admin", gotStatusReason)
+
+	updated, err := yakit.GetHTTPFlowByHash(db, flow.Hash)
+	require.NoError(t, err)
+	assert.Equal(t, "sql-injection", updated.IssueType)
+	assert.Equal(t, "high", updated.Severity)
+	assert.Equal(t, "confirmed", updated.Status)
+	assert.Equal(t, "verified by admin", updated.StatusReason)
 }
 
 func TestHTTPFlowsFromOnline(t *testing.T) {
@@ -2277,105 +2285,82 @@ func TestHTTPFlowsFromOnline(t *testing.T) {
 	require.NoError(t, yakit.InsertHTTPFlow(db, existingFlow))
 	defer yakit.DeleteHTTPFlowByID(db, int64(existingFlow.ID))
 
-	// 不存在的新 httpflow：提供原始请求数据，hash 由 BeforeSave/CalcHash 决定
 	newReqRaw := []byte("POST / HTTP/1.1\r\nHost: new-" + token + ".com\r\n\r\n")
-	mockItems := []*yaklib.DownloadHTTPFlowStreamItem{
-		{
-			Flow: &yaklib.DownloadHTTPFlowItem{
-				Hash:         existingFlow.Hash, // 已存在 → 更新四个标识字段
-				URL:          "http://" + token + ".com",
-				Method:       "GET",
-				IssueType:    "sql-injection",
-				Severity:     "high",
-				Status:       "confirmed",
-				StatusReason: "verified",
+
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		require.Equal(t, "/api/httpflow/download", r.URL.Path)
+		require.Equal(t, "test-token", r.Header.Get("Authorization"))
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"pagemeta": map[string]any{"page": 1, "total": 2, "total_page": 1, "limit": 30},
+			"data": []map[string]any{
+				{
+					"hash":         existingFlow.Hash,
+					"url":          "http://" + token + ".com",
+					"method":       "GET",
+					"issueType":    "sql-injection",
+					"severity":     "high",
+					"status":       "confirmed",
+					"statusReason": "verified",
+				},
+				{
+					"url":       "http://new-" + token + ".com",
+					"method":    "POST",
+					"request":   string(newReqRaw),
+					"issueType": "xss",
+					"severity":  "medium",
+					"status":    "pending",
+				},
 			},
-			Total: 2,
-		},
-		{
-			Flow: &yaklib.DownloadHTTPFlowItem{
-				Hash:      "", // hash 由 BeforeSave 的 CalcHash 计算
-				URL:       "http://new-" + token + ".com",
-				Method:    "POST",
-				Request:   string(newReqRaw),
-				IssueType: "xss",
-				Severity:  "medium",
-				Status:    "pending",
-			},
-			Total: 2,
-		},
+		})
+	}))
+	defer ts.Close()
+	oldBase := consts.GetOnlineBaseUrl()
+	consts.SetOnlineBaseUrl(ts.URL)
+	t.Cleanup(func() { consts.SetOnlineBaseUrl(oldBase) })
+
+	client, err := NewLocalClient()
+	require.NoError(t, err)
+
+	stream, err := client.HTTPFlowsFromOnline(context.Background(), &ypb.HTTPFlowsFromOnlineRequest{
+		Token: "test-token",
+	})
+	require.NoError(t, err)
+
+	var progressLogs []string
+	for {
+		msg, err := stream.Recv()
+		if err != nil {
+			break
+		}
+		progressLogs = append(progressLogs, msg.Log)
 	}
 
-	mockey.PatchConvey("mock download from online", t, func() {
-		mockClient := new(yaklib.OnlineClient)
-
-		mockey.Mock((*yaklib.OnlineClient).DownloadHTTPFlows).
-			To(func(_ *yaklib.OnlineClient, ctx context.Context, tk string) (chan *yaklib.DownloadHTTPFlowStreamItem, error) {
-				ch := make(chan *yaklib.DownloadHTTPFlowStreamItem, len(mockItems))
-				for _, item := range mockItems {
-					ch <- item
-				}
-				close(ch)
-				return ch, nil
-			}).Build()
-
-		mockey.Mock(yaklib.NewOnlineClient).
-			To(func(baseUrl string) *yaklib.OnlineClient {
-				return mockClient
-			}).Build()
-
-		mockey.Mock(yaklib.DownloadOnlineAuthProxy).
-			To(func(baseUrl string) error {
-				return nil
-			}).Build()
-
-		client, err := NewLocalClient()
-		require.NoError(t, err)
-
-		stream, err := client.HTTPFlowsFromOnline(context.Background(), &ypb.HTTPFlowsFromOnlineRequest{
-			Token: "test-token",
-		})
-		require.NoError(t, err)
-
-		var progressLogs []string
-		for {
-			msg, err := stream.Recv()
-			if err != nil {
-				break
-			}
-			progressLogs = append(progressLogs, msg.Log)
+	foundUpdate := false
+	foundInsert := false
+	for _, logMsg := range progressLogs {
+		if logMsg == "update ["+existingFlow.Hash+"] issue fields finished" {
+			foundUpdate = true
 		}
-
-		foundUpdate := false
-		foundInsert := false
-		for _, logMsg := range progressLogs {
-			if logMsg == "update ["+existingFlow.Hash+"] issue fields finished" {
-				foundUpdate = true
-			}
-			if strings.HasPrefix(logMsg, "insert ") && strings.HasSuffix(logMsg, "] finished") {
-				foundInsert = true
-			}
+		if strings.HasPrefix(logMsg, "insert ") && strings.HasSuffix(logMsg, "] finished") {
+			foundInsert = true
 		}
-		assert.True(t, foundUpdate, "should have updated existing httpflow")
-		assert.True(t, foundInsert, "should have inserted new httpflow")
+	}
+	assert.True(t, foundUpdate, "should have updated existing httpflow")
+	assert.True(t, foundInsert, "should have inserted new httpflow")
 
-		// 验证已存在的 httpflow 字段已更新
-		updated, err := yakit.GetHTTPFlowByHash(db, existingFlow.Hash)
-		require.NoError(t, err)
-		assert.Equal(t, "sql-injection", updated.IssueType)
-		assert.Equal(t, "high", updated.Severity)
-		assert.Equal(t, "confirmed", updated.Status)
-		assert.Equal(t, "verified", updated.StatusReason)
+	updated, err := yakit.GetHTTPFlowByHash(db, existingFlow.Hash)
+	require.NoError(t, err)
+	assert.Equal(t, "sql-injection", updated.IssueType)
+	assert.Equal(t, "high", updated.Severity)
+	assert.Equal(t, "confirmed", updated.Status)
+	assert.Equal(t, "verified", updated.StatusReason)
 
-		// 验证新 httpflow 已写入（BeforeSave 会重算 hash，用 URL keyword 查询）
-		_, newFlows, err := yakit.QueryHTTPFlow(db, &ypb.QueryHTTPFlowRequest{
-			Keyword: "new-" + token,
-		})
-		require.NoError(t, err)
-		require.NotEmpty(t, newFlows)
-		// 清理所有匹配的 httpflow
-		for _, f := range newFlows {
-			yakit.DeleteHTTPFlowByID(db, int64(f.ID))
-		}
+	_, newFlows, err := yakit.QueryHTTPFlow(db, &ypb.QueryHTTPFlowRequest{
+		Keyword: "new-" + token,
 	})
+	require.NoError(t, err)
+	require.NotEmpty(t, newFlows)
+	for _, f := range newFlows {
+		yakit.DeleteHTTPFlowByID(db, int64(f.ID))
+	}
 }
