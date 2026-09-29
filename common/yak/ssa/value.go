@@ -355,7 +355,7 @@ func (b *FunctionBuilder) AssignVariable(variable *Variable, value Value) {
 		newValue.SetName(originName)
 		newValue.SetVerboseName(originName)
 
-		if newVariable := b.CreateVariableGlobalIndex(originName, originGlobalId); v != nil {
+		if newVariable := b.CreateVariableGlobalIndex(originName, originGlobalId); newVariable != nil {
 			b.AssignVariable(newVariable, newValue)
 			newVariable.SetCross(true)
 		}

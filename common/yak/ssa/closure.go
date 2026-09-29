@@ -232,6 +232,40 @@ func shouldBindSideEffectInCurrentScope(se *FunctionSideEffect, lexicalVar, bind
 	return lexicalVar.GetCaptured() == bindVariable.GetCaptured()
 }
 
+// valueForSideEffectAssign merges a side effect with the value already visible
+// in a loop. Assigning the side effect alone drops the value carried from the
+// previous iteration; the merge phi keeps both reachable.
+func valueForSideEffectAssign(builder *FunctionBuilder, variable *Variable, sideEffect Value) Value {
+	if builder == nil || builder.CurrentBlock == nil || variable == nil || utils.IsNil(sideEffect) {
+		return sideEffect
+	}
+	block := builder.CurrentBlock
+	if !block.IsBlock(LoopBody) && !block.IsBlock(LoopLatch) && !block.IsBlock(LoopCondition) {
+		return sideEffect
+	}
+	name := variable.GetName()
+	if name == "" {
+		return sideEffect
+	}
+	var previous Value
+	for scope := ScopeIF(block.ScopeTable); scope != nil; scope = scope.GetParent() {
+		found := ReadVariableFromScope(scope, name)
+		if found == nil || utils.IsNil(found.GetValue()) {
+			continue
+		}
+		previous = found.GetValue()
+		break
+	}
+	if utils.IsNil(previous) || previous.GetId() == sideEffect.GetId() {
+		return sideEffect
+	}
+	merged := generatePhi(builder, block, nil)(name, []Value{previous, sideEffect})
+	if utils.IsNil(merged) {
+		return sideEffect
+	}
+	return merged
+}
+
 func handleSideEffect(c *Call, funcTyp *FunctionType, buildPointer bool) {
 	currentScope := c.GetBlock().ScopeTable
 	function := c.GetFunc()
@@ -397,19 +431,13 @@ func handleSideEffect(c *Call, funcTyp *FunctionType, buildPointer bool) {
 			log.Warnf("[ssa.handleSideEffect] skip side effect %s: variable creation failed", se.Name)
 			continue
 		}
-		if variable == nil {
-			log.Warnf("[ssa.handleSideEffectBind] skip side effect %s: variable creation failed", se.Name)
-			continue
-		}
 		if sideEffect := builder.EmitSideEffect(se.Name, c, modify); sideEffect != nil {
-			// TODO: handle side effect in loop scope,
-			// will replace value in scope and create new phi
 			sideEffect = builder.SwitchFreevalueInSideEffect(se.Name, sideEffect)
 			if v := ReadVariableFromScopeAndParent(currentScope, se.Name); v != nil {
 				variable.SetCaptured(v)
 			}
 
-			builder.AssignVariable(variable, sideEffect)
+			builder.AssignVariable(variable, valueForSideEffectAssign(builder, variable, sideEffect))
 
 			// 计算实际的 VerboseName（使用调用时的实际参数值）
 			actualVerboseName := computeActualVerboseName(c, se)
@@ -595,13 +623,11 @@ func handleSideEffectBind(c *Call, funcTyp *FunctionType) {
 			actualVerboseName := computeActualVerboseName(c, se)
 
 			assignSideEffectInCurrentScope := func() {
-				// TODO: handle side effect in loop scope,
-				// will replace value in scope and create new phi
 				sideEffect = builder.SwitchFreevalueInSideEffect(se.Name, sideEffect)
 				if se.Variable != nil {
 					variable.SetCaptured(se.Variable)
 				}
-				builder.AssignVariable(variable, sideEffect)
+				builder.AssignVariable(variable, valueForSideEffectAssign(builder, variable, sideEffect))
 				sideEffect.SetVerboseName(actualVerboseName)
 				if c.SideEffectValue == nil {
 					c.SideEffectValue = make(map[string]int64)

@@ -44,11 +44,10 @@ func SpinHandle(name string, phiValue, header, latch Value) map[string]Value {
 		// this  value not change in this loop, should replace phi-value to header value
 		if phiValue == latch || header == latch {
 			ReplaceAllValue(phiValue, header)
-			DeleteInst(phiValue)
-
 			for name, v := range ReplaceMemberCall(phiValue, header) {
 				ret[name] = v
 			}
+			DeleteInst(phiValue)
 
 			var CreatePhi func(Value)
 			pass := make(map[Value]struct{})
@@ -149,6 +148,25 @@ func SpinHandle(name string, phiValue, header, latch Value) map[string]Value {
 
 var _ ssautil.SpinHandle[Value] = SpinHandle
 
+// normalizePhiIncoming drops only Go-nil operands. Duplicate ids are kept:
+// each incoming value is a CFG predecessor, and analysis/tests depend on
+// that multiplicity (e.g. if/switch merges of the same value).
+// A one-edge Phi is still emitted; folding it back to the value itself
+// drops Const-nil / trivial merge sites that TopDef reports by name.
+func normalizePhiIncoming(vs []Value) Values {
+	if len(vs) == 0 {
+		return nil
+	}
+	out := make(Values, 0, len(vs))
+	for _, v := range vs {
+		if v == nil || utils.IsNil(v) {
+			continue
+		}
+		out = append(out, v)
+	}
+	return out
+}
+
 // build phi
 func generatePhi(builder *FunctionBuilder, block *BasicBlock, cfgEntryBlock Value) func(name string, t []Value) Value {
 	return func(name string, vst []Value) Value {
@@ -171,16 +189,14 @@ func generatePhi(builder *FunctionBuilder, block *BasicBlock, cfgEntryBlock Valu
 			}()
 		}
 
-		var t Type
-		var vs []Value
-		typeMerge := make(map[Type]struct{})
-
-		for _, v := range vst {
-			vs = append(vs, v)
-		}
+		vs := normalizePhiIncoming(vst)
 		if len(vs) == 0 {
 			return nil
 		}
+
+		var t Type
+		typeMerge := make(map[Type]struct{})
+
 		for _, v := range vs {
 			if v.GetType().GetTypeKind() == AnyTypeKind {
 				continue
@@ -205,10 +221,10 @@ func generatePhi(builder *FunctionBuilder, block *BasicBlock, cfgEntryBlock Valu
 			t = NewOrType(lo.Keys(typeMerge)...)
 		}
 		phi := builder.EmitPhi(name, vs)
-		phi.SetType(t)
 		if utils.IsNil(phi) {
 			return nil
 		}
+		phi.SetType(t)
 		phi.GetProgram().SetVirtualRegister(phi)
 		phi.GetProgram().SetInstructionWithName(name, phi)
 		phi.SetVerboseName(vs[0].GetVerboseName())
