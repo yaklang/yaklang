@@ -71,6 +71,11 @@ type queryConfig struct {
 	// When set, risks are submitted to it instead of being written here.
 	scanRuntime *ScanRuntime
 
+	// noFinalize leaves the finished result to the caller: no risk is built
+	// and no consumer is notified. A rule that runs once per unit merges the
+	// unit frames and finalizes the merged result exactly once.
+	noFinalize bool
+
 	// control
 	ctx context.Context
 
@@ -280,6 +285,12 @@ func QuerySyntaxflow(opt ...QueryOption) (*SyntaxFlowResult, error) {
 	defer process(1, "end query syntaxflow")
 	if config.program != nil {
 		ret.program = config.program
+		if config.noFinalize {
+			// The caller merges this frame with its siblings and publishes the
+			// merged result, so nothing is built or delivered here.
+			ret.TaskID = config.taskID
+			return ret, nil
+		}
 		switch kind := config.GetSyntaxFlowResultKind(); kind {
 		case ssaconfig.SFResultSaveDatabase:
 			process(float64(total-1)/float64(total), "save result")
@@ -497,6 +508,18 @@ func QueryWithScanRuntime(rt *ScanRuntime) QueryOption {
 	return func(c *queryConfig) {
 		if rt != nil {
 			c.scanRuntime = rt
+		}
+	}
+}
+
+// QueryWithNoFinalize runs the frame and returns its result without building
+// risks or notifying consumers. Callers that merge several executions of one
+// rule (for example one per compile unit) use it and finalize the merged
+// result themselves.
+func QueryWithNoFinalize() QueryOption {
+	return func(c *queryConfig) {
+		if c != nil {
+			c.noFinalize = true
 		}
 	}
 }
@@ -753,18 +776,24 @@ func (ps Programs) SyntaxFlowRuleName(ruleName string, opts ...QueryOption) (*Sy
 	return QuerySyntaxflow(opts...)
 }
 
+// SyntaxFlowRule runs one rule against the program, whichever mode the rule
+// declares: an SSA rule feeds on the program, a source rule runs on the
+// program's own source snapshot, and a struct rule runs over the program's
+// application/library units. Everything else (runtime, task, callbacks,
+// budget) travels through opts unchanged.
 func (p *Program) SyntaxFlowRule(rule *schema.SyntaxFlowRule, opts ...QueryOption) (*SyntaxFlowResult, error) {
-	if p != nil && rule.IsSourceMode() {
-		return nil, utils.Errorf(
-			"SSA program target cannot execute source rule %s; source rules require a raw source target",
-			ruleGetRuleName(rule),
-		)
+	if rule != nil && rule.IsSourceMode() {
+		return p.queryProgramSourceRule(rule, opts...)
 	}
-	if p != nil && rule.IsStructMode() {
-		return nil, utils.Errorf(
-			"SSA program target cannot execute struct rule %s; struct rules require QueryWithStruct",
-			ruleGetRuleName(rule),
-		)
+	if rule != nil && rule.IsStructMode() {
+		res, err := p.queryProgramStructRule(rule, opts...)
+		if err != nil {
+			return nil, err
+		}
+		if err := finalizeProgramRuleResult(res); err != nil {
+			return res, err
+		}
+		return res, nil
 	}
 	opts = append(opts, QueryWithProgram(p), QueryWithRule(rule))
 	return QuerySyntaxflow(opts...)
