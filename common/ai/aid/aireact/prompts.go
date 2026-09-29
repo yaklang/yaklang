@@ -413,7 +413,11 @@ func (pm *PromptManager) generateToolParamsPromptWithMetaForQueryAndLoop(
 	})
 	dynamicData["ToolName"] = tool.Name
 	dynamicData["ToolDescription"] = tool.Description
-	dynamicData["ToolUsage"] = tool.Usage
+	toolUsage, err := aitool.RenderUsageForMode(tool.Usage, false)
+	if err != nil {
+		return nil, fmt.Errorf("render Usage for tool %q: %w", tool.Name, err)
+	}
+	dynamicData["ToolUsage"] = toolUsage
 	dynamicData["ParamNames"] = paramNames
 	dynamicData["OriginalQuery"] = originalQuery
 	dynamicData["ToolSchema"] = toolSchema
@@ -611,7 +615,11 @@ func (pm *PromptManager) GenerateReGenerateToolParamsPromptWithMeta(
 	})
 	dynamicData["ToolName"] = oldTool.Name
 	dynamicData["ToolDescription"] = oldTool.Description
-	dynamicData["ToolUsage"] = oldTool.Usage
+	toolUsage, err := aitool.RenderUsageForMode(oldTool.Usage, false)
+	if err != nil {
+		return nil, fmt.Errorf("render Usage for tool %q: %w", oldTool.Name, err)
+	}
+	dynamicData["ToolUsage"] = toolUsage
 	dynamicData["OldParams"] = oldParamsDump
 	dynamicData["ParamNames"] = paramNames
 	dynamicData["ToolSchema"] = schemaString

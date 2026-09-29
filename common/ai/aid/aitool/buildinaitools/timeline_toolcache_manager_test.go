@@ -61,6 +61,18 @@ func TestRecentToolCacheMutationReportsUpsertAndReuse(t *testing.T) {
 	assert.Equal(t, len(mgr.GetRecentToolNames()), 1, "reuse and schema replacement must not duplicate entries")
 }
 
+func TestRecentToolEntryDefaultsUsageToFunctionCallMode(t *testing.T) {
+	mgr := newManagerWithCache(0)
+	tool := makeTool("mode_sensitive", "Run a command", aitool.WithUsage("SHARED [[- if .FunctionCallMode -]]JSON_ONLY[[- else -]]AITAG_ONLY[[- end -]]"))
+	entry := mgr.AddRecentlyUsedTool(tool).Upsert
+	assert.Assert(t, entry != nil)
+	assert.Equal(t, entry.Usage, "SHARED JSON_ONLY")
+	rendered := RenderRecentToolEntryForPromotion(entry)
+	assert.Check(t, strings.Contains(rendered, "SHARED"))
+	assert.Check(t, strings.Contains(rendered, "JSON_ONLY"))
+	assert.Check(t, !strings.Contains(rendered, "AITAG_ONLY"))
+}
+
 func TestRecentToolCacheMutationReportsEviction(t *testing.T) {
 	probeMgr := newManagerWithCache(0)
 	probe := makeTool("probe", "same", aitool.WithStringParam("x"))

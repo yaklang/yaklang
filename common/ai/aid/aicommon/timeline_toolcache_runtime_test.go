@@ -27,6 +27,30 @@ func restoreCacheTimeline(t *testing.T, source *Timeline, cfg *Config) {
 	cfg.restoreRecentToolsFromTimeline()
 }
 
+func TestTimelineToolCacheUsageDefaultsToFunctionCallMode(t *testing.T) {
+	tool := aitool.NewWithoutCallback("mode_sensitive",
+		aitool.WithStringParam("command"),
+		aitool.WithUsage("SHARED [[- if .FunctionCallMode -]]JSON_ONLY[[- else -]]AITAG_ONLY[[- end -]]"))
+	for _, native := range []bool{false, true} {
+		cfg := NewConfig(context.Background(), WithDisableAutoSkills(true),
+			WithEnableFunctionCallMode(native),
+			WithToolManager(buildinaitools.NewToolManager(buildinaitools.WithOnlyTools(tool))))
+		cfg.RecordRecentlyUsedTool(tool)
+		view := RenderTimelineFrozenOpen(cfg.Timeline).Open
+		require.Contains(t, view, "SHARED")
+		require.Contains(t, view, "JSON_ONLY")
+		require.NotContains(t, view, "AITAG_ONLY")
+		cfg.Timeline.FreezeAll()
+		restored := NewConfig(context.Background(), WithDisableAutoSkills(true),
+			WithEnableFunctionCallMode(native),
+			WithToolManager(buildinaitools.NewToolManager(buildinaitools.WithOnlyTools(tool))))
+		restoreCacheTimeline(t, cfg.Timeline, restored)
+		restoredView := RenderTimelineFrozenOpen(restored.Timeline).PromotedSemiDynamic1
+		require.Contains(t, restoredView, "JSON_ONLY")
+		require.NotContains(t, restoredView, "AITAG_ONLY")
+	}
+}
+
 // Load A/B -> freeze -> reuse A -> reload -> reuse B. Reload must retain the
 // pending recency without sealing it or copying either schema into Open.
 // Schema changes and removals are then appended as new deltas and only replace

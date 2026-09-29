@@ -632,7 +632,12 @@ func (m *AiToolManager) addRecentlyUsedToolLocked(tool *aitool.Tool) RecentToolC
 	desc := tool.GetDescription()
 	schemaStr := tool.ToJSONSchemaString()
 	usage := tool.GetUsage()
-	entrySize := ytoken.CalcTokenCount(name) + ytoken.CalcTokenCount(desc) + ytoken.CalcTokenCount(schemaStr) + ytoken.CalcTokenCount(usage)
+	renderedUsage, err := aitool.RenderUsageForMode(usage, true)
+	if err != nil {
+		log.Warnf("cannot render Usage for cached tool %q: %v", name, err)
+		renderedUsage = ""
+	}
+	entrySize := ytoken.CalcTokenCount(name) + ytoken.CalcTokenCount(desc) + ytoken.CalcTokenCount(schemaStr) + ytoken.CalcTokenCount(renderedUsage)
 
 	// remove existing entry with same name (will be re-appended at tail)
 	filtered := make([]*RecentToolEntry, 0, len(m.recentToolsCache))
@@ -650,7 +655,7 @@ func (m *AiToolManager) addRecentlyUsedToolLocked(tool *aitool.Tool) RecentToolC
 		Name:          name,
 		Description:   desc,
 		SchemaSnippet: schemaStr,
-		Usage:         usage,
+		Usage:         renderedUsage,
 		Size:          entrySize,
 	}
 	m.recentToolsCache = append(m.recentToolsCache, newEntry)
