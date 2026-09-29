@@ -11,7 +11,6 @@ import (
 	"bytes"
 	"fmt"
 	"io"
-	"math"
 	"os"
 	"reflect"
 	"strings"
@@ -339,15 +338,19 @@ func runtimeDecodeArg(raw uint64, targetType reflect.Type) (reflect.Value, error
 	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64, reflect.Uintptr:
 		return reflect.ValueOf(raw &^ yakTaggedPointerMask).Convert(targetType), nil
 	case reflect.Float32, reflect.Float64:
-		bits := raw &^ yakTaggedPointerMask
 		// The compiler encodes float constants as float64 bit patterns and int
-		// constants as int64 words. Reinterpret the bits when they form a
-		// normal float (large word); otherwise treat the word as an integer.
-		if f := math.Float64frombits(bits); !math.IsInf(f, 0) && !math.IsNaN(f) &&
-			math.Abs(f) >= 1e-300 && math.Abs(f) <= 1e300 && bits > 1<<32 {
+		// constants as int64 words. Reinterpret the ORIGINAL word when it forms
+		// a plausible float: clearing the tag bit first corrupts a real value
+		// (3.14 becomes a denormal, and negatives become NaN). A float64 always
+		// sets bit 62 in its exponent except for tiny magnitudes, so the tagged
+		// branch is the common case and the untagged branch covers the rest.
+		if f, ok := plausibleFloat(raw); ok {
 			return reflect.ValueOf(f).Convert(targetType), nil
 		}
-		return reflect.ValueOf(float64(int64(bits))).Convert(targetType), nil
+		if f, ok := plausibleFloat(raw &^ yakTaggedPointerMask); ok {
+			return reflect.ValueOf(f).Convert(targetType), nil
+		}
+		return reflect.ValueOf(float64(int64(raw &^ yakTaggedPointerMask))).Convert(targetType), nil
 	case reflect.Bool:
 		return reflect.ValueOf(raw&^yakTaggedPointerMask != 0).Convert(targetType), nil
 	}
