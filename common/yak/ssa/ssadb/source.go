@@ -69,28 +69,6 @@ type IrSourceTreeEntry struct {
 	IsDir      bool
 }
 
-func normalizeIrSourceFolderPath(path string) string {
-	if !strings.HasSuffix(path, "/") {
-		return path + "/"
-	}
-	return path
-}
-
-// GetIrSourceTreeByPath lists children under folder_path without selecting QuotedCode.
-func GetIrSourceTreeByPath(path string) ([]IrSourceTreeEntry, error) {
-	db := GetDB()
-	path = normalizeIrSourceFolderPath(path)
-	var entries []IrSourceTreeEntry
-	err := db.Table(TableIrSources).
-		Select("folder_path, file_name, CASE WHEN quoted_code IS NULL OR quoted_code = '' THEN 1 ELSE 0 END AS is_dir").
-		Where("folder_path = ?", path).
-		Scan(&entries).Error
-	if err != nil {
-		return nil, utils.Wrapf(err, "query source tree via path: %v failed", path)
-	}
-	return entries, nil
-}
-
 // GetIrSourceTreeByProgram lists every tree entry for a program without QuotedCode.
 func GetIrSourceTreeByProgram(programName string) ([]IrSourceTreeEntry, error) {
 	if programName == "" {
@@ -106,24 +84,6 @@ func GetIrSourceTreeByProgram(programName string) ([]IrSourceTreeEntry, error) {
 		return nil, utils.Wrapf(err, "query source tree via program: %v failed", programName)
 	}
 	return entries, nil
-}
-
-// GetIrSourceTreeByPathAndName returns one tree entry without QuotedCode.
-func GetIrSourceTreeByPathAndName(path, name string) (*IrSourceTreeEntry, error) {
-	db := GetDB()
-	path = normalizeIrSourceFolderPath(path)
-	var entry IrSourceTreeEntry
-	err := db.Table(TableIrSources).
-		Select("folder_path, file_name, CASE WHEN quoted_code IS NULL OR quoted_code = '' THEN 1 ELSE 0 END AS is_dir").
-		Where("folder_path = ? AND file_name = ?", path, name).
-		Scan(&entry).Error
-	if err != nil {
-		return nil, utils.Wrapf(err, "query source tree via path: %v name: %v failed", path, name)
-	}
-	if entry.FolderPath == "" && entry.FileName == "" {
-		return nil, utils.Errorf("query source tree via path: %v name: %v failed: not found", path, name)
-	}
-	return &entry, nil
 }
 
 func GetEditorByFileName(fileName string) (*memedit.MemEditor, error) {
