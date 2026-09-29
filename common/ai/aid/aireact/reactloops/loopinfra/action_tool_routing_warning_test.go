@@ -65,7 +65,7 @@ func TestRequireToolVerifier_WarnsButAllowsBash(t *testing.T) {
 
 	action := buildRequireToolAction("bash")
 	require.NoError(t, loopAction_toolRequireAndCall.ActionVerifier(loop, action))
-	assert.Equal(t, "bash", loop.GetActionExecutionValue(action, "tool_require_payload"))
+	assert.Equal(t, []string{"bash"}, loop.GetActionExecutionValue(action, actionStateToolSchemaNames))
 	assert.Contains(t, invoker.getTimelineString(), "tool_routing_warning")
 	assert.Contains(t, invoker.getTimelineString(), "modify_file")
 }

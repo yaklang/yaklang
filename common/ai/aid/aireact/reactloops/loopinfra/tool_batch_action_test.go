@@ -169,8 +169,7 @@ func TestToolCallPromptExamples_ParseAndVerifyExactBytes(t *testing.T) {
 		action := parseToolBatchPromptExample(t, requireToolScalarOutputExampleJSON, schema.AI_REACT_LOOP_ACTION_REQUIRE_TOOL)
 
 		require.NoError(t, loopAction_toolRequireAndCall.ActionVerifier(loop, action))
-		assert.Nil(t, loop.GetActionExecutionValue(action, actionStateRequireToolBatch))
-		assert.Equal(t, "grep", loop.GetActionExecutionValue(action, "tool_require_payload"))
+		assert.Equal(t, []string{"grep"}, loop.GetActionExecutionValue(action, actionStateToolSchemaNames))
 		assert.Less(t,
 			strings.Index(loopAction_toolRequireAndCall.OutputExamples, requireToolScalarOutputExampleJSON),
 			strings.Index(loopAction_toolRequireAndCall.OutputExamples, requireToolBatchOutputExampleJSON),
@@ -186,13 +185,11 @@ func TestToolCallPromptExamples_ParseAndVerifyExactBytes(t *testing.T) {
 		action := parseToolBatchPromptExample(t, requireToolBatchOutputExampleJSON, schema.AI_REACT_LOOP_ACTION_REQUIRE_TOOL)
 
 		require.NoError(t, loopAction_toolRequireAndCall.ActionVerifier(loop, action))
-		request, ok := loop.GetActionExecutionValue(action, actionStateRequireToolBatch).(*aicommon.ToolBatchRequest)
+		names, ok := loop.GetActionExecutionValue(action, actionStateToolSchemaNames).([]string)
 		require.True(t, ok)
-		require.Len(t, request.Calls, 2)
-		assert.Equal(t, aicommon.ToolCallModeRequire, request.Calls[0].Mode)
-		assert.Equal(t, "grep", request.Calls[0].ToolName)
-		assert.Nil(t, request.Calls[0].Params)
-		assert.Equal(t, "read_file", request.Calls[1].ToolName)
+		require.Len(t, names, 2)
+		assert.Equal(t, "grep", names[0])
+		assert.Equal(t, "read_file", names[1])
 		assert.Contains(t, loopAction_toolRequireAndCall.OutputExamples, requireToolBatchOutputExampleJSON)
 	})
 }
@@ -252,8 +249,7 @@ func TestToolCallActionDescriptionsUseScalarFirstPolicy(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			require.Contains(t, test.action.Description, "默认使用")
-			require.Contains(t, test.action.Description, "参数未完整的嵌套 wrapper")
+			require.Contains(t, test.action.Description, "directly_call_tool")
 			require.NotContains(t, test.action.Description, "For one call")
 			require.NotContains(t, test.action.Description, "Required only")
 
@@ -459,7 +455,7 @@ func TestRequireToolBatchVerifier_RejectsParamsAndMixedForms(t *testing.T) {
 			action := parseToolBatchPromptExample(t, tt.payload, schema.AI_REACT_LOOP_ACTION_REQUIRE_TOOL)
 			err := loopAction_toolRequireAndCall.ActionVerifier(loop, action)
 			require.ErrorContains(t, err, tt.errContain)
-			assert.Nil(t, loop.GetActionExecutionValue(action, actionStateRequireToolBatch))
+			assert.Nil(t, loop.GetActionExecutionValue(action, actionStateToolSchemaNames))
 		})
 	}
 }
@@ -471,7 +467,7 @@ func TestToolScalarVerifier_PreservesLegacyPriorityWhenMalformedActionAlsoContai
 		payload    string
 		verify     func(*reactloops.ReActLoop, *aicommon.Action) error
 		stateKey   string
-		wantValue  string
+		wantValue  any
 	}{
 		{
 			name:       "direct",
@@ -486,8 +482,8 @@ func TestToolScalarVerifier_PreservesLegacyPriorityWhenMalformedActionAlsoContai
 			actionType: schema.AI_REACT_LOOP_ACTION_REQUIRE_TOOL,
 			payload:    `{"@action":"require_tool","tool_require_payload":"grep","tool_require_calls":[{"tool_name":"grep"},{"tool_name":"read_file"}]}`,
 			verify:     loopAction_toolRequireAndCall.ActionVerifier,
-			stateKey:   "tool_require_payload",
-			wantValue:  "grep",
+			stateKey:   actionStateToolSchemaNames,
+			wantValue:  []string{"grep"},
 		},
 	}
 	for _, test := range tests {
@@ -564,7 +560,7 @@ func TestToolScalarVerifier_ReturnsBeforeCompleteResponseEOF(t *testing.T) {
 		payload    string
 		verify     func(*reactloops.ReActLoop, *aicommon.Action) error
 		stateKey   string
-		want       string
+		want       any
 	}{
 		{
 			name:       "direct",
@@ -579,8 +575,8 @@ func TestToolScalarVerifier_ReturnsBeforeCompleteResponseEOF(t *testing.T) {
 			actionType: schema.AI_REACT_LOOP_ACTION_REQUIRE_TOOL,
 			payload:    `{"@action":"require_tool","tool_require_payload":"grep","human_readable_thought":"prepare search"}`,
 			verify:     loopAction_toolRequireAndCall.ActionVerifier,
-			stateKey:   "tool_require_payload",
-			want:       "grep",
+			stateKey:   actionStateToolSchemaNames,
+			want:       []string{"grep"},
 		},
 	}
 	for _, test := range tests {
@@ -1000,7 +996,7 @@ func TestToolBatchPromptExamples_ExecuteActualToolCallbacks(t *testing.T) {
 			raw:        requireToolBatchOutputExampleJSON,
 			actionType: schema.AI_REACT_LOOP_ACTION_REQUIRE_TOOL,
 			action:     loopAction_toolRequireAndCall,
-			expected:   []string{"grep", "read_file"},
+			expected:   nil, // require_tool only loads schemas, does not execute
 		},
 	}
 	for _, test := range tests {
@@ -1023,10 +1019,17 @@ func TestToolBatchPromptExamples_ExecuteActualToolCallbacks(t *testing.T) {
 			op := reactloops.NewActionHandlerOperator(task)
 			test.action.ActionHandler(loop, action, op)
 
-			require.Equal(t, 1, invoker.requests, "one model action must dispatch one joined batch")
-			require.Equal(t, test.expected, invoker.executed)
-			require.True(t, op.IsContinued())
-			require.Contains(t, op.GetFeedback().String(), "Tool batch settled: 2 calls")
+			if test.action.ActionType == schema.AI_REACT_LOOP_ACTION_REQUIRE_TOOL {
+				// require_tool only loads schemas; no batch execution occurs.
+				assert.Equal(t, 0, invoker.requests)
+				assert.Empty(t, invoker.executed)
+				assert.True(t, op.IsContinued())
+			} else {
+				require.Equal(t, 1, invoker.requests, "one model action must dispatch one joined batch")
+				require.Equal(t, test.expected, invoker.executed)
+				require.True(t, op.IsContinued())
+				require.Contains(t, op.GetFeedback().String(), "Tool batch settled: 2 calls")
+			}
 		})
 	}
 }
@@ -1060,8 +1063,8 @@ func TestToolScalarPromptExamples_ExecuteActualToolCallbacks(t *testing.T) {
 			actionType:    schema.AI_REACT_LOOP_ACTION_REQUIRE_TOOL,
 			action:        loopAction_toolRequireAndCall,
 			expectedTool:  "grep",
-			expectedParam: "pattern",
-			expectedValue: "auth",
+			expectedParam: "",
+			expectedValue: "",
 		},
 	}
 	for _, test := range tests {
@@ -1088,10 +1091,16 @@ func TestToolScalarPromptExamples_ExecuteActualToolCallbacks(t *testing.T) {
 			op := reactloops.NewActionHandlerOperator(task)
 			test.action.ActionHandler(loop, action, op)
 
-			require.Equal(t, []string{test.expectedTool}, invoker.executed)
-			require.Len(t, invoker.received, 1)
-			assert.Equal(t, test.expectedValue, invoker.received[0].GetString(test.expectedParam))
-			assert.True(t, op.IsContinued())
+			if test.action.ActionType == schema.AI_REACT_LOOP_ACTION_REQUIRE_TOOL {
+				// require_tool only loads schemas; it does not execute any tool.
+				assert.Empty(t, invoker.executed)
+				assert.True(t, op.IsContinued())
+			} else {
+				require.Equal(t, []string{test.expectedTool}, invoker.executed)
+				require.Len(t, invoker.received, 1)
+				assert.Equal(t, test.expectedValue, invoker.received[0].GetString(test.expectedParam))
+				assert.True(t, op.IsContinued())
+			}
 		})
 	}
 }

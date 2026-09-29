@@ -53,13 +53,13 @@ func TestToolCallsKeepTheirOwnVerifiedState(t *testing.T) {
 		wantTargets []string
 	}{
 		{"direct distinct tools", []string{directRead, directGrep}, []string{"read_file", "grep"}, []string{"/first", "/second"}},
-		{"require distinct tools", []string{requireRead, requireGrep}, []string{"read_file", "grep"}, []string{"/generated-file", "/generated-path"}},
+		{"require distinct tools", []string{requireRead, requireGrep}, nil, nil},
 		{"direct scalar then batch", []string{directGrep, directBatch}, []string{"grep", "read_file", "read_file"}, []string{"/second", "/batch-a", "/batch-b"}},
 		{"direct batch then scalar", []string{directBatch, directGrep}, []string{"read_file", "read_file", "grep"}, []string{"/batch-a", "/batch-b", "/second"}},
 		{"two direct batches", []string{directBatch, `{"@action":"directly_call_tool","directly_call_tool_calls":[{"tool_name":"grep","params":{"path":"/batch-c","pattern":"third"}},{"tool_name":"read_file","params":{"file":"/batch-d"}}]}`}, []string{"read_file", "read_file", "grep", "read_file"}, []string{"/batch-a", "/batch-b", "/batch-c", "/batch-d"}},
-		{"require scalar then batch", []string{requireRead, requireBatch}, []string{"read_file", "grep", "read_file"}, []string{"/generated-file", "/generated-path", "/generated-file"}},
-		{"require batch then scalar", []string{requireBatch, requireGrep}, []string{"grep", "read_file", "grep"}, []string{"/generated-path", "/generated-file", "/generated-path"}},
-		{"mixed actions", []string{directRead, requireBatch, directGrep, requireRead}, []string{"read_file", "grep", "read_file", "grep", "read_file"}, []string{"/first", "/generated-path", "/generated-file", "/second", "/generated-file"}},
+		{"require scalar then batch", []string{requireRead, requireBatch}, nil, nil},
+		{"require batch then scalar", []string{requireBatch, requireGrep}, nil, nil},
+		{"mixed actions", []string{directRead, requireBatch, directGrep, requireRead}, []string{"read_file", "grep"}, []string{"/first", "/second"}},
 		{"compose distinct DAGs", []string{composeRead, composeGrep}, []string{"read_file", "grep"}, []string{"/generated-file", "/generated-path"}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
