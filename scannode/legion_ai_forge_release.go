@@ -250,10 +250,9 @@ func buildContextForgeBlueprint(
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("build immutable Forge release: %w", err)
 	}
-	// Server report limits and empty-output recovery are invocation policy;
-	// client Blueprints keep their model settings and single-call behavior.
+	// Empty-output recovery is invocation policy; client Blueprints keep
+	// their single-call behavior. All callers retain their model token settings.
 	aiforge.WithResultPolicy(aiforge.ForgeResultPolicy{
-		MaxTokens:        4096,
 		RetryEmptyOutput: true,
 	})(blueprint)
 	params := make([]aiforge.Parameter, 0, len(release.GetParameters()))

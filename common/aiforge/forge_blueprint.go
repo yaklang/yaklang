@@ -9,7 +9,6 @@ import (
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon/promptloader"
-	"github.com/yaklang/yaklang/common/ai/aispec"
 
 	"github.com/yaklang/yaklang/common/ai/aid"
 
@@ -138,8 +137,6 @@ func WithResultPrompt(prompt string) Option {
 // ForgeResultPolicy controls only the final result request of a Blueprint.
 // The zero value preserves the caller's model configuration and does not retry.
 type ForgeResultPolicy struct {
-	// MaxTokens overrides the result request budget only when positive.
-	MaxTokens int64
 	// RetryEmptyOutput permits one additional request when the model produces
 	// no final output. The retry retains the original output format instructions.
 	RetryEmptyOutput bool
@@ -412,10 +409,6 @@ func (f *ForgeBlueprint) generateResult(cod *aid.Coordinator, prompt string) (st
 	call := func(requestPrompt string) (string, error) {
 		requestOptions := []aicommon.AIRequestOption{
 			aicommon.WithAIRequest_CallerLabel("forge-blueprint"),
-		}
-		if f.ResultPolicy.MaxTokens > 0 {
-			requestOptions = append(requestOptions,
-				aicommon.WithAIRequest_ExtraSpecOpts(aispec.WithMaxTokens(f.ResultPolicy.MaxTokens)))
 		}
 		rsp, err := config.CallAI(aicommon.NewAIRequest(requestPrompt, requestOptions...))
 		if err != nil {

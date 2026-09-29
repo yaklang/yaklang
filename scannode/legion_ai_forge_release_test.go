@@ -171,7 +171,7 @@ func TestBuildContextForgeBlueprintOptsIntoResultPolicy(t *testing.T) {
 	require.NotNil(t, coordinator.ResultHandler)
 	coordinator.ResultHandler(coordinator)
 
-	require.Equal(t, []int64{4096, 4096}, budgets, "only the server adapter opts into the report budget and retry")
+	require.Equal(t, []int64{8192, 8192}, budgets, "initial and retry requests must preserve the caller model budget")
 	require.Contains(t, prompts[0], release.ResultPrompt)
 	require.Contains(t, prompts[1], "最终输出通道")
 	require.Equal(t, "# Report\nOnly the supplied facts were reviewed.", config.ForgeResult.Formated)
