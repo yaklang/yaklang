@@ -97,9 +97,12 @@ if len(rows) > 0 {
 
 协议订阅使用有界 TCP 流式重组，与禁用重组、抓包缓存或旧的全流 HTTP/TLS helper
 不能同时使用；只有原包/旧 helper 的脚本无需修改。
-目前实时准入覆盖 HTTP/1.x、明文 HTTP/2、MySQL/MariaDB 经典协议、TLS、MQTT 3.1/3.1.1、DNS、Kerberos，以及 Memcached /
-Cassandra 的限定阶段。未知、缺上下文、不完整、非法和资源受限样本都保留明确状态；
-TLS 密文保持不透明。扩展范围见 [协议 TODO](../../bin-parser/PROTOCOL_TODO.md)。
+实时准入涵盖 HTTP/1.x、HTTP/2、TLS、MySQL/MariaDB、MQTT、DNS、Redis、Kafka、
+SIP、NATS、STOMP、OPC UA、GOOSE 等协议的限定版本和阶段。应结合事件的 `Profile`、
+`Completeness`、`Status` 和会话上下文确认支持范围，协议名不代表支持其全部特性。
+未知、缺上下文、不完整、非法和资源受限样本都保留明确状态。没有授权密钥或超出支持
+密码套件时，TLS 密文保持不透明；CLI 的授权密钥用法见 [抓包与回放](../cmd/README.md)。
+扩展范围见 [协议 TODO](../../bin-parser/PROTOCOL_TODO.md)。
 
 ## HTTP/2 与 MySQL 会话解析
 

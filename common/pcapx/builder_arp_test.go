@@ -22,6 +22,9 @@ func TestSmoking_Arp(t *testing.T) {
 		PublicInterface, PublicGatewayAddress, PublicPreferredAddress = oldIface, oldGateway, oldAddress
 	})
 	packets, err := PacketBuilder(
+		// Packet serialization tests use explicit link addresses, without host routing or ARP.
+		WithEthernet_SrcMac("02:00:00:00:00:01"),
+		WithEthernet_DstMac("02:00:00:00:00:02"),
 		WithArp_RequestAuto("8.8.8.8"),
 	)
 	if err != nil {

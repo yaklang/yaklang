@@ -104,7 +104,7 @@ func TestClickHouseProbeAcceptsOnlyCompleteBoundedServerHello(t *testing.T) {
 	p := probeClickHouse(valid, DefaultParserBudget().ProbeBytes)
 	require.Equal(t, ProbeAccept, p.Verdict)
 	require.Equal(t, "clickhouse", p.Protocol)
-	require.Equal(t, "native-23.8-r54401/server-hello", p.Version)
+	require.Equal(t, "native-23.8-r54401/ambiguous-hello", p.Version)
 
 	for n := 0; n < len(valid); n++ {
 		p := probeClickHouse(valid[:n], DefaultParserBudget().ProbeBytes)
@@ -262,10 +262,10 @@ func TestClickHouseNativeCaptureReassemblesOneByteSegments(t *testing.T) {
 	require.Equal(t, "matched", events[3].Fields["Request Association"])
 }
 
-func TestClickHouseNativeServerHelloCanStartMidstreamCapture(t *testing.T) {
-	// A midstream capture may begin with the response to an unseen client Hello.
-	// The synthetic pcap carries that complete server packet over single-byte TCP
-	// segments, exercising detection, direction selection, and reassembly.
+func TestClickHouseNativeServerHelloRequiresRoleContext(t *testing.T) {
+	// This synthetic pcap starts with a server Hello whose bytes also form an
+	// incomplete client Hello. The missing role context must remain explicit,
+	// including when the packet arrives over single-byte TCP segments.
 	steps := []sessionStep{{dir: 1, wire: clickHouseTestServerHello(23, 8, 54401)}}
 	raw := sessionTestPCAP(t, steps, layers.TCPPort(9000), 1, false, true)
 	var events []*ProtocolEvent
@@ -276,8 +276,7 @@ func TestClickHouseNativeServerHelloCanStartMidstreamCapture(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, events, 1)
 	require.Equal(t, "clickhouse", events[0].Protocol)
-	require.Equal(t, "decoded", events[0].Status, "%s: %s", events[0].Status, events[0].Summary)
-	require.Equal(t, "Hello", events[0].Fields["Packet Name"])
-	require.Equal(t, "server", events[0].Fields["Role"])
-	require.Equal(t, uint64(54401), events[0].Fields["Revision"])
+	require.Equal(t, "context-required", events[0].Status, "%s: %s", events[0].Status, events[0].Summary)
+	require.Contains(t, events[0].Summary, "Hello role is ambiguous")
+	require.Empty(t, events[0].Fields["Role"])
 }

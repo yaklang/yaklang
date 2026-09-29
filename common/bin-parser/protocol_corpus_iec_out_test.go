@@ -282,6 +282,85 @@ func TestProtocolCorpusIECOutGOOSECompleteTreeAndImports(t *testing.T) {
 	}
 }
 
+func TestProtocolCorpusGOOSEOptionalFieldsAndMalformedOrder(t *testing.T) {
+	// Synthetic variants derived from the pinned iti-goose capture. They are
+	// not new independent capture evidence. IECGoosePdu permits omitted goID,
+	// simulation DEFAULT FALSE, and ndsCom DEFAULT FALSE:
+	// https://github.com/wireshark/wireshark/blob/4f63ea0eae68cf6facea31604994f1a339e43640/epan/dissectors/asn1/goose/goose.asn
+	original := protocolCorpusAuditPackets(t, "testdata/protocol-corpus/captures/iti-ics/iti-goose.pcap")[0][14:]
+	end := int(binary.BigEndian.Uint16(original[2:4]))
+	pdu := protocolCorpusBERFields(t, original[8:end])
+	require.Len(t, pdu, 1)
+	fields := protocolCorpusBERFields(t, pdu[0].value)
+	encode := func(selected []protocolCorpusBERField) []byte {
+		var body []byte
+		for _, field := range selected {
+			body = append(body, iecOutTLV(field.tag, field.value, 0)...)
+		}
+		wire := append(bytes.Clone(original[:8]), iecOutTLV(0x61, body, 0)...)
+		binary.BigEndian.PutUint16(wire[2:4], uint16(len(wire)))
+		return wire
+	}
+	var works []currentCorpusWork
+	for mask := 0; mask < 8; mask++ {
+		var selected []protocolCorpusBERField
+		for _, field := range fields {
+			if field.tag == 0x83 && mask&1 != 0 || field.tag == 0x87 && mask&2 != 0 || field.tag == 0x89 && mask&4 != 0 {
+				continue
+			}
+			selected = append(selected, field)
+		}
+		wire := encode(selected)
+		t.Run(fmt.Sprintf("omitted-%d", mask), func(t *testing.T) {
+			iecOutCompare(t, wire, "iec61850", "GOOSE", func(t *testing.T, node *base.Node) {
+				for _, optional := range []struct {
+					name string
+					bit  int
+				}{{"GOOSE ID", 1}, {"Simulation", 2}, {"Needs Commissioning", 4}} {
+					field := protocolCorpusFindNode(node, optional.name)
+					if mask&optional.bit == 0 {
+						require.NotNil(t, field)
+					} else {
+						require.Nil(t, field, "omission must not invent captured field bytes")
+						if optional.bit != 1 {
+							metadata := protocolCorpusFindNode(node, "PDU").Cfg.GetItem("additionInfo").(map[string]any)
+							require.Equal(t, false, metadata[optional.name])
+						}
+					}
+				}
+				protocolCorpusRequireValue(t, node, "Dataset Entry Count", protocolCorpusBERUnsigned(t, fields[10].value))
+			})
+		})
+		frame, _ := iecOutEthernet(wire, 0x88b8, mask%3)
+		works = append(works, currentCorpusWork{id: fmt.Sprintf("goose/omitted-%d", mask), wire: frame})
+	}
+	malformed := map[string][]protocolCorpusBERField{}
+	// A permitted omission must not allow duplicated or reordered optionals,
+	// a missing mandatory field, or invalid BOOLEAN content widths.
+	for _, index := range []int{3, 7, 9} {
+		duplicate := append([]protocolCorpusBERField(nil), fields[:index+1]...)
+		duplicate = append(duplicate, fields[index:]...)
+		malformed[fmt.Sprintf("duplicate-%x", fields[index].tag)] = duplicate
+		wide := append([]protocolCorpusBERField(nil), fields...)
+		if index != 3 {
+			wide[index].value = []byte{0, 1}
+			malformed[fmt.Sprintf("wide-boolean-%x", fields[index].tag)] = wide
+		}
+	}
+	missingTimestamp := append([]protocolCorpusBERField(nil), fields[:4]...)
+	malformed["missing-timestamp"] = append(missingTimestamp, fields[5:]...)
+	reordered := append([]protocolCorpusBERField(nil), fields...)
+	reordered[3], reordered[4] = reordered[4], reordered[3]
+	malformed["reordered-goID"] = reordered
+	for name, selected := range malformed {
+		t.Run(name, func(t *testing.T) {
+			_, err := parser.ParseBinary(newProtocolCorpusBoundedReader(encode(selected)), "iec61850", "GOOSE")
+			require.Error(t, err)
+		})
+	}
+	assertDispatchEquivalence(t, works)
+}
+
 func TestProtocolCorpusIECOutGenerationAndResultIsolation(t *testing.T) {
 	for _, mode := range iecOutTestModes {
 		t.Run(mode.name, func(t *testing.T) {

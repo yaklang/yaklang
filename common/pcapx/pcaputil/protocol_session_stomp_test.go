@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"strconv"
+	"strings"
 	"testing"
 	"time"
 
@@ -182,4 +183,67 @@ func TestProtocolSessionSTOMPPinnedNDPIStream(t *testing.T) {
 	require.NoError(t, err)
 	require.Empty(t, commands)
 	require.Empty(t, errorsSeen)
+}
+
+// Synthetic STOMP 1.2 fixtures derived from the specification, not an
+// independently captured broker session. Authentication commonly pushes the
+// opening frame beyond the generic 64-byte signature window.
+func TestProtocolSessionSTOMPLongHandshakeBoundaries(t *testing.T) {
+	wire := []byte("CONNECT\naccept-version:1.2\nhost:broker.example\nlogin:user\npasscode:password\nheart-beat:10000,10000\n\n\x00")
+	message := []byte("SEND\ndestination:/queue/a\nx-label:hello\tworld\ncontent-length:3\n\na\x00b\x00")
+	combined := messagingRegressionBytes(t, "stomp12-authenticated-stream.bin")
+	require.Equal(t, append(bytes.Clone(wire), message...), combined)
+	for split := 0; split <= len(combined); split++ {
+		s := newReviewSession(t, ParserBudget{})
+		require.Equal(t, ProbeAccept, s.Probe(wire).Verdict, "split=%d", split)
+		var events []*ProtocolEvent
+		for _, chunk := range [][]byte{combined[:split], combined[split:]} {
+			r := s.Feed(0, time.Unix(1, 0), chunk)
+			if r.Err != nil {
+				require.Equal(t, ErrNeedMore, r.Err.Kind, "split=%d: %s", split, r.Err)
+			}
+			events = append(events, r.Events...)
+		}
+		require.Len(t, events, 2, "split=%d", split)
+		require.Equal(t, wire, events[0].Raw)
+		require.Equal(t, message, events[1].Raw)
+		require.Equal(t, "decoded", events[0].Status)
+		require.Equal(t, "decoded", events[1].Status)
+		headers := events[1].Session["Headers"].(map[string]any)
+		require.Equal(t, "hello\tworld", headers["x-label"])
+		require.Equal(t, []byte{'a', 0, 'b'}, events[1].Session["Body"])
+	}
+	for _, lineEnd := range []string{"\n", "\r\n"} {
+		handshake := bytes.ReplaceAll(wire, []byte("\n"), []byte(lineEnd))
+		events, _ := sessionTestFlow(t, "stomp", []sessionStep{{0, handshake}}, 1, false)
+		require.Len(t, events, 1)
+		assertSessionEvents(t, events, "stomp", false)
+	}
+}
+
+func TestProtocolSessionSTOMPHandshakeBudgets(t *testing.T) {
+	// Synthetic complete and incomplete handshakes exercise both configured
+	// frame limits and the fixed line/header bounds without retaining forever.
+	for _, wire := range [][]byte{
+		[]byte("CONNECT\naccept-version:1.2\nhost:broker.example\nlogin:" + strings.Repeat("x", 96)),
+		[]byte("STOMP\naccept-version:1.2\nhost:" + strings.Repeat("x", stompMaxLineBytes+2)),
+	} {
+		s := newReviewSession(t, ParserBudget{MaxFrameBytes: 128})
+		require.NotEqual(t, ProbeAccept, s.Probe(wire).Verdict)
+		r := s.Feed(0, time.Unix(1, 0), wire)
+		require.NotNil(t, r.Err)
+		require.False(t, r.NeedMore)
+		require.NotEqual(t, "stomp", r.State)
+	}
+	for _, command := range []string{"CONNECT", "STOMP"} {
+		wire := []byte(command + "\naccept-version:1.2\nhost:broker.example\nlogin:a\tb\n\n\x00")
+		s := newReviewSession(t, ParserBudget{})
+		r := s.Feed(0, time.Unix(1, 0), wire)
+		require.Nil(t, r.Err)
+		require.Len(t, r.Events, 1)
+		require.Equal(t, "a\tb", r.Events[0].Session["Headers"].(map[string]any)["login"])
+	}
+	_, complete, err := parseSTOMPFrame([]byte("SEND\ndestination:/q\nx-label:hello\\tworld\n\nx\x00"), 1024)
+	require.Error(t, err, "a literal TAB is legal; an undefined backslash-t escape is not")
+	require.False(t, complete)
 }

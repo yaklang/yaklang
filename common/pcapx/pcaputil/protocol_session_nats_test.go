@@ -8,9 +8,11 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
+	"github.com/gopacket/gopacket/layers"
 	"github.com/stretchr/testify/require"
 )
 
@@ -236,4 +238,184 @@ func TestReplayPcapFileNATSNdpiCorpus(t *testing.T) {
 		counts[operation]++
 	}
 	require.Equal(t, map[string]int{"INFO": 2, "CONNECT": 2, "PING": 3, "PONG": 3}, counts)
+}
+
+func TestProtocolSessionNATSJSONStructuralBudgets(t *testing.T) {
+	// Synthetic JSON exercises the shared parser resource contract; it is not
+	// asserted to have originated from a NATS server implementation.
+	for _, tc := range []struct {
+		name     string
+		budget   ParserBudget
+		argument string
+	}{
+		{"default-depth", ParserBudget{}, `{"x":` + strings.Repeat("[", 100) + "0" + strings.Repeat("]", 100) + "}"},
+		{"custom-depth", ParserBudget{MaxRecursionDepth: 2}, `{"x":[[]]}`},
+		{"object-elements", ParserBudget{MaxCollectionElements: 1}, `{"x":0,"y":1}`},
+		{"array-elements", ParserBudget{MaxCollectionElements: 1}, `{"x":[0,1]}`},
+		{"duplicate-elements", ParserBudget{MaxCollectionElements: 1}, `{"x":0,"x":1}`},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			wire := []byte("INFO " + tc.argument + "\r\n")
+			s := newReviewSession(t, tc.budget)
+			require.Equal(t, ProbeReject, s.Probe(wire).Verdict)
+			require.Nil(t, s.Feed(1, time.Unix(1, 0), []byte("INFO {}\r\n")).Err)
+			r := s.Feed(1, time.Unix(2, 0), wire)
+			require.NotNil(t, r.Err)
+			require.Equal(t, ErrResourceExceeded, r.Err.Kind)
+			require.Len(t, r.Events, 1)
+			require.Equal(t, "limited", r.Events[0].Status)
+		})
+	}
+	for _, argument := range []string{`{"x":[0]}`, `{"x":{"y":0}}`, `{"x":"[{}]"}`} {
+		s := newReviewSession(t, ParserBudget{MaxRecursionDepth: 2, MaxCollectionElements: 1})
+		r := s.Feed(1, time.Unix(1, 0), []byte("INFO "+argument+"\r\n"))
+		require.Nil(t, r.Err, argument)
+		require.Equal(t, 1, r.Events[0].Session["JSON Field Count"])
+	}
+	for _, argument := range []string{`{"x":}`, `{"x":[1,]}`, `{"x":0} {}`, `{"x":{"y":0}`} {
+		s := newReviewSession(t, ParserBudget{})
+		require.Nil(t, s.Feed(1, time.Unix(1, 0), []byte("INFO {}\r\n")).Err)
+		r := s.Feed(1, time.Unix(2, 0), []byte("INFO "+argument+"\r\n"))
+		require.NotNil(t, r.Err, argument)
+		require.Equal(t, ErrMalformedMessage, r.Err.Kind)
+	}
+}
+
+func TestProtocolSessionNATSLongProbeFeedAgreement(t *testing.T) {
+	// Synthetic long INFO, CONNECT and binary PUB fixtures cover complete
+	// lookahead, every two-chunk split and multiple commands in one arrival.
+	for _, wire := range [][]byte{
+		bytes.TrimSuffix(messagingRegressionBytes(t, "nats-long-info-ping.txt"), []byte("PING\r\n")),
+		[]byte("CONNECT {\"name\":\"" + strings.Repeat("c", 80) + "\"}\r\n"),
+		natsPublish("foo", "", bytes.Repeat([]byte{'a', 0, '\r', '\n'}, 40)),
+	} {
+		combined := append(bytes.Clone(wire), []byte("PING\r\n")...)
+		for split := 0; split <= len(combined); split++ {
+			s := newReviewSession(t, ParserBudget{})
+			probe := s.Probe(wire)
+			require.Equal(t, ProbeAccept, probe.Verdict, "wire=%q split=%d", wire, split)
+			require.Equal(t, "nats", probe.Protocol)
+			if split > 1 && split < len(wire) {
+				partial := s.Probe(wire[:split])
+				require.NotEqual(t, ProbeAccept, partial.Verdict)
+				if partial.Verdict == ProbeNeedMore && split >= DefaultParserBudget().ProbeBytes {
+					require.Equal(t, "nats", partial.Protocol)
+				}
+			}
+			var events []*ProtocolEvent
+			for _, chunk := range [][]byte{combined[:split], combined[split:]} {
+				r := s.Feed(0, time.Unix(1, 0), chunk)
+				if r.Err != nil {
+					require.Equal(t, ErrNeedMore, r.Err.Kind, "split=%d: %s", split, r.Err)
+				}
+				events = append(events, r.Events...)
+			}
+			require.Len(t, events, 2, "split=%d", split)
+			require.Equal(t, "decoded", events[0].Status)
+			require.Equal(t, wire, events[0].Raw)
+			require.Equal(t, "PING", events[1].Session["Operation"])
+		}
+	}
+	s := newReviewSession(t, ParserBudget{MaxFrameBytes: 80})
+	wire := []byte("INFO {\"server_id\":\"" + strings.Repeat("s", 80))
+	require.Equal(t, ProbeReject, s.Probe(wire).Verdict)
+	r := s.Feed(0, time.Unix(1, 0), wire)
+	require.NotNil(t, r.Err)
+	require.False(t, r.NeedMore)
+}
+
+func messagingRegressionBytes(t *testing.T, name string) []byte {
+	t.Helper()
+	root := filepath.Join("..", "..", "bin-parser", "testdata", "protocol-recognition-regressions", "messaging")
+	var manifest struct {
+		Provenance string `json:"provenance"`
+		Fixtures   []struct {
+			File   string `json:"file"`
+			SHA256 string `json:"sha256"`
+		} `json:"fixtures"`
+	}
+	index, err := os.ReadFile(filepath.Join(root, "manifest.json"))
+	require.NoError(t, err)
+	require.NoError(t, json.Unmarshal(index, &manifest))
+	require.Equal(t, "synthetic", manifest.Provenance)
+	wire, err := os.ReadFile(filepath.Join(root, name))
+	require.NoError(t, err)
+	digest := sha256.Sum256(wire)
+	for _, fixture := range manifest.Fixtures {
+		if fixture.File == name {
+			require.Equal(t, fixture.SHA256, hex.EncodeToString(digest[:]))
+			return wire
+		}
+	}
+	t.Fatalf("messaging fixture %s has no provenance record", name)
+	return nil
+}
+
+func TestMessagingRegressionTCPReplay(t *testing.T) {
+	for _, tc := range []struct {
+		file, protocol string
+		messages       int
+	}{
+		{"nats-long-info-ping.txt", "nats", 2},
+		{"stomp12-authenticated-stream.bin", "stomp", 2},
+		{"sip-long-invite.txt", "sip", 1},
+	} {
+		t.Run(tc.protocol, func(t *testing.T) {
+			wire := messagingRegressionBytes(t, tc.file)
+			steps := []tcpStep{{seq: 100, syn: true}, {seq: 300, syn: true, synack: true, reverse: true}, {seq: 101, ack: 301}}
+			for at := 0; at < len(wire); {
+				end := min(at+64, len(wire))
+				steps = append(steps, tcpStep{seq: uint32(101 + at), ack: 301, data: string(wire[at:end])})
+				at = end
+			}
+			steps = append(steps, tcpStep{seq: uint32(101 + len(wire)), ack: 301, fin: true})
+			capture := binTestPcap(t, steps, layers.TCPPort(40001), false, false)
+			for _, workers := range []int{1, 4} {
+				events, _, err := binReplay(t, capture, workers)
+				require.NoError(t, err)
+				var decoded []*ProtocolEvent
+				for _, event := range events {
+					require.Equal(t, tc.protocol, event.Protocol)
+					if event.Status == "incomplete" && tc.protocol == "sip" {
+						require.Empty(t, event.Raw)
+						require.Equal(t, 1, event.Session["Outstanding"])
+						require.Contains(t, event.Summary, "unmatched transactions")
+						continue // The synthetic capture intentionally contains no response.
+					}
+					require.Equal(t, "decoded", event.Status, event.Error)
+					decoded = append(decoded, event)
+				}
+				require.Len(t, decoded, tc.messages)
+				var reconstructed []byte
+				for _, event := range decoded {
+					reconstructed = append(reconstructed, event.Raw...)
+				}
+				require.Equal(t, wire, reconstructed)
+			}
+		})
+	}
+}
+
+func TestProtocolSessionNATSMaximumControlLineSplit(t *testing.T) {
+	// Synthetic exact-boundary JSON line: the 8 KiB control-line budget does
+	// not include its CRLF, including when either delimiter is fragmented.
+	prefix, suffix := "INFO {\"x\":\"", "\"}"
+	wire := []byte(prefix + strings.Repeat("x", natsControlLineMax-len(prefix)-len(suffix)) + suffix + "\r\n")
+	for _, split := range []int{natsControlLineMax - 1, natsControlLineMax, natsControlLineMax + 1} {
+		s := newReviewSession(t, ParserBudget{})
+		require.Equal(t, ProbeAccept, s.Probe(wire).Verdict)
+		first := s.Feed(1, time.Unix(1, 0), wire[:split])
+		require.True(t, first.NeedMore, "split=%d", split)
+		require.Empty(t, first.Events)
+		last := s.Feed(1, time.Unix(1, 0), wire[split:])
+		require.Nil(t, last.Err, "split=%d", split)
+		require.Len(t, last.Events, 1)
+		require.Equal(t, wire, last.Events[0].Raw)
+	}
+	s := newReviewSession(t, ParserBudget{})
+	tooLong := []byte(prefix + strings.Repeat("x", natsControlLineMax-len(prefix)-len(suffix)+1) + suffix + "\r\n")
+	require.Equal(t, ProbeReject, s.Probe(tooLong).Verdict)
+	r := s.Feed(1, time.Unix(1, 0), tooLong)
+	require.NotNil(t, r.Err)
+	require.False(t, r.NeedMore)
 }

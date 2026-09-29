@@ -167,6 +167,7 @@ func (s *binGOOSE) consume(raw []byte) (map[string]any, error) {
 	}
 	out := map[string]any{
 		"Packet Name": "GOOSE", "APPID": int(binary.BigEndian.Uint16(raw[0:2])), "Length": n,
+		"Simulation": false, "Needs Commissioning": false,
 	}
 	at := 0
 	for at < len(pdu) {
@@ -187,6 +188,15 @@ func (s *binGOOSE) consume(raw []byte) (map[string]any, error) {
 		case 0x86:
 			s.sqNum = berUint(val)
 			out["Sequence Number"] = int(s.sqNum)
+		case 0x87, 0x89:
+			if len(val) != 1 {
+				return nil, fmt.Errorf("goose: BOOLEAN length must be one")
+			}
+			name := "Simulation"
+			if tag == 0x89 {
+				name = "Needs Commissioning"
+			}
+			out[name] = val[0] != 0
 		case 0x8a:
 			out["Dataset Entry Count"] = int(berUint(val))
 		case 0xab:

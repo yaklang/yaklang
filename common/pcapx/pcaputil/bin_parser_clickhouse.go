@@ -208,20 +208,21 @@ func probeClickHouse(wire []byte, limit int) ProbeResult {
 	if wire[1] == 0 || wire[1] > clickHouseMaxStringBytes {
 		return ProbeResult{Verdict: ProbeReject}
 	}
+	// A server Hello's timezone/display-name/patch fields also form a
+	// client Hello's database/user/password-length prefix. With patch 1,
+	// the next byte (for example a coalesced Pong) completes that password.
+	// Neither arrival boundaries nor parser order can establish the role.
+	server, _, serverOK := parseClickHouseServerHello(wire)
+	if serverOK {
+		if server.consumed <= min(limit, clickHouseMaxHelloBytes) {
+			return probeAccept("clickhouse", "native-23.8-r54401/ambiguous-hello", 97)
+		}
+		return ProbeResult{Verdict: ProbeReject, Reason: "ClickHouse Hello exceeds probe limit"}
+	}
 	client, _, clientOK := parseClickHouseClientHello(wire)
 	if clientOK {
 		if client.consumed <= min(limit, clickHouseMaxHelloBytes) {
 			return probeAccept("clickhouse", "native-23.8-r54401/client-hello", 97)
-		}
-		return ProbeResult{Verdict: ProbeReject, Reason: "ClickHouse Hello exceeds probe limit"}
-	}
-	// Captures can begin midstream, after the client Hello has already passed.
-	// Recognize a server Hello from its full Native packet layout so direction
-	// can still be set correctly; a port number alone never selects this path.
-	server, _, serverOK := parseClickHouseServerHello(wire)
-	if serverOK {
-		if server.consumed <= min(limit, clickHouseMaxHelloBytes) {
-			return probeAccept("clickhouse", "native-23.8-r54401/server-hello", 97)
 		}
 		return ProbeResult{Verdict: ProbeReject, Reason: "ClickHouse Hello exceeds probe limit"}
 	}
@@ -243,6 +244,11 @@ func (f *binFlow) frameClickHouse(dir int, wire []byte) (int, *binSpec, error) {
 		return 0, nil, nil
 	}
 	s := f.clickhouse
+	if !s.clientHelloSeen && !s.serverHelloSeen {
+		if _, _, ambiguous := parseClickHouseServerHello(wire); ambiguous {
+			return 0, nil, sessionContext("ClickHouse Hello role is ambiguous without the peer handshake")
+		}
+	}
 	if dir == s.clientDir && !s.clientHelloSeen {
 		_, need, ok := parseClickHouseClientHello(wire)
 		if ok {

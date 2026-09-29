@@ -14,9 +14,10 @@ pcapx 提供实时抓包/文件回放、TCP 重组、有限协议探测、消息
 | [P0 消息合同](P0_SCOPE.md)、[P0 评分](P0_SCORES.md)、[P1 评分](P1_SCORES.md) | 被测试约束的交付范围与评分证据 |
 | [样本目录](testdata/protocol-corpus/README.md) | 捕获、字段合同、来源、许可和维护工具 |
 
-当前实时准入为 HTTP/1.x、TLS、MQTT 3.1/3.1.1、DNS、Kerberos，以及 Memcached /
-Cassandra 的限定阶段。YAML、显式字段入口和完整实时协议支持是不同层次；其余协议
-从 TODO 和 `protocol_catalog.go` 选择明确入口，不把已识别端口当作完整解析。
+实时准入已包含 HTTP/1.x、HTTP/2、TLS、DNS 及其加密载体、MQTT、Redis、Kafka、
+SIP、NATS、STOMP、OPC UA、GOOSE 等协议的限定版本和阶段。YAML、显式字段入口和
+完整实时协议支持是不同层次；以事件的 `Profile`、`Completeness`、`Status` 及
+会话上下文判断本次实际解析范围，不把已识别端口或协议名当作完整解析。
 
 ## 规则与结果
 
@@ -61,8 +62,13 @@ ReadFile 返回独立副本；内部文件视图共享不可变归档，避免�
 ```sh
 go generate ./common/bin-parser
 go generate ./common/bin-parser/rules
-go test ./common/bin-parser/... -count=1 -timeout=5m
+go test -count=1 -timeout=5m ./common/bin-parser/... ./common/pcapx/...
 ```
+
+CI 的 `Bin Parser Traffic Tests` 独立执行上述完整解析与流量测试，只在 PR 修改
+`common/bin-parser/**` 时自动触发；WIP/Draft 不运行。其他路径的修改不会默认启动
+该套件，需要时可手动选择分支或 commit SHA 运行。默认 `Essential Tests` 保留轻量的
+工作流分流检查，不重复运行 bin-parser/pcapx 语料测试。
 
 后续优先逐协议补齐字段、协商状态和实时入口。保留全部回归正负样本和来源；
 性能只比较 1/2/4 worker、同等完整输出及 CPU 时间。实验日志、profile、过程报告、

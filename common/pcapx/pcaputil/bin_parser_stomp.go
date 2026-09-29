@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
-	"unicode"
 	"unicode/utf8"
 )
 
@@ -84,7 +83,7 @@ func stompDecodeHeader(v []byte) (string, error) {
 	out.Grow(len(v))
 	for i := 0; i < len(v); i++ {
 		if v[i] != '\\' {
-			if v[i] < 0x20 || v[i] == 0x7f {
+			if v[i] == 0 || v[i] == '\r' || v[i] == '\n' {
 				return "", protocolError(ErrMalformedMessage, "stomp: control byte in header")
 			}
 			out.WriteByte(v[i])
@@ -274,8 +273,8 @@ func parseSTOMPFrame(w []byte, max int) (stompFrame, bool, error) {
 }
 
 func stompHasControl(v []byte) bool {
-	for _, r := range string(v) {
-		if unicode.IsControl(r) {
+	for _, r := range v {
+		if r == 0 || r == '\r' || r == '\n' {
 			return true
 		}
 	}

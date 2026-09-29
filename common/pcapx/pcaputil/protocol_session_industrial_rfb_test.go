@@ -128,6 +128,71 @@ func TestOPCUANegotiationAndSecurityBoundary(t *testing.T) {
 	_, err = s.consume(0, bad, 4, 128)
 	require.Error(t, err)
 }
+
+func uaECCReverseConnectSteps(buffer uint32) []sessionStep {
+	// Synthetic Part 6 7.1.2/7.1.3 handshake; direction 0 is the server
+	// initiating TCP to a client listener, not an inference from its port.
+	// https://reference.opcfoundation.org/specs/OPC-10000-6/7.1.3
+	str := func(value string) []byte {
+		wire := make([]byte, 4)
+		binary.LittleEndian.PutUint32(wire, uint32(len(value)))
+		return append(wire, value...)
+	}
+	header := make([]byte, 20)
+	binary.LittleEndian.PutUint32(header[4:8], buffer)
+	binary.LittleEndian.PutUint32(header[8:12], buffer)
+	url := "opc.tcp://server.example:4840"
+	hello := uaTestEnvelope("HEL", append(append([]byte(nil), header...), str(url)...))
+	ack := uaTestEnvelope("ACK", header)
+	rhe := uaTestEnvelope("RHE", append(str("urn:example:server"), str(url)...))
+	return []sessionStep{{0, rhe}, {1, hello}, {0, ack}}
+}
+
+func TestOPCUAECCReverseConnectNegotiation(t *testing.T) {
+	// ECC permits HEL/ACK buffers >=1024. These are transport envelopes;
+	// no SecurityPolicy negotiation or plaintext service decoding is claimed.
+	// https://reference.opcfoundation.org/specs/OPC-10000-6/7.1.2.3
+	for _, buffer := range []uint32{1024, 4096, 8192} {
+		for _, chunk := range []int{0, 1, 7} {
+			for _, deferred := range []bool{false, true} {
+				t.Run(fmt.Sprintf("buffer-%d/chunk-%d/deferred-%t", buffer, chunk, deferred), func(t *testing.T) {
+					events, _ := sessionTestFlow(t, "opcua", uaECCReverseConnectSteps(buffer), chunk, deferred)
+					require.Len(t, events, 3)
+					assertSessionEvents(t, events, "opcua", deferred)
+					for i, kind := range []string{"RHE", "HEL", "ACK"} {
+						require.Equal(t, kind, events[i].Session["Message Type"])
+					}
+					require.Equal(t, buffer, events[1].Session["Receive Buffer Size"])
+					require.Equal(t, buffer, events[2].Session["Send Buffer Size"])
+				})
+			}
+		}
+	}
+	for _, size := range []uint32{0, 1, 1023} {
+		steps := uaECCReverseConnectSteps(size)
+		for _, step := range steps[1:] {
+			_, err := (&binOPCUA{}).consume(step.dir, step.wire, 4, 1024)
+			require.ErrorContains(t, err, "buffers below 1024")
+		}
+	}
+	for _, ackSize := range []uint32{1024, 16384} {
+		s := &binOPCUA{}
+		_, err := s.consume(1, uaECCReverseConnectSteps(8192)[1].wire, 4, 1024)
+		require.NoError(t, err)
+		_, err = s.consume(0, uaECCReverseConnectSteps(ackSize)[2].wire, 4, 1024)
+		require.ErrorContains(t, err, "ACK buffers outside HEL negotiation")
+	}
+	// The two directions can negotiate different sizes. An ACK's send limit
+	// corresponds to the HEL's receive limit, not its send limit.
+	steps := uaECCReverseConnectSteps(1024)
+	binary.LittleEndian.PutUint32(steps[1].wire[16:20], 8192)
+	binary.LittleEndian.PutUint32(steps[2].wire[12:16], 8192)
+	s := &binOPCUA{}
+	for _, step := range steps {
+		_, err := s.consume(step.dir, step.wire, 4, 1024)
+		require.NoError(t, err)
+	}
+}
 func TestRFBStandardNoneHandshake(t *testing.T) {
 	init := make([]byte, 24)
 	binary.BigEndian.PutUint16(init, 16)

@@ -23,8 +23,12 @@ type binH2Stream struct {
 	method         string
 	grpc           [2][]byte
 	grpcEnabled    [2]bool
+	dohRetained    int64
+	dohFailed      bool
 	doh            [2]bool
 	dohBuf         [2][]byte
+	dohStatus      [2]string
+	dohContentType [2]string
 }
 
 type binH2Settings struct {
@@ -429,6 +433,8 @@ func (h *binHTTP2) applyLimits(receiver int, before binH2Settings) error {
 	return nil
 }
 
+// DoH payloads, added stream metadata, and request keys use their own
+// shrinking reservation in binDoH; both reservations share a.buffered.
 func (h *binHTTP2) sessionStorageBytes() int64 {
 	tables := int64(h.settings[0].table) + int64(h.settings[1].table)
 	return 12288 + int64(len(h.streams)+1)*512 + int64(len(h.pending[0])+len(h.pending[1])+1)*64 + 8*tables + h.grpcBuffered

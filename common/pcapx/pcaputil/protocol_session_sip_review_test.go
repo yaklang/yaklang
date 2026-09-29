@@ -1,8 +1,11 @@
 package pcaputil
 
 import (
+	"bytes"
 	"fmt"
+	"strings"
 	"testing"
+	"time"
 
 	"github.com/gopacket/gopacket/layers"
 	"github.com/stretchr/testify/require"
@@ -99,5 +102,73 @@ func TestSIPAdmissionSurvivesGopherPortHint(t *testing.T) {
 	for _, event := range events {
 		require.Equal(t, "sip", event.Protocol, "%s: %s", event.Status, event.Summary)
 		require.Equal(t, "decoded", event.Status, "%s: %s", event.Status, event.Summary)
+	}
+}
+
+func TestProtocolSessionSIPLongStartLineBoundaries(t *testing.T) {
+	// Explicitly synthetic RFC 3261 regression sample; the manifest carries
+	// its source classification and digest, separate from independent captures.
+	invite := messagingRegressionBytes(t, "sip-long-invite.txt")
+	for _, method := range []string{"INVITE", "OPTIONS"} {
+		wire := bytes.ReplaceAll(invite, []byte("INVITE"), []byte(method))
+		combined := append(bytes.Clone(wire), wire...)
+		for split := 0; split <= len(combined); split++ {
+			s := newReviewSession(t, ParserBudget{})
+			probe := s.Probe(wire)
+			require.Equal(t, ProbeAccept, probe.Verdict, "method=%s split=%d", method, split)
+			require.Equal(t, "sip", probe.Protocol)
+			var events []*ProtocolEvent
+			for _, chunk := range [][]byte{combined[:split], combined[split:]} {
+				r := s.Feed(0, time.Unix(1, 0), chunk)
+				if r.Err != nil {
+					require.Equal(t, ErrNeedMore, r.Err.Kind, "method=%s split=%d: %s", method, split, r.Err)
+				}
+				events = append(events, r.Events...)
+			}
+			require.Len(t, events, 2, "method=%s split=%d", method, split)
+			for _, event := range events {
+				require.Equal(t, "decoded", event.Status, event.Error)
+				require.Equal(t, wire, event.Raw)
+			}
+		}
+		s := newReviewSession(t, ParserBudget{})
+		var events []*ProtocolEvent
+		for _, b := range wire {
+			r := s.Feed(0, time.Unix(1, 0), []byte{b})
+			if r.Err != nil {
+				require.Equal(t, ErrNeedMore, r.Err.Kind)
+			}
+			events = append(events, r.Events...)
+		}
+		require.Len(t, events, 1)
+		assertSessionEvents(t, events, "sip", false)
+	}
+}
+
+func TestProtocolSessionSIPLongStartLineBudgets(t *testing.T) {
+	for _, wire := range [][]byte{
+		[]byte("INVITE sip:" + strings.Repeat("x", 100)),
+		[]byte("SIP/2.0 200 " + strings.Repeat("x", 100)),
+		[]byte("OPTIONS sip:" + strings.Repeat("x", 100)),
+		[]byte("INVITE sip:" + strings.Repeat("x", 100) + "@example.test SIP/2.0\r\n"),
+	} {
+		s := newReviewSession(t, ParserBudget{MaxFrameBytes: 80})
+		require.Equal(t, ProbeReject, s.Probe(wire).Verdict)
+		r := s.Feed(0, time.Unix(1, 0), wire)
+		require.NotNil(t, r.Err)
+		require.False(t, r.NeedMore)
+		require.NotEqual(t, "sip", r.State)
+	}
+	wire := []byte("INVITE sip:" + strings.Repeat("x", sipMaxHeaderBytes))
+	s := newReviewSession(t, ParserBudget{})
+	require.Equal(t, ProbeReject, s.Probe(wire).Verdict)
+	r := s.Feed(0, time.Unix(1, 0), wire)
+	require.NotNil(t, r.Err)
+	require.False(t, r.NeedMore)
+	for _, wire := range [][]byte{
+		[]byte("INVITE sip:" + strings.Repeat("x", 100) + " HTTP/1.1\r\n"),
+		[]byte("INVITE sip:" + strings.Repeat("x", 100) + "\n"),
+	} {
+		require.Equal(t, ProbeReject, newReviewSession(t, ParserBudget{}).Probe(wire).Verdict)
 	}
 }

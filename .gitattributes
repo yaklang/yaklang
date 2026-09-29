@@ -5,6 +5,11 @@ common/bin-parser/rules/**/*.yaml text eol=lf
 common/bin-parser/rules/*.yaml text eol=lf
 *.zst binary
 
+# Wire fixtures (including text protocols) must retain exact CR/LF bytes.
+common/bin-parser/testdata/protocol-recognition-regressions/** -text
+# CRLF and terminal blank header lines are protocol bytes, not source whitespace.
+common/bin-parser/testdata/protocol-recognition-regressions/messaging/*.txt whitespace=cr-at-eol,-blank-at-eof
+
 common/pcapx/pcaputil/testdata/protocol-sessions/first-batch-m2a/*.tsv whitespace=-blank-at-eol
 # Raw TShark TSV exports retain tab delimiters for empty trailing columns.
 common/pcapx/pcaputil/testdata/protocol-sessions/first-batch-oracles/*.tsv whitespace=-blank-at-eol

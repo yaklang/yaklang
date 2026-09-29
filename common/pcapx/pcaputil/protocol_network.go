@@ -41,12 +41,21 @@ type fragmentStore struct {
 func (a *binParser) networkPacket(p gopacket.Packet) (gopacket.Packet, bool) {
 	e := packetEvidence(p)
 	ci := p.Metadata().CaptureInfo
-	if eth, ok := p.Layer(layers.LayerTypeEthernet).(*layers.Ethernet); ok && eth.EthernetType == layers.EthernetType(0x88b8) {
-		// 0x88b8 is a dedicated link-layer carrier. Consume near-matches too:
-		// otherwise gopacket reports an unknown-EtherType error after the strict
-		// GOOSE probe rejects them.
-		a.decodeGOOSEEthernet(eth, eth.Payload, e, ci)
-		return nil, true
+	if eth, ok := p.Layer(layers.LayerTypeEthernet).(*layers.Ethernet); ok {
+		etherType, payload := eth.EthernetType, eth.Payload
+		// Follow the Ethernet carrier through 802.1Q / 802.1ad tags. Each
+		// iteration consumes four captured bytes, including the next EtherType;
+		// packetEvidence already retains the VLAN IDs in outer-to-inner order.
+		for (etherType == layers.EthernetTypeDot1Q || etherType == layers.EthernetTypeQinQ) && len(payload) >= 4 {
+			etherType = layers.EthernetType(binary.BigEndian.Uint16(payload[2:4]))
+			payload = payload[4:]
+		}
+		if etherType == layers.EthernetType(0x88b8) {
+			// Consume near-matches too: an unknown-EtherType diagnostic must not
+			// replace the strict GOOSE probe's rejection.
+			a.decodeGOOSEEthernet(eth, payload, e, ci)
+			return nil, true
+		}
 	}
 	// gopacket exposes the outer NetworkLayer and TransportLayer. Normalize a
 	// supported tunnel to its innermost IP before transport dispatch.

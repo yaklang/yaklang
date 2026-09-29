@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
 	"strconv"
 	"strings"
 )
@@ -49,6 +50,10 @@ func natsOperationAt(line []byte) (string, int, bool) {
 // PING/PONG and +OK/-ERR are only meaningful after a NATS session is established:
 // alone they also occur in other text protocols and RESP, respectively.
 func natsAdmission(w []byte) (ProbeResult, string) {
+	return natsAdmissionWithBudget(w, DefaultParserBudget())
+}
+
+func natsAdmissionWithBudget(w []byte, budget ParserBudget) (ProbeResult, string) {
 	if len(w) < 2 {
 		return ProbeResult{Verdict: ProbeReject}, ""
 	}
@@ -61,19 +66,19 @@ func natsAdmission(w []byte) (ProbeResult, string) {
 		if !ok || !natsInitialOperation(op) {
 			return ProbeResult{Verdict: ProbeReject, Reason: "not a distinctive NATS opening command"}, ""
 		}
-		info, err := natsFrameInfoFor(w, DefaultParserBudget().MaxMessageBytes)
+		info, err := natsFrameInfoWithBudget(w, budget)
 		if err != nil {
 			return ProbeResult{Verdict: ProbeReject, Reason: err.Error()}, ""
 		}
 		if info.length > len(w) {
-			return ProbeResult{Verdict: ProbeNeedMore, NeedBytes: info.length - len(w), Reason: "NATS payload is incomplete"}, op
+			return ProbeResult{Verdict: ProbeNeedMore, Protocol: "nats", NeedBytes: info.length - len(w), Reason: "NATS payload is incomplete"}, op
 		}
 		return probeAccept("nats", "client", 92), op
 	}
-	if cr := bytes.IndexByte(w, '\r'); cr >= 0 && cr != len(w)-1 {
-		return ProbeResult{Verdict: ProbeReject, Reason: "NATS command line contains a bare CR"}, ""
+	if _, _, err := natsLine(w); err != nil {
+		return ProbeResult{Verdict: ProbeReject, Reason: err.Error()}, ""
 	}
-	if len(w) >= natsControlLineMax {
+	if len(w) >= budget.MaxMessageBytes {
 		return ProbeResult{Verdict: ProbeReject, Reason: "NATS command line exceeds limit"}, ""
 	}
 	if op, end, ok := natsOperationAt(w); ok {
@@ -83,11 +88,11 @@ func natsAdmission(w []byte) (ProbeResult, string) {
 		if end < len(w) && op == "CONNECT" && !natsJSONCommandArgument(op, w) {
 			return ProbeResult{Verdict: ProbeReject, Reason: "not a NATS JSON command"}, ""
 		}
-		return ProbeResult{Verdict: ProbeNeedMore, NeedBytes: 1, Reason: "NATS command line is incomplete"}, op
+		return ProbeResult{Verdict: ProbeNeedMore, Protocol: "nats", NeedBytes: 1, Reason: "NATS command line is incomplete"}, op
 	}
 	for _, op := range []string{"INFO", "CONNECT", "PUB", "HPUB", "MSG", "HMSG"} {
 		if len(w) < len(op) && bytes.Equal(w, []byte(op[:len(w)])) {
-			return ProbeResult{Verdict: ProbeNeedMore, NeedBytes: 1, Reason: "NATS operation is incomplete"}, op
+			return ProbeResult{Verdict: ProbeNeedMore, Protocol: "nats", NeedBytes: 1, Reason: "NATS operation is incomplete"}, op
 		}
 	}
 	return ProbeResult{Verdict: ProbeReject, Reason: "not a NATS client-protocol prefix"}, ""
@@ -114,11 +119,6 @@ func natsJSONCommandArgument(op string, line []byte) bool {
 	}
 	arg := bytes.TrimLeft(line[end:], " \t")
 	return len(arg) > 0 && arg[0] == '{'
-}
-
-func natsNeedsMore(w []byte) bool {
-	result, _ := natsAdmission(w)
-	return result.Verdict == ProbeNeedMore
 }
 
 func natsCandidateLine(op string, line []byte) bool {
@@ -164,7 +164,7 @@ func natsFields(line []byte) [][]byte {
 func natsLine(w []byte) ([]byte, int, error) {
 	lf := bytes.IndexByte(w, '\n')
 	if lf < 0 {
-		if len(w) > natsControlLineMax || len(w) == natsControlLineMax && w[len(w)-1] != '\r' {
+		if len(w) > natsControlLineMax+1 || len(w) == natsControlLineMax+1 && w[len(w)-1] != '\r' {
 			return nil, 0, protocolError(ErrResourceExceeded, "NATS control line exceeds limit")
 		}
 		if cr := bytes.IndexByte(w, '\r'); cr >= 0 && cr != len(w)-1 {
@@ -206,22 +206,72 @@ func natsParseSize(text []byte) (int, error) {
 	return int(n), nil
 }
 
-func natsJSONArgument(line []byte, op string, tokenEnd int) (map[string]any, error) {
-	if tokenEnd == len(line) {
-		return nil, protocolError(ErrMalformedMessage, "NATS %s requires a JSON object", op)
-	}
-	if line[tokenEnd] != ' ' && line[tokenEnd] != '\t' {
-		return nil, protocolError(ErrMalformedMessage, "NATS %s operation is not separated from its JSON object", op)
+// natsJSONArgument validates JSON without constructing its recursive value tree.
+// Each collection and nesting level is charged before reading its children.
+func natsJSONArgument(line []byte, op string, tokenEnd int, budget ParserBudget) (int, error) {
+	malformed := func() error { return protocolError(ErrMalformedMessage, "NATS %s JSON object is malformed", op) }
+	if tokenEnd == len(line) || line[tokenEnd] != ' ' && line[tokenEnd] != '\t' {
+		return 0, malformed()
 	}
 	argument := bytes.TrimLeft(line[tokenEnd:], " \t")
 	if len(argument) == 0 || argument[0] != '{' {
-		return nil, protocolError(ErrMalformedMessage, "NATS %s argument is not a JSON object", op)
+		return 0, malformed()
 	}
-	var object map[string]any
-	if err := json.Unmarshal(argument, &object); err != nil || object == nil {
-		return nil, protocolError(ErrMalformedMessage, "NATS %s JSON object is malformed", op)
+	decoder := json.NewDecoder(bytes.NewReader(argument))
+	decoder.UseNumber()
+	rootKeys := make(map[string]struct{})
+	var value func(int) error
+	value = func(depth int) error {
+		token, err := decoder.Token()
+		if err != nil {
+			return malformed()
+		}
+		delimiter, collection := token.(json.Delim)
+		if !collection {
+			return nil
+		}
+		if delimiter != '{' && delimiter != '[' {
+			return malformed()
+		}
+		if depth > budget.MaxRecursionDepth {
+			return protocolError(ErrResourceExceeded, "NATS JSON nesting exceeds configured depth limit")
+		}
+		count := 0
+		for decoder.More() {
+			count++
+			if count > budget.MaxCollectionElements {
+				return protocolError(ErrResourceExceeded, "NATS JSON collection exceeds configured element limit")
+			}
+			if delimiter == '{' {
+				key, err := decoder.Token()
+				if err != nil {
+					return malformed()
+				}
+				name, ok := key.(string)
+				if !ok {
+					return malformed()
+				}
+				if depth == 1 {
+					rootKeys[name] = struct{}{}
+				}
+			}
+			if err := value(depth + 1); err != nil {
+				return err
+			}
+		}
+		closing, err := decoder.Token()
+		if err != nil || delimiter == '{' && closing != json.Delim('}') || delimiter == '[' && closing != json.Delim(']') {
+			return malformed()
+		}
+		return nil
 	}
-	return object, nil
+	if err := value(1); err != nil {
+		return 0, err
+	}
+	if _, err := decoder.Token(); err != io.EOF {
+		return 0, malformed()
+	}
+	return len(rootKeys), nil
 }
 
 func natsValidateHeader(header []byte) error {
@@ -243,9 +293,19 @@ func natsValidateHeader(header []byte) error {
 // TCP callers retain it for later input. maxBytes includes the control line,
 // payload, and terminal CRLF.
 func natsFrameInfoFor(w []byte, maxBytes int) (natsFrameInfo, error) {
+	budget := DefaultParserBudget()
+	budget.MaxMessageBytes = maxBytes
+	return natsFrameInfoWithBudget(w, budget)
+}
+
+func natsFrameInfoWithBudget(w []byte, budget ParserBudget) (natsFrameInfo, error) {
+	maxBytes := budget.MaxMessageBytes
 	line, lineBytes, err := natsLine(w)
 	if err != nil || lineBytes == 0 {
 		return natsFrameInfo{}, err
+	}
+	if lineBytes > maxBytes {
+		return natsFrameInfo{}, protocolError(ErrResourceExceeded, "NATS control line exceeds configured byte limit")
 	}
 	op, tokenEnd, ok := natsOperationAt(line)
 	if !ok || !natsCandidateLine(op, line) {
@@ -302,11 +362,11 @@ func natsFrameInfoFor(w []byte, maxBytes int) (natsFrameInfo, error) {
 		return nil
 	}
 	if op == "CONNECT" || op == "INFO" {
-		object, err := natsJSONArgument(line, op, tokenEnd)
+		fieldCount, err := natsJSONArgument(line, op, tokenEnd, budget)
 		if err != nil {
 			return natsFrameInfo{}, err
 		}
-		set("JSON Field Count", len(object))
+		set("JSON Field Count", fieldCount)
 		if op == "INFO" {
 			set("Server Info Observed", true)
 		} else {
@@ -487,8 +547,8 @@ func natsFrameInfoFor(w []byte, maxBytes int) (natsFrameInfo, error) {
 
 func maxInt() int { return int(^uint(0) >> 1) }
 
-func (f *binNATS) consume(dir int, raw []byte, maxBytes int) (map[string]any, error) {
-	info, err := natsFrameInfoFor(raw, maxBytes)
+func (f *binNATS) consume(dir int, raw []byte, budget ParserBudget) (map[string]any, error) {
+	info, err := natsFrameInfoWithBudget(raw, budget)
 	if err != nil {
 		return nil, err
 	}
@@ -531,7 +591,7 @@ func (f *binNATS) consume(dir int, raw []byte, maxBytes int) (map[string]any, er
 }
 
 func (f *binFlow) frameNATS(w []byte) (int, *binSpec, error) {
-	info, err := natsFrameInfoFor(w, f.a.config.MaxMessageBytes)
+	info, err := natsFrameInfoWithBudget(w, f.a.budget)
 	if err != nil || info.length == 0 {
 		return info.length, nil, err
 	}

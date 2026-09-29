@@ -1,0 +1,27 @@
+{
+  "source": "Specification-derived synthetic DNS-over-TCP regression messages; not live traffic",
+  "references": [
+    "https://www.rfc-editor.org/rfc/rfc1035#section-4.1.3",
+    "https://www.rfc-editor.org/rfc/rfc1035#section-4.2.2"
+  ],
+  "samples": [
+    {
+      "path": "short-a-rdata.tcp.bin",
+      "sha256": "cdcc99f6ca5f7da0a5efb5b8afd024c530009a81b7f9e0849d4b9a58290b67ca",
+      "size_bytes": 28,
+      "expected": "malformed: A RDATA is 3 bytes, not 4"
+    },
+    {
+      "path": "valid-a-rdata.tcp.bin",
+      "sha256": "079286c1f4660968df41b7215c5b39b90e311daf409fc54f43a3a34c2443c291",
+      "size_bytes": 29,
+      "expected": "decoded A address 1.2.3.4"
+    },
+    {
+      "path": "two-questions.tcp.bin",
+      "sha256": "279c7800e7613ed8f5d37354e9f570c171af6001f2ecede40c01651be76cb264",
+      "size_bytes": 24,
+      "expected": "decoded with default budget; limited at MaxCollectionElements=1"
+    }
+  ]
+}

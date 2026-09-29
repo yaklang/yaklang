@@ -10,6 +10,9 @@ import (
 
 func TestSmoking_IP(t *testing.T) {
 	packets, err := PacketBuilder(
+		// Packet serialization tests use explicit link addresses, without host routing or ARP.
+		WithEthernet_SrcMac("02:00:00:00:00:01"),
+		WithEthernet_DstMac("02:00:00:00:00:02"),
 		WithIPv4_SrcIP("1.1.1.1"),
 		WithIPv4_DstIP("1.1.1.2"),
 	)

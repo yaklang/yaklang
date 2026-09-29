@@ -26,14 +26,20 @@ func (f *binFlow) detectDirection(dir int, wire []byte) {
 			return
 		}
 	}
-	if verdict, op := natsAdmission(wire); verdict.Verdict == ProbeAccept {
-		clientDir := -1
-		if role := natsRole(op); role == "client" {
-			clientDir = dir
-		} else if role == "server" {
-			clientDir = 1 - dir
+	if verdict := f.probeBoundedText(wire); verdict.Verdict == ProbeAccept {
+		switch verdict.Protocol {
+		case "nats":
+			op, _, _ := natsOperationAt(wire)
+			clientDir := dir
+			if natsRole(op) == "server" {
+				clientDir = 1 - dir
+			}
+			f.protocol, f.nats = "nats", &binNATS{clientDir: clientDir}
+		case "stomp":
+			f.protocol, f.stomp = "stomp", &binSTOMP{clientDir: dir}
+		case "sip":
+			f.protocol, f.sip = "sip", &binSIP{pending: map[sipTxnKey]string{}, seen: map[sipTxnKey]int{}}
 		}
-		f.protocol, f.nats = "nats", &binNATS{clientDir: clientDir}
 		return
 	}
 	if isHTTPStartLineCandidate(wire) {
@@ -196,6 +202,25 @@ func (f *binFlow) detectDirection(dir int, wire []byte) {
 	}
 }
 
+// Text handshakes and SIP request URIs routinely exceed the generic signature
+// window. Inspect only each protocol's bounded prefix, with the same admission
+// path for public Probe and streaming Feed.
+func (f *binFlow) probeBoundedText(wire []byte) ProbeResult {
+	budget := f.a.budget
+	budget.MaxMessageBytes = min(budget.MaxMessageBytes, budget.MaxFrameBytes)
+	if p, _ := natsAdmissionWithBudget(wire, budget); p.Verdict != ProbeReject {
+		return p
+	}
+	if p := probeSTOMP(wire, min(budget.MaxMessageBytes, stompMaxHeaderBytes+stompMaxLineBytes+4)); p.Verdict != ProbeReject {
+		return p
+	}
+	return probeSIP(wire, min(budget.MaxMessageBytes, sipMaxHeaderBytes))
+}
+
+func (f *binFlow) needsMoreBoundedText(wire []byte) bool {
+	return f.probeBoundedText(wire).Verdict == ProbeNeedMore
+}
+
 func (f *binFlow) needsMorePortProtocolPrefix(wire []byte) bool {
 	if !f.captureTCP {
 		return false
@@ -257,6 +282,9 @@ func (f *binFlow) consumeSession(dir int, e *ProtocolEvent, result map[string]an
 			}
 			if err != nil && e.Session != nil {
 				e.Session["Error Scope"] = "stream"
+				if id, ok := e.Session["Stream ID"].(uint32); ok {
+					f.failDoHH2Stream(stream, id)
+				}
 				if previous != nil {
 					for d := range previous.grpc {
 						f.h2.grpcBuffered -= int64(cap(previous.grpc[d]))
@@ -321,7 +349,7 @@ func (f *binFlow) consumeSession(dir int, e *ProtocolEvent, result map[string]an
 		if f.nats == nil {
 			f.nats = &binNATS{clientDir: -1}
 		}
-		e.Session, err = f.nats.consume(dir, e.Raw, f.a.config.MaxMessageBytes)
+		e.Session, err = f.nats.consume(dir, e.Raw, f.a.budget)
 	case "mongodb":
 		e.Session, err = f.mongo.consume(e.Raw, result)
 	case "kafka":
@@ -624,6 +652,7 @@ func (f *binFlow) invalidateSession(dir int) {
 }
 
 func (f *binFlow) closeSession() {
+	f.releaseDoH()
 	if f.protocol == "dns" || f.protocol == "dot" {
 		f.a.closeDNSFlow(f.id)
 	}
@@ -739,7 +768,7 @@ func (f *binFlow) finishSession(reason TrafficFlowCloseReason) {
 		emit(0, map[string]any{"Outstanding": len(d.pending)}, "DoT exchange ended with unmatched DNS transaction IDs")
 	}
 	if h := f.doh; h != nil && len(h.pending) > 0 {
-		emit(0, map[string]any{"Outstanding": len(h.pending)}, "DoH exchange ended with unmatched DNS transaction IDs")
+		emit(0, map[string]any{"Outstanding": len(h.pending)}, "DoH exchange ended with unmatched HTTP exchanges")
 	}
 	if p := f.sip; p != nil && len(p.pending) > 0 {
 		emit(0, map[string]any{"Outstanding": len(p.pending)}, "SIP exchange ended with unmatched transactions")

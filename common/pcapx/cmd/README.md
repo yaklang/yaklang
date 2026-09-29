@@ -23,15 +23,18 @@ History defaults to the last 4,096 messages within 32 MiB of raw data; an older
 detail can be evicted. Increase `-history`/`-memory-mib` or narrow replay with BPF.
 Protocol/flow filters affect the display only. The inspector retains raw messages
 and metadata; details re-create owned structured fields. TLS ciphertext remains
-opaque; this tool does not decrypt TLS.
+opaque without an authorized key log. `-tls-keylog session.keys` enables the
+supported AES-128-GCM TLS profiles; authentication must succeed before plaintext
+is passed to an application parser. Unsupported cipher suites remain opaque.
 
 The default is full structured parsing. `-deferred` explicitly postpones field
 decoding until a detail is requested. Final JSON serialization is outside capture
 timing. `-quiet -history 0` is useful for measuring the analysis path without a
 viewer. `-follow` emits at most `-rows` rows per `-interval`, rather than printing
 every packet. Ctrl-C or `-duration` stops capture and drains accepted worker jobs.
-Only worker counts 1, 2 and 4 are supported by this CLI; GOMAXPROCS follows that
-setting. UDP analysis remains on the reader.
+Only worker counts 1, 2 and 4 are supported by this CLI. `-gomaxprocs 0` (the
+default) preserves the runtime/environment scheduler setting; set it explicitly
+for comparable performance measurements. UDP analysis remains on the reader.
 
 Use separate terminals for a reproducible local test. On Windows:
 

@@ -190,11 +190,14 @@ func (s *captureSession) Probe(data []byte) ProbeResult {
 		}
 		return probeAccept(probe.protocol, "", 90)
 	}
-	if result, _ := natsAdmission(data); result.Verdict != ProbeReject {
+	if result := s.f.probeBoundedText(input); result.Verdict != ProbeReject {
 		return result
 	}
-	if isHTTPStartLineCandidate(data) {
-		if bytes.Index(data, []byte("\r\n")) < 0 {
+	if isHTTPStartLineCandidate(input) {
+		if bytes.Index(input, []byte("\r\n")) < 0 {
+			if len(input) >= min(httpStartLineMaxBytes, s.f.a.budget.MaxFrameBytes) {
+				return ProbeResult{Verdict: ProbeReject, Reason: "HTTP start line exceeds configured byte limit"}
+			}
 			return ProbeResult{Verdict: ProbeNeedMore, NeedBytes: 1, Reason: "HTTP start line is incomplete"}
 		}
 		return ProbeResult{Verdict: ProbeReject, Reason: "invalid HTTP start line"}

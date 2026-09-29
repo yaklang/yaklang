@@ -573,8 +573,9 @@ Package:
         this.ProcessSubNode("Send Buffer Size")
         this.ProcessSubNode("Maximum Message Size")
         this.ProcessSubNode("Maximum Chunk Count")
-        if getNodeResult("Receive Buffer Size").Value < 8192 || getNodeResult("Send Buffer Size").Value < 8192 {
-          panic("opcua: HEL receive/send buffers must be at least 8192 bytes")
+        # Part 6 permits 1024-byte buffers for ECC; HEL precedes security-policy negotiation.
+        if getNodeResult("Receive Buffer Size").Value < 1024 || getNodeResult("Send Buffer Size").Value < 1024 {
+          panic("opcua: HEL receive/send buffers must be at least 1024 bytes")
         }
         this.ProcessSubNode("Endpoint URL Length")
         length = getNodeResult("Endpoint URL Length").Value
@@ -590,8 +591,9 @@ Package:
         this.ProcessSubNode("Send Buffer Size")
         this.ProcessSubNode("Maximum Message Size")
         this.ProcessSubNode("Maximum Chunk Count")
-        if getNodeResult("Receive Buffer Size").Value < 8192 || getNodeResult("Send Buffer Size").Value < 8192 {
-          panic("opcua: ACK receive/send buffers must be at least 8192 bytes")
+        # A stateless ACK parser cannot infer the corresponding HEL or security policy.
+        if getNodeResult("Receive Buffer Size").Value < 1024 || getNodeResult("Send Buffer Size").Value < 1024 {
+          panic("opcua: ACK receive/send buffers must be at least 1024 bytes")
         }
       } else if messageType == "ERR" {
         if size < 16 { panic("opcua: truncated ERR body") }

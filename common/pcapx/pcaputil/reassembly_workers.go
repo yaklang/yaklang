@@ -553,6 +553,12 @@ func rawFlowKey(raw []byte, link layers.LinkType) (flowKey, bool, error) {
 			kind = binary.BigEndian.Uint16(raw[offset+2 : offset+4])
 			offset += 4
 		}
+		if kind == 0x88b8 {
+			// GOOSE has no TCP flow key. Its dedicated link-layer ingress
+			// validates the PDU; gopacket's unknown EtherType error must not
+			// discard it before that ingress runs in multi-worker captures.
+			return flowKey{}, false, nil
+		}
 		ip := raw[offset:]
 		if kind == 0x0800 && len(ip) >= 20 && ip[9] == 6 && binary.BigEndian.Uint16(ip[6:8])&0x3fff == 0 {
 			h := int(ip[0]&15) * 4

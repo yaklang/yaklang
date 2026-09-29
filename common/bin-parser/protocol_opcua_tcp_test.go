@@ -135,7 +135,7 @@ func TestOPCUATCPDispatchPlanMatchesLegacy(t *testing.T) {
 	works := []currentCorpusWork{
 		{id: "opcua/hello-standard-port", wire: ipv4TCPFrame(t, 50000, 4840, validHello)},
 		{id: "opcua/hello-custom-port", wire: ipv4TCPFrame(t, 50000, 50001, validHello)},
-		{id: "opcua/hello-server-direction-rejected", wire: ipv4TCPFrame(t, 4840, 50000, validHello)},
+		{id: "opcua/hello-reverse-connect-client", wire: ipv4TCPFrame(t, 4840, 50000, validHello)},
 		{id: "opcua/ack-server-direction", wire: ipv4TCPFrame(t, 4840, 50000, opcuaAckMessage())},
 		{id: "opcua/err-server-direction", wire: ipv4TCPFrame(t, 4840, 50000, opcuaErrMessage())},
 		{id: "opcua/rhe-server-direction", wire: ipv4TCPFrame(t, 4840, 50000, opcuaRHEMessage())},
@@ -151,6 +151,66 @@ func TestOPCUATCPDispatchPlanMatchesLegacy(t *testing.T) {
 			id:   fmt.Sprintf("opcua/truncated-header/%d", end),
 			wire: ipv4TCPFrame(t, 50000, 4840, validHello[:end]),
 		})
+	}
+	assertDispatchEquivalence(t, works)
+}
+
+func TestOPCUATCPReverseConnectAdmission(t *testing.T) {
+	// Synthetic Part 6 7.1.3 Reverse Connect exchange. The server opens a
+	// socket to the client's listener (which may use 4840), sends RHE, then
+	// receives HEL from that client and sends ACK back on the same socket.
+	// https://reference.opcfoundation.org/specs/OPC-10000-6/7.1.3
+	var works []currentCorpusWork
+	for _, tc := range []struct {
+		name, kind string
+		src, dst   layers.TCPPort
+		wire       []byte
+	}{
+		{"server-RHE", "RHE", 50000, 4840, opcuaRHEMessage()},
+		{"client-HEL", "HEL", 4840, 50000, opcuaHelloMessage()},
+		{"server-ACK", "ACK", 50000, 4840, opcuaAckMessage()},
+		{"client-rejects-RHE", "ERR", 4840, 50000, opcuaErrMessage()},
+		{"same-numbered-ports-HEL", "HEL", 4840, 4840, opcuaHelloMessage()},
+		{"same-numbered-ports-OPN", "OPN", 4840, 4840, opcuaOPNMessage()},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			parsed := requireOPCUAFrame(t, tc.src, tc.dst, tc.wire)
+			require.Equal(t, tc.kind, strVal(t, parsed.Child("Message Type")))
+			require.EqualValues(t, len(tc.wire), uintVal(t, parsed.Child("Message Size")))
+			works = append(works, currentCorpusWork{id: tc.name, wire: ipv4TCPFrame(t, tc.src, tc.dst, tc.wire)})
+		})
+	}
+	assertDispatchEquivalence(t, works)
+}
+
+func TestOPCUATCPECCNegotiationBuffers(t *testing.T) {
+	// Synthetic HEL/ACK samples from the normative Part 6 tables: ECC permits
+	// a 1024-byte minimum. SecurityPolicy is not available until a later OPN.
+	// https://reference.opcfoundation.org/specs/OPC-10000-6/7.1.2.3
+	// https://reference.opcfoundation.org/specs/OPC-10000-6/7.1.2.4
+	var works []currentCorpusWork
+	for _, size := range []uint32{0, 1, 1023, 1024, 4096, 8192} {
+		for kind, wire := range map[string][]byte{"HEL": opcuaHelloMessage(), "ACK": opcuaAckMessage()} {
+			t.Run(fmt.Sprintf("%s/%d", kind, size), func(t *testing.T) {
+				binary.LittleEndian.PutUint32(wire[12:16], size)
+				binary.LittleEndian.PutUint32(wire[16:20], size)
+				reader := newProtocolCorpusBoundedReader(wire)
+				node, err := parser.ParseBinary(reader, "application-layer.extended_protocols", "OPCUATCPMessage")
+				frame := ipv4TCPFrame(t, 50000, 50001, wire)
+				tcp := mustChild(t, parseEthernet(t, frame), "IP", "TCP")
+				if size < 1024 {
+					require.Error(t, err)
+					require.Nil(t, tcp.Child("OPCUATCPMessage"))
+				} else {
+					require.NoError(t, err)
+					require.Zero(t, reader.Len())
+					protocolCorpusRequireValue(t, node, "Receive Buffer Size", uint64(size))
+					protocolCorpusRequireValue(t, node, "Send Buffer Size", uint64(size))
+					require.NotNil(t, tcp.Child("OPCUATCPMessage"))
+				}
+				works = append(works, currentCorpusWork{id: fmt.Sprintf("%s/%d", kind, size), wire: frame})
+			})
+		}
 	}
 	assertDispatchEquivalence(t, works)
 }
@@ -192,27 +252,10 @@ func TestOPCUATCPMessageFramingAndNearMisses(t *testing.T) {
 
 	for _, tt := range []struct {
 		name string
-		src  layers.TCPPort
-		dst  layers.TCPPort
-	}{
-		{name: "HEL in server direction", src: 4840, dst: 50000},
-		{name: "HEL with both ports 4840", src: 4840, dst: 4840},
-	} {
-		t.Run(tt.name, func(t *testing.T) {
-			eth := parseEthernet(t, ipv4TCPFrame(t, tt.src, tt.dst, valid))
-			payload := mustChild(t, eth, "IP", "TCP")
-			require.Nil(t, payload.Child("OPCUATCPMessage"))
-		})
-	}
-	for _, tt := range []struct {
-		name string
 		wire []byte
 		src  layers.TCPPort
 		dst  layers.TCPPort
 	}{
-		{name: "ACK in client direction", wire: opcuaAckMessage(), src: 50000, dst: 4840},
-		{name: "ERR in client direction", wire: opcuaErrMessage(), src: 50000, dst: 4840},
-		{name: "RHE in client direction", wire: opcuaRHEMessage(), src: 50000, dst: 4840},
 		{name: "non-final HEL", wire: badChunk, src: 50000, dst: 4840},
 		{name: "truncated HEL", wire: truncatedBody, src: 50000, dst: 4840},
 		{name: "unknown UACP type", wire: unknownType, src: 50000, dst: 4840},

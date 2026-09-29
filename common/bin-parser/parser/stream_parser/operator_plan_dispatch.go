@@ -280,33 +280,17 @@ func (p *portDispatchPlan) opcuaCandidate(e *planExecution, src, dst uint16, max
 		chunkType := (header >> 24) & 0xff
 		messageSize := header >> 32
 		var minimumSize uint64
-		directionOK := true
 		switch messageType {
 		case 0x4c4548: // HEL
 			minimumSize = 32
-			if src == 4840 || dst == 4840 {
-				directionOK = dst == 4840 && src != 4840
-			}
 		case 0x4b4341: // ACK
 			minimumSize = 28
-			if src == 4840 || dst == 4840 {
-				directionOK = src == 4840 && dst != 4840
-			}
-		case 0x525245: // ERR
+		case 0x525245, 0x454852: // ERR, RHE
 			minimumSize = 16
-			if src == 4840 || dst == 4840 {
-				directionOK = src == 4840 && dst != 4840
-			}
-		case 0x454852: // RHE
-			minimumSize = 16
-			if src == 4840 || dst == 4840 {
-				directionOK = src == 4840 && dst != 4840
-			}
 		case 0x4e504f: // OPN
 			minimumSize = 33
-			directionOK = src != dst
 		}
-		candidate = chunkType == 0x46 && minimumSize != 0 && messageSize >= minimumSize && messageSize <= maximum && messageSize <= 16777216 && directionOK
+		candidate = chunkType == 0x46 && minimumSize != 0 && messageSize >= minimumSize && messageSize <= maximum && messageSize <= 16777216
 	}
 	e.at("probe.Recovery()")
 	probe.recovery()
@@ -395,24 +379,18 @@ if probe.OK {
   chunkType = (header >> 24) & 255
   messageSize = header >> 32
   minimumSize = 0
-  directionOK = true
   if messageType == 0x4c4548 {
     minimumSize = 32
-    if src == 4840 || dst == 4840 { directionOK = dst == 4840 && src != 4840 }
   } else if messageType == 0x4b4341 {
     minimumSize = 28
-    if src == 4840 || dst == 4840 { directionOK = src == 4840 && dst != 4840 }
   } else if messageType == 0x525245 {
     minimumSize = 16
-    if src == 4840 || dst == 4840 { directionOK = src == 4840 && dst != 4840 }
   } else if messageType == 0x454852 {
     minimumSize = 16
-    if src == 4840 || dst == 4840 { directionOK = src == 4840 && dst != 4840 }
   } else if messageType == 0x4e504f {
     minimumSize = 33
-    directionOK = src != dst
   }
-  opcuaCandidate = chunkType == 0x46 && minimumSize != 0 && messageSize >= minimumSize && messageSize <= maximum && messageSize <= 16777216 && directionOK
+  opcuaCandidate = chunkType == 0x46 && minimumSize != 0 && messageSize >= minimumSize && messageSize <= maximum && messageSize <= 16777216
 }
 err = probe.Recovery()
 if err != nil { panic(err) }`

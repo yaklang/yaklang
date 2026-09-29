@@ -69,18 +69,20 @@ var sipMethods = []string{
 }
 
 func probeSIP(w []byte, limit int) ProbeResult {
-	if len(w) == 0 {
+	limit = min(limit, sipMaxHeaderBytes)
+	if limit <= 0 || len(w) == 0 || !sipLooksLike(w) {
 		return ProbeResult{Verdict: ProbeReject}
 	}
-	if !sipLooksLike(w) {
-		return ProbeResult{Verdict: ProbeReject}
-	}
+	w = w[:min(len(w), limit)]
 	line, ok := sipFirstLine(w)
 	if !ok {
-		if len(w) >= min(limit, 512) {
+		if len(w) >= limit || bytes.IndexByte(w, '\n') >= 0 {
 			return ProbeResult{Verdict: ProbeReject}
 		}
-		return probeNeed("sip", "2.0", len(w), min(limit, 64))
+		if cr := bytes.IndexByte(w, '\r'); cr >= 0 && cr != len(w)-1 {
+			return ProbeResult{Verdict: ProbeReject}
+		}
+		return probeNeed("sip", "2.0", len(w), len(w)+1)
 	}
 	if sipRequestLine(line) || sipResponseLine(line) {
 		return probeAccept("sip", "2.0", 93)

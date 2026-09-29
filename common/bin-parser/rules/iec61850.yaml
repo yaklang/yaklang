@@ -152,20 +152,34 @@ GOOSEPDU:
     if getNodeResult("Time Allowed To Live/Tag").Value != 129 { panic("goose: unexpected Time Allowed To Live tag") }
     this.ProcessSubNode("Dataset")
     if getNodeResult("Dataset/Tag").Value != 130 { panic("goose: unexpected Dataset tag") }
-    this.ProcessSubNode("GOOSE ID")
-    if getNodeResult("GOOSE ID/Tag").Value != 131 { panic("goose: unexpected GOOSE ID tag") }
+    # IECGoosePdu: goID is OPTIONAL; simulation and ndsCom DEFAULT FALSE.
+    # https://github.com/wireshark/wireshark/blob/4f63ea0eae68cf6facea31604994f1a339e43640/epan/dissectors/asn1/goose/goose.asn
+    next, probe = this.TryProcessByType("PeekByte")
+    if !probe.OK { probe.Recovery(); panic("goose: truncated optional goID") }
+    probe.Recovery()
+    if next.Value == 131 { this.ProcessSubNode("GOOSE ID") }
     this.ProcessSubNode("Timestamp")
     if getNodeResult("Timestamp/Tag").Value != 132 { panic("goose: unexpected Timestamp tag") }
     this.ProcessSubNode("State Number")
     if getNodeResult("State Number/Tag").Value != 133 { panic("goose: unexpected State Number tag") }
     this.ProcessSubNode("Sequence Number")
     if getNodeResult("Sequence Number/Tag").Value != 134 { panic("goose: unexpected Sequence Number tag") }
-    this.ProcessSubNode("Simulation")
-    if getNodeResult("Simulation/Tag").Value != 135 { panic("goose: unexpected Simulation tag") }
+    next, probe = this.TryProcessByType("PeekByte")
+    if !probe.OK { probe.Recovery(); panic("goose: truncated optional simulation") }
+    probe.Recovery()
+    if next.Value == 135 {
+      this.ProcessSubNode("Simulation")
+      if getNodeResult("Simulation/Length").Value != 1 { panic("goose: simulation BOOLEAN length must be one") }
+    } else { this.AddInfo("Simulation", false) }
     this.ProcessSubNode("Configuration Revision")
     if getNodeResult("Configuration Revision/Tag").Value != 136 { panic("goose: unexpected Configuration Revision tag") }
-    this.ProcessSubNode("Needs Commissioning")
-    if getNodeResult("Needs Commissioning/Tag").Value != 137 { panic("goose: unexpected Needs Commissioning tag") }
+    next, probe = this.TryProcessByType("PeekByte")
+    if !probe.OK { probe.Recovery(); panic("goose: truncated optional ndsCom") }
+    probe.Recovery()
+    if next.Value == 137 {
+      this.ProcessSubNode("Needs Commissioning")
+      if getNodeResult("Needs Commissioning/Length").Value != 1 { panic("goose: ndsCom BOOLEAN length must be one") }
+    } else { this.AddInfo("Needs Commissioning", false) }
     this.ProcessSubNode("Dataset Entry Count")
     if getNodeResult("Dataset Entry Count/Tag").Value != 138 { panic("goose: unexpected Dataset Entry Count tag") }
     this.ProcessSubNode("Data Tag")

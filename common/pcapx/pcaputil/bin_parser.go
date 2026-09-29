@@ -590,7 +590,7 @@ func (f *binFlow) feed(dir int, data []byte, ts time.Time) {
 			}
 			if f.protocol == "" {
 				if len(wire) >= a.config.ProbeBytes {
-					if needsMoreHTTPStartLine(wire) || f.needsMorePortProtocolPrefix(wire) || natsNeedsMore(wire) || f.needsMoreOpenWire(wire) {
+					if len(wire) < a.budget.MaxFrameBytes && (needsMoreHTTPStartLine(wire) || f.needsMorePortProtocolPrefix(wire) || f.needsMoreBoundedText(wire) || f.needsMoreOpenWire(wire)) {
 						break
 					}
 					f.stop(dir, wire, "unrecognized", "bounded detection exhausted; subsequent bytes are counted without VM retries")
@@ -763,25 +763,13 @@ func (f *binFlow) feed(dir int, data []byte, ts time.Time) {
 				}
 				e.Status, e.sessionError = classifySessionError(err)
 				e.Error = err.Error()
-				switch e.Status {
-				case "limited":
-					a.limited.Add(uint64(n))
-				case "context-required":
-					a.contextRequired.Add(1)
-				default:
-					a.malformed.Add(1)
-				}
 			} else if a.config.Deferred {
 				if e.Protocol == "tls" || e.Protocol == "enip" || e.Protocol == "stratum" || e.Protocol == "gearman" || e.Protocol == "beanstalkd" || e.Protocol == "scgi" || e.Protocol == "msgpack-rpc" {
 					e.Structured = result
 				}
-				a.deferred.Add(1)
 			} else {
 				e.Status, e.Structured = "decoded", result
-				a.decoded.Add(1)
 			}
-		} else {
-			a.deferred.Add(1)
 		}
 		if e.Protocol == "dns" || e.Protocol == "dot" {
 			if f.byteSource != "decrypted" {
@@ -790,10 +778,31 @@ func (f *binFlow) feed(dir int, data []byte, ts time.Time) {
 			} else {
 				e.Profile = "dns-over-tls"
 			}
-			if err := a.dnsEvent(e, e.Raw[2:]); err != nil {
-				e.Status = "malformed"
-				e.Error = err.Error()
+			// Preserve earlier framing/semantic errors. DNS association must not
+			// publish a successful request for an already failed message.
+			if e.Error == "" {
+				if err := a.dnsEvent(e, e.Raw[2:]); err != nil {
+					e.Status, e.sessionError = classifySessionError(err)
+					e.Error = err.Error()
+					e.Structured = nil
+				}
 			}
+		}
+		// Count the final outcome after all semantic validation, including DNS
+		// RDATA validation in deferred mode. Each framed message counts once.
+		switch e.Status {
+		case "decoded":
+			a.decoded.Add(1)
+		case "deferred":
+			a.deferred.Add(1)
+		case "limited":
+			a.limited.Add(uint64(n))
+		case "context-required":
+			a.contextRequired.Add(1)
+		case "incomplete":
+			a.incomplete.Add(1)
+		default:
+			a.malformed.Add(1)
 		}
 		d.offset += uint64(n)
 		d.pruneContributions(a)
@@ -803,7 +812,7 @@ func (f *binFlow) feed(dir int, data []byte, ts time.Time) {
 		if !failed {
 			f.deliverTLS(dir, e)
 		}
-		if failed && !((e.Protocol == "http2" || e.Protocol == "grpc") && e.Session["Error Scope"] == "stream") {
+		if failed && !((e.Protocol == "http2" || e.Protocol == "grpc" || e.Protocol == "doh") && e.Session["Error Scope"] == "stream") {
 			if stateful {
 				f.invalidateSession(1 - dir)
 				f.closeSession()

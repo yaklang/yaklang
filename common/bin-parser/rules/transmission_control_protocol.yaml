@@ -42,9 +42,9 @@ Package:
                 // caller context before they can claim an identification.
                 typeNameList = ["TLS", "HTTP", "SSH"]
                 // Recognize strict UACP control signatures on custom ports too.
-                // Port 4840 adds role/direction evidence, but never identifies a
-                // protocol by itself. The full candidate parser validates the
-                // body after this bounded header probe.
+                // Reverse Connect can put the client on port 4840. TCP ports
+                // do not determine OPC UA roles; the full candidate parser
+                // validates the body after this bounded header probe.
                 prefix,probe = this.TryProcessByType("OPCUAHeaderProbe")
                 opcuaCandidate = false
                 if probe.OK {
@@ -53,24 +53,18 @@ Package:
                   chunkType = (header >> 24) & 255
                   messageSize = header >> 32
                   minimumSize = 0
-                  directionOK = true
                   if messageType == 0x4c4548 { // HEL
                     minimumSize = 32
-                    if src == 4840 || dst == 4840 { directionOK = dst == 4840 && src != 4840 }
                   } else if messageType == 0x4b4341 { // ACK
                     minimumSize = 28
-                    if src == 4840 || dst == 4840 { directionOK = src == 4840 && dst != 4840 }
                   } else if messageType == 0x525245 { // ERR
                     minimumSize = 16
-                    if src == 4840 || dst == 4840 { directionOK = src == 4840 && dst != 4840 }
                   } else if messageType == 0x454852 { // RHE
                     minimumSize = 16
-                    if src == 4840 || dst == 4840 { directionOK = src == 4840 && dst != 4840 }
                   } else if messageType == 0x4e504f { // OPN
                     minimumSize = 33
-                    directionOK = src != dst
                   }
-                  opcuaCandidate = chunkType == 0x46 && minimumSize != 0 && messageSize >= minimumSize && messageSize <= maximum && messageSize <= 16777216 && directionOK
+                  opcuaCandidate = chunkType == 0x46 && minimumSize != 0 && messageSize >= minimumSize && messageSize <= maximum && messageSize <= 16777216
                 }
                 err = probe.Recovery()
                 if err != nil { panic(err) }
