@@ -1,0 +1,14 @@
+// Regression: poc.downloadProgress((downloaded, total, percent) => {...}) is a
+// yaklib call site whose argument count is smaller than the callback's
+// parameter list. Resolving the side-effect of the captured `total` looked the
+// callback's parameters up in that call's args and aborted the whole compile
+// with "parameter index 1 out of bounds for call N (args=1)".
+//
+// The callback never runs here (registration only), so the assertion checks
+// both that the compile succeeds and that registration has no side effect.
+total = 0
+progress = poc.downloadProgress((downloaded, total, percent) => {
+    total = percent
+})
+assert progress != nil, "downloadProgress must return a usable option"
+assert total == 0, "registering a callback must not run it"
