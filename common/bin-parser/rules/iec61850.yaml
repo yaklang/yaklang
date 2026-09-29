@@ -160,6 +160,7 @@ GOOSEPDU:
     if next.Value == 131 { this.ProcessSubNode("GOOSE ID") }
     this.ProcessSubNode("Timestamp")
     if getNodeResult("Timestamp/Tag").Value != 132 { panic("goose: unexpected Timestamp tag") }
+    if getNodeResult("Timestamp/Length").Value != 8 { panic("goose: Timestamp must be eight octets") }
     this.ProcessSubNode("State Number")
     if getNodeResult("State Number/Tag").Value != 133 { panic("goose: unexpected State Number tag") }
     this.ProcessSubNode("Sequence Number")

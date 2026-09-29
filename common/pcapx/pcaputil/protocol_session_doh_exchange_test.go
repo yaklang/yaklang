@@ -220,7 +220,7 @@ func TestDoHClickHouseRecognitionRegressionCaptures(t *testing.T) {
 	}
 	require.NoError(t, json.Unmarshal(raw, &manifest))
 	require.Equal(t, "synthetic", manifest.Kind)
-	require.Len(t, manifest.Files, 5)
+	require.Len(t, manifest.Files, 6)
 	for _, fixture := range manifest.Files {
 		t.Run(fixture.File, func(t *testing.T) {
 			raw, err := os.ReadFile(filepath.Join(root, fixture.File))
@@ -228,6 +228,10 @@ func TestDoHClickHouseRecognitionRegressionCaptures(t *testing.T) {
 			require.Equal(t, fixture.SHA256, fmt.Sprintf("%x", sha256.Sum256(raw)))
 			var events []*ProtocolEvent
 			require.NoError(t, ReplayPcap(bytes.NewReader(raw), WithTCPReassemblyWorkers(1), WithOnProtocolMessage(func(e *ProtocolEvent) { events = append(events, e) })))
+			if fixture.File == "doh-h2-dns-semantics.pcapng" {
+				assertDoHDNSSemanticsEvents(t, events)
+				return
+			}
 			var matched, names []string
 			for _, event := range events {
 				if fixture.File == "clickhouse-server-hello-pong-ambiguous.pcapng" {

@@ -43,11 +43,11 @@ func assertDoHBudgetAccounting(t *testing.T, f *binFlow) {
 	require.Equal(t, streamBytes, d.streamBytes)
 	var names int64
 	for _, name := range d.pending {
-		names += int64(len(name))
+		names += int64(len(name.name))
 	}
 	pending := int64(0)
 	if d.pending != nil {
-		pending = 128 + int64(d.pendingSlots)*64 + names
+		pending = 128 + int64(d.pendingSlots)*96 + names
 	}
 	require.Equal(t, pending, d.pendingBytes)
 	require.Equal(t, d.retainedBytes(), d.reserved)
@@ -153,12 +153,12 @@ func TestDoHHTTP1PendingMapRetainsSlotChargeUntilEmpty(t *testing.T) {
 	}
 	d := s.f.doh
 	require.Equal(t, 2, d.pendingSlots)
-	require.Equal(t, int64(128+2*64+len("one.example")+len("two.example")), d.pendingBytes)
+	require.Equal(t, int64(128+2*96+len("one.example")+len("two.example")), d.pendingBytes)
 	for i, name := range []string{"one.example", "two.example"} {
 		require.Nil(t, s.Feed(1, time.Unix(1, 0), dohHTTPResp(200, dnsWire(dnsAResponse(0, name, [4]byte{1, 2, 3, 4})))).Err)
 		if i == 0 {
 			require.Equal(t, 2, d.pendingSlots)
-			require.Equal(t, int64(128+2*64+len("two.example")), d.pendingBytes)
+			require.Equal(t, int64(128+2*96+len("two.example")), d.pendingBytes)
 		}
 	}
 	require.Nil(t, d.pending)

@@ -21,6 +21,26 @@
       "file": "sip-long-invite.txt",
       "sha256": "864ada3abc740c2e84ab0004b46df10faeabdee49a69c107240c4ca211b0f06d",
       "bytes": 318
+    },
+    {
+      "file": "sip-content-length-overflow.txt",
+      "sha256": "9ff00b46f73b2818d0418b4dfbe429083ba6c40d0da311f75d1a7faae91cd64b",
+      "bytes": 336
+    },
+    {
+      "file": "stomp-max-crlf-header.bin",
+      "sha256": "6c841e73356ce6ec54ebcef3b20850966640cc3969c82d4da70d613cf250030e",
+      "bytes": 4127
+    },
+    {
+      "file": "stomp-unknown-version.bin",
+      "sha256": "e01489b01daddee16e2ebc7fe99548aa530f053195a4ab23630fffc27af990cf",
+      "bytes": 24
+    },
+    {
+      "file": "stomp-send-missing-destination.bin",
+      "sha256": "61c71a2cff1b587d51736d07d139e6d04a50df626f3dfc660d0ae54de89372b9",
+      "bytes": 7
     }
   ]
 }

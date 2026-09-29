@@ -1,0 +1,39 @@
+{
+  "kind": "synthetic",
+  "description": "Specification-derived TPKT v3 envelope and negative variants. Not live traffic or proof of full RDP/S7 support.",
+  "references": [
+    "https://www.rfc-editor.org/rfc/rfc1006#section-6"
+  ],
+  "files": [
+    {
+      "file": "valid-minimum.bin",
+      "sha256": "bfcf49dd1b4e985d4393f2d2f1b8b822ae411f98acd93334d9eb6414a493edae",
+      "bytes": 7,
+      "expected": "decoded"
+    },
+    {
+      "file": "unsupported-v2.bin",
+      "sha256": "88f4da0d21d3e3538f59d253ab9c5c0fce86218d380e9ab00ffef40ce6b646b9",
+      "bytes": 7,
+      "expected": "error"
+    },
+    {
+      "file": "header-only.bin",
+      "sha256": "b6db583453f7c1547ae2cc692fe633d60e651c5b5f12d9b3a82d9eb82347d8c3",
+      "bytes": 4,
+      "expected": "error"
+    },
+    {
+      "file": "too-short.bin",
+      "sha256": "8a269f564891da5392b9b25354e0d305bd4d54e6cc8f4838144d5330f805d365",
+      "bytes": 6,
+      "expected": "error"
+    },
+    {
+      "file": "truncated-body.bin",
+      "sha256": "6b62d74cdc471ed5844313b6b4dfd5f6c9f329132110dfb89e9d942874ea1a2b",
+      "bytes": 6,
+      "expected": "error"
+    }
+  ]
+}

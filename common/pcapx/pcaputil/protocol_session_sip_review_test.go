@@ -3,6 +3,7 @@ package pcaputil
 import (
 	"bytes"
 	"fmt"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -170,5 +171,60 @@ func TestProtocolSessionSIPLongStartLineBudgets(t *testing.T) {
 		[]byte("INVITE sip:" + strings.Repeat("x", 100) + "\n"),
 	} {
 		require.Equal(t, ProbeReject, newReviewSession(t, ParserBudget{}).Probe(wire).Verdict)
+	}
+}
+
+func TestProtocolSessionSIPContentLengthSyntaxAndOverflow(t *testing.T) {
+	// Synthetic malformed Content-Length values verify the RFC 3261 1*DIGIT
+	// grammar and checked frame-length arithmetic, including a coalesced frame.
+	base := messagingRegressionBytes(t, "sip-long-invite.txt")
+	for _, value := range []string{strconv.Itoa(maxInt()), "+0", "-0", "", "18446744073709551616"} {
+		wire := bytes.Replace(base, []byte("Content-Length: 0"), []byte("Content-Length: "+value), 1)
+		if value == "9223372036854775807" {
+			require.Equal(t, wire, messagingRegressionBytes(t, "sip-content-length-overflow.txt"))
+		}
+		for _, split := range []int{0, len(wire) - 3} {
+			s := newReviewSession(t, ParserBudget{})
+			if split > 0 {
+				first := s.Feed(0, time.Unix(1, 0), wire[:split])
+				require.True(t, first.NeedMore)
+			}
+			result := s.Feed(0, time.Unix(1, 0), append(bytes.Clone(wire[split:]), base...))
+			require.NotNil(t, result.Err, "value=%q split=%d", value, split)
+			if value == strconv.Itoa(maxInt()) || value == "18446744073709551616" {
+				require.Equal(t, ErrResourceExceeded, result.Err.Kind)
+			} else {
+				require.Equal(t, ErrMalformedMessage, result.Err.Kind)
+			}
+			require.Len(t, result.Events, 1)
+			require.NotEqual(t, "decoded", result.Events[0].Status)
+		}
+	}
+}
+
+func TestProtocolSessionSIPContentLengthPreservesBodyBoundary(t *testing.T) {
+	base := messagingRegressionBytes(t, "sip-long-invite.txt")
+	// Leading zeroes are still a valid decimal; an embedded SIP-looking line
+	// belongs to this body, never to the next command in the TCP stream.
+	body := []byte("SIP/2.0 200 fake\r\n\r\n\x00")
+	wire := bytes.Replace(base, []byte("Content-Length: 0"), []byte(fmt.Sprintf("Content-Length: %04d", len(body))), 1)
+	wire = append(wire, body...)
+	combined := append(bytes.Clone(wire), base...)
+	for split := len(wire) - len(body); split <= len(wire)+1; split++ {
+		s := newReviewSession(t, ParserBudget{})
+		var events []*ProtocolEvent
+		for _, chunk := range [][]byte{combined[:split], combined[split:]} {
+			r := s.Feed(0, time.Unix(1, 0), chunk)
+			if r.Err != nil {
+				require.Equal(t, ErrNeedMore, r.Err.Kind)
+			}
+			events = append(events, r.Events...)
+		}
+		require.Len(t, events, 2)
+		require.Equal(t, wire, events[0].Raw)
+		require.Equal(t, base, events[1].Raw)
+		for _, event := range events {
+			require.Equal(t, "decoded", event.Status, event.Error)
+		}
 	}
 }

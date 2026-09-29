@@ -3,6 +3,7 @@ package pcaputil
 import (
 	"bufio"
 	"bytes"
+	"crypto/sha256"
 	"encoding/base64"
 	"encoding/binary"
 	"fmt"
@@ -17,11 +18,41 @@ import (
 // is out of scope; Feed is the inner HTTP.
 type binDoH struct {
 	// Keys identify HTTP exchanges, not DNS IDs (RFC 8484 recommends ID 0).
-	pending                             map[uint64]string
+	pending                             map[uint64]dohPending
 	http1Requests, http1Responses       uint64
 	flow                                *binFlow
 	reserved, streamBytes, pendingBytes int64
 	pendingSlots                        int
+}
+
+// Retain fixed-size question identity; display names must not define DNS
+// equality (escaped labels and ASCII case have different representations).
+type dohPending struct {
+	name      string
+	questions [32]byte
+	opcode    uint16
+}
+
+func dohQuestionIdentity(questions []map[string]any) [32]byte {
+	h := sha256.New()
+	for _, q := range questions {
+		var canonical [255]byte
+		wire := q["Name Wire"].([]byte)
+		for i, c := range wire {
+			if c >= 'A' && c <= 'Z' {
+				c += 'a' - 'A'
+			}
+			canonical[i] = c
+		}
+		_, _ = h.Write(canonical[:len(wire)])
+		var fields [4]byte
+		binary.BigEndian.PutUint16(fields[:2], q["Type"].(uint16))
+		binary.BigEndian.PutUint16(fields[2:], q["Class"].(uint16))
+		_, _ = h.Write(fields[:])
+	}
+	var identity [32]byte
+	copy(identity[:], h.Sum(nil))
+	return identity
 }
 
 func dohMedia(v string) bool {
@@ -402,14 +433,32 @@ func (d *binDoH) attachDNS(info map[string]any, msg []byte, response bool, max i
 	}
 	id := binary.BigEndian.Uint16(msg[0:2])
 	flags := binary.BigEndian.Uint16(msg[2:4])
-	qname, qtype, err := dnsQuestion(msg)
-	if err != nil {
-		return info, err
+	if (flags&0x8000 != 0) != response {
+		return info, protocolError(ErrMalformedMessage, "DoH DNS QR contradicts HTTP direction")
 	}
+	questions := semantic["Questions"].([]map[string]any)
+	var qname string
+	var qtype uint16
+	if len(questions) > 0 {
+		qname = questions[0]["Name"].(string)
+		qtype = questions[0]["Type"].(uint16)
+		info["QCLASS"] = questions[0]["Class"]
+	}
+	pending := dohPending{name: qname, questions: dohQuestionIdentity(questions), opcode: (flags >> 11) & 15}
 	info["Transaction ID"] = id
 	info["QR"] = flags>>15 != 0
 	info["Opcode"] = (flags >> 11) & 0xf
-	info["RCODE"] = flags & 0xf
+	// RFC 6891: OPT TTL's high octet supplies the upper eight RCODE bits.
+	// Use the already-decoded Additional records; a header RCODE of zero
+	// alone does not mean success (for example, BADVERS is RCODE 16).
+	rcode := flags & 0xf
+	for _, rr := range semantic["Additional"].([]map[string]any) {
+		if rr["Type"] == uint16(41) {
+			rcode |= uint16(rr["TTL"].(uint32)>>24) << 4
+			break
+		}
+	}
+	info["RCODE"], semantic["RCODE"] = rcode, rcode
 	info["QNAME"] = qname
 	info["QTYPE"] = qtype
 	info["QTYPE Name"] = dnsTypeName(qtype)
@@ -434,7 +483,7 @@ func (d *binDoH) attachDNS(info map[string]any, msg []byte, response bool, max i
 			d.http1Requests++
 			key = d.http1Requests
 		}
-		if err := d.addPending(key, qname); err != nil {
+		if err := d.addPending(key, pending); err != nil {
 			return info, err
 		}
 		info["Outstanding"] = true
@@ -444,7 +493,17 @@ func (d *binDoH) attachDNS(info map[string]any, msg []byte, response bool, max i
 	key := d.responseKey(info)
 	if want, ok := d.pending[key]; ok {
 		d.removePending(key)
-		info["Matched Request"] = want
+		// Error replies may omit a question they could not interpret. The HTTP
+		// exchange still identifies them; do not invent a response question.
+		omittedErrorQuestion := len(questions) == 0 && rcode != 0
+		if want.opcode != pending.opcode || (!omittedErrorQuestion && want.questions != pending.questions) {
+			info["Association Status"] = "question-mismatch"
+			return info, protocolError(ErrMalformedMessage, "DoH DNS response question contradicts HTTP request")
+		}
+		info["Matched Request"] = want.name
+		if omittedErrorQuestion {
+			info["Question Status"] = "omitted-error-question"
+		}
 		info["Association Status"] = "matched"
 	} else {
 		info["Unmatched"] = true
@@ -530,7 +589,8 @@ func (d *binDoH) clearStream(s *binH2Stream) {
 	d.syncStream(s)
 }
 
-func (d *binDoH) addPending(key uint64, name string) error {
+func (d *binDoH) addPending(key uint64, pending dohPending) error {
+	name := pending.name
 	old, exists := d.pending[key]
 	slots := d.pendingSlots
 	if !exists && len(d.pending)+1 > slots {
@@ -538,17 +598,18 @@ func (d *binDoH) addPending(key uint64, name string) error {
 	}
 	// The map keeps buckets after deletion. Charge a conservative slot high
 	// water until the map is empty and its backing storage can be discarded.
-	next := d.pendingBytes + int64(len(name)-len(old)+(slots-d.pendingSlots)*64)
+	next := d.pendingBytes + int64(len(name)-len(old.name)+(slots-d.pendingSlots)*96)
 	if d.pending == nil {
 		next += 128
 	}
-	if err := d.reserve(d.retainedBytes() - d.pendingBytes + next + int64(len(old))); err != nil {
+	if err := d.reserve(d.retainedBytes() - d.pendingBytes + next + int64(len(old.name))); err != nil {
 		return err
 	}
 	if d.pending == nil {
-		d.pending = make(map[uint64]string)
+		d.pending = make(map[uint64]dohPending)
 	}
-	d.pending[key] = strings.Clone(name)
+	pending.name = strings.Clone(name)
+	d.pending[key] = pending
 	d.pendingSlots, d.pendingBytes = slots, next
 	return d.reserve(d.retainedBytes())
 }
@@ -556,7 +617,7 @@ func (d *binDoH) addPending(key uint64, name string) error {
 func (d *binDoH) removePending(key uint64) {
 	if name, ok := d.pending[key]; ok {
 		delete(d.pending, key)
-		d.pendingBytes -= int64(len(name))
+		d.pendingBytes -= int64(len(name.name))
 		if len(d.pending) == 0 {
 			d.pending = nil
 			d.pendingSlots, d.pendingBytes = 0, 0

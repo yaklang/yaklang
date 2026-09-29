@@ -335,6 +335,11 @@ func TestProtocolCorpusGOOSEOptionalFieldsAndMalformedOrder(t *testing.T) {
 		works = append(works, currentCorpusWork{id: fmt.Sprintf("goose/omitted-%d", mask), wire: frame})
 	}
 	malformed := map[string][]protocolCorpusBERField{}
+	for _, width := range []int{0, 1, 7, 9} {
+		badTime := append([]protocolCorpusBERField(nil), fields...)
+		badTime[4].value = make([]byte, width)
+		malformed[fmt.Sprintf("timestamp-width-%d", width)] = badTime
+	}
 	// A permitted omission must not allow duplicated or reordered optionals,
 	// a missing mandatory field, or invalid BOOLEAN content widths.
 	for _, index := range []int{3, 7, 9} {

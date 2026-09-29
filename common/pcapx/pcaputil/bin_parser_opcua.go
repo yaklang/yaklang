@@ -18,6 +18,7 @@ type uaChunk struct {
 }
 type uaPeer struct {
 	seen, hello                    bool
+	version                        uint32
 	receive, send, message, chunks uint32
 }
 type binOPCUA struct {
@@ -126,13 +127,16 @@ func (s *binOPCUA) consume(dir int, w []byte, max, maxBytes int) (map[string]any
 		if chunk != 'F' || len(b) < 20 {
 			return nil, fmt.Errorf("opcua: HEL/ACK")
 		}
-		p := uaPeer{seen: true, hello: kind == "HEL", receive: binary.LittleEndian.Uint32(b[4:]), send: binary.LittleEndian.Uint32(b[8:]), message: binary.LittleEndian.Uint32(b[12:]), chunks: binary.LittleEndian.Uint32(b[16:])}
+		p := uaPeer{seen: true, hello: kind == "HEL", version: binary.LittleEndian.Uint32(b), receive: binary.LittleEndian.Uint32(b[4:]), send: binary.LittleEndian.Uint32(b[8:]), message: binary.LittleEndian.Uint32(b[12:]), chunks: binary.LittleEndian.Uint32(b[16:])}
 		// Part 6 permits 1024-byte buffers for ECC. HEL/ACK precede OPN,
 		// so the security policy is not yet known at this transport boundary.
 		if p.receive < 1024 || p.send < 1024 {
 			return nil, fmt.Errorf("opcua: buffers below 1024")
 		}
 		if peer := s.peers[1-dir]; kind == "ACK" && peer.seen && peer.hello {
+			if p.version > peer.version {
+				return nil, fmt.Errorf("opcua: ACK version exceeds HEL version")
+			}
 			// ACK receive/send correspond to the HEL send/receive limits.
 			// A large HEL buffer still requires an ACK minimum of 8192;
 			// allowing ECC must not relax a negotiation we actually observed.

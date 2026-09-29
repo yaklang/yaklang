@@ -247,3 +247,85 @@ func TestProtocolSessionSTOMPHandshakeBudgets(t *testing.T) {
 	require.Error(t, err, "a literal TAB is legal; an undefined backslash-t escape is not")
 	require.False(t, complete)
 }
+
+func TestProtocolSessionSTOMPMaximumHeaderLineCRLF(t *testing.T) {
+	// Synthetic maximum-size header with equivalent LF and CRLF encoding.
+	for _, eol := range []string{"\n", "\r\n"} {
+		line := "x:" + strings.Repeat("x", stompMaxLineBytes-2)
+		wire := []byte("SEND" + eol + "destination:/q" + eol + line + eol + eol + "body\x00")
+		if eol == "\r\n" {
+			require.Equal(t, wire, messagingRegressionBytes(t, "stomp-max-crlf-header.bin"))
+		}
+		for _, split := range []int{0, len("SEND"+eol+"destination:/q"+eol) + len(line), len("SEND"+eol+"destination:/q"+eol) + len(line) + 1} {
+			s := newReviewSession(t, ParserBudget{})
+			require.Nil(t, s.Feed(0, time.Unix(1, 0), []byte(stomp12Connect)).Err)
+			if split > 0 {
+				r := s.Feed(0, time.Unix(1, 0), wire[:split])
+				require.True(t, r.NeedMore)
+				require.Empty(t, r.Events)
+			}
+			r := s.Feed(0, time.Unix(1, 0), wire[split:])
+			require.Nil(t, r.Err, "eol=%q split=%d", eol, split)
+			require.Len(t, r.Events, 1)
+			require.Equal(t, []byte("body"), r.Events[0].Session["Body"])
+		}
+	}
+}
+
+func TestSTOMPRejectsHeaderLineBeyondBoundary(t *testing.T) {
+	for _, eol := range []string{"\n", "\r\n"} {
+		wire := []byte("SEND" + eol + "x:" + strings.Repeat("x", stompMaxLineBytes-1) + eol + eol + "body\x00")
+		_, complete, err := parseSTOMPFrame(wire, 1<<20)
+		require.Error(t, err)
+		require.False(t, complete)
+	}
+}
+
+func TestProtocolSessionSTOMPRejectsUnknownExplicitVersion(t *testing.T) {
+	for _, version := range []string{"1.3", "2.0", ""} {
+		s := newReviewSession(t, ParserBudget{})
+		require.Nil(t, s.Feed(0, time.Unix(1, 0), []byte(stomp12Connect)).Err)
+		wire := []byte("CONNECTED\nversion:" + version + "\n\n\x00")
+		if version == "1.3" {
+			require.Equal(t, wire, messagingRegressionBytes(t, "stomp-unknown-version.bin"))
+		}
+		r := s.Feed(1, time.Unix(1, 0), wire)
+		require.NotNil(t, r.Err, "version=%q", version)
+		require.Equal(t, ErrUnsupportedVersion, r.Err.Kind)
+		require.Len(t, r.Events, 1)
+		require.Equal(t, "context-required", r.Events[0].Status)
+	}
+	for _, header := range []string{"", "version:1.0\n", "version:1.1\n", "version:1.2\n"} {
+		s := newReviewSession(t, ParserBudget{})
+		require.Nil(t, s.Feed(0, time.Unix(1, 0), []byte(stomp12Connect)).Err)
+		r := s.Feed(1, time.Unix(1, 0), []byte("CONNECTED\n"+header+"\n\x00"))
+		require.Nil(t, r.Err, "header=%q", header)
+		require.Len(t, r.Events, 1)
+		require.Equal(t, "decoded", r.Events[0].Status)
+	}
+}
+
+func TestProtocolSessionSTOMPSENDRequiresDestination(t *testing.T) {
+	for _, wire := range [][]byte{messagingRegressionBytes(t, "stomp-send-missing-destination.bin"), []byte("SEND\ncontent-length:4\n\nbody\x00")} {
+		for split := 0; split <= len(wire); split++ {
+			s := newReviewSession(t, ParserBudget{})
+			require.Nil(t, s.Feed(0, time.Unix(1, 0), []byte(stomp12Connect)).Err)
+			var failure *ProtocolError
+			var events []*ProtocolEvent
+			for _, chunk := range [][]byte{wire[:split], wire[split:]} {
+				if len(chunk) == 0 {
+					continue
+				}
+				r := s.Feed(0, time.Unix(1, 0), chunk)
+				if r.Err != nil && r.Err.Kind != ErrNeedMore {
+					failure = r.Err
+				}
+				events = append(events, r.Events...)
+			}
+			require.NotNil(t, failure, "split=%d", split)
+			require.Equal(t, ErrMalformedMessage, failure.Kind)
+			require.Len(t, events, 1)
+			require.Equal(t, "malformed", events[0].Status)
+		}
+	}
+}

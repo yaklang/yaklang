@@ -4,7 +4,8 @@
     "https://www.rfc-editor.org/rfc/rfc8484.html#section-4.1",
     "https://www.rfc-editor.org/rfc/rfc8484.html#section-4.2.1",
     "https://github.com/ClickHouse/clickhouse-docs/blob/main/docs/native-protocol/client.md",
-    "https://github.com/ClickHouse/clickhouse-docs/blob/main/docs/native-protocol/server.md"
+    "https://github.com/ClickHouse/clickhouse-docs/blob/main/docs/native-protocol/server.md",
+    "https://www.rfc-editor.org/rfc/rfc1035.html#section-4.1.1"
   ],
   "construction": "Generated with pcaputil sessionTestPCAP, h2TestFrame, h2TestHeaders, dohExchangeH2GET/dohExchangeH2Response and ClickHouse Hello fixture helpers. TCP headers and application messages are synthetic; no deployed resolver/server capture is claimed. DoH captures contain plaintext HTTP carrier bytes and do not demonstrate TLS decryption.",
   "files": [
@@ -37,6 +38,12 @@
       "sha256": "b3bc3953383d24e4b94832b27eab19c25f15798ebf783f8d3af304850811d46a",
       "bytes": 1908,
       "description": "Concurrent HTTP/2 streams 1 and 3 both use DNS ID zero; stream 3 responds before stream 1."
+    },
+    {
+      "file": "doh-h2-dns-semantics.pcapng",
+      "sha256": "398c40621e1d6210e763ef2288223c3ee4535559b5ad0c48a023e25fdb802510",
+      "bytes": 9752,
+      "description": "Synthetic HTTP/2 streams with wrong DNS QR and mismatched QCLASS, followed by a SERVFAIL without questions and a NOERROR/NODATA answer. Invalid streams are isolated; the two later responses remain matched. TCP payloads are fragmented into seven-byte segments."
     }
   ]
 }

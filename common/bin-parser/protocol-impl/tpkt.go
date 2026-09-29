@@ -1,11 +1,15 @@
 package protocol_impl
 
 import (
+	"bytes"
+	"encoding/binary"
 	"errors"
+	"fmt"
+	"io"
+
 	"github.com/yaklang/yaklang/common/bin-parser/parser"
 	"github.com/yaklang/yaklang/common/bin-parser/utils"
 	utils2 "github.com/yaklang/yaklang/common/utils"
-	"io"
 )
 
 type TpktPacket struct {
@@ -27,10 +31,22 @@ func (t *TpktPacket) WriteTo(writer io.Writer) (int, error) {
 	if err != nil {
 		return 0, err
 	}
-	return writer.Write(res)
+	n, err := writer.Write(res)
+	if err == nil && n != len(res) {
+		err = io.ErrShortWrite
+	}
+	return n, err
 }
 
 func (t *TpktPacket) Marshal() ([]byte, error) {
+	// RFC 1006 section 6: version 3 and a total length of 7..65535.
+	// Check before converting PacketLength to the rule's uint16 field.
+	if t.Version != 3 {
+		return nil, fmt.Errorf("tpkt: unsupported version %d", t.Version)
+	}
+	if len(t.TPDU) < 3 || len(t.TPDU) > 65531 {
+		return nil, fmt.Errorf("tpkt: invalid TPDU length %d", len(t.TPDU))
+	}
 	data := map[string]any{
 		"Version":      t.Version,
 		"Reserved":     t.Reserved,
@@ -45,7 +61,21 @@ func (t *TpktPacket) Marshal() ([]byte, error) {
 }
 
 func ParseTpkt(r io.Reader) (*TpktPacket, error) {
-	node, err := parser.ParseBinary(r, "application-layer.msrdp", "TPKT")
+	var header [4]byte
+	if _, err := io.ReadFull(r, header[:]); err != nil {
+		return nil, err
+	}
+	if header[0] != 3 {
+		return nil, fmt.Errorf("tpkt: unsupported version %d", header[0])
+	}
+	length := binary.BigEndian.Uint16(header[2:])
+	if length < 7 {
+		return nil, fmt.Errorf("tpkt: invalid packet length %d", length)
+	}
+	// The reader can contain coalesced packets. Never consume the next
+	// envelope while parsing this one, including on malformed input.
+	framed := io.MultiReader(bytes.NewReader(header[:]), io.LimitReader(r, int64(length)-4))
+	node, err := parser.ParseBinary(framed, "application-layer.msrdp", "TPKT")
 	if err != nil {
 		return nil, err
 	}

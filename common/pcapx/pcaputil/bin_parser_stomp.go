@@ -66,11 +66,11 @@ func parseSTOMPLine(w []byte, offset, max int) (line []byte, next int, complete 
 	}
 	end := offset + rel
 	line = w[offset:end]
-	if len(line) > stompMaxLineBytes {
-		return nil, 0, false, protocolError(ErrResourceExceeded, "stomp: line exceeds limit")
-	}
 	if len(line) > 0 && line[len(line)-1] == '\r' {
 		line = line[:len(line)-1]
+	}
+	if len(line) > stompMaxLineBytes {
+		return nil, 0, false, protocolError(ErrResourceExceeded, "stomp: line exceeds limit")
 	}
 	if bytes.IndexByte(line, '\r') >= 0 || !utf8.Valid(line) {
 		return nil, 0, false, protocolError(ErrMalformedMessage, "stomp: invalid line encoding")
@@ -397,8 +397,20 @@ func (s *binSTOMP) consume(dir int, wire []byte, max int) (map[string]any, error
 	if stompWrongDirection(frame.command, dir, s.clientDir) {
 		return nil, protocolError(ErrMalformedMessage, "stomp: command on wrong direction")
 	}
-	if v := frame.headers["version"]; (frame.command == "CONNECTED") && (v == "1.1" || v == "1.2") {
-		s.version = v
+	if frame.command == "CONNECTED" {
+		// A missing version remains compatible with legacy STOMP 1.0 peers.
+		// Explicit versions must be understood before decoding later frames.
+		if version, present := frame.headers["version"]; present {
+			switch version {
+			case "1.0", "1.1", "1.2":
+				s.version = version
+			default:
+				return nil, protocolError(ErrUnsupportedVersion, "stomp: unsupported negotiated version %q", version)
+			}
+		}
+	}
+	if _, present := frame.headers["destination"]; frame.command == "SEND" && !present {
+		return nil, protocolError(ErrMalformedMessage, "stomp: SEND requires a destination header")
 	}
 	headers := make(map[string]any, len(frame.headers))
 	for key, value := range frame.headers {

@@ -182,6 +182,10 @@ func (s *binGOOSE) consume(raw []byte) (map[string]any, error) {
 			out["Dataset"] = string(val)
 		case 0x83:
 			out["GOOSE ID"] = string(val)
+		case 0x84:
+			if len(val) != 8 {
+				return nil, fmt.Errorf("goose: Timestamp must be eight octets")
+			}
 		case 0x85:
 			s.stNum = berUint(val)
 			out["State Number"] = int(s.stNum)

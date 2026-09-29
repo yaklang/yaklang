@@ -185,10 +185,12 @@ func (f *binFlow) frameSIP(dir int, w []byte) (int, *binSpec, error) {
 	if err != nil {
 		return 0, nil, err
 	}
-	n := end + 4 + cl
-	if n > f.a.config.MaxMessageBytes {
-		return f.a.config.MaxMessageBytes + 1, nil, nil
+	// Check the remaining budget before adding the advertised body length;
+	// a valid decimal near maxInt must not overflow into a negative slice bound.
+	if end+4 > f.a.config.MaxMessageBytes || cl > f.a.config.MaxMessageBytes-end-4 {
+		return 0, nil, protocolError(ErrResourceExceeded, "SIP declared message exceeds configured byte limit")
 	}
+	n := end + 4 + cl
 	if n > len(w) {
 		return n, nil, nil
 	}
@@ -368,12 +370,20 @@ func sipContentLength(header []byte) (int, error) {
 		return 0, err
 	}
 	v, ok := hs["content-length"]
-	if !ok || v == "" {
+	if !ok {
 		return 0, nil
 	}
-	n, err := strconv.Atoi(strings.TrimSpace(v))
-	if err != nil || n < 0 {
-		return 0, fmt.Errorf("sip: invalid Content-Length")
+	if v == "" {
+		return 0, protocolError(ErrMalformedMessage, "SIP Content-Length is empty")
+	}
+	for i := range v {
+		if v[i] < '0' || v[i] > '9' {
+			return 0, protocolError(ErrMalformedMessage, "SIP Content-Length must contain only decimal digits")
+		}
+	}
+	n, err := strconv.Atoi(v)
+	if err != nil {
+		return 0, protocolError(ErrResourceExceeded, "SIP Content-Length exceeds addressable memory")
 	}
 	return n, nil
 }
