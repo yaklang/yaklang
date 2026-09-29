@@ -118,8 +118,12 @@ func TestPCAPFanoutIndependentSubscribers(t *testing.T) {
 	a, b := make(chan gopacket.Packet, 1), make(chan gopacket.Packet, 1)
 	p := &pcapFanOut{chans: map[string]chan gopacket.Packet{"a": a, "b": b}}
 	raw := tcpCapture(t, 2).Data()
-	p.dispatch(raw, gopacket.CaptureInfo{}, layers.LayerTypeEthernet)
+	ci := gopacket.CaptureInfo{AncillaryData: []interface{}{captureChecksumEvidence{interfaceIndex: 7, partial: true}}}
+	p.dispatch(raw, ci, layers.LayerTypeEthernet)
 	pa, pb := <-a, <-b
+	pa.Metadata().AncillaryData[0] = nil
+	require.Equal(t, ci.AncillaryData, pb.Metadata().AncillaryData, "one subscriber must not alter another subscriber's kernel evidence")
+	require.NotNil(t, ci.AncillaryData[0])
 	pa.LinkLayer().(*layers.Ethernet).SrcMAC[0] = 0xff
 	require.Equal(t, byte(2), pb.LinkLayer().(*layers.Ethernet).SrcMAC[0])
 	require.Equal(t, byte(2), raw[6])
