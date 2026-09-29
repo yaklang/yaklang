@@ -155,12 +155,12 @@ func (f *ForgeBlueprint) renderInitPrompt(query string, params ...*ypb.ExecParam
 // renderInitPromptWithValidatedParams renders a server-normalized parameter
 // set without parsing or executing the Forge's client-side CLI declarations.
 // The caller owns schema validation and authorization before this boundary.
-func (f *ForgeBlueprint) renderInitPromptWithValidatedParams(query string, params []*ypb.ExecParamItem) (string, error) {
+func (f *ForgeBlueprint) renderInitPromptWithValidatedParams(query string, params []Parameter) (string, error) {
 	tmpl, err := template.New("init").Parse(f.InitializePrompt)
 	if err != nil {
 		return "", err
 	}
-	rawParams := ExecParams2PromptString(params)
+	rawParams := parametersToPromptString(params)
 	nonce := utils.RandStringBytes(8)
 	forgePromptParams := &ForgePromptParams{
 		UserParams:       fmt.Sprintf("<user_params_%s>\n%s\n</user_params_%s>", nonce, rawParams, nonce),

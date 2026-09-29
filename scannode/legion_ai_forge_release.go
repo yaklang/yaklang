@@ -11,7 +11,6 @@ import (
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/aiforge"
-	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	aiv1 "github.com/yaklang/yaklang/scannode/gen/legionpb/legion/ai/v1"
 	"google.golang.org/protobuf/proto"
 )
@@ -234,7 +233,7 @@ func equalContextForgeStrings(left, right []string) bool {
 
 func buildContextForgeBlueprint(
 	release *aiv1.ContextForgeRelease,
-) (*aiforge.YakForgeBlueprintConfig, *aiforge.ForgeBlueprint, []*ypb.ExecParamItem, error) {
+) (*aiforge.YakForgeBlueprintConfig, *aiforge.ForgeBlueprint, []aiforge.Parameter, error) {
 	if err := validateContextForgeRelease(release); err != nil {
 		return nil, nil, nil, err
 	}
@@ -257,9 +256,9 @@ func buildContextForgeBlueprint(
 		MaxTokens:        4096,
 		RetryEmptyOutput: true,
 	})(blueprint)
-	params := make([]*ypb.ExecParamItem, 0, len(release.GetParameters()))
+	params := make([]aiforge.Parameter, 0, len(release.GetParameters()))
 	for _, parameter := range release.GetParameters() {
-		params = append(params, &ypb.ExecParamItem{Key: parameter.GetKey(), Value: parameter.GetValue()})
+		params = append(params, aiforge.Parameter{Key: parameter.GetKey(), Value: parameter.GetValue()})
 	}
 	return config, blueprint, params, nil
 }

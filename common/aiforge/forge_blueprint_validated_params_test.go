@@ -7,7 +7,6 @@ import (
 	"testing"
 
 	"github.com/yaklang/yaklang/common/ai/aid"
-	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
 func TestValidatedInvocationResultRetainsInputAndEvidence(t *testing.T) {
@@ -43,7 +42,7 @@ func TestValidatedInvocationRetainsInputWithoutTemplatePlaceholders(t *testing.T
 		ParameterRuleYaklangCode: `panic("must not execute")`,
 	}
 	prompt, _, err := blueprint.GenerateFirstPromptWithMemoryOptionWithQueryAndParams(
-		"Return the final analysis", []*ypb.ExecParamItem{{Key: "email-content", Value: "SUBJECT: urgent password verification"}},
+		"Return the final analysis", []Parameter{{Key: "email-content", Value: "SUBJECT: urgent password verification"}},
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -62,7 +61,7 @@ func TestGenerateFirstPromptWithValidatedParamsDoesNotParseImportedCLI(t *testin
 	}
 	prompt, _, err := blueprint.GenerateFirstPromptWithMemoryOptionWithQueryAndParams(
 		"server query",
-		[]*ypb.ExecParamItem{{Key: "topic", Value: "bounded value"}},
+		[]Parameter{{Key: "topic", Value: "bounded value"}},
 	)
 	if err != nil {
 		t.Fatal(err)

@@ -60,7 +60,7 @@ func TestBuildContextForgeBlueprintUsesInlineDefinition(t *testing.T) {
 	if config.Name != release.Name || blueprint.Name != release.Name {
 		t.Fatalf("unexpected inline definition: config=%q blueprint=%q", config.Name, blueprint.Name)
 	}
-	if len(blueprint.Tools) != 0 || len(params) != 1 || params[0].GetKey() != "topic" {
+	if len(blueprint.Tools) != 0 || len(params) != 1 || params[0].Key != "topic" {
 		t.Fatalf("unexpected tools or params: tools=%d params=%#v", len(blueprint.Tools), params)
 	}
 	if config.YakForgeBlueprintAIDOptionsConfig == nil || config.YakForgeBlueprintAIDOptionsConfig.DisableToolUse == nil || !*config.YakForgeBlueprintAIDOptionsConfig.DisableToolUse {

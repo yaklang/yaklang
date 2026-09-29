@@ -296,7 +296,7 @@ func (f *ForgeBlueprint) GenerateFirstPromptWithMemoryOptionWithQuery(
 
 func (f *ForgeBlueprint) GenerateFirstPromptWithMemoryOptionWithQueryAndParams(
 	query string,
-	params []*ypb.ExecParamItem,
+	params []Parameter,
 ) (string, []aicommon.ConfigOption, error) {
 	initPrompt, err := f.renderInitPromptWithValidatedParams(query, params)
 	if err != nil {

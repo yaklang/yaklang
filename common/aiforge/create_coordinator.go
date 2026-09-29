@@ -6,7 +6,6 @@ import (
 
 	"github.com/yaklang/yaklang/common/ai/aid"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
-	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
 func (t *ForgeBlueprint) CreateCoordinatorWithQuery(ctx context.Context, originQuery string, opts ...aicommon.ConfigOption) (*aid.Coordinator, error) {
@@ -24,7 +23,7 @@ func (t *ForgeBlueprint) CreateCoordinatorWithQuery(ctx context.Context, originQ
 func (t *ForgeBlueprint) CreateCoordinatorWithQueryAndParams(
 	ctx context.Context,
 	originQuery string,
-	params []*ypb.ExecParamItem,
+	params []Parameter,
 	opts ...aicommon.ConfigOption,
 ) (*aid.Coordinator, error) {
 	firstQuery, extraOpts, err := t.GenerateFirstPromptWithMemoryOptionWithQueryAndParams(originQuery, params)
