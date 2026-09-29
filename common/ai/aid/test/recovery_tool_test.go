@@ -177,11 +177,8 @@ func TestCoordinator_Recovery_ToolUseReview(t *testing.T) {
 				return rsp, nil
 			}
 
-			if utils.MatchAllOfSubString(request.GetPrompt(), `工具名称: ls`, `"call-tool"`, "const") {
-				rsp.EmitOutputStream(strings.NewReader(`{"@action": "call-tool", "tool": "ls", "params": {"path": "/abc-target"}}`))
-				return rsp, nil
-			} else if utils.MatchAllOfSubString(request.GetPrompt(), `当前任务: "扫描目录结构"`) {
-				rsp.EmitOutputStream(strings.NewReader(`{"@action": "require-tool", "tool": "ls"}`))
+			if utils.MatchAllOfSubString(request.GetPrompt(), `当前任务: "扫描目录结构"`) {
+				rsp.EmitOutputStream(strings.NewReader(`{"@action": "directly_call_tool", "directly_call_tool_name": "ls", "directly_call_tool_params": {"path": "/abc-target"}}`))
 				return rsp, nil
 			}
 			// 处理决策阶段 - 检查更多的决策阶段特征

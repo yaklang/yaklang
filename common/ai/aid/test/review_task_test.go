@@ -44,7 +44,7 @@ func TestCoordinator_TaskReview(t *testing.T) {
 				return rsp, nil
 			}
 			rsp, err := mockedToolCalling(i, r, "now", `{"@action": "call-tool", "tool": "now", "params": {}}`)
-			if err == nil && isToolParamGenerationPrompt(prompt, "now") {
+			if err == nil && isNextActionDecisionPrompt(prompt) {
 				atomic.AddInt32(&toolCalled, 1)
 			}
 			return rsp, err

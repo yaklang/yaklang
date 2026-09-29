@@ -62,15 +62,14 @@ func TestCoordinator_ToolUseReview_WrongTool_SuggestionTools(t *testing.T) {
 				return rsp, nil
 			}
 
-			if isNextActionDecisionPrompt(prompt) && strings.Contains(prompt, "require_tool") {
+			if isNextActionDecisionPrompt(prompt) {
 				rsp := i.NewAIResponse()
-				rsp.EmitOutputStream(bytes.NewBufferString(`
-{"@action": "object", "next_action": { "type": "require_tool", "tool_require_payload": "` + toolName1 + `" },
+				rsp.EmitOutputStream(bytes.NewBufferString(fmt.Sprintf(`
+{"@action": "directly_call_tool", "directly_call_tool_name": %q, "directly_call_tool_params": {"path": "."},
 "human_readable_thought": "mocked thought for tool calling", "cumulative_summary": "..cumulative-mocked for tool calling.."}
-`))
+`, toolName1)))
 				rsp.Close()
 				return rsp, nil
-
 			}
 
 			if isWrongToolReviewPrompt(prompt) {
@@ -80,6 +79,8 @@ func TestCoordinator_ToolUseReview_WrongTool_SuggestionTools(t *testing.T) {
 				return rsp, nil
 			}
 
+			// After review switches tool, param-gen may still be triggered
+			// by the old ExecuteToolRequiredAndCall path in the review system.
 			if isToolParamGenerationPrompt(prompt, toolName1) || isToolParamGenerationPrompt(prompt, toolName2) {
 				rsp := i.NewAIResponse()
 				if isToolParamGenerationPrompt(prompt, toolName1) {
