@@ -356,6 +356,9 @@ func (s *structScanRuntime) submitRisk(res *SyntaxFlowResult, risk *schema.SSARi
 		risk.RuntimeId = res.TaskID
 		risk.ResultID = uint64(res.GetResultID())
 		risk.ResultUUID = res.GetResultUUID()
+		// The hash covers the result identity; recompute it now that the
+		// identity of this result is known.
+		risk.Hash = risk.CalcHash()
 		if res.riskMap == nil {
 			res.riskMap = map[string]*schema.SSARisk{}
 		}
