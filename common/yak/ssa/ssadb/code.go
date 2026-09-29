@@ -274,22 +274,37 @@ func (r *IrCode) GetExtraInfo() map[string]any {
 }
 
 func (r *IrCode) GetStartAndEndPositions() (*memedit.MemEditor, *memedit.Position, *memedit.Position, error) {
-	// 对于 Undefined、ExternLib 或外部库类型的值，允许源代码缺失
-	// 这些类型的值通常引用外部库或未定义的符号，不需要完整的源代码
+	// instruction2IrCode/fitRange leave the entire tuple empty for IR which
+	// has no source range (e.g. synthetic constants, functions and blocks).
+	// That is an absent optional range, not a failed source lookup. A partial
+	// tuple must still be diagnosed rather than silently discarded.
+	if r.SourceCodeHash == "" && r.SourceCodeStartOffset == 0 && r.SourceCodeEndOffset == 0 {
+		return nil, nil, nil, ErrSourceRangeAbsent
+	}
+	// Undefined and extern values often have no backing source file.
 	isUndefinedOrExtern := (r.OpcodeName == "Undefined" || r.OpcodeName == "ExternLib") || r.IsExternal
 
 	editor, err := GetEditorByHash(r.SourceCodeHash)
 	if err != nil {
 		if isUndefinedOrExtern {
-			log.Debugf("GetStartAndEndPositions: source code not found for external/undefined value (opcode=%s, name=%s, hash=%s), this is expected",
+			log.Debugf("GetStartAndEndPositions: source code not found for external/undefined value (opcode=%s, name=%s, hash=%s)",
 				r.OpcodeName, r.Name, r.SourceCodeHash)
-			return nil, nil, nil, nil
+			return nil, nil, nil, ErrSourceRangeAbsent
 		}
 		return nil, nil, nil, utils.Errorf("GetStartAndEndPositions failed: %v", err)
 	}
 	startOff, endOff := memedit.ClampOffsetPair(editor, int(r.SourceCodeStartOffset), int(r.SourceCodeEndOffset))
-	start, _ := editor.GetPositionByOffsetWithError(startOff)
-	end, _ := editor.GetPositionByOffsetWithError(endOff)
+	start, startErr := editor.GetPositionByOffsetWithError(startOff)
+	if startErr != nil {
+		return nil, nil, nil, utils.Errorf("GetStartAndEndPositions start: %v", startErr)
+	}
+	end, endErr := editor.GetPositionByOffsetWithError(endOff)
+	if endErr != nil {
+		return nil, nil, nil, utils.Errorf("GetStartAndEndPositions end: %v", endErr)
+	}
+	if start == nil || end == nil {
+		return nil, nil, nil, ErrSourceRangeAbsent
+	}
 	return editor, start, end, nil
 }
 

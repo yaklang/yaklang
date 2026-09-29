@@ -11,7 +11,7 @@ import (
 )
 
 func TestStreamHTTPErrorIsNotEmptySuccess(t *testing.T) {
-	for name, process := range map[string]func([]byte, io.ReadCloser, io.Writer, io.Writer, io.Writer, func([]*ToolCall), RawHTTPResponseHeaderCallback, func([]byte, []byte, *ChatUsage), func(*ChatUsage)) error{
+	for name, process := range map[string]func([]byte, io.ReadCloser, io.Writer, io.Writer, io.Writer, func([]*ToolCall), RawHTTPResponseHeaderCallback, func([]byte, []byte, *ChatUsage), func(*ChatUsage), ...func(string, []byte)) error{
 		"chat": processAIResponse, "responses": processAIResponseForResponses,
 	} {
 		for _, status := range []int{400, 401, 403, 500, 502} {

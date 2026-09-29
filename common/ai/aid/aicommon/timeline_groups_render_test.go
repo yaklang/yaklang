@@ -22,6 +22,7 @@ func injectTimelineItem(tl *Timeline, id int64, ts time.Time, value TimelineItem
 	tl.idToTs.Set(id, tsMs)
 	tl.OrderInsertId(id, item)
 	tl.OrderInsertTs(tsMs, item)
+	tl.Freeze()
 }
 
 // makeToolResult 构造一个简单的 ToolResult 条目

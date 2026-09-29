@@ -108,6 +108,8 @@ func doH2Request(t *testing.T, pool *LowHttpConnPool, host string, port int) err
 func h2PoolFor(ctx context.Context, idleTimeout time.Duration) *LowHttpConnPool {
 	pool := NewHttpConnPool(ctx, 10, 2)
 	pool.idleConnTimeout = idleTimeout
+	// Propagate the custom idle timeout to the H2 pool.
+	pool.h2Pool.idleTimeout = idleTimeout
 	return pool
 }
 
@@ -128,16 +130,14 @@ func waitCondition(cond func() bool, interval, timeout time.Duration) bool {
 
 // h2ConnCount returns the number of live H2 connections in the pool.
 func h2ConnCount(pool *LowHttpConnPool) int {
-	pool.h2Mu.Lock()
-	defer pool.h2Mu.Unlock()
-	return len(pool.h2ConnMap)
+	live, _ := pool.h2Pool.Snapshot()
+	return len(live)
 }
 
 // latestTombstone returns a snapshot of the tombstone queue (newest-first).
 func latestTombstones(pool *LowHttpConnPool) []h2ConnTombstone {
-	pool.h2Mu.Lock()
-	defer pool.h2Mu.Unlock()
-	return pool.h2Tombstones.snapshot()
+	_, ts := pool.h2Pool.Snapshot()
+	return ts
 }
 
 // ─── 1. H1 idle-timeout ───────────────────────────────────────────────────────
@@ -273,13 +273,12 @@ func TestConnPool_H2_PingKeepalive_ServerResponds(t *testing.T) {
 
 	// Shrink the ping interval on the already-established connection so we
 	// don't need to wait 30 s for the default interval.
-	pool.h2Mu.Lock()
-	for _, pc := range pool.h2ConnMap {
-		if pc.alt != nil {
-			pc.alt.setPingConfig(pingInterval, pingInterval*3)
+	live, _ := pool.h2Pool.Snapshot()
+	for _, entry := range live {
+		if entry.alt != nil {
+			entry.alt.setPingConfig(pingInterval, pingInterval*3)
 		}
 	}
-	pool.h2Mu.Unlock()
 
 	// Let several ping cycles run.
 	time.Sleep(pingInterval * 6)
@@ -417,7 +416,8 @@ func TestConnPool_H2_PingKeepalive_ServerSilent(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	pool := h2PoolFor(ctx, 60*time.Second) // don't expire on idle
-	pool.keepAliveTimeout = pingInterval   // picked up by h2Conn() as pingInterval
+	pool.keepAliveTimeout = pingInterval   // picked up by H2ConnPool as pingInterval
+	pool.h2Pool.keepAliveTimeout = pingInterval
 	pool.EnableConnPoolDebug(true)
 	defer pool.Clear()
 
@@ -450,14 +450,13 @@ func TestConnPool_H2_PingKeepalive_ServerSilent(t *testing.T) {
 
 	// 4. Override pingTimeout on the live connection so sendPing gives up fast.
 	//    (pingInterval is already short from pool.keepAliveTimeout set above.)
-	pool.h2Mu.Lock()
-	for _, pc := range pool.h2ConnMap {
-		if pc.alt != nil {
-			interval, _ := pc.alt.pingConfig()
-			pc.alt.setPingConfig(interval, pingTimeout)
+	live, _ := pool.h2Pool.Snapshot()
+	for _, entry := range live {
+		if entry.alt != nil {
+			interval, _ := entry.alt.pingConfig()
+			entry.alt.setPingConfig(interval, pingTimeout)
 		}
 	}
-	pool.h2Mu.Unlock()
 
 	// 5. Wait for ping timeout → eviction.
 	//    Budget: pingInterval (timer fires) + pingTimeout (ACK wait) + buffer.
@@ -537,10 +536,11 @@ func TestConnPool_TombstoneQueue_DebugGate(t *testing.T) {
 	defer pool.Clear()
 
 	// Debug OFF — tombstone must NOT be stored.
-	pool.h2Mu.Lock()
-	pool.recordH2Tombstone(h2ConnTombstone{host: "should-not-appear:443"})
-	snap := pool.h2Tombstones.snapshot()
-	pool.h2Mu.Unlock()
+	pool.h2Pool.SetDebugEnabled(false)
+	pool.h2Pool.mu.Lock()
+	pool.h2Pool.recordTombstone(h2ConnTombstone{host: "should-not-appear:443"})
+	snap := pool.h2Pool.tombstones.snapshot()
+	pool.h2Pool.mu.Unlock()
 
 	if len(snap) != 0 {
 		t.Fatalf("debug OFF: expected 0 tombstones, got %d", len(snap))
@@ -548,10 +548,10 @@ func TestConnPool_TombstoneQueue_DebugGate(t *testing.T) {
 
 	// Debug ON — tombstone MUST be stored.
 	pool.EnableConnPoolDebug(true)
-	pool.h2Mu.Lock()
-	pool.recordH2Tombstone(h2ConnTombstone{host: "should-appear:443"})
-	snap = pool.h2Tombstones.snapshot()
-	pool.h2Mu.Unlock()
+	pool.h2Pool.mu.Lock()
+	pool.h2Pool.recordTombstone(h2ConnTombstone{host: "should-appear:443"})
+	snap = pool.h2Pool.tombstones.snapshot()
+	pool.h2Pool.mu.Unlock()
 
 	if len(snap) != 1 || snap[0].host != "should-appear:443" {
 		t.Fatalf("debug ON: expected 1 tombstone with correct host, got %v", snap)
@@ -871,13 +871,12 @@ func TestConnPool_H2_NoStreamLeakOnForceClose(t *testing.T) {
 	// so calling it while holding h2Mu would deadlock.
 	time.Sleep(50 * time.Millisecond)
 	var altsToClose []*http2ClientConn
-	pool.h2Mu.Lock()
-	for _, pc := range pool.h2ConnMap {
-		if pc.alt != nil {
-			altsToClose = append(altsToClose, pc.alt)
+	live, _ := pool.h2Pool.Snapshot()
+	for _, entry := range live {
+		if entry.alt != nil {
+			altsToClose = append(altsToClose, entry.alt)
 		}
 	}
-	pool.h2Mu.Unlock()
 
 	for _, alt := range altsToClose {
 		alt.setCloseReason("test-forced-close")

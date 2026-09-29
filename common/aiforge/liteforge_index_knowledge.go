@@ -1,12 +1,12 @@
 package aiforge
 
 import (
-	_ "embed"
 	"fmt"
 	"sort"
 	"strings"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon/promptloader"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/ai/rag"
 	"github.com/yaklang/yaklang/common/chunkmaker"
@@ -16,8 +16,7 @@ import (
 	"github.com/yaklang/yaklang/common/utils/chanx"
 )
 
-//go:embed liteforge_prompt/knowledge_index_build.txt
-var indexBuildPrompt string
+var indexBuildPrompt = promptloader.MustLoad("aiforge/liteforge_prompt/knowledge_index_build.txt")
 
 var indexBuildSchema = aitool.NewObjectSchemaWithAction(
 	// chunk_list: 聚合后的“知识分片”(稍大)列表；每个分片包含标题、答案范围、以及若干个可检索问题

@@ -3,6 +3,7 @@ package reactloops_yak
 import (
 	"io/fs"
 	"os"
+	"path"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -130,7 +131,7 @@ func iterateFocusEntriesFS(fsys fs.FS, root string) ([]focusEntry, error) {
 			return nil
 		}
 		entries = append(entries, focusEntry{
-			dir:       filepath.Dir(p),
+			dir:       path.Dir(p),
 			entryFile: name,
 		})
 		return nil

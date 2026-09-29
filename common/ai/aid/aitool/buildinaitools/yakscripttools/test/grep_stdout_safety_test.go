@@ -39,18 +39,8 @@ func getGrepToolFromEmbed(t *testing.T) *aitool.Tool {
 // 2. grep results are properly printed via println() to stdout
 // 3. stdout doesn't contain the large original file content (no duplicate/flood)
 func TestGrepTool_StdoutSafety(t *testing.T) {
-	// Get all tools and find the grep tool by name
-	allTools := yakscripttools.GetAllYakScriptAiTools()
-	var grepTool *aitool.Tool
-	for _, tool := range allTools {
-		if tool.GetName() == "grep" {
-			grepTool = tool
-			break
-		}
-	}
-	if grepTool == nil {
-		t.Fatal("grep tool not found")
-	}
+	// Load the fixture independently of the developer profile database.
+	grepTool := getGrepToolFromEmbed(t)
 	t.Logf("Found grep tool: %s", grepTool.GetName())
 
 	// Create a LARGE temporary file (2MB) with test content
@@ -132,17 +122,7 @@ func TestGrepTool_StdoutSafety(t *testing.T) {
 }
 
 func TestGrepTool_RegexpLimitWithoutContext(t *testing.T) {
-	allTools := yakscripttools.GetAllYakScriptAiTools()
-	var grepTool *aitool.Tool
-	for _, tool := range allTools {
-		if tool.GetName() == "grep" {
-			grepTool = tool
-			break
-		}
-	}
-	if grepTool == nil {
-		t.Fatal("grep tool not found")
-	}
+	grepTool := getGrepToolFromEmbed(t)
 
 	content := strings.Repeat(`<a href="/demo/path">demo</a>`+"\n", 4000)
 	tmpFile, err := consts.TempFile("grep_regexp_limit_*.txt")

@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
+	"github.com/yaklang/yaklang/common/ai/aid/aiprojection"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 )
 
@@ -32,7 +33,6 @@ func TestTimelineMarshalUnmarshal(t *testing.T) {
 	originalTimeline.PushText(300, "test text content")
 
 	// 设置限制
-	originalTimeline.perDumpContentLimit = 1000
 	originalTimeline.totalDumpContentLimit = 5000
 
 	// 序列化
@@ -49,7 +49,6 @@ func TestTimelineMarshalUnmarshal(t *testing.T) {
 
 	// 验证数据完整性
 	require.Equal(t, originalTimeline.idToTimelineItem.Len(), restoredTimeline.idToTimelineItem.Len())
-	require.Equal(t, originalTimeline.perDumpContentLimit, restoredTimeline.perDumpContentLimit)
 	require.Equal(t, originalTimeline.totalDumpContentLimit, restoredTimeline.totalDumpContentLimit)
 
 	// 验证每个项目
@@ -85,10 +84,12 @@ func TestTimelineMarshalUnmarshal(t *testing.T) {
 
 func TestTimelineMarshalPreservesPromptOnlyTextWithoutChangingDisplay(t *testing.T) {
 	timeline := NewTimeline(nil, nil)
+	projection := "[model_thinking]:\n" + aiprojection.CreateTag("TIMELINE_MODEL_THINKING_V1", "n1",
+		`{"v":1,"reasoning_content":"payload","content":"historical answer"}`)
 	timeline.PushTextWithPromptProjection(
 		301,
 		"[model_thinking]:\ndisplay-only reasoning",
-		"[model_thinking]:\n<|TIMELINE_MODEL_THINKING_n1|>payload<|TIMELINE_MODEL_THINKING_END_n1|>",
+		projection,
 	)
 
 	serialized, err := MarshalTimeline(timeline)
@@ -101,78 +102,8 @@ func TestTimelineMarshalPreservesPromptOnlyTextWithoutChangingDisplay(t *testing
 	require.Equal(t, "[model_thinking]:\ndisplay-only reasoning", item.String())
 	textItem, ok := item.GetValue().(*TextTimelineItem)
 	require.True(t, ok)
-	require.Contains(t, textItem.PromptText, "TIMELINE_MODEL_THINKING_n1")
-	require.NotContains(t, item.String(), "TIMELINE_MODEL_THINKING_n1")
-}
-
-// TestTimelineMarshalWithCompressedHead 测试 single compressed head 的往返一致性
-func TestTimelineMarshalWithCompressedHead(t *testing.T) {
-	originalTimeline := NewTimeline(nil, nil)
-
-	// 添加一些工具结果
-	for i := 1; i <= 5; i++ {
-		originalTimeline.PushToolResult(&aitool.ToolResult{
-			ID:          int64(100 + i),
-			Name:        "test_tool",
-			Description: "test description",
-			Param:       map[string]any{"param": i},
-			Success:     true,
-			Data:        i,
-			Error:       "",
-		})
-	}
-
-	originalTimeline.compressedHead = &TimelineCompressedHead{
-		Text:             "compressed memory",
-		CoveredEndItemID: 200,
-		CoveredEndAtMs:   1700000000000,
-		Version:          3,
-	}
-
-	jsonStr, err := MarshalTimeline(originalTimeline)
-	require.NoError(t, err)
-	require.NotEmpty(t, jsonStr)
-
-	restoredTimeline, err := UnmarshalTimeline(jsonStr)
-	require.NoError(t, err)
-	require.NotNil(t, restoredTimeline)
-
-	require.NotNil(t, restoredTimeline.compressedHead)
-	require.Equal(t, originalTimeline.compressedHead.Text, restoredTimeline.compressedHead.Text)
-	require.Equal(t, originalTimeline.compressedHead.CoveredEndItemID, restoredTimeline.compressedHead.CoveredEndItemID)
-	require.Equal(t, originalTimeline.compressedHead.CoveredEndAtMs, restoredTimeline.compressedHead.CoveredEndAtMs)
-	require.Equal(t, originalTimeline.compressedHead.Version, restoredTimeline.compressedHead.Version)
-
-	t.Log("Timeline marshal with compressed head test passed")
-}
-
-func TestUnmarshalTimelineLegacyReducers(t *testing.T) {
-	// This shape was written before compressed_head replaced reducers.
-	const legacy = `{"id_to_ts":{},"ts_to_timeline_item":{},"id_to_timeline_item":{},"reducers":{"11":"first memory","22":"second memory"},"reducer_ts":{"11":1700000000000,"22":1700000001000},"archive_refs":{},"per_dump_content_limit":100,"total_dump_content_limit":500}`
-
-	timeline, err := UnmarshalTimeline(legacy)
-	require.NoError(t, err)
-	require.Equal(t, &TimelineCompressedHead{
-		Text:             "second memory",
-		CoveredEndItemID: 22,
-		CoveredEndAtMs:   1700000001000,
-		Version:          2,
-	}, timeline.compressedHead)
-	require.Equal(t, []*TimelineCompressedHistoryNode{{
-		Version:          1,
-		PrevVersion:      0,
-		Text:             "first memory",
-		CoveredEndItemID: 11,
-		CoveredEndAtMs:   1700000000000,
-		CreatedAtMs:      1700000000000,
-	}}, timeline.compressedHistory)
-
-	serialized, err := MarshalTimeline(timeline)
-	require.NoError(t, err)
-	require.NotContains(t, serialized, `"reducers"`)
-	require.NotContains(t, serialized, `"reducer_ts"`)
-	require.Contains(t, serialized, `"compressed_head"`)
-	require.Contains(t, serialized, `"compressed_history"`)
+	require.Equal(t, projection, textItem.PromptText)
+	require.NotContains(t, item.String(), "TIMELINE_MODEL_THINKING")
 }
 
 func TestTimelineMarshalEmpty(t *testing.T) {
@@ -233,4 +164,26 @@ func TestTimelineUnmarshalLegacySummaryType(t *testing.T) {
 			require.NotContains(t, serialized, `"summary"`)
 		})
 	}
+}
+
+func TestTimelineMarshalDropsInvalidPromptOnlyReplayWithoutChangingDisplay(t *testing.T) {
+	timeline := NewTimeline(nil, nil)
+	timeline.PushTextWithPromptProjection(
+		301,
+		"[model_thinking]:\ndisplay-only reasoning",
+		"[model_thinking]:\n<|TIMELINE_MODEL_THINKING_n1|>payload<|TIMELINE_MODEL_THINKING_END_n1|>",
+	)
+
+	serialized, err := MarshalTimeline(timeline)
+	require.NoError(t, err)
+	restored, err := UnmarshalTimeline(serialized)
+	require.NoError(t, err)
+
+	item, ok := restored.idToTimelineItem.Get(301)
+	require.True(t, ok)
+	require.Equal(t, "[model_thinking]:\ndisplay-only reasoning", item.String())
+	textItem, ok := item.GetValue().(*TextTimelineItem)
+	require.True(t, ok)
+	require.Empty(t, textItem.PromptText, "replay tags with a nonce unrelated to the saved projection must be discarded")
+	require.NotContains(t, item.String(), "TIMELINE_MODEL_THINKING_n1")
 }

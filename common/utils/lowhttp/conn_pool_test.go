@@ -17,14 +17,15 @@ func TestH2FramerRejectsFramesAboveAdvertisedMaxSize(t *testing.T) {
 	defer localConn.Close()
 	defer remoteConn.Close()
 
-	pc := &persistConn{
+	pool := NewHttpConnPool(context.Background(), 100, 2)
+	entry := &h2ConnEntry{
 		conn:     localConn,
 		cacheKey: &connectKey{scheme: H2},
-		p:        NewHttpConnPool(context.Background(), 100, 2),
+		pool:     pool.h2Pool,
 	}
-	pc.h2Conn()
-	defer pc.alt.idleTimer.Stop()
-	defer pc.alt.setClose()
+	pool.h2Pool.initH2Conn(entry)
+	defer entry.alt.idleTimer.Stop()
+	defer entry.alt.setClose()
 
 	frameHeader := make([]byte, 9)
 	binary.BigEndian.PutUint32(frameHeader[:4], (defaultMaxFrameSize+1)<<8)
@@ -34,7 +35,7 @@ func TestH2FramerRejectsFramesAboveAdvertisedMaxSize(t *testing.T) {
 		_, _ = io.Copy(remoteConn, bytes.NewReader(frameHeader))
 	}()
 
-	_, err := pc.alt.fr.ReadFrame()
+	_, err := entry.alt.fr.ReadFrame()
 	if !errors.Is(err, http2.ErrFrameTooLarge) {
 		t.Fatalf("ReadFrame() error = %v, want %v", err, http2.ErrFrameTooLarge)
 	}

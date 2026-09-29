@@ -1,0 +1,8 @@
+The following internet research did not yield sufficient results to fully answer the user's question.
+
+Please analyze why the search results are insufficient. Consider:
+1. What specific aspects of the user's question remain unanswered?
+2. What was found vs what was expected?
+3. Possible reasons (topic too niche, information not publicly available, wrong search strategy, etc.)
+
+Provide a concise analysis (3-5 sentences) explaining why the collected information does not meet the user's needs.

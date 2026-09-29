@@ -4,7 +4,7 @@ desc(
 	title: "检测 Go SSH 忽略主机密钥"
 	title_zh: "检测 Go SSH 忽略主机密钥"
 	type: vuln
-	level: high
+	level: middle
 	rule_id: "source-go-ssh-insecure-ignore"
 	risk: "certificate-validation"
 	desc: <<<DESC
@@ -33,14 +33,14 @@ func c() { ssh.InsecureIgnoreHostKey() }
 POS
 	"safefile://ok.go": <<<NEG
 package main
-func c() {}
+func c() { yakgit.WithInsecureIgnoreHostKey() }
 
 NEG
 )
 
-${*.go}.pattern_regex(/InsecureIgnoreHostKey\s*\(/) as $hit
+${*.go}.pattern_regex(/(?:[^A-Za-z0-9_]|^)(?:ssh|gossh)\.InsecureIgnoreHostKey\s*\(/) as $hit
 alert $hit for {
-	level: "high",
+	level: "middle",
 	title: "检测 Go SSH 忽略主机密钥",
 	title_zh: "检测 Go SSH 忽略主机密钥",
 	message: "检测 Go SSH 忽略主机密钥",

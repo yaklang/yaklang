@@ -1,6 +1,7 @@
 package ssadb
 
 import (
+	"errors"
 	"strings"
 
 	"github.com/yaklang/gorm"
@@ -12,6 +13,9 @@ import (
 // MAX_VARIABLE_NUMBER=250000 ceiling; 1000 rows is safe for the IrOffset model
 // and reduces the number of INSERT statements per flush.
 const irOffsetBatchChunk = 1000
+
+// ErrSourceRangeAbsent means the instruction or offset has no source file.
+var ErrSourceRangeAbsent = errors.New("source range is absent")
 
 type IrOffset struct {
 	gorm.Model
@@ -95,19 +99,24 @@ func GetValueBeforeEndOffset(DB *gorm.DB, rng *memedit.Range) (int64, error) {
 }
 
 func (r *IrOffset) GetStartAndEndPositions() (*memedit.MemEditor, *memedit.Position, *memedit.Position, error) {
-	if r == nil {
-		return nil, nil, nil, nil
-	}
-	if strings.TrimSpace(r.FileHash) == "" {
-		// Some synthetic variables (for example dependency/config placeholders)
-		// intentionally have no backing source file.
-		return nil, nil, nil, nil
+	if r == nil || strings.TrimSpace(r.FileHash) == "" {
+		return nil, nil, nil, ErrSourceRangeAbsent
 	}
 
 	editor, err := GetEditorByHash(r.FileHash)
 	if err != nil {
 		return nil, nil, nil, utils.Errorf("GetStartAndEndPositions failed: %v", err)
 	}
-	start, end := editor.GetPositionByOffset(int(r.StartOffset)), editor.GetPositionByOffset(int(r.EndOffset))
+	start, startErr := editor.GetPositionByOffsetWithError(int(r.StartOffset))
+	if startErr != nil {
+		return nil, nil, nil, utils.Errorf("GetStartAndEndPositions start: %v", startErr)
+	}
+	end, endErr := editor.GetPositionByOffsetWithError(int(r.EndOffset))
+	if endErr != nil {
+		return nil, nil, nil, utils.Errorf("GetStartAndEndPositions end: %v", endErr)
+	}
+	if start == nil || end == nil {
+		return nil, nil, nil, ErrSourceRangeAbsent
+	}
 	return editor, start, end, nil
 }

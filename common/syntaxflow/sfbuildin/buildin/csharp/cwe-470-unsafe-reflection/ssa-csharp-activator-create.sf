@@ -1,0 +1,54 @@
+desc(
+	mode: "ssa"
+	language: "csharp"
+	title: "数据流：C# Activator.CreateInstance 外部类型"
+	title_zh: "数据流：C# Activator.CreateInstance 外部类型"
+	type: vuln
+	level: high
+	rule_id: "ssa-csharp-activator-create"
+	risk: "reflection-abuse"
+	cwe: "CWE-470"
+	desc: <<<DESC
+### 规则说明
+`Type.GetType(name)` 按字符串加载类型，`Activator.CreateInstance` 再调用它的构造函数。名字来自请求时，攻击者可以指定进程里已经加载的其他类型，触发不该执行的构造逻辑，在反序列化场景里还会变成对象注入的入口。
+
+### 风险类型
+reflection-abuse
+
+### 影响
+可能创建带有副作用的对象，绕过工厂方法里的校验，或作为下一步反序列化利用的起点。
+
+### 检测方式
+这条规则使用 ssa 模式，只保留非常量、且不是当前函数参数的实参。常量字符串不告警。实参如果只是函数形参，也不会命中。
+匹配 `CreateInstance`，而且实参不是常量，也不是当前函数形参。`Type.GetType` 由 source 规则覆盖。常量类型名不告警。
+同一检查还有 source（源码正则）。它们描述同一个问题，命中条件不同，修复时看实际告警来自哪一条。
+
+### 参考
+- [CWE-470：用外部输入选择类或代码](https://cwe.mitre.org/data/definitions/470.html)
+
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+- 用字典把允许的短名映射到具体类型，找不到就拒绝。
+- 不要把请求参数传给 `Type.GetType` 或 `Activator.CreateInstance`。
+- 需要插件时，只从受控的程序集清单加载，并限制可调用的构造函数。
+
+SOLUTION
+	alert_min: 1
+	"file://bad.cs": <<<POS
+class Bad { object n(Microsoft.AspNetCore.Http.HttpRequest req) { return System.Activator.CreateInstance(null, req.Query["type"]); } }
+
+POS
+	"safefile://ok.cs": <<<NEG
+class Ok { object n() { return System.Activator.CreateInstance(null, "App.KnownType"); } }
+
+NEG
+)
+CreateInstance(*?{!opcode: const && !opcode: param} as $dyn) as $call
+alert $dyn for {
+	level: "high",
+	title: "数据流：C# Activator.CreateInstance 外部类型",
+	title_zh: "数据流：C# Activator.CreateInstance 外部类型",
+	message: "数据流：C# Activator.CreateInstance 外部类型",
+	risk: "reflection-abuse",
+}

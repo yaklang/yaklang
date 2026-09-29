@@ -1,0 +1,54 @@
+desc(
+	mode: "source"
+	language: "java"
+	title: "源码扫描：Java System.setProperty 接受外部值"
+	title_zh: "源码扫描：Java System.setProperty 接受外部值"
+	type: vuln
+	level: high
+	rule_id: "source-java-system-set-property"
+	risk: "security-misconfiguration"
+	cwe: "CWE-15"
+	desc: <<<DESC
+### 规则说明
+`System.setProperty` 修改的是整个 JVM 的系统属性，所有线程都能看见。键或值来自请求时，一次请求就能改写代理、安全提供者、日志路径等全局配置，并影响后面的请求。
+
+### 风险类型
+security-misconfiguration
+
+### 影响
+进程级安全配置被请求改掉之后，后续流量可能走错误的代理、加载意外的提供者，或把日志写到攻击者指定的位置。
+
+### 检测方式
+这条规则使用 source 模式，用正则扫描源文件文本，不构建语法树或 SSA。命中只说明出现了对应写法，不能单独证明数据来自外部输入。注释、字符串和文档中的相同文本也会命中。
+正则匹配任意 `System.setProperty(`。启动时写入常量的合法调用也会命中，需要看值是不是外部数据。
+同一检查还有 ssa（数据流）。它们描述同一个问题，命中条件不同，修复时看实际告警来自哪一条。
+
+### 参考
+- [CWE-15：外部控制的系统或配置设置](https://cwe.mitre.org/data/definitions/15.html)
+
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+- 系统属性只在进程启动时从受控配置设置。
+- 不要用请求参数作为属性的键或值。
+- 只对当前请求有效的选项放进请求上下文，不要放进 `System`。
+
+SOLUTION
+	alert_min: 1
+	"file://bad.java": <<<POS
+class Bad { void c(String v) { System.setProperty("app.mode", v); } }
+
+POS
+	"safefile://ok.java": <<<NEG
+class Ok { void c() { String v = System.getProperty("java.version"); } }
+
+NEG
+)
+${*.java}.pattern_regex(/System\.setProperty\s*\(/) as $hit
+alert $hit for {
+	level: "high",
+	title: "源码扫描：Java System.setProperty 接受外部值",
+	title_zh: "源码扫描：Java System.setProperty 接受外部值",
+	message: "源码扫描：Java System.setProperty 接受外部值",
+	risk: "security-misconfiguration",
+}

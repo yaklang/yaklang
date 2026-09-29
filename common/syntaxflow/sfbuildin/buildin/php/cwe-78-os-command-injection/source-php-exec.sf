@@ -33,11 +33,18 @@ POS
 	"safefile://s.php": <<<NEG
 <?php
 function r($cmd) { echo htmlspecialchars($cmd); }
-
+// do not call exec( with untrusted input
+$snippet = "exec(cmd)";
+$doc = 'see exec( usage';
 NEG
 )
 
-${*.php}.pattern_regex(/(?m)(?<![\w>])exec\s*\(/) as $hit
+${*.php}.pattern_regex(/(?m)(?<![\w>])exec\s*\(/) as $raw
+${*.php}.pattern_regex(/'[^'\n]*'/) as $sq
+${*.php}.pattern_regex(/"[^"\n]*"/) as $dq
+${*.php}.pattern_regex(/\/\/[^\n]*|#[^\n]*|\/\*[\s\S]*?\*\//) as $cm
+$sq + $dq + $cm as $quoted
+$raw not_inside $quoted as $hit
 alert $hit for {
 	level: "high",
 	title: "检测 PHP exec",

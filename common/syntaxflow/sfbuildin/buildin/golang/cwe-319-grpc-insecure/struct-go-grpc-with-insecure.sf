@@ -1,0 +1,57 @@
+desc(
+	mode: "struct"
+	language: "golang"
+	title: "结构扫描：Go grpc.WithInsecure"
+	title_zh: "结构扫描：Go grpc.WithInsecure"
+	type: vuln
+	level: high
+	rule_id: "struct-go-grpc-with-insecure"
+	risk: "cleartext-transmission"
+	cwe: "CWE-319"
+	desc: <<<DESC
+### 规则说明
+`grpc.WithInsecure()` 关闭 gRPC 通道的传输加密。元数据里的令牌和业务消息以明文经过网络，调用方也不能确认对端身份。
+
+### 风险类型
+cleartext-transmission
+
+### 影响
+窃听可以拿走认证元数据。中间人可以改写请求和响应。
+
+### 检测方式
+这条规则使用 struct 模式，匹配编译后真实存在的调用。注释和普通字符串不会命中。它不分析参数来源，出现该调用即告警。
+匹配 `grpc.WithInsecure()` 这个真实调用。注释和字符串不会命中。
+同一检查还有 source（源码正则）。它们描述同一个问题，命中条件不同，修复时看实际告警来自哪一条。
+
+### 参考
+- [CWE-319：敏感信息明文传输](https://cwe.mitre.org/data/definitions/319.html)
+
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+- 改用 `grpc.WithTransportCredentials`，并传入 TLS 配置。
+- 生产拨号选项里不要保留 `WithInsecure`。本地调试用完即删。
+- 内网同样需要 TLS，或者由服务网格提供双向认证。不要把“在内网”当作明文的理由。
+
+SOLUTION
+	alert_min: 1
+	"file://bad.go": <<<POS
+package main
+import "google.golang.org/grpc"
+func bad(target string) { grpc.Dial(target, grpc.WithInsecure()) }
+
+POS
+	"safefile://ok.go": <<<NEG
+package main
+func ok() { println("tls") }
+
+NEG
+)
+grpc.WithInsecure() as $call
+alert $call for {
+	level: "high",
+	title: "结构扫描：Go grpc.WithInsecure",
+	title_zh: "结构扫描：Go grpc.WithInsecure",
+	message: "结构扫描：Go grpc.WithInsecure",
+	risk: "cleartext-transmission",
+}

@@ -9,8 +9,8 @@
 **high-static / frozen-block / semi-dynamic-1 / semi-dynamic-2 / timeline-open** 五段中与 prefix 缓存对齐的正文已统一放在  
 `common/ai/aid/aicommon/prompts/prefix/`（`high_static_section.txt`、`frozen_block_section.txt`、`semi_dynamic_1_section.txt`、`semi_dynamic_2_section.txt`、`timeline_open_section.txt`），由 `aicommon.PromptPrefixBuilder` 嵌入，勿在本目录重复维护副本。
 
-段间字节稳定性与 aicache 边界约定见  
-[`common/ai/aid/aicache/LESSONS_LEARNED.md`](../../../aicache/LESSONS_LEARNED.md)。
+段间字节稳定性与缓存边界约定见
+[`aiprojection/README.md`](../../../aiprojection/README.md)。
 
 ## 修改 high-static 时的硬约束
 

@@ -1,0 +1,57 @@
+desc(
+	mode: "source"
+	language: "golang"
+	title: "源码扫描：Go Cookie SameSiteNoneMode"
+	title_zh: "源码扫描：Go Cookie SameSiteNoneMode"
+	type: vuln
+	level: middle
+	rule_id: "source-go-samesite-none"
+	risk: "cookie-security"
+	cwe: "CWE-1275"
+	desc: <<<DESC
+### 规则说明
+`http.SameSiteNoneMode` 允许浏览器在跨站请求中发送这枚 Cookie。会话 Cookie 会随着其他网站发起的请求回到本站。
+
+### 风险类型
+cookie-security
+
+### 影响
+跨站请求伪造的门槛下降。没有同时设置 Secure 时，浏览器会拒绝或降级这枚 Cookie。
+
+### 检测方式
+这条规则使用 source 模式，用正则扫描源文件文本，不构建语法树或 SSA。命中只说明出现了对应写法，不能单独证明数据来自外部输入。注释、字符串和文档中的相同文本也会命中。
+正则匹配 `SameSiteNoneMode`。其他 SameSite 模式不会命中。
+
+### 参考
+- [CWE-1275：敏感 Cookie 的 SameSite 属性不当](https://cwe.mitre.org/data/definitions/1275.html)
+
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+- 会话 Cookie 使用 `http.SameSiteLaxMode` 或 `http.SameSiteStrictMode`。
+- 必须使用 None 时同时设置 `Secure: true`，并另外校验 CSRF 令牌。
+- 这和“完全没有设置 SameSite”不是同一条规则。缺省属性由另一条规则负责。
+
+SOLUTION
+	alert_min: 1
+	"file://bad.go": <<<POS
+package main
+import "net/http"
+func bad() { http.SetCookie(nil, &http.Cookie{Name: "sid", SameSite: http.SameSiteNoneMode}) }
+
+POS
+	"safefile://ok.go": <<<NEG
+package main
+import "net/http"
+func ok() { http.SetCookie(nil, &http.Cookie{Name: "sid", SameSite: http.SameSiteLaxMode}) }
+
+NEG
+)
+${*.go}.pattern_regex(/SameSiteNoneMode/) as $hit
+alert $hit for {
+	level: "middle",
+	title: "源码扫描：Go Cookie SameSiteNoneMode",
+	title_zh: "源码扫描：Go Cookie SameSiteNoneMode",
+	message: "源码扫描：Go Cookie SameSiteNoneMode",
+	risk: "cookie-security",
+}

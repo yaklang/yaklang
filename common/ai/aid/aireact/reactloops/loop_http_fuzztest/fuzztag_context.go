@@ -1,7 +1,6 @@
 package loop_http_fuzztest
 
 import (
-	_ "embed"
 	"fmt"
 	"html"
 	"sort"
@@ -9,6 +8,7 @@ import (
 	"sync"
 
 	"github.com/yaklang/gorm"
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon/promptloader"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 )
@@ -38,8 +38,7 @@ func getLoopHTTPFuzzFuzztagReference() string {
 	return loopHTTPFuzzFuzztagReferenceText
 }
 
-//go:embed prompts/fuzztag.md
-var fuzztagReferenceData []byte
+var fuzztagReferenceData = promptloader.MustReadFile("ai/aid/aireact/reactloops/loop_http_fuzztest/prompts/fuzztag.md")
 
 func loadLoopHTTPFuzzFuzztagReference() string {
 	content := strings.TrimSpace(html.UnescapeString(string(fuzztagReferenceData)))

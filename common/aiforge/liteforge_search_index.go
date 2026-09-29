@@ -1,12 +1,11 @@
 package aiforge
 
 import (
-	_ "embed"
-
 	"os"
 
 	"github.com/google/uuid"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon/promptloader"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/ai/rag"
 	"github.com/yaklang/yaklang/common/log"
@@ -14,8 +13,7 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 )
 
-//go:embed liteforge_prompt/search_index_build.txt
-var searchIndexBuildPrompt string
+var searchIndexBuildPrompt = promptloader.MustLoad("aiforge/liteforge_prompt/search_index_build.txt")
 
 // searchIndexSchema defines the schema for search index generation
 // It generates 5-10 questions that users might ask to find this content

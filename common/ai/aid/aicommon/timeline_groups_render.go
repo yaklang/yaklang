@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/yaklang/yaklang/common/ai/aid/aiprojection"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/utils"
 )
@@ -32,6 +33,9 @@ type TimelineIntervalBlock struct {
 	// promptProjection is set only on ephemeral copies produced for prompt
 	// rendering. Raw Timeline dumps and UI-facing values remain byte-identical.
 	promptProjection bool
+	// Explicit freeze batches keep their identity across later tail appends.
+	frozenNonce  string
+	freezeBudget int64 // budget selected by the packer; never recomputed when sealing
 }
 
 // TimelineIntervalBlocks 是按时间顺序排列的 block 切片
@@ -101,7 +105,7 @@ func (m *Timeline) GroupByMinutes(minutes int) *TimelineGroups {
 
 // groupByMinutesWithSizer 用动态 sizer 决策每个 flush 临界的桶大小。
 // 关键词: groupByMinutesWithSizer, 动态桶切分
-func (m *Timeline) groupByMinutesWithSizer(minutes int, sizer BucketSizer) *TimelineGroups {
+func (m *Timeline) groupByMinutesWithSizer(minutes int, sizer BucketSizer, taskSeed ...string) *TimelineGroups {
 	if m == nil || minutes <= 0 || sizer == nil {
 		return &TimelineGroups{intervalMinutes: 0}
 	}
@@ -154,8 +158,9 @@ func (m *Timeline) groupByMinutesWithSizer(minutes int, sizer BucketSizer) *Time
 		if cb == nil || len(cb.items) == 0 {
 			continue
 		}
-		subs := packTimelineIntervalSubBlocksWithSizer(cb.start, cb.end, minutes, cb.items, sizer)
+		subs := packTimelineIntervalSubBlocksWithSizer(cb.start, cb.end, minutes, cb.items, sizer, taskSeed...)
 		orderedBuckets = append(orderedBuckets, subs...)
+		taskSeed = nil
 	}
 	if len(orderedBuckets) > 0 {
 		orderedBuckets[len(orderedBuckets)-1].Open = true
@@ -177,7 +182,7 @@ func (m *Timeline) GroupByMinutesAndBytes(minutes int, bytesPerBucket int64) *Ti
 	return m.groupByMinutesAndBytesLocked(minutes, bytesPerBucket)
 }
 
-func (m *Timeline) groupByMinutesAndBytesLocked(minutes int, bytesPerBucket int64) *TimelineGroups {
+func (m *Timeline) groupByMinutesAndBytesLocked(minutes int, bytesPerBucket int64, taskSeed ...string) *TimelineGroups {
 	if m == nil || minutes <= 0 {
 		return &TimelineGroups{intervalMinutes: 0}
 	}
@@ -248,9 +253,14 @@ func (m *Timeline) groupByMinutesAndBytesLocked(minutes int, bytesPerBucket int6
 			continue
 		}
 		if byteSplit {
-			subs := packTimelineIntervalSubBlocks(cb.start, cb.end, minutes, cb.items, budget)
+			subs := packTimelineIntervalSubBlocks(cb.start, cb.end, minutes, cb.items, budget, taskSeed...)
 			orderedBuckets = append(orderedBuckets, subs...)
+			taskSeed = nil
 		} else {
+			initialTaskID := ""
+			if len(taskSeed) > 0 {
+				initialTaskID = taskSeed[0]
+			}
 			orderedBuckets = append(orderedBuckets, &TimelineIntervalBlock{
 				BucketStart:     cb.start,
 				BucketEnd:       cb.end,
@@ -259,7 +269,9 @@ func (m *Timeline) groupByMinutesAndBytesLocked(minutes int, bytesPerBucket int6
 				Open:            false,
 				SeqInBucket:     0,
 				TotalInBucket:   1,
+				initialTaskID:   initialTaskID,
 			})
+			taskSeed = nil
 		}
 	}
 
@@ -290,7 +302,7 @@ func (m *Timeline) collectReducerGroups(minutes int, orderedBuckets []*TimelineI
 
 // packTimelineIntervalSubBlocks 在同一日历时间桶内按字节预算切分为多个 TimelineIntervalBlock。
 // 关键词: packTimelineIntervalSubBlocks, 字节子桶打包
-func packTimelineIntervalSubBlocks(bs, be time.Time, intervalMinutes int, items []*TimelineItem, bytesPerBucket int64) []*TimelineIntervalBlock {
+func packTimelineIntervalSubBlocks(bs, be time.Time, intervalMinutes int, items []*TimelineItem, bytesPerBucket int64, taskSeed ...string) []*TimelineIntervalBlock {
 	if len(items) == 0 {
 		return nil
 	}
@@ -300,6 +312,9 @@ func packTimelineIntervalSubBlocks(bs, be time.Time, intervalMinutes int, items 
 	var curInitialTaskID string
 	var curRenderState timelineTaskRenderState
 	var carriedTaskID string
+	if len(taskSeed) > 0 {
+		carriedTaskID = taskSeed[0]
+	}
 
 	flush := func() {
 		if len(cur) == 0 {
@@ -312,6 +327,7 @@ func packTimelineIntervalSubBlocks(bs, be time.Time, intervalMinutes int, items 
 			Items:           append([]*TimelineItem(nil), cur...),
 			Open:            false,
 			initialTaskID:   curInitialTaskID,
+			freezeBudget:    bytesPerBucket,
 		}
 		out = append(out, blk)
 		cur = nil
@@ -365,7 +381,7 @@ func packTimelineIntervalSubBlocks(bs, be time.Time, intervalMinutes int, items 
 // 单条 item 超过当次 budget 时仍按原规则独占一个子桶 (不在 entry 内部切)。
 //
 // 关键词: packTimelineIntervalSubBlocksWithSizer, 动态切桶
-func packTimelineIntervalSubBlocksWithSizer(bs, be time.Time, intervalMinutes int, items []*TimelineItem, sizer BucketSizer) []*TimelineIntervalBlock {
+func packTimelineIntervalSubBlocksWithSizer(bs, be time.Time, intervalMinutes int, items []*TimelineItem, sizer BucketSizer, taskSeed ...string) []*TimelineIntervalBlock {
 	if len(items) == 0 {
 		return nil
 	}
@@ -375,9 +391,13 @@ func packTimelineIntervalSubBlocksWithSizer(bs, be time.Time, intervalMinutes in
 	var out []*TimelineIntervalBlock
 	var cur []*TimelineItem
 	var curBytes int
+	var selectedBudget int64
 	var curInitialTaskID string
 	var curRenderState timelineTaskRenderState
 	var carriedTaskID string
+	if len(taskSeed) > 0 {
+		carriedTaskID = taskSeed[0]
+	}
 	// recentEntrySamples 用于让 sizer 看到最近若干 entry 的平均字节
 	const recentN = 8
 	var recentSizes []int
@@ -393,6 +413,7 @@ func packTimelineIntervalSubBlocksWithSizer(bs, be time.Time, intervalMinutes in
 			Items:           append([]*TimelineItem(nil), cur...),
 			Open:            false,
 			initialTaskID:   curInitialTaskID,
+			freezeBudget:    selectedBudget,
 		}
 		out = append(out, blk)
 		cur = nil
@@ -451,6 +472,7 @@ func packTimelineIntervalSubBlocksWithSizer(bs, be time.Time, intervalMinutes in
 
 		if len(cur) == 0 {
 			start(item)
+			selectedBudget = budget
 			continue
 		}
 		candidateState := curRenderState
@@ -458,8 +480,10 @@ func packTimelineIntervalSubBlocksWithSizer(bs, be time.Time, intervalMinutes in
 		if int64(curBytes+len(entry)) > budget {
 			flush()
 			start(item)
+			selectedBudget = budget
 			continue
 		}
+		selectedBudget = budget
 		cur = append(cur, item)
 		curBytes += len(entry)
 		curRenderState = candidateState
@@ -556,10 +580,6 @@ func stripTimelineTaskLabel(content, taskID string) string {
 // renderTimelineEntry 渲染一个 entry，并推进仅在当前 block 内使用的 task state。
 // 同 task 的逐条 [task:...] 标签从渲染结果中折叠；task 切换只输出一次边界。
 func renderTimelineEntry(item *TimelineItem, bucketStart time.Time, state *timelineTaskRenderState) string {
-	return renderTimelineEntryForPrompt(item, bucketStart, state, false)
-}
-
-func renderTimelineEntryForPrompt(item *TimelineItem, bucketStart time.Time, state *timelineTaskRenderState, promptProjection bool) string {
 	if item == nil || item.deleted {
 		return ""
 	}
@@ -591,16 +611,8 @@ func renderTimelineEntryForPrompt(item *TimelineItem, bucketStart time.Time, sta
 		state.activeTaskID = taskID
 	}
 	content := selectShrunkContent(item)
-	// Timeline facts are untrusted prompt data: tool output, user input, and
-	// reviewed source can all contain AITAG-looking literals. Escape their open
-	// delimiter before wrapping the item in real Timeline control tags, otherwise
-	// a literal can corrupt downstream section parsing or impersonate an internal
-	// reasoning replay record. PromptText-backed model replay is the sole internal
-	// projection allowed to retain a raw control envelope; its JSON fields are
-	// emitted with encoding/json and therefore escape '<' inside payload values.
-	if promptProjection && !isModelThinkingReplayProjection(item) {
-		content = strings.ReplaceAll(content, "<|", "&lt;|")
-	}
+	// Preserve literal AITAGs in data. aiprojection authenticates control tags
+	// with its process nonce before any cache/schema/replay parser runs.
 	if explicitTask && taskID != "" {
 		content = stripTimelineTaskLabel(content, taskID)
 	}
@@ -625,17 +637,34 @@ func renderTimelineEntryForPrompt(item *TimelineItem, bucketStart time.Time, sta
 	return buf.String()
 }
 
-func isModelThinkingReplayProjection(item *TimelineItem) bool {
+func isTrustedReplayProjection(item *TimelineItem) bool {
 	textItem, ok := timelineTextItem(item)
-	if !ok || normalizeTimelinePromptCategory(extractTextEntryType(textItem.Text)) != "MODEL_THINKING" {
+	if !ok {
 		return false
 	}
 	promptText := strings.TrimSpace(textItem.PromptText)
 	if promptText == "" || strings.TrimSpace(textItem.Text) != promptText {
 		return false
 	}
-	return strings.Contains(promptText, "<|TIMELINE_MODEL_THINKING_V1_") ||
-		strings.Contains(promptText, "<|TIMELINE_MODEL_THINKING_")
+	switch normalizeTimelinePromptCategory(extractTextEntryType(textItem.Text)) {
+	case "MODEL_THINKING":
+		return strings.Contains(promptText, "<|TIMELINE_MODEL_THINKING_V1_") || strings.Contains(promptText, "<|TIMELINE_MODEL_THINKING_")
+	case "FUNCTION_CALL_ACTION_RESPONSE":
+		return strings.Contains(promptText, "<|FUNCTION_CALL_ACTION_RESPONSE_")
+	default:
+		return false
+	}
+}
+
+func isActionResponseReplayProjection(item *TimelineItem) bool {
+	textItem, ok := timelineTextItem(item)
+	if !ok || normalizeTimelinePromptCategory(extractTextEntryType(textItem.Text)) != "FUNCTION_CALL_ACTION_RESPONSE" {
+		return false
+	}
+	promptText := strings.TrimSpace(textItem.PromptText)
+	return promptText != "" && strings.TrimSpace(textItem.Text) == promptText &&
+		strings.Contains(promptText, "<|FUNCTION_CALL_ACTION_RESPONSE_"+aiprojection.Nonce()+"|>") &&
+		strings.HasSuffix(promptText, "<|FUNCTION_CALL_ACTION_RESPONSE_END_"+aiprojection.Nonce()+"|>")
 }
 
 func timelineIntervalBlockRenderedByteLen(block *TimelineIntervalBlock) int {
@@ -646,7 +675,7 @@ func timelineIntervalBlockRenderedByteLen(block *TimelineIntervalBlock) int {
 	n := len(renderTimelineIntervalHeader(block.BucketStart, block.BucketEnd, block.IntervalMinutes, headerTaskID))
 	state := timelineTaskRenderState{activeTaskID: headerTaskID, firstEntry: true}
 	for _, item := range block.Items {
-		n += len(renderTimelineEntryForPrompt(item, block.BucketStart, &state, block.promptProjection))
+		n += len(renderTimelineEntry(item, block.BucketStart, &state))
 	}
 	return n
 }
@@ -688,7 +717,7 @@ func (b *TimelineIntervalBlock) Render() string {
 	buf.WriteString(renderTimelineIntervalHeader(b.BucketStart, b.BucketEnd, b.IntervalMinutes, headerTaskID))
 	state := timelineTaskRenderState{activeTaskID: headerTaskID, firstEntry: true}
 	for _, item := range b.Items {
-		buf.WriteString(renderTimelineEntryForPrompt(item, b.BucketStart, &state, b.promptProjection))
+		buf.WriteString(renderTimelineEntry(item, b.BucketStart, &state))
 	}
 	return strings.TrimRight(buf.String(), "\n")
 }
@@ -701,6 +730,9 @@ func (b *TimelineIntervalBlock) Render() string {
 func (b *TimelineIntervalBlock) StableNonce() string {
 	if b == nil {
 		return ""
+	}
+	if b.frozenNonce != "" {
+		return b.frozenNonce
 	}
 	// 用秒级 unix 时间足够区分（桶最小粒度 1 分钟），加 interval 避免不同 interval 重合
 	base := fmt.Sprintf("b%dt%d", b.IntervalMinutes, b.BucketStart.Unix())
@@ -756,13 +788,17 @@ func (bs TimelineIntervalBlocks) Render(aitagName string) string {
 		if i > 0 {
 			buf.WriteByte('\n')
 		}
-		buf.WriteString(fmt.Sprintf("<|%s_%s|>\n", tag, nonce))
 		body := blk.Render()
-		if body != "" {
-			buf.WriteString(body)
-			buf.WriteByte('\n')
+		if blk.promptProjection {
+			buf.WriteString(aiprojection.CreateTag(tag, nonce, body))
+		} else {
+			buf.WriteString(fmt.Sprintf("<|%s_%s|>\n", tag, nonce))
+			if body != "" {
+				buf.WriteString(body)
+				buf.WriteByte('\n')
+			}
+			buf.WriteString(fmt.Sprintf("<|%s_END_%s|>", tag, nonce))
 		}
-		buf.WriteString(fmt.Sprintf("<|%s_END_%s|>", tag, nonce))
 	}
 	return buf.String()
 }
@@ -794,6 +830,8 @@ func renderItemTypeVerbose(item *TimelineItem) string {
 		return "raw/unknown"
 	}
 	switch v := item.value.(type) {
+	case *timelineToolCachePromptItem:
+		return "cache/tool"
 	case *aitool.ToolResult:
 		name := strings.TrimSpace(v.Name)
 		if name == "" {
@@ -893,6 +931,7 @@ func (b *TimelineIntervalBlock) IsOpen() bool {
 }
 
 type TimelineCompressedHeadBlock struct {
+	promptProjection bool
 	CoveredEndItemID int64
 	CoveredEndAtMs   int64
 	Version          int64
@@ -904,8 +943,14 @@ func (h *TimelineCompressedHeadBlock) Render() string {
 		return ""
 	}
 	var buf bytes.Buffer
-	buf.WriteString(fmt.Sprintf("# compressed_head covered_end_item_id=%d covered_end_at_ms=%d version=%d\n",
-		h.CoveredEndItemID, h.CoveredEndAtMs, h.Version))
+	if h.promptProjection {
+		// Coverage/version remain in the persisted head and diagnostic render.
+		// They must not invalidate the unchanged beginning of an appended summary.
+		buf.WriteString("# compressed_head\n")
+	} else {
+		buf.WriteString(fmt.Sprintf("# compressed_head covered_end_item_id=%d covered_end_at_ms=%d version=%d\n",
+			h.CoveredEndItemID, h.CoveredEndAtMs, h.Version))
+	}
 	buf.WriteString("[compressed/head]")
 	text := strings.TrimSpace(h.Text)
 	if text != "" {
@@ -931,6 +976,11 @@ func (h *TimelineCompressedHeadBlock) Render() string {
 func (h *TimelineCompressedHeadBlock) StableNonce() string {
 	if h == nil {
 		return ""
+	}
+	if h.promptProjection {
+		// A timeline has one active compressed head. This is its stable display
+		// identity, not the process nonce authenticating aiprojection controls.
+		return "compressedhead"
 	}
 	return fmt.Sprintf("h%dv%d", h.CoveredEndAtMs/1000, h.Version)
 }
@@ -979,7 +1029,7 @@ const (
 //     "semi-dynamic" 混淆 (frozen 是 cache 边界 nonce, semi-dynamic 是
 //     PROMPT_SECTION 段名 nonce, 两者历史上已经分开)
 //
-// 字面量必须与 aicache.semiBoundaryTagName / semiBoundaryNonce 严格一致 (两
+// 字面量必须与 aiprojection.semiBoundaryTagName / semiBoundaryNonce 严格一致 (两
 // 包互不 import 各自定义本地副本).
 //
 // 关键词: SemiDynamicCacheBoundaryTagName, AI_CACHE_SEMI, semi cache boundary,
@@ -1003,7 +1053,7 @@ const (
 // 一个合并 prefix 计算缓存; 但物理上仍是两条 user message, 让上游 UI 字节统计
 // 与 caller 端观测树能各自展示一组语义分块.
 //
-// 字面量必须与 aicache.semi2BoundaryTagName / semi2BoundaryNonce 严格一致.
+// 字面量必须与 aiprojection.semi2BoundaryTagName / semi2BoundaryNonce 严格一致.
 //
 // 关键词: SemiDynamicPart2CacheBoundaryTagName, AI_CACHE_SEMI2, P1.1,
 //
@@ -1043,13 +1093,17 @@ func (bs TimelineRenderableBlocks) Render(aitagName string) string {
 		if emitted > 0 {
 			buf.WriteByte('\n')
 		}
-		buf.WriteString(fmt.Sprintf("<|%s_%s|>\n", tag, nonce))
 		body := blk.Render()
-		if body != "" {
-			buf.WriteString(body)
-			buf.WriteByte('\n')
+		if interval, ok := blk.(*TimelineIntervalBlock); ok && interval.promptProjection {
+			buf.WriteString(aiprojection.CreateTag(tag, nonce, body))
+		} else {
+			buf.WriteString(fmt.Sprintf("<|%s_%s|>\n", tag, nonce))
+			if body != "" {
+				buf.WriteString(body)
+				buf.WriteByte('\n')
+			}
+			buf.WriteString(fmt.Sprintf("<|%s_END_%s|>", tag, nonce))
 		}
-		buf.WriteString(fmt.Sprintf("<|%s_END_%s|>", tag, nonce))
 		emitted++
 	}
 	return buf.String()
@@ -1131,6 +1185,11 @@ func (bs TimelineRenderableBlocks) RenderWithFrozenBoundary(aitagName, frozenTag
 
 	frozenBody := frozen.Render(aitagName)
 	openBody := open.Render(aitagName)
+	for _, block := range frozen {
+		if interval, ok := block.(*TimelineIntervalBlock); ok && interval.promptProjection {
+			return aiprojection.CreateTag(bTag, bNonce, frozenBody) + "\n" + openBody
+		}
+	}
 
 	var buf bytes.Buffer
 	buf.WriteString(fmt.Sprintf("<|%s_%s|>\n", bTag, bNonce))
@@ -1192,4 +1251,15 @@ func (bs TimelineRenderableBlocks) RenderOpenOnly(aitagName string) string {
 		return ""
 	}
 	return open.Render(aitagName)
+}
+
+func isPromptProjectionBlock(block TimelineRenderableBlock) bool {
+	switch b := block.(type) {
+	case *TimelineIntervalBlock:
+		return b != nil && b.promptProjection
+	case *TimelineCompressedHeadBlock:
+		return b != nil && b.promptProjection
+	default:
+		return false
+	}
 }

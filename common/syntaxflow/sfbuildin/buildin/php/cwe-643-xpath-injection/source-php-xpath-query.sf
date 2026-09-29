@@ -1,0 +1,56 @@
+desc(
+	mode: "source"
+	language: "php"
+	title: "源码扫描：PHP XPath query 拼接"
+	title_zh: "源码扫描：PHP XPath query 拼接"
+	type: vuln
+	level: high
+	rule_id: "source-php-xpath-query"
+	risk: "xpath-injection"
+	cwe: "CWE-643"
+	desc: <<<DESC
+### 规则说明
+`DOMXPath::query` 和 SimpleXML 的 `xpath` 执行 XPath 表达式。把用户输入拼进去之后，可以闭合引号再追加条件，从而选出原本不该返回的节点。
+
+### 风险类型
+xpath-injection
+
+### 影响
+查询越权，XML 里其他用户的数据或配置会被读出。有的 XPath 引擎还允许调用扩展函数。
+
+### 检测方式
+这条规则使用 source 模式，用正则扫描源文件文本，不构建语法树或 SSA。命中只说明出现了对应写法，不能单独证明数据来自外部输入。注释、字符串和文档中的相同文本也会命中。
+正则匹配 `->query(` 和 `->xpath(`。常量表达式也会命中。数据库或其他对象上的 `query` 如果写成箭头调用，同样会命中。
+同一检查还有 ssa（数据流）。它们描述同一个问题，命中条件不同，修复时看实际告警来自哪一条。
+
+### 参考
+- [CWE-643：XPath 注入](https://cwe.mitre.org/data/definitions/643.html)
+
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+- 使用 XPath 变量绑定，不要拼接表达式。
+- 不能绑定变量时，转义引号并限制允许的字符。
+- 先按白名单校验输入，再放进固定的表达式模板。
+
+SOLUTION
+	alert_min: 1
+	"file://bad.php": <<<POS
+<?php
+function bad($xp, $name) { return $xp->query("//user[@name='".$name."']"); }
+
+POS
+	"safefile://ok.php": <<<NEG
+<?php
+function ok() { return 1; }
+
+NEG
+)
+${*.php}.pattern_regex(/->query\s*\(|->xpath\s*\(/) as $hit
+alert $hit for {
+	level: "high",
+	title: "源码扫描：PHP XPath query 拼接",
+	title_zh: "源码扫描：PHP XPath query 拼接",
+	message: "源码扫描：PHP XPath query 拼接",
+	risk: "xpath-injection",
+}

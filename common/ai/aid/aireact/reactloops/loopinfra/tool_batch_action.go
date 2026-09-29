@@ -18,8 +18,8 @@ const (
 	directlyCallToolBatchField = "directly_call_tool_calls"
 	requireToolBatchField      = "tool_require_calls"
 
-	loopVarDirectToolBatch  = "directly_call_tool_batch"
-	loopVarRequireToolBatch = "tool_require_batch"
+	actionStateDirectToolBatch  = "directly_call_tool_batch"
+	actionStateRequireToolBatch = "tool_require_batch"
 )
 
 // These are the exact scalar and batch examples taught by the tool-call actions.
@@ -156,7 +156,7 @@ func directlyCallToolBatchSchemaOption() aitool.ToolOption {
 		aitool.WithStringParam("expectations",
 			aitool.WithParam_Description("可选。该 child 调用的预计耗时和回退策略。")),
 		aitool.WithStringParam("reason",
-			aitool.WithParam_Description("可选。用简短短语说明该 child 调用具体做什么。")),
+			aitool.WithParam_Description("可选。直接展示在该工具卡片上；用简短短语说明这个 child 具体做什么，同名工具的不同调用也要分别描述，不能照搬整批任务的理由。")),
 	)
 }
 
@@ -177,7 +177,7 @@ func requireToolBatchSchemaOption() aitool.ToolOption {
 		aitool.WithStringParam("identifier",
 			aitool.WithParam_Description("可选。该 child 调用的唯一 snake_case 目的标识。")),
 		aitool.WithStringParam("reason",
-			aitool.WithParam_Description("可选。用简短短语说明该 child 调用具体做什么。")),
+			aitool.WithParam_Description("可选。直接展示在该工具卡片上；用简短短语说明这个 child 具体做什么，同名工具的不同调用也要分别描述。")),
 	)
 }
 
@@ -328,6 +328,10 @@ func deepCloneInvokeParams(params aitool.InvokeParams) (aitool.InvokeParams, err
 }
 
 func parseDirectToolBatchAction(loop *reactloops.ReActLoop, action *aicommon.Action) (*aicommon.ToolBatchRequest, bool, error) {
+	return parseDirectToolBatchActionWithMetadata(loop, action, false)
+}
+
+func parseDirectToolBatchActionWithMetadata(loop *reactloops.ReActLoop, action *aicommon.Action, allowMetadata bool) (*aicommon.ToolBatchRequest, bool, error) {
 	if err := action.WaitParseResult(toolBatchVerifierContext(loop)); err != nil {
 		return nil, false, utils.Wrap(err, "directly_call_tool action parse failed")
 	}
@@ -336,13 +340,8 @@ func parseDirectToolBatchAction(loop *reactloops.ReActLoop, action *aicommon.Act
 	if err != nil || !hasBatch {
 		return nil, hasBatch, err
 	}
-	if hasAnyCanonicalActionParam(action,
-		"directly_call_tool_name",
-		"directly_call_tool_params",
-		"directly_call_identifier",
-		"directly_call_expectations",
-		"directly_call_reason",
-	) {
+	if hasAnyCanonicalActionParam(action, "directly_call_tool_name", "directly_call_tool_params") ||
+		(!allowMetadata && hasAnyCanonicalActionParam(action, "directly_call_identifier", "directly_call_expectations", "directly_call_reason")) {
 		return nil, true, utils.Errorf("%s cannot be combined with legacy directly_call_tool_* fields", directlyCallToolBatchField)
 	}
 	if hasAnyCanonicalActionParam(action,
@@ -424,6 +423,16 @@ func parseDirectToolBatchAction(loop *reactloops.ReActLoop, action *aicommon.Act
 			Reason:       reason,
 		})
 	}
+	if allowMetadata {
+		if raw, exists := lookupCanonicalActionParam(action, "directly_call_reason"); exists {
+			if _, err := strictBatchString(aitool.InvokeParams{"directly_call_reason": raw}, "directly_call_reason", false); err != nil {
+				return nil, true, err
+			}
+		}
+		// Accept the old top-level field for compatibility, but never turn a
+		// batch-wide reason into each child's visible reason. A missing child
+		// reason is generated with that child's identifier as context.
+	}
 	return request, true, nil
 }
 
@@ -501,10 +510,11 @@ func parseRequireToolBatchAction(loop *reactloops.ReActLoop, action *aicommon.Ac
 
 func executeVerifiedToolBatch(
 	loop *reactloops.ReActLoop,
+	action *aicommon.Action,
 	stateKey string,
 	operator *reactloops.LoopActionHandlerOperator,
 ) bool {
-	raw := loop.GetVariable(stateKey)
+	raw := loop.GetActionExecutionValue(action, stateKey)
 	request, ok := raw.(*aicommon.ToolBatchRequest)
 	if !ok || request == nil || len(request.Calls) == 0 {
 		return false
@@ -522,6 +532,7 @@ func executeVerifiedToolBatch(
 		toolNames = append(toolNames, call.ToolName)
 	}
 	emitToolsPreparingStatus(loop, toolNames)
+	emitToolBatchRunningStatus(loop, toolNames)
 	batchRuntime, supported := invoker.(aicommon.ToolBatchInvokeRuntime)
 	var (
 		result *aicommon.ToolBatchResult

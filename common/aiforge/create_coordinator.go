@@ -13,7 +13,31 @@ func (t *ForgeBlueprint) CreateCoordinatorWithQuery(ctx context.Context, originQ
 	if err != nil {
 		return nil, err
 	}
+	return t.createCoordinatorWithRenderedPrompt(ctx, firstQuery, extraOpts, opts...)
+}
 
+// CreateCoordinatorWithQueryAndParams renders the query and caller-validated
+// parameters without interpreting CLI declarations. Templates decide where
+// invocation data appears; callers own any additional prompt composition.
+func (t *ForgeBlueprint) CreateCoordinatorWithQueryAndParams(
+	ctx context.Context,
+	originQuery string,
+	params []Parameter,
+	opts ...aicommon.ConfigOption,
+) (*aid.Coordinator, error) {
+	firstQuery, extraOpts, err := t.GenerateFirstPromptWithMemoryOptionWithQueryAndParams(originQuery, params)
+	if err != nil {
+		return nil, err
+	}
+	return t.createCoordinatorWithRenderedPrompt(ctx, firstQuery, extraOpts, opts...)
+}
+
+func (t *ForgeBlueprint) createCoordinatorWithRenderedPrompt(
+	ctx context.Context,
+	firstQuery string,
+	extraOpts []aicommon.ConfigOption,
+	opts ...aicommon.ConfigOption,
+) (*aid.Coordinator, error) {
 	extraOpts = append(extraOpts, aicommon.WithForgeName(t.Name))
 	extraOpts = append(extraOpts, opts...)
 

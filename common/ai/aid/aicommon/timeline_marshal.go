@@ -3,8 +3,10 @@ package aicommon
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/yaklang/yaklang/common/utils"
 	"strconv"
+
+	"github.com/yaklang/yaklang/common/ai/aid/aiprojection"
+	"github.com/yaklang/yaklang/common/log"
 
 	"github.com/yaklang/yaklang/common/utils/omap"
 )
@@ -15,6 +17,7 @@ import (
 //   - Summary 字段已废弃（dead code），新数据不再写入；仅在反序列化老数据时容忍其存在并静默忽略。
 //   - Reducers/ReducerTs 字段已废弃，新数据不再写入；仅在反序列化老数据时做一次性迁移为 CompressedHead。
 type timelineSerializable struct {
+	ProjectionNonce       string                           `json:"projection_nonce,omitempty"`
 	IdToTs                map[string]int64                 `json:"id_to_ts"`
 	TsToTimelineItem      map[string]*TimelineItem         `json:"ts_to_timeline_item"`
 	IdToTimelineItem      map[string]*TimelineItem         `json:"id_to_timeline_item"`
@@ -23,10 +26,11 @@ type timelineSerializable struct {
 	CompressedHistory     []*TimelineCompressedHistoryNode `json:"compressed_history,omitempty"`
 	Reducers              map[string]string                `json:"reducers,omitempty"`   // legacy read only: migrated to CompressedHead on unmarshal
 	ReducerTs             map[string]int64                 `json:"reducer_ts,omitempty"` // legacy read only
-	ArchiveRefs           map[string]*TimelineArchiveRef   `json:"archive_refs"`
-	PerDumpContentLimit   int64                            `json:"per_dump_content_limit"`
 	TotalDumpContentLimit int64                            `json:"total_dump_content_limit"`
 	PromotedState         *TimelinePromotedState           `json:"promoted_state,omitempty"`
+	FreezeState           *TimelineFreezeState             `json:"freeze_state,omitempty"`
+	BucketByteSize        int64                            `json:"bucket_byte_size,omitempty"`
+	EvidenceInitialized   bool                             `json:"evidence_initialized,omitempty"`
 }
 
 // MarshalTimeline serializes a Timeline into a string.
@@ -74,22 +78,18 @@ func marshalTimelineUnlocked(i *Timeline) (string, error) {
 		return true
 	})
 
-	archiveRefsMap := make(map[string]*TimelineArchiveRef)
-	i.archiveRefs.ForEach(func(id int64, ref *TimelineArchiveRef) bool {
-		archiveRefsMap[fmt.Sprintf("%d", id)] = ref
-		return true
-	})
-
 	serializable := &timelineSerializable{
+		ProjectionNonce:       aiprojection.Nonce(),
 		IdToTs:                idToTsMap,
 		TsToTimelineItem:      tsToTimelineItemMap,
 		IdToTimelineItem:      idToTimelineItemMap,
 		CompressedHead:        cloneTimelineCompressedHead(i.compressedHead),
 		CompressedHistory:     cloneTimelineCompressedHistory(i.compressedHistory),
-		ArchiveRefs:           archiveRefsMap,
-		PerDumpContentLimit:   i.perDumpContentLimit,
 		TotalDumpContentLimit: i.totalDumpContentLimit,
 		PromotedState:         cloneTimelinePromotedState(i.promotedState),
+		FreezeState:           cloneTimelineFreezeState(i.freezeState),
+		EvidenceInitialized:   i.evidenceInitialized,
+		BucketByteSize:        i.bucketByteSize,
 	}
 
 	data, err := json.Marshal(serializable)
@@ -110,14 +110,16 @@ func UnmarshalTimeline(s string) (*Timeline, error) {
 	if err != nil {
 		return nil, err
 	}
+	rebindTimelineProjectionNonce(&serializable)
 
 	// 恢复 Timeline 结构体
 	timeline := &Timeline{
-		perDumpContentLimit:   serializable.PerDumpContentLimit,
 		totalDumpContentLimit: serializable.TotalDumpContentLimit,
-		compressing:           utils.NewOnce(),
 		branchTimeline:        false,
 		promotedState:         cloneTimelinePromotedState(serializable.PromotedState),
+		freezeState:           cloneTimelineFreezeState(serializable.FreezeState),
+		evidenceInitialized:   serializable.EvidenceInitialized,
+		bucketByteSize:        serializable.BucketByteSize,
 	}
 
 	// 恢复 idToTs
@@ -152,71 +154,51 @@ func UnmarshalTimeline(s string) (*Timeline, error) {
 
 	// summary 仍参与 typed JSON 解码以兼容旧数据，但恢复时不消费其内容。
 
-	timeline.compressedHead = cloneTimelineCompressedHead(serializable.CompressedHead)
-	timeline.compressedHistory = cloneTimelineCompressedHistory(serializable.CompressedHistory)
+	timeline.restoreCompressionHistory(&serializable)
 
-	// Legacy migration: if no compressed_head but old reducers data exists, migrate to head+history view
-	if timeline.compressedHead == nil && len(serializable.Reducers) > 0 {
-		type legacyReducerItem struct {
-			id   int64
-			text string
-			ts   int64
-		}
-		var legacyItems []legacyReducerItem
-		for key, value := range serializable.Reducers {
-			if value == "" {
-				continue
-			}
-			id, err := strconv.ParseInt(key, 10, 64)
-			if err != nil {
-				continue
-			}
-			var ts int64
-			if v, ok := serializable.ReducerTs[key]; ok {
-				ts = v
-			}
-			legacyItems = append(legacyItems, legacyReducerItem{id: id, text: value, ts: ts})
-		}
-		// sort by id ascending
-		for i := 0; i < len(legacyItems); i++ {
-			for j := i + 1; j < len(legacyItems); j++ {
-				if legacyItems[i].id > legacyItems[j].id {
-					legacyItems[i], legacyItems[j] = legacyItems[j], legacyItems[i]
-				}
-			}
-		}
-		if len(legacyItems) > 0 {
-			for idx, item := range legacyItems {
-				version := int64(idx + 1)
-				if idx == len(legacyItems)-1 {
-					timeline.compressedHead = &TimelineCompressedHead{
-						Text:             item.text,
-						CoveredEndItemID: item.id,
-						CoveredEndAtMs:   item.ts,
-						Version:          version,
-					}
-					break
-				}
-				timeline.compressedHistory = append(timeline.compressedHistory, &TimelineCompressedHistoryNode{
-					Version:          version,
-					PrevVersion:      version - 1,
-					Text:             item.text,
-					CoveredEndItemID: item.id,
-					CoveredEndAtMs:   item.ts,
-					CreatedAtMs:      item.ts,
-				})
-			}
-		}
-	}
-
-	timeline.archiveRefs = omap.NewOrderedMap(map[int64]*TimelineArchiveRef{})
-	for key, value := range serializable.ArchiveRefs {
-		id, err := strconv.ParseInt(key, 10, 64)
-		if err != nil || value == nil {
-			continue
-		}
-		timeline.archiveRefs.Set(id, value)
-	}
-
+	timeline.restoreFreezeStateLocked()
 	return timeline, nil
+}
+
+// Only system-owned alternate prompt records can carry replay envelopes.
+// Rebind their envelope tokens after restore without changing the visible
+// timeline entry or any bytes inside its JSON payload.
+func rebindTimelineProjectionNonce(saved *timelineSerializable) {
+	updated := make(map[string]string)
+	for _, index := range []map[string]*TimelineItem{saved.IdToTimelineItem, saved.TsToTimelineItem} {
+		for _, item := range index {
+			text, ok := timelineTextItem(item)
+			if !ok || text.PromptText == "" {
+				continue
+			}
+			category := normalizeTimelinePromptCategory(extractTextEntryType(text.Text))
+			if category != "FUNCTION_CALL_ACTION_RESPONSE" && category != "MODEL_THINKING" {
+				continue
+			}
+			if rebound, ok := updated[text.PromptText]; ok {
+				text.PromptText = rebound
+				continue
+			}
+			original := text.PromptText
+			prefix, body := "", original
+			if normalizeTimelinePromptCategory(extractTextEntryType(original)) == category {
+				location := withTaskRegex.FindStringIndex(original)
+				if location == nil {
+					location = withoutTaskRegex.FindStringIndex(original)
+				}
+				if location != nil {
+					prefix, body = original[:location[1]], original[location[1]:]
+				}
+			}
+			rebound, err := aiprojection.RebindReplayNonce(body, saved.ProjectionNonce)
+			if err != nil {
+				log.Warnf("timeline replay restore skipped for item %d: %v", text.ID, err)
+				rebound = ""
+			} else {
+				rebound = prefix + rebound
+			}
+			updated[original] = rebound
+			text.PromptText = rebound
+		}
+	}
 }

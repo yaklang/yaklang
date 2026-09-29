@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"regexp"
 	"strings"
+
+	"github.com/yaklang/yaklang/common/ai/aid/aiprojection"
 )
 
 const (
@@ -38,11 +40,16 @@ func ExtractPromptNonce(prompt string, tagNames ...string) string {
 }
 
 func ExtractPromptSectionNonce(prompt string, sectionName string) string {
-	return ExtractPromptNonce(prompt, promptSectionTagName+"_"+sectionName)
+	nonce := ExtractPromptNonce(prompt, promptSectionTagName+"_"+sectionName)
+	// Prompt section envelopes carry a process signature after the section's
+	// own nonce. Simulated model responses must use only the latter for AITags.
+	return strings.TrimSuffix(nonce, "_"+aiprojection.Nonce())
 }
 
 func ExtractDynamicSectionNonce(prompt string) string {
-	return ExtractPromptSectionNonce(prompt, dynamicSectionName)
+	// Projection signs the section marker with a process nonce. AI response
+	// tags use only the turn nonce preceding that signature.
+	return strings.TrimSuffix(ExtractPromptSectionNonce(prompt, dynamicSectionName), "_"+aiprojection.Nonce())
 }
 
 func IsLegalNonce(data string) bool {
@@ -91,7 +98,11 @@ func MustExtractPromptSectionNonce(t TestingT, prompt string, sectionName string
 
 func MustExtractDynamicSectionNonce(t TestingT, prompt string) string {
 	t.Helper()
-	return MustExtractPromptSectionNonce(t, prompt, dynamicSectionName)
+	nonce := ExtractDynamicSectionNonce(prompt)
+	if nonce == "" {
+		t.Fatalf("failed to find dynamic prompt section nonce in prompt:\n%s", prompt)
+	}
+	return nonce
 }
 
 func MustExtractAITagBlock(t TestingT, prompt string, tagName string) AITagBlock {

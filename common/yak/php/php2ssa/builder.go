@@ -55,16 +55,21 @@ func initHandler(fb *ssa.FunctionBuilder) {
 	fb.SetEmptyRange()
 	container := fb.EmitEmptyContainer()
 	fb.AssignVariable(fb.CreateVariable("global-container"), container)
+	prog := fb.GetProgram()
 	initHandler := func(name ...string) {
 		for _, _name := range name {
 			variable := fb.CreateMemberCallVariable(container, fb.EmitConstInstPlaceholder(_name))
 			emptyContainer := fb.EmitEmptyContainer()
 			fb.AssignVariable(variable, emptyContainer)
+			// Global lookup uses the blueprint's static-member index. Merely
+			// attaching a member to the backing container does not populate it.
+			if prog.GlobalVariablesBlueprint != nil {
+				prog.GlobalVariablesBlueprint.RegisterStaticMember(_name, emptyContainer, false)
+			}
 		}
 	}
 	initHandler("_SERVER")
 
-	prog := fb.GetProgram()
 	if prog.GlobalVariablesBlueprint != nil {
 		prog.GlobalVariablesBlueprint.InitializeWithContainer(container)
 	}

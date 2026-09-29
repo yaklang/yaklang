@@ -1,13 +1,13 @@
 package aireact
 
 import (
-	_ "embed"
 	"fmt"
 	"runtime"
 	"strings"
 	"time"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon/promptloader"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 )
@@ -27,7 +27,7 @@ const (
 	// 关键词: promptSectionTimeline, 老 timeline 段名, 兼容
 	promptSectionTimeline = "timeline"
 	// promptSectionTimelineOpen 是 "按稳定性分层" 拆分后的 timeline 易变尾段:
-	// 仅含最末 interval 桶 + 当前时间 + 工作目录。
+	// 包含开放历史及当前 TODO / 用户历史；工作区在 Semi，时钟在 Dynamic。
 	// 关键词: promptSectionTimelineOpen, timeline open
 	promptSectionTimelineOpen = "timeline-open"
 	promptSectionDynamic      = "dynamic"
@@ -38,8 +38,7 @@ const (
 	aiCacheSystemTagName = "AI_CACHE_SYSTEM"
 )
 
-//go:embed prompts/loop/dynamic_section.txt
-var loopDynamicSectionTemplate string
+var loopDynamicSectionTemplate = promptloader.MustLoad("ai/aid/aireact/prompts/loop/dynamic_section.txt")
 
 func (r *ReAct) GetLoopPromptBaseMaterials(tools []*aitool.Tool, nonce string) (*reactloops.LoopPromptBaseMaterials, error) {
 	if r == nil || r.promptManager == nil {
@@ -90,14 +89,12 @@ func (pm *PromptManager) GetLoopPromptBaseMaterialsForLoop(
 	}
 
 	materials := &reactloops.LoopPromptBaseMaterials{
-		Nonce:       nonce,
-		Language:    pm.react.config.GetLanguage(),
-		CurrentTime: time.Now().Format("2006-01-02 15:04:05"),
-		OSArch:      fmt.Sprintf("%s/%s", runtime.GOOS, runtime.GOARCH),
-		WorkingDir:  pm.workdir,
-	}
-	if pm.workdir != "" {
-		materials.WorkingDirGlance = pm.GetGlanceWorkdir(pm.workdir)
+		Nonce:          nonce,
+		Language:       pm.react.config.GetLanguage(),
+		CurrentTime:    time.Now().Format("2006-01-02 15:04:05"),
+		OSArch:         fmt.Sprintf("%s/%s", runtime.GOOS, runtime.GOARCH),
+		WorkingDir:     pm.workdir,
+		AIArtifactsDir: pm.react.config.GetConfiguredWorkDir(),
 	}
 
 	taskType := "react"
@@ -181,6 +178,7 @@ func (pm *PromptManager) AssembleLoopPrompt(tools []*aitool.Tool, input *reactlo
 	}
 
 	prefixMaterials := pm.NewPromptMaterials(base, effectiveInput)
+	prefixMaterials.CurrentTime = ""
 	prefix, err := pm.AssemblePromptPrefix(prefixMaterials)
 	if err != nil {
 		return nil, err
@@ -220,7 +218,6 @@ const (
 	lightweightLoopSkillsTokens          = 1024
 	lightweightLoopSkillBodyTokens       = 2048
 	lightweightLoopPlanContextTokens     = 2048
-	lightweightLoopTodoTokens            = 2048
 	lightweightLoopExtraTokens           = 1024
 	lightweightLoopReactiveTokens        = 3072
 	lightweightLoopMemoryTokens          = 1024
@@ -270,8 +267,9 @@ func (pm *PromptManager) projectLightweightLoopMaterials(
 	lightInput.AutoLoadedSkills = boundedLightweightPromptBlock(input.AutoLoadedSkills, lightweightLoopSkillBodyTokens, "auto-loaded skill body")
 	lightInput.FrozenUserContext = boundedLightweightPromptBlock(input.FrozenUserContext, lightweightLoopPlanContextTokens, "plan context")
 	lightInput.FrozenPartitions = nil
-	lightInput.SessionEvidence = ""
-	lightInput.TodoSnapshot = boundedLightweightPromptBlock(input.TodoSnapshot, lightweightLoopTodoTokens, "TODO snapshot")
+	// TODO already has a single store-level budget. Do not omit the entire work
+	// set under a second, smaller lightweight-only limit.
+	lightInput.TodoSnapshot = input.TodoSnapshot
 	lightInput.ExtraCapabilities = aicommon.ShrinkTextBlockByTokens(input.ExtraCapabilities, lightweightLoopExtraTokens)
 	lightInput.ReactiveData = aicommon.ShrinkTextBlockByTokens(input.ReactiveData, lightweightLoopReactiveTokens)
 	lightInput.InjectedMemory = aicommon.ShrinkTextBlockByTokens(input.InjectedMemory, lightweightLoopMemoryTokens)
@@ -312,26 +310,23 @@ func (pm *PromptManager) NewPromptMaterials(base *reactloops.LoopPromptBaseMater
 		materials.CurrentTime = base.CurrentTime
 		materials.OSArch = base.OSArch
 		materials.WorkingDir = base.WorkingDir
-		materials.WorkingDirGlance = base.WorkingDirGlance
-		materials.Workspace = strings.TrimSpace(base.OSArch+base.WorkingDir+base.WorkingDirGlance) != ""
+		materials.AIArtifactsDir = base.AIArtifactsDir
+		materials.Workspace = strings.TrimSpace(base.OSArch+base.WorkingDir+base.AIArtifactsDir) != ""
 	}
 	if pm != nil && pm.react != nil && pm.react.config != nil {
 		materials.ExecutionPolicy = pm.react.config.GetExecutionPolicy()
 	}
 	if input != nil {
+		materials.FunctionCallMode = input.FunctionCallMode
 		materials.TaskInstruction = input.TaskInstruction
 		materials.OutputExample = input.OutputExample
 		materials.SkillsContext = input.SkillsContext
 		materials.Schema = input.Schema
-		// P1-C2: SessionEvidence / UserHistory 从 dynamic 段上移到 timeline-open 段
-		materials.SessionEvidence = input.SessionEvidence
-		if strings.TrimSpace(materials.SessionEvidenceOpen) == "" {
-			materials.SessionEvidenceOpen = input.SessionEvidence
-		}
-		// 全局 TODO 块: 与 SessionEvidence 平行透传, 物理位置在 timeline-open 段
-		// section.timeline_open.todo_list (在 session_evidence 之后), 让 loop
+		materials.FunctionCallSchemas = input.FunctionCallSchemas
+		// 全局 TODO 块: 在普通 Timeline 之后透传, 物理位置在 timeline-open 段
+		// section.timeline_open.todo_list (在普通 Timeline 之后), 让 loop
 		// prompt 任何一次 iteration 都能看到当前 TODO 全貌.
-		// 关键词: TodoSnapshot 透传, timeline-open, SessionEvidence 之后
+		// 关键词: TodoSnapshot 透传, timeline-open, Timeline 中的 evidence delta 之后
 		materials.TodoSnapshot = input.TodoSnapshot
 		// PE-TASK PLAN 产物 (PARENT_TASK + CURRENT_TASK + INSTRUCTION) 通过
 		// FrozenUserContext 字段透传, 渲染时位于 timeline-open 段最末尾
@@ -421,13 +416,13 @@ func (pm *PromptManager) AssemblePromptPrefix(materials *aicommon.PromptMaterial
 func (pm *PromptManager) buildLoopPromptSectionData(base *reactloops.LoopPromptBaseMaterials, input *reactloops.LoopPromptAssemblyInput) map[string]any {
 	data := map[string]any{
 		"Nonce":              "",
+		"FunctionCallMode":   false,
 		"UserQuery":          "",
 		"TaskInstruction":    "",
 		"OutputExample":      "",
 		"Schema":             "",
 		"SkillsContext":      "",
 		"ExtraCapabilities":  "",
-		"SessionEvidence":    "",
 		"TodoSnapshot":       "",
 		"ReactiveData":       "",
 		"InjectedMemory":     "",
@@ -439,7 +434,7 @@ func (pm *PromptManager) buildLoopPromptSectionData(base *reactloops.LoopPromptB
 		"CurrentTime":        "",
 		"OSArch":             "",
 		"WorkingDir":         "",
-		"WorkingDirGlance":   "",
+		"AIArtifactsDir":     "",
 		"Workspace":          false,
 		"AutoContext":        "",
 		"UserHistory":        "",
@@ -460,8 +455,8 @@ func (pm *PromptManager) buildLoopPromptSectionData(base *reactloops.LoopPromptB
 		data["CurrentTime"] = base.CurrentTime
 		data["OSArch"] = base.OSArch
 		data["WorkingDir"] = base.WorkingDir
-		data["WorkingDirGlance"] = base.WorkingDirGlance
-		data["Workspace"] = strings.TrimSpace(base.OSArch+base.WorkingDir+base.WorkingDirGlance) != ""
+		data["AIArtifactsDir"] = base.AIArtifactsDir
+		data["Workspace"] = strings.TrimSpace(base.OSArch+base.WorkingDir+base.AIArtifactsDir) != ""
 		data["AutoContext"] = base.AutoContext
 		data["UserHistory"] = base.UserHistory
 		data["ToolsCount"] = base.ToolsCount
@@ -474,13 +469,14 @@ func (pm *PromptManager) buildLoopPromptSectionData(base *reactloops.LoopPromptB
 	}
 	if input != nil {
 		data["Nonce"] = input.Nonce
+		data["FunctionCallMode"] = input.FunctionCallMode
 		data["UserQuery"] = input.UserQuery
 		data["TaskInstruction"] = input.TaskInstruction
 		data["OutputExample"] = input.OutputExample
 		data["Schema"] = input.Schema
+		data["FunctionCallSchemas"] = input.FunctionCallSchemas
 		data["SkillsContext"] = input.SkillsContext
 		data["ExtraCapabilities"] = input.ExtraCapabilities
-		data["SessionEvidence"] = input.SessionEvidence
 		data["TodoSnapshot"] = input.TodoSnapshot
 		data["ReactiveData"] = input.ReactiveData
 		data["InjectedMemory"] = input.InjectedMemory
@@ -597,13 +593,6 @@ func (pm *PromptManager) buildFrozenBlockObservation(
 	}
 	children = append(children,
 		reactloops.NewPromptSectionObservation(
-			"section.frozen_block.session_evidence_frozen",
-			"Session Evidence (Frozen)",
-			reactloops.PromptSectionRoleFrozenBlock,
-			true,
-			renderSessionEvidenceFrozenBlock(materials),
-		),
-		reactloops.NewPromptSectionObservation(
 			"section.frozen_block.timeline_frozen",
 			"Timeline (Frozen Prefix)",
 			reactloops.PromptSectionRoleFrozenBlock,
@@ -674,6 +663,10 @@ func (pm *PromptManager) buildSemiDynamic1Observation(
 	// 关键词: section.semi_dynamic_1 子节点 Name 去前缀, UI 信息密度
 	children := []*reactloops.PromptSectionObservation{
 		reactloops.NewPromptSectionObservation(
+			"section.semi_dynamic_1.workspace", "Workspace",
+			reactloops.PromptSectionRoleSemiDynamic1, false, renderWorkspaceBlock(materials),
+		),
+		reactloops.NewPromptSectionObservation(
 			"section.semi_dynamic_1.skills_context",
 			"Skills Context",
 			reactloops.PromptSectionRoleSemiDynamic1,
@@ -687,6 +680,7 @@ func (pm *PromptManager) buildSemiDynamic1Observation(
 			true,
 			materials.PromotedSemiDynamic1,
 		),
+		reactloops.NewPromptSectionObservation("section.semi_dynamic_1.evidence", "Session Evidence", reactloops.PromptSectionRoleSemiDynamic1, true, materials.SessionEvidenceSemiDynamic),
 	}
 	section.Children = filterIncludedPromptSections(children)
 	if strings.TrimSpace(rendered) != "" {
@@ -696,7 +690,7 @@ func (pm *PromptManager) buildSemiDynamic1Observation(
 }
 
 // buildSemiDynamic2Observation 给"PROMPT_SECTION_semi-dynamic-2 段"做观测树:
-// TaskInstruction + OutputExample + Schema. 物理上对应 hijacker 5 段切分中的
+// TaskInstruction + (OutputExample + Schema 或 FunctionCallSchemas)。物理上对应 hijacker 5 段切分中的
 // user3 (ephemeral cc), 与 buildSemiDynamic1Observation 一起被 dashscope 视作
 // 合并 prefix cache 计算 (cc 锚点落在本段末尾, prefix 跨过 semi-1).
 //
@@ -744,6 +738,13 @@ func (pm *PromptManager) buildSemiDynamic2Observation(
 			true,
 			renderSchemaBlock(materials.Schema),
 		),
+		reactloops.NewPromptSectionObservation(
+			"section.semi_dynamic_2.function_call_schemas",
+			"Action Tools",
+			reactloops.PromptSectionRoleSemiDynamic2,
+			true,
+			materials.FunctionCallSchemas,
+		),
 		// section.semi_dynamic_2.output_example 从 high-static 段迁入:
 		// OutputExample 是 caller-specific 字段, 不同 forge / loop 注入的内容
 		// 差异较大, 留在 high-static 段会破坏 AI_CACHE_SYSTEM 段的 hash 稳定性.
@@ -774,53 +775,17 @@ func (pm *PromptManager) buildSemiDynamic2Observation(
 	return reactloops.FinalizePromptContainerSection(section)
 }
 
-// buildTimelineOpenObservation 给"PROMPT_SECTION_timeline-open 段"做观测树:
-// Timeline 末桶 + SessionEvidence + TodoSnapshot + Workspace +
-// UserHistory + Current Time + PlanContext (末尾)。
-//
-// 段内排序原则 (P1-C3 调整):
-//  1. Timeline (Open Tail) 在最前: 时间线最末桶是模型理解"刚发生了什么"的
-//     首要信息源, 顶到段首让 LLM 第一时间看到。
-//  2. Session Evidence 紧跟其后: SESSION_ARTIFACTS 是 Config 级持久化观测
-//     (跨 turn 累积的工件证据), 与 Timeline 末桶共同构成"会话级实证"语料,
-//     物理上贴近 Timeline 让两者形成连续语义块。
-//  3. TodoSnapshot 紧跟 SessionEvidence, 暴露全局待办状态。
-//  4. Workspace 居中: OS/Arch + working dir + glance 是相对静态的环境标识,
-//     既不属于"刚发生", 也不属于"用户视角", 居中过渡。
-//  5. User History 在 Workspace 之后: PREV_USER_INPUT 是用户历史输入轨迹,
-//     与 Current Time 一起构成"时序前缀", 紧贴当前时间。
-//  6. Current Time 紧跟 User History: 当前时间是最末稳定的时序锚点, 放在
-//     User History 之后形成"历史输入 -> 现在"的时间递进, 同时与下方
-//     PlanContext (任务规划) 形成"时间 -> 任务"的语义衔接。
-//  7. Plan Context 末尾: PE-TASK PLAN 产物本质易变 (子任务切换),
-//     放最末让其落在所有 cache
-//     边界外, 不污染上游 system / frozen / semi 三段缓存命中率。
-//
-// timeline-open 整段位于 system / frozen / semi 三段缓存之外, 是 prompt 的
-// "易变尾段", 段内子块顺序不影响上游 prefix cache, 仅影响 LLM 理解顺序。
-//
-// 关键词: buildTimelineOpenObservation, Timeline 末桶, SessionEvidence,
-//
-//	Workspace, UserHistory, Current Time, PlanContext 末尾,
-//	段内排序原则, P1-C3 顺序调整, 缓存边界外
+// buildTimelineOpenObservation mirrors the variable timeline-open template.
+// Workspace is observed in SemiDynamic1; the main-loop clock is in Dynamic.
 func (pm *PromptManager) buildTimelineOpenObservation(
 	materials *reactloops.PromptPrefixMaterials,
 	rendered string,
 ) *reactloops.PromptSectionObservation {
 	section := reactloops.NewPromptContainerSection(
 		"section.timeline_open",
-		"Timeline Open & Workspace",
+		"Timeline Open",
 		reactloops.PromptSectionRoleTimelineOpen,
 	)
-	// 子节点 Name 已去掉 "Timeline Open / " 前缀: UI 字节统计面板里父容器
-	// "Timeline Open & Workspace" 已经表达层级.
-	// 关键词: section.timeline_open 子节点 Name 去前缀, UI 信息密度
-	//
-	// 子节点排列顺序: timeline_open -> promoted_state_updates -> session_evidence -> todo_list -> workspace ->
-	// session_artifacts_open -> user_history -> current_time -> plan_context. 该顺序与 timeline_open_section.txt
-	// 模板渲染顺序严格一致, 让"上下文成分"面板看到的层级与实际 prompt 字节
-	// 流顺序保持同步.
-	// 关键词: P1-C3 子节点顺序, observation 与模板对齐
 	children := []*reactloops.PromptSectionObservation{
 		reactloops.NewPromptSectionObservation(
 			"section.timeline_open.timeline_open",
@@ -829,40 +794,15 @@ func (pm *PromptManager) buildTimelineOpenObservation(
 			true,
 			renderTimelineOpenBlock(materials),
 		),
-		reactloops.NewPromptSectionObservation(
-			"section.timeline_open.promoted_state_updates",
-			"Promoted State Updates",
-			reactloops.PromptSectionRoleTimelineOpen,
-			true,
-			materials.PromotedTimelineOpen,
-		),
-		// P1-C3: SessionEvidence 紧跟 Timeline (Open Tail), 与时间线末桶
-		// 形成"会话级实证"连续块.
-		reactloops.NewPromptSectionObservation(
-			"section.timeline_open.session_evidence",
-			"Session Evidence",
-			reactloops.PromptSectionRoleTimelineOpen,
-			true,
-			materials.SessionEvidence,
-		),
-		// 全局 TODO 块: 紧跟 SessionEvidence, 让 loop prompt 始终能看到当前
-		// TODO 列表; 数据来源是 SessionPromptState.VerificationTodoStore,
-		// 由 VerifyUserSatisfaction 通过 ApplyTodoDelta 增量写入.
+
+		// TODO 快照紧跟 Open Timeline；状态由普通 ReAct action 更新。
 		// 段位仍属 timeline-open, 落在所有 cache 边界外, 不污染上游 prefix cache.
-		// 关键词: section.timeline_open.todo_list, 全局 TODO, SessionEvidence 之后
 		reactloops.NewPromptSectionObservation(
 			"section.timeline_open.todo_list",
 			"Todo List",
 			reactloops.PromptSectionRoleTimelineOpen,
 			true,
 			materials.TodoSnapshot,
-		),
-		reactloops.NewPromptSectionObservation(
-			"section.timeline_open.workspace",
-			"Workspace",
-			reactloops.PromptSectionRoleTimelineOpen,
-			true,
-			renderWorkspaceBlock(materials),
 		),
 		// P1-C3: UserHistory 在 Workspace 之后, 与下方 Current Time 共同
 		// 构成"用户输入历史 -> 现在"的时序前缀.
@@ -875,13 +815,6 @@ func (pm *PromptManager) buildTimelineOpenObservation(
 		),
 		// P1-C3: Current Time 紧跟 User History, 充当时序末端锚点;
 		// 同时与下方 PlanContext (任务规划) 形成"现在 -> 任务"语义衔接.
-		reactloops.NewPromptSectionObservation(
-			"section.timeline_open.current_time",
-			"Current Time",
-			reactloops.PromptSectionRoleTimelineOpen,
-			false,
-			renderCurrentTimeBlock(materials),
-		),
 		// PlanContext (PE-TASK PLAN 产物) 末尾注入: 该字段仅 PE-TASK 子任务
 		// 非空, 内容随子任务切换抖动, 不适合放任何 cache 边界内。
 		// 放 timeline-open 段最末让其落在所有
@@ -918,6 +851,11 @@ func (pm *PromptManager) buildDynamicObservation(
 	// 关键词: section.dynamic 子节点 Name 去前缀, UI 信息密度
 	children := []*reactloops.PromptSectionObservation{
 		reactloops.NewPromptSectionObservation(
+			"section.dynamic.current_time", "Current Time",
+			reactloops.PromptSectionRoleDynamic, false,
+			renderCurrentTimeBlock(&aicommon.PromptMaterials{CurrentTime: base.CurrentTime}),
+		),
+		reactloops.NewPromptSectionObservation(
 			"section.dynamic.user_query",
 			"User Query",
 			reactloops.PromptSectionRoleDynamic,
@@ -940,7 +878,6 @@ func (pm *PromptManager) buildDynamicObservation(
 			true,
 			renderTaggedBlock("EXTRA_CAPABILITIES", input.Nonce, input.ExtraCapabilities),
 		),
-		// P1-C2: session_evidence 已上移到 section.timeline_open.session_evidence,
 		// 此处 dynamic 段不再渲染 SESSION_ARTIFACTS.
 		reactloops.NewPromptSectionObservation(
 			"section.dynamic.reactive_data",
@@ -972,8 +909,8 @@ func (pm *PromptManager) buildDynamicObservation(
 }
 
 // renderHighStaticPreamble 渲染 high-static 段的"前导文" (TRAITS + 方法论
-// 协议块 + 能力系统介绍). 当前 high_static_section.txt 已重构为完全无变量的
-// 纯静态系统提示词, HighStaticData() 返回空 map, 这里只是把模板原文 trim 后返回.
+// 协议块 + 能力系统介绍). high_static_section.txt 只按输出协议切换文案,
+// HighStaticData() 不包含每轮易变内容, 同一模式内的前缀字节保持稳定.
 // 若以后又向 HighStaticData 注入 caller-specific 字段, 需要重新审视: 任何
 // caller-specific 内容都会破坏 AI_CACHE_SYSTEM 段的 prefix cache, 应优先放
 // SemiDynamic1Data / SemiDynamic2Data 而不是 HighStaticData.
@@ -983,7 +920,7 @@ func (pm *PromptManager) renderHighStaticPreamble(materials *reactloops.PromptPr
 	if materials == nil {
 		return ""
 	}
-	rendered, err := aicommon.RenderPromptTemplate("loop-high-static-preamble", aicommon.SharedPlanAndExecHighStaticTemplate, materials.HighStaticData())
+	rendered, err := aicommon.RenderPromptTemplate("loop-high-static-preamble", aicommon.MainloopHighStaticTemplate(materials.FunctionCallMode), materials.HighStaticData())
 	if err != nil {
 		return ""
 	}
@@ -1052,32 +989,9 @@ func renderSchemaBlock(schema string) string {
 	return fmt.Sprintf("响应格式输出JSON和<|TAG...|>，请遵守如下Schema ：\n\n<|SCHEMA|>\n```jsonschema\n%s\n```\n<|SCHEMA|>", schema)
 }
 
-// renderWorkspaceBlock 渲染 timeline-open 段中 Workspace 子块.
-//
-// Session Artifacts no longer participate in prompt construction. Workspace
-// only contains OS / working dir / glance.
+// renderWorkspaceBlock observes the same read-only coordinates as the template.
 func renderWorkspaceBlock(materials *reactloops.PromptPrefixMaterials) string {
-	if materials == nil {
-		return ""
-	}
-	hasEnv := strings.TrimSpace(materials.OSArch) != "" ||
-		strings.TrimSpace(materials.WorkingDir) != "" ||
-		strings.TrimSpace(materials.WorkingDirGlance) != ""
-	if !materials.Workspace || !hasEnv {
-		return ""
-	}
-	var lines []string
-	lines = append(lines, "# Workspace Context")
-	if materials.OSArch != "" {
-		lines = append(lines, "OS/Arch: "+materials.OSArch)
-	}
-	if materials.WorkingDir != "" {
-		lines = append(lines, "working dir: "+materials.WorkingDir)
-	}
-	if materials.WorkingDirGlance != "" {
-		lines = append(lines, "working dir glance: "+materials.WorkingDirGlance)
-	}
-	return strings.Join(lines, "\n")
+	return materials.WorkspaceContext()
 }
 
 func renderFrozenPartitionBlock(partition aicommon.FrozenBlockPartition) string {
@@ -1104,25 +1018,24 @@ func renderFrozenPartitionBlock(partition aicommon.FrozenBlockPartition) string 
 	)
 }
 
-func renderSessionEvidenceFrozenBlock(materials *reactloops.PromptPrefixMaterials) string {
-	if materials == nil || strings.TrimSpace(materials.SessionEvidenceFrozen) == "" {
-		return ""
-	}
-	return "# Session Evidence (Frozen)\n" + materials.SessionEvidenceFrozen
-}
-
-// renderToolInventoryBlock 是给 observation 树 (UI / 调试) 用的镜像渲染, 必须
-// 与 frozen_block_section.txt 模板保持字节级一致, 否则面板里看到的与 LLM 真正
-// 收到的会错位. 任何模板改动都要同步本函数, 反之亦然.
-// 关键词: renderToolInventoryBlock, observation 镜像, frozen_block_section 对齐
 func renderToolInventoryBlock(materials *reactloops.PromptPrefixMaterials) string {
 	if materials == nil || !materials.ToolInventory || materials.ToolsCount <= 0 || len(materials.TopTools) == 0 {
 		return ""
 	}
 	var lines []string
+	if materials.FunctionCallMode {
+		lines = append(lines,
+			"# Tool Inventory — 业务工具目录",
+			"用法：下列仅是工具名称和简介，不含完整参数 Schema；原生 `tool_calls[].function.name` 只能选已声明的 action，目录名称要填在 action 参数中。",
+			"完整 Schema 已知（优先查 `CACHE_TOOL_CALL`）→ `directly_call_tool`：`directly_call_tool_name`=名称、`directly_call_tool_params`=参数；否则 → `require_tool`：`tool_require_payload`=名称，由运行时生成参数。缓存未命中但已知完整 Schema 时仍可直调，由运行时校验。",
+		)
+	} else {
+		lines = append(lines,
+			"# Tool Inventory",
+			"下列是按优先级选出的可用业务工具，完整目录可按需检索。",
+		)
+	}
 	lines = append(lines,
-		"# Tool Inventory",
-		fmt.Sprintf("You have access to %d built-in tools. Below are %d prioritized entries selected within a token budget:", materials.ToolsCount, materials.TopToolsCount),
 		"",
 		"## 工具调用模式（单调用、可选并发批次或 tool_compose）",
 		"",
@@ -1140,12 +1053,10 @@ func renderToolInventoryBlock(materials *reactloops.PromptPrefixMaterials) strin
 		}
 		lines = append(lines, fmt.Sprintf("* `%s`: %s", tool.Name, tool.Description))
 	}
-	if materials.HasMoreTools {
-		lines = append(lines,
-			"",
-			fmt.Sprintf("> 还有 %d 个工具未列入上方清单. 不在列表中的工具 / AI 蓝图 / 技能 / Focus 模式, 通过 `search_capabilities` 按关键字检索后再加载使用.", materials.MoreToolsCount),
-		)
-	}
+	lines = append(lines,
+		"",
+		"> 此处为优先展示目录；完整能力范围可按需通过能力检索入口查询。",
+	)
 	return strings.Join(lines, "\n")
 }
 
@@ -1218,7 +1129,7 @@ func renderInjectedMemoryBlock(nonce string, memory string) string {
 }
 
 func (pm *PromptManager) renderLoopHighStaticSection(materials *reactloops.PromptPrefixMaterials) (string, error) {
-	return aicommon.RenderPromptTemplate("loop-high-static", aicommon.SharedPlanAndExecHighStaticTemplate, materials.HighStaticData())
+	return aicommon.RenderPromptTemplate("loop-high-static", aicommon.MainloopHighStaticTemplate(materials.FunctionCallMode), materials.HighStaticData())
 }
 
 // renderLoopSemiDynamic1Section 渲染 P1.1 拆分后的 semi-dynamic 第一块:
@@ -1239,7 +1150,7 @@ func (pm *PromptManager) renderLoopSemiDynamic1Section(materials *reactloops.Pro
 //
 //	AI_CACHE_SEMI2 cc
 func (pm *PromptManager) renderLoopSemiDynamic2Section(materials *reactloops.PromptPrefixMaterials) (string, error) {
-	return aicommon.RenderPromptTemplate("loop-semi-dynamic-2", aicommon.SharedTaskInstructionSchemaExampleTemplate, materials.SemiDynamic2Data())
+	return aicommon.RenderPromptTemplate("loop-semi-dynamic-2", aicommon.MainloopSemiDynamic2Template(materials.FunctionCallMode), materials.SemiDynamic2Data())
 }
 
 // renderLoopFrozenBlockSection 渲染"按稳定性分层"路径下的 FrozenBlock 段
@@ -1247,7 +1158,7 @@ func (pm *PromptManager) renderLoopSemiDynamic2Section(materials *reactloops.Pro
 //
 // 关键词: renderLoopFrozenBlockSection, frozen_block_section.txt
 func (pm *PromptManager) renderLoopFrozenBlockSection(materials *reactloops.PromptPrefixMaterials) (string, error) {
-	return aicommon.RenderPromptTemplate("loop-frozen-block", aicommon.SharedFrozenBlockTemplate, materials.FrozenBlockData())
+	return aicommon.RenderPromptTemplate("loop-frozen-block", aicommon.MainloopFrozenBlockTemplate(materials.FunctionCallMode), materials.FrozenBlockData())
 }
 
 func (pm *PromptManager) renderLoopDynamicSection(data map[string]any) (string, error) {
@@ -1274,7 +1185,7 @@ func (pm *PromptManager) renderLoopDynamicSection(data map[string]any) (string, 
 //
 // 内层 PROMPT_SECTION_semi-dynamic-1 / -2 标签保留 (不会与 AI_CACHE_SEMI / SEMI2
 // 冲突, tagName 不同), 让 splitter 6 段切片仍能识别 semi-dynamic-1/2 段.
-// 字面量必须与 aicache.semiBoundaryTagName / semi2BoundaryTagName 严格一致.
+// 字面量必须与 aiprojection.semiBoundaryTagName / semi2BoundaryTagName 严格一致.
 //
 // 关键词: buildTaggedPromptSections, 6 段拼接, AI_CACHE_FROZEN, AI_CACHE_SEMI,
 //

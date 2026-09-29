@@ -380,11 +380,6 @@ func (r *ReActLoop) buildPerceptionInput(trigger string) (string, map[string]str
 		extra["Facts"] = facts
 	}
 
-	if evidence := strings.TrimSpace(r.Get("plan_evidence")); evidence != "" {
-		evidence = aicommon.ShrinkTextBlockByTokens(evidence, 2048)
-		extra["Evidence"] = evidence
-	}
-
 	cfg := r.config
 	if cfg != nil {
 		if cpm := cfg.GetContextProviderManager(); cpm != nil {

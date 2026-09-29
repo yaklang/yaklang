@@ -1,0 +1,53 @@
+desc(
+	mode: "source"
+	language: "csharp"
+	title: "源码扫描：C# HttpClient 明文地址"
+	title_zh: "源码扫描：C# HttpClient 明文地址"
+	type: vuln
+	level: middle
+	rule_id: "source-csharp-http-client-cleartext"
+	risk: "cleartext-transmission"
+	cwe: "CWE-319"
+	desc: <<<DESC
+### 规则说明
+`HttpClient.GetAsync` 的地址以 `http:` 开头时，请求行、头部和正文都走明文。路径上的每一跳都能读取 Cookie、令牌和业务数据，也能改写响应。
+
+### 风险类型
+cleartext-transmission
+
+### 影响
+会话和密钥在网络上泄露。中间人可以替换响应，把客户端引向恶意内容。
+
+### 检测方式
+这条规则使用 source 模式，用正则扫描源文件文本，不构建语法树或 SSA。命中只说明出现了对应写法，不能单独证明数据来自外部输入。注释、字符串和文档中的相同文本也会命中。
+正则匹配 `GetAsync(` 后面紧跟引号和 `http:`。`https` 不会命中。地址放在变量里的明文请求也不会命中，这条规则只抓写死的明文 URL。
+
+### 参考
+- [CWE-319：敏感信息明文传输](https://cwe.mitre.org/data/definitions/319.html)
+
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+- 地址改为 `https://`。
+- 不要根据请求参数选择协议，也不要拼接用户提供的 URL。
+- 生产环境禁用明文端点。必须访问内部 HTTP 时，把目标限制在明确的主机白名单。
+
+SOLUTION
+	alert_min: 1
+	"file://bad.cs": <<<POS
+class Bad { void c(System.Net.Http.HttpClient client) { client.GetAsync("http://api.internal/users"); } }
+
+POS
+	"safefile://ok.cs": <<<NEG
+class Ok { void c(System.Net.Http.HttpClient client) { client.GetAsync("https://api.internal/users"); } }
+
+NEG
+)
+${*.cs}.pattern_regex(/GetAsync\s*\(\s*\"http:/) as $hit
+alert $hit for {
+	level: "middle",
+	title: "源码扫描：C# HttpClient 明文地址",
+	title_zh: "源码扫描：C# HttpClient 明文地址",
+	message: "源码扫描：C# HttpClient 明文地址",
+	risk: "cleartext-transmission",
+}

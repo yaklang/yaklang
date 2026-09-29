@@ -1,0 +1,55 @@
+desc(
+	mode: "source"
+	language: "php"
+	title: "源码扫描：PHP 关闭 CSRF"
+	title_zh: "源码扫描：PHP 关闭 CSRF"
+	type: vuln
+	level: high
+	rule_id: "source-php-csrf-false"
+	risk: "csrf"
+	cwe: "CWE-352"
+	desc: <<<DESC
+### 规则说明
+配置里 `'csrf' => false` 关闭框架的 CSRF 防护。浏览器在跨站请求里仍会自动带上会话 Cookie。
+
+### 风险类型
+csrf
+
+### 影响
+用户访问攻击页面时，可能触发本站的状态变更。
+
+### 检测方式
+这条规则使用 source 模式，用正则扫描源文件文本，不构建语法树或 SSA。命中只说明出现了对应写法，不能单独证明数据来自外部输入。注释、字符串和文档中的相同文本也会命中。
+正则匹配单引号或双引号的 `csrf` 被设为 `false`。设为 true 不会命中。
+
+### 参考
+- [CWE-352：跨站请求伪造](https://cwe.mitre.org/data/definitions/352.html)
+
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+- 保持 CSRF 中间件开启，删除把 csrf 设为 false 的配置。
+- 状态变更请求校验令牌。
+- 前端没有带令牌时，补上令牌，而不是关掉校验。
+
+SOLUTION
+	alert_min: 1
+	"file://bad.php": <<<POS
+<?php
+$cfg = ["csrf" => false];
+
+POS
+	"safefile://ok.php": <<<NEG
+<?php
+$cfg = ["csrf" => true];
+
+NEG
+)
+${*.php}.pattern_regex(/[\"']csrf[\"']\s*=>\s*false/) as $hit
+alert $hit for {
+	level: "high",
+	title: "源码扫描：PHP 关闭 CSRF",
+	title_zh: "源码扫描：PHP 关闭 CSRF",
+	message: "源码扫描：PHP 关闭 CSRF",
+	risk: "csrf",
+}

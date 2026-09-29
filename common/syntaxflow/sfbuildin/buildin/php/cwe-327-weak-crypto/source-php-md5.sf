@@ -33,11 +33,17 @@ POS
 	"safefile://app-safe.php": <<<NEG
 <?php
 function digest($s) { return hash('sha256', $s); }
-
+// md5( is not allowed for passwords
+$doc = "md5(x)";
 NEG
 )
 
-${*.php}.pattern_regex(/(?m)(?<![\w>])md5\s*\(/) as $hit
+${*.php}.pattern_regex(/(?m)(?<![\w>])md5\s*\(/) as $raw
+${*.php}.pattern_regex(/'[^'\n]*'/) as $sq
+${*.php}.pattern_regex(/"[^"\n]*"/) as $dq
+${*.php}.pattern_regex(/\/\/[^\n]*|#[^\n]*|\/\*[\s\S]*?\*\//) as $cm
+$sq + $dq + $cm as $quoted
+$raw not_inside $quoted as $hit
 alert $hit for {
 	level: "medium",
 	title: "检测 PHP md5 调用",

@@ -3,6 +3,7 @@ package mock
 import (
 	"context"
 	"fmt"
+	"github.com/yaklang/yaklang/common/ai/aid/aiprojection"
 	"os"
 	"strings"
 	"sync"
@@ -27,8 +28,10 @@ type MockedAIConfig struct {
 	IdSequence int64
 	RuntimeId  string
 
-	Emitter   *aicommon.Emitter
-	TodoState *aicommon.SessionPromptState
+	Emitter       *aicommon.Emitter
+	TodoState     *aicommon.SessionPromptState
+	EvidenceState *aicommon.Config
+	evidenceOnce  sync.Once
 
 	TimelineContentSizeLimit int64
 
@@ -107,6 +110,10 @@ func (m *MockedAIConfig) GetAiToolManager() *buildinaitools.AiToolManager {
 	return nil
 }
 
+func (m *MockedAIConfig) RecordRecentlyUsedTool(*aitool.Tool) buildinaitools.RecentToolCacheMutation {
+	return buildinaitools.RecentToolCacheMutation{}
+}
+
 func (m *MockedAIConfig) GetOrCreateWorkDir() string {
 	dir, _ := os.MkdirTemp("", "mock-workdir-*")
 	return dir
@@ -118,12 +125,22 @@ func (m *MockedAIConfig) GetContextProviderManager() *aicommon.ContextProviderMa
 
 func (m *MockedAIConfig) AppendRelatedRuntimeID(string) {}
 
+// Evidence mocks use the production journal; unrelated mocks need no extra Config.
+func (m *MockedAIConfig) getEvidenceState() *aicommon.Config {
+	m.evidenceOnce.Do(func() {
+		if m.EvidenceState == nil {
+			m.EvidenceState = aicommon.NewConfig(m.Ctx)
+		}
+	})
+	return m.EvidenceState
+}
+
 func (m *MockedAIConfig) GetSessionEvidenceRendered() string {
-	return m.TodoState.GetSessionEvidenceRendered()
+	return m.getEvidenceState().GetSessionEvidenceRendered()
 }
 
 func (m *MockedAIConfig) ApplySessionEvidenceOps(ops []aicommon.EvidenceOperation) {
-	m.TodoState.ApplySessionEvidenceOps(ops)
+	m.getEvidenceState().ApplySessionEvidenceOps(ops)
 }
 
 func (m *MockedAIConfig) GetVerificationTodoRendered(scope aicommon.VerificationTodoScope) string {
@@ -314,7 +331,6 @@ func (m *MockInvoker) AssembleLoopPrompt(tools []*aitool.Tool, input *aicommon.L
 	dynamic := wrapMockPromptSectionWithNonce("dynamic", joinMockPromptParts(
 		renderMockUserQueryBlock(input.Nonce, input.UserQuery),
 		renderMockTaggedBlock("EXTRA_CAPABILITIES", input.Nonce, input.ExtraCapabilities),
-		input.SessionEvidence,
 		renderMockTaggedBlock("REACTIVE_DATA", input.Nonce, input.ReactiveData),
 		renderMockInjectedMemoryBlock(input.Nonce, input.InjectedMemory),
 		input.TodoCheckpoint,
@@ -333,7 +349,7 @@ func wrapMockPromptSectionWithNonce(sectionName string, content string, nonce st
 	}
 	// Match production's tagName=PROMPT_SECTION_dynamic, nonce=<nonce>.
 	// END precedes the nonce, not the dynamic part of the tag name.
-	return fmt.Sprintf("<|PROMPT_SECTION_%s_%s|>\n%s\n<|PROMPT_SECTION_%s_END_%s|>", sectionName, nonce, content, sectionName, nonce)
+	return aiprojection.CreateTag("PROMPT_SECTION_"+sectionName, nonce, content)
 }
 
 func wrapMockPromptSection(sectionName string, content string) string {
@@ -341,7 +357,7 @@ func wrapMockPromptSection(sectionName string, content string) string {
 	if content == "" {
 		return ""
 	}
-	return fmt.Sprintf("<|PROMPT_SECTION_%s|>\n%s\n<|PROMPT_SECTION_END_%s|>", sectionName, content, sectionName)
+	return aiprojection.CreateTag("PROMPT_SECTION", sectionName, content)
 }
 
 func renderMockTitledBlock(title string, body string) string {

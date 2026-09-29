@@ -81,12 +81,12 @@ func TestAttachedBrowserResourcePromotesBridgeTools(t *testing.T) {
 	require.True(t, cfg.GetAiToolManager().IsRecentlyUsedTool(attachedBrowserHandoffToolName))
 	require.True(t, cfg.GetAiToolManager().IsRecentlyUsedTool(attachedBrowserHTTPToolName))
 	promptMaterials := BuildPromptFrozenOpenMaterials(cfg)
-	require.Contains(t, promptMaterials.PromotedTimelineOpen, "## Tool: "+attachedBrowserCatalogToolName)
-	require.Contains(t, promptMaterials.PromotedTimelineOpen, "## Tool: "+attachedBrowserCallToolName)
-	require.Contains(t, promptMaterials.PromotedTimelineOpen, "## Tool: "+attachedBrowserCryptoToolName)
-	require.Contains(t, promptMaterials.PromotedTimelineOpen, "## Tool: "+attachedBrowserPrepareToolName)
-	require.Contains(t, promptMaterials.PromotedTimelineOpen, "## Tool: "+attachedBrowserHandoffToolName)
-	require.Contains(t, promptMaterials.PromotedTimelineOpen, "## Tool: "+attachedBrowserHTTPToolName)
+	require.Contains(t, promptMaterials.TimelineOpen, "## Tool: "+attachedBrowserCatalogToolName)
+	require.Contains(t, promptMaterials.TimelineOpen, "## Tool: "+attachedBrowserCallToolName)
+	require.Contains(t, promptMaterials.TimelineOpen, "## Tool: "+attachedBrowserCryptoToolName)
+	require.Contains(t, promptMaterials.TimelineOpen, "## Tool: "+attachedBrowserPrepareToolName)
+	require.Contains(t, promptMaterials.TimelineOpen, "## Tool: "+attachedBrowserHandoffToolName)
+	require.Contains(t, promptMaterials.TimelineOpen, "## Tool: "+attachedBrowserHTTPToolName)
 	require.Contains(t, resource.ToAttachData(loop), "tools are available and have been promoted")
 }
 

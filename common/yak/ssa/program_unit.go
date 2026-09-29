@@ -2,9 +2,11 @@ package ssa
 
 import (
 	"runtime"
+	"runtime/debug"
 	"strings"
 
 	stdlog "github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils/memorybudget"
 )
 
 // BeginCompileUnit marks the start of a compile unit so deferred file builds
@@ -245,22 +247,22 @@ func (prog *Program) CheckMemoryPressure(batchIndex, totalBatches int) bool {
 	var m runtime.MemStats
 	runtime.ReadMemStats(&m)
 
-	heapMB := float64(m.HeapInuse) / (1024 * 1024)
+	warning, critical := memorybudget.PressureThresholds(memorybudget.Total(), debug.SetMemoryLimit(-1))
+	// Match the Go memory-limit accounting, which includes stacks and runtime
+	// metadata rather than only heap objects. This remains diagnostic only.
+	managed := m.Sys - m.HeapReleased
+	managedMB := float64(managed) / (1024 * 1024)
+	warningMB, criticalMB := float64(warning)/(1024*1024), float64(critical)/(1024*1024)
 
-	const (
-		warningThresholdMB  = 2048
-		criticalThresholdMB = 4096
-	)
-
-	if heapMB > criticalThresholdMB {
-		log.Warnf("[split-compile] CRITICAL memory pressure detected: heap=%.1fMB batch=%d/%d - relying on per-unit flush + adaptive GC for reclaim",
-			heapMB, batchIndex, totalBatches)
+	if managed > uint64(critical) {
+		log.Warnf("[split-compile] high memory pressure: managed=%.1fMB warning=%.1fMB critical=%.1fMB batch=%d/%d - relying on per-unit flush + adaptive GC for reclaim",
+			managedMB, warningMB, criticalMB, batchIndex, totalBatches)
 		return true
 	}
 
-	if heapMB > warningThresholdMB {
-		log.Warnf("[split-compile] Memory pressure warning: heap=%.1fMB batch=%d/%d",
-			heapMB, batchIndex, totalBatches)
+	if managed > uint64(warning) {
+		log.Warnf("[split-compile] memory pressure: managed=%.1fMB warning=%.1fMB critical=%.1fMB batch=%d/%d",
+			managedMB, warningMB, criticalMB, batchIndex, totalBatches)
 	}
 
 	return false

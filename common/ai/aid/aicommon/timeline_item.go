@@ -155,6 +155,9 @@ func (item *TimelineItem) SetShrinkResult(pers string) {
 }
 
 func (item *TimelineItem) ToTimelineItemOutput() *TimelineItemOutput {
+	if content, ok := timelineEvidenceDisplay(item); ok {
+		return &TimelineItemOutput{Timestamp: item.createdAt, Type: "text", Content: content}
+	}
 	var typeName string
 	switch item.value.(type) {
 	case *aitool.ToolResult:

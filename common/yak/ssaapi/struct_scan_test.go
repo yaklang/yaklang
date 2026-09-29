@@ -1,6 +1,7 @@
 package ssaapi
 
 import (
+	"context"
 	"strings"
 	"testing"
 
@@ -9,9 +10,43 @@ import (
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
 	"github.com/yaklang/yaklang/common/utils/filesys"
+	"github.com/yaklang/yaklang/common/yak/ssa"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 )
+
+func TestStructOpcodeIndexPreservesUnitBoundary(t *testing.T) {
+	vf := filesys.NewVirtualFs()
+	vf.AddFile("a/A.java", `package a; class A { void f() { println("a"); } }`)
+	vf.AddFile("b/B.java", `package b; class B { void f() { println("b"); } }`)
+	progs, err := ParseProjectWithFS(vf, WithLanguage(ssaconfig.JAVA), WithMemory())
+	require.NoError(t, err)
+	require.Len(t, progs, 1)
+	prog := progs[0]
+	checked := 0
+	seen := map[int64]string{}
+	for _, unit := range prog.Program.CompileUnits {
+		if unit == nil || (unit.Key != "java:a" && unit.Key != "java:b") {
+			continue
+		}
+		target := NewStructQueryTarget(prog, unit, nil)
+		cmp := sfvm.NewOpcodeComparator(context.Background())
+		cmp.AddOpcode(ssa.SSAOpcodeCall)
+		values, _ := target.CompareOpcode(cmp)
+		require.NotEmpty(t, values)
+		for _, value := range values {
+			v, ok := value.(*Value)
+			require.True(t, ok)
+			id := v.GetId()
+			if previous, ok := seen[id]; ok {
+				require.Equal(t, previous, unit.Key, "a call must not leak into another compile unit")
+			}
+			seen[id] = unit.Key
+		}
+		checked++
+	}
+	require.Equal(t, 2, checked)
+}
 
 func TestValidRuleModeStructIsNotSSA(t *testing.T) {
 	require.Equal(t, schema.SFR_MODE_STRUCT, schema.ValidRuleMode("struct"))

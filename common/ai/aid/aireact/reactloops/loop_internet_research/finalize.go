@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon/promptloader"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/log"
@@ -153,27 +154,12 @@ var insufficientReasonOutputs = []aitool.ToolOption{
 // smartEvaluationStaticInstruction 是 SMART 评估的系统侧静态指令
 // 通过 aicommon.WithLiteForgeStaticInstruction 进入 LiteForge 的 high-static 段，跨调用稳定哈希
 // 关键词: aicache, PROMPT_SECTION, StaticInstruction, smart-evaluation, B 档
-const smartEvaluationStaticInstruction = `Evaluate the following internet research results using the S.M.A.R.T framework.
-
-For each S.M.A.R.T dimension, provide a brief evaluation (1-2 sentences) of the search results:
-- Specific: How specific and targeted are the search results relative to the user's question?
-- Measurable: Can the information be verified? Are there concrete data points, dates, numbers, or citations?
-- Achievable: Did the research achieve its goal of answering the user's question? What percentage of the question was answered?
-- Relevant: How relevant is the collected information to the user's actual needs?
-- Time-bound: Is the information current and timely? Are the sources up-to-date?
-- Overall: A brief overall assessment of the research quality (1 sentence).`
+var smartEvaluationStaticInstruction = promptloader.MustLoad("inline/ai/aid/aireact/reactloops/loop_internet_research/finalize/smartEvaluationStaticInstruction.txt")
 
 // insufficientReasonStaticInstruction 是 insufficient-reason 评估的系统侧静态指令
 // 通过 aicommon.WithLiteForgeStaticInstruction 进入 LiteForge 的 high-static 段，跨调用稳定哈希
 // 关键词: aicache, PROMPT_SECTION, StaticInstruction, insufficient-reason-analysis, B 档
-const insufficientReasonStaticInstruction = `The following internet research did not yield sufficient results to fully answer the user's question.
-
-Please analyze why the search results are insufficient. Consider:
-1. What specific aspects of the user's question remain unanswered?
-2. What was found vs what was expected?
-3. Possible reasons (topic too niche, information not publicly available, wrong search strategy, etc.)
-
-Provide a concise analysis (3-5 sentences) explaining why the collected information does not meet the user's needs.`
+var insufficientReasonStaticInstruction = promptloader.MustLoad("inline/ai/aid/aireact/reactloops/loop_internet_research/finalize/insufficientReasonStaticInstruction.txt")
 
 func collectResearchData(loop *reactloops.ReActLoop) (allCompressedResults []string, artifactFiles []string) {
 	maxIterations := loop.GetCurrentIterationIndex()
@@ -263,18 +249,7 @@ func generateAndOutputFinalReport(loop *reactloops.ReActLoop, invoker aicommon.A
 				if len(resultPreview) > 4096 {
 					resultPreview = resultPreview[:4096] + "\n...(truncated)"
 				}
-				promptTemplate := `<user_query>
-{{ .userQuery }}
-</user_query>
-
-<search_history>
-{{ .searchHistory }}
-</search_history>
-
-<search_results>
-{{ .searchResults }}
-</search_results>
-`
+				promptTemplate := promptloader.MustLoad("inline/ai/aid/aireact/reactloops/loop_internet_research/finalize/promptTemplate.txt")
 				materials, err := utils.RenderTemplate(promptTemplate, map[string]any{
 					"userQuery":     userQuery,
 					"searchHistory": searchHistory,
@@ -367,18 +342,7 @@ func generateAndOutputFinalReport(loop *reactloops.ReActLoop, invoker aicommon.A
 				if len(resultPreview) > 2048 {
 					resultPreview = resultPreview[:2048] + "\n...(truncated)"
 				}
-				promptTemplate := `<user_query>
-{{ .userQuery }}
-</user_query>
-
-<search_history>
-{{ .searchHistory }}
-</search_history>
-
-<partial_results>
-{{ .searchResults }}
-</partial_results>
-`
+				promptTemplate := promptloader.MustLoad("inline/ai/aid/aireact/reactloops/loop_internet_research/finalize/promptTemplate_2.txt")
 				materials, err := utils.RenderTemplate(promptTemplate, map[string]any{
 					"userQuery":     userQuery,
 					"searchHistory": searchHistory,

@@ -2,9 +2,9 @@ package loop_plan
 
 import (
 	"bytes"
-	_ "embed"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon/promptloader"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
@@ -42,7 +42,6 @@ var PLAN_FILE_RESULTS_KEY = "plan_file_results"
 var PLAN_WEB_RESULTS_KEY = "plan_web_results"
 var PLAN_RECON_RESULTS_KEY = "plan_recon_results"
 var PLAN_FACTS_KEY = "plan_facts"
-var PLAN_EVIDENCE_KEY = "plan_evidence"
 var PLAN_DOCUMENT_KEY = "plan_document"
 
 const PlanMaxIterations = 4
@@ -53,23 +52,17 @@ var infoGatheringActions = []string{
 	schema.AI_REACT_LOOP_ACTION_LOADING_SKILLS,
 }
 
-//go:embed prompts/output_example.txt
-var outputExample string
+var outputExample = promptloader.MustLoad("ai/aid/aireact/reactloops/loop_plan/prompts/output_example.txt")
 
-//go:embed prompts/reactive_data.txt
-var reactiveData string
+var reactiveData = promptloader.MustLoad("ai/aid/aireact/reactloops/loop_plan/prompts/reactive_data.txt")
 
-//go:embed prompts/persistent_instruction.txt
-var persistentInstruction string
+var persistentInstruction = promptloader.MustLoad("ai/aid/aireact/reactloops/loop_plan/prompts/persistent_instruction.txt")
 
-//go:embed prompts/guidance_document.txt
-var guidanceDocumentPrompt string
+var guidanceDocumentPrompt = promptloader.MustLoad("ai/aid/aireact/reactloops/loop_plan/prompts/guidance_document.txt")
 
-//go:embed prompts/plan_from_document.txt
-var planFromDocumentPrompt string
+var planFromDocumentPrompt = promptloader.MustLoad("ai/aid/aireact/reactloops/loop_plan/prompts/plan_from_document.txt")
 
-//go:embed prompts/plan_direct.txt
-var planDirectPrompt string
+var planDirectPrompt = promptloader.MustLoad("ai/aid/aireact/reactloops/loop_plan/prompts/plan_direct.txt")
 
 func init() {
 	err := reactloops.RegisterLoopFactory(
@@ -139,15 +132,16 @@ func init() {
 						log.Infof("plan loop: last iteration (%d/%d) in simple mode, forcing generate_direct_plan", currentIter+1, maxIter)
 					}
 					renderMap := map[string]any{
-						"Help":           help,
-						"Nonce":          nonce,
-						"Enhance":        enhance,
-						"FileResults":    fileResults,
-						"WebResults":     webResults,
-						"ReconResults":   reconResults,
-						"Facts":          loop.Get(PLAN_FACTS_KEY),
-						"PlanMode":       loop.Get(PLAN_MODE_KEY),
-						"PlanModeReason": loop.Get(PLAN_MODE_REASON_KEY),
+						"ExplorationClosed": isLastIteration && isDeepPlanMode(loop),
+						"Help":              help,
+						"Nonce":             nonce,
+						"Enhance":           enhance,
+						"FileResults":       fileResults,
+						"WebResults":        webResults,
+						"ReconResults":      reconResults,
+						"Facts":             loop.Get(PLAN_FACTS_KEY),
+						"PlanMode":          loop.Get(PLAN_MODE_KEY),
+						"PlanModeReason":    loop.Get(PLAN_MODE_REASON_KEY),
 					}
 					return utils.RenderTemplate(reactiveData, renderMap)
 				}),

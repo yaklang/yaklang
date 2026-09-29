@@ -276,6 +276,9 @@ func (m *scanManager) Query(rule *schema.SyntaxFlowRule, target ssaapi.SyntaxFlo
 			if res != nil {
 				m.StatusTask(res)
 			}
+			// The rule stopped at its budget and kept the findings it already
+			// produced. That is still a finished rule: marking it failed makes
+			// a scan that found results look like it did not run.
 			m.markRuleSuccess()
 			log.Warnf("rule %s on program %s hit per-rule budget (%s), returned partial results",
 				rule.RuleName, targetName, bailReason)

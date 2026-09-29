@@ -90,5 +90,11 @@ var outputFactsAction = func(r aicommon.AIInvokeRuntime) reactloops.ReActLoopOpt
 		[]*reactloops.LoopStreamField{},
 		verifyOutputFactsAction,
 		handleOutputFactsAction,
+		func(action *reactloops.LoopAction) {
+			action.NativeDescription = "Append concrete, verifiable Markdown facts to the shared FACTS document. Put the complete facts in the facts argument."
+			action.NativeOptions = []aitool.ToolOption{
+				aitool.WithStringParam("facts", aitool.WithParam_Description("Complete Markdown facts to append to the shared FACTS document."), aitool.WithParam_Required(true)),
+			}
+		},
 	)
 }

@@ -482,7 +482,7 @@ func TestRecovery_StartEarlierThanPreviousCursorResetsCompletedTasks(t *testing.
 		CoordinatorID: coordinatorID,
 		TaskTree:      string(utils.Jsonify(root)),
 		TaskProgress: string(utils.Jsonify(&aid.PlanAndExecProgress{
-			Phase:            "executing",
+			Phase:         "executing",
 			CurrentTaskID: fourthTask.TaskId,
 		})),
 	}
@@ -749,7 +749,13 @@ func TestRecovery_ConcurrentSameStageAllTasksExecute(t *testing.T) {
 	tempDBPath := filepath.Join(dbDir, "recovery-concurrent-test.db")
 	tempDB, err := consts.CreateProjectDatabase(tempDBPath)
 	require.NoError(t, err)
+	originalDB := consts.GetGormProjectDatabase()
+	originalPath := consts.GetCurrentProjectDatabasePath()
 	consts.BindProjectDatabase(tempDB, tempDBPath)
+	t.Cleanup(func() {
+		consts.BindProjectDatabase(originalDB, originalPath)
+		require.NoError(t, tempDB.Close())
+	})
 	db := consts.GetGormProjectDatabase()
 	require.NoError(t, db.AutoMigrate(&schema.AISessionPlanAndExec{}).Error)
 
@@ -782,10 +788,10 @@ func TestRecovery_ConcurrentSameStageAllTasksExecute(t *testing.T) {
 	require.NoError(t, yakit.CreateOrUpdateAISessionPlanAndExec(db, record))
 
 	var (
-		mu       sync.Mutex
-		pushed   = make(map[string]int)
-		popped   = make(map[string]int)
-		aiCalls  = make(map[string]int)
+		mu      sync.Mutex
+		pushed  = make(map[string]int)
+		popped  = make(map[string]int)
+		aiCalls = make(map[string]int)
 	)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)

@@ -29,9 +29,25 @@ func projectTimelineItemForPromptWithModelReplay(item *TimelineItem, allowModelR
 	switch category {
 	case "TODO_DELTA", "EVIDENCE_OPS":
 		return nil
+	case "SESSION_EVIDENCE_SAVED":
+		// Historical saves duplicated the complete evidence body in this receipt.
+		// Preserve the raw audit entry, but only project its identity/status.
+		content := strings.TrimSpace(extractTextTimelineContent(textItem.Text))
+		receipt := "Evidence save recorded."
+		if strings.HasPrefix(content, "[id: ") {
+			if end := strings.IndexByte(content, ']'); end >= 0 {
+				receipt = content[:end+1] + " saved."
+			}
+		}
+		return cloneTextTimelineItemForPrompt(item, textItem, replaceTimelineTextBody(textItem.Text, receipt))
 	case "MODEL_THINKING":
 		if !allowModelReplay || strings.TrimSpace(textItem.PromptText) == "" {
 			return nil
+		}
+		return cloneTextTimelineItemForPrompt(item, textItem, textItem.PromptText)
+	case "FUNCTION_CALL_ACTION_RESPONSE":
+		if !allowModelReplay || strings.TrimSpace(textItem.PromptText) == "" {
+			return item
 		}
 		return cloneTextTimelineItemForPrompt(item, textItem, textItem.PromptText)
 	case "ITERATION":
@@ -116,8 +132,8 @@ func projectTimelineRenderableBlocksForPrompt(blocks TimelineRenderableBlocks) T
 // existing bucket topology while allowing every successful model replay still
 // present in the visible frozen/open interval blocks into the prompt. Reduced
 // or evicted items are never reconstructed; compressed heads remain ordinary
-// historical facts, with control-looking delimiters escaped only in their
-// ephemeral prompt copy.
+// historical facts. Literal tags remain data; only aiprojection's nonce-bearing
+// envelopes can change the outgoing message structure.
 func projectTimelineRenderableBlocksForPromptWithLatestModelReplay(blocks TimelineRenderableBlocks) TimelineRenderableBlocks {
 	return projectTimelineRenderableBlocksForPromptWithModelReplay(blocks, true)
 }
@@ -139,7 +155,8 @@ func projectTimelineRenderableBlocksForPromptWithModelReplay(blocks TimelineRend
 				continue
 			}
 			copyBlock := *typed
-			copyBlock.Text = strings.ReplaceAll(copyBlock.Text, "<|", "&lt;|")
+			copyBlock.Text = typed.Text
+			copyBlock.promptProjection = true
 			projected = append(projected, &copyBlock)
 		default:
 			// Preserve unknown renderable types byte-for-byte.

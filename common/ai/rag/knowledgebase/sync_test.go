@@ -79,7 +79,7 @@ func TestSyncFunctionality(t *testing.T) {
 	assert.Equal(t, 0, syncResult.TotalRAGDocuments)
 	assert.Equal(t, 2, len(syncResult.AddedToRAG))
 	assert.Equal(t, 0, len(syncResult.DeletedFromRAG))
-	assert.Equal(t, 0, len(syncResult.SyncErrors))
+	assert.Empty(t, syncResult.SyncErrors)
 
 	// 检查同步后状态
 	status, err = kb.GetSyncStatus()
@@ -162,7 +162,7 @@ func TestBatchSyncEntries(t *testing.T) {
 	syncResult, err := kb.BatchSyncEntries(entryIDs)
 	assert.NoError(t, err)
 	assert.Equal(t, 2, len(syncResult.AddedToRAG))
-	assert.Equal(t, 0, len(syncResult.SyncErrors))
+	assert.Empty(t, syncResult.SyncErrors)
 
 	// 验证同步结果
 	count, err := kb.CountDocuments()

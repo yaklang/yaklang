@@ -109,3 +109,4 @@ CLAUDE.md
 /common/syntaxflow/sfbuildin/standards/mappings.tar.gz
 /common/syntaxflow/sfdb/rule_versions.tar.gz
 /common/ai/aid/aireact/skills.tar.gz
+/common/ai/aid/aicommon/promptloader/prompts.tar.gz

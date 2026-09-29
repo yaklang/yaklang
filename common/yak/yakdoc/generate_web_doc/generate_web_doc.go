@@ -28,11 +28,6 @@ func loadOverviews(dir string) map[string]string {
 	return overviewutil.LoadAll(dir)
 }
 
-// collapseToSingleLine 把多行文本压成单行(用于 MDX frontmatter 的 description 字段，避免破坏 YAML)。
-func collapseToSingleLine(s string) string {
-	return strings.Join(strings.Fields(s), " ")
-}
-
 // 本程序为 web 文档生成器的"薄壳"：负责从引擎取数(EngineToDocumentHelper)、写文件、跑
 // 覆盖率与产物不变量校验。所有纯渲染逻辑都在无引擎依赖的 common/yak/yakdoc/webdoc 包中，
 // 由该包的单元/边界/不变量测试在 essential-tests 里保证 Markdown 构建健壮。
@@ -141,11 +136,13 @@ func main() {
 	helper := yak.EngineToDocumentHelperWithVerboseInfo(yaklang.New())
 	for _, lib := range helper.Libs {
 		if mdxLibs[lib.Name] {
-			desc := overviews[lib.Name]
+			// front matter description 只取首段短文案，避免整篇 overview 正文
+			// (含表格/代码块/冒号/花括号) 破坏 YAML 解析。
+			desc := overviewutil.FirstParagraph(overviews[lib.Name])
 			if strings.TrimSpace(desc) == "" {
 				desc = aiOverviewFallback
 			}
-			GenerateSingleFileMDX(basepath, lib, collapseToSingleLine(desc))
+			GenerateSingleFileMDX(basepath, lib, desc)
 		} else {
 			GenerateSingleFile(basepath, lib, overviews[lib.Name])
 		}

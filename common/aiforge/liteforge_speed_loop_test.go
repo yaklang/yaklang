@@ -15,6 +15,16 @@ import (
 	"github.com/yaklang/yaklang/common/ai/aispec"
 )
 
+type speedLoopProjectedInvoker struct {
+	*mock.MockInvoker
+	projections []string
+}
+
+func (i *speedLoopProjectedInvoker) AddToTimelineWithPromptProjection(entry, display, prompt string) {
+	i.AddToTimeline(entry, display)
+	i.projections = append(i.projections, prompt)
+}
+
 // Exercise a complete loop round against the real Config -> LiteForge bridge,
 // not a scheduler mock. The only mock is the provider's emitted response.
 func TestSpeedLoopLiteForgeIntegration(t *testing.T) {
@@ -46,7 +56,7 @@ func TestSpeedLoopLiteForgeIntegration(t *testing.T) {
 					} else {
 						require.Same(t, activeTask.GetContext(), req.GetContext())
 					}
-					require.Equal(t, mode == "functioncall", req.IsToolCallArgumentsStreamEnabled())
+					require.False(t, req.IsToolCallArgumentsStreamEnabled())
 					var opts aispec.AIConfig
 					for _, option := range req.GetExtraSpecOpts() {
 						option(&opts)
@@ -58,7 +68,11 @@ func TestSpeedLoopLiteForgeIntegration(t *testing.T) {
 					if attempt == 1 {
 						firstPrompt = req.GetPrompt()
 						require.Equal(t, 1, strings.Count(firstPrompt, "perform auxiliary round"))
-						require.Contains(t, firstPrompt, "# Response Schema")
+						if mode == "functioncall" {
+							require.NotContains(t, firstPrompt, "# Response Schema")
+						} else {
+							require.Contains(t, firstPrompt, "# Response Schema")
+						}
 					} else {
 						require.True(t, strings.HasPrefix(req.GetPrompt(), firstPrompt))
 						require.Contains(t, req.GetPrompt(), "reject first attempt")
@@ -68,12 +82,19 @@ func TestSpeedLoopLiteForgeIntegration(t *testing.T) {
 						return nil, req.GetContext().Err()
 					}
 					response := c.NewAIResponse()
-					response.EmitOutputStream(strings.NewReader(`{"action":"accept","human_readable_thought":"ready"}` + "\n<|BODY_CURRENT_NONCE|>accepted body<|BODY_END_CURRENT_NONCE|>"))
+					if mode == "functioncall" {
+						opts.ToolCallCallback([]*aispec.ToolCall{{Index: 0, ID: "call_accept", Type: "function",
+							Function: aispec.FuncReturn{Name: "accept", Arguments: `{"body":"accepted body","human_readable_thought":"ready"}`}}})
+						opts.FinishReasonCallback("tool_calls", nil)
+						response.EmitOutputStream(strings.NewReader("<|BODY_CURRENT_NONCE|>accepted body<|BODY_END_CURRENT_NONCE|>"))
+					} else {
+						response.EmitOutputStream(strings.NewReader(`{"action":"accept","human_readable_thought":"ready"}` + "\n<|BODY_CURRENT_NONCE|>accepted body<|BODY_END_CURRENT_NONCE|>"))
+					}
 					response.Close()
 					return response, nil
 				}),
 			)
-			invoker := mock.NewMockInvoker(ctx)
+			invoker := &speedLoopProjectedInvoker{MockInvoker: mock.NewMockInvoker(ctx)}
 			invoker.SetConfig(cfg)
 			loop, err := reactloops.NewReActLoop("auxiliary-integration", invoker,
 				reactloops.WithAllowRAG(false), reactloops.WithAllowAIForge(false),
@@ -111,6 +132,9 @@ func TestSpeedLoopLiteForgeIntegration(t *testing.T) {
 			require.NotNil(t, observed)
 			require.Equal(t, "accepted body", observed.GetString("body"))
 			require.Contains(t, loop.Get("last_ai_decision_response"), "BODY_CURRENT_NONCE")
+			if mode == "functioncall" {
+				require.Len(t, invoker.projections, 1)
+			}
 			if mode == "retry" {
 				require.EqualValues(t, 2, speedCalls.Load())
 			} else {

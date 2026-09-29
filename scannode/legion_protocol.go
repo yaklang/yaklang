@@ -15,8 +15,9 @@ const (
 	legionCommandHIDSCurrentStateCollect              = "hids.current_state.collect"
 	legionCommandHIDSFileEvidenceCollect              = "hids.file_evidence.collect"
 	legionCommandSSARuleSyncExport                    = "ssa.rule_sync.export"
-	legionCommandSSADebugQuery                        = "ssa.debug.query"
-	legionCommandSSALogTail                           = "ssa.log.tail"
+	legionCommandSSADebugQuery                        = "ssa.debug.query.v2"
+	legionCommandSSALogTail                           = "ssa.log.tail.v2"
+	legionCommandSSAIRProgramDelete                   = "ssa.ir_program.delete.v2"
 	legionCommandPluginStoreSync                      = "plugin.store.sync"
 	legionCommandPluginStoreSyncStatusQuery           = "plugin.store.sync.status"
 	legionCommandPluginStoreImport                    = "plugin.store.import"
@@ -249,6 +250,12 @@ const (
 	legionRiskKindSecurityRisk  = "security_risk"
 
 	legionReportKindScan = "scan_report"
+)
+
+const (
+	legionCapabilitySSAIRProgramDelete = "ssa.ir_program.delete.v2"
+	legionCapabilitySSADebugQuery      = "ssa.debug.query.v2"
+	legionCapabilitySSALogTail         = "ssa.log.tail.v2"
 )
 
 const legionRealtimeHIDSDesiredSpecDryRunResultPrefix = legionRealtimePrefix + ".hids.desired_spec_dry_run.result"

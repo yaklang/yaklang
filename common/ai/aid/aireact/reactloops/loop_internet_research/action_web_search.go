@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon/promptloader"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/log"
@@ -221,41 +222,7 @@ func evaluateNextSearch(
 		}
 	}
 
-	promptTemplate := `<|USER_QUERY_{{ .nonce }}|>
-{{ .userQuery }}
-<|USER_QUERY_END_{{ .nonce }}|>
-
-<|SEARCH_HISTORY_{{ .nonce }}|>
-{{ .searchHistory }}
-<|SEARCH_HISTORY_END_{{ .nonce }}|>
-
-<|CURRENT_SEARCH_{{ .nonce }}|>
-Query: {{ .currentQuery }}
-Search Count: #{{ .searchCount }}
-
-Result Summary:
-{{ .currentResult }}
-<|CURRENT_SEARCH_END_{{ .nonce }}|>
-
-<|INSTRUCT_{{ .nonce }}|>
-Evaluate whether the current search results are sufficient to answer the user's question, and provide next-step recommendations.
-
-Evaluation Criteria:
-1. Do current results directly answer the user's core question?
-2. Are there important aspects not yet covered?
-3. Is additional information from different angles needed?
-
-Output Requirements:
-- finished: boolean, true if information is sufficient, false otherwise
-- next_search: if finished is false, provide specific search suggestions (keywords/queries); if finished is true, output empty string
-- summary: if finished is true, briefly summarize collected knowledge; if finished is false, output empty string
-
-Constraints:
-- Total searches should not exceed 8
-- Avoid repeating identical or similar searches
-- Prioritize uncovered aspects of the user's question
-<|INSTRUCT_END_{{ .nonce }}|>
-`
+	promptTemplate := promptloader.MustLoad("inline/ai/aid/aireact/reactloops/loop_internet_research/action_web_search/promptTemplate.txt")
 
 	resultPreview := currentResult
 	if len(resultPreview) > 2000 {

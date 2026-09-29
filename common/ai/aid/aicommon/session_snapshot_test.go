@@ -128,11 +128,11 @@ func TestBuildSessionSnapshotExecution_EndedAtOnEmit(t *testing.T) {
 func TestSessionSnapshot_RiskLevelCount(t *testing.T) {
 	originProjectDBPath := consts.GetCurrentProjectDatabasePath()
 	require.NoError(t, consts.SetGormProjectDatabase(filepath.Join(t.TempDir(), "snapshot-risk.db")))
+	db := consts.GetGormProjectDatabase()
 	t.Cleanup(func() {
 		require.NoError(t, consts.SetGormProjectDatabase(originProjectDBPath))
+		require.NoError(t, db.Close())
 	})
-
-	db := consts.GetGormProjectDatabase()
 	require.NoError(t, db.AutoMigrate(&schema.Risk{}).Error)
 
 	createRisk := func(runtimeId, severity, url string) {

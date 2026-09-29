@@ -1,0 +1,3 @@
+# Prompt bytes are part of the model protocol and cache prefix on every OS.
+# Existing prompt whitespace is intentional and must survive relocation.
+common/ai/aid/aicommon/promptloader/prompts/** text eol=lf -whitespace

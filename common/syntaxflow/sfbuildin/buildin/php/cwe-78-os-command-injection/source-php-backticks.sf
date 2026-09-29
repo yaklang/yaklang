@@ -34,10 +34,19 @@ POS
 <?php
 function r() { return "ok"; }
 
+$states = Db::getInstance()->executeS('SELECT `id_order_state` FROM ' . _DB_PREFIX_ . 'order_state');
+$name = "table `users` column `id`";
+// comment mentioning `ls` is not execution
+$instance->execute(($truncate ? 'TRUNCATE TABLE ' : 'DROP TABLE ') . '`' . $table . '`');
 NEG
 )
 
-${*.php}.pattern_regex(/(?m)`[^`]+`/) as $hit
+${*.php}.pattern_regex(/(?m)`[^`'"\n]+`/) as $ticks
+${*.php}.pattern_regex(/'[^'\n]*'/) as $sq
+${*.php}.pattern_regex(/"[^"\n]*"/) as $dq
+${*.php}.pattern_regex(/\/\/[^\n]*|#[^\n]*|\/\*[\s\S]*?\*\//) as $cm
+$sq + $dq + $cm as $quoted
+$ticks not_inside $quoted as $hit
 alert $hit for {
 	level: "high",
 	title: "检测 PHP 反引号命令",

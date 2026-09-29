@@ -11,7 +11,9 @@ import (
 )
 
 var loopActionDirectlyAnswerHTTPFuzztest = &reactloops.LoopAction{
-	ActionType: "directly_answer",
+	ActionType:        "directly_answer",
+	NativeDescription: "在 answer_payload 中提供完整答复，包括 Markdown、列表或表格。已验证的风险必须先通过 generate_risk 保存；漏洞结论须包含证据链。普通任务答复后按 Current/TODO 状态续跑或 finish；安排后续工作时先调用 adjust_todolist。",
+	NativeOptions:     reactloops.NativeDirectlyAnswerOptions(),
 	Description: "用于回答 HTTP 安全测试过程中的阶段性结论或简短问题。短答案可用 answer_payload；需要 Markdown 分段、列表、表格或更复杂展示时，使用 FINAL_ANSWER AITAG。若已验证漏洞或存在应落库风险，必须先调用 generate_risk 保存 Risk；回答漏洞结论时必须包含证据链。" +
 		" 普通任务答复后根据 Current/TODO 状态续跑或 finish；同一 CURRENT-TASK 不得在无有效 todo_delta 时重复 directly_answer。" +
 		" 如答复同时改变或安排后续 TODO，必须携带非空 todo_delta。",

@@ -1,0 +1,56 @@
+desc(
+	mode: "source"
+	language: "php"
+	title: "源码扫描：PHP error_log 写入外部数据"
+	title_zh: "源码扫描：PHP error_log 写入外部数据"
+	type: vuln
+	level: middle
+	rule_id: "source-php-error-log"
+	risk: "log-forging"
+	cwe: "CWE-117"
+	desc: <<<DESC
+### 规则说明
+`error_log` 把字符串写入错误日志。直接记录请求参数时，换行可以伪造新的日志行，口令和令牌也会进日志。
+
+### 风险类型
+log-forging
+
+### 影响
+审计记录不可信。敏感参数在日志系统里扩散，读日志的人可以拿走会话。
+
+### 检测方式
+这条规则使用 source 模式，用正则扫描源文件文本，不构建语法树或 SSA。命中只说明出现了对应写法，不能单独证明数据来自外部输入。注释、字符串和文档中的相同文本也会命中。
+正则匹配任意 `error_log(`。只记录常量消息的调用也会命中，这是粗筛。
+同一检查还有 ssa（数据流）。它们描述同一个问题，命中条件不同，修复时看实际告警来自哪一条。
+
+### 参考
+- [CWE-117：日志输出未处理](https://cwe.mitre.org/data/definitions/117.html)
+
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+- 记录固定的事件名和请求 id，不要记录原始请求体。
+- 去掉用户内容里的换行后再写入。
+- 不要把 `$_GET` 或 `$_POST` 整包交给 `error_log`。
+
+SOLUTION
+	alert_min: 1
+	"file://bad.php": <<<POS
+<?php
+function bad($user) { error_log($user); }
+
+POS
+	"safefile://ok.php": <<<NEG
+<?php
+function ok() { return 1; }
+
+NEG
+)
+${*.php}.pattern_regex(/error_log\s*\(/) as $hit
+alert $hit for {
+	level: "middle",
+	title: "源码扫描：PHP error_log 写入外部数据",
+	title_zh: "源码扫描：PHP error_log 写入外部数据",
+	message: "源码扫描：PHP error_log 写入外部数据",
+	risk: "log-forging",
+}

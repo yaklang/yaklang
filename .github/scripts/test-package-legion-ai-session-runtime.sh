@@ -103,8 +103,14 @@ jq -e \
     (.capabilities | index("ai.input.managed_attachment.v1")) != null and
     (.capabilities | index("ai.session.bind_epoch.v1")) != null and
     (.capabilities | index("ai.session.turn_lifecycle.v1")) != null and
+    (.capabilities | index("ai.skill_bundle.v1")) != null and
     (.capabilities | index("ai.session.runtime")) != null and
     (.capabilities | index("yak.execute")) != null and
+    (.capabilities | index("ai.tools.builtin.v1")) != null and
+    (.capabilities | map(select(startswith("ai.forge.discovery.") or startswith("ai.forge.evidence.") or startswith("ai.forge.http_assessment."))) | length == 0) and
+    (.capabilities | index("ai.forge_release.v1")) != null and
+    (.capabilities | index("ai.forge.custom_tools.v1")) != null and
+    (.capabilities | index("hids")) == null and
     .image.ref == $image_ref and
     .image.revision_label == $source_sha and
     .image.archive_sha256 == $archive_sha and

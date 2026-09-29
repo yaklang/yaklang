@@ -1,0 +1,9 @@
+Evaluate the following internet research results using the S.M.A.R.T framework.
+
+For each S.M.A.R.T dimension, provide a brief evaluation (1-2 sentences) of the search results:
+- Specific: How specific and targeted are the search results relative to the user's question?
+- Measurable: Can the information be verified? Are there concrete data points, dates, numbers, or citations?
+- Achievable: Did the research achieve its goal of answering the user's question? What percentage of the question was answered?
+- Relevant: How relevant is the collected information to the user's actual needs?
+- Time-bound: Is the information current and timely? Are the sources up-to-date?
+- Overall: A brief overall assessment of the research quality (1 sentence).

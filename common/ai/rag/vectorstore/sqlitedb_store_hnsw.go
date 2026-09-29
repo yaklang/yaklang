@@ -638,7 +638,7 @@ func (s *SQLiteVectorStoreHNSW) SearchWithFilter(query string, page, limit int, 
 		}
 		if filter != nil {
 			return filter(key, func() *Document {
-				doc, err := yakit.GetRAGDocumentByID(s.db, s.collection.Name, key)
+				doc, err := yakit.GetRAGDocumentByCollectionIDAndKey(s.db, s.collection.ID, key)
 				if err != nil {
 					return nil
 				}
@@ -801,9 +801,12 @@ func (s *SQLiteVectorStoreHNSW) Get(id string) (*Document, bool, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
-	doc, err := yakit.GetRAGDocumentByID(s.db, s.collection.Name, id)
+	doc, err := yakit.GetRAGDocumentByCollectionIDAndKey(s.db, s.collection.ID, id)
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, false, nil
+	}
 	if err != nil {
-		return nil, false, utils.Errorf("查询文档失败: %v", err)
+		return nil, false, utils.Wrap(err, "查询文档失败")
 	}
 	if doc == nil {
 		return nil, false, nil

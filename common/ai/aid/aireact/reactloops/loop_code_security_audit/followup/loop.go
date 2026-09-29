@@ -2,8 +2,8 @@ package followup
 
 import (
 	"bytes"
-	_ "embed"
 	"fmt"
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon/promptloader"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops/loop_code_security_audit/internal/model"
 	"math"
 	"os"
@@ -14,8 +14,7 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 )
 
-//go:embed prompts/instruction.txt
-var followupInstruction string
+var followupInstruction = promptloader.MustLoad("ai/aid/aireact/reactloops/loop_code_security_audit/followup/prompts/instruction.txt")
 
 const followupOutputExample = `
 * 当用户追问某段代码是否安全时：

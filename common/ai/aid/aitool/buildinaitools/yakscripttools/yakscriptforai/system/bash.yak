@@ -796,7 +796,9 @@ if cmd.ProcessState != nil {
     RESULT["process_started"] = true
     RESULT["process_completed"] = true
     processExitCode = cmd.ProcessState.ExitCode()
-    if processExitCode >= 0 {
+    // TerminateProcess on Windows reports 1 for a killed process; it is not
+    // an exit status returned by the command. Timeout remains the sole outcome.
+    if !isTimeout && processExitCode >= 0 {
         exitCode = processExitCode
         exitCodeAvailable = true
     }

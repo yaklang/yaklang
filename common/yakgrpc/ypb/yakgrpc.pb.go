@@ -241,6 +241,8 @@ const (
 	MITMHijackTaskSource_MITM_HIJACK_TASK_SOURCE_UNSPECIFIED MITMHijackTaskSource = 0
 	MITMHijackTaskSource_MITM_HIJACK_TASK_SOURCE_MANUAL      MITMHijackTaskSource = 1
 	MITMHijackTaskSource_MITM_HIJACK_TASK_SOURCE_CONDITIONAL MITMHijackTaskSource = 2
+	// The engine entered manual hijacking after a conditional match.
+	MITMHijackTaskSource_MITM_HIJACK_TASK_SOURCE_CONDITIONAL_MANUAL MITMHijackTaskSource = 3
 )
 
 // Enum value maps for MITMHijackTaskSource.
@@ -249,11 +251,13 @@ var (
 		0: "MITM_HIJACK_TASK_SOURCE_UNSPECIFIED",
 		1: "MITM_HIJACK_TASK_SOURCE_MANUAL",
 		2: "MITM_HIJACK_TASK_SOURCE_CONDITIONAL",
+		3: "MITM_HIJACK_TASK_SOURCE_CONDITIONAL_MANUAL",
 	}
 	MITMHijackTaskSource_value = map[string]int32{
-		"MITM_HIJACK_TASK_SOURCE_UNSPECIFIED": 0,
-		"MITM_HIJACK_TASK_SOURCE_MANUAL":      1,
-		"MITM_HIJACK_TASK_SOURCE_CONDITIONAL": 2,
+		"MITM_HIJACK_TASK_SOURCE_UNSPECIFIED":        0,
+		"MITM_HIJACK_TASK_SOURCE_MANUAL":             1,
+		"MITM_HIJACK_TASK_SOURCE_CONDITIONAL":        2,
+		"MITM_HIJACK_TASK_SOURCE_CONDITIONAL_MANUAL": 3,
 	}
 )
 
@@ -56092,8 +56096,11 @@ type MITMFilterData struct {
 	ExcludeMIME      []*FilterDataItem      `protobuf:"bytes,8,rep,name=ExcludeMIME,proto3" json:"ExcludeMIME,omitempty"`
 	// 是否过滤打包/构建产物的静态 JS（默认 true：过滤）
 	FilterBundledStaticJS bool `protobuf:"varint,9,opt,name=FilterBundledStaticJS,proto3" json:"FilterBundledStaticJS,omitempty"`
-	unknownFields         protoimpl.UnknownFields
-	sizeCache             protoimpl.SizeCache
+	// Conditional hijack only: switch the session to manual hijacking on a match.
+	// False (default) intercepts matching requests only.
+	HijackToManual bool `protobuf:"varint,10,opt,name=HijackToManual,proto3" json:"HijackToManual,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
 }
 
 func (x *MITMFilterData) Reset() {
@@ -56185,6 +56192,13 @@ func (x *MITMFilterData) GetExcludeMIME() []*FilterDataItem {
 func (x *MITMFilterData) GetFilterBundledStaticJS() bool {
 	if x != nil {
 		return x.FilterBundledStaticJS
+	}
+	return false
+}
+
+func (x *MITMFilterData) GetHijackToManual() bool {
+	if x != nil {
+		return x.HijackToManual
 	}
 	return false
 }
@@ -83181,7 +83195,7 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\x0eFilterDataItem\x12 \n" +
 	"\vMatcherType\x18\x01 \x01(\tR\vMatcherType\x12\x14\n" +
 	"\x05Group\x18\x02 \x03(\tR\x05Group\x12\x1a\n" +
-	"\bRuleName\x18\x03 \x01(\tR\bRuleName\"\x9c\x04\n" +
+	"\bRuleName\x18\x03 \x01(\tR\bRuleName\"\xc4\x04\n" +
 	"\x0eMITMFilterData\x12?\n" +
 	"\x10IncludeHostnames\x18\x01 \x03(\v2\x13.ypb.FilterDataItemR\x10IncludeHostnames\x12?\n" +
 	"\x10ExcludeHostnames\x18\x02 \x03(\v2\x13.ypb.FilterDataItemR\x10ExcludeHostnames\x129\n" +
@@ -83195,7 +83209,9 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"ExcludeUri\x12;\n" +
 	"\x0eExcludeMethods\x18\a \x03(\v2\x13.ypb.FilterDataItemR\x0eExcludeMethods\x125\n" +
 	"\vExcludeMIME\x18\b \x03(\v2\x13.ypb.FilterDataItemR\vExcludeMIME\x124\n" +
-	"\x15FilterBundledStaticJS\x18\t \x01(\bR\x15FilterBundledStaticJS\"\xc3\x01\n" +
+	"\x15FilterBundledStaticJS\x18\t \x01(\bR\x15FilterBundledStaticJS\x12&\n" +
+	"\x0eHijackToManual\x18\n" +
+	" \x01(\bR\x0eHijackToManual\"\xc3\x01\n" +
 	"\vCertificate\x12\x16\n" +
 	"\x06CrtPem\x18\x01 \x01(\fR\x06CrtPem\x12\x16\n" +
 	"\x06KeyPem\x18\x02 \x01(\fR\x06KeyPem\x12&\n" +
@@ -85126,11 +85142,12 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\x14ChunkedDataDirection\x12&\n" +
 	"\"CHUNKED_DATA_DIRECTION_UNSPECIFIED\x10\x00\x12\"\n" +
 	"\x1eCHUNKED_DATA_DIRECTION_REQUEST\x10\x01\x12#\n" +
-	"\x1fCHUNKED_DATA_DIRECTION_RESPONSE\x10\x02*\x8c\x01\n" +
+	"\x1fCHUNKED_DATA_DIRECTION_RESPONSE\x10\x02*\xbc\x01\n" +
 	"\x14MITMHijackTaskSource\x12'\n" +
 	"#MITM_HIJACK_TASK_SOURCE_UNSPECIFIED\x10\x00\x12\"\n" +
 	"\x1eMITM_HIJACK_TASK_SOURCE_MANUAL\x10\x01\x12'\n" +
-	"#MITM_HIJACK_TASK_SOURCE_CONDITIONAL\x10\x02*\x85\x02\n" +
+	"#MITM_HIJACK_TASK_SOURCE_CONDITIONAL\x10\x02\x12.\n" +
+	"*MITM_HIJACK_TASK_SOURCE_CONDITIONAL_MANUAL\x10\x03*\x85\x02\n" +
 	"\x15HTTPFlowLiveEventType\x12)\n" +
 	"%HTTP_FLOW_LIVE_EVENT_TYPE_UNSPECIFIED\x10\x00\x12'\n" +
 	"#HTTP_FLOW_LIVE_EVENT_TYPE_COMMITTED\x10\x01\x12%\n" +

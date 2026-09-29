@@ -1,0 +1,55 @@
+desc(
+	mode: "source"
+	language: "python"
+	title: "源码扫描：Python Cookie secure=False"
+	title_zh: "源码扫描：Python Cookie secure=False"
+	type: vuln
+	level: middle
+	rule_id: "source-python-set-cookie-secure-false"
+	risk: "cookie-security"
+	cwe: "CWE-614"
+	desc: <<<DESC
+### 规则说明
+`set_cookie` 把 `secure` 设为 `False` 时，浏览器可以通过明文 HTTP 发送这枚 Cookie。会话标识因此出现在未加密的请求里。
+
+### 风险类型
+cookie-security
+
+### 影响
+网络路径上的窃听者可以复用会话 Cookie，劫持登录状态。
+
+### 检测方式
+这条规则使用 source 模式，用正则扫描源文件文本，不构建语法树或 SSA。命中只说明出现了对应写法，不能单独证明数据来自外部输入。注释、字符串和文档中的相同文本也会命中。
+正则匹配 `set_cookie(` 到右括号之间的 `secure=False`。参数跨行时可能匹配不到。
+
+### 参考
+- [CWE-614：HTTPS 会话 Cookie 缺少 Secure](https://cwe.mitre.org/data/definitions/614.html)
+
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+- 会话 Cookie 设置 `secure=True`。
+- 站点强制跳转到 HTTPS。
+- 本地 HTTP 调试使用单独配置，不要把 `secure=False` 提交到生产设置。
+
+SOLUTION
+	alert_min: 1
+	"file://bad.py": <<<POS
+def bad(resp):
+    resp.set_cookie("sid", "v", secure=False)
+
+POS
+	"safefile://ok.py": <<<NEG
+def ok(resp):
+    resp.set_cookie("sid", "v", secure=True)
+
+NEG
+)
+${*.py}.pattern_regex(/set_cookie\s*\([^)]*secure\s*=\s*False/) as $hit
+alert $hit for {
+	level: "middle",
+	title: "源码扫描：Python Cookie secure=False",
+	title_zh: "源码扫描：Python Cookie secure=False",
+	message: "源码扫描：Python Cookie secure=False",
+	risk: "cookie-security",
+}

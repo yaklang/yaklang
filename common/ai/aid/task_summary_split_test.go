@@ -5,13 +5,13 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
-	"github.com/yaklang/yaklang/common/ai/aid/aicache"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
+	"github.com/yaklang/yaklang/common/ai/aid/aiprojection"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools"
 )
 
-// 关键词: aicache.Split 单测, P0-A5, task-summary.txt 段稳定性回归
+// 关键词: aiprojection.Split 单测, P0-A5, task-summary.txt 段稳定性回归
 //
 // task-summary prompt 通过 PromptPrefixBuilder 组装为多段 PROMPT_SECTION,
 // 这里通过 assembleTaskSummaryPrompt 验证:
@@ -42,7 +42,7 @@ func renderTaskSummaryFixture(t *testing.T, fixture taskSummaryFixture) string {
 	cfg := taskSummaryToolConfig()
 	if fixture.TimelineFrozen != "" || fixture.TimelineOpen != "" {
 		timeline := aicommon.NewTimeline(cfg, nil)
-		timeline.SetTimelineBucketByteSize(80)
+		timeline.SetTimelineBucketByteSize(300)
 		if fixture.TimelineFrozen != "" {
 			timeline.PushText(101, fixture.TimelineFrozen+" "+strings.Repeat("A", 120))
 		}
@@ -60,12 +60,12 @@ func renderTaskSummaryFixture(t *testing.T, fixture taskSummaryFixture) string {
 	return prompt
 }
 
-func taskSummaryChunksBySection(t *testing.T, prompt string) map[string][]*aicache.Chunk {
+func taskSummaryChunksBySection(t *testing.T, prompt string) map[string][]*aiprojection.Chunk {
 	t.Helper()
 	require.NotEmpty(t, prompt)
-	res := aicache.Split(prompt)
+	res := aiprojection.Split(prompt)
 	require.NotNil(t, res)
-	out := make(map[string][]*aicache.Chunk)
+	out := make(map[string][]*aiprojection.Chunk)
 	for _, c := range res.Chunks {
 		require.NotNil(t, c)
 		out[c.Section] = append(out[c.Section], c)
@@ -85,25 +85,25 @@ func TestSplit_TaskSummaryPrompt_FourSections(t *testing.T) {
 	sec1 := taskSummaryChunksBySection(t, prompt1)
 	sec2 := taskSummaryChunksBySection(t, prompt2)
 
-	require.NotEmpty(t, sec1[aicache.SectionHighStatic], "task-summary prompt must expose high-static chunk")
-	require.NotEmpty(t, sec1[aicache.SectionDynamic], "task-summary prompt must expose dynamic chunk")
-	require.Empty(t, sec1[aicache.SectionRaw], "task-summary prompt should not produce raw/noise chunk; rendered:\n%s", prompt1)
-	require.Contains(t, prompt1, "<|AI_CACHE_FROZEN_semi-dynamic|>")
+	require.NotEmpty(t, sec1[aiprojection.SectionHighStatic], "task-summary prompt must expose high-static chunk")
+	require.NotEmpty(t, sec1[aiprojection.SectionDynamic], "task-summary prompt must expose dynamic chunk")
+	require.Empty(t, sec1[aiprojection.SectionRaw], "task-summary prompt should not produce raw/noise chunk; rendered:\n%s", prompt1)
+	require.Contains(t, prompt1, aiprojection.CreateTemplate("<|AI_CACHE_FROZEN_semi-dynamic|>"))
 	require.Contains(t, prompt1, "# Tool Inventory")
 	require.Contains(t, prompt1, "`grep`: grep tool")
 	require.NotContains(t, prompt1, "# 牢记")
 
-	require.Equal(t, sec1[aicache.SectionHighStatic][0].Hash, sec2[aicache.SectionHighStatic][0].Hash,
+	require.Equal(t, sec1[aiprojection.SectionHighStatic][0].Hash, sec2[aiprojection.SectionHighStatic][0].Hash,
 		"task-summary high-static hash must be byte-stable across calls")
 
 	// 同一 schema 下, 不同 dynamic 输入仍保持 high-static / semi-dynamic 稳定。
 	stub.CurrentTaskInfo = "current task: scan /var"
 	prompt3 := renderTaskSummaryFixture(t, stub)
 	sec3 := taskSummaryChunksBySection(t, prompt3)
-	require.Equal(t, sec1[aicache.SectionHighStatic][0].Hash, sec3[aicache.SectionHighStatic][0].Hash,
+	require.Equal(t, sec1[aiprojection.SectionHighStatic][0].Hash, sec3[aiprojection.SectionHighStatic][0].Hash,
 		"task-summary high-static hash must remain stable across different dynamic inputs")
-	if len(sec1[aicache.SectionSemiDynamic1]) > 0 && len(sec3[aicache.SectionSemiDynamic1]) > 0 {
-		require.Equal(t, sec1[aicache.SectionSemiDynamic1][0].Hash, sec3[aicache.SectionSemiDynamic1][0].Hash,
+	if len(sec1[aiprojection.SectionSemiDynamic1]) > 0 && len(sec3[aiprojection.SectionSemiDynamic1]) > 0 {
+		require.Equal(t, sec1[aiprojection.SectionSemiDynamic1][0].Hash, sec3[aiprojection.SectionSemiDynamic1][0].Hash,
 			"task-summary semi-dynamic-1 hash should remain stable when only dynamic input changes")
 	}
 }
@@ -117,16 +117,16 @@ func TestSplit_TaskSummaryPrompt_FrozenTimelineLandsInFrozenBlock(t *testing.T) 
 	}
 
 	prompt := renderTaskSummaryFixture(t, stub)
-	require.Contains(t, prompt, "<|AI_CACHE_FROZEN_semi-dynamic|>")
+	require.Contains(t, prompt, aiprojection.CreateTemplate("<|AI_CACHE_FROZEN_semi-dynamic|>"))
 	require.Contains(t, prompt, "# Tool Inventory")
 	require.Contains(t, prompt, "`grep`: grep tool")
 	require.Contains(t, prompt, "frozen task timeline")
-	require.Contains(t, prompt, "<|AI_CACHE_FROZEN_END_semi-dynamic|>")
-	require.Contains(t, prompt, "<|PROMPT_SECTION_timeline-open|>")
+	require.Contains(t, prompt, aiprojection.CreateTemplate("<|AI_CACHE_FROZEN_END_semi-dynamic|>"))
+	require.Contains(t, prompt, aiprojection.CreateTemplate("<|PROMPT_SECTION_timeline-open|>"))
 
-	frozenStart := strings.Index(prompt, "<|AI_CACHE_FROZEN_semi-dynamic|>")
-	frozenEnd := strings.Index(prompt, "<|AI_CACHE_FROZEN_END_semi-dynamic|>")
-	openStart := strings.Index(prompt, "<|PROMPT_SECTION_timeline-open|>")
+	frozenStart := strings.Index(prompt, aiprojection.CreateTemplate("<|AI_CACHE_FROZEN_semi-dynamic|>"))
+	frozenEnd := strings.Index(prompt, aiprojection.CreateTemplate("<|AI_CACHE_FROZEN_END_semi-dynamic|>"))
+	openStart := strings.Index(prompt, aiprojection.CreateTemplate("<|PROMPT_SECTION_timeline-open|>"))
 	require.GreaterOrEqual(t, frozenStart, 0)
 	require.Greater(t, frozenEnd, frozenStart)
 	require.Greater(t, openStart, frozenEnd)
@@ -143,20 +143,20 @@ func TestGenerateTaskSummaryPrompt_UsesConfigTimelineFrozenOpen(t *testing.T) {
 	task.Config.Timeline = timeline
 	task.Config.AiToolManager = taskSummaryToolConfig().AiToolManager
 	task.Config.TopToolsCount = 100
-	timeline.SetTimelineBucketByteSize(80)
+	timeline.SetTimelineBucketByteSize(300)
 
 	timeline.PushText(101, "first current task timeline block "+strings.Repeat("A", 120))
 	timeline.PushText(102, "second current task timeline block "+strings.Repeat("B", 120))
 
 	prompt, err := task.GenerateTaskSummaryPrompt()
 	require.NoError(t, err)
-	require.Contains(t, prompt, "<|AI_CACHE_FROZEN_semi-dynamic|>")
+	require.Contains(t, prompt, aiprojection.CreateTemplate("<|AI_CACHE_FROZEN_semi-dynamic|>"))
 	require.Contains(t, prompt, "`grep`: grep tool")
 	require.Contains(t, prompt, "first current task timeline block")
-	require.Contains(t, prompt, "<|PROMPT_SECTION_timeline-open|>")
+	require.Contains(t, prompt, aiprojection.CreateTemplate("<|PROMPT_SECTION_timeline-open|>"))
 	require.Contains(t, prompt, "second current task timeline block")
-	frozenEnd := strings.Index(prompt, "<|AI_CACHE_FROZEN_END_semi-dynamic|>")
-	openStart := strings.Index(prompt, "<|PROMPT_SECTION_timeline-open|>")
+	frozenEnd := strings.Index(prompt, aiprojection.CreateTemplate("<|AI_CACHE_FROZEN_END_semi-dynamic|>"))
+	openStart := strings.Index(prompt, aiprojection.CreateTemplate("<|PROMPT_SECTION_timeline-open|>"))
 	require.Greater(t, frozenEnd, 0)
 	require.Greater(t, openStart, frozenEnd, "frozen timeline must be outside and before timeline-open")
 }

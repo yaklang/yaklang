@@ -1,0 +1,56 @@
+desc(
+	mode: "ssa"
+	language: "php"
+	title: "数据流：PHP header 写入外部值"
+	title_zh: "数据流：PHP header 写入外部值"
+	type: vuln
+	level: high
+	rule_id: "ssa-php-header-call"
+	risk: "crlf-injection"
+	cwe: "CWE-113"
+	desc: <<<DESC
+### 规则说明
+PHP 的 `header` 把字符串写进响应头。参数是变量、并且内容里有换行时，可以多插入 `Set-Cookie` 或 `Location`，把响应拆开。
+
+### 风险类型
+crlf-injection
+
+### 影响
+响应分裂、额外会话 Cookie，以及把用户重定向到外部站点。
+
+### 检测方式
+这条规则使用 ssa 模式，只保留非常量、且不是当前函数参数的实参。常量字符串不告警。实参如果只是函数形参，也不会命中。
+匹配名为 `header` 的调用，而且实参不是常量，也不是当前函数形参。其他同名函数也会命中。常量头部不告警。
+同一检查还有 source（源码正则）。它们描述同一个问题，命中条件不同，修复时看实际告警来自哪一条。
+
+### 参考
+- [CWE-113：HTTP 头中的回车换行未处理](https://cwe.mitre.org/data/definitions/113.html)
+
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+- 传给 `header` 之前删除回车和换行。
+- 头名写死，只对值做白名单校验。
+- 重定向使用框架的重定向方法，并限制允许的主机名。
+
+SOLUTION
+	alert_min: 1
+	"file://bad.php": <<<POS
+<?php
+function bad($v) { header("X-Name: " . $_GET["n"]); }
+
+POS
+	"safefile://ok.php": <<<NEG
+<?php
+function ok() { header("X-Name: fixed"); }
+
+NEG
+)
+header(*?{!opcode: const && !opcode: param} as $dyn) as $call
+alert $dyn for {
+	level: "high",
+	title: "数据流：PHP header 写入外部值",
+	title_zh: "数据流：PHP header 写入外部值",
+	message: "数据流：PHP header 写入外部值",
+	risk: "crlf-injection",
+}

@@ -147,7 +147,7 @@ func (y *singleFileBuilder) VisitExpression(raw javaparser.IExpressionContext) s
 		} else if creator := ret.InnerCreator(); creator != nil {
 			if ret.NonWildcardTypeArguments() != nil {
 			}
-			res = y.VisitInnerCreator(ret.InnerCreator(), ret.Expression().GetText())
+			res = y.VisitInnerCreator(ret.InnerCreator(), obj)
 		} else if explicit := ret.ExplicitGenericInvocation(); explicit != nil {
 			res = y.VisitExplicitGenericInvocation(explicit, obj)
 		}
@@ -786,9 +786,14 @@ func (y *singleFileBuilder) VisitPrimary(raw javaparser.IPrimaryContext) ssa.Val
 		if parent == nil {
 			parent = y.EmitConstInstPlaceholder(text)
 		}
-		cls := y.MarkedThisClassBlueprint.GetSuperBlueprint()
-		if parent != nil {
-			parent.SetType(cls)
+		if y.MarkedThisClassBlueprint != nil {
+			if cls := y.MarkedThisClassBlueprint.GetSuperBlueprint(); cls != nil {
+				parent.SetType(cls)
+			} else {
+				// An implicit/unresolved superclass is not a nil Blueprint type.
+				// Keep the conservative type until a superclass is available.
+				parent.SetType(ssa.CreateAnyType())
+			}
 		}
 		return parent
 	}
@@ -1634,7 +1639,7 @@ func (y *singleFileBuilder) VisitBlockStatementList(raw javaparser.IBlockStateme
 	}
 }
 
-func (y *singleFileBuilder) VisitInnerCreator(raw javaparser.IInnerCreatorContext, outClassVariable string) ssa.Value {
+func (y *singleFileBuilder) VisitInnerCreator(raw javaparser.IInnerCreatorContext, outClassObj ssa.Value) ssa.Value {
 	if y == nil || raw == nil || y.IsStop() {
 		return nil
 	}
@@ -1645,9 +1650,17 @@ func (y *singleFileBuilder) VisitInnerCreator(raw javaparser.IInnerCreatorContex
 	// todo 类声明的泛型
 	if nonWildcard := i.NonWildcardTypeArgumentsOrDiamond(); nonWildcard != nil {
 	}
-	outClassObj := y.ReadOrCreateVariable(outClassVariable)
+	// The qualifier can itself be a call (ansi().new Text(...)). It has
+	// already been evaluated by VisitExpression; do not look up its source
+	// spelling as a new variable or evaluate it a second time.
+	if utils.IsNil(outClassObj) {
+		return y.EmitUndefined(raw.GetText())
+	}
 	outClassType := outClassObj.GetType()
 	outClassName := outClassType.String()
+	if bp, ok := ssa.ToBluePrintType(outClassType); ok && bp != nil {
+		outClassName = bp.Name
+	}
 	var builder strings.Builder
 	builder.WriteString(outClassName)
 	builder.WriteString(".")
@@ -1656,23 +1669,22 @@ func (y *singleFileBuilder) VisitInnerCreator(raw javaparser.IInnerCreatorContex
 
 	class := y.GetBluePrint(className)
 	if class == nil {
-		return nil
+		// External nested classes may not have declarations in the project.
+		// Model their constructor just like an unresolved normal new-expression.
+		class = y.CreateBlueprint(className, raw)
+		for _, name := range outClassType.GetFullTypeNames() {
+			class.AddFullTypeName(name + "." + i.Identifier().GetText())
+		}
+		class.RegisterMagicMethod(ssa.Constructor, y.ReadMemberCallValue(outClassObj, y.EmitConstInstPlaceholder(i.Identifier().GetText())))
 	}
 
 	obj := y.EmitMakeWithoutType(nil, nil)
 	obj.SetType(class)
 
-	constructor := class.Constructor
-	if constructor == nil {
-		return obj
-	}
-
 	args := []ssa.Value{obj}
 	arguments := y.VisitClassCreatorRest(i.ClassCreatorRest(), className)
 	args = append(args, arguments...)
-	c := y.NewCall(constructor, args)
-	y.EmitCall(c)
-	return obj
+	return y.ClassConstructor(class, args)
 
 }
 

@@ -72,6 +72,10 @@ func (s *RAGHTTPServer) handleSearch(w http.ResponseWriter, r *http.Request) {
 		opts = append(opts, rag.WithEmbeddingClient(s.embeddingClient))
 	}
 
+	if s.enhanceSearchHandler != nil {
+		opts = append(opts, rag.WithRAGEnhanceSearchHandler(s.enhanceSearchHandler))
+	}
+
 	ch, err := rag.Query(s.db, req.Query, opts...)
 	if err != nil {
 		writeJSONError(w, http.StatusInternalServerError, "search failed: "+err.Error())

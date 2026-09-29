@@ -7,9 +7,6 @@ replace github.com/yaklang/yaklang v0.0.0 => ./
 // Use the locally forked go-sqlite3 (FTS5 enabled by default) without rewriting imports.
 replace github.com/mattn/go-sqlite3 => github.com/yaklang/go-sqlite3 v0.0.1
 
-// Backport ALPS 17613 support without raising the project's Go version.
-replace github.com/refraction-networking/utls => ./common/third_party/utls
-
 require (
 	github.com/BurntSushi/toml v1.3.2
 	github.com/DataDog/mmh3 v0.0.0-20210722141835-012dc69a9e49
@@ -86,7 +83,6 @@ require (
 	github.com/projectdiscovery/gostruct v0.0.0-20230520110439-bbdedaae3c35
 	github.com/quic-go/quic-go v0.49.1
 	github.com/rabbitmq/amqp091-go v1.9.0
-	github.com/refraction-networking/utls v1.6.7
 	github.com/saintfish/chardet v0.0.0-20120816061221-3af4cd4741ca
 	github.com/samber/lo v1.38.1
 	github.com/santhosh-tekuri/jsonschema/v6 v6.0.1

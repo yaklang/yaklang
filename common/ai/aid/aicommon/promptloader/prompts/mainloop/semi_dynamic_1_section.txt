@@ -1,0 +1,8 @@
+{{ if .WorkspaceContext }}{{ .WorkspaceContext }}
+
+{{ end }}{{ if .SkillsContext }}{{ .SkillsContext }}{{ end }}
+{{ if .PromotedSemiDynamic1 }}
+
+{{ .PromotedSemiDynamic1 }}{{ end }}
+
+{{ if .SessionEvidenceSemiDynamic }}{{ .SessionEvidenceSemiDynamic }}{{ end }}

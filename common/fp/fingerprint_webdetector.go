@@ -308,7 +308,13 @@ func (f *Matcher) fetchBannerFromHostPortWithTLSSkipped(checkedTls bool, baseCtx
 
 	var isTls bool = len(tlsInspectResults) > 0
 	if !isTls && !checkedTls {
-		tlsInspectResults, _ = netx.TLSInspectContext(ctx, target)
+		var inspectErr error
+		tlsInspectResults, inspectErr = netx.TLSInspectContext(ctx, target)
+		if inspectErr != nil {
+			// TLS 探测自己会拨号. 拨号失败说明端口关闭, 不再做 HTTP, 也不再换一种 TLS 握手.
+			f.log("tls inspect dial %v failed, skip http: %v", target, inspectErr)
+			return false, false, nil, nil, utils2.Errorf("dial %s failed: %s", target, inspectErr)
+		}
 		isTls = len(tlsInspectResults) > 0
 		tlsChecked = true
 	}

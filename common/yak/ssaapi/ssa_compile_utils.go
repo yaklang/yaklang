@@ -3,6 +3,7 @@ package ssaapi
 import (
 	"context"
 	"errors"
+	"github.com/yaklang/yaklang/common/utils/memorybudget"
 	"io/fs"
 	"os"
 	"runtime/debug"
@@ -115,22 +116,7 @@ func parseMemoryBudgetEnv(raw string) (int64, bool) {
 }
 
 func systemMemoryTotalBytes() int64 {
-	raw, err := os.ReadFile("/proc/meminfo")
-	if err != nil {
-		return 0
-	}
-	for _, line := range strings.Split(string(raw), "\n") {
-		fields := strings.Fields(line)
-		if len(fields) < 2 || fields[0] != "MemTotal:" {
-			continue
-		}
-		kb, err := strconv.ParseInt(fields[1], 10, 64)
-		if err != nil {
-			return 0
-		}
-		return kb * 1024
-	}
-	return 0
+	return memorybudget.Total()
 }
 
 func autoASTMemoryBudgetBytes() (int64, string) {
@@ -414,8 +400,8 @@ func (c *Config) GetFileHandler(
 		// the heap grows unchecked to 20GB+ on 32GB machines.
 		// Use sync.Once to avoid setting/logging 98 times (once per concurrent worker).
 		gomeMemLimitOnce.Do(func() {
-			if totalMem := systemMemoryTotalBytes(); totalMem > 0 {
-				memLimit := totalMem * 80 / 100
+			totalMem := systemMemoryTotalBytes()
+			if memLimit, enabled := automaticSSACompileMemoryLimit(totalMem); enabled {
 				debug.SetMemoryLimit(memLimit)
 				log.Infof("[ssa-compile] large project: set GOMEMLIMIT=%s (80%% of %s system memory)",
 					formatFileSize(int(memLimit)), formatFileSize(int(totalMem)))

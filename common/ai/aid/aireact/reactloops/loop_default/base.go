@@ -2,25 +2,22 @@ package loop_default
 
 import (
 	"bytes"
-	_ "embed"
 	"fmt"
 	"strings"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon/promptloader"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 )
 
-//go:embed prompts/instruction.txt
-var instruction string
+var instruction = promptloader.MustLoad("ai/aid/aireact/reactloops/loop_default/prompts/instruction.txt")
 
-//go:embed prompts/output_example.txt
-var outputExample string
+var outputExample = promptloader.MustLoad("ai/aid/aireact/reactloops/loop_default/prompts/output_example.txt")
 
-//go:embed prompts/reactive_data.txt
-var reactiveDataTemplate string
+var reactiveDataTemplate = promptloader.MustLoad("ai/aid/aireact/reactloops/loop_default/prompts/reactive_data.txt")
 
 const reActPostSummary = `
 请根据实际执行记录给出收尾答复，严格遵守当前用户请求的语言、长度、格式和文件输出限制，禁止 Emoji。
@@ -82,6 +79,7 @@ func init() {
 		schema.AI_REACT_LOOP_NAME_DEFAULT,
 		func(r aicommon.AIInvokeRuntime, opts ...reactloops.ReActLoopOption) (*reactloops.ReActLoop, error) {
 			preset := []reactloops.ReActLoopOption{
+				reactloops.WithFunctionCallActionVariants(),
 				reactloops.WithAllowRAG(true),
 				reactloops.WithAllowToolCall(true),
 				reactloops.WithAllowAIForge(true),

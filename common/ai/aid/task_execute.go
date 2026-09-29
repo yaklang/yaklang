@@ -18,13 +18,6 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 )
 
-var (
-	taskContinue    = "continue-current-task"
-	taskProceedNext = "proceed-next-task"
-	taskFailed      = "task-failed"
-	taskSkipped     = "task-skipped"
-)
-
 func (t *AiTask) execute() error {
 	t.ContextProvider.StoreCurrentTask(t)
 	taskUserInput := t.GetUserInput()
@@ -90,10 +83,10 @@ func (t *AiTask) execute() error {
 				allOps = append(allOps, lastRecord.EvidenceOps...)
 				allOps = append(allOps, buildVerificationCarryoverEvidenceOps(t, summary)...)
 				if len(allOps) > 0 {
-					// EVIDENCE 单写到 SessionPromptState (SESSION_EVIDENCE 段)。
+					// EVIDENCE 单写到 Timeline，Open 原位展示 delta，freeze 后聚合到 semi。
 					// 历史曾把 EVIDENCE 块嵌入 root user input, 但这会让 PlanContext
 					// 跨子任务抖动并破坏多个 prompt cache 命中。现仅保留
-					// SESSION_EVIDENCE 单一渲染源；基础 save_evidence 与 PE 兼容
+					// Timeline 单一记录源；基础 save_evidence 与 PE 兼容
 					// output_evidence action 也直接写入同一个 Session Evidence Store。
 					// 关键词: EVIDENCE 单写, ApplySessionEvidenceOps, PlanContext 抖动修复
 					log.Infof("task %s applying session evidence ops, count=%d", t.Index, len(allOps))
@@ -406,7 +399,7 @@ func (t *AiTask) generateTaskSummary(summary, nextSteps string) error {
 	if displaySummary != "" {
 		summaryOps := buildSummaryEvidenceOps(t, displaySummary)
 		if len(summaryOps) > 0 {
-			// EVIDENCE 单写到 SessionPromptState (SESSION_EVIDENCE 段),
+			// EVIDENCE 单写到 Timeline，Open 原位展示 delta，freeze 后聚合到 semi,
 			// 同上方 verify-stage 处理理由。
 			// 关键词: EVIDENCE 单写, ApplySessionEvidenceOps, PlanContext 抖动修复
 			log.Infof("task %s applying session summary evidence ops, count=%d", t.Index, len(summaryOps))

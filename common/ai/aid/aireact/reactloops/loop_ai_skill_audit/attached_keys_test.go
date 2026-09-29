@@ -2,6 +2,7 @@ package loop_ai_skill_audit
 
 import (
 	"context"
+	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -17,7 +18,7 @@ func TestWorkspaceAttachedContext_TargetOverridesDirectory(t *testing.T) {
 	})
 	ws := reactloops.InitWorkspaceAttachedContext(nil, nil, task, AttachedResourceKeySkillAuditTargetPath)
 	require.NotNil(t, ws)
-	require.Equal(t, "/tmp/legacy-target", ws.ResolveAttachedScanDirectory())
+	require.Equal(t, filepath.FromSlash("/tmp/legacy-target"), ws.ResolveAttachedScanDirectory())
 }
 
 func TestWorkspaceAttachedContext_LegacyTargetFallback(t *testing.T) {
@@ -27,5 +28,5 @@ func TestWorkspaceAttachedContext_LegacyTargetFallback(t *testing.T) {
 	})
 	ws := reactloops.InitWorkspaceAttachedContext(nil, nil, task, AttachedResourceKeySkillAuditTargetPath)
 	require.NotNil(t, ws)
-	require.Equal(t, "/tmp/skill/demo", ws.ResolveAttachedScanDirectory())
+	require.Equal(t, filepath.FromSlash("/tmp/skill/demo"), ws.ResolveAttachedScanDirectory())
 }

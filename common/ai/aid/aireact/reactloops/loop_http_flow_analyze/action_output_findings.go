@@ -10,6 +10,8 @@ import (
 
 const recordHTTPFlowEvidenceActionDescription = "Persist reusable HTTP flow analysis evidence to the HTTP_FLOW_EVIDENCE document. Use this SPARINGLY only when you have durable evidence worth carrying across later iterations, such as a confirmed suspicious pattern, cross-flow correlation, evidence gap, or rationale for dispatching fuzz tests. Provide the content either via the JSON field `http_flow_evidence` or the `HTTP_FLOW_EVIDENCE` AITag block, but ONLY when `@action=\"record_http_flow_evidence\"`. NEVER attach `http_flow_evidence` to `directly_answer`, `finish`, `filter_and_match_http_flows`, `match_http_flows_with_matcher`, `get_http_flow_detail`, or `dispatch_fuzz_test`. Do not dump ordinary query results or duplicate final-answer prose here."
 
+const recordHTTPFlowEvidenceNativeDescription = "Persist concise, reusable HTTP flow evidence in http_flow_evidence. Use this for confirmed suspicious patterns, cross-flow correlations, evidence gaps, or fuzzing rationale. Do not use it for raw query results or final-answer prose."
+
 const httpFlowEvidenceParamDescription = "Reusable HTTP flow analysis evidence in Markdown format. USE THIS FIELD ONLY IF `@action` IS `record_http_flow_evidence`. Keep it concise and durable: record stable conclusions, correlations, evidence gaps, or fuzz rationale. Do not use it for raw hit dumps, routine search summaries, or final answer text. Use ## headings to categorize evidence (for example: ## Suspicious Patterns, ## Authentication Chain). Content is merged with existing evidence and duplicates are removed automatically."
 
 var recordHTTPFlowEvidenceAction = func(r aicommon.AIInvokeRuntime) reactloops.ReActLoopOption {
@@ -51,6 +53,15 @@ var recordHTTPFlowEvidenceAction = func(r aicommon.AIInvokeRuntime) reactloops.R
 				"recorded HTTP flow evidence",
 				utils.ShrinkTextBlock(incoming, 200))
 			op.Continue()
+		},
+		func(action *reactloops.LoopAction) {
+			action.NativeDescription = recordHTTPFlowEvidenceNativeDescription
+			action.NativeOptions = []aitool.ToolOption{
+				aitool.WithStringParam(httpFlowEvidenceFieldName,
+					aitool.WithParam_Description("Concise, durable HTTP flow evidence in Markdown. Include stable conclusions, correlations, evidence gaps, or fuzzing rationale; avoid raw hit dumps and final-answer text."),
+					aitool.WithParam_Required(true),
+				),
+			}
 		},
 	)
 }

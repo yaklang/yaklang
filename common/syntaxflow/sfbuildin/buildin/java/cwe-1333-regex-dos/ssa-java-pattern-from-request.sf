@@ -1,0 +1,56 @@
+desc(
+	mode: "ssa"
+	language: "java"
+	title: "数据流：Java 用请求编译正则"
+	title_zh: "数据流：Java 用请求编译正则"
+	type: vuln
+	level: middle
+	rule_id: "ssa-java-pattern-from-request"
+	risk: "regex-dos"
+	cwe: "CWE-1333"
+	desc: <<<DESC
+### 规则说明
+`Pattern.compile` 的参数是变量而不是字符串字面量时，模式可能来自请求。Java 的匹配器在嵌套量词上会发生灾难性回溯，请求线程会被长时间占用。
+
+### 风险类型
+regex-dos
+
+### 影响
+攻击者用很短的输入占满服务线程，形成正则拒绝服务。动态模式如果还参与访问判断，也会改变校验结果。
+
+### 检测方式
+这条规则使用 ssa 模式。只有实参本身来自另一次调用时告警，常量字符串不报。直接传入的函数参数也不在本次匹配范围内。
+匹配名为 `compile` 的调用，而且实参本身来自另一次调用。不限于 `Pattern.compile`，其他叫 `compile` 的方法也会命中。常量模式不报，直接传入的形参也不报。
+同一检查还有 source（源码正则）。它们描述同一个问题，命中条件不同，修复时看实际告警来自哪一条。
+
+### 参考
+- [CWE-1333：正则表达式复杂度低效](https://cwe.mitre.org/data/definitions/1333.html)
+
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+- 只编译源码里的固定正则，并复用已经编译好的 `Pattern`。
+- 必须接受用户模式时限制长度和字符集，并给匹配加上超时。
+- 拒绝嵌套量词和可被放大的反向引用。
+
+SOLUTION
+	alert_min: 1
+	"file://bad.java": <<<POS
+import java.util.regex.Pattern;
+class Bad { void c(javax.servlet.http.HttpServletRequest req) { Pattern.compile(req.getParameter("re")); } }
+
+POS
+	"safefile://ok.java": <<<NEG
+import java.util.regex.Pattern;
+class Ok { void c() { Pattern.compile("^[a-z]+$"); } }
+
+NEG
+)
+compile(*?{opcode: call} as $dyn) as $call
+alert $dyn for {
+	level: "middle",
+	title: "数据流：Java 用请求编译正则",
+	title_zh: "数据流：Java 用请求编译正则",
+	message: "数据流：Java 用请求编译正则",
+	risk: "regex-dos",
+}

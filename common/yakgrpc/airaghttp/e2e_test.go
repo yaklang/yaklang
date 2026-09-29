@@ -14,6 +14,7 @@ import (
 
 	"github.com/yaklang/gorm"
 	"github.com/yaklang/yaklang/common/ai/rag"
+	"github.com/yaklang/yaklang/common/ai/rag/enhancesearch"
 	"github.com/yaklang/yaklang/common/ai/rag/vectorstore"
 	"github.com/yaklang/yaklang/common/utils"
 )
@@ -79,6 +80,8 @@ func newE2EServer(t *testing.T, db *gorm.DB, embedder vectorstore.EmbeddingClien
 	if err != nil {
 		t.Fatalf("create server failed: %v", err)
 	}
+	// Keep the HTTP/vector integration offline even when AI providers are configured.
+	server.enhanceSearchHandler = enhancesearch.NewMockSearchHandler()
 	return server
 }
 

@@ -36,9 +36,19 @@ package main
 func main() {}
 
 NEG
+	"safefile://import-list.go": <<<NEG
+package main
+var groups = []string{
+	"net/http/pprof",
+}
+func main() {}
+
+NEG
 )
 
-${*.go}.pattern_regex(/net\/http\/pprof/) as $hit
+// A generated import table stores the path as a quoted string with a trailing
+// comma. Only an import spec is an actual pprof registration.
+${*.go}.pattern_regex(/(?m)^[ \t]*(?:import[ \t]+)?(?:_[ \t]+|[A-Za-z_][A-Za-z0-9_]*[ \t]+)?\"net\/http\/pprof\"[ \t]*\r?$/) as $hit
 alert $hit for {
 	level: "medium",
 	title: "检测 Go 导入 net/http/pprof",

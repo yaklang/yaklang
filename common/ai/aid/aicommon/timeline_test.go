@@ -38,21 +38,7 @@ func (m *mockedAI) CallAI(req *AIRequest) (*AIResponse, error) {
 	rsp := NewUnboundAIResponse()
 	defer rsp.Close()
 
-	// Check if this is a batch compression request
-	prompt := req.GetPrompt()
-	if strings.Contains(prompt, "批量精炼与浓缩") || strings.Contains(prompt, "batch compress") {
-		rsp.EmitOutputStream(strings.NewReader(`
-{"@action": "timeline-reducer", "key_findings": ["batch compressed finding via ai"]}
-`))
-	} else if strings.Contains(prompt, "timeline-reducer") || strings.Contains(prompt, "timeline reducer") {
-		rsp.EmitOutputStream(strings.NewReader(`
-{"@action": "timeline-reducer", "key_findings": ["reducer memory finding via ai"]}
-`))
-	} else {
-		rsp.EmitOutputStream(strings.NewReader(`
-{"@action": "timeline-shrink", "persistent": "summary via ai"}
-`))
-	}
+	rsp.EmitOutputStream(strings.NewReader(`{"@action":"timeline-summary","summary":"Verified history; next step pending."}`))
 	return rsp, nil
 }
 
@@ -174,27 +160,6 @@ func TestTextTimelineItemMethods(t *testing.T) {
 	require.Equal(t, "similar result", textItem.GetShrinkSimilarResult())
 }
 
-// TestTimelineCompressionMethods 测试Timeline压缩相关方法
-func TestTimelineCompressionMethods(t *testing.T) {
-	memoryTimeline := NewTimeline(&mockedAI{}, nil)
-
-	// Add an item
-	memoryTimeline.PushToolResult(&aitool.ToolResult{
-		ID:          100,
-		Name:        "test",
-		Description: "test",
-		Param:       map[string]any{"test": "test"},
-		Success:     true,
-		Data:        "test",
-		Error:       "test",
-	})
-
-	// Test CopyReducibleTimelineWithMemory
-	copied := memoryTimeline.CopyReducibleTimelineWithMemory()
-	require.NotNil(t, copied)
-	require.IsType(t, &Timeline{}, copied)
-}
-
 // TestTimelineConfigurationMethods 测试Timeline配置相关方法
 func TestTimelineConfigurationMethods(t *testing.T) {
 	memoryTimeline := NewTimeline(&mockedAI{}, nil)
@@ -213,28 +178,6 @@ func TestTimelineConfigurationMethods(t *testing.T) {
 	timelineNilMeta := NewTimeline(&mockedAI{}, nil)
 	metaInfoNil := timelineNilMeta.ExtraMetaInfo()
 	require.Equal(t, "", metaInfoNil)
-}
-
-// TestTimelineCompressedHeadInitialized 测试 NewTimeline 后 compressedHead 初始为 nil
-// 关键词: compressedHead 初始化校验
-func TestTimelineCompressedHeadInitialized(t *testing.T) {
-	memoryTimeline := NewTimeline(&mockedAI{}, nil)
-
-	// Add items
-	for i := 1; i <= 3; i++ {
-		memoryTimeline.PushToolResult(&aitool.ToolResult{
-			ID:          int64(i + 100),
-			Name:        "test",
-			Description: "test",
-			Param:       map[string]any{"test": "test"},
-			Success:     true,
-			Data:        "test",
-			Error:       "test",
-		})
-	}
-
-	require.Nil(t, memoryTimeline.compressedHead)
-	require.Empty(t, memoryTimeline.compressedHistory)
 }
 
 // TestTimelineItemOutputString 测试TimelineItemOutput的String方法

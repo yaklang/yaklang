@@ -528,6 +528,7 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 	}
 
 	hijackManger := newManualHijackManager()
+	hijackManger.setHijackToManual(hijackFilterManager.Data.GetHijackToManual())
 	hijackListReload := func() {
 		sendLogged(&ypb.MITMV2Response{
 			ManualHijackListAction: Hijack_List_Reload,
@@ -718,6 +719,7 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 			}
 
 			if reqInstance.GetUpdateHijackFilter() {
+				hijackManger.setHijackToManual(reqInstance.GetHijackFilterData().GetHijackToManual())
 				if hijackFilterManager == nil {
 					hijackFilterManager = NewMITMFilter(reqInstance.HijackFilterData)
 				} else {
@@ -1200,7 +1202,7 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 				}
 			})
 		}()
-		// 条件劫持只作用于当前请求，不能改变会话级手动劫持状态。
+		// 根据条件劫持设置，注册当前任务或切换会话至手动劫持。
 		conditionalHijack := hijackFilterManager != nil && !hijackFilterManager.IsEmpty() && hijackFilterManager.IsPassed(req.Method, req.Host, urlStr, extName)
 		if conditionalHijack {
 			log.Infof("[mitm] hijack ws request by hijack filter")
@@ -1426,7 +1428,7 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 			req = httpctx.GetHijackedRequestBytes(originReqIns)
 		}
 
-		// 条件劫持只作用于当前请求，不能改变会话级手动劫持状态。
+		// 根据条件劫持设置，注册当前任务或切换会话至手动劫持。
 		conditionalHijack := hijackFilterManager != nil && !hijackFilterManager.IsEmpty() && hijackFilterManager.IsPassed(method, hostname, urlStr, extName)
 		if conditionalHijack {
 			log.Infof("[mitm] hijack request by hijack filter")
@@ -2239,13 +2241,15 @@ type manualHijackTask struct {
 }
 
 type manualHijackManager struct {
-	hijackTask           *omap.OrderedMap[string, *manualHijackTask]
-	messageChan          map[string]chan<- *ypb.SingleManualHijackControlMessage
-	manualHijacking      bool
-	hijackLock           sync.Mutex
-	fuzztagConvertedTask *utils.SafeMap[bool] // Track which tasks had binary response converted to fuzztag
-	autoUnzipRequest     *utils.SafeMap[*lowhttp.PacketEncodingState]
-	autoUnzipResponse    *utils.SafeMap[*lowhttp.PacketEncodingState]
+	hijackTask                 *omap.OrderedMap[string, *manualHijackTask]
+	messageChan                map[string]chan<- *ypb.SingleManualHijackControlMessage
+	manualHijacking            bool
+	hijackToManual             bool
+	conditionalManualHijacking bool
+	hijackLock                 sync.Mutex
+	fuzztagConvertedTask       *utils.SafeMap[bool] // Track which tasks had binary response converted to fuzztag
+	autoUnzipRequest           *utils.SafeMap[*lowhttp.PacketEncodingState]
+	autoUnzipResponse          *utils.SafeMap[*lowhttp.PacketEncodingState]
 }
 
 func newManualHijackManager() *manualHijackManager {
@@ -2257,6 +2261,12 @@ func newManualHijackManager() *manualHijackManager {
 		autoUnzipRequest:     utils.NewSafeMap[*lowhttp.PacketEncodingState](),
 		autoUnzipResponse:    utils.NewSafeMap[*lowhttp.PacketEncodingState](),
 	}
+}
+
+func (m *manualHijackManager) setHijackToManual(b bool) {
+	m.hijackLock.Lock()
+	defer m.hijackLock.Unlock()
+	m.hijackToManual = b
 }
 
 func (m *manualHijackManager) setCanRegister(b bool) {
@@ -2276,6 +2286,9 @@ func (m *manualHijackManager) setCanRegister(b bool) {
 		}
 	}
 	m.manualHijacking = b
+	if !b {
+		m.conditionalManualHijacking = false
+	}
 }
 
 func (m *manualHijackManager) getHijackingTaskInfo() []*ypb.SingleManualHijackInfoMessage {
@@ -2296,11 +2309,15 @@ func (m *manualHijackManager) register(resp *ypb.SingleManualHijackInfoMessage, 
 		return nil
 	}
 	taskSourceIsConditional := !m.manualHijacking && conditionalHijack
+	if taskSourceIsConditional && m.hijackToManual {
+		m.manualHijacking = true
+		m.conditionalManualHijacking = true
+	}
 	id := ksuid.New().String()
 	ch := make(chan *ypb.SingleManualHijackControlMessage, 2)
 
 	resp.TaskID = id
-	resp.HijackTaskSource = resolveMITMHijackTaskSource(taskSourceIsConditional)
+	resp.HijackTaskSource = resolveMITMHijackTaskSource(taskSourceIsConditional, m.conditionalManualHijacking)
 	m.messageChan[id] = ch
 	task := &manualHijackTask{
 		taskID:      id,

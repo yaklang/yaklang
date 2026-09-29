@@ -11,8 +11,9 @@ import (
 )
 
 var loopAction_toolRequireAndCall = &reactloops.LoopAction{
-	ActionType:  schema.AI_REACT_LOOP_ACTION_REQUIRE_TOOL,
-	Description: "申请工具并由运行时阅读工具文档、生成参数。默认使用 tool_require_payload 单次生成参数；工具是参数未完整的嵌套 wrapper 时必须使用单调用。仅当 2-8 个调用低风险、互不依赖、互不干扰，且每个工具 Schema 都简单无歧义时，才可使用 tool_require_calls。若工具已在 CACHE_TOOL_CALL 且参数完整，改用 directly_call_tool。批量项严禁提供 params；严禁混用单调用和批量字段，也不要为了凑数量发明调用。",
+	FunctionCallAction: nativeToolSchemaLoadAction,
+	ActionType:         schema.AI_REACT_LOOP_ACTION_REQUIRE_TOOL,
+	Description:        "申请工具并由运行时阅读工具文档、生成参数。默认使用 tool_require_payload 单次生成参数；工具是参数未完整的嵌套 wrapper 时必须使用单调用。仅当 2-8 个调用低风险、互不依赖、互不干扰，且每个工具 Schema 都简单无歧义时，才可使用 tool_require_calls。若工具已在 CACHE_TOOL_CALL 且参数完整，改用 directly_call_tool。批量项严禁提供 params；严禁混用单调用和批量字段，也不要为了凑数量发明调用。",
 	Options: []aitool.ToolOption{
 		aitool.WithStringParam(
 			"tool_require_payload",
@@ -26,7 +27,8 @@ var loopAction_toolRequireAndCall = &reactloops.LoopAction{
 	},
 	OutputExamples: requireToolOutputExamples,
 	ActionVerifier: func(loop *reactloops.ReActLoop, action *aicommon.Action) error {
-		loop.Delete(loopVarRequireToolBatch)
+		loop.SetActionExecutionValue(action, actionStateRequireToolBatch, nil)
+		loop.SetActionExecutionValue(action, "tool_require_payload", nil)
 
 		// tool_require_payload is the legacy one-call discriminator. Preserve its
 		// field-level streaming behavior and only wait for a canonical object when
@@ -37,7 +39,7 @@ var loopAction_toolRequireAndCall = &reactloops.LoopAction{
 		}
 		if payload != "" {
 			reactloops.MaybeWarnBashBeforeEdit(loop, payload)
-			loop.Set("tool_require_payload", payload)
+			loop.SetActionExecutionValue(action, "tool_require_payload", payload)
 			return nil
 		}
 
@@ -46,18 +48,17 @@ var loopAction_toolRequireAndCall = &reactloops.LoopAction{
 			return batchErr
 		}
 		if hasBatch {
-			loop.Set(loopVarRequireToolBatch, batch)
-			loop.Delete("tool_require_payload")
+			loop.SetActionExecutionValue(action, actionStateRequireToolBatch, batch)
 			return nil
 		}
 
 		return utils.Error("require_tool requires tool_require_payload or tool_require_calls")
 	},
 	ActionHandler: func(loop *reactloops.ReActLoop, action *aicommon.Action, operator *reactloops.LoopActionHandlerOperator) {
-		if executeVerifiedToolBatch(loop, loopVarRequireToolBatch, operator) {
+		if executeVerifiedToolBatch(loop, action, actionStateRequireToolBatch, operator) {
 			return
 		}
-		toolPayload := loop.Get("tool_require_payload")
+		toolPayload, _ := loop.GetActionExecutionValue(action, "tool_require_payload").(string)
 		if toolPayload == "" {
 			operator.Feedback(utils.Error("tool_require_payload is required for ActionRequireTool but empty"))
 			return

@@ -15,7 +15,7 @@
 
 **真正影响成本的是上游 (dashscope) 的 cache_creation 行为**:
 
-| dashscope 实测约束 (见 [TONGYI_CACHE_REPORT.md](../aicache/TONGYI_CACHE_REPORT.md) §4.4 / §4.12) | 含义 |
+| dashscope 缓存约束 | 含义 |
 | --- | --- |
 | 建块阈值 = 1024 token (≈4KB) | 前缀短于此不会建任何缓存块 |
 | **"部分命中 + 增量建块"机制不存在** (E12 决定性 FAIL) | frozen 字节序列每变一次, 整段 user1 按 125% cache_creation 计费**全段重建**, 没有"前缀命中 + 增量计费" |
@@ -163,7 +163,7 @@ go test -tags bucketbench -v -run TestBucketBench \
    - 默认行为升级, 所有走 `GroupByMinutes` 的路径自动受益
    - 在真实数据上节省 1.13M (从 -1.99M -> -3.12M, **57% 提升**)
    - 在所有测过的场景里都不弱于 16K
-2. **保留 `TimelineDumpLegacyBucketByteSize = 16K` 常量**, 用作历史标记 / 显式回滚锚点
+2. 旧默认值为 16K；导出的 `TimelineDumpLegacyBucketByteSize` 仅为旧调用方保留，新代码直接设置数值
 3. **新增 `DefaultBucketSizer()` 工厂** ([bucket_bench.go](bucket_bench.go))
    - 等价于 `EntryAdaptiveBucketSizer(8, 32K, 256K)`
    - 主动缓存敏感的调用方可显式开启:
@@ -209,11 +209,8 @@ go test -tags bucketbench -v -run TestBucketBench \
 如果发现新默认值在某个场景下意外劣化:
 
 ```go
-// 全局回退到旧默认:
-aicommon.SetTimelineBucketByteSize(aicommon.TimelineDumpLegacyBucketByteSize)
-
-// 单 timeline 回退:
-tl.SetTimelineBucketByteSize(aicommon.TimelineDumpLegacyBucketByteSize)
+// 单个 Timeline 使用旧的 16 KiB 桶:
+tl.SetTimelineBucketByteSize(16 * 1024)
 
 // 完全关闭字节切分 (退回纯时间桶):
 tl.SetTimelineBucketByteSize(-1)
@@ -255,7 +252,5 @@ go test -run "TestBucketSizer|TestPackTimeline|TestDefault64K" -v \
 
 ## 9. 引用
 
-- [TONGYI_CACHE_REPORT.md](../aicache/TONGYI_CACHE_REPORT.md) §4.4 (1024 token 阈值实测)
-  与 §4.12 (增量建块不存在实测)
-- [CACHE_BOUNDARY_GUIDE.md](../aicache/CACHE_BOUNDARY_GUIDE.md) §1-§3 (frozen 边界标签机制)
+- [aiprojection README](../aiprojection/README.md) (缓存切片与 frozen 边界)
 - [README_TIMELINE_GROUPS.md](README_TIMELINE_GROUPS.md) (Timeline 桶切分实现总览)

@@ -1,0 +1,27 @@
+{{ if .TimelineOpen }}# Timeline Memory (Open Tail)
+
+开放时间线记录的是当前回合"刚刚发生过的事情"——最近若干步工具调用、其返回的观察结果与流程事件，按时间先后追加，是会话内最易变的"近期记忆"段。
+请把它作为"目前已经做了什么"的事实依据：判断任务进度、确认已经尝试过哪些路径、避免重复发起同一工具调用。
+
+{{ .TimelineOpen }}{{ end }}
+
+
+
+{{ if .TodoSnapshot }}
+
+TODO LIST 是当前任务的只读状态快照；执行和写入规则见 High Static 的 TODO 状态维护。优先推进 CURRENT，新发现先登记。
+
+{{ .TodoSnapshot }}
+{{ end }}
+
+{{ if .UserHistory }}
+以下 PREV_USER_INPUT 块是当前会话内用户在此前各轮的原始输入文本，按时间先后给出，用于跨回合维持上下文连贯：理解用户的真实意图、追溯尚未完成的请求、避免反复询问用户早已明确说过的信息。
+注意：这里列出的是"历史输入"，当前回合的实际指令以 USER_QUERY 块为准，本块仅作背景参考。
+{{ .UserHistory }}
+{{ end }}
+{{ if .CurrentTime }}# Current Time
+{{ .CurrentTime }}{{ end }}
+
+{{ if .PlanContext }}{{ .PlanContext }}{{ end }}
+{{ if .ReportedRisks }}
+{{ .ReportedRisks }}{{ end }}

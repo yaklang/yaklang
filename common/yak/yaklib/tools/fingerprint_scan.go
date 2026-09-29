@@ -299,7 +299,7 @@ func _scanFingerprint(ctx context.Context, config *fp.Config, concurrent int, ho
 								return
 							}
 							filter.Insert(addr)
-							log.Infof("start task to scan: [%s://%s]", proto, utils.HostPort(buildinHost, portWithoutProto))
+							log.Debugf("start task to scan: [%s://%s]", proto, utils.HostPort(buildinHost, portWithoutProto))
 							result, err := matcher.MatchWithContext(scanCtx, buildinHost, buildinPort)
 							if err != nil {
 								if len(portsInt) <= 0 {
@@ -575,11 +575,17 @@ func _scanFromTargetStream(res interface{}, opts ...fp.ConfigOption) (chan *fp.M
 	// 关键词: _scanFromTargetStream 派发 ctx 短路, 单主机端口熔断 cancel
 	scanCtx, scanCancel := context.WithCancel(ctx)
 
-	// guard 单主机端口数熔断器. 这里 synResults 中的每个元素都是"已开放端口"
-	// (synscan 只投递开放端口, SpaceEngine/Ping 等输入也都是已确认的目标),
-	// 因此在派发处计数即等价于"单主机开放端口数", 语义正确.
+	// guard 按已确认开放的端口计数, 不按派发次数计数.
+	// ScanFromPing 会把端口列表里的每个端口都送进来, 其中大部分最终是关闭的;
+	// 在派发处计数会把正常的多端口扫描误判成 tarpit.
 	guardLimit := openPortGuardLimit(config)
 	guard := newHostPortGuard(guardLimit)
+	tripGuard := func(h string) {
+		if guard.observe(h) {
+			log.Errorf("host [%s] reached scan-port safety threshold (%d open ports in one scan); likely a tarpit/firewall responding on all ports, force stopping the scan to keep the system healthy", h, guardLimit)
+			scanCancel()
+		}
+	}
 
 	go func() {
 		// 注意: 不能在这里 defer scanCancel(). 派发循环结束时仍有最多 concurrent 个
@@ -595,15 +601,6 @@ func _scanFromTargetStream(res interface{}, opts ...fp.ConfigOption) (chan *fp.M
 			if scanCtx.Err() != nil {
 				break
 			}
-			// 单主机端口数熔断: 命中阈值视为异常目标 (tarpit/防火墙全端口响应),
-			// 强制停止整条扫描流, 保护系统健康. 调用方可通过
-			// servicescan.openPortGuardLimit() 调整阈值, 或通过
-			// servicescan.disableOpenPortGuard() 显式关闭该保护.
-			if guard.observe(synRes.Host) {
-				log.Errorf("host [%s] reached scan-port safety threshold (%d open ports in one scan); likely a tarpit/firewall responding on all ports, force stopping the scan to keep the system healthy", synRes.Host, guardLimit)
-				scanCancel()
-				break
-			}
 			swg.Add()
 			rawPort := synRes.Port
 			rawHost := synRes.Host
@@ -617,11 +614,14 @@ func _scanFromTargetStream(res interface{}, opts ...fp.ConfigOption) (chan *fp.M
 				if scanCtx.Err() != nil {
 					return
 				}
-				log.Infof("start task to scan: [%s://%s]", proto, utils.HostPort(rawHost, portWithoutProto))
+				log.Debugf("start task to scan: [%s://%s]", proto, utils.HostPort(rawHost, portWithoutProto))
 				result, err := matcher.MatchWithContext(scanCtx, rawHost, rawPort)
 				if err != nil {
 					log.Errorf("failed to scan [%s://%s]: %v", proto, utils.HostPort(rawHost, portWithoutProto), err)
 					return
+				}
+				if result != nil && result.IsOpen() {
+					tripGuard(rawHost)
 				}
 
 				sendMatchResultOrDrop(scanCtx, outC, result)

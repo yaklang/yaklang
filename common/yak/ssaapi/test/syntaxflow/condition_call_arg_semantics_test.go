@@ -9,6 +9,24 @@ import (
 	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
 )
 
+func TestConditionSuccessiveArgumentsKeepCallIdentity(t *testing.T) {
+	prog, err := ssaapi.Parse(`f("a", 1); f("b", 2); f("a", 2); f("c", 3); f("d", 4)`, ssaapi.WithLanguage(ssaconfig.Yak))
+	require.NoError(t, err)
+	for _, rule := range []string{
+		`f?(*?{=="a"}, *?{==2}) as $result`,
+		`f?(*?{=="b"}, *?{==1}) as $result`,
+	} {
+		result, err := prog.SyntaxFlowWithError(rule)
+		require.NoError(t, err)
+		if rule == `f?(*?{=="a"}, *?{==2}) as $result` {
+			require.Len(t, result.GetValues("result"), 1)
+			require.Contains(t, result.GetValues("result")[0].String(), `"a",2`)
+		} else {
+			require.Empty(t, result.GetValues("result"), "arguments on different calls must not be combined")
+		}
+	}
+}
+
 func TestCondition_CallArg_Semantics_CallWideVsPerArg(t *testing.T) {
 	code := `
 f = (p) => {

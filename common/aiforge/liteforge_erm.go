@@ -1,9 +1,9 @@
 package aiforge
 
 import (
-	_ "embed"
 	"fmt"
 	"github.com/google/uuid"
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon/promptloader"
 	"github.com/yaklang/yaklang/common/ai/rag/entityrepos"
 	"github.com/yaklang/yaklang/common/jsonextractor"
 	"strings"
@@ -87,32 +87,7 @@ func (e *ERMAnalysisResult) ShowDotGraph() {
 	fmt.Println(art)
 }
 
-var DetectPrompt = `# **你的角色与目标**
-你是一个智能文本领域分类器。你的任务是精准地分析输入的一小段文本（<|INPUT|>），并从以下四个预定义领域中，选择**一个最主要、最贴切**的领域。这个分类至关重要，因为它将决定后续使用哪种专业的分析引擎来深度解析整个文档。你的选择必须果断且有依据。
-# **领域定义与分类标准**
-请严格按照以下定义来判断：
-### 1. "code" (代码领域)
-*   **分类意义**: 此领域代表由程序员编写、用于计算机执行的指令。内容遵循严格的语法和结构。
-*   **识别目标**: 识别出编程语言、脚本语言、查询语言或标记/配置文件。
-*   **关键特征**: 出现编程关键字("func", "class")、大量特殊符号("{}", "()", ";")、注释("//", "#")。
-*   **示例**: Go, Python, JavaScript, SQL, Dockerfile, Nginx配置。
-### 2. "rules" (规则领域)
-*   **分类意义**: 此领域代表用于定义行为、约束、权利或义务的结构化文本。
-*   **识别目标**: 识别出法律条文、公司政策、合同协议或高度结构化的配置（如CI/CD）。
-*   **关键特征**: 使用契约性语言(“甲方应...”)、条款章节形式、YAML/TOML等配置语法。
-*   **示例**: GDPR法律条文、用户服务协议(TOS)、".gitlab-ci.yml"。
-### 3. "log" (日志领域)
-*   **分类意义**: 此领域代表由机器或系统自动生成的、按时间顺序记录的事件数据。
-*   **识别目标**: 识别出来自应用程序、服务器或网络设备的运行时记录。
-*   **关键特征**: 以**时间戳**开始、包含日志级别("INFO", "ERROR")、包含源标识(IP地址, PID)。
-*   **示例**: Nginx访问日志、应用错误堆栈、系统syslog。
-### 4. "other" (其他领域)
-*   **分类意义**: 这是包罗万象的默认类别，适用于所有不属于上述三个专业领域的、以**自然语言**为主的文本。
-*   **识别目标**: 识别出人类日常交流、写作和阅读的内容。
-*   **关键特征**: 连贯的散文、段落或对话。
-*   **示例**: 小说、新闻文章、个人简历、产品说明书、聊天记录。
-# **你的任务**
-现在，请分析下面的文本，并输出它所属的**唯一**领域。`
+var DetectPrompt = promptloader.MustLoad("inline/aiforge/liteforge_erm/DetectPrompt.txt")
 
 var detectDomainSchema = aitool.NewObjectSchemaWithAction(
 	aitool.WithStringParam(
@@ -122,17 +97,13 @@ var detectDomainSchema = aitool.NewObjectSchemaWithAction(
 	),
 )
 
-//go:embed liteforge_prompt/entity_analyze_code.txt
-var ermCodePrompt string
+var ermCodePrompt = promptloader.MustLoad("aiforge/liteforge_prompt/entity_analyze_code.txt")
 
-//go:embed liteforge_prompt/entity_analyze_rule.txt
-var ermRulesPrompt string
+var ermRulesPrompt = promptloader.MustLoad("aiforge/liteforge_prompt/entity_analyze_rule.txt")
 
-//go:embed liteforge_prompt/entity_analyze_log.txt
-var ermLogPrompt string
+var ermLogPrompt = promptloader.MustLoad("aiforge/liteforge_prompt/entity_analyze_log.txt")
 
-//go:embed liteforge_prompt/entity_analyze_other.txt
-var ermOtherPrompt string
+var ermOtherPrompt = promptloader.MustLoad("aiforge/liteforge_prompt/entity_analyze_other.txt")
 
 func DetectERMPrompt(input string, options ...any) (string, error) {
 	analyzeConfig := NewAnalysisConfig(options...)
@@ -548,8 +519,7 @@ var resolveEntitySchema = aitool.NewObjectSchemaWithAction(
 	),
 )
 
-//go:embed liteforge_prompt/resolve_same_entity.txt
-var resolveEntityPrompt string
+var resolveEntityPrompt = promptloader.MustLoad("aiforge/liteforge_prompt/resolve_same_entity.txt")
 
 func ResolveEntity(oldEntity *schema.ERModelEntity, newEntity *schema.ERModelEntity, options ...any) (*schema.ERModelEntity, bool, error) {
 	analyzeConfig := NewAnalysisConfig(options...)

@@ -1,15 +1,13 @@
 package aibp
 
 import (
-	_ "embed"
-
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon/promptloader"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/aiforge"
 	"github.com/yaklang/yaklang/common/log"
 )
 
-//go:embed sf_test_cases_completion_prompts/test_cases_init.txt
-var sf_test_cases_completion_prompt string
+var sf_test_cases_completion_prompt = promptloader.MustLoad("aiforge/aibp/sf_test_cases_completion_prompts/test_cases_init.txt")
 
 func init() {
 	err := aiforge.RegisterLiteForge("sf_test_cases_completion",

@@ -10,6 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon/mock"
+	"github.com/yaklang/yaklang/common/ai/aispec"
 	"github.com/yaklang/yaklang/common/utils/omap"
 )
 
@@ -73,14 +74,28 @@ func TestCallAITransaction_ActionKeyAliasBatch(t *testing.T) {
 				var calls, verifications atomic.Int32
 				config := &fcTestConfig{
 					MockedAIConfig: baseConfig,
-					aiCallback: func(*aicommon.AIRequest) (*aicommon.AIResponse, error) {
+					aiCallback: func(req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 						calls.Add(1)
 						resp := aicommon.NewAIResponse(baseConfig)
-						resp.EmitOutputStream(strings.NewReader(`{"action":"` + actionName + `","identifier":"initial_recon",
+						if functionCall {
+							cfg := aispec.NewDefaultAIConfig(req.GetExtraSpecOpts()...)
+							cfg.ToolCallCallback([]*aispec.ToolCall{{
+								Index: 0, ID: "call_batch", Type: "function",
+								Function: aispec.FuncReturn{Name: actionName, Arguments: `{"identifier":"initial_recon",
+									"directly_call_tool_calls":[
+										{"tool_name":"dig","params":{"domain":"example.invalid","type":"A"}},
+										{"tool_name":"dig","params":{"domain":"example.invalid","type":"CNAME"}}
+									]}`},
+							}})
+							cfg.FinishReasonCallback("tool_calls", nil)
+							resp.EmitOutputStream(strings.NewReader("native function call"))
+						} else {
+							resp.EmitOutputStream(strings.NewReader(`{"action":"` + actionName + `","identifier":"initial_recon",
 							"directly_call_tool_calls":[
 								{"tool_name":"dig","params":{"domain":"example.invalid","type":"A"}},
 								{"tool_name":"dig","params":{"domain":"example.invalid","type":"CNAME"}}
 							]}`))
+						}
 						resp.Close()
 						return resp, nil
 					},
@@ -103,7 +118,8 @@ func TestCallAITransaction_ActionKeyAliasBatch(t *testing.T) {
 						return nil
 					},
 				})
-				action, handler, err := loop.callAITransaction(&sync.WaitGroup{}, "test prompt", "nonce", nil)
+				loopCalls, _, _, err := loop.callAILoopTransaction(&sync.WaitGroup{}, "test prompt", "nonce", nil,
+					loop.emitLoopGeneralOutput, loop.emitLoopFunctionCallOutput)
 				require.EqualValues(t, 1, calls.Load())
 				if actionName == "unsupported" {
 					require.ErrorContains(t, err, `requested="unsupported"`)
@@ -111,6 +127,8 @@ func TestCallAITransaction_ActionKeyAliasBatch(t *testing.T) {
 					return
 				}
 				require.NoError(t, err)
+				require.Len(t, loopCalls, 1)
+				action, handler := loopCalls[0].Action, loopCalls[0].LoopAction
 				require.EqualValues(t, 1, verifications.Load())
 				require.Equal(t, "directly_call_tool", action.ActionType())
 				require.Equal(t, "directly_call_tool", handler.ActionType)

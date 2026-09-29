@@ -10,6 +10,14 @@ import (
 	"github.com/yaklang/yaklang/common/yak/yakdoc"
 )
 
+// yamlEscapeDescription 对 front matter description 值做 YAML 双引号字符串转义：
+// 仅需转义反斜杠和双引号，其余字符在双引号标量中原样安全。
+func yamlEscapeDescription(s string) string {
+	s = strings.ReplaceAll(s, "\\", "\\\\")
+	s = strings.ReplaceAll(s, "\"", "\\\"")
+	return s
+}
+
 // RenderLibMDX 把一个库渲染为 MDX(带 Tabs 的富交互页),目前仅 ai 库使用。
 // 复用与 Markdown 路径相同的解析/示例/锚点逻辑;描述使用解析后的结构化字段(天然去重)。
 // 注意:MDX 含 JSX(<Tabs>),不适用 CheckMarkdownInvariants,其健壮性由文档站真实构建保证。
@@ -24,7 +32,8 @@ func RenderLibMDX(lib *yakdoc.ScriptLib, description string, formatExample func(
 	b.WriteString("sidebar_label: " + lib.Name + "\n")
 	b.WriteString("slug: /api/" + lib.Name + "\n")
 	b.WriteString("title: " + lib.Name + "\n")
-	b.WriteString("description: " + description + "\n")
+	// description 用双引号包裹并转义内部引号，确保 YAML 安全（兜底防御）。
+	b.WriteString("description: \"" + yamlEscapeDescription(description) + "\"\n")
 	b.WriteString("---\n")
 
 	b.WriteString("import Tabs from '@theme/Tabs';\n")

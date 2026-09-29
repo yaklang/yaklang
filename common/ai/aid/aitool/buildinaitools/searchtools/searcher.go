@@ -8,21 +8,17 @@ import (
 	"strings"
 	"text/template"
 
-	_ "embed"
-
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon/promptloader"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/jsonextractor"
 	"github.com/yaklang/yaklang/common/utils"
 )
 
-//go:embed aitool-search.txt
-var __prompt_SearchByAIPrompt string
+var __prompt_SearchByAIPrompt = promptloader.MustLoad("ai/aid/aitool/buildinaitools/searchtools/aitool-search.txt")
 
-//go:embed aitool-keyword-search.txt
-var __prompt_KeywordSearch string
+var __prompt_KeywordSearch = promptloader.MustLoad("ai/aid/aitool/buildinaitools/searchtools/aitool-keyword-search.txt")
 
-//go:embed aitool-keyword-summary.txt
-var __prompt_KeywordSummary string
+var __prompt_KeywordSummary = promptloader.MustLoad("ai/aid/aitool/buildinaitools/searchtools/aitool-keyword-summary.txt")
 
 type AISearchable interface {
 	GetName() string // 唯一标识

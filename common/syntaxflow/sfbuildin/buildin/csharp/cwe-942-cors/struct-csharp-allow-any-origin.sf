@@ -1,0 +1,55 @@
+desc(
+	mode: "struct"
+	language: "csharp"
+	title: "结构扫描：C# CORS 允许任意来源"
+	title_zh: "结构扫描：C# CORS 允许任意来源"
+	type: vuln
+	level: middle
+	rule_id: "struct-csharp-allow-any-origin"
+	risk: "cors"
+	cwe: "CWE-942"
+	desc: <<<DESC
+### 规则说明
+`AllowAnyOrigin()` 把 CORS 来源设为任意网站。浏览器会把接口响应交给任何网页。若再允许凭据，其他网站就能带着用户的 Cookie 读到响应。
+
+### 风险类型
+cors
+
+### 影响
+跨站页面可以读取本应受同源策略保护的数据。和允许凭据一起使用时，已登录用户的接口等于对任意来源开放。
+
+### 检测方式
+这条规则使用 struct 模式，匹配编译后真实存在的调用。注释和普通字符串不会命中。它不分析参数来源，出现该调用即告警。
+匹配名为 `AllowAnyOrigin` 的真实调用。这个调用本身就是过于宽松的跨域策略。
+同一检查还有 source（源码正则）。它们描述同一个问题，命中条件不同，修复时看实际告警来自哪一条。
+
+### 参考
+- [CWE-942：过于宽松的跨域策略](https://cwe.mitre.org/data/definitions/942.html)
+
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+- 用 `WithOrigins` 列出具体来源，不要反射请求里的 Origin。
+- 不要同时调用 `AllowAnyOrigin` 和 `AllowCredentials`。
+- 敏感接口继续做认证。CORS 头不是访问控制的替代。
+
+SOLUTION
+	alert_min: 1
+	"file://bad.cs": <<<POS
+class Bad { void c(Microsoft.AspNetCore.Cors.Infrastructure.CorsPolicyBuilder b) { b.AllowAnyOrigin(); } }
+
+POS
+	"safefile://ok.cs": <<<NEG
+class Ok { void c() { int n = 1; } }
+
+NEG
+)
+AllowAnyOrigin as $call
+AllowAnyOrigin(* as $arg) as $call
+alert $call for {
+	level: "middle",
+	title: "结构扫描：C# CORS 允许任意来源",
+	title_zh: "结构扫描：C# CORS 允许任意来源",
+	message: "结构扫描：C# CORS 允许任意来源",
+	risk: "cors",
+}

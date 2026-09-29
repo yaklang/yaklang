@@ -1,0 +1,56 @@
+desc(
+	mode: "source"
+	language: "python"
+	title: "源码扫描：Python XPath 拼接"
+	title_zh: "源码扫描：Python XPath 拼接"
+	type: vuln
+	level: high
+	rule_id: "source-python-xpath-query"
+	risk: "xpath-injection"
+	cwe: "CWE-643"
+	desc: <<<DESC
+### 规则说明
+`element.xpath` 和 `etree.XPath` 执行 XPath。外部字符串被拼进表达式后，可以改变查询条件，选出原本不该返回的节点。
+
+### 风险类型
+xpath-injection
+
+### 影响
+XML 里的数据会被越权读出。表达式如果还能调用扩展函数，影响会超出这次查询。
+
+### 检测方式
+这条规则使用 source 模式，用正则扫描源文件文本，不构建语法树或 SSA。命中只说明出现了对应写法，不能单独证明数据来自外部输入。注释、字符串和文档中的相同文本也会命中。
+正则匹配 `.xpath(` 和 `etree.XPath(`。常量表达式也会命中。
+同一检查还有 ssa（数据流）。它们描述同一个问题，命中条件不同，修复时看实际告警来自哪一条。
+
+### 参考
+- [CWE-643：XPath 注入](https://cwe.mitre.org/data/definitions/643.html)
+
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+- 使用 lxml 的 XPath 变量，把用户输入作为变量值，而不是表达式的一段文本。
+- 不能使用变量时，限制字符并转义引号。
+- 不要把请求参数格式化进 XPath 字符串。
+
+SOLUTION
+	alert_min: 1
+	"file://bad.py": <<<POS
+def bad(tree, name):
+    return tree.xpath("//user[@name='" + name + "']")
+
+POS
+	"safefile://ok.py": <<<NEG
+def ok():
+    return 1
+
+NEG
+)
+${*.py}.pattern_regex(/\.xpath\s*\(|etree\.XPath\s*\(/) as $hit
+alert $hit for {
+	level: "high",
+	title: "源码扫描：Python XPath 拼接",
+	title_zh: "源码扫描：Python XPath 拼接",
+	message: "源码扫描：Python XPath 拼接",
+	risk: "xpath-injection",
+}

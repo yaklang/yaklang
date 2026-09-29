@@ -231,7 +231,7 @@ func (c *callbackManager) handleFieldStreamStart(fieldName string, bufManager *b
 	// 从stack获取父路径
 	var prefix []string
 	if bufManager != nil {
-		prefix = bufManager.getPrefixKey()
+		prefix = bufManager.getParentPath()
 	}
 
 	var contexts []*fieldStreamContext

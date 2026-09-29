@@ -308,7 +308,8 @@ func directlyCallParamKeys(params aitool.InvokeParams) []string {
 }
 
 var loopAction_directlyCallTool = &reactloops.LoopAction{
-	ActionType: schema.AI_REACT_LOOP_ACTION_DIRECTLY_CALL_TOOL,
+	FunctionCallAction: nativeDirectToolAction,
+	ActionType:         schema.AI_REACT_LOOP_ACTION_DIRECTLY_CALL_TOOL,
 	Description: "直接调用已启用且参数完整的工具，跳过申请和参数生成阶段。默认使用 directly_call_tool_name 和 directly_call_tool_params 的单调用形式。" +
 		"仅当存在 2-8 个低风险、互不依赖、互不干扰，且每层参数都已从真实 Schema 确定的调用时，才可用 directly_call_tool_calls 并发；" +
 		"优先使用 CACHE_TOOL_CALL 中已展示参数 Schema 的工具；已启用但未缓存的工具仍可解析并产生告警。" +
@@ -337,7 +338,8 @@ var loopAction_directlyCallTool = &reactloops.LoopAction{
 	},
 	OutputExamples: directlyCallToolOutputExamples,
 	ActionVerifier: func(loop *reactloops.ReActLoop, action *aicommon.Action) error {
-		loop.Delete(loopVarDirectToolBatch)
+		loop.SetActionExecutionValue(action, actionStateDirectToolBatch, nil)
+		loop.SetActionExecutionValue(action, "directly_call_tool_name", nil)
 
 		// Keep the established scalar streaming contract. The legacy discriminator
 		// is readable before the root JSON object closes, so a valid one-call action
@@ -368,7 +370,7 @@ var loopAction_directlyCallTool = &reactloops.LoopAction{
 				)
 			}
 			reactloops.MaybeWarnBashBeforeEdit(loop, toolName)
-			loop.Set("directly_call_tool_name", toolName)
+			loop.SetActionExecutionValue(action, "directly_call_tool_name", toolName)
 			return nil
 		}
 
@@ -377,39 +379,26 @@ var loopAction_directlyCallTool = &reactloops.LoopAction{
 			return batchErr
 		}
 		if hasBatch {
-			loop.Set(loopVarDirectToolBatch, batch)
-			loop.Delete("directly_call_tool_name")
+			loop.SetActionExecutionValue(action, actionStateDirectToolBatch, batch)
 			return nil
 		}
 
 		return utils.Error("directly_call_tool requires directly_call_tool_name or directly_call_tool_calls")
 	},
 	ActionHandler: func(loop *reactloops.ReActLoop, action *aicommon.Action, operator *reactloops.LoopActionHandlerOperator) {
-		if executeVerifiedToolBatch(loop, loopVarDirectToolBatch, operator) {
+		if executeVerifiedToolBatch(loop, action, actionStateDirectToolBatch, operator) {
 			return
 		}
 		invoker := loop.GetInvoker()
-		cacheSuccessfulTool := func(name string, result *aitool.ToolResult, callErr error) {
-			if callErr != nil || result == nil || !result.Success {
-				return
-			}
-			if cachedTool, lookupErr := loop.GetConfig().GetAiToolManager().GetToolByName(name); lookupErr == nil {
-				if realCfg, ok := loop.GetConfig().(*aicommon.Config); ok {
-					realCfg.RecordRecentlyUsedTool(cachedTool)
-				} else {
-					loop.GetConfig().GetAiToolManager().AddRecentlyUsedTool(cachedTool)
-				}
-			}
-		}
 		reportStatus := func(msg string) {
 			invoker.AddToTimeline("DIRECT_CALL_PARAMS", msg)
 		}
 
-		toolName := loop.Get("directly_call_tool_name")
+		toolName, _ := loop.GetActionExecutionValue(action, "directly_call_tool_name").(string)
 		if toolName == "" {
 			loopInfraStatus(loop, "没有找到要使用的工具", "No suitable tool was found")
 			reportStatus(strings.TrimSpace(`
-Error: directly_call_tool_name is missing in loop state.
+Error: directly_call_tool_name is missing in verified action state.
 Fast-path directly_call_tool failed before execution and cannot be recovered in-place because the target tool is unknown.
 Next attempt MUST either switch to require_tool or retry directly_call_tool with both directly_call_tool_name and directly_call_tool_params.
 
@@ -570,7 +559,7 @@ Few-shot example 2 (valid direct retry):
 		// DirectlyCallTool emits the card (loading) first, then runs prepare (reads
 		// streaming params), then invokes — reusing the same card on fallback.
 		result, directly, callErr := invoker.DirectlyCallTool(ctx, toolName, action, prepare)
-		cacheSuccessfulTool(toolName, result, callErr)
+		recordSuccessfulToolCache(loop.GetConfig(), toolName, result, callErr)
 
 		handleToolCallResult(loop, ctx, invoker, toolName, result, directly, callErr, operator)
 	},

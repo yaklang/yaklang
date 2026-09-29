@@ -20,10 +20,10 @@ func TestH2CanceledResponseKeepsSharedConnectionUsable(t *testing.T) {
 	client, peer := net.Pipe()
 	pool := h2PoolFor(context.Background(), time.Minute)
 	t.Cleanup(pool.Clear)
-	pc := &persistConn{conn: client, p: pool}
-	pc.h2Conn()
-	conn := pc.alt
-	conn.pc = nil // this test owns the connection directly, outside h2ConnMap
+	entry := &h2ConnEntry{conn: client, cacheKey: &connectKey{scheme: H2}, pool: pool.h2Pool}
+	pool.h2Pool.initH2Conn(entry)
+	conn := entry.alt
+	conn.pc = nil // this test owns the connection directly, outside the pool map
 	go conn.readLoop()
 	peerDone := make(chan struct{})
 	t.Cleanup(func() {
@@ -125,7 +125,7 @@ func TestH2CanceledResponseKeepsSharedConnectionUsable(t *testing.T) {
 				result <- response{err: err}
 				return
 			}
-			_, packet, err := stream.waitResponse(ctx, 5*time.Second)
+			_, packet, _, err := stream.waitResponse(ctx, 5*time.Second)
 			result <- response{packet, err}
 		}()
 		return result

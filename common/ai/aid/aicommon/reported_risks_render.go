@@ -30,8 +30,7 @@ type ReportedRiskItem struct {
 }
 
 // ReportedRiskStore is the session-level accumulator for reported risk
-// summaries. It is serialized to JSON and persisted alongside
-// evidenceJSON / todoJSON in SessionPromptState.
+// summaries. It is serialized to JSON in SessionPromptState.
 type ReportedRiskStore struct {
 	mu    sync.Mutex
 	Items []ReportedRiskItem `json:"items"`

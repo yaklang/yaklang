@@ -3,8 +3,9 @@ package aicommon
 import (
 	"bytes"
 	"context"
-	_ "embed"
 	"fmt"
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon/promptloader"
+	"github.com/yaklang/yaklang/common/ai/aid/aiprojection"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
@@ -222,8 +223,7 @@ func (c *Config) DoWaitAgree(ctx context.Context, endpoint *Endpoint) {
 
 type RiskControl func(ctx context.Context, config *Config, ep *Endpoint) (*Action, error)
 
-//go:embed prompts/review/ai-review-tool-call.txt
-var aiReviewPromptTemplate string
+var aiReviewPromptTemplate = promptloader.MustLoad("ai/aid/aicommon/prompts/review/ai-review-tool-call.txt")
 
 // AIReviewPromptData contains data for AI tool call review prompt
 type AIReviewPromptData struct {
@@ -263,7 +263,7 @@ func GenerateAIReviewPrompt(config *Config, userQuery, toolOrTitle, params strin
 		data.Timeline = t.Dump()
 	}
 	name := "ai-review"
-	tmpl, err := template.New(name).Parse(aiReviewPromptTemplate)
+	tmpl, err := template.New(name).Parse(aiprojection.CreateTemplate(aiReviewPromptTemplate))
 	if err != nil {
 		return "", fmt.Errorf("error parsing %s template: %w", name, err)
 	}

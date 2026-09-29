@@ -4,7 +4,7 @@
 
 **Goal:** Add a stateless AI engine runtime path to the yaklang scannode: a new `statelessAIEngineRuntimeDriver` that constructs a fresh `aiengine.AIEngine` per turn (consuming the S3a `ContextPackage` for history/tools/user_input), runs the ReAct loop without persisting to local yakit DB, emits the unchanged 8-type `ai.session.*` event contract, and destroys the engine instance at turn end. Add an `aiengine.WithStateless(true)` option that short-circuits the four persistence hooks in `buildReActOptions`. The stateless driver is built + unit-tested but **NOT wired into `legionJobBridge`** — wiring (driver selection switch + cutover) is S3d. This keeps S3c a parallel path with zero impact on the running stateful engine.
 
-**Architecture:** Three changes: (1) `common/aiengine/config.go` + `aiengine.go` — add `Stateless bool` field + `WithStateless()` option; in `buildReActOptions`, when `config.Stateless` is true, skip `WithPersistentSessionId`/`WithMemoryTriageId` (pass empty) and inject a no-op `MemoryTriage` so `re-act.go`'s four persistence branches (`:127 SaveTimeline`, `:231 EnsureAISessionMeta`, `:265 TimelineArchiveStore`, `:247 MemoryTriage`) all short-circuit. `re-act.go` itself is NOT modified. (2) `scannode/legion_ai_bridge.go` — extend `aiSessionInput` with a `ContextPackage *aiv1.ContextPackage` field; `AcceptInput` reads `command.GetContextPackage()` and passes it through. (3) new `scannode/legion_ai_runtime_stateless.go` — `statelessAIEngineRuntimeDriver` + `statelessAIEngineRuntimeHandle`: `Bind` caches the binding + pre-computes attachment/credential/callback options (reusing `buildYakAIEngineOptions`'s helpers) WITHOUT calling `NewAIEngine`; `SendInput` builds a fresh `AIEngine` per turn with `WithStateless(true)` + cached options + ContextPackage history, runs `SendMsg`, closes the engine on return.
+**Architecture:** Three changes: (1) `common/aiengine/config.go` + `aiengine.go` — add `Stateless bool` field + `WithStateless()` option; in `buildReActOptions`, when `config.Stateless` is true, skip `WithPersistentSessionId`/`WithMemoryTriageId` (pass empty) and inject a no-op `MemoryTriage` so `re-act.go`'s three persistence branches (`:127 SaveTimeline`, `:231 EnsureAISessionMeta`, `:247 MemoryTriage`) all short-circuit. `re-act.go` itself is NOT modified. (2) `scannode/legion_ai_bridge.go` — extend `aiSessionInput` with a `ContextPackage *aiv1.ContextPackage` field; `AcceptInput` reads `command.GetContextPackage()` and passes it through. (3) new `scannode/legion_ai_runtime_stateless.go` — `statelessAIEngineRuntimeDriver` + `statelessAIEngineRuntimeHandle`: `Bind` caches the binding + pre-computes attachment/credential/callback options (reusing `buildYakAIEngineOptions`'s helpers) WITHOUT calling `NewAIEngine`; `SendInput` builds a fresh `AIEngine` per turn with `WithStateless(true)` + cached options + ContextPackage history, runs `SendMsg`, closes the engine on return.
 
 **Tech Stack:** Go, yaklang `common/aiengine` (AIEngine + ReAct operator), `common/ai/aid/aicommon` (ConfigOption), `scannode/gen/legionpb/legion/ai/v1` (S3a proto: ContextPackage), `scannode` AI bridge (legion_ai_bridge.go, legion_ai_runtime_yak.go helpers), `httptest` (attachment download tests), existing `aiSessionRuntimeDriver`/`aiSessionRuntimeHandle` interfaces.
 
@@ -12,7 +12,7 @@
 
 - **S3a is merged on this baseline.** `ContextPackage` / `ContextMessage` / `ContextTool` / `ContextKbFragment` proto types exist in `scannode/gen/legionpb/legion/ai/v1` (package `legionpb`, import path `aiv1 "legion/gen/proto/legion/ai/v1"` — but yaklang uses `legionpb "legion/gen/proto/legion/ai/v1"`; confirm the import alias used in `scannode/legion_ai_bridge.go` and use the same).
 - **NOT wired into legionJobBridge.** S3c only adds the stateless driver + WithStateless option + aiSessionInput extension + unit tests. `legionJobBridge.ensureAIRuntime()` (`scannode/legion_ai_bridge.go:506`) still constructs `newAISessionRuntimeManager(newYakAIEngineRuntimeDriver())` — unchanged. Driver selection + cutover is S3d.
-- **Do NOT modify `common/ai/aid/aireact/re-act.go`.** The four persistence branches (`:127`, `:231`, `:265`, `:247`) are short-circuited by passing empty `PersistentSessionId` + a no-op `MemoryTriage` from the engine config, NOT by editing re-act.go. re-act.go is shared with the client stateful path; editing it risks the client.
+- **Do NOT modify `common/ai/aid/aireact/re-act.go`.** The three persistence branches (`:127`, `:231`, `:265`, `:247`) are short-circuited by passing empty `PersistentSessionId` + a no-op `MemoryTriage` from the engine config, NOT by editing re-act.go. re-act.go is shared with the client stateful path; editing it risks the client.
 - **`WithStateless(true)` is the clean short-circuit.** It sets `AIEngineConfig.Stateless = true`. In `buildReActOptions` (`common/aiengine/aiengine.go` around `:525-526`), when `config.Stateless` is true: (a) pass `WithPersistentSessionId("")` instead of `config.SessionID`; (b) pass `WithMemoryTriageId("")`; (c) inject a no-op `MemoryTriage` via `WithMemoryTriage(<in-memory stub>)` so re-act.go `:246-256` else-branch does not build a DB-backed memory. The stateful path (Stateless=false) is byte-identical to today.
 - **Per-turn engine lifecycle.** The stateless handle's `SendInput` builds a fresh `aiengine.AIEngine` via `aiengine.NewAIEngine(options...)` at the start of each turn, calls `engine.SendMsg(userInput)`, and calls `engine.Close()` when SendMsg returns (success or error). The engine instance is NOT retained across turns. `Bind` does NOT call `NewAIEngine` — it only caches the binding + pre-computes the option slice (minus the NewAIEngine call) so each turn replays them without re-downloading attachments.
 - **Bind caches attachment/credential/callback options.** `appendYakAttachmentOptions` (`legion_ai_runtime_yak.go:419`), `renderCredentialProjection` (`:534`), `loadYakAICallback` (`:336`) run ONCE at Bind; their returned `[]aiengine.AIEngineConfigOption` are cached on the handle. Each turn replays them. This avoids re-downloading 64KiB attachments every turn. Provider/runtime snapshots come from the binding (`aiSessionBinding` `legion_ai_bridge.go:40-41`) and are also cached.
@@ -62,7 +62,7 @@ In `common/aiengine/config.go`, add a field to `AIEngineConfig` (after `SessionI
 	// Stateless 为 true 时,引擎不持久化会话历史/memory/timeline 到本地 DB。
 	// 每轮由服务端打包 ContextPackage 注入历史,turn 完销毁引擎实例。
 	// 用于 S3c 无状态引擎路径。buildReActOptions 据此短路 PersistentSessionId/
-	// MemoryTriageId/TimelineArchiveStore/SaveTimeline 四个落盘分支。
+	// MemoryTriageId/SaveTimeline 三个落盘分支。
 	Stateless bool
 ```
 
@@ -94,7 +94,7 @@ Replace them with a conditional that checks `config.Stateless`:
 
 ```go
 		// S3c: 无状态模式短路持久化。PersistentSessionId/MemoryTriageId 留空,
-		// re-act.go 的 EnsureAISessionMeta(:231)/TimelineArchiveStore(:265)/
+		// re-act.go 的 EnsureAISessionMeta(:231)/
 		// SaveTimeline(:127) 三个分支因 ID 为空而跳过。MemoryTriage 注入
 		// no-op(见下方),避免 re-act.go:246-256 构建 DB-backed memory。
 		persistentID := config.SessionID
@@ -636,7 +636,7 @@ gh pr create --base go0p/refactor/scannode --head feat/yaklang/s3c-stateless-eng
 S3 (Coordinator + 无状态引擎) 的第三步 S3c:在 scannode 侧新增无状态 AI 引擎 runtime 路径,与现有有状态 yakAIEngineRuntimeDriver 并行存在。
 
 三个改动:
-1. aiengine.WithStateless(true) 选项:在 buildReActOptions 里短路 PersistentSessionId/MemoryTriageId/TimelineArchiveStore/SaveTimeline 四个落盘分支,re-act.go 不动
+1. aiengine.WithStateless(true) 选项:在 buildReActOptions 里短路 PersistentSessionId/MemoryTriageId/SaveTimeline 三个落盘分支,re-act.go 不动
 2. aiSessionInput 扩展 ContextPackage 字段:AcceptInput 读取 command.GetContextPackage(),传入 handle
 3. statelessAIEngineRuntimeDriver + statelessAIEngineRuntimeHandle:Bind 缓存附件/凭证/回调选项(不建引擎),SendInput 每轮 new 一个 AIEngine + WithStateless(true) + ContextPackage 历史 + turn 完 Close
 

@@ -2,10 +2,10 @@ package loop_write_python_script
 
 import (
 	"bytes"
-	_ "embed"
 	"strings"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon/promptloader"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops/loopinfra"
 	"github.com/yaklang/yaklang/common/log"
@@ -13,14 +13,11 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 )
 
-//go:embed prompts/persistent_instruction.txt
-var instruction string
+var instruction = promptloader.MustLoad("ai/aid/aireact/reactloops/loop_write_python_script/prompts/persistent_instruction.txt")
 
-//go:embed prompts/output_example.txt
-var outputExample string
+var outputExample = promptloader.MustLoad("ai/aid/aireact/reactloops/loop_write_python_script/prompts/output_example.txt")
 
-//go:embed prompts/reactive_data.txt
-var reactiveData string
+var reactiveData = promptloader.MustLoad("ai/aid/aireact/reactloops/loop_write_python_script/prompts/reactive_data.txt")
 
 func init() {
 	err := reactloops.RegisterLoopFactory(

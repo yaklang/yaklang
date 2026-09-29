@@ -1,0 +1,14 @@
+<|USER_QUERY_%s|>
+%s
+<|USER_QUERY_END_%s|>
+
+<|CANDIDATES_%s|>
+%s
+<|CANDIDATES_END_%s|>
+
+<|INSTRUCT_%s|>
+Rate the relevance of each candidate to the user query.
+Output a JSON array "scores" with objects {index, score} where score is 0.00-1.00.
+Only include candidates with score >= 0.10.
+Sort by score descending.
+<|INSTRUCT_END_%s|>

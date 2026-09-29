@@ -3,6 +3,7 @@ package builtin
 import (
 	"fmt"
 	"io"
+	"os"
 	"reflect"
 	"strings"
 	"unicode/utf8"
@@ -650,7 +651,7 @@ func MapInit(args ...interface{}) interface{} {
 // print("hello", 1, "2", [1, 2, 3])
 // ```
 func print(a ...any) (n int, err error) {
-	return fmt.Print(a...)
+	return PrintTo(os.Stdout, a...)
 }
 
 // printf 在标准输出中根据格式说明符进行格式化并打印信息
@@ -660,7 +661,7 @@ func print(a ...any) (n int, err error) {
 // printf("value = %v", value)
 // ```
 func printf(format string, a ...any) (n int, err error) {
-	return fmt.Printf(format, a...)
+	return PrintfTo(os.Stdout, format, a...)
 }
 
 // println 在标准输出中使用默认格式进行格式化并打印信息（包含换行）
@@ -670,6 +671,21 @@ func printf(format string, a ...any) (n int, err error) {
 // println("hello yak")
 // ```
 func println(a ...any) (n int, err error) {
+	return PrintlnTo(os.Stdout, a...)
+}
+
+// PrintTo preserves Yak print formatting while writing to a caller-owned stream.
+func PrintTo(w io.Writer, a ...any) (int, error) {
+	return fmt.Fprint(w, a...)
+}
+
+// PrintfTo preserves Yak printf formatting while writing to a caller-owned stream.
+func PrintfTo(w io.Writer, format string, a ...any) (int, error) {
+	return fmt.Fprintf(w, format, a...)
+}
+
+// PrintlnTo preserves Yak println formatting while writing to a caller-owned stream.
+func PrintlnTo(w io.Writer, a ...any) (n int, err error) {
 	var results = make([]any, len(a))
 	for i, v := range a {
 		switch val := v.(type) {
@@ -685,7 +701,7 @@ func println(a ...any) (n int, err error) {
 			results[i] = val
 		}
 	}
-	return fmt.Println(results...)
+	return fmt.Fprintln(w, results...)
 }
 
 // sprint 使用默认格式进行格式化并返回字符串

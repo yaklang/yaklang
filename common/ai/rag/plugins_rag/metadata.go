@@ -4,15 +4,13 @@ import (
 	"context"
 	"fmt"
 
-	_ "embed"
-
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon/promptloader"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/aiforge"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
-//go:embed prompt/init.txt
-var generateMetadataPrompt string
+var generateMetadataPrompt = promptloader.MustLoad("ai/rag/plugins_rag/prompt/init.txt")
 
 func GenerateYakScriptMetadata(forgeContent string) (*GenerateResult, error) {
 	var lfopts []aiforge.LiteForgeOption

@@ -23,11 +23,6 @@ type Config struct {
 	// It is intended for trigger/background-only scenarios.
 	autoReActInvoker bool
 	reActOptions     []aicommon.ConfigOption
-
-	// midtermArchiveMode makes this AIMemoryTriage instance use independent DB tables
-	// (ai_midterm_archive_entities_v1 / ai_midterm_archive_collections_v1) instead of
-	// the shared long-term memory tables. Retained for access to historical archives.
-	midtermArchiveMode bool
 }
 
 // Option AIMemoryTriage的配置选项
@@ -53,9 +48,6 @@ type AIMemoryTriage struct {
 
 	// embedding 服务可用标志
 	embeddingAvailable bool
-
-	// midtermArchiveMode makes this instance use independent DB tables for midterm archives.
-	midtermArchiveMode bool
 }
 
 func (a *AIMemoryTriage) SetInvoker(invoker aicommon.AIInvokeRuntime) {
@@ -99,17 +91,6 @@ func WithAutoReActInvoker(opts ...aicommon.ConfigOption) Option {
 	}
 }
 
-// WithMidtermArchiveMode makes the AIMemoryTriage instance use independent DB tables
-// (ai_midterm_archive_entities_v1 / ai_midterm_archive_collections_v1) for midterm
-// archive storage, physically isolating it from normal long-term memory.
-//
-// Deprecated: retained for access to historical data; the runtime no longer archives timelines.
-func WithMidtermArchiveMode() Option {
-	return func(config *Config) {
-		config.midtermArchiveMode = true
-	}
-}
-
 func (r *AIMemoryTriage) SafeGetDB() *gorm.DB {
 	if r.db == nil {
 		return consts.GetGormProjectDatabase()
@@ -117,21 +98,13 @@ func (r *AIMemoryTriage) SafeGetDB() *gorm.DB {
 	return r.db
 }
 
-// entityTableName returns the DB table name for memory entities, depending on whether
-// this instance is in midterm archive mode.
+// entityTableName returns the memory entity table.
 func (r *AIMemoryTriage) entityTableName() string {
-	if r.midtermArchiveMode {
-		return "ai_midterm_archive_entities_v1"
-	}
 	return "ai_memory_entities_v1"
 }
 
-// collectionTableName returns the DB table name for HNSW collections, depending on whether
-// this instance is in midterm archive mode.
+// collectionTableName returns the HNSW collection table.
 func (r *AIMemoryTriage) collectionTableName() string {
-	if r.midtermArchiveMode {
-		return "ai_midterm_archive_collections_v1"
-	}
 	return "ai_memory_collections_v1"
 }
 

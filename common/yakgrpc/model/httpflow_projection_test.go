@@ -6,10 +6,15 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
+	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/schema"
 )
 
 func TestHTTPFlowProjectionExcludesResponseWithoutMutatingCanonicalCache(t *testing.T) {
+	prev := consts.GetHTTPFlowListInlineMaxContentLength()
+	consts.SetHTTPFlowListInlineMaxContentLength(0)
+	t.Cleanup(func() { consts.SetHTTPFlowListInlineMaxContentLength(prev) })
+
 	DropHTTPFlowCacheGRPCModelByFlow()
 	t.Cleanup(DropHTTPFlowCacheGRPCModelByFlow)
 
@@ -54,4 +59,32 @@ func TestHTTPFlowProjectionExcludesResponseWithoutMutatingCanonicalCache(t *test
 	require.NoError(t, err)
 	require.NotEmpty(t, canonical.GetRequest(), "projection must not mutate the cached canonical request")
 	require.NotEmpty(t, canonical.GetResponse(), "projection must not mutate the cached canonical model")
+}
+
+func TestHTTPFlowListCacheDoesNotReuseOmittedPackets(t *testing.T) {
+	DropHTTPFlowCacheGRPCModelByFlow()
+	t.Cleanup(DropHTTPFlowCacheGRPCModelByFlow)
+
+	flow := &schema.HTTPFlow{
+		Hash:     "list-cache-budget",
+		Url:      "http://example.test/",
+		Path:     "/",
+		Method:   "GET",
+		Request:  strconv.Quote("GET / HTTP/1.1\r\nHost: example.test\r\n\r\n"),
+		Response: strconv.Quote("HTTP/1.1 200 OK\r\n\r\n<title>cache</title>"),
+	}
+	flow.ID = 7
+
+	omitted := *flow
+	omitted.Request = ""
+	omitted.Response = ""
+	omittedModel, err := ToHTTPFlowGRPCModel(&omitted, false)
+	require.NoError(t, err)
+	require.Empty(t, omittedModel.GetRequest())
+	require.Empty(t, omittedModel.GetResponse())
+
+	restored, err := ToHTTPFlowGRPCModel(flow, false)
+	require.NoError(t, err)
+	require.NotEmpty(t, restored.GetRequest(), "a later list row that includes the packet must not reuse the omitted cache entry")
+	require.NotEmpty(t, restored.GetResponse(), "a later list row that includes the packet must not reuse the omitted cache entry")
 }

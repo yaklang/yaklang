@@ -1,0 +1,11 @@
+
+请从用户输入中提取可用于 HTTP 安全测试的请求信息。
+
+输出规则：
+1) 如果用户提供了原始 HTTP 请求报文（请求行 + Host 头），将完整报文放到 raw_http_request。
+2) 如果没有原始报文但有 URL，提取到 url，并给出 method（无明确时使用 GET）。
+3) 若无法提取，返回空字符串。
+
+<|USER_INPUT_{{ .nonce }}|>
+{{ .userInput }}
+<|USER_INPUT_END_{{ .nonce }}|>

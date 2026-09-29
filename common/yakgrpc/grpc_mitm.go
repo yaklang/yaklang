@@ -59,7 +59,10 @@ var mitmSaveToDBLock = new(sync.Mutex)
 
 const mitmConditionalHijackContextKey = "yakit_mitm_conditional_hijack"
 
-func resolveMITMHijackTaskSource(conditionalHijack bool) ypb.MITMHijackTaskSource {
+func resolveMITMHijackTaskSource(conditionalHijack, conditionalManual bool) ypb.MITMHijackTaskSource {
+	if conditionalManual {
+		return ypb.MITMHijackTaskSource_MITM_HIJACK_TASK_SOURCE_CONDITIONAL_MANUAL
+	}
 	if conditionalHijack {
 		return ypb.MITMHijackTaskSource_MITM_HIJACK_TASK_SOURCE_CONDITIONAL
 	}
@@ -419,7 +422,26 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 	}()
 
 	autoForward := utils.NewBool(true)
+	conditionalManualHijacking := false
+	var hijackModeLock sync.Mutex
+	hijackToManual := utils.NewBool(hijackFilterManager.Data.GetHijackToManual())
 	autoForwardCh := make(chan struct{}, 1)
+
+	// Keep the session mode and its source in sync when traffic and UI commands race.
+	triggerConditionalManual := func() {
+		hijackModeLock.Lock()
+		defer hijackModeLock.Unlock()
+		if hijackToManual.IsSet() && autoForward.IsSet() {
+			conditionalManualHijacking = true
+			autoForward.UnSet()
+			clearPluginHTTPFlowCache()
+		}
+	}
+	taskSource := func(conditional bool) ypb.MITMHijackTaskSource {
+		hijackModeLock.Lock()
+		defer hijackModeLock.Unlock()
+		return resolveMITMHijackTaskSource(autoForward.IsSet() && conditional, conditionalManualHijacking)
+	}
 
 	filterWebSocket := utils.NewBool(firstReq.GetFilterWebsocket())
 
@@ -555,6 +577,10 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 			// 设置自动转发
 			if reqInstance.GetSetAutoForward() {
 				autoForwardValue := reqInstance.GetAutoForwardValue()
+				hijackModeLock.Lock()
+				if autoForwardValue {
+					conditionalManualHijacking = false
+				}
 				if autoForwardValue != autoForward.IsSet() {
 					clearPluginHTTPFlowCache()
 					beforeAuto := autoForward.IsSet() // 存当前状态
@@ -564,6 +590,7 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 						autoForwardCh <- struct{}{}
 					}
 				}
+				hijackModeLock.Unlock()
 			}
 
 			// 设置中间人插件
@@ -633,6 +660,7 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 			}
 
 			if reqInstance.UpdateHijackFilter {
+				hijackToManual.SetTo(reqInstance.GetHijackFilterData().GetHijackToManual())
 				if hijackFilterManager == nil {
 					hijackFilterManager = NewMITMFilter(reqInstance.HijackFilterData)
 				} else {
@@ -768,7 +796,7 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 			IsHttps:          httpctx.GetRequestHTTPSWithFallback(req) || enableGMTLS,
 			RemoteAddr:       httpctx.GetRemoteAddr(req),
 			IsWebsocket:      true,
-			HijackTaskSource: resolveMITMHijackTaskSource(autoForward.IsSet() && conditionalHijack),
+			HijackTaskSource: taskSource(conditionalHijack),
 		}
 
 		err = mitmSendResp(feedbackRspIns)
@@ -1032,7 +1060,7 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 			ResponseId:       responseCounter,
 			RemoteAddr:       remoteAddr,
 			TraceInfo:        model.ToLowhttpTraceInfoGRPCModel(traceInfo),
-			HijackTaskSource: resolveMITMHijackTaskSource(autoForward.IsSet() && conditionalResponseHijack),
+			HijackTaskSource: taskSource(conditionalResponseHijack),
 		}
 		err = mitmSendResp(feedbackRspIns)
 		if err != nil {
@@ -1128,10 +1156,11 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 				}
 			})
 		}()
-		// 条件劫持只作用于当前请求，不能改变会话级自动转发状态。
+		// 默认仅劫持匹配请求；用户也可以选择命中后进入手动劫持。
 		conditionalHijack := hijackFilterManager != nil && !hijackFilterManager.IsEmpty() && hijackFilterManager.IsPassed(req.Method, req.Host, urlStr, extName)
 		if conditionalHijack {
 			log.Infof("[mitm] hijack ws request by hijack filter")
+			triggerConditionalManual()
 			httpctx.SetContextValueInfoFromRequest(req, mitmConditionalHijackContextKey, true)
 		}
 
@@ -1186,7 +1215,7 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 					Replacers:           replacer.GetRules(),
 					IsWebsocket:         true,
 					RemoteAddr:          httpctx.GetRemoteAddr(req),
-					HijackTaskSource:    resolveMITMHijackTaskSource(autoForward.IsSet() && conditionalHijack),
+					HijackTaskSource:    taskSource(conditionalHijack),
 				}
 				err = mitmSendResp(feedbackOrigin)
 				if err != nil {
@@ -1422,10 +1451,11 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 			req = httpctx.GetHijackedRequestBytes(originReqIns)
 		}
 
-		// 条件劫持只作用于当前请求，不能改变会话级自动转发状态。
+		// 默认仅劫持匹配请求；用户也可以选择命中后进入手动劫持。
 		conditionalHijack := hijackFilterManager != nil && !hijackFilterManager.IsEmpty() && hijackFilterManager.IsPassed(method, hostname, urlStr, extName)
 		if conditionalHijack {
 			log.Infof("[mitm] hijack request by hijack filter")
+			triggerConditionalManual()
 			httpctx.SetContextValueInfoFromRequest(originReqIns, mitmConditionalHijackContextKey, true)
 		}
 
@@ -1481,7 +1511,7 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 					JustContentReplacer: true,
 					Replacers:           replacer.GetRules(),
 					RemoteAddr:          httpctx.GetRemoteAddr(originReqIns),
-					HijackTaskSource:    resolveMITMHijackTaskSource(autoForward.IsSet() && conditionalHijack),
+					HijackTaskSource:    taskSource(conditionalHijack),
 				}
 
 				if lowhttp.IsMultipartFormDataRequest(displayReq) || !utf8.Valid(displayReq) {

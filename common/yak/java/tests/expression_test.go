@@ -9,6 +9,10 @@ import (
 	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
 )
 
+func TestJavaOctalCharacterValues(t *testing.T) {
+	CheckJavaPrintlnValue(`println('\0'); println('\07'); println('\377');`, []string{"0", "7", "255"}, t)
+}
+
 func TestJava_Simple_Expression(t *testing.T) {
 	t.Run("test PostfixExpression", func(t *testing.T) {
 		CheckJavaPrintlnValue(`

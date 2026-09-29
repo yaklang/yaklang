@@ -1,0 +1,54 @@
+desc(
+	mode: "source"
+	language: "java"
+	title: "源码扫描：Java MongoDB 查询拼接"
+	title_zh: "源码扫描：Java MongoDB 查询拼接"
+	type: vuln
+	level: high
+	rule_id: "source-java-mongodb-nosql"
+	risk: "nosql-injection"
+	cwe: "CWE-943"
+	desc: <<<DESC
+### 规则说明
+MongoDB 查询如果把外部字符串放进 `BasicDBObject`、`Filters.regex` 或 `$where`，攻击者可以提交运算符，而不只是一个值。`$where` 还会在服务端执行脚本。用户控制的正则可以被做成拒绝服务，或绕过原本的匹配。
+
+### 风险类型
+nosql-injection
+
+### 影响
+查询条件被改写后，可以读到其他用户的文档。`$where` 里还能执行攻击者的脚本。精心构造的正则会拖垮数据库。
+
+### 检测方式
+这条规则使用 source 模式，用正则扫描源文件文本，不构建语法树或 SSA。命中只说明出现了对应写法，不能单独证明数据来自外部输入。注释、字符串和文档中的相同文本也会命中。
+正则匹配文本中的 `BasicDBObject`、`Filters.regex` 或 `$where`，不要求它们出现在同一次调用里。常量查询也会命中。
+同一检查还有 ssa（数据流）。它们描述同一个问题，命中条件不同，修复时看实际告警来自哪一条。
+
+### 参考
+- [CWE-943：数据查询逻辑中的特殊元素未处理](https://cwe.mitre.org/data/definitions/943.html)
+
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+- 使用驱动的等值过滤器，用户输入只作为值，不作为运算符或代码。
+- 禁止请求参数进入 `$where`、`$regex` 和原始查询 JSON。
+- 不要把客户端提交的整段文档直接交给 `find`。
+
+SOLUTION
+	alert_min: 1
+	"file://bad.java": <<<POS
+class Bad { void q(String id) { String q = "{$where: '" + id + "'}"; } }
+
+POS
+	"safefile://ok.java": <<<NEG
+class Ok { void q() { String q = "fixed"; } }
+
+NEG
+)
+${*.java}.pattern_regex(/BasicDBObject|Filters\.regex|\$where/) as $hit
+alert $hit for {
+	level: "high",
+	title: "源码扫描：Java MongoDB 查询拼接",
+	title_zh: "源码扫描：Java MongoDB 查询拼接",
+	message: "源码扫描：Java MongoDB 查询拼接",
+	risk: "nosql-injection",
+}

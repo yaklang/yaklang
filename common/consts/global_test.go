@@ -22,3 +22,25 @@ func TestSetGlobalMaxContentLength(t *testing.T) {
 		require.Equal(t, uint64(50*1024*1024), GetGlobalMaxContentLength())
 	})
 }
+
+func TestSetHTTPFlowListInlineMaxContentLength(t *testing.T) {
+	previous := GetHTTPFlowListInlineMaxContentLength()
+	t.Cleanup(func() {
+		SetHTTPFlowListInlineMaxContentLength(previous)
+	})
+
+	t.Run("allows zero to drop all list packets", func(t *testing.T) {
+		SetHTTPFlowListInlineMaxContentLength(0)
+		require.Equal(t, uint64(0), GetHTTPFlowListInlineMaxContentLength())
+	})
+
+	t.Run("accepts default 300K", func(t *testing.T) {
+		SetHTTPFlowListInlineMaxContentLength(DefaultHTTPFlowListInlineMaxContentLength)
+		require.Equal(t, DefaultHTTPFlowListInlineMaxContentLength, GetHTTPFlowListInlineMaxContentLength())
+	})
+
+	t.Run("clamps values above 500K", func(t *testing.T) {
+		SetHTTPFlowListInlineMaxContentLength(501 * 1024)
+		require.Equal(t, MaximumHTTPFlowListInlineMaxContentLength, GetHTTPFlowListInlineMaxContentLength())
+	})
+}

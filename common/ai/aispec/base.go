@@ -222,6 +222,8 @@ type ChatBaseContext struct {
 	// If set, tool_calls will NOT be converted to <|TOOL_CALL...|> format in the output stream.
 	// If not set, the original behavior (converting to <|TOOL_CALL...|> format) is preserved.
 	ToolCallCallback func([]*ToolCall)
+	// FinishReasonCallback receives the provider's terminal reason and raw response body.
+	FinishReasonCallback func(string, []byte)
 	// ToolCallArgumentsStreamHandler, when set, receives a reader that
 	// streams the incremental function_call arguments as raw (unescaped)
 	// bytes. This allows downstream consumers (e.g. the ReAct loop
@@ -260,11 +262,9 @@ type ChatBaseContext struct {
 	// 关键词: ChatBaseContext.RawMessages, messages 完整透传
 	RawMessages []ChatDetail
 
-	// MirrorCorrelationID 由 ChatBase 在 dispatchChatBaseMirror 后填充,
-	// 取自 mirrorResult.MirrorCorrelationID. processAIResponse 在调用
-	// UsageCallback 前会通过本字段把 ID 复制到 ChatUsage.MirrorCorrelationID.
-	// 关键词: ChatBaseContext.MirrorCorrelationID, mirror dump usage 关联
-	MirrorCorrelationID string
+	// CorrelationID comes from the pre-send hijack hook. ChatBase copies it
+	// to ChatUsage.MirrorCorrelationID before invoking the usage callback.
+	CorrelationID string
 }
 
 type ChatBaseOption func(c *ChatBaseContext)
@@ -452,6 +452,12 @@ func WithChatBase_ToolCallCallback(cb func([]*ToolCall)) ChatBaseOption {
 	}
 }
 
+func WithChatBase_FinishReasonCallback(cb func(string, []byte)) ChatBaseOption {
+	return func(c *ChatBaseContext) {
+		c.FinishReasonCallback = cb
+	}
+}
+
 // WithChatBase_ToolCallArgumentsStreamHandler sets a handler that receives a
 // reader streaming the incremental function_call arguments as raw bytes.
 // When set, tool_call arguments flow through this handler in addition to
@@ -517,29 +523,38 @@ func NewChatBaseContext(opts ...ChatBaseOption) *ChatBaseContext {
 
 func ChatBase(url string, model string, msg string, chatOpts ...ChatBaseOption) (string, error) {
 	ctx := NewChatBaseContext(chatOpts...)
-	// RawMessages 非空时，让 mirror observer 收到稳定的 messages 序列化字符串
-	// 而不是 prompt 拍平字符串，保持 aicache 等观测者的前缀字节序与上游 LLM
-	// 实际收到的 messages 数组一致，提升缓存命中率统计准确性。
-	// 关键词: ChatBase mirror RawMessages 序列化, 镜像观测前缀对齐
-	mirrorMsg := msg
+	// Hooks run before either protocol serializes the request. When the caller
+	// supplied RawMessages, pass their stable JSON representation to the hooks
+	// for cache observation without allowing a second projection.
+	hookInput := msg
 	if len(ctx.RawMessages) > 0 {
-		mirrorMsg = serializeRawMessagesForMirror(ctx.RawMessages)
+		hookInput = serializeRawMessagesForHook(ctx.RawMessages)
 	}
-	// 同步分发 mirror observer，可能拿到 hijack 决策。仅当 caller 没显式
-	// 给 RawMessages 时才允许 hijack 接管：caller 已构造好 messages 时尊
-	// 重其意图，不二次猜测。
-	// 关键词: ChatBase mirror hijack apply, RawMessages 优先级
-	mirrorResult := dispatchChatBaseMirror(model, mirrorMsg)
-	if len(ctx.RawMessages) == 0 && mirrorResult != nil && mirrorResult.IsHijacked && len(mirrorResult.Messages) > 0 {
-		ctx.RawMessages = mirrorResult.Messages
+	hijackResult := dispatchChatBaseHijackHooks(model, hookInput)
+	if len(ctx.RawMessages) == 0 && hijackResult != nil && hijackResult.IsHijacked && len(hijackResult.Messages) > 0 {
+		ctx.RawMessages = hijackResult.Messages
+		if len(hijackResult.Tools) > 0 {
+			// Explicit caller tools take precedence on name collisions. Keep
+			// projected action tools in prompt order after those caller tools.
+			seen := make(map[string]struct{}, len(ctx.Tools)+len(hijackResult.Tools))
+			for _, tool := range ctx.Tools {
+				seen[tool.Function.Name] = struct{}{}
+			}
+			for _, tool := range hijackResult.Tools {
+				if _, exists := seen[tool.Function.Name]; exists {
+					continue
+				}
+				ctx.Tools = append(ctx.Tools, tool)
+				seen[tool.Function.Name] = struct{}{}
+			}
+		}
 	}
-	// 把 mirror observer 自定义的关联 ID 透传到 ctx, 并用闭包包装 UsageCallback,
+	// 把 hook 自定义的关联 ID 透传到 ctx, 并用闭包包装 UsageCallback,
 	// 让 SSE 末帧 usage 在抵达上层订阅者前自动盖上同一个 ID, 离线分析就能
-	// 用 ID 在 mirror 落盘 (例如 aicache dump) 与 token usage 之间做精确 join.
-	// 关键词: ChatBase mirror correlation plumb, UsageCallback wrap, dump usage 对齐
-	if mirrorResult != nil && mirrorResult.MirrorCorrelationID != "" {
-		ctx.MirrorCorrelationID = mirrorResult.MirrorCorrelationID
-		correlationID := ctx.MirrorCorrelationID
+	// 用 ID 在调试 dump 与 token usage 之间做精确 join.
+	if hijackResult != nil && hijackResult.CorrelationID != "" {
+		ctx.CorrelationID = hijackResult.CorrelationID
+		correlationID := ctx.CorrelationID
 		origUsageCallback := ctx.UsageCallback
 		ctx.UsageCallback = func(usage *ChatUsage) {
 			if usage != nil {
@@ -562,15 +577,13 @@ func ChatBase(url string, model string, msg string, chatOpts ...ChatBaseOption) 
 	}
 }
 
-// serializeRawMessagesForMirror 将 RawMessages 稳定序列化为 JSON 字符串，
-// 用于 dispatchChatBaseMirror 的 msg 参数。失败时回退为空字符串。
+// serializeRawMessagesForHook 将 RawMessages 稳定序列化为 JSON 字符串，
+// 用于 hijack hook 的 msg 参数。失败时回退为空字符串。
 //
 // 实现选择 encoding/json：默认使用结构体 JSON tag 的字段顺序，多次序列化
 // 同一输入产生相同字节序，满足 aicache 等观测者基于字符串前缀做 LCP 计算
 // 的稳定性要求。
-//
-// 关键词: serializeRawMessagesForMirror, RawMessages JSON 序列化, mirror 前缀稳定
-func serializeRawMessagesForMirror(msgs []ChatDetail) string {
+func serializeRawMessagesForHook(msgs []ChatDetail) string {
 	if len(msgs) == 0 {
 		return ""
 	}
@@ -1197,6 +1210,7 @@ type chatBaseStreamHandlerAppender func(
 	rawResponseHeaderCallback RawHTTPResponseHeaderCallback,
 	rawResponseCallback func([]byte, []byte, *ChatUsage),
 	usageCallback func(*ChatUsage),
+	finishReasonCallback ...func(string, []byte),
 ) (io.Reader, io.Reader, io.Reader, []poc.PocConfigOption, func(), streamReadErrGetter)
 
 func executeChatBaseRequest(
@@ -1260,13 +1274,13 @@ func executeChatBaseRequest(
 			ctx.RawHTTPResponseCallback(headerBytes, bodyPreview)
 		}
 		if ctx.RawHTTPRequestResponseCallback != nil {
-			if usageInfo != nil && ctx.MirrorCorrelationID != "" {
-				usageInfo.MirrorCorrelationID = ctx.MirrorCorrelationID
+			if usageInfo != nil && ctx.CorrelationID != "" {
+				usageInfo.MirrorCorrelationID = ctx.CorrelationID
 			}
 			ctx.RawHTTPRequestResponseCallback(requestPacket, headerBytes, bodyPreview, usageInfo)
 		}
 	}
-	pr, reasonPr, toolCallArgsReader, opts, cancel, getStreamReadErr = appendHandler(handleStream, opts, ctx.ToolCallCallback, ctx.RawHTTPResponseHeaderCallback, rawResponseCallback, ctx.UsageCallback)
+	pr, reasonPr, toolCallArgsReader, opts, cancel, getStreamReadErr = appendHandler(handleStream, opts, ctx.ToolCallCallback, ctx.RawHTTPResponseHeaderCallback, rawResponseCallback, ctx.UsageCallback, ctx.FinishReasonCallback)
 	requestPacket = poc.BuildRequest(
 		lowhttp.UrlToRequestPacket(
 			"POST",

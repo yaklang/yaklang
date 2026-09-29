@@ -2,10 +2,11 @@ package aicommon
 
 import (
 	"bytes"
-	_ "embed"
 	"fmt"
 	"strings"
 	"text/template"
+
+	"github.com/yaklang/yaklang/common/ai/aid/aiprojection"
 )
 
 const (
@@ -19,31 +20,6 @@ const (
 	promptMessageSectionTagName = "PROMPT_SECTION"
 	aiCacheSystemSectionTagName = "AI_CACHE_SYSTEM"
 )
-
-// SharedPlanAndExecHighStaticTemplate 是 plan/execution 系统级共享 high-static。
-// 它必须完全无模板变量，避免污染 AI_CACHE_SYSTEM。
-//
-//go:embed prompts/prefix/high_static_section.txt
-var SharedPlanAndExecHighStaticTemplate string
-
-//go:embed prompts/prefix/semi_dynamic_1_section.txt
-var SharedSemiDynamic1Template string
-
-// SharedTaskInstructionSchemaExampleTemplate 复用 aireact 的
-// TaskInstruction -> OutputExample -> Schema 半动态槽位顺序。
-//
-//go:embed prompts/prefix/semi_dynamic_2_section.txt
-var SharedTaskInstructionSchemaExampleTemplate string
-
-// SharedFrozenBlockTemplate 复用 aireact 的 frozen-block 段模板。
-//
-//go:embed prompts/prefix/frozen_block_section.txt
-var SharedFrozenBlockTemplate string
-
-// SharedTimelineOpenTemplate 复用 aireact 的 timeline-open 段模板。
-//
-//go:embed prompts/prefix/timeline_open_section.txt
-var SharedTimelineOpenTemplate string
 
 type PromptPrefixBuilder struct {
 	HighStaticTemplateName string
@@ -99,7 +75,7 @@ func RenderPromptTemplate(name, templateContent string, data any) (string, error
 	if strings.TrimSpace(templateContent) == "" {
 		return "", nil
 	}
-	tmpl, err := template.New(name).Parse(templateContent)
+	tmpl, err := template.New(name).Parse(aiprojection.CreateTemplate(templateContent))
 	if err != nil {
 		return "", fmt.Errorf("error parsing %s template: %w", name, err)
 	}
@@ -120,11 +96,28 @@ func (b *PromptPrefixBuilder) AssemblePromptPrefix(materials *PromptMaterials) (
 	}
 	materials.FrozenPartitions = NormalizeFrozenBlockPartitions(materials.FrozenPartitions)
 
-	highStatic, err := RenderPromptTemplate(b.HighStaticTemplateName, b.HighStaticTemplate, materials.HighStaticData())
+	// Only the shared main-loop templates switch mode. Callers that replace a
+	// template (for example, tool-parameter generation) retain their override.
+	highStaticTemplate := b.HighStaticTemplate
+	frozenBlockTemplate := b.FrozenBlockTemplate
+	semiDynamic2Template := b.SemiDynamic2Template
+	if materials.FunctionCallMode {
+		if highStaticTemplate == SharedPlanAndExecHighStaticTemplate {
+			highStaticTemplate = SharedPlanAndExecHighStaticFunctionCallTemplate
+		}
+		if frozenBlockTemplate == SharedFrozenBlockTemplate {
+			frozenBlockTemplate = SharedFrozenBlockFunctionCallTemplate
+		}
+		if semiDynamic2Template == SharedTaskInstructionSchemaExampleTemplate {
+			semiDynamic2Template = SharedTaskInstructionFunctionCallTemplate
+		}
+	}
+
+	highStatic, err := RenderPromptTemplate(b.HighStaticTemplateName, highStaticTemplate, materials.HighStaticData())
 	if err != nil {
 		return nil, err
 	}
-	frozenBlock, err := RenderPromptTemplate(b.FrozenBlockTemplateName, b.FrozenBlockTemplate, materials.FrozenBlockData())
+	frozenBlock, err := RenderPromptTemplate(b.FrozenBlockTemplateName, frozenBlockTemplate, materials.FrozenBlockData())
 	if err != nil {
 		return nil, err
 	}
@@ -132,7 +125,7 @@ func (b *PromptPrefixBuilder) AssemblePromptPrefix(materials *PromptMaterials) (
 	if err != nil {
 		return nil, err
 	}
-	semiDynamic2, err := RenderPromptTemplate(b.SemiDynamic2TemplateName, b.SemiDynamic2Template, materials.SemiDynamic2Data())
+	semiDynamic2, err := RenderPromptTemplate(b.SemiDynamic2TemplateName, semiDynamic2Template, materials.SemiDynamic2Data())
 	if err != nil {
 		return nil, err
 	}
@@ -249,14 +242,7 @@ func WrapAICacheFrozen(content string) string {
 	if content == "" {
 		return ""
 	}
-	return fmt.Sprintf(
-		"<|%s_%s|>\n%s\n<|%s_END_%s|>",
-		TimelineFrozenBoundaryTagName,
-		TimelineFrozenBoundaryNonce,
-		content,
-		TimelineFrozenBoundaryTagName,
-		TimelineFrozenBoundaryNonce,
-	)
+	return aiprojection.CreateTag(TimelineFrozenBoundaryTagName, TimelineFrozenBoundaryNonce, content)
 }
 
 func WrapAICacheSemi(content string) string {
@@ -264,14 +250,7 @@ func WrapAICacheSemi(content string) string {
 	if content == "" {
 		return ""
 	}
-	return fmt.Sprintf(
-		"<|%s_%s|>\n%s\n<|%s_END_%s|>",
-		SemiDynamicCacheBoundaryTagName,
-		SemiDynamicCacheBoundaryNonce,
-		content,
-		SemiDynamicCacheBoundaryTagName,
-		SemiDynamicCacheBoundaryNonce,
-	)
+	return aiprojection.CreateTag(SemiDynamicCacheBoundaryTagName, SemiDynamicCacheBoundaryNonce, content)
 }
 
 func WrapAICacheSemi2(content string) string {
@@ -279,14 +258,7 @@ func WrapAICacheSemi2(content string) string {
 	if content == "" {
 		return ""
 	}
-	return fmt.Sprintf(
-		"<|%s_%s|>\n%s\n<|%s_END_%s|>",
-		SemiDynamicPart2CacheBoundaryTagName,
-		SemiDynamicPart2CacheBoundaryNonce,
-		content,
-		SemiDynamicPart2CacheBoundaryTagName,
-		SemiDynamicPart2CacheBoundaryNonce,
-	)
+	return aiprojection.CreateTag(SemiDynamicPart2CacheBoundaryTagName, SemiDynamicPart2CacheBoundaryNonce, content)
 }
 
 func WrapPromptMessageSection(sectionName string, content string, nonce string) string {
@@ -300,12 +272,12 @@ func wrapPromptMessageSectionWithForce(sectionName string, content string, nonce
 	}
 	if sectionName == PromptSectionDynamic && nonce != "" {
 		tagName := fmt.Sprintf("%s_%s", promptMessageSectionTagName, sectionName)
-		return fmt.Sprintf("<|%s_%s|>\n%s\n<|%s_END_%s|>", tagName, nonce, content, tagName, nonce)
+		return aiprojection.CreateTag(tagName, nonce, content)
 	}
 	if sectionName == PromptSectionHighStatic {
-		return fmt.Sprintf("<|%s_%s|>\n%s\n<|%s_END_%s|>", aiCacheSystemSectionTagName, sectionName, content, aiCacheSystemSectionTagName, sectionName)
+		return aiprojection.CreateTag(aiCacheSystemSectionTagName, sectionName, content)
 	}
-	return fmt.Sprintf("<|%s_%s|>\n%s\n<|%s_END_%s|>", promptMessageSectionTagName, sectionName, content, promptMessageSectionTagName, sectionName)
+	return aiprojection.CreateTag(promptMessageSectionTagName, sectionName, content)
 }
 
 func JoinPromptSections(parts ...string) string {

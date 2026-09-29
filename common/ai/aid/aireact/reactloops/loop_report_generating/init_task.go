@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon/promptloader"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/log"
@@ -56,28 +57,7 @@ func buildInitTask(r aicommon.AIInvokeRuntime) func(loop *reactloops.ReActLoop, 
 		isModifyExisting := false
 		if outputFilename == "" {
 			reactloops.EmitStatusI18n(loop, "正在了解报告重点", "Understanding the report's focus")
-			analysisPrompt := `分析用户的报告生成需求，判断是要修改现有文件还是创建新文件。
-
-## 用户输入
-<|USER_INPUT_{{ .nonce }}|>
-{{ .userInput }}
-<|USER_INPUT_END_{{ .nonce }}|>
-
-## 附加文件列表
-{{ if .attachedFiles }}
-{{ range .attachedFiles }}- {{ . }}
-{{ end }}
-{{ else }}
-（无附加文件）
-{{ end }}
-
-## 判断规则
-1. 如果用户明确提到要"修改"、"编辑"、"更新"某个现有文件 → is_modify=true
-2. 如果用户指定了输出文件路径（如"保存到 xxx.md"、"写入 xxx"）→ is_modify=true, target_file=指定路径
-3. 如果用户要求"生成"、"创建"、"撰写"新报告 → is_modify=false
-4. 如果用户提到现有报告需要"补充"、"完善" → is_modify=true
-
-请分析并返回结果。`
+			analysisPrompt := promptloader.MustLoad("inline/ai/aid/aireact/reactloops/loop_report_generating/init_task/analysisPrompt.txt")
 			config.ScheduleAuxiliaryTask(task.GetContext(),
 				aicommon.CallerLabelAnalyzeReportIntent,
 				func() string {

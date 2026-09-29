@@ -1,0 +1,54 @@
+desc(
+	mode: "source"
+	language: "python"
+	title: "源码扫描：Python Cookie samesite=None"
+	title_zh: "源码扫描：Python Cookie samesite=None"
+	type: vuln
+	level: middle
+	rule_id: "source-python-set-cookie-samesite-none"
+	risk: "cookie-security"
+	cwe: "CWE-1275"
+	desc: <<<DESC
+### 规则说明
+`samesite='None'` 允许跨站请求携带这枚 Cookie。会话会参与其他网站发起的请求。
+
+### 风险类型
+cookie-security
+
+### 影响
+跨站请求伪造更容易成功。没有同时 `secure=True` 时，浏览器会拒绝这枚 Cookie。
+
+### 检测方式
+这条规则使用 source 模式，用正则扫描源文件文本，不构建语法树或 SSA。命中只说明出现了对应写法，不能单独证明数据来自外部输入。注释、字符串和文档中的相同文本也会命中。
+正则匹配 `samesite=` 后面引号里的 `None`。`Lax` 和 `Strict` 不会命中。
+
+### 参考
+- [CWE-1275：敏感 Cookie 的 SameSite 属性不当](https://cwe.mitre.org/data/definitions/1275.html)
+
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+- 改为 `samesite='Lax'` 或 `samesite='Strict'`。
+- 必须使用 None 时同时设置 `secure=True`，并校验 CSRF 令牌。
+
+SOLUTION
+	alert_min: 1
+	"file://bad.py": <<<POS
+def bad(resp):
+    resp.set_cookie("sid", "v", samesite="None")
+
+POS
+	"safefile://ok.py": <<<NEG
+def ok(resp):
+    resp.set_cookie("sid", "v", samesite="Lax")
+
+NEG
+)
+${*.py}.pattern_regex(/samesite\s*=\s*[\"']None[\"']/) as $hit
+alert $hit for {
+	level: "middle",
+	title: "源码扫描：Python Cookie samesite=None",
+	title_zh: "源码扫描：Python Cookie samesite=None",
+	message: "源码扫描：Python Cookie samesite=None",
+	risk: "cookie-security",
+}

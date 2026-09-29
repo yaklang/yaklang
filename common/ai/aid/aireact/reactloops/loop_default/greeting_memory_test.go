@@ -27,16 +27,6 @@ func (m *greetingRecallMemory) SearchMemoryWithoutAI(any, int) (*aicommon.Search
 	return &aicommon.SearchMemoryResult{}, nil
 }
 
-type greetingRecallInvoker struct {
-	*postIterationTestInvoker
-	midterm atomic.Int32
-}
-
-func (i *greetingRecallInvoker) ConsumeAndSearchMidtermMemory() string {
-	i.midterm.Add(1)
-	return "irrelevant historical memory"
-}
-
 func TestMUSTPASS_GreetingAnswersOnceWithoutMemoryRecall(t *testing.T) {
 	for _, emptyHTTP := range []bool{false, true} {
 		name := "no attachment"
@@ -51,14 +41,15 @@ func TestMUSTPASS_GreetingAnswersOnceWithoutMemoryRecall(t *testing.T) {
 				`{"@action":"directly_answer","answer_payload":"你好！"}`,
 				`{"@action":"finish","answer":"done"}`,
 			)
-			inv := &greetingRecallInvoker{postIterationTestInvoker: newPostIterationTestInvoker(
+			inv := newPostIterationTestInvoker(
 				func(c aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 					modelCalls.Add(1)
 					return callback(c, req)
-				})}
+				})
 			inv.GetConfig().SetConfig("DisableIntentRecognition", false)
 			memory := &greetingRecallMemory{MemoryTriage: aicommon.NewNoOpMemoryTriage()}
 			loop, err := reactloops.CreateLoopByName(schema.AI_REACT_LOOP_NAME_DEFAULT, inv,
+				reactloops.WithFunctionCallMode(false), // This fixture emits text actions.
 				reactloops.WithAllowRAG(false), reactloops.WithAllowToolCall(false),
 				reactloops.WithAllowAIForge(false), reactloops.WithAllowPlanAndExec(false),
 				reactloops.WithAllowUserInteract(false), reactloops.WithMemoryTriage(memory),
@@ -72,7 +63,7 @@ func TestMUSTPASS_GreetingAnswersOnceWithoutMemoryRecall(t *testing.T) {
 			require.NoError(t, loop.ExecuteWithExistedTask(task))
 			require.EqualValues(t, 1, modelCalls.Load(), "greeting must complete after its first answer")
 			require.Zero(t, inv.directAnswerCalls(), "greeting must not trigger another summary model")
-			require.Never(t, func() bool { return memory.ai.Load()+memory.fast.Load()+inv.midterm.Load() != 0 },
+			require.Never(t, func() bool { return memory.ai.Load()+memory.fast.Load() != 0 },
 				100*time.Millisecond, time.Millisecond, "trivial greeting must not launch background recall")
 		})
 	}

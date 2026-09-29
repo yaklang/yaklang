@@ -63,7 +63,7 @@ func mockedRequestPlanAndExecuting_MultiPlans(i aicommon.AICallerConfigIf, req *
 		return rsp, nil
 	}
 
-	if utils.MatchAllOfSubString(prompt, "FINAL_ANSWER", "answer_payload") && !utils.MatchAllOfSubString(prompt, "require_tool") {
+	if strings.Contains(prompt, "Current Response Contract") && strings.Contains(prompt, "FINAL_ANSWER") {
 		rsp := i.NewAIResponse()
 		rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "directly_answer", "answer_payload": "mocked post-iteration summary"}`))
 		rsp.Close()

@@ -11,28 +11,27 @@ import (
 	"time"
 
 	"github.com/yaklang/yaklang/common/log"
+	ssav1 "github.com/yaklang/yaklang/scannode/gen/legionpb/legion/ssa/v1"
+	"google.golang.org/protobuf/proto"
 )
 
 // ssaDebugQueryResultPrefix is the core-NATS subject prefix a node uses to
 // answer ssa.debug.query commands. The full subject is derived from the
 // caller-provided query_id so concurrent queries never collide:
 //
-//	legion.realtime.ssa.debug.result.<query_id>
-const ssaDebugQueryResultPrefix = "legion.realtime.ssa.debug.result"
+//	legion.realtime.ssa.debug.result.v2.<query_id>
+const ssaDebugQueryResultPrefix = "legion.realtime.ssa.debug.result.v2"
 
-// ssaDebugQueryPayload is the JSON body of an ssa.debug.query command. The
-// platform sends it to the node that owns (or owned) a scan attempt; the node
-// answers with whatever pprof/log data exists in the attempt's debug
-// directory, regardless of the task state (running, paused, cancel-requested,
-// succeeded, failed, cancelled, ...).
+// ssaDebugQueryPayload is the internal form of the protobuf debug command.
 type ssaDebugQueryPayload struct {
-	QueryID    string `json:"query_id"`
-	JobID      string `json:"job_id"`
-	AttemptID  string `json:"attempt_id"`
-	TaskStatus string `json:"task_status,omitempty"`
+	QueryID    string
+	JobID      string
+	AttemptID  string
+	TaskStatus string
 }
 
-// ssaDebugQueryResponse is the JSON body published back to the platform.
+// ssaDebugQueryResponse holds the analysis cache JSON before it is converted
+// to a fully typed protobuf result for the node-to-platform message.
 type ssaDebugQueryResponse struct {
 	Found    bool            `json:"found"`
 	Reason   string          `json:"reason,omitempty"`
@@ -103,9 +102,13 @@ func (r *debugDirRegistry) resolve(jobID, attemptID string) string {
 // is still running, when it was cancelled mid-run, and after it finished —
 // as long as the debug directory still exists on this node.
 func (b *legionJobBridge) handleSSADebugQuery(ctx context.Context, raw []byte) error {
-	var payload ssaDebugQueryPayload
-	if err := json.Unmarshal(raw, &payload); err != nil {
+	var command ssav1.DebugQueryCommand
+	if err := proto.Unmarshal(raw, &command); err != nil {
 		return fmt.Errorf("unmarshal ssa debug query: %w", err)
+	}
+	payload := ssaDebugQueryPayload{
+		QueryID: command.GetQueryId(), JobID: command.GetJobId(),
+		AttemptID: command.GetAttemptId(), TaskStatus: command.GetTaskStatus(),
 	}
 	if strings.TrimSpace(payload.QueryID) == "" {
 		return fmt.Errorf("ssa debug query query_id is required")
@@ -415,9 +418,24 @@ func capLiveDebugAnalysis(raw json.RawMessage, maxBytes int) json.RawMessage {
 }
 
 func (b *legionJobBridge) publishDebugQueryResponse(ctx context.Context, queryID string, response ssaDebugQueryResponse) error {
-	responseRaw, err := json.Marshal(response)
+	result := &ssav1.DebugQueryResult{
+		QueryId: queryID,
+		Found:   response.Found,
+		Reason:  response.Reason,
+	}
+	if response.Found {
+		var analysis DebugRunAnalysis
+		if err := json.Unmarshal(response.Analysis, &analysis); err != nil {
+			return fmt.Errorf("decode ssa debug analysis before protobuf reply: %w", err)
+		}
+		result.Analysis = debugRunAnalysisToProto(&analysis)
+	}
+	if err := boundDebugQueryResult(result); err != nil {
+		return err
+	}
+	responseRaw, err := proto.Marshal(result)
 	if err != nil {
-		return fmt.Errorf("marshal ssa debug query response: %w", err)
+		return fmt.Errorf("marshal ssa debug query protobuf result: %w", err)
 	}
 	publisher, ok := b.capabilityPublisher.(*capabilityEventPublisher)
 	if !ok || publisher == nil {
@@ -428,6 +446,42 @@ func (b *legionJobBridge) publishDebugQueryResponse(ctx context.Context, queryID
 	subject := ssaDebugQueryResultSubject(queryID)
 	if err := publisher.PublishRaw(publishCtx, subject, responseRaw); err != nil {
 		return fmt.Errorf("publish ssa debug query response: %w", err)
+	}
+	return nil
+}
+
+// Keep the actual protobuf payload, not only the earlier JSON cache estimate,
+// below the NATS 1 MiB limit. Detail can be recovered from the final artifact.
+func boundDebugQueryResult(result *ssav1.DebugQueryResult) error {
+	const maxPayload = 900 * 1024
+	if result == nil {
+		return fmt.Errorf("ssa debug protobuf result is missing")
+	}
+	if proto.Size(result) <= maxPayload {
+		return nil
+	}
+	if result.Analysis == nil {
+		return fmt.Errorf("ssa debug protobuf result exceeds NATS payload limit")
+	}
+	for _, sample := range result.Analysis.Samples {
+		if sample == nil {
+			continue
+		}
+		sample.CpuTop = nil
+		sample.CpuTopYaklang = nil
+		sample.CpuStacks = nil
+		sample.CpuStacksYaklang = nil
+		sample.HeapTop = nil
+		sample.HeapTopYaklang = nil
+		sample.HeapStacks = nil
+		sample.HeapStacksYaklang = nil
+		sample.LogExcerpt = ""
+	}
+	for proto.Size(result) > maxPayload && len(result.Analysis.Samples) > 0 {
+		result.Analysis.Samples = result.Analysis.Samples[1:]
+	}
+	if proto.Size(result) > maxPayload {
+		return fmt.Errorf("ssa debug protobuf result exceeds NATS payload limit after reducing samples")
 	}
 	return nil
 }

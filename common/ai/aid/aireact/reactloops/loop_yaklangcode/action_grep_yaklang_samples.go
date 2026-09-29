@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon/promptloader"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops/loopinfra"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
@@ -35,67 +36,7 @@ func compressSearchResults(resultStr string, searchInfo string, userContext stri
 		func() string {
 			dNonce := utils.RandStringBytes(4)
 
-			promptTemplate := `
-{{ if .userContext }}<|USER_CONTEXT_{{ .nonce }}|>
-{{ .userContext }}
-<|USER_CONTEXT_END_{{ .nonce }}|>
-
-{{ end }}<|GREP_RESULT_{{ .nonce }}|>
-{{ .samples }}
-<|GREP_RESULT_END_{{ .nonce }}|>
-
-<|INSTRUCT_{{ .nonce }}|>
-【智能代码片段提取与排序】
-{{ if .userContext }}
-请严格根据上述用户需求从搜索结果中提取最有价值的代码片段，按重要性排序：
-
-【核心原则】
-- 必须与用户需求直接相关
-- 过滤掉所有无关的代码片段
-- 优先选择能直接解决用户问题的代码
-{{ else }}
-请从上述搜索结果中提取最有价值的代码片段，按重要性排序：
-{{ end }}
-【提取要求】
-1. 最多提取 %d 个代码片段
-2. 每个片段 %d-%d 行，确保上下文完整
-3. 按重要性从高到低排序（rank: 1最重要，数字越大越不重要）
-4. 严格过滤无关代码片段
-
-【重要性评判标准】（按优先级排序）
-最高优先级 (rank 1-3)：
-- 完整的满足用户需求的函数调用示例
-- 包含关键参数配置的典型用法
-- 展示核心API调用模式的代码
-
-高优先级 (rank 4-6)：
-- 包含重要配置或选项的示例
-- 展示常见使用场景的代码
-- 有详细注释说明的关键代码
-
-中等优先级 (rank 7-10)：
-- 辅助功能或工具函数调用
-- 简单的变量赋值或初始化
-- 补充性的代码片段
-
-【输出格式】
-返回JSON数组，每个元素包含：
-{
-  "range": "start-end", 
-  "rank": 数字(1-10),
-  "reason": "选择理由，例如：找到xxx相关代码样本"
-}
-
-【严格要求】
-- 总行数控制在80行以内
-- 避免重复或相似的代码片段
-- 优先选择能独立理解的完整代码块
-- 确保每个片段都有实际参考价值
-{{ if .userContext }}- 必须与用户需求相关，无关代码一律排除{{ end }}
-
-请按重要性排序输出ranges数组。
-<|INSTRUCT_END_{{ .nonce }}|>
-`
+			promptTemplate := promptloader.MustLoad("inline/ai/aid/aireact/reactloops/loop_yaklangcode/action_grep_yaklang_samples/promptTemplate.txt")
 
 			if usePatterns {
 				promptTemplate = strings.Replace(promptTemplate, "<|GREP_RESULT_{{ .nonce }}|>", "<|SEARCH_PATTERNS_{{ .nonce }}|>\n{{ .searchInfo }}\n<|SEARCH_PATTERNS_END_{{ .nonce }}|>\n\n<|SEARCH_RESULTS_{{ .nonce }}|>", 1)

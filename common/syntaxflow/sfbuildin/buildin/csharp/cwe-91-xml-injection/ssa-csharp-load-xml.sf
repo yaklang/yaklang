@@ -1,0 +1,53 @@
+desc(
+	mode: "ssa"
+	language: "csharp"
+	title: "数据流：C# LoadXml 接受外部 XML"
+	title_zh: "数据流：C# LoadXml 接受外部 XML"
+	type: vuln
+	level: high
+	rule_id: "ssa-csharp-load-xml"
+	risk: "xml-injection"
+	cwe: "CWE-91"
+	desc: <<<DESC
+### 规则说明
+`XmlDocument.LoadXml` 把一整段字符串当作 XML 解析。字符串来自请求时，攻击者可以插入额外元素、属性和闭合标签，改变文档结构。解析器如果还允许 DTD，同一入口会进一步变成外部实体注入。
+
+### 风险类型
+xml-injection
+
+### 影响
+业务 XML 被改写，校验可能被绕过，下游会读到攻击者插入的节点。DTD 未关闭时还可以读本地文件或访问内网。
+
+### 检测方式
+这条规则使用 ssa 模式，只保留非常量、且不是当前函数参数的实参。常量字符串不告警。实参如果只是函数形参，也不会命中。
+匹配 `LoadXml`，而且实参不是常量，也不是当前函数形参。常量 XML 不告警。源码里单纯出现 `LoadXml(` 的字面量由 XXE 的 source 规则覆盖，这条规则只看数据是不是运行中算出来的。
+
+### 参考
+- [CWE-91：XML 注入](https://cwe.mitre.org/data/definitions/91.html)
+
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+- 用 `XmlReader` 创建文档，把 `DtdProcessing` 设为禁止，并限制实体展开。
+- 用 DOM 或序列化 API 创建元素，不要拼接 XML 文本。
+- 必须保留的文本先做 XML 转义，再放进文档。
+
+SOLUTION
+	alert_min: 1
+	"file://bad.cs": <<<POS
+class Bad { void p(System.Xml.XmlDocument doc, Microsoft.AspNetCore.Http.HttpRequest req) { doc.LoadXml(req.Query["xml"]); } }
+
+POS
+	"safefile://ok.cs": <<<NEG
+class Ok { void p(System.Xml.XmlDocument doc) { doc.LoadXml("<a/>"); } }
+
+NEG
+)
+LoadXml(*?{!opcode: const && !opcode: param} as $dyn) as $call
+alert $dyn for {
+	level: "high",
+	title: "数据流：C# LoadXml 接受外部 XML",
+	title_zh: "数据流：C# LoadXml 接受外部 XML",
+	message: "数据流：C# LoadXml 接受外部 XML",
+	risk: "xml-injection",
+}

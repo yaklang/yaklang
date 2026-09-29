@@ -12,8 +12,8 @@ import (
 	"unicode/utf8"
 
 	"github.com/stretchr/testify/require"
-	"github.com/yaklang/yaklang/common/ai/aid/aicache"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
+	"github.com/yaklang/yaklang/common/ai/aid/aiprojection"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/ai/ytoken"
 	"github.com/yaklang/yaklang/common/consts"
@@ -486,9 +486,9 @@ LOOP:
 	require.GreaterOrEqualf(t, len(records), 5, "expected at least 5 intelligent prompts\n%s", diagnostics)
 
 	for _, rec := range records {
-		require.NotContainsf(t, rec.Sections, aicache.SectionRaw, "intelligent prompt must not contain raw section\n%s", formatPlanExecProbeRecord(rec))
-		require.Containsf(t, rec.Sections, aicache.SectionHighStatic, "intelligent prompt must contain high-static\n%s", formatPlanExecProbeRecord(rec))
-		require.Containsf(t, rec.Sections, aicache.SectionDynamic, "intelligent prompt must contain dynamic\n%s", formatPlanExecProbeRecord(rec))
+		require.NotContainsf(t, rec.Sections, aiprojection.SectionRaw, "intelligent prompt must not contain raw section\n%s", formatPlanExecProbeRecord(rec))
+		require.Containsf(t, rec.Sections, aiprojection.SectionHighStatic, "intelligent prompt must contain high-static\n%s", formatPlanExecProbeRecord(rec))
+		require.Containsf(t, rec.Sections, aiprojection.SectionDynamic, "intelligent prompt must contain dynamic\n%s", formatPlanExecProbeRecord(rec))
 		require.NotEmptyf(t, rec.HighStaticHash, "intelligent prompt must expose a high-static hash\n%s", formatPlanExecProbeRecord(rec))
 	}
 
@@ -554,7 +554,7 @@ func newPlanExecPromptProbe() *planExecPromptProbe {
 }
 
 func (p *planExecPromptProbe) Observe(prompt string) *planExecPromptRecord {
-	split := aicache.Split(prompt)
+	split := aiprojection.Split(prompt)
 	hashes := make([]string, 0, len(split.Chunks))
 	contents := make([]string, 0, len(split.Chunks))
 	sections := make([]string, 0, len(split.Chunks))
@@ -572,7 +572,7 @@ func (p *planExecPromptProbe) Observe(prompt string) *planExecPromptRecord {
 			sections = append(sections, chunk.Section)
 			seenSections[chunk.Section] = struct{}{}
 		}
-		if chunk.Section == aicache.SectionHighStatic && highStaticHash == "" {
+		if chunk.Section == aiprojection.SectionHighStatic && highStaticHash == "" {
 			highStaticHash = chunk.Hash
 		}
 	}

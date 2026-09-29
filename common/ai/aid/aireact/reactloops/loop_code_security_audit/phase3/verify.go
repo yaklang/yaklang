@@ -1,22 +1,20 @@
 package phase3
 
 import (
-	_ "embed"
 	"fmt"
 	"math"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon/promptloader"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops/loop_code_security_audit/internal/emit"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops/loop_code_security_audit/internal/model"
 	"github.com/yaklang/yaklang/common/log"
 )
 
-//go:embed prompts/verify_instruction.txt
-var phase3VerifyInstruction string
+var phase3VerifyInstruction = promptloader.MustLoad("ai/aid/aireact/reactloops/loop_code_security_audit/phase3/prompts/verify_instruction.txt")
 
-//go:embed prompts/output_example.txt
-var phase3OutputExample string
+var phase3OutputExample = promptloader.MustLoad("ai/aid/aireact/reactloops/loop_code_security_audit/phase3/prompts/output_example.txt")
 
 // BuildVerifyLoop builds the Phase 3 orchestrator loop.
 // It forks one sub-agent per finding (engine concurrency from MaxSubAgents) and merges verified_vulns.json at the end.

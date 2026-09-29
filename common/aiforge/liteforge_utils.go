@@ -5,6 +5,7 @@ import (
 	"strings"
 	"text/template"
 
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon/promptloader"
 	"github.com/yaklang/yaklang/common/chunkmaker"
 	"github.com/yaklang/yaklang/common/log"
 )
@@ -14,41 +15,12 @@ import (
 // 安全性说明：返回的字符串通常作为 LiteForge 的 Params 或 Prompt 字段被传入 dynamic 段，
 // 外层 PROMPT_SECTION_dynamic_NONCE 已经屏蔽 prompt-injection，内层 nonce 是冗余防护
 // 关键词: aicache, PROMPT_SECTION, queryPrompt, B 档, 去 nonce
-var queryPrompt = `{{.PROMPT}}
-
-{{ if .EXTRA }}
-<extra>
-{{.EXTRA}}
-</extra>
-{{ end }}
-
-{{ if .OVERLAP }}
-<overlap>
-{{.OVERLAP}}
-</overlap>
-{{ end }}
-
-
-<input>
-{{.INPUT}}
-</input>
-`
+var queryPrompt = promptloader.MustLoad("inline/aiforge/liteforge_utils/queryPrompt.txt")
 
 // queryDynamicOnlyPrompt 是 B 档新增的"纯动态内容"模板（不含调用方稳定指令头部）
 // 用于配合 BuildLiteForgeStaticAndDynamic 拆分 prompt 时使用
 // 关键词: aicache, PROMPT_SECTION, queryDynamicOnlyPrompt, BuildLiteForgeStaticAndDynamic
-var queryDynamicOnlyPrompt = `{{ if .EXTRA }}<extra>
-{{.EXTRA}}
-</extra>
-
-{{ end }}{{ if .OVERLAP }}<overlap>
-{{.OVERLAP}}
-</overlap>
-
-{{ end }}<input>
-{{.INPUT}}
-</input>
-`
+var queryDynamicOnlyPrompt = promptloader.MustLoad("inline/aiforge/liteforge_utils/queryDynamicOnlyPrompt.txt")
 
 // LiteForgeQueryFromChunk 兼容函数：保留原签名，B 档改造仅去掉模板内层 nonce
 // 旧调用方零代码变更，但 hash 复用能力不变（内容仍随 chunk 数据每次不同）

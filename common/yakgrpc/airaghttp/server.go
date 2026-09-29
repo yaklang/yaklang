@@ -14,6 +14,7 @@ import (
 	"github.com/yaklang/gorm"
 	"github.com/yaklang/yaklang/common/ai/aispec"
 	"github.com/yaklang/yaklang/common/ai/rag"
+	"github.com/yaklang/yaklang/common/ai/rag/enhancesearch"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
@@ -31,6 +32,9 @@ type RAGHTTPServer struct {
 	// embeddingClient 可选的嵌入客户端覆盖. 为 nil 时使用默认嵌入服务.
 	// 主要用于测试 (mock embedder) 与高级自定义部署.
 	embeddingClient aispec.EmbeddingCaller
+
+	// Optional query-enhancement dependency; nil retains the default AI handler.
+	enhanceSearchHandler enhancesearch.SearchHandler
 
 	// readyCollections 启动时确定的可用知识库集合 (启动后只读)
 	readyCollections []string

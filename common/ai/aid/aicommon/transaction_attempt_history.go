@@ -2,6 +2,7 @@ package aicommon
 
 import (
 	"fmt"
+	"github.com/yaklang/yaklang/common/ai/aid/aiprojection"
 	"strings"
 
 	"github.com/yaklang/yaklang/common/utils"
@@ -66,7 +67,7 @@ type transactionAttemptRecord struct {
 func buildAttemptRecord(attempt int64, prompt string, callAiErr error, rsp *AIResponse) transactionAttemptRecord {
 	rec := transactionAttemptRecord{
 		Attempt:       attempt,
-		PromptSummary: utils.ShrinkString(prompt, 512),
+		PromptSummary: utils.ShrinkString(aiprojection.RedactNonce(prompt), 512),
 		CallAiErr:     callAiErr,
 	}
 	if rsp != nil {

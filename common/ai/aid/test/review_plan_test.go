@@ -36,14 +36,21 @@ func TestCoordinator_ReviewPlan(t *testing.T) {
         {"subtask_name": "输出结果", "subtask_goal": "将最大文件的路径和大小以可读格式输出"}
     ]
 }`
-	inputChan := chanx.NewUnlimitedChan[*ypb.AIInputEvent](context.Background(), 10)
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	inputChan := chanx.NewUnlimitedChan[*ypb.AIInputEvent](ctx, 10)
 	outputChan := make(chan *schema.AiOutputEvent, 100)
 	ins, err := aid.NewCoordinator(
 		"test",
+		aicommon.WithContext(ctx),
+		aicommon.WithDisableIntentRecognition(true),
 		testAIRetryWaitOption(),
 		aicommon.WithEventInputChanx(inputChan),
 		aicommon.WithEventHandler(func(event *schema.AiOutputEvent) {
-			outputChan <- event
+			select {
+			case outputChan <- event:
+			case <-ctx.Done():
+			}
 		}),
 		aicommon.WithAICallback(func(config aicommon.AICallerConfigIf, request *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			prompt := request.GetPrompt()
@@ -75,7 +82,7 @@ LOOP:
 				inputChan.SafeFeed(ContinueSuggestionInputEvent(result.GetInteractiveId()))
 				break LOOP
 			}
-		case <-time.After(time.Second * 15):
+		case <-ctx.Done():
 			t.Fatal("timeout")
 		}
 	}
@@ -105,13 +112,20 @@ func TestCoordinator_ReviewPlan_Incomplete(t *testing.T) {
         {"subtask_name": "BCD", "subtask_goal": "BCD"}
     ]
 }`
-	inputChan := chanx.NewUnlimitedChan[*ypb.AIInputEvent](context.Background(), 10)
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	inputChan := chanx.NewUnlimitedChan[*ypb.AIInputEvent](ctx, 10)
 	outputChan := make(chan *schema.AiOutputEvent, 100)
 	ins, err := aid.NewCoordinator(
 		"test",
+		aicommon.WithContext(ctx),
+		aicommon.WithDisableIntentRecognition(true),
 		aicommon.WithEventInputChanx(inputChan),
 		aicommon.WithEventHandler(func(event *schema.AiOutputEvent) {
-			outputChan <- event
+			select {
+			case outputChan <- event:
+			case <-ctx.Done():
+			}
 		}),
 		aicommon.WithAICallback(func(config aicommon.AICallerConfigIf, request *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			prompt := request.GetPrompt()
@@ -156,7 +170,7 @@ LOOP:
 				regeneratePlan = true
 				break LOOP
 			}
-		case <-time.After(time.Second * 30):
+		case <-ctx.Done():
 			t.Fatal("timeout")
 		}
 	}
@@ -191,13 +205,20 @@ func TestCoordinator_ReviewPlan_Incomplete_2(t *testing.T) {
     ]
 }`
 	extraPromptToken := utils.RandStringBytes(100)
-	inputChan := chanx.NewUnlimitedChan[*ypb.AIInputEvent](context.Background(), 10)
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	inputChan := chanx.NewUnlimitedChan[*ypb.AIInputEvent](ctx, 10)
 	outputChan := make(chan *schema.AiOutputEvent, 100)
 	ins, err := aid.NewCoordinator(
 		"test",
+		aicommon.WithContext(ctx),
+		aicommon.WithDisableIntentRecognition(true),
 		aicommon.WithEventInputChanx(inputChan),
 		aicommon.WithEventHandler(func(event *schema.AiOutputEvent) {
-			outputChan <- event
+			select {
+			case outputChan <- event:
+			case <-ctx.Done():
+			}
 		}),
 		aicommon.WithAICallback(func(config aicommon.AICallerConfigIf, request *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			prompt := request.GetPrompt()
@@ -242,7 +263,7 @@ LOOP:
 				regeneratePlan = true
 				break LOOP
 			}
-		case <-time.After(time.Second * 30):
+		case <-ctx.Done():
 			t.Fatal("timeout")
 		}
 	}
@@ -269,13 +290,20 @@ func TestCoordinator_ReviewPlan_CreateSubtask(t *testing.T) {
 }`
 	var createSubtaskCalled int64
 	extraPromptToken := utils.RandStringBytes(100)
-	inputChan := chanx.NewUnlimitedChan[*ypb.AIInputEvent](context.Background(), 10)
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	inputChan := chanx.NewUnlimitedChan[*ypb.AIInputEvent](ctx, 10)
 	outputChan := make(chan *schema.AiOutputEvent, 100)
 	ins, err := aid.NewCoordinator(
 		"test",
+		aicommon.WithContext(ctx),
+		aicommon.WithDisableIntentRecognition(true),
 		aicommon.WithEventInputChanx(inputChan),
 		aicommon.WithEventHandler(func(event *schema.AiOutputEvent) {
-			outputChan <- event
+			select {
+			case outputChan <- event:
+			case <-ctx.Done():
+			}
 		}),
 		aicommon.WithAICallback(func(config aicommon.AICallerConfigIf, request *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			prompt := request.GetPrompt()
@@ -332,7 +360,7 @@ LOOP:
 				regeneratePlan = true
 				break LOOP
 			}
-		case <-time.After(time.Second * 30):
+		case <-ctx.Done():
 			t.Fatal("timeout")
 		}
 	}

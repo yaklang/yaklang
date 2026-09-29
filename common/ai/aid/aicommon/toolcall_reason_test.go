@@ -18,7 +18,7 @@ func TestBuildToolCallReasonPrompt_ContainsContext(t *testing.T) {
 	task := NewStatefulTaskBase("task-1", "scan 10.0.0.1 for open ports", context.Background(), nil, true)
 	task.name = "recon"
 
-	prompt := buildToolCallReasonPrompt(tool, aitool.InvokeParams{"target": "10.0.0.1"}, task)
+	prompt := buildToolCallReasonPrompt(tool, aitool.InvokeParams{"target": "10.0.0.1"}, task, "")
 
 	require.Contains(t, prompt, "Tool: port_scan")
 	require.Contains(t, prompt, "Tool description: Scan a target for open ports.")
@@ -35,12 +35,39 @@ func TestBuildToolCallReasonPrompt_ContainsContext(t *testing.T) {
 func TestBuildToolCallReasonPrompt_NilTaskAndEmptyParams(t *testing.T) {
 	tool := aitool.NewWithoutCallback("noop_tool")
 
-	prompt := buildToolCallReasonPrompt(tool, nil, nil)
+	prompt := buildToolCallReasonPrompt(tool, nil, nil, "")
 
 	require.Contains(t, prompt, "Tool: noop_tool")
 	require.NotContains(t, prompt, "User input:")
 	require.NotContains(t, prompt, "Params:")
 	require.NotContains(t, prompt, "Recent steps")
+}
+
+func TestBuildToolCallReasonPrompt_DistinguishesBatchCallIntents(t *testing.T) {
+	tool := aitool.NewWithoutCallback("do_http_request")
+	register := buildToolCallReasonPrompt(tool, nil, nil, "guest_register")
+	health := buildToolCallReasonPrompt(tool, nil, nil, "portal_health")
+
+	require.Contains(t, register, "This call's intent identifier: guest_register")
+	require.NotContains(t, register, "portal_health")
+	require.Contains(t, health, "This call's intent identifier: portal_health")
+	require.NotContains(t, health, "guest_register")
+	require.Contains(t, register, "express it naturally rather than copying snake_case")
+}
+
+func TestToolCallReasonFallbackWhenAuxiliaryIsSkipped(t *testing.T) {
+	config := NewTestConfig(context.Background(), WithSingleAIModelMode(true))
+	tool := aitool.NewWithoutCallback("do_http_request")
+	tc, err := NewToolCaller(context.Background(),
+		WithToolCaller_AICallerConfig(config),
+		WithToolCaller_AICaller(config),
+		WithToolCaller_DestinationIdentifier("portal_health"),
+	)
+	require.NoError(t, err)
+	require.False(t, config.ResolveAuxiliaryTask(CallerLabelToolCallReason).ShouldRun())
+	tc.generateReasonIfNeeded(tool, nil)
+	require.Equal(t, "portal health", tc.reason)
+	require.True(t, tc.reasonFinalized)
 }
 
 func TestBuildToolCallReasonPrompt_IncludesRecentSteps(t *testing.T) {
@@ -56,7 +83,7 @@ func TestBuildToolCallReasonPrompt_IncludesRecentSteps(t *testing.T) {
 	task.PushToolCallResult(&aitool.ToolResult{ID: 2, Name: "do_http_request", Success: true})
 	task.PushToolCallResult(&aitool.ToolResult{ID: 3, Name: "grep", Success: false, Error: "no matches found"})
 
-	prompt := buildToolCallReasonPrompt(tool, nil, task)
+	prompt := buildToolCallReasonPrompt(tool, nil, task, "")
 
 	require.Contains(t, prompt, "Recent steps")
 	require.Contains(t, prompt, "- bash: completed")

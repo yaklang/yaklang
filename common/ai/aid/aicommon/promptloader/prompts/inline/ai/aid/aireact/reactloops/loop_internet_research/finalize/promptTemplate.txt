@@ -1,0 +1,11 @@
+<user_query>
+{{ .userQuery }}
+</user_query>
+
+<search_history>
+{{ .searchHistory }}
+</search_history>
+
+<search_results>
+{{ .searchResults }}
+</search_results>

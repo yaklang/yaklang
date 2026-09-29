@@ -31,10 +31,13 @@ func (y *singleFileBuilder) VisitLiteral(raw javaparser.ILiteralContext) ssa.Val
 		res = y.VisitFloatLiteral(ret)
 	} else if ret := i.CHAR_LITERAL(); ret != nil {
 		lit := ret.GetText()
-		s, err := yakunquote.Unquote(lit)
+		s, err := unquoteJavaLiteral(lit)
 		if err != nil {
 			log.Errorf("javaast %s: %s", y.CurrentRange.String(), fmt.Sprintf("unquote error %s", err))
-			return y.EmitConstInst(s)
+			return y.EmitUndefined(lit)
+		}
+		if len([]rune(s)) != 1 {
+			return y.EmitUndefined(lit)
 		}
 		runeChar := []rune(s)[0]
 		if runeChar < 256 {
@@ -47,7 +50,11 @@ func (y *singleFileBuilder) VisitLiteral(raw javaparser.ILiteralContext) ssa.Val
 		if text == "\"\"" {
 			res = y.EmitConstInst(text)
 		}
-		val := yakunquote.TryUnquote(text)
+		val, err := unquoteJavaLiteral(text)
+		if err != nil {
+			log.Errorf("javaast %s: unquote error %s", y.CurrentRange.String(), err)
+			return y.EmitUndefined(text)
+		}
 		res = y.EmitConstInst(val)
 	} else if ret := i.BOOL_LITERAL(); ret != nil {
 		boolLit, err := strconv.ParseBool(ret.GetText())
@@ -68,6 +75,41 @@ func (y *singleFileBuilder) VisitLiteral(raw javaparser.ILiteralContext) ssa.Val
 	newTyp := y.AddFullTypeNameRaw(t.String(), t)
 	res.SetType(newTyp)
 	return res
+}
+
+// Java string escapes are not the same as yakunquote.Unquote. Go and Yak
+// require exactly three octal digits and reject `\s`. Java allows one to three
+// octal digits (\0..\377) and text blocks use `\s` for a space. Normalizing
+// those here keeps the shared decoder unchanged for Yak, PHP, and JavaScript.
+func unquoteJavaLiteral(literal string) (string, error) {
+	var normalized strings.Builder
+	normalized.Grow(len(literal))
+	for i := 0; i < len(literal); i++ {
+		if literal[i] != '\\' || i+1 == len(literal) {
+			normalized.WriteByte(literal[i])
+			continue
+		}
+		i++
+		c := literal[i]
+		if c >= '0' && c <= '7' {
+			limit := 2
+			if c <= '3' {
+				limit = 3
+			}
+			value := int(c - '0')
+			for n := 1; n < limit && i+1 < len(literal) && literal[i+1] >= '0' && literal[i+1] <= '7'; n++ {
+				i++
+				value = value*8 + int(literal[i]-'0')
+			}
+			fmt.Fprintf(&normalized, "\\u%04x", value)
+		} else if c == 's' {
+			normalized.WriteByte(' ')
+		} else {
+			normalized.WriteByte('\\')
+			normalized.WriteByte(c)
+		}
+	}
+	return yakunquote.Unquote(normalized.String())
 }
 
 // integer literal

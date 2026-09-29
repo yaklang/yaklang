@@ -285,22 +285,10 @@ func TestConfig_SessionPromptStatePropagation(t *testing.T) {
 func TestConfig_ConvertConfigToOptions_RebindsTimelineConfig(t *testing.T) {
 	parent := NewConfig(context.Background())
 	require.NotNil(t, parent.Timeline)
-	require.Nil(t, parent.TimelineArchiveStore)
 
 	child := NewConfig(context.Background(), ConvertConfigToOptions(parent)...)
 	require.Same(t, parent.Timeline, child.Timeline)
 	require.Same(t, child, child.Timeline.config)
-}
-
-func TestConfig_ConvertConfigToOptions_PreservesLegacyArchiveOption(t *testing.T) {
-	parent := NewConfig(context.Background())
-	store := &mockTimelineArchiveStore{}
-	parent.TimelineArchiveStore = store
-
-	child := NewConfig(context.Background(), ConvertConfigToOptions(parent)...)
-
-	require.Same(t, store, child.TimelineArchiveStore)
-	require.Same(t, store, child.GetTimelineArchiveStore())
 }
 
 type stubBrowserSessionTracker struct{}
@@ -361,4 +349,3 @@ func TestConfig_CreateOrUpdateRuntimeRecord_Disabled(t *testing.T) {
 	require.NoError(t, config.GetDB().Model(&schema.AIAgentRuntime{}).Where("uuid = ?", runtimeUUID).Count(&count).Error)
 	require.Zero(t, count)
 }
-

@@ -1,13 +1,13 @@
 package aiforge
 
 import (
-	_ "embed"
 	"fmt"
 	"os"
 	"strings"
 
 	"github.com/yaklang/yaklang/common/ai/aid"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon/promptloader"
 	"github.com/yaklang/yaklang/common/aireducer"
 	"github.com/yaklang/yaklang/common/chunkmaker"
 	"github.com/yaklang/yaklang/common/utils/chanx"
@@ -16,8 +16,7 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 )
 
-//go:embed liteforge_schema/liteforge_image.schema.json
-var IMAGE_OUTPUT_SCHEMA string
+var IMAGE_OUTPUT_SCHEMA = promptloader.MustLoad("aiforge/liteforge_schema/liteforge_image.schema.json")
 
 // TemporalQualifier represents the temporal nature of a relationship
 type TemporalQualifier string
@@ -470,43 +469,7 @@ func AnalyzeImage(image any, opts ...any) (*ImageAnalysisResult, error) {
 	imgCfg.fallbackOptions = append(imgCfg.fallbackOptions, _withImageCompress(image), _withForceImage(true))
 	imgCfg.fallbackOptions = append(imgCfg.fallbackOptions, WithOutputJSONSchema(IMAGE_OUTPUT_SCHEMA))
 	// 构建详细的分析提示
-	prompt := `Your primary task is to perform a comprehensive, multi-modal analysis of the provided inputs. You will receive an **image** and, optionally, **supplementary text** (such as a title, user description, or speech-to-text transcript). Your analysis must holistically synthesize information from both sources to generate a detailed JSON output.
-
-**Core Mandate: Synthesize Information**
-
-Do not treat the image and the text as separate items. You must **integrate** the supplementary information to **enrich, confirm, and disambiguate** your visual analysis.
-
-*   Use the text to clarify ambiguous objects, locations, or relationships.
-*   Allow the text to guide your interpretation of the scene's context, mood, and purpose.
-*   Your final summary must explicitly weave together insights from both the visual evidence and the provided text.
-
-**Inputs**
-
-1.  **Image:** The primary visual content for analysis.
-2.  **Supplementary Information:** (Optional, may be "null") A string of text that provides additional context about the image.
-
-
-1. **Visual Elements**: Identify and describe all objects, people, animals, or items visible in the image
-2. **Text Elements**: Extract all text content using OCR (Optical Character Recognition) 
-3. **Relationships**: Describe how elements relate to each other spatially and contextually
-4. **Scene Context**: Determine the location type, time of day, overall mood, and inferred purpose
-
-**Important Instructions:**
-- Provide unique IDs for each element (v_1, v_2, etc. for visual elements; t_1, t_2, etc. for text elements)
-- Include confidence scores for all detections
-- Use descriptive labels and detailed descriptions
-- Extract ALL visible text, even if partially obscured
-- Establish relationships between identified elements
-- Ensure the cumulative_summary synthesizes all findings into a coherent narrative
-
-**Output Requirements:**
-- Must include "@action": "object" field
-- All required fields must be populated
-- Follow the provided JSON schema exactly
-- Return valid JSON without additional commentary
-- Ensure cumulative_summary is comprehensive and descriptive
-
-` + imgCfg.ExtraPrompt
+	prompt := promptloader.MustLoad("inline/aiforge/liteforge_analyze_image/prompt.txt") + imgCfg.ExtraPrompt
 
 	forgeResult, err := _executeLiteForgeTemp(prompt, imgCfg.ForgeExecOption(IMAGE_OUTPUT_SCHEMA)...)
 	if err != nil {

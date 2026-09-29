@@ -11,8 +11,8 @@ import (
 	"github.com/yaklang/yaklang/common/utils/omap"
 	"github.com/yaklang/yaklang/common/utils/yakunquote"
 
-	"github.com/yaklang/antlr/v4"
 	"github.com/google/uuid"
+	"github.com/yaklang/antlr/v4"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/syntaxflow/sf"
 	"github.com/yaklang/yaklang/common/utils"
@@ -513,7 +513,7 @@ func (f *RuleFormat) VisitLfHereDoc(raw sf.ILfHereDocContext) string {
 		return ""
 	}
 	if i.LfText() != nil {
-		return i.LfText().GetText()
+		return hereDocText(i.LfText())
 	} else {
 		return ""
 	}
@@ -528,7 +528,7 @@ func (f *RuleFormat) VisitCrlfHereDoc(raw sf.ICrlfHereDocContext) string {
 		return ""
 	}
 	if i.CrlfText() != nil {
-		return i.CrlfText().GetText()
+		return hereDocText(i.CrlfText())
 	} else {
 		return ""
 	}

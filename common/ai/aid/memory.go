@@ -441,7 +441,6 @@ func (m *PromptContextProvider) CurrentTaskInfoDynamic() string {
 		"CurrentTaskUserInput":    currentTask.GetUserInput(),
 		"ToolCallCount":           currentTask.ToolCallCount(),
 		"SingleLineStatusSummary": currentTask.SingleLineStatusSummary(),
-		"SharedEvidenceContext":   m.SharedEvidenceContext(),
 	})
 	if err != nil {
 		return "BUG:... currentTaskInfo cannot be generated in `CurrentTaskInfo` err: " + err.Error()
@@ -455,26 +454,6 @@ func (m *PromptContextProvider) CurrentTaskInfoStable() string {
 		return "BUG:... currentTaskInfo stable cannot be generated err: " + err.Error()
 	}
 	return results
-}
-
-func (m *PromptContextProvider) SharedEvidenceContext() string {
-	currentTask := m.getCurrentTask()
-	if currentTask == nil {
-		return ""
-	}
-
-	evidence := strings.TrimSpace(getTaskPlanEvidence(currentTask))
-	if evidence == "" {
-		return ""
-	}
-
-	const maxEvidenceRunes = 1600
-	runes := []rune(evidence)
-	if len(runes) <= maxEvidenceRunes {
-		return evidence
-	}
-
-	return string(runes[:maxEvidenceRunes]) + "\n\n..."
 }
 
 // PersistentMemory 渲染"持久记忆"段, 进 LiteForge / aireact 模板的 semi-dynamic

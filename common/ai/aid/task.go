@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"strconv"
 	"strings"
 	"time"
 
@@ -17,20 +16,7 @@ import (
 
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils/omap"
-
-	"github.com/yaklang/yaklang/common/ai/aispec"
 )
-
-// TaskResponseCallback 定义Task执行过程中响应回调函数类型
-type TaskResponseCallback func(ctx *PromptContextProvider, details ...aispec.ChatDetail) (continueThinking bool, prompt string, err error)
-
-// TaskProgress 记录任务执行的进度信息
-type TaskProgress struct {
-	TotalTasks     int    `json:"total_tasks"`     // 总任务数
-	CompletedTasks int    `json:"completed_tasks"` // 已完成任务数
-	CurrentTask    string `json:"current_task"`    // 当前执行的任务
-	CurrentGoal    string `json:"current_goal"`    // 当前任务的目标
-}
 
 type AiTask struct {
 	*Coordinator
@@ -522,50 +508,10 @@ func (t *AiTask) SingleLineStatusSummary() string {
 	return strings.ReplaceAll(t.StatusSummary, "\n", " ")
 }
 
-func (t *AiTask) QuoteName() string {
-	return strconv.Quote(t.Name)
-}
-
-func (t *AiTask) QuoteGoal() string {
-	return strconv.Quote(t.Goal)
-}
-
 // ToolCallCount 返回工具调用次数
 func (t *AiTask) ToolCallCount() int {
 	if t == nil {
 		return 0
 	}
 	return len(t.GetAllToolCallResults())
-}
-
-// TaskContinueCount 返回任务继续执行的次数（从 ReActLoop 获取迭代次数）
-func (t *AiTask) TaskContinueCount() int {
-	if t == nil {
-		return 0
-	}
-	// 尝试从 ReActLoop 获取当前迭代次数
-	loop := t.GetReActLoop()
-	if loop == nil {
-		return 0
-	}
-	// 使用类型断言获取迭代次数（ReActLoopIF 接口中没有这个方法，需要类型断言）
-	// 如果无法获取，返回 0
-	if reactLoop, ok := loop.(interface{ GetCurrentIterationIndex() int }); ok {
-		return reactLoop.GetCurrentIterationIndex()
-	}
-	return 0
-}
-
-func (t *AiTask) CanContinue() bool {
-	if t == nil {
-		return false
-	}
-	maxContinue := int64(0)
-	if t.Coordinator != nil {
-		maxContinue = t.Coordinator.MaxTaskContinue
-	}
-	if maxContinue <= 0 {
-		return true
-	}
-	return int64(t.TaskContinueCount()) < maxContinue
 }

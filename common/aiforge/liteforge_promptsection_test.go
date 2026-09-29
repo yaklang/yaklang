@@ -6,8 +6,8 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/yaklang/yaklang/common/ai/aid/aicache"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
+	"github.com/yaklang/yaklang/common/ai/aid/aiprojection"
 	"github.com/yaklang/yaklang/common/ai/ytoken"
 	"github.com/yaklang/yaklang/common/utils"
 )
@@ -35,7 +35,7 @@ func TestLiteForgeDisableTimelineOption(t *testing.T) {
 	require.True(t, forge.DisableTimeline)
 }
 
-// TestLiteForgePrompt_SplitsIntoFourSections 验证 LiteForge 模板能被 aicache.Split 切成预期的 4 段
+// TestLiteForgePrompt_SplitsIntoFourSections 验证 LiteForge 模板能被 aiprojection.Split 切成预期的 4 段
 // B 档语义：StaticInstruction -> high-static 段；Prompt -> dynamic 段
 // 关键词: aicache, PROMPT_SECTION, LiteForge 模板, 4 段切片, B 档
 func TestLiteForgePrompt_SplitsIntoFourSections(t *testing.T) {
@@ -51,22 +51,22 @@ func TestLiteForgePrompt_SplitsIntoFourSections(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	split := aicache.Split(rendered)
+	split := aiprojection.Split(rendered)
 	require.NotNil(t, split)
 	require.Len(t, split.Chunks, 4, "expect 4 sections when all fields present")
 
-	sections := make(map[string]*aicache.Chunk, 4)
+	sections := make(map[string]*aiprojection.Chunk, 4)
 	for _, c := range split.Chunks {
 		sections[c.Section] = c
 	}
-	require.Contains(t, sections, aicache.SectionHighStatic)
-	require.Contains(t, sections, aicache.SectionSemiDynamic)
-	require.Contains(t, sections, aicache.SectionTimeline)
-	require.Contains(t, sections, aicache.SectionDynamic)
+	require.Contains(t, sections, aiprojection.SectionHighStatic)
+	require.Contains(t, sections, aiprojection.SectionSemiDynamic)
+	require.Contains(t, sections, aiprojection.SectionTimeline)
+	require.Contains(t, sections, aiprojection.SectionDynamic)
 
 	// high-static 段：仅含 Preset / Output Formatter 通用文案 (P0-B1: SCHEMA 与
 	// Instruction 已下移到 semi-dynamic 段, 让 high-static 跨 forge byte-stable)
-	hs := sections[aicache.SectionHighStatic]
+	hs := sections[aiprojection.SectionHighStatic]
 	require.Contains(t, hs.Content, "# Preset")
 	require.Contains(t, hs.Content, "# Output Formatter")
 	require.NotContains(t, hs.Content, "# SCHEMA",
@@ -84,7 +84,7 @@ func TestLiteForgePrompt_SplitsIntoFourSections(t *testing.T) {
 	require.NotContains(t, hs.Content, nonce, "high-static section MUST NOT contain nonce")
 
 	// semi-dynamic 段：含 SCHEMA + Instruction (P0-B1 下移) + persistent memory
-	sd := sections[aicache.SectionSemiDynamic]
+	sd := sections[aiprojection.SectionSemiDynamic]
 	require.Contains(t, sd.Content, "# SCHEMA",
 		"P0-B1: SCHEMA must appear in semi-dynamic now")
 	require.Contains(t, sd.Content, "<schema>")
@@ -97,13 +97,13 @@ func TestLiteForgePrompt_SplitsIntoFourSections(t *testing.T) {
 	require.Contains(t, sd.Content, "remember: prefer chinese keywords")
 
 	// timeline 段
-	tl := sections[aicache.SectionTimeline]
+	tl := sections[aiprojection.SectionTimeline]
 	require.Contains(t, tl.Content, "<timeline_"+nonce+">")
 	require.Contains(t, tl.Content, "tool[1] success at 12:00")
 
 	// dynamic 段：含调用方动态上下文（Prompt） + 用户参数（Params）
-	dy := sections[aicache.SectionDynamic]
-	require.Equal(t, aicache.SectionDynamic+"_"+nonce, dy.Nonce)
+	dy := sections[aiprojection.SectionDynamic]
+	require.Equal(t, aiprojection.SectionDynamic+"_"+nonce, dy.Nonce)
 	require.Contains(t, dy.Content, "<context_"+nonce+">",
 		"Prompt should be wrapped by <context_NONCE>...</context_NONCE> in dynamic section")
 	require.Contains(t, dy.Content, "user_query=hostscan; tags=[a,b,c]",
@@ -144,21 +144,21 @@ func TestLiteForgePrompt_HighStaticStableAcrossNonces(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	splitA := aicache.Split(renderA)
-	splitB := aicache.Split(renderB)
+	splitA := aiprojection.Split(renderA)
+	splitB := aiprojection.Split(renderB)
 	require.NotNil(t, splitA)
 	require.NotNil(t, splitB)
 
-	hsA := pickSection(t, splitA, aicache.SectionHighStatic)
-	hsB := pickSection(t, splitB, aicache.SectionHighStatic)
+	hsA := pickSection(t, splitA, aiprojection.SectionHighStatic)
+	hsB := pickSection(t, splitB, aiprojection.SectionHighStatic)
 
 	require.Equal(t, hsA.Content, hsB.Content,
 		"high-static content must be byte-identical across different nonces and different Prompt content")
 	require.Equal(t, hsA.Hash, hsB.Hash,
 		"high-static hash must be stable across different nonces and different Prompt content")
 
-	dyA := pickSection(t, splitA, aicache.SectionDynamic)
-	dyB := pickSection(t, splitB, aicache.SectionDynamic)
+	dyA := pickSection(t, splitA, aiprojection.SectionDynamic)
+	dyB := pickSection(t, splitB, aiprojection.SectionDynamic)
 	require.NotEqual(t, dyA.Hash, dyB.Hash,
 		"dynamic hash should differ when nonce / Prompt / Params differ (anti-injection by design)")
 }
@@ -184,17 +184,17 @@ func TestLiteForgePrompt_TimelineEmptyOmitsSection(t *testing.T) {
 		"timeline-open 段必须无条件输出 (即便为空), 保证 4 段对齐")
 	require.Contains(t, rendered, "<|PROMPT_SECTION_END_timeline-open|>")
 
-	split := aicache.Split(rendered)
+	split := aiprojection.Split(rendered)
 	require.NotNil(t, split)
 	require.Len(t, split.Chunks, 4,
 		"expect 4 sections (high-static, semi-dynamic, timeline-open empty placeholder, dynamic) when timeline content is empty")
 
 	for _, c := range split.Chunks {
-		require.NotEqual(t, aicache.SectionTimeline, c.Section,
+		require.NotEqual(t, aiprojection.SectionTimeline, c.Section,
 			"老 timeline 段不应出现在 chunks 中")
 	}
 
-	tlOpen := pickSection(t, split, aicache.SectionTimelineOpen)
+	tlOpen := pickSection(t, split, aiprojection.SectionTimelineOpen)
 	require.NotNil(t, tlOpen, "timeline-open 段应作为空占位存在")
 	require.Empty(t, strings.TrimSpace(tlOpen.Content),
 		"timeline-open 占位 chunk 内容应为空 (仅含起止标签之间的空内容)")
@@ -213,11 +213,11 @@ func TestLiteForgePrompt_DynamicNonceConsistent(t *testing.T) {
 		Params:            "z",
 	})
 	require.NoError(t, err)
-	split := aicache.Split(rendered)
+	split := aiprojection.Split(rendered)
 	require.NotNil(t, split)
 
-	dy := pickSection(t, split, aicache.SectionDynamic)
-	require.Equal(t, aicache.SectionDynamic+"_"+nonce, dy.Nonce,
+	dy := pickSection(t, split, aiprojection.SectionDynamic)
+	require.Equal(t, aiprojection.SectionDynamic+"_"+nonce, dy.Nonce,
 		"dynamic chunk nonce should equal section + outer NONCE")
 	require.Contains(t, dy.Content, "<context_"+nonce+">")
 	require.Contains(t, dy.Content, "</context_"+nonce+">")
@@ -238,10 +238,10 @@ func TestLiteForgePrompt_OnlyStaticInstructionEmpty(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	split := aicache.Split(rendered)
+	split := aiprojection.Split(rendered)
 	require.NotNil(t, split)
 
-	hs := pickSection(t, split, aicache.SectionHighStatic)
+	hs := pickSection(t, split, aiprojection.SectionHighStatic)
 	require.Contains(t, hs.Content, "# Preset")
 	require.NotContains(t, hs.Content, "<schema>",
 		"P0-B1: <schema> moved to semi-dynamic, must NOT appear in high-static")
@@ -253,7 +253,7 @@ func TestLiteForgePrompt_OnlyStaticInstructionEmpty(t *testing.T) {
 		"Prompt content must NOT leak into high-static when StaticInstruction is empty")
 
 	// P0-B1: schema 现在在 semi-dynamic 段
-	sd := pickSection(t, split, aicache.SectionSemiDynamic)
+	sd := pickSection(t, split, aiprojection.SectionSemiDynamic)
 	require.Contains(t, sd.Content, "<schema>",
 		"P0-B1: schema must appear in semi-dynamic when present")
 	require.NotContains(t, sd.Content, "# Instruction",
@@ -262,7 +262,7 @@ func TestLiteForgePrompt_OnlyStaticInstructionEmpty(t *testing.T) {
 		"<instruction> tag must remain omitted when StaticInstruction is empty")
 
 	// 老调用方传入的 Prompt 现在出现在 dynamic 段
-	dy := pickSection(t, split, aicache.SectionDynamic)
+	dy := pickSection(t, split, aiprojection.SectionDynamic)
 	require.Contains(t, dy.Content, "old caller pattern: everything in Prompt")
 }
 
@@ -313,13 +313,13 @@ func TestLiteForgePrompt_TimelineFrozenOpen_RendersBothSections(t *testing.T) {
 	require.NotContains(t, renderA, "<|PROMPT_SECTION_timeline|>",
 		"legacy single-timeline tag must NOT appear when frozen+open path is used")
 
-	splitA := aicache.Split(renderA)
-	splitB := aicache.Split(renderB)
+	splitA := aiprojection.Split(renderA)
+	splitB := aiprojection.Split(renderB)
 	require.NotNil(t, splitA)
 	require.NotNil(t, splitB)
 
-	tlOpenA := pickSection(t, splitA, aicache.SectionTimelineOpen)
-	tlOpenB := pickSection(t, splitB, aicache.SectionTimelineOpen)
+	tlOpenA := pickSection(t, splitA, aiprojection.SectionTimelineOpen)
+	tlOpenB := pickSection(t, splitB, aiprojection.SectionTimelineOpen)
 	require.Contains(t, tlOpenA.Content, "tool result A")
 	require.Contains(t, tlOpenB.Content, "tool result B (different)")
 	require.NotEqual(t, tlOpenA.Hash, tlOpenB.Hash,
@@ -328,7 +328,7 @@ func TestLiteForgePrompt_TimelineFrozenOpen_RendersBothSections(t *testing.T) {
 	// frozen 段被 splitter 归类到 semi-dynamic / timeline 等 cacheable 前缀段中:
 	// 跨调用 frozen 内容相同时, 至少有一个 cacheable section chunk 的 hash 字节稳定。
 	stableSectionFound := false
-	for _, secName := range []string{aicache.SectionSemiDynamic, aicache.SectionTimeline} {
+	for _, secName := range []string{aiprojection.SectionSemiDynamic, aiprojection.SectionTimeline} {
 		var hashesA, hashesB []string
 		for _, c := range splitA.Chunks {
 			if c.Section == secName {
@@ -402,16 +402,16 @@ func TestLiteForgePrompt_HighStaticTokenBudget(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	split := aicache.Split(rendered)
+	split := aiprojection.Split(rendered)
 	require.NotNil(t, split)
-	hs := pickSection(t, split, aicache.SectionHighStatic)
+	hs := pickSection(t, split, aiprojection.SectionHighStatic)
 	got := ytoken.CalcTokenCount(hs.Content)
 	require.GreaterOrEqual(t, got, minTokens,
 		"LiteForge high-static section must keep >= %d tokens to be cacheable by dashscope/qwen explicit prefix cache; got %d",
 		minTokens, got)
 }
 
-func pickSection(t *testing.T, split *aicache.PromptSplit, section string) *aicache.Chunk {
+func pickSection(t *testing.T, split *aiprojection.PromptSplit, section string) *aiprojection.Chunk {
 	t.Helper()
 	for _, c := range split.Chunks {
 		if c.Section == section {

@@ -1,0 +1,15 @@
+{{ if .ExecutionPolicy }}<|EXECUTION_POLICY|>
+## 执行策略
+
+以下是当前会话的顶层运行策略，决定你如何选择动作、是否拆分并行子 Agent、以及何时收尾。这些约束优先级高于你的默认习惯，必须严格遵守；仅在策略未覆盖时才回退到常规判断。
+
+{{ .ExecutionPolicy }}
+<|EXECUTION_POLICY_END|>{{ end }}{{ if .TaskInstruction }}
+
+<|PERSISTENT|>
+{{ .TaskInstruction }}
+<|PERSISTENT_END|>{{ end }}{{ if .AutoLoadedSkills }}
+{{ .AutoLoadedSkills }}{{ end }}
+
+本轮通过原生工具调用选择 action。工具名即 action 名；所有执行所需内容必须写入该工具的 arguments，不输出外置 AITAG。以下每个标签供请求投影为一个原生工具：
+{{ .FunctionCallSchemas }}

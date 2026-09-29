@@ -1,0 +1,53 @@
+desc(
+	mode: "source"
+	language: "csharp"
+	title: "源码扫描：C# 把异常文本返回给客户端"
+	title_zh: "源码扫描：C# 把异常文本返回给客户端"
+	type: vuln
+	level: middle
+	rule_id: "source-csharp-exception-tostring"
+	risk: "information-exposure"
+	cwe: "CWE-209"
+	desc: <<<DESC
+### 规则说明
+`ex.ToString()` 包含异常类型、消息和堆栈。把它写入 HTTP 响应、邮件或返回给客户端的 JSON，会把内部路径、SQL、依赖版本和调用链暴露出去。堆栈是给服务端排查用的，不是给调用方的错误文案。
+
+### 风险类型
+information-exposure
+
+### 影响
+攻击者可以据此选择下一步目标，例如本地路径、数据库结构和框架版本。用户也会看到不该出现的内部错误。
+
+### 检测方式
+这条规则使用 source 模式，用正则扫描源文件文本，不构建语法树或 SSA。命中只说明出现了对应写法，不能单独证明数据来自外部输入。注释、字符串和文档中的相同文本也会命中。
+正则匹配 `ex.ToString(`。变量名不是 `ex` 的调用不会命中。注释里的相同文本会命中，需要确认它是否写进了响应。
+
+### 参考
+- [CWE-209：错误信息包含敏感数据](https://cwe.mitre.org/data/definitions/209.html)
+
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+- 对客户端返回固定的错误码和通用文案。
+- 堆栈只写入服务端日志，并限制谁能读这些日志。
+- 捕获异常时把异常对象交给日志库，不要把 `ToString()` 的结果放进响应体。
+
+SOLUTION
+	alert_min: 1
+	"file://bad.cs": <<<POS
+class Bad { string e(System.Exception ex) { return ex.ToString(); } }
+
+POS
+	"safefile://ok.cs": <<<NEG
+class Ok { string e() { return "error"; } }
+
+NEG
+)
+${*.cs}.pattern_regex(/ex\.ToString\s*\(/) as $hit
+alert $hit for {
+	level: "middle",
+	title: "源码扫描：C# 把异常文本返回给客户端",
+	title_zh: "源码扫描：C# 把异常文本返回给客户端",
+	message: "源码扫描：C# 把异常文本返回给客户端",
+	risk: "information-exposure",
+}

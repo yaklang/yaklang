@@ -820,8 +820,8 @@ func TestToolCaller_CancellationAfterAdmissionBoundariesSkipsCallbacks(t *testin
 			aicommon.WithToolCaller_Emitter(react.config.GetEmitter()),
 			aicommon.WithToolCaller_Task(react.config.DefaultTask),
 			aicommon.WithToolCaller_Reason("cancel after parameter admission"),
-			aicommon.WithToolCaller_GenerateToolParamsBuilder(func(_ *aitool.Tool, _ string) (string, error) {
-				return "generate params", nil
+			aicommon.WithToolCaller_GenerateToolParamsBuilderWithMeta(func(_ *aitool.Tool, _ string) (*aicommon.ToolParamsPromptMeta, error) {
+				return &aicommon.ToolParamsPromptMeta{Prompt: "generate params"}, nil
 			}),
 			aicommon.WithToolCaller_ParamGenerationGate(func(context.Context) (func(), error) {
 				cancel()

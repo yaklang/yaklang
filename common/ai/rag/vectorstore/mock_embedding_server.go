@@ -7,7 +7,6 @@ import (
 	"regexp"
 	"sort"
 	"strings"
-	"time"
 
 	"github.com/yaklang/yaklang/common/ai/rag/hnsw"
 	"github.com/yaklang/yaklang/common/ai/rag/test"
@@ -253,7 +252,9 @@ func (c *MockEmbeddingClient) GenerateRandomWord(wordCount int) []string {
 	if wordCount <= 0 {
 		return nil
 	}
-	source := rand.NewSource(time.Now().UnixNano())
+	// Clock resolution can repeat across rapid calls, especially on Windows.
+	// Draw independent seeds from the concurrency-safe process RNG instead.
+	source := rand.NewSource(rand.Int63())
 	rng := rand.New(source)
 	if wordCount > c.dimension {
 		wordCount = c.dimension
@@ -295,7 +296,9 @@ func (c *MockEmbeddingClient) GenerateSimilarText(baseText string, threshold flo
 	shuffledVocab := make([]string, c.dimension)
 	copy(shuffledVocab, c.vocabulary)
 
-	source := rand.NewSource(time.Now().UnixNano())
+	// Clock resolution can repeat across rapid calls, especially on Windows.
+	// Draw independent seeds from the concurrency-safe process RNG instead.
+	source := rand.NewSource(rand.Int63())
 	rng := rand.New(source)
 	rng.Shuffle(len(shuffledVocab), func(i, j int) {
 		shuffledVocab[i], shuffledVocab[j] = shuffledVocab[j], shuffledVocab[i]

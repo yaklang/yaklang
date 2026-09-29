@@ -1,6 +1,10 @@
 package aicommon
 
-import "strings"
+import (
+	"strings"
+
+	"github.com/yaklang/yaklang/common/ai/aid/aiprojection"
+)
 
 // This file provides shared prompt-matcher helpers used by test mock AI
 // callbacks across packages (common/ai/aid/test, common/ai/aid/aireact, and
@@ -15,7 +19,7 @@ import "strings"
 // kebab-case); use semantic Chinese placeholders instead.
 //
 // When static prompts are edited, the散文 (prose) MUST NOT contain any concrete
-// action literal. See common/ai/aid/aicache/LESSONS_LEARNED.md §6.
+// action literal. See common/ai/aid/aiprojection/README.md.
 
 // --- 参数生成场景识别 (R2 / R3 / R5) ---
 
@@ -32,6 +36,8 @@ func IsToolParamGenerationPrompt(prompt, toolName string) bool {
 // the current context's target, not another tool mentioned elsewhere in it.
 // Keep the old matcher fallback for standalone prompts without this context.
 func promptParameterTarget(prompt string) (name string, blueprint bool, ok bool) {
+	// Embedded templates retain checkout line endings on Windows.
+	prompt = strings.ReplaceAll(prompt, "\r\n", "\n")
 	const toolPrefix = "# Tool Context\n需要为 `"
 	const blueprintPrefix = "# Blueprint Context\nYou need to generate parameters for the AI Blueprint '"
 	toolAt := strings.LastIndex(prompt, toolPrefix)
@@ -152,7 +158,9 @@ func IsPrimaryDecisionPrompt(prompt string) bool {
 	if IsToolParamGenPrompt(prompt) {
 		return false
 	}
-	hasHighStatic := strings.Contains(prompt, "<|AI_CACHE_SYSTEM_high-static|>") ||
+	hasHighStatic := strings.Contains(prompt, "<|AI_CACHE_SYSTEM_high-static_"+aiprojection.Nonce()+"|>") ||
+		strings.Contains(prompt, "<|PROMPT_SECTION_high-static_"+aiprojection.Nonce()+"|>") ||
+		strings.Contains(prompt, "<|AI_CACHE_SYSTEM_high-static|>") ||
 		strings.Contains(prompt, "<|PROMPT_SECTION_high-static|>")
 	if hasHighStatic &&
 		strings.Contains(prompt, "<|PROMPT_SECTION_dynamic_") &&

@@ -1,16 +1,15 @@
 package aid
 
 import (
-	_ "embed"
 	"io"
 
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon/promptloader"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 )
 
-//go:embed jsonschema/plan-review/re-plan-suggestion.json
-var schemaRePlanSuggestion string
+var schemaRePlanSuggestion = promptloader.MustLoad("ai/aid/jsonschema/plan-review/re-plan-suggestion.json")
 
 type ReviewSuggestion struct {
 	Value            string `json:"value"`

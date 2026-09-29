@@ -2,12 +2,12 @@ package browsercrypto
 
 import (
 	"context"
-	_ "embed"
 	"errors"
 	"fmt"
 	"strings"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon/promptloader"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools/browsertools"
 	"github.com/yaklang/yaklang/common/aiforge"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
@@ -15,11 +15,9 @@ import (
 
 const ForgeName = "browser_crypto_analysis"
 
-//go:embed prompts/init.txt
-var initializePrompt string
+var initializePrompt = promptloader.MustLoad("aiforge/browsercrypto/prompts/init.txt")
 
-//go:embed prompts/persistent.txt
-var persistentPrompt string
+var persistentPrompt = promptloader.MustLoad("aiforge/browsercrypto/prompts/persistent.txt")
 
 var requiredCapabilities = []string{
 	"browser.recording.trace.list",

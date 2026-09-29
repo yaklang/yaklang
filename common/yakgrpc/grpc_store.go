@@ -51,6 +51,9 @@ func (s *Server) SetKey(ctx context.Context, req *ypb.SetKeyRequest) (*ypb.Empty
 			return nil, err
 		}
 	}
+	if req.GetKey() == consts.HTTPFlowListInlineMaxContentLengthKey {
+		yakit.ApplyHTTPFlowListInlineMaxContentLength(req.GetValue())
+	}
 	return &ypb.Empty{}, nil
 }
 

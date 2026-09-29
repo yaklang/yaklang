@@ -14,3 +14,4 @@ fi
 "$gzip_embed_tool" --source common/thirdparty_bin/bin_cfg.yml --base common/thirdparty_bin --gz common/thirdparty_bin/config.tar.gz --no-embed
 "$gzip_embed_tool" --source common/syntaxflow/sfbuildin/standards/mappings.yaml --base common/syntaxflow/sfbuildin/standards --gz common/syntaxflow/sfbuildin/standards/mappings.tar.gz --no-embed
 "$gzip_embed_tool" --source common/syntaxflow/sfdb/rule_versions.json --base common/syntaxflow/sfdb --gz common/syntaxflow/sfdb/rule_versions.tar.gz --no-embed
+"$gzip_embed_tool" --source common/ai/aid/aicommon/promptloader/prompts --root-path --gz common/ai/aid/aicommon/promptloader/prompts.tar.gz --no-embed

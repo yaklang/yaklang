@@ -1,0 +1,1562 @@
+// aicache cachebench - shared library
+// 关键词: aicache cachebench, dump 解析, usage 对齐, bottleneck classify
+
+// 该文件只导出函数与常量, 不能在加载时启动任何任务。
+// 由 run_react.yak / analyze.yak 通过 include 引入。
+// 关键词: cachebench lib, include 入口
+
+// =============================================================================
+// 常量定义
+// =============================================================================
+
+// classify tags 列表 - 用来标注每条 prompt 在两路口径下的健康程度
+// 关键词: cachebench tag, prompt 健康分类
+TAG_HEALTHY                  = "healthy"
+TAG_PARTIAL_HIT              = "partial_hit"
+TAG_CACHE_CREATE             = "cache_create"
+TAG_PREFIX_MISALIGN          = "prefix_misalign"
+TAG_LCP_HIT_UPSTREAM_MISS    = "lcp_hit_but_upstream_miss"
+TAG_IN_FLIGHT_CANCELLED      = "in_flight_cancelled"
+TAG_NOISE                    = "noise"
+TAG_UNKNOWN                  = "unknown"
+
+// 命中率阈值
+// 关键词: cachebench threshold
+//
+// HEALTHY_TOKEN_RATIO_MIN: cachedTokens / promptTokens >= 该值 视为 healthy.
+//   取 0.10 是因为 memfit-standard-free 的高静态/语义动态段约占整 prompt 10-20%,
+//   只要上游真把这段 prefix cache 起来, 比例自然落在 0.10+ 区间.
+// HEALTHY_LCP_RATIO_MIN: 客户端 LCP 比例阈值, 仍保留作为参考但不再是 healthy 唯一门槛.
+HEALTHY_TOKEN_RATIO_MIN      = 0.10
+HEALTHY_LCP_RATIO_MIN        = 0.5
+
+// =============================================================================
+// 工具函数
+// =============================================================================
+
+func ccbIsNil(v) {
+    return v == nil || v == undefined
+}
+
+// ccbAsInt 强制把任意 v 归一成 int, nil / undefined / 非法都归 0.
+// yak 里 undefined > int 会直接 panic, 所有数值比较前都要先过这层兜底.
+// 关键词: ccbAsInt nil-safe, undefined > int panic 拦截
+func ccbAsInt(v) {
+    if ccbIsNil(v) {
+        return 0
+    }
+    return ccbAtoi(v)
+}
+
+// ccbAsFloat 强制把任意 v 归一成 float, nil / undefined / 非法都归 0.0.
+// 关键词: ccbAsFloat nil-safe, 数值比较兜底
+func ccbAsFloat(v) {
+    if ccbIsNil(v) {
+        return 0.0
+    }
+    return ccbAtof(v)
+}
+
+func ccbToString(v) {
+    if ccbIsNil(v) {
+        return ""
+    }
+    return sprintf("%v", v)
+}
+
+func ccbAtoi(s) {
+    s = str.TrimSpace(ccbToString(s))
+    if s == "" {
+        return 0
+    }
+    return parseInt(s)
+}
+
+func ccbAtof(s) {
+    s = str.TrimSpace(ccbToString(s))
+    if s == "" {
+        return 0.0
+    }
+    s = str.TrimSuffix(s, "%")
+    return parseFloat(s)
+}
+
+// ccbSafeRatio: 安全除法, 避免除零
+func ccbSafeRatio(num, den) {
+    if den <= 0 {
+        return 0.0
+    }
+    return float(num) / float(den)
+}
+
+// ccbTruncate 截断字符串避免输出过长
+func ccbTruncate(s, n) {
+    if ccbIsNil(s) {
+        return ""
+    }
+    text = ccbToString(s)
+    if n <= 0 || len(text) <= n {
+        return text
+    }
+    if n <= 3 {
+        return text[:n]
+    }
+    return text[:n-3] + "..."
+}
+
+// =============================================================================
+// dump 文件解析
+// =============================================================================
+
+// parseSectionLine 解析 "[i] section=... nonce=... bytes=N hash=H seen=N first=T"
+// 关键词: cachebench parse section
+func parseSectionLine(line) {
+    info = {
+        "index":   0,
+        "section": "",
+        "nonce":   "",
+        "bytes":   0,
+        "hash":    "",
+        "seen":    0,
+        "first":   "",
+    }
+    // 原行示例: [1] section=high-static   nonce=high-static              bytes=3109 hash=c1b566f2a696dcff seen=1 first=2026-05-03T11:35:29+08:00
+    line = str.TrimSpace(line)
+    if !str.HasPrefix(line, "[") {
+        return info
+    }
+    // 提取 [N]
+    rb = str.Index(line, "]")
+    if rb > 1 {
+        info["index"] = ccbAtoi(line[1:rb])
+        line = str.TrimSpace(line[rb+1:])
+    }
+
+    // 把 key=value pairs 拆出来。注意 hash/section/nonce 都是单 token.
+    // 但 first= 后面是 RFC3339, 含 ":" 与 "+", 没有空格, 仍可按空格分。
+    parts = str.Fields(line)
+    for part in parts {
+        if !str.Contains(part, "=") {
+            continue
+        }
+        kv = str.SplitN(part, "=", 2)
+        if len(kv) != 2 {
+            continue
+        }
+        key = kv[0]
+        value = kv[1]
+        if key == "section" {
+            info["section"] = value
+        } else if key == "nonce" {
+            info["nonce"] = value
+        } else if key == "bytes" {
+            info["bytes"] = ccbAtoi(value)
+        } else if key == "hash" {
+            info["hash"] = value
+        } else if key == "seen" {
+            info["seen"] = ccbAtoi(value)
+        } else if key == "first" {
+            info["first"] = value
+        }
+    }
+    return info
+}
+
+// parseDumpFile 解析单个 000XXX.txt 落盘文件, 抽出关键字段成 map
+// 关键词: cachebench parseDumpFile
+func parseDumpFile(filePath) {
+    record = {
+        "path":              filePath,
+        "filename":          file.GetBase(filePath),
+        "seqId":             0,
+        "model":             "",
+        "totalBytes":        0,
+        "totalChunks":       0,
+        "sections":          [],
+        "prefixHitChunks":   0,
+        "prefixHitBytes":    0,
+        "prefixHitRatio":    0.0,
+        "globalUniqChunks":  0,
+        "globalCacheBytes":  0,
+        "totalRequests":     0,
+        "sectionHashCount":  {},
+        "sectionTotalUses":  {},
+        "sectionReuseRate":  {},
+        "advices":           [],
+        "rawPromptBytes":    0,
+        "parseError":        "",
+    }
+
+    raw, err = file.ReadFile(filePath)
+    if err != nil {
+        record["parseError"] = sprintf("read file failed: %v", err)
+        return record
+    }
+
+    text = string(raw)
+    lines = str.Split(text, "\n")
+
+    // 状态机: 默认 header, 进入 ## sections / ## hit report / ## advices / ## raw prompt
+    state = "header"
+    inSectionHashCount = false
+    inSectionTotalUses = false
+
+    for line in lines {
+        trimmed = str.TrimSpace(line)
+        if str.HasPrefix(trimmed, "## sections") {
+            state = "sections"
+            inSectionHashCount = false
+            inSectionTotalUses = false
+            continue
+        }
+        if str.HasPrefix(trimmed, "## hit report") {
+            state = "hit"
+            inSectionHashCount = false
+            inSectionTotalUses = false
+            continue
+        }
+        if str.HasPrefix(trimmed, "## advices") {
+            state = "advices"
+            inSectionHashCount = false
+            inSectionTotalUses = false
+            continue
+        }
+        if str.HasPrefix(trimmed, "## raw prompt") {
+            state = "raw"
+            inSectionHashCount = false
+            inSectionTotalUses = false
+            // 同时抽出 raw prompt 的 bytes 数
+            // 形如: "## raw prompt (4788 bytes)"
+            lp = str.Index(trimmed, "(")
+            rp = str.Index(trimmed, " bytes")
+            if lp >= 0 && rp > lp {
+                record["rawPromptBytes"] = ccbAtoi(trimmed[lp+1:rp])
+            }
+            continue
+        }
+
+        if state == "header" {
+            if str.HasPrefix(trimmed, "seq:") {
+                record["seqId"] = ccbAtoi(str.TrimSpace(trimmed[len("seq:"):]))
+            } else if str.HasPrefix(trimmed, "model:") {
+                record["model"] = str.TrimSpace(trimmed[len("model:"):])
+            } else if str.HasPrefix(trimmed, "total:") {
+                // 形如 "total:  4788 bytes / 3 chunks"
+                payload = str.TrimSpace(trimmed[len("total:"):])
+                parts = str.SplitN(payload, "/", 2)
+                if len(parts) == 2 {
+                    leftFields = str.Fields(str.TrimSpace(parts[0]))
+                    rightFields = str.Fields(str.TrimSpace(parts[1]))
+                    if len(leftFields) >= 1 {
+                        record["totalBytes"] = ccbAtoi(leftFields[0])
+                    }
+                    if len(rightFields) >= 1 {
+                        record["totalChunks"] = ccbAtoi(rightFields[0])
+                    }
+                }
+            }
+        } else if state == "sections" {
+            if !str.HasPrefix(trimmed, "[") {
+                continue
+            }
+            section = parseSectionLine(trimmed)
+            sections = record["sections"]
+            sections = append(sections, section)
+            record["sections"] = sections
+        } else if state == "hit" {
+            if str.HasPrefix(trimmed, "prefix_hit_chunks:") {
+                record["prefixHitChunks"] = ccbAtoi(str.TrimSpace(trimmed[len("prefix_hit_chunks:"):]))
+            } else if str.HasPrefix(trimmed, "prefix_hit_bytes:") {
+                record["prefixHitBytes"] = ccbAtoi(str.TrimSpace(trimmed[len("prefix_hit_bytes:"):]))
+            } else if str.HasPrefix(trimmed, "prefix_hit_ratio:") {
+                v = str.TrimSpace(trimmed[len("prefix_hit_ratio:"):])
+                record["prefixHitRatio"] = ccbAtof(v) / 100.0
+            } else if str.HasPrefix(trimmed, "global_uniq_chunks:") {
+                record["globalUniqChunks"] = ccbAtoi(str.TrimSpace(trimmed[len("global_uniq_chunks:"):]))
+            } else if str.HasPrefix(trimmed, "global_cache_bytes:") {
+                record["globalCacheBytes"] = ccbAtoi(str.TrimSpace(trimmed[len("global_cache_bytes:"):]))
+            } else if str.HasPrefix(trimmed, "total_requests:") {
+                record["totalRequests"] = ccbAtoi(str.TrimSpace(trimmed[len("total_requests:"):]))
+            } else if str.HasPrefix(trimmed, "section_hash_count:") {
+                inSectionHashCount = true
+                inSectionTotalUses = false
+            } else if str.HasPrefix(trimmed, "section_total_uses:") {
+                // section_total_uses 块每行形如 "- high-static: total=10 distinct=3 reuse_rate=70%"
+                // 解析后写入 sectionTotalUses / sectionReuseRate, 让 cachebench 报告
+                // 用 reuse_rate 替代单纯 distinct 判定 (修 high-static distinct 误报).
+                // 关键词: cachebench parser section_total_uses, reuse_rate
+                inSectionHashCount = false
+                inSectionTotalUses = true
+            } else if inSectionTotalUses && str.HasPrefix(trimmed, "- ") {
+                payload = str.TrimSpace(trimmed[2:])
+                parts = str.SplitN(payload, ":", 2)
+                if len(parts) == 2 {
+                    sectionName = str.TrimSpace(parts[0])
+                    rest = str.TrimSpace(parts[1])
+                    fields = str.Fields(rest)
+                    stu = record["sectionTotalUses"]
+                    if ccbIsNil(stu) {
+                        stu = {}
+                    }
+                    srr = record["sectionReuseRate"]
+                    if ccbIsNil(srr) {
+                        srr = {}
+                    }
+                    for f in fields {
+                        if str.HasPrefix(f, "total=") {
+                            stu[sectionName] = ccbAtoi(f[len("total="):])
+                        } else if str.HasPrefix(f, "reuse_rate=") {
+                            v = f[len("reuse_rate="):]
+                            if str.HasSuffix(v, "%") {
+                                v = v[:len(v)-1]
+                            }
+                            srr[sectionName] = ccbAtof(v) / 100.0
+                        }
+                    }
+                    record["sectionTotalUses"] = stu
+                    record["sectionReuseRate"] = srr
+                }
+            } else if inSectionHashCount && str.HasPrefix(trimmed, "- ") {
+                // 形如 "- high-static: 1"
+                payload = str.TrimSpace(trimmed[2:])
+                parts = str.SplitN(payload, ":", 2)
+                if len(parts) == 2 {
+                    sectionName = str.TrimSpace(parts[0])
+                    sectionCnt  = ccbAtoi(parts[1])
+                    shc = record["sectionHashCount"]
+                    shc[sectionName] = sectionCnt
+                    record["sectionHashCount"] = shc
+                }
+            }
+        } else if state == "advices" {
+            if str.HasPrefix(trimmed, "- ") {
+                advice = str.TrimSpace(trimmed[2:])
+                if advice != "" && advice != "(none)" {
+                    advs = record["advices"]
+                    advs = append(advs, advice)
+                    record["advices"] = advs
+                }
+            }
+        }
+    }
+
+    return record
+}
+
+// ccbBubbleSortStrings 对字符串切片做升序冒泡排序 (yak 暂未暴露 sort 库, 自己写一份)
+// 关键词: cachebench ccbBubbleSortStrings, dump 顺序
+func ccbBubbleSortStrings(arr) {
+    n = len(arr)
+    if n <= 1 {
+        return arr
+    }
+    i = 0
+    for i < n-1 {
+        j = 0
+        for j < n-1-i {
+            if arr[j] > arr[j+1] {
+                tmp = arr[j]
+                arr[j] = arr[j+1]
+                arr[j+1] = tmp
+            }
+            j++
+        }
+        i++
+    }
+    return arr
+}
+
+// listDumpFiles 列出 sessionDir 下所有 000XXX.txt 并按 SeqId 升序返回路径
+// 关键词: cachebench listDumpFiles
+func listDumpFiles(sessionDir) {
+    paths = []
+    entries = file.Ls(sessionDir)
+    if ccbIsNil(entries) {
+        return paths
+    }
+    for entry in entries {
+        if entry.IsDir {
+            continue
+        }
+        if !str.HasSuffix(entry.Name, ".txt") {
+            continue
+        }
+        paths = append(paths, entry.Path)
+    }
+    // 文件名形如 000001.txt 000002.txt, 按字符串排序即按 SeqId 升序
+    paths = ccbBubbleSortStrings(paths)
+    return paths
+}
+
+// =============================================================================
+// 瓶颈分类与建议
+// =============================================================================
+
+// classifyRecord 给单条 (dump record + usage) 打 tag
+// 关键词: cachebench classifyRecord, bottleneck tag
+func classifyRecord(rec, usage) {
+    sections = rec["sections"]
+    isRawOnly = false
+    if len(sections) == 1 {
+        sec = sections[0]
+        if sec["section"] == "raw" {
+            isRawOnly = true
+        }
+    }
+    if isRawOnly {
+        return TAG_NOISE
+    }
+
+    // in_flight_cancelled: max-prompts 触发后还在飞的 chat 被 ctx cancel
+    // SSE 末帧 usage 没读到, 仅是测量伪影 - 不算瓶颈也不算 missing
+    // 关键词: classifyRecord in_flight_cancelled, ctx cancel SSE truncate
+    if !ccbIsNil(usage) && usage["inFlightCancelled"] == true {
+        return TAG_IN_FLIGHT_CANCELLED
+    }
+
+    // 字段兜底: dump placeholder / 残缺 dump / yak undefined 比较都会 panic.
+    // 用 ccbAsInt / ccbAsFloat 强转一遍, nil/undefined 都归 0, 彻底拦死
+    // "op1[undefined] > op2[int]" 这类 panic.
+    // 关键词: classifyRecord nil-safe, ccbAsInt 兜底
+    cachedTokens = 0
+    cacheCreation = 0
+    promptTokens = 0
+    if !ccbIsNil(usage) {
+        cachedTokens = ccbAsInt(usage["cachedTokens"])
+        cacheCreation = ccbAsInt(usage["cacheCreation"])
+        promptTokens = ccbAsInt(usage["promptTokens"])
+    }
+
+    prefixHitChunks = ccbAsInt(rec["prefixHitChunks"])
+    prefixHitRatio = ccbAsFloat(rec["prefixHitRatio"])
+    totalRequests = ccbAsInt(rec["totalRequests"])
+
+    // 上游 cached_tokens / prompt_tokens 比例: 这才是真实命中率口径
+    // 关键词: classifyRecord upstream token ratio, partial_hit, healthy
+    tokenHitRatio = 0.0
+    if cachedTokens > 0 && promptTokens > 0 {
+        tokenHitRatio = float(cachedTokens) / float(promptTokens)
+    }
+
+    // healthy: 上游 token 比例命中达标 (不再要求客户端 LCP 同步, 因为 LCP 受
+    // dynamic 段尾抖动影响很大, 与上游 prefix cache 是否真命中并不强相关)
+    if tokenHitRatio >= HEALTHY_TOKEN_RATIO_MIN {
+        return TAG_HEALTHY
+    }
+
+    // partial_hit: 上游有少量 cached_tokens 但比例不足 healthy 门槛.
+    // 通常发生在 prompt 体积偏大、prefix cache 命中段落只占小头 (例如只命中
+    // high-static), 已经"开始有缓存"但没用满, 算亚健康而非瓶颈.
+    if cachedTokens > 0 {
+        return TAG_PARTIAL_HIT
+    }
+
+    // lcp_hit_but_upstream_miss: 客户端 LCP 看到命中但 dashscope 没命中
+    // (意味着 hijacker 切的字节边界与 cache_control 标记位置不一致, 或 cache 还没建好)
+    if prefixHitChunks > 0 && cachedTokens == 0 && totalRequests > 1 {
+        return TAG_LCP_HIT_UPSTREAM_MISS
+    }
+
+    // prefix_misalign: 客户端就没对齐前缀 (totalRequests > 1 才能判, 第一次必然 0)
+    if prefixHitChunks == 0 && totalRequests > 1 {
+        return TAG_PREFIX_MISALIGN
+    }
+
+    // cache_create: 上游本次新建缓存块 (首次预期, 也可能是字节边界变了导致重建)
+    if cacheCreation > 0 {
+        return TAG_CACHE_CREATE
+    }
+
+    return TAG_UNKNOWN
+}
+
+// classifyReason 给 tag 附带一句人类可读的简短归因, 用在 bottleneck 文件头
+// 关键词: cachebench classifyReason
+func classifyReason(tag) {
+    if tag == TAG_HEALTHY {
+        return "上游 cached_tokens / prompt_tokens >= HEALTHY_TOKEN_RATIO_MIN, prefix cache 真正落地"
+    } else if tag == TAG_PARTIAL_HIT {
+        return "上游 cached_tokens > 0 但比例不足门槛, 通常是 dynamic 段过大稀释了 prefix 命中比例"
+    } else if tag == TAG_CACHE_CREATE {
+        return "上游本次新建缓存块, 首次/字节边界变化时预期出现"
+    } else if tag == TAG_PREFIX_MISALIGN {
+        return "客户端 LCP 完全未对齐 - 检查 high-static/frozen 段是否被污染"
+    } else if tag == TAG_LCP_HIT_UPSTREAM_MISS {
+        return "客户端 LCP 命中但上游未命中 - 检查 hijacker 字节边界与 cache_control 标记位置"
+    } else if tag == TAG_IN_FLIGHT_CANCELLED {
+        return "max-prompts 触发后被 ctx cancel 中断, SSE 末帧 usage 未读到 (测量伪影)"
+    } else if tag == TAG_NOISE {
+        return "单 raw chunk, 无 PROMPT_SECTION 包装, 不参与段缓存"
+    }
+    return "未分类 (首次/usage 缺失/其它)"
+}
+
+// =============================================================================
+// 报告聚合
+// =============================================================================
+
+// alignDumpsAndUsages 把 dumps 与 usages 对齐成 records.
+//
+// 对齐策略 (修 cachebench 归因 bug):
+//   1. 第一优先按 correlationID join. usage["correlationID"] 来自
+//      ChatUsage.MirrorCorrelationID, aiprojection.ProjectAndObserve 把本次 SeqId 写到上面,
+//      ChatBase 透传到 SSE 末帧 callback. dump 文件名 (000XXX.txt) 同名 SeqId,
+//      所以 dump.seqId.toString() 就能直接 join.
+//   2. 只有真正没有 correlationID 的 usage (老 yak 二进制 / 非 mirror 路径)
+//      才允许按顺序兜底. 带 ID 但 ID 不等于当前 dump.seqId 的 usage 绝不能
+//      被兜底消费, 否则一次漏 callback 会把后续所有记录整体左移.
+//   3. 每条 record 写入 alignment 字段, 让报告明确区分 correlation_id / legacy_order /
+//      missing / in_flight_cancelled / usage_without_dump, 并计算精确关联覆盖率.
+//
+// maxPromptsTriggered 透传"末尾 trailing dumps 是否 ctx cancel 飞行中"语义,
+// 标 inFlightCancelled 避免误判 missing.
+//
+// 关键词: alignDumpsAndUsages correlationID join, 归因 bug 修复, 下标兜底
+func alignDumpsAndUsages(dumps, usages, maxPromptsTriggered) {
+    records = []
+    nDumps = len(dumps)
+    nUsages = len(usages)
+
+    // 第一遍: 建 correlationID -> usage 索引, 同时单独保存无 ID usage.
+    // 让上层一眼看出新旧二进制的部署状态 (启动期就能分辨"还在跑老 binary").
+    // 关键词: cachebench correlationID stats, ID 部署可观测
+    usageByID = {}
+    usagesWithoutID = []
+    usagesWithID = 0
+    usagesNoID = 0
+    maxUsageSeqID = 0
+    j = 0
+    for j < nUsages {
+        u = usages[j]
+        cid = ""
+        if !ccbIsNil(u) {
+            cid = ccbToString(u["correlationID"])
+        }
+        if cid != "" {
+            usageByID[cid] = u
+            usagesWithID++
+            cidInt = ccbAsInt(cid)
+            if cidInt > maxUsageSeqID {
+                maxUsageSeqID = cidInt
+            }
+        } else {
+            usagesNoID++
+            usagesWithoutID = append(usagesWithoutID, u)
+        }
+        j++
+    }
+    log.info("cachebench align: nDumps=%d nUsages=%d usagesWithID=%d usagesNoID=%d",
+        nDumps, nUsages, usagesWithID, usagesNoID)
+
+    // 第二遍: 按 dump 顺序产 records. 优先 ID 匹配; 不匹配时只允许消费
+    // usagesWithoutID, 永远不跨 correlationID 错配.
+    consumedByID = {}
+    nextNoIDPtr = 0
+
+    i = 0
+    for i < nDumps {
+        rec = dumps[i]
+        usage = nil
+        alignment = "missing"
+        seqStr = ""
+        if !ccbIsNil(rec) {
+            seqStr = sprintf("%d", ccbAsInt(rec["seqId"]))
+        }
+        if seqStr != "" && seqStr != "0" && !ccbIsNil(usageByID[seqStr]) && consumedByID[seqStr] != true {
+            usage = usageByID[seqStr]
+            consumedByID[seqStr] = true
+            alignment = "correlation_id"
+        } else {
+            if nextNoIDPtr < len(usagesWithoutID) {
+                usage = usagesWithoutID[nextNoIDPtr]
+                nextNoIDPtr++
+                alignment = "legacy_order"
+            }
+        }
+
+        if ccbIsNil(rec) {
+            rec = {
+                "seqId":            i + 1,
+                "missing":          true,
+                "sections":         [],
+                "advices":          [],
+                "sectionHashCount": {},
+                "sectionTotalUses": {},
+                "totalRequests":    0,
+                "totalChunks":      0,
+                "prefixHitChunks":  0,
+                "prefixHitRatio":   0.0,
+                "totalBytes":       0,
+                "prefixHitBytes":   0,
+                "rawText":          "",
+            }
+        }
+        // max-prompts 触发后, 没 usage 的 trailing dump 视为 in-flight cancelled
+        // 而非真实 missing (chat 被 ctx cancel 抛错, callback 没机会触发).
+        seqID = ccbAsInt(rec["seqId"])
+        trailingCancelled = usagesWithID > 0 && seqID > maxUsageSeqID
+        if usagesWithID == 0 {
+            trailingCancelled = i >= nUsages
+        }
+        if ccbIsNil(usage) && maxPromptsTriggered && trailingCancelled {
+            usage = {
+                "seq":               i + 1,
+                "missing":           false,
+                "inFlightCancelled": true,
+            }
+            alignment = "in_flight_cancelled"
+        }
+
+        tag = TAG_UNKNOWN
+        try {
+            tag = classifyRecord(rec, usage)
+        } catch e {
+            log.warn("classifyRecord panicked at seq=%d: %v", i+1, e)
+            tag = TAG_UNKNOWN
+        }
+        item = {
+            "seq":    i + 1,
+            "dump":   rec,
+            "usage":  usage,
+            "tag":    tag,
+            "reason": classifyReason(tag),
+            "alignment": alignment,
+        }
+        records = append(records, item)
+        i++
+    }
+
+    // 第三遍: 兜底处理 trailing usages (dump 落盘失败但 callback 跑过的边界场景),
+    // 用 placeholder dump 反映真实情况, 不让任何 usage 被静默吞掉.
+    // 关键词: alignDumpsAndUsages trailing usages placeholder
+    // 先补带 ID 但没有对应 dump 的 usage.
+    for cid, u in usageByID {
+        if consumedByID[cid] == true {
+            continue
+        }
+        idx = len(records)
+        rec = {
+            "seqId":            ccbAsInt(cid),
+            "missing":          true,
+            "sections":         [],
+            "advices":          [],
+            "sectionHashCount": {},
+            "sectionTotalUses": {},
+            "totalRequests":    0,
+            "totalChunks":      0,
+            "prefixHitChunks":  0,
+            "prefixHitRatio":   0.0,
+            "totalBytes":       0,
+            "prefixHitBytes":   0,
+            "rawText":          "",
+        }
+        tag = TAG_UNKNOWN
+        item = {
+            "seq":       ccbAsInt(cid),
+            "dump":      rec,
+            "usage":     u,
+            "tag":       tag,
+            "reason":    classifyReason(tag),
+            "alignment": "usage_without_dump",
+        }
+        records = append(records, item)
+        consumedByID[cid] = true
+    }
+
+    // 再补无 ID 且顺序兜底没有消费完的 legacy usage.
+    for nextNoIDPtr < len(usagesWithoutID) {
+        u = usagesWithoutID[nextNoIDPtr]
+        nextNoIDPtr++
+        cid = ""
+        idx = len(records)
+        rec = {
+            "seqId":            idx + 1,
+            "missing":          true,
+            "sections":         [],
+            "advices":          [],
+            "sectionHashCount": {},
+            "sectionTotalUses": {},
+            "totalRequests":    0,
+            "totalChunks":      0,
+            "prefixHitChunks":  0,
+            "prefixHitRatio":   0.0,
+            "totalBytes":       0,
+            "prefixHitBytes":   0,
+            "rawText":          "",
+        }
+        tag = TAG_UNKNOWN
+        try {
+            tag = classifyRecord(rec, u)
+        } catch e {
+            log.warn("classifyRecord panicked at trailing seq=%d: %v", idx+1, e)
+            tag = TAG_UNKNOWN
+        }
+        item = {
+            "seq":    idx + 1,
+            "dump":   rec,
+            "usage":  u,
+            "tag":    tag,
+            "reason": classifyReason(tag),
+            "alignment": "usage_without_dump",
+        }
+        records = append(records, item)
+    }
+
+    return records
+}
+
+// summarize 计算总体指标 (回答 Q1) + 段稳定性快照
+// 关键词: cachebench summarize, Q1 指标
+func summarize(records) {
+    summary = {
+        "totalCalls":            len(records),
+        "cacheCreateCount":      0,
+        "cacheHitCount":         0,
+        "missingUsageCount":     0,
+        "inFlightCancelledCount": 0,
+        "exactCorrelationCount": 0,
+        "legacyOrderCount":      0,
+        "unalignedDumpCount":    0,
+        "usageWithoutDumpCount": 0,
+        "alignmentCoverage":     0.0,
+        "tagCount":              {},
+        "sumPromptTokens":       0,
+        "sumCachedTokens":       0,
+        "sumCacheCreation":      0,
+        "sumRequestBytes":       0,
+        "sumPrefixHitBytes":     0,
+        "hitRatioTokenReal":     0.0,
+        "hitRatioLcpClient":     0.0,
+        "upstreamCreationCost":  0.0,
+        "sectionHashMax":        {},
+        "sectionTotalMax":       {},
+        "sectionReuseRateMin":   {},
+    }
+
+    for item in records {
+        alignment = ccbToString(item["alignment"])
+        if alignment == "correlation_id" {
+            summary["exactCorrelationCount"]++
+        } else if alignment == "legacy_order" {
+            summary["legacyOrderCount"]++
+        } else if alignment == "usage_without_dump" {
+            summary["usageWithoutDumpCount"]++
+        } else if alignment == "missing" {
+            summary["unalignedDumpCount"]++
+        }
+
+        tag = item["tag"]
+        tagCount = summary["tagCount"]
+        if ccbIsNil(tagCount[tag]) {
+            tagCount[tag] = 0
+        }
+        tagCount[tag]++
+        summary["tagCount"] = tagCount
+
+        usage = item["usage"]
+        // missing 与 in_flight_cancelled 区分:
+        //   inFlightCancelled = max-prompts 触发后还在飞的 chat 被 ctx cancel,
+        //     SSE 末帧 usage 没拿到 -> 测量伪影, 不算 missing 漏接
+        //   missing = max-prompts 触发前的 nil callback -> 真实链路问题
+        // 关键词: summarize inFlightCancelled, missing usage 真实诊断
+        if ccbIsNil(usage) {
+            summary["missingUsageCount"]++
+        } else {
+            if usage["inFlightCancelled"] == true {
+                summary["inFlightCancelledCount"]++
+            } else if usage["missing"] == true {
+                summary["missingUsageCount"]++
+            } else {
+                // ccbAsInt 兜底: 部分 provider 返回的 usage 字段可能缺失,
+                // 直接 += undefined 会 panic; 关键词: summarize nil-safe usage
+                pt = ccbAsInt(usage["promptTokens"])
+                ct = ccbAsInt(usage["cachedTokens"])
+                cc = ccbAsInt(usage["cacheCreation"])
+                summary["sumPromptTokens"] += pt
+                summary["sumCachedTokens"] += ct
+                summary["sumCacheCreation"] += cc
+                if cc > 0 {
+                    summary["cacheCreateCount"]++
+                }
+                if ct > 0 {
+                    summary["cacheHitCount"]++
+                }
+            }
+        }
+
+        dumpRec = item["dump"]
+        if !ccbIsNil(dumpRec) && dumpRec["missing"] != true {
+            summary["sumRequestBytes"] += ccbAsInt(dumpRec["totalBytes"])
+            summary["sumPrefixHitBytes"] += ccbAsInt(dumpRec["prefixHitBytes"])
+
+            shc = dumpRec["sectionHashCount"]
+            for sectionName, cnt in shc {
+                cur = summary["sectionHashMax"][sectionName]
+                if ccbIsNil(cur) || cnt > cur {
+                    summary["sectionHashMax"][sectionName] = cnt
+                }
+            }
+            // 同步累计 totalUses / reuse_rate (取最大 total / 最低 reuse_rate)
+            // 关键词: summarize sectionTotalMax, sectionReuseRateMin
+            stu = dumpRec["sectionTotalUses"]
+            if !ccbIsNil(stu) {
+                for sectionName, total in stu {
+                    cur = summary["sectionTotalMax"][sectionName]
+                    if ccbIsNil(cur) || total > cur {
+                        summary["sectionTotalMax"][sectionName] = total
+                    }
+                }
+            }
+            srr = dumpRec["sectionReuseRate"]
+            if !ccbIsNil(srr) {
+                for sectionName, rate in srr {
+                    cur = summary["sectionReuseRateMin"][sectionName]
+                    if ccbIsNil(cur) || rate < cur {
+                        summary["sectionReuseRateMin"][sectionName] = rate
+                    }
+                }
+            }
+        }
+    }
+
+    summary["hitRatioTokenReal"] = ccbSafeRatio(summary["sumCachedTokens"], summary["sumPromptTokens"])
+    summary["hitRatioLcpClient"] = ccbSafeRatio(summary["sumPrefixHitBytes"], summary["sumRequestBytes"])
+    summary["upstreamCreationCost"] = float(summary["sumCacheCreation"]) * 1.25
+    alignedDen = summary["exactCorrelationCount"] + summary["legacyOrderCount"] + summary["unalignedDumpCount"]
+    summary["alignmentCoverage"] = ccbSafeRatio(summary["exactCorrelationCount"], alignedDen)
+
+    return summary
+}
+
+// pickBottlenecks 抽出值得人工审查的瓶颈条目 (去重 + Top N)
+// 关键词: cachebench pickBottlenecks, 瓶颈过滤
+func pickBottlenecks(records, topN) {
+    bots = []
+    seenHash = {}
+    for item in records {
+        tag = item["tag"]
+        if tag == TAG_HEALTHY || tag == TAG_PARTIAL_HIT || tag == TAG_NOISE || tag == TAG_UNKNOWN || tag == TAG_IN_FLIGHT_CANCELLED {
+            continue
+        }
+        // 去重: 同 prefix 哈希签名只保留一次
+        dumpRec = item["dump"]
+        sig = ""
+        if !ccbIsNil(dumpRec) {
+            sections = dumpRec["sections"]
+            for s in sections {
+                h = s["hash"]
+                if len(h) > 8 {
+                    h = h[:8]
+                }
+                sig += h + "|"
+            }
+        }
+        if seenHash[sig] == true && tag == TAG_CACHE_CREATE {
+            // cache_create 同 prefix 重复出现 -> 已在前面记过, 后面就跳过 (避免噪音)
+            continue
+        }
+        seenHash[sig] = true
+        bots = append(bots, item)
+        if topN > 0 && len(bots) >= topN {
+            break
+        }
+    }
+    return bots
+}
+
+// =============================================================================
+// 报告输出
+// =============================================================================
+
+// saveReport 把对齐结果落盘为 json/md/bottleneck-prompts/
+// 关键词: cachebench saveReport, 报告产物
+func saveReport(outputDir, benchReport) {
+    err = file.MkdirAll(outputDir)
+    if err != nil {
+        die(sprintf("create output dir %s failed: %v", outputDir, err))
+    }
+    bottleneckDir = file.Join(outputDir, "bottleneck-prompts")
+    err = file.MkdirAll(bottleneckDir)
+    if err != nil {
+        die(sprintf("create bottleneck dir failed: %v", err))
+    }
+
+    ts = time.Now().Format("20060102-150405")
+    jsonPath = file.Join(outputDir, sprintf("cachebench-%s.json", ts))
+    mdPath   = file.Join(outputDir, sprintf("cachebench-%s.md", ts))
+
+    jsonText = json.dumps(benchReport, json.withIndent("  "))
+    err = file.Save(jsonPath, jsonText)
+    if err != nil {
+        die(sprintf("save json failed: %v", err))
+    }
+
+    mdText = renderMarkdown(benchReport)
+    err = file.Save(mdPath, mdText)
+    if err != nil {
+        die(sprintf("save markdown failed: %v", err))
+    }
+
+    bottlenecks = benchReport["bottlenecks"]
+    for item in bottlenecks {
+        dumpRec = item["dump"]
+        if ccbIsNil(dumpRec) || dumpRec["missing"] == true {
+            continue
+        }
+        sourcePath = dumpRec["path"]
+        if sourcePath == "" {
+            continue
+        }
+        srcRaw, readErr = file.ReadFile(sourcePath)
+        if readErr != nil {
+            log.warn("read bottleneck source %s failed: %v", sourcePath, readErr)
+            continue
+        }
+        botName = sprintf("%06d-%s.txt", item["seq"], item["tag"])
+        botPath = file.Join(bottleneckDir, botName)
+        usageJson = "null"
+        if !ccbIsNil(item["usage"]) {
+            usageJson = json.dumps(item["usage"])
+        }
+        header = sprintf(
+            "# cachebench bottleneck\n# tag:    %s\n# reason: %s\n# seq:    %d\n# usage:  %s\n# source: %s\n\n",
+            item["tag"],
+            item["reason"],
+            item["seq"],
+            usageJson,
+            sourcePath,
+        )
+        body = header + string(srcRaw)
+        saveErr = file.Save(botPath, body)
+        if saveErr != nil {
+            log.warn("save bottleneck %s failed: %v", botPath, saveErr)
+        }
+    }
+
+    return jsonPath, mdPath, bottleneckDir
+}
+
+// renderMarkdown 把 report 渲染为 Markdown 摘要
+// 关键词: cachebench renderMarkdown
+func renderMarkdown(benchReport) {
+    summary = benchReport["summary"]
+    bottlenecks = benchReport["bottlenecks"]
+    sessionDir = benchReport["sessionDir"]
+    invokeError = benchReport["invokeError"]
+    inputText = benchReport["input"]
+
+    md = "# aicache cache hit benchmark\n\n"
+    md += sprintf("- generated:    %s\n", benchReport["generatedAt"])
+    md += sprintf("- input:        %s\n", ccbTruncate(inputText, 200))
+    md += sprintf("- session dir:  %s\n", sessionDir)
+    if invokeError != "" {
+        md += sprintf("- invoke error: %s\n", invokeError)
+    }
+    md += "\n"
+
+    // intelligent-only 视图先于全局聚合: 这是 cachebench 真正衡量的主指标,
+    // 排除 lightweight 模型 (低成本路径) 的稀释, 让 high-cost 智能模型的命中率
+    // 与 high-static distinct 验收基线一目了然.
+    // 关键词: renderMarkdown intelligent-only 主指标段, high-static distinct 验收
+    intelOnly = summary["intelligentOnly"]
+    if !ccbIsNil(intelOnly) {
+        md += "## intelligent-only summary (主指标, 验收基线)\n\n"
+        md += "_仅统计 modelTier == intelligent 且 correlationID 精确关联的高推理成本调用, 排除 lightweight 与顺序兜底污染._\n\n"
+        md += sprintf("- intelligent calls:                 %d\n", intelOnly["totalCalls"])
+        md += sprintf("- intelligent prompt_tokens:         %d\n", intelOnly["sumPromptTokens"])
+        md += sprintf("- intelligent cached_tokens:         %d\n", intelOnly["sumCachedTokens"])
+        md += sprintf("- intelligent cache_creation_tokens: %d\n", intelOnly["sumCacheCreation"])
+        md += sprintf("- intelligent token_hit_ratio:       %.2f%% (upstream)\n", intelOnly["hitRatioTokenReal"]*100.0)
+        md += sprintf("- intelligent lcp_hit_ratio:         %.2f%% (in-proc)\n", intelOnly["hitRatioLcpClient"]*100.0)
+        md += sprintf("- intelligent cache_hit_count:       %d\n", intelOnly["cacheHitCount"])
+        md += sprintf("- intelligent cache_create_count:    %d\n", intelOnly["cacheCreateCount"])
+        md += sprintf("- excluded unaligned records:        %d\n", intelOnly["excludedUnalignedCount"])
+        md += sprintf("- intelligent upstream_creation_cost (1.25x): %.0f tokens\n", intelOnly["upstreamCreationCost"])
+        hsDistinct = ccbAsInt(intelOnly["highStaticDistinct"])
+        passLine = "PASS"
+        if hsDistinct > 3 {
+            passLine = "FAIL"
+        }
+        md += sprintf("- intelligent high_static_distinct:  %d (acceptance: <= 3, %s)\n",
+            hsDistinct, passLine)
+        md += "\n"
+    }
+
+    md += "## Q1: hit/creation summary (全量, 含 lightweight)\n\n"
+    md += sprintf("- total LLM calls:                  %d\n", summary["totalCalls"])
+    md += sprintf("- cache_create_count (creation>0):  %d\n", summary["cacheCreateCount"])
+    md += sprintf("- cache_hit_count    (cached>0):    %d\n", summary["cacheHitCount"])
+    md += sprintf("- missing usage callbacks:          %d\n", summary["missingUsageCount"])
+    md += sprintf("- in_flight cancelled (max-prompts): %d\n", summary["inFlightCancelledCount"])
+    md += sprintf("- exact correlation joins:           %d\n", summary["exactCorrelationCount"])
+    md += sprintf("- legacy order joins:                %d\n", summary["legacyOrderCount"])
+    md += sprintf("- unaligned dumps:                   %d\n", summary["unalignedDumpCount"])
+    md += sprintf("- usages without dump:               %d\n", summary["usageWithoutDumpCount"])
+    md += sprintf("- exact alignment coverage:          %.2f%%\n", summary["alignmentCoverage"]*100.0)
+    md += sprintf("- sum prompt_tokens:                %d\n", summary["sumPromptTokens"])
+    md += sprintf("- sum cached_tokens:                %d\n", summary["sumCachedTokens"])
+    md += sprintf("- sum cache_creation_input_tokens:  %d\n", summary["sumCacheCreation"])
+    md += sprintf("- hit_ratio_token_real (upstream):  %.2f%%\n", summary["hitRatioTokenReal"]*100.0)
+    md += sprintf("- hit_ratio_lcp_client (in-proc):   %.2f%%\n", summary["hitRatioLcpClient"]*100.0)
+    md += sprintf("- upstream_creation_cost (1.25x):   %.0f tokens\n", summary["upstreamCreationCost"])
+    md += "\n"
+
+    md += "## tag distribution\n\n"
+    md += "| tag | count |\n| --- | --- |\n"
+    tagOrder = [TAG_HEALTHY, TAG_PARTIAL_HIT, TAG_CACHE_CREATE, TAG_PREFIX_MISALIGN, TAG_LCP_HIT_UPSTREAM_MISS, TAG_IN_FLIGHT_CANCELLED, TAG_NOISE, TAG_UNKNOWN]
+    for tag in tagOrder {
+        cnt = 0
+        if !ccbIsNil(summary["tagCount"][tag]) {
+            cnt = summary["tagCount"][tag]
+        }
+        md += sprintf("| %s | %d |\n", tag, cnt)
+    }
+    md += "\n"
+
+    // 按 model_name 分组 (standard / light) 的命中率对比.
+    // 关键词: renderMarkdown perModel hit rate, standard vs light tier
+    byModel = summary["byModel"]
+    if !ccbIsNil(byModel) && len(byModel) > 0 {
+        md += "## per-model hit rate (standard vs light tier)\n\n"
+        md += "_aireact 内部按调用类型自动 routing: intelligent (memfit-standard-free) 承载 plan/reasoning, lightweight (memfit-light-free) 承载 verification/quick judge._\n\n"
+        md += "| model_name | tier | calls | sum_prompt | sum_cached | sum_creation | token_hit_ratio | lcp_hit_ratio | hit_count | create_count |\n"
+        md += "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |\n"
+        for mname, v in byModel {
+            md += sprintf("| %s | %s | %d | %d | %d | %d | %.2f%% | %.2f%% | %d | %d |\n",
+                mname, ccbToString(v["modelTier"]), v["totalCalls"],
+                v["sumPromptTokens"], v["sumCachedTokens"], v["sumCacheCreation"],
+                v["hitRatioTokenReal"]*100.0, v["hitRatioLcpClient"]*100.0,
+                v["cacheHitCount"], v["cacheCreateCount"],
+            )
+        }
+        md += "\n"
+        md += "### per-model tag distribution\n\n"
+        md += "| model_name |"
+        for tag in tagOrder {
+            md += sprintf(" %s |", tag)
+        }
+        md += "\n| --- |"
+        for tag in tagOrder {
+            tag = tag
+            md += " --- |"
+        }
+        md += "\n"
+        for mname, v in byModel {
+            md += sprintf("| %s |", mname)
+            tc = v["tagCount"]
+            for tag in tagOrder {
+                cnt = 0
+                if !ccbIsNil(tc[tag]) {
+                    cnt = tc[tag]
+                }
+                md += sprintf(" %d |", cnt)
+            }
+            md += "\n"
+        }
+        md += "\n"
+    }
+
+    md += "## section hash drift (distinct + total uses + reuse_rate)\n\n"
+    md += "_reuse_rate = 1 - distinct/total. 高 reuse_rate 表示同一 hash 被多次复用 (健康); 低 reuse_rate 表示几乎每次都换新 hash (污染或入口分散)._\n\n"
+    md += "| section | distinct | total_uses | reuse_rate_min |\n| --- | --- | --- | --- |\n"
+    knownSections = ["high-static", "semi-dynamic", "timeline", "timeline-open", "dynamic", "raw"]
+    for s in knownSections {
+        v = summary["sectionHashMax"][s]
+        if ccbIsNil(v) {
+            continue
+        }
+        total = summary["sectionTotalMax"][s]
+        if ccbIsNil(total) {
+            total = 0
+        }
+        rateMin = summary["sectionReuseRateMin"][s]
+        rateStr = "-"
+        if !ccbIsNil(rateMin) {
+            rateStr = sprintf("%.0f%%", rateMin*100)
+        }
+        md += sprintf("| %s | %d | %d | %s |\n", s, v, total, rateStr)
+    }
+    md += "\n"
+
+    md += "## Q2: bottleneck prompts (top)\n\n"
+    if len(bottlenecks) == 0 {
+        md += "_no bottleneck detected_\n\n"
+    } else {
+        md += "| seq | tag | reason | totalBytes | prefixHitBytes | prefixHitRatio | cachedTokens | cacheCreation | dump |\n"
+        md += "| --- | --- | --- | --- | --- | --- | --- | --- | --- |\n"
+        for item in bottlenecks {
+            dumpRec = item["dump"]
+            usage = item["usage"]
+            totalBytes = 0
+            phb = 0
+            phr = 0.0
+            cached = 0
+            creation = 0
+            dumpName = "-"
+            if !ccbIsNil(dumpRec) && dumpRec["missing"] != true {
+                totalBytes = dumpRec["totalBytes"]
+                phb = dumpRec["prefixHitBytes"]
+                phr = dumpRec["prefixHitRatio"]
+                dumpName = dumpRec["filename"]
+            }
+            if !ccbIsNil(usage) && usage["missing"] != true {
+                cached = usage["cachedTokens"]
+                creation = usage["cacheCreation"]
+            }
+            md += sprintf("| %d | %s | %s | %d | %d | %.2f%% | %d | %d | %s |\n",
+                item["seq"], item["tag"],
+                str.ReplaceAll(ccbTruncate(item["reason"], 60), "|", "/"),
+                totalBytes, phb, phr*100.0, cached, creation, dumpName,
+            )
+        }
+        md += "\n"
+        md += "_完整 prompt 原文见 reports/bottleneck-prompts/<seq>-<tag>.txt_\n\n"
+    }
+
+    md += "## advice clusters\n\n"
+    adviceCount = {}
+    for item in benchReport["records"] {
+        dumpRec = item["dump"]
+        if ccbIsNil(dumpRec) {
+            continue
+        }
+        for adv in dumpRec["advices"] {
+            if ccbIsNil(adviceCount[adv]) {
+                adviceCount[adv] = 0
+            }
+            adviceCount[adv]++
+        }
+    }
+    if len(adviceCount) == 0 {
+        md += "_no advices_\n"
+    } else {
+        md += "| count | advice |\n| --- | --- |\n"
+        for adv, cnt in adviceCount {
+            md += sprintf("| %d | %s |\n", cnt, str.ReplaceAll(adv, "|", "/"))
+        }
+    }
+    md += "\n"
+
+    return md
+}
+
+// printSummary 在终端打印一段纯文本摘要 (不依赖落盘)
+// 关键词: cachebench printSummary
+func printSummary(benchReport) {
+    summary = benchReport["summary"]
+    println("")
+    println("==========================================================")
+    println("aicache cache hit benchmark - summary")
+    println("==========================================================")
+    // 抢占式 abort 元数据展示 (放最显眼位置)
+    // 关键词: printSummary abort metadata, fast-fail visible
+    abortReason = ccbToString(benchReport["abortReason"])
+    if abortReason != "" {
+        printf("ABORTED:         reason=%s detail=%s at=+%ds\n",
+            abortReason,
+            ccbTruncate(ccbToString(benchReport["abortDetail"]), 200),
+            ccbAsInt(benchReport["abortAtSec"]))
+        thr = ccbAsInt(benchReport["throttleEventCount"])
+        ftl = ccbAsInt(benchReport["fatalErrorCount"])
+        if thr > 0 {
+            printf("throttle events: %d (limit=%d)\n",
+                thr, ccbAsInt(benchReport["maxThrottleEvents"]))
+        }
+        if ftl > 0 {
+            printf("fatal events:    %d\n", ftl)
+        }
+        println("----------------------------------------------------------")
+    }
+    printf("input:           %s\n", ccbTruncate(benchReport["input"], 80))
+    printf("session dir:     %s\n", benchReport["sessionDir"])
+    // intelligent-only 主指标先打印 (验收口径), 全量聚合放后面参考用.
+    // 关键词: printSummary intelligent-only first, high-static distinct acceptance
+    intelOnly = summary["intelligentOnly"]
+    if !ccbIsNil(intelOnly) {
+        println("--------- INTELLIGENT-ONLY (主指标) ---------")
+        printf("intelligent calls:    %d\n", intelOnly["totalCalls"])
+        printf("intelligent prompt:   %d  cached: %d  creation: %d\n",
+            intelOnly["sumPromptTokens"], intelOnly["sumCachedTokens"], intelOnly["sumCacheCreation"])
+        printf("intelligent token_hit:  %.2f%% (upstream)\n", intelOnly["hitRatioTokenReal"]*100.0)
+        printf("intelligent lcp_hit:    %.2f%% (in-proc)\n", intelOnly["hitRatioLcpClient"]*100.0)
+        printf("intelligent hit_cnt:    %d  create_cnt: %d\n",
+            intelOnly["cacheHitCount"], intelOnly["cacheCreateCount"])
+        hsDistinct = ccbAsInt(intelOnly["highStaticDistinct"])
+        verdict = "PASS"
+        if hsDistinct > 3 {
+            verdict = "FAIL"
+        }
+        printf("high-static distinct (intelligent): %d (acceptance <=3, %s)\n", hsDistinct, verdict)
+        println("---------------------------------------------")
+    }
+    printf("total calls:     %d\n", summary["totalCalls"])
+    printf("cache create:    %d\n", summary["cacheCreateCount"])
+    printf("cache hit:       %d\n", summary["cacheHitCount"])
+    printf("missing usage:   %d\n", summary["missingUsageCount"])
+    printf("in-flight cancelled: %d\n", summary["inFlightCancelledCount"])
+    printf("token hit ratio: %.2f%% (upstream, all tiers)\n", summary["hitRatioTokenReal"]*100.0)
+    printf("lcp  hit ratio:  %.2f%% (in-proc, all tiers)\n", summary["hitRatioLcpClient"]*100.0)
+    printf("creation cost:   %.0f tokens (1.25x)\n", summary["upstreamCreationCost"])
+    println("----------------------------------------------------------")
+    printf("tag distribution: %v\n", summary["tagCount"])
+    printf("section drift:    %v\n", summary["sectionHashMax"])
+    byModel = summary["byModel"]
+    if !ccbIsNil(byModel) && len(byModel) > 0 {
+        println("----------------------------------------------------------")
+        println("per-model hit rate (standard vs light):")
+        for mname, v in byModel {
+            printf("  %s [%s]: calls=%d  token_hit=%.2f%%  lcp_hit=%.2f%%  hit_cnt=%d  create_cnt=%d  prompt=%d cached=%d creation=%d\n",
+                mname, ccbToString(v["modelTier"]), v["totalCalls"],
+                v["hitRatioTokenReal"]*100.0, v["hitRatioLcpClient"]*100.0,
+                v["cacheHitCount"], v["cacheCreateCount"],
+                v["sumPromptTokens"], v["sumCachedTokens"], v["sumCacheCreation"],
+            )
+        }
+    }
+    println("----------------------------------------------------------")
+    bottlenecks = benchReport["bottlenecks"]
+    printf("bottlenecks:     %d (see reports/bottleneck-prompts/)\n", len(bottlenecks))
+    for item in bottlenecks {
+        dumpName = "-"
+        if !ccbIsNil(item["dump"]) && item["dump"]["missing"] != true {
+            dumpName = item["dump"]["filename"]
+        }
+        printf("  - seq=%d  tag=%s  dump=%s\n", item["seq"], item["tag"], dumpName)
+    }
+    println("==========================================================")
+    println("")
+}
+
+// =============================================================================
+// 顶层入口
+// =============================================================================
+
+// analyzeBenchmark 把 sessionDir 与 usageList 拼成一个完整 report.
+// maxPromptsTriggered 透传到 alignDumpsAndUsages, 用于把 ctx cancel 后的
+// trailing dumps 标记为 in_flight_cancelled (测量伪影) 而非 missing.
+// 关键词: cachebench analyzeBenchmark, 顶层入口, maxPromptsTriggered 透传
+func analyzeBenchmark(sessionDir, usageList, events, invokeErr, inputText, maxPromptsTriggered) {
+    paths = listDumpFiles(sessionDir)
+    dumps = []
+    for p in paths {
+        rec = parseDumpFile(p)
+        dumps = append(dumps, rec)
+    }
+    records = alignDumpsAndUsages(dumps, usageList, maxPromptsTriggered)
+    summary = summarize(records)
+    bottlenecks = pickBottlenecks(records, 50)
+
+    invokeErrText = ""
+    if !ccbIsNil(invokeErr) {
+        invokeErrText = sprintf("%v", invokeErr)
+    }
+
+    benchReport = {
+        "generatedAt":     time.Now().Format("2006-01-02 15:04:05"),
+        "input":           ccbToString(inputText),
+        "sessionDir":      sessionDir,
+        "invokeError":     invokeErrText,
+        "summary":         summary,
+        "tagOrder":        [TAG_HEALTHY, TAG_PARTIAL_HIT, TAG_CACHE_CREATE, TAG_PREFIX_MISALIGN, TAG_LCP_HIT_UPSTREAM_MISS, TAG_IN_FLIGHT_CANCELLED, TAG_NOISE, TAG_UNKNOWN],
+        "records":         records,
+        "bottlenecks":     bottlenecks,
+        "eventCount":      len(events),
+    }
+    return benchReport
+}
+
+// summarizeByModel 按 model_name 分组重新汇总命中指标.
+// 用于对比 aireact 内部 tier 调度 (intelligent=memfit-standard-free / lightweight=memfit-light-free)
+// 各自的缓存命中率, 因为 standard 通常承载 plan/reasoning, 是核心缓存,
+// light 主要承载 verification/quick judge.
+//
+// 模型名优先取 dump.model: dump 文件由 aicache 在 ChatBase 入口直接记录,
+// 永远等于实际请求的 model 名, 不受 SSE 末帧 callback 错位/缺失影响.
+// 之前按 ts 就近匹配 modelName 在 hostscan 长跑里被 stream-finished 漏 callback
+// 引发的累计错位污染, 出现"242KB prompt 配 830 tokens"等离谱 join, 是 cachebench
+// 归因 bug 的根因之一. 切到 dump.model 后, per-tier 命中率才真实可信.
+// modelTier 来自 analyzeBenchmarkWithModels 建立的 modelName -> tier 元数据表,
+// 不再逐请求按时间猜测, 避免漏 first-byte / usage callback 后跨模型串线.
+//
+// 关键词: cachebench summarizeByModel 直读 dump.model, 修复跨记录归因错位
+func summarizeByModel(records) {
+    grouped = {}
+    for item in records {
+        // 直读 dump.model: 这是 aicache 在 ChatBase 入口直接记录的真值.
+        model = ""
+        dumpRecOuter = item["dump"]
+        if !ccbIsNil(dumpRecOuter) && dumpRecOuter["missing"] != true {
+            model = ccbToString(dumpRecOuter["model"])
+        }
+        // 兜底: dump 缺失或无 model 字段时回退到 ts 匹配出的 modelName.
+        if model == "" {
+            model = ccbToString(item["modelName"])
+        }
+        tier  = ccbToString(item["modelTier"])
+        if model == "" {
+            model = "(unknown)"
+        }
+        if ccbIsNil(grouped[model]) {
+            grouped[model] = {
+                "modelName":          model,
+                "modelTier":          tier,
+                "totalCalls":         0,
+                "cacheCreateCount":   0,
+                "cacheHitCount":      0,
+                "sumPromptTokens":    0,
+                "sumCachedTokens":    0,
+                "sumCacheCreation":   0,
+                "sumRequestBytes":    0,
+                "sumPrefixHitBytes":  0,
+                "tagCount":           {},
+                "hitRatioTokenReal": 0.0,
+                "hitRatioLcpClient": 0.0,
+            }
+        }
+        g = grouped[model]
+        g["totalCalls"]++
+        tag = item["tag"]
+        if ccbIsNil(g["tagCount"][tag]) {
+            g["tagCount"][tag] = 0
+        }
+        g["tagCount"][tag]++
+
+        usage = item["usage"]
+        if !ccbIsNil(usage) && usage["missing"] != true && usage["inFlightCancelled"] != true {
+            pt = ccbAsInt(usage["promptTokens"])
+            ct = ccbAsInt(usage["cachedTokens"])
+            cc = ccbAsInt(usage["cacheCreation"])
+            g["sumPromptTokens"]  += pt
+            g["sumCachedTokens"]  += ct
+            g["sumCacheCreation"] += cc
+            if cc > 0 {
+                g["cacheCreateCount"]++
+            }
+            if ct > 0 {
+                g["cacheHitCount"]++
+            }
+        }
+        dumpRec = item["dump"]
+        if !ccbIsNil(dumpRec) && dumpRec["missing"] != true {
+            g["sumRequestBytes"]   += ccbAsInt(dumpRec["totalBytes"])
+            g["sumPrefixHitBytes"] += ccbAsInt(dumpRec["prefixHitBytes"])
+        }
+        if g["modelTier"] == "" && tier != "" {
+            g["modelTier"] = tier
+        }
+        grouped[model] = g
+    }
+    for k, v in grouped {
+        v["hitRatioTokenReal"] = ccbSafeRatio(v["sumCachedTokens"], v["sumPromptTokens"])
+        v["hitRatioLcpClient"] = ccbSafeRatio(v["sumPrefixHitBytes"], v["sumRequestBytes"])
+        grouped[k] = v
+    }
+    return grouped
+}
+
+// summarizeIntelligentOnly 仅汇总 modelTier == "intelligent" 的高推理成本调用,
+// 排除 lightweight (verification / quick judge) 的低成本干扰。这是 cachebench
+// 的"主指标视图": 我们关心的真正成本来自 intelligent 模型的 prompt_tokens, 而
+// lightweight 模型即便命中率 0% 影响也极小.
+//
+// 输出字段:
+//   - totalCalls / sumPromptTokens / sumCachedTokens / sumCacheCreation: 仅 intelligent
+//   - hitRatioTokenReal: cached / prompt, 即"上游真命中率"
+//   - hitRatioLcpClient: 客户端 LCP 命中率 (bytes 维度)
+//   - cacheHitCount / cacheCreateCount: intelligent 调用里命中 / 新建的次数
+//   - highStaticDistinct: intelligent 调用中观察到的 high-static distinct hash 最大值
+//     (验收基线: <= 3 视为已对齐到稳定 system 前缀)
+//   - sectionHashMax / sectionTotalMax / sectionReuseRateMin: 仅取自 intelligent 调用
+//
+// 关键词: summarizeIntelligentOnly, intelligent-only 主指标, high-static distinct,
+//
+//	cachebench 验收基线
+func summarizeIntelligentOnly(records) {
+	view = {
+		"totalCalls":           0,
+		"cacheCreateCount":     0,
+		"cacheHitCount":        0,
+		"sumPromptTokens":      0,
+		"sumCachedTokens":      0,
+		"sumCacheCreation":     0,
+		"sumRequestBytes":      0,
+		"sumPrefixHitBytes":    0,
+		"hitRatioTokenReal":    0.0,
+		"hitRatioLcpClient":    0.0,
+		"upstreamCreationCost": 0.0,
+		"highStaticDistinct":   0,
+		"tagCount":             {},
+		"sectionHashMax":       {},
+		"sectionTotalMax":      {},
+		"sectionReuseRateMin":  {},
+		"modelNames":           {},
+		"excludedUnalignedCount": 0,
+	}
+
+    for item in records {
+        // intelligent-only 是验收主指标, 只接受 correlationID 精确 join.
+        // legacy 顺序关联仍保留在全量报告中用于兼容旧 binary, 但不能作为
+        // 高成本模型缓存优化的验收依据.
+        if ccbToString(item["alignment"]) != "correlation_id" {
+            view["excludedUnalignedCount"]++
+            continue
+        }
+        tier = ccbToString(item["modelTier"])
+        if tier != "intelligent" {
+            continue
+        }
+        view["totalCalls"]++
+
+        modelName = ccbToString(item["modelName"])
+        dumpRecForModel = item["dump"]
+        if !ccbIsNil(dumpRecForModel) && dumpRecForModel["missing"] != true {
+            dumpModel = ccbToString(dumpRecForModel["model"])
+            if dumpModel != "" {
+                modelName = dumpModel
+            }
+        }
+        if modelName != "" {
+            view["modelNames"][modelName] = true
+        }
+
+        tag = item["tag"]
+        if ccbIsNil(view["tagCount"][tag]) {
+            view["tagCount"][tag] = 0
+        }
+        view["tagCount"][tag]++
+
+        usage = item["usage"]
+        if !ccbIsNil(usage) && usage["missing"] != true && usage["inFlightCancelled"] != true {
+            pt = ccbAsInt(usage["promptTokens"])
+            ct = ccbAsInt(usage["cachedTokens"])
+            cc = ccbAsInt(usage["cacheCreation"])
+            view["sumPromptTokens"] += pt
+            view["sumCachedTokens"] += ct
+            view["sumCacheCreation"] += cc
+            if cc > 0 {
+                view["cacheCreateCount"]++
+            }
+            if ct > 0 {
+                view["cacheHitCount"]++
+            }
+        }
+
+        dumpRec = item["dump"]
+        if !ccbIsNil(dumpRec) && dumpRec["missing"] != true {
+            view["sumRequestBytes"] += ccbAsInt(dumpRec["totalBytes"])
+            view["sumPrefixHitBytes"] += ccbAsInt(dumpRec["prefixHitBytes"])
+
+            shc = dumpRec["sectionHashCount"]
+            if !ccbIsNil(shc) {
+                for sectionName, cnt in shc {
+                    cur = view["sectionHashMax"][sectionName]
+                    if ccbIsNil(cur) || cnt > cur {
+                        view["sectionHashMax"][sectionName] = cnt
+                    }
+                }
+                hsCnt = ccbAsInt(shc["high-static"])
+                if hsCnt > view["highStaticDistinct"] {
+                    view["highStaticDistinct"] = hsCnt
+                }
+            }
+            stu = dumpRec["sectionTotalUses"]
+            if !ccbIsNil(stu) {
+                for sectionName, total in stu {
+                    cur = view["sectionTotalMax"][sectionName]
+                    if ccbIsNil(cur) || total > cur {
+                        view["sectionTotalMax"][sectionName] = total
+                    }
+                }
+            }
+            srr = dumpRec["sectionReuseRate"]
+            if !ccbIsNil(srr) {
+                for sectionName, rate in srr {
+                    cur = view["sectionReuseRateMin"][sectionName]
+                    if ccbIsNil(cur) || rate < cur {
+                        view["sectionReuseRateMin"][sectionName] = rate
+                    }
+                }
+            }
+        }
+    }
+
+	view["hitRatioTokenReal"] = ccbSafeRatio(view["sumCachedTokens"], view["sumPromptTokens"])
+	view["hitRatioLcpClient"] = ccbSafeRatio(view["sumPrefixHitBytes"], view["sumRequestBytes"])
+	view["upstreamCreationCost"] = float(view["sumCacheCreation"]) * 1.25
+	return view
+}
+
+// analyzeBenchmarkWithModels 在 analyzeBenchmark 基础上额外接受 modelList,
+// 为每条 record 注入 modelName / modelTier, 并在 summary 中产出 byModel 子表.
+//
+// 模型归因策略:
+//   1. modelName 永远优先取 dump.model, 它与 prompt dump 在 ChatBase 入口同步落盘.
+//   2. modelList 只用来建立 modelName -> (tier, provider) 元数据表; 不再按时间
+//      或顺序逐请求匹配. 同一实际模型的 tier/provider 是稳定属性.
+//   3. 没有 dump.model 的记录保留 unknown, 不把猜测结果混入 intelligent-only.
+//
+// 关键词: cachebench analyzeBenchmarkWithModels, dump model 真值, model 元数据表
+func analyzeBenchmarkWithModels(sessionDir, usageList, modelList, events, invokeErr, inputText, maxPromptsTriggered) {
+    benchReport = analyzeBenchmark(sessionDir, usageList, events, invokeErr, inputText, maxPromptsTriggered)
+    records = benchReport["records"]
+    nModel = len(modelList)
+    modelMeta = {}
+    for entry in modelList {
+        name = ccbToString(entry["modelName"])
+        if name == "" {
+            continue
+        }
+        tier = ccbToString(entry["modelTier"])
+        provider = ccbToString(entry["providerName"])
+        old = modelMeta[name]
+        if ccbIsNil(old) {
+            modelMeta[name] = {"modelTier": tier, "providerName": provider}
+            continue
+        }
+        if ccbToString(old["modelTier"]) == "" && tier != "" {
+            old["modelTier"] = tier
+        }
+        if ccbToString(old["providerName"]) == "" && provider != "" {
+            old["providerName"] = provider
+        }
+        modelMeta[name] = old
+    }
+
+    i = 0
+    for i < len(records) {
+        rec = records[i]
+        modelName = ""
+        dumpRec = rec["dump"]
+        if !ccbIsNil(dumpRec) && dumpRec["missing"] != true {
+            modelName = ccbToString(dumpRec["model"])
+        }
+        rec["modelName"] = modelName
+        rec["modelTier"] = ""
+        rec["providerName"] = ""
+        rec["modelAttribution"] = "unknown"
+        if modelName != "" {
+            rec["modelAttribution"] = "dump_model"
+            meta = modelMeta[modelName]
+            if !ccbIsNil(meta) {
+                rec["modelTier"] = ccbToString(meta["modelTier"])
+                rec["providerName"] = ccbToString(meta["providerName"])
+            }
+        }
+        records[i] = rec
+        i++
+    }
+    benchReport["records"] = records
+
+    byModel = summarizeByModel(records)
+    summary = benchReport["summary"]
+    summary["byModel"] = byModel
+    // intelligent-only 视图: 这是真正用来评判 cachebench 验收是否通过的"主指标".
+    // lightweight tier 单价低、绝大多数路径用不到, 不应稀释总命中率口径.
+    // 关键词: analyzeBenchmarkWithModels intelligentOnly 注入, 主指标视图
+    summary["intelligentOnly"] = summarizeIntelligentOnly(records)
+    benchReport["summary"] = summary
+
+    benchReport["modelEventCount"] = nModel
+    benchReport["modelMetadata"] = modelMeta
+    return benchReport
+}

@@ -7,7 +7,7 @@ import (
 	"net/http"
 	"strings"
 
-	tls "github.com/refraction-networking/utls"
+	tls "github.com/yaklang/yaklang/common/third_party/utls"
 
 	"github.com/yaklang/yaklang/common/netx"
 )

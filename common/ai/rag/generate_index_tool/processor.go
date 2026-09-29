@@ -2,15 +2,14 @@ package generate_index_tool
 
 import (
 	"context"
-	_ "embed"
 	"fmt"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon/promptloader"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 )
 
-//go:embed prompt/init.txt
-var defaultProcessPrompt string
+var defaultProcessPrompt = promptloader.MustLoad("ai/rag/generate_index_tool/prompt/init.txt")
 
 type DummyContentProcessor struct{}
 

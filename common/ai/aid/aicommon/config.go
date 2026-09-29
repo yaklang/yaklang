@@ -309,10 +309,8 @@ type Config struct {
 	MemoryTriage        MemoryTriage
 	DisableMemoryTriage bool // 禁用 Memory Triage（智能记忆处理），默认为 false（即默认启用）
 
-	// Deprecated: retained for source compatibility; timeline archives are no longer written or recalled.
-	TimelineArchiveStore TimelineArchiveStore
-	MemoryPoolSize       int64
-	MemoryPool           *omap.OrderedMap[string, *MemoryEntity]
+	MemoryPoolSize int64
+	MemoryPool     *omap.OrderedMap[string, *MemoryEntity]
 	// other context
 	PersistentMemory []string
 
@@ -383,6 +381,8 @@ type Config struct {
 	SyncPerceptionTrigger              bool // 感知调度处同步调用 TriggerPerception（否则 goroutine 异步）
 	DisablePerception                  bool // 禁用感知层（用于测试环境，避免异步 AI 调用干扰 mock 回调）
 	EnableFunctionCallMode             bool // 启用原生 functioncall (tool_calls) 模式
+	functionCallModeExplicit           bool
+	legacyAICallbackConfigured         bool
 	singleAIModelMode                  bool // 单模型简易模式：辅助任务统一调度，详见 config_auxiliary_scheduler.go
 	singleAIModelModeResolved          bool // NewConfig freezes the effective mode after applying options.
 	PerTaskUserInteractiveLimitedTimes int64
@@ -607,6 +607,12 @@ func NewConfig(ctx context.Context, opts ...ConfigOption) *Config {
 		opt(config)
 	}
 	config.collectingToolManagerOptions = false
+	// A caller-supplied single callback has historically produced text actions.
+	// Keep that protocol unless the caller explicitly selects native tool calls.
+	if config.legacyAICallbackConfigured && !config.functionCallModeExplicit {
+		config.EnableFunctionCallMode = false
+		config.SetConfig("EnableFunctionCallMode", false)
+	}
 	// The global switch is a construction-time default. Callback roles,
 	// auxiliary policy, subsystem gates, and consumption metadata must all use
 	// the same effective mode for the lifetime of this Config.
@@ -686,6 +692,8 @@ func NewConfig(ctx context.Context, opts ...ConfigOption) *Config {
 	if !config.InitStatus.IsPersistentSessionRestored() {
 		config.restorePersistentSession()
 	}
+
+	config.restoreEvidenceTimeline()
 
 	// Auto-load skills from all well-known directories unless explicitly disabled.
 	// Scanned dirs: ~/yakit-projects/ai-skills, ~/.cursor/skills, $CWD/.cursor/skills
@@ -918,6 +926,7 @@ func WithSessionTitle(title string) ConfigOption {
 // ```
 func WithAICallback(cb AICallbackType) ConfigOption {
 	return func(c *Config) error {
+		c.legacyAICallbackConfigured = true
 		if c.m == nil {
 			c.m = &sync.Mutex{}
 		}
@@ -1475,50 +1484,6 @@ func (c *Config) SaveLoadedSkillNames(skillNames []string) {
 	joined := strings.Join(skillNames, ",")
 	if err := yakit.UpdateAIAgentRuntimeLoadedSkillNames(db, c.PersistentSessionId, joined); err != nil {
 		log.Warnf("failed to save loaded skill names for session [%s]: %v", c.PersistentSessionId, err)
-	}
-}
-
-// RecordRecentlyUsedTool keeps execution authorization in AiToolManager while
-// recording only prompt-visible mutations in Timeline Open.
-func (c *Config) RecordRecentlyUsedTool(tool *aitool.Tool) buildinaitools.RecentToolCacheMutation {
-	var mutation buildinaitools.RecentToolCacheMutation
-	if c == nil || tool == nil || c.GetAiToolManager() == nil {
-		return mutation
-	}
-	mutation = c.GetAiToolManager().AddRecentlyUsedTool(tool)
-	timeline := c.GetTimeline()
-	promptMutated := false
-	if timeline != nil && mutation.Upsert != nil {
-		promptMutated = timeline.PushPromotable(c.AcquireId(), TimelinePromotedKindRecentTool, TimelinePromotedTargetSemiDynamic1,
-			mutation.Upsert.Name, TimelinePromotedOperationUpsert,
-			buildinaitools.RenderRecentToolEntryForPromotion(mutation.Upsert)) || promptMutated
-	}
-	if timeline != nil {
-		for _, deleted := range mutation.Deleted {
-			if deleted == nil {
-				continue
-			}
-			promptMutated = timeline.PushPromotable(c.AcquireId(), TimelinePromotedKindRecentTool, TimelinePromotedTargetSemiDynamic1,
-				deleted.Name, TimelinePromotedOperationDelete, "") || promptMutated
-		}
-	}
-	if promptMutated && c.PersistentSessionId != "" && c.GetDB() != nil {
-		timeline.Save(c.GetDB(), c.PersistentSessionId)
-	}
-	return mutation
-}
-
-func (c *Config) restoreRecentToolsFromTimeline() {
-	if c == nil || c.GetTimeline() == nil || c.GetAiToolManager() == nil {
-		return
-	}
-	for _, name := range c.GetTimeline().effectivePromotedKeys(TimelinePromotedTargetSemiDynamic1, TimelinePromotedKindRecentTool) {
-		tool, err := c.GetAiToolManager().GetToolByName(name)
-		if err != nil || tool == nil {
-			log.Warnf("failed to restore promoted recent tool [%s] for session [%s]: %v", name, c.PersistentSessionId, err)
-			continue
-		}
-		c.GetAiToolManager().AddRecentlyUsedTool(tool)
 	}
 }
 
@@ -2818,6 +2783,7 @@ func WithEnableFunctionCallMode(enable bool) ConfigOption {
 		}
 		c.m.Lock()
 		c.EnableFunctionCallMode = enable
+		c.functionCallModeExplicit = true
 		c.m.Unlock()
 		c.SetConfig("EnableFunctionCallMode", enable)
 		return nil
@@ -3460,26 +3426,6 @@ func WithMemoryTriageId(id string) ConfigOption {
 	}
 }
 
-// WithTimelineArchiveStore retains the legacy option for source compatibility.
-//
-// Deprecated: the store is no longer used by timeline compression or ReAct.
-func WithTimelineArchiveStore(store TimelineArchiveStore) ConfigOption {
-	return func(c *Config) error {
-		c.m.Lock()
-		c.TimelineArchiveStore = store
-		c.m.Unlock()
-		return nil
-	}
-}
-
-// Deprecated: the returned legacy store is not used by the runtime.
-func (c *Config) GetTimelineArchiveStore() TimelineArchiveStore {
-	if c == nil {
-		return nil
-	}
-	return c.TimelineArchiveStore
-}
-
 func (c *Config) GetPersistentSessionID() string {
 	if c == nil {
 		return ""
@@ -3635,24 +3581,36 @@ func (c *Config) AppendUserInputHistory(userInput string, timestamp time.Time) (
 }
 
 func (c *Config) GetSessionEvidenceRendered() string {
+	if c != nil {
+		if timeline := c.GetTimeline(); timeline != nil {
+			if store, found := timeline.evidenceStore(); found {
+				return store.Render()
+			}
+		}
+	}
 	return c.GetSessionPromptState().GetSessionEvidenceRendered()
 }
 
 func (c *Config) ApplySessionEvidenceOps(ops []EvidenceOperation) {
-	if len(ops) == 0 {
+	if c == nil || len(ops) == 0 {
 		return
 	}
-	quotedEvidence := c.GetSessionPromptState().ApplySessionEvidenceOps(ops)
-	if c.PersistentSessionId != "" && c.GetDB() != nil {
-		if err := yakit.UpdateAIAgentRuntimeEvidence(c.GetDB(), c.PersistentSessionId, quotedEvidence); err != nil {
-			log.Warnf("persist session evidence failed: %v", err)
-		}
+	if c.GetTimeline() == nil {
+		state := c.GetSessionPromptState()
+		state.m.Lock()
+		defer state.m.Unlock()
+		store := UnmarshalEvidenceStore(state.evidenceJSON)
+		store.ApplyOperations(ops)
+		store.ShrinkToTokenBudget(sessionEvidenceTokenBudget)
+		state.evidenceJSON = store.Marshal()
+		return
 	}
+	c.applyEvidenceToTimeline(ops)
 }
 
 // GetVerificationTodoRendered returns the rendered TODO snapshot for the
 // current session, suitable for prompt injection (loop prompt timeline-open
-// section). Returns empty string when no TODO has been tracked yet.
+// section). An empty work set renders an explicit empty-list marker.
 //
 // 关键词: GetVerificationTodoRendered, prompt 注入, 全局 TODO
 func (c *Config) GetVerificationTodoRendered(currentScope VerificationTodoScope) string {
@@ -3660,8 +3618,7 @@ func (c *Config) GetVerificationTodoRendered(currentScope VerificationTodoScope)
 }
 
 // ApplyTodoDelta applies one normal ReAct action's optional todo_delta to the
-// persisted TODO store. When the persistent session id is configured, the
-// resulting canonical JSON is retained by the shared SessionPromptState.
+// in-memory TODO store in the shared SessionPromptState.
 //
 // 关键词: ApplyTodoDelta, ReAct 增量写入, SessionPromptState 同步
 func (c *Config) ApplyTodoDelta(scope VerificationTodoScope, delta *TodoDelta) []VerificationTodoApplyResult {
@@ -3711,23 +3668,6 @@ func (c *Config) HasActiveVerificationTodosByScope(scope VerificationTodoScope) 
 
 func (c *Config) ActiveVerificationTodoItemsByScope(scope VerificationTodoScope) []VerificationTodoItem {
 	return c.GetSessionPromptState().ActiveVerificationTodoItemsByScope(scope)
-}
-
-// FlushRestoredSessionEvidence persists the in-memory session evidence (restored from
-// a previous runtime) to the current runtime's DB row. This must be called after
-// the runtime DB row is created, because restorePersistentSession runs before row creation.
-func (c *Config) FlushRestoredSessionEvidence() {
-	if c.PersistentSessionId == "" || c.GetDB() == nil {
-		return
-	}
-	raw := c.GetSessionPromptState().GetSessionEvidence()
-	if raw == "" {
-		return
-	}
-	quoted := c.GetSessionPromptState().quoteEvidence(raw)
-	if err := yakit.UpdateAIAgentRuntimeEvidence(c.GetDB(), c.PersistentSessionId, quoted); err != nil {
-		log.Warnf("flush restored session evidence failed: %v", err)
-	}
 }
 
 func (c *Config) FormatUserInputHistory() string {
@@ -3840,6 +3780,16 @@ func (c *Config) CreateOrUpdateRuntimeRecord(runtime *schema.AIAgentRuntime) err
 	c.DatabaseRecordID = dbID
 	runtime.ID = dbID
 	return nil
+}
+
+// GetConfiguredWorkDir returns the configured artifacts path without creating it.
+func (c *Config) GetConfiguredWorkDir() string {
+	c.workDirMu.RLock()
+	defer c.workDirMu.RUnlock()
+	if c.workDir != "" {
+		return c.workDir
+	}
+	return c.Workdir
 }
 
 // IsWorkDirReady checks if the working directory has been created
@@ -4426,9 +4376,6 @@ func ConvertConfigToOptions(i *Config) []ConfigOption {
 	if i.MemoryTriage != nil {
 		opts = append(opts, WithMemoryTriage(i.MemoryTriage))
 	}
-	if i.TimelineArchiveStore != nil {
-		opts = append(opts, WithTimelineArchiveStore(i.TimelineArchiveStore))
-	}
 
 	// Misc
 	if i.PromptHook != nil {
@@ -4545,9 +4492,7 @@ func ConvertConfigToOptions(i *Config) []ConfigOption {
 	}
 
 	// Propagate functioncall mode flag so sub-loops inherit the setting.
-	if i.EnableFunctionCallMode {
-		opts = append(opts, WithEnableFunctionCallMode(true))
-	}
+	opts = append(opts, WithEnableFunctionCallMode(i.EnableFunctionCallMode))
 
 	// A derived Config continues the parent's session even when a new global
 	// setting has taken effect since the parent was constructed. Keep the

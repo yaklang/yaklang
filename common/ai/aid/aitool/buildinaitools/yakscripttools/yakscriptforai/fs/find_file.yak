@@ -316,10 +316,10 @@ filesys.Recursive(dirname, filesys.onStat((isDir, name, info) => {
             return
         }
     case "g", "glob", "global":
-        basename = name
-        slashIdx = str.LastIndex(name, "/")
+        basename = str.ReplaceAll(name, "\\", "/")
+        slashIdx = str.LastIndex(basename, "/")
         if slashIdx >= 0 {
-            basename = name[slashIdx+1:]
+            basename = basename[slashIdx+1:]
         }
         if str.MatchAllOfGlob(basename, pattern) {
             count++

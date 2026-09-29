@@ -232,11 +232,11 @@ func setupToolCallInvokeTestProjectDB(t *testing.T) *gorm.DB {
 	originProjectDBPath := consts.GetCurrentProjectDatabasePath()
 	projectDBPath := filepath.Join(t.TempDir(), "toolcall-invoke-test.db")
 	require.NoError(t, consts.SetGormProjectDatabase(projectDBPath))
+	db := consts.GetGormProjectDatabase()
 	t.Cleanup(func() {
 		require.NoError(t, consts.SetGormProjectDatabase(originProjectDBPath))
+		require.NoError(t, db.Close())
 	})
-
-	db := consts.GetGormProjectDatabase()
 	require.NoError(t, db.AutoMigrate(
 		&schema.HTTPFlow{},
 		&schema.Risk{},

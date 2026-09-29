@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/davecgh/go-spew/spew"
-	utls "github.com/refraction-networking/utls"
+	utls "github.com/yaklang/yaklang/common/third_party/utls"
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/gmsm/gmtls"

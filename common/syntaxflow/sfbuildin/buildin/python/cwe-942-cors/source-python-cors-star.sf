@@ -1,0 +1,56 @@
+desc(
+	mode: "source"
+	language: "python"
+	title: "源码扫描：Python CORS 允许任意来源"
+	title_zh: "源码扫描：Python CORS 允许任意来源"
+	type: vuln
+	level: middle
+	rule_id: "source-python-cors-star"
+	risk: "cors"
+	cwe: "CWE-942"
+	desc: <<<DESC
+### 规则说明
+`origins='*'` 允许任意网站读取接口响应。把 CORS 资源配成通配来源也是同样的效果。`CORS(...)` 这个入口经常把默认来源放得过宽，需要看到具体的 origins 才知道是不是星号。
+
+### 风险类型
+cors
+
+### 影响
+其他网站上的脚本可以读取本应受同源策略保护的响应。如果同时还允许凭据，已登录用户的数据会被跨站读走。
+
+### 检测方式
+这条规则使用 source 模式，用正则扫描源文件文本，不构建语法树或 SSA。命中只说明出现了对应写法，不能单独证明数据来自外部输入。注释、字符串和文档中的相同文本也会命中。
+正则匹配任意 `CORS(`，以及 `origins` 被赋成引号里的星号。因此不带星号的 `CORS(app)` 也会命中，必须看实际的 origins 配置才能确定是不是任意来源。
+
+### 参考
+- [CWE-942：过于宽松的跨域策略](https://cwe.mitre.org/data/definitions/942.html)
+
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+- 使用明确的来源列表，不要用星号。
+- 不要反射请求头里的 Origin，除非它在白名单中。
+- 敏感接口不要和 `supports_credentials=True` 一起使用通配来源。
+
+SOLUTION
+	alert_min: 1
+	"file://bad.py": <<<POS
+from flask_cors import CORS
+def bad(app):
+    CORS(app, origins="*")
+
+POS
+	"safefile://ok.py": <<<NEG
+def ok(app):
+    app.config["X"] = "https://app.example"
+
+NEG
+)
+${*.py}.pattern_regex(/CORS\s*\(|origins\s*=\s*[\"']\*[\"']/) as $hit
+alert $hit for {
+	level: "middle",
+	title: "源码扫描：Python CORS 允许任意来源",
+	title_zh: "源码扫描：Python CORS 允许任意来源",
+	message: "源码扫描：Python CORS 允许任意来源",
+	risk: "cors",
+}

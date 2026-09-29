@@ -90,7 +90,7 @@ var loopAction_SaveEvidence = &LoopAction{
 		}
 
 		idMarker := fmt.Sprintf("[id: %s]", evidenceOp.ID)
-		loop.GetInvoker().AddToTimeline("session_evidence_saved", fmt.Sprintf("%s\n%s", idMarker, evidenceOp.Content))
+		loop.GetInvoker().AddToTimeline("session_evidence_saved", fmt.Sprintf("%s saved; evidence content is recorded in the timeline delta.", idMarker))
 		operator.Feedback(fmt.Sprintf("Session evidence saved as %s; continue with the remaining task.", idMarker))
 		operator.Continue()
 	},

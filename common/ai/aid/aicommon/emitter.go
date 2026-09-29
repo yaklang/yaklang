@@ -17,6 +17,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/segmentio/ksuid"
+	"github.com/yaklang/yaklang/common/ai/aid/aiprojection"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
@@ -438,6 +439,7 @@ func (r *Emitter) EmitLogWithLevel(level, name, fmtlog string, items ...any) (*s
 	if len(items) > 0 {
 		message = fmt.Sprintf(fmtlog, items...)
 	}
+	message = aiprojection.RedactNonce(message)
 
 	nodeName := name
 	if name == "" {
@@ -1091,7 +1093,7 @@ func (e *Emitter) EmitPrompt(step string, prompt string) (*schema.AiOutputEvent,
 	return e.EmitStructured("prompt", map[string]any{
 		"system": false,
 		"step":   step,
-		"prompt": prompt,
+		"prompt": aiprojection.RedactNonce(prompt),
 	})
 }
 
@@ -1099,7 +1101,7 @@ func (e *Emitter) EmitSystemPrompt(step string, prompt string) (*schema.AiOutput
 	return e.EmitStructured("prompt", map[string]any{
 		"system": true,
 		"step":   step,
-		"prompt": prompt,
+		"prompt": aiprojection.RedactNonce(prompt),
 	})
 }
 

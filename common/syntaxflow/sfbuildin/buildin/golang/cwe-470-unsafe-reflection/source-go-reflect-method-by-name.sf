@@ -1,0 +1,57 @@
+desc(
+	mode: "source"
+	language: "golang"
+	title: "源码扫描：Go MethodByName 使用外部名字"
+	title_zh: "源码扫描：Go MethodByName 使用外部名字"
+	type: vuln
+	level: middle
+	rule_id: "source-go-reflect-method-by-name"
+	risk: "reflection-abuse"
+	cwe: "CWE-470"
+	desc: <<<DESC
+### 规则说明
+`reflect.Value.MethodByName` 按字符串取出方法，后面还可以 `Call`。方法名来自请求时，攻击者可以调用该值上其他导出方法，只要名字猜得到。
+
+### 风险类型
+reflection-abuse
+
+### 影响
+本不该暴露的导出方法被触发，可能改数据，或绕过正常的命令分发。
+
+### 检测方式
+这条规则使用 source 模式，用正则扫描源文件文本，不构建语法树或 SSA。命中只说明出现了对应写法，不能单独证明数据来自外部输入。注释、字符串和文档中的相同文本也会命中。
+正则匹配任意 `MethodByName(`。方法名是常量的调用也会命中。
+同一检查还有 ssa（数据流）。它们描述同一个问题，命中条件不同，修复时看实际告警来自哪一条。
+
+### 参考
+- [CWE-470：用外部输入选择类或代码](https://cwe.mitre.org/data/definitions/470.html)
+
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+- 用白名单把外部短名映射到固定的函数值，未知名字直接拒绝。
+- 不要把请求参数直接传给 `MethodByName`。
+- 对外入口使用明确的接口，不要反射导出方法的全集。
+
+SOLUTION
+	alert_min: 1
+	"file://bad.go": <<<POS
+package main
+import "reflect"
+func bad(v reflect.Value, name string) { v.MethodByName(name) }
+
+POS
+	"safefile://ok.go": <<<NEG
+package main
+func ok() { println("known") }
+
+NEG
+)
+${*.go}.pattern_regex(/MethodByName\s*\(/) as $hit
+alert $hit for {
+	level: "middle",
+	title: "源码扫描：Go MethodByName 使用外部名字",
+	title_zh: "源码扫描：Go MethodByName 使用外部名字",
+	message: "源码扫描：Go MethodByName 使用外部名字",
+	risk: "reflection-abuse",
+}

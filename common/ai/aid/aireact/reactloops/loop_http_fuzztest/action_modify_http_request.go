@@ -119,5 +119,14 @@ var modifyHTTPRequestAction = func(r aicommon.AIInvokeRuntime) reactloops.ReActL
 			reactloops.EmitActionLog(loop, loopHTTPFuzzActionLogNodeModifyRequest, "HTTP 请求已修改 / HTTP Request Modified", utils.ShrinkTextBlock(result.Diff, 2000))
 			operator.Feedback(feedbackMsg)
 		},
+		func(action *reactloops.LoopAction) {
+			action.NativeDescription = "Modify the current HTTP request. Put the complete modified request in modified_packet_content; no external AITAG is read in function-call mode."
+			action.NativeOptions = []aitool.ToolOption{
+				aitool.WithStringParam("modification_target", aitool.WithParam_Description("What part of the current request is modified."), aitool.WithParam_Required(true)),
+				aitool.WithStringParam("modification_reason", aitool.WithParam_Description("Reason for this modification."), aitool.WithParam_Required(true)),
+				aitool.WithBoolParam("require_manual_review", aitool.WithParam_Description("Request manual review before applying the modification.")),
+				aitool.WithStringParam(modifiedPacketContentField, aitool.WithParam_Description("Complete modified raw HTTP request, including request line, headers, and body."), aitool.WithParam_Required(true)),
+			}
+		},
 	)
 }

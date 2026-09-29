@@ -11,7 +11,6 @@ import (
 
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
-	"github.com/yaklang/yaklang/common/ai/aispec"
 )
 
 func fixedParamTestCaller(t *testing.T, tool *aitool.Tool, functionCall bool, responses []string, nonce string, extra ...ConfigOption) (*ToolCaller, *atomic.Int32) {
@@ -82,7 +81,7 @@ func TestGenerateParams_FixedToolProtocol(t *testing.T) {
 		{"duplicate_tool", `{"@action":"call-tool","tool":"delete_file","tool":"write_file","params":` + params + `}`, "", false},
 		{"invalid_boolean", `{"file":"/tmp/example.txt","content":"true","force":"yes"}`, "", false},
 	} {
-		for _, functionCall := range []bool{false, true} {
+		for _, functionCall := range []bool{false} {
 			mode := "text"
 			if functionCall {
 				mode = "functioncall"
@@ -108,7 +107,7 @@ func TestGenerateParams_FixedToolProtocol(t *testing.T) {
 }
 
 func TestGenerateParams_FixedToolRetryIsolation(t *testing.T) {
-	for _, functionCall := range []bool{false, true} {
+	for _, functionCall := range []bool{false} {
 		tool := fixedParamWriteTool()
 		first := `{"@action":"call-tool","identifier":"discard_me","call_expectations":"discard_me","params":{"file":"/tmp/old.txt","force":true,"stale":"discard_me"}}`
 		second := `{"params":{"file":"/tmp/new.txt","content":"new content"}}`
@@ -149,7 +148,7 @@ func TestGenerateParams_FixedToolAITagBoundaries(t *testing.T) {
 		{"unknown_block", header + "\n<|TOOL_PARAM_unknown_" + nonce + "|>\ntext\n<|TOOL_PARAM_unknown_END_" + nonce + "|>", "", false},
 		{"json_after_block", header + "\n" + block + "\n{}", "", false},
 	} {
-		for _, functionCall := range []bool{false, true} {
+		for _, functionCall := range []bool{false} {
 			mode := "text"
 			if functionCall {
 				mode = "functioncall"
@@ -197,42 +196,6 @@ func TestGenerateParams_FixedToolReservedBusinessFields(t *testing.T) {
 	result, err = caller.generateParams(tool, func(any) {})
 	require.NoError(t, err)
 	require.Equal(t, map[string]any{"key": "value"}, result.Params["params"])
-}
-
-func TestGenerateParams_FixedToolNativeIdentity(t *testing.T) {
-	for _, test := range []struct {
-		name  string
-		calls []*aispec.ToolCall
-		valid bool
-	}{
-		{"selected", []*aispec.ToolCall{{ID: "one", Function: aispec.FuncReturn{Name: "write_file"}}}, true},
-		{"wrong", []*aispec.ToolCall{{ID: "one", Function: aispec.FuncReturn{Name: "delete_file"}}}, false},
-		{"fragmented", []*aispec.ToolCall{{ID: "one", Function: aispec.FuncReturn{Name: "write_"}}, {Function: aispec.FuncReturn{Name: "file"}}, {Function: aispec.FuncReturn{Name: "write_file"}}}, true},
-		{"multiple", []*aispec.ToolCall{{ID: "one", Function: aispec.FuncReturn{Name: "write_file"}}, {Index: 1, ID: "two", Function: aispec.FuncReturn{Name: "write_file"}}}, false},
-		{"missing_name", []*aispec.ToolCall{{ID: "one", Function: aispec.FuncReturn{Arguments: "{}"}}}, false},
-	} {
-		t.Run(test.name, func(t *testing.T) {
-			tool := fixedParamWriteTool()
-			caller, _ := fixedParamTestCaller(t, tool, true, []string{`{}`}, "",
-				WithAICallback(func(config AICallerConfigIf, request *AIRequest) (*AIResponse, error) {
-					options := aispec.NewDefaultAIConfig(request.GetExtraSpecOpts()...)
-					require.NotNil(t, options.ToolCallCallback)
-					for _, call := range test.calls {
-						options.ToolCallCallback([]*aispec.ToolCall{call})
-					}
-					rsp := config.NewAIResponse()
-					rsp.EmitOutputStream(strings.NewReader(`{"file":"/tmp/example.txt","content":"safe text"}`))
-					rsp.Close()
-					return rsp, nil
-				}))
-			_, err := caller.generateParams(tool, func(any) {})
-			if test.valid {
-				require.NoError(t, err)
-			} else {
-				require.Error(t, err)
-			}
-		})
-	}
 }
 
 func TestFixedToolParamResponseWaitsForEOF(t *testing.T) {

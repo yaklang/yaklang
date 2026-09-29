@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon/promptloader"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/log"
@@ -343,45 +344,7 @@ func evaluateNextSearch(
 		}
 	}
 
-	promptTemplate := `<|USER_QUERY_{{ .nonce }}|>
-{{ .userQuery }}
-<|USER_QUERY_END_{{ .nonce }}|>
-
-<|SEARCH_HISTORY_{{ .nonce }}|>
-{{ .searchHistory }}
-<|SEARCH_HISTORY_END_{{ .nonce }}|>
-
-<|CURRENT_SEARCH_{{ .nonce }}|>
-查询条件: {{ .currentQuery }}
-搜索次数: 第 {{ .searchCount }} 次
-
-搜索结果摘要:
-{{ .currentResult }}
-<|CURRENT_SEARCH_END_{{ .nonce }}|>
-
-<|INSTRUCT_{{ .nonce }}|>
-【评估知识收集进度】
-
-请评估当前搜索结果是否足够回答用户问题，并给出下一步建议：
-
-【评估标准】
-1. 当前结果是否直接回答了用户的核心问题？
-2. 是否还有重要的知识维度未被覆盖？
-3. 是否需要从其他角度补充信息？
-
-【输出要求】
-- finished: 布尔值，如果信息已足够则为 true，否则为 false
-- next_search: 如果 finished 为 false，输出具体的搜索建议（用什么关键词/查询语句）；如果 finished 为 true，输出空字符串
-- summary: 如果 finished 为 true，简要总结已收集的知识；如果 finished 为 false，输出空字符串
-
-【限制】
-- 搜索次数不应超过 5 次
-- 避免重复相同或相似的搜索
-- 优先考虑用户问题中未被覆盖的方面
-
-请输出 finished、next_search 和 summary。
-<|INSTRUCT_END_{{ .nonce }}|>
-`
+	promptTemplate := promptloader.MustLoad("inline/ai/aid/aireact/reactloops/loop_knowledge_enhance/action_search/promptTemplate.txt")
 
 	result := EvaluateResult{Finished: true, Summary: "auxiliary evaluation returned nil"}
 	invoker.GetConfig().ScheduleAuxiliaryTask(

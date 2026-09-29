@@ -1,6 +1,7 @@
 package ssa
 
 import (
+	"errors"
 	"strings"
 
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
@@ -35,7 +36,7 @@ func GetVariableFromDB(id int64, name string, programName string) *Variable {
 	for _, o := range offset {
 		editor, start, end, err := o.GetStartAndEndPositions()
 		if err != nil {
-			if strings.Contains(err.Error(), "record not found") {
+			if errors.Is(err, ssadb.ErrSourceRangeAbsent) || strings.Contains(err.Error(), "record not found") {
 				continue
 			}
 			log.Errorf("GetStartAndEndPositions failed: %v", err)

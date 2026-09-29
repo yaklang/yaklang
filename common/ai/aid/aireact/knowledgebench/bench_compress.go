@@ -12,6 +12,7 @@ import (
 
 	"github.com/yaklang/yaklang/common/ai/aid"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon/promptloader"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/ai/ytoken"
 	"github.com/yaklang/yaklang/common/aireducer"
@@ -172,23 +173,7 @@ func benchCompressChunk(
 `, dNonce, alreadyExtracted, dNonce)
 			}
 
-			promptTemplate := `<|USER_QUERY_{{ .nonce }}|>
-{{ .userQuery }}
-<|USER_QUERY_END_{{ .nonce }}|>
-
-{{ .alreadyExtractedSection }}<|KNOWLEDGE_CHUNK_{{ .nonce }}|>
-{{ .samples }}
-<|KNOWLEDGE_CHUNK_END_{{ .nonce }}|>
-
-<|INSTRUCT_{{ .nonce }}|>
-Extract the most relevant knowledge snippets from this chunk for the user question.
-
-Output up to 8 ranges, each 3-20 lines, with relevance score 0.00-1.00.
-Only output ranges with score >= %.2f.
-
-Output the ranges array.
-<|INSTRUCT_END_{{ .nonce }}|>
-`
+			promptTemplate := promptloader.MustLoad("inline/ai/aid/aireact/knowledgebench/bench_compress/promptTemplate.txt")
 
 			materials, err := utils.RenderTemplate(fmt.Sprintf(promptTemplate, scoreThreshold), map[string]any{
 				"nonce":                   dNonce,

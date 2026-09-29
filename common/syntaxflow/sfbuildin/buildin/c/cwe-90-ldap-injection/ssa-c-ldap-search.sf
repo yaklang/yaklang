@@ -1,0 +1,57 @@
+desc(
+	mode: "ssa"
+	language: "c"
+	title: "数据流：C ldap_search 过滤器"
+	title_zh: "数据流：C ldap_search 过滤器"
+	type: vuln
+	level: high
+	rule_id: "ssa-c-ldap-search"
+	risk: "ldap-injection"
+	cwe: "CWE-90"
+	desc: <<<DESC
+### 规则说明
+`ldap_search`、`ldap_search_s`、`ldap_search_ext` 和 `ldap_search_ext_s` 的过滤器使用 LDAP 过滤语法。把用户名、部门等外部字符串直接拼进 `(uid=...)` 时，攻击者可以插入 `)(|(uid=*)` 这样的片段，把查询改成永远为真，或者读出其他目录项。
+
+### 风险类型
+ldap-injection
+
+### 影响
+目录查询被扩大或改写，账号属性可能泄露。登录流程如果用这条查询的结果判断身份，攻击者可以绕过认证，或让程序接受错误的 DN。
+
+### 检测方式
+这条规则使用 ssa 模式，只保留非常量、且不是当前函数参数的实参。常量字符串不告警。实参如果只是函数形参，也不会命中。
+只匹配名为 `ldap_search_s` 的调用，而且过滤器实参不是常量，也不是当前函数的形参。`ldap_search`、`ldap_search_ext` 和 `ldap_search_ext_s` 不在这条数据流规则里，它们由 source 规则覆盖。
+同一检查还有 source（源码正则）。它们描述同一个问题，命中条件不同，修复时看实际告警来自哪一条。
+
+### 参考
+- [CWE-90：LDAP 注入](https://cwe.mitre.org/data/definitions/90.html)
+
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+- 按 RFC 4515 转义过滤器中的反斜杠、星号、括号和空字节。
+- 更稳妥的是只允许白名单字符，并把外部值放进已经转义的单一断言。
+- 不要把用户输入拼进带有 OR 或通配符的过滤器模板。
+
+SOLUTION
+	alert_min: 1
+	"file://bad.c": <<<POS
+#include <stdio.h>
+#include <ldap.h>
+void bad(LDAP *ld, const char *user) { char filter[64]; sprintf(filter, "(uid=%s)", user); ldap_search_s(ld, "dc=a", 2, filter, 0, 0, 0); }
+
+POS
+	"safefile://ok.c": <<<NEG
+#include <ldap.h>
+void ok(LDAP *ld) { ldap_search_s(ld, "dc=a", 2, "(uid=fixed)", 0, 0, 0); }
+
+NEG
+)
+ldap_search_s(*?{!opcode: const && !opcode: param} as $dyn) as $call
+alert $dyn for {
+	level: "high",
+	title: "数据流：C ldap_search 过滤器",
+	title_zh: "数据流：C ldap_search 过滤器",
+	message: "数据流：C ldap_search 过滤器",
+	risk: "ldap-injection",
+}

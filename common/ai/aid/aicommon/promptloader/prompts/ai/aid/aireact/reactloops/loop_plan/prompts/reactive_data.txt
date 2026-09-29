@@ -1,0 +1,96 @@
+{{ if eq .PlanMode "simple" }}## 直接规划模式
+
+你已选择直接规划。请调用 `generate_direct_plan` 完成规划，无需信息收集或 `finish_exploration`。
+{{ if .PlanModeReason }}
+选择理由：{{ .PlanModeReason }}
+{{ end }}
+{{ else }}{{ if .ExplorationClosed }}## 规划交接
+
+当前已关闭信息收集入口。请基于已有事实整理规划依据；需要补充已确认事实时使用 `output_facts`，然后调用 `finish_exploration` 交给后续规划阶段。尚未核实的内容应标为待执行计划中的验证项，不要把推断写成已确认事实。历史调用只供参考，不代表本轮仍可调用；动作及参数以本轮声明的 Schema 为准，不要通过其它入口继续探索。
+{{ else }}{{ if eq .PlanMode "" }}
+## 规划路径待选择
+
+请结合时间线、记忆与意图识别结果，在本轮选择一条路径：
+- 目标清晰、步骤可推导 → `generate_direct_plan`
+- 需先摸底、侦查或收集事实 → 调用信息收集工具（进入深度探索规划）
+{{ end }}{{ if eq .PlanMode "deep" }}{{ if not .FileResults }}{{ if not .WebResults }}{{ if not .Enhance }}{{ if not .ReconResults }}## 探索优先提示
+
+当前尚未收集到任何事实数据（无文件信息、无搜索结果、无补充知识、无网络侦查结果）。**禁止**在此阶段直接调用 `finish_exploration`——没有事实数据支撑的计划只会是空泛的模板。
+
+**你必须先使用信息收集工具进行探索**。根据任务类型选择合适的工具：
+
+**通用探索：**
+- 用 `find_files` 了解项目结构或目标环境
+- 用 `grep_text` 搜索关键代码或配置
+- 用 `read_file` 阅读核心文本文件内容（自动检测二进制文件并推荐内置工具如 read_excel_info、parse_office_to_text 等）
+- 用 `web_search` 获取领域最佳实践
+- 用 `search_knowledge` 搜索知识库补充背景知识
+- 用 `loading_skills` 加载专业技能获取操作指南
+
+**安全/渗透测试场景（强制）或者涉及到某一些域名，主机可以先找一下他们是否存在：**
+如果用户任务涉及编码，运维，渗透测试、安全评估、漏洞扫描等，你**必须**在本轮立即调用以下工具：
+- **`scan_port`** — 扫描目标主机端口，获取真实的开放服务和指纹信息
+- **`simple_crawler`** — 爬取目标 Web 应用，获取真实的 URL 结构、页面和入口点
+
+这些工具的执行结果将作为后续自动生成计划的事实依据。
+{{ end }}{{ end }}{{ end }}{{ end }}{{ end }}{{ end }}{{/*
+
+*/}}{{if .Facts}}## 规划事实库（FACTS）
+
+以下是当前已累积的 FACTS。它们会在每次 `output_facts` 或自动 facts hook 后持续累积，是后续自动生成指导性文档和计划的核心依据：
+
+<|FACTS_{{ .Nonce }}|>
+{{ .Facts }}
+<|FACTS_END_{{ .Nonce }}|>
+{{end}}{{/*
+
+EVIDENCE 已统一移到 SessionPromptState 渲染 (timeline-open 段的
+SESSION_EVIDENCE 块), 这里不再重复渲染 EVIDENCE, 避免 prompt 中
+EVIDENCE 多处重复出现。
+
+*/}}{{if .Help }}
+## 规划任务帮助信息
+
+这是用户在开始规划之前提供的一些帮助信息，以下信息可以帮助你进行探索和信息收集。
+
+<|PLAN_HELP_{{ .Nonce }}|>
+{{ .Help }}
+<|PLAN_HELP_END_{{ .Nonce }}|>{{end}}{{/*
+
+*/}}{{if .Enhance }}
+## 增强补充知识
+
+这是一些可以帮助你更好地完成探索的补充知识信息，是在执行规划循环的途中通过工具获取到的有价值的信息
+
+<|ENHANCE_KNOWLEDGE_{{ .Nonce }}|>
+{{ .Enhance }}
+<|ENHANCE_KNOWLEDGE_END_{{ .Nonce }}|>{{end}}{{/*
+
+*/}}{{if .FileResults }}
+## 文件与代码信息
+
+以下是通过 read_file / find_files / grep_text 等工具收集到的项目文件和代码信息（白帽思维）。
+
+<|FILE_RESULTS_{{ .Nonce }}|>
+{{ .FileResults }}
+<|FILE_RESULTS_END_{{ .Nonce }}|>{{end}}{{/*
+
+*/}}{{if .WebResults }}
+## 互联网搜索结果
+
+以下是通过 web_search 工具从互联网获取到的外部信息，包含最佳实践、技术文档或行业知识。
+
+<|WEB_RESULTS_{{ .Nonce }}|>
+{{ .WebResults }}
+<|WEB_RESULTS_END_{{ .Nonce }}|>{{end}}{{/*
+
+*/}}{{if .ReconResults }}
+## 网络侦查结果
+
+以下是通过 scan_port / simple_crawler 等侦查工具收集到的目标网络和 Web 应用信息，包含开放端口、服务指纹、URL 结构和入口点等。
+
+<|RECON_RESULTS_{{ .Nonce }}|>
+{{ .ReconResults }}
+<|RECON_RESULTS_END_{{ .Nonce }}|>{{end}}{{/*
+
+*/}}{{ end }}

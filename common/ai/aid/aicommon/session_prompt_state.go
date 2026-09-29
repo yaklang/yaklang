@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/yaklang/yaklang/common/schema"
-	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 )
 
 const sessionEvidenceTokenBudget = 15000
@@ -18,28 +17,19 @@ type SessionPromptState struct {
 
 	UserInputHistory []schema.AIAgentUserInputRecord
 
-	// evidenceJSON stores the serialized EvidenceStore JSON for session-level evidence.
+	// evidenceJSON is a business mirror / legacy import source. Timeline owns
+	// mutations, freeze boundaries and prompt rendering.
 	// Persisted to DB alongside UserInputHistory under the same persistent session.
 	evidenceJSON string
 
-	// todoJSON stores the serialized VerificationTodoStore JSON for the global
-	// task-scoped TODO work set maintained by normal ReAct actions. The list is rendered
-	// into every loop prompt (timeline-open section, right after
-	// SessionEvidence) so the model can see its own pending TODOs on every
-	// iteration, not only at Verify checkpoints.
-	//
-	// 关键词: todoJSON, VerificationTodoStore 序列化, SessionEvidence 同构,
-	//        全局 TODO 持久态
+	// todoJSON is the session's in-memory, task-scoped TODO work set. Normal
+	// ReAct actions update it; main-loop prompts project it after the Open Timeline.
 	todoJSON string
 
 	// sessionArtifactsState keeps the sealed frozen artifact snapshots for the
 	// current session/workdir. It is intentionally in-memory only; persistent
 	// restore can add serialization later without changing the prompt API.
 	sessionArtifactsState *SessionArtifactsRenderState
-
-	// sessionEvidenceState keeps the frozen evidence snapshot used to render
-	// frozen/open evidence blocks under a timeline frozen cutoff.
-	sessionEvidenceState *SessionEvidenceRenderState
 
 	// reportedRiskStore is the session-level "已报告漏洞清单" accumulator.
 	// Each time a risk is emitted via cybersecurity-risk (or any risk-emitting
@@ -107,9 +97,7 @@ func (s *SessionPromptState) forkForSubAgent(inheritConversation bool) *SessionP
 	if s.sessionArtifactsState != nil {
 		forked.sessionArtifactsState = s.sessionArtifactsState.Fork()
 	}
-	if s.sessionEvidenceState != nil {
-		forked.sessionEvidenceState = s.sessionEvidenceState.Fork()
-	}
+
 	return forked
 }
 
@@ -198,31 +186,10 @@ func (s *SessionPromptState) SetSessionEvidence(evidenceJSON string) {
 	s.m.Lock()
 	defer s.m.Unlock()
 	s.evidenceJSON = evidenceJSON
-	s.sessionEvidenceState = nil
 }
 
-// ApplySessionEvidenceOps deserializes the current evidence store, applies
-// the operations, shrinks to token budget, serializes back, and returns
-// the quoted string suitable for DB persistence.
-func (s *SessionPromptState) ApplySessionEvidenceOps(ops []EvidenceOperation) string {
-	if s == nil {
-		return ""
-	}
-	s.m.Lock()
-	defer s.m.Unlock()
-
-	store := UnmarshalEvidenceStore(s.evidenceJSON)
-	store.ApplyOperations(ops)
-	shrinkEvidenceStoreWithStateToTokenBudget(store, s.sessionEvidenceState, sessionEvidenceTokenBudget)
-	s.evidenceJSON = store.Marshal()
-	return codec.StrConvQuote(s.evidenceJSON)
-}
-
-func (s *SessionPromptState) quoteEvidence(raw string) string {
-	return codec.StrConvQuote(raw)
-}
-
-// GetSessionEvidenceRendered returns markdown text ready for prompt injection.
+// GetSessionEvidenceRendered renders the business mirror for legacy restoration.
+// Prompt construction uses Timeline deltas and the frozen evidence snapshot.
 func (s *SessionPromptState) GetSessionEvidenceRendered() string {
 	if s == nil {
 		return ""
@@ -234,49 +201,7 @@ func (s *SessionPromptState) GetSessionEvidenceRendered() string {
 	return store.Render()
 }
 
-func (s *SessionPromptState) GetSessionEvidenceFrozenOpenBlocks(frozenTimeUnix int64, openNonce string) SessionEvidencePromptBlocks {
-	if s == nil {
-		return SessionEvidencePromptBlocks{}
-	}
-	s.m.Lock()
-	defer s.m.Unlock()
-
-	store := UnmarshalEvidenceStore(s.evidenceJSON)
-	if s.sessionEvidenceState == nil {
-		s.sessionEvidenceState = NewSessionEvidenceRenderState()
-	}
-
-	blocks := RenderSessionEvidenceFrozenOpen(s.sessionEvidenceState, store, frozenTimeUnix)
-	rendered := renderSessionEvidencePromptBlocks(blocks, openNonce)
-	for len(store.Items) > 1 && TokenCountExceeds(joinSessionEvidencePromptBlocks(rendered), sessionEvidenceTokenBudget) {
-		trimmed := store.Items[0]
-		store.Items = store.Items[1:]
-		pruneSessionEvidenceFrozenItem(s.sessionEvidenceState, trimmed.ID)
-		blocks = RenderSessionEvidenceFrozenOpen(s.sessionEvidenceState, store, frozenTimeUnix)
-		rendered = renderSessionEvidencePromptBlocks(blocks, openNonce)
-	}
-	s.evidenceJSON = store.Marshal()
-	return rendered
-}
-
-func shrinkEvidenceStoreWithStateToTokenBudget(store *EvidenceStore, state *SessionEvidenceRenderState, budget int) {
-	if store == nil || budget <= 0 {
-		return
-	}
-	for len(store.Items) > 1 {
-		rendered := store.Render()
-		if !TokenCountExceeds(rendered, budget) {
-			return
-		}
-		trimmed := store.Items[0]
-		store.Items = store.Items[1:]
-		pruneSessionEvidenceFrozenItem(state, trimmed.ID)
-	}
-}
-
-// GetVerificationTodo returns the raw serialized VerificationTodoStore JSON
-// (no quoting). Suitable for DB persistence callers that want to manage their
-// own quoting strategy.
+// GetVerificationTodo returns the raw serialized in-memory TODO state.
 func (s *SessionPromptState) GetVerificationTodo() string {
 	if s == nil {
 		return ""
@@ -286,8 +211,7 @@ func (s *SessionPromptState) GetVerificationTodo() string {
 	return s.todoJSON
 }
 
-// SetVerificationTodo replaces the in-memory TODO state with the given JSON
-// payload. Used during session restore from DB.
+// SetVerificationTodo replaces the in-memory TODO state with the given JSON.
 func (s *SessionPromptState) SetVerificationTodo(todoJSON string) {
 	if s == nil {
 		return
@@ -298,11 +222,11 @@ func (s *SessionPromptState) SetVerificationTodo(todoJSON string) {
 }
 
 // ApplyTodoDelta applies one normal ReAct action's optional todo_delta to the
-// persisted TODO store, then re-serializes back to todoJSON. It returns one
+// session TODO store, then re-serializes back to todoJSON. It returns one
 // result entry per delta operation so callers can render a uniform summary;
 // failures carry a non-empty Reason.
 //
-// 关键词: ApplyTodoDelta, 增量更新, DB 持久化, per-op 结果
+// 关键词: ApplyTodoDelta, 增量更新, per-op 结果
 func (s *SessionPromptState) ApplyTodoDelta(scope VerificationTodoScope, delta *TodoDelta) []VerificationTodoApplyResult {
 	if s == nil {
 		return nil
@@ -330,9 +254,7 @@ func (s *SessionPromptState) ValidateTodoDelta(scope VerificationTodoScope, delt
 }
 
 // GetVerificationTodoRendered returns the plain-text TODO snapshot ready for
-// loop prompt injection. When currentScope is set, the snapshot groups items
-// into CURRENT TASK vs OTHER TASKS sections. Empty string when no TODO has been
-// tracked yet, so the prompt template can naturally skip the block.
+// loop prompt injection. It includes an explicit empty current-task state.
 func (s *SessionPromptState) GetVerificationTodoRendered(currentScope VerificationTodoScope) string {
 	if s == nil {
 		return ""
@@ -340,14 +262,11 @@ func (s *SessionPromptState) GetVerificationTodoRendered(currentScope Verificati
 	s.m.RLock()
 	defer s.m.RUnlock()
 	store := UnmarshalVerificationTodoStore(s.todoJSON)
-	if store.IsEmpty() {
-		return ""
-	}
 	return store.RenderWithCurrentScope(currentScope)
 }
 
 // GetVerificationTodoMarkdownDelta returns the markdown snapshot computed
-// against the current persisted state without mutating it. Callers should
+// against the current session state without mutating it. Callers should
 // invoke this BEFORE ApplyTodoDelta when a caller needs a non-mutating preview.
 //
 // 关键词: GetVerificationTodoMarkdownDelta, 预览模式, 不变更状态

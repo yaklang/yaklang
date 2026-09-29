@@ -1,4 +1,3 @@
-log.setLevel("info")// 设置日志级别
 yakit.AutoInitYakit()
 
 memProfile = cli.String(
@@ -49,10 +48,6 @@ go fn() {
 autoAnalyze = i =>{
     if !i.HasSuffix(".prof") {
        return
-    }
-    content,err = file.ReadFile(i)
-    if err != nil {
-        return
     }
     path = i.ReplaceAll(".prof", "_自动分析结果.txt")
     f,err=file.Create(path)

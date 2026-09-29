@@ -46,7 +46,7 @@ func outputEvidenceAction(_ *AiTask) reactloops.ReActLoopOption {
 			idMarker := fmt.Sprintf("[id: %s]", evidenceOp.ID)
 			log.Infof("task loop: output_evidence saved to Session Evidence Store, id=%s", evidenceOp.ID)
 			loop.GetInvoker().AddToTimeline("session_evidence_saved",
-				fmt.Sprintf("%s\n%s", idMarker, evidenceOp.Content))
+				fmt.Sprintf("%s saved; evidence content is recorded in the timeline delta.", idMarker))
 			op.Continue()
 		},
 	)

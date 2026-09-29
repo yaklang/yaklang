@@ -2,6 +2,8 @@ package ssaapi
 
 import (
 	"bytes"
+	"context"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
@@ -119,14 +121,131 @@ func getJarFS(c *Config) (*javaclassparser.JarFS, error) {
 }
 
 func gitFs(codeSource *Config) (fi.FileSystem, error) {
+	targetPath, err := cloneGitSourceDir(codeSource)
+	if err != nil {
+		return nil, err
+	}
+	codeSource.Processf(0, "git clone finish start compile...")
+	return filesys.NewRelLocalFs(targetPath), nil
+}
+
+// CollectCodeSourceDir clones or opens the project tree without compiling SSA IR.
+// Inspect/source analysis uses this so git/zip/jar inputs do not pay for a full compile.
+func CollectCodeSourceDir(ctx context.Context, cfg *ssaconfig.Config) (string, error) {
+	if cfg == nil {
+		return "", utils.Errorf("config is nil")
+	}
+	if ctx != nil {
+		if err := ssaconfig.WithContext(ctx)(cfg); err != nil {
+			return "", err
+		}
+	}
+	c := &Config{Config: cfg}
+	c.NormalizeCodeSourceKind()
+	switch c.GetCodeSourceKind() {
+	case ssaconfig.CodeSourceLocal:
+		dir := strings.TrimSpace(c.GetCodeSourceLocalFile())
+		info, err := os.Stat(dir)
+		if err != nil || !info.IsDir() {
+			return "", utils.Errorf("local source is not a directory")
+		}
+		return dir, nil
+	case ssaconfig.CodeSourceGit:
+		return cloneGitSourceDir(c)
+	case ssaconfig.CodeSourceCompression, ssaconfig.CodeSourceJar:
+		return extractArchiveSourceDir(c)
+	default:
+		return "", utils.Errorf("inspect-only collect does not support source kind %s", c.GetCodeSourceKind())
+	}
+}
+
+func extractArchiveSourceDir(codeSource *Config) (string, error) {
+	if codeSource == nil {
+		return "", utils.Errorf("config is nil")
+	}
+	codeSource.Processf(0, "extract archive for source analysis")
+	fsys, err := codeSource.parseFSFromInfo()
+	if err != nil {
+		return "", err
+	}
+	if fsys == nil {
+		return "", utils.Errorf("empty archive filesystem")
+	}
+	dest, err := os.MkdirTemp("", "yaklang-inspect-source-*")
+	if err != nil {
+		return "", err
+	}
+	cleanupOnError := true
+	cleanup := func() {
+		if err := os.RemoveAll(dest); err != nil {
+			log.Errorf("failed to cleanup inspect source dir %s: %v", dest, err)
+		}
+	}
+	defer func() {
+		if cleanupOnError {
+			cleanup()
+		}
+	}()
+	if err := dumpFileSystemToDir(fsys, dest); err != nil {
+		return "", err
+	}
+	codeSource.AddCleanupFunc(cleanup)
+	cleanupOnError = false
+	return dest, nil
+}
+
+func dumpFileSystemToDir(fsys fi.FileSystem, dest string) error {
+	if fsys == nil {
+		return utils.Errorf("nil filesystem")
+	}
+	dest = filepath.Clean(dest)
+	return filesys.Recursive(".",
+		filesys.WithFileSystem(fsys),
+		filesys.WithFileStat(func(name string, info fs.FileInfo) error {
+			if info == nil || info.IsDir() {
+				return nil
+			}
+			target, ok := confinedExtractPath(dest, name)
+			if !ok {
+				return nil
+			}
+			raw, err := fsys.ReadFile(name)
+			if err != nil {
+				return nil
+			}
+			if err := os.MkdirAll(filepath.Dir(target), 0o755); err != nil {
+				return err
+			}
+			return os.WriteFile(target, raw, 0o644)
+		}),
+	)
+}
+
+func confinedExtractPath(dest, name string) (string, bool) {
+	rel := filepath.Clean(filepath.FromSlash(name))
+	if rel == "." || rel == "" {
+		return "", false
+	}
+	if filepath.IsAbs(rel) || rel == ".." || strings.HasPrefix(rel, ".."+string(os.PathSeparator)) {
+		return "", false
+	}
+	target := filepath.Join(dest, rel)
+	relToDest, err := filepath.Rel(dest, target)
+	if err != nil || relToDest == ".." || strings.HasPrefix(relToDest, ".."+string(os.PathSeparator)) {
+		return "", false
+	}
+	return target, true
+}
+
+func cloneGitSourceDir(codeSource *Config) (string, error) {
 	process := codeSource.Processf
 	if codeSource.GetCodeSourceURL() == "" {
-		return nil, utils.Errorf("git url is empty ")
+		return "", utils.Errorf("git url is empty ")
 	}
 	process(0, "start git clone process from %s", codeSource.GetCodeSourceURL())
 	local, cleanup, err := ssagitworkdir.Prepare(codeSource.GetContext(), os.Getpid())
 	if err != nil {
-		return nil, err
+		return "", err
 	}
 	cleanupOnError := true
 	cleanupWorkspace := func() {
@@ -171,7 +290,7 @@ func gitFs(codeSource *Config) (fi.FileSystem, error) {
 		opts,
 		report,
 	); err != nil {
-		return nil, ssagitworkdir.WrapCloneError(codeSource.GetContext(), local, err)
+		return "", ssagitworkdir.WrapCloneError(codeSource.GetContext(), local, err)
 	}
 
 	// DefaultConfig can fail after the clone but before ParseProject installs its
@@ -188,8 +307,7 @@ func gitFs(codeSource *Config) (fi.FileSystem, error) {
 		log.Errorf("not found this path,start compile local path")
 		targetPath = local
 	}
-	process(0, "git clone finish start compile...")
-	return filesys.NewRelLocalFs(targetPath), nil
+	return targetPath, nil
 }
 
 func parseAuth(auth *ssaconfig.AuthConfigInfo) []yakgit.Option {

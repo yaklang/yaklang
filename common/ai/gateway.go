@@ -4,7 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/yaklang/yaklang/common/ai/aibalance"
-	"github.com/yaklang/yaklang/common/ai/aid/aicache"
+	"github.com/yaklang/yaklang/common/ai/aid/aiprojection"
 	"io"
 	"strings"
 	"time"
@@ -116,6 +116,7 @@ func (g *Gateway) Chat(s string, f ...any) (string, error) {
 		aispec.ChatBaseThinkingOptions(g.Config, g.TargetUrl),
 		aispec.WithChatBase_AISamplingFromConfig(g.Config),
 		aispec.WithChatBase_ToolCallCallback(g.Config.ToolCallCallback),
+		aispec.WithChatBase_FinishReasonCallback(g.Config.FinishReasonCallback),
 		aispec.WithChatBase_ToolCallArgumentsStreamHandler(g.Config.ToolCallArgumentsStreamHandler),
 		aispec.WithChatBase_Tools(g.Config.Tools),
 		aispec.WithChatBase_ToolChoice(g.Config.ToolChoice),
@@ -1082,12 +1083,22 @@ func FunctionCall(input string, funcs any, opts ...aispec.AIConfigOption) (map[s
 }
 
 func LoadChater(name string, defaultOpts ...aispec.AIConfigOption) (aispec.GeneralChatter, error) {
-	gateway, ok := aispec.Lookup(name)
+	_, ok := aispec.Lookup(name)
 	if !ok {
 		return nil, errors.New("not found valid ai chatter type: " + name)
 	}
 	return func(msg string, opts ...aispec.AIConfigOption) (string, error) {
-		gateway.LoadOption(append(defaultOpts, append([]aispec.AIConfigOption{aispec.WithType(name)}, opts...)...)...)
+		// One chatter can serve overlapping execution and verification calls.
+		// A gateway holds mutable options and callbacks, so it must be per-call.
+		gateway, ok := aispec.Lookup(name)
+		if !ok {
+			return "", errors.New("not found valid ai chatter type: " + name)
+		}
+		callOpts := make([]aispec.AIConfigOption, 0, len(defaultOpts)+1+len(opts))
+		callOpts = append(callOpts, defaultOpts...)
+		callOpts = append(callOpts, aispec.WithType(name))
+		callOpts = append(callOpts, opts...)
+		gateway.LoadOption(callOpts...)
 		if err := gateway.CheckValid(); err != nil {
 			log.Warnf("check valid by %s failed: %s", name, err)
 			return "", err
@@ -1182,9 +1193,9 @@ var Exports = map[string]any{
 	// aicacheSession 暴露当前进程的 aicache 调试落盘根目录绝对路径。
 	// 用法：sessionDir = ai.aicacheSession()
 	// 触发条件：仅在 utils.InDebugMode()（DEBUG / PALMDEBUG / YAKLANGDEBUG 任一非空）
-	// 或测试场景下，aicache.Observe 才会异步落盘 000XXX.txt；返回路径稳定可复用。
+	// 或测试场景下，aiprojection.ProjectAndObserve 才会异步落盘 000XXX.txt；返回路径稳定可复用。
 	// 关键词: yak ai aicacheSession, dump 目录暴露, cachebench
-	"aicacheSession": aicache.SessionDir,
+	"aicacheSession": aiprojection.SessionDir,
 }
 
 // CreateChatterFromConfig creates a chat function from AIModelConfig.

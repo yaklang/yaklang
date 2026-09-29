@@ -60,6 +60,39 @@ func TestFilterNotContained(t *testing.T) {
 	require.Equal(t, 2, sfvm.ValuesLen(res))
 }
 
+// Context regions can nest: a double-quoted string lives inside a
+// single-quoted one in PHP, comments can appear inside strings, and so on.
+// Only the region that starts last before the target used to be considered,
+// so a target covered by an earlier, longer region leaked through.
+func TestFilterNotContained_NestedContextRegions(t *testing.T) {
+	ctx := sfvm.NewValues([]sfvm.ValueOperator{
+		hit("a.txt", 10, 100), // long single-quoted string containing the rest
+		hit("a.txt", 30, 40),  // short double-quoted string nested inside
+	})
+	target := sfvm.NewValues([]sfvm.ValueOperator{
+		hit("a.txt", 60, 70), // outside the nested one, inside the long one
+		hit("a.txt", 32, 38), // inside both
+		hit("a.txt", 200, 210),
+	})
+	res := sfpattern.FilterNotContained(target, ctx)
+	require.Equal(t, 1, sfvm.ValuesLen(res))
+}
+
+// Same nesting hazard for the overlap filter: a long region starting before a
+// shorter nested one must still match targets that only the long one covers.
+func TestFilterOverlap_NestedContextRegions(t *testing.T) {
+	other := sfvm.NewValues([]sfvm.ValueOperator{
+		hit("a.txt", 10, 100),
+		hit("a.txt", 30, 40),
+	})
+	target := sfvm.NewValues([]sfvm.ValueOperator{
+		hit("a.txt", 60, 70), // only the long region overlaps
+		hit("a.txt", 300, 310),
+	})
+	res := sfpattern.FilterOverlap(target, other)
+	require.Equal(t, 1, sfvm.ValuesLen(res))
+}
+
 func TestFilterNotContained_NoContext(t *testing.T) {
 	target := sfvm.NewValues([]sfvm.ValueOperator{hit("a.txt", 1, 2)})
 	res := sfpattern.FilterNotContained(target, sfvm.NewEmptyValues())

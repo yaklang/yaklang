@@ -16,7 +16,7 @@ import (
 	"github.com/yaklang/yaklang/common/schema"
 
 	"github.com/davecgh/go-spew/spew"
-	utls "github.com/refraction-networking/utls"
+	utls "github.com/yaklang/yaklang/common/third_party/utls"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"

@@ -81,9 +81,9 @@ func TestH2PoolCoalescesConcurrentDials(t *testing.T) {
 	if conns.Load() != 1 {
 		t.Fatalf("concurrent cold requests opened %d connections", conns.Load())
 	}
-	p.h2Mu.Lock()
-	pending := len(p.h2Dials)
-	p.h2Mu.Unlock()
+	p.h2Pool.mu.Lock()
+	pending := len(p.h2Pool.dials)
+	p.h2Pool.mu.Unlock()
 	if pending != 0 {
 		t.Fatal("completed dial remained in registry")
 	}
@@ -98,16 +98,16 @@ func TestH2PoolBoundsIdleOrigins(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	p.h2Mu.Lock()
-	cached, idle := len(p.h2ConnMap), len(p.h2Idle)
-	p.h2Mu.Unlock()
+	p.h2Pool.mu.Lock()
+	cached, idle := len(p.h2Pool.connMap), len(p.h2Pool.idle)
+	p.h2Pool.mu.Unlock()
 	if cached > 2 || idle > 2 {
 		t.Fatalf("idle pool grew beyond cap: cached=%d idle=%d", cached, idle)
 	}
 	p.Clear()
-	p.h2Mu.Lock()
-	cached, idle = len(p.h2ConnMap), len(p.h2Idle)
-	p.h2Mu.Unlock()
+	p.h2Pool.mu.Lock()
+	cached, idle = len(p.h2Pool.connMap), len(p.h2Pool.idle)
+	p.h2Pool.mu.Unlock()
 	if cached != 0 || idle != 0 {
 		t.Fatal("Clear retained idle connection references")
 	}
@@ -212,8 +212,8 @@ func TestH2PoolClearCancelsPendingDial(t *testing.T) {
 	defer unblock()
 	result := make(chan error, 1)
 	go func() {
-		_, err := p.getOrCreateH2Conn(context.Background(), &connectKey{scheme: H2, addr: "127.0.0.1:12345"},
-			netx.DialX_WithDisableProxy(true), netx.DialX_WithDialer(func(time.Duration, string) (net.Conn, error) { close(started); <-release; return client, nil }))
+		_, err := p.h2Pool.GetOrCreate(context.Background(), &connectKey{scheme: H2, addr: "127.0.0.1:12345"},
+			[]netx.DialXOption{netx.DialX_WithDisableProxy(true), netx.DialX_WithDialer(func(time.Duration, string) (net.Conn, error) { close(started); <-release; return client, nil })})
 		result <- err
 	}()
 	select {
@@ -235,9 +235,9 @@ func TestH2PoolClearCancelsPendingDial(t *testing.T) {
 	if _, err := peer.Read(make([]byte, 1)); !errors.Is(err, io.EOF) {
 		t.Fatalf("late dial transport was not closed: %v", err)
 	}
-	p.h2Mu.Lock()
-	cached, pending := len(p.h2ConnMap), len(p.h2Dials)
-	p.h2Mu.Unlock()
+	p.h2Pool.mu.Lock()
+	cached, pending := len(p.h2Pool.connMap), len(p.h2Pool.dials)
+	p.h2Pool.mu.Unlock()
 	if cached != 0 || pending != 0 {
 		t.Fatalf("Clear retained state: cached=%d pending=%d", cached, pending)
 	}
@@ -257,7 +257,7 @@ func TestH2PoolDialWaiterCancellationIsIndependent(t *testing.T) {
 	result := make(chan error, 1)
 	key := &connectKey{scheme: H2, addr: "127.0.0.1:12345"}
 	go func() {
-		_, err := p.getOrCreateH2Conn(context.Background(), key, netx.DialX_WithDisableProxy(true), netx.DialX_WithDialer(func(time.Duration, string) (net.Conn, error) { close(started); <-release; return client, nil }))
+		_, err := p.h2Pool.GetOrCreate(context.Background(), key, []netx.DialXOption{netx.DialX_WithDisableProxy(true), netx.DialX_WithDialer(func(time.Duration, string) (net.Conn, error) { close(started); <-release; return client, nil })})
 		result <- err
 	}()
 	select {
@@ -267,7 +267,7 @@ func TestH2PoolDialWaiterCancellationIsIndependent(t *testing.T) {
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Millisecond)
 	defer cancel()
-	_, err := p.getOrCreateH2Conn(ctx, &connectKey{scheme: H2, addr: key.addr})
+	_, err := p.h2Pool.GetOrCreate(ctx, &connectKey{scheme: H2, addr: key.addr}, nil)
 	if !errors.Is(err, context.DeadlineExceeded) {
 		t.Fatalf("waiting request did not time out: %v", err)
 	}

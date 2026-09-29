@@ -10,7 +10,9 @@ import (
 )
 
 var loopActionDirectlyAnswerHTTPFlowAnalyze = &reactloops.LoopAction{
-	ActionType: "directly_answer",
+	ActionType:        "directly_answer",
+	NativeDescription: "Answer the HTTP traffic question or summarize evidence in answer_payload, including complete Markdown reports. This delivers the answer; continue or finish according to Current/TODO state, and avoid repeating an unchanged answer.",
+	NativeOptions:     reactloops.NativeDirectlyAnswerOptions(),
 	Description: `Answer the user's HTTP traffic analysis question or summarize collected HTTP flow evidence.
 [OUTPUT FORMAT OPTIONS]
 * For short plain text answers (< 200 chars):

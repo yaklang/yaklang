@@ -2,7 +2,6 @@ package loop_ai_skill_audit
 
 import (
 	"bytes"
-	_ "embed"
 	"fmt"
 	"math"
 	"os"
@@ -11,6 +10,7 @@ import (
 	"time"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon/promptloader"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops/loopinfra"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
@@ -25,11 +25,9 @@ const (
 	skillAuditReportNodeID = "skill-audit-report"
 )
 
-//go:embed prompts/persistent_instruction.txt
-var auditInstruction string
+var auditInstruction = promptloader.MustLoad("ai/aid/aireact/reactloops/loop_ai_skill_audit/prompts/persistent_instruction.txt")
 
-//go:embed prompts/output_example.txt
-var auditOutputExample string
+var auditOutputExample = promptloader.MustLoad("ai/aid/aireact/reactloops/loop_ai_skill_audit/prompts/output_example.txt")
 
 // reactive data template for the Phase 2 static analysis loop
 const auditReactiveDataTpl = `## 当前审计状态

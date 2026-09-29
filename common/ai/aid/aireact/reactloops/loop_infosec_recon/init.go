@@ -2,11 +2,11 @@ package loop_infosec_recon
 
 import (
 	"bytes"
-	_ "embed"
 	"sort"
 	"strings"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon/promptloader"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
 	"github.com/yaklang/yaklang/common/ai/ytoken"
 	"github.com/yaklang/yaklang/common/log"
@@ -14,14 +14,11 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 )
 
-//go:embed prompts/persistent_instruction.txt
-var persistentInstruction string
+var persistentInstruction = promptloader.MustLoad("ai/aid/aireact/reactloops/loop_infosec_recon/prompts/persistent_instruction.txt")
 
-//go:embed prompts/output_example.txt
-var outputExample string
+var outputExample = promptloader.MustLoad("ai/aid/aireact/reactloops/loop_infosec_recon/prompts/output_example.txt")
 
-//go:embed prompts/reactive_data.txt
-var reactiveDataTemplate string
+var reactiveDataTemplate = promptloader.MustLoad("ai/aid/aireact/reactloops/loop_infosec_recon/prompts/reactive_data.txt")
 
 func init() {
 	err := reactloops.RegisterLoopFactory(

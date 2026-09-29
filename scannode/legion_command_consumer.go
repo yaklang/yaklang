@@ -14,6 +14,7 @@ import (
 
 const commandPollInterval = time.Second
 const maxConcurrentAISessionBinds = 4
+const maxConcurrentSSAIRMaintenances = 1
 const maxAISessionBindAckInterval = 10 * time.Second
 
 type messageDispositionKind uint8
@@ -96,12 +97,30 @@ func (s *unsupportedCommandWarnState) warn(subject string) {
 }
 
 type commandConsumer struct {
-	sessionID       string
-	cancel          context.CancelFunc
-	conn            *nats.Conn
-	sub             *nats.Subscription
-	bindSlots       chan struct{}
-	bindAckInterval time.Duration
+	sessionID                string
+	cancel                   context.CancelFunc
+	conn                     *nats.Conn
+	sub                      *nats.Subscription
+	bindSlots                chan struct{}
+	bindAckInterval          time.Duration
+	irMaintenanceSlots       chan struct{}
+	irMaintenanceAckInterval time.Duration
+}
+
+func (c *commandConsumer) tryAcquireSSAIRMaintenance() bool {
+	if c == nil || c.irMaintenanceSlots == nil {
+		return false
+	}
+	select {
+	case c.irMaintenanceSlots <- struct{}{}:
+		return true
+	default:
+		return false
+	}
+}
+
+func (c *commandConsumer) releaseSSAIRMaintenance() {
+	<-c.irMaintenanceSlots
 }
 
 func (b *legionJobBridge) Run(ctx context.Context) {
@@ -272,12 +291,14 @@ func (b *legionJobBridge) startConsumer(
 
 	ctx, cancel := context.WithCancel(parent)
 	consumer := &commandConsumer{
-		sessionID:       sessionID,
-		cancel:          cancel,
-		conn:            conn,
-		sub:             subscription,
-		bindSlots:       make(chan struct{}, maxConcurrentAISessionBinds),
-		bindAckInterval: aiSessionBindAckInterval(info.Config),
+		sessionID:                sessionID,
+		cancel:                   cancel,
+		conn:                     conn,
+		sub:                      subscription,
+		bindSlots:                make(chan struct{}, maxConcurrentAISessionBinds),
+		bindAckInterval:          aiSessionBindAckInterval(info.Config),
+		irMaintenanceSlots:       make(chan struct{}, maxConcurrentSSAIRMaintenances),
+		irMaintenanceAckInterval: aiSessionBindAckInterval(info.Config),
 	}
 	go b.consumeLoop(ctx, consumer)
 	log.Infof("started legion command consumer: node_id=%s session_id=%s", currentNodeID, sessionID)
@@ -336,6 +357,19 @@ func (b *legionJobBridge) consumeLoop(ctx context.Context, consumer *commandCons
 			if ctx.Err() != nil {
 				return
 			}
+			if strings.HasSuffix(message.Subject, "."+legionCommandSSAIRProgramDelete) {
+				// IR deletion may execute large SQL transactions. Keep the main
+				// command loop available for cancel/status traffic while allowing
+				// only one maintenance transaction at a time.
+				if consumer.tryAcquireSSAIRMaintenance() {
+					go b.handleAsyncSSAIRProgramDelete(ctx, consumer, message)
+				} else {
+					if err := message.NakWithDelay(time.Second); err != nil {
+						log.Errorf("delay ssa IR maintenance while worker is busy: %v", err)
+					}
+				}
+				continue
+			}
 			if strings.HasSuffix(message.Subject, "."+legionCommandAISessionBind) {
 				// Keep control commands flowing while a Bind prepares potentially large inputs.
 				select {
@@ -350,6 +384,44 @@ func (b *legionJobBridge) consumeLoop(ctx context.Context, consumer *commandCons
 			}
 			b.handleConsumerMessage(ctx, consumer.sessionID, message)
 		}
+	}
+}
+
+func (b *legionJobBridge) handleAsyncSSAIRProgramDelete(
+	ctx context.Context,
+	consumer *commandConsumer,
+	message *nats.Msg,
+) {
+	defer consumer.releaseSSAIRMaintenance()
+	done, stopped := make(chan struct{}), make(chan struct{})
+	go func() {
+		defer close(stopped)
+		ticker := time.NewTicker(consumer.irMaintenanceAckInterval)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-done:
+				return
+			case <-ticker.C:
+				if err := message.InProgress(); err != nil && ctx.Err() == nil {
+					log.Errorf("extend ssa IR maintenance acknowledgement: %v", err)
+				}
+			}
+		}
+	}()
+	disposition, err := b.handleMessageWithDisposition(ctx, consumer.sessionID, message)
+	close(done)
+	<-stopped
+	if ctx.Err() != nil {
+		return
+	} // Leave unsettled work available to the next consumer.
+	if err != nil {
+		log.Errorf("handle ssa IR maintenance command failed: %v", err)
+	}
+	if err := applyMessageDisposition(message, disposition); err != nil {
+		log.Errorf("apply ssa IR maintenance disposition failed: %v", err)
 	}
 }
 
@@ -510,6 +582,8 @@ func (b *legionJobBridge) handleMessagePayload(
 		return b.handleSSADebugQuery(ctx, message.Data)
 	case strings.HasSuffix(message.Subject, "."+legionCommandSSALogTail):
 		return b.handleSSALogTail(ctx, message.Data)
+	case strings.HasSuffix(message.Subject, "."+legionCommandSSAIRProgramDelete):
+		return b.handleSSAIRProgramDelete(ctx, message.Data)
 	case strings.HasSuffix(message.Subject, "."+legionCommandPluginStoreSync):
 		return b.handlePluginStoreSync(ctx, message.Data)
 	case strings.HasSuffix(message.Subject, "."+legionCommandPluginStoreSyncStatusQuery):

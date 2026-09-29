@@ -6,6 +6,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/yaklang/yaklang/common/utils"
 )
 
 func TestOutputExampleMakesDirectAnswerCarriersMutuallyExclusive(t *testing.T) {
@@ -27,4 +28,17 @@ func TestOutputExampleMakesDirectAnswerCarriersMutuallyExclusive(t *testing.T) {
 	assert.Less(t, longRuleIndex, longExampleIndex)
 	assert.Contains(t, outputExample, "两个示例是互斥的独立响应")
 	assert.Contains(t, outputExample, "任一响应只能出现其中一种答案内容")
+}
+
+func TestDefaultInstructionUsesRequestOutputMode(t *testing.T) {
+	textInstruction, err := utils.RenderTemplate(instruction, map[string]any{"FunctionCallMode": false})
+	require.NoError(t, err)
+	functionInstruction, err := utils.RenderTemplate(instruction, map[string]any{"FunctionCallMode": true})
+	require.NoError(t, err)
+	require.Contains(t, textInstruction, `{"@action":"require_tool"`)
+	require.Contains(t, textInstruction, "# 第二章：参数生成")
+	require.NotContains(t, functionInstruction, `{"@action":"require_tool"`)
+	require.NotContains(t, functionInstruction, "# 第二章：参数生成")
+	require.Contains(t, functionInstruction, "通过原生工具调用选择 action")
+	require.Contains(t, functionInstruction, "正文放在工具参数 `answer_payload`")
 }

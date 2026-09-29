@@ -14,11 +14,14 @@ const (
 	TimelinePromotedKindRecentTool     = "recent-tool-cache"
 	TimelinePromotedOperationUpsert    = "upsert"
 	TimelinePromotedOperationDelete    = "delete"
+	TimelinePromotedOperationReuse     = "reuse"
 )
 
 // PromotableTimelineItem is a control-plane timeline entry. It is persisted and
 // follows fork/merge/checkpoint semantics, but is deliberately excluded from the
-// user timeline, ordinary buckets, diffs and reducers.
+// ordinary dump buckets, diffs and reducers. Evidence has a separate readable
+// UI view. Its payload does
+// participate in the prompt freeze budget.
 type PromotableTimelineItem struct {
 	ID            int64  `json:"id"`
 	Kind          string `json:"kind"`
@@ -35,6 +38,27 @@ func (p *PromotableTimelineItem) GetShrinkResult() string        { return "" }
 func (p *PromotableTimelineItem) GetShrinkSimilarResult() string { return "" }
 func (p *PromotableTimelineItem) SetShrinkResult(string)         {}
 
+// OpenPromptText is the exact, non-reducible payload used for open-bucket
+// accounting. String remains empty for ordinary history/UI compatibility.
+func (p *PromotableTimelineItem) OpenPromptText() string {
+	if p != nil && p.Kind == TimelinePromotedKindRecentTool {
+		return timelineToolCacheDeltaPrompt(p)
+	}
+	if p != nil && p.Kind == TimelinePromotedKindEvidence {
+		return timelineEvidenceDeltaPrompt(p)
+	}
+	if p == nil {
+		return ""
+	}
+	if p.Operation == TimelinePromotedOperationDelete {
+		return fmt.Sprintf("[state %s/%s deleted]", p.Kind, p.Key)
+	}
+	if p.Operation == TimelinePromotedOperationReuse {
+		return fmt.Sprintf("[state %s/%s reused]", p.Kind, p.Key)
+	}
+	return fmt.Sprintf("[state %s/%s]\n%s", p.Kind, p.Key, p.Payload)
+}
+
 type PromotedTimelineEntry struct {
 	Kind          string `json:"kind"`
 	TargetSection string `json:"target_section"`
@@ -42,6 +66,9 @@ type PromotedTimelineEntry struct {
 	Payload       string `json:"payload"`
 	PayloadHash   string `json:"payload_hash"`
 	SourceItemID  int64  `json:"source_item_id"`
+	// LastUsedItemID is independent of the schema source. Older snapshots fall
+	// back to SourceItemID until their journal is replayed.
+	LastUsedItemID int64 `json:"last_used_item_id,omitempty"`
 }
 
 // TimelinePromotedState is the materialized, long-lived projection of sealed
@@ -97,7 +124,10 @@ func (m *Timeline) PushPromotable(id int64, kind, targetSection, key, operation,
 	if m == nil || id <= 0 || targetSection != TimelinePromotedTargetSemiDynamic1 || strings.TrimSpace(kind) == "" || strings.TrimSpace(key) == "" {
 		return false
 	}
-	if operation != TimelinePromotedOperationUpsert && operation != TimelinePromotedOperationDelete {
+	if operation != TimelinePromotedOperationUpsert && operation != TimelinePromotedOperationDelete && operation != TimelinePromotedOperationReuse {
+		return false
+	}
+	if operation == TimelinePromotedOperationReuse && (kind != TimelinePromotedKindRecentTool || payload != "") {
 		return false
 	}
 	if operation == TimelinePromotedOperationDelete {
@@ -107,6 +137,16 @@ func (m *Timeline) PushPromotable(id int64, kind, targetSection, key, operation,
 	ts := now.UnixMilli()
 	m.mu.Lock()
 	defer m.mu.Unlock()
+	// Journal entries are immutable, including tombstones retained for rollback.
+	// Reusing an ID would also leave a second timestamp index pointing at it.
+	if m.idToTimelineItem.Have(id) {
+		return false
+	}
+	// Reuse is a reference, never a way to create or resurrect a cache entry.
+	// The caller must submit a full upsert if this returns false.
+	if operation == TimelinePromotedOperationReuse && !m.hasToolCacheBeforeLocked(id, key) {
+		return false
+	}
 	for m.tsToTimelineItem.Have(ts) {
 		ts++
 	}
@@ -118,7 +158,7 @@ func (m *Timeline) PushPromotable(id int64, kind, targetSection, key, operation,
 	return true
 }
 
-func (m *Timeline) rebuildPromotedStateLocked(sealedBeforeID int64, forceAll bool) {
+func (m *Timeline) rebuildPromotedStateLocked(throughID int64) {
 	state := newTimelinePromotedState()
 	if m == nil {
 		return
@@ -136,7 +176,7 @@ func (m *Timeline) rebuildPromotedStateLocked(sealedBeforeID int64, forceAll boo
 		if !ok || control == nil {
 			continue
 		}
-		if !forceAll && (sealedBeforeID <= 0 || id >= sealedBeforeID) {
+		if id > throughID {
 			continue
 		}
 		if control.TargetSection != TimelinePromotedTargetSemiDynamic1 {
@@ -159,74 +199,42 @@ func (m *Timeline) rebuildPromotedStateLocked(sealedBeforeID int64, forceAll boo
 			delete(entries, control.Key)
 			continue
 		}
+		if control.Operation == TimelinePromotedOperationReuse {
+			if entry := entries[control.Key]; control.Kind == TimelinePromotedKindRecentTool && entry != nil {
+				entry.LastUsedItemID = id
+			}
+			continue
+		}
+		if control.Operation != TimelinePromotedOperationUpsert {
+			continue
+		}
 		entries[control.Key] = &PromotedTimelineEntry{
 			Kind: control.Kind, TargetSection: control.TargetSection, Key: control.Key,
 			Payload: control.Payload, PayloadHash: control.PayloadHash, SourceItemID: id,
+		}
+		if control.Kind == TimelinePromotedKindRecentTool {
+			entries[control.Key].LastUsedItemID = id
 		}
 	}
 	m.promotedState = state
 }
 
-func (m *Timeline) forcePromoteAllLocked() {
-	m.rebuildPromotedStateLocked(0, true)
-}
-
-func (m *Timeline) ForcePromoteAll() {
+// effectivePromotedEntries overlays Open deltas on the frozen snapshot without
+// freezing or rewriting either view. Returned entries are private copies.
+func (m *Timeline) effectivePromotedEntries(targetSection, kind string) []*PromotedTimelineEntry {
 	if m == nil {
-		return
-	}
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	m.forcePromoteAllLocked()
-}
-
-func (m *Timeline) HasPromotableKind(kind string) bool {
-	if m == nil {
-		return false
-	}
-	m.mu.RLock()
-	defer m.mu.RUnlock()
-	for _, id := range m.idToTimelineItem.Keys() {
-		item, ok := m.idToTimelineItem.Get(id)
-		if !ok || item == nil || item.deleted {
-			continue
-		}
-		if control, ok := item.value.(*PromotableTimelineItem); ok && control != nil && control.Kind == kind {
-			return true
-		}
-	}
-	return false
-}
-
-// effectivePromotedKeys returns the current materialized membership for one
-// promotion namespace, including mutations that are still in Timeline Open.
-// It is deliberately read-only: session restore must not seal buckets or move
-// the promotion watermark merely to rebuild execution-side authorization.
-//
-// Ordering follows the latest mutation source ID. Reuse of an unchanged tool
-// does not create a prompt mutation, so exact execution-side LRU touches are
-// intentionally not persisted across process restarts.
-func (m *Timeline) effectivePromotedKeys(targetSection, kind string) []string {
-	if m == nil || strings.TrimSpace(targetSection) == "" || strings.TrimSpace(kind) == "" {
 		return nil
 	}
 	m.mu.RLock()
 	defer m.mu.RUnlock()
-
-	type activePromotion struct {
-		key      string
-		sourceID int64
-	}
-	active := make(map[string]activePromotion)
+	active := make(map[string]*PromotedTimelineEntry)
 	watermark := int64(0)
 	if m.promotedState != nil {
 		watermark = m.promotedState.Watermark
-		if kinds := m.promotedState.Entries[targetSection]; kinds != nil {
-			for key, entry := range kinds[kind] {
-				if entry == nil {
-					continue
-				}
-				active[key] = activePromotion{key: key, sourceID: entry.SourceItemID}
+		for key, entry := range m.promotedState.Entries[targetSection][kind] {
+			if entry != nil {
+				cp := *entry
+				active[key] = &cp
 			}
 		}
 	}
@@ -240,118 +248,32 @@ func (m *Timeline) effectivePromotedKeys(targetSection, kind string) []string {
 		if !ok || item == nil || item.deleted {
 			continue
 		}
-		control, ok := item.value.(*PromotableTimelineItem)
-		if !ok || control == nil || control.TargetSection != targetSection || control.Kind != kind {
+		op, ok := item.value.(*PromotableTimelineItem)
+		if !ok || op == nil || op.TargetSection != targetSection || op.Kind != kind {
 			continue
 		}
-		if control.Operation == TimelinePromotedOperationDelete {
-			delete(active, control.Key)
-			continue
+		switch op.Operation {
+		case TimelinePromotedOperationDelete:
+			delete(active, op.Key)
+		case TimelinePromotedOperationReuse:
+			if entry := active[op.Key]; entry != nil && kind == TimelinePromotedKindRecentTool {
+				entry.LastUsedItemID = id
+			}
+		case TimelinePromotedOperationUpsert:
+			active[op.Key] = &PromotedTimelineEntry{Kind: kind, TargetSection: targetSection, Key: op.Key,
+				Payload: op.Payload, PayloadHash: op.PayloadHash, SourceItemID: id, LastUsedItemID: id}
 		}
-		active[control.Key] = activePromotion{key: control.Key, sourceID: id}
 	}
-
-	ordered := make([]activePromotion, 0, len(active))
+	entries := make([]*PromotedTimelineEntry, 0, len(active))
 	for _, entry := range active {
-		ordered = append(ordered, entry)
+		entries = append(entries, entry)
 	}
-	sort.Slice(ordered, func(i, j int) bool {
-		if ordered[i].sourceID == ordered[j].sourceID {
-			return ordered[i].key < ordered[j].key
+	sort.Slice(entries, func(i, j int) bool {
+		left, right := promotedToolLastUsedID(entries[i]), promotedToolLastUsedID(entries[j])
+		if left == right {
+			return entries[i].Key < entries[j].Key
 		}
-		return ordered[i].sourceID < ordered[j].sourceID
+		return left < right
 	})
-	keys := make([]string, 0, len(ordered))
-	for _, entry := range ordered {
-		keys = append(keys, entry.key)
-	}
-	return keys
+	return entries
 }
-
-func (m *Timeline) projectPromoted(sealedBeforeID int64) (string, string) {
-	if m == nil {
-		return "", ""
-	}
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	// A previously materialized watermark never moves backwards during ordinary
-	// rendering. This also preserves force-promotion performed before compression
-	// and one-time legacy bootstrap.
-	effectiveLimit := sealedBeforeID
-	if m.promotedState != nil && m.promotedState.Watermark > 0 && m.promotedState.Watermark+1 > effectiveLimit {
-		effectiveLimit = m.promotedState.Watermark + 1
-	}
-	m.rebuildPromotedStateLocked(effectiveLimit, false)
-	semi := renderPromotedRecentTools(m.promotedState)
-	var pending []*PromotableTimelineItem
-	for _, id := range m.idToTimelineItem.Keys() {
-		item, ok := m.idToTimelineItem.Get(id)
-		if !ok || item == nil || item.deleted {
-			continue
-		}
-		control, ok := item.value.(*PromotableTimelineItem)
-		if !ok || control == nil || id <= m.promotedState.Watermark {
-			continue
-		}
-		pending = append(pending, control)
-	}
-	return semi, renderPromotableOpenDeltas(pending, semi == "")
-}
-
-func renderPromotedRecentTools(state *TimelinePromotedState) string {
-	if state == nil {
-		return ""
-	}
-	entries := state.Entries[TimelinePromotedTargetSemiDynamic1][TimelinePromotedKindRecentTool]
-	if len(entries) == 0 {
-		return ""
-	}
-	keys := make([]string, 0, len(entries))
-	for key := range entries {
-		keys = append(keys, key)
-	}
-	sort.Strings(keys)
-	var out strings.Builder
-	out.WriteString("<|CACHE_TOOL_CALL_[current-nonce]|>\n")
-	out.WriteString("# Recently Used Tools (available for directly_call_tool)\n\n")
-	for _, key := range keys {
-		if entry := entries[key]; entry != nil {
-			out.WriteString(strings.TrimSpace(entry.Payload))
-			out.WriteString("\n\n")
-		}
-	}
-	out.WriteString(recentToolRoutingInstructions)
-	out.WriteString("\n<|CACHE_TOOL_CALL_END_[current-nonce]|>")
-	return strings.TrimSpace(out.String())
-}
-
-func renderPromotableOpenDeltas(items []*PromotableTimelineItem, includeInstructions bool) string {
-	if len(items) == 0 {
-		return ""
-	}
-	var out strings.Builder
-	out.WriteString("<|CACHE_TOOL_CALL_[current-nonce]|>\n")
-	out.WriteString("# Prompt State Updates (pending Timeline seal)\n\n")
-	for _, item := range items {
-		if item == nil || item.Kind != TimelinePromotedKindRecentTool {
-			continue
-		}
-		if item.Operation == TimelinePromotedOperationDelete {
-			fmt.Fprintf(&out, "- invalidated recent tool: %s\n", item.Key)
-			continue
-		}
-		out.WriteString(strings.TrimSpace(item.Payload))
-		out.WriteString("\n\n")
-	}
-	if includeInstructions {
-		out.WriteString(recentToolRoutingInstructions)
-	}
-	out.WriteString("\n<|CACHE_TOOL_CALL_END_[current-nonce]|>")
-	return strings.TrimSpace(out.String())
-}
-
-const recentToolRoutingInstructions = `## How to use directly_call_tool
-
-If the exact tool you need is already listed above, prefer directly_call_tool for faster execution.
-The schemas above are params-only shapes. Pass one directly as directly_call_tool_params; do not wrap it with @action, tool, or params.
-For multiline values, TOOL_PARAM_{param_name}_[current-nonce] AITAG blocks may be used. AITAG values override same-named JSON params.`

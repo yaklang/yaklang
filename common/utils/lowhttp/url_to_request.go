@@ -127,8 +127,15 @@ func shouldRewriteRedirectToGet(statusCode int, method string) bool {
 
 // BuildRedirectRequest 用于生成重定向请求包
 func BuildRedirectRequest(targetUrl string, originRequest []byte, originRequestIsHttps bool, statusCode int) ([]byte, error) {
+	rewriteToGet := shouldRewriteRedirectToGet(statusCode, GetHTTPRequestMethod(originRequest))
+	return buildRedirectRequestWithMethod(targetUrl, originRequest, originRequestIsHttps, rewriteToGet)
+}
+
+// buildRedirectRequestWithMethod also supports retrying a redirect with the
+// opposite method policy after a redirected request receives 400 or 405,
+// without changing the normal policy.
+func buildRedirectRequestWithMethod(targetUrl string, originRequest []byte, originRequestIsHttps bool, rewriteToGet bool) ([]byte, error) {
 	method := GetHTTPRequestMethod(originRequest)
-	rewriteToGet := shouldRewriteRedirectToGet(statusCode, method)
 	if rewriteToGet {
 		method = http.MethodGet
 	}

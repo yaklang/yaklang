@@ -12,14 +12,16 @@ import "github.com/yaklang/yaklang/common/ai/aid/aitool"
 // 关键词: PromptMaterials, shared prefix materials, aireact + aid 共用
 type PromptMaterials struct {
 	Nonce             string
+	FunctionCallMode  bool
 	AllowToolCall     bool
 	AllowPlanAndExec  bool
 	HasLoadCapability bool
 
-	TaskInstruction string
-	ExecutionPolicy string
-	Schema          string
-	OutputExample   string
+	TaskInstruction     string
+	ExecutionPolicy     string
+	Schema              string
+	FunctionCallSchemas string
+	OutputExample       string
 
 	// SemiDynamic 提示材料:
 	//   - aireact: SkillsContext
@@ -51,29 +53,27 @@ type PromptMaterials struct {
 	ForgeInventory bool
 	AIForgeList    string
 
-	TimelineFrozen         string
-	TimelineOpen           string
-	PromotedTimelineOpen   string
-	TimelineFrozenTimeUnix int64
-	FrozenPartitions       []FrozenBlockPartition
-	SessionArtifactsFrozen string
-	SessionArtifactsOpen   string
-	SessionEvidenceFrozen  string
-	SessionEvidenceOpen    string
-	CurrentTime            string
-	Workspace              bool
-	OSArch                 string
-	WorkingDir             string
-	WorkingDirGlance       string
+	TimelineFrozen             string
+	TimelineOpen               string
+	PromotedTimelineOpen       string
+	TimelineFrozenTimeUnix     int64
+	FrozenPartitions           []FrozenBlockPartition
+	SessionArtifactsFrozen     string
+	SessionArtifactsOpen       string
+	SessionEvidenceFrozen      string
+	SessionEvidenceOpen        string
+	SessionEvidenceSemiDynamic string
+	CurrentTime                string
+	Workspace                  bool
+	OSArch                     string
+	WorkingDir                 string
+	WorkingDirGlance           string
+	AIArtifactsDir             string
 
 	// Deprecated: Session Artifacts no longer participate in prompt construction.
 	SessionArtifactsListing string
-	// Deprecated: SessionEvidence 保留给旧调用路径 fallback。新主路径使用
-	// SessionEvidenceFrozen / SessionEvidenceOpen 两个一级字段。
-	SessionEvidence string
 	// TodoSnapshot 是会话级 TODO 列表渲染结果 (含 <|TODO_LIST_<nonce>|>...
-	// 边界标签的整段块). 物理位置紧跟 SessionEvidence, 与 SessionEvidence
-	// 一样落在 timeline-open 段, 不被 AI_CACHE_FROZEN / AI_CACHE_SEMI 任何
+	// 边界标签的整段块). 物理位置在普通 Timeline 之后，落在 timeline-open 段, 不被 AI_CACHE_FROZEN / AI_CACHE_SEMI 任何
 	// 缓存边界包裹, 避免污染上游 prefix cache.
 	//
 	// 关键词: TodoSnapshot, 全局 TODO 块, timeline-open 段位
@@ -90,9 +90,9 @@ type PromptMaterials struct {
 	ReportedRisks string
 }
 
-// HighStaticData 返回空 map: high-static 段是完全无变量的系统级共享 static。
+// HighStaticData only selects between two stable protocol prefixes.
 func (m *PromptMaterials) HighStaticData() map[string]any {
-	return map[string]any{}
+	return map[string]any{"FunctionCallMode": m != nil && m.FunctionCallMode}
 }
 
 // SemiDynamicData 供 caller-specific semi-dynamic 模板消费。
@@ -101,11 +101,13 @@ func (m *PromptMaterials) SemiDynamicData() map[string]any {
 		return map[string]any{}
 	}
 	return map[string]any{
-		"SkillsContext":        m.SkillsContext,
-		"PromotedSemiDynamic1": m.PromotedSemiDynamic1,
-		"PlanHelp":             m.PlanHelp,
-		"OriginalUserInput":    m.OriginalUserInput,
-		"StableInstruction":    m.StableInstruction,
+		"WorkspaceContext":           m.WorkspaceContext(),
+		"SkillsContext":              m.SkillsContext,
+		"PromotedSemiDynamic1":       m.PromotedSemiDynamic1,
+		"SessionEvidenceSemiDynamic": m.SessionEvidenceSemiDynamic,
+		"PlanHelp":                   m.PlanHelp,
+		"OriginalUserInput":          m.OriginalUserInput,
+		"StableInstruction":          m.StableInstruction,
 	}
 }
 
@@ -114,17 +116,20 @@ func (m *PromptMaterials) SemiDynamic1Data() map[string]any {
 	return m.SemiDynamicData()
 }
 
-// SemiDynamic2Data 供 TaskInstruction -> OutputExample -> Schema 半动态段消费, 尾部追加 AutoLoadedSkills (AI 意图驱动加载 SKILL).
+// SemiDynamic2Data selects either the text example/schema or native action
+// tags for this request. AutoLoadedSkills remain visible in both modes.
 func (m *PromptMaterials) SemiDynamic2Data() map[string]any {
 	if m == nil {
 		return map[string]any{}
 	}
 	return map[string]any{
-		"TaskInstruction":  m.TaskInstruction,
-		"ExecutionPolicy":  m.ExecutionPolicy,
-		"Schema":           m.Schema,
-		"OutputExample":    m.OutputExample,
-		"AutoLoadedSkills": m.AutoLoadedSkills,
+		"FunctionCallMode":    m.FunctionCallMode,
+		"TaskInstruction":     m.TaskInstruction,
+		"ExecutionPolicy":     m.ExecutionPolicy,
+		"Schema":              m.Schema,
+		"FunctionCallSchemas": m.FunctionCallSchemas,
+		"OutputExample":       m.OutputExample,
+		"AutoLoadedSkills":    m.AutoLoadedSkills,
 	}
 }
 
@@ -134,71 +139,35 @@ func (m *PromptMaterials) FrozenBlockData() map[string]any {
 		return map[string]any{}
 	}
 	return map[string]any{
-		"ForcedSkills":           m.ForcedSkills,
-		"ToolInventory":          m.ToolInventory,
-		"ToolsCount":             m.ToolsCount,
-		"TopToolsCount":          m.TopToolsCount,
-		"TopTools":               m.TopTools,
-		"HasMoreTools":           m.HasMoreTools,
-		"MoreToolsCount":         m.MoreToolsCount,
-		"ForgeInventory":         m.ForgeInventory,
-		"AIForgeList":            m.AIForgeList,
-		"FrozenPartitions":       NormalizeFrozenBlockPartitions(m.FrozenPartitions),
-		"SessionEvidenceFrozen":  m.SessionEvidenceFrozen,
+		"ForcedSkills":     m.ForcedSkills,
+		"FunctionCallMode": m.FunctionCallMode,
+		"ToolInventory":    m.ToolInventory,
+		"ToolsCount":       m.ToolsCount,
+		"TopToolsCount":    m.TopToolsCount,
+		"TopTools":         m.TopTools,
+		"HasMoreTools":     m.HasMoreTools,
+		"MoreToolsCount":   m.MoreToolsCount,
+		"ForgeInventory":   m.ForgeInventory,
+		"AIForgeList":      m.AIForgeList,
+		"FrozenPartitions": NormalizeFrozenBlockPartitions(m.FrozenPartitions),
+
 		"TimelineFrozen":         m.TimelineFrozen,
 		"TimelineFrozenTimeUnix": m.TimelineFrozenTimeUnix,
 	}
 }
 
-// TimelineOpenData 供 timeline-open 模板消费, 模板字段渲染顺序 (P1-C3):
-//
-//	Timeline (Open Tail) -> SessionEvidence -> TodoSnapshot -> Workspace ->
-//	UserHistory -> Current Time -> PlanContext (末尾)
-//
-// 段内排序原则:
-//  1. Timeline (Open Tail) 在最前: 时间线最末桶是模型理解"刚发生了什么"的
-//     首要信息源, 顶到段首让 LLM 第一时间看到。
-//  2. SessionEvidence 紧跟 Timeline: SESSION_ARTIFACTS 是 Config 级持久化
-//     观测 (跨 turn 累积的工件证据), 与 Timeline 末桶共同构成"会话级实证"
-//     连续语料块, 物理上贴近 Timeline 让两者形成连续语义。
-//  3. Workspace 居中: OS/Arch + working dir + glance 是相对静态的环境标识,
-//     既不属于"刚发生", 也不属于"用户视角", 居中过渡。
-//  4. UserHistory 在 Workspace 之后: PREV_USER_INPUT 是用户历史输入轨迹,
-//     与下方 Current Time 一起构成"时序前缀"。
-//  5. Current Time 紧跟 UserHistory: 当前时间是最末稳定的时序锚点, 形成
-//     "历史输入 -> 现在"时间递进, 同时与下方 PlanContext 形成"时间 ->
-//     任务"语义衔接。
-//  6. PlanContext (PE-TASK PLAN 产物 PARENT_TASK + CURRENT_TASK + INSTRUCTION)
-//     在段最末尾。本段不被 AI_CACHE_FROZEN /
-//     AI_CACHE_SEMI 任何缓存边界包裹, 是 prompt 的"易变尾段", 让 PlanContext
-//     的子任务切换抖动不会污染上游 system / frozen / semi 三段缓存命中。
-//
-// 注: Go map literal 的 key 顺序不影响模板渲染 (template 按 key 取值),
-// 这里 key 顺序与上面文档中的渲染顺序保持一致只是为了源码可读性, 真正的
-// 渲染顺序由 prompts/prefix/timeline_open_section.txt 决定。
-//
-// 关键词: TimelineOpenData, Timeline 末桶, SessionEvidence, Workspace,
-//
-//	UserHistory, Current Time, PlanContext 末尾注入, P1-C3 段内顺序,
-//	缓存边界外
+// TimelineOpenData supplies the variable tail. The main ReAct loop places
+// workspace coordinates in SemiDynamic1 and clears CurrentTime here before
+// rendering, then emits the clock in Dynamic. Other callers retain their
+// existing clock behavior.
 func (m *PromptMaterials) TimelineOpenData() map[string]any {
 	if m == nil {
 		return map[string]any{}
 	}
-	sessionEvidenceOpen := m.SessionEvidenceOpen
-	if sessionEvidenceOpen == "" {
-		sessionEvidenceOpen = m.SessionEvidence
-	}
 	return map[string]any{
 		"TimelineOpen":           m.TimelineOpen,
-		"PromotedTimelineOpen":   m.PromotedTimelineOpen,
 		"TimelineFrozenTimeUnix": m.TimelineFrozenTimeUnix,
-		"SessionEvidence":        sessionEvidenceOpen,
 		"TodoSnapshot":           m.TodoSnapshot,
-		"Workspace":              m.Workspace,
-		"OSArch":                 m.OSArch,
-		"WorkingDir":             m.WorkingDir,
-		"WorkingDirGlance":       m.WorkingDirGlance,
 		"UserHistory":            m.UserHistory,
 		"CurrentTime":            m.CurrentTime,
 		"PlanContext":            m.FrozenUserContext,
@@ -209,54 +178,71 @@ func (m *PromptMaterials) TimelineOpenData() map[string]any {
 type TimelineFrozenOpenBlocks struct {
 	Frozen               string
 	Open                 string
-	PromotedOpen         string
 	PromotedSemiDynamic1 string
 	FrozenTimeUnix       int64
+	EvidenceSemiDynamic  string
 }
 
 func RenderTimelineFrozenOpen(timeline *Timeline) TimelineFrozenOpenBlocks {
-	return renderTimelineFrozenOpen(timeline, false)
+	return RenderTimelineFrozenOpenWithOptions(timeline, TimelinePromptOptions{})
 }
 
 // RenderTimelineFrozenOpenWithLatestModelReplay is reserved for the main ReAct
 // decision prompt. Helper prompts use RenderTimelineFrozenOpen and therefore
 // never receive an internal replay marker.
 func RenderTimelineFrozenOpenWithLatestModelReplay(timeline *Timeline) TimelineFrozenOpenBlocks {
-	return renderTimelineFrozenOpen(timeline, true)
+	return RenderTimelineFrozenOpenWithOptions(timeline, TimelinePromptOptions{IncludeLatestModelReplay: true})
 }
 
-func renderTimelineFrozenOpen(timeline *Timeline, includeLatestModelReplay bool) TimelineFrozenOpenBlocks {
+// TimelinePromptOptions selects a read-only view, never new freeze boundaries.
+// ExcludeToolCache omits structured cache events and their semi snapshot, not
+// ordinary history mentioning tools or containing tool execution results.
+type TimelinePromptOptions struct {
+	IncludeLatestModelReplay bool
+	ExcludeToolCache         bool
+}
+
+func RenderTimelineFrozenOpenWithOptions(timeline *Timeline, options TimelinePromptOptions) TimelineFrozenOpenBlocks {
 	if timeline == nil {
 		return TimelineFrozenOpenBlocks{}
 	}
-	rb := timeline.GroupByMinutes(TimelineDumpDefaultIntervalMinutes).GetAllRenderable()
-	var sealedBeforeID int64
-	for _, block := range rb {
-		interval, ok := block.(*TimelineIntervalBlock)
-		if !ok || interval == nil || !interval.Open || len(interval.Items) == 0 {
-			continue
-		}
-		sealedBeforeID = interval.Items[0].GetID()
-		break
+	// Freeze is committed on writes/import, never as a rendering side effect.
+	timeline.mu.RLock()
+	defer timeline.mu.RUnlock()
+	rb := timeline.frozenPromptBlocksLocked(options.ExcludeToolCache)
+	var promotedSemi1 string
+	if !options.ExcludeToolCache {
+		promotedSemi1 = renderPromotedRecentTools(timeline.promotedState)
 	}
-	promotedSemi1, openDeltas := timeline.projectPromoted(sealedBeforeID)
+	evidenceSemi := timeline.projectEvidenceLocked()
 	promptBlocks := projectTimelineRenderableBlocksForPrompt(rb)
-	if includeLatestModelReplay {
+	if options.IncludeLatestModelReplay {
 		promptBlocks = projectTimelineRenderableBlocksForPromptWithLatestModelReplay(rb)
+	}
+	if options.ExcludeToolCache {
+		// Keep empty filtered intervals in rb for boundary metadata, but avoid
+		// sending an empty Timeline envelope to a parameter-generation prompt.
+		visible := make(TimelineRenderableBlocks, 0, len(promptBlocks))
+		for _, block := range promptBlocks {
+			if interval, ok := block.(*TimelineIntervalBlock); ok && len(interval.Items) == 0 {
+				continue
+			}
+			visible = append(visible, block)
+		}
+		promptBlocks = visible
 	}
 	return TimelineFrozenOpenBlocks{
 		Frozen:               promptBlocks.RenderFrozenOnly(TimelineDumpDefaultAITagName),
 		Open:                 promptBlocks.RenderOpenOnly(TimelineDumpDefaultAITagName),
-		PromotedOpen:         openDeltas,
 		PromotedSemiDynamic1: promotedSemi1,
 		FrozenTimeUnix:       timelineFrozenTimeUnixFromRenderable(rb),
+		EvidenceSemiDynamic:  evidenceSemi,
 	}
 }
 
 type PromptFrozenOpenMaterials struct {
 	TimelineFrozen         string
 	TimelineOpen           string
-	PromotedTimelineOpen   string
 	PromotedSemiDynamic1   string
 	TimelineFrozenTimeUnix int64
 	FrozenPartitions       []FrozenBlockPartition
@@ -265,8 +251,7 @@ type PromptFrozenOpenMaterials struct {
 	SessionArtifactsFrozen string
 	SessionArtifactsOpen   string
 
-	SessionEvidenceFrozen string
-	SessionEvidenceOpen   string
+	SessionEvidenceSemiDynamic string
 
 	// ReportedRisks is the rendered "已报告漏洞清单" block for the
 	// timeline-open section. Populated from SessionPromptState.
@@ -274,7 +259,7 @@ type PromptFrozenOpenMaterials struct {
 }
 
 func BuildPromptFrozenOpenMaterials(config *Config, openNonce ...string) PromptFrozenOpenMaterials {
-	return buildPromptFrozenOpenMaterials(config, false, openNonce...)
+	return BuildPromptFrozenOpenMaterialsWithOptions(config, TimelinePromptOptions{})
 }
 
 // BuildPromptFrozenOpenMaterialsWithLatestModelReplay is the main ReAct
@@ -282,33 +267,24 @@ func BuildPromptFrozenOpenMaterials(config *Config, openNonce ...string) PromptF
 // LiteForge, verification, summarizers and other shared prompt builders from
 // replaying a decision that belongs to the ReAct action protocol.
 func BuildPromptFrozenOpenMaterialsWithLatestModelReplay(config *Config, openNonce ...string) PromptFrozenOpenMaterials {
-	return buildPromptFrozenOpenMaterials(config, true, openNonce...)
+	return BuildPromptFrozenOpenMaterialsWithOptions(config, TimelinePromptOptions{IncludeLatestModelReplay: true})
 }
 
-func buildPromptFrozenOpenMaterials(config *Config, includeLatestModelReplay bool, openNonce ...string) PromptFrozenOpenMaterials {
+// BuildPromptFrozenOpenMaterialsWithOptions applies the same typed filter to Open and Semi.
+func BuildPromptFrozenOpenMaterialsWithOptions(config *Config, options TimelinePromptOptions) PromptFrozenOpenMaterials {
 	if config == nil {
 		return PromptFrozenOpenMaterials{}
 	}
-	nonce := ""
-	if len(openNonce) > 0 {
-		nonce = openNonce[0]
-	}
-	timelineBlocks := RenderTimelineFrozenOpen(config.GetTimeline())
-	if includeLatestModelReplay {
-		timelineBlocks = RenderTimelineFrozenOpenWithLatestModelReplay(config.GetTimeline())
-	}
-	evidenceBlocks := config.GetSessionPromptState().GetSessionEvidenceFrozenOpenBlocks(timelineBlocks.FrozenTimeUnix, nonce)
+	timelineBlocks := RenderTimelineFrozenOpenWithOptions(config.GetTimeline(), options)
 	reportedRisks := config.GetSessionPromptState().GetReportedRisksRendered()
 	return PromptFrozenOpenMaterials{
-		TimelineFrozen:         timelineBlocks.Frozen,
-		TimelineOpen:           timelineBlocks.Open,
-		PromotedTimelineOpen:   timelineBlocks.PromotedOpen,
-		PromotedSemiDynamic1:   timelineBlocks.PromotedSemiDynamic1,
-		TimelineFrozenTimeUnix: timelineBlocks.FrozenTimeUnix,
-		FrozenPartitions:       FrozenBlockPartitionsFromConfig(config),
-		SessionEvidenceFrozen:  evidenceBlocks.Frozen,
-		SessionEvidenceOpen:    evidenceBlocks.Open,
-		ReportedRisks:          reportedRisks,
+		TimelineFrozen:             timelineBlocks.Frozen,
+		TimelineOpen:               timelineBlocks.Open,
+		PromotedSemiDynamic1:       timelineBlocks.PromotedSemiDynamic1,
+		TimelineFrozenTimeUnix:     timelineBlocks.FrozenTimeUnix,
+		FrozenPartitions:           FrozenBlockPartitionsFromConfig(config),
+		SessionEvidenceSemiDynamic: timelineBlocks.EvidenceSemiDynamic,
+		ReportedRisks:              reportedRisks,
 	}
 }
 
@@ -318,12 +294,10 @@ func ApplyPromptFrozenOpenMaterials(materials *PromptMaterials, frozenOpen Promp
 	}
 	materials.TimelineFrozen = frozenOpen.TimelineFrozen
 	materials.TimelineOpen = frozenOpen.TimelineOpen
-	materials.PromotedTimelineOpen = frozenOpen.PromotedTimelineOpen
 	materials.PromotedSemiDynamic1 = frozenOpen.PromotedSemiDynamic1
 	materials.TimelineFrozenTimeUnix = frozenOpen.TimelineFrozenTimeUnix
 	materials.FrozenPartitions = append([]FrozenBlockPartition(nil), NormalizeFrozenBlockPartitions(frozenOpen.FrozenPartitions)...)
-	materials.SessionEvidenceFrozen = frozenOpen.SessionEvidenceFrozen
-	materials.SessionEvidenceOpen = frozenOpen.SessionEvidenceOpen
+	materials.SessionEvidenceSemiDynamic = frozenOpen.SessionEvidenceSemiDynamic
 	materials.ReportedRisks = frozenOpen.ReportedRisks
 }
 

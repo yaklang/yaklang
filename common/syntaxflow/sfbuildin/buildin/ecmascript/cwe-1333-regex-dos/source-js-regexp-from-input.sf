@@ -1,0 +1,53 @@
+desc(
+	mode: "source"
+	language: "javascript"
+	title: "源码扫描：JavaScript 用外部字符串构造 RegExp"
+	title_zh: "源码扫描：JavaScript 用外部字符串构造 RegExp"
+	type: vuln
+	level: middle
+	rule_id: "source-js-regexp-from-input"
+	risk: "regex-dos"
+	cwe: "CWE-1333"
+	desc: <<<DESC
+### 规则说明
+`new RegExp(pattern)` 在 pattern 是变量时，模式可能来自用户。嵌套量词会造成灾难性回溯，占住事件循环，其他请求得不到处理。
+
+### 风险类型
+regex-dos
+
+### 影响
+一个请求可以把进程打满，形成拒绝服务。动态模式如果还用于过滤或权限判断，也会改变校验结果。
+
+### 检测方式
+这条规则使用 source 模式，用正则扫描源文件文本，不构建语法树或 SSA。命中只说明出现了对应写法，不能单独证明数据来自外部输入。注释、字符串和文档中的相同文本也会命中。
+正则匹配 `new RegExp(` 后面紧跟标识符。`new RegExp("固定模式")` 这种引号字面量不会命中。
+同一检查还有 ssa（数据流）。它们描述同一个问题，命中条件不同，修复时看实际告警来自哪一条。
+
+### 参考
+- [CWE-1333：正则表达式复杂度低效](https://cwe.mitre.org/data/definitions/1333.html)
+
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+- 使用字面量正则，不要用请求参数构造 `RegExp`。
+- 必须动态构造时限制长度，禁止重复量词组合，并给匹配加超时，或放到可被取消的任务里。
+
+SOLUTION
+	alert_min: 1
+	"file://bad.js": <<<POS
+function bad(p) { return new RegExp(p); }
+
+POS
+	"safefile://ok.js": <<<NEG
+function ok() { return new RegExp("^[a-z]+$"); }
+
+NEG
+)
+${*.js}.pattern_regex(/new\s+RegExp\s*\(\s*[a-zA-Z]/) as $hit
+alert $hit for {
+	level: "middle",
+	title: "源码扫描：JavaScript 用外部字符串构造 RegExp",
+	title_zh: "源码扫描：JavaScript 用外部字符串构造 RegExp",
+	message: "源码扫描：JavaScript 用外部字符串构造 RegExp",
+	risk: "regex-dos",
+}
