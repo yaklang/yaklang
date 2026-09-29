@@ -23,10 +23,17 @@ var fanouts = struct {
 	entries map[string]*pcapFanOut
 }{entries: make(map[string]*pcapFanOut)}
 
+type packetCaptureHandle interface {
+	ReadPacketData() ([]byte, gopacket.CaptureInfo, error)
+	WritePacketData([]byte) error
+	LinkType() layers.LinkType
+	Close()
+}
+
 type pcapFanOut struct {
 	m           sync.Mutex
 	writeGate   chan struct{}
-	handle      *pcap.Handle
+	handle      packetCaptureHandle
 	inject      func([]byte) error
 	closeInject func()
 	device      string
@@ -49,8 +56,9 @@ func NewPCAPAdaptor(device string, mtu int32, promisc bool) (*pcapAdaptor, error
 		if err != nil {
 			return nil, err
 		}
-		p = &pcapFanOut{writeGate: make(chan struct{}, 1), handle: h, device: name, chans: make(map[string]chan gopacket.Packet), stop: make(chan struct{}), done: make(chan struct{})}
-		p.inject, p.closeInject = newPCAPLoopbackWriter(device, h.LinkType(), h.WritePacketData)
+		capture := captureWithChecksumMetadata(name, int(mtu), promisc, h)
+		p = &pcapFanOut{writeGate: make(chan struct{}, 1), handle: capture, device: name, chans: make(map[string]chan gopacket.Packet), stop: make(chan struct{}), done: make(chan struct{})}
+		p.inject, p.closeInject = newPCAPLoopbackWriter(device, capture.LinkType(), capture.WritePacketData)
 		fanouts.entries[key] = p
 		go p.background()
 	}
@@ -153,6 +161,7 @@ func (p *pcapFanOut) dispatch(data []byte, ci gopacket.CaptureInfo, decoder gopa
 		// race with or corrupt another consumer of the same captured packet.
 		packet := gopacket.NewPacket(data, decoder, gopacket.Default)
 		packet.Metadata().CaptureInfo = ci
+		packet.Metadata().AncillaryData = append([]interface{}(nil), ci.AncillaryData...)
 		packet.Metadata().Truncated = packet.Metadata().Truncated || ci.CaptureLength < ci.Length
 		select {
 		case ch <- packet:

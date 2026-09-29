@@ -348,7 +348,7 @@ func HalfOpen(ctx context.Context, device, source, gateway, target string) error
 - `ErrProbeSend`：本地发送/生成失败，保留底层错误；不能解释为目标无响应。
 - `context.Canceled` / `context.DeadlineExceeded`：调用者或生命周期取消/超时。
 
-报文还需通过 flags、长度、分片检查。物理接口校验 IPv4/TCP 校验和；已知 loopback 接口允许宿主栈的校验和卸载占位值，例如 macOS `lo0`。SYN-ACK 和 RST 都不注入 gVisor。来源、目标、端口、ACK 不匹配的报文，以及旧探测的迟到响应不能直接生成结果；生成 SYN 时也核对 endpoint 自身的 ISN，防止队列中的旧 SYN 被误认成本次发送。
+报文还需通过 flags、长度、分片检查。非回环接口验证 IPv4 头，并验证 TCP 校验和或使用下节描述的 Linux 内核逐包卸载证据；已知 loopback 接口允许宿主栈的校验和卸载占位值，例如 macOS `lo0`。SYN-ACK 和 RST 都不注入 gVisor。来源、目标、端口、ACK 不匹配的报文，以及旧探测的迟到响应不能直接生成结果；生成 SYN 时也核对 endpoint 自身的 ISN，防止队列中的旧 SYN 被误认成本次发送。
 
 **TUN / 透明代理误报：** Windows 实机的 sing-tun `tun0`（Npcap DLT 12）会对未监听端口返回匹配的 SYN-ACK，而远端没有接受连接。这种代答同样可以通过四元组、ACK、校验和检查；重试无法解决，也不能通过发送第三次 ACK“验证”而仍称为半开扫描。
 
@@ -498,7 +498,24 @@ NETSTACKVM_PCAP_DEVICE=any go test -race ./common/netstackvm \
 
 接收端支持 Ethernet、VLAN/QinQ、NULL/LOOP、raw IP（含平台 DLT 12/14）、Linux SLL/SLL2 封装；截断帧不交给协议栈或主动 RST 逻辑。这里的封装兼容不代表任意设备都可以主动半开探测。VLAN 主动探测应选择操作系统配置好的 VLAN 子接口，包本身不由会话额外插入 VLAN 标签。协议栈 MTU 取设备实际 MTU，抓包缓冲的额外链路头空间不计入 MTU。
 
-**虚拟网卡校验和卸载：** 同宿主机的 veth/虚拟交换机可能把尚未完成 TCP 校验和的 SYN-ACK 直接交给抓包接口。当前 pcap 元数据不提供足够的卸载校验依据，因此不会把校验失败自动视为可信响应。遇到 `ErrProbeChecksum`，先对照抓包与接口卸载配置；受控测试网络可临时关闭发送端的 TX checksum offload 后复测，记录原值并在测试后恢复。库不会修改宿主机卸载配置，也不提供忽略任意非回环校验和的开关。TUN 的代理代答属于另一种问题，关闭卸载不能解决它。
+**虚拟网卡校验和卸载：** 同宿主机的 veth/虚拟交换机可能把尚未完成 TCP 校验和的 SYN-ACK 直接交给抓包接口。Linux Ethernet 捕获现在使用绑定指定接口的 `AF_PACKET` socket，通过 `PACKET_AUXDATA` 保留逐包卸载状态；仍由同一个捕获读取器向各订阅者分发，发包继续经过最终策略检查，不会修改系统卸载配置。
+
+- 普通报文仍验证 IPv4/TCP 校验和。若内核明确标记 TCP 校验已完成，可以采用该证据；若标记 `CHECKSUM_PARTIAL`，还必须确认报文中的值等于本包 TCP 伪首部的初始和。**仅凭字节值像卸载占位值不能通过检查**。
+- 内核证据只对完整捕获、对应接口、非 outgoing 副本有效；缺失、截断、矛盾的元数据不会放宽检查。IPv4 头、四元组、ACK、flags、长度、分片检查继续执行；原始校验和字节不会被改写。
+- 原生捕获同时保留内核时间戳，并恢复卸载剥离的外层 VLAN 标签，包含 VLAN ID 0 和 QinQ。socket 的等待有超时，最后一个订阅者关闭时释放句柄和临时混杂成员资格。
+- macOS、Windows、Linux `any` 和非 Ethernet 链路继续使用 pcap。Linux 原生捕获不可用时回退到严格 pcap 校验并记录原因；没有内核卸载证据的非回环坏校验和仍返回 `ErrProbeChecksum`，不能报告 open 或 closed。
+
+状态语义见 [Linux 内核捕获说明](https://docs.kernel.org/networking/packet_mmap.html#capture-process)。TUN 的代理代答属于另一种问题，内核校验通过也不能证明响应来自真实远端，因此 `ErrUnverifiedSYNTransport` 默认策略不变。
+
+Linux 可在受控对端 **保持 TX checksum offload 开启**，设置上文的 `NETSTACKVM_LIVE_DEVICE/SOURCE/TARGET` 后验证：
+
+```sh
+NETSTACKVM_OFFLOAD_TEST=1 go test -race ./common/netstackvm \
+  -run 'TestLinuxHalfOpenWithChecksumOffload|TestHalfOpenPCAPControlledPeer' \
+  -count=3 -timeout=90s
+```
+
+该附加测试要求实际抓到内核标记为 partial、且原始 TCP 校验和尚未完成的 SYN-ACK；如果环境没有产生这种包，测试会失败，不能用普通有效校验和报文冒充卸载验证。
 
 真实设备验证不能由 mock 替代：桥接/DHCP 的默认回归使用可控以太网帧设备和 DHCP 对端；它不证明某个 Hyper-V、VMware、TAP、Wi-Fi 驱动或交换机允许独立 MAC/DHCP。部署时仍需在实际网络上运行双端验证，确认允许额外网络身份、路由正确且没有代理代答。
 

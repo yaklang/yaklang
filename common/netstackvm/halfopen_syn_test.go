@@ -16,6 +16,7 @@ import (
 	"github.com/gopacket/gopacket"
 	"github.com/gopacket/gopacket/layers"
 	"github.com/stretchr/testify/require"
+	"github.com/yaklang/yaklang/common/lowtun/netstack/gvisor/pkg/tcpip/header"
 	"golang.org/x/time/rate"
 )
 
@@ -879,4 +880,60 @@ func TestHalfOpenCloseBetweenStepsPreservesContextCause(t *testing.T) {
 	err = p.beginStep("ReceiveSYNACK", phaseSynSent)
 	p.mu.Unlock()
 	require.ErrorIs(t, err, context.Canceled)
+}
+
+func TestHalfOpenChecksumOffloadRequiresKernelEvidence(t *testing.T) {
+	for _, tc := range []struct {
+		name                                       string
+		evidence                                   captureChecksumEvidence
+		missing, wrongSeed, badIP, wrongACK, reset bool
+		want                                       error
+	}{
+		{name: "partial", evidence: captureChecksumEvidence{interfaceIndex: 7, partial: true}},
+		{name: "validated", evidence: captureChecksumEvidence{interfaceIndex: 7, validated: true}, wrongSeed: true},
+		{name: "seed-alone", missing: true, want: ErrProbeChecksum},
+		{name: "invalid-seed", evidence: captureChecksumEvidence{interfaceIndex: 7, partial: true}, wrongSeed: true, want: ErrProbeChecksum},
+		{name: "other-interface", evidence: captureChecksumEvidence{interfaceIndex: 8, partial: true}, want: ErrProbeChecksum},
+		{name: "ambiguous-status", evidence: captureChecksumEvidence{interfaceIndex: 7, partial: true, validated: true}, want: ErrProbeChecksum},
+		{name: "bad-ip-even-if-tcp-validated", evidence: captureChecksumEvidence{interfaceIndex: 7, validated: true}, badIP: true, want: ErrProbeChecksum},
+		{name: "wrong-ack-even-if-tcp-validated", evidence: captureChecksumEvidence{interfaceIndex: 7, validated: true}, wrongACK: true, want: ErrProbeNoResponse},
+		{name: "partial-reset", evidence: captureChecksumEvidence{interfaceIndex: 7, partial: true}, reset: true, want: ErrProbeRefused},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			h := mockHalfOpen(t, func(h *HalfOpenSYN, raw []byte) error {
+				reply := synReply(t, raw, func(_ *layers.IPv4, tcp *layers.TCP) {
+					if tc.wrongACK {
+						tcp.Ack++
+					}
+					if tc.reset {
+						tcp.SYN, tcp.RST = false, true
+					}
+				})
+				data := append([]byte(nil), reply.Data()...)
+				ip := header.IPv4(data)
+				tcp := header.TCP(ip.Payload())
+				seed := header.PseudoHeaderChecksum(header.TCPProtocolNumber, ip.SourceAddress(), ip.DestinationAddress(), uint16(len(ip.Payload())))
+				if tc.wrongSeed {
+					seed ^= 0xffff
+				}
+				tcp.SetChecksum(seed)
+				if tc.badIP {
+					data[10] ^= 0xff
+				}
+				packet := gopacket.NewPacket(data, layers.LayerTypeIPv4, gopacket.Default)
+				packet.Metadata().InterfaceIndex = 7
+				if !tc.missing {
+					packet.Metadata().AncillaryData = []interface{}{tc.evidence}
+				}
+				h.observeInbound(h.main.MainNICID(), packet)
+				return nil
+			})
+			_, err := h.ProbeSYN(context.Background(), "192.0.2.20:80")
+			if tc.want == nil {
+				require.NoError(t, err)
+			} else {
+				require.ErrorIs(t, err, tc.want)
+			}
+		})
+	}
 }

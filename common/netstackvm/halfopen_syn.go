@@ -523,8 +523,7 @@ func (h *HalfOpenSYN) observeInbound(nic tcpip.NICID, packet gopacket.Packet) bo
 	loopback := (h.loop != nil && nic == h.loop.MainNICID()) || (h.mainIsLoopback && h.main != nil && nic == h.main.MainNICID())
 	if !loopback {
 		ipv4hdr := header.IPv4(raw)
-		tcphdr := header.TCP(ipv4hdr.Payload())
-		if !ipv4hdr.IsChecksumValid() || !tcphdr.IsChecksumValid(ipv4hdr.SourceAddress(), ipv4hdr.DestinationAddress(), 0, 0) {
+		if !ipv4hdr.IsChecksumValid() || !capturedTCPChecksumValid(packet, ipv4hdr) {
 			f.badChecksum = true
 			return false
 		}
