@@ -65,6 +65,7 @@ type ProxyCredential struct {
 	schema    string
 	proxyUrl  string
 	dialCfg   *dialXConfig
+	check     bool
 }
 
 func (c *ProxyCredential) dialProxyTCP(ctx context.Context, target string) (net.Conn, error) {
@@ -89,7 +90,7 @@ func (c *ProxyCredential) getCredentialString() string {
 
 func (c *ProxyCredential) proxyDial(ctx context.Context, target string) (net.Conn, error) {
 	switch strings.ToLower(c.schema) {
-	case "socks", "socks5", "s5":
+	case "socks", "socks5", "socks5h", "s5":
 		return c.socksProxyDial(ctx, target, SOCKS5)
 	case "s4a":
 		return c.socksProxyDial(ctx, target, SOCKS4A)
@@ -140,7 +141,7 @@ func (c *ProxyCredential) httpProxyDial(ctx context.Context, target string) (net
 // Argument socksType should be one of SOCKS4, SOCKS4A and SOCKS5.
 // Argument proxy should be in this format "127.0.0.1:1080".
 func (c *ProxyCredential) socksProxyDial(ctx context.Context, target string, socksType int) (net.Conn, error) {
-	cfg := &config{Context: ctx, Proto: socksType, Host: c.proxyAddr, ProxyDialer: c.dialProxyTCP}
+	cfg := &config{Context: ctx, Proto: socksType, Host: c.proxyAddr, ProxyDialer: c.dialProxyTCP, Check: c.check}
 	if c.username != "" {
 		cfg.Auth = &auth{c.username, c.password}
 	}
@@ -241,7 +242,8 @@ const DefaultUserAgent = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_13_4) AppleW
 
 func ProxyCheck(proxy string, connectTimeout time.Duration) (net.Conn, error) { // check proxy func
 	ctx := context.Background()
-	ctx, _ = context.WithTimeout(ctx, connectTimeout)
+	ctx, cancel := context.WithTimeout(ctx, connectTimeout)
+	defer cancel()
 
 	host, port, _ := utils.ParseStringToHostPort(proxy)
 	if host == "" || port <= 0 {
@@ -251,6 +253,13 @@ func ProxyCheck(proxy string, connectTimeout time.Duration) (net.Conn, error) { 
 	credential, err := newProxyCredential(proxy, &dialXConfig{Timeout: connectTimeout})
 	if err != nil {
 		return nil, err
+	}
+	// Checking SOCKS5 availability only needs negotiation/authentication. A
+	// CONNECT to the proxy's own address may be denied by an otherwise healthy
+	// proxy, and can reject a valid MITM downstream proxy configuration.
+	switch credential.schema {
+	case "socks", "socks5", "socks5h", "s5":
+		credential.check = true
 	}
 	return credential.proxyDial(ctx, "")
 }

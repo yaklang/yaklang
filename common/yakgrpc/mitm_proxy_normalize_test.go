@@ -21,6 +21,11 @@ func TestNormalizeProxyURL(t *testing.T) {
 			want:  "socks5://user:pass%40word@127.0.0.1:1080",
 		},
 		{
+			name:  "socks5h 密码含@",
+			input: "socks5h://user:pass@word@127.0.0.1:1080",
+			want:  "socks5h://user:pass%40word@127.0.0.1:1080",
+		},
+		{
 			name:  "密码含#需fallback",
 			input: "socks5://user:pass#frag@127.0.0.1:1080",
 			want:  "socks5://user:pass%23frag@127.0.0.1:1080",

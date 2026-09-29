@@ -226,6 +226,7 @@ func TestHTTPFuzzerRedirectResponsesAreOrderedAndUnique(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			stream, err := client.HTTPFuzzer(context.Background(), &ypb.FuzzerRequest{
 				Request:                  fmt.Sprintf("GET %s HTTP/1.1\r\nHost: %s\r\n\r\n", tt.start, utils.HostPort(host, port)),
+				NoSystemProxy:            true,
 				NoFollowRedirect:         tt.noFollow,
 				RedirectTimes:            tt.redirectTimes,
 				PerRequestTimeoutSeconds: 5,

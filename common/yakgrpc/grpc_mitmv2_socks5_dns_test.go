@@ -13,6 +13,8 @@ import (
 	"io"
 	"math/big"
 	"net"
+	"net/http"
+	"net/http/httptest"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -88,31 +90,49 @@ func (p *mockSocks5ProxyDNS) handle(conn net.Conn) {
 
 	// auth negotiation
 	authBuf := make([]byte, 3)
-	io.ReadFull(conn, authBuf)
-	conn.Write([]byte{0x05, 0x00})
+	if _, err := io.ReadFull(conn, authBuf); err != nil {
+		return
+	}
+	if _, err := conn.Write([]byte{0x05, 0x00}); err != nil {
+		return
+	}
 
 	// CONNECT request
 	header := make([]byte, 4)
-	io.ReadFull(conn, header)
+	if _, err := io.ReadFull(conn, header); err != nil {
+		return
+	}
 	var host string
 	switch header[3] {
 	case 0x1:
 		ip := make([]byte, 4)
-		io.ReadFull(conn, ip)
+		if _, err := io.ReadFull(conn, ip); err != nil {
+			return
+		}
 		host = net.IP(ip).String()
 	case 0x3:
 		lenBuf := make([]byte, 1)
-		io.ReadFull(conn, lenBuf)
+		if _, err := io.ReadFull(conn, lenBuf); err != nil {
+			return
+		}
 		domain := make([]byte, lenBuf[0])
-		io.ReadFull(conn, domain)
+		if _, err := io.ReadFull(conn, domain); err != nil {
+			return
+		}
 		host = string(domain)
 	case 0x4:
 		ip := make([]byte, 16)
-		io.ReadFull(conn, ip)
+		if _, err := io.ReadFull(conn, ip); err != nil {
+			return
+		}
 		host = net.IP(ip).String()
+	default:
+		return
 	}
 	portBuf := make([]byte, 2)
-	io.ReadFull(conn, portBuf)
+	if _, err := io.ReadFull(conn, portBuf); err != nil {
+		return
+	}
 	_ = binary.BigEndian.Uint16(portBuf)
 
 	p.mu.Lock()
@@ -142,6 +162,76 @@ func (p *mockSocks5ProxyDNS) handle(conn net.Conn) {
 
 func (p *mockSocks5ProxyDNS) close() {
 	p.listener.Close()
+}
+
+func TestGRPCMUSTPASS_MITM_Socks5hRemoteDNS(t *testing.T) {
+	const targetDomain = "mitm-socks5h.invalid"
+	const responseBody = "mitm-socks5h-ok"
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = io.WriteString(w, responseBody)
+	}))
+	defer upstream.Close()
+	socksProxy := newMockSocks5ProxyDNS(t, strings.TrimPrefix(upstream.URL, "http://"))
+	defer socksProxy.close()
+	_, port, err := net.SplitHostPort(strings.TrimPrefix(upstream.URL, "http://"))
+	require.NoError(t, err)
+
+	client, err := NewLocalClient()
+	require.NoError(t, err)
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+	defer cancel()
+	stream, err := client.MITM(ctx)
+	require.NoError(t, err)
+	mitmPort := utils.GetRandomAvailableTCPPort()
+	require.NoError(t, stream.Send(&ypb.MITMRequest{
+		Host:            "127.0.0.1",
+		Port:            uint32(mitmPort),
+		DownstreamProxy: "socks5h://" + socksProxy.addr(),
+	}))
+
+	resultCh := make(chan error, 1)
+	started := false
+	for {
+		response, err := stream.Recv()
+		if err != nil {
+			break
+		}
+		if response.GetMessage().GetIsMessage() &&
+			strings.Contains(string(response.GetMessage().GetMessage()), "starting mitm server") && !started {
+			started = true
+			go func() {
+				rsp, _, err := poc.DoGET(
+					fmt.Sprintf("http://%s:%s/", targetDomain, port),
+					poc.WithProxy(fmt.Sprintf("http://127.0.0.1:%d", mitmPort)),
+					poc.WithTimeout(10),
+				)
+				if err == nil && (rsp == nil || !strings.Contains(string(rsp.RawPacket), responseBody)) {
+					err = fmt.Errorf("unexpected MITM response: %v", rsp)
+				}
+				resultCh <- err
+				cancel()
+			}()
+		}
+	}
+	require.True(t, started, "MITM server did not start")
+	select {
+	case err := <-resultCh:
+		require.NoError(t, err)
+	case <-time.After(12 * time.Second):
+		t.Fatal("timed out waiting for MITM response")
+	}
+	select {
+	case atyp := <-socksProxy.atypCh:
+		require.Equal(t, byte(3), atyp)
+	case <-time.After(time.Second):
+		t.Fatal("SOCKS5 proxy did not receive CONNECT")
+	}
+	select {
+	case host := <-socksProxy.hostCh:
+		require.Equal(t, targetDomain, host)
+	case <-time.After(time.Second):
+		t.Fatal("SOCKS5 proxy did not receive target domain")
+	}
 }
 
 // These tests verify that when a downstream proxy is configured, the MITM
@@ -208,7 +298,7 @@ func TestGRPCMUSTPASS_MITMV2_Socks5DNSDomainEndToEnd(t *testing.T) {
 	err = stream.Send(&ypb.MITMV2Request{
 		Host:            "127.0.0.1",
 		Port:            uint32(mitmPort),
-		DownstreamProxy: fmt.Sprintf("socks5://%s", socksProxy.addr()),
+		DownstreamProxy: fmt.Sprintf("socks5h://%s", socksProxy.addr()),
 	})
 	require.NoError(t, err)
 
