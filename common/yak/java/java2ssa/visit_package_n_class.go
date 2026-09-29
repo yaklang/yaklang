@@ -124,6 +124,7 @@ func (y *singleFileBuilder) VisitClassDeclaration(raw javaparser.IClassDeclarati
 	*/
 	store := y.StoreFunctionBuilder()
 	blueprint.AddLazyBuilder(func() {
+		y := y.forkForLazyBuild()
 		switchHandler := y.SwitchFunctionBuilder(store)
 		defer switchHandler()
 
@@ -232,6 +233,7 @@ func (y *singleFileBuilder) VisitMemberDeclaration(raw javaparser.IMemberDeclara
 		}
 		store := y.StoreFunctionBuilder()
 		class.AddLazyBuilder(func() {
+			y := y.forkForLazyBuild()
 			switchHandler := y.SwitchFunctionBuilder(store)
 			defer switchHandler()
 			var fieldType ssa.Type
@@ -571,6 +573,7 @@ func (y *singleFileBuilder) VisitClassBodyDeclaration(
 		block := ssa.DetachAST(ret)
 		store := y.StoreFunctionBuilder()
 		class.AddLazyBuilder(func() {
+			y := y.forkForLazyBuild()
 			switchHandler := y.SwitchFunctionBuilder(store)
 			defer switchHandler()
 			y.VisitBlock(block)
@@ -653,6 +656,7 @@ func (y *singleFileBuilder) VisitMethodDeclaration(
 	formalParameters := ssa.DetachAST(i.FormalParameters())
 	methodBody := ssa.DetachAST(i.MethodBody())
 	newFunc.AddLazyBuilder(func() {
+		y := y.forkForLazyBuild()
 		log.Debugf("lazybuild: %s %s ", funcName, key)
 		switchHandler := y.SwitchFunctionBuilder(store)
 		defer switchHandler()
@@ -672,7 +676,7 @@ func (y *singleFileBuilder) VisitMethodDeclaration(
 		// framework support for spring boot
 		y.ResetUIModel()
 		y.isInController = false
-		newFunc.Type.AddAnnotationFunc(annotationFunc...)
+		newFunc.AddAnnotationFunc(annotationFunc...)
 		y.FunctionBuilder = y.PopFunction()
 		if len(annotationFunc) > 0 || len(defCallback) > 0 {
 			log.Debugf("start to build annotation ref to def: %v", funcName)
@@ -928,6 +932,7 @@ func (y *singleFileBuilder) VisitConstructorDeclaration(raw javaparser.IConstruc
 	formalParameters := ssa.DetachAST(i.FormalParameters())
 	block := ssa.DetachAST(i.Block())
 	newFunc.AddLazyBuilder(func() {
+		y := y.forkForLazyBuild()
 		switchHandler := y.SwitchFunctionBuilder(store)
 		defer switchHandler()
 		y.FunctionBuilder = y.PushFunction(newFunc)

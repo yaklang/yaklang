@@ -243,7 +243,7 @@ func saveIrType(prog *Program, db *gorm.DB) func([]*ssadb.IrType) error {
 	return func(types []*ssadb.IrType) error {
 		var saveErr error
 		saveStep := func() error {
-			saveErr = utils.GormTransaction(db, func(tx *gorm.DB) error {
+			saveErr = cacheWriteTransaction(db, func(tx *gorm.DB) error {
 				return ssadb.SaveIrTypeBatch(tx, types)
 			})
 			return saveErr

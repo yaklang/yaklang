@@ -295,7 +295,7 @@ func getMethodWithBuilder(t Type, id string, builder MethodBuilder, peek ...bool
 		f = fun
 		// peek is true, don't build
 		if len(peek) == 0 || !peek[0] {
-			f.Build()
+			f.buildOnLookup()
 		}
 	}
 

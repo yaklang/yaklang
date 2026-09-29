@@ -349,14 +349,14 @@ type PackageInfo struct {
 }
 
 func (b *astbuilder) SwitchFunctionBuilder(s *ssa.StoredFunctionBuilder) func() {
-	t := b.StoreFunctionBuilder()
-	b.LoadBuilder(s)
-	return func() {
-		b.LoadBuilder(t)
+	previous := b.FunctionBuilder
+	execution := s.NewExecutionBuilder()
+	if execution == nil {
+		return func() {}
 	}
-}
-
-func (b *astbuilder) LoadBuilder(s *ssa.StoredFunctionBuilder) {
-	b.FunctionBuilder = s.Current
-	b.LoadFunctionBuilder(s)
+	b.FunctionBuilder = execution
+	return func() {
+		s.CommitExecutionBuilder(execution)
+		b.FunctionBuilder = previous
+	}
 }
