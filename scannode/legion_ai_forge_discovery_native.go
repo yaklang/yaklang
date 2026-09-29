@@ -103,7 +103,7 @@ func (r *legionForgeDiscoveryRuntime) enumerateNative(ctx context.Context) (map[
 		return nil, err
 	}
 	query := &legionForgeNativeQuerier{runtime: r, seen: map[string]bool{}}
-	scanner.SetARecordQuerier(query)
+	scanner.UseQuerier(query)
 	matches := []map[string]any{}
 	var mu sync.Mutex
 	aborted := ""

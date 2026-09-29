@@ -330,8 +330,10 @@ func (s *SubdomainScanner) isSinkholeHijack(ctx context.Context, querier aRecord
 }
 
 // UseQuerier installs an override A-record querier used by brute force and
-// wildcard detection. It is primarily intended for tests; production code
-// should leave it unset so the scanner queries real DNS via QueryA.
+// wildcard detection. Managed runtimes can use it to enforce DNS scope,
+// cancellation and query budgets while reusing the native scanner algorithms.
+// Bind it before starting a scan; never change it while a scan is running.
+// Passing nil restores the default resolver.
 func (s *SubdomainScanner) UseQuerier(q aRecordQuerier) {
 	s.querierOverride = q
 }
