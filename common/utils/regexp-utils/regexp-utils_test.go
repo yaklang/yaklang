@@ -145,6 +145,15 @@ jsc.accessKey.secret=bbbbbbbbbbbbbbbbb
 			"jsc.accessKey.secret=bbbbbbbbbbbbbbbbb",
 		})
 	})
+
+	// Lookbehind patterns run through regexp2, which reports rune indices.
+	// Callers slice the original string with these offsets, so multibyte text
+	// before the match must not shift the returned spans.
+	t.Run("lookbehind with multibyte prefix", func(t *testing.T) {
+		code := "前缀───${DEFAULT_MODULES} 尾部\n# 注释 ${seen_files}\n"
+		rule := `(?<![\w"'=:])\$\{[A-Za-z_][^}]*\}`
+		check(t, code, rule, []string{"${DEFAULT_MODULES}", "${seen_files}"})
+	})
 }
 
 func TestBearerRegexCompatibility(t *testing.T) {

@@ -289,10 +289,29 @@ func (r *Regexp2Wrapper) FindAllSubmatchIndex(s string) ([][]int, error) {
 	if err != nil {
 		return nil, err
 	}
+	// regexp2 reports rune-based indices, while Go's regexp package and every
+	// caller in this repository slice the source string with the returned
+	// offsets. Convert once per call so lookbehind patterns and stdlib patterns
+	// share one byte-based coordinate system; otherwise every hit after a
+	// multibyte rune is shifted in reports and in range comparisons.
+	byteOffsets := runeIndexToByteOffsets(s)
+	toByte := func(i int) int {
+		if i < 0 {
+			return -1
+		}
+		if i >= len(byteOffsets) {
+			return len(s)
+		}
+		return byteOffsets[i]
+	}
 	var results [][]int
 	for matchRes != nil {
 		for _, g := range matchRes.Groups() {
-			results = append(results, []int{g.Index, g.Index + g.Length})
+			if g.Index < 0 {
+				results = append(results, []int{-1, -1})
+				continue
+			}
+			results = append(results, []int{toByte(g.Index), toByte(g.Index + g.Length)})
 		}
 		matchRes, err = r.getReg().FindNextMatch(matchRes)
 		if err != nil {
@@ -300,6 +319,17 @@ func (r *Regexp2Wrapper) FindAllSubmatchIndex(s string) ([][]int, error) {
 		}
 	}
 	return results, nil
+}
+
+// runeIndexToByteOffsets returns the byte offset of every rune boundary in s,
+// plus the end of the string, so rune indices can be converted to byte offsets.
+func runeIndexToByteOffsets(s string) []int {
+	offsets := make([]int, 0, len(s)+1)
+	for byteIndex := range s {
+		offsets = append(offsets, byteIndex)
+	}
+	offsets = append(offsets, len(s))
+	return offsets
 }
 
 func (r *Regexp2Wrapper) FindStringSubmatch(s string) ([]string, error) {

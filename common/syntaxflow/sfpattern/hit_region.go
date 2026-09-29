@@ -107,11 +107,19 @@ func regionOverlaps(r, t hitRegion) bool {
 type regionIndex struct {
 	// byFile maps a file path to its sorted non-empty hit regions.
 	byFile map[string][]hitRegion
+	// maxEnd maps a file path to the prefix maximum of end offsets aligned with
+	// byFile. Regions can nest (a double-quoted string inside a single-quoted
+	// one, comments inside strings, ...), so containment/overlap cannot be
+	// decided from the last region that starts before the target.
+	maxEnd map[string][]int
 }
 
 // newRegionIndex builds an index from a slice of hit regions.
 func newRegionIndex(regions []hitRegion) regionIndex {
-	idx := regionIndex{byFile: make(map[string][]hitRegion, len(regions))}
+	idx := regionIndex{
+		byFile: make(map[string][]hitRegion, len(regions)),
+		maxEnd: make(map[string][]int, len(regions)),
+	}
 	for _, r := range regions {
 		idx.byFile[r.path] = append(idx.byFile[r.path], r)
 	}
@@ -134,6 +142,17 @@ func newRegionIndex(regions []hitRegion) regionIndex {
 		}
 		idx.byFile[path] = compact
 	}
+	for path, rs := range idx.byFile {
+		prefix := make([]int, len(rs))
+		best := 0
+		for i, r := range rs {
+			if r.end > best {
+				best = r.end
+			}
+			prefix[i] = best
+		}
+		idx.maxEnd[path] = prefix
+	}
 	return idx
 }
 
@@ -143,16 +162,13 @@ func (idx regionIndex) contains(t hitRegion) bool {
 	if !ok || len(rs) == 0 {
 		return false
 	}
-	// Find the rightmost region with start <= t.start. Only that region (and
-	// possibly the previous one with same start) can contain t.
+	// Every region starting after t.start cannot contain t. Among the rest the
+	// prefix maximum end decides whether some region reaches t.end.
 	i := sort.Search(len(rs), func(i int) bool { return rs[i].start > t.start })
-	if i > 0 {
-		cand := rs[i-1]
-		if cand.start <= t.start && t.end <= cand.end {
-			return true
-		}
+	if i == 0 {
+		return false
 	}
-	return false
+	return idx.maxEnd[t.path][i-1] >= t.end
 }
 
 // overlaps reports whether any region in the same file overlaps t.
@@ -161,16 +177,13 @@ func (idx regionIndex) overlaps(t hitRegion) bool {
 	if !ok || len(rs) == 0 {
 		return false
 	}
-	// Find the first region whose end > t.start. That is the only candidate that
-	// can overlap t (all earlier regions end before t starts).
-	i := sort.Search(len(rs), func(i int) bool { return rs[i].end > t.start })
-	if i < len(rs) {
-		cand := rs[i]
-		if cand.start < t.end && t.start < cand.end {
-			return true
-		}
+	// Regions starting at/after t.end cannot overlap. Among the rest the prefix
+	// maximum end decides whether some region extends past t.start.
+	i := sort.Search(len(rs), func(i int) bool { return rs[i].start >= t.end })
+	if i == 0 {
+		return false
 	}
-	return false
+	return idx.maxEnd[t.path][i-1] > t.start
 }
 
 // bailContext bundles cancellation/budget callbacks so long-running filters can
