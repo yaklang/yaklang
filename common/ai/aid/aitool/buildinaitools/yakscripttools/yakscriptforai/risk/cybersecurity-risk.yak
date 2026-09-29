@@ -1,33 +1,32 @@
-__DESC__ = "将已验证或有充分证据支持的安全问题写入风险记录；可附真实原始请求和响应，直接传完整报文或传现有文件路径由工具读取，每个独立风险调用一次。"
+__DESC__ = "记录有证据支持的安全风险或安全见解：根据目标、摘要和复现/观察方法生成可排查的描述；HTTP 场景有真实报文时可附原始请求、响应或现有文件。"
 __VERBOSE_NAME__ = "Risk Output"
 __VERBOSE_NAME_ZH__ = "风险输出"
-__KEYWORDS__ = "security risk,vulnerability report,risk output,security audit,risk management,pentest finding,sqli,xss,rce,security finding,evidence,remediation"
+__KEYWORDS__ = "security risk,security insight,security observation,vulnerability report,risk output,security audit,risk management,pentest finding,sqli,xss,rce,security finding,evidence,remediation"
 
 __USAGE__ = <<<USAGE_BLOCK
-风险记录：确认安全问题或取得足够强的一手证据后及时调用；每个独立风险一条。`target`、`title`、`summary` 必填，摘要写清触发位置、现象和影响，避免只有标题或只有猜测。不要把多个问题合成一条，也不要重复报告同一目标、类型和参数的问题；继续测试得到的新证据要先核对已有记录。
+记录安全风险或安全见解，每项独立发现一条。`target`、`title`、`summary` 必填；`summary` 写现象和影响，`reproduction` 写实际复现步骤、触发路径，或见解的观察与核对方法。工具把目标和这些内容写入 Risk 的 description，方便排查；不确定的步骤不要编造，避免只有标题或只有猜测。`title` 可写“中文标题 / English title”。`type` 缺省为 info；`severity` 不填时，info 见解为 info，其他类型为 low。`parameter`、`payload`、`evidence`、`solution` 按实际情况填写，避免重复报告同一问题。
 
-参数均为普通字符串：`type` 为风险类型，缺省为 info；`severity` 可取 high/middle/low/info/debug，默认 low；`parameter`、`payload`、`evidence` 只放必要的触发点和可复核证据。`title` 可写“中文标题 / English title”，工具会拆成两个标题字段；`solution` 可选，未提供时按类型生成建议。避免在证据中重复粘贴整份响应或无关敏感数据。
+数据包可选。HTTP/Web 发现若有真实报文，优先附同一次验证的完整 `request` 和 `response`；也可用 `request-file`、`response-file` 指向已有文件，由工具读取。文件优先于同名内联报文，空文件或不存在的文件会报错。只有部分报文时只填已有部分；不要编造报文、混配不同请求的响应，或为了记录 Risk 强迫 HTTP 工具保存文件。单份报文超过 2 MiB 会被截断并提示。非 HTTP 见解可只提交可核对的观察证据。
 
-有真实 HTTP 报文时尽量附上同一次验证的请求和响应：可直接传完整内容给 `request`/`response`，也可将已有文件路径传给 `request-file`/`response-file`，工具会读取内容写入 Risk。文件优先于同名内联报文；文件不存在或为空则不记录。不要把截断的工具输出当作完整报文，也不要编造报文或混用不同请求的响应。没有报文时仍可用其他真实证据记录风险，无需专门让 HTTP 工具落盘。单份报文超过 2 MiB 时 Risk 字段只保留前段，工具会提示截断。
-
-典型案例：携带简短证据记录一个已验证问题：
+典型案例：无数据包的安全见解，给出观察入口和核对方法：
 ```json
-{"target":"https://example.com/search","title":"搜索参数反射型 XSS / Reflected XSS in Search","summary":"q 参数未编码进入 HTML；测试输入在浏览器中执行，可影响访问该页面的用户。","type":"xss","severity":"high","parameter":"q","payload":"<script>alert(1)</script>","evidence":"响应正文含未转义的 script 标签，浏览器执行已复现。"}
+{"target":"example.com:443","title":"公开服务暴露调试入口","summary":"发现调试入口可被外部访问，需要确认访问控制与可见信息范围。","reproduction":"访问 /debug/，记录返回状态和可见页面；在未登录会话中复核。","type":"info","severity":"info","evidence":"未登录请求返回调试页面标题；未进一步访问敏感数据。"}
 ```
 
 [[- if .FunctionCallMode -]]
-附原始请求和响应：所有参数直接放入 JSON，多行报文用 `\r\n` 转义：
+HTTP 风险：所有参数直接写入 JSON；报文换行用 `\r\n` 转义：
 ```json
-{"target":"https://example.com/orders/1002","title":"订单越权访问","summary":"将订单 ID 改为 1002 后返回其他用户的订单摘要，已与当前用户订单对比。","type":"unauth-access","severity":"high","parameter":"orderId","request":"GET /orders/1002 HTTP/1.1\r\nHost: example.com\r\n\r\n","response":"HTTP/1.1 200 OK\r\nContent-Type: application/json\r\n\r\n{\"id\":1002,\"owner\":\"other-user\"}"}
+{"target":"https://example.com/orders/1002","title":"订单越权访问","summary":"普通用户可读取其他用户的订单摘要。","reproduction":"以普通用户登录，先读取自己的订单，再将 GET /orders/1001 中的订单 ID 改为 1002；响应返回另一用户的订单。","type":"unauth-access","severity":"high","parameter":"orderId","request":"GET /orders/1002 HTTP/1.1\r\nHost: example.com\r\nCookie: session=example\r\n\r\n","response":"HTTP/1.1 200 OK\r\nContent-Type: application/json\r\n\r\n{\"id\":1002,\"owner\":\"other-user\"}"}
 ```
 [[- else -]]
-附原始报文：JSON 传单行参数，多行 `request`/`response` 使用本次 nonce 的 AITAG：
+HTTP 风险：普通参数写 JSON，多行报文用本次 nonce 的 AITAG：
 ```json
-{"target":"https://example.com/orders/1002","title":"订单越权访问","summary":"将订单 ID 改为 1002 后返回其他用户的订单摘要，已与当前用户订单对比。","type":"unauth-access","severity":"high","parameter":"orderId"}
+{"target":"https://example.com/orders/1002","title":"订单越权访问","summary":"普通用户可读取其他用户的订单摘要。","reproduction":"以普通用户登录，先读取自己的订单，再将 GET /orders/1001 中的订单 ID 改为 1002；响应返回另一用户的订单。","type":"unauth-access","severity":"high","parameter":"orderId"}
 ```
 <|TOOL_PARAM_request_{NONCE}|>
 GET /orders/1002 HTTP/1.1
 Host: example.com
+Cookie: session=example
 
 <|TOOL_PARAM_request_END_{NONCE}|>
 <|TOOL_PARAM_response_{NONCE}|>
@@ -38,11 +37,7 @@ Content-Type: application/json
 <|TOOL_PARAM_response_END_{NONCE}|>
 [[- end -]]
 
-如果报文已经保存在文件中，也可填实际路径（示例路径仅示意）：
-```json
-{"target":"https://example.com/orders/1002","title":"订单越权访问","summary":"普通用户取得其他用户订单摘要。","type":"unauth-access","severity":"high","parameter":"orderId","request-file":"/tmp/http-request-actual.txt","response-file":"/tmp/http-response-actual.txt"}
-```
-提交后核对工具结果，确认风险确实写入。
+已有完整报文文件时，把实际路径填入 `request-file`、`response-file`；不要求为了填这两个参数而新建文件。提交后核对工具结果。
 USAGE_BLOCK
 
 yakit.AutoInitYakit()
@@ -114,21 +109,27 @@ truncateForDescription = func(raw, limit) {
     return raw[:limit] + "\n... (truncated, full evidence stored in details)"
 }
 
-buildDescription = func(summary, parameter, payload, evidence) {
+buildDescription = func(summary, target, reproduction, parameter, payload, evidence) {
     parts = []string{}
     if summary != "" {
         parts.Push(summary)
     }
+    if target != "" {
+        parts.Push(sprintf("触发入口/观察对象：%s", target))
+    }
+    if reproduction != "" {
+        parts.Push(sprintf("复现/观察方法：\n%s", reproduction))
+    }
     if parameter != "" {
-        parts.Push(sprintf("Affected input: %s", parameter))
+        parts.Push(sprintf("受影响输入：%s", parameter))
     }
     if payload != "" {
-        parts.Push(sprintf("Verification payload: %s", payload))
+        parts.Push(sprintf("验证输入：%s", payload))
     }
 
     evidenceExcerpt = truncateForDescription(str.TrimSpace(evidence), 2000)
     if evidenceExcerpt != "" {
-        parts.Push(sprintf("Evidence:\n%s", evidenceExcerpt))
+        parts.Push(sprintf("证据：\n%s", evidenceExcerpt))
     }
     return str.Join(parts, "\n\n")
 }
@@ -176,8 +177,9 @@ defaultSolutionByType = func(riskType, parameter, target) {
 target := cli.String("target", cli.setHelp("affected target: URL, host, IP, or host:port"), cli.setRequired(true))
 titleInput := cli.String("title", cli.setHelp("one-line risk title; use `中文标题 / English title` if bilingual context is useful"), cli.setRequired(true))
 summary := cli.Text("summary", cli.setHelp("required summary: what is vulnerable, where it is triggered, and why it matters"), cli.setRequired(true))
+reproduction := cli.Text("reproduction", cli.setHelp("actual reproduction steps or trigger path; for an insight, state how it was observed and checked; do not invent steps"))
 riskType := cli.String("type", cli.setHelp("risk type such as sqli/xss/rce/ssrf/auth-bypass/unauth-access/path-traversal/info-exposure/weak-pass"), cli.setRequired(false))
-severity := cli.String("severity", cli.setHelp("risk severity: high/middle/low/info/debug"), cli.setDefault("low"))
+severity := cli.String("severity", cli.setHelp("severity: critical/high/middle/low/info; defaults to info for insights, low for other risks"))
 parameter := cli.String("parameter", cli.setHelp("triggering parameter, header, or input point"))
 payload := cli.Text("payload", cli.setHelp("payload or verification input"))
 evidence := cli.Text("evidence", cli.setHelp("concise proof, verification notes, or traffic excerpts"))
@@ -196,19 +198,33 @@ if summary == "" {
 // Normalize before creating risk options so the stored fields and dedup hash
 // use the same canonical type and parameter.
 riskType = normalizeType(riskType)
+if riskType == "" {
+    riskType = "info"
+}
+if str.TrimSpace(severity) == "" {
+    if riskType == "info" {
+        severity = "info"
+    } else {
+        severity = "low"
+    }
+}
 parameter = normalizeParameter(parameter)
+reproduction = str.TrimSpace(reproduction)
 
 title, titleVerbose = normalizeTitle(titleInput)
-description = buildDescription(summary, parameter, payload, evidence)
+description = buildDescription(summary, target, reproduction, parameter, payload, evidence)
 
 finalSolution = str.TrimSpace(solution)
-if finalSolution == "" {
+if finalSolution == "" && riskType != "info" {
     finalSolution = defaultSolutionByType(riskType, parameter, target)
 }
 
 details = {
     "title_input": titleInput,
     "summary": summary,
+}
+if reproduction != "" {
+    details["reproduction"] = reproduction
 }
 if parameter != "" {
     details["parameter"] = parameter

@@ -60,9 +60,11 @@ func TestCybersecurityRisk_MetadataUsesCompactDisclosure(t *testing.T) {
 
 	assert.Assert(t, strings.Contains(aiTool.Usage, "`target`、`title`、`summary` 必填"), "usage should require complete finding")
 	assert.Assert(t, strings.Contains(aiTool.Usage, "避免只有标题或只有猜测"), "usage should forbid unsupported risks")
+	assert.Assert(t, strings.Contains(aiTool.Usage, "安全风险或安全见解"), "usage should cover both risks and insights")
+	assert.Assert(t, strings.Contains(aiTool.Usage, "`reproduction` 写实际复现步骤、触发路径"), "usage should teach reproducible descriptions")
+	assert.Assert(t, strings.Contains(aiTool.Usage, "数据包可选"), "usage should not require HTTP packets")
 	assert.Assert(t, strings.Contains(aiTool.Usage, "中文标题 / English title"), "usage should document bilingual compact title format")
 	assert.Assert(t, strings.Contains(aiTool.Usage, "request-file"), "usage should document request-file")
-	assert.Assert(t, strings.Contains(aiTool.Usage, "参数均为普通字符串"), "usage should keep the schema simple")
 }
 
 func TestCybersecurityRisk_SchemaUsesCompactFields(t *testing.T) {
@@ -74,6 +76,8 @@ func TestCybersecurityRisk_SchemaUsesCompactFields(t *testing.T) {
 
 	_, ok = properties["summary"]
 	assert.Assert(t, ok, "schema should expose summary")
+	_, ok = properties["reproduction"]
+	assert.Assert(t, ok, "schema should expose reproduction or observation method")
 	_, ok = properties["parameter"]
 	assert.Assert(t, ok, "schema should expose parameter")
 	_, ok = properties["payload"]
@@ -109,15 +113,16 @@ func TestCybersecurityRisk_UsesRuntimeRiskSinkInsteadOfLocalDatabase(t *testing.
 	var submitted *schema.Risk
 	_, err := tool.InvokeWithParams(
 		aitool.InvokeParams{
-			"target":    "https://example.test/xss?q=admin",
-			"title":     "反射型 XSS",
-			"summary":   "q 参数未经编码直接进入 HTML 响应。",
-			"type":      "xss",
-			"severity":  "high",
-			"parameter": "q",
-			"payload":   "<script>alert(1)</script>",
-			"request":   "GET /xss?q=%3Cscript%3Ealert(1)%3C/script%3E HTTP/1.1\r\nHost: example.test\r\n\r\n",
-			"response":  "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\n\r\n<script>alert(1)</script>",
+			"target":       "https://example.test/xss?q=admin",
+			"title":        "反射型 XSS",
+			"summary":      "q 参数未经编码直接进入 HTML 响应。",
+			"reproduction": "在浏览器访问 /xss?q=%3Cscript%3Ealert(1)%3C/script%3E，确认脚本执行。",
+			"type":         "xss",
+			"severity":     "high",
+			"parameter":    "q",
+			"payload":      "<script>alert(1)</script>",
+			"request":      "GET /xss?q=%3Cscript%3Ealert(1)%3C/script%3E HTTP/1.1\r\nHost: example.test\r\n\r\n",
+			"response":     "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\n\r\n<script>alert(1)</script>",
 		},
 		aitool.WithRuntimeConfig(&aitool.ToolRuntimeConfig{
 			RuntimeID: runtimeID,
@@ -140,6 +145,8 @@ func TestCybersecurityRisk_UsesRuntimeRiskSinkInsteadOfLocalDatabase(t *testing.
 	if submitted.RuntimeId != runtimeID || submitted.QuotedRequest == "" || submitted.QuotedResponse == "" {
 		t.Fatalf("missing runtime identity or evidence: %#v", submitted)
 	}
+	assert.Assert(t, strings.Contains(submitted.Description, "触发入口/观察对象：https://example.test/xss?q=admin"))
+	assert.Assert(t, strings.Contains(submitted.Description, "复现/观察方法：\n在浏览器访问 /xss?q="))
 	request, err := strconv.Unquote(submitted.QuotedRequest)
 	assert.NilError(t, err)
 	assert.Assert(t, strings.HasPrefix(request, "GET /xss?q=%3Cscript%3Ealert(1)%3C/script%3E HTTP/1.1\r\n"))
@@ -153,6 +160,34 @@ func TestCybersecurityRisk_UsesRuntimeRiskSinkInsteadOfLocalDatabase(t *testing.
 	if len(localRisks) != 0 {
 		t.Fatalf("platform-bound risk leaked into local SQLite: %#v", localRisks)
 	}
+}
+
+func TestCybersecurityRisk_InsightCanBeRecordedWithoutPackets(t *testing.T) {
+	var submitted *schema.Risk
+	_, err := getCybersecurityRiskTool(t).InvokeWithParams(aitool.InvokeParams{
+		"target":       "example.test:443",
+		"title":        "暴露的调试入口",
+		"summary":      "调试入口可从公网访问，需确认其信息范围。",
+		"reproduction": "在未登录会话访问 /debug/，记录页面标题和返回状态。",
+		"evidence":     "返回调试页面标题。",
+	}, aitool.WithRuntimeConfig(&aitool.ToolRuntimeConfig{
+		RiskSaveHandler: func(_ context.Context, risk *schema.Risk) error {
+			copy := *risk
+			submitted = &copy
+			return nil
+		},
+	}))
+	assert.NilError(t, err)
+	if submitted == nil {
+		t.Fatal("insight was not submitted")
+	}
+	assert.Equal(t, submitted.RiskType, "info")
+	assert.Equal(t, submitted.Severity, "info")
+	assert.Equal(t, submitted.QuotedRequest, "")
+	assert.Equal(t, submitted.QuotedResponse, "")
+	assert.Assert(t, strings.Contains(submitted.Description, "触发入口/观察对象：example.test:443"))
+	assert.Assert(t, strings.Contains(submitted.Description, "复现/观察方法：\n在未登录会话访问 /debug/"))
+	assert.Equal(t, submitted.Solution, "")
 }
 
 func TestCybersecurityRisk_ReadsPacketFilesOverInlineEvidence(t *testing.T) {
