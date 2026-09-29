@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"os"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -138,6 +140,12 @@ func TestCybersecurityRisk_UsesRuntimeRiskSinkInsteadOfLocalDatabase(t *testing.
 	if submitted.RuntimeId != runtimeID || submitted.QuotedRequest == "" || submitted.QuotedResponse == "" {
 		t.Fatalf("missing runtime identity or evidence: %#v", submitted)
 	}
+	request, err := strconv.Unquote(submitted.QuotedRequest)
+	assert.NilError(t, err)
+	assert.Assert(t, strings.HasPrefix(request, "GET /xss?q=%3Cscript%3Ealert(1)%3C/script%3E HTTP/1.1\r\n"))
+	response, err := strconv.Unquote(submitted.QuotedResponse)
+	assert.NilError(t, err)
+	assert.Assert(t, strings.Contains(response, "<script>alert(1)</script>"))
 	localRisks, err := yakit.GetRisksByRuntimeId(consts.GetGormProjectDatabase(), runtimeID)
 	if err != nil {
 		t.Fatalf("query local risk database: %v", err)
@@ -145,6 +153,68 @@ func TestCybersecurityRisk_UsesRuntimeRiskSinkInsteadOfLocalDatabase(t *testing.
 	if len(localRisks) != 0 {
 		t.Fatalf("platform-bound risk leaked into local SQLite: %#v", localRisks)
 	}
+}
+
+func TestCybersecurityRisk_ReadsPacketFilesOverInlineEvidence(t *testing.T) {
+	requestFile := t.TempDir() + "/request.txt"
+	responseFile := t.TempDir() + "/response.txt"
+	wantRequest := "GET /proof?id=7 HTTP/1.1\r\nHost: example.test\r\n\r\n"
+	wantResponse := "HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\n\r\nverified-risk-evidence"
+	assert.NilError(t, os.WriteFile(requestFile, []byte(wantRequest), 0600))
+	assert.NilError(t, os.WriteFile(responseFile, []byte(wantResponse), 0600))
+
+	var submitted *schema.Risk
+	_, err := getCybersecurityRiskTool(t).InvokeWithParams(aitool.InvokeParams{
+		"target":        "https://example.test/proof?id=7",
+		"title":         "已验证的风险",
+		"summary":       "测试响应包含预期证据。",
+		"request":       "GET /wrong HTTP/1.1\r\nHost: wrong.test\r\n\r\n",
+		"response":      "HTTP/1.1 404 Not Found\r\n\r\nwrong",
+		"request-file":  requestFile,
+		"response-file": responseFile,
+	}, aitool.WithRuntimeConfig(&aitool.ToolRuntimeConfig{
+		RiskSaveHandler: func(_ context.Context, risk *schema.Risk) error {
+			copy := *risk
+			submitted = &copy
+			return nil
+		},
+	}))
+	assert.NilError(t, err)
+	if submitted == nil {
+		t.Fatal("risk was not submitted")
+	}
+	gotRequest, err := strconv.Unquote(submitted.QuotedRequest)
+	assert.NilError(t, err)
+	gotResponse, err := strconv.Unquote(submitted.QuotedResponse)
+	assert.NilError(t, err)
+	assert.Equal(t, gotRequest, wantRequest)
+	assert.Equal(t, gotResponse, wantResponse)
+	assert.Assert(t, strings.Contains(gotRequest, "GET /proof?id=7 HTTP/1.1"))
+	assert.Assert(t, strings.Contains(gotResponse, "verified-risk-evidence"))
+	detailsText, err := strconv.Unquote(submitted.Details)
+	assert.NilError(t, err)
+	var details map[string]any
+	assert.NilError(t, json.Unmarshal([]byte(detailsText), &details))
+	assert.Equal(t, details["request_source"], "file")
+	assert.Equal(t, details["response_source"], "file")
+}
+
+func TestCybersecurityRisk_EmptyPacketFileDoesNotSubmit(t *testing.T) {
+	requestFile := t.TempDir() + "/empty-request.txt"
+	assert.NilError(t, os.WriteFile(requestFile, nil, 0600))
+	called := false
+	_, _ = getCybersecurityRiskTool(t).InvokeWithParams(aitool.InvokeParams{
+		"target":       "https://example.test/empty",
+		"title":        "测试风险",
+		"summary":      "有验证证据。",
+		"request-file": requestFile,
+	}, aitool.WithRuntimeConfig(&aitool.ToolRuntimeConfig{
+		RiskSaveHandler: func(context.Context, *schema.Risk) error {
+			called = true
+			return nil
+		},
+	}))
+	assert.Assert(t, !called, "empty packet file must not create a risk record")
 }
 
 func TestCybersecurityRisk_PropagatesRuntimeRiskSinkFailure(t *testing.T) {

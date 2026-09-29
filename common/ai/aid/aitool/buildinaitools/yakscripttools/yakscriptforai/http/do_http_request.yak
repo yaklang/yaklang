@@ -42,7 +42,7 @@ __KEYWORDS__ = "http request,curl,web,network,packet,raw request,http response,u
 __USAGE__ = <<<USAGE_BLOCK
 单次 HTTP 请求：`url` 与 `packet` 二选一。URL 模式由工具生成并显示实际请求包；需要重复参数、固定顺序或自定义编码时用原样 `packet`。多路径测试用 batch_do_http_request。
 
-参数要点：URL 模式的 `query`/`form` 是 JSON 对象，传原始未转义值，由工具各编码一次；不要先编码 `%`、`&` 等字符。`body` 是原始请求体，覆盖 `form`；Packet 模式的路径和查询必须自行编码。`headers` 可传对象或逐行的 `Key: Value`。默认 `timeout=10` 秒、`redirect-times=3`；`save-packet=true` 才会把完整请求和响应保存成文件，大报文的内联输出会截断。
+参数要点：URL 模式的 `query`/`form` 是 JSON 对象，传原始未转义值，由工具各编码一次；不要先编码 `%`、`&` 等字符。`body` 是原始请求体，覆盖 `form`；Packet 模式的路径和查询必须自行编码。`headers` 可传对象或逐行的 `Key: Value`。默认 `timeout=10` 秒、`redirect-times=3`；仅在结果可能涉及漏洞或确需完整报文复核时设置 `save-packet=true` 保存请求和响应，普通探测保持默认，大报文内联输出会截断。
 
 先看 `RESULT.request_built`、`request_sent`、`response_received`、`status_code` 和 `transport_error`：HTTP 404/500 仍是已收到响应；连接、TLS、代理等失败则没有响应。POST JSON 请求遇到包含 required/invalid/missing 的 HTTP 400 时，工具可能自动改为表单编码再请求一次；核对输出中的 retry request packet 和 content-type hint，不能把重试响应当作原 JSON 请求的结果。
 

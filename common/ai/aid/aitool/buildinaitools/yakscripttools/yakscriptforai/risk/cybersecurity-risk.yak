@@ -1,4 +1,4 @@
-__DESC__ = "将已验证或有充分证据支持的安全问题写入风险记录；提供目标、标题、问题摘要和简短证据，可附原始请求/响应或已有文件路径，每个独立风险调用一次。"
+__DESC__ = "将已验证或有充分证据支持的安全问题写入风险记录；可附真实原始请求和响应，直接传完整报文或传现有文件路径由工具读取，每个独立风险调用一次。"
 __VERBOSE_NAME__ = "Risk Output"
 __VERBOSE_NAME_ZH__ = "风险输出"
 __KEYWORDS__ = "security risk,vulnerability report,risk output,security audit,risk management,pentest finding,sqli,xss,rce,security finding,evidence,remediation"
@@ -8,7 +8,7 @@ __USAGE__ = <<<USAGE_BLOCK
 
 参数均为普通字符串：`type` 为风险类型，缺省为 info；`severity` 可取 high/middle/low/info/debug，默认 low；`parameter`、`payload`、`evidence` 只放必要的触发点和可复核证据。`title` 可写“中文标题 / English title”，工具会拆成两个标题字段；`solution` 可选，未提供时按类型生成建议。避免在证据中重复粘贴整份响应或无关敏感数据。
 
-`request`/`response` 可直接给原始报文；若已保存完整报文，传 `request-file`/`response-file` 的现有路径。对应的内联报文优先于文件路径；文件读取失败则不会成功记录。提交后核对工具结果，确认风险确实写入。
+有真实 HTTP 报文时尽量附上同一次验证的请求和响应：可直接传完整内容给 `request`/`response`，也可将已有文件路径传给 `request-file`/`response-file`，工具会读取内容写入 Risk。文件优先于同名内联报文；文件不存在或为空则不记录。不要把截断的工具输出当作完整报文，也不要编造报文或混用不同请求的响应。没有报文时仍可用其他真实证据记录风险，无需专门让 HTTP 工具落盘。单份报文超过 2 MiB 时 Risk 字段只保留前段，工具会提示截断。
 
 典型案例：携带简短证据记录一个已验证问题：
 ```json
@@ -37,6 +37,12 @@ Content-Type: application/json
 {"id":1002,"owner":"other-user"}
 <|TOOL_PARAM_response_END_{NONCE}|>
 [[- end -]]
+
+如果报文已经保存在文件中，也可填实际路径（示例路径仅示意）：
+```json
+{"target":"https://example.com/orders/1002","title":"订单越权访问","summary":"普通用户取得其他用户订单摘要。","type":"unauth-access","severity":"high","parameter":"orderId","request-file":"/tmp/http-request-actual.txt","response-file":"/tmp/http-response-actual.txt"}
+```
+提交后核对工具结果，确认风险确实写入。
 USAGE_BLOCK
 
 yakit.AutoInitYakit()
@@ -176,10 +182,10 @@ parameter := cli.String("parameter", cli.setHelp("triggering parameter, header, 
 payload := cli.Text("payload", cli.setHelp("payload or verification input"))
 evidence := cli.Text("evidence", cli.setHelp("concise proof, verification notes, or traffic excerpts"))
 solution := cli.Text("solution", cli.setHelp("optional explicit remediation guidance"))
-requestRaw := cli.HTTPPacket("request", cli.setHelp("raw HTTP request content"))
-responseRaw := cli.HTTPPacket("response", cli.setHelp("raw HTTP response content"))
-requestFile := cli.String("request-file", cli.setHelp("path to a saved raw HTTP request file"))
-responseFile := cli.String("response-file", cli.setHelp("path to a saved raw HTTP response file"))
+requestRaw := cli.HTTPPacket("request", cli.setHelp("complete actual HTTP request packet; use request-file for an existing complete packet file"))
+responseRaw := cli.HTTPPacket("response", cli.setHelp("complete actual HTTP response packet; use response-file for an existing complete packet file"))
+requestFile := cli.String("request-file", cli.setHelp("existing path to a complete HTTP request packet; read and store its content; takes priority over request"))
+responseFile := cli.String("response-file", cli.setHelp("existing path to a complete HTTP response packet; read and store its content; takes priority over response"))
 cli.check()
 
 if summary == "" {
@@ -216,15 +222,57 @@ if evidence != "" {
 if finalSolution != "" {
     details["solution"] = finalSolution
 }
-if requestRaw != "" {
-    details["request_source"] = "inline"
-} elif requestFile != "" {
-    details["request_source"] = "file"
+// A supplied file takes precedence over inline text so the chosen source is unambiguous.
+requestSource = ""
+if requestFile != "" {
+    req, err := file.ReadFile(requestFile)
+    if err != nil {
+        yakit.Error("failed to read request-file %s: %v", requestFile, err)
+        return
+    }
+    if len(req) == 0 {
+        yakit.Error("request-file is empty: %s", requestFile)
+        return
+    }
+    requestRaw = string(req)
+    requestSource = "file"
+} elif requestRaw != "" {
+    requestSource = "inline"
 }
-if responseRaw != "" {
-    details["response_source"] = "inline"
-} elif responseFile != "" {
-    details["response_source"] = "file"
+
+responseSource = ""
+if responseFile != "" {
+    rsp, err := file.ReadFile(responseFile)
+    if err != nil {
+        yakit.Error("failed to read response-file %s: %v", responseFile, err)
+        return
+    }
+    if len(rsp) == 0 {
+        yakit.Error("response-file is empty: %s", responseFile)
+        return
+    }
+    responseRaw = string(rsp)
+    responseSource = "file"
+} elif responseRaw != "" {
+    responseSource = "inline"
+}
+
+if requestSource != "" {
+    details["request_source"] = requestSource
+}
+if responseSource != "" {
+    details["response_source"] = responseSource
+}
+// risk.request/risk.response currently retain at most 2 MiB per packet.
+if len(requestRaw) > 2097152 {
+    details["request_original_bytes"] = len(requestRaw)
+    details["request_truncated"] = true
+    yakit.Warn("request packet exceeds the 2 MiB risk field limit; source has %d bytes and will be truncated", len(requestRaw))
+}
+if len(responseRaw) > 2097152 {
+    details["response_original_bytes"] = len(responseRaw)
+    details["response_truncated"] = true
+    yakit.Warn("response packet exceeds the 2 MiB risk field limit; source has %d bytes and will be truncated", len(responseRaw))
 }
 
 opts = []
@@ -245,24 +293,10 @@ if payload != "" {
 
 if requestRaw != "" {
     opts.Push(risk.request(requestRaw))
-} elif requestFile != "" {
-    req, err := file.ReadFile(requestFile)
-    if err != nil {
-        yakit.Error("failed to read request-file %s: %v", requestFile, err)
-        return
-    }
-    opts.Push(risk.request(req))
 }
 
 if responseRaw != "" {
     opts.Push(risk.response(responseRaw))
-} elif responseFile != "" {
-    rsp, err := file.ReadFile(responseFile)
-    if err != nil {
-        yakit.Error("failed to read response-file %s: %v", responseFile, err)
-        return
-    }
-    opts.Push(risk.response(rsp))
 }
 
 // Normalize the target before risk.NewRisk computes the dedup hash.
