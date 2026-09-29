@@ -62,6 +62,9 @@ func LoadResultByID(resultID uint, force ...bool) (*SyntaxFlowResult, error) {
 func loadResult(result *ssadb.AuditResult) (*SyntaxFlowResult, error) {
 	res := createEmptyResult()
 	res.dbResult = result
+	if result.ResultUUID != "" {
+		res.resultUUID = result.ResultUUID
+	}
 	var rule *schema.SyntaxFlowRule
 	if result.RuleName != "" {
 		// load rule from db
@@ -144,6 +147,7 @@ func (r *SyntaxFlowResult) save(
 	// result
 	result := ssadb.CreateResult(TaskIDs...)
 	r.id = result.ID
+	result.ResultUUID = r.GetResultUUID()
 	result.CheckMsg = r.GetCheckMsg()
 	result.Errors = r.GetErrors()
 

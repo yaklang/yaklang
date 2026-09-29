@@ -70,6 +70,29 @@ func TestRiskCollect_RuleLevelFiltersSameMode(t *testing.T) {
 	require.True(t, ok, "the same level keeps the later finding")
 }
 
+func TestRiskCollect_SeverityFiltersSameModeByDefault(t *testing.T) {
+	c := NewRiskCollect()
+	low := collectRisk("feature-1", string(SFR_MODE_SSA), "low-rule", 4)
+	low.Severity = SFR_SEVERITY_LOW
+	if _, ok := c.Submit(low); !ok {
+		t.Fatal("the first finding must be kept")
+	}
+	// A weaker report of the same finding may not replace the stronger one.
+	weaker := collectRisk("feature-1", string(SFR_MODE_SSA), "info-rule", 0)
+	weaker.Severity = SFR_SEVERITY_INFO
+	_, ok := c.Submit(weaker)
+	require.False(t, ok)
+	require.Equal(t, low, c.Current("feature-1"))
+
+	// A stronger report replaces it.
+	stronger := collectRisk("feature-1", string(SFR_MODE_SSA), "high-rule", 0)
+	stronger.Severity = SFR_SEVERITY_HIGH
+	item, ok := c.Submit(stronger)
+	require.True(t, ok)
+	require.Equal(t, uint(4), item.OldID)
+	require.Equal(t, low.Hash, item.OldHash)
+}
+
 func TestRiskCollect_EmptyFeatureHashIsAlwaysKept(t *testing.T) {
 	c := NewRiskCollect()
 	first := collectRisk("", string(SFR_MODE_SOURCE), "rule", 0)

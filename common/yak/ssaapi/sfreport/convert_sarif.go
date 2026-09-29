@@ -1,6 +1,7 @@
 package sfreport
 
 import (
+	"bytes"
 	"io"
 	"path"
 	"strings"
@@ -80,6 +81,9 @@ type SarifReport struct {
 	// resultByHash remembers where each appended finding sits so a covered
 	// finding is replaced instead of reported twice.
 	resultByHash map[string]int
+	// sinceFlush counts findings appended since the last snapshot, so a long
+	// scan publishes intermediate documents instead of only the final one.
+	sinceFlush int
 }
 
 // SarifContext accumulates the SARIF entities one result contributes (files,
@@ -165,10 +169,12 @@ func (r *SarifReport) Save() error {
 	if r.writer == nil {
 		return nil
 	}
-	if err := rewindReportOutput(r.writer); err != nil {
+	var buf bytes.Buffer
+	if err := r.report.PrettyWrite(&buf); err != nil {
 		return err
 	}
-	return r.report.PrettyWrite(r.writer)
+	// A file destination is replaced atomically; other destinations are rewound.
+	return writeReportSnapshot(r.writer, buf.Bytes())
 }
 
 // Report exposes the accumulated document for callers that want to serialize
@@ -183,6 +189,7 @@ func (r *SarifReport) Report() *sarif.Report {
 func (r *SarifReport) appendResult(result *ssaapi.SyntaxFlowResult) {
 	SFRule := result.GetRule()
 	ruleID := sarifRuleID(SFRule)
+	added := 0
 
 	for risk := range result.YieldRisk() {
 		if !r.keepRisk(risk) {
@@ -219,6 +226,23 @@ func (r *SarifReport) appendResult(result *ssaapi.SyntaxFlowResult) {
 		r.registerRule(ruleID, SFRule, risk)
 		r.rememberResult(risk, res)
 		r.run.Results = append(r.run.Results, res)
+		added++
+	}
+	r.noteFlush(added)
+}
+
+// noteFlush publishes an intermediate document once enough findings piled up.
+func (r *SarifReport) noteFlush(added int) {
+	if r == nil || added <= 0 {
+		return
+	}
+	r.sinceFlush += added
+	if reportFlushEvery <= 0 || r.sinceFlush < reportFlushEvery {
+		return
+	}
+	r.sinceFlush = 0
+	if err := r.Save(); err != nil {
+		log.Errorf("flush sarif snapshot failed: %v", err)
 	}
 }
 

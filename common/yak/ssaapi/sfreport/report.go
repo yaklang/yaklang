@@ -22,6 +22,9 @@ type Report struct {
 	// AddSyntaxFlowResult uses it to skip a finding a later mode already
 	// covered, so the thin update from the scan stays authoritative.
 	keeper func(*schema.SSARisk) (string, bool) `json:"-"`
+	// sinceFlush counts findings added since the last snapshot. A long scan
+	// publishes intermediate snapshots instead of writing only at the end.
+	sinceFlush int `json:"-"`
 	// info
 	ReportType    ReportType `json:"report_type"`
 	EngineVersion string     `json:"engine_version"`
@@ -135,7 +138,6 @@ func (r *Report) GetRule(ruleName string) *Rule {
 
 func (r *Report) AddRisks(risk ...*Risk) {
 	r.mu.Lock()
-	defer r.mu.Unlock()
 
 	if r.Risks == nil {
 		r.Risks = make(map[string]*Risk)
@@ -149,6 +151,27 @@ func (r *Report) AddRisks(risk ...*Risk) {
 
 		r.Risks[risk.GetHash()] = risk
 	}
+	r.sinceFlush++
+	flush := r.shouldFlushLocked()
+	r.mu.Unlock()
+	if flush {
+		if err := r.Save(); err != nil {
+			log.Errorf("flush report snapshot failed: %v", err)
+		}
+	}
+}
+
+// shouldFlushLocked reports whether enough findings accumulated for another
+// snapshot. The caller releases the lock before writing it.
+func (r *Report) shouldFlushLocked() bool {
+	if r == nil || reportFlushEvery <= 0 {
+		return false
+	}
+	if r.sinceFlush < reportFlushEvery {
+		return false
+	}
+	r.sinceFlush = 0
+	return true
 }
 
 // SetKeeper attaches the scan's decision. AddSyntaxFlowResult skips a risk the
