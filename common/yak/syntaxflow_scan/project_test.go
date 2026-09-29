@@ -714,10 +714,10 @@ alert $call`,
 	)
 	require.NoError(t, err)
 	require.Greater(t, alerts, 0, "code-scan -p must struct-scan the loaded program")
-	require.Contains(t, stages, string(syntaxflow_scan.StageReview))
+	// A program input has no source path and nothing to compile, so the source
+	// and struct stages do not run on their own: their rules run with the
+	// program stage, which dispatches each rule by its mode.
 	require.Contains(t, stages, string(syntaxflow_scan.StageAnalyze))
-	// Inspect still runs after review, but live callbacks stay in product
-	// order so the cursor does not jump backward.
 	var sawInspect, sawReview, sawAnalyze bool
 	for _, outcome := range result.Stages {
 		switch outcome.Stage {
@@ -729,9 +729,85 @@ alert $call`,
 			sawAnalyze = true
 		}
 	}
-	require.True(t, sawInspect, "inspect must still run after a loaded-program review")
-	require.True(t, sawReview)
+	require.False(t, sawInspect, "the source stage is skipped without a source path")
+	require.False(t, sawReview, "the struct stage is skipped without a compile")
 	require.True(t, sawAnalyze)
+	require.ElementsMatch(t, []string{"inspect", "review"}, result.SkippedStages,
+		"the skipped stages stay visible in the project result")
+}
+
+// TestScanProject_ProgramInputRunsEveryModeThroughProgramQuery covers the
+// program input: there is no source path and nothing to compile, so the source
+// and struct stages are skipped and every rule runs in the program stage,
+// where Program.Query dispatches it by its own mode.
+func TestScanProject_ProgramInputRunsEveryModeThroughProgramQuery(t *testing.T) {
+	vf := filesys.NewVirtualFs()
+	vf.AddFile("main.go", `package main
+
+func run(cmd string) {
+	sink(cmd)
+}
+
+func sink(any) {}
+`)
+	vf.AddFile("leak.env", "AWS_ACCESS_KEY_ID=AKIAIOSFODNN7EXAMPLE\n")
+	progs, err := ssaapi.ParseProjectWithFS(vf,
+		ssaapi.WithLanguage(ssaconfig.GO),
+		ssaapi.WithProgramName(t.Name()),
+	)
+	require.NoError(t, err)
+	require.NotEmpty(t, progs)
+
+	seenRules := map[string]int{}
+	result, err := syntaxflow_scan.ScanProject(context.Background(),
+		ssaconfig.WithProgramNames(t.Name()),
+		syntaxflow_scan.WithMode(
+			syntaxflow_scan.SourceMode,
+			syntaxflow_scan.StructMode,
+			syntaxflow_scan.SSAMode,
+		),
+		ssaconfig.WithScanIgnoreLanguage(true),
+		ssaconfig.WithRuleInput(&ypb.SyntaxFlowRuleInput{
+			Content: `desc(mode: "source", language: general, title: "program source")
+${*}.pattern_regex(/AKIA[0-9A-Z]{16}/) as $hit
+alert $hit`,
+			Language: "general",
+		}),
+		ssaconfig.WithRuleInput(&ypb.SyntaxFlowRuleInput{
+			Content: `desc(mode: "struct", language: golang, title: "program struct")
+sink(* as $arg) as $call
+alert $call`,
+			Language: "golang",
+		}),
+		ssaconfig.WithRuleInput(&ypb.SyntaxFlowRuleInput{
+			Content: `desc(mode: "ssa", language: golang, title: "program ssa")
+sink(* as $arg) as $call
+alert $call`,
+			Language: "golang",
+		}),
+		syntaxflow_scan.WithScanResultCallback(func(r *syntaxflow_scan.ScanResult) {
+			if r == nil || r.Result == nil {
+				return
+			}
+			rule := r.Result.GetRule()
+			if rule == nil {
+				return
+			}
+			name := rule.RuleName
+			if name == "" {
+				name = rule.Title
+			}
+			seenRules[name]++
+		}),
+	)
+	require.NoError(t, err)
+
+	for _, title := range []string{"program source", "program struct", "program ssa"} {
+		require.Contains(t, seenRules, title,
+			"the program stage must run the %q rule", title)
+	}
+	require.ElementsMatch(t, []string{"inspect", "review"}, result.SkippedStages,
+		"a program input skips the source and struct stages")
 }
 
 func TestScanProject_NamedProgramFromDatabase(t *testing.T) {
