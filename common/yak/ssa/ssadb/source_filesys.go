@@ -1,7 +1,6 @@
 package ssadb
 
 import (
-	"fmt"
 	"io/fs"
 	"os"
 	"path"
@@ -140,18 +139,6 @@ func pathSplit(p string) (string, string) {
 	return dir, name
 }
 
-// splitProjectPath 传入全路径，会以路径分隔符分割，分割后的第一个元素为项目名，后面的元素为文件路径
-func splitProjectPath(p string) (projectPath string, fileName string) {
-	paths := strings.Split(p, string(IrSourceFsSeparators))
-	paths = utils.StringArrayFilterEmpty(paths)
-	if len(paths) == 1 {
-		return paths[0], ""
-	} else if len(paths) > 1 {
-		return paths[0], strings.Join(paths[1:], string(IrSourceFsSeparators))
-	}
-	return "", ""
-}
-
 func (f *irSourceFS) ExtraInfo(path string) map[string]any {
 	m := make(map[string]any)
 	programName, isProgram := f.getProgram(path)
@@ -205,10 +192,6 @@ func (fs *irSourceFS) getProgram(path string) (string, bool) {
 	}
 }
 
-func GetIrSourceFsSeparators() rune {
-	return IrSourceFsSeparators
-}
-
 func (f *irSourceFS) GetSeparators() rune         { return IrSourceFsSeparators }
 func (f *irSourceFS) Join(paths ...string) string { return path.Join(paths...) }
 func (f *irSourceFS) IsAbs(name string) bool {
@@ -224,28 +207,6 @@ func (f *irSourceFS) Rel(string, string) (string, error)          { return "", u
 func (f *irSourceFS) WriteFile(string, []byte, os.FileMode) error { return utils.Error("implement me") }
 func (f *irSourceFS) MkdirAll(string, os.FileMode) error          { return utils.Error("implement me") }
 func (f *irSourceFS) Base(p string) string                        { return path.Base(p) }
-
-func (f *irSourceFS) String() string {
-	if f == nil {
-		return "<nil>"
-	}
-
-	f.mu.Lock()
-	defer f.mu.Unlock()
-
-	var builder strings.Builder
-	builder.WriteString("irSourceFS{")
-	first := true
-	f.virtual.ForEach(func(programName string, virtualFS *filesys.VirtualFS) {
-		if !first {
-			builder.WriteString(", ")
-		}
-		first = false
-		builder.WriteString(fmt.Sprintf("%s: %s", programName, virtualFS.String()))
-	})
-	builder.WriteString("}")
-	return builder.String()
-}
 
 // treeFor resolves (and builds on first touch) the cached tree for the program
 // named by anyPath. The DB build runs under fs.mu to avoid duplicate builds.
