@@ -52606,9 +52606,15 @@ type QueryHTTPFlowRequest struct {
 	ExcludeRequestRaw bool `protobuf:"varint,54,opt,name=ExcludeRequestRaw,proto3" json:"ExcludeRequestRaw,omitempty"`
 	// 显式跳过精确 Total；用于已有游标的实时增量查询。
 	// Data/Pagination 仍正常返回，但 Total 为 0。初始化、历史与周期校准不得开启。
-	SkipTotal     bool `protobuf:"varint,55,opt,name=SkipTotal,proto3" json:"SkipTotal,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	SkipTotal bool `protobuf:"varint,55,opt,name=SkipTotal,proto3" json:"SkipTotal,omitempty"`
+	// 按字面量查询报文字段。同一字段内多个值 OR，不同字段之间 AND。
+	RequestContains  []string `protobuf:"bytes,56,rep,name=RequestContains,proto3" json:"RequestContains,omitempty"`
+	ResponseContains []string `protobuf:"bytes,57,rep,name=ResponseContains,proto3" json:"ResponseContains,omitempty"`
+	// HTTPFlow 创建时间范围，Unix 秒，边界包含。
+	AfterCreatedAt  int64 `protobuf:"varint,58,opt,name=AfterCreatedAt,proto3" json:"AfterCreatedAt,omitempty"`
+	BeforeCreatedAt int64 `protobuf:"varint,59,opt,name=BeforeCreatedAt,proto3" json:"BeforeCreatedAt,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
 }
 
 func (x *QueryHTTPFlowRequest) Reset() {
@@ -53010,6 +53016,34 @@ func (x *QueryHTTPFlowRequest) GetSkipTotal() bool {
 		return x.SkipTotal
 	}
 	return false
+}
+
+func (x *QueryHTTPFlowRequest) GetRequestContains() []string {
+	if x != nil {
+		return x.RequestContains
+	}
+	return nil
+}
+
+func (x *QueryHTTPFlowRequest) GetResponseContains() []string {
+	if x != nil {
+		return x.ResponseContains
+	}
+	return nil
+}
+
+func (x *QueryHTTPFlowRequest) GetAfterCreatedAt() int64 {
+	if x != nil {
+		return x.AfterCreatedAt
+	}
+	return 0
+}
+
+func (x *QueryHTTPFlowRequest) GetBeforeCreatedAt() int64 {
+	if x != nil {
+		return x.BeforeCreatedAt
+	}
+	return 0
 }
 
 type HTTPFlowsToOnlineRequest struct {
@@ -82815,7 +82849,7 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"_PartIndex\"g\n" +
 	"!MITMExtractAggregateFlowFilterRow\x12 \n" +
 	"\vRuleVerbose\x18\x01 \x01(\tR\vRuleVerbose\x12 \n" +
-	"\vDisplayData\x18\x02 \x01(\tR\vDisplayData\"\xb7\x0f\n" +
+	"\vDisplayData\x18\x02 \x01(\tR\vDisplayData\"\xdf\x10\n" +
 	"\x14QueryHTTPFlowRequest\x12+\n" +
 	"\n" +
 	"Pagination\x18\x01 \x01(\v2\v.ypb.PagingR\n" +
@@ -82880,7 +82914,11 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\x13IncludeSystemTiming\x184 \x01(\bR\x13IncludeSystemTiming\x12.\n" +
 	"\x12ExcludeResponseRaw\x185 \x01(\bR\x12ExcludeResponseRaw\x12,\n" +
 	"\x11ExcludeRequestRaw\x186 \x01(\bR\x11ExcludeRequestRaw\x12\x1c\n" +
-	"\tSkipTotal\x187 \x01(\bR\tSkipTotal\"\xdc\x01\n" +
+	"\tSkipTotal\x187 \x01(\bR\tSkipTotal\x12(\n" +
+	"\x0fRequestContains\x188 \x03(\tR\x0fRequestContains\x12*\n" +
+	"\x10ResponseContains\x189 \x03(\tR\x10ResponseContains\x12&\n" +
+	"\x0eAfterCreatedAt\x18: \x01(\x03R\x0eAfterCreatedAt\x12(\n" +
+	"\x0fBeforeCreatedAt\x18; \x01(\x03R\x0fBeforeCreatedAt\"\xdc\x01\n" +
 	"\x18HTTPFlowsToOnlineRequest\x12\x14\n" +
 	"\x05Token\x18\x01 \x01(\tR\x05Token\x12 \n" +
 	"\vProjectName\x18\x02 \x01(\tR\vProjectName\x12.\n" +

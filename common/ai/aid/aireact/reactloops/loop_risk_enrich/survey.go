@@ -9,8 +9,8 @@ import (
 	"github.com/yaklang/gorm"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
-	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
+	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
 // surveyEnvironment exposes the size and shape of the fixed evidence set.
@@ -20,18 +20,16 @@ func surveyEnvironment(db *gorm.DB, env *riskEnvironment) (string, error) {
 	if db == nil || env == nil || len(env.RuntimeIDs) == 0 {
 		return "", fmt.Errorf("risk runtime environment unavailable")
 	}
-	var totalFlows, totalPorts int64
-	if err := db.Model(&schema.HTTPFlow{}).Where("runtime_id IN (?)", env.RuntimeIDs).Count(&totalFlows).Error; err != nil {
+	flowPage, sample, err := yakit.QueryHTTPFlow(db, &ypb.QueryHTTPFlowRequest{
+		RuntimeIDs:         env.RuntimeIDs,
+		ExcludeRequestRaw:  true,
+		ExcludeResponseRaw: true,
+		Pagination:         &ypb.Paging{Page: 1, Limit: 1500, OrderBy: "id", Order: "desc"},
+	})
+	if err != nil {
 		return "", err
 	}
-	if err := db.Model(&schema.Port{}).Where("runtime_id IN (?)", env.RuntimeIDs).Count(&totalPorts).Error; err != nil {
-		return "", err
-	}
-	var sample []*schema.HTTPFlow
-	if err := db.Model(&schema.HTTPFlow{}).Select("id, runtime_id, url, method, status_code").
-		Where("runtime_id IN (?)", env.RuntimeIDs).Order("id desc").Limit(1500).Find(&sample).Error; err != nil {
-		return "", err
-	}
+	totalFlows := int64(flowPage.TotalRecord)
 	type bucket struct {
 		name  string
 		count int
@@ -64,22 +62,10 @@ func surveyEnvironment(db *gorm.DB, env *riskEnvironment) (string, error) {
 		return buckets[i].count > buckets[j].count
 	})
 	var b strings.Builder
-	fmt.Fprintf(&b, "Runtime boundary: %d IDs. Total HTTP flows: %d; total port records: %d.\n", len(env.RuntimeIDs), totalFlows, totalPorts)
+	fmt.Fprintf(&b, "Runtime boundary: %d IDs. Total HTTP flows: %d.\n", len(env.RuntimeIDs), totalFlows)
 	fmt.Fprintf(&b, "Recent metadata sample: %d flows; %d match the risk host/port. Top endpoint/status clusters (sample counts, not totals):\n", len(sample), targetCount)
 	for _, item := range buckets[:min(len(buckets), 12)] {
 		fmt.Fprintf(&b, "- %d × %s\n", item.count, item.name)
-	}
-	risk, err := yakit.GetRisk(db, env.RiskID)
-	if err != nil {
-		return "", err
-	}
-	ports, err := findPorts(db, risk, env)
-	if err != nil {
-		return "", err
-	}
-	fmt.Fprintf(&b, "Matching target ports inside the runtime boundary (%d shown):\n", min(len(ports), 12))
-	for _, p := range ports[:min(len(ports), 12)] {
-		fmt.Fprintf(&b, "- port_id=%d %s:%d/%s service=%s state=%s runtime=%s\n", p.ID, p.Host, p.Port, p.Proto, p.ServiceType, p.State, p.RuntimeId)
 	}
 	if totalFlows > int64(len(sample)) {
 		b.WriteString("The inventory only samples recent metadata. Targeted searches query the entire runtime boundary, including older flows.\n")
@@ -89,7 +75,7 @@ func surveyEnvironment(db *gorm.DB, env *riskEnvironment) (string, error) {
 
 func surveyAction(invoker aicommon.AIInvokeRuntime) reactloops.ReActLoopOption {
 	return reactloops.WithRegisterLoopAction("survey_risk_evidence",
-		"Review exact scoped flow/port totals and recent endpoint clusters before choosing a discriminating search hypothesis.",
+		"Review the exact scoped flow total and recent endpoint clusters before choosing a discriminating search hypothesis.",
 		nil, nil,
 		func(loop *reactloops.ReActLoop, action *aicommon.Action, op *reactloops.LoopActionHandlerOperator) {
 			env, err := environment(loop)

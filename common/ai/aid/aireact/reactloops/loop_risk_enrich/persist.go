@@ -3,10 +3,10 @@ package loop_risk_enrich
 import (
 	"fmt"
 	"strconv"
-	"strings"
 
 	"github.com/yaklang/gorm"
 	"github.com/yaklang/yaklang/common/schema"
+	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 )
 
 const maxPacketBytes = 256 * 1024
@@ -52,7 +52,7 @@ func attachFlow(db *gorm.DB, env *riskEnvironment, flowID int) error {
 	pairs := append(r.PacketPairs, &schema.PacketPair{
 		HTTPFlowId: int64(f.ID), Url: f.Url, Request: req, Response: rsp,
 	})
-	updates := map[string]interface{}{"packet_pairs": pairs}
+	update := &yakit.RiskHTTPFlowEvidenceUpdate{PacketPairs: pairs}
 	// The legacy top-level request/response fields form a pair. Do not combine
 	// a new response with a different pre-existing request (or vice versa).
 	oldReq, err := strconv.Unquote(r.QuotedRequest)
@@ -64,45 +64,12 @@ func attachFlow(db *gorm.DB, env *riskEnvironment, flowID int) error {
 		oldRsp = r.QuotedResponse
 	}
 	if r.QuotedRequest == "" && req != "" && (r.QuotedResponse == "" || oldRsp == rsp) {
-		updates["quoted_request"] = strconv.Quote(req)
+		quoted := strconv.Quote(req)
+		update.QuotedRequest = &quoted
 	}
 	if r.QuotedResponse == "" && rsp != "" && (r.QuotedRequest == "" || oldReq == req) {
-		updates["quoted_response"] = strconv.Quote(rsp)
+		quoted := strconv.Quote(rsp)
+		update.QuotedResponse = &quoted
 	}
-	return db.Model(&schema.Risk{}).Where("id = ?", r.ID).UpdateColumns(updates).Error
-}
-
-func fillPort(db *gorm.DB, env *riskEnvironment, portID int) error {
-	if env == nil || len(env.RuntimeIDs) == 0 {
-		return fmt.Errorf("port is outside the initialized risk runtime boundary")
-	}
-	r, err := loadRisk(db, int(env.RiskID))
-	if err != nil {
-		return err
-	}
-	if r.Port != 0 {
-		return fmt.Errorf("risk already has port %d; refusing to overwrite", r.Port)
-	}
-	if portID <= 0 {
-		return fmt.Errorf("port_id must be positive")
-	}
-	var p schema.Port
-	if err := db.Where("id = ? AND runtime_id IN (?)", portID, env.RuntimeIDs).First(&p).Error; err != nil {
-		return fmt.Errorf("port is outside the risk/AI session boundary or does not exist: %w", err)
-	}
-	s := env.Scope
-	if s.host == "" || !(strings.EqualFold(p.Host, s.host) || (r.IP != "" && strings.EqualFold(p.Host, r.IP))) || p.Port <= 0 || p.Port > 65535 {
-		return fmt.Errorf("port record does not match the risk host")
-	}
-	if s.port != 0 && p.Port != s.port {
-		return fmt.Errorf("port record does not match the risk target port")
-	}
-	result := db.Model(&schema.Risk{}).Where("id = ? AND port = 0", r.ID).UpdateColumn("port", p.Port)
-	if result.Error != nil {
-		return result.Error
-	}
-	if result.RowsAffected == 0 {
-		return fmt.Errorf("risk port changed concurrently; refusing to overwrite")
-	}
-	return nil
+	return yakit.UpdateRiskHTTPFlowEvidence(db, int64(r.ID), update)
 }

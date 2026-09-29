@@ -1365,6 +1365,12 @@ func FilterHTTPFlow(db *gorm.DB, params *ypb.QueryHTTPFlowRequest) *gorm.DB {
 	if params.GetAfterUpdatedAt() > 0 {
 		db = bizhelper.QueryByTimeRangeWithTimestamp(db, "updated_at", params.GetAfterUpdatedAt(), time.Now().Add(10*time.Minute).Unix())
 	}
+	if params.GetAfterCreatedAt() > 0 {
+		db = bizhelper.QueryDateTimeAfterTimestampOr(db, "created_at", params.GetAfterCreatedAt())
+	}
+	if params.GetBeforeCreatedAt() > 0 {
+		db = bizhelper.QueryDateTimeBeforeTimestampOr(db, "created_at", params.GetBeforeCreatedAt())
+	}
 	keywordType := strings.ToLower(params.GetKeywordType())
 	keywordFields := []string{
 		"tags", "url", "path", "request",
@@ -1418,6 +1424,14 @@ func FilterHTTPFlow(db *gorm.DB, params *ypb.QueryHTTPFlowRequest) *gorm.DB {
 	}
 	// 搜索 URL
 	db = bizhelper.FuzzQueryLike(db, "url", params.GetSearchURL())
+	db = bizhelper.FuzzQueryArrayOrLike(db, "request", lo.Map(
+		utils.StringArrayFilterEmpty(params.GetRequestContains()),
+		func(item string, _ int) any { return item },
+	), true)
+	db = bizhelper.FuzzQueryArrayOrLike(db, "response", lo.Map(
+		utils.StringArrayFilterEmpty(params.GetResponseContains()),
+		func(item string, _ int) any { return item },
+	), true)
 	db = bizhelper.FuzzQueryLike(db, "from_plugin", params.GetFromPlugin())
 	// status code 这里可以支持范围搜索,支持1-200,300这样的写法
 	statusCodeRaw := params.GetStatusCode()

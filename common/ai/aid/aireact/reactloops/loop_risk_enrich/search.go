@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/url"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 	"unicode"
@@ -14,6 +15,8 @@ import (
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
+	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
 const searchPageSize = 300
@@ -86,12 +89,6 @@ func containsEvidence(haystack, needle string, decodeURL bool) bool {
 	return false
 }
 
-func escapeLike(raw string) string {
-	raw = strings.ReplaceAll(raw, `\`, `\\`)
-	raw = strings.ReplaceAll(raw, `%`, `\%`)
-	return strings.ReplaceAll(raw, `_`, `\_`)
-}
-
 // An encoded payload need not appear verbatim in the stored request. The
 // longest readable token is a safe SQL *superset* prefilter; Go-side matching
 // verifies the complete decoded clue before reporting a hit.
@@ -118,9 +115,9 @@ func readableAnchor(raw string) string {
 	return ""
 }
 
-func addClueFilter(query *gorm.DB, column, clue string, request bool) *gorm.DB {
+func cluePrefilterTerms(clue string, request bool) []string {
 	if clue == "" {
-		return query
+		return nil
 	}
 	terms := []string{clue}
 	if request {
@@ -129,18 +126,16 @@ func addClueFilter(query *gorm.DB, column, clue string, request bool) *gorm.DB {
 			terms = append(terms, anchor)
 		}
 	}
-	var clauses []string
-	var args []interface{}
+	result := make([]string, 0, len(terms))
 	seen := map[string]bool{}
 	for _, term := range terms {
 		if term == "" || seen[term] {
 			continue
 		}
 		seen[term] = true
-		clauses = append(clauses, column+` LIKE ? ESCAPE '\'`)
-		args = append(args, "%"+escapeLike(term)+"%")
+		result = append(result, term)
 	}
-	return query.Where("("+strings.Join(clauses, " OR ")+")", args...)
+	return result
 }
 
 // searchFlows filters on the database BEFORE paging. One old matching packet
@@ -154,28 +149,32 @@ func searchFlows(db *gorm.DB, r *schema.Risk, env *riskEnvironment, criteria sea
 	if db == nil || env == nil || r == nil || env.RiskID != int64(r.ID) || len(env.RuntimeIDs) == 0 {
 		return nil, 0, false, fmt.Errorf("attached risk runtime environment is unavailable")
 	}
-	query := db.Model(&schema.HTTPFlow{}).Where("runtime_id IN (?)", env.RuntimeIDs)
-	if q.BeforeID > 0 {
-		query = query.Where("id < ?", q.BeforeID)
-	}
-	if q.Method != "" {
-		query = query.Where("method = ?", q.Method)
+	request := &ypb.QueryHTTPFlowRequest{
+		RuntimeIDs:       env.RuntimeIDs,
+		BeforeId:         q.BeforeID,
+		Methods:          q.Method,
+		IncludeInUrl:     cluePrefilterTerms(q.URLContains, false),
+		RequestContains:  cluePrefilterTerms(q.RequestContains, true),
+		ResponseContains: cluePrefilterTerms(q.ResponseContains, false),
+		Full:             true,
+		SkipTotal:        true,
+		Pagination: &ypb.Paging{
+			Page: 1, Limit: searchPageSize, OrderBy: "id", Order: "desc",
+		},
 	}
 	if q.StatusCode != 0 {
-		query = query.Where("status_code = ?", q.StatusCode)
+		request.StatusCode = strconv.Itoa(q.StatusCode)
 	}
 	if q.TimeWindowMinutes > 0 {
 		if r.CreatedAt.IsZero() {
 			return nil, 0, false, fmt.Errorf("attached risk has no creation time for a time-window search")
 		}
 		window := time.Duration(q.TimeWindowMinutes) * time.Minute
-		query = query.Where("created_at BETWEEN ? AND ?", r.CreatedAt.Add(-window), r.CreatedAt.Add(window))
+		request.AfterCreatedAt = r.CreatedAt.Add(-window).Unix()
+		request.BeforeCreatedAt = r.CreatedAt.Add(window).Unix()
 	}
-	query = addClueFilter(query, "url", q.URLContains, false)
-	query = addClueFilter(query, "request", q.RequestContains, true)
-	query = addClueFilter(query, "response", q.ResponseContains, false)
-	var rows []*schema.HTTPFlow
-	if err := query.Order("id desc").Limit(searchPageSize).Find(&rows).Error; err != nil {
+	_, rows, err := yakit.QueryHTTPFlow(db, request)
+	if err != nil {
 		return nil, 0, false, err
 	}
 	var matches []flowCandidate

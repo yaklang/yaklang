@@ -15,7 +15,7 @@ func riskTestDB(t *testing.T) *gorm.DB {
 	t.Helper()
 	db, err := utils.CreateTempTestDatabaseInMemory()
 	require.NoError(t, err)
-	require.NoError(t, db.AutoMigrate(&schema.Risk{}, &schema.AISession{}, &schema.AIAgentRuntime{}, &schema.HTTPFlow{}, &schema.Port{}).Error)
+	require.NoError(t, db.AutoMigrate(&schema.Risk{}, &schema.AISession{}, &schema.AIAgentRuntime{}, &schema.HTTPFlow{}).Error)
 	return db
 }
 
@@ -167,10 +167,7 @@ func TestSearchWithoutRuntimeBoundaryDoesNotScanTarget(t *testing.T) {
 	require.NoError(t, db.Create(r).Error)
 	f := &schema.HTTPFlow{RuntimeId: "unrelated", Url: "https://example.test/search", Request: "GET /search?token=secret"}
 	require.NoError(t, db.Create(f).Error)
-	ports, err := findPorts(db, r, nil)
-	require.NoError(t, err)
-	require.Empty(t, ports)
-	_, _, _, err = searchFlows(db, r, nil, searchCriteria{RequestContains: "token=secret"})
+	_, _, _, err := searchFlows(db, r, nil, searchCriteria{RequestContains: "token=secret"})
 	require.ErrorContains(t, err, "environment is unavailable")
 	require.ErrorContains(t, attachFlow(db, nil, int(f.ID)), "boundary")
 }
@@ -186,7 +183,7 @@ func TestLegacyAIHostPathStillDefinesTarget(t *testing.T) {
 func TestWriteActionsRequireExplicitUserIntent(t *testing.T) {
 	require.False(t, userRequestedWrite("只展示风险关联的流量，不要写入"))
 	require.False(t, userRequestedWrite("查询风险 123 的流量"))
-	require.True(t, userRequestedWrite("补全风险 123 的流量和端口，并保存"))
+	require.True(t, userRequestedWrite("补全风险 123 的流量并保存"))
 }
 
 func TestAttachFlowPreservesExistingEvidenceAndRejectsUnrelatedRuntime(t *testing.T) {
@@ -205,30 +202,4 @@ func TestAttachFlowPreservesExistingEvidenceAndRejectsUnrelatedRuntime(t *testin
 	require.Equal(t, strconv.Quote("original"), updated.QuotedRequest)
 	require.Empty(t, updated.QuotedResponse) // don't pair a new response with "original"
 	require.Len(t, updated.PacketPairs, 1)
-}
-
-func TestFillPortOnlyMatchingHostAndEmptyPort(t *testing.T) {
-	db := riskTestDB(t)
-	r := &schema.Risk{Hash: "port-risk", Host: "example.test", RuntimeId: "tool-a"}
-	require.NoError(t, db.Create(r).Error)
-	env := &riskEnvironment{RiskID: int64(r.ID), RuntimeIDs: []string{r.RuntimeId}, Scope: scopeForRisk(r)}
-	other := &schema.Port{Host: "other.test", Port: 22, RuntimeId: "tool-a"}
-	require.NoError(t, db.Create(other).Error)
-	require.Error(t, fillPort(db, env, int(other.ID)))
-	outside := &schema.Port{Host: "example.test", Port: 8443, RuntimeId: "other-tool"}
-	require.NoError(t, db.Create(outside).Error)
-	require.ErrorContains(t, fillPort(db, env, int(outside.ID)), "boundary")
-	ports, err := findPorts(db, r, env)
-	require.NoError(t, err)
-	require.Empty(t, ports)
-	port := &schema.Port{Host: "example.test", Port: 8443, RuntimeId: "tool-a"}
-	require.NoError(t, db.Create(port).Error)
-	ports, err = findPorts(db, r, env)
-	require.NoError(t, err)
-	require.Len(t, ports, 1)
-	require.NoError(t, fillPort(db, env, int(port.ID)))
-	require.Error(t, fillPort(db, env, int(port.ID)))
-	updated, err := loadRisk(db, int(r.ID))
-	require.NoError(t, err)
-	require.Equal(t, 8443, updated.Port)
 }

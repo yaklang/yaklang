@@ -34,17 +34,15 @@ func init() {
 				}),
 				surveyAction(invoker),
 				searchFlowAction(invoker),
-				searchPortAction(invoker),
 				inspectFlowAction(invoker),
 				recordAssessmentAction(),
 				attachFlowAction(invoker),
-				fillPortAction(invoker),
 			}
 			preset = append(preset, opts...)
 			return reactloops.NewReActLoop(schema.AI_REACT_LOOP_ACTION_RISK_ENRICH, invoker, preset...)
 		},
-		reactloops.WithLoopDescription("Investigate a specific risk's related traffic and ports; optionally enrich its stored evidence."),
-		reactloops.WithLoopDescriptionZh("风险补全：根据指定风险关联流量和端口，可选择展示或显式写回证据。"),
+		reactloops.WithLoopDescription("Investigate a specific risk's related HTTP traffic; optionally enrich its stored evidence."),
+		reactloops.WithLoopDescriptionZh("风险补全：根据指定风险关联 HTTP 流量，可选择展示或显式写回证据。"),
 		reactloops.WithLoopUsagePrompt("Use with exactly one attached resource of type risk_id (value: an existing risk ID). Initialization binds the risk and its runtime/session scope; the agent investigates evidence without choosing a risk ID."),
 		reactloops.WithVerboseName("Risk Enrichment"),
 		reactloops.WithVerboseNameZh("风险补全"),

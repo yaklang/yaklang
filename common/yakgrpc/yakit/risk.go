@@ -83,6 +83,37 @@ func GetRisk(db *gorm.DB, id int64) (*schema.Risk, error) {
 	return &r, nil
 }
 
+// RiskHTTPFlowEvidenceUpdate is a typed patch for HTTP evidence selected by a
+// caller. Nil request/response pointers preserve the corresponding columns.
+type RiskHTTPFlowEvidenceUpdate struct {
+	PacketPairs    schema.PacketPairList
+	QuotedRequest  *string
+	QuotedResponse *string
+}
+
+func UpdateRiskHTTPFlowEvidence(db *gorm.DB, riskID int64, update *RiskHTTPFlowEvidenceUpdate) error {
+	if db == nil {
+		return utils.Error("project database is nil")
+	}
+	if riskID <= 0 {
+		return utils.Error("risk ID must be positive")
+	}
+	if update == nil {
+		return utils.Error("risk HTTP flow evidence update is nil")
+	}
+	updates := map[string]interface{}{"packet_pairs": update.PacketPairs}
+	if update.QuotedRequest != nil {
+		updates["quoted_request"] = *update.QuotedRequest
+	}
+	if update.QuotedResponse != nil {
+		updates["quoted_response"] = *update.QuotedResponse
+	}
+	if err := db.Model(&schema.Risk{}).Where("id = ?", riskID).UpdateColumns(updates).Error; err != nil {
+		return utils.Errorf("update risk HTTP flow evidence failed: %v", err)
+	}
+	return nil
+}
+
 func GetRisksByRuntimeId(db *gorm.DB, runtimeId string) ([]*schema.Risk, error) {
 	var r []*schema.Risk
 	if db := db.Model(&schema.Risk{}).Where("runtime_id = ?", runtimeId).Find(&r); db.Error != nil {

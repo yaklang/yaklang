@@ -3,7 +3,6 @@ package loop_risk_enrich
 import (
 	"encoding/json"
 	"fmt"
-	"net"
 	"net/url"
 	"strconv"
 	"strings"
@@ -11,6 +10,7 @@ import (
 	"github.com/yaklang/gorm"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
+	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
 // targetScope narrows the strict runtime/session boundary to the risk's target.
@@ -105,8 +105,7 @@ func runtimeIDsForRisk(db *gorm.DB, r *schema.Risk) ([]string, error) {
 	if r.AISessionID == "" {
 		return ids, nil
 	}
-	var session schema.AISession
-	err := db.Where("session_id = ?", r.AISessionID).First(&session).Error
+	session, err := yakit.GetAISessionMetaBySessionID(db, r.AISessionID)
 	if err != nil && !gorm.IsRecordNotFoundError(err) {
 		return nil, err
 	}
@@ -137,31 +136,18 @@ func getScopedFlow(db *gorm.DB, flowID int64, ids []string) (*schema.HTTPFlow, e
 	if flowID <= 0 || len(ids) == 0 {
 		return nil, fmt.Errorf("flow is outside the risk/AI session boundary or does not exist")
 	}
-	// Check the boundary in SQL before loading the full (possibly large) packet.
-	var scoped schema.HTTPFlow
-	if err := db.Model(&schema.HTTPFlow{}).Select("runtime_id").
-		Where("id = ? AND runtime_id IN (?)", flowID, ids).First(&scoped).Error; err != nil {
+	_, flows, err := yakit.QueryHTTPFlow(db, &ypb.QueryHTTPFlowRequest{
+		RuntimeIDs: ids,
+		IncludeId:  []int64{flowID},
+		Full:       true,
+		SkipTotal:  true,
+		Pagination: &ypb.Paging{Page: 1, Limit: 1, OrderBy: "id", Order: "desc"},
+	})
+	if err != nil {
 		return nil, fmt.Errorf("flow is outside the risk/AI session boundary or does not exist: %w", err)
 	}
-	return yakit.GetHTTPFlow(db, flowID)
-}
-
-func findPorts(db *gorm.DB, r *schema.Risk, env *riskEnvironment) ([]*schema.Port, error) {
-	if env == nil || len(env.RuntimeIDs) == 0 {
-		return nil, nil
+	if len(flows) != 1 {
+		return nil, fmt.Errorf("flow is outside the risk/AI session boundary or does not exist")
 	}
-	s := env.Scope
-	if s.host == "" {
-		return nil, nil
-	}
-	var ports []*schema.Port
-	hosts := []string{s.host}
-	if ip := net.ParseIP(s.host); ip == nil && r.IP != "" && !strings.EqualFold(r.IP, s.host) {
-		hosts = append(hosts, r.IP)
-	}
-	q := db.Model(&schema.Port{}).Where("runtime_id IN (?) AND host IN (?)", env.RuntimeIDs, hosts)
-	if s.port != 0 {
-		q = q.Where("port = ?", s.port)
-	}
-	return ports, q.Order("id desc").Limit(50).Find(&ports).Error
+	return flows[0], nil
 }
