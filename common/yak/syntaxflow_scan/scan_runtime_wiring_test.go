@@ -107,3 +107,46 @@ alert $call`, "golang")),
 	require.NoError(t, err)
 	require.NotEmpty(t, projectResult.Stages)
 }
+
+// TestScanProject_SourceStageSubmitsThroughRuntime proves the source stage is
+// part of the same contract as the struct and SSA stages: its findings reach
+// the scan runtime's collect instead of being written by the source engine.
+func TestScanProject_SourceStageSubmitsThroughRuntime(t *testing.T) {
+	dir := t.TempDir()
+	require.NoError(t, os.WriteFile(
+		filepath.Join(dir, "main.go"),
+		[]byte(runtimeWiringProgram),
+		0o644,
+	))
+
+	rt := ssaapi.NewScanRuntime()
+	var mu sync.Mutex
+	var modes []string
+	rt.ListenRisk(schema.RiskUpdateHandlerFunc(func(item schema.RiskUpdateItem) error {
+		mu.Lock()
+		defer mu.Unlock()
+		if item.Risk != nil {
+			modes = append(modes, item.Risk.ScanMode)
+		}
+		return nil
+	}))
+
+	_, err := syntaxflow_scan.ScanProject(context.Background(),
+		ssaconfig.WithCodeSourceKind(ssaconfig.CodeSourceLocal),
+		ssaconfig.WithCodeSourceLocalFile(dir),
+		ssaconfig.WithProjectRawLanguage("golang"),
+		ssaconfig.WithSetProgramName("runtime-wiring-source-program"),
+		ssaconfig.WithScanIgnoreLanguage(true),
+		ssaconfig.WithRuleInput(runtimeWiringRule(`desc(mode: "source", language: general, title: "wiring source")
+${*}.pattern_regex(/sink/) as $hit
+alert $hit`, "")),
+		syntaxflow_scan.WithMode(syntaxflow_scan.SourceMode),
+		syntaxflow_scan.WithScanRuntime(rt),
+	)
+	require.NoError(t, err)
+
+	mu.Lock()
+	defer mu.Unlock()
+	require.Contains(t, modes, string(schema.SFR_MODE_SOURCE),
+		"the source stage submits its finding to the runtime")
+}
