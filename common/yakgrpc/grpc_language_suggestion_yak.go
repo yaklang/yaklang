@@ -6,6 +6,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/samber/lo"
@@ -57,6 +58,17 @@ var (
 	yakTypeSuggestions         = make([]*ypb.SuggestionDescription, 0)
 	progCacheMap               = utils.NewTTLCache[*ssaapi.Program](0)
 
+	// 补全建议是进程级只读缓存，会被并发的补全请求同时触发初始化；
+	// 这里用 sync.Once 保护懒加载，避免 concurrent map writes（见
+	// getBytesBuiltinMethodSuggestions 历史崩溃现场）。
+	stringBuiltinMethodSuggestionsOnce sync.Once
+	bytesBuiltinMethodSuggestionsOnce  sync.Once
+	mapBuiltinMethodSuggestionsOnce    sync.Once
+	sliceBuiltinMethodSuggestionsOnce  sync.Once
+	standardLibrarySuggestionsOnce     sync.Once
+	yakKeywordSuggestionsOnce          sync.Once
+	yakTypeSuggestionsOnce             sync.Once
+
 	CompletionKindField    = "Field"
 	CompletionKindKeyword  = "Keyword"
 	CompletionKindConstant = "Constant"
@@ -69,8 +81,7 @@ var (
 )
 
 func getLanguageKeywordSuggestions() []*ypb.SuggestionDescription {
-	// 懒加载
-	if len(yakKeywordSuggestions) == 0 {
+	yakKeywordSuggestionsOnce.Do(func() {
 		yakKeywordSuggestions = make([]*ypb.SuggestionDescription, 0, len(yakKeywords))
 		for _, keyword := range yakKeywords {
 			yakKeywordSuggestions = append(yakKeywordSuggestions, &ypb.SuggestionDescription{
@@ -80,14 +91,13 @@ func getLanguageKeywordSuggestions() []*ypb.SuggestionDescription {
 				Kind:        CompletionKindKeyword,
 			})
 		}
-	}
+	})
 
 	return yakKeywordSuggestions
 }
 
 func getLanguageBasicTypeSuggestions() []*ypb.SuggestionDescription {
-	// 懒加载
-	if len(yakTypeSuggestions) == 0 {
+	yakTypeSuggestionsOnce.Do(func() {
 		yakTypeSuggestions = make([]*ypb.SuggestionDescription, 0, len(yakTypes))
 		for _, typ := range yakTypes {
 			yakTypeSuggestions = append(yakTypeSuggestions, &ypb.SuggestionDescription{
@@ -97,14 +107,13 @@ func getLanguageBasicTypeSuggestions() []*ypb.SuggestionDescription {
 				Kind:        CompletionKindClass,
 			})
 		}
-	}
+	})
 
 	return yakTypeSuggestions
 }
 
 func getStringBuiltinMethodSuggestions() []*ypb.SuggestionDescription {
-	// 懒加载
-	if len(stringBuiltinMethodSuggestionMap) == 0 {
+	stringBuiltinMethodSuggestionsOnce.Do(func() {
 		for methodName, method := range stringBuiltinMethod {
 			snippets, _ := method.VSCodeSnippets()
 			sug := &ypb.SuggestionDescription{
@@ -116,14 +125,13 @@ func getStringBuiltinMethodSuggestions() []*ypb.SuggestionDescription {
 			stringBuiltinMethodSuggestionMap[methodName] = sug
 			stringBuiltinMethodSuggestions = append(stringBuiltinMethodSuggestions, sug)
 		}
-	}
+	})
 
 	return stringBuiltinMethodSuggestions
 }
 
 func getBytesBuiltinMethodSuggestions() []*ypb.SuggestionDescription {
-	// 懒加载
-	if len(bytesBuiltinMethodSuggestionMap) == 0 {
+	bytesBuiltinMethodSuggestionsOnce.Do(func() {
 		for methodName, method := range bytesBuiltinMethod {
 			snippets, _ := method.VSCodeSnippets()
 			sug := &ypb.SuggestionDescription{
@@ -135,14 +143,13 @@ func getBytesBuiltinMethodSuggestions() []*ypb.SuggestionDescription {
 			bytesBuiltinMethodSuggestionMap[methodName] = sug
 			bytesBuiltinMethodSuggestions = append(bytesBuiltinMethodSuggestions, sug)
 		}
-	}
+	})
 
 	return bytesBuiltinMethodSuggestions
 }
 
 func getMapBuiltinMethodSuggestions() []*ypb.SuggestionDescription {
-	// 懒加载
-	if len(mapBuiltinMethodSuggestionMap) == 0 {
+	mapBuiltinMethodSuggestionsOnce.Do(func() {
 		for methodName, method := range mapBuiltinMethod {
 			snippets, _ := method.VSCodeSnippets()
 			sug := &ypb.SuggestionDescription{
@@ -154,14 +161,13 @@ func getMapBuiltinMethodSuggestions() []*ypb.SuggestionDescription {
 			mapBuiltinMethodSuggestionMap[methodName] = sug
 			mapBuiltinMethodSuggestions = append(mapBuiltinMethodSuggestions, sug)
 		}
-	}
+	})
 
 	return mapBuiltinMethodSuggestions
 }
 
 func getSliceBuiltinMethodSuggestions() []*ypb.SuggestionDescription {
-	// 懒加载
-	if len(sliceBuiltinMethodSuggestionMap) == 0 {
+	sliceBuiltinMethodSuggestionsOnce.Do(func() {
 		for methodName, method := range sliceBuiltinMethod {
 			snippets, verbose := method.VSCodeSnippets()
 			sug := &ypb.SuggestionDescription{
@@ -174,14 +180,13 @@ func getSliceBuiltinMethodSuggestions() []*ypb.SuggestionDescription {
 			sliceBuiltinMethodSuggestionMap[methodName] = sug
 			sliceBuiltinMethodSuggestions = append(sliceBuiltinMethodSuggestions, sug)
 		}
-	}
+	})
 
 	return sliceBuiltinMethodSuggestions
 }
 
 func getStandardLibrarySuggestions() []*ypb.SuggestionDescription {
-	// 懒加载
-	if len(standardLibrarySuggestions) == 0 {
+	standardLibrarySuggestionsOnce.Do(func() {
 		standardLibrarySuggestions = make([]*ypb.SuggestionDescription, 0, len(doc.GetDefaultDocumentHelper().Libs))
 		for libName := range doc.GetDefaultDocumentHelper().Libs {
 			standardLibrarySuggestions = append(standardLibrarySuggestions, &ypb.SuggestionDescription{
@@ -191,7 +196,7 @@ func getStandardLibrarySuggestions() []*ypb.SuggestionDescription {
 				Kind:        CompletionKindModule,
 			})
 		}
-	}
+	})
 
 	return standardLibrarySuggestions
 }
