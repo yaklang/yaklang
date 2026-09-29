@@ -16,9 +16,6 @@ func TestHTTPRequestAndRiskUsagesRenderForBothCallModes(t *testing.T) {
 	paths := []string{
 		"http/do_http_request.yak",
 		"http/batch_do_http_request.yak",
-		"http/http_response_diff.yak",
-		"http/send_http_request_packet.yak",
-		"http/send_http_request_by_url.yak",
 		"risk/cybersecurity-risk.yak",
 		"risk/ssa-risk.yak",
 	}
@@ -44,7 +41,7 @@ func TestHTTPRequestAndRiskUsagesRenderForBothCallModes(t *testing.T) {
 				if mode && strings.Contains(usage, "<|TOOL_PARAM_") {
 					t.Fatal("AITAG marker leaked into native function-call usage")
 				}
-				if !mode && path != "http/send_http_request_by_url.yak" && path != "risk/ssa-risk.yak" && !strings.Contains(usage, "<|TOOL_PARAM_") {
+				if !mode && path != "risk/ssa-risk.yak" && !strings.Contains(usage, "<|TOOL_PARAM_") {
 					t.Fatal("text-call usage lost its multiline parameter example")
 				}
 				matches := usageJSONExample.FindAllStringSubmatch(usage, -1)

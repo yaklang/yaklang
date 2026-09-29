@@ -6,7 +6,7 @@ description: >
   Web 应用越权漏洞测试技能。覆盖水平越权(IDOR)、垂直越权(权限提升)、业务逻辑绕过
   三大类测试场景。提供基于 HTTP 请求篡改的系统化测试方法论，包括参数替换、Cookie/Token
   交换、角色 ID 篡改、隐藏字段操控、HTTP 方法变换、路径遍历、请求头伪造等具体技术。
-  每种技术都映射到可直接调用的工具(do_http_request, send_http_request_packet, use_browser)，
+  每种技术都映射到可直接调用的工具(do_http_request, use_browser)，
   确保 AI 可以自动化执行越权测试。参考 OWASP WSTG-ATHZ-02/03/04 和 OWASP Top 10 A01。
 ---
 
@@ -250,7 +250,7 @@ ID 范围: 1-100 (或根据已知 ID 推断范围)
 攻击: 修改 hidden 字段值为 admin/superadmin，
       或在请求中添加额外的权限参数。
 
-工具: send_http_request_packet (精确控制请求内容)
+工具: do_http_request (使用 `packet` 参数精确控制请求内容)
 ```
 
 ### 4.4 请求头伪造绕过
@@ -267,7 +267,7 @@ X-Client-IP: 127.0.0.1
 X-Remote-Addr: 192.168.1.1
 X-Originating-IP: 10.0.0.1
 
-工具: send_http_request_packet (自定义请求头)
+工具: do_http_request (使用 `packet` 参数自定义请求头)
 
 检测方法:
   Step 1: 正常请求 GET / (记录响应)
@@ -517,12 +517,13 @@ Step 2: 用普通用户凭据调用相同接口
 Step 3: 分析 -> 如果 Step 2 成功创建用户，确认垂直越权
 ```
 
-### 8.3 使用 send_http_request_packet 精确测试
+### 8.3 使用 do_http_request 的 packet 模式精确测试
 
 当需要精确控制请求内容 (自定义头部、特殊编码等) 时:
 
 ```
-工具: send_http_request_packet
+工具: do_http_request
+参数: packet
 原始请求包:
 
 GET /admin/dashboard HTTP/1.1

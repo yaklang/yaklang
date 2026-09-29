@@ -286,7 +286,7 @@ func TestExistingAIToolsStillWork(t *testing.T) {
 
 	hasDoHttp := false
 	for _, tool := range tools {
-		if tool.Name == "send_http_request_by_url" || tool.Name == "do_http_request" {
+		if tool.Name == "do_http_request" {
 			hasDoHttp = true
 			break
 		}

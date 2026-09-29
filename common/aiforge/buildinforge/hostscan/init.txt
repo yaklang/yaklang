@@ -18,7 +18,7 @@
 - **端口服务检查**: 使用`scan_tcp_port`、`syn_scan_tcp_port`工具进行端口扫描，识别开放端口和运行的服务
 - **服务配置分析**: 
   - 通过`match_fingerprint_by_packet`工具分析网络数据包，识别服务指纹和应用版本
-  - 对于Web服务，使用`send_http_request_by_url`或`send_http_request_packet`获取HTTP响应包
+  - 对于Web服务，使用`do_http_request`的 `url` 或 `packet` 模式获取HTTP响应包
   - 将HTTP响应包传入`match_fingerprint_by_packet`进行Web应用指纹识别
 - **系统状态检查**: 检查进程状态、系统服务、用户账户、权限设置等关键系统信息
 - **配置文件分析**: 检查关键服务配置文件，识别配置问题和安全隐患

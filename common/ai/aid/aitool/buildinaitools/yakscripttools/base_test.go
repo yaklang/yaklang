@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/yaklang/yaklang/common/schema"
+	"github.com/yaklang/yaklang/common/utils"
 	"gotest.tools/v3/assert"
 )
 
@@ -92,4 +93,50 @@ func TestLoadAllYakScriptFromEmbedFS(t *testing.T) {
 		assert.Equal(t, tool.Author, schema.AIResourceAuthorBuiltin)
 		assert.Equal(t, tool.IsBuiltin, true)
 	}
+}
+
+func TestRetiredHTTPToolsNotEmbedded(t *testing.T) {
+	tools, err := loadAllYakScriptFromEmbedFS()
+	assert.NilError(t, err)
+	loaded := make(map[string]bool, len(tools))
+	for _, tool := range tools {
+		loaded[tool.Name] = true
+	}
+	for _, name := range []string{"http_response_diff", "url_content_summary", "send_http_request_by_url", "send_http_request_packet"} {
+		if loaded[name] {
+			t.Fatalf("retired tool %q is still embedded", name)
+		}
+		if _, err := testYakScriptFS.ReadFile("yakscriptforai/http/" + name + ".yak"); err == nil {
+			t.Fatalf("retired tool file %q is still embedded", name)
+		}
+	}
+}
+
+func TestRemoveRetiredBuiltInAIToolsPreservesCustomTools(t *testing.T) {
+	db, err := utils.CreateTempTestDatabaseInMemory()
+	assert.NilError(t, err)
+	t.Cleanup(func() { _ = db.Close() })
+	assert.NilError(t, db.AutoMigrate(&schema.AIYakTool{}).Error)
+
+	rows := []schema.AIYakTool{
+		{Name: "http_response_diff", IsBuiltin: true},
+		{Name: "url_content_summary", Author: schema.AIResourceAuthorBuiltin},
+		{Name: "send_http_request_by_url", IsBuiltin: true},
+		{Name: "send_http_request_packet", Author: "user", IsBuiltin: false},
+		{Name: "do_http_request", IsBuiltin: true},
+	}
+	for _, row := range rows {
+		assert.NilError(t, db.Create(&row).Error)
+	}
+	assert.NilError(t, removeRetiredBuiltInAITools(db))
+
+	var remaining []schema.AIYakTool
+	assert.NilError(t, db.Find(&remaining).Error)
+	assert.Equal(t, len(remaining), 2)
+	names := map[string]bool{}
+	for _, row := range remaining {
+		names[row.Name] = true
+	}
+	assert.Assert(t, names["send_http_request_packet"])
+	assert.Assert(t, names["do_http_request"])
 }
