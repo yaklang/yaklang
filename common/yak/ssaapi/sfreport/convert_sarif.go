@@ -84,6 +84,9 @@ type SarifReport struct {
 	// sinceFlush counts findings appended since the last snapshot, so a long
 	// scan publishes intermediate documents instead of only the final one.
 	sinceFlush int
+	// flusher writes intermediate snapshots in the background; a final Save()
+	// drains and stops it.
+	flusher *reportFlusher
 }
 
 // SarifContext accumulates the SARIF entities one result contributes (files,
@@ -169,6 +172,10 @@ func (r *SarifReport) Save() error {
 	if r.writer == nil {
 		return nil
 	}
+	// A pending background snapshot would race this final document.
+	if flusher := r.currentFlusher(); flusher != nil {
+		flusher.stopAndWait()
+	}
 	var buf bytes.Buffer
 	if err := r.report.PrettyWrite(&buf); err != nil {
 		return err
@@ -241,9 +248,32 @@ func (r *SarifReport) noteFlush(added int) {
 		return
 	}
 	r.sinceFlush = 0
-	if err := r.Save(); err != nil {
-		log.Errorf("flush sarif snapshot failed: %v", err)
+	if r.writer == nil {
+		return
 	}
+	var buf bytes.Buffer
+	if err := r.report.PrettyWrite(&buf); err != nil {
+		log.Errorf("serialize sarif snapshot failed: %v", err)
+		return
+	}
+	r.flusherFor().submit(buf.Bytes())
+}
+
+// flusherFor returns the background writer of this report, creating it on
+// first use.
+func (r *SarifReport) flusherFor() *reportFlusher {
+	if r.flusher == nil {
+		r.flusher = newReportFlusher(r.writer)
+	}
+	return r.flusher
+}
+
+// currentFlusher returns the background writer without creating one.
+func (r *SarifReport) currentFlusher() *reportFlusher {
+	if r == nil {
+		return nil
+	}
+	return r.flusher
 }
 
 // SetKeeper attaches the scan's decision so a risk the scan dropped is not

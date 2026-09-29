@@ -72,7 +72,7 @@ func Scan(ctx context.Context, option ...ssaconfig.Option) (retErr error) {
 		// batch is complete. Write it before the task row so a caller that sees
 		// the finished task can also read every finding.
 		if dbSaver != nil {
-			if err := dbSaver.Flush(); err != nil {
+			if err := dbSaver.Close(); err != nil {
 				log.Errorf("flush risk batch failed: %v", err)
 			}
 		}

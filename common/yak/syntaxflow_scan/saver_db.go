@@ -30,12 +30,28 @@ type dbSaver struct {
 	noRisk bool
 
 	mu      sync.Mutex
-	creates []*schema.SSARisk
-	updates []schema.RiskUpdateItem
+	pending []schema.RiskUpdateItem
+	// wake asks the worker to write a full batch; flush carries a channel the
+	// worker closes after it drained every pending decision.
+	wake    chan struct{}
+	flushCh chan chan struct{}
+	closeCh chan struct{}
+	wg      sync.WaitGroup
+	err     error
 }
 
 func newDBSaver(kind schema.SyntaxflowResultKind, taskID string, noRisk bool) *dbSaver {
-	return &dbSaver{kind: kind, task: taskID, noRisk: noRisk}
+	s := &dbSaver{
+		kind:    kind,
+		task:    taskID,
+		noRisk:  noRisk,
+		wake:    make(chan struct{}, 1),
+		flushCh: make(chan chan struct{}),
+		closeCh: make(chan struct{}),
+	}
+	s.wg.Add(1)
+	go s.worker()
+	return s
 }
 
 // ApplyResult writes one finished result. Persisting the result also persists
@@ -57,47 +73,159 @@ func (s *dbSaver) ApplyRiskUpdate(item schema.RiskUpdateItem) error {
 	if s == nil || item.Risk == nil || s.noRisk {
 		return nil
 	}
-	// The decision is already a plain row snapshot; the batch keeps the same
-	// pointer because the write-back of the row id is what lets a later scan
-	// mode rewrite this finding instead of inserting a second row.
-	pending := schema.RiskUpdateItem{
-		Risk:    item.Risk,
-		OldID:   item.OldID,
-		OldHash: item.OldHash,
-	}
+	item = s.resolveCoveredPending(item)
 	s.mu.Lock()
-	if item.OldID == 0 {
-		s.creates = append(s.creates, pending.Risk)
-	} else {
-		s.updates = append(s.updates, pending)
-	}
-	full := len(s.creates)+len(s.updates) >= riskBatchSize
+	s.pending = append(s.pending, item)
+	full := len(s.pending) >= riskBatchSize
 	s.mu.Unlock()
 	if full {
-		return s.Flush()
+		select {
+		case s.wake <- struct{}{}:
+		default:
+		}
 	}
 	return nil
 }
 
-// Flush writes every pending decision. A scan calls it when it ends; the saver
-// also calls it by itself once a batch is full.
+// resolveCoveredPending handles a cover whose previous row has not been
+// written yet: the superseded decision is removed from the batch instead of
+// reaching the database. A row that was already written is rewritten in place.
+func (s *dbSaver) resolveCoveredPending(item schema.RiskUpdateItem) schema.RiskUpdateItem {
+	if item.OldID != 0 || item.OldHash == "" {
+		return item
+	}
+	s.mu.Lock()
+	for i := range s.pending {
+		if s.pending[i].Risk != nil && s.pending[i].Risk.Hash == item.OldHash {
+			s.pending = append(s.pending[:i], s.pending[i+1:]...)
+			s.mu.Unlock()
+			// The superseded row never reached the database, so the new
+			// finding is created instead of rewriting anything.
+			return schema.RiskUpdateItem{Risk: item.Risk}
+		}
+	}
+	s.mu.Unlock()
+	// The previous row may already be committed; find its id so the cover
+	// rewrites that row instead of inserting a second one.
+	if db := ssadb.GetDB(); db != nil {
+		if stored, err := yakit.GetSSARiskByHash(db, item.OldHash); err == nil && stored != nil {
+			item.OldID = stored.ID
+		}
+	}
+	return item
+}
+
+// worker writes risk batches in the background so the scanning goroutine never
+// waits for a database round trip.
+func (s *dbSaver) worker() {
+	defer s.wg.Done()
+	for {
+		select {
+		case <-s.closeCh:
+			s.drain(0)
+			return
+		case done := <-s.flushCh:
+			s.drain(0)
+			close(done)
+		case <-s.wake:
+			s.drain(riskBatchSize)
+		}
+	}
+}
+
+// drain writes pending decisions. A limit > 0 writes at most that many; 0
+// writes everything.
+func (s *dbSaver) drain(limit int) {
+	for {
+		batch := s.takePending(limit)
+		if len(batch) == 0 {
+			return
+		}
+		if err := s.write(batch); err != nil {
+			s.mu.Lock()
+			if s.err == nil {
+				s.err = err
+			}
+			s.mu.Unlock()
+			log.Errorf("write risk batch failed: %v", err)
+		}
+		if limit > 0 && len(batch) < limit {
+			return
+		}
+	}
+}
+
+func (s *dbSaver) takePending(limit int) []schema.RiskUpdateItem {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if len(s.pending) == 0 {
+		return nil
+	}
+	n := len(s.pending)
+	if limit > 0 && n > limit {
+		n = limit
+	}
+	batch := make([]schema.RiskUpdateItem, n)
+	copy(batch, s.pending[:n])
+	s.pending = append([]schema.RiskUpdateItem(nil), s.pending[n:]...)
+	return batch
+}
+
+// Flush writes every pending decision and waits for the worker. A scan calls
+// it when it ends; the worker also writes by itself once a batch is full.
 func (s *dbSaver) Flush() error {
 	if s == nil {
 		return nil
 	}
-	s.mu.Lock()
-	creates := s.creates
-	updates := s.updates
-	s.creates = nil
-	s.updates = nil
-	s.mu.Unlock()
-
-	if len(creates) == 0 && len(updates) == 0 {
+	done := make(chan struct{})
+	select {
+	case s.flushCh <- done:
+	case <-s.closeCh:
 		return nil
 	}
+	<-done
+	s.mu.Lock()
+	err := s.err
+	s.mu.Unlock()
+	return err
+}
+
+// Close flushes the remaining decisions and stops the worker. It is safe to
+// call more than once.
+func (s *dbSaver) Close() error {
+	if s == nil {
+		return nil
+	}
+	select {
+	case <-s.closeCh:
+	default:
+		close(s.closeCh)
+	}
+	s.wg.Wait()
+	s.mu.Lock()
+	err := s.err
+	s.mu.Unlock()
+	return err
+}
+
+// write persists one batch: creates in one statement, rewrites in one
+// transaction.
+func (s *dbSaver) write(batch []schema.RiskUpdateItem) error {
 	db := ssadb.GetDB()
 	if db == nil {
 		return nil
+	}
+	creates := make([]*schema.SSARisk, 0, len(batch))
+	updates := make([]schema.RiskUpdateItem, 0, len(batch))
+	for _, item := range batch {
+		if item.Risk == nil {
+			continue
+		}
+		if item.OldID == 0 {
+			creates = append(creates, item.Risk)
+		} else {
+			updates = append(updates, item)
+		}
 	}
 	if len(creates) > 0 {
 		if err := yakit.CreateSSARisksInBatches(db, creates); err != nil {
