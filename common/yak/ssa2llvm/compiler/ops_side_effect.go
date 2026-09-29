@@ -262,15 +262,20 @@ func (c *Compiler) resolveSideEffectActualID(inst *ssa.SideEffect) (int64, error
 			idx := tmpl.FormalParameterIndex
 			if idx >= 0 && idx < len(callInst.Args) {
 				actualID = callInst.Args[idx]
-			} else {
-				return 0, fmt.Errorf("compileSideEffect: parameter index %d out of bounds for call %d (args=%d)", idx, callInst.GetId(), len(callInst.Args))
 			}
+			// idx beyond the call site's arguments (or a negative index for a
+			// receiver/free value) means this call simply does not carry the
+			// parameter: yak allows calling with fewer arguments than the
+			// callee declares, and a variadic tail is folded into one tuple
+			// argument. There is no actual value to resolve here, so keep the
+			// template and let the callers fall back instead of failing the
+			// whole compile.
 		case *ssa.ParameterMember:
 			if actual, ok := tmpl.GetActualCallParam(callInst); ok && actual != nil {
 				actualID = actual.GetId()
-			} else {
-				return 0, fmt.Errorf("compileSideEffect: failed to resolve actual call param for %s at call %d", tmpl.GetName(), callInst.GetId())
 			}
+			// Same as above: GetActualCallParam only fails when the call site
+			// has no argument at this parameter's position.
 		}
 	}
 	return actualID, nil
