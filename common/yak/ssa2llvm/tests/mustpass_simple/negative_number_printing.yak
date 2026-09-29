@@ -1,0 +1,16 @@
+// Regression: ints and floats share one i64 ABI word, so both the unary-minus
+// lowering and the runtime argument decoder had to learn to tell them apart.
+// -1 printed as -1.9999999999999998 (the decoder masked the tag bit off the
+// bit pattern and read a denormal), -1.5 printed as -3 (negating the pattern
+// instead of its value), and -0.5 printed as -8.
+println("int-literal", -1)
+println("int-var", -5)
+println("float-1.0", -1.0)
+println("float-half", -0.5)
+println("float-quarter", -0.25)
+println("float-var", -1.5)
+
+assert -1 == -1, "negative int literal must compare equal"
+assert (0 - 1) == -1, "negative int expression must compare equal"
+assert -1.0 == -1.0, "negative float literal must compare equal"
+assert (0 - 1.5) == -1.5, "negative float expression must compare equal"
