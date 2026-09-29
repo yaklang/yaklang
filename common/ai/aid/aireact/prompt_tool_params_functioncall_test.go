@@ -181,6 +181,29 @@ func TestFunctionCallToolParamsTreatsSelectedToolMetadataAsData(t *testing.T) {
 	require.Equal(t, aicommon.SubmitToolParamsFunctionName, projected.Tools[0].Function.Name)
 }
 
+func TestSelectedToolUsageRendersForParameterProtocol(t *testing.T) {
+	react, err := NewTestReAct()
+	require.NoError(t, err)
+	tool := aitool.NewWithoutCallback("mode_sensitive",
+		aitool.WithUsage("[[- if .FunctionCallMode -]]JSON_ONLY[[- else -]]AITAG_ONLY[[- end -]]"),
+		aitool.WithStringParam("command", aitool.WithParam_Required(true)))
+	task := aicommon.NewStatefulTaskBase("usage-mode-task", "Run a command", context.Background(), react.config.GetEmitter())
+
+	native, err := react.promptManager.GenerateFunctionCallToolParamsPromptForTask(task, tool, aicommon.ToolParamsCallIntent{})
+	require.NoError(t, err)
+	require.Contains(t, native, "JSON_ONLY")
+	require.NotContains(t, native, "AITAG_ONLY")
+
+	textParams, err := react.promptManager.GenerateToolParamsPromptWithMetaForQuery("Run a command", tool)
+	require.NoError(t, err)
+	require.Contains(t, textParams.Prompt, "AITAG_ONLY")
+	require.NotContains(t, textParams.Prompt, "JSON_ONLY")
+	retry, err := react.promptManager.GenerateReGenerateToolParamsPromptWithMeta("Run a command", aitool.InvokeParams{"command": "old"}, tool)
+	require.NoError(t, err)
+	require.Contains(t, retry.Prompt, "AITAG_ONLY")
+	require.NotContains(t, retry.Prompt, "JSON_ONLY")
+}
+
 // Recent-tool routing belongs to the parent loop, even after it moves from
 // Timeline Open into the stable prefix. R2 keeps history and the selected
 // schema, but must not inherit the cache's competing submission protocol.

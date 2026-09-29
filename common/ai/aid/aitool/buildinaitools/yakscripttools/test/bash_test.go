@@ -3,6 +3,9 @@ package test
 import (
 	"bytes"
 	"context"
+	"encoding/json"
+	"os"
+	"regexp"
 	"strings"
 	"testing"
 
@@ -141,4 +144,47 @@ func TestBashToolNormalizesGeneratedScriptLineEndings(t *testing.T) {
 	assert.Assert(t, strings.Contains(combined, "BASH_CRLF_OK"), "command output missing: %s", combined)
 	assert.Assert(t, !strings.Contains(combined, "command not found"), "generated script still contains CRLF: %s", combined)
 	assert.Assert(t, !strings.Contains(combined, "exit code 127"), "bash tool unexpectedly failed: %s", combined)
+}
+
+func TestBashToolRemovesInternalScriptAfterExecution(t *testing.T) {
+	tool := getBashTool(t)
+	stdout, stderr := bytes.NewBuffer(nil), bytes.NewBuffer(nil)
+	_, err := tool.Callback(context.Background(), aitool.InvokeParams{
+		"command":             "printf 'WRAPPER_PATH=%s\\n' \"$0\"",
+		"shell":               "bash",
+		"timeout":             10,
+		"accepted-exit-codes": "0",
+	}, nil, stdout, stderr)
+	assert.NilError(t, err)
+
+	observations := stdout.String() + stderr.String()
+	match := regexp.MustCompile(`WRAPPER_PATH=([^\r\n]+)`).FindStringSubmatch(observations)
+	assert.Assert(t, len(match) == 2, "missing internal script path in command output: %s", observations)
+	_, statErr := os.Stat(match[1])
+	assert.Assert(t, os.IsNotExist(statErr), "internal script still exists after invocation: %s", match[1])
+	assert.Assert(t, !strings.Contains(observations, "Script file:"), "tool should not announce the internal script path")
+}
+
+func TestBashUsageShowsOnlyTheCurrentParameterProtocol(t *testing.T) {
+	raw := getBashTool(t).Usage
+	for _, tc := range []struct {
+		name     string
+		native   bool
+		wantTags bool
+	}{
+		{name: "function_call", native: true},
+		{name: "text", wantTags: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			usage, err := aitool.RenderUsageForMode(raw, tc.native)
+			assert.NilError(t, err)
+			assert.Equal(t, strings.Contains(usage, "<|TOOL_PARAM_command_"), tc.wantTags)
+			assert.Assert(t, !strings.Contains(usage, "[[- if .FunctionCallMode -]]"))
+			for _, block := range regexp.MustCompile("(?s)```json\\n(.*?)\\n```").FindAllStringSubmatch(usage, -1) {
+				var params map[string]any
+				assert.NilError(t, json.Unmarshal([]byte(block[1]), &params))
+				assert.Assert(t, params["accepted-exit-codes"] != nil)
+			}
+		})
+	}
 }

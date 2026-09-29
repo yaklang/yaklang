@@ -70,10 +70,14 @@ func (pm *PromptManager) GenerateFunctionCallToolParamsPromptForTask(
 	if toolDescription == "" {
 		toolDescription = tool.Name
 	}
+	toolUsage, err := aitool.RenderUsageForMode(tool.Usage, true)
+	if err != nil {
+		return "", fmt.Errorf("render Usage for tool %q: %w", tool.Name, err)
+	}
 	selectedTool, err := aicommon.RenderPromptTemplate("r2-selected-tool", functionCallToolParamsSelectedTool,
 		map[string]any{
 			"ToolName": tool.Name, "ToolDescription": toolDescription,
-			"ToolUsage": tool.Usage, "ToolInputSchema": string(inputSchema),
+			"ToolUsage": toolUsage, "ToolInputSchema": string(inputSchema),
 		})
 	if err != nil {
 		return "", err

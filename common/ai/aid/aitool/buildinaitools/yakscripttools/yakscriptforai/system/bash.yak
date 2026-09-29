@@ -1,355 +1,53 @@
-__DESC__ = "跨平台Shell命令执行工具，支持bash/cmd/powershell，具备超时控制和输出捕获。bash 默认以登录 shell 执行以加载系统和用户 profile 中的 PATH/环境变量，不额外启用 set -e 或命令追踪，行为更接近原生终端执行。注意：对于文件创建/写入操作，应优先使用 write_file 工具；对于文件局部修改，应优先使用 modify_file 工具。仅当专用工具无法满足需求时，才使用 bash 的 cat/echo 重定向操作文件。对于已通过 ExcelCLI 入库的数据分析任务，应优先使用 `excelcli query` 命令通过 SQL 分析，而非编写 Python 脚本。"
+__DESC__ = "用于在工具运行主机执行命令：Linux/macOS 默认将命令写入本地临时脚本并以 bash --login 调用，Windows 默认优先以相同方式调用可用的 Bash、否则通过 PowerShell -File 运行临时脚本、再否则由 cmd.exe /d /s /c 直接执行（可用 shell 参数指定）；子进程继承工具进程的环境变量，Bash 登录配置可能进一步修改 PATH 等变量，执行后清理临时脚本并返回输出、退出码和超时状态。"
 __VERBOSE_NAME__ = "Shell Executor"
 __VERBOSE_NAME_ZH__ = "Shell执行"
-__KEYWORDS__ = "shell command,bash,cmd,powershell,命令行工具,系统管理,自动化脚本,运维工具,shell script,command execution,系统操作,终端命令,system administration,automation tools,操作系统,跨平台命令,timeout,超时控制,python script,pandas,data analysis,excel analysis,csv cache,data cache,批量分析,write_file优先,文件操作优先,modify_file优先"
+__KEYWORDS__ = "shell command,shell script,bash,cmd,powershell,命令执行,终端命令,Shell脚本,系统诊断,超时控制"
 
 __USAGE__ = <<<USAGE_BLOCK
-跨平台 Shell 命令执行工具 —— AI 参数生成使用指南
+[[- if .FunctionCallMode -]]必填 `command`：命令或脚本文本；多行内容放在 JSON 字符串中，用 `\n` 表示换行。
+[[- else -]]必填 `command`：单行命令直接写入 JSON 参数；较长或多行脚本使用当前 nonce 对应的 AITAG。
+[[- end -]]
+**每次调用都明确设置退出码**：使用 `accepted-exit-codes` 指定预期的退出码（逗号分隔字符串），并在调用前识别正常情况下可能出现的非零码。例如 `rg` 查无匹配返回 1，可填 `"0,1"`；不要接受未知故障码。默认值是 `"0"`，兼容旧名 `accepted_exit_codes`；该参数只影响 `RESULT.exit_code_accepted`，不改变实际退出码。
+可选 `timeout`：执行上限，单位为秒，默认 60；按任务耗时设置，避免无限运行的命令。
+可选 `shell`：bash、cmd 或 powershell；默认自动选择。bash 以登录 shell 运行，不自动启用 `set -e` 或 `pipefail`；需要让前序命令或管道失败终止脚本时，请自行启用。
+执行原则：较长脚本在关键步骤适量用 `echo`/`printf`（Python 脚本用 `print`）输出阶段、处理对象和必要的中间结果，便于根据输出快速定位并修改问题；不要打印脚本全文、敏感值或大量重复日志。
+判断执行结果请查看 `RESULT.timed_out`、`process_completed`、`exit_code_available`、`exit_code_accepted` 和 `termination_reason`。工具调用成功不等于命令成功；超时可能没有可用退出码。
+执行完整脚本时，推荐从工作区提示读取 `AI Artifacts dir` 的实际绝对路径，先写入该目录，再 `chmod +x` 并执行；简单固定文本可用 `echo`，多行或含转义的脚本用 `printf '%s\n'`，并正确引用路径。工具内部自动生成的临时包装脚本会在调用结束时删除，不作为交付物。
 
-## 参数说明
+典型案例（仅展示工具参数）：
 
-必填：
-  command   (string)  要执行的 Shell 命令或脚本。
-                      单行命令：直接在 JSON params.command 中填写。
-                      多行脚本：必须使用 AITAG 格式传递 command 参数。
-
-可选：
-  timeout   (int)     *** 关键：必须始终设置此参数 ***
-                      最大执行时间（秒）。超时后进程将被强制终止。
-                      默认值：60（但不要依赖默认值——始终显式设置！）
-                      如果命令挂起或永远运行，整个工具调用将被阻塞。
-                      推荐值：
-                        - 快速查询（ls, cat, echo, uname, whoami）：10-15
-                        - 文件操作（find, grep, du）：15-30
-                        - 网络命令（curl, wget, ping -c N）：30-60
-                        - 构建/编译/安装（make, go build, pip install）：120-300
-  shell     (string)  Shell 类型："bash" | "cmd" | "powershell"
-                      默认：自动检测（linux/mac -> bash，
-                      windows -> 如果存在 Git Bash/MSYS/Cygwin bash 则用 bash，
-                      否则用 powershell/cmd）
-  accepted-exit-codes (string) 可接受的退出码，逗号分隔，默认 "0"。
-  accepted_exit_codes (string) 兼容旧式下划线拼写；仍须传逗号分隔字符串。
-                      例如 grep 未匹配也属于预期时传 "0,1"。原始 exit_code
-                      始终保留；该参数只影响 exit_code_accepted。
-
-## 执行特性
-
-bash：  通过 "bash --login <script>" 执行临时脚本，使 /etc/profile
-        和用户的 bash profile 文件可以加载默认 PATH/环境变量。
-        不会强制启用 set -e 或命令追踪。
-cmd：   通过 "cmd.exe /d /s /c <command>" 执行，反斜杠必须转义：
-        "C:\\Users"
-powershell：通过 PowerShell 执行临时脚本，正常加载 profile；
-            不会强制 $ErrorActionPreference 或命令追踪。
-
-## 安全规则
-
-禁止：find / , ls -R / , sudo, su, chmod 777, rm -rf /, 访问 /etc/shadow
-必须加限制：ping -c N, find ... -maxdepth N, tail -n N（不能用 -f）, 管道 | head -N
-
-## 少样本示例
-
-将 {NONCE} 替换为响应格式部分中的实际 nonce。
-
-### 示例 1：简单单行命令（JSON 参数，显式设置超时）
-
-用户意图："检查磁盘空间"
-
+执行简单命令：
 ```json
-{
-  "@action": "call-tool",
-  "tool": "bash",
-  "identifier": "check_disk_space",
-  "params": {
-    "command": "df -h",
-    "timeout": 10
-  }
-}
+{"command":"pwd","timeout":10,"accepted-exit-codes":"0"}
 ```
 
-### 示例 2：多行诊断脚本（使用 AITAG 传递命令）
-
-用户意图："显示系统状态：操作系统、内存和 top 进程"
-
+[[- if .FunctionCallMode -]]
+在 Linux/macOS 上写入并执行较长的 Bash 脚本；把下方占位符换成工作区给出的真实 `AI Artifacts dir` 路径，脚本留在该目录。`rg` 查无匹配时脚本明确返回 1，因此预先接受退出码 1（其他错误码仍不接受）；Windows Bash 须按其路径格式调整：
 ```json
 {
-  "@action": "call-tool",
-  "tool": "bash",
-  "identifier": "system_status_check",
-  "params": {
-    "timeout": 20
-  }
+  "shell": "bash",
+  "timeout": 30,
+  "accepted-exit-codes": "0,1",
+  "command": "set -euo pipefail\nartifacts_dir='<AI Artifacts dir 的实际绝对路径>'\nmkdir -p \"$artifacts_dir\"\nscript=\"$artifacts_dir/check_todos.sh\"\nprintf '%s\\n' '#!/usr/bin/env bash' 'set -euo pipefail' 'if rg -n --glob \"*.go\" \"TODO|FIXME\" .; then exit 0; else exit $?; fi' > \"$script\"\nchmod +x \"$script\"\nprintf '检查 Go 文件中的 TODO/FIXME...\\n'\n\"$script\""
 }
 ```
-
+[[- else -]]
+在 Linux/macOS 上写入并执行较长的 Bash 脚本；把下方占位符换成工作区给出的真实 `AI Artifacts dir` 路径，脚本留在该目录。`rg` 查无匹配时脚本明确返回 1，因此预先接受退出码 1（其他错误码仍不接受）；Windows Bash 须按其路径格式调整：
+```json
+{"shell":"bash","timeout":30,"accepted-exit-codes":"0,1"}
+```
+将下方 `{NONCE}` 替换为本次调用的 nonce：
 <|TOOL_PARAM_command_{NONCE}|>
-echo "=== OS Info ==="
-uname -a
-echo ""
-echo "=== Memory ==="
-free -h 2>/dev/null || vm_stat 2>/dev/null || echo "Memory info not available"
-echo ""
-echo "=== Top 5 CPU Processes ==="
-ps aux --sort=-%cpu 2>/dev/null | head -6 || ps aux | head -6
+set -euo pipefail
+artifacts_dir='<AI Artifacts dir 的实际绝对路径>'
+mkdir -p "$artifacts_dir"
+script="$artifacts_dir/check_todos.sh"
+printf '%s\n' '#!/usr/bin/env bash' 'set -euo pipefail' 'if rg -n --glob "*.go" "TODO|FIXME" .; then exit 0; else exit $?; fi' > "$script"
+chmod +x "$script"
+printf '检查 Go 文件中的 TODO/FIXME...\n'
+"$script"
 <|TOOL_PARAM_command_END_{NONCE}|>
-
-### 示例 3：带安全限制的文件搜索（使用 AITAG 传递命令）
-
-用户意图："在 /var/log 中查找大日志文件"
-
-```json
-{
-  "@action": "call-tool",
-  "tool": "bash",
-  "identifier": "find_large_logs",
-  "params": {
-    "timeout": 20
-  }
-}
-```
-
-<|TOOL_PARAM_command_{NONCE}|>
-echo "Searching for .log files > 10MB (max depth 3)..."
-find /var/log -name "*.log" -size +10M -maxdepth 3 -type f -exec ls -lh {} \; 2>/dev/null | head -20
-echo ""
-du -sh /var/log 2>/dev/null || echo "Cannot access /var/log"
-<|TOOL_PARAM_command_END_{NONCE}|>
-
-### 示例 4：带条件逻辑的复杂脚本（使用 AITAG 传递命令）
-
-用户意图："检查是否安装了 Python3，显示版本和包列表"
-
-```json
-{
-  "@action": "call-tool",
-  "tool": "bash",
-  "identifier": "check_python_env",
-  "params": {
-    "timeout": 25
-  }
-}
-```
-
-<|TOOL_PARAM_command_{NONCE}|>
-if command -v python3 &> /dev/null; then
-    echo "Python3 found: $(python3 --version)"
-    echo "Path: $(which python3)"
-    echo ""
-    echo "Installed packages (first 20):"
-    python3 -m pip list 2>/dev/null | head -20 || echo "pip not available"
-else
-    echo "Python3 not found"
-    which python 2>/dev/null && python --version 2>/dev/null || echo "No python found"
-fi
-<|TOOL_PARAM_command_END_{NONCE}|>
-
-### 示例 5：Python 脚本执行（必须——先用 write_file 写入）
-
-重要：对于超过 5 行的 Python 脚本，绝对不要通过 heredoc（python3 << 'EOF'）
-或 cat/echo 重定向直接传递代码。这会导致 Shell 解析错误，特别是在包含
-Python shebang、docstring 和复杂字符串格式化时。
-
-正确的做法：先使用 `write_file` 工具写入脚本文件，再用 bash 执行：
-
-步骤 1 - 通过 write_file 写入脚本：
-```json
-{
-  "@action": "call-tool",
-  "tool": "write_file",
-  "identifier": "write_python_script",
-  "params": {
-    "file": "analysis_script.py",
-    "force": true
-  }
-}
-```
-
-<|TOOL_PARAM_content_{NONCE}|>
-#!/usr/bin/env python3
-"""This script analyzes data - docstrings are safe here."""
-import json
-import os
-
-data_file = "/path/to/data.json"
-with open(data_file) as f:
-    data = json.load(f)
-
-print(f"Records: {len(data)}")
-for key, value in data.items():
-    print(f"  {key}: {value}")
-<|TOOL_PARAM_content_END_{NONCE}|>
-
-步骤 2 - 通过 bash 执行：
-```json
-{
-  "@action": "call-tool",
-  "tool": "bash",
-  "identifier": "run_python_script",
-  "params": {
-    "command": "python3 analysis_script.py",
-    "timeout": 120
-  }
-}
-```
-
-要点：
-  - 始终先用 write_file 工具创建脚本，再用 bash 执行
-  - write_file 通过 AITAG 块安全处理多行内容
-  - 不要在 bash 中使用 cat/echo heredoc 创建文件——改用 write_file/modify_file
-  - 对于大文件的多步骤数据分析，优先使用 ExcelCLI query（数据已入库时）或 Python pandas（兜底），
-    避免重复调用 query_excel_data
-
-对于短小 Python 单行代码（< 5 行，不含 docstring），可以直接使用：
-
-```json
-{
-  "@action": "call-tool",
-  "tool": "bash",
-  "identifier": "quick_python_check",
-  "params": {
-    "command": "python3 -c \"import os; print(os.listdir('.'))\"",
-    "timeout": 10
-  }
-}
-```
-
-### 示例 6：带缓存的 Python 数据分析（write_file + bash 执行）
-
-对于超过 10MB 的 Excel/CSV 文件，或需要跨多次 bash 调用的分析，
-使用缓存优先模式避免重复读取大文件。
-始终使用 write_file 创建脚本，再用 bash 执行：
-
-步骤 1 - 通过 write_file 写入分析脚本：
-```json
-{
-  "@action": "call-tool",
-  "tool": "write_file",
-  "identifier": "write_cached_analysis",
-  "params": {
-    "file": "/tmp/analysis_with_cache.py",
-    "force": true
-  }
-}
-```
-
-<|TOOL_PARAM_content_{NONCE}|>
-import pandas as pd, json, os
-
-EXCEL_FILE = "/path/to/large_data.xlsx"
-CACHE_FILE = "/tmp/large_data_cache.csv"
-
-# Cache-first: load from CSV cache if available (~1s), otherwise read Excel (~30s+)
-if os.path.exists(CACHE_FILE):
-    print(f"[cache hit] Loading from: {CACHE_FILE}")
-    df = pd.read_csv(CACHE_FILE)
-else:
-    print(f"[cache miss] Reading Excel: {EXCEL_FILE}")
-    df = pd.read_excel(EXCEL_FILE, sheet_name="Sheet1")
-    df.to_csv(CACHE_FILE, index=False)
-    print(f"[cache saved] {CACHE_FILE} ({os.path.getsize(CACHE_FILE)} bytes)")
-
-results = {"row_count": len(df), "columns": list(df.columns)}
-print(json.dumps(results, ensure_ascii=False, indent=2, default=str))
-
-# Save results for downstream tasks
-with open("/tmp/analysis_results.json", "w") as f:
-    json.dump(results, f, ensure_ascii=False, indent=2, default=str)
-print(f"Results saved to /tmp/analysis_results.json")
-<|TOOL_PARAM_content_END_{NONCE}|>
-
-步骤 2 - 通过 bash 执行：
-```json
-{
-  "@action": "call-tool",
-  "tool": "bash",
-  "identifier": "run_cached_analysis",
-  "params": {
-    "command": "python3 /tmp/analysis_with_cache.py",
-    "timeout": 120
-  }
-}
-```
-
-缓存规则：
-  - 首选（数据已通过 ExcelCLI 入库）：使用 `excelcli query` 通过 SQL 进行批量分析
-  - 兜底（ExcelCLI 不可用）：第一个脚本使用 pd.read_excel() + df.to_csv() 创建缓存
-  - 后续所有脚本：从缓存 pd.read_csv() 读取（快 10 倍）
-  - 将分析结果保存到 JSON 文件供下游任务复用
-  - 使用 /tmp/ 存放缓存文件（重启后自动清理）
-  - 使用 write_file 创建脚本，不要在 bash 中用 cat heredoc
-
-### 示例 7：Windows CMD 单行命令（显式指定 shell）
-
-用户意图："在 Windows 主机上显示操作系统版本、当前用户和系统目录"
-
-```json
-{
-  "@action": "call-tool",
-  "tool": "bash",
-  "identifier": "windows_cmd_quick_check",
-  "params": {
-    "command": "ver && whoami && dir C:\\Windows\\System32\\drivers\\etc",
-    "shell": "cmd",
-    "timeout": 15
-  }
-}
-```
-
-### 示例 8：Windows PowerShell 诊断脚本（AITAG + 显式指定 shell）
-
-用户意图："在 Windows 主机上显示内存占用最高的进程和正在运行的服务"
-
-```json
-{
-  "@action": "call-tool",
-  "tool": "bash",
-  "identifier": "windows_powershell_diagnostics",
-  "params": {
-    "shell": "powershell",
-    "timeout": 30
-  }
-}
-```
-
-<|TOOL_PARAM_command_{NONCE}|>
-Write-Output "=== Computer ==="
-Write-Output $env:COMPUTERNAME
-Write-Output ""
-Write-Output "=== Top 5 Processes By Working Set (MB) ==="
-Get-Process |
-  Sort-Object WorkingSet -Descending |
-  Select-Object -First 5 Name, Id, @{Name="WorkingSetMB"; Expression = { [math]::Round($_.WorkingSet64 / 1MB, 1) }}
-Write-Output ""
-Write-Output "=== Running Services (first 10) ==="
-Get-Service |
-  Where-Object { $_.Status -eq "Running" } |
-  Select-Object -First 10 Name, DisplayName, Status
-<|TOOL_PARAM_command_END_{NONCE}|>
-
-## 核心规则
-
-1. **必须设置超时（TIMEOUT）** —— 始终显式设置 timeout。不要依赖默认的 60 秒。
-   预估命令应执行的时间，将 timeout 设为该预估值的约 1.5 倍。
-   没有超时的命令如果挂起，将阻塞整个 agent 工作流。
-2. 多行命令 -> 始终使用 AITAG 格式传递 command 参数
-3. 单行命令 -> 直接在 JSON params.command 中填写
-4. 限制输出：通过管道 | head -N；限制搜索：为 find 添加 -maxdepth
-5. 跨平台使用降级链：cmd1 2>/dev/null || cmd2 || echo "not available"
-6. 绝对不要生成无限期命令（不要 tail -f, 不要 watch, 不要不带 -c 的 ping）
-7. **Python 脚本** —— 对于超过 5 行的 Python 脚本，始终使用 write_file 工具
-   先创建脚本文件，再用 bash 执行。绝不要在 bash 中使用 cat/echo heredoc
-   来写文件。这可以避免 Shell 解析错误，遵循使用专用工具进行文件操作的原则。
-8. **数据缓存** —— 分析大文件（Excel > 10MB）时：
-   首选：如果数据已通过 ExcelCLI 入库，使用 `excelcli query` 通过 SQL 进行批量分析。
-   兜底：使用 Python pandas 配合 CSV 缓存（首次 pd.read_excel + pd.to_csv 创建缓存，
-   后续使用 pd.read_csv 读取）。将分析结果保存到 JSON 文件供下游任务复用。
-9. **文件操作优先级** —— 需要创建或写入文件（脚本、配置、文档等）时，
-   始终使用 `write_file` 工具代替 bash heredoc/cat。
-   修改现有文件时，始终使用 `modify_file` 工具代替 bash sed/echo。
-   仅在 write_file/modify_file 无法满足特定需求时，才使用 bash 进行文件操作。
-10. **Windows 目标** —— 在 Windows 上，当 Git Bash/MSYS/Cygwin bash 可用时，
-   工具优先使用 bash。生成 Windows 原生命令时，显式将 shell 设为 "cmd" 或 "powershell"。
-   这可以避免 Bash 语法与 Windows 命令语法混用。
+[[- end -]]
 USAGE_BLOCK
 
 yakit.AutoInitYakit()
@@ -564,6 +262,15 @@ defer cancel()
 var cmd
 var err
 var scriptFile = ""
+// The generated wrapper is internal and must not remain after any exit path.
+defer func() {
+    if scriptFile != "" {
+        removeErr := file.Remove(scriptFile)
+        if removeErr != nil {
+            yakit.Warn("Failed to clean up internal temporary script: %v", removeErr)
+        }
+    }
+}()
 
 switch shellType {
 case "bash":
@@ -601,16 +308,6 @@ case "bash":
         return
     }
     
-    // Ensure cleanup of temporary file
-    defer func() {
-        if scriptFile != "" {
-            removeErr := file.Remove(scriptFile)
-            if removeErr != nil {
-                yakit.Info("Note: Failed to remove temporary script file %v: %v", scriptFile, removeErr)
-            }
-        }
-    }()
-    
     // Write script content to file
     err = file.Save(scriptFile, scriptContent)
     if err != nil {
@@ -619,15 +316,7 @@ case "bash":
         return
     }
     
-    // Make script executable (optional, since we run via 'bash scriptfile')
-    chmodErr := os.Chmod(scriptFile, 0755)
-    if chmodErr != nil {
-        yakit.Info("Note: Failed to chmod script file: %v (continuing anyway)", chmodErr)
-    }
-    
     yakit.Info("Executing bash login shell with %d seconds timeout", timeoutSeconds)
-    yakit.Info("Bash binary: %v", bashPath)
-    yakit.Info("Script file: %v", scriptFile)
     
     // Execute the script using login bash so /etc/profile and user bash profile files load.
     bashScriptFile := scriptFile
@@ -639,7 +328,7 @@ case "bash":
     
 case "cmd":
     // For Windows cmd, pass the whole user command as one /c argument.
-    yakit.Info("Executing cmd command with %d seconds timeout: %v", timeoutSeconds, command)
+    yakit.Info("Executing cmd command with %d seconds timeout", timeoutSeconds)
     cmd, err = exec.CommandContext(ctx, "cmd.exe /d /s /c " + quoteForExec(command))
     
 case "powershell":
@@ -667,15 +356,6 @@ case "powershell":
         return
     }
     
-    defer func() {
-        if scriptFile != "" {
-            removeErr := file.Remove(scriptFile)
-            if removeErr != nil {
-                yakit.Info("Note: Failed to remove temporary script file %v: %v", scriptFile, removeErr)
-            }
-        }
-    }()
-    
     err = file.Save(scriptFile, scriptContent)
     if err != nil {
         yakit.Error("Failed to write PowerShell script content to file: %v", err)
@@ -684,8 +364,6 @@ case "powershell":
     }
     
     yakit.Info("Executing PowerShell script with %d seconds timeout", timeoutSeconds)
-    yakit.Info("PowerShell binary: %v", powershellPath)
-    yakit.Info("Script file: %v", scriptFile)
     
     cmd, err = exec.CommandContext(ctx, quoteForExec(powershellPath) + " -NoLogo -ExecutionPolicy Bypass -File " + quoteForExec(scriptFile))
     
