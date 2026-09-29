@@ -6,6 +6,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/sarif"
 	"github.com/yaklang/yaklang/common/schema"
+	"github.com/yaklang/yaklang/common/yak/ssaapi"
 )
 
 func coveredRisk(hash, feature, mode string) *schema.SSARisk {
@@ -64,4 +65,31 @@ func TestSarifReport_ApplyRiskUpdateDropsCoveredResult(t *testing.T) {
 		OldHash: source.Hash,
 	}))
 	require.Empty(t, report.run.Results, "the covered alert is removed before the richer one is added")
+}
+
+// TestReport_SourceFindingIsCoveredBySSA runs the two modes through the scan
+// runtime's own decision and checks the report keeps one entry, the later
+// mode's, for a source finding the deep scan covers.
+func TestReport_SourceFindingIsCoveredBySSA(t *testing.T) {
+	runtime := ssaapi.NewScanRuntime()
+	report := NewReport(IRifyReportType)
+	report.SetKeeper(runtime.KeepRisk)
+	runtime.ListenRisk(schema.RiskUpdateHandlerFunc(report.ApplyRiskUpdate))
+
+	source := coveredRisk("hash-source", "feature-cover", string(schema.SFR_MODE_SOURCE))
+	require.True(t, runtime.SubmitRisk(source))
+	report.AddRisks(&Risk{Hash: source.Hash, RiskFeatureHash: source.RiskFeatureHash, ScanMode: source.ScanMode})
+	require.Len(t, report.Risks, 1, "the source stage contributes its finding")
+
+	ssa := coveredRisk("hash-ssa", "feature-cover", string(schema.SFR_MODE_SSA))
+	require.True(t, runtime.SubmitRisk(ssa))
+	require.Empty(t, report.Risks, "the cover decision drops the earlier body")
+
+	// The richer result of the later stage adds its own body.
+	report.AddRisks(&Risk{Hash: ssa.Hash, RiskFeatureHash: ssa.RiskFeatureHash, ScanMode: ssa.ScanMode})
+
+	require.Len(t, report.Risks, 1, "one entry per finding")
+	for _, risk := range report.Risks {
+		require.Equal(t, string(schema.SFR_MODE_SSA), risk.ScanMode)
+	}
 }
