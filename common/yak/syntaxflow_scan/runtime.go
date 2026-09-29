@@ -133,9 +133,16 @@ func (m *scanManager) skipRule(program, rule, reason string) {
 	m.processMonitor.EmitEvent()
 }
 
+// ruleMatchesQueryTarget decides whether a rule runs on a target on its own.
+// A Program is a multi-mode target (its Query dispatches by the rule mode), so
+// it accepts every mode; the single-mode targets accept only their own mode,
+// and an SSA rule never runs on a raw source target.
 func ruleMatchesQueryTarget(rule *schema.SyntaxFlowRule, target ssaapi.SyntaxFlowQueryInstance) bool {
 	if rule == nil || target == nil {
 		return false
+	}
+	if _, ok := target.(*ssaapi.Program); ok {
+		return true
 	}
 	switch schema.ValidRuleMode(rule.Mode) {
 	case schema.SFR_MODE_SOURCE:
