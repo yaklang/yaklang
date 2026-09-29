@@ -50,6 +50,11 @@ func wrapCompileTimeline(t *testing.T, timeline *[]string, onStart func(cfg *ssa
 	t.Helper()
 	orig := syntaxflow_scan.CompileProject
 	t.Cleanup(func() { syntaxflow_scan.CompileProject = orig })
+	if orig == nil {
+		// Nothing registers the compiler any more: the default path is a plain
+		// function, so the timeline wrapper still has something to call.
+		orig = syntaxflow_scan.CompileProjectDefault
+	}
 	syntaxflow_scan.CompileProject = func(ctx context.Context, cfg *ssaconfig.Config, extra ...ssaconfig.Option) (*ssaapi.Program, error) {
 		*timeline = append(*timeline, "compile:start")
 		if onStart != nil {
