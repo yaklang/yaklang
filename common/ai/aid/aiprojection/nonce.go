@@ -46,9 +46,10 @@ func CreateTag(tag, label, content string) string {
 // CreateTemplate marks control tags in a TRUSTED template before substituting
 // user/tool/model data. Never call this on an already assembled prompt.
 func CreateTemplate(template string) string {
+	suffix := "_" + projectionNonce
 	return rewriteTagTokens(template, func(token string) string {
-		if isProjectionToken(token) && !strings.HasSuffix(token, "_"+projectionNonce) {
-			return token + "_" + projectionNonce
+		if isProjectionToken(token) && !strings.HasSuffix(token, suffix) {
+			return token + suffix
 		}
 		return token
 	})
@@ -113,8 +114,10 @@ func prepareProjection(text, nonce string) (string, bool) {
 		nested := strings.Index(text, "<|")
 		if end >= 0 && (nested < 0 || nested > end) {
 			token := text[:end]
-			if nonce != "" && strings.HasSuffix(token, suffix) && isProjectionToken(strings.TrimSuffix(token, suffix)) {
-				out.WriteString("<|" + strings.TrimSuffix(token, suffix) + "|>")
+			if plain, signed := strings.CutSuffix(token, suffix); nonce != "" && signed && isProjectionToken(plain) {
+				out.WriteString("<|")
+				out.WriteString(plain)
+				out.WriteString("|>")
 				text = text[end+2:]
 				found = true
 				continue
@@ -181,21 +184,17 @@ func CreateToolParamSchema(tool aispec.Tool) (string, error) {
 }
 
 func createSchema(tag string, tool aispec.Tool) (string, error) {
-	if tool.Type != "function" || !validActionSchemaName(tool.Function.Name) {
-		return "", fmt.Errorf("invalid projection tool definition")
-	}
 	encoded, err := json.Marshal(tool)
 	if err != nil {
+		return "", fmt.Errorf("encode projection tool: %w", err)
+	}
+	// Decode after marshaling so structs, typed maps and RawMessage parameters
+	// follow the same validation rules as schemas extracted from a prompt.
+	schema := string(encoded)
+	if _, err := decodeProjectionTool(schema); err != nil {
 		return "", err
 	}
-	var canonical aispec.Tool
-	if err := json.Unmarshal(encoded, &canonical); err != nil {
-		return "", err
-	}
-	if err := validateProjectionTool(canonical); err != nil {
-		return "", err
-	}
-	return CreateTag(tag, tool.Function.Name, string(encoded)), nil
+	return CreateTag(tag, tool.Function.Name, schema), nil
 }
 
 func CreateActionResponse(payload json.RawMessage) (string, error) {
