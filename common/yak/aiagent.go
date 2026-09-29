@@ -166,9 +166,17 @@ func YakTool2AITool(aitools []*schema.AIYakTool) []*aitool.Tool {
 				registerBrowserSessionHooks(engine, browserTracker)
 				engine.RegisterEngineHooks(func(ae *antlr4yak.Engine) error {
 					// Bind only this invocation; never redirect the process or global builtins.
-					ae.SetVars(map[string]any{"println": func(values ...any) (int, error) {
-						return builtin.PrintlnTo(stdout, values...)
-					}})
+					ae.SetVars(map[string]any{
+						"print": func(values ...any) (int, error) {
+							return fmt.Fprint(stdout, values...)
+						},
+						"printf": func(format string, values ...any) (int, error) {
+							return fmt.Fprintf(stdout, format, values...)
+						},
+						"println": func(values ...any) (int, error) {
+							return builtin.PrintlnTo(stdout, values...)
+						},
+					})
 					pluginContext := CreateYakitPluginContext(
 						runtimeId,
 					).WithContext(
