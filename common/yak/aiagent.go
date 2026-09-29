@@ -8,6 +8,8 @@ import (
 	"reflect"
 	"strings"
 
+	"github.com/davecgh/go-spew/spew"
+
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	// blank-import aive 触发价值评估 submitter 的 init() 注册 (默认开启).
 	// 关键词: aive blank import, RegisterValueFeedbackSubmitter 触发
@@ -167,6 +169,9 @@ func YakTool2AITool(aitools []*schema.AIYakTool) []*aitool.Tool {
 				engine.RegisterEngineHooks(func(ae *antlr4yak.Engine) error {
 					// Bind only this invocation; never redirect the process or global builtins.
 					ae.SetVars(map[string]any{
+						"dump": func(values ...any) {
+							spew.Fdump(stdout, values...)
+						},
 						"print": func(values ...any) (int, error) {
 							return fmt.Fprint(stdout, values...)
 						},
