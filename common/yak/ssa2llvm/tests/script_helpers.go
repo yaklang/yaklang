@@ -253,7 +253,7 @@ func RunYakScriptFileWithCLI(t *testing.T, scriptPath string, env map[string]str
 
 	// Real CLI compile/run must match ordinary user flows (usable runtime
 	// archive + fresh rebuild), exactly like runSSA2LLVMCLI.
-	res := runSSA2LLVMCLIInDir(t, "", "compile", scriptAbs, "-o", bin, "-f", "", "-a")
+	res := runSSA2LLVMCLIInDirScratch(t, "compile", scriptAbs, "-o", bin, "-f", "", "-a")
 	if res.ExitCode != 0 {
 		t.Fatalf("ssa2llvm compile failed (exit %d):\n%s", res.ExitCode, res.Output)
 	}
@@ -282,7 +282,7 @@ func RunYakScriptFileWithCLITimeout(t *testing.T, ctx context.Context, scriptPat
 	name := strings.TrimSuffix(filepath.Base(scriptAbs), filepath.Ext(scriptAbs))
 	bin := filepath.Join(tmpDir, name+".bin")
 
-	res := runSSA2LLVMCLIInDir(t, "", "compile", scriptAbs, "-o", bin, "-f", "", "-a")
+	res := runSSA2LLVMCLIInDirScratch(t, "compile", scriptAbs, "-o", bin, "-f", "", "-a")
 	if res.ExitCode != 0 {
 		t.Fatalf("ssa2llvm compile failed (exit %d):\n%s", res.ExitCode, res.Output)
 	}
