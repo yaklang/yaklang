@@ -179,13 +179,7 @@ func newPHPFileBuilder(functionBuilder *ssa.FunctionBuilder, callbackBuilder *ss
 		if app == nil {
 			app = callbackBuilder.GetProgram()
 		}
-		files, ok := app.LibraryFile[str]
-		if ok {
-			files = append(files, filename)
-		} else {
-			files = []string{filename}
-		}
-		app.LibraryFile[str] = files
+		app.AppendLibraryFile(str, filename)
 	}
 	return build
 }
@@ -271,7 +265,10 @@ func registerPHPFileBuild(ast phpparser.IHtmlDocumentContext, b *ssa.FunctionBui
 	functionBuilder.AddLazyBuilder(func() {
 		buildCapturedChildren(capturedBuilder)
 	}, true)
-	app.RegisterFileBuild(path, editor, capturedBuilder, func(fileFb *ssa.FunctionBuilder) {
+	// Register through the directory owner so the deferred task retains its
+	// compile-unit key. The task map remains application-wide, but this lets
+	// the batch runner build the file before that unit is flushed.
+	prog.RegisterFileBuild(path, editor, capturedBuilder, func(fileFb *ssa.FunctionBuilder) {
 		buildCapturedChildren(fileFb)
 	})
 }

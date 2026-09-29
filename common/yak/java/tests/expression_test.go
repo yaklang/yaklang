@@ -168,6 +168,18 @@ public class Main {
 		println(b);
 		`, []string{"2"}, t)
 	})
+	t.Run("test nested switch expression outcome", func(t *testing.T) {
+		CheckJavaPrintlnValue(`
+		int result = switch (1) {
+		case 1 -> switch (2) {
+			case 2 -> 0;
+			default -> 2;
+		};
+		default -> 2;
+		};
+		println(result);
+		`, []string{"0"}, t)
+	})
 	t.Run("test switch expression with muti-cases", func(t *testing.T) {
 		CheckJavaPrintlnValue(` 
 		int a = 1;

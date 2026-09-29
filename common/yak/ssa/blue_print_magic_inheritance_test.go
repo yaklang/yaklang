@@ -6,6 +6,15 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestBlueprintMagicMethodWithoutContainer(t *testing.T) {
+	_, builder := newTestBuilder(t)
+	blueprint := NewBlueprint("Detached")
+	require.False(t, blueprint.IsMagicMethodName(Constructor))
+	method := blueprint.GetMagicMethod(Constructor, builder)
+	require.NotNil(t, method)
+	require.Equal(t, method.GetId(), blueprint.Constructor.GetId())
+}
+
 func TestBlueprintAddParentKeepsHistoricalParentEffectiveMagicMethods(t *testing.T) {
 	_, builder := newTestBuilder(t)
 	parent := builder.CreateBlueprint("Parent")

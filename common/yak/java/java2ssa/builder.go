@@ -133,6 +133,33 @@ type singleFileBuilder struct {
 	stableAnonClassSeq   int
 }
 
+// forkForLazyBuild gives a deferred task its own mutable frontend state. A
+// file can contribute lazy functions to different libraries, which the unit
+// scheduler may drain concurrently. Sharing FunctionBuilder between those
+// tasks lets one task's SwitchFunctionBuilder/PopFunction clear another's
+// active builder. The file-level lookup maps are copied after declaration
+// pre-handling has finished, so lazy writes cannot race with sibling tasks.
+func (b *singleFileBuilder) forkForLazyBuild() *singleFileBuilder {
+	if b == nil {
+		return nil
+	}
+	fork := *b
+	fork.constMap = make(map[string]ssa.Value, len(b.constMap))
+	for key, value := range b.constMap {
+		fork.constMap[key] = value
+	}
+	fork.fullTypeNameMap = make(map[string][]string, len(b.fullTypeNameMap))
+	for key, values := range b.fullTypeNameMap {
+		fork.fullTypeNameMap[key] = append([]string(nil), values...)
+	}
+	fork.allImportPkgSlice = make([][]string, len(b.allImportPkgSlice))
+	for index, values := range b.allImportPkgSlice {
+		fork.allImportPkgSlice[index] = append([]string(nil), values...)
+	}
+	fork.selfPkgPath = append([]string(nil), b.selfPkgPath...)
+	return &fork
+}
+
 func Frontend(src string, caches ...*ssa.AntlrCache) (javaparser.ICompilationUnitContext, error) {
 	var cache *ssa.AntlrCache
 	if len(caches) > 0 {

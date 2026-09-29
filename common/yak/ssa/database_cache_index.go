@@ -58,7 +58,7 @@ func newIndexStore(cfg *ssaconfig.Config, prog *Program, mode ProgramCacheKind, 
 
 	store.indexSaver = dbcache.NewSave(func(indices []*ssadb.IrIndex) error {
 		saveStep := func() error {
-			return utils.GormTransaction(db, func(tx *gorm.DB) error {
+			return cacheWriteTransaction(db, func(tx *gorm.DB) error {
 				batch := make([]*ssadb.IrIndex, 0, len(indices))
 				for _, index := range indices {
 					if index != nil {
@@ -77,7 +77,7 @@ func newIndexStore(cfg *ssaconfig.Config, prog *Program, mode ProgramCacheKind, 
 	)
 	store.offsetSaver = dbcache.NewSave(func(offsets []*ssadb.IrOffset) error {
 		saveStep := func() error {
-			return utils.GormTransaction(db, func(tx *gorm.DB) error {
+			return cacheWriteTransaction(db, func(tx *gorm.DB) error {
 				return ssadb.SaveIrOffsetBatch(tx, offsets)
 			})
 		}

@@ -10,6 +10,39 @@ import (
 	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 )
 
+// AppendLibraryFile records a frontend's library-to-file relation on the
+// application. Compile-unit prehandlers may call this from different owners.
+func (prog *Program) AppendLibraryFile(name, filename string) {
+	if prog == nil || name == "" || filename == "" {
+		return
+	}
+	app := prog.GetApplication()
+	if app == nil {
+		app = prog
+	}
+	app.libraryFileMu.Lock()
+	if app.LibraryFile == nil {
+		app.LibraryFile = make(map[string][]string)
+	}
+	app.LibraryFile[name] = append(app.LibraryFile[name], filename)
+	app.libraryFileMu.Unlock()
+}
+
+// LibraryFiles returns a snapshot so readers do not share the mutable slice.
+func (prog *Program) LibraryFiles(name string) []string {
+	if prog == nil || name == "" {
+		return nil
+	}
+	app := prog.GetApplication()
+	if app == nil {
+		app = prog
+	}
+	app.libraryFileMu.RLock()
+	files := append([]string(nil), app.LibraryFile[name]...)
+	app.libraryFileMu.RUnlock()
+	return files
+}
+
 // BeginCompileUnit marks the start of a compile unit so deferred file builds
 // capture this unitKey. Function/class LazyBuild is owned by the unit's
 // library Program (see ProgramForCompileUnit), not by this string.
@@ -116,7 +149,8 @@ func (prog *Program) GetOrCreateUnitBuilder(unitKey string, parent *FunctionBuil
 // Language-prefixed keys encode the package/namespace after the first colon
 // (java:a.b → a.b, csharp:Foo.Bar → Foo.Bar, php:App.Http → App.Http).
 // Directory keys (dir:helper/db) become library names so Python/JS/TS
-// directory units can drain concurrently. Go and PHP keep serial drain.
+// directory units can drain concurrently. Go uses its declared package name;
+// PHP keeps the serial application drain.
 // Resource keys and the project-root directory stay on the Application.
 func libraryNameFromCompileUnitKey(unitKey string) string {
 	if unitKey == "" {
@@ -141,8 +175,8 @@ func libraryNameFromCompileUnitKey(unitKey string) string {
 }
 
 // Go's frontend owns its package libraries by declared package name, which
-// cannot be recovered from a directory key. Keep directory units on the
-// application until the scheduler can map each key to its declared package.
+// cannot be recovered from a directory key. Keep declaration registration on
+// the application; ProgramForCompileUnit maps the body build to the package.
 func (prog *Program) libraryNameForCompileUnit(unitKey string) string {
 	name := libraryNameFromCompileUnitKey(unitKey)
 	app := prog.GetApplication()
@@ -166,6 +200,17 @@ func (prog *Program) ProgramForCompileUnit(unitKey string) *Program {
 	app := prog.GetApplication()
 	if app == nil {
 		app = prog
+	}
+	if app.Language == ssaconfig.GO && strings.HasPrefix(unitKey, "dir:") {
+		for _, unit := range app.CompileUnits {
+			if unit != nil && unit.Key == unitKey && unit.LibraryName != "" {
+				if lib, _ := app.GetLibrary(unit.LibraryName); lib != nil {
+					return lib
+				}
+				break
+			}
+		}
+		return app
 	}
 	if name := prog.libraryNameForCompileUnit(unitKey); name != "" {
 		if lib, _ := app.GetLibrary(name); lib != nil {

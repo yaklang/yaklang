@@ -24,6 +24,18 @@ func Test_Type_ContainSelf(t *testing.T) {
 	})
 }
 
+func TestFunctionAddAnnotationFuncInitializesDeferredType(t *testing.T) {
+	f := &ssa.Function{}
+	called := false
+	f.AddAnnotationFunc(func(ssa.Value) { called = true })
+	ft, ok := ssa.ToFunctionType(f.GetType())
+	require.True(t, ok)
+	require.Same(t, f, ft.This)
+	require.Len(t, ft.AnnotationFunc, 1)
+	ft.AnnotationFunc[0](nil)
+	require.True(t, called)
+}
+
 func Test_Type_CheckOrType(t *testing.T) {
 	// {
 	// 	str1 := ssa.CreateStringType()

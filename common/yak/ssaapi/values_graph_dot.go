@@ -47,12 +47,33 @@ func (g *DotGraph) createNode(value *Value, isEntry ...bool) int {
 	// nodeId := 0
 	code := ""
 	if r := value.GetRange(); r != nil {
+		// Some in-memory values retain positions after their editor pointer is
+		// released. A uniquely sourced program can recover the source text
+		// without guessing which file those positions refer to.
+		if r.GetEditor() == nil {
+			if inst := value.getInstruction(); inst != nil {
+				if prog := inst.GetProgram(); prog != nil {
+					if app := prog.GetApplication(); app != nil && len(app.FileList) == 1 {
+						for url, hash := range app.FileList {
+							editor, ok := app.GetEditor(url)
+							if !ok {
+								editor, ok = app.GetEditorByHash(hash)
+							}
+							if ok {
+								r.SetEditor(editor)
+							}
+						}
+					}
+				}
+			}
+		}
 		code = r.GetText()
 		if len(code) > 100 {
 			code = code[:100] + "..."
 		}
 		code = removeEscapes(code)
-	} else {
+	}
+	if code == "" {
 		code = value.GetVerboseName()
 	}
 	if entry {

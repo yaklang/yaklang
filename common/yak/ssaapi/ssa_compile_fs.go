@@ -208,7 +208,7 @@ func (c *Config) parseProjectWithFSUnits(
 	}()
 	defer func() {
 		if r := recover(); r != nil {
-			err = utils.Errorf("parse project panic: %v", r)
+			err = utils.JoinErrors(err, utils.Errorf("parse project panic: %v", r))
 			log.Errorf("parse project error: %s", r)
 			utils.PrintCurrentGoroutineRuntimeStack()
 		}
@@ -220,12 +220,25 @@ func (c *Config) parseProjectWithFSUnits(
 	programPath := c.programPath
 	var processBits atomic.Uint64
 	var progressMu sync.Mutex
+	var lastReportedProcess float64
 	loadProcess := func() float64 { return math.Float64frombits(processBits.Load()) }
-	storeProcess := func(p float64) { processBits.Store(math.Float64bits(p)) }
+	storeProcess := func(p float64) {
+		for {
+			old := processBits.Load()
+			if p <= math.Float64frombits(old) || processBits.CompareAndSwap(old, math.Float64bits(p)) {
+				return
+			}
+		}
+	}
 	reportProcess := func(p float64, msg string, args ...any) {
 		progressMu.Lock()
+		defer progressMu.Unlock()
+		if p < lastReportedProcess {
+			p = lastReportedProcess
+		} else {
+			lastReportedProcess = p
+		}
 		processCallback(p, msg, args...)
-		progressMu.Unlock()
 	}
 	start := time.Now()
 
@@ -269,7 +282,7 @@ func (c *Config) parseProjectWithFSUnits(
 	calculateTime = time.Since(start)
 	c.Config.SetCompileProjectBytes(scanResult.HandlerBytes)
 	emitCompileScale(processCallback, loadProcess(), scanResult)
-	if restoreGC := c.applyLargeProjectGCPercent(); restoreGC != nil {
+	if restoreGC := c.applyCompileProjectGCPercent(); restoreGC != nil {
 		defer restoreGC()
 	}
 
@@ -398,14 +411,10 @@ func (c *Config) parseProjectWithFSUnits(
 	prog.SetPreHandler(true)
 	prog.ProcessInfof("unit compile start scc=%d batches=%d", len(plan.Order), len(batches))
 	var structProgAPI *Program
-	var batchPipeline compileBatchPipeline
-	defer batchPipeline.Wait()
 	for batchIndex, batch := range batches {
 		if c.isStop() {
 			return nil, ErrContextCancel
 		}
-		// Start bounded parsing while the previous batch scans and persists.
-		// Wait only before touching shared Program/type/instruction state.
 		var batchFiles []string
 		fileUnits := make(map[string]string, batch.files)
 		for _, unit := range batch.units {
@@ -425,14 +434,8 @@ func (c *Config) parseProjectWithFSUnits(
 			order = ssareducer.BoundedOrder
 		}
 		prefetchedFiles := c.getFileHandlerWithOrder(filesystem, batchFiles, preHandlerFileSet, order)
-		if err := batchPipeline.Wait(); err != nil {
-			if prefetchedFiles != nil {
-				for file := range prefetchedFiles {
-					file.Release()
-				}
-			}
-			return nil, err
-		}
+		prog.SetPreHandler(true)
+		compilePhase = "f1_units"
 		if holdSCCIR && prog.Cache != nil {
 			prog.Cache.DisableInstructionSpill()
 		}
@@ -445,6 +448,12 @@ func (c *Config) parseProjectWithFSUnits(
 				batchIndex+1, len(batches), batch.startSCC+1, batch.endSCC+1, len(batch.units), batch.files, batch.bytes, spillMode)
 		}
 		concurrentPrehandle := prog.ConcurrentUnitBuildEnabled()
+		if language, ok := c.LanguageBuilder.(ssa.ConcurrentUnitPreHandler); ok {
+			// Declaration registration and deferred body building have distinct
+			// safety boundaries. A frontend may safely prehandle independent
+			// owners even when its body drain must remain serial.
+			concurrentPrehandle = language.SupportsConcurrentUnitPreHandler()
+		}
 		if concurrentPrehandle {
 			for _, key := range unitKeys {
 				prog.EnsureLibraryForCompileUnit(key)
@@ -537,64 +546,40 @@ func (c *Config) parseProjectWithFSUnits(
 			// their existing single drain, including upstream library discovery.
 			prog.LazyBuildForUnits(unitKeys)
 		} else {
-			waves := compileUnitBuildWaves(plan, batch)
-			builtOwners := make(map[*ssa.Program]bool)
-			for waveIndex, wave := range waves {
-				waveStart := time.Now()
-				peak, err := buildCompileUnitWaveWithOwners(c.GetContext(), prog, wave, c.GetCompileConcurrency(), builtOwners)
-				log.Infof("compile unit wave batch=%d wave=%d/%d groups=%d concurrency=%d peak_active=%d cost=%v",
-					batchIndex+1, waveIndex+1, len(waves), len(wave), c.GetCompileConcurrency(), peak, time.Since(waveStart))
-				if err != nil {
-					return nil, err
-				}
+			buildStart := time.Now()
+			peak, err := buildCompileUnitPipeline(c.GetContext(), prog, plan, batch, c.GetCompileConcurrency())
+			log.Infof("compile unit pipeline batch=%d groups=%d concurrency=%d peak_active=%d cost=%v",
+				batchIndex+1, len(batch.unitKeys), c.GetCompileConcurrency(), peak, time.Since(buildStart))
+			if err != nil {
+				return nil, err
 			}
 		}
 		if c.isStop() {
 			return nil, ErrContextCancel
 		}
+		// A single-batch project has no future declarations to add to the
+		// application entry functions. Finish their lazy top-level work before
+		// the struct scan observes resident instructions.
+		if structScanOn && len(batches) == 1 {
+			prog.Finish()
+		}
 		parseTime += time.Since(unitBuildStart)
-		batchPipeline.Start(func() error {
-			if structScanOn {
-				if structProgAPI == nil {
-					structProgAPI = NewProgram(prog, c)
-				}
-				index := &structResidentOpcodeIndex{prog: prog}
-				for _, unit := range batch.units {
-					if unit == nil {
-						continue
-					}
-					reportProcess(loadProcess(), fmt.Sprintf("[struct_scan] package=%s", unit.Key))
-					c.structScan.scanStructWithOpcodeIndex(structProgAPI, unit, index)
-					if c.isStop() {
-						return ErrContextCancel
-					}
-				}
-				c.structScan.WaitSaves()
-				if prog.Cache != nil {
-					prog.Cache.EnableInstructionSpill()
-				}
-			}
-			// Per-batch flush evicts ordinary instructions while retaining
-			// cross-unit boundaries. The program cache owns database selection.
-			if prog.Cache != nil {
-				if !isIncremental {
-					prog.Cache.FlushCompileUnit(strings.Join(unitKeys, ","))
-				}
-				prog.Cache.FlushInstructionSaver()
-				prog.Cache.FlushAuxSavers()
-				prog.CheckMemoryPressure(batchIndex+1, len(batches))
-			}
-			if compileUnitLogEnabled() {
-				prog.ProcessInfof("compile unit batch(%d/%d) build finished units=%s cost=%v", batchIndex+1, len(batches), strings.Join(unitKeys, ","), time.Since(unitBuildStart))
-			}
-			logPhaseHeap(fmt.Sprintf("unit_batch_%03d", batchIndex+1))
-			prog.SetPreHandler(true)
-			compilePhase = "f1_units"
-			return nil
-		})
-	}
-	if err := batchPipeline.Wait(); err != nil {
-		return nil, err
+		if structScanOn && structProgAPI == nil {
+			structProgAPI = NewProgram(prog, c)
+		}
+		cleanup := compileBatchCleanup{
+			config: c, program: prog, apiProgram: structProgAPI,
+			batch: batch, unitKeys: unitKeys, structScan: structScanOn,
+			incremental: isIncremental, batchIndex: batchIndex,
+			batchCount: len(batches), buildStarted: unitBuildStart,
+			loadProgress: loadProcess, reportProgress: reportProcess,
+		}
+		// The scan and cache mutate or traverse shared IR. Finish them before
+		// starting the next batch; compilation parallelism is inside the DAG
+		// scheduler above, not in an unowned cleanup goroutine.
+		if err := cleanup.run(); err != nil {
+			return nil, err
+		}
 	}
 	preHandlerTime = time.Since(unitStart) - parseTime
 	if astErr != nil && c.GetCompileStrictMode() {
@@ -781,7 +766,7 @@ func (c *Config) parseProjectWithFSLegacy(
 	// This is runtime tuning input, not persistent project metadata.
 	c.Config.SetCompileProjectBytes(scanResult.HandlerBytes)
 	emitCompileScale(processCallback, 0, scanResult)
-	if restoreGC := c.applyLargeProjectGCPercent(); restoreGC != nil {
+	if restoreGC := c.applyCompileProjectGCPercent(); restoreGC != nil {
 		defer restoreGC()
 	}
 	c.Config.SetCompileUnitSplit(false)
