@@ -3,6 +3,7 @@ package builtin
 import (
 	"fmt"
 	"io"
+	"os"
 	"reflect"
 	"strings"
 	"unicode/utf8"
@@ -670,6 +671,11 @@ func printf(format string, a ...any) (n int, err error) {
 // println("hello yak")
 // ```
 func println(a ...any) (n int, err error) {
+	return PrintlnTo(os.Stdout, a...)
+}
+
+// PrintlnTo preserves Yak println formatting while writing to a caller-owned stream.
+func PrintlnTo(w io.Writer, a ...any) (n int, err error) {
 	var results = make([]any, len(a))
 	for i, v := range a {
 		switch val := v.(type) {
@@ -685,7 +691,7 @@ func println(a ...any) (n int, err error) {
 			results[i] = val
 		}
 	}
-	return fmt.Println(results...)
+	return fmt.Fprintln(w, results...)
 }
 
 // sprint 使用默认格式进行格式化并返回字符串
