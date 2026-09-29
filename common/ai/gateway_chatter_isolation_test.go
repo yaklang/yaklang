@@ -40,9 +40,14 @@ func (g *isolatedChatterGateway) Chat(prompt string, _ ...any) (string, error) {
 func TestLoadChaterIsolatesConcurrentInvocationOptions(t *testing.T) {
 	started, release := make(chan struct{}), make(chan struct{})
 	defer close(release)
-	provider := "test-isolated-chatter"
+	provider := t.Name()
+	require.NotContains(t, aispec.GetRegisteredAIGateways(), provider)
 	aispec.Register(provider, func() aispec.AIClient {
 		return &isolatedChatterGateway{firstStarted: started, releaseFirst: release}
+	})
+	t.Cleanup(func() {
+		aispec.Unregister(provider)
+		require.NotContains(t, aispec.GetRegisteredAIGateways(), provider)
 	})
 	chat, err := LoadChater(provider, aispec.WithModel("default-model"))
 	require.NoError(t, err)

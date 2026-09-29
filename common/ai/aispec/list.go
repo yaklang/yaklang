@@ -15,6 +15,11 @@ func Register(name string, gateway func() AIClient) {
 	list.Set(name, gateway)
 }
 
+// Unregister removes a gateway registration by name.
+func Unregister(name string) {
+	list.Delete(name)
+}
+
 func Lookup(name string) (AIClient, bool) {
 	creator, ok := list.Get(name)
 	if !ok {
