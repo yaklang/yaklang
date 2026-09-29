@@ -2,6 +2,8 @@ package syntaxflow_scan_test
 
 import (
 	"context"
+	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -9,6 +11,7 @@ import (
 	"github.com/yaklang/yaklang/common/utils/filesys"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/sfreport"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 	"github.com/yaklang/yaklang/common/yak/syntaxflow_scan"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
@@ -185,4 +188,55 @@ alert $call`,
 	require.NoError(t, ssadb.GetDB().Model(&schema.SSARisk{}).
 		Where("runtime_id = ?", runtimeID).Count(&riskCount).Error)
 	require.Zero(t, riskCount, "a memory scan writes no risk row")
+}
+
+// TestScanProject_DatabaseModeWritesThroughSaver is the project-scan
+// counterpart of the gRPC database scan: an explicit database result kind
+// registers the scan's database consumer, so the result row, the audit graph
+// and the risk row are written by the saver instead of the query. The default
+// project scan stays in memory.
+func TestScanProject_DatabaseModeWritesThroughSaver(t *testing.T) {
+	const programName = "project-db-saver-program"
+	t.Cleanup(func() {
+		ssadb.DeleteProgram(ssadb.GetDB(), programName)
+	})
+
+	dir := t.TempDir()
+	require.NoError(t, os.WriteFile(
+		filepath.Join(dir, "main.go"),
+		[]byte(coverProgramSource),
+		0o644,
+	))
+
+	report := sfreport.NewReport(sfreport.IRifyReportType)
+	_, err := syntaxflow_scan.ScanProject(context.Background(),
+		ssaconfig.WithCodeSourceKind(ssaconfig.CodeSourceLocal),
+		ssaconfig.WithCodeSourceLocalFile(dir),
+		ssaconfig.WithProjectRawLanguage("golang"),
+		ssaconfig.WithSetProgramName(programName),
+		ssaconfig.WithScanIgnoreLanguage(true),
+		ssaconfig.WithSyntaxFlowResultKind(ssaconfig.SFResultSaveDatabase),
+		ssaconfig.WithRuleInput(&ypb.SyntaxFlowRuleInput{
+			Content: `desc(mode: "struct", language: golang, title: "project db saver")
+sink(* as $arg) as $call;
+alert $call`,
+			Language: "golang",
+		}),
+		ssaconfig.WithRuleInput(&ypb.SyntaxFlowRuleInput{
+			Content: `desc(mode: "ssa", language: golang, title: "project db saver")
+sink(* as $arg) as $call;
+alert $call`,
+			Language: "golang",
+		}),
+		syntaxflow_scan.WithMode(syntaxflow_scan.StructMode, syntaxflow_scan.SSAMode),
+		syntaxflow_scan.WithReporter(report),
+	)
+	require.NoError(t, err)
+
+	require.Positive(t, countAuditRowsForProgram(t, programName),
+		"the database saver writes the result row and the audit graph")
+	require.Positive(t, countSSARisksForProgram(t, programName),
+		"the database saver writes the risk row")
+	require.Equal(t, int64(len(report.Risks)), countSSARisksForProgram(t, programName),
+		"the stored risks match the findings the scan kept")
 }
