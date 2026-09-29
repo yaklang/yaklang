@@ -224,6 +224,10 @@ func (r *SyntaxFlowResult) SaveRisk(
 	ssaRisk.RuntimeId = r.TaskID
 	ssaRisk.ResultID = uint64(r.GetResultID())
 	ssaRisk.ResultUUID = r.GetResultUUID()
+	// The row hash covers the result identity, so it must be computed after
+	// those fields are set: the same finding reported by two results is two
+	// rows, and the unique index on hash must not collapse them.
+	ssaRisk.Hash = ssaRisk.CalcHash()
 	r.riskMap[name] = ssaRisk
 
 	// A scan runtime owns the decision and the persistence of every risk: it

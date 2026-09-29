@@ -1,6 +1,8 @@
 package ssaapi
 
 import (
+	"sync"
+
 	"github.com/google/uuid"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
@@ -16,10 +18,13 @@ import (
 type ScanRuntime struct {
 	ID string
 
-	collect  *schema.RiskCollect
+	collect *schema.RiskCollect
+
+	mu       sync.Mutex
 	results  []func(*SyntaxFlowResult) error
 	risks    []schema.RiskUpdateHandler
 	noRiskDB bool
+	bindings map[string]struct{}
 }
 
 // NewScanRuntime creates the runtime of one scan.
@@ -45,6 +50,8 @@ func (r *ScanRuntime) ListenResult(fn func(*SyntaxFlowResult) error) {
 	if r == nil || fn == nil {
 		return
 	}
+	r.mu.Lock()
+	defer r.mu.Unlock()
 	r.results = append(r.results, fn)
 }
 
@@ -54,7 +61,29 @@ func (r *ScanRuntime) ListenRisk(handler schema.RiskUpdateHandler) {
 	if r == nil || handler == nil {
 		return
 	}
+	r.mu.Lock()
+	defer r.mu.Unlock()
 	r.risks = append(r.risks, handler)
+}
+
+// BindOnce runs fn the first time this runtime binds the key. Several stages
+// of one scan share a runtime, and a consumer that owns the whole scan (for
+// example a report writer) must attach exactly once.
+func (r *ScanRuntime) BindOnce(key string, fn func()) {
+	if r == nil || fn == nil || key == "" {
+		return
+	}
+	r.mu.Lock()
+	if r.bindings == nil {
+		r.bindings = map[string]struct{}{}
+	}
+	if _, ok := r.bindings[key]; ok {
+		r.mu.Unlock()
+		return
+	}
+	r.bindings[key] = struct{}{}
+	r.mu.Unlock()
+	fn()
 }
 
 // SetNoRiskDB marks this scan as "do not persist risks". Consumers that
@@ -63,6 +92,8 @@ func (r *ScanRuntime) SetNoRiskDB(noSave bool) {
 	if r == nil {
 		return
 	}
+	r.mu.Lock()
+	defer r.mu.Unlock()
 	r.noRiskDB = noSave
 }
 
@@ -71,6 +102,8 @@ func (r *ScanRuntime) NoRiskDB() bool {
 	if r == nil {
 		return false
 	}
+	r.mu.Lock()
+	defer r.mu.Unlock()
 	return r.noRiskDB
 }
 
@@ -79,8 +112,11 @@ func (r *ScanRuntime) EmitResult(res *SyntaxFlowResult) error {
 	if r == nil || res == nil {
 		return nil
 	}
+	r.mu.Lock()
+	listeners := append([]func(*SyntaxFlowResult) error(nil), r.results...)
+	r.mu.Unlock()
 	var errs error
-	for _, fn := range r.results {
+	for _, fn := range listeners {
 		if fn == nil {
 			continue
 		}
@@ -105,7 +141,10 @@ func (r *ScanRuntime) SubmitRisk(risk *schema.SSARisk) bool {
 		// higher level covers it. Nothing to publish.
 		return true
 	}
-	for _, handler := range r.risks {
+	r.mu.Lock()
+	handlers := append([]schema.RiskUpdateHandler(nil), r.risks...)
+	r.mu.Unlock()
+	for _, handler := range handlers {
 		if handler == nil {
 			continue
 		}

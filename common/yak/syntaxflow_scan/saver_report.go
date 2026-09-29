@@ -31,12 +31,17 @@ func bindDBSaver(rt *ssaapi.ScanRuntime, kind schema.SyntaxflowResultKind, taskI
 	if rt == nil {
 		return nil
 	}
-	rt.SetNoRiskDB(noRisk)
-	saver := newDBSaver(kind, taskID, noRisk)
-	rt.ListenResult(saver.ApplyResult)
-	if !noRisk {
-		rt.ListenRisk(saver)
-	}
+	var saver *dbSaver
+	rt.BindOnce("db", func() {
+		rt.SetNoRiskDB(noRisk)
+		saver = newDBSaver(kind, taskID, noRisk)
+		rt.ListenResult(saver.ApplyResult)
+		if !noRisk {
+			rt.ListenRisk(saver)
+		}
+	})
+	// A nil saver means another stage of this scan already owns the database
+	// consumer; that stage flushes it.
 	return saver
 }
 
@@ -45,14 +50,17 @@ func ensureScanRuntime(cfg *Config) *ssaapi.ScanRuntime {
 	if cfg == nil {
 		return nil
 	}
-	if cfg.scanRuntime != nil {
-		return cfg.scanRuntime
+	if cfg.scanRuntime == nil {
+		cfg.scanRuntime = ssaapi.NewScanRuntime()
 	}
-	rt := ssaapi.NewScanRuntime()
-	cfg.scanRuntime = rt
+	rt := cfg.scanRuntime
 	if cfg.IsNoSaveRisk() {
 		rt.SetNoRiskDB(true)
 	}
-	bindReportSaver(rt, cfg.Reporter)
+	// The reporter consumes every stage of one scan, so it attaches exactly
+	// once even when the caller supplied the runtime.
+	rt.BindOnce("report", func() {
+		bindReportSaver(rt, cfg.Reporter)
+	})
 	return rt
 }
