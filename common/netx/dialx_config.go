@@ -112,6 +112,9 @@ type dialXConfig struct {
 	TimeoutRetryMaxWait time.Duration
 
 	DNSOpts []DNSOption
+	// ResolveBeforeProxy resolves the destination locally before a proxy CONNECT.
+	// The default leaves domain names intact for server-side DNS (including socks://).
+	ResolveBeforeProxy bool
 
 	Debug bool
 
@@ -201,6 +204,12 @@ func DialX_WithDNSOptions(opt ...DNSOption) DialXOption {
 	return func(c *dialXConfig) {
 		c.DNSOpts = opt
 	}
+}
+
+// DialX_WithResolveBeforeProxy explicitly sends the locally resolved IP to a
+// proxy. Without it, SOCKS proxies receive the original domain name.
+func DialX_WithResolveBeforeProxy(enabled bool) DialXOption {
+	return func(c *dialXConfig) { c.ResolveBeforeProxy = enabled }
 }
 
 func DialX_WithTimeoutRetryWait(timeout time.Duration) DialXOption {

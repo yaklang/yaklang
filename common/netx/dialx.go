@@ -240,8 +240,28 @@ RETRY:
 	}
 
 	var errs error
+	proxyTarget := target
+	if config.ResolveBeforeProxy {
+		host, port, splitErr := net.SplitHostPort(target)
+		if splitErr != nil {
+			return nil, splitErr
+		}
+		if net.ParseIP(host) == nil {
+			ip := lookupFirstWithContext(ctx, host, config.DNSOpts...)
+			if ip == "" {
+				if err := ctx.Err(); err != nil {
+					return nil, err
+				}
+				return nil, fmt.Errorf("cannot resolve proxy target %q locally", host)
+			}
+			if config.DisallowAddress != nil && config.DisallowAddress.Contains(ip) {
+				return nil, fmt.Errorf("disallow address %q by config", ip)
+			}
+			proxyTarget = net.JoinHostPort(ip, port)
+		}
+	}
 	for _, proxy := range config.Proxy {
-		conn, err := getConnForceProxy(target, proxy, config)
+		conn, err := connectForceProxy(ctx, proxyTarget, proxy, config)
 		if err != nil {
 			log.Errorf("proxy conn failed: %s", err)
 			lastError = err

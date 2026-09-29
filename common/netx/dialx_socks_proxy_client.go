@@ -10,8 +10,6 @@ import (
 	"net/url"
 	"strconv"
 	"time"
-
-	"github.com/yaklang/yaklang/common/utils"
 )
 
 type requestBuilder struct {
@@ -24,36 +22,27 @@ func (b *requestBuilder) add(data ...byte) {
 
 func (c *config) sendReceive(conn net.Conn, req []byte) (resp []byte, err error) {
 	defer conn.SetDeadline(time.Time{})
+	deadline := time.Time{}
 	if c.Context != nil {
 		ddl, ok := c.Context.Deadline()
 		if ok {
-			if err := conn.SetDeadline(ddl); err != nil {
-				return nil, err
-			}
+			deadline = ddl
 		}
-	} else if c.Timeout > 0 {
-		if err := conn.SetDeadline(time.Now().Add(c.Timeout)); err != nil {
+	}
+	if deadline.IsZero() && c.Timeout > 0 {
+		deadline = time.Now().Add(c.Timeout)
+	}
+	if !deadline.IsZero() {
+		if err := conn.SetDeadline(deadline); err != nil {
 			return nil, err
 		}
 	}
-	_, err = conn.Write(req)
-	if err != nil {
-		return
+	if _, err := io.Copy(conn, bytes.NewReader(req)); err != nil {
+		return nil, err
 	}
-	resp, err = c.readAll(conn)
-	return
-}
-
-func (c *config) readAll(conn net.Conn) (resp []byte, err error) {
-	resp = make([]byte, 1024)
-	if c.Timeout > 0 {
-		if err := conn.SetReadDeadline(time.Now().Add(c.Timeout)); err != nil {
-			return nil, err
-		}
-	}
-	n, err := conn.Read(resp)
-	resp = resp[:n]
-	return
+	resp = make([]byte, 8) // SOCKS4 reply is exactly eight bytes.
+	_, err = io.ReadFull(conn, resp)
+	return resp, err
 }
 
 func lookupIPv4(host string) (net.IP, error) {
@@ -147,6 +136,9 @@ func parse(proxyURI string) (*config, error) {
 
 func (cfg *config) dialSocks5(targetAddr string) (_ net.Conn, err error) {
 	ctx := cfg.Context
+	if cfg.Auth != nil && (len(cfg.Auth.Username) > 255 || len(cfg.Auth.Password) > 255) {
+		return nil, errors.New("SOCKS5 username or password exceeds 255 bytes")
+	}
 
 	// dial TCP
 	conn, err := cfg.ProxyDialer(ctx, cfg.Host)
@@ -162,13 +154,16 @@ func (cfg *config) dialSocks5(targetAddr string) (_ net.Conn, err error) {
 	if ctx != nil {
 		stopCancel = context.AfterFunc(ctx, func() { _ = conn.Close() })
 		defer stopCancel()
-		if deadline, ok := ctx.Deadline(); ok {
-			if err = conn.SetDeadline(deadline); err != nil {
-				return nil, err
-			}
-		}
-	} else if cfg.Timeout > 0 {
-		if err = conn.SetDeadline(time.Now().Add(cfg.Timeout)); err != nil {
+	}
+	deadline := time.Time{}
+	if ctx != nil {
+		deadline, _ = ctx.Deadline()
+	}
+	if deadline.IsZero() && cfg.Timeout > 0 {
+		deadline = time.Now().Add(cfg.Timeout)
+	}
+	if !deadline.IsZero() {
+		if err = conn.SetDeadline(deadline); err != nil {
 			return nil, err
 		}
 	}
@@ -232,64 +227,20 @@ func (cfg *config) dialSocks5(targetAddr string) (_ net.Conn, err error) {
 		targetAddr = cfg.Host
 	}
 	// detail request
-	host, port, err := splitHostPort(targetAddr)
+	address, err := socks5Address(targetAddr)
 	if err != nil {
 		return nil, err
 	}
-	aType := 0x3
-	if utils.IsIPv4(host) {
-		aType = 0x1
-	} else if utils.IsIPv6(host) {
-		aType = 0x4
+	if address[len(address)-2] == 0 && address[len(address)-1] == 0 {
+		return nil, errors.New("SOCKS5 target port must be nonzero")
 	}
-
 	req.Reset()
-	req.add(
-		5,           // version number
-		1,           // connect command
-		0,           // reserved, must be zero
-		byte(aType), // address type, 3 means domain name
-	)
-	if aType == 0x1 {
-		req.add(net.ParseIP(host).To4()...)
-	} else if aType == 0x4 {
-		req.add(net.ParseIP(host).To16()...)
-	} else {
-		if len(host) > 255 {
-			return nil, errors.New("SOCKS5 domain name exceeds 255 bytes")
-		}
-		req.add(byte(len(host))) // length of domain name
-		req.add([]byte(host)...)
-	}
-
-	req.add(
-		byte(port>>8), // higher byte of destination port
-		byte(port),    // lower byte of destination port (big endian)
-	)
-	resp, err = writeRead(req.Bytes(), 4)
-	if err != nil {
+	req.add(5, 1, 0)
+	req.add(address...)
+	if _, err = io.Copy(conn, bytes.NewReader(req.Bytes())); err != nil {
 		return nil, err
-	} else if resp[0] != 5 || resp[2] != 0 {
-		return nil, errors.New("invalid SOCKS5 connect reply")
-	} else if resp[1] != 0 {
-		return nil, errors.New("can't complete SOCKS5 connection")
 	}
-	var addressSize int
-	switch resp[3] {
-	case 1:
-		addressSize = net.IPv4len
-	case 4:
-		addressSize = net.IPv6len
-	case 3:
-		length := make([]byte, 1)
-		if _, err = io.ReadFull(conn, length); err != nil {
-			return nil, err
-		}
-		addressSize = int(length[0])
-	default:
-		return nil, errors.New("invalid SOCKS5 reply address type")
-	}
-	if _, err = io.CopyN(io.Discard, conn, int64(addressSize+2)); err != nil {
+	if _, err = readSocks5Reply(conn); err != nil {
 		return nil, err
 	}
 	if !stopCancel() {
@@ -346,6 +297,10 @@ func (cfg *config) dialSocks4(targetAddr string) (_ net.Conn, err error) {
 	if cfg.Check { // s4 just dial ok
 		return conn, nil
 	}
+	if ctx != nil {
+		stopCancel := context.AfterFunc(ctx, func() { _ = conn.Close() })
+		defer stopCancel()
+	}
 	defer func() {
 		if err != nil {
 			conn.Close()
@@ -380,6 +335,9 @@ func (cfg *config) dialSocks4(targetAddr string) (_ net.Conn, err error) {
 	if err != nil {
 		return nil, err
 	}
+	if resp[0] != 0 && resp[0] != 4 {
+		return nil, errors.New("invalid SOCKS4 reply version")
+	}
 	switch resp[1] {
 	case 90:
 		// request granted
@@ -395,6 +353,9 @@ func (cfg *config) dialSocks4(targetAddr string) (_ net.Conn, err error) {
 	// clear the deadline before returning
 	if err := conn.SetDeadline(time.Time{}); err != nil {
 		return nil, err
+	}
+	if ctx != nil && ctx.Err() != nil {
+		return nil, ctx.Err()
 	}
 	return conn, nil
 }
