@@ -101,35 +101,3 @@ func attachFlowAction(invoker aicommon.AIInvokeRuntime) reactloops.ReActLoopOpti
 			op.Feedback(fmt.Sprintf("Attached flow #%d to risk #%d (preserved existing evidence).", flowID, env.RiskID))
 		})
 }
-
-func fillPortAction(invoker aicommon.AIInvokeRuntime) reactloops.ReActLoopOption {
-	return reactloops.WithRegisterLoopAction("fill_risk_port",
-		"Fill the empty port of an existing risk using a matching stored port record; never overwrite an existing port.",
-		[]aitool.ToolOption{aitool.WithIntegerParam("port_id", aitool.WithParam_Required(true))}, nil,
-		func(loop *reactloops.ReActLoop, action *aicommon.Action, op *reactloops.LoopActionHandlerOperator) {
-			env, err := environment(loop)
-			if err != nil {
-				op.Fail(err.Error())
-				return
-			}
-			if loop.GetCurrentTask() == nil || !userRequestedWrite(loop.GetCurrentTask().GetUserInput()) {
-				op.Fail("user did not request updating the risk; use read-only lookup instead")
-				return
-			}
-			portID := action.GetInt("port_id")
-			var scoped schema.Port
-			if portID <= 0 || projectDB(invoker).Model(&schema.Port{}).
-				Where("id = ? AND runtime_id IN (?)", portID, env.RuntimeIDs).First(&scoped).Error != nil {
-				op.Fail("port is outside the initialized risk runtime boundary or does not exist")
-				return
-			}
-			if err := fillPort(projectDB(invoker), env, portID); err != nil {
-				op.Fail(err.Error())
-				return
-			}
-			if _, updated, err := loadBoundRisk(loop, invoker); err == nil {
-				loop.Set("risk_enrich_context", riskContext(updated))
-			}
-			op.Feedback("Filled the risk's empty port from port record #" + strconv.Itoa(action.GetInt("port_id")))
-		})
-}

@@ -35,10 +35,10 @@ func TestRiskActionsStayBoundAndRequireEvidenceBeforeWrite(t *testing.T) {
 	loop, err := reactloops.NewReActLoop(schema.AI_REACT_LOOP_ACTION_RISK_ENRICH, invoker,
 		reactloops.WithAllowRAG(false), reactloops.WithAllowToolCall(false),
 		reactloops.WithAllowAIForge(false), reactloops.WithAllowPlanAndExec(false), reactloops.WithAllowUserInteract(false),
-		surveyAction(invoker), searchFlowAction(invoker), searchPortAction(invoker),
-		inspectFlowAction(invoker), recordAssessmentAction(), attachFlowAction(invoker), fillPortAction(invoker))
+		surveyAction(invoker), searchFlowAction(invoker),
+		inspectFlowAction(invoker), recordAssessmentAction(), attachFlowAction(invoker))
 	require.NoError(t, err)
-	for _, name := range []string{"survey_risk_evidence", "search_risk_flows", "search_risk_ports", "inspect_risk_flow", "assess_risk_flow", "attach_risk_flow", "fill_risk_port"} {
+	for _, name := range []string{"survey_risk_evidence", "search_risk_flows", "inspect_risk_flow", "assess_risk_flow", "attach_risk_flow"} {
 		handler, err := loop.GetActionHandler(name)
 		require.NoError(t, err)
 		actionSchema := aitool.NewWithoutCallback(name, handler.Options...).ToJSONSchemaString()
@@ -53,8 +53,6 @@ func TestRiskActionsStayBoundAndRequireEvidenceBeforeWrite(t *testing.T) {
 	require.NoError(t, db.Create(f).Error)
 	other := &schema.HTTPFlow{Url: "https://example.test/login", RuntimeId: "outside", Request: "GET /login?marker=x"}
 	require.NoError(t, db.Create(other).Error)
-	port := &schema.Port{Host: "example.test", Port: 8443, RuntimeId: r.RuntimeId, ServiceType: "https"}
-	require.NoError(t, db.Create(port).Error)
 	attachment := aicommon.NewAttachedResource(aicommon.AttachedResourceTypeRiskID, aicommon.AttachedResourceKeyID, strconv.FormatUint(uint64(r.ID), 10))
 	readonly := aicommon.NewStatefulTaskBase("risk-query", "只展示关联流量，不要写入", context.Background(), loop.GetEmitter(), true)
 	readonly.SetAttachedDatas([]*aicommon.AttachedResource{attachment})
@@ -68,11 +66,6 @@ func TestRiskActionsStayBoundAndRequireEvidenceBeforeWrite(t *testing.T) {
 	require.Contains(t, response, fmt.Sprintf("flow_id=%d", f.ID))
 	require.NotContains(t, response, fmt.Sprintf("flow_id=%d", other.ID))
 	require.Contains(t, searchHistoryPrompt(loop), "marker=x")
-	response, err = runRiskAction(t, loop, "search_risk_ports", `"risk_id":999999,"port":8443`)
-	require.NoError(t, err)
-	require.Contains(t, response, fmt.Sprintf("port_id=%d", port.ID))
-	_, err = runRiskAction(t, loop, "fill_risk_port", fmt.Sprintf(`"port_id":%d`, port.ID))
-	require.ErrorContains(t, err, "user did not request")
 	args := fmt.Sprintf(`"flow_id":%d`, f.ID)
 	_, err = runRiskAction(t, loop, "attach_risk_flow", args)
 	require.ErrorContains(t, err, "user did not request")
@@ -102,11 +95,6 @@ func TestRiskActionsStayBoundAndRequireEvidenceBeforeWrite(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, updated.PacketPairs, 1)
 	require.Equal(t, int64(f.ID), updated.PacketPairs[0].HTTPFlowId)
-	_, err = runRiskAction(t, loop, "fill_risk_port", fmt.Sprintf(`"port_id":%d`, port.ID))
-	require.NoError(t, err)
-	updated, err = loadRisk(db, int(r.ID))
-	require.NoError(t, err)
-	require.Equal(t, port.Port, updated.Port)
 }
 
 func TestRiskLoopFailsBeforeModelCallWithoutAttachedRisk(t *testing.T) {

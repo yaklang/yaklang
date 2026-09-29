@@ -7416,6 +7416,12 @@ message QueryHTTPFlowRequest {
   string IssueType = 56;
   string Severity = 57;
   string Status = 58;
+  // 按字面量查询报文字段。同一字段内多个值 OR，不同字段之间 AND。
+  repeated string RequestContains = 59;
+  repeated string ResponseContains = 60;
+  // HTTPFlow 创建时间范围，Unix 秒，边界包含。
+  int64 AfterCreatedAt = 61;
+  int64 BeforeCreatedAt = 62;
 }
 
 message HTTPFlowsToOnlineRequest {
