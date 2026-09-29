@@ -53,13 +53,16 @@
 - 闭包 slice 写回（支配检查 + 变量名匹配 + 懒解析 + entry alloca 中转）
 - mustpass_simple/ 回归套件（5 个最小用例 + mustpass_simple_test.go）
 
-## 当前状态
+## 当前状态（2026-09-29 11:37 CST 更新）
 
-- **rebase 到 main 之后的实测基线（2026-09-28）：54/115 通过，61 失败。**
-  命令与产物见下一节；这是当前唯一有效的全量数字，取代此前的 55/115 旧数据。
-- 失败分类：崩溃 crash(exit -1) 23 个、exit 255 21 个、超时 9 个、
-  编译失败 5 个（`nuclei_network_runtime`、`poc_download`、`udp`、
-  `waitAllAsyncCallFinish`、`waitAllAsyncCallFinish2`）、runtime panic 3 个。
+- **59/115 通过，56 失败**（本轮修复后实测；此前为 54/115）。
+  修复了 5 个原先编译失败的脚本（`poc_download`、`nuclei_network_runtime`、
+  `udp`、`waitAllAsyncCallFinish`×2）以及负数 int/float 显示错误。
+- 失败分类：崩溃 crash(exit -1) 24 个、exit 255 20 个、超时 9 个、
+  runtime panic 3 个。**本轮无新增失败脚本**（逐项对比失败清单确认）。
+- 单轮测试的临时磁盘占用从约 60 GB 降到约 27 MB（见下节）。
+
+- 历史基线（2026-09-28）：54/115 通过，61 失败（含 5 个编译失败）。
 - 回归测试（mustpass_simple + closure + DualRun + ZeroDep）全绿
 
 ### 2026-09-28 rebase + 实测基线（本机复现步骤）
@@ -132,6 +135,9 @@ TMPDIR=/mnt/data/ssa2llvm-deps/tmp YAKIT_HOME=/mnt/data/ssa2llvm-deps/yakit-all 
 副本（staticanalyze 层最大约 390 MB）加上链接产物，而编译器会保留这些确定性
 work dir（`yakssa-compile-*`）以便复用。mustpass 逐脚本强制 `-a` 重建，复用
 不可能发生，于是 115 个脚本累积约 60 GB 残留，CI runner 的磁盘放不下。
+
+**修复后实测：** 完整 115 脚本一轮结束后，共享 temp 目录只剩 27 MB
+（修复前为 63 GB），峰值约 6 GB，且不残留任何 `yakssa-compile-*`。
 
 修复只动测试侧，生产缓存语义不变：
 
