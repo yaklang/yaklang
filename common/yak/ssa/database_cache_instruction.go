@@ -937,7 +937,7 @@ func (s *instructionStore) saveInstructionPersistRecords(records []*instructionP
 	start := time.Now()
 	var saveErr error
 	saveStep := func() error {
-		saveErr = utils.GormTransaction(s.db, func(tx *gorm.DB) error {
+		saveErr = cacheWriteTransaction(s.db, func(tx *gorm.DB) error {
 			// Separate insert and upsert paths:
 			// - Insert path: batch CreateInBatches for speed
 			// - Upsert path: SaveIrCodeBatch (delete+bulk insert) — avoids

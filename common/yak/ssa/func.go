@@ -37,8 +37,6 @@ func (p *Program) NewFunctionWithParent(name string, parent *Function) *Function
 		SideEffects: make([]*FunctionSideEffect, 0),
 		builder:     nil,
 	}
-	f.Type = NewFunctionType("", nil, nil, false)
-	f.Type.This = f
 	f.SetName(name)
 	f.SetProgram(p)
 	p.SetVirtualRegister(f)
@@ -245,6 +243,21 @@ func (f *Function) functionType() *FunctionType {
 	return ft
 }
 
+// AddAnnotationFunc initializes the function type only when annotations need
+// to be attached. Some frontends leave it unset until the deferred body build.
+func (f *Function) AddAnnotationFunc(handlers ...func(Value)) {
+	if f == nil || len(handlers) == 0 {
+		return
+	}
+	f.typeMu.Lock()
+	if f.Type == nil {
+		f.Type = NewFunctionType("", nil, nil, false)
+		f.Type.This = f
+	}
+	f.Type.AddAnnotationFunc(handlers...)
+	f.typeMu.Unlock()
+}
+
 func (f *Function) IsMethod() bool {
 	ft := f.functionType()
 	if ft == nil {
@@ -257,10 +270,16 @@ func (f *Function) IsMethod() bool {
 }
 
 func (f *Function) SetMethod(is bool, objType Type) {
-	ft := f.functionType()
-	if ft == nil {
+	if f == nil {
 		return
 	}
+	f.typeMu.Lock()
+	if f.Type == nil {
+		f.Type = NewFunctionType("", nil, nil, false)
+		f.Type.This = f
+	}
+	ft := f.Type
+	f.typeMu.Unlock()
 	ft.methodLock.Lock()
 	ft.IsMethod = is
 	ft.ObjectType = objType

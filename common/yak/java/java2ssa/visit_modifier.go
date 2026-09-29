@@ -121,6 +121,7 @@ func (y *singleFileBuilder) VisitAnnotation(annotationContext javaparser.IAnnota
 	// 而不仅是在本functionBuilder
 	store := y.StoreFunctionBuilder()
 	return func(v ssa.Value) {
+			y := y.forkForLazyBuild()
 			start := time.Now()
 			defer deltaAnnotationCostFrom(start)
 
@@ -140,6 +141,7 @@ func (y *singleFileBuilder) VisitAnnotation(annotationContext javaparser.IAnnota
 			ref := y.CreateMemberCallVariable(thisAnnotation, y.EmitConstInstPlaceholder("__ref__"))
 			y.AssignVariable(ref, v)
 		}, func(value ssa.Value) {
+			y := y.forkForLazyBuild()
 			/*
 				@RequestParam(value = "xml_str") String xmlStr
 

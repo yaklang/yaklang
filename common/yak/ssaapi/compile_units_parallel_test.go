@@ -11,28 +11,60 @@ import (
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/utils/filesys"
+	fi "github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
+	"github.com/yaklang/yaklang/common/utils/memedit"
+	"github.com/yaklang/yaklang/common/yak/php/php2ssa"
 	"github.com/yaklang/yaklang/common/yak/ssa"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 )
 
-func TestCompileUnitBuildWavesDependencyDiamond(t *testing.T) {
+type phpPrehandlerProbe struct {
+	ssa.Builder
+	active atomic.Int32
+	peak   atomic.Int32
+}
+
+func (*phpPrehandlerProbe) SupportsConcurrentUnitPreHandler() bool { return true }
+
+func (p *phpPrehandlerProbe) PreHandlerProject(fs fi.FileSystem, ast ssa.FrontAST, builder *ssa.FunctionBuilder, editor *memedit.MemEditor) error {
+	current := p.active.Add(1)
+	defer p.active.Add(-1)
+	for previous := p.peak.Load(); current > previous; previous = p.peak.Load() {
+		if p.peak.CompareAndSwap(previous, current) {
+			break
+		}
+	}
+	time.Sleep(20 * time.Millisecond)
+	return p.Builder.PreHandlerProject(fs, ast, builder, editor)
+}
+
+func TestCompileUnitPipelineDependencyDiamond(t *testing.T) {
 	units := make(map[string]*CompileUnit)
-	for _, key := range []string{"base", "left", "right", "top", "cycle1", "cycle2"} {
+	for _, key := range []string{"java:base", "java:left", "java:right", "java:top", "java:cycle1", "java:cycle2"} {
 		units[key] = testCompileUnit(key, 1, 1)
 	}
 	plan := topoCompileUnits(units, []UnitRef{
-		{From: "left", To: "base"}, {From: "right", To: "base"},
-		{From: "top", To: "left"}, {From: "top", To: "right"},
-		{From: "cycle1", To: "cycle2"}, {From: "cycle2", To: "cycle1"},
-		{From: "cycle1", To: "top"},
+		{From: "java:left", To: "java:base"}, {From: "java:right", To: "java:base"},
+		{From: "java:top", To: "java:left"}, {From: "java:top", To: "java:right"},
+		{From: "java:cycle1", To: "java:cycle2"}, {From: "java:cycle2", To: "java:cycle1"},
+		{From: "java:cycle1", To: "java:top"},
 	})
-	waves := compileUnitBuildWaves(plan, compileUnitExecutionBatch{unitKeys: []string{"base", "left", "right", "top", "cycle1", "cycle2"}})
-	require.Len(t, waves, 4)
-	require.Equal(t, [][]string{{"base"}}, waves[0])
-	require.ElementsMatch(t, [][]string{{"left"}, {"right"}}, waves[1])
-	require.Equal(t, [][]string{{"top"}}, waves[2])
-	require.Equal(t, [][]string{{"cycle1", "cycle2"}}, waves[3])
+	prog := newPipelineTestProgram(t, "base", "left", "right", "top", "cycle1", "cycle2")
+	nodes := compileUnitBuildNodes(prog, plan, compileUnitExecutionBatch{unitKeys: []string{"java:base", "java:left", "java:right", "java:top", "java:cycle1", "java:cycle2"}})
+	require.Len(t, nodes, 5)
+	remaining := make(map[string]int)
+	for _, node := range nodes {
+		for _, key := range node.keys {
+			remaining[key] = node.remaining
+		}
+	}
+	require.Equal(t, 0, remaining["java:base"])
+	require.Equal(t, 1, remaining["java:left"])
+	require.Equal(t, 1, remaining["java:right"])
+	require.Equal(t, 2, remaining["java:top"])
+	require.Equal(t, 1, remaining["java:cycle1"])
+	require.Equal(t, 1, remaining["java:cycle2"])
 }
 
 func TestCompileUnitParallelQualifiedDependency(t *testing.T) {
@@ -41,10 +73,16 @@ func TestCompileUnitParallelQualifiedDependency(t *testing.T) {
 	vf.AddFile("b/B.java", `package b; public class B {}`)
 	vf.AddFile("c/C.java", `package c; public class C {}`)
 	plan := buildPlanForLanguage(t, ssaconfig.JAVA, vf, []string{"a/A.java", "b/B.java", "c/C.java"})
-	waves := compileUnitBuildWaves(plan, compileUnitExecutionBatch{unitKeys: []string{"java:a", "java:b", "java:c"}})
-	require.Len(t, waves, 2)
-	require.ElementsMatch(t, [][]string{{"java:b"}, {"java:c"}}, waves[0])
-	require.Equal(t, [][]string{{"java:a"}}, waves[1])
+	prog := newPipelineTestProgram(t, "a", "b", "c")
+	nodes := compileUnitBuildNodes(prog, plan, compileUnitExecutionBatch{unitKeys: []string{"java:a", "java:b", "java:c"}})
+	require.Len(t, nodes, 3)
+	remaining := make(map[string]int)
+	for _, node := range nodes {
+		remaining[node.keys[0]] = node.remaining
+	}
+	require.Equal(t, 2, remaining["java:a"])
+	require.Zero(t, remaining["java:b"])
+	require.Zero(t, remaining["java:c"])
 }
 
 func TestCompileUnitBuildWaveOverlapsLibraries(t *testing.T) {
@@ -64,7 +102,8 @@ func TestCompileUnitBuildWaveOverlapsLibraries(t *testing.T) {
 	}
 	finished := make(chan error, 1)
 	go func() {
-		_, err := buildCompileUnitWave(context.Background(), prog, [][]string{{"java:a"}, {"java:b"}}, 2)
+		plan, batch := pipelineTestPlan([]string{"a", "b"})
+		_, err := buildCompileUnitPipeline(context.Background(), prog, plan, batch, 2)
 		finished <- err
 	}()
 	for i := 0; i < 2; i++ {
@@ -98,7 +137,9 @@ func TestCompileUnitSCCGroupLibrariesOverlap(t *testing.T) {
 	}
 	finished := make(chan error, 1)
 	go func() {
-		_, err := buildCompileUnitWave(context.Background(), prog, [][]string{{"java:a", "java:b"}}, 2)
+		plan := &UnitPlan{Order: [][]*CompileUnit{{{Key: "java:a"}, {Key: "java:b"}}}}
+		batch := compileUnitExecutionBatch{unitKeys: []string{"java:a", "java:b"}}
+		_, err := buildCompileUnitPipeline(context.Background(), prog, plan, batch, 2)
 		finished <- err
 	}()
 	for i := 0; i < 2; i++ {
@@ -190,7 +231,9 @@ func TestCompileUnitBuildWaveCancellationJoinsWorkers(t *testing.T) {
 			defer cancel()
 			finished := make(chan error, 1)
 			go func() {
-				_, err := buildCompileUnitWave(ctx, prog, [][]string{{"java:a"}, {second}}, 1)
+				plan := &UnitPlan{Order: [][]*CompileUnit{{{Key: "java:a"}}, {{Key: second}}}}
+				batch := compileUnitExecutionBatch{unitKeys: []string{"java:a", second}}
+				_, err := buildCompileUnitPipeline(ctx, prog, plan, batch, 1)
 				finished <- err
 			}()
 			<-entered
@@ -297,6 +340,69 @@ func TestCompileUnitGoMemory(t *testing.T) {
 	program, err := cfg.parseProjectWithFSUnits(vf, func(float64, string, ...any) {})
 	require.NoError(t, err)
 	require.NotNil(t, program)
+	require.True(t, program.Program.ConcurrentUnitBuildEnabled())
+	for i := 0; i < 8; i++ {
+		key := fmt.Sprintf("dir:p%d", i)
+		lib := program.Program.ProgramForCompileUnit(key)
+		require.NotNil(t, lib)
+		require.NotSame(t, program.Program.GetApplication(), lib, "Go unit %s should drain its package library", key)
+	}
+}
+
+func TestCompileUnitGoErrorsAreNotReplicatedAcrossFiles(t *testing.T) {
+	vf := filesys.NewVirtualFs()
+	for i := 0; i < 4; i++ {
+		vf.AddFile(fmt.Sprintf("p/file%d.go", i), fmt.Sprintf("package p\nfunc F%d() { break }\n", i))
+	}
+	cfg, err := DefaultConfig(WithFileSystem(vf), WithLanguage(ssaconfig.GO), WithMemory())
+	require.NoError(t, err)
+	program, err := cfg.parseProjectWithFSUnits(vf, func(float64, string, ...any) {})
+	require.NoError(t, err)
+	require.NotNil(t, program)
+	breakErrors := 0
+	for _, compileErr := range program.GetErrors() {
+		if compileErr.Message == "unexpected break stmt" {
+			breakErrors++
+		}
+	}
+	require.Equal(t, 4, breakErrors, "each file's error must reach the application exactly once")
+}
+
+func TestCompileUnitGoPackageLibrariesOverlap(t *testing.T) {
+	cfg, err := ssaconfig.New(ssaconfig.ModeSSACompile)
+	require.NoError(t, err)
+	prog := ssa.NewProgram(cfg, ssa.ProgramCacheMemory, ssa.Application, filesys.NewVirtualFs(), ".", 0)
+	prog.Language = ssaconfig.GO
+	prog.CompileUnits = []*ssa.CompileUnit{
+		{Key: "dir:first", LibraryName: "first"},
+		{Key: "dir:second", LibraryName: "second"},
+	}
+	entered := make(chan struct{}, 2)
+	release := make(chan struct{})
+	for _, name := range []string{"first", "second"} {
+		lib := prog.NewLibrary(name, []string{name})
+		lib.NewFunction("work").AddLazyBuilder(func() {
+			entered <- struct{}{}
+			<-release
+		})
+	}
+	finished := make(chan error, 1)
+	go func() {
+		plan := &UnitPlan{Order: [][]*CompileUnit{{{Key: "dir:first"}}, {{Key: "dir:second"}}}}
+		batch := compileUnitExecutionBatch{unitKeys: []string{"dir:first", "dir:second"}}
+		_, err := buildCompileUnitPipeline(context.Background(), prog, plan, batch, 2)
+		finished <- err
+	}()
+	for i := 0; i < 2; i++ {
+		select {
+		case <-entered:
+		case <-time.After(5 * time.Second):
+			close(release)
+			t.Fatal("Go package library builds did not overlap")
+		}
+	}
+	close(release)
+	require.NoError(t, <-finished)
 }
 
 func TestCompileUnitPHPDirectoryMemory(t *testing.T) {
@@ -310,6 +416,21 @@ func TestCompileUnitPHPDirectoryMemory(t *testing.T) {
 	program, err := cfg.parseProjectWithFSUnits(vf, func(float64, string, ...any) {})
 	require.NoError(t, err)
 	require.NotNil(t, program)
+}
+
+func TestCompileUnitPHPPrehandlersOverlapAcrossDirectories(t *testing.T) {
+	vf := filesys.NewVirtualFs()
+	for i := 0; i < 12; i++ {
+		vf.AddFile(fmt.Sprintf("p%d/C.php", i), fmt.Sprintf("<?php namespace P%d; class C { public function n() { return %d; } }", i, i))
+	}
+	cfg, err := DefaultConfig(WithFileSystem(vf), WithLanguage(ssaconfig.PHP), WithMemory(), ssaconfig.WithCompileConcurrency(8))
+	require.NoError(t, err)
+	probe := &phpPrehandlerProbe{Builder: php2ssa.CreateBuilder()}
+	cfg.LanguageBuilder = probe
+	program, err := cfg.parseProjectWithFSUnits(vf, func(float64, string, ...any) {})
+	require.NoError(t, err)
+	require.NotNil(t, program)
+	require.Greater(t, probe.peak.Load(), int32(1), "PHP prehandlers never overlapped")
 }
 
 func TestCompileUnitParallelTypeScriptMemory(t *testing.T) {
@@ -336,14 +457,12 @@ func TestCompileUnitApplicationDoesNotDrainReadyLibraries(t *testing.T) {
 	library := prog.NewLibrary("child", []string{"child"})
 	var calls atomic.Int32
 	library.NewFunction("work").AddLazyBuilder(func() { calls.Add(1) })
-	built := make(map[*ssa.Program]bool)
-	_, err = buildCompileUnitWaveWithOwners(context.Background(), prog, [][]string{{"resource:one"}, {"dir:two"}}, 2, built)
-	require.NoError(t, err)
-	require.EqualValues(t, 0, calls.Load(), "application metadata must not consume a library's scheduled work")
-	peak, err := buildCompileUnitWaveWithOwners(context.Background(), prog, [][]string{{"resource:one"}}, 2, built)
-	require.NoError(t, err)
-	require.Zero(t, peak, "the same owner must not be drained again in a later wave")
-	_, err = buildCompileUnitWaveWithOwners(context.Background(), prog, [][]string{{"java:child"}}, 2, built)
+	plan := &UnitPlan{Order: [][]*CompileUnit{{{Key: "resource:one"}}, {{Key: "dir:two"}}, {{Key: "java:child"}}}}
+	batch := compileUnitExecutionBatch{unitKeys: []string{"resource:one", "dir:two", "java:child"}}
+	nodes := compileUnitBuildNodes(prog, plan, batch)
+	require.Len(t, nodes[0].libraries, 1)
+	require.Empty(t, nodes[1].libraries, "the same application owner must be drained only once")
+	_, err = buildCompileUnitPipeline(context.Background(), prog, plan, batch, 2)
 	require.NoError(t, err)
 	require.EqualValues(t, 1, calls.Load())
 }

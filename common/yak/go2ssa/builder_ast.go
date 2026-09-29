@@ -96,9 +96,8 @@ func (b *astbuilder) build(ast *gol.SourceFileContext) {
 				currentBuilder := b.FunctionBuilder
 				b.FunctionBuilder = builder
 				defer func() {
-					for _, e := range builder.GetProgram().GetErrors() {
-						currentBuilder.GetProgram().AddError(e)
-					}
+					// Program errors already belong to the application. Copying
+					// GetErrors back into it doubles the list on every file.
 					b.FunctionBuilder = currentBuilder
 				}()
 			}
@@ -277,9 +276,7 @@ func (b *astbuilder) build(ast *gol.SourceFileContext) {
 				currentBuilder := b.FunctionBuilder
 				b.FunctionBuilder = builder
 				defer func() {
-					for _, e := range builder.GetProgram().GetErrors() {
-						currentBuilder.GetProgram().AddError(e)
-					}
+					// Errors are shared through the application owner already.
 					b.FunctionBuilder = currentBuilder
 				}()
 			}
