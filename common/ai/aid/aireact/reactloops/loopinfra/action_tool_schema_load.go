@@ -46,6 +46,18 @@ func verifyToolSchemaLoad(loop *reactloops.ReActLoop, action *aicommon.Action) e
 	if single == batch {
 		return utils.Error("require_tool loads schemas only: provide either tool_require_payload or tool_require_calls")
 	}
+	// Reject cross-action fields. require_tool only loads schemas; it must not
+	// be mixed with directly_call_tool fields in the same action payload.
+	if hasAnyCanonicalActionParam(action,
+		directlyCallToolBatchField,
+		"directly_call_tool_name",
+		"directly_call_tool_params",
+		"directly_call_identifier",
+		"directly_call_expectations",
+		"directly_call_reason",
+	) {
+		return utils.Errorf("%s cannot be combined with directly_call_tool fields", requireToolBatchField)
+	}
 	var names []string
 	if single {
 		name, ok := raw.(string)
@@ -77,6 +89,10 @@ func verifyToolSchemaLoad(loop *reactloops.ReActLoop, action *aicommon.Action) e
 			unique = append(unique, name)
 			seen[name] = true
 		}
+		// Warn when the user appears to need an edit-capable tool (e.g. modify_file)
+		// but selected bash instead. This routing guidance is equally relevant
+		// whether require_tool executes or only loads schemas.
+		reactloops.MaybeWarnBashBeforeEdit(loop, name)
 	}
 	loop.SetActionExecutionValue(action, actionStateToolSchemaNames, unique)
 	return nil

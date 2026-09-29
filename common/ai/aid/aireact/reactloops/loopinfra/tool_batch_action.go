@@ -112,7 +112,7 @@ const directlyCallToolBatchOutputExamples = `
 const requireToolScalarOutputExamples = `
 ### require_tool 单次调用
 
-当一个调用仍需运行时生成参数，或工具参数有嵌套 wrapper/语义歧义时，使用标量字段 tool_require_payload。tool_require_payload 只填写工具名，严禁在该字段中携带参数。
+当一个工具的 Schema 尚未在 CACHE_TOOL_CALL 中可见，或工具参数有嵌套 wrapper/语义歧义时，使用标量字段 tool_require_payload 加载其 Schema。tool_require_payload 只填写工具名，严禁在该字段中携带参数。加载后在下一轮用 directly_call_tool 构造参数并执行。
 
 下面的 JSON 是完整可解析格式（工具名应替换为当前可用的真实工具）：
 
@@ -120,9 +120,9 @@ const requireToolScalarOutputExamples = `
 `
 
 const requireToolBatchOutputExamples = `
-### require_tool 并发调用
+### require_tool 并发加载
 
-这是可选的延迟优化。仅当 2-8 个调用低风险、彼此独立且每个工具 Schema 都简单无歧义时，才使用 tool_require_calls。嵌套 wrapper 或参数语义不明时改用单调用。每项只提供工具名、identifier 和 reason，严禁提供 params。不要为凑数量发明调用，不要同时输出旧的 tool_require_payload 字段。
+这是可选的延迟优化。仅当 2-8 个调用低风险、彼此独立且每个工具 Schema 都简单无歧义时，才使用 tool_require_calls。嵌套 wrapper 或参数语义不明时改用单调用。每项只提供工具名、identifier 和 reason，严禁提供 params；运行时只加载 Schema，不生成参数。不要为凑数量发明调用，不要同时输出旧的 tool_require_payload 字段。加载后在下一轮用 directly_call_tool（单次或批量）构造参数并执行。
 
 下面的 JSON 是完整可解析格式（工具名应替换为当前可用的真实工具）：
 
@@ -164,7 +164,7 @@ func requireToolBatchSchemaOption() aitool.ToolOption {
 	return aitool.WithStructArrayParam(
 		requireToolBatchField,
 		[]aitool.PropertyOption{
-			aitool.WithParam_Description("可选的延迟优化。仅当本轮有 2-8 个低风险、互不干扰且每个工具 Schema 都简单无歧义的调用时使用；嵌套 wrapper 或参数语义不明时改用单调用。必须与 tool_require_payload 二选一，严禁混用。每项只填写工具名、identifier 和 reason，严禁提供 params；运行时会分别生成参数。不要为凑数量发明调用。下面是经过 CI 校验且可执行的格式：\n" + requireToolBatchOutputExampleJSON),
+			aitool.WithParam_Description("可选的延迟优化。仅当本轮有 2-8 个低风险、互不干扰且每个工具 Schema 都简单无歧义的调用时使用；嵌套 wrapper 或参数语义不明时改用单调用。必须与 tool_require_payload 二选一，严禁混用。每项只填写工具名、identifier 和 reason，严禁提供 params；运行时只加载 Schema，不生成参数。不要为凑数量发明调用。下面是经过 CI 校验且可执行的格式：\n" + requireToolBatchOutputExampleJSON),
 			aitool.WithParam_Raw("minItems", 2),
 			aitool.WithParam_Raw("maxItems", aicommon.DefaultToolBatchMaxCalls),
 		},
@@ -173,7 +173,7 @@ func requireToolBatchSchemaOption() aitool.ToolOption {
 		},
 		aitool.WithStringParam("tool_name",
 			aitool.WithParam_Required(true),
-			aitool.WithParam_Description("需要由运行时生成参数的工具准确名称。")),
+			aitool.WithParam_Description("需要加载 Schema 的工具准确名称。")),
 		aitool.WithStringParam("identifier",
 			aitool.WithParam_Description("可选。该 child 调用的唯一 snake_case 目的标识。")),
 		aitool.WithStringParam("reason",

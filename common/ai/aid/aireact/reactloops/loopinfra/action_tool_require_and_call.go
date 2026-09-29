@@ -1,7 +1,7 @@
 package loopinfra
 
 import (
-	"fmt"
+	"strings"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
@@ -10,93 +10,117 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 )
 
+// loopAction_toolRequireAndCall is the action-mode variant of require_tool.
+// Both the native (function-call) and action (text/JSON) modes share the same
+// semantics: require_tool only loads tool parameter schemas into the timeline
+// (CACHE_TOOL_CALL). It does NOT generate parameters or execute any tool.
+//
+// After observing the loaded schema in the next response, the model constructs
+// arguments itself and uses directly_call_tool (single or batch) to execute.
+// If a tool's schema is already visible in CACHE_TOOL_CALL with complete
+// parameters, the model should use directly_call_tool directly.
 var loopAction_toolRequireAndCall = &reactloops.LoopAction{
 	FunctionCallAction: nativeToolSchemaLoadAction,
 	ActionType:         schema.AI_REACT_LOOP_ACTION_REQUIRE_TOOL,
-	Description:        "申请工具并由运行时阅读工具文档、生成参数。默认使用 tool_require_payload 单次生成参数；工具是参数未完整的嵌套 wrapper 时必须使用单调用。仅当 2-8 个调用低风险、互不依赖、互不干扰，且每个工具 Schema 都简单无歧义时，才可使用 tool_require_calls。若工具已在 CACHE_TOOL_CALL 且参数完整，改用 directly_call_tool。批量项严禁提供 params；严禁混用单调用和批量字段，也不要为了凑数量发明调用。",
+	Description: "加载工具参数 Schema 到 timeline（CACHE_TOOL_CALL）。不生成参数、不执行工具。" +
+		"使用 tool_require_payload 加载单个工具，或 tool_require_calls 加载多个。" +
+		"在下一轮响应中观察已加载的 Schema，自行构造参数并使用 directly_call_tool 执行。" +
+		"如果 Schema 已在 CACHE_TOOL_CALL 中且参数完整，直接使用 directly_call_tool。" +
+		"批量项只提供工具名、identifier 和 reason，严禁提供 params；严禁混用单调用和批量字段，也不要为了凑数量发明调用。",
 	Options: []aitool.ToolOption{
 		aitool.WithStringParam(
 			"tool_require_payload",
-			aitool.WithParam_Description("选择单调用形式时填写；存在 tool_require_calls 时必须省略。只填写一个需要生成参数的工具准确名称，严禁包含参数。下面是经过 CI 校验且可执行的单调用格式：\n"+requireToolScalarOutputExampleJSON),
+			aitool.WithParam_Description("选择单调用形式时填写；存在 tool_require_calls 时必须省略。只填写一个需要加载 Schema 的工具准确名称，严禁包含参数。下面是经过 CI 校验且可执行的单调用格式：\n"+requireToolScalarOutputExampleJSON),
 		),
 		aitool.WithStringParam(
 			"tool_call_reason",
-			aitool.WithParam_Description(`可选。用简短短语说明这次调用具体做什么，例如“grep /api 路径寻找注入点”或“在 username 中注入 SQLi 并重放登录”。不要写前序总结或过渡语；仅当 human_readable_thought 已说明原因时省略。该内容会显示在工具调用卡片上。`),
+			aitool.WithParam_Description(`可选。用简短短语说明这次调用具体做什么，例如"grep /api 路径寻找注入点"或"在 username 中注入 SQLi 并重放登录"。不要写前序总结或过渡语；仅当 human_readable_thought 已说明原因时省略。该内容会显示在工具调用卡片上。`),
 		),
 		requireToolBatchSchemaOption(),
 	},
 	OutputExamples: requireToolOutputExamples,
-	ActionVerifier: func(loop *reactloops.ReActLoop, action *aicommon.Action) error {
-		loop.SetActionExecutionValue(action, actionStateRequireToolBatch, nil)
-		loop.SetActionExecutionValue(action, "tool_require_payload", nil)
+	// ActionVerifier preserves the legacy scalar streaming priority: when
+	// tool_require_payload is present it returns immediately without waiting
+	// for full response EOF, matching the original action-mode UX. The batch
+	// path falls through to verifyToolSchemaLoad which requires WaitParseResult.
+	ActionVerifier: verifyRequireToolSchemaLoad,
+	// ActionHandler is shared with the native (function-call) variant. Both
+	// modes load tool schemas into the timeline and return; neither generates
+	// parameters nor executes tools.
+	ActionHandler: loadToolSchemas,
+}
 
-		// tool_require_payload is the legacy one-call discriminator. Preserve its
-		// field-level streaming behavior and only wait for a canonical object when
-		// the scalar form is absent and this may actually be a batch action.
-		payload := action.GetString("tool_require_payload")
-		if payload == "" {
-			payload = action.GetInvokeParams("next_action").GetString("tool_require_payload")
-		}
-		if payload != "" {
-			reactloops.MaybeWarnBashBeforeEdit(loop, payload)
-			loop.SetActionExecutionValue(action, "tool_require_payload", payload)
-			return nil
-		}
+// verifyRequireToolSchemaLoad mirrors verifyToolSchemaLoad but preserves the
+// action-mode scalar streaming contract: when tool_require_payload is present,
+// return immediately without waiting for the full response to finish parsing.
+func verifyRequireToolSchemaLoad(loop *reactloops.ReActLoop, action *aicommon.Action) error {
+	loop.SetActionExecutionValue(action, actionStateToolSchemaNames, nil)
 
-		batch, hasBatch, batchErr := parseRequireToolBatchAction(loop, action)
-		if batchErr != nil {
-			return batchErr
-		}
-		if hasBatch {
-			loop.SetActionExecutionValue(action, actionStateRequireToolBatch, batch)
-			return nil
-		}
+	// Scalar streaming fast path: tool_require_payload is readable before the
+	// root JSON object closes, so a valid one-call action must not wait for the
+	// optional batch array's canonical representation. This preserves the
+	// legacy action-mode UX where the verifier returns as soon as the scalar
+	// field has streamed in, without waiting for the full response EOF.
+	payload := action.GetString("tool_require_payload")
+	if payload == "" {
+		payload = action.GetInvokeParams("next_action").GetString("tool_require_payload")
+	}
+	if payload != "" {
+		name := strings.TrimSpace(payload)
+		reactloops.MaybeWarnBashBeforeEdit(loop, name)
+		loop.SetActionExecutionValue(action, actionStateToolSchemaNames, []string{name})
+		return nil
+	}
 
-		return utils.Error("require_tool requires tool_require_payload or tool_require_calls")
-	},
-	ActionHandler: func(loop *reactloops.ReActLoop, action *aicommon.Action, operator *reactloops.LoopActionHandlerOperator) {
-		if executeVerifiedToolBatch(loop, action, actionStateRequireToolBatch, operator) {
-			return
-		}
-		toolPayload, _ := loop.GetActionExecutionValue(action, "tool_require_payload").(string)
-		if toolPayload == "" {
-			operator.Feedback(utils.Error("tool_require_payload is required for ActionRequireTool but empty"))
-			return
-		}
-		invoker := loop.GetInvoker()
-		ctx := invoker.GetConfig().GetContext()
-		t := loop.GetCurrentTask()
-		if t != nil {
-			ctx = t.GetContext()
-		}
+	// Batch path: need the full response to parse tool_require_calls.
+	if err := action.WaitParseResult(toolBatchVerifierContext(loop)); err != nil {
+		return err
+	}
+	items, batch, err := parseCanonicalBatchItems(action, requireToolBatchField)
+	if err != nil {
+		return err
+	}
+	if !batch {
+		return utils.Error("require_tool loads schemas only: provide either tool_require_payload or tool_require_calls")
+	}
+	// Reject cross-action fields. require_tool only loads schemas; it must not
+	// be mixed with directly_call_tool fields in the same action payload.
+	if hasAnyCanonicalActionParam(action,
+		directlyCallToolBatchField,
+		"directly_call_tool_name",
+		"directly_call_tool_params",
+		"directly_call_identifier",
+		"directly_call_expectations",
+		"directly_call_reason",
+	) {
+		return utils.Errorf("%s cannot be combined with directly_call_tool fields", requireToolBatchField)
+	}
 
-		emitToolsPreparingStatus(loop, []string{toolPayload})
-		toolLoadMessage := fmt.Sprintf("loading tool: %s...", toolPayload)
-		if toolIns, err := loop.GetConfig().GetAiToolManager().GetToolByName(toolPayload); err != nil {
-			toolLoadMessage += fmt.Sprintf(" Error: %v", err)
-		} else {
-			displayName := toolIns.GetName()
-			if toolIns.GetVerboseName() != "" {
-				displayName = fmt.Sprintf("%s(%s)", toolIns.GetName(), toolIns.GetVerboseName())
-			}
-			toolLoadMessage += fmt.Sprintf(" done! %s is prepared", displayName)
+	if len(items) == 0 || len(items) > toolBatchMaxCalls(loop) {
+		return utils.Errorf("tool_require_calls must contain 1-%d tools to load", toolBatchMaxCalls(loop))
+	}
+	var names []string
+	for _, item := range items {
+		// Old optional labels are harmless: accept them without giving them
+		// execution semantics. Never accept inline execution parameters here.
+		if err := rejectUnknownBatchFields(item, map[string]struct{}{"tool_name": {}, "identifier": {}, "reason": {}}); err != nil {
+			return err
 		}
-		loopInfraSystemLog(loop, "load_tool", toolLoadMessage)
-
-		reason := resolveToolCallReason(action, "tool_call_reason")
-		result, directly, callErr := invoker.ExecuteToolRequiredAndCall(ctx, toolPayload, aicommon.WithToolCaller_Reason(reason))
-
-		// cache tool on successful execution (before satisfaction check)
-		if callErr == nil && result != nil {
-			if cachedTool, lookupErr := loop.GetConfig().GetAiToolManager().GetToolByName(toolPayload); lookupErr == nil {
-				if realCfg, ok := loop.GetConfig().(*aicommon.Config); ok {
-					realCfg.RecordRecentlyUsedTool(cachedTool)
-				} else {
-					loop.GetConfig().GetAiToolManager().AddRecentlyUsedTool(cachedTool)
-				}
-			}
+		name, err := strictBatchString(item, "tool_name", true)
+		if err != nil {
+			return err
 		}
-
-		handleToolCallResult(loop, ctx, invoker, toolPayload, result, directly, callErr, operator)
-	},
+		names = append(names, name)
+	}
+	seen := make(map[string]bool)
+	unique := make([]string, 0, len(names))
+	for _, name := range names {
+		if !seen[name] {
+			unique = append(unique, name)
+			seen[name] = true
+		}
+		reactloops.MaybeWarnBashBeforeEdit(loop, name)
+	}
+	loop.SetActionExecutionValue(action, actionStateToolSchemaNames, unique)
+	return nil
 }
