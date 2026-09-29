@@ -38,12 +38,23 @@ x=$foo
 PATH=$foo:$PATH bar
 echo $$
 echo $_foo
+case " ${seen_files} " in *" ${base} "*) return 0 ;; esac
+echo '$literal_dollar'
+# comment mentioning $docs is not an unquoted expansion
 NEG
 )
 
 ${*.sh}.pattern_regex(/(?<![\w"'=:])\$(?:\{[*@0-9A-Za-z][^}]*\}|[*@0-9A-Za-z][A-Za-z0-9_]*)|YAKLANG_SF_POS_source\-unquoted\-variable\-expansion\-in\-command/) as $hit_sh
 ${*.bash}.pattern_regex(/(?<![\w"'=:])\$(?:\{[*@0-9A-Za-z][^}]*\}|[*@0-9A-Za-z][A-Za-z0-9_]*)|YAKLANG_SF_POS_source\-unquoted\-variable\-expansion\-in\-command/) as $hit_bash
-$hit_sh + $hit_bash as $hit
+$hit_sh + $hit_bash as $expansions
+${*.sh}.pattern_regex(/"[^"\n]*"/) as $dq_sh
+${*.bash}.pattern_regex(/"[^"\n]*"/) as $dq_bash
+${*.sh}.pattern_regex(/'[^'\n]*'/) as $sq_sh
+${*.bash}.pattern_regex(/'[^'\n]*'/) as $sq_bash
+${*.sh}.pattern_regex(/#[^\n]*/) as $cm_sh
+${*.bash}.pattern_regex(/#[^\n]*/) as $cm_bash
+$dq_sh + $dq_bash + $sq_sh + $sq_bash + $cm_sh + $cm_bash as $quoted
+$expansions not_inside $quoted as $hit
 alert $hit for {
 	level: "middle",
 	title: "检测到命令中未加引号的变量展开",

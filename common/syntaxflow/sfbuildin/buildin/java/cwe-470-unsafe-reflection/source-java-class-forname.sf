@@ -33,11 +33,17 @@ class R {
 POS
 	"safefile://S.java": <<<NEG
 class S { void ok() { System.out.println("static"); } }
-
+// do not use Class.forName( with user input
+class Doc { String s = "Class.forName(x)"; }
 NEG
 )
 
-${*.java}.pattern_regex(/Class\.forName\s*\(/) as $hit
+${*.java}.pattern_regex(/Class\.forName\s*\(/) as $raw
+${*.java}.pattern_regex(/"[^"\n]*"/) as $dq
+${*.java}.pattern_regex(/'[^'\n]*'/) as $cq
+${*.java}.pattern_regex(/\/\/[^\n]*|\/\*[\s\S]*?\*\//) as $cm
+$dq + $cq + $cm as $quoted
+$raw not_inside $quoted as $hit
 alert $hit for {
 	level: "medium",
 	title: "检测 Java Class.forName",

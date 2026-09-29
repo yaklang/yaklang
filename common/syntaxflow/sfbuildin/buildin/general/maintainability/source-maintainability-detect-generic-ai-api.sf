@@ -25,15 +25,22 @@ DESC
 确认该调用是否符合团队规范与安全策略，校验 API 密钥管理与请求内容。
 SOLUTION
 	alert_min: 1
-	"file://pos.txt": <<<POS
-/chat/completions
+	"file://pos.go": <<<POS
+package main
+
+const endpoint = "https://api.openai.com/v1/chat/completions"
 POS
-	"safefile://pos.txt": <<<NEG
+	"safefile://neg.txt": <<<NEG
 https://example.com
+白名单域名（官方 API，不作为漏洞）：api.openai.com、api.anthropic.com
+Whitelisted hosts: api.openai.com is an official API endpoint.
+<td class="api.openai.com">documentation link</td>
 NEG
 )
 
-${*}.pattern_regex(/(?:\/chat\/completions)|(?:api\.openai\.com)/) as $hit
+${/\.(go|py|java|js|jsx|ts|tsx|rb|php|cs|kt|scala)$/}.pattern_regex(/(?:https?:\/\/|\bHost\s*[:=]\s*["']?|\bEndpoint\s*[:=]\s*["']?|["'`])(?:[A-Za-z0-9._-]*\.)?api\.openai\.com(?=[\/"'`\s:]|$)/) as $api_host
+${/\.(go|py|java|js|jsx|ts|tsx|rb|php|cs|kt|scala)$/}.pattern_regex(/["'`][^"'`\n]*\/chat\/completions["'`]/) as $api_path
+$api_host + $api_path as $hit
 alert $hit for {
 	level: "low",
 	title: "检测到 AI API 调用",

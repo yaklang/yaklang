@@ -37,6 +37,10 @@ exec "`foo`"
 exec "bar$(foo)bar"
 x=$(foo)
 echo $((2 + 2))
+echo " $(foo) "
+echo 'literal $(not_a_subshell)'
+# comment mentioning $(docs) is not a command substitution
+local elapsed=$(( $(date +%s) - start_time ))
 NEG
 )
 
@@ -45,8 +49,14 @@ ${*.bash}.pattern_regex(/(?<!=)\$\((?!\()|(?<!=)`[^`]*`|YAKLANG_SF_POS_source\-u
 $t_sh + $t_bash as $t
 ${*.sh}.pattern_regex(/"[^"]*"/) as $q_sh
 ${*.bash}.pattern_regex(/"[^"]*"/) as $q_bash
-$q_sh + $q_bash as $q
-$t not_inside $q as $hit
+${*.sh}.pattern_regex(/'[^'\n]*'/) as $sq_sh
+${*.bash}.pattern_regex(/'[^'\n]*'/) as $sq_bash
+${*.sh}.pattern_regex(/#[^\n]*/) as $cm_sh
+${*.bash}.pattern_regex(/#[^\n]*/) as $cm_bash
+${*.sh}.pattern_regex(/\$\(\([^\n]*\)\)/) as $arith_sh
+${*.bash}.pattern_regex(/\$\(\([^\n]*\)\)/) as $arith_bash
+$q_sh + $q_bash + $sq_sh + $sq_bash + $cm_sh + $cm_bash + $arith_sh + $arith_bash as $excluded
+$t not_inside $excluded as $hit
 alert $hit for {
 	level: "middle",
 	title: "检测到命令中未加引号的命令替换",

@@ -34,11 +34,17 @@ POS
 	"safefile://s.go": <<<NEG
 package main
 func g(u string) {}
-
+// avoid http.Get( with raw input
+var doc = "http.Get(url)"
 NEG
 )
 
-${*.go}.pattern_regex(/http\.Get\s*\(/) as $hit
+${*.go}.pattern_regex(/http\.Get\s*\(/) as $raw
+${*.go}.pattern_regex(/"[^"\n]*"/) as $dq
+${*.go}.pattern_regex(/`[^`]*`/) as $rq
+${*.go}.pattern_regex(/\/\/[^\n]*|\/\*[\s\S]*?\*\//) as $cm
+$dq + $rq + $cm as $quoted
+$raw not_inside $quoted as $hit
 alert $hit for {
 	level: "medium",
 	title: "检测 Go http.Get",
