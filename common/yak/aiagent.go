@@ -173,10 +173,10 @@ func YakTool2AITool(aitools []*schema.AIYakTool) []*aitool.Tool {
 							spew.Fdump(stdout, values...)
 						},
 						"print": func(values ...any) (int, error) {
-							return fmt.Fprint(stdout, values...)
+							return builtin.PrintTo(stdout, values...)
 						},
 						"printf": func(format string, values ...any) (int, error) {
-							return fmt.Fprintf(stdout, format, values...)
+							return builtin.PrintfTo(stdout, format, values...)
 						},
 						"println": func(values ...any) (int, error) {
 							return builtin.PrintlnTo(stdout, values...)
