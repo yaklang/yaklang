@@ -74,16 +74,21 @@ alert $hit
 	require.GreaterOrEqual(t, len(res.GetValues("hit")), 1)
 }
 
-func TestStructRuleContentRejectedWithoutQueryWithStruct(t *testing.T) {
+// TestStructRuleContentDispatchesToProgramUnits covers the content entry: the
+// rule text is compiled first and then dispatched by the compiled frame's mode,
+// so a struct rule runs over the program's units just like the rule-object
+// entry does.
+func TestStructRuleContentDispatchesToProgramUnits(t *testing.T) {
 	prog, err := Parse("a = 1")
 	require.NoError(t, err)
-	_, err = prog.SyntaxFlowWithError(`
+	res, err := prog.SyntaxFlowWithError(`
 desc(mode: "struct")
 a as $hit
 alert $hit
 `)
-	require.Error(t, err)
-	require.Contains(t, err.Error(), "struct rule requires QueryWithStruct")
+	require.NoError(t, err)
+	require.NotNil(t, res)
+	require.GreaterOrEqual(t, len(res.GetValues("hit")), 1)
 }
 
 func TestUnknownRuleModeExecutedAsSSA(t *testing.T) {
