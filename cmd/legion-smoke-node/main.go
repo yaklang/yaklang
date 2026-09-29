@@ -314,8 +314,11 @@ func syncAISessionCapabilities() error {
 	// keeps an in-memory registry. Ephemeral session containers previously only
 	// populated the latter, so query_capabilities saw zero tools and blueprints.
 	finish := startStartupStage(true, "builtin_tools_sync")
-	yakscripttools.OverrideYakScriptAiTools()
-	finish(nil)
+	err := yakscripttools.OverrideYakScriptAiTools()
+	finish(err)
+	if err != nil {
+		return fmt.Errorf("sync builtin AI tools: %w", err)
+	}
 	finish = startStartupStage(true, "builtin_tool_output_options")
 	yakscripttools.UpdateAIYakToolAIOutputOption()
 	finish(nil)

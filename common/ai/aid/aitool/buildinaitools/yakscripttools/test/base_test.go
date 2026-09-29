@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"os"
-	"regexp"
 	"strconv"
 	"strings"
 	"testing"
@@ -29,11 +28,11 @@ func setupHTTPYakToolFixture(t *testing.T) {
 		consts.BindProfileDatabase(previousDB, previousPath)
 		_ = db.Close()
 	})
-	content, err := os.ReadFile("../yakscriptforai/http/send_http_request_by_url.yak")
+	content, err := os.ReadFile("../yakscriptforai/http/do_http_request.yak")
 	assert.NilError(t, err)
-	tool := yakscripttools.LoadYakScriptToAiTools("send_http_request_by_url", string(content))
+	tool := yakscripttools.LoadYakScriptToAiTools("do_http_request", string(content))
 	assert.Assert(t, tool != nil)
-	tool.Path = "http/send_http_request_by_url"
+	tool.Path = "http/do_http_request"
 	assert.NilError(t, db.Create(tool).Error)
 }
 
@@ -44,7 +43,7 @@ func TestGetYakScript(t *testing.T) {
 	tools := yakscripttools.GetAllYakScriptAiTools()
 	hasDoHttp := false
 	for _, ait := range tools {
-		if ait.Name == "send_http_request_by_url" {
+		if ait.Name == "do_http_request" {
 			hasDoHttp = true
 			w1, w2 := bytes.NewBuffer(nil), bytes.NewBuffer(nil)
 			_, err := ait.Callback(context.Background(), aitool.InvokeParams{
@@ -61,31 +60,5 @@ func TestSearchYakScript(t *testing.T) {
 	setupHTTPYakToolFixture(t)
 	tools := yakscripttools.GetYakScriptAiTools("http")
 	assert.Equal(t, len(tools), 1)
-	assert.Equal(t, tools[0].Name, "send_http_request_by_url")
-}
-
-func TestSendHTTPRequestByURLSavesRequestContent(t *testing.T) {
-	setupHTTPYakToolFixture(t)
-	host, port := utils.DebugMockHTTP([]byte("ok"))
-	for _, tool := range yakscripttools.GetAllYakScriptAiTools() {
-		if tool.Name != "send_http_request_by_url" {
-			continue
-		}
-		stdout := bytes.NewBuffer(nil)
-		_, err := tool.Callback(context.Background(), aitool.InvokeParams{
-			"url":          "http://" + host + ":" + strconv.Itoa(port) + "/request-check",
-			"show-request": "yes",
-		}, nil, stdout, bytes.NewBuffer(nil))
-		assert.NilError(t, err)
-		match := regexp.MustCompile(`req packet saved to (\S+)`).FindStringSubmatch(stdout.String())
-		if len(match) != 2 {
-			t.Fatalf("saved request path missing: %s", stdout.String())
-		}
-		t.Cleanup(func() { _ = os.Remove(match[1]) })
-		data, err := os.ReadFile(match[1])
-		assert.NilError(t, err)
-		assert.Assert(t, strings.Contains(string(data), "GET /request-check HTTP/1.1"), "saved file should contain raw request, got %q", data)
-		return
-	}
-	t.Fatal("send_http_request_by_url not found")
+	assert.Equal(t, tools[0].Name, "do_http_request")
 }

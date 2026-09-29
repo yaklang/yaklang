@@ -13,9 +13,8 @@ import (
 // 模型. 它的存在原因是: 默认 Tool Inventory 段在 prompt 里展示所有 enable
 // tools, 但其中部分工具:
 //
-//   1) 已有更好的替代品 (例: send_http_request_by_url / send_http_request_packet
-//      / url_content_summary 都被 do_http_request 覆盖), 默认不再推荐 ->
-//      标记 VisibilityHidden, 默认不展示, 也不允许 focus 模式拉回 inventory.
+//   1) 与当前场景无关的工具 (例: amap 系列), 默认不再推荐 -> 标记
+//      VisibilityHidden, 默认不展示, 也不允许 focus 模式拉回 inventory.
 //
 //   2) 仅在特定场景下值得推荐 (例: ssa / SyntaxFlow 系列工具只在代码审计
 //      场景才有意义), 不该默认占据通用 inventory 名额 -> 标记 VisibilityScenario,
@@ -86,18 +85,9 @@ var (
 	//
 	// 命中规则:
 	//   - amap/ 目录下全部 .yak 工具 (8 个), 业务无关, 默认不推荐.
-	//   - HTTP 系列里有更好替代品的: send_http_request_by_url /
-	//     send_http_request_packet 被 do_http_request 完全覆盖;
-	//     url_content_summary 是单 URL 摘要, 也被 do_http_request + 简易爬虫
-	//     等覆盖.
 	//
-	// 关键词: hidden tool names, amap, http deprecated, do_http_request replacement
+	// 关键词: hidden tool names, amap
 	hiddenToolNames = map[string]struct{}{
-		// HTTP 已有替代品的旧工具
-		"url_content_summary":      {},
-		"send_http_request_by_url": {},
-		"send_http_request_packet": {},
-
 		// amap 系列 (高德地图相关, 与安全/通用 ReAct 场景无关)
 		"walking_plan":   {},
 		"transit_plan":   {},
@@ -130,11 +120,11 @@ var (
 	// 关键词: scenario tool names, ssa, syntaxflow, code audit focus
 	scenarioToolNames = map[string]struct{}{
 		// ssatools 包 Go 内建 (ssa_tools.go / syntaxflow.go)
-		"ssa-project-info":         {},
-		"ssa-list-files":           {},
-		"ssa-read-file":            {},
-		"ssa-grep":                 {},
-		"check-syntaxflow-syntax":  {},
+		"ssa-project-info":        {},
+		"ssa-list-files":          {},
+		"ssa-read-file":           {},
+		"ssa-grep":                {},
+		"check-syntaxflow-syntax": {},
 
 		// yakscriptforai/ssa/*.yak 脚本
 		"check_syntaxflow_syntax": {},
@@ -281,7 +271,8 @@ func UnregisterToolVisibility(name string) {
 // "只保留 normal".
 //
 // 关键词: FilterToolsByVisibility, default inventory entry filter,
-//        scenario whitelist, hidden drop
+//
+//	scenario whitelist, hidden drop
 func FilterToolsByVisibility(tools []*aitool.Tool, scenarioWhitelist []string) []*aitool.Tool {
 	if len(tools) == 0 {
 		return tools

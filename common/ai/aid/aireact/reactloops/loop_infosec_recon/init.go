@@ -51,7 +51,6 @@ func init() {
 				"read_file",
 				"find_files",
 				"grep_text",
-				"url_content_summary",
 				"subdomain_scan",
 				"network_space_search",
 				"search_knowledge",
@@ -140,7 +139,6 @@ func init() {
 				grepTextAction(r),
 				doHTTPAction(r),
 				batchHTTPAction(r),
-				urlSummaryAction(r),
 			}
 			preset = append(preset, opts...)
 			return reactloops.NewReActLoop(schema.AI_REACT_LOOP_NAME_INFOSEC_RECON, r, preset...)

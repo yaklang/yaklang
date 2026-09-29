@@ -26,7 +26,7 @@
    - 网络连接分析：网络接口状态、连接数、带宽使用
 7. **服务配置分析**: 指纹识别(`match_fingerprint_by_packet`)、配置检查、安全设置分析
    - 端口扫描获取基础服务指纹
-   - 对Web服务使用HTTP请求(`send_http_request_by_url`、`send_http_request_packet`)获取应用指纹
+   - 对Web服务使用HTTP请求(`do_http_request`)获取应用指纹
 8. **进程状态监控**: 进程监控、服务状态、异常进程识别
 9. **安全配置检查**: 用户权限、文件权限、系统配置检查
 10. **安全风险分析**: 漏洞扫描、风险评估、威胁分析
@@ -43,10 +43,10 @@
 - **subdomain_scan**: 发现隐藏的子域名和服务入口
 - **whois**: 查询域名注册信息和管理详情
 - **bash**: 如果想执行系统命令，使用这个工具
-- **send_http_request_by_url**: 测试Web应用和API接口
+- **do_http_request**: 通过 `url` 或 `packet` 模式测试Web应用和API接口
   - 除了测试功能外，获取的HTTP响应可用于指纹识别
   - 将响应包传入`match_fingerprint_by_packet`获取Web应用技术栈信息
-- **send_http_request_packet**: 发送自定义的HTTP请求包
+- 需要精确控制请求时，向 `do_http_request` 传入原始 `packet`
   - 可用于发送特定的HTTP请求获取更详细的响应信息
   - 响应包同样可用于`match_fingerprint_by_packet`进行指纹分析
 - **simple_crawler**: 发现Web应用的目录结构和隐藏页面
@@ -197,6 +197,6 @@
   ```
 
 #### 重要提醒
-只有在 `安全风险分析` 任务中才允许使用scan_tcp_port,syn_scan_tcp_port,match_fingerprint_by_packet,send_http_request_by_url,send_http_request_packet,simple_crawler,cybersecurity-risk,call_yak_plugin,query_plugin_by_fp,brute,whois这些工具
+只有在 `安全风险分析` 任务中才允许使用scan_tcp_port,syn_scan_tcp_port,match_fingerprint_by_packet,do_http_request,simple_crawler,cybersecurity-risk,call_yak_plugin,query_plugin_by_fp,brute,whois这些工具
 
-在 `安全风险分析` 任务中的执行流程是根据对之前或得到的端口信息、流量信息得到主机开放端口，对开放端口进行请求（send_http_request_by_url），并指纹识别（match_fingerprint_by_packet），再查询相关插件（query_plugin_by_fp），再执行插件（call_yak_plugin）
+在 `安全风险分析` 任务中的执行流程是根据对之前或得到的端口信息、流量信息得到主机开放端口，对开放端口进行请求（do_http_request），并指纹识别（match_fingerprint_by_packet），再查询相关插件（query_plugin_by_fp），再执行插件（call_yak_plugin）

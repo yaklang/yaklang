@@ -13,8 +13,7 @@ import (
 
 // hidden tool pattern 在 prompt 主路径 (GetLoopPromptBaseMaterials +
 // frozen_block_section.txt 渲染) 上的端到端回归: 给一组混合工具, 默认
-// 不带 scenario 白名单时, 默认 Tool Inventory 段不能出现 amap / 已被
-// do_http_request 覆盖的几个 http 工具 / ssa-* 系列, 且 ToolsCount /
+// 不带 scenario 白名单时, 默认 Tool Inventory 段不能出现 amap / ssa-* 系列, 且 ToolsCount /
 // MoreToolsCount 必须按"过滤后"统计.
 //
 // 关键词: hidden tool pattern regression, GetLoopPromptBaseMaterials filter,
@@ -30,7 +29,8 @@ func mkVisToolWithDesc(name, desc string) *aitool.Tool {
 // block 文本里不能出现这些工具名.
 //
 // 关键词: TestPromptManager_ToolInventory_ExcludesHiddenAndScenario_Default,
-//        default inventory filter, amap excluded, ssa- excluded
+//
+//	default inventory filter, amap excluded, ssa- excluded
 func TestPromptManager_ToolInventory_ExcludesHiddenAndScenario_Default(t *testing.T) {
 	react, err := NewTestReAct(
 		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
@@ -44,15 +44,12 @@ func TestPromptManager_ToolInventory_ExcludesHiddenAndScenario_Default(t *testin
 
 	// 入参挑了一组覆盖 normal / hidden / scenario 三类的代表性工具:
 	//   normal:   do_http_request, grep, read_file
-	//   hidden:   url_content_summary, send_http_request_by_url,
-	//             send_http_request_packet, walking_plan (amap)
+	//   hidden:   walking_plan, transit_plan (amap)
 	//   scenario: ssa-grep, ssa-list-files, check_syntaxflow_syntax (.yak)
 	mixedTools := []*aitool.Tool{
 		mkVisToolWithDesc("do_http_request", "send http request"),
-		mkVisToolWithDesc("url_content_summary", "deprecated http summary"),
-		mkVisToolWithDesc("send_http_request_by_url", "deprecated"),
-		mkVisToolWithDesc("send_http_request_packet", "deprecated"),
 		mkVisToolWithDesc("walking_plan", "amap walking"),
+		mkVisToolWithDesc("transit_plan", "amap transit"),
 		mkVisToolWithDesc("ssa-grep", "ssa grep"),
 		mkVisToolWithDesc("ssa-list-files", "ssa list files"),
 		mkVisToolWithDesc("check_syntaxflow_syntax", "ssa .yak"),
@@ -65,10 +62,8 @@ func TestPromptManager_ToolInventory_ExcludesHiddenAndScenario_Default(t *testin
 		"read_file":       {},
 	}
 	bannedNames := []string{
-		"url_content_summary",
-		"send_http_request_by_url",
-		"send_http_request_packet",
 		"walking_plan",
+		"transit_plan",
 		"ssa-grep",
 		"ssa-list-files",
 		"check_syntaxflow_syntax",

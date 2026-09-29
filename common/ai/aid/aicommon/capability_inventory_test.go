@@ -3,11 +3,11 @@ package aicommon
 import (
 	"testing"
 
+	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon/aiskillloader"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools"
 	"github.com/yaklang/yaklang/common/utils/filesys"
-	"github.com/stretchr/testify/require"
 )
 
 func testSkillInventoryVFS() *filesys.VirtualFS {
@@ -18,13 +18,13 @@ func testSkillInventoryVFS() *filesys.VirtualFS {
 }
 
 type testCapabilityInventoryLoop struct {
-	extraTools        []*aitool.Tool
-	inventorySkills   []CapabilityInventoryNamedItem
+	extraTools      []*aitool.Tool
+	inventorySkills []CapabilityInventoryNamedItem
 }
 
 func (t *testCapabilityInventoryLoop) PromptCandidateTools() []*aitool.Tool { return nil }
-func (t *testCapabilityInventoryLoop) ScenarioToolWhitelist() []string     { return nil }
-func (t *testCapabilityInventoryLoop) AllowToolCall() bool                 { return true }
+func (t *testCapabilityInventoryLoop) ScenarioToolWhitelist() []string      { return nil }
+func (t *testCapabilityInventoryLoop) AllowToolCall() bool                  { return true }
 func (t *testCapabilityInventoryLoop) DynamicExtraTools() []*aitool.Tool {
 	return t.extraTools
 }
@@ -105,11 +105,11 @@ type allowToolCallLoop struct {
 	allow bool
 }
 
-func (l *allowToolCallLoop) PromptCandidateTools() []*aitool.Tool               { return nil }
-func (l *allowToolCallLoop) ScenarioToolWhitelist() []string                      { return nil }
-func (l *allowToolCallLoop) AllowToolCall() bool                                  { return l.allow }
-func (l *allowToolCallLoop) DynamicExtraTools() []*aitool.Tool                    { return nil }
-func (l *allowToolCallLoop) DynamicForges() []CapabilityInventoryNamedItem        { return nil }
+func (l *allowToolCallLoop) PromptCandidateTools() []*aitool.Tool            { return nil }
+func (l *allowToolCallLoop) ScenarioToolWhitelist() []string                 { return nil }
+func (l *allowToolCallLoop) AllowToolCall() bool                             { return l.allow }
+func (l *allowToolCallLoop) DynamicExtraTools() []*aitool.Tool               { return nil }
+func (l *allowToolCallLoop) DynamicForges() []CapabilityInventoryNamedItem   { return nil }
 func (l *allowToolCallLoop) InventorySkills() []CapabilityInventoryNamedItem { return nil }
 
 func TestIsFixedInventoryTool(t *testing.T) {
@@ -121,7 +121,7 @@ func TestIsFixedInventoryTool(t *testing.T) {
 
 func TestSelectToolInventoryTools_FiltersHiddenTools(t *testing.T) {
 	visible := aitool.NewWithoutCallback("grep", aitool.WithDescription("grep files"))
-	hidden := aitool.NewWithoutCallback("send_http_request_by_url", aitool.WithDescription("legacy http"))
+	hidden := aitool.NewWithoutCallback("walking_plan", aitool.WithDescription("amap walking"))
 
 	cfg := &Config{TopToolsCount: 100}
 	selection := ResolvePromptToolInventory(cfg, []*aitool.Tool{visible, hidden}, nil, true)

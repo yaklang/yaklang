@@ -227,11 +227,4 @@ var (
 			aitool.WithStringParam("requests", aitool.WithParam_Description("Batch request spec per tool docs.")),
 		},
 	)
-	urlSummaryAction = makeToolForwardAction(
-		"url_content_summary", "url_content_summary",
-		"Fetch URL and get text summary.",
-		[]aitool.ToolOption{
-			aitool.WithStringParam("url", aitool.WithParam_Required(true)),
-		},
-	)
 )

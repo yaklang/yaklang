@@ -11,7 +11,7 @@ import (
 //     TestToolVisibility_<焦点>, 方便 go test -run TestToolVisibility 一把跑.
 //   - 任何用到 RegisterXxx / UnregisterXxx 的用例都必须用 defer
 //     UnregisterToolVisibility 清理, 避免污染同包内其他测试 (尤其是 amap /
-//     ssa / http 那一批硬编码名单).
+//     ssa 那一批硬编码名单).
 //
 // 关键词: tool visibility tests, hidden tool pattern, filter inventory,
 //        scenario whitelist, runtime register reset
@@ -19,13 +19,9 @@ import (
 // TestToolVisibility_InitialHiddenNames 验证 plan 中列出的全部初始 hidden 名字
 // 都被命中, 防止 hiddenToolNames 被未来重构时无意义地裁掉.
 //
-// 关键词: initial hidden names, amap, http deprecated
+// 关键词: initial hidden names, amap
 func TestToolVisibility_InitialHiddenNames(t *testing.T) {
 	hiddenCases := []string{
-		// HTTP 已有替代品
-		"url_content_summary",
-		"send_http_request_by_url",
-		"send_http_request_packet",
 		// amap 全 8 个
 		"walking_plan",
 		"transit_plan",
@@ -114,15 +110,16 @@ func TestToolVisibility_PrefixFallback(t *testing.T) {
 // 顺序应保持稳定 (与入参顺序一致).
 //
 // 关键词: FilterToolsByVisibility default behavior, drop hidden and scenario,
-//        stable order
+//
+//	stable order
 func TestToolVisibility_FilterDropsHiddenAndScenarioByDefault(t *testing.T) {
 	tools := []*aitool.Tool{
-		mkVisTool("do_http_request"),  // normal
-		mkVisTool("walking_plan"),     // hidden (amap)
-		mkVisTool("ssa-grep"),         // scenario
-		mkVisTool("grep"),             // normal
-		mkVisTool("ssa-newcomer"),     // scenario (prefix)
-		mkVisTool("url_content_summary"), // hidden
+		mkVisTool("do_http_request"), // normal
+		mkVisTool("walking_plan"),    // hidden (amap)
+		mkVisTool("ssa-grep"),        // scenario
+		mkVisTool("grep"),            // normal
+		mkVisTool("ssa-newcomer"),    // scenario (prefix)
+		mkVisTool("transit_plan"),    // hidden (amap)
 	}
 
 	got := FilterToolsByVisibility(tools, nil)
@@ -143,7 +140,8 @@ func TestToolVisibility_FilterDropsHiddenAndScenarioByDefault(t *testing.T) {
 // 仍然被过滤掉; whitelist 命中 hidden 不能让 hidden 复活 (语义: hidden 永远禁用).
 //
 // 关键词: FilterToolsByVisibility scenario whitelist, hidden never returns,
-//        focus mode pull back scenario
+//
+//	focus mode pull back scenario
 func TestToolVisibility_FilterKeepsWhitelistedScenario(t *testing.T) {
 	tools := []*aitool.Tool{
 		mkVisTool("do_http_request"),

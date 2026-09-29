@@ -47,8 +47,7 @@ func init() {
 			buildinHash, _ := BuildInAIToolHash()
 			return buildinHash
 		}, func() error {
-			OverrideYakScriptAiTools()
-			return nil
+			return OverrideYakScriptAiTools()
 		})
 		if err != nil {
 			return err
@@ -98,9 +97,12 @@ func BuildInAIToolHash() (string, error) {
 
 var overrideYakScriptAiToolsOnce sync.Once
 
-func OverrideYakScriptAiTools() {
+func OverrideYakScriptAiTools() error {
+	db := consts.GetGormProfileDatabase()
+	if err := removeRetiredBuiltInAITools(db); err != nil {
+		return err
+	}
 	overrideYakScriptAiToolsOnce.Do(func() {
-		db := consts.GetGormProfileDatabase()
 		aiTools, err := loadAllYakScriptFromEmbedFS()
 		if err != nil {
 			log.Errorf("load all yak script from embed fs failed: %v", err)
@@ -110,6 +112,19 @@ func OverrideYakScriptAiTools() {
 			yakit.SaveAIYakTool(db, aiTool)
 		}
 	})
+	return nil
+}
+
+// 清理升级前写入 profile 数据库的内置工具，保留同名的用户自定义工具。
+func removeRetiredBuiltInAITools(db *gorm.DB) error {
+	retiredNames := []string{
+		"http_response_diff",
+		"url_content_summary",
+		"send_http_request_by_url",
+		"send_http_request_packet",
+	}
+	return db.Where("name IN (?) AND (is_builtin = ? OR author = ?)", retiredNames, true, schema.AIResourceAuthorBuiltin).
+		Unscoped().Delete(&schema.AIYakTool{}).Error
 }
 
 func loadAllYakScriptFromEmbedFS() ([]*schema.AIYakTool, error) {
