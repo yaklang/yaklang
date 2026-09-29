@@ -417,3 +417,70 @@ func TestIrSourceFS_File_URL(t *testing.T) {
 		require.NotEqual(t, sources[0].SourceCodeHash, sources[1].SourceCodeHash)
 	})
 }
+
+// TestIrSourceFS_LazyFillAndTTLCache covers the lazy body-fill behavior:
+// listing never pulls QuotedCode, first ReadFile fills the body into the tree
+// (Stat then reports the real size), repeated reads hit the tree in memory,
+// and DropProgramCache discards the whole tree so the next touch rebuilds it.
+func TestIrSourceFS_LazyFillAndTTLCache(t *testing.T) {
+	code := `package org.example
+		public class LazyFill {
+			public void run() {
+				println("lazy");
+			}
+		}
+	`
+	programID := "prog_" + uuid.NewString()
+	fileRelPath := "src/main/java/org/example/LazyFill.java"
+	fullPath := "/" + programID + "/" + fileRelPath
+
+	opts := []ssaconfig.Option{
+		ssaapi.WithLanguage(ssaconfig.JAVA),
+		ssaapi.WithProgramName(programID),
+	}
+	_, err := ssaconfig.New(ssaconfig.ModeProjectCompile, opts...)
+	require.NoError(t, err)
+	vf := filesys.NewVirtualFs()
+	vf.AddFile(fileRelPath, code)
+	_, err = ssaapi.ParseProjectWithFS(vf, opts...)
+	require.NoError(t, err)
+	t.Cleanup(func() { ssadb.DeleteProgram(ssadb.GetDB(), programID) })
+
+	dbfs := ssadb.NewIrSourceFs()
+
+	// Listing the tree works without touching any file body.
+	entries, err := dbfs.ReadDir("/" + programID)
+	require.NoError(t, err)
+	require.NotEmpty(t, entries)
+
+	// Before the file is read, its stub has no size.
+	info, err := dbfs.Stat(fullPath)
+	require.NoError(t, err)
+	require.Equal(t, int64(0), info.Size())
+
+	// First read fills the body into the tree.
+	data, err := dbfs.ReadFile(fullPath)
+	require.NoError(t, err)
+	require.Contains(t, string(data), "class LazyFill")
+
+	// After the fill, Stat reports the real size.
+	info, err = dbfs.Stat(fullPath)
+	require.NoError(t, err)
+	require.Equal(t, int64(len(data)), info.Size())
+
+	// Open returns the filled body as well.
+	fh, err := dbfs.Open(fullPath)
+	require.NoError(t, err)
+	opened, err := io.ReadAll(fh)
+	require.NoError(t, err)
+	require.Equal(t, data, opened)
+
+	// DropProgramCache removes the tree; the next touch rebuilds and can read again.
+	dbfs.DropProgramCache(programID)
+	info, err = dbfs.Stat(fullPath)
+	require.NoError(t, err)
+	require.Equal(t, int64(0), info.Size())
+	data2, err := dbfs.ReadFile(fullPath)
+	require.NoError(t, err)
+	require.Equal(t, data, data2)
+}
