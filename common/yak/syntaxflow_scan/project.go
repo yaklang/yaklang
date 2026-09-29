@@ -66,9 +66,17 @@ func ScanProject(ctx context.Context, opts ...ssaconfig.Option) (result ProjectR
 	}
 	defer cfg.Cleanup()
 	ssaconfig.ApplyExtraOptions(cfg, cfg.Config)
-	cfg.SetSyntaxFlowResultSaveMemory()
+	// A project scan defaults to keeping findings in memory: the callbacks
+	// stream them and no database consumer is registered. A caller that
+	// explicitly asks for database results gets the scan's database saver
+	// instead, the same consumer the gRPC scan uses.
+	persistResults := cfg.GetSyntaxFlowResultKind() == ssaconfig.SFResultSaveDatabase &&
+		!cfg.GetSyntaxFlowMemory()
+	if !persistResults {
+		cfg.SetSyntaxFlowResultSaveMemory()
+	}
 	if cfg.SyntaxFlow != nil {
-		cfg.SyntaxFlow.Memory = true
+		cfg.SyntaxFlow.Memory = !persistResults
 	}
 	// In-process ScanProject compile (process callbacks force ExtraInfo) skips
 	// the SSA compile plugin that stamps projectName(timestamp). Without a
@@ -86,7 +94,18 @@ func ScanProject(ctx context.Context, opts ...ssaconfig.Option) (result ProjectR
 	// One runtime for the whole project scan: the source, struct and SSA
 	// stages submit their findings to the same collect so a later mode
 	// replaces an earlier one, and the report saver is registered once.
-	ensureScanRuntime(cfg)
+	rt := ensureScanRuntime(cfg)
+	// The database consumer is registered once for the whole scan. Nested
+	// stage scans share this runtime, so their own bind returns early.
+	if persistResults && rt != nil {
+		if saver := bindDBSaver(rt, schema.SFResultKindScan, rt.ID, cfg.IsNoSaveRisk()); saver != nil {
+			defer func() {
+				if err := saver.Close(); err != nil {
+					log.Errorf("flush risk batch failed: %v", err)
+				}
+			}()
+		}
+	}
 	// programName is published through ProjectResult so compile-only runs can
 	// hand the persisted IR name back to the platform.
 	programName := strings.TrimSpace(cfg.GetProgramName())
@@ -1074,11 +1093,15 @@ func copySyntaxFlowRuleOptions(cfg *Config) []ssaconfig.Option {
 	if cfg == nil || cfg.Config == nil || cfg.SyntaxFlowRule == nil {
 		return nil
 	}
+	kind := cfg.GetSyntaxFlowResultKind()
+	if kind == "" {
+		kind = ssaconfig.SFResultSaveMemory
+	}
 	raw, err := json.Marshal(map[string]any{
 		"SyntaxFlowRule": cfg.SyntaxFlowRule,
 		"SyntaxFlow": map[string]any{
-			"result_save_kind": string(ssaconfig.SFResultSaveMemory),
-			"memory":           true,
+			"result_save_kind": string(kind),
+			"memory":           cfg.GetSyntaxFlowMemory(),
 		},
 	})
 	if err != nil {
