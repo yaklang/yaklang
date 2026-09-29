@@ -123,7 +123,6 @@ func yakTool2AITool(aitools []*schema.AIYakTool, invokeForgeHandle bool) []*aito
 				ctx, cancel := context.WithCancel(ctx)
 				defer cancel()
 				params, normalizationNotes := normalizeEmptyObjectParams(tool, params)
-				var captured forgeToolOutput
 				for _, note := range normalizationNotes {
 					fmt.Fprintf(stdout, "[warning] input compatibility: %s. Execution will continue.\n", note)
 				}
@@ -169,9 +168,6 @@ func yakTool2AITool(aitools []*schema.AIYakTool, invokeForgeHandle bool) []*aito
 				}
 				registerBrowserSessionHooks(engine, browserTracker)
 				engine.RegisterEngineHooks(func(ae *antlr4yak.Engine) error {
-					if invokeForgeHandle {
-						ae.SetVars(map[string]any{"println": func(values ...any) { fmt.Fprintln(io.MultiWriter(stdout, &captured), values...) }})
-					}
 					pluginContext := CreateYakitPluginContext(
 						runtimeId,
 					).WithContext(
@@ -228,7 +224,7 @@ func yakTool2AITool(aitools []*schema.AIYakTool, invokeForgeHandle bool) []*aito
 						return result, nil
 					}
 					if invokeForgeHandle {
-						return invokeForgeToolHandler(ctx, executedEngine, params, &captured)
+						return invokeForgeToolHandler(ctx, executedEngine, params)
 					}
 				}
 				return nil, nil

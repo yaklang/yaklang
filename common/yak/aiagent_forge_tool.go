@@ -1,11 +1,8 @@
 package yak
 
 import (
-	"bytes"
 	"context"
 	"fmt"
-	"strings"
-	"sync"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/schema"
@@ -22,48 +19,12 @@ func YakTool2AIToolWithForgeHandle(aitools []*schema.AIYakTool) []*aitool.Tool {
 	return yakTool2AITool(aitools, true)
 }
 
-// This buffer captures only explicit println output, not runtime/Yakit warnings.
-// It cannot prove business success; consumers must inspect the returned payload.
-type forgeToolOutput struct {
-	mu       sync.Mutex
-	buf      bytes.Buffer
-	exceeded bool
-}
-
-// Bound the extra in-memory result capture; this is not a process memory limit.
-const maxForgeToolOutputBytes = 1 << 20
-
-func (b *forgeToolOutput) Write(p []byte) (int, error) {
-	b.mu.Lock()
-	defer b.mu.Unlock()
-	remaining := maxForgeToolOutputBytes - b.buf.Len()
-	if len(p) > remaining {
-		b.exceeded = true
-		b.buf.Write(p[:remaining])
-	} else {
-		b.buf.Write(p)
-	}
-	return len(p), nil
-}
-
-func (b *forgeToolOutput) result() (string, error) {
-	b.mu.Lock()
-	defer b.mu.Unlock()
-	if b.exceeded {
-		return "", fmt.Errorf("standalone Forge tool output exceeds %d bytes", maxForgeToolOutputBytes)
-	}
-	result := strings.TrimSpace(b.buf.String())
-	if result == "" {
-		return "", fmt.Errorf("standalone Forge tool produced no result")
-	}
-	return result, nil
-}
-
 // invokeForgeToolHandler adapts an explicitly selected script convention. It
 // does not choose which tools a platform permits or interpret business success.
-func invokeForgeToolHandler(ctx context.Context, engine *antlr4yak.Engine, params aitool.InvokeParams, captured *forgeToolOutput) (any, error) {
+func invokeForgeToolHandler(ctx context.Context, engine *antlr4yak.Engine, params aitool.InvokeParams) (any, error) {
 	if standalone, _ := params["standalone-tool"].(bool); standalone {
-		return captured.result()
+		// The script already executed its handler; observations use tool stdout.
+		return nil, nil
 	}
 	if _, ok := engine.GetVar(HOOK_AI_FORGE); ok {
 		result, err := engine.SafeCallYakFunction(ctx, HOOK_AI_FORGE, []interface{}{map[string]any(params)})

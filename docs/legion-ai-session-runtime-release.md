@@ -128,3 +128,9 @@ instructions. It snapshots original user input and normalized parameters when
 building the blueprint; rendered coordinator instructions are not original user
 input. These appendices apply independently of the retry flag. The shared core
 renders the declared templates without adding platform reporting requirements.
+
+Forge tool adapters do not intercept printing or convert observations into return
+values. Standalone scripts execute their own handler and may finish without an
+explicit result. Generic print/printf/println/dump routing is provided separately
+by Yaklang PR #5215; deployments relying on native printed tool observations
+must include that change. Existing Yakit feedback continues through tool stdout.
