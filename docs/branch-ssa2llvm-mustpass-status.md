@@ -125,3 +125,21 @@ TMPDIR=/mnt/data/ssa2llvm-deps/tmp YAKIT_HOME=/mnt/data/ssa2llvm-deps/yakit-all 
 - 不要清理 GOCACHE（构建很慢）
 - 构建 CLI 覆盖 `build/ssa2llvm`，不要留版本号
 - 提交前检查无 `Co-authored-by:` 行
+
+## 测试磁盘占用（2026-09-29 修复）
+
+一次 ssa2llvm 编译会在 `$TMPDIR` 下留下约 600 MB 临时数据：运行时归档的私有
+副本（staticanalyze 层最大约 390 MB）加上链接产物，而编译器会保留这些确定性
+work dir（`yakssa-compile-*`）以便复用。mustpass 逐脚本强制 `-a` 重建，复用
+不可能发生，于是 115 个脚本累积约 60 GB 残留，CI runner 的磁盘放不下。
+
+修复只动测试侧，生产缓存语义不变：
+
+- `tests/main_test.go` 的 `TestMain` 为整轮测试建立一个 run root 并把它设为
+  `TMPDIR`/`TMP`/`TEMP`，跑完统一删除；`SSA2LLVM_TEST_KEEP_TMP=1` 可保留排查。
+- mustpass 编译改用 `runSSA2LLVMCLIInDirScratch`，每次调用单独 `TMPDIR`，脚本
+  结束即刻回收，峰值从约 60 GB 降到单个脚本量级（约 0.6 GB）。
+
+验证：指定 2 个脚本运行后共享 temp 目录不再产生任何 `yakssa-compile-*`，run
+root 也不残留；`SSA2LLVM_TEST_KEEP_TMP=1` 单脚本运行时，临时数据确实全部落在
+run root 内。
