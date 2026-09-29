@@ -122,3 +122,67 @@ alert $call`,
 		Where("runtime_id = ?", runtimeID).Count(&riskCount).Error)
 	require.Zero(t, riskCount, "no-save-risk keeps risk rows out of the database")
 }
+
+// TestScan_MemoryModeWritesNothing covers the memory scan: no database
+// consumer is registered at all, so the query streams its findings to the
+// callbacks and the database stays untouched. This is the scan-side
+// equivalent of "no result database": the handling is dropped, not stubbed.
+func TestScan_MemoryModeWritesNothing(t *testing.T) {
+	const progID = "db-saver-memory-program"
+	vf := filesys.NewVirtualFs()
+	vf.AddFile("main.go", `package main
+
+func run(cmd string) {
+	sink(cmd)
+}
+
+func sink(any) {}
+`)
+	_, err := ssaapi.ParseProjectWithFS(vf,
+		ssaapi.WithLanguage(ssaconfig.GO),
+		ssaapi.WithProgramName(progID),
+	)
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		ssadb.DeleteProgram(ssadb.GetDB(), progID)
+	})
+
+	var runtimeID string
+	var emittedRisks int64
+	err = syntaxflow_scan.Scan(context.Background(),
+		ssaconfig.WithScanControlMode(ssaconfig.ControlModeStart),
+		ssaconfig.WithProgramNames(progID),
+		ssaconfig.WithScanIgnoreLanguage(true),
+		ssaconfig.WithSyntaxFlowResultKind(ssaconfig.SFResultSaveMemory),
+		ssaconfig.WithRuleInput(&ypb.SyntaxFlowRuleInput{
+			Content: `desc(mode: "ssa", language: golang, title: "memory scan test")
+sink(* as $arg) as $call;
+alert $call`,
+			Language: "golang",
+		}),
+		syntaxflow_scan.WithScanResultCallback(func(sr *syntaxflow_scan.ScanResult) {
+			if sr == nil {
+				return
+			}
+			if sr.TaskID != "" {
+				runtimeID = sr.TaskID
+			}
+			if sr.Result != nil {
+				emittedRisks += int64(sr.Result.RiskCount())
+			}
+		}),
+	)
+	require.NoError(t, err)
+	require.NotEmpty(t, runtimeID)
+	require.Greater(t, emittedRisks, int64(0), "the memory scan still emits its findings")
+
+	var resultCount int64
+	require.NoError(t, ssadb.GetDB().Model(&ssadb.AuditResult{}).
+		Where("program_name = ?", progID).Count(&resultCount).Error)
+	require.Zero(t, resultCount, "a memory scan writes no audit row")
+
+	var riskCount int64
+	require.NoError(t, ssadb.GetDB().Model(&schema.SSARisk{}).
+		Where("runtime_id = ?", runtimeID).Count(&riskCount).Error)
+	require.Zero(t, riskCount, "a memory scan writes no risk row")
+}

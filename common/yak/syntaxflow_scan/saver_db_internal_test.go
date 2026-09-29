@@ -38,7 +38,9 @@ func countBatchedRisks(t *testing.T, runtimeID string) int64 {
 // with a covered finding rewriting its row instead of inserting a new one.
 func TestDBSaver_FlushBatchesCreatesAndRewrites(t *testing.T) {
 	t.Cleanup(func() {
-		ssadb.GetDB().Where("runtime_id = ?", "batch-runtime").Delete(&schema.SSARisk{})
+		// Unscoped: a soft-deleted row still occupies the unique index on
+		// hash, and this test writes the same synthetic rows on every run.
+		ssadb.GetDB().Unscoped().Where("runtime_id = ?", "batch-runtime").Delete(&schema.SSARisk{})
 	})
 
 	saver := newDBSaver(schema.SFResultKindScan, "batch-task", false)
@@ -73,7 +75,9 @@ func TestDBSaver_FlushBatchesCreatesAndRewrites(t *testing.T) {
 // finding, so the superseded row never reaches the database at all.
 func TestDBSaver_CoverBeforeFlushInsertsOnce(t *testing.T) {
 	t.Cleanup(func() {
-		ssadb.GetDB().Where("runtime_id = ?", "batch-runtime").Delete(&schema.SSARisk{})
+		// Unscoped: a soft-deleted row still occupies the unique index on
+		// hash, and this test writes the same synthetic rows on every run.
+		ssadb.GetDB().Unscoped().Where("runtime_id = ?", "batch-runtime").Delete(&schema.SSARisk{})
 	})
 
 	saver := newDBSaver(schema.SFResultKindScan, "batch-task", false)

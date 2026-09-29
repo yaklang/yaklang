@@ -405,11 +405,49 @@ func (s *structScanRuntime) prepareSave(prog *ssa.Program) {
 	s.saveToDB = prog != nil && prog.DatabaseKind != ssa.ProgramCacheMemory
 }
 
-// keepResults publishes one unit's results. Database compiles save them on
-// the side and drop the value graph; the handle stays so a later report can
-// read the persisted alerts.
+// keepResults publishes one unit's results.
+//
+// When the compile belongs to a scan, persistence belongs to the scan runtime:
+// the result is emitted to its consumers, and a database saver (when the scan
+// has one) writes the row and the value graph. A memory scan registers no
+// saver, so nothing is written and the value graph stays available to the
+// report. Without a runtime the legacy behavior is kept: a database compile
+// saves the result on the side and drops the value graph.
 func (s *structScanRuntime) keepResults(found []*SyntaxFlowResult) {
 	if s == nil || len(found) == 0 {
+		return
+	}
+	// A scan runtime owns persistence: emit the result to its consumers. A
+	// database saver writes the row and the value graph; a memory scan
+	// registers no saver, so nothing is written and the graph stays available
+	// to the report.
+	if s.scanRuntime != nil {
+		for _, res := range found {
+			if res == nil {
+				continue
+			}
+			res.scanRuntime = s.scanRuntime
+			if err := s.scanRuntime.EmitResult(res); err != nil {
+				log.Warnf("[struct_scan] emit result failed: %v", err)
+				s.addErr(err)
+			}
+			// A persisted result knows its row id only after its consumer
+			// wrote it. Submit the findings again so the stored row carries
+			// that id; the collect keeps one entry per finding either way. A
+			// memory result also has a synthetic cache id, so only a written
+			// row (dbResult) may drop the value graph.
+			if res.dbResult != nil {
+				for _, risk := range res.GetRisks() {
+					s.scanRuntime.SubmitRisk(risk)
+				}
+				res.memResult = nil
+				res.symbol = make(map[string]Values)
+				res.unName = nil
+			}
+		}
+		s.mu.Lock()
+		s.results = append(s.results, found...)
+		s.mu.Unlock()
 		return
 	}
 	if !s.saveToDB {
@@ -429,14 +467,6 @@ func (s *structScanRuntime) keepResults(found []*SyntaxFlowResult) {
 				log.Warnf("[struct_scan] persist result failed: %v", err)
 				s.addErr(err)
 				continue
-			}
-			// The row id is known only after the result is written. Re-submit
-			// the findings so a persisted struct risk carries its result id and
-			// a covered row is rewritten with the same decision.
-			if s.scanRuntime != nil {
-				for _, risk := range res.GetRisks() {
-					s.scanRuntime.SubmitRisk(risk)
-				}
 			}
 			res.memResult = nil
 			res.symbol = make(map[string]Values)
