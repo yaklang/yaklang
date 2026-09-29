@@ -309,6 +309,14 @@ func QuerySyntaxflow(opt ...QueryOption) (*SyntaxFlowResult, error) {
 			ret.CreateRisk()
 			ret.TaskID = config.taskID
 			setResultToCache(kind, ret)
+			// A memory scan keeps no rows, so its result consumers are the only
+			// way a caller observes the result. Deliver it the same way the
+			// database path does.
+			if config.scanRuntime != nil {
+				if err := config.scanRuntime.EmitResult(ret); err != nil {
+					return ret, utils.Wrap(err, "SyntaxflowQuery: emit result failed")
+				}
+			}
 		}
 	}
 

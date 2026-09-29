@@ -31,6 +31,11 @@ func TestProgramSyntaxFlow_JoinsScanRuntime(t *testing.T) {
 		submitted = append(submitted, item)
 		return nil
 	}))
+	var results int
+	rt.ListenResult(func(*ssaapi.SyntaxFlowResult) error {
+		results++
+		return nil
+	})
 
 	res, err := prog.SyntaxFlowWithError(`
 desc(title: "runtime program scan")
@@ -43,6 +48,7 @@ alert $target
 	require.NoError(t, err)
 	require.Greater(t, res.RiskCount(), 0)
 	require.NotEmpty(t, submitted, "the program query must submit its finding to the runtime")
+	require.Equal(t, 1, results, "an in-memory result also reaches the runtime consumers")
 	require.NotEmpty(t, res.GetResultUUID(), "an in-memory result still has a stable identity")
 	for _, item := range submitted {
 		require.Equal(t, res.GetResultUUID(), item.Risk.ResultUUID,

@@ -27,9 +27,9 @@ func bindReportSaver(rt *ssaapi.ScanRuntime, reporter sfreport.IReport) {
 // bindDBSaver attaches the saver that owns result rows, the audit graph and
 // risk rows. It is only registered when the scan actually wants database rows:
 // a memory scan streams its findings instead.
-func bindDBSaver(rt *ssaapi.ScanRuntime, kind schema.SyntaxflowResultKind, taskID string, noRisk bool) {
+func bindDBSaver(rt *ssaapi.ScanRuntime, kind schema.SyntaxflowResultKind, taskID string, noRisk bool) *dbSaver {
 	if rt == nil {
-		return
+		return nil
 	}
 	rt.SetNoRiskDB(noRisk)
 	saver := newDBSaver(kind, taskID, noRisk)
@@ -37,6 +37,7 @@ func bindDBSaver(rt *ssaapi.ScanRuntime, kind schema.SyntaxflowResultKind, taskI
 	if !noRisk {
 		rt.ListenRisk(saver)
 	}
+	return saver
 }
 
 // ensureScanRuntime returns the runtime of this scan, creating it on first use.

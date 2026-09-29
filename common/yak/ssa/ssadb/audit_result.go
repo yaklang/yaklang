@@ -17,6 +17,10 @@ type AuditResult struct {
 	gorm.Model
 
 	TaskID string `json:"task_id" gorm:"index"`
+	// ResultUUID identifies this result even when a caller never persisted it.
+	// Risks carry the same value, so a finding can point back at its result
+	// without depending on the numeric row id.
+	ResultUUID string `json:"result_uuid" gorm:"index"`
 	// rule
 	RuleName     string `json:"rule_name"`
 	RuleTitle    string `json:"rule_title"`

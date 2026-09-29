@@ -44,9 +44,10 @@ func (f RiskUpdateHandlerFunc) ApplyRiskUpdate(item RiskUpdateItem) error {
 type RiskCollect struct {
 	mu   sync.Mutex
 	data map[string]*SSARisk
-	// ruleLevel ranks rules of the same scan mode. When two rules of equal
-	// mode report one feature hash, the higher level wins; equal levels keep
-	// the later finding. Nil means every rule has level 0.
+	// ruleLevel optionally ranks rules of the same scan mode. When two rules
+	// of equal mode report one finding, the higher level wins; equal levels
+	// keep the later finding. Nil falls back to ranking by severity so a
+	// stronger rule covers a weaker one.
 	ruleLevel func(ruleName string) int
 }
 
@@ -175,9 +176,34 @@ func (c *RiskCollect) betterLocked(incoming, existing *SSARisk) bool {
 		if inLevel != oldLevel {
 			return inLevel > oldLevel
 		}
+		// Same mode and same configured level: the later finding wins.
+		return true
+	}
+	// Different rules of one mode may report the same finding; keep the more
+	// severe report so a stronger rule covers a weaker one.
+	inSeverity := severityRank(incoming.Severity)
+	oldSeverity := severityRank(existing.Severity)
+	if inSeverity != oldSeverity {
+		return inSeverity > oldSeverity
 	}
 	// Same mode, same level: the later finding is the more complete one.
 	return true
+}
+
+// severityRank orders severities so a stronger rule can cover a weaker one.
+func severityRank(severity SyntaxFlowSeverity) int {
+	switch ValidSeverityType(severity) {
+	case SFR_SEVERITY_CRITICAL:
+		return 5
+	case SFR_SEVERITY_HIGH:
+		return 4
+	case SFR_SEVERITY_WARNING:
+		return 3
+	case SFR_SEVERITY_LOW:
+		return 2
+	default:
+		return 1
+	}
 }
 
 // laterScanMode reports whether a risk of mode incoming may replace a risk of
