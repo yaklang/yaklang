@@ -25,15 +25,26 @@ DESC
 确认该 AI 使用是否符合团队规范与安全策略，按需替换或保留。
 SOLUTION
 	alert_min: 1
-	"file://pos.txt": <<<POS
-openai
+	"file://pos.go": <<<POS
+package main
+
+var c = openai.NewClient(key)
 POS
-	"safefile://pos.txt": <<<NEG
+	"file://pos.py": <<<POS
+from openai import OpenAI
+
+client = OpenAI(api_key=key)
+POS
+	"safefile://neg.txt": <<<NEG
 hello world
+- 默认使用 OpenAI 兼容协议。
+The upstream service is OpenAI-compatible.
+openai: false
+- 支持 OpenAI / Anthropic / Gemini 多provider配置
 NEG
 )
 
-${*}.pattern_regex(/(?:openai)|(?:OpenAI)/) as $hit
+${/\.(go|py|java|js|jsx|ts|tsx|rb|php|cs|kt|scala)$/}.pattern_regex(/(?:from\s+openai\s+import|\bopenai\.|OpenAI\s*\(|new\s+OpenAI\b)/) as $hit
 alert $hit for {
 	level: "low",
 	title: "检测到 OpenAI AI 使用",

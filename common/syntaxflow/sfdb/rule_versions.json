@@ -2318,8 +2318,8 @@
   {
     "rule_id": "source-go-insecure-skip-verify",
     "rule_name": "检测 Go TLS 跳过证书校验",
-    "hash": "08572595325f0692b1ae9cadb31fc8c6adb093aceb529bea8ece438e3830260f",
-    "version": "20260914.0001"
+    "hash": "963a3bcb531da4424d30991fc9ef48a2871b7871048e6c55031041b7d7716116",
+    "version": "20260928.0001"
   },
   {
     "rule_id": "source-insecure-api-absolute-urls",
@@ -2492,14 +2492,14 @@
   {
     "rule_id": "source-unquoted-command-substitution-in-command",
     "rule_name": "检测到命令中未加引号的命令替换",
-    "hash": "bb40f4648026eaa46a244ec0566a5dbd987edf8f0d4d81dc671b039d896deb5a",
-    "version": "20260914.0001"
+    "hash": "db45189812ed74e68d761b1625721b2e9654c7afaa5c315d3da9a68ef3f4cdbb",
+    "version": "20260928.0002"
   },
   {
     "rule_id": "source-unquoted-variable-expansion-in-command",
     "rule_name": "检测到命令中未加引号的变量展开",
-    "hash": "3e220873939468356ca2f3a18bcfddc94bde287635a84ba8284a6a7c93334f27",
-    "version": "20260914.0001"
+    "hash": "f4a7645d9247e8d9b35bfe6469fa64521a259693b8ddeee9f91f282ac495987a",
+    "version": "20260928.0001"
   },
   {
     "rule_id": "source-detected-artifactory-password",
@@ -4220,8 +4220,8 @@
   {
     "rule_id": "source-maintainability-detect-generic-ai-api",
     "rule_name": "检测到 AI API 调用",
-    "hash": "309a7ee827ebe215bea3d3c0cdd970f39e38c888664eefc0b8ecbdce5b5c0ba0",
-    "version": "20260914.0001"
+    "hash": "669272739adf3cb79df2eaa62c3cdfc209df83f6f777b2c58caf5610c35fe5b3",
+    "version": "20260928.0001"
   },
   {
     "rule_id": "source-maintainability-detect-generic-ai-gem",
@@ -4232,8 +4232,8 @@
   {
     "rule_id": "source-maintainability-detect-generic-ai-oai",
     "rule_name": "检测到 OpenAI AI 使用",
-    "hash": "25f60e77d953035f697a9b571f2ad2ad75c575d309bf345fa5ca5fa0322de7c4",
-    "version": "20260914.0001"
+    "hash": "2c94639b8178546228bce8658021eb880e51d977b869ef3c442e811192840dfa",
+    "version": "20260928.0002"
   },
   {
     "rule_id": "source-maintainability-detect-huggingface",
@@ -4916,8 +4916,8 @@
   {
     "rule_id": "source-go-http-get",
     "rule_name": "检测 Go http.Get",
-    "hash": "67aa2f60318d67fe304f1afca95150365f6438090fab98020369abdb3df104ea",
-    "version": "20260914.0001"
+    "hash": "0ab92b2c143b081a34ecc3aedb7ea1082b18114f858365907acab7068539c10b",
+    "version": "20260928.0001"
   },
   {
     "rule_id": "source-go-listen-and-serve",
@@ -4994,8 +4994,8 @@
   {
     "rule_id": "source-java-class-forname",
     "rule_name": "检测 Java Class.forName",
-    "hash": "2e7992a879320f5d2bf362b282160297aff351dee7143add5b1892c31c318c26",
-    "version": "20260914.0001"
+    "hash": "3c5cfe5d82702add40798704100a3f1a8d2688e5b51d1a03857ad88c46d9dc0f",
+    "version": "20260928.0001"
   },
   {
     "rule_id": "source-java-cookie-httponly-false",
@@ -5402,8 +5402,8 @@
   {
     "rule_id": "source-php-backticks",
     "rule_name": "检测 PHP 反引号命令",
-    "hash": "64950a5c2df87d6735e2e60f1236ce2387903363d59214d98566b5e5cddef0a9",
-    "version": "20260914.0001"
+    "hash": "57d0fcc5a97e6f8dd5cc50756a5df585bd8fd8af191361477d04b1b7bde961fd",
+    "version": "20260928.0002"
   },
   {
     "rule_id": "source-php-cors-star",
@@ -5444,8 +5444,8 @@
   {
     "rule_id": "source-php-exec",
     "rule_name": "检测 PHP exec",
-    "hash": "4e3fb14635507bfbaa9863a361480500b092143826c959d031e69abd46c7d07c",
-    "version": "20260914.0001"
+    "hash": "613f32072e700a8dbe96bc2f420920e4b25f634ff50b97e3889f9c5286e3f787",
+    "version": "20260928.0001"
   },
   {
     "rule_id": "source-php-extract",
@@ -5504,8 +5504,8 @@
   {
     "rule_id": "source-php-md5",
     "rule_name": "检测 PHP md5 调用",
-    "hash": "76978be08e4777a6814af3d8a5caf0a165b482021794cc4d4a7edc02a1637c1d",
-    "version": "20260914.0001"
+    "hash": "0abe1175dd9ef48e2c3b02ef6c982671e627853a63466b15d321fa261f706cbd",
+    "version": "20260928.0001"
   },
   {
     "rule_id": "source-php-mt-rand",
