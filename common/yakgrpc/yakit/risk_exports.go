@@ -286,24 +286,18 @@ func limitSize(s string, maxSize int) string {
 	if len(s) <= maxSize {
 		return s
 	}
-
-	i := 0
-	for size := 0; size < maxSize-3; {
-		r, runeSize := utf8.DecodeRuneInString(s[i:])
-		if r == utf8.RuneError {
-			break
-		}
-		if size+runeSize > maxSize {
-			break
-		}
-		i += runeSize
-		size += runeSize
+	if maxSize <= 3 {
+		return s[:maxSize]
 	}
-
-	temp := make([]byte, i)
-	copy(temp, s[:i])
-
-	return string(temp) + "..."
+	cut := maxSize - 3
+	if utf8.ValidString(s) {
+		for cut > 0 && !utf8.RuneStart(s[cut]) {
+			cut--
+		}
+	}
+	// Raw HTTP bodies may contain invalid UTF-8. Keep their bytes instead of
+	// dropping the packet at the first invalid byte.
+	return s[:cut] + "..."
 }
 
 // request 是一个选项参数，用于指定风险记录的原始请求报文
