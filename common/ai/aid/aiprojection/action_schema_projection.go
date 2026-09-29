@@ -2,6 +2,7 @@ package aiprojection
 
 import (
 	"encoding/json"
+	"fmt"
 	"strings"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon/aitag"
@@ -45,15 +46,16 @@ func projectActionSchemaTags(prompt string) (string, []aispec.Tool) {
 				continue
 			}
 			var tool aispec.Tool
-			if err := json.Unmarshal([]byte(strings.TrimSpace(block.Content)), &tool); err != nil ||
-				tool.Type != "function" || tool.Function.Name != block.Nonce ||
-				!validActionSchemaName(block.Nonce) {
+			if err := json.Unmarshal([]byte(strings.TrimSpace(block.Content)), &tool); err != nil {
 				log.Warnf("action schema projection skipped: invalid tool for action %q: %v", block.Nonce, err)
 				return prompt, nil
 			}
-			parameters, ok := tool.Function.Parameters.(map[string]any)
-			if !ok || parameters["type"] != "object" {
-				log.Warnf("action schema projection skipped: invalid parameters for action %q", block.Nonce)
+			if tool.Function.Name != block.Nonce {
+				log.Warnf("action schema projection skipped: mismatched action name %q", block.Nonce)
+				return prompt, nil
+			}
+			if err := validateProjectionTool(tool); err != nil {
+				log.Warnf("action schema projection skipped: invalid tool for action %q: %v", block.Nonce, err)
 				return prompt, nil
 			}
 			if _, duplicate := seen[block.Nonce]; duplicate {
@@ -68,6 +70,17 @@ func projectActionSchemaTags(prompt string) (string, []aispec.Tool) {
 		return prompt, nil
 	}
 	return cleaned.String(), tools
+}
+
+func validateProjectionTool(tool aispec.Tool) error {
+	if tool.Type != "function" || !validActionSchemaName(tool.Function.Name) {
+		return fmt.Errorf("invalid projection tool definition")
+	}
+	parameters, ok := tool.Function.Parameters.(map[string]any)
+	if !ok || parameters["type"] != "object" {
+		return fmt.Errorf("projection tool parameters must be an object schema")
+	}
+	return nil
 }
 
 func validActionSchemaName(name string) bool {

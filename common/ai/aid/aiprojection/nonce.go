@@ -100,6 +100,7 @@ func prepareProjection(text, nonce string) (string, bool) {
 	text = strings.ReplaceAll(text, literalEscape, literalEscape+"E")
 	var out strings.Builder
 	found := false
+	suffix := "_" + nonce
 	for len(text) > 0 {
 		start := strings.Index(text, "<|")
 		if start < 0 {
@@ -112,7 +113,6 @@ func prepareProjection(text, nonce string) (string, bool) {
 		nested := strings.Index(text, "<|")
 		if end >= 0 && (nested < 0 || nested > end) {
 			token := text[:end]
-			suffix := "_" + nonce
 			if nonce != "" && strings.HasSuffix(token, suffix) && isProjectionToken(strings.TrimSuffix(token, suffix)) {
 				out.WriteString("<|" + strings.TrimSuffix(token, suffix) + "|>")
 				text = text[end+2:]
@@ -192,9 +192,8 @@ func createSchema(tag string, tool aispec.Tool) (string, error) {
 	if err := json.Unmarshal(encoded, &canonical); err != nil {
 		return "", err
 	}
-	params, ok := canonical.Function.Parameters.(map[string]any)
-	if !ok || params["type"] != "object" {
-		return "", fmt.Errorf("projection tool parameters must be an object schema")
+	if err := validateProjectionTool(canonical); err != nil {
+		return "", err
 	}
 	return CreateTag(tag, tool.Function.Name, string(encoded)), nil
 }
