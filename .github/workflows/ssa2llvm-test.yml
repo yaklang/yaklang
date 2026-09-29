@@ -60,4 +60,10 @@ jobs:
     - name: Test
       # -x is intentionally NOT passed: it prints every external command and is
       # only useful for manual debugging. Keep CI output lean and deterministic.
-      run: go test -count=1 -timeout 30m -v ./common/yak/ssa2llvm/...
+      #
+      # The timeout covers the whole ./common/yak/ssa2llvm/... tree, and the
+      # mustpass suite alone compiles and runs 115 scripts (measured 30.1 min on
+      # a 32-core workstation, and each script has its own 90s runtime cap), so
+      # 30m kills the run just before it finishes. A runner is slower than this
+      # workstation, not faster.
+      run: go test -count=1 -timeout 60m -v ./common/yak/ssa2llvm/...
