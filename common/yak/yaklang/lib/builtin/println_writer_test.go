@@ -3,8 +3,9 @@ package builtin
 import (
 	"bytes"
 	"errors"
-	"github.com/stretchr/testify/require"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
 type printlnErrorWriter struct{ err error }
@@ -26,4 +27,24 @@ func TestPrintlnToFormattingAndErrors(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, "\n", output.String())
 	require.Equal(t, 1, n)
+}
+
+func TestPrintToPreservesFormatAndErrors(t *testing.T) {
+	var output bytes.Buffer
+	n, err := PrintTo(&output, []byte("ab"), uint8(65))
+	require.NoError(t, err)
+	require.Equal(t, "[97 98] 65", output.String())
+	require.Equal(t, output.Len(), n)
+	output.Reset()
+	n, err = PrintfTo(&output, "%s=%02d", "value", 3)
+	require.NoError(t, err)
+	require.Equal(t, "value=03", output.String())
+	require.Equal(t, output.Len(), n)
+	failure := errors.New("writer failed")
+	n, err = PrintTo(printlnErrorWriter{failure}, "value")
+	require.Zero(t, n)
+	require.ErrorIs(t, err, failure)
+	n, err = PrintfTo(printlnErrorWriter{failure}, "%s", "value")
+	require.Zero(t, n)
+	require.ErrorIs(t, err, failure)
 }
