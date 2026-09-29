@@ -3,6 +3,7 @@ package test
 import (
 	"bytes"
 	"context"
+	"io"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -668,6 +669,51 @@ func TestBatchDoHTTPRequest_ExpandsPacketWithPathAndVariables(t *testing.T) {
 	}
 }
 
+func TestBatchDoHTTPRequest_PreservesLiteralTemplateData(t *testing.T) {
+	for _, tc := range []struct {
+		name, paths, body, wantPath, wantBody string
+		variables                             map[string]any
+	}{
+		{name: "nested JSON", paths: "/json", body: `{"user":{"id":1}}`, wantPath: "/json", wantBody: `{"user":{"id":1}}`},
+		{name: "path variable", paths: "/{{segment}}", body: "{{params(payload)}}", wantPath: "/{{int(1-3)}}", wantBody: `{"user":{"name":"中文"}}`, variables: map[string]any{"segment": "{{int(1-3)}}", "payload": `{"user":{"name":"中文"}}`}},
+		{name: "unknown tags in data", paths: "/{{params(segment)}}", body: "{{payload}}", wantPath: "/{{missing}}", wantBody: "{{PATH}} {{list(a|b)}} {{unterminated", variables: map[string]any{"segment": "{{missing}}", "payload": "{{PATH}} {{list(a|b)}} {{unterminated"}},
+		{name: "repeated variables", paths: "/{{segment}}/{{segment}}", body: "{{payload}}{{params(payload)}}", wantPath: "/demo/demo", wantBody: "}}}}", variables: map[string]any{"segment": "demo", "payload": "}}"}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			type received struct{ path, body, header string }
+			requests := make(chan received, 8)
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				body, _ := io.ReadAll(r.Body)
+				requests <- received{r.URL.Path, string(body), r.Header.Get("X-Path")}
+				_, _ = w.Write([]byte("ok"))
+			}))
+			defer server.Close()
+			params := aitool.InvokeParams{
+				"paths": tc.paths, "packet": "POST {{PATH}} HTTP/1.1\r\nHost: " + strings.TrimPrefix(server.URL, "http://") + "\r\nX-Path: {{PATH}}\r\nContent-Type: application/json\r\n\r\n" + tc.body,
+				"https": "no", "concurrent": 1, "max-requests": 1,
+			}
+			if tc.variables != nil {
+				params["variables"] = tc.variables
+			}
+			result, err := getBatchDoHTTPRequestTool(t).InvokeWithParams(params)
+			assert.NilError(t, err)
+			execution, ok := result.Data.(*aitool.ToolExecutionResult)
+			assert.Assert(t, ok, "missing tool execution result")
+			semantic := utils.InterfaceToGeneralMap(execution.Result)
+			assert.Equal(t, utils.InterfaceToInt(semantic["request_count"]), 1)
+			assert.Equal(t, utils.InterfaceToInt(semantic["response_received_count"]), 1)
+			assert.Equal(t, len(requests), 1, "literal data must not produce additional requests")
+			got := <-requests
+			assert.Equal(t, got.path, tc.wantPath)
+			assert.Equal(t, got.header, tc.wantPath)
+			assert.Equal(t, got.body, tc.wantBody)
+			items := utils.InterfaceToSliceInterface(semantic["items"])
+			assert.Equal(t, len(items), 1)
+			assert.Equal(t, utils.InterfaceToString(utils.InterfaceToGeneralMap(items[0])["path"]), got.path)
+		})
+	}
+}
+
 func TestBatchDoHTTPRequest_RejectsUnknownAndOversizedTemplatesBeforeSending(t *testing.T) {
 	requests := 0
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -679,6 +725,10 @@ func TestBatchDoHTTPRequest_RejectsUnknownAndOversizedTemplatesBeforeSending(t *
 	for _, params := range []aitool.InvokeParams{
 		{"paths": "/a", "packet": "GET {{PATH}} HTTP/1.1\r\nHost: " + host + "\r\nX-Test: {{missing}}\r\n\r\n", "https": "no"},
 		{"base-url": server.URL, "paths": "/a/{{int(1-4)}}", "max-requests": 3},
+		{"base-url": server.URL, "paths": "/valid\n/{{unclosed"},
+		{"base-url": server.URL, "paths": "/{{outer{{list(a|b)}}"},
+		{"base-url": server.URL, "paths": "/{{int(1-2)}}/{{list(a|b)}}", "max-requests": 3},
+		{"paths": "/{{int(1-2)}}", "packet": "GET {{PATH}}?view={{list(a|b)}} HTTP/1.1\r\nHost: " + host + "\r\n\r\n", "https": "no", "max-requests": 3},
 	} {
 		_, err := getBatchDoHTTPRequestTool(t).InvokeWithParams(params)
 		assert.Assert(t, err != nil, "invalid template should fail before sending")

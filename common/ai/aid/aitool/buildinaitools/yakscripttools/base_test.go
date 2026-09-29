@@ -2,12 +2,14 @@ package yakscripttools
 
 import (
 	"embed"
+	"errors"
 	"io/fs"
 	"strings"
 	"testing"
 
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"gotest.tools/v3/assert"
 )
 
@@ -120,7 +122,7 @@ func TestRemoveRetiredBuiltInAIToolsPreservesCustomTools(t *testing.T) {
 
 	rows := []schema.AIYakTool{
 		{Name: "http_response_diff", IsBuiltin: true},
-		{Name: "url_content_summary", Author: schema.AIResourceAuthorBuiltin},
+		{Name: "url_content_summary", Author: schema.AIResourceAuthorBuiltin, IsBuiltin: true},
 		{Name: "send_http_request_by_url", IsBuiltin: true},
 		{Name: "send_http_request_packet", Author: "user", IsBuiltin: false},
 		{Name: "do_http_request", IsBuiltin: true},
@@ -128,15 +130,84 @@ func TestRemoveRetiredBuiltInAIToolsPreservesCustomTools(t *testing.T) {
 	for _, row := range rows {
 		assert.NilError(t, db.Create(&row).Error)
 	}
+	// The real edit path clears IsBuiltin but keeps the builtin author.
+	edited, err := yakit.GetAIYakTool(db, "url_content_summary")
+	assert.NilError(t, err)
+	edited.IsBuiltin = false
+	edited.Content = `println("user customized content")`
+	_, err = yakit.UpdateAIYakToolByID(db, edited)
+	assert.NilError(t, err)
 	assert.NilError(t, removeRetiredBuiltInAITools(db))
 
 	var remaining []schema.AIYakTool
 	assert.NilError(t, db.Find(&remaining).Error)
-	assert.Equal(t, len(remaining), 2)
+	assert.Equal(t, len(remaining), 3)
 	names := map[string]bool{}
 	for _, row := range remaining {
 		names[row.Name] = true
 	}
 	assert.Assert(t, names["send_http_request_packet"])
 	assert.Assert(t, names["do_http_request"])
+	preserved, err := yakit.GetAIYakTool(db, edited.Name)
+	assert.NilError(t, err)
+	assert.Equal(t, preserved.Author, schema.AIResourceAuthorBuiltin)
+	assert.Equal(t, preserved.Content, edited.Content)
+	assert.Equal(t, preserved.IsBuiltin, false)
+}
+
+type failingAIToolFS struct {
+	FileSystemWithHash
+	content []byte
+	err     error
+}
+
+func (f *failingAIToolFS) ReadFile(name string) ([]byte, error) {
+	return f.content, f.err
+}
+
+func TestOverrideYakScriptAiToolsRollsBackAndRetries(t *testing.T) {
+	db, err := utils.CreateTempTestDatabaseInMemory()
+	assert.NilError(t, err)
+	t.Cleanup(func() { _ = db.Close() })
+	assert.NilError(t, db.AutoMigrate(&schema.AIYakTool{}).Error)
+	retired := &schema.AIYakTool{Name: "http_response_diff", IsBuiltin: true, Content: "original"}
+	assert.NilError(t, db.Create(retired).Error)
+	assert.NilError(t, db.Exec(`CREATE TRIGGER reject_ai_tool_insert BEFORE INSERT ON ai_yak_tools WHEN NEW.name = 'do_http_request' BEGIN SELECT RAISE(FAIL, 'injected tool write failure'); END`).Error)
+	err = overrideYakScriptAiTools(db)
+	assert.Assert(t, err != nil && strings.Contains(err.Error(), "injected tool write failure"), "save failure must propagate: %v", err)
+	var count int
+	assert.NilError(t, db.Model(&schema.AIYakTool{}).Count(&count).Error)
+	assert.Equal(t, count, 1, "failed sync must roll back tool deletion and partial inserts")
+	preserved, err := yakit.GetAIYakTool(db, retired.Name)
+	assert.NilError(t, err)
+	assert.Equal(t, preserved.Content, "original")
+	assert.NilError(t, db.Exec(`DROP TRIGGER reject_ai_tool_insert`).Error)
+	assert.NilError(t, overrideYakScriptAiTools(db))
+	_, err = yakit.GetAIYakTool(db, retired.Name)
+	assert.Assert(t, err != nil, "successful retry should remove retired builtins")
+	_, err = yakit.GetAIYakTool(db, "do_http_request")
+	assert.NilError(t, err)
+}
+
+func TestOverrideYakScriptAiToolsLoadFailureLeavesDatabaseIntact(t *testing.T) {
+	db, err := utils.CreateTempTestDatabaseInMemory()
+	assert.NilError(t, err)
+	t.Cleanup(func() { _ = db.Close() })
+	assert.NilError(t, db.AutoMigrate(&schema.AIYakTool{}).Error)
+	retired := &schema.AIYakTool{Name: "http_response_diff", IsBuiltin: true}
+	assert.NilError(t, db.Create(retired).Error)
+	originalFS := yakScriptFS
+	t.Cleanup(func() { yakScriptFS = originalFS })
+	readErr := errors.New("injected embedded read failure")
+	yakScriptFS = &failingAIToolFS{FileSystemWithHash: originalFS, err: readErr}
+	err = overrideYakScriptAiTools(db)
+	assert.Assert(t, errors.Is(err, readErr), "embedded read failure must propagate: %v", err)
+	_, err = yakit.GetAIYakTool(db, retired.Name)
+	assert.NilError(t, err)
+
+	yakScriptFS = &failingAIToolFS{FileSystemWithHash: originalFS, content: []byte("func {")}
+	err = overrideYakScriptAiTools(db)
+	assert.Assert(t, err != nil && strings.Contains(err.Error(), "parse builtin AI tool") && strings.Contains(err.Error(), ".yak"), "parse failure must name the broken file: %v", err)
+	_, err = yakit.GetAIYakTool(db, retired.Name)
+	assert.NilError(t, err)
 }
