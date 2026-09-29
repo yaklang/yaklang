@@ -1,0 +1,22 @@
+// Regression, two related gaps in the AOT global table:
+//
+//  1. atoi/parseInt/parseFloat/parseBool/parseString/sdump/randn exist in
+//     common/yak/yaklib.GlobalExport but the AOT runtime registered only a
+//     hand-picked subset, so scripts calling them died with
+//     `yaklib global callable "atoi" not found` (four mixcaller scripts).
+//  2. A yaklib function returning float64 had its result truncated to a whole
+//     number when it crossed the ABI: parseFloat("1.5") came back as 1 and
+//     compared unequal to 1.5. Floats travel as their IEEE-754 bit pattern.
+assert atoi("42")~ == 42, "atoi"
+assert parseInt("10", 16) == 16, "parseInt base"
+assert parseInt("2e+09") == 2000000000, "parseInt scientific notation"
+assert parseFloat("1.5") == 1.5, "parseFloat must keep the fraction"
+assert parseFloat("2.25") - 0.25 == 2.0, "parseFloat arithmetic"
+assert parseString(12) == "12", "parseString"
+assert parseBool("true"), "parseBool true"
+assert !parseBool("abc"), "parseBool fallback"
+assert randn(7, 8) == 7, "randn in [min,max)"
+assert len(sdump("x", 1)) > 0, "sdump renders"
+
+value, err = atoi("abc")
+assert err != nil, "atoi reports a parse error"
