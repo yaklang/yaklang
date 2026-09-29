@@ -249,5 +249,91 @@ func registerRuntimeGlobals() {
 		"close":   runtimeBuiltinClose,
 		"retry":   runtimeBuiltinRetry,
 		"param":   runtimeBuiltinParam,
+		// The string/number helpers below mirror common/yak/yaklib. They are
+		// reimplemented here instead of registering yaklib.GlobalExport: yaklib
+		// pulls the whole yaklang frontend (common/yak/ssa -> ssadb -> gorm) into
+		// the base .text through its init path, which elfsplit then rejects as a
+		// start-up path into a prunable group.
+		"atoi":        runtimeBuiltinAtoi,
+		"parseInt":    runtimeBuiltinParseInt,
+		"parseFloat":  runtimeBuiltinParseFloat,
+		"parseBool":   runtimeBuiltinParseBool,
+		"parseString": runtimeBuiltinParseString,
+		"sdump":       runtimeBuiltinSDump,
+		"randn":       runtimeBuiltinRandn,
 	})
+}
+
+// runtimeBuiltinAtoi mirrors yaklib.atoi: the value plus a parse error, so a
+// caller using `atoi(s)~` gets the number and one using two returns gets both.
+func runtimeBuiltinAtoi(s string) (int, error) {
+	return strconv.Atoi(strings.TrimSpace(s))
+}
+
+// runtimeBuiltinParseInt mirrors yaklib.parseInt, including its tolerance for
+// scientific notation and its silent zero on failure.
+func runtimeBuiltinParseInt(s string, bases ...int) int {
+	base := 10
+	if len(bases) > 0 && bases[0] != 0 {
+		base = bases[0]
+	}
+	if i, err := strconv.ParseInt(strings.TrimSpace(s), base, 64); err == nil {
+		return int(i)
+	}
+	if f, err := strconv.ParseFloat(strings.TrimSpace(s), 64); err == nil {
+		if math.IsNaN(f) || math.IsInf(f, 0) {
+			return 0
+		}
+		return int(f)
+	}
+	return 0
+}
+
+// runtimeBuiltinParseFloat mirrors yaklib.parseFloat: zero when unparsable.
+func runtimeBuiltinParseFloat(s string) float64 {
+	f, err := strconv.ParseFloat(strings.TrimSpace(s), 64)
+	if err != nil || math.IsNaN(f) || math.IsInf(f, 0) {
+		return 0
+	}
+	return f
+}
+
+// runtimeBuiltinParseBool mirrors yaklib.parseBool: false when unparsable.
+func runtimeBuiltinParseBool(i any) bool {
+	b, err := strconv.ParseBool(strings.TrimSpace(fmt.Sprint(i)))
+	return err == nil && b
+}
+
+// runtimeBuiltinParseString mirrors yaklib.parseString.
+func runtimeBuiltinParseString(i any) string {
+	return fmt.Sprintf("%v", i)
+}
+
+// runtimeBuiltinSDump mirrors yaklib.sdump closely enough for diagnostics:
+// a stable, newline-separated rendering of each argument's type and value.
+func runtimeBuiltinSDump(items ...any) string {
+	var b strings.Builder
+	for i, item := range items {
+		if i > 0 {
+			b.WriteByte('\n')
+		}
+		normalized := normalizePrintArg(item)
+		fmt.Fprintf(&b, "(%s) %#v", reflect.TypeOf(item).String(), normalized)
+	}
+	return b.String()
+}
+
+// runtimeBuiltinRandn mirrors yaklib.randn: a value in [min, max).
+func runtimeBuiltinRandn(min, max int) int {
+	if max <= min {
+		if min > max {
+			panic(fmt.Sprintf("randn failed; min: %v max: %v", min, max))
+		}
+		return min
+	}
+	n, err := rand.Int(rand.Reader, big.NewInt(int64(max-min)))
+	if err != nil {
+		return min
+	}
+	return min + int(n.Int64())
 }

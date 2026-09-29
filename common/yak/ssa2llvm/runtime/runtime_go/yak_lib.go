@@ -17,6 +17,7 @@ void yak_gc_enable(void);
 import "C"
 import (
 	"fmt"
+	"math"
 	"reflect"
 	"runtime"
 	"runtime/cgo"
@@ -397,7 +398,10 @@ func runtimeValueToInt64(v reflect.Value) int64 {
 		}
 		return 0
 	case reflect.Float32, reflect.Float64:
-		return int64(v.Float())
+		// Floats travel through the ABI as their IEEE-754 bit pattern, the same
+		// way the compiler emits a float constant and the way runtimeDecodeArg
+		// reads one back for a float64 parameter.
+		return int64(math.Float64bits(v.Float()))
 	case reflect.Ptr, reflect.Map, reflect.Slice, reflect.Array, reflect.Struct, reflect.String, reflect.Func, reflect.Chan:
 		if v.Kind() == reflect.Ptr && v.IsNil() {
 			return 0
