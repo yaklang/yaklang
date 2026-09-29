@@ -17,6 +17,9 @@ type CompileUnit struct {
 	Files    []string
 	Bytes    int64
 	Language ssaconfig.Language
+	// LibraryName identifies a frontend-owned library when its name cannot be
+	// derived from the unit key (notably Go's declared package name).
+	LibraryName string
 }
 
 // UnitRef is a directed dependency edge between two compile units.
@@ -50,6 +53,12 @@ type ConcurrentUnitBuilder interface {
 	SupportsConcurrentUnitBuild() bool
 }
 
+// ConcurrentUnitPreHandler is optional. A frontend may parallelize independent
+// library body builds while keeping declaration registration serial.
+type ConcurrentUnitPreHandler interface {
+	SupportsConcurrentUnitPreHandler() bool
+}
+
 // SetConcurrentUnitBuild fixes the ownership policy before unit work starts.
 // Frontends that have not opted in retain their existing shared-scope behavior.
 func (p *Program) SetConcurrentUnitBuild(enabled bool) {
@@ -72,6 +81,27 @@ func (p *Program) shouldBuildOnLookup() bool {
 		return false
 	}
 	return !p.ConcurrentUnitBuildEnabled()
+}
+
+// Java and Go register package declarations before the scheduler drains their
+// method bodies. A lookup from another worker must not steal that body. Other
+// frontends still rely on eager method lookup (notably TS re-exports), so keep
+// their established behavior until they have an equivalent ownership gate.
+func (p *Program) deferMethodBuildOnLookup() bool {
+	if p == nil || !p.ConcurrentUnitBuildEnabled() {
+		return false
+	}
+	app := p.GetApplication()
+	return app != nil && (app.Language == ssaconfig.JAVA || app.Language == ssaconfig.GO)
+}
+
+func (f *Function) buildOnLookup() {
+	if f == nil {
+		return
+	}
+	if program := f.GetProgram(); program == nil || !program.deferMethodBuildOnLookup() {
+		f.Build()
+	}
 }
 
 // --- shared compile-unit path helpers (used by language builders) ---

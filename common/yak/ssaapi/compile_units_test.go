@@ -323,6 +323,16 @@ var PI = 3.1415926
 	requireUnitBefore(t, plan, "dir:src/main/go/A", "dir:src/main/go")
 }
 
+func TestCompileUnitGoDeclaredPackageOwner(t *testing.T) {
+	vf := filesys.NewVirtualFs()
+	vf.AddFile("named/a.go", "package actual\nfunc A() {}\n")
+	vf.AddFile("mixed/a.go", "package first\n")
+	vf.AddFile("mixed/b.go", "package second\n")
+	plan := buildPlanForLanguage(t, ssaconfig.GO, vf, []string{"named/a.go", "mixed/a.go", "mixed/b.go"})
+	require.Equal(t, "actual", plan.Units["dir:named"].LibraryName)
+	require.Empty(t, plan.Units["dir:mixed"].LibraryName)
+}
+
 func TestCompileUnitPlanGoSourceRootAliasImportTopoOrder(t *testing.T) {
 	vf := filesys.NewVirtualFs()
 	vf.AddFile("src/main/go/go.mod", "module github.com/yaklang/yaklang\n\ngo 1.20\n")

@@ -102,50 +102,50 @@ func GetIrCodeById(db *gorm.DB, progName string, id int64) *IrCode {
 		itemsToCache := make(map[int64]*IrCode)
 		var ret *IrCode
 
-		utils.GormTransaction(db, func(tx *gorm.DB) error {
-			idsToLoad := make(map[int64]struct{})
-			addID := func(id int64) {
-				// check
-				if id < 0 {
-					return
-				}
-				if _, ok := cache.Get(id); ok {
-					return
-				}
-				if _, ok := idsToLoad[id]; ok {
-					return
-				}
-				idsToLoad[id] = struct{}{}
+		// These are reads only. The SSA SQLite connection uses
+		// _txlock=immediate for write transactions, so wrapping this cache
+		// prefetch in GormTransaction would reserve the sole SQLite writer
+		// slot until all neighboring instructions had been loaded.
+		idsToLoad := make(map[int64]struct{})
+		addID := func(id int64) {
+			if id < 0 {
+				return
 			}
+			if _, ok := cache.Get(id); ok {
+				return
+			}
+			if _, ok := idsToLoad[id]; ok {
+				return
+			}
+			idsToLoad[id] = struct{}{}
+		}
 
-			// load self
-			ret = GetIrCodeItemById(tx, progName, id)
-			if ret == nil {
-				return nil
-			}
-			itemsToCache[ret.CodeID] = ret
+		// Load the requested instruction before prefetching its neighbors.
+		ret = GetIrCodeItemById(db, progName, id)
+		if ret == nil {
+			return nil, nil
+		}
+		itemsToCache[ret.CodeID] = ret
 
-			// load user and function/block
-			for _, userId := range ret.Users {
-				addID(userId)
-			}
-			addID(ret.CurrentFunction)
-			addID(ret.CurrentBlock)
+		// Load users and enclosing function/block.
+		for _, userId := range ret.Users {
+			addID(userId)
+		}
+		addID(ret.CurrentFunction)
+		addID(ret.CurrentBlock)
 
-			// load [id-relation ... id ... id+relation]
-			for i := int64(1); i < irRelationCount; i++ {
-				addID(id + i)
-				addID(id - i)
-			}
+		// Prefetch nearby IDs.
+		for i := int64(1); i < irRelationCount; i++ {
+			addID(id + i)
+			addID(id - i)
+		}
 
-			// update cache
-			ids := lo.MapToSlice(idsToLoad, func(key int64, _ struct{}) int64 { return key })
-			tx = bizhelper.ExactQueryInt64ArrayOr(tx, "code_id", ids).Where("program_name = ?", progName)
-			for ir := range bizhelper.YieldModel[*IrCode](ctx, tx, bizhelper.WithYieldModel_Fast()) {
-				itemsToCache[ir.CodeID] = ir
-			}
-			return nil
-		})
+		// Fetch outside a transaction so reads do not reserve the write slot.
+		ids := lo.MapToSlice(idsToLoad, func(key int64, _ struct{}) int64 { return key })
+		query := bizhelper.ExactQueryInt64ArrayOr(db, "code_id", ids).Where("program_name = ?", progName)
+		for ir := range bizhelper.YieldModel[*IrCode](ctx, query, bizhelper.WithYieldModel_Fast()) {
+			itemsToCache[ir.CodeID] = ir
+		}
 
 		// 更新缓存
 		for id, item := range itemsToCache {

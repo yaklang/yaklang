@@ -99,7 +99,9 @@ func CreateProgramWithError(name, version string, kind ProgramKind) (*IrProgram,
 		Version:     version,
 		ProgramKind: kind,
 	}
-	if err := db.Save(out).Error; err != nil {
+	if err := WithSQLiteWriteLock(db.Dialect().GetName(), func() error {
+		return db.Save(out).Error
+	}); err != nil {
 		return nil, err
 	}
 	return out, nil
@@ -182,11 +184,14 @@ func UpdateProgramWithError(prog *IrProgram) error {
 	if prog == nil {
 		return utils.Errorf("update program failed: program is nil")
 	}
-	return GetDB().Model(&IrProgram{}).
-		Where("id = ?", prog.ID).
-		Where("program_name = ?", prog.ProgramName).
-		Where("program_kind = ?", prog.ProgramKind).
-		Update(prog).Error
+	db := GetDB()
+	return WithSQLiteWriteLock(db.Dialect().GetName(), func() error {
+		return db.Model(&IrProgram{}).
+			Where("id = ?", prog.ID).
+			Where("program_name = ?", prog.ProgramName).
+			Where("program_kind = ?", prog.ProgramKind).
+			Update(prog).Error
+	})
 }
 
 func UpdateProgram(prog *IrProgram) {

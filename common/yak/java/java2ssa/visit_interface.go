@@ -33,6 +33,7 @@ func (y *singleFileBuilder) VisitInterfaceDeclaration(raw javaparser.IInterfaceD
 
 	store := y.StoreFunctionBuilder()
 	blueprint.AddLazyBuilder(func() {
+		y := y.forkForLazyBuild()
 		switchHandler := y.SwitchFunctionBuilder(store)
 		defer switchHandler()
 

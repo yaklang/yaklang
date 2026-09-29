@@ -6,7 +6,6 @@ import (
 	"sync"
 
 	"github.com/yaklang/gorm"
-	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/memedit"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 )
@@ -219,7 +218,7 @@ func (s *sourceStore) Flush() error {
 		return nil
 	}
 
-	saveErr := utils.GormTransaction(s.db, func(tx *gorm.DB) error {
+	saveErr := cacheWriteTransaction(s.db, func(tx *gorm.DB) error {
 		if err := tx.CreateInBatches(toSave).Error; err != nil {
 			return err
 		}

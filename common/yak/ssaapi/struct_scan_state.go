@@ -675,8 +675,8 @@ func programStructUnits(prog *Program) []*ssa.CompileUnit {
 }
 
 func libraryUnitFiles(app *ssa.Program, name string, lib *ssa.Program) []string {
-	if app != nil && app.LibraryFile != nil {
-		if files := append([]string(nil), app.LibraryFile[name]...); len(files) > 0 {
+	if app != nil {
+		if files := app.LibraryFiles(name); len(files) > 0 {
 			sort.Strings(files)
 			return files
 		}

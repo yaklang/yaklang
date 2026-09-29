@@ -3,10 +3,14 @@ package java2ssa
 import "github.com/yaklang/yaklang/common/yak/ssa"
 
 func (y *singleFileBuilder) SetRange(token ssa.CanStartStopToken) func() {
-	if y == nil {
+	if y == nil || y.FunctionBuilder == nil {
 		return func() {}
 	}
-	editor := y.GetEditor()
+	// Lazy method builds may temporarily switch y.FunctionBuilder while nested
+	// ranges are active. Restore the range on the builder that owned it at entry,
+	// even if the frontend's current builder has since changed.
+	owner := y.FunctionBuilder
+	editor := owner.GetEditor()
 	if editor == nil {
 		return func() {}
 	}
@@ -15,24 +19,24 @@ func (y *singleFileBuilder) SetRange(token ssa.CanStartStopToken) func() {
 	if r == nil {
 		return func() {}
 	}
-	backup := y.CurrentRange
-	y.CurrentRange = r
+	backup := owner.CurrentRange
+	owner.CurrentRange = r
 
 	// fix template language range
-	prog := y.GetProgram().GetApplication()
+	prog := owner.GetProgram().GetApplication()
 	if prog == nil {
 		return func() {}
 	}
 	if t := prog.TryGetTemplate(editor.GetFilename()); t != nil {
 		m := t.GetRangeMap()
-		line := y.CurrentRange.GetStart().GetLine()
+		line := owner.CurrentRange.GetStart().GetLine()
 		if tr, ok := m[line]; ok && tr != nil {
 			backup = tr
-			y.CurrentRange = tr
+			owner.CurrentRange = tr
 		}
 	}
 
 	return func() {
-		y.CurrentRange = backup
+		owner.CurrentRange = backup
 	}
 }

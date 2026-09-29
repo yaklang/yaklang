@@ -284,6 +284,7 @@ type Program struct {
 	FileList      map[string]string // file-name and file hash
 	LineCount     int
 
+	libraryFileMu         sync.RWMutex
 	LibraryFile           map[string][]string //library and file relation
 	CurrentIncludingStack *utils.Stack[string]
 

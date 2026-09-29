@@ -24,7 +24,11 @@ const (
 
 // magic
 func (c *Blueprint) IsMagicMethodName(name BlueprintMagicMethodKind) bool {
-	return slices.Contains(c._container.GetProgram().magicMethodName, string(name))
+	if c == nil || utils.IsNil(c._container) {
+		return false
+	}
+	program := c._container.GetProgram()
+	return program != nil && slices.Contains(program.magicMethodName, string(name))
 }
 
 func (c *Blueprint) RegisterMagicMethod(name BlueprintMagicMethodKind, val Value) {
@@ -81,7 +85,7 @@ func (c *Blueprint) GetMagicMethod(name BlueprintMagicMethodKind, fb *FunctionBu
 	}()
 	if !utils.IsNil(method) {
 		if function, ok := ToFunction(method); ok {
-			function.Build()
+			function.buildOnLookup()
 		}
 	}
 	return method
@@ -187,7 +191,7 @@ func (c *Blueprint) GetNormalMethod(key string) Value {
 	c.getFieldWithParent(func(bluePrint *Blueprint) bool {
 		if function, ok := bluePrint.NormalMethod[key]; ok {
 			f = function
-			function.Build()
+			function.buildOnLookup()
 			return true
 		}
 		return false
@@ -221,7 +225,7 @@ func (c *Blueprint) GetStaticMethod(key string) Value {
 	c.getFieldWithParent(func(bluePrint *Blueprint) bool {
 		if function, ok := bluePrint.StaticMethod[key]; ok {
 			f = function
-			function.Build()
+			function.buildOnLookup()
 			return true
 		}
 		return false
