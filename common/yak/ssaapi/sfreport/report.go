@@ -25,6 +25,9 @@ type Report struct {
 	// sinceFlush counts findings added since the last snapshot. A long scan
 	// publishes intermediate snapshots instead of writing only at the end.
 	sinceFlush int `json:"-"`
+	// flusher writes intermediate snapshots in the background so a long scan
+	// does not stall on the report file. A final Save() drains and stops it.
+	flusher *reportFlusher `json:"-"`
 	// info
 	ReportType    ReportType `json:"report_type"`
 	EngineVersion string     `json:"engine_version"`
@@ -155,10 +158,32 @@ func (r *Report) AddRisks(risk ...*Risk) {
 	flush := r.shouldFlushLocked()
 	r.mu.Unlock()
 	if flush {
-		if err := r.Save(); err != nil {
-			log.Errorf("flush report snapshot failed: %v", err)
+		// Serializing the document is cheap compared to the write; the write
+		// itself happens on the flusher so a long scan does not stall.
+		if data, err := r.snapshotJSON(); err != nil {
+			log.Errorf("serialize report snapshot failed: %v", err)
+		} else {
+			r.flusherFor().submit(data)
 		}
 	}
+}
+
+// flusherFor returns the background writer of this report, creating it on
+// first use.
+func (r *Report) flusherFor() *reportFlusher {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if r.flusher == nil {
+		r.flusher = newReportFlusher(r.writer)
+	}
+	return r.flusher
+}
+
+// currentFlusher returns the background writer without creating one.
+func (r *Report) currentFlusher() *reportFlusher {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	return r.flusher
 }
 
 // shouldFlushLocked reports whether enough findings accumulated for another

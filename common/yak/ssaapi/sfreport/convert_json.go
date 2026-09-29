@@ -39,6 +39,10 @@ func (r *Report) Save() error {
 		if r.writer == nil {
 			return nil
 		}
+		// A pending background snapshot would race this final document.
+		if flusher := r.currentFlusher(); flusher != nil {
+			flusher.stopAndWait()
+		}
 		data, err := r.snapshotJSON()
 		if err != nil {
 			return err
