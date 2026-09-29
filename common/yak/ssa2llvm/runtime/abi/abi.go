@@ -165,6 +165,12 @@ const (
 
 	// Channel creation for `make(chan T, n)`.
 	IDRuntimeMakeChan FuncID = 30
+
+	// Wait for every goroutine started by `go func` to finish: the runtime
+	// side of the yak builtin waitAllAsyncCallFinish(). The generated main
+	// wrapper already waits once after the entry function returns, but a
+	// script may also call the builtin explicitly to synchronise mid-run.
+	IDRuntimeWaitAsync FuncID = 31
 )
 
 type SliceElemKind int64

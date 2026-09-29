@@ -36,6 +36,14 @@ var runtimeDispatchHandlers = map[abi.FuncID]runtimeDispatchFunc{
 	abi.IDRuntimeChanRecv:     runtimeDispatchChanRecv,
 	abi.IDRuntimeChanSend:     runtimeDispatchChanSend,
 	abi.IDRuntimeMakeChan:     runtimeDispatchMakeChan,
+	abi.IDRuntimeWaitAsync:    runtimeDispatchWaitAsync,
+}
+
+// runtimeDispatchWaitAsync implements the yak builtin waitAllAsyncCallFinish():
+// block until every goroutine started by `go func` has finished.
+func runtimeDispatchWaitAsync(args []uint64, ellipsis bool) (int64, error) {
+	yakAsyncWaitGroup.Wait()
+	return 0, nil
 }
 
 func executeRuntimeDispatch(ctx unsafe.Pointer) {
