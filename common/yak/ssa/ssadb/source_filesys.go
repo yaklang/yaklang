@@ -15,21 +15,22 @@ import (
 	"github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
 )
 
-// Directory trees stay in memory (small). File bodies use a separate TTL cache:
-// last access extends life; 10 minutes without ReadFile/Open drops that file's
-// content. The path tree itself is not TTL-evicted — only DropProgramCache /
-// Delete removes it.
+// One VirtualFS per program is cached as a whole: the path tree (directories +
+// empty file stubs) is built once, file bodies are lazily filled into the tree
+// on first ReadFile/Open, and an idle program (tree untouched for 10 minutes)
+// is evicted entirely — structure and bodies together. Touch-on-hit: active
+// viewing extends life. DropProgramCache / Delete removes a program explicitly.
 const (
-	irSourceFileContentTTL = 10 * time.Minute
-	irSourceFileContentCap = 512
+	irSourceTreeTTL = 10 * time.Minute
+	irSourceTreeCap = 64
 )
 
-// irSourceFS caches one VirtualFS per program that holds the full path tree
-// (directories + empty file stubs). File bodies live in fileContent, not in the tree.
+// irSourceFS caches one VirtualFS per program. The tree starts as structure
+// only (no QuotedCode pulled); file content is filled in place on demand, so
+// listings stay cheap and read bodies become plain memory afterwards.
 type irSourceFS struct {
-	mu          sync.Mutex
-	virtual     map[string]*filesys.VirtualFS // program -> path tree (long-lived)
-	fileContent *utils.CacheExWithKey[string, []byte]
+	mu      sync.Mutex // guards the tree cache itself (build / fill)
+	virtual *utils.CacheExWithKey[string, *filesys.VirtualFS]
 }
 
 var IrSourceFsSeparators = '/'
@@ -38,14 +39,12 @@ var _ filesys_interface.ReadOnlyFileSystem = (*irSourceFS)(nil)
 var _ filesys_interface.FileSystem = (*irSourceFS)(nil)
 
 func NewIrSourceFs() *irSourceFS {
-	content := utils.NewCacheExWithKey[string, []byte](
-		utils.WithCacheTTL(irSourceFileContentTTL),
-		utils.WithCacheCapacity(irSourceFileContentCap),
-	)
-	// Touch-on-hit (default): actively viewed files stay; idle 10m → evict.
+	// Touch-on-hit (default): active viewing extends life; idle 10m → evict.
 	return &irSourceFS{
-		virtual:     make(map[string]*filesys.VirtualFS),
-		fileContent: content,
+		virtual: utils.NewCacheExWithKey[string, *filesys.VirtualFS](
+			utils.WithCacheTTL(irSourceTreeTTL),
+			utils.WithCacheCapacity(irSourceTreeCap),
+		),
 	}
 }
 
@@ -54,37 +53,43 @@ func (fs *irSourceFS) ReadFile(path string) ([]byte, error) {
 		return nil, utils.Errorf("path [%v] is a program root path, not file.", path)
 	}
 
-	fs.mu.Lock()
-	vf, err := fs.programTreeLocked(path)
-	fs.mu.Unlock()
+	vf, err := fs.treeFor(path)
 	if err != nil {
 		return nil, err
 	}
 	if ok, _ := vf.Exists(path); !ok {
 		return nil, utils.Errorf("file [%v] not found", path)
 	}
-	return fs.getFileContent(path)
+	// Filled bodies live in the tree; a non-empty read is a pure memory hit.
+	// Empty real files degrade to a DB fetch per read (correct, just uncached):
+	// ir_sources models empty quoted_code rows as directories, so a file row's
+	// quoted source is at least `""` — an empty tree stub always means "not yet
+	// filled" except for that empty-file corner.
+	if data, err := vf.ReadFile(path); err == nil && len(data) > 0 {
+		return data, nil
+	}
+	return fs.fillFileContent(vf, path)
 }
 
 func (fs *irSourceFS) Open(path string) (fs.File, error) {
 	if path == "/" {
 		return nil, utils.Errorf("path [%v] is a program root path, not file.", path)
 	}
-	fs.mu.Lock()
-	vf, err := fs.programTreeLocked(path)
-	fs.mu.Unlock()
+	vf, err := fs.treeFor(path)
 	if err != nil {
 		return nil, err
 	}
 	if ok, _ := vf.Exists(path); !ok {
 		return nil, utils.Errorf("file [%v] not found", path)
 	}
-	content, err := fs.getFileContent(path)
+	if data, err := vf.ReadFile(path); err == nil && len(data) > 0 {
+		return filesys.NewVirtualFile(path, string(data)), nil
+	}
+	data, err := fs.fillFileContent(vf, path)
 	if err != nil {
 		return nil, err
 	}
-	// Do not write content into the shared tree — keep tree as structure only.
-	return filesys.NewVirtualFile(path, string(content)), nil
+	return filesys.NewVirtualFile(path, string(data)), nil
 }
 
 func (fs *irSourceFS) OpenFile(path string, flag int, perm os.FileMode) (fs.File, error) {
@@ -98,9 +103,7 @@ func (fs *irSourceFS) Stat(path string) (fs.FileInfo, error) {
 	if path == "/" {
 		return filesys.NewVirtualFileInfo("/", 0, true), nil
 	}
-	fs.mu.Lock()
-	defer fs.mu.Unlock()
-	vf, err := fs.programTreeLocked(path)
+	vf, err := fs.treeFor(path)
 	if err != nil {
 		return nil, err
 	}
@@ -115,9 +118,7 @@ func (isfs *irSourceFS) ReadDir(path string) ([]fs.DirEntry, error) {
 		}
 		return ret, nil
 	}
-	isfs.mu.Lock()
-	defer isfs.mu.Unlock()
-	vf, err := isfs.programTreeLocked(path)
+	vf, err := isfs.treeFor(path)
 	if err != nil {
 		return nil, err
 	}
@@ -179,43 +180,13 @@ func (f *irSourceFS) Delete(path string) error {
 	return nil
 }
 
-// DropProgramCache removes the path tree and any cached file bodies for programName.
-// Directory trees are otherwise retained; call this on program rewrite / delete.
+// DropProgramCache removes the cached tree (structure + filled bodies) for
+// programName. Call this on program rewrite / delete.
 func (f *irSourceFS) DropProgramCache(programName string) {
 	if programName == "" {
 		return
 	}
-	f.mu.Lock()
-	delete(f.virtual, programName)
-	f.mu.Unlock()
-	f.dropFileContentPrefix("/" + programName)
-}
-
-func (f *irSourceFS) dropFileContentPrefix(prefix string) {
-	if f.fileContent == nil {
-		return
-	}
-	var toRemove []string
-	f.fileContent.ForEach(func(key string, _ []byte) {
-		if key == prefix || strings.HasPrefix(key, prefix+"/") {
-			toRemove = append(toRemove, key)
-		}
-	})
-	for _, key := range toRemove {
-		f.fileContent.Remove(key)
-	}
-}
-
-func (fs *irSourceFS) getFileContent(filePath string) ([]byte, error) {
-	if data, ok := fs.fileContent.Get(filePath); ok {
-		return data, nil
-	}
-	data, err := readIrSourceFileContent(filePath)
-	if err != nil {
-		return nil, err
-	}
-	fs.fileContent.Set(filePath, data)
-	return data, nil
+	f.virtual.Remove(programName)
 }
 
 func (fs *irSourceFS) Ext(string) string {
@@ -265,33 +236,54 @@ func (f *irSourceFS) String() string {
 	var builder strings.Builder
 	builder.WriteString("irSourceFS{")
 	first := true
-	for programName, virtualFS := range f.virtual {
+	f.virtual.ForEach(func(programName string, virtualFS *filesys.VirtualFS) {
 		if !first {
 			builder.WriteString(", ")
 		}
 		first = false
 		builder.WriteString(fmt.Sprintf("%s: %s", programName, virtualFS.String()))
-	}
+	})
 	builder.WriteString("}")
 	return builder.String()
 }
 
-// programTreeLocked requires fs.mu held.
-// First touch of a program builds the entire path tree once (no QuotedCode).
-func (fs *irSourceFS) programTreeLocked(anyPath string) (*filesys.VirtualFS, error) {
+// treeFor resolves (and builds on first touch) the cached tree for the program
+// named by anyPath. The DB build runs under fs.mu to avoid duplicate builds.
+func (fs *irSourceFS) treeFor(anyPath string) (*filesys.VirtualFS, error) {
 	progName, _ := fs.getProgram(anyPath)
 	if progName == "" {
 		return nil, utils.Errorf("invalid path [%v]: missing program name", anyPath)
 	}
-	if vf, ok := fs.virtual[progName]; ok {
+	if vf, ok := fs.virtual.Get(progName); ok && vf != nil {
+		return vf, nil
+	}
+	fs.mu.Lock()
+	defer fs.mu.Unlock()
+	if vf, ok := fs.virtual.Get(progName); ok && vf != nil {
 		return vf, nil
 	}
 	vf := filesys.NewVirtualFs()
 	if err := buildProgramTree(progName, fs, vf); err != nil {
 		return nil, err
 	}
-	fs.virtual[progName] = vf
+	fs.virtual.Set(progName, vf)
 	return vf, nil
+}
+
+// fillFileContent loads one file's body from the database and writes it back
+// into the tree (replacing the empty stub, which also makes Stat report the
+// real size). The DB fetch runs outside fs.mu — a slow read never blocks
+// listings; only the cheap stub replacement takes the lock.
+func (fs *irSourceFS) fillFileContent(vf *filesys.VirtualFS, path string) ([]byte, error) {
+	data, err := readIrSourceFileContent(path)
+	if err != nil {
+		return nil, err
+	}
+	fs.mu.Lock()
+	vf.RemoveFileOrDir(path)
+	vf.AddFile(path, string(data))
+	fs.mu.Unlock()
+	return data, nil
 }
 
 func buildProgramTree(progName string, irfs *irSourceFS, vf *filesys.VirtualFS) error {
