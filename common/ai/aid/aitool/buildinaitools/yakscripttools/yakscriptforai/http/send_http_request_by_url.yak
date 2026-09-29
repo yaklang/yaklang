@@ -1,25 +1,15 @@
-__DESC__ = "发送基础HTTP请求的工具，允许用户指定请求方法（默认为GET）和完整的URL。工具执行请求并打印原始请求和响应数据包。"
+__DESC__ = "按完整 URL 发送一次基础 HTTP 请求，并保存响应报文；可指定方法、改单个查询或表单参数。需要结构化 query/form、原始报文或结构化结果时使用 do_http_request。"
 __VERBOSE_NAME__ = "HTTP Request by URL"
 __VERBOSE_NAME_ZH__ = "URL HTTP请求"
 __KEYWORDS__ = "http请求,网络工具,web通信,请求工具,响应查看,基础请求,网络调试"
 
 __USAGE__ = <<<USAGE_BLOCK
-HTTP Request by URL Tool - Parameter Description for JSON Tool Calls
+基础 URL 请求：必填 `url`，`method` 默认 GET。仅改变一个参数时传 `param-name`、`param-value`，用 `param-position=query`（默认）或 `post_form_encoded` 选位置；不改参数就省略参数名。`show-request=yes` 保存实际请求报文，响应报文总会保存到临时文件；`keyword` 用于突出响应片段。需要精确控制请求或读取结构化结果时用 do_http_request。
 
-Required Parameters:
-  url             (string)  The full target URL to request.
-
-Optional Parameters:
-  method          (string)  HTTP method to use. Default: "GET".
-  show-request    (string)  Whether to display and save the request packet.
-                            Accepted values: "yes"/"no". Default: "no".
-  param-position  (string)  Where to inject or modify parameter values.
-                            Accepted values: "query" (default), "post_form_encoded".
-  param-name      (string)  Parameter name to add or modify in the request.
-                            Works together with "param-value".
-  param-value     (string)  Parameter value to set for "param-name".
-  keyword         (string)  If provided, highlights and prints content around the
-                            keyword in the response (around 200 bytes context).
+典型案例：
+```json
+{"url":"https://example.com/search?q=base","param-name":"q","param-value":"test","show-request":"yes"}
+```
 USAGE_BLOCK
 
 yakit.AutoInitYakit()
@@ -69,13 +59,15 @@ opts.Push(poc.redirectHandler((redirectIsHttps, redirectReq, redirectRsp) => {
     return true // 继续跟随重定向
 }))
 
-switch str.ToLower(string(testParamType)) {
-case "query", "get":
-    packet = poc.ReplaceHTTPPacketQueryParam(packet /*type: []byte*/, testParamName, testParamValue)
-    yakit.Info("apply get query param into request: \n" + string(packet))
-case "post", "post_form_encoded":
-    packet = poc.ReplaceHTTPPacketPostParam(packet /*type: []byte*/, testParamName, testParamValue)
-    yakit.Info("apply post param into request: \n" + string(packet))
+if testParamName != "" {
+    switch str.ToLower(string(testParamType)) {
+    case "query", "get":
+        packet = poc.ReplaceHTTPPacketQueryParam(packet /*type: []byte*/, testParamName, testParamValue)
+        yakit.Info("apply get query param into request: \n" + string(packet))
+    case "post", "post_form_encoded":
+        packet = poc.ReplaceHTTPPacketPostParam(packet /*type: []byte*/, testParamName, testParamValue)
+        yakit.Info("apply post param into request: \n" + string(packet))
+    }
 }
 
 opts.Push(poc.fixQueryEscape(true))
@@ -91,7 +83,7 @@ if !(str.ToLower(requestRequest) in ["no", "n", "f", "false"]) {
     yakit.Info("requestRequest: %#v", requestRequest)
     tmpFileReq, err := file.TempFileName()
     if err == nil {
-        file.Save(tmpFileReq, len(rsp.RawRequest))
+        file.Save(tmpFileReq, string(rsp.RawRequest))
         yakit.Info("req packet saved to %v", tmpFileReq)
     }
 }

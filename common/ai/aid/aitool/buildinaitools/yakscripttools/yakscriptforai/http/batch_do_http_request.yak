@@ -94,59 +94,32 @@ __INPUT_CONSTRAINTS__ = `{
   }
 }`
 
-__DESC__ = "Send multiple HTTP requests for endpoint probing and API batch validation (IDOR included). URL mode requires `base-url` plus newline-separated `paths`; concurrency is `concurrent`. Responses are included automatically. Prefer structured query/form objects with original unescaped values. Use a packet template only for exact bytes or custom encoding. 用于端点探测、接口批量验证（含 IDOR）的批量 HTTP 请求。URL 模式必须传 `base-url` 和换行分隔的 `paths`，并发参数名是 `concurrent`，响应会自动输出；query/form 传原始未转义值。仅在需要精确报文或自定义编码时使用 packet 模板。"
+__DESC__ = "按换行分隔的 paths 并发发送同形 HTTP 请求，返回每条请求的状态和摘要；用于端点探测、接口批量验证和 IDOR 对比。普通请求用 base-url 或完整 URL，精确报文用含 {{PATH}} 的 packet 模板，并发数由 concurrent 控制。"
 __VERBOSE_NAME__ = "Batch HTTP Request"
 __VERBOSE_NAME_ZH__ = "批量HTTP请求"
 __KEYWORDS__ = "batch http,request multiple,concurrent,batch request,multi path,path scan,batch url,parallel request,mass request,http flood,path enumeration,directory scan,batch get,batch post,api endpoint validation,endpoint probing,api batch testing,request replay,template replay,unauthorized access check,authorization bypass verification,idor validation,horizontal privilege check,batch interface check,批量请求,并发请求,批量HTTP,多路径探测,路径枚举,目录扫描,接口批量验证,API批量测试,接口探测,端点探测,未授权访问验证,越权验证,水平越权验证,IDOR验证,批量验证接口,请求重放,模板请求,多接口测试"
 
 __USAGE__ = <<<USAGE_BLOCK
-Send the same request shape to multiple paths or URLs.
+批量 HTTP 请求：`paths` 必须是换行分隔的字符串，不能传数组；URL 模式使用 `base-url` 加相对路径，或在 `paths` 中逐行给完整 URL。需要精确报文时，用含字面量 `{{PATH}}` 的 `packet` 模板；每条路径会替换该标记，路径和查询需预先编码。
 
-## Choose the mode
+`query`/`form` 传未转义的 JSON 对象，由工具各编码一次；`body` 为原始请求体，会覆盖 `form`。控制并发使用 `concurrent`（默认 5），不是 concurrency；默认 `timeout=10` 秒，`max-body-size=4096` 字节。可用 `delay-seconds` 控制批次节奏。
 
-- Normal requests: use `base-url`, newline-separated `paths`, and optional `query`/`form` objects.
-- Raw JSON/XML/text: use `body` plus `content-type`.
-- Exact bytes, duplicate keys, parameter ordering, unusual separators, or custom/double encoding: use a `packet` template containing `{{PATH}}`.
+查看 `RESULT.request_count`、`response_received_count`、`transport_error_count`、`status_code_distribution` 和 `items`，区分收到 404/500 与未收到响应；`include-code`、`exclude-code`、`exclude-size` 只过滤展示，不能据此判定被过滤路径安全。先做正常基线，再比较状态、长度、正文和响应头；若请求无效、认证失败或结果一致，调整请求条件继续验证。发现新入口先记入待办，对选中的单个端点用 do_http_request 深测。
 
-## Encoding rule (important)
-
-`query` and `form` are JSON objects. Put ORIGINAL, UNESCAPED values in them. The tool URL-encodes each key and value exactly once. Do not pre-encode `%`, spaces, quotes, `#`, or `&`.
-
-The legacy `query-params` string remains for compatibility, but `k=v&k2=v2` cannot distinguish a delimiter from a literal unescaped `&`. Do not generate it for new calls.
-
-`body` is raw and overrides `form`. In Packet mode, the template and substituted paths are sent as written; provide valid encoded HTTP request targets yourself.
-
-Use AITAG for multi-line `paths`, `packet`, `body`, and `headers`.
-
-## Main parameters
-
-- URL mode: `base-url`, `paths`, optional `method`, `query`, `form`, `headers`, `body`, `content-type`, `prefix`.
-- Packet mode: `packet`, `paths`, optional `base-host`, `https`.
-- Control: `timeout`, `concurrent`, `delay-seconds`, `redirect-times`, `proxy`.
-- Results: `keyword`, `regexp-match`, `exclude-code`, `include-code`, `exclude-size`, `max-body-size`.
-- There is no `requests`, `concurrency`, or `include_body` parameter. Use `paths`, `concurrent`; response content is included automatically.
-
-## Interpret the batch as a survey
-
-- Preserve every concrete in-scope endpoint discovered from pages, forms, redirects, scripts, documentation, response fields, or this batch in todo_delta before choosing one current endpoint for deeper testing. A discovered entry point is a coverage branch even when it has no vulnerability signal yet.
-- Compare status, size, body semantics, headers, redirects, and timing against a baseline; filters are viewing aids, not proof that excluded paths are safe.
-- A validation error, connection failure, authentication rejection, empty response, or one uniform result does not exhaust the paths. Correct the request shape or run a materially different batch with another method, encoding, parameter channel, session context, or observable before closing them.
-- Use do_http_request for the selected current endpoint when the next experiment needs one-variable control or exact packet inspection.
-
-## Examples
-
-Structured form (preferred):
+典型案例：两个路径提交相同表单，`paths` 在 JSON 中用 `\n` 分隔：
 ```json
-{"@action":"call-tool","tool":"batch_do_http_request","identifier":"batch_form","params":{"base-url":"https://target.example","method":"POST","form":{"a":"asdf' abc \" #&tail","b":"ssxxx"},"concurrent":3}}
+{"base-url":"https://target.example","paths":"/submit-a\n/submit-b","method":"POST","form":{"name":"a & b"},"concurrent":3}
 ```
-<|TOOL_PARAM_paths_{NONCE}|>
-/submit-a
-/submit-b
-<|TOOL_PARAM_paths_END_{NONCE}|>
 
-Exact packet template:
+[[- if .FunctionCallMode -]]
+精确报文：`packet` 与 `paths` 直接作为 JSON 字符串，多行用转义：
 ```json
-{"@action":"call-tool","tool":"batch_do_http_request","identifier":"batch_raw","params":{"https":"yes","concurrent":3}}
+{"packet":"GET {{PATH}} HTTP/1.1\r\nHost: target.example\r\n\r\n","paths":"/a?id=1\n/b?id=2","https":"yes","concurrent":3}
+```
+[[- else -]]
+精确报文：JSON 传控制参数，多行内容用本次 nonce 的 AITAG：
+```json
+{"https":"yes","concurrent":3}
 ```
 <|TOOL_PARAM_packet_{NONCE}|>
 GET {{PATH}} HTTP/1.1
@@ -154,9 +127,10 @@ Host: target.example
 
 <|TOOL_PARAM_packet_END_{NONCE}|>
 <|TOOL_PARAM_paths_{NONCE}|>
-/a?id=already%20encoded
-/b?id=exact
+/a?id=1
+/b?id=2
 <|TOOL_PARAM_paths_END_{NONCE}|>
+[[- end -]]
 USAGE_BLOCK
 
 yakit.AutoInitYakit()
@@ -164,7 +138,7 @@ yakit.AutoInitYakit()
 // --- parse parameters ---
 // URL mode params
 baseUrl = cli.String("base-url", cli.setHelp("base URL or domain for URL mode"), cli.setRequired(false))
-pathsStr = cli.String("paths", cli.setHelp("paths to test, REQUIRED with base-url, as one newline-separated string (use AITAG for multiple paths; do not pass a JSON array or a requests field). In Packet mode query strings must already be encoded"), cli.setRequired(false))
+pathsStr = cli.String("paths", cli.setHelp("paths to test as one newline-separated string, not an array; use base-url or full URLs in URL mode. Packet mode paths and query strings must already be encoded"), cli.setRequired(false))
 method = cli.String("method", cli.setHelp("HTTP method"), cli.setJsonSchema(`{"type":"string","pattern":"^[!#$%&'*+.^_~\u00600-9A-Za-z|-]+$"}`), cli.setDefault("GET"))
 headers = cli.String("headers", cli.setHelp("custom headers, one per line: 'Key: Value'; ALSO accepts a JSON object {key:value} (AI may pass either); omit when empty"), cli.setJsonSchema(`{
     "oneOf": [

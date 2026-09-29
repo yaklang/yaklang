@@ -39,13 +39,13 @@ func getDoHTTPRequestTool(t *testing.T) *aitool.Tool {
 	return tools[0]
 }
 
-func TestDoHTTPRequestUsagePreservesExperimentAndFrontierRecovery(t *testing.T) {
+func TestDoHTTPRequestUsageExplainsExperimentAndRecovery(t *testing.T) {
 	usage := getDoHTTPRequestTool(t).Usage
-	assert.Assert(t, strings.Contains(usage, "Treat each request as one experiment, not as a one-shot verdict"))
-	assert.Assert(t, strings.Contains(usage, "does not prove the endpoint or hypothesis is exhausted"))
-	assert.Assert(t, strings.Contains(usage, "perform a materially different recovery experiment"))
-	assert.Assert(t, strings.Contains(usage, "record that concrete entry point in todo_delta before continuing"))
-	assert.Assert(t, strings.Contains(usage, "coverage branch even before a vulnerability signal exists"))
+	assert.Assert(t, strings.Contains(usage, "先留正常基线"))
+	assert.Assert(t, strings.Contains(usage, "一次改变一个变量"))
+	assert.Assert(t, strings.Contains(usage, "超时、空响应或一次未命中"))
+	assert.Assert(t, strings.Contains(usage, "新入口应记录到待办"))
+	assert.Assert(t, strings.Contains(usage, "retry request packet"))
 }
 
 func execTool(t *testing.T, tool *aitool.Tool, params aitool.InvokeParams) (stdout, stderr string) {

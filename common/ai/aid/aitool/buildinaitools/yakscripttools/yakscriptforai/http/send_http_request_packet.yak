@@ -1,26 +1,27 @@
-__DESC__ = "发送原始HTTP请求数据包，并接收完整的HTTP响应。工具支持设置HTTPS、重定向次数、请求超时时间，同时提供基于关键字或正则表达式匹配请求和响应内容的功能，并可选保存请求/响应到临时文件，显示网络连接和响应时间信息。"
+__DESC__ = "按给定原始 HTTP 报文发送一次请求，保存实际请求和响应到临时文件，并可按关键字或正则查看片段；需要 URL 模式或结构化结果时使用 do_http_request。"
 __VERBOSE_NAME__ = "HTTP Packet Sender"
 __VERBOSE_NAME_ZH__ = "HTTP数据包发送"
 __KEYWORDS__ = "http请求,网络探测,数据包发送,流量分析,web工具,请求响应,内容匹配,网络测试,抓包"
 
 __USAGE__ = <<<USAGE_BLOCK
-HTTP Raw Packet Request Tool - Parameter Description for JSON Tool Calls
+原始报文请求：必填 `packet`；`https` 默认 no，`redirect-times` 默认 3，`timeout-seconds` 默认 10。工具会把实际请求和响应保存到临时文件。`substring-match` 或 `regexp-match` 可查看响应命中片段；`match-request=yes` 时也匹配请求，`context-line` 默认 3。
 
-Required Parameters:
-  packet          (string)  Raw HTTP request packet content to send.
+[[- if .FunctionCallMode -]]
+典型案例：多行 `packet` 直接放进 JSON，用 `\r\n` 转义：
+```json
+{"packet":"GET / HTTP/1.1\r\nHost: example.com\r\n\r\n","https":"yes","substring-match":"ok"}
+```
+[[- else -]]
+典型案例：JSON 传选项，报文使用本次 nonce 的 AITAG：
+```json
+{"https":"yes","substring-match":"ok"}
+```
+<|TOOL_PARAM_packet_{NONCE}|>
+GET / HTTP/1.1
+Host: example.com
 
-Optional Parameters:
-  https           (string)  Whether to use HTTPS transport. Accepted values:
-                            "yes"/"no". Default: "no".
-  match-request   (string)  Whether to run match logic on the request packet too.
-                            Accepted values: "yes"/"no". Default: "no".
-  regexp-match    (string)  Regular expression used to search request/response data.
-  substring-match (string)  Substring keyword used to search request/response data.
-  context-line    (int)     Number of context lines to display around each match.
-                            Default: 3.
-  redirect-times  (int)     Maximum redirect follow count. Set 0 to disable redirects.
-                            Default: 3.
-  timeout-seconds (int)     Request timeout in seconds. Default: 10.
+<|TOOL_PARAM_packet_END_{NONCE}|>
+[[- end -]]
 USAGE_BLOCK
 
 yakit.AutoInitYakit()

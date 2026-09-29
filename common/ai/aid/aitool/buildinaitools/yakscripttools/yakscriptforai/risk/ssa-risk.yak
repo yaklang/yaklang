@@ -1,15 +1,15 @@
-__DESC__ = "接收一个SSA RiskID获取SSA Risk或者SSA RiskID关联的问题代码"
+__DESC__ = "按正整数 SSA RiskID 查询风险及数据流；需要完整源代码时设置 get_full_code=true，平时用 false 避免无关的大段代码输出。"
 __VERBOSE_NAME__ = "SSA Risk Lookup"
 __VERBOSE_NAME_ZH__ = "SSA风险查询"
 __KEYWORDS__ = "SSA, Risk, SSA Risk"
 
 __USAGE__ = <<<USAGE_BLOCK
-SSA Risk Query Tool - Parameter Description for JSON Tool Calls
+`risk_id` 必须是大于 0 的 SSA 风险记录 ID；`get_full_code` 必填。先用 `false` 查看风险和数据流，只有定位代码需要完整上下文时才改为 `true`，此时返回内容可能明显增加。
 
-Required Parameters:
-  risk_id         (int)     SSA Risk record ID to query. Must be greater than 0.
-  get_full_code   (bool)    Whether to fetch and include full source code in the
-                            returned risk object when available.
+典型案例：
+```json
+{"risk_id":123,"get_full_code":false}
+```
 USAGE_BLOCK
 
 # 获取参数

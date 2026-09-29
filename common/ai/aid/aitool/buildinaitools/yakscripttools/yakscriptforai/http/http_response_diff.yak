@@ -1,53 +1,32 @@
-__DESC__ = "Compares two HTTP responses to detect differences. Supports URL mode (send GET to two URLs) and Packet mode (send two raw HTTP packets). Shows status code comparison, content-length difference, and unified diff of response content. Essential for auth bypass detection, WAF analysis, and logic vulnerability verification."
+__DESC__ = "发送两次 HTTP 请求并对比状态码、长度及响应差异；用 url1/url2 比较两个 GET 地址，或用 packet1/packet2 对比两份原始报文，适合验证权限、过滤和业务条件的影响。"
 __VERBOSE_NAME__ = "HTTP Response Diff"
 __VERBOSE_NAME_ZH__ = "HTTP响应对比"
 __KEYWORDS__ = "http,response,diff,compare,difference,authentication,bypass,waf,security,status code,body,headers,content-length"
 
 __USAGE__ = <<<USAGE_BLOCK
-HTTP Response Diff - Usage Guide for AI Parameter Generation
+比较两次 HTTP 响应。`url1`+`url2` 模式分别发送 GET；需要只改变 Cookie、Header、方法或报文编码时，用 `packet1`+`packet2` 发送两份原始请求。两种模式不要混用；默认 `timeout=10` 秒，`https=auto`，`diff-headers=yes`、`diff-body=yes`。
 
-Compares two HTTP responses to find differences. Supports two modes:
-  1. URL Mode: Provide url1 and url2, sends GET requests and compares responses.
-  2. Packet Mode: Provide packet1 and packet2 via AITAG, sends raw packets.
+一次只改变一个条件，先确认两边都收到响应，再看状态码、长度和统一 diff。若某一边连接失败、重定向或会话已失效，先修正条件再解释差异；仅有差异不等于漏洞。
 
-##############################################################################
-# CRITICAL RULE: AITAG IS MANDATORY FOR "packet1" AND "packet2"             #
-##############################################################################
+典型案例：比较两个 GET 地址：
+```json
+{"url1":"https://example.com/public","url2":"https://example.com/admin","timeout":10}
+```
 
-Parameters:
-  url1          (string, required for URL mode) First URL for comparison
-  url2          (string, required for URL mode) Second URL for comparison
-  packet1       (string, required for Packet mode, via AITAG) First raw HTTP packet
-  packet2       (string, required for Packet mode, via AITAG) Second raw HTTP packet
-  timeout       (int, optional) Request timeout in seconds. Default: 10
-  https         (string, optional) Force HTTPS: "true"/"false"/"auto". Default: "auto"
-  proxy         (string, optional) HTTP proxy URL
-  diff-headers  (string, optional) Include headers in diff: "yes"/"no". Default: "yes"
-  diff-body     (string, optional) Include body in diff: "yes"/"no". Default: "yes"
-
-Example 1 - Compare two URLs:
-{
-  "@action": "call-tool",
-  "tool": "http_response_diff",
-  "identifier": "diff_admin_vs_public",
-  "params": {
-    "url1": "http://example.com/admin",
-    "url2": "http://example.com/public",
-    "timeout": 10
-  }
-}
-
-Example 2 - Compare with/without auth cookie (Packet mode):
-{
-  "@action": "call-tool",
-  "tool": "http_response_diff",
-  "identifier": "diff_auth_bypass_check",
-  "params": { "timeout": 10 }
-}
+[[- if .FunctionCallMode -]]
+比较有无会话 Cookie：两份原始报文放在 JSON 中，用 `\r\n` 表示换行：
+```json
+{"packet1":"GET /admin HTTP/1.1\r\nHost: example.com\r\nCookie: session=valid\r\n\r\n","packet2":"GET /admin HTTP/1.1\r\nHost: example.com\r\n\r\n","https":"true"}
+```
+[[- else -]]
+比较有无会话 Cookie：JSON 传选项，两份报文使用本次 nonce 的 AITAG：
+```json
+{"https":"true"}
+```
 <|TOOL_PARAM_packet1_{NONCE}|>
 GET /admin HTTP/1.1
 Host: example.com
-Cookie: session=valid_token
+Cookie: session=valid
 
 <|TOOL_PARAM_packet1_END_{NONCE}|>
 <|TOOL_PARAM_packet2_{NONCE}|>
@@ -55,6 +34,7 @@ GET /admin HTTP/1.1
 Host: example.com
 
 <|TOOL_PARAM_packet2_END_{NONCE}|>
+[[- end -]]
 USAGE_BLOCK
 
 yakit.AutoInitYakit()

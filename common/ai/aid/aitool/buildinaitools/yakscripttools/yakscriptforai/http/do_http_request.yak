@@ -34,72 +34,43 @@ __INPUT_CONSTRAINTS__ = `{
   }
 }`
 
-__DESC__ = "Send one HTTP request. Prefer URL mode with structured query/form objects: pass original unescaped values and the tool URL-encodes them safely. Use body for a raw JSON/XML/text body. Use packet when exact bytes, duplicate parameters, ordering, or custom encoding matter. Use batch_do_http_request for multiple requests. 发送单个 HTTP 请求。优先使用 URL 模式的 query/form 对象，传原始未转义值，由工具安全编码；JSON/XML/文本使用 body；需要精确数据包、重复参数、顺序或自定义编码时使用 packet；多请求使用 batch_do_http_request。"
+__DESC__ = "向指定目标发送一次 HTTP 请求并返回实际请求、响应和结构化结果；普通请求用 url 加 query/form 对象由工具编码，需保留参数顺序、重复键或特殊编码时用原样 packet，多路径请求用 batch_do_http_request。"
 __VERBOSE_NAME__ = "HTTP Request"
 __VERBOSE_NAME_ZH__ = "HTTP请求"
 __KEYWORDS__ = "http request,curl,web,network,packet,raw request,http response,url,post,get,https,proxy,redirect,header,body,api,http tool,web debug,traffic"
 
 __USAGE__ = <<<USAGE_BLOCK
-Send one HTTP request in either URL mode or Packet mode.
+单次 HTTP 请求：`url` 与 `packet` 二选一。URL 模式由工具生成并显示实际请求包；需要重复参数、固定顺序或自定义编码时用原样 `packet`。多路径测试用 batch_do_http_request。
 
-## Choose the mode
+参数要点：URL 模式的 `query`/`form` 是 JSON 对象，传原始未转义值，由工具各编码一次；不要先编码 `%`、`&` 等字符。`body` 是原始请求体，覆盖 `form`；Packet 模式的路径和查询必须自行编码。`headers` 可传对象或逐行的 `Key: Value`。默认 `timeout=10` 秒、`redirect-times=3`；`save-packet=true` 才会把完整请求和响应保存成文件，大报文的内联输出会截断。
 
-- Normal query/form request: use `url` plus `query` or `form`.
-- Raw JSON/XML/text body: use `body` and `content-type`; use AITAG for multi-line content.
-- Exact request bytes, duplicate keys, parameter ordering, unusual separators, or custom/double encoding: use `packet` with AITAG. Packet content is sent as written.
-- Multiple requests or value iteration: use `batch_do_http_request`.
+先看 `RESULT.request_built`、`request_sent`、`response_received`、`status_code` 和 `transport_error`：HTTP 404/500 仍是已收到响应；连接、TLS、代理等失败则没有响应。POST JSON 请求遇到包含 required/invalid/missing 的 HTTP 400 时，工具可能自动改为表单编码再请求一次；核对输出中的 retry request packet 和 content-type hint，不能把重试响应当作原 JSON 请求的结果。
 
-## Encoding rule (important)
+测试时先留正常基线，再一次改变一个变量并比较状态、内容、响应头和耗时。参数校验失败、超时、空响应或一次未命中都需要修正请求或换一个可区分的实验；响应揭示的新入口应记录到待办。
 
-`query` and `form` are JSON objects. Put ORIGINAL, UNESCAPED values in them. The tool URL-encodes every key and value exactly once. Do not pre-encode `%`, spaces, quotes, `#`, or `&`.
-
-Example: `{"form":{"a":"asdf' abc \" #&tail","b":"ssxxx"}}` is sent as an `application/x-www-form-urlencoded` body with the special characters encoded and the inner `&` kept inside `a`.
-
-The legacy string fields `query-params` and `post-params` remain for compatibility, but their `k=v&k2=v2` syntax cannot distinguish a delimiter from a literal unescaped `&`. Do not generate them for new calls.
-
-## Main parameters
-
-- URL mode: `url`, optional `method`, `query` object, `form` object, `headers`, `body`, `content-type`.
-- Packet mode: `packet`; optional `https` (`yes`/`no`/`auto`).
-- Common: `timeout`, `redirect-times`, `keyword`, `regexp-match`, `proxy`, `verbose`, `save-packet`.
-- `body` overrides `form` when both are present.
-- Use AITAG for `packet`, multi-line `body`, and multi-line `headers`.
-
-## Black-box experiment loop
-
-Treat each request as one experiment, not as a one-shot verdict.
-
-1. Establish a normal baseline and note the status, body/length, headers, redirect, and timing signals relevant to the target.
-2. Change one controllable variable at a time: method, parameter value, input channel, encoding, request shape, authentication/session context, or observable.
-3. Compare against the baseline. A request error, parameter validation failure, timeout, connection/TLS/proxy failure, authentication rejection, empty response, or one payload miss does not prove the endpoint or hypothesis is exhausted.
-4. Read the tool feedback and perform a materially different recovery experiment: correct invalid parameters, inspect the generated packet, switch structured/packet mode, adjust method or encoding, restore required headers/cookies, or expand the observable with verbose/save-packet/keyword/regexp.
-5. Continue while a new controllable variable can produce information. When this endpoint is confirmed, discriminatively ruled out, externally blocked, or temporarily has zero information gain, preserve the result and resume condition in todo_delta and move to the next recorded Frontier entry.
-
-If the response exposes another in-scope link, form action, redirect target, script route, documented endpoint, or API field, record that concrete entry point in todo_delta before continuing the current experiment. It is a coverage branch even before a vulnerability signal exists.
-
-## Examples
-
-Structured form (preferred):
+典型案例：URL 模式提交表单，参数直接传对象：
 ```json
-{"@action":"call-tool","tool":"do_http_request","identifier":"submit_form","params":{"url":"https://target.example/submit","method":"POST","form":{"a":"asdf' abc \" #&tail","b":"ssxxx"},"timeout":10}}
+{"url":"https://target.example/submit","method":"POST","form":{"name":"a & b"},"timeout":10}
 ```
 
-Structured query (preferred):
+[[- if .FunctionCallMode -]]
+精确报文：所有参数直接放在 JSON 中，多行报文用 JSON 转义：
 ```json
-{"@action":"call-tool","tool":"do_http_request","identifier":"search","params":{"url":"https://target.example/search","query":{"q":"a & b #1","page":1}}}
+{"packet":"POST /submit HTTP/1.1\r\nHost: target.example\r\nContent-Type: application/x-www-form-urlencoded\r\n\r\nname=a%20%26%20b","https":"yes","timeout":10}
 ```
-
-Exact raw request:
+[[- else -]]
+精确报文：其他参数用 JSON，多行 `packet` 使用本次 nonce 的 AITAG：
 ```json
-{"@action":"call-tool","tool":"do_http_request","identifier":"raw_request","params":{"https":"yes","timeout":10}}
+{"https":"yes","timeout":10}
 ```
 <|TOOL_PARAM_packet_{NONCE}|>
 POST /submit HTTP/1.1
 Host: target.example
 Content-Type: application/x-www-form-urlencoded
 
-a=already%20encoded&b=exact
+name=a%20%26%20b
 <|TOOL_PARAM_packet_END_{NONCE}|>
+[[- end -]]
 USAGE_BLOCK
 
 yakit.AutoInitYakit()
