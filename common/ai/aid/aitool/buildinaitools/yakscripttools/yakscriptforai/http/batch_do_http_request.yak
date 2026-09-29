@@ -94,17 +94,15 @@ __INPUT_CONSTRAINTS__ = `{
   }
 }`
 
-__DESC__ = "批量发送 HTTP 请求并汇总每条结果，用于多路径探测、接口批量验证和 IDOR 对比：paths 是逐行路径/URL，也可用 {{int(...)}}、{{list(...)}} 展开；URL 模式配 base-url，原始报文模式用 packet 中的 {{PATH}} 和变量占位符渲染后发送，并发由 concurrent 控制。"
+__DESC__ = "按 paths 中逐行指定的路径或 URL 批量发送并汇总 HTTP 请求，用于多路径探测、接口批量验证和 IDOR 对比；URL 模式结合 base-url，原始报文模式将当前路径替换到 packet 的 {{PATH}}，并用 variables 替换命名变量后发送。"
 __VERBOSE_NAME__ = "Batch HTTP Request"
 __VERBOSE_NAME_ZH__ = "批量HTTP请求"
 __KEYWORDS__ = "batch http,request multiple,concurrent,batch request,multi path,path scan,batch url,parallel request,mass request,http flood,path enumeration,directory scan,batch get,batch post,api endpoint validation,endpoint probing,api batch testing,request replay,template replay,unauthorized access check,authorization bypass verification,idor validation,horizontal privilege check,batch interface check,批量请求,并发请求,批量HTTP,多路径探测,路径枚举,目录扫描,接口批量验证,API批量测试,接口探测,端点探测,未授权访问验证,越权验证,水平越权验证,IDOR验证,批量验证接口,请求重放,模板请求,多接口测试"
 
 __USAGE__ = <<<USAGE_BLOCK
-批量 HTTP：`paths` 是换行分隔的单个字符串，每行一个相对路径或完整 URL；不能传数组。URL 模式用 `base-url` 加相对路径，也可不传 `base-url` 而逐行传完整 URL。`prefix` 给相对路径统一加前缀；`concurrent` 控制并发（默认 5）。`query`/`form` 传原始值对象，由工具编码一次；`body` 覆盖 `form`。
+`paths` 是换行分隔的单个字符串，每行一个相对路径或完整 URL，不能传数组。URL 模式用 `base-url` 拼相对路径，或逐行传完整 URL；`prefix` 给相对路径统一加前缀。`query`/`form` 传原始值对象，由工具编码一次；`body` 覆盖 `form`。`concurrent` 默认 5，`max-requests` 默认 100、最多 500；先用少量路径核对实际请求包。
 
-模板只作用于 `paths` 和 `packet`：`{{int(1-3)}}` 展开 1、2、3；`{{list(a|b)}}` 展开 a、b；多个标签生成组合。Packet 模式中，`{{PATH}}` 放入当前渲染路径，`{{name}}` 从 `variables` 对象读取同名字符串（也可写 `{{params(name)}}`）。同一路径的 packet 中有 `list/int` 时会继续展开为多条请求。替换值直接进入原始报文，查询、路径、Body 中的特殊字符需先按目标格式编码；未知标签或缺失变量会报错。总请求数由 `max-requests` 限制，默认 100，最多 500；先用小范围验证模板，核对输出中的最终 request packet。
-
-典型案例 1：普通路径，每行一条；JSON 中用 `\n` 表示换行：
+典型案例 1：同一站点探测多个路径；JSON 中用 `\n` 分隔：
 ```json
 {"base-url":"https://target.example","paths":"/health\n/api/users\n/admin","concurrent":3}
 ```
@@ -114,31 +112,29 @@ __USAGE__ = <<<USAGE_BLOCK
 {"paths":"https://a.example/status\nhttps://b.example/status","concurrent":2}
 ```
 
-典型案例 3：路径变量加范围；实际发送 /users/1、/users/2、/users/3：
+典型案例 3：统一加前缀，实际请求 /v1/api/users 与 /v1/api/orders：
 ```json
-{"base-url":"https://target.example","paths":"/{{segment}}/{{int(1-3)}}","variables":{"segment":"users"},"max-requests":3}
+{"base-url":"https://target.example","prefix":"/v1","paths":"/api/users\n/api/orders","max-requests":2}
 ```
 
-典型案例 4：列表配合统一前缀；实际发送 /v1/api/users 和 /v1/api/orders：
-```json
-{"base-url":"https://target.example","prefix":"/v1","paths":"/api/{{list(users|orders)}}","max-requests":2}
-```
+原始报文模式：`packet` 中用 `{{PATH}}` 表示当前 `paths` 行，用 `{{name}}` 读取 `variables` 对象中的同名字符串。`base-url` 与 `packet` 不同时使用；按目标协议设置 `https`。变量值直接替换进报文，放入路径、查询或 Body 前自行按目标格式编码；变量缺失会报错。先核对结果中的最终 request packet，再扩大范围。
 
 [[- if .FunctionCallMode -]]
-典型案例 5：原始报文同时使用路径范围、报文变量和列表，2 个 ID × 2 个 view = 4 条；多行 `packet` 放在 JSON 字符串中：
+典型案例 4：同一报文验证两个订单路径，并用变量设置租户头；多行 `packet` 放在 JSON 字符串中：
 ```json
-{"paths":"/orders/{{int(1001-1002)}}","packet":"GET {{PATH}}?view={{list(summary|detail)}} HTTP/1.1\r\nHost: target.example\r\nX-Tenant: {{tenant}}\r\n\r\n","variables":{"tenant":"demo"},"https":"yes","concurrent":2,"max-requests":4}
+{"paths":"/orders/1001\n/orders/1002","packet":"GET {{PATH}}?view=summary HTTP/1.1\r\nHost: target.example\r\nX-Tenant: {{tenant}}\r\n\r\n","variables":{"tenant":"demo"},"https":"yes","concurrent":2,"max-requests":2}
 ```
 [[- else -]]
-典型案例 5：原始报文同时使用路径范围、报文变量和列表，2 个 ID × 2 个 view = 4 条；JSON 传控制参数，多行 `paths`/`packet` 用本次 nonce 的 AITAG：
+典型案例 4：同一报文验证两个订单路径，并用变量设置租户头；JSON 传控制参数，多行 `paths`/`packet` 用本次 nonce 的 AITAG：
 ```json
-{"variables":{"tenant":"demo"},"https":"yes","concurrent":2,"max-requests":4}
+{"variables":{"tenant":"demo"},"https":"yes","concurrent":2,"max-requests":2}
 ```
 <|TOOL_PARAM_paths_{NONCE}|>
-/orders/{{int(1001-1002)}}
+/orders/1001
+/orders/1002
 <|TOOL_PARAM_paths_END_{NONCE}|>
 <|TOOL_PARAM_packet_{NONCE}|>
-GET {{PATH}}?view={{list(summary|detail)}} HTTP/1.1
+GET {{PATH}}?view=summary HTTP/1.1
 Host: target.example
 X-Tenant: {{tenant}}
 

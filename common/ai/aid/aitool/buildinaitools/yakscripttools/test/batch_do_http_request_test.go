@@ -132,13 +132,17 @@ func TestBatchDoHTTPRequest_MetadataContainsIntentHints(t *testing.T) {
 }
 
 func TestBatchDoHTTPRequestUsageExplainsSurveyAndRecovery(t *testing.T) {
-	usage := getBatchDoHTTPRequestTool(t).Usage
+	tool := getBatchDoHTTPRequestTool(t)
+	usage := tool.Usage
+	assert.Assert(t, !strings.Contains(tool.Description, "{{int("), "description should not promote range tags")
+	assert.Assert(t, !strings.Contains(tool.Description, "{{list("), "description should not promote list tags")
 	assert.Assert(t, strings.Contains(usage, "发现新入口先记入待办"))
 	assert.Assert(t, strings.Contains(usage, "核对实际请求包"))
 	assert.Assert(t, strings.Contains(usage, "不证明目标安全"))
 	assert.Assert(t, strings.Contains(usage, "用 do_http_request 深测"))
 	assert.Assert(t, strings.Contains(usage, "response_received_count"))
-	assert.Assert(t, strings.Contains(usage, "{{int(1-3)}}"))
+	assert.Assert(t, !strings.Contains(usage, "{{int("), "usage should not promote range tags")
+	assert.Assert(t, !strings.Contains(usage, "{{list("), "usage should not promote list tags")
 	assert.Assert(t, strings.Contains(usage, "{{PATH}}"))
 	assert.Assert(t, strings.Contains(usage, "{{tenant}}"))
 }
