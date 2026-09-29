@@ -16,10 +16,9 @@ func (t *ForgeBlueprint) CreateCoordinatorWithQuery(ctx context.Context, originQ
 	return t.createCoordinatorWithRenderedPrompt(ctx, firstQuery, extraOpts, opts...)
 }
 
-// CreateCoordinatorWithQueryAndParams binds the server-authored user query
-// and the already validated application parameters into one immutable Forge
-// invocation. Unlike the legacy DB-backed entrypoint, it does not resolve or
-// execute parameter code.
+// CreateCoordinatorWithQueryAndParams renders the query and caller-validated
+// parameters without interpreting CLI declarations. Templates decide where
+// invocation data appears; callers own any additional prompt composition.
 func (t *ForgeBlueprint) CreateCoordinatorWithQueryAndParams(
 	ctx context.Context,
 	originQuery string,

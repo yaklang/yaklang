@@ -280,16 +280,16 @@ func (f *ForgeBlueprint) GenerateFirstPromptWithMemoryOptionWithQueryAndParams(
 	query string,
 	params []Parameter,
 ) (string, []aicommon.ConfigOption, error) {
-	initPrompt, err := f.renderInitPromptWithValidatedParams(query, params)
+	initPrompt, err := f.renderInitPromptWithParams(query, params)
 	if err != nil {
 		return "", nil, utils.Errorf("render init prompt failed: %v", err)
 	}
-	persistentPrompt, err := f.renderPersistentPrompt(query)
+	persistentPrompt, err := f.renderPersistentPromptWithParams(query, params)
 	if err != nil {
 		return "", nil, utils.Errorf("render persistent prompt failed: %v", err)
 	}
 
-	return initPrompt, f.coordinatorOptions(persistentPrompt, f.renderValidatedResultPrompt), nil
+	return initPrompt, f.coordinatorOptions(persistentPrompt, f.renderResultPrompt), nil
 }
 
 // Keep option ordering shared while each entrypoint retains its own rendering

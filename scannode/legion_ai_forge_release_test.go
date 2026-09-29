@@ -53,7 +53,7 @@ func rehashLegionContextForgeRelease(t *testing.T, release *aiv1.ContextForgeRel
 
 func TestBuildContextForgeBlueprintUsesInlineDefinition(t *testing.T) {
 	release := testLegionContextForgeRelease(t)
-	config, blueprint, params, err := buildContextForgeBlueprint(release)
+	config, blueprint, params, err := buildContextForgeBlueprint(release, "original user input")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -108,7 +108,7 @@ func TestValidateContextForgeReleaseAllowsExactReportAndHTTPProfiles(t *testing.
 	if err := validateContextForgeRelease(report); err != nil {
 		t.Fatalf("valid report profile was rejected: %v", err)
 	}
-	_, blueprint, _, err := buildContextForgeBlueprint(report)
+	_, blueprint, _, err := buildContextForgeBlueprint(report, "original user input")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -151,7 +151,7 @@ func TestBuildContextForgeBlueprintUsesPlatformResultGenerator(t *testing.T) {
 			release.RetryEmptyOutput = test.retry
 			release.ResultPrompt = "Return only JSON with a report field."
 			rehashLegionContextForgeRelease(t, release)
-			config, blueprint, params, err := buildContextForgeBlueprint(release)
+			config, blueprint, params, err := buildContextForgeBlueprint(release, "original user input")
 			require.NoError(t, err)
 			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 			defer cancel()
@@ -223,9 +223,9 @@ func TestBuildContextForgeBlueprintUsesPlatformResultGenerator(t *testing.T) {
 func TestForgeResultPolicyBoundToInvocation(t *testing.T) {
 	release := testLegionContextForgeRelease(t)
 	require.False(t, release.GetRetryEmptyOutput())
-	_, blueprint, _, err := buildContextForgeBlueprint(release)
+	_, blueprint, _, err := buildContextForgeBlueprint(release, "original user input")
 	require.NoError(t, err)
-	require.Nil(t, blueprint.ResultGenerator)
+	require.NotNil(t, blueprint.ResultGenerator, "Legion report grounding applies even without retry")
 	definitionHash := release.DefinitionSha256
 	invocationHash := release.Sha256
 	release.RetryEmptyOutput = true

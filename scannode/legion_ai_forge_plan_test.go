@@ -31,7 +31,7 @@ func TestLegionForgePresetObservationPlanParsesWithoutModel(t *testing.T) {
 			release.Name = name
 			release.PlanPrompt = tc.prompt
 			rehashLegionContextForgeRelease(t, release)
-			_, blueprint, params, err := buildContextForgeBlueprint(release)
+			_, blueprint, params, err := buildContextForgeBlueprint(release, "original user input")
 			if err != nil {
 				t.Fatal(err)
 			}

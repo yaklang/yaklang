@@ -234,6 +234,7 @@ func equalContextForgeStrings(left, right []string) bool {
 
 func buildContextForgeBlueprint(
 	release *aiv1.ContextForgeRelease,
+	userInput string,
 ) (*aiforge.YakForgeBlueprintConfig, *aiforge.ForgeBlueprint, []aiforge.Parameter, error) {
 	if err := validateContextForgeRelease(release); err != nil {
 		return nil, nil, nil, err
@@ -241,7 +242,7 @@ func buildContextForgeBlueprint(
 	disableTools := release.GetCapabilityProfile() == legionForgeAdvisoryProfile
 	config := aiforge.NewYakForgeBlueprintConfig(
 		strings.TrimSpace(release.GetName()),
-		release.GetInitPrompt(),
+		legionForgeInitPrompt(release.GetInitPrompt()),
 		release.GetPersistentPrompt(),
 	).
 		WithPlanPrompt(release.GetPlanPrompt()).
@@ -251,13 +252,16 @@ func buildContextForgeBlueprint(
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("build immutable Forge release: %w", err)
 	}
-	if release.GetRetryEmptyOutput() {
-		blueprint.ResultGenerator = legionForgeResultGenerator(blueprint.GenerateResult)
-	}
 	params := make([]aiforge.Parameter, 0, len(release.GetParameters()))
 	for _, parameter := range release.GetParameters() {
 		params = append(params, aiforge.Parameter{Key: parameter.GetKey(), Value: parameter.GetValue()})
 	}
+	// Capture original invocation values, not the rendered Coordinator.Query.
+	input, err := json.Marshal(map[string]any{"query": userInput, "parameters": params})
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	blueprint.ResultGenerator = legionForgeResultGenerator(blueprint.GenerateResult, release.GetRetryEmptyOutput(), string(input))
 	return config, blueprint, params, nil
 }
 
@@ -267,7 +271,7 @@ func executeContextForgeRelease(
 	userInput string,
 	options ...aicommon.ConfigOption,
 ) (*aiforge.ForgeResult, error) {
-	config, blueprint, params, err := buildContextForgeBlueprint(release)
+	config, blueprint, params, err := buildContextForgeBlueprint(release, userInput)
 	if err != nil {
 		return nil, err
 	}

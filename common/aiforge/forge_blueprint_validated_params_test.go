@@ -9,49 +9,17 @@ import (
 	"github.com/yaklang/yaklang/common/ai/aid"
 )
 
-func TestValidatedInvocationResultRetainsInputAndEvidence(t *testing.T) {
-	blueprint := &ForgeBlueprint{ResultPrompt: "Return a Markdown analysis."}
+func TestParameterRenderingPreservesPlainTemplate(t *testing.T) {
+	blueprint := &ForgeBlueprint{InitializePrompt: "Analyze supplied data", ParameterRuleYaklangCode: `panic("must not execute")`}
+	prompt, _, err := blueprint.GenerateFirstPromptWithMemoryOptionWithQueryAndParams("caller query", []Parameter{{Key: "topic", Value: "input"}})
+	require.NoError(t, err)
+	require.Equal(t, blueprint.InitializePrompt, prompt, "shared renderer must not append platform input policy")
 	memory := aid.GetDefaultContextProvider()
-	memory.StoreQuery("email-content: billing@example.test; expires in one hour")
-	memory.PushText(1, "Observed credential request; no network request was performed")
-	prompt, err := blueprint.renderValidatedResultPrompt(memory)
-	if err != nil {
-		t.Fatal(err)
-	}
-	for _, expected := range []string{"Return a Markdown analysis", "billing@example.test", "expires in one hour", "Observed credential request", "no network request was performed", "Do not invent"} {
-		if !strings.Contains(prompt, expected) {
-			t.Fatalf("final result prompt lost %q", expected)
-		}
-	}
-	legacy, err := blueprint.renderResultPrompt(memory)
-	if err != nil || legacy != blueprint.ResultPrompt {
-		t.Fatalf("legacy rendering changed: %q, %v", legacy, err)
-	}
-}
-
-func TestValidatedInvocationResultRejectsMissingContext(t *testing.T) {
-	blueprint := &ForgeBlueprint{ResultPrompt: "Return a Markdown analysis."}
-	if _, err := blueprint.renderValidatedResultPrompt(nil); err == nil {
-		t.Fatal("missing context must not generate an ungrounded report")
-	}
-}
-
-func TestValidatedInvocationRetainsInputWithoutTemplatePlaceholders(t *testing.T) {
-	blueprint := &ForgeBlueprint{
-		InitializePrompt:         "Analyze the supplied email without sending it.",
-		ParameterRuleYaklangCode: `panic("must not execute")`,
-	}
-	prompt, _, err := blueprint.GenerateFirstPromptWithMemoryOptionWithQueryAndParams(
-		"Return the final analysis", []Parameter{{Key: "email-content", Value: "SUBJECT: urgent password verification"}},
-	)
-	if err != nil {
-		t.Fatal(err)
-	}
-	for _, expected := range []string{"Analyze the supplied email", "Return the final analysis", "email-content", "SUBJECT: urgent password verification", "<user_params_"} {
-		if !strings.Contains(prompt, expected) {
-			t.Fatalf("missing invocation data %q: %s", expected, prompt)
-		}
-	}
+	memory.StoreQuery("caller input")
+	blueprint.ResultPrompt = "Return only JSON."
+	result, err := blueprint.renderResultPrompt(memory)
+	require.NoError(t, err)
+	require.Equal(t, blueprint.ResultPrompt, result, "shared renderer must not append platform report policy")
 }
 
 func TestGenerateFirstPromptWithValidatedParamsDoesNotParseImportedCLI(t *testing.T) {
@@ -113,5 +81,14 @@ func TestForgeEntrypointsPreserveOptionOrder(t *testing.T) {
 			}
 			require.Equal(t, []string{"base context", "caller context"}, config.PersistentMemory)
 		})
+	}
+}
+
+func TestParameterRenderingRetainsPersistentValues(t *testing.T) {
+	blueprint := &ForgeBlueprint{PersistentPrompt: `query={{.Forge.UserQuery}}; params={{.Forge.UserParams}}`, ParameterRuleYaklangCode: `panic("must not parse")`}
+	prompt, err := blueprint.renderPersistentPromptWithParams("question", []Parameter{{Key: "file", Value: "evidence.txt"}})
+	require.NoError(t, err)
+	for _, value := range []string{"question", "file", "evidence.txt"} {
+		require.Contains(t, prompt, value)
 	}
 }

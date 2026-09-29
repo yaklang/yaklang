@@ -1,14 +1,12 @@
 package yak
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
 	"io"
 	"reflect"
 	"strings"
-	"sync"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	// blank-import aive 触发价值评估 submitter 的 init() 注册 (默认开启).
@@ -98,52 +96,8 @@ func normalizeEmptyObjectParams(tool *mcp.Tool, params aitool.InvokeParams) (ait
 	return normalized, notes
 }
 
-// This buffer captures only explicit println output, not runtime/Yakit warnings.
-// It cannot prove business success; consumers must inspect the returned payload.
-type forgeToolOutput struct {
-	mu       sync.Mutex
-	buf      bytes.Buffer
-	exceeded bool
-}
-
-const maxForgeToolOutputBytes = 1 << 20
-
-func (b *forgeToolOutput) Write(p []byte) (int, error) {
-	b.mu.Lock()
-	defer b.mu.Unlock()
-	remaining := maxForgeToolOutputBytes - b.buf.Len()
-	if len(p) > remaining {
-		b.exceeded = true
-		b.buf.Write(p[:remaining])
-	} else {
-		b.buf.Write(p)
-	}
-	return len(p), nil
-}
-
-func (b *forgeToolOutput) result() (string, error) {
-	b.mu.Lock()
-	defer b.mu.Unlock()
-	if b.exceeded {
-		return "", fmt.Errorf("standalone Forge tool output exceeds %d bytes", maxForgeToolOutputBytes)
-	}
-	result := strings.TrimSpace(b.buf.String())
-	if result == "" {
-		return "", fmt.Errorf("standalone Forge tool produced no result")
-	}
-	return result, nil
-}
-
 func YakTool2AITool(aitools []*schema.AIYakTool) []*aitool.Tool {
 	return yakTool2AITool(aitools, false)
-}
-
-// YakTool2AIToolWithForgeHandle additionally supports a declared forgeHandle
-// entrypoint when no explicit RESULT was produced. This opt-in keeps ordinary
-// Yak tool semantics unchanged, including observation-only tools without an
-// explicit return value. It is not a permissions sandbox.
-func YakTool2AIToolWithForgeHandle(aitools []*schema.AIYakTool) []*aitool.Tool {
-	return yakTool2AITool(aitools, true)
 }
 
 func yakTool2AITool(aitools []*schema.AIYakTool, invokeForgeHandle bool) []*aitool.Tool {
@@ -274,21 +228,7 @@ func yakTool2AITool(aitools []*schema.AIYakTool, invokeForgeHandle bool) []*aito
 						return result, nil
 					}
 					if invokeForgeHandle {
-						if standalone, _ := params["standalone-tool"].(bool); standalone {
-							return captured.result()
-						}
-						if _, ok := executedEngine.GetVar("forgeHandle"); ok {
-							result, err := executedEngine.SafeCallYakFunction(ctx, "forgeHandle", []interface{}{map[string]any(params)})
-							if err == nil && result == nil {
-								return nil, fmt.Errorf("Forge tool handler produced no result")
-							}
-							return result, err
-						}
-						// Opting into forgeHandle support must not require every
-						// original Yak tool to implement that optional entrypoint.
-						// Native observation-only tools already emit through the
-						// captured Yakit feedback channel; preserve their semantics.
-						return nil, nil
+						return invokeForgeToolHandler(ctx, executedEngine, params, &captured)
 					}
 				}
 				return nil, nil

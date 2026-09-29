@@ -122,3 +122,9 @@ package owns one result-generation request and exposes an optional
 `ResultGenerator` callback receiving the rendered prompt. The adapter wraps
 single generation before result delivery, so `ResultHandler` runs once after
 recovery completes. Core Forge has no retry-policy fields or recovery loop.
+
+The adapter also owns the initial invocation appendix and final report grounding
+instructions. It snapshots original user input and normalized parameters when
+building the blueprint; rendered coordinator instructions are not original user
+input. These appendices apply independently of the retry flag. The shared core
+renders the declared templates without adding platform reporting requirements.
