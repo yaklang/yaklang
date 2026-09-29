@@ -27,6 +27,21 @@ func normalizePrintArg(v any) any {
 	}
 }
 
+// plausibleFloat reports whether a raw ABI word is a float64 bit pattern a
+// script could have produced. The lower bound keeps ordinary small integers
+// (and the denormals their bit patterns would form) out of the float path, and
+// the upper bound rejects patterns that only a pointer-like word can form.
+func plausibleFloat(v uint64) (float64, bool) {
+	if v <= 1<<32 {
+		return 0, false
+	}
+	f := math.Float64frombits(v)
+	if math.IsInf(f, 0) || math.IsNaN(f) || math.Abs(f) < 1e-300 || math.Abs(f) > 1e300 {
+		return 0, false
+	}
+	return f, true
+}
+
 func decodeTaggedArg(v uint64) any {
 	// Untagged values are usually integers, but an untagged pointer can also
 	// reach the runtime when the compiler could not prove the SSA type (e.g. a
@@ -44,35 +59,37 @@ func decodeTaggedArg(v uint64) any {
 		if v > 0x100000 && looksLikeCStringPointer(v) {
 			return C.GoString((*C.char)(unsafe.Pointer(uintptr(v))))
 		}
+		// Every float64 below 2.0 leaves bit 62 clear (1.5 is 0x3ff8..., 0.5 is
+		// 0x3fe0...), so those reach this branch instead of the tagged one.
+		if f, ok := plausibleFloat(v); ok {
+			return f
+		}
 		return int64(v)
 	}
 
 	raw := v &^ yakTaggedPointerMask
 	ptr := unsafe.Pointer(uintptr(raw))
-	if ptr == nil {
-		// 2.0 = 0x4000000000000000 sets the tag bit, so the masked word is
-		// zero; reinterpret the ORIGINAL word as a float before giving up.
-		if f := math.Float64frombits(v); !math.IsInf(f, 0) && !math.IsNaN(f) &&
-			math.Abs(f) >= 1e-300 && math.Abs(f) <= 1e300 && v > 1<<32 {
-			return f
+	// Only canonical user-space addresses can be shadow handles or C strings,
+	// so resolve them inside that range and never dereference a float64 bit
+	// pattern: a "pointer" such as 3.14 masked to 0x000921fb9d12d84a would
+	// otherwise be handed to C.GoString.
+	if raw != 0 && looksLikeCStringPointer(raw) {
+		if h, ok := handleFromShadow(ptr); ok {
+			return h.Value()
 		}
-		return ""
-	}
-	if h, ok := handleFromShadow(ptr); ok {
-		return h.Value()
-	}
-	if looksLikeCStringPointer(raw) {
 		return C.GoString((*C.char)(ptr))
 	}
-	// The tag bit alone does not prove a pointer: float64 bit patterns such
-	// as 3.1415926 (0x400921fb9d12d84a) set bit 62 for the exponent, and a
-	// non-canonical address must not be dereferenced. Reinterpret the word as
-	// a float when it forms a normal finite double; otherwise preserve the
-	// raw integer so callers can fall back instead of crashing.
-	if f := math.Float64frombits(raw); !math.IsInf(f, 0) && !math.IsNaN(f) &&
-		math.Abs(f) >= 1e-300 && math.Abs(f) <= 1e300 && raw > 1<<32 {
+	// The tag bit alone does not prove a pointer: every float64 in [1, 2) and
+	// 2.0 itself sets bit 62. Probe the ORIGINAL word, because masking the tag
+	// bit off corrupts a real float — 3.14 becomes a denormal and -1.5 becomes
+	// a NaN — while the values that must stay integers (including every
+	// negative int64, whose all-ones exponent makes it a NaN pattern) fail the
+	// plausibility test and fall through to int64.
+	if f, ok := plausibleFloat(v); ok {
 		return f
 	}
+	// raw == 0 means v was exactly the tag bit plus nothing else (2.0), which
+	// the float probe above already handled.
 	return int64(v)
 }
 
