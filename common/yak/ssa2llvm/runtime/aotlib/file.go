@@ -6,6 +6,8 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/yaklang/yaklang/common/utils"
 )
 
 func FileIsExisted(path string) bool {
@@ -23,9 +25,9 @@ func FileIsDir(path string) bool {
 	return err == nil && info.IsDir()
 }
 
-func FileJoin(parts ...string) string        { return filepath.Join(parts...) }
-func FileGetBase(path string) string         { return filepath.Base(path) }
-func FileGetExt(path string) string          { return filepath.Ext(path) }
+func FileJoin(parts ...string) string { return filepath.Join(parts...) }
+func FileGetBase(path string) string  { return filepath.Base(path) }
+func FileGetExt(path string) string   { return filepath.Ext(path) }
 func FileGetDirPath(path string) string {
 	// Match yaklib's file.GetDirPath: return the directory WITH the trailing
 	// separator ("" stays "").
@@ -94,12 +96,11 @@ func FileCat(path string) (string, error) {
 	return string(b), err
 }
 
-func FileWalk(root string, fn any) error {
-	cb, ok := fn.(func(string, os.FileInfo, error) error)
-	if !ok {
-		return fmt.Errorf("file.Walk callback has unsupported type %T", fn)
-	}
-	return filepath.Walk(root, cb)
+// FileWalk matches yaklib file.Walk: the callback receives one *utils.FileInfo
+// and returns true to keep walking. A filepath.Walk signature never matched
+// the closure the AOT runtime builds, so the callback was skipped.
+func FileWalk(root string, fn func(info *utils.FileInfo) bool) error {
+	return utils.ReadDirsRecursivelyCallback(root, fn)
 }
 
 func FileCopy(dst, src string) error {

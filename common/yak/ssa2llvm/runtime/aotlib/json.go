@@ -165,6 +165,20 @@ func JsonNoEscapeHTML() interface{} {
 // JsonFindPath implements the subset of json.FindPath the mustpass suite uses:
 // recursive-descent `$..key` / `$..a..b` lookups returning the first match.
 func JsonFindPath(v any, path string) any {
+	switch raw := v.(type) {
+	case string:
+		var parsed any
+		if err := json.Unmarshal([]byte(raw), &parsed); err != nil {
+			return nil
+		}
+		v = parsed
+	case []byte:
+		var parsed any
+		if err := json.Unmarshal(raw, &parsed); err != nil {
+			return nil
+		}
+		v = parsed
+	}
 	segs := strings.Split(strings.TrimPrefix(strings.TrimSpace(path), "$"), "..")
 	var segs2 []string
 	for _, s := range segs {
