@@ -1,0 +1,63 @@
+// Contextual select and the full Yak runtime use only existing VM opcodes.
+select = "ordinary identifier"
+object = {"select": () => 7}
+assert object.select() == 7
+
+incoming = make(chan int, 1)
+outgoing = make(chan int, 1)
+incoming <- 42
+select {
+default:
+    panic("buffered receive must be ready")
+case value, ok := <-incoming:
+    assert ok && value == 42
+}
+
+select {
+case outgoing <- 9:
+    assert select == "ordinary identifier"
+}
+assert <-outgoing == 9
+
+selected = false
+select {
+case <-incoming:
+    panic("empty buffered channel cannot receive")
+default:
+    selected = true
+}
+assert selected
+
+outer = 10
+incoming <- 3
+select {
+case outer := <-incoming:
+    assert outer == 3
+    break
+}
+assert outer == 10
+
+iterations = 0
+for i in 3 {
+    select {
+    default:
+        iterations++
+        continue
+    }
+    panic("continue must target the enclosing loop")
+}
+assert iterations == 3
+
+deferred = false
+read = () => {
+    defer (() => { deferred = true })()
+    select {
+    case value := <-incoming:
+        return value
+    default:
+        return -1
+    }
+}
+incoming <- 5
+assert read() == 5
+assert deferred

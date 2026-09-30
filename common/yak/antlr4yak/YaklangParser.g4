@@ -30,6 +30,7 @@ statement
     | empty
 
     // 流程控制
+    | selectStmt
     | ifStmt /* if expr {} elif {} */
     | switchStmt
     | forRangeStmt
@@ -380,3 +381,12 @@ eos
     | COMMENT
     | LINE_COMMENT
     ;
+
+// Append new rules so existing parser rule numbers remain stable. Contextual
+// keyword: keep select usable as an identifier/member. Do not consume an eos
+// between select and {, which would reinterpret two existing statements.
+selectStmt: {this.IsSelectStatement()}? Identifier '{' (ws* selectClause)* ws* ';'? '}';
+selectClause: ('case' selectComm | 'default') ':' statementList?;
+// Validate the communication shape in both compiler frontends, without executing
+// a receive/send while collecting cases.
+selectComm: assignExpression | expression;

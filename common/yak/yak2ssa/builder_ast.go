@@ -158,6 +158,10 @@ func (b *astbuilder) buildStatement(stmt *yak.StatementContext) {
 		b.buildSwitchStmt(s)
 		return
 	}
+	if s, ok := stmt.SelectStmt().(*yak.SelectStmtContext); ok {
+		b.buildSelectStmt(s)
+		return
+	}
 
 	// for range stmt
 	if s, ok := stmt.ForRangeStmt().(*yak.ForRangeStmtContext); ok {
