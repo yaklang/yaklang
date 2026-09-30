@@ -50,8 +50,9 @@ func RunBuiltinRuleVerify(t *testing.T, filter BuiltinVerifyFilter) {
 	root := BuiltinRuleRoot(t)
 	local := filesys.NewLocalFs()
 	type item struct {
-		path string
-		mode string
+		path  string
+		mode  string
+		frame *sfvm.SFFrame
 	}
 	var rules []item
 	err := filesys.Recursive(root, filesys.WithFileStat(func(path string, info fs.FileInfo) error {
@@ -70,7 +71,7 @@ func RunBuiltinRuleVerify(t *testing.T, filter BuiltinVerifyFilter) {
 		if !keep {
 			return nil
 		}
-		rules = append(rules, item{path: path, mode: mode})
+		rules = append(rules, item{path: path, mode: mode, frame: frame})
 		return nil
 	}))
 	require.NoError(t, err)
@@ -79,10 +80,9 @@ func RunBuiltinRuleVerify(t *testing.T, filter BuiltinVerifyFilter) {
 	for _, it := range rules {
 		it := it
 		t.Run(it.mode+"/"+filepath.Base(it.path), func(t *testing.T) {
-			raw, err := local.ReadFile(it.path)
-			require.NoError(t, err)
-			frame, err := sfvm.NewSyntaxFlowVirtualMachine().Compile(string(raw))
-			require.NoError(t, err)
+			// The selection pass already compiled this exact source. Use its frame
+			// for POS/NEG verification rather than parsing the same rule twice.
+			frame := it.frame
 			if sfvm.FrameIsSourceMode(frame) || sfvm.FrameIsStructMode(frame) {
 				require.NotEmpty(t, frame.VerifyFsInfo, "source/struct rule must embed POS/NEG filesystems")
 			}

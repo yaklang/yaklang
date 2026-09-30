@@ -3,35 +3,20 @@
 package sfbuildin
 
 import (
-	"fmt"
-	"io/fs"
 	"sort"
 	"strings"
 	"testing"
 
 	"github.com/yaklang/yaklang/common/syntaxflow/sfdb"
-	"github.com/yaklang/yaklang/common/utils/filesys"
 )
 
 // Run default and gzip_embed builds against their actual embedded resource set.
 func TestBuiltinRiskTypeTaxonomy(t *testing.T) {
-	InitEmbedFSWithNotify(nil)
 	var violations []string
 	types := make(map[string]bool)
 	rules, alerts, libraries := 0, 0, 0
-	err := filesys.Recursive(".", filesys.WithFileSystem(ruleFSWithHash), filesys.WithFileStat(func(path string, info fs.FileInfo) error {
-		if !strings.HasSuffix(info.Name(), ".sf") {
-			return nil
-		}
-		raw, err := ruleFSWithHash.ReadFile(path)
-		if err != nil {
-			return err
-		}
-		rule, err := sfdb.CheckSyntaxFlowRuleContent(string(raw))
-		if err != nil {
-			violations = append(violations, fmt.Sprintf("%s: compile: %v", path, err))
-			return nil
-		}
+	for _, fixture := range builtinFixtures(t) {
+		path, rule := fixture.path, fixture.rule
 		rules++
 		alerts += len(rule.AlertDesc)
 		if rule.AllowIncluded {
@@ -48,10 +33,6 @@ func TestBuiltinRiskTypeTaxonomy(t *testing.T) {
 				types[alert.RiskType] = true
 			}
 		}
-		return nil
-	}))
-	if err != nil {
-		t.Fatal(err)
 	}
 	if rules == 0 || alerts == 0 {
 		t.Fatal("no built-in rules or alerts were inspected")

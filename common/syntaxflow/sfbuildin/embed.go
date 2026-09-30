@@ -88,6 +88,10 @@ func checkDuplicateTitles(fsInstance filesys_interface.FileSystem) error {
 		return err
 	}
 
+	return checkCollectedDuplicateTitles(titleMap, titleZhMap)
+}
+
+func checkCollectedDuplicateTitles(titleMap, titleZhMap map[string][]string) error {
 	// 检查 title 重复
 	var duplicateErrors []string
 	for title, paths := range titleMap {

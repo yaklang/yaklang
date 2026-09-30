@@ -214,8 +214,11 @@ attribute
     : qualifiedNamespaceName arguments?
     ;
 
+// Prefer the enclosing body delimiter when it also looks like a keyword
+// identifier (e.g. endif/endforeach). Greedy prediction otherwise consumes
+// the delimiter as an expression and retries the entire mixed HTML body in LL.
 innerStatementList
-    : innerStatement*
+    : innerStatement*?
     ;
 
 innerStatement
