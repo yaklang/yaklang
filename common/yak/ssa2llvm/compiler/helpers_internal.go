@@ -8,12 +8,18 @@ import (
 	"github.com/yaklang/yaklang/common/yak/ssa"
 )
 
+// coerceToI1 asks the runtime whether a word is truthy. Container bools and
+// nils travel as shadow pointers, so a raw non-zero test would treat false
+// and nil as true. Plain 0/1 words stay false/true.
 func (c *Compiler) coerceToI1(val llvm.Value, name string) llvm.Value {
 	if val.Type().IntTypeWidth() == 1 {
 		return val
 	}
-	zero := llvm.ConstInt(val.Type(), 0, false)
-	return c.Builder.CreateICmp(llvm.IntNE, val, zero, name)
+	word := c.coerceToInt64(val)
+	fn, fnType := c.getOrInsertRuntimeIsTrue()
+	truth := c.Builder.CreateCall(fnType, fn, []llvm.Value{word}, name+"_is_true")
+	zero := llvm.ConstInt(c.LLVMCtx.Int64Type(), 0, false)
+	return c.Builder.CreateICmp(llvm.IntNE, truth, zero, name)
 }
 
 func (c *Compiler) resolveCalleeName(fn *ssa.Function, methodID int64) string {

@@ -23,10 +23,12 @@ import (
 )
 
 const (
-	elf64SymSize                = 24
-	elf64RelaSize               = 24
-	elf64ShdrSize               = 64
-	moduledataTextsectMapOffset = 0x150
+	elf64SymSize  = 24
+	elf64RelaSize = 24
+	elf64ShdrSize = 64
+	// Go 1.27 amd64 runtime.moduledata.textsectmap. Go 1.26 kept this slice at
+	// 0x150; 1.27 inserts typedesclen, itaboffset and itabsize ahead of it.
+	moduledataTextsectMapOffset = 0x168
 	moduledataTextsectMapLenOff = moduledataTextsectMapOffset + 8
 	moduledataTextsectMapCapOff = moduledataTextsectMapOffset + 16
 	textSectionMapEntrySize     = 24
@@ -768,7 +770,12 @@ func rewritePCRelativeBranches(
 				disp, hasDisp, isBranch = int64(v), true, true
 			case x86asm.Mem:
 				if v.Base == x86asm.RIP {
-					disp, hasDisp = v.Disp, true
+					// x86asm zero-extends Mem.Disp. A backward leaq/movq
+					// (closure bodies are emitted before the function that
+					// takes their address) therefore looks like a huge
+					// positive offset, fails the text-range check below, and
+					// keeps the pre-split displacement.
+					disp, hasDisp = signExtendDisp(v.Disp, inst.PCRel), true
 				}
 			}
 			if hasDisp {
@@ -1087,6 +1094,22 @@ func symbolByIndex(symbols []symMeta, index int) *symMeta {
 		}
 	}
 	return nil
+}
+
+// signExtendDisp corrects x86asm.Mem.Disp, which stores a RIP-relative
+// displacement as a zero-extended unsigned value. Rel operands are already
+// sign-extended and must not be passed here.
+func signExtendDisp(disp int64, width int) int64 {
+	switch width {
+	case 1:
+		return int64(int8(disp))
+	case 2:
+		return int64(int16(disp))
+	case 4:
+		return int64(int32(disp))
+	default:
+		return disp
+	}
 }
 
 func writePCRelativeValue(data []byte, offset uint64, width int, value int64) error {

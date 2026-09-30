@@ -1,6 +1,7 @@
 package compiler
 
 import (
+	"fmt"
 	"strings"
 
 	"github.com/yaklang/go-llvm"
@@ -24,6 +25,11 @@ func (c *Compiler) newDynamicCallableContextCallSpec(inst *ssa.Call, fn *ssa.Fun
 		if key := mc.GetKey(); key != nil && c.memberKeyIsStringConst(key) {
 			isMapLookup := false
 			if obj := ssa.GetLatestObject(calleeVal); obj != nil && obj.GetType() != nil && obj.GetType().GetTypeKind() == ssa.MapTypeKind {
+				// m.Keys()/m.Values()/m.Has()/m.Set() are map methods. A stored
+				// closure under any other name is still called as a value.
+				if yakMapBuiltinMethod(c.resolveMemberKeyString(key)) {
+					return contextCallSpec{}, false, nil
+				}
 				isMapLookup = true
 			}
 			if !isMapLookup {
@@ -63,6 +69,17 @@ func (c *Compiler) newDynamicCallableContextCallSpec(inst *ssa.Call, fn *ssa.Fun
 		return contextCallSpec{}, false, nil
 	}
 
+	// The callee is an existing closure object (a returned or stored
+	// function), not a freshly materialized one. Side effects of this call
+	// have to read that same object; otherwise a lifted phi in the caller
+	// has no predecessor and the captured value becomes garbage.
+	if c.function != nil && !targetVal.IsNil() {
+		if c.function.materializedClosures == nil {
+			c.function.materializedClosures = make(map[int64]llvm.Value)
+		}
+		c.function.materializedClosures[inst.GetId()] = c.coerceToInt64(targetVal)
+	}
+
 	return contextCallSpec{
 		inst:      inst,
 		kind:      abi.KindCallable,
@@ -75,6 +92,12 @@ func (c *Compiler) newDynamicCallableContextCallSpec(inst *ssa.Call, fn *ssa.Fun
 }
 
 func yaklibDispatchNames(calleeName string) (pkg, method string) {
+	// getParam and getParams are the interpreter's aliases of param. The
+	// runtime table only registers param, which reads the environment.
+	switch calleeName {
+	case "getParam", "getParams":
+		return "", "param"
+	}
 	if pkgName, methodName, ok := splitQualifiedName(calleeName); ok {
 		return pkgName, methodName
 	}
@@ -100,8 +123,18 @@ func (c *Compiler) lowerYaklibDispatchCall(inst *ssa.Call, calleeName string) er
 }
 
 // compileDieAsPanic lowers die/fail to a context panic, mirroring compilePanic.
+// yaklib die(nil) returns and the script continues. A bare nil is word 0.
+// A nil pulled out of a multi-return tuple is the nil shadow, which is not
+// word 0. yak_runtime_is_true is 0 for both of those and for false (already
+// equal to nil in this ABI), and 1 for a real error, a message, or die(111).
+// A non-nil argument still aborts the function immediately and does not run
+// the current function's defer block.
 func (c *Compiler) compileDieAsPanic(inst *ssa.Call) error {
-	infoVal := llvm.ConstInt(c.LLVMCtx.Int64Type(), 0, false)
+	if c == nil || c.function == nil || c.function.llvmFn.IsNil() || inst == nil {
+		return fmt.Errorf("compileDieAsPanic: no active function")
+	}
+	i64 := c.LLVMCtx.Int64Type()
+	infoVal := llvm.ConstInt(i64, 0, false)
 	flags := uint64(0)
 	if len(inst.Args) > 0 {
 		val, err := c.getValue(inst, inst.Args[0])
@@ -116,13 +149,31 @@ func (c *Compiler) compileDieAsPanic(inst *ssa.Call) error {
 			}
 		}
 	}
-	// die() is a fatal error: flush captured-variable writebacks first so the
+	// Argument resolution may have moved the builder. The branch belongs to
+	// the die call's own block.
+	dieBB := c.restoreInsertBlock(inst)
+	if !dieBB.IsNil() {
+		c.restoreInsertPoint(dieBB)
+	}
+	if len(inst.Args) == 0 {
+		return nil
+	}
+	origBB := c.currentInsertBlock()
+	if origBB.IsNil() {
+		return fmt.Errorf("compileDieAsPanic: missing insert block")
+	}
+	contBB := c.LLVMCtx.AddBasicBlock(c.function.llvmFn, fmt.Sprintf("die_ok_%d", inst.GetId()))
+	abortBB := c.LLVMCtx.AddBasicBlock(c.function.llvmFn, fmt.Sprintf("die_abort_%d", inst.GetId()))
+	isTrueFn, isTrueType := c.getOrInsertRuntimeIsTrue()
+	truthy := c.Builder.CreateCall(isTrueType, isTrueFn, []llvm.Value{infoVal}, fmt.Sprintf("die_true_%d", inst.GetId()))
+	isNil := c.Builder.CreateICmp(llvm.IntEQ, truthy, llvm.ConstInt(i64, 0, false), fmt.Sprintf("die_nil_%d", inst.GetId()))
+
+	// Non-nil die is fatal: flush captured-variable writebacks first so the
 	// caller observes the assignments that ran before die (retry's count++
-	// before `if count > 3 { die(111) }`), then store the panic and return
-	// immediately. Unlike a recoverable panic, die deliberately bypasses the
-	// current function's own defer block: in yak the retry runtime catches it
-	// and stops the loop (count==4), and an unhandled die reaches the main
-	// wrapper's non-zero exit.
+	// before `if count > 3 { die(111) }`), then store the panic and return.
+	// Unlike a recoverable panic, die deliberately bypasses the current
+	// function's own defer block.
+	c.Builder.SetInsertPointAtEnd(abortBB)
 	if fn := inst.GetFunc(); fn != nil {
 		if err := c.applyClosureSideEffectWriteback(fn, inst); err != nil {
 			return err
@@ -131,13 +182,16 @@ func (c *Compiler) compileDieAsPanic(inst *ssa.Call) error {
 	if err := c.storeContextPanic(infoVal, flags); err != nil {
 		return err
 	}
-	// Restore the insert point to the die call's own block: argument
-	// resolution may have moved the builder during lazy compilation, and the
-	// return must terminate exactly the die call's block.
-	dieBB := c.restoreInsertBlock(inst)
-	if !dieBB.IsNil() {
-		c.restoreInsertPoint(dieBB)
-	}
 	c.Builder.CreateRetVoid()
+
+	c.Builder.SetInsertPointAtEnd(origBB)
+	c.Builder.CreateCondBr(isNil, contBB, abortBB)
+	c.Builder.SetInsertPointAtEnd(contBB)
+	if block := inst.GetBlock(); block != nil && block.GetId() > 0 {
+		c.Blocks[block.GetId()] = contBB
+		if c.function != nil {
+			c.function.activeBlockID = block.GetId()
+		}
+	}
 	return nil
 }

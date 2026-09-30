@@ -5,6 +5,13 @@ import (
 	"github.com/yaklang/yaklang/common/yak/ssa"
 )
 
+// capturedCellSlot is the entry alloca holding a shared capture pointer.
+// blockID is the block that stores the malloc'd pointer into that alloca.
+type capturedCellSlot struct {
+	alloca  llvm.Value
+	blockID int64
+}
+
 // redirectedSlotSource records where an SSA value's storage was redirected:
 // the free-value binding index whose heap slot now holds the value, plus an
 // entry-block alloca that holds the materialized closure object. The closure
@@ -42,9 +49,23 @@ type functionCompileContext struct {
 	// values go through this pointer so mutable captures persist across calls
 	// and shared loop variables see the final value.
 	freeValuePointers map[int64]llvm.Value
-	// materializedClosures maps a direct closure call instruction id to the
-	// closure object value materialized at that call site. SideEffect
-	// instructions after the call read captured variables through these slots.
+	// capturedCells maps a variable name to an entry-block alloca that holds
+	// the heap slot shared with closures. The slot pointer itself is created
+	// at the capture site, which may not dominate later reads; uses load the
+	// pointer from this alloca. blockID is the block that stores the real
+	// pointer. A use that block does not dominate must ignore the cell: the
+	// alloca is still null there, and another loop variable of the same name
+	// is a different binding. Per-iteration loop variables are not entered
+	// here: each closure gets a private slot.
+	capturedCells map[string]capturedCellSlot
+	// transitiveCapturePointers maps an ancestor value id to a heap slot this
+	// function received for a nested closure. The function may never mention
+	// the variable; the slot still has to be shared downward.
+	transitiveCapturePointers map[int64]llvm.Value
+	// materializedClosures maps a closure call instruction id to the closure
+	// object invoked there (freshly materialized, or an existing value such
+	// as a returned function). SideEffect instructions after the call read
+	// captured variables through these slots.
 	materializedClosures map[int64]llvm.Value
 	// materializedClosureArgs maps a call instruction id to closure objects
 	// passed as call arguments (extern/yaklib callbacks). SideEffects after
@@ -68,6 +89,16 @@ type functionCompileContext struct {
 	switchHandlers       map[int64]*switchHandlerInfo
 	pendingMemberSets    map[string]pendingMemberSet
 	pendingMemberSetKeys []string
+
+	// deferGuardSlots maps a deferred instruction id to an entry-block slot.
+	// The slot is 0 until the block that contained the defer statement stores 1.
+	deferGuardSlots map[int64]llvm.Value
+	// deferArmAtStart lists deferred instruction ids armed on entry to a block
+	// (the defer was the first instruction there).
+	deferArmAtStart map[int64][]int64
+	// deferArmAfter lists deferred instruction ids armed after an instruction
+	// in the block that contained the defer statement.
+	deferArmAfter map[int64][]int64
 }
 
 type switchHandlerInfo struct {

@@ -20,6 +20,13 @@ func (c *Compiler) compileSideEffectValue(inst *ssa.SideEffect) error {
 	if inst == nil {
 		return nil
 	}
+	// The closure object is stored once, immediately after make_callable.
+	// Every later read resolves the free-value slot from that alloca.
+	if c.function != nil && c.function.redirectedSlots != nil {
+		if _, ok := c.function.redirectedSlots[inst.GetId()]; ok {
+			return c.maybeEmitMemberSet(inst, inst, inst.GetId())
+		}
+	}
 	if inst.IsMember() && inst.GetObject() != nil && inst.GetKey() != nil {
 		// The side-effect writes at its definition site, which is the FIRST
 		// owner pair. GetObject() returns the latest owner: when the written
@@ -50,7 +57,10 @@ func (c *Compiler) compileSideEffectValue(inst *ssa.SideEffect) error {
 		c.cacheValue(inst.GetId(), c.emitRuntimeGetFieldByKey(objVal, key, inst, inst.GetId()))
 		return c.maybeEmitMemberSet(inst, inst, inst.GetId())
 	}
-	if actual := c.resolveSideEffectActualValue(inst); actual != nil && actual.IsMember() && actual.GetObject() != nil && actual.GetKey() != nil {
+	// A member owned by the closure (runtime = s.runtimeId) is not a field of
+	// this function. Reading it here folds the foreign object to 0 and skips
+	// the by-ref slot the callback actually writes.
+	if actual := c.resolveSideEffectActualValue(inst); actual != nil && actual.IsMember() && actual.GetObject() != nil && actual.GetKey() != nil && valueBelongsToFunction(inst.GetFunc(), actual.GetId()) {
 		objVal, err := c.getValue(inst, actual.GetObject().GetId())
 		if err != nil {
 			return err
@@ -87,7 +97,7 @@ func (c *Compiler) compileSideEffectValue(inst *ssa.SideEffect) error {
 			// resolved lazily at each use site.
 			closureSlot := c.ensureRedirectedClosureAlloca(inst.GetId())
 			if !closureSlot.IsNil() {
-				c.Builder.CreateStore(c.coerceToInt64(closureVal), closureSlot)
+				c.storeInt64AfterDef(closureVal, closureSlot)
 			}
 			if c.function.redirectedSlots == nil {
 				c.function.redirectedSlots = make(map[int64]redirectedSlotSource)
@@ -145,38 +155,59 @@ func (c *Compiler) resolveClosureSideEffect(inst *ssa.SideEffect, actualID int64
 		return llvm.Value{}, 0, false, false
 	}
 	closureFn := valObj.GetFunc()
+	// An if/elif assignment inside the closure is a phi there. The front end
+	// copies that phi into the caller (edges still point at the closure's
+	// constants) and parks the copy on the entry block, which has no
+	// predecessor to select GET vs POST. The value that actually ran is in
+	// the closure's by-ref slot; use the closure that owns the edge values.
+	if phi, ok := valObj.(*ssa.Phi); ok && phi != nil && (closureFn == nil || closureFn == fn) {
+		for _, edgeID := range phi.Edge {
+			edge, ok := fn.GetValueById(edgeID)
+			if !ok || edge == nil {
+				continue
+			}
+			owner := edge.GetFunc()
+			if owner != nil && owner != fn {
+				closureFn = owner
+				break
+			}
+		}
+	}
 	if closureFn == nil || closureFn == fn {
 		return llvm.Value{}, 0, false, false
 	}
 	// The modified value's variable name comes from the side-effect
-	// instruction's own variable bindings (e.g. `files` for
-	// `files = append(files, x)`), not from the modified value's id: the
-	// value belongs to the closure function and its id is the closure-local
-	// append result, which never equals the caller's free-value binding id.
-	modifyName := ""
-	if vars := inst.GetAllVariables(); len(vars) > 0 {
-		for name := range vars {
-			modifyName = name
-			break
-		}
-	}
-	if modifyName == "" {
-		if last := inst.GetLastVariable(); last != nil {
-			modifyName = last.GetName()
-		}
-	}
+	// instruction (e.g. `files` for `files = append(files, x)`), not from
+	// the modified value's id: that id is the closure-local result, which
+	// never equals the caller's free-value binding id. A later use such as
+	// `"got %v" % [count]` also binds a member name (`#210[1]`) on the same
+	// value. Map iteration would pick that member and miss the free value,
+	// so the parent read falls through to 0. Prefer the name the side effect
+	// was created with, then any binding that the closure actually captures.
+	modifyName := c.sideEffectCaptureName(inst, closureFn)
 	if modifyName == "" {
 		return llvm.Value{}, 0, false, false
 	}
 	index := -1
 	byRef := false
-	for i, binding := range callframe.OrderedFreeValueBindings(closureFn) {
+	declared := callframe.OrderedFreeValueBindings(closureFn)
+	for i, binding := range declared {
 		if binding.Variable.GetName() != modifyName {
 			continue
 		}
 		index = i
 		byRef = c.freeValueCaptureMode(closureFn, binding) != freeValueCaptureByValue
 		break
+	}
+	if index < 0 {
+		for i, extra := range c.extraCaptures(closureFn) {
+			if extra.Name != modifyName {
+				continue
+			}
+			index = len(declared) + i
+			byRef = true
+			break
+		}
 	}
 	if index < 0 {
 		return llvm.Value{}, 0, false, false
@@ -196,6 +227,56 @@ func (c *Compiler) resolveClosureSideEffect(inst *ssa.SideEffect, actualID int64
 		}
 	}
 	return llvm.Value{}, 0, false, false
+}
+
+// sideEffectCaptureName picks the variable a closure actually captures.
+// inst.GetName() is the name passed to NewSideEffect. Later uses can add
+// other variable bindings (a format-list element) that are not captures.
+func (c *Compiler) sideEffectCaptureName(inst *ssa.SideEffect, closureFn *ssa.Function) string {
+	if inst == nil {
+		return ""
+	}
+	candidates := make([]string, 0, 4)
+	if name := inst.GetName(); name != "" {
+		candidates = append(candidates, name)
+	}
+	if last := inst.GetLastVariable(); last != nil && last.GetName() != "" {
+		candidates = append(candidates, last.GetName())
+	}
+	for name := range inst.GetAllVariables() {
+		if name != "" {
+			candidates = append(candidates, name)
+		}
+	}
+	for _, name := range candidates {
+		if c.closureCapturesName(closureFn, name) {
+			return name
+		}
+	}
+	if name := inst.GetName(); name != "" {
+		return name
+	}
+	if len(candidates) > 0 {
+		return candidates[0]
+	}
+	return ""
+}
+
+func (c *Compiler) closureCapturesName(fn *ssa.Function, name string) bool {
+	if fn == nil || name == "" {
+		return false
+	}
+	for _, binding := range callframe.OrderedFreeValueBindings(fn) {
+		if binding.Name == name {
+			return true
+		}
+	}
+	for _, extra := range c.extraCaptures(fn) {
+		if extra.Name == name {
+			return true
+		}
+	}
+	return false
 }
 
 func (c *Compiler) getOrInsertRuntimeGetClosureFreeSlot() (llvm.Value, llvm.Type) {

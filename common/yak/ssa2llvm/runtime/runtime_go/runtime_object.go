@@ -13,7 +13,10 @@ import (
 	"io"
 	"os"
 	"reflect"
+	"strconv"
 	"strings"
+	"sync"
+	"time"
 	"unicode"
 	"unsafe"
 
@@ -24,10 +27,20 @@ func runtimeCStringToGoString(ptr unsafe.Pointer) string {
 	if ptr == nil {
 		return ""
 	}
-	return C.GoString((*C.char)(ptr))
+	// to_cstring returns a shadow, not a C string, when the text contains a
+	// NUL. Field and method names normally have none, but the same helper
+	// reads both.
+	if s, ok := tryResolveShadowString(ptr); ok {
+		return s
+	}
+	s, ok := tryCString(uint64(uintptr(ptr)))
+	if !ok {
+		return ""
+	}
+	return s
 }
 
-func runtimeDispatchShadowMethod(args []uint64, _ bool) (int64, error) {
+func runtimeDispatchShadowMethod(args []uint64, ellipsis bool) (int64, error) {
 	if len(args) < 2 {
 		return 0, fmt.Errorf("runtime shadow method expects at least 2 args, got %d", len(args))
 	}
@@ -44,7 +57,7 @@ func runtimeDispatchShadowMethod(args []uint64, _ bool) (int64, error) {
 		return 0, nil
 	}
 
-	return callRuntimeShadowMethod(objPtr, runtimeCStringToGoString(methodNamePtr), args[2:])
+	return callRuntimeShadowMethod(objPtr, runtimeCStringToGoString(methodNamePtr), args[2:], ellipsis)
 }
 
 func runtimeResolveMethod(obj any, name string) (reflect.Value, error) {
@@ -90,6 +103,15 @@ func runtimeResolveMethod(obj any, name string) (reflect.Value, error) {
 			if method, ok := runtimeResolveSliceMethod(value, name); ok {
 				return method, nil
 			}
+		}
+	}
+
+	// Yak calls string methods on []byte (poc.HTTP returns the request as
+	// bytes, then the script does req.HasSuffix(...)). Slice methods win when
+	// the name is one of theirs; everything else uses the string table.
+	if text, ok := runtimeBytesAsString(value); ok {
+		if method, ok := runtimeResolveStringMethod(text, name); ok {
+			return method, nil
 		}
 	}
 
@@ -283,6 +305,10 @@ func runtimeResolveStringMethod(s string, name string) (reflect.Value, bool) {
 		return reflect.ValueOf(func() string { return strings.ToUpper(s) }), true
 	case "Contains":
 		return reflect.ValueOf(func(substr string) bool { return substr == "" || strings.Contains(s, substr) }), true
+	case "ReplaceAll", "Replace":
+		return reflect.ValueOf(func(old, new string) string { return strings.ReplaceAll(s, old, new) }), true
+	case "ReplaceN":
+		return reflect.ValueOf(func(old, new string, n int) string { return strings.Replace(s, old, new, n) }), true
 	case "HasPrefix", "StartsWith":
 		return reflect.ValueOf(func(prefix string) bool { return strings.HasPrefix(s, prefix) }), true
 	case "HasSuffix", "EndsWith":
@@ -352,6 +378,16 @@ func runtimeDecodeArg(raw uint64, targetType reflect.Type) (reflect.Value, error
 		}
 		return reflect.ValueOf(float64(int64(raw &^ yakTaggedPointerMask))).Convert(targetType), nil
 	case reflect.Bool:
+		if v, ok := runtimeShadowValue(raw); ok {
+			switch b := v.(type) {
+			case bool:
+				return reflect.ValueOf(b).Convert(targetType), nil
+			default:
+				if isRuntimeNilBox(v) {
+					return reflect.ValueOf(false).Convert(targetType), nil
+				}
+			}
+		}
 		return reflect.ValueOf(raw&^yakTaggedPointerMask != 0).Convert(targetType), nil
 	}
 
@@ -403,7 +439,10 @@ func runtimeDecodeArg(raw uint64, targetType reflect.Type) (reflect.Value, error
 			// generic assignable-to-interface path.
 			if value.Kind() == reflect.Ptr && !value.IsNil() {
 				elem := value.Elem()
-				if elem.IsValid() && (elem.Kind() == reflect.Slice || elem.Kind() == reflect.Map) {
+				if elem.IsValid() && elem.Kind() == reflect.Slice {
+					return runtimeMaterializeSliceElements(elem), nil
+				}
+				if elem.IsValid() && elem.Kind() == reflect.Map {
 					return elem, nil
 				}
 			}
@@ -413,6 +452,15 @@ func runtimeDecodeArg(raw uint64, targetType reflect.Type) (reflect.Value, error
 		}
 		if value.Type().AssignableTo(targetType) {
 			return value, nil
+		}
+		// Integers are convertible to string, but that conversion is a Unicode
+		// code point: 123 becomes "{". Yak wants the decimal text. Do that
+		// before Convert so floats (which are not convertible) and integers
+		// share one path.
+		if targetType.Kind() == reflect.String {
+			if text, ok := runtimeWeakString(decoded); ok {
+				return reflect.ValueOf(text).Convert(targetType), nil
+			}
 		}
 		if value.Type().ConvertibleTo(targetType) {
 			return value.Convert(targetType), nil
@@ -429,13 +477,76 @@ func runtimeDecodeArg(raw uint64, targetType reflect.Type) (reflect.Value, error
 			}
 		}
 		if targetType.Kind() == reflect.Slice {
-			if converted, ok := convertSliceValue(value, targetType); ok {
+			if converted, ok := convertSliceValue(runtimeSliceForConvert(value), targetType); ok {
 				return converted, nil
 			}
 		}
 	}
 
 	return reflect.Value{}, fmt.Errorf("cannot use %T as %s", decoded, targetType)
+}
+
+// runtimeBytesAsString views a byte slice or byte array as text so string
+// methods apply. Non-byte containers return false and keep their own methods.
+func runtimeBytesAsString(value reflect.Value) (string, bool) {
+	if !value.IsValid() {
+		return "", false
+	}
+	if value.Kind() == reflect.Ptr {
+		if value.IsNil() {
+			return "", false
+		}
+		value = value.Elem()
+	}
+	if !value.IsValid() || (value.Kind() != reflect.Slice && value.Kind() != reflect.Array) {
+		return "", false
+	}
+	if value.Type().Elem().Kind() != reflect.Uint8 {
+		return "", false
+	}
+	buf := make([]byte, value.Len())
+	reflect.Copy(reflect.ValueOf(buf), value)
+	return string(buf), true
+}
+
+// runtimeWeakString is the yak coercion into a string parameter: decimals for
+// integers, the shortest fixed-point form for floats, and the raw bytes of a
+// byte slice. Other values stay typed so a real mismatch still errors.
+func runtimeWeakString(decoded any) (string, bool) {
+	switch v := decoded.(type) {
+	case string:
+		return v, true
+	case []byte:
+		return string(v), true
+	case bool:
+		return strconv.FormatBool(v), true
+	case int:
+		return strconv.FormatInt(int64(v), 10), true
+	case int8:
+		return strconv.FormatInt(int64(v), 10), true
+	case int16:
+		return strconv.FormatInt(int64(v), 10), true
+	case int32:
+		return strconv.FormatInt(int64(v), 10), true
+	case int64:
+		return strconv.FormatInt(v, 10), true
+	case uint:
+		return strconv.FormatUint(uint64(v), 10), true
+	case uint8:
+		return strconv.FormatUint(uint64(v), 10), true
+	case uint16:
+		return strconv.FormatUint(uint64(v), 10), true
+	case uint32:
+		return strconv.FormatUint(uint64(v), 10), true
+	case uint64:
+		return strconv.FormatUint(v, 10), true
+	case float32:
+		return strconv.FormatFloat(float64(v), 'f', -1, 32), true
+	case float64:
+		return strconv.FormatFloat(v, 'f', -1, 64), true
+	default:
+		return "", false
+	}
 }
 
 func runtimeDecodeCallableArg(raw uint64, targetType reflect.Type) (reflect.Value, bool) {
@@ -461,9 +572,72 @@ func runtimeDecodeCallableArg(raw uint64, targetType reflect.Type) (reflect.Valu
 		if value.IsValid() && value.Type().ConvertibleTo(targetType) {
 			return value.Convert(targetType), true
 		}
+		// The shadow is a heap object, not machine code. Jumping to its
+		// address (the previous fallthrough) is the crawlerx SIGSEGV.
+		return reflect.Value{}, false
 	}
+	if raw == abi.YaklibExportCallableMarker || runtimeAddrExecutable(uintptr(raw)) {
+		return runtimeMakeCallableWrapper(raw, 0, nil, targetType), true
+	}
+	return reflect.Value{}, false
+}
 
-	return runtimeMakeCallableWrapper(raw, 0, nil, targetType), true
+type runtimeExecRange struct {
+	start uintptr
+	end   uintptr
+}
+
+var runtimeExecRanges struct {
+	once        sync.Once
+	unavailable bool
+	ranges      []runtimeExecRange
+}
+
+// runtimeAddrExecutable reports whether addr is in an executable mapping.
+// A yak function pointer is in the binary text; a shadow or Go heap pointer
+// is not, and yak_invoke_callable would SIGSEGV there.
+func runtimeAddrExecutable(addr uintptr) bool {
+	if addr < 4096 {
+		return false
+	}
+	runtimeExecRanges.once.Do(runtimeLoadExecRanges)
+	if runtimeExecRanges.unavailable {
+		return true
+	}
+	for _, r := range runtimeExecRanges.ranges {
+		if addr >= r.start && addr < r.end {
+			return true
+		}
+	}
+	return false
+}
+
+func runtimeLoadExecRanges() {
+	data, err := os.ReadFile("/proc/self/maps")
+	if err != nil {
+		runtimeExecRanges.unavailable = true
+		return
+	}
+	for _, line := range bytes.Split(data, []byte{'\n'}) {
+		fields := bytes.Fields(line)
+		if len(fields) < 2 || !bytes.Contains(fields[1], []byte{'x'}) {
+			continue
+		}
+		bounds := fields[0]
+		dash := bytes.IndexByte(bounds, '-')
+		if dash <= 0 || dash+1 >= len(bounds) {
+			continue
+		}
+		start, err1 := strconv.ParseUint(string(bounds[:dash]), 16, 64)
+		end, err2 := strconv.ParseUint(string(bounds[dash+1:]), 16, 64)
+		if err1 != nil || err2 != nil || end <= start {
+			continue
+		}
+		runtimeExecRanges.ranges = append(runtimeExecRanges.ranges, runtimeExecRange{
+			start: uintptr(start),
+			end:   uintptr(end),
+		})
+	}
 }
 
 func runtimeCallableClosureValue(value any) (runtimeCallableClosure, bool) {
@@ -519,11 +693,16 @@ func runtimeStoreCallableContextArg(ctx unsafe.Pointer, argc int, index int, raw
 	ctxStoreWord(ctx, abi.HeaderWords+argc+index, raw&^yakTaggedPointerMask)
 }
 
-// runtimeDecodeYaklibExportReturns decodes a single yaklib export return value
-// into the Go func wrapper's result values.
+// runtimeDecodeYaklibExportReturns decodes a yaklib export return value into
+// the Go func wrapper's result values. A multi-return is one tuple word.
 func runtimeDecodeYaklibExportReturns(ret int64, targetType reflect.Type) []reflect.Value {
 	if targetType == nil || targetType.NumOut() == 0 {
 		return nil
+	}
+	if targetType.NumOut() > 1 {
+		if elems, abiWords, ok := runtimeReturnTuple(uint64(ret)); ok {
+			return runtimeFillMultiReturns(elems, abiWords, targetType)
+		}
 	}
 	out := make([]reflect.Value, targetType.NumOut())
 	for i := range out {
@@ -545,6 +724,14 @@ func runtimeDecodeCallableReturns(ctx unsafe.Pointer, targetType reflect.Type) [
 
 	out := make([]reflect.Value, targetType.NumOut())
 	ret := ctxLoadWord(ctx, abi.WordRet)
+	// A yak `return a, b` is one *[]any word. Filling only result 0 leaves the
+	// Go error (or the second any) nil, so `assert err.Error() != nil` fails
+	// even though the script returned a message.
+	if targetType.NumOut() > 1 {
+		if elems, abiWords, ok := runtimeReturnTuple(ret); ok {
+			return runtimeFillMultiReturns(elems, abiWords, targetType)
+		}
+	}
 	for i := range out {
 		if i == 0 {
 			if value, err := runtimeDecodeArg(ret, targetType.Out(i)); err == nil {
@@ -555,6 +742,239 @@ func runtimeDecodeCallableReturns(ctx unsafe.Pointer, targetType reflect.Type) [
 		out[i] = reflect.Zero(targetType.Out(i))
 	}
 	return out
+}
+
+func runtimeReturnTuple(raw uint64) (elems []any, abiWords bool, ok bool) {
+	if raw == 0 {
+		return nil, false, false
+	}
+	ptr := unsafe.Pointer(uintptr(raw &^ yakTaggedPointerMask))
+	h, found := handleFromShadow(ptr)
+	if !found {
+		return nil, false, false
+	}
+	return runtimeReturnTupleValue(h.Value())
+}
+
+// runtimeReturnTupleValue splits a return tuple. Compiler returns are *[]any
+// whose elements are ABI words (set_field into interface{}). Go multi-returns
+// are []any of already-decoded values.
+func runtimeReturnTupleValue(v any) (elems []any, abiWords bool, ok bool) {
+	switch t := v.(type) {
+	case []any:
+		return t, false, true
+	case *[]any:
+		if t == nil {
+			return nil, false, false
+		}
+		return *t, true, true
+	default:
+		return nil, false, false
+	}
+}
+
+func runtimeFillMultiReturns(elems []any, abiWords bool, targetType reflect.Type) []reflect.Value {
+	out := make([]reflect.Value, targetType.NumOut())
+	for i := range out {
+		var elem any
+		if i < len(elems) {
+			elem = elems[i]
+		}
+		value, err := runtimeDecodeReturnElement(elem, targetType.Out(i), abiWords)
+		if err != nil {
+			out[i] = reflect.Zero(targetType.Out(i))
+			continue
+		}
+		out[i] = value
+	}
+	return out
+}
+
+func runtimeDecodeReturnElement(elem any, targetType reflect.Type, abiWords bool) (reflect.Value, error) {
+	if elem == nil {
+		return reflect.Zero(targetType), nil
+	}
+	if abiWords {
+		if word, ok := runtimeAnyABIWord(elem); ok {
+			if word == 0 {
+				return reflect.Zero(targetType), nil
+			}
+			errType := reflect.TypeOf((*error)(nil)).Elem()
+			if targetType == errType {
+				decoded := decodeTaggedArg(word)
+				if decoded == nil {
+					return reflect.Zero(targetType), nil
+				}
+				switch v := decoded.(type) {
+				case error:
+					if v == nil {
+						return reflect.Zero(targetType), nil
+					}
+					return reflect.ValueOf(v), nil
+				case string:
+					return reflect.ValueOf(fmt.Errorf("%s", v)), nil
+				}
+			}
+			return runtimeDecodeArg(word, targetType)
+		}
+	}
+	return runtimeAssignReturnValue(elem, targetType)
+}
+
+func runtimeAnyABIWord(v any) (uint64, bool) {
+	switch n := v.(type) {
+	case int:
+		return uint64(n), true
+	case int64:
+		return uint64(n), true
+	case uint64:
+		return n, true
+	case uintptr:
+		return uint64(n), true
+	default:
+		return 0, false
+	}
+}
+
+func runtimeAssignReturnValue(elem any, targetType reflect.Type) (reflect.Value, error) {
+	if elem == nil || targetType == nil {
+		return reflect.Zero(targetType), nil
+	}
+	value := reflect.ValueOf(elem)
+	if !value.IsValid() {
+		return reflect.Zero(targetType), nil
+	}
+	if value.Kind() == reflect.Ptr && !value.IsNil() {
+		inner := value.Elem()
+		if inner.IsValid() && inner.Kind() == reflect.Slice {
+			inner = runtimeMaterializeSliceElements(inner)
+			if targetType.Kind() == reflect.Interface || inner.Type().AssignableTo(targetType) {
+				return inner, nil
+			}
+			if converted, ok := convertSliceValue(inner, targetType); ok {
+				return converted, nil
+			}
+			value = inner
+		}
+	}
+	errType := reflect.TypeOf((*error)(nil)).Elem()
+	if targetType == errType {
+		switch v := elem.(type) {
+		case error:
+			if v == nil {
+				return reflect.Zero(targetType), nil
+			}
+			return reflect.ValueOf(v), nil
+		case string:
+			return reflect.ValueOf(fmt.Errorf("%s", v)), nil
+		}
+	}
+	if value.Type().AssignableTo(targetType) {
+		return value, nil
+	}
+	if targetType.Kind() == reflect.Interface && value.Type().Implements(targetType) {
+		return value, nil
+	}
+	if value.Type().ConvertibleTo(targetType) {
+		return value.Convert(targetType), nil
+	}
+	return reflect.Value{}, fmt.Errorf("cannot use %T as %s", elem, targetType)
+}
+
+// runtimeMaterializeSliceElements decodes ABI words stored in a []any so a Go
+// caller sees the string or slice, not the pointer's integer spelling.
+func runtimeMaterializeSliceElements(slice reflect.Value) reflect.Value {
+	if !slice.IsValid() || slice.Kind() != reflect.Slice {
+		return slice
+	}
+	if slice.Type().Elem().Kind() != reflect.Interface {
+		return slice
+	}
+	out := reflect.MakeSlice(slice.Type(), slice.Len(), slice.Len())
+	changed := false
+	for i := 0; i < slice.Len(); i++ {
+		elem := slice.Index(i)
+		if !elem.IsValid() || (elem.Kind() == reflect.Interface && elem.IsNil()) {
+			continue
+		}
+		concrete := elem
+		if concrete.Kind() == reflect.Interface {
+			concrete = concrete.Elem()
+		}
+		word, isWord := uint64(0), false
+		if concrete.IsValid() {
+			switch concrete.Kind() {
+			case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+				word = uint64(concrete.Int())
+				isWord = true
+			case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64, reflect.Uintptr:
+				word = concrete.Uint()
+				isWord = true
+			}
+		}
+		if isWord && word != 0 {
+			decoded := decodeTaggedArg(word)
+			if decodedInt, ok := decoded.(int64); !ok || uint64(decodedInt) != word {
+				if decoded != nil {
+					out.Index(i).Set(reflect.ValueOf(decoded))
+					changed = true
+					continue
+				}
+			}
+		}
+		if elem.Type().AssignableTo(out.Type().Elem()) {
+			out.Index(i).Set(elem)
+		}
+	}
+	if !changed {
+		return slice
+	}
+	return out
+}
+
+func runtimeSliceForConvert(value reflect.Value) reflect.Value {
+	if !value.IsValid() {
+		return value
+	}
+	if value.Kind() == reflect.Ptr && !value.IsNil() {
+		elem := value.Elem()
+		if elem.IsValid() && elem.Kind() == reflect.Slice {
+			return runtimeMaterializeSliceElements(elem)
+		}
+	}
+	if value.Kind() == reflect.Slice {
+		return runtimeMaterializeSliceElements(value)
+	}
+	return value
+}
+
+func runtimeTupleTailIsError(last any, abiWords bool) (error, bool) {
+	if !abiWords {
+		if last == nil {
+			return nil, true
+		}
+		err, ok := last.(error)
+		return err, ok
+	}
+	word, ok := runtimeAnyABIWord(last)
+	if !ok {
+		if last == nil {
+			return nil, true
+		}
+		err, isErr := last.(error)
+		return err, isErr
+	}
+	if word == 0 {
+		return nil, true
+	}
+	decoded := decodeTaggedArg(word)
+	if decoded == nil {
+		return nil, true
+	}
+	if err, isErr := decoded.(error); isErr {
+		return err, true
+	}
+	return nil, false
 }
 
 func runtimeDecodeShadowArg(raw uint64, targetType reflect.Type) (reflect.Value, bool) {
@@ -823,6 +1243,10 @@ func runtimeDecodeCallArgs(target reflect.Value, rawArgs []uint64, ellipsis bool
 						e = ee
 					}
 				}
+				e = runtimePrepareVariadicElement(e, variadicElemType)
+				if !e.IsValid() || !e.Type().AssignableTo(variadicElemType) {
+					return nil, fmt.Errorf("cannot use %s as %s", e.Type(), variadicElemType)
+				}
 				elems = append(elems, e)
 			}
 			slice := reflect.MakeSlice(variadicSliceType, len(elems), len(elems))
@@ -949,23 +1373,59 @@ func callRuntimeValue(target reflect.Value, rawArgs []uint64, ellipsis bool) (in
 	return runtimeCallReturnValue(target.Call(args)), nil
 }
 
-func callRuntimeShadowMethod(objPtr unsafe.Pointer, methodName string, rawArgs []uint64) (int64, error) {
+// runtimeDurationMethod resolves methods of a raw time.Duration word.
+// time.Duration is an int64 nanosecond count, so the compiler emits a shadow
+// method call on the integer itself. Positive durations below ~146 years leave
+// the tag bit clear; every negative duration is sign-extended and therefore
+// has the tag bit set, so both shapes are accepted here. A tagged pointer to a
+// real object has bit 62 set and bit 63 clear and does not take this path.
+func runtimeDurationMethod(d time.Duration, name string) (reflect.Value, bool) {
+	switch name {
+	case "Nanoseconds":
+		return reflect.ValueOf(func() int64 { return d.Nanoseconds() }), true
+	case "Microseconds":
+		return reflect.ValueOf(func() int64 { return d.Microseconds() }), true
+	case "Milliseconds":
+		return reflect.ValueOf(func() int64 { return d.Milliseconds() }), true
+	case "Seconds":
+		return reflect.ValueOf(func() float64 { return d.Seconds() }), true
+	case "Minutes":
+		return reflect.ValueOf(func() float64 { return d.Minutes() }), true
+	case "Hours":
+		return reflect.ValueOf(func() float64 { return d.Hours() }), true
+	case "Abs":
+		return reflect.ValueOf(func() time.Duration { return d.Abs() }), true
+	case "String":
+		return reflect.ValueOf(func() string { return d.String() }), true
+	default:
+		return reflect.Value{}, false
+	}
+}
+
+// callRuntimeShadowMethod forwards ellipsis. bruter.Start(targets...) is a
+// method call whose one argument is the yak slice (*[]any). Dropping the flag
+// decodes that slice as a single string ("cannot use *[]interface {} as string").
+func callRuntimeShadowMethod(objPtr unsafe.Pointer, methodName string, rawArgs []uint64, ellipsis bool) (int64, error) {
 	handle, ok := handleFromShadow(objPtr)
 	if !ok {
 		// String receivers are passed as C-string pointers (or string shadows)
 		// rather than shadow handles; resolve the string method directly.
 		if s, ok := tryResolveShadowString(objPtr); ok {
 			if method, ok := runtimeResolveStringMethod(s, methodName); ok {
-				return callRuntimeValue(method, rawArgs, false)
+				return callRuntimeValue(method, rawArgs, ellipsis)
 			}
 			return 0, fmt.Errorf("method %q not found on string", methodName)
 		}
-		raw := uint64(uintptr(objPtr))
-		raw &^= yakTaggedPointerMask
-		if looksLikeCStringPointer(raw) {
-			s := runtimeCStringToGoString(unsafe.Pointer(uintptr(raw)))
+		word := uint64(uintptr(objPtr))
+		if int64(word) < 0 || word&yakTaggedPointerMask == 0 {
+			if method, ok := runtimeDurationMethod(time.Duration(int64(word)), methodName); ok {
+				return callRuntimeValue(method, rawArgs, ellipsis)
+			}
+		}
+		raw := word &^ yakTaggedPointerMask
+		if s, ok := tryCString(raw); ok {
 			if method, ok := runtimeResolveStringMethod(s, methodName); ok {
-				return callRuntimeValue(method, rawArgs, false)
+				return callRuntimeValue(method, rawArgs, ellipsis)
 			}
 			return 0, fmt.Errorf("method %q not found on string", methodName)
 		}
@@ -977,24 +1437,95 @@ func callRuntimeShadowMethod(objPtr unsafe.Pointer, methodName string, rawArgs [
 		return 0, err
 	}
 
-	return callRuntimeValue(method, rawArgs, false)
+	return callRuntimeValue(method, rawArgs, ellipsis)
 }
 
+// yak_runtime_drop_error implements yak's `f()~`. A trailing nil error is
+// removed. A non-nil error is stored on the call context and recovered here
+// so the caller can branch into try/catch instead of continuing. Any other
+// tail is left alone and the first value is returned, matching the previous
+// single-word unwrap.
+//
 //export yak_runtime_drop_error
-func yak_runtime_drop_error(value unsafe.Pointer) int64 {
-	defer recoverRuntimePanic()
+func yak_runtime_drop_error(ctx unsafe.Pointer, value unsafe.Pointer) (ret int64) {
+	if ctx != nil {
+		// The invoke already copied any callee panic back to the caller.
+		// This word is only the signal for the `~` on this call.
+		ctxStoreWord(ctx, abi.WordPanic, 0)
+		ctxClearFlags(ctx, abi.FlagPanicTaggedPointer)
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			// A caught `~` is ordinary control flow. Logging it as a runtime
+			// panic makes the mustpass harness reject a script that handled
+			// the error. Uncaught panics still surface through the function
+			// context and the main wrapper.
+			if ctx != nil {
+				panicValue, flags := recoveredPanicValue(r)
+				ctxSetPanic(ctx, panicValue, flags)
+			}
+			ret = 0
+		}
+	}()
 	if value == nil {
 		return 0
 	}
 	if h, ok := handleFromShadow(value); ok {
-		if tuple, ok := h.Value().([]any); ok && len(tuple) > 0 {
-			// Multi-return tuple from a yaklib call: `f()~` keeps the first
-			// value and drops the trailing error.
-			return runtimeValueToInt64(reflect.ValueOf(tuple[0]))
+		if elems, abiWords, ok := runtimeReturnTupleValue(h.Value()); ok && len(elems) > 0 {
+			if len(elems) > 1 {
+				if err, isErr := runtimeTupleTailIsError(elems[len(elems)-1], abiWords); isErr {
+					if err != nil {
+						panic(err)
+					}
+					return runtimeDropErrorValues(elems[:len(elems)-1])
+				}
+			}
+			return runtimeDropErrorValues([]any{elems[0]})
 		}
 	}
-	// Single-return call: the value is already the result; preserve its word.
 	return int64(uintptr(value))
+}
+
+// runtimePrepareVariadicElement turns an ABI word stored in a yak slice into
+// the variadic element type. `blacklist.Split(",")...` and option slices carry
+// those words; setting the raw int64 into a func or string parameter panics.
+func runtimePrepareVariadicElement(e reflect.Value, elemType reflect.Type) reflect.Value {
+	if !e.IsValid() || elemType == nil {
+		return e
+	}
+	if e.Type().AssignableTo(elemType) {
+		return e
+	}
+	var word uint64
+	isWord := false
+	switch e.Kind() {
+	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+		word = uint64(e.Int())
+		isWord = true
+	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64, reflect.Uintptr:
+		word = e.Uint()
+		isWord = true
+	}
+	if isWord {
+		if decoded, err := runtimeDecodeArg(word, elemType); err == nil && decoded.IsValid() && decoded.Type().AssignableTo(elemType) {
+			return decoded
+		}
+	}
+	if e.Type().ConvertibleTo(elemType) {
+		return e.Convert(elemType)
+	}
+	return e
+}
+
+func runtimeDropErrorValues(vals []any) int64 {
+	switch len(vals) {
+	case 0:
+		return 0
+	case 1:
+		return runtimeValueToInt64(reflect.ValueOf(vals[0]))
+	default:
+		return int64(uintptr(newRuntimeShadow(vals)))
+	}
 }
 
 //export yak_runtime_string_slice
@@ -1014,6 +1545,64 @@ func yak_runtime_string_slice(parent unsafe.Pointer, low, high int64) unsafe.Poi
 	return newStdlibShadow(string(runes[low:high]))
 }
 
+// yak_runtime_sprintf implements yak's string `%` operator: a format string
+// and either one value or a slice of values (`"n=%d" % 3`, `"%s %d" % [a, b]`).
+//
+//export yak_runtime_sprintf
+func yak_runtime_sprintf(formatRaw, argRaw int64) int64 {
+	defer recoverRuntimePanic()
+	formatted := runtimePercentFormat(runtimePercentFormatString(uint64(formatRaw)), decodeTaggedArg(uint64(argRaw)))
+	return int64(uintptr(newStdlibShadow(formatted)))
+}
+
+func runtimePercentFormatString(raw uint64) string {
+	switch value := decodeTaggedArg(raw).(type) {
+	case string:
+		return value
+	case []byte:
+		return string(value)
+	default:
+		if value == nil {
+			return ""
+		}
+		return fmt.Sprint(value)
+	}
+}
+
+func runtimePercentFormat(format string, arg any) string {
+	if arg == nil {
+		return fmt.Sprintf(format, nil)
+	}
+	if b, ok := arg.([]byte); ok {
+		return fmt.Sprintf(format, string(b))
+	}
+	if slice, ok := runtimeSliceValue(arg); ok {
+		vals := make([]any, slice.Len())
+		for i := 0; i < slice.Len(); i++ {
+			vals[i] = runtimePercentArg(slice.Index(i).Interface())
+		}
+		return fmt.Sprintf(format, vals...)
+	}
+	return fmt.Sprintf(format, runtimePercentArg(arg))
+}
+
+func runtimePercentArg(v any) any {
+	switch value := v.(type) {
+	case string, []byte, float64, float32, bool:
+		return value
+	case int64:
+		decoded := decodeTaggedArg(uint64(value))
+		switch decoded.(type) {
+		case string, []byte, float64:
+			return decoded
+		default:
+			return value
+		}
+	default:
+		return v
+	}
+}
+
 //export yak_runtime_concat
 func yak_runtime_concat(a, b unsafe.Pointer) unsafe.Pointer {
 	defer recoverRuntimePanic()
@@ -1031,12 +1620,14 @@ func runtimePtrToString(ptr unsafe.Pointer) string {
 	}
 	raw := uint64(uintptr(ptr))
 	raw &^= yakTaggedPointerMask
-	if !looksLikeCStringPointer(raw) {
-		// Not a string pointer: yak template interpolation converts the value
-		// to its string form (e.g. an int port becomes "41925").
-		return fmt.Sprintf("%d", int64(raw))
+	if s, ok := tryCString(raw); ok {
+		return s
 	}
-	return runtimeCStringToGoString(unsafe.Pointer(uintptr(raw)))
+	// Not a readable C string: yak template interpolation converts the value
+	// to its string form (e.g. an int port becomes "41925"). An unmapped word
+	// that merely looks like a pointer must take the same path instead of
+	// faulting inside C.GoString.
+	return fmt.Sprintf("%d", int64(raw))
 }
 
 func runtimeCallMappedElement(fn any, elem any) any {

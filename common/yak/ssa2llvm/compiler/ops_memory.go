@@ -17,29 +17,44 @@ func (c *Compiler) compileMake(inst *ssa.Make) error {
 			return nil
 		}
 	}
+	var err error
 	typ := inst.GetType()
 	switch typ.GetTypeKind() {
 	case ssa.StructTypeKind:
-		return c.compileMakeStruct(inst, typ)
+		err = c.compileMakeStruct(inst, typ)
 	case ssa.AnyTypeKind, ssa.ObjectTypeKind:
 		// For Any/Object types, allocate generic memory. We represent addresses as `i64`
 		// (uintptr) and only cast to pointers at FFI/runtime boundaries.
-		return c.compileMakeGeneric(inst)
+		err = c.compileMakeGeneric(inst)
 	case ssa.SliceTypeKind, ssa.BytesTypeKind:
-		return c.compileMakeSlice(inst, typ)
+		err = c.compileMakeSlice(inst, typ)
 	case ssa.StringTypeKind:
 		// String slicing (s[low:high]) carries the parent string and rune
 		// bounds; plain string constants never go through Make.
-		return c.compileMakeStringSlice(inst)
+		err = c.compileMakeStringSlice(inst)
 	case ssa.MapTypeKind:
-		return c.compileMakeGeneric(inst)
+		err = c.compileMakeGeneric(inst)
 	case ssa.ChanTypeKind:
-		return c.compileMakeChan(inst)
+		err = c.compileMakeChan(inst)
 	default:
 		// For unhandled types, create a null/zero placeholder
 		c.cacheValue(inst.GetId(), llvm.ConstInt(c.LLVMCtx.Int64Type(), 0, false))
+	}
+	if err != nil {
+		return err
+	}
+	// A nested literal (`[[...]]`) is a Make that is also a member of its
+	// parent. The parent's initializer skips members defined later in the
+	// block, so the child has to store itself once its own elements exist.
+	// Reading that member back through the parent first would overwrite the
+	// allocation with the still-empty field.
+	if inst == nil || inst.GetId() <= 0 {
 		return nil
 	}
+	if _, ok := c.getCachedValue(inst, inst.GetId()); !ok {
+		return nil
+	}
+	return c.maybeEmitMemberSet(inst, inst, inst.GetId())
 }
 
 // compileMakeStringSlice lowers s[low:high] where s is a yak string. Bounds
@@ -193,8 +208,10 @@ func makeInitialMemberCount(inst *ssa.Make) int64 {
 		}
 		// Reads merged into the Make's pair list (e.g. a[-1] later in the
 		// program) carry an Undefined member placeholder; they must not
-		// inflate the initial length. Loop-carried member phis are reads too.
-		if u, isUndef := member.(*ssa.Undefined); isUndef && u != nil {
+		// inflate the initial length. A placeholder that references another
+		// value is a copy (`[host, port]` from a multi-return binding) and
+		// does count. Loop-carried member phis are reads too.
+		if u, isUndef := member.(*ssa.Undefined); isUndef && u != nil && u.GetReference() == nil {
 			continue
 		}
 		if u, isUndef := key.(*ssa.Undefined); isUndef && u != nil {
@@ -326,7 +343,11 @@ func (c *Compiler) getOrInsertMalloc() (llvm.Value, llvm.Type) {
 func (c *Compiler) compileParameterMember(inst *ssa.ParameterMember) error {
 	if inst != nil {
 		if _, ok := c.getCachedValue(inst, inst.GetId()); ok {
-			return nil
+			// Parameter members are not block instructions, so the usual
+			// per-instruction capture store never sees them. A closure
+			// assignment `runtime = s.runtimeId` records this member as the
+			// side effect; write it into the by-ref slot when it is read.
+			return c.storeClosureCaptureAtDefinition(inst.GetFunc(), inst)
 		}
 	}
 	fn := inst.GetFunc()
@@ -352,7 +373,7 @@ func (c *Compiler) compileParameterMember(inst *ssa.ParameterMember) error {
 
 	val := c.emitRuntimeGetFieldByKey(parentVal, keyVal, inst, inst.GetId())
 	c.cacheValue(inst.GetId(), val)
-	return nil
+	return c.storeClosureCaptureAtDefinition(inst.GetFunc(), inst)
 }
 
 func (c *Compiler) resolveParameterMemberParentID(fn *ssa.Function, inst *ssa.ParameterMember) (int64, error) {
@@ -480,6 +501,15 @@ func (c *Compiler) compileMemberCall(contextInst ssa.Instruction, val ssa.Value,
 }
 
 func (c *Compiler) compileDynamicMemberValue(contextInst ssa.Instruction, val ssa.Value) error {
+	// A default member can be parked on the object's block while its key is
+	// only defined in a later block (`result[kv[0]] = kv[1]` inside a loop).
+	// Emitting the read there evaluates the key before that block and indexes
+	// whatever lazy compilation materializes at the entry. Leave the slot
+	// empty; a use dominated by the key still reads it.
+	if !c.memberDynamicReadReady(contextInst, val) {
+		c.storeSSAValue(val.GetId(), llvm.ConstInt(c.LLVMCtx.Int64Type(), 0, false))
+		return nil
+	}
 	valResult, err := c.dynamicMemberReadValue(contextInst, val, val.GetId())
 	if err != nil {
 		return err
@@ -489,6 +519,9 @@ func (c *Compiler) compileDynamicMemberValue(contextInst ssa.Instruction, val ss
 }
 
 func (c *Compiler) dynamicMemberReadValue(contextInst ssa.Instruction, val ssa.Value, memberID int64) (llvm.Value, error) {
+	if !c.memberDynamicReadReady(contextInst, val) {
+		return llvm.ConstInt(c.LLVMCtx.Int64Type(), 0, false), nil
+	}
 	obj, key := c.firstOwnerObjectKey(val)
 	if nameObj := c.memberObjectFromValueName(val); nameObj != nil && (obj == nil || nameObj.GetId() != obj.GetId()) {
 		obj = nameObj
@@ -701,17 +734,18 @@ func (c *Compiler) coerceToInt64(val llvm.Value) llvm.Value {
 	return c.Builder.CreatePtrToInt(val, c.LLVMCtx.Int64Type(), "ptr_i64")
 }
 
-func (c *Compiler) emitRuntimeDropError(ret llvm.Value) llvm.Value {
+func (c *Compiler) emitRuntimeDropError(ctx llvm.Value, ret llvm.Value) llvm.Value {
 	fn, fnType := c.getOrInsertRuntimeDropError()
 	objPtr := c.coerceToI8Ptr(ret)
-	return c.Builder.CreateCall(fnType, fn, []llvm.Value{objPtr}, "drop_error")
+	return c.Builder.CreateCall(fnType, fn, []llvm.Value{ctx, objPtr}, "drop_error")
 }
 
 func (c *Compiler) getOrInsertRuntimeDropError() (llvm.Value, llvm.Type) {
 	name := c.runtimeSymName(abi.RuntimeDropErrorSymbol)
 	fn := c.Mod.NamedFunction(name)
 	i8Ptr := llvm.PointerType(c.LLVMCtx.Int8Type(), 0)
-	fnType := llvm.FunctionType(c.LLVMCtx.Int64Type(), []llvm.Type{i8Ptr}, false)
+	i64 := c.LLVMCtx.Int64Type()
+	fnType := llvm.FunctionType(i64, []llvm.Type{i8Ptr, i8Ptr}, false)
 	if fn.IsNil() {
 		fn = llvm.AddFunction(c.Mod, name, fnType)
 	}
@@ -799,6 +833,8 @@ func (c *Compiler) emitRuntimeSetField(objVal llvm.Value, keyStr string, val llv
 				flags |= abi.FlagFieldBool
 			case ssa.StringTypeKind:
 				flags |= abi.FlagFieldString
+			case ssa.NullTypeKind:
+				flags |= abi.FlagFieldNil
 			}
 		}
 		if flags&abi.FlagFieldString == 0 && c.memberTargetFieldTypeKind(ssaVal) == ssa.StringTypeKind {
@@ -850,6 +886,8 @@ func (c *Compiler) emitRuntimeSetFieldByKey(contextInst ssa.Instruction, objVal 
 						flags |= abi.FlagFieldBool
 					case ssa.StringTypeKind:
 						flags |= abi.FlagFieldString
+					case ssa.NullTypeKind:
+						flags |= abi.FlagFieldNil
 					}
 				}
 				if flags&abi.FlagFieldString == 0 && c.memberTargetFieldTypeKind(ssaVal) == ssa.StringTypeKind {
@@ -1111,7 +1149,10 @@ func (c *Compiler) shouldReadMemberValueDynamically(val ssa.Value, id int64) boo
 		}
 	}
 	switch val.(type) {
-	case *ssa.Parameter, *ssa.ParameterMember, *ssa.SideEffect, *ssa.Phi:
+	case *ssa.Parameter, *ssa.ParameterMember, *ssa.SideEffect, *ssa.Phi, *ssa.Make:
+		// A Make's word is the object it just allocated. Re-reading it through
+		// a parent field overwrites that slot with the field's current word,
+		// which is still empty while the literal's own elements are stored.
 		return false
 	case *ssa.Undefined:
 		obj, key := c.firstOwnerObjectKey(val)
@@ -1442,6 +1483,14 @@ func (c *Compiler) emitMemberVariableSetIfReady(contextInst ssa.Instruction, sou
 
 func (c *Compiler) valueForMemberSet(contextInst ssa.Instruction, source ssa.Value, resultID int64, dynamicMemberRead bool) (llvm.Value, error) {
 	if source != nil {
+		// Assignment placeholders keep the original member's owner and point
+		// at the assigned value. Read that value; reading the placeholder
+		// would fetch the slot being written.
+		if u, ok := source.(*ssa.Undefined); ok && u != nil {
+			if ref := u.GetReference(); ref != nil && ref.GetId() != u.GetId() {
+				return c.getValue(contextInst, ref.GetId())
+			}
+		}
 		if _, isConst := source.(*ssa.ConstInst); isConst {
 			return c.finishGetValue(contextInst, resultID)
 		}
@@ -1461,6 +1510,9 @@ func (c *Compiler) valueForMemberSet(contextInst ssa.Instruction, source ssa.Val
 }
 
 func (c *Compiler) shouldReadInitialMemberValueForMemberSet(source ssa.Value) bool {
+	if _, isMake := source.(*ssa.Make); isMake {
+		return false
+	}
 	return source != nil &&
 		source.IsMember() &&
 		source.GetObject() != nil &&
@@ -1542,6 +1594,47 @@ func (c *Compiler) markMemberVariableSetEmitted(resultID int64, obj ssa.Value, k
 		c.emittedMemberVariableSets = make(map[string]struct{})
 	}
 	c.emittedMemberVariableSets[c.memberVariableSetKey(resultID, obj, keyStr)] = struct{}{}
+}
+
+// memberDynamicReadReady reports whether a member read at contextInst is
+// dominated by the member's object and key. Default member placeholders are
+// parked on the object's block even when the key is created later
+// (result[kv[0]] inside a loop). Reading them at the placeholder evaluates
+// the key early and indexes a value that does not exist yet.
+func (c *Compiler) memberDynamicReadReady(contextInst ssa.Instruction, member ssa.Value) bool {
+	if c == nil || contextInst == nil || contextInst.GetBlock() == nil || member == nil || !member.IsMember() {
+		return true
+	}
+	fn := contextInst.GetFunc()
+	obj, key := c.firstOwnerObjectKey(member)
+	if nameObj := c.memberObjectFromValueName(member); nameObj != nil && (obj == nil || nameObj.GetId() != obj.GetId()) {
+		obj = nameObj
+	}
+	return c.memberValueAvailableAt(fn, contextInst, obj) && c.memberValueAvailableAt(fn, contextInst, key)
+}
+
+func (c *Compiler) memberValueAvailableAt(fn *ssa.Function, contextInst ssa.Instruction, val ssa.Value) bool {
+	if val == nil || contextInst == nil || contextInst.GetBlock() == nil {
+		return true
+	}
+	switch val.(type) {
+	case *ssa.ConstInst, *ssa.Parameter, *ssa.ParameterMember:
+		return true
+	}
+	if _, ok := ssa.ToExternLib(val); ok {
+		return true
+	}
+	inst, ok := val.(ssa.Instruction)
+	if !ok || inst == nil || inst.GetBlock() == nil {
+		return true
+	}
+	if inst.GetBlock().GetId() == contextInst.GetBlock().GetId() {
+		return true
+	}
+	if fn == nil {
+		fn = contextInst.GetFunc()
+	}
+	return c.blockDominates(fn, inst.GetBlock().GetId(), contextInst.GetBlock().GetId())
 }
 
 func (c *Compiler) memberAssignmentObjectAvailable(contextInst ssa.Instruction, obj ssa.Value) bool {
@@ -1763,8 +1856,14 @@ func (c *Compiler) emitInitialMakeMemberAssignments(inst *ssa.Make, objVal llvm.
 		}
 		// Undefined member placeholders (e.g. m[i] or m[0] later in the
 		// program) are resolved at their real use site, not during the Make.
+		// A placeholder with a reference copies that value into the slot.
+		source := member
 		if u, isUndef := member.(*ssa.Undefined); isUndef && u != nil {
-			continue
+			ref := u.GetReference()
+			if ref == nil {
+				continue
+			}
+			source = ref
 		}
 		if u, isUndef := key.(*ssa.Undefined); isUndef && u != nil {
 			continue
@@ -1812,7 +1911,7 @@ func (c *Compiler) emitInitialMakeMemberAssignments(inst *ssa.Make, objVal llvm.
 		var llvmVal llvm.Value
 		err := c.withInitializingMemberValue(member.GetId(), func() error {
 			var err error
-			llvmVal, err = c.valueForInitialMakeMemberAssignment(inst, member, inst, keyStr)
+			llvmVal, err = c.valueForInitialMakeMemberAssignment(inst, source, inst, keyStr)
 			return err
 		})
 		if err != nil {
@@ -1859,12 +1958,66 @@ func (c *Compiler) shouldReadMemberValueForInitialMakeMember(member ssa.Value, o
 		return false
 	}
 	switch v := member.(type) {
-	case *ssa.Parameter, *ssa.ParameterMember, *ssa.SideEffect:
+	case *ssa.Parameter, *ssa.ParameterMember, *ssa.SideEffect, *ssa.Make:
 		return false
 	case *ssa.Undefined:
 		return !v.IsExtern()
 	}
 	return true
+}
+
+// emitReturnTuple packs a yak multi-return into a []any slice shadow.
+// Callers read it back with member keys "0", "1", ...
+func (c *Compiler) emitReturnTuple(inst *ssa.Return) (llvm.Value, error) {
+	if inst == nil || len(inst.Results) == 0 {
+		return llvm.ConstInt(c.LLVMCtx.Int64Type(), 0, false), nil
+	}
+	i64 := c.LLVMCtx.Int64Type()
+	fn := inst.GetFunc()
+	words := make([]llvm.Value, len(inst.Results))
+	for i, id := range inst.Results {
+		val, err := c.getValue(inst, id)
+		if err != nil {
+			return llvm.Value{}, err
+		}
+		val = c.coerceToInt64(val)
+		if fn != nil {
+			if ssaFn, ok := c.functionValueForArg(fn, id); ok && ssaFn != nil && !ssaFn.IsExtern() && c.closureNeedsFreeValues(ssaFn) {
+				closure, err := c.materializeCallableClosure(inst, ssaFn)
+				if err != nil {
+					return llvm.Value{}, fmt.Errorf("emitReturnTuple: materialize returned closure: %w", err)
+				}
+				val = c.coerceToInt64(closure)
+			}
+		}
+		words[i] = val
+	}
+	retBB := c.restoreInsertBlock(inst)
+	if !retBB.IsNil() {
+		c.restoreInsertPoint(retBB)
+	}
+	if c.function != nil && inst.GetBlock() != nil {
+		c.function.activeBlockID = inst.GetBlock().GetId()
+	}
+	makeFn, makeType := c.getOrInsertRuntimeMakeSlice()
+	n := llvm.ConstInt(i64, uint64(len(words)), false)
+	slice := c.Builder.CreateCall(makeType, makeFn, []llvm.Value{
+		llvm.ConstInt(i64, uint64(abi.SliceElemAny), false), n, n,
+	}, "yak_return_tuple")
+	setFn, setType := c.getOrInsertRuntimeSetField()
+	objPtr := c.coerceToI8Ptr(slice)
+	flags := llvm.ConstInt(i64, 0, false)
+	for i, word := range words {
+		intVal := word
+		if fn != nil {
+			if ssaVal, ok := fn.GetValueById(inst.Results[i]); ok && ssaVal != nil && c.ssaValueIsPointer(ssaVal, fn) {
+				intVal = c.Builder.CreateOr(word, llvm.ConstInt(i64, yakTaggedPointerMask, false), "yak_ret_tuple_tag")
+			}
+		}
+		keyPtr := c.Builder.CreateGlobalStringPtr(strconv.Itoa(i), fmt.Sprintf("yak_ret_key_%d_%d", inst.GetId(), i))
+		c.Builder.CreateCall(setType, setFn, []llvm.Value{objPtr, keyPtr, intVal, flags}, "")
+	}
+	return c.coerceToInt64(slice), nil
 }
 
 // memberObjectFromValueName resolves the object id embedded in a member

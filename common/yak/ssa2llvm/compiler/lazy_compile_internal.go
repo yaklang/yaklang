@@ -133,7 +133,7 @@ func (c *Compiler) emitImplicitFunctionExit(fn *ssa.Function) error {
 		return err
 	}
 	if fn != nil && fn.DeferBlock > 0 && c.function != nil && !c.function.returnBlock.IsNil() {
-		deferBB, ok := c.Blocks[fn.DeferBlock]
+		deferBB, ok := c.ssaBlockEntry(fn.DeferBlock)
 		if !ok {
 			return fmt.Errorf("defer block %d not found for function %s", fn.DeferBlock, fn.GetName())
 		}

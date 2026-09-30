@@ -171,7 +171,13 @@ var moduleGroupDeps = []struct {
 	{"rag", []string{"ai", "liteforge"}},
 	{"ai", []string{"ssa", "liteforge"}},
 	{"dyn", []string{"ai"}},
-	{"hook", []string{"ai"}},
+	// hook executes plugin source on the in-process interpreter. That source
+	// is not an SSA call of the outer script, but it does call http.*.
+	// yaklib.HttpExports aliases yakhttp.HttpExports; skipping yakhttp's init
+	// leaves the alias nil, and httpex.go then installs an empty map. The
+	// interpreter panics with "no such key" on http.Get. Keeping the http
+	// group runs the real export-table initializer.
+	{"hook", []string{"ai", "http"}},
 	// Modules whose export tables live in the ssa group (their own packages
 	// are placed there by elfsplit) must keep it, or the module registration
 	// function calls a pruned stub at start-up.
