@@ -7,6 +7,10 @@ import (
 	"strings"
 )
 
+// yakitDatabaseImportPath is the real project-database package. The yakit
+// yak module's AOT shim lives at runtime/shim and must not match this path.
+const yakitDatabaseImportPath = "github.com/yaklang/yaklang/common/yakgrpc/yakit"
+
 // WriteRuntimeImportsPerModule generates a runtime_imports_generated.go that
 // imports the given yaklib modules but does NOT blanket-register them in init().
 // Instead it emits one C-exported `yak_register_module_<m>()` function per
@@ -83,6 +87,30 @@ func WriteRuntimeImportsPerModule(outputPath string, modules []string, aot bool)
 	}
 	sort.Strings(modNames)
 
+	// common/yakgrpc/yakit lives in the ssa elfsplit group. Calling
+	// InitialDatabase from yak_register_globals is safe only when this tier
+	// already imports that package: staticanalyze keeps the ssa group, while
+	// core and net use the yakit shim and must not grow a new import.
+	yakitAlias := ""
+	for _, im := range imports {
+		if im.path == yakitDatabaseImportPath {
+			yakitAlias = im.alias
+			break
+		}
+	}
+	if yakitAlias != "" {
+		hasSync := false
+		for _, im := range imports {
+			if im.path == "sync" {
+				hasSync = true
+				break
+			}
+		}
+		if !hasSync {
+			imports = append(imports, imp{"sync", "sync"})
+		}
+	}
+
 	var b strings.Builder
 	b.WriteString("package main\n\n")
 	// //export requires import "C" (cgo). Minimal preamble.
@@ -100,10 +128,18 @@ func WriteRuntimeImportsPerModule(outputPath string, modules []string, aot bool)
 	// Empty init: modules are imported for their Go init tasks, but registration
 	// is deferred to the exported functions below.
 	b.WriteString("func init() {}\n\n")
+	if yakitAlias != "" {
+		b.WriteString("var runtimeYakitDatabaseOnce sync.Once\n\n")
+	}
 	// Global builtins registration.
 	b.WriteString("//export yak_register_globals\n")
 	b.WriteString("func yak_register_globals() {\n")
 	b.WriteString("\tregisterRuntimeGlobals()\n")
+	if yakitAlias != "" {
+		// The yak CLI opens the project database before user code. poc.save
+		// depends on the HTTP-flow hook installed by that open.
+		b.WriteString(fmt.Sprintf("\truntimeYakitDatabaseOnce.Do(%s.InitialDatabase)\n", yakitAlias))
+	}
 	b.WriteString("}\n\n")
 	writePrunedModuleStubs(&b, modNames)
 	// Per-module registration only reads the package export tables. The Go

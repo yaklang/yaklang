@@ -36,6 +36,7 @@ import (
 	ssaapi "github.com/yaklang/yaklang/common/yak/ssaapi"
 	ssaconfig "github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 	ssaproject "github.com/yaklang/yaklang/common/yak/ssaproject"
+	sync "sync"
 	syntaxflow "github.com/yaklang/yaklang/common/syntaxflow"
 	syntaxflow_scan "github.com/yaklang/yaklang/common/yak/syntaxflow_scan"
 	systemd "github.com/yaklang/yaklang/common/systemd"
@@ -56,9 +57,12 @@ import (
 
 func init() {}
 
+var runtimeYakitDatabaseOnce sync.Once
+
 //export yak_register_globals
 func yak_register_globals() {
 	registerRuntimeGlobals()
+	runtimeYakitDatabaseOnce.Do(yakit.InitialDatabase)
 }
 
 //go:noinline
