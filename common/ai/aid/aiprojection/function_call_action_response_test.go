@@ -27,7 +27,7 @@ func TestFunctionCallActionResponseProjectsToMatchedHistory(t *testing.T) {
 	const callID = "call_inspect_1"
 	const resultText = "execution_status: succeeded\nexecution_result: found a"
 	const actionSchema = `<|FUNCTION_CALL_ACTION_SCHEMA_inspect|>
-{"type":"function","function":{"name":"inspect","parameters":{"type":"object","properties":{"target":{"type":"string"}}}}}
+{"type":"function","function":{"name":"inspect","parameters":{"type":"object","properties":{"target":{"type":"string"},"sequence":{"type":"integer","const":9007199254740993}}}}}
 <|FUNCTION_CALL_ACTION_SCHEMA_END_inspect|>`
 	// One trusted timeline marker contains exactly two JSON messages. Projection
 	// keeps the assistant's reasoning/content/tool_calls together, then emits
@@ -79,6 +79,9 @@ func TestFunctionCallActionResponseProjectsToMatchedHistory(t *testing.T) {
 			body := <-bodies
 			require.NotContains(t, string(body), "FUNCTION_CALL_ACTION_RESPONSE")
 			require.NotContains(t, string(body), "FUNCTION_CALL_ACTION_SCHEMA")
+			// Both provider formats must receive the original schema number,
+			// even when it cannot be represented exactly by float64.
+			require.Contains(t, string(body), `"const":9007199254740993`)
 			if tc.responses {
 				var request struct {
 					Input []map[string]any `json:"input"`

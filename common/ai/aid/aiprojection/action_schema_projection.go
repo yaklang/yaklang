@@ -2,6 +2,8 @@ package aiprojection
 
 import (
 	"encoding/json"
+	"fmt"
+	"io"
 	"strings"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon/aitag"
@@ -16,8 +18,7 @@ const toolParamSchemaTagName = "FUNCTION_CALL_TOOL_PARAM_SCHEMA"
 // slot and returns them as native tools. Any malformed block leaves the entire
 // prompt untouched; a partial tool set must never be sent.
 func projectActionSchemaTags(prompt string) (string, []aispec.Tool) {
-	if (!strings.Contains(prompt, "<|"+actionSchemaTagName+"_") &&
-		!strings.Contains(prompt, "<|"+toolParamSchemaTagName+"_")) || strings.Contains(prompt, "<|SCHEMA|>") {
+	if !containsActionSchemaTag(prompt) || strings.Contains(prompt, "<|SCHEMA|>") {
 		return prompt, nil
 	}
 	outer, err := aitag.SplitViaTAG(prompt, acceptedTagNames...)
@@ -41,19 +42,23 @@ func projectActionSchemaTags(prompt string) (string, []aispec.Tool) {
 		}
 		for _, block := range inner.GetOrderedBlocks() {
 			if !block.IsTagged() {
+				// The generic splitter treats reserved names and stray closing tags
+				// as text. They still invalidate this entire trusted schema slot.
+				// Unsigned tag-looking data was masked by prepareProjection already.
+				if containsActionSchemaTag(block.Raw) {
+					log.Warnf("action schema projection skipped: malformed schema tag")
+					return prompt, nil
+				}
 				cleaned.WriteString(block.Raw)
 				continue
 			}
-			var tool aispec.Tool
-			if err := json.Unmarshal([]byte(strings.TrimSpace(block.Content)), &tool); err != nil ||
-				tool.Type != "function" || tool.Function.Name != block.Nonce ||
-				!validActionSchemaName(block.Nonce) {
+			tool, err := decodeProjectionTool(block.Content)
+			if err != nil {
 				log.Warnf("action schema projection skipped: invalid tool for action %q: %v", block.Nonce, err)
 				return prompt, nil
 			}
-			parameters, ok := tool.Function.Parameters.(map[string]any)
-			if !ok || parameters["type"] != "object" {
-				log.Warnf("action schema projection skipped: invalid parameters for action %q", block.Nonce)
+			if tool.Function.Name != block.Nonce {
+				log.Warnf("action schema projection skipped: mismatched action name %q", block.Nonce)
 				return prompt, nil
 			}
 			if _, duplicate := seen[block.Nonce]; duplicate {
@@ -68,6 +73,44 @@ func projectActionSchemaTags(prompt string) (string, []aispec.Tool) {
 		return prompt, nil
 	}
 	return cleaned.String(), tools
+}
+
+func containsActionSchemaTag(text string) bool {
+	return strings.Contains(text, "<|"+actionSchemaTagName) || strings.Contains(text, "<|"+toolParamSchemaTagName)
+}
+
+// Decode and validate the wire representation at both boundaries. UseNumber
+// preserves exact schema bounds, defaults and enum values through projection.
+func decodeProjectionTool(encoded string) (aispec.Tool, error) {
+	decoder := json.NewDecoder(strings.NewReader(strings.TrimSpace(encoded)))
+	decoder.UseNumber()
+	var tool aispec.Tool
+	if err := decoder.Decode(&tool); err != nil {
+		return aispec.Tool{}, fmt.Errorf("decode projection tool: %w", err)
+	}
+	// Unlike Unmarshal, Decode alone would accept a second JSON value or junk.
+	var trailing any
+	if err := decoder.Decode(&trailing); err != io.EOF {
+		return aispec.Tool{}, fmt.Errorf("projection tool must contain exactly one JSON value")
+	}
+	if err := validateProjectionTool(tool); err != nil {
+		return aispec.Tool{}, err
+	}
+	return tool, nil
+}
+
+func validateProjectionTool(tool aispec.Tool) error {
+	if tool.Type != "function" {
+		return fmt.Errorf("projection tool type must be function")
+	}
+	if !validActionSchemaName(tool.Function.Name) {
+		return fmt.Errorf("invalid projection tool function name")
+	}
+	parameters, ok := tool.Function.Parameters.(map[string]any)
+	if !ok || parameters["type"] != "object" {
+		return fmt.Errorf("projection tool parameters must be an object schema")
+	}
+	return nil
 }
 
 func validActionSchemaName(name string) bool {
