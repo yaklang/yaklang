@@ -96,7 +96,8 @@ func TestVerifiedRule(t *testing.T) {
 			// SSA keeps non-strict embedded verification until that corpus is tightened.
 			compiled := f.GetRule()
 			strict := compiled != nil && (compiled.IsSourceMode() || compiled.IsStructMode())
-			err := ssatest.EvaluateVerifyFilesystemWithRule(rule, t, strict)
+			// Selection already compiled this rule; keep its frame for execution.
+			err := ssatest.EvaluateVerifyFilesystemWithFrame(f, t, strict)
 			if err != nil {
 				failedMu.Lock()
 				failedRules = append(failedRules, caseName)
@@ -139,7 +140,8 @@ func TestVerify_DEBUG(t *testing.T) {
 			t.Parallel()
 			t.Log("Start to verify: " + rule.RuleName)
 			strict := rule.IsSourceMode() || rule.IsStructMode()
-			err := ssatest.EvaluateVerifyFilesystemWithRule(rule, t, strict)
+			// Selection already compiled this rule; keep its frame for execution.
+			err := ssatest.EvaluateVerifyFilesystemWithFrame(f, t, strict)
 			if err != nil {
 				require.NoError(t, err)
 			}
