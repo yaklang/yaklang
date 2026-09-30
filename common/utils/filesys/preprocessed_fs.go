@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"io/fs"
 	"os"
-	"path"
 	"strings"
 
 	fi "github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
@@ -81,65 +80,6 @@ func (f *HookFS) mapPath(name string) (string, error) {
 		return name, nil
 	}
 	return f.pathHook(name)
-}
-
-// NormalizeAbsPath 把调用方路径收成清理后的绝对路径。"." 和空路径变成 "/"。
-func NormalizeAbsPath(name string) (string, error) {
-	name = path.Clean("/" + strings.TrimPrefix(name, "/"))
-	if name == "" || name == "." {
-		return "/", nil
-	}
-	return name, nil
-}
-
-// StripPathPrefix 去掉程序名前缀。"/prog/A.java" 映射为 "/A.java"，"/prog" 映射为 "/"。
-// 路径上没有这段前缀时保持原样。
-func StripPathPrefix(prefix string) MapPathHook {
-	prefix = "/" + strings.Trim(prefix, "/")
-	if prefix == "/" {
-		return NormalizeAbsPath
-	}
-	head := prefix + "/"
-	return func(name string) (string, error) {
-		name, err := NormalizeAbsPath(name)
-		if err != nil {
-			return "", err
-		}
-		if name == prefix {
-			return "/", nil
-		}
-		if strings.HasPrefix(name, head) {
-			rest := strings.TrimPrefix(name, prefix)
-			if rest == "" {
-				return "/", nil
-			}
-			return rest, nil
-		}
-		return name, nil
-	}
-}
-
-// AddPathPrefix 在路径前补上程序名。"/A.java" 映射为 "/prog/A.java"。
-// 已经带这段前缀的路径不再重复添加。
-func AddPathPrefix(prefix string) MapPathHook {
-	prefix = "/" + strings.Trim(prefix, "/")
-	if prefix == "/" {
-		return NormalizeAbsPath
-	}
-	head := prefix + "/"
-	return func(name string) (string, error) {
-		name, err := NormalizeAbsPath(name)
-		if err != nil {
-			return "", err
-		}
-		if name == "/" {
-			return prefix, nil
-		}
-		if name == prefix || strings.HasPrefix(name, head) {
-			return name, nil
-		}
-		return prefix + name, nil
-	}
 }
 
 func (f *HookFS) matchReadHooks(name string) []*ReadHook {
