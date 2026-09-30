@@ -88,6 +88,11 @@ func (variable *Variable) Assign(value Value) error {
 				if blk := value.GetBlock(); blk != nil {
 					blk.Insts = append([]int64{fresh.GetId()}, blk.Insts...)
 				}
+				// The placeholder must still carry the value that was assigned.
+				// Slice literals and `result[k] = params.info.kind` read it
+				// back from here; linking ownership instead would move
+				// GetLatestObject off the original member.
+				fresh.SetReference(und)
 				value = fresh
 			}
 		}

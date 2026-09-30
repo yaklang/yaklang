@@ -476,6 +476,15 @@ func (b *FunctionBuilder) AssignVariable(variable *Variable, value Value) {
 			para.SetDefault(parentValue)
 			para.SetType(parentValue.GetType())
 			parentValue.AddOccultation(para)
+			// scope.AssignVariable ran before BuildFreeValue installed the
+			// free-value parameter, so the first branch saw no parent and was
+			// left out of the phi. The block scope is a *ScopeInstance, which
+			// embeds the versioned table; register through that method set.
+			if captured, ok := any(scope).(interface {
+				RegisterCapturedVariable(ssautil.VersionedIF[Value])
+			}); ok {
+				captured.RegisterCapturedVariable(variable)
+			}
 		}
 	}
 	if _, ok := b.RefParameter[variable.GetName()]; !ok {

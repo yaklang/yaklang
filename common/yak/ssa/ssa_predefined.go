@@ -33,6 +33,14 @@ type anInstruction struct {
 	isExtern     bool
 	isFromDB     bool
 
+	// Set by EmitDefer. The AOT compiler arms a stack slot at this program
+	// point and runs the deferred instruction only when the slot is set.
+	// An SSA value cannot record that the surrounding block actually ran:
+	// a constant is folded, and the defer block does not see a phi for it.
+	deferGuarded    bool
+	deferGuardBlock int64
+	deferGuardAfter int64
+
 	// str               string
 	// readableName      string
 	// readableNameShort string
@@ -69,6 +77,26 @@ func (v *anInstruction) GetSourceCodeContext(n int) string {
 		return ""
 	}
 	return r.GetTextContext(n)
+}
+
+// MarkDeferGuard records the block that executed the defer statement and the
+// instruction already in that block after which the defer becomes active.
+// afterInst is 0 when the defer is the first instruction of the block.
+func (i *anInstruction) MarkDeferGuard(blockID, afterInst int64) {
+	if i == nil || blockID <= 0 {
+		return
+	}
+	i.deferGuarded = true
+	i.deferGuardBlock = blockID
+	i.deferGuardAfter = afterInst
+}
+
+// DeferGuard reports where a deferred instruction was registered.
+func (i *anInstruction) DeferGuard() (blockID, afterInst int64, ok bool) {
+	if i == nil || !i.deferGuarded || i.deferGuardBlock <= 0 {
+		return 0, 0, false
+	}
+	return i.deferGuardBlock, i.deferGuardAfter, true
 }
 
 func (i *anInstruction) IsUndefined() bool {

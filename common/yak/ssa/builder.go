@@ -245,6 +245,16 @@ func (b FunctionBuilder) HandlerEllipsis() {
 func (b *FunctionBuilder) EmitDefer(instruction Instruction) {
 	deferBlock := b.GetDeferBlock()
 	endBlock := b.CurrentBlock
+	// The deferred call itself always lives in the function defer block.
+	// Remember the block that reached this statement so AOT can skip the
+	// call when that block never ran (defer inside an if).
+	if endBlock != nil && deferBlock != nil && endBlock.GetId() != deferBlock.GetId() {
+		after := int64(0)
+		if n := len(endBlock.Insts); n > 0 {
+			after = endBlock.Insts[n-1]
+		}
+		markDeferGuard(instruction, endBlock.GetId(), after)
+	}
 	defer func() {
 		b.CurrentBlock = endBlock
 	}()
@@ -262,6 +272,18 @@ func (b *FunctionBuilder) EmitDefer(instruction Instruction) {
 			deferBlock.Insts = utils.InsertSliceItem(deferBlock.Insts, instruction.GetId(), 0)
 		}
 	})
+}
+
+func markDeferGuard(inst Instruction, blockID, after int64) {
+	if utils.IsNil(inst) || blockID <= 0 {
+		return
+	}
+	type marker interface {
+		MarkDeferGuard(blockID, afterInst int64)
+	}
+	if m, ok := inst.(marker); ok && m != nil {
+		m.MarkDeferGuard(blockID, after)
+	}
 }
 
 func (b *FunctionBuilder) SetMarkedFunction(name string) (ret func()) {
