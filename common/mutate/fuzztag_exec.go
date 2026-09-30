@@ -17,6 +17,7 @@ type FuzzTagConfig struct {
 	isSimple          bool
 	syncRootNodeIndex bool
 	resultLimit       int
+	assertError       bool
 	context           context.Context
 }
 
@@ -127,6 +128,14 @@ func Fuzz_WithResultLimit(limit int) FuzzConfigOpt {
 	}
 }
 
+// Fuzz_WithAssertError propagates tag handler errors instead of tolerating them.
+// Default rendering remains permissive for existing fuzzing callers.
+func Fuzz_WithAssertError(enabled bool) FuzzConfigOpt {
+	return func(config *FuzzTagConfig) {
+		config.assertError = enabled
+	}
+}
+
 func Fuzz_WithContext(ctx context.Context) FuzzConfigOpt {
 	return func(config *FuzzTagConfig) {
 		config.context = ctx
@@ -162,6 +171,7 @@ func FuzzTagExec(input interface{}, opts ...FuzzConfigOpt) (_ []string, err erro
 		return nil, err
 	}
 	defer generator.Cancel()
+	generator.GenerateConfig.AssertError = config.assertError
 	var res []string
 	count := 0
 	for count != config.resultLimit && generator.Next() {

@@ -1,0 +1,151 @@
+__DESC__ = "渲染 FuzzTag 模板，生成文本、字典和测试数据；保留重复结果。默认直接输出到 stdout，也可保存文件并返回路径、数量、字节数及截断状态。支持命名参数、JSON 输出和有界渲染。"
+__VERBOSE_NAME__ = "FuzzTag Template Renderer"
+__VERBOSE_NAME_ZH__ = "FuzzTag 模板生成"
+__KEYWORDS__ = "fuzztag,template,render,文本生成,模板引擎,字典,测试数据,payload,组合,编码,保存文件,stdout"
+
+__USAGE__ = <<<USAGE_BLOCK
+Render a FuzzTag template locally; this tool does not send HTTP requests.
+
+Parameters:
+  template          (string, required) Raw FuzzTag template. Preserve whitespace.
+  params            (object, optional) Named values/lists for {{params(name)}}.
+  output-file       (string, optional) Save results to this path; create parents.
+  stdout            (bool, default false) Also print results when saving a file.
+                    Without output-file, results always go directly to stdout.
+  format            (string, default lines) lines: join results with LF and append
+                    a final LF; json: JSON array, preserving multiline boundaries
+                    and control characters. Use hex/base64 for arbitrary bytes.
+  limit             (integer, default 1000, range 1..100000) Maximum result count.
+                    Generation stops after limit+1 results; truncated reports
+                    whether additional results exist. Never claim a full total
+                    when truncated=true. Duplicates are preserved.
+  force             (bool, default false) Allow replacing an existing output file.
+  enable-file-tags  (bool, default false) Enable file/file:line/file:dir to read
+                    explicit local paths. Codec plugins and yak hotpatch tags
+                    are not enabled here; load fuzztag-reference for tag details.
+
+template is literal text: it does NOT decode backslash escapes. A literal \n
+stays two characters. For multiline text prefer AITAG with ACTUAL line breaks.
+In direct JSON params, escape once according to JSON; do not pre-escape the
+string. A single literal backslash becomes \\ in JSON, not \\\\.
+Use {{unquote(...)}} only when explicit backslash decoding is intended.
+
+Use AITAG for multiline or escape-sensitive template text:
+{"@action":"call-tool","tool":"exec_fuzztag","identifier":"generate_notices",
+ "params":{"output-file":"/tmp/notices.txt","limit":20}}
+<|TOOL_PARAM_template_{NONCE}|>
+通知：{{list(小王|小李)}}，任务{{int(1-3|3)}}已完成。
+<|TOOL_PARAM_template_END_{NONCE}|>
+
+Short templates may be passed directly in params.template:
+{"template":"{{base64({{list(hello|world)}})}}","format":"json"}
+Named data: {"template":"你好，{{params(name)}}","params":{"name":["小王","小李"]}}
+CLI: yak exec_fuzztag.yak --template 'item{{int(1-3)}}' --output-file /tmp/items.txt
+
+RESULT contains success, count (emitted results), truncated, limit, format,
+output_file, bytes, stdout, and a preview of at most 5 results (200 characters each).
+In file-only mode stdout contains only this receipt, not the full file content.
+Errors return success=false and an error message, without claiming an artifact.
+Success confirms rendering/writing; inspect samples for unavailable tags, which
+may become empty strings, or invalid syntax, which the engine may keep literal.
+USAGE_BLOCK
+
+yakit.AutoInitYakit()
+
+template = cli.String("template", cli.setRequired(true), cli.setHelp("raw FuzzTag template; use AITAG for multiline text"))
+params = cli.Json("params", cli.setDefault("{}"), cli.setJsonSchema(`{"type":"object","additionalProperties":{"oneOf":[{"type":"string"},{"type":"number"},{"type":"boolean"},{"type":"array","items":{"oneOf":[{"type":"string"},{"type":"number"},{"type":"boolean"}]}}]}}`), cli.setHelp("named scalar/list values for {{params(name)}}"))
+outputFile = cli.String("output-file", cli.setHelp("destination file; omit to print results to stdout"))
+printStdout = cli.Bool("stdout", cli.setDefault(false), cli.setHelp("also print results when output-file is set"))
+format = cli.String("format", cli.setDefault("lines"), cli.setJsonSchema(`{"type":"string","enum":["lines","json"]}`), cli.setHelp("lines or json array"))
+limit = cli.Int("limit", cli.setDefault(1000), cli.setJsonSchema(`{"type":"integer","minimum":1,"maximum":100000}`), cli.setHelp("maximum emitted results, 1..100000"))
+force = cli.Bool("force", cli.setDefault(false), cli.setHelp("overwrite an existing output file"))
+enableFileTags = cli.Bool("enable-file-tags", cli.setDefault(false), cli.setHelp("enable local file-reading tags"))
+cli.check()
+
+// Declare the semantic result at top level so early-return branches update it.
+RESULT = {"success":false,"error":"execution did not complete"}
+fail = func(message) {
+    yakit.Error("exec_fuzztag: %s", message)
+    return {"success":false,"error":message}
+}
+if limit < 1 || limit > 100000 {
+    RESULT = fail("limit must be between 1 and 100000")
+    return
+}
+if format != "lines" && format != "json" {
+    RESULT = fail("format must be lines or json")
+    return
+}
+if outputFile != "" && file.IsExisted(outputFile) && !force {
+    RESULT = fail("output file already exists; set force=true to overwrite")
+    return
+}
+
+ctx = context.Background()
+injectedCtx = getParam("CTX")
+if injectedCtx != nil && injectedCtx != "" { ctx = injectedCtx }
+options = [fuzz.renderLimit(limit+1), fuzz.renderParams(params), fuzz.renderContext(ctx), fuzz.renderAssertError(true)]
+if enableFileTags { options = append(options, fuzz.renderFileTags()) }
+rows, err = fuzz.Render(template, options...)
+if err != nil {
+    RESULT = fail(sprintf("render failed: %v", err))
+    return
+}
+// DeadlineExceeded is a zero-field Go value, which Yak compares equal to nil.
+// Formatting the native error distinguishes it from the actual nil result.
+contextError = sprintf("%v", ctx.Err())
+if contextError != "<nil>" {
+    RESULT = fail("render canceled: " + contextError)
+    return
+}
+truncated = len(rows) > limit
+if truncated { rows = rows[:limit] }
+
+content = ""
+if format == "json" {
+    // Initialize an array for the zero-result case instead of emitting JSON null.
+    if len(rows) == 0 { content = "[]" } else { content = json.dumps(rows) }
+    content += "\n"
+} else if len(rows) > 0 {
+    content = str.Join(rows, "\n") + "\n"
+}
+
+if outputFile != "" {
+    dir = file.GetDirPath(outputFile)
+    if dir != "" {
+        err = file.MkdirAll(dir)
+        if err != nil {
+            RESULT = fail(sprintf("create parent directory failed: %v", err))
+            return
+        }
+    }
+    flags = file.O_CREATE | file.O_WRONLY | file.O_EXCL
+    if force { flags = file.O_CREATE | file.O_WRONLY | file.O_TRUNC }
+    destination, err = file.OpenFile(outputFile, flags, 0o644)
+    if err != nil {
+        RESULT = fail(sprintf("open output file failed: %v", err))
+        return
+    }
+    _, writeErr = destination.WriteString(content)
+    closeErr = destination.Close()
+    if writeErr != nil || closeErr != nil {
+        RESULT = fail(sprintf("write output file failed: write=%v close=%v", writeErr, closeErr))
+        return
+    }
+    if !printStdout { yakit.File(outputFile) }
+}
+
+preview = []
+for i, row := range rows {
+    if i >= 5 { break }
+    if len(row) > 200 { row = row[:200] + "..." }
+    preview = append(preview, row)
+}
+RESULT = {"success":true,"count":len(rows),"truncated":truncated,"limit":limit,
+    "format":format,"output_file":outputFile,"bytes":len([]byte(content)),
+    "stdout":outputFile == "" || printStdout,"preview":preview}
+if outputFile == "" || printStdout {
+    printf("%s", content)
+} else {
+    yakit.Info("%s", json.dumps(RESULT))
+}
