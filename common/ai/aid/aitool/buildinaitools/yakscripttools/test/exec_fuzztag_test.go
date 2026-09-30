@@ -28,6 +28,11 @@ func getExecFuzztagTool(t *testing.T) *aitool.Tool {
 	metadata := yakscripttools.LoadYakScriptToAiTools("exec_fuzztag", string(content))
 	require.NotNil(t, metadata)
 	require.Equal(t, "FuzzTag 模板生成", metadata.VerboseNameZh)
+	var inputSchema map[string]any
+	require.NoError(t, json.Unmarshal([]byte(metadata.Params), &inputSchema))
+	properties := inputSchema["properties"].(map[string]any)
+	require.Contains(t, properties, "variables")
+	require.NotContains(t, properties, "params", "variables must not collide with the action's params envelope")
 	tools := yakscripttools.ConvertTools([]*schema.AIYakTool{metadata})
 	require.Len(t, tools, 1)
 	return tools[0]
@@ -62,11 +67,11 @@ func TestExecFuzztagStdout(t *testing.T) {
 	require.Equal(t, "abc\nabc\nabc\n", stdout, "the delivery tool must preserve duplicates")
 }
 
-func TestExecFuzztagJSONParams(t *testing.T) {
+func TestExecFuzztagJSONVariables(t *testing.T) {
 	receipt, stdout := runExecFuzztag(t, getExecFuzztagTool(t), aitool.InvokeParams{
-		"template": "{{params(name)}}\n他说：\"100%\" \\ {{int(1-2)}}",
-		"params":   map[string]any{"name": []string{"小王", "小李"}},
-		"format":   "json",
+		"template":  "{{params(name)}}\n他说：\"100%\" \\ {{int(1-2)}}",
+		"variables": map[string]any{"name": []string{"小王", "小李"}},
+		"format":    "json",
 	})
 	require.Equal(t, true, receipt["success"])
 	var rows []string
@@ -177,7 +182,7 @@ func TestExecFuzztagDeadlineReceipt(t *testing.T) {
 	require.NotEqual(t, -1, start)
 	target := filepath.Join(t.TempDir(), "must-not-exist.txt")
 	prefix := fmt.Sprintf(`template = "{{int(1-1000000000)}}"
-params = {}
+variables = {}
 outputFile = %q
 printStdout = false
 format = "lines"
@@ -221,6 +226,13 @@ func TestExecFuzztagCompositionAndTagSemantics(t *testing.T) {
 		{"{{padding:null(abc|5)}}", []string{"\x00\x00abc"}},
 		{"{{padding:null(abc|-5)}}", []string{"\x00\x00abc"}},
 		{`{{jsonpath({{={"key":"value"}=}}|$.key)}}`, []string{"value"}},
+		{"{{base64(hello)}}", []string{"aGVsbG8="}},
+		{"{{base64dec(aGVsbG8=)}}", []string{"hello"}},
+		{"{{hex(abc)}}", []string{"616263"}},
+		{"{{hexdec(616263)}}", []string{"abc"}},
+		{"{{base64({{hex(abc)}})}}", []string{"NjE2MjYz"}},
+		{"{{hexdec({{base64dec(NjE2MjYz)}})}}", []string{"abc"}},
+		{`{{urlescape({{base64({{={"a":1}=}})}})}}`, []string{"eyJhIjoxfQ%3D%3D"}},
 	}
 	for _, c := range cases {
 		t.Run(c.template, func(t *testing.T) {
@@ -231,4 +243,27 @@ func TestExecFuzztagCompositionAndTagSemantics(t *testing.T) {
 			require.Equal(t, c.expected, rows)
 		})
 	}
+}
+
+func TestExecFuzztagHTTPPacket(t *testing.T) {
+	target := filepath.Join(t.TempDir(), "packets.json")
+	template := "GET /query?id={{base64({{={\"a\":1}=}})}} HTTP/1.1\r\nHost: {{params(host)}}\r\n\r\n"
+	receipt, stdout := runExecFuzztag(t, getExecFuzztagTool(t), aitool.InvokeParams{
+		"template":    template,
+		"variables":   map[string]any{"host": []string{"example.com", "example.org"}},
+		"output-file": target, "stdout": true, "format": "json",
+	})
+	require.Equal(t, true, receipt["success"])
+	require.Equal(t, float64(2), receipt["count"])
+	require.Equal(t, false, receipt["truncated"])
+	var packets []string
+	require.NoError(t, json.Unmarshal([]byte(stdout), &packets))
+	require.Equal(t, []string{
+		"GET /query?id=eyJhIjoxfQ== HTTP/1.1\r\nHost: example.com\r\n\r\n",
+		"GET /query?id=eyJhIjoxfQ== HTTP/1.1\r\nHost: example.org\r\n\r\n",
+	}, packets)
+	content, err := os.ReadFile(target)
+	require.NoError(t, err)
+	require.Equal(t, stdout, string(content))
+	require.Equal(t, float64(len(content)), receipt["bytes"])
 }
