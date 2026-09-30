@@ -14,14 +14,21 @@ import (
 	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 )
 
-// TestGoCompileHeapMeasure compiles a synthetic, declaration-heavy multi-file Go
+// BenchmarkGoCompileHeapMeasure compiles a synthetic, declaration-heavy multi-file Go
 // project in memory and reports peak HeapInuse. Pair with YAK_SSA_HEAP_LOG=1 to
 // see retained heap after each phase (the f1 line isolates the AST win). A/B:
 //
-//	YAK_SSA_HEAP_LOG=1 go test ./.../golang -run TestGoCompileHeapMeasure -count=1 -v
+//	YAK_SSA_HEAP_LOG=1 go test ./.../golang -run '^$' -bench '^BenchmarkGoCompileHeapMeasure$' -benchtime=1x -v
 //
-// Throwaway measurement helper, not a correctness assertion.
-func TestGoCompileHeapMeasure(t *testing.T) {
+// This samples performance, not correctness. Keep the full workload available
+// to explicit benchmark runs instead of recompiling it in every essential CI run.
+func BenchmarkGoCompileHeapMeasure(b *testing.B) {
+	for i := 0; i < b.N; i++ {
+		measureGoCompileHeap(b)
+	}
+}
+
+func measureGoCompileHeap(t testing.TB) {
 	vf := filesys.NewVirtualFs()
 	vf.AddFile("src/main/go/go.mod", "module example.com/m\n\ngo 1.20\n")
 
