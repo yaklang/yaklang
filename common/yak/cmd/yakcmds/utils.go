@@ -46,7 +46,7 @@ import (
 	"github.com/yaklang/yaklang/common/utils/filesys"
 	"github.com/yaklang/yaklang/common/utils/omap"
 	"github.com/yaklang/yaklang/common/yak/antlr4yak/dap"
-	"github.com/yaklang/yaklang/common/yak/antlr4yak/yakast"
+	"github.com/yaklang/yaklang/common/yak/antlr4yak/yakfmt"
 	"github.com/yaklang/yaklang/common/yak/yaklib"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"github.com/yaklang/yaklang/scannode"
@@ -628,11 +628,11 @@ const %s string = %q
 		},
 		Action: func(c *cli.Context) error {
 			if c.Bool("version") {
-				fmt.Printf("Formatter version: %v\n", yakast.FormatterVersion)
+				fmt.Fprintf(c.App.Writer, "Formatter version: %v\n", yakfmt.Version)
 				return nil
 			}
 			args := c.Args()
-			file := args[0]
+			file := args.Get(0)
 			if file != "" {
 				var err error
 				absFile := file
@@ -642,13 +642,15 @@ const %s string = %q
 						return utils.Errorf("fetch abs file path failed: %s", err)
 					}
 				}
-				raw, err := os.ReadFile(file)
+				raw, err := os.ReadFile(absFile)
 				if err != nil {
 					return err
 				}
-				vt := yakast.NewYakCompiler()
-				vt.Compiler(string(raw))
-				fmt.Printf("%s", vt.GetFormattedCode())
+				formatted, err := yakfmt.Format(string(raw))
+				if err != nil {
+					return err
+				}
+				fmt.Fprint(c.App.Writer, formatted)
 			} else {
 				return utils.Errorf("empty yak file")
 			}

@@ -58,7 +58,7 @@ func TestOverviewYakExamples(t *testing.T) {
 	}
 
 	syntaxChecker := func(code string) error {
-		_, err := antlr4yak.New().FormattedAndSyntaxChecking(code)
+		_, err := antlr4yak.New().Compile(code)
 		return err
 	}
 

@@ -25,7 +25,8 @@ func (f *FakeCompiler) GetErrors() antlr4util.SourceCodeErrors {
 }
 
 func (f *FakeCompiler) GetFormattedCode() string {
-	return compiler(f.code).GetFormattedCode()
+	formatted, _ := Format(f.code)
+	return formatted
 }
 
 type FakeVM struct {

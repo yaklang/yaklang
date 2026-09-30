@@ -13,14 +13,14 @@ import (
 // 语法/编译检查(进程内、不联网、不执行)。这是文档"内容质量"的强约束：任何库的任何示例
 // 语法错误即红，确保文档站(Docusaurus/MDX)不会因示例代码块破损而崩溃，也保证示例对用户
 // 可复制即用。新增/修改示例时若引入语法错误，本测试会在 CI(Essential-test)中拦截。
-// 关键词: 全库示例语法校验, antlr FormattedAndSyntaxChecking, 文档质量强约束
+// 关键词: 全库示例语法校验, antlr Compile, 文档质量强约束
 func TestAllLibsExampleSyntax(t *testing.T) {
 	// 规避 vendored ANTLR4 运行时在 GC 标记期偶发的堆损坏(与生成器 main 同因)。
 	debug.SetGCPercent(-1)
 
 	helper := testDocumentHelper(t)
 	checker := func(code string) error {
-		_, err := antlr4yak.New().FormattedAndSyntaxChecking(code)
+		_, err := antlr4yak.New().Compile(code)
 		return err
 	}
 

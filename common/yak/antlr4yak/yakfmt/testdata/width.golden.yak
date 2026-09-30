@@ -1,0 +1,35 @@
+result = very_long_function_name_very_long_function_name_(
+    parameter_0,
+    parameter_1,
+    parameter_2,
+    parameter_3,
+    parameter_4,
+    parameter_5,
+    parameter_6,
+    parameter_7,
+    parameter_8,
+    parameter_9,
+    parameter_10,
+    parameter_11,
+)
+total = value_0 + value_1 + value_2 + value_3 + value_4 + value_5 + value_6 + value_7 +
+    value_8 + value_9 + value_10 + value_11 + value_12 + value_13 + value_14 + value_15 +
+    value_16 + value_17 + value_18 + value_19 + value_20 + value_21 + value_22 + value_23 +
+    value_24 + value_25 + value_26 + value_27 + value_28 + value_29
+config = {
+    "long_key_long_key_long_key_long_key_long_key_long_key_long_key_": (
+        "long_value_long_value_long_value_long_value_long_value_long_value_"
+    ),
+}
+f = func(
+    arg0 map[string][]int,
+    arg1 map[string][]int,
+    arg2 map[string][]int,
+    arg3 map[string][]int,
+    arg4 map[string][]int,
+    arg5 map[string][]int,
+    arg6 map[string][]int,
+    arg7 map[string][]int,
+    arg8 map[string][]int,
+    arg9 map[string][]int,
+) {}

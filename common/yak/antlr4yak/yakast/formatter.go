@@ -6,6 +6,7 @@ import (
 
 	"github.com/yaklang/yaklang/common/yak/antlr4yak/parser"
 	yak "github.com/yaklang/yaklang/common/yak/antlr4yak/parser"
+	"github.com/yaklang/yaklang/common/yak/antlr4yak/yakfmt"
 
 	"github.com/yaklang/antlr/v4"
 )
@@ -159,7 +160,17 @@ func (y *YakCompiler) decIndent() {
 }
 
 func (y *YakCompiler) GetFormattedCode() string {
-	return strings.TrimSpace(y.formatted.String())
+	if y.formatTree == nil {
+		return strings.TrimSpace(y.formatted.String())
+	}
+	if !y.formatReady {
+		stream := y.formatTree.(*parser.ProgramContext).GetParser().GetTokenStream().(*antlr.CommonTokenStream)
+		input := y.formatTree.GetStart().GetInputStream()
+		source := input.GetText(0, input.Size()-1)
+		y.formattedCode = strings.TrimSuffix(yakfmt.FormatTree(source, y.formatTree, stream), "\n")
+		y.formatReady = true
+	}
+	return y.formattedCode
 }
 
 type parserGetter interface {

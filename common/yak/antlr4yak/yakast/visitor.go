@@ -35,6 +35,9 @@ type YakCompiler struct {
 
 	// 格式化
 	formatted         *bytes.Buffer
+	formatTree        yak.IProgramContext
+	formattedCode     string
+	formatReady       bool
 	indent            int
 	currentLineLength int
 
@@ -220,6 +223,7 @@ func (y *YakCompiler) Compiler(code string) (success bool) {
 	y.FreeValues = nil
 	y.forDepthStack, y.switchDepthStack, y.tryDepthStack = vmstack.New(), vmstack.New(), vmstack.New()
 	y.formatted = new(bytes.Buffer)
+	y.formatTree, y.formattedCode, y.formatReady = nil, "", false
 	y.indent, y.currentLineLength = 0, 0
 	startScope := y.currentSymtbl
 	defer func() {
@@ -397,6 +401,7 @@ func (y *YakCompiler) VisitProgram(raw yak.IProgramContext, inline ...bool) inte
 	if i == nil {
 		return nil
 	}
+	y.formatTree, y.formattedCode, y.formatReady = raw, "", false
 	y.writeAllWS(i.AllWs())
 
 	// 遇到每一个 program 确定是要给人家新开定义域的！

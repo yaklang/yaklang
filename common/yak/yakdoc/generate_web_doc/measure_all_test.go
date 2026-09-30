@@ -27,7 +27,7 @@ func TestMeasureCoverage(t *testing.T) {
 	debug.SetGCPercent(-1)
 	helper := testDocumentHelper(t)
 	checker := func(code string) error {
-		_, err := antlr4yak.New().FormattedAndSyntaxChecking(code)
+		_, err := antlr4yak.New().Compile(code)
 		return err
 	}
 

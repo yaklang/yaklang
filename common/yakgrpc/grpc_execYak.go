@@ -17,7 +17,7 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/shlex"
 	"github.com/yaklang/yaklang/common/yak"
-	"github.com/yaklang/yaklang/common/yak/antlr4yak"
+	"github.com/yaklang/yaklang/common/yak/antlr4yak/yakfmt"
 	"github.com/yaklang/yaklang/common/yak/yaklib"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
@@ -311,9 +311,9 @@ func (s *Server) ExecWithContext(ctx context.Context, req *ypb.ExecRequest, stre
 }
 
 func (s *Server) YaklangCompileAndFormat(cx context.Context, req *ypb.YaklangCompileAndFormatRequest) (*ypb.YaklangCompileAndFormatResponse, error) {
-	newCode, err := antlr4yak.New().FormattedAndSyntaxChecking(req.GetCode())
+	newCode, err := yakfmt.Format(req.GetCode())
 	if err != nil {
 		return nil, err
 	}
-	return &ypb.YaklangCompileAndFormatResponse{Code: newCode}, nil
+	return &ypb.YaklangCompileAndFormatResponse{Code: strings.TrimSuffix(newCode, "\n")}, nil
 }
