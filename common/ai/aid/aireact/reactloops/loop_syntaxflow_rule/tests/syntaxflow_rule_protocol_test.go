@@ -19,6 +19,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact"
+	"github.com/yaklang/yaklang/common/jsonpath"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
@@ -52,8 +53,15 @@ func runSyntaxFlowProtocolScenario(
 	in := make(chan *ypb.AIInputEvent, 4)
 	out := make(chan *ypb.AIOutputEvent, 128)
 
+	stat := &mockStats_forWriteAndModify{writeDone: len(attached) > 0}
+	if len(attached) > 0 {
+		stat.modifyEndLine = len(strings.Split(attached[0].Value, "\n"))
+	}
 	ins, err := aireact.NewTestReAct(
 		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+			if len(attached) > 0 {
+				return mockedSyntaxFlowWritingAndModify(t, i, r, stat)
+			}
 			return mockedSyntaxFlowWriting(t, i, r)
 		}),
 		aicommon.WithEventInputChan(in),
@@ -88,13 +96,12 @@ taskLoop:
 				result.ruleChangeEvents = append(result.ruleChangeEvents, e)
 			}
 			if e.GetNodeId() == "react_task_status_changed" {
-				content := string(e.GetContent())
-				if strings.Contains(content, "Aborted") || strings.Contains(content, "Failed") {
+				status := strings.ToLower(utils.InterfaceToString(jsonpath.FindFirst(e.Content, "$..react_task_now_status")))
+				if status == "aborted" || status == "failed" {
 					result.taskFailed = true
 					break taskLoop
 				}
-				if strings.Contains(content, `"react_task_now_status":"completed"`) ||
-					strings.Contains(content, `"react_task_now_status": "completed"`) {
+				if status == "completed" {
 					break taskLoop
 				}
 			}
@@ -102,7 +109,7 @@ taskLoop:
 				break taskLoop
 			}
 		case <-deadline:
-			break taskLoop
+			t.Fatal("timeout waiting for SyntaxFlow rule delivery or terminal task state")
 		}
 	}
 	close(in)
@@ -161,6 +168,9 @@ desc(
 	require.Contains(t, result.timeline, "规则编写草稿",
 		"timeline should mark the rule draft attachment")
 
-	// Attached draft already fills the editor buffer; mock still tries write_rule which may fail.
-	// Timeline draft presence is the primary assertion for this scenario.
+	require.False(t, result.taskFailed)
+	require.NotEmpty(t, result.ruleChangeEvents, "the attached draft must also be editable")
+	payload := parseSyntaxFlowRuleChangeResponse(t, result.ruleChangeEvents[0])
+	require.Equal(t, "modify_rule", payload.SourceAction)
+	require.Contains(t, payload.Code.Content, "Test Rule Fixed")
 }

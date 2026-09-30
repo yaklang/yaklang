@@ -4,16 +4,17 @@ import (
 	"archive/zip"
 	"bytes"
 	_ "embed"
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/google/uuid"
 	"github.com/segmentio/ksuid"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	aicommon_testutil "github.com/yaklang/yaklang/common/ai/aid/aicommon/testutil"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact"
@@ -231,41 +232,23 @@ println(parts)
 		}
 	}()
 
-	du := time.Duration(10)
-	if utils.InGithubActions() {
-		du = time.Duration(5)
-	}
-	after := time.After(du * time.Second)
-
-	var grepSamplesSeen bool
-	var codeGenerated bool
-
-LOOP:
-	for {
-		select {
-		case e := <-out:
-			if e.Type == string(schema.EVENT_TYPE_YAKLANG_CODE_EDITOR) {
-				if e.GetNodeId() == "grep_yaklang_samples" {
-					grepSamplesSeen = true
-					content := string(e.GetContent())
-					if !utils.MatchAllOfSubString(content, "Grep pattern") {
-						t.Logf("Grep samples results: %s", content)
-					}
-				}
-				if e.GetNodeId() == "write_code" {
-					codeGenerated = true
-					content := string(e.GetContent())
-					if !utils.MatchAllOfSubString(content, "http server example") {
-						t.Errorf("Generated code doesn't contain expected content: %s", content)
-					}
-					break LOOP
-				}
-			}
-		case <-after:
-			break LOOP
+	waitResult := waitForYaklangDeferredEditorSync(out, focusModeWriteYaklangTestTimeout())
+	close(in)
+	ins.Wait()
+	require.False(t, waitResult.taskFailed)
+	require.True(t, waitResult.taskCompleted, "focus task must complete before the deadline")
+	require.NotEmpty(t, waitResult.codeChangeEvents, "code must be delivered over the current editor protocol")
+	var written bool
+	for _, event := range waitResult.codeChangeEvents {
+		require.Equal(t, "yaklang_code_change", event.NodeId)
+		var payload yaklangCodeChangeResponse
+		require.NoError(t, json.Unmarshal(event.Content, &payload))
+		if payload.SourceAction == "write_code" {
+			require.Contains(t, payload.Code.Content, "http server example")
+			written = true
 		}
 	}
-	close(in)
+	require.True(t, written, "write_code must produce editor content")
 
 	fmt.Println("--------------------------------------")
 	tl := ins.DumpTimeline()
@@ -282,8 +265,6 @@ LOOP:
 		t.Error("Code was not written after grep samples")
 	}
 
-	_ = grepSamplesSeen
-	_ = codeGenerated
 }
 
 func TestFocusMode_QueryDocumentWithFilters(t *testing.T) {
@@ -762,36 +743,23 @@ func TestFocusMode_SemanticSearchYaklangSamples_BasicSearch(t *testing.T) {
 		}
 	}()
 
-	du := time.Duration(10)
-	if utils.InGithubActions() {
-		du = time.Duration(5)
-	}
-	after := time.After(du * time.Second)
-
-LOOP:
-	for {
-		select {
-		case e := <-out:
-			if e.Type == string(schema.EVENT_TYPE_YAKLANG_CODE_EDITOR) {
-				if e.GetNodeId() == "semantic_search_yaklang_samples" {
-					content := string(e.GetContent())
-					if !utils.MatchAllOfSubString(content, "Semantic search") {
-						t.Logf("Semantic search results: %s", content)
-					}
-				}
-				if e.GetNodeId() == "write_code" {
-					content := string(e.GetContent())
-					if !utils.MatchAllOfSubString(content, "http.Get") {
-						t.Errorf("Generated code doesn't contain expected content: %s", content)
-					}
-					break LOOP
-				}
-			}
-		case <-after:
-			break LOOP
+	waitResult := waitForYaklangDeferredEditorSync(out, focusModeWriteYaklangTestTimeout())
+	close(in)
+	ins.Wait()
+	require.False(t, waitResult.taskFailed)
+	require.True(t, waitResult.taskCompleted, "focus task must complete before the deadline")
+	require.NotEmpty(t, waitResult.codeChangeEvents, "code must be delivered over the current editor protocol")
+	var written bool
+	for _, event := range waitResult.codeChangeEvents {
+		require.Equal(t, "yaklang_code_change", event.NodeId)
+		var payload yaklangCodeChangeResponse
+		require.NoError(t, json.Unmarshal(event.Content, &payload))
+		if payload.SourceAction == "write_code" {
+			require.Contains(t, payload.Code.Content, "http.Get")
+			written = true
 		}
 	}
-	close(in)
+	require.True(t, written, "write_code must produce editor content")
 
 	fmt.Println("--------------------------------------")
 	tl := ins.DumpTimeline()

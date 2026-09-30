@@ -545,7 +545,7 @@ func TestReAct_DirectlyCallTool_PersistentSession(t *testing.T) {
 	in1 := make(chan *ypb.AIInputEvent, 10)
 	out1 := make(chan *ypb.AIOutputEvent, 400)
 
-	react1, err := NewTestReAct(
+	react1, err := newImmediatePersistenceTestReAct(
 		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			prompt := r.GetPrompt()
 			// verification 收缩为纯观测角色后, satisfied=true 不再自动退出. mockedToolCalling
@@ -615,8 +615,8 @@ LOOP1:
 	require.True(t, react1.config.GetAiToolManager().IsRecentlyUsedTool("sleep_test"),
 		"sleep_test should be in the cache")
 
-	// Wait for timeline save throttle to flush
-	time.Sleep(3500 * time.Millisecond)
+	// Wait for real task writes before constructing the restoring instance.
+	react1.Wait()
 	close(in1)
 
 	// === Conversation 2: directly_call_tool via restored cache ===
@@ -624,7 +624,7 @@ LOOP1:
 	out2 := make(chan *ypb.AIOutputEvent, 400)
 
 	var conv2ToolCallCount int32
-	react2, err := NewTestReAct(
+	react2, err := newImmediatePersistenceTestReAct(
 		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			return mockedDirectlyCallTool(i, r, "sleep_test")
 		}),

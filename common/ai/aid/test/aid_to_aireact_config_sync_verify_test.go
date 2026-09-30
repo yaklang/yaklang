@@ -2,487 +2,122 @@ package test
 
 import (
 	"context"
+	"fmt"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/ai/aid"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
+	"github.com/yaklang/yaklang/common/ai/aid/aimem"
 	"github.com/yaklang/yaklang/common/schema"
-	"github.com/yaklang/yaklang/common/utils/chanx"
-	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
-// TestAIDToAIReact_ConfigSync_AllowAskForClarification_False
-// 测试当 WithAllowRequireForUserInteract(false) 时，配置是否正确传递到 react loop
-// 验证点：
-// 1. prompt 中不应该包含 "主动提问以澄清意图" 相关内容
-// 2. prompt 中不应该包含 "ask_for_clarification" action 的说明
-// 3. AI 不应该尝试使用 ask_for_clarification action
 func TestAIDToAIReact_ConfigSync_AllowAskForClarification_False(t *testing.T) {
-	inputChan := chanx.NewUnlimitedChan[*ypb.AIInputEvent](context.Background(), 10)
-	outputChan := make(chan *schema.AiOutputEvent, 100)
-
-	// 记录所有收到的 prompt，用于验证配置
-	var receivedPrompts []string
-	var askForClarificationActionUsed bool
-
-	coordinator, err := aid.NewCoordinator(
-		"test-allow-ask-for-clarification-false",
-		aicommon.WithEventInputChanx(inputChan),
-		aicommon.WithSystemFileOperator(),
-		aicommon.WithEventHandler(func(event *schema.AiOutputEvent) {
-			outputChan <- event
-		}),
-		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
-			prompt := r.GetPrompt()
-			receivedPrompts = append(receivedPrompts, prompt)
-
-			configSyncPlanJSON := `{
-    "@action": "plan_from_document",
-    "main_task": "验证配置传递",
-    "main_task_goal": "确保配置正确传递到 react loop",
-    "tasks": [{"subtask_name": "验证配置", "subtask_goal": "检查配置是否正确"}]
-}`
-			if rsp, err := tryHandleNewPlanFlowPrompt(i, prompt, configSyncPlanJSON); rsp != nil {
-				return rsp, err
-			}
-
-			rsp := i.NewAIResponse()
-			defer rsp.Close()
-
-			// 默认返回 finish
-			rsp.EmitOutputStream(strings.NewReader(`{"@action": "finish", "human_readable_thought": "测试完成"}`))
-			return rsp, nil
-		}),
-		aicommon.WithAllowRequireForUserInteract(false), // 关键配置：禁用用户交互
-	)
-	if err != nil {
-		t.Fatalf("NewCoordinator failed: %v", err)
-	}
-	go coordinator.Run()
-
-	// 发送一个简单的任务
-	inputChan.SafeFeed(&ypb.AIInputEvent{
-		IsStart: true,
-		Params: &ypb.AIStartParams{
-			UserQuery: "测试配置同步",
-		},
-	})
-
-	// 等待并收集事件
-	timeout := time.After(5 * time.Second)
-	eventCount := 0
-LOOP:
-	for {
-		select {
-		case <-timeout:
-			break LOOP
-		case result := <-outputChan:
-			eventCount++
-			if eventCount > 100 {
-				break LOOP
-			}
-
-			// 检查是否收到了需要用户交互的事件（不应该出现）
-			if result.Type == schema.EVENT_TYPE_REQUIRE_USER_INTERACTIVE {
-				askForClarificationActionUsed = true
-				t.Errorf("收到 EVENT_TYPE_REQUIRE_USER_INTERACTIVE 事件，但配置为 false，配置未生效")
-			}
-
-			// 如果已经收到并验证了 react loop 的 prompt，可以提前退出
-			if len(receivedPrompts) > 0 {
-				for _, prompt := range receivedPrompts {
-					if strings.Contains(prompt, "Background") || strings.Contains(prompt, "Current Time:") {
-						break LOOP
-					}
-				}
-			}
-
-			// 如果收到了 plan 事件，可以结束测试
-			if result.Type == schema.EVENT_TYPE_PLAN {
-				break LOOP
-			}
-
-			// 如果收到了 end_plan_and_execution 事件，也可以结束测试
-			if result.Type == schema.EVENT_TYPE_END_PLAN_AND_EXECUTION {
-				break LOOP
-			}
-		}
-	}
-
-	// 验证：检查所有收到的 prompt
-	for i, prompt := range receivedPrompts {
-		// 检查 react loop 的 prompt（包含 Background 或 Current Time）
-		if strings.Contains(prompt, "Background") || strings.Contains(prompt, "Current Time:") {
-			// 这些 prompt 不应该包含 ask_for_clarification 相关的内容
-			if strings.Contains(prompt, "主动提问以澄清意图") {
-				t.Errorf("Prompt #%d 包含 '主动提问以澄清意图'，但配置为 false", i)
-			}
-			if strings.Contains(prompt, "ask_for_clarification") {
-				t.Errorf("Prompt #%d 包含 'ask_for_clarification'，但配置为 false", i)
-			}
-		}
-	}
-
-	// 最终验证
-	if askForClarificationActionUsed {
-		t.Fatal("配置 WithAllowRequireForUserInteract(false) 未生效：AI 仍然尝试使用 ask_for_clarification action")
-	}
-
-	t.Logf("测试通过：配置 WithAllowRequireForUserInteract(false) 正确传递到 react loop，共检查了 %d 个 prompt", len(receivedPrompts))
+	verifyCoordinatorLoopConfig(t, false, true)
 }
-
-// TestAIDToAIReact_ConfigSync_AllowPlan_False
-// 测试当 WithAllowPlanUserInteract(false) 时，配置是否正确传递到 react loop
-// 验证点：
-// 1. prompt 中不应该包含 "与规划"、"申请分步计划" 相关内容
-// 2. prompt 中不应该包含 "request_plan_and_execution" action 的说明
-// 3. AI 不应该尝试使用 request_plan_and_execution action
 func TestAIDToAIReact_ConfigSync_AllowPlan_False(t *testing.T) {
-	inputChan := chanx.NewUnlimitedChan[*ypb.AIInputEvent](context.Background(), 10)
-	outputChan := make(chan *schema.AiOutputEvent, 100)
-
-	// 记录所有收到的 prompt，用于验证配置
-	var receivedPrompts []string
-
-	coordinator, err := aid.NewCoordinator(
-		"test-allow-plan-false",
-		aicommon.WithEventInputChanx(inputChan),
-		aicommon.WithSystemFileOperator(),
-		aicommon.WithEventHandler(func(event *schema.AiOutputEvent) {
-			outputChan <- event
-		}),
-		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
-			prompt := r.GetPrompt()
-			receivedPrompts = append(receivedPrompts, prompt)
-
-			configSyncPlanJSON := `{
-    "@action": "plan_from_document",
-    "main_task": "验证配置传递",
-    "main_task_goal": "确保配置正确传递到 react loop",
-    "tasks": [{"subtask_name": "验证配置", "subtask_goal": "检查配置是否正确"}]
-}`
-			if rsp, err := tryHandleNewPlanFlowPrompt(i, prompt, configSyncPlanJSON); rsp != nil {
-				return rsp, err
-			}
-
-			rsp := i.NewAIResponse()
-			defer rsp.Close()
-
-			rsp.EmitOutputStream(strings.NewReader(`{"@action": "finish", "human_readable_thought": "测试完成"}`))
-			return rsp, nil
-		}),
-		aicommon.WithAllowPlanUserInteract(false), // 关键配置：禁用 plan
-	)
-	if err != nil {
-		t.Fatalf("NewCoordinator failed: %v", err)
-	}
-	go coordinator.Run()
-
-	// 发送一个简单的任务
-	inputChan.SafeFeed(&ypb.AIInputEvent{
-		IsStart: true,
-		Params: &ypb.AIStartParams{
-			UserQuery: "测试配置同步 - AllowPlan",
-		},
-	})
-
-	// 等待并收集事件
-	timeout := time.After(5 * time.Second)
-	eventCount := 0
-LOOP:
-	for {
-		select {
-		case <-timeout:
-			break LOOP
-		case result := <-outputChan:
-			eventCount++
-			if eventCount > 100 {
-				break LOOP
-			}
-
-			// 如果已经收到并验证了 react loop 的 prompt，可以提前退出
-			if len(receivedPrompts) > 0 {
-				for _, prompt := range receivedPrompts {
-					if strings.Contains(prompt, "Background") || strings.Contains(prompt, "Current Time:") {
-						break LOOP
-					}
-				}
-			}
-
-			// 如果收到了 end_plan_and_execution 事件，可以结束测试
-			if result.Type == schema.EVENT_TYPE_END_PLAN_AND_EXECUTION {
-				break LOOP
-			}
-		}
-	}
-
-	// 验证：检查所有收到的 prompt
-	for i, prompt := range receivedPrompts {
-		// 检查 react loop 的 prompt（包含 Background 或 Current Time）
-		if strings.Contains(prompt, "Background") || strings.Contains(prompt, "Current Time:") {
-			// 这些 prompt 不应该包含 plan 相关的内容
-			if strings.Contains(prompt, "与规划") {
-				t.Errorf("Prompt #%d 包含 '与规划'，但配置为 false", i)
-			}
-			if strings.Contains(prompt, "申请分步计划") {
-				t.Errorf("Prompt #%d 包含 '申请分步计划'，但配置为 false", i)
-			}
-			if strings.Contains(prompt, "request_plan_and_execution") {
-				t.Errorf("Prompt #%d 包含 'request_plan_and_execution'，但配置为 false", i)
-			}
-			if strings.Contains(prompt, "规划系统") {
-				t.Errorf("Prompt #%d 包含 '规划系统'，但配置为 false", i)
-			}
-		}
-	}
-
-	t.Logf("测试通过：配置 WithAllowPlanUserInteract(false) 正确传递到 react loop，共检查了 %d 个 prompt", len(receivedPrompts))
+	verifyCoordinatorLoopConfig(t, true, false)
 }
-
-// TestAIDToAIReact_ConfigSync_Both_False
-// 测试当同时设置 WithAllowRequireForUserInteract(false) 和 WithAllowPlanUserInteract(false) 时
-// 验证两个配置都正确传递到 react loop
 func TestAIDToAIReact_ConfigSync_Both_False(t *testing.T) {
-	inputChan := chanx.NewUnlimitedChan[*ypb.AIInputEvent](context.Background(), 10)
-	outputChan := make(chan *schema.AiOutputEvent, 100)
-
-	// 记录所有收到的 prompt，用于验证配置
-	var receivedPrompts []string
-	var askForClarificationActionUsed bool
-
-	coordinator, err := aid.NewCoordinator(
-		"test-both-config-false",
-		aicommon.WithEventInputChanx(inputChan),
-		aicommon.WithSystemFileOperator(),
-		aicommon.WithEventHandler(func(event *schema.AiOutputEvent) {
-			outputChan <- event
-		}),
-		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
-			prompt := r.GetPrompt()
-			receivedPrompts = append(receivedPrompts, prompt)
-
-			configSyncPlanJSON := `{
-    "@action": "plan_from_document",
-    "main_task": "验证配置传递",
-    "main_task_goal": "确保配置正确传递到 react loop",
-    "tasks": [{"subtask_name": "验证配置", "subtask_goal": "检查配置是否正确"}]
-}`
-			if rsp, err := tryHandleNewPlanFlowPrompt(i, prompt, configSyncPlanJSON); rsp != nil {
-				return rsp, err
-			}
-
-			rsp := i.NewAIResponse()
-			defer rsp.Close()
-
-			rsp.EmitOutputStream(strings.NewReader(`{"@action": "finish", "human_readable_thought": "测试完成"}`))
-			return rsp, nil
-		}),
-		aicommon.WithAllowRequireForUserInteract(false), // 禁用用户交互
-		aicommon.WithAllowPlanUserInteract(false),       // 禁用 plan
-	)
-	if err != nil {
-		t.Fatalf("NewCoordinator failed: %v", err)
-	}
-	go coordinator.Run()
-
-	// 发送一个简单的任务
-	inputChan.SafeFeed(&ypb.AIInputEvent{
-		IsStart: true,
-		Params: &ypb.AIStartParams{
-			UserQuery: "测试配置同步 - 两个配置都为 false",
-		},
-	})
-
-	// 等待并收集事件
-	timeout := time.After(5 * time.Second)
-	eventCount := 0
-LOOP:
-	for {
-		select {
-		case <-timeout:
-			break LOOP
-		case result := <-outputChan:
-			eventCount++
-			if eventCount > 100 {
-				break LOOP
-			}
-
-			// 检查是否收到了需要用户交互的事件（不应该出现）
-			if result.Type == schema.EVENT_TYPE_REQUIRE_USER_INTERACTIVE {
-				askForClarificationActionUsed = true
-				t.Errorf("收到 EVENT_TYPE_REQUIRE_USER_INTERACTIVE 事件，但配置为 false，配置未生效")
-			}
-
-			// 如果已经收到并验证了 react loop 的 prompt，可以提前退出
-			if len(receivedPrompts) > 0 {
-				for _, prompt := range receivedPrompts {
-					if strings.Contains(prompt, "Background") || strings.Contains(prompt, "Current Time:") {
-						break LOOP
-					}
-				}
-			}
-
-			// 如果收到了 end_plan_and_execution 事件，可以结束测试
-			if result.Type == schema.EVENT_TYPE_END_PLAN_AND_EXECUTION {
-				break LOOP
-			}
-		}
-	}
-
-	// 验证：检查所有收到的 prompt
-	for i, prompt := range receivedPrompts {
-		// 检查 react loop 的 prompt（包含 Background 或 Current Time）
-		if strings.Contains(prompt, "Background") || strings.Contains(prompt, "Current Time:") {
-			// 这些 prompt 不应该包含 ask_for_clarification 相关的内容
-			if strings.Contains(prompt, "主动提问以澄清意图") {
-				t.Errorf("Prompt #%d 包含 '主动提问以澄清意图'，但配置为 false", i)
-			}
-			if strings.Contains(prompt, "ask_for_clarification") {
-				t.Errorf("Prompt #%d 包含 'ask_for_clarification'，但配置为 false", i)
-			}
-
-			// 这些 prompt 不应该包含 plan 相关的内容
-			if strings.Contains(prompt, "与规划") {
-				t.Errorf("Prompt #%d 包含 '与规划'，但配置为 false", i)
-			}
-			if strings.Contains(prompt, "申请分步计划") {
-				t.Errorf("Prompt #%d 包含 '申请分步计划'，但配置为 false", i)
-			}
-			if strings.Contains(prompt, "request_plan_and_execution") {
-				t.Errorf("Prompt #%d 包含 'request_plan_and_execution'，但配置为 false", i)
-			}
-			if strings.Contains(prompt, "规划系统") {
-				t.Errorf("Prompt #%d 包含 '规划系统'，但配置为 false", i)
-			}
-		}
-	}
-
-	// 最终验证
-	if askForClarificationActionUsed {
-		t.Fatal("配置 WithAllowRequireForUserInteract(false) 未生效：AI 仍然尝试使用 ask_for_clarification action")
-	}
-
-	t.Logf("测试通过：两个配置都正确传递到 react loop，共检查了 %d 个 prompt", len(receivedPrompts))
+	verifyCoordinatorLoopConfig(t, false, false)
+}
+func TestAIDToAIReact_ConfigSync_Both_True(t *testing.T) {
+	verifyCoordinatorLoopConfig(t, true, true)
 }
 
-// TestAIDToAIReact_ConfigSync_Both_True
-// 测试当同时设置 WithAllowRequireForUserInteract(true) 和 WithAllowPlanUserInteract(true) 时
-// 验证两个配置都正确传递到 react loop（作为对比测试）
-func TestAIDToAIReact_ConfigSync_Both_True(t *testing.T) {
-	inputChan := chanx.NewUnlimitedChan[*ypb.AIInputEvent](context.Background(), 10)
-	outputChan := make(chan *schema.AiOutputEvent, 100)
-
-	// 记录所有收到的 prompt，用于验证配置
-	var receivedPrompts []string
-	var foundAskForClarificationContent bool
-	var foundPlanContent bool
-
-	coordinator, err := aid.NewCoordinator(
-		"test-both-config-true",
-		aicommon.WithEventInputChanx(inputChan),
-		aicommon.WithSystemFileOperator(),
-		aicommon.WithEventHandler(func(event *schema.AiOutputEvent) {
-			outputChan <- event
-		}),
+// Visit a real PE task's decision prompt and wait for the entire coordinator
+// run. A missing prompt or unfinished task must fail, including negative cases.
+func verifyCoordinatorLoopConfig(t *testing.T, allowAsk, allowPlan bool) {
+	t.Helper()
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	events := make(chan *schema.AiOutputEvent, 256)
+	type observation struct {
+		prompt              string
+		allowAsk, allowPlan bool
+	}
+	observations := make(chan observation, 16)
+	coordinator, err := aid.NewCoordinatorContext(ctx, "verify coordinator loop configuration",
+		aicommon.WithMemoryTriage(aimem.NewMockMemoryTriage()),
+		aicommon.WithDisableIntentRecognition(true),
+		aicommon.WithDisableAutoSkills(true),
+		aicommon.WithDisableSessionTitleGeneration(true),
+		aicommon.WithGenerateReport(false),
+		aicommon.WithDisableDynamicPlanning(true),
+		aicommon.WithPeriodicVerificationInterval(0),
+		aicommon.WithAIAutoRetry(1),
+		aicommon.WithAITransactionAutoRetry(1),
+		aicommon.WithAgreeYOLO(true),
+		aicommon.WithAllowRequireForUserInteract(allowAsk),
+		aicommon.WithAllowPlanUserInteract(allowPlan),
+		aicommon.WithEventHandler(func(e *schema.AiOutputEvent) { events <- e }),
 		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			prompt := r.GetPrompt()
-			receivedPrompts = append(receivedPrompts, prompt)
-			rsp := i.NewAIResponse()
-			defer rsp.Close()
-
-			// 处理 react loop 请求
-			if strings.Contains(prompt, "Background") || strings.Contains(prompt, "Current Time:") {
-				// 检查 prompt 中是否包含应该出现的内容（配置为 true 时应该出现）
-				if strings.Contains(prompt, "主动提问以澄清意图") || strings.Contains(prompt, "ask_for_clarification") {
-					foundAskForClarificationContent = true
-				}
-
-				if strings.Contains(prompt, "与规划") || strings.Contains(prompt, "申请分步计划") || strings.Contains(prompt, "request_plan_and_execution") {
-					foundPlanContent = true
-				}
-
-				// 返回一个 finish action
-				responseJSON := `{"@action": "finish", "human_readable_thought": "测试完成"}`
-				rsp.EmitOutputStream(strings.NewReader(responseJSON))
-				return rsp, nil
+			plan := `{"@action":"plan_from_document","main_task":"verify configuration","main_task_goal":"verify child loop config","tasks":[{"subtask_name":"check configuration","subtask_goal":"check interaction settings"}]}`
+			if rsp, err := tryHandleNewPlanFlowPrompt(i, prompt, plan); rsp != nil {
+				return rsp, err
 			}
-
-			// 默认返回 finish
-			rsp.EmitOutputStream(strings.NewReader(`{"@action": "finish", "human_readable_thought": "测试完成"}`))
+			output := ""
+			switch {
+			case aicommon.IsPrimaryDecisionPrompt(prompt):
+				config, ok := i.(interface{ SimpleInfoMap() map[string]interface{} })
+				if !ok {
+					return nil, fmt.Errorf("unexpected loop config type %T", i)
+				}
+				info := config.SimpleInfoMap()
+				observations <- observation{prompt, i.GetAllowUserInteraction(), info["AllowPlanUserInteract"].(bool)}
+				output = `{"@action":"object","next_action":{"type":"finish"},"human_readable_thought":"configuration checked"}`
+			case isSummaryPrompt(prompt):
+				output = `{"@action":"summary","status_summary":"done","task_short_summary":"checked","task_long_summary":"configuration checked"}`
+			case isVerifySatisfactionPrompt(prompt):
+				output = `{"@action":"verify-satisfaction","user_satisfied":true,"reasoning":"checked"}`
+			default:
+				return nil, fmt.Errorf("unexpected configuration-test prompt: caller=%s", r.GetCallerLabel())
+			}
+			rsp := i.NewAIResponse()
+			rsp.EmitOutputStream(strings.NewReader(output))
+			rsp.Close()
 			return rsp, nil
 		}),
-		aicommon.WithAllowRequireForUserInteract(true), // 启用用户交互
-		aicommon.WithAllowPlanUserInteract(true),       // 启用 plan
 	)
-	if err != nil {
-		t.Fatalf("NewCoordinator failed: %v", err)
+	require.NoError(t, err)
+	done := make(chan error, 1)
+	go func() { done <- coordinator.Run() }()
+	var interactive bool
+	checkEvent := func(e *schema.AiOutputEvent) {
+		if e.Type == schema.EVENT_TYPE_REQUIRE_USER_INTERACTIVE {
+			interactive = true
+		}
 	}
-	go coordinator.Run()
-
-	// 发送一个简单的任务
-	inputChan.SafeFeed(&ypb.AIInputEvent{
-		IsStart: true,
-		Params: &ypb.AIStartParams{
-			UserQuery: "测试配置同步 - 两个配置都为 true",
-		},
-	})
-
-	// 等待并收集事件
-	timeout := time.After(5 * time.Second)
-	eventCount := 0
-LOOP:
 	for {
 		select {
-		case <-timeout:
-			break LOOP
-		case result := <-outputChan:
-			eventCount++
-			if eventCount > 100 {
-				break LOOP
+		case e := <-events:
+			checkEvent(e)
+		case err := <-done:
+			require.NoError(t, err)
+			for len(events) > 0 {
+				checkEvent(<-events)
 			}
-
-			// 如果已经收到并验证了 react loop 的 prompt，可以提前退出
-			if len(receivedPrompts) > 0 {
-				for _, prompt := range receivedPrompts {
-					if strings.Contains(prompt, "Background") || strings.Contains(prompt, "Current Time:") {
-						break LOOP
-					}
-				}
+			close(observations)
+			var visited int
+			for got := range observations {
+				visited++
+				require.Equal(t, allowAsk, got.allowAsk, "user-interaction policy must reach the executing loop")
+				require.Equal(t, allowPlan, got.allowPlan, "plan-interaction policy must reach the executing loop")
+				require.Equal(t, allowAsk, strings.Contains(got.prompt, `"ask_for_clarification"`), "actual decision schema must reflect the interaction policy")
+				// PE tasks execute an existing plan and intentionally never offer nested
+				// request_plan_and_execution, irrespective of the plan-review policy.
+				require.NotContains(t, got.prompt, `"request_plan_and_execution"`)
 			}
-
-			// 如果收到了 end_plan_and_execution 事件，可以结束测试
-			if result.Type == schema.EVENT_TYPE_END_PLAN_AND_EXECUTION {
-				break LOOP
+			require.Positive(t, visited, "the real task decision prompt must be visited")
+			if !allowAsk {
+				require.False(t, interactive)
 			}
+			return
+		case <-ctx.Done():
+			t.Fatal("timeout waiting for coordinator execution and configuration observation")
 		}
 	}
-
-	// 验证：检查所有收到的 prompt
-	for _, prompt := range receivedPrompts {
-		// 检查 react loop 的 prompt（包含 Background 或 Current Time）
-		if strings.Contains(prompt, "Background") || strings.Contains(prompt, "Current Time:") {
-			// 这些 prompt 应该包含 ask_for_clarification 相关的内容（配置为 true）
-			if strings.Contains(prompt, "主动提问以澄清意图") || strings.Contains(prompt, "ask_for_clarification") {
-				foundAskForClarificationContent = true
-			}
-
-			// 这些 prompt 应该包含 plan 相关的内容（配置为 true）
-			if strings.Contains(prompt, "与规划") || strings.Contains(prompt, "申请分步计划") || strings.Contains(prompt, "request_plan_and_execution") {
-				foundPlanContent = true
-			}
-		}
-	}
-
-	// 验证配置是否正确传递（配置为 true 时，应该能找到相关内容）
-	if !foundAskForClarificationContent {
-		t.Logf("警告：未在 prompt 中找到 ask_for_clarification 相关内容，但配置为 true（可能是 prompt 模板变化）")
-	}
-
-	if !foundPlanContent {
-		t.Logf("警告：未在 prompt 中找到 plan 相关内容，但配置为 true（可能是 prompt 模板变化）")
-	}
-
-	t.Logf("测试完成：配置为 true 时的验证，共检查了 %d 个 prompt", len(receivedPrompts))
 }
