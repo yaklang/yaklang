@@ -109,7 +109,7 @@ func (e *Engine) waitAllAsyncCallFinish() {
 
 func InjectContextBuiltinFunction(engine *Engine) {
 	engine.ImportLibs(map[string]interface{}{
-		yakvm.SelectBuiltinName:  engine.yakBuiltinSelect,
+		yakvm.SelectBuiltinName:  yakvm.SelectBuiltin(),
 		"eval":                   engine.YakBuiltinEval,
 		"yakfmt":                 engine.YakBuiltinfmt,
 		"yakfmtWithError":        engine.YakBuiltinfmtWithError,

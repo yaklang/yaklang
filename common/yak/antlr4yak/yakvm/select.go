@@ -10,6 +10,32 @@ import (
 // Resolve this name at execution time so bytecode contains no native function.
 const SelectBuiltinName = "$yak:select$"
 
+// Only this private function type receives the frame from native call dispatch.
+// Ordinary Go functions, even with the same signature, keep their FFI behavior.
+type selectBuiltinFunc func(*Frame, []*Value) []any
+
+// SelectBuiltin is stateless: registering it needs no per-engine bound method,
+// and execution uses the actual caller rather than looking up a goroutine frame.
+func SelectBuiltin() any {
+	return selectBuiltinFunc((*Frame).SelectChannels)
+}
+
+func (f *Frame) callSelectBuiltin(fn selectBuiltinFunc, async bool, args []*Value) []any {
+	if async || len(args) != 1 || args[0] == nil {
+		panic("invalid select call")
+	}
+	operands, ok := args[0].Value.([]*Value)
+	if !ok {
+		// The existing OpNewSlice constructs []any for an empty select. All
+		// nonempty case lists are produced by OpList and contain raw *Values.
+		empty, isEmptySlice := args[0].Value.([]any)
+		if !isEmptySlice || len(empty) != 0 {
+			panic("invalid select operands")
+		}
+	}
+	return fn(f, operands)
+}
+
 // SelectChannels consumes compiler-built Value lists without the FFI numeric or
 // container conversions used for ordinary host-function arguments. It performs
 // exactly one communication, with no worker goroutines for losing cases.
