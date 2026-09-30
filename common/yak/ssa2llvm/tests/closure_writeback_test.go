@@ -263,3 +263,24 @@ assert files[1] == "c", files
 		t.Fatalf("unexpected output: %s", output)
 	}
 }
+
+func TestRecursionFactorial(t *testing.T) {
+	dir := t.TempDir()
+	script := filepath.Join(dir, "factorial.yak")
+	if err := os.WriteFile(script, []byte(`
+func factorial(n) {
+    if n == 0 {
+        return 1
+    }
+    return n * factorial(n - 1)
+}
+assert factorial(0) == 1, "recursion base failed"
+assert factorial(5) == 120, "recursion failed"
+`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	output := RunYakScriptFileWithCLI(t, script, nil)
+	if output != "" {
+		t.Fatalf("unexpected output: %s", output)
+	}
+}
