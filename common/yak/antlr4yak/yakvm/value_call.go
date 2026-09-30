@@ -21,6 +21,9 @@ func (v *Value) nativeCall(asyncCall, wavy bool, vm *Frame, vs ...*Value) interf
 	if asyncCall && vm.vm.config.synchronousExecution {
 		panic("async calls are not supported in synchronous execution mode")
 	}
+	if fn, ok := v.Value.(selectBuiltinFunc); ok {
+		return vm.callSelectBuiltin(fn, asyncCall, vs)
+	}
 	rets := reflect.ValueOf(v.Value)
 	funcType := rets.Type()
 	// 这儿很不完善，需要做大量兼容性处理
