@@ -32,7 +32,7 @@ func TestMemoryFeedbackIndexAccounting(t *testing.T) {
 				}
 				return e, nil
 			})
-			mem, err := CreateTestAIMemory(uuid.NewString(), WithInvoker(invoker), WithRAGOptions(rag.WithEmbeddingClient(vectorstore.NewMockEmbedder(func(text string) ([]float32, error) {
+			mem, err := CreateTestAIMemory(t, uuid.NewString(), WithInvoker(invoker), WithRAGOptions(rag.WithEmbeddingClient(vectorstore.NewMockEmbedder(func(text string) ([]float32, error) {
 				if text == "fail" {
 					return nil, fmt.Errorf("embedding unavailable")
 				}

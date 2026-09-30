@@ -19,7 +19,7 @@ func TestSearchMemory_TimelineOrdering(t *testing.T) {
 	defer cleanupEntryTestData(t, sessionID)
 
 	// 创建AI记忆系统
-	memory, err := CreateTestAIMemory(sessionID,
+	memory, err := CreateTestAIMemory(t, sessionID,
 		WithInvoker(mock.NewMockInvoker(context.Background())),
 	)
 	require.NoError(t, err)
@@ -118,7 +118,7 @@ func TestSearchMemoryWithoutAI_TimelineOrdering(t *testing.T) {
 	defer cleanupEntryTestData(t, sessionID)
 
 	// 创建AI记忆系统
-	memory, err := CreateTestAIMemory(sessionID,
+	memory, err := CreateTestAIMemory(t, sessionID,
 		WithInvoker(mock.NewMockInvoker(context.Background())),
 	)
 	require.NoError(t, err)
@@ -177,7 +177,7 @@ func TestSearchMemory_TimelineWithMixedContent(t *testing.T) {
 	sessionID := "timeline-mixed-test-" + uuid.New().String()
 	defer cleanupEntryTestData(t, sessionID)
 
-	memory, err := CreateTestAIMemory(sessionID,
+	memory, err := CreateTestAIMemory(t, sessionID,
 		WithInvoker(mock.NewMockInvoker(context.Background())),
 	)
 	require.NoError(t, err)
@@ -238,7 +238,7 @@ func TestSearchMemory_TimelineEmptyResult(t *testing.T) {
 	sessionID := "timeline-empty-test-" + uuid.New().String()
 	defer cleanupEntryTestData(t, sessionID)
 
-	memory, err := CreateTestAIMemory(sessionID,
+	memory, err := CreateTestAIMemory(t, sessionID,
 		WithInvoker(mock.NewMockInvoker(context.Background())),
 	)
 	require.NoError(t, err)
@@ -267,7 +267,7 @@ func TestSearchMemory_TimestampPresence(t *testing.T) {
 	sessionID := "timestamp-presence-test-" + uuid.New().String()
 	defer cleanupEntryTestData(t, sessionID)
 
-	memory, err := CreateTestAIMemory(sessionID,
+	memory, err := CreateTestAIMemory(t, sessionID,
 		WithInvoker(mock.NewMockInvoker(context.Background())),
 	)
 	require.NoError(t, err)

@@ -35,7 +35,7 @@ func TestAddRawText_BoundsMemoryTriageInput(t *testing.T) {
 			!strings.Contains(query, "MIDDLE_SENTINEL")
 	})
 
-	memory, err := CreateTestAIMemory(sessionID, WithInvoker(mockInvoker))
+	memory, err := CreateTestAIMemory(t, sessionID, WithInvoker(mockInvoker))
 	require.NoError(t, err)
 	defer memory.Close()
 
@@ -50,7 +50,7 @@ func TestHandleMemory_Basic(t *testing.T) {
 	defer cleanupEntryTestData(t, sessionID)
 
 	// 创建AI记忆系统
-	memory, err := CreateTestAIMemory(sessionID,
+	memory, err := CreateTestAIMemory(t, sessionID,
 		WithInvoker(mock.NewMockInvoker(context.Background())),
 	)
 	if err != nil {
@@ -86,7 +86,7 @@ func TestHandleMemory_Basic(t *testing.T) {
 
 func TestMemoryTriageEmptyArrayIsSuccessfulNoop(t *testing.T) {
 	invoker := NewAdvancedMockInvoker(context.Background())
-	memory, err := CreateTestAIMemory("empty-memory-"+uuid.NewString(), WithInvoker(invoker))
+	memory, err := CreateTestAIMemory(t, "empty-memory-"+uuid.NewString(), WithInvoker(invoker))
 	require.NoError(t, err)
 	defer memory.Close()
 	invoker.SetReturnValue("memory-triage", `{"@action":"memory-triage","memory_entities":[]}`)
@@ -108,7 +108,7 @@ func TestHandleMemory_Deduplication(t *testing.T) {
 	defer cleanupEntryTestData(t, sessionID)
 
 	// 创建AI记忆系统
-	memory, err := CreateTestAIMemory(sessionID,
+	memory, err := CreateTestAIMemory(t, sessionID,
 		WithInvoker(mock.NewMockInvoker(context.Background())),
 	)
 	if err != nil {
@@ -170,7 +170,7 @@ func TestHandleMemory_PromptContainsDurableMemoryRules(t *testing.T) {
 			strings.Contains(prompt, "return an empty memory_entities array")
 	})
 
-	memory, err := CreateTestAIMemory(sessionID, WithInvoker(mockInvoker))
+	memory, err := CreateTestAIMemory(t, sessionID, WithInvoker(mockInvoker))
 	if err != nil {
 		t.Fatalf("create AI memory failed: %v", err)
 	}
@@ -199,7 +199,7 @@ func TestHandleMemory_RejectTransientVisitEvent(t *testing.T) {
 		]
 	}`)
 
-	memory, err := CreateTestAIMemory(sessionID, WithInvoker(mockInvoker))
+	memory, err := CreateTestAIMemory(t, sessionID, WithInvoker(mockInvoker))
 	if err != nil {
 		t.Fatalf("create AI memory failed: %v", err)
 	}
@@ -236,7 +236,7 @@ func TestHandleMemory_RejectAmbiguousPronounMemory(t *testing.T) {
 		]
 	}`)
 
-	memory, err := CreateTestAIMemory(sessionID, WithInvoker(mockInvoker))
+	memory, err := CreateTestAIMemory(t, sessionID, WithInvoker(mockInvoker))
 	if err != nil {
 		t.Fatalf("create AI memory failed: %v", err)
 	}
@@ -273,7 +273,7 @@ func TestHandleMemory_KeepDurableGeneralizedFact(t *testing.T) {
 		]
 	}`)
 
-	memory, err := CreateTestAIMemory(sessionID, WithInvoker(mockInvoker))
+	memory, err := CreateTestAIMemory(t, sessionID, WithInvoker(mockInvoker))
 	if err != nil {
 		t.Fatalf("create AI memory failed: %v", err)
 	}
@@ -295,7 +295,7 @@ func TestHandleMemory_KeepDurableGeneralizedFact(t *testing.T) {
 
 func TestMemoryFeedbackInvalidArrayDoesNotPartiallySave(t *testing.T) {
 	invoker := NewAdvancedMockInvoker(context.Background())
-	memory, err := CreateTestAIMemory("invalid-memory-"+uuid.NewString(), WithInvoker(invoker))
+	memory, err := CreateTestAIMemory(t, "invalid-memory-"+uuid.NewString(), WithInvoker(invoker))
 	require.NoError(t, err)
 	defer memory.Close()
 	invoker.SetReturnValue("memory-triage", `{"@action":"memory-triage","memory_entities":[{"content":"must not persist"},[{"content":"nested invalid item"}]]}`)

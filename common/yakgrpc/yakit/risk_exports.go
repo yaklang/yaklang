@@ -716,7 +716,14 @@ func _createRisk(u string, opts ...RiskParamsOpt) *schema.Risk {
 		}
 	}
 
-	host, port, _ := utils.ParseStringToHostPort(u)
+	lookupTarget := u
+	if !strings.Contains(u, "://") && strings.ContainsAny(u, "/?#") {
+		// AI tools normalize URL schemes before computing deduplication keys.
+		// Keep that key, but never send a path/query to the DNS resolver as a host.
+		r.Url = u
+		lookupTarget = "http://" + u
+	}
+	host, port, _ := utils.ParseStringToHostPort(lookupTarget)
 	if host != "" {
 		r.Host = host
 	}
@@ -931,9 +938,11 @@ func NewLocalReverseProtoUrl(proto string) func(opts ...RiskParamsOpt) string {
 //
 // Example:
 // ```
-// if risk.HaveReverseRisk("token") { // 轮询检查是否存在反连风险，会阻塞
+// // 先写入已验证的本地反连记录；真实场景由回连处理器保存记录。
+// token = "doc-reverse-ready"
+// risk.NewRisk("http://127.0.0.1/doc-reverse", risk.token(token))~
+// assert risk.HaveReverseRisk(token), "the saved reverse risk should be found"
 // println("have reverse risk")
-// }
 // ```
 func HaveReverseRisk(token string) bool {
 	if token == "" {

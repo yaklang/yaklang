@@ -4,18 +4,17 @@ import (
 	"context"
 	_ "embed"
 	"encoding/json"
-	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
-	"github.com/yaklang/yaklang/common/ai/aid/aicommon/mock"
 	"path/filepath"
 	"testing"
 
-	"github.com/yaklang/gorm"
 	"github.com/stretchr/testify/require"
+	"github.com/yaklang/gorm"
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon/mock"
 	"github.com/yaklang/yaklang/common/ai/rag"
-	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
@@ -46,14 +45,14 @@ func SaveEmbeddingToMockData(text string, embedding []float32) error {
 }
 
 // CreateTestAIMemory 创建用于测试的AIMemory实例，自动注入mock embedding，新建测试临时数据库
-func CreateTestAIMemory(sessionID string, opts ...Option) (*AIMemoryTriage, error) {
+func CreateTestAIMemory(t testing.TB, sessionID string, opts ...Option) (*AIMemoryTriage, error) {
 	// 创建mock embedding客户端（使用内置的测试数据）
 	mockEmbedder, err := NewMockEmbeddingClientFromJSON(mockEmbeddingDataJSON)
 	if err != nil {
 		return nil, err
 	}
 
-	db, err := getTestDatabase()
+	db, err := getTestDatabase(t)
 	if err != nil {
 		return nil, err
 	}
@@ -77,7 +76,7 @@ func TestNewAIMemory(t *testing.T) {
 
 	// 先清理可能存在的旧数据
 
-	mem, err := CreateTestAIMemory(sessionID,
+	mem, err := CreateTestAIMemory(t, sessionID,
 		WithInvoker(mock.NewMockInvoker(ctx)),
 		WithContextProvider(func() (string, error) {
 			return "测试背景：用户正在开发AI记忆系统", nil
@@ -104,7 +103,7 @@ func TestAddRawText(t *testing.T) {
 
 	// 先清理可能存在的旧数据
 
-	mem, err := CreateTestAIMemory(sessionID,
+	mem, err := CreateTestAIMemory(t, sessionID,
 		WithInvoker(mock.NewMockInvoker(ctx)),
 		WithContextProvider(func() (string, error) {
 			return "已有标签：AI开发、记忆系统、搜索功能", nil
@@ -145,7 +144,7 @@ func TestSaveMemoryEntitiesAndVerifyDB(t *testing.T) {
 	sessionID := "test-session-003-" + uuid.New().String()
 
 	// 先清理可能存在的旧数据
-	mem, err := CreateTestAIMemory(sessionID,
+	mem, err := CreateTestAIMemory(t, sessionID,
 		WithInvoker(mock.NewMockInvoker(ctx)),
 	)
 	assert.NoError(t, err)
@@ -198,7 +197,7 @@ func TestRAGIndexingVerification(t *testing.T) {
 
 	// 先清理可能存在的旧数据
 
-	mem, err := CreateTestAIMemory(sessionID,
+	mem, err := CreateTestAIMemory(t, sessionID,
 		WithInvoker(mock.NewMockInvoker(ctx)),
 	)
 	assert.NoError(t, err)
@@ -253,7 +252,7 @@ func TestSearchBySemantics(t *testing.T) {
 
 	// 先清理可能存在的旧数据
 
-	mem, err := CreateTestAIMemory(sessionID,
+	mem, err := CreateTestAIMemory(t, sessionID,
 		WithInvoker(mock.NewMockInvoker(ctx)),
 	)
 	assert.NoError(t, err)
@@ -289,7 +288,7 @@ func TestSearchByScoreVector(t *testing.T) {
 
 	// 先清理可能存在的旧数据
 
-	mem, err := CreateTestAIMemory(sessionID,
+	mem, err := CreateTestAIMemory(t, sessionID,
 		WithInvoker(mock.NewMockInvoker(ctx)),
 	)
 	assert.NoError(t, err)
@@ -341,7 +340,7 @@ func TestSearchByScores(t *testing.T) {
 
 	// 先清理可能存在的旧数据
 
-	mem, err := CreateTestAIMemory(sessionID,
+	mem, err := CreateTestAIMemory(t, sessionID,
 		WithInvoker(mock.NewMockInvoker(ctx)),
 	)
 	assert.NoError(t, err)
@@ -380,7 +379,7 @@ func TestSearchByTags(t *testing.T) {
 
 	// 先清理可能存在的旧数据
 
-	mem, err := CreateTestAIMemory(sessionID,
+	mem, err := CreateTestAIMemory(t, sessionID,
 		WithInvoker(mock.NewMockInvoker(ctx)),
 	)
 	assert.NoError(t, err)
@@ -423,7 +422,7 @@ func TestGetAllTags(t *testing.T) {
 
 	// 先清理可能存在的旧数据
 
-	mem, err := CreateTestAIMemory(sessionID,
+	mem, err := CreateTestAIMemory(t, sessionID,
 		WithInvoker(mock.NewMockInvoker(ctx)),
 	)
 	assert.NoError(t, err)
@@ -455,7 +454,7 @@ func TestGetDynamicContextWithTags(t *testing.T) {
 
 	// 先清理可能存在的旧数据
 
-	mem, err := CreateTestAIMemory(sessionID,
+	mem, err := CreateTestAIMemory(t, sessionID,
 		WithInvoker(mock.NewMockInvoker(ctx)),
 	)
 	assert.NoError(t, err)
@@ -488,7 +487,7 @@ func TestErrorHandling(t *testing.T) {
 
 	// 先清理可能存在的旧数据
 
-	mem, err := CreateTestAIMemory(sessionID,
+	mem, err := CreateTestAIMemory(t, sessionID,
 		WithInvoker(mock.NewMockInvoker(ctx)),
 	)
 	assert.NoError(t, err)
@@ -553,7 +552,7 @@ func TestSearchEdgeCases(t *testing.T) {
 
 	// 先清理可能存在的旧数据
 
-	mem, err := CreateTestAIMemory(sessionID,
+	mem, err := CreateTestAIMemory(t, sessionID,
 		WithInvoker(mock.NewMockInvoker(ctx)),
 	)
 	assert.NoError(t, err)
@@ -606,11 +605,12 @@ func TestSearchEdgeCases(t *testing.T) {
 
 func setupTestDB(t *testing.T) *gorm.DB {
 	// 创建临时文件数据库用于测试，避免并发访问问题
-	tmpDir := consts.GetDefaultYakitBaseTempDir()
-	dbFile := filepath.Join(tmpDir, uuid.NewString()+".db")
+	t.Helper()
+	dbFile := filepath.Join(t.TempDir(), "memory.db")
 
 	db, err := gorm.Open("sqlite3", dbFile)
 	require.NoError(t, err)
+	t.Cleanup(func() { _ = db.Close() })
 
 	// 自动迁移表结构
 	schema.AutoMigrate(db, schema.KEY_SCHEMA_PROFILE_DATABASE)
@@ -623,18 +623,25 @@ func setupTestDB(t *testing.T) *gorm.DB {
 }
 
 // 清理测试数据
-func getTestDatabase() (*gorm.DB, error) {
+func getTestDatabase(t testing.TB) (*gorm.DB, error) {
 	// 创建临时文件数据库用于测试，避免并发访问问题
-	tmpDir := consts.GetDefaultYakitBaseTempDir()
-	dbFile := filepath.Join(tmpDir, uuid.NewString()+".db")
+	t.Helper()
+	dbFile := filepath.Join(t.TempDir(), "memory.db")
 
 	db, err := gorm.Open("sqlite3", dbFile)
 	if err != nil {
 		return nil, err
 	}
 
-	// 自动迁移表结构
-	schema.AutoMigrate(db, schema.KEY_SCHEMA_YAKIT_DATABASE)
+	t.Cleanup(func() { _ = db.Close() })
+	// Keep real disk persistence, but migrate only the memory/RAG schemas that
+	// these fixtures exercise, rather than every unrelated Yakit table.
+	if err := db.AutoMigrate(&schema.AIMemoryEntity{}, &schema.AIMemoryCollection{},
+		&schema.ProjectGeneralStorage{}, &schema.VectorStoreCollection{},
+		&schema.VectorStoreDocument{}, &schema.KnowledgeBaseInfo{},
+		&schema.KnowledgeBaseEntry{}).Error; err != nil {
+		return nil, err
+	}
 
 	// 设置数据库连接池和超时
 	db.DB().SetMaxOpenConns(1)

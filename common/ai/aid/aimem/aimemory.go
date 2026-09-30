@@ -27,7 +27,7 @@ func newAIMemory(sessionId string, requireInvoker bool, opts ...Option) (*AIMemo
 	}
 
 	// 应用配置选项
-	config := &Config{}
+	config := &Config{embeddingAvailabilityCheck: rag.CheckConfigEmbeddingAvailable}
 	for _, opt := range opts {
 		opt(config)
 	}
@@ -48,7 +48,7 @@ func newAIMemory(sessionId string, requireInvoker bool, opts ...Option) (*AIMemo
 	var err error
 
 	ragCheckingStart := time.Now()
-	embeddingAvailable = rag.CheckConfigEmbeddingAvailable(ragCheckingOpts...)
+	embeddingAvailable = config.embeddingAvailabilityCheck(ragCheckingOpts...)
 	if du := time.Since(ragCheckingStart); du > 500*time.Millisecond {
 		log.Warnf("[AI-Memory(%v)] checking embedding availability took %v", name, du)
 	}

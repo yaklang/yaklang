@@ -14,10 +14,11 @@ import (
 
 // Config AIMemoryTriage的配置
 type Config struct {
-	invoker         aicommon.AIInvokeRuntime
-	contextProvider func() (string, error)
-	ragOptions      []rag.RAGSystemConfigOption
-	database        *gorm.DB
+	invoker                    aicommon.AIInvokeRuntime
+	contextProvider            func() (string, error)
+	ragOptions                 []rag.RAGSystemConfigOption
+	database                   *gorm.DB
+	embeddingAvailabilityCheck func(...rag.RAGSystemConfigOption) bool
 
 	// autoReActInvoker enables building a lightweight invoker automatically when invoker is required.
 	// It is intended for trigger/background-only scenarios.

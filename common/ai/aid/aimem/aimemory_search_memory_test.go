@@ -19,7 +19,7 @@ func TestSearchMemory_Basic(t *testing.T) {
 	defer cleanupEntryTestData(t, sessionID)
 
 	// 创建AI记忆系统
-	memory, err := CreateTestAIMemory(sessionID,
+	memory, err := CreateTestAIMemory(t, sessionID,
 		WithInvoker(mock.NewMockInvoker(context.Background())),
 	)
 	if err != nil {
@@ -86,7 +86,7 @@ func TestSearchMemory_TokenLimit(t *testing.T) {
 	defer cleanupEntryTestData(t, sessionID)
 
 	// 创建AI记忆系统
-	memory, err := CreateTestAIMemory(sessionID,
+	memory, err := CreateTestAIMemory(t, sessionID,
 		WithInvoker(mock.NewMockInvoker(context.Background())),
 	)
 	if err != nil {
@@ -143,7 +143,7 @@ func TestSearchMemory_EmptyQuery(t *testing.T) {
 	defer cleanupEntryTestData(t, sessionID)
 
 	// 创建AI记忆系统
-	memory, err := CreateTestAIMemory(sessionID,
+	memory, err := CreateTestAIMemory(t, sessionID,
 		WithInvoker(mock.NewMockInvoker(context.Background())),
 	)
 	if err != nil {
@@ -181,7 +181,7 @@ func TestSearchMemoryWithoutAI_TaskRetrievalInfo(t *testing.T) {
 	sessionID := "search-task-retrieval-test-" + uuid.New().String()
 	defer cleanupEntryTestData(t, sessionID)
 
-	memory, err := CreateTestAIMemory(sessionID,
+	memory, err := CreateTestAIMemory(t, sessionID,
 		WithInvoker(mock.NewMockInvoker(context.Background())),
 	)
 	if err != nil {
