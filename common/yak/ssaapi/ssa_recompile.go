@@ -1,15 +1,12 @@
 package ssaapi
 
 import (
-	"time"
-
 	"github.com/yaklang/yaklang/common/consts"
 
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/ssa"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
-	"github.com/yaklang/yaklang/common/yak/ssaproject"
 )
 
 // save to Profile SSAProgram
@@ -76,12 +73,6 @@ func recompileProgramLayer(prog *Program, inputOpt ...ssaconfig.Option) error {
 		opt = append(opt, WithBaseProgramName(layerName))
 		// 增量编译时，不设置 WithProgramName，让调用者通过 inputOpt 传入新的 program name
 		// 这样可以确保每次重新编译都会创建一个新的 diff program，而不是覆盖现有的
-	} else if projectConfigEnablesIncrementalCompile(prog) {
-		// 非增量 program，但所属项目当前配置已启用增量编译（例如首次全量编译后才开启该选项）：
-		// 以当前 program 为 base 做增量重编译，新 diff program 会被标记 IsOverlay，
-		// 之后的重编译将自动走上面的增量分支
-		log.Infof("项目配置已启用增量编译，program %s 转为增量重编译，base program: %s", layerName, layerName)
-		opt = append(opt, WithBaseProgramName(layerName))
 	} else {
 		// 非增量编译时，使用相同的 program name（重新编译会覆盖）
 		opt = append(opt, WithProgramName(layerName))
@@ -90,12 +81,6 @@ func recompileProgramLayer(prog *Program, inputOpt ...ssaconfig.Option) error {
 	// append other options
 	opt = append(opt, WithLanguage(prog.GetLanguage()))
 	opt = append(opt, WithReCompile(true))
-	// 增量重编译会创建新的 diff program：若调用者未显式指定新程序名，
-	// 自动生成时间戳程序名（与"SSA 项目编译"插件一致），避免复用
-	// ConfigInput 中的旧 program 名导致与 base/历史 program 同名冲突。
-	if hasBaseProgramName(opt) && !hasProgramNameOption(inputOpt) {
-		opt = append(opt, WithSetProgramName(layerName+"("+time.Now().Format("2006-01-02 15:04:05")+")"))
-	}
 	opt = append(opt, inputOpt...)
 
 	// parse
@@ -103,54 +88,6 @@ func recompileProgramLayer(prog *Program, inputOpt ...ssaconfig.Option) error {
 	_ = newProg
 
 	return err
-}
-
-// projectConfigEnablesIncrementalCompile 通过 program 的 project_id 读取所属 SSA 项目的
-// 当前配置，判断项目是否启用了增量编译。
-// 用于支持"首次全量编译后，才在项目中开启增量编译"的场景：重编译时应转为
-// 以当前 program 为 base 的增量编译，而不是继续同名全量覆盖。
-func projectConfigEnablesIncrementalCompile(prog *Program) bool {
-	if prog == nil || prog.irProgram == nil || prog.irProgram.ProjectID == 0 {
-		return false
-	}
-	project, err := ssaproject.LoadSSAProjectByID(uint(prog.irProgram.ProjectID))
-	if err != nil || project == nil {
-		return false
-	}
-	config, err := project.GetConfig()
-	if err != nil || config == nil {
-		return false
-	}
-	return config.GetEnableIncrementalCompile()
-}
-
-// hasBaseProgramName 检查 options 中是否设置了 WithBaseProgramName
-// （在临时 config 上重放 options，检查副作用）。
-func hasBaseProgramName(opts []ssaconfig.Option) bool {
-	cfg := &ssaconfig.Config{Mode: ssaconfig.ModeAll}
-	for _, o := range opts {
-		if o == nil {
-			continue
-		}
-		_ = o(cfg)
-	}
-	return cfg.GetBaseProgramName() != ""
-}
-
-// hasProgramNameOption 检查调用者 inputOpt 中是否显式传入了新的 program 名
-// （ssaconfig.WithSetProgramName / ssaapi.WithProgramName）。
-func hasProgramNameOption(inputOpt []ssaconfig.Option) bool {
-	for _, o := range inputOpt {
-		if o == nil {
-			continue
-		}
-		cfg := &ssaconfig.Config{Mode: ssaconfig.ModeAll}
-		_ = o(cfg)
-		if cfg.GetLatestProgramName() != "" {
-			return true
-		}
-	}
-	return false
 }
 
 // 已弃用
