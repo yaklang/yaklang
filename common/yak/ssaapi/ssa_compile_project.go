@@ -4,9 +4,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
-	"io/fs"
 	"os"
-	"path"
 	"path/filepath"
 	"strings"
 
@@ -400,91 +398,28 @@ func overlayPathFromAggregatedFS(vfsPath string) string {
 	return ensureOverlayPathSlash(vfsPath)
 }
 
-// stripProgramPrefixFS wraps an aggregated overlay FS (whose canonical paths
-// have no program-name prefix) under the /programName/... prefix expected by
-// incremental diff tooling — without copying any file content.
-type stripProgramPrefixFS struct {
-	inner fi.FileSystem
-}
-
-var (
-	_ fi.FileSystem         = (*stripProgramPrefixFS)(nil)
-	_ fi.ReadOnlyFileSystem = (*stripProgramPrefixFS)(nil)
-)
-
-func newStripProgramPrefixFS(inner fi.FileSystem) fi.FileSystem {
-	return &stripProgramPrefixFS{inner: inner}
-}
-
-func (s *stripProgramPrefixFS) toInner(name string) string {
-	name = path.Clean("/" + strings.TrimPrefix(name, "/"))
-	if name == "" || name == "." {
-		name = "/"
-	}
-	return name
-}
-
-func (s *stripProgramPrefixFS) ReadFile(name string) ([]byte, error) {
-	return s.inner.ReadFile(s.toInner(name))
-}
-
-func (s *stripProgramPrefixFS) Open(name string) (fs.File, error) {
-	return s.inner.Open(s.toInner(name))
-}
-
-func (s *stripProgramPrefixFS) OpenFile(name string, flag int, perm os.FileMode) (fs.File, error) {
-	return s.inner.OpenFile(s.toInner(name), flag, perm)
-}
-
-func (s *stripProgramPrefixFS) Stat(name string) (os.FileInfo, error) {
-	return s.inner.Stat(s.toInner(name))
-}
-
-func (s *stripProgramPrefixFS) ReadDir(name string) ([]fs.DirEntry, error) {
-	return s.inner.ReadDir(s.toInner(name))
-}
-
-func (s *stripProgramPrefixFS) ExtraInfo(name string) map[string]any {
-	return s.inner.ExtraInfo(s.toInner(name))
-}
-func (s *stripProgramPrefixFS) Delete(name string) error {
-	return s.inner.Delete(s.toInner(name))
-}
-func (s *stripProgramPrefixFS) GetSeparators() rune { return s.inner.GetSeparators() }
-func (s *stripProgramPrefixFS) Join(elem ...string) string {
-	return s.inner.Join(elem...)
-}
-func (s *stripProgramPrefixFS) Base(name string) string { return s.inner.Base(name) }
-func (s *stripProgramPrefixFS) PathSplit(name string) (string, string) {
-	return s.inner.PathSplit(name)
-}
-func (s *stripProgramPrefixFS) Ext(name string) string { return s.inner.Ext(name) }
-func (s *stripProgramPrefixFS) IsAbs(name string) bool { return s.inner.IsAbs(name) }
-func (s *stripProgramPrefixFS) Getwd() (string, error) { return s.inner.Getwd() }
-func (s *stripProgramPrefixFS) Exists(name string) (bool, error) {
-	return s.inner.Exists(s.toInner(name))
-}
-func (s *stripProgramPrefixFS) Rel(from, to string) (string, error) {
-	return s.inner.Rel(s.toInner(from), s.toInner(to))
-}
-func (s *stripProgramPrefixFS) Rename(from, to string) error {
-	return s.inner.Rename(s.toInner(from), s.toInner(to))
-}
-func (s *stripProgramPrefixFS) WriteFile(name string, data []byte, perm os.FileMode) error {
-	return s.inner.WriteFile(s.toInner(name), data, perm)
-}
-func (s *stripProgramPrefixFS) MkdirAll(name string, perm os.FileMode) error {
-	return s.inner.MkdirAll(s.toInner(name), perm)
-}
-
-func removeProgramNamePrefixFromFS(fs fi.FileSystem, _ string) (fi.FileSystem, error) {
+func removeProgramNamePrefixFromFS(fs fi.FileSystem, programName string) (fi.FileSystem, error) {
 	if fs == nil {
 		return nil, utils.Errorf("file system is nil")
 	}
-	// The aggregated overlay FS already exposes canonical (program-name-free)
-	// paths; a pass-through wrapper replaces the legacy full copy. The
-	// programName argument is kept for signature compatibility but unused.
-	return newStripProgramPrefixFS(fs), nil
+	if programName == "" {
+		return fs, nil
+	}
+	// Aggregated paths are already stored without the program name. This hook
+	// only rewrites a leftover prefix on lookup, and leaves "." unchanged so
+	// VirtualFS listings still resolve.
+	hooked := filesys.NewHookFS(fs)
+	hooked.SetPathHook(func(name string) (string, error) {
+		if name == "" || name == "." || name == "/" {
+			return name, nil
+		}
+		cleaned := removeProgramNamePrefix(name, programName)
+		if cleaned == "" || cleaned == "/" {
+			return name, nil
+		}
+		return strings.TrimPrefix(cleaned, "/"), nil
+	})
+	return hooked, nil
 }
 
 func buildFileSystemFromProgramName(programName string) (fi.FileSystem, error) {
@@ -733,7 +668,6 @@ func (c *Config) parseProjectWithFirstIncrementalCompile() (*Program, error) {
 		if err := ssadb.UpdateProgramWithError(irProgram); err != nil {
 			log.Errorf("update incremental base program overlay failed: name=%s err=%v", irProgram.ProgramName, err)
 		}
-		InvalidateProgramFileSystemCache(programName)
 		prog.irProgram = irProgram
 	}
 
@@ -766,11 +700,6 @@ func saveOverlayToDatabase(overlay *ProgramOverLay, diffProgram *Program) error 
 
 	if err := ssadb.UpdateProgramWithError(irProgram); err != nil {
 		log.Errorf("save overlay metadata failed: name=%s err=%v", irProgram.ProgramName, err)
-	}
-	// Drop any cached AggregatedFS for this top (and bump gen for all PFS instances).
-	InvalidateProgramFileSystemCache(irProgram.ProgramName)
-	for _, name := range layerNames {
-		InvalidateProgramFileSystemCache(name)
 	}
 
 	return nil
