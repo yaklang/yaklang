@@ -1,8 +1,5 @@
-{{/*
-维护备注：R2 为工具切换复用 Open 历史前缀；仅缓存历史记录。
-实时 PlanRuntimeState / TODO / ReportedRisks 放到 Dynamic，不能进入本缓存块；
-这与主决策循环 Open 段全部不缓存的布局不同。
-*/}}{{ if .TimelineOpen }}# 开放时间线
+{{ if .TimelineOpen }}# 开放时间线
 以下记录来自主循环此前的操作，供本次参数生成参考。当前受理中的调用可能尚在等待你提交参数；历史中的其他调用不是本次任务。
 {{ .TimelineOpen }}
+{{ end }}{{ if .ReportedRisks }}{{ .ReportedRisks }}
 {{ end }}
