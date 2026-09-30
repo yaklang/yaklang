@@ -54,40 +54,8 @@ func TestScanRuntime_EarlierModePublishesNothing(t *testing.T) {
 	require.Len(t, handler.items, 1, "an earlier mode must not overwrite a later finding")
 }
 
-func TestScanRuntime_KeepRiskTracksTheWinner(t *testing.T) {
-	rt := NewScanRuntime()
-	source := runtimeRisk("feature-1", string(schema.SFR_MODE_SOURCE), 2)
-	require.True(t, rt.SubmitRisk(source))
-	_, kept := rt.KeepRisk(source)
-	require.True(t, kept)
-
-	ssa := runtimeRisk("feature-1", string(schema.SFR_MODE_SSA), 0)
-	require.True(t, rt.SubmitRisk(ssa))
-	_, kept = rt.KeepRisk(source)
-	require.False(t, kept, "the covered finding is no longer the kept one")
-	_, kept = rt.KeepRisk(ssa)
-	require.True(t, kept)
-}
-
-func TestScanRuntime_ResultListenersRunInOrder(t *testing.T) {
-	rt := NewScanRuntime()
-	var order []string
-	rt.ListenResult(func(*SyntaxFlowResult) error {
-		order = append(order, "db")
-		return nil
-	})
-	rt.ListenResult(func(*SyntaxFlowResult) error {
-		order = append(order, "report")
-		return nil
-	})
-	require.NoError(t, rt.EmitResult(&SyntaxFlowResult{}))
-	require.Equal(t, []string{"db", "report"}, order)
-}
-
 func TestScanRuntime_NilRuntimeIsSafe(t *testing.T) {
 	var rt *ScanRuntime
 	require.False(t, rt.SubmitRisk(runtimeRisk("f", "ssa", 0)))
-	_, kept := rt.KeepRisk(runtimeRisk("f", "ssa", 0))
-	require.False(t, kept)
-	require.NoError(t, rt.EmitResult(nil))
+	require.NotPanics(t, func() { rt.ListenRisk(nil) })
 }

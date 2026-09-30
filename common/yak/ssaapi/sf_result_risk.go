@@ -182,6 +182,10 @@ func stableRiskFunctionName(value *Value) string {
 	return utils.EscapeInvalidUTF8Byte([]byte(rawName))
 }
 
+// ssaRiskName is the slot of one alert inside a single result: the alert
+// variable plus its index. GetRiskByValue and the stored RiskHashs map use it
+// to find that slot again. It is not the cover key. Covering the same finding
+// across scan modes uses RiskFeatureHash.
 func ssaRiskName(variable string, index int) string {
 	return fmt.Sprintf("%s-%d", variable, index)
 }
@@ -230,11 +234,11 @@ func (r *SyntaxFlowResult) SaveRisk(
 	ssaRisk.Hash = ssaRisk.CalcHash()
 	r.riskMap[name] = ssaRisk
 
-	// A scan runtime owns the decision and the persistence of every risk: it
-	// decides whether the row is created or rewrites an earlier mode, then
-	// notifies its consumers. Only a result outside any scan writes here.
-	if r.scanRuntime != nil {
-		r.scanRuntime.SubmitRisk(ssaRisk)
+	// A scan registers a callback and decides there whether this finding is
+	// created or rewrites an earlier mode. Only a result with no callback
+	// writes the row here.
+	if r.onRisk != nil {
+		r.onRisk(ssaRisk)
 		return ssaRisk.Hash
 	}
 	if save {

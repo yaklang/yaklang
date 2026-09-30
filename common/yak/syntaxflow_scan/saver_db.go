@@ -54,9 +54,9 @@ func newDBSaver(kind schema.SyntaxflowResultKind, taskID string, noRisk bool) *d
 	return s
 }
 
-// ApplyResult writes one finished result. Persisting the result also persists
-// the value graph of every alert; each risk submission inside that save runs
-// through the scan runtime, so no risk row is created here.
+// ApplyResult persists one finished syntaxflow result and its value graph.
+// The scan does not call it. Risk rows arrive through ApplyRiskUpdate, and a
+// database-kind query saves its own audit result.
 func (s *dbSaver) ApplyResult(res *ssaapi.SyntaxFlowResult) error {
 	if s == nil || res == nil {
 		return nil

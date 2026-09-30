@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/diagnostics"
 	fi "github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
@@ -58,10 +59,9 @@ type Config struct {
 	diagnosticsEnabled  bool
 	diagnosticsRecorder *diagnostics.Recorder
 	structScan          *structScanRuntime
-	// scanRuntime is the control point of the scan this program belongs to.
-	// Nil means this program is used outside a scan and callers keep their
-	// previous result/risk behavior.
-	scanRuntime *ScanRuntime
+	// onRisk is called with each risk this compile's struct rules produce.
+	// Nil means the compile is outside a scan and keeps its previous behavior.
+	onRisk func(*schema.SSARisk)
 	// file performance recorder
 	filePerformanceRecorder *diagnostics.Recorder
 

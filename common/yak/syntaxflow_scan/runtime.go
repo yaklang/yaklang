@@ -248,7 +248,10 @@ func (m *scanManager) Query(rule *schema.SyntaxFlowRule, target ssaapi.SyntaxFlo
 			ssaapi.QueryWithProjectId(m.Config.GetProjectID()),
 		)
 		if m.Config != nil && m.Config.scanRuntime != nil {
-			option = append(option, ssaapi.QueryWithScanRuntime(m.Config.scanRuntime))
+			rt := m.Config.scanRuntime
+			option = append(option, ssaapi.QueryWithOnRisk(func(risk *schema.SSARisk) {
+				rt.SubmitRisk(risk)
+			}))
 		}
 		if workBudget != nil {
 			option = append(option, ssaapi.QueryWithWorkBudget(workBudget))
@@ -360,9 +363,8 @@ func (m *scanManager) Query(rule *schema.SyntaxFlowRule, target ssaapi.SyntaxFlo
 }
 
 func (m *scanManager) notifyResult(res *ssaapi.SyntaxFlowResult) {
-	if m.Config.Reporter != nil {
-		m.Config.Reporter.AddSyntaxFlowResult(res)
-	}
+	// Risks reach the report through the scan callback. This only keeps the
+	// stage metrics and the caller's result callback.
 	m.processMonitor.RiskCount.Add(int64(res.RiskCount()))
 	if m.Config.resultCallback != nil {
 		m.Config.resultCallback(&ScanResult{
@@ -388,10 +390,10 @@ func (m *scanManager) notifyDone() {
 
 // saveReport writes the findings collected so far.
 //
-// It runs at every stage boundary: each stage streams its results into the
-// shared report, so saving here keeps a complete snapshot on disk even when a
-// later stage fails. The report rewrites its output, so the final save (see
-// ScanProject) simply supersedes the intermediate ones.
+// Risks arrive through ApplyRiskUpdate as the scan accepts them, so the
+// document is already current here. Saving at each stage boundary keeps a
+// complete snapshot even when a later stage fails. The report rewrites its
+// output, so the final save (see ScanProject) supersedes the intermediate ones.
 func (m *scanManager) saveReport() {
 	if m == nil || m.Config == nil || m.Config.Reporter == nil {
 		return

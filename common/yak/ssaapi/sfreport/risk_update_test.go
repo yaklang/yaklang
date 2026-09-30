@@ -4,7 +4,6 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
-	"github.com/yaklang/yaklang/common/sarif"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 )
@@ -25,12 +24,12 @@ func coveredRisk(hash, feature, mode string) *schema.SSARisk {
 	}
 }
 
-// TestReport_ApplyRiskUpdateDropsCoveredBody proves the report applies the
-// scan's cover decision: the replaced finding leaves the report.
-func TestReport_ApplyRiskUpdateDropsCoveredBody(t *testing.T) {
+// TestReport_ApplyRiskUpdateReplacesCoveredBody proves one update both drops
+// the earlier body and records the later one.
+func TestReport_ApplyRiskUpdateReplacesCoveredBody(t *testing.T) {
 	report := NewReport(IRifyReportType)
 	source := coveredRisk("hash-source", "feature-1", string(schema.SFR_MODE_SOURCE))
-	report.AddRisks(&Risk{Hash: source.Hash, RiskFeatureHash: source.RiskFeatureHash})
+	require.NoError(t, report.ApplyRiskUpdate(schema.RiskUpdateItem{Risk: source}))
 	require.Len(t, report.Risks, 1)
 
 	ssa := coveredRisk("hash-ssa", "feature-1", string(schema.SFR_MODE_SSA))
@@ -39,23 +38,21 @@ func TestReport_ApplyRiskUpdateDropsCoveredBody(t *testing.T) {
 		OldID:   1,
 		OldHash: source.Hash,
 	}))
-	require.Empty(t, report.Risks, "the covered body is dropped; the new body comes from its rich result")
-	require.Zero(t, report.RiskNums)
+	require.Len(t, report.Risks, 1, "one entry per finding")
+	require.Equal(t, 1, report.RiskNums)
+	got := report.Risks[ssa.Hash]
+	require.NotNil(t, got)
+	require.Equal(t, string(schema.SFR_MODE_SSA), got.ScanMode)
 }
 
-// TestSarifReport_ApplyRiskUpdateDropsCoveredResult proves the SARIF document
-// keeps one alert per finding when a later mode covers an earlier one.
-func TestSarifReport_ApplyRiskUpdateDropsCoveredResult(t *testing.T) {
+// TestSarifReport_ApplyRiskUpdateReplacesCoveredResult proves one update
+// replaces the earlier alert with the later mode's alert.
+func TestSarifReport_ApplyRiskUpdateReplacesCoveredResult(t *testing.T) {
 	report, err := NewSarifReport()
 	require.NoError(t, err)
 
 	source := coveredRisk("hash-source", "feature-1", string(schema.SFR_MODE_SOURCE))
-	report.resultByHash = map[string]int{"feature-1": 0}
-	report.run.Results = append(report.run.Results, sarif.NewRuleResult("test-rule").
-		WithMessage(sarif.NewTextMessage("finding")).
-		WithPartialFingerPrints(map[string]interface{}{
-			SarifFingerprintKey: source.RiskFeatureHash,
-		}))
+	require.NoError(t, report.ApplyRiskUpdate(schema.RiskUpdateItem{Risk: source}))
 	require.Len(t, report.run.Results, 1)
 
 	ssa := coveredRisk("hash-ssa", "feature-1", string(schema.SFR_MODE_SSA))
@@ -64,7 +61,10 @@ func TestSarifReport_ApplyRiskUpdateDropsCoveredResult(t *testing.T) {
 		OldID:   1,
 		OldHash: source.Hash,
 	}))
-	require.Empty(t, report.run.Results, "the covered alert is removed before the richer one is added")
+	require.Len(t, report.run.Results, 1, "one alert per finding")
+	fp, ok := report.run.Results[0].PartialFingerprints[SarifFingerprintKey].(string)
+	require.True(t, ok)
+	require.Equal(t, ssa.RiskFeatureHash, fp)
 }
 
 // TestReport_SourceFindingIsCoveredBySSA runs the two modes through the scan
@@ -73,23 +73,18 @@ func TestSarifReport_ApplyRiskUpdateDropsCoveredResult(t *testing.T) {
 func TestReport_SourceFindingIsCoveredBySSA(t *testing.T) {
 	runtime := ssaapi.NewScanRuntime()
 	report := NewReport(IRifyReportType)
-	report.SetKeeper(runtime.KeepRisk)
-	runtime.ListenRisk(schema.RiskUpdateHandlerFunc(report.ApplyRiskUpdate))
+	runtime.ListenRisk(report)
 
 	source := coveredRisk("hash-source", "feature-cover", string(schema.SFR_MODE_SOURCE))
 	require.True(t, runtime.SubmitRisk(source))
-	report.AddRisks(&Risk{Hash: source.Hash, RiskFeatureHash: source.RiskFeatureHash, ScanMode: source.ScanMode})
 	require.Len(t, report.Risks, 1, "the source stage contributes its finding")
 
 	ssa := coveredRisk("hash-ssa", "feature-cover", string(schema.SFR_MODE_SSA))
 	require.True(t, runtime.SubmitRisk(ssa))
-	require.Empty(t, report.Risks, "the cover decision drops the earlier body")
-
-	// The richer result of the later stage adds its own body.
-	report.AddRisks(&Risk{Hash: ssa.Hash, RiskFeatureHash: ssa.RiskFeatureHash, ScanMode: ssa.ScanMode})
 
 	require.Len(t, report.Risks, 1, "one entry per finding")
 	for _, risk := range report.Risks {
 		require.Equal(t, string(schema.SFR_MODE_SSA), risk.ScanMode)
+		require.Equal(t, ssa.Hash, risk.Hash)
 	}
 }
