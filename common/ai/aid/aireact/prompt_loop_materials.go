@@ -223,9 +223,9 @@ const (
 )
 
 // projectLightweightLoopMaterials keeps the ReAct protocol and task-specific
-// schema intact while removing the full-session context that is uneconomical
-// for speed-priority models. The recent Timeline window is the sole historical
-// execution source; volatile auxiliary fields receive explicit budgets.
+// schema and exact user inputs intact while bounding execution history for
+// speed-priority models. Ordinary events use a recent Timeline window;
+// volatile auxiliary fields receive explicit budgets.
 func (pm *PromptManager) projectLightweightLoopMaterials(
 	base *reactloops.LoopPromptBaseMaterials,
 	input *reactloops.LoopPromptAssemblyInput,

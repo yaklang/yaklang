@@ -438,7 +438,7 @@ func (m *PromptContextProvider) CurrentTaskInfoDynamic() string {
 	}
 	results, err := aicommon.RenderPromptTemplate("current-task-info-dynamic", __prompt_currentTaskInfoDynamic, map[string]any{
 		"Progress":                m.Progress(),
-		"CurrentTaskUserInput":    currentTask.GetUserInput(),
+		"CurrentTaskUserInput":    m.timeline.WrapUserInputForPrompt(currentTask.GetUserInput()),
 		"ToolCallCount":           currentTask.ToolCallCount(),
 		"SingleLineStatusSummary": currentTask.SingleLineStatusSummary(),
 	})

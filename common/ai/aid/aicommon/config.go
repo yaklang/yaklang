@@ -3698,6 +3698,11 @@ func (c *Config) FormatUserInputHistory() string {
 
 func (c *Config) FormatUserInputHistoryAITag(nonce string, maxTokens int) string {
 	body := c.formatUserInputHistoryForPrompt(maxTokens)
+	if body != "" {
+		// Legacy helpers retain their bounded view, with framing applied after
+		// truncation so the view cannot lose its closing delimiter.
+		body = c.GetTimeline().WrapUserInputForPrompt(body)
+	}
 	if body == "" || strings.TrimSpace(nonce) == "" {
 		return body
 	}

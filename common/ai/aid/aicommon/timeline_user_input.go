@@ -115,7 +115,7 @@ func (m *Timeline) importUserInputHistory(history []schema.AIAgentUserInputRecor
 		if !ok || item == nil || item.deleted {
 			continue
 		}
-		if input, ok := item.value.(*UserInteraction); ok && input.Stage == UserInteractionStage_FreeInput && input.SystemPrompt == "" {
+		if input, ok := item.value.(*UserInteraction); ok && (input.Stage == UserInteractionStage_FreeInput || input.Stage == "") && input.SystemPrompt == "" {
 			existing[input.UserExtraPrompt]++
 		}
 	}

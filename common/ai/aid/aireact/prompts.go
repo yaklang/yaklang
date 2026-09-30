@@ -739,7 +739,7 @@ func (pm *PromptManager) GenerateAIBlueprintForgeParamsPrompt(
 func (pm *PromptManager) GenerateRequireConversationTitlePrompt(timeline string, userInput string) (string, error) {
 	return pm.executeTemplate("conversation-title", conversationTitlePrompt, map[string]interface{}{
 		"Timeline":     timeline,
-		"CurrentInput": userInput,
+		"CurrentInput": pm.wrapUserInputForPrompt(userInput),
 	})
 }
 
@@ -892,7 +892,7 @@ func (pm *PromptManager) buildIntervalReviewPromptForTask(
 
 	dynamicData := map[string]any{
 		"Nonce":     nonceString,
-		"UserQuery": userQuery,
+		"UserQuery": pm.wrapUserInputForPrompt(userQuery),
 	}
 	dynamicData["ToolName"] = aicommon.ShrinkStringByTokens(tool.Name, intervalReviewToolNameTokens)
 	dynamicData["ToolDescription"] = aicommon.ShrinkTextBlockByTokens(tool.Description, intervalReviewToolDescriptionTokens)

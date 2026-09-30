@@ -79,7 +79,9 @@ type PromptMaterials struct {
 	// 缓存边界包裹, 避免污染上游 prefix cache.
 	//
 	// 关键词: TodoSnapshot, 全局 TODO 块, timeline-open 段位
-	TodoSnapshot      string
+	TodoSnapshot string
+	// Deprecated: main prompts derive PromptedUserInputHistory and TimelineOpen
+	// from the exact Timeline journal. Kept for bounded legacy helper callers.
 	UserHistory       string
 	FrozenUserContext string
 

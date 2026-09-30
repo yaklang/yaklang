@@ -57,7 +57,9 @@ func (p *PromotableTimelineItem) OpenPromptText() string {
 		return fmt.Sprintf("[state %s/%s reused]", p.Kind, p.Key)
 	}
 	if p.Kind == TimelinePromotedKindUserInput {
-		return "[user_input]:\n" + p.Payload + "\n[user_input_end]"
+		// Only the owning Timeline can supply the session-bound framing key.
+		// Prompt construction uses promotableOpenPromptTextLocked instead.
+		return p.Payload
 	}
 	return fmt.Sprintf("[state %s/%s]\n%s", p.Kind, p.Key, p.Payload)
 }

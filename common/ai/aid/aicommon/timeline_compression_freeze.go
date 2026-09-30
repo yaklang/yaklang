@@ -105,14 +105,15 @@ func (m *Timeline) freezeBudgetGroupsLocked(useSizer bool) TimelineIntervalBlock
 			continue
 		}
 		if control := timelinePromotionForItem(item); control != nil {
+			openText := m.promotableOpenPromptTextLocked(control)
 			item = &TimelineItem{createdAt: item.createdAt, value: &TextTimelineItem{
-				ID: id, Text: m.promotableOpenPromptTextLocked(control),
+				ID: id, Text: openText,
 			}}
 			if control.Kind == TimelinePromotedKindUserInput {
-				item.value = &timelineUserInputPromptItem{TextTimelineItem{ID: id, Text: m.promotableOpenPromptTextLocked(control)}}
+				item.value = &timelineUserInputPromptItem{TextTimelineItem{ID: id, Text: openText}}
 			}
 			if control.Kind == TimelinePromotedKindRecentTool {
-				item.value = &timelineToolCachePromptItem{TextTimelineItem{ID: id, Text: m.promotableOpenPromptTextLocked(control)}}
+				item.value = &timelineToolCachePromptItem{TextTimelineItem{ID: id, Text: openText}}
 			}
 		}
 		view.idToTimelineItem.OrderInsert(id, item, lessInt64)
@@ -236,12 +237,13 @@ func (m *Timeline) frozenPromptBlocksLocked(excludeToolCache bool, onlyUserInput
 					continue
 				}
 				// A detached prompt view preserves the journal, reducer exclusion and UI audit.
-				item = &TimelineItem{createdAt: item.createdAt, value: &TextTimelineItem{ID: id, Text: m.promotableOpenPromptTextLocked(op)}}
+				openText := m.promotableOpenPromptTextLocked(op)
+				item = &TimelineItem{createdAt: item.createdAt, value: &TextTimelineItem{ID: id, Text: openText}}
 				if op.Kind == TimelinePromotedKindUserInput {
-					item.value = &timelineUserInputPromptItem{TextTimelineItem{ID: id, Text: m.promotableOpenPromptTextLocked(op)}}
+					item.value = &timelineUserInputPromptItem{TextTimelineItem{ID: id, Text: openText}}
 				}
 				if op.Kind == TimelinePromotedKindRecentTool {
-					item.value = &timelineToolCachePromptItem{TextTimelineItem{ID: id, Text: m.promotableOpenPromptTextLocked(op)}}
+					item.value = &timelineToolCachePromptItem{TextTimelineItem{ID: id, Text: openText}}
 				}
 			}
 			block.Items = append(block.Items, item)

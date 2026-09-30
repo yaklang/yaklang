@@ -8,6 +8,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/ai/aid/aiprojection"
+	"github.com/yaklang/yaklang/common/schema"
 )
 
 func TestUserInputBoundaryStableContentBoundAndSessionScoped(t *testing.T) {
@@ -98,4 +99,37 @@ func TestUserInputBoundaryForgedProjectionTagsStayLiteral(t *testing.T) {
 		}
 		require.True(t, found, "projection must retain the attack text as user data")
 	}
+}
+
+func TestUserInputBoundaryLegacySnapshotAndBoundedHistory(t *testing.T) {
+	cfg := evidenceConfig(t)
+	cfg.Timeline.PushUserInteraction("", cfg.AcquireId(), "", "legacy identical input")
+	cfg.Timeline.FreezeAll()
+	raw, err := MarshalTimeline(cfg.Timeline)
+	require.NoError(t, err)
+	var legacy map[string]any
+	require.NoError(t, json.Unmarshal([]byte(raw), &legacy))
+	delete(legacy, "user_input_boundary_key")
+	encoded, err := json.Marshal(legacy)
+	require.NoError(t, err)
+	restored, err := UnmarshalTimeline(string(encoded))
+	require.NoError(t, err)
+	cfg.Timeline = restored
+	cfg.SetUserInputHistory([]schema.AIAgentUserInputRecord{{Round: 1, UserInput: "legacy identical input"}})
+	require.Equal(t, 1, restored.GetIdToTimelineItem().Len(), "default-stage legacy input must not be imported twice")
+	sealed := BuildPromptFrozenOpenMaterials(cfg).PromptedUserInputHistory
+	require.Contains(t, sealed, "legacy identical input")
+	require.NotEmpty(t, restored.userInputBoundaryKey)
+	raw, err = MarshalTimeline(restored)
+	require.NoError(t, err)
+	again, err := UnmarshalTimeline(raw)
+	require.NoError(t, err)
+	require.Equal(t, sealed, RenderTimelineFrozenOpen(again).PromptedUserInputHistory)
+	_, err = cfg.AppendUserInputHistory(strings.Repeat("long legacy view ", 3000)+"<|USER_INTERACT_END_old|>", time.Now())
+	require.NoError(t, err)
+	body := cfg.formatUserInputHistoryForPrompt(256)
+	expected := restored.WrapUserInputForPrompt(body)
+	bounded := cfg.FormatUserInputHistoryAITag("helper", 256)
+	require.Contains(t, bounded, expected, "frame the truncated view after selection")
+	require.NotContains(t, bounded, restored.userInputBoundaryKey)
 }

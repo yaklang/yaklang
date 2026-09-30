@@ -246,7 +246,7 @@ func GenerateAIReviewPrompt(config *Config, userQuery, toolOrTitle, params strin
 	data := &AIReviewPromptData{
 		CurrentTime: time.Now().Format("2006-01-02 15:04"),
 		OSArch:      fmt.Sprintf("%s/%s", runtime.GOOS, runtime.GOARCH),
-		UserQuery:   userQuery,
+		UserQuery:   config.GetTimeline().WrapUserInputForPrompt(userQuery),
 		Title:       toolOrTitle,
 		Details:     params,
 		Nonce:       utils.RandStringBytes(4),

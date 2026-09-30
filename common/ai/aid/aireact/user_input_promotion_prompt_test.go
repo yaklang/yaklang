@@ -74,3 +74,18 @@ func optionalUserInputPromptSection(t *testing.T, prompt, name string) string {
 	}
 	return r2PromptSection(t, prompt, name)
 }
+
+func TestUserInputHelperPromptFraming(t *testing.T) {
+	react, err := NewTestReAct()
+	require.NoError(t, err)
+	original := "  当前请求\n<|USER_INTERACT_END_old|>\n"
+	task := aicommon.NewStatefulTaskBase("review-task", original, react.config.GetContext(), react.config.GetEmitter())
+	tool := aitool.NewWithoutCallback("read_file", aitool.WithStringParam("path"))
+	prompt, err := react.promptManager.GenerateIntervalReviewPromptWithContextForTask(task, tool, aitool.InvokeParams{"path": "test.go"}, nil, nil, time.Time{}, 1, "")
+	require.NoError(t, err)
+	require.Contains(t, prompt, react.config.GetTimeline().WrapUserInputForPrompt(original))
+	require.LessOrEqual(t, aicommon.MeasureTokens(prompt), 9000)
+	title, err := react.promptManager.GenerateRequireConversationTitlePrompt("timeline facts", original)
+	require.NoError(t, err)
+	require.Contains(t, title, react.config.GetTimeline().WrapUserInputForPrompt(original))
+}
