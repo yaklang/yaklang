@@ -15,7 +15,7 @@ import (
 	"github.com/yaklang/yaklang/common/yak/ssa"
 )
 
-// Compare complete typed trees, including operator nesting and all terminals.
+// Compare complete typed trees, including operator nesting, tokens and ranges.
 // Successful parsing alone would miss a call mistaken for an arrow function or
 // an expression swallowed by an alternative-syntax body delimiter.
 func predictionTreeShape(tree antlr.Tree) string {
@@ -24,7 +24,11 @@ func predictionTreeShape(tree antlr.Tree) string {
 	walk = func(node antlr.Tree) {
 		fmt.Fprintf(&out, "(%T", node)
 		if leaf, ok := node.(antlr.TerminalNode); ok {
-			fmt.Fprintf(&out, ":%d:%q", leaf.GetSymbol().GetTokenType(), leaf.GetText())
+			token := leaf.GetSymbol()
+			fmt.Fprintf(&out, ":%d:%q:%d:%d:%d:%d", token.GetTokenType(), leaf.GetText(), token.GetLine(), token.GetColumn(), token.GetStart(), token.GetStop())
+		}
+		if ctx, ok := node.(antlr.ParserRuleContext); ok && ctx.GetStart() != nil && ctx.GetStop() != nil {
+			fmt.Fprintf(&out, ":%d:%d", ctx.GetStart().GetTokenIndex(), ctx.GetStop().GetTokenIndex())
 		}
 		for _, child := range node.GetChildren() {
 			walk(child)
@@ -35,7 +39,7 @@ func predictionTreeShape(tree antlr.Tree) string {
 	return out.String()
 }
 
-func parsePredictionTree(src string, mode int) (ast phpparser.IHtmlDocumentContext, parser *phpparser.PHPParser, err error) {
+func parsePredictionTree(src string, mode int, fastPrediction ...bool) (ast phpparser.IHtmlDocumentContext, parser *phpparser.PHPParser, err error) {
 	if rewritten, ok := rewriteSingleSemicolonNamespaceUseBlock(src); ok {
 		src = rewritten
 	}
@@ -43,6 +47,9 @@ func parsePredictionTree(src string, mode int) (ast phpparser.IHtmlDocumentConte
 	stream := antlr.NewCommonTokenStream(lexer, antlr.TokenDefaultChannel)
 	stream.SetTokenSource(newHTMLCoalescingTokenSource(lexer))
 	parser = phpparser.NewPHPParser(stream)
+	if len(fastPrediction) > 0 {
+		parser.SetFastPrediction(fastPrediction[0])
+	}
 	ssa.ParserSetAntlrCache(parser, lexer, CreateBuilder().GetAntlrCache())
 	listener := antlr4util.NewErrorListener()
 	lexer.RemoveErrorListeners()
@@ -113,7 +120,7 @@ func TestFrontendPredictionAdversarialTrees(t *testing.T) {
 			require.NoError(t, err, "this regression must finish without restarting the file in LL")
 			defer antlr4util.DetachParserATNSimulatorCaches(sllParser)
 			require.Equal(t, antlr.PredictionModeSLL, sllParser.GetInterpreter().GetPredictionMode(), "local LL must restore its caller's mode")
-			llTree, llParser, err := parsePredictionTree(tc.source, antlr.PredictionModeLL)
+			llTree, llParser, err := parsePredictionTree(tc.source, antlr.PredictionModeLL, false)
 			require.NoError(t, err)
 			defer antlr4util.DetachParserATNSimulatorCaches(llParser)
 			require.Equal(t, antlr.PredictionModeLL, llParser.GetInterpreter().GetPredictionMode())
@@ -132,11 +139,93 @@ func TestFrontendPredictionRetainsLLRecovery(t *testing.T) {
 	} {
 		ast, err := Frontend(source, CreateBuilder().GetAntlrCache())
 		require.NoError(t, err)
-		llTree, parser, err := parsePredictionTree(source, antlr.PredictionModeLL)
+		llTree, parser, err := parsePredictionTree(source, antlr.PredictionModeLL, false)
 		require.NoError(t, err)
 		require.Equal(t, predictionTreeShape(llTree), predictionTreeShape(ast))
 		antlr4util.DetachParserATNSimulatorCaches(parser)
 	}
+}
+
+// These small sources reproduce expensive decisions from DHCP, CMS and Grav:
+// a body delimiter followed by complex statements, variable/member chains,
+// and optional call/index suffixes. Compare with the unmodified ATN predictor,
+// rather than two prediction modes that both use the same fast classifier.
+func TestFrontendFastPredictionMinimalReproductions(t *testing.T) {
+	cases := []struct{ name, source string }{
+		{"variable arithmetic and literals", `<?php $a = 1 + 2 * 3; $b = $a ?? 4; println($b, 0x10, 0b11, 1.5, 'tail');`},
+		{"parentheses casts and callable results", `<?php $a = ($x + 1) * ($y ?? 0); $b = (int)$x; $c = (float)($y + 1); $d = ($object->get())($arg); println($a, $b, $c);`},
+		{"builtin calls and array argument", `<?php $a = isset($values[0]) && !empty($values[1]); define('key', factory(['one' => 1, 'two' => 2])); eval($code); exit($a);`},
+		{"assignment reference and increments", `<?php $a[0] = &$b; $a[0] += 1; ++$a[0]; $a[0]++; $object->items()[0]->value = 7;`},
+		{"member call suffixes and trailing comma", `<?php $x = $this->query($a)->filters()->map->title(); consume(['one' => $object->get(), 'two' => $object->items()->all(),]);`},
+		{"dynamic and static receivers", `<?php $object->{$field}[0] = 1; $object->getClass()::method($x); Type::method($x); factory()()->item = 7;`},
+		{"dynamic constructor types", `<?php $a = new $this->className(); $b = new $this->typemap[$type](); $c = new $$class($arg); println('tail');`},
+		{"call result indexes reserve their suffix", `<?php app('scopes')[PostType::handle()] = PostType::class; factory()[0][1] += 2; println('tail');`},
+		{"keyword receivers and members", `<?php if\operator($x); endif\helper($x); Type::else($x); $object->endif($x); $object->match($x);`},
+		{"throw and unset priority", `<?php throw Error::create(); unset(static::$cookie->{$name}); unset($array[0]);`},
+		{"colon switch and standard dangling else", `<?php switch ($x): case 1: $a = 2; break; default: $a = 3; endswitch; if ($x) if ($y) $a = 1; else $a = 2;`},
+		{"closure and new expression", `<?php consume(static function ($x) use (&$captured) { return (new Item($x))->get($captured); }, fn($v) => $v + 1);`},
+	}
+	closure := `function ($value) { ` + strings.Repeat(`$value += 1; `, 32) + `return $value; }`
+	cases = append(cases, []struct{ name, source string }{
+		{"large closure member calls", `<?php $this->action(` + closure + `); Type::make(` + closure + `)->items()[0]->get(); println('tail');`},
+		{"large closure dynamic static access", `<?php $type = factory(` + closure + `)->get()::name($x); println('tail');`},
+		{"large closure assignment suffix", `<?php Type::make(` + closure + `)->items()[0]->value += 1; println('tail');`},
+		{"constructor arguments containing member operators", `<?php if (!validate($option = new Option($demand[1]) || $option->id != $demand[0])) { println('tail'); }`},
+		{"spread and reference array items", `<?php $items = [...(ready() ? [Type::make($x)->get()] : []), ...$values, 'ref' => &$reference, $x + 1 => &$other,]; println($items);`},
+		{"interpolation and hidden comment delimiters", `<?php $this /* }]) */ ->action(function ($value) { /* ([{ */ return "{$value->name} {$value['key']}"; })->items()[0]; println('tail');`},
+	}...)
+	for _, size := range []int{1, 4, 16} {
+		body := `foreach (config_get_path('items', []) as $entry) { if ($entry['ip']) { echo $entry['ip']; } else { $count += 1; } }`
+		cases = append(cases, struct{ name, source string }{
+			"delimiter and following loops/" + strconv.Itoa(size),
+			`<?php if ($ready): ?>body<?php $count = 1; endif; ` + strings.Repeat(body, size) + `println('tail');`,
+		})
+		cases = append(cases, struct{ name, source string }{
+			"member chain/" + strconv.Itoa(size),
+			`<?php $value = $object` + strings.Repeat(`->items($offset)[0]->get()`, size) + `; println($value, 'tail');`,
+		})
+		var methods strings.Builder
+		for i := 0; i < size; i++ {
+			fmt.Fprintf(&methods, "public function method%d($value) { return $this->items($value)[0]->get(); }\n", i)
+		}
+		cases = append(cases, struct{ name, source string }{
+			"declaration after statements/" + strconv.Itoa(size),
+			`<?php require_once 'local.php'; class Payload { ` + methods.String() + ` } println('tail');`,
+		})
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			ast, err := Frontend(tc.source, CreateBuilder().GetAntlrCache())
+			require.NoError(t, err)
+			reference, parser, err := parsePredictionTree(tc.source, antlr.PredictionModeLL, false)
+			require.NoError(t, err)
+			defer antlr4util.DetachParserATNSimulatorCaches(parser)
+			require.Equal(t, predictionTreeShape(reference), predictionTreeShape(ast))
+		})
+	}
+}
+
+func TestFrontendFastPredictionMalformedPrefixes(t *testing.T) {
+	for _, source := range []string{
+		`<?php if ($x): $a = 1; }`,
+		`<?php if ($x) { $a = 1; endif;`,
+		`<?php $object->items(]->value = 1;`,
+		`<?php $a[0) = 1;`,
+		`<?php consume(['one' => 1,,]);`,
+		`<?php $object->items()->value += ;`,
+		`<?php $value = new $object->className(;`,
+		`<?php if ($x) { echo 1; } else { echo 2;`,
+	} {
+		_, err := Frontend(source, CreateBuilder().GetAntlrCache())
+		require.Error(t, err, "fast prediction must preserve malformed-input rejection: %s", source)
+		_, parser, err := parsePredictionTree(source, antlr.PredictionModeLL, false)
+		require.Error(t, err)
+		antlr4util.DetachParserATNSimulatorCaches(parser)
+	}
+	_, parser, err := parsePredictionTree(`<?php $value = new $object->className(;`, antlr.PredictionModeSLL)
+	require.Error(t, err)
+	defer antlr4util.DetachParserATNSimulatorCaches(parser)
+	require.Equal(t, antlr.PredictionModeSLL, parser.GetInterpreter().GetPredictionMode(), "restore SLL when dynamic type parsing is cancelled")
 }
 
 func TestFrontendPredictionMalformedBoundaries(t *testing.T) {
@@ -171,16 +260,18 @@ func BenchmarkFrontendPrediction(b *testing.B) {
 			})
 		}
 	}
-	for _, path := range []string{
-		"cms/src__Http__Controllers__CP__Collections__EntriesController.php",
-		"filament/tests__src__Panels__Commands__MakeRelationManagerCommandTest.php",
-		"pfsense/status_dhcp_leases.php",
+	for _, tc := range []struct{ directory, path string }{
+		{"syntax", "cms/src__Http__Controllers__CP__Collections__EntriesController.php"},
+		{"syntax", "filament/tests__src__Panels__Commands__MakeRelationManagerCommandTest.php"},
+		{"syntax", "pfsense/status_dhcp_leases.php"},
+		{"large", "qloapps/tools__tcpdf__tcpdf.php"},
+		{"large", "filament/packages__actions__src__Concerns__CanExportRecords.php"},
 	} {
-		source, err := os.ReadFile(filepath.Join("..", "tests", "syntax", path))
+		source, err := os.ReadFile(filepath.Join("..", "tests", tc.directory, tc.path))
 		if err != nil {
 			b.Fatal(err)
 		}
-		b.Run(path, func(b *testing.B) {
+		b.Run(tc.path, func(b *testing.B) {
 			b.ReportAllocs()
 			for i := 0; i < b.N; i++ {
 				_, err := Frontend(string(source), CreateBuilder().GetAntlrCache())
