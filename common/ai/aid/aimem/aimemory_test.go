@@ -5,10 +5,13 @@ import (
 	_ "embed"
 	"encoding/json"
 	"path/filepath"
+	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/gorm"
+	"github.com/yaklang/yaklang/common/ai/rag/vectorstore"
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
@@ -603,25 +606,6 @@ func TestSearchEdgeCases(t *testing.T) {
 	log.Infof("search edge cases test completed")
 }
 
-func setupTestDB(t *testing.T) *gorm.DB {
-	// 创建临时文件数据库用于测试，避免并发访问问题
-	t.Helper()
-	dbFile := filepath.Join(t.TempDir(), "memory.db")
-
-	db, err := gorm.Open("sqlite3", dbFile)
-	require.NoError(t, err)
-	t.Cleanup(func() { _ = db.Close() })
-
-	// 自动迁移表结构
-	schema.AutoMigrate(db, schema.KEY_SCHEMA_PROFILE_DATABASE)
-
-	// 设置数据库连接池和超时
-	db.DB().SetMaxOpenConns(1)
-	db.DB().SetMaxIdleConns(1)
-
-	return db
-}
-
 // 清理测试数据
 func getTestDatabase(t testing.TB) (*gorm.DB, error) {
 	// 创建临时文件数据库用于测试，避免并发访问问题
@@ -633,13 +617,13 @@ func getTestDatabase(t testing.TB) (*gorm.DB, error) {
 		return nil, err
 	}
 
-	t.Cleanup(func() { _ = db.Close() })
+	t.Cleanup(func() { closeMemoryFixture(t, db) })
 	// Keep real disk persistence, but migrate only the memory/RAG schemas that
 	// these fixtures exercise, rather than every unrelated Yakit table.
-	if err := db.AutoMigrate(&schema.AIMemoryEntity{}, &schema.AIMemoryCollection{},
+	if err := migrateMemoryFixture(db, &schema.AIMemoryEntity{}, &schema.AIMemoryCollection{},
 		&schema.ProjectGeneralStorage{}, &schema.VectorStoreCollection{},
-		&schema.VectorStoreDocument{}, &schema.KnowledgeBaseInfo{},
-		&schema.KnowledgeBaseEntry{}).Error; err != nil {
+		&schema.VectorStoreDocument{}, &schema.KnowledgeBaseInfo{}, &schema.KnowledgeBaseEntry{},
+		&schema.ERModelEntity{}, &schema.ERModelRelationship{}, &schema.EntityRepository{}); err != nil {
 		return nil, err
 	}
 
@@ -648,4 +632,36 @@ func getTestDatabase(t testing.TB) (*gorm.DB, error) {
 	db.DB().SetMaxIdleConns(1)
 
 	return db, nil
+}
+
+// Prepare real SQLite tables/indexes atomically. Every fixture retains its own
+// disk file and normal durability; production writes/restarts stay outside this transaction.
+func migrateMemoryFixture(db *gorm.DB, models ...interface{}) error {
+	tx := db.Begin()
+	if tx.Error != nil {
+		return tx.Error
+	}
+	defer tx.Rollback()
+	if err := tx.AutoMigrate(models...).Error; err != nil {
+		return err
+	}
+	return tx.Commit().Error
+}
+
+// Search schedules cleanup and RAG owns queued graph operations. A fixture must
+// join both owners before closing SQLite/removing its TempDir; SQL.Close alone
+// does not prevent an in-flight operation from writing a journal afterward.
+func closeMemoryFixture(t testing.TB, db *gorm.DB) {
+	t.Helper()
+	require.Eventually(t, func() bool {
+		return globalCoordinator.lastDB.Load() != db.DB() || atomic.LoadInt32(&globalCoordinator.cleanupRunning) == 0
+	}, 3*time.Second, time.Millisecond, "memory cleanup still owns the fixture database")
+	if db.HasTable(&schema.VectorStoreCollection{}) {
+		var collections []schema.VectorStoreCollection
+		require.NoError(t, db.Find(&collections).Error)
+		for i := range collections {
+			vectorstore.GraphWrapperManager.RemoveCollectionFromCache(db, &collections[i])
+		}
+	}
+	require.NoError(t, db.Close())
 }

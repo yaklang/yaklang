@@ -63,7 +63,7 @@ run_package() {
   local pkg="$1" timeout="$2" run_pat="$3" skip_pat="$4" parallel="$5"
   local retry="$6" retry_delay="$7"
   local safe="$(printf '%s' "$pkg" | sed 's|^\./||; s|/|_|g; s|[.*]|_|g')"
-  local log="$TEST_LOG_DIR/pkg_${safe}.run.log"
+  local log
   local max_retries="${retry:-0}" delay="${retry_delay:-5}"
   local attempt=0 rc=1
 
@@ -84,6 +84,7 @@ run_package() {
       echo " retry ($((attempt + 1))/$((max_retries + 1))): $pkg"
       sleep "$delay"
     fi
+    log="$TEST_LOG_DIR/pkg_${safe}.attempt_$((attempt + 1)).run.log"
     echo "===== go test $pkg ${args[*]} (cwd: $pkg_dir) ====="
     # Run from the package directory like the compiled-binary runner did, so tests
     # that resolve testdata or fixtures through relative paths behave identically.
@@ -123,6 +124,12 @@ run_package() {
       rc=0
       break
     fi
+    echo "Failure evidence: $pkg (attempt $((attempt + 1)))"
+    # The final 60 result lines can hide an early failure. Retain its assertions
+    # without dumping unrelated Yak traces or discarding it on retry.
+    awk '/^[[:space:]]*--- FAIL: / { print; next }
+      /Error Trace:|Error:|Messages:|assertion failed:|TempDir RemoveAll cleanup:|WARNING: DATA RACE|panic:|fatal error:|test timed out/ { print; remaining=12; next }
+      remaining > 0 { print; remaining-- }' "$log" | head -160
     echo "FAIL: $pkg (attempt $((attempt + 1))/$((max_retries + 1)))" | tee -a "$log"
     attempt=$((attempt + 1))
   done

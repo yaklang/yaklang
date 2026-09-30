@@ -6,8 +6,10 @@ import (
 	"encoding/json"
 	"os"
 	"regexp"
+	"runtime"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools/yakscripttools"
@@ -128,6 +130,24 @@ func TestBashToolTimeoutHasNoFabricatedExitCode(t *testing.T) {
 	assert.Equal(t, utils.InterfaceToBoolean(result["exit_code_available"]), false)
 	assert.Assert(t, utils.IsNil(result["exit_code"]), "timeout must expose a null exit code, got %#v", result["exit_code"])
 	assert.Equal(t, utils.InterfaceToString(result["termination_reason"]), "timeout")
+}
+
+func TestBashToolInheritedPipesRespectDeadline(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("fixture uses Unix background shell syntax")
+	}
+	stdout, stderr := bytes.NewBuffer(nil), bytes.NewBuffer(nil)
+	start := time.Now()
+	raw, err := getBashTool(t).Callback(context.Background(), aitool.InvokeParams{
+		"command": "sleep 5 & printf 'PARENT_OUTPUT_READY\\n'", "shell": "bash", "timeout": 1,
+	}, nil, stdout, stderr)
+	assert.NilError(t, err)
+	assert.Assert(t, time.Since(start) < 3*time.Second, "inherited output pipes must not extend the command deadline")
+	result := utils.InterfaceToGeneralMap(raw)
+	assert.Equal(t, result["timed_out"], true)
+	assert.Equal(t, result["termination_reason"], "timeout")
+	assert.Equal(t, result["exit_code_available"], false)
+	assert.Assert(t, strings.Contains(stdout.String(), "PARENT_OUTPUT_READY"), "parent output must be drained before cancellation: %s", stdout.String())
 }
 
 func TestBashToolNormalizesGeneratedScriptLineEndings(t *testing.T) {

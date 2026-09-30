@@ -40,8 +40,6 @@ func TestSearchMemory_Basic(t *testing.T) {
 		if err != nil {
 			t.Fatalf("handle memory failed for input '%s': %v", input, err)
 		}
-		// 添加小延迟避免时间戳冲突
-		time.Sleep(10 * time.Millisecond)
 	}
 
 	// 测试搜索功能
@@ -111,7 +109,6 @@ func TestSearchMemory_TokenLimit(t *testing.T) {
 		if err != nil {
 			t.Fatalf("handle memory failed: %v", err)
 		}
-		time.Sleep(10 * time.Millisecond)
 	}
 
 	// 测试不同的字节限制

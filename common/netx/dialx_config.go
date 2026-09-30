@@ -9,12 +9,13 @@ import (
 
 	"github.com/yaklang/yaklang/common/consts"
 
-	utls "github.com/yaklang/yaklang/common/third_party/utls"
 	"github.com/yaklang/yaklang/common/gmsm/gmtls"
+	utls "github.com/yaklang/yaklang/common/third_party/utls"
 	"github.com/yaklang/yaklang/common/utils"
 )
 
 type DialXTraceInfo struct {
+	durationMu sync.RWMutex
 	// dial 耗时 (包括重试
 	TotalTime time.Duration
 	// tcp dial time
@@ -35,21 +36,35 @@ func (d *DialXTraceInfo) SetTLSHandshakeDuration(t time.Duration) {
 	if d == nil {
 		return
 	}
+	d.durationMu.Lock()
 	d.TLSHandshakeTime = t
+	d.durationMu.Unlock()
 }
 
 func (d *DialXTraceInfo) SetTotalDuration(t time.Duration) {
 	if d == nil {
 		return
 	}
+	d.durationMu.Lock()
 	d.TotalTime = t
+	d.durationMu.Unlock()
 }
 
 func (d *DialXTraceInfo) SetTCPDuration(t time.Duration) {
 	if d == nil {
 		return
 	}
+	d.durationMu.Lock()
 	d.TCPtime = t
+	d.durationMu.Unlock()
+}
+
+// Durations safely observes an in-flight dial when its caller is cancelled
+// before the legacy/custom dialer returns.
+func (d *DialXTraceInfo) Durations() (total, tcp, tlsHandshake time.Duration) {
+	d.durationMu.RLock()
+	defer d.durationMu.RUnlock()
+	return d.TotalTime, d.TCPtime, d.TLSHandshakeTime
 }
 
 func (d *DialXTraceInfo) AddTLSRetryTip(tip string) {

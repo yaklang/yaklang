@@ -150,7 +150,7 @@ func TestBatchDoHTTPRequestUsageExplainsSurveyAndRecovery(t *testing.T) {
 
 // Test 1: Basic batch GET requests - verify summary output
 func TestBatchDoHTTPRequest_BasicGet(t *testing.T) {
-	host, port := utils.DebugMockHTTP([]byte("response_body"))
+	host, port := startImmediateHTTPResponse(t, []byte("response_body"))
 
 	tool := getBatchDoHTTPRequestTool(t)
 	stdout, _ := execBatchTool(t, tool, aitool.InvokeParams{
@@ -164,12 +164,12 @@ func TestBatchDoHTTPRequest_BasicGet(t *testing.T) {
 	assert.Assert(t, strings.Contains(stdout, "Responses: 2"), "should show 2 received responses")
 	assert.Assert(t, strings.Contains(stdout, "/path1"), "path1 should appear")
 	assert.Assert(t, strings.Contains(stdout, "/path2"), "path2 should appear")
-	assert.Assert(t, strings.Contains(stdout, "request #1 packet") || strings.Contains(stdout, "request #2 packet"), "each generated batch request packet should be printed")
+	assert.Assert(t, strings.Contains(stdout, "request #1 packet") && strings.Contains(stdout, "request #2 packet"), "both concurrent request packets should be printed without lost output")
 }
 
 // Test 2: Prefix parameter
 func TestBatchDoHTTPRequest_Prefix(t *testing.T) {
-	host, port := utils.DebugMockHTTP([]byte("ok"))
+	host, port := startImmediateHTTPResponse(t, []byte("ok"))
 
 	tool := getBatchDoHTTPRequestTool(t)
 	stdout, _ := execBatchTool(t, tool, aitool.InvokeParams{
@@ -187,7 +187,7 @@ func TestBatchDoHTTPRequest_Prefix(t *testing.T) {
 
 // Test 3: Single custom header via headers parameter
 func TestBatchDoHTTPRequest_SingleHeader(t *testing.T) {
-	host, port := utils.DebugMockHTTPEx(func(req []byte) []byte {
+	host, port := startRawHTTPResponse(t, func(req []byte) []byte {
 		reqStr := string(req)
 		if strings.Contains(reqStr, "X-Custom-Header: custom-value-123") {
 			return []byte("HTTP/1.1 200 OK\r\n\r\nheader_received")
@@ -210,7 +210,7 @@ func TestBatchDoHTTPRequest_SingleHeader(t *testing.T) {
 
 // Test 4: Multiple custom headers via multi-line headers parameter
 func TestBatchDoHTTPRequest_MultipleHeaders(t *testing.T) {
-	host, port := utils.DebugMockHTTPEx(func(req []byte) []byte {
+	host, port := startRawHTTPResponse(t, func(req []byte) []byte {
 		reqStr := string(req)
 		hasAuth := strings.Contains(reqStr, "Authorization: Bearer token123")
 		hasReqID := strings.Contains(reqStr, "X-Request-Id: abc456")
@@ -235,7 +235,7 @@ func TestBatchDoHTTPRequest_MultipleHeaders(t *testing.T) {
 
 // Test 5: Exclude status codes
 func TestBatchDoHTTPRequest_ExcludeCodes(t *testing.T) {
-	host, port := utils.DebugMockHTTPHandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	host, port := startHTTPHandler(t, func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/ok" {
 			w.WriteHeader(200)
 			w.Write([]byte("success"))
@@ -260,7 +260,7 @@ func TestBatchDoHTTPRequest_ExcludeCodes(t *testing.T) {
 
 // Test 6: Include only specific status codes
 func TestBatchDoHTTPRequest_IncludeCodes(t *testing.T) {
-	host, port := utils.DebugMockHTTPHandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	host, port := startHTTPHandler(t, func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/ok" {
 			w.WriteHeader(200)
 			w.Write([]byte("success"))
@@ -285,7 +285,7 @@ func TestBatchDoHTTPRequest_IncludeCodes(t *testing.T) {
 
 // Test 7: POST method with body
 func TestBatchDoHTTPRequest_PostWithBody(t *testing.T) {
-	host, port := utils.DebugMockHTTPEx(func(req []byte) []byte {
+	host, port := startRawHTTPResponse(t, func(req []byte) []byte {
 		reqStr := string(req)
 		if strings.Contains(reqStr, "POST") && strings.Contains(reqStr, `"test":"value"`) {
 			return []byte("HTTP/1.1 200 OK\r\n\r\npost_ok")
@@ -309,7 +309,7 @@ func TestBatchDoHTTPRequest_PostWithBody(t *testing.T) {
 
 // Test 8: Sequential execution with delay
 func TestBatchDoHTTPRequest_DelaySequential(t *testing.T) {
-	host, port := utils.DebugMockHTTP([]byte("test"))
+	host, port := startImmediateHTTPResponse(t, []byte("test"))
 
 	tool := getBatchDoHTTPRequestTool(t)
 	stdout, _ := execBatchTool(t, tool, aitool.InvokeParams{
@@ -328,7 +328,7 @@ func TestBatchDoHTTPRequest_DelaySequential(t *testing.T) {
 func TestBatchDoHTTPRequest_KeywordMatch(t *testing.T) {
 	keyword := "UNIQUE_KEYWORD_" + utils.RandStringBytes(10)
 	body := "prefix " + keyword + " suffix"
-	host, port := utils.DebugMockHTTP([]byte(body))
+	host, port := startImmediateHTTPResponse(t, []byte(body))
 
 	tool := getBatchDoHTTPRequestTool(t)
 	stdout, _ := execBatchTool(t, tool, aitool.InvokeParams{
@@ -345,7 +345,7 @@ func TestBatchDoHTTPRequest_KeywordMatch(t *testing.T) {
 // Test 10: Redirect handling
 func TestBatchDoHTTPRequest_Redirect(t *testing.T) {
 	flag := "FINAL_PAGE_" + utils.RandStringBytes(10)
-	host, port := utils.DebugMockHTTPHandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	host, port := startHTTPHandler(t, func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/final" {
 			w.WriteHeader(200)
 			w.Write([]byte(flag))
@@ -368,7 +368,7 @@ func TestBatchDoHTTPRequest_Redirect(t *testing.T) {
 
 // Test 11: No redirect
 func TestBatchDoHTTPRequest_NoRedirect(t *testing.T) {
-	host, port := utils.DebugMockHTTPHandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	host, port := startHTTPHandler(t, func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/final" {
 			w.WriteHeader(200)
 			w.Write([]byte("final_page"))
@@ -392,7 +392,7 @@ func TestBatchDoHTTPRequest_NoRedirect(t *testing.T) {
 
 // Test 12: Concurrent vs sequential execution
 func TestBatchDoHTTPRequest_ConcurrentMode(t *testing.T) {
-	host, port := utils.DebugMockHTTP([]byte("test"))
+	host, port := startImmediateHTTPResponse(t, []byte("test"))
 
 	tool := getBatchDoHTTPRequestTool(t)
 	stdout, _ := execBatchTool(t, tool, aitool.InvokeParams{
@@ -421,7 +421,7 @@ func TestBatchDoHTTPRequest_ErrorHandling(t *testing.T) {
 
 // Test 14: Content-Type header
 func TestBatchDoHTTPRequest_ContentType(t *testing.T) {
-	host, port := utils.DebugMockHTTPEx(func(req []byte) []byte {
+	host, port := startRawHTTPResponse(t, func(req []byte) []byte {
 		reqStr := string(req)
 		if strings.Contains(reqStr, "Content-Type: application/xml") {
 			return []byte("HTTP/1.1 200 OK\r\n\r\nctype_ok")
@@ -445,7 +445,7 @@ func TestBatchDoHTTPRequest_ContentType(t *testing.T) {
 
 // Test 15: Results summary table
 func TestBatchDoHTTPRequest_ResultsSummary(t *testing.T) {
-	host, port := utils.DebugMockHTTP([]byte("test"))
+	host, port := startImmediateHTTPResponse(t, []byte("test"))
 
 	tool := getBatchDoHTTPRequestTool(t)
 	stdout, _ := execBatchTool(t, tool, aitool.InvokeParams{
@@ -465,7 +465,7 @@ func TestBatchDoHTTPRequest_ResultsSummary(t *testing.T) {
 // Test 16: HTTPS mode forcing
 func TestBatchDoHTTPRequest_HttpsMode(t *testing.T) {
 	flag := "HTTPS_TEST_" + utils.RandStringBytes(10)
-	host, port := utils.DebugMockHTTP([]byte(flag))
+	host, port := startImmediateHTTPResponse(t, []byte(flag))
 
 	tool := getBatchDoHTTPRequestTool(t)
 	stdout, _ := execBatchTool(t, tool, aitool.InvokeParams{
@@ -481,7 +481,7 @@ func TestBatchDoHTTPRequest_HttpsMode(t *testing.T) {
 
 // Test 17: Query parameters
 func TestBatchDoHTTPRequest_QueryParams(t *testing.T) {
-	host, port := utils.DebugMockHTTPEx(func(req []byte) []byte {
+	host, port := startRawHTTPResponse(t, func(req []byte) []byte {
 		reqStr := string(req)
 		if strings.Contains(reqStr, "foo=bar") && strings.Contains(reqStr, "baz=qux") {
 			return []byte("HTTP/1.1 200 OK\r\n\r\nquery_ok")
@@ -503,7 +503,7 @@ func TestBatchDoHTTPRequest_QueryParams(t *testing.T) {
 
 // Test 18: Multiple paths with different responses
 func TestBatchDoHTTPRequest_MultiplePaths(t *testing.T) {
-	host, port := utils.DebugMockHTTPHandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	host, port := startHTTPHandler(t, func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case "/api/users":
 			w.WriteHeader(200)
@@ -559,7 +559,7 @@ func TestBatchDoHTTPRequest_MissingRequestIsProtocolFailure(t *testing.T) {
 
 // Test 20: Custom headers (non-curl style)
 func TestBatchDoHTTPRequest_CustomHeaders(t *testing.T) {
-	host, port := utils.DebugMockHTTPEx(func(req []byte) []byte {
+	host, port := startRawHTTPResponse(t, func(req []byte) []byte {
 		reqStr := string(req)
 		if strings.Contains(reqStr, "X-Custom: value123") {
 			return []byte("HTTP/1.1 200 OK\r\n\r\nheader_received")
@@ -581,7 +581,7 @@ func TestBatchDoHTTPRequest_CustomHeaders(t *testing.T) {
 
 // Test 21: Packet mode with {{PATH}} substitution
 func TestBatchDoHTTPRequest_PacketMode(t *testing.T) {
-	host, port := utils.DebugMockHTTPHandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	host, port := startHTTPHandler(t, func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(200)
 		w.Write([]byte("packet_path:" + r.URL.Path))
 	})
@@ -738,7 +738,7 @@ func TestBatchDoHTTPRequest_RejectsUnknownAndOversizedTemplatesBeforeSending(t *
 
 // Test 22: Full URLs in paths (no base-url needed)
 func TestBatchDoHTTPRequest_FullUrlsInPaths(t *testing.T) {
-	host, port := utils.DebugMockHTTPHandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	host, port := startHTTPHandler(t, func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(200)
 		w.Write([]byte("fullurl_path:" + r.URL.Path))
 	})
@@ -760,7 +760,7 @@ func TestBatchDoHTTPRequest_FullUrlsInPaths(t *testing.T) {
 
 // Test 23: Newline-separated paths
 func TestBatchDoHTTPRequest_NewlinePaths(t *testing.T) {
-	host, port := utils.DebugMockHTTP([]byte("nl_ok"))
+	host, port := startImmediateHTTPResponse(t, []byte("nl_ok"))
 
 	tool := getBatchDoHTTPRequestTool(t)
 	stdout, _ := execBatchTool(t, tool, aitool.InvokeParams{
@@ -776,7 +776,7 @@ func TestBatchDoHTTPRequest_NewlinePaths(t *testing.T) {
 
 // Test 24: Exclude size ranges
 func TestBatchDoHTTPRequest_ExcludeSize(t *testing.T) {
-	host, port := utils.DebugMockHTTPHandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	host, port := startHTTPHandler(t, func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/big" {
 			w.WriteHeader(200)
 			w.Write([]byte(strings.Repeat("X", 500)))
@@ -803,7 +803,7 @@ func TestBatchDoHTTPRequest_ExcludeSize(t *testing.T) {
 func TestBatchDoHTTPRequest_RegexpMatch(t *testing.T) {
 	flag := "ERR_CODE_" + utils.RandStringBytes(5)
 	body := "status=ok " + flag + " done"
-	host, port := utils.DebugMockHTTP([]byte(body))
+	host, port := startImmediateHTTPResponse(t, []byte(body))
 
 	tool := getBatchDoHTTPRequestTool(t)
 	stdout, _ := execBatchTool(t, tool, aitool.InvokeParams{
@@ -821,7 +821,7 @@ func TestBatchDoHTTPRequest_RegexpMatch(t *testing.T) {
 // Test 26: Max body size truncation
 func TestBatchDoHTTPRequest_MaxBodySize(t *testing.T) {
 	largeBody := strings.Repeat("Y", 200)
-	host, port := utils.DebugMockHTTPEx(func(req []byte) []byte {
+	host, port := startRawHTTPResponse(t, func(req []byte) []byte {
 		return []byte("HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\n\r\n" + largeBody)
 	})
 
@@ -839,7 +839,7 @@ func TestBatchDoHTTPRequest_MaxBodySize(t *testing.T) {
 
 // Test 27: Commas inside a single path must be preserved.
 func TestBatchDoHTTPRequest_PathCommasPreserved(t *testing.T) {
-	host, port := utils.DebugMockHTTPHandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	host, port := startHTTPHandler(t, func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(200)
 		w.Write([]byte(r.URL.Path + "?" + r.URL.RawQuery))
 	})
@@ -860,7 +860,7 @@ func TestBatchDoHTTPRequest_PathCommasPreserved(t *testing.T) {
 
 // Test 28: Packet mode with explicit base-host override
 func TestBatchDoHTTPRequest_PacketBaseHost(t *testing.T) {
-	host, port := utils.DebugMockHTTPHandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	host, port := startHTTPHandler(t, func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(200)
 		w.Write([]byte("basehost_ok:" + r.URL.Path))
 	})
@@ -884,7 +884,7 @@ func TestBatchDoHTTPRequest_PacketBaseHost(t *testing.T) {
 
 // Test 29: Full URLs in paths with custom headers (regression test for shared-params fix)
 func TestBatchDoHTTPRequest_FullUrlWithHeaders(t *testing.T) {
-	host, port := utils.DebugMockHTTPEx(func(req []byte) []byte {
+	host, port := startRawHTTPResponse(t, func(req []byte) []byte {
 		reqStr := string(req)
 		if strings.Contains(reqStr, "X-Full-Url-Header: present") {
 			return []byte("HTTP/1.1 200 OK\r\n\r\nfullurl_header_ok")
@@ -908,7 +908,7 @@ func TestBatchDoHTTPRequest_FullUrlWithHeaders(t *testing.T) {
 
 // Test 30: Full URLs in paths with body and content-type
 func TestBatchDoHTTPRequest_FullUrlWithBody(t *testing.T) {
-	host, port := utils.DebugMockHTTPEx(func(req []byte) []byte {
+	host, port := startRawHTTPResponse(t, func(req []byte) []byte {
 		reqStr := string(req)
 		if strings.Contains(reqStr, "POST") && strings.Contains(reqStr, `"key":"val"`) &&
 			strings.Contains(reqStr, "Content-Type: application/json") {
@@ -934,7 +934,7 @@ func TestBatchDoHTTPRequest_FullUrlWithBody(t *testing.T) {
 
 // Test 31: Prefix with leading-slash paths
 func TestBatchDoHTTPRequest_PrefixWithSlashPaths(t *testing.T) {
-	host, port := utils.DebugMockHTTPHandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	host, port := startHTTPHandler(t, func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(200)
 		w.Write([]byte("got:" + r.URL.Path))
 	})
@@ -958,7 +958,7 @@ func TestBatchDoHTTPRequest_PrefixWithSlashPaths(t *testing.T) {
 // into two real paths instead of treating the whole blob as one broken path.
 // Reproduces the field failure: "got array, want string".
 func TestBatchDoHTTPRequest_PathsAsArray(t *testing.T) {
-	host, port := utils.DebugMockHTTPHandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	host, port := startHTTPHandler(t, func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(200)
 		w.Write([]byte("arr_path:" + r.URL.Path))
 	})
@@ -979,7 +979,7 @@ func TestBatchDoHTTPRequest_PathsAsArray(t *testing.T) {
 
 // Test 33: AI passes "headers" as a JSON OBJECT (regression for schema friction).
 func TestBatchDoHTTPRequest_HeadersAsObject(t *testing.T) {
-	host, port := utils.DebugMockHTTPEx(func(req []byte) []byte {
+	host, port := startRawHTTPResponse(t, func(req []byte) []byte {
 		if strings.Contains(string(req), "X-Obj-Header: obj-value-123") {
 			return []byte("HTTP/1.1 200 OK\r\n\r\nobj_header_ok")
 		}
@@ -1000,7 +1000,7 @@ func TestBatchDoHTTPRequest_HeadersAsObject(t *testing.T) {
 
 // Test 34: AI passes "query-params" as a JSON OBJECT.
 func TestBatchDoHTTPRequest_QueryParamsAsObject(t *testing.T) {
-	host, port := utils.DebugMockHTTPEx(func(req []byte) []byte {
+	host, port := startRawHTTPResponse(t, func(req []byte) []byte {
 		if strings.Contains(string(req), "objid=99") {
 			return []byte("HTTP/1.1 200 OK\r\n\r\nobj_param_ok")
 		}
@@ -1021,7 +1021,7 @@ func TestBatchDoHTTPRequest_QueryParamsAsObject(t *testing.T) {
 
 func TestBatchDoHTTPRequest_FormObjectEscapesSpecialCharacters(t *testing.T) {
 	const special = `asdf' abc " #&tail`
-	host, port := utils.DebugMockHTTPHandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	host, port := startHTTPHandler(t, func(w http.ResponseWriter, r *http.Request) {
 		if err := r.ParseForm(); err != nil {
 			w.WriteHeader(http.StatusBadRequest)
 			w.Write([]byte("parse_failed:" + err.Error()))
@@ -1059,7 +1059,7 @@ func TestBatchDoHTTPRequest_FormObjectEscapesSpecialCharacters(t *testing.T) {
 // callback execution, so an omitted query object must never become string "{}".
 func TestBatchDoHTTPRequest_InvokeWithParamsDoesNotStringifyOmittedJSONObjectDefaults(t *testing.T) {
 	const special = `asdf' abc " #&tail`
-	host, port := utils.DebugMockHTTPHandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	host, port := startHTTPHandler(t, func(w http.ResponseWriter, r *http.Request) {
 		_ = r.ParseForm()
 		if r.Form.Get("a") == special && r.Form.Get("b") == "ssxxx" {
 			w.Write([]byte("batch_react_form_result_visible"))
@@ -1090,7 +1090,7 @@ func TestBatchDoHTTPRequest_InvokeWithParamsDoesNotStringifyOmittedJSONObjectDef
 }
 
 func TestBatchDoHTTPRequest_InvokeWithParamsAcceptsEmptyQueryAndFormArrays(t *testing.T) {
-	host, port := utils.DebugMockHTTPEx(func(req []byte) []byte {
+	host, port := startRawHTTPResponse(t, func(req []byte) []byte {
 		return []byte("HTTP/1.1 200 OK\r\n\r\nbatch_empty_collections_ok")
 	})
 	tool := getBatchDoHTTPRequestTool(t)

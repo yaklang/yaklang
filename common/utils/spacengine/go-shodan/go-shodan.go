@@ -259,7 +259,7 @@ func NewClientEx(key string, apiHost string) *ShodanClient {
 		apiHost = defaultAPIHost
 	}
 	return &ShodanClient{
-		BaseSpaceEngineClient: base.NewBaseSpaceEngineClient(key, defaultAPIHost),
+		BaseSpaceEngineClient: base.NewBaseSpaceEngineClient(key, apiHost),
 		exploitAPIHost:        defaultExploitAPIHost,
 	}
 }

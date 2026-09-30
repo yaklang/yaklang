@@ -12,7 +12,6 @@ import (
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools/yakscripttools"
 	"github.com/yaklang/yaklang/common/schema"
-	"github.com/yaklang/yaklang/common/utils"
 	_ "github.com/yaklang/yaklang/common/yak"
 	"gotest.tools/v3/assert"
 )
@@ -48,7 +47,7 @@ func execRunYAMLPocTool(t *testing.T, tool *aitool.Tool, params aitool.InvokePar
 }
 
 func TestRunYAMLPoc_RawPocMatch(t *testing.T) {
-	host, port := utils.DebugMockHTTPHandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	host, port := startHTTPHandler(t, func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("X-Custom-Header", "vulnerable-app-v1")
 		w.WriteHeader(200)
 		w.Write([]byte("Welcome to vulnerable app"))
@@ -90,7 +89,7 @@ http:
 }
 
 func TestRunYAMLPoc_RawPocNoMatch(t *testing.T) {
-	host, port := utils.DebugMockHTTPHandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	host, port := startHTTPHandler(t, func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(200)
 		w.Write([]byte("Normal page"))
 	})
@@ -123,7 +122,7 @@ http:
 }
 
 func TestRunYAMLPoc_BatchTargets(t *testing.T) {
-	host, port := utils.DebugMockHTTPHandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	host, port := startHTTPHandler(t, func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(200)
 		w.Write([]byte("OK"))
 	})
@@ -157,7 +156,7 @@ http:
 }
 
 func TestRunYAMLPoc_WordMatcher(t *testing.T) {
-	host, port := utils.DebugMockHTTPHandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	host, port := startHTTPHandler(t, func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(200)
 		w.Write([]byte(`{"status":"vulnerable","version":"1.0"}`))
 	})
@@ -205,7 +204,7 @@ func TestRunYAMLPoc_MissingTarget(t *testing.T) {
 }
 
 func TestRunYAMLPoc_MissingPoc(t *testing.T) {
-	host, port := utils.DebugMockHTTPHandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	host, port := startHTTPHandler(t, func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(200)
 	})
 	targetURL := "http://" + host + ":" + strconv.Itoa(port)

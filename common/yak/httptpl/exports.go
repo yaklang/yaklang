@@ -342,7 +342,7 @@ func _scanStream(ch chan any, opt ...interface{}) {
 		count++
 		handleData(data)
 	}
-	log.Debugf("waiting for ScanStream total: %v(subtask: %v)", count, swg.WaitingEventCount)
+	log.Debugf("waiting for ScanStream total: %v(subtask: %v)", count, swg.WaitingEventCount.Load())
 	swg.Wait()
 	log.Debugf("finished ScanStream total: %v", count)
 

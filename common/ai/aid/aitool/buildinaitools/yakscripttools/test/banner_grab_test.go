@@ -4,11 +4,11 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"io"
 	"net"
 	"strconv"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools/yakscripttools"
@@ -48,59 +48,24 @@ func execBannerGrabTool(t *testing.T, tool *aitool.Tool, params aitool.InvokePar
 }
 
 func startMockTCPServer(t *testing.T, banner string) (string, int, func()) {
-	t.Helper()
-	ln, err := net.Listen("tcp", "127.0.0.1:0")
-	if err != nil {
-		t.Fatalf("failed to start mock TCP server: %v", err)
-	}
-	addr := ln.Addr().(*net.TCPAddr)
-
-	go func() {
-		for {
-			conn, err := ln.Accept()
-			if err != nil {
-				return
-			}
-			go func(c net.Conn) {
-				defer c.Close()
-				c.Write([]byte(banner))
-				time.Sleep(100 * time.Millisecond)
-			}(conn)
-		}
-	}()
-
-	return addr.IP.String(), addr.Port, func() { ln.Close() }
+	return startOwnedTCPFixture(t, func(conn net.Conn) {
+		_, _ = conn.Write([]byte(banner))
+		_ = conn.(*net.TCPConn).CloseWrite()
+		_, _ = io.Copy(io.Discard, conn)
+	})
 }
 
 func startMockEchoServer(t *testing.T) (string, int, func()) {
-	t.Helper()
-	ln, err := net.Listen("tcp", "127.0.0.1:0")
-	if err != nil {
-		t.Fatalf("failed to start mock echo server: %v", err)
-	}
-	addr := ln.Addr().(*net.TCPAddr)
-
-	go func() {
-		for {
-			conn, err := ln.Accept()
-			if err != nil {
-				return
-			}
-			go func(c net.Conn) {
-				defer c.Close()
-				buf := make([]byte, 4096)
-				n, err := c.Read(buf)
-				if err != nil {
-					return
-				}
-				c.Write([]byte("ECHO: "))
-				c.Write(buf[:n])
-				time.Sleep(100 * time.Millisecond)
-			}(conn)
+	return startOwnedTCPFixture(t, func(conn net.Conn) {
+		buf := make([]byte, 4096)
+		n, err := conn.Read(buf)
+		if err != nil {
+			return
 		}
-	}()
-
-	return addr.IP.String(), addr.Port, func() { ln.Close() }
+		_, _ = conn.Write(append([]byte("ECHO: "), buf[:n]...))
+		_ = conn.(*net.TCPConn).CloseWrite()
+		_, _ = io.Copy(io.Discard, conn)
+	})
 }
 
 func TestBannerGrab_SSHBanner(t *testing.T) {

@@ -163,6 +163,7 @@ func ShodanQueryWithConfig(key string, filter string, maxPage, maxRecord int, co
 				count++
 				if maxRecord > 0 && count >= maxRecord {
 					nextFinished = true
+					break
 				}
 			}
 

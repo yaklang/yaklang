@@ -224,7 +224,7 @@ func TestConvertYakScriptPlugin_UnsupportedType(t *testing.T) {
 
 func TestMitmPluginAITool_Execution(t *testing.T) {
 	flag := utils.RandStringBytes(20)
-	host, port := utils.DebugMockHTTP([]byte(flag))
+	host, port := startImmediateHTTPResponse(t, []byte(flag))
 	targetUrl := fmt.Sprintf("http://%s:%d", host, port)
 
 	script := &schema.YakScript{
@@ -551,7 +551,7 @@ func TestFullChain_MITM_Execution_WithDisclosure(t *testing.T) {
 	db := createTestDB(t)
 
 	flag := utils.RandStringBytes(20)
-	host, port := utils.DebugMockHTTP([]byte(flag))
+	host, port := startImmediateHTTPResponse(t, []byte(flag))
 	targetUrl := fmt.Sprintf("http://%s:%d", host, port)
 
 	insertTestYakScript(t, db, &schema.YakScript{

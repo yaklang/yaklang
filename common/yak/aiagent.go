@@ -7,6 +7,7 @@ import (
 	"io"
 	"reflect"
 	"strings"
+	"sync"
 
 	"github.com/davecgh/go-spew/spew"
 
@@ -103,6 +104,19 @@ func YakTool2AITool(aitools []*schema.AIYakTool) []*aitool.Tool {
 	return yakTool2AITool(aitools, false)
 }
 
+// Yak scripts may print from concurrent workers. Serialize invocation output even
+// when the caller supplies a writer such as bytes.Buffer that is not thread safe.
+type aiToolOutputWriter struct {
+	mu     *sync.Mutex
+	writer io.Writer
+}
+
+func (w *aiToolOutputWriter) Write(data []byte) (int, error) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	return w.writer.Write(data)
+}
+
 func yakTool2AITool(aitools []*schema.AIYakTool, invokeForgeHandle bool) []*aitool.Tool {
 	tools := []*aitool.Tool{}
 	for _, aiTool := range aitools {
@@ -125,6 +139,9 @@ func yakTool2AITool(aitools []*schema.AIYakTool, invokeForgeHandle bool) []*aito
 			aitool.WithCallback(func(ctx context.Context, params aitool.InvokeParams, runtimeConfig *aitool.ToolRuntimeConfig, stdout io.Writer, stderr io.Writer) (any, error) {
 				ctx, cancel := context.WithCancel(ctx)
 				defer cancel()
+				outputMu := new(sync.Mutex)
+				stdout = &aiToolOutputWriter{mu: outputMu, writer: stdout}
+				stderr = &aiToolOutputWriter{mu: outputMu, writer: stderr}
 				params, normalizationNotes := normalizeEmptyObjectParams(tool, params)
 				for _, note := range normalizationNotes {
 					fmt.Fprintf(stdout, "[warning] input compatibility: %s. Execution will continue.\n", note)
@@ -141,8 +158,7 @@ func yakTool2AITool(aitools []*schema.AIYakTool, invokeForgeHandle bool) []*aito
 
 				yakitClient := yaklib.NewVirtualYakitClientWithRuntimeID(func(result *ypb.ExecResult) error {
 					if ret := yaklib.ConvertExecResultIntoAIToolCallStdoutLog(result, aiTool.EnableAIOutputLog == 2); ret != "" {
-						stdout.Write([]byte(ret))
-						stdout.Write([]byte("\n"))
+						stdout.Write([]byte(ret + "\n"))
 					}
 					if runtimeFeedBacker != nil {
 						return runtimeFeedBacker(result)

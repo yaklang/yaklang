@@ -35,11 +35,25 @@ func (p *BrowserPage) WaitText(text string) error {
 	}`, text))
 }
 
-// WaitFunction for JS condition
-func (p *BrowserPage) WaitFunction(js string) error {
+// WaitFunction waits for a JS condition. An optional budget in seconds can
+// shorten, but never extend, the configured operation timeout.
+func (p *BrowserPage) WaitFunction(js string, budgetSeconds ...float64) error {
 	if js == "" {
 		return fmt.Errorf("wait function js cannot be empty")
 	}
 	wrapped := fmt.Sprintf(`() => { return (%s) }`, js)
-	return p.page.Wait(rod.Eval(wrapped))
+	if err := p.requireNoDialog("wait function"); err != nil {
+		return err
+	}
+	timeout := p.timeout
+	if len(budgetSeconds) > 0 {
+		if budgetSeconds[0] <= 0 {
+			return fmt.Errorf("wait function budget must be positive")
+		}
+		budget := time.Duration(budgetSeconds[0] * float64(time.Second))
+		if budget < timeout {
+			timeout = budget
+		}
+	}
+	return p.page.Timeout(timeout).Wait(rod.Eval(wrapped))
 }
