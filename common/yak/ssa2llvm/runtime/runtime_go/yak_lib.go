@@ -63,6 +63,14 @@ func tryResolveShadowString(ptr unsafe.Pointer) (string, bool) {
 		return v, true
 	case []byte:
 		return string(v), true
+	case *[]byte:
+		// make([]byte) and []byte(string) both store *[]byte. An empty or nil
+		// slice is still a successful conversion: falling through would read
+		// the shadow pointer itself as a C string.
+		if v == nil {
+			return "", true
+		}
+		return string(*v), true
 	default:
 		return "", false
 	}
@@ -173,6 +181,11 @@ func runtimeToStringWord(raw int64) int64 {
 			return int64(uintptr(newStdlibShadow(v)))
 		case []byte:
 			return int64(uintptr(newStdlibShadow(string(v))))
+		case *[]byte:
+			if v == nil {
+				return int64(uintptr(newStdlibShadow("")))
+			}
+			return int64(uintptr(newStdlibShadow(string(*v))))
 		case error:
 			if v != nil {
 				return int64(uintptr(newStdlibShadow(v.Error())))
@@ -200,6 +213,49 @@ func runtimeStringContainsNUL(s string) bool {
 		}
 	}
 	return false
+}
+
+func runtimeCopyBytes(b []byte) *[]byte {
+	out := make([]byte, len(b))
+	copy(out, b)
+	return &out
+}
+
+// runtimeStringToBytesValue copies the bytes of a string or byte-slice word.
+// Shadow strings keep every byte, including interior NULs and lengths past
+// the C-string probe. A short literal is still a C string and is read until
+// its trailing NUL. The result is *[]byte, the same shape make([]byte) uses.
+func runtimeStringToBytesValue(raw int64) *[]byte {
+	word := uint64(raw) &^ yakTaggedPointerMask
+	if word != 0 {
+		if h, ok := handleFromShadow(unsafe.Pointer(uintptr(word))); ok {
+			switch v := h.Value().(type) {
+			case string:
+				buf := []byte(v)
+				return &buf
+			case []byte:
+				return runtimeCopyBytes(v)
+			case *[]byte:
+				if v == nil {
+					buf := []byte{}
+					return &buf
+				}
+				return runtimeCopyBytes(*v)
+			}
+		}
+		if s, ok := tryCString(word); ok {
+			buf := []byte(s)
+			return &buf
+		}
+	}
+	buf := []byte{}
+	return &buf
+}
+
+//export yak_runtime_string_to_bytes
+func yak_runtime_string_to_bytes(raw int64) int64 {
+	defer recoverRuntimePanic()
+	return int64(uintptr(newStdlibShadow(runtimeStringToBytesValue(raw))))
 }
 
 //export yak_runtime_to_cstring
