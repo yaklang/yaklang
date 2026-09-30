@@ -463,10 +463,9 @@ Few-shot example 2 (valid directly_call_tool):
 
 		// prepare is the loop-layer callback run AFTER the tool-call card has been
 		// created (loading). It reads the streaming action's params (blocking until
-		// they arrive), normalizes/merges/validates them, streams progress, and either
-		// returns finalized params or signals fallbackToRequire (reusing the same card
-		// and switching to the AI param-generation path).
-		prepare := func(action *aicommon.Action, name string) (aitool.InvokeParams, bool, *aitool.Tool, error) {
+		// they arrive), normalizes/merges/validates them, streams progress, and
+		// returns finalized params or an error for the loop to handle.
+		prepare := func(action *aicommon.Action, name string) (aitool.InvokeParams, *aitool.Tool, error) {
 			emitProgress := func(string) {}
 			finishProgress := func(string) {}
 			if emitter := loop.GetEmitter(); emitter != nil && operator.GetTask() != nil {
@@ -486,8 +485,8 @@ Few-shot example 2 (valid directly_call_tool):
 			emitProgress("[解析缓存工具]")
 			tool, err := resolveTool(name)
 			if err != nil {
-				finishProgress("[failed] cached tool resolution failed; falling back to require_tool")
-				return nil, false, nil, err
+				finishProgress("[failed] cached tool resolution failed; load the schema with require_tool before retrying")
+				return nil, nil, err
 			}
 
 			emitProgress("[开始处理参数]")
@@ -518,7 +517,7 @@ Few-shot example (load schema then call):
 					aicommon.WithStatusState(aicommon.StatusStateRecovering),
 				)
 				operator.Feedback(fmt.Sprintf("directly_call_tool params invalid for '%s': %s; correct the params using the tool schema in CACHE_TOOL_CALL or use require_tool to load the schema first", toolName, validationSummary))
-				return nil, false, tool, utils.Errorf("invalid params for '%s': %s", toolName, validationSummary)
+				return nil, tool, utils.Errorf("invalid params for '%s': %s", toolName, validationSummary)
 			}
 
 			feedbackItems := buildDirectlyCallParamFeedbackItems(params, mergedBlockParams)
@@ -545,7 +544,7 @@ Few-shot example (load schema then call):
 				aicommon.WithStatusCode("tool.running"),
 				aicommon.WithStatusTools(tools...),
 			)
-			return params, false, tool, nil
+			return params, tool, nil
 		}
 
 		// DirectlyCallTool emits the card (loading) first, then runs prepare (reads
