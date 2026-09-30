@@ -27,6 +27,11 @@ options {
     tokenVocab = PHPLexer;
 }
 
+// Keep ANTLR's AST construction and precedence handling. Only unambiguous
+// prediction decisions use the PHP-specific prefix classifier.
+@parser::adaptivePredict {}
+@parser::structmembers { disableFastPrediction bool }
+
 // HTML
 // Also see here: https://github.com/antlr/grammars-v4/tree/master/html
 
@@ -788,6 +793,12 @@ qualifiedStaticTypeRef
     ;
 
 typeRef
+@init {
+    if interpreter := p.GetInterpreter(); interpreter.GetPredictionMode() == antlr.PredictionModeSLL && p.IsDynamicTypeRefAhead() {
+        interpreter.SetPredictionMode(antlr.PredictionModeLL)
+        defer interpreter.SetPredictionMode(antlr.PredictionModeSLL)
+    }
+}
     : indirectTypeRef // genericDynamicArgs?
     | qualifiedNamespaceName
     | primitiveType

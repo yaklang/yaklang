@@ -5,6 +5,19 @@ func (p *PHPParser) IsNamespaceDeclarationAhead() bool {
 	return p.GetTokenStream().LA(2) != PHPParserNamespaceSeparator
 }
 
+// Constructor types overlap expression ->member. Even a named constructor
+// can enter that alternative in SLL when its arguments contain member access.
+// Resolve just this type in LL so these prefixes do not retry an entire file.
+func (p *PHPParser) IsDynamicTypeRefAhead() bool {
+	switch p.GetTokenStream().LA(1) {
+	case PHPParserLabel:
+		return p.GetTokenStream().LA(2) == PHPParserOpenRoundBracket
+	case PHPParserVarName, PHPParserDollar, PHPParserOpenRoundBracket:
+		return true
+	}
+	return false
+}
+
 // IsCallResultAssignmentAhead identifies a bounded subset of the overlapping
 // call/assignment prefixes. It selects LL for that expression only: unrecognized
 // or long prefixes keep SLL plus the normal whole-parse LL recovery path.
