@@ -242,8 +242,8 @@
   {
     "rule_id": "48c2c107-024f-4abc-a940-ed637847f22c",
     "rule_name": "检测通用硬编码凭据",
-    "hash": "02c9ac52c8b8330e57f09e978ae7e15b94ae82268a7c23e1d1c5d0a719599960",
-    "version": "20260920.0001"
+    "hash": "2ae4112e627e2d8d59439fdc23d1f8bb01f6fb26768be1cc2e2d9635c543b799",
+    "version": "20260930.0001"
   },
   {
     "rule_id": "5b485362-1df1-40df-afc4-a3252bee0150",
@@ -2312,8 +2312,8 @@
   {
     "rule_id": "source-detect-insecure-websocket",
     "rule_name": "检测到不安全的 WebSocket 连接",
-    "hash": "8038e739a398ab24d2b9ac90e5a1c89cc105af6176c0fd56f454b2e232ad37bc",
-    "version": "20260914.0001"
+    "hash": "9827f03eb5a8e66118ecc6f98d4af517f4d47e6fad31d33eb27b93c8ecd2ea0b",
+    "version": "20260930.0001"
   },
   {
     "rule_id": "source-go-insecure-skip-verify",
@@ -2576,8 +2576,8 @@
   {
     "rule_id": "source-secret-password-assignment",
     "rule_name": "检测硬编码密码赋值",
-    "hash": "014fbf8e207f9db8adf1b58f8219472616b24b7980cd55d57b58b154becb3282",
-    "version": "20260914.0001"
+    "hash": "1dd0f8e4c7b59fb5e9374658d2aa1e28032d7c49a86fc69d2dd8b39677f41b3b",
+    "version": "20260930.0001"
   },
   {
     "rule_id": "source-secret-pem-private-key",
