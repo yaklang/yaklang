@@ -155,8 +155,8 @@ else
     echo "正在从 $VERSIONS_URL 获取版本列表..." >&2
   fi
   
-  VERSIONS=$(curl -sS -L "$VERSIONS_URL" 2>&1 | grep -v '^$' || true)
-  
+  VERSIONS=$(curl -sS -L "$VERSIONS_URL" 2>/dev/null | grep -v '^$' || true)
+
   if [ -z "$VERSIONS" ]; then
     if [ "$QUIET" = false ]; then
       echo "错误: 无法获取版本列表或列表为空" >&2
