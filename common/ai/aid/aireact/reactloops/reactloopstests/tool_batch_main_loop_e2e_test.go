@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -228,11 +229,9 @@ func TestReActLoop_DirectToolBatchPrimaryDecisionConcurrentOrderedE2E(t *testing
 //	parameter transactions -> concurrent plugin callbacks -> ordered task
 //	commit -> the next primary decision.
 //
-// The two barriers are intentional correctness assertions, not timing hints.
-// A serial parameter generator or a serial plugin scheduler cannot pass them.
 // The second plugin is also forced to settle first, proving that task/history
 // order follows the model array rather than goroutine completion order.
-func TestReActLoop_RequireToolBatchPrimaryDecisionConcurrentOrderedE2E(t *testing.T) {
+func TestReActLoop_SingleRequiresThenConcurrentDirectBatchE2E(t *testing.T) {
 	const (
 		firstToolName    = "main_loop_require_batch_e2e_first"
 		secondToolName   = "main_loop_require_batch_e2e_second"
@@ -240,10 +239,6 @@ func TestReActLoop_RequireToolBatchPrimaryDecisionConcurrentOrderedE2E(t *testin
 		secondParamValue = "params-belong-only-to-second-child"
 	)
 
-	var paramActive int32
-	var paramMaxActive int32
-	var paramStarted int32
-	var paramFinished int32
 	var callbackActive int32
 	var callbackMaxActive int32
 	var callbackStarted int32
@@ -251,10 +246,8 @@ func TestReActLoop_RequireToolBatchPrimaryDecisionConcurrentOrderedE2E(t *testin
 	var primaryDecisions int32
 	var satisfactionChecks int32
 
-	allParamTransactionsStarted := make(chan struct{})
 	allToolCallbacksStarted := make(chan struct{})
 	secondToolCallbackFinished := make(chan struct{})
-	var closeAllParamsStarted sync.Once
 	var closeAllCallbacksStarted sync.Once
 	var closeSecondCallbackFinished sync.Once
 
@@ -293,7 +286,7 @@ func TestReActLoop_RequireToolBatchPrimaryDecisionConcurrentOrderedE2E(t *testin
 				select {
 				case <-allToolCallbacksStarted:
 				case <-time.After(5 * time.Second):
-					return nil, fmt.Errorf("require batch tool callbacks did not overlap")
+					return nil, fmt.Errorf("direct batch tool callbacks did not overlap")
 				}
 
 				if gotParam != expectedParam {
@@ -304,7 +297,7 @@ func TestReActLoop_RequireToolBatchPrimaryDecisionConcurrentOrderedE2E(t *testin
 					select {
 					case <-secondToolCallbackFinished:
 					case <-time.After(5 * time.Second):
-						return nil, fmt.Errorf("second require-batch callback did not finish first")
+						return nil, fmt.Errorf("second direct-batch callback did not finish first")
 					}
 				}
 
@@ -334,9 +327,6 @@ func TestReActLoop_RequireToolBatchPrimaryDecisionConcurrentOrderedE2E(t *testin
 	}
 
 	assertJoinedAndCommitted := func(boundary string) error {
-		if got := atomic.LoadInt32(&paramFinished); got != 2 {
-			return fmt.Errorf("%s ran before both parameter transactions finished: finished=%d", boundary, got)
-		}
 		if got := atomic.LoadInt32(&callbackFinished); got != 2 {
 			return fmt.Errorf("%s ran before both tool callbacks finished: finished=%d", boundary, got)
 		}
@@ -354,7 +344,6 @@ func TestReActLoop_RequireToolBatchPrimaryDecisionConcurrentOrderedE2E(t *testin
 		aicommon.WithWorkdir(t.TempDir()),
 		aicommon.WithTools(firstTool, secondTool),
 		aicommon.WithAgreeYOLO(),
-		aicommon.WithToolBatchParamConcurrency(2),
 		aicommon.WithToolBatchInvokeConcurrency(2),
 		aicommon.WithDisableToolCallerIntervalReview(true),
 		aicommon.WithAIAutoRetry(1),
@@ -367,74 +356,40 @@ func TestReActLoop_RequireToolBatchPrimaryDecisionConcurrentOrderedE2E(t *testin
 				if joinErr := assertJoinedAndCommitted("satisfaction verification"); joinErr != nil {
 					return nil, joinErr
 				}
-				return respond(config, `{"@action":"verify-satisfaction","user_satisfied":true,"reasoning":"both generated calls completed"}`)
-
-			case aicommon.IsToolParamGenPromptForTool(prompt, firstToolName):
-				current := atomic.AddInt32(&paramActive, 1)
-				updateMax(&paramMaxActive, current)
-				defer atomic.AddInt32(&paramActive, -1)
-				if atomic.AddInt32(&paramStarted, 1) == 2 {
-					closeAllParamsStarted.Do(func() { close(allParamTransactionsStarted) })
-				}
-				select {
-				case <-allParamTransactionsStarted:
-				case <-request.GetContext().Done():
-					return nil, request.GetContext().Err()
-				case <-time.After(5 * time.Second):
-					return nil, fmt.Errorf("require batch parameter transactions did not overlap")
-				}
-				atomic.AddInt32(&paramFinished, 1)
-				return respond(config, `{"@action":"call-tool","params":{"child_value":"`+firstParamValue+`"}}`)
-
-			case aicommon.IsToolParamGenPromptForTool(prompt, secondToolName):
-				current := atomic.AddInt32(&paramActive, 1)
-				updateMax(&paramMaxActive, current)
-				defer atomic.AddInt32(&paramActive, -1)
-				if atomic.AddInt32(&paramStarted, 1) == 2 {
-					closeAllParamsStarted.Do(func() { close(allParamTransactionsStarted) })
-				}
-				select {
-				case <-allParamTransactionsStarted:
-				case <-request.GetContext().Done():
-					return nil, request.GetContext().Err()
-				case <-time.After(5 * time.Second):
-					return nil, fmt.Errorf("require batch parameter transactions did not overlap")
-				}
-				atomic.AddInt32(&paramFinished, 1)
-				return respond(config, `{"@action":"call-tool","params":{"child_value":"`+secondParamValue+`"}}`)
+				return respond(config, `{"@action":"verify-satisfaction","user_satisfied":true,"reasoning":"both direct calls completed"}`)
 
 			case aicommon.IsPrimaryDecisionPrompt(prompt):
 				decision := atomic.AddInt32(&primaryDecisions, 1)
-				if decision == 1 {
-					return respond(config, `{
-  "@action": "require_tool",
-  "identifier": "parallel_require_main_loop_e2e",
-  "human_readable_thought": "Generate parameters and run two independent tools concurrently",
-  "tool_require_calls": [
-    {
-      "tool_name": "main_loop_require_batch_e2e_first",
-      "identifier": "first_require_child",
-      "reason": "Generate isolated parameters for the first child"
-    },
-    {
-      "tool_name": "main_loop_require_batch_e2e_second",
-      "identifier": "second_require_child",
-      "reason": "Generate isolated parameters for the second child"
-    }
-  ]
-}`)
+				if decision <= 2 {
+					if atomic.LoadInt32(&callbackStarted) != 0 || atomic.LoadInt32(&callbackFinished) != 0 {
+						return nil, fmt.Errorf("schema loading must not execute tools")
+					}
+					name := firstToolName
+					if decision == 2 {
+						name = secondToolName
+					}
+					return respond(config, fmt.Sprintf(`{"@action":"require_tool","tool_require_payload":%q}`, name))
+				}
+				if decision == 3 {
+					if atomic.LoadInt32(&callbackStarted) != 0 {
+						return nil, fmt.Errorf("requires must not execute before the direct action")
+					}
+					if !strings.Contains(prompt, "Direct Params Schema") || !strings.Contains(prompt, firstToolName) || !strings.Contains(prompt, secondToolName) {
+						return nil, fmt.Errorf("both schemas must be visible before constructing the direct batch")
+					}
+					return respond(config, fmt.Sprintf(`{"@action":"directly_call_tool","directly_call_tool_calls":[{"tool_name":%q,"params":{"child_value":%q},"reason":"first probe"},{"tool_name":%q,"params":{"child_value":%q},"reason":"second probe"}]}`, firstToolName, firstParamValue, secondToolName, secondParamValue))
 				}
 
 				if joinErr := assertJoinedAndCommitted(fmt.Sprintf("primary decision %d", decision)); joinErr != nil {
 					return nil, joinErr
 				}
-				if decision > 2 {
+				if decision > 4 {
 					return nil, fmt.Errorf("unexpected extra primary decision %d", decision)
 				}
 				return respond(config, `{"@action":"finish","identifier":"finish_after_require_batch"}`)
 
 			default:
-				return nil, fmt.Errorf("unexpected AI prompt in require batch main-loop E2E: %.200s", prompt)
+				return nil, fmt.Errorf("unexpected AI prompt in direct batch main-loop E2E: %.200s", prompt)
 			}
 		}),
 	)
@@ -453,13 +408,10 @@ func TestReActLoop_RequireToolBatchPrimaryDecisionConcurrentOrderedE2E(t *testin
 	defer cancel()
 	require.NoError(t, loop.Execute("require-tool-batch-main-loop-e2e-task", ctx, "generate isolated params and run both independent tools"))
 
-	require.Equal(t, int32(2), atomic.LoadInt32(&paramStarted))
-	require.Equal(t, int32(2), atomic.LoadInt32(&paramFinished))
-	require.Equal(t, int32(2), atomic.LoadInt32(&paramMaxActive), "both parameter AI transactions must overlap")
 	require.Equal(t, int32(2), atomic.LoadInt32(&callbackStarted))
 	require.Equal(t, int32(2), atomic.LoadInt32(&callbackFinished))
 	require.Equal(t, int32(2), atomic.LoadInt32(&callbackMaxActive), "both plugin callbacks must overlap")
-	require.Equal(t, int32(2), atomic.LoadInt32(&primaryDecisions), "batch followed by one finish")
+	require.Equal(t, int32(4), atomic.LoadInt32(&primaryDecisions), "two single requires, one direct batch, then finish")
 	require.Positive(t, atomic.LoadInt32(&satisfactionChecks))
 
 	observedParamsMu.Lock()
@@ -471,7 +423,7 @@ func TestReActLoop_RequireToolBatchPrimaryDecisionConcurrentOrderedE2E(t *testin
 	require.Equal(t, map[string]string{
 		firstToolName:  firstParamValue,
 		secondToolName: secondParamValue,
-	}, observedParamsSnapshot, "generated parameters must stay bound to their own child")
+	}, observedParamsSnapshot, "supplied parameters must stay bound to their own child")
 
 	completionMu.Lock()
 	completionSnapshot := append([]string(nil), completionOrder...)
@@ -484,10 +436,16 @@ func TestReActLoop_RequireToolBatchPrimaryDecisionConcurrentOrderedE2E(t *testin
 	require.Equal(t, []string{firstToolName, secondToolName}, []string{committed[0].Name, committed[1].Name})
 
 	history := loop.GetAllExistedActionRecord()
-	require.Len(t, history, 2)
-	require.Equal(t, schema.AI_REACT_LOOP_ACTION_REQUIRE_TOOL, history[0].ActionType)
-	require.Equal(t, []string{firstToolName, secondToolName}, history[0].ToolNames)
-	require.Equal(t, 2, history[0].ToolCallCount)
-	require.Equal(t, 2, history[0].ExecutedToolCallCount)
-	require.Equal(t, "finish", history[1].ActionType)
+	require.Len(t, history, 4)
+	for index, name := range []string{firstToolName, secondToolName} {
+		require.Equal(t, schema.AI_REACT_LOOP_ACTION_REQUIRE_TOOL, history[index].ActionType)
+		require.Equal(t, []string{name}, history[index].ToolNames)
+		require.Equal(t, 1, history[index].ToolCallCount)
+		require.Zero(t, history[index].ExecutedToolCallCount)
+	}
+	require.Equal(t, schema.AI_REACT_LOOP_ACTION_DIRECTLY_CALL_TOOL, history[2].ActionType)
+	require.Equal(t, []string{firstToolName, secondToolName}, history[2].ToolNames)
+	require.Equal(t, 2, history[2].ToolCallCount)
+	require.Equal(t, 2, history[2].ExecutedToolCallCount)
+	require.Equal(t, "finish", history[3].ActionType)
 }

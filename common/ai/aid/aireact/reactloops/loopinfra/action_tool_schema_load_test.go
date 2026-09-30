@@ -8,6 +8,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
+	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 )
 
 func TestNativeToolSchemaLoadTimelineLifecycle(t *testing.T) {
@@ -27,7 +28,7 @@ func TestNativeToolSchemaLoadTimelineLifecycle(t *testing.T) {
 		require.False(t, invoker.toolCallCalled, "loading must not execute or generate parameters")
 		return op.GetFeedback().String()
 	}
-	feedback := load(`{"@action":"require_tool","tool_require_calls":[{"tool_name":"read_file"},{"tool_name":"read_file"},{"tool_name":"grep"},{"tool_name":"missing-probe"}]}`)
+	feedback := load(`{"@action":"require_tool","tool_require_calls":[{"tool_name":"read_file","identifier":"read_config","reason":"inspect configuration"},{"tool_name":"read_file"},{"tool_name":"grep"},{"tool_name":"missing-probe"}]}`)
 	require.Contains(t, feedback, "schema_loaded")
 	require.Contains(t, feedback, "Tool unavailable")
 	before := aicommon.RenderTimelineFrozenOpen(cfg.Timeline)
@@ -45,11 +46,15 @@ func TestNativeToolSchemaLoadTimelineLifecycle(t *testing.T) {
 	require.NotContains(t, frozen.Frozen, "Direct Params Schema")
 }
 
-func TestNativeToolSchemaLoadRejectsMalformedRequests(t *testing.T) {
+func TestToolSchemaLoadRejectsMalformedRequests(t *testing.T) {
 	loop, _ := newToolBatchTestLoop(t)
 	for _, payload := range []string{
 		`{}`, `{"tool_require_payload":42}`, `{"tool_require_payload":" "}`,
 		`{"tool_require_calls":[]}`, `{"tool_require_calls":[null]}`,
+		`{"tool_require_calls":[{"tool_name":"read_file"}]}`,
+		`{"tool_require_calls":[{"tool_name":"read_file"},{"tool_name":"grep","reason":42}]}`,
+		`{"tool_require_calls":[{"tool_name":"read_file"},{"tool_name":"grep","params":{}}]}`,
+		`{"tool_require_payload":"read_file","directly_call_tool_name":"grep"}`,
 		`{"tool_require_payload":"read_file","tool_require_calls":[{"tool_name":"grep"}]}`,
 		`{"tool_require_calls":[{"tool_name":"read_file","params":{"file":"a"}}]}`,
 	} {
@@ -60,6 +65,35 @@ func TestNativeToolSchemaLoadRejectsMalformedRequests(t *testing.T) {
 			}
 			action := parseToolBatchPromptExample(t, raw, "require_tool")
 			require.Error(t, nativeToolSchemaLoadAction.ActionVerifier(loop, action))
+			require.Nil(t, loop.GetActionExecutionValue(action, actionStateToolSchemaNames))
+			if !strings.Contains(payload, `"tool_require_payload":"read_file"`) {
+				require.Error(t, loopAction_toolRequireAndCall.ActionVerifier(loop, action))
+				require.Nil(t, loop.GetActionExecutionValue(action, actionStateToolSchemaNames))
+			}
+		})
+	}
+}
+
+func TestActionToolSchemaLoadRejectsMixedFieldsBeforeCaching(t *testing.T) {
+	for _, extra := range []string{
+		`"tool_require_calls":[{"tool_name":"grep"}]`,
+		`"directly_call_tool_name":"grep"`,
+	} {
+		t.Run(extra, func(t *testing.T) {
+			ctx := context.Background()
+			manager, _, _ := newToolBatchTestManager(t)
+			cfg := aicommon.NewConfig(ctx)
+			cfg.AiToolManager = manager
+			invoker := newTestInvoker(ctx)
+			loop := reactloops.NewMinimalReActLoop(cfg, invoker)
+			action := parseToolBatchPromptExample(t, `{"@action":"require_tool","tool_require_payload":"read_file",`+extra+`}`, "require_tool")
+			require.NoError(t, loopAction_toolRequireAndCall.ActionVerifier(loop, action))
+			op := reactloops.NewActionHandlerOperator(newTestTask(context.Background()))
+			loopAction_toolRequireAndCall.ActionHandler(loop, action, op)
+			require.Contains(t, op.GetFeedback().String(), "Tool schema loading rejected")
+			require.Nil(t, loop.GetActionExecutionValue(action, actionStateToolSchemaNames))
+			require.False(t, manager.IsRecentlyUsedTool("read_file"))
+			require.False(t, invoker.toolCallCalled)
 		})
 	}
 }
@@ -80,4 +114,57 @@ func TestNativeDirectToolMetadataAndNoParameterFallback(t *testing.T) {
 	err := nativeDirectToolAction.ActionVerifier(loop, invalid)
 	require.ErrorContains(t, err, "never generates parameters")
 	require.Nil(t, loop.GetActionExecutionValue(invalid, actionStateNativeDirectParams))
+}
+
+func TestRequireToolSchemasExposeSchemaOnlyBatch(t *testing.T) {
+	for _, handler := range []*reactloops.LoopAction{nativeToolSchemaLoadAction, loopAction_toolRequireAndCall} {
+		t.Run(handler.Description, func(t *testing.T) {
+			tool := newPromptActionSchemaTool(t, handler)
+			require.Contains(t, tool.ToJSONSchemaString(), "tool_require_payload")
+			require.Contains(t, tool.ToJSONSchemaString(), "tool_require_calls")
+			valid, errors := tool.ValidateParams(aitool.InvokeParams{
+				"@action":    "require_tool",
+				"identifier": "load_probe_schemas",
+				"tool_require_calls": []any{
+					map[string]any{"tool_name": "grep", "identifier": "find_handlers", "reason": "定位处理函数"},
+					map[string]any{"tool_name": "read_file", "identifier": "read_config", "reason": "读取独立配置"},
+				},
+			})
+			require.True(t, valid, "%v", errors)
+			valid, _ = tool.ValidateParams(aitool.InvokeParams{
+				"@action":    "require_tool",
+				"identifier": "reject_execution_parameters",
+				"tool_require_calls": []any{
+					map[string]any{"tool_name": "grep", "params": map[string]any{}},
+					map[string]any{"tool_name": "read_file"},
+				},
+			})
+			require.False(t, valid, "schema-loading requests cannot include execution parameters")
+		})
+	}
+}
+
+func TestRequireToolBatchLoadsSchemasWithoutInvokingBatchRuntime(t *testing.T) {
+	for _, handler := range []*reactloops.LoopAction{nativeToolSchemaLoadAction, loopAction_toolRequireAndCall} {
+		t.Run(handler.Description, func(t *testing.T) {
+			ctx := context.Background()
+			manager, _, _ := newToolBatchTestManager(t)
+			cfg := aicommon.NewConfig(ctx)
+			cfg.AiToolManager = manager
+			invoker := &executingToolBatchTestInvoker{testInvoker: newTestInvoker(ctx), manager: manager}
+			loop := reactloops.NewMinimalReActLoop(cfg, invoker)
+			action := parseToolBatchPromptExample(t, requireToolBatchOutputExampleJSON, "require_tool")
+			require.NoError(t, handler.ActionVerifier(loop, action))
+			op := reactloops.NewActionHandlerOperator(newTestTask(ctx))
+			handler.ActionHandler(loop, action, op)
+			require.True(t, manager.IsRecentlyUsedTool("grep"))
+			require.True(t, manager.IsRecentlyUsedTool("read_file"))
+			require.Contains(t, op.GetFeedback().String(), "schema_loaded")
+			require.True(t, op.IsContinued())
+			require.Zero(t, op.GetExecutedToolCallCount())
+			require.Zero(t, invoker.requests)
+			require.Empty(t, invoker.executed)
+			require.False(t, invoker.toolCallCalled)
+		})
+	}
 }

@@ -32,7 +32,7 @@ func exactToolCallJSONsFromExamples(t *testing.T, examples string) []string {
 		exacts = append(exacts, examples[start:end])
 		cursor = end
 	}
-	require.Len(t, exacts, 2, "each tool action must teach one scalar and one batch example")
+	require.NotEmpty(t, exacts, "each tool action must teach its supported forms")
 	return exacts
 }
 
@@ -82,7 +82,10 @@ func TestToolCallExamplesAreInAssembledMainLoopSchema(t *testing.T) {
 	require.Contains(t, directExamples[0], `"directly_call_tool_name"`, "the reliable scalar form must be taught first")
 	require.Contains(t, directExamples[1], `"directly_call_tool_calls"`)
 	require.Contains(t, requireExamples[0], `"tool_require_payload"`, "the reliable scalar form must be taught first")
+	require.Len(t, directExamples, 2)
+	require.Len(t, requireExamples, 2)
 	require.Contains(t, requireExamples[1], `"tool_require_calls"`)
+	require.Contains(t, required.OutputExamples, "不生成参数")
 	var emittedSchema map[string]any
 	require.NoError(t, json.Unmarshal([]byte(schemaText), &emittedSchema))
 	properties := emittedSchema["properties"].(map[string]any)

@@ -1040,7 +1040,7 @@ func renderToolInventoryBlock(materials *reactloops.PromptPrefixMaterials) strin
 		"## 工具调用模式（单调用、可选并发批次或 tool_compose）",
 		"",
 		"- 单工具入口: 默认选择；恰好一个调用、参数仍需生成、工具是嵌套 wrapper、调用有写入/页面状态或后续依赖结果时，使用标量形式.",
-		"- 独立并发批次（可选的延迟优化）: 仅当 2-8 个调用都是低风险、独立且互不干扰时使用. 每层完整参数都已从真实 Schema 确定时使用 `directly_call_tool_calls`; 参数仍需生成但各工具 Schema 简单无歧义时使用 `tool_require_calls`.",
+		"- 独立并发批次（可选的延迟优化）: 仅当 2-8 个调用都是低风险、独立且互不干扰时使用. 每层完整参数都已从真实 Schema 确定时使用 `directly_call_tool_calls`; 缺少 Schema 时用 `tool_require_payload` 加载单个工具的定义，或在各工具 Schema 简单无歧义时用 `tool_require_calls` 批量加载；两种申请都只添加 Schema，不生成参数、不执行工具.",
 		"- 工具编排入口 (tool_compose): 只用于存在明确上游产物依赖的意图 DAG. 它的节点不承载模型直接给出的最终工具参数, 不能替代上述并发调用数组.",
 		"- 嵌套 wrapper、页面状态操作或参数有歧义时必须走单调用.",
 		"- 任一批次发生准入、Schema 或参数错误后，保留已成功结果，将失败调用改为修正后的单调用；禁止原样重试批次.",

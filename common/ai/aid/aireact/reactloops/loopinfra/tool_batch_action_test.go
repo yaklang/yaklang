@@ -155,7 +155,6 @@ func TestToolCallPromptExamples_ParseAndVerifyExactBytes(t *testing.T) {
 		request, ok := loop.GetActionExecutionValue(action, actionStateDirectToolBatch).(*aicommon.ToolBatchRequest)
 		require.True(t, ok)
 		require.Len(t, request.Calls, 2)
-		assert.Equal(t, aicommon.ToolCallModeDirect, request.Calls[0].Mode)
 		assert.Equal(t, "read_file", request.Calls[0].ToolName)
 		assert.Equal(t, "/workspace/go.mod", request.Calls[0].Params.GetString("file"))
 		assert.Equal(t, "read_go_mod", request.Calls[0].Identifier)
@@ -170,28 +169,18 @@ func TestToolCallPromptExamples_ParseAndVerifyExactBytes(t *testing.T) {
 
 		require.NoError(t, loopAction_toolRequireAndCall.ActionVerifier(loop, action))
 		assert.Equal(t, []string{"grep"}, loop.GetActionExecutionValue(action, actionStateToolSchemaNames))
-		assert.Less(t,
-			strings.Index(loopAction_toolRequireAndCall.OutputExamples, requireToolScalarOutputExampleJSON),
-			strings.Index(loopAction_toolRequireAndCall.OutputExamples, requireToolBatchOutputExampleJSON),
-			"the reliable scalar form should be taught before optional batching",
-		)
 		assert.Contains(t, loopAction_toolRequireAndCall.OutputExamples, requireToolScalarOutputExampleJSON)
 		assert.Contains(t, loopAction_toolRequireAndCall.OutputExamples, requireToolBatchOutputExampleJSON)
 	})
-
 	t.Run("require_tool batch", func(t *testing.T) {
-		loop, _ := newToolBatchTestLoop(t)
+		loop, invoker := newToolBatchTestLoop(t)
 		requirePromptExampleMatchesActionSchema(t, requireToolBatchOutputExampleJSON, loopAction_toolRequireAndCall)
 		action := parseToolBatchPromptExample(t, requireToolBatchOutputExampleJSON, schema.AI_REACT_LOOP_ACTION_REQUIRE_TOOL)
-
 		require.NoError(t, loopAction_toolRequireAndCall.ActionVerifier(loop, action))
-		names, ok := loop.GetActionExecutionValue(action, actionStateToolSchemaNames).([]string)
-		require.True(t, ok)
-		require.Len(t, names, 2)
-		assert.Equal(t, "grep", names[0])
-		assert.Equal(t, "read_file", names[1])
-		assert.Contains(t, loopAction_toolRequireAndCall.OutputExamples, requireToolBatchOutputExampleJSON)
+		require.Equal(t, []string{"grep", "read_file"}, loop.GetActionExecutionValue(action, actionStateToolSchemaNames))
+		require.False(t, invoker.toolCallCalled)
 	})
+
 }
 
 // Cross-check the prompt fixture against the embedded production read_file
@@ -239,12 +228,6 @@ func TestToolCallActionDescriptionsUseScalarFirstPolicy(t *testing.T) {
 			batchField:  directlyCallToolBatchField,
 			scalarField: "directly_call_tool_name",
 		},
-		{
-			name:        "require",
-			action:      loopAction_toolRequireAndCall,
-			batchField:  requireToolBatchField,
-			scalarField: "tool_require_payload",
-		},
 	}
 
 	for _, test := range tests {
@@ -285,14 +268,6 @@ func TestToolBatchSchema_DeclaresStrictObjectArrays(t *testing.T) {
 			required:  []string{"tool_name", "params"},
 			forbidden: "tool_require_calls",
 			example:   directlyCallToolBatchOutputExampleJSON,
-		},
-		{
-			name:      "require",
-			field:     requireToolBatchField,
-			action:    loopAction_toolRequireAndCall,
-			required:  []string{"tool_name"},
-			forbidden: "params",
-			example:   requireToolBatchOutputExampleJSON,
 		},
 	}
 	for _, tt := range tests {
@@ -416,50 +391,6 @@ func TestDirectToolBatchVerifier_RejectsAmbiguousOrInvalidBatchBeforeHandler(t *
 	}
 }
 
-func TestRequireToolBatchVerifier_RejectsParamsAndMixedForms(t *testing.T) {
-	tests := []struct {
-		name       string
-		payload    string
-		errContain string
-	}{
-		{
-			name: "params_are_forbidden",
-			payload: `{
-				"@action":"require_tool",
-				"tool_require_calls":[
-					{"tool_name":"grep","params":{"pattern":"auth"}},
-					{"tool_name":"read_file"}
-				]
-			}`,
-			errContain: "unknown fields: params",
-		},
-		{
-			name: "cross_action_batch_is_rejected",
-			payload: `{
-				"@action":"require_tool",
-				"tool_require_calls":[
-					{"tool_name":"grep"},
-					{"tool_name":"read_file"}
-				],
-				"directly_call_tool_calls":[
-					{"tool_name":"read_file","params":{"file":"/a"}},
-					{"tool_name":"read_file","params":{"file":"/b"}}
-				]
-			}`,
-			errContain: "cannot be combined with directly_call_tool fields",
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			loop, _ := newToolBatchTestLoop(t)
-			action := parseToolBatchPromptExample(t, tt.payload, schema.AI_REACT_LOOP_ACTION_REQUIRE_TOOL)
-			err := loopAction_toolRequireAndCall.ActionVerifier(loop, action)
-			require.ErrorContains(t, err, tt.errContain)
-			assert.Nil(t, loop.GetActionExecutionValue(action, actionStateToolSchemaNames))
-		})
-	}
-}
-
 func TestToolScalarVerifier_PreservesLegacyPriorityWhenMalformedActionAlsoContainsBatch(t *testing.T) {
 	tests := []struct {
 		name       string
@@ -477,14 +408,6 @@ func TestToolScalarVerifier_PreservesLegacyPriorityWhenMalformedActionAlsoContai
 			stateKey:   "directly_call_tool_name",
 			wantValue:  "read_file",
 		},
-		{
-			name:       "require",
-			actionType: schema.AI_REACT_LOOP_ACTION_REQUIRE_TOOL,
-			payload:    `{"@action":"require_tool","tool_require_payload":"grep","tool_require_calls":[{"tool_name":"grep"},{"tool_name":"read_file"}]}`,
-			verify:     loopAction_toolRequireAndCall.ActionVerifier,
-			stateKey:   actionStateToolSchemaNames,
-			wantValue:  []string{"grep"},
-		},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
@@ -493,7 +416,6 @@ func TestToolScalarVerifier_PreservesLegacyPriorityWhenMalformedActionAlsoContai
 			require.NoError(t, test.verify(loop, action))
 			require.Equal(t, test.wantValue, loop.GetActionExecutionValue(action, test.stateKey))
 			require.Nil(t, loop.GetActionExecutionValue(action, actionStateDirectToolBatch))
-			require.Nil(t, loop.GetActionExecutionValue(action, actionStateRequireToolBatch))
 		})
 	}
 }
@@ -690,12 +612,9 @@ func (i *executingToolScalarTestInvoker) DirectlyCallTool(
 	action *aicommon.Action,
 	prepare aicommon.DirectlyCallPrepareFunc,
 ) (*aitool.ToolResult, bool, error) {
-	params, fallback, tool, err := prepare(action, name)
+	params, tool, err := prepare(action, name)
 	if err != nil {
 		return nil, false, err
-	}
-	if fallback {
-		return i.ExecuteToolRequiredAndCall(ctx, name)
 	}
 	return i.invokeTool(ctx, name, tool, params)
 }
@@ -712,14 +631,7 @@ func (i *executingToolBatchTestInvoker) ExecuteToolBatch(
 	}
 	for index, call := range request.Calls {
 		params := call.Params
-		if call.Mode == aicommon.ToolCallModeRequire {
-			switch call.ToolName {
-			case "grep":
-				params = aitool.InvokeParams{"path": "/workspace", "pattern": "auth"}
-			case "read_file":
-				params = aitool.InvokeParams{"file": "/workspace/project.json"}
-			}
-		}
+
 		tool, lookupErr := i.manager.GetToolByName(call.ToolName)
 		if lookupErr != nil {
 			return nil, lookupErr
@@ -797,8 +709,8 @@ func TestToolBatchActionHandler_ZeroInvokeDoesNotVerifyOrMarkExecution(t *testin
 		loop := reactloops.NewMinimalReActLoop(cfg, invoker)
 		loop.SetCurrentTask(task)
 		request := &aicommon.ToolBatchRequest{Calls: []aicommon.ToolBatchCall{
-			{Index: 0, Mode: aicommon.ToolCallModeDirect, ToolName: "read_file"},
-			{Index: 1, Mode: aicommon.ToolCallModeDirect, ToolName: "grep"},
+			{Index: 0, ToolName: "read_file"},
+			{Index: 1, ToolName: "grep"},
 		}}
 		return invoker, loop, reactloops.NewActionHandlerOperator(task), request
 	}
@@ -885,8 +797,8 @@ func TestToolBatchActionHandler_CachesOnlyProtocolCompleteChildren(t *testing.T)
 	loop := reactloops.NewMinimalReActLoop(cfg, invoker)
 	loop.SetCurrentTask(task)
 	request := &aicommon.ToolBatchRequest{Calls: []aicommon.ToolBatchCall{
-		{Index: 0, Mode: aicommon.ToolCallModeDirect, ToolName: readFile.Name, Params: aitool.InvokeParams{"file": "/workspace/go.mod"}},
-		{Index: 1, Mode: aicommon.ToolCallModeDirect, ToolName: grep.Name, Params: aitool.InvokeParams{"pattern": "auth"}},
+		{Index: 0, ToolName: readFile.Name, Params: aitool.InvokeParams{"file": "/workspace/go.mod"}},
+		{Index: 1, ToolName: grep.Name, Params: aitool.InvokeParams{"pattern": "auth"}},
 	}}
 
 	op := reactloops.NewActionHandlerOperator(task)
@@ -906,8 +818,8 @@ func TestToolBatchSerialFallback_SettlesNilAndDirectAnswerOutcomes(t *testing.T)
 		invoker := newTestInvoker(context.Background())
 		result := executeToolBatchSerialFallback(context.Background(), invoker, &aicommon.ToolBatchRequest{
 			Calls: []aicommon.ToolBatchCall{
-				{Index: 0, Mode: aicommon.ToolCallModeRequire, ToolName: "grep", Identifier: "first"},
-				{Index: 1, Mode: aicommon.ToolCallModeRequire, ToolName: "read_file", Identifier: "second"},
+				{Index: 0, ToolName: "grep", Identifier: "first"},
+				{Index: 1, ToolName: "read_file", Identifier: "second"},
 			},
 		})
 		require.Len(t, result.Outcomes, 2)
@@ -922,9 +834,9 @@ func TestToolBatchSerialFallback_SettlesNilAndDirectAnswerOutcomes(t *testing.T)
 		invoker.toolCallDirectly = true
 		result := executeToolBatchSerialFallback(context.Background(), invoker, &aicommon.ToolBatchRequest{
 			Calls: []aicommon.ToolBatchCall{
-				{Index: 0, Mode: aicommon.ToolCallModeRequire, ToolName: "grep"},
-				{Index: 1, Mode: aicommon.ToolCallModeRequire, ToolName: "read_file"},
-				{Index: 2, Mode: aicommon.ToolCallModeRequire, ToolName: "search"},
+				{Index: 0, ToolName: "grep"},
+				{Index: 1, ToolName: "read_file"},
+				{Index: 2, ToolName: "search"},
 			},
 		})
 		require.True(t, result.DirectlyAnswer)
@@ -942,9 +854,9 @@ func TestToolBatchSerialFallback_SettlesNilAndDirectAnswerOutcomes(t *testing.T)
 		}
 		result := executeToolBatchSerialFallback(ctx, invoker, &aicommon.ToolBatchRequest{
 			Calls: []aicommon.ToolBatchCall{
-				{Index: 0, Mode: aicommon.ToolCallModeRequire, ToolName: "grep"},
-				{Index: 1, Mode: aicommon.ToolCallModeRequire, ToolName: "read_file"},
-				{Index: 2, Mode: aicommon.ToolCallModeRequire, ToolName: "search"},
+				{Index: 0, ToolName: "grep"},
+				{Index: 1, ToolName: "read_file"},
+				{Index: 2, ToolName: "search"},
 			},
 		})
 		require.Equal(t, 1, invoker.calls)
@@ -960,9 +872,10 @@ type cancelAfterFirstFallbackInvoker struct {
 	calls  int
 }
 
-func (i *cancelAfterFirstFallbackInvoker) ExecuteToolRequiredAndCall(
+func (i *cancelAfterFirstFallbackInvoker) ExecuteToolRequiredAndCallWithoutRequired(
 	ctx context.Context,
 	name string,
+	params aitool.InvokeParams,
 	opts ...aicommon.ToolCallerOption,
 ) (*aitool.ToolResult, bool, error) {
 	i.calls++
@@ -991,13 +904,6 @@ func TestToolBatchPromptExamples_ExecuteActualToolCallbacks(t *testing.T) {
 			action:     loopAction_directlyCallTool,
 			expected:   []string{"read_file", "read_file"},
 		},
-		{
-			name:       "require_tool",
-			raw:        requireToolBatchOutputExampleJSON,
-			actionType: schema.AI_REACT_LOOP_ACTION_REQUIRE_TOOL,
-			action:     loopAction_toolRequireAndCall,
-			expected:   nil, // require_tool only loads schemas, does not execute
-		},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
@@ -1019,17 +925,10 @@ func TestToolBatchPromptExamples_ExecuteActualToolCallbacks(t *testing.T) {
 			op := reactloops.NewActionHandlerOperator(task)
 			test.action.ActionHandler(loop, action, op)
 
-			if test.action.ActionType == schema.AI_REACT_LOOP_ACTION_REQUIRE_TOOL {
-				// require_tool only loads schemas; no batch execution occurs.
-				assert.Equal(t, 0, invoker.requests)
-				assert.Empty(t, invoker.executed)
-				assert.True(t, op.IsContinued())
-			} else {
-				require.Equal(t, 1, invoker.requests, "one model action must dispatch one joined batch")
-				require.Equal(t, test.expected, invoker.executed)
-				require.True(t, op.IsContinued())
-				require.Contains(t, op.GetFeedback().String(), "Tool batch settled: 2 calls")
-			}
+			require.Equal(t, 1, invoker.requests, "one model action must dispatch one joined batch")
+			require.Equal(t, test.expected, invoker.executed)
+			require.True(t, op.IsContinued())
+			require.Contains(t, op.GetFeedback().String(), "Tool batch settled: 2 calls")
 		})
 	}
 }

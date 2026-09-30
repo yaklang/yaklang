@@ -30,7 +30,7 @@ var loopAction_toolRequireAndCall = &reactloops.LoopAction{
 	Options: []aitool.ToolOption{
 		aitool.WithStringParam(
 			"tool_require_payload",
-			aitool.WithParam_Description("选择单调用形式时填写；存在 tool_require_calls 时必须省略。只填写一个需要加载 Schema 的工具准确名称，严禁包含参数。下面是经过 CI 校验且可执行的单调用格式：\n"+requireToolScalarOutputExampleJSON),
+			aitool.WithParam_Description("选择单调用形式时填写；存在 tool_require_calls 时必须省略。只填写一个需要加载 Schema 的工具准确名称，严禁包含参数。格式：\n"+requireToolScalarOutputExampleJSON),
 		),
 		aitool.WithStringParam(
 			"tool_call_reason",
@@ -39,10 +39,6 @@ var loopAction_toolRequireAndCall = &reactloops.LoopAction{
 		requireToolBatchSchemaOption(),
 	},
 	OutputExamples: requireToolOutputExamples,
-	// ActionVerifier preserves the legacy scalar streaming priority: when
-	// tool_require_payload is present it returns immediately without waiting
-	// for full response EOF, matching the original action-mode UX. The batch
-	// path falls through to verifyToolSchemaLoad which requires WaitParseResult.
 	ActionVerifier: verifyRequireToolSchemaLoad,
 	// ActionHandler is shared with the native (function-call) variant. Both
 	// modes load tool schemas into the timeline and return; neither generates
@@ -55,72 +51,19 @@ var loopAction_toolRequireAndCall = &reactloops.LoopAction{
 // return immediately without waiting for the full response to finish parsing.
 func verifyRequireToolSchemaLoad(loop *reactloops.ReActLoop, action *aicommon.Action) error {
 	loop.SetActionExecutionValue(action, actionStateToolSchemaNames, nil)
-
-	// Scalar streaming fast path: tool_require_payload is readable before the
-	// root JSON object closes, so a valid one-call action must not wait for the
-	// optional batch array's canonical representation. This preserves the
-	// legacy action-mode UX where the verifier returns as soon as the scalar
-	// field has streamed in, without waiting for the full response EOF.
-	payload := action.GetString("tool_require_payload")
-	if payload == "" {
-		payload = action.GetInvokeParams("next_action").GetString("tool_require_payload")
+	raw, exists := action.LookupParam("tool_require_payload")
+	if !exists {
+		raw = action.GetInvokeParams("next_action")["tool_require_payload"]
 	}
-	if payload != "" {
-		name := strings.TrimSpace(payload)
-		reactloops.MaybeWarnBashBeforeEdit(loop, name)
-		loop.SetActionExecutionValue(action, actionStateToolSchemaNames, []string{name})
-		return nil
+	if raw == nil {
+		return verifyToolSchemaLoad(loop, action)
 	}
-
-	// Batch path: need the full response to parse tool_require_calls.
-	if err := action.WaitParseResult(toolBatchVerifierContext(loop)); err != nil {
-		return err
+	name, valid := raw.(string)
+	name = strings.TrimSpace(name)
+	if !valid || name == "" {
+		return utils.Error("tool_require_payload must be a non-empty tool name")
 	}
-	items, batch, err := parseCanonicalBatchItems(action, requireToolBatchField)
-	if err != nil {
-		return err
-	}
-	if !batch {
-		return utils.Error("require_tool loads schemas only: provide either tool_require_payload or tool_require_calls")
-	}
-	// Reject cross-action fields. require_tool only loads schemas; it must not
-	// be mixed with directly_call_tool fields in the same action payload.
-	if hasAnyCanonicalActionParam(action,
-		directlyCallToolBatchField,
-		"directly_call_tool_name",
-		"directly_call_tool_params",
-		"directly_call_identifier",
-		"directly_call_expectations",
-		"directly_call_reason",
-	) {
-		return utils.Errorf("%s cannot be combined with directly_call_tool fields", requireToolBatchField)
-	}
-
-	if len(items) == 0 || len(items) > toolBatchMaxCalls(loop) {
-		return utils.Errorf("tool_require_calls must contain 1-%d tools to load", toolBatchMaxCalls(loop))
-	}
-	var names []string
-	for _, item := range items {
-		// Old optional labels are harmless: accept them without giving them
-		// execution semantics. Never accept inline execution parameters here.
-		if err := rejectUnknownBatchFields(item, map[string]struct{}{"tool_name": {}, "identifier": {}, "reason": {}}); err != nil {
-			return err
-		}
-		name, err := strictBatchString(item, "tool_name", true)
-		if err != nil {
-			return err
-		}
-		names = append(names, name)
-	}
-	seen := make(map[string]bool)
-	unique := make([]string, 0, len(names))
-	for _, name := range names {
-		if !seen[name] {
-			unique = append(unique, name)
-			seen[name] = true
-		}
-		reactloops.MaybeWarnBashBeforeEdit(loop, name)
-	}
-	loop.SetActionExecutionValue(action, actionStateToolSchemaNames, unique)
+	reactloops.MaybeWarnBashBeforeEdit(loop, name)
+	loop.SetActionExecutionValue(action, actionStateToolSchemaNames, []string{name})
 	return nil
 }

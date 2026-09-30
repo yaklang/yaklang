@@ -18,8 +18,7 @@ const (
 	directlyCallToolBatchField = "directly_call_tool_calls"
 	requireToolBatchField      = "tool_require_calls"
 
-	actionStateDirectToolBatch  = "directly_call_tool_batch"
-	actionStateRequireToolBatch = "tool_require_batch"
+	actionStateDirectToolBatch = "directly_call_tool_batch"
 )
 
 // These are the exact scalar and batch examples taught by the tool-call actions.
@@ -313,6 +312,9 @@ func strictBatchParams(raw any) (aitool.InvokeParams, error) {
 }
 
 func deepCloneInvokeParams(params aitool.InvokeParams) (aitool.InvokeParams, error) {
+	if params == nil {
+		return make(aitool.InvokeParams), nil
+	}
 	// Action payloads are JSON data. A marshal round-trip is intentional here:
 	// ValidateParams applies defaults and some tools mutate nested parameters;
 	// no child may retain aliases into Action's canonical parse tree.
@@ -345,7 +347,7 @@ func parseDirectToolBatchActionWithMetadata(loop *reactloops.ReActLoop, action *
 		return nil, true, utils.Errorf("%s cannot be combined with legacy directly_call_tool_* fields", directlyCallToolBatchField)
 	}
 	if hasAnyCanonicalActionParam(action,
-		requireToolBatchField,
+		"tool_require_calls",
 		"tool_require_payload",
 		"tool_call_reason",
 	) {
@@ -415,7 +417,6 @@ func parseDirectToolBatchActionWithMetadata(loop *reactloops.ReActLoop, action *
 		reactloops.MaybeWarnBashBeforeEdit(loop, toolName)
 		request.Calls = append(request.Calls, aicommon.ToolBatchCall{
 			Index:        index,
-			Mode:         aicommon.ToolCallModeDirect,
 			ToolName:     toolName,
 			Params:       params,
 			Identifier:   identifier,
@@ -432,78 +433,6 @@ func parseDirectToolBatchActionWithMetadata(loop *reactloops.ReActLoop, action *
 		// Accept the old top-level field for compatibility, but never turn a
 		// batch-wide reason into each child's visible reason. A missing child
 		// reason is generated with that child's identifier as context.
-	}
-	return request, true, nil
-}
-
-func parseRequireToolBatchAction(loop *reactloops.ReActLoop, action *aicommon.Action) (*aicommon.ToolBatchRequest, bool, error) {
-	if err := action.WaitParseResult(toolBatchVerifierContext(loop)); err != nil {
-		return nil, false, utils.Wrap(err, "require_tool action parse failed")
-	}
-
-	items, hasBatch, err := parseCanonicalBatchItems(action, requireToolBatchField)
-	if err != nil || !hasBatch {
-		return nil, hasBatch, err
-	}
-	if hasAnyCanonicalActionParam(action, "tool_require_payload", "tool_call_reason") {
-		return nil, true, utils.Errorf("%s cannot be combined with legacy tool_require_payload/tool_call_reason fields", requireToolBatchField)
-	}
-	if hasAnyCanonicalActionParam(action,
-		directlyCallToolBatchField,
-		"directly_call_tool_name",
-		"directly_call_tool_params",
-		"directly_call_identifier",
-		"directly_call_expectations",
-		"directly_call_reason",
-	) {
-		return nil, true, utils.Errorf("%s cannot be combined with directly_call_tool fields", requireToolBatchField)
-	}
-	if err := validateBatchLength(loop, requireToolBatchField, items); err != nil {
-		return nil, true, err
-	}
-
-	mgr := loop.GetConfig().GetAiToolManager()
-	if mgr == nil {
-		return nil, true, utils.Error("tool manager is unavailable")
-	}
-	allowed := map[string]struct{}{
-		"tool_name": {}, "identifier": {}, "reason": {},
-	}
-	identifiers := make(map[string]int)
-	request := &aicommon.ToolBatchRequest{Calls: make([]aicommon.ToolBatchCall, 0, len(items))}
-	for index, item := range items {
-		if err := rejectUnknownBatchFields(item, allowed); err != nil {
-			return nil, true, utils.Wrapf(err, "%s[%d]", requireToolBatchField, index)
-		}
-		toolName, err := strictBatchString(item, "tool_name", true)
-		if err != nil {
-			return nil, true, utils.Wrapf(err, "%s[%d]", requireToolBatchField, index)
-		}
-		identifier, err := strictBatchString(item, "identifier", false)
-		if err != nil {
-			return nil, true, utils.Wrapf(err, "%s[%d]", requireToolBatchField, index)
-		}
-		if identifier != "" {
-			if first, duplicate := identifiers[identifier]; duplicate {
-				return nil, true, utils.Errorf("%s[%d].identifier duplicates %s[%d].identifier %q", requireToolBatchField, index, requireToolBatchField, first, identifier)
-			}
-			identifiers[identifier] = index
-		}
-		reason, err := strictBatchString(item, "reason", false)
-		if err != nil {
-			return nil, true, utils.Wrapf(err, "%s[%d]", requireToolBatchField, index)
-		}
-		if _, err := mgr.GetToolByName(toolName); err != nil {
-			return nil, true, utils.Wrapf(err, "%s[%d].tool_name %q is unavailable", requireToolBatchField, index, toolName)
-		}
-		reactloops.MaybeWarnBashBeforeEdit(loop, toolName)
-		request.Calls = append(request.Calls, aicommon.ToolBatchCall{
-			Index:      index,
-			Mode:       aicommon.ToolCallModeRequire,
-			ToolName:   toolName,
-			Identifier: identifier,
-			Reason:     reason,
-		})
 	}
 	return request, true, nil
 }
@@ -591,21 +520,17 @@ func executeToolBatchSerialFallback(
 		if call.Expectations != "" {
 			opts = append(opts, aicommon.WithToolCaller_CallExpectations(call.Expectations))
 		}
-		if call.Mode == aicommon.ToolCallModeRequire {
-			toolResult, directlyAnswer, err = invoker.ExecuteToolRequiredAndCall(ctx, call.ToolName, opts...)
+		params, cloneErr := deepCloneInvokeParams(call.Params)
+		if cloneErr != nil {
+			err = cloneErr
 		} else {
-			params, cloneErr := deepCloneInvokeParams(call.Params)
-			if cloneErr != nil {
-				err = cloneErr
-			} else {
-				if call.Identifier != "" {
-					params[aicommon.ReservedKeyIdentifier] = call.Identifier
-				}
-				if call.Expectations != "" {
-					params[aicommon.ReservedKeyCallExpectations] = call.Expectations
-				}
-				toolResult, directlyAnswer, err = invoker.ExecuteToolRequiredAndCallWithoutRequired(ctx, call.ToolName, params, opts...)
+			if call.Identifier != "" {
+				params[aicommon.ReservedKeyIdentifier] = call.Identifier
 			}
+			if call.Expectations != "" {
+				params[aicommon.ReservedKeyCallExpectations] = call.Expectations
+			}
+			toolResult, directlyAnswer, err = invoker.ExecuteToolRequiredAndCallWithoutRequired(ctx, call.ToolName, params, opts...)
 		}
 
 		stage := aicommon.ToolCallStageDone
