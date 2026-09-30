@@ -627,16 +627,17 @@ func (c *Config) parseProjectWithFSUnits(
 		prog.Cache.FlushCompileUnit("final")
 		prog.Cache.FlushInstructionSaver()
 	}
-	remaining := prog.Cache.CountInstruction()
-	persisted := prog.Cache.InstructionPersistedCount()
-	total := remaining + persisted
+	accounting := prog.Cache.GetFlushAccounting()
+	remaining := int(accounting.RemainingDirty)
+	persisted := int(accounting.AlreadyPersisted)
+	total := int(accounting.InstructionsTotal)
 	storeProcess(0.90)
 	// Log memory state before the heaviest save phase
 	{
 		var ms runtime.MemStats
 		runtime.ReadMemStats(&ms)
-		log.Infof("[ssa-compile] f5_save_db enter: program=%s remaining=%d persisted=%d total=%d heapAlloc=%.1fMB heapSys=%.1fMB heapObjects=%d numGC=%d",
-			prog.Name, remaining, persisted, total,
+		log.Infof("[ssa-compile] f5_save_db enter: program=%s remaining=%d persisted=%d total=%d resident=%d heapAlloc=%.1fMB heapSys=%.1fMB heapObjects=%d numGC=%d",
+			prog.Name, remaining, persisted, total, accounting.Resident,
 			float64(ms.Alloc)/1024/1024, float64(ms.Sys)/1024/1024, ms.HeapObjects, ms.NumGC)
 	}
 	if prog.DatabaseKind != ssa.ProgramCacheMemory {
@@ -1007,9 +1008,10 @@ func (c *Config) parseProjectWithFSLegacy(
 
 	f5 := func() error {
 		saveStart := time.Now()
-		remaining := prog.Cache.CountInstruction()
-		persisted := prog.Cache.InstructionPersistedCount()
-		total := remaining + persisted
+		accounting := prog.Cache.GetFlushAccounting()
+		remaining := int(accounting.RemainingDirty)
+		persisted := int(accounting.AlreadyPersisted)
+		total := int(accounting.InstructionsTotal)
 		process = 0.90
 		if prog.DatabaseKind != ssa.ProgramCacheMemory {
 			prog.ProcessInfof("[SSA/persist] program %s flushing IR cache (remaining=%d persisted=%d total=%d) to database",

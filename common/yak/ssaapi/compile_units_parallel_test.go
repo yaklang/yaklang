@@ -251,6 +251,11 @@ func TestCompileUnitBuildWaveCancellationJoinsWorkers(t *testing.T) {
 }
 
 func TestCompileUnitParallelJavaDatabaseReload(t *testing.T) {
+	// Force separate persistence boundaries, including lowercase methods
+	// referenced from a later unit. A single batch cannot catch release bugs.
+	t.Setenv(compileUnitBatchMinFilesEnv, "1")
+	t.Setenv(compileUnitBatchMinBytesEnv, "0")
+	t.Setenv(compileUnitBatchMaxFilesEnv, "1")
 	vf := filesys.NewVirtualFs()
 	vf.AddFile("base/Base.java", `package base; class Base { static String value() { return "parallel-source"; } }`)
 	for _, item := range []struct{ pkg, class string }{{"left", "Left"}, {"right", "Right"}} {

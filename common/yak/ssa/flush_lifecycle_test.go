@@ -165,8 +165,8 @@ func TestPerBatchFlushPersistsInstructionsMidCompile(t *testing.T) {
 }
 
 // TestPerBatchFlushKeepsBoundaryResident verifies that after FlushCompileUnit,
-// function-level instructions (Function, Parameter, FreeValue, BasicBlock)
-// remain resident in memory so that cross-unit calls and lazy builds work.
+// function-level instructions needed for cross-unit calls and lazy builds
+// remain resident; finished private blocks are covered by a separate test.
 func TestPerBatchFlushKeepsBoundaryResident(t *testing.T) {
 	programName := uuid.NewString()
 	defer ssadb.DeleteProgram(ssadb.GetDB(), programName)
@@ -194,6 +194,101 @@ func TestPerBatchFlushKeepsBoundaryResident(t *testing.T) {
 	require.NoError(t, prog.Cache.SaveToDatabase())
 	require.NotNil(t, ssadb.GetIrCodeItemById(ssadb.GetDB(), programName, builder.Function.GetId()))
 	require.NotNil(t, ssadb.GetIrCodeItemById(ssadb.GetDB(), programName, param.GetId()))
+}
+
+// A finished private function cannot be built again by a later compile unit.
+// Its blocks should be persisted with the body instead of accumulating until
+// SaveToDatabase, while an unfinished function still needs its live scopes.
+func TestFlushCompileUnitReleasesFinishedPrivateBlocks(t *testing.T) {
+	programName := uuid.NewString()
+	defer ssadb.DeleteProgram(ssadb.GetDB(), programName)
+
+	cfg, err := ssaconfig.New(ssaconfig.ModeSSACompile, ssaconfig.WithSetProgramName(programName))
+	require.NoError(t, err)
+	cfg.SetCompileUnitSplit(true)
+	prog := NewProgram(cfg, ProgramCacheDBWrite, Application, nil, "", 1)
+	builder := prog.GetAndCreateFunctionBuilder("", "privateFunction")
+	blockID := builder.Function.EnterBlock
+	require.Positive(t, blockID)
+
+	prog.Cache.FlushCompileUnit("unfinished")
+	prog.Cache.FlushInstructionSaver()
+	require.True(t, prog.Cache.hasResidentInstruction(blockID), "unfinished block scope must remain live")
+
+	builder.Finish()
+	prog.Cache.FlushCompileUnit("finished")
+	prog.Cache.FlushInstructionSaver()
+	require.False(t, prog.Cache.hasResidentInstruction(blockID), "finished private block should be released")
+	require.NotNil(t, ssadb.GetIrCodeItemById(ssadb.GetDB(), programName, blockID))
+	require.True(t, prog.Cache.hasResidentInstruction(builder.Function.GetId()), "function skeleton stays available")
+	require.NoError(t, prog.Cache.SaveToDatabase())
+}
+
+func TestFlushCompileUnitReleasesReloadedPersistedInstruction(t *testing.T) {
+	programName := uuid.NewString()
+	defer ssadb.DeleteProgram(ssadb.GetDB(), programName)
+
+	cfg, err := ssaconfig.New(ssaconfig.ModeSSACompile, ssaconfig.WithSetProgramName(programName))
+	require.NoError(t, err)
+	cfg.SetCompileUnitSplit(true)
+	prog := NewProgram(cfg, ProgramCacheDBWrite, Application, nil, "", 1)
+	builder := prog.GetAndCreateFunctionBuilder("", "privateFunction")
+	bin := builder.EmitBinOp(OpAdd, builder.EmitUndefined("left"), builder.EmitUndefined("right"))
+	builder.Finish()
+
+	prog.Cache.FlushCompileUnit("first")
+	prog.Cache.FlushInstructionSaver()
+	require.False(t, prog.Cache.hasResidentInstruction(bin.GetId()))
+	require.NotNil(t, prog.Cache.GetInstruction(bin.GetId()))
+	require.True(t, prog.Cache.hasResidentInstruction(bin.GetId()), "a cross-unit read reloads the persisted instruction")
+
+	prog.Cache.FlushCompileUnit("second")
+	prog.Cache.FlushInstructionSaver()
+	require.False(t, prog.Cache.hasResidentInstruction(bin.GetId()), "the next unit flush should release the clean reloaded entry")
+	require.NoError(t, prog.Cache.SaveToDatabase())
+}
+
+func TestFlushCompileUnitKeepsExportedFunctionBlock(t *testing.T) {
+	programName := uuid.NewString()
+	defer ssadb.DeleteProgram(ssadb.GetDB(), programName)
+
+	cfg, err := ssaconfig.New(ssaconfig.ModeSSACompile, ssaconfig.WithSetProgramName(programName))
+	require.NoError(t, err)
+	cfg.SetCompileUnitSplit(true)
+	prog := NewProgram(cfg, ProgramCacheDBWrite, Application, nil, "", 1)
+	builder := prog.GetAndCreateFunctionBuilder("", "ExportedFunction")
+	blockID := builder.Function.EnterBlock
+	builder.Finish()
+
+	prog.Cache.FlushCompileUnit("first")
+	prog.Cache.FlushInstructionSaver()
+	require.True(t, prog.Cache.hasResidentInstruction(blockID), "cross-unit function scope must remain live")
+	require.NoError(t, prog.Cache.SaveToDatabase())
+}
+
+func TestPersistenceStatsCountsUnpersistedResidentIDs(t *testing.T) {
+	programName := uuid.NewString()
+	defer ssadb.DeleteProgram(ssadb.GetDB(), programName)
+
+	cfg, err := ssaconfig.New(ssaconfig.ModeSSACompile, ssaconfig.WithSetProgramName(programName))
+	require.NoError(t, err)
+	cfg.SetCompileUnitSplit(true)
+	prog := NewProgram(cfg, ProgramCacheDBWrite, Application, nil, "", 1)
+	first := prog.GetAndCreateFunctionBuilder("", "firstFunction")
+	for i := 0; i < 20; i++ {
+		first.EmitBinOp(OpAdd, first.EmitUndefined("left"), first.EmitUndefined("right"))
+	}
+	first.Finish()
+	prog.Cache.FlushCompileUnit("first")
+	prog.Cache.FlushInstructionSaver()
+
+	second := prog.GetAndCreateFunctionBuilder("", "secondFunction")
+	second.EmitBinOp(OpAdd, second.EmitUndefined("left"), second.EmitUndefined("right"))
+	stats := prog.Cache.instructions.PersistenceStats()
+	require.Greater(t, stats.UniquePersisted, stats.Resident, "old persisted IDs exceed current residency")
+	require.Greater(t, stats.RemainingDirty, int64(0), "new instructions are dirty even when persisted IDs exceed residency")
+	second.Finish()
+	require.NoError(t, prog.Cache.SaveToDatabase())
 }
 
 // TestPerBatchFlushNoFeedBlockPanic verifies that after FlushCompileUnit,

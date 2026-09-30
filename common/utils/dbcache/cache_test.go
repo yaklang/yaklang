@@ -14,6 +14,26 @@ import (
 
 type closeFlushItem struct{ id int64 }
 
+func TestResidencyCacheDeleteIfSettled(t *testing.T) {
+	cache := dbcache.NewResidencyCacheWithKey[int, string](0, 0, nil, nil)
+	cache.Set(1, "persisted")
+	require.True(t, cache.DeleteIfSettled(1))
+	_, ok := cache.GetResident(1)
+	require.False(t, ok)
+
+	cache.Set(2, "in-flight")
+	requests := cache.MarkPending([]int{2}, utils.EvictionReasonCapacityReached)
+	require.Len(t, requests, 1)
+	_, ok = cache.SnapshotForPersist(2, requests[0].Generation)
+	require.True(t, ok)
+	require.False(t, cache.DeleteIfSettled(2), "an in-flight update must not be discarded")
+	_, ok = cache.GetResident(2)
+	require.True(t, ok)
+	cache.FinishPersist(2, requests[0].Generation, true)
+	_, ok = cache.GetResident(2)
+	require.False(t, ok)
+}
+
 func (i *closeFlushItem) GetId() int64   { return i.id }
 func (i *closeFlushItem) SetId(id int64) { i.id = id }
 

@@ -517,8 +517,8 @@ func TestResidentLifecycle_PreserveQueryAfterSaveToDatabase(t *testing.T) {
 }
 
 // TestResidentLifecycle_DirtyCountSeparateFromResidentCount proves that the
-// remaining_dirty accounting is computed as max(0, resident - unique_persisted),
-// NOT as the raw resident count. After SaveToDatabase, all resident items
+// remaining_dirty accounting checks each resident ID against persisted IDs,
+// NOT the raw resident count. After SaveToDatabase, all resident items
 // have been persisted, so remaining_dirty=0 even though resident count > 0.
 func TestResidentLifecycle_DirtyCountSeparateFromResidentCount(t *testing.T) {
 	programName := uuid.NewString()
