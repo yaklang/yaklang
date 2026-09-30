@@ -17,22 +17,27 @@ import (
 )
 
 func TestCoordinator_PlanInteraction_Timeline(t *testing.T) {
-	inputChan := chanx.NewUnlimitedChan[*ypb.AIInputEvent](context.Background(), 10)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	inputChan := chanx.NewUnlimitedChan[*ypb.AIInputEvent](ctx, 10)
 	outputChan := make(chan *schema.AiOutputEvent, 200)
 
 	token := utils.RandStringBytes(100)
 
 	userInteractTrigger := false
 
-	timelineShowed := false
+	timelineShown := make(chan struct{}, 1)
 
-	ins, err := aid.NewCoordinator(
+	ins, err := aid.NewCoordinatorContext(ctx,
 		"test",
 		testAIRetryWaitOption(),
 		aicommon.WithAllowPlanUserInteract(true),
 		aicommon.WithEventInputChanx(inputChan),
 		aicommon.WithEventHandler(func(event *schema.AiOutputEvent) {
-			outputChan <- event
+			select {
+			case outputChan <- event:
+			case <-ctx.Done():
+			}
 		}),
 		aicommon.WithAICallback(func(config aicommon.AICallerConfigIf, request *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			rsp := config.NewAIResponse()
@@ -40,7 +45,10 @@ func TestCoordinator_PlanInteraction_Timeline(t *testing.T) {
 			prompts := request.GetPrompt()
 
 			if strings.Contains(prompts, token) {
-				timelineShowed = true
+				select {
+				case timelineShown <- struct{}{}:
+				default:
+				}
 			}
 
 			if utils.MatchAllOfSubString(prompts, `"ask_for_clarification"`) {
@@ -81,15 +89,19 @@ func TestCoordinator_PlanInteraction_Timeline(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	go func() {
-		ins.Run()
-	}()
+	done := make(chan error, 1)
+	go func() { done <- ins.Run() }()
+	t.Cleanup(func() {
+		cancel()
+		select {
+		case <-done:
+		case <-time.After(2 * time.Second):
+			t.Error("coordinator did not stop after cancellation")
+		}
+	})
 
 LOOP:
 	for {
-		if timelineShowed {
-			break LOOP
-		}
 		select {
 		case result := <-outputChan:
 			fmt.Println("result:" + result.String())
@@ -108,15 +120,14 @@ LOOP:
 				t.Fatal("should not create plan build task")
 			}
 			_ = inputChan
-		case <-time.After(time.Second * 10):
-			t.Fatal("timeout")
+		case <-timelineShown:
+			break LOOP
+		case <-ctx.Done():
+			t.Fatal("timeout waiting for the user's reply in a subsequent prompt")
 		}
 	}
 
 	if !userInteractTrigger {
 		t.Fatal("cannot parse task and not sent suggestion")
-	}
-	if !timelineShowed {
-		t.Fatal("timeline not showed, please check your AI model or prompt")
 	}
 }

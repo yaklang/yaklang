@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
@@ -125,37 +124,34 @@ func TestFocusMode_YakdocThenWriteCode(t *testing.T) {
 
 func TestWriteYaklangLoopPromptContainsYakdocActions(t *testing.T) {
 	in := make(chan *ypb.AIInputEvent, 10)
-	out := make(chan *ypb.AIOutputEvent, 10)
-
+	out := make(chan *ypb.AIOutputEvent, 128)
+	prompts := make(chan string, 32)
+	stat := &mockStats_forYakdoc{}
 	ins, err := aireact.NewTestReAct(
 		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
-			prompt := r.GetPrompt()
-			require.Contains(t, prompt, "yakdoc_search")
-			require.Contains(t, prompt, "yakdoc_get_all_library_names")
-			require.Contains(t, prompt, "yakdoc_library_details")
-			require.Contains(t, prompt, "yakdoc_function_details")
-			require.Contains(t, prompt, "yakdoc_variable_details")
-			rsp := i.NewAIResponse()
-			rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "finish"}`))
-			rsp.Close()
-			return rsp, nil
+			prompts <- r.GetPrompt()
+			return mockedYaklangYakdocFlow(t, i, r, stat)
 		}),
 		aicommon.WithEventInputChan(in),
-		aicommon.WithEventHandler(func(e *schema.AiOutputEvent) {
-			out <- e.ToGRPC()
-		}),
+		aicommon.WithEventHandler(func(e *schema.AiOutputEvent) { out <- e.ToGRPC() }),
 	)
 	require.NoError(t, err)
-
-	go func() {
-		in <- &ypb.AIInputEvent{
-			IsFreeInput:   true,
-			FreeInput:     "quick prompt check",
-			FocusModeLoop: schema.AI_REACT_LOOP_NAME_WRITE_YAKLANG,
-		}
-	}()
-
-	time.Sleep(2 * time.Second)
+	in <- &ypb.AIInputEvent{IsFreeInput: true, FreeInput: "quick prompt check", FocusModeLoop: schema.AI_REACT_LOOP_NAME_WRITE_YAKLANG}
+	result := waitForYaklangDeferredEditorSync(out, focusModeWriteYaklangTestTimeout())
 	close(in)
-	_ = ins
+	ins.Wait()
+	require.False(t, result.taskFailed)
+	require.True(t, result.taskCompleted, "the prompt-check task must complete")
+	close(prompts)
+	var mainPrompt string
+	for prompt := range prompts {
+		if strings.Contains(prompt, `"write_code"`) && strings.Contains(prompt, `"yakdoc_search"`) {
+			mainPrompt = prompt
+			break
+		}
+	}
+	require.NotEmpty(t, mainPrompt, "the actual code-writing prompt must be visited")
+	for _, action := range []string{"yakdoc_search", "yakdoc_get_all_library_names", "yakdoc_library_details", "yakdoc_function_details", "yakdoc_variable_details"} {
+		require.Contains(t, mainPrompt, action)
+	}
 }

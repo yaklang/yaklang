@@ -124,8 +124,9 @@ LOOP:
 }
 
 type mockStats_forWriteAndModify struct {
-	mu        sync.Mutex
-	writeDone bool
+	mu            sync.Mutex
+	writeDone     bool
+	modifyEndLine int
 }
 
 // claimFirstWrite returns true exactly once; later callers must use modify_rule.
@@ -191,12 +192,18 @@ desc(
 	type: audit
 	level: info
 )`
-			rsp.EmitOutputStream(bytes.NewBufferString(utils.MustRenderTemplate(`{"@action": "modify_rule", "modify_start_line": 1, "modify_end_line": 6}
+			rsp.EmitOutputStream(bytes.NewBufferString(utils.MustRenderTemplate(`{"@action": "modify_rule", "modify_start_line": 1, "modify_end_line": {{ .endLine }}}
 
 <|GEN_RULE_{{ .nonce }}|>
 `+modifiedContent+`
 <|GEN_RULE_END_{{ .nonce }}|>`, map[string]any{
 				"nonce": nonceStr,
+				"endLine": func() int {
+					if stat.modifyEndLine > 0 {
+						return stat.modifyEndLine
+					}
+					return 6
+				}(),
 			})))
 		}
 		rsp.Close()

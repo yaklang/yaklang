@@ -28,6 +28,16 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
+// Persistence tests exercise the real SQLite save/restore path without waiting
+// for the UI's three-second coalescing interval. Set before submitting any task.
+func newImmediatePersistenceTestReAct(opts ...aicommon.ConfigOption) (*ReAct, error) {
+	ins, err := NewTestReAct(opts...)
+	if err == nil {
+		ins.saveTimelineThrottle = func(save func()) { save() }
+	}
+	return ins, err
+}
+
 func TestReAct_PersistentSession_ToolUse(t *testing.T) {
 	flag := ksuid.New().String()
 	_ = flag
@@ -53,8 +63,14 @@ func TestReAct_PersistentSession_ToolUse(t *testing.T) {
 	}
 
 	pid := uuid.New()
-	ins, err := NewTestReAct(
+	ins, err := newImmediatePersistenceTestReAct(
 		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+			if isPrimaryDecisionPrompt(r.GetPrompt()) && strings.Contains(r.GetPrompt(), "RESULT:") {
+				rsp := i.NewAIResponse()
+				rsp.EmitOutputStream(strings.NewReader(`{"@action":"object","next_action":{"type":"finish"}}`))
+				rsp.Close()
+				return rsp, nil
+			}
 			return mockedToolCalling(i, r, "sleep")
 		}),
 		aicommon.WithEventInputChan(in),
@@ -116,9 +132,10 @@ LOOP:
 				}
 			}
 		case <-after:
-			break LOOP
+			t.Fatal("timeout waiting for persisted tool-use task completion")
 		}
 	}
+	ins.Wait()
 	close(in)
 
 	if !reviewed {
@@ -144,7 +161,7 @@ LOOP:
 	}
 	fmt.Println("--------------------------------------")
 
-	persistentTimeline, err := NewTestReAct(
+	persistentTimeline, err := newImmediatePersistenceTestReAct(
 		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			return mockedToolCalling(i, r, "sleep")
 		}),
@@ -159,7 +176,7 @@ LOOP:
 		t.Fatal(err)
 	}
 
-	withoutPersistent, err := NewTestReAct(
+	withoutPersistent, err := newImmediatePersistenceTestReAct(
 		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			return mockedToolCalling(i, r, "sleep")
 		}),
@@ -203,7 +220,7 @@ func TestReAct_PersistentSession_WorkDir(t *testing.T) {
 
 	// === Session 1: Run plan execution that produces artifacts ===
 	var insErr error
-	reactIns, insErr = NewTestReAct(
+	reactIns, insErr = newImmediatePersistenceTestReAct(
 		aicommon.WithEventInputChan(in),
 		aicommon.WithEventHandler(func(e *schema.AiOutputEvent) {
 			select {
@@ -319,8 +336,8 @@ WAIT_PLAN:
 	require.True(t, planStarted, "plan should have started")
 	require.True(t, planEnded, "plan should have ended")
 
-	// Wait for defer blocks (emitArtifactsSummaryToTimeline) and timeline throttle (3s) to flush
-	time.Sleep(3500 * time.Millisecond)
+	// Join the task, including deferred artifact and timeline writes.
+	reactIns.Wait()
 
 	// Capture Session 1 state for later comparison
 	session1WorkDir := reactIns.config.GetOrCreateWorkDir()
@@ -350,7 +367,7 @@ WAIT_PLAN:
 	// restorePersistentSession() should restore Timeline + WorkDir
 	in2 := make(chan *ypb.AIInputEvent, 10)
 	out2 := make(chan *ypb.AIOutputEvent, 200)
-	ins2, err := NewTestReAct(
+	ins2, err := newImmediatePersistenceTestReAct(
 		aicommon.WithEventInputChan(in2),
 		aicommon.WithEventHandler(func(e *schema.AiOutputEvent) {
 			select {
@@ -406,7 +423,7 @@ WAIT_PLAN:
 	// === Session 3: Create instance WITHOUT persistent session ===
 	in3 := make(chan *ypb.AIInputEvent, 10)
 	out3 := make(chan *ypb.AIOutputEvent, 200)
-	ins3, err := NewTestReAct(
+	ins3, err := newImmediatePersistenceTestReAct(
 		aicommon.WithEventInputChan(in3),
 		aicommon.WithEventHandler(func(e *schema.AiOutputEvent) {
 			select {
@@ -447,7 +464,7 @@ func TestReAct_PersistentSession_FreeInput(t *testing.T) {
 	// 关键词: directly_answer 永不 Exit, finish 唯一终结器, 答复后追加 finish
 	newAnsweringReAct := func(inputChan chan *ypb.AIInputEvent, outputChan chan *ypb.AIOutputEvent) (*ReAct, error) {
 		var decisionCount int32
-		return NewTestReAct(
+		return newImmediatePersistenceTestReAct(
 			aicommon.WithEventInputChan(inputChan),
 			aicommon.WithEventHandler(func(e *schema.AiOutputEvent) {
 				select {
@@ -499,11 +516,11 @@ func TestReAct_PersistentSession_FreeInput(t *testing.T) {
 	// Round 1: persist the first user input.
 	in1 := make(chan *ypb.AIInputEvent, 10)
 	out1 := make(chan *ypb.AIOutputEvent, 200)
-	_, err := newAnsweringReAct(in1, out1)
+	ins1, err := newAnsweringReAct(in1, out1)
 	require.NoError(t, err)
 	in1 <- &ypb.AIInputEvent{IsFreeInput: true, FreeInput: round1Input}
 	waitTaskDone(t, out1)
-	time.Sleep(3500 * time.Millisecond)
+	ins1.Wait()
 	close(in1)
 
 	// Round 2: restore round 1, then append round 2.
@@ -527,7 +544,7 @@ func TestReAct_PersistentSession_FreeInput(t *testing.T) {
 
 	in2 <- &ypb.AIInputEvent{IsFreeInput: true, FreeInput: round2Input}
 	waitTaskDone(t, out2)
-	time.Sleep(3500 * time.Millisecond)
+	ins2.Wait()
 	close(in2)
 
 	// Round 3: restore both round 1 and round 2.

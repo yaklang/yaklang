@@ -486,11 +486,9 @@ LOOP:
 	tl := ins.DumpTimeline()
 	fmt.Println(tl)
 
-
 	if strings.Contains(tl, `when review`) {
 		t.Fatal("auto-continue review must not pollute the timeline")
 	}
-
 
 	fmt.Println("--------------------------------------")
 	fmt.Printf("✓ Successfully called tool from database directly by name: %s\n", toolName)
@@ -721,6 +719,8 @@ yakit.Info("NATIVE_PLUGIN_EXECUTED: target=%s", target)
 	out := make(chan *ypb.AIOutputEvent, 200)
 
 	pluginCalled := false
+	secondaryDisclosure := false
+	var decisionCount int
 
 	toolManager := buildinaitools.NewToolManagerByToolGetter(
 		func() []*aitool.Tool {
@@ -739,6 +739,13 @@ yakit.Info("NATIVE_PLUGIN_EXECUTED: target=%s", target)
 			prompt := r.GetPrompt()
 
 			if isPrimaryDecisionPrompt(prompt) {
+				decisionCount++
+				if decisionCount > 1 {
+					rsp := i.NewAIResponse()
+					rsp.EmitOutputStream(strings.NewReader(`{"@action":"object","next_action":{"type":"finish"}}`))
+					rsp.Close()
+					return rsp, nil
+				}
 				rsp := i.NewAIResponse()
 				rsp.EmitOutputStream(bytes.NewBufferString(`
 {"@action": "object", "next_action": { "type": "require_tool", "tool_require_payload": "` + pluginName + `" },
@@ -752,6 +759,7 @@ yakit.Info("NATIVE_PLUGIN_EXECUTED: target=%s", target)
 				rsp := i.NewAIResponse()
 				// Verify secondary disclosure: the prompt should contain __USAGE__ content
 				if strings.Contains(prompt, "Scan a target host") {
+					secondaryDisclosure = true
 					log.Infof("secondary disclosure verified: __USAGE__ content found in tool-params prompt")
 				}
 				rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "call-tool", "params": { "target": "192.168.1.1" }}`))
@@ -818,16 +826,22 @@ LOOP:
 			if e.NodeId == "react_task_status_changed" {
 				result := jsonpath.FindFirst(e.GetContent(), "$..react_task_now_status")
 				status := utils.InterfaceToString(result)
-				if status == "completed" || status == "failed" {
+				if status == "failed" {
+					t.Fatal("native plugin task failed")
+				}
+				if status == "completed" {
 					break LOOP
 				}
 			}
 		case <-after:
-			log.Warnf("test timeout")
-			break LOOP
+			t.Fatal("timeout waiting for native plugin task completion")
 		}
 	}
 	close(in)
+	ins.Wait()
+	if !secondaryDisclosure {
+		t.Fatal("native plugin usage was not disclosed during parameter generation")
+	}
 
 	if !pluginCalled {
 		t.Fatal("native YakScript plugin was not called through ReAct loop")
@@ -840,6 +854,10 @@ LOOP:
 
 	if !strings.Contains(tl, pluginName) {
 		t.Fatal("timeline does not contain native YakScript plugin name")
+	}
+
+	if !strings.Contains(tl, "NATIVE_PLUGIN_EXECUTED: target=192.168.1.1") {
+		t.Fatal("timeline must retain the actual plugin execution output and CLI target")
 	}
 
 	fmt.Printf("Native YakScript plugin successfully called: %s\n", pluginName)
