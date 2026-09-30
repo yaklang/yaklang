@@ -164,6 +164,10 @@ func (c *Compiler) materializeCallableClosure(contextInst ssa.Instruction, ssaFn
 	extras := c.extraCaptures(ssaFn)
 	freeCount := len(bindings) + len(extras)
 	freeValuesPtr := llvm.ConstPointerNull(i8Ptr)
+	// A named function captures its own name so the body can call it. That
+	// slot cannot be filled while the object is still being built; the cell
+	// is patched with the object after make_callable returns.
+	var selfCells []llvm.Value
 	if freeCount > 0 {
 		mallocFn, mallocType := c.getOrInsertMalloc()
 		sizeBytes := llvm.ConstInt(i64, uint64(freeCount*8), false)
@@ -222,6 +226,8 @@ func (c *Compiler) materializeCallableClosure(contextInst ssa.Instruction, ssaFn
 				}
 			}
 			mode := c.freeValueCaptureMode(ssaFn, binding)
+			isSelf := bindingNamesSelf(ssaFn, binding)
+			var selfCell llvm.Value
 			switch mode {
 			case freeValueCaptureByRefShared:
 				// Point the closure at the parent's phi slot so every closure
@@ -261,6 +267,9 @@ func (c *Compiler) materializeCallableClosure(contextInst ssa.Instruction, ssaFn
 				freshRaw := c.Builder.CreateCall(mallocType, mallocFn, []llvm.Value{llvm.ConstInt(i64, 8, false)}, "yak_free_slot_mem")
 				freshPtr := c.Builder.CreateIntToPtr(freshRaw, i64Ptr, "yak_free_slot_i64p")
 				c.Builder.CreateStore(value, freshPtr)
+				if isSelf {
+					selfCell = freshPtr
+				}
 				if name != "" {
 					freshSlots[name] = freshPtr
 				}
@@ -294,6 +303,9 @@ func (c *Compiler) materializeCallableClosure(contextInst ssa.Instruction, ssaFn
 					}
 				}
 			}
+			if isSelf && !selfCell.IsNil() {
+				selfCells = append(selfCells, selfCell)
+			}
 			idx := llvm.ConstInt(i64, uint64(index), false)
 			slot := c.Builder.CreateGEP(i64, freeI64Ptr, []llvm.Value{idx}, "")
 			c.Builder.CreateStore(value, slot)
@@ -305,12 +317,30 @@ func (c *Compiler) materializeCallableClosure(contextInst ssa.Instruction, ssaFn
 	}
 
 	makeFn, makeType := c.getOrInsertRuntimeMakeCallable()
-	return c.Builder.CreateCall(makeType, makeFn, []llvm.Value{
+	closure := c.Builder.CreateCall(makeType, makeFn, []llvm.Value{
 		target,
 		llvm.ConstInt(i64, uint64(len(ssaFn.ParameterMembers)), false),
 		llvm.ConstInt(i64, uint64(freeCount), false),
 		freeValuesPtr,
-	}, "yak_callable_closure"), nil
+	}, "yak_callable_closure")
+	// make_callable copies the slot pointer, not the cell word. Filling the
+	// cell now makes a recursive call through this free value see the object.
+	for _, cell := range selfCells {
+		c.Builder.CreateStore(c.coerceToInt64(closure), cell)
+	}
+	return closure, nil
+}
+
+func bindingNamesSelf(fn *ssa.Function, binding callframe.FreeValueBinding) bool {
+	if fn == nil || binding.Variable == nil {
+		return false
+	}
+	param, ok := ssa.ToParameter(binding.Variable.GetValue())
+	if !ok || param == nil || param.GetDefault() == nil {
+		return false
+	}
+	self, ok := ssa.ToFunction(param.GetDefault())
+	return ok && self != nil && self.GetId() == fn.GetId()
 }
 
 func (c *Compiler) enterMaterializingCallable(fn *ssa.Function) {
