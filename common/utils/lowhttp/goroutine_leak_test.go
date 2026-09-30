@@ -360,14 +360,13 @@ func TestGoroutineLeak_ConnPool_ServerClose(t *testing.T) {
 }
 
 func TestGoroutineLeak_ConnPool_StressMaxGoroutines(t *testing.T) {
-	// Wait for any goroutines from previous tests to settle
-	time.Sleep(100 * time.Millisecond)
 	runtime.GC()
 
 	// Record baseline goroutines from previous tests
 	baselinePersistConnGoroutines := countPersistConnGoroutines()
 
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
 	host, port := utils.DebugMockHTTPHandlerFuncContext(ctx, func(writer http.ResponseWriter, request *http.Request) {
 		writer.Header().Set("Content-Type", "text/plain")
 		writer.WriteHeader(200)
@@ -380,19 +379,22 @@ func TestGoroutineLeak_ConnPool_StressMaxGoroutines(t *testing.T) {
 	const (
 		// Reduced from 400/40 to keep the test fast on CI runners while still
 		// exercising concurrent reuse and goroutine cleanup.
-		requests      = 100
-		poolSize      = 20
-		maxGoroutines = poolSize * 2
+		requests       = 100
+		poolSize       = 20
 		requestTimeout = 200 * time.Millisecond
 	)
-	poolCtx, poolCancel := context.WithCancel(context.Background())
+	poolCtx, poolCancel := context.WithCancel(ctx)
 	pool := NewHttpConnPool(poolCtx, poolSize, poolSize)
+	// At saturation, a waiter may need idle eviction to free a connection
+	// slot. This lifecycle test does not need the production 90-second TTL.
+	pool.idleConnTimeout = 100 * time.Millisecond
 	defer func() {
 		pool.Clear()
 		poolCancel()
 	}()
 
 	var wg sync.WaitGroup
+	var successfulRequests int64
 	sem := make(chan struct{}, poolSize)
 	for i := 0; i < requests; i++ {
 		wg.Add(1)
@@ -401,6 +403,7 @@ func TestGoroutineLeak_ConnPool_StressMaxGoroutines(t *testing.T) {
 			defer wg.Done()
 			defer func() { <-sem }()
 			_, err := HTTP(
+				WithContext(ctx),
 				WithPacketBytes(buildBasicRequest(host, port)),
 				WithConnPool(true),
 				ConnPool(pool),
@@ -408,26 +411,35 @@ func TestGoroutineLeak_ConnPool_StressMaxGoroutines(t *testing.T) {
 			)
 			if err != nil {
 				log.Infof("conn pool stress request failed: %v", err)
+			} else {
+				atomic.AddInt64(&successfulRequests, 1)
 			}
 		}()
 	}
 	wg.Wait()
+	if ctx.Err() != nil {
+		t.Fatalf("conn pool stress exhausted its deadline: %v", ctx.Err())
+	}
+	if got := atomic.LoadInt64(&successfulRequests); got != requests {
+		t.Errorf("conn pool stress requests succeeded: got %d, want %d", got, requests)
+	}
+	if current := countPersistConnGoroutines(); current > baselinePersistConnGoroutines+poolSize*2 {
+		t.Errorf("persistConn goroutines exceed pool bound: current=%d baseline=%d limit=%d", current, baselinePersistConnGoroutines, poolSize*2)
+	}
 	cancel()
 
 	// Clear the pool and wait for goroutines to exit
 	pool.Clear()
 	poolCancel()
-	time.Sleep(500 * time.Millisecond)
-	runtime.GC()
-
-	persistConnGoroutines := countPersistConnGoroutines()
-	// Only count the goroutines created by this test (subtract baseline)
-	thisTestGoroutines := persistConnGoroutines - baselinePersistConnGoroutines
-	if thisTestGoroutines < 0 {
-		thisTestGoroutines = 0
-	}
-	if thisTestGoroutines > maxGoroutines {
-		log.Infof("persistConn goroutines exceed limit: current=%d (baseline=%d) limit=%d", persistConnGoroutines, baselinePersistConnGoroutines, maxGoroutines)
-		t.Fatalf("persistConn goroutines exceed limit: current=%d (baseline=%d, this_test=%d) limit=%d", persistConnGoroutines, baselinePersistConnGoroutines, thisTestGoroutines, maxGoroutines)
+	deadline := time.Now().Add(2 * time.Second)
+	for {
+		current := countPersistConnGoroutines()
+		if current <= baselinePersistConnGoroutines {
+			return
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("persistConn goroutines did not exit: current=%d baseline=%d", current, baselinePersistConnGoroutines)
+		}
+		time.Sleep(10 * time.Millisecond)
 	}
 }

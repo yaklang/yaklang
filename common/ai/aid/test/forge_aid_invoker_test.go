@@ -1,602 +1,177 @@
 package test
 
 import (
-	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/ai/aid"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
-	"github.com/yaklang/yaklang/common/ai/aid/aireact"
+	"github.com/yaklang/yaklang/common/ai/aid/aimem"
+	_ "github.com/yaklang/yaklang/common/aiforge"
 	"github.com/yaklang/yaklang/common/consts"
-	"github.com/yaklang/yaklang/common/jsonpath"
-	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/utils/chanx"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
-
-	"github.com/stretchr/testify/require"
 )
 
-// TestForge_PersistentContentOnlyOnce tests that:
-// 1. Create a Forge, register it to the database, execute it, then delete the temporary Forge Blueprint
-// 2. Mock the Plan using the Forge's built-in PlanPrompt
-// 3. Forge's Schema Persistent and Init contain random identifiers for verification
-// 4. Use YOLO mode to disable all user interaction
-// 5. Verify that Persistent content only appears once in prompts (avoiding context waste)
-// 6. Verify that Init content appears once and doesn't interfere with user query
-func TestForge_PersistentContentOnlyOnce(t *testing.T) {
-	// Generate unique identifiers for testing
-	testNonce := utils.RandStringBytes(16)
-	testForgeName := "test_forge_persistent_once_" + testNonce
-	persistentMarker := "PERSISTENT_UNIQUE_MARKER_" + testNonce
-	initMarker := "INIT_UNIQUE_MARKER_" + testNonce
-	planMarker := "PLAN_UNIQUE_MARKER_" + testNonce
-	userQueryMarker := "USER_QUERY_MARKER_" + testNonce
-	finishTaskMarker := "FINISH_TASK_MARKER_" + testNonce
-	persistentSessionId := "persistent_session_" + testNonce
-
-	// Track max occurrences of markers in any single prompt
-	persistentMarkerMaxCount := 0
-	initMarkerMaxCount := 0
-	userQueryMarkerMaxCount := 0
-	forgeTaskExecuted := false
-
-	// Create test Forge with embedded Plan (mock plan generation)
-	forge := &schema.AIForge{
-		ForgeName:        testForgeName,
-		ForgeVerboseName: "Test Forge for Persistent Content Verification",
-		ForgeType:        "yak",
-		ForgeContent:     "", // Empty for config-based forge
-		Description:      "Test forge to verify persistent content appears only once",
-		InitPrompt: fmt.Sprintf(`## Forge Initialization
-<init_content_marker>
-%s
-</init_content_marker>
-
-**Analysis Target**: {{ .Forge.UserQuery }}`, initMarker),
-		PersistentPrompt: fmt.Sprintf(`<persistent_content_marker>
-%s
-</persistent_content_marker>
-
-Remember: This persistent instruction should only appear ONCE in context.`, persistentMarker),
-		// Use built-in PlanPrompt to mock plan generation
-		PlanPrompt: fmt.Sprintf(`{
-  "@action": "plan",
-  "query": "Execute test task with marker",
-  "main_task": "%s",
-  "main_task_goal": "Complete the test task and verify markers",
-  "tasks": [
-    {
-      "subtask_name": "Verify markers",
-      "subtask_goal": "Check that all markers are present and counted correctly"
-    }
-  ]
-}`, planMarker),
-	}
-
-	// Register Forge to database
-	db := consts.GetGormProfileDatabase()
-	err := yakit.CreateAIForge(db, forge)
-	require.NoError(t, err, "Failed to create test AIForge")
-
-	// Clean up after test
-	defer func() {
-		count, err := yakit.DeleteAIForge(db, &ypb.AIForgeFilter{
-			ForgeName: testForgeName,
-		})
-		if err != nil {
-			log.Errorf("Failed to delete test forge: %v", err)
-		} else {
-			log.Infof("Cleaned up test forge, deleted %d records", count)
-		}
-	}()
-
-	// Set up channels for test
-	in := make(chan *ypb.AIInputEvent, 10)
-	out := make(chan *ypb.AIOutputEvent, 100)
-	finishedCh := make(chan bool, 1)
-	defer close(finishedCh)
-
-	// Create ReAct instance with YOLO mode
-	_, err = aireact.NewTestReAct(
-		aicommon.WithAgreeYOLO(true),
-		aicommon.WithPersistentSessionId(persistentSessionId),
-		aicommon.WithEventInputChan(in),
-		aicommon.WithEventHandler(func(e *schema.AiOutputEvent) {
-			out <- e.ToGRPC()
-		}),
-		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
-			prompt := r.GetPrompt()
-
-			// Count occurrences of markers in this prompt
-			currentPersistentCount := strings.Count(prompt, persistentMarker)
-			currentInitCount := strings.Count(prompt, initMarker)
-			currentUserQueryCount := strings.Count(prompt, userQueryMarker)
-
-			// Update max counts
-			if currentPersistentCount > persistentMarkerMaxCount {
-				persistentMarkerMaxCount = currentPersistentCount
-			}
-			if currentInitCount > initMarkerMaxCount {
-				initMarkerMaxCount = currentInitCount
-			}
-			if currentUserQueryCount > userQueryMarkerMaxCount {
-				userQueryMarkerMaxCount = currentUserQueryCount
-			}
-
-			log.Infof("Prompt analysis: persistent=%d, init=%d, userQuery=%d",
-				currentPersistentCount, currentInitCount, currentUserQueryCount)
-
-			// Handle ReAct main loop - request blueprint
-			if aicommon.IsPrimaryDecisionPrompt(prompt) && strings.Contains(prompt, "\"require_ai_blueprint\"") &&
-				strings.Contains(prompt, userQueryMarker) {
-				log.Infof("ReAct main loop: requesting forge %s", testForgeName)
-				rsp := i.NewAIResponse()
-				rsp.EmitOutputStream(bytes.NewBufferString(fmt.Sprintf(`
-{"@action": "object", "next_action": { "type": "require_ai_blueprint", "blueprint_payload": "%s" },
-"human_readable_thought": "Requesting test forge", "cumulative_summary": "Test forge execution"}
-`, testForgeName)))
-				rsp.Close()
-				return rsp, nil
-			}
-
-			// Handle Blueprint parameter generation
-			if aicommon.IsToolParamGenPromptForBlueprint(prompt, testForgeName) {
-				log.Infof("Blueprint parameter generation for %s", testForgeName)
-				rsp := i.NewAIResponse()
-				rsp.EmitOutputStream(bytes.NewBufferString(fmt.Sprintf(`
-{"@action": "call-ai-blueprint", "blueprint": "%s", "params": {"query": "test parameter"},
-"human_readable_thought": "Generating blueprint parameters", "cumulative_summary": "Blueprint params ready"}
-`, testForgeName)))
-				rsp.Close()
-				return rsp, nil
-			}
-
-			// Handle task execution within Forge - this is where persistent and init should appear
-			if utils.MatchAllOfSubString(prompt, planMarker, "PROGRESS_TASK_") {
-				forgeTaskExecuted = true
-				log.Infof("Forge task execution detected, persistent=%d, init=%d",
-					currentPersistentCount, currentInitCount)
-
-				// Verify persistent content appears only once
-				if currentPersistentCount > 1 {
-					log.Errorf("CRITICAL: Persistent content appeared %d times in task execution prompt!", currentPersistentCount)
-				}
-				if currentInitCount > 1 {
-					log.Errorf("CRITICAL: Init content appeared %d times in task execution prompt!", currentInitCount)
-				}
-
-				rsp := i.NewAIResponse()
-				rsp.EmitOutputStream(bytes.NewBufferString(fmt.Sprintf(`
-{"@action": "directly_answer", "answer_payload": "%s"}`, finishTaskMarker)))
-				rsp.Close()
-				finishedCh <- true
-				return rsp, nil
-			}
-
-			// Handle default ReAct loop (first call without forge name yet)
-			if utils.MatchAllOfSubString(prompt, "directly_answer", "require_tool", "\"require_ai_blueprint\"") {
-				rsp := i.NewAIResponse()
-				rsp.EmitOutputStream(bytes.NewBufferString(fmt.Sprintf(`
-{"@action": "object", "next_action": { "type": "require_ai_blueprint", "blueprint_payload": "%s" },
-"human_readable_thought": "Requesting test forge", "cumulative_summary": "Test forge execution"}
-`, testForgeName)))
-				rsp.Close()
-				return rsp, nil
-			}
-
-			log.Warnf("Unexpected prompt pattern: %s", utils.ShrinkString(prompt, 300))
-			rsp := i.NewAIResponse()
-			rsp.EmitOutputStream(bytes.NewBufferString(fmt.Sprintf(`
-{"@action": "object", "next_action": {"type": "directly_answer"}, "answer_payload": "%s",
-"human_readable_thought": "Fallback response", "cumulative_summary": "Done"}`, finishTaskMarker)))
-			rsp.Close()
-			return rsp, nil
-		}),
-	)
-	require.NoError(t, err, "Failed to create ReAct instance")
-
-	// Send user input
-	go func() {
-		in <- &ypb.AIInputEvent{
-			IsFreeInput: true,
-			FreeInput:   userQueryMarker,
-		}
-	}()
-
-	// Wait for completion with timeout
-	timeout := time.After(60 * time.Second)
-	forgeStarted := false
-	forgeEnded := false
-
-LOOP:
-	for {
-		select {
-		case <-finishedCh:
-			log.Infof("Test finished signal received")
-			break LOOP
-		case e := <-out:
-			if e.Type == string(schema.EVENT_TYPE_START_PLAN_AND_EXECUTION) {
-				forgeStarted = true
-				log.Infof("Forge execution started")
-			}
-			if e.Type == string(schema.EVENT_TYPE_END_PLAN_AND_EXECUTION) {
-				forgeEnded = true
-				log.Infof("Forge execution ended")
-			}
-			if e.NodeId == "react_task_status_changed" {
-				taskResult := jsonpath.FindFirst(string(e.Content), "$..react_task_now_status")
-				status := utils.InterfaceToString(taskResult)
-				if status == "completed" || status == "failed" {
-					log.Infof("Task status changed to: %s", status)
-					break LOOP
-				}
-			}
-		case <-timeout:
-			log.Warnf("Test timeout reached")
-			break LOOP
-		}
-	}
-
-	// Close input channel
-	close(in)
-
-	// Wait a bit for any pending events
-	time.Sleep(100 * time.Millisecond)
-
-	// Verify results
-	log.Infof("Test Results Summary:")
-	log.Infof("  Forge Started: %v", forgeStarted)
-	log.Infof("  Forge Ended: %v", forgeEnded)
-	log.Infof("  Forge Task Executed: %v", forgeTaskExecuted)
-	log.Infof("  Persistent Marker Max Count: %d", persistentMarkerMaxCount)
-	log.Infof("  Init Marker Max Count: %d", initMarkerMaxCount)
-	log.Infof("  User Query Marker Max Count: %d", userQueryMarkerMaxCount)
-
-	// Core verification: Persistent content should appear at most once in any single prompt
-	// This is the key requirement to avoid context token waste
-	require.LessOrEqual(t, persistentMarkerMaxCount, 1,
-		"CRITICAL: Persistent content appeared %d times in a single prompt (should be at most 1). This wastes context tokens.",
-		persistentMarkerMaxCount)
-
-	// Note: Init content may appear multiple times across different prompts/phases
-	// This is acceptable as Init is meant to be shown at initialization
-	// We only log a warning if it appears too many times
-	if initMarkerMaxCount > 3 {
-		log.Warnf("Init content appeared %d times - consider reviewing if this is expected", initMarkerMaxCount)
-	}
-
-	// Verify forge was actually executed
-	require.True(t, forgeTaskExecuted || forgeStarted,
-		"Forge execution was not triggered - test may not be properly validating the scenario")
-
-	// If forge executed, verify persistent marker was present at least once
-	if forgeTaskExecuted && persistentMarkerMaxCount == 0 {
-		log.Warnf("Forge executed but persistent marker not found - persistent prompt may not be rendered")
-	}
-
-	log.Infof("✓ Test passed: Persistent content verified to appear only once in any single prompt")
-}
-
-// TestForge_PersistentAndInitNotDuplicated verifies that when Forge execution proceeds,
-// the persistent and init content doesn't get duplicated across different AI calls.
-func TestForge_PersistentAndInitNotDuplicated(t *testing.T) {
-	testNonce := utils.RandStringBytes(16)
-	testForgeName := "test_forge_no_dup_" + testNonce
-	persistentId := "persistent_session_nodup_" + testNonce
-	persistentMarker := "PERSISTENT_MARKER_NODUP_" + testNonce
-	initMarker := "INIT_MARKER_NODUP_" + testNonce
-	planMarker := "PLAN_MARKER_NODUP_" + testNonce
-	userQuery := "Test query no duplication " + testNonce
-
-	// Track all prompts
-	promptCount := 0
-	taskExecutionCount := 0
-	persistentMarkerMaxInSinglePrompt := 0
-	initMarkerMaxInSinglePrompt := 0
-
-	// Create test Forge
-	forge := &schema.AIForge{
-		ForgeName:        testForgeName,
-		ForgeVerboseName: "Test Forge No Duplication",
-		ForgeType:        "yak",
-		ForgeContent:     "",
-		Description:      "Test forge to verify no duplication of persistent/init content",
-		InitPrompt: fmt.Sprintf(`## Forge Init Section
-<init_marker>%s</init_marker>
-Target: {{ .Forge.UserQuery }}`, initMarker),
-		PersistentPrompt: fmt.Sprintf(`## Persistent Section
-<persistent_marker>%s</persistent_marker>`, persistentMarker),
-		PlanPrompt: fmt.Sprintf(`{
-  "@action": "plan",
-  "query": "test",
-  "main_task": "%s",
-  "main_task_goal": "Complete test",
-  "tasks": [
-    {"subtask_name": "Step1", "subtask_goal": "Execute step 1"},
-    {"subtask_name": "Step2", "subtask_goal": "Execute step 2"}
-  ]
-}`, planMarker),
-	}
-
-	db := consts.GetGormProfileDatabase()
-	err := yakit.CreateAIForge(db, forge)
-	require.NoError(t, err)
-
-	defer func() {
-		yakit.DeleteAIForge(db, &ypb.AIForgeFilter{ForgeName: testForgeName})
-	}()
-
-	in := make(chan *ypb.AIInputEvent, 10)
-	out := make(chan *ypb.AIOutputEvent, 100)
-	finishedCh := make(chan bool, 1)
-	ctx, cancel := context.WithCancel(context.Background())
+// Execute the real registered forge synchronously. Dispatch lifecycle is covered
+// separately; these tests must finish the plan before inspecting prompt counts.
+func testForgePromptMarkers(t *testing.T, steps int) {
+	t.Helper()
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-
-	_, err = aireact.NewTestReAct(
-		aicommon.WithAgreeYOLO(true),
-		aicommon.WithPersistentSessionId(persistentId),
-		aicommon.WithEventInputChan(in),
-		aicommon.WithEventHandler(func(e *schema.AiOutputEvent) {
-			select {
-			case out <- e.ToGRPC():
-			case <-ctx.Done():
-			}
-		}),
-		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
-			prompt := r.GetPrompt()
-			promptCount++
-
-			// Count in current prompt
-			persistentCount := strings.Count(prompt, persistentMarker)
-			initCount := strings.Count(prompt, initMarker)
-
-			log.Infof("Prompt #%d: persistent=%d, init=%d", promptCount, persistentCount, initCount)
-
-			// Track max counts
-			if persistentCount > persistentMarkerMaxInSinglePrompt {
-				persistentMarkerMaxInSinglePrompt = persistentCount
-			}
-			if initCount > initMarkerMaxInSinglePrompt {
-				initMarkerMaxInSinglePrompt = initCount
-			}
-
-			// Core verification: persistent content should appear at most once in any single prompt
-			if persistentCount > 1 {
-				t.Errorf("CRITICAL: Persistent marker duplicated in prompt #%d: found %d times", promptCount, persistentCount)
-			}
-			// Note: init content may appear multiple times due to framework design
-			// We only log a warning, not an error
-			if initCount > 3 {
-				log.Warnf("Init marker appeared %d times in prompt #%d", initCount, promptCount)
-			}
-
-			// Handle ReAct loop
-			if utils.MatchAllOfSubString(prompt, "directly_answer", "require_tool") &&
-				!strings.Contains(prompt, planMarker) {
-				rsp := i.NewAIResponse()
-				rsp.EmitOutputStream(bytes.NewBufferString(fmt.Sprintf(`
-{"@action": "object", "next_action": {"type": "require_ai_blueprint", "blueprint_payload": "%s"},
-"human_readable_thought": "Request forge", "cumulative_summary": "Forge request"}`, testForgeName)))
-				rsp.Close()
-				return rsp, nil
-			}
-
-			// Handle Blueprint params
-			if utils.MatchAllOfSubString(prompt, "Blueprint Schema:", "call-ai-blueprint") ||
-				utils.MatchAllOfSubString(prompt, "Blueprint Description:", "call-ai-blueprint") {
-				rsp := i.NewAIResponse()
-				rsp.EmitOutputStream(bytes.NewBufferString(fmt.Sprintf(`
-{"@action": "call-ai-blueprint", "blueprint": "%s", "params": {},
-"human_readable_thought": "Params ready", "cumulative_summary": "Ready"}`, testForgeName)))
-				rsp.Close()
-				return rsp, nil
-			}
-
-			// Handle task execution - simulate multiple task steps
-			if strings.Contains(prompt, planMarker) && strings.Contains(prompt, "PROGRESS_TASK_") {
-				taskExecutionCount++
-				rsp := i.NewAIResponse()
-				if taskExecutionCount >= 2 {
-					rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "directly_answer", "answer_payload": "Done"}`))
-					finishedCh <- true
-				} else {
-					rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "directly_answer", "answer_payload": "Step done, continue..."}`))
-				}
-				rsp.Close()
-				return rsp, nil
-			}
-
-			// Default
-			rsp := i.NewAIResponse()
-			rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "object", "next_action": {"type": "directly_answer"}, "answer_payload": "Done", "human_readable_thought": "Done", "cumulative_summary": "Done"}`))
-			rsp.Close()
-			return rsp, nil
-		}),
-	)
+	nonce := utils.RandStringBytes(16)
+	persistentMarker := "PERSISTENT_UNIQUE_MARKER_" + nonce
+	initMarker := "INIT_UNIQUE_MARKER_" + nonce
+	queryMarker := "USER_QUERY_MARKER_" + nonce
+	tasks := make([]map[string]string, steps)
+	for i := range tasks {
+		tasks[i] = map[string]string{"subtask_name": fmt.Sprintf("step-%d", i), "subtask_goal": "verify prompt markers"}
+	}
+	plan, err := json.Marshal(map[string]any{
+		"@action": "plan_from_document", "main_task": "verify markers", "main_task_goal": "verify prompt markers", "tasks": tasks,
+	})
 	require.NoError(t, err)
-
-	go func() {
-		in <- &ypb.AIInputEvent{
-			IsFreeInput: true,
-			FreeInput:   userQuery,
-		}
-	}()
-
-	timeout := time.After(60 * time.Second)
-
-LOOP:
-	for {
-		select {
-		case <-finishedCh:
-			break LOOP
-		case e := <-out:
-			if e.NodeId == "react_task_status_changed" {
-				taskResult := jsonpath.FindFirst(string(e.Content), "$..react_task_now_status")
-				if utils.InterfaceToString(taskResult) == "completed" ||
-					utils.InterfaceToString(taskResult) == "failed" {
-					break LOOP
-				}
-			}
-		case <-timeout:
-			log.Warnf("Test timeout")
-			break LOOP
-		}
+	forge := &schema.AIForge{
+		ForgeName:        "test_forge_markers_" + nonce,
+		ForgeVerboseName: "Prompt marker test",
+		ForgeType:        schema.FORGE_TYPE_Config,
+		InitPrompt:       initMarker + " {{ .Forge.UserParams }}",
+		PersistentPrompt: persistentMarker,
 	}
+	db := consts.GetGormProfileDatabase()
+	require.NoError(t, yakit.CreateAIForge(db, forge))
+	t.Cleanup(func() {
+		_, err := yakit.DeleteAIForge(db, &ypb.AIForgeFilter{ForgeName: forge.ForgeName})
+		require.NoError(t, err)
+	})
 
-	close(in)
-	time.Sleep(100 * time.Millisecond)
-
-	// Final verification
-	log.Infof("Total prompts collected: %d", promptCount)
-	log.Infof("Task execution count: %d", taskExecutionCount)
-	log.Infof("Max persistent marker in single prompt: %d", persistentMarkerMaxInSinglePrompt)
-	log.Infof("Max init marker in single prompt: %d", initMarkerMaxInSinglePrompt)
-
-	require.Greater(t, promptCount, 0, "No prompts were collected")
-
-	// Core verification: Persistent content should appear at most once in any single prompt
-	// This is the key requirement to avoid context token waste
-	require.LessOrEqual(t, persistentMarkerMaxInSinglePrompt, 1,
-		"CRITICAL: Persistent marker appeared %d times in a single prompt (should be at most 1)",
-		persistentMarkerMaxInSinglePrompt)
-
-	// Note: Init content may appear multiple times across prompts or within a single prompt
-	// due to framework design (e.g., task context inheritance, parent task info)
-	// We log a warning but don't fail the test for this
-	if initMarkerMaxInSinglePrompt > 3 {
-		log.Warnf("Init marker appeared %d times in a single prompt - consider reviewing if this is expected",
-			initMarkerMaxInSinglePrompt)
-	}
-
-	log.Infof("✓ Test passed: Persistent content verified to not be duplicated")
-}
-
-// TestCoordinator_PlanPrompt_OnlyInPlanPhase tests that:
-// 1. PlanPrompt is added to the Config and passed to the Plan Loop
-// 2. PlanPrompt content appears only before EVENT_TYPE_PLAN_REVIEW_REQUIRE (Plan phase)
-// 3. PlanPrompt should NOT appear after plan is accepted (Task execution phase)
-func TestCoordinator_PlanPrompt_OnlyInPlanPhase(t *testing.T) {
-	testNonce := utils.RandStringBytes(16)
-	planPromptMarker := "PLAN_PROMPT_UNIQUE_MARKER_" + testNonce
-	userQuery := "Test query for plan prompt " + testNonce
-
-	// Use atomic to track phase state (shared between goroutines)
-	var planReviewReceived utils.AtomicBool
-
-	// Track occurrences
-	planPromptFoundBeforePlanReview := false
-	planPromptFoundAfterPlanReview := false
-	beforePlanReviewPromptCount := 0
-	afterPlanReviewPromptCount := 0
-
-	inputChan := chanx.NewUnlimitedChan[*ypb.AIInputEvent](context.Background(), 100)
-	outputChan := make(chan *schema.AiOutputEvent, 100)
-
-	coordinator, err := aid.NewCoordinator(
-		userQuery,
+	var mu sync.Mutex
+	decisions := 0
+	maxPersistent := 0
+	sawInit, sawQuery := false, false
+	_, err = aicommon.ExecuteForgeFromDB(forge.ForgeName, ctx, map[string]any{"query": queryMarker},
 		aicommon.WithAgreeYOLO(true),
 		aicommon.WithDisableIntentRecognition(true),
-		aicommon.WithPlanPrompt(planPromptMarker), // Set the PlanPrompt
-		aicommon.WithEventInputChanx(inputChan),
-		aicommon.WithEventHandler(func(event *schema.AiOutputEvent) {
-			outputChan <- event
-		}),
-		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
-			prompt := r.GetPrompt()
-			hasPlanPromptMarker := strings.Contains(prompt, planPromptMarker)
-
-			// Determine phase by checking if PLAN_REVIEW has been received
-			if !planReviewReceived.IsSet() {
-				beforePlanReviewPromptCount++
-				if hasPlanPromptMarker {
-					planPromptFoundBeforePlanReview = true
-					log.Infof("PlanPrompt marker found BEFORE plan review (prompt #%d)", beforePlanReviewPromptCount)
-				}
-			} else {
-				afterPlanReviewPromptCount++
-				if hasPlanPromptMarker {
-					planPromptFoundAfterPlanReview = true
-					log.Warnf("PlanPrompt marker found AFTER plan review (prompt #%d) - should NOT happen",
-						afterPlanReviewPromptCount)
-				}
+		aicommon.WithDisableAutoSkills(true),
+		aicommon.WithDisableDynamicPlanning(true),
+		aicommon.WithDisablePerception(true),
+		aicommon.WithDisableSessionTitleGeneration(true),
+		aicommon.WithGenerateReport(false),
+		aicommon.WithPeriodicVerificationInterval(0),
+		aicommon.WithMemoryTriage(aimem.NewMockMemoryTriage()),
+		aicommon.WithAIRetryWaitFunc(func(ctx context.Context, _ time.Duration) error { return ctx.Err() }),
+		aicommon.WithAICallback(func(cfg aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+			prompt := req.GetPrompt()
+			mu.Lock()
+			maxPersistent = max(maxPersistent, strings.Count(prompt, persistentMarker))
+			sawInit = sawInit || strings.Contains(prompt, initMarker)
+			sawQuery = sawQuery || strings.Contains(prompt, queryMarker)
+			if isNextActionDecisionPrompt(prompt) {
+				decisions++
 			}
-
-			planJSON := `{
-    "@action": "plan_from_document",
-    "main_task": "Test Main Task",
-    "main_task_goal": "Complete the test",
-    "tasks": [{"subtask_name": "Test Step", "subtask_goal": "Execute test step"}]
-}`
-			if rsp, err := tryHandleNewPlanFlowPrompt(i, prompt, planJSON); rsp != nil {
+			mu.Unlock()
+			if rsp, err := tryHandleNewPlanFlowPrompt(cfg, prompt, string(plan)); rsp != nil {
 				return rsp, err
 			}
-
-			rsp := i.NewAIResponse()
-			rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "directly_answer", "answer_payload": "Task completed"}`))
+			response := `{"@action":"finish","reason":"markers verified"}`
+			if isVerifySatisfactionPrompt(prompt) {
+				response = `{"@action":"verify-satisfaction","user_satisfied":true,"reasoning":"done"}`
+			} else if isSummaryPrompt(prompt) {
+				response = `{"@action":"summary","task_summary":"done","task_short_summary":"done","task_long_summary":"done"}`
+			}
+			rsp := cfg.NewAIResponse()
+			rsp.EmitOutputStream(strings.NewReader(response))
 			rsp.Close()
 			return rsp, nil
 		}),
 	)
-	require.NoError(t, err, "Failed to create coordinator")
+	require.NoError(t, err, "forge execution must complete successfully")
+	require.NoError(t, ctx.Err(), "forge execution must not consume its timeout")
+	mu.Lock()
+	defer mu.Unlock()
+	require.Equal(t, steps, decisions, "every planned task must execute")
+	require.Equal(t, 1, maxPersistent, "persistent content must be present exactly once per prompt")
+	require.True(t, sawInit, "forge initialization must be rendered")
+	require.True(t, sawQuery, "the original query must reach the forge")
+}
 
-	go coordinator.Run()
+func TestForge_PersistentContentOnlyOnce(t *testing.T) {
+	testForgePromptMarkers(t, 1)
+}
 
-	// Wait for completion and track events
-	timeout := time.After(30 * time.Second)
+func TestForge_PersistentAndInitNotDuplicated(t *testing.T) {
+	testForgePromptMarkers(t, 2)
+}
 
-LOOP:
-	for {
-		select {
-		case result := <-outputChan:
-			// Track when PLAN_REVIEW_REQUIRE is received
-			if result.Type == schema.EVENT_TYPE_PLAN_REVIEW_REQUIRE {
-				log.Infof("✓ EVENT_TYPE_PLAN_REVIEW_REQUIRE received - Plan phase ends here")
-				planReviewReceived.Set()
+func TestCoordinator_PlanPrompt_OnlyInPlanPhase(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	marker := "PLAN_PROMPT_UNIQUE_MARKER_" + utils.RandStringBytes(16)
+	var mu sync.Mutex
+	reviewed := false
+	before, after := 0, 0
+	foundBefore, foundAfter := false, false
+	coordinator, err := aid.NewCoordinatorContext(ctx, "verify plan prompt phases",
+		aicommon.WithAgreeYOLO(true),
+		aicommon.WithDisableIntentRecognition(true),
+		aicommon.WithDisableAutoSkills(true),
+		aicommon.WithDisablePerception(true),
+		aicommon.WithDisableDynamicPlanning(true),
+		aicommon.WithGenerateReport(false),
+		aicommon.WithPeriodicVerificationInterval(0),
+		aicommon.WithPlanPrompt(marker),
+		aicommon.WithMemoryTriage(aimem.NewMockMemoryTriage()),
+		aicommon.WithAIRetryWaitFunc(func(ctx context.Context, _ time.Duration) error { return ctx.Err() }),
+		aicommon.WithEventHandler(func(e *schema.AiOutputEvent) {
+			if e.Type == schema.EVENT_TYPE_PLAN_REVIEW_REQUIRE {
+				mu.Lock()
+				reviewed = true
+				mu.Unlock()
 			}
-
-			// Check for task completion
-			if result.NodeId == "react_task_status_changed" {
-				taskResult := jsonpath.FindFirst(string(result.Content), "$..react_task_now_status")
-				status := utils.InterfaceToString(taskResult)
-				if status == "completed" || status == "failed" {
-					log.Infof("Task status: %s", status)
-					break LOOP
-				}
+		}),
+		aicommon.WithAICallback(func(cfg aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+			prompt := req.GetPrompt()
+			mu.Lock()
+			if reviewed {
+				after++
+				foundAfter = foundAfter || strings.Contains(prompt, marker)
+			} else {
+				before++
+				foundBefore = foundBefore || strings.Contains(prompt, marker)
 			}
-			// Also check for coordinator finish
-			if strings.Contains(string(result.Content), "coordinator run finished") {
-				break LOOP
+			mu.Unlock()
+			plan := `{"@action":"plan_from_document","main_task":"test plan","main_task_goal":"finish test","tasks":[{"subtask_name":"test step","subtask_goal":"finish test"}]}`
+			if rsp, err := tryHandleNewPlanFlowPrompt(cfg, prompt, plan); rsp != nil {
+				return rsp, err
 			}
-		case <-timeout:
-			log.Warnf("Test timeout")
-			break LOOP
-		}
-	}
-
-	inputChan.Close()
-	time.Sleep(100 * time.Millisecond)
-
-	// Verify results
-	log.Infof("Test Results:")
-	log.Infof("  Prompts before PLAN_REVIEW: %d", beforePlanReviewPromptCount)
-	log.Infof("  Prompts after PLAN_REVIEW: %d", afterPlanReviewPromptCount)
-	log.Infof("  PlanPrompt found before PLAN_REVIEW: %v", planPromptFoundBeforePlanReview)
-	log.Infof("  PlanPrompt found after PLAN_REVIEW: %v", planPromptFoundAfterPlanReview)
-
-	// Core verification: PlanPrompt should appear before PLAN_REVIEW (Plan phase)
-	require.True(t, planPromptFoundBeforePlanReview,
-		"PlanPrompt marker was NOT found before PLAN_REVIEW - the feature may not be working correctly")
-
-	// Core verification: PlanPrompt should NOT appear after PLAN_REVIEW (Task execution phase)
-	require.False(t, planPromptFoundAfterPlanReview,
-		"PlanPrompt marker was found after PLAN_REVIEW - it should only appear during Plan phase, not Task execution")
-
-	log.Infof("✓ Test passed: PlanPrompt only appears before PLAN_REVIEW (Plan phase), not after (Task execution)")
+			response := `{"@action":"finish","reason":"test complete"}`
+			if isVerifySatisfactionPrompt(prompt) {
+				response = `{"@action":"verify-satisfaction","user_satisfied":true,"reasoning":"done"}`
+			} else if isSummaryPrompt(prompt) {
+				response = `{"@action":"summary","task_summary":"done","task_short_summary":"done","task_long_summary":"done"}`
+			}
+			rsp := cfg.NewAIResponse()
+			rsp.EmitOutputStream(strings.NewReader(response))
+			rsp.Close()
+			return rsp, nil
+		}),
+	)
+	require.NoError(t, err)
+	require.NoError(t, coordinator.Run())
+	require.NoError(t, ctx.Err())
+	mu.Lock()
+	defer mu.Unlock()
+	require.True(t, reviewed, "the plan review phase must run")
+	require.Positive(t, before)
+	require.Positive(t, after, "task execution must run after plan review")
+	require.True(t, foundBefore, "PlanPrompt must be rendered during planning")
+	require.False(t, foundAfter, "PlanPrompt must not leak into task execution")
 }

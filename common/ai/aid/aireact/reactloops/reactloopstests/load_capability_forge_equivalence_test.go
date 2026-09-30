@@ -59,7 +59,9 @@ func runForgeEquivTest(
 
 	var result forgeEquivResult
 	var mu sync.Mutex
-	var finishCh = make(chan struct{}, 1)
+	dispatches := 0
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
 
 	forgeMgr := &mockForgeFactoryForEquiv{
 		forges: map[string]*schema.AIForge{
@@ -71,6 +73,11 @@ func runForgeEquivTest(
 	}
 
 	reactIns, err := aireact.NewTestReAct(
+		aicommon.WithContext(ctx),
+		aicommon.WithHijackPERequest(func(context.Context, string) error {
+			dispatches++
+			return nil
+		}),
 		aicommon.WithAgreePolicy(aicommon.AgreePolicyYOLO),
 		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			prompt := req.GetPrompt()
@@ -123,23 +130,26 @@ func runForgeEquivTest(
 			mu.Lock()
 			result.finishCalled = true
 			mu.Unlock()
-			finishCh <- struct{}{}
 			t.Logf("[%s] onAsyncTaskFinished: task=%s", testName, task.GetId())
 		}),
 		reactloops.WithOnTaskCreated(func(task aicommon.AIStatefulTask) {
 			capturedTask = task
+			reactIns.SetCurrentTask(task)
 		}),
 	)
 	if err != nil {
 		t.Fatalf("[%s] Failed to create loop: %v", testName, err)
 	}
 
-	result.executeErr = loop.Execute(testName+"-task", context.Background(), "test forge "+testName)
-
-	select {
-	case <-finishCh:
-	case <-time.After(30 * time.Second):
-		t.Logf("[%s] Timeout waiting for async finish", testName)
+	result.executeErr = loop.Execute(testName+"-task", ctx, "test forge "+testName)
+	if result.executeErr != nil {
+		t.Fatalf("[%s] synchronous forge dispatch failed: %v", testName, result.executeErr)
+	}
+	if capturedTask == nil {
+		t.Fatalf("[%s] forge dispatch did not create a task", testName)
+	}
+	if dispatches != 1 {
+		t.Fatalf("[%s] expected one forge execution, got %d", testName, dispatches)
 	}
 
 	if capturedTask != nil {
@@ -158,8 +168,9 @@ func runForgeEquivTest(
 // 2. task.IsAsyncMode() is false
 // 3. onAsyncTaskFinished is NOT called (no async callback)
 //
-// Note: invokePlanAndExecute panics due to incomplete mock (GetCurrentTask nil),
-// but this is identical in both paths and does not affect the lifecycle equivalence.
+// The plan executor is stubbed: this test verifies dispatch lifecycle, while
+// forge execution has its own integration tests. Execute returns only after
+// synchronous dispatch finishes, so no async completion wait is needed.
 func TestForgeEquivalence_RequireAIBlueprint_vs_LoadCapability(t *testing.T) {
 	forgeName := "test-forge"
 

@@ -37,6 +37,11 @@ func TestTierCallbacks429RecoverAfterRepeatedCooldowns(t *testing.T) {
 				ctx, cancel := context.WithTimeout(context.Background(), 45*time.Second)
 				defer cancel()
 				cfg := NewTestConfig(ctx)
+				var cooldowns []time.Duration
+				require.NoError(t, WithAIRetryWaitFunc(func(ctx context.Context, delay time.Duration) error {
+					cooldowns = append(cooldowns, delay)
+					return ctx.Err()
+				})(cfg))
 				cfg.AiAutoRetry = 1
 				calls := 0
 				cb := func(_ AICallerConfigIf, req *AIRequest) (*AIResponse, error) {
@@ -73,6 +78,11 @@ func TestTierCallbacks429RecoverAfterRepeatedCooldowns(t *testing.T) {
 				require.NoError(t, err)
 				require.Equal(t, 10, calls)
 				require.Equal(t, 1, parsed)
+				require.Len(t, cooldowns, 9)
+				for _, delay := range cooldowns {
+					require.GreaterOrEqual(t, delay, time.Second)
+					require.LessOrEqual(t, delay, 4*time.Second)
+				}
 			})
 		}
 	}

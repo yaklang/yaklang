@@ -2,10 +2,9 @@ package phase2
 
 import (
 	"context"
-	"errors"
 	"strings"
-	"sync"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 
@@ -63,6 +62,7 @@ func newResumePropagationHarness(t *testing.T) (
 		aicommon.WithTimeline(aicommon.NewTimeline(nil, nil)),
 		aicommon.WithEmitter(parentEmitter),
 		aicommon.WithDisableAutoSkills(true),
+		aicommon.WithAIRetryWaitFunc(func(ctx context.Context, _ time.Duration) error { return ctx.Err() }),
 		aicommon.WithEnableFunctionCallMode(false), // The failure fixture emits text, not tool calls.
 		aicommon.WithAICallbacks(&aicommon.AICallbacks{
 			Original:           aiCB,
@@ -135,7 +135,3 @@ func TestRunAllCategoryScans_SingleResumeRound(t *testing.T) {
 	// 兜底 observation 已写入（初始批死亡 → resume 批死亡 → 兜底）。
 	require.NotEmpty(t, state.GetScanObservations())
 }
-
-var _ = errors.New // 保留 errors 导入便于后续断言扩展
-
-var _ sync.Mutex // 保留 sync 导入便于后续并发断言扩展

@@ -6,6 +6,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -13,7 +14,7 @@ import (
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon/mock"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
 	_ "github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops/loop_default"
-		"github.com/yaklang/yaklang/common/ai/aid/aitool"
+	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/schema"
 )
 
@@ -381,7 +382,6 @@ func TestBuildForwardingEmitter_NilParentIsSafe(t *testing.T) {
 	})
 }
 
-
 // TestRunForkedSubReactAgentJob_SubTaskEmitterForwardsAndStampsTaskId replicates the exact
 // emitter wiring DispatchSubAgents applies to the sub-task (NewSubTaskBase +
 // SetEmitter(BuildForwardingEmitter(...))) and verifies the sub-task's emitter —
@@ -432,8 +432,6 @@ func TestRunForkedSubReactAgentJob_SubTaskEmitterForwardsAndStampsTaskId(t *test
 // hit counter each time it is invoked. Using closures (rather than comparing function pointers,
 // which Go forbids for non-nil funcs) lets the test verify behaviorally that a given child slot
 // actually runs the callback the parent put there — invoke the slot and check which probe fired.
-
-
 
 // ---------------------------------------------------------------------------
 // Tests for rebase fix changes: early SetStatus(Processing), HotPatchOptionChan
@@ -487,6 +485,7 @@ func TestRunForkedSubReactAgentJob_SetsProcessingBeforeElaboration(t *testing.T)
 		aicommon.WithDisableAutoSkills(true),
 		// Provide a dummy AI callback so the sub-loop does not panic when the
 		// mock invoker cannot reach a real AI backend.
+		aicommon.WithAIRetryWaitFunc(func(ctx context.Context, _ time.Duration) error { return ctx.Err() }),
 		aicommon.WithAICallbacks(&aicommon.AICallbacks{
 			Original: func(_ aicommon.AICallerConfigIf, _ *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 				return &aicommon.AIResponse{}, nil
@@ -544,5 +543,3 @@ func TestRunForkedSubReactAgentJob_SetsProcessingBeforeElaboration(t *testing.T)
 		t.Fatal("goal elaboration was not invoked, so status-at-elaboration could not be observed")
 	}
 }
-
-
