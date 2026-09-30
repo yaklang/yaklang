@@ -13,6 +13,24 @@ func TestBlueprintMagicMethodWithoutContainer(t *testing.T) {
 	method := blueprint.GetMagicMethod(Constructor, builder)
 	require.NotNil(t, method)
 	require.Equal(t, method.GetId(), blueprint.Constructor.GetId())
+	require.NotPanics(t, func() {
+		require.Equal(t, method.GetId(), blueprint.GetMagicMethod(Constructor, builder).GetId(),
+			"a detached blueprint must reuse its generated constructor on repeated lookup")
+	})
+}
+
+func TestBlueprintConstructorWithoutContainerFunction(t *testing.T) {
+	_, builder := newTestBuilder(t)
+	blueprint := NewBlueprint("External")
+	container := NewConst("external-type")
+	require.Nil(t, container.GetFunc())
+	require.NoError(t, blueprint.InitializeWithContainer(container))
+	constructor := builder.EmitUndefined("external-constructor")
+	blueprint.RegisterMagicMethod(Constructor, constructor)
+
+	require.NotPanics(t, func() {
+		require.Equal(t, constructor.GetId(), blueprint.GetMagicMethod(Constructor, builder).GetId())
+	})
 }
 
 func TestBlueprintAddParentKeepsHistoricalParentEffectiveMagicMethods(t *testing.T) {

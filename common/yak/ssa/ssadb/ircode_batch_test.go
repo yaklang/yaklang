@@ -3,10 +3,12 @@ package ssadb
 import (
 	"testing"
 
-	"github.com/yaklang/gorm"
-	_ "github.com/yaklang/gorm/dialects/sqlite"
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/yaklang/gorm"
+	_ "github.com/yaklang/gorm/dialects/sqlite"
+	"github.com/yaklang/yaklang/common/utils"
 )
 
 func setupIrCodeTestDB(t *testing.T) *gorm.DB {
@@ -18,6 +20,7 @@ func setupIrCodeTestDB(t *testing.T) *gorm.DB {
 	require.NoError(t, db.Exec(
 		`CREATE UNIQUE INDEX IF NOT EXISTS ux_ir_codes_program_code ON ir_codes (program_name, code_id)`,
 	).Error)
+	t.Cleanup(func() { require.NoError(t, db.Close()) })
 	return db
 }
 
@@ -66,4 +69,57 @@ func TestUpsertIrCode_UsesBatchPath(t *testing.T) {
 	var got IrCode
 	require.NoError(t, db.Where("program_name = ? AND code_id = ?", "p", 1).First(&got).Error)
 	assert.Equal(t, "b", got.Name)
+}
+
+func TestSaveIrCodeBatch_UpsertFailurePreservesExisting(t *testing.T) {
+	db := setupIrCodeTestDB(t)
+	require.NoError(t, SaveIrCodeBatch(db, []*IrCode{{CodeID: 7, ProgramName: "prog", Name: "old"}}))
+	require.NoError(t, db.Exec(`CREATE TRIGGER reject_ir_insert BEFORE INSERT ON ir_codes
+		WHEN NEW.name = 'reject' BEGIN SELECT RAISE(ABORT, 'rejected IR'); END`).Error)
+
+	err := SaveIrCodeBatch(db, []*IrCode{{CodeID: 7, ProgramName: "prog", Name: "reject"}})
+	require.ErrorContains(t, err, "rejected IR")
+
+	var got IrCode
+	require.NoError(t, db.Where("program_name = ? AND code_id = ?", "prog", 7).First(&got).Error,
+		"a failed replacement must preserve the previously persisted IR")
+	require.Equal(t, "old", got.Name)
+}
+
+func TestSaveIrCodeBatch_UpsertRestoresDeletedRowInPlace(t *testing.T) {
+	db := setupIrCodeTestDB(t)
+	require.NoError(t, SaveIrCodeBatch(db, []*IrCode{
+		{CodeID: 7, ProgramName: "prog", Name: "old", IsExternal: true, Users: Int64Slice{1, 2}},
+		{CodeID: 7, ProgramName: "other", Name: "untouched"},
+	}))
+	var before IrCode
+	require.NoError(t, db.Where("program_name = ? AND code_id = ?", "prog", 7).First(&before).Error)
+	require.NoError(t, db.Delete(&before).Error)
+
+	require.NoError(t, SaveIrCodeBatch(db, []*IrCode{{CodeID: 7, ProgramName: "prog", Name: "new"}}))
+	var got IrCode
+	require.NoError(t, db.Where("program_name = ? AND code_id = ?", "prog", 7).First(&got).Error)
+	require.Equal(t, before.ID, got.ID, "updating an existing IR must not delete and reinsert its row")
+	require.Equal(t, "new", got.Name)
+	require.False(t, got.IsExternal, "zero-valued fields must overwrite the previous snapshot")
+	require.Empty(t, got.Users)
+	require.Nil(t, got.DeletedAt)
+
+	var other IrCode
+	require.NoError(t, db.Where("program_name = ? AND code_id = ?", "other", 7).First(&other).Error)
+	require.Equal(t, "untouched", other.Name)
+}
+
+func TestSaveIrCodeBatch_ProductionScopedTransaction(t *testing.T) {
+	program := uuid.NewString()
+	db := GetDB().Where("program_name = ?", program)
+	t.Cleanup(func() { DeleteProgram(GetDB(), program) })
+	for _, name := range []string{"before", "after"} {
+		require.NoError(t, utils.GormTransaction(db, func(tx *gorm.DB) error {
+			return SaveIrCodeBatch(tx, []*IrCode{{CodeID: 1, ProgramName: program, Name: name}})
+		}))
+	}
+	var got IrCode
+	require.NoError(t, db.Where("program_name = ? AND code_id = ?", program, 1).First(&got).Error)
+	require.Equal(t, "after", got.Name)
 }
