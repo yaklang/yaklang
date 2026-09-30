@@ -197,7 +197,7 @@ func TestPlanExec_PrefixCacheStableWithMockedTieredAI(t *testing.T) {
 	decisionStageIdx := 0
 	toolParamStageIdx := 0
 	progressStageIdx := 0
-	pendingDirectlyCallStage := -1  // tracks which stage has require_tool loaded schema but not yet directly_call_tool
+	pendingDirectlyCallStage := -1 // tracks which stage has require_tool loaded schema but not yet directly_call_tool
 	// verification 收缩为纯观测角色后, satisfied=true 不再自动结束子任务.
 	// 无开放 TODO 的子任务只需一次显式 finish。
 	remainingSubtaskFinishes := 0
@@ -339,8 +339,8 @@ func TestPlanExec_PrefixCacheStableWithMockedTieredAI(t *testing.T) {
 				pendingDirectlyCallStage = -1
 				stageCursorMu.Unlock()
 				return newMockAIResponse(i, intelligentModel, mustJSONString(map[string]any{
-					"@action":               "directly_call_tool",
-					"directly_call_tool_name":   toolName,
+					"@action":                 "directly_call_tool",
+					"directly_call_tool_name": toolName,
 					"directly_call_tool_params": map[string]any{
 						"subtask_id": stage.ToolParam,
 					},

@@ -287,22 +287,8 @@ func TestCoordinator_SyncTask_Upgrade(t *testing.T) {
 					rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "finish", "human_readable_thought": "mocked: skip step three"}`))
 					return rsp, nil
 				}
-			switch subTaskToolSeq {
-			case 0:
-				rsp.EmitOutputStream(bytes.NewBufferString(fmt.Sprintf(`
-{"@action": "directly_call_tool", "directly_call_tool_name": "echo", "directly_call_tool_params": {"input": "%s"},
-"human_readable_thought": "mocked thought for tool calling", "cumulative_summary": "..cumulative-mocked for tool calling.."}
-`, echoToken[echoToolRequestCount])))
-				if echoToolRequestCount < 2 {
-					echoToolRequestCount++
-				}
-			case 1:
-				// 子任务1 第 2 次: echo; 子任务2 第 2 次: error. 用 task1/tool 计数区分.
-				toolName := "echo"
-				if taskExecRequestCount >= 3 {
-					toolName = "error"
-				}
-				if toolName == "echo" {
+				switch subTaskToolSeq {
+				case 0:
 					rsp.EmitOutputStream(bytes.NewBufferString(fmt.Sprintf(`
 {"@action": "directly_call_tool", "directly_call_tool_name": "echo", "directly_call_tool_params": {"input": "%s"},
 "human_readable_thought": "mocked thought for tool calling", "cumulative_summary": "..cumulative-mocked for tool calling.."}
@@ -310,19 +296,33 @@ func TestCoordinator_SyncTask_Upgrade(t *testing.T) {
 					if echoToolRequestCount < 2 {
 						echoToolRequestCount++
 					}
-				} else {
-					rsp.EmitOutputStream(bytes.NewBufferString(`
+				case 1:
+					// 子任务1 第 2 次: echo; 子任务2 第 2 次: error. 用 task1/tool 计数区分.
+					toolName := "echo"
+					if taskExecRequestCount >= 3 {
+						toolName = "error"
+					}
+					if toolName == "echo" {
+						rsp.EmitOutputStream(bytes.NewBufferString(fmt.Sprintf(`
+{"@action": "directly_call_tool", "directly_call_tool_name": "echo", "directly_call_tool_params": {"input": "%s"},
+"human_readable_thought": "mocked thought for tool calling", "cumulative_summary": "..cumulative-mocked for tool calling.."}
+`, echoToken[echoToolRequestCount])))
+						if echoToolRequestCount < 2 {
+							echoToolRequestCount++
+						}
+					} else {
+						rsp.EmitOutputStream(bytes.NewBufferString(`
 {"@action": "directly_call_tool", "directly_call_tool_name": "error", "directly_call_tool_params": {},
 "human_readable_thought": "mocked thought for tool calling", "cumulative_summary": "..cumulative-mocked for tool calling.."}
 `))
+					}
+				default: // 2 次工具调完, 主动 finish 收口当前子任务
+					rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "finish", "human_readable_thought": "mocked: subtask tool sequence done"}`))
 				}
-			default: // 2 次工具调完, 主动 finish 收口当前子任务
-				rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "finish", "human_readable_thought": "mocked: subtask tool sequence done"}`))
+				subTaskToolSeq++
+				taskExecRequestCount++
+				return rsp, nil
 			}
-			subTaskToolSeq++
-			taskExecRequestCount++
-			return rsp, nil
-		}
 
 			// 注: verification 收缩为纯观测角色后, satisfied 不再推进/结束子任务,
 			// 但 verification 仍会被作为观测调用, 需要返回合法的 verify-satisfaction
