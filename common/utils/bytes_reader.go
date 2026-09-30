@@ -18,7 +18,6 @@ import (
 	"github.com/pkg/errors"
 	"github.com/yaklang/yaklang/common/cybertunnel/ctxio"
 	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 )
 
 func IOCopy(dst io.Writer, src io.Reader, buf []byte) (written int64, err error) {
@@ -345,47 +344,56 @@ func StableReaderEx(conn net.Conn, timeout time.Duration, maxSize int) []byte {
 	return buffer.Bytes()
 }
 
+// StableReader returns when the reader ends, the size limit is crossed, the
+// timeout expires, or an open stream has unchanged data at two 500ms samples.
+// Only this goroutine owns the buffer; the reader transfers copied chunks.
 func StableReader(conn io.Reader, timeout time.Duration, maxSize int) []byte {
-	var buffer bytes.Buffer
-	ddlCtx, cancel := context.WithTimeout(context.Background(), timeout)
-	// read first connection
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+	chunks := make(chan []byte)
+	done := make(chan struct{})
+	reader := ctxio.NewReader(ctx, conn)
 	go func() {
-		_, err := io.Copy(&buffer, ctxio.NewReader(ddlCtx, conn))
-		if err != nil {
-			log.Debugf("copy end: %v", err)
+		defer close(done)
+		buf := make([]byte, 32*1024)
+		for {
+			n, err := reader.Read(buf)
+			if n > 0 {
+				chunk := append([]byte(nil), buf[:n]...)
+				select {
+				case chunks <- chunk:
+				case <-ctx.Done():
+					return
+				}
+			}
+			if err != nil {
+				return
+			}
 		}
 	}()
-	defer cancel()
 
-	var banner []byte
-	var bannerHash string
-TOKEN:
+	var buffer bytes.Buffer
+	lastSize := 0
+	ticker := time.NewTicker(500 * time.Millisecond)
+	defer ticker.Stop()
 	for {
-		// check for every 0.5 seconds
 		select {
-		case <-ddlCtx.Done():
-			break TOKEN
-		default:
-			time.Sleep(500 * time.Millisecond)
+		case chunk := <-chunks:
+			buffer.Write(chunk)
+			if buffer.Len() > maxSize {
+				return buffer.Bytes()
+			}
+		case <-done:
+			return buffer.Bytes()
+		case <-ctx.Done():
+			return buffer.Bytes()
+		case <-ticker.C:
+			if buffer.Len() > 0 && buffer.Len() == lastSize {
+				return buffer.Bytes()
+			}
+			lastSize = buffer.Len()
 		}
-
-		if len(buffer.Bytes()) <= 0 {
-			continue
-		}
-
-		if len(buffer.Bytes()) > maxSize {
-			banner = buffer.Bytes()
-			break
-		}
-
-		currentHash := codec.Sha1(buffer.Bytes())
-		if currentHash == bannerHash {
-			break
-		}
-		banner = buffer.Bytes()
-		bannerHash = currentHash
 	}
-	return banner
 }
 
 func ReadN(reader io.Reader, n int) ([]byte, error) {
@@ -593,8 +601,8 @@ func NewTriggerWriterEx(sizeTrigger uint64, timeTrigger time.Duration, h func(bu
 func NewTriggerWriterImmediate(h func(buffer io.ReadCloser, triggerEvent string)) *TriggerWriter {
 	r, w := NewBufPipe(nil)
 	return &TriggerWriter{
-		immediate:      true,
-		w:              w, r: r,
+		immediate: true,
+		w:         w, r: r,
 		once:           new(sync.Once),
 		writeFirstOnce: new(sync.Once),
 		h:              h,

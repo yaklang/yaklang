@@ -8,36 +8,24 @@ import (
 )
 
 func WaitConnect(addr string, timeout float64) error {
-	ch := make(chan int)
-	ctx, cancle := context.WithCancel(context.Background())
-	go func() {
-		for {
-			select {
-			case <-ctx.Done():
-				return
-			default:
-				conn, err := net.Dial("tcp", addr)
-				if err == nil {
-					ch <- 1
-					return
-				}
-				if conn != nil {
-					conn.Close()
-				}
-				//println("连接失败")
-				time.Sleep(100 * time.Microsecond)
-			}
+	ctx, cancel := context.WithTimeout(context.Background(), FloatSecondDuration(timeout))
+	defer cancel()
+	dialer := net.Dialer{}
+	for {
+		conn, err := dialer.DialContext(ctx, "tcp", addr)
+		if err == nil {
+			// A readiness probe must not leave a connection behind. In particular,
+			// a gRPC server cannot gracefully stop with an unfinished handshake.
+			_ = conn.Close()
+			return nil
 		}
-	}()
-
-	select {
-	case <-time.After(FloatSecondDuration(timeout)):
-		cancle()
-		//println("超时")
-		return errors.New("Connection attempt timed out")
-	case <-ch:
-		cancle()
-		return nil
+		timer := time.NewTimer(100 * time.Microsecond)
+		select {
+		case <-ctx.Done():
+			timer.Stop()
+			return errors.New("Connection attempt timed out")
+		case <-timer.C:
+		}
 	}
 }
 

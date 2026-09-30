@@ -517,8 +517,8 @@ func TestLowhttp_HTTP_ProxyTimeout(t *testing.T) {
 
 func TestLowhttp_RESP_WithoutContentLength_WithContent(t *testing.T) {
 	target := utils.HostPort(utils.DebugMockTCPEx(func(ctx context.Context, lis net.Listener, conn net.Conn) {
+		defer conn.Close()
 		conn.Write([]byte("HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nX-Content-Type-Options: nosniff\r\n\r\n"))
-		time.Sleep(50 * time.Millisecond)
 		conn.Write([]byte("abcd"))
 	}))
 	rsp, err := HTTPWithoutRedirect(WithPacketBytes([]byte("GET / HTTP/1.1\r\nHost: " + target + "\r\n\r\n")))
@@ -912,7 +912,8 @@ User-Agent: yaklang-test/1.0
 		rsp, err := HTTP(WithPacketBytes(
 			[]byte(packet)),
 			WithTimeout(3*time.Second),
-			WithRetryWaitTime(100*time.Millisecond),
+			WithRetryWaitTime(5*time.Millisecond),
+			WithRetryMaxWaitTime(10*time.Millisecond),
 			WithRetryNotInStatusCode([]int{200}),
 			WithRetryTimes(10),
 		)
@@ -942,7 +943,8 @@ User-Agent: yaklang-test/1.0
 		rsp, err := HTTP(WithPacketBytes(
 			[]byte(packet)),
 			WithTimeout(3*time.Second),
-			WithRetryWaitTime(100*time.Millisecond),
+			WithRetryWaitTime(5*time.Millisecond),
+			WithRetryMaxWaitTime(10*time.Millisecond),
 			WithRetryInStatusCode([]int{403}),
 			WithRetryTimes(10),
 		)
@@ -976,7 +978,8 @@ User-Agent: yaklang-test/1.0
 		rsp, err := HTTP(WithPacketBytes(
 			[]byte(packet)),
 			WithTimeout(3*time.Second),
-			WithRetryWaitTime(100*time.Millisecond),
+			WithRetryWaitTime(5*time.Millisecond),
+			WithRetryMaxWaitTime(10*time.Millisecond),
 			WithRetryNotInStatusCode([]int{500, 200}),
 			WithRetryInStatusCode([]int{500}),
 			WithRetryTimes(10),
@@ -1018,7 +1021,8 @@ User-Agent: yaklang-test/1.0
 			WithHttp2(true),
 			WithHttps(true),
 			WithVerifyCertificate(false),
-			WithRetryWaitTime(100*time.Millisecond),
+			WithRetryWaitTime(5*time.Millisecond),
+			WithRetryMaxWaitTime(10*time.Millisecond),
 			WithRetryNotInStatusCode([]int{500, 200}),
 			WithRetryInStatusCode([]int{500}),
 			WithRetryTimes(10),
@@ -1054,7 +1058,8 @@ User-Agent: yaklang-test/1.0
 		rsp, err := HTTP(WithPacketBytes(
 			[]byte(packet)),
 			WithTimeout(3*time.Second),
-			WithRetryWaitTime(100*time.Millisecond),
+			WithRetryWaitTime(5*time.Millisecond),
+			WithRetryMaxWaitTime(10*time.Millisecond),
 			WithRetryNotInStatusCode([]int{500, 200}),
 			WithRetryInStatusCode([]int{500}),
 			WithRetryTimes(10),
