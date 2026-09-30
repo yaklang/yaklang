@@ -7,6 +7,7 @@ import (
 	"sync"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon/mock"
@@ -27,6 +28,7 @@ func newHTTPFuzztestAICallbackInvoker(t *testing.T, cb aicommon.AICallbackType) 
 	base := mock.NewMockInvoker(ctx)
 	base.SetConfig(aicommon.NewConfig(
 		ctx,
+		aicommon.WithAIRetryWaitFunc(func(ctx context.Context, _ time.Duration) error { return ctx.Err() }),
 		aicommon.WithAICallback(cb),
 		aicommon.WithDisallowMCPServers(true),
 		aicommon.WithDisableSessionTitleGeneration(true),

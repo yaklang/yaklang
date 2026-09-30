@@ -217,6 +217,7 @@ func TestSupperAction_WaitStringSlice(t *testing.T) {
 
 func TestSupperAction_Get_WaitForParam(t *testing.T) {
 	pr, pw := io.Pipe()
+	defer pr.Close()
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -228,7 +229,10 @@ func TestSupperAction_Get_WaitForParam(t *testing.T) {
 		pw.Write([]byte(uuidString))
 		pw.Write([]byte(`", "C": 123 }, "other": "value" }`))
 		pw.Write([]byte("abc")) // 多写一些无关内容
-		time.Sleep(20 * time.Second)
+		select {
+		case <-done:
+		case <-ctx.Done():
+		}
 		pw.Close()
 	}()
 

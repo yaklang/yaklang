@@ -4,6 +4,7 @@ import (
 	"context"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -16,9 +17,13 @@ import (
 
 func newMinimalCoordinator(t *testing.T, userInput string) *aid.Coordinator {
 	t.Helper()
-	inputChan := chanx.NewUnlimitedChan[*ypb.AIInputEvent](context.Background(), 10)
-	c, err := aid.NewCoordinator(
+	ctx, cancel := context.WithCancel(context.Background())
+	t.Cleanup(cancel)
+	inputChan := chanx.NewUnlimitedChan[*ypb.AIInputEvent](ctx, 10)
+	t.Cleanup(inputChan.Close)
+	c, err := aid.NewCoordinatorContext(ctx,
 		userInput,
+		aicommon.WithAIRetryWaitFunc(func(ctx context.Context, _ time.Duration) error { return ctx.Err() }),
 		aicommon.WithEventInputChanx(inputChan),
 		aicommon.WithEventHandler(func(event *schema.AiOutputEvent) {}),
 		aicommon.WithAICallback(func(config aicommon.AICallerConfigIf, request *aicommon.AIRequest) (*aicommon.AIResponse, error) {

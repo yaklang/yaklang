@@ -2426,7 +2426,8 @@ Host: %s:%d
 }
 
 func TestGRPCMUSTPASS_MITM_Longtime_chunk(t *testing.T) {
-	ctx, cancel := context.WithCancel(utils.TimeoutContextSeconds(120))
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
 
 	vulinboxTarget, err := vulinbox.NewVulinServerEx(ctx, true, false, "127.0.0.1")
 	require.NoError(t, err)
@@ -2443,7 +2444,7 @@ func TestGRPCMUSTPASS_MITM_Longtime_chunk(t *testing.T) {
 		stream.Send(&ypb.MITMRequest{
 			Host:            mitmHost,
 			Port:            uint32(mitmPort),
-			MaxReadWaitTime: 10,
+			MaxReadWaitTime: 1,
 		})
 	}, func(stream ypb.Yak_MITMClient) {
 
@@ -2452,7 +2453,8 @@ func TestGRPCMUSTPASS_MITM_Longtime_chunk(t *testing.T) {
 		defer conn.Close()
 		defer cancel()
 
-		_, err = conn.Write(lowhttp.FixHTTPRequest([]byte(fmt.Sprintf(`GET /misc/response/long-time-chunked?token=%s HTTP/1.1
+		// The fixture outlives the one-second forwarding threshold.
+		_, err = conn.Write(lowhttp.FixHTTPRequest([]byte(fmt.Sprintf(`GET /misc/response/long-time-chunked?token=%s&duration=2s&interval=50ms HTTP/1.1
 Host: %s
 Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7
 Accept-Encoding: gzip, deflate
@@ -2462,26 +2464,31 @@ Content-length: 0
 		require.NoError(t, err)
 
 		buffer := make([]byte, 128)
+		var received bytes.Buffer
 		conn.SetReadDeadline(time.Now().Add(time.Second * 15)) // check start forwarding
-		_, err = conn.Read(buffer)
+		n, err := conn.Read(buffer)
 		require.NoError(t, err)
-		fmt.Println("read buffer---------------------")
-		spew.Dump(buffer)
+		received.Write(buffer[:n])
 
 		for i := 0; i < 10; i++ { // check is forwarding stable?
 			buffer := make([]byte, 128)
 			conn.SetReadDeadline(time.Now().Add(time.Second * 2))
-			_, err = conn.Read(buffer)
+			n, err := conn.Read(buffer)
 			require.NoError(t, err)
-			fmt.Println("read buffer---------------------")
-			spew.Dump(buffer)
+			received.Write(buffer[:n])
 		}
 
-		conn.SetReadDeadline(time.Time{})
-		all, err := io.ReadAll(conn)
+		// Read to the terminating HTTP chunk rather than waiting for the proxy's
+		// keep-alive connection to close after its idle timeout.
+		conn.SetReadDeadline(time.Now().Add(5 * time.Second))
+		response, err := http.ReadResponse(bufio.NewReader(io.MultiReader(&received, conn)), nil)
 		require.NoError(t, err)
-		fmt.Println("read all------------------")
-		spew.Dump(all)
+		defer response.Body.Close()
+		body, err := io.ReadAll(response.Body)
+		require.NoError(t, err)
+		require.Equal(t, http.StatusOK, response.StatusCode)
+		require.Equal(t, []string{"chunked"}, response.TransferEncoding)
+		require.GreaterOrEqual(t, bytes.Count(body, []byte("Hello Long-Time Chunked")), 10)
 
 		flows, err := QueryHTTPFlows(ctx, client, &ypb.QueryHTTPFlowRequest{Keyword: token}, 1)
 		require.NoError(t, err)

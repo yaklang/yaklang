@@ -211,36 +211,54 @@ func TestHandle429_Generic429_EmitsNotifyEvent(t *testing.T) {
 }
 
 func TestHandle429_Generic429_WaitsWhenContextAlive(t *testing.T) {
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
 
 	cfg := newTestConfigForHandle429(ctx)
+	var waits []time.Duration
+	require.NoError(t, WithAIRetryWaitFunc(func(ctx context.Context, delay time.Duration) error {
+		waits = append(waits, delay)
+		return ctx.Err()
+	})(cfg))
 	rsp := make429Response()
 
-	start := time.Now()
-	is429, _, ctxDone := cfg.handle429RateLimit(rsp)
-	elapsed := time.Since(start)
+	is429, shouldRetry, ctxDone := cfg.handle429RateLimit(rsp)
 
 	assert.True(t, is429)
+	assert.False(t, shouldRetry, "a generic 429 without Retry-After must not auto-retry")
 	assert.False(t, ctxDone)
-	require.GreaterOrEqual(t, elapsed, 4*time.Second, "should wait at least 5s for generic 429")
+	require.Len(t, waits, 1)
+	require.GreaterOrEqual(t, waits[0], 5*time.Second)
+	require.LessOrEqual(t, waits[0], 15*time.Second, "generic cooldown must include bounded jitter")
 }
 
 func TestHandle429_AIBalance_ParseableQueue_WaitDuration(t *testing.T) {
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
 
 	cfg := newTestConfigForHandle429(ctx)
+	var waits []time.Duration
+	require.NoError(t, WithAIRetryWaitFunc(func(ctx context.Context, delay time.Duration) error {
+		waits = append(waits, delay)
+		return ctx.Err()
+	})(cfg))
 	rsp := make429Response("X-AIBalance-Info: 1")
 
-	start := time.Now()
-	is429, _, ctxDone := cfg.handle429RateLimit(rsp)
-	elapsed := time.Since(start)
+	is429, shouldRetry, ctxDone := cfg.handle429RateLimit(rsp)
 
 	assert.True(t, is429)
+	assert.True(t, shouldRetry)
 	assert.False(t, ctxDone)
-	require.GreaterOrEqual(t, elapsed, 4*time.Second, "queue=1 => waitSec=max(3,5)=5, should wait ~5s")
-	require.Less(t, elapsed, 8*time.Second, "should not wait much longer than 5s")
+	require.Equal(t, []time.Duration{5 * time.Second}, waits, "queue=1 => waitSec=max(3,5)=5")
+}
+
+func TestWait429_DefaultWait(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	cfg := newTestConfigForHandle429(ctx)
+	start := time.Now()
+	require.False(t, cfg.wait429(ctx, 20*time.Millisecond))
+	require.GreaterOrEqual(t, time.Since(start), 20*time.Millisecond, "the default waiter must still honor cooldowns")
 }
 
 func TestHandle429_ContextCancelDuringSleep(t *testing.T) {

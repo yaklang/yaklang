@@ -66,13 +66,29 @@ func (s *VulinServer) registerMiscResponse() {
 	addRouteWithVulInfo(r, &VulInfo{
 		Handler: func(writer http.ResponseWriter, request *http.Request) {
 			writer.Header().Set("Content-Type", "text/plain; charset=utf-8")
-			start := time.Now()
+			duration, interval := 60*time.Second, time.Second
+			// Tests can shorten the fixture while retaining the streaming threshold.
+			if value, err := time.ParseDuration(request.URL.Query().Get("duration")); err == nil && value > 0 && value <= duration {
+				duration = value
+			}
+			if value, err := time.ParseDuration(request.URL.Query().Get("interval")); err == nil && value > 0 && value <= interval {
+				interval = value
+			}
+			deadline := time.NewTimer(duration)
+			defer deadline.Stop()
+			ticker := time.NewTicker(interval)
+			defer ticker.Stop()
 			for {
-				writer.Write([]byte("Hello Long-Time Chunked now is " + time.Now().Format("2006-01-02 15:04:05") + "\n"))
+				if _, err := writer.Write([]byte("Hello Long-Time Chunked now is " + time.Now().Format("2006-01-02 15:04:05") + "\n")); err != nil {
+					return
+				}
 				utils.FlushWriter(writer)
-				time.Sleep(time.Second * 1)
-				if time.Since(start) > time.Second*60 {
-					break
+				select {
+				case <-request.Context().Done():
+					return
+				case <-deadline.C:
+					return
+				case <-ticker.C:
 				}
 			}
 		},

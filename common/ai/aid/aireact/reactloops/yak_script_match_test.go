@@ -11,8 +11,8 @@ import (
 	"time"
 	_ "unsafe"
 
-	"github.com/yaklang/gorm"
 	_ "github.com/mattn/go-sqlite3"
+	"github.com/yaklang/gorm"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 )
@@ -22,8 +22,6 @@ const (
 	yakScriptMatchStressInputSize   = 1 << 20
 	yakScriptMatchBatchSize         = 500
 )
-
-var yakScriptMatchBenchmarkSink int
 
 //go:linkname constsProfileDatabase github.com/yaklang/yaklang/common/consts.profileDatabase
 var constsProfileDatabase *gorm.DB
@@ -39,7 +37,6 @@ type yakScriptMatchStrategyMetrics struct {
 	Elapsed         time.Duration
 	AllocDeltaBytes int64
 	HeapDeltaBytes  int64
-	Benchmark       testing.BenchmarkResult
 }
 
 func TestYakScriptMatchStrategies_Stress(t *testing.T) {
@@ -88,17 +85,40 @@ func TestYakScriptMatchStrategies_Stress(t *testing.T) {
 		assertYakScriptMatchTargets(t, strategy.name, metrics.MatchedNames, normalizedTargets)
 
 		t.Logf(
-			"%s: plugins=%d input_bytes=%d matched=%d query_time=%s cpu_bench=%s mem_bench=%s total_alloc_delta=%dB heap_alloc_delta=%dB",
+			"%s: plugins=%d input_bytes=%d matched=%d query_time=%s total_alloc_delta=%dB heap_alloc_delta=%dB",
 			strategy.name,
 			yakScriptMatchStressPluginCount,
 			len(input),
 			len(metrics.MatchedNames),
 			metrics.Elapsed,
-			metrics.Benchmark.String(),
-			metrics.Benchmark.MemString(),
 			metrics.AllocDeltaBytes,
 			metrics.HeapDeltaBytes,
 		)
+	}
+}
+
+// Performance measurement is opt-in via go test -bench; the stress test above
+// still checks all strategies once with the full 10k-plugin, 1 MiB fixture.
+func BenchmarkYakScriptMatchStrategies(b *testing.B) {
+	db := createYakScriptMatchStressDatabase(b, yakScriptMatchStressPluginCount)
+	installYakScriptStressProfileDatabase(b, db)
+	input := buildYakScriptStressInput([]string{"stress-plugin-00000", "stress-plugin-05000", "stress-plugin-09999"}, yakScriptMatchStressInputSize)
+	for _, strategy := range []struct {
+		name string
+		fn   func(*gorm.DB, string) []string
+	}{
+		{"db_instr_match", matchYakScriptNamesByDatabase},
+		{"go_strings_contains", matchYakScriptNamesByStringsContains},
+		{"go_index_all_substrings", matchYakScriptNamesByIndexAllSubstrings},
+	} {
+		b.Run(strategy.name, func(b *testing.B) {
+			b.ReportAllocs()
+			for i := 0; i < b.N; i++ {
+				if len(strategy.fn(db, input)) != 3 {
+					b.Fatal("expected three matching plugins")
+				}
+			}
+		})
 	}
 }
 
@@ -116,20 +136,11 @@ func measureYakScriptMatchStrategy(t *testing.T, fn func() []string) yakScriptMa
 	var memAfter runtime.MemStats
 	runtime.ReadMemStats(&memAfter)
 
-	benchmark := testing.Benchmark(func(b *testing.B) {
-		b.ReportAllocs()
-		for i := 0; i < b.N; i++ {
-			matchResult := fn()
-			yakScriptMatchBenchmarkSink += len(matchResult)
-		}
-	})
-
 	return yakScriptMatchStrategyMetrics{
 		MatchedNames:    matchedNames,
 		Elapsed:         elapsed,
 		AllocDeltaBytes: int64(memAfter.TotalAlloc - memBefore.TotalAlloc),
 		HeapDeltaBytes:  int64(memAfter.HeapAlloc) - int64(memBefore.HeapAlloc),
-		Benchmark:       benchmark,
 	}
 }
 
@@ -242,7 +253,7 @@ func matchYakScriptNamesByIndexAllSubstrings(db *gorm.DB, input string) []string
 	return normalizeCapabilityStrings(matched)
 }
 
-func createYakScriptMatchStressDatabase(t *testing.T, pluginCount int) *gorm.DB {
+func createYakScriptMatchStressDatabase(t testing.TB, pluginCount int) *gorm.DB {
 	t.Helper()
 
 	db, err := utils.CreateTempTestDatabaseInMemory()
@@ -309,7 +320,7 @@ func createYakScriptMatchStressDatabase(t *testing.T, pluginCount int) *gorm.DB 
 	return db
 }
 
-func installYakScriptStressProfileDatabase(t *testing.T, db *gorm.DB) {
+func installYakScriptStressProfileDatabase(t testing.TB, db *gorm.DB) {
 	t.Helper()
 
 	oldProfileDB := constsProfileDatabase

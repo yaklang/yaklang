@@ -11,65 +11,89 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
+// Wait for the config events emitted after each option has been applied. This
+// also synchronizes direct field assertions with the hot-patch consumer.
+func newHotPatchTestConfig(t *testing.T, ctx context.Context, opts ...ConfigOption) (*Config, func(*ypb.AIInputEvent, int)) {
+	t.Helper()
+	ctx, cancel := context.WithCancel(ctx)
+	applied := make(chan struct{}, 8)
+	opts = append(opts, WithEventHandler(func(e *schema.AiOutputEvent) {
+		if e.Type == schema.EVENT_TYPE_AID_CONFIG {
+			applied <- struct{}{}
+		}
+	}))
+	c := NewTestConfig(ctx, opts...)
+	t.Cleanup(func() {
+		cancel()
+		c.WaitHotPatchLoopStopped()
+	})
+	return c, func(event *ypb.AIInputEvent, optionCount int) {
+		t.Helper()
+		c.EventInputChan.SafeFeed(event)
+		for i := 0; i < optionCount; i++ {
+			select {
+			case <-applied:
+			case <-ctx.Done():
+				t.Fatalf("hot-patch %s did not finish applying %d options: %v", event.HotpatchType, optionCount, ctx.Err())
+			}
+		}
+	}
+}
+
 func TestHotPatchConfig(t *testing.T) {
 	// Setup config with epm stub
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	c := NewTestConfig(ctx)
+	c, feed := newHotPatchTestConfig(t, ctx)
 	c.StartEventLoop(ctx)
 
 	require.True(t, c.AllowRequireForUserInteract)
 	require.Equal(t, c.AgreePolicy, AgreePolicyManual)
 
-	c.EventInputChan.SafeFeed(&ypb.AIInputEvent{
+	feed(&ypb.AIInputEvent{
 		IsConfigHotpatch: true,
 		HotpatchType:     HotPatchType_AllowRequireForUserInteract,
 		Params: &ypb.AIStartParams{
 			DisallowRequireForUserPrompt: true,
 		},
-	})
-	time.Sleep(1 * time.Second)
+	}, 1)
 	require.False(t, c.AllowRequireForUserInteract)
 
-	c.EventInputChan.SafeFeed(&ypb.AIInputEvent{
+	feed(&ypb.AIInputEvent{
 		IsConfigHotpatch: true,
 		HotpatchType:     HotPatchType_AgreePolicy,
 		Params: &ypb.AIStartParams{
 			ReviewPolicy: string(AgreePolicyYOLO),
 		},
-	})
-	time.Sleep(1 * time.Second)
+	}, 1)
 	require.Equal(t, AgreePolicyYOLO, c.AgreePolicy)
 
-	c.EventInputChan.SafeFeed(&ypb.AIInputEvent{
+	feed(&ypb.AIInputEvent{
 		IsConfigHotpatch: true,
 		HotpatchType:     HotPatchType_RiskControlScore,
 		Params: &ypb.AIStartParams{
 			AIReviewRiskControlScore: 0.75,
 		},
-	})
-	time.Sleep(1 * time.Second)
+	}, 1)
 	require.Equal(t, 0.75, c.AgreeAIScoreMiddle)
 	require.Equal(t, 0.55, c.AgreeAIScoreLow)
 
-	c.EventInputChan.SafeFeed(&ypb.AIInputEvent{
+	feed(&ypb.AIInputEvent{
 		IsConfigHotpatch: true,
 		HotpatchType:     HotPatchType_EnablePlan,
 		Params: &ypb.AIStartParams{
 			EnablePlan: false,
 		},
-	})
-	time.Sleep(1 * time.Second)
+	}, 1)
 	require.False(t, c.GetEnablePlanAndExec())
 
-	c.EventInputChan.SafeFeed(&ypb.AIInputEvent{
+	feed(&ypb.AIInputEvent{
 		IsConfigHotpatch: true,
 		HotpatchType:     HotPatchType_SyncPerceptionTrigger,
 		Params: &ypb.AIStartParams{
 			SyncPerceptionTrigger: true,
 		},
-	})
-	time.Sleep(1 * time.Second)
+	}, 1)
 	require.True(t, c.GetSyncPerceptionTrigger())
 }
 
@@ -115,7 +139,7 @@ func TestConfigHotpatch_PersistSessionStartParams(t *testing.T) {
 	defer cancel()
 
 	sessionID := "session-hotpatch-persist"
-	c := NewTestConfig(ctx, WithPersistentSessionId(sessionID))
+	c, feed := newHotPatchTestConfig(t, ctx, WithPersistentSessionId(sessionID))
 	require.NoError(t, c.GetDB().AutoMigrate(&schema.AISession{}).Error)
 	_, err := yakit.CreateOrUpdateAISessionMetaStartParams(c.GetDB(), sessionID, &ypb.AIStartParams{
 		EnablePlan:            false,
@@ -125,42 +149,39 @@ func TestConfigHotpatch_PersistSessionStartParams(t *testing.T) {
 	require.NoError(t, err)
 	c.StartEventLoop(ctx)
 
-	c.EventInputChan.SafeFeed(&ypb.AIInputEvent{
+	feed(&ypb.AIInputEvent{
 		IsConfigHotpatch: true,
 		HotpatchType:     HotPatchType_EnablePlan,
 		Params: &ypb.AIStartParams{
 			EnablePlan: true,
 		},
-	})
-	time.Sleep(time.Second)
+	}, 1)
 
 	got, err := yakit.GetAISessionMetaStartParamsBySessionID(c.GetDB(), sessionID)
 	require.NoError(t, err)
 	require.True(t, got.GetEnablePlan())
 	require.False(t, got.GetSyncPerceptionTrigger())
 
-	c.EventInputChan.SafeFeed(&ypb.AIInputEvent{
+	feed(&ypb.AIInputEvent{
 		IsConfigHotpatch: true,
 		HotpatchType:     HotPatchType_SyncPerceptionTrigger,
 		Params: &ypb.AIStartParams{
 			SyncPerceptionTrigger: true,
 		},
-	})
-	time.Sleep(time.Second)
+	}, 1)
 
 	got, err = yakit.GetAISessionMetaStartParamsBySessionID(c.GetDB(), sessionID)
 	require.NoError(t, err)
 	require.True(t, got.GetEnablePlan())
 	require.True(t, got.GetSyncPerceptionTrigger())
 
-	c.EventInputChan.SafeFeed(&ypb.AIInputEvent{
+	feed(&ypb.AIInputEvent{
 		IsConfigHotpatch: true,
 		HotpatchType:     HotPatchType_EnablePlan,
 		Params: &ypb.AIStartParams{
 			EnablePlan: false,
 		},
-	})
-	time.Sleep(time.Second)
+	}, 1)
 
 	got, err = yakit.GetAISessionMetaStartParamsBySessionID(c.GetDB(), sessionID)
 	require.NoError(t, err)
@@ -172,7 +193,7 @@ func TestHotPatch_ExecutionStrategy_TopLevelAgent(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	c := NewTestConfig(ctx)
+	c, feed := newHotPatchTestConfig(t, ctx)
 	c.StartEventLoop(ctx)
 
 	// Initially strategy fields are at defaults
@@ -180,7 +201,7 @@ func TestHotPatch_ExecutionStrategy_TopLevelAgent(t *testing.T) {
 	require.False(t, c.GetEnableGoalMode())
 	require.Equal(t, int64(DefaultMaxSubAgentConcurrency), c.GetMaxSubAgents())
 
-	c.EventInputChan.SafeFeed(&ypb.AIInputEvent{
+	feed(&ypb.AIInputEvent{
 		IsConfigHotpatch: true,
 		HotpatchType:     HotPatchType_ExecutionStrategy,
 		Params: &ypb.AIStartParams{
@@ -191,8 +212,7 @@ func TestHotPatch_ExecutionStrategy_TopLevelAgent(t *testing.T) {
 				MaxSubAgents:      7,
 			},
 		},
-	})
-	time.Sleep(time.Second)
+	}, 6)
 
 	require.True(t, c.GetPreferDispatchSubReactAgents(), "EnableMultiAgent should be applied on top-level config")
 	require.True(t, c.EnableDispatchSubReactAgents, "EnableDispatchSubReactAgents should be applied on top-level config")
@@ -205,14 +225,14 @@ func TestHotPatch_ExecutionStrategy_AppliesAllFields(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	c := NewTestConfig(ctx)
+	c, feed := newHotPatchTestConfig(t, ctx)
 	c.StartEventLoop(ctx)
 
 	// Initially strategy fields are at defaults
 	require.False(t, c.GetPreferDispatchSubReactAgents())
 	require.False(t, c.GetEnableGoalMode())
 
-	c.EventInputChan.SafeFeed(&ypb.AIInputEvent{
+	feed(&ypb.AIInputEvent{
 		IsConfigHotpatch: true,
 		HotpatchType:     HotPatchType_ExecutionStrategy,
 		Params: &ypb.AIStartParams{
@@ -223,8 +243,7 @@ func TestHotPatch_ExecutionStrategy_AppliesAllFields(t *testing.T) {
 				MaxSubAgents:      7,
 			},
 		},
-	})
-	time.Sleep(time.Second)
+	}, 6)
 
 	// All four strategy fields should be applied via hotpatch.
 	require.True(t, c.GetPreferDispatchSubReactAgents())
@@ -239,7 +258,7 @@ func TestHotPatch_ExecutionStrategy_PersistSessionStartParams(t *testing.T) {
 	defer cancel()
 
 	sessionID := "session-strategy-hotpatch-persist"
-	c := NewTestConfig(ctx, WithPersistentSessionId(sessionID))
+	c, feed := newHotPatchTestConfig(t, ctx, WithPersistentSessionId(sessionID))
 	require.NoError(t, c.GetDB().AutoMigrate(&schema.AISession{}).Error)
 	_, err := yakit.CreateOrUpdateAISessionMetaStartParams(c.GetDB(), sessionID, &ypb.AIStartParams{
 		TimelineSessionID: sessionID,
@@ -247,7 +266,7 @@ func TestHotPatch_ExecutionStrategy_PersistSessionStartParams(t *testing.T) {
 	require.NoError(t, err)
 	c.StartEventLoop(ctx)
 
-	c.EventInputChan.SafeFeed(&ypb.AIInputEvent{
+	feed(&ypb.AIInputEvent{
 		IsConfigHotpatch: true,
 		HotpatchType:     HotPatchType_ExecutionStrategy,
 		Params: &ypb.AIStartParams{
@@ -258,8 +277,7 @@ func TestHotPatch_ExecutionStrategy_PersistSessionStartParams(t *testing.T) {
 				MaxSubAgents:      8,
 			},
 		},
-	})
-	time.Sleep(time.Second)
+	}, 6)
 
 	got, err := yakit.GetAISessionMetaStartParamsBySessionID(c.GetDB(), sessionID)
 	require.NoError(t, err)
@@ -287,24 +305,23 @@ func TestHotPatch_ExecutionStrategy_WithDurationAndCriteria(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	c := NewTestConfig(ctx)
+	c, feed := newHotPatchTestConfig(t, ctx)
 	c.StartEventLoop(ctx)
 
-	c.EventInputChan.SafeFeed(&ypb.AIInputEvent{
+	feed(&ypb.AIInputEvent{
 		IsConfigHotpatch: true,
 		HotpatchType:     HotPatchType_ExecutionStrategy,
 		Params: &ypb.AIStartParams{
 			Strategy: &ypb.AIExecutionStrategy{
-				EnableMultiAgent:        true,
-				EnableGoalMode:          true,
-				GoalMinIterations:       3,
-				MaxSubAgents:            5,
-				GoalDurationSeconds:     3600,
-				GoalAcceptanceCriteria:  "must produce at least 3 vulnerability findings with evidence",
+				EnableMultiAgent:       true,
+				EnableGoalMode:         true,
+				GoalMinIterations:      3,
+				MaxSubAgents:           5,
+				GoalDurationSeconds:    3600,
+				GoalAcceptanceCriteria: "must produce at least 3 vulnerability findings with evidence",
 			},
 		},
-	})
-	time.Sleep(time.Second)
+	}, 6)
 
 	require.True(t, c.GetEnableGoalMode())
 	require.Equal(t, int64(3600), c.GetGoalDurationSeconds())
@@ -325,10 +342,10 @@ func TestHotPatch_ExecutionStrategy_NeverEndingDeadline(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	c := NewTestConfig(ctx)
+	c, feed := newHotPatchTestConfig(t, ctx)
 	c.StartEventLoop(ctx)
 
-	c.EventInputChan.SafeFeed(&ypb.AIInputEvent{
+	feed(&ypb.AIInputEvent{
 		IsConfigHotpatch: true,
 		HotpatchType:     HotPatchType_ExecutionStrategy,
 		Params: &ypb.AIStartParams{
@@ -338,8 +355,7 @@ func TestHotPatch_ExecutionStrategy_NeverEndingDeadline(t *testing.T) {
 				GoalDurationSeconds: -1, // never-ending
 			},
 		},
-	})
-	time.Sleep(time.Second)
+	}, 6)
 
 	require.Equal(t, int64(-1), c.GetGoalDurationSeconds())
 
@@ -356,7 +372,7 @@ func TestHotPatch_ExecutionStrategy_PersistWithDurationAndCriteria(t *testing.T)
 	defer cancel()
 
 	sessionID := "session-strategy-duration-persist"
-	c := NewTestConfig(ctx, WithPersistentSessionId(sessionID))
+	c, feed := newHotPatchTestConfig(t, ctx, WithPersistentSessionId(sessionID))
 	require.NoError(t, c.GetDB().AutoMigrate(&schema.AISession{}).Error)
 	_, err := yakit.CreateOrUpdateAISessionMetaStartParams(c.GetDB(), sessionID, &ypb.AIStartParams{
 		TimelineSessionID: sessionID,
@@ -364,7 +380,7 @@ func TestHotPatch_ExecutionStrategy_PersistWithDurationAndCriteria(t *testing.T)
 	require.NoError(t, err)
 	c.StartEventLoop(ctx)
 
-	c.EventInputChan.SafeFeed(&ypb.AIInputEvent{
+	feed(&ypb.AIInputEvent{
 		IsConfigHotpatch: true,
 		HotpatchType:     HotPatchType_ExecutionStrategy,
 		Params: &ypb.AIStartParams{
@@ -375,8 +391,7 @@ func TestHotPatch_ExecutionStrategy_PersistWithDurationAndCriteria(t *testing.T)
 				GoalAcceptanceCriteria: "must complete code audit with risk ratings",
 			},
 		},
-	})
-	time.Sleep(time.Second)
+	}, 6)
 
 	got, err := yakit.GetAISessionMetaStartParamsBySessionID(c.GetDB(), sessionID)
 	require.NoError(t, err)

@@ -325,10 +325,5 @@ func (c *Config) handleLegacyQueue429(ctx context.Context, queueInfo string) (is
 // wait429 在给定的等待时长内阻塞，期间响应 context 取消。
 // 返回 ctxDone。
 func (c *Config) wait429(ctx context.Context, waitDuration time.Duration) bool {
-	select {
-	case <-ctx.Done():
-		return true
-	case <-time.After(waitDuration):
-		return false
-	}
+	return c.waitBeforeAIRetry(ctx, waitDuration) != nil
 }
