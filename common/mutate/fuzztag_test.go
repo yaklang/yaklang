@@ -795,3 +795,15 @@ func TestCodecFuzzTagWithPipeInParams(t *testing.T) {
 		require.Equal(t, "pluginName|复杂{{参数}}", results[0])
 	})
 }
+
+// Data-generation tools need handler failures to propagate; existing fuzzers
+// retain their permissive empty-result behavior unless they opt in.
+func TestFuzzTagExecAssertError(t *testing.T) {
+	results, err := FuzzTagExec("{{regen([)}}")
+	require.NoError(t, err)
+	require.Equal(t, []string{""}, results)
+	_, err = FuzzTagExec("{{regen([)}}", Fuzz_WithAssertError(true))
+	require.Error(t, err)
+	_, err = FuzzTagExec("{{base64({{regen([)}})}}", Fuzz_WithAssertError(true))
+	require.Error(t, err, "the setting must apply to nested tags")
+}

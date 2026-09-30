@@ -12,6 +12,7 @@ import (
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon/aiskillloader"
 	"github.com/yaklang/yaklang/common/ai/aid/aimem"
 	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/mutate"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 )
 
@@ -29,6 +30,31 @@ var allBuiltinSkills = []struct {
 	{"how-to-use-browser", "skills/how-to-use-browser/SKILL.md", []string{"snapshot", "click", "fill", "screenshot", "CDP"}},
 	{"authorization-bypass", "skills/authorization-bypass/SKILL.md", []string{"IDOR", "WSTG-ATHZ-02", "Horizontal", "Vertical", "do_http_request"}},
 	{"java-audit", "skills/java-audit/SKILL.md", []string{"java_project_probe", "java_audit", "RuoYi", "spring_boot", "scope-modules"}},
+	{"fuzztag", "skills/fuzztag/SKILL.md", []string{"fuzz.Strings", "笛卡尔积", "同步配对"}},
+	{"fuzztag-reference", "skills/fuzztag-reference/SKILL.md", []string{"exec_fuzztag", "codecflow", "params", "别名"}},
+}
+
+// Keep the reference skill complete as the engine's tag registry evolves.
+func TestBuiltinFuzztagReferenceCoversRegistry(t *testing.T) {
+	content, err := GetBuiltinSkillsFS().ReadFile("skills/fuzztag-reference/SKILL.md")
+	if err != nil {
+		t.Fatal(err)
+	}
+	document := string(content)
+	tags := append([]*mutate.FuzzTagDescription{}, mutate.GetAllFuzztags()...)
+	tags = append(tags, mutate.FileTag()...)
+	tags = append(tags, mutate.CodecTag()...)
+	tags = append(tags, mutate.HotPatchFuzztag(nil), mutate.HotPatchDynFuzztag(nil))
+	for _, tag := range tags {
+		if !strings.Contains(document, "**"+tag.TagName+"**") {
+			t.Errorf("reference is missing tag %q", tag.TagName)
+		}
+		for _, alias := range tag.Alias {
+			if !strings.Contains(document, "`"+alias+"`") {
+				t.Errorf("reference is missing alias %q for %q", alias, tag.TagName)
+			}
+		}
+	}
 }
 
 func useTempBuiltinSkillReleaseDB(t *testing.T) {

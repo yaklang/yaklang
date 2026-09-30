@@ -711,6 +711,13 @@ func _protobufRecordsFromYAML(i interface{}) *ProtobufRecords {
 }
 
 var FuzzExports = map[string]interface{}{
+	// Render exposes engine options without Strings' deduplication or fallback.
+	"Render":             mutate.FuzzTagExec,
+	"renderLimit":        mutate.Fuzz_WithResultLimit,
+	"renderParams":       mutate.Fuzz_WithParams,
+	"renderContext":      mutate.Fuzz_WithContext,
+	"renderFileTags":     mutate.Fuzz_WithEnableFileTag,
+	"renderAssertError":  mutate.Fuzz_WithAssertError,
 	"Strings":            _fuzz,
 	"StringsWithParam":   _fuzzFuncEx,
 	"StringsFunc":        _fuzzFunc,
