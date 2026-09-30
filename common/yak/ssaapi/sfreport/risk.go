@@ -1,6 +1,7 @@
 package sfreport
 
 import (
+	"strings"
 	"time"
 
 	"github.com/yaklang/gorm"
@@ -228,4 +229,20 @@ func (r *Risk) GetLatestDisposalStatus() string {
 
 func (r *Risk) SetRule(rule *Rule) {
 	r.RuleName = rule.RuleName
+}
+
+// riskRuleName is the report's rule id for one risk. The rule name is used
+// when the scan set it. An inline rule often has none, so the title keeps
+// each rule distinct after a later mode replaces the finding.
+func riskRuleName(risk *schema.SSARisk) string {
+	if risk == nil {
+		return "syntaxflow"
+	}
+	if name := strings.TrimSpace(risk.FromRule); name != "" {
+		return name
+	}
+	if title := strings.TrimSpace(risk.Title); title != "" {
+		return title
+	}
+	return "syntaxflow"
 }

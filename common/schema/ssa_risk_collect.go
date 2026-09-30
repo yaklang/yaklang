@@ -1,9 +1,9 @@
 package schema
 
 import (
-	"strconv"
 	"strings"
-	"sync"
+
+	"github.com/yaklang/yaklang/common/utils"
 )
 
 // RiskUpdateItem is one decision the scan reached about a single finding.
@@ -42,17 +42,16 @@ func (f RiskUpdateHandlerFunc) ApplyRiskUpdate(item RiskUpdateItem) error {
 // The collector never writes anything. Submit reports the decision to the
 // caller so the caller can hand a RiskUpdateItem to its handlers.
 type RiskCollect struct {
-	mu   sync.Mutex
-	data map[string]*SSARisk
+	data *utils.SafeMap[*SSARisk]
 	// ruleLevel optionally ranks rules of the same scan mode. When two rules
 	// of equal mode report one finding, the higher level wins; equal levels
 	// keep the later finding. Nil falls back to ranking by severity so a
-	// stronger rule covers a weaker one.
+	// stronger rule covers a weaker one. It is installed before Submit runs.
 	ruleLevel func(ruleName string) int
 }
 
 func NewRiskCollect() *RiskCollect {
-	return &RiskCollect{data: map[string]*SSARisk{}}
+	return &RiskCollect{data: utils.NewSafeMap[*SSARisk]()}
 }
 
 // SetRuleLevelFunc installs the rule-level ranking used to filter findings
@@ -61,68 +60,33 @@ func (c *RiskCollect) SetRuleLevelFunc(fn func(ruleName string) int) {
 	if c == nil {
 		return
 	}
-	c.mu.Lock()
 	c.ruleLevel = fn
-	c.mu.Unlock()
 }
 
 // Current returns the risk kept for this feature hash.
 func (c *RiskCollect) Current(feature string) *SSARisk {
-	return c.currentByKey(strings.TrimSpace(feature))
-}
-
-// CurrentRisk returns the risk kept for the same key Submit would use, which
-// includes the reported position so two sibling findings inside one function
-// stay distinct.
-func (c *RiskCollect) CurrentRisk(risk *SSARisk) *SSARisk {
-	if c == nil || risk == nil {
+	if c == nil || c.data == nil {
 		return nil
 	}
-	feature := strings.TrimSpace(risk.RiskFeatureHash)
+	feature = strings.TrimSpace(feature)
 	if feature == "" {
 		return nil
 	}
-	return c.currentByKey(riskCollectKey(feature, risk))
-}
-
-func (c *RiskCollect) currentByKey(key string) *SSARisk {
-	if c == nil {
+	risk, ok := c.data.Get(feature)
+	if !ok {
 		return nil
 	}
-	if key == "" {
-		return nil
-	}
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	if c.data == nil {
-		return nil
-	}
-	return c.data[key]
-}
-
-// riskCollectKey combines the feature hash with the reported position. Two
-// sibling statements can share a feature hash (same function and value text),
-// and only the statement itself may be covered by a later mode.
-func riskCollectKey(feature string, risk *SSARisk) string {
-	key := feature
-	if risk == nil {
-		return key
-	}
-	if rangeInfo := strings.TrimSpace(risk.CodeRange); rangeInfo != "" {
-		return key + "\x00" + rangeInfo
-	}
-	if risk.Line > 0 {
-		return key + "\x00line:" + strconv.FormatInt(risk.Line, 10)
-	}
-	return key
+	return risk
 }
 
 // Submit records in and returns the update the caller must publish.
 //
-// When the feature hash is new the returned item has OldID 0. When an earlier
-// risk is replaced the item carries that row's id and hash. When the incoming
-// risk loses to the stored one no update is returned (ok=false), which is how
-// an earlier mode is dropped and how a lower-level rule is filtered out.
+// The key is only the feature hash. When it is new the returned item has
+// OldID 0. When an earlier risk is replaced the item carries that row's id
+// and hash. When the incoming risk loses to the stored one no update is
+// returned (ok=false), which is how an earlier mode is dropped and how a
+// lower-level rule is filtered out. An empty feature hash is always kept and
+// is not stored, so it never covers another finding.
 func (c *RiskCollect) Submit(in *SSARisk) (RiskUpdateItem, bool) {
 	item := RiskUpdateItem{Risk: in}
 	if c == nil || in == nil {
@@ -132,33 +96,33 @@ func (c *RiskCollect) Submit(in *SSARisk) (RiskUpdateItem, bool) {
 	if key == "" {
 		return item, true
 	}
-	key = riskCollectKey(key, in)
-	c.mu.Lock()
-	defer c.mu.Unlock()
 	if c.data == nil {
-		c.data = map[string]*SSARisk{}
+		c.data = utils.NewSafeMap[*SSARisk]()
 	}
-	old, exist := c.data[key]
-	if !exist {
-		c.data[key] = in
-		return item, true
-	}
-	if !c.betterLocked(in, old) {
-		return item, false
-	}
-	if old != nil {
-		item.OldID = old.ID
-		item.OldHash = old.Hash
-	}
-	if in.ID == 0 {
-		in.ID = item.OldID
-	}
-	c.data[key] = in
-	return item, true
+	accepted := false
+	c.data.Update(key, func(old *SSARisk, loaded bool) (*SSARisk, bool) {
+		if !loaded {
+			accepted = true
+			return in, true
+		}
+		if !c.better(in, old) {
+			return old, false
+		}
+		if old != nil {
+			item.OldID = old.ID
+			item.OldHash = old.Hash
+		}
+		if in.ID == 0 {
+			in.ID = item.OldID
+		}
+		accepted = true
+		return in, true
+	})
+	return item, accepted
 }
 
-// betterLocked reports whether incoming should replace existing.
-func (c *RiskCollect) betterLocked(incoming, existing *SSARisk) bool {
+// better reports whether incoming should replace existing.
+func (c *RiskCollect) better(incoming, existing *SSARisk) bool {
 	if incoming == nil {
 		return false
 	}

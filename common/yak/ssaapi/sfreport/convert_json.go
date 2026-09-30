@@ -127,13 +127,6 @@ func (r *Report) ConvertSSARiskToReport(ssarisk *schema.SSARisk, results ...*ssa
 		// already exists
 		return
 	}
-	// The scan already decided which row survives. A rich result may still
-	// carry an earlier mode's finding, and adding it back would undo the cover.
-	if r.keeper != nil {
-		if _, kept := r.keeper(ssarisk); !kept {
-			return
-		}
-	}
 
 	// get result
 	var result *ssaapi.SyntaxFlowResult = nil

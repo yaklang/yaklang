@@ -3,6 +3,7 @@ package sfreport
 import (
 	"encoding/json"
 	"io"
+	"strings"
 	"sync"
 	"time"
 
@@ -18,10 +19,6 @@ type Report struct {
 	// fileByHash accelerates FirstOrCreateFile* and allows adding risks to existing files.
 	// It must not be serialized into JSON.
 	fileByHash map[string]*File `json:"-"`
-	// keeper answers whether the scan kept this risk. A rich result added by
-	// AddSyntaxFlowResult uses it to skip a finding a later mode already
-	// covered, so the thin update from the scan stays authoritative.
-	keeper func(*schema.SSARisk) (string, bool) `json:"-"`
 	// sinceFlush counts findings added since the last snapshot. A long scan
 	// publishes intermediate snapshots instead of writing only at the end.
 	sinceFlush int `json:"-"`
@@ -199,33 +196,62 @@ func (r *Report) shouldFlushLocked() bool {
 	return true
 }
 
-// SetKeeper attaches the scan's decision. AddSyntaxFlowResult skips a risk the
-// scan did not keep, and ApplyRiskUpdate replaces the previous body.
-func (r *Report) SetKeeper(fn func(*schema.SSARisk) (string, bool)) {
-	if r == nil {
-		return
-	}
-	r.mu.Lock()
-	r.keeper = fn
-	r.mu.Unlock()
-}
-
-// ApplyRiskUpdate applies one decision of the scan. The report never decides
-// which mode wins; the scan runtime already did.
-//
-// A covered finding drops the body of the row it replaced, so the report keeps
-// one entry per finding instead of one per mode. The rich result of the new
-// mode adds its own detailed body, and a created finding needs no work here.
+// ApplyRiskUpdate creates or replaces one finding. The scan already decided
+// which mode wins and passes that decision here. OldHash empty means create.
+// Any other OldHash is the row this finding replaces.
 func (r *Report) ApplyRiskUpdate(item schema.RiskUpdateItem) error {
-	if r == nil || item.Risk == nil || item.OldHash == "" {
+	if r == nil || item.Risk == nil {
 		return nil
 	}
 	r.mu.Lock()
-	defer r.mu.Unlock()
-	if item.OldHash != item.Risk.Hash {
+	newHash := strings.TrimSpace(item.Risk.Hash)
+	if item.OldHash != "" && item.OldHash != newHash {
 		r.dropRiskLocked(item.OldHash)
 	}
+	r.addSchemaRiskLocked(item.Risk)
+	flush := r.shouldFlushLocked()
+	r.mu.Unlock()
+	if flush {
+		if data, err := r.snapshotJSON(); err != nil {
+			log.Errorf("serialize report snapshot failed: %v", err)
+		} else {
+			r.flusherFor().submit(data)
+		}
+	}
 	return nil
+}
+
+// addSchemaRiskLocked records one risk from its own fields. The scan does not
+// hand over the syntaxflow result, so there is no value graph to walk here.
+func (r *Report) addSchemaRiskLocked(ssarisk *schema.SSARisk) {
+	if r == nil || ssarisk == nil {
+		return
+	}
+	if r.Risks == nil {
+		r.Risks = make(map[string]*Risk)
+	}
+	if r.ProgramName == "" && ssarisk.ProgramName != "" {
+		r.ProgramName = ssarisk.ProgramName
+	}
+	risk, _ := NewRisk(ssarisk, r)
+	r.Risks[risk.GetHash()] = risk
+	if file := r.firstOrCreateFileByPath(ssarisk.CodeSourceUrl); file != nil {
+		file.AddRisk(risk)
+	}
+	ruleName := riskRuleName(ssarisk)
+	rule := r.FirstOrCreateRule(&schema.SyntaxFlowRule{
+		RuleName:    ruleName,
+		Title:       ssarisk.Title,
+		Severity:    ssarisk.Severity,
+		Description: ssarisk.Description,
+		Language:    ssaconfig.Language(ssarisk.Language),
+	})
+	if rule != nil {
+		risk.SetRule(rule)
+		rule.AddRisk(risk)
+	}
+	r.RiskNums = len(r.Risks)
+	r.sinceFlush++
 }
 
 // dropRiskLocked removes a replaced finding from the map and from the file and

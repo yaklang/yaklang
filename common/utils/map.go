@@ -68,6 +68,23 @@ func (sm *SafeMapWithKey[K, V]) Set(key K, value V) {
 	sm.m[key] = value
 }
 
+// Update runs fn while holding the write lock, so a read-and-replace of one
+// key is atomic. store false leaves the map unchanged.
+func (sm *SafeMapWithKey[K, V]) Update(key K, fn func(old V, loaded bool) (next V, store bool)) (prev V, loaded bool) {
+	if sm == nil || fn == nil {
+		var zero V
+		return zero, false
+	}
+	sm.mu.Lock()
+	defer sm.mu.Unlock()
+	prev, loaded = sm.m[key]
+	next, store := fn(prev, loaded)
+	if store {
+		sm.m[key] = next
+	}
+	return prev, loaded
+}
+
 func (sm *SafeMapWithKey[K, V]) Keys() []K {
 	if sm == nil {
 		return nil

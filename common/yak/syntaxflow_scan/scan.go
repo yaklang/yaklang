@@ -25,24 +25,25 @@ func Scan(ctx context.Context, option ...ssaconfig.Option) (retErr error) {
 		return err
 	}
 
-	// Every scan gets one runtime: it owns the risk collect and decides which
-	// finding each mode keeps. A database scan also registers the saver that
-	// writes result rows, the audit graph and risk rows; a memory scan streams
-	// its findings instead.
+	// The call that creates the runtime owns its consumers. A nested stage
+	// receives the runtime already and must not register a second report or
+	// database saver.
+	ownsRuntime := config.scanRuntime == nil
 	rt := ensureScanRuntime(config)
-	if config.GetSyntaxFlowMemory() ||
-		config.GetSyntaxFlowResultKind() == ssaconfig.SFResultSaveMemory {
+	memory := config.GetSyntaxFlowMemory() ||
+		config.GetSyntaxFlowResultKind() == ssaconfig.SFResultSaveMemory
+	if memory && rt != nil {
 		rt.SetNoRiskDB(true)
 	}
-	// The database consumer must be registered before the scan starts: a
-	// resumed or freshly created task can run queries immediately.
+	if ownsRuntime {
+		registerReport(rt, config.Reporter)
+	}
 	var dbSaver *dbSaver
-	bindManagerSaver := func(m *scanManager) {
-		if rt == nil || m == nil || config.GetSyntaxFlowMemory() ||
-			config.GetSyntaxFlowResultKind() == ssaconfig.SFResultSaveMemory {
+	attachSaver := func(taskID string) {
+		if !ownsRuntime || memory || config.IsNoSaveRisk() || dbSaver != nil {
 			return
 		}
-		dbSaver = bindDBSaver(rt, schema.SFResultKindScan, m.taskID, config.IsNoSaveRisk())
+		dbSaver = attachDBSaver(rt, schema.SFResultKindScan, taskID, false)
 	}
 
 	// Wire up debug/pprof output when debug_dir is set.
@@ -68,9 +69,9 @@ func Scan(ctx context.Context, option ...ssaconfig.Option) (retErr error) {
 		}
 		m.StatusTask()
 		m.Stop(runningID)
-		// Stop waited for every queued result and risk callback, so the pending
-		// batch is complete. Write it before the task row so a caller that sees
-		// the finished task can also read every finding.
+		// Stop waited for every queued risk callback, so the pending batch is
+		// complete. Write it before the task row so a caller that sees the
+		// finished task can also read every finding.
 		if dbSaver != nil {
 			if err := dbSaver.Close(); err != nil {
 				log.Errorf("flush risk batch failed: %v", err)
@@ -86,9 +87,8 @@ func Scan(ctx context.Context, option ...ssaconfig.Option) (retErr error) {
 		if success && m.status == schema.SYNTAXFLOWSCAN_DONE {
 			m.notifyDone()
 		}
-		// 在 Stop() 之后保存报告，确保所有结果都已被处理
-		// Stop() 会调用 processMonitor.Close()，等待后台 goroutine 完成
-		// 这样可以确保所有 AddSyntaxFlowResult 调用都已完成
+		// Stop waits for the queued risk callbacks, so the report already holds
+		// every finding this task accepted. Saving here publishes that document.
 		m.saveReport()
 	}()
 	errC := make(chan error)
@@ -99,7 +99,7 @@ func Scan(ctx context.Context, option ...ssaconfig.Option) (retErr error) {
 		if err != nil {
 			return err
 		}
-		bindManagerSaver(m)
+		attachSaver(m.taskID)
 		log.Info("start to create syntaxflow scan")
 		go func() {
 			err := m.ScanNewTask()
@@ -114,7 +114,6 @@ func Scan(ctx context.Context, option ...ssaconfig.Option) (retErr error) {
 		if err != nil {
 			return err
 		}
-		bindManagerSaver(m)
 		m.StatusTask()
 		close(errC)
 	case ssaconfig.ControlModeResume:
@@ -123,7 +122,7 @@ func Scan(ctx context.Context, option ...ssaconfig.Option) (retErr error) {
 		if err != nil {
 			return err
 		}
-		bindManagerSaver(m)
+		attachSaver(m.taskID)
 		go func() {
 			err := m.ResumeTask()
 			if err != nil {

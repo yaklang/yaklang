@@ -6,46 +6,37 @@ import (
 	"github.com/yaklang/yaklang/common/yak/ssaapi/sfreport"
 )
 
-// bindReportSaver attaches the scan's reporter as a consumer of the risk
-// decisions. The rich result still flows through notifyResult; this handler
-// only applies the cover decision so a replaced finding does not stay in the
-// report.
-func bindReportSaver(rt *ssaapi.ScanRuntime, reporter sfreport.IReport) {
+// registerReport attaches the reporter as a consumer of risk updates.
+//
+// The scan already filtered the finding. The report only creates or replaces
+// the entry for that one RiskUpdateItem. A reporter that does not implement
+// the handler is left alone; one-shot export still uses AddSyntaxFlowResult.
+func registerReport(rt *ssaapi.ScanRuntime, reporter sfreport.IReport) {
 	if rt == nil || reporter == nil {
 		return
 	}
-	switch rep := reporter.(type) {
-	case *sfreport.Report:
-		rep.SetKeeper(rt.KeepRisk)
-		rt.ListenRisk(schema.RiskUpdateHandlerFunc(rep.ApplyRiskUpdate))
-	case *sfreport.SarifReport:
-		rep.SetKeeper(rt.KeepRisk)
-		rt.ListenRisk(schema.RiskUpdateHandlerFunc(rep.ApplyRiskUpdate))
+	handler, ok := reporter.(schema.RiskUpdateHandler)
+	if !ok || handler == nil {
+		return
 	}
+	rt.ListenRisk(handler)
 }
 
-// bindDBSaver attaches the saver that owns result rows, the audit graph and
-// risk rows. It is only registered when the scan actually wants database rows:
-// a memory scan streams its findings instead.
-func bindDBSaver(rt *ssaapi.ScanRuntime, kind schema.SyntaxflowResultKind, taskID string, noRisk bool) *dbSaver {
-	if rt == nil {
+// attachDBSaver attaches the consumer that writes risk rows. The query writes
+// its own audit result when the result kind is database; this saver only
+// creates or rewrites the risk row from each RiskUpdateItem.
+func attachDBSaver(rt *ssaapi.ScanRuntime, kind schema.SyntaxflowResultKind, taskID string, noRisk bool) *dbSaver {
+	if rt == nil || noRisk {
 		return nil
 	}
-	var saver *dbSaver
-	rt.BindOnce("db", func() {
-		rt.SetNoRiskDB(noRisk)
-		saver = newDBSaver(kind, taskID, noRisk)
-		rt.ListenResult(saver.ApplyResult)
-		if !noRisk {
-			rt.ListenRisk(saver)
-		}
-	})
-	// A nil saver means another stage of this scan already owns the database
-	// consumer; that stage flushes it.
+	saver := newDBSaver(kind, taskID, false)
+	rt.ListenRisk(saver)
 	return saver
 }
 
 // ensureScanRuntime returns the runtime of this scan, creating it on first use.
+// Registration of report and database consumers belongs to the caller that
+// created the runtime, so a nested stage sharing it does not register again.
 func ensureScanRuntime(cfg *Config) *ssaapi.ScanRuntime {
 	if cfg == nil {
 		return nil
@@ -53,14 +44,8 @@ func ensureScanRuntime(cfg *Config) *ssaapi.ScanRuntime {
 	if cfg.scanRuntime == nil {
 		cfg.scanRuntime = ssaapi.NewScanRuntime()
 	}
-	rt := cfg.scanRuntime
 	if cfg.IsNoSaveRisk() {
-		rt.SetNoRiskDB(true)
+		cfg.scanRuntime.SetNoRiskDB(true)
 	}
-	// The reporter consumes every stage of one scan, so it attaches exactly
-	// once even when the caller supplied the runtime.
-	rt.BindOnce("report", func() {
-		bindReportSaver(rt, cfg.Reporter)
-	})
-	return rt
+	return cfg.scanRuntime
 }
