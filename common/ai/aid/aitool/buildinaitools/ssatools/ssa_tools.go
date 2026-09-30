@@ -14,7 +14,6 @@ import (
 	"github.com/yaklang/yaklang/common/utils/filesys"
 	"github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
-	"github.com/yaklang/yaklang/common/yak/ssaapi"
 )
 
 // CreateSSATools 创建所有 SSA 相关的 AI 工具
@@ -103,10 +102,8 @@ func projectInfoCallback(params aitool.InvokeParams, stdout io.Writer, stderr io
 		result["exists"] = true
 		result["source_type"] = string(src.Kind)
 		result["has_source_code"] = true
-		if src.DB != nil {
-			if extraInfo := src.DB.ExtraInfo(src.Root); extraInfo != nil {
-				result["metadata"] = extraInfo
-			}
+		if extraInfo := src.FS.ExtraInfo(src.Root); extraInfo != nil {
+			result["metadata"] = extraInfo
 		}
 		assignLimitedFiles(result, src, showFiles, maxFiles)
 		stdout.Write([]byte(fmt.Sprintf("成功获取项目 '%s' 信息，共 %d 个文件\n", programName, result["file_count"])))
@@ -555,7 +552,6 @@ type programSource struct {
 	RelPrefix string
 	// LocalRoot 是配置里的本地目录，仅本地源码有值。
 	LocalRoot string
-	DB        *ssaapi.ProgramFileSystem
 }
 
 type programLookup struct {
@@ -566,7 +562,7 @@ type programLookup struct {
 // lookupProgram 优先打开数据库中的源码目录，没有再回退到本地编译路径。
 // 项目不存在时 Source 和 Program 都为空；项目在但源码不可读时只有 Program。
 func lookupProgram(programName string) programLookup {
-	irfs := ssaapi.NewProgramFileSystem()
+	irfs := ssadb.NewIrSourceFs()
 	programPath := "/" + programName
 	if entries, err := irfs.ReadDir(programPath); err == nil && len(entries) > 0 {
 		return programLookup{Source: &programSource{
@@ -574,7 +570,6 @@ func lookupProgram(programName string) programLookup {
 			FS:        irfs,
 			Root:      programPath,
 			RelPrefix: programPath,
-			DB:        irfs,
 		}}
 	}
 
@@ -694,7 +689,7 @@ func assignFilePage(result map[string]any, allFiles []map[string]any, offset, li
 
 // readProgramFile 按单个文件读取：数据库里有这个文件就用数据库，否则再试本地路径。
 func readProgramFile(programName, relPath string) ([]byte, programSourceKind, bool) {
-	irfs := ssaapi.NewProgramFileSystem()
+	irfs := ssadb.NewIrSourceFs()
 	fullPath := "/" + programName + "/" + relPath
 	if content, err := irfs.ReadFile(fullPath); err == nil {
 		return content, programSourceDatabase, true
