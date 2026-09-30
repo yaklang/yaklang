@@ -1,7 +1,7 @@
 {{/*
 维护备注：Timeline Open：各缓存前缀之后的可变尾部。
-TimelineOpen、TodoSnapshot、CurrentTime、PlanContext、ReportedRisks 的来源不同，不能把尾部所有内容都当作普通 Timeline 事件。
-主 ReAct 的时钟在 Dynamic，其他调用方可使用本段 CurrentTime。
+TimelineOpen、PlanRuntimeState、TodoSnapshot、PlanContext、ReportedRisks 的来源不同，不能把尾部所有内容都当作普通 Timeline 事件。
+当前时钟只在 Dynamic；事件和用户输入自带的发生时间保留在各自记录中。
 */}}{{/*
 维护备注：TimelineOpen：RenderTimelineFrozenOpenWithOptions() 输出未封存 journal；
 包含用户输入原文、Evidence/工具缓存 delta 与普通执行事件。
@@ -16,6 +16,22 @@ TimelineOpen、TodoSnapshot、CurrentTime、PlanContext、ReportedRisks 的来�
 
 
 {{/*
+维护备注：PlanRuntimeState：AiTask.GetPlanPromptContext() 从真实任务树/依赖图构建，
+含 PlanVersion、当前节点、父节点、TODO scope、节点状态、未完成依赖。
+存档来源：AISessionPlanAndExec.TaskTree / TaskProgress；恢复后由真实状态重建；
+不是另一个 Timeline Evidence store，不等待封桶，也不进入任何缓存边界。
+此处先展示计划层状态，再展示节点内 TODO；状态、摘要、时钟不进入 Frozen 定义版本。
+*/}}{{ if .PlanRuntimeState }}# Plan Runtime State (Read Only)
+计划定义见 Frozen 中同 plan_version 的 plan_definition；计划状态约束当前 TODO，不能用 TODO 完成代替整棵任务树完成。
+{{ .PlanRuntimeState }}
+{{ end }}
+
+{{/*
+维护备注：PlanContext：PromptMaterials.FrozenUserContext 经 TimelineOpenData 映射得到的当前计划/父任务上下文；
+名字里的 Frozen 不代表其位于 Frozen Prefix。
+它随当前任务变化，留在缓存之外，供参考当前执行范围。
+*/}}{{ if .PlanContext }}{{ .PlanContext }}{{ end }}
+{{/*
 维护备注：TodoSnapshot：SessionPromptState 的 TODO store 只读快照，通常按当前任务 scope 渲染；
 每轮读取当前状态，不参加 Timeline 封存。
 通过既有 todo_delta 规则写入，不能直接改这段文本。
@@ -26,18 +42,6 @@ TODO LIST 是当前任务的只读状态快照；执行和写入规则见 High S
 {{ .TodoSnapshot }}
 {{ end }}
 
-{{/*
-维护备注：CurrentTime：调用方提供的当前时钟，每次构建可能变化；
-不是事件发生时间。
-主 ReAct 清空本字段并将时钟放到 Dynamic，避免重复。
-*/}}{{ if .CurrentTime }}# Current Time
-{{ .CurrentTime }}{{ end }}
-
-{{/*
-维护备注：PlanContext：PromptMaterials.FrozenUserContext 经 TimelineOpenData 映射得到的当前计划/父任务上下文；
-名字里的 Frozen 不代表其位于 Frozen Prefix。
-它随当前任务变化，留在缓存之外，供参考当前执行范围。
-*/}}{{ if .PlanContext }}{{ .PlanContext }}{{ end }}
 {{/*
 维护备注：ReportedRisks：SessionPromptState 中已报告漏洞记录的只读渲染，供调用 cybersecurity-risk 前去重；
 随上报更新，不是新的用户指令，也不与 Evidence 存储混同。

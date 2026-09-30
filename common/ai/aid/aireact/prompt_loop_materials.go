@@ -326,14 +326,10 @@ func (pm *PromptManager) NewPromptMaterials(base *reactloops.LoopPromptBaseMater
 		// prompt 任何一次 iteration 都能看到当前 TODO 全貌.
 		// 关键词: TodoSnapshot 透传, timeline-open, Timeline 中的 evidence delta 之后
 		materials.TodoSnapshot = input.TodoSnapshot
-		// PE-TASK PLAN 产物 (PARENT_TASK + CURRENT_TASK + INSTRUCTION) 通过
-		// FrozenUserContext 字段透传, 渲染时位于 timeline-open 段最末尾
-		// (Timeline / Todo 之后), 落在所有 cache 边界之外。早期版本曾尝试
-		// frozen-block / semi-dynamic, 但子任务切换会让 PlanContext 内容
-		// 抖动, 破坏上游缓存命中, 现采用"放弃自身缓存, 保护上游缓存"策略。
-		// 关键词: FrozenUserContext 透传, PLAN_CONTEXT, timeline-open 末尾,
-		//        缓存边界外
+		// Legacy mixed context remains uncached; typed plans split definition,
+		// runtime state and execution rules before rendering/observation.
 		materials.FrozenUserContext = input.FrozenUserContext
+		aicommon.ApplyPlanPromptContext(materials, input.PlanContext)
 		materials.FrozenPartitions = append(materials.FrozenPartitions, input.FrozenPartitions...)
 		// SKILL 三态透传: forced (frozen_block 顶部) / auto (semi_dynamic_2 尾部).
 		// SkillsContext (含 catalog) 已透传, 这里补 forced / auto.
@@ -713,6 +709,9 @@ func (pm *PromptManager) buildSemiDynamic2Observation(
 	// 已经表达层级.
 	// 关键词: section.semi_dynamic_2 子节点 Name 去前缀, UI 信息密度
 	children := []*reactloops.PromptSectionObservation{
+		reactloops.NewPromptSectionObservation(
+			"section.semi_dynamic_2.plan_execution_rules", "Plan Execution Rules",
+			reactloops.PromptSectionRoleSemiDynamic2, true, materials.PlanExecutionRules),
 		// section.semi_dynamic_2.task_instruction 从 high-static 段迁入:
 		// TaskInstruction 是 caller 注入的 PERSISTENT 指令, caller-specific,
 		// 跨同一 caller 的 turn 字节稳定. 留在 high-static 段会污染
@@ -790,28 +789,18 @@ func (pm *PromptManager) buildTimelineOpenObservation(
 			renderTimelineOpenBlock(materials),
 		),
 
-		// TODO 快照紧跟 Open Timeline；状态由普通 ReAct action 更新。
-		// 段位仍属 timeline-open, 落在所有 cache 边界外, 不污染上游 prefix cache.
 		reactloops.NewPromptSectionObservation(
-			"section.timeline_open.todo_list",
-			"Todo List",
-			reactloops.PromptSectionRoleTimelineOpen,
-			true,
-			materials.TodoSnapshot,
-		),
-		// PlanContext (PE-TASK PLAN 产物) 末尾注入: 该字段仅 PE-TASK 子任务
-		// 非空, 内容随子任务切换抖动, 不适合放任何 cache 边界内。
-		// 放 timeline-open 段最末让其落在所有
-		// cache 边界之外, 不污染上游 system / frozen / semi 三段缓存命中。
-		// 关键词: section.timeline_open.plan_context, PLAN_CONTEXT 末尾,
-		//        缓存边界外, 上游缓存保护
+			"section.timeline_open.plan_runtime_state", "Plan Runtime State",
+			reactloops.PromptSectionRoleTimelineOpen, true, materials.PlanRuntimeState),
 		reactloops.NewPromptSectionObservation(
-			"section.timeline_open.plan_context",
-			"Plan Context (PE-TASK PLAN Output)",
-			reactloops.PromptSectionRoleTimelineOpen,
-			true,
-			renderPlanContextBlock(materials),
-		),
+			"section.timeline_open.plan_context", "Legacy Plan Context",
+			reactloops.PromptSectionRoleTimelineOpen, true, renderPlanContextBlock(materials)),
+		reactloops.NewPromptSectionObservation(
+			"section.timeline_open.todo_list", "Todo List",
+			reactloops.PromptSectionRoleTimelineOpen, true, materials.TodoSnapshot),
+		reactloops.NewPromptSectionObservation(
+			"section.timeline_open.reported_risks", "Reported Risks",
+			reactloops.PromptSectionRoleTimelineOpen, true, materials.ReportedRisks),
 	}
 	section.Children = filterIncludedPromptSections(children)
 	if strings.TrimSpace(rendered) != "" {

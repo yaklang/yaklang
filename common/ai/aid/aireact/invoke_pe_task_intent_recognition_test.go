@@ -88,7 +88,7 @@ func TestReAct_PETask_DeepIntentRecognition(t *testing.T) {
 			// (during PE task init). The simplified loop_intent runs entirely
 			// in InitTask with one LiteForge call; no ReAct iterations.
 			if aicommon.IsIntentKeywordGenPrompt(prompt) &&
-				!strings.Contains(prompt, "PROGRESS_TASK_") {
+				!strings.Contains(prompt, "# Plan Runtime State") {
 				atomic.AddInt32(&intentLoopCalled, 1)
 				log.Infof("intent loop (intent-keyword-gen) called during PE task init")
 				rsp := i.NewAIResponse()
@@ -113,8 +113,8 @@ func TestReAct_PETask_DeepIntentRecognition(t *testing.T) {
 				return rsp, nil
 			}
 
-			// Phase: PE task execution (contains PROGRESS_TASK_ and planFlag)
-			if strings.Contains(prompt, "PROGRESS_TASK_") && strings.Contains(prompt, planFlag) {
+			// Phase: PE task execution (contains # Plan Runtime State and planFlag)
+			if strings.Contains(prompt, "# Plan Runtime State") && strings.Contains(prompt, planFlag) {
 				atomic.AddInt32(&peTaskCalled, 1)
 				log.Infof("PE task main loop called")
 				rsp := i.NewAIResponse()
@@ -131,7 +131,7 @@ func TestReAct_PETask_DeepIntentRecognition(t *testing.T) {
 
 			// Phase: Main loop - request blueprint
 			if isPrimaryDecisionPrompt(prompt) &&
-				!strings.Contains(prompt, "PROGRESS_TASK_") {
+				!strings.Contains(prompt, "# Plan Runtime State") {
 				rsp := i.NewAIResponse()
 				rsp.EmitOutputStream(bytes.NewBufferString(`
 {"@action": "object", "next_action": { "type": "require_ai_blueprint", "blueprint_payload": "` + testForgeName + `" },
@@ -163,7 +163,7 @@ func TestReAct_PETask_DeepIntentRecognition(t *testing.T) {
 			}
 
 			// Phase: Task summary
-			if strings.Contains(prompt, "任务执行引擎") && strings.Contains(prompt, "task_long_summary") && !strings.Contains(prompt, "PROGRESS_TASK_") {
+			if strings.Contains(prompt, "任务执行引擎") && strings.Contains(prompt, "task_long_summary") && !strings.Contains(prompt, "# Plan Runtime State") {
 				rsp := i.NewAIResponse()
 				rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "summary", "status_summary": "done", "task_short_summary": "completed", "task_long_summary": "task completed"}`))
 				rsp.Close()
@@ -276,7 +276,7 @@ func TestReAct_PlanExec_DeepIntentRecognition(t *testing.T) {
 			// Phase: Intent loop — single LiteForge "intent-keyword-gen" call
 			// (during plan or PE task init).
 			if aicommon.IsIntentKeywordGenPrompt(prompt) &&
-				!strings.Contains(prompt, "PROGRESS_TASK_") &&
+				!strings.Contains(prompt, "# Plan Runtime State") &&
 				!strings.Contains(prompt, "search_knowledge") {
 				atomic.AddInt32(&intentLoopCalled, 1)
 				log.Infof("intent loop (intent-keyword-gen) called")
@@ -306,7 +306,7 @@ func TestReAct_PlanExec_DeepIntentRecognition(t *testing.T) {
 			if strings.Contains(prompt, "search_knowledge") &&
 				strings.Contains(prompt, "plan") &&
 				!strings.Contains(prompt, "directly_answer") &&
-				!strings.Contains(prompt, "PROGRESS_TASK_") {
+				!strings.Contains(prompt, "# Plan Runtime State") {
 				atomic.AddInt32(&planLoopCalled, 1)
 				log.Infof("plan loop AI called")
 				rsp := i.NewAIResponse()
@@ -323,7 +323,7 @@ func TestReAct_PlanExec_DeepIntentRecognition(t *testing.T) {
 			}
 
 			// Phase: PE task execution
-			if strings.Contains(prompt, "PROGRESS_TASK_") {
+			if strings.Contains(prompt, "# Plan Runtime State") {
 				atomic.AddInt32(&peTaskCalled, 1)
 				log.Infof("PE task main loop called")
 				rsp := i.NewAIResponse()
@@ -344,7 +344,7 @@ func TestReAct_PlanExec_DeepIntentRecognition(t *testing.T) {
 
 			// Phase: Main loop → request_plan_and_execution
 			if isPrimaryDecisionPrompt(prompt) &&
-				!strings.Contains(prompt, "PROGRESS_TASK_") {
+				!strings.Contains(prompt, "# Plan Runtime State") {
 				rsp := i.NewAIResponse()
 				rsp.EmitOutputStream(bytes.NewBufferString(`
 {"@action": "object", "next_action": { "type": "request_plan_and_execution", "plan_request_payload": "` + planPayload + `" },
@@ -355,7 +355,7 @@ func TestReAct_PlanExec_DeepIntentRecognition(t *testing.T) {
 			}
 
 			// Phase: Task summary
-			if strings.Contains(prompt, "任务执行引擎") && strings.Contains(prompt, "task_long_summary") && !strings.Contains(prompt, "PROGRESS_TASK_") {
+			if strings.Contains(prompt, "任务执行引擎") && strings.Contains(prompt, "task_long_summary") && !strings.Contains(prompt, "# Plan Runtime State") {
 				rsp := i.NewAIResponse()
 				rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "summary", "status_summary": "done", "task_short_summary": "completed", "task_long_summary": "task completed"}`))
 				rsp.Close()

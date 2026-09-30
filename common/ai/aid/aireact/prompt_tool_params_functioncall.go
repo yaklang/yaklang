@@ -33,13 +33,19 @@ func (pm *PromptManager) GenerateFunctionCallToolParamsPromptForTask(
 		return "", fmt.Errorf("selected tool is nil")
 	}
 	query := ""
+	var plan aicommon.PlanPromptContext
 	if task != nil {
-		query = task.GetUserInput()
+		if provider, ok := task.(aicommon.PlanPromptContextProvider); ok {
+			plan = provider.GetPlanPromptContext()
+			query = plan.UserQuery
+		} else {
+			query = task.GetUserInput()
+		}
 	}
 	currentNonce := nonce()
 	loop := promptLoopForTask(task)
 	base, materials, err := pm.preparePromptPrefixMaterialsForLoop(nil,
-		&reactloops.LoopPromptAssemblyInput{Nonce: currentNonce}, loop)
+		&reactloops.LoopPromptAssemblyInput{Nonce: currentNonce, PlanContext: plan}, loop)
 	if err != nil {
 		return "", err
 	}
@@ -106,7 +112,10 @@ func (pm *PromptManager) GenerateFunctionCallToolParamsPromptForTask(
 	return assembleFunctionCallToolParamsPrompt(materials,
 		map[string]any{
 			"RecentUserInput": materials.UserHistory, "CallIntent": callIntent,
-			"CurrentTime": base.CurrentTime,
+			"CurrentTime":      base.CurrentTime,
+			"PlanRuntimeState": materials.PlanRuntimeState,
+			"TodoSnapshot":     materials.TodoSnapshot,
+			"ReportedRisks":    materials.ReportedRisks,
 		}, currentNonce)
 }
 

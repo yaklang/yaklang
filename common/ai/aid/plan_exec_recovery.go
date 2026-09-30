@@ -13,19 +13,21 @@ import (
 )
 
 type recoveredTask struct {
-	TaskId             string           `json:"task_id,omitempty"`
-	Index              string           `json:"index"`
-	Name               string           `json:"name"`
-	Goal               string           `json:"goal"`
-	SemanticIdentifier string           `json:"semantic_identifier,omitempty"`
-	DependsOn          []string         `json:"depends_on,omitempty"`
-	Progress           string           `json:"progress"`
-	Summary            string           `json:"summary"`
-	StatusSummary      string           `json:"status_summary"`
-	TaskSummary        string           `json:"task_summary"`
-	ShortSummary       string           `json:"short_summary"`
-	LongSummary        string           `json:"long_summary"`
-	Subtasks           []*recoveredTask `json:"subtasks,omitempty"`
+	TaskInput           *string          `json:"task_input"`
+	PlanSourceUserQuery *string          `json:"plan_source_user_query,omitempty"`
+	TaskId              string           `json:"task_id,omitempty"`
+	Index               string           `json:"index"`
+	Name                string           `json:"name"`
+	Goal                string           `json:"goal"`
+	SemanticIdentifier  string           `json:"semantic_identifier,omitempty"`
+	DependsOn           []string         `json:"depends_on,omitempty"`
+	Progress            string           `json:"progress"`
+	Summary             string           `json:"summary"`
+	StatusSummary       string           `json:"status_summary"`
+	TaskSummary         string           `json:"task_summary"`
+	ShortSummary        string           `json:"short_summary"`
+	LongSummary         string           `json:"long_summary"`
+	Subtasks            []*recoveredTask `json:"subtasks,omitempty"`
 }
 
 func (c *Coordinator) tryRecoverPlanAndExec(startTaskID string) (*AiTask, *PlanAndExecProgress, bool, error) {
@@ -110,6 +112,10 @@ func (c *Coordinator) buildRecoveredTaskTree(src *recoveredTask, parent *AiTask)
 		task.TaskSummary = src.Summary
 	}
 	restoreRecoveredTaskID(task, src)
+	task.planSourceUserQuery = src.PlanSourceUserQuery
+	if src.TaskInput != nil {
+		task.SetUserInput(*src.TaskInput)
+	}
 
 	switch strings.ToLower(strings.TrimSpace(src.Progress)) {
 	case string(aicommon.AITaskState_Completed):

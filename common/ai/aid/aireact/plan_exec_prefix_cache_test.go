@@ -13,6 +13,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
+	aicommon_testutil "github.com/yaklang/yaklang/common/ai/aid/aicommon/testutil"
 	"github.com/yaklang/yaklang/common/ai/aid/aiprojection"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/ai/ytoken"
@@ -280,7 +281,7 @@ func TestPlanExec_PrefixCacheStableWithMockedTieredAI(t *testing.T) {
 			})), nil
 
 		case isPrimaryDecisionPrompt(prompt) &&
-			!strings.Contains(prompt, "PROGRESS_TASK_"):
+			!strings.Contains(prompt, "# Plan Runtime State"):
 			return newMockAIResponse(i, intelligentModel, mustJSONString(map[string]any{
 				"@action": "object",
 				"next_action": map[string]any{
@@ -320,7 +321,7 @@ func TestPlanExec_PrefixCacheStableWithMockedTieredAI(t *testing.T) {
 				"reasoning":      "all deterministic mock subtasks finished successfully",
 			})), nil
 
-		case utils.MatchAllOfSubString(prompt, "PROGRESS_TASK_", "directly_answer", "require_tool"):
+		case utils.MatchAllOfSubString(prompt, "# Plan Runtime State", "directly_answer", "require_tool"):
 			stageCursorMu.Lock()
 			if remainingSubtaskFinishes > 0 {
 				// 本子任务 verification 已观测到 satisfied；finish 后推进 progress 流程。
@@ -364,7 +365,7 @@ func TestPlanExec_PrefixCacheStableWithMockedTieredAI(t *testing.T) {
 			})), nil
 
 		case utils.MatchAllOfSubString(prompt, "任务执行引擎", "task_long_summary") &&
-			!strings.Contains(prompt, "PROGRESS_TASK_"):
+			!strings.Contains(prompt, "# Plan Runtime State"):
 			return newMockAIResponse(i, intelligentModel, mustJSONString(map[string]any{
 				"@action":            "summary",
 				"status_summary":     "all mocked subtasks completed",
@@ -849,6 +850,9 @@ func matchPlanExecStage(prompt string, stages []planExecMockStage) (planExecMock
 }
 
 func extractLastCurrentTaskBlock(prompt string) string {
+	if current := aicommon_testutil.ExtractPlanCurrentTask(prompt); current != "" {
+		return current
+	}
 	bestStart := -1
 	bestBlock := ""
 	for _, pair := range [][2]string{

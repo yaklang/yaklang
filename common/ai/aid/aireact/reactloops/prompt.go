@@ -286,6 +286,11 @@ func (r *ReActLoop) generateLoopPrompt(
 	memory string,
 	operator *LoopActionHandlerOperator,
 ) (string, error) {
+	var planContext aicommon.PlanPromptContext
+	if provider, ok := r.GetCurrentTask().(aicommon.PlanPromptContextProvider); ok {
+		planContext = provider.GetPlanPromptContext()
+		userInput, frozenUserContext = planContext.UserQuery, ""
+	}
 	subAgentInput, subAgentRevision := r.prepareSubAgentPrompt()
 	var tools []*aitool.Tool
 	if r.toolsGetter == nil {
@@ -389,7 +394,7 @@ func (r *ReActLoop) generateLoopPrompt(
 		return "", err
 	}
 	r.lastLoopSchema = schema
-	if err := r.compressTimelineBeforePrompt(userInput, frozenUserContext, todoSnapshot, persistent); err != nil {
+	if err := r.compressTimelineBeforePrompt(userInput, frozenUserContext, todoSnapshot, persistent, planContext.Definition, planContext.RuntimeState, planContext.ExecutionRules); err != nil {
 		return "", err
 	}
 
@@ -400,6 +405,7 @@ func (r *ReActLoop) generateLoopPrompt(
 		Lightweight:              r.useSpeedPriorityAI,
 		UserQuery:                userInput,
 		FrozenUserContext:        frozenUserContext,
+		PlanContext:              planContext,
 		FrozenPartitions:         frozenPartitions,
 		TaskInstruction:          persistent,
 		OutputExample:            outputExample,

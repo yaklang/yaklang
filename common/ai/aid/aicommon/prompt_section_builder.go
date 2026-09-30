@@ -159,6 +159,12 @@ func (b *PromptPrefixBuilder) AssemblePromptWithDynamicSection(
 	if err != nil {
 		return "", err
 	}
+	// The shared open tail never owns the clock. Caller templates which
+	// explicitly render CurrentTime already own it; other helper prompts get
+	// it prepended here, inside the pure Dynamic section only.
+	if materials != nil && materials.CurrentTime != "" && !strings.Contains(dynamicTemplate, ".CurrentTime") {
+		dynamicSection = "# Current Time\n" + materials.CurrentTime + "\n\n" + dynamicSection
+	}
 	return b.buildTaggedPromptSections(
 		prefix.HighStatic,
 		prefix.FrozenBlock,

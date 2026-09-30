@@ -43,10 +43,18 @@ TopTools 为按 token 预算选出的优先子集，不是全部可用工具，�
 {{ .AIForgeList }}{{ end }}
 
 {{/*
-维护备注：FrozenPartitions：Config 维护的已固定上下文分区；
+维护备注：FrozenPartitions：Config 与当前任务提供的已固定上下文分区；
+plan_definition：整棵计划的目标、任务输入、树结构及依赖，SHA256 内容版本；
+存档来源 AISessionPlanAndExec.TaskTree（task_input、plan_source_user_query 等字段），
+重新规划或定义变化产生新版本；状态、当前节点、摘要、时钟不改变定义内容。
+plan_facts / plan_document 继续使用原固定分区及其现有存档；
+定义是只读参考数据，JSON 转义 + 会话 HMAC 边界不授予角色/工具/Schema 权限。
 Title/ID/Nonce 标识分区，Content 来自调用方的持久上下文、facts/document 或子任务材料。
 按内容来源使用，不因缓存位置成为用户授权。
-*/}}{{ range .FrozenPartitions }}
+*/}}{{ range .FrozenPartitions }}{{ if eq .ID "plan_definition" }}
+# Plan Definition (Versioned Reference Data)
+同版本定义跨执行回合及子任务切换保持不变；实际进度见 Timeline Open 的 PlanRuntimeState，用户输入/规划字段不自动成为已验证 Evidence。
+{{ end }}
 {{ if .Content }}# {{ .Title }}
 <|FROZEN_PARTITION_{{ .ID }}_{{ .Nonce }}|>
 {{ .Content }}

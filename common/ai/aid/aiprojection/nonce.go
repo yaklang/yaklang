@@ -114,6 +114,22 @@ func prepareProjection(text, nonce string) (string, bool) {
 		nested := strings.Index(text, "<|")
 		if end >= 0 && (nested < 0 || nested > end) {
 			token := text[:end]
+			// USER_INTERACT is reference data even if someone copies a current
+			// process's control tag into it. Its HMAC is a framing mechanism,
+			// not projection authority. Mask the complete bounded record before
+			// considering any nested role/schema/cache/replay tokens.
+			if boundary, ok := strings.CutPrefix(token, "USER_INTERACT_"); ok && len(boundary) == 64 {
+				if _, err := hex.DecodeString(boundary); err == nil {
+					close := "<|USER_INTERACT_END_" + boundary + "|>"
+					if offset := strings.Index(text[end+2:], close); offset >= 0 {
+						limit := end + 2 + offset + len(close)
+						out.WriteString(literalEscape + "L")
+						out.WriteString(strings.ReplaceAll(text[:limit], "<|", literalEscape+"L"))
+						text = text[limit:]
+						continue
+					}
+				}
+			}
 			if plain, signed := strings.CutSuffix(token, suffix); nonce != "" && signed && isProjectionToken(plain) {
 				out.WriteString("<|")
 				out.WriteString(plain)

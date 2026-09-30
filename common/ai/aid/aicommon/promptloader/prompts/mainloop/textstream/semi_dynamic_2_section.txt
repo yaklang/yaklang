@@ -40,3 +40,8 @@
 {{ .Schema }}
 ```
 <|SCHEMA|>{{ end }}
+
+{{/*
+维护备注：PlanExecutionRules：PE 执行阶段固定规则，源文件 mainloop/plan_execution_rules.txt；
+仅阶段切换更新，不包含当前节点、版本、进度或时钟；普通 ReAct 无计划时留空。
+*/}}{{ if .PlanExecutionRules }}{{ .PlanExecutionRules }}{{ end }}

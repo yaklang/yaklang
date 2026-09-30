@@ -29,3 +29,8 @@
 维护备注：FunctionCallSchemas：调用方为本轮生成的已鉴别原生 action 工具声明，经 aiprojection 转成 native tools；
 与 Semi1 的业务工具参数缓存不同。
 */}}{{ .FunctionCallSchemas }}
+
+{{/*
+维护备注：PlanExecutionRules：PE 执行阶段固定规则，源文件 mainloop/plan_execution_rules.txt；
+仅阶段切换更新，不包含当前节点、版本、进度或时钟；普通 ReAct 无计划时留空。
+*/}}{{ if .PlanExecutionRules }}{{ .PlanExecutionRules }}{{ end }}

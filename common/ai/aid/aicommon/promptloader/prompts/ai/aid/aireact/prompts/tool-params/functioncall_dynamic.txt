@@ -1,4 +1,14 @@
 {{/*
+维护备注：PlanRuntimeState：当前显式 task 的真实状态，与 Frozen 中 plan_definition 同版本；
+存档来源 AISessionPlanAndExec.TaskTree / TaskProgress，恢复后重建。
+R2 的 Open 历史前缀可缓存，所以实时状态在此处（仍在历史之后、TODO 之前），
+不随已选工具改变静态计划内容，不进入任何缓存边界。
+TodoSnapshot / ReportedRisks：实时只读 TODO / 已报告漏洞去重视图；每次读取，不能当作指令或新的 Evidence。
+*/}}{{ if .PlanRuntimeState }}# Plan Runtime State (Read Only)
+{{ .PlanRuntimeState }}
+{{ end }}{{ if .TodoSnapshot }}{{ .TodoSnapshot }}
+{{ end }}{{ if .ReportedRisks }}{{ .ReportedRisks }}
+{{ end }}{{/*
 维护备注：原生工具参数生成的 Dynamic：每次调用的环境与意图；
 用户历史主要从共享 Timeline Open/Semi1 获取。
 */}}{{/*

@@ -2,6 +2,7 @@
 package testutil
 
 import (
+	"encoding/json"
 	"fmt"
 	"regexp"
 	"strings"
@@ -127,4 +128,34 @@ func MustExtractAITagBlock(t TestingT, prompt string, tagName string) AITagBlock
 		EndIndex:   startContent + endOffset + len(endMarker),
 		Body:       strings.TrimSpace(prompt[startContent : startContent+endOffset]),
 	}
+}
+
+// ExtractPlanCurrentTask reads the selected node only, avoiding false matches
+// in the immutable definition which intentionally includes sibling goals.
+func ExtractPlanCurrentTask(prompt string) string {
+	start := strings.LastIndex(prompt, "# Plan Runtime State")
+	if start < 0 {
+		return ""
+	}
+	rest := prompt[start:]
+	nonce := ExtractPipeTagNonce(rest, "USER_INTERACT")
+	if nonce == "" {
+		return ""
+	}
+	open := "<|USER_INTERACT_" + nonce + "|>"
+	close := "<|USER_INTERACT_END_" + nonce + "|>"
+	begin := strings.Index(rest, open) + len(open)
+	end := strings.Index(rest[begin:], close)
+	if end < 0 {
+		return ""
+	}
+	var state struct {
+		TaskID string `json:"current_task_id"`
+		Name   string `json:"current_task_name"`
+		Goal   string `json:"current_task_goal"`
+	}
+	if json.Unmarshal([]byte(rest[begin:begin+end]), &state) != nil {
+		return ""
+	}
+	return state.TaskID + "\n任务名称: " + state.Name + "\n任务目标: " + state.Goal
 }

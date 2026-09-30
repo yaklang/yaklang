@@ -356,6 +356,9 @@ func (pm *PromptManager) GenerateToolParamsPromptWithMeta(tool *aitool.Tool) (*T
 	if pm != nil && pm.react != nil {
 		loop = pm.react.GetCurrentLoop()
 	}
+	if pm != nil && pm.react != nil && pm.react.GetCurrentTask() != nil {
+		return pm.GenerateToolParamsPromptWithMetaForTask(pm.react.GetCurrentTask(), tool)
+	}
 	return pm.generateToolParamsPromptWithMetaForQueryAndLoop(pm.currentUserInput(), loop, tool)
 }
 
@@ -367,10 +370,16 @@ func (pm *PromptManager) GenerateToolParamsPromptWithMetaForTask(
 	tool *aitool.Tool,
 ) (*ToolParamsPromptResult, error) {
 	userQuery := ""
+	var plan aicommon.PlanPromptContext
 	if task != nil {
-		userQuery = task.GetUserInput()
+		if provider, ok := task.(aicommon.PlanPromptContextProvider); ok {
+			plan = provider.GetPlanPromptContext()
+			userQuery = plan.UserQuery
+		} else {
+			userQuery = task.GetUserInput()
+		}
 	}
-	return pm.generateToolParamsPromptWithMetaForQueryAndLoop(userQuery, promptLoopForTask(task), tool)
+	return pm.generateToolParamsPromptWithMetaForQueryAndLoop(userQuery, promptLoopForTask(task), tool, plan)
 }
 
 // GenerateToolParamsPromptWithMetaForQuery is the task-independent core used
@@ -386,7 +395,12 @@ func (pm *PromptManager) generateToolParamsPromptWithMetaForQueryAndLoop(
 	originalQuery string,
 	loop *reactloops.ReActLoop,
 	tool *aitool.Tool,
+	planContexts ...aicommon.PlanPromptContext,
 ) (*ToolParamsPromptResult, error) {
+	var plan aicommon.PlanPromptContext
+	if len(planContexts) > 0 {
+		plan = planContexts[0]
+	}
 	nonceString := nonce()
 	toolSchema := ""
 	if tool.Tool != nil {
@@ -395,8 +409,9 @@ func (pm *PromptManager) generateToolParamsPromptWithMetaForQueryAndLoop(
 	paramNames := toolParamNames(tool)
 
 	_, prefixMaterials, err := pm.preparePromptPrefixMaterialsForLoop(nil, &reactloops.LoopPromptAssemblyInput{
-		Nonce:  nonceString,
-		Schema: loopSchema(loop),
+		Nonce:       nonceString,
+		PlanContext: plan,
+		Schema:      loopSchema(loop),
 	}, loop)
 	if err != nil {
 		return nil, err

@@ -82,8 +82,10 @@ type PromptMaterials struct {
 	TodoSnapshot string
 	// Deprecated: main prompts derive PromptedUserInputHistory and TimelineOpen
 	// from the exact Timeline journal. Kept for bounded legacy helper callers.
-	UserHistory       string
-	FrozenUserContext string
+	UserHistory        string
+	FrozenUserContext  string
+	PlanRuntimeState   string
+	PlanExecutionRules string
 
 	// ReportedRisks is the rendered "已报告漏洞清单" block injected at the
 	// very end of the timeline-open prompt section (after PlanContext).
@@ -130,6 +132,7 @@ func (m *PromptMaterials) SemiDynamic2Data() map[string]any {
 	return map[string]any{
 		"FunctionCallMode":    m.FunctionCallMode,
 		"TaskInstruction":     m.TaskInstruction,
+		"PlanExecutionRules":  m.PlanExecutionRules,
 		"ExecutionPolicy":     m.ExecutionPolicy,
 		"Schema":              m.Schema,
 		"FunctionCallSchemas": m.FunctionCallSchemas,
@@ -161,10 +164,8 @@ func (m *PromptMaterials) FrozenBlockData() map[string]any {
 	}
 }
 
-// TimelineOpenData supplies the variable tail. The main ReAct loop places
-// workspace coordinates in SemiDynamic1 and clears CurrentTime here before
-// rendering, then emits the clock in Dynamic. Other callers retain their
-// existing clock behavior.
+// TimelineOpenData supplies live plan state, TODOs and risk deduplication after
+// the journal. The current clock belongs exclusively to Dynamic.
 func (m *PromptMaterials) TimelineOpenData() map[string]any {
 	if m == nil {
 		return map[string]any{}
@@ -173,7 +174,7 @@ func (m *PromptMaterials) TimelineOpenData() map[string]any {
 		"TimelineOpen":           m.TimelineOpen,
 		"TimelineFrozenTimeUnix": m.TimelineFrozenTimeUnix,
 		"TodoSnapshot":           m.TodoSnapshot,
-		"CurrentTime":            m.CurrentTime,
+		"PlanRuntimeState":       m.PlanRuntimeState,
 		"PlanContext":            m.FrozenUserContext,
 		"ReportedRisks":          m.ReportedRisks,
 	}

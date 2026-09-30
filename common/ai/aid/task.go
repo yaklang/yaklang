@@ -2,6 +2,7 @@ package aid
 
 import (
 	"bytes"
+	"context"
 	_ "embed"
 	"encoding/json"
 	"errors"
@@ -39,10 +40,11 @@ type AiTask struct {
 	ShortSummary  string `json:"short_summary"`
 	LongSummary   string `json:"long_summary"`
 
-	toolCallResultIds  *omap.OrderedMap[int64, *aitool.ToolResult]
-	taskTimelineDiffer *aicommon.TimelineDiffer // Timeline differ for tracking task execution timeline changes
-	taskStartTime      time.Time                // Task execution start time for duration calculation
-	timelineFork       *aicommon.TimelineFork
+	toolCallResultIds   *omap.OrderedMap[int64, *aitool.ToolResult]
+	taskTimelineDiffer  *aicommon.TimelineDiffer // Timeline differ for tracking task execution timeline changes
+	taskStartTime       time.Time                // Task execution start time for duration calculation
+	planSourceUserQuery *string                  // Persisted source query; only the root contributes to definition version.
+	timelineFork        *aicommon.TimelineFork
 }
 
 // GetSemanticIdentifier returns the semantic identifier for directory naming.
@@ -322,9 +324,20 @@ func (t *AiTask) GetProgressStatue() string {
 func (t *AiTask) MarshalJSON() ([]byte, error) {
 	type TaskAlias AiTask // 创建一个别名类型以避免递归调用
 	progress := t.GetProgressStatue()
+	var taskInput string
+	if t.AIStatefulTaskBase != nil {
+		taskInput = t.AIStatefulTaskBase.GetUserInput()
+	}
+	var sourceQuery *string
+	if t.ParentTask == nil {
+		query := t.planPromptSourceQuery()
+		sourceQuery = &query
+	}
 
 	// 创建一个不包含AICallback的结构体
 	return json.Marshal(struct {
+		TaskInput            string    `json:"task_input"`
+		PlanSourceUserQuery  *string   `json:"plan_source_user_query,omitempty"`
 		TaskId               string    `json:"task_id,omitempty"`
 		Index                string    `json:"index"`
 		Name                 string    `json:"name"`
@@ -342,6 +355,8 @@ func (t *AiTask) MarshalJSON() ([]byte, error) {
 		SuccessToolCallCount int       `json:"success_tool_call_count"`
 		FailToolCallCount    int       `json:"fail_tool_call_count"`
 	}{
+		TaskInput:            taskInput,
+		PlanSourceUserQuery:  sourceQuery,
 		TaskId:               t.TaskId,
 		Index:                t.Index,
 		Name:                 t.Name,
@@ -365,11 +380,15 @@ func (t *AiTask) MarshalJSON() ([]byte, error) {
 func (t *AiTask) UnmarshalJSON(data []byte) error {
 	// 创建一个临时结构体，不包含AICallback
 	aux := struct {
-		TaskId   string    `json:"task_id,omitempty"`
-		Index    string    `json:"index"`
-		Name     string    `json:"name"`
-		Goal     string    `json:"goal"`
-		Subtasks []*AiTask `json:"subtasks,omitempty"`
+		TaskInput           *string   `json:"task_input"`
+		PlanSourceUserQuery *string   `json:"plan_source_user_query,omitempty"`
+		DependsOn           []string  `json:"depends_on,omitempty"`
+		SemanticIdentifier  string    `json:"semantic_identifier,omitempty"`
+		TaskId              string    `json:"task_id,omitempty"`
+		Index               string    `json:"index"`
+		Name                string    `json:"name"`
+		Goal                string    `json:"goal"`
+		Subtasks            []*AiTask `json:"subtasks,omitempty"`
 	}{}
 
 	if err := json.Unmarshal(data, &aux); err != nil {
@@ -381,12 +400,28 @@ func (t *AiTask) UnmarshalJSON(data []byte) error {
 	t.Name = aux.Name
 	t.Goal = aux.Goal
 	t.Subtasks = aux.Subtasks
+	t.DependsOn = append([]string(nil), aux.DependsOn...)
+	t.SemanticIdentifier = aux.SemanticIdentifier
+	t.planSourceUserQuery = aux.PlanSourceUserQuery
+	for _, child := range t.Subtasks {
+		if child != nil {
+			child.ParentTask = t
+		}
+	}
 	if t.TaskId == "" {
 		// Backward compatibility for older persisted trees without task_id.
 		// Will be re-stabilized by Coordinator.ensureTaskTreeInitialized().
 		t.TaskId = fmt.Sprintf("pe-task-%s", t.Index)
 	}
-	t.AIStatefulTaskBase = aicommon.NewStatefulTaskBase(t.TaskId, aux.Goal, t.Ctx, nil)
+	input := aux.Goal // compatibility with old trees without task_input
+	if aux.TaskInput != nil {
+		input = *aux.TaskInput
+	}
+	ctx := context.Background()
+	if t.Coordinator != nil && t.Coordinator.Config != nil && t.Ctx != nil {
+		ctx = t.Ctx
+	}
+	t.AIStatefulTaskBase = aicommon.NewStatefulTaskBase(t.TaskId, input, ctx, nil)
 	return nil
 }
 
