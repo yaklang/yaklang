@@ -79,7 +79,7 @@ type instructionStore struct {
 	// persisted to the DB. This prevents duplicate INSERTs when the async
 	// persist pipeline (MarkDirty+Barrier) or compile-unit split causes
 	// the same instruction to be flushed multiple times.
-	persistedIDsMu sync.Mutex
+	persistedIDsMu sync.RWMutex
 	persistedIDs   map[int64]struct{}
 
 	// reservedIDs tracks IDs that have been enqueued for persistence
@@ -378,36 +378,27 @@ func (s *instructionStore) flushCompileUnitWriter(onComplete func()) {
 	// On Hadoop with 5M instructions, GetAll allocates a 5M-entry map;
 	// ForEach iterates without copying the underlying map.
 	ids := make([]int64, 0, 1024)
+	persistedResident := make([]int64, 0)
 	s.writer.ForEach(func(id int64, inst Instruction) bool {
-		if shouldKeepCompileUnitBoundaryResident(inst) {
+		if shouldKeepCompileUnitBoundaryResident(inst) && !canSpillFinishedPrivateBlock(inst) {
 			return true // continue
 		}
-		// Skip IDs that have already been persisted (prevents duplicate INSERTs
-		// when async persist pipeline or compile-unit split re-visits the same instruction)
+		// A later unit may reload a persisted instruction. It no longer needs
+		// another write, but keeping it resident until Close defeats the unit
+		// memory boundary. Delete it only after its current save has settled.
 		if s.isPersisted(id) {
+			persistedResident = append(persistedResident, id)
 			return true // continue
 		}
 		ids = append(ids, id)
 		return true
 	})
-	// Mark dirty for async persistence with persistedIDs guard.
-	// MarkDirty enqueues dirty keys (non-blocking, with dedup), Barrier
-	// waits for writer completion. The persistedIDs guard prevents
-	// duplicate INSERTs when Close() encounters items that were already
-	// persisted by a previous MarkDirty+Barrier (e.g. re-added during
-	// cross-unit resolution).
-	// Use FlushKeys (synchronous, no persistLimit backpressure) instead of
-	// MarkDirty+Barrier. MarkDirty's persistLimit backpressure (32768 for
-	// large projects) causes PersistRejected for items above the limit —
-	// those items stay in cache with pending=false, unsaved to DB. When
-	// later compile units access them, resolveLinkedValue falls through to
-	// lazy creation, which under pair-first member relations triggers O(N)
-	// GetMembersByKeyString traversal. This was the root cause of chat.go
-	// taking 26 minutes to compile (vs 38ms on main).
-	//
-	// FlushKeys calls QueueKeys (no persistLimit) + Wait (synchronous).
-	// This matches main's behavior exactly. persistedIDs guard in
-	// saveInstructionPersistRecords prevents duplicate INSERTs.
+	for _, id := range persistedResident {
+		s.writer.DeleteIfSettled(id)
+	}
+	// Reserve every selected ID before enqueueing it. Unlike MarkDirty's
+	// persistLimit path, MarkDirtyAsync must not reject the overflow and
+	// silently leave ordinary instructions resident until final Close.
 	for _, id := range ids {
 		s.reserveID(id)
 	}
@@ -615,9 +606,9 @@ func (s *instructionStore) isPersisted(id int64) bool {
 	if s == nil || id <= 0 {
 		return false
 	}
-	s.persistedIDsMu.Lock()
+	s.persistedIDsMu.RLock()
 	_, ok := s.persistedIDs[id]
-	s.persistedIDsMu.Unlock()
+	s.persistedIDsMu.RUnlock()
 	return ok
 }
 
@@ -1167,24 +1158,31 @@ func (s *instructionStore) PersistenceStats() InstructionPersistStats {
 	switch {
 	case s.writer != nil:
 		cacheStats := s.writer.Stats()
-		stats.Resident = int64(s.writer.Count())
 		stats.Pending = cacheStats.Saver.Pending
+		s.writer.ForEach(func(id int64, _ Instruction) bool {
+			stats.Resident++
+			if !s.isPersisted(id) {
+				stats.RemainingDirty++
+			}
+			return true
+		})
 	case s.residentCache != nil:
-		stats.Resident = int64(s.residentCache.Count())
+		s.resident.ForEach(func(id int64, _ Instruction) bool {
+			stats.Resident++
+			if !s.isPersisted(id) {
+				stats.RemainingDirty++
+			}
+			return true
+		})
 	case s.reader != nil:
 		stats.Resident = int64(s.reader.Count())
 	case s.resident != nil:
 		stats.Resident = int64(s.resident.Count())
+		stats.RemainingDirty = stats.Resident
 	}
-	// RemainingDirty is the count of resident items that have NOT been
-	// persisted yet. It is derived as max(0, Resident - UniquePersisted).
-	// This separates the unsaved dirty count from the live resident object
-	// count: after SaveToDatabase, resident > 0 (for query reuse) but
-	// remaining_dirty == 0 (all were persisted).
-	stats.RemainingDirty = stats.Resident - stats.UniquePersisted
-	if stats.RemainingDirty < 0 {
-		stats.RemainingDirty = 0
-	}
+	// Persisted IDs and resident IDs are not disjoint: a later unit can
+	// reload an already-saved value. Subtracting their aggregate counts
+	// double-counted clean entries and could hide genuinely dirty new ones.
 	return stats
 }
 

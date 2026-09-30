@@ -216,3 +216,38 @@ hanging/OOM-killing.
 `refactor/ssa/compile_step_shrink_ast`. The TODO(scan-log) comments it carries
 trace where split-compile flush + lazy reload surface nil/missing data; the
 OffsetMap mutex guards the scan-time race that the deeper dataflow exposed.
+
+## Compile-unit persistence boundaries (2026-09-30)
+
+The writer-mode unit flush now releases settled, already-persisted instruction
+copies reloaded by later units, rather than skipping them until final close.
+It also spills finished function blocks under the existing conservative
+function-retention policy; unfinished/protected block scopes and callable
+boundary instructions remain resident. That policy's uppercase/extern check
+is not language-specific export metadata.
+
+`resident` and `remaining_dirty` are separate sets: resident includes clean
+reloaded IDs. Final-save accounting counts resident IDs not yet persisted;
+subtracting the total persisted count from residency can hide new unsaved IR.
+This is first-persistence accounting, not complete version tracking of later
+in-place IR mutations. Evicting a cache entry alone also does not prove heap
+reclamation: live function builders, scopes and type/index maps may still
+reference it.
+
+Batch cleanup schedules immutable source payloads on a single coalescing
+background saver. Only successful writes release source-store editor
+references; URL/hash and visited markers remain, and reads use the bounded
+DB source cache. A final source close joins all outstanding requests and
+retains the source payload on failure for retry. Memory-mode editors without
+file/hash metadata and URL aliases preserve their existing lookup semantics.
+
+Index/type maps still retain mutable cross-unit identities. Their batch
+flushes and the instruction-saver barrier are currently synchronous; this
+change does not claim that all batch I/O has moved off the compile path.
+Removing those barriers or releasing mutable type/index entries requires
+stable snapshots and cross-unit update/reload regression tests first.
+
+Current run evidence belongs under `/mnt/data/scan-outputs/`, not the historical
+`build/pprof/` paths above. Distinguish `ssa-compile` runtime from complete
+`code-scan` runtime, and do not attribute GC/CPU improvements to a resident
+count reduction without comparing heap profiles and controlled measurements.
