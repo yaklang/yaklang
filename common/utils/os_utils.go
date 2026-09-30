@@ -558,13 +558,19 @@ func TLSConfigSetCheckServerName(tlsConfig *tls.Config, host string) *tls.Config
 }
 
 func DebugMockHTTPServerWithContextWithAddress(ctx context.Context, addr string, https, h2, gmtlsFlag, onlyGmtls, keepAlive bool, checkServerName bool, handle func([]byte) []byte) (string, int) {
+	return debugMockHTTPServerWithTLSConfig(ctx, addr, https, h2, gmtlsFlag, onlyGmtls, keepAlive, checkServerName, handle, nil)
+}
+
+func debugMockHTTPServerWithTLSConfig(ctx context.Context, addr string, https, h2, gmtlsFlag, onlyGmtls, keepAlive bool, checkServerName bool, handle func([]byte) []byte, tlsConfig *tls.Config) (string, int) {
 	host, port, _ := ParseStringToHostPort(addr)
 	var (
 		lis net.Listener
 		err error
 	)
 	if https && !h2 && !gmtlsFlag && !onlyGmtls {
-		tlsConfig := GetDefaultTLSConfig(5)
+		if tlsConfig == nil {
+			tlsConfig = GetDefaultTLSConfig(5)
+		}
 		if tlsConfig == nil {
 			panic(1)
 		}
