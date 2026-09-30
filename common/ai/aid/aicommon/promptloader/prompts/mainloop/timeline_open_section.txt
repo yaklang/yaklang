@@ -14,11 +14,6 @@ TODO LIST 是当前任务的只读状态快照；执行和写入规则见 High S
 {{ .TodoSnapshot }}
 {{ end }}
 
-{{ if .UserHistory }}
-以下 PREV_USER_INPUT 块是当前会话内用户在此前各轮的原始输入文本，按时间先后给出，用于跨回合维持上下文连贯：理解用户的真实意图、追溯尚未完成的请求、避免反复询问用户早已明确说过的信息。
-注意：这里列出的是"历史输入"，当前回合的实际指令以 USER_QUERY 块为准，本块仅作背景参考。
-{{ .UserHistory }}
-{{ end }}
 {{ if .CurrentTime }}# Current Time
 {{ .CurrentTime }}{{ end }}
 

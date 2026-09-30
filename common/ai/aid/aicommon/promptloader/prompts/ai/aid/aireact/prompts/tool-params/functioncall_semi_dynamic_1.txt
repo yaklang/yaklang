@@ -5,4 +5,6 @@
 {{ .OriginalUserInput }}
 {{ end }}
 
+{{ if .PromptedUserInputHistory }}{{ .PromptedUserInputHistory }}{{ end }}
+
 {{ if .SessionEvidenceSemiDynamic }}{{ .SessionEvidenceSemiDynamic }}{{ end }}

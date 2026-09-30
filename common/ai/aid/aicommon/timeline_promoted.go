@@ -56,6 +56,9 @@ func (p *PromotableTimelineItem) OpenPromptText() string {
 	if p.Operation == TimelinePromotedOperationReuse {
 		return fmt.Sprintf("[state %s/%s reused]", p.Kind, p.Key)
 	}
+	if p.Kind == TimelinePromotedKindUserInput {
+		return "[user_input]:\n" + p.Payload + "\n[user_input_end]"
+	}
 	return fmt.Sprintf("[state %s/%s]\n%s", p.Kind, p.Key, p.Payload)
 }
 
@@ -172,8 +175,8 @@ func (m *Timeline) rebuildPromotedStateLocked(throughID int64) {
 		if !ok || item == nil || item.deleted {
 			continue
 		}
-		control, ok := item.value.(*PromotableTimelineItem)
-		if !ok || control == nil {
+		control := timelinePromotionForItem(item)
+		if control == nil {
 			continue
 		}
 		if id > throughID {

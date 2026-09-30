@@ -203,14 +203,17 @@ type UserInteraction struct {
 	UserExtraPrompt string               `json:"extra_prompt"`
 	Stage           UserInteractionStage `json:"stage"` // Stage
 	ShrinkResult    string               `json:"shrink_result,omitempty"`
+	Round           int                  `json:"round,omitempty"`
+	InputTimestamp  time.Time            `json:"input_timestamp,omitempty"`
 }
 
 func (u *UserInteraction) String() string {
-	if u.Stage == "" {
-		u.Stage = UserInteractionStage_FreeInput
+	stage := u.Stage
+	if stage == "" {
+		stage = UserInteractionStage_FreeInput
 	}
 	var buf bytes.Buffer
-	buf.WriteString(fmt.Sprintf(" <- [id:%v] when %v\n", u.ID, u.Stage))
+	buf.WriteString(fmt.Sprintf(" <- [id:%v] when %v\n", u.ID, stage))
 	buf.WriteString("   system-question: " + u.SystemPrompt + "\n")
 	buf.WriteString("       user-answer: " + u.UserExtraPrompt + "\n")
 	return buf.String()

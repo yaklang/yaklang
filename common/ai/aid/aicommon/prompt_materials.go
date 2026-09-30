@@ -53,16 +53,18 @@ type PromptMaterials struct {
 	ForgeInventory bool
 	AIForgeList    string
 
-	TimelineFrozen             string
-	TimelineOpen               string
-	PromotedTimelineOpen       string
-	TimelineFrozenTimeUnix     int64
-	FrozenPartitions           []FrozenBlockPartition
-	SessionArtifactsFrozen     string
-	SessionArtifactsOpen       string
-	SessionEvidenceFrozen      string
-	SessionEvidenceOpen        string
+	TimelineFrozen         string
+	TimelineOpen           string
+	PromotedTimelineOpen   string
+	TimelineFrozenTimeUnix int64
+	FrozenPartitions       []FrozenBlockPartition
+	SessionArtifactsFrozen string
+	SessionArtifactsOpen   string
+	SessionEvidenceFrozen  string
+	SessionEvidenceOpen    string
+	// SessionEvidenceSemiDynamic is Timeline-owned sealed Evidence, not a second store.
 	SessionEvidenceSemiDynamic string
+	PromptedUserInputHistory   string
 	CurrentTime                string
 	Workspace                  bool
 	OSArch                     string
@@ -105,6 +107,7 @@ func (m *PromptMaterials) SemiDynamicData() map[string]any {
 		"SkillsContext":              m.SkillsContext,
 		"PromotedSemiDynamic1":       m.PromotedSemiDynamic1,
 		"SessionEvidenceSemiDynamic": m.SessionEvidenceSemiDynamic,
+		"PromptedUserInputHistory":   m.PromptedUserInputHistory,
 		"PlanHelp":                   m.PlanHelp,
 		"OriginalUserInput":          m.OriginalUserInput,
 		"StableInstruction":          m.StableInstruction,
@@ -168,7 +171,6 @@ func (m *PromptMaterials) TimelineOpenData() map[string]any {
 		"TimelineOpen":           m.TimelineOpen,
 		"TimelineFrozenTimeUnix": m.TimelineFrozenTimeUnix,
 		"TodoSnapshot":           m.TodoSnapshot,
-		"UserHistory":            m.UserHistory,
 		"CurrentTime":            m.CurrentTime,
 		"PlanContext":            m.FrozenUserContext,
 		"ReportedRisks":          m.ReportedRisks,
@@ -176,11 +178,12 @@ func (m *PromptMaterials) TimelineOpenData() map[string]any {
 }
 
 type TimelineFrozenOpenBlocks struct {
-	Frozen               string
-	Open                 string
-	PromotedSemiDynamic1 string
-	FrozenTimeUnix       int64
-	EvidenceSemiDynamic  string
+	Frozen                   string
+	Open                     string
+	PromotedSemiDynamic1     string
+	FrozenTimeUnix           int64
+	EvidenceSemiDynamic      string
+	PromptedUserInputHistory string
 }
 
 func RenderTimelineFrozenOpen(timeline *Timeline) TimelineFrozenOpenBlocks {
@@ -200,6 +203,8 @@ func RenderTimelineFrozenOpenWithLatestModelReplay(timeline *Timeline) TimelineF
 type TimelinePromptOptions struct {
 	IncludeLatestModelReplay bool
 	ExcludeToolCache         bool
+	// UserInputOnly supplies exact user context to lightweight loops.
+	UserInputOnly bool
 }
 
 func RenderTimelineFrozenOpenWithOptions(timeline *Timeline, options TimelinePromptOptions) TimelineFrozenOpenBlocks {
@@ -209,12 +214,15 @@ func RenderTimelineFrozenOpenWithOptions(timeline *Timeline, options TimelinePro
 	// Freeze is committed on writes/import, never as a rendering side effect.
 	timeline.mu.RLock()
 	defer timeline.mu.RUnlock()
-	rb := timeline.frozenPromptBlocksLocked(options.ExcludeToolCache)
+	rb := timeline.frozenPromptBlocksLocked(options.ExcludeToolCache, options.UserInputOnly)
 	var promotedSemi1 string
-	if !options.ExcludeToolCache {
+	if !options.ExcludeToolCache && !options.UserInputOnly {
 		promotedSemi1 = renderPromotedRecentTools(timeline.promotedState)
 	}
-	evidenceSemi := timeline.projectEvidenceLocked()
+	evidenceSemi := ""
+	if !options.UserInputOnly {
+		evidenceSemi = timeline.projectEvidenceLocked()
+	}
 	promptBlocks := projectTimelineRenderableBlocksForPrompt(rb)
 	if options.IncludeLatestModelReplay {
 		promptBlocks = projectTimelineRenderableBlocksForPromptWithLatestModelReplay(rb)
@@ -232,11 +240,12 @@ func RenderTimelineFrozenOpenWithOptions(timeline *Timeline, options TimelinePro
 		promptBlocks = visible
 	}
 	return TimelineFrozenOpenBlocks{
-		Frozen:               promptBlocks.RenderFrozenOnly(TimelineDumpDefaultAITagName),
-		Open:                 promptBlocks.RenderOpenOnly(TimelineDumpDefaultAITagName),
-		PromotedSemiDynamic1: promotedSemi1,
-		FrozenTimeUnix:       timelineFrozenTimeUnixFromRenderable(rb),
-		EvidenceSemiDynamic:  evidenceSemi,
+		Frozen:                   promptBlocks.RenderFrozenOnly(TimelineDumpDefaultAITagName),
+		Open:                     promptBlocks.RenderOpenOnly(TimelineDumpDefaultAITagName),
+		PromotedSemiDynamic1:     promotedSemi1,
+		FrozenTimeUnix:           timelineFrozenTimeUnixFromRenderable(rb),
+		EvidenceSemiDynamic:      evidenceSemi,
+		PromptedUserInputHistory: timeline.projectUserInputHistoryLocked(),
 	}
 }
 
@@ -251,7 +260,9 @@ type PromptFrozenOpenMaterials struct {
 	SessionArtifactsFrozen string
 	SessionArtifactsOpen   string
 
+	// SessionEvidenceSemiDynamic is Timeline-owned sealed Evidence, not a second store.
 	SessionEvidenceSemiDynamic string
+	PromptedUserInputHistory   string
 
 	// ReportedRisks is the rendered "已报告漏洞清单" block for the
 	// timeline-open section. Populated from SessionPromptState.
@@ -284,6 +295,7 @@ func BuildPromptFrozenOpenMaterialsWithOptions(config *Config, options TimelineP
 		TimelineFrozenTimeUnix:     timelineBlocks.FrozenTimeUnix,
 		FrozenPartitions:           FrozenBlockPartitionsFromConfig(config),
 		SessionEvidenceSemiDynamic: timelineBlocks.EvidenceSemiDynamic,
+		PromptedUserInputHistory:   timelineBlocks.PromptedUserInputHistory,
 		ReportedRisks:              reportedRisks,
 	}
 }
@@ -298,6 +310,7 @@ func ApplyPromptFrozenOpenMaterials(materials *PromptMaterials, frozenOpen Promp
 	materials.TimelineFrozenTimeUnix = frozenOpen.TimelineFrozenTimeUnix
 	materials.FrozenPartitions = append([]FrozenBlockPartition(nil), NormalizeFrozenBlockPartitions(frozenOpen.FrozenPartitions)...)
 	materials.SessionEvidenceSemiDynamic = frozenOpen.SessionEvidenceSemiDynamic
+	materials.PromptedUserInputHistory = frozenOpen.PromptedUserInputHistory
 	materials.ReportedRisks = frozenOpen.ReportedRisks
 }
 
