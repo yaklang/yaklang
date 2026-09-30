@@ -341,5 +341,14 @@ func EvaluateVerifyFilesystem(i string, t require.TestingT, isStrict bool) error
 		return err
 	}
 
-	return EvaluateVerifyFilesystemWithRule(frame.GetRule(), t, isStrict)
+	return EvaluateVerifyFilesystemWithFrame(frame, t, isStrict)
+}
+
+// EvaluateVerifyFilesystemWithFrame verifies the already compiled source with
+// the same strict POS/NEG checks as the rule-content entrypoint.
+func EvaluateVerifyFilesystemWithFrame(frame *sfvm.SFFrame, t require.TestingT, isStrict bool) error {
+	if isStrict {
+		return sfanalysis.EvaluateVerifyFilesystemWithFrame(frame, sfanalysis.WithStrictEmbeddedVerify())
+	}
+	return sfanalysis.EvaluateVerifyFilesystemWithFrame(frame)
 }
