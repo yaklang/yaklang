@@ -60,7 +60,7 @@ func (pm *PromptManager) GenerateFunctionCallToolParamsPromptForTask(
 	materials.OutputExample = ""
 	materials.Schema = ""
 	materials.ExecutionPolicy = ""
-	materials.OriginalUserInput = pm.wrapUserInputForPrompt(query)
+	materials.OriginalUserInput = query
 
 	inputSchema, err := json.MarshalIndent(tool.InputSchema, "", "  ")
 	if err != nil {

@@ -1,25 +1,8 @@
-{{/*
-维护备注：原生工具参数生成的 Semi1：与主循环共享 Timeline 封存用户历史和 Evidence，但当前阶段只生成已选工具的一次参数。
-模板仅消费投影。
-*/}}{{/*
-维护备注：WorkspaceContext：会话固定路径配置，与主循环共用；
-不证明路径或文件存在。
-*/}}{{ if .WorkspaceContext }}{{ .WorkspaceContext }}
+{{ if .WorkspaceContext }}{{ .WorkspaceContext }}
 
-{{ end }}{{/*
-维护备注：OriginalUserInput：当前任务完整输入的有边界背景，由 PromptManager 包装；
-用于理解整体目标，不把本次工具参数生成扩展为执行全部任务。
-*/}}{{ if .OriginalUserInput }}# 完整任务输入（背景）
+{{ end }}{{ if .OriginalUserInput }}# 完整任务输入（背景）
 这是主循环负责的整体任务。当前只承担其中一次已选工具的参数生成，不在本阶段完成全部任务。
 {{ .OriginalUserInput }}
 {{ end }}
 
-{{/*
-维护备注：PromptedUserInputHistory：与主循环同源的 Timeline 已封存用户原文投影；
-未封存后续输入仍在共享 Open。
-*/}}{{ if .PromptedUserInputHistory }}{{ .PromptedUserInputHistory }}{{ end }}
-
-{{/*
-维护备注：SessionEvidenceSemiDynamic：与主循环同源的 Timeline 已封存 Evidence 投影，没有独立的参数生成 Evidence store；
-Open delta 覆盖对应旧 id。
-*/}}{{ if .SessionEvidenceSemiDynamic }}{{ .SessionEvidenceSemiDynamic }}{{ end }}
+{{ if .SessionEvidenceSemiDynamic }}{{ .SessionEvidenceSemiDynamic }}{{ end }}

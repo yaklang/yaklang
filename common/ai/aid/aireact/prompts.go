@@ -892,7 +892,7 @@ func (pm *PromptManager) buildIntervalReviewPromptForTask(
 
 	dynamicData := map[string]any{
 		"Nonce":     nonceString,
-		"UserQuery": pm.wrapUserInputForPrompt(userQuery),
+		"UserQuery": userQuery,
 	}
 	dynamicData["ToolName"] = aicommon.ShrinkStringByTokens(tool.Name, intervalReviewToolNameTokens)
 	dynamicData["ToolDescription"] = aicommon.ShrinkTextBlockByTokens(tool.Description, intervalReviewToolDescriptionTokens)
