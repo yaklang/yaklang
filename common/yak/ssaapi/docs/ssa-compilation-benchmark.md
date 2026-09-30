@@ -251,3 +251,22 @@ Current run evidence belongs under `/mnt/data/scan-outputs/`, not the historical
 `build/pprof/` paths above. Distinguish `ssa-compile` runtime from complete
 `code-scan` runtime, and do not attribute GC/CPU improvements to a resident
 count reduction without comparing heap profiles and controlled measurements.
+
+## SQLite final IR updates (2026-09-30)
+
+The resident-cache final flush still writes a fresh snapshot: instructions can
+change in place after an incremental flush, so a persisted ID alone is not a
+safe reason to skip that write. With the production `(program_name, code_id)`
+unique index, `SaveIrCodeBatch` now uses SQLite `ON CONFLICT DO UPDATE` in bounded
+batches, retaining the row identity and updating zero-valued fields and
+soft-delete state. This removes the delete-and-reinsert operation and protects
+the previous snapshot if an insert fails. Schemas lacking that index and other
+database dialects use the existing replacement path.
+
+The interrupted GoBlog run under
+`/mnt/data/scan-outputs/dirty-ir-20260930-small/goblog` had 497,503 unique IR IDs
+already persisted before final close. Its 11:56 and 12:01 goroutine snapshots
+both showed the final flush in `bulkUpsertIrCode`'s SQLite delete. That run exited
+137 and is incomplete performance evidence. The failure-preservation and
+row-identity regressions fail with the old implementation and pass with native
+UPSERT. End-to-end time and memory still require completed project runs.

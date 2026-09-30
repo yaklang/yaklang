@@ -99,10 +99,13 @@ func (c *Blueprint) resolveMagicMethod(name BlueprintMagicMethodKind, fb *Functi
 			if utils.IsNil(bluePrint.Constructor) {
 				return false
 			} else {
-				//check blueprint is virtual
-				_func := bluePrint._container.GetFunc()
-				if _func.name == string(VirtualFunctionName) {
-					return false
+				// External and detached blueprints can have a constructor
+				// without a container function. Only an actual virtual owner
+				// makes that constructor ineligible for lookup.
+				if container := bluePrint._container; !utils.IsNil(container) {
+					if owner := container.GetFunc(); owner != nil && owner.name == string(VirtualFunctionName) {
+						return false
+					}
 				}
 				_method = bluePrint.Constructor
 				return true
