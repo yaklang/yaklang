@@ -1,6 +1,7 @@
 package pcaputil
 
 import (
+	"strings"
 	"testing"
 	"time"
 
@@ -76,5 +77,38 @@ func TestProtocolSessionHTTPAdmissionSurvivesFragmentationAndRejectsBadVersion(t
 	}
 	for _, event := range allEvents {
 		require.NotEqual(t, "http", event.Protocol, "%s: %s", event.Status, event.Summary)
+	}
+}
+
+func TestHTTPProbeFeedBoundedStartLineAgreement(t *testing.T) {
+	for _, size := range []int{63, 64, 65, 94, 1024, httpStartLineMaxBytes - 2} {
+		line := "GET /" + strings.Repeat("a", size-len("GET / HTTP/1.1")) + " HTTP/1.1\r\n"
+		s, err := NewProtocolSession(DefaultParserBudget())
+		require.NoError(t, err)
+		wire := []byte(line + "Host: lab.invalid\r\n\r\n")
+		require.Equal(t, ProbeAccept, s.Probe(wire).Verdict, "size %d", size)
+		for _, cut := range []int{1, 63, 64, len(line) - 1} {
+			peer, err := NewProtocolSession(DefaultParserBudget())
+			require.NoError(t, err)
+			require.Equal(t, ProbeNeedMore, peer.Probe(wire[:cut]).Verdict)
+			require.Empty(t, peer.Feed(0, time.Unix(1, 0), wire[:cut]).Events)
+			r := peer.Feed(0, time.Unix(1, 0), wire[cut:])
+			require.Nil(t, r.Err)
+			require.Equal(t, "http", r.State)
+			require.Len(t, r.Events, 1)
+			peer.Close("test")
+		}
+		require.Equal(t, "http", s.Feed(0, time.Unix(1, 0), wire).State)
+		s.Close("test")
+	}
+	for _, budget := range []int{128, httpStartLineMaxBytes} {
+		b := DefaultParserBudget()
+		b.MaxFrameBytes = budget
+		s, err := NewProtocolSession(b)
+		require.NoError(t, err)
+		wire := []byte("GET /" + strings.Repeat("x", budget) + " HTTP/1.1\r\n\r\n")
+		require.Equal(t, ProbeReject, s.Probe(wire).Verdict)
+		require.NotEqual(t, "http", s.Feed(0, time.Unix(1, 0), wire).State)
+		s.Close("test")
 	}
 }

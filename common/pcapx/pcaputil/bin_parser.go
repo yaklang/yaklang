@@ -355,6 +355,7 @@ type binDirection struct {
 type binFlow struct {
 	domain            CaptureDomain
 	tls               *binTLS
+	dtls              *binDTLS
 	byteSource        string
 	parentID          uint64
 	captureTCP        bool
@@ -775,13 +776,22 @@ func (f *binFlow) feed(dir int, data []byte, ts time.Time) {
 			if f.byteSource != "decrypted" {
 				e.Protocol = "dns"
 				e.Profile = "dns-tcp"
+				if f.protocol == "dot" {
+					e.Summary = fmt.Sprintf("DNS TCP %v id %v %v", e.Session["Packet Name"], e.Session["Transaction ID"], e.Session["QNAME"])
+				}
 			} else {
 				e.Profile = "dns-over-tls"
 			}
 			// Preserve earlier framing/semantic errors. DNS association must not
 			// publish a successful request for an already failed message.
 			if e.Error == "" {
-				if err := a.dnsEvent(e, e.Raw[2:]); err != nil {
+				var err error
+				if dns, ok := e.Session["DNS"].(map[string]any); ok {
+					err = a.dnsEventDecoded(e, dns)
+				} else {
+					err = a.dnsEvent(e, e.Raw[2:])
+				}
+				if err != nil {
 					e.Status, e.sessionError = classifySessionError(err)
 					e.Error = err.Error()
 					e.Structured = nil

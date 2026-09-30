@@ -209,12 +209,12 @@ func (f *binFlow) detect(w []byte) {
 			}
 		}
 	}
+	if isHTTPStartLineCandidate(w) && f.probeHTTPStartLine(w).Verdict == ProbeAccept {
+		f.protocol = "http"
+		return
+	}
 	for _, prefix := range httpDetectionPrefixes {
 		if bytes.HasPrefix(w, []byte(prefix)) {
-			if _, _, _, ok := parseHTTPRequestStartLine(w); ok {
-				f.protocol = "http"
-				return
-			}
 			if prefix == "OPTIONS " && isOtherOPTIONSStartLine(w) {
 				// OPTIONS is also a SIP and RTSP method. Let those strict
 				// protocol probes inspect their complete start line.
@@ -272,6 +272,23 @@ var httpDetectionPrefixes = []string{
 }
 
 const httpStartLineMaxBytes = 8 << 10
+
+// HTTP start lines have their own bounded look-ahead. The generic binary
+// signature window must not turn a complete long URL into a malformed line.
+func (f *binFlow) probeHTTPStartLine(w []byte) ProbeResult {
+	limit := min(httpStartLineMaxBytes, f.a.budget.MaxFrameBytes)
+	end := bytes.Index(w[:min(len(w), limit)], []byte("\r\n"))
+	if end < 0 {
+		if len(w) >= limit {
+			return ProbeResult{Verdict: ProbeReject, Reason: "HTTP start line exceeds configured byte limit"}
+		}
+		return ProbeResult{Verdict: ProbeNeedMore, NeedBytes: 1, Reason: "HTTP start line is incomplete"}
+	}
+	if _, _, _, ok := parseHTTPRequestStartLine(w[:end+2]); ok {
+		return probeAccept("http", "", 90)
+	}
+	return ProbeResult{Verdict: ProbeReject, Reason: "invalid HTTP start line"}
+}
 
 // isHTTPStartLineCandidate holds weak protocol probes while a recognized HTTP
 // method or response prefix is incomplete or malformed. Otherwise a short

@@ -872,6 +872,134 @@
         "full",
         "race"
       ]
+    },
+    {
+      "package": "github.com/yaklang/yaklang/common/bin-parser",
+      "test": "TestDTLSRuleKeepsEncryptedAndPartialFragmentsOpaque",
+      "requirement": "recognition-dtls-review",
+      "tiers": [
+        "full",
+        "race",
+        "quick"
+      ]
+    },
+    {
+      "package": "github.com/yaklang/yaklang/common/pcapx/pcaputil",
+      "test": "FuzzDTLSStateSequence",
+      "requirement": "dtls-state-machine",
+      "tiers": [
+        "sustained"
+      ]
+    },
+    {
+      "package": "github.com/yaklang/yaklang/common/pcapx/pcaputil",
+      "test": "TestCurrentRecognitionEvidenceContract",
+      "requirement": "recognition-dtls-review",
+      "tiers": [
+        "full",
+        "race",
+        "quick"
+      ]
+    },
+    {
+      "package": "github.com/yaklang/yaklang/common/pcapx/pcaputil",
+      "test": "TestDNSNativeEDNSVariations",
+      "requirement": "recognition-dtls-review",
+      "tiers": [
+        "full",
+        "race",
+        "quick"
+      ]
+    },
+    {
+      "package": "github.com/yaklang/yaklang/common/pcapx/pcaputil",
+      "test": "TestDNSSharedEDNSSemantics",
+      "requirement": "recognition-dtls-review",
+      "tiers": [
+        "full",
+        "race",
+        "quick"
+      ]
+    },
+    {
+      "package": "github.com/yaklang/yaklang/common/pcapx/pcaputil",
+      "test": "TestDTLSAdmissionRequiresWireAndPreservesOpaque",
+      "requirement": "recognition-dtls-review",
+      "tiers": [
+        "full",
+        "race",
+        "quick"
+      ]
+    },
+    {
+      "package": "github.com/yaklang/yaklang/common/pcapx/pcaputil",
+      "test": "TestDTLSFragmentsReplayAndIsolation",
+      "requirement": "recognition-dtls-review",
+      "tiers": [
+        "full",
+        "race",
+        "quick"
+      ]
+    },
+    {
+      "package": "github.com/yaklang/yaklang/common/pcapx/pcaputil",
+      "test": "TestDTLSMalformedBoundsAndExpiry",
+      "requirement": "recognition-dtls-review",
+      "tiers": [
+        "full",
+        "race",
+        "quick"
+      ]
+    },
+    {
+      "package": "github.com/yaklang/yaklang/common/pcapx/pcaputil",
+      "test": "TestDTLSNativeCaptureOracle",
+      "requirement": "recognition-dtls-review",
+      "tiers": [
+        "full",
+        "race",
+        "quick"
+      ]
+    },
+    {
+      "package": "github.com/yaklang/yaklang/common/pcapx/pcaputil",
+      "test": "TestDTLSReplayCacheBudgetAndRelease",
+      "requirement": "dtls-state-budget",
+      "tiers": [
+        "full",
+        "race",
+        "quick"
+      ]
+    },
+    {
+      "package": "github.com/yaklang/yaklang/common/pcapx/pcaputil",
+      "test": "TestHTTPProbeFeedBoundedStartLineAgreement",
+      "requirement": "recognition-dtls-review",
+      "tiers": [
+        "full",
+        "race",
+        "quick"
+      ]
+    },
+    {
+      "package": "github.com/yaklang/yaklang/common/pcapx/pcaputil",
+      "test": "TestOPCUANativeRenewalAndMultiChunk",
+      "requirement": "opcua-native-lifecycle",
+      "tiers": [
+        "full",
+        "race",
+        "quick"
+      ]
+    },
+    {
+      "package": "github.com/yaklang/yaklang/common/pcapx/pcaputil",
+      "test": "TestRecognitionDTLSTransportAndPortIsolation",
+      "requirement": "recognition-dtls-review",
+      "tiers": [
+        "full",
+        "race",
+        "quick"
+      ]
     }
   ]
 }

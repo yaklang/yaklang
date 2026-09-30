@@ -188,7 +188,9 @@ func TestP1UDPApplications(t *testing.T) {
 	eth = parseEthernet(t, ipv4UDPBytes(t, 623, 623, ipmi))
 	require.Equal(t, uint64(6), uintVal(t, mustChild(t, eth, "IP", "UDP", "IPMI").Child("Class")))
 
-	dtls := []byte{0x16, 0xfe, 0xfd, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00}
+	// A nonzero epoch carries opaque protected bytes; a one-byte epoch-zero
+	// handshake is malformed (covered by TestDTLSRuleKeepsEncryptedAndPartialFragmentsOpaque).
+	dtls := []byte{0x16, 0xfe, 0xfd, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00}
 	dt := parseRule(t, dtls, "dtls", "DTLS")
 	require.Equal(t, uint64(0x16), uintVal(t, dt.Child("Content Type")))
 	eth = parseEthernet(t, ipv4UDPBytes(t, 443, 443, dtls))

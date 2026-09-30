@@ -1,0 +1,324 @@
+[
+  {
+    "transport": "udp",
+    "query": {
+      "id": 100,
+      "flags": 256,
+      "rcode": 0,
+      "edns": 0,
+      "edns_flags": 32768,
+      "question": [
+        {
+          "name": "native.test.",
+          "type": 2,
+          "class": 1
+        }
+      ],
+      "answer": [],
+      "authority": [],
+      "additional": []
+    },
+    "response": {
+      "id": 100,
+      "flags": 34048,
+      "rcode": 0,
+      "edns": 0,
+      "edns_flags": 32768,
+      "question": [
+        {
+          "name": "native.test.",
+          "type": 2,
+          "class": 1
+        }
+      ],
+      "answer": [
+        {
+          "name": "native.test.",
+          "type": 2,
+          "class": 1,
+          "ttl": 300,
+          "data": [
+            "ns.native.test."
+          ]
+        }
+      ],
+      "authority": [],
+      "additional": [
+        {
+          "name": "ns.native.test.",
+          "type": 1,
+          "class": 1,
+          "ttl": 300,
+          "data": [
+            "192.0.2.53"
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "transport": "udp",
+    "query": {
+      "id": 101,
+      "flags": 256,
+      "rcode": 0,
+      "edns": 0,
+      "edns_flags": 32768,
+      "question": [
+        {
+          "name": "native.test.",
+          "type": 15,
+          "class": 1
+        }
+      ],
+      "answer": [],
+      "authority": [],
+      "additional": []
+    },
+    "response": {
+      "id": 101,
+      "flags": 34048,
+      "rcode": 0,
+      "edns": 0,
+      "edns_flags": 32768,
+      "question": [
+        {
+          "name": "native.test.",
+          "type": 15,
+          "class": 1
+        }
+      ],
+      "answer": [
+        {
+          "name": "native.test.",
+          "type": 15,
+          "class": 1,
+          "ttl": 300,
+          "data": [
+            "10 mail.native.test."
+          ]
+        }
+      ],
+      "authority": [
+        {
+          "name": "native.test.",
+          "type": 2,
+          "class": 1,
+          "ttl": 300,
+          "data": [
+            "ns.native.test."
+          ]
+        }
+      ],
+      "additional": [
+        {
+          "name": "mail.native.test.",
+          "type": 1,
+          "class": 1,
+          "ttl": 300,
+          "data": [
+            "192.0.2.25"
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "transport": "udp",
+    "query": {
+      "id": 102,
+      "flags": 256,
+      "rcode": 0,
+      "edns": 1,
+      "edns_flags": 98304,
+      "question": [
+        {
+          "name": "native.test.",
+          "type": 1,
+          "class": 1
+        }
+      ],
+      "answer": [],
+      "authority": [],
+      "additional": []
+    },
+    "response": {
+      "id": 102,
+      "flags": 33024,
+      "rcode": 16,
+      "edns": 0,
+      "edns_flags": 16777216,
+      "question": [
+        {
+          "name": "native.test.",
+          "type": 1,
+          "class": 1
+        }
+      ],
+      "answer": [],
+      "authority": [],
+      "additional": []
+    }
+  },
+  {
+    "transport": "tcp",
+    "query": {
+      "id": 103,
+      "flags": 256,
+      "rcode": 0,
+      "edns": 0,
+      "edns_flags": 32768,
+      "question": [
+        {
+          "name": "native.test.",
+          "type": 2,
+          "class": 1
+        }
+      ],
+      "answer": [],
+      "authority": [],
+      "additional": []
+    },
+    "response": {
+      "id": 103,
+      "flags": 34048,
+      "rcode": 0,
+      "edns": 0,
+      "edns_flags": 32768,
+      "question": [
+        {
+          "name": "native.test.",
+          "type": 2,
+          "class": 1
+        }
+      ],
+      "answer": [
+        {
+          "name": "native.test.",
+          "type": 2,
+          "class": 1,
+          "ttl": 300,
+          "data": [
+            "ns.native.test."
+          ]
+        }
+      ],
+      "authority": [],
+      "additional": [
+        {
+          "name": "ns.native.test.",
+          "type": 1,
+          "class": 1,
+          "ttl": 300,
+          "data": [
+            "192.0.2.53"
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "transport": "tcp",
+    "query": {
+      "id": 104,
+      "flags": 256,
+      "rcode": 0,
+      "edns": 0,
+      "edns_flags": 32768,
+      "question": [
+        {
+          "name": "native.test.",
+          "type": 15,
+          "class": 1
+        }
+      ],
+      "answer": [],
+      "authority": [],
+      "additional": []
+    },
+    "response": {
+      "id": 104,
+      "flags": 34048,
+      "rcode": 0,
+      "edns": 0,
+      "edns_flags": 32768,
+      "question": [
+        {
+          "name": "native.test.",
+          "type": 15,
+          "class": 1
+        }
+      ],
+      "answer": [
+        {
+          "name": "native.test.",
+          "type": 15,
+          "class": 1,
+          "ttl": 300,
+          "data": [
+            "10 mail.native.test."
+          ]
+        }
+      ],
+      "authority": [
+        {
+          "name": "native.test.",
+          "type": 2,
+          "class": 1,
+          "ttl": 300,
+          "data": [
+            "ns.native.test."
+          ]
+        }
+      ],
+      "additional": [
+        {
+          "name": "mail.native.test.",
+          "type": 1,
+          "class": 1,
+          "ttl": 300,
+          "data": [
+            "192.0.2.25"
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "transport": "tcp",
+    "query": {
+      "id": 105,
+      "flags": 256,
+      "rcode": 0,
+      "edns": 1,
+      "edns_flags": 98304,
+      "question": [
+        {
+          "name": "native.test.",
+          "type": 1,
+          "class": 1
+        }
+      ],
+      "answer": [],
+      "authority": [],
+      "additional": []
+    },
+    "response": {
+      "id": 105,
+      "flags": 33024,
+      "rcode": 16,
+      "edns": 0,
+      "edns_flags": 16777216,
+      "question": [
+        {
+          "name": "native.test.",
+          "type": 1,
+          "class": 1
+        }
+      ],
+      "answer": [],
+      "authority": [],
+      "additional": []
+    }
+  }
+]

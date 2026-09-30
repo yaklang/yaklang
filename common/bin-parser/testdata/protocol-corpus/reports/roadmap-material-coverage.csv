@@ -128,7 +128,7 @@ LLMNR,name-config,P1,done,2,collected
 NBNS,name-config,P0,done,2,collected
 DoT,name-config,P1,done,1,collected
 DoH,name-config,P1,done,1,collected
-DoQ,name-config,P2,todo,1,collected
+DoQ,name-config,P2,partial,1,collected
 DHCP,name-config,P0,done,3,collected
 DHCPv6,name-config,P1,done,2,collected
 BOOTP,name-config,P1,done,1,collected
@@ -247,8 +247,8 @@ Kafka,mq-rpc,P1,done,1,collected
 RocketMQ,mq-rpc,P3,todo,0,missing
 RabbitMQ,mq-rpc,P1,done,0,missing
 ActiveMQ OpenWire,mq-rpc,P2,todo,1,collected
-STOMP,mq-rpc,P2,todo,1,collected
-NATS,mq-rpc,P2,todo,1,collected
+STOMP,mq-rpc,P2,partial,1,collected
+NATS,mq-rpc,P2,partial,1,collected
 NSQ,mq-rpc,P4,todo,0,missing
 Pulsar,mq-rpc,P3,todo,0,missing
 IBM MQ,mq-rpc,P2,todo,0,missing

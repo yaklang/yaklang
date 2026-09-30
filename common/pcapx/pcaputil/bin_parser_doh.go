@@ -448,17 +448,8 @@ func (d *binDoH) attachDNS(info map[string]any, msg []byte, response bool, max i
 	info["Transaction ID"] = id
 	info["QR"] = flags>>15 != 0
 	info["Opcode"] = (flags >> 11) & 0xf
-	// RFC 6891: OPT TTL's high octet supplies the upper eight RCODE bits.
-	// Use the already-decoded Additional records; a header RCODE of zero
-	// alone does not mean success (for example, BADVERS is RCODE 16).
-	rcode := flags & 0xf
-	for _, rr := range semantic["Additional"].([]map[string]any) {
-		if rr["Type"] == uint16(41) {
-			rcode |= uint16(rr["TTL"].(uint32)>>24) << 4
-			break
-		}
-	}
-	info["RCODE"], semantic["RCODE"] = rcode, rcode
+	rcode := semantic["RCODE"].(uint16)
+	info["RCODE"] = rcode
 	info["QNAME"] = qname
 	info["QTYPE"] = qtype
 	info["QTYPE Name"] = dnsTypeName(qtype)

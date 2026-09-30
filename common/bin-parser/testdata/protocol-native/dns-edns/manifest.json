@@ -1,0 +1,39 @@
+{
+  "evidence_kind": "independent-native-capture",
+  "files": [
+    {
+      "file": "Corefile",
+      "sha256": "2ac9d08044673284f2f1d73ecff442e23333a01bbac0178abf6ab01985453b07"
+    },
+    {
+      "file": "capture.log",
+      "sha256": "854db4b4ab19d4a88118cf2e7d4339e5b6b0b2b7fd6434f53f1002f2c33d95eb"
+    },
+    {
+      "file": "client-oracle.json",
+      "sha256": "b24bf72e26e535805c41428a2fbb9e66d080d885d87c62485e9342d03026c0ef"
+    },
+    {
+      "file": "db.native.test",
+      "sha256": "316f428fa54c6dffb58abb6e19ccea2d2bdf2832c17dbfd83390f8f9412873fc"
+    },
+    {
+      "file": "native.pcapng",
+      "sha256": "4a19eb5246891ef2f25e8fcafc92e3e912e05676cdf44da3e1a2131c793de886"
+    },
+    {
+      "file": "server.log",
+      "sha256": "fb63eff0dc735e0ea1dc3b9b4070fc099306b63841f204d32d8faa7267ce8409"
+    },
+    {
+      "file": "tshark.tsv",
+      "sha256": "af0785af2e65379d81d77fd952e4b36f72f7e1f59d6e5ced602187174979004b"
+    },
+    {
+      "file": "versions.json",
+      "sha256": "700e459de4a4f1373599beacc4c29b2c05e8b9db284e2add514027db3fe9712a"
+    }
+  ],
+  "fixture_license": "CC0-1.0",
+  "generator_sha256": "b48ea4ca2b10f33bbb0e84df15944df33d6d4f1e29d360172aae48f1c13fa2ca"
+}

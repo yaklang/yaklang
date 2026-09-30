@@ -61,6 +61,8 @@ func nativeDNSRecords(t testing.TB, records []map[string]any) []nativeDNSAnswer 
 			a.Data = []string{rr["Address"].(string)}
 		case 2, 5, 12:
 			a.Data = []string{nativeDNSName(rr["Target"].(string))}
+		case 15:
+			a.Data = []string{fmt.Sprintf("%d %s", rr["Priority"], nativeDNSName(rr["Target"].(string)))}
 		case 16:
 			var txt []string
 			for _, s := range rr["Text"].([]string) {
@@ -115,7 +117,7 @@ func nativeDNSCanonicalize(t testing.TB, dns map[string]any) nativeDNSCanonical 
 		c.UDPPayload = rr["UDP Size"].(uint16)
 		ttl := rr["TTL"].(uint32)
 		c.EDNSFlags = uint16(ttl)
-		c.RCode |= uint16(ttl>>24) << 4
+		require.Equal(t, dns["Flags"].(uint16)&15|uint16(ttl>>24)<<4, c.RCode, "shared codec must expose the complete RCODE without oracle repair")
 		for _, option := range rr["Options"].([]map[string]any) {
 			c.EDNSOptions = append(c.EDNSOptions, nativeDNSEDNSOption{Code: option["Code"].(uint16), Value: option["Value"].([]byte)})
 		}

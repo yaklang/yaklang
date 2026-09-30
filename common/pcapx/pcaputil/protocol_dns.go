@@ -23,6 +23,7 @@ func DecodeDNSMessage(w []byte, limit int) (map[string]any, error) {
 	flags := binary.BigEndian.Uint16(w[2:])
 	out := map[string]any{"ID": binary.BigEndian.Uint16(w), "Flags": flags, "Response": flags&0x8000 != 0, "Opcode": (flags >> 11) & 15, "RCODE": flags & 15, "Truncated": flags&0x200 != 0}
 	pos, total := 12, 0
+	optSeen := false
 	name := func(end int) (string, error) {
 		n, next, err := dnsParseName(w, pos)
 		if err != nil {
@@ -42,6 +43,7 @@ func DecodeDNSMessage(w []byte, limit int) (map[string]any, error) {
 		}
 		rows := make([]map[string]any, 0, min(count, 16))
 		for j := 0; j < count; j++ {
+			nameAt := pos
 			nm, next, nameWire, err := dnsParseNameWire(w, pos)
 			pos = next
 			if err != nil {
@@ -128,6 +130,11 @@ func DecodeDNSMessage(w []byte, limit int) (map[string]any, error) {
 				}
 				row["Text"] = txt
 			case 41:
+				if section != 3 || optSeen || nm != "" || w[nameAt] != 0 || next != nameAt+1 {
+					return nil, protocolError(ErrMalformedMessage, "DNS OPT must be unique, in Additional, with an uncompressed root name")
+				}
+				optSeen = true
+				out["RCODE"] = flags&15 | uint16(ttl>>24)<<4
 				var options []map[string]any
 				for pos < end {
 					if end-pos < 4 {
@@ -145,6 +152,7 @@ func DecodeDNSMessage(w []byte, limit int) (map[string]any, error) {
 					pos += l
 				}
 				row["Options"], row["UDP Size"], row["EDNS Version"] = options, class, uint8(ttl>>16)
+				row["EDNS Flags"], row["DNSSEC OK"] = uint16(ttl), ttl&0x8000 != 0
 			case 64, 65:
 				if n < 3 {
 					return nil, fmt.Errorf("DNS SVCB length")

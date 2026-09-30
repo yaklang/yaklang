@@ -1,0 +1,10 @@
+{
+  "openssl": "OpenSSL 3.6.2 7 Apr 2026 (Library: OpenSSL 3.6.2 7 Apr 2026)",
+  "tshark": "TShark (Wireshark) 4.4.8 (v4.4.8-0-g0d289c003bfb).",
+  "capture": "dumpcap lo0; no packet mutation",
+  "sources": [
+    "https://github.com/openssl/openssl",
+    "https://www.rfc-editor.org/rfc/rfc6347.html"
+  ],
+  "scope": "DTLS 1.0/1.2 UDP / full and fragmented certificate handshake; application ciphertext is opaque"
+}

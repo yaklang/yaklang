@@ -8,6 +8,11 @@ type ProtocolProfile struct{ Protocol, Transport, Framing, Context string }
 
 func NativeProtocolProfiles() []ProtocolProfile {
 	return []ProtocolProfile{
+		{"nats", "tcp", "plaintext client control/payload frames including HPUB/HMSG", "observed INFO/CONNECT capabilities, client direction and subscription; no TLS plaintext inference"},
+		{"stomp", "tcp", "STOMP 1.0/1.1/1.2 commands and binary bodies", "observed CONNECT/CONNECTED version, escapes, content-length and transaction state"},
+		{"opcua", "tcp", "UA TCP HEL/ACK/RHE and bounded secure-channel chunks", "observed endpoints/channel/policy; protected OPN/MSG/CLO payload remains opaque"},
+		{"goose", "l2", "IEC 61850 Ethernet GOOSE BER", "EtherType/application ID and bounded BER fields; subscriber identity remains unverified"},
+		{"dtls", "udp", "bounded DTLS 1.0/1.2 records and handshake fragments", "endpoint pair/domain/epoch/direction/message_seq; authenticated identity and payload decryption are not inferred"},
 		{"quic", "udp", "v1 protected datagram/coalesced packets", "capture domain/CID; Initial and ClientRandom-selected keylog"},
 		{"http3", "quic", "reassembled stream frames", "authenticated h3 ALPN, peer SETTINGS and QPACK state"},
 		{"doq", "quic", "one length-prefixed DNS message per direction", "authenticated doq ALPN, client stream and FIN"},
@@ -25,7 +30,7 @@ func NativeProtocolProfiles() []ProtocolProfile {
 		{"gearman", "tcp", "12-byte binary header and exact payload length", "request/response magic, supported type and bounded method-specific fields"},
 		{"beanstalkd", "tcp", "CRLF commands with bounded put/reserved body", "strict put syntax on port 11300 and observed response order"},
 		{"bjnp", "udp", "16-byte printer datagram header and exact payload", "observed command family, direction, sequence and session; port hint or explicit DecodeAs"},
-		{"dns", "udp", "datagram", "question and endpoint transaction"}, {"mdns", "udp", "datagram", "multicast observation"}, {"llmnr", "udp", "datagram", "domain/requester/question; bounded multicast responders"}, {"dhcp", "udp", "datagram", "domain/client/xid observation"}, {"dhcpv6", "udp", "datagram", "domain/relay/client/xid observation"}, {"syslog", "udp/tcp", "RFC 5424 v1, bounded RFC 3164; UDP datagram or RFC 6587", "PRI signature/port hint or explicit DecodeAs; hostname is unverified message content"},
+		{"dns", "udp/tcp", "datagram or two-byte TCP length prefix", "question and endpoint transaction"}, {"mdns", "udp", "datagram", "multicast observation"}, {"llmnr", "udp", "datagram", "domain/requester/question; bounded multicast responders"}, {"dhcp", "udp", "datagram", "domain/client/xid observation"}, {"dhcpv6", "udp", "datagram", "domain/relay/client/xid observation"}, {"syslog", "udp/tcp", "RFC 5424 v1, bounded RFC 3164; UDP datagram or RFC 6587", "PRI signature/port hint or explicit DecodeAs; hostname is unverified message content"},
 		{"arp", "l2", "ethernet", "unverified neighbor"}, {"icmp", "network", "IP", "quoted packet observation"}, {"icmpv6", "network", "IPv6", "unverified neighbor"},
 		{"http", "tcp", "ordered bytes", "observed request method"}, {"websocket", "tcp", "ordered bytes", "validated HTTP upgrade"}, {"tls", "tcp", "records", "ClientRandom/direction/epoch; TLS 1.3 non-PSK HelloRetryRequest"}, {"http2", "tcp", "frames", "preface and HPACK state"}, {"grpc", "tcp", "HTTP2 DATA", "content-type and stream"},
 	}
@@ -40,7 +45,7 @@ func WithProtocolDecodeAs(transport string, port uint16, protocol string) Captur
 			return fmt.Errorf("DecodeAs requires UDP and a nonzero port")
 		}
 		switch protocol {
-		case "dns", "mdns", "llmnr", "dhcp", "dhcpv6", "syslog", "snmp", "mqtt-sn", "bittorrent-dht", "bjnp", "rtp", "sip", "stun", "turn":
+		case "dns", "mdns", "llmnr", "dhcp", "dhcpv6", "syslog", "snmp", "mqtt-sn", "bittorrent-dht", "bjnp", "rtp", "sip", "stun", "turn", "dtls":
 		default:
 			return fmt.Errorf("unsupported native DecodeAs profile")
 		}
@@ -83,6 +88,12 @@ func (a *binParser) decodeNativeDatagram(e *ProtocolEvent, w []byte, src, dst ui
 		explicit = a.datagramDecodeAs[src]
 	}
 	if explicit == "" && (src == bacnetIPv4UDPPort || dst == bacnetIPv4UDPPort) && a.decodeBACnetDatagram(e, w) {
+		return true
+	}
+	if explicit == "dtls" {
+		return a.decodeDTLSDatagram(e, w, true)
+	}
+	if explicit == "" && a.decodeDTLSDatagram(e, w, false) {
 		return true
 	}
 	if explicit == "rtp" {

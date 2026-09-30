@@ -92,12 +92,17 @@ func (d *binDoT) consume(raw []byte, max int) (map[string]any, error) {
 	an := binary.BigEndian.Uint16(msg[6:8])
 	qr := flags>>15 != 0
 	opcode := (flags >> 11) & 0xf
-	rcode := flags & 0xf
+	semantic, err := DecodeDNSMessage(msg, max)
+	if err != nil {
+		return nil, err
+	}
+	rcode := semantic["RCODE"].(uint16)
 	qname, qtype, err := dnsQuestion(msg)
 	if err != nil {
 		return nil, err
 	}
 	info := map[string]any{
+		"DNS":            semantic,
 		"Transaction ID": id,
 		"QR":             qr,
 		"Opcode":         opcode,

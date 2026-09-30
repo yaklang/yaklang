@@ -1,0 +1,83 @@
+{
+  "schema_version": 1,
+  "scope": "Current executable recognition claims for the reviewed protocol subset; not a whole-protocol completion declaration or replacement for the historical M0 snapshot",
+  "profiles": [
+    {
+      "protocol": "http",
+      "transport": "tcp",
+      "scope": "HTTP/1.1 strict bounded start line",
+      "fixture": "winlab5013/captures/11-carddav.pcapng",
+      "sha256": "b5b655c93904baddae5ea18df4c8fca33741c4f7efb546d4de08ae0486de3976",
+      "boundaries": [
+        "HTTP message syntax; CardDAV business behavior not inferred"
+      ],
+      "messages": 6
+    },
+    {
+      "protocol": "dns",
+      "transport": "udp/tcp",
+      "scope": "EDNS BADVERS and Additional NS/MX",
+      "fixture": "protocol-native/dns-edns/native.pcapng",
+      "sha256": "4a19eb5246891ef2f25e8fcafc92e3e912e05676cdf44da3e1a2131c793de886",
+      "boundaries": [
+        "DNSSEC is observed, not signature-verified"
+      ],
+      "messages": 12
+    },
+    {
+      "protocol": "dtls",
+      "transport": "udp",
+      "scope": "DTLS 1.0/1.2 legacy records and bounded handshake reassembly",
+      "fixture": "protocol-native/dtls/fragmented.pcapng",
+      "sha256": "7c43b6d02161dbde91ff8cf49bb4e11096820109db11915301d3f384133f6f79",
+      "boundaries": [
+        "DTLS 1.3/CID unsupported; ciphertext opaque; no peer authentication"
+      ],
+      "messages": 10
+    },
+    {
+      "protocol": "nats",
+      "transport": "tcp",
+      "scope": "Plaintext HPUB/HMSG and observed capabilities",
+      "fixture": "protocol-native/nats/native-headers.pcapng",
+      "sha256": "5c56848405fe058f9a7ed3ba63ad4a787d8e0f7864eae275a2e2242407a37199",
+      "boundaries": [
+        "NATS TLS/cluster protocol not inferred"
+      ],
+      "messages": 52
+    },
+    {
+      "protocol": "stomp",
+      "transport": "tcp",
+      "scope": "STOMP negotiated 1.2 commands and binary bodies",
+      "fixture": "protocol-native/stomp/rabbitmq-4.1.0-stomp-1.2.pcap",
+      "sha256": "08b6387255a51e4459c268ba7c8a098e052ce5a74d362a33298f4469ae9c089f",
+      "boundaries": [
+        "TLS opaque; version 1.0/1.1 have separate acceptance tests"
+      ],
+      "messages": 33
+    },
+    {
+      "protocol": "opcua",
+      "transport": "tcp",
+      "scope": "None policy secure channel service envelopes",
+      "fixture": "protocol-native/industrial/open62541-none.pcap",
+      "sha256": "e940e2a6d74b291643f52134adb3cffe66dac5dd4a81fbf4e2afe20cae61e658",
+      "boundaries": [
+        "Service bodies not semantically complete; protected policies opaque"
+      ],
+      "messages": 19
+    },
+    {
+      "protocol": "goose",
+      "transport": "l2",
+      "scope": "IEC 61850 native Ethernet BER fields",
+      "fixture": "protocol-native/industrial/libiec61850-0.pcap",
+      "sha256": "077ca572ca9b258068d0b9acd1b422037dc7dc25717ea3d289e0bde2dfcf6445",
+      "boundaries": [
+        "Publisher identity and message authentication unverified"
+      ],
+      "messages": 3
+    }
+  ]
+}

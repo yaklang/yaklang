@@ -1,7 +1,6 @@
 package pcaputil
 
 import (
-	"bytes"
 	"encoding/binary"
 	"errors"
 	"fmt"
@@ -175,6 +174,14 @@ func (s *captureSession) Probe(data []byte) ProbeResult {
 		limit = 64
 	}
 	input := data
+	if isHTTPStartLineCandidate(input) {
+		// CONNECT/INFO can be long NATS control lines. Preserve their bounded
+		// exact admission before testing the more general HTTP method syntax.
+		if result := s.f.probeBoundedText(input); result.Verdict != ProbeReject {
+			return result
+		}
+		return s.f.probeHTTPStartLine(input)
+	}
 	if len(data) > limit {
 		data = data[:limit]
 	}
@@ -192,15 +199,6 @@ func (s *captureSession) Probe(data []byte) ProbeResult {
 	}
 	if result := s.f.probeBoundedText(input); result.Verdict != ProbeReject {
 		return result
-	}
-	if isHTTPStartLineCandidate(input) {
-		if bytes.Index(input, []byte("\r\n")) < 0 {
-			if len(input) >= min(httpStartLineMaxBytes, s.f.a.budget.MaxFrameBytes) {
-				return ProbeResult{Verdict: ProbeReject, Reason: "HTTP start line exceeds configured byte limit"}
-			}
-			return ProbeResult{Verdict: ProbeNeedMore, NeedBytes: 1, Reason: "HTTP start line is incomplete"}
-		}
-		return ProbeResult{Verdict: ProbeReject, Reason: "invalid HTTP start line"}
 	}
 	if probe := probeOpenWire(input, s.f.a.budget.MaxFrameBytes); probe.Verdict != ProbeReject {
 		return probe

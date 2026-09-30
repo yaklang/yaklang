@@ -1,0 +1,29 @@
+[2026-09-30 14:29:33.668 (UTC+0800)] [33mwarn/server[0m	AccessControl: Unconfigured AccessControl. Users have all permissions.
+[2026-09-30 14:29:33.668 (UTC+0800)] [32minfo/server[0m	AccessControl: Anonymous login is enabled
+[2026-09-30 14:29:33.668 (UTC+0800)] [33mwarn/server[0m	x509 Certificate Authentication configured, but no encrypting SecurityPolicy. This can leak credentials on the network.
+[2026-09-30 14:29:33.669 (UTC+0800)] [32minfo/session[0m	TCP 0	| SC 0	| Session "Administrator"	| AddNode (i=15303): No TypeDefinition. Use the default TypeDefinition for the Variable/Object
+[2026-09-30 14:29:33.670 (UTC+0800)] [32minfo/session[0m	TCP 0	| SC 0	| Session "Administrator"	| AddNode (i=25451): No TypeDefinition. Use the default TypeDefinition for the Variable/Object
+[2026-09-30 14:29:33.673 (UTC+0800)] [33mwarn/application[0m	ServerUrls already set. Overriding.
+[2026-09-30 14:29:33.674 (UTC+0800)] [33mwarn/server[0m	AccessControl: Unconfigured AccessControl. Users have all permissions.
+[2026-09-30 14:29:33.674 (UTC+0800)] [32minfo/server[0m	AccessControl: Anonymous login is enabled
+[2026-09-30 14:29:33.674 (UTC+0800)] [33mwarn/server[0m	x509 Certificate Authentication configured, but no encrypting SecurityPolicy. This can leak credentials on the network.
+[2026-09-30 14:29:33.674 (UTC+0800)] [33mwarn/server[0m	x509 Certificate Authentication configured, but no encrypting SecurityPolicy. This can leak credentials on the network.
+[2026-09-30 14:29:33.675 (UTC+0800)] [32minfo/network[0m	TCP 3	| Creating listen socket for "127.0.0.1" on port 14846
+[2026-09-30 14:29:33.675 (UTC+0800)] [32minfo/server[0m	New DiscoveryUrl added: opc.tcp://127.0.0.1:14846
+[2026-09-30 14:29:33.912 (UTC+0800)] [32minfo/network[0m	TCP 7	| Connection opened from "127.0.0.1" via the server socket 3
+[2026-09-30 14:29:33.912 (UTC+0800)] [32minfo/channel[0m	TCP 7	| SC 1	| SecureChannel created
+[2026-09-30 14:29:33.912 (UTC+0800)] [32minfo/channel[0m	TCP 7	| SC 1	| OpenSecureChannel: Channel opened with SecurityMode None for SecurityPolicy http://opcfoundation.org/UA/SecurityPolicy#None and a revised lifetime of 2.0s
+[2026-09-30 14:29:33.912 (UTC+0800)] [33mwarn/client[0m	Removing a UserTokenPolicy that would allow the password to be transmitted without encryption (Can be enabled via config->allowNonePolicyPassword)
+[2026-09-30 14:29:33.912 (UTC+0800)] [33mwarn/client[0m	Removing a UserTokenPolicy that would allow the password to be transmitted without encryption (Can be enabled via config->allowNonePolicyPassword)
+[2026-09-30 14:29:33.913 (UTC+0800)] [33mwarn/client[0m	Removing a UserTokenPolicy that would allow the password to be transmitted without encryption (Can be enabled via config->allowNonePolicyPassword)
+[2026-09-30 14:29:33.913 (UTC+0800)] [33mwarn/client[0m	Removing a UserTokenPolicy that would allow the password to be transmitted without encryption (Can be enabled via config->allowNonePolicyPassword)
+[2026-09-30 14:29:33.913 (UTC+0800)] [32minfo/session[0m	TCP 7	| SC 1	| Session "ns=1;g=f9b3d933-73aa-f5a3-c46c-863849340340"	| Session created
+[2026-09-30 14:29:33.913 (UTC+0800)] [32minfo/session[0m	TCP 7	| SC 1	| Session "ns=1;g=f9b3d933-73aa-f5a3-c46c-863849340340"	| ActivateSession: Session activated with ClientUserId ""
+[2026-09-30 14:29:35.916 (UTC+0800)] [32minfo/channel[0m	TCP 7	| SC 1	| OpenSecureChannel: Channel renewed with a revised lifetime of 2.0s
+[2026-09-30 14:29:37.915 (UTC+0800)] [32minfo/channel[0m	TCP 7	| SC 1	| OpenSecureChannel: Channel renewed with a revised lifetime of 2.0s
+[2026-09-30 14:29:38.019 (UTC+0800)] [32minfo/session[0m	TCP 7	| SC 1	| Session "ns=1;g=f9b3d933-73aa-f5a3-c46c-863849340340"	| Closing the Session
+[2026-09-30 14:29:38.019 (UTC+0800)] [32minfo/channel[0m	TCP 7	| SC 1	| SecureChannel closed
+[2026-09-30 14:29:38.019 (UTC+0800)] [32minfo/network[0m	TCP 7	| Socket closed
+[2026-09-30 14:29:38.636 (UTC+0800)] [33mwarn/eventloop[0m	Error during select: Interrupted system call
+[2026-09-30 14:29:38.636 (UTC+0800)] [32minfo/network[0m	TCP 3	| Socket closed
+[2026-09-30 14:29:39.137 (UTC+0800)] [32minfo/session[0m	TCP 0	| SC 0	| Session "Administrator"	| Subscription 0 | Subscription deleted

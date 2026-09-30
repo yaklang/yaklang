@@ -660,6 +660,7 @@ func (f *binFlow) closeSession() {
 		f.tls.child.close(TrafficFlowCloseReason("TLS carrier closed"))
 	}
 	f.tls = nil
+	f.dtls = nil
 	f.stun, f.tftp, f.rtsp, f.ipp = nil, nil, nil, nil
 	f.diameter, f.iec104, f.s7, f.opcua = nil, nil, nil, nil
 	f.rfb = nil

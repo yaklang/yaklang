@@ -9,7 +9,7 @@ Package:
       }
       this.ProcessSubNode("Version")
       ver = getNodeResult("Version").Value
-      if ver != 0xfeff && ver != 0xfefd && ver != 0xfefc {
+      if ver != 0xfeff && ver != 0xfefd {
         panic("dtls: unexpected version")
       }
       this.ProcessSubNode("Epoch")
@@ -17,6 +17,10 @@ Package:
       this.ProcessSubNode("Length")
       l = getNodeResult("Length").Value
       setCtx("dtls_ct", ct)
+      setCtx("dtls_epoch", getNodeResult("Epoch").Value)
+      if l > 18432 || (getCtx("dtls_epoch") == 0 && l > 16384) {
+        panic("dtls: record payload exceeds version limit")
+      }
       if l > 0 && l < 1048576 {
         this.GetSubNode("Fragment").SetMaxLength(l)
         this.ProcessSubNode("Fragment")
@@ -29,14 +33,21 @@ Package:
     Fragment:
       operator: |
         ct = getCtx("dtls_ct")
-        if ct == 22 && this.GetMaxLength() >= 12 {
+        if ct == 22 && getCtx("dtls_epoch") == 0 {
+          if this.GetMaxLength() < 12 { panic("dtls: truncated handshake header") }
           this.ProcessSubNode("Handshake Type")
           this.ProcessSubNode("Handshake Length")
           this.ProcessSubNode("Message Seq")
           this.ProcessSubNode("Fragment Offset")
           this.ProcessSubNode("Fragment Length")
           ht = getNodeResult("Handshake Type").Value
-          if ht == 1 && this.GetMaxLength() > this.Length() {
+          total = getNodeResult("Handshake Length").Value
+          offset = getNodeResult("Fragment Offset").Value
+          fragment = getNodeResult("Fragment Length").Value
+          if offset > total || fragment > total - offset || fragment > this.GetMaxLength() - this.Length() || (total > 0 && fragment == 0) {
+            panic("dtls: invalid handshake fragment range")
+          }
+          if ht == 1 && offset == 0 && fragment >= 2 {
             this.ProcessSubNode("Client Version")
           }
           if this.GetMaxLength() > this.Length() {
