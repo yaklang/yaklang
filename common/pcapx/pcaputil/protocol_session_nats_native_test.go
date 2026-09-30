@@ -314,6 +314,8 @@ func FuzzNATSStateSequence(f *testing.F) {
 		remember(session.Close("FIN"))
 		require.Empty(t, session.Close("FIN"))
 		require.Zero(t, session.Stats().BufferedBytes)
+		require.Nil(t, s.f.a.err.Load(), "mutation must not reach panic recovery")
+		require.Zero(t, s.f.a.panics.Load())
 		for _, saved := range snapshots {
 			now, err := json.Marshal(saved.event.Session)
 			require.NoError(t, err)

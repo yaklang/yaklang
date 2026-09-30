@@ -128,6 +128,8 @@ func FuzzSTOMPStateSequence(f *testing.F) {
 		s.Close("FIN")
 		require.Empty(t, s.Close("FIN"))
 		require.Zero(t, s.f.a.buffered.Load())
+		require.Nil(t, s.f.a.err.Load(), "mutation must not reach panic recovery")
+		require.Zero(t, s.f.a.panics.Load())
 		for _, snapshot := range snapshots {
 			require.Equal(t, snapshot.raw, marshal(snapshot.event), "event snapshot changed after later feed/close")
 		}

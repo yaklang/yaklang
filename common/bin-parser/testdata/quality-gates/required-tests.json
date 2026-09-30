@@ -863,6 +863,15 @@
         "full",
         "race"
       ]
+    },
+    {
+      "package": "github.com/yaklang/yaklang/common/pcapx/pcaputil",
+      "test": "TestT06MissingResponseNegativeControl",
+      "tiers": [
+        "quick",
+        "full",
+        "race"
+      ]
     }
   ]
 }

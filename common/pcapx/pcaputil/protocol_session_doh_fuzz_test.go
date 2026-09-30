@@ -63,5 +63,7 @@ func FuzzDoHHTTP2StreamIsolation(f *testing.F) {
 		session.Close("FIN")
 		require.Zero(t, s.f.a.buffered.Load())
 		require.LessOrEqual(t, s.f.a.peak.Load(), int64(s.f.a.config.MaxBufferedBytes))
+		require.Nil(t, s.f.a.err.Load(), "mutation must not reach panic recovery")
+		require.Zero(t, s.f.a.panics.Load())
 	})
 }
