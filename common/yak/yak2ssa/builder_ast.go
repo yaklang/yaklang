@@ -1798,14 +1798,13 @@ func (b *astbuilder) buildOrdinaryArguments(stmt *yak.OrdinaryArgumentsContext) 
 		values = values[:len(values)-1]
 		if !utils.IsNil(ellipsisValue) {
 			memberPairs := ssa.GetLastWinsMemberPairs(ellipsisValue)
-			if len(memberPairs) == 0 {
-				values = append(values, ellipsisValue)
-			}
 			// GetLastWinsMemberPairs walks the pair list backwards (last wins),
 			// so iterate in reverse to restore element order. Skip read
 			// placeholders (Undefined members) and negative-index reads
 			// (a[-1] merged into the Make's pair list) that are not literal
-			// members of the container.
+			// members of the container. expanded stays 0 when the container
+			// has no literal elements (a runtime slice, or only placeholders);
+			// the fallback below then passes that container once.
 			expanded := 0
 			for i := len(memberPairs) - 1; i >= 0; i-- {
 				pair := memberPairs[i]
