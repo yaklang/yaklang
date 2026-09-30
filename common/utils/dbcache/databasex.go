@@ -288,6 +288,14 @@ func (c *Cache[T, D]) Delete(id int64) {
 	c.resident.DeleteWithoutSave(id)
 }
 
+// DeleteIfSettled evicts a resident value only when no write is in flight.
+func (c *Cache[T, D]) DeleteIfSettled(id int64) bool {
+	if c == nil || c.resident == nil {
+		return false
+	}
+	return c.resident.DeleteIfSettled(id)
+}
+
 func (c *Cache[T, D]) Count() int {
 	if c == nil || c.resident == nil {
 		return 0
