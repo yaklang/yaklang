@@ -2,6 +2,7 @@ package ssadb
 
 import (
 	"encoding/json"
+	"fmt"
 	"slices"
 	"time"
 
@@ -162,12 +163,11 @@ func UpsertIrCode(db *gorm.DB, ir *IrCode) error {
 // host-parameter ceiling.
 const irCodeBatchChunk = 500
 
-// SaveIrCodeBatch issues a chunked batched UPSERT for IR codes: per chunk it
-// DELETEs the (program_name, code_id) rows this batch is about to write, then
-// bulk-INSERTs them. Same pattern as SaveIrTypeBatch — replaces N
-// FirstOrCreate round-trips (SELECT+UPDATE) with one DELETE + one multi-row
-// INSERT. Soft-deleted rows are removed with Unscoped so the UNIQUE index
-// ux_ir_codes_program_code cannot block the insert.
+// SaveIrCodeBatch uses a native batched SQLite UPSERT when the production
+// (program_name, code_id) unique index is present. Updating rows in place avoids
+// deleting and rebuilding their indexes during the final resident-cache flush,
+// and a failed INSERT cannot first remove the previous snapshot. Legacy schemas
+// without that index and other dialects retain the delete-and-insert path.
 func SaveIrCodeBatch(db *gorm.DB, items []*IrCode) error {
 	if db == nil || len(items) == 0 {
 		return nil
@@ -176,6 +176,32 @@ func SaveIrCodeBatch(db *gorm.DB, items []*IrCode) error {
 	for _, it := range items {
 		if it != nil {
 			clean = append(clean, it)
+		}
+	}
+	if len(clean) == 0 {
+		return nil
+	}
+	switch db.Dialect().GetName() {
+	case "sqlite3", "sqlite3_extended":
+		var indexed int
+		// SSA caches pass a DB scoped to program_name. Schema inspection must
+		// clear that row predicate while retaining the current transaction.
+		if err := db.New().Raw(`SELECT COUNT(*) FROM sqlite_master WHERE type = 'index' AND tbl_name = ? AND name = ?`,
+			TableIrCodes, "ux_ir_codes_program_code").Row().Scan(&indexed); err != nil {
+			return fmt.Errorf("check IR unique index: %w", err)
+		}
+		if indexed > 0 {
+			for _, it := range clean {
+				it.ID = 0
+				it.CreatedAt = time.Time{}
+				it.UpdatedAt = time.Time{}
+				it.DeletedAt = nil
+			}
+			upsert := db.New().Model(&IrCode{}).OnConflictUpdateAll("program_name,code_id")
+			if err := upsert.CreateInBatches(clean, irCodeBatchChunk).Error; err != nil {
+				return fmt.Errorf("upsert IR snapshot: %w", err)
+			}
+			return nil
 		}
 	}
 	for start := 0; start < len(clean); start += irCodeBatchChunk {
