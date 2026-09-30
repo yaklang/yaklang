@@ -1,23 +1,30 @@
 # Branch: feature/ssa2llvm/support_ci_and_mustpass_test
 
-> 分支状态与待办清单（2026-08-25 更新）。换机器继续时先读本文件。
+> 分支状态（2026-09-30 22:59 +0800 实测更新）。换机器继续时先读本文件。
 
 ## 目标
 
-让 `common/yak/yaktest/mustpass/files/*.yak`（115 个脚本）全部通过 ssa2llvm AOT 编译 + 原生二进制运行（exit 0、无 panic），并保证 CI + mustpass 测试通过。
+让 `common/yak/yaktest/mustpass/files/*.yak` 全部通过 ssa2llvm AOT 编译 + 原生二进制运行（exit 0、输出不含 `panic`）。
+
+## 实测（2026-09-30）
+
+`TestMustPass_SSA2LLVM_AllScripts` 在 2026-09-30T22:59:28+08:00 结束，`TEST_EXIT:0`。父测试 `--- PASS: TestMustPass_SSA2LLVM_AllScripts (3298.69s)`。目录里 115 个 `.yak` 都有对应的 `--- PASS`，没有 `--- FAIL`。`swagger2_generator.yak` 26.23s。
+
+- HEAD：`69c8445b30749f14742e3aecb031f5a990c1722a`
+- 套件日志：`/mnt/data/ssa2llvm-deps/repro-vulinbox/runs/mustpass-all-go127-httpflow.log`
+- 驱动日志：`/mnt/data/ssa2llvm-deps/repro-vulinbox/runs/tier-go127/mustpass-httpflow.log`
+- 测试进程 `GOROOT=/usr/lib/go`，`go version go1.27.1-X:nodwarf5 linux/amd64`
+- 嵌入归档在同日 22:01 用 `/mnt/data/ssa2llvm-deps/go1.27.1-textsect` 重编（core、net、staticanalyze）。系统 `/usr/lib/go` 没有 textsect 补丁。
+
+这一轮之前，同一套脚本在 `swagger2_generator.yak` 停住：AOT 没有打开项目库，`poc.save` 没有 HTTP flow 回调，`openapi.ExtractOpenAPI3Scheme` 返回 `no path item`。`yakit.InitialDatabase` 只写在已经导入 `common/yakgrpc/yakit` 的生成 `yak_register_globals` 里。core 档不导入这个包。
 
 ## 环境要求（重要）
 
-- **Go 工具链**：必须用 **go 1.26.6**（系统 go 1.27.0 会破坏 elfsplit 的 moduledata 布局，报 `textsectmap len/cap mismatch`）。已下载到 `~/go1.26.6/`，构建时：
-
-  ```sh
-  export PATH=/home/wlz/go1.26.6/bin:$PATH GOTOOLCHAIN=local
-  ```
-
-- **GOWORK**：`GOWORK=/home/wlz/Developer/yaklang-workspace/feature-ssa2llvm-support_ci_and_mustpass_test/build/ssa2llvm-go.work`（replace go-llvm 到本地 checkout）
-- **gcc 16 ICE 绕过**：构建 CLI 时若 pcre2 触发 gcc internal compiler error，加 `CGO_CFLAGS="-O1"`（core tier 通常不需要）
-- **构建 CLI**：`bash common/yak/ssa2llvm/scripts/build_cli.sh -o build/ssa2llvm`（覆盖式，不要留版本号）
-- **YAKIT_HOME**：跑脚本时用独立目录（如 `/tmp/ssa2llvm-check/yakit`）避免 DB 锁
+- **Go 工具链**：测试和普通编译用系统 `/usr/bin/go`（go 1.27.1），`GOTOOLCHAIN=local`，不要设置 `GOROOT`。不要把 `/mnt/data/ssa2llvm-deps/go1.26.6` 放进 `PATH`。
+- **c-archive**：只有编 `libyak.a` 时用补过的 `GOROOT=/mnt/data/ssa2llvm-deps/go1.27.1-textsect`。编完测试前再把 `GOROOT` 取消。不要改 `/usr/lib/go`。
+- 2026-09-28 文档里“必须用 go 1.26.6”已经过时。1.26.6 的 textsect 偏移不能拿来编现在的归档。
+- **本分支的测试门**是 `TestMustPass_SSA2LLVM_AllScripts`，用 `/usr/bin/go test` 跑 `./common/yak/ssa2llvm/tests/`。不要用 `scripts/ssa-test.sh` 当这个分支的门。
+- **YAKIT_HOME**：跑脚本时用 `/mnt/data/ssa2llvm-deps/` 下的独立目录，避免写到用户自己的 yakit 库。
 
 ## 已完成（已 push 的 commit 见 git log）
 
@@ -53,9 +60,9 @@
 - 闭包 slice 写回（支配检查 + 变量名匹配 + 懒解析 + entry alloca 中转）
 - mustpass_simple/ 回归套件（5 个最小用例 + mustpass_simple_test.go）
 
-## 当前状态（2026-09-29 11:37 CST 更新）
+## 历史状态（2026-09-29 11:37 CST，已被上面的 115/115 取代）
 
-- **59/115 通过，56 失败**（本轮修复后实测；此前为 54/115）。
+- **59/115 通过，56 失败**（当时实测；此前为 54/115）。下面的失败清单是这次全量通过之前的记录。
   修复了 5 个原先编译失败的脚本（`poc_download`、`nuclei_network_runtime`、
   `udp`、`waitAllAsyncCallFinish`×2）以及负数 int/float 显示错误。
 - 失败分类：崩溃 crash(exit -1) 24 个、exit 255 20 个、超时 9 个、
@@ -65,10 +72,10 @@
 - 历史基线（2026-09-28）：54/115 通过，61 失败（含 5 个编译失败）。
 - 回归测试（mustpass_simple + closure + DualRun + ZeroDep）全绿
 
-### 2026-09-28 rebase + 实测基线（本机复现步骤）
+### 2026-09-28 rebase + 实测基线（历史记录，不要再按这里执行）
 
-本机为 Arch，`go` 1.27.1 会产生 `final textsectmap len/cap mismatch`，
-必须用 1.26.6 工具链。依赖与产物按 §6.1 放在 `/mnt/data` 下：
+当时的记录认为系统 go 1.27.1 会产生 `final textsectmap len/cap mismatch`，
+所以用了 1.26.6。2026-09-30 起改用系统 go 1.27.1，c-archive 用补过的 1.27 GOROOT。下面的命令只作当时的记录：
 
 ```sh
 export PATH=/mnt/data/ssa2llvm-deps/go1.26.6/go/bin:$PATH GOTOOLCHAIN=local
@@ -91,7 +98,7 @@ TMPDIR=/mnt/data/ssa2llvm-deps/tmp YAKIT_HOME=/mnt/data/ssa2llvm-deps/yakit-all 
   shared 组里的 protobuf，原先未被任何分组认领；已把它归入 shared 组，
   否则 `staticanalyze` 层会因 elfsplit 启动路径泄漏而构建失败。
 
-## 剩余工作（60 个失败脚本，按优先级）
+## 历史剩余工作（2026-09-29；2026-09-30 全量已通过，不再是待办）
 
 ### P0-P2（runtime 语义，可继续修）
 
@@ -109,22 +116,20 @@ TMPDIR=/mnt/data/ssa2llvm-deps/tmp YAKIT_HOME=/mnt/data/ssa2llvm-deps/yakit-all 
 
 - `mitm_*`（10 个）、`udp*`（3 个，含 lld 链接崩溃）、`waitAllAsyncCallFinish*`（lld 崩溃）、`rag*`、`omnisearch`、`sandbox`、`nuclei_network*`、`poc_download`（编译失败）等
 
-## 如何继续
+## 如何重跑
 
-1. 重跑全量 mustpass 拿准确基线：
+在 worktree 里，`GOROOT` 不设置，`GOTOOLCHAIN=local`，`GOWORK=off`，`SSA2LLVM_TIER_DIR` 不设置：
 
-   ```sh
-   GOWORK=.../build/ssa2llvm-go.work go test ./common/yak/ssa2llvm/tests/ -run TestMustPass_SSA2LLVM_AllScripts -v -timeout 3h
-   ```
+```sh
+/usr/bin/go test -v -count=1 -timeout 150m -failfast \
+  -run 'TestMustPass_SSA2LLVM_AllScripts$' ./common/yak/ssa2llvm/tests/
+```
 
-2. 修 P0-P2 的 exit 255 类（逐个脚本，用 `build/ssa2llvm run <script> -f main -a` 复现）
-3. 每个修复补 mustpass_simple/ 回归用例（用户要求）
-4. 最后攻 P3 SIGSEGV（调用帧/指针表示）
-5. 全部完成后跑 ssa-test.sh 相关全量 + push
+`runtime/libyak.a` 必须新于 `runtime/runtime_go` 里的源文件，否则测试会用系统 GOROOT 重编归档。归档要用补过的 1.27 GOROOT，按 core、net、staticanalyze 的顺序编，一次只跑一个链接。
 
 ## 注意事项
 
-- 不要用 `go test` 直接跑（AGENTS.md 要求 `scripts/ssa-test.sh`）
+- 这个分支的 mustpass 用上面的 `/usr/bin/go test`，不要把 `scripts/ssa-test.sh` 当作本分支的门
 - 不要清理 GOCACHE（构建很慢）
 - 构建 CLI 覆盖 `build/ssa2llvm`，不要留版本号
 - 提交前检查无 `Co-authored-by:` 行
