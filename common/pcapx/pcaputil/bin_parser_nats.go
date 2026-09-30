@@ -12,16 +12,19 @@ import (
 const natsControlLineMax = 8 << 10
 
 type natsFrameInfo struct {
-	length      int
-	operation   string
-	role        string
-	fields      map[string]any
-	payloadSize int
-	headerSize  int
+	length        int
+	operation     string
+	role          string
+	fields        map[string]any
+	payloadSize   int
+	headerSize    int
+	headersOption *bool
 }
 
 type binNATS struct {
-	clientDir int // -1 until an unambiguous client/server operation is observed
+	clientDir                         int // -1 until an unambiguous client/server operation is observed
+	serverHeadersKnown, serverHeaders bool
+	clientHeadersKnown, clientHeaders bool
 }
 
 // natsOperationAt returns the case-insensitive operation token at the start of
@@ -208,7 +211,7 @@ func natsParseSize(text []byte) (int, error) {
 
 // natsJSONArgument validates JSON without constructing its recursive value tree.
 // Each collection and nesting level is charged before reading its children.
-func natsJSONArgument(line []byte, op string, tokenEnd int, budget ParserBudget) (int, error) {
+func natsJSONArgument(line []byte, op string, tokenEnd int, budget ParserBudget, info *natsFrameInfo) (int, error) {
 	malformed := func() error { return protocolError(ErrMalformedMessage, "NATS %s JSON object is malformed", op) }
 	if tokenEnd == len(line) || line[tokenEnd] != ' ' && line[tokenEnd] != '\t' {
 		return 0, malformed()
@@ -253,6 +256,15 @@ func natsJSONArgument(line []byte, op string, tokenEnd int, budget ParserBudget)
 				}
 				if depth == 1 {
 					rootKeys[name] = struct{}{}
+					if name == "headers" {
+						option, err := decoder.Token()
+						enabled, ok := option.(bool)
+						if err != nil || !ok {
+							return malformed()
+						}
+						info.headersOption = &enabled
+						continue
+					}
 				}
 			}
 			if err := value(depth + 1); err != nil {
@@ -274,17 +286,135 @@ func natsJSONArgument(line []byte, op string, tokenEnd int, budget ParserBudget)
 	return len(rootKeys), nil
 }
 
-func natsValidateHeader(header []byte) error {
-	const prefix = "NATS/1.0"
-	if !bytes.HasPrefix(header, []byte(prefix)) || len(header) <= len(prefix) || header[len(prefix)] != '\r' && header[len(prefix)] != ' ' {
-		return protocolError(ErrMalformedMessage, "NATS header section has no NATS/1.0 version line")
+// natsDecodeHeader follows NATS ADR-4, not HTTP's case-insensitive header map.
+// Values are ASCII other than CR/LF (including NUL); each physical field or
+// continuation line consumes one collection element before it is retained.
+func natsDecodeHeader(header []byte, budget ParserBudget, fields map[string]any) error {
+	malformed := func(reason string) error { return protocolError(ErrMalformedMessage, "NATS header %s", reason) }
+	readLine := func() ([]byte, error) {
+		at := bytes.Index(header, []byte("\r\n"))
+		if at < 0 {
+			return nil, malformed("line must end in CRLF")
+		}
+		line := header[:at]
+		if bytes.ContainsAny(line, "\r\n") {
+			return nil, malformed("line contains a bare CR or LF")
+		}
+		header = header[at+2:]
+		return line, nil
 	}
-	if !bytes.HasSuffix(header, []byte("\r\n\r\n")) {
-		return protocolError(ErrMalformedMessage, "NATS header section has no terminating empty line")
+	line, err := readLine()
+	if err != nil {
+		return err
 	}
-	if bytes.IndexByte(header, 0) >= 0 {
-		return protocolError(ErrMalformedMessage, "NATS header section contains NUL")
+	version, statusLine, _ := strings.Cut(string(line), " ")
+	if !strings.HasPrefix(version, "NATS/") {
+		return malformed("section has no NATS version line")
 	}
+	major, minor, found := strings.Cut(strings.TrimPrefix(version, "NATS/"), ".")
+	digits := func(s string) bool {
+		if s == "" {
+			return false
+		}
+		for i := range s {
+			if s[i] < '0' || s[i] > '9' {
+				return false
+			}
+		}
+		return true
+	}
+	if !found || !digits(major) || !digits(minor) {
+		return malformed("version token is malformed")
+	}
+	if version != "NATS/1.0" {
+		return protocolError(ErrUnsupportedVersion, "NATS header version %s is unsupported", version)
+	}
+	headers := make(map[string]any)
+	status, description := "", ""
+	if len(line) > len(version) {
+		statusLine = strings.Trim(statusLine, " \t")
+		if len(statusLine) < 3 || !digits(statusLine[:3]) || len(statusLine) > 3 && statusLine[3] != ' ' && statusLine[3] != '\t' {
+			return malformed("status must contain a three-digit code and optional description")
+		}
+		status = statusLine[:3]
+		description = strings.Trim(statusLine[3:], " \t")
+		for i := range description {
+			if description[i] > 127 || description[i] < 32 && description[i] != '\t' {
+				return malformed("status description contains a non-text byte")
+			}
+		}
+	}
+	count, lines := 0, 0
+	previous := ""
+	var current strings.Builder
+	flush := func() {
+		if previous != "" {
+			values, _ := headers[previous].([]string)
+			headers[previous] = append(values, current.String())
+			current.Reset()
+		}
+	}
+	for {
+		line, err := readLine()
+		if err != nil {
+			return err
+		}
+		if len(line) == 0 {
+			if len(header) != 0 {
+				return malformed("length includes bytes after the terminating empty line")
+			}
+			break
+		}
+		lines++
+		if lines > budget.MaxCollectionElements {
+			return protocolError(ErrResourceExceeded, "NATS header lines exceed configured element limit")
+		}
+		for _, c := range line {
+			if c > 127 {
+				return malformed("field contains a non-ASCII byte")
+			}
+		}
+		if line[0] == ' ' || line[0] == '\t' {
+			// ADR-4 cites RFC 822 unfolding. Preserve case and repeated values,
+			// and unfold only the most recently observed value.
+			if previous == "" {
+				return malformed("continuation has no preceding field")
+			}
+			current.WriteByte(' ')
+			current.WriteString(strings.TrimLeft(string(line), " \t"))
+			continue
+		}
+		colon := bytes.IndexByte(line, ':')
+		if colon <= 0 {
+			return malformed("field has no name/colon delimiter")
+		}
+		for _, c := range line[:colon] {
+			if c < 33 || c > 126 {
+				return malformed("field name contains whitespace or a non-printable byte")
+			}
+		}
+		flush()
+		previous = string(line[:colon])
+		current.WriteString(strings.TrimLeft(string(line[colon+1:]), " \t"))
+		count++
+	}
+	flush()
+	// Match the official clients' representation of inline status without
+	// overwriting application fields with the same case-sensitive names.
+	if status != "" {
+		values, _ := headers["Status"].([]string)
+		headers["Status"] = append(values, status)
+		fields["Header Status"] = status
+	}
+	if description != "" {
+		values, _ := headers["Description"].([]string)
+		headers["Description"] = append(values, description)
+		fields["Header Description"] = description
+	}
+	fields["Headers"] = headers
+	fields["Header Version"] = version
+	fields["Headers Decoded"] = true
+	fields["Header Field Count"] = count
 	return nil
 }
 
@@ -362,7 +492,7 @@ func natsFrameInfoWithBudget(w []byte, budget ParserBudget) (natsFrameInfo, erro
 		return nil
 	}
 	if op == "CONNECT" || op == "INFO" {
-		fieldCount, err := natsJSONArgument(line, op, tokenEnd, budget)
+		fieldCount, err := natsJSONArgument(line, op, tokenEnd, budget, &info)
 		if err != nil {
 			return natsFrameInfo{}, err
 		}
@@ -439,11 +569,11 @@ func natsFrameInfoWithBudget(w []byte, budget ParserBudget) (natsFrameInfo, erro
 		if err := payload(uint64(total)); err != nil {
 			return natsFrameInfo{}, err
 		}
-		if len(w) >= info.length && hdr > 0 {
-			if err := natsValidateHeader(w[lineBytes : lineBytes+hdr]); err != nil {
+		if len(w) >= lineBytes+hdr && hdr > 0 {
+			if err := natsDecodeHeader(w[lineBytes:lineBytes+hdr], budget, info.fields); err != nil {
 				return natsFrameInfo{}, err
 			}
-		} else if len(w) >= info.length && hdr == 0 {
+		} else if hdr == 0 {
 			return natsFrameInfo{}, protocolError(ErrMalformedMessage, "NATS HPUB header section is empty")
 		}
 	case "SUB":
@@ -524,11 +654,11 @@ func natsFrameInfoWithBudget(w []byte, budget ParserBudget) (natsFrameInfo, erro
 			if err := payload(uint64(total)); err != nil {
 				return natsFrameInfo{}, err
 			}
-			if len(w) >= info.length && hdr > 0 {
-				if err := natsValidateHeader(w[lineBytes : lineBytes+hdr]); err != nil {
+			if len(w) >= lineBytes+hdr && hdr > 0 {
+				if err := natsDecodeHeader(w[lineBytes:lineBytes+hdr], budget, info.fields); err != nil {
 					return natsFrameInfo{}, err
 				}
-			} else if len(w) >= info.length && hdr == 0 {
+			} else if hdr == 0 {
 				return natsFrameInfo{}, protocolError(ErrMalformedMessage, "NATS HMSG header section is empty")
 			}
 		} else {
@@ -572,6 +702,32 @@ func (f *binNATS) consume(dir int, raw []byte, budget ParserBudget) (map[string]
 			}
 		}
 	}
+	switch info.operation {
+	case "INFO":
+		// Asynchronous INFO updates may omit headers; omission cannot revoke
+		// an explicitly observed server capability.
+		if info.headersOption != nil {
+			f.serverHeadersKnown, f.serverHeaders = true, *info.headersOption
+		}
+	case "CONNECT":
+		f.clientHeadersKnown, f.clientHeaders = true, info.headersOption != nil && *info.headersOption
+	}
+	negotiation := "unknown"
+	if f.serverHeadersKnown && !f.serverHeaders || f.clientHeadersKnown && !f.clientHeaders {
+		negotiation = "disabled"
+	} else if f.serverHeadersKnown && f.clientHeadersKnown {
+		negotiation = "enabled"
+	}
+	if (info.operation == "HPUB" || info.operation == "HMSG") && negotiation == "disabled" {
+		return nil, protocolError(ErrUnsupportedFeature, "NATS header message was observed without mutually enabled header support")
+	}
+	info.fields["Header Negotiation"] = negotiation
+	if f.serverHeadersKnown {
+		info.fields["Server Headers Supported"] = f.serverHeaders
+	}
+	if f.clientHeadersKnown {
+		info.fields["Client Headers Enabled"] = f.clientHeaders
+	}
 	role := "unknown"
 	if f.clientDir >= 0 {
 		if dir == f.clientDir {
@@ -586,8 +742,23 @@ func (f *binNATS) consume(dir int, raw []byte, budget ParserBudget) (map[string]
 	info.fields["Payload Decoded"] = false
 	if info.operation == "HPUB" || info.operation == "HMSG" {
 		info.fields["Header Payload Size"] = info.headerSize
+		info.fields["Body Length"] = info.payloadSize - info.headerSize
 	}
 	return info.fields, nil
+}
+
+// Header negotiation retains only a fixed-size capability snapshot, never a
+// subscription table or a previous message's header strings.
+func (f *binFlow) consumeNATS(e *ProtocolEvent, dir int) error {
+	if f.nats == nil {
+		if err := f.reserveSession(64); err != nil {
+			return err
+		}
+		f.nats = &binNATS{clientDir: -1}
+	}
+	var err error
+	e.Session, err = f.nats.consume(dir, e.Raw, f.a.budget)
+	return err
 }
 
 func (f *binFlow) frameNATS(w []byte) (int, *binSpec, error) {

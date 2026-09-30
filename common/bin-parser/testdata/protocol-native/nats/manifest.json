@@ -1,0 +1,113 @@
+{
+  "kind": "native",
+  "capture_method": "passive dumpcap on loopback, unmodified packets; official nats.go API against official nats-server release",
+  "capture_license": "Generated locally for this repository; no third-party packet capture copied",
+  "sources": [
+    {
+      "name": "server",
+      "version": "v2.10.26",
+      "source": "https://github.com/nats-io/nats-server/tree/v2.10.26",
+      "license": "Apache-2.0",
+      "license_source": "https://raw.githubusercontent.com/nats-io/nats-server/v2.10.26/LICENSE"
+    },
+    {
+      "name": "client",
+      "version": "v1.39.1",
+      "source": "https://github.com/nats-io/nats.go/tree/v1.39.1",
+      "license": "Apache-2.0",
+      "license_source": "https://raw.githubusercontent.com/nats-io/nats.go/v1.39.1/LICENSE"
+    }
+  ],
+  "header_spec": "https://github.com/nats-io/nats-architecture-and-design/blob/685743395fb8e2c912f1cbf2405db1ed5802c7ac/adr/ADR-4.md",
+  "server_release": {
+    "url": "https://github.com/nats-io/nats-server/releases/download/v2.10.26/nats-server-v2.10.26-darwin-arm64.tar.gz",
+    "archive_sha256": "b1e2fd61507703ee81b0b2c1c35894beeebf908ddc7a4a5b7928aca438f716e6",
+    "binary_sha256": "bfda0d4590e5e272dfa92c46105958bd086f582e696b3c6bde898c979cba646f",
+    "version_output": "nats-server: v2.10.26"
+  },
+  "environment": {
+    "os": "macOS-14.1.2-arm64-arm-64bit-Mach-O",
+    "machine": "arm64",
+    "interface": "lo0",
+    "go": "go version go1.22.12 darwin/arm64"
+  },
+  "tshark": {
+    "version": "TShark (Wireshark) 4.4.8 (v4.4.8-0-g0d289c003bfb).",
+    "protocol_dissectors_matching_nats": [],
+    "available_fields_used": [
+      "frame.number",
+      "tcp.stream",
+      "ip.src",
+      "tcp.srcport",
+      "ip.dst",
+      "tcp.dstport",
+      "tcp.seq",
+      "tcp.len",
+      "tcp.payload"
+    ],
+    "limitation": "TCP byte oracle only; no NATS dissector in the capture environment"
+  },
+  "tcp_oracle": [
+    {
+      "stream": 0,
+      "direction": "client",
+      "file": "connection-1-client.bin",
+      "bytes": 263,
+      "sha256": "d92ccf369e73b5f0d26c87addbe50e1f4c21b6a2857212f006822de469fcfed8"
+    },
+    {
+      "stream": 0,
+      "direction": "server",
+      "file": "connection-1-server.bin",
+      "bytes": 821,
+      "sha256": "32d919573374885c53a9005f6a4e40a6918a5e233e45a9468f93ad8303f7ad07"
+    },
+    {
+      "stream": 1,
+      "direction": "client",
+      "file": "connection-2-client.bin",
+      "bytes": 2028,
+      "sha256": "faec1704ed51099f2f1b9ccf998bb0d9aeaf32b8db33aae90cc8c84a6d6061ef"
+    },
+    {
+      "stream": 1,
+      "direction": "server",
+      "file": "connection-2-server.bin",
+      "bytes": 3291,
+      "sha256": "c17c369e424eb23228d390f32159539d7b9fda2329a93b991ec8a3c14df6b162"
+    }
+  ],
+  "native_variants": [
+    "multi-value and case-distinct keys",
+    "ASCII NUL/SOH/DEL values",
+    "empty header section",
+    "reply subject and zero body",
+    "server-generated 503",
+    "server-generated 404 with description",
+    "server-generated 100 heartbeat with fields"
+  ],
+  "synthetic": "Malformed, future-version, folding and budget fixtures are created explicitly in protocol_session_nats_headers_test.go; none are represented as native captures",
+  "generator_files": {
+    "client.go.txt": "c216d8de9ae0ab5d2fce27cb7c4c2dc6b780f9988bab888e6533db591fe080ec",
+    "client.mod": "eccf0fbea7e04a837f1ccecdb1803348d7e4dba10c2c0da2d4f85c217a2d63ce",
+    "client.sum": "ec5f884c848a19c7eaf45cf4484f6115dea613c6b1c0461d3115232bd97f8bf6",
+    "generate.py": "56249c391a2e32604c2a86a220f3a43474a308d2351ecfd167ea618fe5217dac",
+    "server-SHA256SUMS": "c8e2e3968f029e4f42312afbf341da97905a7cf8e03f0fcc10f5b57c6dadc26a"
+  },
+  "files": {
+    "client-LICENSE.txt": "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4",
+    "client-build-info.txt": "f1b4d23a64e29e1ec577250e9e51ef6ab5f9ad710e8a30ff338b83e74359cae4",
+    "client-build.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "client-oracle.json": "40a62cd5062c1bca6e887aecebcf346318c1247fd1b1a730501c4e1c4f0f059a",
+    "connection-1-client.bin": "d92ccf369e73b5f0d26c87addbe50e1f4c21b6a2857212f006822de469fcfed8",
+    "connection-1-server.bin": "32d919573374885c53a9005f6a4e40a6918a5e233e45a9468f93ad8303f7ad07",
+    "connection-2-client.bin": "faec1704ed51099f2f1b9ccf998bb0d9aeaf32b8db33aae90cc8c84a6d6061ef",
+    "connection-2-server.bin": "c17c369e424eb23228d390f32159539d7b9fda2329a93b991ec8a3c14df6b162",
+    "dumpcap.log": "86108e1ca08f3e12eb49ac6d3cec350431857653efa41349e195c5f6ab1f7361",
+    "native-headers.pcapng": "5c56848405fe058f9a7ed3ba63ad4a787d8e0f7864eae275a2e2242407a37199",
+    "server-LICENSE.txt": "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4",
+    "server-varz.json": "e98094d82c83774270b6e23e5572117a446f66b1fe157bf7359f1877ff2cd69e",
+    "server.log": "44b3a0713764d5e11bea8c33816a6005f7b7d7e257eacac8daac7c0cf98a29fd",
+    "tshark-tcp.csv": "801c2c104f68178525c38d6a9410fe34f8de65eda5417ca603ef1ad1e579f4a2"
+  }
+}

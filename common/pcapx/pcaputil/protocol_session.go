@@ -282,6 +282,9 @@ func sessionErrorFromEvents(events []*ProtocolEvent) *ProtocolError {
 }
 
 func (f *binFlow) hasSession() bool {
+	if f.protocol == "nats" {
+		return true // NATS allocates its budgeted negotiation state at consumption.
+	}
 	return f.tls != nil || f.dnp3 != nil || f.c37118 != nil || f.goose != nil || f.syslog != nil || f.rfb != nil || f.diameter != nil || f.iec104 != nil || f.s7 != nil || f.opcua != nil || f.ipp != nil || f.rtsp != nil || f.stun != nil || f.h2 != nil || f.mysql != nil || f.pg != nil || f.ws != nil || f.ldap != nil || f.redis != nil || f.mqtt != nil || f.nats != nil || f.mongo != nil || f.kafka != nil || f.tds != nil || f.amqp != nil || f.smb2 != nil || f.dcerpc != nil || f.ssh != nil || f.nfs != nil || f.snmp != nil || f.rdp != nil || f.dot != nil || f.doh != nil || f.sip != nil || f.rtp != nil || f.quic != nil || f.smtp != nil || f.imap != nil || f.pop3 != nil || f.ftp != nil || f.tns != nil || f.socks5 != nil || f.scgi != nil || f.msgpackRPC != nil || f.textInternet != nil || f.radius != nil || f.dhcp != nil || f.ntp != nil || f.coap != nil || f.modbus != nil || f.enip != nil || f.stratum != nil || f.gearman != nil || f.beanstalk != nil || f.zookeeper != nil || f.clickhouse != nil || f.stomp != nil
 }
 

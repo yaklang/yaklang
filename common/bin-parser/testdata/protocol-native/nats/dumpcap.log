@@ -1,0 +1,4 @@
+Capturing on 'Loopback: lo0'
+File: /private/tmp/pr5013-complete/nats/final-native/native-headers.pcapng
+Packets: 108 Packets captured: 108
+Packets received/dropped on interface 'Loopback: lo0': 108/0 (pcap:0/dumpcap:0/flushed:0/ps_ifdrop:0) (100.0%)

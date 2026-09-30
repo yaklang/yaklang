@@ -22,12 +22,16 @@ type uaPeer struct {
 	receive, send, message, chunks uint32
 }
 type binOPCUA struct {
-	peers   [2]uaPeer
-	plain   map[uint32]bool
-	tokens  map[uint32]uint32
-	seq     [2]map[uint32]uint32
-	chunks  map[uaKey]*uaChunk
-	pending map[uaKey]uint32
+	transportSeen   bool
+	reverseSeen     bool
+	reverseDir      int
+	reverseEndpoint string
+	peers           [2]uaPeer
+	plain           map[uint32]bool
+	tokens          map[uint32]uint32
+	seq             [2]map[uint32]uint32
+	chunks          map[uaKey]*uaChunk
+	pending         map[uaKey]uint32
 }
 
 func probeOPCUA(w []byte, _ int) ProbeResult {
@@ -50,7 +54,7 @@ func probeOPCUA(w []byte, _ int) ProbeResult {
 }
 func (f *binFlow) frameOPCUA(w []byte) (int, *binSpec, error) {
 	s := f.opcua
-	memory := int64(512 + (len(s.plain)+len(s.tokens)+len(s.pending)+len(s.seq[0])+len(s.seq[1]))*128 + 2*len(w))
+	memory := int64(512 + len(s.reverseEndpoint) + (len(s.plain)+len(s.tokens)+len(s.pending)+len(s.seq[0])+len(s.seq[1]))*128 + 2*len(w))
 	for _, c := range s.chunks {
 		memory += 2*int64(cap(c.data)) + 128
 	}
@@ -108,11 +112,16 @@ func uaService(w []byte) (uint32, int, error) {
 	}
 	return 0, 0, protocolError(ErrUnsupportedFeature, "OPC UA nonnumeric service NodeId")
 }
-func (s *binOPCUA) consume(dir int, w []byte, max, maxBytes int) (map[string]any, error) {
+func (s *binOPCUA) consume(dir int, w []byte, max, maxBytes int) (result map[string]any, err error) {
 	if len(w) < 8 || int(binary.LittleEndian.Uint32(w[4:])) != len(w) {
 		return nil, fmt.Errorf("opcua: header")
 	}
 	kind := string(w[:3])
+	defer func() {
+		if err == nil && kind != "RHE" {
+			s.transportSeen = true
+		}
+	}()
 	chunk := w[3]
 	b := w[8:]
 	out := map[string]any{"Message Type": kind, "Chunk Type": string(chunk), "Message Size": len(w)}
@@ -126,6 +135,21 @@ func (s *binOPCUA) consume(dir int, w []byte, max, maxBytes int) (map[string]any
 	if kind == "HEL" || kind == "ACK" {
 		if chunk != 'F' || len(b) < 20 {
 			return nil, fmt.Errorf("opcua: HEL/ACK")
+		}
+		// Part 6 7.1.3 permits one HEL and one ACK per transport. Check
+		// observed messages only: ACK can be the first packet in a capture.
+		for _, peer := range s.peers {
+			if peer.seen && peer.hello == (kind == "HEL") {
+				return nil, fmt.Errorf("opcua: duplicate %s", kind)
+			}
+		}
+		if s.peers[dir].seen {
+			return nil, fmt.Errorf("opcua: HEL/ACK sender role changed")
+		}
+		// RHE identifies the server independently of TCP initiation or ports.
+		// Enforce roles only after observing that message in this connection.
+		if s.reverseSeen && (kind == "HEL" && dir == s.reverseDir || kind == "ACK" && dir != s.reverseDir) {
+			return nil, fmt.Errorf("opcua: reverse handshake direction")
 		}
 		p := uaPeer{seen: true, hello: kind == "HEL", version: binary.LittleEndian.Uint32(b), receive: binary.LittleEndian.Uint32(b[4:]), send: binary.LittleEndian.Uint32(b[8:]), message: binary.LittleEndian.Uint32(b[12:]), chunks: binary.LittleEndian.Uint32(b[16:])}
 		// Part 6 permits 1024-byte buffers for ECC. HEL/ACK precede OPN,
@@ -158,6 +182,10 @@ func (s *binOPCUA) consume(dir int, w []byte, max, maxBytes int) (map[string]any
 			if len(rest) != 0 {
 				return nil, fmt.Errorf("opcua: HEL trailing bytes")
 			}
+			// Part 6 7.1.2.6 requires the RHE EndpointUrl to be returned in HEL.
+			if s.reverseSeen && string(endpoint) != s.reverseEndpoint {
+				return nil, fmt.Errorf("opcua: HEL endpoint differs from ReverseHello")
+			}
 			out["Endpoint URL"] = string(endpoint)
 		} else if len(b) != 20 {
 			return nil, fmt.Errorf("opcua: ACK trailing bytes")
@@ -181,6 +209,9 @@ func (s *binOPCUA) consume(dir int, w []byte, max, maxBytes int) (map[string]any
 		return out, nil
 	}
 	if kind == "RHE" {
+		if s.reverseSeen || s.transportSeen {
+			return nil, fmt.Errorf("opcua: ReverseHello after transport establishment")
+		}
 		if chunk != 'F' {
 			return nil, fmt.Errorf("opcua: RHE chunk")
 		}
@@ -195,8 +226,14 @@ func (s *binOPCUA) consume(dir int, w []byte, max, maxBytes int) (map[string]any
 		if len(rest) != 0 {
 			return nil, fmt.Errorf("opcua: RHE trailing bytes")
 		}
+		// Part 6 7.1.2.6 limits each UTF-8 encoded string value, independently
+		// of the frame's resource budget. Preserve null/empty string handling.
+		if len(uri) >= 4096 || len(url) >= 4096 {
+			return nil, fmt.Errorf("opcua: ReverseHello string length")
+		}
 		out["Server URI"] = string(uri)
 		out["Endpoint URL"] = string(url)
+		s.reverseSeen, s.reverseDir, s.reverseEndpoint = true, dir, string(url)
 		return out, nil
 	}
 	if kind != "OPN" && kind != "MSG" && kind != "CLO" {

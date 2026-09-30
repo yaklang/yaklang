@@ -1,0 +1,868 @@
+{
+  "schema_version": 1,
+  "tests": [
+    {
+      "package": "github.com/yaklang/yaklang/common/pcapx/pcaputil",
+      "test": "TestFirstBatchM2AKafkaBounds",
+      "requirement": "first-batch-native-contract",
+      "tiers": [
+        "full",
+        "race"
+      ]
+    },
+    {
+      "package": "github.com/yaklang/yaklang/common/pcapx/pcaputil",
+      "test": "TestFirstBatchM2AManifest",
+      "requirement": "first-batch-native-contract",
+      "tiers": [
+        "full",
+        "race"
+      ]
+    },
+    {
+      "package": "github.com/yaklang/yaklang/common/pcapx/pcaputil",
+      "test": "TestFirstBatchM2ANativeReplay",
+      "requirement": "first-batch-native-contract",
+      "tiers": [
+        "full",
+        "race"
+      ]
+    },
+    {
+      "package": "github.com/yaklang/yaklang/common/pcapx/pcaputil",
+      "test": "TestFirstBatchM2ARedisErrorAndExpiredAuth",
+      "requirement": "first-batch-native-contract",
+      "tiers": [
+        "full",
+        "race"
+      ]
+    },
+    {
+      "package": "github.com/yaklang/yaklang/common/pcapx/pcaputil",
+      "test": "TestFirstBatchM2ARedisResponseArrays",
+      "requirement": "first-batch-native-contract",
+      "tiers": [
+        "full",
+        "race"
+      ]
+    },
+    {
+      "package": "github.com/yaklang/yaklang/common/pcapx/pcaputil",
+      "test": "TestFirstBatchM2ARedisUnsubscribeAll",
+      "requirement": "first-batch-native-contract",
+      "tiers": [
+        "full",
+        "race"
+      ]
+    },
+    {
+      "package": "github.com/yaklang/yaklang/common/pcapx/pcaputil",
+      "test": "TestFirstBatchT00",
+      "requirement": "T00",
+      "tiers": [
+        "full",
+        "race",
+        "quick"
+      ]
+    },
+    {
+      "package": "github.com/yaklang/yaklang/common/pcapx/pcaputil",
+      "test": "TestFirstBatchT00CapabilityEvidence",
+      "requirement": "T00",
+      "tiers": [
+        "full",
+        "race"
+      ]
+    },
+    {
+      "package": "github.com/yaklang/yaklang/common/pcapx/pcaputil",
+      "test": "TestFirstBatchT01",
+      "requirement": "T01",
+      "tiers": [
+        "full",
+        "race",
+        "quick"
+      ]
+    },
+    {
+      "package": "github.com/yaklang/yaklang/common/pcapx/pcaputil",
+      "test": "TestFirstBatchT01NameRecords",
+      "requirement": "T01",
+      "tiers": [
+        "full",
+        "race"
+      ]
+    },
+    {
+      "package": "github.com/yaklang/yaklang/common/pcapx/pcaputil",
+      "test": "TestFirstBatchT02",
+      "requirement": "T02",
+      "tiers": [
+        "full",
+        "race",
+        "quick"
+      ]
+    },
+    {
+      "package": "github.com/yaklang/yaklang/common/pcapx/pcaputil",
+      "test": "TestFirstBatchT02IPv6AndTunnel",
+      "requirement": "T02",
+      "tiers": [
+        "full",
+        "race"
+      ]
+    },
+    {
+      "package": "github.com/yaklang/yaklang/common/pcapx/pcaputil",
+      "test": "TestFirstBatchT03",
+      "requirement": "T03",
+      "tiers": [
+        "full",
+        "race",
+        "quick"
+      ]
+    },
+    {
+      "package": "github.com/yaklang/yaklang/common/pcapx/pcaputil",
+      "test": "TestFirstBatchT03BadTagAndBudget",
+      "requirement": "T03",
+      "tiers": [
+        "full",
+        "race"
+      ]
+    },
+    {
+      "package": "github.com/yaklang/yaklang/common/pcapx/pcaputil",
+      "test": "TestFirstBatchT03NativeDecodeAs",
+      "requirement": "T03",
+      "tiers": [
+        "full",
+        "race"
+      ]
+    },
+    {
+      "package": "github.com/yaklang/yaklang/common/pcapx/pcaputil",
+      "test": "TestFirstBatchT04",
+      "requirement": "T04",
+      "tiers": [
+        "full",
+        "race",
+        "quick"
+      ]
+    },
+    {
+      "package": "github.com/yaklang/yaklang/common/pcapx/pcaputil",
+      "test": "TestFirstBatchT05Filters",
+      "requirement": "T05",
+      "tiers": [
+        "full",
+        "race"
+      ]
+    },
+    {
+      "package": "github.com/yaklang/yaklang/common/pcapx/pcaputil",
+      "test": "TestFirstBatchT06",
+      "requirement": "T06",
+      "tiers": [
+        "full",
+        "race",
+        "quick"
+      ]
+    },
+    {
+      "package": "github.com/yaklang/yaklang/common/pcapx/pcaputil",
+      "test": "TestFirstBatchT07",
+      "requirement": "T07",
+      "tiers": [
+        "full",
+        "race",
+        "quick"
+      ]
+    },
+    {
+      "package": "github.com/yaklang/yaklang/common/pcapx/pcaputil",
+      "test": "TestFirstBatchT07Native",
+      "requirement": "T07",
+      "tiers": [
+        "full",
+        "race"
+      ]
+    },
+    {
+      "package": "github.com/yaklang/yaklang/common/pcapx/pcaputil",
+      "test": "TestFirstBatchT08",
+      "requirement": "T08",
+      "tiers": [
+        "full",
+        "race",
+        "quick"
+      ]
+    },
+    {
+      "package": "github.com/yaklang/yaklang/common/pcapx/pcaputil",
+      "test": "TestFirstBatchT08DHCP6Native",
+      "requirement": "T08",
+      "tiers": [
+        "full",
+        "race"
+      ]
+    },
+    {
+      "package": "github.com/yaklang/yaklang/common/pcapx/pcaputil",
+      "test": "TestFirstBatchT09",
+      "requirement": "T09",
+      "tiers": [
+        "full",
+        "race",
+        "quick"
+      ]
+    },
+    {
+      "package": "github.com/yaklang/yaklang/common/pcapx/pcaputil",
+      "test": "TestFirstBatchT09KeyEpoch",
+      "requirement": "T09",
+      "tiers": [
+        "full",
+        "race"
+      ]
+    },
+    {
+      "package": "github.com/yaklang/yaklang/common/pcapx/pcaputil",
+      "test": "TestFirstBatchT10DecompressionBudget",
+      "requirement": "T10",
+      "tiers": [
+        "full",
+        "race"
+      ]
+    },
+    {
+      "package": "github.com/yaklang/yaklang/common/pcapx/pcaputil",
+      "test": "TestFirstBatchT10DeflateNegotiation",
+      "requirement": "T10",
+      "tiers": [
+        "full",
+        "race"
+      ]
+    },
+    {
+      "package": "github.com/yaklang/yaklang/common/pcapx/pcaputil",
+      "test": "TestFirstBatchT10Native",
+      "requirement": "T10",
+      "tiers": [
+        "full",
+        "race"
+      ]
+    },
+    {
+      "package": "github.com/yaklang/yaklang/common/pcapx/pcaputil",
+      "test": "TestFirstBatchT11",
+      "requirement": "T11",
+      "tiers": [
+        "full",
+        "race",
+        "quick"
+      ]
+    },
+    {
+      "package": "github.com/yaklang/yaklang/common/pcapx/pcaputil",
+      "test": "TestFirstBatchT11BodySemantics",
+      "requirement": "T11",
+      "tiers": [
+        "full",
+        "race"
+      ]
+    },
+    {
+      "package": "github.com/yaklang/yaklang/common/pcapx/pcaputil",
+      "test": "TestFirstBatchT11PushIsolation",
+      "requirement": "T11",
+      "tiers": [
+        "full",
+        "race"
+      ]
+    },
+    {
+      "package": "github.com/yaklang/yaklang/common/pcapx/pcaputil",
+      "test": "TestFirstBatchT12",
+      "requirement": "T12",
+      "tiers": [
+        "full",
+        "race",
+        "quick"
+      ]
+    },
+    {
+      "package": "github.com/yaklang/yaklang/common/pcapx/pcaputil",
+      "test": "TestFirstBatchT12DirectionalState",
+      "requirement": "T12",
+      "tiers": [
+        "full",
+        "race"
+      ]
+    },
+    {
+      "package": "github.com/yaklang/yaklang/common/pcapx/pcaputil",
+      "test": "TestFirstBatchT13",
+      "requirement": "T13",
+      "tiers": [
+        "full",
+        "race",
+        "quick"
+      ]
+    },
+    {
+      "package": "github.com/yaklang/yaklang/common/pcapx/pcaputil",
+      "test": "TestFirstBatchT14",
+      "requirement": "T14",
+      "tiers": [
+        "full",
+        "race",
+        "quick"
+      ]
+    },
+    {
+      "package": "github.com/yaklang/yaklang/common/pcapx/pcaputil",
+      "test": "TestFirstBatchT14M2",
+      "requirement": "T14",
+      "tiers": [
+        "full",
+        "race"
+      ]
+    },
+    {
+      "package": "github.com/yaklang/yaklang/common/pcapx/pcaputil",
+      "test": "TestFirstBatchT15",
+      "requirement": "T15",
+      "tiers": [
+        "full",
+        "race",
+        "quick"
+      ]
+    },
+    {
+      "package": "github.com/yaklang/yaklang/common/pcapx/pcaputil",
+      "test": "TestFirstBatchT16",
+      "requirement": "T16",
+      "tiers": [
+        "full",
+        "race",
+        "quick"
+      ]
+    },
+    {
+      "package": "github.com/yaklang/yaklang/common/pcapx/pcaputil",
+      "test": "TestFirstBatchT17",
+      "requirement": "T17",
+      "tiers": [
+        "full",
+        "race",
+        "quick"
+      ]
+    },
+    {
+      "package": "github.com/yaklang/yaklang/common/pcapx/pcaputil",
+      "test": "TestFirstBatchT18",
+      "requirement": "T18",
+      "tiers": [
+        "full",
+        "race",
+        "quick"
+      ]
+    },
+    {
+      "package": "github.com/yaklang/yaklang/common/pcapx/pcaputil",
+      "test": "TestFirstBatchT19",
+      "requirement": "T19",
+      "tiers": [
+        "full",
+        "race",
+        "quick"
+      ]
+    },
+    {
+      "package": "github.com/yaklang/yaklang/common/pcapx/pcaputil",
+      "test": "TestFirstBatchT20",
+      "requirement": "T20",
+      "tiers": [
+        "full",
+        "race",
+        "quick"
+      ]
+    },
+    {
+      "package": "github.com/yaklang/yaklang/common/pcapx/pcaputil",
+      "test": "TestFirstBatchT20T21Manifest",
+      "requirement": "T20",
+      "tiers": [
+        "full",
+        "race"
+      ]
+    },
+    {
+      "package": "github.com/yaklang/yaklang/common/pcapx/pcaputil",
+      "test": "TestFirstBatchT21",
+      "requirement": "T21",
+      "tiers": [
+        "full",
+        "race",
+        "quick"
+      ]
+    },
+    {
+      "package": "github.com/yaklang/yaklang/common/pcapx/pcaputil",
+      "test": "TestIndustrialIndependentUpstreamGOOSEOPCUA",
+      "requirement": "GOOSE/OPCUA independent upstream corpus",
+      "tiers": [
+        "quick",
+        "full",
+        "race"
+      ]
+    },
+    {
+      "package": "github.com/yaklang/yaklang/common/pcapx/pcaputil",
+      "test": "TestIndustrialNativeGOOSEOPCUACaptures",
+      "requirement": "GOOSE/OPCUA native ReverseConnect/ECC/protected",
+      "tiers": [
+        "quick",
+        "full",
+        "race"
+      ]
+    },
+    {
+      "package": "github.com/yaklang/yaklang/common/pcapx/pcaputil",
+      "test": "TestNativeDNSDoHCorpus",
+      "requirement": "T07/T09/DoH native independent oracle",
+      "tiers": [
+        "quick",
+        "full",
+        "race"
+      ]
+    },
+    {
+      "package": "github.com/yaklang/yaklang/common/pcapx/pcaputil",
+      "test": "TestReplayPcapFileNATSNativeHeadersCorpus",
+      "requirement": "NATS header semantics and native oracle",
+      "tiers": [
+        "quick",
+        "full",
+        "race"
+      ]
+    },
+    {
+      "package": "github.com/yaklang/yaklang/common/pcapx/pcaputil",
+      "test": "TestSTOMPNativeCapturesAndOracles",
+      "requirement": "STOMP 1.0/1.1/1.2 native oracle",
+      "tiers": [
+        "quick",
+        "full",
+        "race"
+      ]
+    },
+    {
+      "package": "github.com/yaklang/yaklang/common/pcapx/pcaputil",
+      "test": "TestSTOMPNativeExtractedPayloadFragmentation",
+      "requirement": "STOMP native structural variants",
+      "tiers": [
+        "quick",
+        "full",
+        "race"
+      ]
+    },
+    {
+      "package": "github.com/yaklang/yaklang/common/pcapx/pcaputil",
+      "test": "TestT06MixedTrafficContract",
+      "requirement": "T06 scheduler and exact semantic equivalence",
+      "tiers": [
+        "quick",
+        "full",
+        "race"
+      ]
+    },
+    {
+      "package": "github.com/yaklang/yaklang/common/pcapx/pcaputil",
+      "test": "TestT06RepeatedSessionRelease",
+      "requirement": "T06 bounded lifecycle repetition",
+      "tiers": [
+        "quick",
+        "full",
+        "race"
+      ]
+    },
+    {
+      "package": "github.com/yaklang/yaklang/common/yak/cmd/yakcmds/shark-cli",
+      "test": "TestFirstBatchM2SharkNative",
+      "requirement": "first-batch-native-contract",
+      "tiers": [
+        "full",
+        "race"
+      ]
+    },
+    {
+      "package": "github.com/yaklang/yaklang/common/yak/cmd/yakcmds/shark-cli",
+      "test": "TestFirstBatchT01Shark",
+      "requirement": "T01",
+      "tiers": [
+        "full",
+        "race"
+      ]
+    },
+    {
+      "package": "github.com/yaklang/yaklang/common/yak/cmd/yakcmds/shark-cli",
+      "test": "TestFirstBatchT05",
+      "requirement": "T05",
+      "tiers": [
+        "full",
+        "race",
+        "quick"
+      ]
+    },
+    {
+      "package": "github.com/yaklang/yaklang/common/bin-parser",
+      "test": "TestIndustrialNativeGOOSEOPCUARuleParity",
+      "requirement": "native GOOSE/OPCUA rule/native parity",
+      "tiers": [
+        "quick",
+        "full",
+        "race"
+      ]
+    },
+    {
+      "package": "github.com/yaklang/yaklang/common/pcapx/pcaputil",
+      "test": "TestT06MixedTrafficSoak",
+      "requirement": "T06 >=30m mixed replay and >=1M close/timeout cycles",
+      "tiers": [
+        "sustained"
+      ]
+    },
+    {
+      "package": "github.com/yaklang/yaklang/common/pcapx/pcaputil",
+      "test": "FuzzNATSStateSequence",
+      "requirement": "T06 >=30m sustained state/transport fuzz",
+      "tiers": [
+        "sustained"
+      ]
+    },
+    {
+      "package": "github.com/yaklang/yaklang/common/pcapx/pcaputil",
+      "test": "FuzzSTOMPStateSequence",
+      "requirement": "T06 >=30m sustained state/transport fuzz",
+      "tiers": [
+        "sustained"
+      ]
+    },
+    {
+      "package": "github.com/yaklang/yaklang/common/pcapx/pcaputil",
+      "test": "FuzzOPCUAStateSequence",
+      "requirement": "T06 >=30m sustained state/transport fuzz",
+      "tiers": [
+        "sustained"
+      ]
+    },
+    {
+      "package": "github.com/yaklang/yaklang/common/pcapx/pcaputil",
+      "test": "FuzzDoHHTTP2StreamIsolation",
+      "requirement": "T06 >=30m sustained state/transport fuzz",
+      "tiers": [
+        "sustained"
+      ]
+    },
+    {
+      "package": "github.com/yaklang/yaklang/common/pcapx/pcaputil",
+      "test": "FuzzTCPReassemblyOverlap",
+      "requirement": "T06 >=30m sustained state/transport fuzz",
+      "tiers": [
+        "sustained"
+      ]
+    },
+    {
+      "package": "github.com/yaklang/yaklang/common/pcapx/pcaputil",
+      "test": "TestProtocolSessionNATSHeaderSemanticsRegression",
+      "requirement": "native-round semantic/state regression",
+      "tiers": [
+        "quick",
+        "full",
+        "race"
+      ]
+    },
+    {
+      "package": "github.com/yaklang/yaklang/common/pcapx/pcaputil",
+      "test": "TestProtocolSessionNATSHeaderValidationAndBudgets",
+      "requirement": "native-round semantic/state regression",
+      "tiers": [
+        "quick",
+        "full",
+        "race"
+      ]
+    },
+    {
+      "package": "github.com/yaklang/yaklang/common/pcapx/pcaputil",
+      "test": "TestProtocolSessionNATSHeaderNegotiationAndDirections",
+      "requirement": "native-round semantic/state regression",
+      "tiers": [
+        "quick",
+        "full",
+        "race"
+      ]
+    },
+    {
+      "package": "github.com/yaklang/yaklang/common/pcapx/pcaputil",
+      "test": "TestProtocolSessionNATSHeaderFragmentationAndContextBudget",
+      "requirement": "native-round semantic/state regression",
+      "tiers": [
+        "quick",
+        "full",
+        "race"
+      ]
+    },
+    {
+      "package": "github.com/yaklang/yaklang/common/pcapx/pcaputil",
+      "test": "TestProtocolSessionNATSHeaderFailureBoundary",
+      "requirement": "native-round semantic/state regression",
+      "tiers": [
+        "quick",
+        "full",
+        "race"
+      ]
+    },
+    {
+      "package": "github.com/yaklang/yaklang/common/pcapx/pcaputil",
+      "test": "TestSTOMPNegotiationMustSelectOfferedVersion",
+      "requirement": "native-round semantic/state regression",
+      "tiers": [
+        "quick",
+        "full",
+        "race"
+      ]
+    },
+    {
+      "package": "github.com/yaklang/yaklang/common/pcapx/pcaputil",
+      "test": "TestSTOMPRejectsRepeatedConnectedWithoutRewritingState",
+      "requirement": "native-round semantic/state regression",
+      "tiers": [
+        "quick",
+        "full",
+        "race"
+      ]
+    },
+    {
+      "package": "github.com/yaklang/yaklang/common/pcapx/pcaputil",
+      "test": "TestSTOMPRequiredHeadersByVersion",
+      "requirement": "native-round semantic/state regression",
+      "tiers": [
+        "quick",
+        "full",
+        "race"
+      ]
+    },
+    {
+      "package": "github.com/yaklang/yaklang/common/pcapx/pcaputil",
+      "test": "TestSTOMPVersionSpecificHeaderEncoding",
+      "requirement": "native-round semantic/state regression",
+      "tiers": [
+        "quick",
+        "full",
+        "race"
+      ]
+    },
+    {
+      "package": "github.com/yaklang/yaklang/common/pcapx/pcaputil",
+      "test": "TestSTOMPResponseFirstHasPartialContext",
+      "requirement": "native-round semantic/state regression",
+      "tiers": [
+        "quick",
+        "full",
+        "race"
+      ]
+    },
+    {
+      "package": "github.com/yaklang/yaklang/common/pcapx/pcaputil",
+      "test": "TestSTOMP10HandshakeAdmission",
+      "requirement": "native-round semantic/state regression",
+      "tiers": [
+        "quick",
+        "full",
+        "race"
+      ]
+    },
+    {
+      "package": "github.com/yaklang/yaklang/common/pcapx/pcaputil",
+      "test": "TestSTOMPStateAcknowledgementsTransactionsAndReceipts",
+      "requirement": "native-round semantic/state regression",
+      "tiers": [
+        "quick",
+        "full",
+        "race"
+      ]
+    },
+    {
+      "package": "github.com/yaklang/yaklang/common/pcapx/pcaputil",
+      "test": "TestSTOMPStateRejectsObservedContradictions",
+      "requirement": "native-round semantic/state regression",
+      "tiers": [
+        "quick",
+        "full",
+        "race"
+      ]
+    },
+    {
+      "package": "github.com/yaklang/yaklang/common/pcapx/pcaputil",
+      "test": "TestSTOMP10ExplicitAndAnonymousAdmission",
+      "requirement": "native-round semantic/state regression",
+      "tiers": [
+        "quick",
+        "full",
+        "race"
+      ]
+    },
+    {
+      "package": "github.com/yaklang/yaklang/common/pcapx/pcaputil",
+      "test": "TestSTOMP10SubscribeBodyAndUnknownVersion",
+      "requirement": "native-round semantic/state regression",
+      "tiers": [
+        "quick",
+        "full",
+        "race"
+      ]
+    },
+    {
+      "package": "github.com/yaklang/yaklang/common/pcapx/pcaputil",
+      "test": "TestSTOMPTransactionalACKAtEntryBudget",
+      "requirement": "native-round semantic/state regression",
+      "tiers": [
+        "quick",
+        "full",
+        "race"
+      ]
+    },
+    {
+      "package": "github.com/yaklang/yaklang/common/pcapx/pcaputil",
+      "test": "TestSTOMPMidstreamLeadingHeartbeat",
+      "requirement": "native-round semantic/state regression",
+      "tiers": [
+        "quick",
+        "full",
+        "race"
+      ]
+    },
+    {
+      "package": "github.com/yaklang/yaklang/common/pcapx/pcaputil",
+      "test": "TestSTOMPReusedReceiptDoesNotGrowEntryBudget",
+      "requirement": "native-round semantic/state regression",
+      "tiers": [
+        "quick",
+        "full",
+        "race"
+      ]
+    },
+    {
+      "package": "github.com/yaklang/yaklang/common/pcapx/pcaputil",
+      "test": "TestSTOMPTransactionCompletionNeverConsumesUnboundMessages",
+      "requirement": "native-round semantic/state regression",
+      "tiers": [
+        "quick",
+        "full",
+        "race"
+      ]
+    },
+    {
+      "package": "github.com/yaklang/yaklang/common/pcapx/pcaputil",
+      "test": "TestSTOMPEmptyTransactionIdentifierIsDistinctFromNoTransaction",
+      "requirement": "native-round semantic/state regression",
+      "tiers": [
+        "quick",
+        "full",
+        "race"
+      ]
+    },
+    {
+      "package": "github.com/yaklang/yaklang/common/pcapx/pcaputil",
+      "test": "TestGOOSERejectInvalidTimestampWidth",
+      "requirement": "native-round semantic/state regression",
+      "tiers": [
+        "quick",
+        "full",
+        "race"
+      ]
+    },
+    {
+      "package": "github.com/yaklang/yaklang/common/pcapx/pcaputil",
+      "test": "TestOPCUAAckRejectsVersionUpgrade",
+      "requirement": "native-round semantic/state regression",
+      "tiers": [
+        "quick",
+        "full",
+        "race"
+      ]
+    },
+    {
+      "package": "github.com/yaklang/yaklang/common/pcapx/pcaputil",
+      "test": "TestOPCUAAckVersionCompatibility",
+      "requirement": "native-round semantic/state regression",
+      "tiers": [
+        "quick",
+        "full",
+        "race"
+      ]
+    },
+    {
+      "package": "github.com/yaklang/yaklang/common/pcapx/pcaputil",
+      "test": "TestGOOSEOPCUAMalformedCaptures",
+      "requirement": "native-round semantic/state regression",
+      "tiers": [
+        "quick",
+        "full",
+        "race"
+      ]
+    },
+    {
+      "package": "github.com/yaklang/yaklang/common/pcapx/pcaputil",
+      "test": "TestOPCUAReverseContextObserved",
+      "requirement": "native-round semantic/state regression",
+      "tiers": [
+        "quick",
+        "full",
+        "race"
+      ]
+    },
+    {
+      "package": "github.com/yaklang/yaklang/common/pcapx/pcaputil",
+      "test": "TestOPCUAObservedHandshakeCannotRestart",
+      "requirement": "native-round semantic/state regression",
+      "tiers": [
+        "quick",
+        "full",
+        "race"
+      ]
+    },
+    {
+      "package": "github.com/yaklang/yaklang/common/pcapx/pcaputil",
+      "test": "TestOPCUAReverseHelloStringBounds",
+      "requirement": "native-round semantic/state regression",
+      "tiers": [
+        "quick",
+        "full",
+        "race"
+      ]
+    },
+    {
+      "package": "github.com/yaklang/yaklang/common/pcapx/pcaputil",
+      "test": "TestT06LargeBodySplitInvariance",
+      "requirement": "T06 large PDU whole/one-byte/fixed random splits",
+      "tiers": [
+        "quick",
+        "full",
+        "race"
+      ]
+    },
+    {
+      "package": "github.com/yaklang/yaklang/common/bin-parser/parser/stream_parser",
+      "test": "TestFirstBatchT15",
+      "requirement": "T15 original independent Kafka regression assertions",
+      "tiers": [
+        "quick",
+        "full",
+        "race"
+      ]
+    }
+  ]
+}

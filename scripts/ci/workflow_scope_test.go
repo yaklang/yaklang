@@ -80,7 +80,10 @@ func TestTrafficWorkflowIsolation(t *testing.T) {
 	for _, step := range job.Steps {
 		run += step.Run + "\n"
 	}
-	if !strings.Contains(run, "go test -count=1 -timeout=5m ./common/bin-parser/... ./common/pcapx/...") {
+	if !strings.Contains(run, "go test -json -count=1 -timeout=5m ./common/bin-parser/... ./common/pcapx/... ./common/yak/cmd/yakcmds/shark-cli") {
 		t.Fatal("isolated traffic job must run complete parser and pcapx packages, including capture CLI")
+	}
+	if !strings.Contains(run, "check_go_test_json.py") || !strings.Contains(run, "--inventory common/bin-parser/testdata/quality-gates/required-tests.json --tier full") {
+		t.Fatal("traffic test success requires the actual package-qualified test inventory")
 	}
 }

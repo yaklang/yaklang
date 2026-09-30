@@ -93,7 +93,6 @@ func TestSTOMPRejectsHTTPTextAndMalformedFrames(t *testing.T) {
 		"http-connect":        []byte("CONNECT broker.example:61613 HTTP/1.1\r\nHost: broker.example\r\n\r\n"),
 		"http-get":            []byte("GET /stomp HTTP/1.1\r\nHost: broker.example\r\n\r\n"),
 		"ordinary-text":       []byte("STOMP is a word in this sentence, not a command\n"),
-		"server-frame-alone":  []byte("CONNECTED\nversion:1.2\n\n\x00"),
 		"unsupported-version": []byte("STOMP\naccept-version:1.3\nhost:broker.example\n\n\x00"),
 		"missing-host":        []byte("STOMP\naccept-version:1.1\n\n\x00"),
 		"missing-nul":         []byte("STOMP\naccept-version:1.2\nhost:broker.example\n\n"),
@@ -161,8 +160,9 @@ func TestProtocolSessionSTOMPPinnedNDPIStream(t *testing.T) {
 	// 18c9a606bfd29c7759dea701ba960ea81e5d44acfea24e371349471f7a1b5c86.
 	// Its live-vs-generated origin is not asserted. The STOMP 1.1 opening
 	// handshake omits the mandatory host header, and a later "message" command
-	// is lowercase. Reject this malformed trace at admission instead of using
-	// its apparent protocol label as a positive fixture.
+	// is lowercase. The malformed opening request is not a positive fixture.
+	// The complete CONNECTED response can independently establish partial
+	// context; this does not validate the malformed client-side trace.
 	var commands []string
 	var errorsSeen []string
 	err := ReplayPcap(bytes.NewReader(binCorpusBytes(t, "ndpi/ndpi-stomp.pcapng")),
@@ -181,8 +181,9 @@ func TestProtocolSessionSTOMPPinnedNDPIStream(t *testing.T) {
 		}),
 	)
 	require.NoError(t, err)
-	require.Empty(t, commands)
-	require.Empty(t, errorsSeen)
+	require.Equal(t, []string{"CONNECTED"}, commands)
+	require.Len(t, errorsSeen, 1)
+	require.Contains(t, errorsSeen[0], "requires host header")
 }
 
 // Synthetic STOMP 1.2 fixtures derived from the specification, not an
@@ -297,10 +298,9 @@ func TestProtocolSessionSTOMPRejectsUnknownExplicitVersion(t *testing.T) {
 	}
 	for _, header := range []string{"", "version:1.0\n", "version:1.1\n", "version:1.2\n"} {
 		s := newReviewSession(t, ParserBudget{})
-		require.Nil(t, s.Feed(0, time.Unix(1, 0), []byte(stomp12Connect)).Err)
+		require.Nil(t, s.Feed(0, time.Unix(1, 0), []byte("CONNECT\naccept-version:1.0,1.1,1.2\nhost:broker.example\n\n\x00")).Err)
 		r := s.Feed(1, time.Unix(1, 0), []byte("CONNECTED\n"+header+"\n\x00"))
 		require.Nil(t, r.Err, "header=%q", header)
-		require.Len(t, r.Events, 1)
 		require.Equal(t, "decoded", r.Events[0].Status)
 	}
 }

@@ -38,7 +38,7 @@ func TestProtocolSessionNATSClientProtocolFraming(t *testing.T) {
 	hpubBody := []byte{'H', '\r', '\n', 'i'}
 	hpub := []byte(fmt.Sprintf("HPUB foo.bar reply.1 %d %d\r\n%s%s\r\n", len(hpubHeader), len(hpubHeader)+len(hpubBody), hpubHeader, hpubBody))
 	info := []byte("INFO {\"server_id\":\"local\",\"headers\":true}\r\n")
-	connect := []byte("CONNECT {\"verbose\":false,\"lang\":\"go\"}\r\n")
+	connect := []byte("CONNECT {\"verbose\":false,\"lang\":\"go\",\"headers\":true}\r\n")
 	steps := []sessionStep{
 		{dir: 1, wire: info},
 		{dir: 0, wire: connect},

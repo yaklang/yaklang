@@ -29,12 +29,7 @@ func (f *binFlow) detectDirection(dir int, wire []byte) {
 	if verdict := f.probeBoundedText(wire); verdict.Verdict == ProbeAccept {
 		switch verdict.Protocol {
 		case "nats":
-			op, _, _ := natsOperationAt(wire)
-			clientDir := dir
-			if natsRole(op) == "server" {
-				clientDir = 1 - dir
-			}
-			f.protocol, f.nats = "nats", &binNATS{clientDir: clientDir}
+			f.protocol = "nats"
 		case "stomp":
 			f.protocol, f.stomp = "stomp", &binSTOMP{clientDir: dir}
 		case "sip":
@@ -346,10 +341,7 @@ func (f *binFlow) consumeSession(dir int, e *ProtocolEvent, result map[string]an
 	case "mqtt":
 		e.Session, err = f.mqtt.consume(dir, e.Raw, result)
 	case "nats":
-		if f.nats == nil {
-			f.nats = &binNATS{clientDir: -1}
-		}
-		e.Session, err = f.nats.consume(dir, e.Raw, f.a.budget)
+		err = f.consumeNATS(e, dir)
 	case "mongodb":
 		e.Session, err = f.mongo.consume(e.Raw, result)
 	case "kafka":
@@ -512,6 +504,11 @@ func (f *binFlow) consumeSession(dir int, e *ProtocolEvent, result map[string]an
 		}
 	}
 	if e.Session != nil {
+		// Carried HTTP/2 and MySQL messages inherit the actual byte source.
+		// Their protocol decoders cannot decide whether TLS decrypted the bytes.
+		if _, present := e.Session["Payload Decrypted"]; present {
+			e.Session["Payload Decrypted"] = f.byteSource == "decrypted"
+		}
 		switch e.Protocol {
 		case "enip":
 			if service, ok := e.Session["CIP Service"].(string); ok {

@@ -55,13 +55,18 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          go test -count=1 -timeout=5m ./common/bin-parser/... ./common/pcapx/... 2>&1 | tee "$RUNNER_TEMP/bin-parser-traffic.log"
+          python3 -m unittest discover -s scripts/protocol-tests -p 'test_check_go_test_json.py'
+          go test -json -count=1 -timeout=5m ./common/bin-parser/... ./common/pcapx/... ./common/yak/cmd/yakcmds/shark-cli > "$RUNNER_TEMP/bin-parser-traffic.jsonl" 2> "$RUNNER_TEMP/bin-parser-build.log"
+          python3 scripts/protocol-tests/check_go_test_json.py "$RUNNER_TEMP/bin-parser-traffic.jsonl" --inventory common/bin-parser/testdata/quality-gates/required-tests.json --tier full > "$RUNNER_TEMP/required-tests-result.json"
 
       - name: Upload test log
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: bin-parser-traffic-${{ github.run_id }}
-          path: ${{ runner.temp }}/bin-parser-traffic.log
+          path: |
+            ${{ runner.temp }}/bin-parser-traffic.jsonl
+            ${{ runner.temp }}/bin-parser-build.log
+            ${{ runner.temp }}/required-tests-result.json
           if-no-files-found: ignore
           retention-days: 3

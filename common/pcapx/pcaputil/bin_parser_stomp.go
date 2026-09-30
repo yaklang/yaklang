@@ -23,8 +23,14 @@ type stompFrame struct {
 }
 
 type binSTOMP struct {
-	clientDir int
-	version   string
+	clientDir    int
+	version      string
+	roleKnown    bool
+	offered      uint8
+	sawConnect   bool
+	sawConnected bool
+	flow         *binFlow
+	state        stompState
 }
 
 var stompCommands = map[string]bool{
@@ -78,7 +84,9 @@ func parseSTOMPLine(w []byte, offset, max int) (line []byte, next int, complete 
 	return line, end + 1, true, nil
 }
 
-func stompDecodeHeader(v []byte) (string, error) {
+func stompDecodeHeader(v []byte) (string, error) { return stompDecodeHeaderVersion(v, "1.2") }
+
+func stompDecodeHeaderVersion(v []byte, version string) (string, error) {
 	var out strings.Builder
 	out.Grow(len(v))
 	for i := 0; i < len(v); i++ {
@@ -95,6 +103,9 @@ func stompDecodeHeader(v []byte) (string, error) {
 		}
 		switch v[i] {
 		case 'r':
+			if version == "1.1" {
+				return "", protocolError(ErrMalformedMessage, "stomp: carriage-return escape requires STOMP 1.2")
+			}
 			out.WriteByte('\r')
 		case 'n':
 			out.WriteByte('\n')
@@ -132,6 +143,10 @@ func stompParseDecimal(s string, max int) (int, error) {
 // reports an incomplete prefix separately from malformed wire data so TCP
 // reassembly can wait for the remaining bytes.
 func parseSTOMPFrame(w []byte, max int) (stompFrame, bool, error) {
+	return parseSTOMPFrameVersion(w, max, "1.2")
+}
+
+func parseSTOMPFrameVersion(w []byte, max int, version string) (stompFrame, bool, error) {
 	var frame stompFrame
 	if max <= 0 {
 		return frame, false, protocolError(ErrResourceExceeded, "stomp: invalid frame limit")
@@ -163,6 +178,9 @@ func parseSTOMPFrame(w []byte, max int) (stompFrame, bool, error) {
 		return frame, false, protocolError(ErrMalformedMessage, "stomp: unknown or empty command")
 	}
 	frame.command = string(line)
+	if version != "" && version != "1.2" && cursor >= 2 && w[cursor-2] == '\r' {
+		return frame, false, protocolError(ErrMalformedMessage, "stomp: CRLF requires STOMP 1.2")
+	}
 	frame.headers = make(map[string]string)
 	headerBytes, headerCount := cursor, 0
 	contentLength, hasContentLength := 0, false
@@ -175,6 +193,9 @@ func parseSTOMPFrame(w []byte, max int) (stompFrame, bool, error) {
 			return frame, false, lineErr
 		}
 		cursor = next
+		if version != "" && version != "1.2" && cursor >= 2 && w[cursor-2] == '\r' {
+			return frame, false, protocolError(ErrMalformedMessage, "stomp: CRLF requires STOMP 1.2")
+		}
 		if len(header) == 0 {
 			break
 		}
@@ -188,15 +209,15 @@ func parseSTOMPFrame(w []byte, max int) (stompFrame, bool, error) {
 		}
 		keyBytes, valueBytes := header[:colon], header[colon+1:]
 		key, value := string(keyBytes), string(valueBytes)
-		if frame.command != "CONNECT" && frame.command != "CONNECTED" {
+		if frame.command != "CONNECT" && frame.command != "CONNECTED" && version != "1.0" && version != "" {
 			if bytes.IndexByte(valueBytes, ':') >= 0 {
 				return frame, false, protocolError(ErrMalformedMessage, "stomp: unescaped colon in header value")
 			}
-			key, err = stompDecodeHeader(keyBytes)
+			key, err = stompDecodeHeaderVersion(keyBytes, version)
 			if err != nil {
 				return frame, false, err
 			}
-			value, err = stompDecodeHeader(valueBytes)
+			value, err = stompDecodeHeaderVersion(valueBytes, version)
 			if err != nil {
 				return frame, false, err
 			}
@@ -226,7 +247,7 @@ func parseSTOMPFrame(w []byte, max int) (stompFrame, bool, error) {
 		return frame, false, protocolError(ErrMalformedMessage, "stomp: heart-beat is only valid during connection setup")
 	}
 
-	bodyAllowed := frame.command == "SEND" || frame.command == "MESSAGE" || frame.command == "ERROR"
+	bodyAllowed := frame.command == "SEND" || frame.command == "MESSAGE" || frame.command == "ERROR" || ((version == "1.0" || version == "") && frame.command == "SUBSCRIBE")
 	if !bodyAllowed && hasContentLength && contentLength != 0 {
 		return frame, false, protocolError(ErrMalformedMessage, "stomp: body is not allowed for this command")
 	}
@@ -305,6 +326,11 @@ func stompValidHeartbeat(v string) bool {
 func stompInitialProbeHeaders(frame stompFrame) bool {
 	// A 1.1/1.2 handshake needs both headers. In particular, accept-version
 	// alone is not a safe signature: it also appears in malformed corpus data.
+	if frame.command == "CONNECT" && (frame.headers["accept-version"] == "" || frame.headers["accept-version"] == "1.0") {
+		// A complete NUL-terminated CONNECT frame is distinct from HTTP CONNECT.
+		// Authentication is broker policy, not a mandatory STOMP 1.0 signature.
+		return true
+	}
 	if frame.headers["host"] == "" {
 		return false
 	}
@@ -326,7 +352,7 @@ func stompInitialPrefix(w []byte) bool {
 	if len(w) == 0 {
 		return false
 	}
-	for _, command := range []string{"CONNECT", "STOMP"} {
+	for command := range stompCommands {
 		if len(w) <= len(command) && bytes.Equal(w, []byte(command[:len(w)])) {
 			return true
 		}
@@ -350,33 +376,61 @@ func probeSTOMP(w []byte, limit int) ProbeResult {
 	if len(w) > limit {
 		w = w[:limit]
 	}
-	frame, complete, err := parseSTOMPFrame(w, limit)
+	// A midstream capture can begin with heartbeat EOLs. They provide no
+	// protocol identity themselves; require the following bounded frame.
+	for len(w) > 0 {
+		n := 0
+		if w[0] == '\n' {
+			n = 1
+		} else if len(w) >= 2 && w[0] == '\r' && w[1] == '\n' {
+			n = 2
+		}
+		if n == 0 {
+			break
+		}
+		w = w[n:]
+		limit -= n
+	}
+	if len(w) == 0 && limit > 0 {
+		return ProbeResult{Verdict: ProbeNeedMore, Protocol: "stomp", NeedBytes: 1, Confidence: 20}
+	}
+	if limit <= 0 {
+		return ProbeResult{Verdict: ProbeReject}
+	}
+	frame, complete, err := parseSTOMPFrameVersion(w, limit, "")
 	if err != nil {
 		return ProbeResult{Verdict: ProbeReject, Reason: err.Error()}
 	}
 	if !complete {
 		if stompInitialPrefix(w) {
 			if len(w) < limit {
-				return ProbeResult{Verdict: ProbeNeedMore, Protocol: "stomp", NeedBytes: 1, Confidence: 45, Reason: "incomplete STOMP CONNECT/STOMP frame"}
+				return ProbeResult{Verdict: ProbeNeedMore, Protocol: "stomp", NeedBytes: 1, Confidence: 45, Reason: "incomplete bounded STOMP frame"}
 			}
 		}
 		return ProbeResult{Verdict: ProbeReject, Reason: "no complete STOMP handshake"}
 	}
-	if (frame.command != "CONNECT" && frame.command != "STOMP") || frame.total > limit || !stompInitialProbeHeaders(frame) {
-		return ProbeResult{Verdict: ProbeReject, Reason: "not a bounded STOMP handshake"}
+	if frame.total > limit {
+		return ProbeResult{Verdict: ProbeReject}
+	}
+	if frame.command == "CONNECT" || frame.command == "STOMP" {
+		if !stompInitialProbeHeaders(frame) {
+			return ProbeResult{Verdict: ProbeReject, Reason: "not a bounded STOMP handshake"}
+		}
+	} else if !stompMidstreamEvidence(frame) {
+		return ProbeResult{Verdict: ProbeReject, Reason: "no bounded STOMP context"}
 	}
 	return probeAccept("stomp", "", 96)
 }
 
 func (f *binFlow) frameSTOMP(dir int, w []byte) (int, *binSpec, error) {
-	frame, complete, err := parseSTOMPFrame(w, f.a.config.MaxMessageBytes)
+	frame, complete, err := parseSTOMPFrameVersion(w, f.a.config.MaxMessageBytes, f.stomp.parseVersion())
 	if err != nil {
 		return 0, nil, err
 	}
 	if !complete {
 		return 0, nil, nil
 	}
-	if stompWrongDirection(frame.command, dir, f.stomp.clientDir) {
+	if f.stomp.roleKnown && stompWrongDirection(frame.command, dir, f.stomp.clientDir) {
 		return 0, nil, protocolError(ErrMalformedMessage, "stomp: command on wrong direction")
 	}
 	entry := frame.command
@@ -387,30 +441,33 @@ func (f *binFlow) frameSTOMP(dir int, w []byte) (int, *binSpec, error) {
 }
 
 func (s *binSTOMP) consume(dir int, wire []byte, max int) (map[string]any, error) {
-	frame, complete, err := parseSTOMPFrame(wire, max)
+	frame, complete, err := parseSTOMPFrameVersion(wire, max, s.parseVersion())
 	if err != nil {
 		return nil, err
 	}
 	if !complete || frame.total != len(wire) {
 		return nil, protocolError(ErrMalformedMessage, "stomp: event does not contain exactly one complete frame")
 	}
+	if !s.roleKnown && s.version == "" && !frame.heartbeat {
+		s.clientDir = dir
+		if stompServerCommands[frame.command] {
+			s.clientDir = 1 - dir
+		}
+	}
+	if !frame.heartbeat {
+		s.roleKnown = true
+	}
 	if stompWrongDirection(frame.command, dir, s.clientDir) {
 		return nil, protocolError(ErrMalformedMessage, "stomp: command on wrong direction")
 	}
-	if frame.command == "CONNECTED" {
-		// A missing version remains compatible with legacy STOMP 1.0 peers.
-		// Explicit versions must be understood before decoding later frames.
-		if version, present := frame.headers["version"]; present {
-			switch version {
-			case "1.0", "1.1", "1.2":
-				s.version = version
-			default:
-				return nil, protocolError(ErrUnsupportedVersion, "stomp: unsupported negotiated version %q", version)
-			}
-		}
+	context, err := s.validate(frame)
+	if err != nil {
+		return nil, err
 	}
-	if _, present := frame.headers["destination"]; frame.command == "SEND" && !present {
-		return nil, protocolError(ErrMalformedMessage, "stomp: SEND requires a destination header")
+	if frame.command == "CONNECT" || frame.command == "STOMP" || frame.command == "CONNECTED" {
+		if _, _, err := parseSTOMPFrameVersion(wire, max, s.parseVersion()); err != nil {
+			return nil, err
+		}
 	}
 	headers := make(map[string]any, len(frame.headers))
 	for key, value := range frame.headers {
@@ -420,17 +477,22 @@ func (s *binSTOMP) consume(dir int, wire []byte, max int) (map[string]any, error
 			headers[key] = value
 		}
 	}
-	return map[string]any{
+	info := map[string]any{
 		"Command": frame.command, "Headers": headers,
 		"Body": append([]byte(nil), frame.body...), "Heartbeat": frame.heartbeat,
-		"Version": s.version,
-	}, nil
+		"Version": s.parseVersion(), "Context Level": context,
+	}
+	if err := s.observe(frame, info); err != nil {
+		return nil, err
+	}
+	return info, nil
 }
 
 func (f *binFlow) consumeSTOMP(dir int, e *ProtocolEvent) error {
 	if f.stomp == nil {
 		return fmt.Errorf("stomp: session was not observed")
 	}
+	f.stomp.flow = f
 	fields, err := f.stomp.consume(dir, e.Raw, f.a.config.MaxMessageBytes)
 	if err != nil {
 		return err

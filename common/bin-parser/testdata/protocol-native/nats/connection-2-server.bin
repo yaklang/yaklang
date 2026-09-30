@@ -1,0 +1,30 @@
+INFO {"server_id":"NAVJL4YXB2VUGTDNVJ4CAXULVXAG2YPX3NCWDNXMYIEYR7DXSWMJVSZL","server_name":"nats-native-fixture","version":"2.10.26","proto":1,"git_commit":"14fa949","go":"go1.23.6","host":"127.0.0.1","port":44222,"headers":true,"max_payload":1048576,"jetstream":true,"client_id":6,"client_ip":"127.0.0.1","xkey":"XB4QKI2O2NRWT7WJRU7YTJWNUYUDY7VFC34WMHPYURRML35BIRAWXQY7"} 
+PONG
+PONG
+PONG
+PONG
+HMSG _INBOX.WlXrBdUWQhgNmoil8fqOqm.LSiAUU8a 1 16 16
+NATS/1.0 503
+
+
+MSG _INBOX.WlXrBdUWQhgNmoil8fqOqm.rgVD1QSO 1 728
+{"type":"io.nats.jetstream.api.v1.stream_create_response","config":{"name":"NATIVE","subjects":["native.js.data"],"retention":"limits","max_consumers":-1,"max_msgs":-1,"max_bytes":-1,"max_age":0,"max_msgs_per_subject":-1,"max_msg_size":-1,"discard":"old","storage":"memory","num_replicas":1,"duplicate_window":120000000000,"compression":"none","allow_direct":false,"mirror_direct":false,"sealed":false,"deny_delete":false,"deny_purge":false,"allow_rollup_hdrs":false,"consumer_limits":{}},"created":"2026-09-30T01:11:51.532373Z","state":{"messages":0,"bytes":0,"first_seq":0,"first_ts":"0001-01-01T00:00:00Z","last_seq":0,"last_ts":"0001-01-01T00:00:00Z","consumer_count":0},"ts":"2026-09-30T01:11:51.532583Z","did_create":true}
+MSG _INBOX.WlXrBdUWQhgNmoil8fqOqm.zQMx8JhK 1 131
+{"type":"io.nats.jetstream.api.v1.consumer_info_response","error":{"code":404,"err_code":10014,"description":"consumer not found"}}
+MSG _INBOX.WlXrBdUWQhgNmoil8fqOqm.KzM7ZUSz 1 544
+{"type":"io.nats.jetstream.api.v1.consumer_create_response","stream_name":"NATIVE","name":"C","created":"2026-09-30T01:11:51.533814Z","config":{"durable_name":"C","name":"C","deliver_policy":"all","ack_policy":"explicit","ack_wait":30000000000,"max_deliver":-1,"replay_policy":"instant","max_waiting":512,"max_ack_pending":1000,"num_replicas":0},"delivered":{"consumer_seq":0,"stream_seq":0},"ack_floor":{"consumer_seq":0,"stream_seq":0},"num_ack_pending":0,"num_redelivered":0,"num_waiting":0,"num_pending":0,"ts":"2026-09-30T01:11:51.53397Z"}
+HMSG _INBOX.WlXrBdUWQhgNmoil8fqOqm.YaUpcifT 1 28 28
+NATS/1.0 404 No Messages
+
+
+MSG _INBOX.WlXrBdUWQhgNmoil8fqOqm.RYR44fFt 1 131
+{"type":"io.nats.jetstream.api.v1.consumer_info_response","error":{"code":404,"err_code":10014,"description":"consumer not found"}}
+MSG _INBOX.WlXrBdUWQhgNmoil8fqOqm.3iIYb0dP 1 562
+{"type":"io.nats.jetstream.api.v1.consumer_create_response","stream_name":"NATIVE","name":"HB","created":"2026-09-30T01:11:51.535331Z","config":{"durable_name":"HB","name":"HB","deliver_policy":"all","ack_policy":"none","max_deliver":-1,"replay_policy":"instant","idle_heartbeat":100000000,"deliver_subject":"native.heartbeat","num_replicas":0},"delivered":{"consumer_seq":0,"stream_seq":0},"ack_floor":{"consumer_seq":0,"stream_seq":0},"num_ack_pending":0,"num_redelivered":0,"num_waiting":0,"num_pending":0,"push_bound":true,"ts":"2026-09-30T01:11:51.535401Z"}
+MSG _INBOX.WlXrBdUWQhgNmoil8fqOqm.ZLJo4nSg 1 75
+{"type":"io.nats.jetstream.api.v1.consumer_delete_response","success":true}
+MSG _INBOX.WlXrBdUWQhgNmoil8fqOqm.ZtbXTWgv 1 75
+{"type":"io.nats.jetstream.api.v1.consumer_delete_response","success":true}
+MSG _INBOX.WlXrBdUWQhgNmoil8fqOqm.FttnVPW4 1 73
+{"type":"io.nats.jetstream.api.v1.stream_delete_response","success":true}
+PONG

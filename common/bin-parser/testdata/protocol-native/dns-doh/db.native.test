@@ -1,0 +1,9 @@
+$ORIGIN native.test.
+$TTL 300
+@ IN SOA ns.native.test. hostmaster.native.test. (2026093001 3600 600 86400 300)
+@ IN NS ns.native.test.
+ns IN A 192.0.2.53
+a IN A 192.0.2.10
+a IN AAAA 2001:db8::10
+alias IN CNAME a.native.test.
+text IN TXT "independent CoreDNS oracle" "two TXT strings"

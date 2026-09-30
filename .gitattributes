@@ -14,3 +14,10 @@ common/pcapx/pcaputil/testdata/protocol-sessions/first-batch-m2a/*.tsv whitespac
 # Raw TShark TSV exports retain tab delimiters for empty trailing columns.
 common/pcapx/pcaputil/testdata/protocol-sessions/first-batch-oracles/*.tsv whitespace=-blank-at-eol
 scripts/protocol-tests/generate-dcerpc-session/*.tsv whitespace=-blank-at-eol
+
+# Native captures and independent tool exports are byte-preserved evidence.
+common/bin-parser/testdata/protocol-native/** -text
+common/bin-parser/testdata/protocol-native/**/*.tsv whitespace=-blank-at-eol
+common/bin-parser/testdata/protocol-native/nats/*.bin whitespace=cr-at-eol,-blank-at-eof,-blank-at-eol
+common/bin-parser/testdata/protocol-native/nats/server.log whitespace=-blank-at-eol
+common/bin-parser/testdata/protocol-native/nats/client-build-info.txt whitespace=-blank-at-eof,-blank-at-eol

@@ -1,0 +1,11 @@
+native.test:19553 {
+    file /fixtures/db.native.test native.test
+    log
+    errors
+}
+https://native.test:19544 {
+    tls /fixtures/server.pem /fixtures/server-key.pem
+    file /fixtures/db.native.test native.test
+    log
+    errors
+}

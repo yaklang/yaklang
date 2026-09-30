@@ -1,0 +1,123 @@
+[34628] 2026/09/30 09:11:50.568794 [INF] Starting nats-server
+[34628] 2026/09/30 09:11:50.569259 [INF]   Version:  2.10.26
+[34628] 2026/09/30 09:11:50.569269 [INF]   Git:      [14fa949]
+[34628] 2026/09/30 09:11:50.569300 [DBG]   Go build: go1.23.6
+[34628] 2026/09/30 09:11:50.569307 [INF]   Name:     nats-native-fixture
+[34628] 2026/09/30 09:11:50.569315 [INF]   Node:     IrPmc7G7
+[34628] 2026/09/30 09:11:50.569321 [INF]   ID:       NAVJL4YXB2VUGTDNVJ4CAXULVXAG2YPX3NCWDNXMYIEYR7DXSWMJVSZL
+[34628] 2026/09/30 09:11:50.569375 [DBG] Created system account: "$SYS"
+[34628] 2026/09/30 09:11:50.570396 [INF] Starting http monitor on 127.0.0.1:44223
+[34628] 2026/09/30 09:11:50.570531 [INF] Starting JetStream
+[34628] 2026/09/30 09:11:50.570851 [DBG] JetStream creating dynamic configuration - 48.00 GB memory, 80.30 GB disk
+[34628] 2026/09/30 09:11:50.571086 [INF]     _ ___ _____ ___ _____ ___ ___   _   __  __
+[34628] 2026/09/30 09:11:50.571093 [INF]  _ | | __|_   _/ __|_   _| _ \ __| /_\ |  \/  |
+[34628] 2026/09/30 09:11:50.571098 [INF] | || | _|  | | \__ \ | | |   / _| / _ \| |\/| |
+[34628] 2026/09/30 09:11:50.571102 [INF]  \__/|___| |_| |___/ |_| |_|_\___/_/ \_\_|  |_|
+[34628] 2026/09/30 09:11:50.571107 [INF] 
+[34628] 2026/09/30 09:11:50.571113 [INF]          https://docs.nats.io/jetstream
+[34628] 2026/09/30 09:11:50.571117 [INF] 
+[34628] 2026/09/30 09:11:50.571122 [INF] ---------------- JETSTREAM ----------------
+[34628] 2026/09/30 09:11:50.571127 [INF]   Max Memory:      48.00 GB
+[34628] 2026/09/30 09:11:50.571133 [INF]   Max Storage:     80.30 GB
+[34628] 2026/09/30 09:11:50.571137 [INF]   Store Directory: "/var/folders/jp/j2r6mvsx5ss5r448p6gzwckc0000gn/T/nats-native-rsy0qip2/jetstream/jetstream"
+[34628] 2026/09/30 09:11:50.571145 [INF] -------------------------------------------
+[34628] 2026/09/30 09:11:50.571192 [DBG]   Exports:
+[34628] 2026/09/30 09:11:50.571198 [DBG]      $JS.API.>
+[34628] 2026/09/30 09:11:50.571241 [DBG] Enabled JetStream for account "$G"
+[34628] 2026/09/30 09:11:50.571248 [DBG]   Max Memory:      -1 B
+[34628] 2026/09/30 09:11:50.571253 [DBG]   Max Storage:     -1 B
+[34628] 2026/09/30 09:11:50.571504 [DBG] JetStream state for account "$G" recovered
+[34628] 2026/09/30 09:11:50.571541 [INF] Listening for client connections on 127.0.0.1:44222
+[34628] 2026/09/30 09:11:50.571567 [INF] Server is ready
+[34628] 2026/09/30 09:11:50.571573 [DBG] maxprocs: Leaving GOMAXPROCS=10: CPU quota undefined
+[34628] 2026/09/30 09:11:51.527605 [DBG] 127.0.0.1:63697 - cid:5 - Client connection created
+[34628] 2026/09/30 09:11:51.528404 [TRC] 127.0.0.1:63697 - cid:5 - <<- [CONNECT {"verbose":false,"pedantic":false,"tls_required":false,"name":"native-oracle-subscriber","lang":"go","version":"1.39.1","protocol":1,"echo":true,"headers":true,"no_responders":true}]
+[34628] 2026/09/30 09:11:51.528580 [TRC] 127.0.0.1:63697 - cid:5 - <<- [PING]
+[34628] 2026/09/30 09:11:51.528592 [TRC] 127.0.0.1:63697 - cid:5 - ->> [PONG]
+[34628] 2026/09/30 09:11:51.529112 [DBG] 127.0.0.1:63698 - cid:6 - Client connection created
+[34628] 2026/09/30 09:11:51.529453 [TRC] 127.0.0.1:63698 - cid:6 - <<- [CONNECT {"verbose":false,"pedantic":false,"tls_required":false,"name":"native-oracle-publisher","lang":"go","version":"1.39.1","protocol":1,"echo":true,"headers":true,"no_responders":true}]
+[34628] 2026/09/30 09:11:51.529534 [TRC] 127.0.0.1:63698 - cid:6 - <<- [PING]
+[34628] 2026/09/30 09:11:51.529551 [TRC] 127.0.0.1:63698 - cid:6 - ->> [PONG]
+[34628] 2026/09/30 09:11:51.529810 [TRC] 127.0.0.1:63697 - cid:5 - <<- [SUB native.headers  1]
+[34628] 2026/09/30 09:11:51.529835 [TRC] 127.0.0.1:63697 - cid:5 - <<- [PING]
+[34628] 2026/09/30 09:11:51.529845 [TRC] 127.0.0.1:63697 - cid:5 - ->> [PONG]
+[34628] 2026/09/30 09:11:51.530038 [TRC] 127.0.0.1:63698 - cid:6 - <<- [HPUB native.headers 123 142]
+[34628] 2026/09/30 09:11:51.530051 [TRC] 127.0.0.1:63698 - cid:6 - <<- MSG_PAYLOAD: ["NATS/1.0\r\nASCII: \x00\x01\x7f\r\nColon: left:right\r\nEmpty: \r\nTab: left\tright\r\nX-Trace: alpha\r\nX-Trace: beta, gamma\r\nx-trace: lower\r\n\r\nnative\x00\r\nPING\r\nbody"]
+[34628] 2026/09/30 09:11:51.530085 [TRC] 127.0.0.1:63697 - cid:5 - ->> [HMSG native.headers 1 123 142]
+[34628] 2026/09/30 09:11:51.530226 [TRC] 127.0.0.1:63698 - cid:6 - <<- [PING]
+[34628] 2026/09/30 09:11:51.530233 [TRC] 127.0.0.1:63698 - cid:6 - ->> [PONG]
+[34628] 2026/09/30 09:11:51.530558 [TRC] 127.0.0.1:63698 - cid:6 - <<- [HPUB native.headers 12 12]
+[34628] 2026/09/30 09:11:51.530613 [TRC] 127.0.0.1:63698 - cid:6 - <<- MSG_PAYLOAD: ["NATS/1.0\r\n\r\n"]
+[34628] 2026/09/30 09:11:51.530636 [TRC] 127.0.0.1:63697 - cid:5 - ->> [HMSG native.headers 1 12 12]
+[34628] 2026/09/30 09:11:51.530647 [TRC] 127.0.0.1:63698 - cid:6 - <<- [PING]
+[34628] 2026/09/30 09:11:51.530655 [TRC] 127.0.0.1:63698 - cid:6 - ->> [PONG]
+[34628] 2026/09/30 09:11:51.530925 [TRC] 127.0.0.1:63698 - cid:6 - <<- [HPUB native.headers native.reply 52 52]
+[34628] 2026/09/30 09:11:51.530946 [TRC] 127.0.0.1:63698 - cid:6 - <<- MSG_PAYLOAD: ["NATS/1.0\r\nReply-Case: present\r\nReply-Case: twice\r\n\r\n"]
+[34628] 2026/09/30 09:11:51.530971 [TRC] 127.0.0.1:63697 - cid:5 - ->> [HMSG native.headers 1 native.reply 52 52]
+[34628] 2026/09/30 09:11:51.530981 [TRC] 127.0.0.1:63698 - cid:6 - <<- [PING]
+[34628] 2026/09/30 09:11:51.530988 [TRC] 127.0.0.1:63698 - cid:6 - ->> [PONG]
+[34628] 2026/09/30 09:11:51.531207 [TRC] 127.0.0.1:63698 - cid:6 - <<- [SUB _INBOX.WlXrBdUWQhgNmoil8fqOqm.*  1]
+[34628] 2026/09/30 09:11:51.531227 [TRC] 127.0.0.1:63698 - cid:6 - <<- [PUB native.absent _INBOX.WlXrBdUWQhgNmoil8fqOqm.LSiAUU8a 7]
+[34628] 2026/09/30 09:11:51.531235 [TRC] 127.0.0.1:63698 - cid:6 - <<- MSG_PAYLOAD: ["request"]
+[34628] 2026/09/30 09:11:51.531722 [TRC] 127.0.0.1:63698 - cid:6 - <<- [PUB $JS.API.STREAM.CREATE.NATIVE _INBOX.WlXrBdUWQhgNmoil8fqOqm.rgVD1QSO 287]
+[34628] 2026/09/30 09:11:51.531743 [TRC] 127.0.0.1:63698 - cid:6 - <<- MSG_PAYLOAD: ["{\"name\":\"NATIVE\",\"subjects\":[\"native.js.data\"],\"retention\":\"limits\",\"max_consumers\":0,\"max_msgs\":0,\"max_bytes\":0,\"discard\":\"old\",\"max_age\":0,\"max_msgs_per_subject\":0,\"storage\":\"memory\",\"num_replicas\":0,\"compression\":\"none\",\"allow_direct\":false,\"mirror_direct\":false,\"consumer_limits\":{}}"]
+[34628] 2026/09/30 09:11:51.532807 [TRC] 127.0.0.1:63698 - cid:6 - ->> [MSG _INBOX.WlXrBdUWQhgNmoil8fqOqm.rgVD1QSO 1 728]
+[34628] 2026/09/30 09:11:51.533133 [TRC] 127.0.0.1:63698 - cid:6 - <<- [PUB $JS.API.CONSUMER.INFO.NATIVE.C _INBOX.WlXrBdUWQhgNmoil8fqOqm.zQMx8JhK 0]
+[34628] 2026/09/30 09:11:51.533144 [TRC] 127.0.0.1:63698 - cid:6 - <<- MSG_PAYLOAD: [""]
+[34628] 2026/09/30 09:11:51.533395 [TRC] 127.0.0.1:63698 - cid:6 - ->> [MSG _INBOX.WlXrBdUWQhgNmoil8fqOqm.zQMx8JhK 1 131]
+[34628] 2026/09/30 09:11:51.533697 [TRC] 127.0.0.1:63698 - cid:6 - <<- [PUB $JS.API.CONSUMER.CREATE.NATIVE.C _INBOX.WlXrBdUWQhgNmoil8fqOqm.KzM7ZUSz 144]
+[34628] 2026/09/30 09:11:51.533714 [TRC] 127.0.0.1:63698 - cid:6 - <<- MSG_PAYLOAD: ["{\"stream_name\":\"NATIVE\",\"config\":{\"durable_name\":\"C\",\"deliver_policy\":\"all\",\"ack_policy\":\"explicit\",\"replay_policy\":\"instant\",\"num_replicas\":0}}"]
+[34628] 2026/09/30 09:11:51.533945 [TRC] JETSTREAM - <<- [SUB $JSC.CI.$G.NATIVE.C  59]
+[34628] 2026/09/30 09:11:51.534085 [TRC] 127.0.0.1:63698 - cid:6 - ->> [MSG _INBOX.WlXrBdUWQhgNmoil8fqOqm.KzM7ZUSz 1 544]
+[34628] 2026/09/30 09:11:51.534274 [TRC] 127.0.0.1:63698 - cid:6 - <<- [PUB $JS.API.CONSUMER.MSG.NEXT.NATIVE.C _INBOX.WlXrBdUWQhgNmoil8fqOqm.YaUpcifT 26]
+[34628] 2026/09/30 09:11:51.534283 [TRC] 127.0.0.1:63698 - cid:6 - <<- MSG_PAYLOAD: ["{\"batch\":1,\"no_wait\":true}"]
+[34628] 2026/09/30 09:11:51.534386 [TRC] 127.0.0.1:63698 - cid:6 - ->> [HMSG _INBOX.WlXrBdUWQhgNmoil8fqOqm.YaUpcifT 1 28 28]
+[34628] 2026/09/30 09:11:51.534595 [TRC] 127.0.0.1:63697 - cid:5 - <<- [SUB native.heartbeat  2]
+[34628] 2026/09/30 09:11:51.534643 [TRC] 127.0.0.1:63697 - cid:5 - <<- [PING]
+[34628] 2026/09/30 09:11:51.534652 [TRC] 127.0.0.1:63697 - cid:5 - ->> [PONG]
+[34628] 2026/09/30 09:11:51.534858 [TRC] 127.0.0.1:63698 - cid:6 - <<- [PUB $JS.API.CONSUMER.INFO.NATIVE.HB _INBOX.WlXrBdUWQhgNmoil8fqOqm.RYR44fFt 0]
+[34628] 2026/09/30 09:11:51.534875 [TRC] 127.0.0.1:63698 - cid:6 - <<- MSG_PAYLOAD: [""]
+[34628] 2026/09/30 09:11:51.534993 [TRC] 127.0.0.1:63698 - cid:6 - ->> [MSG _INBOX.WlXrBdUWQhgNmoil8fqOqm.RYR44fFt 1 131]
+[34628] 2026/09/30 09:11:51.535209 [TRC] 127.0.0.1:63698 - cid:6 - <<- [PUB $JS.API.CONSUMER.CREATE.NATIVE.HB _INBOX.WlXrBdUWQhgNmoil8fqOqm.3iIYb0dP 205]
+[34628] 2026/09/30 09:11:51.535240 [TRC] 127.0.0.1:63698 - cid:6 - <<- MSG_PAYLOAD: ["{\"stream_name\":\"NATIVE\",\"config\":{\"durable_name\":\"HB\",\"deliver_policy\":\"all\",\"ack_policy\":\"none\",\"replay_policy\":\"instant\",\"idle_heartbeat\":100000000,\"deliver_subject\":\"native.heartbeat\",\"num_replicas\":0}}"]
+[34628] 2026/09/30 09:11:51.535358 [TRC] JETSTREAM - <<- [SUB $JSC.CI.$G.NATIVE.HB  60]
+[34628] 2026/09/30 09:11:51.535577 [TRC] 127.0.0.1:63698 - cid:6 - ->> [MSG _INBOX.WlXrBdUWQhgNmoil8fqOqm.3iIYb0dP 1 562]
+[34628] 2026/09/30 09:11:51.636860 [TRC] 127.0.0.1:63697 - cid:5 - ->> [HMSG native.heartbeat 2 75 75]
+[34628] 2026/09/30 09:11:51.637746 [TRC] 127.0.0.1:63698 - cid:6 - <<- [PUB $JS.API.CONSUMER.DELETE.NATIVE.HB _INBOX.WlXrBdUWQhgNmoil8fqOqm.ZLJo4nSg 0]
+[34628] 2026/09/30 09:11:51.637787 [TRC] 127.0.0.1:63698 - cid:6 - <<- MSG_PAYLOAD: [""]
+[34628] 2026/09/30 09:11:51.637997 [TRC] JETSTREAM - <-> [DELSUB 1]
+[34628] 2026/09/30 09:11:51.638031 [TRC] JETSTREAM - <-> [DELSUB 60]
+[34628] 2026/09/30 09:11:51.638058 [DBG] JETSTREAM - JetStream connection closed: Client Closed
+[34628] 2026/09/30 09:11:51.638130 [DBG] JETSTREAM - JetStream connection closed: Client Closed
+[34628] 2026/09/30 09:11:51.638281 [TRC] 127.0.0.1:63698 - cid:6 - ->> [MSG _INBOX.WlXrBdUWQhgNmoil8fqOqm.ZLJo4nSg 1 75]
+[34628] 2026/09/30 09:11:51.638655 [TRC] 127.0.0.1:63698 - cid:6 - <<- [PUB $JS.API.CONSUMER.DELETE.NATIVE.C _INBOX.WlXrBdUWQhgNmoil8fqOqm.ZtbXTWgv 0]
+[34628] 2026/09/30 09:11:51.638669 [TRC] 127.0.0.1:63698 - cid:6 - <<- MSG_PAYLOAD: [""]
+[34628] 2026/09/30 09:11:51.638803 [TRC] JETSTREAM - <-> [DELSUB 1]
+[34628] 2026/09/30 09:11:51.638828 [TRC] JETSTREAM - <-> [DELSUB 2]
+[34628] 2026/09/30 09:11:51.638844 [TRC] JETSTREAM - <-> [DELSUB 59]
+[34628] 2026/09/30 09:11:51.638861 [DBG] JETSTREAM - JetStream connection closed: Client Closed
+[34628] 2026/09/30 09:11:51.638871 [DBG] JETSTREAM - JetStream connection closed: Client Closed
+[34628] 2026/09/30 09:11:51.638978 [TRC] 127.0.0.1:63698 - cid:6 - ->> [MSG _INBOX.WlXrBdUWQhgNmoil8fqOqm.ZtbXTWgv 1 75]
+[34628] 2026/09/30 09:11:51.639130 [TRC] 127.0.0.1:63698 - cid:6 - <<- [PUB $JS.API.STREAM.DELETE.NATIVE _INBOX.WlXrBdUWQhgNmoil8fqOqm.FttnVPW4 0]
+[34628] 2026/09/30 09:11:51.639144 [TRC] 127.0.0.1:63698 - cid:6 - <<- MSG_PAYLOAD: [""]
+[34628] 2026/09/30 09:11:51.639244 [DBG] JETSTREAM - JetStream connection closed: Client Closed
+[34628] 2026/09/30 09:11:51.639261 [DBG] JETSTREAM - JetStream connection closed: Client Closed
+[34628] 2026/09/30 09:11:51.639265 [TRC] JETSTREAM - <-> [DELSUB 1]
+[34628] 2026/09/30 09:11:51.639287 [DBG] JETSTREAM - JetStream connection closed: Client Closed
+[34628] 2026/09/30 09:11:51.639480 [TRC] 127.0.0.1:63698 - cid:6 - ->> [MSG _INBOX.WlXrBdUWQhgNmoil8fqOqm.FttnVPW4 1 73]
+[34628] 2026/09/30 09:11:51.640465 [TRC] 127.0.0.1:63697 - cid:5 - <<- [PING]
+[34628] 2026/09/30 09:11:51.640483 [TRC] 127.0.0.1:63697 - cid:5 - ->> [PONG]
+[34628] 2026/09/30 09:11:51.640659 [TRC] 127.0.0.1:63698 - cid:6 - <<- [PING]
+[34628] 2026/09/30 09:11:51.640673 [TRC] 127.0.0.1:63698 - cid:6 - ->> [PONG]
+[34628] 2026/09/30 09:11:51.640890 [DBG] 127.0.0.1:63697 - cid:5 - Client connection closed: Client Closed
+[34628] 2026/09/30 09:11:51.640970 [TRC] 127.0.0.1:63697 - cid:5 - <-> [DELSUB 1]
+[34628] 2026/09/30 09:11:51.640983 [TRC] 127.0.0.1:63697 - cid:5 - <-> [DELSUB 2]
+[34628] 2026/09/30 09:11:51.641159 [DBG] 127.0.0.1:63698 - cid:6 - Client connection closed: Client Closed
+[34628] 2026/09/30 09:11:51.641177 [TRC] 127.0.0.1:63698 - cid:6 - <-> [DELSUB 1]
+[34628] 2026/09/30 09:11:51.951961 [DBG] Trapped "terminated" signal
+[34628] 2026/09/30 09:11:51.952149 [INF] Initiating Shutdown...
+[34628] 2026/09/30 09:11:51.952198 [INF] Initiating JetStream Shutdown...
+[34628] 2026/09/30 09:11:51.952210 [INF] JetStream Shutdown
+[34628] 2026/09/30 09:11:51.952408 [DBG] Client accept loop exiting..
+[34628] 2026/09/30 09:11:51.952411 [DBG] SYSTEM - System connection closed: Client Closed
+[34628] 2026/09/30 09:11:51.952473 [INF] Server Exiting..

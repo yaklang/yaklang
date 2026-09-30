@@ -1,0 +1,20 @@
+{
+  "server": "CoreDNS-1.12.0\nlinux/arm64, go1.23.3, 51e11f1",
+  "docker_image": "coredns/coredns@sha256:40384aa1f5ea6bfdc77997d243aec73da05f27aed0c5e9d65bfa98933c519d97",
+  "client": "dnspython 2.7.0 / httpx 0.28.1",
+  "python": "3.14.0 (main, Oct  7 2025, 09:34:52) [Clang 16.0.0 (clang-1600.0.26.6)]",
+  "tshark": "TShark (Wireshark) 4.4.8 (v4.4.8-0-g0d289c003bfb).",
+  "ssl": "OpenSSL 3.6.2 7 Apr 2026",
+  "license": {
+    "coredns": "Apache-2.0",
+    "dnspython": "ISC",
+    "httpx": "BSD-3-Clause"
+  },
+  "sources": [
+    "https://github.com/coredns/coredns/tree/v1.12.0",
+    "https://github.com/rthalley/dnspython/tree/v2.7.0"
+  ],
+  "representation": "native_capture",
+  "capture_interface": "lo0",
+  "keylog_origin": "locally generated client TLS test sessions"
+}
