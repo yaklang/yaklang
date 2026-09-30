@@ -112,12 +112,14 @@ useDeclarationContentList
     : namespaceUseDeclaration (',' namespaceUseDeclaration)*
     ;
 
+// A separator belongs to the next segment (or to a grouped import tail).
+// Greedily accepting a trailing separator makes adjacent segments ambiguous.
 namespacePath
-    : '\\'? identifier ('\\' identifier '\\'?)*
+    : '\\'? identifier ('\\' identifier)*
     ;
 
 namespaceDeclaration
-    : Namespace (
+    : {p.IsNamespaceDeclarationAhead()}? Namespace (
         namespacePath? OpenCurlyBracket namespaceStatement* CloseCurlyBracket
         | namespacePath SemiColon namespaceStatement*
     )
@@ -597,10 +599,23 @@ dynamicStaticReceiverAccess
     ;
 
 // Expressions
+// Keyword lambdas and match must precede the general call/name alternatives.
+// For short call-result assignments, use LL locally and restore SLL even on
+// cancellation. Putting predicates on common recursive alternatives instead
+// propagates semantic contexts through their ATN configurations and is slower.
+// Keep operator alternatives in order: they define operand binding precedence.
 // Grouped by priorities: http://php.net/manual/en/language.operators.precedence.php
 expression
+@init {
+    if interpreter := p.GetInterpreter(); interpreter.GetPredictionMode() == antlr.PredictionModeSLL && p.IsCallResultAssignmentAhead() {
+        interpreter.SetPredictionMode(antlr.PredictionModeLL)
+        defer interpreter.SetPredictionMode(antlr.PredictionModeSLL)
+    }
+}
     : Clone expression                                                                  # CloneExpression
     | newExpr                                                                           # KeywordNewExpression
+    | lambdaFunctionExpr                                                                # LambdaFunctionExpression
+    | matchExpr                                                                         # MatchExpression
     | functionCall                                                                      # DirectFunctionCallExpression
     | fullyQualifiedNamespaceExpr                                                       # FullyQualifiedNamespaceExpression
     | Parent_ DoubleColon memberCallKey                                                 # ParentExpression
@@ -626,8 +641,6 @@ expression
     | Yield                                                                             # SpecialWordExpression
     | List '(' assignmentList ')' Eq expression                                         # SpecialWordExpression
     | Throw expression                                                                  # SpecialWordExpression
-    | lambdaFunctionExpr                                                                # LambdaFunctionExpression
-    | matchExpr                                                                         # MatchExpression
     | '(' castOperation ')' expression                                                  # CastExpression
     | expression arguments                                                              # FunctionCallExpression
     | ('~' | '@') expression                                                            # UnaryOperatorExpression
