@@ -1,9 +1,6 @@
 package yakast
 
 import (
-	"fmt"
-	"strings"
-
 	yak "github.com/yaklang/yaklang/common/yak/antlr4yak/parser"
 	"github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm"
 
@@ -49,14 +46,9 @@ func (y *YakCompiler) VisitAnonymousFunctionDecl(raw yak.IAnonymousFunctionDeclC
 	if i.EqGt() != nil {
 		// 处理参数：为参数设置函数内定义域的符号表
 		if i.LParen() != nil && i.RParen() != nil {
-			y.writeString("(")
 			paramsSymbol, isVariable = y.VisitFunctionParamDecl(i.FunctionParamDecl())
-			y.writeString(")")
-			y.writeStringWithWhitespace("=>")
 		} else {
 			symbolText := i.Identifier().GetText()
-			y.writeString(symbolText)
-			y.writeStringWithWhitespace("=>")
 			symbolId, err := y.currentSymtbl.NewSymbolWithReturn(symbolText)
 			if err != nil {
 				y.panicCompilerError(compileError, "cannot create identifier["+i.Identifier().GetText()+"] for params (arrow function): "+err.Error())
@@ -70,7 +62,7 @@ func (y *YakCompiler) VisitAnonymousFunctionDecl(raw yak.IAnonymousFunctionDeclC
 			y.panicCompilerError(compileError, "BUG: arrow function need expression or block at least")
 		}
 		if i.Block() != nil {
-			y.VisitBlock(i.Block(), true)
+			y.VisitBlock(i.Block())
 			y.pushOperator(yakvm.OpReturn)
 		} else {
 			// 一般来说，这儿的栈是不平的，但是因为这是函数调用内部，最后一个栈数据应该作为函数返回值，这儿所以不需要处理，其他的情况
@@ -88,24 +80,8 @@ func (y *YakCompiler) VisitAnonymousFunctionDecl(raw yak.IAnonymousFunctionDeclC
 		}
 	} else {
 		// 创建符号
-		if fn := i.Func(); fn != nil {
-			y.writeString(fn.GetText())
-		}
-		if funcName != "" {
-			y.writeString(" ")
-			y.writeString(funcName)
-		}
-		y.writeString("(")
-		paramsSymbol, isVariable = y.VisitFunctionParamDecl(i.FunctionParamDecl())
-		y.writeString(")")
-		// Go 风格返回类型注解：仅 formatter 保留，运行时忽略
-		if rt := i.FunctionResultType(); rt != nil {
-			y.writeString(" ")
-			y.writeString(formatTypeLiteralText(rt.GetText()))
-		}
-		y.writeString(" ")
-		// visit代码块
-		y.VisitBlock(i.Block(), true)
+		paramsSymbol, isVariable = y.VisitFunctionParamDecl(i.FunctionParamDecl()) // visit代码块
+		y.VisitBlock(i.Block())
 		y.pushOperator(yakvm.OpReturn)
 		funcCode := y.codes
 		// 编译好的 FuncCode 配合符号表，一般来说就可以供执行和调用了
@@ -153,20 +129,7 @@ func (y *YakCompiler) VisitAnonymousFunctionDecl(raw yak.IAnonymousFunctionDeclC
 	return nil
 }
 
-func formatTypeLiteralText(text string) string {
-	// ANTLR GetText 可能丢掉空格；对常见多返回 `(int,error)` 补空格更可读
-	text = strings.TrimSpace(text)
-	if strings.HasPrefix(text, "(") && strings.HasSuffix(text, ")") {
-		inner := strings.TrimSpace(text[1 : len(text)-1])
-		parts := strings.Split(inner, ",")
-		for i := range parts {
-			parts[i] = strings.TrimSpace(parts[i])
-		}
-		return "(" + strings.Join(parts, ", ") + ")"
-	}
-	return text
-}
-
+// Type annotations are syntax metadata; runtime parameter binding uses names.
 func (y *YakCompiler) VisitFunctionParamDecl(raw yak.IFunctionParamDeclContext) ([]int, bool) {
 	if y == nil || raw == nil {
 		return nil, false
@@ -184,93 +147,17 @@ func (y *YakCompiler) VisitFunctionParamDecl(raw yak.IFunctionParamDeclContext) 
 	lenOfIds := len(params)
 	symbols := make([]int, lenOfIds)
 
-	tokenStart := i.BaseParserRuleContext.GetStart().GetColumn()
-	lineLength := tokenStart
-	eachParamOneLine := false
-	identifierTokenLengths := make([]int, lenOfIds)
 	for index, p := range params {
 		pc, _ := p.(*yak.FunctionParamContext)
 		if pc == nil || pc.Identifier() == nil {
 			continue
 		}
-		n := len(pc.Identifier().GetText())
-		if tl := pc.FuncTypeRef(); tl != nil {
-			n += 1 + len(tl.GetText())
-		}
-		identifierTokenLengths[index] = n
-		if !eachParamOneLine && identifierTokenLengths[index] > FORMATTER_RECOMMEND_PARAM_LENGTH {
-			eachParamOneLine = true
-		}
-	}
-
-	if lenOfIds == 1 && eachParamOneLine {
-		eachParamOneLine = false
-	}
-
-	hadIncIndent := false
-	comments := getIdentifersSurroundComments(i.GetParser().GetTokenStream(), i.GetStart(), i.GetStop(), lenOfIds)
-
-	for index, p := range params {
-		pc, _ := p.(*yak.FunctionParamContext)
-		if pc == nil || pc.Identifier() == nil {
-			continue
-		}
-		idText := pc.Identifier().GetText()
-		lineLength += identifierTokenLengths[index]
-
-		if lenOfIds > 1 { // 如果不是只有一个参数，超出单行最长长度或任意一个参数过长，就换行
-			if eachParamOneLine {
-				y.writeNewLine()
-				if !hadIncIndent {
-					y.incIndent()
-					hadIncIndent = true
-				}
-				y.writeIndent()
-				lineLength = y.indent*4 + identifierTokenLengths[index]
-			} else if lineLength > FORMATTER_MAXWIDTH {
-				y.writeNewLine()
-				y.writeWhiteSpace(tokenStart)
-				lineLength = tokenStart + identifierTokenLengths[index]
-			}
-		}
-
-		symbolId, err := y.currentSymtbl.NewSymbolWithReturn(idText)
+		id := pc.Identifier().GetText()
+		symbol, err := y.currentSymtbl.NewSymbolWithReturn(id)
 		if err != nil {
 			y.panicCompilerError(compileError, "cannot create symbol for function params decl")
 		}
-		symbols[index] = symbolId
-
-		y.writeString(idText)
-		// Go 风格参数类型注解：formatter 保留，不生成类型相关 opcode
-		if tl := pc.FuncTypeRef(); tl != nil {
-			y.writeString(" ")
-			y.writeString(formatTypeLiteralText(tl.GetText()))
-		}
-
-		if comments[index] != "" {
-			y.writeString(fmt.Sprintf(" /* %s */", comments[index]))
-		}
-
-		// 如果是最后一个参数且有...，就要加...
-		if index == lenOfIds-1 {
-			if ellipsis != nil {
-				y.writeString("...")
-			}
-		}
-		// 如果不是最后一个参数或者每个参数一行就要加,
-		if index != lenOfIds-1 || eachParamOneLine {
-			y.writeString(", ")
-			lineLength += 2
-		}
-		// 如果是最后一个参数且每个参数一行，就要换行
-		if index == lenOfIds-1 && eachParamOneLine {
-			y.writeNewLine()
-			if hadIncIndent {
-				y.decIndent()
-			}
-			y.writeIndent()
-		}
+		symbols[index] = symbol
 	}
-
 	return symbols, ellipsis != nil
 }

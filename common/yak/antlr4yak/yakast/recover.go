@@ -16,7 +16,6 @@ func (y *YakCompiler) VisitRecoverStmt(raw yak.IRecoverStmtContext) {
 	}
 
 	if op := i.Recover(); op != nil {
-		y.writeString(op.GetText() + "()")
 		y.pushOperator(yakvm.OpRecover)
 	}
 }

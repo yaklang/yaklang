@@ -18,7 +18,6 @@ func (y *YakCompiler) VisitGoStmt(raw yak.IGoStmtContext) interface{} {
 	}
 	recoverRange := y.SetRange(&i.BaseParserRuleContext)
 	defer recoverRange()
-	y.writeString("go ")
 
 	call := i.CallExpr().(*yak.CallExprContext)
 	if instance := call.InstanceCode(); instance != nil {

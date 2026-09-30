@@ -15,19 +15,14 @@ func (y *YakCompiler) VisitAssertStmt(raw yak.IAssertStmtContext) interface{} {
 	}
 	recoverRange := y.SetRange(&i.BaseParserRuleContext)
 	defer recoverRange()
-	y.writeString("assert ")
 
 	exps := i.AllExpression()
-	lenOfExps := len(exps)
-	for index, Iexp := range i.AllExpression() {
+	for _, Iexp := range exps {
 		exp, ok := Iexp.(*yak.ExpressionContext)
 		if !ok {
 			y.panicCompilerError(assertExpressionError)
 		}
 		y.VisitExpression(exp)
-		if index < lenOfExps-1 {
-			y.writeString(", ")
-		}
 	}
 
 	var desc = i.GetText()

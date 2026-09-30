@@ -18,9 +18,6 @@ func (y *YakCompiler) VisitInstanceCode(raw yak.IInstanceCodeContext) interface{
 	}
 	recoverRange := y.SetRange(&i.BaseParserRuleContext)
 	defer recoverRange()
-	if op := i.Func(); op != nil {
-		y.writeString(op.GetText() + " ")
-	}
 	//var funcName = fmt.Sprintf("anonymous-%v", uuid.New().String())
 
 	var yakFn *yakvm.Function

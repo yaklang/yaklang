@@ -25,8 +25,6 @@ func (y *YakCompiler) VisitSliceCall(raw yak.ISliceCallContext) interface{} {
 	if len(exps) > 3 {
 		y.panicCompilerError(sliceCallTooManyParamError)
 	}
-	y.writeString("[")
-	defer y.writeString("]")
 	//解决:一侧为空的情况
 	childrens := i.GetChildren()
 	expect := true // 记录状态，如果期望是数字，得到的是:，则push一个默认数，不切换状态。
@@ -34,8 +32,7 @@ func (y *YakCompiler) VisitSliceCall(raw yak.ISliceCallContext) interface{} {
 	idEnd := false
 	omitted := 0
 	visitChildrens := childrens[1:]
-	lenOfVisitChildrens := len(visitChildrens)
-	for index, children := range visitChildrens {
+	for _, children := range visitChildrens {
 		if expect {
 			expression, isExpression := children.(*yak.ExpressionContext)
 
@@ -52,9 +49,6 @@ func (y *YakCompiler) VisitSliceCall(raw yak.ISliceCallContext) interface{} {
 					idEnd = true
 				}
 
-				if index != lenOfVisitChildrens-1 {
-					y.writeString(":")
-				}
 				if t == 2 {
 					y.pushInteger(1, "1")
 				} else {
@@ -64,9 +58,6 @@ func (y *YakCompiler) VisitSliceCall(raw yak.ISliceCallContext) interface{} {
 
 			t += 1
 		} else { // 如果期望是:, 则直接切换状态
-			if index != lenOfVisitChildrens-1 {
-				y.writeString(":")
-			}
 			expect = !expect
 		}
 	}

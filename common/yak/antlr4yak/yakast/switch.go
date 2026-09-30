@@ -2,12 +2,10 @@ package yakast
 
 import (
 	"fmt"
-	"strings"
-
-	yak "github.com/yaklang/yaklang/common/yak/antlr4yak/parser"
-	"github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm"
 
 	uuid "github.com/google/uuid"
+	yak "github.com/yaklang/yaklang/common/yak/antlr4yak/parser"
+	"github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm"
 )
 
 type switchContext struct {
@@ -46,7 +44,42 @@ func (y *YakCompiler) exitSwitchContext(end int) {
 	y.switchDepthStack.Pop()
 }
 
-func (y *YakCompiler) _VisitSwitchStmt(raw yak.ISwitchStmtContext) interface{} {
+/*
+cfg:
+	// switch case, just jump
+	if a == 1 {
+		jump body1
+		break
+	} else if a==2{
+		jump body3
+		fallthought
+	}else {
+		jump body-default
+	}
+
+	// body list
+	body1 {
+		...
+		break end-switch (current break counter) // break
+		...
+	}
+	jump end-switch // body1:jump-to-end
+	body2 {
+		...
+		break body-default:start-scope (current break counter) // fallthought
+		...
+	}
+	jump end-switch
+	body-default {
+		// body-default:start-scope
+		...
+	}
+	jump end-switch
+	// end-swich
+
+*/
+
+func (y *YakCompiler) VisitSwitchStmt(raw yak.ISwitchStmtContext) interface{} {
 	if y == nil || raw == nil {
 		return nil
 	}
@@ -57,11 +90,11 @@ func (y *YakCompiler) _VisitSwitchStmt(raw yak.ISwitchStmtContext) interface{} {
 	}
 	recoverRange := y.SetRange(&i.BaseParserRuleContext)
 	defer recoverRange()
-	y.writeString("switch ")
 
 	var (
-		defaultCodeIndex  int
-		switchExprIsEmpty bool
+		defaultCodeAddress int
+		switchExprIsEmpty  bool
+		jmp2Default        *yakvm.Code
 	)
 
 	recoverSymtbl := y.SwitchSymbolTableInNewScope("switch", uuid.New().String())
@@ -85,136 +118,99 @@ func (y *YakCompiler) _VisitSwitchStmt(raw yak.ISwitchStmtContext) interface{} {
 		y.pushListWithLen(1)
 		// 为右值创建一个符号，这个符号为 rightExpressionSymbol
 		y.pushOperator(yakvm.OpAssign)
-		y.writeString(" {")
 	} else {
 		//y.pushUndefined()
 		switchExprIsEmpty = true
-		y.writeString("{")
 	}
-
-	y.writeNewLine()
 
 	allcases := i.AllCase()
 	lenOfAllCases := len(allcases)
+	jmpToCase := make([]*yakvm.Code, 0, lenOfAllCases)
 	jmpToEnd := make([]*yakvm.Code, 0, lenOfAllCases)
-	jmpToNextCase := make([]*yakvm.Code, 0, lenOfAllCases)
-	jmpFallthrough := make([]*yakvm.Code, 0)
-	nextCaseIndexs := make([]int, 0, lenOfAllCases)
-	nextStmtIndexs := make([]int, 0, lenOfAllCases)
+	_fallthrough := make([]*yakvm.Code, 0)
+	caseAddress := make([]int, 0, lenOfAllCases)
 
+	// save jump to case with index
+	pushJumpTrue := func(index int) {
+		jmpt := y.pushJmpIfTrue()
+		jmpt.Unary = index
+		jmpToCase = append(jmpToCase, jmpt)
+	}
+	// build check list
 	for index := range allcases {
-		recoverSymtbl = y.SwitchSymbolTableInNewScope("case", uuid.New().String())
-		y.writeString("case ")
-
-		var jmpToStmt []*yakvm.Code
-		// 获取下个case的位置
-		caseIndex := y.GetNextCodeIndex()
-		nextCaseIndexs = append(nextCaseIndexs, caseIndex)
-
-		// if 判断
-		iExprs := i.ExpressionList(index)
-		if iExprs != nil {
-			exprs := iExprs.(*yak.ExpressionListContext)
-			lenOfExprs := len(exprs.AllExpression())
-			// 如果只有一个表达式,则直接用eq判断
-			if lenOfExprs == 1 {
+		if exprs, ok := i.ExpressionList(index).(*yak.ExpressionListContext); ok {
+			if len(exprs.AllExpression()) == 1 {
+				// only one expression
 				y.VisitExpression(exprs.AllExpression()[0])
 				if !switchExprIsEmpty {
 					y.pushRef(expressionResultID)
 					y.pushOperator(yakvm.OpEq)
 				}
-			} else { // 如果多个表达式,要短路处理
-				for i, e := range exprs.AllExpression() {
+				pushJumpTrue(index)
+			} else {
+				// multiple expression
+				for _, e := range exprs.AllExpression() {
 					y.VisitExpression(e)
 					if !switchExprIsEmpty {
 						y.pushRef(expressionResultID)
 						y.pushOperator(yakvm.OpEq)
 					}
-					jmpToStmt = append(jmpToStmt, y.pushJmpIfTrue())
-					if i < lenOfExprs-1 {
-						y.writeString(", ")
-					}
+					pushJumpTrue(index)
 				}
-				// 最后补一个false,用于下面的jmpToNextCase条件判断
-				y.pushBool(false)
 			}
 		}
-		y.writeString(":")
-		y.writeNewLine()
-		y.incIndent()
+	}
+	jmp2Default = y.pushJmp()
 
-		// 如果不相等，跳转到下个case
-		jmpToNextCase = append(jmpToNextCase, y.pushJmpIfFalse())
+	// build body list
+	for index := range allcases {
+		// save case  body address
+		stmtAddress := y.GetNextCodeIndex()
+		caseAddress = append(caseAddress, stmtAddress)
 
-		// 获取下个statementlist的位置
-		stmtIndex := y.GetNextCodeIndex()
-		nextStmtIndexs = append(nextStmtIndexs, stmtIndex)
+		// new scope for body
+		recoverSymtbl = y.SwitchSymbolTableInNewScope("case", uuid.New().String())
 
-		// 设置条件短路
-		for _, jmp := range jmpToStmt {
-			jmp.Unary = stmtIndex
-		}
-
-		// 执行case中的语句,由于有fallthrough需要获取上下文,不能直接用VisitStatementList和VisitStatement
-		recoverFormatBufferFunc := y.switchFormatBuffer()
-		iStmts := i.StatementList(index)
-		if iStmts != nil {
-			stmts := iStmts.(*yak.StatementListContext)
-			allStatement := stmts.AllStatement()
+		if stmt, ok := i.StatementList(index).(*yak.StatementListContext); ok {
+			allStatement := stmt.AllStatement()
 			lenOfAllStatement := len(allStatement)
 			for i, istmt := range allStatement {
 				if istmt == nil {
 					continue
 				}
 				stmt := istmt.(*yak.StatementContext)
-				// 忽略开头的empty
-				if i == 0 && stmt.Empty() != nil {
+				// 忽略开头和结尾的empty
+				if (i == 0 || i == lenOfAllStatement-1) && stmt.Empty() != nil {
 					continue
 				}
 
-				y.writeIndent()
-
 				if s := stmt.FallthroughStmt(); s != nil {
 					if y.NowInSwitch() {
-						y.writeString("fallthrough")
-						y.writeEOS(stmt.Eos())
-						jmp := y.pushJmp()
-						// 暂时设置为index, 后面会设置为跳转到下一个statementlist的位置
-						jmp.Unary = index
-						jmpFallthrough = append(jmpFallthrough, jmp)
+						// save in _fallthrough
+						b := y.pushBreak()
+						b.Unary = index
+						_fallthrough = append(_fallthrough, b)
 						continue
 					}
 					y.panicCompilerError(fallthroughError)
-				} else {
 				}
 
-				newline := y.VisitStatement(istmt.(*yak.StatementContext))
-				if i < lenOfAllStatement-1 && newline {
-					y.writeNewLine()
-				}
+				y.VisitStatement(istmt.(*yak.StatementContext))
 			}
 		}
-		buf := recoverFormatBufferFunc()
-		buf = strings.Trim(buf, "\n")
-		y.writeString(buf)
-		y.decIndent()
-		y.writeNewLine()
 
-		// 跳转到switch结尾
-		jmpToEnd = append(jmpToEnd, y.pushJmp())
+		// end scope
 		recoverSymtbl()
+		// jump to switch end, when body finish
+		jmpToEnd = append(jmpToEnd, y.pushJmp())
 	}
 
-	// 访问default statementlist
+	// default
 	if i.Default() != nil {
+		defaultCodeAddress = y.GetNextCodeIndex()
+		// default body scope
 		recoverSymtbl = y.SwitchSymbolTableInNewScope("default", uuid.New().String())
-		y.writeString("default:")
-		y.writeNewLine()
-		y.incIndent()
 
-		defaultCodeIndex = y.GetNextCodeIndex()
-
-		recoverFormatBufferFunc := y.switchFormatBuffer()
 		stmts := i.StatementList(len(allcases)).(*yak.StatementListContext)
 		// y.VisitStatementList(stmts)
 		allStatement := stmts.AllStatement()
@@ -224,63 +220,48 @@ func (y *YakCompiler) _VisitSwitchStmt(raw yak.ISwitchStmtContext) interface{} {
 				continue
 			}
 			stmt := istmt.(*yak.StatementContext)
-			// 忽略开头的empty
-			if i == 0 && stmt.Empty() != nil {
+			// 忽略开头和结尾的empty
+			if (i == 0 || i == lenOfAllStatement-1) && stmt.Empty() != nil {
 				continue
 			}
 
-			y.writeIndent()
-			newline := y.VisitStatement(istmt.(*yak.StatementContext))
-			if i < lenOfAllStatement-1 && newline {
-				y.writeNewLine()
-			}
+			y.VisitStatement(istmt.(*yak.StatementContext))
 		}
 
-		buf := recoverFormatBufferFunc()
-		buf = strings.Trim(buf, "\n")
-		y.writeString(buf)
-		y.decIndent()
-		y.writeNewLine()
+		// end scope
 		recoverSymtbl()
 	}
 
+	// handler jump case
+	for _, jmp := range jmpToCase {
+		jmp.Unary = caseAddress[jmp.Unary]
+	}
+
 	endCodewithScopeEnd := y.GetNextCodeIndex()
-	// 如果没有default,则跳转到switch结尾
-	if defaultCodeIndex == 0 {
-		defaultCodeIndex = endCodewithScopeEnd
+	if defaultCodeAddress == 0 {
+		defaultCodeAddress = endCodewithScopeEnd
 	}
 
-	endCode := y.GetNextCodeIndex()
+	jmp2Default.Unary = defaultCodeAddress
 
+	// handler fallthough
 	// 设置fallthrough跳转到下个statementlist的位置
-
-	for _, jmp := range jmpFallthrough {
+	for _, b := range _fallthrough {
 		// 最后一个的fallthrough应该跳转到default
-		if jmp.Unary == lenOfAllCases-1 {
-			jmp.Unary = defaultCodeIndex
+		if b.Unary == lenOfAllCases-1 {
+			b.Unary = defaultCodeAddress
 		} else {
-			jmp.Unary = nextStmtIndexs[jmp.Unary+1]
+			b.Unary = caseAddress[b.Unary+1]
 		}
+		b.Op2 = yakvm.NewIntValue(2)
 	}
-
-	// 设置跳转到下个case的位置
-	for index, jmp := range jmpToNextCase[:len(jmpToNextCase)-1] {
-		jmp.Unary = nextCaseIndexs[index+1]
-	}
-
-	// 设置最后一个case跳转到default
-	jmpToNextCase[len(jmpToNextCase)-1].Unary = defaultCodeIndex
 
 	// 设置跳转到switch结尾的位置
 	for _, jmp := range jmpToEnd {
 		jmp.Unary = endCodewithScopeEnd
 	}
-	// 设置break跳转到switch结尾的位置,不需要处理内部的scopeEnd,因为break自带了scopeEnd
-	// 因为switch创建时，breakScope的层数从0开始，因此break只会退出switch-scope内部的scope， 最后仍然需要一个switch-scope的scopeEnd。
-	// endCode一定是最后的ScopeEnd
-	y.exitSwitchContext(endCode)
-
-	y.writeString("}")
+	// handler break
+	y.exitSwitchContext(endCodewithScopeEnd)
 
 	return nil
 }

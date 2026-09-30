@@ -42,18 +42,10 @@ func (y *YakCompiler) VisitAssignExpression(raw yak.IAssignExpressionContext) in
 	if op, op2 := i.AssignEq(), i.ColonAssignEq(); op != nil || op2 != nil {
 
 		// 赋值语句，应该先 visit 右值，再 visit 左值
-		recoverFormatBufferFunc := y.switchFormatBuffer()
 		y.VisitExpressionList(i.ExpressionList())
-		buf := recoverFormatBufferFunc()
 
 		forceAssign := op2 != nil
 		y.VisitLeftExpressionList(forceAssign, i.LeftExpressionList())
-		if op != nil {
-			y.writeStringWithWhitespace(op.GetText())
-		} else {
-			y.writeStringWithWhitespace(op2.GetText())
-		}
-		y.writeString(buf)
 
 		y.pushOperator(yakvm.OpAssign)
 		return nil
@@ -61,23 +53,17 @@ func (y *YakCompiler) VisitAssignExpression(raw yak.IAssignExpressionContext) in
 
 	if i.PlusPlus() != nil { // ++
 		y.VisitLeftExpression(false, i.LeftExpression())
-		y.writeString("++")
 		y.pushOperator(yakvm.OpPlusPlus)
 		return nil
 	} else if i.SubSub() != nil { // --
 		y.VisitLeftExpression(false, i.LeftExpression())
-		y.writeString("--")
 		y.pushOperator(yakvm.OpMinusMinus)
 		return nil
 	}
 
 	if op := i.InplaceAssignOperator(); op != nil {
-		recoverFormatBufferFunc := y.switchFormatBuffer()
 		y.VisitExpression(i.Expression())
-		buf := recoverFormatBufferFunc()
 		y.VisitLeftExpression(false, i.LeftExpression())
-		y.writeStringWithWhitespace(op.GetText())
-		y.writeString(buf)
 		switch op.GetText() {
 		case "+=":
 			y.pushOperator(yakvm.OpPlusEq)
@@ -122,12 +108,8 @@ func (y *YakCompiler) VisitLeftExpressionList(forceNewSymbol bool, raw yak.ILeft
 	defer recoverRange()
 
 	allExpr := i.AllLeftExpression()
-	lenOfAllExpr := len(allExpr)
-	for index, le := range allExpr {
+	for _, le := range allExpr {
 		y.VisitLeftExpression(forceNewSymbol, le)
-		if index < lenOfAllExpr-1 {
-			y.writeString(", ")
-		}
 	}
 	if allExpr != nil {
 		y.pushListWithLen(len(allExpr))
@@ -210,9 +192,7 @@ func (y *YakCompiler) VisitLeftExpression(forceNewSymbol bool, raw yak.ILeftExpr
 			return nil
 		}
 		y.VisitExpression(base)
-		y.writeString("[")
 		y.VisitExpression(s.Expression(0))
-		y.writeString("]")
 		y.pushListWithLen(2)
 		return nil
 	}
@@ -221,9 +201,8 @@ func (y *YakCompiler) VisitLeftExpression(forceNewSymbol bool, raw yak.ILeftExpr
 	return nil
 }
 
-// visitLeftIdentifier 处理裸标识符左值的符号创建与格式化输出
+// visitLeftIdentifier 处理裸标识符左值的符号创建
 func (y *YakCompiler) visitLeftIdentifier(forceNewSymbol bool, idName string) {
-	y.writeString(idName)
 	if forceNewSymbol {
 		id, err := y.currentSymtbl.NewSymbolWithReturn(idName)
 		if err != nil {
@@ -248,17 +227,14 @@ func (y *YakCompiler) visitLeftMemberCallKey(i *yak.MemberCallContext) {
 	recoverRange := y.SetRange(&i.BaseParserRuleContext)
 	defer recoverRange()
 
-	y.writeString(".")
 	if id := i.Identifier(); id != nil {
 		idName := id.GetText()
-		y.writeString(idName)
 		y.pushString(idName, idName)
 		return
 	}
 
 	if id := i.IdentifierWithDollar(); id != nil {
 		varName := id.GetText()
-		y.writeString(varName)
 		for strings.HasPrefix(varName, "$") {
 			varName = varName[1:]
 		}
@@ -306,16 +282,10 @@ func (y *YakCompiler) VisitDeclareAndAssignExpression(raw yak.IDeclareAndAssignE
 		return nil
 	}
 
-	y.writeString("var ")
-
 	// 赋值语句，应该先 visit 右值，再 visit 左值
-	recoverFormat := y.switchFormatBuffer()
 	y.VisitExpressionList(i.ExpressionList())
-	buf := recoverFormat()
-	y.VisitLeftExpressionList(true, i.LeftExpressionList())
 
-	y.writeString(" = ")
-	y.writeString(buf)
+	y.VisitLeftExpressionList(true, i.LeftExpressionList())
 
 	y.pushOperator(yakvm.OpAssign)
 	return nil
@@ -336,21 +306,12 @@ func (y *YakCompiler) VisitDeclareVariableOnly(raw yak.IDeclareVariableOnlyConte
 	}
 	y.pushListWithLen(count)
 
-	// format
-	y.writeString("var ")
-
-	for index, idCtx := range i.AllIdentifier() {
+	for _, idCtx := range i.AllIdentifier() {
 		id, err := y.currentSymtbl.NewSymbolWithReturn(idCtx.GetText())
 		if err != nil {
 			y.panicCompilerError(CreateSymbolError, err.Error())
 		}
 		y.pushLeftRef(id)
-
-		// format variables
-		y.writeString(idCtx.GetText())
-		if index != count-1 {
-			y.writeString(", ")
-		}
 	}
 	y.pushListWithLen(count)
 	y.pushOperator(yakvm.OpAssign)

@@ -20,7 +20,7 @@ func testYakParsing(i string) {
 	vt := NewYakCompiler()
 	vt.AntlrTokenStream = tokenStream
 	vt.VisitProgram(p.Program().(*yak.ProgramContext))
-	println(vt.formatted.String())
+	println(vt.GetFormattedCode())
 	vt.ShowOpcodes()
 }
 

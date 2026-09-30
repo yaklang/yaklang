@@ -1,11 +1,9 @@
 package yakast
 
 import (
-	"bytes"
 	"fmt"
 	"reflect"
 
-	"github.com/yaklang/yaklang/common/go-funk"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils/memedit"
 	"github.com/yaklang/yaklang/common/yak/antlr4util"
@@ -33,13 +31,11 @@ type YakCompiler struct {
 	// 新增语句绑定起止位置
 	currentStartPosition, currentEndPosition *memedit.Position
 
-	// 格式化
-	formatted         *bytes.Buffer
-	formatTree        yak.IProgramContext
-	formattedCode     string
-	formatReady       bool
-	indent            int
-	currentLineLength int
+	// Only explicit GetFormattedCode callers request formatting. Retain the
+	// input already owned by the lexer, rather than an extra parsed tree.
+	formatInput   antlr.CharStream
+	formattedCode string
+	formatReady   bool
 
 	sourceCodeFilePathPointer, sourceCodePointer *string
 	codes                                        []*yakvm.Code
@@ -124,7 +120,6 @@ func (y *YakCompiler) NewWithSymbolTable(rootSymbol *yakvm.SymbolTable) yakvm.Co
 
 func NewYakCompilerWithSymbolTable(rootSymbol *yakvm.SymbolTable, options ...CompilerOptionsFun) *YakCompiler {
 	compiler := &YakCompiler{
-		formatted:        new(bytes.Buffer),
 		rootSymtbl:       rootSymbol,
 		currentSymtbl:    rootSymbol,
 		forDepthStack:    vmstack.New(),
@@ -222,9 +217,7 @@ func (y *YakCompiler) Compiler(code string) (success bool) {
 	y.indeterminateUndefinedVar = nil
 	y.FreeValues = nil
 	y.forDepthStack, y.switchDepthStack, y.tryDepthStack = vmstack.New(), vmstack.New(), vmstack.New()
-	y.formatted = new(bytes.Buffer)
-	y.formatTree, y.formattedCode, y.formatReady = nil, "", false
-	y.indent, y.currentLineLength = 0, 0
+	y.formatInput, y.formattedCode, y.formatReady = nil, "", false
 	startScope := y.currentSymtbl
 	defer func() {
 		if p := recover(); p != nil {
@@ -364,7 +357,7 @@ func (y *YakCompiler) parseProgramTwoStage(tokenStream *antlr.CommonTokenStream)
 	return newLLParser()
 }
 
-func (y *YakCompiler) VisitProgram(raw yak.IProgramContext, inline ...bool) interface{} {
+func (y *YakCompiler) VisitProgram(raw yak.IProgramContext, _ ...bool) interface{} {
 	defer func() {
 		prefix := y.GetRangeVerbose()
 		if prefix != "" {
@@ -401,26 +394,22 @@ func (y *YakCompiler) VisitProgram(raw yak.IProgramContext, inline ...bool) inte
 	if i == nil {
 		return nil
 	}
-	y.formatTree, y.formattedCode, y.formatReady = raw, "", false
-	y.writeAllWS(i.AllWs())
+	y.formatInput, y.formattedCode, y.formatReady = raw.GetStart().GetInputStream(), "", false
 
 	// 遇到每一个 program 确定是要给人家新开定义域的！
 	y.programCounter++
 
-	noEmptyStmts := funk.Filter(i.StatementList().(*yak.StatementListContext).AllStatement(), func(i yak.IStatementContext) bool {
-		return i.(*yak.StatementContext).Empty() == nil
-	}).([]yak.IStatementContext)
-	if len(noEmptyStmts) <= 0 {
+	if i.StatementList() == nil {
 		return nil
 	}
 
 	recoverRange := y.SetRange(&i.BaseParserRuleContext)
 	defer recoverRange()
-	y.VisitStatementList(i.StatementList(), inline...)
+	y.VisitStatementList(i.StatementList())
 	return nil
 }
 
-func (y *YakCompiler) VisitProgramWithoutSymbolTable(raw yak.IProgramContext, inline ...bool) interface{} {
+func (y *YakCompiler) VisitProgramWithoutSymbolTable(raw yak.IProgramContext, _ ...bool) interface{} {
 	if y == nil || raw == nil {
 		return nil
 	}
@@ -430,11 +419,9 @@ func (y *YakCompiler) VisitProgramWithoutSymbolTable(raw yak.IProgramContext, in
 		return nil
 	}
 
-	y.writeAllWS(i.AllWs())
-
 	recoverRange := y.SetRange(&i.BaseParserRuleContext)
 	defer recoverRange()
-	y.VisitStatementList(i.StatementList(), inline...)
+	y.VisitStatementList(i.StatementList())
 	return nil
 }
 

@@ -16,9 +16,7 @@ func (y *YakCompiler) VisitPanicStmt(raw yak.IPanicStmtContext) {
 	}
 
 	if op := i.Panic(); op != nil {
-		y.writeString(op.GetText() + "(")
 		y.VisitExpression(i.Expression())
-		y.writeString(")")
 		y.pushOperator(yakvm.OpPanic)
 	}
 }

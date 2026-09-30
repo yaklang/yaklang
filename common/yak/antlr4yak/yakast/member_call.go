@@ -17,16 +17,12 @@ func (y *YakCompiler) VisitMemberCall(raw parser.IMemberCallContext) interface{}
 	recoverRange := y.SetRange(&i.BaseParserRuleContext)
 	defer recoverRange()
 
-	y.writeString(".")
-
 	if identifier := memberCallContext.Identifier(); identifier != nil {
 		idText := identifier.GetText()
-		y.writeString(idText)
 		y.pushString(idText, identifier.GetText())
 		y.pushOperator(yakvm.OpMemberCall)
 	} else if identifierWithDollar := memberCallContext.IdentifierWithDollar(); identifierWithDollar != nil {
 		idText := identifierWithDollar.GetText()
-		y.writeString(idText)
 		if sym, ok := y.currentSymtbl.GetSymbolByVariableName(idText[1:]); ok {
 			y.pushRef(sym)
 			y.pushOperator(yakvm.OpMemberCall)

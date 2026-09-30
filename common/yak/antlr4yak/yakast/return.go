@@ -16,11 +16,9 @@ func (y *YakCompiler) VisitReturnStmt(raw yak.IReturnStmtContext) interface{} {
 	}
 	recoverRange := y.SetRange(&i.BaseParserRuleContext)
 	defer recoverRange()
-	y.writeString("return")
 
 	// 这是一个压栈操作，虚拟机要记录返回值，所以需要 return 作为 OPCODE 去操作栈
 	if list := i.ExpressionList(); list != nil {
-		y.writeString(" ")
 		y.VisitExpressionList(list)
 	} else {
 		y.pushNil()

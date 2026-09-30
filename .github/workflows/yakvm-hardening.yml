@@ -41,7 +41,7 @@ jobs:
           YAK_ANTLR_SLL_FIRST: '0'
         run: go test ./common/yak/antlr4yak ./common/yak/antlr4yak/yakast -run '^TestCore' -count=1 -timeout=3m
       - name: Formatter grammar, layout and concurrent API race coverage
-        run: go test -race ./common/yak/antlr4yak/yakfmt ./common/yak/antlr4yak -run '^TestFormat' -count=1 -timeout=5m
+        run: go test -race ./common/yak/antlr4yak/yakfmt ./common/yak/antlr4yak -run '^Test(Format|CompilerLargeLiteral)' -count=1 -timeout=5m
       - name: Formatter round-trip fuzz smoke test
         run: go test ./common/yak/antlr4yak/yakfmt -run '^$' -fuzz '^FuzzFormat$' -fuzztime=30s -parallel=2 -timeout=3m
       - name: Bounded bytecode fuzz smoke test

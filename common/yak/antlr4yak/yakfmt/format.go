@@ -42,12 +42,7 @@ func Format(source string) (result string, err error) {
 	p.GetInterpreter().SetPredictionMode(antlr.PredictionModeSLL)
 	tree, ok := trySLL(p)
 	if !ok {
-		stream.Seek(0)
-		p = parser.NewYaklangParser(stream)
-		p.RemoveErrorListeners()
-		p.AddErrorListener(errors)
-		p.GetInterpreter().SetPredictionMode(antlr.PredictionModeLL)
-		tree = p.Program()
+		tree = retryLL(tree, stream, errors)
 	}
 	return FormatTree(source, tree, stream), nil
 }
@@ -81,6 +76,16 @@ func trySLL(p *parser.YaklangParser) (tree parser.IProgramContext, ok bool) {
 	defer func() {
 		if r := recover(); r != nil {
 			if _, cancel := r.(*antlr.ParseCancellationException); cancel {
+				// Only completed top-level statements can be reused. Their
+				// boundaries are closed in this grammar; never reuse an
+				// incomplete function/block/expression after SLL failure.
+				for ctx := p.GetParserRuleContext(); ctx != nil; {
+					if root, isProgram := ctx.(*parser.ProgramContext); isProgram {
+						tree = root
+						break
+					}
+					ctx, _ = ctx.GetParent().(antlr.ParserRuleContext)
+				}
 				ok = false
 			} else {
 				panic(r)
@@ -90,8 +95,56 @@ func trySLL(p *parser.YaklangParser) (tree parser.IProgramContext, ok bool) {
 	return p.Program(), true
 }
 
-// FormatTree reuses an already validated program and its tokens. This is also
-// used by the compiler's lazy GetFormattedCode compatibility API. Layout visits
+// Whole-program LL replay recomputes full-context predictions for every valid
+// prefix statement when an editor buffer has a malformed tail. Retry from the
+// last completed top-level statement boundary instead. No enclosing rule spans
+// that boundary in Yak's program: ws* statementList EOF grammar.
+func retryLL(prefix parser.IProgramContext, stream *antlr.CommonTokenStream, errors *errorListener) parser.IProgramContext {
+	var statements *parser.StatementListContext
+	completed, start := 0, 0
+	if prefix != nil && prefix.StatementList() != nil {
+		statements = prefix.StatementList().(*parser.StatementListContext)
+		for _, child := range statements.GetChildren() {
+			stmt, ok := child.(*parser.StatementContext)
+			if !ok || stmt.GetStop() == nil {
+				break
+			}
+			completed++
+			start = stmt.GetStop().GetTokenIndex() + 1
+		}
+	}
+	stream.Seek(start)
+	p := parser.NewYaklangParser(stream)
+	p.RemoveErrorListeners()
+	p.AddErrorListener(errors)
+	p.GetInterpreter().SetPredictionMode(antlr.PredictionModeLL)
+	suffix := p.Program()
+	if completed == 0 {
+		return suffix
+	}
+	for statements.GetChildCount() > completed {
+		statements.RemoveLastChild()
+	}
+	for _, child := range suffix.GetChildren() {
+		switch c := child.(type) {
+		case *parser.WsContext:
+			c.SetParent(statements)
+			statements.AddChild(c)
+		case *parser.StatementListContext:
+			for _, stmt := range c.GetChildren() {
+				stmt.SetParent(statements)
+				statements.AddChild(stmt.(antlr.RuleContext))
+			}
+		case antlr.TerminalNode:
+			prefix.AddTokenNode(c.GetSymbol())
+		}
+	}
+	statements.SetStop(suffix.StatementList().GetStop())
+	prefix.SetStop(suffix.GetStop())
+	return prefix
+}
+
+// FormatTree reuses an already validated program and its tokens. Layout visits
 // each child once; it never calls GetText on a subtree or generated AllX getters
 // (both can turn large left-recursive expressions/lists into quadratic work).
 func FormatTree(source string, tree parser.IProgramContext, stream *antlr.CommonTokenStream) string {
