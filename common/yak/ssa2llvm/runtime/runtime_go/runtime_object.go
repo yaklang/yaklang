@@ -432,11 +432,10 @@ func runtimeDecodeArg(raw uint64, targetType reflect.Type) (reflect.Value, error
 					return converted, nil
 				}
 			}
-			// A closure stored as any is still the runtime struct. Callers
-			// such as the yak sandbox can invoke a Go func, not that struct.
-			if closure, ok := runtimeCallableClosureValue(decoded); ok && targetType.NumMethod() == 0 {
-				return runtimeBoundaryFuncForClosure(closure, nil), nil
-			}
+			// A closure passed as any stays the runtime struct. append stores
+			// that struct in the slice and yak calls it later. Wrapping it as
+			// a Go func here breaks per-iteration loop closures. Map elements
+			// are wrapped in convertMapValue, which is what the sandbox calls.
 			// AOT slice/map shadows are pointers; yak code sees them as
 			// values, so pass the dereferenced container to yaklib before the
 			// generic assignable-to-interface path.
