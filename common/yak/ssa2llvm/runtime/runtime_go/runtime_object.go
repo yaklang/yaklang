@@ -428,11 +428,14 @@ func runtimeDecodeArg(raw uint64, targetType reflect.Type) (reflect.Value, error
 			// expects real Go maps (utils.IsMap / range), so convert before
 			// crossing the interface boundary.
 			if om, ok := decoded.(*runtimeOrderedMap); ok && om != nil {
-				m := make(map[string]any, len(om.keys))
-				for _, k := range om.keys {
-					m[k] = om.values[k]
+				if converted, ok := convertMapValue(reflect.ValueOf(om), reflect.TypeOf(map[string]any{})); ok {
+					return converted, nil
 				}
-				return reflect.ValueOf(m), nil
+			}
+			// A closure stored as any is still the runtime struct. Callers
+			// such as the yak sandbox can invoke a Go func, not that struct.
+			if closure, ok := runtimeCallableClosureValue(decoded); ok && targetType.NumMethod() == 0 {
+				return runtimeBoundaryFuncForClosure(closure, nil), nil
 			}
 			// AOT slice/map shadows are pointers; yak code sees them as
 			// values, so pass the dereferenced container to yaklib before the
@@ -1074,7 +1077,7 @@ func convertMapValue(value reflect.Value, targetType reflect.Type) (reflect.Valu
 			}
 			kv = kv.Convert(keyType)
 		}
-		ev := reflect.ValueOf(values[k])
+		ev := runtimeBoundaryMapElement(values[k], elemType)
 		if !ev.IsValid() {
 			ev = reflect.Zero(elemType)
 		}
@@ -1087,6 +1090,37 @@ func convertMapValue(value reflect.Value, targetType reflect.Type) (reflect.Valu
 		out.SetMapIndex(kv, ev)
 	}
 	return out, true
+}
+
+// runtimeBoundaryFuncForClosure turns a yak closure into a Go func of
+// elemType, or a variadic func(...any) any when the destination is an
+// interface. The sandbox VM calls native funcs; it cannot call the runtime
+// closure struct.
+func runtimeBoundaryFuncForClosure(closure runtimeCallableClosure, elemType reflect.Type) reflect.Value {
+	fnType := elemType
+	if fnType == nil || fnType.Kind() != reflect.Func {
+		fnType = reflect.TypeOf(func(...any) any { return nil })
+	}
+	return runtimeMakeCallableWrapper(closure.fn, closure.paramMemberCount, closure.freeValues, fnType)
+}
+
+// runtimeBoundaryMapElement prepares one map value for a Go map. Closures
+// become callable funcs, and nested ordered maps become Go maps.
+func runtimeBoundaryMapElement(raw any, elemType reflect.Type) reflect.Value {
+	if closure, ok := runtimeCallableClosureValue(raw); ok {
+		return runtimeBoundaryFuncForClosure(closure, elemType)
+	}
+	if om, ok := raw.(*runtimeOrderedMap); ok && om != nil && elemType != nil &&
+		(elemType.Kind() == reflect.Interface || elemType.Kind() == reflect.Map) {
+		nested := elemType
+		if nested.Kind() == reflect.Interface {
+			nested = reflect.TypeOf(map[string]any{})
+		}
+		if converted, ok := convertMapValue(reflect.ValueOf(om), nested); ok {
+			return converted
+		}
+	}
+	return reflect.ValueOf(raw)
 }
 
 // convertSliceValue converts a Go slice (usually []any) into the target slice

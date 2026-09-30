@@ -1,11 +1,40 @@
 package main
 
 import (
+	"reflect"
 	"runtime"
 	"testing"
 
 	"github.com/yaklang/yaklang/common/yak/yaklib"
 )
+
+func TestRuntimeMapClosureBecomesGoFunc(t *testing.T) {
+	fn, hits := runtimeTestClosureProbe()
+	om := newRuntimeOrderedMap()
+	om.Set("do", runtimeCallableClosure{fn: fn})
+	om.Set("n", int64(2))
+	raw := uint64(uintptr(newStdlibShadow(om))) | yakTaggedPointerMask
+	got, err := runtimeDecodeArg(raw, reflect.TypeOf(map[string]any{}))
+	if err != nil {
+		t.Fatalf("decode map: %v", err)
+	}
+	m, ok := got.Interface().(map[string]any)
+	if !ok {
+		t.Fatalf("decoded map type %T", got.Interface())
+	}
+	if m["n"] != int64(2) {
+		t.Fatalf("n = %#v", m["n"])
+	}
+	call, ok := m["do"].(func(...any) any)
+	if !ok {
+		t.Fatalf("do = %T, want func(...any) any", m["do"])
+	}
+	before := hits()
+	call(2)
+	if hits() <= before {
+		t.Fatalf("closure hits stayed %d", before)
+	}
+}
 
 func TestRuntimeRiskClosureCallbackIsInvoked(t *testing.T) {
 	previous := yaklib.GetYakitClientInstance()
