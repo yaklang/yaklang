@@ -106,7 +106,9 @@ func (f *printer) print() {
 		if typ == parser.YaklangLexerLF {
 			continue
 		}
-		if text == ";" && m.flags&headerSemi == 0 {
+		// Template characters can also contain a literal semicolon. Only
+		// statement separator tokens (including lexer-inserted ones) are skipped.
+		if typ == parser.YaklangLexerSemiColon && m.flags&headerSemi == 0 {
 			continue
 		}
 		if m.flags&caseLabel != 0 {

@@ -15,6 +15,7 @@ import (
 // alternative, every operator, and all lexer literal modes. Syntax-only examples
 // deliberately include free identifiers and include paths that need not exist.
 var grammarSamples = []string{
+	`a=f"; ${x} ;";a=f';';a=f` + "`" + `;` + "`" + `;a=f"{}[](),:?+-*/<>=!&|%^~"`,
 	`x=panic(1);x=recover();x={func(){return 1}:2,[1,2]:3};func(long_parameter_name_long_parameter_name_long_parameter_name_long_parameter_name_ map[string][]int){}`,
 	`a="\\\"\n\t";a='\\';a=f"escaped \$ and ${x}";a=b'bytes'`,
 	`// line
