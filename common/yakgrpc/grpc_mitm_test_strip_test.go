@@ -148,7 +148,7 @@ Content-Length: 1
 
 1`)
 	})
-	matcher, err := fp.NewDefaultFingerprintMatcher(fp.NewConfig())
+	matcher, err := fp.NewDefaultFingerprintMatcher(fp.NewConfig(fp.WithOnlyEnableWebFingerprint(true), fp.WithProbeTimeoutHumanRead(2)))
 	if err != nil {
 		t.Error(err)
 	}

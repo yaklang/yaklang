@@ -98,6 +98,7 @@ func TestServer_CustomFingerprint(t *testing.T) {
 			Targets:              host,
 			Ports:                strconv.Itoa(port),
 			Mode:                 "fingerprint",
+			ProbeTimeout:         0.2,
 			Proto:                []string{"tcp"},
 			Concurrent:           50,
 			Active:               false,
@@ -270,7 +271,8 @@ func TestServer_ScanWithFingerprintGroup(t *testing.T) {
 	// helper function to create mock http server for each subtest
 	createMockServer := func() (string, int) {
 		host, port := utils.DebugMockHTTP([]byte(fmt.Sprintf(
-			"HTTP 1.1 200 OK\r\nServer: nginx\r\nContent-Length: 0\r\n\r\n%s\r\n%s",
+			"HTTP/1.1 200 OK\r\nServer: nginx\r\nContent-Length: %d\r\n\r\n%s\r\n%s",
+			len(token1)+len(token2)+2,
 			token1,
 			token2,
 		)))
@@ -293,6 +295,7 @@ func TestServer_ScanWithFingerprintGroup(t *testing.T) {
 				Targets:                host,
 				Ports:                  strconv.Itoa(port),
 				Mode:                   "fingerprint",
+				ProbeTimeout:           0.2,
 				Proto:                  []string{"tcp"},
 				Concurrent:             50,
 				Active:                 false,
@@ -356,6 +359,7 @@ func TestServer_ScanWithFingerprintGroup(t *testing.T) {
 				Targets:                host,
 				Ports:                  strconv.Itoa(port),
 				Mode:                   "fingerprint",
+				ProbeTimeout:           0.2,
 				Proto:                  []string{"tcp"},
 				Concurrent:             50,
 				Active:                 false,

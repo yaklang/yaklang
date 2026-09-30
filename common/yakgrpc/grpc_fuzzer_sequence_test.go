@@ -1,11 +1,13 @@
 package yakgrpc
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"strconv"
+	"strings"
+	"sync"
 	"testing"
-	"time"
 
 	"github.com/samber/lo"
 	"github.com/stretchr/testify/require"
@@ -557,15 +559,54 @@ func TestGRPCMUSTPASS_HTTPFuzzer_FuzzerSequence_FuzzerTagWithConcurrent(t *testi
 	if err != nil {
 		t.Fatal(err)
 	}
-	host, port := utils.DebugMockHTTPHandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
-		time.Sleep(time.Millisecond * 500)
+	ctx, cancel := context.WithCancel(utils.TimeoutContextSeconds(3))
+	defer cancel()
+	type chainState struct {
+		arrived, active int
+		ready           chan struct{}
+	}
+	var mu sync.Mutex
+	chains := make(map[string]*chainState)
+	peakChains := 0
+	host, port := utils.DebugMockHTTPHandlerFuncContext(ctx, func(writer http.ResponseWriter, request *http.Request) {
+		if request.URL.Path == "/verify" {
+			value := request.URL.Query().Get("a")
+			key := value[:strings.LastIndex(value, "/")]
+			mu.Lock()
+			state := chains[key]
+			if state == nil {
+				state = &chainState{ready: make(chan struct{})}
+				chains[key] = state
+			}
+			state.active++
+			state.arrived++
+			if len(chains) > peakChains {
+				peakChains = len(chains)
+			}
+			if state.arrived == 10 {
+				close(state.ready)
+			}
+			mu.Unlock()
+			defer func() {
+				mu.Lock()
+				state.active--
+				if state.active == 0 {
+					delete(chains, key)
+				}
+				mu.Unlock()
+			}()
+			select {
+			case <-state.ready:
+			case <-request.Context().Done():
+				return
+			}
+		}
 		writer.Write([]byte(`{"path":` + strconv.Quote(request.URL.Path) + `}`))
 		return
 	})
 
-	start := time.Now()
 	client, err := c.HTTPFuzzerSequence(
-		utils.TimeoutContextSeconds(10),
+		ctx,
 		&ypb.FuzzerRequests{
 			Concurrent: 1,
 			Requests: []*ypb.FuzzerRequest{
@@ -620,9 +661,9 @@ abc`), "Host", utils.HostPort(host, port))),
 	if count != 100+10 {
 		t.Fatal("Fuzztag COUNT: " + fmt.Sprint(count) + " failed")
 	}
-	if time.Now().Sub(start).Seconds() <= 5 {
-		t.Fatal("concurrent(flowmax) is not working")
-	}
+	mu.Lock()
+	defer mu.Unlock()
+	require.Equal(t, 1, peakChains, "Concurrent=1 must serialize the ten inherited chains")
 }
 
 func TestGRPCMUSTPASS_HTTPFuzzer_FuzzerSequence_InheritCookie(t *testing.T) {

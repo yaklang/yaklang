@@ -79,56 +79,29 @@ Accept: */*
 }
 
 func TestWsFuzzer(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+	host, port := utils.DebugMockEchoWs("ws")
 	client, err := NewLocalClient()
-	if err != nil {
-		panic(err)
+	require.NoError(t, err)
+	stream, err := client.CreateWebsocketFuzzer(ctx)
+	require.NoError(t, err)
+	require.NoError(t, stream.Send(&ypb.ClientWebsocketRequest{
+		UpgradeRequest:      []byte(fmt.Sprintf("GET /ws HTTP/1.1\r\nHost: %s\r\nConnection: Upgrade\r\nUpgrade: websocket\r\nSec-WebSocket-Key: 62HzcscpHVLdq0MlgjMA/A==\r\nSec-WebSocket-Version: 13\r\n\r\n", utils.HostPort(host, port))),
+		TotalTimeoutSeconds: 3,
+	}))
+	for i := 0; i < 16; i++ {
+		payload := fmt.Sprintf("message-%d", i)
+		require.NoError(t, stream.Send(&ypb.ClientWebsocketRequest{ToServer: []byte(payload)}))
+		for {
+			response, err := stream.Recv()
+			require.NoError(t, err)
+			if response.GetFromServer() {
+				require.Equal(t, "server: "+payload, string(response.GetData()))
+				break
+			}
+		}
 	}
-	stream, err := client.CreateWebsocketFuzzer(utils.TimeoutContextSeconds(20))
-	if err != nil {
-		panic(err)
-	}
-	stream.Send(&ypb.ClientWebsocketRequest{
-		IsTLS: true,
-		UpgradeRequest: []byte(`
-GET /ws HTTP/1.1
-Host: v1ll4n.local:8885
-Accept-Encoding: gzip, deflate, br
-Accept-Language: zh-CN,zh;q=0.9
-Cache-Control: no-cache
-Connection: Upgrade
-Cookie: PHPSESSID=upube8i55iuim3khf5bnvttab7; security=low
-Origin: https://v1ll4n.local:8885
-Pragma: no-cache
-Sec-WebSocket-Extensions: permessage-deflate; client_max_window_bits
-Sec-WebSocket-Key: 62HzcscpHVLdq0MlgjMA/A==
-Sec-WebSocket-Version: 13
-Upgrade: websocket
-User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/104.0.0.0 Safari/537.36
-`),
-		TotalTimeoutSeconds: 20,
-	})
-	stream.Send(&ypb.ClientWebsocketRequest{ToServer: []byte(`HfasdfasdHfasdfasdHfasdfasdHfasdfasd`)})
-	time.Sleep(time.Second)
-	stream.Send(&ypb.ClientWebsocketRequest{ToServer: []byte(`HfasdfasdHfasdfasdHfasdfasdHfasdfasd`)})
-	time.Sleep(time.Second)
-	stream.Send(&ypb.ClientWebsocketRequest{ToServer: []byte(`HfasdfasdHfasdfasdHfasdfasdHfasdfasd`)})
-	time.Sleep(time.Second)
-	stream.Send(&ypb.ClientWebsocketRequest{ToServer: []byte(`HfasdfasdHfasdfasdHfasdfasdHfasdfasd`)})
-	time.Sleep(time.Second)
-	stream.Send(&ypb.ClientWebsocketRequest{ToServer: []byte(`HfasdfasdHfasdfasdHfasdfasdHfasdfasd`)})
-	time.Sleep(time.Second)
-	stream.Send(&ypb.ClientWebsocketRequest{ToServer: []byte(`HfasdfasdHfasdfasdHfasdfasdHfasdfasd`)})
-	time.Sleep(time.Second)
-	stream.Send(&ypb.ClientWebsocketRequest{ToServer: []byte(`HfasdfasdHfasdfasdHfasdfasdHfasdfasd`)})
-	time.Sleep(time.Second)
-	stream.Send(&ypb.ClientWebsocketRequest{ToServer: []byte(`HfasdfasdHfasdfasdHfasdfasdHfasdfasd`)})
-	stream.Send(&ypb.ClientWebsocketRequest{ToServer: []byte(`HfasdfasdHfasdfasdHfasdfasdHfasdfasd`)})
-	stream.Send(&ypb.ClientWebsocketRequest{ToServer: []byte(`HfasdfasdHfasdfasdHfasdfasdHfasdfasd`)})
-	stream.Send(&ypb.ClientWebsocketRequest{ToServer: []byte(`HfasdfasdHfasdfasdHfasdfasdHfasdfasd`)})
-	stream.Send(&ypb.ClientWebsocketRequest{ToServer: []byte(`HfasdfasdHfasdfasdHfasdfasdHfasdfasd`)})
-	stream.Send(&ypb.ClientWebsocketRequest{ToServer: []byte(`HfasdfasdHfasdfasdHfasdfasdHfasdfasd`)})
-	stream.Send(&ypb.ClientWebsocketRequest{ToServer: []byte(`HfasdfasdHfasdfasdHfasdfasdHfasdfasd`)})
-	stream.Send(&ypb.ClientWebsocketRequest{ToServer: []byte(`HfasdfasdHfasdfasdHfasdfasdHfasdfasd`)})
 }
 
 func TestPBTest(t *testing.T) {
@@ -158,7 +131,6 @@ func TestPBTest(t *testing.T) {
 		fields = fields[n:]
 		spew.Dump(index, data, n, value)
 
-		time.Sleep(time.Second)
 	}
 	// spew.Dump(anyPB.AsMap())
 	jsonRaw, err := protojson.Marshal(anyPB)

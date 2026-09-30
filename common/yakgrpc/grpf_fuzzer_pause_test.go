@@ -2,144 +2,126 @@ package yakgrpc
 
 import (
 	"context"
-	"fmt"
+	"io"
 	"net/http"
-	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
-	"github.com/yaklang/yaklang/common/log"
+	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
 func TestGRPCMUSTPASS_HTTPFuzzer_Pause(t *testing.T) {
-	client, err := NewLocalClient()
-	if err != nil {
-		t.Fatal(err)
-	}
-	host, port := utils.DebugMockHTTPHandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		time.Sleep(100 * time.Millisecond)
-		w.Write([]byte(""))
-	})
-	target := utils.HostPort(host, port)
-	req := &ypb.FuzzerRequest{
-		Request: "GET /?a={{int(1-10)}} HTTP/1.1\r\nHost: " + target + "\r\n\r\n",
-	}
-	req.ForceFuzz = true
-	req.Concurrent = 1
-	stream, err := client.HTTPFuzzer(utils.TimeoutContextSeconds(10), req)
-	if err != nil {
-		t.Fatal(err)
-	}
-	count, taskID := 0, int64(0)
-	wg := &sync.WaitGroup{}
-	wg.Add(1)
-	var finalErr error
-
-	go func(t *testing.T) {
-		defer wg.Done()
-		inPause := false
-		for {
-			rsp, err := stream.Recv()
-			if err != nil {
-				finalErr = err
-				return
-			} else if inPause {
-				finalErr = utils.Error("should not receive any response when in pause")
-				return
-			}
-			taskID = rsp.TaskId
-			count++
-			if count == 2 {
-				client.HTTPFuzzer(utils.TimeoutContextSeconds(10), &ypb.FuzzerRequest{
-					PauseTaskID:    taskID,
-					IsPause:        true,
-					SetPauseStatus: true,
-				})
-				log.Info("start pause")
-				inPause = true
-				go func() {
-					time.Sleep(1 * time.Second)
-					client.HTTPFuzzer(utils.TimeoutContextSeconds(10), &ypb.FuzzerRequest{
-						PauseTaskID:    taskID,
-						IsPause:        false,
-						SetPauseStatus: true,
-					})
-					log.Info("start continue")
-					inPause = false
-				}()
-			} else if count == 10 {
-				return
-			}
-		}
-	}(t)
-
-	wg.Wait()
-	if finalErr != nil {
-		t.Fatal(finalErr)
-	}
-	if count != 10 {
-		t.Fatalf("expected 10 times, got %d", count)
-	}
+	testHTTPFuzzerPause(t, false)
 }
 
 func TestGRPCMUSTPASS_HTTPFUZZER_Pause_SetPauseStatus(t *testing.T) {
-	c, err := NewLocalClient()
-	if err != nil {
-		t.Fatal(err)
-	}
+	testHTTPFuzzerPause(t, true)
+}
 
-	isPause := false
-	targetHost, targetPort := utils.DebugMockHTTPEx(func(req []byte) []byte {
-		fmt.Println("send request")
-		if isPause {
-			panic("pause failed")
+func testHTTPFuzzerPause(t *testing.T, checkUnsetFlag bool) {
+	t.Helper()
+	client, err := NewLocalClient()
+	require.NoError(t, err)
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+	// Hold later requests while the pause RPC is acknowledged. This avoids
+	// mistaking responses already in flight for a failure of the pause switch.
+	permits := make(chan struct{}, 10)
+	thirdArrived, thirdServed := make(chan struct{}), make(chan struct{})
+	var arrivals atomic.Int32
+	permits <- struct{}{}
+	permits <- struct{}{}
+	host, port := utils.DebugMockHTTPHandlerFuncContext(ctx, func(w http.ResponseWriter, r *http.Request) {
+		n := arrivals.Add(1)
+		if n == 3 {
+			close(thirdArrived)
 		}
-		return []byte("HTTP/1.1 200 OK\r\nContent-Type: text/html\r\n\r\n")
+		select {
+		case <-permits:
+			_, _ = w.Write([]byte("resumed request"))
+			if n == 3 {
+				close(thirdServed)
+			}
+		case <-r.Context().Done():
+		}
 	})
-
-	client, err := c.HTTPFuzzer(context.Background(), &ypb.FuzzerRequest{
-		RepeatTimes: 200000,
-		ForceFuzz:   true,
-		Concurrent:  1,
-		Request: `GET / HTTP/1.1
-Host: ` + utils.HostPort(targetHost, targetPort) + `
-
-`,
+	stream, err := client.HTTPFuzzer(ctx, &ypb.FuzzerRequest{
+		Request:    "GET /?a={{int(1-10)}} HTTP/1.1\r\nHost: " + utils.HostPort(host, port) + "\r\n\r\n",
+		ForceFuzz:  true,
+		Concurrent: 1,
 	})
-	if err != nil {
-		t.Fatal(err)
-	}
-
+	require.NoError(t, err)
 	var taskID int64
-	rsp, err := client.Recv()
-	if err != nil {
-		t.Fatalf("recv failed: %v", err)
+	for i := 0; i < 2; i++ {
+		rsp, err := stream.Recv()
+		require.NoError(t, err)
+		require.True(t, rsp.GetOk())
+		taskID = rsp.GetTaskId()
 	}
-	taskID = rsp.TaskId
-
-	_, err = c.HTTPFuzzer(context.Background(), &ypb.FuzzerRequest{
-		PauseTaskID:    taskID,
-		IsPause:        true,
-		SetPauseStatus: true,
-	})
-	if err != nil {
-		t.Fatal(err)
+	setPause := func(paused bool) {
+		control, err := client.HTTPFuzzer(ctx, &ypb.FuzzerRequest{PauseTaskID: taskID, IsPause: paused, SetPauseStatus: true})
+		require.NoError(t, err)
+		_, err = control.Recv()
+		require.ErrorIs(t, err, io.EOF, "the control RPC must finish before checking its state")
 	}
-
-	time.Sleep(1 * time.Second)
-
-	isPause = true
-
-	_, err = c.HTTPFuzzer(context.Background(), &ypb.FuzzerRequest{
-		PauseTaskID:    taskID,
-		IsPause:        false,
-		SetPauseStatus: false,
-	})
-	if err != nil {
-		t.Fatal(err)
+	select {
+	case <-thirdArrived:
+	case <-ctx.Done():
+		t.Fatal("third request did not reach the response gate")
 	}
-	time.Sleep(2 * time.Second)
-
+	setPause(true)
+	value, ok := _FuzzerTaskSwitchMap.Load(uint(taskID))
+	require.True(t, ok)
+	sw := value.(*utils.Switch)
+	isOpen := func() bool {
+		sw.L.Lock()
+		defer sw.L.Unlock()
+		return sw.Condition()
+	}
+	require.False(t, isOpen())
+	if checkUnsetFlag {
+		control, err := client.HTTPFuzzer(ctx, &ypb.FuzzerRequest{PauseTaskID: taskID, IsPause: false, SetPauseStatus: false})
+		require.NoError(t, err)
+		_, err = control.Recv()
+		require.Error(t, err, "a request without SetPauseStatus must not resume the task")
+		require.False(t, isOpen(), "SetPauseStatus=false must leave the original task paused")
+	}
+	close(permits)
+	select {
+	case <-thirdServed:
+	case <-ctx.Done():
+		t.Fatal("in-flight response was not released")
+	}
+	type responseResult struct {
+		rsp *ypb.FuzzerResponse
+		err error
+	}
+	next := make(chan responseResult, 1)
+	go func() { rsp, err := stream.Recv(); next <- responseResult{rsp, err} }()
+	// A short negative observation remains necessary: a paused task must not
+	// deliver the now-complete in-flight response or start another request.
+	select {
+	case <-next:
+		t.Fatal("received a response while the acknowledged pause was active")
+	case <-time.After(20 * time.Millisecond):
+	}
+	// The pool checks the switch before acquiring its concurrency semaphore;
+	// one request can already be admitted behind the in-flight third request.
+	require.LessOrEqual(t, arrivals.Load(), int32(4), "pause must prevent requests beyond the already admitted request")
+	setPause(false)
+	require.True(t, isOpen())
+	result := <-next
+	require.NoError(t, result.err)
+	require.True(t, result.rsp.GetOk())
+	for i := 3; i < 10; i++ {
+		rsp, err := stream.Recv()
+		require.NoError(t, err)
+		require.True(t, rsp.GetOk())
+		require.Equal(t, taskID, rsp.GetTaskId())
+	}
+	_, err = stream.Recv()
+	require.ErrorIs(t, err, io.EOF, "all ten requests must finish after resuming")
 }

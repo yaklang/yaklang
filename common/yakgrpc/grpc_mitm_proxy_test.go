@@ -289,16 +289,16 @@ poc.Get(mockUrl, poc.proxy(mitmProxy), poc.replaceQueryParam("u", token))~`,
 
 func TestGRPCMUSTPASS_MITM_S5Proxy(t *testing.T) {
 	var (
-		networkIsPassed bool
+		networkIsPassed atomic.Bool
 		token           = utils.RandNumberStringBytes(10)
 		rspToken        = utils.RandStringBytes(10)
 	)
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 
 	mockHost, mockPort := utils.DebugMockHTTPHandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 		if request.URL.Query().Get("u") == token {
-			networkIsPassed = true
+			networkIsPassed.Store(true)
 		}
 		writer.Write([]byte(rspToken))
 	})
@@ -338,27 +338,29 @@ assert str.Contains(rsp.RawPacket,rspToken)`,
 					}); err != nil {
 					t.Fatalf("execute script failed: %v", err)
 				}
+				cancel()
+				break
 			}
 		}
 	}
 
-	if !networkIsPassed {
+	if !networkIsPassed.Load() {
 		t.Fatalf("Network not passed")
 	}
 }
 
 func TestGRPCMUSTPASS_MITM_S5Proxy_https(t *testing.T) {
 	var (
-		networkIsPassed bool
+		networkIsPassed atomic.Bool
 		token           = utils.RandNumberStringBytes(10)
 		rspToken        = utils.RandStringBytes(10)
 	)
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 
 	mockHost, mockPort := utils.DebugMockHTTPSEx(func(req []byte) []byte {
 		if lowhttp.GetHTTPRequestQueryParam(req, "u") == token {
-			networkIsPassed = true
+			networkIsPassed.Store(true)
 		}
 		return []byte("HTTP/1.1 200 OK\r\nContent-length: 10\r\n\r\n" + rspToken)
 	})
@@ -398,11 +400,13 @@ assert str.Contains(rsp.RawPacket,rspToken)`,
 					}); err != nil {
 					t.Fatalf("execute script failed: %v", err)
 				}
+				cancel()
+				break
 			}
 		}
 	}
 
-	if !networkIsPassed {
+	if !networkIsPassed.Load() {
 		t.Fatalf("Network not passed")
 	}
 }
@@ -605,7 +609,7 @@ yakit.StatusCard("mitmId", "StatusCard")
 `)
 	require.NoError(t, err)
 	defer clearFunc()
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 
 	targetHost, targetPort := utils.DebugMockHTTPHandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
@@ -656,10 +660,6 @@ mirrorNewWebsite = (tls, url, req, rsp, body) => {
 				// do sth
 				_, err := yak.Execute(`rsp, req := poc.Get(targetUrl, poc.proxy(mitmProxy))~
 assert string(rsp.RawPacket).Contains("Hello Token")
-go func{
-	sleep(2)
-	cancel()
-}
 `, map[string]any{"targetUrl": targetUrl, "mitmProxy": `http://` + utils.HostPort("127.0.0.1", mitmPort), "cancel": cancel})
 				require.NoError(t, err)
 			}
@@ -676,9 +676,11 @@ go func{
 		if strings.Contains(spew.Sdump(data), "StatusCard") && strings.Contains(spew.Sdump(data), "mitmId") {
 			pluginStatusCardFound = true
 		}
+		if pluginStatusCardFound && hotStatusCardFound {
+			cancel()
+			break
+		}
 	}
-
-	time.Sleep(1 * time.Second)
 
 	require.True(t, pluginStatusCardFound, "plugin status card not found")
 	require.True(t, hotStatusCardFound, "hot status card not found")

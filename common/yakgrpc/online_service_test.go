@@ -22,6 +22,7 @@ type stubOnlineService struct {
 	uploadFlow       func(context.Context, *ypb.HTTPFlowsToOnlineRequest, []byte) error
 	apiKey           func(context.Context, string) (string, error)
 	downloadRules    func(context.Context, string, *ypb.DownloadSyntaxFlowRuleRequest) *yaklib.OnlineDownloadFlowRuleStream
+	downloadPlugin   func(string, string) (*yaklib.OnlinePlugin, error)
 }
 
 func (s *stubOnlineService) UploadHotPatchTemplateToOnline(c context.Context, t string, b []byte) error {
@@ -47,6 +48,10 @@ func (s *stubOnlineService) GetAIApiKeyByOnline(c context.Context, t string) (st
 }
 func (s *stubOnlineService) DownloadOnlineSyntaxFlowRule(c context.Context, t string, r *ypb.DownloadSyntaxFlowRuleRequest) *yaklib.OnlineDownloadFlowRuleStream {
 	return s.downloadRules(c, t, r)
+}
+
+func (s *stubOnlineService) DownloadOnlinePluginByUUID(token, id string) (*yaklib.OnlinePlugin, error) {
+	return s.downloadPlugin(token, id)
 }
 
 func newOnlineTestDB(t *testing.T, models ...interface{}) *gorm.DB {

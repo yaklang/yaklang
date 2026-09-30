@@ -17,7 +17,7 @@ import (
 func TestGRPCMUSTPASS_Brute(t *testing.T) {
 	redisPasswd := "123456"
 	ctx, cancel := context.WithTimeout(context.Background(), 80*time.Second)
-	_ = cancel
+	defer cancel()
 	host, port := tools.DebugMockRedis(ctx, true, redisPasswd)
 	target := utils.HostPort(host, port)
 
@@ -35,7 +35,7 @@ func TestGRPCMUSTPASS_Brute(t *testing.T) {
 		OkToStop:                   true,
 		Concurrent:                 50,
 		TargetTaskConcurrent:       1,
-		DelayMax:                   5,
+		DelayMax:                   1,
 		DelayMin:                   1,
 	})
 	require.NoError(t, err)

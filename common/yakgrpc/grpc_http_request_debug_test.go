@@ -12,6 +12,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -34,15 +35,15 @@ func TestGRPCMUSTPASS_HTTP_Server_DebugPlugin_TestFlow(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	ctx, cancel := context.WithCancel(utils.TimeoutContextSeconds(1000))
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 
-	count := 0
+	var count atomic.Int64
 	host, port := utils.DebugMockHTTPHandlerFuncContext(ctx, func(writer http.ResponseWriter, request *http.Request) {
 		raw, _ := utils.HttpDumpWithBody(request, true)
 		spew.Dump(raw)
 		writer.Write(raw)
-		count++
+		count.Add(1)
 	})
 
 	stream, err := client.DebugPlugin(ctx, &ypb.DebugPluginRequest{
@@ -80,15 +81,11 @@ func TestGRPCMUSTPASS_HTTP_Server_DebugPlugin_TestFlow(t *testing.T) {
 		spew.Dump(rsp)
 	}
 
-	rsp, err := client.QueryHTTPFlows(ctx, &ypb.QueryHTTPFlowRequest{RuntimeId: runtimeId})
-	if err != nil {
-		t.Fatal(err)
-	}
-	total := rsp.GetTotal()
-	t.Log("total: ", total)
-	if total != int64(count) && total >= 3+5+4 {
-		t.Errorf("total: %d != count: %d", total, count)
-	}
+	require.Equal(t, int64(1+3+5+4), count.Load(), "the initial request and every plugin request must reach the server")
+	require.Eventually(t, func() bool {
+		rsp, err := client.QueryHTTPFlows(ctx, &ypb.QueryHTTPFlowRequest{RuntimeId: runtimeId})
+		return err == nil && rsp.GetTotal() == count.Load()
+	}, time.Second, time.Millisecond, "all completed requests must be persisted under the plugin runtime")
 }
 
 func TestGRPCMUSTPASS_HTTP_Server_DebugPlugin_MITM_WithRawPacketAndPaths(t *testing.T) {
@@ -798,24 +795,10 @@ func TestGRPCMUSTPASS_Yak_Debug_Context(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	flag := false
-	for i := 0; i < 10; i++ {
-		time.Sleep(500 * time.Millisecond)
-		if !utils.IsTCPPortAvailable(serverPort) { // 不可用即开
-			flag = true
-			break
-		}
-	}
-	if flag {
-		cancel()
-		time.Sleep(2 * time.Second)
-		if !utils.IsTCPPortAvailable(serverPort) {
-			t.Fatal("context close server port failed")
-		}
-	} else {
-		cancel()
-		t.Fatal("start server port failed")
-	}
+	defer cancel()
+	require.Eventually(t, func() bool { return !utils.IsTCPPortAvailable(serverPort) }, time.Second, time.Millisecond, "debug script did not bind its listener")
+	cancel()
+	require.Eventually(t, func() bool { return utils.IsTCPPortAvailable(serverPort) }, time.Second, time.Millisecond, "cancelling debug script did not release its listener")
 }
 
 func TestGRPCMUSTPASS_Codec_Debug_Context(t *testing.T) {
@@ -834,24 +817,10 @@ httpserver.Serve("127.0.0.1",%d)}`, serverPort),
 	if err != nil {
 		t.Fatal(err)
 	}
-	flag := false
-	for i := 0; i < 10; i++ {
-		time.Sleep(500 * time.Millisecond)
-		if !utils.IsTCPPortAvailable(serverPort) { // 不可用即开
-			flag = true
-			break
-		}
-	}
-	if flag {
-		cancel()
-		time.Sleep(2 * time.Second)
-		if !utils.IsTCPPortAvailable(serverPort) {
-			t.Fatal("context close server port failed")
-		}
-	} else {
-		cancel()
-		t.Fatal("start server port failed")
-	}
+	defer cancel()
+	require.Eventually(t, func() bool { return !utils.IsTCPPortAvailable(serverPort) }, time.Second, time.Millisecond, "debug script did not bind its listener")
+	cancel()
+	require.Eventually(t, func() bool { return utils.IsTCPPortAvailable(serverPort) }, time.Second, time.Millisecond, "cancelling debug script did not release its listener")
 }
 
 func TestGRPCMUSTPASS_MITM_Debug_Context(t *testing.T) {
@@ -874,24 +843,10 @@ httpserver.Serve("127.0.0.1",%d)}`, serverPort),
 	if err != nil {
 		t.Fatal(err)
 	}
-	flag := false
-	for i := 0; i < 10; i++ {
-		time.Sleep(500 * time.Millisecond)
-		if !utils.IsTCPPortAvailable(serverPort) { // 不可用即开
-			flag = true
-			break
-		}
-	}
-	if flag {
-		cancel()
-		time.Sleep(2 * time.Second)
-		if !utils.IsTCPPortAvailable(serverPort) {
-			t.Fatal("context close server port failed")
-		}
-	} else {
-		cancel()
-		t.Fatal("start server port failed")
-	}
+	defer cancel()
+	require.Eventually(t, func() bool { return !utils.IsTCPPortAvailable(serverPort) }, time.Second, time.Millisecond, "debug script did not bind its listener")
+	cancel()
+	require.Eventually(t, func() bool { return utils.IsTCPPortAvailable(serverPort) }, time.Second, time.Millisecond, "cancelling debug script did not release its listener")
 }
 
 func TestGRPCMUSTPASS_MITM_Debug_BoolParams(t *testing.T) {

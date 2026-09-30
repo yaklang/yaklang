@@ -6,16 +6,15 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"sync"
 	"testing"
 	"time"
 
-	"github.com/yaklang/gorm"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/yaklang/gorm"
 	"github.com/yaklang/yaklang/common/consts"
-	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/mcp"
 	mcpmodel "github.com/yaklang/yaklang/common/mcp/mcp-go/mcp"
 	rawserver "github.com/yaklang/yaklang/common/mcp/mcp-go/server"
 	"github.com/yaklang/yaklang/common/schema"
@@ -500,39 +499,20 @@ func TestMCPServerToolsRetrieval(t *testing.T) {
 		}
 	})
 
-	// 设置日志级别以减少输出
-	log.SetLevel(log.ErrorLevel)
-
-	// 创建并启动一个 mock MCP 服务器
-	port := utils.GetRandomAvailableTCPPort()
-	serverURL := fmt.Sprintf("http://localhost:%d", port)
-
-	// 启动 MCP 服务器
-	go func() {
-		mcpServer, err := mcp.NewMCPServer(mcp.WithEnableAllToolSets())
-		if err != nil {
-			t.Errorf("创建 MCP 服务器失败: %v", err)
-			return
-		}
-
-		if err := mcpServer.ServeSSE(fmt.Sprintf(":%d", port), serverURL); err != nil {
-			t.Logf("MCP 服务器启动失败: %v", err)
-		}
-	}()
-
-	// 等待服务器启动
-	time.Sleep(2 * time.Second)
-	err := utils.WaitConnect(fmt.Sprintf("127.0.0.1:%d", port), 5)
-	if err != nil {
-		t.Skipf("无法连接到 MCP 服务器，跳过测试: %v", err)
-		return
-	}
+	// A single local tool is enough to verify transport and metadata persistence.
+	mcpServer := rawserver.NewMCPServer("tools-fixture", "1.0.0")
+	mcpServer.AddTool(mcpmodel.NewTool("fixture-tool"), func(ctx context.Context, request mcpmodel.CallToolRequest) (*mcpmodel.CallToolResult, error) {
+		return &mcpmodel.CallToolResult{}, nil
+	})
+	sseServer := rawserver.NewTestServer(mcpServer)
+	defer sseServer.Close()
+	serverURL := sseServer.URL
 
 	// 创建 gRPC 服务器实例
 	grpcServer, err := NewServer()
 	require.NoError(t, err)
 
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 
 	t.Run("TestGetMCPServerToolsWithSSE", func(t *testing.T) {
@@ -546,35 +526,9 @@ func TestMCPServerToolsRetrieval(t *testing.T) {
 		// 调用 getMCPServerTools 方法
 		tools, err := grpcServer.getMCPServerTools(ctx, mcpServerConfig)
 
-		// 验证结果
-		if err != nil {
-			// 如果连接失败，这可能是正常的（服务器可能没有完全启动）
-			t.Logf("获取工具列表失败（可能是正常的）: %v", err)
-			return
-		}
-
-		// 验证返回的工具列表
-		assert.NotNil(t, tools)
-		t.Logf("成功获取到 %d 个工具", len(tools))
-
-		// 打印工具信息用于调试
-		for i, tool := range tools {
-			t.Logf("工具 %d: 名称=%s, 描述=%s, 参数数量=%d",
-				i+1, tool.GetName(), tool.GetDescription(), len(tool.GetParams()))
-
-			// 验证工具基本信息
-			assert.NotEmpty(t, tool.GetName(), "工具名称不应为空")
-
-			// 验证参数信息
-			for j, param := range tool.GetParams() {
-				t.Logf("  参数 %d: 名称=%s, 类型=%s, 必需=%v, 描述=%s",
-					j+1, param.GetName(), param.GetType(), param.GetRequired(), param.GetDescription())
-
-				assert.NotEmpty(t, param.GetName(), "参数名称不应为空")
-				assert.NotEmpty(t, param.GetType(), "参数类型不应为空")
-				assert.Contains(t, []bool{true, false}, param.GetRequired(), "参数必需字段应为 true 或 false")
-			}
-		}
+		require.NoError(t, err)
+		require.Len(t, tools, 1)
+		require.Equal(t, "fixture-tool", tools[0].GetName())
 	})
 
 	t.Run("TestGetMCPServerToolsWithSSEHeaders", func(t *testing.T) {
@@ -630,25 +584,28 @@ func TestMCPServerToolsRetrieval(t *testing.T) {
 	})
 
 	t.Run("TestGetMCPServerToolsWithStdio", func(t *testing.T) {
-		// 测试 stdio 类型的 MCP 服务器（使用一个简单的 echo 命令作为 mock）
-		mcpServerConfig := &schema.MCPServer{
-			Name:    "test-stdio-server-for-tools",
-			Type:    "stdio",
-			Command: "echo '{\"tools\":[]}'", // 简单的 mock 命令
-		}
-
-		// 调用 getMCPServerTools 方法
-		tools, err := grpcServer.getMCPServerTools(ctx, mcpServerConfig)
-
-		// 对于 stdio 类型，我们期望会有错误（因为 echo 不是真正的 MCP 服务器）
-		if err != nil {
-			t.Logf("stdio 类型服务器获取工具列表失败（预期的）: %v", err)
-			assert.Error(t, err)
-		} else {
-			// 如果没有错误，验证返回的工具列表
-			assert.NotNil(t, tools)
-			t.Logf("stdio 服务器返回了 %d 个工具", len(tools))
-		}
+		// A minimal line-delimited JSON-RPC peer exercises the real stdio
+		// transport without starting another engine and rebuilding its databases.
+		fixture := t.TempDir() + "/mcp-stdio.sh"
+		require.NoError(t, os.WriteFile(fixture, []byte(`#!/bin/sh
+while IFS= read -r line; do
+printf '%s\n' "$line" | awk '
+/"id"[[:space:]]*:/ {
+    id=$0; sub(/^.*"id"[[:space:]]*:[[:space:]]*/, "", id); sub(/[^0-9].*$/, "", id)
+    if ($0 ~ /"initialize"/) result="{\"protocolVersion\":\"2024-11-05\",\"capabilities\":{\"tools\":{}},\"serverInfo\":{\"name\":\"stdio-fixture\",\"version\":\"1\"}}"
+    else if ($0 ~ /"tools\/list"/) result="{\"tools\":[{\"name\":\"stdio-tool\",\"inputSchema\":{\"type\":\"object\"}}]}"
+    else exit 1
+    printf "{\"jsonrpc\":\"2.0\",\"id\":%s,\"result\":%s}\n", id, result
+    fflush()
+}'
+done
+`), 0600))
+		tools, err := grpcServer.getMCPServerTools(ctx, &schema.MCPServer{
+			Name: "test-stdio-server-for-tools", Type: "stdio", Command: "sh " + fixture,
+		})
+		require.NoError(t, err)
+		require.Len(t, tools, 1)
+		require.Equal(t, "stdio-tool", tools[0].GetName())
 	})
 
 	t.Run("TestGetMCPServerToolsWithInvalidType", func(t *testing.T) {

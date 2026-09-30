@@ -1,6 +1,7 @@
 package yakgrpc
 
 import (
+	"bufio"
 	"context"
 	"errors"
 	"fmt"
@@ -8,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -458,8 +460,18 @@ func generateLargePayloadFile(lines int) (filename string, clean func(), err err
 		return "", nil, err
 	}
 
+	writer := bufio.NewWriter(fd)
 	for i := 0; i < lines; i++ {
-		fd.WriteString(utils.RandAlphaNumStringBytes(16) + "\n")
+		if _, err := fmt.Fprintf(writer, "%016x\n", i); err != nil {
+			fd.Close()
+			os.Remove(fd.Name())
+			return "", nil, err
+		}
+	}
+	if err := writer.Flush(); err != nil {
+		fd.Close()
+		os.Remove(fd.Name())
+		return "", nil, err
 	}
 
 	return fd.Name(), func() {
@@ -471,17 +483,30 @@ func generateLargePayloadFile(lines int) (filename string, clean func(), err err
 func TestLargePayload(t *testing.T) {
 	local, err := NewLocalClient()
 	require.NoError(t, err)
-	filename, clean, err := generateLargePayloadFile(1e6)
-	defer clean()
+	// QueryPayloadFromFile switches to a preview above FiveMB. Keep enough
+	// unique lines to cross that boundary rather than importing a million.
+	filename, clean, err := generateLargePayloadFile(FiveMB/17 + 1)
 	require.NoError(t, err)
+	defer clean()
 	group := uuid.NewString()
 	ctx := utils.TimeoutContextSeconds(20)
 	save2LargeFile(local, t, ctx, group, "", filename)
 
 	rsp := queryFromFile(local, t, group, "")
 	require.True(t, rsp.IsBigFile)
-	// t.Logf("big file size: %d", len(rsp.Data))
-	// t.Logf("big file content:\n%s", rsp.Data[:])
+	require.Greater(t, len(rsp.Data), 0)
+	require.LessOrEqual(t, len(rsp.Data), FiftyKB+17, "the response must stay bounded")
+	lines := strings.Split(string(rsp.Data), "\n")
+	seen := make(map[string]bool, len(lines))
+	for _, line := range lines {
+		// The large-file reader can return chunks in a different order.
+		require.Len(t, line, 16)
+		number, err := strconv.ParseUint(line, 16, 64)
+		require.NoError(t, err)
+		require.Less(t, number, uint64(FiveMB/17+1))
+		require.False(t, seen[line], "preview lines must stay unique")
+		seen[line] = true
+	}
 }
 
 func TestPayload(t *testing.T) {

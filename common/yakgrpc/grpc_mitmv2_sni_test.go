@@ -26,8 +26,7 @@ import (
 // This test verifies that when connecting to an IP address, the SNI is still set to the domain name
 func TestGRPCMUSTPASS_MITMV2_SNI_DomainNotIP(t *testing.T) {
 	testDomain := "api.test.example.com"
-	receivedSNI := ""
-	tlsHandshakeCompleted := false
+	sniReceived := make(chan string, 1)
 
 	// Create self-signed certificate for test domain
 	cert, key := generateTestCertificate(t, testDomain)
@@ -46,7 +45,7 @@ func TestGRPCMUSTPASS_MITMV2_SNI_DomainNotIP(t *testing.T) {
 	log.Infof("TLS mock server (with SNI capture) started on %s", serverAddr)
 
 	// Server goroutine - captures SNI from ClientHello
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 
 	go func() {
@@ -67,8 +66,10 @@ func TestGRPCMUSTPASS_MITMV2_SNI_DomainNotIP(t *testing.T) {
 						Certificates: []tls.Certificate{tlsCert},
 						GetConfigForClient: func(info *tls.ClientHelloInfo) (*tls.Config, error) {
 							log.Infof("✅ Server captured SNI from ClientHello: %s", info.ServerName)
-							receivedSNI = info.ServerName
-							tlsHandshakeCompleted = true
+							select {
+							case sniReceived <- info.ServerName:
+							default:
+							}
 							return &tls.Config{
 								Certificates: []tls.Certificate{tlsCert},
 							}, nil
@@ -84,8 +85,6 @@ func TestGRPCMUSTPASS_MITMV2_SNI_DomainNotIP(t *testing.T) {
 			}
 		}
 	}()
-
-	time.Sleep(500 * time.Millisecond)
 
 	// Start MITM server
 	mitmPort := utils.GetRandomAvailableTCPPort()
@@ -103,8 +102,10 @@ func TestGRPCMUSTPASS_MITMV2_SNI_DomainNotIP(t *testing.T) {
 
 	mitmStarted := false
 
-	// Wait for MITM to start, then send request
+	// The bound-listener event starts the request; completion joins the worker.
+	requestDone := make(chan error, 1)
 	go func() {
+		defer cancel()
 		for {
 			data, err := stream.Recv()
 			if err != nil {
@@ -115,9 +116,6 @@ func TestGRPCMUSTPASS_MITMV2_SNI_DomainNotIP(t *testing.T) {
 				log.Info(msg)
 				if strings.Contains(msg, "starting mitm server") && !mitmStarted {
 					mitmStarted = true
-
-					// Wait a bit for MITM to be fully ready
-					time.Sleep(500 * time.Millisecond)
 
 					// CRITICAL TEST: Send HTTPS request through MITM
 					// We connect to IP but use domain in Host header
@@ -135,18 +133,14 @@ log.info("Sending HTTPS request through MITM proxy")
 log.info(f"Target: ${target}, Host header: ${testDomain}")
 
 // Send request through MITM with domain Host header (simulates Proxifier scenario)
-rsp, err = poc.Get(
+rsp, req = poc.Get(
 	target,
 	poc.proxy(mitmProxy),
 	poc.replaceHeader("Host", testDomain),
 	poc.timeout(5),
 )~
 
-if err != nil {
-	log.error(f"Request failed: ${err}")
-} else {
-	log.info("✅ Request succeeded!")
-}
+assert str.Contains(rsp.RawPacket, "200 OK")
 `,
 						map[string]any{
 							"serverIP":   serverIP,
@@ -155,23 +149,28 @@ if err != nil {
 							"mitmProxy":  fmt.Sprintf("http://127.0.0.1:%d", mitmPort),
 						})
 
-					if err != nil {
-						log.Errorf("Execute script failed: %v", err)
-					}
-
-					// Give time for TLS handshake to complete
-					time.Sleep(2 * time.Second)
-					cancel()
+					requestDone <- err
+					return
 				}
 			}
 		}
 	}()
 
-	<-ctx.Done()
+	select {
+	case err := <-requestDone:
+		require.NoError(t, err)
+	case <-ctx.Done():
+		t.Fatal("MITM request did not complete")
+	}
+	var receivedSNI string
+	select {
+	case receivedSNI = <-sniReceived:
+	default:
+		t.Fatal("TLS server did not capture a ClientHello")
+	}
 
 	// CRITICAL ASSERTIONS
 	require.True(t, mitmStarted, "MITM server should have started")
-	require.True(t, tlsHandshakeCompleted, "TLS handshake should have completed")
 	require.NotEmpty(t, receivedSNI, "Server should have captured SNI from ClientHello")
 
 	// MAIN TEST: Verify SNI is the DOMAIN, not the IP

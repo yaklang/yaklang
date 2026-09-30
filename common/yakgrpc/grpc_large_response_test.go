@@ -335,6 +335,9 @@ Host: ` + vulinboxAddr + "\r\n\r\n",
 }
 
 func TestLARGEGRPCMUSTPASS_LARGE_RESPOSNE(t *testing.T) {
+	// Cross both the configured 100-byte storage limit and the default 5 MiB
+	// large-body boundary, retaining file persistence and gRPC preview coverage.
+	const bodySize = 5*1024*1024 + 100
 	var port int
 	ctx, cancel := context.WithCancel(utils.TimeoutContextSeconds(60))
 	defer cancel()
@@ -358,7 +361,7 @@ func TestLARGEGRPCMUSTPASS_LARGE_RESPOSNE(t *testing.T) {
 cancel()
 assert len(rsp) > 1111100, f"ResponseLength ${len(rsp)}"`,
 				map[string]any{
-					"packet": `GET /misc/response/content_length?cl=111110000&c=` + token + ` HTTP/1.1
+					"packet": `GET /misc/response/content_length?cl=` + fmt.Sprint(bodySize) + `&c=` + token + ` HTTP/1.1
 Host: ` + vulinboxAddr + "\r\n\r\n",
 					`cancel`:    cancel,
 					"mitmProxy": fmt.Sprintf(`http://127.0.0.1:%v`, port),
@@ -374,15 +377,21 @@ Host: ` + vulinboxAddr + "\r\n\r\n",
 			})
 			require.NoError(t, err, "query taged flow failed")
 			require.Len(t, data, 1, "query taged flow failed(count is not right)")
-			require.GreaterOrEqual(t, data[0].BodyLength, int64(111110000), "query taged flow failed")
+			require.GreaterOrEqual(t, data[0].BodyLength, int64(bodySize), "the entire response must be recorded")
 			require.True(t, data[0].IsTooLargeResponse, "too-large-response tag not found")
 
 			bodyFile := data[0].TooLargeResponseBodyFile
 			headerFile := data[0].TooLargeResponseHeaderFile
 
 			require.NotEmpty(t, bodyFile, "too-large-response body file not found")
-			rawBody, _ := os.ReadFile(bodyFile)
-			require.GreaterOrEqual(t, len(rawBody), 111110000, "too-large-response body file not found")
+			rawBody, err := os.ReadFile(bodyFile)
+			require.NoError(t, err)
+			// Chunked responses persist their wire framing in the body file.
+			if len(rawBody) != bodySize {
+				rawBody, err = codec.HTTPChunkedDecode(rawBody)
+				require.NoError(t, err)
+			}
+			require.Equal(t, bodySize, len(rawBody), "the body file must not be truncated")
 			if headerFile == "" {
 				t.Fatal("too-large-response header file not found")
 			}
@@ -391,7 +400,7 @@ Host: ` + vulinboxAddr + "\r\n\r\n",
 
 			raw := data[0]
 			ins, _ := model.ToHTTPFlowGRPCModel(raw, true)
-			require.LessOrEqual(t, len(ins.Response), 111110000, "ins.Response is too large")
+			require.LessOrEqual(t, len(ins.Response), bodySize, "ins.Response is too large")
 			require.Greater(t, len(ins.Response), 0, "ins.Response should not be empty")
 			require.NotEmpty(t, ins.TooLargeResponseHeaderFile, "ins.TooLargeResponseHeaderFile should not be empty")
 			require.NotEmpty(t, ins.TooLargeResponseBodyFile, "ins.TooLargeResponseBodyFile should not be empty")

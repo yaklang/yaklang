@@ -3,13 +3,14 @@ package yakgrpc
 import (
 	"bytes"
 	"context"
-	"crypto/tls"
 	"encoding/json"
 	"fmt"
+	"net/http"
+	"net/http/httptest"
 	"regexp"
 	"strings"
+	"sync"
 	"testing"
-	"time"
 
 	"github.com/davecgh/go-spew/spew"
 	"github.com/google/uuid"
@@ -17,8 +18,6 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/jsonpath"
-	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"github.com/yaklang/yaklang/common/yak"
 	"github.com/yaklang/yaklang/common/yak/yaklib"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
@@ -27,6 +26,22 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
+// Exercise real TLS, SSE parsing and Yak output with a complete local response.
+// Returning from the handler terminates the HTTP body; no idle-read timeout is needed.
+func mockChatStream(t *testing.T, chunks ...string) string {
+	t.Helper()
+	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/event-stream")
+		for _, chunk := range chunks {
+			fmt.Fprintf(w, "data: {\"id\":\"1\",\"choices\":[{\"index\":0,\"delta\":{\"role\":\"assistant\",\"content\":%s}}]}\n\n", utils.Jsonify(chunk))
+			w.(http.Flusher).Flush()
+		}
+		fmt.Fprint(w, "data: [DONE]\n\n")
+	}))
+	t.Cleanup(server.Close)
+	return strings.TrimPrefix(server.URL, "https://")
+}
+
 func TestMitmInvokeAi(t *testing.T) {
 	consts.ClearThirdPartyApplicationConfig()
 	consts.UpdateThirdPartyApplicationConfig(&ypb.ThirdPartyApplicationConfig{
@@ -34,60 +49,29 @@ func TestMitmInvokeAi(t *testing.T) {
 		Type:   "chatglm",
 	})
 	caller, err := yak.NewMixPluginCaller()
-	if err != nil {
-		t.Fatal(err)
-	}
-	rspStrTmp := `data: {"id":"1","created":1,"model":"1","choices":[{"index":0,"delta":{"role":"assistant","content":"%s"}}]}`
-	headerStr, _, _ := lowhttp.FixHTTPResponse([]byte("HTTP/1.1 200 OK\nContent-Type: application/json\nTransfer-Encoding: chunked\nConnection: Keep-Alive\n\n"))
-	port := utils.GetRandomAvailableTCPPort()
-	l, err := tls.Listen("tcp", spew.Sprintf(":%d", port), utils.GetDefaultTLSConfig(3))
-	if err != nil {
-		t.Fatal(err)
-	}
-	go func() {
-		for {
-			conn, err := l.Accept()
-			if err != nil {
-				log.Error(err)
-				return
-			}
-			genMsg := func(s string) []byte {
-				msg := []byte(fmt.Sprintf(rspStrTmp, s))
-				return []byte(fmt.Sprintf("%x\r\n%s\r\n", len(msg), msg))
-			}
-			log.Info("accept conn")
-			go func() {
-				utils.StableReader(conn, 1, 10240)
-				conn.Write(headerStr)
-				conn.Write(genMsg("我是人工智障"))
-				conn.Write([]byte("\r\n"))
-				time.Sleep(time.Millisecond * 500)
-				conn.Close()
-				log.Info("close conn")
-			}()
-		}
-	}()
-	msgs := ""
+	require.NoError(t, err)
+	addr := mockChatStream(t, "我是人工智障")
+	var mu sync.Mutex
+	var msgs strings.Builder
 	caller.SetFeedback(func(i *ypb.ExecResult) error {
-		msgs += string(i.Message)
+		mu.Lock()
+		defer mu.Unlock()
+		msgs.Write(i.Message)
 		return nil
 	})
-	addr := fmt.Sprintf("%s:%d", "127.0.0.1", port)
-	caller.LoadHotPatch(context.Background(), []*ypb.ExecParamItem{}, `
-mirrorHTTPFlow = func(isHttps /*bool*/, url /*string*/, req /*[]byte*/, rsp /*[]byte*/, body /*[]byte*/) {
- 	res = ai.Chat("你好",ai.domain("`+addr+`"),ai.type("chatglm"))~
-yakit_output(res)
+	require.NoError(t, caller.LoadHotPatch(context.Background(), []*ypb.ExecParamItem{}, `
+mirrorHTTPFlow = func(isHttps, url, req, rsp, body) {
+    res = ai.Chat("你好", ai.domain("`+addr+`"), ai.type("chatglm"))~
+    yakit_output(res)
 }
-`)
-
+`))
 	for i := 0; i < 10; i++ {
 		caller.MirrorHTTPFlow(false, "aaa", []byte(""), []byte(""), []byte(""))
 	}
 	caller.Wait()
-	println(strings.Count(string(msgs), "我是人工智障"))
-	if strings.Count(string(msgs), "我是人工智障") != 10 {
-		t.Fatal("test mitm invoke ai failed")
-	}
+	mu.Lock()
+	defer mu.Unlock()
+	require.Equal(t, 10, strings.Count(msgs.String(), "我是人工智障"))
 }
 
 func TestOUTPUT_AiChat(t *testing.T) {
@@ -96,89 +80,40 @@ func TestOUTPUT_AiChat(t *testing.T) {
 		APIKey: fmt.Sprintf("%s.%s", utils.RandStringBytes(32), utils.RandStringBytes(16)),
 		Type:   "chatglm",
 	})
-	rspStrTmp := `data: {"id":"1","created":1,"model":"1","choices":[{"index":0,"delta":{"role":"assistant","content":"%s"}}]}
-`
-	headerStr, _, _ := lowhttp.FixHTTPResponse([]byte("HTTP/1.1 200 OK\nContent-Type: application/json\nTransfer-Encoding: chunked\nConnection: Keep-Alive\n\n"))
-	port := utils.GetRandomAvailableTCPPort()
-	l, err := tls.Listen("tcp", spew.Sprintf(":%d", port), utils.GetDefaultTLSConfig(3))
-	if err != nil {
-		t.Fatal(err)
-	}
-	go func() {
-		for {
-			conn, err := l.Accept()
-			if err != nil {
-				t.Fatal(err)
-			}
-			genMsg := func(s string) []byte {
-				msg := []byte(fmt.Sprintf(rspStrTmp, s))
-				return []byte(fmt.Sprintf("%x\r\n%s\r\n", len(msg), msg))
-			}
-			log.Info("accept conn")
-			go func() {
-				utils.StableReader(conn, 1, 10240)
-				conn.Write(headerStr)
-				conn.Write(genMsg("你好"))
-				time.Sleep(time.Millisecond * 500)
-				conn.Write(genMsg("我是人工智障"))
-				time.Sleep(time.Millisecond * 500)
-				conn.Write(genMsg("助手"))
-				conn.Write(genMsg(""))
-				conn.Write([]byte("\r\n"))
-				conn.Close()
-				log.Info("close conn")
-			}()
-		}
-	}()
-	yaklib.InitYakit(yaklib.NewVirtualYakitClient(func(i *ypb.ExecResult) error {
-		return nil
-	}))
-	addr := fmt.Sprintf("127.0.0.1:%d", port)
-	time.Sleep(time.Second)
-	debugStreamTestResult := false
-	stdOutputCh := ""
+	addr := mockChatStream(t, "你好", "我是人工智障", "助手")
+	yaklib.InitYakit(yaklib.NewVirtualYakitClient(func(i *ypb.ExecResult) error { return nil }))
 	re := regexp.MustCompile("[\u4e00-\u9fa5]")
-	var cancel, wait func()
-	cancel, wait, err = utils.HandleStdoutBackgroundForTest(func(s string) {
+	var stdout strings.Builder
+	var mu sync.Mutex
+	cancel, wait, err := utils.HandleStdoutBackgroundForTest(func(s string) {
+		mu.Lock()
+		defer mu.Unlock()
 		for _, c := range re.FindAllString(s, -1) {
-			stdOutputCh += c
-		}
-		// log.Infof("HandleStdoutBackgroundForTest stdout: %v", stdOutputCh)
-		if stdOutputCh == "你好我是人工智障助手" {
-			debugStreamTestResult = true
-			cancel()
+			stdout.WriteString(c)
 		}
 	})
-	_ = debugStreamTestResult
-	if err != nil {
-		t.Fatal(err)
-	}
-	engine := yak.NewYakitVirtualClientScriptEngine(yaklib.NewVirtualYakitClient(func(i *ypb.ExecResult) error {
-		return nil
-	}))
-	err = engine.Execute(fmt.Sprintf(`result = ai.Chat("你好",ai.type("chatglm"),ai.debugStream(),ai.domain("%s"))~; dump(result); assert result == "你好我是人工智障助手"`, addr))
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
+	engine := yak.NewYakitVirtualClientScriptEngine(yaklib.NewVirtualYakitClient(func(i *ypb.ExecResult) error { return nil }))
+	err = engine.Execute(fmt.Sprintf(`result = ai.Chat("你好", ai.type("chatglm"), ai.debugStream(), ai.domain("%s"))~; assert result == "你好我是人工智障助手"`, addr))
+	cancel()
 	wait()
+	require.NoError(t, err)
+	mu.Lock()
+	assert.Contains(t, stdout.String(), "你好我是人工智障助手")
+	mu.Unlock()
+
 	subMsgN := 0
-	msg := ""
-	time.Sleep(time.Second)
+	var msg strings.Builder
 	engine = yak.NewYakitVirtualClientScriptEngine(yaklib.NewVirtualYakitClient(func(i *ypb.ExecResult) error {
-		s := re.FindAllString(string(i.Message), -1)
-		for _, s2 := range s {
-			msg += s2
+		for _, s := range re.FindAllString(string(i.Message), -1) {
+			msg.WriteString(s)
 		}
 		subMsgN++
-		print(string(i.Raw))
 		return nil
 	}))
-	err = engine.Execute(fmt.Sprintf(`ai.Chat("你好",ai.type("chatglm"),ai.domain("%s"))~`, addr))
-	if err != nil {
-		t.Fatal(err)
-	}
-	assert.Equal(t, true, subMsgN >= 3)
-	assert.Contains(t, msg, "你好我是人工智障助手")
+	require.NoError(t, engine.Execute(fmt.Sprintf(`ai.Chat("你好", ai.type("chatglm"), ai.domain("%s"))~`, addr)))
+	assert.GreaterOrEqual(t, subMsgN, 3)
+	assert.Contains(t, msg.String(), "你好我是人工智障助手")
 }
 
 func TestOUTPUT_STREAMYakitStream(t *testing.T) {
@@ -200,16 +135,13 @@ go func{
     for {
         count++
         pw.Write("Hello1")
-        sleep(0.3)
         if count > 5 {
             pw.Close()
-            pr.Close()
             return
         }
     }
 }
 yakit.Stream("ai", "` + uid + `", pr)
-sleep(2)
 `,
 	})
 	if err != nil {

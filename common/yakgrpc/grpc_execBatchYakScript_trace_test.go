@@ -65,7 +65,7 @@ requests:
 `)
 	require.NoError(t, err)
 	defer clearFunc()
-	host, port := utils.DebugMockHTTP([]byte("HTTP/1.1 200 OK\r\n\r\nHello, world!"))
+	host, port := utils.DebugMockHTTP([]byte("HTTP/1.1 200 OK\r\nContent-Length: 13\r\n\r\nHello, world!"))
 
 	stream, err := client.ExecYakScript(context.Background(), &ypb.ExecRequest{
 		ScriptId: name,

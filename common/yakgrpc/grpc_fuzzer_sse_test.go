@@ -16,7 +16,11 @@ import (
 )
 
 func TestGRPCMUSTPASS_HTTPFuzzer_SSE_IncrementalChunkUpdates(t *testing.T) {
-	host, port := utils.DebugMockHTTPHandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+	advance := make(chan struct{}, 4)
+	nextEvent := 0
+	host, port := utils.DebugMockHTTPHandlerFuncContext(ctx, func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/event-stream")
 		w.Header().Set("Cache-Control", "no-cache")
 		w.WriteHeader(http.StatusOK)
@@ -27,16 +31,20 @@ func TestGRPCMUSTPASS_HTTPFuzzer_SSE_IncrementalChunkUpdates(t *testing.T) {
 		for i := 0; i < 4; i++ {
 			_, _ = fmt.Fprintf(w, "data: msg%d\n\n", i)
 			f.Flush()
-			time.Sleep(350 * time.Millisecond)
+			// Keep the stream open until the client observes this event.
+			select {
+			case <-advance:
+			case <-r.Context().Done():
+				return
+			}
 		}
 
-		time.Sleep(2 * time.Second)
 	})
 
 	c, err := NewLocalClient()
 	require.NoError(t, err)
 
-	stream, err := c.HTTPFuzzer(context.Background(), &ypb.FuzzerRequest{
+	stream, err := c.HTTPFuzzer(ctx, &ypb.FuzzerRequest{
 		Request: fmt.Sprintf("GET / HTTP/1.1\r\nHost: %s\r\nAccept: text/event-stream\r\n\r\n", utils.HostPort(host, port)),
 		// Incremental updates are expected; final "full response" should not be required.
 		PerRequestTimeoutSeconds: 1.8,
@@ -68,6 +76,10 @@ func TestGRPCMUSTPASS_HTTPFuzzer_SSE_IncrementalChunkUpdates(t *testing.T) {
 			if bytes.Contains(c.Data, []byte("data: msg")) {
 				hit = true
 			}
+			for nextEvent < 4 && bytes.Contains(c.Data, []byte(fmt.Sprintf("data: msg%d", nextEvent))) {
+				advance <- struct{}{}
+				nextEvent++
+			}
 		}
 		if hit {
 			gotSSE++
@@ -89,7 +101,11 @@ func TestGRPCMUSTPASS_HTTPFuzzer_SSE_IncrementalChunkUpdates(t *testing.T) {
 }
 
 func TestGRPCMUSTPASS_HTTPFuzzer_SSE_AutoDetectWithoutAccept(t *testing.T) {
-	host, port := utils.DebugMockHTTPHandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+	advance := make(chan struct{}, 4)
+	nextEvent := 0
+	host, port := utils.DebugMockHTTPHandlerFuncContext(ctx, func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/event-stream")
 		w.Header().Set("Cache-Control", "no-cache")
 		w.WriteHeader(http.StatusOK)
@@ -100,16 +116,20 @@ func TestGRPCMUSTPASS_HTTPFuzzer_SSE_AutoDetectWithoutAccept(t *testing.T) {
 		for i := 0; i < 4; i++ {
 			_, _ = fmt.Fprintf(w, "data: msg%d\n\n", i)
 			f.Flush()
-			time.Sleep(350 * time.Millisecond)
+			// Keep the stream open until the client observes this event.
+			select {
+			case <-advance:
+			case <-r.Context().Done():
+				return
+			}
 		}
 
-		time.Sleep(2 * time.Second)
 	})
 
 	c, err := NewLocalClient()
 	require.NoError(t, err)
 
-	stream, err := c.HTTPFuzzer(context.Background(), &ypb.FuzzerRequest{
+	stream, err := c.HTTPFuzzer(ctx, &ypb.FuzzerRequest{
 		// No Accept: text/event-stream; should still auto-detect SSE by response Content-Type.
 		Request:                  fmt.Sprintf("GET / HTTP/1.1\r\nHost: %s\r\n\r\n", utils.HostPort(host, port)),
 		PerRequestTimeoutSeconds: 1.8,
@@ -140,6 +160,10 @@ func TestGRPCMUSTPASS_HTTPFuzzer_SSE_AutoDetectWithoutAccept(t *testing.T) {
 			if bytes.Contains(c.Data, []byte("data: msg")) {
 				hit = true
 			}
+			for nextEvent < 4 && bytes.Contains(c.Data, []byte(fmt.Sprintf("data: msg%d", nextEvent))) {
+				advance <- struct{}{}
+				nextEvent++
+			}
 		}
 		if hit {
 			gotSSE++
@@ -157,7 +181,10 @@ func TestGRPCMUSTPASS_HTTPFuzzer_SSE_AutoDetectWithoutAccept(t *testing.T) {
 }
 
 func TestGRPCMUSTPASS_HTTPFuzzer_SSE_HTTP2_IncrementalChunkUpdates(t *testing.T) {
-	ctx := utils.TimeoutContextSeconds(10)
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+	advance := make(chan struct{}, 4)
+	nextEvent := 0
 	host, port := utils.DebugMockHTTP2HandlerFuncContext(ctx, func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/event-stream")
 		w.Header().Set("Cache-Control", "no-cache")
@@ -169,16 +196,20 @@ func TestGRPCMUSTPASS_HTTPFuzzer_SSE_HTTP2_IncrementalChunkUpdates(t *testing.T)
 		for i := 0; i < 4; i++ {
 			_, _ = fmt.Fprintf(w, "data: msg%d\n\n", i)
 			f.Flush()
-			time.Sleep(350 * time.Millisecond)
+			// Keep the stream open until the client observes this event.
+			select {
+			case <-advance:
+			case <-r.Context().Done():
+				return
+			}
 		}
 
-		time.Sleep(2 * time.Second)
 	})
 
 	c, err := NewLocalClient()
 	require.NoError(t, err)
 
-	stream, err := c.HTTPFuzzer(context.Background(), &ypb.FuzzerRequest{
+	stream, err := c.HTTPFuzzer(ctx, &ypb.FuzzerRequest{
 		Request:                  fmt.Sprintf("GET / HTTP/2.0\r\nHost: %s\r\nAccept: text/event-stream\r\n\r\n", utils.HostPort(host, port)),
 		PerRequestTimeoutSeconds: 1.8,
 		DialTimeoutSeconds:       1.0,
@@ -210,6 +241,10 @@ func TestGRPCMUSTPASS_HTTPFuzzer_SSE_HTTP2_IncrementalChunkUpdates(t *testing.T)
 			if bytes.Contains(c.Data, []byte("data: msg")) {
 				hit = true
 			}
+			for nextEvent < 4 && bytes.Contains(c.Data, []byte(fmt.Sprintf("data: msg%d", nextEvent))) {
+				advance <- struct{}{}
+				nextEvent++
+			}
 		}
 		if hit {
 			gotSSE++
@@ -231,7 +266,10 @@ func TestGRPCMUSTPASS_HTTPFuzzer_SSE_HTTP2_IncrementalChunkUpdates(t *testing.T)
 }
 
 func TestGRPCMUSTPASS_HTTPFuzzer_SSE_HTTP2_AutoDetectWithoutAccept(t *testing.T) {
-	ctx := utils.TimeoutContextSeconds(10)
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+	advance := make(chan struct{}, 4)
+	nextEvent := 0
 	host, port := utils.DebugMockHTTP2HandlerFuncContext(ctx, func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/event-stream")
 		w.Header().Set("Cache-Control", "no-cache")
@@ -243,18 +281,22 @@ func TestGRPCMUSTPASS_HTTPFuzzer_SSE_HTTP2_AutoDetectWithoutAccept(t *testing.T)
 		for i := 0; i < 4; i++ {
 			_, _ = fmt.Fprintf(w, "data: msg%d\n\n", i)
 			f.Flush()
-			time.Sleep(350 * time.Millisecond)
+			// Keep the stream open until the client observes this event.
+			select {
+			case <-advance:
+			case <-r.Context().Done():
+				return
+			}
 		}
 
-		time.Sleep(2 * time.Second)
 	})
 
 	c, err := NewLocalClient()
 	require.NoError(t, err)
 
-	stream, err := c.HTTPFuzzer(context.Background(), &ypb.FuzzerRequest{
+	stream, err := c.HTTPFuzzer(ctx, &ypb.FuzzerRequest{
 		Request:                  fmt.Sprintf("GET / HTTP/2.0\r\nHost: %s\r\n\r\n", utils.HostPort(host, port)),
-		PerRequestTimeoutSeconds: 5.0,
+		PerRequestTimeoutSeconds: 1.8,
 		DialTimeoutSeconds:       1.0,
 		ForceFuzz:                true,
 		IsHTTPS:                  true,
@@ -282,6 +324,10 @@ func TestGRPCMUSTPASS_HTTPFuzzer_SSE_HTTP2_AutoDetectWithoutAccept(t *testing.T)
 			}
 			if bytes.Contains(c.Data, []byte("data: msg")) {
 				hit = true
+			}
+			for nextEvent < 4 && bytes.Contains(c.Data, []byte(fmt.Sprintf("data: msg%d", nextEvent))) {
+				advance <- struct{}{}
+				nextEvent++
 			}
 		}
 		if hit {

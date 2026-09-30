@@ -58,12 +58,12 @@ func TestComputeRiskHash_HostPortFallback(t *testing.T) {
 }
 
 func TestCreateRisk_DeterministicHash(t *testing.T) {
-	r1 := CreateRisk("https://example.com/login",
+	r1 := CreateRisk("https://127.0.0.1/login",
 		WithRiskParam_RiskType("sqli"),
 		WithRiskParam_Parameter("username"),
 		WithRiskParam_Title("SQL注入"),
 	)
-	r2 := CreateRisk("https://example.com/login",
+	r2 := CreateRisk("https://127.0.0.1/login",
 		WithRiskParam_RiskType("sqli"),
 		WithRiskParam_Parameter("username"),
 		WithRiskParam_Title("SQL注入 (re-verify)"), // different title
@@ -72,11 +72,11 @@ func TestCreateRisk_DeterministicHash(t *testing.T) {
 }
 
 func TestCreateRisk_DifferentParamDifferentHash(t *testing.T) {
-	r1 := CreateRisk("https://example.com/login",
+	r1 := CreateRisk("https://127.0.0.1/login",
 		WithRiskParam_RiskType("sqli"),
 		WithRiskParam_Parameter("username"),
 	)
-	r2 := CreateRisk("https://example.com/login",
+	r2 := CreateRisk("https://127.0.0.1/login",
 		WithRiskParam_RiskType("sqli"),
 		WithRiskParam_Parameter("password"),
 	)
@@ -84,7 +84,7 @@ func TestCreateRisk_DifferentParamDifferentHash(t *testing.T) {
 }
 
 func TestCreateRisk_NoRandomUUID(t *testing.T) {
-	r := CreateRisk("https://example.com/login",
+	r := CreateRisk("https://127.0.0.1/login",
 		WithRiskParam_RiskType("sqli"),
 		WithRiskParam_Parameter("username"),
 	)

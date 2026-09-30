@@ -557,6 +557,11 @@ func syncAIMemoryVectors(ctx context.Context, db *gorm.DB, entity *schema.AIMemo
 func syncAIMemorySemanticIndex(ctx context.Context, db *gorm.DB, entity *schema.AIMemoryEntity, prev *schema.AIMemoryEntity) error {
 	sessionID := entity.SessionID
 	collectionName := aimem.Session2MemoryName(sessionID)
+	// Removing questions only needs the existing index. A DB-only update must
+	// not initialize or health-check a remote embedding service.
+	if len(entity.PotentialQuestions) == 0 && !vectorstore.HasCollection(db, collectionName) {
+		return nil
+	}
 
 	embeddingAvailable := rag.CheckConfigEmbeddingAvailable(rag.WithDB(db))
 	if !embeddingAvailable && !vectorstore.HasCollection(db, collectionName) {

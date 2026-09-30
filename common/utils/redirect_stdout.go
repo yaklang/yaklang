@@ -62,49 +62,56 @@ func StartCacheLog(ctx context.Context, n int) {
 }
 
 func HandleStdoutBackgroundForTest(handle func(string)) (func(), func(), error) {
-	ctx := context.Background()
+	ctx, cancel := context.WithCancel(context.Background())
+	returned := make(chan struct{})
 	var l int32 = 0xffff - 0xfe00
 	n := rand.Int31n(l)
 	msg := string([]rune{n + 0xfe00})
-	endCh := make(chan struct{})
+	endCh := make(chan struct{}, 1)
 	endFlagMsg := fmt.Sprintf("%s", msg)
 	sendEndMsg := func() {
-		println(endFlagMsg)
+		fmt.Fprintln(os.Stdout, endFlagMsg)
 	}
 	checkEndMsg := func(s string) {
 		if strings.Contains(s, msg) {
-			endCh <- struct{}{}
+			select {
+			case endCh <- struct{}{}:
+			default:
+			}
 		}
 	}
 	waitEnd := func() {
 		select {
 		case <-endCh:
-		case <-time.After(time.Second * 3):
+		case <-time.After(time.Second):
 		}
+		cancel()
+		<-returned
 	}
-	startCh := make(chan struct{})
+	startCh := make(chan error, 1)
 	once := sync.Once{}
-	var err error
 	go func() {
-		err = HandleStdout(ctx, func(s string) {
+		defer close(returned)
+		err := HandleStdout(ctx, func(s string) {
 			once.Do(func() {
-				startCh <- struct{}{}
+				startCh <- nil
 			})
 			handle(s)
 			checkEndMsg(s)
 		})
 		once.Do(func() {
-			startCh <- struct{}{}
+			startCh <- err
 		})
 	}()
 	for i := 0; i < 10; i++ {
 		select {
-		case <-startCh:
+		case err := <-startCh:
 			return sendEndMsg, waitEnd, err
 		case <-time.After(100 * time.Millisecond):
 			fmt.Println("waiting for mirror stdout start signal...")
 		}
 	}
+	cancel()
 	return nil, nil, Errorf("wait for mirror stdout start signal timeout")
 }
 func HandleStdout(ctx context.Context, handle func(string)) error {

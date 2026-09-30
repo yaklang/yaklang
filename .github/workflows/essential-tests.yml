@@ -1275,6 +1275,7 @@ jobs:
           export TEST_SHUFFLE="${{ matrix.shuffle || 'off' }}"
           export SUITE_NAME="${{ matrix.name }}"
           export SUITE_NEEDS_GRPC="0"
+          export SUITE_OFFLINE="1"
           export SUITE_SYNC_RULE="${{ matrix.sync_rule == '1' && '1' || '0' }}"
           ./scripts/ci/test-run-suite.sh
 

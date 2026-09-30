@@ -107,14 +107,14 @@ poc.Get(mockUrl, poc.proxy(mitmProxy), poc.replaceQueryParam("u", token))~`,
 
 func TestGRPCMUSTPASS_MITMV2_DownstreamProxy_SpecialCharsCredentials(t *testing.T) {
 	// 下游代理地址中凭据含 @ 等特殊字符，验证能正确解析并启动
-	var downstreamPassed bool
+	var downstreamPassed atomic.Bool
 	token := utils.RandNumberStringBytes(10)
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 
 	_, mockPort := utils.DebugMockHTTPHandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 		if request.URL.Query().Get("u") == token {
-			downstreamPassed = true
+			downstreamPassed.Store(true)
 		}
 		writer.Write([]byte("ok"))
 	})
@@ -123,7 +123,7 @@ func TestGRPCMUSTPASS_MITMV2_DownstreamProxy_SpecialCharsCredentials(t *testing.
 	port := utils.GetRandomAvailableTCPPort()
 	server, err := crep.NewMITMServer(crep.MITM_SetHTTPRequestHijack(func(https bool, req *http.Request) *http.Request {
 		if req.URL.Query().Get("u") == token {
-			downstreamPassed = true
+			downstreamPassed.Store(true)
 		}
 		return req
 	}))
@@ -156,13 +156,16 @@ func TestGRPCMUSTPASS_MITMV2_DownstreamProxy_SpecialCharsCredentials(t *testing.
 			msg := string(data.GetMessage().GetMessage())
 			if strings.Contains(msg, "starting mitm server") {
 				started = true
-				_, _ = yak.Execute(
+				_, requestErr := yak.Execute(
 					`poc.Get(mockUrl, poc.proxy(mitmProxy), poc.replaceQueryParam("u", token))~`,
 					map[string]any{
 						"mockUrl":   mockUrl,
 						"mitmProxy": "http://" + utils.HostPort("127.0.0.1", mitmPort),
 						"token":     token,
 					})
+				require.NoError(t, requestErr)
+				cancel()
+				break
 			}
 			if strings.Contains(msg, "ERROR") && strings.Contains(msg, "downstream") {
 				t.Fatalf("MITM should not fail with downstream parse error when credentials have @: %s", msg)
@@ -170,21 +173,21 @@ func TestGRPCMUSTPASS_MITMV2_DownstreamProxy_SpecialCharsCredentials(t *testing.
 		}
 	}
 	require.True(t, started, "MITM should start")
-	require.True(t, downstreamPassed, "request should pass through downstream proxy")
+	require.True(t, downstreamPassed.Load(), "request should pass through downstream proxy")
 }
 
 func TestGRPCMUSTPASS_MITMV2_S5Proxy(t *testing.T) {
 	var (
-		networkIsPassed bool
+		networkIsPassed atomic.Bool
 		token           = utils.RandNumberStringBytes(10)
 		rspToken        = utils.RandStringBytes(10)
 	)
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 
 	mockHost, mockPort := utils.DebugMockHTTPHandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 		if request.URL.Query().Get("u") == token {
-			networkIsPassed = true
+			networkIsPassed.Store(true)
 		}
 		writer.Write([]byte(rspToken))
 	})
@@ -224,27 +227,29 @@ assert str.Contains(rsp.RawPacket,rspToken)`,
 					}); err != nil {
 					t.Fatalf("execute script failed: %v", err)
 				}
+				cancel()
+				break
 			}
 		}
 	}
 
-	if !networkIsPassed {
+	if !networkIsPassed.Load() {
 		t.Fatalf("Network not passed")
 	}
 }
 
 func TestGRPCMUSTPASS_MITMV2_S5Proxy_https(t *testing.T) {
 	var (
-		networkIsPassed bool
+		networkIsPassed atomic.Bool
 		token           = utils.RandNumberStringBytes(10)
 		rspToken        = utils.RandStringBytes(10)
 	)
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 
 	mockHost, mockPort := utils.DebugMockHTTPSEx(func(req []byte) []byte {
 		if lowhttp.GetHTTPRequestQueryParam(req, "u") == token {
-			networkIsPassed = true
+			networkIsPassed.Store(true)
 		}
 		return []byte("HTTP/1.1 200 OK\r\nContent-length: 10\r\n\r\n" + rspToken)
 	})
@@ -284,11 +289,13 @@ assert str.Contains(rsp.RawPacket,rspToken)`,
 					}); err != nil {
 					t.Fatalf("execute script failed: %v", err)
 				}
+				cancel()
+				break
 			}
 		}
 	}
 
-	if !networkIsPassed {
+	if !networkIsPassed.Load() {
 		t.Fatalf("Network not passed")
 	}
 }
@@ -491,7 +498,7 @@ yakit.StatusCard("mitmId", "StatusCard")
 `)
 	require.NoError(t, err)
 	defer clearFunc()
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 
 	targetHost, targetPort := utils.DebugMockHTTPHandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
@@ -543,10 +550,6 @@ mirrorNewWebsite = (tls, url, req, rsp, body) => {
 				// do sth
 				_, err := yak.Execute(`rsp, req := poc.Get(targetUrl, poc.proxy(mitmProxy))~
 assert string(rsp.RawPacket).Contains("Hello Token")
-go func{
-	sleep(2)
-	cancel()
-}
 `, map[string]any{"targetUrl": targetUrl, "mitmProxy": `http://` + utils.HostPort("127.0.0.1", mitmPort), "cancel": cancel})
 				require.NoError(t, err)
 			}
@@ -566,9 +569,11 @@ go func{
 			}
 			pluginStatusCardFound = true
 		}
+		if pluginStatusCardFound && hotStatusCardFound && pluginNameFound {
+			cancel()
+			break
+		}
 	}
-
-	time.Sleep(1 * time.Second)
 
 	require.True(t, pluginStatusCardFound, "plugin status card not found")
 	require.True(t, hotStatusCardFound, "hot status card not found")

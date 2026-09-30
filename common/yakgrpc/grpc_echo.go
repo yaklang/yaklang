@@ -5,6 +5,7 @@ import (
 	"crypto/tls"
 	"fmt"
 	"net/http"
+	"sync"
 	"time"
 
 	"github.com/yaklang/yaklang/common/consts"
@@ -20,32 +21,50 @@ func (s *Server) Echo(ctx context.Context, req *ypb.EchoRequest) (*ypb.EchoRespo
 }
 
 var verifyFunction = verifySystemCertificate
+var checkMITMInstallReadyFunc = crep.CheckMITMAutoInstallReady
 var installMITMCertFunc = crep.AddMITMRootCertIntoSystem
 var verifyInstalledCertFunc = crep.VerifyMITMRootCertInstalled
 
 var VerifySystemCertificateCD = utils.NewCoolDown(10 * time.Second)
 var resp *ypb.VerifySystemCertificateResponse
+var verifyResultMu sync.Mutex
+var verifyResultDone chan struct{}
+var verifyResultErr error
 
 func (s *Server) VerifySystemCertificate(ctx context.Context, _ *ypb.Empty) (*ypb.VerifySystemCertificateResponse, error) {
-	var err error
+	verifyResultMu.Lock()
 	VerifySystemCertificateCD.DoOr(func() {
 		resp = nil
-		resp, err = verifyFunction()
+		verifyResultDone = make(chan struct{})
+		done := verifyResultDone
+		verifyResultMu.Unlock()
+		result, err := verifyFunction()
+		verifyResultMu.Lock()
+		resp, verifyResultErr = result, err
+		close(done)
+		verifyResultMu.Unlock()
 	}, func() {
-		_ = utils.Spinlock(10, func() bool {
-			// 拿到结果，解除自旋
-			return resp != nil
-		})
+		done := verifyResultDone
+		verifyResultMu.Unlock()
+		if done != nil {
+			select {
+			case <-done:
+			case <-ctx.Done():
+				return
+			}
+		}
 	})
+	verifyResultMu.Lock()
+	defer verifyResultMu.Unlock()
 	if resp == nil {
 		return &ypb.VerifySystemCertificateResponse{Valid: false, Reason: "Timeout"}, nil
 	}
 	//return verifySystemCertificateByURL()
-	return resp, err
+	return resp, verifyResultErr
 }
 
 func (s *Server) InstallMITMCertificate(ctx context.Context, _ *ypb.Empty) (*ypb.GeneralResponse, error) {
-	if ok, reason := crep.CheckMITMAutoInstallReady(); !ok {
+	if ok, reason := checkMITMInstallReadyFunc(); !ok {
 		return &ypb.GeneralResponse{Ok: false, Reason: reason}, nil
 	}
 	if err := installMITMCertFunc(); err != nil {

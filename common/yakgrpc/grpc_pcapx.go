@@ -79,12 +79,11 @@ func (s *Server) GetPcapMetadata(ctx context.Context, req *ypb.PcapMetadataReque
 	ifIns, _, _, err := netutil.GetPublicRoute()
 	if err != nil {
 		log.Errorf("get public route failed: %s", err)
-		return nil, err
 	}
 
 	var defaultIfName *ypb.NetInterface
 	for _, ifItem := range ifs {
-		if ifItem.NetInterfaceName == ifIns.Name {
+		if ifIns != nil && ifItem.NetInterfaceName == ifIns.Name {
 			defaultIfName = ifItem
 			break
 		}

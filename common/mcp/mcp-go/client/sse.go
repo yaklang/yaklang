@@ -40,6 +40,8 @@ type SSEMCPClient struct {
 	endpointChan   chan struct{}
 	capabilities   mcp.ServerCapabilities
 	isDisconnected atomic.Bool
+	closeOnce      sync.Once
+	streamCancel   context.CancelFunc
 }
 
 // NewSSEMCPClient creates a new SSE-based MCP client with the given base URL.
@@ -83,10 +85,27 @@ func (c *SSEMCPClient) applyHeaders(req *http.Request) {
 // Start initiates the SSE connection to the server and waits for the endpoint information.
 // Returns an error if the connection fails or times out waiting for the endpoint.
 func (c *SSEMCPClient) Start(ctx context.Context) error {
+	ctx, cancel := context.WithCancel(ctx)
+	c.mu.Lock()
+	select {
+	case <-c.done:
+		c.mu.Unlock()
+		cancel()
+		return fmt.Errorf("SSE client is closed")
+	default:
+		if c.streamCancel != nil {
+			c.mu.Unlock()
+			cancel()
+			return fmt.Errorf("SSE client has already started")
+		}
+		c.streamCancel = cancel
+	}
+	c.mu.Unlock()
 
 	req, err := http.NewRequestWithContext(ctx, "GET", c.baseURL.String(), nil)
 
 	if err != nil {
+		cancel()
 
 		return fmt.Errorf("failed to create request: %w", err)
 
@@ -99,11 +118,13 @@ func (c *SSEMCPClient) Start(ctx context.Context) error {
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
+		cancel()
 		return fmt.Errorf("failed to connect to SSE stream: %w", err)
 	}
 
 	if resp.StatusCode != http.StatusOK {
 		resp.Body.Close()
+		cancel()
 		return fmt.Errorf("unexpected status code: %d", resp.StatusCode)
 	}
 
@@ -115,8 +136,10 @@ func (c *SSEMCPClient) Start(ctx context.Context) error {
 	case <-c.endpointChan:
 		// Endpoint received, proceed
 	case <-ctx.Done():
+		cancel()
 		return fmt.Errorf("context cancelled while waiting for endpoint")
 	case <-time.After(60 * time.Minute): // Add a timeout
+		cancel()
 		return fmt.Errorf("timeout waiting for endpoint")
 	}
 
@@ -621,15 +644,16 @@ func (c *SSEMCPClient) GetEndpoint() *url.URL {
 // Close shuts down the SSE client connection and cleans up any pending responses.
 // Returns an error if the shutdown process fails.
 func (c *SSEMCPClient) Close() error {
-	select {
-	case <-c.done:
-		return nil // Already closed
-	default:
+	c.closeOnce.Do(func() {
 		close(c.done)
-	}
-
-	// Clean up any pending responses by notifying them
-	c.cleanupPendingRequests()
+		c.mu.RLock()
+		cancel := c.streamCancel
+		c.mu.RUnlock()
+		if cancel != nil {
+			cancel()
+		}
+		c.cleanupPendingRequests()
+	})
 
 	return nil
 }

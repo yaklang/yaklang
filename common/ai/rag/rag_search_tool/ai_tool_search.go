@@ -6,9 +6,10 @@ import (
 	"io"
 	"slices"
 	"strings"
+	"sync"
 
-	"github.com/yaklang/gorm"
 	"github.com/samber/lo"
+	"github.com/yaklang/gorm"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools/searchtools"
 	"github.com/yaklang/yaklang/common/ai/rag"
 	"github.com/yaklang/yaklang/common/ai/rag/generate_index_tool"
@@ -95,14 +96,26 @@ func NewMergeSearchr[T searchtools.AISearchable](searchs ...searchtools.AISearch
 // NewComprehensiveSearcher 综合 RAG 和 关键词 查询工具
 func NewComprehensiveSearcher[T searchtools.AISearchable](name string, chatToAiFunc func(string) (io.Reader, error)) searchtools.AISearcher[T] {
 	searchs := []searchtools.AISearcher[T]{}
-	ragSearcher, err := NewRAGSearcher[T](name)
-	if err != nil {
-		log.Errorf("failed to create RAG searcher: %v", err)
-	}
+	ragSearcher := newLazyRAGSearcher(func() (searchtools.AISearcher[T], error) { return NewRAGSearcher[T](name) })
 	keywordSearcher := searchtools.NewKeyWordSearcher[T](chatToAiFunc)
 
 	searchs = append(searchs, ragSearcher, keywordSearcher)
 	return NewMergeSearchr(searchs...)
+}
+
+// Configuration alone must not download an embedding model or open an index.
+// Initialize on the first search, while retaining the keyword fallback on errors.
+func newLazyRAGSearcher[T searchtools.AISearchable](create func() (searchtools.AISearcher[T], error)) searchtools.AISearcher[T] {
+	var once sync.Once
+	var search searchtools.AISearcher[T]
+	var err error
+	return func(query string, list []T) ([]T, error) {
+		once.Do(func() { search, err = create() })
+		if err != nil {
+			return nil, err
+		}
+		return search(query, list)
+	}
 }
 
 // BuildVectorIndexForSearcher 构建向量索引

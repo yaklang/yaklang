@@ -16,7 +16,6 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"io/ioutil"
 	"math"
-	"math/rand"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -304,7 +303,6 @@ func (s *Server) ExecBatchYakScript(req *ypb.ExecBatchYakScriptRequest, stream y
 					TaskId:     taskId,
 					Timestamp:  time.Now().Unix(),
 				})
-				time.Sleep(time.Duration(rand.Intn(1000)) * time.Millisecond)
 
 				//// 启动一个带上下文引擎的内容
 				//err = s.execRequest(params, `general-batch`, subCtx, func(result *ypb.ExecResult, logItem *yaklib.YakitLog) error {
@@ -351,7 +349,6 @@ func (s *Server) ExecBatchYakScript(req *ypb.ExecBatchYakScriptRequest, stream y
 				_ = coreEngine
 
 				defer func() {
-					time.Sleep(time.Duration(rand.Intn(3000)) * time.Millisecond)
 					stream.Send(&ypb.ExecBatchYakScriptResult{
 						Status:     "end",
 						Target:     target,

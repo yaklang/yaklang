@@ -2,106 +2,55 @@ package yakgrpc
 
 import (
 	"context"
-	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
+	"errors"
 	"testing"
+
+	"github.com/stretchr/testify/require"
+	"github.com/yaklang/yaklang/common/schema"
+	"github.com/yaklang/yaklang/common/yak/yaklib"
+	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
+	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
-//func TestServer_DownloadOnlinePluginAll(t *testing.T) {
-//	client, err := NewLocalClient()
-//	if err != nil {
-//		panic(err)
-//	}
-//
-//	res, err := client.DownloadOnlinePluginAll(context.Background(), &ypb.DownloadOnlinePluginByTokenRequest{})
-//	if err != nil {
-//		panic(err)
-//	}
-//
-//	for {
-//		r, err := res.Recv()
-//		if err != nil {
-//			panic(err)
-//			return
-//		}
-//		println(r.Progress)
-//	}
-//}
-//
-//func TestDownloadOnlinePluginBatch(t *testing.T) {
-//	client, err := NewLocalClient()
-//	if err != nil {
-//		panic(err)
-//	}
-//
-//	_, err = client.DownloadOnlinePluginBatch(context.Background(), &ypb.DownloadOnlinePluginsRequest{})
-//	if err != nil {
-//		panic(err)
-//	}
-//}
-//
-//func TestDownloadOnlinePlugins(t *testing.T) {
-//	client, err := NewLocalClient()
-//	if err != nil {
-//		panic(err)
-//	}
-//	res, err := client.DownloadOnlinePlugins(context.Background(), &ypb.DownloadOnlinePluginsRequest{})
-//	if err != nil {
-//		panic(err)
-//	}
-//	for {
-//		r, err := res.Recv()
-//		if err != nil {
-//			panic(err)
-//			return
-//		}
-//		println(r.Progress)
-//	}
-//}
-//
-//func TestDownloadOnlinePluginByPluginName(t *testing.T) {
-//	client, err := NewLocalClient()
-//	if err != nil {
-//		panic(err)
-//	}
-//
-//	_, err = client.DownloadOnlinePluginByPluginName(context.Background(), &ypb.DownloadOnlinePluginByScriptNamesRequest{
-//		ScriptNames: []string{"基础 XSS 检测"},
-//		Token:       "",
-//	})
-//	if err != nil {
-//		panic(err)
-//	}
-//}
-//
-//func TestSaveYakScriptToOnline(t *testing.T) {
-//	client, err := NewLocalClient()
-//	if err != nil {
-//		panic(err)
-//	}
-//
-//	_, err = client.SaveYakScriptToOnline(context.Background(), &ypb.SaveYakScriptToOnlineRequest{
-//		//ScriptNames: []string{"testlimin1113"},
-//		Token:     "74_nXiaH-Z-elUDSS2RnXACUlDZx-645BGzlU4-rkss3H-9Z-B8SVxvEf9Omv1MXO2tFcRPMHm_vsNP3aaq1xKIj8ks3A59-igjjb2VDrUzwpM",
-//		IsPrivate: false,
-//		All:       true,
-//	})
-//	if err != nil {
-//		panic(err)
-//	}
-//}
-
 func TestDownloadOnlinePluginByUUID(t *testing.T) {
-	client, err := NewLocalClient()
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Run("DownloadOnlinePluginByUUID", func(t *testing.T) {
-		_, err = client.DownloadOnlinePluginByUUID(context.Background(), &ypb.DownloadOnlinePluginByUUIDRequest{
-			UUID:  "72c29790-2783-4b04-b597-8c54ce20bed2",
-			Token: "",
+	for _, scenario := range []string{"download and persist", "remote error", "missing UUID"} {
+		t.Run(scenario, func(t *testing.T) {
+			db := newOnlineTestDB(t, &schema.YakScript{})
+			calls := 0
+			remote := &stubOnlineService{downloadPlugin: func(token, id string) (*yaklib.OnlinePlugin, error) {
+				calls++
+				require.Equal(t, "fixture-token", token)
+				require.Equal(t, "fixture-uuid", id)
+				if scenario == "remote error" {
+					return nil, errors.New("remote unavailable")
+				}
+				return &yaklib.OnlinePlugin{UUID: id, ScriptName: "fixture-plugin", Type: "yak", Content: `println("fixture")`}, nil
+			}}
+			client, err := newInMemoryClient(&Server{profileDatabase: db, onlineClient: remote})
+			require.NoError(t, err)
+			t.Cleanup(func() { require.NoError(t, client.Close()) })
+			req := &ypb.DownloadOnlinePluginByUUIDRequest{UUID: "fixture-uuid", Token: "fixture-token"}
+			if scenario == "missing UUID" {
+				req.UUID = ""
+			}
+			result, err := client.DownloadOnlinePluginByUUID(context.Background(), req)
+			if scenario != "download and persist" {
+				require.Error(t, err)
+				require.Nil(t, result)
+				if scenario == "missing UUID" {
+					require.Zero(t, calls)
+				} else {
+					require.Equal(t, 1, calls)
+				}
+				return
+			}
+			require.NoError(t, err)
+			require.Equal(t, 1, calls)
+			require.Equal(t, "fixture-plugin", result.GetScriptName())
+			saved, err := yakit.GetYakScriptByName(db, "fixture-plugin")
+			require.NoError(t, err)
+			require.Equal(t, req.UUID, saved.Uuid)
+			require.Equal(t, `println("fixture")`, saved.Content)
 		})
-		if err != nil {
-			t.Fatal(err)
-		}
-	})
+	}
 }

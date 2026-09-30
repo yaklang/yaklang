@@ -17,6 +17,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -1007,15 +1008,29 @@ func TestGRPCMUSTPASS_HTTPFuzzer_FuzztagVars(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
 
 	token := utils.RandStringBytes(100)
-	targetHost, targetPort := utils.DebugMockHTTPHandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
-		time.Sleep(time.Second)
+	var active, peak, arrivals atomic.Int32
+	ready := make(chan struct{})
+	targetHost, targetPort := utils.DebugMockHTTPHandlerFuncContext(ctx, func(writer http.ResponseWriter, request *http.Request) {
+		n := active.Add(1)
+		defer active.Add(-1)
+		for previous := peak.Load(); n > previous && !peak.CompareAndSwap(previous, n); previous = peak.Load() {
+		}
+		if arrivals.Add(1) == 7 {
+			close(ready)
+		}
+		select {
+		case <-ready:
+		case <-request.Context().Done():
+			return
+		}
 		writer.Write([]byte(token))
 	})
 
-	start := time.Now()
-	client, err := c.HTTPFuzzer(context.Background(), &ypb.FuzzerRequest{
+	client, err := c.HTTPFuzzer(ctx, &ypb.FuzzerRequest{
 		ForceFuzz: true,
 		Params: []*ypb.FuzzerParamItem{
 			{
@@ -1054,11 +1069,7 @@ Host: ` + utils.HostPort(targetHost, targetPort) + `
 		t.Fatal("expect 30, got " + fmt.Sprint(count))
 	}
 
-	if ret := time.Since(start); ret.Seconds() > 5 && ret.Seconds() < 6 {
-		t.Log("time cost [" + ret.String() + "] is expected")
-	} else {
-		t.Fatalf("time cost is not expected: %v", ret)
-	}
+	require.Equal(t, int32(7), peak.Load(), "seven requests must overlap without exceeding the configured concurrency")
 }
 
 // nuclei-dsl type tags and raw type tags

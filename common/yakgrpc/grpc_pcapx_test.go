@@ -2,19 +2,20 @@ package yakgrpc
 
 import (
 	"context"
-	"github.com/davecgh/go-spew/spew"
-	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"testing"
+
+	"github.com/stretchr/testify/require"
+	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
 func TestServer_PcapX(t *testing.T) {
 	client, err := NewLocalClient()
-	if err != nil {
-		panic(err)
-	}
+	require.NoError(t, err)
 	rsp, err := client.GetPcapMetadata(context.Background(), &ypb.PcapMetadataRequest{})
-	if err != nil {
-		panic(err)
-	}
-	spew.Dump(rsp)
+	require.NoError(t, err)
+	require.NotEmpty(t, rsp.GetAvailablePcapDevices(), "offline hosts still expose their loopback device")
+	require.NotEmpty(t, rsp.GetAvailableSessionTypes())
+	require.NotEmpty(t, rsp.GetAvailableLinkLayerTypes())
+	require.NotEmpty(t, rsp.GetAvailableNetworkLayerTypes())
+	require.NotEmpty(t, rsp.GetAvailableTransportLayerTypes())
 }
