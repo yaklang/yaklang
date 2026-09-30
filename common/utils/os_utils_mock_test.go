@@ -1,16 +1,20 @@
-package utils_test
+package utils
 
 import (
 	"context"
+	"crypto/ecdsa"
+	"crypto/elliptic"
+	"crypto/rand"
 	"crypto/tls"
-	"github.com/stretchr/testify/require"
-	"github.com/yaklang/yaklang/common/utils"
-	_ "github.com/yaklang/yaklang/common/utils/tlsutils"
+	"crypto/x509"
 	"io"
+	"math/big"
 	"net"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/require"
 )
 
 func TestDebugMockHTTPClosesCompletedResponse(t *testing.T) {
@@ -23,17 +27,35 @@ func TestDebugMockHTTPClosesCompletedResponse(t *testing.T) {
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
 			body := strings.Repeat("complete local response", 64)
-			host, port := utils.DebugMockHTTPServerWithContext(ctx, https, false, false, false, false, func([]byte) []byte {
+			var serverTLS, clientTLS *tls.Config
+			if https {
+				key, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+				require.NoError(t, err)
+				certificate := &x509.Certificate{
+					SerialNumber: big.NewInt(1), NotBefore: time.Now().Add(-time.Minute), NotAfter: time.Now().Add(time.Hour),
+					IPAddresses: []net.IP{net.ParseIP("127.0.0.1")}, DNSNames: []string{"localhost"},
+					KeyUsage: x509.KeyUsageDigitalSignature, ExtKeyUsage: []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
+				}
+				der, err := x509.CreateCertificate(rand.Reader, certificate, certificate, &key.PublicKey, key)
+				require.NoError(t, err)
+				trusted, err := x509.ParseCertificate(der)
+				require.NoError(t, err)
+				roots := x509.NewCertPool()
+				roots.AddCert(trusted)
+				serverTLS = &tls.Config{MinVersion: tls.VersionTLS12, Certificates: []tls.Certificate{{Certificate: [][]byte{der}, PrivateKey: key}}}
+				clientTLS = &tls.Config{MinVersion: tls.VersionTLS12, RootCAs: roots}
+			}
+			host, port := debugMockHTTPServerWithTLSConfig(ctx, "127.0.0.1:0", https, false, false, false, false, false, func([]byte) []byte {
 				// A close-delimited body requires EOF, so a hidden post-write
 				// sleep would cause the read deadline to expire.
 				return []byte("HTTP/1.1 200 OK\r\nConnection: close\r\n\r\n" + body)
-			})
+			}, serverTLS)
 			var conn net.Conn
 			var err error
 			if https {
-				conn, err = tls.Dial("tcp", utils.HostPort(host, port), &tls.Config{InsecureSkipVerify: true})
+				conn, err = tls.Dial("tcp", HostPort(host, port), clientTLS)
 			} else {
-				conn, err = net.Dial("tcp", utils.HostPort(host, port))
+				conn, err = net.Dial("tcp", HostPort(host, port))
 			}
 			require.NoError(t, err)
 			defer conn.Close()
