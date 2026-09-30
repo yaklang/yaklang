@@ -202,6 +202,14 @@ compile_one() {
       echo "OK  $pkg -> $(basename "$bin")"
     fi
     echo "$pkg_path" > "${bin}.package"
+    # Discover entry points without running package initialization. The runner
+    # can then avoid launching a binary for rules that select no tests.
+    local list_args=()
+    [[ $enable_race_for_pkg -eq 1 ]] && list_args+=("-race")
+    if [[ -z "$CI_TEST_NAMES_TOOL" ]] || ! go list "${list_args[@]}" -json "$pkg" | "$CI_TEST_NAMES_TOOL" "${bin}.tests"; then
+      rm -f "${bin}.tests"
+      echo "WARNING: Test names unavailable for $pkg; runner will execute every matching rule"
+    fi
     rm -f "$log"
   else
     echo "FAIL $pkg"
@@ -211,7 +219,14 @@ compile_one() {
 
 export -f compile_one
 export -f should_enable_race
-export TEST_BIN_DIR GO_TEST_P RACE_CONFIG_CACHE
+CI_TEST_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+CI_TEST_NAMES_TOOL="$(mktemp)"
+trap 'rm -f "$CI_TEST_NAMES_TOOL"' EXIT
+if ! go build -o "$CI_TEST_NAMES_TOOL" "$CI_TEST_SCRIPT_DIR/record-test-names.go"; then
+  rm -f "$CI_TEST_NAMES_TOOL"
+  CI_TEST_NAMES_TOOL=""
+fi
+export TEST_BIN_DIR GO_TEST_P RACE_CONFIG_CACHE CI_TEST_NAMES_TOOL
 
 echo "=== Compiling test packages ==="
 printf '%s\0' "${PKGS[@]}" | xargs -0 -n1 -P "$COMPILE_WORKERS" bash -c 'compile_one "$1"' _
@@ -232,7 +247,7 @@ echo "Failed: $failed_count"
 # 记录编译的测试列表：只保存 TEST_BIN_DIR 下的相对文件名，避免 artifact 解包后路径失效
 (
   cd "$TEST_BIN_DIR"
-  find . -maxdepth 1 -type f -name "test_*" ! -name "*.log" ! -name "*.package" ! -name ".*" \
+  find . -maxdepth 1 -type f -name "test_*" ! -name "*.log" ! -name "*.package" ! -name "*.tests" ! -name ".*" \
     -exec basename {} \; | sort
 ) > "$TEST_BIN_DIR/compiled_tests.txt"
 echo "Compiled tests listed in: $TEST_BIN_DIR/compiled_tests.txt"

@@ -421,19 +421,20 @@ func (s *Server) SaveYakScriptToOnline(req *ypb.SaveYakScriptToOnlineRequest, st
 }
 
 func (s *Server) DownloadOnlinePluginByUUID(ctx context.Context, req *ypb.DownloadOnlinePluginByUUIDRequest) (*ypb.YakScript, error) {
-	err := yaklib.DownloadOnlineAuthProxy(consts.GetOnlineBaseUrl())
-	if err != nil {
-		return nil, utils.Errorf("download failed: %s", err.Error())
-	}
 	if req.UUID == "" {
 		return nil, utils.Error("params is empty: uuid is required")
 	}
-	client := yaklib.NewOnlineClient(consts.GetOnlineBaseUrl())
+	if s.onlineClient == nil {
+		if err := yaklib.DownloadOnlineAuthProxy(consts.GetOnlineBaseUrl()); err != nil {
+			return nil, utils.Errorf("download failed: %s", err.Error())
+		}
+	}
+	client := s.getOnlineClient()
 	plugin, err := client.DownloadOnlinePluginByUUID(req.GetToken(), req.UUID)
 	if err != nil {
 		return nil, utils.Errorf("download plugin[%s] failed: %v", req.UUID, err)
 	}
-	err = client.Save(s.GetProfileDatabase(), plugin)
+	err = yaklib.NewOnlineClient(consts.GetOnlineBaseUrl()).Save(s.GetProfileDatabase(), plugin)
 	if err != nil {
 		return nil, utils.Errorf("save plugin[%s] to database failed: %v", plugin.ScriptName, err)
 	}

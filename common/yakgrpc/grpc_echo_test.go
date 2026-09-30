@@ -6,8 +6,12 @@ import (
 	"crypto/x509"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/yaklang/yaklang/common/crep"
 	"github.com/yaklang/yaklang/common/utils"
@@ -99,92 +103,77 @@ func Test_verify(t *testing.T) {
 	}
 }
 
-var callCount int
-var mu sync.Mutex
-
-func mockVerifySystemCertificate() (*ypb.VerifySystemCertificateResponse, error) {
-	mu.Lock()
-	callCount++
-	time.Sleep(1000 * time.Millisecond)
-	mu.Unlock()
-	return &ypb.VerifySystemCertificateResponse{Valid: true}, nil
-}
-
-func mockVerifySystemCertificateNil() (*ypb.VerifySystemCertificateResponse, error) {
-	mu.Lock()
-	callCount++
-	time.Sleep(1000 * time.Millisecond)
-	mu.Unlock()
-	return nil, nil
+func setupCertificateVerifier(t *testing.T, cooldown time.Duration, verify func() (*ypb.VerifySystemCertificateResponse, error)) {
+	t.Helper()
+	originalCD, originalVerify := VerifySystemCertificateCD, verifyFunction
+	originalResp, originalDone, originalErr := resp, verifyResultDone, verifyResultErr
+	cd := utils.NewCoolDown(cooldown)
+	VerifySystemCertificateCD, verifyFunction = cd, verify
+	resp, verifyResultDone, verifyResultErr = nil, nil, nil
+	t.Cleanup(func() {
+		cd.Close()
+		VerifySystemCertificateCD, verifyFunction = originalCD, originalVerify
+		resp, verifyResultDone, verifyResultErr = originalResp, originalDone, originalErr
+	})
 }
 
 func TestVerifySystemCertificateCooldown(t *testing.T) {
-	callCount = 0
-	resp = nil
-
-	// mock
-	verifyFunction = mockVerifySystemCertificate
-
+	started, release := make(chan struct{}), make(chan struct{})
+	var calls atomic.Int32
+	setupCertificateVerifier(t, time.Minute, func() (*ypb.VerifySystemCertificateResponse, error) {
+		calls.Add(1)
+		close(started)
+		<-release
+		return &ypb.VerifySystemCertificateResponse{Valid: true}, nil
+	})
 	server := &Server{}
-	sw := sync.WaitGroup{}
-	for i := 0; i < 5; i++ {
-		sw.Add(1)
-		go func() {
-			defer sw.Done()
-			_, _ = server.VerifySystemCertificate(context.Background(), &ypb.Empty{})
-		}()
-		time.Sleep(1 * time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+	results := make(chan *ypb.VerifySystemCertificateResponse, 5)
+	var wg sync.WaitGroup
+	invoke := func() {
+		defer wg.Done()
+		result, err := server.VerifySystemCertificate(ctx, &ypb.Empty{})
+		assert.NoError(t, err)
+		results <- result
 	}
-
-	// 等待足够的时间以确保所有协程都已完成
-	sw.Wait()
-
-	time.Sleep(2 * time.Second)
-	verifyFunction = mockVerifySystemCertificateNil
-	// spinlock 结束，cooldown 时间内，不会增加count
-	_, _ = server.VerifySystemCertificate(context.Background(), &ypb.Empty{})
-
-	// 检查 mockVerifySystemCertificate 是否只被调用了一次 CI卡顿可能不稳定导致数量大于1
-	mu.Lock()
-	if callCount > 2 {
-		t.Errorf("verifySystemCertificate was called %d times; want 1", callCount)
+	wg.Add(1)
+	go invoke()
+	<-started
+	for i := 0; i < 4; i++ {
+		wg.Add(1)
+		go invoke()
 	}
-	mu.Unlock()
+	close(release)
+	wg.Wait()
+	close(results)
+	for result := range results {
+		require.True(t, result.GetValid())
+	}
+	require.Equal(t, int32(1), calls.Load(), "concurrent callers must share verification")
 }
 
 func TestVerifySystemCertificateCooldown2(t *testing.T) {
-	callCount = 0
-	resp = nil
-
-	// mock
-	verifyFunction = mockVerifySystemCertificateNil
-
+	var calls atomic.Int32
+	setupCertificateVerifier(t, 10*time.Millisecond, func() (*ypb.VerifySystemCertificateResponse, error) {
+		calls.Add(1)
+		return nil, nil
+	})
 	server := &Server{}
-	sw := sync.WaitGroup{}
-	for i := 0; i < 5; i++ {
-		sw.Add(1)
-		go func() {
-			defer sw.Done()
-			_, _ = server.VerifySystemCertificate(context.Background(), &ypb.Empty{})
-		}()
-		time.Sleep(1 * time.Second)
-	}
-
-	// 等待足够的时间以确保所有协程都已完成
-	sw.Wait()
-
-	time.Sleep(2 * time.Second)
-	// spinlock 超时，会增加count
-	_, _ = server.VerifySystemCertificate(context.Background(), &ypb.Empty{})
-
-	mu.Lock()
-	if callCount > 3 || callCount < 2 {
-		t.Errorf("verifySystemCertificate was called %d times; want 1", callCount)
-	}
-	mu.Unlock()
+	result, err := server.VerifySystemCertificate(context.Background(), &ypb.Empty{})
+	require.NoError(t, err)
+	require.Equal(t, "Timeout", result.GetReason())
+	require.Equal(t, int32(1), calls.Load())
+	require.Eventually(t, func() bool {
+		result, err = server.VerifySystemCertificate(context.Background(), &ypb.Empty{})
+		return err == nil && result.GetReason() == "Timeout" && calls.Load() == 2
+	}, time.Second, time.Millisecond, "nil results must finish promptly and allow retry after cooldown")
 }
 
 func TestInstallMITMCertificate(t *testing.T) {
+	originalReady := checkMITMInstallReadyFunc
+	t.Cleanup(func() { checkMITMInstallReadyFunc = originalReady })
+	checkMITMInstallReadyFunc = func() (bool, string) { return true, "" }
 	defer func(origInstall func() error, origVerify func() error) {
 		installMITMCertFunc = origInstall
 		verifyInstalledCertFunc = origVerify

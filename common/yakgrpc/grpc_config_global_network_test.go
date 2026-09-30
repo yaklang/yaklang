@@ -2,7 +2,6 @@ package yakgrpc
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -858,76 +857,52 @@ func TestLoadThirdPartyConfig(t *testing.T) {
 }
 
 func TestCallPluginTimeout(t *testing.T) {
-	ctx, cancel := context.WithTimeout(context.Background(), time.Minute*2)
-	defer cancel()
 	client, err := NewLocalClient(true)
-	require.Nil(t, err, "new local client error")
-
-	config, err := client.GetGlobalNetworkConfig(context.Background(), &ypb.GetGlobalNetworkConfigRequest{})
 	require.NoError(t, err)
-
-	defaultBytes, _ := json.Marshal(config)
-	defer yakit.Set(consts.GLOBAL_NETWORK_CONFIG, string(defaultBytes))
-
-	config.CallPluginTimeout = 5
-	_, err = client.SetGlobalNetworkConfig(context.Background(), config)
+	original, err := client.GetGlobalNetworkConfig(context.Background(), &ypb.GetGlobalNetworkConfigRequest{})
 	require.NoError(t, err)
-
+	t.Cleanup(func() {
+		_, err := client.SetGlobalNetworkConfig(context.Background(), original)
+		assert.NoError(t, err)
+	})
 	host, port := utils.DebugMockHTTP([]byte("Hello"))
-	token := utils.RandStringBytes(20)
-	code := fmt.Sprintf(`mirrorHTTPFlow = func(isHttps /*bool*/, url /*string*/, req /*[]byte*/, rsp /*[]byte*/, body /*[]byte*/) {
-    time.sleep(2)
-    yakit.StatusCard("%s", "%s")
-}`, token, token)
-
-	stream, err := client.DebugPlugin(ctx, &ypb.DebugPluginRequest{
-		Code:       code,
-		PluginType: "mitm",
-		Input:      utils.HostPort(host, port),
-	})
-	require.NoError(t, err)
-
-	checkOk := false
-	for {
-		exec, err := stream.Recv()
-		if err != nil {
-			if err == io.EOF {
-				break
+	for _, tc := range []struct {
+		name       string
+		timeout    float32
+		wantOutput bool
+	}{
+		{"completes before deadline", 1, true},
+		{"interrupted at deadline", 0.05, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+			defer cancel()
+			config := *original
+			config.CallPluginTimeout = tc.timeout
+			_, err := client.SetGlobalNetworkConfig(ctx, &config)
+			require.NoError(t, err)
+			token := utils.RandStringBytes(20)
+			stream, err := client.DebugPlugin(ctx, &ypb.DebugPluginRequest{
+				Code: fmt.Sprintf(`mirrorHTTPFlow = func(isHttps, url, req, rsp, body) {
+                    time.sleep(0.2)
+                    yakit.StatusCard("%s", "%s")
+                }`, token, token),
+				PluginType: "mitm", Input: utils.HostPort(host, port),
+			})
+			require.NoError(t, err)
+			gotOutput := false
+			for {
+				result, err := stream.Recv()
+				if err == io.EOF {
+					break
+				}
+				require.NoError(t, err)
+				if result.IsMessage && strings.Contains(string(result.Message), token) {
+					gotOutput = true
+				}
 			}
-			log.Warn(err)
-		}
-		if exec.IsMessage && strings.Contains(string(exec.Message), token) {
-			checkOk = true
-			break
-		}
-	}
-
-	require.True(t, checkOk, "call plugin timeout failed")
-
-	config.CallPluginTimeout = 1
-	_, err = client.SetGlobalNetworkConfig(context.Background(), config)
-	require.NoError(t, err)
-
-	stream, err = client.DebugPlugin(ctx, &ypb.DebugPluginRequest{
-		Code:       code,
-		PluginType: "mitm",
-		Input:      utils.HostPort(host, port),
-	})
-	require.NoError(t, err)
-
-	checkOk = false
-	for {
-		exec, err := stream.Recv()
-		if err != nil {
-			if err == io.EOF {
-				break
-			}
-			log.Warn(err)
-		}
-		if exec.IsMessage && strings.Contains(string(exec.Message), token) {
-			checkOk = true
-			break
-		}
+			require.Equal(t, tc.wantOutput, gotOutput)
+		})
 	}
 }
 

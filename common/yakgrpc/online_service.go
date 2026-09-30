@@ -19,6 +19,7 @@ type onlineService interface {
 	UploadHTTPFlowToOnline(context.Context, *ypb.HTTPFlowsToOnlineRequest, []byte) error
 	GetAIApiKeyByOnline(context.Context, string) (string, error)
 	DownloadOnlineSyntaxFlowRule(context.Context, string, *ypb.DownloadSyntaxFlowRuleRequest) *yaklib.OnlineDownloadFlowRuleStream
+	DownloadOnlinePluginByUUID(string, string) (*yaklib.OnlinePlugin, error)
 }
 
 func (s *Server) getOnlineClient() onlineService {

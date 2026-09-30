@@ -43,7 +43,7 @@ build_package_map() {
     ALL_TEST_BINS+=("$bin")
     ALL_TEST_PKGS+=("$pkg_path")
   done < <(
-    find "$BIN_DIR" -maxdepth 1 -type f -name "test_*" ! -name "*.log" ! -name "*.package" ! -name ".*" | sort
+    find "$BIN_DIR" -maxdepth 1 -type f -name "test_*" ! -name "*.log" ! -name "*.package" ! -name "*.tests" ! -name ".*" | sort
   )
   
   echo "Found ${#ALL_TEST_BINS[@]} test binaries"
@@ -154,6 +154,24 @@ run_test() {
   
   local name="$(basename "$bin")"
   local log="${TEST_LOG_DIR}/${name}.run.log"
+
+  # Simple top-level selectors have identical Go/ERE matching semantics.
+  # Fall back to executing for subtest paths or escaped/extended expressions.
+  if [[ -f "${bin}.tests" && "$run_pattern$skip_pattern" != *'/'* && "$run_pattern$skip_pattern" != *'\'* && "$run_pattern$skip_pattern" != *'(?'* ]]; then
+    local selected_names match_rc
+    selected_names="$(cat "${bin}.tests")"
+    match_rc=0
+    if [[ -n "$run_pattern" ]]; then
+      selected_names="$(grep -E "$run_pattern" <<< "$selected_names")" || match_rc=$?
+    fi
+    if [[ $match_rc -lt 2 && -n "$skip_pattern" ]]; then
+      selected_names="$(grep -Ev "$skip_pattern" <<< "$selected_names")" || match_rc=$?
+    fi
+    if [[ $match_rc -lt 2 && -z "$selected_names" ]]; then
+      echo "NO MATCHING CASES: $name"
+      return 0
+    fi
+  fi
   
   # 默认重试参数
   local max_retries="${retry:-0}"
@@ -220,12 +238,15 @@ run_test() {
       # 在子shell中，exit会退出子shell而不是整个脚本
       cd "$pkg_dir" && "$bin" "${args[@]}"
     ) 2>&1 | tee -a "$log" | {
-      # 过滤输出：优先显示失败/panic信息，如果没有则显示关键的运行信息
-      grep -E -A10 -B10 "(FAIL|--- FAIL|panic:|test timed out)" || \
-      grep -E "(PASS|RUN|=== RUN|--- PASS|TestTemplate|panic:|goroutine.*\[(running|sleep)\]|testing\..*panic|recovered)" "$log"
+      # Expected error output can contain FAIL even when the suite succeeds.
+      # Always print every test result so slow passing cases remain observable.
+      grep -aE -A10 -B10 "(^[[:space:]]*--- FAIL:|^FAIL([[:space:]]|$)|^panic:|test timed out)" || true
+      grep -aE "^[[:space:]]*(=== RUN|=== PAUSE|=== CONT|--- (PASS|FAIL|SKIP):|PASS$|FAIL$)" "$log" || true
     } >&3
     
     local code=${PIPESTATUS[0]}
+    python3 "$(dirname "${BASH_SOURCE[0]}")/summarize-test-times.py" "$log"
+
     
     # 停止计时器
     if [[ -n "$timer_pid" ]]; then

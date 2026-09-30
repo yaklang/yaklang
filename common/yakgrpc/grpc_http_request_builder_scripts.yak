@@ -44,7 +44,10 @@ caller.SetRuntimeId(runtimeId)
 caller.SetVar("NUCLEI_MOCK_RESPONSE",getParams("NUCLEI_MOCK_RESPONSE"))
 err = caller.LoadPluginEx(ctx, plugin,cliParams...)
 if err != nil { die(err) }
-caller.SetCache(false)
+// Evaluation has already installed a synthetic fingerprint for its echo server.
+// Reprobing it tests unrelated protocols and follows links in the sample corpus.
+isPluginTesting = getParams("PLUGIN_TESTING") == true
+caller.SetCache(isPluginTesting)
 caller.SetConcurrent(len(reqs))
 
 swg = sync.NewSizedWaitGroup(10)
@@ -69,13 +72,20 @@ for req in reqs {
                     u = str.ExtractURLFromHTTPRequestRaw(req.RawHTTPRequest, req.IsHttps )~
                     caller.MirrorHTTPFlowExSync(!isSmoking,req.IsHttps, u.String(), "", "", "") // port scan not need req and rsp
                 default:
-                    rspIns, _ := poc.HTTPEx(req.RawHTTPRequest, poc.https(req.IsHttps), poc.session(sessionId))~
+                    httpOptions = [poc.https(req.IsHttps), poc.session(sessionId)]
+                    if isPluginTesting {
+                        httpOptions = append(httpOptions, poc.redirectTimes(0))
+                    }
+                    rspIns, _ := poc.HTTPEx(req.RawHTTPRequest, httpOptions...)~
                     rsp = rspIns.RawPacket
-                    firstRsp = rspIns.RedirectRawPackets[0].Response
-                    firstReq = rspIns.RedirectRawPackets[0].Request
-                    reqRaw = rspIns.RedirectRawPackets[-1].Request
-                    if poc.GetHTTPPacketHeader(firstRsp, "Set-Cookie") == "" {
-                        reqRaw = firstReq
+                    reqRaw = req.RawHTTPRequest
+                    if len(rspIns.RedirectRawPackets) > 0 {
+                        firstRsp = rspIns.RedirectRawPackets[0].Response
+                        firstReq = rspIns.RedirectRawPackets[0].Request
+                        reqRaw = rspIns.RedirectRawPackets[-1].Request
+                        if poc.GetHTTPPacketHeader(firstRsp, "Set-Cookie") == "" {
+                            reqRaw = firstReq
+                        }
                     }
                     //println("---------------------")
                     //println(string(reqRaw))
@@ -86,7 +96,6 @@ for req in reqs {
                     u = str.ExtractURLFromHTTPRequestRaw(reqRaw, isHttps /*type: bool*/)~
                     header, body = poc.Split(rsp)~
                     caller.MirrorHTTPFlowExSync(!isSmoking, isHttps, u.String(), reqRaw, rsp, body)
-                    sleep(float(randn(40,100))/float(1000))
 
             }
         } catch err {

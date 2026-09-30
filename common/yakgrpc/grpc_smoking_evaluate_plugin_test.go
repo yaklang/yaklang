@@ -4,12 +4,47 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
+	"github.com/yaklang/yaklang/common/fp"
+	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/yak/yakscript"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
+
+func TestGRPCMUSTPASS_LANGUAGE_EvaluationUsesPreparedFingerprint(t *testing.T) {
+	server, err := NewServer()
+	require.NoError(t, err)
+	// There is deliberately no listener: a new network probe cannot produce the
+	// prepared service. Evaluation must deliver its fixture to the real handler.
+	port := utils.GetRandomAvailableTCPPort()
+	target := utils.HostPort("127.0.0.1", port)
+	prepared := MockPluginTestingFpResult("127.0.0.1", &PluginTestingEchoServer{Port: port})
+	prepared.Fingerprint.ServiceName = "evaluation-fixture"
+	fp.SetMatchResultCache(target, prepared)
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+	ctx = context.WithValue(ctx, pluginEvaluationContextKey{}, true)
+	var called atomic.Bool
+	err = server.debugScript(target, "port-scan", `
+yakit.AutoInitYakit()
+handle = result => {
+    assert result.Fingerprint.ServiceName == "evaluation-fixture"
+    yakit.Info("prepared fingerprint reached handler")
+}
+`, yakscript.NewFakeStream(ctx, func(result *ypb.ExecResult) error {
+		if strings.Contains(string(result.GetMessage()), "prepared fingerprint reached handler") {
+			called.Store(true)
+		}
+		return nil
+	}), []*ypb.KVPair{{Key: "Mode", Value: "Strict"}}, utils.RandStringBytes(20))
+	require.NoError(t, err)
+	require.True(t, called.Load(), "evaluation must still execute and validate the plugin handler")
+}
 
 func TestGRPCMUSTPASS_LANGUAGE_SMOKING_EVALUATE_PLUGIN(t *testing.T) {
 	client, err := NewLocalClient()

@@ -8,6 +8,7 @@ import (
 	"slices"
 	"sort"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -703,6 +704,8 @@ hijackSaveHTTPFlow = func(flow /* *yakit.HTTPFlow */, modify /* func(modified *y
 		defer cancel()
 
 		checkMap := make(map[string]string)
+		var checkMu sync.Mutex
+		var complete sync.Once
 		checkFuncs := []string{"mirrorHTTPFlow", "mirrorFilteredHTTPFlow", "mirrorNewWebsite", "mirrorNewWebsitePath", "mirrorNewWebsitePathParams", "hijackHTTPRequest", "hijackHTTPResponse", "hijackHTTPResponseEx", "beforeRequest", "afterRequest", "hijackSaveHTTPFlow"}
 		sort.Strings(checkFuncs)
 		sig := make(chan struct{})
@@ -717,14 +720,16 @@ hijackSaveHTTPFlow = func(flow /* *yakit.HTTPFlow */, modify /* func(modified *y
 			runtimeID, ok2 := query["id"]
 			if ok1 && ok2 {
 				fmt.Printf("[%s] %s\n", from, runtimeID)
+				checkMu.Lock()
+				defer checkMu.Unlock()
 				checkMap[from] = runtimeID
 				keys := lo.Keys(checkMap)
 				sort.Strings(keys)
 				if slices.Equal(keys, checkFuncs) {
-					close(sig)
+					complete.Do(func() { close(sig) })
 				}
 			}
-			return []byte("Hello")
+			return []byte("HTTP/1.1 200 OK\r\nContent-Length: 5\r\nConnection: close\r\n\r\nHello")
 		}
 		if http2 {
 			host, port = utils.DebugMockHTTP2(ctx, handler)
@@ -786,6 +791,8 @@ hijackSaveHTTPFlow = func(flow /* *yakit.HTTPFlow */, modify /* func(modified *y
 			}
 		})
 
+		checkMu.Lock()
+		defer checkMu.Unlock()
 		require.ElementsMatch(t, lo.Keys(checkMap), checkFuncs)
 		onlyPluginRuntimeID := ""
 		for _, v := range checkMap {

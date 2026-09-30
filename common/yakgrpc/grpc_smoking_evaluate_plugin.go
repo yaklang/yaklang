@@ -79,6 +79,10 @@ type PluginTestingEchoServer struct {
 	Ctx      context.Context
 }
 
+// Only plugin evaluation uses the synthetic fingerprint and response corpus.
+// Ordinary debugging must continue to inspect the target's current fingerprint.
+type pluginEvaluationContextKey struct{}
+
 func NewPluginTestingEchoServer(ctx context.Context) *PluginTestingEchoServer {
 	defer func() {
 		if err := recover(); err != nil {
@@ -254,7 +258,8 @@ func (s *Server) EvaluatePlugin(ctx context.Context, pluginCode, pluginType stri
 
 		log.Info("start to echo debug script")
 		runtimeId := uuid.New().String()
-		err := s.debugScript(target, pluginType, pluginCode, yakscript.NewFakeStream(ctx, func(result *ypb.ExecResult) error {
+		evaluationCtx := context.WithValue(ctx, pluginEvaluationContextKey{}, true)
+		err := s.debugScript(target, pluginType, pluginCode, yakscript.NewFakeStream(evaluationCtx, func(result *ypb.ExecResult) error {
 			if result.IsMessage {
 				m := make(map[string]any)
 				err := json.Unmarshal(result.Message, &m)

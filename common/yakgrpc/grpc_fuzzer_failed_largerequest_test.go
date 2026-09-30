@@ -18,7 +18,8 @@ import (
 )
 
 func TestGRPCMUSTPASS_HTTPFUZZER_LargeRequest_Failed(t *testing.T) {
-	var crazyBody = "{{repeatstr(A|130000000)}}"
+	// The preview boundary is 2 MiB. Cross it without allocating 130 MB per retry.
+	var crazyBody = "{{repeatstr(A|2097252)}}"
 
 	// 构造一个很容易网络错误的东西
 	port := utils.GetRandomAvailableTCPPort()

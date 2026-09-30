@@ -3,6 +3,7 @@ package yakgrpc
 import (
 	"context"
 	"fmt"
+	"sync/atomic"
 	"testing"
 
 	"github.com/davecgh/go-spew/spew"
@@ -59,7 +60,7 @@ requests:
 `)
 	require.NoError(t, err)
 	defer clearFunc()
-	host, port := utils.DebugMockHTTP([]byte("HTTP/1.1 200 OK\r\n\r\nHello, world!"))
+	host, port := utils.DebugMockHTTP([]byte("HTTP/1.1 200 OK\r\nContent-Length: 13\r\n\r\nHello, world!"))
 
 	stream, err := client.ExecYakScript(context.Background(), &ypb.ExecRequest{
 		ScriptId: name,
@@ -89,16 +90,16 @@ mirrorHTTPFlow = func(isHttps, url , req , rsp , body ) {
 `)
 	require.NoError(t, err)
 	defer clearFunc()
-	count := 0
+	var count atomic.Int32
 	host, port := utils.DebugMockHTTPKeepAliveEx(func(req []byte) []byte {
 		r, _ := lowhttp.ParseBytesToHttpRequest(req)
 		if r.Method == "CONNECT" {
 			return []byte("HTTP/1.0 200 Connection established\r\n\r\n")
 		}
 		if keys, ok := r.URL.Query()["key"]; ok && keys[0] == "1" {
-			count++
+			count.Add(1)
 		}
-		return []byte("HTTP/1.1 200 OK\r\n\r\nHello, world!")
+		return []byte("HTTP/1.1 200 OK\r\nContent-Length: 13\r\n\r\nHello, world!")
 	})
 	// host, port := utils.DebugMockTCPEx(func(ctx context.Context, lis net.Listener, conn net.Conn) {
 	// 	for {
@@ -125,7 +126,7 @@ mirrorHTTPFlow = func(isHttps, url , req , rsp , body ) {
 	// })
 
 	stream, err := client.ExecBatchYakScript(context.Background(), &ypb.ExecBatchYakScriptRequest{
-		Target:              "http://www.baidu.com?key=0",
+		Target:              "http://127.0.0.1?key=0",
 		ScriptNames:         []string{name},
 		Limit:               10,
 		TotalTimeoutSeconds: 1000,
@@ -139,5 +140,5 @@ mirrorHTTPFlow = func(isHttps, url , req , rsp , body ) {
 			break
 		}
 	}
-	require.Greater(t, count, 0, "want more than 1, but got %d", count)
+	require.Greater(t, count.Load(), int32(0), "the plugin request must use the proxy")
 }

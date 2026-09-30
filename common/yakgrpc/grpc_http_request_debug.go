@@ -42,6 +42,7 @@ func (s *Server) execScriptWithRequest(scriptInstance *schema.YakScript, targetI
 		projectDB  = s.GetProjectDatabase()
 	)
 	streamCtx, cancel := context.WithCancel(stream.Context())
+	defer cancel()
 	if scriptName == "" {
 		return utils.Error("script name is empty")
 	}
@@ -167,6 +168,7 @@ func (s *Server) execScriptWithRequest(scriptInstance *schema.YakScript, targetI
 		"PLUGIN_TYPE":          strings.ToLower(scriptType),
 		"IS_SMOKING":           isSmoking,
 		"IS_STRICT":            isStrict,
+		"PLUGIN_TESTING":       streamCtx.Value(pluginEvaluationContextKey{}) == true,
 		"RUNTIME_ID":           runtimeId,
 		"CLI_PARAMS":           KVPairToParamItem(execParams),
 	})

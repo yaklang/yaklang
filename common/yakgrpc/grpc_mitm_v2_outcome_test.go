@@ -831,7 +831,7 @@ func TestGRPCMUSTPASS_MITMV2_RequestOutcomeMatrix(t *testing.T) {
 			require.NoError(t, err)
 			require.Contains(t, string(response.RawPacket), "200 OK")
 		}
-		time.Sleep(800 * time.Millisecond)
+		waitMITMFlowWrites(t)
 		cancel()
 	}, func(stream ypb.Yak_MITMV2Client, msg *ypb.MITMV2Response) {
 		if len(msg.GetManualHijackList()) != 1 {
@@ -993,7 +993,7 @@ func TestGRPCMUSTPASS_MITMV2_RequestOutcomeMatrix(t *testing.T) {
 		}))
 	})
 
-	for _, tc := range cases {
+	validateOutcome := func(t *testing.T, tc mitmV2RequestOutcomeCase) {
 		token := tokensByName[tc.name]
 		t.Logf("asserting persisted and replayed outcome for %s", tc.name)
 		flows, err := QueryHTTPFlows(utils.TimeoutContextSeconds(8), client, &ypb.QueryHTTPFlowRequest{
@@ -1297,6 +1297,9 @@ func TestGRPCMUSTPASS_MITMV2_RequestOutcomeMatrix(t *testing.T) {
 			}
 		}
 	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) { validateOutcome(t, tc) })
+	}
 }
 
 // Auto-forward has no editor action and therefore no bare/original snapshot.
@@ -1388,7 +1391,6 @@ func TestGRPCMUSTPASS_MITMV2_AutoForwardResourceOutcome(t *testing.T) {
 		require.NoError(t, stream.Send(&ypb.MITMV2Request{SetAutoForward: true, AutoForwardValue: true}))
 	}, func(stream ypb.Yak_MITMV2Client) {
 		require.NoError(t, utils.WaitConnect(utils.HostPort("127.0.0.1", mitmPort), 5))
-		time.Sleep(100 * time.Millisecond)
 		for _, packet := range packets {
 			response, err := lowhttp.HTTP(
 				lowhttp.WithPacketBytes(packet),
@@ -1399,7 +1401,7 @@ func TestGRPCMUSTPASS_MITMV2_AutoForwardResourceOutcome(t *testing.T) {
 			require.NoError(t, err)
 			require.Contains(t, string(response.RawPacket), "200 OK")
 		}
-		time.Sleep(500 * time.Millisecond)
+		waitMITMFlowWrites(t)
 		cancel()
 	}, func(stream ypb.Yak_MITMV2Client, msg *ypb.MITMV2Response) {
 		if msg.GetManualHijackListAction() != Hijack_List_Add || len(msg.GetManualHijackList()) == 0 {

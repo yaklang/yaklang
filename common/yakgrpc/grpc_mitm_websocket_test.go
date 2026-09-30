@@ -332,7 +332,7 @@ func TestGRPCMUSTPASS_MITM_WebSocket_RULE(t *testing.T) {
 			PreferGMTLS: true,
 		})
 	}, func(stream ypb.Yak_MITMClient) {
-		stream.Send(&ypb.MITMRequest{
+		sendMITMTestControl(t, stream, &ypb.MITMRequest{
 			SetContentReplacers: true,
 			Replacers: []*ypb.MITMContentReplacer{
 				{
@@ -350,7 +350,6 @@ func TestGRPCMUSTPASS_MITM_WebSocket_RULE(t *testing.T) {
 				},
 			},
 		})
-		time.Sleep(3 * time.Second)
 		defer cancel()
 		wsClient, err := lowhttp.NewWebsocketClient([]byte(fmt.Sprintf(`GET /ruleCheck?token=%s HTTP/1.1
 Host: %s

@@ -6,11 +6,13 @@ import (
 	"runtime"
 	"runtime/pprof"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/yak/antlr4yak"
+	"github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm"
 )
 
 func TestYakFunctionCallerTimeoutDoesNotLeakResultSender(t *testing.T) {
@@ -94,4 +96,67 @@ func callHandlerAndRecover(caller *YakFunctionCaller) (panicValue any) {
 	}()
 	caller.Handler(nil)
 	return nil
+}
+
+func TestYakToCallerManagerWaitIncludesCompletionCallback(t *testing.T) {
+	manager := NewYakToCallerManager()
+	require.NoError(t, manager.SetConcurrent(1))
+	started, release := make(chan struct{}), make(chan struct{})
+	var releaseOnce sync.Once
+	unblock := func() { releaseOnce.Do(func() { close(release) }) }
+	t.Cleanup(unblock)
+	manager.table.Store("handle", []*Caller{{Id: "fixture", Core: &YakFunctionCaller{
+		Handler: func(_ func(*yakvm.Frame), _ ...interface{}) interface{} { return nil },
+	}}})
+	go manager.Call("handle", WithCallConfigCallback(func() {
+		close(started)
+		<-release
+	}))
+	<-started
+	waited := make(chan struct{})
+	go func() { manager.Wait(); close(waited) }()
+	select {
+	case <-waited:
+		t.Fatal("Wait returned while the completion callback was still running")
+	case <-time.After(20 * time.Millisecond):
+	}
+	unblock()
+	select {
+	case <-waited:
+	case <-time.After(time.Second):
+		t.Fatal("Wait did not return after all registered work completed")
+	}
+}
+
+func TestYakToCallerManagerWaitIncludesQueuedHandlers(t *testing.T) {
+	manager := NewYakToCallerManager()
+	require.NoError(t, manager.SetConcurrent(1))
+	started, release := make(chan struct{}, 2), make(chan struct{})
+	var releaseOnce sync.Once
+	unblock := func() { releaseOnce.Do(func() { close(release) }) }
+	t.Cleanup(unblock)
+	handler := &YakFunctionCaller{Handler: func(_ func(*yakvm.Frame), _ ...interface{}) interface{} {
+		started <- struct{}{}
+		<-release
+		return nil
+	}}
+	manager.table.Store("handle", []*Caller{{Id: "first", Core: handler}, {Id: "second", Core: handler}})
+	callDone := make(chan struct{})
+	go func() { manager.Call("handle"); close(callDone) }()
+	<-started
+	waited := make(chan struct{})
+	go func() { manager.Wait(); close(waited) }()
+	select {
+	case <-waited:
+		t.Fatal("Wait returned before the queued handlers finished")
+	case <-time.After(20 * time.Millisecond):
+	}
+	unblock()
+	<-started
+	<-callDone
+	select {
+	case <-waited:
+	case <-time.After(time.Second):
+		t.Fatal("Wait retained an artificial delay after both handlers finished")
+	}
 }

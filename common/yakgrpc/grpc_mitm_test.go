@@ -19,7 +19,6 @@ import (
 	"github.com/yaklang/yaklang/common/crep"
 
 	"github.com/yaklang/yaklang/common/gmsm/gmtls"
-	"github.com/yaklang/yaklang/common/vulinbox"
 
 	"github.com/google/uuid"
 
@@ -451,7 +450,6 @@ if rsp.Contains(getParam("token")) {
 				params["packet"] = "GET /gziptestted HTTP/1.1\r\nHost: " + utils.HostPort(mockHost, mockPort)
 				params["packet"] = lowhttp.ReplaceHTTPPacketBody(utils.InterfaceToBytes(params["packet"]), tokenRaw, false)
 				params["packet"] = lowhttp.ReplaceHTTPPacketHeader(utils.InterfaceToBytes(params["packet"]), "Content-Encoding", "gzip")
-				time.Sleep(time.Second)
 				_, err = yak.NewScriptEngine(10).ExecuteEx(`
 log.info("Start to send packet echo")
 packet := getParam("packet")
@@ -476,7 +474,6 @@ if rsp.Contains(getParam("token")) {
 				originPacket := params["packet"].([]byte)
 				_ = originPacket
 
-				time.Sleep(time.Second)
 				_, err = yak.NewScriptEngine(10).ExecuteEx(`
 log.info("Start to send packet echo")
 packet := getParam("packet")
@@ -530,21 +527,14 @@ println("-----------------------------------------------------------------------
 					t.Fatal(err)
 				}
 
-				ctx, cancel := context.WithTimeout(context.Background(), 300*time.Second)
-				_ = ctx
-				defer cancel()
-				time.Sleep(time.Second)
-				_, flows, err := yakit.QueryHTTPFlow(consts.GetGormProjectDatabase(), &ypb.QueryHTTPFlowRequest{
-					SearchURL: "/mitm/test/h2/token/" + token,
-				})
-				if err != nil {
-					t.Fatal(err)
-				}
-				if len(flows) > 0 {
-					h2Test = true
-				} else {
-					panic("/mitm/test/h2/token/" + token + " is not logged in db")
-				}
+				require.Eventually(t, func() bool {
+					_, flows, err := yakit.QueryHTTPFlow(consts.GetGormProjectDatabase(), &ypb.QueryHTTPFlowRequest{
+						SearchURL: "/mitm/test/h2/token/" + token,
+					})
+					return err == nil && len(flows) > 0
+				}, time.Second, time.Millisecond, "H2 flow must be persisted")
+				h2Test = true
+
 			}()
 		}
 	}
@@ -977,10 +967,11 @@ Host: ` + h2Addr,
 		t.Fatal(err)
 	}
 	stream.Send(&ypb.MITMRequest{
-		Host:        "127.0.0.1",
-		Port:        uint32(rPort),
-		Recover:     true,
-		EnableHttp2: true,
+		Host:           "127.0.0.1",
+		Port:           uint32(rPort),
+		Recover:        true,
+		EnableHttp2:    true,
+		SetAutoForward: true, AutoForwardValue: false,
 	})
 	var wg sync.WaitGroup
 	wg.Add(1)
@@ -1002,7 +993,8 @@ Host: ` + h2Addr,
 				SetAutoForward:   true,
 				AutoForwardValue: false, // 手动劫持
 			})
-			time.Sleep(time.Second * 3)
+		}
+		if started && rsp.GetJustFilter() && !manual {
 			manual = true
 			go func() {
 				defer func() {
@@ -2378,7 +2370,7 @@ func TestGRPCMUSTPASS_RuleExtractedData(t *testing.T) {
 			PreferGMTLS: true,
 		})
 	}, func(stream ypb.Yak_MITMClient) {
-		stream.Send(&ypb.MITMRequest{
+		sendMITMTestControl(t, stream, &ypb.MITMRequest{
 			SetContentReplacers: true,
 			Replacers: []*ypb.MITMContentReplacer{
 				{
@@ -2396,7 +2388,6 @@ func TestGRPCMUSTPASS_RuleExtractedData(t *testing.T) {
 				},
 			},
 		})
-		time.Sleep(3 * time.Second)
 		defer cancel()
 		requestBytes := []byte(fmt.Sprintf(`GET /%s HTTP/1.1
 Host: %s:%d
@@ -2406,6 +2397,7 @@ Host: %s:%d
 		rsp, _, err := poc.HTTP(req, poc.WithProxy(proxy), poc.WithSave(false))
 		require.NoError(t, err)
 		require.Equal(t, lowhttp.GetStatusCodeFromResponse(rsp), 200)
+		waitMITMFlowWrites(t)
 		flows, err := QueryHTTPFlows(ctx, client, &ypb.QueryHTTPFlowRequest{
 			Keyword: token,
 		}, 1)
@@ -2429,10 +2421,28 @@ func TestGRPCMUSTPASS_MITM_Longtime_chunk(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
 
-	vulinboxTarget, err := vulinbox.NewVulinServerEx(ctx, true, false, "127.0.0.1")
-	require.NoError(t, err)
-
-	addr := strings.Trim(vulinboxTarget, "http://")
+	fixture := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Outlive the one-second forwarding threshold with real incremental data.
+		// The terminating HTTP chunk is emitted when this handler returns.
+		w.Header().Set("Content-Type", "text/plain")
+		ticker := time.NewTicker(10 * time.Millisecond)
+		defer ticker.Stop()
+		deadline := time.NewTimer(1200 * time.Millisecond)
+		defer deadline.Stop()
+		for {
+			select {
+			case <-ticker.C:
+				fmt.Fprint(w, "Hello Long-Time Chunked\n")
+				w.(http.Flusher).Flush()
+			case <-deadline.C:
+				return
+			case <-r.Context().Done():
+				return
+			}
+		}
+	}))
+	defer fixture.Close()
+	addr := strings.TrimPrefix(fixture.URL, "http://")
 
 	client, err := NewLocalClient()
 	require.NoError(t, err)
@@ -2454,7 +2464,7 @@ func TestGRPCMUSTPASS_MITM_Longtime_chunk(t *testing.T) {
 		defer cancel()
 
 		// The fixture outlives the one-second forwarding threshold.
-		_, err = conn.Write(lowhttp.FixHTTPRequest([]byte(fmt.Sprintf(`GET /misc/response/long-time-chunked?token=%s&duration=2s&interval=50ms HTTP/1.1
+		_, err = conn.Write(lowhttp.FixHTTPRequest([]byte(fmt.Sprintf(`GET /misc/response/long-time-chunked?token=%s&duration=1200ms&interval=10ms HTTP/1.1
 Host: %s
 Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7
 Accept-Encoding: gzip, deflate

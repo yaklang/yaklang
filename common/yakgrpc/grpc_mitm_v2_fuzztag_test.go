@@ -27,7 +27,7 @@ func TestGRPCMUSTPASS_MITMV2_HijackResponse_BinaryFuzztagRendering(t *testing.T)
 	require.NoError(t, err)
 
 	// Use a shorter timeout context since we'll cancel immediately on success
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 
 	// Create a simple PNG-like binary data (PNG magic number + some data)
@@ -42,36 +42,20 @@ func TestGRPCMUSTPASS_MITMV2_HijackResponse_BinaryFuzztagRendering(t *testing.T)
 	stream, err := client.MITMV2(ctx)
 	require.NoError(t, err)
 
-	// Initialize MITM server
-	stream.Send(&ypb.MITMV2Request{
-		Host: "127.0.0.1",
-		Port: uint32(mitmPort),
-	})
-
-	// Reset filters to prevent .png from being filtered
-	stream.Send(&ypb.MITMV2Request{
-		ResetFilter: true,
-	})
-
-	// Clear all filters including MIME filters
-	stream.Send(&ypb.MITMV2Request{
-		UpdateFilter: true,
-		FilterData: &ypb.MITMFilterData{
-			ExcludeMIME: []*ypb.FilterDataItem{}, // Empty MIME filter
-		},
-	})
-
-	// Disable auto-forward to enable manual hijacking
-	stream.Send(&ypb.MITMV2Request{
-		SetAutoForward:   true,
-		AutoForwardValue: false,
-	})
+	// Traffic begins after the receive loop acknowledges the empty MIME filter.
+	require.NoError(t, stream.Send(&ypb.MITMV2Request{
+		Host: "127.0.0.1", Port: uint32(mitmPort),
+		SetAutoForward: true, AutoForwardValue: false,
+	}))
 
 	fuzztagConverted := false
 	responseSent := false
 	clientReceivedCorrectData := false
 
 	resultChan := make(chan []byte, 1)
+	requestDone := make(chan error, 1)
+	requestStarted := false
+	filterSent := false
 
 	for {
 		rsp, err := stream.Recv()
@@ -82,10 +66,17 @@ func TestGRPCMUSTPASS_MITMV2_HijackResponse_BinaryFuzztagRendering(t *testing.T)
 		rspMsg := string(rsp.GetMessage().GetMessage())
 
 		// Send HTTP request after MITM server starts
-		if strings.Contains(rspMsg, `starting mitm serve`) {
+		if strings.Contains(rspMsg, `starting mitm serve`) && !filterSent {
+			filterSent = true
+			require.NoError(t, stream.Send(&ypb.MITMV2Request{SetAutoForward: true, AutoForwardValue: false}))
+			require.NoError(t, stream.Send(&ypb.MITMV2Request{
+				UpdateFilter: true, FilterData: &ypb.MITMFilterData{},
+			}))
+		}
+		if filterSent && rsp.GetJustFilter() && !requestStarted && len(rsp.GetFilterData().GetExcludeMIME()) == 0 {
+			requestStarted = true
 			go func() {
-				// Wait for MITM server to fully initialize
-				time.Sleep(time.Second)
+				defer cancel()
 				// Send HTTP request and extract response body
 				_, err := yak.Execute(`
 rsp, req, err = poc.Get(target, poc.proxy(mitmProxy), poc.save(false))
@@ -101,10 +92,7 @@ resultChan <- body
 					"target":     fmt.Sprintf("http://%s/api/getimage", utils.HostPort(mockHost, mockPort)),
 					"resultChan": resultChan,
 				})
-				if err != nil {
-					t.Logf("HTTP request error: %v", err)
-				}
-				// Don't cancel here, let the main test loop handle it after verifying the data
+				requestDone <- err
 			}()
 		}
 
@@ -150,15 +138,18 @@ resultChan <- body
 						if err == nil {
 							responseSent = true
 						}
-						// Give time for client to receive the response before we exit the loop
-						go func() {
-							time.Sleep(2 * time.Second)
-							cancel()
-						}()
 					}
 				}
 			}
 		}
+	}
+
+	require.True(t, requestStarted, "MITM filter must be applied before sending traffic")
+	select {
+	case err := <-requestDone:
+		require.NoError(t, err)
+	case <-time.After(time.Second):
+		t.Fatal("client request did not complete")
 	}
 
 	// Check if client received the correct data
@@ -176,7 +167,7 @@ resultChan <- body
 		}
 		// Stop the test immediately after verification
 		cancel()
-	case <-time.After(5 * time.Second):
+	default:
 		t.Log("✗ Timeout waiting for client response")
 		cancel()
 	}
@@ -195,7 +186,7 @@ func TestGRPCMUSTPASS_MITMV2_HijackResponse_TextWithBracesNotRendered(t *testing
 	client, err := NewLocalClient()
 	require.NoError(t, err)
 
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 
 	// Server returns fuzztag-like text + binary data
@@ -211,31 +202,18 @@ func TestGRPCMUSTPASS_MITMV2_HijackResponse_TextWithBracesNotRendered(t *testing
 	stream, err := client.MITMV2(ctx)
 	require.NoError(t, err)
 
-	// Initialize MITM server
-	stream.Send(&ypb.MITMV2Request{
-		Host: "127.0.0.1",
-		Port: uint32(mitmPort),
-	})
-
-	stream.Send(&ypb.MITMV2Request{
-		ResetFilter: true,
-	})
-
-	stream.Send(&ypb.MITMV2Request{
-		UpdateFilter: true,
-		FilterData: &ypb.MITMFilterData{
-			ExcludeMIME: []*ypb.FilterDataItem{},
-		},
-	})
-
-	stream.Send(&ypb.MITMV2Request{
-		SetAutoForward:   true,
-		AutoForwardValue: false,
-	})
+	// Traffic begins after the receive loop acknowledges the empty MIME filter.
+	require.NoError(t, stream.Send(&ypb.MITMV2Request{
+		Host: "127.0.0.1", Port: uint32(mitmPort),
+		SetAutoForward: true, AutoForwardValue: false,
+	}))
 
 	fuzztagConverted := false
 	clientReceivedCorrectData := false
 	resultChan := make(chan []byte, 1)
+	requestDone := make(chan error, 1)
+	requestStarted := false
+	filterSent := false
 
 	for {
 		rsp, err := stream.Recv()
@@ -245,9 +223,17 @@ func TestGRPCMUSTPASS_MITMV2_HijackResponse_TextWithBracesNotRendered(t *testing
 
 		rspMsg := string(rsp.GetMessage().GetMessage())
 
-		if strings.Contains(rspMsg, `starting mitm serve`) {
+		if strings.Contains(rspMsg, `starting mitm serve`) && !filterSent {
+			filterSent = true
+			require.NoError(t, stream.Send(&ypb.MITMV2Request{SetAutoForward: true, AutoForwardValue: false}))
+			require.NoError(t, stream.Send(&ypb.MITMV2Request{
+				UpdateFilter: true, FilterData: &ypb.MITMFilterData{},
+			}))
+		}
+		if filterSent && rsp.GetJustFilter() && !requestStarted && len(rsp.GetFilterData().GetExcludeMIME()) == 0 {
+			requestStarted = true
 			go func() {
-				time.Sleep(time.Second)
+				defer cancel()
 				_, err := yak.Execute(`
 rsp, req, err = poc.Get(target, poc.proxy(mitmProxy), poc.save(false))
 if err != nil {
@@ -261,9 +247,7 @@ resultChan <- body
 					"target":     fmt.Sprintf("http://%s/api/data", utils.HostPort(mockHost, mockPort)),
 					"resultChan": resultChan,
 				})
-				if err != nil {
-					t.Logf("HTTP request error: %v", err)
-				}
+				requestDone <- err
 			}()
 		}
 
@@ -305,15 +289,18 @@ resultChan <- body
 								Response:   originalResponse,
 							},
 						})
-
-						go func() {
-							time.Sleep(2 * time.Second)
-							cancel()
-						}()
 					}
 				}
 			}
 		}
+	}
+
+	require.True(t, requestStarted, "MITM filter must be applied before sending traffic")
+	select {
+	case err := <-requestDone:
+		require.NoError(t, err)
+	case <-time.After(time.Second):
+		t.Fatal("client request did not complete")
 	}
 
 	// Verify client received the original mixed data (not re-rendered)
@@ -330,7 +317,7 @@ resultChan <- body
 			}
 		}
 		cancel()
-	case <-time.After(5 * time.Second):
+	default:
 		t.Log("✗ Timeout waiting for client response")
 		cancel()
 	}

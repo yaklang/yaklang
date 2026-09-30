@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -45,7 +46,8 @@ func RunMITMV2TestServerEx(
 		panic(err)
 	}
 	wg := sync.WaitGroup{}
-	wg.Add(1)
+	var loadOnce sync.Once
+	observed := &mitmV2TestClient{Yak_MITMV2Client: stream}
 	if onInit != nil {
 		onInit(stream)
 	}
@@ -58,13 +60,14 @@ func RunMITMV2TestServerEx(
 			msgStr := string(msg.GetMessage().GetMessage())
 			if strings.Contains(msgStr, `starting mitm serve`) {
 				if onLoad != nil {
-					go func() {
-						defer wg.Done()
-						onLoad(stream)
-					}()
+					loadOnce.Do(func() {
+						wg.Add(1)
+						go func() { defer wg.Done(); onLoad(observed) }()
+					})
 				}
 			}
 		}
+		observed.ack.observe(msg)
 		if onRecv != nil {
 			onRecv(stream, msg)
 		}
@@ -97,10 +100,11 @@ func TestGRPCMUSTPASS_MITMV2_ForExcludeBadCase(t *testing.T) {
 		Port: uint32(mitmPort),
 		Host: "127.0.0.1",
 	}, func(mitmClient ypb.Yak_MITMV2Client) {
+		defer cancel()
 		var token string
 		var packet []byte
 
-		mitmClient.Send(&ypb.MITMV2Request{
+		sendMITMV2TestControl(t, mitmClient, &ypb.MITMV2Request{
 			FilterData: &ypb.MITMFilterData{
 				ExcludeSuffix: []*ypb.FilterDataItem{
 					{
@@ -112,7 +116,6 @@ func TestGRPCMUSTPASS_MITMV2_ForExcludeBadCase(t *testing.T) {
 			UpdateFilter: true,
 		})
 		defer GetMITMFilterManager(consts.GetGormProjectDatabase(), consts.GetGormProfileDatabase()).Recover()
-		time.Sleep(500 * time.Millisecond)
 		for _, ct := range [][]any{
 			{"/abc.a", 0},
 		} {
@@ -139,11 +142,11 @@ sec-ch-ua-platform: "macOS"
 			params["packet"] = packet
 			_, err = yak.Execute(`
 rsp, _ = poc.HTTP(packet, poc.proxy(proxy), poc.host(mockHost), poc.port(mockPort))~
-sleep(0.3)
 `, params)
 			if err != nil {
 				t.Fatalf("err: %v", err)
 			}
+			waitMITMFlowWrites(t)
 			count := yakit.QuickSearchMITMHTTPFlowCount(token)
 			log.Infof("yakit.QuickSearchMITMHTTPFlowCount("+`[`+token+`]`+") == %v", count)
 			if count != expectCount {
@@ -179,6 +182,7 @@ func TestGRPCMUSTPASS_MITMV2_Filter_ForExcludeURI(t *testing.T) {
 		Port: uint32(mitmPort),
 		Host: "127.0.0.1",
 	}, func(mitmClient ypb.Yak_MITMV2Client) {
+		defer cancel()
 		var token string
 		var packet []byte
 
@@ -196,12 +200,11 @@ func TestGRPCMUSTPASS_MITMV2_Filter_ForExcludeURI(t *testing.T) {
 				},
 			},
 		}
-		mitmClient.Send(&ypb.MITMV2Request{
+		sendMITMV2TestControl(t, mitmClient, &ypb.MITMV2Request{
 			FilterData:   FilterData,
 			UpdateFilter: true,
 		})
 		defer GetMITMFilterManager(consts.GetGormProjectDatabase(), consts.GetGormProfileDatabase()).Recover()
-		time.Sleep(500 * time.Millisecond)
 		for _, ct := range [][]any{
 			{"/abc.a", 0},
 			{"/a/abc.js", 0},
@@ -223,12 +226,12 @@ func TestGRPCMUSTPASS_MITMV2_Filter_ForExcludeURI(t *testing.T) {
 println(string(packet))
 rsp, _ = poc.HTTP(packet, poc.proxy(proxy), poc.host(mockHost), poc.port(mockPort))~
 println(string(rsp))
-sleep(0.3)
 `, params)
 			if err != nil {
 				t.Logf("err: %v", err)
 				t.Fail()
 			}
+			waitMITMFlowWrites(t)
 			count := yakit.QuickSearchMITMHTTPFlowCount(token)
 			log.Infof("yakit.QuickSearchMITMHTTPFlowCount("+`[`+token+`]`+") == %v", count)
 			fmt.Println("checking path : " + path)
@@ -262,10 +265,11 @@ func TestGRPCMUSTPASS_MITMV2_Filter_ForExcludeSuffixAndContentType(t *testing.T)
 		Port: uint32(mitmPort),
 		Host: "127.0.0.1",
 	}, func(mitmClient ypb.Yak_MITMV2Client) {
+		defer cancel()
 		var token string
 		var packet []byte
 
-		mitmClient.Send(&ypb.MITMV2Request{
+		sendMITMV2TestControl(t, mitmClient, &ypb.MITMV2Request{
 			FilterData: &ypb.MITMFilterData{
 				ExcludeSuffix: []*ypb.FilterDataItem{
 					{
@@ -277,7 +281,6 @@ func TestGRPCMUSTPASS_MITMV2_Filter_ForExcludeSuffixAndContentType(t *testing.T)
 			UpdateFilter: true,
 		})
 		defer GetMITMFilterManager(consts.GetGormProjectDatabase(), consts.GetGormProfileDatabase()).Recover()
-		time.Sleep(500 * time.Millisecond)
 		for _, ct := range [][]any{
 			{"/abc.png.zip?ab=1", 0},
 			{"/abc.a", 1},
@@ -304,11 +307,11 @@ func TestGRPCMUSTPASS_MITMV2_Filter_ForExcludeSuffixAndContentType(t *testing.T)
 			params["packet"] = packet
 			_, err = yak.Execute(`
 rsp, _ = poc.HTTP(packet, poc.proxy(proxy), poc.host(mockHost), poc.port(mockPort))~
-sleep(0.3)
 `, params)
 			if err != nil {
 				t.Fatalf("err: %v", err)
 			}
+			waitMITMFlowWrites(t)
 			count := yakit.QuickSearchMITMHTTPFlowCount(token)
 			log.Infof("yakit.QuickSearchMITMHTTPFlowCount("+`[`+token+`]`+") == %v", count)
 			if count != expectCount {
@@ -338,13 +341,12 @@ sleep(0.3)
 			},
 		}
 
-		mitmClient.Send(&ypb.MITMV2Request{
+		sendMITMV2TestControl(t, mitmClient, &ypb.MITMV2Request{
 			FilterData:   FilterData,
 			UpdateFilter: true,
 		})
 		defer GetMITMFilterManager(consts.GetGormProjectDatabase(), consts.GetGormProfileDatabase()).Recover()
 
-		time.Sleep(500 * time.Millisecond)
 		for _, ct := range [][]any{
 			{"application/abc", 0},
 			{"abc1111", 0},
@@ -369,11 +371,11 @@ sleep(0.3)
 			params["packet"] = packet
 			_, err = yak.Execute(`
 rsp, _ = poc.HTTP(packet, poc.proxy(proxy), poc.host(mockHost), poc.port(mockPort))~
-sleep(0.5)
 `, params)
 			if err != nil {
 				t.Fatalf("err: %v", err)
 			}
+			waitMITMFlowWrites(t)
 			count := yakit.QuickSearchMITMHTTPFlowCount(token)
 			log.Infof("yakit.QuickSearchMITMHTTPFlowCount("+`[`+token+`]`+") == %v", count)
 			if count != expectCount {
@@ -409,6 +411,7 @@ func TestGRPCMUSTPASS_MITMV2_WebSockett_Filter_RSP(t *testing.T) {
 		Port: uint32(mitmPort),
 		Host: "127.0.0.1",
 	}, func(mitmClient ypb.Yak_MITMV2Client) {
+		defer cancel()
 		mitmClient.Send(&ypb.MITMV2Request{
 			FilterWebsocket:       true,
 			UpdateFilterWebsocket: true,
@@ -463,6 +466,7 @@ func TestGRPCMUSTPASS_MITMV2_WebSockett_Filter_REQ(t *testing.T) {
 		Port: uint32(mitmPort),
 		Host: "127.0.0.1",
 	}, func(mitmClient ypb.Yak_MITMV2Client) {
+		defer cancel()
 		mitmClient.Send(&ypb.MITMV2Request{
 			FilterWebsocket:       true,
 			UpdateFilterWebsocket: true,
@@ -495,18 +499,18 @@ Sec-WebSocket-Key: w4v7O6xFTi36lq3RNcgctw==
 }
 
 func TestGRPCMUSTPASS_MITMV2_Filter_Plugin(t *testing.T) {
-	var shouldFilter bool
-	var notFilter bool
+	var shouldFilter atomic.Bool
+	var notFilter atomic.Bool
 
 	shouldFilterToken := utils.RandStringBytes(10)
 	notFilterToken := utils.RandStringBytes(10)
 	_, mockPort := utils.DebugMockHTTPEx(func(req []byte) []byte {
 		token := lowhttp.GetHTTPRequestQueryParam(req, "token")
 		if token == shouldFilterToken {
-			shouldFilter = true
+			shouldFilter.Store(true)
 		}
 		if token == notFilterToken {
-			notFilter = true
+			notFilter.Store(true)
 		}
 		return []byte("HTTP/1.1 200 OK\r\nContent-length: 0\r\n\r\n")
 	})
@@ -551,26 +555,25 @@ mirrorHTTPFlow = func(isHttps /*bool*/, url /*string*/, req /*[]byte*/, rsp /*[]
 		Host: "127.0.0.1",
 		Port: uint32(mitmPort),
 	}, func(stream ypb.Yak_MITMV2Client) {
-		stream.Send(&ypb.MITMV2Request{
+		defer cancel()
+		sendMITMV2TestControl(t, stream, &ypb.MITMV2Request{
 			SetYakScript:     true,
 			YakScriptContent: code,
 		})
-		stream.Recv()
-		stream.Send(&ypb.MITMV2Request{
+		sendMITMV2TestControl(t, stream, &ypb.MITMV2Request{
 			UpdateFilter: true,
 			FilterData: &ypb.MITMFilterData{
 				ExcludeUri: []*ypb.FilterDataItem{{MatcherType: "word", Group: []string{"abc"}}},
 			},
 		})
-		stream.Recv()
 		defer GetMITMFilterManager(consts.GetGormProjectDatabase(), consts.GetGormProfileDatabase()).Recover()
 		_, err := lowhttp.HTTPWithoutRedirect(lowhttp.WithPacketBytes(packet), lowhttp.WithProxy(proxy))
 		require.NoError(t, err)
-		time.Sleep(3 * time.Second)
+		require.Eventually(t, func() bool { return notFilter.Load() }, 2*time.Second, time.Millisecond)
 		cancel()
 	})
-	require.False(t, shouldFilter)
-	require.True(t, notFilter)
+	require.False(t, shouldFilter.Load())
+	require.True(t, notFilter.Load())
 }
 
 func TestGRPCMUSTPASS_MITMV2_Static_Filter(t *testing.T) {
@@ -579,16 +582,16 @@ func TestGRPCMUSTPASS_MITMV2_Static_Filter(t *testing.T) {
 	notFilterToken2 := utils.RandStringBytes(10)
 
 	t.Run("url", func(t *testing.T) {
-		var shouldFilter bool
-		var notFilter bool
+		var shouldFilter atomic.Bool
+		var notFilter atomic.Bool
 
 		_, mockPort := utils.DebugMockHTTPEx(func(req []byte) []byte {
 			token := lowhttp.GetHTTPRequestQueryParam(req, "token")
 			if token == shouldFilterToken {
-				shouldFilter = true
+				shouldFilter.Store(true)
 			}
 			if token == notFilterToken {
-				notFilter = true
+				notFilter.Store(true)
 			}
 			return []byte("HTTP/1.1 200 OK\r\nContent-length: 0\r\n\r\n")
 		})
@@ -617,36 +620,35 @@ mirrorHTTPFlow = func(isHttps /*bool*/, url /*string*/, req /*[]byte*/, rsp /*[]
 			Host: "127.0.0.1",
 			Port: uint32(mitmPort),
 		}, func(stream ypb.Yak_MITMV2Client) {
-			stream.Send(&ypb.MITMV2Request{
+			defer cancel()
+			sendMITMV2TestControl(t, stream, &ypb.MITMV2Request{
 				SetYakScript:     true,
 				YakScriptContent: code,
 			})
-			stream.Recv()
-			stream.Send(&ypb.MITMV2Request{
+			sendMITMV2TestControl(t, stream, &ypb.MITMV2Request{
 				UpdateFilter: true,
 				FilterData:   &ypb.MITMFilterData{},
 			})
-			stream.Recv()
 			defer GetMITMFilterManager(consts.GetGormProjectDatabase(), consts.GetGormProfileDatabase()).Recover()
 			_, err := lowhttp.HTTPWithoutRedirect(lowhttp.WithPacketBytes(packet), lowhttp.WithProxy(proxy))
 			require.NoError(t, err)
-			time.Sleep(3 * time.Second)
+			require.Eventually(t, func() bool { return notFilter.Load() }, 2*time.Second, time.Millisecond)
 			cancel()
 		})
-		require.True(t, notFilter)
-		require.False(t, shouldFilter)
+		require.True(t, notFilter.Load())
+		require.False(t, shouldFilter.Load())
 	})
 
 	t.Run("url extend", func(t *testing.T) {
-		var notFilter, notFilter2 bool
+		var notFilter, notFilter2 atomic.Bool
 
 		_, mockPort := utils.DebugMockHTTPEx(func(req []byte) []byte {
 			token := lowhttp.GetHTTPRequestQueryParam(req, "token")
 			if token == notFilterToken {
-				notFilter = true
+				notFilter.Store(true)
 			}
 			if token == notFilterToken2 {
-				notFilter2 = true
+				notFilter2.Store(true)
 			}
 			return []byte("HTTP/1.1 200 OK\r\nContent-length: 0\r\n\r\n")
 		})
@@ -675,37 +677,36 @@ mirrorHTTPFlow = func(isHttps /*bool*/, url /*string*/, req /*[]byte*/, rsp /*[]
 			Host: "127.0.0.1",
 			Port: uint32(mitmPort),
 		}, func(stream ypb.Yak_MITMV2Client) {
-			stream.Send(&ypb.MITMV2Request{
+			defer cancel()
+			sendMITMV2TestControl(t, stream, &ypb.MITMV2Request{
 				SetYakScript:     true,
 				YakScriptContent: code,
 			})
-			stream.Recv()
-			stream.Send(&ypb.MITMV2Request{
+			sendMITMV2TestControl(t, stream, &ypb.MITMV2Request{
 				UpdateFilter: true,
 				FilterData:   &ypb.MITMFilterData{},
 			})
-			stream.Recv()
 			defer GetMITMFilterManager(consts.GetGormProjectDatabase(), consts.GetGormProfileDatabase()).Recover()
 			_, err := lowhttp.HTTPWithoutRedirect(lowhttp.WithPacketBytes(packet), lowhttp.WithProxy(proxy))
 			require.NoError(t, err)
-			time.Sleep(3 * time.Second)
+			require.Eventually(t, func() bool { return notFilter.Load() }, 2*time.Second, time.Millisecond)
 			cancel()
 		})
-		require.True(t, notFilter)
-		require.True(t, notFilter2)
+		require.True(t, notFilter.Load())
+		require.True(t, notFilter2.Load())
 	})
 
 	t.Run("content-type", func(t *testing.T) {
-		var shouldFilter bool
-		var notFilter bool
+		var shouldFilter atomic.Bool
+		var notFilter atomic.Bool
 
 		_, mockPort := utils.DebugMockHTTPEx(func(req []byte) []byte {
 			token := lowhttp.GetHTTPRequestQueryParam(req, "token")
 			if token == shouldFilterToken {
-				shouldFilter = true
+				shouldFilter.Store(true)
 			}
 			if token == notFilterToken {
-				notFilter = true
+				notFilter.Store(true)
 			}
 			return []byte("HTTP/1.1 200 OK\r\nContent-length: 0\r\n\r\n")
 		})
@@ -737,36 +738,35 @@ mirrorHTTPFlow = func(isHttps /*bool*/, url /*string*/, req /*[]byte*/, rsp /*[]
 			Host: "127.0.0.1",
 			Port: uint32(mitmPort),
 		}, func(stream ypb.Yak_MITMV2Client) {
-			stream.Send(&ypb.MITMV2Request{
+			defer cancel()
+			sendMITMV2TestControl(t, stream, &ypb.MITMV2Request{
 				SetYakScript:     true,
 				YakScriptContent: code,
 			})
-			stream.Recv()
-			stream.Send(&ypb.MITMV2Request{
+			sendMITMV2TestControl(t, stream, &ypb.MITMV2Request{
 				UpdateFilter: true,
 				FilterData:   &ypb.MITMFilterData{},
 			})
-			stream.Recv()
 			defer GetMITMFilterManager(consts.GetGormProjectDatabase(), consts.GetGormProfileDatabase()).Recover()
 			_, err := lowhttp.HTTPWithoutRedirect(lowhttp.WithPacketBytes(packet), lowhttp.WithProxy(proxy))
 			require.NoError(t, err)
-			time.Sleep(3 * time.Second)
+			require.Eventually(t, func() bool { return notFilter.Load() }, 2*time.Second, time.Millisecond)
 			cancel()
 		})
-		require.True(t, notFilter)
-		require.False(t, shouldFilter)
+		require.True(t, notFilter.Load())
+		require.False(t, shouldFilter.Load())
 	})
 
 	t.Run("content-type and accept", func(t *testing.T) {
-		var notFilter, notFilter2 bool
+		var notFilter, notFilter2 atomic.Bool
 
 		_, mockPort := utils.DebugMockHTTPEx(func(req []byte) []byte {
 			token := lowhttp.GetHTTPRequestQueryParam(req, "token")
 			if token == notFilterToken {
-				notFilter = true
+				notFilter.Store(true)
 			}
 			if token == notFilterToken2 {
-				notFilter2 = true
+				notFilter2.Store(true)
 			}
 			return []byte("HTTP/1.1 200 OK\r\nContent-length: 0\r\n\r\n")
 		})
@@ -798,24 +798,23 @@ mirrorHTTPFlow = func(isHttps /*bool*/, url /*string*/, req /*[]byte*/, rsp /*[]
 			Host: "127.0.0.1",
 			Port: uint32(mitmPort),
 		}, func(stream ypb.Yak_MITMV2Client) {
-			stream.Send(&ypb.MITMV2Request{
+			defer cancel()
+			sendMITMV2TestControl(t, stream, &ypb.MITMV2Request{
 				SetYakScript:     true,
 				YakScriptContent: code,
 			})
-			stream.Recv()
-			stream.Send(&ypb.MITMV2Request{
+			sendMITMV2TestControl(t, stream, &ypb.MITMV2Request{
 				UpdateFilter: true,
 				FilterData:   &ypb.MITMFilterData{},
 			})
-			stream.Recv()
 			defer GetMITMFilterManager(consts.GetGormProjectDatabase(), consts.GetGormProfileDatabase()).Recover()
 			_, err := lowhttp.HTTPWithoutRedirect(lowhttp.WithPacketBytes(packet), lowhttp.WithProxy(proxy))
 			require.NoError(t, err)
-			time.Sleep(3 * time.Second)
+			require.Eventually(t, func() bool { return notFilter.Load() }, 2*time.Second, time.Millisecond)
 			cancel()
 		})
-		require.True(t, notFilter)
-		require.True(t, notFilter2)
+		require.True(t, notFilter.Load())
+		require.True(t, notFilter2.Load())
 	})
 }
 

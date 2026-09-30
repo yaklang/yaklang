@@ -1,6 +1,11 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+if [[ "${SUITE_OFFLINE:-0}" == "1" ]]; then
+  # The child inherits every other suite setting, including startup and sync-rule.
+  exec "$(dirname "$0")/with-loopback-network.sh" env SUITE_OFFLINE=0 "$0" "$@"
+fi
+
 YAK_BINARY_PATH="${YAK_BINARY_PATH:-}"
 TEST_BIN_DIR="${TEST_BIN_DIR:-}"
 TEST_CONFIG="${TEST_CONFIG:-}"

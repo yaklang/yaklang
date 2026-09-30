@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -93,30 +94,11 @@ Content-Length: 3
 	})
 	h2Addr := utils.HostPort(h2Host, h2Port)
 
-	// 在CI环境中增加额外的等待时间确保H2服务器完全启动
-	time.Sleep(2 * time.Second)
-	log.Infof("H2 Mock Server started at %s, testing connectivity...", h2Addr)
-
-	// 测试我们的h2 mock服务器是否正常工作，增加重试机制
-	var h2TestErr error
-	for i := 0; i < 5; i++ {
-		_, h2TestErr = yak.NewScriptEngine(10).ExecuteEx(`
-rsp,req = poc.HTTP(getParam("packet"), poc.http2(true), poc.https(true))~
-`, map[string]any{
-			"packet": `GET / HTTP/2.0
-User-Agent: 111
-Host: ` + h2Addr,
-		})
-		if h2TestErr == nil {
-			log.Infof("H2 Mock Server connectivity test passed on attempt %d", i+1)
-			break
-		}
-		log.Warnf("H2 Mock Server test attempt %d failed: %v", i+1, h2TestErr)
-		time.Sleep(time.Second)
-	}
-	if h2TestErr != nil {
-		t.Fatalf("H2 Mock Server connectivity test failed after 5 attempts: %v", h2TestErr)
-	}
+	// The mock has already bound its listener. Verify real H2 connectivity.
+	_, err = yak.NewScriptEngine(10).ExecuteEx(`
+rsp, req = poc.HTTP(getParam("packet"), poc.http2(true), poc.https(true))~
+`, map[string]any{"packet": "GET / HTTP/2.0\r\nHost: " + h2Addr + "\r\n\r\n"})
+	require.NoError(t, err)
 
 	rule := `W3siUnVsZSI6Iig/aSkoanNvbnBfW2EtejAtOV0rKXwoKF8/Y2FsbGJhY2t8X2NifF9jYWxsfF8/anNvbnBfPyk9KSIsIkNvbG9yIjoieWVsbG93IiwiRW5hYmxlRm9yUmVxdWVzdCI6dHJ1ZSwiRW5hYmxlRm9ySGVhZGVyIjp0cnVlLCJJbmRleCI6MSwiRXh0cmFUYWciOlsi55aR5Ly8SlNPTlAiXSwiTm9SZXBsYWNlIjp0cnVlfSx7IlJ1bGUiOiIoP2kpKChwYXNzd29yZCl8KHBhc3MpfChzZWNyZXQpfChtaW1hKSlbJ1wiXT9cXHMqW1xcOlxcPV0iLCJDb2xvciI6InJlZCIsIkVuYWJsZUZvclJlcXVlc3QiOnRydWUsIkVuYWJsZUZvckhlYWRlciI6dHJ1ZSwiRW5hYmxlRm9yQm9keSI6dHJ1ZSwiSW5kZXgiOjIsIkV4dHJhVGFnIjpbIueZu+mZhi/lr4bnoIHkvKDovpMiXSwiTm9SZXBsYWNlIjp0cnVlfSx7IlJ1bGUiOiIoP2kpKChhY2Nlc3N8YWRtaW58YXBpfGRlYnVnfGF1dGh8YXV0aG9yaXphdGlvbnxncGd8b3BzfHJheXxkZXBsb3l8czN8Y2VydGlmaWNhdGV8YXdzfGFwcHxhcHBsaWNhdGlvbnxkb2NrZXJ8ZXN8ZWxhc3RpY3xlbGFzdGljc2VhcmNofHNlY3JldClbLV9dezAsNX0oa2V5fHRva2VufHNlY3JldHxzZWNyZXRrZXl8cGFzc3xwYXNzd29yZHxzaWR8ZGVidWcpKXwoc2VjcmV0fHBhc3N3b3JkKShbXCInXT9cXHMqOlxccyp8XFxzKj1cXHMqKSIsIkNvbG9yIjoicmVkIiwiRW5hYmxlRm9yUmVxdWVzdCI6dHJ1ZSwiRW5hYmxlRm9yUmVzcG9uc2UiOnRydWUsIkVuYWJsZUZvckhlYWRlciI6dHJ1ZSwiRW5hYmxlRm9yQm9keSI6dHJ1ZSwiSW5kZXgiOjMsIkV4dHJhVGFnIjpbIuaVj+aEn+S/oeaBryJdLCJOb1JlcGxhY2UiOnRydWV9LHsiUnVsZSI6IihCRUdJTiBQVUJMSUMgS0VZKS4qPyhFTkQgUFVCTElDIEtFWSkiLCJDb2xvciI6InB1cnBsZSIsIkVuYWJsZUZvclJlcXVlc3QiOnRydWUsIkVuYWJsZUZvclJlc3BvbnNlIjp0cnVlLCJFbmFibGVGb3JIZWFkZXIiOnRydWUsIkVuYWJsZUZvckJvZHkiOnRydWUsIkluZGV4Ijo0LCJFeHRyYVRhZyI6WyLlhazpkqXkvKDovpMiXSwiTm9SZXBsYWNlIjp0cnVlfSx7IlJ1bGUiOiIoP2lzKSg8Zm9ybS4qdHlwZT0uKj90ZXh0Lio/dHlwZT0uKj9wYXNzd29yZC4qPzwvZm9ybS4qPz4pIiwiQ29sb3IiOiJncmVlbiIsIkVuYWJsZUZvclJlcXVlc3QiOnRydWUsIkVuYWJsZUZvclJlc3BvbnNlIjp0cnVlLCJFbmFibGVGb3JIZWFkZXIiOnRydWUsIkVuYWJsZUZvckJvZHkiOnRydWUsIkluZGV4Ijo1LCJFeHRyYVRhZyI6WyLnmbvpmYbngrkiXSwiVmVyYm9zZU5hbWUiOiLnmbvpmYbngrkiLCJOb1JlcGxhY2UiOnRydWV9LHsiUnVsZSI6Iig/aXMpKDxmb3JtLip0eXBlPS4qP3RleHQuKj90eXBlPS4qP3Bhc3N3b3JkLio/b25jbGljaz0uKj88L2Zvcm0uKj8+KSIsIkNvbG9yIjoiZ3JlZW4iLCJFbmFibGVGb3JSZXF1ZXN0Ijp0cnVlLCJFbmFibGVGb3JSZXNwb25zZSI6dHJ1ZSwiRW5hYmxlRm9ySGVhZGVyIjp0cnVlLCJFbmFibGVGb3JCb2R5Ijp0cnVlLCJJbmRleCI6NiwiRXh0cmFUYWciOlsi55m76ZmG77yI6aqM6K+B56CB77yJIl0sIlZlcmJvc2VOYW1lIjoi55m76ZmG77yI6aqM6K+B56CB77yJIiwiTm9SZXBsYWNlIjp0cnVlfSx7IlJ1bGUiOiIoP2lzKTxmb3JtLiplbmN0eXBlPS4qP211bHRpcGFydC9mb3JtLWRhdGEuKj90eXBlPS4qP2ZpbGUuKj88L2Zvcm0+IiwiQ29sb3IiOiJncmVlbiIsIkVuYWJsZUZvclJlcXVlc3QiOnRydWUsIkVuYWJsZUZvclJlc3BvbnNlIjp0cnVlLCJFbmFibGVGb3JIZWFkZXIiOnRydWUsIkVuYWJsZUZvckJvZHkiOnRydWUsIkluZGV4Ijo3LCJFeHRyYVRhZyI6WyLmlofku7bkuIrkvKDngrkiXSwiVmVyYm9zZU5hbWUiOiLmlofku7bkuIrkvKDngrkiLCJOb1JlcGxhY2UiOnRydWV9LHsiUnVsZSI6IihmaWxlPXxwYXRoPXx1cmw9fGxhbmc9fHNyYz18bWVudT18bWV0YS1pbmY9fHdlYi1pbmY9fGZpbGVuYW1lPXx0b3BpYz18cGFnZT3vvZxfRmlsZVBhdGg9fHRhcmdldD0pIiwiQ29sb3IiOiJncmVlbiIsIkVuYWJsZUZvclJlcXVlc3QiOnRydWUsIkVuYWJsZUZvclJlc3BvbnNlIjp0cnVlLCJFbmFibGVGb3JIZWFkZXIiOnRydWUsIkVuYWJsZUZvckJvZHkiOnRydWUsIkluZGV4Ijo4LCJFeHRyYVRhZyI6WyLmlofku7bljIXlkKvlj4LmlbAiXSwiVmVyYm9zZU5hbWUiOiLmlofku7bljIXlkKvlj4LmlbAiLCJOb1JlcGxhY2UiOnRydWV9LHsiUnVsZSI6IigoY21kPSl8KGV4ZWM9KXwoY29tbWFuZD0pfChleGVjdXRlPSl8KHBpbmc9KXwocXVlcnk9KXwoanVtcD0pfChjb2RlPSl8KHJlZz0pfChkbz0pfChmdW5jPSl8KGFyZz0pfChvcHRpb249KXwobG9hZD0pfChwcm9jZXNzPSl8KHN0ZXA9KXwocmVhZD0pfChmdW5jdGlvbj0pfChmZWF0dXJlPSl8KGV4ZT0pfChtb2R1bGU9KXwocGF5bG9hZD0pfChydW49KXwoZGFlbW9uPSl8KHVwbG9hZD0pfChkaXI9KXwoZG93bmxvYWQ9KXwobG9nPSl8KGlwPSl8KGNsaT0pKXwoaXBhZGRyZXNzPSl8KHR4dD0pfChjYXNlPSl8KGNvdW50PSkiLCJDb2xvciI6ImdyZWVuIiwiRW5hYmxlRm9yUmVxdWVzdCI6dHJ1ZSwiRW5hYmxlRm9yUmVzcG9uc2UiOnRydWUsIkVuYWJsZUZvckhlYWRlciI6dHJ1ZSwiRW5hYmxlRm9yQm9keSI6dHJ1ZSwiSW5kZXgiOjksIkV4dHJhVGFnIjpbIuWRveS7pOazqOWFpeWPguaVsCJdLCJWZXJib3NlTmFtZSI6IuWRveS7pOazqOWFpeWPguaVsCIsIk5vUmVwbGFjZSI6dHJ1ZX0seyJSdWxlIjoiXFxiKChbXjw+KClbXFxdXFxcXC4sOzpcXHNAXCJdKyhcXC5bXjw+KClbXFxdXFxcXC4sOzpcXHNAXCJdKykqKXwoXCIuK1wiKSlAKChcXFtbMC05XXsxLDN9XFwuWzAtOV17MSwzfVxcLlswLTldezEsM31cXC5bMC05XXsxLDN9XFxdKXwoKFthLXpBLVpcXC0wLTldK1xcLikrKGNufGNvbXxlZHV8Z292fGludHxtaWx8bmV0fG9yZ3xiaXp8aW5mb3xwcm98bmFtZXxtdXNldW18Y29vcHxhZXJvfHh4eHxpZHYpKSlcXGIiLCJDb2xvciI6ImdyZWVuIiwiRW5hYmxlRm9yUmVzcG9uc2UiOnRydWUsIkVuYWJsZUZvckJvZHkiOnRydWUsIkluZGV4IjoxMCwiRXh0cmFUYWciOlsiZW1haWzms4TmvI8iXSwiVmVyYm9zZU5hbWUiOiJlbWFpbOazhOa8jyIsIk5vUmVwbGFjZSI6dHJ1ZX0seyJSdWxlIjoiXFxiKD86KD86XFwrfDAwKTg2KT8xKD86KD86M1tcXGRdKXwoPzo0WzUtNzldKXwoPzo1WzAtMzUtOV0pfCg/OjZbNS03XSl8KD86N1swLThdKXwoPzo4W1xcZF0pfCg/OjlbMTg5XSkpXFxkezh9XFxiIiwiQ29sb3IiOiJncmVlbiIsIkVuYWJsZUZvclJlc3BvbnNlIjp0cnVlLCJFbmFibGVGb3JCb2R5Ijp0cnVlLCJJbmRleCI6MTEsIkV4dHJhVGFnIjpbIuaJi+acuuWPt+azhOa8jyJdLCJWZXJib3NlTmFtZSI6IuaJi+acuuWPt+azhOa8jyIsIk5vUmVwbGFjZSI6dHJ1ZX0seyJSdWxlIjoiKChcXFtjbGllbnRcXF0pfFxcWyhteXNxbFxcXSl8KFxcW215c3FsZFxcXSkpIiwiQ29sb3IiOiJncmVlbiIsIkVuYWJsZUZvclJlcXVlc3QiOnRydWUsIkVuYWJsZUZvclJlc3BvbnNlIjp0cnVlLCJFbmFibGVGb3JIZWFkZXIiOnRydWUsIkVuYWJsZUZvckJvZHkiOnRydWUsIkluZGV4IjoxMiwiRXh0cmFUYWciOlsiTXlTUUzphY3nva4iXSwiVmVyYm9zZU5hbWUiOiJNeVNRTOmFjee9riIsIk5vUmVwbGFjZSI6dHJ1ZX0seyJSdWxlIjoiXFxiWzEtOV1cXGR7NX0oPzoxOHwxOXwyMClcXGR7Mn0oPzowWzEtOV18MTB8MTF8MTIpKD86MFsxLTldfFsxLTJdXFxkfDMwfDMxKVxcZHszfVtcXGRYeF1cXGIiLCJDb2xvciI6ImdyZWVuIiwiRW5hYmxlRm9yUmVzcG9uc2UiOnRydWUsIkVuYWJsZUZvckJvZHkiOnRydWUsIkluZGV4IjoxMywiRXh0cmFUYWciOlsi6Lqr5Lu96K+BIl0sIlZlcmJvc2VOYW1lIjoi6Lqr5Lu96K+BIiwiTm9SZXBsYWNlIjp0cnVlfSx7IlJ1bGUiOiJbLV0rQkVHSU4gW15cXHNdKyBQUklWQVRFIEtFWVstXSIsIkNvbG9yIjoicmVkIiwiRW5hYmxlRm9yUmVxdWVzdCI6dHJ1ZSwiRW5hYmxlRm9yUmVzcG9uc2UiOnRydWUsIkVuYWJsZUZvckJvZHkiOnRydWUsIkluZGV4IjoxNCwiRXh0cmFUYWciOlsiUlNB56eB6ZKlIl0sIlZlcmJvc2VOYW1lIjoiUlNB56eB6ZKlIiwiTm9SZXBsYWNlIjp0cnVlfSx7IlJ1bGUiOiIoW0F8YV1jY2Vzc1tLfGtdZXlbU3xzXWVjcmV0KXwoW0F8YV1jY2Vzc1tLfGtdZXlbSXxpXVtkfERdKXwoW0FhXShjY2Vzc3xDQ0VTUylfP1tLa10oZXl8RVkpKXwoW0FhXShjY2Vzc3xDQ0VTUylfP1tzU10oZWNyZXR8RUNSRVQpKXwoKFtBYV0oY2Nlc3N8Q0NFU1MpXz8oaWR8SUR8SWQpKSl8KFtTc10oZWNyZXR8RUNSRVQpXz9bS2tdKGV5fEVZKSkiLCJDb2xvciI6InllbGxvdyIsIkVuYWJsZUZvclJlc3BvbnNlIjp0cnVlLCJFbmFibGVGb3JCb2R5Ijp0cnVlLCJJbmRleCI6MTUsIkV4dHJhVGFnIjpbIk9TUyBLZXkiXSwiVmVyYm9zZU5hbWUiOiJPU1MgS2V5IiwiTm9SZXBsYWNlIjp0cnVlfSx7IlJ1bGUiOiJbXFx3LS5dK1xcLm9zc1xcLmFsaXl1bmNzXFwuY29tIiwiQ29sb3IiOiJyZWQiLCJFbmFibGVGb3JSZXNwb25zZSI6dHJ1ZSwiRW5hYmxlRm9ySGVhZGVyIjp0cnVlLCJFbmFibGVGb3JCb2R5Ijp0cnVlLCJJbmRleCI6MTYsIkV4dHJhVGFnIjpbIkFsaXl1bk9TUyJdLCJWZXJib3NlTmFtZSI6IkFsaXl1bk9TUyIsIk5vUmVwbGFjZSI6dHJ1ZX0seyJSdWxlIjoiXFxiKCgxMjdcXC4wXFwuMFxcLjEpfChsb2NhbGhvc3QpfCgxMFxcLlxcZHsxLDN9XFwuXFxkezEsM31cXC5cXGR7MSwzfSl8KDE3MlxcLigoMVs2LTldKXwoMlxcZCl8KDNbMDFdKSlcXC5cXGR7MSwzfVxcLlxcZHsxLDN9KXwoMTkyXFwuMTY4XFwuXFxkezEsM31cXC5cXGR7MSwzfSkpXFxiIiwiQ29sb3IiOiJyZWQiLCJFbmFibGVGb3JSZXF1ZXN0Ijp0cnVlLCJFbmFibGVGb3JSZXNwb25zZSI6dHJ1ZSwiRW5hYmxlRm9ySGVhZGVyIjp0cnVlLCJFbmFibGVGb3JCb2R5Ijp0cnVlLCJJbmRleCI6MTcsIkV4dHJhVGFnIjpbIklQ5Zyw5Z2AIl0sIlZlcmJvc2VOYW1lIjoiSVDlnLDlnYAiLCJOb1JlcGxhY2UiOnRydWV9LHsiUnVsZSI6Iig9ZGVsZXRlTWV8cmVtZW1iZXJNZT0pIiwiQ29sb3IiOiJncmVlbiIsIkVuYWJsZUZvclJlcXVlc3QiOnRydWUsIkVuYWJsZUZvclJlc3BvbnNlIjp0cnVlLCJFbmFibGVGb3JIZWFkZXIiOnRydWUsIkluZGV4IjoxOCwiRXh0cmFUYWciOlsiU2hpcm8iXSwiVmVyYm9zZU5hbWUiOiJTaGlybyIsIk5vUmVwbGFjZSI6dHJ1ZX0seyJSdWxlIjoiKD9pcyleey4qfSQiLCJDb2xvciI6ImdyZWVuIiwiRW5hYmxlRm9yUmVxdWVzdCI6dHJ1ZSwiRW5hYmxlRm9yUmVzcG9uc2UiOnRydWUsIkVuYWJsZUZvckJvZHkiOnRydWUsIkluZGV4IjoxOSwiRXh0cmFUYWciOlsiSlNPTuS8oOi+kyJdLCJWZXJib3NlTmFtZSI6IkpTT07kvKDovpMiLCJOb1JlcGxhY2UiOnRydWV9LHsiUnVsZSI6Iig/aXMpXjxcXD94bWwuKjxzb2FwOkJvZHk+IiwiQ29sb3IiOiJncmVlbiIsIkVuYWJsZUZvclJlcXVlc3QiOnRydWUsIkVuYWJsZUZvckJvZHkiOnRydWUsIkluZGV4IjoyMCwiRXh0cmFUYWciOlsiU09BUOivt+axgiJdLCJWZXJib3NlTmFtZSI6IlNPQVDor7fmsYIiLCJOb1JlcGxhY2UiOnRydWV9LHsiUnVsZSI6Iig/aXMpXjxcXD94bWwuKj4kIiwiQ29sb3IiOiJncmVlbiIsIkVuYWJsZUZvclJlcXVlc3QiOnRydWUsIkVuYWJsZUZvckJvZHkiOnRydWUsIkluZGV4IjoyMSwiRXh0cmFUYWciOlsiWE1M6K+35rGCIl0sIlZlcmJvc2VOYW1lIjoiWE1M6K+35rGCIiwiTm9SZXBsYWNlIjp0cnVlfSx7IlJ1bGUiOiIoP2kpKEF1dGhvcml6YXRpb246IC4qKXwod3d3LUF1dGhlbnRpY2F0ZTogKChCYXNpYyl8KEJlYXJlcil8KERpZ2VzdCl8KEhPQkEpfChNdXR1YWwpfChOZWdvdGlhdGUpfChPQXV0aCl8KFNDUkFNLVNIQS0xKXwoU0NSQU0tU0hBLTI1Nil8KHZhcGlkKSkpIiwiQ29sb3IiOiJncmVlbiIsIkVuYWJsZUZvclJlcXVlc3QiOnRydWUsIkVuYWJsZUZvclJlc3BvbnNlIjp0cnVlLCJFbmFibGVGb3JIZWFkZXIiOnRydWUsIkluZGV4IjoyMiwiRXh0cmFUYWciOlsiSFRUUOiupOivgeWktCJdLCJWZXJib3NlTmFtZSI6IkhUVFDorqTor4HlpLQiLCJOb1JlcGxhY2UiOnRydWV9LHsiUnVsZSI6IihHRVQuKlxcdys9XFx3Kyl8KD9pcykoUE9TVC4qXFxuXFxuLipcXHcrPVxcdyspIiwiQ29sb3IiOiJncmVlbiIsIkVuYWJsZUZvclJlcXVlc3QiOnRydWUsIkVuYWJsZUZvclJlc3BvbnNlIjp0cnVlLCJFbmFibGVGb3JIZWFkZXIiOnRydWUsIkVuYWJsZUZvckJvZHkiOnRydWUsIkluZGV4IjoyMywiRXh0cmFUYWciOlsiU1FM5rOo5YWl5rWL6K+V54K5Il0sIlZlcmJvc2VOYW1lIjoiU1FM5rOo5YWl5rWL6K+V54K5IiwiTm9SZXBsYWNlIjp0cnVlfSx7IlJ1bGUiOiIoR0VULipcXHcrPVxcdyspfCg/aXMpKFBPU1QuKlxcblxcbi4qXFx3Kz1cXHcrKSIsIkNvbG9yIjoiZ3JlZW4iLCJFbmFibGVGb3JSZXF1ZXN0Ijp0cnVlLCJFbmFibGVGb3JSZXNwb25zZSI6dHJ1ZSwiRW5hYmxlRm9ySGVhZGVyIjp0cnVlLCJFbmFibGVGb3JCb2R5Ijp0cnVlLCJJbmRleCI6MjQsIkV4dHJhVGFnIjpbIlhQYXRo5rOo5YWl5rWL6K+V54K5Il0sIlZlcmJvc2VOYW1lIjoiWFBhdGjms6jlhaXmtYvor5XngrkiLCJOb1JlcGxhY2UiOnRydWV9LHsiUnVsZSI6IigoUE9TVC4qP3dzZGwpfChHRVQuKj93c2RsKXwoeG1sPSl8KDxcXD94bWwgKXwoJmx0O1xcP3htbCkpfCgoUE9TVC4qP2FzbXgpfChHRVQuKj9hc214KSkiLCJDb2xvciI6ImdyZWVuIiwiRW5hYmxlRm9yUmVxdWVzdCI6dHJ1ZSwiRW5hYmxlRm9yUmVzcG9uc2UiOnRydWUsIkVuYWJsZUZvckhlYWRlciI6dHJ1ZSwiRW5hYmxlRm9yQm9keSI6dHJ1ZSwiSW5kZXgiOjI1LCJFeHRyYVRhZyI6WyJYWEXmtYvor5XngrkiXSwiVmVyYm9zZU5hbWUiOiJYWEXmtYvor5XngrkiLCJOb1JlcGxhY2UiOnRydWV9LHsiUnVsZSI6IihmaWxlPXxwYXRoPXx1cmw9fGxhbmc9fHNyYz18bWVudT18bWV0YS1pbmY9fHdlYi1pbmY9fGZpbGVuYW1lPXx0b3BpYz18cGFnZT3vvZxfRmlsZVBhdGg9fHRhcmdldD3vvZxmaWxlcGF0aD0pIiwiQ29sb3IiOiJncmVlbiIsIkVuYWJsZUZvclJlcXVlc3QiOnRydWUsIkVuYWJsZUZvclJlc3BvbnNlIjp0cnVlLCJFbmFibGVGb3JIZWFkZXIiOnRydWUsIkVuYWJsZUZvckJvZHkiOnRydWUsIkluZGV4IjoyNiwiRXh0cmFUYWciOlsi5paH5Lu25LiL6L295Y+C5pWwIl0sIlZlcmJvc2VOYW1lIjoi5paH5Lu25LiL6L295Y+C5pWwIiwiTm9SZXBsYWNlIjp0cnVlfSx7IlJ1bGUiOiIoKHVlZGl0b3JcXC4oY29uZmlnfGFsbClcXC5qcykpIiwiQ29sb3IiOiJncmVlbiIsIkVuYWJsZUZvclJlcXVlc3QiOnRydWUsIkVuYWJsZUZvclJlc3BvbnNlIjp0cnVlLCJFbmFibGVGb3JIZWFkZXIiOnRydWUsIkVuYWJsZUZvckJvZHkiOnRydWUsIkluZGV4IjoyNywiRXh0cmFUYWciOlsiVUVkaXRvcua1i+ivleeCuSJdLCJWZXJib3NlTmFtZSI6IlVFZGl0b3LmtYvor5XngrkiLCJOb1JlcGxhY2UiOnRydWV9LHsiUnVsZSI6IihraW5kZWRpdG9yXFwtKGFsbFxcLW1pbnxhbGwpXFwuanMpIiwiQ29sb3IiOiJncmVlbiIsIkVuYWJsZUZvclJlcXVlc3QiOnRydWUsIkVuYWJsZUZvclJlc3BvbnNlIjp0cnVlLCJFbmFibGVGb3JIZWFkZXIiOnRydWUsIkVuYWJsZUZvckJvZHkiOnRydWUsIkluZGV4IjoyOCwiRXh0cmFUYWciOlsiS2luZEVkaXRvcua1i+ivleeCuSJdLCJWZXJib3NlTmFtZSI6IktpbmRFZGl0b3LmtYvor5XngrkiLCJOb1JlcGxhY2UiOnRydWV9LHsiUnVsZSI6IigoY2FsbGJhY2s9KXwodXJsPSl8KHJlcXVlc3Q9KXwocmVkaXJlY3RfdG89KXwoanVtcD0pfCh0bz0pfChsaW5rPSl8KGRvbWFpbj0pKSIsIkNvbG9yIjoiZ3JlZW4iLCJFbmFibGVGb3JSZXF1ZXN0Ijp0cnVlLCJFbmFibGVGb3JSZXNwb25zZSI6dHJ1ZSwiRW5hYmxlRm9ySGVhZGVyIjp0cnVlLCJFbmFibGVGb3JCb2R5Ijp0cnVlLCJJbmRleCI6MjksIkV4dHJhVGFnIjpbIlVybOmHjeWumuWQkeWPguaVsCJdLCJWZXJib3NlTmFtZSI6IlVybOmHjeWumuWQkeWPguaVsCIsIk5vUmVwbGFjZSI6dHJ1ZX0seyJSdWxlIjoiKHdhcD18dXJsPXxsaW5rPXxzcmM9fHNvdXJjZT18ZGlzcGxheT18c291cmNlVVJsPXxpbWFnZVVSTD18ZG9tYWluPSkiLCJDb2xvciI6ImdyZWVuIiwiRW5hYmxlRm9yUmVxdWVzdCI6dHJ1ZSwiRW5hYmxlRm9yUmVzcG9uc2UiOnRydWUsIkVuYWJsZUZvckhlYWRlciI6dHJ1ZSwiRW5hYmxlRm9yQm9keSI6dHJ1ZSwiSW5kZXgiOjMwLCJFeHRyYVRhZyI6WyJTU1JG5rWL6K+V5Y+C5pWwIl0sIlZlcmJvc2VOYW1lIjoiU1NSRua1i+ivleWPguaVsCIsIk5vUmVwbGFjZSI6dHJ1ZX0seyJSdWxlIjoiKChHRVR8UE9TVHxodHRwW3NdPykuKlxcLihkb3xhY3Rpb24pKVteYS16QS1aXSIsIkNvbG9yIjoicmVkIiwiRW5hYmxlRm9yUmVxdWVzdCI6dHJ1ZSwiRW5hYmxlRm9yUmVzcG9uc2UiOnRydWUsIkVuYWJsZUZvckhlYWRlciI6dHJ1ZSwiRW5hYmxlRm9yQm9keSI6dHJ1ZSwiSW5kZXgiOjMxLCJFeHRyYVRhZyI6WyJTdHJ1dHMy5rWL6K+V54K5Il0sIlZlcmJvc2VOYW1lIjoiU3RydXRzMua1i+ivleeCuSIsIk5vUmVwbGFjZSI6dHJ1ZX0seyJSdWxlIjoiKChHRVR8UE9TVHxodHRwW3NdPykuKj9cXD8uKj8odG9rZW49fHNlc3Npb25cXHcrPSkpIiwiQ29sb3IiOiJncmVlbiIsIkVuYWJsZUZvclJlcXVlc3QiOnRydWUsIkVuYWJsZUZvclJlc3BvbnNlIjp0cnVlLCJFbmFibGVGb3JIZWFkZXIiOnRydWUsIkVuYWJsZUZvckJvZHkiOnRydWUsIkluZGV4IjozMiwiRXh0cmFUYWciOlsiU2Vzc2lvbi9Ub2tlbua1i+ivleeCuSJdLCJWZXJib3NlTmFtZSI6IlNlc3Npb24vVG9rZW7mtYvor5XngrkiLCJOb1JlcGxhY2UiOnRydWV9LHsiUnVsZSI6IigoQUtJQXxBR1BBfEFJREF8QVJPQXxBSVBBfEFOUEF8QU5WQXxBU0lBKVthLXpBLVowLTldezE2fSkiLCJDb2xvciI6ImdyZWVuIiwiRW5hYmxlRm9yUmVxdWVzdCI6dHJ1ZSwiRW5hYmxlRm9yUmVzcG9uc2UiOnRydWUsIkVuYWJsZUZvckhlYWRlciI6dHJ1ZSwiRW5hYmxlRm9yQm9keSI6dHJ1ZSwiSW5kZXgiOjMzLCJFeHRyYVRhZyI6WyJBbWF6b24gQUsiXSwiVmVyYm9zZU5hbWUiOiJBbWF6b24gQUsiLCJOb1JlcGxhY2UiOnRydWV9LHsiUnVsZSI6IihEaXJlY3RvcnkgbGlzdGluZyBmb3J8UGFyZW50IERpcmVjdG9yeXxJbmRleCBvZnxmb2xkZXIgbGlzdGluZzopIiwiQ29sb3IiOiJncmVlbiIsIkVuYWJsZUZvclJlcXVlc3QiOnRydWUsIkVuYWJsZUZvclJlc3BvbnNlIjp0cnVlLCJFbmFibGVGb3JIZWFkZXIiOnRydWUsIkVuYWJsZUZvckJvZHkiOnRydWUsIkluZGV4IjozNCwiRXh0cmFUYWciOlsi55uu5b2V5p6a5Li+54K5Il0sIlZlcmJvc2VOYW1lIjoi55uu5b2V5p6a5Li+54K5IiwiTm9SZXBsYWNlIjp0cnVlfSx7IlJ1bGUiOiIoPC4qP1VuYXV0aG9yaXplZCkiLCJDb2xvciI6ImdyZWVuIiwiRW5hYmxlRm9yUmVxdWVzdCI6dHJ1ZSwiRW5hYmxlRm9yUmVzcG9uc2UiOnRydWUsIkVuYWJsZUZvckhlYWRlciI6dHJ1ZSwiRW5hYmxlRm9yQm9keSI6dHJ1ZSwiSW5kZXgiOjM1LCJFeHRyYVRhZyI6WyLpnZ7mjojmnYPpobXpnaLngrkiXSwiVmVyYm9zZU5hbWUiOiLpnZ7mjojmnYPpobXpnaLngrkiLCJOb1JlcGxhY2UiOnRydWV9LHsiUnVsZSI6IigoXCJ8Jyk/W3VdKHNlcnxuYW1lfGFtZXxzZXJuYW1lKShcInwnfFxccyk/KDp8PSkuKj8sKSIsIkNvbG9yIjoiZ3JlZW4iLCJFbmFibGVGb3JSZXF1ZXN0Ijp0cnVlLCJFbmFibGVGb3JSZXNwb25zZSI6dHJ1ZSwiRW5hYmxlRm9ySGVhZGVyIjp0cnVlLCJFbmFibGVGb3JCb2R5Ijp0cnVlLCJJbmRleCI6MzYsIkV4dHJhVGFnIjpbIueUqOaIt+WQjeazhOa8j+eCuSJdLCJWZXJib3NlTmFtZSI6IueUqOaIt+WQjeazhOa8j+eCuSIsIk5vUmVwbGFjZSI6dHJ1ZX0seyJSdWxlIjoiKChcInwnKT9bcF0oYXNzfHdkfGFzc3dkfGFzc3dvcmQpKFwifCd8XFxzKT8oOnw9KS4qPywpIiwiQ29sb3IiOiJncmVlbiIsIkVuYWJsZUZvclJlcXVlc3QiOnRydWUsIkVuYWJsZUZvclJlc3BvbnNlIjp0cnVlLCJFbmFibGVGb3JIZWFkZXIiOnRydWUsIkVuYWJsZUZvckJvZHkiOnRydWUsIkluZGV4IjozNywiRXh0cmFUYWciOlsi5a+G56CB5rOE5ryP54K5Il0sIlZlcmJvc2VOYW1lIjoi5a+G56CB5rOE5ryP54K5IiwiTm9SZXBsYWNlIjp0cnVlfSx7IlJ1bGUiOiIoKCgoW2EtekEtWjAtOS5fLV0rXFwuczN8czMpKFxcLnxcXC0pK1thLXpBLVowLTkuXy1dK3xbYS16QS1aMC05Ll8tXStcXC5zM3xzMylcXC5hbWF6b25hd3NcXC5jb20pfChzMzpcXC9cXC9bYS16QS1aMC05LVxcLlxcX10rKXwoczMuY29uc29sZS5hd3MuYW1hem9uLmNvbVxcL3MzXFwvYnVja2V0c1xcL1thLXpBLVowLTktXFwuXFxfXSspfChhbXpuXFwubXdzXFwuWzAtOWEtZl17OH0tWzAtOWEtZl17NH0tWzAtOWEtZl17NH0tWzAtOWEtZl17NH0tWzAtOWEtZl17MTJ9KXwoZWMyLVswLTktXSsuY2QtW2EtejAtOS1dKy5jb21wdXRlLmFtYXpvbmF3cy5jb20pfCh1c1tfLV0/ZWFzdFtfLV0/MVtfLV0/ZWxiW18tXT9hbWF6b25hd3NbXy1dP2NvbSkpIiwiQ29sb3IiOiJyZWQiLCJFbmFibGVGb3JSZXF1ZXN0Ijp0cnVlLCJFbmFibGVGb3JSZXNwb25zZSI6dHJ1ZSwiRW5hYmxlRm9ySGVhZGVyIjp0cnVlLCJFbmFibGVGb3JCb2R5Ijp0cnVlLCJJbmRleCI6MzgsIkV4dHJhVGFnIjpbIkFtYXpvbiBBV1MgVVJMIl0sIlZlcmJvc2VOYW1lIjoiQW1hem9uIEFXUyBVUkwiLCJOb1JlcGxhY2UiOnRydWV9LHsiUnVsZSI6Iig/aXMpKDxmb3JtLip0eXBlPS4qP3RleHQuKj88L2Zvcm0uKj8+KSIsIkNvbG9yIjoiZ3JlZW4iLCJFbmFibGVGb3JSZXNwb25zZSI6dHJ1ZSwiRW5hYmxlRm9yQm9keSI6dHJ1ZSwiSW5kZXgiOjM5LCJFeHRyYVRhZyI6WyJIVFRQIFhTU+a1i+ivleeCuSJdLCJWZXJib3NlTmFtZSI6IkhUVFAgWFNT5rWL6K+V54K5IiwiTm9SZXBsYWNlIjp0cnVlfSx7IlJ1bGUiOiIoP2kpKDx0aXRsZT4uKj8o5ZCO5Y+wfGFkbWluKS4qPzwvdGl0bGU+KSIsIkNvbG9yIjoiZ3JlZW4iLCJFbmFibGVGb3JSZXF1ZXN0Ijp0cnVlLCJFbmFibGVGb3JSZXNwb25zZSI6dHJ1ZSwiRW5hYmxlRm9ySGVhZGVyIjp0cnVlLCJFbmFibGVGb3JCb2R5Ijp0cnVlLCJJbmRleCI6NDAsIkV4dHJhVGFnIjpbIuWQjuWPsOeZu+mZhiJdLCJWZXJib3NlTmFtZSI6IuWQjuWPsOeZu+mZhiIsIk5vUmVwbGFjZSI6dHJ1ZX0seyJSdWxlIjoiKChnaHB8Z2h1KVxcX1thLXpBLVowLTldezM2fSkiLCJDb2xvciI6InJlZCIsIkVuYWJsZUZvclJlcXVlc3QiOnRydWUsIkVuYWJsZUZvclJlc3BvbnNlIjp0cnVlLCJFbmFibGVGb3JIZWFkZXIiOnRydWUsIkVuYWJsZUZvckJvZHkiOnRydWUsIkluZGV4Ijo0MSwiRXh0cmFUYWciOlsiR2l0aHViQWNjZXNzVG9rZW4iXSwiVmVyYm9zZU5hbWUiOiJHaXRodWJBY2Nlc3NUb2tlbiIsIk5vUmVwbGFjZSI6dHJ1ZX0seyJSdWxlIjoiKChhY2Nlc3M9KXwoYWRtPSl8KGFkbWluPSl8KGFsdGVyPSl8KGNmZz0pfChjbG9uZT0pfChjb25maWc9KXwoY3JlYXRlPSl8KGRiZz0pfChkZWJ1Zz0pfChkZWxldGU9KXwoZGlzYWJsZT0pfChlZGl0PSl8KGVuYWJsZT0pfChleGVjPSl8KGV4ZWN1dGU9KXwoZ3JhbnQ9KXwobG9hZD0pfChtYWtlPSl8KG1vZGlmeT0pfChyZW5hbWU9KXwocmVzZXQ9KXwocm9vdD0pfChzaGVsbD0pfCh0ZXN0PSl8KHRvZ2dsPSkpIiwiQ29sb3IiOiJncmVlbiIsIkVuYWJsZUZvclJlcXVlc3QiOnRydWUsIkVuYWJsZUZvclJlc3BvbnNlIjp0cnVlLCJFbmFibGVGb3JIZWFkZXIiOnRydWUsIkVuYWJsZUZvckJvZHkiOnRydWUsIkluZGV4Ijo0MiwiRXh0cmFUYWciOlsi6LCD6K+V5Y+C5pWwIl0sIlZlcmJvc2VOYW1lIjoi6LCD6K+V5Y+C5pWwIiwiTm9SZXBsYWNlIjp0cnVlfSx7IlJ1bGUiOiIoamRiYzpbYS16Ol0rOi8vW0EtWmEtejAtOVxcLlxcLV86Oz0vQD8sJl0rKSIsIkNvbG9yIjoiZ3JlZW4iLCJFbmFibGVGb3JSZXF1ZXN0Ijp0cnVlLCJFbmFibGVGb3JSZXNwb25zZSI6dHJ1ZSwiRW5hYmxlRm9ySGVhZGVyIjp0cnVlLCJFbmFibGVGb3JCb2R5Ijp0cnVlLCJJbmRleCI6NDMsIkV4dHJhVGFnIjpbIkpEQkPov57mjqXlj4LmlbAiXSwiVmVyYm9zZU5hbWUiOiJKREJD6L+e5o6l5Y+C5pWwIiwiTm9SZXBsYWNlIjp0cnVlfSx7IlJ1bGUiOiIoZXlbQS1aYS16MC05Xy1dezEwLH1cXC5bQS1aYS16MC05Ll8tXXsxMCx9fGV5W0EtWmEtejAtOV9cXC8rLV17MTAsfVxcLltBLVphLXowLTkuX1xcLystXXsxMCx9KSIsIkNvbG9yIjoiZ3JlZW4iLCJFbmFibGVGb3JSZXF1ZXN0Ijp0cnVlLCJFbmFibGVGb3JSZXNwb25zZSI6dHJ1ZSwiRW5hYmxlRm9ySGVhZGVyIjp0cnVlLCJFbmFibGVGb3JCb2R5Ijp0cnVlLCJJbmRleCI6NDQsIkV4dHJhVGFnIjpbIkpXVCDmtYvor5XngrkiXSwiVmVyYm9zZU5hbWUiOiJKV1Qg5rWL6K+V54K5IiwiTm9SZXBsYWNlIjp0cnVlfSx7IlJ1bGUiOiIoP2kpKGpzb25wX1thLXowLTldKyl8KChfP2NhbGxiYWNrfF9jYnxfY2FsbHxfP2pzb25wXz8pPSkiLCJDb2xvciI6ImdyZWVuIiwiRW5hYmxlRm9yUmVxdWVzdCI6dHJ1ZSwiRW5hYmxlRm9yUmVzcG9uc2UiOnRydWUsIkVuYWJsZUZvckhlYWRlciI6dHJ1ZSwiRW5hYmxlRm9yQm9keSI6dHJ1ZSwiSW5kZXgiOjQ1LCJFeHRyYVRhZyI6WyJKU09OUCDmtYvor5XngrkiXSwiVmVyYm9zZU5hbWUiOiJqc29ucF9wcmVfdGVzdCIsIk5vUmVwbGFjZSI6dHJ1ZX0seyJSdWxlIjoiKFtjfENdb3JbcHxQXWlkfFtjfENdb3JwW3N8U11lY3JldCkiLCJDb2xvciI6InJlZCIsIkVuYWJsZUZvclJlcXVlc3QiOnRydWUsIkVuYWJsZUZvclJlc3BvbnNlIjp0cnVlLCJFbmFibGVGb3JIZWFkZXIiOnRydWUsIkVuYWJsZUZvckJvZHkiOnRydWUsIkluZGV4Ijo0NiwiRXh0cmFUYWciOlsiV2Vjb20gS2V5KFNlY3JldCkiXSwiVmVyYm9zZU5hbWUiOiJXZWNvbSBLZXkoU2VjcmV0KSIsIk5vUmVwbGFjZSI6dHJ1ZX0seyJSdWxlIjoiKGh0dHBzOi8vb3V0bG9va1xcLm9mZmljZVxcLmNvbS93ZWJob29rL1thLXowLTlALV0rL0luY29taW5nV2ViaG9vay9bYS16MC05LV0rL1thLXowLTktXSspIiwiQ29sb3IiOiJyZWQiLCJFbmFibGVGb3JSZXF1ZXN0Ijp0cnVlLCJFbmFibGVGb3JSZXNwb25zZSI6dHJ1ZSwiRW5hYmxlRm9ySGVhZGVyIjp0cnVlLCJFbmFibGVGb3JCb2R5Ijp0cnVlLCJJbmRleCI6NDcsIkV4dHJhVGFnIjpbIk1pY3Jvc29mdFRlYW1zIFdlYmhvb2siXSwiVmVyYm9zZU5hbWUiOiJNaWNyb3NvZnRUZWFtcyBXZWJob29rIiwiTm9SZXBsYWNlIjp0cnVlfSx7IlJ1bGUiOiJodHRwczovL2NyZWF0b3JcXC56b2hvXFwuY29tL2FwaS9bQS1aYS16MC05L1xcLV9cXC5dK1xcP2F1dGh0b2tlbj1bQS1aYS16MC05XSsiLCJDb2xvciI6InJlZCIsIkVuYWJsZUZvclJlcXVlc3QiOnRydWUsIkVuYWJsZUZvclJlc3BvbnNlIjp0cnVlLCJFbmFibGVGb3JIZWFkZXIiOnRydWUsIkVuYWJsZUZvckJvZHkiOnRydWUsIkluZGV4Ijo0OCwiRXh0cmFUYWciOlsiWm9obyBXZWJob29rIl0sIlZlcmJvc2VOYW1lIjoiWm9obyBXZWJob29rIiwiTm9SZXBsYWNlIjp0cnVlfSx7IlJ1bGUiOiIoW2EtekEtWl06XFxcXChcXHcrXFxcXCkrfFthLXpBLVpdOlxcXFxcXFxcKFxcdytcXFxcXFxcXCkrKXwoLyhiaW58ZGV2fGhvbWV8bWVkaWF8b3B0fHJvb3R8c2JpbnxzeXN8dXNyfGJvb3R8ZGF0YXxldGN8bGlifG1udHxwcm9jfHJ1bnxzcnZ8dG1wfHZhcikvW148PigpW1xcXSw7Olxcc1wiXSsvKSIsIkNvbG9yIjoicmVkIiwiRW5hYmxlRm9yUmVxdWVzdCI6dHJ1ZSwiRW5hYmxlRm9yUmVzcG9uc2UiOnRydWUsIkVuYWJsZUZvckJvZHkiOnRydWUsIkluZGV4Ijo0OSwiRXh0cmFUYWciOlsi5pON5L2c57O757uf6Lev5b6EIl0sIlZlcmJvc2VOYW1lIjoi5pON5L2c57O757uf6Lev5b6EIiwiTm9SZXBsYWNlIjp0cnVlfSx7IlJ1bGUiOiIoamF2YXhcXC5mYWNlc1xcLlZpZXdTdGF0ZSkiLCJDb2xvciI6ImJsdWUiLCJFbmFibGVGb3JSZXF1ZXN0Ijp0cnVlLCJFbmFibGVGb3JSZXNwb25zZSI6dHJ1ZSwiRW5hYmxlRm9ySGVhZGVyIjp0cnVlLCJFbmFibGVGb3JCb2R5Ijp0cnVlLCJJbmRleCI6NTAsIkV4dHJhVGFnIjpbIkphdmHlj43luo/liJfljJbmtYvor5XngrkiXSwiVmVyYm9zZU5hbWUiOiJKYXZh5Y+N5bqP5YiX5YyW5rWL6K+V54K5IiwiTm9SZXBsYWNlIjp0cnVlfSx7IlJ1bGUiOiIoc29uYXIuezAsNTB9KD86XCJ8XFwnfGApP1swLTlhLWZdezQwfSg/OlwifFxcJ3xgKT8pIiwiQ29sb3IiOiJyZWQiLCJFbmFibGVGb3JSZXF1ZXN0Ijp0cnVlLCJFbmFibGVGb3JSZXNwb25zZSI6dHJ1ZSwiRW5hYmxlRm9ySGVhZGVyIjp0cnVlLCJFbmFibGVGb3JCb2R5Ijp0cnVlLCJJbmRleCI6NTEsIkV4dHJhVGFnIjpbIlNvbmFycXViZSBUb2tlbiJdLCJWZXJib3NlTmFtZSI6IlNvbmFycXViZSBUb2tlbiIsIk5vUmVwbGFjZSI6dHJ1ZX0seyJSdWxlIjoiKCh1cygtZ292KT98YXB8Y2F8Y258ZXV8c2EpLShjZW50cmFsfChub3J0aHxzb3V0aCk/KGVhc3R8d2VzdCk/KS1cXGQpIiwiQ29sb3IiOiJyZWQiLCJFbmFibGVGb3JSZXF1ZXN0Ijp0cnVlLCJFbmFibGVGb3JSZXNwb25zZSI6dHJ1ZSwiRW5hYmxlRm9ySGVhZGVyIjp0cnVlLCJFbmFibGVGb3JCb2R5Ijp0cnVlLCJJbmRleCI6NTIsIkV4dHJhVGFnIjpbIkFtYXpvbiBBV1MgUmVnaW9u5rOE5ryPIl0sIlZlcmJvc2VOYW1lIjoiQW1hem9uIEFXUyBSZWdpb27ms4TmvI8iLCJOb1JlcGxhY2UiOnRydWV9LHsiUnVsZSI6Iig9KGh0dHBzPzovLy4qfGh0dHBzPyUzKGF8QSklMihmfEYpJTIoZnxGKS4qKSkiLCJDb2xvciI6ImJsdWUiLCJFbmFibGVGb3JSZXF1ZXN0Ijp0cnVlLCJFbmFibGVGb3JSZXNwb25zZSI6dHJ1ZSwiRW5hYmxlRm9ySGVhZGVyIjp0cnVlLCJFbmFibGVGb3JCb2R5Ijp0cnVlLCJJbmRleCI6NTMsIkV4dHJhVGFnIjpbIlVSTOS9nOS4uuWPguaVsCJdLCJWZXJib3NlTmFtZSI6IlVSTOS9nOS4uuWPguaVsCIsIk5vUmVwbGFjZSI6dHJ1ZX0seyJSdWxlIjoiKHlhMjlcXC5bMC05QS1aYS16Xy1dKykiLCJDb2xvciI6InJlZCIsIkVuYWJsZUZvclJlcXVlc3QiOnRydWUsIkVuYWJsZUZvclJlc3BvbnNlIjp0cnVlLCJFbmFibGVGb3JIZWFkZXIiOnRydWUsIkVuYWJsZUZvckJvZHkiOnRydWUsIkluZGV4Ijo1NCwiRXh0cmFUYWciOlsiT2F1dGggQWNjZXNzIEtleSJdLCJWZXJib3NlTmFtZSI6Ik9hdXRoIEFjY2VzcyBLZXkiLCJOb1JlcGxhY2UiOnRydWV9LHsiUnVsZSI6IihFcnJvciByZXBvcnR8aW4geW91ciBTUUwgc3ludGF4fG15c3FsX2ZldGNoX2FycmF5fG15c3FsX2Nvbm5lY3QoKXxvcmcuYXBhY2hlLmNhdGFsaW5hKSIsIkNvbG9yIjoicmVkIiwiRW5hYmxlRm9yUmVxdWVzdCI6dHJ1ZSwiRW5hYmxlRm9yUmVzcG9uc2UiOnRydWUsIkVuYWJsZUZvckhlYWRlciI6dHJ1ZSwiRW5hYmxlRm9yQm9keSI6dHJ1ZSwiSW5kZXgiOjU1LCJFeHRyYVRhZyI6WyLnvZHnq5nlh7rplJkiXSwiVmVyYm9zZU5hbWUiOiLnvZHnq5nlh7rplJkiLCJOb1JlcGxhY2UiOnRydWV9XQ==`
 	ruleBytes, _ := codec.DecodeBase64(rule)
@@ -187,7 +169,7 @@ if rsp.Contains(getParam("token")) {
 				params["packet"] = "GET /gziptestted HTTP/1.1\r\nHost: " + utils.HostPort(mockHost, mockPort)
 				params["packet"] = lowhttp.ReplaceHTTPPacketBody(utils.InterfaceToBytes(params["packet"]), tokenRaw, false)
 				params["packet"] = lowhttp.ReplaceHTTPPacketHeader(utils.InterfaceToBytes(params["packet"]), "Content-Encoding", "gzip")
-				time.Sleep(time.Second)
+
 				_, err = yak.NewScriptEngine(10).ExecuteEx(`
 log.info("Start to send packet echo")
 packet := getParam("packet")
@@ -212,7 +194,6 @@ if rsp.Contains(getParam("token")) {
 				originPacket := params["packet"].([]byte)
 				_ = originPacket
 
-				time.Sleep(time.Second)
 				_, err = yak.NewScriptEngine(10).ExecuteEx(`
 log.info("Start to send packet echo")
 packet := getParam("packet")
@@ -230,8 +211,6 @@ if rsp.Contains(getParam("token")) {
 				}
 				chunkDecode = true
 
-				// 为H2测试添加额外的稳定性保证
-				time.Sleep(3 * time.Second)
 				log.Infof("Starting H2 test with proxy %s to H2 server %s", proxy, h2Addr)
 
 				tokenRaw = []byte(token)
@@ -278,21 +257,14 @@ println("-----------------------------------------------------------------------
 					t.Fatal(err)
 				}
 
-				ctx, cancel := context.WithTimeout(context.Background(), 300*time.Second)
-				_ = ctx
-				defer cancel()
-				time.Sleep(time.Second)
-				_, flows, err := yakit.QueryHTTPFlow(consts.GetGormProjectDatabase(), &ypb.QueryHTTPFlowRequest{
-					SearchURL: "/mitm/test/h2/token/" + token,
-				})
-				if err != nil {
-					t.Fatal(err)
-				}
-				if len(flows) > 0 {
-					h2Test = true
-				} else {
-					panic("/mitm/test/h2/token/" + token + " is not logged in db")
-				}
+				require.Eventually(t, func() bool {
+					_, flows, err := yakit.QueryHTTPFlow(consts.GetGormProjectDatabase(), &ypb.QueryHTTPFlowRequest{
+						SearchURL: "/mitm/test/h2/token/" + token,
+					})
+					return err == nil && len(flows) > 0
+				}, time.Second, time.Millisecond, "H2 flow must be persisted")
+				h2Test = true
+
 			}()
 		}
 	}
@@ -761,7 +733,7 @@ func TestGRPCMUSTPASS_MITMV2_Drop(t *testing.T) {
 		h2serverHandled int
 	)
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer func() {
 		cancel()
 	}()
@@ -792,13 +764,14 @@ Host: ` + h2Addr,
 		t.Fatal(err)
 	}
 	stream.Send(&ypb.MITMV2Request{
-		Host:        "127.0.0.1",
-		Port:        uint32(rPort),
-		EnableHttp2: true,
+		Host:           "127.0.0.1",
+		Port:           uint32(rPort),
+		EnableHttp2:    true,
+		SetAutoForward: true, AutoForwardValue: false,
 	})
 	var wg sync.WaitGroup
 	wg.Add(1)
-	dropped := false
+	dropped := make(chan struct{})
 	manual := false
 	for {
 		rsp, err := stream.Recv()
@@ -809,12 +782,10 @@ Host: ` + h2Addr,
 
 		if strings.Contains(spew.Sdump(rsp), `starting mitm server`) && !started {
 			started = true
+			require.NoError(t, stream.Send(&ypb.MITMV2Request{SetAutoForward: true, AutoForwardValue: false}))
 			stream.Send(&ypb.MITMV2Request{ResetFilter: true})
-			stream.Send(&ypb.MITMV2Request{
-				SetAutoForward:   true,
-				AutoForwardValue: false, // 手动劫持
-			})
-			time.Sleep(time.Second * 3)
+		}
+		if started && !manual && rsp.GetJustFilter() {
 			manual = true
 			go func() {
 				defer func() {
@@ -844,9 +815,9 @@ a, b, _ = poc.HTTP(string(packet), poc.proxy(getParam("proxy")), poc.https(true)
 					t.Fatal(err)
 				}
 				defer cancel()
-				if utils.Spinlock(15, func() bool {
-					return dropped
-				}) == nil {
+				select {
+				case <-dropped:
+					waitMITMFlowWrites(t)
 					_, flows, err := yakit.QueryHTTPFlow(consts.GetGormProjectDatabase(), &ypb.QueryHTTPFlowRequest{
 						SearchURL: "/mitm/test/h2/drop/token/" + token,
 					})
@@ -862,6 +833,8 @@ a, b, _ = poc.HTTP(string(packet), poc.proxy(getParam("proxy")), poc.https(true)
 					} else {
 						t.Fatal("unknown err")
 					}
+				case <-ctx.Done():
+					t.Error("manual drop was not acknowledged")
 				}
 			}()
 		}
@@ -876,7 +849,7 @@ a, b, _ = poc.HTTP(string(packet), poc.proxy(getParam("proxy")), poc.https(true)
 					if err != nil {
 						t.Fatal(err)
 					}
-					dropped = true
+					close(dropped)
 				}
 			}
 		}
@@ -1251,16 +1224,24 @@ func TestGRPCMUSTPASS_MITMV2_Replacer_ReplaceContent_ManualHijack(t *testing.T) 
 }
 
 func TestGRPCMUSTPASS_MITMV2_Replacer_Drop_ManualHijack_Stress(t *testing.T) {
-	for i := 0; i < 20; i++ {
-		TestGRPCMUSTPASS_MITMV2_Replacer_Drop_ManualHijack(t)
-	}
+	testMITMV2ManualHijackDrop(t, 20)
 }
 
 func TestGRPCMUSTPASS_MITMV2_Replacer_Drop_ManualHijack(t *testing.T) {
-	ctx, cancel := context.WithCancel(utils.TimeoutContextSeconds(30))
+	testMITMV2ManualHijackDrop(t, 1)
+}
+
+func testMITMV2ManualHijackDrop(t *testing.T, iterations int) {
+	t.Helper()
+	ctx, cancel := context.WithCancel(utils.TimeoutContextSeconds(3))
 	defer cancel()
 
+	var requests atomic.Int32
 	mockHost, mockPort := utils.DebugMockHTTPHandlerFuncContext(ctx, func(writer http.ResponseWriter, request *http.Request) {
+		requests.Add(1)
+		// The original stress case used a fresh upstream for each iteration.
+		// Keep that connection isolation while reusing the MITM listener.
+		writer.Header().Set("Connection", "close")
 		writer.Write([]byte("Hello"))
 	})
 
@@ -1271,7 +1252,11 @@ func TestGRPCMUSTPASS_MITMV2_Replacer_Drop_ManualHijack(t *testing.T) {
 	}
 	token := utils.RandStringBytes(16)
 
-	tokenCheck := false
+	deleted := make(chan string, iterations)
+	deletedTasks := make(map[string]bool)
+	workerDone := make(chan struct{})
+	var requestErr error
+	completed := 0
 
 	RunMITMV2TestServerEx(client, ctx, func(stream ypb.Yak_MITMV2Client) {
 		stream.Send(&ypb.MITMV2Request{
@@ -1284,7 +1269,11 @@ func TestGRPCMUSTPASS_MITMV2_Replacer_Drop_ManualHijack(t *testing.T) {
 			SetAutoForward:   true,
 			AutoForwardValue: false,
 		})
-		stream.Send(&ypb.MITMV2Request{
+		sendMITMV2TestControl(t, stream, &ypb.MITMV2Request{
+			UpdateFilter: true,
+			FilterData:   &ypb.MITMFilterData{},
+		})
+		sendMITMV2TestControl(t, stream, &ypb.MITMV2Request{
 			SetContentReplacers: true,
 			Replacers: []*ypb.MITMContentReplacer{
 				&ypb.MITMContentReplacer{
@@ -1296,25 +1285,31 @@ func TestGRPCMUSTPASS_MITMV2_Replacer_Drop_ManualHijack(t *testing.T) {
 			},
 		})
 
-	}, func(stream ypb.Yak_MITMV2Client, msg *ypb.MITMV2Response) {
-		if len(msg.GetReplacers()) > 0 {
-			// send packet
-			go func() {
-				_, err := yak.Execute(`
-			url = f"${target}?token=${token}"
-			rsp, req, _ = poc.Get(url, poc.proxy(mitmProxy), poc.save(false))
-			`, map[string]any{
-					"mitmProxy": `http://` + utils.HostPort("127.0.0.1", mitmPort),
-					"target":    `http://` + utils.HostPort(mockHost, mockPort),
-					"token":     token,
-				})
-				if err != nil {
-					t.Fatal(err)
-				}
-				time.Sleep(1 * time.Second) //avoid conditional competition
-				cancel()
-			}()
+		defer cancel()
+		defer close(workerDone)
+		for i := 0; i < iterations; i++ {
+			_, requestErr = yak.Execute(`
+url = f"${target}?token=${token}&iteration=${iteration}"
+rsp, req, _ = poc.Get(url, poc.proxy(mitmProxy), poc.save(false), poc.context(ctx))
+assert !str.Contains(string(rsp), "Hello"), "the dropped response must not reach the client"
+`, map[string]any{
+				"mitmProxy": "http://" + utils.HostPort("127.0.0.1", mitmPort),
+				"target":    "http://" + utils.HostPort(mockHost, mockPort),
+				"token":     token,
+				"iteration": i,
+				"ctx":       ctx,
+			})
+			if requestErr != nil {
+				return
+			}
+			select {
+			case <-deleted:
+				completed++
+			case <-ctx.Done():
+				return
+			}
 		}
+	}, func(stream ypb.Yak_MITMV2Client, msg *ypb.MITMV2Response) {
 		if msg.ManualHijackListAction == Hijack_List_Add {
 			manualResp := msg.ManualHijackList[0]
 			if manualResp.GetRequest() != nil && strings.Contains(string(manualResp.GetRequest()), token) {
@@ -1332,12 +1327,20 @@ func TestGRPCMUSTPASS_MITMV2_Replacer_Drop_ManualHijack(t *testing.T) {
 
 		if msg.ManualHijackListAction == Hijack_List_Delete {
 			manualResp := msg.ManualHijackList[0]
-			if manualResp.GetRequest() != nil && strings.Contains(string(manualResp.GetRequest()), token) {
-				tokenCheck = true
+			if strings.Contains(string(manualResp.GetRequest()), token) && !deletedTasks[manualResp.GetTaskID()] {
+				deletedTasks[manualResp.GetTaskID()] = true
+				deleted <- manualResp.GetTaskID()
 			}
 		}
 	})
-	require.True(t, tokenCheck)
+	select {
+	case <-workerDone:
+	case <-time.After(time.Second):
+		t.Fatal("manual hijack worker did not complete")
+	}
+	require.NoError(t, requestErr)
+	require.Equal(t, iterations, completed, "every request must be manually forwarded and dropped")
+	require.Equal(t, int32(iterations), requests.Load(), "all manually forwarded requests must reach the upstream")
 }
 
 func TestGRPCMUSTPASS_MITM_ObsoleteTLS(t *testing.T) {

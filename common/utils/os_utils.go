@@ -319,11 +319,11 @@ func DebugMockHTTPHandlerFunc(handlerFunc http.HandlerFunc) (string, int) {
 
 func DebugMockHTTPHandlerFuncContext(ctx context.Context, handlerFunc http.HandlerFunc) (string, int) {
 	host := "127.0.0.1"
-	port := GetRandomAvailableTCPPort()
-	lis, err := net.Listen("tcp", HostPort(host, port))
+	lis, err := net.Listen("tcp", HostPort(host, 0))
 	if err != nil {
 		panic(err)
 	}
+	port := lis.Addr().(*net.TCPAddr).Port
 	go func() {
 		select {
 		case <-ctx.Done():
@@ -712,6 +712,7 @@ func DebugMockHTTPServerWithContextWithAddress(ctx context.Context, addr string,
 				break
 			}
 			go func() {
+				defer conn.Close()
 				ctx := TimeoutContextSeconds(10)
 				for {
 					select {
@@ -736,7 +737,6 @@ func DebugMockHTTPServerWithContextWithAddress(ctx context.Context, addr string,
 						conn.Write(handle(raw))
 						if !keepAlive {
 							//log.Infof("write response flush: %#v", string(raw))
-							time.Sleep(500 * time.Millisecond)
 							FlushWriter(conn)
 							CloseWrite(conn)
 							log.Infof("close tcp connection: %v", conn.RemoteAddr())

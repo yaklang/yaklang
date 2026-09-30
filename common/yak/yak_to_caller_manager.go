@@ -984,10 +984,10 @@ func (y *YakToCallerManager) Call(name string, opts ...CallOpt) (results []any) 
 	isSync := y.swg == nil || forceSync
 	y.baseWaitGroup.Add(1)
 	defer func() {
+		defer y.baseWaitGroup.Done()
 		if !isSync {
 			taskWG.Wait()
 		}
-		y.baseWaitGroup.Done()
 		if callback != nil {
 			callback()
 		}
@@ -1146,7 +1146,9 @@ func (y *YakToCallerManager) Call(name string, opts ...CallOpt) (results []any) 
 
 func (y *YakToCallerManager) Wait() {
 	defer func() {
-		y.vulFilter.Close()
+		if y.vulFilter != nil {
+			y.vulFilter.Close()
+		}
 		if r := recover(); r != nil {
 			if errMsg := utils.InterfaceToString(r); errMsg != "" {
 				log.Error(errMsg)
@@ -1154,19 +1156,12 @@ func (y *YakToCallerManager) Wait() {
 		}
 	}()
 
-	if y.swg == nil {
-		return
-	}
-
-	count := 0
-	for {
-		y.baseWaitGroup.Wait()
+	// Call keeps its registration until every queued handler and completion
+	// callback has returned. This also covers calls scheduled by a callback;
+	// polling for several seconds after the groups drain adds no guarantee.
+	y.baseWaitGroup.Wait()
+	if y.swg != nil {
 		y.swg.Wait()
-		count++
-		time.Sleep(300 * time.Millisecond)
-		if count > 8 {
-			break
-		}
 	}
 }
 
