@@ -1,0 +1,11 @@
+text=f"hello ${user.name}, count=${count+1}"
+text=f'${outer(f"${inner(1+2)}")}'
+raw=f`line one
+  literal indent ${ready?"yes":"no"}
+line three`
+body=<<<BODY
+  keep ${these} and // these bytes
+    exactly as authored
+BODY
+// Comments retain their original text.
+include "formatter-does-not-read-this-file.yak"

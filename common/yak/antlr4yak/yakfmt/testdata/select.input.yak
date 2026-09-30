@@ -1,0 +1,6 @@
+select{case value,ok:= <-incoming: // receive
+if (ok){println(value)}else{break};case outgoing<-func(){return 1}:println("sent");default: // fallback
+select{case <-done:break;default:println("waiting")}}
+
+switch kind{case 1,2:println("first");fallthrough;case 3:println("second");break;default:println("other")}
+select = fn(v){return v};println(select(1))

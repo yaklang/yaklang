@@ -21,9 +21,9 @@ import (
 	"github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 
-	"github.com/yaklang/antlr/v4"
 	"github.com/davecgh/go-spew/spew"
 	"github.com/go-rod/rod/lib/utils"
+	"github.com/yaklang/antlr/v4"
 )
 
 type testStructed struct {
@@ -1787,16 +1787,22 @@ continue
     continue
 }`
 	goTestCase := `go fn{print("test")}`
-	goExpected := `go fn { print("test") }`
+	goExpected := `go fn {
+    print("test")
+}`
 	goTestCase2 := "go func(){print(\"test\")}()\n"
-	goExpected2 := "go func() { print(\"test\") }()"
+	goExpected2 := "go func() {\n    print(\"test\")\n}()"
 	deferTestCase := `defer func(){print("test")}()`
-	deferExpected := `defer func() { print("test") }()`
+	deferExpected := `defer func() {
+    print("test")
+}()`
 	deferTestCase2 := `defer println(1)
 println(2)`
 	deferTestExpected2 := deferTestCase2
 	inlineTestCase := `abc = func() {return "short"}`
-	inlineExpected := `abc = func() { return "short" }`
+	inlineExpected := `abc = func() {
+    return "short"
+}`
 	inlineTestCase2 := `abc = func() {return "longlonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglong"}`
 	inlineExpected2 := `abc = func() {
     return "longlonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglong"
@@ -1823,7 +1829,7 @@ a + 1`,
 		`/* qwe */
 		b=1+1`: `/* qwe */
 b = 1 + 1`,
-		`b=1+1// test`:          `b = 1 + 1// test`,
+		`b=1+1// test`:          `b = 1 + 1 // test`,
 		`"123"`:                 `"123"`,
 		`x"123"`:                `x"123"`,
 		`1.5`:                   `1.5`,
@@ -1857,33 +1863,37 @@ b = 1 + 1`,
 		`true && false`:            `true && false`,
 		`true && (false || false)`: `true && (false || false)`,
 		`true?1:0`:                 `true ? 1 : 0`,
-		`fn{1 +  1}`:               `fn { 1 + 1 }`,
-		`func{1 +  1}`:             `func { 1 + 1 }`,
-		`a=1`:                      `a = 1`,
-		`a:=1`:                     `a := 1`,
-		`a,b,c=1,2,3`:              `a, b, c = 1, 2, 3`,
-		`a ++`:                     `a++`,
-		`a --`:                     `a--`,
-		`a+=1`:                     `a += 1`,
-		`a[1]=1`:                   `a[1] = 1`,
-		`a.b=1`:                    `a.b = 1`,
-		includeTestCase:            includeExpected,
-		funcTestCase:               funcExpected,
-		ifTestCase:                 ifExpected,
-		switchTestCase:             switchExpected,
-		switchTestCase2:            switchExpected2,
-		forTestCase:                forExpected,
-		forRangeTestCase:           forRangeExpected,
-		forRangeTestCase2:          forRangeExpected2,
-		goTestCase:                 goExpected,
-		goTestCase2:                goExpected2,
-		deferTestCase:              deferExpected,
-		deferTestCase2:             deferTestExpected2,
-		inlineTestCase:             inlineExpected,
-		inlineTestCase2:            inlineExpected2,
-		assertTestCase:             assertExpected,
-		assertTestCase2:            assertExpected2,
-		multiBlockTestCase:         multiBlockExpected,
+		`fn{1 +  1}`: `fn {
+    1 + 1
+}`,
+		`func{1 +  1}`: `func {
+    1 + 1
+}`,
+		`a=1`:              `a = 1`,
+		`a:=1`:             `a := 1`,
+		`a,b,c=1,2,3`:      `a, b, c = 1, 2, 3`,
+		`a ++`:             `a++`,
+		`a --`:             `a--`,
+		`a+=1`:             `a += 1`,
+		`a[1]=1`:           `a[1] = 1`,
+		`a.b=1`:            `a.b = 1`,
+		includeTestCase:    includeExpected,
+		funcTestCase:       funcExpected,
+		ifTestCase:         ifExpected,
+		switchTestCase:     switchExpected,
+		switchTestCase2:    switchExpected2,
+		forTestCase:        forExpected,
+		forRangeTestCase:   forRangeExpected,
+		forRangeTestCase2:  forRangeExpected2,
+		goTestCase:         goExpected,
+		goTestCase2:        goExpected2,
+		deferTestCase:      deferExpected,
+		deferTestCase2:     deferTestExpected2,
+		inlineTestCase:     inlineExpected,
+		inlineTestCase2:    inlineExpected2,
+		assertTestCase:     assertExpected,
+		assertTestCase2:    assertExpected2,
+		multiBlockTestCase: multiBlockExpected,
 	}
 	for testcase, expected := range testcases {
 		inputStream := antlr.NewInputStream(testcase)
@@ -1894,7 +1904,7 @@ b = 1 + 1`,
 		vt.AntlrTokenStream = tokenStream
 		p.AddErrorListener(vt.GetParserErrorListener())
 		vt.VisitProgram(p.Program().(*yak.ProgramContext))
-		if len(vt.GetErrors()) <= 0 {
+		if len(vt.GetErrors()) > 0 {
 			for _, v := range vt.GetErrors() {
 				t.Errorf("source: %#v, error: %s", testcase, v.Message)
 			}

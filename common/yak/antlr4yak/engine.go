@@ -5,11 +5,13 @@ import (
 	"fmt"
 	"os"
 	"sort"
+	"strings"
 	"sync"
 
 	"github.com/yaklang/yaklang/common/go-funk"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/antlr4yak/yakast"
+	"github.com/yaklang/yaklang/common/yak/antlr4yak/yakfmt"
 	"github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm"
 
 	"github.com/davecgh/go-spew/spew"
@@ -547,12 +549,17 @@ func (n *Engine) SafeEvalInlineWithResult(ctx context.Context, code string) (ret
 	return ret, nil
 }
 
-func (n *Engine) FormattedAndSyntaxChecking(code string) (string, error) {
-	compiler, err := n._compile(code, n.rootSymbol)
-	if err != nil {
-		return "", err
-	}
-	return compiler.GetFormattedCode(), err
+// FormattedAndSyntaxChecking formats syntactically valid source without resolving
+// symbols, reading includes, generating bytecode, or changing the engine's scope.
+// Compile is the API for semantic validation. The historical no-final-LF result
+// is retained; yakfmt.Format provides the file-oriented final-LF form.
+func (n *Engine) FormattedAndSyntaxChecking(code string) (string, error) { return Format(code) }
+
+// Format provides the engine-compatible no-final-LF form without an Engine.
+// Use yakfmt.Format for a complete source file with a final LF.
+func Format(code string) (string, error) {
+	formatted, err := yakfmt.Format(code)
+	return strings.TrimSuffix(formatted, "\n"), err
 }
 
 func (n *Engine) ExecuteAsBooleanExpression(expr string, dependencies map[string]interface{}) (bool, error) {

@@ -42,7 +42,7 @@ func (e *Engine) YakBuiltinEval(code string) {
 // yakfmt("for { println(`hello yak`) }")
 // ```
 func (e *Engine) YakBuiltinfmt(code string) string {
-	newCode, err := New().FormattedAndSyntaxChecking(code)
+	newCode, err := Format(code)
 	if err != nil {
 		log.Errorf("format and syntax checking met error: %s", err)
 		return code
@@ -56,7 +56,7 @@ func (e *Engine) YakBuiltinfmt(code string) string {
 // yakfmtWithError("for { println(`hello yak`) }")
 // ```
 func (e *Engine) YakBuiltinfmtWithError(code string) (string, error) {
-	return New().FormattedAndSyntaxChecking(code)
+	return Format(code)
 }
 
 // getScopeInspects 获取当前作用域中的所有变量，返回 ScopeValue 结构体引用切片

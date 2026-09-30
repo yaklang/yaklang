@@ -1,0 +1,12 @@
+config={"callback":func(value){return value+1},"nested":[{"enabled":true,"tags":["first","second"]},{"enabled":false}]}
+handler = func(
+request map[string]interface{}, // request input
+response []byte, /* response payload */
+) (int,error) {return request["code"],nil}
+values = []int{
+1,2, // first group
+3,
+}
+queue=make(
+chan map[string][]byte,
+100,200)

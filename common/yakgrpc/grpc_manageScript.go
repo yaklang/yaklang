@@ -309,7 +309,7 @@ func isYakScriptNameDuplicateErr(err error) bool {
 func (s *Server) SaveYakScript(ctx context.Context, script *ypb.YakScript) (*ypb.YakScript, error) {
 	switch script.Type {
 	case "yak", "mitm", "port-scan", contextmenu.PluginType:
-		_, err := antlr4yak.New().FormattedAndSyntaxChecking(script.GetContent())
+		_, err := antlr4yak.New().Compile(script.GetContent())
 		if err != nil {
 			return nil, utils.Errorf("save plugin failed! content is invalid(潜在语法错误): %s", err)
 		}
@@ -1051,7 +1051,7 @@ func (s *Server) SaveNewYakScript(ctx context.Context, request *ypb.SaveNewYakSc
 	}
 	switch script.Type {
 	case "yak", "mitm", "port-scan":
-		_, err := antlr4yak.New().FormattedAndSyntaxChecking(script.GetContent())
+		_, err := antlr4yak.New().Compile(script.GetContent())
 		if err != nil {
 			return nil, utils.Errorf("save plugin failed! content is invalid(潜在语法错误): %s", err)
 		}

@@ -1,0 +1,9 @@
+// Functions and scope
+func handle(a map[string]interface{},b []byte) (int,error){if (a["enabled"]){return 1,nil};return 0,nil}
+
+if response,err:=fetch();err==nil{println(response)}elif err!=nil{println(err)}else if (ready){return 0}
+for i=0;i<10;i++{if i==3{continue};println(i)}
+for key,value:=range {"a":1,"b":2}{println(key,value)}
+for value in [1,2,3]{println(value)}
+try{panic("failure")}catch err{println(err)}finally{defer recover()}
+go func(){defer cleanup();work()}()
