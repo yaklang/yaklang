@@ -272,13 +272,13 @@ func TestToolCallerDirectlyCallTool_EmitsStartBeforeLaterActionFields(t *testing
 	prepareErr := errors.New("stop after card-ordering assertion")
 	callDone := make(chan error, 1)
 	go func() {
-		_, _, callErr := caller.DirectlyCallTool(tool, action, func(_ *Action, _ string) (aitool.InvokeParams, bool, *aitool.Tool, error) {
+		_, _, callErr := caller.DirectlyCallTool(tool, action, func(_ *Action, _ string) (aitool.InvokeParams, *aitool.Tool, error) {
 			close(prepareEntered)
 			<-releasePrepare
 			// Stop at the direct-call preparation boundary. The purpose of this
 			// test is to lock the legacy card-first ordering; executable scalar
 			// examples cover the subsequent real tool callback separately.
-			return nil, false, tool, prepareErr
+			return nil, tool, prepareErr
 		})
 		callDone <- callErr
 	}()

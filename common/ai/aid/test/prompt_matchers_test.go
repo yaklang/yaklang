@@ -29,6 +29,7 @@ package test
 //        kebab-case 同样不安全, 中文语义类别指代
 
 import (
+	"strconv"
 	"strings"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
@@ -169,7 +170,12 @@ func tryHandleNewPlanFlowPrompt(config aicommon.AICallerConfigIf, prompt string,
 }
 
 func isNextActionDecisionPrompt(prompt string) bool {
-	return aicommon.IsPrimaryDecisionPrompt(prompt)
+	return !isForcedToolCallPrompt(prompt, "") && aicommon.IsPrimaryDecisionPrompt(prompt)
+}
+
+func isForcedToolCallPrompt(prompt, toolName string) bool {
+	return strings.Contains(prompt, "Call exactly one tool using directly_call_tool.") &&
+		(toolName == "" || strings.Contains(prompt, "The tool name must be "+strconv.Quote(toolName)+"."))
 }
 
 func isToolParamGenerationPrompt(prompt, toolName string) bool {

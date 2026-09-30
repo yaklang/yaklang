@@ -67,7 +67,6 @@ func TestToolCallReasonFallbackWhenAuxiliaryIsSkipped(t *testing.T) {
 	require.False(t, config.ResolveAuxiliaryTask(CallerLabelToolCallReason).ShouldRun())
 	tc.generateReasonIfNeeded(tool, nil)
 	require.Equal(t, "portal health", tc.reason)
-	require.True(t, tc.reasonFinalized)
 }
 
 func TestBuildToolCallReasonPrompt_IncludesRecentSteps(t *testing.T) {
@@ -114,7 +113,7 @@ func TestBuildRecentToolCallSummary_NoResults(t *testing.T) {
 	require.Empty(t, buildRecentToolCallSummary(task, 5))
 }
 
-func TestWithToolCaller_Reason_SetsReasonFinalized(t *testing.T) {
+func TestWithToolCaller_Reason_SetsReason(t *testing.T) {
 	task := NewStatefulTaskBase("task-1", "test", context.Background(), nil, true)
 	tc, err := NewToolCaller(
 		context.Background(),
@@ -126,11 +125,10 @@ func TestWithToolCaller_Reason_SetsReasonFinalized(t *testing.T) {
 		WithToolCaller_Reason("specific reason for this call"),
 	)
 	require.NoError(t, err)
-	require.True(t, tc.reasonFinalized)
 	require.Equal(t, "specific reason for this call", tc.reason)
 }
 
-func TestWithToolCaller_Reason_EmptyDoesNotFinalize(t *testing.T) {
+func TestWithToolCaller_Reason_EmptyDoesNotPresetReason(t *testing.T) {
 	task := NewStatefulTaskBase("task-1", "test", context.Background(), nil, true)
 	tc, err := NewToolCaller(
 		context.Background(),
@@ -142,7 +140,7 @@ func TestWithToolCaller_Reason_EmptyDoesNotFinalize(t *testing.T) {
 		WithToolCaller_Reason(""),
 	)
 	require.NoError(t, err)
-	require.False(t, tc.reasonFinalized)
+	require.Empty(t, tc.reason)
 }
 
 func TestBuildRecentToolCallSummary_TruncatesLongError(t *testing.T) {

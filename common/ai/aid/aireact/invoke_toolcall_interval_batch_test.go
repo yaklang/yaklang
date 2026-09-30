@@ -121,14 +121,12 @@ func TestExecuteToolBatch_IntervalReviewEventsStayWithChildAndCancelIsIsolated(t
 
 	request := &aicommon.ToolBatchRequest{Calls: []aicommon.ToolBatchCall{
 		{
-			Mode:            aicommon.ToolCallModeDirect,
 			ToolName:        tool.Name,
 			Reason:          "exercise cancellation for only one child",
 			Params:          aitool.InvokeParams{"marker": cancelMarker},
 			ExecutionCallID: cancelCallID,
 		},
 		{
-			Mode:            aicommon.ToolCallModeDirect,
 			ToolName:        tool.Name,
 			Reason:          "prove the sibling continues independently",
 			Params:          aitool.InvokeParams{"marker": continueMarker},

@@ -8,32 +8,31 @@ import (
 
 // Keep the scalar-first safety rule in the prompt layers closest to model output.
 func TestDefaultPromptTeachesScalarBeforeOptionalBatch(t *testing.T) {
-	const batchField = "tool_require_calls"
+	const batchField = "directly_call_tool_calls"
 
 	for name, test := range map[string]struct {
-		prompt           string
-		scalarMarker     string
-		directBatchRule  string
-		requireBatchRule string
+		prompt          string
+		scalarMarker    string
+		directBatchRule string
 	}{
 		"instruction": {
-			prompt:           instruction,
-			scalarMarker:     "标量 `tool_require_payload`",
-			directBatchRule:  "每层完整参数已从真实 Schema 确定",
-			requireBatchRule: "各工具 Schema 简单无歧义",
+			prompt:          instruction,
+			scalarMarker:    "标量 `tool_require_payload`",
+			directBatchRule: "每层完整参数已从真实 Schema 确定",
 		},
 		"output_example": {
-			prompt:           outputExample,
-			scalarMarker:     `"tool_require_payload":"..[your-toolname].."`,
-			directBatchRule:  "每层参数全部明确",
-			requireBatchRule: "每个工具 Schema 简单无歧义",
+			prompt:          outputExample,
+			scalarMarker:    `"tool_require_payload":"..[your-toolname].."`,
+			directBatchRule: "每层参数全部明确",
 		},
 	} {
 		t.Run(name, func(t *testing.T) {
 			assert.Contains(t, test.prompt, batchField)
 			assert.Contains(t, test.prompt, test.scalarMarker)
 			assert.Contains(t, test.prompt, test.directBatchRule)
-			assert.Contains(t, test.prompt, test.requireBatchRule)
+			assert.Contains(t, test.prompt, "tool_require_calls")
+			assert.Contains(t, test.prompt, "批量")
+			assert.Contains(t, test.prompt, "不生成参数、不执行工具")
 		})
 	}
 

@@ -2,6 +2,21 @@
 
 > 回到 [README](../README.md) | 相关章节：[03 Prompt 系统](03-prompt-system.md) · [04 Action 体系](04-actions.md) · [06 Emitter 与流式输出](06-emitter-and-streaming.md) · [08 确定性机制](08-determinism-mechanisms.md) · [12 调试与可观测性](12-debugging-and-observability.md)
 
+## 2026-09-30 协议调整
+
+**本节是现行约定；后续正文保留为旧设计记录，其中批量 require 生成参数并执行、参数生成并发配置和相关旧 API 示例不再适用。**
+
+- `require_tool` 支持 `tool_require_payload` 单独加载一个 Schema，以及 `tool_require_calls` 选项批量添加 2–8 个 Schema；不是新增 action，两种选项都不生成参数、不执行工具。
+- 要加载多个工具，AI 可以分别调用 require，也可以在同一个 require action 中使用批量选项。原生单轮响应可以包含多个 require action，复用 `exec_actions.go` 的 `execCalls`；目前按声明顺序执行，不新增 require 专用并发调度器。
+- 批量只保留 `directly_call_tool_calls`。每项必须携带完整参数，进入 `ExecuteToolBatch` 并发执行，不以串行 `execCalls` 替代。
+- 删除 `ToolCallMode`、require 批量执行 parser、初始参数请求、参数生成 semaphore/sequence 和 `WithToolBatchParamConcurrency`；保留 require 的 Schema-only 批量选项、示例和 Schema 加载解析。保留批量数量与插件执行并发配置（默认 8 项、3 并发）。
+- 保留声明顺序的 admission/mutator、审批、实际工具 guard、全批 invoke barrier、取消、checkpoint、事件隔离及结果有序汇总。
+- review 的 wrong_tool/wrong_params 仍在 review 内通过主循环 prompt/transaction 请求新提案，重新审批后执行；它不是批量 require 或初始参数生成。
+- action 模式仍能在标量字段到达时提前完成 verifier；handler 在缓存 Schema 前核验完整 action，拒绝单工具/批量选项混用、执行参数及跨 action 混用。原生模式直接校验完整参数对象。
+- 回归覆盖多次标量 require 的零执行/零额外模型请求、直接 batch 的并发和有序提交，以及 review 重生成、回放和取消。
+
+最新进度与回归结果见 [24-toolcall-migration-progress.zh-CN.md](24-toolcall-migration-progress.zh-CN.md)。
+
 ## 文档元信息
 
 | 项目 | 内容 |

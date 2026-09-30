@@ -313,7 +313,7 @@ var loopAction_directlyCallTool = &reactloops.LoopAction{
 	Description: "直接调用已启用且参数完整的工具，跳过申请和参数生成阶段。默认使用 directly_call_tool_name 和 directly_call_tool_params 的单调用形式。" +
 		"仅当存在 2-8 个低风险、互不依赖、互不干扰，且每层参数都已从真实 Schema 确定的调用时，才可用 directly_call_tool_calls 并发；" +
 		"优先使用 CACHE_TOOL_CALL 中已展示参数 Schema 的工具；已启用但未缓存的工具仍可解析并产生告警。" +
-		"参数不确定或工具是参数未完整的嵌套 wrapper 时改用单次 require_tool；严禁混用单调用和批量字段，也不要为了凑数量发明调用。",
+		"参数不确定或工具 Schema 尚未在 CACHE_TOOL_CALL 中可见时，先使用 require_tool 加载 Schema，下一轮再用 directly_call_tool 执行；严禁混用单调用和批量字段，也不要为了凑数量发明调用。",
 	Options: []aitool.ToolOption{
 		aitool.WithStringParam(
 			"directly_call_tool_name",
@@ -406,7 +406,7 @@ Few-shot example 1 (fallback to require_tool):
 {"@action":"require_tool","tool_require_payload":"<tool_name>"}
 
 Few-shot example 2 (valid directly_call_tool):
-{"@action":"directly_call_tool","directly_call_tool_name":"<tool_name>","directly_call_identifier":"<snake_case_intent>","directly_call_expectations":"~3s, fallback to require_tool if params are uncertain","directly_call_reason":"<why this call>","directly_call_tool_params":{"<param>":"<value>"}}
+{"@action":"directly_call_tool","directly_call_tool_name":"<tool_name>","directly_call_identifier":"<snake_case_intent>","directly_call_expectations":"~3s, use require_tool first if schema is unknown","directly_call_reason":"<why this call>","directly_call_tool_params":{"<param>":"<value>"}}
 `))
 			operator.Feedback(utils.Error("directly_call_tool requires tool_name; switch to require_tool or provide directly_call_tool_name + directly_call_tool_params"))
 			return
@@ -463,10 +463,9 @@ Few-shot example 2 (valid directly_call_tool):
 
 		// prepare is the loop-layer callback run AFTER the tool-call card has been
 		// created (loading). It reads the streaming action's params (blocking until
-		// they arrive), normalizes/merges/validates them, streams progress, and either
-		// returns finalized params or signals fallbackToRequire (reusing the same card
-		// and switching to the AI param-generation path).
-		prepare := func(action *aicommon.Action, name string) (aitool.InvokeParams, bool, *aitool.Tool, error) {
+		// they arrive), normalizes/merges/validates them, streams progress, and
+		// returns finalized params or an error for the loop to handle.
+		prepare := func(action *aicommon.Action, name string) (aitool.InvokeParams, *aitool.Tool, error) {
 			emitProgress := func(string) {}
 			finishProgress := func(string) {}
 			if emitter := loop.GetEmitter(); emitter != nil && operator.GetTask() != nil {
@@ -486,17 +485,12 @@ Few-shot example 2 (valid directly_call_tool):
 			emitProgress("[解析缓存工具]")
 			tool, err := resolveTool(name)
 			if err != nil {
-				finishProgress("[failed] cached tool resolution failed; falling back to require_tool")
-				return nil, false, nil, err
+				finishProgress("[failed] cached tool resolution failed; load the schema with require_tool before retrying")
+				return nil, nil, err
 			}
 
 			emitProgress("[开始处理参数]")
-			raw, objParams := getDirectlyCallToolParamPayload(action)
-			params, _ := normalizeDirectlyCallToolParams(raw, objParams)
-			if params == nil {
-				params = make(aitool.InvokeParams)
-			}
-			mergedBlockParams := aicommon.MergeActionAITagParams(action, params, getDirectlyCallToolParamNames(loop, toolName))
+			params, mergedBlockParams := readDirectToolCallParams(loop, action, tool)
 
 			valid, validationErrors := tool.ValidateParams(params)
 			if !valid {
@@ -506,27 +500,24 @@ Few-shot example 2 (valid directly_call_tool):
 				}
 				reportStatus(strings.TrimSpace(fmt.Sprintf(`
 directly_call_tool params validation failed for cached tool '%s'.
-The fast path already selected a cached tool, but the generated params do not satisfy the tool schema.
 Validation errors: %s
-Next attempt should prefer @action=require_tool for '%s' so the runtime can re-enter normal parameter generation and review, or retry directly_call_tool with schema-matching params.
+Correct the params using the tool schema in CACHE_TOOL_CALL and retry directly_call_tool, or use require_tool to load the schema first.
 
-Few-shot example 1 (preferred fallback):
+Few-shot example (load schema then call):
 {"@action":"require_tool","tool_require_payload":"%s"}
-
-Few-shot example 2 (valid direct retry):
-{"@action":"directly_call_tool","directly_call_tool_name":"%s","directly_call_identifier":"<snake_case_intent>","directly_call_expectations":"~3s, fallback to require_tool if params are uncertain","directly_call_reason":"<why this call>","directly_call_tool_params":{"<param>":"<value>"}}
-`, toolName, validationSummary, toolName, toolName, toolName)))
-				finishProgress("[failed] params validation failed; falling back to require_tool")
-				reportStatus(fmt.Sprintf("auto fallback: switching '%s' from directly_call_tool to @action=require_tool because schema validation failed", toolName))
+# After observing the schema in CACHE_TOOL_CALL:
+{"@action":"directly_call_tool","directly_call_tool_name":"%s","directly_call_identifier":"<snake_case_intent>","directly_call_expectations":"~3s","directly_call_reason":"<why this call>","directly_call_tool_params":{"<param>":"<value>"}}
+`, toolName, validationSummary, toolName, toolName)))
+				finishProgress("[failed] params validation failed")
 				reactloops.EmitStatusI18n(
 					loop,
-					"当前方式不太合适，正在调整调用方式",
-					"Adjusting the tool invocation approach",
+					"参数不正确，请修正后重试",
+					"Params are incorrect; please correct and retry",
 					aicommon.WithStatusCode("tool.adjusting"),
 					aicommon.WithStatusState(aicommon.StatusStateRecovering),
 				)
-				operator.Feedback(fmt.Sprintf("directly_call_tool params invalid for '%s': %s; automatically switching to @action=require_tool", toolName, validationSummary))
-				return nil, true, tool, nil
+				operator.Feedback(fmt.Sprintf("directly_call_tool params invalid for '%s': %s; correct the params using the tool schema in CACHE_TOOL_CALL or use require_tool to load the schema first", toolName, validationSummary))
+				return nil, tool, utils.Errorf("invalid params for '%s': %s", toolName, validationSummary)
 			}
 
 			feedbackItems := buildDirectlyCallParamFeedbackItems(params, mergedBlockParams)
@@ -553,7 +544,7 @@ Few-shot example 2 (valid direct retry):
 				aicommon.WithStatusCode("tool.running"),
 				aicommon.WithStatusTools(tools...),
 			)
-			return params, false, tool, nil
+			return params, tool, nil
 		}
 
 		// DirectlyCallTool emits the card (loading) first, then runs prepare (reads

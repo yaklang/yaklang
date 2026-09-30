@@ -120,33 +120,18 @@ func MergeActionAITagParams(action *Action, invokeParams aitool.InvokeParams, pa
 	return merged
 }
 
-type toolParamAITagBlock struct {
-	ParamName string
-	Nonce     string
-	Content   string
-}
-
-func normalizeAITAGBlockContent(content string) string {
-	content = strings.TrimPrefix(content, "\r\n")
-	content = strings.TrimPrefix(content, "\n")
-	content = strings.TrimSuffix(content, "\r\n")
-	content = strings.TrimSuffix(content, "\n")
-	return content
-}
-
 type ToolCaller struct {
-	runtimeId       string
-	task            AITask
-	config          AICallerConfigIf
-	emitter         *Emitter // specific, backup for config.GetEmitter()
-	ai              AICaller
-	start           *sync.Once
-	done            *sync.Once
-	callToolId      string
-	startTime       time.Time // Track tool call start time
-	reason          string    // human-readable reason for this tool call (preset / action / liteforge-generated)
-	reasonFinalized bool      // ONLY for the thinking stream: when true, SetOnReasonChunk should not emit (a concrete reason already exists)
-	reasonGen       bool      // liteforge reason generation has run for this tool call (at most once; reset by review)
+	runtimeId  string
+	task       AITask
+	config     AICallerConfigIf
+	emitter    *Emitter // specific, backup for config.GetEmitter()
+	ai         AICaller
+	start      *sync.Once
+	done       *sync.Once
+	callToolId string
+	startTime  time.Time // Track tool call start time
+	reason     string    // human-readable reason for this tool call (preset / action / liteforge-generated)
+	reasonGen  bool      // liteforge reason generation has run for this tool call (at most once; reset by review)
 
 	// invokeRuntime is an optional AIInvokeRuntime used to (re)generate a
 	// human-readable reason via a lightweight (speed-priority) lite forge when
@@ -156,9 +141,6 @@ type ToolCaller struct {
 
 	ctx    context.Context
 	cancel context.CancelFunc
-
-	generateToolParamsBuilderWithMeta func(tool *aitool.Tool, toolName string) (*ToolParamsPromptMeta, error)
-	generateFunctionCallParamsPrompt  func(tool *aitool.Tool, toolName string, intent ToolParamsCallIntent) (string, error)
 
 	m               *sync.Mutex
 	onCallToolStart func(callToolId string)
@@ -178,17 +160,15 @@ type ToolCaller struct {
 
 	// Batch-only scheduling hooks. Scalar callers leave these nil and retain
 	// their historical behaviour. The hooks deliberately live on ToolCaller so
-	// parameter generation, interactive review and the actual plugin invoke can
+	// interactive review and the actual plugin invoke can
 	// be scheduled independently without duplicating the tool-call pipeline.
-	paramGenerationGate ToolCallerGate
-	reviewGate          ToolCallerGate
-	beforeInvoke        ToolCallerBeforeInvoke
+	reviewGate   ToolCallerGate
+	beforeInvoke ToolCallerBeforeInvoke
 
 	// Runtime-owned deterministic metadata. These values are allocated before a
 	// batch starts, so goroutine completion order cannot change checkpoint,
 	// result or artifact ordering.
 	checkpointSeq         int64
-	paramTransactionSeq   int64
 	reviewCheckpointSeq   int64
 	watcherCheckpointSeq  int64
 	resultID              int64
@@ -262,14 +242,6 @@ func WithToolCaller_CallExpectations(expectations string) ToolCallerOption {
 	}
 }
 
-// WithToolCaller_ParamGenerationGate installs a batch-only gate around the AI
-// parameter-generation transaction. It has no effect on preset/direct params.
-func WithToolCaller_ParamGenerationGate(gate ToolCallerGate) ToolCallerOption {
-	return func(tc *ToolCaller) {
-		tc.paramGenerationGate = gate
-	}
-}
-
 // WithToolCaller_ReviewGate serializes the interactive approval endpoint. The
 // gate is released before applying a review decision, which keeps legacy
 // wrong-tool/wrong-params recursion re-entrant while ensuring only one pending
@@ -290,12 +262,6 @@ func WithToolCaller_BeforeInvoke(hook ToolCallerBeforeInvoke) ToolCallerOption {
 func WithToolCaller_CheckpointSeq(seq int64) ToolCallerOption {
 	return func(tc *ToolCaller) {
 		tc.checkpointSeq = seq
-	}
-}
-
-func WithToolCaller_ParamTransactionSeq(seq int64) ToolCallerOption {
-	return func(tc *ToolCaller) {
-		tc.paramTransactionSeq = seq
 	}
 }
 
@@ -358,14 +324,10 @@ func WithToolCaller_OmitResultParamsInTimeline() ToolCallerOption {
 
 // WithToolCaller_Reason sets the human-readable reason for this tool call. The
 // reason is emitted from the unified reason-handling point in
-// CallToolWithExistedParams. reasonFinalized is set so the param-generation
-// thinking stream won't overwrite this concrete reason.
+// CallToolWithExistedParams.
 func WithToolCaller_Reason(reason string) ToolCallerOption {
 	return func(tc *ToolCaller) {
 		tc.reason = reason
-		if strings.TrimSpace(reason) != "" {
-			tc.reasonFinalized = true
-		}
 	}
 }
 
@@ -487,7 +449,7 @@ func WithToolCaller_ReviewWrongParam(
 }
 
 // WithToolCaller_ParamAugment sets an optional callback to merge extra params into the final invoke params
-// after generation or preset. Used when infra must inject params (e.g. sample code for validation tools).
+// before review and execution. Used when infra must inject params (e.g. sample code for validation tools).
 func WithToolCaller_ParamAugment(augment func(aitool.InvokeParams) aitool.InvokeParams) ToolCallerOption {
 	return func(tc *ToolCaller) {
 		tc.paramAugment = augment
@@ -580,34 +542,6 @@ func WithToolCaller_OnEnd(i func(callToolId string)) ToolCallerOption {
 	}
 }
 
-// ToolParamsPromptMeta contains the generated prompt and metadata for AITAG parsing
-type ToolParamsPromptMeta struct {
-	Prompt     string
-	Nonce      string
-	ParamNames []string
-	Identifier string // destination identifier extracted from AI response, e.g. "query_large_file", "find_process"
-}
-
-// WithToolCaller_GenerateToolParamsBuilderWithMeta sets a builder that returns prompt with metadata for AITAG support
-func WithToolCaller_GenerateToolParamsBuilderWithMeta(
-	builder func(tool *aitool.Tool, toolName string) (*ToolParamsPromptMeta, error),
-) ToolCallerOption {
-	return func(tc *ToolCaller) {
-		tc.generateToolParamsBuilderWithMeta = builder
-	}
-}
-
-// WithToolCaller_FunctionCallParamsPromptBuilder supplies the R2 prompt used
-// only by the native submit_tool_params path. It must not contain the text-mode
-// action JSON or TOOL_PARAM AITAG protocol.
-func WithToolCaller_FunctionCallParamsPromptBuilder(
-	builder func(tool *aitool.Tool, toolName string, intent ToolParamsCallIntent) (string, error),
-) ToolCallerOption {
-	return func(tc *ToolCaller) {
-		tc.generateFunctionCallParamsPrompt = builder
-	}
-}
-
 func NewToolCaller(ctx context.Context, opts ...ToolCallerOption) (*ToolCaller, error) {
 	caller := &ToolCaller{
 		callToolId:  ksuid.New().String(),
@@ -625,10 +559,6 @@ func NewToolCaller(ctx context.Context, opts ...ToolCallerOption) (*ToolCaller, 
 
 	if caller.config == nil || utils.IsNil(caller.config) {
 		return nil, fmt.Errorf("config is nil in ToolCaller")
-	}
-
-	if caller.ai == nil || utils.IsNil(caller.ai) {
-		return nil, fmt.Errorf("ai caller is nil in ToolCaller")
 	}
 
 	if utils.IsNil(ctx) {
@@ -657,10 +587,6 @@ func (t *ToolCaller) GetIntervalReviewDuration() time.Duration {
 	return t.intervalReviewDuration
 }
 
-func (t *ToolCaller) CallTool(tool *aitool.Tool) (result *aitool.ToolResult, directlyAnswer bool, err error) {
-	return t.CallToolWithExistedParams(tool, false, make(aitool.InvokeParams))
-}
-
 // emitStart emits the tool-call START event (the loading card) exactly once,
 // guarded by t.start (sync.Once). It ONLY emits the start event — reason
 // emission and liteforge generation are handled in one place by
@@ -677,15 +603,11 @@ func (t *ToolCaller) emitStart(tool *aitool.Tool) {
 	t.emitter.EmitToolCallStart(t.callToolId, tool, t.startTime)
 }
 
-// emitReason emits a concrete reason string on the tool-call card and marks the
-// reason as finalized so the param-generation thinking stream won't overwrite it.
+// emitReason emits a concrete reason string on the tool-call card.
 func (t *ToolCaller) emitReason(reason string) {
 	if strings.TrimSpace(reason) == "" {
 		return
 	}
-	t.m.Lock()
-	t.reasonFinalized = true
-	t.m.Unlock()
 	if t.emitter != nil {
 		t.emitter.EmitToolCallReason(t.callToolId, reason)
 	}
@@ -705,32 +627,27 @@ func (t *ToolCaller) emitIdentifierReasonFallback() {
 		return
 	}
 	t.reason = reason
-	t.reasonFinalized = true
 	t.m.Unlock()
 	if t.emitter != nil {
 		t.emitter.EmitToolCallReason(t.callToolId, reason)
 	}
 }
 
-// resetReasonForReview clears the reason state so the recursive CallTool
+// resetReasonForReview clears the reason state so the recursive explicit call
 // (after review changed the tool or params) may generate a fresh reason once
 // more from the unified reason-handling point. This is the only legitimate
-// case for regenerating a reason. reasonFinalized is reset only so the thinking
-// stream is allowed to emit again until a new concrete reason is set.
+// case for regenerating a reason.
 func (t *ToolCaller) resetReasonForReview() {
 	t.m.Lock()
 	defer t.m.Unlock()
 	t.reason = ""
-	t.reasonFinalized = false
 	t.reasonGen = false
 }
 
 // generateReasonIfNeeded generates a reason via the speed-priority liteforge AT
 // MOST ONCE per tool call (guarded by t.reasonGen). It is a no-op when a reason
 // is already present (preset / action-stashed) or no Config is configured.
-// reasonFinalized is NOT used as a guard here — its only job is to tell the
-// param-generation thinking stream (SetOnReasonChunk) not to overwrite an already
-// emitted concrete reason. Call this from the single reason-handling point in
+// Call this from the single reason-handling point in
 // CallToolWithExistedParams; review resets the state before recursing so it may
 // run once more.
 func (t *ToolCaller) generateReasonIfNeeded(tool *aitool.Tool, params aitool.InvokeParams) {
@@ -769,7 +686,6 @@ func (t *ToolCaller) generateReasonIfNeeded(tool *aitool.Tool, params aitool.Inv
 			}
 			t.m.Lock()
 			t.reason = reason
-			t.reasonFinalized = true // concrete reason now exists; thinking stream should not overwrite
 			t.m.Unlock()
 			if t.emitter != nil {
 				t.emitter.EmitToolCallReason(t.callToolId, reason)
@@ -782,10 +698,9 @@ func (t *ToolCaller) generateReasonIfNeeded(tool *aitool.Tool, params aitool.Inv
 // DirectlyCallPrepareFunc is the loop-layer callback that prepares the final
 // invoke params for a directly_call_tool action AFTER the tool-call card has been
 // created. It receives the streaming *Action (whose field getters block until
-// each field has streamed in) and the resolved tool. It returns the finalized
-// params, whether to fall back to the AI param-generation (require) path (e.g.
-// on schema-validation failure), or an error.
-type DirectlyCallPrepareFunc func(action *Action, toolName string) (finalParams aitool.InvokeParams, fallbackToRequire bool, tool *aitool.Tool, err error)
+// each field has streamed in) and the tool name. It returns finalized params,
+// the resolved tool, or an error.
+type DirectlyCallPrepareFunc func(action *Action, toolName string) (finalParams aitool.InvokeParams, tool *aitool.Tool, err error)
 
 // DirectlyCallTool handles the "card already created" flow for a
 // directly_call_tool action: it emits the tool-call card (loading) FIRST, then
@@ -793,9 +708,6 @@ type DirectlyCallPrepareFunc func(action *Action, toolName string) (finalParams 
 // they arrive), then invokes the tool. Because Action is an async streaming
 // structure, the card appears immediately and reason/params stream in afterwards
 // — card creation is never blocked on reason/params parsing.
-//
-// On fallbackToRequire the same card is reused and execution switches to the AI
-// param-generation path (CallToolWithExistedParams with skipRequire=false).
 func (t *ToolCaller) DirectlyCallTool(nominalTool *aitool.Tool, action *Action, prepare DirectlyCallPrepareFunc) (*aitool.ToolResult, bool, error) {
 	if t.emitter == nil {
 		emitter := t.config.GetEmitter()
@@ -814,8 +726,6 @@ func (t *ToolCaller) DirectlyCallTool(nominalTool *aitool.Tool, action *Action, 
 	// 2. stash the action's reason (if any) into t.reason so the unified
 	//    reason handler in CallToolWithExistedParams can emit it. We do NOT emit
 	//    here — that path is the single source of truth for reason events.
-	//    reasonFinalized is set so the param-generation thinking stream won't
-	//    overwrite this concrete reason.
 	if action != nil && strings.TrimSpace(t.reason) == "" {
 		reason := action.GetString("directly_call_reason")
 		if strings.TrimSpace(reason) == "" {
@@ -823,20 +733,17 @@ func (t *ToolCaller) DirectlyCallTool(nominalTool *aitool.Tool, action *Action, 
 		}
 		if strings.TrimSpace(reason) != "" {
 			t.reason = reason
-			t.reasonFinalized = true
 		}
 	}
 
 	// 3. prepare params via loop-layer callback (reads action fields, blocks until streamed).
 	finalParams := make(aitool.InvokeParams)
-	fallback := false
 	var tool *aitool.Tool
 	if prepare != nil {
 		var fp aitool.InvokeParams
 		var err error
-		var fb bool
 		t.emitter.EmitToolCallStatus(t.callToolId, schema.TOOL_CALL_STATUS_PROCESSING_PARAMS)
-		fp, fb, tool, err = prepare(action, nominalTool.Name)
+		fp, tool, err = prepare(action, nominalTool.Name)
 		t.emitter.EmitToolCallStatus(t.callToolId, schema.TOOL_CALL_STATUS_RUNNING)
 		if err != nil {
 			// close the card on prepare error (we never reach CallToolWithExistedParams' defers)
@@ -852,20 +759,13 @@ func (t *ToolCaller) DirectlyCallTool(nominalTool *aitool.Tool, action *Action, 
 			return nil, false, err
 		}
 		finalParams = fp
-		fallback = fb
 	}
 
 	// 4. run the post-card flow. sync.Once ensures start is not re-emitted.
-	if fallback {
-		// The direct params were rejected and the require path generated a new set,
-		// so the final result remains the only authoritative timeline copy.
-		t.omitResultParamsInTimeline = false
-		return t.CallToolWithExistedParams(tool, false, nil)
-	}
 	if finalParams == nil {
 		finalParams = make(aitool.InvokeParams)
 	}
-	return t.CallToolWithExistedParams(tool, true, finalParams)
+	return t.CallToolWithExistedParams(tool, finalParams)
 }
 
 // EmitReason emits (or updates) the human-readable reason for this tool call on
@@ -877,22 +777,6 @@ func (t *ToolCaller) EmitReason(reason string) {
 		return
 	}
 	t.emitter.EmitToolCallReason(t.callToolId, reason)
-}
-
-// GenerateParamsResult contains the result of generateParams including params and identifier
-type GenerateParamsResult struct {
-	Params           aitool.InvokeParams
-	Identifier       string        // destination identifier, e.g. "query_large_file", "find_process"
-	Duration         time.Duration // time spent generating params via AI
-	RawAIResponse    string        // raw AI stream output for param generation
-	CallExpectations string        // AI-generated expectations for this tool call (timing, success criteria, etc.)
-}
-
-func (t *ToolCaller) generateParams(tool *aitool.Tool, handleError func(i any)) (*GenerateParamsResult, error) {
-	if t.config.GetConfigBool("EnableFunctionCallMode") {
-		return t.functionCallGenerateParams(tool, handleError)
-	}
-	return t.textStreamGenerateParams(tool, handleError)
 }
 
 // sanitizeIdentifier sanitizes the identifier to be safe for use in file paths
@@ -960,10 +844,9 @@ func SanitizeTaskName(name string) string {
 	return str
 }
 
-// CallToolWithExistedParams is the normal require/preset tool-call flow (param
-// generation/review/invoke/done). DirectlyCallTool delegates here for the actual
-// invoke after emitting the card and running the prepare callback.
-func (t *ToolCaller) CallToolWithExistedParams(tool *aitool.Tool, presetParams bool, presetInvokeParams aitool.InvokeParams) (result *aitool.ToolResult, directlyAnswer bool, err error) {
+// CallToolWithExistedParams reviews and executes explicit arguments.
+// DirectlyCallTool delegates here after creating the card and preparing params.
+func (t *ToolCaller) CallToolWithExistedParams(tool *aitool.Tool, presetInvokeParams aitool.InvokeParams) (result *aitool.ToolResult, directlyAnswer bool, err error) {
 	if t.emitter == nil {
 		emitter := t.config.GetEmitter()
 		if emitter == nil {
@@ -988,16 +871,14 @@ func (t *ToolCaller) CallToolWithExistedParams(tool *aitool.Tool, presetParams b
 	// Both the normal require path and DirectlyCallTool converge here. Priority:
 	//   1. preset reason (WithToolCaller_Reason) or action-stashed reason
 	//   2. liteforge-generated reason (at most once per tool call)
-	// Emit the concrete reason if present, otherwise generate one. The
-	// param-generation thinking stream may still update the card afterwards, but
-	// only while reasonFinalized is false.
+	// Emit the concrete reason if present, otherwise generate one.
 	if strings.TrimSpace(t.reason) != "" {
 		t.emitReason(t.reason)
 	} else {
 		t.generateReasonIfNeeded(tool, nil)
 	}
 
-	t.emitter.EmitInfo("start to generate tool[%v] params in task: %v", tool.Name, t.task.GetName())
+	t.emitter.EmitInfo("start tool[%v] call in task: %v", tool.Name, t.task.GetName())
 	// pluginInvokeStartTime: 纯插件执行起点（从真正进入 t.invoke 前开始计时）。
 	// 该时间不会包含 AI 生成参数、人工 review 等前置阶段。
 	var pluginInvokeStartTime time.Time
@@ -1068,51 +949,32 @@ func (t *ToolCaller) CallToolWithExistedParams(tool *aitool.Tool, presetParams b
 
 	defer handleDone()
 
-	// generate params
-	var invokeParams = make(aitool.InvokeParams)
-	var destinationIdentifier string // identifier describing the purpose of this tool call
-	var paramGenDuration time.Duration
-	var rawAIParamResponse string
-	if presetParams {
-		invokeParams = presetInvokeParams
-		if id, ok := invokeParams[ReservedKeyIdentifier]; ok {
+	invokeParams := presetInvokeParams
+	var destinationIdentifier string
+	if id, ok := invokeParams[ReservedKeyIdentifier]; ok {
+		destinationIdentifier = sanitizeIdentifier(utils.InterfaceToString(id))
+		delete(invokeParams, ReservedKeyIdentifier)
+	}
+	if destinationIdentifier == "" && !tool.Params().Have("identifier") {
+		if id, ok := invokeParams["identifier"]; ok {
 			destinationIdentifier = sanitizeIdentifier(utils.InterfaceToString(id))
-			delete(invokeParams, ReservedKeyIdentifier)
-		}
-		if destinationIdentifier == "" {
-			if id, ok := invokeParams["identifier"]; ok {
-				destinationIdentifier = sanitizeIdentifier(utils.InterfaceToString(id))
-				delete(invokeParams, "identifier")
-			}
-		}
-		if ce, ok := invokeParams[ReservedKeyCallExpectations]; ok {
-			t.callExpectations = utils.InterfaceToString(ce)
-			delete(invokeParams, ReservedKeyCallExpectations)
-		}
-		if t.callExpectations == "" {
-			if ce, ok := invokeParams["call_expectations"]; ok {
-				t.callExpectations = utils.InterfaceToString(ce)
-				delete(invokeParams, "call_expectations")
-			}
-		}
-		if destinationIdentifier != "" {
-			t.emitter.EmitInfo("tool[%v] destination identifier: %v", tool.Name, destinationIdentifier)
-		}
-		t.emitter.EmitInfo("use preset params for tool[%v]: %v", tool.Name, invokeParams)
-	} else {
-		generateResult, err := t.generateParams(tool, handleError)
-		if err != nil {
-			return nil, false, fmt.Errorf("error generating params for tool[%v]: %w", tool.Name, err)
-		}
-		invokeParams = generateResult.Params
-		destinationIdentifier = generateResult.Identifier
-		paramGenDuration = generateResult.Duration
-		rawAIParamResponse = generateResult.RawAIResponse
-		t.callExpectations = generateResult.CallExpectations
-		if destinationIdentifier != "" {
-			t.emitter.EmitInfo("tool[%v] destination identifier: %v", tool.Name, destinationIdentifier)
+			delete(invokeParams, "identifier")
 		}
 	}
+	if ce, ok := invokeParams[ReservedKeyCallExpectations]; ok {
+		t.callExpectations = utils.InterfaceToString(ce)
+		delete(invokeParams, ReservedKeyCallExpectations)
+	}
+	if t.callExpectations == "" && !tool.Params().Have("call_expectations") {
+		if ce, ok := invokeParams["call_expectations"]; ok {
+			t.callExpectations = utils.InterfaceToString(ce)
+			delete(invokeParams, "call_expectations")
+		}
+	}
+	if destinationIdentifier != "" {
+		t.emitter.EmitInfo("tool[%v] destination identifier: %v", tool.Name, destinationIdentifier)
+	}
+	t.emitter.EmitInfo("use preset params for tool[%v]: %v", tool.Name, invokeParams)
 	if t.destinationIdentifier != "" {
 		destinationIdentifier = t.destinationIdentifier
 	}
@@ -1408,7 +1270,7 @@ func (t *ToolCaller) CallToolWithExistedParams(tool *aitool.Tool, presetParams b
 		stdoutMultiWriter, stderrMultiWriter,
 		stdoutBuffer, stderrBuffer,
 		func(result *aitool.ToolResult) error {
-			return artifactBundle.finalize(t, tool, callToolId, destinationIdentifier, invokeParams, result, paramGenDuration, rawAIParamResponse)
+			return artifactBundle.finalize(t, tool, callToolId, destinationIdentifier, invokeParams, result)
 		},
 	)
 	t.m.Lock()

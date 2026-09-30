@@ -42,7 +42,7 @@ func TestReAct_ToolUse_FromDB_ViaToolSearch_WithDefaultConfig(t *testing.T) {
 				if !toolSearchCalled {
 					rsp := i.NewAIResponse()
 					rsp.EmitOutputStream(bytes.NewBufferString(`
-{"@action": "object", "next_action": { "type": "require_tool", "tool_require_payload": "tools_search" },
+{"@action": "directly_call_tool", "directly_call_tool_name": "tools_search", "directly_call_tool_params": { "query" : "mock_db_tool" },
 "human_readable_thought": "need to search for the mock tool", "cumulative_summary": "searching for tools"}
 `))
 					rsp.Close()

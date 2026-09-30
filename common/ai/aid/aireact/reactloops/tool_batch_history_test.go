@@ -38,10 +38,7 @@ func TestToolBatchActionInferenceAndHistoryExtraction(t *testing.T) {
 				"@action":"object",
 				"next_action":{
 					"type":"require_tool",
-					"tool_require_calls":[
-						{"tool_name":"grep"},
-						{"tool_name":"read_file"}
-					]
+					"tool_require_calls":[{"tool_name":"grep"},{"tool_name":"read_file"}]
 				}
 			}`,
 			actionName: "object",
@@ -72,16 +69,16 @@ func TestToolBatchHistoryCountsChildrenAndClonesParams(t *testing.T) {
 		{
 			ActionType:    schema.AI_REACT_LOOP_ACTION_REQUIRE_TOOL,
 			ToolName:      "search",
-			ToolNames:     []string{"search", "search", "read_file"},
-			ToolCallCount: 3,
+			ToolNames:     []string{"search"},
+			ToolCallCount: 1,
 		},
 		// A legacy record has no ToolCallCount and remains one call.
 		{ActionType: schema.AI_REACT_LOOP_ACTION_TOOL_COMPOSE, ToolName: "legacy"},
 	}
-	require.Equal(t, 6, countToolCallsFromActionRecords(records))
+	require.Equal(t, 4, countToolCallsFromActionRecords(records))
 	require.Equal(
 		t,
-		"directly_call_tool(read_file,grep) -> require_tool(search,search,read_file) -> tool_compose(legacy)",
+		"directly_call_tool(read_file,grep) -> require_tool(search) -> tool_compose(legacy)",
 		summarizeValueFeedbackActions(records),
 	)
 	feedbackAction := valueFeedbackActionFromRecord(records[0])

@@ -18,8 +18,7 @@ const (
 	directlyCallToolBatchField = "directly_call_tool_calls"
 	requireToolBatchField      = "tool_require_calls"
 
-	actionStateDirectToolBatch  = "directly_call_tool_batch"
-	actionStateRequireToolBatch = "tool_require_batch"
+	actionStateDirectToolBatch = "directly_call_tool_batch"
 )
 
 // These are the exact scalar and batch examples taught by the tool-call actions.
@@ -112,7 +111,7 @@ const directlyCallToolBatchOutputExamples = `
 const requireToolScalarOutputExamples = `
 ### require_tool 单次调用
 
-当一个调用仍需运行时生成参数，或工具参数有嵌套 wrapper/语义歧义时，使用标量字段 tool_require_payload。tool_require_payload 只填写工具名，严禁在该字段中携带参数。
+当一个工具的 Schema 尚未在 CACHE_TOOL_CALL 中可见，或工具参数有嵌套 wrapper/语义歧义时，使用标量字段 tool_require_payload 加载其 Schema。tool_require_payload 只填写工具名，严禁在该字段中携带参数。加载后在下一轮用 directly_call_tool 构造参数并执行。
 
 下面的 JSON 是完整可解析格式（工具名应替换为当前可用的真实工具）：
 
@@ -120,9 +119,9 @@ const requireToolScalarOutputExamples = `
 `
 
 const requireToolBatchOutputExamples = `
-### require_tool 并发调用
+### require_tool 并发加载
 
-这是可选的延迟优化。仅当 2-8 个调用低风险、彼此独立且每个工具 Schema 都简单无歧义时，才使用 tool_require_calls。嵌套 wrapper 或参数语义不明时改用单调用。每项只提供工具名、identifier 和 reason，严禁提供 params。不要为凑数量发明调用，不要同时输出旧的 tool_require_payload 字段。
+这是可选的延迟优化。仅当 2-8 个调用低风险、彼此独立且每个工具 Schema 都简单无歧义时，才使用 tool_require_calls。嵌套 wrapper 或参数语义不明时改用单调用。每项只提供工具名、identifier 和 reason，严禁提供 params；运行时只加载 Schema，不生成参数。不要为凑数量发明调用，不要同时输出旧的 tool_require_payload 字段。加载后在下一轮用 directly_call_tool（单次或批量）构造参数并执行。
 
 下面的 JSON 是完整可解析格式（工具名应替换为当前可用的真实工具）：
 
@@ -164,7 +163,7 @@ func requireToolBatchSchemaOption() aitool.ToolOption {
 	return aitool.WithStructArrayParam(
 		requireToolBatchField,
 		[]aitool.PropertyOption{
-			aitool.WithParam_Description("可选的延迟优化。仅当本轮有 2-8 个低风险、互不干扰且每个工具 Schema 都简单无歧义的调用时使用；嵌套 wrapper 或参数语义不明时改用单调用。必须与 tool_require_payload 二选一，严禁混用。每项只填写工具名、identifier 和 reason，严禁提供 params；运行时会分别生成参数。不要为凑数量发明调用。下面是经过 CI 校验且可执行的格式：\n" + requireToolBatchOutputExampleJSON),
+			aitool.WithParam_Description("可选的延迟优化。仅当本轮有 2-8 个低风险、互不干扰且每个工具 Schema 都简单无歧义的调用时使用；嵌套 wrapper 或参数语义不明时改用单调用。必须与 tool_require_payload 二选一，严禁混用。每项只填写工具名、identifier 和 reason，严禁提供 params；运行时只加载 Schema，不生成参数。不要为凑数量发明调用。下面是经过 CI 校验且可执行的格式：\n" + requireToolBatchOutputExampleJSON),
 			aitool.WithParam_Raw("minItems", 2),
 			aitool.WithParam_Raw("maxItems", aicommon.DefaultToolBatchMaxCalls),
 		},
@@ -173,7 +172,7 @@ func requireToolBatchSchemaOption() aitool.ToolOption {
 		},
 		aitool.WithStringParam("tool_name",
 			aitool.WithParam_Required(true),
-			aitool.WithParam_Description("需要由运行时生成参数的工具准确名称。")),
+			aitool.WithParam_Description("需要加载 Schema 的工具准确名称。")),
 		aitool.WithStringParam("identifier",
 			aitool.WithParam_Description("可选。该 child 调用的唯一 snake_case 目的标识。")),
 		aitool.WithStringParam("reason",
@@ -313,6 +312,9 @@ func strictBatchParams(raw any) (aitool.InvokeParams, error) {
 }
 
 func deepCloneInvokeParams(params aitool.InvokeParams) (aitool.InvokeParams, error) {
+	if params == nil {
+		return make(aitool.InvokeParams), nil
+	}
 	// Action payloads are JSON data. A marshal round-trip is intentional here:
 	// ValidateParams applies defaults and some tools mutate nested parameters;
 	// no child may retain aliases into Action's canonical parse tree.
@@ -345,7 +347,7 @@ func parseDirectToolBatchActionWithMetadata(loop *reactloops.ReActLoop, action *
 		return nil, true, utils.Errorf("%s cannot be combined with legacy directly_call_tool_* fields", directlyCallToolBatchField)
 	}
 	if hasAnyCanonicalActionParam(action,
-		requireToolBatchField,
+		"tool_require_calls",
 		"tool_require_payload",
 		"tool_call_reason",
 	) {
@@ -415,7 +417,6 @@ func parseDirectToolBatchActionWithMetadata(loop *reactloops.ReActLoop, action *
 		reactloops.MaybeWarnBashBeforeEdit(loop, toolName)
 		request.Calls = append(request.Calls, aicommon.ToolBatchCall{
 			Index:        index,
-			Mode:         aicommon.ToolCallModeDirect,
 			ToolName:     toolName,
 			Params:       params,
 			Identifier:   identifier,
@@ -432,78 +433,6 @@ func parseDirectToolBatchActionWithMetadata(loop *reactloops.ReActLoop, action *
 		// Accept the old top-level field for compatibility, but never turn a
 		// batch-wide reason into each child's visible reason. A missing child
 		// reason is generated with that child's identifier as context.
-	}
-	return request, true, nil
-}
-
-func parseRequireToolBatchAction(loop *reactloops.ReActLoop, action *aicommon.Action) (*aicommon.ToolBatchRequest, bool, error) {
-	if err := action.WaitParseResult(toolBatchVerifierContext(loop)); err != nil {
-		return nil, false, utils.Wrap(err, "require_tool action parse failed")
-	}
-
-	items, hasBatch, err := parseCanonicalBatchItems(action, requireToolBatchField)
-	if err != nil || !hasBatch {
-		return nil, hasBatch, err
-	}
-	if hasAnyCanonicalActionParam(action, "tool_require_payload", "tool_call_reason") {
-		return nil, true, utils.Errorf("%s cannot be combined with legacy tool_require_payload/tool_call_reason fields", requireToolBatchField)
-	}
-	if hasAnyCanonicalActionParam(action,
-		directlyCallToolBatchField,
-		"directly_call_tool_name",
-		"directly_call_tool_params",
-		"directly_call_identifier",
-		"directly_call_expectations",
-		"directly_call_reason",
-	) {
-		return nil, true, utils.Errorf("%s cannot be combined with directly_call_tool fields", requireToolBatchField)
-	}
-	if err := validateBatchLength(loop, requireToolBatchField, items); err != nil {
-		return nil, true, err
-	}
-
-	mgr := loop.GetConfig().GetAiToolManager()
-	if mgr == nil {
-		return nil, true, utils.Error("tool manager is unavailable")
-	}
-	allowed := map[string]struct{}{
-		"tool_name": {}, "identifier": {}, "reason": {},
-	}
-	identifiers := make(map[string]int)
-	request := &aicommon.ToolBatchRequest{Calls: make([]aicommon.ToolBatchCall, 0, len(items))}
-	for index, item := range items {
-		if err := rejectUnknownBatchFields(item, allowed); err != nil {
-			return nil, true, utils.Wrapf(err, "%s[%d]", requireToolBatchField, index)
-		}
-		toolName, err := strictBatchString(item, "tool_name", true)
-		if err != nil {
-			return nil, true, utils.Wrapf(err, "%s[%d]", requireToolBatchField, index)
-		}
-		identifier, err := strictBatchString(item, "identifier", false)
-		if err != nil {
-			return nil, true, utils.Wrapf(err, "%s[%d]", requireToolBatchField, index)
-		}
-		if identifier != "" {
-			if first, duplicate := identifiers[identifier]; duplicate {
-				return nil, true, utils.Errorf("%s[%d].identifier duplicates %s[%d].identifier %q", requireToolBatchField, index, requireToolBatchField, first, identifier)
-			}
-			identifiers[identifier] = index
-		}
-		reason, err := strictBatchString(item, "reason", false)
-		if err != nil {
-			return nil, true, utils.Wrapf(err, "%s[%d]", requireToolBatchField, index)
-		}
-		if _, err := mgr.GetToolByName(toolName); err != nil {
-			return nil, true, utils.Wrapf(err, "%s[%d].tool_name %q is unavailable", requireToolBatchField, index, toolName)
-		}
-		reactloops.MaybeWarnBashBeforeEdit(loop, toolName)
-		request.Calls = append(request.Calls, aicommon.ToolBatchCall{
-			Index:      index,
-			Mode:       aicommon.ToolCallModeRequire,
-			ToolName:   toolName,
-			Identifier: identifier,
-			Reason:     reason,
-		})
 	}
 	return request, true, nil
 }
@@ -591,21 +520,17 @@ func executeToolBatchSerialFallback(
 		if call.Expectations != "" {
 			opts = append(opts, aicommon.WithToolCaller_CallExpectations(call.Expectations))
 		}
-		if call.Mode == aicommon.ToolCallModeRequire {
-			toolResult, directlyAnswer, err = invoker.ExecuteToolRequiredAndCall(ctx, call.ToolName, opts...)
+		params, cloneErr := deepCloneInvokeParams(call.Params)
+		if cloneErr != nil {
+			err = cloneErr
 		} else {
-			params, cloneErr := deepCloneInvokeParams(call.Params)
-			if cloneErr != nil {
-				err = cloneErr
-			} else {
-				if call.Identifier != "" {
-					params[aicommon.ReservedKeyIdentifier] = call.Identifier
-				}
-				if call.Expectations != "" {
-					params[aicommon.ReservedKeyCallExpectations] = call.Expectations
-				}
-				toolResult, directlyAnswer, err = invoker.ExecuteToolRequiredAndCallWithoutRequired(ctx, call.ToolName, params, opts...)
+			if call.Identifier != "" {
+				params[aicommon.ReservedKeyIdentifier] = call.Identifier
 			}
+			if call.Expectations != "" {
+				params[aicommon.ReservedKeyCallExpectations] = call.Expectations
+			}
+			toolResult, directlyAnswer, err = invoker.ExecuteToolRequiredAndCallWithoutRequired(ctx, call.ToolName, params, opts...)
 		}
 
 		stage := aicommon.ToolCallStageDone

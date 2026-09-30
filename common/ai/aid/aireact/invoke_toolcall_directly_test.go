@@ -423,7 +423,7 @@ func TestReAct_DirectlyCallTool_RequireThenDirect(t *testing.T) {
 				rsp := i.NewAIResponse()
 				if atomic.LoadInt32(&toolCallCount) == 0 {
 					rsp.EmitOutputStream(bytes.NewBufferString(`
-{"@action": "object", "next_action": { "type": "require_tool", "tool_require_payload": "sleep_test" },
+{"@action": "directly_call_tool", "directly_call_tool_name": "sleep_test", "directly_call_tool_params": { "seconds": 0.1 },
 "human_readable_thought": "first call via require", "cumulative_summary": "..phase1.."}
 `))
 				} else {
@@ -541,25 +541,14 @@ func TestReAct_DirectlyCallTool_PersistentSession(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	// === Conversation 1: require_tool ===
+	// === Conversation 1: directly_call_tool (was require_tool; now require_tool
+	// only loads schemas, so use directly_call_tool to execute and cache the tool) ===
 	in1 := make(chan *ypb.AIInputEvent, 10)
 	out1 := make(chan *ypb.AIOutputEvent, 400)
 
 	react1, err := NewTestReAct(
 		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
-			prompt := r.GetPrompt()
-			// verification 收缩为纯观测角色后, satisfied=true 不再自动退出. mockedToolCalling
-			// 在 isPrimaryDecisionPrompt 总是返回 require_tool, 工具执行一轮后会无限循环.
-			// 这里在 isPrimaryDecisionPrompt 分支检测到工具语义结果 (RESULT) 已
-			// 存在于 prompt (作为 timeline-open 段内容), 说明工具已执行过, 主动 finish 收口
-			// (模拟 "AI 判断任务完成后主动调 finish" 的新行为).
-			if isPrimaryDecisionPrompt(prompt) && strings.Contains(prompt, "RESULT:") {
-				rsp := i.NewAIResponse()
-				rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "finish", "human_readable_thought": "mocked: task done after tool call"}`))
-				rsp.Close()
-				return rsp, nil
-			}
-			return mockedToolCalling(i, r, "sleep_test")
+			return mockedDirectlyCallTool(i, r, "sleep_test")
 		}),
 		aicommon.WithEventInputChan(in1),
 		aicommon.WithEventHandler(func(e *schema.AiOutputEvent) {
@@ -624,9 +613,40 @@ LOOP1:
 	out2 := make(chan *ypb.AIOutputEvent, 400)
 
 	var conv2ToolCallCount int32
+	var conv2DecisionCount int32
 	react2, err := NewTestReAct(
 		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
-			return mockedDirectlyCallTool(i, r, "sleep_test")
+			prompt := r.GetPrompt()
+			if isPrimaryDecisionPrompt(prompt) {
+				// The persistent timeline from conversation 1 contains
+				// "ToolName sleep_test Parameter:" and "RESULT:", so we cannot
+				// use those markers to decide finish. Instead, count primary
+				// decision prompts: first call executes the tool, second call
+				// finishes.
+				if atomic.AddInt32(&conv2DecisionCount, 1) >= 2 {
+					rsp := i.NewAIResponse()
+					rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "finish", "human_readable_thought": "mocked: task done after tool call"}`))
+					rsp.Close()
+					return rsp, nil
+				}
+				rsp := i.NewAIResponse()
+				rsp.EmitOutputStream(bytes.NewBufferString(`
+{"@action": "object", "next_action": { "type": "directly_call_tool", "directly_call_tool_name": "sleep_test", "directly_call_identifier": "sleep_briefly", "directly_call_expectations": "~0.1s, instant", "directly_call_tool_params": {"seconds": 0.1} },
+"human_readable_thought": "directly calling cached tool", "cumulative_summary": "..directly-call-summary.."}
+`))
+				rsp.Close()
+				return rsp, nil
+			}
+			if isVerifySatisfactionPrompt(prompt) {
+				rsp := i.NewAIResponse()
+				rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "verify-satisfaction", "user_satisfied": true, "reasoning": "directly-call-satisfied"}`))
+				rsp.Close()
+				return rsp, nil
+			}
+			rsp := i.NewAIResponse()
+			rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "finish", "human_readable_thought": "mocked: task done after tool call"}`))
+			rsp.Close()
+			return rsp, nil
 		}),
 		aicommon.WithEventInputChan(in2),
 		aicommon.WithEventHandler(func(e *schema.AiOutputEvent) {

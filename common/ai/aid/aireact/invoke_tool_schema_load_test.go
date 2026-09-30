@@ -55,14 +55,15 @@ func TestNativeMainLoopLoadSchemasThenDirectExecution(t *testing.T) {
 			switch step {
 			case 1:
 				require.Contains(t, req.GetPrompt(), "Load business-tool parameter schemas")
-				add("require_tool", `{"tool_require_calls":[{"tool_name":"schema_probe_a"},{"tool_name":"schema_probe_b"}]}`)
+				add("require_tool", `{"tool_require_payload":"schema_probe_a"}`)
+				add("require_tool", `{"tool_require_payload":"schema_probe_b"}`)
 			case 2:
 				require.Zero(t, executions.Load())
 				open := aicommon.RenderTimelineFrozenOpen(react.config.Timeline)
 				require.Contains(t, open.Open, "[UPSERT] schema_probe_a")
 				require.Equal(t, 2, strings.Count(open.Open, "Direct Params Schema"))
 				require.Empty(t, open.PromotedSemiDynamic1)
-				add("require_tool", `{"tool_require_payload":"schema_probe_a"}`)
+				add("require_tool", `{"tool_require_calls":[{"tool_name":"schema_probe_a"},{"tool_name":"schema_probe_b"}]}`)
 			case 3:
 				require.Zero(t, executions.Load())
 				require.Contains(t, aicommon.RenderTimelineFrozenOpen(react.config.Timeline).Open, "[REUSE] schema_probe_a")

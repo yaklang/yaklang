@@ -197,6 +197,7 @@ func TestPlanExec_PrefixCacheStableWithMockedTieredAI(t *testing.T) {
 	decisionStageIdx := 0
 	toolParamStageIdx := 0
 	progressStageIdx := 0
+	pendingDirectlyCallStage := -1 // tracks which stage has require_tool loaded schema but not yet directly_call_tool
 	// verification 收缩为纯观测角色后, satisfied=true 不再自动结束子任务.
 	// 无开放 TODO 的子任务只需一次显式 finish。
 	remainingSubtaskFinishes := 0
@@ -331,12 +332,29 @@ func TestPlanExec_PrefixCacheStableWithMockedTieredAI(t *testing.T) {
 					"human_readable_thought": "mocked: subtask done after verification satisfied",
 				})), nil
 			}
+			// 新流程: require_tool 只加载 Schema, 下一轮需要 directly_call_tool 执行
+			if pendingDirectlyCallStage >= 0 {
+				// Schema 已加载, 这次用 directly_call_tool 执行
+				stage := stages[pendingDirectlyCallStage]
+				pendingDirectlyCallStage = -1
+				stageCursorMu.Unlock()
+				return newMockAIResponse(i, intelligentModel, mustJSONString(map[string]any{
+					"@action":                 "directly_call_tool",
+					"directly_call_tool_name": toolName,
+					"directly_call_tool_params": map[string]any{
+						"subtask_id": stage.ToolParam,
+					},
+					"human_readable_thought": fmt.Sprintf("执行子任务 %s，调用 mock tool", stage.Identifier),
+					"cumulative_summary":     fmt.Sprintf("%s executing deterministic tool", stage.Identifier),
+				})), nil
+			}
 			if decisionStageIdx >= len(stages) {
 				stageCursorMu.Unlock()
 				return nil, utils.Errorf("unexpected intelligent subtask decision prompt overflow: %s", utils.ShrinkString(prompt, 240))
 			}
 			stage := stages[decisionStageIdx]
 			decisionStageIdx++
+			pendingDirectlyCallStage = decisionStageIdx - 1
 			stageCursorMu.Unlock()
 			return newMockAIResponse(i, intelligentModel, mustJSONString(map[string]any{
 				"@action": "object",
@@ -344,8 +362,8 @@ func TestPlanExec_PrefixCacheStableWithMockedTieredAI(t *testing.T) {
 					"type":                 "require_tool",
 					"tool_require_payload": toolName,
 				},
-				"human_readable_thought": fmt.Sprintf("执行子任务 %s，需要调用 mock tool", stage.Identifier),
-				"cumulative_summary":     fmt.Sprintf("%s ready for deterministic tool execution", stage.Identifier),
+				"human_readable_thought": fmt.Sprintf("执行子任务 %s，需要加载 mock tool schema", stage.Identifier),
+				"cumulative_summary":     fmt.Sprintf("%s ready for tool schema loading", stage.Identifier),
 			})), nil
 
 		case utils.MatchAllOfSubString(prompt, "continue-current-task", "proceed-next-task", "task-failed"):
@@ -394,8 +412,13 @@ func TestPlanExec_PrefixCacheStableWithMockedTieredAI(t *testing.T) {
 					"- 所有工具结果均由 deterministic mock tool 产生",
 				}, "\n"),
 			})), nil
-		}
+		case isTaskShortIdPrompt(prompt):
+			return newMockAIResponse(i, lightweightModel, mustJSONString(map[string]any{
+				"@action":    "task-short-id",
+				"identifier": "mock_prefix_cache",
+			})), nil
 
+		}
 		return nil, utils.Errorf("unexpected lightweight prompt: %s", utils.ShrinkString(prompt, 240))
 	}
 
@@ -892,4 +915,8 @@ func isPlanExecGuidanceDocPrompt(prompt string) bool {
 
 func isPlanExecPlanFromDocPrompt(prompt string) bool {
 	return strings.Contains(prompt, `"const": "plan_from_document"`)
+}
+
+func isTaskShortIdPrompt(prompt string) bool {
+	return strings.Contains(prompt, `"const": "task-short-id"`)
 }

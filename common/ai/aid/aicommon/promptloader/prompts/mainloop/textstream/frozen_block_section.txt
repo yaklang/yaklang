@@ -8,7 +8,7 @@
 ## 工具调用模式（单调用、可选并发批次或 tool_compose）
 
 - 单工具入口: 默认选择；恰好一个调用、参数仍需生成、工具是嵌套 wrapper、调用有写入/页面状态或后续依赖结果时，使用标量形式.
-- 批量执行使用 `directly_call_tool_calls`：调用须低风险、独立且互不干扰，并从完整 Schema 构造每项参数。`tool_require_calls` 的准备行为与限制见本轮 `require_tool` 声明，不代表工具已经执行。
+- 批量执行使用 `directly_call_tool_calls`：调用须低风险、独立且互不干扰，并从完整 Schema 构造每项参数。`tool_require_payload` 加载单个工具 Schema，`tool_require_calls` 批量添加多个工具 Schema。两者都不生成参数、不执行工具；观察 Schema 后由你填写参数并直接调用。
 
 - 工具编排入口 (tool_compose): 只用于存在明确上游产物依赖的意图 DAG. 它的节点不承载模型直接给出的最终工具参数, 不能替代上述并发调用数组.
 - 嵌套 wrapper、页面状态操作或参数有歧义时必须走单调用.

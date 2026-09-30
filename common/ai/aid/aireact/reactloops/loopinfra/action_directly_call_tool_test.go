@@ -34,17 +34,12 @@ func (t *directlyCallTestInvoker) ExecuteToolRequiredAndCallWithoutRequired(ctx 
 
 // DirectlyCallTool mirrors aicommon.ToolCaller.DirectlyCallTool for tests: it
 // runs the loop-layer prepare callback (which normalizes/validates params and
-// emits progress), records the finalized preset params, and on fallbackToRequire
-// delegates to the require path (ExecuteToolRequiredAndCall) — reusing the same
-// card semantics as the real implementation.
+// emits progress), then records the finalized params for explicit execution.
 func (t *directlyCallTestInvoker) DirectlyCallTool(ctx context.Context, toolName string, action *aicommon.Action, prepare aicommon.DirectlyCallPrepareFunc) (*aitool.ToolResult, bool, error) {
 	if prepare != nil && t.tool != nil {
-		params, fallback, _, err := prepare(action, toolName)
+		params, _, err := prepare(action, toolName)
 		if err != nil {
 			return nil, false, err
-		}
-		if fallback {
-			return t.ExecuteToolRequiredAndCall(ctx, toolName)
 		}
 		t.mu.Lock()
 		t.withoutRequiredName = toolName
@@ -297,16 +292,17 @@ func TestDirectlyCallTool_Handler_RequiredParamMismatchAddsLatestFewShot(t *test
 	op := reactloops.NewActionHandlerOperator(task)
 	loopAction_directlyCallTool.ActionHandler(loop, action, op)
 
-	assert.Empty(t, invoker.withoutRequiredName)
-	assert.True(t, invoker.toolCallCalled)
-	assert.Equal(t, "sleep_test", invoker.toolCallName)
+	// Validation failure no longer falls back to require_tool (AI param generation).
+	// The handler reports the error so the model can correct params in the next
+	// iteration using the schema in CACHE_TOOL_CALL.
+	assert.False(t, invoker.toolCallCalled)
+	assert.Empty(t, invoker.toolCallName)
 	timeline := invoker.getTimelineString()
 	assert.Contains(t, timeline, "params validation failed for cached tool 'sleep_test'")
-	assert.Contains(t, timeline, "auto fallback: switching 'sleep_test' from directly_call_tool to @action=require_tool because schema validation failed")
 	assert.Contains(t, timeline, `{"@action":"require_tool","tool_require_payload":"sleep_test"}`)
 	assert.Contains(t, timeline, `{"@action":"directly_call_tool","directly_call_tool_name":"sleep_test"`)
 	assert.NotContains(t, timeline, `"next_action"`)
-	assert.Contains(t, op.GetFeedback().String(), "automatically switching to @action=require_tool")
+	assert.Contains(t, op.GetFeedback().String(), "correct the params using the tool schema in CACHE_TOOL_CALL or use require_tool to load the schema first")
 }
 
 func TestDirectlyCallTool_Verifier_PassesThroughWhenNotCached(t *testing.T) {

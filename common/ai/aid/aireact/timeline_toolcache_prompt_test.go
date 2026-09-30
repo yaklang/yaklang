@@ -92,27 +92,3 @@ func TestTimelineToolCachePromptProjection(t *testing.T) {
 		})
 	}
 }
-
-func TestTimelineToolCacheTextParamsExcludeCachedSchemas(t *testing.T) {
-	react, err := NewTestReAct()
-	require.NoError(t, err)
-	react.config.GetTimeline().SetTimelineBucketByteSize(-1)
-	selected := aitool.NewWithoutCallback("selected_tool", aitool.WithStringParam("path"))
-	cached := aitool.NewWithoutCallback("unrelated_tool", aitool.WithDescription("UNRELATED_CACHE_SCHEMA"), aitool.WithStringParam("query"))
-	react.config.RecordRecentlyUsedTool(cached)
-	react.config.GetTimeline().PushText(react.config.AcquireId(), "KEEP_TOOL_RESULT_HISTORY")
-	for _, frozen := range []bool{false, true} {
-		if frozen {
-			react.config.GetTimeline().FreezeAll()
-		}
-		initial, err := react.promptManager.GenerateToolParamsPromptWithMetaForQuery("read selected file", selected)
-		require.NoError(t, err)
-		retry, err := react.promptManager.GenerateReGenerateToolParamsPromptWithMeta("read selected file", aitool.InvokeParams{"path": "old"}, selected)
-		require.NoError(t, err)
-		for _, prompt := range []string{initial.Prompt, retry.Prompt} {
-			require.NotContains(t, prompt, "UNRELATED_CACHE_SCHEMA")
-			require.Contains(t, prompt, "KEEP_TOOL_RESULT_HISTORY")
-			require.Contains(t, prompt, "selected_tool")
-		}
-	}
-}

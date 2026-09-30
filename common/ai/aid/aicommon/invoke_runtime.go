@@ -361,8 +361,7 @@ type AIInvokeRuntime interface {
 	// DirectlyCallTool handles a directly_call_tool action: it creates the tool-call
 	// card (loading) first, then reads reason/params from the streaming action and
 	// invokes the tool. The loop-layer prepare callback does param normalize/validate
-	// and may signal fallbackToRequire to reuse the same card and switch to the AI
-	// param-generation path. See aicommon.ToolCaller.DirectlyCallTool / DirectlyCallPrepareFunc.
+	// and returns validation errors without implicitly requesting new parameters.
 	DirectlyCallTool(ctx context.Context, toolName string, action *Action, prepare DirectlyCallPrepareFunc) (*aitool.ToolResult, bool, error)
 	AskForClarification(ctx context.Context, question string, payloads []string) string
 	DirectlyAnswer(ctx context.Context, query string, tools []*aitool.Tool, opts ...any) (string, error)

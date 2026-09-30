@@ -35,7 +35,7 @@ func mockedMCPToolCalling(i aicommon.AICallerConfigIf, req *aicommon.AIRequest, 
 			return rsp, nil
 		}
 		rsp.EmitOutputStream(bytes.NewBufferString(`
-{"@action": "object", "next_action": { "type": "require_tool", "tool_require_payload": "` + toolName + `" },
+{"@action": "directly_call_tool", "directly_call_tool_name": "` + toolName + `", "directly_call_tool_params": { "message" : "message_` + nonce + `" },
 "human_readable_thought": "mocked thought for mcp tool calling", "cumulative_summary": "..cumulative-mocked for mcp tool calling.."}
 `))
 		rsp.Close()

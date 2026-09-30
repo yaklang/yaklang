@@ -82,7 +82,7 @@ func TestToolCaller_ExplicitEditedParamsValueFeedback(t *testing.T) {
 		WithToolCaller_Reason("verify explicit edited params feedback"),
 	)
 	require.NoError(t, err)
-	result, directlyAnswer, callErr := caller.CallToolWithExistedParams(tool, true, aitool.InvokeParams{"id": 1})
+	result, directlyAnswer, callErr := caller.CallToolWithExistedParams(tool, aitool.InvokeParams{"id": 1})
 	require.NoError(t, callErr)
 	require.False(t, directlyAnswer)
 	require.NotNil(t, result)

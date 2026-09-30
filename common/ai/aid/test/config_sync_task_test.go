@@ -289,38 +289,38 @@ func TestCoordinator_SyncTask_Upgrade(t *testing.T) {
 				}
 				switch subTaskToolSeq {
 				case 0:
-					rsp.EmitOutputStream(bytes.NewBufferString(`
-{"@action": "object", "next_action": { "type": "require_tool", "tool_require_payload": "echo" },
+					rsp.EmitOutputStream(bytes.NewBufferString(fmt.Sprintf(`
+{"@action": "directly_call_tool", "directly_call_tool_name": "echo", "directly_call_tool_params": {"input": "%s"},
 "human_readable_thought": "mocked thought for tool calling", "cumulative_summary": "..cumulative-mocked for tool calling.."}
-`))
+`, echoToken[echoToolRequestCount])))
+					if echoToolRequestCount < 2 {
+						echoToolRequestCount++
+					}
 				case 1:
 					// 子任务1 第 2 次: echo; 子任务2 第 2 次: error. 用 task1/tool 计数区分.
 					toolName := "echo"
 					if taskExecRequestCount >= 3 {
 						toolName = "error"
 					}
-					rsp.EmitOutputStream(bytes.NewBufferString(`
-{"@action": "object", "next_action": { "type": "require_tool", "tool_require_payload": "` + toolName + `" },
+					if toolName == "echo" {
+						rsp.EmitOutputStream(bytes.NewBufferString(fmt.Sprintf(`
+{"@action": "directly_call_tool", "directly_call_tool_name": "echo", "directly_call_tool_params": {"input": "%s"},
+"human_readable_thought": "mocked thought for tool calling", "cumulative_summary": "..cumulative-mocked for tool calling.."}
+`, echoToken[echoToolRequestCount])))
+						if echoToolRequestCount < 2 {
+							echoToolRequestCount++
+						}
+					} else {
+						rsp.EmitOutputStream(bytes.NewBufferString(`
+{"@action": "directly_call_tool", "directly_call_tool_name": "error", "directly_call_tool_params": {},
 "human_readable_thought": "mocked thought for tool calling", "cumulative_summary": "..cumulative-mocked for tool calling.."}
 `))
+					}
 				default: // 2 次工具调完, 主动 finish 收口当前子任务
 					rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "finish", "human_readable_thought": "mocked: subtask tool sequence done"}`))
 				}
 				subTaskToolSeq++
 				taskExecRequestCount++
-				return rsp, nil
-			}
-
-			if isTestToolParamPrompt(prompt) {
-
-				if isToolParamGenerationPrompt(prompt, "echo") {
-					rsp.EmitOutputStream(strings.NewReader(fmt.Sprintf(`{"@action": "call-tool", "tool": "echo", "params": {"input": "%s"}}`, echoToken[echoToolRequestCount])))
-					if echoToolRequestCount < 2 {
-						echoToolRequestCount++
-					}
-				} else if isToolParamGenerationPrompt(prompt, "error") {
-					rsp.EmitOutputStream(strings.NewReader(`{"@action": "call-tool", "tool": "error", "params": {}}`))
-				}
 				return rsp, nil
 			}
 

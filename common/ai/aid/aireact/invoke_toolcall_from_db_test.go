@@ -117,7 +117,7 @@ func mockedToolCallingForDB(i aicommon.AICallerConfigIf, req *aicommon.AIRequest
 	if isPrimaryDecisionPrompt(prompt) {
 		rsp := i.NewAIResponse()
 		rsp.EmitOutputStream(bytes.NewBufferString(`
-{"@action": "object", "next_action": { "type": "require_tool", "tool_require_payload": "` + toolName + `" },
+{"@action": "directly_call_tool", "directly_call_tool_name": "` + toolName + `", "directly_call_tool_params": { "message" : "test message" },
 "human_readable_thought": "mocked thought for tool calling from database", "cumulative_summary": "..cumulative-mocked for db tool calling.."}
 `))
 		rsp.Close()
@@ -198,7 +198,7 @@ func TestReAct_ToolUse_FromDB_ViaToolSearch(t *testing.T) {
 				if !toolSearchCalled {
 					rsp := i.NewAIResponse()
 					rsp.EmitOutputStream(bytes.NewBufferString(`
-{"@action": "object", "next_action": { "type": "require_tool", "tool_require_payload": "tools_search" },
+{"@action": "directly_call_tool", "directly_call_tool_name": "tools_search", "directly_call_tool_params": { "query" : "mock_db_tool" },
 "human_readable_thought": "need to search for the mock tool", "cumulative_summary": "searching for tools"}
 `))
 					rsp.Close()
@@ -550,7 +550,7 @@ func mockedToolCallingForYakScriptPlugin(i aicommon.AICallerConfigIf, req *aicom
 			return rsp, nil
 		}
 		rsp.EmitOutputStream(bytes.NewBufferString(`
-{"@action": "object", "next_action": { "type": "require_tool", "tool_require_payload": "` + toolName + `" },
+{"@action": "directly_call_tool", "directly_call_tool_name": "` + toolName + `", "directly_call_tool_params": { "seconds": 0.1 },
 "human_readable_thought": "calling YakScript plugin", "cumulative_summary": "testing yakscript plugin integration"}
 `))
 		rsp.Close()
@@ -741,7 +741,7 @@ yakit.Info("NATIVE_PLUGIN_EXECUTED: target=%s", target)
 			if isPrimaryDecisionPrompt(prompt) {
 				rsp := i.NewAIResponse()
 				rsp.EmitOutputStream(bytes.NewBufferString(`
-{"@action": "object", "next_action": { "type": "require_tool", "tool_require_payload": "` + pluginName + `" },
+{"@action": "directly_call_tool", "directly_call_tool_name": "` + pluginName + `", "directly_call_tool_params": { "target": "192.168.1.1" },
 "human_readable_thought": "calling native YakScript plugin", "cumulative_summary": "testing native plugin"}
 `))
 				rsp.Close()

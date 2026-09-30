@@ -38,7 +38,12 @@ func buildStatusTools(loop *reactloops.ReActLoop, names []string, state aicommon
 
 func statusToolNames(tools []aicommon.StatusTool, english bool) string {
 	const visibleLimit = 3
-	labels := make([]string, 0, len(tools))
+	type toolLabelGroup struct {
+		label string
+		count int
+	}
+	groups := make([]toolLabelGroup, 0, len(tools))
+	groupIndexes := make(map[string]int, len(tools))
 	for _, tool := range tools {
 		label := tool.DisplayName
 		if english && tool.DisplayNameI18n != nil && strings.TrimSpace(tool.DisplayNameI18n.En) != "" {
@@ -46,6 +51,23 @@ func statusToolNames(tools []aicommon.StatusTool, english bool) string {
 		}
 		if strings.TrimSpace(label) == "" {
 			label = tool.Name
+		}
+		name := strings.TrimSpace(tool.Name)
+		if name == "" {
+			name = label
+		}
+		if index, exists := groupIndexes[name]; exists {
+			groups[index].count++
+			continue
+		}
+		groupIndexes[name] = len(groups)
+		groups = append(groups, toolLabelGroup{label: label, count: 1})
+	}
+	labels := make([]string, 0, len(groups))
+	for _, group := range groups {
+		label := group.label
+		if group.count > 1 {
+			label = fmt.Sprintf("%s * %d", label, group.count)
 		}
 		labels = append(labels, label)
 	}

@@ -4342,9 +4342,6 @@ func ConvertConfigToOptions(i *Config) []ConfigOption {
 		if i.HaveConfig(ConfigKeyToolBatchMaxCalls) {
 			opts = append(opts, WithToolBatchMaxCalls(i.GetConfigInt(ConfigKeyToolBatchMaxCalls, DefaultToolBatchMaxCalls)))
 		}
-		if i.HaveConfig(ConfigKeyToolBatchParamConcurrency) {
-			opts = append(opts, WithToolBatchParamConcurrency(i.GetConfigInt(ConfigKeyToolBatchParamConcurrency, DefaultToolBatchParamConcurrency)))
-		}
 		if i.HaveConfig(ConfigKeyToolBatchInvokeConcurrency) {
 			opts = append(opts, WithToolBatchInvokeConcurrency(i.GetConfigInt(ConfigKeyToolBatchInvokeConcurrency, DefaultToolBatchInvokeConcurrency)))
 		}

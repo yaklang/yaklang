@@ -55,6 +55,14 @@ func (t *testInvoker) ExecuteToolRequiredAndCall(ctx context.Context, name strin
 	return t.toolCallResult, t.toolCallDirectly, t.toolCallErr
 }
 
+func (t *testInvoker) ExecuteToolRequiredAndCallWithoutRequired(ctx context.Context, name string, params aitool.InvokeParams, opt ...aicommon.ToolCallerOption) (*aitool.ToolResult, bool, error) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	t.toolCallCalled = true
+	t.toolCallName = name
+	return t.toolCallResult, t.toolCallDirectly, t.toolCallErr
+}
+
 func (t *testInvoker) RequireAIForgeAndAsyncExecute(ctx context.Context, forgeName string, onFinish func(error)) {
 	t.mu.Lock()
 	defer t.mu.Unlock()

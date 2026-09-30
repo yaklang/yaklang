@@ -69,19 +69,12 @@ func TestReActLoop_ToolNotFound_ShouldContinue(t *testing.T) {
 				}
 				if firstToolCall {
 					firstToolCall = false
-					// First: try nonexistent tool
-					rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "object", "next_action": {"type": "require_tool", "tool_require_payload": "nonexistent_tool"}, "human_readable_thought": "trying nonexistent", "cumulative_summary": "test"}`))
+					// First: try nonexistent tool via directly_call_tool (will fail)
+					rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "directly_call_tool", "directly_call_tool_name": "nonexistent_tool", "directly_call_tool_params": {"input": "test"}, "human_readable_thought": "trying nonexistent", "cumulative_summary": "test"}`))
 				} else {
-					// Second: use success_tool
-					rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "object", "next_action": {"type": "require_tool", "tool_require_payload": "success_tool"}, "human_readable_thought": "using success_tool", "cumulative_summary": "retry"}`))
+					// Second: use success_tool via directly_call_tool
+					rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "directly_call_tool", "directly_call_tool_name": "success_tool", "directly_call_tool_params": {"input": "test"}, "human_readable_thought": "using success_tool", "cumulative_summary": "retry"}`))
 				}
-				rsp.Close()
-				return rsp, nil
-			}
-
-			// Generate params
-			if aicommon.IsToolParamGenerationPrompt(prompt, "") {
-				rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "call-tool", "params": {"input": "test"}}`))
 				rsp.Close()
 				return rsp, nil
 			}
@@ -173,17 +166,10 @@ func TestReActLoop_ToolExecutionError_ShouldContinue(t *testing.T) {
 				}
 				if firstToolCall {
 					firstToolCall = false
-					rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "object", "next_action": {"type": "require_tool", "tool_require_payload": "failing_tool"}, "human_readable_thought": "trying failing", "cumulative_summary": "test"}`))
+					rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "directly_call_tool", "directly_call_tool_name": "failing_tool", "directly_call_tool_params": {"input": "test"}, "human_readable_thought": "trying failing", "cumulative_summary": "test"}`))
 				} else {
-					rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "object", "next_action": {"type": "require_tool", "tool_require_payload": "success_tool"}, "human_readable_thought": "using success", "cumulative_summary": "retry"}`))
+					rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "directly_call_tool", "directly_call_tool_name": "success_tool", "directly_call_tool_params": {"input": "test"}, "human_readable_thought": "using success", "cumulative_summary": "retry"}`))
 				}
-				rsp.Close()
-				return rsp, nil
-			}
-
-			// Generate params
-			if aicommon.IsToolParamGenPrompt(prompt) {
-				rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "call-tool", "params": {"input": "test"}}`))
 				rsp.Close()
 				return rsp, nil
 			}

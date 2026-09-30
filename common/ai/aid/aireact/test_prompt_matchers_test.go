@@ -11,6 +11,7 @@ package aireact
 // 关键词: prompt-mock 分流, high-static 散文污染, schema 字面量解耦
 
 import (
+	"strconv"
 	"strings"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
@@ -20,6 +21,11 @@ import (
 
 func isToolParamGenerationPrompt(prompt, toolName string) bool {
 	return aicommon.IsToolParamGenerationPrompt(prompt, toolName)
+}
+
+func isForcedToolCallPrompt(prompt, toolName string) bool {
+	return strings.Contains(prompt, "Call exactly one tool using directly_call_tool.") &&
+		(toolName == "" || strings.Contains(prompt, "The tool name must be "+strconv.Quote(toolName)+"."))
 }
 
 func isToolParamGenPrompt(prompt string) bool {
@@ -60,10 +66,9 @@ func isDirectAnswerPrompt(prompt string) bool {
 	return aicommon.IsDirectAnswerPrompt(prompt)
 }
 
-// isPrimaryDecisionPrompt 检测主循环决策 prompt (R1).
-// R2 复用 R1 instruction, 需排除 R2.
+// isPrimaryDecisionPrompt 检测主循环决策，排除指定工具的新提案请求。
 func isPrimaryDecisionPrompt(prompt string) bool {
-	return aicommon.IsPrimaryDecisionPrompt(prompt)
+	return !isForcedToolCallPrompt(prompt, "") && aicommon.IsPrimaryDecisionPrompt(prompt)
 }
 
 func isVerifySatisfactionPrompt(prompt string) bool {
@@ -73,8 +78,5 @@ func isVerifySatisfactionPrompt(prompt string) bool {
 func isToolCallReasonLiteForgePrompt(prompt string) bool {
 	return aicommon.IsToolCallReasonLiteForgePrompt(prompt)
 }
-
-// ensure strings is referenced even if no direct call remains after refactor
-var _ = strings.Contains
 
 const mockedToolCallReasonActionJSON = aicommon.MockedToolCallReasonActionJSON

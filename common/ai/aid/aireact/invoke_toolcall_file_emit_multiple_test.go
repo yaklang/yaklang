@@ -36,22 +36,14 @@ func mockedToolCallingMultiple(i aicommon.AICallerConfigIf, req *aicommon.AIRequ
 			rsp.Close()
 			return rsp, nil
 		}
-		rsp := i.NewAIResponse()
-		rsp.EmitOutputStream(bytes.NewBufferString(fmt.Sprintf(`
-{"@action": "object", "next_action": { "type": "require_tool", "tool_require_payload": "%s" },
-"human_readable_thought": "mocked thought for multiple tool calls test", "cumulative_summary": "..cumulative-mocked.."}
-`, toolName)))
-		rsp.Close()
-		return rsp, nil
-	}
-
-	if isToolParamGenerationPrompt(prompt, toolName) {
 		*callCount++
 		message := fmt.Sprintf("call %d", *callCount)
 		identifier := fmt.Sprintf("call_%d_test", *callCount)
 		rsp := i.NewAIResponse()
-		// Include identifier field for new directory structure
-		rsp.EmitOutputStream(bytes.NewBufferString(fmt.Sprintf(`{"@action": "call-tool", "identifier": "%s", "params": { "message" : "%s", "output_lines": 2 }}`, identifier, message)))
+		rsp.EmitOutputStream(bytes.NewBufferString(fmt.Sprintf(`
+{"@action": "directly_call_tool", "directly_call_tool_name": "%s", "directly_call_identifier": "%s", "directly_call_tool_params": { "message" : "%s", "output_lines": 2 },
+"human_readable_thought": "mocked thought for multiple tool calls test", "cumulative_summary": "..cumulative-mocked.."}
+`, toolName, identifier, message)))
 		rsp.Close()
 		return rsp, nil
 	}

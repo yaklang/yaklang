@@ -324,22 +324,6 @@ line3
 	require.Equal(t, "line1\nline2\nline3", rawContent, "AITAG content should be raw multiline")
 }
 
-// TestToolParamsPromptMeta tests the ToolParamsPromptMeta structure
-func TestToolParamsPromptMeta(t *testing.T) {
-	meta := &ToolParamsPromptMeta{
-		Prompt:     "test prompt",
-		Nonce:      "abc123",
-		ParamNames: []string{"param1", "param2", "param3"},
-	}
-
-	require.Equal(t, "test prompt", meta.Prompt)
-	require.Equal(t, "abc123", meta.Nonce)
-	require.Len(t, meta.ParamNames, 3)
-	require.Contains(t, meta.ParamNames, "param1")
-	require.Contains(t, meta.ParamNames, "param2")
-	require.Contains(t, meta.ParamNames, "param3")
-}
-
 func TestFilterSupportedToolParamAITagNames(t *testing.T) {
 	filtered := FilterSupportedToolParamAITagNames([]string{
 		"command",

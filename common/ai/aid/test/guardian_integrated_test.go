@@ -78,16 +78,20 @@ func mockedToolCalling(i aicommon.AICallerConfigIf, req *aicommon.AIRequest, too
 		return rsp, nil
 	}
 
-	if isNextActionDecisionPrompt(prompt) && strings.Contains(prompt, "require_tool") {
-		rsp.EmitOutputStream(bytes.NewBufferString(`
-{"@action": "object", "next_action": { "type": "require_tool", "tool_require_payload": "` + toolName + `" },
+	if isNextActionDecisionPrompt(prompt) {
+		// New flow: directly_call_tool with inline params (no separate require_tool + param-gen)
+		var callToolParams map[string]any
+		if err := json.Unmarshal([]byte(params), &callToolParams); err == nil {
+			if p, ok := callToolParams["params"]; ok {
+				paramsBytes, _ := json.Marshal(p)
+				rsp.EmitOutputStream(bytes.NewBufferString(`
+{"@action": "directly_call_tool", "directly_call_tool_name": "` + toolName + `", "directly_call_tool_params": ` + string(paramsBytes) + `,
 "human_readable_thought": "mocked thought for tool calling", "cumulative_summary": "..cumulative-mocked for tool calling.."}
 `))
-		return rsp, nil
-	}
-
-	if isToolParamGenerationPrompt(prompt, toolName) {
-
+				return rsp, nil
+			}
+		}
+		// fallback: emit raw params
 		rsp.EmitOutputStream(bytes.NewBufferString(params))
 		return rsp, nil
 	}

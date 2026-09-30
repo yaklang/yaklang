@@ -78,14 +78,6 @@ func TestToolCallReviewSubAIHonorsCallContextCancellation(t *testing.T) {
 	decoyTask.SetReActLoop(decoyLoop)
 	// The review helpers below must use task, not this mutable session pointer.
 	react.SetCurrentTask(decoyTask)
-	paramPrompt, err := react.generateToolParamsPromptWithMetaForTask(task, tool, tool.Name)
-	require.NoError(t, err)
-	require.Contains(t, paramPrompt.Prompt, "the explicit owning task query")
-	require.NotContains(t, paramPrompt.Prompt, "query from an unrelated concurrent task")
-	require.Contains(t, paramPrompt.Prompt, "OWNER_LOOP_INSTRUCTION")
-	require.Contains(t, paramPrompt.Prompt, "OWNER_LOOP_EXAMPLE")
-	require.NotContains(t, paramPrompt.Prompt, "DECOY_LOOP_INSTRUCTION")
-	require.NotContains(t, paramPrompt.Prompt, "DECOY_LOOP_EXAMPLE")
 
 	tests := []struct {
 		name                    string

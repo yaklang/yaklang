@@ -33,7 +33,7 @@ func mockedToolCallingWithCallExpectations(i aicommon.AICallerConfigIf, req *aic
 		}
 		rsp := i.NewAIResponse()
 		rsp.EmitOutputStream(bytes.NewBufferString(`
-{"@action": "object", "next_action": { "type": "require_tool", "tool_require_payload": "` + toolName + `" },
+{"@action": "directly_call_tool", "directly_call_tool_name": "` + toolName + `", "directly_call_tool_params": { "seconds": 0.1 }, "directly_call_expectations": "` + testCallExpectations + `",
 "human_readable_thought": "mocked thought for tool calling", "cumulative_summary": "..cumulative-mocked for tool calling.."}
 `))
 		rsp.Close()

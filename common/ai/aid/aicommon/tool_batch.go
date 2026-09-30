@@ -12,11 +12,9 @@ import (
 // ReAct iteration starts.
 const (
 	ConfigKeyToolBatchMaxCalls          = "tool_batch_max_calls"
-	ConfigKeyToolBatchParamConcurrency  = "tool_batch_param_concurrency"
 	ConfigKeyToolBatchInvokeConcurrency = "tool_batch_invoke_concurrency"
 
 	DefaultToolBatchMaxCalls          = 8
-	DefaultToolBatchParamConcurrency  = 2
 	DefaultToolBatchInvokeConcurrency = 3
 )
 
@@ -50,13 +48,6 @@ func WithToolBatchMaxCalls(value int) ConfigOption {
 	}
 }
 
-func WithToolBatchParamConcurrency(value int) ConfigOption {
-	return func(config *Config) error {
-		config.SetConfig(ConfigKeyToolBatchParamConcurrency, clampToolBatchConcurrency(value))
-		return nil
-	}
-}
-
 func WithToolBatchInvokeConcurrency(value int) ConfigOption {
 	return func(config *Config) error {
 		config.SetConfig(ConfigKeyToolBatchInvokeConcurrency, clampToolBatchConcurrency(value))
@@ -64,15 +55,8 @@ func WithToolBatchInvokeConcurrency(value int) ConfigOption {
 	}
 }
 
-type ToolCallMode string
-
-const (
-	ToolCallModeDirect  ToolCallMode = "direct"
-	ToolCallModeRequire ToolCallMode = "require"
-)
-
 // ToolBatchRequest is the canonical representation used by both
-// directly_call_tool and require_tool. Index is the model-provided array order
+// action and native directly_call_tool. Index is the model-provided array order
 // and must remain stable even when calls finish in a different order.
 type ToolBatchRequest struct {
 	BatchID string          `json:"batch_id,omitempty"`
@@ -81,7 +65,6 @@ type ToolBatchRequest struct {
 
 type ToolBatchCall struct {
 	Index        int                 `json:"index"`
-	Mode         ToolCallMode        `json:"mode"`
 	ToolName     string              `json:"tool_name"`
 	Params       aitool.InvokeParams `json:"params,omitempty"`
 	Identifier   string              `json:"identifier,omitempty"`

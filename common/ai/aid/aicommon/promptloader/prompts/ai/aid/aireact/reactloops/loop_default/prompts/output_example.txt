@@ -20,8 +20,9 @@
 
 *. 如果你想要使用工具，先枚举本轮可立即执行的真实调用：
     * 默认用标量单调用：`{"@action":"require_tool","tool_require_payload":"..[your-toolname]..","human_readable_thought":"先读取配置"}`
-    * 只有 2-8 个调用都低风险、彼此独立，且每个工具 Schema 简单无歧义时，才可批量申请：
+    * 同一个 `require_tool` action 也支持批量申请：只有 2-8 个调用都低风险、彼此独立，且每个工具 Schema 简单无歧义时才使用：
       `{"@action":"require_tool","identifier":"parallel_inspection","human_readable_thought":"并发收集独立证据","tool_require_calls":[{"tool_name":"grep","identifier":"find_handlers","reason":"定位处理函数"},{"tool_name":"read_file","identifier":"read_config","reason":"读取独立配置"}]}`
+      此选项只向 CACHE_TOOL_CALL 添加多个工具 Schema，不生成参数、不执行工具。观察加载结果后，由你构造参数，再通过 `directly_call_tool` 单次或批量执行。
     * 只有真实 Schema 已展示且每层参数全部明确时，才可用 `directly_call_tool_calls`；嵌套 wrapper、页面状态操作或任一参数不确定时使用单调用。
     * 批次首次出现准入、Schema 或参数错误后，保留成功 child，只将失败项改为修正后的单调用；禁止原样重试批次。
 
@@ -52,7 +53,7 @@
 同时你必须遵循动作选择优先级：
 1. 复杂/不确定任务，或需要新建/修订 Plan：优先 `request_plan`
 2. 需要领域指导：优先加载技能（`loading_skills` / `load_skill_resources`）
-3. 仅在后序参数依赖前序真实输出时使用 `tool_compose`；低风险、独立的多调用只有满足上述直接批次或申请批次门槛时才考虑并发
+3. 仅在后序参数依赖前序真实输出时使用 `tool_compose`；低风险、独立的多调用只有满足上述直接批次门槛时才考虑并发
 4. AI Blueprint 必须使用 `require_ai_blueprint`，禁止通过 `tool_compose` 代替
 
 反例（禁止）：

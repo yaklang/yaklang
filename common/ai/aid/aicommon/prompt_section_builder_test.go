@@ -73,6 +73,8 @@ func TestSharedToolCallModePromptsUseOneConsistentBatchContract(t *testing.T) {
 			require.Contains(t, test.prompt, "默认")
 			require.Contains(t, test.prompt, "directly_call_tool_calls")
 			require.Contains(t, test.prompt, "tool_require_calls")
+			require.Contains(t, test.prompt, "tool_require_payload")
+			require.Contains(t, test.prompt, "不生成参数、不执行工具")
 			require.Contains(t, test.prompt, test.singleCallRule)
 			require.Contains(t, test.prompt, "嵌套 wrapper")
 			require.NotContains(t, test.prompt, "不要先默认单工具")

@@ -260,7 +260,7 @@ func TestToolCallerBindsAttachedBrowserDevice(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	result, _, err := caller.CallToolWithExistedParams(tool, true, aitool.InvokeParams{
+	result, _, err := caller.CallToolWithExistedParams(tool, aitool.InvokeParams{
 		"device_id": "model-selected-other-device",
 		"method":    "browser.tabs",
 	})
@@ -293,7 +293,7 @@ func TestToolCallerBlocksRodForBrowserExtensionIntent(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	_, _, err = caller.CallToolWithExistedParams(tool, true, nil)
+	_, _, err = caller.CallToolWithExistedParams(tool, nil)
 	require.ErrorContains(t, err, "explicitly requested an existing browser-extension/YTray instance")
 	require.False(t, invoked)
 }

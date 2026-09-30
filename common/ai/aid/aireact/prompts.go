@@ -3,7 +3,6 @@ package aireact
 import (
 	"fmt"
 	"runtime"
-	"sort"
 	"strings"
 	"time"
 
@@ -174,17 +173,6 @@ func loopSchema(loop *reactloops.ReActLoop) string {
 // toolParamNames extracts and sorts the input parameter names declared on a
 // tool's JSON schema, used to render AITAG hints for the parameter generation
 // prompt.
-func toolParamNames(tool *aitool.Tool) []string {
-	var names []string
-	if tool.Tool != nil && tool.Tool.InputSchema.Properties != nil {
-		tool.Tool.InputSchema.Properties.ForEach(func(name string, _ any) bool {
-			names = append(names, name)
-			return true
-		})
-		sort.Strings(names)
-	}
-	return names
-}
 
 // GetBasicPromptInfo renders the legacy base.txt template map. It is the only
 // remaining consumer of base.txt and is used by loop-level persistent
@@ -339,102 +327,6 @@ func (pm *PromptManager) applyLoopInstructionAndExampleForLoop(
 	materials.SkillsContext = renderSkillsContextForLoop(loop)
 }
 
-// ToolParamsPromptResult contains the generated prompt and metadata for AITAG
-// parsing.
-type ToolParamsPromptResult struct {
-	Prompt     string
-	Nonce      string
-	ParamNames []string
-}
-
-// GenerateToolParamsPromptWithMeta generates the tool parameter generation
-// prompt. It reuses the main loop's schema/instruction/example for R1→R2
-// prefix cache alignment; the tool-specific schema lives in the dynamic
-// section.
-func (pm *PromptManager) GenerateToolParamsPromptWithMeta(tool *aitool.Tool) (*ToolParamsPromptResult, error) {
-	var loop *reactloops.ReActLoop
-	if pm != nil && pm.react != nil {
-		loop = pm.react.GetCurrentLoop()
-	}
-	return pm.generateToolParamsPromptWithMetaForQueryAndLoop(pm.currentUserInput(), loop, tool)
-}
-
-// GenerateToolParamsPromptWithMetaForTask binds parameter generation to the
-// task that owns the ToolCaller. Concurrent batch workers must use this form
-// instead of resolving ReAct.currentTask while they are running.
-func (pm *PromptManager) GenerateToolParamsPromptWithMetaForTask(
-	task aicommon.AIStatefulTask,
-	tool *aitool.Tool,
-) (*ToolParamsPromptResult, error) {
-	userQuery := ""
-	if task != nil {
-		userQuery = task.GetUserInput()
-	}
-	return pm.generateToolParamsPromptWithMetaForQueryAndLoop(userQuery, promptLoopForTask(task), tool)
-}
-
-// GenerateToolParamsPromptWithMetaForQuery is the task-independent core used
-// when the owning query has already been captured by the caller.
-func (pm *PromptManager) GenerateToolParamsPromptWithMetaForQuery(
-	originalQuery string,
-	tool *aitool.Tool,
-) (*ToolParamsPromptResult, error) {
-	return pm.generateToolParamsPromptWithMetaForQueryAndLoop(originalQuery, nil, tool)
-}
-
-func (pm *PromptManager) generateToolParamsPromptWithMetaForQueryAndLoop(
-	originalQuery string,
-	loop *reactloops.ReActLoop,
-	tool *aitool.Tool,
-) (*ToolParamsPromptResult, error) {
-	nonceString := nonce()
-	toolSchema := ""
-	if tool.Tool != nil {
-		toolSchema = tool.ToJSONSchemaString()
-	}
-	paramNames := toolParamNames(tool)
-
-	_, prefixMaterials, err := pm.preparePromptPrefixMaterialsForLoop(nil, &reactloops.LoopPromptAssemblyInput{
-		Nonce:  nonceString,
-		Schema: loopSchema(loop),
-	}, loop)
-	if err != nil {
-		return nil, err
-	}
-	aicommon.ApplyPromptFrozenOpenMaterials(prefixMaterials,
-		aicommon.BuildPromptFrozenOpenMaterialsWithOptions(pm.react.config, aicommon.TimelinePromptOptions{ExcludeToolCache: true}))
-	prefixMaterials.AllowPlanAndExec = false
-	prefixMaterials.HasLoadCapability = false
-	pm.applyLoopInstructionAndExampleForLoop(prefixMaterials, loop, toolParamsInstructionText, toolParamsOutputExampleText)
-
-	dynamicData := pm.buildLoopPromptSectionData(nil, &reactloops.LoopPromptAssemblyInput{
-		Nonce:     nonceString,
-		UserQuery: originalQuery,
-	})
-	dynamicData["ToolName"] = tool.Name
-	dynamicData["ToolDescription"] = tool.Description
-	toolUsage, err := aitool.RenderUsageForMode(tool.Usage, false)
-	if err != nil {
-		return nil, fmt.Errorf("render Usage for tool %q: %w", tool.Name, err)
-	}
-	dynamicData["ToolUsage"] = toolUsage
-	dynamicData["ParamNames"] = paramNames
-	dynamicData["OriginalQuery"] = originalQuery
-	dynamicData["ToolSchema"] = toolSchema
-
-	prompt, err := pm.assemblePromptWithDynamicSection(
-		prefixMaterials, "tool-params-dynamic", toolParamsDynamicTemplate, dynamicData,
-	)
-	if err != nil {
-		return nil, err
-	}
-	return &ToolParamsPromptResult{
-		Prompt:     prompt,
-		Nonce:      nonceString,
-		ParamNames: paramNames,
-	}, nil
-}
-
 // GenerateVerificationPrompt generates the verification prompt using the shared
 // prefix assembly path. Verification-specific rules and few-shot live in
 // semi-dynamic-2; volatile per-iteration data lives in the dynamic tail.
@@ -583,58 +475,6 @@ func (pm *PromptManager) generateToolReSelectPromptForQueryAndLoop(
 	return pm.assemblePromptWithDynamicSection(
 		prefixMaterials, "wrong-tool-dynamic", wrongToolDynamicTemplate, dynamicData,
 	)
-}
-
-// GenerateReGenerateToolParamsPromptWithMeta generates a tool parameter
-// regeneration prompt (retry after invalid params), reusing the main loop's
-// schema/instruction/example for R1→R3 prefix cache alignment.
-func (pm *PromptManager) GenerateReGenerateToolParamsPromptWithMeta(
-	userQuery string, oldParams aitool.InvokeParams, oldTool *aitool.Tool,
-) (*ToolParamsPromptResult, error) {
-	nonceString := nonce()
-	schemaString := oldTool.ToJSONSchemaString()
-	oldParamsDump := oldParams.Dump()
-	paramNames := toolParamNames(oldTool)
-
-	_, prefixMaterials, err := pm.preparePromptPrefixMaterials(nil, &reactloops.LoopPromptAssemblyInput{
-		Nonce:  nonceString,
-		Schema: pm.currentLoopSchema(),
-	})
-	if err != nil {
-		return nil, err
-	}
-	aicommon.ApplyPromptFrozenOpenMaterials(prefixMaterials,
-		aicommon.BuildPromptFrozenOpenMaterialsWithOptions(pm.react.config, aicommon.TimelinePromptOptions{ExcludeToolCache: true}))
-	prefixMaterials.AllowPlanAndExec = false
-	prefixMaterials.HasLoadCapability = false
-	pm.applyLoopInstructionAndExample(prefixMaterials, toolParamsInstructionText, toolParamsOutputExampleText)
-
-	dynamicData := pm.buildLoopPromptSectionData(nil, &reactloops.LoopPromptAssemblyInput{
-		Nonce:     nonceString,
-		UserQuery: userQuery,
-	})
-	dynamicData["ToolName"] = oldTool.Name
-	dynamicData["ToolDescription"] = oldTool.Description
-	toolUsage, err := aitool.RenderUsageForMode(oldTool.Usage, false)
-	if err != nil {
-		return nil, fmt.Errorf("render Usage for tool %q: %w", oldTool.Name, err)
-	}
-	dynamicData["ToolUsage"] = toolUsage
-	dynamicData["OldParams"] = oldParamsDump
-	dynamicData["ParamNames"] = paramNames
-	dynamicData["ToolSchema"] = schemaString
-
-	prompt, err := pm.assemblePromptWithDynamicSection(
-		prefixMaterials, "tool-params-dynamic", toolParamsDynamicTemplate, dynamicData,
-	)
-	if err != nil {
-		return nil, err
-	}
-	return &ToolParamsPromptResult{
-		Prompt:     prompt,
-		Nonce:      nonceString,
-		ParamNames: paramNames,
-	}, nil
 }
 
 // GenerateChangeAIBlueprintPrompt generates the prompt that asks the model to

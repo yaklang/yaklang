@@ -167,6 +167,7 @@ func TestReActLoop_MaxIterationsLimit(t *testing.T) {
 		"sleep",
 		aitool.WithNumberParam("seconds"),
 		aitool.WithSimpleCallback(func(params aitool.InvokeParams, stdout io.Writer, stderr io.Writer) (any, error) {
+			callCount++
 			sleepInt := params.GetFloat("seconds", 0.01) // Reduce sleep from 0.3s to 0.01s for faster tests
 			if sleepInt <= 0 {
 				sleepInt = 0.01
@@ -189,17 +190,9 @@ func TestReActLoop_MaxIterationsLimit(t *testing.T) {
 			if aicommon.IsPrimaryDecisionPrompt(prompt) {
 				rsp := i.NewAIResponse()
 				rsp.EmitOutputStream(bytes.NewBufferString(`
-{"@action": "object", "next_action": { "type": "require_tool", "tool_require_payload": "` + toolName + `" },
+{"@action": "object", "next_action": { "type": "directly_call_tool", "directly_call_tool_name": "` + toolName + `", "directly_call_tool_params": {"seconds": 0.01} },
 "human_readable_thought": "mocked thought for tool calling", "cumulative_summary": "..cumulative-mocked for tool calling.."}
 `))
-				rsp.Close()
-				return rsp, nil
-			}
-
-			if isRequireToolParamPrompt(prompt) {
-				callCount++
-				rsp := i.NewAIResponse()
-				rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "call-tool", "params": { "seconds" : 0.01 }}`))
 				rsp.Close()
 				return rsp, nil
 			}
