@@ -23,7 +23,6 @@ func (y *YakCompiler) VisitIfStmt(raw yak.IIfStmtContext) interface{} {
 	}
 	recoverRange := y.SetRange(ifBlock)
 	defer recoverRange()
-	y.writeString("if ")
 
 	// if 初始化语句：if <init>; <cond> { ... }
 	// 初始化语句声明的变量需要在整个 if/elif/else 链中可见，但不能泄漏到外层作用域，
@@ -33,7 +32,6 @@ func (y *YakCompiler) VisitIfStmt(raw yak.IIfStmtContext) interface{} {
 	if initStmt := i.IfStmtInit(); initStmt != nil {
 		initScopeRecover = y.SwitchSymbolTableInNewScope("if-init", uuid.New().String())
 		y.VisitIfStmtInit(initStmt)
-		y.writeString("; ")
 	}
 	if initScopeRecover != nil {
 		defer initScopeRecover()
@@ -46,7 +44,6 @@ func (y *YakCompiler) VisitIfStmt(raw yak.IIfStmtContext) interface{} {
 		y.panicCompilerError(compileError, "no if condition")
 	}
 	y.VisitExpression(ifCond)
-	y.writeString(" ")
 
 	// if 条件为真，执行 if 语句块
 	// 使用 jmpf 来实现，如果 pop stack 之后的值被认为是 false，则跳转
@@ -68,9 +65,7 @@ func (y *YakCompiler) VisitIfStmt(raw yak.IIfStmtContext) interface{} {
 		// 然后使用 jmpf 跳转
 		// 但是 elif 有一个特殊的地方，就是需要在 if 语句块执行完毕之后
 		// 跳过 elif 语句块，所以需要在 elif 语句块的最后添加一个 jmp 指令
-		y.writeStringWithWhitespace("elif")
 		y.VisitExpression(i.Expression(index + 1))
-		y.writeString(" ")
 		var jmpfCode = y.pushJmpIfFalse()
 		y.VisitBlock(i.Block(index + 1))
 		jmpToEnd = append(jmpToEnd, y.pushJmp())
@@ -82,7 +77,6 @@ func (y *YakCompiler) VisitIfStmt(raw yak.IIfStmtContext) interface{} {
 	// 为 else 设置好结尾符
 	if ielseBlock := i.ElseBlock(); ielseBlock != nil {
 		elseBlock := ielseBlock.(*yak.ElseBlockContext)
-		y.writeStringWithWhitespace("else")
 		block := elseBlock.Block()
 		elseIf := elseBlock.IfStmt()
 		if block != nil {
@@ -92,7 +86,6 @@ func (y *YakCompiler) VisitIfStmt(raw yak.IIfStmtContext) interface{} {
 		} else if elseIf != nil {
 			y.VisitIfStmt(elseIf)
 		}
-
 	}
 
 	endCode := y.GetCodeIndex()

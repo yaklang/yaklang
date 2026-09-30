@@ -84,7 +84,6 @@ func (y *YakCompiler) VisitForStmt(raw yak.IForStmtContext) interface{} {
 	}
 	recoverRange := y.SetRange(&i.BaseParserRuleContext)
 	defer recoverRange()
-	y.writeString("for ")
 
 	// _ 记录一下开始的索引，一般是 continue 的时候
 	startIndex := y.GetNextCodeIndex()
@@ -113,7 +112,6 @@ func (y *YakCompiler) VisitForStmt(raw yak.IForStmtContext) interface{} {
 			y.VisitForFirstExpr(entry)
 			loopVars = y.collectColonAssignLoopVars(entry)
 		}
-		y.writeString("; ")
 
 		startIndex = y.GetNextCodeIndex()
 		if condIns.Expression() != nil {
@@ -126,7 +124,6 @@ func (y *YakCompiler) VisitForStmt(raw yak.IForStmtContext) interface{} {
 			toEnd := y.pushJmpIfFalse()
 			toEnds = append(toEnds, toEnd)
 		}
-		y.writeString("; ")
 
 		if e := condIns.ForThirdExpr(); e != nil {
 			endThirdExpr = e
@@ -134,7 +131,6 @@ func (y *YakCompiler) VisitForStmt(raw yak.IForStmtContext) interface{} {
 	}
 	// for 执行体结束之后应该无条件跳转回开头，重新判断
 	// 但是三语句 for ;; 应该是 block 执行解释后执行第三条语句
-	recoverFormatBufferFunc := y.switchFormatBuffer()
 	if len(loopVars) > 0 {
 		forCtx := y.peekForContext()
 		y.VisitBlockWithCallbacks(i.Block(), func(y *YakCompiler) {
@@ -165,7 +161,6 @@ func (y *YakCompiler) VisitForStmt(raw yak.IForStmtContext) interface{} {
 	} else {
 		y.VisitBlock(i.Block())
 	}
-	buf := recoverFormatBufferFunc()
 
 	// continue index
 	continueIndex := y.GetNextCodeIndex()
@@ -177,9 +172,7 @@ func (y *YakCompiler) VisitForStmt(raw yak.IForStmtContext) interface{} {
 			toEnds = append(toEnds, toEnd)
 		}
 		y.VisitForThirdExpr(endThirdExpr)
-		y.writeString(" ")
 	}
-	y.writeString(buf)
 	y.pushJmp().Unary = startIndex
 	forEnd := y.GetNextCodeIndex()
 
@@ -208,9 +201,7 @@ func (y *YakCompiler) VisitForRangeStmt(raw yak.IForRangeStmtContext) interface{
 	}
 	recoverRange := y.SetRange(&i.BaseParserRuleContext)
 	defer recoverRange()
-	y.writeString("for ")
 
-	recoverFormatBufferFunc := y.switchFormatBuffer()
 	expr := i.Expression()
 	if expr == nil {
 		y.panicCompilerError(compileError, "for-range/in need expression in right value at least")
@@ -232,7 +223,6 @@ func (y *YakCompiler) VisitForRangeStmt(raw yak.IForRangeStmtContext) interface{
 	// y.pushLeftRef(expressionResultID)
 	// enter for-range
 	y.VisitExpression(expr)
-	buf := recoverFormatBufferFunc()
 	// y.pushOperator(yakvm.OpFastAssign)
 	defer y.pushOpPop()
 
@@ -302,20 +292,6 @@ func (y *YakCompiler) VisitForRangeStmt(raw yak.IForRangeStmtContext) interface{
 		}
 	}
 
-	if op, op2 := i.In(), i.Range(); op != nil || op2 != nil {
-		if op != nil {
-			y.writeStringWithWhitespace(op.GetText())
-		} else {
-			eq, ceq := i.AssignEq(), i.ColonAssignEq()
-			if eq != nil {
-				y.writeStringWithWhitespace(eq.GetText())
-			} else if ceq != nil {
-				y.writeStringWithWhitespace(ceq.GetText())
-			}
-			y.writeString(op2.GetText() + " ")
-		}
-	}
-	y.writeString(buf + " ")
 	if len(loopVarNames) > 0 {
 		y.VisitBlockWithCallback(i.Block(), func(y *YakCompiler) {
 			// 进入本次迭代的 block 作用域后立即执行，为每个具名循环变量在

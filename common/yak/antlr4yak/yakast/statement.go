@@ -5,55 +5,23 @@ import (
 	"github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm"
 )
 
-func (y *YakCompiler) PreviewStatementList(raw yak.IStatementListContext) (int, *yak.StatementContext) {
-	if raw == nil {
-		return -1, nil
-	}
-	i := raw.(*yak.StatementListContext)
-	istmts := i.AllStatement()
-	var firstStmt *yak.StatementContext
-	if len(istmts) > 0 {
-		firstStmt = istmts[0].(*yak.StatementContext)
-	}
-	return len(istmts), firstStmt
-}
-
-func (y *YakCompiler) VisitStatementList(raw yak.IStatementListContext, inline ...bool) interface{} {
+func (y *YakCompiler) VisitStatementList(raw yak.IStatementListContext, _ ...bool) interface{} {
 	if raw == nil {
 		return nil
 	}
 	i := raw.(*yak.StatementListContext)
-	newLine := false
 	recoverRange := y.SetRange(&i.BaseParserRuleContext)
 	defer recoverRange()
-	allStatement := i.AllStatement()
-	lenOfAllStatement := len(allStatement)
-	for index, s := range allStatement {
-		stmt := s.(*yak.StatementContext)
-		if index == 0 && len(inline) > 0 && inline[0] {
-		} else if index >= lenOfAllStatement-2 && stmt.Empty() != nil {
-			// 最后两个为空的语句不需要换行,本来是最后一个为空的语句
-			// 改成最后2个为空的语句是因为lexer现在右大括号或者EOF时插入分号
-			continue
-		} else {
-			y.writeIndent()
-		}
-		newLine = y.VisitStatement(stmt)
-		if index < lenOfAllStatement-1 && newLine {
-			y.writeNewLine()
-		}
+	for _, s := range i.AllStatement() {
+		y.VisitStatement(s.(*yak.StatementContext))
 	}
-
 	return nil
 }
 
-func (y *YakCompiler) VisitStatement(i *yak.StatementContext) (newLine bool) {
-	defer func() {
-		if e := recover(); e != nil {
-
-		}
-	}()
-	defer y.writeEOS(i.Eos())
+// VisitStatement compiles one statement. Its boolean result is retained for
+// source compatibility with callers of the former formatting visitor.
+func (y *YakCompiler) VisitStatement(i *yak.StatementContext) (_ bool) {
+	defer func() { _ = recover() }()
 
 	if i == nil {
 		return true
@@ -63,7 +31,6 @@ func (y *YakCompiler) VisitStatement(i *yak.StatementContext) (newLine bool) {
 	defer recoverRange()
 
 	if s := i.LineCommentStmt(); s != nil {
-		y.VisitLineCommentStmt(s.(*yak.LineCommentStmtContext))
 		return false
 	}
 
@@ -120,8 +87,6 @@ func (y *YakCompiler) VisitStatement(i *yak.StatementContext) (newLine bool) {
 		if !y.NowInFor() {
 			y.panicCompilerError(continueError)
 		}
-		y.writeString("continue")
-		y.writeEOS(i.Eos())
 		var tryStart = -1
 		if y.tryDepthStack.Len() > 0 {
 			tryStart = y.tryDepthStack.Peek().(int)
@@ -154,8 +119,6 @@ func (y *YakCompiler) VisitStatement(i *yak.StatementContext) (newLine bool) {
 		if !y.NowInFor() && !y.NowInSwitch() {
 			y.panicCompilerError(breakError)
 		}
-		y.writeString("break")
-		y.writeEOS(i.Eos())
 
 		var tryStart = -1
 		if y.tryDepthStack.Len() > 0 {
@@ -194,7 +157,6 @@ func (y *YakCompiler) VisitStatement(i *yak.StatementContext) (newLine bool) {
 
 	if s := i.Block(); s != nil {
 		y.VisitBlock(s)
-		y.writeEOS(i.Eos())
 		return false
 	}
 
@@ -209,7 +171,6 @@ func (y *YakCompiler) VisitStatement(i *yak.StatementContext) (newLine bool) {
 	}
 
 	if s := i.Empty(); s != nil {
-		y.writeEosWithText(s.GetText())
 		return false
 	}
 	if s := i.AssertStmt(); s != nil {

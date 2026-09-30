@@ -16,14 +16,11 @@ func (y *YakCompiler) VisitMakeExpression(raw yak.IMakeExpressionContext) interf
 	recoverRange := y.SetRange(&i.BaseParserRuleContext)
 	defer recoverRange()
 
-	y.writeString("make(")
-	defer y.writeString(")")
 	y.VisitTypeLiteral(i.TypeLiteral())
 
 	n := 0
 	expressions := i.ExpressionListMultiline()
 	if expressions != nil {
-		y.writeString(", ")
 		if esi, _ := expressions.(*yak.ExpressionListMultilineContext); esi != nil {
 			n = y.VisitExpressionListMultiline(esi)
 		}

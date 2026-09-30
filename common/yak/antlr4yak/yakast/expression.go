@@ -41,11 +41,8 @@ func (y *YakCompiler) VisitExpressionList(raw yak.IExpressionListContext) int {
 	exprs := i.AllExpression()
 	LenOfExprs := len(exprs)
 	defer y.pushListWithLen(LenOfExprs)
-	for index, e := range exprs {
+	for _, e := range exprs {
 		y.VisitExpression(e)
-		if index < LenOfExprs-1 {
-			y.writeString(", ")
-		}
 	}
 
 	return LenOfExprs
@@ -65,8 +62,6 @@ func (y *YakCompiler) VisitExpression(raw yak.IExpressionContext) interface{} {
 	defer recoverRange()
 	if op := i.TypeLiteral(); op != nil {
 		if i.LParen() != nil && i.RParen() != nil {
-			recoverFormatBufferFunc := y.switchFormatBuffer()
-			y.writeString("(")
 			isOMap := op.GetText() == "omap"
 			if isOMap {
 				recoverSwitchOMap := y.switchIsOMap(true)
@@ -79,10 +74,7 @@ func (y *YakCompiler) VisitExpression(raw yak.IExpressionContext) interface{} {
 			} else {
 				y.VisitExpression(expression)
 			}
-			y.writeString(")")
-			buf := recoverFormatBufferFunc()
 			y.VisitTypeLiteral(op)
-			y.writeString(buf)
 			y.pushOperator(yakvm.OpTypeCast)
 		}
 	} else if s := i.RecoverStmt(); s != nil {
@@ -92,7 +84,6 @@ func (y *YakCompiler) VisitExpression(raw yak.IExpressionContext) interface{} {
 	} else if s := i.Literal(); s != nil { // 解析单个字面量
 		y.VisitLiteral(s)
 	} else if s := i.Identifier(); s != nil { // 解析变量
-		y.writeString(s.GetText())
 		// 遇到变量的时候，在表达式中，使用符号！
 		sym, ok := y.currentSymtbl.GetSymbolByVariableName(s.GetText())
 		if !ok {
@@ -124,16 +115,12 @@ func (y *YakCompiler) VisitExpression(raw yak.IExpressionContext) interface{} {
 		i := pE.(*yak.ParenExpressionContext)
 		if e := i.Expression(); e != nil {
 			// 存在表达式
-			y.writeString("(")
 			y.VisitExpression(e)
-			y.writeString(")")
 		} else {
 			// 只有括号没有表达式
-			y.writeString("()")
 			y.pushUndefined()
 		}
 	} else if op := i.UnaryOperator(); op != nil { // unary op
-		y.writeString(op.GetText())
 		y.VisitExpression(i.Expression(0))
 		opStr := op.GetText()
 		switch opStr {
@@ -152,7 +139,6 @@ func (y *YakCompiler) VisitExpression(raw yak.IExpressionContext) interface{} {
 		}
 	} else if op := i.BitBinaryOperator(); op != nil { // bit binary op
 		y.VisitExpression(i.Expression(0))
-		y.writeStringWithWhitespace(op.GetText())
 		y.VisitExpression(i.Expression(1))
 		opStr := op.GetText()
 		switch opStr {
@@ -173,7 +159,6 @@ func (y *YakCompiler) VisitExpression(raw yak.IExpressionContext) interface{} {
 		}
 	} else if op := i.MultiplicativeBinaryOperator(); op != nil { // op * / %
 		y.VisitExpression(i.Expression(0))
-		y.writeStringWithWhitespace(op.GetText())
 		y.VisitExpression(i.Expression(1))
 		opStr := op.GetText()
 		switch opStr {
@@ -188,7 +173,6 @@ func (y *YakCompiler) VisitExpression(raw yak.IExpressionContext) interface{} {
 		}
 	} else if op := i.AdditiveBinaryOperator(); op != nil { // - +
 		y.VisitExpression(i.Expression(0))
-		y.writeStringWithWhitespace(op.GetText())
 		y.VisitExpression(i.Expression(1))
 
 		opStr := op.GetText()
@@ -200,7 +184,6 @@ func (y *YakCompiler) VisitExpression(raw yak.IExpressionContext) interface{} {
 		}
 	} else if op := i.ComparisonBinaryOperator(); op != nil {
 		y.VisitExpression(i.Expression(0))
-		y.writeStringWithWhitespace(op.GetText())
 		y.VisitExpression(i.Expression(1))
 		switch op.GetText() {
 		case `>`:
@@ -218,16 +201,10 @@ func (y *YakCompiler) VisitExpression(raw yak.IExpressionContext) interface{} {
 		}
 	} else if op := i.ChanIn(); op != nil {
 		y.VisitExpression(i.Expression(0))
-		y.writeStringWithWhitespace(op.GetText())
 		y.VisitExpression(i.Expression(1))
 		y.pushOperator(yakvm.OpSendChan)
 	} else if op := i.In(); op != nil {
 		y.VisitExpression(i.Expression(0))
-		text := op.GetText()
-		if op2 := i.NotLiteral(); op2 != nil {
-			text = "not " + text
-		}
-		y.writeStringWithWhitespace(text)
 		y.VisitExpression(i.Expression(1))
 		y.pushOperator(yakvm.OpIn)
 		if op2 := i.NotLiteral(); op2 != nil {
@@ -240,23 +217,19 @@ func (y *YakCompiler) VisitExpression(raw yak.IExpressionContext) interface{} {
 		y.VisitSliceCall(op)
 	} else if op := i.LogicAnd(); op != nil {
 		y.VisitExpression(i.Expression(0))
-		y.writeStringWithWhitespace(op.GetText())
 		jmptop := y.pushJmpIfFalseOrPop()
 		y.VisitExpression(i.Expression(1))
 		jmptop.Unary = y.GetNextCodeIndex()
 	} else if op := i.LogicOr(); op != nil {
 		y.VisitExpression(i.Expression(0))
-		y.writeStringWithWhitespace(op.GetText())
 		jmptop := y.pushJmpIfTrueOrPop()
 		y.VisitExpression(i.Expression(1))
 		jmptop.Unary = y.GetNextCodeIndex()
 	} else if op := i.Question(); op != nil { // 三元条件运算符 ? :
 		// e0 ? e1 : e2
 		y.VisitExpression(i.Expression(0))
-		y.writeStringWithWhitespace("?")
 		jmpf := y.pushJmpIfFalse()
 		y.VisitExpression(i.Expression(1))
-		y.writeStringWithWhitespace(":")
 		jmpEnd := y.pushJmp()
 		jmpf.Unary = y.GetNextCodeIndex()
 		y.VisitExpression(i.Expression(2))
@@ -287,4 +260,11 @@ func (y *YakCompiler) VisitExpression(raw yak.IExpressionContext) interface{} {
 	}
 
 	return nil
+}
+
+// This state controls ordered-map literal compilation inside an omap cast.
+func (y *YakCompiler) switchIsOMap(isOmap bool) func() {
+	previous := y.isOMap
+	y.isOMap = isOmap
+	return func() { y.isOMap = previous }
 }

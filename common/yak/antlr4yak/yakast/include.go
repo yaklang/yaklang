@@ -22,7 +22,6 @@ func (y *YakCompiler) VisitIncludeStmt(raw yak.IIncludeStmtContext) interface{} 
 	}
 	recoverRange := y.SetRange(&i.BaseParserRuleContext)
 	defer recoverRange()
-	y.writeString("include ")
 
 	// include 语句的参数是文件路径，直接读取并判断是否存在
 	fpath := i.StringLiteral().GetText()
@@ -47,21 +46,15 @@ func (y *YakCompiler) VisitIncludeStmt(raw yak.IIncludeStmtContext) interface{} 
 	}
 	y.importCycleHash[fileHash] = struct{}{}
 
-	y.writeString(`"` + fpath + `"`)
-
 	// parse
 	inputStream := antlr.NewInputStream(string(code))
 	lex := yak.NewYaklangLexer(inputStream)
 	tokenStream := antlr.NewCommonTokenStream(lex, antlr.TokenDefaultChannel)
 	p := yak.NewYaklangParser(tokenStream)
 
-	// compile, 忽略formatter
-	recoverFormatBufferFunc := y.switchFormatBuffer()
+	// Compile included source using its own source positions.
 	recoverSource := y.switchSource(&fpath, &codeStr)
-	defer func() {
-		recoverFormatBufferFunc()
-		recoverSource()
-	}()
+	defer recoverSource()
 
 	y.VisitProgramWithoutSymbolTable(p.Program().(*yak.ProgramContext))
 

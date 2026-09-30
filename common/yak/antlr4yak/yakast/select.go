@@ -2,9 +2,6 @@ package yakast
 
 import (
 	"reflect"
-	"strings"
-
-	"github.com/yaklang/antlr/v4"
 
 	yak "github.com/yaklang/yaklang/common/yak/antlr4yak/parser"
 	"github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm"
@@ -27,9 +24,7 @@ func (y *YakCompiler) VisitSelectStmt(raw yak.ISelectStmtContext) interface{} {
 	y.enterSwitchContext(y.GetNextCodeIndex())
 	resultID := y.currentSymtbl.NewSymbolWithoutName()
 	y.pushIdentifierName(yakvm.SelectBuiltinName)
-	headings := make([]string, len(cases))
-	for i, c := range cases {
-		restoreFormat := y.switchFormatBuffer()
+	for _, c := range cases {
 		if c.Channel == nil {
 			y.pushInteger(int(reflect.SelectDefault), "")
 			y.pushUndefined()
@@ -40,19 +35,14 @@ func (y *YakCompiler) VisitSelectStmt(raw yak.ISelectStmtContext) interface{} {
 				dir = reflect.SelectSend
 			}
 			y.pushInteger(int(dir), "")
-			if c.Send == nil {
-				y.writeString("<-")
-			}
 			y.VisitExpression(c.Channel)
 			if c.Send != nil {
-				y.writeString(" <- ")
 				y.VisitExpression(c.Send)
 			} else {
 				y.pushUndefined()
 			}
 		}
 		y.pushListWithLen(3)
-		headings[i] = restoreFormat()
 	}
 	if len(cases) == 0 {
 		// OpList(0) is a no-op, whereas OpNewSlice(0) creates an empty argument.
@@ -84,18 +74,10 @@ func (y *YakCompiler) VisitSelectStmt(raw yak.ISelectStmtContext) interface{} {
 		y.pushOperator(yakvm.OpAssign)
 		bodyJumps, invalidJumps = y.selectDispatchTree(chosenID, len(cases))
 	}
-	y.writeString("select {")
-	y.writeNewLine()
 	var ends []*yakvm.Code
-	wsIndex := 0
-	whitespace := stmt.AllWs()
 	clauses := stmt.AllSelectClause()
 	for i, c := range cases {
 		clause := clauses[i].(*yak.SelectClauseContext)
-		for wsIndex < len(whitespace) && whitespace[wsIndex].GetStart().GetTokenIndex() < clause.GetStart().GetTokenIndex() {
-			y.writeSelectComments(whitespace[wsIndex])
-			wsIndex++
-		}
 		restoreRange := y.SetRange(clause)
 		var next *yakvm.Code
 		if bodyJumps == nil {
@@ -107,45 +89,24 @@ func (y *YakCompiler) VisitSelectStmt(raw yak.ISelectStmtContext) interface{} {
 			bodyJumps[i].Unary = y.GetNextCodeIndex()
 		}
 		restoreCase := y.SwitchSymbolTableInNewScope("select case")
-		y.writeIndent()
-		if c.Channel == nil {
-			y.writeString("default")
-		} else {
-			y.writeString("case ")
-			if c.Left != nil {
-				leftCount := len(c.Left.(*yak.LeftExpressionListContext).AllLeftExpression())
-				for j := 0; j < leftCount; j++ {
-					resultField(j + 1)
-				}
-				y.pushListWithLen(leftCount)
-				y.VisitLeftExpressionList(c.Declare, c.Left)
-				if c.Declare {
-					y.writeString(" := ")
-				} else {
-					y.writeString(" = ")
-				}
-				y.pushOperator(yakvm.OpAssign)
+		if c.Channel != nil && c.Left != nil {
+			leftCount := len(c.Left.(*yak.LeftExpressionListContext).AllLeftExpression())
+			for j := 0; j < leftCount; j++ {
+				resultField(j + 1)
 			}
-			y.writeString(headings[i])
+			y.pushListWithLen(leftCount)
+			y.VisitLeftExpressionList(c.Declare, c.Left)
+			y.pushOperator(yakvm.OpAssign)
 		}
-		y.writeString(":")
-		y.writeNewLine()
-		y.incIndent()
 		if body := clause.StatementList(); body != nil {
 			for _, raw := range body.(*yak.StatementListContext).AllStatement() {
 				s := raw.(*yak.StatementContext)
 				if s.Empty() != nil {
-					y.writeSelectComments(s.Empty())
 					continue
 				}
-				restoreFormat := y.switchFormatBuffer()
-				y.writeIndent()
 				y.VisitStatement(s)
-				y.writeString(strings.TrimRight(restoreFormat(), " \t\r\n"))
-				y.writeNewLine()
 			}
 		}
-		y.decIndent()
 		restoreCase()
 		ends = append(ends, y.pushJmp())
 		if next != nil {
@@ -161,10 +122,6 @@ func (y *YakCompiler) VisitSelectStmt(raw yak.ISelectStmtContext) interface{} {
 		jump.Unary = end
 	}
 	y.exitSwitchContext(end)
-	for ; wsIndex < len(whitespace); wsIndex++ {
-		y.writeSelectComments(whitespace[wsIndex])
-	}
-	y.writeStringWithIndent("}")
 	return nil
 }
 
@@ -195,18 +152,4 @@ func (y *YakCompiler) selectDispatchTree(chosenID, count int) ([]*yakvm.Code, []
 	}
 	emit(0, count)
 	return bodies, invalid
-}
-
-func (y *YakCompiler) writeSelectComments(tree antlr.Tree) {
-	if token, ok := tree.(antlr.TerminalNode); ok {
-		switch token.GetSymbol().GetTokenType() {
-		case yak.YaklangParserCOMMENT, yak.YaklangParserLINE_COMMENT:
-			y.writeStringWithIndent(strings.TrimSpace(token.GetText()))
-			y.writeNewLine()
-		}
-		return
-	}
-	for _, child := range tree.GetChildren() {
-		y.writeSelectComments(child)
-	}
 }

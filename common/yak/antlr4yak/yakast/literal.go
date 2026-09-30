@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/samber/lo"
+	"github.com/yaklang/antlr/v4"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/yakunquote"
 	yak "github.com/yaklang/yaklang/common/yak/antlr4yak/parser"
@@ -25,7 +26,6 @@ func (y *YakCompiler) VisitNumericLiteral(raw yak.INumericLiteralContext) interf
 	}
 	recoverRange := y.SetRange(&i.BaseParserRuleContext)
 	defer recoverRange()
-	y.writeString(raw.GetText())
 
 	var err error
 
@@ -82,7 +82,6 @@ func (y *YakCompiler) VisitBoolLiteral(raw yak.IBoolLiteralContext) interface{} 
 	}
 	recoverRange := y.SetRange(&i.BaseParserRuleContext)
 	defer recoverRange()
-	y.writeString(raw.GetText())
 
 	b, _ := strconv.ParseBool(i.GetText())
 	y.pushBool(b)
@@ -121,7 +120,6 @@ func (y *YakCompiler) VisitLiteral(raw yak.ILiteralContext) interface{} {
 	}
 
 	if i.UndefinedLiteral() != nil || i.NilLiteral() != nil {
-		y.writeString(i.GetText())
 		y.pushUndefined()
 		return nil
 	}
@@ -167,9 +165,7 @@ func (y *YakCompiler) VisitSliceLiteral(raw yak.ISliceLiteralContext) interface{
 
 	// [ ... ] 语法
 	if i.LBracket() != nil && i.RBracket() != nil {
-		y.writeString("[")
 		unary := y.VisitExpressionListMultiline(i.ExpressionListMultiline())
-		y.writeString("]")
 		y.pushNewSlice(unary)
 		return nil
 	}
@@ -192,9 +188,7 @@ func (y *YakCompiler) VisitSliceTypedLiteral(raw yak.ISliceTypedLiteralContext) 
 
 	// 先创建一个类型
 	y.VisitSliceTypeLiteral(i.SliceTypeLiteral())
-	y.writeString("{")
 	y.pushTypedSlice(y.VisitExpressionListMultiline(i.ExpressionListMultiline()))
-	y.writeString("}")
 	return nil
 }
 
@@ -207,7 +201,6 @@ func (y *YakCompiler) VisitSliceTypeLiteral(raw yak.ISliceTypeLiteralContext) in
 	if i == nil {
 		return nil
 	}
-	y.writeString("[]")
 	y.VisitTypeLiteral(i.TypeLiteral())
 	y.pushType("slice")
 	return nil
@@ -227,11 +220,8 @@ func (y *YakCompiler) VisitExpressionListMultiline(raw yak.IExpressionListMultil
 
 	allExpression := i.AllExpression()
 	lenOfAllExpression := len(allExpression)
-	for index, e := range allExpression {
+	for _, e := range allExpression {
 		y.VisitExpression(e)
-		if index != lenOfAllExpression-1 {
-			y.writeString(", ")
-		}
 	}
 	return lenOfAllExpression
 }
@@ -253,9 +243,6 @@ func (y *YakCompiler) VisitMapLiteral(raw yak.IMapLiteralContext) interface{} {
 		return nil
 	}
 
-	y.writeString("{")
-	defer y.writeString("}")
-
 	pairs := i.MapPairs()
 	if pairs == nil {
 		y.pushNewMap(0, y.isOMap)
@@ -264,13 +251,9 @@ func (y *YakCompiler) VisitMapLiteral(raw yak.IMapLiteralContext) interface{} {
 
 	allPair := pairs.(*yak.MapPairsContext).AllMapPair()
 	lenOfAllPair := len(allPair)
-	for index, p := range allPair {
+	for _, p := range allPair {
 		y.VisitExpression(p.(*yak.MapPairContext).Expression(0))
-		y.writeString(": ")
 		y.VisitExpression(p.(*yak.MapPairContext).Expression(1))
-		if index < lenOfAllPair-1 {
-			y.writeString(", ")
-		}
 	}
 
 	y.pushNewMap(lenOfAllPair, y.isOMap)
@@ -292,8 +275,6 @@ func (y *YakCompiler) VisitMapTypedLiteral(raw yak.IMapTypedLiteralContext) inte
 
 	// 先创建一个类型
 	y.VisitMapTypeLiteral(i.MapTypeLiteral())
-	y.writeString("{")
-	defer y.writeString("}")
 
 	pairs := i.MapPairs()
 	if pairs == nil {
@@ -304,13 +285,9 @@ func (y *YakCompiler) VisitMapTypedLiteral(raw yak.IMapTypedLiteralContext) inte
 
 	allPair := pairs.(*yak.MapPairsContext).AllMapPair()
 	lenOfAllPair := len(allPair)
-	for index, p := range allPair {
+	for _, p := range allPair {
 		y.VisitExpression(p.(*yak.MapPairContext).Expression(0))
-		y.writeString(": ")
 		y.VisitExpression(p.(*yak.MapPairContext).Expression(1))
-		if index < lenOfAllPair-1 {
-			y.writeString(", ")
-		}
 	}
 
 	y.pushTypedMap(lenOfAllPair)
@@ -327,9 +304,7 @@ func (y *YakCompiler) VisitMapTypeLiteral(raw yak.IMapTypeLiteralContext) interf
 		return nil
 	}
 
-	y.writeString("map[")
 	y.VisitTypeLiteral(i.TypeLiteral(0))
-	y.writeString("]")
 	y.VisitTypeLiteral(i.TypeLiteral(1))
 	y.pushType("map")
 	return nil
@@ -341,14 +316,9 @@ func (y *YakCompiler) VisitTemplateStringLiteral(raw yak.ITemplateStringLiteralC
 	}
 	recoverRange := y.SetRange(raw)
 	defer recoverRange()
-	y.writeString(raw.GetText())
-
-	// 在当前函数中禁用！
-	recoverFormatter := y.switchFormatBuffer()
-	defer recoverFormatter()
 
 	type StringAtom interface {
-		GetText() string
+		antlr.ParserRuleContext
 		Expression() yak.IExpressionContext
 	}
 	var tempString string
@@ -379,7 +349,7 @@ func (y *YakCompiler) VisitTemplateStringLiteral(raw yak.ITemplateStringLiteralC
 			y.pushOperator(yakvm.OpTypeCast)
 			y.pushOperator(yakvm.OpAdd)
 		} else {
-			tempString += atom.GetText()
+			tempString += literalSourceText(atom)
 		}
 	}
 
@@ -433,7 +403,6 @@ func (y *YakCompiler) VisitTemplateStringLiteral(raw yak.ITemplateStringLiteralC
 		y.panicCompilerError(compileError, "parse template string literal error")
 	}
 
-	// y.pushString(i.GetText())
 	return nil
 }
 
@@ -454,7 +423,6 @@ func (y *YakCompiler) VisitStringLiteral(raw yak.IStringLiteralContext) interfac
 
 	recoverRange := y.SetRange(&i.BaseParserRuleContext)
 	defer recoverRange()
-	y.writeString(raw.GetText())
 
 	text := i.GetText()
 	if text == "" {
@@ -543,13 +511,12 @@ func (y *YakCompiler) VisitDoc(raw yak.IStringLiteralContext) interface{} {
 	}
 	recoverRange := y.SetRange(&i.BaseParserRuleContext)
 	defer recoverRange()
-	y.writeString(raw.GetText())
 
 	var text string
 	if node := i.CrlfHereDoc(); node != nil {
-		text = node.GetText()
+		text = literalSourceText(node)
 	} else if node := i.LfHereDoc(); node != nil {
-		text = node.GetText()
+		text = literalSourceText(node)
 	}
 	y.pushString(text, text)
 	return nil
@@ -566,7 +533,6 @@ func (y *YakCompiler) VisitCharacterLiteral(raw yak.ICharacterLiteralContext) in
 	}
 	recoverRange := y.SetRange(&i.BaseParserRuleContext)
 	defer recoverRange()
-	y.writeString(raw.GetText())
 
 	lit := i.GetText()
 	var s string
@@ -585,4 +551,12 @@ func (y *YakCompiler) VisitCharacterLiteral(raw yak.ICharacterLiteralContext) in
 	v := runeLit[0]
 	y.pushChar(v, lit)
 	return nil
+}
+
+// Literal character tokens cover a contiguous source interval, including their
+// whitespace. Read that interval once: ANTLR subtree GetText concatenates each
+// character and would copy quadratic amounts of data for large payloads.
+func literalSourceText(node antlr.ParserRuleContext) string {
+	start, stop := node.GetStart(), node.GetStop()
+	return start.GetInputStream().GetText(start.GetStart(), stop.GetStop())
 }

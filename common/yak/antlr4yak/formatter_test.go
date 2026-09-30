@@ -2,6 +2,8 @@ package antlr4yak
 
 import (
 	"context"
+	"fmt"
+	"strings"
 	"sync"
 	"testing"
 
@@ -79,5 +81,40 @@ func TestFormatterConcurrentSameEngine(t *testing.T) {
 	wg.Wait()
 	if e.HaveEvaluatedCode() {
 		t.Fatal("formatter changed scope")
+	}
+}
+
+// Large literal extraction uses rune offsets, and must preserve exact payloads
+// while avoiding ANTLR's quadratic subtree text concatenation.
+func TestCompilerLargeLiteralPayloads(t *testing.T) {
+	cases := map[string]struct{ source, want string }{}
+	for _, sep := range []string{"\n", "\r\n"} {
+		body := strings.Repeat("  原文 {} // ;\t"+sep, 2048) + "末尾"
+		name := "heredoc_LF"
+		if sep == "\r\n" {
+			name = "heredoc_CRLF"
+		}
+		cases[name] = struct{ source, want string }{"value=<<<TAG" + sep + body + sep + "TAG\nassert value == want", body}
+	}
+	for _, quote := range []string{"'", "\"", "`"} {
+		body := strings.Repeat("原文 ; {} // ", 2048)
+		cases["template_"+quote] = struct{ source, want string }{"value=f" + quote + body + "${number} " + body + quote + ";assert value == want", body + "7 " + body}
+	}
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			formatted, err := yakfmt.Format(tc.source)
+			if err != nil {
+				t.Fatal(err)
+			}
+			for i, source := range []string{tc.source, formatted} {
+				t.Run(fmt.Sprint(i), func(t *testing.T) {
+					e := New()
+					e.ImportLibs(map[string]interface{}{"want": tc.want, "number": 7})
+					if err := e.SafeEval(context.Background(), source); err != nil {
+						t.Fatal(err)
+					}
+				})
+			}
+		})
 	}
 }

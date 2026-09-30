@@ -1,112 +1,50 @@
 package yakast
 
 import (
+	"github.com/google/uuid"
 	yak "github.com/yaklang/yaklang/common/yak/antlr4yak/parser"
 	"github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm"
-
-	"github.com/google/uuid"
 )
 
-func (y *YakCompiler) _VisitTryStmt(raw yak.ITryStmtContext) interface{} {
-
+func (y *YakCompiler) VisitTryStmt(raw yak.ITryStmtContext) interface{} {
 	if y == nil || raw == nil {
 		return nil
 	}
-
 	i, _ := raw.(*yak.TryStmtContext)
 	if i == nil {
 		return nil
 	}
-	var (
-		jmpIfFalse                               *yakvm.Code
-		catchFormattedCode, finallyFormattedCode string
-		idName                                   = "__recover_value__"
-		identifier                               = i.Identifier()
-	)
 
-	recoverRange := y.SetRange(&i.BaseParserRuleContext)
-	defer recoverRange()
+	// Assign 错误
+	recoverSymbolTableAndScope := y.SwitchSymbolTableInNewScope("try-catch-finally", uuid.New().String())
 
-	tableRecover := y.SwitchSymbolTable("instanceCode", uuid.New().String())
-	defer tableRecover()
-	recoverCodeFunc := y.SwitchCodes()
-
-	y.writeString("try ")
-
-	// catch block
-	recoverFormatBufferFunc := y.switchFormatBuffer()
-	recoverCatchCodeFunc := y.SwitchCodes()
-
-	y.VisitBlockWithCallback(i.Block(1), func(y *YakCompiler) {
-		if identifier != nil {
-			idName = identifier.GetText()
-		}
-
-		id, err := y.currentSymtbl.NewSymbolWithReturn(idName)
+	var id = -1
+	var text string
+	if identifier := i.Identifier(); identifier != nil {
+		text = identifier.GetText()
+		id1, err := y.currentSymtbl.NewSymbolWithReturn(text)
 		if err != nil {
-			y.panicCompilerError(forceCreateSymbolFailed, idName)
+			y.panicCompilerError(CreateSymbolError, text)
 		}
-		y.pushLeftRef(id)
-		y.pushOperator(yakvm.OpRecover)
-
-		y.pushOperator(yakvm.OpFastAssign)
-		jmpIfFalse = y.pushJmpIfFalse()
-	}, false)
-	jmpIfFalse.Unary = y.GetNextCodeIndex()
-	y.pushOperator(yakvm.OpReturn)
-	catchCode := make([]*yakvm.Code, len(y.codes))
-	copy(catchCode, y.codes)
-	recoverCatchCodeFunc()
-	catchFormattedCode = recoverFormatBufferFunc()
-
-	finallyBlock := i.Block(2)
-	if finallyBlock != nil {
-		recoverFormatBufferFunc = y.switchFormatBuffer()
-		recoverFinallyCodeFunc := y.SwitchCodes()
-		y.VisitBlock(i.Block(2), false)
-		y.pushOperator(yakvm.OpReturn)
-		finallyCode := make([]*yakvm.Code, len(y.codes))
-		copy(finallyCode, y.codes)
-		recoverFinallyCodeFunc()
-		finallyFormattedCode = recoverFormatBufferFunc()
-		y.pushDefer(finallyCode)
+		id = id1
 	}
 
-	y.pushDefer(catchCode)
-	y.VisitBlock(i.Block(0), false)
-	y.pushOperator(yakvm.OpReturn)
-	y.writeString(" catch ")
-	if identifier != nil {
-		y.writeString(idName)
-		y.writeString(" ")
-	}
-	y.writeString(catchFormattedCode)
+	// 捕获 try block 中可能出现的的异常
+	catchErrorOpCode := y.pushOperator(yakvm.OpCatchError) //开始捕获error
+	y.tryDepthStack.Push(y.GetNextCodeIndex())
+	y.VisitBlock(i.Block(0))
+	y.tryDepthStack.Pop()
+	y.pushOperator(yakvm.OpStopCatchError) // 结束捕获error
+	jmp1 := y.pushJmp()                    // 执行 try block 后跳转到 finally block
 
-	if finallyBlock != nil {
-		y.writeString(" finally ")
-		y.writeString(finallyFormattedCode)
-	}
+	catchErrorOpCode.Op1 = yakvm.NewAutoValue(y.GetCodeIndex()) // 捕获到异常后跳转到 catch block
+	catchErrorOpCode.Op2 = yakvm.NewAutoValue(id)
+	y.VisitBlock(i.Block(1)) // catch block
 
-	funcCode := make([]*yakvm.Code, len(y.codes))
-	copy(funcCode, y.codes)
-	freeValues := y.FreeValues
-	recoverCodeFunc()
-
-	yakFn := yakvm.NewFunction(funcCode, y.currentSymtbl)
-	yakFn.FreeValue = freeValues
-	if y.sourceCodePointer != nil {
-		yakFn.SetSourceCode(*y.sourceCodePointer)
+	jmp1.Unary = y.GetNextCodeIndex()
+	if finallyBlock := i.Block(2); finallyBlock != nil {
+		y.VisitBlock(finallyBlock)
 	}
-	if yakFn == nil {
-		y.panicCompilerError(compileError, "cannot create yak function from compiler")
-	}
-
-	// 配置函数
-	y.pushValue(&yakvm.Value{
-		TypeVerbose: "anonymous-function",
-		Value:       yakFn,
-	})
-	y.pushCall(0)
-	y.pushOpPop()
+	recoverSymbolTableAndScope()
 	return nil
 }

@@ -13,9 +13,10 @@ func TestCoreCompilerUnknownPanicFailsClosed(t *testing.T) {
 	y := NewYakCompilerWithSymbolTable(yakvm.NewSymbolTable())
 	lexer := yak.NewYaklangLexer(antlr.NewInputStream("value = 1"))
 	parser := yak.NewYaklangParser(antlr.NewCommonTokenStream(lexer, antlr.TokenDefaultChannel))
-	// A broken formatter is an internal failure, not a registered semantic error.
-	y.formatted = nil
-	y.VisitProgram(parser.Program())
+	// A corrupted syntax tree is an internal failure, not a semantic error.
+	program := parser.Program().(*yak.ProgramContext)
+	program.SetStart(nil)
+	y.VisitProgram(program)
 	if len(y.GetErrors()) == 0 || !strings.Contains(y.GetErrors().Error(), "internal compiler error") {
 		t.Fatal("internal panic was swallowed")
 	}

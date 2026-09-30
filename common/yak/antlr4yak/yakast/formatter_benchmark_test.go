@@ -12,9 +12,8 @@ import (
 
 var formatterResult string
 
-// Legacy measures the previous public path: compile plus the visitor's original
-// formatting buffer. GetFormattedCode now uses the independent printer lazily,
-// so reading that method here would unfairly run BOTH formatters for the baseline.
+// Independent includes parsing; LayoutOnly reuses a parsed tree. Compile never
+// requests formatting and makes their different costs explicit.
 func BenchmarkYakFormatter(b *testing.B) {
 	sources := map[string]string{
 		"small":         "f = func(a) { if (a > 0) { return a + 1 }; return 0 }\n",
@@ -41,7 +40,7 @@ func BenchmarkYakFormatter(b *testing.B) {
 					}
 				}
 			})
-			b.Run("Legacy", func(b *testing.B) {
+			b.Run("Compile", func(b *testing.B) {
 				b.ReportAllocs()
 				b.SetBytes(int64(len(source)))
 				for i := 0; i < b.N; i++ {
@@ -49,7 +48,7 @@ func BenchmarkYakFormatter(b *testing.B) {
 					if !c.Compiler(source) {
 						b.Fatal(c.GetErrors())
 					}
-					formatterResult = strings.TrimSpace(c.formatted.String())
+					compilerBenchmarkCodes = c.GetOpcodes()
 				}
 			})
 			b.Run("LayoutOnly", func(b *testing.B) {
