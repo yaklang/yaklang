@@ -69,6 +69,7 @@ const (
 	RuntimeToIntSymbol                = "yak_runtime_to_int"
 	RuntimeToFloatSymbol              = "yak_runtime_to_float"
 	RuntimeToStringSymbol             = "yak_runtime_to_string"
+	RuntimeStringToBytesSymbol        = "yak_runtime_string_to_bytes"
 	RuntimeBoolToStringSymbol         = "yak_runtime_bool_to_string"
 	RuntimeIsTrueSymbol               = "yak_runtime_is_true"
 	RuntimeParseIntSymbol             = "yak_runtime_parse_int"
