@@ -12,6 +12,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
 	"github.com/yaklang/yaklang/common/utils/memedit"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 	"github.com/yaklang/yaklang/common/yak/ssa_compile"
@@ -253,4 +254,18 @@ func normalizeOverlayProgramFilePath(filePath, programName string) string {
 		return ""
 	}
 	return normalizedPath
+}
+
+// ExpandedSources loads the top program and returns its full incremental tree.
+func ExpandedSources(t *testing.T, overlay *ssaapi.ProgramOverLay) filesys_interface.FileSystem {
+	t.Helper()
+	require.NotNil(t, overlay)
+	names := overlay.ProgramNames()
+	require.NotEmpty(t, names)
+	prog, err := ssaapi.NewProgramFromDB(names[len(names)-1])
+	require.NoError(t, err)
+	expanded, err := ssaapi.ExpandIncrementalSources(prog)
+	require.NoError(t, err)
+	require.NotNil(t, expanded)
+	return expanded
 }

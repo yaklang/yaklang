@@ -47,7 +47,7 @@ func (p *Program) GetSourceStatistics() (*SourceStatistics, error) {
 	return sourceStatisticsFromLines(lines), nil
 }
 
-// GetSourceStatistics follows the same effective file ownership as aggregateFileSystems,
+// GetSourceStatistics follows the same effective file ownership as expandOverlaySources,
 // but a failed read is an error instead of silently reducing the count.
 func (p *ProgramOverLay) GetSourceStatistics() (*SourceStatistics, error) {
 	if p == nil || p.Base == nil || p.Base.Program == nil || p.Base.Program.FileList == nil || len(p.Diff) == 0 {

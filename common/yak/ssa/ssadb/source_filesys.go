@@ -13,16 +13,6 @@ import (
 	"github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
 )
 
-// GetAggregatedFileSystemFunc 用于获取聚合文件系统的函数类型
-// 这个函数变量由 ssaapi 包在初始化时注册，避免循环导入
-var GetAggregatedFileSystemFunc func(programName string) filesys_interface.FileSystem
-
-// SetGetAggregatedFileSystemFunc 设置获取聚合文件系统的函数
-// 由 ssaapi 包在初始化时调用
-func SetGetAggregatedFileSystemFunc(fn func(programName string) filesys_interface.FileSystem) {
-	GetAggregatedFileSystemFunc = fn
-}
-
 type irSourceFS struct {
 	virtual map[string]*filesys.VirtualFS // echo program -> virtual fs
 }
@@ -282,46 +272,6 @@ func (fs *irSourceFS) checkPath(path string, isDirs ...bool) (*filesys.VirtualFS
 }
 
 func loadIrSourceFS(path, progName string, isDir bool, irfs *irSourceFS, vf *filesys.VirtualFS) {
-	// 检查是否是增量编译的 program，如果是，使用 overlay 的聚合文件系统
-	if progName != "" {
-		prog, err := GetApplicationProgram(progName)
-		if err == nil && prog != nil && prog.IsOverlay && len(prog.OverlayLayers) > 0 {
-			// 这是一个增量编译的 program，使用 overlay 的聚合文件系统
-			// 通过函数变量调用 GetAggregatedFileSystemForProgramName，避免循环导入
-			if GetAggregatedFileSystemFunc != nil {
-				log.Infof("loading aggregated file system for overlay program: %s", progName)
-				aggregatedFS := GetAggregatedFileSystemFunc(progName)
-				if aggregatedFS != nil {
-					log.Infof("successfully loaded aggregated file system for program: %s", progName)
-					// 从聚合文件系统复制所有文件到 VirtualFS（参考测试中的做法）
-					err := filesys.Recursive(".",
-						filesys.WithFileSystem(aggregatedFS),
-						filesys.WithFileStat(func(filePath string, info fs.FileInfo) error {
-							if info.IsDir() {
-								return nil
-							}
-							content, err := aggregatedFS.ReadFile(filePath)
-							if err != nil {
-								log.Warnf("failed to read file %s from aggregatedFS: %v", filePath, err)
-								return nil
-							}
-							normalizedPath := strings.TrimPrefix(filePath, "/")
-							vf.AddFile("/"+progName+"/"+normalizedPath, string(content))
-							return nil
-						}))
-					if err == nil {
-						mergeExtraFileEntriesIntoVF(progName, vf)
-						// 成功加载聚合文件系统，直接返回
-						return
-					}
-					log.Warnf("failed to copy files from aggregatedFS: %v, fallback to single program", err)
-				}
-			}
-			// 如果加载 overlay 失败，fallback 到原来的逻辑
-		}
-	}
-
-	// 原来的逻辑：从数据库加载单个 program 的文件
 	add2FS := func(source *IrSource) {
 		path := irfs.Join(source.FolderPath, source.FileName)
 		if source.QuotedCode == "" {

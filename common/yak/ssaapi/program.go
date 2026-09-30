@@ -202,6 +202,27 @@ func (p *Program) IsBaseProgram() bool {
 	return false
 }
 
+// incrementalLayerNames is the persisted diff stack, bottom to top.
+// A full program and the first incremental base have no stack.
+// This is program metadata, the same fact ProgramOverLay exposes as a query instance.
+func (p *Program) incrementalLayerNames() []string {
+	if p == nil {
+		return nil
+	}
+	if p.irProgram != nil && len(p.irProgram.OverlayLayers) >= 2 {
+		return append([]string(nil), []string(p.irProgram.OverlayLayers)...)
+	}
+	if p.IsIncrementalCompile() && !p.IsBaseProgram() {
+		baseName := p.GetBaseProgramName()
+		self := p.GetProgramName()
+		if baseName == "" || self == "" || baseName == self {
+			return nil
+		}
+		return []string{baseName, self}
+	}
+	return nil
+}
+
 // GetBaseProgramName 获取基础程序名称（用于增量编译）
 func (p *Program) GetBaseProgramName() string {
 	if p == nil {
