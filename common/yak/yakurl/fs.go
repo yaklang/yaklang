@@ -228,23 +228,9 @@ func (f *fileSystemAction) fileInfoToResource(originParam *ypb.YakURL, query url
 	return src
 }
 
-// readDir lists rawPath. diffOnly is ignored unless the backend implements
-// ReadDirDiffOnly. ssadb lists the files stored under that program name.
-func (f fileSystemAction) readDir(rawPath string, backend fi.FileSystem, absPath string, query url.Values) ([]fs.DirEntry, error) {
-	if getBoolQueryValue(query, "diffOnly") {
-		if dfs, ok := backend.(interface {
-			ReadDirDiffOnly(string) ([]fs.DirEntry, error)
-		}); ok {
-			return dfs.ReadDirDiffOnly(absPath)
-		}
-	}
-	return backend.ReadDir(absPath)
-}
-
 func (f fileSystemAction) Get(params *ypb.RequestYakURLParams) (*ypb.RequestYakURLResponse, error) {
 	// available query:
 	// op=list # list directory
-	// diffOnly=true # honored only when the backend implements ReadDirDiffOnly
 	// op=search&keyword=xxx # search file content
 	// global=true # recursively search subdirectories
 	// regex=true # treat keyword as a Go regular expression
@@ -272,7 +258,7 @@ func (f fileSystemAction) Get(params *ypb.RequestYakURLParams) (*ypb.RequestYakU
 	switch query.Get("op") {
 	case "list":
 		if info.IsDir() {
-			infos, err := f.readDir(params.GetUrl().Path, fs, absPath, query)
+			infos, err := fs.ReadDir(absPath)
 			if err != nil {
 				return nil, utils.Wrapf(err, "cannot read dir[%s]", u.GetPath())
 			}
