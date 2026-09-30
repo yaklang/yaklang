@@ -17,8 +17,11 @@ import (
 	"reflect"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 	"unsafe"
+
+	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 )
 
 // registerRuntimeGlobals registers the minimal global set for the AOT runtime.
@@ -237,7 +240,20 @@ func yak_runtime_float_binop(op int64, a, b int64) int64 {
 	return int64(math.Float64bits(r))
 }
 
+var runtimeYakitDatabaseOnce sync.Once
+
+// runtimeEnsureYakitDatabase mirrors the yak CLI, which opens the project
+// database and runs post-init hooks before a script starts. The HTTP flow
+// saver is one of those hooks; without it poc.save drops the response and
+// openapi.ExtractOpenAPI3Scheme reports "no path item".
+func runtimeEnsureYakitDatabase() {
+	runtimeYakitDatabaseOnce.Do(func() {
+		yakit.InitialDatabase()
+	})
+}
+
 func registerRuntimeGlobals() {
+	runtimeEnsureYakitDatabase()
 	runtimeRegisterYaklibGlobals(map[string]any{
 		"len":     runtimeYakBuiltinLen,
 		"cap":     runtimeYakBuiltinCap,
