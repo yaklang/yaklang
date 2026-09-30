@@ -118,6 +118,19 @@ func runtimeWordAsFloat(raw uint64) (float64, bool) {
 //export yak_runtime_to_int
 func yak_runtime_to_int(raw int64) int64 {
 	defer recoverRuntimePanic()
+	if v, ok := runtimeShadowValue(uint64(raw)); ok {
+		switch b := v.(type) {
+		case bool:
+			if b {
+				return 1
+			}
+			return 0
+		default:
+			if isRuntimeNilBox(v) {
+				return 0
+			}
+		}
+	}
 	if f, ok := runtimeWordAsFloat(uint64(raw)); ok {
 		return int64(f)
 	}
@@ -136,27 +149,13 @@ func yak_runtime_to_float(raw int64) int64 {
 //export yak_runtime_to_string
 func yak_runtime_to_string(raw int64) int64 {
 	defer recoverRuntimePanic()
-	if raw == 0 {
-		return int64(uintptr(newStdlibShadow("")))
-	}
-	// A string shadow (e.g. a member read that yielded a string value)
-	// must pass through unchanged; the float heuristic below would format
-	// its pointer as a decimal integer.
-	if h, ok := handleFromShadow(unsafe.Pointer(uintptr(raw))); ok {
-		if s, ok := h.Value().(string); ok {
-			return int64(uintptr(newStdlibShadow(s)))
-		}
-	}
-	if f, ok := runtimeWordAsFloat(uint64(raw)); ok {
-		return int64(uintptr(newStdlibShadow(strconv.FormatFloat(f, 'g', -1, 64))))
-	}
-	return int64(uintptr(newStdlibShadow(strconv.FormatInt(raw, 10))))
+	return runtimeToStringWord(raw)
 }
 
 //export yak_runtime_bool_to_string
 func yak_runtime_bool_to_string(raw int64) int64 {
 	defer recoverRuntimePanic()
-	if raw != 0 {
+	if yak_runtime_is_true(raw) != 0 {
 		return int64(uintptr(newStdlibShadow("true")))
 	}
 	return int64(uintptr(newStdlibShadow("false")))
@@ -214,6 +213,10 @@ func yak_runtime_float_binop(op int64, a, b int64) int64 {
 	}
 	if !bok {
 		bf = float64(b)
+	}
+	switch op {
+	case 4, 5, 6, 7:
+		return runtimeNumericCompare(op, a, b)
 	}
 	var r float64
 	switch op {

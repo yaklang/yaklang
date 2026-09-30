@@ -155,6 +155,22 @@ func (c *Compiler) bindParamsFromContext(fn *ssa.Function) error {
 		c.cacheValue(binding.ValueID, raw)
 	}
 
+	// Nested callbacks can capture a variable this function never names
+	// (tcp.serverCallback closing over a channel). Those cells are appended
+	// after the declared free values and keyed by the ancestor value id so
+	// the inner closure shares the slot instead of capturing zero.
+	declaredFree := int64(len(callframe.OrderedFreeValueBindings(fn)))
+	for i, extra := range c.extraCaptures(fn) {
+		idx := llvm.ConstInt(i64, uint64(argBase+freeValueBase+declaredFree+int64(i)), false)
+		elemPtr := c.Builder.CreateGEP(i64, ctxPtr, []llvm.Value{idx}, "")
+		raw := c.Builder.CreateLoad(i64, elemPtr, fmt.Sprintf("fv_extra_%d", extra.OriginID))
+		ptr := c.Builder.CreateIntToPtr(raw, i64Ptr, fmt.Sprintf("fv_extra_ptr_%d", extra.OriginID))
+		if c.function.transitiveCapturePointers == nil {
+			c.function.transitiveCapturePointers = make(map[int64]llvm.Value)
+		}
+		c.function.transitiveCapturePointers[extra.OriginID] = ptr
+	}
+
 	for _, paramID := range fn.Params {
 		value, ok := fn.GetValueById(paramID)
 		if !ok || value == nil {

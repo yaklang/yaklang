@@ -8,6 +8,75 @@ import (
 	"github.com/yaklang/yaklang/common/yak/ssa2llvm/runtime/abi"
 )
 
+// emitCheckedIntDiv lowers integer division and remainder. A zero divisor
+// traps in the CPU (SIGFPE) before any defer/recover can run, so the zero
+// case stores a panic and leaves through the function's defer block instead
+// of emitting sdiv/srem.
+func (c *Compiler) emitCheckedIntDiv(inst *ssa.BinOp, lhs, rhs llvm.Value, name string, isMod bool) (llvm.Value, error) {
+	fn := c.currentFunction()
+	if fn == nil || c.function == nil || c.function.llvmFn.IsNil() || inst == nil {
+		if isMod {
+			return c.Builder.CreateSRem(lhs, rhs, name), nil
+		}
+		return c.Builder.CreateSDiv(lhs, rhs, name), nil
+	}
+
+	i64 := c.LLVMCtx.Int64Type()
+	zero := llvm.ConstInt(i64, 0, false)
+	isZero := c.Builder.CreateICmp(llvm.IntEQ, rhs, zero, name+"_zero")
+
+	origBB := c.currentInsertBlock()
+	if origBB.IsNil() {
+		if isMod {
+			return c.Builder.CreateSRem(lhs, rhs, name), nil
+		}
+		return c.Builder.CreateSDiv(lhs, rhs, name), nil
+	}
+	okBB := c.LLVMCtx.AddBasicBlock(c.function.llvmFn, name+"_ok")
+	panicBB := c.LLVMCtx.AddBasicBlock(c.function.llvmFn, name+"_div0")
+
+	c.Builder.SetInsertPointAtEnd(panicBB)
+	msg := "division by zero"
+	if isMod {
+		msg = "integer modulo by zero"
+	}
+	msgPtr := c.Builder.CreateGlobalStringPtr(msg, name+"_div0_msg")
+	tagged := c.Builder.CreateOr(
+		llvm.ConstPtrToInt(msgPtr, i64),
+		llvm.ConstInt(i64, yakTaggedPointerMask, false),
+		name+"_div0_panic",
+	)
+	if err := c.storeContextPanic(tagged, abi.FlagPanicTaggedPointer); err != nil {
+		return llvm.Value{}, err
+	}
+	if fn.DeferBlock > 0 && !c.function.returnBlock.IsNil() {
+		deferBB, ok := c.ssaBlockEntry(fn.DeferBlock)
+		if !ok {
+			return llvm.Value{}, fmt.Errorf("emitCheckedIntDiv: defer block %d not found", fn.DeferBlock)
+		}
+		c.Builder.CreateBr(deferBB)
+	} else {
+		c.Builder.CreateRetVoid()
+	}
+
+	c.Builder.SetInsertPointAtEnd(okBB)
+	var val llvm.Value
+	if isMod {
+		val = c.Builder.CreateSRem(lhs, rhs, name)
+	} else {
+		val = c.Builder.CreateSDiv(lhs, rhs, name)
+	}
+
+	c.Builder.SetInsertPointAtEnd(origBB)
+	c.Builder.CreateCondBr(isZero, panicBB, okBB)
+	c.Builder.SetInsertPointAtEnd(okBB)
+	if block := inst.GetBlock(); block != nil && block.GetId() > 0 {
+		c.Blocks[block.GetId()] = okBB
+		c.function.activeBlockID = block.GetId()
+	}
+	return val, nil
+}
+
 func (c *Compiler) compilePanic(inst *ssa.Panic) error {
 	if inst == nil {
 		return nil
@@ -23,54 +92,88 @@ func (c *Compiler) compilePanic(inst *ssa.Panic) error {
 	if err := c.storeContextPanic(infoVal, c.panicValueFlags(inst)); err != nil {
 		return err
 	}
+	return c.branchAfterContextPanic(inst.GetBlock())
+}
 
-	block := inst.GetBlock()
+// continuePastDropErrorPanic splits the current block after `f()~`.
+// yak_runtime_drop_error leaves a non-nil error in the call context's panic
+// word. That path must enter try/catch (or leave the function) instead of
+// executing the rest of the statement.
+func (c *Compiler) continuePastDropErrorPanic(inst ssa.Instruction, ctxI64 llvm.Value) error {
+	if c == nil || c.function == nil || c.function.llvmFn.IsNil() || inst == nil || ctxI64.IsNil() {
+		return nil
+	}
+	panicVal, err := c.loadCtxWordFrom(ctxI64, abi.WordPanic, "yak_drop_panic")
+	if err != nil {
+		return err
+	}
+	i64 := c.LLVMCtx.Int64Type()
+	isPanic := c.Builder.CreateICmp(llvm.IntNE, panicVal, llvm.ConstInt(i64, 0, false), "yak_drop_has_panic")
+
+	origBB := c.currentInsertBlock()
+	if origBB.IsNil() {
+		return fmt.Errorf("continuePastDropErrorPanic: missing insert block")
+	}
+	contBB := c.LLVMCtx.AddBasicBlock(c.function.llvmFn, fmt.Sprintf("yak_drop_ok_%d", inst.GetId()))
+	panicBB := c.LLVMCtx.AddBasicBlock(c.function.llvmFn, fmt.Sprintf("yak_drop_panic_%d", inst.GetId()))
+
+	c.Builder.SetInsertPointAtEnd(panicBB)
+	if err := c.storeContextPanic(panicVal, abi.FlagPanicTaggedPointer); err != nil {
+		return err
+	}
+	if err := c.branchAfterContextPanic(inst.GetBlock()); err != nil {
+		return err
+	}
+
+	c.Builder.SetInsertPointAtEnd(origBB)
+	c.Builder.CreateCondBr(isPanic, panicBB, contBB)
+	c.Builder.SetInsertPointAtEnd(contBB)
+	if block := inst.GetBlock(); block != nil && block.GetId() > 0 {
+		c.Blocks[block.GetId()] = contBB
+		c.function.activeBlockID = block.GetId()
+	}
+	return nil
+}
+
+// branchAfterContextPanic leaves the current block once a panic is stored on
+// the function context: into the active catch, through defer, or back to the caller.
+func (c *Compiler) branchAfterContextPanic(block *ssa.BasicBlock) error {
 	if block == nil {
-		return fmt.Errorf("compilePanic: panic %d has no block", inst.GetId())
+		return fmt.Errorf("branchAfterContextPanic: missing block")
 	}
 	handlerID := int64(0)
 	if c.function != nil && c.function.activeHandlerByBlock != nil {
 		handlerID = c.function.activeHandlerByBlock[block.GetId()]
 	}
 	if handlerID == 0 {
-		// Unhandled panic: propagate to caller (through defer if present).
-		currentFunction := c.currentFunction()
-		if currentFunction != nil && currentFunction.DeferBlock > 0 && c.function != nil && !c.function.returnBlock.IsNil() {
-			deferBB, ok := c.Blocks[currentFunction.DeferBlock]
-			if !ok {
-				return fmt.Errorf("compilePanic: defer block %d not found", currentFunction.DeferBlock)
-			}
-			c.Builder.CreateBr(deferBB)
-			return nil
-		}
-		c.Builder.CreateRetVoid()
-		return nil
+		return c.leaveFunctionOnPanic()
 	}
-
 	catchBodyID := int64(0)
 	if c.function != nil && c.function.catchBodyByHandler != nil {
 		catchBodyID = c.function.catchBodyByHandler[handlerID]
 	}
 	if catchBodyID == 0 {
-		// No catch block; propagate to caller (through defer if present).
-		currentFunction := c.currentFunction()
-		if currentFunction != nil && currentFunction.DeferBlock > 0 && c.function != nil && !c.function.returnBlock.IsNil() {
-			deferBB, ok := c.Blocks[currentFunction.DeferBlock]
-			if !ok {
-				return fmt.Errorf("compilePanic: defer block %d not found", currentFunction.DeferBlock)
-			}
-			c.Builder.CreateBr(deferBB)
-			return nil
-		}
-		c.Builder.CreateRetVoid()
-		return nil
+		return c.leaveFunctionOnPanic()
 	}
-
-	catchBB, ok := c.Blocks[catchBodyID]
+	catchBB, ok := c.ssaBlockEntry(catchBodyID)
 	if !ok {
-		return fmt.Errorf("compilePanic: catch body block %d not found", catchBodyID)
+		return fmt.Errorf("branchAfterContextPanic: catch body block %d not found", catchBodyID)
 	}
 	c.Builder.CreateBr(catchBB)
+	return nil
+}
+
+func (c *Compiler) leaveFunctionOnPanic() error {
+	currentFunction := c.currentFunction()
+	if currentFunction != nil && currentFunction.DeferBlock > 0 && c.function != nil && !c.function.returnBlock.IsNil() {
+		deferBB, ok := c.ssaBlockEntry(currentFunction.DeferBlock)
+		if !ok {
+			return fmt.Errorf("leaveFunctionOnPanic: defer block %d not found", currentFunction.DeferBlock)
+		}
+		c.Builder.CreateBr(deferBB)
+		return nil
+	}
+	c.Builder.CreateRetVoid()
 	return nil
 }
 
@@ -170,7 +273,7 @@ func (c *Compiler) compileAssert(inst *ssa.Assert) error {
 		return err
 	}
 	if fn.DeferBlock > 0 && !c.function.returnBlock.IsNil() {
-		deferBB, ok := c.Blocks[fn.DeferBlock]
+		deferBB, ok := c.ssaBlockEntry(fn.DeferBlock)
 		if !ok {
 			return fmt.Errorf("compileAssert: defer block %d not found", fn.DeferBlock)
 		}
