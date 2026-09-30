@@ -141,6 +141,31 @@ func TestWritePrunedRuntimeImports_ScriptEngineGlobalDependencies(t *testing.T) 
 	assertContains(t, got, `"len": runtimeYakBuiltinLen,`)
 }
 
+func TestWriteRuntimeImportsPerModule_HTTPFlowDatabaseFollowsYakitImport(t *testing.T) {
+	dir := t.TempDir()
+
+	corePath := filepath.Join(dir, "core.go")
+	err := WriteRuntimeImportsPerModule(corePath, []string{"codec", "os", "yakit"}, true)
+	if err != nil {
+		t.Fatalf("write core imports: %v", err)
+	}
+	core := readGeneratedFile(t, corePath)
+	assertContains(t, core, `yakshim "github.com/yaklang/yaklang/common/yak/ssa2llvm/runtime/shim"`)
+	assertNotContains(t, core, yakitDatabaseImportPath)
+	assertNotContains(t, core, "InitialDatabase")
+
+	reportPath := filepath.Join(dir, "report.go")
+	err = WriteRuntimeImportsPerModule(reportPath, []string{"report"}, true)
+	if err != nil {
+		t.Fatalf("write report imports: %v", err)
+	}
+	report := readGeneratedFile(t, reportPath)
+	assertContains(t, report, `yakit "github.com/yaklang/yaklang/common/yakgrpc/yakit"`)
+	assertContains(t, report, "sync \"sync\"")
+	assertContains(t, report, "runtimeYakitDatabaseOnce.Do(yakit.InitialDatabase)")
+	assertContains(t, report, "registerRuntimeGlobals()")
+}
+
 func TestWritePrunedRuntimeImports_YakitDependencyUsesRuntimeClient(t *testing.T) {
 	dir := t.TempDir()
 
@@ -183,7 +208,12 @@ func TestUnsupportedPrunedRuntimeDependencies(t *testing.T) {
 
 func readGeneratedRuntimeImports(t *testing.T, dir string) string {
 	t.Helper()
-	got, err := os.ReadFile(filepath.Join(dir, "runtime_imports_generated.go"))
+	return readGeneratedFile(t, filepath.Join(dir, "runtime_imports_generated.go"))
+}
+
+func readGeneratedFile(t *testing.T, path string) string {
+	t.Helper()
+	got, err := os.ReadFile(path)
 	if err != nil {
 		t.Fatalf("read generated imports failed: %v", err)
 	}
