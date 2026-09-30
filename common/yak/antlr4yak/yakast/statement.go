@@ -28,8 +28,6 @@ func (y *YakCompiler) VisitStatementList(raw yak.IStatementListContext, inline .
 	defer recoverRange()
 	allStatement := i.AllStatement()
 	lenOfAllStatement := len(allStatement)
-	t := i.GetText()
-	_ = t
 	for index, s := range allStatement {
 		stmt := s.(*yak.StatementContext)
 		if index == 0 && len(inline) > 0 && inline[0] {

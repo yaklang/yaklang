@@ -72,22 +72,40 @@ func (y *YakCompiler) VisitSelectStmt(raw yak.ISelectStmtContext) interface{} {
 		y.pushBool(false)
 		y.pushIterableCall(1)
 	}
+	var bodyJumps, invalidJumps []*yakvm.Code
+	if len(cases) >= 16 {
+		// Large selects dispatch by a balanced decision tree. Keep small
+		// selects' short linear path and avoid repeatedly indexing the tuple.
+		chosenID := y.currentSymtbl.NewSymbolWithoutName()
+		resultField(0)
+		y.pushListWithLen(1)
+		y.pushLeftRef(chosenID)
+		y.pushListWithLen(1)
+		y.pushOperator(yakvm.OpAssign)
+		bodyJumps, invalidJumps = y.selectDispatchTree(chosenID, len(cases))
+	}
 	y.writeString("select {")
 	y.writeNewLine()
 	var ends []*yakvm.Code
 	wsIndex := 0
 	whitespace := stmt.AllWs()
+	clauses := stmt.AllSelectClause()
 	for i, c := range cases {
-		clause := stmt.SelectClause(i).(*yak.SelectClauseContext)
+		clause := clauses[i].(*yak.SelectClauseContext)
 		for wsIndex < len(whitespace) && whitespace[wsIndex].GetStart().GetTokenIndex() < clause.GetStart().GetTokenIndex() {
 			y.writeSelectComments(whitespace[wsIndex])
 			wsIndex++
 		}
 		restoreRange := y.SetRange(clause)
-		resultField(0)
-		y.pushInteger(i, "")
-		y.pushOperator(yakvm.OpEq)
-		next := y.pushJmpIfFalse()
+		var next *yakvm.Code
+		if bodyJumps == nil {
+			resultField(0)
+			y.pushInteger(i, "")
+			y.pushOperator(yakvm.OpEq)
+			next = y.pushJmpIfFalse()
+		} else {
+			bodyJumps[i].Unary = y.GetNextCodeIndex()
+		}
 		restoreCase := y.SwitchSymbolTableInNewScope("select case")
 		y.writeIndent()
 		if c.Channel == nil {
@@ -130,11 +148,16 @@ func (y *YakCompiler) VisitSelectStmt(raw yak.ISelectStmtContext) interface{} {
 		y.decIndent()
 		restoreCase()
 		ends = append(ends, y.pushJmp())
-		next.Unary = y.GetNextCodeIndex()
+		if next != nil {
+			next.Unary = y.GetNextCodeIndex()
+		}
 		restoreRange()
 	}
 	end := y.GetNextCodeIndex()
 	for _, jump := range ends {
+		jump.Unary = end
+	}
+	for _, jump := range invalidJumps {
 		jump.Unary = end
 	}
 	y.exitSwitchContext(end)
@@ -143,6 +166,35 @@ func (y *YakCompiler) VisitSelectStmt(raw yak.ISelectStmtContext) interface{} {
 	}
 	y.writeStringWithIndent("}")
 	return nil
+}
+
+// The tree changes only dispatch, after all communication operands have already
+// been evaluated. Leaf equality checks preserve the linear path's behavior for
+// invalid indexes, including an interrupted selection's -1 result.
+func (y *YakCompiler) selectDispatchTree(chosenID, count int) ([]*yakvm.Code, []*yakvm.Code) {
+	bodies := make([]*yakvm.Code, count)
+	invalid := make([]*yakvm.Code, 0, count)
+	var emit func(int, int)
+	emit = func(lo, hi int) {
+		if hi-lo == 1 {
+			y.pushRef(chosenID)
+			y.pushInteger(lo, "")
+			y.pushOperator(yakvm.OpEq)
+			invalid = append(invalid, y.pushJmpIfFalse())
+			bodies[lo] = y.pushJmp()
+			return
+		}
+		mid := lo + (hi-lo)/2
+		y.pushRef(chosenID)
+		y.pushInteger(mid, "")
+		y.pushOperator(yakvm.OpLt)
+		right := y.pushJmpIfFalse()
+		emit(lo, mid)
+		right.Unary = y.GetNextCodeIndex()
+		emit(mid, hi)
+	}
+	emit(0, count)
+	return bodies, invalid
 }
 
 func (y *YakCompiler) writeSelectComments(tree antlr.Tree) {

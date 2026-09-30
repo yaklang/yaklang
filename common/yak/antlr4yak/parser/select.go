@@ -49,9 +49,10 @@ func selectReceive(raw IExpressionContext) IExpressionContext {
 
 // SelectCommunications validates the same communication shapes in both frontends.
 func SelectCommunications(stmt *SelectStmtContext) ([]SelectCommunication, error) {
-	cases := make([]SelectCommunication, 0, len(stmt.AllSelectClause()))
+	clauses := stmt.AllSelectClause()
+	cases := make([]SelectCommunication, 0, len(clauses))
 	defaultSeen := false
-	for _, raw := range stmt.AllSelectClause() {
+	for _, raw := range clauses {
 		clause := raw.(*SelectClauseContext)
 		if selectHasFallthrough(clause) {
 			return nil, fmt.Errorf("fallthrough is not allowed in select")
