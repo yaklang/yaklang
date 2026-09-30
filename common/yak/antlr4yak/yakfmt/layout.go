@@ -139,7 +139,7 @@ func (f *printer) applyGroup(g groupLayout, groupIndex int, force bool) {
 	}
 	if trailing { // insert a trailing comma before any final comment
 		last := b - 1
-		for last > a && (f.text(last) == ";" || f.tokens[last].GetTokenType() == parser.YaklangLexerLF || isComment(f.tokens[last].GetTokenType())) {
+		for last > a && (f.tokens[last].GetTokenType() == parser.YaklangLexerSemiColon || f.tokens[last].GetTokenType() == parser.YaklangLexerLF || isComment(f.tokens[last].GetTokenType())) {
 			last--
 		}
 		if last > a && f.text(last) != "," {
@@ -357,7 +357,7 @@ func (f *printer) annotate(tree antlr.ParserRuleContext) {
 		// the raw source span would wrap compact lists only on the SECOND run
 		// once spaces had expanded them. One separator per token bounds width.
 		text := f.text(i)
-		if typ := f.tokens[i].GetTokenType(); typ != parser.YaklangLexerLF && typ != antlr.TokenEOF && text != ";" {
+		if typ := f.tokens[i].GetTokenType(); typ != parser.YaklangLexerLF && typ != antlr.TokenEOF && typ != parser.YaklangLexerSemiColon {
 			f.widths[i+1] += len(text) + 1
 		}
 		if m.flags&(blockOpen|blockClose|caseOpen|caseClose) != 0 {
@@ -411,7 +411,7 @@ func (f *printer) allowParen(c antlr.ParserRuleContext) {
 }
 func (f *printer) emptyGroup(a, b int) bool {
 	for i := a + 1; i < b; i++ {
-		if f.tokens[i].GetTokenType() != parser.YaklangLexerLF && f.text(i) != ";" {
+		if f.tokens[i].GetTokenType() != parser.YaklangLexerLF && f.tokens[i].GetTokenType() != parser.YaklangLexerSemiColon {
 			return false
 		}
 	}

@@ -107,3 +107,21 @@ func TestFormatWidthAndComments(t *testing.T) {
 		t.Run(strconv.Itoa(i), func(t *testing.T) { assertRoundTrip(t, s, nil) })
 	}
 }
+
+// Lexer modes reuse punctuation as template character tokens. Statement and
+// width handling must never mistake their text for a default-mode separator.
+func TestFormatTemplateTokenIsolation(t *testing.T) {
+	for _, quote := range []string{"'", "\"", "`"} {
+		for _, payload := range []string{";", "; ${x} ;", "{}[](),:?+-*/<>=!&|%^~", strings.Repeat(";", 120)} {
+			source := "f(f" + quote + payload + quote + ",2)"
+			assertRoundTrip(t, source, nil)
+			got, err := Format(source)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if len(payload) > lineWidth && !strings.HasPrefix(got, "f(\n    f") {
+				t.Fatalf("long template payload did not expand argument group: %q", got)
+			}
+		}
+	}
+}
