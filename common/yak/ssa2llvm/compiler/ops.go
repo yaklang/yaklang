@@ -1148,6 +1148,11 @@ func (c *Compiler) compileTypeCast(inst *ssa.TypeCast) error {
 				castFn, castType := c.getOrInsertRuntimeToInt()
 				val = c.Builder.CreateCall(castType, castFn, []llvm.Value{c.coerceToInt64(val)}, fmt.Sprintf("to_int_%d", inst.GetId()))
 			}
+		case ssa.BytesTypeKind:
+			// []byte(x) has to become a real byte slice. A no-op cast leaves a
+			// string word in place, and len() then counts runes.
+			castFn, castType := c.getOrInsertRuntimeStringToBytes()
+			val = c.Builder.CreateCall(castType, castFn, []llvm.Value{c.coerceToInt64(val)}, fmt.Sprintf("to_bytes_%d", inst.GetId()))
 		case ssa.BooleanTypeKind:
 			// bool(x): any non-zero word is true (float bit patterns included).
 			cond := c.coerceToI1(c.coerceToInt64(val), "bool_cast_cond")
@@ -1187,6 +1192,17 @@ func (c *Compiler) getOrInsertRuntimeToFloat() (llvm.Value, llvm.Type) {
 
 func (c *Compiler) getOrInsertRuntimeToString() (llvm.Value, llvm.Type) {
 	name := c.runtimeSymName(abi.RuntimeToStringSymbol)
+	fn := c.Mod.NamedFunction(name)
+	i64 := c.LLVMCtx.Int64Type()
+	fnType := llvm.FunctionType(i64, []llvm.Type{i64}, false)
+	if fn.IsNil() {
+		fn = llvm.AddFunction(c.Mod, name, fnType)
+	}
+	return fn, fnType
+}
+
+func (c *Compiler) getOrInsertRuntimeStringToBytes() (llvm.Value, llvm.Type) {
+	name := c.runtimeSymName(abi.RuntimeStringToBytesSymbol)
 	fn := c.Mod.NamedFunction(name)
 	i64 := c.LLVMCtx.Int64Type()
 	fnType := llvm.FunctionType(i64, []llvm.Type{i64}, false)
