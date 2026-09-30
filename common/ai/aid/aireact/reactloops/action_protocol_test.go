@@ -40,6 +40,6 @@ func TestFunctionCallActionVariantSelection(t *testing.T) {
 	require.NotContains(t, params["properties"], "human_readable_thought")
 	require.Contains(t, params["properties"], "identifier")
 	var plain map[string]any
-	require.NoError(t, json.Unmarshal([]byte(BuildSchema(legacy)), &plain))
+	require.NoError(t, json.Unmarshal([]byte(buildSchema(legacy)), &plain))
 	require.Contains(t, plain["properties"], "human_readable_thought")
 }

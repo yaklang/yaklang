@@ -34,7 +34,7 @@ func (r *ReActLoop) generateSchemaString(disallowExit bool, actionOperators ...*
 		r.initActionApplied = true
 	}
 
-	schemaText := BuildSchema(filteredValues...)
+	schemaText := buildSchema(filteredValues...)
 	return applyToolBatchSchemaMaxItems(schemaText, r.toolBatchMaxCalls())
 }
 
@@ -62,7 +62,7 @@ func (r *ReActLoop) prepareLoopActionSchemas(operator *LoopActionHandlerOperator
 		nativeTools = tools
 	} else {
 		var err error
-		schema, err = applyToolBatchSchemaMaxItems(BuildSchema(filtered...), maxBatchCalls)
+		schema, err = applyToolBatchSchemaMaxItems(buildSchema(filtered...), maxBatchCalls)
 		if err != nil {
 			return "", "", err
 		}

@@ -210,15 +210,23 @@ func (r *ReActLoop) callAILoopTransaction(
 	streamWg *sync.WaitGroup, prompt, nonce string, operator *LoopActionHandlerOperator,
 	generalOutputCallback LoopGeneralOutputCallback,
 	functionCallOutputCallback LoopFunctionCallOutputCallback,
+	requestContexts ...context.Context,
 ) ([]LoopCall, LoopStopReason, *LoopResultDescriptor, error) {
 	if streamWg == nil || generalOutputCallback == nil || functionCallOutputCallback == nil {
 		return nil, LoopStopAbused, nil, utils.Error("loop transaction requires a stream waitgroup and both output callbacks")
 	}
+	requestContext := r.config.GetContext()
+	if task := r.GetCurrentTask(); task != nil && !utils.IsNil(task.GetContext()) {
+		requestContext = task.GetContext()
+	}
+	if len(requestContexts) > 0 && !utils.IsNil(requestContexts[0]) {
+		requestContext = requestContexts[0]
+	}
 	if r.functionCallMode {
-		return r.callAIFunctionTransaction(prompt, nonce, generalOutputCallback, functionCallOutputCallback)
+		return r.callAIFunctionTransaction(prompt, nonce, generalOutputCallback, functionCallOutputCallback, requestContext)
 	}
 	descriptor := newLoopResultDescriptor("normal")
-	action, handler, err := r.callAINormalTransaction(streamWg, prompt, nonce, operator, descriptor)
+	action, handler, err := r.callAINormalTransaction(streamWg, prompt, nonce, operator, descriptor, requestContext)
 	if err != nil {
 		descriptor.setError(err)
 		descriptor.finish(nil, r.Get("last_ai_decision_response"), "", nil)
@@ -457,6 +465,7 @@ func (c *loopToolCallCollector) finish() ([]*aispec.ToolCall, error) {
 func (r *ReActLoop) callAIFunctionTransaction(
 	prompt, nonce string, generalOutputCallback LoopGeneralOutputCallback,
 	functionCallOutputCallback LoopFunctionCallOutputCallback,
+	activeTaskCtx context.Context,
 ) ([]LoopCall, LoopStopReason, *LoopResultDescriptor, error) {
 	descriptor := newLoopResultDescriptor("functioncall")
 	// Capture once for all retries. Registered handlers are not necessarily
@@ -467,10 +476,6 @@ func (r *ReActLoop) callAIFunctionTransaction(
 	if advertisedActions == nil {
 		// Compatibility for callers using a supplied prompt without loop assembly.
 		availableActions = r.GetAllActionNames()
-	}
-	activeTaskCtx := r.config.GetContext()
-	if task := r.GetCurrentTask(); task != nil && !utils.IsNil(task.GetContext()) {
-		activeTaskCtx = task.GetContext()
 	}
 	r.resetModelThinkingBuffer()
 	r.Set("last_ai_decision_response", "")
@@ -764,7 +769,7 @@ func (r *ReActLoop) callAIFunctionTransaction(
 	return acceptedCalls, LoopStopToolCalls, descriptor, nil
 }
 
-func (r *ReActLoop) callAINormalTransaction(streamWg *sync.WaitGroup, prompt string, nonce string, operator *LoopActionHandlerOperator, descriptor *LoopResultDescriptor) (*aicommon.Action, *LoopAction, error) {
+func (r *ReActLoop) callAINormalTransaction(streamWg *sync.WaitGroup, prompt string, nonce string, operator *LoopActionHandlerOperator, descriptor *LoopResultDescriptor, activeTaskCtx context.Context) (*aicommon.Action, *LoopAction, error) {
 	var action *aicommon.Action
 	keepExecutionState := false
 	defer func() {
@@ -778,11 +783,6 @@ func (r *ReActLoop) callAINormalTransaction(streamWg *sync.WaitGroup, prompt str
 	// while Stop cancels the queue-owned task context. If the request only uses
 	// the session config context, the runtime can emit a successful cancellation
 	// receipt yet continue streaming model output until the provider finishes.
-	activeTask := r.GetCurrentTask()
-	activeTaskCtx := r.config.GetContext()
-	if activeTask != nil && !utils.IsNil(activeTask.GetContext()) {
-		activeTaskCtx = activeTask.GetContext()
-	}
 
 	getNextActionType := func(a *aicommon.Action) string { //legacy support
 		return inferActionTypeFromPayload(a, r.Get("tag_final_answer"))

@@ -106,7 +106,7 @@ func TestLoopAction_BuildSchema(t *testing.T) {
 		},
 	}
 
-	schema := BuildSchema(actions...)
+	schema := buildSchema(actions...)
 	if schema == "" {
 		t.Error("Schema should not be empty")
 	}
@@ -163,7 +163,7 @@ func TestLoopAction_OutputExample(t *testing.T) {
 	}
 
 	// Test that buildSchema includes the action
-	schema := BuildSchema(action)
+	schema := buildSchema(action)
 	if schema == "" {
 		t.Error("Schema should not be empty")
 	}

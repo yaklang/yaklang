@@ -83,14 +83,11 @@ func (r *ReAct) executeToolCallInternal(ctx context.Context, toolName string, pa
 		}
 
 		log.Infof("preparing tool with preset params: %s - %s", tool.Name, tool.Description)
-
-		// Preset-params path: skip param generation, execute directly
 		toolCaller, err := r.newToolCallerForCall(ctx, currentTask, toolName, false, opt...)
 		if err != nil {
 			return nil, false, err
 		}
-
-		if currentLoop := r.GetCurrentLoop(); currentLoop != nil {
+		if currentLoop := promptLoopForTask(currentTask); currentLoop != nil {
 			if allow, guardMsg := reactloops.CheckToolInvokeGuard(currentLoop, toolName, params); !allow {
 				return nil, false, utils.Error(guardMsg)
 			}
@@ -196,7 +193,7 @@ func (r *ReAct) newToolCallerForCall(ctx context.Context, currentTask aicommon.A
 		toolCallerOptions = append(toolCallerOptions, aicommon.WithToolCaller_Task(r.config.DefaultTask))
 	}
 
-	if currentLoop := r.GetCurrentLoop(); currentLoop != nil {
+	if currentLoop := promptLoopForTask(currentTask); currentLoop != nil {
 		if allow, guardMsg := reactloops.CheckToolInvokeGuard(currentLoop, toolName, nil); !allow {
 			return nil, utils.Error(guardMsg)
 		}
@@ -315,6 +312,12 @@ func (r *ReAct) ExecuteToolRequiredAndCallWithoutRequired(ctx context.Context, t
 // and may signal fallbackToRequire to reuse the same card and switch to the AI
 // param-generation path. reason is read inside (from the action), not passed in.
 func (r *ReAct) DirectlyCallTool(ctx context.Context, toolName string, action *aicommon.Action, prepare aicommon.DirectlyCallPrepareFunc) (*aitool.ToolResult, bool, error) {
+	return r.withTaskEmitterScope(func(currentTask aicommon.AIStatefulTask) (*aitool.ToolResult, bool, error) {
+		return r.directlyCallToolForTask(ctx, currentTask, toolName, action, prepare)
+	})
+}
+
+func (r *ReAct) directlyCallToolForTask(ctx context.Context, currentTask aicommon.AIStatefulTask, toolName string, action *aicommon.Action, prepare aicommon.DirectlyCallPrepareFunc, opt ...aicommon.ToolCallerOption) (*aitool.ToolResult, bool, error) {
 	if utils.IsNil(ctx) {
 		ctx = r.config.GetContext()
 	}
@@ -330,26 +333,6 @@ func (r *ReAct) DirectlyCallTool(ctx context.Context, toolName string, action *a
 		defer r.config.RunVerificationWatchdogToolBlockingEnd()
 	}
 
-	var taskIndex string
-	currentTask := r.GetCurrentTask()
-	if !utils.IsNil(r.GetCurrentTask()) {
-		taskIndex = r.GetCurrentTask().GetIndex()
-	}
-	if currentTask == nil {
-		currentTask = r.config.DefaultTask
-	}
-	currentTask.SetEmitter(
-		currentTask.GetEmitter().PushEventProcesser(func(event *schema.AiOutputEvent) *schema.AiOutputEvent {
-			if event != nil && event.TaskIndex == "" {
-				event.TaskIndex = taskIndex
-			}
-			return event
-		}),
-	)
-	defer func() {
-		currentTask.SetEmitter(currentTask.GetEmitter().PopEventProcesser())
-	}()
-
 	// Always attach the param-gen builder so fallbackToRequire can reuse this card
 	// and switch to the AI param-generation path.
 	toolCaller, err := r.newToolCallerForCall(
@@ -357,8 +340,10 @@ func (r *ReAct) DirectlyCallTool(ctx context.Context, toolName string, action *a
 		currentTask,
 		toolName,
 		true,
-		aicommon.WithToolCaller_OmitResultParamsInTimeline(),
-		aicommon.WithToolCaller_StatsSource(aicommon.StatsSourceToolDirect),
+		append([]aicommon.ToolCallerOption{
+			aicommon.WithToolCaller_OmitResultParamsInTimeline(),
+			aicommon.WithToolCaller_StatsSource(aicommon.StatsSourceToolDirect),
+		}, opt...)...,
 	)
 	if err != nil {
 		return nil, false, err

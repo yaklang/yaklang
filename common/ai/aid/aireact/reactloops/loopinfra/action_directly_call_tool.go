@@ -491,12 +491,7 @@ Few-shot example 2 (valid directly_call_tool):
 			}
 
 			emitProgress("[开始处理参数]")
-			raw, objParams := getDirectlyCallToolParamPayload(action)
-			params, _ := normalizeDirectlyCallToolParams(raw, objParams)
-			if params == nil {
-				params = make(aitool.InvokeParams)
-			}
-			mergedBlockParams := aicommon.MergeActionAITagParams(action, params, getDirectlyCallToolParamNames(loop, toolName))
+			params, mergedBlockParams := readDirectToolCallParams(loop, action, tool)
 
 			valid, validationErrors := tool.ValidateParams(params)
 			if !valid {
