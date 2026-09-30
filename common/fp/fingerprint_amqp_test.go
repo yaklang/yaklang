@@ -4,10 +4,12 @@ import (
 	"context"
 	"fmt"
 	"net"
+	"sync"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 )
@@ -22,7 +24,10 @@ func startMockAMQPServer(t *testing.T, port int) (net.Listener, func()) {
 	log.Infof("Mock AMQP server started on port %d", port)
 
 	// Start accepting connections
+	var workers sync.WaitGroup
+	workers.Add(1)
 	go func() {
+		defer workers.Done()
 		for {
 			conn, err := listener.Accept()
 			if err != nil {
@@ -31,13 +36,15 @@ func startMockAMQPServer(t *testing.T, port int) (net.Listener, func()) {
 			}
 
 			// Handle connection in goroutine
-			go handleAMQPConnection(t, conn)
+			workers.Add(1)
+			go func() { defer workers.Done(); handleAMQPConnection(t, conn) }()
 		}
 	}()
 
 	// Return cleanup function
 	cleanup := func() {
 		listener.Close()
+		workers.Wait()
 		log.Infof("Mock AMQP server stopped on port %d", port)
 	}
 
@@ -48,7 +55,7 @@ func handleAMQPConnection(t *testing.T, conn net.Conn) {
 	defer conn.Close()
 
 	// Set read timeout
-	conn.SetReadDeadline(time.Now().Add(5 * time.Second))
+	conn.SetReadDeadline(time.Now().Add(100 * time.Millisecond))
 
 	// Read incoming data (we don't care what it is)
 	buffer := make([]byte, 4096)
@@ -57,6 +64,9 @@ func handleAMQPConnection(t *testing.T, conn net.Conn) {
 		log.Debugf("Read error (expected): %v", err)
 	}
 
+	if n == 0 {
+		return
+	}
 	if n > 0 {
 		log.Debugf("Mock AMQP server received %d bytes: %s", n, string(buffer[:n]))
 	}
@@ -74,18 +84,42 @@ func handleAMQPConnection(t *testing.T, conn net.Conn) {
 
 	log.Debugf("Mock AMQP server sent AMQP protocol header (8 bytes)")
 
-	// Keep connection open for a bit to simulate real server
-	time.Sleep(100 * time.Millisecond)
+}
+
+// Keep the real bundled AMQP payload and matching expressions, with three
+// port-specific decoys so probe-budget behavior is independent of ephemeral
+// port assignments and future changes to unrelated built-in service rules.
+func amqpFixtureRules(t *testing.T, port int) map[*NmapProbe][]*NmapMatch {
+	t.Helper()
+	all, err := GetDefaultNmapServiceProbeRules()
+	require.NoError(t, err)
+	selected := make(map[*NmapProbe][]*NmapMatch)
+	for probe, matches := range all {
+		if probe.Name == "AMQP" && probe.Proto == TCP {
+			copy := *probe
+			copy.DefaultPorts = nil
+			copy.Index, copy.Rarity = 4, 1
+			selected[&copy] = matches
+			break
+		}
+	}
+	require.Len(t, selected, 1, "the bundled AMQP probe must be present")
+	for i := 1; i <= 3; i++ {
+		selected[&NmapProbe{Proto: TCP, Name: fmt.Sprintf("LocalDecoy%d", i), Index: i, Rarity: 1,
+			DefaultPorts: []int{port}, Payload: "local-non-amqp-probe"}] = nil
+	}
+	return selected
 }
 
 // TestAMQPDetectionOnNonStandardPort tests that AMQP service can be detected
 // on a non-standard port (not 5672) after the fix
 func TestAMQPDetectionOnNonStandardPort(t *testing.T) {
 	// Use a non-standard port for AMQP
-	testPort := utils.GetRandomAvailableTCPPort()
+	testPort := 0
 
 	// Start mock AMQP server
-	_, cleanup := startMockAMQPServer(t, testPort)
+	listener, cleanup := startMockAMQPServer(t, testPort)
+	testPort = listener.Addr().(*net.TCPAddr).Port
 	defer cleanup()
 
 	// Wait for server to be ready by attempting to connect
@@ -102,7 +136,8 @@ func TestAMQPDetectionOnNonStandardPort(t *testing.T) {
 	// Using ProbesMax=10 is sufficient to detect AMQP while keeping test execution time reasonable
 	config := NewConfig(
 		WithActiveMode(true),
-		WithProbesMax(10), // Reduced to speed up tests while still detecting AMQP
+		WithNmapRule(amqpFixtureRules(t, testPort)),
+		WithProbesMax(10),               // Reduced to speed up tests while still detecting AMQP
 		WithProbeTimeout(1*time.Second), // Reduced to speed up tests
 		WithDisableWebFingerprint(true), // Disable web fingerprint to avoid interference
 	)
@@ -295,12 +330,12 @@ func TestProbesMaxLimitation(t *testing.T) {
 
 // TestAMQPDetectionWithDifferentProbesMax tests AMQP detection with various ProbesMax values
 func TestAMQPDetectionWithDifferentProbesMax(t *testing.T) {
-	testPort := 19004
+	testPort := 0
 
 	// Start mock server
-	_, cleanup := startMockAMQPServer(t, testPort)
+	listener, cleanup := startMockAMQPServer(t, testPort)
+	testPort = listener.Addr().(*net.TCPAddr).Port
 	defer cleanup()
-	time.Sleep(100 * time.Millisecond)
 
 	testCases := []struct {
 		name         string
@@ -316,9 +351,11 @@ func TestAMQPDetectionWithDifferentProbesMax(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			config := NewConfig(
 				WithActiveMode(true),
+				WithNmapRule(amqpFixtureRules(t, testPort)),
 				WithProbesMax(tc.probesMax),
 				WithRarityMax(9),
-				WithProbeTimeout(3*time.Second),
+				WithProbeTimeout(300*time.Millisecond),
+				WithDisableWebFingerprint(true),
 			)
 
 			matcher, err := NewDefaultFingerprintMatcher(config)
@@ -335,12 +372,9 @@ func TestAMQPDetectionWithDifferentProbesMax(t *testing.T) {
 			log.Infof("ProbesMax=%d: Detected service=%s", tc.probesMax, serviceName)
 
 			if tc.shouldDetect {
-				// With the fix, AMQP should be detected
-				if !utils.MatchAnyOfSubString(serviceName, "amqp") {
-					t.Logf("WARNING: AMQP not detected with ProbesMax=%d, service=%s",
-						tc.probesMax, serviceName)
-					// Not failing the test for smaller ProbesMax values
-				}
+				assert.Contains(t, serviceName, "amqp", "AMQP must be detected with ProbesMax=%d", tc.probesMax)
+			} else {
+				assert.NotContains(t, serviceName, "amqp", "the AMQP probe is outside the budget")
 			}
 		})
 	}
