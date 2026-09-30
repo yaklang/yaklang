@@ -16,7 +16,8 @@ import (
 // A readable but partial/stale gzip archive must not pass by validating only
 // the files it happens to contain. Compare the complete set and exact bytes.
 func TestBuiltinRiskEmbeddedParity(t *testing.T) {
-	InitEmbedFSWithNotify(nil)
+	// init() has already opened the embedded filesystem; byte parity needs no
+	// rule compilation or database synchronization.
 	embedded := make(map[string][]byte)
 	err := filesys.Recursive(".", filesys.WithFileSystem(ruleFSWithHash), filesys.WithFileStat(func(path string, info fs.FileInfo) error {
 		if !strings.HasSuffix(info.Name(), ".sf") {
