@@ -175,7 +175,12 @@ func (m *Timeline) projectEvidenceLocked() string {
 			}
 		}
 	}
-	return RenderSessionEvidencePromptBlock(StablePromptNonce("session-evidence-promoted"), renderEvidenceItems(frozen))
+	block := RenderSessionEvidencePromptBlock(StablePromptNonce("session-evidence-promoted"), renderEvidenceItems(frozen))
+	if block == "" {
+		return ""
+	}
+	return "# Session Evidence (SessionEvidenceSemiDynamic)\n" +
+		"来源：Timeline 的 session-evidence journal 已封存投影，位于 Semi Dynamic 1；它就是已封存 Evidence，不是另一份证据存储。尚未封存的变更在 Open 以 evidence_delta 追加，同 id 的最新 UPSERT 覆盖旧内容、DELETE 使其失效；封存事务后再合并到本块。这里记录观测，用户原文另见 PromptedUserInputHistory 与 Open。\n" + block
 }
 
 // timelineEvidenceDeltaPrompt renders one immutable mutation at its journal position.

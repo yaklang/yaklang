@@ -1,15 +1,31 @@
-{{ if .ExecutionPolicy }}<|EXECUTION_POLICY|>
+{{/*
+维护备注：Semi Dynamic 2：当前 loop 或辅助调用阶段的执行规则和输出结构；
+阶段变化可更新。
+本段不承载用户历史、Evidence 或时钟。
+*/}}{{/*
+维护备注：ExecutionPolicy：会话配置的顶层执行策略，由调用方注入；
+不是从 Timeline/Evidence/用户历史推导出的规则。
+*/}}{{ if .ExecutionPolicy }}<|EXECUTION_POLICY|>
 ## 执行策略
 
 以下是当前会话的顶层运行策略，决定你如何选择动作、是否拆分并行子 Agent、以及何时收尾。这些约束优先级高于你的默认习惯，必须严格遵守；仅在策略未覆盖时才回退到常规判断。
 
 {{ .ExecutionPolicy }}
-<|EXECUTION_POLICY_END|>{{ end }}{{ if .TaskInstruction }}
+<|EXECUTION_POLICY_END|>{{ end }}{{/*
+维护备注：TaskInstruction：当前 loop/调用阶段的任务规则；
+阶段切换时可变化，与用户 Query 原文分开。
+*/}}{{ if .TaskInstruction }}
 
 <|PERSISTENT|>
 {{ .TaskInstruction }}
-<|PERSISTENT_END|>{{ end }}{{ if .AutoLoadedSkills }}
+<|PERSISTENT_END|>{{ end }}{{/*
+维护备注：AutoLoadedSkills：技能管理器按 AI 意图加载的技能全文；
+加载后可更新本段，来源仍是技能内容，不是新的用户输入。
+*/}}{{ if .AutoLoadedSkills }}
 {{ .AutoLoadedSkills }}{{ end }}
 
 本轮通过原生工具调用选择 action。工具名即 action 名；所有执行所需内容必须写入该工具的 arguments，不输出外置 AITAG。以下每个标签供请求投影为一个原生工具：
-{{ .FunctionCallSchemas }}
+{{/*
+维护备注：FunctionCallSchemas：调用方为本轮生成的已鉴别原生 action 工具声明，经 aiprojection 转成 native tools；
+与 Semi1 的业务工具参数缓存不同。
+*/}}{{ .FunctionCallSchemas }}

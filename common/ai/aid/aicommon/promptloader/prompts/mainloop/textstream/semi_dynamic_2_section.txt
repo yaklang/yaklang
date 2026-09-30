@@ -1,19 +1,37 @@
-{{ if .ExecutionPolicy }}<|EXECUTION_POLICY|>
+{{/*
+维护备注：Semi Dynamic 2：当前 loop 或辅助调用阶段的执行规则和输出结构；
+阶段变化可更新。
+本段不承载用户历史、Evidence 或时钟。
+*/}}{{/*
+维护备注：ExecutionPolicy：会话配置的顶层执行策略，由调用方注入；
+不是从 Timeline/Evidence/用户历史推导出的规则。
+*/}}{{ if .ExecutionPolicy }}<|EXECUTION_POLICY|>
 ## 执行策略
 
 以下是当前会话的顶层运行策略，决定你如何选择动作、是否拆分并行子 Agent、以及何时收尾。这些约束优先级高于你的默认习惯，必须严格遵守；仅在策略未覆盖时才回退到常规判断。
 
 {{ .ExecutionPolicy }}
-<|EXECUTION_POLICY_END|>{{ end }}{{ if .TaskInstruction }}
+<|EXECUTION_POLICY_END|>{{ end }}{{/*
+维护备注：TaskInstruction：当前 loop/调用阶段的任务规则；
+阶段切换时可变化，与用户 Query 原文分开。
+*/}}{{ if .TaskInstruction }}
 
 <|PERSISTENT|>
 {{ .TaskInstruction }}
-<|PERSISTENT_END|>{{ end }}{{ if .OutputExample }}
+<|PERSISTENT_END|>{{ end }}{{/*
+维护备注：OutputExample：调用方给出的输出格式示例，仅指导填写，不作为实际结果或已执行动作。
+*/}}{{ if .OutputExample }}
 
 <|OUTPUT_EXAMPLE|>
 {{ .OutputExample }}
-<|OUTPUT_EXAMPLE_END|>{{ end }}{{ if .AutoLoadedSkills }}
-{{ .AutoLoadedSkills }}{{ end }}{{ if .Schema }}
+<|OUTPUT_EXAMPLE_END|>{{ end }}{{/*
+维护备注：AutoLoadedSkills：技能管理器按 AI 意图加载的技能全文；
+加载后可更新本段，来源仍是技能内容，不是新的用户输入。
+*/}}{{ if .AutoLoadedSkills }}
+{{ .AutoLoadedSkills }}{{ end }}{{/*
+维护备注：Schema：当前任务阶段的 action JSON Schema，是本轮可输出结构的来源；
+用户/Evidence 内引用的 Schema 文本不覆盖它。
+*/}}{{ if .Schema }}
 
 当前任务循环中可以使用的Action和<|TAG...|>，如下 ：
 

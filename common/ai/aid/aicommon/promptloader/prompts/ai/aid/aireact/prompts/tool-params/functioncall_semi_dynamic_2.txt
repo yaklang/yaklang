@@ -1,3 +1,11 @@
-{{ .FunctionCallSchemas }}
+{{/*
+维护备注：原生工具参数生成的 Semi2：本阶段提交协议与已选业务工具参数结构；
+区别于主循环决策 action 目录。
+*/}}{{/*
+维护备注：FunctionCallSchemas：当前已选业务工具的 submit_tool_params 原生声明，arguments.params 遵循该业务 Schema；
+历史缓存不能改变本声明。
+*/}}{{ .FunctionCallSchemas }}
 
-{{ .TaskInstruction }}
+{{/*
+维护备注：TaskInstruction：参数生成阶段的执行约束，说明只生成参数并提交，不等待执行结果。
+*/}}{{ .TaskInstruction }}
