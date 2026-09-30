@@ -228,9 +228,8 @@ func (f *fileSystemAction) fileInfoToResource(originParam *ypb.YakURL, query url
 	return src
 }
 
-// readDir lists rawPath. With diffOnly=true on an fs that supports the
-// last-diff-only view (ProgramFileSystem), incremental programs list only
-// their own last diff layer; everything else lists normally.
+// readDir lists rawPath. diffOnly is ignored unless the backend implements
+// ReadDirDiffOnly. ssadb lists the files stored under that program name.
 func (f fileSystemAction) readDir(rawPath string, backend fi.FileSystem, absPath string, query url.Values) ([]fs.DirEntry, error) {
 	if getBoolQueryValue(query, "diffOnly") {
 		if dfs, ok := backend.(interface {
@@ -245,7 +244,7 @@ func (f fileSystemAction) readDir(rawPath string, backend fi.FileSystem, absPath
 func (f fileSystemAction) Get(params *ypb.RequestYakURLParams) (*ypb.RequestYakURLResponse, error) {
 	// available query:
 	// op=list # list directory
-	// diffOnly=true # list an incremental program with only its last diff layer (default aggregate view otherwise)
+	// diffOnly=true # honored only when the backend implements ReadDirDiffOnly
 	// op=search&keyword=xxx # search file content
 	// global=true # recursively search subdirectories
 	// regex=true # treat keyword as a Go regular expression

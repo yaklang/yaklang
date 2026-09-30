@@ -11,7 +11,7 @@ import (
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/bot"
-	"github.com/yaklang/yaklang/common/yak/ssaapi"
+	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/sfreport"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
@@ -414,7 +414,7 @@ func readFileFromSSAURL(fileURL string) (string, error) {
 
 // readFileFromSSADB 从 ssadb 文件系统读取文件
 func readFileFromSSADB(filePath string) (string, error) {
-	fs := ssaapi.NewProgramFileSystem()
+	fs := ssadb.NewIrSourceFs()
 	fh, err := fs.Open(filePath)
 	if err != nil {
 		return "", utils.Errorf("从ssadb打开文件失败: %v", err)

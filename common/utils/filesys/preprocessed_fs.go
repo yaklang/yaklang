@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io/fs"
 	"os"
+	"path"
 	"strings"
 
 	fi "github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
@@ -14,7 +15,13 @@ type HookFS struct {
 	enabled    bool
 
 	readHooks []*ReadHook
+	// pathHook rewrites a caller path into the underlying filesystem path.
+	pathHook MapPathHook
 }
+
+// MapPathHook rewrites a path before it is passed to the underlying filesystem.
+// Read hooks still observe the caller's original path.
+type MapPathHook func(name string) (string, error)
 
 var _ fi.FileSystem = (*HookFS)(nil)
 
@@ -64,6 +71,77 @@ func (f *HookFS) SetEnabled(enabled bool) {
 	f.enabled = enabled
 }
 
+// SetPathHook 注册路径映射。加前缀、去前缀都走这里，不再单独包一层文件系统。
+func (f *HookFS) SetPathHook(hook MapPathHook) {
+	f.pathHook = hook
+}
+
+func (f *HookFS) mapPath(name string) (string, error) {
+	if f == nil || f.pathHook == nil {
+		return name, nil
+	}
+	return f.pathHook(name)
+}
+
+// NormalizeAbsPath 把调用方路径收成清理后的绝对路径。"." 和空路径变成 "/"。
+func NormalizeAbsPath(name string) (string, error) {
+	name = path.Clean("/" + strings.TrimPrefix(name, "/"))
+	if name == "" || name == "." {
+		return "/", nil
+	}
+	return name, nil
+}
+
+// StripPathPrefix 去掉程序名前缀。"/prog/A.java" 映射为 "/A.java"，"/prog" 映射为 "/"。
+// 路径上没有这段前缀时保持原样。
+func StripPathPrefix(prefix string) MapPathHook {
+	prefix = "/" + strings.Trim(prefix, "/")
+	if prefix == "/" {
+		return NormalizeAbsPath
+	}
+	head := prefix + "/"
+	return func(name string) (string, error) {
+		name, err := NormalizeAbsPath(name)
+		if err != nil {
+			return "", err
+		}
+		if name == prefix {
+			return "/", nil
+		}
+		if strings.HasPrefix(name, head) {
+			rest := strings.TrimPrefix(name, prefix)
+			if rest == "" {
+				return "/", nil
+			}
+			return rest, nil
+		}
+		return name, nil
+	}
+}
+
+// AddPathPrefix 在路径前补上程序名。"/A.java" 映射为 "/prog/A.java"。
+// 已经带这段前缀的路径不再重复添加。
+func AddPathPrefix(prefix string) MapPathHook {
+	prefix = "/" + strings.Trim(prefix, "/")
+	if prefix == "/" {
+		return NormalizeAbsPath
+	}
+	head := prefix + "/"
+	return func(name string) (string, error) {
+		name, err := NormalizeAbsPath(name)
+		if err != nil {
+			return "", err
+		}
+		if name == "/" {
+			return prefix, nil
+		}
+		if name == prefix || strings.HasPrefix(name, head) {
+			return name, nil
+		}
+		return prefix + name, nil
+	}
+}
+
 func (f *HookFS) matchReadHooks(name string) []*ReadHook {
 	if !f.enabled {
 		return nil
@@ -84,6 +162,10 @@ func (f *HookFS) matchReadHooks(name string) []*ReadHook {
 }
 
 func (f *HookFS) ReadFile(name string) ([]byte, error) {
+	mapped, err := f.mapPath(name)
+	if err != nil {
+		return nil, err
+	}
 	ctx := &ReadHookContext{
 		Name:       name,
 		FS:         f,
@@ -100,7 +182,7 @@ func (f *HookFS) ReadFile(name string) ([]byte, error) {
 		}
 	}
 
-	data, err := f.underlying.ReadFile(name)
+	data, err := f.underlying.ReadFile(mapped)
 	if err != nil {
 		return nil, err
 	}
@@ -159,19 +241,35 @@ func CustomMatcher(fn func(string) bool) HookMatcher {
 // ------- FileSystem 接口默认实现 -------
 
 func (f *HookFS) Open(name string) (fs.File, error) {
-	return f.underlying.Open(name)
+	mapped, err := f.mapPath(name)
+	if err != nil {
+		return nil, err
+	}
+	return f.underlying.Open(mapped)
 }
 
 func (f *HookFS) OpenFile(name string, flag int, perm os.FileMode) (fs.File, error) {
-	return f.underlying.OpenFile(name, flag, perm)
+	mapped, err := f.mapPath(name)
+	if err != nil {
+		return nil, err
+	}
+	return f.underlying.OpenFile(mapped, flag, perm)
 }
 
 func (f *HookFS) Stat(name string) (fs.FileInfo, error) {
-	return f.underlying.Stat(name)
+	mapped, err := f.mapPath(name)
+	if err != nil {
+		return nil, err
+	}
+	return f.underlying.Stat(mapped)
 }
 
 func (f *HookFS) ReadDir(dirname string) ([]fs.DirEntry, error) {
-	return f.underlying.ReadDir(dirname)
+	mapped, err := f.mapPath(dirname)
+	if err != nil {
+		return nil, err
+	}
+	return f.underlying.ReadDir(mapped)
 }
 
 func (f *HookFS) GetSeparators() rune {
@@ -190,32 +288,68 @@ func (f *HookFS) Getwd() (string, error) {
 	return f.underlying.Getwd()
 }
 
-func (f *HookFS) Exists(path string) (bool, error) {
-	return f.underlying.Exists(path)
+func (f *HookFS) Exists(name string) (bool, error) {
+	mapped, err := f.mapPath(name)
+	if err != nil {
+		return false, err
+	}
+	return f.underlying.Exists(mapped)
 }
 
-func (f *HookFS) Rename(old string, new string) error {
-	return f.underlying.Rename(old, new)
+func (f *HookFS) Rename(old string, newName string) error {
+	mappedOld, err := f.mapPath(old)
+	if err != nil {
+		return err
+	}
+	mappedNew, err := f.mapPath(newName)
+	if err != nil {
+		return err
+	}
+	return f.underlying.Rename(mappedOld, mappedNew)
 }
 
 func (f *HookFS) Rel(base string, target string) (string, error) {
-	return f.underlying.Rel(base, target)
+	mappedBase, err := f.mapPath(base)
+	if err != nil {
+		return "", err
+	}
+	mappedTarget, err := f.mapPath(target)
+	if err != nil {
+		return "", err
+	}
+	return f.underlying.Rel(mappedBase, mappedTarget)
 }
 
 func (f *HookFS) WriteFile(name string, data []byte, perm os.FileMode) error {
-	return f.underlying.WriteFile(name, data, perm)
+	mapped, err := f.mapPath(name)
+	if err != nil {
+		return err
+	}
+	return f.underlying.WriteFile(mapped, data, perm)
 }
 
 func (f *HookFS) Delete(name string) error {
-	return f.underlying.Delete(name)
+	mapped, err := f.mapPath(name)
+	if err != nil {
+		return err
+	}
+	return f.underlying.Delete(mapped)
 }
 
 func (f *HookFS) MkdirAll(name string, perm os.FileMode) error {
-	return f.underlying.MkdirAll(name, perm)
+	mapped, err := f.mapPath(name)
+	if err != nil {
+		return err
+	}
+	return f.underlying.MkdirAll(mapped, perm)
 }
 
-func (f *HookFS) ExtraInfo(path string) map[string]any {
-	return f.underlying.ExtraInfo(path)
+func (f *HookFS) ExtraInfo(name string) map[string]any {
+	mapped, err := f.mapPath(name)
+	if err != nil {
+		return nil
+	}
+	return f.underlying.ExtraInfo(mapped)
 }
 
 func (f *HookFS) Base(p string) string {
