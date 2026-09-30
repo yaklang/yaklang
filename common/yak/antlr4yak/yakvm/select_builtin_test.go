@@ -68,3 +68,30 @@ func TestSelectBuiltinDoesNotInterceptOrdinaryNativeFunctions(t *testing.T) {
 		t.Fatalf("ordinary function result changed: %v", got)
 	}
 }
+
+func TestSelectBuiltinResolvesWithoutEngineRegistration(t *testing.T) {
+	f := NewFrame(New())
+	f.ctx = context.Background()
+	f._execCode(&Code{Opcode: OpPushId, Op1: NewIdentifierValue(SelectBuiltinName)}, false)
+	builtin := f.pop()
+	args := NewValue("__opcode_list__", []*Value{selectTestOperand(reflect.SelectDefault, nil, nil)}, "")
+	got := builtin.NativeCall(f, false, args)
+	if !reflect.DeepEqual(got, []any{0, nil, false}) {
+		t.Fatalf("unregistered select result: %v", got)
+	}
+	// Ordinary unresolved names still use the external-variable resolver.
+	f.vm.GetExternalVar = func(name string) (any, bool) {
+		if name != "legacyExternal" {
+			t.Fatalf("unexpected external lookup: %s", name)
+		}
+		return 42, true
+	}
+	f._execCode(&Code{Opcode: OpPushId, Op1: NewIdentifierValue("legacyExternal")}, false)
+	if got := f.pop().Int(); got != 42 {
+		t.Fatalf("external resolution changed: %v", got)
+	}
+	f._execCode(&Code{Opcode: OpPushId, Op1: NewIdentifierValue(SelectBuiltinName)}, false)
+	if _, ok := f.pop().Value.(selectBuiltinFunc); !ok {
+		t.Fatal("internal builtin reached external resolver")
+	}
+}

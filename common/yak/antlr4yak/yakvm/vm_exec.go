@@ -719,6 +719,12 @@ func (v *Frame) _execCode(c *Code, debug bool) {
 			return
 		}
 
+		// Compiler-only names resolve on a library miss. Existing globals take
+		// their unchanged fast path, and engines need no extra builtin binding.
+		if name == SelectBuiltinName {
+			v.push(NewValue("global", SelectBuiltin(), name))
+			return
+		}
 		currentScope := v.CurrentScope()
 		tbl := currentScope.symtbl
 		id, ok := tbl.GetSymbolByVariableName(name)
