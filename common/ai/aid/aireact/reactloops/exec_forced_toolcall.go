@@ -13,7 +13,7 @@ import (
 
 const forcedToolCallAttempts = 3
 
-func (r *ReActLoop) RequestForcedToolCall(ctx context.Context, task aicommon.AIStatefulTask, toolName string) (LoopCall, error) {
+func (r *ReActLoop) RequestForcedToolCall(ctx context.Context, task aicommon.AIStatefulTask, toolName, instruction string, requestOptions ...aicommon.AIRequestOption) (LoopCall, error) {
 	if utils.IsNil(task) {
 		return LoopCall{}, utils.Error("forced tool call requires a task")
 	}
@@ -43,9 +43,17 @@ func (r *ReActLoop) RequestForcedToolCall(ctx context.Context, task aicommon.AIS
 			return LoopCall{}, err
 		}
 		prompt += "\n\n" + directive
+		if strings.TrimSpace(instruction) != "" {
+			prompt += "\n\n" + instruction
+		}
+		options := append([]aicommon.AIRequestOption{}, requestOptions...)
+		if attempt > 0 {
+			options = append(options, aicommon.WithAIRequest_SeqId(r.config.AcquireId()))
+		}
+		options = append(options, aicommon.WithAIRequest_Context(ctx))
 		streamWg := new(sync.WaitGroup)
 		calls, stopReason, descriptor, err := r.callAILoopTransaction(streamWg, prompt, currentNonce, operator,
-			r.emitLoopGeneralOutput, r.emitLoopFunctionCallOutput, ctx)
+			r.emitLoopGeneralOutput, r.emitLoopFunctionCallOutput, options...)
 		streamWg.Wait()
 		if ctx.Err() != nil {
 			r.clearCallsExecutionValues(calls)

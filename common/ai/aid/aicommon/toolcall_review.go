@@ -1,6 +1,7 @@
 package aicommon
 
 import (
+	"fmt"
 	"strings"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
@@ -73,7 +74,6 @@ func (t *ToolCaller) review(
 	}
 
 	extraPrompt := userInput.GetString("extra_prompt")
-	_ = extraPrompt
 	e := t.emitter
 	switch suggestion {
 	case "wrong_tool":
@@ -86,8 +86,7 @@ func (t *ToolCaller) review(
 		}
 
 		if t.reviewWrongToolHandler == nil {
-			e.EmitError("no review wrong tool handler defined")
-			return targetTool, param, nil, HandleToolUseNext_Default, nil
+			return targetTool, param, nil, HandleToolUseNext_Default, utils.Error("no review wrong tool handler defined")
 		}
 		newTool, directlyAnswer, err := t.reviewWrongToolHandler(
 			t.ctx,
@@ -104,20 +103,24 @@ func (t *ToolCaller) review(
 			return targetTool, param, nil, HandleToolUseNext_DirectlyAnswer, nil
 		}
 
-		targetTool = newTool
-		// Review 换了工具, 原始 reason 已与新工具不符; 重置 reason 状态, 让递归的
-		// CallTool -> CallToolWithExistedParams 的统一 reason 处理点重新生成一次.
-		t.resetReasonForReview()
-		result, directlyAnswer, err := t.CallTool(newTool)
-		if directlyAnswer {
-			userCancelHandler("tool directly answer")
-			return targetTool, param, nil, HandleToolUseNext_DirectlyAnswer, nil
+		if utils.IsNil(newTool) {
+			return targetTool, param, nil, HandleToolUseNext_Default, utils.Error("review did not select a replacement tool")
 		}
+		newParam, hasEditedParam, err := reviewEditedParams(userInput)
 		if err != nil {
-			e.EmitError("error handling tool review: %v", err)
 			return targetTool, param, nil, HandleToolUseNext_Default, err
 		}
-		return targetTool, param, result, HandleToolUseNext_Override, nil
+		if !hasEditedParam {
+			if t.reviewWrongParamHandler == nil {
+				return targetTool, param, nil, HandleToolUseNext_Default, utils.Error("no review parameter handler defined for replacement tool")
+			}
+			feedback := fmt.Sprintf("The review rejected tool %q with parameters %s. Construct fresh parameters for replacement tool %q; do not reuse the old tool's parameters as the new proposal. Review feedback: %s", targetTool.Name, param.Dump(), newTool.Name, extraPrompt)
+			newParam, err = t.reviewWrongParamHandler(t.ctx, newTool, nil, feedback)
+			if err != nil {
+				return targetTool, param, nil, HandleToolUseNext_Default, err
+			}
+		}
+		return t.reviewWithEditedParams(newTool, param, newParam, false, userCancelHandler)
 	case "wrong_params":
 		// Check context before processing
 		select {
@@ -133,8 +136,7 @@ func (t *ToolCaller) review(
 		}
 		if !hasEditedParam {
 			if t.reviewWrongParamHandler == nil {
-				e.EmitError("wrong params suggestion received, but no handler defined")
-				return targetTool, param, nil, HandleToolUseNext_Override, nil
+				return targetTool, param, nil, HandleToolUseNext_Default, utils.Error("wrong params suggestion received, but no handler defined")
 			}
 			newParam, err = t.reviewWrongParamHandler(t.ctx, targetTool, param, userInput.GetString("extra_prompt"))
 			if err != nil {
@@ -183,7 +185,10 @@ func (t *ToolCaller) reviewWithEditedParams(
 	approveUnchangedExplicitEdit bool,
 	userCancelHandler func(reason any),
 ) (*aitool.Tool, aitool.InvokeParams, *aitool.ToolResult, HandleToolUseNext, error) {
-	valid, validationErrors := targetTool.ValidateParams(editedParam)
+	validationParams := cloneEndpointParams(editedParam)
+	delete(validationParams, ReservedKeyIdentifier)
+	delete(validationParams, ReservedKeyCallExpectations)
+	valid, validationErrors := targetTool.ValidateParams(validationParams)
 	if !valid {
 		return targetTool, originalParam, nil, HandleToolUseNext_Default,
 			utils.Errorf("invalid review edited params for tool[%s]: %v", targetTool.Name, validationErrors)
@@ -200,7 +205,7 @@ func (t *ToolCaller) reviewWithEditedParams(
 	// Review 改了参数, 原始 reason 与新参数不符; 重置 reason 状态, 让递归的
 	// CallToolWithExistedParams 的统一 reason 处理点重新生成一次.
 	t.resetReasonForReview()
-	result, directlyAnswer, err := t.CallToolWithExistedParams(targetTool, true, editedParam)
+	result, directlyAnswer, err := t.CallToolWithExistedParams(targetTool, editedParam)
 	if err != nil {
 		t.emitter.EmitError("error handling tool review: %v", err)
 		return targetTool, originalParam, nil, HandleToolUseNext_Default, err

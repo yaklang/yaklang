@@ -210,7 +210,7 @@ func (r *ReActLoop) callAILoopTransaction(
 	streamWg *sync.WaitGroup, prompt, nonce string, operator *LoopActionHandlerOperator,
 	generalOutputCallback LoopGeneralOutputCallback,
 	functionCallOutputCallback LoopFunctionCallOutputCallback,
-	requestContexts ...context.Context,
+	requestOptions ...aicommon.AIRequestOption,
 ) ([]LoopCall, LoopStopReason, *LoopResultDescriptor, error) {
 	if streamWg == nil || generalOutputCallback == nil || functionCallOutputCallback == nil {
 		return nil, LoopStopAbused, nil, utils.Error("loop transaction requires a stream waitgroup and both output callbacks")
@@ -219,14 +219,14 @@ func (r *ReActLoop) callAILoopTransaction(
 	if task := r.GetCurrentTask(); task != nil && !utils.IsNil(task.GetContext()) {
 		requestContext = task.GetContext()
 	}
-	if len(requestContexts) > 0 && !utils.IsNil(requestContexts[0]) {
-		requestContext = requestContexts[0]
+	if optionContext := aicommon.NewAIRequest(prompt, requestOptions...).GetContext(); !utils.IsNil(optionContext) {
+		requestContext = optionContext
 	}
 	if r.functionCallMode {
-		return r.callAIFunctionTransaction(prompt, nonce, generalOutputCallback, functionCallOutputCallback, requestContext)
+		return r.callAIFunctionTransaction(prompt, nonce, generalOutputCallback, functionCallOutputCallback, requestContext, requestOptions...)
 	}
 	descriptor := newLoopResultDescriptor("normal")
-	action, handler, err := r.callAINormalTransaction(streamWg, prompt, nonce, operator, descriptor, requestContext)
+	action, handler, err := r.callAINormalTransaction(streamWg, prompt, nonce, operator, descriptor, requestContext, requestOptions...)
 	if err != nil {
 		descriptor.setError(err)
 		descriptor.finish(nil, r.Get("last_ai_decision_response"), "", nil)
@@ -466,6 +466,7 @@ func (r *ReActLoop) callAIFunctionTransaction(
 	prompt, nonce string, generalOutputCallback LoopGeneralOutputCallback,
 	functionCallOutputCallback LoopFunctionCallOutputCallback,
 	activeTaskCtx context.Context,
+	requestOptions ...aicommon.AIRequestOption,
 ) ([]LoopCall, LoopStopReason, *LoopResultDescriptor, error) {
 	descriptor := newLoopResultDescriptor("functioncall")
 	// Capture once for all retries. Registered handlers are not necessarily
@@ -580,6 +581,7 @@ func (r *ReActLoop) callAIFunctionTransaction(
 		aicommon.WithAIRequest_Context(activeTaskCtx),
 		captureOption,
 	}
+	requestOpts = append(requestOpts, requestOptions...)
 	postHandler := func(resp *aicommon.AIResponse) error {
 		r.clearCallsExecutionValues(acceptedCalls)
 		acceptedCalls = nil
@@ -769,7 +771,7 @@ func (r *ReActLoop) callAIFunctionTransaction(
 	return acceptedCalls, LoopStopToolCalls, descriptor, nil
 }
 
-func (r *ReActLoop) callAINormalTransaction(streamWg *sync.WaitGroup, prompt string, nonce string, operator *LoopActionHandlerOperator, descriptor *LoopResultDescriptor, activeTaskCtx context.Context) (*aicommon.Action, *LoopAction, error) {
+func (r *ReActLoop) callAINormalTransaction(streamWg *sync.WaitGroup, prompt string, nonce string, operator *LoopActionHandlerOperator, descriptor *LoopResultDescriptor, activeTaskCtx context.Context, requestOptions ...aicommon.AIRequestOption) (*aicommon.Action, *LoopAction, error) {
 	var action *aicommon.Action
 	keepExecutionState := false
 	defer func() {
@@ -819,6 +821,7 @@ func (r *ReActLoop) callAINormalTransaction(streamWg *sync.WaitGroup, prompt str
 			aicommon.WithAIRequest_ExtraSpecOpts(aispec.WithFinishReasonCallback(descriptor.setProviderFinishReason))(req)
 		},
 	}
+	requestOpts = append(requestOpts, requestOptions...)
 	var acceptedResp *aicommon.AIResponse
 
 	postHandler := func(resp *aicommon.AIResponse) (err error) {

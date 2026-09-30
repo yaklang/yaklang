@@ -2,7 +2,6 @@ package aireact
 
 import (
 	"context"
-	"fmt"
 	"time"
 
 	"github.com/yaklang/yaklang/common/mcp/mcp-go/mcp"
@@ -42,9 +41,8 @@ func (r *ReAct) withTaskEmitterScope(fn func(currentTask aicommon.AIStatefulTask
 	return result, directly, err
 }
 
-// executeToolCallInternal is the internal implementation that handles both regular and preset-parameter tool calls.
-// If params is nil, it will use AI to generate parameters (require phase).
-// If params is provided, it will skip the require phase and use the provided parameters directly.
+// executeToolCallInternal handles forced proposals and explicit-parameter tool calls.
+// skipRequire selects explicit execution; otherwise the loop requests a proposal first.
 // opt is forwarded to the ToolCaller (e.g. WithToolCaller_Reason, WithToolCaller_CallToolID).
 func (r *ReAct) executeToolCallInternal(ctx context.Context, toolName string, params aitool.InvokeParams, skipRequire bool, opt ...aicommon.ToolCallerOption) (*aitool.ToolResult, bool, error) {
 	if utils.IsNil(ctx) {
@@ -83,7 +81,7 @@ func (r *ReAct) executeToolCallInternal(ctx context.Context, toolName string, pa
 		}
 
 		log.Infof("preparing tool with preset params: %s - %s", tool.Name, tool.Description)
-		toolCaller, err := r.newToolCallerForCall(ctx, currentTask, toolName, false, opt...)
+		toolCaller, err := r.newToolCallerForCall(ctx, currentTask, toolName, opt...)
 		if err != nil {
 			return nil, false, err
 		}
@@ -91,9 +89,8 @@ func (r *ReAct) executeToolCallInternal(ctx context.Context, toolName string, pa
 			if allow, guardMsg := reactloops.CheckToolInvokeGuard(currentLoop, toolName, params); !allow {
 				return nil, false, utils.Error(guardMsg)
 			}
-			params = reactloops.ApplyToolInvokeParamsMutators(currentLoop, toolName, params)
 		}
-		result, directlyAnswer, err := toolCaller.CallToolWithExistedParams(tool, true, params)
+		result, directlyAnswer, err := toolCaller.CallToolWithExistedParams(tool, params)
 		if err != nil {
 			return nil, false, utils.Errorf("tool call failed: %v", err)
 		}
@@ -167,11 +164,8 @@ func (r *ReAct) tryFillVerboseNameForPlaceholder(tool *aitool.Tool) {
 	}
 }
 
-// newToolCallerForCall builds a ToolCaller with the shared options (emitter
-// binding, review handlers, interval review). withParamGenBuilder controls
-// whether the AI param-generation builder is attached (required for the require
-// path). opt is appended (e.g. WithToolCaller_Reason, WithToolCaller_CallToolID).
-func (r *ReAct) newToolCallerForCall(ctx context.Context, currentTask aicommon.AIStatefulTask, toolName string, withParamGenBuilder bool, opt ...aicommon.ToolCallerOption) (*aicommon.ToolCaller, error) {
+// newToolCallerForCall builds a ToolCaller with shared execution and review options.
+func (r *ReAct) newToolCallerForCall(ctx context.Context, currentTask aicommon.AIStatefulTask, toolName string, opt ...aicommon.ToolCallerOption) (*aicommon.ToolCaller, error) {
 	var toolCaller *aicommon.ToolCaller
 
 	var toolCallerOptions []aicommon.ToolCallerOption
@@ -197,13 +191,17 @@ func (r *ReAct) newToolCallerForCall(ctx context.Context, currentTask aicommon.A
 		if allow, guardMsg := reactloops.CheckToolInvokeGuard(currentLoop, toolName, nil); !allow {
 			return nil, utils.Error(guardMsg)
 		}
-		if withParamGenBuilder {
-			toolCallerOptions = append(toolCallerOptions,
-				aicommon.WithToolCaller_ParamAugment(func(invokeParams aitool.InvokeParams) aitool.InvokeParams {
-					return reactloops.ApplyToolInvokeParamsMutators(currentLoop, toolName, invokeParams)
-				}),
-			)
-		}
+		toolCallerOptions = append(toolCallerOptions,
+			aicommon.WithToolCaller_ParamAugmentForTool(func(tool *aitool.Tool, params aitool.InvokeParams) aitool.InvokeParams {
+				return reactloops.ApplyToolInvokeParamsMutators(currentLoop, tool.Name, params)
+			}),
+			aicommon.WithToolCaller_BeforeInvoke(func(ctx context.Context, tool *aitool.Tool, params aitool.InvokeParams) (func(), error) {
+				if allow, message := reactloops.CheckToolInvokeGuard(currentLoop, tool.Name, params); !allow {
+					return nil, utils.Error(message)
+				}
+				return nil, ctx.Err()
+			}),
+		)
 	}
 
 	// Add callback handlers
@@ -248,17 +246,6 @@ func (r *ReAct) newToolCallerForCall(ctx context.Context, currentTask aicommon.A
 				)
 			}
 		}
-	}
-
-	if withParamGenBuilder {
-		toolCallerOptions = append(toolCallerOptions,
-			aicommon.WithToolCaller_GenerateToolParamsBuilderWithMeta(func(tool *aitool.Tool, toolName string) (*aicommon.ToolParamsPromptMeta, error) {
-				return r.generateToolParamsPromptWithMetaForTask(currentTask, tool, toolName)
-			}),
-			aicommon.WithToolCaller_FunctionCallParamsPromptBuilder(func(tool *aitool.Tool, _ string, intent aicommon.ToolParamsCallIntent) (string, error) {
-				return r.promptManager.GenerateFunctionCallToolParamsPromptForTask(currentTask, tool, intent)
-			}),
-		)
 	}
 
 	toolCallerOptions = append(toolCallerOptions, opt...)
@@ -309,8 +296,8 @@ func (r *ReAct) ExecuteToolRequiredAndCallWithoutRequired(ctx context.Context, t
 // DirectlyCallTool handles a directly_call_tool action. It emits the tool-call
 // card (loading) first, then reads reason/params from the streaming action and
 // invokes the tool. The loop-layer prepare callback does param normalize/validate
-// and may signal fallbackToRequire to reuse the same card and switch to the AI
-// param-generation path. reason is read inside (from the action), not passed in.
+// and returns errors to the loop instead of silently generating new parameters.
+// reason is read inside (from the action), not passed in.
 func (r *ReAct) DirectlyCallTool(ctx context.Context, toolName string, action *aicommon.Action, prepare aicommon.DirectlyCallPrepareFunc) (*aitool.ToolResult, bool, error) {
 	return r.withTaskEmitterScope(func(currentTask aicommon.AIStatefulTask) (*aitool.ToolResult, bool, error) {
 		return r.directlyCallToolForTask(ctx, currentTask, toolName, action, prepare)
@@ -333,13 +320,10 @@ func (r *ReAct) directlyCallToolForTask(ctx context.Context, currentTask aicommo
 		defer r.config.RunVerificationWatchdogToolBlockingEnd()
 	}
 
-	// Always attach the param-gen builder so fallbackToRequire can reuse this card
-	// and switch to the AI param-generation path.
 	toolCaller, err := r.newToolCallerForCall(
 		ctx,
 		currentTask,
 		toolName,
-		true,
 		append([]aicommon.ToolCallerOption{
 			aicommon.WithToolCaller_OmitResultParamsInTimeline(),
 			aicommon.WithToolCaller_StatsSource(aicommon.StatsSourceToolDirect),
@@ -361,30 +345,4 @@ func (r *ReAct) directlyCallToolForTask(ctx context.Context, currentTask aicommo
 		return nil, false, utils.Errorf("tool call failed: %v", err)
 	}
 	return r.finalizeToolCallResult(currentTask, result, directlyAnswer)
-}
-
-func (r *ReAct) generateToolParamsPromptWithMetaForTask(
-	task aicommon.AIStatefulTask,
-	tool *aitool.Tool,
-	toolName string,
-) (*aicommon.ToolParamsPromptMeta, error) {
-	if tool == nil {
-		return nil, fmt.Errorf("tool '%s' not found", toolName)
-	}
-
-	// Use PromptManager to generate the prompt with metadata
-	promptResult, err := r.promptManager.GenerateToolParamsPromptWithMetaForTask(task, tool)
-	if err != nil {
-		return nil, fmt.Errorf("failed to generate tool params prompt: %w", err)
-	}
-
-	if r.config.DebugPrompt {
-		log.Infof("Tool params prompt: %s", promptResult.Prompt)
-	}
-
-	return &aicommon.ToolParamsPromptMeta{
-		Prompt:     promptResult.Prompt,
-		Nonce:      promptResult.Nonce,
-		ParamNames: promptResult.ParamNames,
-	}, nil
 }

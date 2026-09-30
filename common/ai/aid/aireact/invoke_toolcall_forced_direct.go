@@ -3,6 +3,7 @@ package aireact
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
@@ -19,12 +20,39 @@ func (r *ReAct) executeForcedDirectlyCall(
 	toolName string,
 	opt ...aicommon.ToolCallerOption,
 ) (*aitool.ToolResult, bool, error) {
-	if err := ctx.Err(); err != nil {
+	params, reason, err := r.requestToolCallParamsForTask(ctx, currentTask, tool, "")
+	if err != nil {
 		return nil, false, err
+	}
+	options := append([]aicommon.ToolCallerOption{
+		aicommon.WithToolCaller_Reason(reason),
+		aicommon.WithToolCaller_OmitResultParamsInTimeline(),
+	}, opt...)
+	caller, err := r.newToolCallerForCall(ctx, currentTask, toolName, options...)
+	if err != nil {
+		return nil, false, err
+	}
+	result, directlyAnswer, err := caller.CallToolWithExistedParams(tool, params)
+	if err != nil {
+		return nil, false, err
+	}
+	return r.finalizeToolCallResult(currentTask, result, directlyAnswer)
+}
+
+func (r *ReAct) requestToolCallParamsForTask(ctx context.Context, currentTask aicommon.AIStatefulTask, tool *aitool.Tool, feedback string, requestOptions ...aicommon.AIRequestOption) (aitool.InvokeParams, string, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, "", err
+	}
+	if utils.IsNil(tool) {
+		return nil, "", utils.Error("parameter request requires a tool")
+	}
+	toolName := tool.Name
+	if allow, message := reactloops.CheckToolInvokeGuard(promptLoopForTask(currentTask), toolName, nil); !allow {
+		return nil, "", utils.Error(message)
 	}
 	mutation := r.config.RecordRecentlyUsedTool(tool)
 	if mutation.Upsert == nil && mutation.Reuse == nil {
-		return nil, false, utils.Errorf("cannot load schema for tool %q within the tool-cache budget", toolName)
+		return nil, "", utils.Errorf("cannot load schema for tool %q within the tool-cache budget", toolName)
 	}
 	r.AddToTimeline("tool_schema_load", fmt.Sprintf("Tool %q schema loaded into CACHE_TOOL_CALL; no execution has occurred.", toolName))
 	loop := promptLoopForTask(currentTask)
@@ -33,23 +61,25 @@ func (r *ReAct) executeForcedDirectlyCall(
 		loop, err = reactloops.NewReActLoop(schema.AI_REACT_LOOP_NAME_DEFAULT, r,
 			reactloops.WithFunctionCallActionVariants())
 		if err != nil {
-			return nil, false, err
+			return nil, "", err
 		}
 		defer loop.Release()
 	}
-	call, err := loop.RequestForcedToolCall(ctx, currentTask, toolName)
+	call, err := loop.RequestForcedToolCall(ctx, currentTask, toolName, feedback, requestOptions...)
 	if err != nil {
-		return nil, false, err
+		return nil, "", err
 	}
 	defer loop.ClearActionExecutionValues(call.Action)
-	prepare := func(action *aicommon.Action, name string) (aitool.InvokeParams, bool, *aitool.Tool, error) {
-		params, err := loopinfra.PrepareDirectToolCallParams(loop, action, tool)
-		if err == nil {
-			if allow, message := reactloops.CheckToolInvokeGuard(promptLoopForTask(currentTask), name, params); !allow {
-				err = utils.Error(message)
-			}
-		}
-		return params, false, tool, err
+	params, err := loopinfra.PrepareDirectToolCallParams(loop, call.Action, tool)
+	if err != nil {
+		return nil, "", err
 	}
-	return r.directlyCallToolForTask(ctx, currentTask, toolName, call.Action, prepare, opt...)
+	if allow, message := reactloops.CheckToolInvokeGuard(promptLoopForTask(currentTask), toolName, params); !allow {
+		return nil, "", utils.Error(message)
+	}
+	reason := call.Action.GetString("directly_call_reason")
+	if strings.TrimSpace(reason) == "" {
+		reason = call.Action.GetString("human_readable_thought")
+	}
+	return params, reason, nil
 }
