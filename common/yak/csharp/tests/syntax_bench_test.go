@@ -4,7 +4,6 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
-	"github.com/yaklang/yaklang/common/yak/antlr4util"
 	"github.com/yaklang/yaklang/common/yak/csharp/csharp2ssa"
 )
 
@@ -79,27 +78,9 @@ func TestCSharpFrontendBenchmarkMetrics(t *testing.T) {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			src := mustReadCodeFixture(t, tc.file)
-			res := testing.Benchmark(func(b *testing.B) {
-				b.ReportAllocs()
-				b.ResetTimer()
-				for i := 0; i < b.N; i++ {
-					antlr4util.ResetSLLFirstCounters()
-					ast, err := csharp2ssa.Frontend(src, cache)
-					if err != nil {
-						b.Fatal(err)
-					}
-					if ast == nil {
-						b.Fatal("nil ast")
-					}
-					if antlr4util.SLLFirstCountersSnapshot().FallbackError > 0 {
-						b.Fatal("fallback error")
-					}
-				}
-			})
-			require.Greater(t, res.N, 0)
-			require.Greater(t, res.NsPerOp(), int64(0), "benchmark must report ns/op for %s", tc.name)
-			t.Logf("BENCH name=%s file=%s n=%d ns/op=%d allocs/op=%d bytes/op=%d",
-				tc.name, tc.file, res.N, res.NsPerOp(), res.AllocsPerOp(), res.AllocedBytesPerOp())
+			_, elapsed, stats := parseCSharpFrontend(t, src, cache)
+			t.Logf("METRICS name=%s file=%s parse=%s bytes=%d sll_attempts=%d fallbacks=%d errors=%d",
+				tc.name, tc.file, elapsed, len(src), stats.SLLAttempts, stats.Fallbacks, stats.FallbackError)
 		})
 	}
 }

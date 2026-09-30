@@ -3,6 +3,8 @@ package main
 import (
 	"context"
 	"fmt"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"runtime/debug"
@@ -12,6 +14,7 @@ import (
 	"time"
 
 	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/netx"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/cli"
 	"github.com/yaklang/yaklang/common/yak/yakdoc/webdoc"
@@ -60,9 +63,19 @@ func setupLocalExecEnv(t *testing.T) {
 	); err != nil {
 		t.Fatalf("init temp database failed: %v", err)
 	}
-	// 起一个本地 mock HTTP 服务，地址通过环境变量暴露，便于将来示例以 mock 方式自给自足地联调。
-	host, port := utils.DebugMockHTTP([]byte("HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: 4\r\n\r\nmock"))
-	_ = os.Setenv("YAK_DOC_MOCK_HTTP", utils.HostPort(host, port))
+	previousDNS := netx.GetDefaultOptions()
+	netx.SetDefaultDNSOptions(append(previousDNS, netx.WithTemporaryHosts(map[string]string{
+		"example.com": "127.0.0.1", "doc.example.test": "127.0.0.1",
+	}))...)
+	t.Cleanup(func() { netx.SetDefaultDNSOptions(previousDNS...) })
+	// Provide real local plaintext/TLS endpoints for executable examples.
+	handler := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { _, _ = w.Write([]byte("mock")) })
+	plain := httptest.NewServer(handler)
+	tls := httptest.NewTLSServer(handler)
+	t.Cleanup(plain.Close)
+	t.Cleanup(tls.Close)
+	t.Setenv("YAK_DOC_MOCK_HTTP", strings.TrimPrefix(plain.URL, "http://"))
+	t.Setenv("YAK_DOC_MOCK_TLS", strings.TrimPrefix(tls.URL, "https://"))
 
 	// cli 库通过全局单例 DefaultCliApp 绑定到引擎，示例间状态会累积；缺省命令行参数时 cli.check() 默认
 	// 会调用 os.Exit(1) 直接终止整个测试进程。这里把校验回调替换为空操作：cli.check() 不再退出进程，
@@ -98,8 +111,8 @@ func TestSafeLibsExampleExecution(t *testing.T) {
 				continue
 			}
 			t.Run(fmt.Sprintf("%s/%d", name, i+1), func(t *testing.T) {
-				if strings.Contains(code, "risk.CheckServerReachable(") {
-					setupReachabilityExample(t)
+				if utils.MatchAnyOfSubString(code, "risk.CheckServerReachable(", "risk.NewDNSLogDomain(", "risk.CheckDNSLogByToken(", "risk.NewHTTPLog(", "risk.CheckHTTPLogByToken(") {
+					setupRiskBridgeExample(t, code)
 				}
 				engine := yaklang.New()
 				ctx, cancel := context.WithTimeout(context.Background(), 8*time.Second)
