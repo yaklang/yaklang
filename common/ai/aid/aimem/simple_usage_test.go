@@ -11,7 +11,7 @@ import (
 )
 
 func NewTestAIMemoryHNSWBackend(t *testing.T, sessionID string) *AIMemoryHNSWBackend {
-	db, err := getTestDatabase()
+	db, err := getTestDatabase(t)
 	if db == nil || err != nil {
 		t.Fatal("getTestDatabase failed")
 	}

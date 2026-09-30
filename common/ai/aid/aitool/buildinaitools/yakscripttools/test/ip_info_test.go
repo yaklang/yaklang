@@ -3,11 +3,15 @@ package test
 import (
 	"bytes"
 	"context"
+	"net"
+	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools/yakscripttools"
+	"github.com/yaklang/yaklang/common/amap"
 	"github.com/yaklang/yaklang/common/schema"
 	_ "github.com/yaklang/yaklang/common/yak"
 	"gotest.tools/v3/assert"
@@ -17,6 +21,7 @@ const ipInfoToolName = "ip_info"
 
 func getIPInfoTool(t *testing.T) *aitool.Tool {
 	t.Helper()
+	setupIPInfoFallback(t, !strings.Contains(t.Name(), "ErrorMessageQuality"))
 	embedFS := yakscripttools.GetEmbedFS()
 	content, err := embedFS.ReadFile("yakscriptforai/recon/ip_info.yak")
 	if err != nil {
@@ -31,6 +36,30 @@ func getIPInfoTool(t *testing.T) *aitool.Tool {
 		t.Fatalf("ConvertTools returned empty")
 	}
 	return tools[0]
+}
+
+// Redirect only the external fallback transport. Keep the actual Yak script,
+// MMDB lookup, amap client, HTTP request and response/error decoding.
+func setupIPInfoFallback(t *testing.T, success bool) {
+	t.Helper()
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/v3/ip" || net.ParseIP(r.URL.Query().Get("ip")) == nil || r.URL.Query().Get("key") != "local-test-key" {
+			t.Errorf("unexpected IP-location request: %s", r.URL)
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		if success {
+			_, _ = w.Write([]byte(`{"status":"1","info":"OK","infocode":"10000","province":"Fixture Province","city":"Fixture City","adcode":"000000","rectangle":""}`))
+		} else {
+			_, _ = w.Write([]byte(`{"status":"0","info":"INVALID_USER_KEY","infocode":"10001"}`))
+		}
+	}))
+	original := amap.YakExport["GetIpLocation"]
+	amap.YakExport["GetIpLocation"] = func(ip string, opts ...amap.AmapConfigOption) (*amap.IPLocationResultEx, error) {
+		return amap.IPLocation(ip, append(opts, amap.WithApiKey("local-test-key"), amap.WithBaseURL(server.URL))...)
+	}
+	t.Cleanup(func() { amap.YakExport["GetIpLocation"] = original; server.Close() })
 }
 
 func execIPInfoTool(t *testing.T, tool *aitool.Tool, params aitool.InvokeParams) (stdout, stderr string) {
@@ -62,7 +91,7 @@ func TestIPInfo_SingleIP(t *testing.T) {
 	if strings.Contains(stdout, "Country:") {
 		t.Logf("MMDB GeoIP available - got geolocation data")
 	} else if strings.Contains(stdout, "MMDB query failed") || strings.Contains(stdout, "FALLBACK") {
-		t.Logf("MMDB not available - graceful degradation confirmed")
+		assert.Assert(t, strings.Contains(stdout, "[AMAP] Province: Fixture Province"), "local fallback should return decoded geolocation data")
 	}
 	t.Logf("stdout:\n%s", stdout)
 }
@@ -128,7 +157,7 @@ func TestIPInfo_ErrorMessageQuality(t *testing.T) {
 
 	if strings.Contains(stdout, "MMDB query failed") {
 		assert.Assert(t,
-			strings.Contains(stdout, "FALLBACK") || strings.Contains(stdout, "AMAP") || strings.Contains(stdout, "HINT"),
+			strings.Contains(stdout, "fallback also failed") && strings.Contains(stdout, "[HINT]"),
 			"when MMDB fails, should provide fallback attempt or helpful hints, got:\n%s", stdout)
 		t.Logf("MMDB not available - verified fallback and hint messages")
 	} else {

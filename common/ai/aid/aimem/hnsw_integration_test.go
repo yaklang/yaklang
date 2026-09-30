@@ -248,7 +248,7 @@ func TestAIMemoryHNSWBackend_BasicOperations(t *testing.T) {
 func TestAIMemoryHNSWBackend_Persistence(t *testing.T) {
 	// 测试HNSW图的持久化
 	sessionID := "test-persistence-" + uuid.New().String()
-	db, err := getTestDatabase()
+	db, err := getTestDatabase(t)
 	if db == nil || err != nil {
 		t.Fatal("getTestDatabase failed")
 	}

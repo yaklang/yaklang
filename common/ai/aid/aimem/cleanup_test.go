@@ -3,6 +3,7 @@ package aimem
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -20,7 +21,7 @@ import (
 func createCleanupTestMemory(t *testing.T, sessionID string) *AIMemoryTriage {
 	t.Helper()
 	ctx := context.Background()
-	mem, err := CreateTestAIMemory(sessionID, WithInvoker(mock.NewMockInvoker(ctx)))
+	mem, err := CreateTestAIMemory(t, sessionID, WithInvoker(mock.NewMockInvoker(ctx)))
 	require.NoError(t, err)
 	require.NotNil(t, mem)
 	return mem
@@ -574,8 +575,15 @@ func TestMaybeCleanup_LazyTimerTrigger(t *testing.T) {
 	// Trigger cleanup via MaybeCleanup (first call → lastCleanupTime=0 → triggers)
 	MaybeCleanup(db)
 
-	// Wait for async cleanup to complete
-	time.Sleep(3 * time.Second)
+	// Wait for both the deletion and the worker's terminal state, so teardown
+	// cannot race another test resetting the global coordinator.
+	require.Eventually(t, func() bool {
+		var remaining int64
+		if err := db.Table(tableName).Where("session_id = ?", sid).Count(&remaining).Error; err != nil {
+			return false
+		}
+		return remaining == 0 && atomic.LoadInt32(&globalCoordinator.cleanupRunning) == 0
+	}, 3*time.Second, time.Millisecond)
 
 	// Verify cleanup happened: totalCount should be reduced
 	var totalCount int64
@@ -602,10 +610,12 @@ func TestMaybeCleanup_RateLimit(t *testing.T) {
 		MaybeCleanup(db)
 	}
 
-	time.Sleep(500 * time.Millisecond)
-
 	// cleanupRunning should still be 0 (never triggered)
 	assert.Equal(t, int32(0), atomic.LoadInt32(&globalCoordinator.cleanupRunning))
+	var claimed int64
+	require.NoError(t, db.Model(&schema.ProjectGeneralStorage{}).
+		Where("key = ?", strconv.Quote(cleanupStateKey)).Count(&claimed).Error)
+	require.Zero(t, claimed, "cooldown must not schedule or claim cleanup")
 }
 
 func atomicStoreLastCleanupNow() {

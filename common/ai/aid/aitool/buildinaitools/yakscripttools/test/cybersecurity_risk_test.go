@@ -13,6 +13,7 @@ import (
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools/yakscripttools"
 	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/netx"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	_ "github.com/yaklang/yaklang/common/yak"
@@ -48,6 +49,11 @@ func getCybersecurityRiskToolSchema(t *testing.T) map[string]any {
 
 func getCybersecurityRiskTool(t *testing.T) *aitool.Tool {
 	t.Helper()
+	previousDNS := netx.GetDefaultOptions()
+	netx.SetDefaultDNSOptions(append(previousDNS, netx.WithTemporaryHosts(map[string]string{
+		"example.test": "127.0.0.1",
+	}))...)
+	t.Cleanup(func() { netx.SetDefaultDNSOptions(previousDNS...) })
 	aiTool := loadCybersecurityRiskAITool(t)
 	tools := yakscripttools.ConvertTools([]*schema.AIYakTool{aiTool})
 	if len(tools) != 1 {
@@ -139,6 +145,12 @@ func TestCybersecurityRisk_UsesRuntimeRiskSinkInsteadOfLocalDatabase(t *testing.
 	}
 	if submitted == nil {
 		t.Fatal("expected runtime risk sink submission")
+	}
+	if submitted.Host != "example.test" || submitted.IP != "127.0.0.1" || submitted.Url != "example.test/xss?q=admin" {
+		t.Fatalf("normalized target lost its host, local resolution, or endpoint: %#v", submitted)
+	}
+	if submitted.Hash != yakit.ComputeRiskHash("example.test/xss?q=admin", "", 0, "xss", "q") {
+		t.Fatal("normalizing the host changed the existing risk identity")
 	}
 	if submitted.RiskType != "xss" || submitted.Severity != "high" || submitted.Parameter != "q" {
 		t.Fatalf("unexpected submitted risk: %#v", submitted)
