@@ -72,9 +72,10 @@ func (c *Config) parseFile() (ret *Program, err error) {
 		wait = prog.UpdateToDatabase()
 		// prog.ProcessInfof("[SSA/persist] program %s program metadata saved, cost %v", prog.Name, time.Since(metaStart))
 	}
-	total := prog.Cache.CountInstruction()
-	persisted := prog.Cache.InstructionPersistedCount()
-	totalExpected := total + persisted
+	accounting := prog.Cache.GetFlushAccounting()
+	total := int(accounting.RemainingDirty)
+	persisted := int(accounting.AlreadyPersisted)
+	totalExpected := int(accounting.InstructionsTotal)
 	if prog.DatabaseKind != ssa.ProgramCacheMemory {
 		prog.ProcessInfof("[SSA/persist] program %s flushing IR cache (remaining=%d persisted=%d total=%d) to database",
 			prog.Name, total, persisted, totalExpected)
