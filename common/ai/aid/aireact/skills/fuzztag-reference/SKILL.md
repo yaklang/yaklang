@@ -14,7 +14,7 @@ description: 按需查询 Yaklang FuzzTag 标签全集、别名、参数示例�
 - 标准语法 `{{name(text)}}`，无参 `{{name}}`；保留大小写和冒号。参数不是 Yak 表达式，每个标签自行解释逗号、竖线等分隔符。
 - 并列标签默认笛卡尔积；嵌套标签先展开，外层逐项加工。`{{base64({{array(a|b)}})}}` 得两条。字面保留用 `{{=原文=}}`；raw 防止解析标签，不阻止外层函数拆分参数。
 - 同层标签相同 `::row` 按索引配对，如 `{{array::row(A|B)}}={{int::row(1-2)}}`；列表保持等长，短列表耗尽可能补空。`::rep` 可复用末项；`::dyn` 强制每轮重算，随机值和时间默认动态行为因标签参数而异。
-- template 是原文，不会自动把字面 `\n` 或 `\\` 解码。多行优先用 AITAG 写真实换行；直接 JSON 参数只转义一次。需要显式解析反斜杠转义时用 unquote。
+- template 是原文，不会自动把字面 `\n` 或 `\\` 解码。多行保留真实换行；工具传参方式查看 exec_fuzztag 的 USAGE，JSON 参数只转义一次。需要显式解析反斜杠转义时用 unquote。
 - first/last/nth 操作的是一次传入的换行文本，不会自动聚合所有嵌套 list 的结果。使用 unquote 生成真实换行后再取行。
 - `exec_fuzztag` 保留重复结果；limit 在生成时限制，truncated=true 时 count 不是完整总数。输出多行、空字节或结构化字符串用 format=json 保留结果边界；任意二进制最好先套 hex/base64。
 - 文件标签需 enable-file-tags；词表和工作流需 profile 数据库；Codec 插件和热加载标签需对应宿主，本工具未启用。标签不存在可能输出空串，参数错误也可能返回原文或空串，必须检查样本。
@@ -22,7 +22,7 @@ description: 按需查询 Yaklang FuzzTag 标签全集、别名、参数示例�
 
 ## 命名参数（运行时注入）
 
-- **params**（别名：param、p）：`{{params(name)}}`。exec_fuzztag 传 `params:{"name":["小王","小李"]}`；数组展开，标量单值。未提供的键返回空串。p 在该入口是参数标签，不是整数标签。
+- **params**（别名：param、p）：`{{params(name)}}`。exec_fuzztag 传 `variables:{"name":["小王","小李"]}`；数组展开，标量单值。未提供的键返回空串。p 在该入口是参数标签，不是整数标签。
 
 ## 枚举、随机与组合
 

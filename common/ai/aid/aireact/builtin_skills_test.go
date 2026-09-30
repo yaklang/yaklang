@@ -36,6 +36,15 @@ var allBuiltinSkills = []struct {
 
 // Keep the reference skill complete as the engine's tag registry evolves.
 func TestBuiltinFuzztagReferenceCoversRegistry(t *testing.T) {
+	for _, name := range []string{"fuzztag", "fuzztag-reference"} {
+		content, err := GetBuiltinSkillsFS().ReadFile("skills/" + name + "/SKILL.md")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if strings.Contains(string(content), "AITAG") || strings.Contains(string(content), "TOOL_PARAM_") {
+			t.Errorf("%s exposes tool transport details that belong in tool USAGE", name)
+		}
+	}
 	content, err := GetBuiltinSkillsFS().ReadFile("skills/fuzztag-reference/SKILL.md")
 	if err != nil {
 		t.Fatal(err)
