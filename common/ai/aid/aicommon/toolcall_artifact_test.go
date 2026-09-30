@@ -229,7 +229,7 @@ func TestToolArtifactFinalizeReplacesDataAndPersistsRawFiles(t *testing.T) {
 	}
 	tool, err := aitool.New("artifact-test-tool", aitool.WithSimpleCallback(func(aitool.InvokeParams, io.Writer, io.Writer) (any, error) { return nil, nil }))
 	require.NoError(t, err)
-	require.NoError(t, b.finalize(caller, tool, "call-1", "fixture", toolResult.Param.(aitool.InvokeParams), toolResult, 0, ""))
+	require.NoError(t, b.finalize(caller, tool, "call-1", "fixture", toolResult.Param.(aitool.InvokeParams), toolResult))
 
 	require.IsType(t, "", toolResult.Data)
 	require.Contains(t, toolResult.Data.(string), "ARTIFACT:")
@@ -269,7 +269,7 @@ func TestToolArtifactFailureNeverFallsBackToOversizedInlineData(t *testing.T) {
 	}
 	tool, err := aitool.New("artifact-failure", aitool.WithSimpleCallback(func(aitool.InvokeParams, io.Writer, io.Writer) (any, error) { return nil, nil }))
 	require.NoError(t, err)
-	err = b.finalize(&ToolCaller{}, tool, "call-failure", "", nil, toolResult, 0, "")
+	err = b.finalize(&ToolCaller{}, tool, "call-failure", "", nil, toolResult)
 	require.NoError(t, err)
 	require.True(t, toolResult.Success, "artifact persistence is not invocation protocol completion")
 	require.Empty(t, toolResult.Error)
@@ -292,7 +292,7 @@ func TestSmallToolResultCanContinueWhenArtifactPersistenceFails(t *testing.T) {
 	}
 	tool, err := aitool.New("small-artifact-failure", aitool.WithSimpleCallback(func(aitool.InvokeParams, io.Writer, io.Writer) (any, error) { return nil, nil }))
 	require.NoError(t, err)
-	require.NoError(t, b.finalize(&ToolCaller{}, tool, "call-small-failure", "", nil, toolResult, 0, ""))
+	require.NoError(t, b.finalize(&ToolCaller{}, tool, "call-small-failure", "", nil, toolResult))
 	require.True(t, toolResult.Success)
 	require.Contains(t, toolResult.Data.(string), "small combined output")
 	require.Contains(t, toolResult.Data.(string), "small result")
@@ -348,7 +348,7 @@ func TestCurrentCheckpointReplayKeepsCompactedDataByteStable(t *testing.T) {
 			toolResult := &aitool.ToolResult{Name: "replay", Success: true, Data: tc.data}
 			tool, err := aitool.New("replay", aitool.WithSimpleCallback(func(aitool.InvokeParams, io.Writer, io.Writer) (any, error) { return nil, nil }))
 			require.NoError(t, err)
-			require.NoError(t, b.finalize(&ToolCaller{}, tool, "replay-call", "", nil, toolResult, 0, ""))
+			require.NoError(t, b.finalize(&ToolCaller{}, tool, "replay-call", "", nil, toolResult))
 			require.Equal(t, tc.data, toolResult.Data, "checkpoint replay must be byte-stable")
 			require.NoDirExists(t, replayDir, "replay must remove the speculative _2 bundle")
 			originalBytes, err := os.ReadFile(originalArtifact)
@@ -448,7 +448,7 @@ func TestToolArtifactLateFinalizeFailureDoesNotLeaveGhostArtifactHint(t *testing
 	toolResult := &aitool.ToolResult{Name: "late-persist", Success: true, Data: &aitool.ToolExecutionResult{Result: "small result"}}
 	tool, err := aitool.New("late-persist", aitool.WithSimpleCallback(func(aitool.InvokeParams, io.Writer, io.Writer) (any, error) { return nil, nil }))
 	require.NoError(t, err)
-	err = b.finalize(&ToolCaller{}, tool, "late-call", "", nil, toolResult, 0, "")
+	err = b.finalize(&ToolCaller{}, tool, "late-call", "", nil, toolResult)
 	require.NoError(t, err, "artifact persistence is an observation failure after protocol completion")
 	require.True(t, toolResult.Success)
 	data := toolResult.Data.(string)

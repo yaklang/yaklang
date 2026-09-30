@@ -34,17 +34,12 @@ func (t *directlyCallTestInvoker) ExecuteToolRequiredAndCallWithoutRequired(ctx 
 
 // DirectlyCallTool mirrors aicommon.ToolCaller.DirectlyCallTool for tests: it
 // runs the loop-layer prepare callback (which normalizes/validates params and
-// emits progress), records the finalized preset params, and on fallbackToRequire
-// delegates to the require path (ExecuteToolRequiredAndCall) — reusing the same
-// card semantics as the real implementation.
+// emits progress), then records the finalized params for explicit execution.
 func (t *directlyCallTestInvoker) DirectlyCallTool(ctx context.Context, toolName string, action *aicommon.Action, prepare aicommon.DirectlyCallPrepareFunc) (*aitool.ToolResult, bool, error) {
 	if prepare != nil && t.tool != nil {
-		params, fallback, _, err := prepare(action, toolName)
+		params, _, err := prepare(action, toolName)
 		if err != nil {
 			return nil, false, err
-		}
-		if fallback {
-			return t.ExecuteToolRequiredAndCall(ctx, toolName)
 		}
 		t.mu.Lock()
 		t.withoutRequiredName = toolName

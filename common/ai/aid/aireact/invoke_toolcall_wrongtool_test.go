@@ -52,9 +52,9 @@ func mockedToolCallingWrongTool(i aicommon.AICallerConfigIf, req *aicommon.AIReq
 		return rsp, nil
 	}
 
-	if isToolParamGenerationPrompt(prompt, "") {
+	if isForcedToolCallPrompt(prompt, "echo") {
 		rsp := i.NewAIResponse()
-		rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "call-tool", "params": { "input" : "mocked-echo-params" }}`))
+		rsp.EmitOutputStream(bytes.NewBufferString(`{"@action":"directly_call_tool","directly_call_tool_name":"echo","directly_call_tool_params":{"input":"mocked-echo-params"}}`))
 		rsp.Close()
 		return rsp, nil
 	}

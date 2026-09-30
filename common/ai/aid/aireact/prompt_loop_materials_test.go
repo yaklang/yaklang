@@ -59,11 +59,6 @@ func TestPromptManager_ModelReasoningReplayOnlyEntersMainDecisionPrompt(t *testi
 	require.NoError(t, err)
 	require.Contains(t, mainResult.Prompt, "TIMELINE_MODEL_THINKING_V1_scope1")
 
-	tool := aitool.NewWithoutCallback("scope-tool", aitool.WithDescription("scope test tool"))
-	toolParams, err := react.promptManager.GenerateToolParamsPromptWithMeta(tool)
-	require.NoError(t, err)
-	require.NotContains(t, toolParams.Prompt, "TIMELINE_MODEL_THINKING_V1_scope1")
-
 	lightInput := mainInput
 	lightInput.Nonce = "scope-light"
 	lightInput.Lightweight = true

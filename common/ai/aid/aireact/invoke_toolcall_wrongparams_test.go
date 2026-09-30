@@ -58,23 +58,9 @@ func mockedToolCallingWrongParam_Normal(i aicommon.AICallerConfigIf, req *aicomm
 		return rsp, nil
 	}
 
-	if isToolParamGenerationPrompt(prompt, toolName) {
+	if isForcedToolCallPrompt(prompt, toolName) {
 		rsp := i.NewAIResponse()
-		rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "call-tool", "params": { "input" : "mocked-echo-params" }}`))
-		rsp.Close()
-		return rsp, nil
-	}
-
-	if utils.MatchAllOfSubString(prompt, "<|OLD_PARAMS_", "call-tool") {
-		rsp := i.NewAIResponse()
-		rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "call-tool", "params": { "seconds" : 0.1 }}`))
-		rsp.Close()
-		return rsp, nil
-	}
-
-	if strings.Contains(prompt, "重新生成一套参数") || strings.Contains(prompt, "参数名不匹配") {
-		rsp := i.NewAIResponse()
-		rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "call-tool", "params": { "seconds" : 0.1 }}`))
+		rsp.EmitOutputStream(bytes.NewBufferString(fmt.Sprintf(`{"@action":"directly_call_tool","directly_call_tool_name":%q,"directly_call_tool_params":{"seconds":0.1}}`, toolName)))
 		rsp.Close()
 		return rsp, nil
 	}
@@ -269,8 +255,8 @@ LOOP:
 	if !utils.MatchAllOfSubString(tl, `system-question`, "user-answer", "when review") {
 		t.Fatal("timeline does not contain system-question")
 	}
-	if !utils.MatchAllOfSubString(tl, `Regenerating parameters for tool: sleep`) {
-		t.Fatal("timeline does not contain Regenerating parameters for tool: sleep")
+	if !utils.MatchAllOfSubString(tl, `tool_call_review`, `The review rejected the parameters for tool "sleep"`) {
+		t.Fatal("timeline does not contain the rejected proposal and review feedback for sleep")
 	}
 	fmt.Println("--------------------------------------")
 }
@@ -333,9 +319,9 @@ func TestReAct_ToolUse_EmitFinalInvokeParams(t *testing.T) {
 				return rsp, nil
 			}
 
-			if isToolParamGenerationPrompt(prompt, toolName) {
+			if isForcedToolCallPrompt(prompt, toolName) {
 				rsp := i.NewAIResponse()
-				rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "call-tool", "params": { "input" : "` + expectedInput + `" }}`))
+				rsp.EmitOutputStream(bytes.NewBufferString(fmt.Sprintf(`{"@action":"directly_call_tool","directly_call_tool_name":%q,"directly_call_tool_params":{"input":%q}}`, toolName, expectedInput)))
 				rsp.Close()
 				return rsp, nil
 			}

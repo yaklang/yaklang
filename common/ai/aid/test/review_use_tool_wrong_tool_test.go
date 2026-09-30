@@ -79,14 +79,12 @@ func TestCoordinator_ToolUseReview_WrongTool_SuggestionTools(t *testing.T) {
 				return rsp, nil
 			}
 
-			// After review switches tool, param-gen may still be triggered
-			// by the old ExecuteToolRequiredAndCall path in the review system.
-			if isToolParamGenerationPrompt(prompt, toolName1) || isToolParamGenerationPrompt(prompt, toolName2) {
+			if isForcedToolCallPrompt(prompt, toolName1) || isForcedToolCallPrompt(prompt, toolName2) {
 				rsp := i.NewAIResponse()
-				if isToolParamGenerationPrompt(prompt, toolName1) {
-					rsp.EmitOutputStream(bytes.NewBufferString(fmt.Sprintf(`{"@action": "call-tool", "tool": %q, "params": {"path": "."}}`, toolName1)))
+				if isForcedToolCallPrompt(prompt, toolName1) {
+					rsp.EmitOutputStream(bytes.NewBufferString(fmt.Sprintf(`{"@action":"directly_call_tool","directly_call_tool_name":%q,"directly_call_tool_params":{"path":"."}}`, toolName1)))
 				} else {
-					rsp.EmitOutputStream(bytes.NewBufferString(fmt.Sprintf(`{"@action": "call-tool", "tool": %q, "params": {}}`, toolName2)))
+					rsp.EmitOutputStream(bytes.NewBufferString(fmt.Sprintf(`{"@action":"directly_call_tool","directly_call_tool_name":%q,"directly_call_tool_params":{}}`, toolName2)))
 				}
 				rsp.Close()
 				return rsp, nil
