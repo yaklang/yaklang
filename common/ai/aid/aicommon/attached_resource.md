@@ -12,6 +12,7 @@ Attached Resource 用于把前端或上层任务传入的附加材料转成 ReAc
 - `attached_resource_format.go`：跨资源共享的格式化 helper。
 - `attached_resource_builtin.go`：轻量内置资源实现，包括 `default`、`file/file_path`、`knowledge_base`。
 - `attached_resource_http_flow.go`：`http_flow_id` 资源实现。
+- `attached_resource_risk.go`：`risk_id` 资源实现（现有 risk 的单个 ID，交给专注模式在 init 中加载）。
 - `attached_resource_http_fuzz_request.go`：`http_fuzz_request` 资源实现。
 - `attached_resource_selected.go`：`selected` 资源实现。
 - `attached_resource_code.go`：`code` 资源实现（可写入的脚本交付目标，与 `file` 参考附加分离）。
@@ -61,6 +62,7 @@ type AttachedResourceData interface {
   - `ToAttachData` 返回空，避免混入 `attached_file`；由 `write_yaklang_code` 写入 `yaklang_editor_context` 并走 `yaklang_code_change`。
   - 旧客户端若仍把打开的 `.yak` 放在 `Type=file Key=file_path`，后端仅在无 `Type=code` 时做兼容回退。
 - `knowledge_base`：解析为 `AttachedKnowledgeBaseResourceData`，但 `ToAttachData` 返回空，不 dump 内容。default loop 只根据返回的资源列表判断是否需要启动 knowledge enhance loop，具体查询仍由 knowledge enhance 内部处理。
+- `risk_id`：`Type=risk_id, Key=id, Value="123"`（也接受 `123` / `{"id":123}`）解析为单个正整数 risk ID；风险补全专注模式在 init 中据此读取项目 risk、固定 runtime/session 范围。不把 risk ID 放进模型 action 参数。
 
 ## 新增资源步骤
 

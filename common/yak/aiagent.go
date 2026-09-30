@@ -131,10 +131,12 @@ func yakTool2AITool(aitools []*schema.AIYakTool, invokeForgeHandle bool) []*aito
 				}
 
 				var runtimeId string
+				var aiSessionID string
 				var runtimeFeedBacker func(result *ypb.ExecResult) error
 				var riskSaveHandler func(context.Context, *schema.Risk) error
 				if runtimeConfig != nil {
 					runtimeId = runtimeConfig.RuntimeID
+					aiSessionID = runtimeConfig.PersistentSessionID
 					runtimeFeedBacker = runtimeConfig.FeedBacker
 					riskSaveHandler = runtimeConfig.RiskSaveHandler
 				}
@@ -222,10 +224,11 @@ func yakTool2AITool(aitools []*schema.AIYakTool, invokeForgeHandle bool) []*aito
 				})
 
 				executedEngine, err := engine.ExecuteExWithContext(ctx, aiTool.Content, map[string]interface{}{
-					"RUNTIME_ID":   runtimeId,
-					"CTX":          ctx,
-					"PLUGIN_NAME":  aiTool.Name + ".yak",
-					"YAK_FILENAME": aiTool.Name + ".yak",
+					"RUNTIME_ID":    runtimeId,
+					"AI_SESSION_ID": aiSessionID,
+					"CTX":           ctx,
+					"PLUGIN_NAME":   aiTool.Name + ".yak",
+					"YAK_FILENAME":  aiTool.Name + ".yak",
 				})
 				if err != nil {
 					log.Errorf("execute ex with context failed: %v", err)

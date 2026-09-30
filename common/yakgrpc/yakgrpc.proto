@@ -5441,6 +5441,9 @@ message Risk {
 
   // 关联的请求/响应报文对列表
   repeated PacketPair PacketPairs = 34;
+
+  // Persistent AI conversation that produced this risk (may span runtimes).
+  string AISessionID = 35;
 }
 
 message QueryRisksRequest {
@@ -7370,6 +7373,12 @@ message QueryHTTPFlowRequest {
   // 显式跳过精确 Total；用于已有游标的实时增量查询。
   // Data/Pagination 仍正常返回，但 Total 为 0。初始化、历史与周期校准不得开启。
   bool SkipTotal = 55;
+  // 按字面量查询报文字段。同一字段内多个值 OR，不同字段之间 AND。
+  repeated string RequestContains = 56;
+  repeated string ResponseContains = 57;
+  // HTTPFlow 创建时间范围，Unix 秒，边界包含。
+  int64 AfterCreatedAt = 58;
+  int64 BeforeCreatedAt = 59;
 }
 
 message HTTPFlowsToOnlineRequest {

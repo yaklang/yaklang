@@ -3,9 +3,9 @@ package schema
 import (
 	"testing"
 
-	"github.com/yaklang/gorm"
 	_ "github.com/mattn/go-sqlite3"
 	"github.com/stretchr/testify/require"
+	"github.com/yaklang/gorm"
 )
 
 // Test that PacketPairs (httpflow_id + url + request/response snapshot) is persisted to and loaded from the database.
@@ -48,4 +48,17 @@ func TestRiskPacketPairsPersisted(t *testing.T) {
 	require.Equal(t, "http://example.com/b", got.PacketPairs[1].Url)
 	require.Equal(t, "GET /b HTTP/1.1\r\nHost: example.com\r\n\r\n", got.PacketPairs[1].Request)
 	require.Equal(t, "HTTP/1.1 201 Created\r\n\r\nb", got.PacketPairs[1].Response)
+}
+
+func TestRiskAISessionIDPersistedAndExposed(t *testing.T) {
+	db, err := gorm.Open("sqlite3", ":memory:")
+	require.NoError(t, err)
+	defer db.Close()
+	require.NoError(t, db.AutoMigrate(&Risk{}).Error)
+	r := &Risk{Hash: "ai-session-risk", AISessionID: "session-a"}
+	require.NoError(t, db.Create(r).Error)
+	var got Risk
+	require.NoError(t, db.First(&got, r.ID).Error)
+	require.Equal(t, "session-a", got.AISessionID)
+	require.Equal(t, "session-a", got.ToGRPCModel().GetAISessionID())
 }
