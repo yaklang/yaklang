@@ -214,9 +214,11 @@ func ReplaceMemberCall(old, replacement Value) map[string]Value {
 			case member.GetOpcode() == SSAOpcodeBinOp || member.GetOpcode() == SSAOpcodeUnOp:
 				// 保留原始指令供后续替换
 			default:
-				ReplaceAllValue(member, toMember)
-				DeleteInst(member)
-				memberT = toMember
+				if !utils.IsNil(toMember) && member.GetId() != toMember.GetId() {
+					ReplaceAllValue(member, toMember)
+					DeleteInst(member)
+					memberT = toMember
+				}
 			}
 
 			// 递归处理嵌套成员

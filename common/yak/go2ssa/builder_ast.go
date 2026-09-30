@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/google/uuid"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	gol "github.com/yaklang/yaklang/common/yak/antlr4go/parser"
@@ -583,7 +582,7 @@ func (b *astbuilder) AssignList(leftVariables []*ssa.Variable, rightVariables []
 
 	GetCallField := func(c *ssa.Call, lvs []*ssa.Variable) {
 		length := 1
-		c.SetName(uuid.NewString())
+		c.SetName(b.nextGoStableName("call_unpack"))
 		c.Unpack = true
 		if it, ok := ssa.ToObjectType(c.GetType()); c.GetType().GetTypeKind() == ssa.TupleTypeKind && ok {
 			length = it.Len
@@ -2269,6 +2268,9 @@ func (b *astbuilder) buildMethodSpec(stmt *gol.MethodSpecContext, interfacetyp *
 	recoverRange := b.SetRange(&stmt.BaseParserRuleContext)
 	defer recoverRange()
 
+	var params []ssa.Type
+	var result ssa.Type
+
 	funcName := ""
 	if Name := stmt.IDENTIFIER(); Name != nil {
 		funcName = Name.GetText()
@@ -2280,6 +2282,8 @@ func (b *astbuilder) buildMethodSpec(stmt *gol.MethodSpecContext, interfacetyp *
 	MarkedFunctionType := b.GetMarkedFunction()
 	handleFunctionType := func(fun *ssa.Function) {
 		fun.ParamLength = len(fun.Params)
+		fun.SetType(ssa.NewFunctionType("", params, result, false))
+		fun.Type.IsMethod = true
 		if MarkedFunctionType == nil {
 			return
 		}
@@ -2301,8 +2305,21 @@ func (b *astbuilder) buildMethodSpec(stmt *gol.MethodSpecContext, interfacetyp *
 		recoverRange := b.SetRange(&stmt.BaseParserRuleContext)
 		b.FunctionBuilder = b.PushFunction(newFunc)
 
+		receiver := b.NewParam("this")
+		receiver.SetType(interfacetyp)
+		params = append(params, interfacetyp)
+
+		if para := stmt.Parameters(); para != nil {
+			params = append(params, b.buildParameters(para.(*gol.ParametersContext))...)
+		}
+		// Interface method specs may omit parameter names (e.g. Set(int)).
+		// Create synthetic params so Function.Finish keeps the declared arity/types.
+		for i := len(b.Function.Params); i < len(params); i++ {
+			p := b.NewParam(fmt.Sprintf("arg%d", i))
+			p.SetType(params[i])
+		}
 		if para, ok := stmt.Result().(*gol.ResultContext); ok {
-			b.buildResult(para)
+			result = b.buildResult(para)
 		}
 
 		handleFunctionType(b.Function)

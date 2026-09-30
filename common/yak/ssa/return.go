@@ -6,6 +6,31 @@ import (
 	"golang.org/x/exp/slices"
 )
 
+func normalizeReturnedMemberEffect(value Value) (Value, SideEffectKind) {
+	if value == nil {
+		return nil, NormalSideEffect
+	}
+	current := value
+	for {
+		se, ok := ToSideEffect(current)
+		if !ok {
+			break
+		}
+		next, ok := se.GetValueById(se.Value)
+		if !ok || next == nil {
+			break
+		}
+		current = next
+	}
+	if _, ok := ToParameter(current); ok {
+		return current, PointerSideEffect
+	}
+	if _, ok := ToParameterMember(current); ok {
+		return current, PointerSideEffect
+	}
+	return value, NormalSideEffect
+}
+
 func (r *Return) calcType() Type {
 	handleType := func(v Value) Type {
 		if v == nil {
@@ -188,12 +213,16 @@ func handlerReturnType(rs []*Return, functionType *FunctionType) Type {
 						if variable == nil {
 							continue
 						}
+						modify, kind := normalizeReturnedMemberEffect(value)
+						if modify == nil {
+							continue
+						}
 						functionType.SideEffects = append(functionType.SideEffects, &FunctionSideEffect{
 							Name:        variable.GetName(),
 							VerboseName: getMemberVerboseName(result, key),
 							Variable:    variable,
-							Modify:      value.GetId(),
-							Kind:        NormalSideEffect,
+							Modify:      modify.GetId(),
+							Kind:        kind,
 							parameterMemberInner: &parameterMemberInner{
 								MemberCallKind: CallMemberCall,
 								MemberCallKey:  key.GetId(),
@@ -341,6 +370,72 @@ func (f *Function) Finish() {
 		}
 
 		ses = append(ses, se)
+	}
+
+	seenReturnMembers := make(map[string]struct{})
+	for _, se := range ses {
+		if se == nil {
+			continue
+		}
+		seenReturnMembers[se.VerboseName] = struct{}{}
+	}
+	for _, retID := range f.Return {
+		retInst, ok := f.GetValueById(retID)
+		if !ok || retInst == nil {
+			continue
+		}
+		retVal, ok := ToReturn(retInst)
+		if !ok || retVal == nil {
+			continue
+		}
+		for _, resultID := range retVal.Results {
+			result, ok := f.GetValueById(resultID)
+			if !ok || result == nil || utils.IsNil(result.GetType()) {
+				continue
+			}
+			if result.GetType().GetTypeKind() != ClassBluePrintTypeKind {
+				continue
+			}
+			for key, value := range result.GetAllMember() {
+				if value == nil {
+					continue
+				}
+				verbose := getMemberVerboseName(result, key)
+				if _, exists := seenReturnMembers[verbose]; exists {
+					continue
+				}
+				variable := value.GetLastVariable()
+				if variable == nil {
+					continue
+				}
+				modify, kind := normalizeReturnedMemberEffect(value)
+				if modify == nil {
+					continue
+				}
+				// 自反成员别名（成员当前值又解析回该成员本身，如 this.State =>
+				// this.State）不携带任何调用方可用的写入信息，却会在调用点被当成
+				// “构造过程写了这个成员”，覆盖构造函数里真实的嵌套成员写入
+				// （C# nested receiver 回归），因此不再为它补记录。
+				// 注意：形参别名（this.A = a 且 a 来自调用方）必须保留。
+				if paramMember, ok := ToParameterMember(modify); ok {
+					if name := paramMember.GetVerboseName(); name != "" && name == verbose {
+						continue
+					}
+				}
+				ses = append(ses, &FunctionSideEffect{
+					Name:        variable.GetName(),
+					VerboseName: verbose,
+					Variable:    variable,
+					Modify:      modify.GetId(),
+					Kind:        kind,
+					parameterMemberInner: &parameterMemberInner{
+						MemberCallKind: CallMemberCall,
+						MemberCallKey:  key.GetId(),
+					},
+				})
+				seenReturnMembers[verbose] = struct{}{}
+			}
+		}
 	}
 	funType.SetSideEffect(ses)
 	f.SetType(funType)

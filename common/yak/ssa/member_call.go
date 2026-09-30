@@ -12,10 +12,39 @@ func (b *FunctionBuilder) getFieldValue(object, key Value, wantFunction bool) Va
 	if ret := b.PeekValueInThisFunction(res.name); ret != nil {
 		return ret
 	}
+	if !isStaticBlueprintMemberAccess(object, key) {
+		if members := GetMembersByKey(object, key); len(members) > 0 {
+			if wantFunction {
+				for _, member := range members {
+					if utils.IsNil(member) {
+						continue
+					}
+					if typ := member.GetType(); typ != nil && typ.GetTypeKind() == FunctionTypeKind {
+						return member
+					}
+				}
+			} else if !utils.IsNil(members[0]) {
+				return members[0]
+			}
+		}
+	}
 
 	// default member
 	value := b.createDefaultMember(res, object, key, wantFunction)
 	return value
+}
+
+// isStaticBlueprintMemberAccess reports whether object/key denote a class static
+// member access such as A.value, where static/phi resolution must stay in charge.
+func isStaticBlueprintMemberAccess(object, key Value) bool {
+	if utils.IsNil(object) || utils.IsNil(key) {
+		return false
+	}
+	blueprint, ok := ToBluePrintType(object.GetType())
+	if !ok {
+		return false
+	}
+	return isBlueprintStaticAccessValue(object, blueprint)
 }
 
 func (b *FunctionBuilder) getStaticFieldValue(object, key Value, wantFunction bool) Value {

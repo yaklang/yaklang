@@ -3,7 +3,6 @@ package tests
 import (
 	"testing"
 
-	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/utils/filesys"
 
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
@@ -259,8 +258,7 @@ class A {
 	})
 
 	t.Run("static method read and set member ", func(t *testing.T) {
-		t.Skip()
-		//TODO: wait for oop refractor
+		t.Skip("TODO(wait fix/ssa/field/sensetive): static member topdefs still include class/member noise")
 		code := `
 package foo.bar;
 class A {
@@ -290,8 +288,7 @@ class A {
 }
 
 func Test_Cross_Class_Side_Effect(t *testing.T) {
-	t.Skip()
-	//TODO:类成员的side-effect要有传递性
+	t.Skip("TODO(wait fix/ssa/field/sensetive): cross-class member side effects still depend on field-sensitive topdefs")
 	t.Run("aaa", func(t *testing.T) {
 		vf := filesys.NewVirtualFs()
 		vf.AddFile("a.java", `
@@ -334,17 +331,122 @@ class B {
 	}
 }
 `)
-		ssatest.CheckWithFS(vf, t, func(programs ssaapi.Programs) error {
-			prog := programs[0]
-			prog.Show()
-			ret, err := prog.SyntaxFlowWithError(`println(* #-> as $a);`)
-			require.NoError(t, err)
-			a := ret.GetValues("a")
-			a.Show()
-			require.Contains(t, a.String(), "22")
-			require.Contains(t, a.String(), "33")
-			return nil
-		})
+		ssatest.CheckSyntaxFlowWithFS(t, vf, `println(* #-> as $a);`, map[string][]string{
+			"a": {"22", "33"},
+		}, false, ssaapi.WithLanguage(ssaconfig.JAVA))
+	})
+}
+
+func TestMethodOverloadDispatchSideEffect(t *testing.T) {
+	check := func(t *testing.T, invoke string, expect string) {
+		code := `
+class A {
+	int value;
+	void set(int num) {
+		this.value = num;
+	}
+	void set(String num) {
+		this.value = 99;
+	}
+	int get() {
+		return this.value;
+	}
+}
+class Main {
+	void main() {
+		A a = new A();
+		` + invoke + `
+		print(a.get());
+	}
+}
+`
+		ssatest.CheckSyntaxFlow(t, code,
+			`print(* #-> * as $target)`,
+			map[string][]string{
+				"target": {expect},
+			},
+			ssaapi.WithLanguage(ssaconfig.JAVA),
+		)
+	}
+
+	t.Run("prefer int overload", func(t *testing.T) {
+		check(t, `a.set(12);`, "12")
+	})
+
+	t.Run("prefer string overload", func(t *testing.T) {
+		check(t, `a.set("hello");`, "99")
+	})
+}
+
+func TestMethodOverloadDispatchComplex(t *testing.T) {
+	t.Run("dispatch by arity then by type", func(t *testing.T) {
+		code := `
+class A {
+	int value;
+	void set(int num) {
+		this.value = 11;
+	}
+	void set(int left, int right) {
+		this.value = 22;
+	}
+	void set(String raw) {
+		this.value = 33;
+	}
+	int get() {
+		return this.value;
+	}
+}
+class Main {
+	void main() {
+		A a = new A();
+		a.set(1, 2);
+		print(a.get());
+		a.set(10);
+		print(a.get());
+		a.set("yak");
+		print(a.get());
+	}
+}
+`
+		ssatest.CheckSyntaxFlow(t, code,
+			`print(* #-> * as $target)`,
+			map[string][]string{
+				"target": {"11", "22", "33"},
+			},
+			ssaapi.WithLanguage(ssaconfig.JAVA),
+		)
+	})
+
+	t.Run("constructor overload keeps separated state", func(t *testing.T) {
+		code := `
+class Box {
+	int value;
+	Box(int num) {
+		this.value = 44;
+	}
+	Box(String text) {
+		this.value = 55;
+	}
+	int get() {
+		return this.value;
+	}
+}
+class Main {
+	void main() {
+		Box n = new Box(1);
+		Box s = new Box("x");
+		print(n.get());
+		print(s.get());
+	}
+}
+`
+		ssatest.CheckSyntaxFlow(t, code,
+			`print(* #-> * as $target)`,
+			map[string][]string{
+				"target": {"44", "55"},
+			},
+			ssaapi.WithLanguage(ssaconfig.JAVA),
+		)
 	})
 }
 

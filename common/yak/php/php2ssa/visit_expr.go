@@ -371,7 +371,7 @@ func (y *builder) VisitExpression(raw phpparser.IExpressionContext) (v ssa.Value
 		}).Build()
 		return y.ReadValue(variableName)
 	case *phpparser.NullCoalescingExpressionContext:
-		name := uuid.NewString()
+		name := y.nextPHPStableName("null_coalescing")
 		variable := y.CreateVariable(name)
 		y.AssignVariable(variable, y.VisitExpression(ret.Expression(0)))
 		y.CreateIfBuilder().SetCondition(func() ssa.Value {
@@ -422,8 +422,27 @@ func (y *builder) VisitExpression(raw phpparser.IExpressionContext) (v ssa.Value
 		y.AssignVariable(variable, rightValue)
 		return rightValue
 	case *phpparser.ReferenceAssignmentExpressionContext:
-		variable := y.VisitAssignableChainLeft(ret.AssignableChain())
 		rightValue := y.VisitExpression(ret.Expression())
+		// Try to extract simple variable name from AssignableChain for reference-alias tracking
+		if chain, ok := ret.AssignableChain().(*phpparser.AssignableChainContext); ok && chain.FlexiVariable() != nil {
+			if leftName, hasLeft := y.getSimpleFlexiVariableRawName(chain.FlexiVariable()); hasLeft {
+				if rhsExpr, ok := ret.Expression().(*phpparser.VariableExpressionContext); ok {
+					if rightName, hasRight := y.getSimpleFlexiVariableRawName(rhsExpr.FlexiVariable()); hasRight {
+						y.bindReferenceAlias(leftName, rightName)
+					}
+				} else {
+					y.clearReferenceAlias(leftName)
+				}
+				target := y.resolveReferenceAlias(leftName)
+				variable := y.CreateVariable(target)
+				if rhsCurrent := y.ReadValue(target); !utils.IsNil(rhsCurrent) {
+					rightValue = rhsCurrent
+				}
+				y.AssignVariable(variable, rightValue)
+				return rightValue
+			}
+		}
+		variable := y.VisitAssignableChainLeft(ret.AssignableChain())
 		y.AssignVariable(variable, rightValue)
 		y.syncStaticClassMemberAssignment(ret.AssignableChain(), rightValue)
 		return rightValue
@@ -436,7 +455,7 @@ func (y *builder) VisitExpression(raw phpparser.IExpressionContext) (v ssa.Value
 		return rightValue
 
 	case *phpparser.LogicalExpressionContext:
-		id := uuid.NewString()
+		id := y.nextPHPStableName("logical")
 		y.AssignVariable(y.CreateVariable(id), y.EmitValueOnlyDeclare(id))
 		if ret.LogicalXor() != nil {
 			v1 := y.VisitExpression(ret.Expression(0))
@@ -1857,6 +1876,33 @@ func (y *builder) VisitRightValue(raw phpparser.IFlexiVariableContext) ssa.Value
 	}
 }
 
+func (y *builder) getSimpleFlexiVariableRawName(raw phpparser.IFlexiVariableContext) (string, bool) {
+	if y == nil || raw == nil {
+		return "", false
+	}
+	custom, ok := raw.(*phpparser.CustomVariableContext)
+	if !ok || custom.Variable() == nil {
+		return "", false
+	}
+	name := y.VisitVariableRaw(custom.Variable())
+	if name == "" {
+		return "", false
+	}
+	return name, true
+}
+
+func (y *builder) VisitVariableRaw(raw phpparser.IVariableContext) string {
+	if y == nil || raw == nil {
+		return ""
+	}
+	switch ret := raw.(type) {
+	case *phpparser.NormalVariableContext:
+		return ret.VarName().GetText()
+	default:
+		return y.VisitVariable(raw)
+	}
+}
+
 func (y *builder) VisitVariable(raw phpparser.IVariableContext) string {
 	if y == nil || raw == nil || y.IsStop() {
 		return ""
@@ -1865,7 +1911,7 @@ func (y *builder) VisitVariable(raw phpparser.IVariableContext) string {
 	defer recoverRange()
 	switch ret := raw.(type) {
 	case *phpparser.NormalVariableContext:
-		return ret.VarName().GetText()
+		return y.resolveReferenceAlias(ret.VarName().GetText())
 
 	case *phpparser.DynamicVariableContext:
 		id := ret.VarName().GetText()
