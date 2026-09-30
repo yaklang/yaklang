@@ -27,12 +27,32 @@ import (
 // Example:
 // ```
 // risk.NewRisk("http://example.com",
-//     risk.title("SQL Injection"),
-//     risk.type("sqli"),
-//     risk.severity("high"),
+//
+//	risk.title("SQL Injection"),
+//	risk.type("sqli"),
+//	risk.severity("high"),
+//
 // )
 // // 写入后可用 risk.YieldRiskByTarget 等查询（示意性示例）
 // ```
+// yakitClientForOutput returns the client captured when the export was built,
+// or the process-wide client if that capture is still nil. RiskExports is
+// initialized before AutoInitYakit runs, and the AOT runtime skips that init,
+// so the captured client is nil unless something installs one later.
+func yakitClientForOutput(client *YakitClient) *YakitClient {
+	if client != nil {
+		return client
+	}
+	return GetYakitClientInstance()
+}
+
+func outputRiskToYakit(client *YakitClient, risk *schema.Risk) {
+	if client = yakitClientForOutput(client); client == nil {
+		return
+	}
+	client.Output(risk)
+}
+
 func YakitNewRiskBuilder(client *YakitClient) func(target string, opts ...yakit.RiskParamsOpt) {
 	return func(target string, opts ...yakit.RiskParamsOpt) {
 		risk, _ := yakit.NewRisk(target, opts...)
@@ -59,7 +79,7 @@ func YakitNewRiskBuilder(client *YakitClient) func(target string, opts ...yakit.
 `, title, risk.IP))
 			}
 		}
-		client.Output(risk)
+		outputRiskToYakit(client, risk)
 	}
 }
 
@@ -106,7 +126,7 @@ func YakitSaveRiskBuilder(client *YakitClient) func(r *schema.Risk) error {
 `, title, risk.IP))
 			}
 		}
-		client.Output(risk)
+		outputRiskToYakit(client, risk)
 		return nil
 	}
 }
