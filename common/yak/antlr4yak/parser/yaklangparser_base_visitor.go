@@ -343,3 +343,15 @@ func (v *BaseYaklangParserVisitor) VisitWs(ctx *WsContext) interface{} {
 func (v *BaseYaklangParserVisitor) VisitEos(ctx *EosContext) interface{} {
 	return v.VisitChildren(ctx)
 }
+
+func (v *BaseYaklangParserVisitor) VisitSelectStmt(ctx *SelectStmtContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BaseYaklangParserVisitor) VisitSelectClause(ctx *SelectClauseContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BaseYaklangParserVisitor) VisitSelectComm(ctx *SelectCommContext) interface{} {
+	return v.VisitChildren(ctx)
+}

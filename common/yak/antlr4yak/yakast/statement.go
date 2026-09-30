@@ -103,6 +103,10 @@ func (y *YakCompiler) VisitStatement(i *yak.StatementContext) (newLine bool) {
 		y.VisitSwitchStmt(s)
 		return true
 	}
+	if s := i.SelectStmt(); s != nil {
+		y.VisitSelectStmt(s)
+		return true
+	}
 
 	if s := i.ForStmt(); s != nil {
 		y.VisitForStmt(s)

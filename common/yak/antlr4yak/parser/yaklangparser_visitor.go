@@ -259,4 +259,13 @@ type YaklangParserVisitor interface {
 
 	// Visit a parse tree produced by YaklangParser#eos.
 	VisitEos(ctx *EosContext) interface{}
+
+	// Visit a parse tree produced by YaklangParser#selectStmt.
+	VisitSelectStmt(ctx *SelectStmtContext) interface{}
+
+	// Visit a parse tree produced by YaklangParser#selectClause.
+	VisitSelectClause(ctx *SelectClauseContext) interface{}
+
+	// Visit a parse tree produced by YaklangParser#selectComm.
+	VisitSelectComm(ctx *SelectCommContext) interface{}
 }
