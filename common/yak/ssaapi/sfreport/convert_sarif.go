@@ -75,9 +75,6 @@ type SarifReport struct {
 	// driver is run.Tool.Driver, kept for O(1) rule registration.
 	driver   *sarif.ToolComponent
 	ruleByID map[string]struct{}
-	// keeper answers whether the scan kept this risk. A rich result may still
-	// carry an earlier mode's finding; adding it back would undo the cover.
-	keeper func(*schema.SSARisk) (string, bool)
 	// resultByHash remembers where each appended finding sits so a covered
 	// finding is replaced instead of reported twice.
 	resultByHash map[string]int
@@ -199,9 +196,6 @@ func (r *SarifReport) appendResult(result *ssaapi.SyntaxFlowResult) {
 	added := 0
 
 	for risk := range result.YieldRisk() {
-		if !r.keepRisk(risk) {
-			continue
-		}
 		value, err := result.GetValue(risk.Variable, int(risk.Index))
 		if err != nil {
 			log.Errorf("get value from result failed: resultId[%d: %s: %d] %s", result.GetResultID(), risk.Variable, risk.Index, err)
@@ -276,23 +270,6 @@ func (r *SarifReport) currentFlusher() *reportFlusher {
 	return r.flusher
 }
 
-// SetKeeper attaches the scan's decision so a risk the scan dropped is not
-// reported again by its rich result.
-func (r *SarifReport) SetKeeper(fn func(*schema.SSARisk) (string, bool)) {
-	if r == nil {
-		return
-	}
-	r.keeper = fn
-}
-
-func (r *SarifReport) keepRisk(risk *schema.SSARisk) bool {
-	if r == nil || risk == nil || r.keeper == nil {
-		return true
-	}
-	_, kept := r.keeper(risk)
-	return kept
-}
-
 // rememberResult records the slot of a finding keyed by its feature hash (its
 // SARIF fingerprint) so a later scan mode replaces it.
 func (r *SarifReport) rememberResult(risk *schema.SSARisk, res *sarif.Result) {
@@ -312,16 +289,68 @@ func (r *SarifReport) rememberResult(risk *schema.SSARisk, res *sarif.Result) {
 	r.resultByHash[key] = len(r.run.Results)
 }
 
-// ApplyRiskUpdate applies one decision of the scan. A finding that moves to a
-// later mode drops its earlier SARIF result here; the rich result of the new
-// mode appends its own entry, so the document keeps one alert per finding.
-// A created finding needs no work: its rich result adds the full entry.
+// ApplyRiskUpdate creates or replaces one alert. The scan already filtered the
+// finding. OldHash empty adds the alert; any other OldHash drops the alert it
+// names and adds the new one, so the document keeps one alert per finding.
 func (r *SarifReport) ApplyRiskUpdate(item schema.RiskUpdateItem) error {
-	if r == nil || item.Risk == nil || item.OldHash == "" {
+	if r == nil || item.Risk == nil {
 		return nil
 	}
-	r.removeResultByFeatureHash(item.Risk.RiskFeatureHash)
+	if item.OldHash != "" {
+		feature := strings.TrimSpace(item.Risk.RiskFeatureHash)
+		if feature == "" {
+			feature = strings.TrimSpace(item.OldHash)
+		}
+		r.removeResultByFeatureHash(feature)
+	}
+	r.appendRisk(item.Risk)
 	return nil
+}
+
+// appendRisk adds one alert from the risk itself. The scan does not hand over
+// the syntaxflow result, so there is no value to walk for a code flow.
+func (r *SarifReport) appendRisk(risk *schema.SSARisk) {
+	if r == nil || risk == nil || r.run == nil {
+		return
+	}
+	ruleName := riskRuleName(risk)
+	rule := &schema.SyntaxFlowRule{
+		RuleName:    ruleName,
+		Title:       risk.Title,
+		Severity:    risk.Severity,
+		Description: risk.Description,
+		Solution:    risk.Solution,
+	}
+	ruleID := sarifRuleID(rule)
+	res := sarif.NewRuleResult(ruleID).
+		WithMessage(sarif.NewTextMessage(sarifRiskMessage(risk))).
+		WithLevel(ToSarifLevel(risk.Severity)).
+		WithKind(sarifResultKind).
+		WithPartialFingerPrints(sarifFingerprint(risk))
+	if loc := locationFromRisk(risk); loc != nil {
+		res.WithLocations([]*sarif.Location{loc})
+	}
+	r.registerRule(ruleID, rule, risk)
+	r.rememberResult(risk, res)
+	r.run.Results = append(r.run.Results, res)
+	r.noteFlush(1)
+}
+
+// locationFromRisk builds a physical location from the risk's file and line.
+// A risk without either still becomes an alert; it just has no region.
+func locationFromRisk(risk *schema.SSARisk) *sarif.Location {
+	if risk == nil {
+		return nil
+	}
+	uri := strings.TrimSpace(risk.CodeSourceUrl)
+	if uri == "" || risk.Line <= 0 {
+		return nil
+	}
+	return sarif.NewLocation().WithPhysicalLocation(
+		sarif.NewPhysicalLocation().
+			WithArtifactLocation(sarif.NewArtifactLocation().WithUri(uri)).
+			WithRegion(sarif.NewRegion().WithStartLine(int(risk.Line))),
+	)
 }
 
 // removeResultByFeatureHash drops the alert of a covered finding, keyed by the
@@ -344,6 +373,7 @@ func (r *SarifReport) removeResultByFeatureHash(feature string) {
 		out = append(out, res)
 	}
 	r.run.Results = out
+	delete(r.resultByHash, feature)
 }
 
 // registerRule appends the result rule to the driver once per rule ID.

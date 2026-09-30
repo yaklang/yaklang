@@ -20,9 +20,12 @@ import (
 )
 
 // CompileProject optionally overrides how a project scan compiles its source.
-// It exists for tests and for callers that need a different compile pipeline;
-// production scans call CompileProjectDefault when it is nil. Nothing needs to
-// register it.
+//
+// ssa_compile registers the production compiler in its init. That compiler
+// calls ParseProjectWithConfig, which auto-detects the project. syntaxflow_scan
+// cannot import ssa_compile (the import cycle runs the other way), so the
+// registration is the link. Tests may replace it. When it is nil, this package
+// was built without ssa_compile and falls back to CompileProjectDefault.
 var CompileProject func(ctx context.Context, cfg *ssaconfig.Config, extra ...ssaconfig.Option) (*ssaapi.Program, error)
 
 // CollectCodeSourceDir clones or opens the project tree without compiling SSA.
@@ -91,14 +94,13 @@ func ScanProject(ctx context.Context, opts ...ssaconfig.Option) (result ProjectR
 
 	recorder := newStageOutcomeRecorder()
 	report := func(stage ProductStage, err error) { recorder.record(stage, err) }
-	// One runtime for the whole project scan: the source, struct and SSA
-	// stages submit their findings to the same collect so a later mode
-	// replaces an earlier one, and the report saver is registered once.
+	// One runtime for the whole project scan. This call created it, or the
+	// caller supplied it; either way the report is registered here, once.
+	// Nested stage scans share the runtime and do not register again.
 	rt := ensureScanRuntime(cfg)
-	// The database consumer is registered once for the whole scan. Nested
-	// stage scans share this runtime, so their own bind returns early.
-	if persistResults && rt != nil {
-		if saver := bindDBSaver(rt, schema.SFResultKindScan, rt.ID, cfg.IsNoSaveRisk()); saver != nil {
+	registerReport(rt, cfg.Reporter)
+	if persistResults && rt != nil && !cfg.IsNoSaveRisk() {
+		if saver := attachDBSaver(rt, schema.SFResultKindScan, rt.ID, false); saver != nil {
 			defer func() {
 				if err := saver.Close(); err != nil {
 					log.Errorf("flush risk batch failed: %v", err)
@@ -617,12 +619,8 @@ func emitStructResults(cfg *Config, prog *ssaapi.Program) {
 		if res == nil {
 			continue
 		}
-		// Struct rules run inside compile, not StartScan, so they never reach
-		// notifyResult. Fold them into the shared report here; source and SSA
-		// results are added by the stage scan that owns the same reporter.
-		if cfg.Reporter != nil {
-			cfg.Reporter.AddSyntaxFlowResult(res)
-		}
+		// Struct rules run inside compile. Their risks already went to the scan
+		// callback. This only keeps the stage metrics.
 		cfg.resultCallback(&ScanResult{Status: "executing", Result: res})
 	}
 }
@@ -786,16 +784,14 @@ func compileProductProject(ctx context.Context, cfg *ssaconfig.Config, extra ...
 	return CompileProjectDefault(ctx, cfg, extra...)
 }
 
-// CompileProjectDefault compiles a project through ssaapi without any
-// registration side effect.
+// CompileProjectDefault compiles a project through ssaapi.ParseProject.
+//
+// It is the fallback when ssa_compile is not linked, so it does not auto-detect
+// the project. The production path is the compiler ssa_compile registers.
 func CompileProjectDefault(ctx context.Context, cfg *ssaconfig.Config, extra ...ssaconfig.Option) (*ssaapi.Program, error) {
 	if cfg == nil {
 		return nil, utils.Errorf("ScanProject: compile config is nil")
 	}
-	// Compile through ssaapi directly: it owns the compile pipeline, so this
-	// package no longer depends on a registration side effect that ssa_compile
-	// performs (ssa_compile -> yakscript -> yak -> this package makes the
-	// reverse import impossible).
 	raw, err := cfg.ToJSONString()
 	if err != nil {
 		return nil, utils.Wrapf(err, "ScanProject: serialize compile config failed")
@@ -870,10 +866,13 @@ func loadNamedPrograms(cfg *Config) error {
 
 func structCompileOptions(cfg *Config) []ssaconfig.Option {
 	var opts []ssaconfig.Option
-	// Compile-time struct rules submit their findings to the same scan runtime
-	// as the source and SSA stages.
+	// Compile-time struct rules hand each risk to the scan. The compile does
+	// not receive the runtime; the callback submits into its collect.
 	if cfg != nil && cfg.scanRuntime != nil {
-		opts = append(opts, ssaapi.WithScanRuntime(cfg.scanRuntime))
+		rt := cfg.scanRuntime
+		opts = append(opts, ssaapi.WithOnRisk(func(risk *schema.SSARisk) {
+			rt.SubmitRisk(risk)
+		}))
 	}
 	// Struct rules use the same final SyntaxFlow result-save guard as SSA rules.
 	if cfg != nil && cfg.IsNoSaveRisk() {

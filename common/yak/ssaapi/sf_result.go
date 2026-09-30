@@ -24,11 +24,14 @@ type SyntaxFlowResult struct {
 	saveKind ssaconfig.SFResultSaveKind
 	TaskID   string
 	// resultUUID identifies this result even when it is never persisted. Risks
-	// carry it so the scan can tell two in-memory results apart.
+	// carry it so the scan can tell two in-memory results apart. ResultID
+	// stays the database row id and is 0 until that row exists.
 	resultUUID string
-	// scanRuntime is the control point of the scan this result belongs to.
-	// When set, risks are submitted to it instead of being written here.
-	scanRuntime *ScanRuntime
+	// onRisk receives each risk this result builds. When it is set the result
+	// does not write the risk row itself.
+	onRisk func(*schema.SSARisk)
+	// dbKind is the syntaxflow result kind used when this result is persisted.
+	dbKind schema.SyntaxflowResultKind
 	// result
 	memResult *sfvm.SFFrameResult
 	dbResult  *ssadb.AuditResult

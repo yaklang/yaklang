@@ -54,8 +54,8 @@ func (p *Program) queryProgramStructRule(base *queryConfig, rule *schema.SyntaxF
 				QueryWithTaskID(base.taskID),
 				QueryWithSSAConfig(base.Config),
 			)
-			if base.scanRuntime != nil {
-				unitOpts = append(unitOpts, QueryWithScanRuntime(base.scanRuntime))
+			if base.onRisk != nil {
+				unitOpts = append(unitOpts, QueryWithOnRisk(base.onRisk))
 			}
 			for _, opt := range base.opts {
 				unitOpts = append(unitOpts, QueryWithSFOption(opt))
@@ -82,24 +82,28 @@ func (p *Program) queryProgramStructRule(base *queryConfig, rule *schema.SyntaxF
 	merged.rule = rule
 	if base != nil {
 		merged.TaskID = base.taskID
-		merged.scanRuntime = base.scanRuntime
+		merged.onRisk = base.onRisk
+		merged.dbKind = base.kind
+		merged.Config = base.Config
 	}
 	return merged, nil
 }
 
 // finalizeProgramRuleResult publishes a merged result the way a normal query
-// would: a scan runtime owns the risk decision and the consumers, and a result
-// outside a scan keeps its risks in memory only. The result is emitted before
-// its risks are built so a database consumer writes the row first and the
-// stored risk carries the row id.
+// would. A database result is saved here, which builds its risks. A memory
+// result only builds risks. Either way a registered callback receives each
+// risk and the result does not write the risk row itself.
 func finalizeProgramRuleResult(res *SyntaxFlowResult) error {
 	if res == nil {
 		return nil
 	}
-	if res.scanRuntime != nil {
-		if err := res.scanRuntime.EmitResult(res); err != nil {
-			return err
+	if res.GetSyntaxFlowResultKind() == ssaconfig.SFResultSaveDatabase {
+		kind := res.dbKind
+		if kind == "" {
+			kind = schema.SFResultKindScan
 		}
+		_, err := res.Save(kind, res.TaskID)
+		return err
 	}
 	return res.CreateRisk()
 }

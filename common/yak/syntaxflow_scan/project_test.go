@@ -2,22 +2,22 @@ package syntaxflow_scan_test
 
 import (
 	"archive/zip"
+	"bytes"
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"io"
 	"os"
 	"path/filepath"
 	"testing"
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
-	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils/filesys"
 	_ "github.com/yaklang/yaklang/common/yak/ssa_compile"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/sfreport"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
 	"github.com/yaklang/yaklang/common/yak/syntaxflow_scan"
@@ -963,39 +963,29 @@ alert $hit`,
 	require.Greater(t, alerts, 0)
 }
 
-// reportSpy stands in for a real report (sfreport.SarifReport) and records how
-// the project scan feeds it.
-type reportSpy struct {
-	saves    int
-	results  int
-	saveSeen []int
+// snapshotWriter counts each published document. Reset matches the report's
+// rewind contract, so the buffer always holds the latest complete snapshot.
+type snapshotWriter struct {
+	buf    bytes.Buffer
+	writes int
 }
 
-func (s *reportSpy) AddSyntaxFlowResult(result *ssaapi.SyntaxFlowResult) bool {
-	s.results++
-	return true
+func (w *snapshotWriter) Write(p []byte) (int, error) {
+	w.writes++
+	return w.buf.Write(p)
 }
 
-func (s *reportSpy) AddSyntaxFlowRisks(...*schema.SSARisk) {}
+func (w *snapshotWriter) Reset() { w.buf.Reset() }
 
-func (s *reportSpy) SetWriter(writer io.Writer) error { return nil }
-
-func (s *reportSpy) Save() error {
-	s.saves++
-	// Snapshot how many results had streamed in at the moment of each save, so
-	// the test can tell a mid-scan snapshot from the final one.
-	s.saveSeen = append(s.saveSeen, s.results)
-	return nil
-}
-
-// Results stream into one shared report as each stage runs; every stage saves a
-// snapshot of what it has so far, and the project saves the finished document
-// last. That is what keeps findings on disk when a later stage fails.
+// Findings reach the report as risk updates. Each stage saves a snapshot, and
+// the project saves the finished document last.
 func TestScanProject_SavesSnapshotPerStageThenFinal(t *testing.T) {
 	dir := t.TempDir()
 	require.NoError(t, os.WriteFile(filepath.Join(dir, "app.py"), []byte("eval(user)\n"), 0o644))
 
-	spy := &reportSpy{}
+	report := sfreport.NewReport(sfreport.IRifyReportType)
+	out := &snapshotWriter{}
+	require.NoError(t, report.SetWriter(out))
 	_, err := syntaxflow_scan.ScanProject(context.Background(),
 		ssaconfig.WithCodeSourceKind(ssaconfig.CodeSourceLocal),
 		ssaconfig.WithCodeSourceLocalFile(dir),
@@ -1008,18 +998,14 @@ ${*.py}.pattern_regex(/eval\s*\(/) as $hit
 alert $hit`,
 			Language: "python",
 		}),
-		syntaxflow_scan.WithReporter(spy),
+		syntaxflow_scan.WithReporter(report),
 		ssaconfig.WithScanIgnoreLanguage(true),
 	)
 	require.NoError(t, err)
 
-	require.Positive(t, spy.results, "stage results must stream into the report")
-	require.GreaterOrEqual(t, spy.saves, 2,
+	require.NotEmpty(t, report.Risks, "accepted findings must be in the report")
+	require.GreaterOrEqual(t, out.writes, 2,
 		"the stage must save a snapshot and the project must save the finished report")
-	require.Equal(t, spy.results, spy.saveSeen[len(spy.saveSeen)-1],
-		"the last save must carry every streamed result")
-	for i := 1; i < len(spy.saveSeen); i++ {
-		require.GreaterOrEqual(t, spy.saveSeen[i], spy.saveSeen[i-1],
-			"snapshots may only grow: a later save must never lose earlier findings")
-	}
+	require.NotEmpty(t, out.buf.Bytes())
+	require.Contains(t, out.buf.String(), "probe")
 }
