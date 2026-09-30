@@ -543,6 +543,72 @@ func TestRuntimeToStringWord_TaggedPointerIsText(t *testing.T) {
 	}
 }
 
+func TestRuntimeStringToBytes_UTF8AndShadow(t *testing.T) {
+	const text = "你好"
+	if got := runtimeYakBuiltinLen(text); got != 2 {
+		t.Fatalf("len(string) = %d, want 2", got)
+	}
+
+	check := func(name string, raw int64) {
+		t.Helper()
+		out := yak_runtime_string_to_bytes(raw)
+		value, ok := runtimeHandleValue(unsafe.Pointer(uintptr(uint64(out) &^ yakTaggedPointerMask)))
+		if !ok {
+			t.Fatalf("%s: result is not a shadow", name)
+		}
+		if got := runtimeYakBuiltinLen(value); got != 6 {
+			t.Fatalf("%s: len([]byte) = %d, want 6", name, got)
+		}
+		back, ok := tryResolveShadowString(unsafe.Pointer(uintptr(out)))
+		if !ok || back != text {
+			t.Fatalf("%s: string([]byte) = %q ok=%v", name, back, ok)
+		}
+	}
+
+	check("shadow", int64(uintptr(newStdlibShadow(text))))
+	check("tagged", int64(uint64(uintptr(newStdlibShadow(text)))|yakTaggedPointerMask))
+
+	buf := []byte(text)
+	sliceOut := yak_runtime_string_to_bytes(int64(uintptr(newStdlibShadow(buf))))
+	ptrOut := yak_runtime_string_to_bytes(int64(uintptr(newStdlibShadow(&buf))))
+	buf[0] = 'X'
+	for _, item := range []struct {
+		name string
+		out  int64
+	}{
+		{"slice", sliceOut},
+		{"ptr-slice", ptrOut},
+	} {
+		value, ok := runtimeHandleValue(unsafe.Pointer(uintptr(item.out)))
+		if !ok {
+			t.Fatalf("%s: result is not a shadow", item.name)
+		}
+		got, ok := value.(*[]byte)
+		if !ok || len(*got) != 6 || (*got)[0] == 'X' {
+			t.Fatalf("%s aliases the source: %#v", item.name, value)
+		}
+		if runtimeYakBuiltinLen(value) != 6 {
+			t.Fatalf("%s: len([]byte) = %d, want 6", item.name, runtimeYakBuiltinLen(value))
+		}
+	}
+
+	nulRaw := int64(uintptr(newStdlibShadow("a\x00b")))
+	nulOut := yak_runtime_string_to_bytes(nulRaw)
+	nulVal, ok := runtimeHandleValue(unsafe.Pointer(uintptr(nulOut)))
+	if !ok || runtimeYakBuiltinLen(nulVal) != 3 {
+		t.Fatalf("nul bytes len = %d ok=%v", runtimeYakBuiltinLen(nulVal), ok)
+	}
+
+	empty := yak_runtime_string_to_bytes(0)
+	emptyVal, ok := runtimeHandleValue(unsafe.Pointer(uintptr(empty)))
+	if !ok || runtimeYakBuiltinLen(emptyVal) != 0 {
+		t.Fatalf("empty len = %d ok=%v", runtimeYakBuiltinLen(emptyVal), ok)
+	}
+	if back, ok := tryResolveShadowString(unsafe.Pointer(uintptr(empty))); !ok || back != "" {
+		t.Fatalf("string(empty []byte) = %q ok=%v", back, ok)
+	}
+}
+
 func TestRuntimeToCString_PreservesInteriorNUL(t *testing.T) {
 	raw := uintptr(newStdlibShadow("a\x00b"))
 	out := yak_runtime_to_cstring(raw)
