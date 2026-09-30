@@ -116,6 +116,19 @@ func (c *Compiler) getValue(contextInst ssa.Instruction, id int64) (llvm.Value, 
 			return llvm.ConstInt(c.LLVMCtx.Int64Type(), 0, false), nil
 		}
 	}
+	// A variable captured by a closure lives in one heap cell. A later read,
+	// including a side effect the front end attached to an async go, loads
+	// that cell. A loop that does not assign the variable still builds a phi
+	// of the pre-loop word; that phi is not the cell, so the read loads the
+	// cell too. Shared loop variables have no remembered cell and keep the
+	// phi slot.
+	if phi, isPhi := valObj.(*ssa.Phi); isPhi {
+		if ptr := c.capturedCellForPhi(phi); !ptr.IsNil() {
+			return c.Builder.CreateLoad(c.LLVMCtx.Int64Type(), ptr, fmt.Sprintf("yak_cell_%d", id)), nil
+		}
+	} else if ptr := c.capturedCellPointer(valObj); !ptr.IsNil() {
+		return c.Builder.CreateLoad(c.LLVMCtx.Int64Type(), ptr, fmt.Sprintf("yak_cell_%d", id)), nil
+	}
 	if se, ok := valObj.(*ssa.SideEffect); ok {
 		err := c.withLazyCompileInsertPoint(contextInst, se, func() error {
 			return c.compileSideEffectValue(se)
@@ -125,6 +138,16 @@ func (c *Compiler) getValue(contextInst ssa.Instruction, id int64) (llvm.Value, 
 		}
 		if val, ok := c.getCachedValue(contextInst, id); ok {
 			return val, nil
+		}
+		// A by-ref side effect does not snapshot the word. The closure slot
+		// is resolved at this use, so a callback that ran after the call
+		// (and before this read) is visible.
+		if c.function != nil && c.function.redirectedSlots != nil {
+			if src, ok := c.function.redirectedSlots[id]; ok {
+				if ptr, ok := c.redirectedSlotPtr(id, src); ok && !ptr.IsNil() {
+					return c.Builder.CreateLoad(c.LLVMCtx.Int64Type(), ptr, fmt.Sprintf("yak_redir_load_%d", id)), nil
+				}
+			}
 		}
 		return llvm.Value{}, fmt.Errorf("getValue: compileSideEffect succeeded but value %d not cached", id)
 	}
@@ -467,18 +490,38 @@ func (c *Compiler) compileBinOp(inst *ssa.BinOp, resultID int64) error {
 		if floatOp {
 			val = c.emitRuntimeFloatBinop(inst, 3, lhs, rhs, name)
 		} else {
-			val = c.Builder.CreateSDiv(lhs, rhs, name)
+			checked, err := c.emitCheckedIntDiv(inst, lhs, rhs, name, false)
+			if err != nil {
+				return err
+			}
+			val = checked
 		}
 	case ssa.OpMod:
-		val = c.Builder.CreateSRem(lhs, rhs, name)
-	case ssa.OpGt:
-		val = c.Builder.CreateZExt(c.Builder.CreateICmp(llvm.IntSGT, lhs, rhs, name), c.LLVMCtx.Int64Type(), name)
-	case ssa.OpLt:
-		val = c.Builder.CreateZExt(c.Builder.CreateICmp(llvm.IntSLT, lhs, rhs, name), c.LLVMCtx.Int64Type(), name)
-	case ssa.OpGtEq:
-		val = c.Builder.CreateZExt(c.Builder.CreateICmp(llvm.IntSGE, lhs, rhs, name), c.LLVMCtx.Int64Type(), name)
-	case ssa.OpLtEq:
-		val = c.Builder.CreateZExt(c.Builder.CreateICmp(llvm.IntSLE, lhs, rhs, name), c.LLVMCtx.Int64Type(), name)
+		// `"fmt" % args` is sprintf, not integer remainder. A string left
+		// operand (or a []byte) takes that path; numbers stay on checked mod.
+		if c.binOpLeftIsString(inst) {
+			val = c.emitRuntimeSprintf(lhs, rhs, name)
+			break
+		}
+		checked, err := c.emitCheckedIntDiv(inst, lhs, rhs, name, true)
+		if err != nil {
+			return err
+		}
+		val = checked
+	case ssa.OpGt, ssa.OpLt, ssa.OpGtEq, ssa.OpLtEq:
+		// Ordered compares go through the runtime so a float bit pattern
+		// (0.2, or Duration.Seconds()) is not ordered as a signed integer.
+		// Opcodes match yak_runtime_float_binop: 4 >, 5 <, 6 >=, 7 <=.
+		opID := int64(4)
+		switch inst.Op {
+		case ssa.OpLt:
+			opID = 5
+		case ssa.OpGtEq:
+			opID = 6
+		case ssa.OpLtEq:
+			opID = 7
+		}
+		val = c.emitRuntimeFloatBinop(inst, opID, lhs, rhs, name)
 	case ssa.OpEq:
 		spec, err := c.newRuntimeEqDispatchSpec(inst, false)
 		if err != nil {
@@ -605,9 +648,34 @@ func (c *Compiler) compileConst(inst *ssa.ConstInst) error {
 	return c.finishConstValue(inst, id)
 }
 
+// returnedValueNeedsCStringTag reports a returned word that is a raw C string.
+// Shadow strings (concat, sprintf, yaklib) already compare through their
+// handle and must stay untagged so callers can use the address directly.
+func returnedValueNeedsCStringTag(val ssa.Value) bool {
+	ci, ok := val.(*ssa.ConstInst)
+	if !ok || ci == nil || ci.Unary == 'x' {
+		return false
+	}
+	if ci.IsString() {
+		return true
+	}
+	if t := ci.GetType(); t != nil && t.GetTypeKind() == ssa.BytesTypeKind {
+		return true
+	}
+	return false
+}
+
 func (c *Compiler) compileReturn(inst *ssa.Return) error {
 	retVal := llvm.ConstInt(c.LLVMCtx.Int64Type(), 0, false)
-	if len(inst.Results) > 0 {
+	if len(inst.Results) > 1 {
+		// Callers unpack `a, b = f()` by reading member keys "0" and "1".
+		// A single ABI word cannot carry both results.
+		packed, err := c.emitReturnTuple(inst)
+		if err != nil {
+			return err
+		}
+		retVal = packed
+	} else if len(inst.Results) > 0 {
 		val, err := c.getValue(inst, inst.Results[0])
 		if err != nil {
 			return err
@@ -618,12 +686,18 @@ func (c *Compiler) compileReturn(inst *ssa.Return) error {
 		// Materializing at the caller's call site would resolve the captured
 		// variable from the caller's scope, where it does not exist.
 		if fn := inst.GetFunc(); fn != nil {
-			if ssaFn, ok := c.functionValueForArg(fn, inst.Results[0]); ok && ssaFn != nil && !ssaFn.IsExtern() && len(ssaFn.FreeValues) > 0 {
+			if ssaFn, ok := c.functionValueForArg(fn, inst.Results[0]); ok && ssaFn != nil && !ssaFn.IsExtern() && c.closureNeedsFreeValues(ssaFn) {
 				closure, err := c.materializeCallableClosure(inst, ssaFn)
 				if err != nil {
 					return fmt.Errorf("compileReturn: materialize returned closure: %w", err)
 				}
 				retVal = c.coerceToInt64(closure)
+			} else if ssaVal, ok := fn.GetValueById(inst.Results[0]); ok && returnedValueNeedsCStringTag(ssaVal) {
+				// String constants are raw C strings. Equality only GoStrings a
+				// word when bit 62 is set; an untagged return compares as an
+				// address against a tagged literal. OR is idempotent, and bit
+				// 62 sits above the i32 exit code.
+				retVal = c.Builder.CreateOr(retVal, llvm.ConstInt(c.LLVMCtx.Int64Type(), yakTaggedPointerMask, false), "yak_ret_cstr_tag")
 			}
 		}
 	}
@@ -644,7 +718,7 @@ func (c *Compiler) compileReturn(inst *ssa.Return) error {
 	// If this function has a DeferBlock, route all returns through it.
 	currentFunction := c.currentFunction()
 	if currentFunction != nil && currentFunction.DeferBlock > 0 && c.function != nil && !c.function.returnBlock.IsNil() {
-		deferBB, ok := c.Blocks[currentFunction.DeferBlock]
+		deferBB, ok := c.ssaBlockEntry(currentFunction.DeferBlock)
 		if !ok {
 			return fmt.Errorf("compileReturn: defer block %d not found", currentFunction.DeferBlock)
 		}
@@ -654,6 +728,180 @@ func (c *Compiler) compileReturn(inst *ssa.Return) error {
 
 	c.Builder.CreateRetVoid()
 	return nil
+}
+
+// storeClosureCaptureAtDefinition writes a by-ref capture in the block that
+// produces the new value. Exit writeback only stores a modification that
+// dominates the exit, so a branch-local assignment such as
+// `if recover() != nil { ok = false }` never reaches the shared slot.
+// Side-effect instructions are the caller's view of a write the callee
+// already performed; reading one here does not yield a cached word.
+func (c *Compiler) storeClosureCaptureAtDefinition(fn *ssa.Function, inst ssa.Instruction) error {
+	if fn == nil || inst == nil || c == nil || c.function == nil || len(c.function.freeValuePointers) == 0 {
+		return nil
+	}
+	if _, ok := inst.(*ssa.SideEffect); ok {
+		return nil
+	}
+	id := inst.GetId()
+	if id <= 0 {
+		return nil
+	}
+	for _, ser := range fn.SideEffectsReturn {
+		for _, se := range ser {
+			if se == nil || se.Modify != id {
+				continue
+			}
+			if err := c.storeFreeValueSideEffect(fn, se, inst); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+func (c *Compiler) storeFreeValueSideEffect(fn *ssa.Function, se *ssa.FunctionSideEffect, contextInst ssa.Instruction) error {
+	return c.storeFreeValueSideEffectWord(fn, se, contextInst, llvm.Value{})
+}
+
+func (c *Compiler) storeFreeValueSideEffectWord(fn *ssa.Function, se *ssa.FunctionSideEffect, contextInst ssa.Instruction, preset llvm.Value) error {
+	if fn == nil || se == nil || se.Modify <= 0 || c == nil || c.function == nil {
+		return nil
+	}
+	for _, binding := range callframe.OrderedFreeValueBindings(fn) {
+		if se.Variable != nil && binding.Variable != nil {
+			if se.Variable.GetName() != binding.Variable.GetName() {
+				continue
+			}
+		} else if se.Name != binding.Name {
+			continue
+		}
+		if c.freeValueCaptureMode(fn, binding) == freeValueCaptureByValue {
+			continue
+		}
+		ptr, ok := c.function.freeValuePointers[binding.ValueID]
+		if !ok || ptr.IsNil() {
+			continue
+		}
+		// The modify value may be the instruction currently being compiled
+		// (a parameter member materialized from its own read). Re-entering
+		// getValue would recurse; the word is already cached.
+		var modifyVal llvm.Value
+		if !preset.IsNil() {
+			modifyVal = preset
+		} else if contextInst != nil && contextInst.GetId() == se.Modify {
+			cached, ok := c.getCachedValue(contextInst, se.Modify)
+			if !ok || cached.IsNil() {
+				return nil
+			}
+			modifyVal = cached
+		} else {
+			var err error
+			modifyVal, err = c.getValue(contextInst, se.Modify)
+			if err != nil {
+				return err
+			}
+		}
+		c.Builder.CreateStore(c.coerceToInt64(modifyVal), ptr)
+		return nil
+	}
+	return nil
+}
+
+// publishPhiClosureCapture writes a by-ref capture at the phi that merges it.
+// Exit writeback only stores a modify whose block dominates the exit. With
+// several `if { checkN = true }` in one closure, only the last phi shares the
+// exit block, so the earlier cells stay at the value captured on entry. The
+// merged word is stored here, after both incoming edges have filled the phi
+// slot. A path that returns before this block does not reach the store.
+func (c *Compiler) publishPhiClosureCapture(fn *ssa.Function, phi *ssa.Phi) error {
+	if fn == nil || phi == nil || c == nil || c.function == nil || len(c.function.freeValuePointers) == 0 || len(fn.SideEffectsReturn) == 0 {
+		return nil
+	}
+	phiID := phi.GetId()
+	if phiID <= 0 {
+		return nil
+	}
+	matched := make([]*ssa.FunctionSideEffect, 0, 1)
+	seen := make(map[*ssa.FunctionSideEffect]struct{})
+	for _, ser := range fn.SideEffectsReturn {
+		for _, se := range ser {
+			if se == nil || se.Modify <= 0 {
+				continue
+			}
+			if _, ok := seen[se]; ok {
+				continue
+			}
+			if !phiCarriesSideEffect(phi, se.Modify) {
+				continue
+			}
+			seen[se] = struct{}{}
+			matched = append(matched, se)
+		}
+	}
+	if len(matched) == 0 {
+		return nil
+	}
+	block := phi.GetBlock()
+	if block == nil {
+		return nil
+	}
+	phiBB, ok := c.Blocks[block.GetId()]
+	if !ok || phiBB.IsNil() {
+		return nil
+	}
+	// Publishing loads the merged phi at the block start. Restore the builder
+	// afterwards so a later side-effect compile does not emit into this block.
+	savedBB := c.currentInsertBlock()
+	prevActive := int64(0)
+	if c.function != nil {
+		prevActive = c.function.activeBlockID
+	}
+	defer func() {
+		if c.function != nil {
+			c.function.activeBlockID = prevActive
+		}
+		if !savedBB.IsNil() {
+			c.restoreInsertPoint(savedBB)
+		}
+	}()
+	if first := phiBB.FirstInstruction(); first.IsNil() {
+		c.Builder.SetInsertPointAtEnd(phiBB)
+	} else {
+		c.Builder.SetInsertPointBefore(first)
+	}
+	if c.function != nil {
+		c.function.activeBlockID = block.GetId()
+	}
+	word := c.loadSSAValue(phiID)
+	if word.IsNil() {
+		return nil
+	}
+	for _, se := range matched {
+		if err := c.storeFreeValueSideEffectWord(fn, se, nil, word); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// phiCarriesSideEffect reports that the phi is the captured variable's merged
+// value, or that one incoming edge is the branch assignment recorded as the
+// side effect. The edge id is the const or instruction inside the branch; its
+// block does not dominate the function exit.
+func phiCarriesSideEffect(phi *ssa.Phi, modifyID int64) bool {
+	if phi == nil || modifyID <= 0 {
+		return false
+	}
+	if phi.GetId() == modifyID {
+		return true
+	}
+	for _, edge := range phi.Edge {
+		if edge == modifyID {
+			return true
+		}
+	}
+	return false
 }
 
 // applyClosureSideEffectWriteback stores the closure's modified captured
@@ -689,32 +937,53 @@ func (c *Compiler) applyClosureSideEffectWriteback(fn *ssa.Function, contextInst
 			if !c.sideEffectModifyDominates(fn, se, retBlock) {
 				continue
 			}
-			for _, binding := range callframe.OrderedFreeValueBindings(fn) {
-				// Match the side-effect's variable to the free-value binding by
-				// name: the binding's variable value is the free-value
-				// parameter, which differs from the modified value when the
-				// captured variable is reassigned (e.g. files = append(files, x)).
-				if se.Variable != nil && binding.Variable != nil {
-					if se.Variable.GetName() != binding.Variable.GetName() {
-						continue
-					}
-				} else if se.Name != binding.Name {
-					continue
-				}
-				ptr, ok := c.function.freeValuePointers[binding.ValueID]
-				if !ok || ptr.IsNil() {
-					continue
-				}
-				modifyVal, err := c.getValue(contextInst, se.Modify)
-				if err != nil {
-					continue
-				}
-				c.Builder.CreateStore(c.coerceToInt64(modifyVal), ptr)
-				break
+			// The assignment already stored this word into the capture cell
+			// (at the instruction, or at a phi). Storing the same register
+			// again at the exit replays a snapshot from this call. Under a
+			// user lock that only covers the assignment, that replay lands
+			// after Unlock and races with other goroutines.
+			if sideEffectStoredBeforeExit(fn, se) {
+				continue
+			}
+			if err := c.storeFreeValueSideEffect(fn, se, contextInst); err != nil {
+				continue
 			}
 		}
 	}
 	return nil
+}
+
+// sideEffectStoredBeforeExit reports that the capture cell is updated where
+// the value is produced, so the exit replay must not run. Block instructions
+// go through storeClosureCaptureAtDefinition. Phis go through
+// publishPhiClosureCapture. A modify that is only materialized later (a
+// parameter member, a constant) still needs the exit store.
+func sideEffectStoredBeforeExit(fn *ssa.Function, se *ssa.FunctionSideEffect) bool {
+	if fn == nil || se == nil || se.Modify <= 0 {
+		return false
+	}
+	modifyVal, ok := fn.GetValueById(se.Modify)
+	if !ok || modifyVal == nil {
+		return false
+	}
+	if _, isPhi := modifyVal.(*ssa.Phi); isPhi {
+		return true
+	}
+	inst, ok := modifyVal.(ssa.Instruction)
+	if !ok || inst == nil {
+		return false
+	}
+	block := inst.GetBlock()
+	if block == nil {
+		return false
+	}
+	id := inst.GetId()
+	for _, listed := range block.Insts {
+		if listed == id {
+			return true
+		}
+	}
+	return false
 }
 
 // sideEffectModifyDominates reports whether the block defining the side
@@ -739,6 +1008,11 @@ func (c *Compiler) sideEffectModifyDominates(fn *ssa.Function, se *ssa.FunctionS
 
 // blockDominatesInFunction reports whether block a dominates block b in fn's
 // CFG: every path from the function entry to b passes through a.
+//
+// Non-entry blocks start as the full block set. A loop back-edge is still
+// the universal set on the first pass; seeding those blocks empty makes the
+// intersection collapse, so the entry stops dominating everything after the
+// loop and a capture cell allocated there is ignored.
 func blockDominatesInFunction(fn *ssa.Function, a, b *ssa.BasicBlock) bool {
 	if fn == nil || a == nil || b == nil {
 		return false
@@ -746,16 +1020,19 @@ func blockDominatesInFunction(fn *ssa.Function, a, b *ssa.BasicBlock) bool {
 	if a.GetId() == b.GetId() {
 		return true
 	}
-	// Classic iterative dominator dataflow over the function's block graph:
-	// dom[b] = {b} ∪ (∩ dom[p] for p in preds(b)), iterated to a fixpoint.
 	entryID := fn.EnterBlock
 	blockIDs := fn.Blocks
+	universe := make(map[int64]struct{}, len(blockIDs))
+	for _, id := range blockIDs {
+		universe[id] = struct{}{}
+	}
 	dom := make(map[int64]map[int64]struct{}, len(blockIDs))
 	for _, id := range blockIDs {
-		dom[id] = make(map[int64]struct{})
-	}
-	if d, ok := dom[entryID]; ok {
-		d[entryID] = struct{}{}
+		if id == entryID {
+			dom[id] = map[int64]struct{}{entryID: {}}
+			continue
+		}
+		dom[id] = cloneIDSet(universe)
 	}
 	changed := true
 	for changed {
@@ -765,36 +1042,41 @@ func blockDominatesInFunction(fn *ssa.Function, a, b *ssa.BasicBlock) bool {
 				continue
 			}
 			blockInst, ok := fn.GetInstructionById(id)
-			if !ok || blockInst == nil {
+			block, isBlock := ssa.ToBasicBlock(blockInst)
+			if !ok || blockInst == nil || !isBlock || block == nil || len(block.Preds) == 0 {
+				only := map[int64]struct{}{id: {}}
+				if !domSetEqual(dom[id], only) {
+					dom[id] = only
+					changed = true
+				}
 				continue
 			}
-			block, ok := ssa.ToBasicBlock(blockInst)
-			if !ok || block == nil {
-				continue
-			}
-			newDom := make(map[int64]struct{})
-			newDom[id] = struct{}{}
-			first := true
+			var inter map[int64]struct{}
+			seenPred := false
+			unknownPred := false
 			for _, pred := range block.Preds {
 				predDom, ok := dom[pred]
 				if !ok {
+					unknownPred = true
+					break
+				}
+				if !seenPred {
+					inter = cloneIDSet(predDom)
+					seenPred = true
 					continue
 				}
-				if first {
-					for k := range predDom {
-						newDom[k] = struct{}{}
-					}
-					first = false
-				} else {
-					for k := range newDom {
-						if _, ok := predDom[k]; !ok {
-							delete(newDom, k)
-						}
+				for k := range inter {
+					if _, ok := predDom[k]; !ok {
+						delete(inter, k)
 					}
 				}
 			}
-			if !domSetEqual(dom[id], newDom) {
-				dom[id] = newDom
+			if !seenPred || unknownPred {
+				inter = map[int64]struct{}{}
+			}
+			inter[id] = struct{}{}
+			if !domSetEqual(dom[id], inter) {
+				dom[id] = inter
 				changed = true
 			}
 		}
@@ -925,6 +1207,17 @@ func (c *Compiler) getOrInsertRuntimeBoolToString() (llvm.Value, llvm.Type) {
 	return fn, fnType
 }
 
+func (c *Compiler) getOrInsertRuntimeIsTrue() (llvm.Value, llvm.Type) {
+	name := c.runtimeSymName(abi.RuntimeIsTrueSymbol)
+	fn := c.Mod.NamedFunction(name)
+	i64 := c.LLVMCtx.Int64Type()
+	fnType := llvm.FunctionType(i64, []llvm.Type{i64}, false)
+	if fn.IsNil() {
+		fn = llvm.AddFunction(c.Mod, name, fnType)
+	}
+	return fn, fnType
+}
+
 func (c *Compiler) getOrInsertRuntimeParseInt() (llvm.Value, llvm.Type) {
 	name := c.runtimeSymName(abi.RuntimeParseIntSymbol)
 	fn := c.Mod.NamedFunction(name)
@@ -994,6 +1287,42 @@ func (c *Compiler) compileExternInstanceValue(contextInst ssa.Instruction, undef
 // binOpIsFloat reports whether a binary operation involves a float constant
 // operand (float constants carry their bit pattern in the i64 word and must
 // not go through integer arithmetic).
+func (c *Compiler) binOpLeftIsString(inst *ssa.BinOp) bool {
+	if inst == nil || inst.GetFunc() == nil {
+		return false
+	}
+	v, ok := inst.GetFunc().GetValueById(inst.X)
+	if !ok || v == nil {
+		return false
+	}
+	if cst, ok := v.(*ssa.ConstInst); ok && cst != nil && cst.IsString() {
+		return true
+	}
+	if t := v.GetType(); t != nil {
+		switch t.GetTypeKind() {
+		case ssa.StringTypeKind, ssa.BytesTypeKind:
+			return true
+		}
+	}
+	return false
+}
+
+func (c *Compiler) emitRuntimeSprintf(lhs, rhs llvm.Value, name string) llvm.Value {
+	fn, fnType := c.getOrInsertRuntimeSprintf()
+	return c.Builder.CreateCall(fnType, fn, []llvm.Value{c.coerceToInt64(lhs), c.coerceToInt64(rhs)}, name)
+}
+
+func (c *Compiler) getOrInsertRuntimeSprintf() (llvm.Value, llvm.Type) {
+	name := c.runtimeSymName(abi.RuntimeSprintfSymbol)
+	fn := c.Mod.NamedFunction(name)
+	i64 := c.LLVMCtx.Int64Type()
+	fnType := llvm.FunctionType(i64, []llvm.Type{i64, i64}, false)
+	if fn.IsNil() {
+		fn = llvm.AddFunction(c.Mod, name, fnType)
+	}
+	return fn, fnType
+}
+
 func (c *Compiler) binOpIsFloat(inst *ssa.BinOp) bool {
 	if inst == nil || inst.GetFunc() == nil {
 		return false

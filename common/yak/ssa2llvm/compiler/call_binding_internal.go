@@ -26,8 +26,16 @@ func (c *Compiler) callableContextArgs(inst *ssa.Call, calleeFn *ssa.Function) [
 	// the call arguments flat, so the packing happens here at the call site.
 	if inst != nil && calleeFn != nil && c.calleeIsVariadic(calleeFn) {
 		variadicIndex := len(calleeFn.Params) - 1
-		if variadicIndex >= 0 && variadicIndex < len(args) && len(inst.Args) > variadicIndex {
-			packed := c.emitVariadicPack(inst, inst.Args[variadicIndex:])
+		// An empty call (`sumAll()`) still has to pass a real empty slice.
+		// The missing argument is the zero word; `for x in args` tags that
+		// word because a variadic parameter is a slice, and a tagged zero
+		// decodes as float 2.
+		if variadicIndex >= 0 && variadicIndex < len(args) {
+			var tail []int64
+			if len(inst.Args) > variadicIndex {
+				tail = inst.Args[variadicIndex:]
+			}
+			packed := c.emitVariadicPack(inst, tail)
 			args[variadicIndex] = contextCallArg{value: packed, tagPointerArg: true}
 		}
 	}

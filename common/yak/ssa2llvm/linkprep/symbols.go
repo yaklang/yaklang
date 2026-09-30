@@ -19,6 +19,7 @@ func CanonicalRuntimeSymbols() []string {
 		abi.RuntimeNewShadowSymbol,
 		abi.RuntimeGetFieldSymbol,
 		abi.RuntimeSetFieldSymbol,
+		abi.RuntimeIsTrueSymbol,
 		abi.RuntimeDumpSymbol,
 		abi.RuntimeDumpHandleSymbol,
 		abi.RuntimeGCSymbol,

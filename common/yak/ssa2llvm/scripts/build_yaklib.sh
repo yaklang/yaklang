@@ -58,6 +58,17 @@ case ",${MODULES}," in
   *,ssa,*) AOT_SPLIT_MODULES="${AOT_SPLIT_MODULES},ssafront" ;;
 esac
 
+# The AOT runtime's textsectmap has one entry per function. Go's linear
+# textAddr/textOff scan of that table makes every traceback take milliseconds,
+# which blows mustpass read timeouts. The lookup is patched to a binary search
+# in this toolchain's GOROOT (marker below). Refuse to build a runtime that
+# still has the linear scan.
+GOROOT_SYMTAB="$(go env GOROOT)/src/runtime/symtab.go"
+if ! grep -q 'ssa2llvm: textsect binary search' "${GOROOT_SYMTAB}"; then
+  echo "[yaklib] ERROR: ${GOROOT_SYMTAB} is missing the textsect binary-search patch" >&2
+  exit 1
+fi
+
 mkdir -p "${ASSETS_DIR}"
 rm -rf "${EXTDEPS_DIR}"
 mkdir -p "${EXTDEPS_DIR}"
@@ -232,6 +243,10 @@ cp "${CRTBEGIN}" "${ASSETS_DIR}/crtbegin.o"; cp "${CRTEND}" "${ASSETS_DIR}/crten
 cp "${LIBC_A}"     "${ASSETS_DIR}/libc.a"
 cp "${LIBGCC_A}"   "${ASSETS_DIR}/libgcc.a"
 cp "${LIBGCC_EH_A}" "${ASSETS_DIR}/libgcc_eh.a"
+# Disables Boehm's automatic collection and registers the explicit collector
+# thread. See runtime/boehm_wrap.c. Not part of libyak.a, so tier rebuilds
+# pick it up here without a runtime source change.
+gcc -c -O2 -fno-strict-aliasing -fno-stack-protector -o "${ASSETS_DIR}/yak_boehm_wrap.o" "${RUNTIME_DIR}/boehm_wrap.c"
 
 # ── 6. Generate manifest_generated.go ──────────────────────────────────────
 sha_of() { sha256sum "$1" | awk '{print $1}'; }
@@ -266,8 +281,9 @@ fi
   gen_field CrtBegin "${ASSETS_DIR}/crtbegin.o"
   gen_field CrtEnd   "${ASSETS_DIR}/crtend.o"
   gen_field Libc     "${ASSETS_DIR}/libc.a"
-  gen_field Libgcc   "${ASSETS_DIR}/libgcc.a"
-  gen_field LibgccEh "${ASSETS_DIR}/libgcc_eh.a"
+  gen_field Libgcc     "${ASSETS_DIR}/libgcc.a"
+  gen_field LibgccEh   "${ASSETS_DIR}/libgcc_eh.a"
+  gen_field BoehmWrap  "${ASSETS_DIR}/yak_boehm_wrap.o"
   echo "}"
   echo ""
   echo "// extdepManifest lists the extra cgo C static libraries embedded under"

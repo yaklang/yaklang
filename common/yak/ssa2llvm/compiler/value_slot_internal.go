@@ -37,6 +37,80 @@ func (c *Compiler) currentInsertBlock() llvm.BasicBlock {
 	return out
 }
 
+func asCValue(v llvm.Value) C.LLVMValueRef {
+	return (C.LLVMValueRef)(unsafe.Pointer(v.C))
+}
+
+func instructionParentBlock(v llvm.Value) llvm.BasicBlock {
+	if v.IsNil() || C.LLVMGetValueKind(asCValue(v)) != C.LLVMInstructionValueKind {
+		return llvm.BasicBlock{}
+	}
+	bb := C.LLVMGetInstructionParent(asCValue(v))
+	if bb == nil {
+		return llvm.BasicBlock{}
+	}
+	var out llvm.BasicBlock
+	*(*unsafe.Pointer)(unsafe.Pointer(&out)) = unsafe.Pointer(bb)
+	return out
+}
+
+// setInsertPointAfterValue moves the builder to just after an instruction so a
+// use of that instruction is dominated by it. A non-instruction (a constant)
+// leaves the builder where it is.
+func (c *Compiler) setInsertPointAfterValue(v llvm.Value) bool {
+	if c == nil {
+		return false
+	}
+	bb := instructionParentBlock(v)
+	if bb.IsNil() {
+		return false
+	}
+	if c.function != nil && !c.function.llvmFn.IsNil() {
+		parent := bb.Parent()
+		if parent.IsNil() || parent.C != c.function.llvmFn.C {
+			return false
+		}
+	}
+	if C.LLVMIsATerminatorInst(asCValue(v)) != nil {
+		c.Builder.SetInsertPointBefore(v)
+	} else if next := v.NextInstruction(); next.IsNil() {
+		c.Builder.SetInsertPointAtEnd(bb)
+	} else {
+		c.Builder.SetInsertPointBefore(next)
+	}
+	if c.function != nil {
+		if id := c.blockIDForLLVM(bb); id > 0 {
+			c.function.activeBlockID = id
+		}
+	}
+	return true
+}
+
+// storeInt64AfterDef stores val into ptr in a block dominated by val.
+// Side-effect reads are compiled at the current insert point, which may be a
+// phi block the defining call does not dominate.
+func (c *Compiler) storeInt64AfterDef(val, ptr llvm.Value) {
+	if c == nil || val.IsNil() || ptr.IsNil() {
+		return
+	}
+	savedBB := c.currentInsertBlock()
+	prevActive := int64(0)
+	if c.function != nil {
+		prevActive = c.function.activeBlockID
+	}
+	if c.setInsertPointAfterValue(val) {
+		defer func() {
+			if c.function != nil {
+				c.function.activeBlockID = prevActive
+			}
+			if !savedBB.IsNil() {
+				c.restoreInsertPoint(savedBB)
+			}
+		}()
+	}
+	c.Builder.CreateStore(c.coerceToInt64(val), ptr)
+}
+
 func (c *Compiler) isSlotBackedValue(id int64) bool {
 	if c == nil || id <= 0 || c.function == nil || c.function.current == nil {
 		return false
