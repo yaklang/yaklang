@@ -36,6 +36,31 @@ func TestRuntimeMapClosureBecomesGoFunc(t *testing.T) {
 	}
 }
 
+func TestRuntimeAnyKeepsCallableClosure(t *testing.T) {
+	fn, _ := runtimeTestClosureProbe()
+	closure := runtimeCallableClosure{fn: fn, freeValues: []uint64{7}}
+	raw := uint64(uintptr(newRuntimeShadow(closure))) | yakTaggedPointerMask
+	got, err := runtimeDecodeArg(raw, reflect.TypeOf((*any)(nil)).Elem())
+	if err != nil {
+		t.Fatalf("decode any: %v", err)
+	}
+	kept, ok := got.Interface().(runtimeCallableClosure)
+	if !ok {
+		t.Fatalf("any closure became %T", got.Interface())
+	}
+	if kept.fn != fn || len(kept.freeValues) != 1 || kept.freeValues[0] != 7 {
+		t.Fatalf("closure changed: %+v", kept)
+	}
+	out := runtimeSliceAppend([]any{}, got.Interface())
+	elems, ok := out.([]any)
+	if !ok || len(elems) != 1 {
+		t.Fatalf("append result %#v", out)
+	}
+	if _, ok := elems[0].(runtimeCallableClosure); !ok {
+		t.Fatalf("appended element %T", elems[0])
+	}
+}
+
 func TestRuntimeRiskClosureCallbackIsInvoked(t *testing.T) {
 	previous := yaklib.GetYakitClientInstance()
 	yaklib.InitYakit(nil)
