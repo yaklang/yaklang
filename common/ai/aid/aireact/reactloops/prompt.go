@@ -363,7 +363,11 @@ func (r *ReActLoop) generateLoopPrompt(
 	// 关键词: TodoSnapshot 渲染, timeline-open 全局可见, SessionPromptState
 	var todoSnapshot string
 	if r.shouldRenderTodoSnapshot() {
-		if todoContent := r.config.GetVerificationTodoRendered(aicommon.BuildVerificationTodoScope(r.GetCurrentTask())); todoContent != "" {
+		scope := aicommon.BuildVerificationTodoScope(r.GetCurrentTask())
+		if planContext.Version != "" {
+			scope.PlanVersion = planContext.Version // same captured definition as the runtime snapshot
+		}
+		if todoContent := r.config.GetVerificationTodoRendered(scope); todoContent != "" {
 			todoSnapshot, err = utils.RenderTemplate(todoListTemplate, map[string]any{
 				"Nonce": nonce,
 				"Todo":  todoContent,
@@ -394,7 +398,12 @@ func (r *ReActLoop) generateLoopPrompt(
 		return "", err
 	}
 	r.lastLoopSchema = schema
-	if err := r.compressTimelineBeforePrompt(userInput, frozenUserContext, todoSnapshot, persistent, planContext.Definition, planContext.RuntimeState, planContext.ExecutionRules); err != nil {
+	var fixedReferenceContext strings.Builder
+	for _, partition := range planContext.FrozenPartitions {
+		fixedReferenceContext.WriteString(partition.Content)
+		fixedReferenceContext.WriteString("\n")
+	}
+	if err := r.compressTimelineBeforePrompt(userInput, frozenUserContext, todoSnapshot, persistent, planContext.Definition, planContext.RuntimeState, planContext.ExecutionRules, fixedReferenceContext.String()); err != nil {
 		return "", err
 	}
 

@@ -182,7 +182,9 @@ func (b *PromptPrefixBuilder) buildTaggedPromptSections(highStatic string, froze
 		WrapAICacheFrozen(frozenBlock),
 		WrapAICacheSemi(wrapPromptMessageSectionWithForce(semiDynamicSectionName(b.SemiDynamicSectionName), semiDynamic, "", b.ForceSemiDynamicSection)),
 		WrapAICacheSemi2(wrapPromptMessageSectionWithForce(semiDynamic2SectionName(b.SemiDynamic2SectionName), semiDynamic2, "", false)),
-		wrapPromptMessageSectionWithForce(PromptSectionTimelineOpen, timelineOpen, "", false),
+		// Preserve the shared prefix envelope when the clock moves to Dynamic.
+		// An empty open journal carries no events and remains outside caches.
+		wrapPromptMessageSectionWithForce(PromptSectionTimelineOpen, timelineOpen, "", true),
 		wrapPromptMessageSectionWithForce(PromptSectionDynamic, dynamic, dynamicNonce, false),
 	), nil
 }

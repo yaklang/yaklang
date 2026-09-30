@@ -37,7 +37,15 @@ func snapshotPlanPromptNode(t *AiTask) planPromptNode {
 	return n
 }
 
+type planPromptReferenceVersion struct {
+	ID     string `json:"id"`
+	SHA256 string `json:"sha256"`
+}
+
 type planPromptDefinition struct {
+	ReferenceVersions []planPromptReferenceVersion    `json:"fixed_reference_versions,omitempty"`
+	frozenPartitions  []aicommon.FrozenBlockPartition // captured once, not duplicated in definition JSON
+
 	UserQuery string         `json:"user_query"`
 	Root      planPromptNode `json:"root"`
 }
@@ -49,6 +57,11 @@ func (t *AiTask) planDefinitionSnapshot() (planPromptDefinition, string) {
 	}
 	definition := planPromptDefinition{Root: snapshotPlanPromptNode(root)}
 	definition.UserQuery = root.planPromptSourceQuery()
+	definition.frozenPartitions = root.planPromptFrozenPartitions()
+	for _, partition := range definition.frozenPartitions {
+		digest := sha256.Sum256([]byte(partition.Content))
+		definition.ReferenceVersions = append(definition.ReferenceVersions, planPromptReferenceVersion{ID: partition.ID, SHA256: hex.EncodeToString(digest[:])})
+	}
 	raw, _ := json.Marshal(definition)
 	digest := sha256.Sum256(raw)
 	return definition, hex.EncodeToString(digest[:])
@@ -148,8 +161,9 @@ func (t *AiTask) GetPlanPromptContext() aicommon.PlanPromptContext {
 	timeline := t.CurrentTimeline()
 	return aicommon.PlanPromptContext{
 		Version: version, UserQuery: definition.UserQuery,
-		Definition:     timeline.WrapPlanReferenceForPrompt("PLAN_DEFINITION", string(frozen)),
-		RuntimeState:   timeline.WrapPlanReferenceForPrompt("PLAN_RUNTIME_STATE", string(runtime)),
-		ExecutionRules: planExecutionRules,
+		FrozenPartitions: definition.frozenPartitions,
+		Definition:       timeline.WrapPlanReferenceForPrompt("PLAN_DEFINITION", string(frozen)),
+		RuntimeState:     timeline.WrapPlanReferenceForPrompt("PLAN_RUNTIME_STATE", string(runtime)),
+		ExecutionRules:   planExecutionRules,
 	}
 }

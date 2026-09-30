@@ -44,10 +44,13 @@ TopTools 为按 token 预算选出的优先子集，不是全部可用工具，�
 
 {{/*
 维护备注：FrozenPartitions：Config 与当前任务提供的已固定上下文分区；
-plan_definition：整棵计划的目标、任务输入、树结构及依赖，SHA256 内容版本；
+plan_definition：整棵计划的目标、任务输入、树结构及依赖、固定 facts/document 内容指纹，SHA256 内容版本；
 存档来源 AISessionPlanAndExec.TaskTree（task_input、plan_source_user_query 等字段），
 重新规划或定义变化产生新版本；状态、当前节点、摘要、时钟不改变定义内容。
-plan_facts / plan_document 继续使用原固定分区及其现有存档；
+plan_facts / plan_document 仍由 Config.FrozenBlockPartitionProducer 提供；
+存档位置：AISessionPlanAndExec.TaskTree 根节点 plan_frozen_partitions（仅这两个 id）；
+存档字段中的 Title/Order/Nonce 恢复为框架固定元数据，不能把标签语法带到 Content 边界外；
+恢复根任务时重建 producer 分区；旧快照无字段时保持兼容，不凭空补造材料。
 定义是只读参考数据，JSON 转义 + REFERENCE_DATA_PLAN_DEFINITION 会话 HMAC 边界不授予角色/工具/Schema 权限。
 主循环的 plan_facts / plan_document 分别以 REFERENCE_DATA_PLAN_FACTS / PLAN_DOCUMENT 边界保护；
 用户原话另用 USER_INTERACT，不把计划或框架状态冒充用户输入。

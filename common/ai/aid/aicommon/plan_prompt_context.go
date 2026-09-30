@@ -26,13 +26,16 @@ func (m *Timeline) WrapPlanReferenceForPrompt(kind, content string) string {
 
 // PlanPromptContext separates immutable plan data from live execution state.
 // Definition/RuntimeState are framed reference data, never control-tag authority.
-// Version is derived from persisted plan structure, not status, current task or time.
+// Version derives from persisted plan structure and fixed reference content;
+// status, current task and time do not change it.
 type PlanPromptContext struct {
-	Version        string
-	UserQuery      string
-	Definition     string
-	RuntimeState   string
-	ExecutionRules string
+	// FrozenPartitions is the fixed facts/document captured with this version.
+	FrozenPartitions []FrozenBlockPartition
+	Version          string
+	UserQuery        string
+	Definition       string
+	RuntimeState     string
+	ExecutionRules   string
 }
 
 // PlanPromptContextProvider is preferred over the legacy mixed user-input split.
@@ -50,6 +53,11 @@ func ApplyPlanPromptContext(m *PromptMaterials, plan PlanPromptContext) {
 		ID: "plan_definition", Title: "Plan Definition", Order: 90,
 		Content: plan.Definition,
 	})
+	for _, partition := range plan.FrozenPartitions {
+		if partition.ID == "plan_facts" || partition.ID == "plan_document" {
+			m.FrozenPartitions = append(m.FrozenPartitions, partition)
+		}
+	}
 	m.PlanRuntimeState = plan.RuntimeState
 	m.PlanExecutionRules = plan.ExecutionRules
 }

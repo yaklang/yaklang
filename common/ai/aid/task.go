@@ -40,11 +40,12 @@ type AiTask struct {
 	ShortSummary  string `json:"short_summary"`
 	LongSummary   string `json:"long_summary"`
 
-	toolCallResultIds   *omap.OrderedMap[int64, *aitool.ToolResult]
-	taskTimelineDiffer  *aicommon.TimelineDiffer // Timeline differ for tracking task execution timeline changes
-	taskStartTime       time.Time                // Task execution start time for duration calculation
-	planSourceUserQuery *string                  // Persisted source query; only the root contributes to definition version.
-	timelineFork        *aicommon.TimelineFork
+	toolCallResultIds    *omap.OrderedMap[int64, *aitool.ToolResult]
+	taskTimelineDiffer   *aicommon.TimelineDiffer        // Timeline differ for tracking task execution timeline changes
+	taskStartTime        time.Time                       // Task execution start time for duration calculation
+	planFrozenPartitions []aicommon.FrozenBlockPartition // Root TaskTree fixed facts/document archive.
+	planSourceUserQuery  *string                         // Persisted source query; only the root contributes to definition version.
+	timelineFork         *aicommon.TimelineFork
 }
 
 // GetSemanticIdentifier returns the semantic identifier for directory naming.
@@ -329,34 +330,38 @@ func (t *AiTask) MarshalJSON() ([]byte, error) {
 		taskInput = t.AIStatefulTaskBase.GetUserInput()
 	}
 	var sourceQuery *string
+	var fixedPartitions []aicommon.FrozenBlockPartition
 	if t.ParentTask == nil {
+		fixedPartitions = t.planPromptFrozenPartitions()
 		query := t.planPromptSourceQuery()
 		sourceQuery = &query
 	}
 
 	// 创建一个不包含AICallback的结构体
 	return json.Marshal(struct {
-		TaskInput            string    `json:"task_input"`
-		PlanSourceUserQuery  *string   `json:"plan_source_user_query,omitempty"`
-		TaskId               string    `json:"task_id,omitempty"`
-		Index                string    `json:"index"`
-		Name                 string    `json:"name"`
-		Goal                 string    `json:"goal"`
-		SemanticIdentifier   string    `json:"semantic_identifier"`
-		DependsOn            []string  `json:"depends_on,omitempty"`
-		Subtasks             []*AiTask `json:"subtasks,omitempty"`
-		Progress             string    `json:"progress"` // 添加进度字段
-		Summary              string    `json:"summary"`
-		StatusSummary        string    `json:"status_summary,omitempty"`
-		TaskSummary          string    `json:"task_summary,omitempty"`
-		ShortSummary         string    `json:"short_summary,omitempty"`
-		LongSummary          string    `json:"long_summary,omitempty"`
-		TotalToolCallCount   int64     `json:"total_tool_call_count"`
-		SuccessToolCallCount int       `json:"success_tool_call_count"`
-		FailToolCallCount    int       `json:"fail_tool_call_count"`
+		PlanFrozenPartitions []aicommon.FrozenBlockPartition `json:"plan_frozen_partitions,omitempty"`
+		TaskInput            string                          `json:"task_input"`
+		PlanSourceUserQuery  *string                         `json:"plan_source_user_query,omitempty"`
+		TaskId               string                          `json:"task_id,omitempty"`
+		Index                string                          `json:"index"`
+		Name                 string                          `json:"name"`
+		Goal                 string                          `json:"goal"`
+		SemanticIdentifier   string                          `json:"semantic_identifier"`
+		DependsOn            []string                        `json:"depends_on,omitempty"`
+		Subtasks             []*AiTask                       `json:"subtasks,omitempty"`
+		Progress             string                          `json:"progress"` // 添加进度字段
+		Summary              string                          `json:"summary"`
+		StatusSummary        string                          `json:"status_summary,omitempty"`
+		TaskSummary          string                          `json:"task_summary,omitempty"`
+		ShortSummary         string                          `json:"short_summary,omitempty"`
+		LongSummary          string                          `json:"long_summary,omitempty"`
+		TotalToolCallCount   int64                           `json:"total_tool_call_count"`
+		SuccessToolCallCount int                             `json:"success_tool_call_count"`
+		FailToolCallCount    int                             `json:"fail_tool_call_count"`
 	}{
 		TaskInput:            taskInput,
 		PlanSourceUserQuery:  sourceQuery,
+		PlanFrozenPartitions: fixedPartitions,
 		TaskId:               t.TaskId,
 		Index:                t.Index,
 		Name:                 t.Name,
@@ -380,15 +385,16 @@ func (t *AiTask) MarshalJSON() ([]byte, error) {
 func (t *AiTask) UnmarshalJSON(data []byte) error {
 	// 创建一个临时结构体，不包含AICallback
 	aux := struct {
-		TaskInput           *string   `json:"task_input"`
-		PlanSourceUserQuery *string   `json:"plan_source_user_query,omitempty"`
-		DependsOn           []string  `json:"depends_on,omitempty"`
-		SemanticIdentifier  string    `json:"semantic_identifier,omitempty"`
-		TaskId              string    `json:"task_id,omitempty"`
-		Index               string    `json:"index"`
-		Name                string    `json:"name"`
-		Goal                string    `json:"goal"`
-		Subtasks            []*AiTask `json:"subtasks,omitempty"`
+		PlanFrozenPartitions []aicommon.FrozenBlockPartition `json:"plan_frozen_partitions,omitempty"`
+		TaskInput            *string                         `json:"task_input"`
+		PlanSourceUserQuery  *string                         `json:"plan_source_user_query,omitempty"`
+		DependsOn            []string                        `json:"depends_on,omitempty"`
+		SemanticIdentifier   string                          `json:"semantic_identifier,omitempty"`
+		TaskId               string                          `json:"task_id,omitempty"`
+		Index                string                          `json:"index"`
+		Name                 string                          `json:"name"`
+		Goal                 string                          `json:"goal"`
+		Subtasks             []*AiTask                       `json:"subtasks,omitempty"`
 	}{}
 
 	if err := json.Unmarshal(data, &aux); err != nil {
@@ -403,6 +409,7 @@ func (t *AiTask) UnmarshalJSON(data []byte) error {
 	t.DependsOn = append([]string(nil), aux.DependsOn...)
 	t.SemanticIdentifier = aux.SemanticIdentifier
 	t.planSourceUserQuery = aux.PlanSourceUserQuery
+	t.planFrozenPartitions = snapshotPlanFrozenPartitions(aux.PlanFrozenPartitions)
 	for _, child := range t.Subtasks {
 		if child != nil {
 			child.ParentTask = t

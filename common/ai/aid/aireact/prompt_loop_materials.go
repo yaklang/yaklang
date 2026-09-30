@@ -362,8 +362,10 @@ func (pm *PromptManager) NewPromptMaterials(base *reactloops.LoopPromptBaseMater
 			partition := &materials.FrozenPartitions[i]
 			switch partition.ID {
 			case "plan_facts":
+				partition.Title, partition.Order, partition.Nonce = "Plan Facts", aicommon.PlanFactsFrozenPartitionOrder, ""
 				partition.Content = timeline.WrapPlanReferenceForPrompt("PLAN_FACTS", partition.Content)
 			case "plan_document":
+				partition.Title, partition.Order, partition.Nonce = "Plan Document", aicommon.PlanDocumentFrozenPartitionOrder, ""
 				partition.Content = timeline.WrapPlanReferenceForPrompt("PLAN_DOCUMENT", partition.Content)
 			}
 		}
