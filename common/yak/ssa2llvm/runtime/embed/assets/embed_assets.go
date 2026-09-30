@@ -35,6 +35,9 @@ var embeddedLibgcc []byte
 //go:embed libgcc_eh.a
 var embeddedLibgccEh []byte
 
+//go:embed yak_boehm_wrap.o
+var embeddedBoehmWrap []byte
+
 // embeddedExtDeps holds the extra cgo C static libraries (libpcap.a, libm.a,
 // libresolv.a, ...) that the registered yaklib modules pull in. The set is
 // variable (depends on SSA2LLVM_EMBED_MODULES), so the whole extdeps/ directory

@@ -61,6 +61,7 @@ const (
 	RuntimeInvokeVMSymbol             = "yak_runtime_invoke_vm"
 	RuntimeTestAdd1CtxSymbol          = "yak_runtime_test_add1_ctx"
 	RuntimeConcatSymbol               = "yak_runtime_concat"
+	RuntimeSprintfSymbol              = "yak_runtime_sprintf"
 	RuntimeReadClosureFreeValueSymbol = "yak_runtime_read_closure_free_value"
 	RuntimeStringSliceSymbol          = "yak_runtime_string_slice"
 	RuntimeSliceSliceSymbol           = "yak_runtime_slice_slice"
@@ -69,6 +70,7 @@ const (
 	RuntimeToFloatSymbol              = "yak_runtime_to_float"
 	RuntimeToStringSymbol             = "yak_runtime_to_string"
 	RuntimeBoolToStringSymbol         = "yak_runtime_bool_to_string"
+	RuntimeIsTrueSymbol               = "yak_runtime_is_true"
 	RuntimeParseIntSymbol             = "yak_runtime_parse_int"
 	RuntimeParseFloatSymbol           = "yak_runtime_parse_float"
 	RuntimeFuzztagSymbol              = "yak_runtime_fuzztag"
@@ -86,6 +88,10 @@ const (
 	FlagFieldBool          uint64 = 1 << 2
 	FlagFieldString        uint64 = 1 << 3
 	FlagEllipsis           uint64 = 1 << 4
+	// FlagFieldNil marks a yak_runtime_set_field store of yak nil. The ABI
+	// word is 0, the same bits as integer 0, so the container keeps a real
+	// nil and get_field hands back a nil shadow. It is a field flag only.
+	FlagFieldNil uint64 = 1 << 5
 )
 
 const (

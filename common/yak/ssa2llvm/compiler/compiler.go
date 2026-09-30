@@ -25,8 +25,14 @@ type Compiler struct {
 	// This is critical because YakSSA uses int64 IDs for all SSA values.
 	Values map[int64]llvm.Value
 
-	// Blocks maps YakSSA BasicBlock IDs to LLVM BasicBlocks.
+	// Blocks maps YakSSA BasicBlock IDs to LLVM BasicBlocks. A split
+	// (assert, checked div, drop-error) rebinds this to the continuation
+	// that receives the rest of the block.
 	Blocks map[int64]llvm.BasicBlock
+
+	// blockEntries keeps the LLVM block created for each SSA block. Edges
+	// from other blocks enter here, not the continuation Blocks may hold.
+	blockEntries map[int64]llvm.BasicBlock
 
 	// Funcs maps YakSSA Function IDs to LLVM function values.
 	Funcs map[int64]llvm.Value
@@ -65,6 +71,11 @@ type Compiler struct {
 	initializingMemberDepth    int
 	emittedMemberVariableSets  map[string]struct{}
 	materializingCallableIDs   map[int64]int
+
+	// extraCaptureCache memoizes free values a closure must carry for nested
+	// functions that the closure body itself never names.
+	extraCaptureCache     map[int64][]extraCapture
+	extraCaptureComputing map[int64]bool
 
 	function *functionCompileContext
 }
@@ -133,6 +144,7 @@ func NewCompiler(ctx context.Context, prog *ssa.Program, opts ...CompilerOption)
 		Builder:                   c.NewBuilder(),
 		Values:                    make(map[int64]llvm.Value),
 		Blocks:                    make(map[int64]llvm.BasicBlock),
+		blockEntries:              make(map[int64]llvm.BasicBlock),
 		Funcs:                     make(map[int64]llvm.Value),
 		Program:                   prog,
 		TypeConverter:             types.NewTypeConverter(c),
@@ -272,6 +284,7 @@ func (c *Compiler) CompileFunction(fn *ssa.Function) error {
 		}
 		bb := c.LLVMCtx.AddBasicBlock(llvmFn, fmt.Sprintf("bb_%d", blockID))
 		c.Blocks[blockID] = bb
+		c.blockEntries[blockID] = bb
 	}
 	// Add the unified return block last so the real entry block remains first.
 	if fn.DeferBlock > 0 {
@@ -317,6 +330,13 @@ func (c *Compiler) CompileFunction(fn *ssa.Function) error {
 		}
 	}
 
+	if err := c.prepareDeferGuards(fn); err != nil {
+		return err
+	}
+	if err := c.prepareEntryCaptureCells(fn); err != nil {
+		return err
+	}
+
 	// 4. Compile Instructions in each Block
 	for _, blockID := range orderBlocksForCompile(fn) {
 		bb, ok := c.Blocks[blockID]
@@ -345,6 +365,9 @@ func (c *Compiler) CompileFunction(fn *ssa.Function) error {
 				return err
 			}
 		}
+		if c.function != nil {
+			c.armDeferGuards(c.function.deferArmAtStart[blockID])
+		}
 
 		// Then compile regular instructions
 		hasTerminator := false
@@ -360,14 +383,23 @@ func (c *Compiler) CompileFunction(fn *ssa.Function) error {
 				continue
 			}
 			inst := instVal
+			if c.instructionRunsInDeferBlock(fn, blockID, inst) {
+				if c.function != nil {
+					c.armDeferGuards(c.function.deferArmAfter[instID])
+				}
+				continue
+			}
 			isTerminator := false
 			switch inst.(type) {
 			case *ssa.Return, *ssa.Jump, *ssa.If, *ssa.Loop, *ssa.Switch, *ssa.Panic:
 				isTerminator = true
 			}
 
-			if err := c.compileInstruction(inst); err != nil {
+			if err := c.compileInstWithDeferGuard(fn, inst); err != nil {
 				return err
+			}
+			if c.function != nil {
+				c.armDeferGuards(c.function.deferArmAfter[instID])
 			}
 			if isTerminator {
 				hasTerminator = true
@@ -393,7 +425,7 @@ func (c *Compiler) CompileFunction(fn *ssa.Function) error {
 		}
 		if !hasTerminator && c.function.catchTargetByBlock != nil {
 			if targetID, ok := c.function.catchTargetByBlock[blockID]; ok && targetID > 0 {
-				targetBB, ok := c.Blocks[targetID]
+				targetBB, ok := c.ssaBlockEntry(targetID)
 				if !ok {
 					return fmt.Errorf("catch target block %d not found", targetID)
 				}
@@ -432,13 +464,13 @@ func (c *Compiler) CompileFunction(fn *ssa.Function) error {
 						return err
 					}
 					condVal = c.coerceToI1(condVal, "if_cond")
-					trueBlock := c.Blocks[blockObj.Succs[0]]
-					falseBlock := c.Blocks[blockObj.Succs[1]]
+					trueBlock, _ := c.ssaBlockEntry(blockObj.Succs[0])
+					falseBlock, _ := c.ssaBlockEntry(blockObj.Succs[1])
 					c.Builder.CreateCondBr(condVal, trueBlock, falseBlock)
 					hasTerminator = true
 				}
 			} else if len(blockObj.Succs) == 1 {
-				targetBlock := c.Blocks[blockObj.Succs[0]]
+				targetBlock, _ := c.ssaBlockEntry(blockObj.Succs[0])
 				c.Builder.CreateBr(targetBlock)
 				hasTerminator = true
 			}

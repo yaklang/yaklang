@@ -14,7 +14,7 @@ func (c *Compiler) compileJump(inst *ssa.Jump) error {
 	if info := c.switchHandlerForJump(inst); info != nil {
 		return c.compileSwitchHandlerJump(inst, info)
 	}
-	targetBlock, ok := c.Blocks[inst.To]
+	targetBlock, ok := c.ssaBlockEntry(inst.To)
 	if !ok {
 		return fmt.Errorf("compileJump: target block %d not found", inst.To)
 	}
@@ -92,18 +92,18 @@ func (c *Compiler) switchHandlerForJump(inst *ssa.Jump) *switchHandlerInfo {
 		return nil
 	}
 	info := c.function.switchHandlers[inst.GetBlock().GetId()]
-	if info == nil || info.condID <= 0 || len(info.labelIDs) == 0 || info.trueBlockID <= 0 || info.falseBlockID <= 0 {
+	if info == nil || len(info.labelIDs) == 0 || info.trueBlockID <= 0 || info.falseBlockID <= 0 {
 		return nil
 	}
 	return info
 }
 
 func (c *Compiler) compileSwitchHandlerJump(inst *ssa.Jump, info *switchHandlerInfo) error {
-	trueBlock, ok := c.Blocks[info.trueBlockID]
+	trueBlock, ok := c.ssaBlockEntry(info.trueBlockID)
 	if !ok || trueBlock.IsNil() {
 		return fmt.Errorf("compileSwitchHandlerJump: true block %d not found", info.trueBlockID)
 	}
-	falseBlock, ok := c.Blocks[info.falseBlockID]
+	falseBlock, ok := c.ssaBlockEntry(info.falseBlockID)
 	if !ok || falseBlock.IsNil() {
 		return fmt.Errorf("compileSwitchHandlerJump: false block %d not found", info.falseBlockID)
 	}
@@ -119,6 +119,13 @@ func (c *Compiler) emitSwitchLabelMatch(contextInst ssa.Instruction, condID int6
 	if len(labelIDs) == 0 {
 		return llvm.ConstInt(c.LLVMCtx.Int1Type(), 0, false), nil
 	}
+	// `switch { case expr: }` has no switch value. Each case expression is
+	// already the condition, so branch on its truth instead of comparing it
+	// to a missing cond (that comparison was skipped and every value took
+	// the first case).
+	if condID <= 0 {
+		return c.emitSwitchLabelTruthy(contextInst, labelIDs)
+	}
 	var combined llvm.Value
 	for _, labelID := range labelIDs {
 		if labelID <= 0 {
@@ -133,6 +140,29 @@ func (c *Compiler) emitSwitchLabelMatch(contextInst ssa.Instruction, condID int6
 			continue
 		}
 		combined = c.Builder.CreateOr(combined, match, "switch_case_any")
+	}
+	if combined.IsNil() {
+		return llvm.ConstInt(c.LLVMCtx.Int1Type(), 0, false), nil
+	}
+	return combined, nil
+}
+
+func (c *Compiler) emitSwitchLabelTruthy(contextInst ssa.Instruction, labelIDs []int64) (llvm.Value, error) {
+	var combined llvm.Value
+	for _, labelID := range labelIDs {
+		if labelID <= 0 {
+			continue
+		}
+		val, err := c.getValue(contextInst, labelID)
+		if err != nil {
+			return llvm.Value{}, err
+		}
+		bit := c.coerceToI1(c.coerceToInt64(val), "switch_cond")
+		if combined.IsNil() {
+			combined = bit
+			continue
+		}
+		combined = c.Builder.CreateOr(combined, bit, "switch_cond_any")
 	}
 	if combined.IsNil() {
 		return llvm.ConstInt(c.LLVMCtx.Int1Type(), 0, false), nil
@@ -183,12 +213,12 @@ func (c *Compiler) compileIf(inst *ssa.If) error {
 
 	condVal = c.coerceToI1(condVal, "if_cond")
 
-	trueBlock, ok := c.Blocks[inst.True]
+	trueBlock, ok := c.ssaBlockEntry(inst.True)
 	if !ok {
 		return fmt.Errorf("compileIf: true block %d not found", inst.True)
 	}
 
-	falseBlock, ok := c.Blocks[inst.False]
+	falseBlock, ok := c.ssaBlockEntry(inst.False)
 	if !ok {
 		return fmt.Errorf("compileIf: false block %d not found", inst.False)
 	}
@@ -207,11 +237,11 @@ func (c *Compiler) compileLoop(inst *ssa.Loop) error {
 
 	condVal = c.coerceToI1(condVal, "loop_cond")
 
-	bodyBlock, ok := c.Blocks[inst.Body]
+	bodyBlock, ok := c.ssaBlockEntry(inst.Body)
 	if !ok {
 		return fmt.Errorf("compileLoop: body block %d not found", inst.Body)
 	}
-	exitBlock, ok := c.Blocks[inst.Exit]
+	exitBlock, ok := c.ssaBlockEntry(inst.Exit)
 	if !ok {
 		return fmt.Errorf("compileLoop: exit block %d not found", inst.Exit)
 	}
@@ -226,14 +256,14 @@ func (c *Compiler) compileSwitch(inst *ssa.Switch) error {
 	}
 	defaultBlock := llvm.BasicBlock{}
 	if inst.DefaultBlock != nil {
-		defaultBlock = c.Blocks[inst.DefaultBlock.GetId()]
+		defaultBlock, _ = c.ssaBlockEntry(inst.DefaultBlock.GetId())
 	}
 	if defaultBlock.IsNil() {
 		return fmt.Errorf("compileSwitch: default block not found")
 	}
 	for _, label := range inst.Label {
 		if label.Dest > 0 {
-			caseBlock, ok := c.Blocks[label.Dest]
+			caseBlock, ok := c.ssaBlockEntry(label.Dest)
 			if !ok || caseBlock.IsNil() {
 				return fmt.Errorf("compileSwitch: case block %d not found", label.Dest)
 			}
@@ -300,6 +330,21 @@ func (c *Compiler) ssaValueIsFunction(val ssa.Value) bool {
 	}
 	if _, ok := ssa.ToFunction(val); ok {
 		return true
+	}
+	return false
+}
+
+// ssaValueIsBytes reports a bytes/byte value. Those words are C strings, the
+// same representation as a string literal, but they are not pointer types.
+func (c *Compiler) ssaValueIsBytes(val ssa.Value) bool {
+	if val == nil {
+		return false
+	}
+	if t := val.GetType(); t != nil {
+		switch t.GetTypeKind() {
+		case ssa.BytesTypeKind, ssa.ByteTypeKind:
+			return true
+		}
 	}
 	return false
 }
@@ -502,6 +547,40 @@ func (c *Compiler) resolvePhi(inst *ssa.Phi) error {
 			}
 			emitPredStore(predBlockID, edgeValID)
 		}
+		// try/catch phis carry one edge per scope branch, but the catch body is
+		// not a CFG predecessor of the done block. The extra edges are the
+		// catch assignments; store them at the end of the catch so the done
+		// block observes that version.
+		if len(edges) > len(preds) && c.function != nil && c.function.catchTargetByBlock != nil {
+			for _, edgeValID := range edges[len(preds):] {
+				if edgeValID <= 0 {
+					continue
+				}
+				edgeObj, ok := fn.GetValueById(edgeValID)
+				if !ok || edgeObj == nil {
+					continue
+				}
+				if edgeObj.IsLazy() {
+					if self := edgeObj.Self(); self != nil {
+						if unwrapped, ok := self.(ssa.Value); ok && unwrapped != nil {
+							edgeObj = unwrapped
+						}
+					}
+				}
+				edgeInst, ok := edgeObj.(ssa.Instruction)
+				if !ok || edgeInst == nil || edgeInst.GetBlock() == nil {
+					continue
+				}
+				defBlockID := edgeInst.GetBlock().GetId()
+				if defBlockID <= 0 || c.function.catchTargetByBlock[defBlockID] != blockID {
+					continue
+				}
+				emitPredStore(defBlockID, edgeValID)
+			}
+		}
+		if err := c.publishPhiClosureCapture(fn, inst); err != nil {
+			return err
+		}
 		return emitMemberSet()
 	}
 
@@ -509,6 +588,9 @@ func (c *Compiler) resolvePhi(inst *ssa.Phi) error {
 	for _, predBB := range llvmPreds {
 		predID := c.blockIDForLLVM(predBB)
 		emitPredStore(predID, edgeByPred[predID])
+	}
+	if err := c.publishPhiClosureCapture(fn, inst); err != nil {
+		return err
 	}
 
 	return emitMemberSet()

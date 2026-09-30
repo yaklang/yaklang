@@ -90,11 +90,6 @@ func (c *Compiler) newRuntimeMethodDispatchSpec(inst *ssa.Call, fn *ssa.Function
 	if obj == nil || key == nil {
 		return contextCallSpec{}, false, nil
 	}
-	// Map lookups yield values, not methods: a["c"] is a closure stored in
-	// the map (callable value), not a method dispatch on the map object.
-	if obj.GetType() != nil && obj.GetType().GetTypeKind() == ssa.MapTypeKind {
-		return contextCallSpec{}, false, nil
-	}
 	// Numeric/dynamic keys (slice index, map lookup) yield a callable VALUE
 	// (e.g. fns[0] is a closure stored in the slice), not a method name.
 	// Only string-constant keys are method dispatches.
@@ -103,6 +98,12 @@ func (c *Compiler) newRuntimeMethodDispatchSpec(inst *ssa.Call, fn *ssa.Function
 	}
 	methodName := c.resolveMemberKeyString(key)
 	if methodName == "" {
+		return contextCallSpec{}, false, nil
+	}
+	// Map lookups yield values, not methods: a["c"] is a closure stored in
+	// the map. Yak still exposes a fixed set of map methods (m.Keys(),
+	// m.Values(), m.Has(), m.Set()) under those exact names.
+	if obj.GetType() != nil && obj.GetType().GetTypeKind() == ssa.MapTypeKind && !yakMapBuiltinMethod(methodName) {
 		return contextCallSpec{}, false, nil
 	}
 	// Shadow-method dispatch is used for both plain objects and yaklib module
@@ -157,11 +158,10 @@ func (c *Compiler) compileCall(inst *ssa.Call) error {
 			}
 		}
 	}
-
 	switch c.instructionTag(inst.GetId()) {
 	case callLowerTagInternal:
 		if resolvedCallee, ok := callframe.ResolveDirectCallee(c.Program, fn, inst); ok && resolvedCallee != nil {
-			if len(resolvedCallee.FreeValues) > 0 || len(resolvedCallee.ParameterMembers) > 0 {
+			if len(resolvedCallee.ParameterMembers) > 0 || c.closureNeedsFreeValues(resolvedCallee) {
 				// Closure invocation: pass the materialized closure object so
 				// the runtime fills parameter members and free values from the
 				// captured slots (which are by-ref pointers). The call context
@@ -283,6 +283,18 @@ func (c *Compiler) compileCall(inst *ssa.Call) error {
 	}
 
 	return fmt.Errorf("compileCall: unable to resolve callee %q", calleeName)
+}
+
+// yakMapBuiltinMethod reports the yak map methods implemented on
+// runtimeOrderedMap. Other names stay value lookups so a stored closure
+// can still be called.
+func yakMapBuiltinMethod(name string) bool {
+	switch name {
+	case "Keys", "Values", "Has", "Set", "Len", "Get", "Delete":
+		return true
+	default:
+		return false
+	}
 }
 
 func (c *Compiler) yaklibModuleNameFromObject(obj ssa.Value) string {

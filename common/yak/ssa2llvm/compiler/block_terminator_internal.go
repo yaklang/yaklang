@@ -28,6 +28,24 @@ func (c *Compiler) blockHasTerminator(bb llvm.BasicBlock) bool {
 	return !llvmBasicBlockTerminator(bb).IsNil()
 }
 
+// ssaBlockEntry is the LLVM block created for an SSA block. Splits rebind
+// c.Blocks to the continuation; edges from other blocks still enter here.
+func (c *Compiler) ssaBlockEntry(id int64) (llvm.BasicBlock, bool) {
+	if c == nil || id <= 0 {
+		return llvm.BasicBlock{}, false
+	}
+	if c.blockEntries != nil {
+		if bb, ok := c.blockEntries[id]; ok && !bb.IsNil() {
+			return bb, true
+		}
+	}
+	bb, ok := c.Blocks[id]
+	if !ok || bb.IsNil() {
+		return llvm.BasicBlock{}, false
+	}
+	return bb, true
+}
+
 func (c *Compiler) emitSSABlockTerminator(blockID int64, blockObj *ssa.BasicBlock, fn *ssa.Function) error {
 	if c == nil || blockObj == nil || fn == nil {
 		return nil
@@ -47,7 +65,7 @@ func (c *Compiler) emitSSABlockTerminator(blockID int64, blockObj *ssa.BasicBloc
 	}
 	if c.function != nil && c.function.catchTargetByBlock != nil {
 		if targetID, ok := c.function.catchTargetByBlock[blockID]; ok && targetID > 0 {
-			targetBB, ok := c.Blocks[targetID]
+			targetBB, ok := c.ssaBlockEntry(targetID)
 			if !ok {
 				return fmt.Errorf("catch target block %d not found", targetID)
 			}
@@ -85,13 +103,13 @@ func (c *Compiler) emitSSABlockTerminator(blockID int64, blockObj *ssa.BasicBloc
 				return err
 			}
 			condVal = c.coerceToI1(condVal, "if_cond")
-			trueBlock := c.Blocks[blockObj.Succs[0]]
-			falseBlock := c.Blocks[blockObj.Succs[1]]
+			trueBlock, _ := c.ssaBlockEntry(blockObj.Succs[0])
+			falseBlock, _ := c.ssaBlockEntry(blockObj.Succs[1])
 			c.Builder.CreateCondBr(condVal, trueBlock, falseBlock)
 			return nil
 		}
 	} else if len(blockObj.Succs) == 1 {
-		targetBlock := c.Blocks[blockObj.Succs[0]]
+		targetBlock, _ := c.ssaBlockEntry(blockObj.Succs[0])
 		c.Builder.CreateBr(targetBlock)
 		return nil
 	}

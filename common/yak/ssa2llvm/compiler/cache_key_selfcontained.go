@@ -32,6 +32,7 @@ func cacheToolKeyPart(cfg *CompileConfig, write func(string)) {
 	add("libc=" + m.Libc)
 	add("libgcc=" + m.Libgcc)
 	add("libgcc_eh=" + m.LibgccEh)
+	add("boehm_wrap=" + m.BoehmWrap)
 	// Include the variable set of extra cgo C static libraries (libpcap.a, ...)
 	// so the cache key reflects which module deps are embedded. extdepManifest is
 	// generated in stable order by build_runtime_embed.sh.
@@ -42,7 +43,7 @@ func cacheToolKeyPart(cfg *CompileConfig, write func(string)) {
 	write("llvm=" + bundledLLVMVersion())
 	// Reflect the link-time options applied by CompileObjectToBinarySC so a
 	// change in stripping/gc-sections invalidates cached artifacts.
-	write("linkOpts=gc-sections+strip")
+	write("linkOpts=gc-sections+strip+boehm-wrap")
 	// Which modules survive the link is decided by these rules, so a change
 	// to them produces a different binary from the same script.
 	write("moduleClosure=" + moduleClosureKey())

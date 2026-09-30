@@ -3,6 +3,7 @@ package tests
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -76,6 +77,33 @@ assert count == 4, count
 	}
 }
 
+// TestClosureScalarWritebackAsyncGo covers a goroutine that mutates a captured
+// scalar, then joins before the parent reads it. The read is also an element
+// of a format list, which binds a second variable name on the side effect.
+// The parent must still observe the updated cell.
+func TestClosureScalarWritebackAsyncGo(t *testing.T) {
+	dir := t.TempDir()
+	script := filepath.Join(dir, "closure_async_go.yak")
+	if err := os.WriteFile(script, []byte(`
+var count = 0
+ch = make(chan any)
+go func {
+    count++
+    go func {
+        ch <- 0
+    }
+}
+<-ch
+assert count == 1, "got %v" % [count]
+`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	output := RunYakScriptFileWithCLI(t, script, nil)
+	if output != "" {
+		t.Fatalf("unexpected output: %s", output)
+	}
+}
+
 // TestClosureScalarWritebackEach covers a yaklib method callback (Set.Each)
 // mutating an outer scalar.
 func TestClosureScalarWritebackEach(t *testing.T) {
@@ -89,6 +117,82 @@ s.Each(func(val) {
     return true
 })
 assert count == 2, count
+`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	output := RunYakScriptFileWithCLI(t, script, nil)
+	if output != "" {
+		t.Fatalf("unexpected output: %s", output)
+	}
+}
+
+// TestClosureScalarWritebackLockedConcurrent covers a captured counter
+// incremented under a mutex from many goroutines. The parent joins after each
+// call returns, so it observes the cell only once every invocation has
+// finished. An exit replay of the increment would land after Unlock and drop
+// updates.
+func TestClosureScalarWritebackLockedConcurrent(t *testing.T) {
+	dir := t.TempDir()
+	script := filepath.Join(dir, "closure_locked_concurrent.yak")
+	if err := os.WriteFile(script, []byte(`
+count = 0
+lock = sync.NewLock()
+f = func() {
+    lock.Lock()
+    count++
+    lock.Unlock()
+    spin = 0
+    for k = 0; k < 2000; k++ {
+        spin = spin + k
+    }
+}
+ch = make(chan any)
+n = 32
+for i = 0; i < n; i++ {
+    go func {
+        f()
+        ch <- 1
+    }
+}
+for i = 0; i < n; i++ {
+    <-ch
+}
+println(count)
+assert count == n, count
+`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	output := RunYakScriptFileWithCLI(t, script, nil)
+	if strings.TrimSpace(output) != "32" {
+		t.Fatalf("got %q, want 32", output)
+	}
+}
+
+// TestClosureScalarWritebackBranchIf covers several branch-local assignments
+// of outer bools in one closure. Each if merges through its own phi, and only
+// the last of those phis shares the function exit. Every assignment must still
+// reach the captured cell, and a later call that skips an assignment must
+// leave the previous update in place.
+func TestClosureScalarWritebackBranchIf(t *testing.T) {
+	dir := t.TempDir()
+	script := filepath.Join(dir, "closure_branch_if.yak")
+	if err := os.WriteFile(script, []byte(`
+check = false
+check2 = false
+check3 = false
+f = func(raw) {
+    if raw { check = true }
+    if raw { check2 = true }
+    if !raw { check3 = true }
+}
+f(true)
+assert check
+assert check2
+assert check3 == false
+f(false)
+assert check
+assert check2
+assert check3
 `), 0o644); err != nil {
 		t.Fatal(err)
 	}

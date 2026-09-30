@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"reflect"
+	"strings"
 	"testing"
 	"unsafe"
 
@@ -16,6 +17,24 @@ func TestRuntimeCallReturnValueSingle(t *testing.T) {
 	got := runtimeCallReturnValue([]reflect.Value{reflect.ValueOf(int64(42))})
 	if got == 0 {
 		t.Fatal("expected non-zero shadow handle for single return")
+	}
+}
+
+func TestInvokeGoFuncShadowCallsByteCallback(t *testing.T) {
+	var got []byte
+	fn := func(b []byte) { got = append([]byte(nil), b...) }
+	raw := uint64(uintptr(newRuntimeShadow(fn)))
+	arg := uint64(uintptr(newRuntimeShadow([]byte("abc"))))
+	words := make([]uint64, abi.HeaderWords+2)
+	ctx := unsafe.Pointer(&words[0])
+	ctxInit(ctx, abi.KindCallable, raw, 1)
+	ctxStoreWord(ctx, abi.HeaderWords, arg)
+	ctxStoreWord(ctx, abi.HeaderWords+1, arg)
+	if !invokeGoFuncShadow(ctx, raw) {
+		t.Fatal("expected go func shadow to be invoked")
+	}
+	if string(got) != "abc" {
+		t.Fatalf("callback saw %q", got)
 	}
 }
 
@@ -251,6 +270,100 @@ func TestSetRuntimeFieldYaklibOrderedMapDecodesValues(t *testing.T) {
 	}
 }
 
+func TestSliceAnyBoolNilRoundTrip(t *testing.T) {
+	s := make([]any, 4)
+	sp := &s
+	if err := setRuntimeField(sp, "0", 123, 0); err != nil {
+		t.Fatal(err)
+	}
+	if err := setRuntimeField(sp, "1", 1, abi.FlagFieldBool); err != nil {
+		t.Fatal(err)
+	}
+	if err := setRuntimeField(sp, "2", 0, abi.FlagFieldBool); err != nil {
+		t.Fatal(err)
+	}
+	if err := setRuntimeField(sp, "3", 0, abi.FlagFieldNil); err != nil {
+		t.Fatal(err)
+	}
+	if s[0] != int64(123) {
+		t.Fatalf("int element = %#v (%T)", s[0], s[0])
+	}
+	if s[1] != true {
+		t.Fatalf("true element = %#v (%T)", s[1], s[1])
+	}
+	if s[2] != false {
+		t.Fatalf("false element = %#v (%T)", s[2], s[2])
+	}
+	if s[3] != nil {
+		t.Fatalf("nil element = %#v (%T)", s[3], s[3])
+	}
+
+	// Range yields the element into a map and the compiler reads it back
+	// with get_field. That is the path fuzz_json_params uses.
+	check := func(name string, elem any, want any, truth int64) {
+		t.Helper()
+		result := map[string]any{"field": elem, "ok": true}
+		field, err := resolveField(result, "field")
+		if err != nil {
+			t.Fatal(err)
+		}
+		word := runtimeFieldWord(field)
+		if yak_runtime_is_true(word) != truth {
+			t.Fatalf("%s truth = %d, want %d", name, yak_runtime_is_true(word), truth)
+		}
+		got := decodeTaggedArg(uint64(word))
+		if got != want {
+			t.Fatalf("%s decode = %#v (%T), want %#v", name, got, got, want)
+		}
+	}
+	check("int", s[0], int64(123), 1)
+	check("true", s[1], true, 1)
+	check("false", s[2], false, 0)
+	check("nil", s[3], nil, 0)
+
+	trueWord := runtimeFieldWord(mustResolve(t, resultField(s[1]), "field"))
+	falseWord := runtimeFieldWord(mustResolve(t, resultField(s[2]), "field"))
+	nilWord := runtimeFieldWord(mustResolve(t, resultField(s[3]), "field"))
+	if !runtimeValuesEqual(runtimeDecodeEqValue(uint64(trueWord)), runtimeDecodeEqValue(1)) {
+		t.Fatal("true shadow should equal numeric 1")
+	}
+	if runtimeValuesEqual(runtimeDecodeEqValue(uint64(trueWord)), runtimeDecodeEqValue(0)) {
+		t.Fatal("true shadow should not equal nil")
+	}
+	if !runtimeValuesEqual(runtimeDecodeEqValue(uint64(falseWord)), runtimeDecodeEqValue(0)) {
+		t.Fatal("false shadow should equal nil/false word")
+	}
+	if !runtimeValuesEqual(runtimeDecodeEqValue(uint64(nilWord)), runtimeDecodeEqValue(0)) {
+		t.Fatal("nil shadow should equal nil word")
+	}
+	if runtimeValuesEqual(runtimeDecodeEqValue(uint64(nilWord)), runtimeDecodeEqValue(1)) {
+		t.Fatal("nil shadow should not equal 1")
+	}
+	if yak_runtime_is_true(0) != 0 || yak_runtime_is_true(1) != 1 || yak_runtime_is_true(2) != 1 {
+		t.Fatal("plain integer truthiness changed")
+	}
+	missing, err := resolveField(sp, "missing")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if runtimeFieldWord(missing) != 0 {
+		t.Fatal("missing field should stay word 0")
+	}
+}
+
+func resultField(elem any) map[string]any {
+	return map[string]any{"field": elem}
+}
+
+func mustResolve(t *testing.T, obj any, name string) reflect.Value {
+	t.Helper()
+	field, err := resolveField(obj, name)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return field
+}
+
 func TestRuntimeOrderedMapMarshalJSON(t *testing.T) {
 	om := newRuntimeOrderedMap()
 	om.Set("project_exists", "aa")
@@ -350,5 +463,104 @@ func TestRuntimeCallReturnValueMultiError(t *testing.T) {
 	}
 	if tuple[1] == nil {
 		t.Fatal("tuple[1] should preserve non-nil error")
+	}
+}
+
+func TestRuntimeDecodeCallableArgRejectsHeapPointer(t *testing.T) {
+	buf := []byte("not code")
+	target := reflect.TypeOf(func() {})
+	if _, ok := runtimeDecodeCallableArg(uint64(uintptr(unsafe.Pointer(&buf[0]))), target); ok {
+		t.Fatal("heap pointer must not become a callable")
+	}
+	raw := uint64(uintptr(newStdlibShadow("nope")))
+	if _, ok := runtimeDecodeCallableArg(raw, target); ok {
+		t.Fatal("string shadow must not become a callable")
+	}
+}
+
+func TestRuntimeDecodeCallableReturns_YakTuple(t *testing.T) {
+	msg := "api key is invalid"
+	word := int64(uintptr(newStdlibShadow(msg)))
+	tuple := []any{int64(0), word}
+	ret := int64(uintptr(newStdlibShadow(&tuple)))
+	words := make([]uint64, abi.HeaderWords)
+	ctx := unsafe.Pointer(&words[0])
+	ctxInit(ctx, abi.KindCallable, 0, 0)
+	ctxSetRet(ctx, ret)
+
+	target := reflect.TypeOf(func() (any, any) { return nil, nil })
+	out := runtimeDecodeCallableReturns(ctx, target)
+	if len(out) != 2 {
+		t.Fatalf("results = %d", len(out))
+	}
+	if out[0].IsValid() && !out[0].IsNil() {
+		t.Fatalf("first = %#v", out[0].Interface())
+	}
+	if !out[1].IsValid() || out[1].Interface() != msg {
+		t.Fatalf("second = %#v", out[1])
+	}
+
+	inner := []any{"yaklang1", "yaklang2"}
+	okTuple := []any{&inner, int64(0)}
+	ctxSetRet(ctx, int64(uintptr(newStdlibShadow(&okTuple))))
+	out = runtimeDecodeCallableReturns(ctx, target)
+	list, ok := out[0].Interface().([]any)
+	if !ok || len(list) != 2 || list[0] != "yaklang1" || list[1] != "yaklang2" {
+		t.Fatalf("list = %#v", out[0].Interface())
+	}
+	if !out[1].IsValid() || !out[1].IsNil() {
+		t.Fatalf("nil tail = %#v", out[1])
+	}
+}
+
+func TestRuntimeDecodeCallArgs_EllipsisDecodesStringWords(t *testing.T) {
+	slice := []any{
+		int64(uintptr(newStdlibShadow("logout"))),
+		int64(uintptr(newStdlibShadow("delete"))),
+	}
+	raw := uint64(uintptr(newStdlibShadow(&slice)))
+	fn := func(keywords ...string) {}
+	args, err := runtimeDecodeCallArgs(reflect.ValueOf(fn), []uint64{raw}, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := args[0].Interface().([]string)
+	if len(got) != 2 || got[0] != "logout" || got[1] != "delete" {
+		t.Fatalf("unpacked = %#v", got)
+	}
+}
+
+type ellipsisProbe struct{}
+
+func (ellipsisProbe) Start(targets ...string) int { return len(targets) }
+
+func TestShadowMethodEllipsisUnpacksYakSlice(t *testing.T) {
+	targets := makeRuntimeSlice(abi.SliceElemAny, 0, 2)
+	ps, ok := targets.(*[]any)
+	if !ok {
+		t.Fatalf("yak slice type %T", targets)
+	}
+	*ps = append(*ps, "127.0.0.1:1", "127.0.0.1:2")
+
+	obj := newStdlibShadow(ellipsisProbe{})
+	slice := newStdlibShadow(targets)
+	name := append([]byte("Start"), 0)
+	args := []uint64{
+		uint64(uintptr(obj)),
+		uint64(uintptr(unsafe.Pointer(&name[0]))),
+		uint64(uintptr(slice)),
+	}
+
+	ret, err := runtimeDispatchShadowMethod(args, true)
+	if err != nil {
+		t.Fatalf("ellipsis Start: %v", err)
+	}
+	if ret != 2 {
+		t.Fatalf("Start returned %d, want 2", ret)
+	}
+
+	_, err = runtimeDispatchShadowMethod(args, false)
+	if err == nil || !strings.Contains(err.Error(), "cannot use *[]interface {} as string") {
+		t.Fatalf("missing ellipsis flag should reject the slice, got %v", err)
 	}
 }

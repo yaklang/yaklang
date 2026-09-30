@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"fmt"
 	"os"
 	"reflect"
@@ -45,6 +46,16 @@ func runtimeDispatchYaklibCall(args []uint64, ellipsis bool) (int64, error) {
 	}
 	pkg := runtimeCStringToGoString(unsafe.Pointer(uintptr(args[0])))
 	method := runtimeCStringToGoString(unsafe.Pointer(uintptr(args[1])))
+	// delete(m, k) must mutate the original ordered-map shadow. Decoding the
+	// argument as interface{} copies it into a plain map[string]any first, so
+	// the builtin would delete from that copy and leave the script's map intact.
+	if pkg == "" && method == "delete" {
+		if len(args) < 4 {
+			return 0, fmt.Errorf("delete expects a map and a key")
+		}
+		runtimeDeleteKey(decodeTaggedArg(args[2]), decodeTaggedArg(args[3]))
+		return 0, nil
+	}
 	fn, ok := runtimeLookupYaklibCallable(pkg, method)
 	if !ok || fn == nil {
 		if pkg == "" {
@@ -282,25 +293,94 @@ func runtimeDispatchChanRecv(args []uint64, _ bool) (int64, error) {
 	return runtimeValueToInt64(recv), nil
 }
 
+// runtimeInKeyString is the key yak's `in` and `delete` use for an ordered
+// map. Those maps store every key as a string (member names are cstrings).
+func runtimeInKeyString(key any) string {
+	switch value := key.(type) {
+	case string:
+		return value
+	case []byte:
+		return string(value)
+	default:
+		return fmt.Sprint(key)
+	}
+}
+
 func runtimeMatchInContainer(left, right any) bool {
 	if left == nil || right == nil {
 		return false
 	}
+	// make(map) is a *runtimeOrderedMap shadow, not a reflect.Map. Without
+	// this branch every `"k" in mp` is false.
+	if om, ok := right.(*runtimeOrderedMap); ok {
+		return om != nil && om.Has(runtimeInKeyString(left))
+	}
 	if s, ok := right.(string); ok {
-		if ls, ok := left.(string); ok {
+		switch ls := left.(type) {
+		case string:
 			return strings.Contains(s, ls)
+		case []byte:
+			return bytes.Contains([]byte(s), ls)
 		}
 	}
 
 	rv := reflect.ValueOf(right)
-	for rv.IsValid() && rv.Kind() == reflect.Interface {
-		rv = rv.Elem()
+	// AOT slices are *[]T shadows (the header pointer is what Push mutates).
+	// decodeTaggedArg returns that pointer, so `in` has to dereference it
+	// before the slice/array/map cases. A pointer to anything else is not a
+	// yak container.
+	for rv.IsValid() {
+		switch rv.Kind() {
+		case reflect.Interface:
+			if rv.IsNil() {
+				return false
+			}
+			rv = rv.Elem()
+			continue
+		case reflect.Ptr:
+			if rv.IsNil() {
+				return false
+			}
+			elem := rv.Elem()
+			if !elem.IsValid() {
+				return false
+			}
+			switch elem.Kind() {
+			case reflect.Slice, reflect.Array, reflect.Map, reflect.Interface, reflect.Ptr:
+				rv = elem
+				continue
+			}
+		}
+		break
 	}
 	if !rv.IsValid() {
 		return false
 	}
 
 	switch rv.Kind() {
+	case reflect.Slice, reflect.Array:
+		// `"HTTP/1.1 100 Continue" in rsp.BareResponse` is a byte-slice
+		// substring test. Element equality never matches a string needle
+		// against a single byte.
+		if rv.Kind() == reflect.Slice && rv.Type().Elem().Kind() == reflect.Uint8 {
+			raw := rv.Bytes()
+			switch sub := left.(type) {
+			case string:
+				if bytes.Contains(raw, []byte(sub)) {
+					return true
+				}
+			case []byte:
+				if bytes.Contains(raw, sub) {
+					return true
+				}
+			}
+		}
+		for i := 0; i < rv.Len(); i++ {
+			if reflect.DeepEqual(rv.Index(i).Interface(), left) {
+				return true
+			}
+		}
+		return false
 	case reflect.Map:
 		lv := reflect.ValueOf(left)
 		for lv.IsValid() && lv.Kind() == reflect.Interface {
@@ -317,18 +397,53 @@ func runtimeMatchInContainer(left, right any) bool {
 			return false
 		}
 		return rv.MapIndex(lv).IsValid()
-	case reflect.Slice, reflect.Array:
-		for i := 0; i < rv.Len(); i++ {
-			if reflect.DeepEqual(rv.Index(i).Interface(), left) {
-				return true
-			}
-		}
-		return false
 	case reflect.String:
 		return strings.Contains(rv.String(), fmt.Sprint(left))
 	default:
 		return false
 	}
+}
+
+func runtimeDeleteKey(obj, key any) {
+	if obj == nil || key == nil {
+		return
+	}
+	if om, ok := obj.(*runtimeOrderedMap); ok {
+		if om != nil {
+			om.Delete(runtimeInKeyString(key))
+		}
+		return
+	}
+	rv := reflect.ValueOf(obj)
+	for rv.IsValid() && rv.Kind() == reflect.Interface {
+		if rv.IsNil() {
+			return
+		}
+		rv = rv.Elem()
+	}
+	if rv.IsValid() && rv.Kind() == reflect.Ptr && !rv.IsNil() {
+		elem := rv.Elem()
+		if elem.IsValid() && elem.Kind() == reflect.Map {
+			rv = elem
+		}
+	}
+	if !rv.IsValid() || rv.Kind() != reflect.Map {
+		return
+	}
+	keyVal := reflect.ValueOf(key)
+	if rv.Type().Key().Kind() == reflect.String && keyVal.Kind() != reflect.String {
+		keyVal = reflect.ValueOf(runtimeInKeyString(key))
+	}
+	if !keyVal.IsValid() {
+		return
+	}
+	if !keyVal.Type().AssignableTo(rv.Type().Key()) {
+		if !keyVal.Type().ConvertibleTo(rv.Type().Key()) {
+			return
+		}
+		keyVal = keyVal.Convert(rv.Type().Key())
+	}
+	rv.SetMapIndex(keyVal, reflect.Value{})
 }
 
 func runtimeDispatchIn(args []uint64, _ bool) (int64, error) {
@@ -350,11 +465,11 @@ func runtimeDecodeEqValue(raw uint64) any {
 		if ptr == nil {
 			return nil
 		}
-		if h, ok := handleFromShadow(ptr); ok {
-			return h.Value()
+		if value, ok := runtimeHandleValue(ptr); ok {
+			return value
 		}
-		if looksLikeCStringPointer(raw) {
-			return runtimeCStringToGoString(ptr)
+		if s, ok := tryCString(raw); ok {
+			return s
 		}
 		// Negative integers (e.g. -6 = 0xfffffffffffffffa) set the tag bit but
 		// are not pointers. Restore the tag bit so the signed word survives
@@ -365,10 +480,32 @@ func runtimeDecodeEqValue(raw uint64) any {
 	if raw == 0 {
 		return nil
 	}
-	if h, ok := handleFromShadow(unsafe.Pointer(uintptr(raw))); ok {
-		return h.Value()
+	if value, ok := runtimeHandleValue(unsafe.Pointer(uintptr(raw))); ok {
+		return value
 	}
 	return int64(raw)
+}
+
+// runtimeBoolEquals matches a container bool against the unboxed words the
+// compiler still uses for bool constants: true is 1, false is word 0, and
+// word 0 decodes as nil on this path.
+func runtimeBoolEquals(b bool, other any) bool {
+	if isRuntimeNilBox(other) {
+		other = nil
+	}
+	if b {
+		if n, ok := runtimeNumericValue(other); ok {
+			return n == 1
+		}
+		return false
+	}
+	if other == nil {
+		return true
+	}
+	if n, ok := runtimeNumericValue(other); ok {
+		return n == 0
+	}
+	return false
 }
 
 func runtimeNumericValue(v any) (float64, bool) {
@@ -408,6 +545,12 @@ func runtimeValuesEqual(left, right any) bool {
 	if reflect.DeepEqual(left, right) {
 		return true
 	}
+	if lb, ok := left.(bool); ok && runtimeBoolEquals(lb, right) {
+		return true
+	}
+	if rb, ok := right.(bool); ok && runtimeBoolEquals(rb, left) {
+		return true
+	}
 	if ln, ok := runtimeNumericValue(left); ok {
 		if rn, ok := runtimeNumericValue(right); ok {
 			return ln == rn
@@ -425,6 +568,13 @@ func runtimeValuesEqual(left, right any) bool {
 			return string(lb) == rs
 		}
 	}
+	// A byte slice shadow is *[]byte. poc body checks compare that pointer
+	// with the []byte or string on the other side.
+	if ls, lok := runtimeEqualBytes(left); lok {
+		if rs, rok := runtimeEqualBytes(right); rok {
+			return ls == rs
+		}
+	}
 	// yak semantics: an empty slice/map equals nil (and any other empty
 	// container of the same kind): make([]string) == nil is true, while a
 	// non-empty container is never nil.
@@ -432,6 +582,22 @@ func runtimeValuesEqual(left, right any) bool {
 		return true
 	}
 	return false
+}
+
+func runtimeEqualBytes(v any) (string, bool) {
+	switch t := v.(type) {
+	case string:
+		return t, true
+	case []byte:
+		return string(t), true
+	case *[]byte:
+		if t == nil {
+			return "", false
+		}
+		return string(*t), true
+	default:
+		return "", false
+	}
 }
 
 // runtimeContainerIsEmpty reports whether a value is nil or an empty

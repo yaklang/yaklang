@@ -1,7 +1,6 @@
 package tests
 
 import (
-	"context"
 	"os"
 	"path/filepath"
 	"sort"
@@ -39,9 +38,7 @@ func TestMustPass_SSA2LLVM_Simple(t *testing.T) {
 		name := name
 		t.Run(name, func(t *testing.T) {
 			script := filepath.Join(simpleDir, name)
-			ctx, cancel := context.WithTimeout(context.Background(), 90*time.Second)
-			defer cancel()
-			output := RunYakScriptFileWithCLITimeout(t, ctx, script, nil)
+			output := RunYakScriptFileWithCLITimeout(t, 90*time.Second, script, nil)
 			if strings.Contains(output, "panic") {
 				t.Fatalf("ssa2llvm run of %s produced a runtime panic:\n%s", name, output)
 			}

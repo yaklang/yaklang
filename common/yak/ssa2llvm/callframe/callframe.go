@@ -111,6 +111,45 @@ func IsFunctionLikeValue(value ssa.Value) bool {
 	return false
 }
 
+// foreignCapturedClosure reports a parameter whose default is a closure
+// defined in an ancestor and that closure has free values. The call has to
+// use the object the ancestor materialized.
+func foreignCapturedClosure(current *ssa.Function, calleeVal ssa.Value) bool {
+	if current == nil || calleeVal == nil {
+		return false
+	}
+	param, ok := ssa.ToParameter(calleeVal)
+	if !ok || param == nil {
+		return false
+	}
+	nested := directNonExternFunction(param.GetDefault())
+	if nested == nil {
+		nested = directNonExternFunction(param)
+	}
+	if nested == nil || len(nested.FreeValues) == 0 {
+		return false
+	}
+	parent := nested.GetParent()
+	if parent == nil {
+		return false
+	}
+	return parent.GetId() != current.GetId()
+}
+
+func directNonExternFunction(value ssa.Value) *ssa.Function {
+	if value == nil {
+		return nil
+	}
+	if fn, ok := ssa.ToFunction(value); ok && fn != nil && !fn.IsExtern() {
+		return fn
+	}
+	ft, ok := value.GetType().(*ssa.FunctionType)
+	if !ok || ft == nil || ft.This == nil || ft.This.IsExtern() {
+		return nil
+	}
+	return ft.This
+}
+
 func ResolveDirectCallee(program *ssa.Program, fn *ssa.Function, call *ssa.Call) (*ssa.Function, bool) {
 	if fn == nil || call == nil {
 		return nil, false
@@ -132,6 +171,14 @@ func ResolveDirectCallee(program *ssa.Program, fn *ssa.Function, call *ssa.Call)
 	}
 	if ssaFn, ok := ssa.ToFunction(calleeVal); ok && ssaFn != nil && !ssaFn.IsExtern() {
 		return ssaFn, true
+	}
+	// A parameter whose default is a closure defined in an ancestor must stay
+	// indirect. The ancestor stored the closure object (with its free values)
+	// into this parameter. Rebuilding the function here initializes those
+	// captures to zero. The FunctionType.This shortcut below would otherwise
+	// devirtualize the parameter before this check.
+	if foreignCapturedClosure(fn, calleeVal) {
+		return nil, false
 	}
 	if ft, ok := calleeVal.GetType().(*ssa.FunctionType); ok && ft != nil && ft.This != nil && !ft.This.IsExtern() {
 		return ft.This, true

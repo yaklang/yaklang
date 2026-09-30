@@ -1,11 +1,20 @@
 package main
 
 import (
+	"errors"
+	"math"
 	"os"
 	"path/filepath"
 	"reflect"
+	"runtime"
+	"runtime/debug"
 	"testing"
 	"unsafe"
+
+	"github.com/yaklang/yaklang/common/schema"
+	"github.com/yaklang/yaklang/common/yak/ssa2llvm/runtime/abi"
+	"github.com/yaklang/yaklang/common/yak/yaklib"
+	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 )
 
 func TestConvertMapValue_OrderedMapToGoMap(t *testing.T) {
@@ -233,6 +242,195 @@ func TestRuntimeOrderedMap_KeysValuesHasDelete(t *testing.T) {
 	}
 }
 
+func TestRuntimeMatchIn_OrderedMap(t *testing.T) {
+	m := newRuntimeOrderedMap()
+	m.Set("a", int64(1))
+	m.Set("b", int64(2))
+	if !runtimeMatchInContainer("a", m) || runtimeMatchInContainer("z", m) {
+		t.Fatalf("ordered map membership: a=%v z=%v", runtimeMatchInContainer("a", m), runtimeMatchInContainer("z", m))
+	}
+	if !runtimeMatchInContainer([]byte("b"), m) {
+		t.Fatal("[]byte key should match the string key")
+	}
+	if !runtimeMatchInContainer("cde", "abcdef") || runtimeMatchInContainer("zzz", "abcdef") {
+		t.Fatal("string containment regressed")
+	}
+	plain := map[string]int{"a": 1}
+	if !runtimeMatchInContainer("a", plain) || runtimeMatchInContainer("z", plain) {
+		t.Fatal("reflect map membership regressed")
+	}
+	slice := []string{"method", "body"}
+	if !runtimeMatchInContainer("method", slice) || runtimeMatchInContainer("nope", slice) {
+		t.Fatal("plain slice membership regressed")
+	}
+	// make([]string) stores *[]string so later writes share the header.
+	if !runtimeMatchInContainer("method", &slice) || runtimeMatchInContainer("nope", &slice) {
+		t.Fatal("*[]string membership should see the elements")
+	}
+	anySlice := []any{"method", "body"}
+	if !runtimeMatchInContainer("body", &anySlice) || runtimeMatchInContainer("nope", &anySlice) {
+		t.Fatal("*[]any membership should see the elements")
+	}
+	var nilSlice *[]string
+	if runtimeMatchInContainer("method", nilSlice) {
+		t.Fatal("nil slice pointer is not a container")
+	}
+	if !runtimeMatchInContainer("a", &plain) || runtimeMatchInContainer("z", &plain) {
+		t.Fatal("*map membership should see the keys")
+	}
+	raw := []byte("HTTP/1.1 100 Continue\r\n\r\nHTTP/1.1 200 OK")
+	if !runtimeMatchInContainer("HTTP/1.1 100 Continue", raw) || runtimeMatchInContainer("NOPE", raw) {
+		t.Fatal("[]byte substring membership regressed")
+	}
+	if !runtimeMatchInContainer("HTTP/1.1 100 Continue", &raw) || runtimeMatchInContainer("NOPE", &raw) {
+		t.Fatal("*[]byte substring membership regressed")
+	}
+	if !runtimeMatchInContainer([]byte("100"), "HTTP/1.1 100 Continue") || runtimeMatchInContainer([]byte("NOPE"), "HTTP/1.1 100 Continue") {
+		t.Fatal("[]byte needle in string regressed")
+	}
+}
+
+func TestRuntimeDecodeRiskOptionFunc(t *testing.T) {
+	opt := yakit.WithRiskParam_Title("no")
+	raw := uint64(runtimeValueToInt64(reflect.ValueOf(opt)))
+	if raw == 0 {
+		t.Fatal("boxing risk.title result produced 0")
+	}
+	tagged := raw | yakTaggedPointerMask
+	elem := reflect.TypeOf(yakit.NewRisk).In(1).Elem()
+	got, err := runtimeDecodeArg(tagged, elem)
+	if err != nil {
+		t.Fatalf("decode option: %v", err)
+	}
+	if !got.IsValid() || got.Kind() != reflect.Func || got.IsNil() {
+		t.Fatalf("decoded option = %#v (%v)", got, got.Type())
+	}
+	risk := &schema.Risk{}
+	got.Call([]reflect.Value{reflect.ValueOf(risk)})
+	if risk.Title != "no" {
+		t.Fatalf("title = %q", risk.Title)
+	}
+
+	hostRaw := uint64(uintptr(newStdlibShadow("127.0.0.1:111"))) | yakTaggedPointerMask
+	defer func() {
+		if recovered := recover(); recovered != nil {
+			t.Fatalf("NewRisk panicked: %v\n%s", recovered, debug.Stack())
+		}
+	}()
+	if _, err := callRuntimeValue(reflect.ValueOf(yakit.NewRisk), []uint64{hostRaw, tagged}, false); err != nil {
+		t.Fatalf("call NewRisk: %v", err)
+	}
+}
+
+// pinnedCString returns an untagged pointer to a NUL-terminated copy of s.
+// The caller must KeepAlive the returned buffer until the pointer is unused.
+func pinnedCString(s string) (uint64, []byte) {
+	buf := append([]byte(s), 0)
+	return uint64(uintptr(unsafe.Pointer(&buf[0]))), buf
+}
+
+func TestRuntimeRiskExportUsesNilYakitClient(t *testing.T) {
+	// AOT builds skip AutoInitYakit, so the export must not call Output on nil.
+	previous := yaklib.GetYakitClientInstance()
+	yaklib.InitYakit(nil)
+	t.Cleanup(func() { yaklib.InitYakit(previous) })
+
+	yak_register_module_risk()
+	pkg, pkgBuf := pinnedCString("risk")
+	titleName, titleBuf := pinnedCString("title")
+	argNo, argBuf := pinnedCString("no")
+	defer runtime.KeepAlive(pkgBuf)
+	defer runtime.KeepAlive(titleBuf)
+	defer runtime.KeepAlive(argBuf)
+
+	ret, err := runtimeDispatchYaklibCall([]uint64{pkg, titleName, argNo | yakTaggedPointerMask}, false)
+	if err != nil {
+		t.Fatalf("risk.title: %v", err)
+	}
+	if ret == 0 {
+		t.Fatal("risk.title returned 0")
+	}
+	elem := reflect.TypeOf(yakit.NewRisk).In(1).Elem()
+	opt, err := runtimeDecodeArg(uint64(ret)|yakTaggedPointerMask, elem)
+	if err != nil || !opt.IsValid() || opt.Kind() != reflect.Func || opt.IsNil() {
+		t.Fatalf("title return does not decode as option: ret=%#x err=%v opt=%#v", uint64(ret), err, opt)
+	}
+
+	called := false
+	yakit.RegisterBeforeRiskSave(func(r *schema.Risk) {
+		called = true
+		if r != nil && r.Title != "no" {
+			t.Errorf("callback title = %q", r.Title)
+		}
+	})
+
+	newRisk, newRiskBuf := pinnedCString("NewRisk")
+	host, hostBuf := pinnedCString("127.0.0.1:111")
+	defer runtime.KeepAlive(newRiskBuf)
+	defer runtime.KeepAlive(hostBuf)
+	defer func() {
+		if recovered := recover(); recovered != nil {
+			t.Fatalf("risk.NewRisk panicked (callback=%v): %v\n%s", called, recovered, debug.Stack())
+		}
+	}()
+	if _, err := runtimeDispatchYaklibCall([]uint64{
+		pkg,
+		newRisk,
+		host | yakTaggedPointerMask,
+		uint64(ret) | yakTaggedPointerMask,
+	}, false); err != nil {
+		t.Fatalf("risk.NewRisk: %v (callback=%v)", err, called)
+	}
+	if !called {
+		t.Fatal("RegisterBeforeRiskSave callback did not run")
+	}
+}
+
+func TestRuntimeDeleteKey_OrderedMap(t *testing.T) {
+	m := newRuntimeOrderedMap()
+	m.Set("a", int64(1))
+	m.Set("b", int64(2))
+	m.Set("c", int64(3))
+	runtimeDeleteKey(m, "b")
+	if m.Has("b") || m.Len() != 2 || !m.Has("a") || !m.Has("c") {
+		t.Fatalf("delete ordered map: keys=%v", m.Keys())
+	}
+	plain := map[string]int{"a": 1, "b": 2}
+	runtimeDeleteKey(plain, "a")
+	if _, ok := plain["a"]; ok || len(plain) != 1 {
+		t.Fatalf("delete reflect map: %#v", plain)
+	}
+}
+
+func TestRuntimeSprintf_SliceAndScalar(t *testing.T) {
+	format := int64(uintptr(newStdlibShadow("hello %s = %d")))
+	slice := []any{"x", int64(42)}
+	arg := int64(uintptr(newStdlibShadow(&slice)))
+	got := sprintfResult(t, yak_runtime_sprintf(format, arg))
+	if got != "hello x = 42" {
+		t.Fatalf("slice sprintf = %q", got)
+	}
+
+	scalarFmt := int64(uintptr(newStdlibShadow("n=%d")))
+	got = sprintfResult(t, yak_runtime_sprintf(scalarFmt, 42))
+	if got != "n=42" {
+		t.Fatalf("scalar sprintf = %q", got)
+	}
+}
+
+func sprintfResult(t *testing.T, raw int64) string {
+	t.Helper()
+	h, ok := handleFromShadow(unsafe.Pointer(uintptr(raw)))
+	if !ok {
+		t.Fatalf("sprintf result %d is not a shadow", raw)
+	}
+	s, ok := h.Value().(string)
+	if !ok {
+		t.Fatalf("sprintf result type %T", h.Value())
+	}
+	return s
+}
+
 func TestRuntimeStringSlice_RuneBounds(t *testing.T) {
 	s := "你好"
 	ptr := newStdlibShadow(s)
@@ -254,16 +452,47 @@ func TestRuntimeStringSlice_RuneBounds(t *testing.T) {
 }
 
 func TestRuntimeDropError_TupleAndSingle(t *testing.T) {
-	// Multi-return tuple: drop error, keep first value.
+	ctx := make([]uint64, 16)
+	ctxPtr := unsafe.Pointer(&ctx[0])
+	ctxInit(ctxPtr, 1, 0, 0)
+
+	// A non-error tail is not `~`'s error slot: keep the first value.
 	tuple := []any{int64(7), "boom"}
 	raw := uintptr(newStdlibShadow(tuple))
-	if got := yak_runtime_drop_error(unsafe.Pointer(raw)); got != 7 {
+	if got := yak_runtime_drop_error(ctxPtr, unsafe.Pointer(raw)); got != 7 {
 		t.Fatalf("drop_error tuple = %d, want 7", got)
 	}
+	if ctxLoadWord(ctxPtr, abi.WordPanic) != 0 {
+		t.Fatal("non-error tail should not panic")
+	}
+
+	// A nil error is dropped and the first value is kept.
+	nilErr := []any{int64(7), nil}
+	rawNil := uintptr(newStdlibShadow(nilErr))
+	if got := yak_runtime_drop_error(ctxPtr, unsafe.Pointer(rawNil)); got != 7 {
+		t.Fatalf("drop_error nil error = %d, want 7", got)
+	}
+	if ctxLoadWord(ctxPtr, abi.WordPanic) != 0 {
+		t.Fatal("nil error should not panic")
+	}
+
+	// A non-nil error is stored on the call context for try/catch.
+	bad := []any{[]byte(nil), errors.New("bad hex")}
+	rawBad := uintptr(newStdlibShadow(bad))
+	if got := yak_runtime_drop_error(ctxPtr, unsafe.Pointer(rawBad)); got != 0 {
+		t.Fatalf("drop_error bad = %d, want 0", got)
+	}
+	if ctxLoadWord(ctxPtr, abi.WordPanic) == 0 {
+		t.Fatal("non-nil error should set panic")
+	}
+	if ctxLoadWord(ctxPtr, abi.WordFlags)&abi.FlagPanicTaggedPointer == 0 {
+		t.Fatal("error panic should be a tagged pointer")
+	}
+
 	// Single value (a string shadow): returned unchanged as its word.
 	s := "abc"
 	raw2 := uintptr(newStdlibShadow(s))
-	out := yak_runtime_drop_error(unsafe.Pointer(raw2))
+	out := yak_runtime_drop_error(nil, unsafe.Pointer(raw2))
 	if h, ok := handleFromShadow(unsafe.Pointer(uintptr(out))); !ok {
 		t.Fatalf("drop_error single = %#x, want shadow handle", out)
 	} else if h.Value() != s {
@@ -285,4 +514,98 @@ func TestRuntimeReadClosureFreeValue_ByRefSlot(t *testing.T) {
 	if got := yak_runtime_read_closure_free_value(raw, 0, 1); got != 99 {
 		t.Fatalf("read closure free value after update = %d, want 99", got)
 	}
+}
+
+func TestRuntimeToStringWord_TaggedPointerIsText(t *testing.T) {
+	buf := append([]byte("127.0.0.1:9"), 0)
+	ptr := uint64(uintptr(unsafe.Pointer(&buf[0])))
+	if !looksLikeCStringPointer(ptr) {
+		t.Fatalf("fixture pointer %#x is not a cstring candidate", ptr)
+	}
+	got := runtimeShadowString(t, runtimeToStringWord(int64(ptr|yakTaggedPointerMask)))
+	if got != "127.0.0.1:9" {
+		t.Fatalf("tagged cstring = %q", got)
+	}
+
+	shadow := uint64(uintptr(newStdlibShadow("127.0.0.1:9"))) | yakTaggedPointerMask
+	got = runtimeShadowString(t, runtimeToStringWord(int64(shadow)))
+	if got != "127.0.0.1:9" {
+		t.Fatalf("tagged shadow = %q", got)
+	}
+
+	got = runtimeShadowString(t, runtimeToStringWord(int64(math.Float64bits(3.14))))
+	if got != "3.14" {
+		t.Fatalf("float = %q", got)
+	}
+	got = runtimeShadowString(t, runtimeToStringWord(42))
+	if got != "42" {
+		t.Fatalf("int = %q", got)
+	}
+}
+
+func TestRuntimeToCString_PreservesInteriorNUL(t *testing.T) {
+	raw := uintptr(newStdlibShadow("a\x00b"))
+	out := yak_runtime_to_cstring(raw)
+	got, ok := tryResolveShadowString(unsafe.Pointer(out))
+	if !ok || got != "a\x00b" {
+		t.Fatalf("nul string = %q ok=%v", got, ok)
+	}
+
+	plain := uintptr(newStdlibShadow("hello"))
+	copied := yak_runtime_to_cstring(plain)
+	text, ok := tryCString(uint64(uintptr(unsafe.Pointer(copied))))
+	if !ok || text != "hello" {
+		t.Fatalf("plain cstring = %q ok=%v", text, ok)
+	}
+}
+
+func TestRuntimeDropError_PointerTuple(t *testing.T) {
+	ctx := make([]uint64, 16)
+	ctxPtr := unsafe.Pointer(&ctx[0])
+	ctxInit(ctxPtr, 1, 0, 0)
+
+	nilTail := []any{int64(7), int64(0)}
+	rawNil := newStdlibShadow(&nilTail)
+	if got := yak_runtime_drop_error(ctxPtr, rawNil); got != 7 {
+		t.Fatalf("drop *[]any nil error = %d, want 7", got)
+	}
+	if ctxLoadWord(ctxPtr, abi.WordPanic) != 0 {
+		t.Fatal("nil abi error should not panic")
+	}
+
+	errWord := int64(uintptr(newStdlibShadow(errors.New("bad hex"))))
+	bad := []any{int64(7), errWord}
+	rawBad := newStdlibShadow(&bad)
+	if got := yak_runtime_drop_error(ctxPtr, rawBad); got != 0 {
+		t.Fatalf("drop *[]any error = %d, want 0", got)
+	}
+	if ctxLoadWord(ctxPtr, abi.WordPanic) == 0 {
+		t.Fatal("abi error should set panic")
+	}
+}
+
+func TestRuntimeValuesEqual_ByteSlicePointer(t *testing.T) {
+	body := []byte("a")
+	if !runtimeValuesEqual(&body, []byte("a")) {
+		t.Fatal("*[]byte should equal []byte")
+	}
+	if !runtimeValuesEqual(&body, "a") {
+		t.Fatal("*[]byte should equal string")
+	}
+	if runtimeValuesEqual(&body, "b") {
+		t.Fatal("*[]byte should not equal a different string")
+	}
+}
+
+func runtimeShadowString(t *testing.T, raw int64) string {
+	t.Helper()
+	h, ok := handleFromShadow(unsafe.Pointer(uintptr(raw)))
+	if !ok {
+		t.Fatalf("not a shadow: %#x", raw)
+	}
+	s, ok := h.Value().(string)
+	if !ok {
+		t.Fatalf("shadow %T", h.Value())
+	}
+	return s
 }

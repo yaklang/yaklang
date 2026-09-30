@@ -148,10 +148,20 @@ func linkStaticWithPatch(objFile, binFile, workDir string, obfArchives []string,
 		// identical Go functions would share one address and runtime.textsectmap
 		// would attribute the folded PC to the wrong function.
 		linkArgs = append(linkArgs, "--gc-sections")
+		// Boehm's collector aborts when a Go runtime thread allocates enough
+		// to start a collection. The wrap object disables automatic collection
+		// on the first GC_malloc and registers the thread that runs the
+		// explicit GC_gcollect. -u keeps those sections under --gc-sections.
+		linkArgs = append(linkArgs,
+			"--wrap=GC_malloc",
+			"--wrap=GC_gcollect",
+			"-u", "__wrap_GC_malloc",
+			"-u", "__wrap_GC_gcollect",
+		)
 		in := llvm.StaticLinkInput{
 			ObjectPath: objFile,
 			Archives:   archives,
-			CRTBegin:   []string{rp.Crt1, rp.Crti, rp.CrtBegin},
+			CRTBegin:   []string{rp.Crt1, rp.Crti, rp.CrtBegin, rp.BoehmWrap},
 			CRTEnd:     []string{rp.CrtEnd, rp.Crtn},
 			SystemLibs: []string{rp.Libc, rp.Libgcc, rp.LibgccEh},
 			OutputPath: binFile,

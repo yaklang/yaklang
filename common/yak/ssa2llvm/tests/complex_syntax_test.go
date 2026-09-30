@@ -1,5 +1,6 @@
 package tests
 
+import "strings"
 import "testing"
 import "github.com/stretchr/testify/require"
 
@@ -75,6 +76,61 @@ func TestComplex_Defer_PrintOrder(t *testing.T) {
 		return 0
 	}
 	`, 2, 1)
+}
+
+func TestComplex_Defer_SkippedWhenBranchNotTaken(t *testing.T) {
+	checkPrintBinary(t, `
+	check = () => {
+		v = 0
+		defer println(1)
+		if v == 1 {
+			defer println(2)
+		}
+		println(3)
+		return 0
+	}
+	`, 3, 1)
+}
+
+func TestComplex_DieNil_Continues(t *testing.T) {
+	checkPrintBinary(t, `
+	check = () => {
+		die(nil)
+		println(1)
+		return 0
+	}
+	`, 1)
+}
+
+func TestComplex_DieNonNil_Aborts(t *testing.T) {
+	exit, output := runBinaryExitCodeWithEnv(t, `
+	check = () => {
+		println(1)
+		die(111)
+		println(2)
+		return 0
+	}
+	`, "check", nil)
+	if exit == 0 {
+		t.Fatalf("die(111) exited 0: %s", output)
+	}
+	if !strings.Contains(output, "1\n") || strings.Contains(output, "2\n") {
+		t.Fatalf("die(111) output %q", output)
+	}
+}
+
+func TestComplex_Defer_RunsWhenBranchTaken(t *testing.T) {
+	checkPrintBinary(t, `
+	check = () => {
+		v = 1
+		defer println(1)
+		if v == 1 {
+			defer println(2)
+		}
+		println(3)
+		return 0
+	}
+	`, 3, 2, 1)
 }
 
 func TestComplex_TryCatchFinally_Panic(t *testing.T) {

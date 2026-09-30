@@ -107,8 +107,25 @@ func (c *Compiler) addMainWrapperToModule(entryFunc string, printEntryResult boo
 
 	// Panic exit block: return a non-zero code (255) so a failing script
 	// (assert / panic) is detectable by the caller / test harness.
+	// Assert failures only store the message on the context; print it before
+	// exiting so a non-zero status is not an empty capture.
 	panicBB := c.LLVMCtx.AddBasicBlock(mainFn, "yak_exit_panic")
 	c.Builder.SetInsertPointAtEnd(panicBB)
+	// die(err) stores the error shadow. to_cstring only understands string
+	// shadows and C strings, so an error object is printed as the shadow
+	// header magic ("Q2ASSKAY"). to_string turns errors and other values
+	// into a string shadow first.
+	toStrFn, toStrType := c.getOrInsertRuntimeToString()
+	panicStr := c.Builder.CreateCall(toStrType, toStrFn, []llvm.Value{panicSlot}, "yak_panic_str")
+	cstrFn, cstrType := c.getOrInsertRuntimeToCString()
+	panicMsg := c.Builder.CreateCall(cstrType, cstrFn, []llvm.Value{panicStr}, "yak_panic_cstr")
+	i8Ptr := llvm.PointerType(c.LLVMCtx.Int8Type(), 0)
+	putsType := llvm.FunctionType(c.LLVMCtx.Int32Type(), []llvm.Type{i8Ptr}, false)
+	putsFn := mod.NamedFunction("puts")
+	if putsFn.IsNil() {
+		putsFn = llvm.AddFunction(mod, "puts", putsType)
+	}
+	c.Builder.CreateCall(putsType, putsFn, []llvm.Value{panicMsg}, "")
 	c.Builder.CreateRet(llvm.ConstInt(c.LLVMCtx.Int32Type(), 255, false))
 
 	// Branch from the entry block to panic/normal based on the panic slot.
