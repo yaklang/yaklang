@@ -138,7 +138,7 @@ func TestDoHTTPRequest_MissingRequestIsProtocolFailure(t *testing.T) {
 
 func TestDoHTTPRequest_BasicURL(t *testing.T) {
 	flag := utils.RandStringBytes(20)
-	host, port := utils.DebugMockHTTP([]byte(flag))
+	host, port := startImmediateHTTPResponse(t, []byte(flag))
 	tool := getDoHTTPRequestTool(t)
 
 	stdout, _ := execTool(t, tool, aitool.InvokeParams{
@@ -155,7 +155,7 @@ func TestDoHTTPRequest_BasicURL(t *testing.T) {
 
 func TestDoHTTPRequest_RequestSmallPrint(t *testing.T) {
 	flag := utils.RandStringBytes(20)
-	host, port := utils.DebugMockHTTP([]byte(flag))
+	host, port := startImmediateHTTPResponse(t, []byte(flag))
 	tool := getDoHTTPRequestTool(t)
 
 	stdout, _ := execTool(t, tool, aitool.InvokeParams{
@@ -173,7 +173,7 @@ func TestDoHTTPRequest_RequestSmallPrint(t *testing.T) {
 
 func TestDoHTTPRequest_RequestLargeTruncate(t *testing.T) {
 	flag := utils.RandStringBytes(20)
-	host, port := utils.DebugMockHTTP([]byte(flag))
+	host, port := startImmediateHTTPResponse(t, []byte(flag))
 	tool := getDoHTTPRequestTool(t)
 
 	largeBody := strings.Repeat("X", 6*1024)
@@ -194,7 +194,7 @@ func TestDoHTTPRequest_RequestLargeTruncate(t *testing.T) {
 	assert.Assert(t, !strings.Contains(stdout, "saved to"), "no file should be saved when save-packet is off")
 
 	// with save-packet=true: the full packet is dumped to a file
-	host2, port2 := utils.DebugMockHTTP([]byte(flag))
+	host2, port2 := startImmediateHTTPResponse(t, []byte(flag))
 	stdout, _ = execTool(t, tool, aitool.InvokeParams{
 		"url":          "http://" + host2 + ":" + strconv.Itoa(port2),
 		"method":       "POST",
@@ -211,7 +211,7 @@ func TestDoHTTPRequest_RequestLargeTruncate(t *testing.T) {
 
 func TestDoHTTPRequest_ResponseSmallNoPattern(t *testing.T) {
 	smallBody := "SMALL_RESPONSE_" + utils.RandStringBytes(20)
-	host, port := utils.DebugMockHTTP([]byte(smallBody))
+	host, port := startImmediateHTTPResponse(t, []byte(smallBody))
 	tool := getDoHTTPRequestTool(t)
 
 	stdout, _ := execTool(t, tool, aitool.InvokeParams{
@@ -229,7 +229,7 @@ func TestDoHTTPRequest_ResponseLargeNoPattern(t *testing.T) {
 	tailMarker := "TAIL_MARKER_" + utils.RandStringBytes(10)
 	largeBody := headMarker + strings.Repeat("A", 12*1024) + tailMarker
 
-	host, port := utils.DebugMockHTTPEx(func(req []byte) []byte {
+	host, port := startRawHTTPResponse(t, func(req []byte) []byte {
 		return []byte("HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\n\r\n" + largeBody)
 	})
 	tool := getDoHTTPRequestTool(t)
@@ -260,7 +260,7 @@ func TestDoHTTPRequest_ResponseLargeNoPattern(t *testing.T) {
 func TestDoHTTPRequest_ResponseSmallWithKeyword(t *testing.T) {
 	keyword := "UNIQUE_KEYWORD_" + utils.RandStringBytes(10)
 	smallBody := "prefix content " + keyword + " suffix content"
-	host, port := utils.DebugMockHTTP([]byte(smallBody))
+	host, port := startImmediateHTTPResponse(t, []byte(smallBody))
 	tool := getDoHTTPRequestTool(t)
 
 	stdout, _ := execTool(t, tool, aitool.InvokeParams{
@@ -276,7 +276,7 @@ func TestDoHTTPRequest_ResponseSmallWithKeyword(t *testing.T) {
 }
 
 func TestDoHTTPRequest_KeywordNotFoundIsExplicit(t *testing.T) {
-	host, port := utils.DebugMockHTTP([]byte("ordinary response without the marker"))
+	host, port := startImmediateHTTPResponse(t, []byte("ordinary response without the marker"))
 	tool := getDoHTTPRequestTool(t)
 
 	stdout, _ := execTool(t, tool, aitool.InvokeParams{
@@ -291,7 +291,7 @@ func TestDoHTTPRequest_KeywordNotFoundIsExplicit(t *testing.T) {
 }
 
 func TestDoHTTPRequest_MalformedHeaderIsVisibleButRequestContinues(t *testing.T) {
-	host, port := utils.DebugMockHTTP([]byte("malformed_header_recovered"))
+	host, port := startImmediateHTTPResponse(t, []byte("malformed_header_recovered"))
 	tool := getDoHTTPRequestTool(t)
 
 	stdout, _ := execTool(t, tool, aitool.InvokeParams{
@@ -309,7 +309,7 @@ func TestDoHTTPRequest_ResponseLargeWithKeyword(t *testing.T) {
 	keyword := "NEEDLE_" + utils.RandStringBytes(10)
 	largeBody := strings.Repeat("B", 6*1024) + keyword + strings.Repeat("C", 6*1024)
 
-	host, port := utils.DebugMockHTTPEx(func(req []byte) []byte {
+	host, port := startRawHTTPResponse(t, func(req []byte) []byte {
 		return []byte("HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\n\r\n" + largeBody)
 	})
 	tool := getDoHTTPRequestTool(t)
@@ -330,7 +330,7 @@ func TestDoHTTPRequest_ResponseLargeWithKeyword(t *testing.T) {
 func TestDoHTTPRequest_ResponseWithRegexp(t *testing.T) {
 	marker := "ERR_CODE_42"
 	body := "status=ok " + marker + " done"
-	host, port := utils.DebugMockHTTP([]byte(body))
+	host, port := startImmediateHTTPResponse(t, []byte(body))
 	tool := getDoHTTPRequestTool(t)
 
 	stdout, _ := execTool(t, tool, aitool.InvokeParams{
@@ -347,7 +347,7 @@ func TestDoHTTPRequest_ResponseWithRegexp(t *testing.T) {
 
 func TestDoHTTPRequest_PacketMode(t *testing.T) {
 	flag := utils.RandStringBytes(20)
-	host, port := utils.DebugMockHTTPEx(func(req []byte) []byte {
+	host, port := startRawHTTPResponse(t, func(req []byte) []byte {
 		if strings.Contains(string(req), "X-Custom-Test") {
 			return []byte("HTTP/1.1 200 OK\r\n\r\n" + flag)
 		}
@@ -370,7 +370,7 @@ func TestDoHTTPRequest_PacketMode(t *testing.T) {
 
 func TestDoHTTPRequest_CustomHeaders(t *testing.T) {
 	receivedHeader := ""
-	host, port := utils.DebugMockHTTPEx(func(req []byte) []byte {
+	host, port := startRawHTTPResponse(t, func(req []byte) []byte {
 		reqStr := string(req)
 		if strings.Contains(reqStr, "X-My-Header: test-value-123") {
 			receivedHeader = "found"
@@ -398,7 +398,7 @@ func TestDoHTTPRequest_CustomHeaders(t *testing.T) {
 // the map to "map[X-My-Header:test-value-123]"; the tool must normalize that back into a
 // real header instead of dropping it.
 func TestDoHTTPRequest_HeadersAsObject(t *testing.T) {
-	host, port := utils.DebugMockHTTPEx(func(req []byte) []byte {
+	host, port := startRawHTTPResponse(t, func(req []byte) []byte {
 		if strings.Contains(string(req), "X-My-Header: test-value-123") {
 			return []byte("HTTP/1.1 200 OK\r\n\r\nheader_received")
 		}
@@ -419,7 +419,7 @@ func TestDoHTTPRequest_HeadersAsObject(t *testing.T) {
 
 // TestDoHTTPRequest_QueryParamsAsObject verifies query-params also accept a JSON object.
 func TestDoHTTPRequest_QueryParamsAsObject(t *testing.T) {
-	host, port := utils.DebugMockHTTPEx(func(req []byte) []byte {
+	host, port := startRawHTTPResponse(t, func(req []byte) []byte {
 		if strings.Contains(string(req), "id=42") {
 			return []byte("HTTP/1.1 200 OK\r\n\r\nparam_received")
 		}
@@ -437,7 +437,7 @@ func TestDoHTTPRequest_QueryParamsAsObject(t *testing.T) {
 }
 
 func TestDoHTTPRequest_PostBody(t *testing.T) {
-	host, port := utils.DebugMockHTTPEx(func(req []byte) []byte {
+	host, port := startRawHTTPResponse(t, func(req []byte) []byte {
 		reqStr := string(req)
 		if strings.Contains(reqStr, `"name":"test"`) {
 			return []byte("HTTP/1.1 200 OK\r\n\r\nbody_ok")
@@ -460,7 +460,7 @@ func TestDoHTTPRequest_PostBody(t *testing.T) {
 }
 
 func TestDoHTTPRequest_QueryParams(t *testing.T) {
-	host, port := utils.DebugMockHTTPEx(func(req []byte) []byte {
+	host, port := startRawHTTPResponse(t, func(req []byte) []byte {
 		reqStr := string(req)
 		if strings.Contains(reqStr, "foo=bar") && strings.Contains(reqStr, "baz=qux") {
 			return []byte("HTTP/1.1 200 OK\r\n\r\nquery_ok")
@@ -482,7 +482,7 @@ func TestDoHTTPRequest_QueryParams(t *testing.T) {
 
 func TestDoHTTPRequest_QueryObjectEscapesSpecialCharacters(t *testing.T) {
 	const special = `asdf' abc " #&tail`
-	host, port := utils.DebugMockHTTPHandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	host, port := startHTTPHandler(t, func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Query().Get("a") == special && r.URL.Query().Get("b") == "ssxxx" {
 			w.Write([]byte("special_query_ok"))
 			return
@@ -507,7 +507,7 @@ func TestDoHTTPRequest_QueryObjectEscapesSpecialCharacters(t *testing.T) {
 }
 
 func TestDoHTTPRequest_PostParams(t *testing.T) {
-	host, port := utils.DebugMockHTTPEx(func(req []byte) []byte {
+	host, port := startRawHTTPResponse(t, func(req []byte) []byte {
 		reqStr := string(req)
 		if strings.Contains(reqStr, "user=admin") && strings.Contains(reqStr, "pass=secret") {
 			return []byte("HTTP/1.1 200 OK\r\n\r\npost_params_ok")
@@ -530,7 +530,7 @@ func TestDoHTTPRequest_PostParams(t *testing.T) {
 
 func TestDoHTTPRequest_FormObjectEscapesSpecialCharacters(t *testing.T) {
 	const special = `asdf' abc " #&tail`
-	host, port := utils.DebugMockHTTPHandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	host, port := startHTTPHandler(t, func(w http.ResponseWriter, r *http.Request) {
 		if err := r.ParseForm(); err != nil {
 			w.WriteHeader(http.StatusBadRequest)
 			w.Write([]byte("parse_failed:" + err.Error()))
@@ -567,7 +567,7 @@ func TestDoHTTPRequest_FormObjectEscapesSpecialCharacters(t *testing.T) {
 // ReAct. An omitted JSON object must stay omitted instead of becoming string "{}".
 func TestDoHTTPRequest_InvokeWithParamsDoesNotStringifyOmittedJSONObjectDefaults(t *testing.T) {
 	const special = `asdf' abc " #&tail`
-	host, port := utils.DebugMockHTTPHandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	host, port := startHTTPHandler(t, func(w http.ResponseWriter, r *http.Request) {
 		_ = r.ParseForm()
 		if r.Form.Get("a") == special && r.Form.Get("b") == "ssxxx" {
 			w.Write([]byte("react_form_result_visible"))
@@ -600,7 +600,7 @@ func TestDoHTTPRequest_InvokeWithParamsDoesNotStringifyOmittedJSONObjectDefaults
 // reaching the Yak script before it can print request/response evidence.
 func TestDoHTTPRequest_InvokeWithParamsAcceptsEmptyQueryAndFormArrays(t *testing.T) {
 	bodyMarker := "EMPTY_COLLECTIONS_" + utils.RandStringBytes(10)
-	host, port := utils.DebugMockHTTPEx(func(req []byte) []byte {
+	host, port := startRawHTTPResponse(t, func(req []byte) []byte {
 		if strings.Contains(string(req), "Cookie: sess_guest=test-session") {
 			return []byte("HTTP/1.1 200 OK\r\nContent-Type: application/json\r\n\r\n{\"InternalNote\":\"" + bodyMarker + "\"}")
 		}
@@ -629,7 +629,7 @@ func TestDoHTTPRequest_InvokeWithParamsAcceptsEmptyQueryAndFormArrays(t *testing
 }
 
 func TestDoHTTPRequest_InvokeWithParamsAcceptsHeaderObject(t *testing.T) {
-	host, port := utils.DebugMockHTTPEx(func(req []byte) []byte {
+	host, port := startRawHTTPResponse(t, func(req []byte) []byte {
 		if strings.Contains(string(req), "Cookie: sess_guest=test-session") {
 			return []byte("HTTP/1.1 200 OK\r\n\r\nheader_object_ok")
 		}
@@ -663,7 +663,7 @@ func TestDoHTTPRequest_InvalidNonEmptyFormArrayReturnsActionableError(t *testing
 
 func TestDoHTTPRequest_LegacyPostParamsObjectEscapesSpecialCharacters(t *testing.T) {
 	const special = `asdf' abc " #&tail`
-	host, port := utils.DebugMockHTTPHandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	host, port := startHTTPHandler(t, func(w http.ResponseWriter, r *http.Request) {
 		r.ParseForm()
 		if r.Form.Get("a") == special && r.Form.Get("b") == "ssxxx" {
 			w.Write([]byte("legacy_object_form_ok"))
@@ -687,7 +687,7 @@ func TestDoHTTPRequest_LegacyPostParamsObjectEscapesSpecialCharacters(t *testing
 
 func TestDoHTTPRequest_Redirect(t *testing.T) {
 	flag := utils.RandStringBytes(20)
-	host, port := utils.DebugMockHTTPHandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	host, port := startHTTPHandler(t, func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/final" {
 			w.WriteHeader(200)
 			w.Write([]byte(flag))
@@ -708,7 +708,7 @@ func TestDoHTTPRequest_Redirect(t *testing.T) {
 }
 
 func TestDoHTTPRequest_NoRedirect(t *testing.T) {
-	host, port := utils.DebugMockHTTPHandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	host, port := startHTTPHandler(t, func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/final" {
 			w.WriteHeader(200)
 			w.Write([]byte("final_page"))
@@ -730,7 +730,7 @@ func TestDoHTTPRequest_NoRedirect(t *testing.T) {
 
 func TestDoHTTPRequest_SavePacket(t *testing.T) {
 	flag := utils.RandStringBytes(20)
-	host, port := utils.DebugMockHTTP([]byte(flag))
+	host, port := startImmediateHTTPResponse(t, []byte(flag))
 	tool := getDoHTTPRequestTool(t)
 
 	// default (save-packet off, verbose off): the generated request packet is printed
@@ -745,7 +745,7 @@ func TestDoHTTPRequest_SavePacket(t *testing.T) {
 
 	// save-packet=true (+ verbose to also see the inline packet): both request and
 	// response packets are saved to temp files
-	host2, port2 := utils.DebugMockHTTP([]byte(flag))
+	host2, port2 := startImmediateHTTPResponse(t, []byte(flag))
 	stdout, _ = execTool(t, tool, aitool.InvokeParams{
 		"url":         "http://" + host2 + ":" + strconv.Itoa(port2),
 		"timeout":     10,
@@ -762,7 +762,7 @@ func TestDoHTTPRequest_SavePacket(t *testing.T) {
 // connection trace.
 func TestDoHTTPRequest_QuietMode(t *testing.T) {
 	bodyMarker := "QUIET_BODY_" + utils.RandStringBytes(10)
-	host, port := utils.DebugMockHTTPEx(func(req []byte) []byte {
+	host, port := startRawHTTPResponse(t, func(req []byte) []byte {
 		return []byte("HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\n\r\n" + bodyMarker)
 	})
 	tool := getDoHTTPRequestTool(t)
@@ -792,7 +792,7 @@ func TestDoHTTPRequest_QuietMode(t *testing.T) {
 // The tool must auto-retry the same request as form-encoded, surface a [content-type hint],
 // and report the accepted response (200 here) instead of leaving the AI stuck on 400.
 func TestDoHTTPRequest_FormRetryOnJsonRejected(t *testing.T) {
-	host, port := utils.DebugMockHTTPEx(func(req []byte) []byte {
+	host, port := startRawHTTPResponse(t, func(req []byte) []byte {
 		reqStr := string(req)
 		// form-only endpoint: JSON body -> 400 required; form-encoded body -> 200
 		if strings.Contains(reqStr, "Content-Type: application/json") {
@@ -820,23 +820,35 @@ func TestDoHTTPRequest_FormRetryOnJsonRejected(t *testing.T) {
 }
 
 func TestDoHTTPRequest_Timeout(t *testing.T) {
-	host, port := utils.DebugMockHTTPHandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		select {}
-	})
+	received := make(chan struct{}, 1)
+	release := make(chan struct{})
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		received <- struct{}{}
+		select {
+		case <-r.Context().Done():
+		case <-release:
+		}
+	}))
+	t.Cleanup(server.Close)
+	t.Cleanup(func() { close(release) })
 	tool := getDoHTTPRequestTool(t)
-
-	stdout, _ := execTool(t, tool, aitool.InvokeParams{
-		"url":     "http://" + host + ":" + strconv.Itoa(port),
-		"timeout": 2,
-	})
-
-	assert.Assert(t,
-		strings.Contains(stdout, "failed") || strings.Contains(stdout, "timeout") || strings.Contains(stdout, "context deadline"),
-		"timeout should cause a failure message, got: %s", stdout)
+	var out, stderr bytes.Buffer
+	raw, err := tool.Callback(context.Background(), aitool.InvokeParams{"url": server.URL, "timeout": 1}, nil, &out, &stderr)
+	assert.NilError(t, err, stderr.String())
+	select {
+	case <-received:
+	default:
+		t.Fatal("timeout test never sent its request")
+	}
+	result := utils.InterfaceToGeneralMap(raw)
+	assert.Equal(t, result["request_sent"], true)
+	assert.Equal(t, result["response_received"], false)
+	transportError := strings.ToLower(fmt.Sprint(result["transport_error"]))
+	assert.Assert(t, strings.Contains(transportError, "timeout") || strings.Contains(transportError, "deadline"), "expected actual transport timeout, got %v", result)
 }
 
 func TestDoHTTPRequest_ContentType(t *testing.T) {
-	host, port := utils.DebugMockHTTPEx(func(req []byte) []byte {
+	host, port := startRawHTTPResponse(t, func(req []byte) []byte {
 		reqStr := string(req)
 		if strings.Contains(reqStr, "Content-Type: application/xml") {
 			return []byte("HTTP/1.1 200 OK\r\n\r\nctype_ok")
@@ -860,7 +872,7 @@ func TestDoHTTPRequest_ContentType(t *testing.T) {
 
 func TestDoHTTPRequest_HttpsMode(t *testing.T) {
 	flag := utils.RandStringBytes(20)
-	host, port := utils.DebugMockHTTP([]byte(flag))
+	host, port := startImmediateHTTPResponse(t, []byte(flag))
 	tool := getDoHTTPRequestTool(t)
 
 	stdout, _ := execTool(t, tool, aitool.InvokeParams{

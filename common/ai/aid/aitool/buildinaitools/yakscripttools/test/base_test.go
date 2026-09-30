@@ -39,7 +39,7 @@ func setupHTTPYakToolFixture(t *testing.T) {
 func TestGetYakScript(t *testing.T) {
 	setupHTTPYakToolFixture(t)
 	flag := utils.RandStringBytes(20)
-	host, port := utils.DebugMockHTTP([]byte(flag))
+	host, port := startImmediateHTTPResponse(t, []byte(flag))
 	tools := yakscripttools.GetAllYakScriptAiTools()
 	hasDoHttp := false
 	for _, ait := range tools {

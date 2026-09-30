@@ -992,7 +992,8 @@ jobs:
             package_workers: "2"
             test_configs: |
               [
-                {"package": "./common/ai/aid/...", "timeout": "12m", "parallel": 1, "exclude_packages": ["./common/ai/aid/aireact/...", "./common/ai/aid/test"], "retry": 1, "retry_delay": 5}
+                {"package": "./common/ai/aid/...", "timeout": "12m", "parallel": 1, "exclude_packages": ["./common/ai/aid/aireact/...", "./common/ai/aid/test"], "retry": 1, "retry_delay": 5},
+                {"package": "./common/browser", "timeout": "10s", "run": "^TestWaitFunction", "parallel": 1}
               ]
 
           - name: "Test AI Aid Test / RAG / Forge / AIHTTP"
@@ -1111,14 +1112,14 @@ jobs:
           ./scripts/ci/test-run-suite.sh
 
       - name: Generate safe artifact name
-        if: failure()
+        if: always()
         id: artifact_name
         run: |
           SAFE_NAME=$(echo "${{ matrix.name }}" | sed 's/[^a-zA-Z0-9_-]/_/g')
           echo "name=test_logs_${SAFE_NAME}_${{ github.run_id }}" >> $GITHUB_OUTPUT
 
-      - name: Upload failure logs (GRPC + test logs)
-        if: failure()
+      - name: Upload test attempt logs
+        if: always()
         uses: actions/upload-artifact@v4
         continue-on-error: true
         with:

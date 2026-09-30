@@ -1592,6 +1592,30 @@ func TestLowhttpTraceInfo_ParseDialXTraceInfo(t *testing.T) {
 	require.Equal(t, dialTrace.TLSHandshakeTime, trace.TLSHandshakeTime)
 }
 
+func TestLowhttpTraceInfo_ConcurrentDialCancellation(t *testing.T) {
+	dialTrace := netx.NewDialXTraceInfo()
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		for i := 0; i < 1000; i++ {
+			dialTrace.SetTotalDuration(time.Duration(i))
+			dialTrace.SetTCPDuration(time.Duration(i))
+			dialTrace.SetTLSHandshakeDuration(time.Duration(i))
+		}
+	}()
+	for i := 0; i < 1000; i++ {
+		trace := &LowhttpTraceInfo{}
+		trace.ParseDialXTraceInfo(dialTrace)
+		require.Same(t, dialTrace, trace.DialTraceInfo)
+	}
+	<-done
+	trace := &LowhttpTraceInfo{}
+	trace.ParseDialXTraceInfo(dialTrace)
+	require.Equal(t, time.Duration(999), trace.ConnTime)
+	require.Equal(t, time.Duration(999), trace.TCPTime)
+	require.Equal(t, time.Duration(999), trace.TLSHandshakeTime)
+}
+
 // TestNoBodyBuffer_NormalRequestsUnaffected verifies normal requests still work correctly
 func TestNoBodyBuffer_NormalRequestsUnaffected(t *testing.T) {
 	// This test ensures that the NoBodyBuffer condition in FixHTTPResponse doesn't affect normal requests

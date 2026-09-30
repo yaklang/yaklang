@@ -18,7 +18,6 @@ import (
 	"github.com/yaklang/yaklang/common/crawler"
 	"github.com/yaklang/yaklang/common/crawler/crawlertest"
 	"github.com/yaklang/yaklang/common/schema"
-	"github.com/yaklang/yaklang/common/utils"
 	_ "github.com/yaklang/yaklang/common/yak"
 	"gotest.tools/v3/assert"
 )
@@ -77,7 +76,7 @@ func TestSimpleCrawler_DefaultAutoUsesContextScopedAIInvoker(t *testing.T) {
 	var aiCalls atomic.Int64
 	var hiddenRequests atomic.Int64
 
-	host, port := utils.DebugMockHTTPHandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	host, port := startHTTPHandler(t, func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case "/":
 			w.Header().Set("Content-Type", "text/html; charset=utf-8")
@@ -148,7 +147,7 @@ func TestSimpleCrawler_StructuredRequestSurfacesAreReportedButUnsafeShapesAreNot
 	var headRequests atomic.Int64
 	var postRequests atomic.Int64
 
-	host, port := utils.DebugMockHTTPHandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	host, port := startHTTPHandler(t, func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case "/":
 			w.Header().Set("Content-Type", "text/html; charset=utf-8")
@@ -267,7 +266,7 @@ func TestSimpleCrawler_ExplicitDepthBudgetAndDomainScope(t *testing.T) {
 	})
 	externalURL := "http://localhost:" + externalPort + "/vendor/external.js"
 
-	seedHost, seedPort := utils.DebugMockHTTPHandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	seedHost, seedPort := startHTTPHandler(t, func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
 		_, _ = w.Write([]byte(`<!doctype html><script src="` + externalURL + `"></script>`))
 	})
@@ -585,7 +584,7 @@ func simpleCrawlerOutputSection(output, startMarker, endMarker string) string {
 
 func TestSimpleCrawler_AIJSNoDisablesAdaptiveInvoker(t *testing.T) {
 	var aiCalls atomic.Int64
-	host, port := utils.DebugMockHTTPHandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	host, port := startHTTPHandler(t, func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case "/":
 			w.Header().Set("Content-Type", "text/html; charset=utf-8")
@@ -636,7 +635,7 @@ func TestSimpleCrawler_ParentDeadlineCancelsContextScopedAIInvoker(t *testing.T)
 	var aiCalls atomic.Int64
 	var observedCancellation atomic.Bool
 
-	host, port := utils.DebugMockHTTPHandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	host, port := startHTTPHandler(t, func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case "/":
 			w.Header().Set("Content-Type", "text/html; charset=utf-8")
@@ -696,7 +695,7 @@ func TestSimpleCrawler_CoverageHint(t *testing.T) {
 	// port is assigned by DebugMockHTTPHandlerFunc below; capture it for the
 	// handler closure via a pointer so the landing page can self-link.
 	var port int
-	host, p := utils.DebugMockHTTPHandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	host, p := startHTTPHandler(t, func(w http.ResponseWriter, r *http.Request) {
 		// Landing page links to several internal paths and two other virtual
 		// hostnames on the same loopback server, so the crawler discovers
 		// multiple subdomains and pending URLs.
@@ -763,7 +762,7 @@ func TestSimpleCrawler_RedactsDisplayURLsWithoutChangingCrawlIdentity(t *testing
 	var receivedMu sync.Mutex
 	receivedRawQuery := ""
 
-	host, port := utils.DebugMockHTTPHandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	host, port := startHTTPHandler(t, func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/" {
 			http.NotFound(w, r)
 			return
@@ -841,7 +840,7 @@ func TestSimpleCrawler_RejectsScopeDomainOutputControls(t *testing.T) {
 func TestSimpleCrawler_HidesAndDoesNotRequestURLFragments(t *testing.T) {
 	var port int
 	var fragmentRequestCount atomic.Int64
-	host, p := utils.DebugMockHTTPHandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	host, p := startHTTPHandler(t, func(w http.ResponseWriter, r *http.Request) {
 		if strings.Contains(r.RequestURI, "#") {
 			fragmentRequestCount.Add(1)
 			http.NotFound(w, r)
@@ -965,7 +964,7 @@ history.pushState({}, "", "/dashboard"); fetch("/api/v1/me")</script></body></ht
 	for _, tc := range fixtures {
 		fixtureByPath["/"+tc.name] = tc
 	}
-	host, port := utils.DebugMockHTTPHandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	host, port := startHTTPHandler(t, func(w http.ResponseWriter, r *http.Request) {
 		if tc, ok := fixtureByPath[r.URL.Path]; ok {
 			w.Header().Set("Content-Type", tc.contentType)
 			_, _ = w.Write([]byte(tc.body))
@@ -999,7 +998,7 @@ history.pushState({}, "", "/dashboard"); fetch("/api/v1/me")</script></body></ht
 }
 
 func TestSimpleCrawler_SPAAdviceStopsRepeatedCrawling(t *testing.T) {
-	host, port := utils.DebugMockHTTPHandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	host, port := startHTTPHandler(t, func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/html")
 		_, _ = w.Write([]byte(`<!doctype html><html><body><div id="root"></div>
 <script>window.webpackChunkapp=[]; history.pushState({}, "", "/dashboard")</script>
@@ -1035,7 +1034,7 @@ func TestSimpleCrawler_BoundsRenderingAssessmentWork(t *testing.T) {
 	}
 	landing.WriteString(`</body></html>`)
 
-	host, port := utils.DebugMockHTTPHandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	host, port := startHTTPHandler(t, func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/html")
 		if r.URL.Path == "/" {
 			_, _ = w.Write([]byte(landing.String()))

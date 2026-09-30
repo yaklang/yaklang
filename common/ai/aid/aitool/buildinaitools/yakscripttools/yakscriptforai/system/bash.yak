@@ -420,6 +420,23 @@ if stderrPipeErr != nil {
     return
 }
 
+// A descendant may inherit the pipes. The command deadline must also unblock
+// stream readers even on platforms that only terminate the immediate process.
+streamCtx, stopStreamWatch = context.WithCancel(ctx)
+streamDone = make(chan bool, 1)
+streamTimedOut = make(chan bool, 1)
+streamWatchWg = sync.NewWaitGroup()
+streamWatchWg.Add(1)
+go func() {
+    defer streamWatchWg.Done()
+    <-streamCtx.Done()
+    if len(streamDone) == 0 {
+        streamTimedOut <- true
+        stdoutPipe.Close()
+        stderrPipe.Close()
+    }
+}()
+
 streamWg := sync.NewWaitGroup()
 streamWg.Add(2)
 stdoutStreamLen := 0
@@ -457,8 +474,18 @@ go func() {
 
 // 执行命令并处理结果
 startTime = time.Now()
-err = cmd.Run()
+// Run/Wait closes StdoutPipe and StderrPipe. Let the stream readers consume EOF
+// before Wait reclaims those pipes, otherwise a fast command can lose its output.
+err = cmd.Start()
+if err != nil {
+    stdoutPipe.Close()
+    stderrPipe.Close()
+}
 streamWg.Wait()
+streamDone <- true
+stopStreamWatch()
+streamWatchWg.Wait()
+if err == nil { err = cmd.Wait() }
 elapsed = time.Since(startTime)
 elapsedSec = int(elapsed.Seconds())
 elapsedMs = elapsed.Milliseconds()
@@ -466,7 +493,7 @@ elapsedMs = elapsed.Milliseconds()
 // becomes visible. The command is owned by this deadline, so an execution error
 // at the configured deadline is also objective timeout evidence.
 deadlineWindowMs = timeoutSeconds * 1000
-isTimeout = ctx.Err() != nil || (err != nil && elapsedMs >= deadlineWindowMs - 20)
+isTimeout = len(streamTimedOut) > 0 || ctx.Err() != nil || (err != nil && elapsedMs >= deadlineWindowMs - 20)
 exitCode = nil
 exitCodeAvailable = false
 
@@ -490,8 +517,8 @@ if exitCodeAvailable {
     RESULT["exit_code_accepted"] = acceptedExitCodeSet[sprint(exitCode)] == true
 }
 
-if err != nil {
-    RESULT["process_error"] = sprint(err)
+if err != nil || isTimeout {
+    if err != nil { RESULT["process_error"] = sprint(err) }
     if isTimeout {
         RESULT["termination_reason"] = "timeout"
         yakit.Info("COMMAND TIMEOUT: The command was killed after %d seconds timeout. The command may be running too long or hanging indefinitely.", timeoutSeconds)

@@ -3,6 +3,7 @@ package aimem
 import (
 	"context"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -22,6 +23,7 @@ import (
 type AdvancedMockInvoker struct {
 	*aicommonmock.MockInvoker
 
+	mu               sync.Mutex
 	ctx              context.Context
 	capturedPrompts  []string
 	capturedActions  []string
@@ -74,27 +76,37 @@ func NewAdvancedMockInvoker(ctx context.Context) *AdvancedMockInvoker {
 
 // SetReturnValue 设置特定action的返回值
 func (m *AdvancedMockInvoker) SetReturnValue(action, value string) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
 	m.returnValues[action] = value
 }
 
 // SetShouldFail 设置特定action是否应该失败
 func (m *AdvancedMockInvoker) SetShouldFail(action string, shouldFail bool) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
 	m.shouldFail[action] = shouldFail
 }
 
 // SetPromptValidator 设置prompt验证器
 func (m *AdvancedMockInvoker) SetPromptValidator(action string, validator func(string) bool) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
 	m.promptValidators[action] = validator
 }
 
 // GetCapturedPrompts 获取捕获的prompts
 func (m *AdvancedMockInvoker) GetCapturedPrompts() []string {
-	return m.capturedPrompts
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return append([]string(nil), m.capturedPrompts...)
 }
 
 // GetCapturedActions 获取捕获的actions
 func (m *AdvancedMockInvoker) GetCapturedActions() []string {
-	return m.capturedActions
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return append([]string(nil), m.capturedActions...)
 }
 
 func (m *AdvancedMockInvoker) GetBasicPromptInfo(tools []*aitool.Tool) (string, map[string]any, error) {
@@ -121,25 +133,31 @@ func (m *AdvancedMockInvoker) InvokeQualityPriorityLiteForge(ctx context.Context
 }
 
 func (m *AdvancedMockInvoker) InvokeLiteForge(ctx context.Context, actionName string, prompt string, outputs []aitool.ToolOption, opts ...aicommon.GeneralKVConfigOption) (*aicommon.Action, error) {
-	// 记录调用
+	// Capture configuration under the lock, then allow concurrent work and validators.
+	m.mu.Lock()
 	m.capturedActions = append(m.capturedActions, actionName)
 	m.capturedPrompts = append(m.capturedPrompts, prompt)
 
+	validator := m.promptValidators[actionName]
+	shouldFail := m.shouldFail[actionName]
+	customValue, custom := m.returnValues[actionName]
+	m.mu.Unlock()
+
 	// 验证prompt
-	if validator, exists := m.promptValidators[actionName]; exists {
+	if validator != nil {
 		if !validator(prompt) {
 			return nil, utils.Errorf("prompt validation failed for action: %s", actionName)
 		}
 	}
 
 	// 检查是否应该失败
-	if shouldFail, exists := m.shouldFail[actionName]; exists && shouldFail {
+	if shouldFail {
 		return nil, utils.Errorf("mock failure for action: %s", actionName)
 	}
 
 	// 返回自定义值或默认值
 	var mockResponseJSON string
-	if customValue, exists := m.returnValues[actionName]; exists {
+	if custom {
 		mockResponseJSON = customValue
 	} else {
 		// 默认返回值

@@ -21,9 +21,9 @@ func cleanupRegressionDB(t testing.TB) *gorm.DB {
 	db, err := gorm.Open("sqlite3", filepath.Join(t.TempDir(), "cleanup.db"))
 	require.NoError(t, err)
 	db.DB().SetMaxOpenConns(1)
-	t.Cleanup(func() { _ = db.Close() })
-	require.NoError(t, db.AutoMigrate(&schema.AIMemoryEntity{}, &schema.AIMemoryCollection{}, &schema.ProjectGeneralStorage{},
-		&schema.VectorStoreCollection{}, &schema.VectorStoreDocument{}).Error)
+	t.Cleanup(func() { closeMemoryFixture(t, db) })
+	require.NoError(t, migrateMemoryFixture(db, &schema.AIMemoryEntity{}, &schema.AIMemoryCollection{}, &schema.ProjectGeneralStorage{},
+		&schema.VectorStoreCollection{}, &schema.VectorStoreDocument{}))
 	return db
 }
 
@@ -116,6 +116,9 @@ func TestMUSTPASS_CleanupCooldownAcrossRestartAndDatabases(t *testing.T) {
 func TestMUSTPASS_CleanupScanBoundedAndNoStarvation(t *testing.T) {
 	db := cleanupRegressionDB(t)
 	expired := time.Now().Add(-24 * time.Hour)
+	tx := db.Begin()
+	require.NoError(t, tx.Error)
+	defer tx.Rollback()
 	for i := 0; i < 500; i++ {
 		score := 1.0
 		if i >= 450 {
@@ -124,8 +127,9 @@ func TestMUSTPASS_CleanupScanBoundedAndNoStarvation(t *testing.T) {
 		e := &schema.AIMemoryEntity{MemoryID: fmt.Sprint(i), SessionID: "default", Content: "body", C_Score: score, R_Score: score, A_Score: score, P_Score: score, O_Score: score, E_Score: score, T_Score: .1}
 		e.CreatedAt = time.Now().Add(-90 * 24 * time.Hour)
 		e.ExpiresAt = &expired
-		require.NoError(t, db.Create(e).Error)
+		require.NoError(t, tx.Create(e).Error)
 	}
+	require.NoError(t, tx.Commit().Error)
 	config := DefaultCleanupConfig()
 	config.MaxBatchSize = 10
 	ids, err := ScanLowValueMemories(db, "ai_memory_entities_v1", "default", config)
@@ -164,10 +168,14 @@ func TestMUSTPASS_CleanupAutosaveBurst(t *testing.T) {
 func TestMUSTPASS_CleanupSessionPagination(t *testing.T) {
 	db := cleanupRegressionDB(t)
 	past := time.Now().Add(-time.Hour)
+	tx := db.Begin()
+	require.NoError(t, tx.Error)
+	defer tx.Rollback()
 	for i := 0; i < 70; i++ {
-		require.NoError(t, db.Create(&schema.AIMemoryEntity{MemoryID: fmt.Sprint(i), SessionID: fmt.Sprintf("session-%03d", i), Content: "expired", ExpiresAt: &past}).Error)
+		require.NoError(t, tx.Create(&schema.AIMemoryEntity{MemoryID: fmt.Sprint(i), SessionID: fmt.Sprintf("session-%03d", i), Content: "expired", ExpiresAt: &past}).Error)
 	}
 	var counts []int
+	require.NoError(t, tx.Commit().Error)
 	for pass := 0; pass < 3; pass++ {
 		coordinator := &cleanupCoordinator{}
 		coordinator.runCleanup(db)

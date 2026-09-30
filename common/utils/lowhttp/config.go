@@ -16,9 +16,9 @@ import (
 	"github.com/yaklang/yaklang/common/schema"
 
 	"github.com/davecgh/go-spew/spew"
-	utls "github.com/yaklang/yaklang/common/third_party/utls"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
+	utls "github.com/yaklang/yaklang/common/third_party/utls"
 	"github.com/yaklang/yaklang/common/utils"
 )
 
@@ -384,9 +384,7 @@ func (l *LowhttpTraceInfo) ParseDialXTraceInfo(info *netx.DialXTraceInfo) {
 		return
 	}
 	l.DialTraceInfo = info
-	l.ConnTime = info.TotalTime
-	l.TCPTime = info.TCPtime
-	l.TLSHandshakeTime = info.TLSHandshakeTime
+	l.ConnTime, l.TCPTime, l.TLSHandshakeTime = info.Durations()
 }
 
 func (l *LowhttpTraceInfo) GetServerDurationMS() int64 {

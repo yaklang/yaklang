@@ -444,34 +444,24 @@ case "open":
     }
     yakit.Info("navigated to %v", url)
 
-    // SPA 检测: 哈希路由 (#/) 或常见 SPA 标志表明页面需要额外等待 JS 框架渲染
-    isSPA = str.Contains(url, "#/") || str.Contains(url, "#!/")
-    if isSPA {
-        yakit.Info("detected SPA hash route in URL, waiting for framework rendering...")
-        sleep(2)
-    }
+    if reportPendingDialog(page) { return }
 
-    // 自动 snapshot 获取元素引用
+    // Only explicit SPA routes need rendering readiness. Zero interactive refs
+    // are valid for plain-text pages, and are not evidence of an incomplete load.
+    isSPA = str.Contains(url, "#/") || str.Contains(url, "#!/")
     snap, err = page.Snapshot()
     if err != nil {
-        yakit.Warn("auto-snapshot failed: %v", err)
+        operationError("auto-snapshot failed: %v", err)
         return
     }
-
-    // SPA 自适应等待: snapshot 返回 0 refs 时，轮询等待 DOM 中出现表单元素
-    if snap.RefMap.Count() <= 0 {
-        maxWaitRounds = 5
-        for i = 0; i < maxWaitRounds; i++ {
-            elemCount, evalErr = page.Evaluate("document.querySelectorAll('input,select,textarea,button,[role=button],[role=textbox]').length")
-            if evalErr == nil && parseInt(sprint(elemCount)) > 0 {
-                yakit.Info("SPA rendering detected: found %v interactive elements after waiting, re-taking snapshot...", elemCount)
-                snap, err = page.Snapshot()
-                if err != nil {
-                    yakit.Warn("re-snapshot after SPA wait failed: %v", err)
-                }
-                break
-            }
-            sleep(1)
+    if isSPA && snap.RefMap.Count() <= 0 {
+        waitErr = page.WaitFunction("document.querySelectorAll('input,select,textarea,button,[role=button],[role=textbox]').length > 0", 1)
+        if waitErr == nil {
+            snap, err = page.Snapshot()
+            if err != nil { operationError("snapshot after SPA rendering failed: %v", err); return }
+        } else {
+            if reportPendingDialog(page) { return }
+            yakit.Warn("SPA rendering wait ended: %v (initial snapshot retained)", waitErr)
         }
     }
 

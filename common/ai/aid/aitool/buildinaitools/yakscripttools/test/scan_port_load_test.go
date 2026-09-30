@@ -3,9 +3,12 @@ package test
 import (
 	"context"
 	"fmt"
+	"github.com/yaklang/yaklang/common/fp"
+	"github.com/yaklang/yaklang/common/yak/yaklib/tools"
+	"io"
 	"net"
 	"strings"
-	"sync/atomic"
+	"sync"
 	"testing"
 	"time"
 
@@ -78,21 +81,22 @@ func TestMUSTPASS_ScanPortTool_RuntimeCTXUsable(t *testing.T) {
 // 关键词: scan_port TUN safe mode 回归, SCAN_TUN_SAFE_MODE,
 // 198.18.0.0/15 大规模端口误报, AI_TODO_REQUIRED
 func TestMUSTPASS_ScanPortTool_ActivatesTunSafeMode(t *testing.T) {
-	tool := getScanPortTool(t)
+	exports := map[string]any{}
+	for key, value := range tools.FingerprintScanExports {
+		exports[key] = value
+	}
+	calls := 0
+	exports["Scan"] = func(hosts, ports string, opts ...fp.ConfigOption) (chan *fp.MatchResult, error) {
+		calls++
+		assert.Equal(t, hosts, "198.18.215.229")
+		assert.Equal(t, ports, "22,80,443,445,3306,3389,5432,6379,8000,8080,8443,9000")
+		results := make(chan *fp.MatchResult)
+		close(results)
+		return results, nil
+	}
+	_, combined := executeFixtureScript(t, "yakscriptforai/pentest/scan_port.yak", aitool.InvokeParams{"hosts": "198.18.215.229", "ports": "1-65535", "mode": "auto"}, map[string]any{"servicescan": exports})
+	assert.Equal(t, calls, 1, "planning must start exactly one compact TCP scan")
 
-	ctx, cancel := context.WithTimeout(context.Background(), 250*time.Millisecond)
-	defer cancel()
-
-	w1, w2 := &strings.Builder{}, &strings.Builder{}
-	// 短 context 只让脚本完成计划收缩并进入 TCP 路径，避免测试
-	// 对保留网段真正进行外部网络扫描. context canceled 是预期退出.
-	_, _ = tool.Callback(ctx, aitool.InvokeParams{
-		"hosts": "198.18.215.229",
-		"ports": "1-65535",
-		"mode":  "auto",
-	}, nil, w1, w2)
-
-	combined := w1.String() + "\n" + w2.String()
 	assert.Assert(t, strings.Contains(combined, "[SCAN_TUN_SAFE_MODE]"),
 		"expected machine-readable TUN-safe-mode marker:\n%s", combined)
 	assert.Assert(t, strings.Contains(combined, "effective-mode=tcp"),
@@ -111,81 +115,80 @@ func TestMUSTPASS_ScanPortTool_ActivatesTunSafeMode(t *testing.T) {
 // 被取消时, scan_port 的 TCP 扫描能借助注入的 CTX 迅速停止, 而不是把对一个 tarpit
 // 主机的全部端口扫完.
 //
-// 构造: 本地 tarpit listener (accept 后永不回包) + 大端口范围, 取消 ctx 后断言
-// Callback 在远小于"全量扫完"所需时间内返回.
+// 构造: 本地 tarpit 在收到实际 probe 字节后通知测试取消，断言
+// Callback 在 3s 内结束；不依赖解析/调度速度或随机固定 sleep。
 //
 // 关键词: scan_port 端到端取消, CTX 传播到 servicescan, tarpit 资源泄漏防护
 func TestMUSTPASS_ScanPortTool_CancelStopsTcpScanFast(t *testing.T) {
-	host, port, closeFn := startLocalTarpit(t)
-	defer closeFn()
-
+	host, port, probing := startLocalTarpit(t)
 	tool := getScanPortTool(t)
-
 	ctx, cancel := context.WithCancel(context.Background())
-
-	// 端口范围围绕 tarpit 端口展开, 让大量 TCP 连接都落到 tarpit 上 (accept 但不回包),
-	// 没有取消传播时每个连接都要卡满 probeTimeout(5s), 全量扫完会非常久.
-	ports := fmt.Sprintf("%d-%d", port, port+800)
-
-	go func() {
-		time.Sleep(700 * time.Millisecond)
-		cancel()
-	}()
-
-	start := time.Now()
+	defer cancel()
 	done := make(chan struct{})
 	go func() {
 		defer close(done)
-		w1, w2 := &strings.Builder{}, &strings.Builder{}
-		_, _ = tool.Callback(ctx, aitool.InvokeParams{
-			"hosts":      host,
-			"ports":      ports,
-			"mode":       "tcp",
-			"concurrent": 50,
-		}, nil, w1, w2)
+		var out, stderr strings.Builder
+		_, _ = tool.Callback(ctx, aitool.InvokeParams{"hosts": host, "ports": fmt.Sprint(port), "mode": "tcp", "concurrent": 1, "active": true, "web": true}, nil, &out, &stderr)
 	}()
-
+	select {
+	case <-probing:
+	case <-done:
+		t.Fatal("scan finished without starting an application probe")
+	case <-time.After(3 * time.Second):
+		t.Fatal("local application probe never started")
+	}
+	cancel()
 	select {
 	case <-done:
-		elapsed := time.Since(start)
-		t.Logf("scan_port returned %v after cancel", elapsed)
-		if elapsed > 25*time.Second {
-			t.Fatalf("scan_port did not stop quickly after cancel (%v); CTX cancellation not propagated", elapsed)
-		}
-	case <-time.After(40 * time.Second):
-		t.Fatal("scan_port did not return within 40s after cancel; CTX cancellation not propagated")
+	case <-time.After(3 * time.Second):
+		t.Fatal("cancellation did not stop the in-flight probe")
 	}
 }
 
-// startLocalTarpit 启动一个 accept 后持有连接、永不回包也不主动关闭的 TCP listener,
-// 用于模拟"全端口响应"的异常主机.
-func startLocalTarpit(t *testing.T) (host string, port int, closeFn func()) {
+// Read the first probe byte so cancellation happens during the real scan, not
+// during script parsing or a TCP readiness connection. Cleanup joins all workers.
+func startLocalTarpit(t *testing.T) (host string, port int, probing <-chan struct{}) {
 	t.Helper()
 	ln, err := net.Listen("tcp", "127.0.0.1:0")
-	if err != nil {
-		t.Fatalf("failed to listen: %v", err)
-	}
+	assert.NilError(t, err)
 	addr := ln.Addr().(*net.TCPAddr)
-
-	var stopped atomic.Bool
-	var conns []net.Conn
+	started := make(chan struct{})
+	var once sync.Once
+	var mu sync.Mutex
+	var workers sync.WaitGroup
+	connections := map[net.Conn]struct{}{}
+	acceptDone := make(chan struct{})
 	go func() {
+		defer close(acceptDone)
 		for {
 			conn, err := ln.Accept()
 			if err != nil {
 				return
 			}
-			conns = append(conns, conn)
-			if stopped.Load() {
-				return
-			}
+			mu.Lock()
+			connections[conn] = struct{}{}
+			mu.Unlock()
+			workers.Add(1)
+			go func() {
+				defer workers.Done()
+				defer conn.Close()
+				b := make([]byte, 1)
+				if _, err := io.ReadFull(conn, b); err == nil {
+					once.Do(func() { close(started) })
+				}
+				_, _ = io.Copy(io.Discard, conn)
+			}()
 		}
 	}()
-	return addr.IP.String(), addr.Port, func() {
-		stopped.Store(true)
+	t.Cleanup(func() {
 		_ = ln.Close()
-		for _, c := range conns {
-			_ = c.Close()
+		<-acceptDone
+		mu.Lock()
+		for conn := range connections {
+			_ = conn.Close()
 		}
-	}
+		mu.Unlock()
+		workers.Wait()
+	})
+	return addr.IP.String(), addr.Port, started
 }
