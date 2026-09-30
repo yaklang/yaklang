@@ -235,6 +235,15 @@ func (pm *PromptManager) projectLightweightLoopMaterials(
 	}
 	lightBase := *base
 	lightBase.PromptFrozenOpenMaterials = aicommon.PromptFrozenOpenMaterials{}
+	// A lightweight plan still needs its fixed facts/document. Keep these
+	// atomic core partitions; only ordinary frozen execution history is omitted.
+	if input.PlanContext.Version != "" {
+		for _, partition := range base.FrozenPartitions {
+			if partition.ID == "plan_facts" || partition.ID == "plan_document" {
+				lightBase.FrozenPartitions = append(lightBase.FrozenPartitions, partition)
+			}
+		}
+	}
 	// Preserve ReportedRisks in lightweight mode: the dedup list is critical
 	// for preventing duplicate vulnerability reports even on speed-priority
 	// models. Budget-limited via the render function's internal token cap.
@@ -265,6 +274,13 @@ func (pm *PromptManager) projectLightweightLoopMaterials(
 	lightInput.AutoLoadedSkills = boundedLightweightPromptBlock(input.AutoLoadedSkills, lightweightLoopSkillBodyTokens, "auto-loaded skill body")
 	lightInput.FrozenUserContext = boundedLightweightPromptBlock(input.FrozenUserContext, lightweightLoopPlanContextTokens, "plan context")
 	lightInput.FrozenPartitions = nil
+	if input.PlanContext.Version != "" {
+		for _, partition := range input.FrozenPartitions {
+			if partition.ID == "plan_facts" || partition.ID == "plan_document" {
+				lightInput.FrozenPartitions = append(lightInput.FrozenPartitions, partition)
+			}
+		}
+	}
 	// TODO already has a single store-level budget. Do not omit the entire work
 	// set under a second, smaller lightweight-only limit.
 	lightInput.TodoSnapshot = input.TodoSnapshot
@@ -321,8 +337,8 @@ func (pm *PromptManager) NewPromptMaterials(base *reactloops.LoopPromptBaseMater
 		materials.SkillsContext = input.SkillsContext
 		materials.Schema = input.Schema
 		materials.FunctionCallSchemas = input.FunctionCallSchemas
-		// 全局 TODO 块: 在普通 Timeline 之后透传, 物理位置在 timeline-open 段
-		// section.timeline_open.todo_list (在普通 Timeline 之后), 让 loop
+		// 全局 TODO 块: 在普通 Timeline 和 PlanRuntimeState 之后透传, 物理位置在 timeline-open 段
+		// section.timeline_open.todo_list (在计划运行状态之后), 让 loop
 		// prompt 任何一次 iteration 都能看到当前 TODO 全貌.
 		// 关键词: TodoSnapshot 透传, timeline-open, Timeline 中的 evidence delta 之后
 		materials.TodoSnapshot = input.TodoSnapshot
@@ -337,6 +353,21 @@ func (pm *PromptManager) NewPromptMaterials(base *reactloops.LoopPromptBaseMater
 		materials.AutoLoadedSkills = input.AutoLoadedSkills
 	}
 
+	if input != nil && input.PlanContext.Version != "" {
+		var timeline *aicommon.Timeline
+		if pm != nil && pm.react != nil && pm.react.config != nil {
+			timeline = pm.react.config.GetTimeline()
+		}
+		for i := range materials.FrozenPartitions {
+			partition := &materials.FrozenPartitions[i]
+			switch partition.ID {
+			case "plan_facts":
+				partition.Content = timeline.WrapPlanReferenceForPrompt("PLAN_FACTS", partition.Content)
+			case "plan_document":
+				partition.Content = timeline.WrapPlanReferenceForPrompt("PLAN_DOCUMENT", partition.Content)
+			}
+		}
+	}
 	materials.FrozenPartitions = aicommon.NormalizeFrozenBlockPartitions(materials.FrozenPartitions)
 	return materials
 }
@@ -520,15 +551,8 @@ func (pm *PromptManager) buildHighStaticObservation(
 // Timeline-frozen 随时间轴增长可能间歇性扩展 (新一段 reducer 块产生时), 排在
 // 最后, 让前两段的前缀缓存更稳定。
 //
-// PlanContext (PE-TASK PLAN 产物) 历史上曾在此段渲染, 但因仅 PE-TASK 子任务
-// 有内容, root task / 普通 ReAct 时为空, 这种"有时存在有时不存在"的渲染态
-// 会让 frozen-block 段字节内容随 task 类型剧烈抖动, 破坏 AI_CACHE_FROZEN
-// prefix cache 命中。现已迁到 buildSemiDynamicResidualObservation
-// (section.semi_dynamic.plan_context, AI_CACHE_SEMI 边界包裹)。
-//
-// 关键词: buildFrozenBlockObservation, Tool/Forge/Timeline-frozen,
-//
-//	AI_CACHE_FROZEN, PlanContext 已迁出
+// Versioned plan_definition, plan_facts and plan_document are fixed reference
+// partitions. Live plan state belongs to Timeline Open, before the TODO view.
 func (pm *PromptManager) buildFrozenBlockObservation(
 	materials *reactloops.PromptPrefixMaterials,
 	rendered string,
@@ -597,26 +621,9 @@ func (pm *PromptManager) buildFrozenBlockObservation(
 	return reactloops.FinalizePromptContainerSection(section)
 }
 
-// renderPlanContextBlock 渲染 PE-TASK 的 PLAN_CONTEXT 段。
-//
-// FrozenUserContext 的 nonce 由 (rootIdentifier, "plan_context") 派生, 与
-// task.GetUserInput 内部使用的 (rawUserInput+parentInputs, "task_user_input")
-// nonce 不同, 这是有意为之: 内层 PARENT_TASK / CURRENT_TASK / INSTRUCTION
-// 三个标签已经用 plan-scoped 稳定 nonce 渲染好了, 外层 PLAN_CONTEXT 包装只
-// 需要给观测层一个稳定的边界标记, 与内层标签命名空间互不冲突。
-//
-// 物理位置: timeline-open 段最末尾 (Timeline / Todo 之后)。timeline-open 段不被
-// AI_CACHE_FROZEN / AI_CACHE_SEMI 任何缓存边界包裹, 是"易变尾段"。这样安排
-// 是因为 PlanContext 内容会随 PE-TASK 子任务切换抖动 (CURRENT_TASK 内容变化)。
-//
-// 早期版本试图把 PlanContext 放进 frozen-block / semi-dynamic 等"可缓存段",
-// 但这种本质易变的内容不适合缓存; 保护策略改为让其落在所有 cache 边界外,
-// 不再追求 PlanContext 自身缓存, 而是保护更上游的 SYSTEM / FROZEN / SEMI
-// 三段缓存命中率。
-//
-// 关键词: renderPlanContextBlock, PLAN_CONTEXT, plan-scoped nonce,
-//
-//	timeline-open 末尾, 缓存边界外, 上游缓存保护
+// renderPlanContextBlock observes the legacy mixed context only. New plan
+// tasks use PlanPromptContextProvider; this compatibility block remains outside
+// caches, before TODO, and its informational nonce grants no authority.
 func renderPlanContextBlock(materials *reactloops.PromptPrefixMaterials) string {
 	if materials == nil {
 		return ""
@@ -685,13 +692,9 @@ func (pm *PromptManager) buildSemiDynamic1Observation(
 // user3 (ephemeral cc), 与 buildSemiDynamic1Observation 一起被 dashscope 视作
 // 合并 prefix cache 计算 (cc 锚点落在本段末尾, prefix 跨过 semi-1).
 //
-// PlanContext 已彻底迁出本段 (历史曾位于 semi-dynamic 段, 但子任务切换会让
-// 内容抖动并破坏 AI_CACHE_SEMI 命中; 现已迁到 timeline-open 段末尾,
-// 落在所有 cache 边界之外, 见 buildTimelineOpenObservation)。
-//
-// 关键词: buildSemiDynamic2Observation, TaskInstruction, Schema, OutputExample,
-//
-//	AI_CACHE_SEMI2 cc, P1.1, PlanContext 已迁出至 timeline-open 末尾
+// PlanExecutionRules are stage rules only; definition is Frozen and live
+// PlanRuntimeState stays outside all caches. Observe the same field order as
+// the source templates (rules follow the schema).
 func (pm *PromptManager) buildSemiDynamic2Observation(
 	materials *reactloops.PromptPrefixMaterials,
 	rendered string,
@@ -709,9 +712,7 @@ func (pm *PromptManager) buildSemiDynamic2Observation(
 	// 已经表达层级.
 	// 关键词: section.semi_dynamic_2 子节点 Name 去前缀, UI 信息密度
 	children := []*reactloops.PromptSectionObservation{
-		reactloops.NewPromptSectionObservation(
-			"section.semi_dynamic_2.plan_execution_rules", "Plan Execution Rules",
-			reactloops.PromptSectionRoleSemiDynamic2, true, materials.PlanExecutionRules),
+
 		// section.semi_dynamic_2.task_instruction 从 high-static 段迁入:
 		// TaskInstruction 是 caller 注入的 PERSISTENT 指令, caller-specific,
 		// 跨同一 caller 的 turn 字节稳定. 留在 high-static 段会污染
@@ -762,6 +763,9 @@ func (pm *PromptManager) buildSemiDynamic2Observation(
 			renderAutoLoadedSkillsBlock(materials),
 		),
 	}
+	children = append(children, reactloops.NewPromptSectionObservation(
+		"section.semi_dynamic_2.plan_execution_rules", "Plan Execution Rules",
+		reactloops.PromptSectionRoleSemiDynamic2, true, materials.PlanExecutionRules))
 	section.Children = filterIncludedPromptSections(children)
 	if strings.TrimSpace(rendered) != "" {
 		section.Content = ""

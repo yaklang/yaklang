@@ -265,11 +265,11 @@ type LoopPromptAssemblyInput struct {
 	SkillsContext       string
 	ExtraCapabilities   string
 	// TodoSnapshot 是全局 TODO 列表的渲染输出 (含 <|TODO_LIST_<nonce>|>...
-	// 边界标签的整段块), 紧跟在 普通 Timeline 后面注入到 timeline-open 段。
+	// 边界标签的整段块), 在普通 Timeline 和 PlanRuntimeState 之后注入到 timeline-open 段。
 	// 落在所有缓存边界外, 保证不污染上游 prefix cache.
 	// 空字符串时 timeline-open 模板自动跳过该块。
 	//
-	// 关键词: TodoSnapshot, 全局 TODO 块, timeline-open 段, 普通 Timeline 后,
+	// 关键词: TodoSnapshot, 全局 TODO 块, timeline-open 段, 计划运行状态后,
 	//        loop prompt 任何时刻可见
 	TodoSnapshot   string
 	ReactiveData   string

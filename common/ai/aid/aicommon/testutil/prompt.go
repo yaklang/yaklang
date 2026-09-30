@@ -138,12 +138,21 @@ func ExtractPlanCurrentTask(prompt string) string {
 		return ""
 	}
 	rest := prompt[start:]
-	nonce := ExtractPipeTagNonce(rest, "USER_INTERACT")
+	tag := "REFERENCE_DATA_PLAN_RUNTIME_STATE"
+	nonce := ExtractPipeTagNonce(rest, tag)
+	if nonce == "" {
+		tag = "USER_INTERACT"
+		nonce = ExtractPipeTagNonce(rest, tag)
+	}
 	if nonce == "" {
 		return ""
 	}
-	open := "<|USER_INTERACT_" + nonce + "|>"
-	close := "<|USER_INTERACT_END_" + nonce + "|>"
+	open := "<|" + tag + "_" + nonce + "|>"
+	endTag := "USER_INTERACT_END"
+	if tag != "USER_INTERACT" {
+		endTag = "REFERENCE_DATA_END_PLAN_RUNTIME_STATE"
+	}
+	close := "<|" + endTag + "_" + nonce + "|>"
 	begin := strings.Index(rest, open) + len(open)
 	end := strings.Index(rest[begin:], close)
 	if end < 0 {

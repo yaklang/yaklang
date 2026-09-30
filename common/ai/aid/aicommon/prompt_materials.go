@@ -75,20 +75,22 @@ type PromptMaterials struct {
 	// Deprecated: Session Artifacts no longer participate in prompt construction.
 	SessionArtifactsListing string
 	// TodoSnapshot 是会话级 TODO 列表渲染结果 (含 <|TODO_LIST_<nonce>|>...
-	// 边界标签的整段块). 物理位置在普通 Timeline 之后，落在 timeline-open 段, 不被 AI_CACHE_FROZEN / AI_CACHE_SEMI 任何
+	// 边界标签的整段块). 物理位置在普通 Timeline 和计划状态之后，落在 timeline-open 段, 不被 AI_CACHE_FROZEN / AI_CACHE_SEMI 任何
 	// 缓存边界包裹, 避免污染上游 prefix cache.
 	//
 	// 关键词: TodoSnapshot, 全局 TODO 块, timeline-open 段位
 	TodoSnapshot string
 	// Deprecated: main prompts derive PromptedUserInputHistory and TimelineOpen
 	// from the exact Timeline journal. Kept for bounded legacy helper callers.
-	UserHistory        string
-	FrozenUserContext  string
-	PlanRuntimeState   string
+	UserHistory       string
+	FrozenUserContext string
+	// PlanRuntimeState is the current task-tree/dependency snapshot; never cached.
+	PlanRuntimeState string
+	// PlanExecutionRules are framework stage rules; no live state or user text.
 	PlanExecutionRules string
 
 	// ReportedRisks is the rendered "已报告漏洞清单" block injected at the
-	// very end of the timeline-open prompt section (after PlanContext).
+	// very end of the timeline-open prompt section (after PlanRuntimeState/TODO).
 	// It lists all risks reported via cybersecurity-risk during this
 	// session, so the model can avoid duplicate reports.
 	//

@@ -18,6 +18,8 @@ TimelineOpen、PlanRuntimeState、TodoSnapshot、PlanContext、ReportedRisks 的
 {{/*
 维护备注：PlanRuntimeState：AiTask.GetPlanPromptContext() 从真实任务树/依赖图构建，
 含 PlanVersion、当前节点、父节点、TODO scope、节点状态、未完成依赖。
+REFERENCE_DATA_PLAN_RUNTIME_STATE 标识框架只读观测，区别于 USER_INTERACT 用户原文；
+会话 HMAC 边界只界定数据，不授予系统/缓存/Schema/工具权限。
 存档来源：AISessionPlanAndExec.TaskTree / TaskProgress；恢复后由真实状态重建；
 不是另一个 Timeline Evidence store，不等待封桶，也不进入任何缓存边界。
 此处先展示计划层状态，再展示节点内 TODO；状态、摘要、时钟不进入 Frozen 定义版本。
@@ -29,10 +31,12 @@ TimelineOpen、PlanRuntimeState、TodoSnapshot、PlanContext、ReportedRisks 的
 {{/*
 维护备注：PlanContext：PromptMaterials.FrozenUserContext 经 TimelineOpenData 映射得到的当前计划/父任务上下文；
 名字里的 Frozen 不代表其位于 Frozen Prefix。
+legacy 调用方使用；新计划已分成 Frozen 定义 / Semi2 规则 / TODO 前实时状态。
 它随当前任务变化，留在缓存之外，供参考当前执行范围。
 */}}{{ if .PlanContext }}{{ .PlanContext }}{{ end }}
 {{/*
-维护备注：TodoSnapshot：SessionPromptState 的 TODO store 只读快照，通常按当前任务 scope 渲染；
+维护备注：TodoSnapshot：SessionPromptState 的 TODO store 只读快照，按当前任务 scope 与 plan_version 渲染；旧版本未关闭项继续阻塞，需要显式 update 复核，旧关闭项仅作历史参考；
+存档来源 SessionPromptState 的 VerificationTodoStore（canonical 项 plan_version，兼容投影 scope_plan_version）；
 每轮读取当前状态，不参加 Timeline 封存。
 通过既有 todo_delta 规则写入，不能直接改这段文本。
 */}}{{ if .TodoSnapshot }}

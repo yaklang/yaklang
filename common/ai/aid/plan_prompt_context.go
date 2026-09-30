@@ -148,8 +148,8 @@ func (t *AiTask) GetPlanPromptContext() aicommon.PlanPromptContext {
 	timeline := t.CurrentTimeline()
 	return aicommon.PlanPromptContext{
 		Version: version, UserQuery: definition.UserQuery,
-		Definition:     timeline.WrapUserInputForPrompt(string(frozen)),
-		RuntimeState:   timeline.WrapUserInputForPrompt(string(runtime)),
+		Definition:     timeline.WrapPlanReferenceForPrompt("PLAN_DEFINITION", string(frozen)),
+		RuntimeState:   timeline.WrapPlanReferenceForPrompt("PLAN_RUNTIME_STATE", string(runtime)),
 		ExecutionRules: planExecutionRules,
 	}
 }
