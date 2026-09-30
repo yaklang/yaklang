@@ -488,7 +488,7 @@ func tick1s(f func() bool) {
 //
 // Example:
 // ```
-// sleep(1.5) // 休眠1.5秒
+// sleep(0.01) // 休眠10毫秒
 // ```
 func sleep(i float64) {
 	time.Sleep(utils.FloatSecondDuration(i))
