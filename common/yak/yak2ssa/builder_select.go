@@ -81,7 +81,7 @@ func (b *astbuilder) buildSelectStmt(stmt *yak.SelectStmtContext) {
 			break
 		}
 	}
-	var branches []int
+	branches := make([]int, 0, len(cases)-1)
 	for i := range cases {
 		if i != fallback {
 			branches = append(branches, i)
@@ -89,8 +89,9 @@ func (b *astbuilder) buildSelectStmt(stmt *yak.SelectStmtContext) {
 	}
 	sw.BuildCaseSize(len(branches))
 	sw.SetCase(func(i int) []ssa.Value { return []ssa.Value{b.EmitConstInst(branches[i])} })
+	clauses := stmt.AllSelectClause()
 	buildBody := func(i int) {
-		clause := stmt.SelectClause(i).(*yak.SelectClauseContext)
+		clause := clauses[i].(*yak.SelectClauseContext)
 		restoreRange := b.SetRange(clause)
 		defer restoreRange()
 		c := cases[i]

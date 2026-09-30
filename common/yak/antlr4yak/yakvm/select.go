@@ -44,14 +44,32 @@ func (f *Frame) SelectChannels(operands []*Value) []any {
 	if len(operands) > 65535 {
 		panic("select has too many cases")
 	}
-	cases := make([]reflect.SelectCase, 0, len(operands)+1)
+	// Most selects have few active channels. Nil channels must still be
+	// validated, but do not need reflect.Select's per-receive scratch storage.
+	var caseStorage [8]reflect.SelectCase
+	cases := caseStorage[:]
+	active := 0
+	// Before the first disabled case, compact and source indexes are identical.
+	// Only active cases after it need a mapping; dense selects need none.
+	firstDisabled := -1
+	var indexStorage [8]int
+	indexes := indexStorage[:]
 	defaultSeen := false
-	for _, operand := range operands {
+	for sourceIndex, operand := range operands {
 		values := operand.ValueList()
 		if len(values) != 3 {
 			panic("invalid select operands")
 		}
-		dir := reflect.SelectDir(values[0].Int())
+		// Compiler-generated directions are int; retain the existing numeric
+		// conversion for callers constructing operands directly.
+		if values[0] == nil {
+			panic("invalid select direction")
+		}
+		direction, isInt := values[0].Value.(int)
+		if !isInt {
+			direction = values[0].Int()
+		}
+		dir := reflect.SelectDir(direction)
 		c := reflect.SelectCase{Dir: dir}
 		if dir == reflect.SelectDefault {
 			if defaultSeen {
@@ -67,16 +85,17 @@ func (f *Frame) SelectChannels(operands []*Value) []any {
 				panic("select case requires a channel")
 			}
 			c.Chan = ch
+			typ := ch.Type()
 			if dir == reflect.SelectRecv {
-				if ch.Type().ChanDir() == reflect.SendDir {
+				if typ.ChanDir() == reflect.SendDir {
 					panic("cannot receive from send-only channel")
 				}
 			} else {
-				if ch.Type().ChanDir() == reflect.RecvDir {
+				if typ.ChanDir() == reflect.RecvDir {
 					panic("cannot send on receive-only channel")
 				}
 				item := reflect.ValueOf(values[2].Value)
-				elem := ch.Type().Elem()
+				elem := typ.Elem()
 				if !item.IsValid() {
 					switch elem.Kind() {
 					case reflect.Chan, reflect.Func, reflect.Interface, reflect.Map, reflect.Ptr, reflect.Slice, reflect.UnsafePointer:
@@ -89,8 +108,28 @@ func (f *Frame) SelectChannels(operands []*Value) []any {
 				}
 				c.Send = item
 			}
+			if ch.IsNil() {
+				if firstDisabled < 0 {
+					firstDisabled = active
+				}
+				continue
+			}
 		}
-		cases = append(cases, c)
+		if firstDisabled >= 0 {
+			if active-firstDisabled == len(indexes) {
+				grown := make([]int, len(operands)-firstDisabled)
+				copy(grown, indexes)
+				indexes = grown
+			}
+			indexes[active-firstDisabled] = sourceIndex
+		}
+		if active == len(cases) {
+			grown := make([]reflect.SelectCase, len(operands)+1)
+			copy(grown, cases)
+			cases = grown
+		}
+		cases[active] = c
+		active++
 	}
 	ctx := f.ctx
 	if ctx == nil {
@@ -99,15 +138,25 @@ func (f *Frame) SelectChannels(operands []*Value) []any {
 	if ctx.Err() != nil {
 		return []any{-1, nil, false}
 	}
-	cases = append(cases, reflect.SelectCase{Dir: reflect.SelectRecv, Chan: reflect.ValueOf(ctx.Done())})
+	cancelIndex := active
+	if active == len(cases) {
+		grown := make([]reflect.SelectCase, len(operands)+1)
+		copy(grown, cases)
+		cases = grown
+	}
+	cases[active] = reflect.SelectCase{Dir: reflect.SelectRecv, Chan: reflect.ValueOf(ctx.Done())}
+	cases = cases[:active+1]
 	chosen, value, ok := reflect.Select(cases)
-	if chosen == len(operands) {
+	if chosen == cancelIndex {
 		return []any{-1, nil, false}
 	}
 	var received any
 	// Preserve Yak's existing closed-channel convention: nil, false.
 	if cases[chosen].Dir == reflect.SelectRecv && ok {
 		received = value.Interface()
+	}
+	if firstDisabled >= 0 && chosen >= firstDisabled {
+		chosen = indexes[chosen-firstDisabled]
 	}
 	return []any{chosen, received, ok}
 }
