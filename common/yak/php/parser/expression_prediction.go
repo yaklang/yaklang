@@ -10,7 +10,7 @@ func (p *PHPParser) IsNamespaceDeclarationAhead() bool {
 // Resolve just this type in LL so these prefixes do not retry an entire file.
 func (p *PHPParser) IsDynamicTypeRefAhead() bool {
 	switch p.GetTokenStream().LA(1) {
-	case PHPParserLabel:
+	case PHPParserLabel, PHPParserStatic:
 		return p.GetTokenStream().LA(2) == PHPParserOpenRoundBracket
 	case PHPParserVarName, PHPParserDollar, PHPParserOpenRoundBracket:
 		return true
@@ -84,7 +84,7 @@ func (p *PHPParser) IsCallResultAssignmentAhead() bool {
 				return false
 			}
 		case PHPParserObjectOperator:
-			if !called || stream.LA(i+1) != PHPParserLabel && stream.LA(i+1) != PHPParserVarName {
+			if !called || !isSimpleMemberIdentifier(stream.LA(i+1)) && stream.LA(i+1) != PHPParserVarName {
 				return false
 			}
 			accessed = true
@@ -99,4 +99,33 @@ func (p *PHPParser) IsCallResultAssignmentAhead() bool {
 		}
 	}
 	return false
+}
+
+// Resolve only the overlapping static-variable expression, keeping the same
+// original LL choice while avoiding a second parse of its enclosing file.
+func (p *PHPParser) IsDynamicStaticVariableAhead() bool {
+	input := p.GetTokenStream()
+	end, ok := 2, true
+	switch input.LA(1) {
+	case PHPParserVarName:
+		end, ok = variablePrefixEnd(input)
+	case PHPParserLabel:
+		for steps := 0; steps < prefixTokenLimit && input.LA(end) == PHPParserNamespaceSeparator && input.LA(end+1) == PHPParserLabel; steps++ {
+			end += 2
+		}
+	case PHPParserStatic, PHPParserParent_:
+	case PHPParserNamespaceSeparator:
+		if input.LA(2) != PHPParserLabel {
+			return false
+		}
+		end = 3
+		for steps := 0; steps < prefixTokenLimit && input.LA(end) == PHPParserNamespaceSeparator && input.LA(end+1) == PHPParserLabel; steps++ {
+			end += 2
+		}
+	case PHPParserOpenRoundBracket:
+		end, ok = skipBalancedPrefix(input, 1)
+	default:
+		return false
+	}
+	return ok && input.LA(end) == PHPParserDoubleColon && (input.LA(end+1) == PHPParserVarName || input.LA(end+1) == PHPParserDollar)
 }
