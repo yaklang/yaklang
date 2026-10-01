@@ -150,8 +150,8 @@ func (s *Server) ExecBatchYakScript(req *ypb.ExecBatchYakScriptRequest, stream y
 	if !(baseProgress > 0 && baseProgress < 1) {
 		baseProgress = 0.1
 	}
-	getPercent := func() float64 {
-		return baseProgress + (float64(progressCount)/float64(progressTotal))*(1-baseProgress)
+	getPercent := func(completed int64) float64 {
+		return baseProgress + (float64(completed)/float64(progressTotal))*(1-baseProgress)
 	}
 	var yakScriptOnlineGroup, taskName string
 	if req.YakScriptOnlineGroup != "" {
@@ -167,7 +167,7 @@ func (s *Server) ExecBatchYakScript(req *ypb.ExecBatchYakScriptRequest, stream y
 			return
 		}
 		uid := uuid.New().String()
-		AddExecBatchTask(uid, getPercent(), yakScriptOnlineGroup, taskName, &ypb.ExecBatchYakScriptRequest{
+		AddExecBatchTask(uid, getPercent(atomic.LoadInt64(&progressCount)), yakScriptOnlineGroup, taskName, &ypb.ExecBatchYakScriptRequest{
 			Target:                req.Target,
 			ExtraParams:           req.ExtraParams,
 			Keyword:               req.Keyword,
@@ -193,13 +193,14 @@ func (s *Server) ExecBatchYakScript(req *ypb.ExecBatchYakScriptRequest, stream y
 		Timestamp: time.Now().Unix(),
 	})
 	sendStatus := func() {
+		completed := atomic.LoadInt64(&progressCount)
 		_ = stream.Send(&ypb.ExecBatchYakScriptResult{
 			ProgressMessage:        true,
-			ProgressPercent:        getPercent(),
-			ProgressCount:          progressCount,
+			ProgressPercent:        getPercent(completed),
+			ProgressCount:          completed,
 			ProgressTotal:          int64(progressTotal),
-			ProgressRunning:        progressRunning,
-			ScanTaskExecutingCount: scanTaskExecutingCount,
+			ProgressRunning:        atomic.LoadInt64(&progressRunning),
+			ScanTaskExecutingCount: atomic.LoadInt64(&scanTaskExecutingCount),
 			Timestamp:              time.Now().Unix(),
 		})
 	}

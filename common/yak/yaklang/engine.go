@@ -76,7 +76,7 @@ func NewAntlrEngine() *antlr4yak.Engine {
 		"yakit": map[string]interface{}{
 			"AutoInitYakit": engineAutoInitYakitOverride(engine),
 		}})
-	yaklib.SetEngineClient(engine, yaklib.GetYakitClientInstance())
+	yaklib.BindEngineClient(engine, yaklib.GetYakitClientInstance())
 	return engine
 }
 
@@ -93,7 +93,7 @@ func NewAntlrEngine() *antlr4yak.Engine {
 func engineAutoInitYakitOverride(engine *antlr4yak.Engine) func() {
 	return func() {
 		if client := yaklib.AutoInitYakit(); client != nil {
-			yaklib.SetEngineClient(engine, client)
+			yaklib.BindEngineClient(engine, client)
 		}
 	}
 }

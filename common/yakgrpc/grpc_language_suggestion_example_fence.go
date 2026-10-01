@@ -165,6 +165,15 @@ func RenderExampleMarkersForMarkdown(text string) string {
 // applyExampleFenceToResponse 对返回给前端的建议逐条渲染 EXAMPLE 标记。
 // Label(悬浮内容) 与 Description(补全/签名文档) 都可能内嵌标记，均需处理。
 func applyExampleFenceToResponse(resp *ypb.YaklangLanguageSuggestionResponse) *ypb.YaklangLanguageSuggestionResponse {
+	if resp != nil {
+		// SyntaxFlow and Fuzztag completion may return cached message pointers.
+		resp.SuggestionMessage = cloneCompletionSuggestions(resp.SuggestionMessage)
+	}
+	return applyExampleFenceToOwnedResponse(resp)
+}
+
+// The caller must own the messages before rendering changes their fields.
+func applyExampleFenceToOwnedResponse(resp *ypb.YaklangLanguageSuggestionResponse) *ypb.YaklangLanguageSuggestionResponse {
 	if resp == nil {
 		return resp
 	}

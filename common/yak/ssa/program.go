@@ -143,6 +143,7 @@ func (prog *Program) createSubProgram(name string, kind ssadb.ProgramKind, path 
 	subProg.editorStack = prog.editorStack.Copy()
 	// subProg.editorStack = prog.editorStack
 	subProg.externType = prog.externType
+	subProg.externMethodBuilder = prog.externMethodBuilder
 	subProg.externBuildValueHandler = prog.externBuildValueHandler
 	subProg.ExternInstance = prog.ExternInstance
 	subProg.ExternLib = prog.ExternLib

@@ -628,7 +628,15 @@ func (c *Cache[T, D]) CloseWithoutSave() {
 	if c == nil {
 		return
 	}
+	// Both close modes share one lifecycle. The first caller chooses whether
+	// to drain residents; every later caller waits for that close to finish.
+	c.closeOnce.Do(func() {
+		c.closeErr = c.closeWithoutSaveInternal()
+	})
+}
 
+func (c *Cache[T, D]) closeWithoutSaveInternal() error {
+	var closeErr error
 	c.closing.Store(true)
 	// This path is only safe after the caller has persisted what it needs, but
 	// cancel any still-running observation so it cannot outlive the cache.
@@ -638,14 +646,16 @@ func (c *Cache[T, D]) CloseWithoutSave() {
 	}
 	if c.marshalPipe != nil {
 		c.marshalPipe.Close()
+		closeErr = utils.JoinErrors(closeErr, c.marshalPipe.Error())
 	}
 	c.wg.Wait()
 	if c.saver != nil {
-		_ = c.saver.Close()
+		closeErr = utils.JoinErrors(closeErr, c.saver.Close())
 	}
 	if c.cancel != nil {
 		c.cancel()
 	}
+	return closeErr
 }
 
 func (c *Cache[T, D]) EnableSave() {

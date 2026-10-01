@@ -315,7 +315,7 @@ func (t *TypeCheck) TypeCheckUndefine(inst *ssa.Undefined) {
 			return
 		}
 		if ssa.IsConstInst(key) {
-			want := ssa.TryGetSimilarityKey(ssa.GetAllKey(objTyp), key.String())
+			want := ssa.TryGetSimilarityKey(obj.GetProgram().GetAllKey(objTyp), key.String())
 			if want != "" {
 				inst.NewError(
 					ssa.Error, TypeCheckTAG,

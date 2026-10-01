@@ -844,6 +844,7 @@ jobs:
             # parent test, so they finish before any other package test runs.
             test_configs: |
               [
+                {"package": "./common/log", "timeout": "20s", "race": true},
                 {"package": "./common/yak/cmd/yakcmds/...", "timeout": "20s"},
                 {"package": "./common/yak/yaklib/codec", "timeout": "20s"},
                 {"package": "./common/yak/cartesian", "timeout": "20s"},

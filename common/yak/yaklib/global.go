@@ -104,8 +104,8 @@ func _failed(msg ...interface{}) {
 }
 
 func yakitOutputHelper(i interface{}) {
-	if yakitClientInstance != nil {
-		yakitClientInstance.Output(i)
+	if client := GetYakitClientInstance(); client != nil {
+		client.Output(i)
 	}
 }
 

@@ -225,6 +225,14 @@ func (c *YakitClient) SendRaw(y *YakitLog) error {
 }
 
 func SetEngineClient(e *antlr4yak.Engine, client *YakitClient) {
+	BindEngineClient(e, client)
+
+	// 修改全局默认客户端；显式绑定保留原有的默认客户端更新语义。
+	InitYakit(client)
+}
+
+// BindEngineClient sets the engine's client without changing the global default.
+func BindEngineClient(e *antlr4yak.Engine, client *YakitClient) {
 	e.OverrideRuntimeGlobalVariables(map[string]any{
 		"yakit": GetExtYakitLibByClient(client),
 		"risk": map[string]any{
@@ -236,7 +244,4 @@ func SetEngineClient(e *antlr4yak.Engine, client *YakitClient) {
 			"CheckICMPTriggerByLength":  yakit.YakitNewCheckICMPTriggerByLength(yakit.YakitPluginInfo{}),
 		},
 	})
-
-	//修改全局默认客户端
-	InitYakit(client)
 }

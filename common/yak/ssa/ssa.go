@@ -338,6 +338,7 @@ type Program struct {
 	// extern lib
 	cacheExternInstance     map[string]Value // lib and value
 	externType              map[string]Type
+	externMethodBuilder     MethodBuilder
 	externBuildValueHandler map[string]func(b *FunctionBuilder, id string, v any) (value Value)
 	ExternInstance          map[string]any
 	ExternSideEffect        map[string][]uint

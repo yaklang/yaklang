@@ -6,6 +6,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/samber/lo"
@@ -18,7 +19,42 @@ import (
 	"github.com/yaklang/yaklang/common/yak/yakdoc"
 	"github.com/yaklang/yaklang/common/yak/yakdoc/doc"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
+	"google.golang.org/protobuf/proto"
 )
+
+// Each cache is published only after both the list and its lookup are complete.
+// Cached messages are immutable; completion edits use request-owned copies.
+type completionSuggestionCache struct {
+	once        sync.Once
+	suggestions []*ypb.SuggestionDescription
+	byLabel     map[string]*ypb.SuggestionDescription
+}
+
+func (c *completionSuggestionCache) get(build func() []*ypb.SuggestionDescription) []*ypb.SuggestionDescription {
+	c.once.Do(func() {
+		c.suggestions = build()
+		c.byLabel = make(map[string]*ypb.SuggestionDescription, len(c.suggestions))
+		for _, suggestion := range c.suggestions {
+			if suggestion != nil {
+				c.byLabel[suggestion.Label] = suggestion
+			}
+		}
+	})
+	return c.suggestions
+}
+
+func cloneCompletionSuggestions(suggestions []*ypb.SuggestionDescription) []*ypb.SuggestionDescription {
+	if len(suggestions) == 0 {
+		return nil
+	}
+	owned := make([]*ypb.SuggestionDescription, 0, len(suggestions))
+	for _, suggestion := range suggestions {
+		if suggestion != nil {
+			owned = append(owned, proto.Clone(suggestion).(*ypb.SuggestionDescription))
+		}
+	}
+	return owned
+}
 
 var (
 	stringBuiltinMethod = yakvm.GetStringBuildInMethod()
@@ -26,14 +62,10 @@ var (
 	mapBuiltinMethod    = yakvm.GetMapBuildInMethod()
 	sliceBuiltinMethod  = yakvm.GetSliceBuildInMethod()
 
-	stringBuiltinMethodSuggestionMap = make(map[string]*ypb.SuggestionDescription, len(stringBuiltinMethod))
-	bytesBuiltinMethodSuggestionMap  = make(map[string]*ypb.SuggestionDescription, len(bytesBuiltinMethod))
-	mapBuiltinMethodSuggestionMap    = make(map[string]*ypb.SuggestionDescription, len(mapBuiltinMethod))
-	sliceBuiltinMethodSuggestionMap  = make(map[string]*ypb.SuggestionDescription, len(sliceBuiltinMethod))
-	stringBuiltinMethodSuggestions   = make([]*ypb.SuggestionDescription, 0, len(stringBuiltinMethod))
-	bytesBuiltinMethodSuggestions    = make([]*ypb.SuggestionDescription, 0, len(bytesBuiltinMethod))
-	mapBuiltinMethodSuggestions      = make([]*ypb.SuggestionDescription, 0, len(mapBuiltinMethod))
-	sliceBuiltinMethodSuggestions    = make([]*ypb.SuggestionDescription, 0, len(sliceBuiltinMethod))
+	stringBuiltinSuggestionCache completionSuggestionCache
+	bytesBuiltinSuggestionCache  completionSuggestionCache
+	mapBuiltinSuggestionCache    completionSuggestionCache
+	sliceBuiltinSuggestionCache  completionSuggestionCache
 
 	yakKeywords = []string{
 		"break", "case", "continue", "default", "defer", "else",
@@ -52,10 +84,10 @@ var (
 
 	externValueSuggestionsMap = utils.NewTTLCache[[]*ypb.SuggestionDescription](15 * time.Minute)
 
-	standardLibrarySuggestions = make([]*ypb.SuggestionDescription, 0)
-	yakKeywordSuggestions      = make([]*ypb.SuggestionDescription, 0)
-	yakTypeSuggestions         = make([]*ypb.SuggestionDescription, 0)
-	progCacheMap               = utils.NewTTLCache[*ssaapi.Program](0)
+	standardLibrarySuggestionCache completionSuggestionCache
+	yakKeywordSuggestionCache      completionSuggestionCache
+	yakTypeSuggestionCache         completionSuggestionCache
+	progCacheMap                   = utils.NewTTLCache[*ssaapi.Program](0)
 
 	CompletionKindField    = "Field"
 	CompletionKindKeyword  = "Keyword"
@@ -69,42 +101,38 @@ var (
 )
 
 func getLanguageKeywordSuggestions() []*ypb.SuggestionDescription {
-	// 懒加载
-	if len(yakKeywordSuggestions) == 0 {
-		yakKeywordSuggestions = make([]*ypb.SuggestionDescription, 0, len(yakKeywords))
+	return yakKeywordSuggestionCache.get(func() []*ypb.SuggestionDescription {
+		suggestions := make([]*ypb.SuggestionDescription, 0, len(yakKeywords))
 		for _, keyword := range yakKeywords {
-			yakKeywordSuggestions = append(yakKeywordSuggestions, &ypb.SuggestionDescription{
+			suggestions = append(suggestions, &ypb.SuggestionDescription{
 				Label:       keyword,
 				InsertText:  keyword,
 				Description: "Language Keyword",
 				Kind:        CompletionKindKeyword,
 			})
 		}
-	}
-
-	return yakKeywordSuggestions
+		return suggestions
+	})
 }
 
 func getLanguageBasicTypeSuggestions() []*ypb.SuggestionDescription {
-	// 懒加载
-	if len(yakTypeSuggestions) == 0 {
-		yakTypeSuggestions = make([]*ypb.SuggestionDescription, 0, len(yakTypes))
+	return yakTypeSuggestionCache.get(func() []*ypb.SuggestionDescription {
+		suggestions := make([]*ypb.SuggestionDescription, 0, len(yakTypes))
 		for _, typ := range yakTypes {
-			yakTypeSuggestions = append(yakTypeSuggestions, &ypb.SuggestionDescription{
+			suggestions = append(suggestions, &ypb.SuggestionDescription{
 				Label:       typ,
 				InsertText:  typ,
 				Description: "Basic Type",
 				Kind:        CompletionKindClass,
 			})
 		}
-	}
-
-	return yakTypeSuggestions
+		return suggestions
+	})
 }
 
 func getStringBuiltinMethodSuggestions() []*ypb.SuggestionDescription {
-	// 懒加载
-	if len(stringBuiltinMethodSuggestionMap) == 0 {
+	return stringBuiltinSuggestionCache.get(func() []*ypb.SuggestionDescription {
+		suggestions := make([]*ypb.SuggestionDescription, 0, len(stringBuiltinMethod))
 		for methodName, method := range stringBuiltinMethod {
 			snippets, _ := method.VSCodeSnippets()
 			sug := &ypb.SuggestionDescription{
@@ -113,17 +141,15 @@ func getStringBuiltinMethodSuggestions() []*ypb.SuggestionDescription {
 				InsertText:  snippets,
 				Kind:        CompletionKindMethod,
 			}
-			stringBuiltinMethodSuggestionMap[methodName] = sug
-			stringBuiltinMethodSuggestions = append(stringBuiltinMethodSuggestions, sug)
+			suggestions = append(suggestions, sug)
 		}
-	}
-
-	return stringBuiltinMethodSuggestions
+		return suggestions
+	})
 }
 
 func getBytesBuiltinMethodSuggestions() []*ypb.SuggestionDescription {
-	// 懒加载
-	if len(bytesBuiltinMethodSuggestionMap) == 0 {
+	return bytesBuiltinSuggestionCache.get(func() []*ypb.SuggestionDescription {
+		suggestions := make([]*ypb.SuggestionDescription, 0, len(bytesBuiltinMethod))
 		for methodName, method := range bytesBuiltinMethod {
 			snippets, _ := method.VSCodeSnippets()
 			sug := &ypb.SuggestionDescription{
@@ -132,17 +158,15 @@ func getBytesBuiltinMethodSuggestions() []*ypb.SuggestionDescription {
 				InsertText:  snippets,
 				Kind:        CompletionKindMethod,
 			}
-			bytesBuiltinMethodSuggestionMap[methodName] = sug
-			bytesBuiltinMethodSuggestions = append(bytesBuiltinMethodSuggestions, sug)
+			suggestions = append(suggestions, sug)
 		}
-	}
-
-	return bytesBuiltinMethodSuggestions
+		return suggestions
+	})
 }
 
 func getMapBuiltinMethodSuggestions() []*ypb.SuggestionDescription {
-	// 懒加载
-	if len(mapBuiltinMethodSuggestionMap) == 0 {
+	return mapBuiltinSuggestionCache.get(func() []*ypb.SuggestionDescription {
+		suggestions := make([]*ypb.SuggestionDescription, 0, len(mapBuiltinMethod))
 		for methodName, method := range mapBuiltinMethod {
 			snippets, _ := method.VSCodeSnippets()
 			sug := &ypb.SuggestionDescription{
@@ -151,17 +175,15 @@ func getMapBuiltinMethodSuggestions() []*ypb.SuggestionDescription {
 				InsertText:  snippets,
 				Kind:        CompletionKindMethod,
 			}
-			mapBuiltinMethodSuggestionMap[methodName] = sug
-			mapBuiltinMethodSuggestions = append(mapBuiltinMethodSuggestions, sug)
+			suggestions = append(suggestions, sug)
 		}
-	}
-
-	return mapBuiltinMethodSuggestions
+		return suggestions
+	})
 }
 
 func getSliceBuiltinMethodSuggestions() []*ypb.SuggestionDescription {
-	// 懒加载
-	if len(sliceBuiltinMethodSuggestionMap) == 0 {
+	return sliceBuiltinSuggestionCache.get(func() []*ypb.SuggestionDescription {
+		suggestions := make([]*ypb.SuggestionDescription, 0, len(sliceBuiltinMethod))
 		for methodName, method := range sliceBuiltinMethod {
 			snippets, verbose := method.VSCodeSnippets()
 			sug := &ypb.SuggestionDescription{
@@ -171,29 +193,26 @@ func getSliceBuiltinMethodSuggestions() []*ypb.SuggestionDescription {
 				InsertText:        snippets,
 				Kind:              CompletionKindMethod,
 			}
-			sliceBuiltinMethodSuggestionMap[methodName] = sug
-			sliceBuiltinMethodSuggestions = append(sliceBuiltinMethodSuggestions, sug)
+			suggestions = append(suggestions, sug)
 		}
-	}
-
-	return sliceBuiltinMethodSuggestions
+		return suggestions
+	})
 }
 
 func getStandardLibrarySuggestions() []*ypb.SuggestionDescription {
-	// 懒加载
-	if len(standardLibrarySuggestions) == 0 {
-		standardLibrarySuggestions = make([]*ypb.SuggestionDescription, 0, len(doc.GetDefaultDocumentHelper().Libs))
-		for libName := range doc.GetDefaultDocumentHelper().Libs {
-			standardLibrarySuggestions = append(standardLibrarySuggestions, &ypb.SuggestionDescription{
+	return standardLibrarySuggestionCache.get(func() []*ypb.SuggestionDescription {
+		libraries := doc.GetDefaultDocumentHelper().Libs
+		suggestions := make([]*ypb.SuggestionDescription, 0, len(libraries))
+		for libName := range libraries {
+			suggestions = append(suggestions, &ypb.SuggestionDescription{
 				Label:       libName,
 				InsertText:  libName,
 				Description: "Standard Library",
 				Kind:        CompletionKindModule,
 			})
 		}
-	}
-
-	return standardLibrarySuggestions
+		return suggestions
+	})
 }
 
 func getSSAFunctionVscodeSnippets(funcName string, funTyp *ssa.FunctionType) string {
@@ -437,19 +456,19 @@ func _getBuiltinFuncDeclAndDoc(name string, bareTyp ssa.Type) (desc string, doc 
 		}
 		if rTyp.KeyTyp.GetTypeKind() == ssa.BytesTypeKind {
 			getBytesBuiltinMethodSuggestions()
-			m = bytesBuiltinMethodSuggestionMap
+			m = bytesBuiltinSuggestionCache.byLabel
 		} else {
 			getSliceBuiltinMethodSuggestions()
-			m = sliceBuiltinMethodSuggestionMap
+			m = sliceBuiltinSuggestionCache.byLabel
 		}
 	case ssa.MapTypeKind:
 		// map 内置方法
 		getMapBuiltinMethodSuggestions()
-		m = mapBuiltinMethodSuggestionMap
+		m = mapBuiltinSuggestionCache.byLabel
 	case ssa.StringTypeKind:
 		// string 内置方法
 		getStringBuiltinMethodSuggestions()
-		m = stringBuiltinMethodSuggestionMap
+		m = stringBuiltinSuggestionCache.byLabel
 	}
 	sug, ok := m[name]
 	if ok {
@@ -784,8 +803,15 @@ func completionUserDefinedVariable(prog *ssaapi.Program, rng *memedit.Range, fil
 }
 
 func completionExternValues(prog *ssaapi.Program, filterMap map[string]struct{}) (ret []*ypb.SuggestionDescription) {
+	if prog == nil || prog.Program == nil {
+		return nil
+	}
 	functions := doc.GetDefaultDocumentHelper().Functions
 	ret = make([]*ypb.SuggestionDescription, 0, len(functions))
+	// Source analysis reuses the same SSA program across language requests.
+	// Building undocumented extern values registers instructions and types, so
+	// use a request-local program for their completion metadata.
+	var externProgram *ssaapi.Program
 
 	for name, value := range prog.Program.ExternInstance {
 		if strings.HasPrefix(name, "$") {
@@ -800,8 +826,13 @@ func completionExternValues(prog *ssaapi.Program, filterMap map[string]struct{})
 				Kind:        CompletionKindFunction,
 			})
 		} else {
-			bareValue := prog.Program.BuildValueFromAny(nil, name, value)
-			v, err := prog.NewValue(bareValue)
+			if externProgram == nil {
+				externProgram = ssaapi.NewTmpProgram("language-completion-extern")
+				// Variable types are retrieved by ID and need a local type store.
+				externProgram.Program.Cache = ssa.NewDBCache(nil, externProgram.Program, ssa.ProgramCacheMemory, 0)
+			}
+			bareValue := externProgram.Program.BuildValueFromAny(nil, name, value)
+			v, err := externProgram.NewValue(bareValue)
 			if err != nil {
 				continue
 			}
@@ -1005,6 +1036,9 @@ func completionComplexStructMethodAndInstances(v *ssaapi.Value, realTyp ...ssa.T
 func fixCompletionFunctionParams(suggestions []*ypb.SuggestionDescription, v *ssaapi.Value) []*ypb.SuggestionDescription {
 	// fix completion, for function params that are function type, we should complete function name instead of function signature
 	// e.g. callable(app) -> callable(append), not callable(append(a, vals...))
+	if v == nil || v.IsNil() {
+		return suggestions
+	}
 	users := v.GetUsers()
 	if len(users) == 0 {
 		return suggestions
@@ -1017,7 +1051,7 @@ func fixCompletionFunctionParams(suggestions []*ypb.SuggestionDescription, v *ss
 		return suggestions
 	}
 	call, ok := ssa.ToCall(lastUser.GetSSAInst())
-	if !ok {
+	if !ok || call == nil {
 		return suggestions
 	}
 	method, ok := call.GetValueById(call.Method)
@@ -1025,7 +1059,7 @@ func fixCompletionFunctionParams(suggestions []*ypb.SuggestionDescription, v *ss
 		return suggestions
 	}
 	funcTyp, ok := ssa.ToFunctionType(method.GetType())
-	if !ok {
+	if !ok || funcTyp == nil {
 		return suggestions
 	}
 	// find index of call.Args
@@ -1042,12 +1076,12 @@ func fixCompletionFunctionParams(suggestions []*ypb.SuggestionDescription, v *ss
 		return suggestions
 	}
 	paramTyp := funcTyp.Parameter[index]
-	if paramTyp.GetTypeKind() != ssa.FunctionTypeKind {
+	if utils.IsNil(paramTyp) || paramTyp.GetTypeKind() != ssa.FunctionTypeKind {
 		return suggestions
 	}
 	if ssa.TypeCompare(paramTyp, ssaapi.GetBareType(v.GetType())) {
 		for _, r := range suggestions {
-			if r.Kind != CompletionKindFunction && r.Kind != CompletionKindMethod {
+			if r == nil || (r.Kind != CompletionKindFunction && r.Kind != CompletionKindMethod) {
 				continue
 			}
 			if index := strings.Index(r.InsertText, "("); index != -1 {
@@ -1061,8 +1095,11 @@ func fixCompletionFunctionParams(suggestions []*ypb.SuggestionDescription, v *ss
 func fixCompletionBeforeParen(suggestions []*ypb.SuggestionDescription, prog *ssaapi.Program, rng *memedit.Range, v *ssaapi.Value) []*ypb.SuggestionDescription {
 	// fix completion, for text before paren, we should complete function name instead of function signature
 	// e.g. callable(app()) -> callable(append()), not callable(append(a, vals...)())
+	if prog == nil || prog.Program == nil || rng == nil {
+		return suggestions
+	}
 	editor, ok := prog.Program.GetEditor("")
-	if !ok {
+	if !ok || editor == nil {
 		return suggestions
 	}
 	text := editor.GetTextFromOffset(rng.GetEndOffset(), rng.GetEndOffset()+1)
@@ -1070,7 +1107,7 @@ func fixCompletionBeforeParen(suggestions []*ypb.SuggestionDescription, prog *ss
 		return suggestions
 	}
 	for _, r := range suggestions {
-		if r.Kind != CompletionKindFunction && r.Kind != CompletionKindMethod {
+		if r == nil || (r.Kind != CompletionKindFunction && r.Kind != CompletionKindMethod) {
 			continue
 		}
 		if index := strings.Index(r.InsertText, "("); index != -1 {
@@ -1352,6 +1389,7 @@ func OnCompletion(
 		if r := recover(); r != nil {
 			log.Errorf("Language completion error: %v", r)
 		}
+		ret = cloneCompletionSuggestions(ret)
 		ret = fixCompletionFunctionParams(ret, v)
 		ret = fixCompletionBeforeParen(ret, prog, rng, v)
 	}()
@@ -1435,5 +1473,7 @@ func (s *Server) YaklangLanguageSuggestion(ctx context.Context, req *ypb.Yaklang
 		ret.SuggestionMessage = OnSignature(prog, word, containPoint, ssaRange, v)
 	}
 	// 发送给前端展示前的最后一刻：把文档里的 <|EXAMPLE...|> 标记渲染成代码围栏
-	return applyExampleFenceToResponse(ret), nil
+	// Completion edits already own their messages; hover and signature build
+	// fresh messages. Render directly instead of cloning these responses twice.
+	return applyExampleFenceToOwnedResponse(ret), nil
 }

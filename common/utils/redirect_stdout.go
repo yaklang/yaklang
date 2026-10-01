@@ -241,7 +241,7 @@ func HandleStdout(ctx context.Context, handle func(string)) error {
 	os.Stdout = tempOutputs
 	os.Stderr = tempOutputs
 	log.SetOutput(tempOutputs)
-	log.DefaultLogger.Printer.IsTerminal = true
+	log.DefaultLogger.SetTerminal(true)
 	for {
 		select {
 		case <-runCtx.Done():

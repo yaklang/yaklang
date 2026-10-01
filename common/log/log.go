@@ -62,6 +62,12 @@ type Logger struct {
 	*golog.Logger
 	vmRuntimeInfoGetter func(infoType string) (any, error)
 	name                string
+	output              logOutput
+}
+
+func (l *Logger) SetLevel(level string) *Logger {
+	l.Logger.SetLevel(level)
+	return l
 }
 
 const IGNOREFLAG = `[IGNORE]`
@@ -136,9 +142,12 @@ func GetLogger(name string) *Logger {
 		return logger
 	} else {
 		logger = &Logger{
-			Logger: golog.New(),
+			Logger: newGologLogger(),
 			name:   name,
 		}
+		logger.output.target.Store(logCurrentOutput)
+		logger.Printer.SetOutput(&logger.output)
+		logger.Printer.Hijack(logger.output.hijack)
 		if IsMCPStdioLogging() {
 			logger.SetOutput(os.Stderr)
 		}
@@ -156,6 +165,12 @@ func GetLogger(name string) *Logger {
 		//logger.SetTimeFormat("2006-01-02 15:04:05 -0700")
 		logger.SetTimeFormat("2006-01-02 15:04:05")
 		logger.SetLevel(GetConfig().Level)
+		if strings.HasSuffix(strings.ToLower(name), ".yak") {
+			logger.SetTerminal(true)
+			if defaultLogger, exists := loggers["default"]; exists {
+				logger.Level = defaultLogger.Level
+			}
+		}
 		loggers[name] = logger
 		return logger
 	}
@@ -294,9 +309,12 @@ func GetLevel() golog.Level {
 func SetOutput(w io.Writer) {
 	lock.Lock()
 	defer lock.Unlock()
-	DefaultLogger.SetOutput(w)
+	// All named loggers share the same serialized destination, including
+	// writers such as bytes.Buffer which are not safe for concurrent writes.
+	target := newLogOutputTarget(w)
+	logCurrentOutput = target
 	for _, l := range loggers {
-		l.SetOutput(w)
+		l.output.target.Store(target)
 	}
 }
 
