@@ -103,7 +103,7 @@ func (f *printer) print() {
 		if typ == antlr.TokenEOF {
 			break
 		}
-		if typ == parser.YaklangLexerLF {
+		if typ == parser.YaklangLexerLF || m.flags&skipToken != 0 {
 			continue
 		}
 		// Template characters can also contain a literal semicolon. Only

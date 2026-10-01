@@ -1,0 +1,16 @@
+switch {}
+switch true {}
+
+a
+,b = 1,2
+
+quoted = <<<'TAG'
+raw ; // ${x}
+TAG
+unicode = <<<'标签'
+原文 {} [] ()
+标签
+
+f = func() { return 1,; 2 }
+text = f"${func() { return {"key": [1,2]} }()["key"][0]}"
+println(a,b,quoted,unicode,f(),text)

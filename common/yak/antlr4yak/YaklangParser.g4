@@ -102,7 +102,8 @@ forRangeStmt: 'for' (((leftExpressionList (':=' | '='))? 'range') | ((leftExpres
 /*
 switch statement syntax
 */
-switchStmt: 'switch' expression? '{' (ws* 'case' expressionList ':' statementList?)* ( ws* 'default' ':' statementList?)? ws* '}';
+// The lexer inserts a semicolon before every RBrace, including an empty body.
+switchStmt: 'switch' expression? '{' (ws* 'case' expressionList ':' statementList?)* ( ws* 'default' ':' statementList?)? ws* ';'? '}';
 
 /*
 panic statement
