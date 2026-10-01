@@ -12,13 +12,19 @@ import (
 func (c *Config) applyEvidenceToTimeline(ops []EvidenceOperation) {
 	s := c.GetSessionPromptState()
 	s.m.Lock()
-	defer s.m.Unlock()
-	timeline := c.GetTimeline()
+	timeline := s.evidenceTimeline
+	if timeline == nil {
+		timeline = c.GetTimeline()
+		s.evidenceTimeline = timeline
+	}
 	if _, err := timeline.applyEvidenceOperations(ops, s.evidenceJSON, c.AcquireId); err != nil {
+		s.m.Unlock()
 		log.Warnf("journal session evidence: %v", err)
 		return
 	}
 	c.persistEvidenceTimelineLocked(s, timeline)
+	s.m.Unlock()
+	c.SyncSessionEvidenceTimeline()
 }
 
 // The journal is authoritative once migrated, including an empty state after
@@ -28,7 +34,11 @@ func (c *Config) restoreEvidenceTimeline() {
 	s := c.GetSessionPromptState()
 	s.m.Lock()
 	defer s.m.Unlock()
-	if store, found := c.GetTimeline().evidenceStore(); found {
+	if s.evidenceTimeline == nil {
+		s.evidenceTimeline = c.GetTimeline()
+	}
+	timeline := s.evidenceTimeline
+	if store, found := timeline.evidenceStore(); found {
 		s.evidenceJSON = store.Marshal()
 		return
 	}
@@ -37,7 +47,7 @@ func (c *Config) restoreEvidenceTimeline() {
 	}
 	store := UnmarshalEvidenceStore(s.evidenceJSON)
 	store.ShrinkToTokenBudget(sessionEvidenceTokenBudget)
-	if err := c.GetTimeline().replaceEvidence(store, c.AcquireId); err != nil {
+	if err := timeline.replaceEvidence(store, c.AcquireId); err != nil {
 		log.Warnf("restore evidence timeline: %v", err)
 		return
 	}
@@ -50,11 +60,35 @@ func (c *Config) FlushRestoredSessionEvidence() {
 	s := c.GetSessionPromptState()
 	s.m.Lock()
 	defer s.m.Unlock()
-	c.persistEvidenceTimelineLocked(s, c.GetTimeline())
+	c.persistEvidenceTimelineLocked(s, s.evidenceTimeline)
+}
+
+func (c *Config) sessionEvidenceTimeline() *Timeline {
+	s := c.GetSessionPromptState()
+	s.m.RLock()
+	timeline := s.evidenceTimeline
+	s.m.RUnlock()
+	if timeline == nil {
+		return c.GetTimeline()
+	}
+	return timeline
+}
+
+// SyncSessionEvidenceTimeline imports the session journal into a task's local
+// Timeline before compression. Original IDs preserve ordering, deduplication
+// and exact promotion; rendering itself remains read-only.
+func (c *Config) SyncSessionEvidenceTimeline() {
+	local, session := c.GetTimeline(), c.sessionEvidenceTimeline()
+	if local != nil && session != nil && local != session {
+		local.importSessionEvidence(session)
+	}
 }
 
 // Caller holds the session lock; the DB mirror and journal use one snapshot.
 func (c *Config) persistEvidenceTimelineLocked(s *SessionPromptState, timeline *Timeline) {
+	if timeline == nil {
+		return
+	}
 	timeline.mu.RLock()
 	store, _ := timeline.evidenceStoreLocked()
 	s.evidenceJSON = store.Marshal()

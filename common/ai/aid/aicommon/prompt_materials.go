@@ -203,7 +203,8 @@ type TimelinePromptOptions struct {
 	// PromoteUserInput is opt-in for main context construction. Helper and
 	// parameter prompts retain typed user records in their ordinary history.
 	PromoteUserInput bool
-	// UserInputOnly supplies exact user context to lightweight loops.
+	// UserInputOnly supplies exact user context and session evidence to
+	// lightweight loops; ordinary execution history uses a separate recent window.
 	UserInputOnly bool
 }
 
@@ -219,10 +220,7 @@ func RenderTimelineFrozenOpenWithOptions(timeline *Timeline, options TimelinePro
 	if !options.ExcludeToolCache && !options.UserInputOnly {
 		recentTools = renderPromotedRecentTools(timeline.promotedState)
 	}
-	evidenceSemi := ""
-	if !options.UserInputOnly {
-		evidenceSemi = timeline.projectEvidenceLocked()
-	}
+	evidenceSemi := timeline.projectEvidenceLocked()
 	promptBlocks := projectTimelineRenderableBlocksForPrompt(rb)
 	if options.IncludeLatestModelReplay {
 		promptBlocks = projectTimelineRenderableBlocksForPromptWithLatestModelReplay(rb)

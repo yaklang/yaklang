@@ -225,7 +225,7 @@ func (m *Timeline) frozenPromptBlocksLocked(excludeToolCache bool, onlyUserInput
 			if promoteUserInput || !isTimelineUserInput(item) {
 				op = timelinePromotionForItem(item)
 			}
-			if onlyUserInput && (op == nil || op.Kind != TimelinePromotedKindUserInput) {
+			if onlyUserInput && (op == nil || (op.Kind != TimelinePromotedKindUserInput && op.Kind != TimelinePromotedKindEvidence)) {
 				continue
 			}
 			if op != nil {

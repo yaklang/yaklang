@@ -87,12 +87,12 @@ func (t *AiTask) execute() error {
 					// 历史曾把 EVIDENCE 块嵌入 root user input, 但这会让 PlanContext
 					// 跨子任务抖动并破坏多个 prompt cache 命中。现仅保留
 					// Timeline 单一记录源；基础 save_evidence 与 PE 兼容
-					// output_evidence action 也直接写入同一个 Session Evidence Store。
+					// save_evidence action 也直接写入同一个 Session Evidence Store。
 					// 关键词: EVIDENCE 单写, ApplySessionEvidenceOps, PlanContext 抖动修复
 					log.Infof("task %s applying session evidence ops, count=%d", t.Index, len(allOps))
 					if incremental := aicommon.FormatEvidenceOpsLines(allOps, t.GetLanguage()); incremental != "" {
 						if _, emitErr := t.EmitTextMarkdownStreamEvent(
-							"plan-evidence",
+							"evidence_content",
 							strings.NewReader(incremental),
 							t.GetIndex(),
 						); emitErr != nil {
@@ -185,7 +185,6 @@ func (t *AiTask) execute() error {
 
 			return reactiveData, nil
 		}),
-		outputEvidenceAction(t),
 	)
 	if err != nil {
 		if t.GetStatus() == aicommon.AITaskState_Processing {
@@ -368,7 +367,7 @@ func (t *AiTask) generateTaskSummary(summary, nextSteps string) error {
 			log.Infof("task %s applying session summary evidence ops, count=%d", t.Index, len(summaryOps))
 			if incremental := aicommon.FormatEvidenceOpsLines(summaryOps, t.GetLanguage()); incremental != "" {
 				if _, emitErr := t.EmitTextMarkdownStreamEvent(
-					"plan-evidence",
+					"evidence_content",
 					strings.NewReader(incremental),
 					t.GetIndex(),
 				); emitErr != nil {

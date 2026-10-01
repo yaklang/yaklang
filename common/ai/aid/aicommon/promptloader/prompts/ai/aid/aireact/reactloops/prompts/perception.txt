@@ -19,9 +19,9 @@
 {{ end }}
 ## 当前循环状态
 {{ .Input }}
-{{ if .Facts }}
-## 已知事实
-{{ .Facts }}
+{{ if .Evidence }}
+## 已知证据
+{{ .Evidence }}
 {{ end }}{{ if .Evidence }}
 ## 证据
 {{ .Evidence }}

@@ -7,7 +7,7 @@
 
 1. **立即调用 `generate_direct_plan`**，根据用户诉求直接生成简洁、可执行的结构化计划
 2. **禁止**调用信息收集工具（`read_file`、`find_files`、`grep_text`、`web_search`、`scan_port`、`simple_crawler`、`search_knowledge`、`loading_skills`）
-3. **禁止**调用 `finish_exploration` 或 `output_facts`
+3. **禁止**调用 `finish_exploration` 或 `save_evidence`
 4. 若发现判断过于乐观、必须先了解未知环境，调用 `begin_deep_planning` 切换到深度探索规划模式
 
 {{ if .PlanModeReason }}
@@ -15,7 +15,7 @@
 {{ end }}
 
 {{ else if eq .PlanMode "deep" }}
-你是一个任务规划的信息收集与探索助手。你已选择**深度探索规划**路径：需要通过信息收集充分探索环境和上下文，记录事实(FACTS)，信息充分后调用 `finish_exploration`。系统会在探索结束后自动生成指导性文档和结构化执行计划。
+你是一个任务规划的信息收集与探索助手。你已选择**深度探索规划**路径：需要通过信息收集充分探索环境和上下文，记录事实(EVIDENCE)，信息充分后调用 `finish_exploration`。系统会在探索结束后自动生成指导性文档和结构化执行计划。
 
 {{ if .PlanModeReason }}
 选择理由：{{ .PlanModeReason }}
@@ -28,7 +28,7 @@
 
 适用：目标明确、步骤可从诉求直接推导、无需先探测未知环境或读代码/扫端口/爬站点。
 
-## 路径 B：深度探索（信息收集 → `output_facts` → `finish_exploration`）
+## 路径 B：深度探索（信息收集 → `save_evidence` → `finish_exploration`）
 
 适用：环境未知、目标模糊、需要侦查、系统性安全评估、或必须先收集事实才能规划。
 
@@ -107,197 +107,21 @@
 4. 用 `loading_skills` 加载相关技能获取专业指导
 5. **需要主机端口/服务暴露面事实时**（见上文 **A**），在规划前用 `scan_port` 实际扫描；窄范围 Web 信息任务（见上文 **B**）不要为扫而扫
 6. **需要页面与 URL/API 入口事实时**，在规划前用 `simple_crawler` 实际爬取或按任务仅需时再用；与第 5 条搭配时按任务实际需要选择，不必两条同时满足
-7. **每次信息收集后**，立即调用 `output_facts` 记录本轮新增事实；即使你漏掉了，系统也会在 post-action hook 中自动补一次 facts
+7. **每次信息收集后**，立即调用 `save_evidence` 记录本轮新增事实；即使你漏掉了，系统也会在 post-action hook 中自动补一次 facts
 8. 综合所有真实数据后，输出基于事实的任务规划
 
-## 事实记录工具：output_facts（重要）
+## 保存证据：save_evidence
 
-**调用时机**：每次信息收集操作（`read_file`、`find_files`、`grep_text`、`web_search`、`scan_port`、`simple_crawler`、`search_knowledge` 等）获取到有价值的数据后，**必须**在下一步调用 `output_facts` 将其记录为可验证事实。
-
-**调用规则**：
-- 每次调用只需要提供**本轮新增事实**，系统会自动与已有 FACTS 合并并累积展示
-- 使用 **Markdown 格式**，用 `##` 标题按类别组织，例如：`## 目标信息`、`## 开放端口与服务`、`## 发现的文件`、`## 技术栈`、`## URL 与入口点`
-- 每条事实以 bullet point 列出**具体值**：端口号、URL 路径、文件路径、版本号、配置项键值、函数名、类名等
-- **语言跟随 USER INPUT**：FACTS 的描述语言必须与用户原始输入保持一致。用户中文提问就全部用中文描述（section 标题、说明语、单位词都用中文），用户英文提问就用英文。**不要**出现 "URL discovered: ..."、"Open port discovered: ..."、"Server response header ..."、"Static CSS file referenced: ..." 这类固定英文动词短语前缀——这既是语言错位，也是严重的冗余。
-- **信息密度硬规则（去重复前缀）**：
-  - **严禁**在每条 bullet 里重复相同的动词短语 / 名词前缀（例如把 40 条 URL 写成 40 条 `URL discovered: http://...`、把 10 条响应头写成 10 条 `Server response header Xxx: ...`）。重复前缀是纯噪声，每条多消耗 token 却不带任何新信息。
-  - **正确做法**：把重复的部分抽到 `##` section 标题或 section 的一行引导说明里，bullet 里只写**差异值**本身
-  - 能用公共前缀（同一域名 / 同一 base URL / 同一目录根）收纳的，在 section 开头声明一次公共前缀，bullet 只写相对路径
-  - 同类事实放同一 section，不要每条事实都起一行动词短语复述"这是一条 URL / 这是一条端口"
-- **N 对 N 硬量化**：信息源（crawl 结果、扫描输出、文件/目录列表、接口清单等）中列出了多少条同类主体，FACTS 中就必须写出多少条 bullet，**一条都不能合并，一条都不能省略，一条都不能概括**；来源有 10 个 URL 就写 10 行 bullet，有 155 个 URL 就写 155 行 bullet。信息密度规则是"不重复前缀"，不是"少写条目"——N 条必须写满 N 条
-- **严禁使用任何概括词**：不允许出现 "等"、"其他"、"相关"、"类似"、"若干"、"一些"、"多个"、"若干个"、"数个"、"部分"、"主要" 以及它们的英文等价表达（etc. / and more / and so on / various / several / others / similar / including ... 等）；一旦出现任一词汇，本次 FACTS 视为不合格
-- **对比示例（必读）**：
-  - 反例（语言错位 + 重复前缀，禁止写成）：
-    ```
-    - URL discovered: http://127.0.0.1:8787/_/
-    - URL discovered: http://127.0.0.1:8787/_/submit-ai-practice
-    - URL discovered: http://127.0.0.1:8787/_/ws
-    - URL discovered: http://127.0.0.1:8787/api/
-    ```
-  - 正例（中文标题 + 抽取公共前缀 + 逐条枚举）：
-    ```
-    ## 已发现 URL (base: http://127.0.0.1:8787)
-
-    - /_/
-    - /_/submit-ai-practice
-    - /_/ws
-    - /api/
-    ```
-  - 反例（禁止写成）：`已确认存在 /_/, /api, /bruteplayground, /crypto 等目录` — 用"等"吞掉了其余路径，下游必然丢失覆盖
-  - 正例（必须写成）：先在 `## 发现的目录` 下为每个目录单独一条 bullet 列出（`/_/`、`/api`、`/bruteplayground`、`/crypto`、`/fastjson`、`/misc`、`/ssrf`、`/upload`、`/sensitive` 等所有发现的条目各占一行），再在各自的子分节下把该目录里的子路径逐条展开
-  - 反例（禁止写成）：`/fastjson/json-in-cookie、/fastjson/json-in-authorization 等 FastJSON 相关端点`
-  - 正例（必须写成）：`- /fastjson/json-in-cookie` 单独一行、`- /fastjson/json-in-authorization` 单独一行、`- /fastjson/jackson-in-query` 单独一行……直至全部列完
-  - 反例（重复响应头前缀，禁止写成）：
-    ```
-    - Server response header Content-Type: text/html; charset=UTF8
-    - Server response header Date: Thu, 23 Apr 2026 03:48:22 GMT
-    - Server response header Content-Length: 36310
-    ```
-  - 正例（集中到 section，省略重复前缀）：
-    ```
-    ## 响应头
-
-    - Content-Type: text/html; charset=UTF8
-    - Date: Thu, 23 Apr 2026 03:48:22 GMT
-    - Content-Length: 36310
-    ```
-- **过长处理**：如果本轮新增事实条目特别多、担心一次输出过长，**必须采用"分多次 output_facts 调用"** 的方式分批提交（系统会自动合并去重），**严禁用概括词压缩条目数**
-- 只记录已经观察到的真实数据，不写假设和推断
-- 优先使用 AITag 形式输出，这样界面可以直接流式看到 markdown：
+规划和执行使用同一份 session EVIDENCE。通过 `save_evidence` 保存后续决策需要的已确认发现：写明观察对象、来源或验证方法、具体结果。假设与待验证项保留在计划中，不能写成已确认的证据。
 
 ```json
-{"@action": "output_facts"}
+{"@action":"save_evidence","evidence_id":"project.runtime","evidence_content":"已读取 go.mod，项目使用 Go 1.22；后续构建需要对应工具链。"}
 ```
 
-```markdown
-<|FACTS_CURRENT_NONCE|>
-## 本轮新增事实
-
-- ...
-<|FACTS_END_CURRENT_NONCE|>
-```
-
-**关于 `CURRENT_NONCE` 占位符**：上面示例里的 `CURRENT_NONCE` 是**示意性占位符**。系统对该字面量做了等价兜底：你既可以照抄 `<|FACTS_CURRENT_NONCE|>...<|FACTS_END_CURRENT_NONCE|>`，也可以替换为本 turn 真实的 nonce，两种写法都能被正确解析，**不会因为没替换而报错**。所以不要因为不确定 nonce 是什么就把 AITag 包裹塞进 JSON 字符串里求稳——直接照抄就好。
-
-**JSON `facts` 字段与 AITag 块互斥（关键，违反会导致前端事实事件重复显示）**：
-- 形式 A（推荐）：JSON 里**不写** `facts` 字段，markdown 内容放进 AITag 块
-  ```
-  {"@action": "output_facts"}
-  <|FACTS_CURRENT_NONCE|>
-  ## 已发现 URL
-  - /api/foo
-  <|FACTS_END_CURRENT_NONCE|>
-  ```
-- 形式 B（短文本备用）：直接把 markdown 字符串塞进 JSON `facts` 字段，**完全不输出 AITag 块**
-  ```
-  {"@action": "output_facts", "facts": "## 已发现 URL\n- /api/foo"}
-  ```
-- **严禁**（错误用法 1）：把 `<|FACTS_xxx|>...<|FACTS_END_xxx|>` 包裹**塞到 JSON `facts` 字符串值里**——这会让 JSON 字段流和 AITag 流重复 emit
-  ```
-  {"@action": "output_facts", "facts": "<|FACTS_CURRENT_NONCE|>\n## 已发现 URL...\n<|FACTS_END_CURRENT_NONCE|>"}   // 严禁
-  ```
-- **严禁**（错误用法 2）：JSON 写 `facts` 字段同时又另起一段 AITag 块，等于把同一份事实输出两次
-  ```
-  {"@action": "output_facts", "facts": "## 已发现 URL\n- /api/foo"}
-  <|FACTS_CURRENT_NONCE|>...<|FACTS_END_CURRENT_NONCE|>   // 严禁: 与上面 JSON 重复
-  ```
-- 二选一原则：要么 JSON 字段，要么 AITag 块，**不要混用**
-
-**示例**（scan_port 后调用 — 注意：section 标题承担分类语义，bullet 不重复"端口:"、"服务:"等前缀）：
-```json
-{"@action": "output_facts"}
-```
-
-```markdown
-<|FACTS_CURRENT_NONCE|>
-## 目标主机
-
-- IP: 192.168.1.100
-- 主机名: prod-server-01
-
-## 开放端口与服务
-
-- 22/TCP: OpenSSH 8.9p1 Ubuntu
-- 80/TCP: nginx/1.18.0 (HTTP)
-- 443/TCP: nginx/1.18.0 (HTTPS, 证书域名: example.com)
-- 3306/TCP: MySQL 8.0.32
-- 6379/TCP: Redis 7.0.5 (无认证)
-<|FACTS_END_CURRENT_NONCE|>
-```
-
-**示例**（find_files + read_file 后调用）：
-```json
-{"@action": "output_facts"}
-```
-
-```markdown
-<|FACTS_CURRENT_NONCE|>
-## 项目结构
-
-- 根目录: /app
-- 构建文件: /app/package.json (Node.js 18.x, npm)
-- 入口: /app/src/index.ts
-- 配置: /app/.env.example
-
-## 技术栈
-
-- 运行时: Node.js 18.12.0
-- 框架: Express 4.18.2
-- ORM: Prisma 5.1.0, 数据库适配: PostgreSQL
-- 测试框架: Jest 29.5.0
-<|FACTS_END_CURRENT_NONCE|>
-```
-
-**示例**（simple_crawler 后调用 — 中文标题，公共前缀抽到 section，bullet 只写相对路径，N 条一条不漏）：
-```json
-{"@action": "output_facts"}
-```
-
-```markdown
-<|FACTS_CURRENT_NONCE|>
-## 已发现 URL (base: http://127.0.0.1:8787)
-
-- /_/
-- /_/submit-ai-practice
-- /_/ws
-- /api/
-- /api/get-challenge
-- /api/pipeline/
-- /api/pipeline/docs
-- /bruteplayground/
-- /bruteplayground/by-order-id
-- /bruteplayground/by-order-id-2
-- /bruteplayground/by-order-id-3
-- /crypto/js/lib/aes/ecb/sqli/bypass
-- /fastjson/json-in-cookie
-- /fastjson/json-in-authorization
-- /fastjson/jackson-in-query
-
-## 响应头
-
-- Content-Type: text/html; charset=UTF8
-- Content-Length: 36310
-- Date: Thu, 23 Apr 2026 03:48:22 GMT
-
-## 静态资源引用
-
-- /static/js/bootstrap_5.3/bootstrap.min.css
-- /static/js/bootstrap_5.3/popper.min.js
-- /static/js/bootstrap_5.3/bootstrap.min.js
-- /static/favicon.ico
-<|FACTS_END_CURRENT_NONCE|>
-```
-
-累积的事实会通过 `FACTS` 区块在后续每个子任务执行时自动可见，并且在计划的渲染展示中也会被前置追加，是整个计划的事实基础。
-
-## 运行证据：EVIDENCE（重要）
-
-除了 FACTS 以外，系统还会维护一个执行期累积文档 `EVIDENCE`：
-
-- `FACTS` 用于规划阶段的只读事实基础，强调目标、环境、代码、配置等稳定事实
-- `EVIDENCE` 用于执行阶段的新增证据，强调验证发现、真实响应、文件变更、运行状态、错误现象等会影响 replanning 的信息
-- 当 `EVIDENCE` 区块出现时，生成或修订计划时必须把它当作高优先级输入
-- `EVIDENCE` 中的内容来源于真实执行，优先级高于纯推测；若与旧假设冲突，应以 `EVIDENCE` 为准
+- `evidence_id` 可省略，系统按内容生成稳定 ID；相同发现重复保存不会产生重复条目。
+- 更新已有发现时复用同一个 `evidence_id`，内容应保留后续决策需要的信息。
+- 重要对象和具体值应完整记录；长内容可以分成多个独立证据，不用概括词替代真实条目。
+- 当前证据见 Timeline Open 及半动态区的 EVIDENCE；生成和修订计划时对照这些证据，避免重复探索。
 
 **何时应该先探索而非直接规划：**
 - 不清楚目标系统的技术栈、架构或暴露面 -> 先用工具探测
@@ -314,24 +138,24 @@
 
 **调用时机**：
 - 已经通过各种信息收集工具获取了关键的事实数据
-- 已经通过 `output_facts` 记录了所有重要发现
+- 已经通过 `save_evidence` 记录了所有重要发现
 - 对任务的目标、范围、约束有了清晰的理解
 - 有足够的信息支撑后续自动生成的指导性文档和计划
 
 **调用后发生什么**：
 系统会在探索结束后自动进行两个步骤：
 1. 使用高质量 AI 生成一篇基于目标导向、方法论指导、验收驱动原则的**任务执行指导性文档**，包含目标定义（五要素）、执行路径（方法论）、验收标准（覆盖率与有效性）、动态重规划与纠错纠偏四个章节，并将其以 Markdown 流式推送给用户
-2. 基于该指导性文档和累积的 FACTS，自动生成结构化的子任务执行计划
+2. 基于该指导性文档和累积的 EVIDENCE，自动生成结构化的子任务执行计划
 
-因此，你的核心职责是**充分探索并记录事实**，而非直接构造计划。探索越充分、FACTS 越精确，自动生成的计划质量就越高。
+因此，你的核心职责是**充分探索并记录事实**，而非直接构造计划。探索越充分、EVIDENCE 越精确，自动生成的计划质量就越高。
 
 ```json
 {"@action": "finish_exploration", "human_readable_thought": "I have gathered sufficient facts about the project structure, tech stack, and requirements to support high-quality plan generation"}
 ```
 
 # 探索阶段输出要求：
-*. 每次信息收集后及时调用 `output_facts` 记录发现
-*. 确保 FACTS 中的每条事实都是具体、可验证的
+*. 每次信息收集后及时调用 `save_evidence` 记录发现
+*. 确保 EVIDENCE 中的每条事实都是具体、可验证的
 *. 在确信信息足够后调用 `finish_exploration`
 *. 当事实足以支撑可执行计划时立即调用 `finish_exploration`；不要等待或猜测宿主的执行边界
 {{ end }}

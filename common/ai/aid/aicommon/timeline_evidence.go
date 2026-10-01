@@ -9,6 +9,59 @@ import (
 
 const TimelinePromotedKindEvidence = "session-evidence"
 
+// Task branches project the same session journal, including tombstones, rather
+// than rebuilding evidence from an inherited business snapshot. Only exact
+// evidence entries are imported; ordinary task history stays in its own branch.
+func (m *Timeline) importSessionEvidence(session *Timeline) {
+	if m == nil || session == nil || m == session {
+		return
+	}
+	type entry struct {
+		item TimelineItem
+		op   PromotableTimelineItem
+		ts   int64
+	}
+	var entries []entry
+	session.mu.RLock()
+	initialized := session.evidenceInitialized
+	for _, id := range session.idToTimelineItem.Keys() {
+		item, ok := session.idToTimelineItem.Get(id)
+		if !ok || item == nil {
+			continue
+		}
+		op, ok := item.value.(*PromotableTimelineItem)
+		if !ok || op == nil || op.Kind != TimelinePromotedKindEvidence {
+			continue
+		}
+		ts, _ := session.idToTs.Get(id)
+		entries = append(entries, entry{item: *item, op: *op, ts: ts})
+	}
+	session.mu.RUnlock()
+
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	for _, entry := range entries {
+		if existing, ok := m.idToTimelineItem.Get(entry.op.ID); ok && existing != nil {
+			if existing.deleted != entry.item.deleted {
+				m.invalidateFreezeFromLocked(entry.op.ID)
+				existing.deleted = entry.item.deleted
+			}
+			continue
+		}
+		m.invalidateFreezeFromLocked(entry.op.ID)
+		op, item := entry.op, entry.item
+		item.value = &op
+		ts := entry.ts
+		for m.tsToTimelineItem.Have(ts) {
+			ts++
+		}
+		m.idToTs.Set(op.ID, ts)
+		m.OrderInsertId(op.ID, &item)
+		m.OrderInsertTs(ts, &item)
+	}
+	m.evidenceInitialized = m.evidenceInitialized || initialized
+}
+
 // Evidence mutations use the same journal and freeze transaction as cached
 // tools. The runtime view includes pending operations; the semi-dynamic view
 // includes only committed operations. Neither view advances a freeze boundary.

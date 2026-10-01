@@ -2,87 +2,25 @@ package aid
 
 import (
 	"fmt"
-	"io"
 	"regexp"
 	"strings"
-	"sync"
 	"unicode"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
-	"github.com/yaklang/yaklang/common/ai/aid/aicommon/aitag"
 )
 
-const (
-	planFactsPersistentKey    = "plan_facts"
-	planDocumentPersistentKey = "plan_document"
-)
-
-var (
-	planFactsAITags    = []string{"FACTS", "PLAN_FACTS"}
-	planEvidenceAITags = []string{"EVIDENCE", "PLAN_EVIDENCE"}
-	planDocumentAITags = []string{"DOCUMENT", "PLAN_DOCUMENT"}
-	planContextGapRE   = regexp.MustCompile(`\n{3,}`)
-)
+var planContextGapRE = regexp.MustCompile(`\n{3,}`)
 
 type discoveredAITagBlock struct {
-	TagName string
-	Nonce   string
-	Start   int
-	End     int
-}
-
-func extractPlanFactsFromText(content string) string {
-	return extractPlanContextFromText(content, planFactsAITags...)
-}
-
-func extractPlanDocumentFromText(content string) string {
-	return extractPlanContextFromText(content, planDocumentAITags...)
-}
-
-func extractPlanContextFromText(content string, tagNames ...string) string {
-	content = strings.TrimSpace(content)
-	if content == "" {
-		return ""
-	}
-	blocks := discoverAITagBlocks(content, tagNames...)
-	if len(blocks) == 0 {
-		return ""
-	}
-
-	results := make([]string, len(blocks))
-	options := make([]aitag.ParseOption, 0, len(blocks))
-	var mu sync.Mutex
-	for index, block := range blocks {
-		index := index
-		block := block
-		options = append(options, aitag.WithCallback(block.TagName, block.Nonce, func(reader io.Reader) {
-			contentBytes, err := io.ReadAll(reader)
-			if err != nil {
-				return
-			}
-			mu.Lock()
-			results[index] = strings.TrimSpace(string(contentBytes))
-			mu.Unlock()
-		}))
-	}
-	if err := aitag.Parse(strings.NewReader(content), options...); err != nil {
-		return ""
-	}
-	for _, result := range results {
-		if result != "" {
-			return result
-		}
-	}
-	return ""
+	Start int
+	End   int
 }
 
 func stripPlanContextBlocks(content string) string {
 	content = strings.TrimSpace(content)
-	allTags := make([]string, 0, len(planFactsAITags)+len(planDocumentAITags)+len(planEvidenceAITags))
-	allTags = append(allTags, planFactsAITags...)
-	allTags = append(allTags, planDocumentAITags...)
-	allTags = append(allTags, planEvidenceAITags...)
-	blocks := discoverAITagBlocks(content, allTags...)
+	// Legacy task inputs may contain old plan context blocks. Strip those copies;
+	// current document/evidence presentation is owned by the context sections.
+	blocks := discoverAITagBlocks(content, "FACTS", "PLAN_FACTS", "EVIDENCE", "PLAN_EVIDENCE", "DOCUMENT", "PLAN_DOCUMENT")
 	if len(blocks) == 0 {
 		return content
 	}
@@ -149,10 +87,8 @@ func discoverAITagBlocks(content string, tagNames ...string) []discoveredAITagBl
 		}
 		end := tagClose + endOffset + len(endTag)
 		blocks = append(blocks, discoveredAITagBlock{
-			TagName: tagName,
-			Nonce:   nonce,
-			Start:   start,
-			End:     end,
+			Start: start,
+			End:   end,
 		})
 		offset = end
 	}
@@ -175,13 +111,6 @@ func parseAITagStartToken(token string) (string, string, bool) {
 		}
 	}
 	return tagName, nonce, true
-}
-
-func getTaskPlanEvidence(task *AiTask) string {
-	if task == nil || task.Coordinator == nil || task.Coordinator.Config == nil {
-		return ""
-	}
-	return task.Coordinator.GetSessionEvidenceRendered()
 }
 
 func formatTaskPlanEvidenceLabel(task *AiTask) string {
@@ -210,7 +139,7 @@ func buildVerificationCarryoverEvidenceOps(task *AiTask, reasoning string) []aic
 	if reasoning != "" {
 		ops = append(ops, aicommon.EvidenceOperation{
 			Op:      "add",
-			ID:      fmt.Sprintf("verify-%s", task.GetIndex()),
+			ID:      taskEvidenceID("verify", task),
 			Content: fmt.Sprintf("[%s] 核实: %s", taskLabel, reasoning),
 		})
 	}
@@ -226,8 +155,18 @@ func buildSummaryEvidenceOps(task *AiTask, summary string) []aicommon.EvidenceOp
 	return []aicommon.EvidenceOperation{
 		{
 			Op:      "add",
-			ID:      fmt.Sprintf("summary-%s", task.GetIndex()),
+			ID:      taskEvidenceID("summary", task),
 			Content: fmt.Sprintf("[%s] 总结: %s", taskLabel, summary),
 		},
 	}
+}
+
+// Task IDs survive recovery and index changes. Plan-local indices can repeat
+// in the next plan and must not overwrite another task's session evidence.
+func taskEvidenceID(kind string, task *AiTask) string {
+	id := strings.TrimSpace(task.TaskId)
+	if id == "" {
+		id = task.GetIndex()
+	}
+	return kind + "-" + id
 }

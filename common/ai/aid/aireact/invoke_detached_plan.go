@@ -11,6 +11,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/yaklang/yaklang/common/ai/aid"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
+	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
@@ -26,7 +27,6 @@ type detachedPlanProgress struct {
 	Phase        string `json:"phase"`
 	ReactTaskID  string `json:"react_task_id"`
 	PlanPayload  string `json:"plan_payload"`
-	PlanFacts    string `json:"plan_facts"`
 	PlanDocument string `json:"plan_document"`
 	UpdatedAt    int64  `json:"updated_at"`
 }
@@ -60,7 +60,6 @@ func (r *ReAct) PublishDetachedPlan(ctx context.Context, input *aicommon.Execute
 
 	planRsp := &aid.PlanResponse{
 		RootTask: rootTask,
-		Facts:    input.PlanFacts,
 		Document: input.PlanDocument,
 	}
 	if err := r.saveDetachedPlanSession(coordinatorID, reactTaskID, planPayload, rootTask, input); err != nil {
@@ -123,11 +122,6 @@ func formatDetachedPlanTimelineContent(
 	}
 
 	if input != nil {
-		if facts := strings.TrimSpace(input.PlanFacts); facts != "" {
-			sb.WriteString("\n## plan_facts\n")
-			sb.WriteString(facts)
-			sb.WriteRune('\n')
-		}
 		if document := strings.TrimSpace(input.PlanDocument); document != "" {
 			sb.WriteString("\n## plan_document\n")
 			sb.WriteString(document)
@@ -185,7 +179,6 @@ func (r *ReAct) saveDetachedPlanSession(
 		Phase:        detachedPlanPhasePendingApproval,
 		ReactTaskID:  reactTaskID,
 		PlanPayload:  planPayload,
-		PlanFacts:    input.PlanFacts,
 		PlanDocument: input.PlanDocument,
 		UpdatedAt:    time.Now().Unix(),
 	}
@@ -251,6 +244,21 @@ func (r *ReAct) HandleSyncTypeExecuteDetachedPlanEvent(event *ypb.AIInputEvent) 
 
 	var detectPlan detachedPlanProgress
 	json.Unmarshal([]byte(record.TaskProgress), &detectPlan)
+	// Older pending plans carried a Markdown facts copy in plan metadata. Import
+	// it once through the session evidence contract before replacing that metadata.
+	var legacy struct {
+		Facts string `json:"plan_facts"`
+	}
+	json.Unmarshal([]byte(event.SyncJsonInput), &legacy)
+	if strings.TrimSpace(legacy.Facts) == "" {
+		json.Unmarshal([]byte(record.TaskProgress), &legacy)
+	}
+	if strings.TrimSpace(legacy.Facts) != "" {
+		if _, err := reactloops.SaveSessionEvidence(r.config, "", legacy.Facts); err != nil {
+			r.EmitSyncEventError("execute_detached_plan", err, event.SyncID)
+			return nil
+		}
+	}
 
 	if sessionID != "" {
 		record.SessionID = sessionID
@@ -267,9 +275,6 @@ func (r *ReAct) HandleSyncTypeExecuteDetachedPlanEvent(event *ypb.AIInputEvent) 
 	if input.PlanPayload == "" {
 		input.PlanPayload = detectPlan.PlanPayload
 	}
-	if input.PlanFacts == "" {
-		input.PlanFacts = detectPlan.PlanFacts
-	}
 	if input.PlanDocument == "" {
 		input.PlanDocument = detectPlan.PlanDocument
 	}
@@ -280,7 +285,6 @@ func (r *ReAct) HandleSyncTypeExecuteDetachedPlanEvent(event *ypb.AIInputEvent) 
 	approvedInput := &aicommon.ExecutePlanInput{
 		PlanPayload:  input.PlanPayload,
 		PlanData:     input.PlanData,
-		PlanFacts:    input.PlanFacts,
 		PlanDocument: input.PlanDocument,
 	}
 
@@ -365,7 +369,6 @@ func parseExecuteDetachedPlanParams(syncJSON string) (coordinatorID, sessionID, 
 	input = &aicommon.ExecutePlanInput{
 		PlanPayload:  utils.InterfaceToString(params["plan_payload"]),
 		PlanData:     utils.InterfaceToString(params["plan_data"]),
-		PlanFacts:    utils.InterfaceToString(params["plan_facts"]),
 		PlanDocument: utils.InterfaceToString(params["plan_document"]),
 	}
 	return coordinatorID, sessionID, reactTaskID, input, nil

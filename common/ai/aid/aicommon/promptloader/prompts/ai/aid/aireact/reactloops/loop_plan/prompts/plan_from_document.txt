@@ -20,9 +20,9 @@ Observe the language used in the Timeline and user input below. ALL plan output 
 
 {{ .Document }}
 {{ end }}
-{{ if .Facts }}## Verified Facts (FACTS)
+{{ if .Evidence }}## Session Evidence (EVIDENCE)
 
-{{ .Facts }}
+{{ .Evidence }}
 {{ end }}
 {{ if .Context }}## Exploration Context
 
@@ -46,7 +46,7 @@ Each subtask MUST contain:
 - subtask_name: A concise action-oriented name (use tool categories or method descriptions, NEVER write internal tool function names)
 - subtask_identifier: English snake_case semantic identifier for directory naming
 - subtask_goal: A DETAILED natural-language description that covers three aspects in a single paragraph (do NOT use section headers like "Objective:", "Acceptance Criteria:", "Completion Condition:" — just write directly):
-  1. What specifically to do — list EVERY exact target, parameter, file path, URL, or configuration involved. If FACTS lists N targets, reference ALL N targets, not a subset.
+  1. What specifically to do — list EVERY exact target, parameter, file path, URL, or configuration involved. If EVIDENCE lists N targets, reference ALL N targets, not a subset.
   2. How to verify — specify concrete test cases/inputs (specific Payload, parameter value, request body), expected responses (HTTP status code, response body keyword, timing difference), and pass/fail rules (e.g., "if response contains 'syntax error' near quote character, SQL injection confirmed").
   3. When it is done — enumerate ALL test points that must be verified. The subtask is done when all points have a definitive pass/fail result.
 - depends_on: Array of subtask_name values this task depends on (empty array if no dependencies)
@@ -63,26 +63,26 @@ Subtasks can contain `sub_subtasks` for finer-grained decomposition:
 ## Subtask Granularity
 
 - Each subtask (or sub_subtask at leaf level) should focus on ONE specific target or verification dimension
-- The number of subtasks MUST be proportional to the number of distinct targets/endpoints/parameters discovered in FACTS
-- Do NOT merge unrelated targets into a single subtask — if FACTS lists 3 SQL injection test points, create 3 sub_subtasks (one per test point), not 1 combined subtask
+- The number of subtasks MUST be proportional to the number of distinct targets/endpoints/parameters discovered in EVIDENCE
+- Do NOT merge unrelated targets into a single subtask — if EVIDENCE lists 3 SQL injection test points, create 3 sub_subtasks (one per test point), not 1 combined subtask
 - If a single target requires multiple distinct verification steps (e.g., different payload types), use sub_subtasks to decompose
 
 ## Coverage Completeness (Critical)
 
 ### Single Source of Truth
 
-**FACTS is the ONLY source of truth for coverage verification.** The Guidance Document does NOT enumerate subject lists (by design — it only declares methodology and acceptance rules), and it MAY contain abstractions or summaries that can miss items. **DO NOT** use the Guidance Document as your coverage checklist. **DO** read the FACTS block above line by line as your authoritative checklist.
+**EVIDENCE is the ONLY source of truth for coverage verification.** The Guidance Document does NOT enumerate subject lists (by design — it only declares methodology and acceptance rules), and it MAY contain abstractions or summaries that can miss items. **DO NOT** use the Guidance Document as your coverage checklist. **DO** read the EVIDENCE block above line by line as your authoritative checklist.
 
 ### Coverage Rules
 
-The plan MUST cover ALL subjects (targets / endpoints / files / modules / records / configuration items / any other form of "item to be processed") discovered in FACTS:
-- Count every distinct subject bullet mentioned in FACTS, regardless of its concrete form (URL, file path, function/module name, record, configuration key, component, interface contract, etc.)
+The plan MUST cover ALL subjects (targets / endpoints / files / modules / records / configuration items / any other form of "item to be processed") discovered in EVIDENCE:
+- Count every distinct subject bullet mentioned in EVIDENCE, regardless of its concrete form (URL, file path, function/module name, record, configuration key, component, interface contract, etc.)
 - Ensure EVERY single bullet appears in at least one subtask's or sub_subtask's goal, referenced by its exact name / path / identifier
-- If a FACTS bullet is omitted from the plan, the plan is INCOMPLETE and MUST be expanded before returning
-- **N-to-N hard quantification**: if FACTS lists N subjects, the union of all subtask_goal / sub_subtask subtask_goal strings MUST explicitly reference all N subjects by their exact identifiers. Representative sampling is forbidden — every item in a list-style FACTS block (URL list, file list, table list, directory list, etc.) must be named
-- **Mandatory verification pass before returning**: re-scan FACTS line by line; for each bullet, confirm it is literally quoted (or its exact identifier is embedded) in at least one subtask_goal. Any missing subject means the plan is incomplete — expand sub_subtasks until coverage is complete
-- For security testing: each (subject x vulnerability_type) combination that FACTS data suggests is testable MUST have a corresponding subtask or sub_subtask
-- For development tasks: each file / module / component mentioned in FACTS that requires changes MUST appear in a subtask
+- If a EVIDENCE bullet is omitted from the plan, the plan is INCOMPLETE and MUST be expanded before returning
+- **N-to-N hard quantification**: if EVIDENCE lists N subjects, the union of all subtask_goal / sub_subtask subtask_goal strings MUST explicitly reference all N subjects by their exact identifiers. Representative sampling is forbidden — every item in a list-style EVIDENCE block (URL list, file list, table list, directory list, etc.) must be named
+- **Mandatory verification pass before returning**: re-scan EVIDENCE line by line; for each bullet, confirm it is literally quoted (or its exact identifier is embedded) in at least one subtask_goal. Any missing subject means the plan is incomplete — expand sub_subtasks until coverage is complete
+- For security testing: each (subject x vulnerability_type) combination that EVIDENCE data suggests is testable MUST have a corresponding subtask or sub_subtask
+- For development tasks: each file / module / component mentioned in EVIDENCE that requires changes MUST appear in a subtask
 
 ## Summary Task Requirement
 
@@ -93,7 +93,7 @@ The plan MUST cover ALL subjects (targets / endpoints / files / modules / record
 
 - NEVER use vague words: "etc.", "and so on", "several", "some", "related", "similar", "various", "other", "and more" or their equivalents in any language (Chinese: "等", "其他", "若干", "一些", "相关", "类似", "各种")
 - NEVER write generic goals like "test for vulnerabilities" or "verify security" — specify EXACTLY which vulnerability type, which endpoint, which parameter
-- NEVER fabricate information not present in the guidance document, FACTS, or context above
+- NEVER fabricate information not present in the guidance document, EVIDENCE, or context above
 - Every claim in subtask_goal must be traceable to a specific fact or document section
 - NEVER collapse multiple distinct test points into one vague verification item
 
@@ -114,7 +114,7 @@ The plan MUST cover ALL subjects (targets / endpoints / files / modules / record
     {
       "subtask_name": "SQL注入漏洞验证",
       "subtask_identifier": "sql_injection",
-      "subtask_goal": "对FACTS中发现的3个注入点 /user/id?id=1(数字型)、/user/name?name=admin(字符型)、/user/cookie-id(Cookie型) 进行SQL注入测试。",
+      "subtask_goal": "对EVIDENCE中发现的3个注入点 /user/id?id=1(数字型)、/user/name?name=admin(字符型)、/user/cookie-id(Cookie型) 进行SQL注入测试。",
       "depends_on": [],
       "sub_subtasks": [
         {
@@ -140,7 +140,7 @@ The plan MUST cover ALL subjects (targets / endpoints / files / modules / record
     {
       "subtask_name": "反射型XSS漏洞验证",
       "subtask_identifier": "reflected_xss",
-      "subtask_goal": "对FACTS中发现的输入点 /search?q= 和 /user/name?name= 进行反射型XSS测试: 1) 发送 <script>alert(1)</script> 作为参数值，检查响应体是否原样包含该脚本标签(未编码); 2) 发送 \"><img src=x onerror=alert(1)>，检查响应是否包含未转义的HTML标签; 3) 检查响应头 Content-Type 是否为 text/html。2个端点各2个Payload共4个测试点全部完成即完成。",
+      "subtask_goal": "对EVIDENCE中发现的输入点 /search?q= 和 /user/name?name= 进行反射型XSS测试: 1) 发送 <script>alert(1)</script> 作为参数值，检查响应体是否原样包含该脚本标签(未编码); 2) 发送 \"><img src=x onerror=alert(1)>，检查响应是否包含未转义的HTML标签; 3) 检查响应头 Content-Type 是否为 text/html。2个端点各2个Payload共4个测试点全部完成即完成。",
       "depends_on": []
     },
     {

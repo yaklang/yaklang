@@ -6,7 +6,7 @@
 {{ end }}
 {{ else }}{{ if .ExplorationClosed }}## 规划交接
 
-当前已关闭信息收集入口。请基于已有事实整理规划依据；需要补充已确认事实时使用 `output_facts`，然后调用 `finish_exploration` 交给后续规划阶段。尚未核实的内容应标为待执行计划中的验证项，不要把推断写成已确认事实。历史调用只供参考，不代表本轮仍可调用；动作及参数以本轮声明的 Schema 为准，不要通过其它入口继续探索。
+当前已关闭信息收集入口。请基于已有事实整理规划依据；需要补充已确认事实时使用 `save_evidence`，然后调用 `finish_exploration` 交给后续规划阶段。尚未核实的内容应标为待执行计划中的验证项，不要把推断写成已确认事实。历史调用只供参考，不代表本轮仍可调用；动作及参数以本轮声明的 Schema 为准，不要通过其它入口继续探索。
 {{ else }}{{ if eq .PlanMode "" }}
 ## 规划路径待选择
 
@@ -35,18 +35,7 @@
 这些工具的执行结果将作为后续自动生成计划的事实依据。
 {{ end }}{{ end }}{{ end }}{{ end }}{{ end }}{{ end }}{{/*
 
-*/}}{{if .Facts}}## 规划事实库（FACTS）
-
-以下是当前已累积的 FACTS。它们会在每次 `output_facts` 或自动 facts hook 后持续累积，是后续自动生成指导性文档和计划的核心依据：
-
-<|FACTS_{{ .Nonce }}|>
-{{ .Facts }}
-<|FACTS_END_{{ .Nonce }}|>
-{{end}}{{/*
-
-EVIDENCE 已统一移到 SessionPromptState 渲染 (timeline-open 段的
-SESSION_EVIDENCE 块), 这里不再重复渲染 EVIDENCE, 避免 prompt 中
-EVIDENCE 多处重复出现。
+Evidence 由 session Timeline Open 和提升后的 SemiDynamic1 提供，此处不重复展示。
 
 */}}{{if .Help }}
 ## 规划任务帮助信息

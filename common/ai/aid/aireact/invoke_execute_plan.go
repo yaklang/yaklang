@@ -141,7 +141,7 @@ func (r *ReAct) invokeExecutePlan(doneChannel chan struct{}, ctx context.Context
 	if err != nil {
 		return utils.Errorf("failed to build root task from plan data: %v", err)
 	}
-	if err := cod.CommitApprovedPlan(rootTask, input.PlanFacts, input.PlanDocument); err != nil {
+	if err := cod.CommitApprovedPlan(rootTask, input.PlanDocument); err != nil {
 		return utils.Errorf("failed to commit approved plan: %v", err)
 	}
 
