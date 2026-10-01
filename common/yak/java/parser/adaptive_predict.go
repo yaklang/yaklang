@@ -3,7 +3,7 @@ package javaparser
 import "github.com/yaklang/antlr/v4"
 
 // SetFastPrediction selects the original ATN predictor for differential tests.
-// LL recovery and exact ambiguity diagnostics always use the original predictor.
+// Recovering strategies, LL and exact ambiguity diagnostics retain the ATN.
 func (p *JavaParser) SetFastPrediction(enabled bool) { p.disableFastPrediction = !enabled }
 
 // AdaptivePredict resolves syntactically distinct SLL prefixes without exploring
@@ -12,7 +12,12 @@ func (p *JavaParser) SetFastPrediction(enabled bool) { p.disableFastPrediction =
 // ambiguous prefixes, scans on other token streams and exceeded bounds use ATN.
 func (p *JavaParser) AdaptivePredict(base *antlr.BaseParser, input antlr.TokenStream, decision int, ctx antlr.ParserRuleContext) int {
 	interpreter := p.GetInterpreter()
-	if !p.disableFastPrediction && interpreter.GetPredictionMode() == antlr.PredictionModeSLL {
+	if p.disableFastPrediction || interpreter.GetPredictionMode() != antlr.PredictionModeSLL {
+		return interpreter.AdaptivePredict(base, input, decision, ctx)
+	}
+	strategy, marked := p.GetErrorHandler().(interface{ BailsOnSyntaxError() bool })
+	bail := marked && strategy.BailsOnSyntaxError()
+	if bail {
 		state := p.GetATN().DecisionToState[decision]
 		if state.GetStateType() == antlr.ATNStateBlockStart {
 			switch state.GetRuleIndex() {
