@@ -227,6 +227,8 @@ func TestPromptManager_AssembleLoopPrompt_LightweightUsesBoundedRecentTimeline(t
 	require.NotContains(t, result.Prompt, "evidence evidence evidence")
 	require.NotContains(t, result.Prompt, "Timeline Memory (Frozen)")
 	require.Contains(t, result.Prompt, "[CURRENT TODO CHECKPOINT]\nkeep this dynamic tail")
+	require.Contains(t, r2PromptSection(t, result.Prompt, "timeline-open"), strings.Repeat("query ", 5000))
+	require.NotContains(t, result.Prompt, "USER_QUERY")
 	require.Contains(t, result.Prompt, strings.Repeat("todo ", 100))
 	require.NotContains(t, result.Prompt, "TODO snapshot omitted from lightweight prompt")
 	require.Less(t, strings.Index(result.Prompt, "[CURRENT TODO CHECKPOINT]"), strings.Index(result.Prompt, aiprojection.CreateTemplate("<|PROMPT_SECTION_dynamic_END_light-1|>")))
@@ -312,7 +314,7 @@ func TestPromptManager_AssembleLoopPrompt_SectionOrder(t *testing.T) {
 	semiSection1Idx := strings.Index(prompt, aiprojection.CreateTemplate("<|PROMPT_SECTION_semi-dynamic-1|>"))
 	semiSection2Idx := strings.Index(prompt, aiprojection.CreateTemplate("<|PROMPT_SECTION_semi-dynamic-2|>"))
 	timelineOpenSectionIdx := strings.Index(prompt, aiprojection.CreateTemplate("<|PROMPT_SECTION_timeline-open|>"))
-	userQueryIdx := strings.Index(prompt, "<|USER_QUERY_n123|>")
+	userQueryIdx := strings.Index(prompt, "current user query")
 	autoCtxIdx := strings.Index(prompt, "<|AUTO_PROVIDE_CTX_[n123_provider_one]_START key=provider-one|>")
 	prevUserInputIdx := strings.Index(prompt, "User Input: previous input")
 	reactiveDataIdx := strings.Index(prompt, "<|REACTIVE_DATA_n123|>")
@@ -335,6 +337,8 @@ func TestPromptManager_AssembleLoopPrompt_SectionOrder(t *testing.T) {
 	require.NotEqual(t, -1, semiSection2Idx)
 	require.NotEqual(t, -1, timelineOpenSectionIdx)
 	require.NotEqual(t, -1, userQueryIdx)
+	require.NotContains(t, prompt, "CURRENT_TASK_INPUT")
+	require.NotContains(t, prompt, "USER_QUERY")
 	require.NotEqual(t, -1, autoCtxIdx)
 	require.NotEqual(t, -1, prevUserInputIdx)
 	require.NotEqual(t, -1, reactiveDataIdx)
@@ -360,9 +364,9 @@ func TestPromptManager_AssembleLoopPrompt_SectionOrder(t *testing.T) {
 	require.Less(t, timelineOpenSectionIdx, timelineIdx)
 	// Pending user input is rendered at its journal position inside Open.
 	require.Less(t, timelineIdx, prevUserInputIdx)
-	require.Less(t, prevUserInputIdx, currentTimeIdx)
-	require.Less(t, currentTimeIdx, userQueryIdx)
-	require.Less(t, userQueryIdx, autoCtxIdx)
+	require.Less(t, prevUserInputIdx, userQueryIdx)
+	require.Less(t, userQueryIdx, currentTimeIdx)
+	require.Less(t, currentTimeIdx, autoCtxIdx)
 	require.Less(t, autoCtxIdx, reactiveDataIdx)
 	require.Less(t, reactiveDataIdx, injectedMemoryIdx)
 	require.Less(t, injectedMemoryIdx, checkpointIdx)
@@ -424,10 +428,9 @@ func TestPromptManager_AssembleLoopPrompt_SectionOrder(t *testing.T) {
 
 	require.GreaterOrEqual(t, len(sections[5].Children), 3)
 	require.Equal(t, "section.dynamic.current_time", sections[5].Children[0].Key)
-	require.Equal(t, "section.dynamic.user_query", sections[5].Children[1].Key)
-	require.Equal(t, "User Query", sections[5].Children[1].Label)
-	require.Equal(t, "section.dynamic.auto_context", sections[5].Children[2].Key)
-	require.Equal(t, "Auto Context", sections[5].Children[2].Label)
+	require.Equal(t, "section.dynamic.auto_context", sections[5].Children[1].Key)
+	require.Equal(t, "Auto Context", sections[5].Children[1].Label)
+	require.NotContains(t, sections[5].Content, "current user query")
 	require.Equal(t, reactloops.PromptSectionRoleDynamic, sections[5].Children[0].Role)
 
 }
@@ -767,15 +770,15 @@ func TestPromptManager_AssembleLoopPrompt_HijackFiveSegment(t *testing.T) {
 		"user3 should end at semi-2 boundary END tag, got: %q", user3Content)
 	require.NotContains(t, user3Content, "<|PROMPT_SECTION_timeline-open|>",
 		"user3 must NOT contain timeline-open section (belongs to user4)")
-	require.NotContains(t, user3Content, "<|USER_QUERY_hj01|>",
-		"user3 must NOT contain dynamic user query (belongs to user4)")
+	require.NotContains(t, user3Content, "user query body")
 	requireMessageHasCacheControl(t, user3, "user3 semi-2")
 
 	user4 := hijack.Messages[4]
 	require.Equal(t, "user", user4.Role)
 	user4Content := chatDetailContentString(user4)
 	require.Contains(t, user4Content, "<|PROMPT_SECTION_timeline-open|>")
-	require.Contains(t, user4Content, "<|USER_QUERY_hj01|>")
+	require.Contains(t, user4Content, "user query body")
+	require.NotContains(t, user4Content, "USER_QUERY")
 	require.NotContains(t, user4Content, "<|AI_CACHE_FROZEN_semi-dynamic|>",
 		"user4 must NOT contain frozen START tag")
 	require.NotContains(t, user4Content, "<|AI_CACHE_SEMI_semi|>",

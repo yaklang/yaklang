@@ -164,6 +164,12 @@ func (pm *PromptManager) AssembleLoopPrompt(tools []*aitool.Tool, input *reactlo
 	if input == nil {
 		return nil, fmt.Errorf("loop prompt assembly input is nil")
 	}
+	if pm.react == nil || pm.react.config == nil || pm.react.config.GetTimeline() == nil {
+		return nil, fmt.Errorf("main-loop timeline is not initialized")
+	}
+	// Ingest once before taking the prompt snapshot. Never fall back to query
+	// text in Dynamic, including on first use and in lightweight mode.
+	pm.react.config.GetTimeline().EnsureTaskUserInput(input.CurrentTaskID, input.UserQuery, pm.react.config.AcquireId)
 
 	base, err := pm.GetLoopPromptBaseMaterials(tools, input.Nonce)
 	if err != nil {
@@ -188,7 +194,7 @@ func (pm *PromptManager) AssembleLoopPrompt(tools []*aitool.Tool, input *reactlo
 		return nil, err
 	}
 	dynamicData := pm.buildLoopPromptSectionData(base, effectiveInput)
-	dynamicData["UserQuery"] = pm.wrapUserInputForPrompt(effectiveInput.UserQuery)
+	dynamicData["UserQuery"] = ""
 	dynamic, err := pm.renderLoopDynamicSection(dynamicData)
 	if err != nil {
 		return nil, err
@@ -217,7 +223,6 @@ func (pm *PromptManager) AssembleLoopPrompt(tools []*aitool.Tool, input *reactlo
 
 const (
 	lightweightLoopRecentTimelineTokens  = 4096
-	lightweightLoopUserQueryTokens       = 2048
 	lightweightLoopTaskInstructionTokens = 6144
 	lightweightLoopOutputExampleTokens   = 1024
 	lightweightLoopSkillsTokens          = 1024
@@ -241,7 +246,6 @@ func (pm *PromptManager) projectLightweightLoopMaterials(
 	}
 	lightBase := *base
 	lightBase.PromptFrozenOpenMaterials = aicommon.PromptFrozenOpenMaterials{}
-	lightBase.PromoteUserInput = true
 	// Preserve ReportedRisks in lightweight mode: the dedup list is critical
 	// for preventing duplicate vulnerability reports even on speed-priority
 	// models. Budget-limited via the render function's internal token cap.
@@ -264,7 +268,6 @@ func (pm *PromptManager) projectLightweightLoopMaterials(
 	lightBase.MoreToolsCount = lightBase.ToolsCount - lightBase.TopToolsCount
 
 	lightInput := *input
-	lightInput.UserQuery = aicommon.ShrinkTextBlockByTokens(input.UserQuery, lightweightLoopUserQueryTokens)
 	lightInput.TaskInstruction = boundedLightweightPromptBlock(input.TaskInstruction, lightweightLoopTaskInstructionTokens, "task instruction")
 	lightInput.OutputExample = boundedLightweightPromptBlock(input.OutputExample, lightweightLoopOutputExampleTokens, "output example")
 	lightInput.SkillsContext = boundedLightweightPromptBlock(input.SkillsContext, lightweightLoopSkillsTokens, "skills context")
@@ -857,13 +860,6 @@ func (pm *PromptManager) buildDynamicObservation(
 			renderCurrentTimeBlock(&aicommon.PromptMaterials{CurrentTime: base.CurrentTime}),
 		),
 		reactloops.NewPromptSectionObservation(
-			"section.dynamic.user_query",
-			"User Query",
-			reactloops.PromptSectionRoleDynamic,
-			false,
-			renderUserQueryBlock(input.Nonce, pm.wrapUserInputForPrompt(input.UserQuery)),
-		),
-		reactloops.NewPromptSectionObservation(
 			"section.dynamic.auto_context",
 			"Auto Context",
 			reactloops.PromptSectionRoleDynamic,
@@ -1111,22 +1107,6 @@ func renderCurrentTimeBlock(materials *reactloops.PromptPrefixMaterials) string 
 		return ""
 	}
 	return "# Current Time\n" + materials.CurrentTime
-}
-
-func (pm *PromptManager) wrapUserInputForPrompt(content string) string {
-	var timeline *aicommon.Timeline
-	if pm != nil && pm.react != nil && pm.react.config != nil {
-		timeline = pm.react.config.GetTimeline()
-	}
-	return timeline.WrapUserInputForPrompt(content)
-}
-
-func renderUserQueryBlock(nonce string, userQuery string) string {
-	userQuery = strings.TrimSpace(userQuery)
-	if userQuery == "" {
-		return ""
-	}
-	return fmt.Sprintf("<|USER_QUERY_%s|>\n%s\n<|USER_QUERY_END_%s|>", nonce, userQuery, nonce)
 }
 
 func renderInjectedMemoryBlock(nonce string, memory string) string {

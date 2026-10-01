@@ -24,7 +24,7 @@ import (
 // Priority order (first match wins):
 //   1. verify-satisfaction  — "verify-satisfaction" + "user_satisfied" + "reasoning"
 //   2. call-tool params     — "# Tool Context" + "call-tool" (R2 reuses R1 instruction)
-//   3. main ReAct prompt    — "directly_answer" + "SCHEMA" + "USER_QUERY"
+//   3. main ReAct prompt    — layered main-loop envelope + action schema
 //   4. unknown / fallback
 //
 // The main ReAct prompt is the only one that contains the action schema
@@ -33,8 +33,7 @@ import (
 // Markers were chosen by observing actual prompt content:
 //   - "directly_answer": always in the main prompt action schema
 //   - "SCHEMA":          schema block <|SCHEMA|>, main prompt only
-//   - "USER_QUERY":      nonce-tagged <|USER_QUERY_{nonce}|> block, main prompt only
-//   (Note: verify-satisfaction uses "USER_ORIGINAL_QUERY_" instead of "USER_QUERY")
+//   - "PROMPT_SECTION_dynamic_": turn envelope; user input lives in Timeline
 
 // extractSchemaBlock 从主 ReAct prompt 中提取 SCHEMA 块的 jsonschema 内容,
 // 用于精确判断某个 action (例如 loading_skills / load_skill_resources) 是否
@@ -88,10 +87,7 @@ func classifyPrompt(prompt string) promptType {
 		return promptCallToolParams
 	}
 
-	// 3. main ReAct prompt: three markers that uniquely and stably identify it
-	//    - "directly_answer": always present as an action type in the schema
-	//    - "SCHEMA": static schema block unique to main prompt
-	//    - "USER_QUERY": nonce-tagged user query block unique to main prompt
+	// 3. main ReAct prompt: layered envelope and the decision action schema.
 	if aicommon.IsPrimaryDecisionPrompt(prompt) {
 		return promptMainReAct
 	}

@@ -638,7 +638,13 @@ func (r *ReActLoop) ExecuteWithExistedTask(task aicommon.AIStatefulTask) (finalE
 		}
 	}
 
-	r.GetInvoker().AddToTimeline(aicommon.TIMELINE_ITEM_TYPE_CURRENT_TASK_USER_INPUT, fmt.Sprintf("%v", task.GetOriginUserInput()))
+	if cfg, ok := r.config.(*aicommon.Config); ok && cfg.GetTimeline() != nil {
+		// Queue ingress may already own this exact input. Reuse its audit record
+		// while nested/new task inputs are recorded once under their task ID.
+		cfg.GetTimeline().EnsureTaskUserInput(task.GetId(), task.GetOriginUserInput(), cfg.AcquireId)
+	} else {
+		r.GetInvoker().AddToTimeline(aicommon.TIMELINE_ITEM_TYPE_CURRENT_TASK_USER_INPUT, task.GetOriginUserInput())
+	}
 
 	// 启动主循环卡死兜底观察 goroutine: 周期性比对 lastIterationTickAt,
 	// 长时间无推进就 emit timeline + dump goroutine stack. 不会主动 abort
