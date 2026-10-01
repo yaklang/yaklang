@@ -18,9 +18,6 @@ func (p *PythonParser) AdaptivePredict(base *antlr.BaseParser, input antlr.Token
 	}
 	strategy, marked := p.GetErrorHandler().(interface{ BailsOnSyntaxError() bool })
 	bail := marked && strategy.BailsOnSyntaxError()
-	if !bail {
-		_, bail = p.GetErrorHandler().(*antlr.BailErrorStrategy)
-	}
 	if bail {
 		state := p.GetATN().DecisionToState[decision]
 		if state.GetStateType() == antlr.ATNStateBlockStart {

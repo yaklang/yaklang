@@ -210,3 +210,32 @@ func TestPredictionNonBailingMarker(t *testing.T) {
 		}
 	}
 }
+
+func TestPredictionNativeBailStrategy(t *testing.T) {
+	for _, source := range []string{"*x", "1 x", "lambda x:", "x", "x,y", "*x,"} {
+		parse := func(fast bool) (snapshot string, err error, next int, panicText string) {
+			listener := antlr4util.NewErrorListener()
+			p := NewPythonParser(boundaryTokens(source))
+			newPredictionAutomata().apply(p)
+			p.SetFastPrediction(fast)
+			p.GetInterpreter().SetPredictionMode(antlr.PredictionModeSLL)
+			p.SetErrorHandler(antlr.NewBailErrorStrategy())
+			p.RemoveErrorListeners()
+			p.AddErrorListener(listener)
+			defer func() {
+				if r := recover(); r != nil {
+					panicText = fmt.Sprintf("%T:%v", r, r)
+				}
+				err = listener.Error()
+				next = p.GetTokenStream().LA(1)
+			}()
+			snapshot = predictionSnapshot(p.Testlist_star_expr())
+			return
+		}
+		want, err, next, panicked := parse(false)
+		got, gotErr, gotNext, gotPanic := parse(true)
+		if panicked != gotPanic || fmt.Sprint(err) != fmt.Sprint(gotErr) || next != gotNext || want != got {
+			t.Fatalf("native Bail changed for %q: panic=%q/%q next=%d/%d errors=%v/%v", source, panicked, gotPanic, next, gotNext, err, gotErr)
+		}
+	}
+}
