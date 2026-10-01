@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strconv"
 	"strings"
 	"testing"
@@ -20,15 +21,37 @@ import (
 // an expression swallowed by an alternative-syntax body delimiter.
 func predictionTreeShape(tree antlr.Tree) string {
 	var out strings.Builder
+	typeNames := make(map[reflect.Type]string)
+	var scratch [128]byte
+	writeInt := func(value int) {
+		out.Write(strconv.AppendInt(scratch[:0], int64(value), 10))
+	}
 	var walk func(antlr.Tree)
 	walk = func(node antlr.Tree) {
-		fmt.Fprintf(&out, "(%T", node)
+		typ := reflect.TypeOf(node)
+		name, ok := typeNames[typ]
+		if !ok {
+			name = typ.String() // identical to fmt's %T
+			typeNames[typ] = name
+		}
+		out.WriteByte('(')
+		out.WriteString(name)
 		if leaf, ok := node.(antlr.TerminalNode); ok {
 			token := leaf.GetSymbol()
-			fmt.Fprintf(&out, ":%d:%q:%d:%d:%d:%d", token.GetTokenType(), leaf.GetText(), token.GetLine(), token.GetColumn(), token.GetStart(), token.GetStop())
+			out.WriteByte(':')
+			writeInt(token.GetTokenType())
+			out.WriteByte(':')
+			out.Write(strconv.AppendQuote(scratch[:0], leaf.GetText()))
+			for _, value := range [...]int{token.GetLine(), token.GetColumn(), token.GetStart(), token.GetStop()} {
+				out.WriteByte(':')
+				writeInt(value)
+			}
 		}
 		if ctx, ok := node.(antlr.ParserRuleContext); ok && ctx.GetStart() != nil && ctx.GetStop() != nil {
-			fmt.Fprintf(&out, ":%d:%d", ctx.GetStart().GetTokenIndex(), ctx.GetStop().GetTokenIndex())
+			out.WriteByte(':')
+			writeInt(ctx.GetStart().GetTokenIndex())
+			out.WriteByte(':')
+			writeInt(ctx.GetStop().GetTokenIndex())
 		}
 		for _, child := range node.GetChildren() {
 			walk(child)
@@ -40,6 +63,10 @@ func predictionTreeShape(tree antlr.Tree) string {
 }
 
 func parsePredictionTree(src string, mode int, fastPrediction ...bool) (ast phpparser.IHtmlDocumentContext, parser *phpparser.PHPParser, err error) {
+	return parsePredictionTreeWithCache(src, mode, CreateBuilder().GetAntlrCache(), fastPrediction...)
+}
+
+func parsePredictionTreeWithCache(src string, mode int, cache *ssa.AntlrCache, fastPrediction ...bool) (ast phpparser.IHtmlDocumentContext, parser *phpparser.PHPParser, err error) {
 	if rewritten, ok := rewriteSingleSemicolonNamespaceUseBlock(src); ok {
 		src = rewritten
 	}
@@ -50,7 +77,7 @@ func parsePredictionTree(src string, mode int, fastPrediction ...bool) (ast phpp
 	if len(fastPrediction) > 0 {
 		parser.SetFastPrediction(fastPrediction[0])
 	}
-	ssa.ParserSetAntlrCache(parser, lexer, CreateBuilder().GetAntlrCache())
+	ssa.ParserSetAntlrCache(parser, lexer, cache)
 	listener := antlr4util.NewErrorListener()
 	lexer.RemoveErrorListeners()
 	lexer.AddErrorListener(listener)
