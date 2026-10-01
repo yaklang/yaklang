@@ -6,13 +6,43 @@ import "github.com/yaklang/antlr/v4"
 // Recovering strategies, LL and exact ambiguity diagnostics retain the ATN.
 func (p *JavaParser) SetFastPrediction(enabled bool) { p.disableFastPrediction = !enabled }
 
+// Prefix prediction relies on the complete compilation-unit follow context.
+// Partial public rule entries can accept a different prefix without reporting
+// an error, even with whole-pass cancellation. Track the root at rule entry,
+// rather than walking its parent chain for every decision in deeply nested ASTs.
+// A new root resets this flag, including after SetTokenStream or a failed pass.
+func (p *JavaParser) EnterRule(ctx antlr.ParserRuleContext, state, rule int) {
+	if p.GetParserRuleContext() == nil {
+		p.compilationUnitPrediction = rule == JavaParserRULE_compilationUnit
+	}
+	p.BaseParser.EnterRule(ctx, state, rule)
+}
+
+func (p *JavaParser) EnterRecursionRule(ctx antlr.ParserRuleContext, state, rule, precedence int) {
+	if p.GetParserRuleContext() == nil {
+		p.compilationUnitPrediction = false
+	}
+	p.BaseParser.EnterRecursionRule(ctx, state, rule, precedence)
+}
+
+// The runtime resets contexts and the error strategy but leaves its recognition
+// error set after a cancellation panic. Reusing the Java parser must start with
+// a clean pass rather than immediately cancelling an unrelated valid input.
+func (p *JavaParser) SetTokenStream(input antlr.TokenStream) {
+	p.BaseParser.SetTokenStream(input)
+	p.SetError(nil)
+	p.compilationUnitPrediction = false
+}
+
+func (p *JavaParser) SetInputStream(input antlr.TokenStream) { p.SetTokenStream(input) }
+
 // AdaptivePredict resolves syntactically distinct SLL prefixes without exploring
 // complete initializers, call arguments or lambda bodies. The generated rules
 // still validate every token and construct every AST node. Precedence predicates,
 // ambiguous prefixes, scans on other token streams and exceeded bounds use ATN.
 func (p *JavaParser) AdaptivePredict(base *antlr.BaseParser, input antlr.TokenStream, decision int, ctx antlr.ParserRuleContext) int {
 	interpreter := p.GetInterpreter()
-	if p.disableFastPrediction || interpreter.GetPredictionMode() != antlr.PredictionModeSLL {
+	if p.disableFastPrediction || !p.compilationUnitPrediction || interpreter.GetPredictionMode() != antlr.PredictionModeSLL {
 		return interpreter.AdaptivePredict(base, input, decision, ctx)
 	}
 	strategy, marked := p.GetErrorHandler().(interface{ BailsOnSyntaxError() bool })
@@ -25,6 +55,9 @@ func (p *JavaParser) AdaptivePredict(base *antlr.BaseParser, input antlr.TokenSt
 				if len(state.GetTransitions()) == 14 {
 					if alt := expressionPrefix(input); alt != 0 {
 						return alt
+					}
+					if typeReferencePrefix(input) {
+						return 3
 					}
 				}
 			case JavaParserRULE_primary:

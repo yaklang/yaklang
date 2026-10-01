@@ -118,3 +118,11 @@ func TestFrontendPredictionConcurrentCaches(t *testing.T) {
 	}
 	wg.Wait()
 }
+
+func TestFrontendPredictionLLOnly(t *testing.T) {
+	if antlr4util.SLLFirstEnabled() {
+		t.Skip("run with YAK_ANTLR_SLL_FIRST=0 to exercise the LL-only frontend")
+	}
+	TestFrontendPredictionRejectsInvalidSource(t)
+	TestFrontendPredictionASTEquivalence(t)
+}

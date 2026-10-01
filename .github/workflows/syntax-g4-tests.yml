@@ -101,6 +101,12 @@ jobs:
         if: matrix.package == './common/yak/java/tests'
         run: go test -run '^$' -fuzz '^FuzzPrediction$' -fuzztime=30s -parallel=2 -timeout=3m ./common/yak/java/parser
 
+      - name: Java frontend LL-only race regressions
+        if: matrix.package == './common/yak/java/tests'
+        env:
+          YAK_ANTLR_SLL_FIRST: "0"
+        run: go test -race -count=1 -timeout 3m -run '^TestFrontendPrediction' ./common/yak/java/java2ssa
+
       - name: Python prediction and frontend race regressions
         if: matrix.package == './common/yak/python/test'
         run: go test -race -count=1 -timeout 8m -run '^Test(Prediction|FrontendPrediction)' ./common/yak/python/parser ./common/yak/python/python2ssa

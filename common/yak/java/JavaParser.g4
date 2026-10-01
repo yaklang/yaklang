@@ -42,6 +42,7 @@ options {
 @parser::adaptivePredict {}
 @parser::structmembers {
     disableFastPrediction bool
+    compilationUnitPrediction bool
 }
 
 compilationUnit

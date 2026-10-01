@@ -72,6 +72,12 @@ func FuzzPrediction(f *testing.F) {
 	for _, expr := range adversarialConflictExpressions {
 		f.Add(methodSource("return "+expr+";"), uint16(0), uint8(0))
 	}
+	for _, expr := range challengeTypeReferences {
+		f.Add(methodSource("return "+expr+";"), uint16(0), uint8(0))
+	}
+	for i, fixture := range predictionRuleFixtures {
+		f.Add(fixture.source, uint16(i), uint8(0x40))
+	}
 	f.Add("class C { T<> x; }", uint16(0), uint8(15))
 	f.Add(methodSource("return a -> ;"), uint16(0), uint8(15))
 	for _, expr := range predictionExpressions {
@@ -94,6 +100,11 @@ func FuzzPrediction(f *testing.F) {
 			source = predictionMutation(source, int(position), int(action>>1))
 		}
 		if !predictionFuzzInput(source) {
+			return
+		}
+		if action&0x40 != 0 {
+			fixture := predictionRuleFixtures[int(position)%len(predictionRuleFixtures)]
+			checkPredictionRule(t, source, fixture.entry, reference, false)
 			return
 		}
 		checkPrediction(t, source, reference, false)

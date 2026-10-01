@@ -18,7 +18,8 @@ type JavaParser struct {
 	*antlr.BaseParser
 	// Grammar author supplied members of the instance struct
 
-	disableFastPrediction bool
+	disableFastPrediction     bool
+	compilationUnitPrediction bool
 }
 
 var JavaParserParserStaticData struct {
