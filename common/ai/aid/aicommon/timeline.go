@@ -597,10 +597,8 @@ func (m *Timeline) dumpRecentForPrompt(tokenLimit int, includeLatestModelReplay 
 		if !ok || item == nil || item.deleted || isPromotableTimelineItem(item) {
 			continue
 		}
-		if excludeUserInput {
-			if op := timelinePromotionForItem(item); op != nil && op.Kind == TimelinePromotedKindUserInput {
-				continue
-			}
+		if excludeUserInput && isTimelineUserInput(item) {
+			continue
 		}
 		textItem, isText := timelineTextItem(item)
 		isActionResponse := isText && normalizeTimelinePromptCategory(extractTextEntryType(textItem.Text)) == "FUNCTION_CALL_ACTION_RESPONSE"

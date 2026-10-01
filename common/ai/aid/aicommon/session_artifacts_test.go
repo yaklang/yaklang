@@ -135,18 +135,19 @@ func TestBuildPromptFrozenOpenMaterialsCoordinatesTimelineAndArtifacts(t *testin
 	require.Contains(t, materials.TimelineOpen, "verify-ok")
 	require.Len(t, materials.FrozenPartitions, 1)
 	require.Equal(t, "plan_facts", materials.FrozenPartitions[0].ID)
-	require.Empty(t, materials.SessionArtifactsFrozen)
-	require.Empty(t, materials.SessionArtifactsOpen)
 }
 
 func TestSessionArtifactsAreNotRenderedByPromptTemplates(t *testing.T) {
+	cfg := NewConfig(context.Background())
+	cfg.Workdir = t.TempDir()
+	writeArtifactFile(t, cfg.Workdir, "task_1-1_done/result.txt", "result", time.Now())
+	writeArtifactFile(t, cfg.Workdir, "task_1-2_open/result.txt", "result", time.Now())
 	materials := &PromptMaterials{
-		SessionArtifactsFrozen: "artifacts_dir: /tmp/session\ntotal_files: 1\n\n### task_1-1_done\n- result.txt (1B, 00:00:00)\n",
-		SessionArtifactsOpen:   "artifacts_dir: /tmp/session\ntotal_files: 1\n\n### task_1-2_open\n- result.txt (1B, 00:00:00)\n",
-		Workspace:              true,
-		OSArch:                 "darwin/arm64",
-		WorkingDir:             "/tmp/session",
+		Workspace:  true,
+		OSArch:     "darwin/arm64",
+		WorkingDir: cfg.Workdir,
 	}
+	ApplyPromptFrozenOpenMaterials(materials, BuildPromptFrozenOpenMaterials(cfg))
 
 	frozen, err := RenderPromptTemplate("test-frozen-artifacts", SharedFrozenBlockTemplate, materials.FrozenBlockData())
 	require.NoError(t, err)

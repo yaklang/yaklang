@@ -97,7 +97,7 @@ func TestTimelineCompressionTransactionAtomicPublish(t *testing.T) {
 	require.Empty(t, tl.FreezeAll().NewlyFrozenIDs)
 	during := RenderTimelineFrozenOpen(tl)
 	require.Equal(t, before.Frozen, during.Frozen)
-	require.Equal(t, before.PromotedSemiDynamic1, during.PromotedSemiDynamic1)
+	require.Equal(t, before.PromotedRecentTools, during.PromotedRecentTools)
 	require.Equal(t, before.EvidenceSemiDynamic, during.EvidenceSemiDynamic)
 	require.Contains(t, during.Open, "LATER_OPEN")
 	unblock()
@@ -105,7 +105,7 @@ func TestTimelineCompressionTransactionAtomicPublish(t *testing.T) {
 	for i := 0; i < 30; i++ {
 		view := RenderTimelineFrozenOpen(tl)
 		if strings.Contains(view.Frozen, "NEW_SUMMARY") {
-			require.Contains(t, view.PromotedSemiDynamic1, "EXACT_SCHEMA")
+			require.Contains(t, view.PromotedRecentTools, "EXACT_SCHEMA")
 			require.Contains(t, view.EvidenceSemiDynamic, "PENDING_EVIDENCE")
 			require.NotContains(t, view.Open, "item-240")
 		} else {
@@ -125,7 +125,7 @@ func TestTimelineCompressionTransactionAtomicPublish(t *testing.T) {
 	require.Contains(t, after.Open, "LATER_OPEN")
 	require.Contains(t, after.Open, "LATER_SCHEMA")
 	require.Contains(t, after.Open, "LATER_EVIDENCE")
-	require.NotContains(t, after.PromotedSemiDynamic1, "LATER_SCHEMA")
+	require.NotContains(t, after.PromotedRecentTools, "LATER_SCHEMA")
 	require.NotContains(t, after.EvidenceSemiDynamic, "LATER_EVIDENCE")
 	require.Contains(t, after.EvidenceSemiDynamic, "EXACT_EVIDENCE")
 	require.Equal(t, before, RenderTimelineFrozenOpen(fork.Branch), "fork must not share commit state")
@@ -370,7 +370,7 @@ func TestTimelineCompressionTransactionReviewExample(t *testing.T) {
 	if dir := os.Getenv("YAK_TIMELINE_COMPRESSION_EXAMPLES_DIR"); dir != "" {
 		require.NoError(t, os.MkdirAll(dir, 0755))
 		render := func(v TimelineFrozenOpenBlocks) string {
-			return "Frozen Timeline:\n" + v.Frozen + "\nSemi evidence:\n" + v.EvidenceSemiDynamic + "\nSemi toolcache:\n" + v.PromotedSemiDynamic1 + "\nOpen Timeline:\n" + v.Open
+			return "Frozen Timeline:\n" + v.Frozen + "\nSemi evidence:\n" + v.EvidenceSemiDynamic + "\nSemi toolcache:\n" + v.PromotedRecentTools + "\nOpen Timeline:\n" + v.Open
 		}
 		for name, body := range map[string]string{"transaction-before.txt": render(before), "transaction-request.txt": prompt, "transaction-mock-response.json": compressionMockSummary(summary), "transaction-after.txt": render(after)} {
 			require.NoError(t, os.WriteFile(filepath.Join(dir, name), []byte(body), 0644))

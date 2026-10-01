@@ -722,15 +722,11 @@ LOOP:
 			aicommon.WithStatusCode("task.working"),
 		)
 		var prompt string
-		// PE-TASK 缓存优化: 当 task 实现 CacheableUserInputProvider 接口时,
-		// 把 PARENT_TASK + CURRENT_TASK + INSTRUCTION 整块当作 frozenUserContext
-		// 注入 frozen-block, 让 dynamic 段不再承载 PLAN 阶段的产物。
-		// 普通 ReAct loop 的 task 不实现该接口, fallback 走老路径。
-		// 关键词: CacheableUserInputProvider, frozenUserContext, PLAN_CONTEXT
-		userInputForDynamic := task.GetUserInput()
+		// PE-TASK 的计划上下文交给 Open 区，任务输入仅为历史压缩提供目标。
+		taskInput := task.GetUserInput()
 		var frozenUserContext string
 		if provider, ok := task.(aicommon.CacheableUserInputProvider); ok {
-			userInputForDynamic, frozenUserContext = provider.GetUserInputSplitForCache()
+			taskInput, frozenUserContext = provider.GetUserInputSplitForCache()
 		}
 		// goal-mode finish gate: single application point. Applied here so the
 		// operator used to build this iteration's prompt has disallowLoopExit set
@@ -739,7 +735,7 @@ LOOP:
 		r.ApplyGoalModeGate(operator, iterationCount)
 		prompt, finalError = r.generateLoopPrompt(
 			nonce,
-			userInputForDynamic,
+			taskInput,
 			frozenUserContext,
 			nil,
 			r.GetCurrentMemoriesContent(),

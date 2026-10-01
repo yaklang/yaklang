@@ -180,11 +180,10 @@ func TestExecLoopPromptCompare_TextAndFunctionCallSchemas(t *testing.T) {
 func TestExecLoopPromptCompare_HighStaticProtocol(t *testing.T) {
 	render := func(functionCallMode bool) string {
 		t.Helper()
-		materials := &aicommon.PromptMaterials{FunctionCallMode: functionCallMode}
 		prompt, err := aicommon.RenderPromptTemplate(
 			"loop-prompt-compare-high-static",
 			aicommon.MainloopHighStaticTemplate(functionCallMode),
-			materials.HighStaticData(),
+			nil,
 		)
 		require.NoError(t, err)
 		return prompt

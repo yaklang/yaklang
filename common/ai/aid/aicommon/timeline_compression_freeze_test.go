@@ -46,7 +46,7 @@ func TestTimelineFreezePromotionPayloadTriggersBudget(t *testing.T) {
 			require.Equal(t, []int64{1}, result.NewlyFrozenIDs, "only the explicit freeze commits, never append")
 			rendered := RenderTimelineFrozenOpen(tl)
 			require.Empty(t, rendered.Open)
-			require.Contains(t, rendered.PromotedSemiDynamic1, payload)
+			require.Contains(t, rendered.PromotedRecentTools, payload)
 			require.Empty(t, tl.GetTimelineItemIDs(), "schema must never enter AI compression")
 			require.Empty(t, tl.Dump(), "no control-plane noise in the ordinary dump")
 		})
@@ -63,7 +63,7 @@ func TestTimelineFreezeAtomicReceiptAndReadOnlyRendering(t *testing.T) {
 	before, err := MarshalTimeline(tl)
 	require.NoError(t, err)
 	for i := 0; i < 3; i++ {
-		require.Empty(t, RenderTimelineFrozenOpen(tl).PromotedSemiDynamic1)
+		require.Empty(t, RenderTimelineFrozenOpen(tl).PromotedRecentTools)
 	}
 	after, err := MarshalTimeline(tl)
 	require.NoError(t, err)
@@ -78,7 +78,7 @@ func TestTimelineFreezeAtomicReceiptAndReadOnlyRendering(t *testing.T) {
 	result.Promotions[0].Payload = "caller mutation"
 	snapshot := tl.FreezeSnapshot()
 	snapshot.Batches[0].IDs[0] = 999
-	require.NotContains(t, RenderTimelineFrozenOpen(tl).PromotedSemiDynamic1, "caller mutation")
+	require.NotContains(t, RenderTimelineFrozenOpen(tl).PromotedRecentTools, "caller mutation")
 	require.Equal(t, int64(1), tl.FreezeSnapshot().Batches[0].IDs[0])
 	require.Empty(t, tl.Freeze().NewlyFrozenIDs)
 	frozen := RenderTimelineFrozenOpen(tl)
@@ -86,7 +86,7 @@ func TestTimelineFreezeAtomicReceiptAndReadOnlyRendering(t *testing.T) {
 	injectTimelineItem(tl, 3, ts.Add(2*time.Second), &TextTimelineItem{ID: 3, Text: "new tail"})
 	next := RenderTimelineFrozenOpen(tl)
 	require.Equal(t, frozen.Frozen, next.Frozen)
-	require.Equal(t, frozen.PromotedSemiDynamic1, next.PromotedSemiDynamic1)
+	require.Equal(t, frozen.PromotedRecentTools, next.PromotedRecentTools)
 	require.Contains(t, next.Open, "new tail")
 }
 
@@ -105,7 +105,7 @@ func TestTimelineFreezeMixedItemsShareBudget(t *testing.T) {
 	require.Empty(t, RenderTimelineFrozenOpen(build(false)).Frozen)
 	mixed := build(true)
 	require.Equal(t, int64(2), mixed.Freeze().ThroughID)
-	require.Contains(t, RenderTimelineFrozenOpen(mixed).PromotedSemiDynamic1, strings.Repeat("s", 300))
+	require.Contains(t, RenderTimelineFrozenOpen(mixed).PromotedRecentTools, strings.Repeat("s", 300))
 	require.Contains(t, RenderTimelineFrozenOpen(mixed).Open, strings.Repeat("b", 200))
 }
 
@@ -127,21 +127,21 @@ func TestTimelineFreezeRestoreForkRollbackAndRemap(t *testing.T) {
 	restored.ReassignIDs(func() int64 { next++; return next })
 	require.Equal(t, int64(102), restored.Freeze().ThroughID)
 	require.Equal(t, frozen.Frozen, RenderTimelineFrozenOpen(restored).Frozen)
-	require.Equal(t, frozen.PromotedSemiDynamic1, RenderTimelineFrozenOpen(restored).PromotedSemiDynamic1)
+	require.Equal(t, frozen.PromotedRecentTools, RenderTimelineFrozenOpen(restored).PromotedRecentTools)
 	require.Contains(t, RenderTimelineFrozenOpen(restored).Open, "tail")
 	fork, err := tl.ForkForTask("child", "test", nil, nil)
 	require.NoError(t, err)
 	require.Equal(t, tl.FreezeSnapshot(), fork.Branch.FreezeSnapshot())
 	injectTimelineItem(fork.Branch, 4, ts.Add(3*time.Second), freezeMutation(4, "child schema"))
 	fork.Branch.FreezeAll()
-	require.Equal(t, frozen.PromotedSemiDynamic1, RenderTimelineFrozenOpen(tl).PromotedSemiDynamic1, "fork must not mutate parent's committed snapshot")
+	require.Equal(t, frozen.PromotedRecentTools, RenderTimelineFrozenOpen(tl).PromotedRecentTools, "fork must not mutate parent's committed snapshot")
 	_, err = fork.MergeBack()
 	require.NoError(t, err)
 	require.Contains(t, RenderTimelineFrozenOpen(tl).Open, "child schema", "a child freeze must not force parent promotion")
 	tl.FreezeAll()
-	require.Contains(t, RenderTimelineFrozenOpen(tl).PromotedSemiDynamic1, "child schema")
+	require.Contains(t, RenderTimelineFrozenOpen(tl).PromotedRecentTools, "child schema")
 	tl.TruncateAfter(2)
-	require.Equal(t, frozen.PromotedSemiDynamic1, RenderTimelineFrozenOpen(tl).PromotedSemiDynamic1)
+	require.Equal(t, frozen.PromotedRecentTools, RenderTimelineFrozenOpen(tl).PromotedRecentTools)
 	require.Empty(t, RenderTimelineFrozenOpen(tl).Open)
 }
 
@@ -160,7 +160,7 @@ func TestTimelineFreezeLegacyRestorePreservesPromotion(t *testing.T) {
 	restored, err := UnmarshalTimeline(string(legacyDump))
 	require.NoError(t, err)
 	result := RenderTimelineFrozenOpen(restored)
-	require.Contains(t, result.PromotedSemiDynamic1, "original")
+	require.Contains(t, result.PromotedRecentTools, "original")
 	require.Contains(t, result.Open, "[DELETE] alpha")
 	require.Equal(t, int64(1), restored.Freeze().ThroughID)
 }
@@ -176,7 +176,7 @@ func TestTimelineFreezeDisabledAdaptiveSizerAndReadOnlyCalls(t *testing.T) {
 	RenderTimelineFrozenOpen(tl)
 	require.Equal(t, before, calls, "read-only rendering must not invoke an adaptive decision")
 	tl.FreezeAll()
-	require.NotEmpty(t, RenderTimelineFrozenOpen(tl).PromotedSemiDynamic1)
+	require.NotEmpty(t, RenderTimelineFrozenOpen(tl).PromotedRecentTools)
 }
 
 func TestTimelineFreezeOutOfOrderTimestampsNeverLoseItems(t *testing.T) {
@@ -188,7 +188,7 @@ func TestTimelineFreezeOutOfOrderTimestampsNeverLoseItems(t *testing.T) {
 	require.Contains(t, RenderTimelineFrozenOpen(tl).Open, "earlier time, later ID")
 	require.Contains(t, RenderTimelineFrozenOpen(tl).Open, "later time, earlier ID")
 	tl.FreezeAll()
-	require.Contains(t, RenderTimelineFrozenOpen(tl).PromotedSemiDynamic1, "later time, earlier ID")
+	require.Contains(t, RenderTimelineFrozenOpen(tl).PromotedRecentTools, "later time, earlier ID")
 	require.Contains(t, RenderTimelineFrozenOpen(tl).Frozen, "earlier time, later ID")
 }
 

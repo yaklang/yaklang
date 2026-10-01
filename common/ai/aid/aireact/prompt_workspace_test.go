@@ -110,11 +110,10 @@ func TestPromptWorkspaceConfiguredPathsAreReadOnly(t *testing.T) {
 	require.Equal(t, dir, cfg.GetConfiguredWorkDir())
 	require.NoDirExists(t, dir)
 	for _, paths := range [][2]string{{`C:\project with spaces`, `D:\AI Artifacts\session`}, {"/srv/project", "/srv/artifacts/session"}} {
-		m := &aicommon.PromptMaterials{Workspace: true, WorkingDir: paths[0], AIArtifactsDir: paths[1], WorkingDirGlance: "legacy-tree-must-not-render"}
+		m := &aicommon.PromptMaterials{Workspace: true, WorkingDir: paths[0], AIArtifactsDir: paths[1]}
 		text := m.WorkspaceContext()
 		require.Contains(t, text, "working dir: "+paths[0])
 		require.Contains(t, text, "AI Artifacts dir: "+paths[1])
-		require.NotContains(t, text, "legacy-tree")
 	}
 	require.Empty(t, (&aicommon.PromptMaterials{Workspace: true}).WorkspaceContext())
 }

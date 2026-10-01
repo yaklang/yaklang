@@ -31,7 +31,7 @@ func TestNativeToolSchemaLoadTimelineLifecycle(t *testing.T) {
 	require.Contains(t, feedback, "schema_loaded")
 	require.Contains(t, feedback, "Tool unavailable")
 	before := aicommon.RenderTimelineFrozenOpen(cfg.Timeline)
-	require.Empty(t, before.PromotedSemiDynamic1)
+	require.Empty(t, before.PromotedRecentTools)
 	require.Equal(t, 2, strings.Count(before.Open, "Direct Params Schema"))
 	require.Equal(t, 1, strings.Count(before.Open, "[UPSERT] read_file"))
 	load(`{"@action":"require_tool","tool_require_payload":"read_file"}`)
@@ -41,7 +41,7 @@ func TestNativeToolSchemaLoadTimelineLifecycle(t *testing.T) {
 	cfg.Timeline.FreezeAll()
 	frozen := aicommon.RenderTimelineFrozenOpen(cfg.Timeline)
 	require.Empty(t, frozen.Open)
-	require.Equal(t, 2, strings.Count(frozen.PromotedSemiDynamic1, "Direct Params Schema"))
+	require.Equal(t, 2, strings.Count(frozen.PromotedRecentTools, "Direct Params Schema"))
 	require.NotContains(t, frozen.Frozen, "Direct Params Schema")
 }
 

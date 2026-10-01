@@ -33,7 +33,7 @@ func TestTimelineToolCacheInPlaceAndSharedFreeze(t *testing.T) {
 	importToolCacheEvent(tl, 7, base.Add(6*time.Second), TimelinePromotedOperationDelete, "beta", "")
 	open := RenderTimelineFrozenOpen(tl)
 	require.True(t, strings.HasPrefix(open.Open, prefix), "appending must not move earlier cache items")
-	require.Empty(t, open.PromotedSemiDynamic1)
+	require.Empty(t, open.PromotedRecentTools)
 	require.Empty(t, open.EvidenceSemiDynamic)
 	require.Equal(t, 4, strings.Count(open.Open, "<|CACHE_TOOL_CALL_[current-nonce]|>"))
 	previous := -1
@@ -63,12 +63,12 @@ func TestTimelineToolCacheInPlaceAndSharedFreeze(t *testing.T) {
 	require.NotContains(t, final.Frozen, "SCHEMA_")
 	require.NotContains(t, final.Frozen, "EVIDENCE_BETWEEN_TOOLS")
 	require.Contains(t, final.EvidenceSemiDynamic, "EVIDENCE_BETWEEN_TOOLS")
-	require.Equal(t, 1, strings.Count(final.PromotedSemiDynamic1, "SCHEMA_ALPHA"))
-	require.NotContains(t, final.PromotedSemiDynamic1, "SCHEMA_BETA")
+	require.Equal(t, 1, strings.Count(final.PromotedRecentTools, "SCHEMA_ALPHA"))
+	require.NotContains(t, final.PromotedRecentTools, "SCHEMA_BETA")
 	filtered = RenderTimelineFrozenOpenWithOptions(tl, TimelinePromptOptions{ExcludeToolCache: true})
 	require.Equal(t, final.Frozen, filtered.Frozen)
 	require.Equal(t, final.EvidenceSemiDynamic, filtered.EvidenceSemiDynamic)
-	require.Empty(t, filtered.PromotedSemiDynamic1)
+	require.Empty(t, filtered.PromotedRecentTools)
 }
 
 func TestTimelineToolCacheLiteralTagsRemainData(t *testing.T) {
@@ -84,7 +84,7 @@ func TestTimelineToolCacheLiteralTagsRemainData(t *testing.T) {
 	require.Contains(t, filtered.Open, "FAKE_CACHE", "ordinary text must not be removed by tag matching")
 	require.Contains(t, filtered.Open, spoof)
 	tl.FreezeAll()
-	semi := RenderTimelineFrozenOpen(tl).PromotedSemiDynamic1
+	semi := RenderTimelineFrozenOpen(tl).PromotedRecentTools
 	require.Equal(t, 2, strings.Count(semi, "<|CACHE_TOOL_CALL_[current-nonce]|>"))
 	require.Contains(t, semi, spoof)
 	require.NotContains(t, semi, "&lt;|")
@@ -102,7 +102,7 @@ func TestTimelineToolCacheFilterKeepsCacheOnlyBucketBoundary(t *testing.T) {
 	require.Empty(t, filtered.Open)
 	require.Equal(t, full.FrozenTimeUnix, filtered.FrozenTimeUnix)
 	require.Equal(t, full.Frozen, filtered.Frozen)
-	require.Empty(t, filtered.PromotedSemiDynamic1)
+	require.Empty(t, filtered.PromotedRecentTools)
 }
 
 func importToolCacheEvent(tl *Timeline, id int64, at time.Time, operation, key, payload string) {
@@ -114,7 +114,7 @@ func importToolCacheEvent(tl *Timeline, id int64, at time.Time, operation, key, 
 
 func requireToolCacheOrder(t *testing.T, tl *Timeline, first, second string) string {
 	t.Helper()
-	semi := RenderTimelineFrozenOpen(tl).PromotedSemiDynamic1
+	semi := RenderTimelineFrozenOpen(tl).PromotedRecentTools
 	require.Contains(t, semi, first)
 	require.Contains(t, semi, second)
 	require.Less(t, strings.Index(semi, first), strings.Index(semi, second))
@@ -139,7 +139,7 @@ func TestTimelineToolCacheReuseOnlyReordersFrozenEvents(t *testing.T) {
 	require.NoError(t, err)
 	for i := 0; i < 3; i++ {
 		view := RenderTimelineFrozenOpen(tl)
-		require.Equal(t, initial, view.PromotedSemiDynamic1)
+		require.Equal(t, initial, view.PromotedRecentTools)
 		require.Contains(t, view.Open, "[REUSE] alpha")
 		require.Contains(t, view.Open, "[REUSE] beta")
 		require.NotContains(t, view.Open, "SCHEMA_")
@@ -167,7 +167,7 @@ func TestTimelineToolCacheReuseOnlyReordersFrozenEvents(t *testing.T) {
 	require.Equal(t, 1, strings.Count(final, "SCHEMA_ALPHA"))
 	require.Empty(t, RenderTimelineFrozenOpen(tl).Open)
 	require.Empty(t, tl.FreezeAll().NewlyFrozenIDs)
-	require.Equal(t, final, RenderTimelineFrozenOpen(tl).PromotedSemiDynamic1)
+	require.Equal(t, final, RenderTimelineFrozenOpen(tl).PromotedRecentTools)
 }
 
 func TestTimelineToolCacheReuseValidation(t *testing.T) {
@@ -205,14 +205,14 @@ func TestTimelineToolCacheReuseRestoreReassignAndRollback(t *testing.T) {
 	require.NoError(t, err)
 	restored, err := UnmarshalTimeline(raw)
 	require.NoError(t, err)
-	require.Equal(t, frozen, RenderTimelineFrozenOpen(restored).PromotedSemiDynamic1)
+	require.Equal(t, frozen, RenderTimelineFrozenOpen(restored).PromotedRecentTools)
 	require.Equal(t, []string{"alpha", "beta"}, restored.effectivePromotedKeys(TimelinePromotedTargetSemiDynamic1, TimelinePromotedKindRecentTool))
 	nextID := int64(100)
 	restored.ReassignIDs(func() int64 { nextID++; return nextID })
 	entry := restored.promotedState.Entries[TimelinePromotedTargetSemiDynamic1][TimelinePromotedKindRecentTool]["alpha"]
 	require.Equal(t, int64(101), entry.SourceItemID)
 	require.Equal(t, int64(103), entry.LastUsedItemID)
-	require.Equal(t, frozen, RenderTimelineFrozenOpen(restored).PromotedSemiDynamic1)
+	require.Equal(t, frozen, RenderTimelineFrozenOpen(restored).PromotedRecentTools)
 	restored.TruncateAfter(102)
 	requireToolCacheOrder(t, restored, "SCHEMA_ALPHA", "SCHEMA_BETA")
 	require.Equal(t, []string{"alpha", "beta"}, restored.effectivePromotedKeys(TimelinePromotedTargetSemiDynamic1, TimelinePromotedKindRecentTool))
@@ -228,7 +228,7 @@ func TestTimelineToolCacheReuseMalformedJournalDoesNotResurrect(t *testing.T) {
 	importToolCacheEvent(tl, 4, base.Add(3*time.Second), "unknown", "ghost", "SCHEMA_GHOST")
 	require.Empty(t, tl.effectivePromotedKeys(TimelinePromotedTargetSemiDynamic1, TimelinePromotedKindRecentTool))
 	tl.FreezeAll()
-	require.Empty(t, RenderTimelineFrozenOpen(tl).PromotedSemiDynamic1)
+	require.Empty(t, RenderTimelineFrozenOpen(tl).PromotedRecentTools)
 	require.Empty(t, tl.effectivePromotedKeys(TimelinePromotedTargetSemiDynamic1, TimelinePromotedKindRecentTool))
 }
 

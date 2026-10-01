@@ -45,7 +45,6 @@ func TestPromptManager_ModelReasoningReplayOnlyEntersMainDecisionPrompt(t *testi
 
 	baseInput := &reactloops.LoopPromptAssemblyInput{
 		Nonce:           "scope-main",
-		UserQuery:       "continue",
 		TaskInstruction: "decide the next action",
 		Schema:          `{"type":"object"}`,
 	}
@@ -128,7 +127,6 @@ func TestPromptManager_ModelReasoningReplayInterleavesTimelineFactsInFinalMessag
 
 	assembled, err := react.promptManager.AssembleLoopPrompt(nil, &reactloops.LoopPromptAssemblyInput{
 		Nonce:                    "interleave-main",
-		UserQuery:                "continue after both observations",
 		TaskInstruction:          "decide the next action",
 		Schema:                   `{"type":"object"}`,
 		IncludeLatestModelReplay: true,
@@ -207,11 +205,12 @@ func TestPromptManager_AssembleLoopPrompt_LightweightUsesBoundedRecentTimeline(t
 	require.NoError(t, err)
 	react.AddToTimeline("note", "ANCIENT_LIGHTWEIGHT_CONTEXT "+strings.Repeat("old ", 20000))
 	react.AddToTimeline("note", "RECENT_LIGHTWEIGHT_FACT")
+	_, err = react.config.AppendUserInputHistory(strings.Repeat("query ", 5000), time.Now())
+	require.NoError(t, err)
 
 	result, err := react.promptManager.AssembleLoopPrompt(nil, &reactloops.LoopPromptAssemblyInput{
 		Nonce:             "light-1",
 		Lightweight:       true,
-		UserQuery:         strings.Repeat("query ", 5000),
 		TaskInstruction:   "keep the task protocol",
 		Schema:            `{"type":"object","properties":{"@action":{"type":"string"}}}`,
 		SkillsContext:     strings.Repeat("skill ", 5000),
@@ -266,10 +265,11 @@ func TestPromptManager_AssembleLoopPrompt_SectionOrder(t *testing.T) {
 	})
 	react.config.PreferDispatchSubReactAgents = true
 	react.AddToTimeline("test", "timeline content")
+	_, err = react.config.AppendUserInputHistory("current user query", time.Now())
+	require.NoError(t, err)
 
 	result, err := react.promptManager.AssembleLoopPrompt([]*aitool.Tool{tool}, &reactloops.LoopPromptAssemblyInput{
 		Nonce:           "n123",
-		UserQuery:       "current user query",
 		TaskInstruction: "follow task rules",
 		OutputExample:   "example output",
 		Schema:          `{"type":"object","properties":{"@action":{"type":"string"}}}`,
@@ -436,7 +436,7 @@ func TestPromptManager_AssembleLoopPrompt_SectionOrder(t *testing.T) {
 }
 
 // TestPromptManager_RenderLoopSemiDynamic1Section_Order 验证 SEMI-1 段包含
-// SkillsContext 与 Timeline 晋升状态，
+// SkillsContext 与分别展示的工具、用户输入历史、Evidence，
 // 也不包含 Schema / Persistent / OutputExample / Tool / Forge。
 //
 // 关键词: renderLoopSemiDynamic1Section, semi_dynamic_section_1 内容范围, P1.1
@@ -451,20 +451,23 @@ func TestPromptManager_RenderLoopSemiDynamic1Section_Order(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	rendered, err := react.promptManager.renderLoopSemiDynamic1Section(&reactloops.PromptPrefixMaterials{
-		ToolInventory:        true,
-		ToolsCount:           2,
-		TopToolsCount:        1,
-		TopTools:             []*aitool.Tool{aitool.NewWithoutCallback("tool-a", aitool.WithDescription("tool a desc"))},
-		HasMoreTools:         true,
-		ForgeInventory:       true,
-		AIForgeList:          "* `forge-a`: forge a desc",
-		SkillsContext:        "<|SKILLS_CONTEXT_demo|>\nskill body\n<|SKILLS_CONTEXT_END_demo|>",
-		PromotedSemiDynamic1: "<|CACHE_TOOL_CALL_[current-nonce]|>\npromoted cache body\n<|CACHE_TOOL_CALL_END_[current-nonce]|>",
-		Schema:               `{"type":"object","properties":{"@action":{"type":"string"}}}`,
-		TaskInstruction:      "follow task rules",
-		OutputExample:        "example output",
-	})
+	materials := &reactloops.PromptPrefixMaterials{
+		ToolInventory:              true,
+		ToolsCount:                 2,
+		TopToolsCount:              1,
+		TopTools:                   []*aitool.Tool{aitool.NewWithoutCallback("tool-a", aitool.WithDescription("tool a desc"))},
+		HasMoreTools:               true,
+		ForgeInventory:             true,
+		AIForgeList:                "* `forge-a`: forge a desc",
+		SkillsContext:              "<|SKILLS_CONTEXT_demo|>\nskill body\n<|SKILLS_CONTEXT_END_demo|>",
+		PromotedRecentTools:        "<|CACHE_TOOL_CALL_[current-nonce]|>\npromoted cache body\n<|CACHE_TOOL_CALL_END_[current-nonce]|>",
+		PromotedUserInputHistory:   "# Session User Input History\nexact user input body",
+		SessionEvidenceSemiDynamic: "# Session Evidence\nverified evidence body",
+		Schema:                     `{"type":"object","properties":{"@action":{"type":"string"}}}`,
+		TaskInstruction:            "follow task rules",
+		OutputExample:              "example output",
+	}
+	rendered, err := react.promptManager.renderLoopSemiDynamic1Section(materials)
 	require.NoError(t, err)
 
 	skillsIdx := strings.Index(rendered, "<|SKILLS_CONTEXT_demo|>")
@@ -473,6 +476,23 @@ func TestPromptManager_RenderLoopSemiDynamic1Section_Order(t *testing.T) {
 	require.NotEqual(t, -1, promotedIdx)
 	require.Less(t, skillsIdx, promotedIdx)
 	require.Contains(t, rendered, "promoted cache body")
+	userInputIdx := strings.Index(rendered, "exact user input body")
+	evidenceIdx := strings.Index(rendered, "verified evidence body")
+	require.Greater(t, userInputIdx, promotedIdx)
+	require.Greater(t, evidenceIdx, userInputIdx)
+	observation := react.promptManager.buildSemiDynamic1Observation(materials, rendered)
+	children := map[string]*reactloops.PromptSectionObservation{}
+	for _, child := range observation.Children {
+		children[child.Key] = child
+	}
+	for key, content := range map[string]string{
+		"section.semi_dynamic_1.recent_tools": materials.PromotedRecentTools,
+		"section.semi_dynamic_1.user_history": materials.PromotedUserInputHistory,
+		"section.semi_dynamic_1.evidence":     materials.SessionEvidenceSemiDynamic,
+	} {
+		require.Contains(t, children, key)
+		require.Equal(t, content, children[key].Content)
+	}
 	// SEMI-1 段绝对不能含 Schema / Persistent / OutputExample / Tool / Forge.
 	require.NotContains(t, rendered, "<|SCHEMA|>")
 	require.NotContains(t, rendered, "<|PERSISTENT|>")
@@ -699,10 +719,11 @@ func TestPromptManager_AssembleLoopPrompt_HijackFiveSegment(t *testing.T) {
 
 	tool := aitool.NewWithoutCallback("tool-a", aitool.WithDescription("tool a desc"))
 	react.AddToTimeline("test", "timeline content")
+	_, err = react.config.AppendUserInputHistory("user query body", time.Now())
+	require.NoError(t, err)
 
 	result, err := react.promptManager.AssembleLoopPrompt([]*aitool.Tool{tool}, &reactloops.LoopPromptAssemblyInput{
 		Nonce:           "hj01",
-		UserQuery:       "user query body",
 		TaskInstruction: "follow task rules",
 		OutputExample:   "example output",
 		Schema:          `{"type":"object","properties":{"@action":{"type":"string"}}}`,
@@ -816,7 +837,6 @@ func TestPromptManager_AssembleLoopPrompt_DoesNotRenderSessionArtifacts(t *testi
 	tool := aitool.NewWithoutCallback("tool-a", aitool.WithDescription("tool a desc"))
 	result, err := react.promptManager.AssembleLoopPrompt([]*aitool.Tool{tool}, &reactloops.LoopPromptAssemblyInput{
 		Nonce:           "artifacts01",
-		UserQuery:       "user query body",
 		TaskInstruction: "follow task rules",
 		OutputExample:   "example output",
 		Schema:          `{"type":"object","properties":{"@action":{"type":"string"}}}`,
@@ -857,7 +877,6 @@ func TestPromptManager_AssembleLoopPrompt_EmptySemiDynamic1StillKeepsWrapper(t *
 
 	result, err := react.promptManager.AssembleLoopPrompt(nil, &reactloops.LoopPromptAssemblyInput{
 		Nonce:           "emptysemi1",
-		UserQuery:       "user query body",
 		TaskInstruction: "follow task rules",
 		OutputExample:   "example output",
 		Schema:          `{"type":"object","properties":{"@action":{"type":"string"}}}`,
@@ -955,9 +974,10 @@ func TestPromptManager_AssembleLoopPrompt_SemiSegmentByteStableAcrossTurns(t *te
 	tool := aitool.NewWithoutCallback("tool-a", aitool.WithDescription("tool a desc"))
 
 	mk := func(turnNonce string, userQuery string) string {
+		_, err := react.config.AppendUserInputHistory(userQuery, time.Now())
+		require.NoError(t, err)
 		result, err := react.promptManager.AssembleLoopPrompt([]*aitool.Tool{tool}, &reactloops.LoopPromptAssemblyInput{
 			Nonce:           turnNonce,
-			UserQuery:       userQuery,
 			TaskInstruction: "task rules",
 			Schema:          `{"type":"object"}`,
 			SkillsContext:   "<|SKILLS_CONTEXT_demo|>\nskill\n<|SKILLS_CONTEXT_END_demo|>",
@@ -1047,7 +1067,6 @@ func TestPromptManager_AssembleLoopPrompt_AicacheSplitClassification(t *testing.
 
 	result, err := react.promptManager.AssembleLoopPrompt([]*aitool.Tool{tool}, &reactloops.LoopPromptAssemblyInput{
 		Nonce:           "cls01",
-		UserQuery:       "user query body",
 		TaskInstruction: "follow task rules",
 		OutputExample:   "example output",
 		Schema:          `{"type":"object","properties":{"@action":{"type":"string"}}}`,
@@ -1086,8 +1105,7 @@ func TestPromptManager_AssembleLoopPrompt_AicacheSplitClassification(t *testing.
 // 创建最小窗口", 高静态段 < 1500 token 容易被上游直接放弃缓存, 让 high-static
 // 这一对 chunk hash 即便稳定也无法转化为真实计费节省。
 //
-// 该测试覆盖最坏情况 (4 个条件块全为 false / TaskInstruction 为空), 是否任何
-// 后续改动都让高静态段降到 1500 token 以下的回归门闸.
+// 高静态段的最小尺寸必须达到缓存窗口，不依赖当前任务材料。
 //
 // 关键词: high-static token budget, dashscope cache 最小窗口, 1500 阈值,
 //
@@ -1103,16 +1121,7 @@ func TestPromptManager_HighStaticSection_TokenBudget(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	// 最坏情况: AllowToolCall / AllowPlanAndExec / HasLoadCapability 全 false,
-	// TaskInstruction 为空. 这种 caller 下 high-static 模板只渲染 TRAITS +
-	// 方法论协议三段, 对应当前 prompt 模板的最小尺寸.
-	rendered, err := react.promptManager.renderLoopHighStaticSection(&reactloops.PromptPrefixMaterials{
-		AllowToolCall:     false,
-		AllowPlanAndExec:  false,
-		HasLoadCapability: false,
-		TaskInstruction:   "",
-	})
-	require.NoError(t, err)
+	rendered := react.promptManager.renderHighStaticPreamble(&reactloops.PromptPrefixMaterials{})
 	require.NotEmpty(t, rendered)
 
 	tokenCount := ytoken.CalcTokenCount(rendered)

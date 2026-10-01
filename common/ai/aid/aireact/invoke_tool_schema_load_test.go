@@ -61,7 +61,7 @@ func TestNativeMainLoopLoadSchemasThenDirectExecution(t *testing.T) {
 				open := aicommon.RenderTimelineFrozenOpen(react.config.Timeline)
 				require.Contains(t, open.Open, "[UPSERT] schema_probe_a")
 				require.Equal(t, 2, strings.Count(open.Open, "Direct Params Schema"))
-				require.Empty(t, open.PromotedSemiDynamic1)
+				require.Empty(t, open.PromotedRecentTools)
 				add("require_tool", `{"tool_require_payload":"schema_probe_a"}`)
 			case 3:
 				require.Zero(t, executions.Load())

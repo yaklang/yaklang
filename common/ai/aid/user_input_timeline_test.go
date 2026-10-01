@@ -16,15 +16,15 @@ func TestCoordinatorUserInputEntersExactTimelineHistory(t *testing.T) {
 	options := aicommon.TimelinePromptOptions{PromoteUserInput: true}
 	open := aicommon.BuildPromptFrozenOpenMaterialsWithOptions(coordinator.Config, options)
 	require.Contains(t, open.TimelineOpen, input)
-	require.Empty(t, open.PromptedUserInputHistory)
+	require.Empty(t, open.PromotedUserInputHistory)
 	coordinator.GetTimeline().FreezeAll()
 	sealed := aicommon.BuildPromptFrozenOpenMaterialsWithOptions(coordinator.Config, options)
-	require.Contains(t, sealed.PromptedUserInputHistory, input)
+	require.Contains(t, sealed.PromotedUserInputHistory, input)
 	require.NotContains(t, sealed.TimelineFrozen, input)
 	require.NotContains(t, sealed.TimelineOpen, input)
 	raw, err := aicommon.MarshalTimeline(coordinator.GetTimeline())
 	require.NoError(t, err)
 	restored, err := aicommon.UnmarshalTimeline(raw)
 	require.NoError(t, err)
-	require.Equal(t, sealed.PromptedUserInputHistory, aicommon.RenderTimelineFrozenOpenWithOptions(restored, options).PromptedUserInputHistory)
+	require.Equal(t, sealed.PromotedUserInputHistory, aicommon.RenderTimelineFrozenOpenWithOptions(restored, options).PromotedUserInputHistory)
 }

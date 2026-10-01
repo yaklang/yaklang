@@ -24,7 +24,11 @@ func TestUserInputHistoryPromptPromotionAcrossModes(t *testing.T) {
 				_, err = react.config.AppendUserInputHistory(original, time.Now())
 				require.NoError(t, err)
 				current := "  CURRENT_QUERY\n\t保留当前输入原文  \n" + strings.Repeat("当前 Query 不得裁剪\n", 2048)
-				input := &reactloops.LoopPromptAssemblyInput{Nonce: "input-1", CurrentTaskID: "current-task", UserQuery: current, FunctionCallMode: functionCall, Lightweight: lightweight}
+				_, err = react.config.AppendUserInputHistory(current, time.Now())
+				require.NoError(t, err)
+				before, err := aicommon.MarshalTimeline(react.config.GetTimeline())
+				require.NoError(t, err)
+				input := &reactloops.LoopPromptAssemblyInput{Nonce: "input-1", UserQuery: "UNJOURNALED_HELPER_QUERY", FunctionCallMode: functionCall, Lightweight: lightweight}
 				open, err := react.promptManager.AssembleLoopPrompt(nil, input)
 				require.NoError(t, err)
 				require.Contains(t, r2PromptSection(t, open.Prompt, "timeline-open"), original)
@@ -33,8 +37,12 @@ func TestUserInputHistoryPromptPromotionAcrossModes(t *testing.T) {
 				require.Equal(t, 1, strings.Count(open.Prompt, current))
 				require.NotContains(t, open.Prompt, "CURRENT_TASK_INPUT")
 				require.NotContains(t, open.Prompt, "USER_QUERY")
+				require.NotContains(t, open.Prompt, "UNJOURNALED_HELPER_QUERY", "shared helper query must not enter main context")
 				require.NotContains(t, aicommon_testutil.MustExtractAITagBlock(t, open.Prompt, "PROMPT_SECTION_dynamic").Body, "CURRENT_QUERY")
 				require.Contains(t, open.Prompt, "关注 Timeline 中的用户输入")
+				after, err := aicommon.MarshalTimeline(react.config.GetTimeline())
+				require.NoError(t, err)
+				require.JSONEq(t, before, after, "main prompt assembly must not mutate Timeline")
 				react.config.GetTimeline().FreezeAll()
 				input.Nonce = "input-2"
 				sealed, err := react.promptManager.AssembleLoopPrompt(nil, input)
@@ -46,6 +54,7 @@ func TestUserInputHistoryPromptPromotionAcrossModes(t *testing.T) {
 				require.NotContains(t, optionalUserInputPromptSection(t, sealed.Prompt, "timeline-open"), current)
 				require.Equal(t, 1, strings.Count(sealed.Prompt, current))
 				require.NotContains(t, sealed.Prompt, "USER_QUERY")
+				require.NotContains(t, sealed.Prompt, "UNJOURNALED_HELPER_QUERY")
 				require.NotContains(t, aicommon_testutil.MustExtractAITagBlock(t, sealed.Prompt, "PROMPT_SECTION_dynamic").Body, "CURRENT_QUERY")
 				sections := mustLoopPromptSections(t, sealed.Sections)
 				found := false
@@ -95,7 +104,7 @@ func TestUserInputPromotionIsOptInForMainContext(t *testing.T) {
 		rawBefore, err := aicommon.MarshalTimeline(react.config.GetTimeline())
 		require.NoError(t, err)
 		legacy := aicommon.BuildPromptFrozenOpenMaterialsWithOptions(react.config, aicommon.TimelinePromptOptions{ExcludeToolCache: true})
-		require.Empty(t, legacy.PromptedUserInputHistory)
+		require.Empty(t, legacy.PromotedUserInputHistory)
 		if sealed {
 			require.Contains(t, legacy.TimelineFrozen, original)
 		} else {
@@ -104,7 +113,7 @@ func TestUserInputPromotionIsOptInForMainContext(t *testing.T) {
 		base, err := react.promptManager.GetLoopPromptBaseMaterials(nil, "compat")
 		require.NoError(t, err)
 		require.Equal(t, react.promptManager.UserHistoryContextWithNonce("compat"), base.UserHistory)
-		main, err := react.promptManager.AssembleLoopPrompt(nil, &reactloops.LoopPromptAssemblyInput{Nonce: "main", CurrentTaskID: task.GetId(), UserQuery: task.GetUserInput()})
+		main, err := react.promptManager.AssembleLoopPrompt(nil, &reactloops.LoopPromptAssemblyInput{Nonce: "main"})
 		require.NoError(t, err)
 		require.Contains(t, main.Prompt, "关注 Timeline 中的用户输入")
 		require.Contains(t, main.Prompt, task.GetUserInput())
@@ -118,7 +127,6 @@ func TestUserInputPromotionIsOptInForMainContext(t *testing.T) {
 		for _, helper := range []string{native, text.Prompt, retry.Prompt} {
 			require.Contains(t, helper, original)
 			require.Contains(t, helper, task.GetUserInput())
-			require.NotContains(t, helper, "PromptedUserInputHistory")
 			require.NotContains(t, helper, "USER_INTERACT_")
 			require.NotContains(t, helper, "CURRENT_TASK_INPUT_")
 		}

@@ -103,7 +103,7 @@ func (m *Timeline) captureCompressionSnapshotLocked() (snapshot *timelineCompres
 		if utils.IsNil(item.value) || item.GetID() != id {
 			return nil, fmt.Errorf("invalid compression source item %d", id)
 		}
-		if timelinePromotionForItem(item) != nil {
+		if isPromotableTimelineItem(item) || isTimelineUserInput(item) {
 			snapshot.ExactItemIDs = append(snapshot.ExactItemIDs, id)
 			continue
 		}
