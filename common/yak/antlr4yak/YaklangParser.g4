@@ -4,6 +4,15 @@ options {
     tokenVocab=YaklangLexer;
 }
 
+// Resolve only bounded, unambiguous SLL prefixes before entering the ATN.
+@parser::adaptivePredict {}
+@parser::structmembers {
+    disableFastPrediction bool
+    prefixTokenIndex int
+    prefixAlternative int
+    prefixToken *antlr.CommonToken
+}
+
 /*
     语法部分
 */

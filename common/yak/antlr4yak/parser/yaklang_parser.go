@@ -17,6 +17,12 @@ var _ = sync.Once{}
 
 type YaklangParser struct {
 	*antlr.BaseParser
+	// Grammar author supplied members of the instance struct
+
+	disableFastPrediction bool
+	prefixTokenIndex      int
+	prefixAlternative     int
+	prefixToken           *antlr.CommonToken
 }
 
 var YaklangParserParserStaticData struct {
@@ -1095,7 +1101,7 @@ func (p *YaklangParser) Program() (localctx IProgramContext) {
 	if p.HasError() {
 		goto errorExit
 	}
-	_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 0, p.GetParserRuleContext())
+	_alt = p.AdaptivePredict(p.BaseParser, p.GetTokenStream(), 0, p.GetParserRuleContext())
 	if p.HasError() {
 		goto errorExit
 	}
@@ -1112,7 +1118,7 @@ func (p *YaklangParser) Program() (localctx IProgramContext) {
 		if p.HasError() {
 			goto errorExit
 		}
-		_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 0, p.GetParserRuleContext())
+		_alt = p.AdaptivePredict(p.BaseParser, p.GetTokenStream(), 0, p.GetParserRuleContext())
 		if p.HasError() {
 			goto errorExit
 		}
@@ -1279,7 +1285,7 @@ func (p *YaklangParser) StatementList() (localctx IStatementListContext) {
 
 		p.SetState(186)
 		p.GetErrorHandler().Sync(p)
-		_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 1, p.GetParserRuleContext())
+		_alt = p.AdaptivePredict(p.BaseParser, p.GetTokenStream(), 1, p.GetParserRuleContext())
 		if p.HasError() {
 			goto errorExit
 		}
@@ -1730,7 +1736,7 @@ func (p *YaklangParser) Statement() (localctx IStatementContext) {
 		goto errorExit
 	}
 
-	switch p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 2, p.GetParserRuleContext()) {
+	switch p.AdaptivePredict(p.BaseParser, p.GetTokenStream(), 2, p.GetParserRuleContext()) {
 	case 1:
 		p.EnterOuterAlt(localctx, 1)
 		{
@@ -2724,7 +2730,7 @@ func (p *YaklangParser) DeferStmt() (localctx IDeferStmtContext) {
 		goto errorExit
 	}
 
-	switch p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 5, p.GetParserRuleContext()) {
+	switch p.AdaptivePredict(p.BaseParser, p.GetTokenStream(), 5, p.GetParserRuleContext()) {
 	case 1:
 		{
 			p.SetState(259)
@@ -3592,7 +3598,7 @@ func (p *YaklangParser) CallExpr() (localctx ICallExprContext) {
 		goto errorExit
 	}
 
-	switch p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 8, p.GetParserRuleContext()) {
+	switch p.AdaptivePredict(p.BaseParser, p.GetTokenStream(), 8, p.GetParserRuleContext()) {
 	case 1:
 		p.EnterOuterAlt(localctx, 1)
 		{
@@ -3876,7 +3882,7 @@ func (p *YaklangParser) ForStmt() (localctx IForStmtContext) {
 	p.SetState(299)
 	p.GetErrorHandler().Sync(p)
 
-	if p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 9, p.GetParserRuleContext()) == 1 {
+	if p.AdaptivePredict(p.BaseParser, p.GetTokenStream(), 9, p.GetParserRuleContext()) == 1 {
 		{
 			p.SetState(293)
 			p.ForStmtCond()
@@ -3884,7 +3890,7 @@ func (p *YaklangParser) ForStmt() (localctx IForStmtContext) {
 
 	} else if p.HasError() { // JIM
 		goto errorExit
-	} else if p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 9, p.GetParserRuleContext()) == 2 {
+	} else if p.AdaptivePredict(p.BaseParser, p.GetTokenStream(), 9, p.GetParserRuleContext()) == 2 {
 		{
 			p.SetState(294)
 			p.Match(YaklangParserLParen)
@@ -3908,7 +3914,7 @@ func (p *YaklangParser) ForStmt() (localctx IForStmtContext) {
 
 	} else if p.HasError() { // JIM
 		goto errorExit
-	} else if p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 9, p.GetParserRuleContext()) == 3 {
+	} else if p.AdaptivePredict(p.BaseParser, p.GetTokenStream(), 9, p.GetParserRuleContext()) == 3 {
 		{
 			p.SetState(298)
 			p.expression(0)
@@ -4115,7 +4121,7 @@ func (p *YaklangParser) ForStmtCond() (localctx IForStmtCondContext) {
 	p.SetState(312)
 	p.GetErrorHandler().Sync(p)
 
-	if p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 12, p.GetParserRuleContext()) == 1 {
+	if p.AdaptivePredict(p.BaseParser, p.GetTokenStream(), 12, p.GetParserRuleContext()) == 1 {
 		{
 			p.SetState(311)
 			p.ForThirdExpr()
@@ -4247,7 +4253,7 @@ func (p *YaklangParser) ForFirstExpr() (localctx IForFirstExprContext) {
 		goto errorExit
 	}
 
-	switch p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 13, p.GetParserRuleContext()) {
+	switch p.AdaptivePredict(p.BaseParser, p.GetTokenStream(), 13, p.GetParserRuleContext()) {
 	case 1:
 		p.EnterOuterAlt(localctx, 1)
 		{
@@ -4388,7 +4394,7 @@ func (p *YaklangParser) ForThirdExpr() (localctx IForThirdExprContext) {
 		goto errorExit
 	}
 
-	switch p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 14, p.GetParserRuleContext()) {
+	switch p.AdaptivePredict(p.BaseParser, p.GetTokenStream(), 14, p.GetParserRuleContext()) {
 	case 1:
 		p.EnterOuterAlt(localctx, 1)
 		{
@@ -4582,7 +4588,7 @@ func (p *YaklangParser) ForRangeStmt() (localctx IForRangeStmtContext) {
 		goto errorExit
 	}
 
-	switch p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 17, p.GetParserRuleContext()) {
+	switch p.AdaptivePredict(p.BaseParser, p.GetTokenStream(), 17, p.GetParserRuleContext()) {
 	case 1:
 		p.SetState(326)
 		p.GetErrorHandler().Sync(p)
@@ -4938,7 +4944,7 @@ func (p *YaklangParser) SwitchStmt() (localctx ISwitchStmtContext) {
 	p.SetState(340)
 	p.GetErrorHandler().Sync(p)
 
-	if p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 18, p.GetParserRuleContext()) == 1 {
+	if p.AdaptivePredict(p.BaseParser, p.GetTokenStream(), 18, p.GetParserRuleContext()) == 1 {
 		{
 			p.SetState(339)
 			p.expression(0)
@@ -4960,7 +4966,7 @@ func (p *YaklangParser) SwitchStmt() (localctx ISwitchStmtContext) {
 	if p.HasError() {
 		goto errorExit
 	}
-	_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 21, p.GetParserRuleContext())
+	_alt = p.AdaptivePredict(p.BaseParser, p.GetTokenStream(), 21, p.GetParserRuleContext())
 	if p.HasError() {
 		goto errorExit
 	}
@@ -5009,7 +5015,7 @@ func (p *YaklangParser) SwitchStmt() (localctx ISwitchStmtContext) {
 			p.SetState(353)
 			p.GetErrorHandler().Sync(p)
 
-			if p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 20, p.GetParserRuleContext()) == 1 {
+			if p.AdaptivePredict(p.BaseParser, p.GetTokenStream(), 20, p.GetParserRuleContext()) == 1 {
 				{
 					p.SetState(352)
 					p.StatementList()
@@ -5025,7 +5031,7 @@ func (p *YaklangParser) SwitchStmt() (localctx ISwitchStmtContext) {
 		if p.HasError() {
 			goto errorExit
 		}
-		_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 21, p.GetParserRuleContext())
+		_alt = p.AdaptivePredict(p.BaseParser, p.GetTokenStream(), 21, p.GetParserRuleContext())
 		if p.HasError() {
 			goto errorExit
 		}
@@ -5033,7 +5039,7 @@ func (p *YaklangParser) SwitchStmt() (localctx ISwitchStmtContext) {
 	p.SetState(371)
 	p.GetErrorHandler().Sync(p)
 
-	if p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 24, p.GetParserRuleContext()) == 1 {
+	if p.AdaptivePredict(p.BaseParser, p.GetTokenStream(), 24, p.GetParserRuleContext()) == 1 {
 		p.SetState(363)
 		p.GetErrorHandler().Sync(p)
 		if p.HasError() {
@@ -5073,7 +5079,7 @@ func (p *YaklangParser) SwitchStmt() (localctx ISwitchStmtContext) {
 		p.SetState(369)
 		p.GetErrorHandler().Sync(p)
 
-		if p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 23, p.GetParserRuleContext()) == 1 {
+		if p.AdaptivePredict(p.BaseParser, p.GetTokenStream(), 23, p.GetParserRuleContext()) == 1 {
 			{
 				p.SetState(368)
 				p.StatementList()
@@ -5703,7 +5709,7 @@ func (p *YaklangParser) IfStmt() (localctx IIfStmtContext) {
 	p.SetState(406)
 	p.GetErrorHandler().Sync(p)
 
-	if p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 28, p.GetParserRuleContext()) == 1 {
+	if p.AdaptivePredict(p.BaseParser, p.GetTokenStream(), 28, p.GetParserRuleContext()) == 1 {
 		{
 			p.SetState(403)
 			p.IfStmtInit()
@@ -5733,7 +5739,7 @@ func (p *YaklangParser) IfStmt() (localctx IIfStmtContext) {
 	if p.HasError() {
 		goto errorExit
 	}
-	_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 29, p.GetParserRuleContext())
+	_alt = p.AdaptivePredict(p.BaseParser, p.GetTokenStream(), 29, p.GetParserRuleContext())
 	if p.HasError() {
 		goto errorExit
 	}
@@ -5762,7 +5768,7 @@ func (p *YaklangParser) IfStmt() (localctx IIfStmtContext) {
 		if p.HasError() {
 			goto errorExit
 		}
-		_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 29, p.GetParserRuleContext())
+		_alt = p.AdaptivePredict(p.BaseParser, p.GetTokenStream(), 29, p.GetParserRuleContext())
 		if p.HasError() {
 			goto errorExit
 		}
@@ -5770,7 +5776,7 @@ func (p *YaklangParser) IfStmt() (localctx IIfStmtContext) {
 	p.SetState(420)
 	p.GetErrorHandler().Sync(p)
 
-	if p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 30, p.GetParserRuleContext()) == 1 {
+	if p.AdaptivePredict(p.BaseParser, p.GetTokenStream(), 30, p.GetParserRuleContext()) == 1 {
 		{
 			p.SetState(419)
 			p.ElseBlock()
@@ -5919,7 +5925,7 @@ func (p *YaklangParser) IfStmtInit() (localctx IIfStmtInitContext) {
 		goto errorExit
 	}
 
-	switch p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 31, p.GetParserRuleContext()) {
+	switch p.AdaptivePredict(p.BaseParser, p.GetTokenStream(), 31, p.GetParserRuleContext()) {
 	case 1:
 		p.EnterOuterAlt(localctx, 1)
 		{
@@ -6269,7 +6275,7 @@ func (p *YaklangParser) Block() (localctx IBlockContext) {
 	if p.HasError() {
 		goto errorExit
 	}
-	_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 33, p.GetParserRuleContext())
+	_alt = p.AdaptivePredict(p.BaseParser, p.GetTokenStream(), 33, p.GetParserRuleContext())
 	if p.HasError() {
 		goto errorExit
 	}
@@ -6286,7 +6292,7 @@ func (p *YaklangParser) Block() (localctx IBlockContext) {
 		if p.HasError() {
 			goto errorExit
 		}
-		_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 33, p.GetParserRuleContext())
+		_alt = p.AdaptivePredict(p.BaseParser, p.GetTokenStream(), 33, p.GetParserRuleContext())
 		if p.HasError() {
 			goto errorExit
 		}
@@ -6294,7 +6300,7 @@ func (p *YaklangParser) Block() (localctx IBlockContext) {
 	p.SetState(440)
 	p.GetErrorHandler().Sync(p)
 
-	if p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 34, p.GetParserRuleContext()) == 1 {
+	if p.AdaptivePredict(p.BaseParser, p.GetTokenStream(), 34, p.GetParserRuleContext()) == 1 {
 		{
 			p.SetState(439)
 			p.StatementList()
@@ -6829,7 +6835,7 @@ func (p *YaklangParser) AssignExpression() (localctx IAssignExpressionContext) {
 		goto errorExit
 	}
 
-	switch p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 37, p.GetParserRuleContext()) {
+	switch p.AdaptivePredict(p.BaseParser, p.GetTokenStream(), 37, p.GetParserRuleContext()) {
 	case 1:
 		p.EnterOuterAlt(localctx, 1)
 		{
@@ -7116,7 +7122,7 @@ func (p *YaklangParser) DeclareVariableExpression() (localctx IDeclareVariableEx
 		goto errorExit
 	}
 
-	switch p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 38, p.GetParserRuleContext()) {
+	switch p.AdaptivePredict(p.BaseParser, p.GetTokenStream(), 38, p.GetParserRuleContext()) {
 	case 1:
 		p.EnterOuterAlt(localctx, 1)
 		{
@@ -8430,7 +8436,7 @@ func (p *YaklangParser) LeftExpression() (localctx ILeftExpressionContext) {
 		goto errorExit
 	}
 
-	switch p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 43, p.GetParserRuleContext()) {
+	switch p.AdaptivePredict(p.BaseParser, p.GetTokenStream(), 43, p.GetParserRuleContext()) {
 	case 1:
 		p.EnterOuterAlt(localctx, 1)
 		{
@@ -8964,7 +8970,7 @@ func (p *YaklangParser) expression(_p int) (localctx IExpressionContext) {
 		goto errorExit
 	}
 
-	switch p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 47, p.GetParserRuleContext()) {
+	switch p.AdaptivePredict(p.BaseParser, p.GetTokenStream(), 47, p.GetParserRuleContext()) {
 	case 1:
 		{
 			p.SetState(525)
@@ -8983,7 +8989,7 @@ func (p *YaklangParser) expression(_p int) (localctx IExpressionContext) {
 		if p.HasError() {
 			goto errorExit
 		}
-		_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 44, p.GetParserRuleContext())
+		_alt = p.AdaptivePredict(p.BaseParser, p.GetTokenStream(), 44, p.GetParserRuleContext())
 		if p.HasError() {
 			goto errorExit
 		}
@@ -9000,7 +9006,7 @@ func (p *YaklangParser) expression(_p int) (localctx IExpressionContext) {
 			if p.HasError() {
 				goto errorExit
 			}
-			_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 44, p.GetParserRuleContext())
+			_alt = p.AdaptivePredict(p.BaseParser, p.GetTokenStream(), 44, p.GetParserRuleContext())
 			if p.HasError() {
 				goto errorExit
 			}
@@ -9119,7 +9125,7 @@ func (p *YaklangParser) expression(_p int) (localctx IExpressionContext) {
 	if p.HasError() {
 		goto errorExit
 	}
-	_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 60, p.GetParserRuleContext())
+	_alt = p.AdaptivePredict(p.BaseParser, p.GetTokenStream(), 60, p.GetParserRuleContext())
 	if p.HasError() {
 		goto errorExit
 	}
@@ -9135,7 +9141,7 @@ func (p *YaklangParser) expression(_p int) (localctx IExpressionContext) {
 				goto errorExit
 			}
 
-			switch p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 59, p.GetParserRuleContext()) {
+			switch p.AdaptivePredict(p.BaseParser, p.GetTokenStream(), 59, p.GetParserRuleContext()) {
 			case 1:
 				localctx = NewExpressionContext(p, _parentctx, _parentState)
 				p.PushNewRecursionContext(localctx, _startState, YaklangParserRULE_expression)
@@ -9577,7 +9583,7 @@ func (p *YaklangParser) expression(_p int) (localctx IExpressionContext) {
 		if p.HasError() {
 			goto errorExit
 		}
-		_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 60, p.GetParserRuleContext())
+		_alt = p.AdaptivePredict(p.BaseParser, p.GetTokenStream(), 60, p.GetParserRuleContext())
 		if p.HasError() {
 			goto errorExit
 		}
@@ -9753,7 +9759,7 @@ func (p *YaklangParser) ParenExpression() (localctx IParenExpressionContext) {
 	if p.HasError() {
 		goto errorExit
 	}
-	_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 61, p.GetParserRuleContext())
+	_alt = p.AdaptivePredict(p.BaseParser, p.GetTokenStream(), 61, p.GetParserRuleContext())
 	if p.HasError() {
 		goto errorExit
 	}
@@ -9770,7 +9776,7 @@ func (p *YaklangParser) ParenExpression() (localctx IParenExpressionContext) {
 		if p.HasError() {
 			goto errorExit
 		}
-		_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 61, p.GetParserRuleContext())
+		_alt = p.AdaptivePredict(p.BaseParser, p.GetTokenStream(), 61, p.GetParserRuleContext())
 		if p.HasError() {
 			goto errorExit
 		}
@@ -11180,7 +11186,7 @@ func (p *YaklangParser) AnonymousFunctionDecl() (localctx IAnonymousFunctionDecl
 		if p.HasError() {
 			goto errorExit
 		}
-		_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 71, p.GetParserRuleContext())
+		_alt = p.AdaptivePredict(p.BaseParser, p.GetTokenStream(), 71, p.GetParserRuleContext())
 		if p.HasError() {
 			goto errorExit
 		}
@@ -11197,7 +11203,7 @@ func (p *YaklangParser) AnonymousFunctionDecl() (localctx IAnonymousFunctionDecl
 			if p.HasError() {
 				goto errorExit
 			}
-			_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 71, p.GetParserRuleContext())
+			_alt = p.AdaptivePredict(p.BaseParser, p.GetTokenStream(), 71, p.GetParserRuleContext())
 			if p.HasError() {
 				goto errorExit
 			}
@@ -11310,7 +11316,7 @@ func (p *YaklangParser) AnonymousFunctionDecl() (localctx IAnonymousFunctionDecl
 			goto errorExit
 		}
 
-		switch p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 76, p.GetParserRuleContext()) {
+		switch p.AdaptivePredict(p.BaseParser, p.GetTokenStream(), 76, p.GetParserRuleContext()) {
 		case 1:
 			{
 				p.SetState(758)
@@ -11646,7 +11652,7 @@ func (p *YaklangParser) FunctionParamDecl() (localctx IFunctionParamDeclContext)
 	if p.HasError() {
 		goto errorExit
 	}
-	_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 81, p.GetParserRuleContext())
+	_alt = p.AdaptivePredict(p.BaseParser, p.GetTokenStream(), 81, p.GetParserRuleContext())
 	if p.HasError() {
 		goto errorExit
 	}
@@ -11711,7 +11717,7 @@ func (p *YaklangParser) FunctionParamDecl() (localctx IFunctionParamDeclContext)
 		if p.HasError() {
 			goto errorExit
 		}
-		_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 81, p.GetParserRuleContext())
+		_alt = p.AdaptivePredict(p.BaseParser, p.GetTokenStream(), 81, p.GetParserRuleContext())
 		if p.HasError() {
 			goto errorExit
 		}
@@ -11739,7 +11745,7 @@ func (p *YaklangParser) FunctionParamDecl() (localctx IFunctionParamDeclContext)
 	if p.HasError() {
 		goto errorExit
 	}
-	_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 83, p.GetParserRuleContext())
+	_alt = p.AdaptivePredict(p.BaseParser, p.GetTokenStream(), 83, p.GetParserRuleContext())
 	if p.HasError() {
 		goto errorExit
 	}
@@ -11756,7 +11762,7 @@ func (p *YaklangParser) FunctionParamDecl() (localctx IFunctionParamDeclContext)
 		if p.HasError() {
 			goto errorExit
 		}
-		_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 83, p.GetParserRuleContext())
+		_alt = p.AdaptivePredict(p.BaseParser, p.GetTokenStream(), 83, p.GetParserRuleContext())
 		if p.HasError() {
 			goto errorExit
 		}
@@ -11961,7 +11967,7 @@ func (p *YaklangParser) FunctionParam() (localctx IFunctionParamContext) {
 	p.SetState(818)
 	p.GetErrorHandler().Sync(p)
 
-	if p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 87, p.GetParserRuleContext()) == 1 {
+	if p.AdaptivePredict(p.BaseParser, p.GetTokenStream(), 87, p.GetParserRuleContext()) == 1 {
 		p.SetState(814)
 		p.GetErrorHandler().Sync(p)
 		if p.HasError() {
@@ -12236,7 +12242,7 @@ func (p *YaklangParser) FunctionResultType() (localctx IFunctionResultTypeContex
 		if p.HasError() {
 			goto errorExit
 		}
-		_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 91, p.GetParserRuleContext())
+		_alt = p.AdaptivePredict(p.BaseParser, p.GetTokenStream(), 91, p.GetParserRuleContext())
 		if p.HasError() {
 			goto errorExit
 		}
@@ -12301,7 +12307,7 @@ func (p *YaklangParser) FunctionResultType() (localctx IFunctionResultTypeContex
 			if p.HasError() {
 				goto errorExit
 			}
-			_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 91, p.GetParserRuleContext())
+			_alt = p.AdaptivePredict(p.BaseParser, p.GetTokenStream(), 91, p.GetParserRuleContext())
 			if p.HasError() {
 				goto errorExit
 			}
@@ -12490,7 +12496,7 @@ func (p *YaklangParser) FunctionCall() (localctx IFunctionCallContext) {
 	p.SetState(864)
 	p.GetErrorHandler().Sync(p)
 
-	if p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 95, p.GetParserRuleContext()) == 1 {
+	if p.AdaptivePredict(p.BaseParser, p.GetTokenStream(), 95, p.GetParserRuleContext()) == 1 {
 		{
 			p.SetState(863)
 			p.Match(YaklangParserWavy)
@@ -12721,7 +12727,7 @@ func (p *YaklangParser) OrdinaryArguments() (localctx IOrdinaryArgumentsContext)
 	if p.HasError() {
 		goto errorExit
 	}
-	_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 99, p.GetParserRuleContext())
+	_alt = p.AdaptivePredict(p.BaseParser, p.GetTokenStream(), 99, p.GetParserRuleContext())
 	if p.HasError() {
 		goto errorExit
 	}
@@ -12786,7 +12792,7 @@ func (p *YaklangParser) OrdinaryArguments() (localctx IOrdinaryArgumentsContext)
 		if p.HasError() {
 			goto errorExit
 		}
-		_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 99, p.GetParserRuleContext())
+		_alt = p.AdaptivePredict(p.BaseParser, p.GetTokenStream(), 99, p.GetParserRuleContext())
 		if p.HasError() {
 			goto errorExit
 		}
@@ -12814,7 +12820,7 @@ func (p *YaklangParser) OrdinaryArguments() (localctx IOrdinaryArgumentsContext)
 	if p.HasError() {
 		goto errorExit
 	}
-	_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 101, p.GetParserRuleContext())
+	_alt = p.AdaptivePredict(p.BaseParser, p.GetTokenStream(), 101, p.GetParserRuleContext())
 	if p.HasError() {
 		goto errorExit
 	}
@@ -12831,7 +12837,7 @@ func (p *YaklangParser) OrdinaryArguments() (localctx IOrdinaryArgumentsContext)
 		if p.HasError() {
 			goto errorExit
 		}
-		_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 101, p.GetParserRuleContext())
+		_alt = p.AdaptivePredict(p.BaseParser, p.GetTokenStream(), 101, p.GetParserRuleContext())
 		if p.HasError() {
 			goto errorExit
 		}
@@ -13148,7 +13154,7 @@ func (p *YaklangParser) SliceCall() (localctx ISliceCallContext) {
 		goto errorExit
 	}
 
-	switch p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 109, p.GetParserRuleContext()) {
+	switch p.AdaptivePredict(p.BaseParser, p.GetTokenStream(), 109, p.GetParserRuleContext()) {
 	case 1:
 		p.EnterOuterAlt(localctx, 1)
 		{
@@ -13559,7 +13565,7 @@ func (p *YaklangParser) Literal() (localctx ILiteralContext) {
 		goto errorExit
 	}
 
-	switch p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 110, p.GetParserRuleContext()) {
+	switch p.AdaptivePredict(p.BaseParser, p.GetTokenStream(), 110, p.GetParserRuleContext()) {
 	case 1:
 		p.EnterOuterAlt(localctx, 1)
 		{
@@ -13910,7 +13916,7 @@ func (p *YaklangParser) StringLiteral() (localctx IStringLiteralContext) {
 		goto errorExit
 	}
 
-	switch p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 113, p.GetParserRuleContext()) {
+	switch p.AdaptivePredict(p.BaseParser, p.GetTokenStream(), 113, p.GetParserRuleContext()) {
 	case 1:
 		p.EnterOuterAlt(localctx, 1)
 		{
@@ -15110,7 +15116,7 @@ func (p *YaklangParser) TemplateSingleQuoteStringAtom() (localctx ITemplateSingl
 
 			p.SetState(1018)
 			p.GetErrorHandler().Sync(p)
-			_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 120, p.GetParserRuleContext())
+			_alt = p.AdaptivePredict(p.BaseParser, p.GetTokenStream(), 120, p.GetParserRuleContext())
 			if p.HasError() {
 				goto errorExit
 			}
@@ -15299,7 +15305,7 @@ func (p *YaklangParser) TemplateDoubleQuoteStringAtom() (localctx ITemplateDoubl
 
 			p.SetState(1029)
 			p.GetErrorHandler().Sync(p)
-			_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 122, p.GetParserRuleContext())
+			_alt = p.AdaptivePredict(p.BaseParser, p.GetTokenStream(), 122, p.GetParserRuleContext())
 			if p.HasError() {
 				goto errorExit
 			}
@@ -15488,7 +15494,7 @@ func (p *YaklangParser) TemplateBackTickStringAtom() (localctx ITemplateBackTick
 
 			p.SetState(1040)
 			p.GetErrorHandler().Sync(p)
-			_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 124, p.GetParserRuleContext())
+			_alt = p.AdaptivePredict(p.BaseParser, p.GetTokenStream(), 124, p.GetParserRuleContext())
 			if p.HasError() {
 				goto errorExit
 			}
@@ -15896,7 +15902,7 @@ func (p *YaklangParser) SliceLiteral() (localctx ISliceLiteralContext) {
 	if p.HasError() {
 		goto errorExit
 	}
-	_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 126, p.GetParserRuleContext())
+	_alt = p.AdaptivePredict(p.BaseParser, p.GetTokenStream(), 126, p.GetParserRuleContext())
 	if p.HasError() {
 		goto errorExit
 	}
@@ -15913,7 +15919,7 @@ func (p *YaklangParser) SliceLiteral() (localctx ISliceLiteralContext) {
 		if p.HasError() {
 			goto errorExit
 		}
-		_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 126, p.GetParserRuleContext())
+		_alt = p.AdaptivePredict(p.BaseParser, p.GetTokenStream(), 126, p.GetParserRuleContext())
 		if p.HasError() {
 			goto errorExit
 		}
@@ -16157,7 +16163,7 @@ func (p *YaklangParser) SliceTypedLiteral() (localctx ISliceTypedLiteralContext)
 	if p.HasError() {
 		goto errorExit
 	}
-	_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 129, p.GetParserRuleContext())
+	_alt = p.AdaptivePredict(p.BaseParser, p.GetTokenStream(), 129, p.GetParserRuleContext())
 	if p.HasError() {
 		goto errorExit
 	}
@@ -16174,7 +16180,7 @@ func (p *YaklangParser) SliceTypedLiteral() (localctx ISliceTypedLiteralContext)
 		if p.HasError() {
 			goto errorExit
 		}
-		_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 129, p.GetParserRuleContext())
+		_alt = p.AdaptivePredict(p.BaseParser, p.GetTokenStream(), 129, p.GetParserRuleContext())
 		if p.HasError() {
 			goto errorExit
 		}
@@ -16442,7 +16448,7 @@ func (p *YaklangParser) ExpressionList() (localctx IExpressionListContext) {
 	if p.HasError() {
 		goto errorExit
 	}
-	_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 135, p.GetParserRuleContext())
+	_alt = p.AdaptivePredict(p.BaseParser, p.GetTokenStream(), 135, p.GetParserRuleContext())
 	if p.HasError() {
 		goto errorExit
 	}
@@ -16507,7 +16513,7 @@ func (p *YaklangParser) ExpressionList() (localctx IExpressionListContext) {
 		if p.HasError() {
 			goto errorExit
 		}
-		_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 135, p.GetParserRuleContext())
+		_alt = p.AdaptivePredict(p.BaseParser, p.GetTokenStream(), 135, p.GetParserRuleContext())
 		if p.HasError() {
 			goto errorExit
 		}
@@ -16515,7 +16521,7 @@ func (p *YaklangParser) ExpressionList() (localctx IExpressionListContext) {
 	p.SetState(1119)
 	p.GetErrorHandler().Sync(p)
 
-	if p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 137, p.GetParserRuleContext()) == 1 {
+	if p.AdaptivePredict(p.BaseParser, p.GetTokenStream(), 137, p.GetParserRuleContext()) == 1 {
 		p.SetState(1115)
 		p.GetErrorHandler().Sync(p)
 		if p.HasError() {
@@ -16745,7 +16751,7 @@ func (p *YaklangParser) ExpressionListMultiline() (localctx IExpressionListMulti
 	if p.HasError() {
 		goto errorExit
 	}
-	_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 139, p.GetParserRuleContext())
+	_alt = p.AdaptivePredict(p.BaseParser, p.GetTokenStream(), 139, p.GetParserRuleContext())
 	if p.HasError() {
 		goto errorExit
 	}
@@ -16790,7 +16796,7 @@ func (p *YaklangParser) ExpressionListMultiline() (localctx IExpressionListMulti
 		if p.HasError() {
 			goto errorExit
 		}
-		_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 139, p.GetParserRuleContext())
+		_alt = p.AdaptivePredict(p.BaseParser, p.GetTokenStream(), 139, p.GetParserRuleContext())
 		if p.HasError() {
 			goto errorExit
 		}
@@ -17021,7 +17027,7 @@ func (p *YaklangParser) MapLiteral() (localctx IMapLiteralContext) {
 		if p.HasError() {
 			goto errorExit
 		}
-		_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 141, p.GetParserRuleContext())
+		_alt = p.AdaptivePredict(p.BaseParser, p.GetTokenStream(), 141, p.GetParserRuleContext())
 		if p.HasError() {
 			goto errorExit
 		}
@@ -17038,7 +17044,7 @@ func (p *YaklangParser) MapLiteral() (localctx IMapLiteralContext) {
 			if p.HasError() {
 				goto errorExit
 			}
-			_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 141, p.GetParserRuleContext())
+			_alt = p.AdaptivePredict(p.BaseParser, p.GetTokenStream(), 141, p.GetParserRuleContext())
 			if p.HasError() {
 				goto errorExit
 			}
@@ -17305,7 +17311,7 @@ func (p *YaklangParser) MapTypedLiteral() (localctx IMapTypedLiteralContext) {
 	if p.HasError() {
 		goto errorExit
 	}
-	_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 146, p.GetParserRuleContext())
+	_alt = p.AdaptivePredict(p.BaseParser, p.GetTokenStream(), 146, p.GetParserRuleContext())
 	if p.HasError() {
 		goto errorExit
 	}
@@ -17322,7 +17328,7 @@ func (p *YaklangParser) MapTypedLiteral() (localctx IMapTypedLiteralContext) {
 		if p.HasError() {
 			goto errorExit
 		}
-		_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 146, p.GetParserRuleContext())
+		_alt = p.AdaptivePredict(p.BaseParser, p.GetTokenStream(), 146, p.GetParserRuleContext())
 		if p.HasError() {
 			goto errorExit
 		}
@@ -17580,7 +17586,7 @@ func (p *YaklangParser) MapPairs() (localctx IMapPairsContext) {
 	if p.HasError() {
 		goto errorExit
 	}
-	_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 151, p.GetParserRuleContext())
+	_alt = p.AdaptivePredict(p.BaseParser, p.GetTokenStream(), 151, p.GetParserRuleContext())
 	if p.HasError() {
 		goto errorExit
 	}
@@ -17625,7 +17631,7 @@ func (p *YaklangParser) MapPairs() (localctx IMapPairsContext) {
 		if p.HasError() {
 			goto errorExit
 		}
-		_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 151, p.GetParserRuleContext())
+		_alt = p.AdaptivePredict(p.BaseParser, p.GetTokenStream(), 151, p.GetParserRuleContext())
 		if p.HasError() {
 			goto errorExit
 		}
@@ -17942,7 +17948,7 @@ func (p *YaklangParser) Ws() (localctx IWsContext) {
 
 		p.SetState(1207)
 		p.GetErrorHandler().Sync(p)
-		_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 153, p.GetParserRuleContext())
+		_alt = p.AdaptivePredict(p.BaseParser, p.GetTokenStream(), 153, p.GetParserRuleContext())
 		if p.HasError() {
 			goto errorExit
 		}
@@ -18102,7 +18108,7 @@ func (p *YaklangParser) Eos() (localctx IEosContext) {
 
 			p.SetState(1213)
 			p.GetErrorHandler().Sync(p)
-			_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 154, p.GetParserRuleContext())
+			_alt = p.AdaptivePredict(p.BaseParser, p.GetTokenStream(), 154, p.GetParserRuleContext())
 			if p.HasError() {
 				goto errorExit
 			}
@@ -18355,7 +18361,7 @@ func (p *YaklangParser) SelectStmt() (localctx ISelectStmtContext) {
 	if p.HasError() {
 		goto errorExit
 	}
-	_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 157, p.GetParserRuleContext())
+	_alt = p.AdaptivePredict(p.BaseParser, p.GetTokenStream(), 157, p.GetParserRuleContext())
 	if p.HasError() {
 		goto errorExit
 	}
@@ -18392,7 +18398,7 @@ func (p *YaklangParser) SelectStmt() (localctx ISelectStmtContext) {
 		if p.HasError() {
 			goto errorExit
 		}
-		_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 157, p.GetParserRuleContext())
+		_alt = p.AdaptivePredict(p.BaseParser, p.GetTokenStream(), 157, p.GetParserRuleContext())
 		if p.HasError() {
 			goto errorExit
 		}
@@ -18622,7 +18628,7 @@ func (p *YaklangParser) SelectClause() (localctx ISelectClauseContext) {
 	p.SetState(1252)
 	p.GetErrorHandler().Sync(p)
 
-	if p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 161, p.GetParserRuleContext()) == 1 {
+	if p.AdaptivePredict(p.BaseParser, p.GetTokenStream(), 161, p.GetParserRuleContext()) == 1 {
 		{
 			p.SetState(1251)
 			p.StatementList()
@@ -18754,7 +18760,7 @@ func (p *YaklangParser) SelectComm() (localctx ISelectCommContext) {
 		goto errorExit
 	}
 
-	switch p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 162, p.GetParserRuleContext()) {
+	switch p.AdaptivePredict(p.BaseParser, p.GetTokenStream(), 162, p.GetParserRuleContext()) {
 	case 1:
 		p.EnterOuterAlt(localctx, 1)
 		{

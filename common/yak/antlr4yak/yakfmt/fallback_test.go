@@ -71,7 +71,7 @@ func TestFormatLLCheckpointEquivalence(t *testing.T) {
 					p.RemoveErrorListeners()
 					p.SetErrorHandler(&checkpointStrategy{bailErrorStrategy: &bailErrorStrategy{antlr.NewDefaultErrorStrategy()}, inside: inside})
 					p.GetInterpreter().SetPredictionMode(antlr.PredictionModeSLL)
-					prefix, ok := trySLL(p)
+					prefix, ok, _ := trySLL(p)
 					if ok || prefix == nil {
 						t.Fatal("fixture did not enter checkpoint fallback")
 					}

@@ -19,10 +19,11 @@ const lineWidth = 100
 // Invalid source returns an empty result and the first syntax error. Literal and
 // comment contents are preserved, including CRLF inside strings and heredocs.
 func Format(source string) (result string, err error) {
+	var lexical *syntaxError
 	defer func() {
 		if r := recover(); r != nil {
 			if e, ok := r.(*syntaxError); ok {
-				result, err = "", e
+				result, err = "", firstError(e, lexical)
 			} else {
 				panic(r)
 			}
@@ -40,9 +41,12 @@ func Format(source string) (result string, err error) {
 	p.RemoveErrorListeners()
 	p.SetErrorHandler(&bailErrorStrategy{antlr.NewDefaultErrorStrategy()})
 	p.GetInterpreter().SetPredictionMode(antlr.PredictionModeSLL)
-	tree, ok := trySLL(p)
+	tree, ok, lexical := trySLL(p)
 	if !ok {
 		tree = retryLL(tree, stream, errors)
+	}
+	if lexical != nil {
+		return "", lexical
 	}
 	return FormatTree(source, tree, stream), nil
 }
@@ -61,6 +65,7 @@ func (b *bailErrorStrategy) Sync(antlr.Parser)                        {}
 type syntaxError struct {
 	line, column int
 	message      string
+	lexical      bool
 }
 
 func (e *syntaxError) Error() string {
@@ -69,30 +74,49 @@ func (e *syntaxError) Error() string {
 
 type errorListener struct{ *antlr.DefaultErrorListener }
 
-func (l *errorListener) SyntaxError(_ antlr.Recognizer, _ interface{}, line, column int, msg string, _ antlr.RecognitionException) {
-	panic(&syntaxError{line, column, msg})
+func (l *errorListener) SyntaxError(recognizer antlr.Recognizer, _ interface{}, line, column int, msg string, _ antlr.RecognitionException) {
+	_, lexical := recognizer.(antlr.Lexer)
+	panic(&syntaxError{line: line, column: column, message: msg, lexical: lexical})
 }
-func trySLL(p *parser.YaklangParser) (tree parser.IProgramContext, ok bool) {
+
+func firstError(err, lexical *syntaxError) *syntaxError {
+	if lexical != nil && (lexical.line < err.line || lexical.line == err.line && lexical.column < err.column) {
+		return lexical
+	}
+	return err
+}
+
+func trySLL(p *parser.YaklangParser) (tree parser.IProgramContext, ok bool, lexical *syntaxError) {
 	defer func() {
 		if r := recover(); r != nil {
-			if _, cancel := r.(*antlr.ParseCancellationException); cancel {
-				// Only completed top-level statements can be reused. Their
-				// boundaries are closed in this grammar; never reuse an
-				// incomplete function/block/expression after SLL failure.
-				for ctx := p.GetParserRuleContext(); ctx != nil; {
-					if root, isProgram := ctx.(*parser.ProgramContext); isProgram {
-						tree = root
-						break
-					}
-					ctx, _ = ctx.GetParent().(antlr.ParserRuleContext)
+			switch e := r.(type) {
+			case *antlr.ParseCancellationException:
+			case *syntaxError:
+				if !e.lexical {
+					panic(r)
 				}
-				ok = false
-			} else {
+				// Lookahead can encounter a later lexical error before an
+				// earlier syntax error in a closure. LL retries the existing
+				// buffered prefix; preserve the lexical error if it is first,
+				// or if the failed lexer reaches EOF and LL otherwise succeeds.
+				lexical = e
+			default:
 				panic(r)
 			}
+			// Only completed top-level statements can be reused. Their
+			// boundaries are closed in this grammar; never reuse an
+			// incomplete function/block/expression after SLL failure.
+			for ctx := p.GetParserRuleContext(); ctx != nil; {
+				if root, isProgram := ctx.(*parser.ProgramContext); isProgram {
+					tree = root
+					break
+				}
+				ctx, _ = ctx.GetParent().(antlr.ParserRuleContext)
+			}
+			ok = false
 		}
 	}()
-	return p.Program(), true
+	return p.Program(), true, nil
 }
 
 // Whole-program LL replay recomputes full-context predictions for every valid
