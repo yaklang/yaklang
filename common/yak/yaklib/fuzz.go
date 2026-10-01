@@ -711,6 +711,8 @@ func _protobufRecordsFromYAML(i interface{}) *ProtobufRecords {
 }
 
 var FuzzExports = map[string]interface{}{
+	"RenderHTTPTemplate": mutate.RenderHTTPTemplate,
+	"RenderHTTPFields":   mutate.RenderHTTPFields,
 	// Render exposes engine options without Strings' deduplication or fallback.
 	"Render":             mutate.FuzzTagExec,
 	"renderLimit":        mutate.Fuzz_WithResultLimit,

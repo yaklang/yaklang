@@ -34,7 +34,7 @@ __INPUT_CONSTRAINTS__ = `{
   }
 }`
 
-__DESC__ = "向指定目标发送一次 HTTP 请求并返回实际请求、响应和结构化结果；普通请求用 url 加 query/form 对象由工具编码，需保留参数顺序、重复键或特殊编码时用原样 packet，多路径请求用 batch_do_http_request。"
+__DESC__ = "向指定目标发送一次 HTTP 请求并返回实际请求、响应和结构化结果；普通请求用 url 加 query/form 对象由工具编码，需保留参数顺序、重复键或特殊编码时用原样 packet，多路径或多载荷请求用 batch_do_http_request；fuzztag=true 可直接渲染嵌套编码、随机值和变量。"
 __VERBOSE_NAME__ = "HTTP Request"
 __VERBOSE_NAME_ZH__ = "HTTP请求"
 __KEYWORDS__ = "http request,curl,web,network,packet,raw request,http response,url,post,get,https,proxy,redirect,header,body,api,http tool,web debug,traffic"
@@ -110,6 +110,13 @@ Content-Type: application/x-www-form-urlencoded
 name=a%20%26%20b
 <|TOOL_PARAM_packet_END_{NONCE}|>
 [[- end -]]
+FuzzTag 发包辅助：设置 `fuzztag=true`，直接在 `packet` 或 URL 模式的 `url`、`headers`、`body`、`query`/`form` 值中写标签，省去先调用 exec_fuzztag 再复制报文的步骤。默认 false 保留原样文本。`variables` 支持标量或数组，用 `{{params(name)}}` 取值；变量插入后不会作为标签再次执行。URL 模式先渲染再编码 query/form 一次，结构化值不要再套 urlescape/urlenc；精确 packet 模式自行处理编码。仅允许生成一份请求，多结果会在发包前报错并提示使用 batch_do_http_request。文件/插件标签未启用；未知标签、缺失变量、未闭合模板会报错。
+
+嵌套编码单请求：
+```json
+{"url":"https://target.example/query","query":{"token":"{{base64({{params(payload)}})}}"},"variables":{"payload":"a & b"},"fuzztag":true}
+```
+标签原样发送：不设置 fuzztag，或用 `{{=原文=}}` 保留模板中的局部文本。
 USAGE_BLOCK
 
 yakit.AutoInitYakit()
@@ -158,6 +165,10 @@ postParams = cli.String("post-params", cli.setHelp("legacy k=v&k2=v2 form string
 
 // Packet mode params
 packet = cli.String("packet", cli.setHelp("raw HTTP request packet for Packet mode; request target/query must already be encoded"), cli.setRequired(false))
+
+// Template rendering is opt-in for existing raw request callers.
+fuzztag = cli.Bool("fuzztag", cli.setDefault(false), cli.setHelp("render FuzzTag in packet or URL-mode fields before encoding; exactly one variant is required, use batch_do_http_request for multiple variants"))
+variables = cli.Json("variables", cli.setDefault("{}"), cli.setJsonSchema(`{"type":"object","additionalProperties":{"oneOf":[{"type":"string"},{"type":"number"},{"type":"boolean"},{"type":"array","items":{"oneOf":[{"type":"string"},{"type":"number"},{"type":"boolean"}]}}]}}`), cli.setHelp("named scalar/array values used by {{params(name)}}; inserted values remain literal"))
 
 // Common params
 httpsMode = cli.String("https", cli.setHelp("force HTTPS: yes/no/auto"), cli.setDefault("auto"))
@@ -303,8 +314,50 @@ if packet == "" && urlStr == "" {
     die("either 'url' (URL mode) or 'packet' (Packet mode) must be provided")
 }
 
+// Render before URL/form encoding. Related fields share one expansion so
+// synchronization labels work across the URL, query/form values and headers.
+requestCtx = context.Background()
+injectedCtx = getParam("CTX")
+if injectedCtx != nil && injectedCtx != "" { requestCtx = injectedCtx }
+if fuzztag {
+    if packet != "" {
+        rendered, renderErr = fuzz.RenderHTTPTemplate(packet, variables, 1, requestCtx)
+        if renderErr != nil {
+            RESULT["transport_error"] = "template_error: " + sprint(renderErr)
+            die(sprintf("FuzzTag render failed: %v. No request sent; use batch_do_http_request for multiple variants.", renderErr))
+        }
+        packet = rendered[0]
+    } else {
+        fields = [urlStr, method, headers, body, contentType, queryParams, postParams]
+        valueMaps = [legacyQueryValues, queryValues, legacyFormValues, formValues]
+        keys = []
+        for _, values := range valueMaps {
+            mapKeys = []
+            for key, value := range values {
+                mapKeys.Push(key)
+                fields.Push(sprint(value))
+            }
+            keys.Push(mapKeys)
+        }
+        rendered, renderErr = fuzz.RenderHTTPFields(fields, variables, 1, requestCtx)
+        if renderErr != nil {
+            RESULT["transport_error"] = "template_error: " + sprint(renderErr)
+            die(sprintf("FuzzTag render failed: %v. No request sent; use batch_do_http_request for multiple variants.", renderErr))
+        }
+        row = rendered[0]
+        urlStr, method, headers, body, contentType, queryParams, postParams = row[0], row[1], row[2], row[3], row[4], row[5], row[6]
+        offset = 7
+        for i, values := range valueMaps {
+            for _, key := range keys[i] {
+                values[key] = row[offset]
+                offset++
+            }
+        }
+    }
+}
+
 // --- build poc options ---
-opts = []
+opts = [poc.context(requestCtx)]
 redirectLogs = []
 
 // timeout

@@ -94,7 +94,7 @@ __INPUT_CONSTRAINTS__ = `{
   }
 }`
 
-__DESC__ = "按 paths 中逐行指定的路径或 URL 批量发送并汇总 HTTP 请求，用于多路径探测、接口批量验证和 IDOR 对比；URL 模式结合 base-url，原始报文模式将当前路径替换到 packet 的 {{PATH}}，并用 variables 替换命名变量后发送。"
+__DESC__ = "按 paths 中逐行指定的路径或 URL 批量发送并汇总 HTTP 请求，用于多路径探测、接口批量验证和 IDOR 对比；URL 模式结合 base-url，原始报文模式将当前路径替换到 packet 的 {{PATH}}，用原生 FuzzTag 展开嵌套编码、同步配对和 variables 载荷组合后并发发送，减少逐条调用。"
 __VERBOSE_NAME__ = "Batch HTTP Request"
 __VERBOSE_NAME_ZH__ = "批量HTTP请求"
 __KEYWORDS__ = "batch http,request multiple,concurrent,batch request,multi path,path scan,batch url,parallel request,mass request,http flood,path enumeration,directory scan,batch get,batch post,api endpoint validation,endpoint probing,api batch testing,request replay,template replay,unauthorized access check,authorization bypass verification,idor validation,horizontal privilege check,batch interface check,批量请求,并发请求,批量HTTP,多路径探测,路径枚举,目录扫描,接口批量验证,API批量测试,接口探测,端点探测,未授权访问验证,越权验证,水平越权验证,IDOR验证,批量验证接口,请求重放,模板请求,多接口测试"
@@ -224,6 +224,20 @@ X-Tenant: {{tenant}}
 [[- end -]]
 
 `RESULT.request_count` 是展开后请求数；结合 `response_received_count`、`transport_error_count`、`status_code_distribution` 和 `items` 看每条结果。404/500 也表示收到了响应；过滤参数只影响展示，不证明目标安全。先留正常基线；结果异常时核对实际请求包，调整认证、编码或变量后再验证，发现新入口先记入待办。选出有差异的单个端点后用 do_http_request 深测。
+FuzzTag 批量测试：默认启用 FuzzTag，支持原生标签的嵌套编码、枚举、随机值、`::row` 同步配对和 `repeat` 重复请求。`variables` 的标量/数组通过 `{{params(name)}}` 引用，旧 `{{name}}` 仍可用；变量值是字面数据，不会再次执行。URL 模式的路径、base-url、headers、body、query/form 值一起渲染，随后 query/form 编码一次；精确报文模式在每个已渲染路径上展开 packet，`{{PATH}}` 或 `{{params(PATH)}}` 插入当前路径，路径与 packet 标签形成笛卡尔积。packet 中的同步标签应写在同一份 packet 模板里。
+
+先小范围核对，再扩大组合：`max-requests` 限制展开后的总请求数（含重复项），不是原始路径行数；超限、未知标签、缺失变量、未闭合模板均在发包前报错，整批不发送，不能靠静默截断完成实验。文件/插件标签未启用。`disable-fuzztag=true` 保留全部字段原文，也不替换 `{{PATH}}`。并发数控制实际网络并发；结果仍按 request idx/path 对应到实际请求和响应。
+
+两个 ID × 两种载荷，一次调用发四份请求：
+```json
+{"base-url":"https://target.example","paths":"/users/{{int(1-2)}}","method":"POST","form":{"input":"{{params(payload)}}"},"variables":{"payload":["normal","a & b"]},"max-requests":4,"concurrent":2}
+```
+
+同步配对，避免无意义组合：
+```json
+{"base-url":"https://target.example","paths":"/users/{{int::row(1-2)}}","query":{"role":"{{list::row(reader|admin)}}"},"max-requests":2}
+```
+精确报文可直接写 `{{urlescape({{base64({{params(payload)}})}})}}`，无需中间生成文件；重复稳定性测试可在 packet 中用 `{{repeat(3)}}`（保留重复项）。
 USAGE_BLOCK
 
 yakit.AutoInitYakit()
@@ -269,7 +283,8 @@ curlHeaders = cli.StringSlice("H", cli.setHelp("curl-style headers, can be used 
 // Packet mode params
 packet = cli.String("packet", cli.setHelp("raw HTTP request template; {{PATH}} inserts each rendered path, {{name}} reads variables, and {{int(...)}}/{{list(...)}} generate packet variants"), cli.setRequired(false))
 baseHost = cli.String("base-host", cli.setHelp("host header value for packet mode"), cli.setRequired(false))
-variables = cli.Json("variables", cli.setHelp("named scalar values for {{name}} in paths or packet; values are inserted literally, so encode request-target values first"), cli.setJsonSchema(`{"type":"object","additionalProperties":{"type":"string"}}`), cli.setDefault("{}"))
+variables = cli.Json("variables", cli.setHelp("named scalar/array values for {{params(name)}} or legacy {{name}}; values are inserted literally"), cli.setJsonSchema(`{"type":"object","additionalProperties":{"oneOf":[{"type":"string"},{"type":"number"},{"type":"boolean"},{"type":"array","items":{"oneOf":[{"type":"string"},{"type":"number"},{"type":"boolean"}]}}]}}`), cli.setDefault("{}"))
+fuzztag = !cli.Bool("disable-fuzztag", cli.setDefault(false), cli.setHelp("send literal paths, packet and URL-mode fields without any FuzzTag rendering or {{PATH}} substitution"))
 maxRequests = cli.Int("max-requests", cli.setHelp("maximum requests after path and packet template expansion; default 100, hard limit 500"), cli.setDefault(100), cli.setJsonSchema(`{"type":"integer","minimum":1,"maximum":500}`))
 
 // Common params
@@ -469,87 +484,56 @@ if maxRequests < 1 || maxRequests > 500 {
     die("max-requests must be between 1 and 500")
 }
 
-// Scan the original template only. Inserted paths and variables are data, not
-// new templates; ordinary JSON closing braces must also remain untouched.
-renderTemplateVariants = fn(templateText, path, allowPath) {
-    rendered = []string{""}
-    offset = 0
-    for _, location := range re.FindAllIndex(templateText, `\{\{[^{}]*\}\}`) {
-        literal = templateText[offset:location[0]]
-        if str.Contains(literal, "{{") {
-            die("malformed {{...}} template tag")
-        }
-        tag = templateText[location[0]:location[1]]
-        offset = location[1]
-        name = tag[2:len(tag)-2]
-        values = []string{}
-        if allowPath && name == "PATH" {
-            values = []string{path}
-        } elif str.MatchAllOfRegexp(name, `^[A-Za-z_][A-Za-z0-9_]*$`) {
-            if !(name in variables) {
-                die(sprintf("unknown template variable %s", tag))
-            }
-            values = []string{variables[name]}
-        } elif str.MatchAllOfRegexp(name, `^params\([A-Za-z_][A-Za-z0-9_]*\)$`) {
-            key = name[7:len(name)-1]
-            if !(key in variables) {
-                die(sprintf("unknown template variable %s", tag))
-            }
-            values = []string{variables[key]}
-        } elif str.MatchAllOfRegexp(name, `^int\([0-9]{1,6}-[0-9]{1,6}\)$`) {
-            bounds = str.Split(name[4:len(name)-1], "-")
-            first = parseInt(bounds[0])
-            last = parseInt(bounds[1])
-            if last < first || last-first+1 > maxRequests {
-                die(sprintf("template range %s exceeds max-requests", tag))
-            }
-            values = fuzz.Strings(tag)
-        } elif str.MatchAllOfRegexp(name, `^list\([^{}]*\)$`) {
-            alternatives = str.Split(name[5:len(name)-1], "|")
-            if len(alternatives) > maxRequests {
-                die("template expansion exceeds max-requests")
-            }
-            values = fuzz.Strings(tag)
-        } else {
-            die(sprintf("unsupported template tag %s; use {{PATH}}, {{name}}, {{int(1-3)}} or {{list(a|b)}}", tag))
-        }
-        if len(values) == 0 || len(rendered) * len(values) > maxRequests {
-            die("template expansion exceeds max-requests")
-        }
-        next = []string{}
-        for _, prefix := range rendered {
-            for _, value := range values {
-                next.Push(prefix + literal + value)
-            }
-        }
-        rendered = next
-    }
-    tail = templateText[offset:]
-    if str.Contains(tail, "{{") {
-        die("malformed {{...}} template tag")
-    }
-    for i, prefix := range rendered {
-        rendered[i] = prefix + tail
-    }
-    return rendered
+// Use the native engine with strict preflight checks and a bounded expansion.
+requestCtx = context.Background()
+injectedCtx = getParam("CTX")
+if injectedCtx != nil && injectedCtx != "" { requestCtx = injectedCtx }
+renderTemplateVariants = fn(templateText, path, allowPath, limit) {
+    if !fuzztag { return [templateText] }
+    params = {}
+    for key, value := range variables { params[key] = value }
+    if allowPath { params["PATH"] = path }
+    rows, renderErr = fuzz.RenderHTTPTemplate(templateText, params, limit, requestCtx)
+    if renderErr != nil { die(sprintf("FuzzTag render failed before sending: %v", renderErr)) }
+    return rows
 }
 
-// Every rendered path and packet variant is one request. A packet without a
-// Fuzztag still produces exactly one request per path, preserving old calls.
-requestItems = make([]map[string]any)
-for _, p := range paths {
-    for _, expandedPath := range renderTemplateVariants(p, "", false) {
-        if packet != "" {
-            for _, renderedPacket := range renderTemplateVariants(packet, expandedPath, true) {
-                requestItems = append(requestItems, {"path": expandedPath, "packet": renderedPacket})
-            }
-        } else {
-            requestItems = append(requestItems, {"path": expandedPath, "packet": ""})
+// Render related URL fields together. The URL builder encodes structured values
+// afterwards; generated '&', quotes or tag-looking variable data stay intact.
+renderURLVariants = fn(path, limit) {
+    fields = [path, baseUrl, method, headers, body, contentType, queryParams]
+    valueMaps = [legacyQueryValues, queryValues, formValues]
+    keys = []
+    for _, values := range valueMaps {
+        mapKeys = []
+        for key, value := range values {
+            mapKeys.Push(key)
+            fields.Push(sprint(value))
         }
-        if len(requestItems) > maxRequests {
-            die("total rendered requests exceed max-requests")
-        }
+        keys.Push(mapKeys)
     }
+    rows = [fields]
+    if fuzztag {
+        rows, renderErr = fuzz.RenderHTTPFields(fields, variables, limit, requestCtx)
+        if renderErr != nil { die(sprintf("FuzzTag render failed before sending: %v", renderErr)) }
+    }
+    variants = []
+    for _, row := range rows {
+        maps = []
+        offset = 7
+        for _, mapKeys := range keys {
+            values = {}
+            for _, key := range mapKeys {
+                values[key] = row[offset]
+                offset++
+            }
+            maps.Push(values)
+        }
+        variants.Push({"path":row[0], "base":row[1], "method":row[2], "headers":row[3],
+            "body":row[4], "content_type":row[5], "query_params":row[6],
+            "legacy_query":maps[0], "query":maps[1], "form":maps[2], "packet":""})
+    }
+    return variants
 }
 
 // --- merge curl-style headers with headers ---
@@ -586,6 +570,25 @@ if len(curlHeaders) > 0 {
 }
 
 yakit.Info("=== Batch HTTP Request Tool ===")
+// Complete every expansion before any worker sends. The limit covers the
+// aggregate path × packet/field combinations, including duplicate payloads.
+requestItems = make([]map[string]any)
+for _, p := range paths {
+    remaining = maxRequests - len(requestItems)
+    if remaining <= 0 { die("total rendered requests exceed max-requests") }
+    if packet != "" {
+        for _, expandedPath := range renderTemplateVariants(p, "", false, remaining) {
+            remaining = maxRequests - len(requestItems)
+            if remaining <= 0 { die("total rendered requests exceed max-requests") }
+            for _, renderedPacket := range renderTemplateVariants(packet, expandedPath, true, remaining) {
+                requestItems.Push({"path":expandedPath, "packet":renderedPacket})
+            }
+        }
+    } else {
+        for _, variant := range renderURLVariants(p, remaining) { requestItems.Push(variant) }
+    }
+}
+
 yakit.Info("Total paths to test: %d", len(requestItems))
 yakit.Info("Concurrency: %d, Delay: %.2fs, Timeout: %ds", concurrent, delaySeconds, timeout)
 
@@ -660,7 +663,7 @@ resolveHttps = fn(isAutoDetected) {
 
 // --- build poc options ---
 buildOpts = fn() {
-    opts = []
+    opts = [poc.context(requestCtx)]
     if timeout > 0 {
         opts.Push(poc.timeout(float64(timeout)))
     }
@@ -676,21 +679,25 @@ buildOpts = fn() {
 }
 
 // --- build request from URL mode ---
-buildRequestFromUrlMode = fn(path, base) {
+buildRequestFromUrlMode = fn(item) {
+    requestPath, requestBase = item["path"], item["base"]
+    requestMethod, requestHeaders, requestBody = item["method"], item["headers"], item["body"]
+    requestContentType, requestQueryParams = item["content_type"], item["query_params"]
+    requestLegacyQueryValues, requestQueryValues, requestFormValues = item["legacy_query"], item["query"], item["form"]
     rawPacket = undefined
     isHttps = false
 
-    // Check if path is a full URL
-    if str.HasPrefix(str.ToLower(path), "http://") || str.HasPrefix(str.ToLower(path), "https://") {
-        autoHttps, parsedPacket, err := poc.ParseUrlToHTTPRequestRaw(method, path)
+    // Check if the rendered path is a full URL
+    if str.HasPrefix(str.ToLower(requestPath), "http://") || str.HasPrefix(str.ToLower(requestPath), "https://") {
+        autoHttps, parsedPacket, err := poc.ParseUrlToHTTPRequestRaw(requestMethod, requestPath)
         if err != nil {
             return false, nil, err
         }
         rawPacket = parsedPacket
         isHttps = resolveHttps(autoHttps)
     } else {
-        // Build full URL from base + path
-        fullUrl = base
+        // Build the full URL from rendered base and path
+        fullUrl = requestBase
         if !str.HasPrefix(str.ToLower(fullUrl), "http://") && !str.HasPrefix(str.ToLower(fullUrl), "https://") {
             fullUrl = "https://" + fullUrl
         }
@@ -701,13 +708,13 @@ buildRequestFromUrlMode = fn(path, base) {
         }
 
         // Add leading slash to path if needed
-        if !str.HasPrefix(path, "/") {
-            path = "/" + path
+        if !str.HasPrefix(requestPath, "/") {
+            requestPath = "/" + requestPath
         }
 
-        fullUrl = fullUrl + path
+        fullUrl = fullUrl + requestPath
 
-        autoHttps, parsedPacket, err := poc.ParseUrlToHTTPRequestRaw(method, fullUrl)
+        autoHttps, parsedPacket, err := poc.ParseUrlToHTTPRequestRaw(requestMethod, fullUrl)
         if err != nil {
             return false, nil, err
         }
@@ -716,13 +723,13 @@ buildRequestFromUrlMode = fn(path, base) {
     }
 
     // Apply custom Content-Type
-    if contentType != "" {
-        rawPacket = poc.ReplaceHTTPPacketHeader(rawPacket, "Content-Type", contentType)
+    if requestContentType != "" {
+        rawPacket = poc.ReplaceHTTPPacketHeader(rawPacket, "Content-Type", requestContentType)
     }
 
-    // Apply custom headers
-    if headers != "" {
-        for _, line := range str.SplitAndTrim(headers, "\n") {
+    // Apply rendered headers
+    if requestHeaders != "" {
+        for _, line := range str.SplitAndTrim(requestHeaders, "\n") {
             line = str.TrimSpace(line)
             if line == "" {
                 continue
@@ -740,8 +747,8 @@ buildRequestFromUrlMode = fn(path, base) {
     }
 
     // Apply query params
-    if queryParams != "" {
-        for _, pair := range str.SplitAndTrim(queryParams, "&") {
+    if requestQueryParams != "" {
+        for _, pair := range str.SplitAndTrim(requestQueryParams, "&") {
             parts = str.SplitN(pair, "=", 2)
             if len(parts) == 2 {
                 rawPacket = poc.ReplaceHTTPPacketQueryParam(rawPacket, parts[0], parts[1])
@@ -750,25 +757,25 @@ buildRequestFromUrlMode = fn(path, base) {
             }
         }
     }
-    for key, value := range legacyQueryValues {
+    for key, value := range requestLegacyQueryValues {
         rawPacket = poc.ReplaceHTTPPacketQueryParam(rawPacket, sprint(key), sprint(value))
     }
-    for key, value := range queryValues {
+    for key, value := range requestQueryValues {
         rawPacket = poc.ReplaceHTTPPacketQueryParam(rawPacket, sprint(key), sprint(value))
     }
 
     // Structured form values stay separated until the lowhttp patcher URL-encodes
     // each key/value exactly once. A raw body wins when both were supplied.
-    if body == "" && len(formValues) > 0 {
+    if requestBody == "" && len(requestFormValues) > 0 {
         rawPacket = poc.ReplaceHTTPPacketHeader(rawPacket, "Content-Type", "application/x-www-form-urlencoded")
-        for key, value := range formValues {
+        for key, value := range requestFormValues {
             rawPacket = poc.ReplaceHTTPPacketPostParam(rawPacket, sprint(key), sprint(value))
         }
     }
 
-    // Apply body
-    if body != "" {
-        rawPacket = poc.ReplaceHTTPPacketBody(rawPacket, []byte(body))
+    // Apply rendered body
+    if requestBody != "" {
+        rawPacket = poc.ReplaceHTTPPacketBody(rawPacket, []byte(requestBody))
     }
 
     return isHttps, rawPacket, nil
@@ -808,7 +815,9 @@ printRequestPacket = fn(idx, path, requestPacket) {
 }
 
 // --- execute single request ---
-executeRequest = fn(idx, path, base, renderedPacket) {
+executeRequest = fn(idx, item) {
+    path = item["path"]
+    renderedPacket = item["packet"]
     opts = buildOpts()
 
     isHttps = false
@@ -818,7 +827,7 @@ executeRequest = fn(idx, path, base, renderedPacket) {
     if packet != "" {
         isHttps, rawPacket, err = buildRequestFromPacketMode(renderedPacket)
     } else {
-        isHttps, rawPacket, err = buildRequestFromUrlMode(path, base)
+        isHttps, rawPacket, err = buildRequestFromUrlMode(item)
     }
 
     if err != nil {
@@ -887,7 +896,7 @@ if concurrent > 1 {
             defer swg.Done()
 
             path = requestItem["path"]
-            result = executeRequest(idx+1, path, baseUrl, requestItem["packet"])
+            result = executeRequest(idx+1, requestItem)
 
             resultsLock.Lock()
             results = append(results, result)
@@ -915,7 +924,7 @@ if concurrent > 1 {
     yakit.Info("Starting sequential batch requests...")
     for i, item := range requestItems {
         p = item["path"]
-        result = executeRequest(i+1, p, baseUrl, item["packet"])
+        result = executeRequest(i+1, item)
 
         results = append(results, result)
         if result["response_received"] == true {
