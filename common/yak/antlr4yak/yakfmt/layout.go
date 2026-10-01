@@ -29,6 +29,7 @@ const (
 	groupCandidate
 	parenBefore
 	spacedColon
+	skipToken
 )
 
 type layout struct {
@@ -327,6 +328,12 @@ func (f *printer) annotate(tree antlr.ParserRuleContext) {
 				}
 			}
 		case parser.YaklangParserRULE_expressionList, parser.YaklangParserRULE_leftExpressionList, parser.YaklangParserRULE_ordinaryArguments, parser.YaklangParserRULE_expressionListMultiline:
+			// An optional statement-level trailing comma would absorb the
+			// next statement after its semicolon becomes a newline. Delimited
+			// argument/collection lists keep their own trailing commas.
+			if c.GetRuleIndex() == parser.YaklangParserRULE_expressionList && f.tokens[b].GetTokenType() == parser.YaklangLexerComma {
+				f.marks[b].flags |= skipToken
+			}
 			first := true
 			for _, child := range c.GetChildren() {
 				if r, ok := child.(antlr.ParserRuleContext); ok && (r.GetRuleIndex() == parser.YaklangParserRULE_expression || r.GetRuleIndex() == parser.YaklangParserRULE_leftExpression) {

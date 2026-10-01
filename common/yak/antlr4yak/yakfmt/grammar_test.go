@@ -209,7 +209,13 @@ func FuzzFormat(f *testing.F) {
 	for _, s := range grammarSamples {
 		f.Add(s)
 	}
-	for _, s := range []string{"", "dump(123)))", "@", "select\n{}", "a=", "x= & ^y", "x=[" + strings.Repeat("1,", 40) + "2]", "x=1" + strings.Repeat("+2", 100)} {
+	for _, s := range []string{
+		"", "dump(123)))", "@", "select\n{}", "a=", "x= & ^y",
+		"x=[" + strings.Repeat("1,", 40) + "2]", "x=1" + strings.Repeat("+2", 100),
+		"a\n,b=1,2", "a/* before comma */,b=1,2", "A=0,;0#0",
+		"switch{}", "switch true{}", "a=<<<'标签'\r\nraw\r\n标签\n",
+		`a=f"${func(){return {"key":[1,2]}}()}"`,
+	} {
 		f.Add(s)
 	}
 	f.Fuzz(func(t *testing.T, source string) {

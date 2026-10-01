@@ -13,25 +13,49 @@ type YaklangLexerBase struct {
 	_heredocIdentifier string
 	_heredocCRLF       string
 	_templateDepth     uint64
+	_templateBraces    []uint64
 	waitForCloseToken  antlr.Token
 }
 
 var templateDepthMap = new(sync.Map)
 
+func (l *YaklangLexerBase) clearInputState() {
+	l._heredocIdentifier, l._heredocCRLF = "", ""
+	l._templateDepth = 0
+	l._templateBraces = l._templateBraces[:0]
+	l.waitForCloseToken = nil
+}
+
+func (l *YaklangLexerBase) Reset() {
+	l.BaseLexer.Reset()
+	l.clearInputState()
+}
+
+func (l *YaklangLexerBase) SetInputStream(input antlr.CharStream) {
+	l.BaseLexer.SetInputStream(input)
+	l.clearInputState()
+}
+
 func (l *YaklangLexer) DecreaseTemplateDepth() {
 	l._templateDepth--
+	l._templateBraces = l._templateBraces[:len(l._templateBraces)-1]
 }
 
 func (l *YaklangLexer) IncreaseTemplateDepth() {
 	l._templateDepth++
+	l._templateBraces = append(l._templateBraces, 0)
 }
 
 func (l *YaklangLexer) IsInTemplateString() bool {
-	return l._templateDepth > 0
+	// A brace inside a map or closure belongs to that expression. Only a
+	// brace at the current template's base depth closes its interpolation.
+	return l._templateDepth > 0 && l._templateBraces[len(l._templateBraces)-1] == 0
 }
 
 func (l *YaklangLexer) recordHereDocLabel() {
-	l._heredocIdentifier = l.GetText()
+	// The action runs at the token end, after both optional quotes. Capture
+	// the complete label regardless of the shared DFA's preceding inputs.
+	l._heredocIdentifier = strings.Trim(l.GetText(), "'")
 }
 
 func (l *YaklangLexer) recordHereDocLF() {
@@ -70,6 +94,15 @@ func (l *YaklangLexerBase) NextToken() antlr.Token {
 	}
 
 	next := l.BaseLexer.NextToken()
+	if l._templateDepth > 0 {
+		depth := &l._templateBraces[len(l._templateBraces)-1]
+		switch next.GetTokenType() {
+		case YaklangLexerLBrace:
+			*depth++
+		case YaklangLexerRBrace:
+			*depth--
+		}
+	}
 
 	if next.GetTokenType() == YaklangLexerRBrace || next.GetTokenType() == -1 {
 		semit := l.GetTokenFactory().Create(

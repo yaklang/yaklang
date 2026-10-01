@@ -211,7 +211,9 @@ mode TEMPLATE_BACKTICK_MODE;
 
 
 mode HereDocIdentifier;
-HereDocIdentifierName: (NameString{this.recordHereDocLabel()}) | ('\'' (NameString{this.recordHereDocLabel()}) '\'');
+// Capture at the token end; an action before the closing quote caches a
+// position dependent offset when labels of different lengths share lexer DFA.
+HereDocIdentifierName: (NameString | '\'' NameString '\'') {this.recordHereDocLabel()};
 HereDocIdentifierBreak: '\r'?'\n'{this.recordHereDocLF()} {this.hereDocModeDistribute()};
 
 mode CRLFHereDoc;

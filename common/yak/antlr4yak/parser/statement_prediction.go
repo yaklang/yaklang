@@ -49,7 +49,23 @@ func (p *YaklangParser) suffixStatementPrefix(input antlr.TokenStream) int {
 				YaklangParserBitAndEq, YaklangParserBitOrEq, YaklangParserLtLtEq,
 				YaklangParserGtGtEq, YaklangParserBitAndNotEq:
 				p.prefixAlternative = 3
-			case YaklangParserSemiColon, YaklangParserLF, YaklangParserCOMMENT, YaklangParserLINE_COMMENT, antlr.TokenEOF:
+			case YaklangParserLF, YaklangParserCOMMENT, YaklangParserLINE_COMMENT:
+				// leftExpressionList allows ws before a comma. Completing the
+				// first expression here would make checkpoint recovery discard
+				// the beginning of a valid multiline assignment: a\n,b=1,2.
+				for {
+					scanner.index++
+					switch scanner.next() {
+					case YaklangParserLF, YaklangParserCOMMENT, YaklangParserLINE_COMMENT:
+						continue
+					case YaklangParserComma, antlr.TokenInvalidType:
+						return 0
+					default:
+						p.prefixAlternative = 4
+						return 4
+					}
+				}
+			case YaklangParserSemiColon, antlr.TokenEOF:
 				p.prefixAlternative = 4
 			}
 			return p.prefixAlternative
