@@ -240,7 +240,6 @@ func TestJavaBasic_Variable_Switch(t *testing.T) {
 			println(44);
 		}
 		println(a); // 4
-}
 `, []string{"22", "44", "44"}, t)
 	})
 	t.Run("simple switch, has default", func(t *testing.T) {

@@ -68,7 +68,6 @@ class test{
 	public void XX(){
 	}
 }
-}
 `
 	t.Run("test typename field", func(t *testing.T) {
 		ssatest.CheckSyntaxFlow(t, code, `.alias<getObject><typeName> as $output`,

@@ -88,3 +88,11 @@ jobs:
 
       - name: Run G4 syntax corpus tests
         run: go test -count=1 -timeout 20m -run '^TestAllSyntax.*_G4$' ${{ matrix.package }}
+
+      - name: Java prediction and frontend race regressions
+        if: matrix.package == './common/yak/java/tests'
+        run: go test -race -count=1 -timeout 8m -run '^Test(Prediction|FrontendPrediction)' ./common/yak/java/parser ./common/yak/java/java2ssa
+
+      - name: Java grammar and prediction differential fuzz
+        if: matrix.package == './common/yak/java/tests'
+        run: go test -run '^$' -fuzz '^FuzzPrediction$' -fuzztime=30s -parallel=2 -timeout=3m ./common/yak/java/parser
