@@ -100,3 +100,11 @@ jobs:
       - name: Java grammar and prediction differential fuzz
         if: matrix.package == './common/yak/java/tests'
         run: go test -run '^$' -fuzz '^FuzzPrediction$' -fuzztime=30s -parallel=2 -timeout=3m ./common/yak/java/parser
+
+      - name: Python prediction and frontend race regressions
+        if: matrix.package == './common/yak/python/test'
+        run: go test -race -count=1 -timeout 8m -run '^Test(Prediction|FrontendPrediction)' ./common/yak/python/parser ./common/yak/python/python2ssa
+
+      - name: Python grammar and prediction differential fuzz
+        if: matrix.package == './common/yak/python/test'
+        run: go test -run '^$' -fuzz '^FuzzPrediction$' -fuzztime=30s -parallel=2 -timeout=3m ./common/yak/python/parser

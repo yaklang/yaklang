@@ -37,6 +37,12 @@ options {
     superClass = PythonParserBase;
 }
 
+// Dispatch only unambiguous SLL prefixes; LL recovery retains the full ATN.
+@parser::adaptivePredict {}
+@parser::structmembers {
+    disableFastPrediction bool
+}
+
 root
     : single_input EOF
     | file_input EOF

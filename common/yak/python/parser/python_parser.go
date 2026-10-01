@@ -16,6 +16,9 @@ var _ = sync.Once{}
 
 type PythonParser struct {
 	PythonParserBase
+	// Grammar author supplied members of the instance struct
+
+	disableFastPrediction bool
 }
 
 var PythonParserParserStaticData struct {
@@ -932,7 +935,7 @@ func (p *PythonParser) Root() (localctx IRootContext) {
 		goto errorExit
 	}
 
-	switch p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 0, p.GetParserRuleContext()) {
+	switch p.AdaptivePredict(p.BaseParser, p.GetTokenStream(), 0, p.GetParserRuleContext()) {
 	case 1:
 		p.EnterOuterAlt(localctx, 1)
 		{
@@ -1120,7 +1123,7 @@ func (p *PythonParser) Single_input() (localctx ISingle_inputContext) {
 		goto errorExit
 	}
 
-	switch p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 1, p.GetParserRuleContext()) {
+	switch p.AdaptivePredict(p.BaseParser, p.GetTokenStream(), 1, p.GetParserRuleContext()) {
 	case 1:
 		p.EnterOuterAlt(localctx, 1)
 		{
@@ -1311,7 +1314,7 @@ func (p *PythonParser) File_input() (localctx IFile_inputContext) {
 				goto errorExit
 			}
 
-			switch p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 2, p.GetParserRuleContext()) {
+			switch p.AdaptivePredict(p.BaseParser, p.GetTokenStream(), 2, p.GetParserRuleContext()) {
 			case 1:
 				{
 					p.SetState(143)
@@ -1339,7 +1342,7 @@ func (p *PythonParser) File_input() (localctx IFile_inputContext) {
 
 		p.SetState(147)
 		p.GetErrorHandler().Sync(p)
-		_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 3, p.GetParserRuleContext())
+		_alt = p.AdaptivePredict(p.BaseParser, p.GetTokenStream(), 3, p.GetParserRuleContext())
 		if p.HasError() {
 			goto errorExit
 		}
@@ -1608,7 +1611,7 @@ func (p *PythonParser) Stmt() (localctx IStmtContext) {
 		goto errorExit
 	}
 
-	switch p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 5, p.GetParserRuleContext()) {
+	switch p.AdaptivePredict(p.BaseParser, p.GetTokenStream(), 5, p.GetParserRuleContext()) {
 	case 1:
 		p.EnterOuterAlt(localctx, 1)
 		{
@@ -2476,7 +2479,7 @@ func (p *PythonParser) Compound_stmt() (localctx ICompound_stmtContext) {
 		goto errorExit
 	}
 
-	switch p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 23, p.GetParserRuleContext()) {
+	switch p.AdaptivePredict(p.BaseParser, p.GetTokenStream(), 23, p.GetParserRuleContext()) {
 	case 1:
 		localctx = NewIf_stmtContext(p, localctx)
 		p.EnterOuterAlt(localctx, 1)
@@ -2512,7 +2515,7 @@ func (p *PythonParser) Compound_stmt() (localctx ICompound_stmtContext) {
 		if p.HasError() {
 			goto errorExit
 		}
-		_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 6, p.GetParserRuleContext())
+		_alt = p.AdaptivePredict(p.BaseParser, p.GetTokenStream(), 6, p.GetParserRuleContext())
 		if p.HasError() {
 			goto errorExit
 		}
@@ -2529,7 +2532,7 @@ func (p *PythonParser) Compound_stmt() (localctx ICompound_stmtContext) {
 			if p.HasError() {
 				goto errorExit
 			}
-			_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 6, p.GetParserRuleContext())
+			_alt = p.AdaptivePredict(p.BaseParser, p.GetTokenStream(), 6, p.GetParserRuleContext())
 			if p.HasError() {
 				goto errorExit
 			}
@@ -2537,7 +2540,7 @@ func (p *PythonParser) Compound_stmt() (localctx ICompound_stmtContext) {
 		p.SetState(171)
 		p.GetErrorHandler().Sync(p)
 
-		if p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 7, p.GetParserRuleContext()) == 1 {
+		if p.AdaptivePredict(p.BaseParser, p.GetTokenStream(), 7, p.GetParserRuleContext()) == 1 {
 			{
 				p.SetState(170)
 				p.Else_clause()
@@ -2577,7 +2580,7 @@ func (p *PythonParser) Compound_stmt() (localctx ICompound_stmtContext) {
 		p.SetState(178)
 		p.GetErrorHandler().Sync(p)
 
-		if p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 8, p.GetParserRuleContext()) == 1 {
+		if p.AdaptivePredict(p.BaseParser, p.GetTokenStream(), 8, p.GetParserRuleContext()) == 1 {
 			{
 				p.SetState(177)
 				p.Else_clause()
@@ -2647,7 +2650,7 @@ func (p *PythonParser) Compound_stmt() (localctx ICompound_stmtContext) {
 		p.SetState(190)
 		p.GetErrorHandler().Sync(p)
 
-		if p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 10, p.GetParserRuleContext()) == 1 {
+		if p.AdaptivePredict(p.BaseParser, p.GetTokenStream(), 10, p.GetParserRuleContext()) == 1 {
 			{
 				p.SetState(189)
 				p.Else_clause()
@@ -2709,7 +2712,7 @@ func (p *PythonParser) Compound_stmt() (localctx ICompound_stmtContext) {
 
 				p.SetState(198)
 				p.GetErrorHandler().Sync(p)
-				_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 11, p.GetParserRuleContext())
+				_alt = p.AdaptivePredict(p.BaseParser, p.GetTokenStream(), 11, p.GetParserRuleContext())
 				if p.HasError() {
 					goto errorExit
 				}
@@ -2717,7 +2720,7 @@ func (p *PythonParser) Compound_stmt() (localctx ICompound_stmtContext) {
 			p.SetState(201)
 			p.GetErrorHandler().Sync(p)
 
-			if p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 12, p.GetParserRuleContext()) == 1 {
+			if p.AdaptivePredict(p.BaseParser, p.GetTokenStream(), 12, p.GetParserRuleContext()) == 1 {
 				{
 					p.SetState(200)
 					p.Else_clause()
@@ -2729,7 +2732,7 @@ func (p *PythonParser) Compound_stmt() (localctx ICompound_stmtContext) {
 			p.SetState(204)
 			p.GetErrorHandler().Sync(p)
 
-			if p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 13, p.GetParserRuleContext()) == 1 {
+			if p.AdaptivePredict(p.BaseParser, p.GetTokenStream(), 13, p.GetParserRuleContext()) == 1 {
 				{
 					p.SetState(203)
 					p.Finally_clause()
@@ -2785,7 +2788,7 @@ func (p *PythonParser) Compound_stmt() (localctx ICompound_stmtContext) {
 			goto errorExit
 		}
 
-		switch p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 19, p.GetParserRuleContext()) {
+		switch p.AdaptivePredict(p.BaseParser, p.GetTokenStream(), 19, p.GetParserRuleContext()) {
 		case 1:
 			{
 				p.SetState(213)
@@ -2838,7 +2841,7 @@ func (p *PythonParser) Compound_stmt() (localctx ICompound_stmtContext) {
 			if p.HasError() {
 				goto errorExit
 			}
-			_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 17, p.GetParserRuleContext())
+			_alt = p.AdaptivePredict(p.BaseParser, p.GetTokenStream(), 17, p.GetParserRuleContext())
 			if p.HasError() {
 				goto errorExit
 			}
@@ -2863,7 +2866,7 @@ func (p *PythonParser) Compound_stmt() (localctx ICompound_stmtContext) {
 				if p.HasError() {
 					goto errorExit
 				}
-				_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 17, p.GetParserRuleContext())
+				_alt = p.AdaptivePredict(p.BaseParser, p.GetTokenStream(), 17, p.GetParserRuleContext())
 				if p.HasError() {
 					goto errorExit
 				}
@@ -2977,7 +2980,7 @@ func (p *PythonParser) Compound_stmt() (localctx ICompound_stmtContext) {
 
 			p.SetState(249)
 			p.GetErrorHandler().Sync(p)
-			_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 20, p.GetParserRuleContext())
+			_alt = p.AdaptivePredict(p.BaseParser, p.GetTokenStream(), 20, p.GetParserRuleContext())
 			if p.HasError() {
 				goto errorExit
 			}
@@ -3207,7 +3210,7 @@ func (p *PythonParser) Suite() (localctx ISuiteContext) {
 		goto errorExit
 	}
 
-	switch p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 25, p.GetParserRuleContext()) {
+	switch p.AdaptivePredict(p.BaseParser, p.GetTokenStream(), 25, p.GetParserRuleContext()) {
 	case 1:
 		p.EnterOuterAlt(localctx, 1)
 		{
@@ -3254,7 +3257,7 @@ func (p *PythonParser) Suite() (localctx ISuiteContext) {
 
 			p.SetState(271)
 			p.GetErrorHandler().Sync(p)
-			_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 24, p.GetParserRuleContext())
+			_alt = p.AdaptivePredict(p.BaseParser, p.GetTokenStream(), 24, p.GetParserRuleContext())
 			if p.HasError() {
 				goto errorExit
 			}
@@ -4639,7 +4642,7 @@ func (p *PythonParser) Except_clause() (localctx IExcept_clauseContext) {
 		p.SetState(339)
 		p.GetErrorHandler().Sync(p)
 
-		if p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 32, p.GetParserRuleContext()) == 1 {
+		if p.AdaptivePredict(p.BaseParser, p.GetTokenStream(), 32, p.GetParserRuleContext()) == 1 {
 			p.SetState(329)
 
 			if !(this.CheckVersion(2)) {
@@ -4662,7 +4665,7 @@ func (p *PythonParser) Except_clause() (localctx IExcept_clauseContext) {
 
 		} else if p.HasError() { // JIM
 			goto errorExit
-		} else if p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 32, p.GetParserRuleContext()) == 2 {
+		} else if p.AdaptivePredict(p.BaseParser, p.GetTokenStream(), 32, p.GetParserRuleContext()) == 2 {
 			p.SetState(334)
 
 			if !(this.CheckVersion(3)) {
@@ -5636,13 +5639,13 @@ func (p *PythonParser) Typedargslist() (localctx ITypedargslistContext) {
 		goto errorExit
 	}
 
-	switch p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 48, p.GetParserRuleContext()) {
+	switch p.AdaptivePredict(p.BaseParser, p.GetTokenStream(), 48, p.GetParserRuleContext()) {
 	case 1:
 		p.EnterOuterAlt(localctx, 1)
 		p.SetState(395)
 		p.GetErrorHandler().Sync(p)
 
-		if p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 42, p.GetParserRuleContext()) == 1 {
+		if p.AdaptivePredict(p.BaseParser, p.GetTokenStream(), 42, p.GetParserRuleContext()) == 1 {
 			{
 				p.SetState(392)
 				p.Def_parameters()
@@ -5674,7 +5677,7 @@ func (p *PythonParser) Typedargslist() (localctx ITypedargslistContext) {
 			p.SetState(400)
 			p.GetErrorHandler().Sync(p)
 
-			if p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 43, p.GetParserRuleContext()) == 1 {
+			if p.AdaptivePredict(p.BaseParser, p.GetTokenStream(), 43, p.GetParserRuleContext()) == 1 {
 				{
 					p.SetState(398)
 					p.Match(PythonParserCOMMA)
@@ -5694,7 +5697,7 @@ func (p *PythonParser) Typedargslist() (localctx ITypedargslistContext) {
 			p.SetState(404)
 			p.GetErrorHandler().Sync(p)
 
-			if p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 44, p.GetParserRuleContext()) == 1 {
+			if p.AdaptivePredict(p.BaseParser, p.GetTokenStream(), 44, p.GetParserRuleContext()) == 1 {
 				{
 					p.SetState(402)
 					p.Match(PythonParserCOMMA)
@@ -6153,7 +6156,7 @@ func (p *PythonParser) Def_parameters() (localctx IDef_parametersContext) {
 	if p.HasError() {
 		goto errorExit
 	}
-	_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 49, p.GetParserRuleContext())
+	_alt = p.AdaptivePredict(p.BaseParser, p.GetTokenStream(), 49, p.GetParserRuleContext())
 	if p.HasError() {
 		goto errorExit
 	}
@@ -6178,7 +6181,7 @@ func (p *PythonParser) Def_parameters() (localctx IDef_parametersContext) {
 		if p.HasError() {
 			goto errorExit
 		}
-		_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 49, p.GetParserRuleContext())
+		_alt = p.AdaptivePredict(p.BaseParser, p.GetTokenStream(), 49, p.GetParserRuleContext())
 		if p.HasError() {
 			goto errorExit
 		}
@@ -6690,7 +6693,7 @@ func (p *PythonParser) Simple_stmt() (localctx ISimple_stmtContext) {
 	if p.HasError() {
 		goto errorExit
 	}
-	_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 53, p.GetParserRuleContext())
+	_alt = p.AdaptivePredict(p.BaseParser, p.GetTokenStream(), 53, p.GetParserRuleContext())
 	if p.HasError() {
 		goto errorExit
 	}
@@ -6715,7 +6718,7 @@ func (p *PythonParser) Simple_stmt() (localctx ISimple_stmtContext) {
 		if p.HasError() {
 			goto errorExit
 		}
-		_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 53, p.GetParserRuleContext())
+		_alt = p.AdaptivePredict(p.BaseParser, p.GetTokenStream(), 53, p.GetParserRuleContext())
 		if p.HasError() {
 			goto errorExit
 		}
@@ -7847,7 +7850,7 @@ func (p *PythonParser) Small_stmt() (localctx ISmall_stmtContext) {
 		goto errorExit
 	}
 
-	switch p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 75, p.GetParserRuleContext()) {
+	switch p.AdaptivePredict(p.BaseParser, p.GetTokenStream(), 75, p.GetParserRuleContext()) {
 	case 1:
 		localctx = NewType_stmtContext(p, localctx)
 		p.EnterOuterAlt(localctx, 1)
@@ -7892,7 +7895,7 @@ func (p *PythonParser) Small_stmt() (localctx ISmall_stmtContext) {
 		p.SetState(467)
 		p.GetErrorHandler().Sync(p)
 
-		if p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 55, p.GetParserRuleContext()) == 1 {
+		if p.AdaptivePredict(p.BaseParser, p.GetTokenStream(), 55, p.GetParserRuleContext()) == 1 {
 			{
 				p.SetState(466)
 				p.Assign_part()
@@ -7936,7 +7939,7 @@ func (p *PythonParser) Small_stmt() (localctx ISmall_stmtContext) {
 			if p.HasError() {
 				goto errorExit
 			}
-			_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 56, p.GetParserRuleContext())
+			_alt = p.AdaptivePredict(p.BaseParser, p.GetTokenStream(), 56, p.GetParserRuleContext())
 			if p.HasError() {
 				goto errorExit
 			}
@@ -7961,7 +7964,7 @@ func (p *PythonParser) Small_stmt() (localctx ISmall_stmtContext) {
 				if p.HasError() {
 					goto errorExit
 				}
-				_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 56, p.GetParserRuleContext())
+				_alt = p.AdaptivePredict(p.BaseParser, p.GetTokenStream(), 56, p.GetParserRuleContext())
 				if p.HasError() {
 					goto errorExit
 				}
@@ -8028,7 +8031,7 @@ func (p *PythonParser) Small_stmt() (localctx ISmall_stmtContext) {
 
 				p.SetState(488)
 				p.GetErrorHandler().Sync(p)
-				_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 58, p.GetParserRuleContext())
+				_alt = p.AdaptivePredict(p.BaseParser, p.GetTokenStream(), 58, p.GetParserRuleContext())
 				if p.HasError() {
 					goto errorExit
 				}
@@ -8269,7 +8272,7 @@ func (p *PythonParser) Small_stmt() (localctx ISmall_stmtContext) {
 			goto errorExit
 		}
 
-		switch p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 68, p.GetParserRuleContext()) {
+		switch p.AdaptivePredict(p.BaseParser, p.GetTokenStream(), 68, p.GetParserRuleContext()) {
 		case 1:
 			p.SetState(529)
 			p.GetErrorHandler().Sync(p)
@@ -8800,7 +8803,7 @@ func (p *PythonParser) Testlist_star_expr() (localctx ITestlist_star_exprContext
 		goto errorExit
 	}
 
-	switch p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 79, p.GetParserRuleContext()) {
+	switch p.AdaptivePredict(p.BaseParser, p.GetTokenStream(), 79, p.GetParserRuleContext()) {
 	case 1:
 		p.EnterOuterAlt(localctx, 1)
 		p.SetState(597)
@@ -8851,7 +8854,7 @@ func (p *PythonParser) Testlist_star_expr() (localctx ITestlist_star_exprContext
 
 			p.SetState(599)
 			p.GetErrorHandler().Sync(p)
-			_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 77, p.GetParserRuleContext())
+			_alt = p.AdaptivePredict(p.BaseParser, p.GetTokenStream(), 77, p.GetParserRuleContext())
 			if p.HasError() {
 				goto errorExit
 			}
@@ -8859,7 +8862,7 @@ func (p *PythonParser) Testlist_star_expr() (localctx ITestlist_star_exprContext
 		p.SetState(603)
 		p.GetErrorHandler().Sync(p)
 
-		if p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 78, p.GetParserRuleContext()) == 1 {
+		if p.AdaptivePredict(p.BaseParser, p.GetTokenStream(), 78, p.GetParserRuleContext()) == 1 {
 			{
 				p.SetState(601)
 				p.Test()
@@ -8867,7 +8870,7 @@ func (p *PythonParser) Testlist_star_expr() (localctx ITestlist_star_exprContext
 
 		} else if p.HasError() { // JIM
 			goto errorExit
-		} else if p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 78, p.GetParserRuleContext()) == 2 {
+		} else if p.AdaptivePredict(p.BaseParser, p.GetTokenStream(), 78, p.GetParserRuleContext()) == 2 {
 			{
 				p.SetState(602)
 				p.Star_expr()
@@ -9283,7 +9286,7 @@ func (p *PythonParser) Assign_part() (localctx IAssign_partContext) {
 		goto errorExit
 	}
 
-	switch p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 85, p.GetParserRuleContext()) {
+	switch p.AdaptivePredict(p.BaseParser, p.GetTokenStream(), 85, p.GetParserRuleContext()) {
 	case 1:
 		p.EnterOuterAlt(localctx, 1)
 		{
@@ -9311,7 +9314,7 @@ func (p *PythonParser) Assign_part() (localctx IAssign_partContext) {
 			if p.HasError() {
 				goto errorExit
 			}
-			_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 80, p.GetParserRuleContext())
+			_alt = p.AdaptivePredict(p.BaseParser, p.GetTokenStream(), 80, p.GetParserRuleContext())
 			if p.HasError() {
 				goto errorExit
 			}
@@ -9336,7 +9339,7 @@ func (p *PythonParser) Assign_part() (localctx IAssign_partContext) {
 				if p.HasError() {
 					goto errorExit
 				}
-				_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 80, p.GetParserRuleContext())
+				_alt = p.AdaptivePredict(p.BaseParser, p.GetTokenStream(), 80, p.GetParserRuleContext())
 				if p.HasError() {
 					goto errorExit
 				}
@@ -9678,7 +9681,7 @@ func (p *PythonParser) Exprlist() (localctx IExprlistContext) {
 	if p.HasError() {
 		goto errorExit
 	}
-	_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 88, p.GetParserRuleContext())
+	_alt = p.AdaptivePredict(p.BaseParser, p.GetTokenStream(), 88, p.GetParserRuleContext())
 	if p.HasError() {
 		goto errorExit
 	}
@@ -9722,7 +9725,7 @@ func (p *PythonParser) Exprlist() (localctx IExprlistContext) {
 		if p.HasError() {
 			goto errorExit
 		}
-		_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 88, p.GetParserRuleContext())
+		_alt = p.AdaptivePredict(p.BaseParser, p.GetTokenStream(), 88, p.GetParserRuleContext())
 		if p.HasError() {
 			goto errorExit
 		}
@@ -9895,7 +9898,7 @@ func (p *PythonParser) Import_as_names() (localctx IImport_as_namesContext) {
 	if p.HasError() {
 		goto errorExit
 	}
-	_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 90, p.GetParserRuleContext())
+	_alt = p.AdaptivePredict(p.BaseParser, p.GetTokenStream(), 90, p.GetParserRuleContext())
 	if p.HasError() {
 		goto errorExit
 	}
@@ -9920,7 +9923,7 @@ func (p *PythonParser) Import_as_names() (localctx IImport_as_namesContext) {
 		if p.HasError() {
 			goto errorExit
 		}
-		_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 90, p.GetParserRuleContext())
+		_alt = p.AdaptivePredict(p.BaseParser, p.GetTokenStream(), 90, p.GetParserRuleContext())
 		if p.HasError() {
 			goto errorExit
 		}
@@ -10654,7 +10657,7 @@ func (p *PythonParser) Test() (localctx ITestContext) {
 		p.SetState(692)
 		p.GetErrorHandler().Sync(p)
 
-		if p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 95, p.GetParserRuleContext()) == 1 {
+		if p.AdaptivePredict(p.BaseParser, p.GetTokenStream(), 95, p.GetParserRuleContext()) == 1 {
 			{
 				p.SetState(690)
 				p.Match(PythonParserCOLON_ASSIGN)
@@ -10674,7 +10677,7 @@ func (p *PythonParser) Test() (localctx ITestContext) {
 		p.SetState(699)
 		p.GetErrorHandler().Sync(p)
 
-		if p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 96, p.GetParserRuleContext()) == 1 {
+		if p.AdaptivePredict(p.BaseParser, p.GetTokenStream(), 96, p.GetParserRuleContext()) == 1 {
 			{
 				p.SetState(694)
 				p.Match(PythonParserIF)
@@ -10923,13 +10926,13 @@ func (p *PythonParser) Varargslist() (localctx IVarargslistContext) {
 		goto errorExit
 	}
 
-	switch p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 105, p.GetParserRuleContext()) {
+	switch p.AdaptivePredict(p.BaseParser, p.GetTokenStream(), 105, p.GetParserRuleContext()) {
 	case 1:
 		p.EnterOuterAlt(localctx, 1)
 		p.SetState(712)
 		p.GetErrorHandler().Sync(p)
 
-		if p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 99, p.GetParserRuleContext()) == 1 {
+		if p.AdaptivePredict(p.BaseParser, p.GetTokenStream(), 99, p.GetParserRuleContext()) == 1 {
 			{
 				p.SetState(709)
 				p.Vardef_parameters()
@@ -10961,7 +10964,7 @@ func (p *PythonParser) Varargslist() (localctx IVarargslistContext) {
 			p.SetState(717)
 			p.GetErrorHandler().Sync(p)
 
-			if p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 100, p.GetParserRuleContext()) == 1 {
+			if p.AdaptivePredict(p.BaseParser, p.GetTokenStream(), 100, p.GetParserRuleContext()) == 1 {
 				{
 					p.SetState(715)
 					p.Match(PythonParserCOMMA)
@@ -10981,7 +10984,7 @@ func (p *PythonParser) Varargslist() (localctx IVarargslistContext) {
 			p.SetState(721)
 			p.GetErrorHandler().Sync(p)
 
-			if p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 101, p.GetParserRuleContext()) == 1 {
+			if p.AdaptivePredict(p.BaseParser, p.GetTokenStream(), 101, p.GetParserRuleContext()) == 1 {
 				{
 					p.SetState(719)
 					p.Match(PythonParserCOMMA)
@@ -11204,7 +11207,7 @@ func (p *PythonParser) Vardef_parameters() (localctx IVardef_parametersContext) 
 	if p.HasError() {
 		goto errorExit
 	}
-	_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 106, p.GetParserRuleContext())
+	_alt = p.AdaptivePredict(p.BaseParser, p.GetTokenStream(), 106, p.GetParserRuleContext())
 	if p.HasError() {
 		goto errorExit
 	}
@@ -11229,7 +11232,7 @@ func (p *PythonParser) Vardef_parameters() (localctx IVardef_parametersContext) 
 		if p.HasError() {
 			goto errorExit
 		}
-		_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 106, p.GetParserRuleContext())
+		_alt = p.AdaptivePredict(p.BaseParser, p.GetTokenStream(), 106, p.GetParserRuleContext())
 		if p.HasError() {
 			goto errorExit
 		}
@@ -11885,7 +11888,7 @@ func (p *PythonParser) logical_test(_p int) (localctx ILogical_testContext) {
 	if p.HasError() {
 		goto errorExit
 	}
-	_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 111, p.GetParserRuleContext())
+	_alt = p.AdaptivePredict(p.BaseParser, p.GetTokenStream(), 111, p.GetParserRuleContext())
 	if p.HasError() {
 		goto errorExit
 	}
@@ -11901,7 +11904,7 @@ func (p *PythonParser) logical_test(_p int) (localctx ILogical_testContext) {
 				goto errorExit
 			}
 
-			switch p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 110, p.GetParserRuleContext()) {
+			switch p.AdaptivePredict(p.BaseParser, p.GetTokenStream(), 110, p.GetParserRuleContext()) {
 			case 1:
 				localctx = NewLogical_testContext(p, _parentctx, _parentState)
 				p.PushNewRecursionContext(localctx, _startState, PythonParserRULE_logical_test)
@@ -11962,7 +11965,7 @@ func (p *PythonParser) logical_test(_p int) (localctx ILogical_testContext) {
 		if p.HasError() {
 			goto errorExit
 		}
-		_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 111, p.GetParserRuleContext())
+		_alt = p.AdaptivePredict(p.BaseParser, p.GetTokenStream(), 111, p.GetParserRuleContext())
 		if p.HasError() {
 			goto errorExit
 		}
@@ -12197,7 +12200,7 @@ func (p *PythonParser) comparison(_p int) (localctx IComparisonContext) {
 	if p.HasError() {
 		goto errorExit
 	}
-	_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 115, p.GetParserRuleContext())
+	_alt = p.AdaptivePredict(p.BaseParser, p.GetTokenStream(), 115, p.GetParserRuleContext())
 	if p.HasError() {
 		goto errorExit
 	}
@@ -12369,7 +12372,7 @@ func (p *PythonParser) comparison(_p int) (localctx IComparisonContext) {
 		if p.HasError() {
 			goto errorExit
 		}
-		_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 115, p.GetParserRuleContext())
+		_alt = p.AdaptivePredict(p.BaseParser, p.GetTokenStream(), 115, p.GetParserRuleContext())
 		if p.HasError() {
 			goto errorExit
 		}
@@ -12667,7 +12670,7 @@ func (p *PythonParser) expr(_p int) (localctx IExprContext) {
 		goto errorExit
 	}
 
-	switch p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 118, p.GetParserRuleContext()) {
+	switch p.AdaptivePredict(p.BaseParser, p.GetTokenStream(), 118, p.GetParserRuleContext()) {
 	case 1:
 		p.SetState(804)
 		p.GetErrorHandler().Sync(p)
@@ -12696,7 +12699,7 @@ func (p *PythonParser) expr(_p int) (localctx IExprContext) {
 		if p.HasError() {
 			goto errorExit
 		}
-		_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 117, p.GetParserRuleContext())
+		_alt = p.AdaptivePredict(p.BaseParser, p.GetTokenStream(), 117, p.GetParserRuleContext())
 		if p.HasError() {
 			goto errorExit
 		}
@@ -12713,7 +12716,7 @@ func (p *PythonParser) expr(_p int) (localctx IExprContext) {
 			if p.HasError() {
 				goto errorExit
 			}
-			_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 117, p.GetParserRuleContext())
+			_alt = p.AdaptivePredict(p.BaseParser, p.GetTokenStream(), 117, p.GetParserRuleContext())
 			if p.HasError() {
 				goto errorExit
 			}
@@ -12752,7 +12755,7 @@ func (p *PythonParser) expr(_p int) (localctx IExprContext) {
 	if p.HasError() {
 		goto errorExit
 	}
-	_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 120, p.GetParserRuleContext())
+	_alt = p.AdaptivePredict(p.BaseParser, p.GetTokenStream(), 120, p.GetParserRuleContext())
 	if p.HasError() {
 		goto errorExit
 	}
@@ -12768,7 +12771,7 @@ func (p *PythonParser) expr(_p int) (localctx IExprContext) {
 				goto errorExit
 			}
 
-			switch p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 119, p.GetParserRuleContext()) {
+			switch p.AdaptivePredict(p.BaseParser, p.GetTokenStream(), 119, p.GetParserRuleContext()) {
 			case 1:
 				localctx = NewExprContext(p, _parentctx, _parentState)
 				p.PushNewRecursionContext(localctx, _startState, PythonParserRULE_expr)
@@ -12975,7 +12978,7 @@ func (p *PythonParser) expr(_p int) (localctx IExprContext) {
 		if p.HasError() {
 			goto errorExit
 		}
-		_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 120, p.GetParserRuleContext())
+		_alt = p.AdaptivePredict(p.BaseParser, p.GetTokenStream(), 120, p.GetParserRuleContext())
 		if p.HasError() {
 			goto errorExit
 		}
@@ -13255,7 +13258,7 @@ func (p *PythonParser) Atom() (localctx IAtomContext) {
 		goto errorExit
 	}
 
-	switch p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 127, p.GetParserRuleContext()) {
+	switch p.AdaptivePredict(p.BaseParser, p.GetTokenStream(), 127, p.GetParserRuleContext()) {
 	case 1:
 		p.EnterOuterAlt(localctx, 1)
 		{
@@ -13507,7 +13510,7 @@ func (p *PythonParser) Atom() (localctx IAtomContext) {
 
 			p.SetState(878)
 			p.GetErrorHandler().Sync(p)
-			_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 126, p.GetParserRuleContext())
+			_alt = p.AdaptivePredict(p.BaseParser, p.GetTokenStream(), 126, p.GetParserRuleContext())
 			if p.HasError() {
 				goto errorExit
 			}
@@ -13759,7 +13762,7 @@ func (p *PythonParser) Dictorsetmaker() (localctx IDictorsetmakerContext) {
 		goto errorExit
 	}
 
-	switch p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 132, p.GetParserRuleContext()) {
+	switch p.AdaptivePredict(p.BaseParser, p.GetTokenStream(), 132, p.GetParserRuleContext()) {
 	case 1:
 		p.EnterOuterAlt(localctx, 1)
 		p.SetState(888)
@@ -13810,7 +13813,7 @@ func (p *PythonParser) Dictorsetmaker() (localctx IDictorsetmakerContext) {
 		if p.HasError() {
 			goto errorExit
 		}
-		_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 130, p.GetParserRuleContext())
+		_alt = p.AdaptivePredict(p.BaseParser, p.GetTokenStream(), 130, p.GetParserRuleContext())
 		if p.HasError() {
 			goto errorExit
 		}
@@ -13874,7 +13877,7 @@ func (p *PythonParser) Dictorsetmaker() (localctx IDictorsetmakerContext) {
 			if p.HasError() {
 				goto errorExit
 			}
-			_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 130, p.GetParserRuleContext())
+			_alt = p.AdaptivePredict(p.BaseParser, p.GetTokenStream(), 130, p.GetParserRuleContext())
 			if p.HasError() {
 				goto errorExit
 			}
@@ -14174,7 +14177,7 @@ func (p *PythonParser) Testlist_comp() (localctx ITestlist_compContext) {
 		if p.HasError() {
 			goto errorExit
 		}
-		_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 135, p.GetParserRuleContext())
+		_alt = p.AdaptivePredict(p.BaseParser, p.GetTokenStream(), 135, p.GetParserRuleContext())
 		if p.HasError() {
 			goto errorExit
 		}
@@ -14218,7 +14221,7 @@ func (p *PythonParser) Testlist_comp() (localctx ITestlist_compContext) {
 			if p.HasError() {
 				goto errorExit
 			}
-			_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 135, p.GetParserRuleContext())
+			_alt = p.AdaptivePredict(p.BaseParser, p.GetTokenStream(), 135, p.GetParserRuleContext())
 			if p.HasError() {
 				goto errorExit
 			}
@@ -14394,7 +14397,7 @@ func (p *PythonParser) Testlist() (localctx ITestlistContext) {
 	if p.HasError() {
 		goto errorExit
 	}
-	_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 138, p.GetParserRuleContext())
+	_alt = p.AdaptivePredict(p.BaseParser, p.GetTokenStream(), 138, p.GetParserRuleContext())
 	if p.HasError() {
 		goto errorExit
 	}
@@ -14419,7 +14422,7 @@ func (p *PythonParser) Testlist() (localctx ITestlistContext) {
 		if p.HasError() {
 			goto errorExit
 		}
-		_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 138, p.GetParserRuleContext())
+		_alt = p.AdaptivePredict(p.BaseParser, p.GetTokenStream(), 138, p.GetParserRuleContext())
 		if p.HasError() {
 			goto errorExit
 		}
@@ -14427,7 +14430,7 @@ func (p *PythonParser) Testlist() (localctx ITestlistContext) {
 	p.SetState(944)
 	p.GetErrorHandler().Sync(p)
 
-	if p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 139, p.GetParserRuleContext()) == 1 {
+	if p.AdaptivePredict(p.BaseParser, p.GetTokenStream(), 139, p.GetParserRuleContext()) == 1 {
 		{
 			p.SetState(943)
 			p.Match(PythonParserCOMMA)
@@ -14586,7 +14589,7 @@ func (p *PythonParser) dotted_name(_p int) (localctx IDotted_nameContext) {
 	if p.HasError() {
 		goto errorExit
 	}
-	_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 140, p.GetParserRuleContext())
+	_alt = p.AdaptivePredict(p.BaseParser, p.GetTokenStream(), 140, p.GetParserRuleContext())
 	if p.HasError() {
 		goto errorExit
 	}
@@ -14623,7 +14626,7 @@ func (p *PythonParser) dotted_name(_p int) (localctx IDotted_nameContext) {
 		if p.HasError() {
 			goto errorExit
 		}
-		_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 140, p.GetParserRuleContext())
+		_alt = p.AdaptivePredict(p.BaseParser, p.GetTokenStream(), 140, p.GetParserRuleContext())
 		if p.HasError() {
 			goto errorExit
 		}
@@ -15448,7 +15451,7 @@ func (p *PythonParser) Trailer() (localctx ITrailerContext) {
 		p.SetState(978)
 		p.GetErrorHandler().Sync(p)
 
-		if p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 144, p.GetParserRuleContext()) == 1 {
+		if p.AdaptivePredict(p.BaseParser, p.GetTokenStream(), 144, p.GetParserRuleContext()) == 1 {
 			{
 				p.SetState(977)
 				p.Arguments()
@@ -15825,7 +15828,7 @@ func (p *PythonParser) Arglist() (localctx IArglistContext) {
 	if p.HasError() {
 		goto errorExit
 	}
-	_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 148, p.GetParserRuleContext())
+	_alt = p.AdaptivePredict(p.BaseParser, p.GetTokenStream(), 148, p.GetParserRuleContext())
 	if p.HasError() {
 		goto errorExit
 	}
@@ -15850,7 +15853,7 @@ func (p *PythonParser) Arglist() (localctx IArglistContext) {
 		if p.HasError() {
 			goto errorExit
 		}
-		_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 148, p.GetParserRuleContext())
+		_alt = p.AdaptivePredict(p.BaseParser, p.GetTokenStream(), 148, p.GetParserRuleContext())
 		if p.HasError() {
 			goto errorExit
 		}
@@ -16249,7 +16252,7 @@ func (p *PythonParser) Subscriptlist() (localctx ISubscriptlistContext) {
 	if p.HasError() {
 		goto errorExit
 	}
-	_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 152, p.GetParserRuleContext())
+	_alt = p.AdaptivePredict(p.BaseParser, p.GetTokenStream(), 152, p.GetParserRuleContext())
 	if p.HasError() {
 		goto errorExit
 	}
@@ -16274,7 +16277,7 @@ func (p *PythonParser) Subscriptlist() (localctx ISubscriptlistContext) {
 		if p.HasError() {
 			goto errorExit
 		}
-		_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 152, p.GetParserRuleContext())
+		_alt = p.AdaptivePredict(p.BaseParser, p.GetTokenStream(), 152, p.GetParserRuleContext())
 		if p.HasError() {
 			goto errorExit
 		}
@@ -16458,7 +16461,7 @@ func (p *PythonParser) Subscript() (localctx ISubscriptContext) {
 		goto errorExit
 	}
 
-	switch p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 159, p.GetParserRuleContext()) {
+	switch p.AdaptivePredict(p.BaseParser, p.GetTokenStream(), 159, p.GetParserRuleContext()) {
 	case 1:
 		p.EnterOuterAlt(localctx, 1)
 		{
