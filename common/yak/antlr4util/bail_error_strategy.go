@@ -22,6 +22,10 @@ func NewBailErrorStrategy() *BailErrorStrategy {
 	}
 }
 
+// BailsOnSyntaxError marks strategies that abort rather than recover. Parser
+// packages use this structural contract without importing the frontend utilities.
+func (*BailErrorStrategy) BailsOnSyntaxError() bool { return true }
+
 func (b *BailErrorStrategy) Recover(recognizer antlr.Parser, e antlr.RecognitionException) {
 	context := recognizer.GetParserRuleContext()
 	for context != nil {
