@@ -8,8 +8,8 @@ name: Syntax G4 Tests
 # ---------------------------------------------------------------------------
 # When this workflow runs
 # ---------------------------------------------------------------------------
-# The four patterns below are the whole trigger; a PR has to touch one of them.
-# Each pattern is structural rather than a list of packages, so a new language
+# A PR runs this workflow when it touches the watched grammar, parser or corpus
+# paths below. The language patterns are structural, so a new language
 # is picked up by following the same layout:
 #
 #   common/yak/**/*.g4          any grammar (antlr4c, antlr4go, antlr4JS,
@@ -28,12 +28,15 @@ name: Syntax G4 Tests
 #                               this workflow does not run, and the csharp/tests
 #                               syntax_*_test.go helpers, which do belong to it)
 #
+# Java prediction tests also read the shared SSTI template, watched explicitly.
+#
 # Deliberately NOT watched:
 #   - go.mod / go.sum: a dependency bump is covered by Essential Tests, and the
 #     corpus depends on the grammar plus its fixtures, not on the module graph;
 #   - everything a corpus test reads through `//go:embed` lives in `code/` or
 #     `syntax/`, and everything read off the working directory is either
-#     `parser/` or another package's `code/` (csharp/tests/g4_coverage_test.go
+#     `parser/`, another package's `code/`, or the explicitly watched SSTI
+#     template (csharp/tests/g4_coverage_test.go
 #     reads ../asp/ASPParser.g4 and ../asp/tests/code).
 #
 # Adding a language: give its driver the `syntax_<language>_test.go` name, keep
@@ -51,6 +54,7 @@ on:
       - "common/yak/**/code/**"
       - "common/yak/**/syntax/**"
       - "common/yak/**/syntax_*.go"
+      - "common/sfweb/templates/java/cwe-1336-ssti.java"
       # This workflow itself
       - ".github/workflows/syntax-g4-tests.yml"
 

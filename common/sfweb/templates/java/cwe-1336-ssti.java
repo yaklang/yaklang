@@ -1,9 +1,12 @@
+package com.ibeetl.admin.console.web;
+
 // demo 1
 
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.servlet.ModelAndView;
 import java.util.Arrays;
 import java.util.List;
 
@@ -62,10 +65,9 @@ public class VulnerableController {
 }
 
 // demo 2
-package com.ibeetl.admin.console.web;
 
 @Controller
-public class OrgConsoleController {
+class OrgConsoleControllerConcatenatedPath {
     @GetMapping(MODEL + "/edit.do")
     @Function("org.edit")
     public ModelAndView edit(String id) {
@@ -78,10 +80,8 @@ public class OrgConsoleController {
 
 // demo 3
 
-package com.ibeetl.admin.console.web;
-
 @Controller
-public class OrgConsoleController {
+class OrgConsoleControllerLiteralPath {
     @GetMapping(MODEL + "/edit.do")
     @Function("org.edit")
     public ModelAndView edit(String id) {
