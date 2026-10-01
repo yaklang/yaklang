@@ -51,6 +51,14 @@ func newAidPromptMaterialsForConfig(config *aicommon.Config, instruction string,
 	return materials
 }
 
+func wrapAidUserInputForPrompt(config *aicommon.Config, input string) string {
+	var timeline *aicommon.Timeline
+	if config != nil {
+		timeline = config.GetTimeline()
+	}
+	return timeline.WrapUserInputForPrompt(input)
+}
+
 func newAidPlanReviewPromptMaterials(pr *planRequest, instruction string, schemaKey string) *aicommon.PromptMaterials {
 	var config *aicommon.Config
 	if pr != nil && pr.cod != nil {
@@ -110,7 +118,7 @@ func (t *AiTask) buildDynamicPlanPrompt(userInput string) (string, error) {
 		__prompt_dynamicPlanDynamic,
 		dynamicPlanDynamicData{
 			CurrentTaskInfo:   ctxProvider.CurrentTaskInfoDynamic(),
-			UserInput:         strings.TrimSpace(userInput),
+			UserInput:         wrapAidUserInputForPrompt(t.Config, userInput),
 			PlanHelp:          ctxProvider.PlanHelp(),
 			StableInstruction: ctxProvider.CurrentTaskInfoStable(),
 		},
@@ -126,10 +134,10 @@ func (pr *planRequest) buildPlanIncompletePrompt(suggestion string, extraPrompt 
 		__prompt_planIncompleteDynamic,
 		planReviewDynamicData{
 			CurrentPlanDetail: rsp.RootTask.ProgressWithDetail(),
-			UserSuggestion:    suggestion,
-			ExtraPrompt:       extraPrompt,
+			UserSuggestion:    wrapAidUserInputForPrompt(pr.cod.Config, suggestion),
+			ExtraPrompt:       wrapAidUserInputForPrompt(pr.cod.Config, extraPrompt),
 			PlanHelp:          pr.cod.ContextProvider.PlanHelp(),
-			OriginalUserInput: pr.cod.ContextProvider.Query,
+			OriginalUserInput: wrapAidUserInputForPrompt(pr.cod.Config, pr.cod.ContextProvider.Query),
 		},
 	)
 }
@@ -142,9 +150,9 @@ func (pr *planRequest) buildFreedomReviewPrompt(extraPrompt string, rsp *PlanRes
 		__prompt_planFreedomReviewDynamic,
 		freedomReviewDynamicData{
 			CurrentPlanDetail: rsp.RootTask.ProgressWithDetail(),
-			UserReviewPlan:    extraPrompt,
+			UserReviewPlan:    wrapAidUserInputForPrompt(pr.cod.Config, extraPrompt),
 			PlanHelp:          pr.cod.ContextProvider.PlanHelp(),
-			OriginalUserInput: pr.cod.ContextProvider.Query,
+			OriginalUserInput: wrapAidUserInputForPrompt(pr.cod.Config, pr.cod.ContextProvider.Query),
 		},
 	)
 }
@@ -158,9 +166,9 @@ func (pr *planRequest) buildCreateSubtaskPrompt(extraPrompt string, targetPlans 
 		createSubtaskDynamicData{
 			CurrentPlanDetail: rsp.RootTask.ProgressWithDetail(),
 			TargetPlansDetail: buildCreateSubtaskTargetPlansDetail(pr.cod, targetPlans),
-			ExtraPrompt:       extraPrompt,
+			ExtraPrompt:       wrapAidUserInputForPrompt(pr.cod.Config, extraPrompt),
 			PlanHelp:          pr.cod.ContextProvider.PlanHelp(),
-			OriginalUserInput: pr.cod.ContextProvider.Query,
+			OriginalUserInput: wrapAidUserInputForPrompt(pr.cod.Config, pr.cod.ContextProvider.Query),
 		},
 	)
 }

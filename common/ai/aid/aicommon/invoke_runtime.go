@@ -265,11 +265,11 @@ type LoopPromptAssemblyInput struct {
 	SkillsContext       string
 	ExtraCapabilities   string
 	// TodoSnapshot 是全局 TODO 列表的渲染输出 (含 <|TODO_LIST_<nonce>|>...
-	// 边界标签的整段块), 紧跟在 普通 Timeline 后面注入到 timeline-open 段。
+	// 边界标签的整段块), 在普通 Timeline 和 PlanRuntimeState 之后注入到 timeline-open 段。
 	// 落在所有缓存边界外, 保证不污染上游 prefix cache.
 	// 空字符串时 timeline-open 模板自动跳过该块。
 	//
-	// 关键词: TodoSnapshot, 全局 TODO 块, timeline-open 段, 普通 Timeline 后,
+	// 关键词: TodoSnapshot, 全局 TODO 块, timeline-open 段, 计划运行状态后,
 	//        loop prompt 任何时刻可见
 	TodoSnapshot   string
 	ReactiveData   string
@@ -279,31 +279,13 @@ type LoopPromptAssemblyInput struct {
 	// PROMPT_SECTION_dynamic_END marker, and never enters a cacheable section.
 	TodoCheckpoint string
 
-	// FrozenUserContext 用于承载 PE-TASK 等场景下"PLAN 阶段产出 + 用户原始
-	// 输入"两类只读上下文。注: 命名虽为 "Frozen", 但实际并不放入冻结段;
-	// 跨同一 plan 周期内同一子任务执行的多次 turn 字节稳定, 但子任务切换仍
-	// 会让其内容抖动, 故不适合 cache。
-	//
-	// 物理位置: 包装为 <|PLAN_CONTEXT_<stable-nonce>|>...<|PLAN_CONTEXT_END_
-	// <stable-nonce>|> 后, 注入到 timeline-open 段最末尾 (UserHistory 之后)。
-	// timeline-open 段不被 AI_CACHE_FROZEN / AI_CACHE_SEMI 任何缓存边界包裹,
-	// 是"易变尾段"。
-	//
-	// 设计取舍 (历史演进):
-	//   - v1: 注入 dynamic 段 (turn nonce), 完全不可缓存;
-	//   - v2: 迁到 frozen-block, 但 root task / 普通 ReAct 时为空, 渲染态
-	//     抖动破坏 AI_CACHE_FROZEN 命中;
-	//   - v3: 迁到 semi-dynamic, 但子任务切换仍让其内容抖动, 破坏
-	//     AI_CACHE_SEMI 命中;
-	//   - v4 (当前): 迁到 timeline-open 末尾, 主动让其落在所有 cache 边界外,
-	//     不再追求自身缓存, 而是保护更上游 SYSTEM / FROZEN / SEMI 三段缓存。
-	//
-	// 老路径 (普通 ReAct loop / focus mode 等没有 PLAN 上下文的场景): 此字段
-	// 为空, timeline-open 段 PlanContext 子块自然不渲染, 段位置稳定。
-	//
-	// 关键词: FrozenUserContext, PLAN_CONTEXT 段, timeline-open 末尾注入,
-	//        缓存边界外, 上游缓存保护, PE-TASK PLAN 产物
+	// Deprecated: legacy mixed plan/user context, kept outside all cache boundaries.
+	// New plan tasks provide PlanContext, separating definition/state/rules.
 	FrozenUserContext string
+	// PlanContext is captured once for the executing task. Definition is a
+	// versioned Frozen partition; RuntimeState precedes TODO in the open tail;
+	// ExecutionRules belong to Semi Dynamic 2 and contain no live state.
+	PlanContext PlanPromptContext
 
 	// FrozenPartitions 是业务侧提供的通用 frozen-block 分区。共享模板只识别
 	// FrozenBlockPartition，不直接依赖 planAndExec / FACTS / DOCUMENT 等业务类型。

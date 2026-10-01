@@ -717,14 +717,14 @@ LOOP:
 		)
 		var prompt string
 		// PE-TASK 缓存优化: 当 task 实现 CacheableUserInputProvider 接口时,
-		// 把 PARENT_TASK + CURRENT_TASK + INSTRUCTION 整块当作 frozenUserContext
-		// 注入 frozen-block, 让 dynamic 段不再承载 PLAN 阶段的产物。
-		// 普通 ReAct loop 的 task 不实现该接口, fallback 走老路径。
-		// 关键词: CacheableUserInputProvider, frozenUserContext, PLAN_CONTEXT
-		userInputForDynamic := task.GetUserInput()
-		var frozenUserContext string
-		if provider, ok := task.(aicommon.CacheableUserInputProvider); ok {
-			userInputForDynamic, frozenUserContext = provider.GetUserInputSplitForCache()
+		// Typed plans are captured once inside generateLoopPrompt. Avoid building
+		// the old mixed parent/current-task input merely to discard it there.
+		var userInputForDynamic, frozenUserContext string
+		if _, typedPlan := task.(aicommon.PlanPromptContextProvider); !typedPlan {
+			userInputForDynamic = task.GetUserInput()
+			if provider, ok := task.(aicommon.CacheableUserInputProvider); ok {
+				userInputForDynamic, frozenUserContext = provider.GetUserInputSplitForCache()
+			}
 		}
 		// goal-mode finish gate: single application point. Applied here so the
 		// operator used to build this iteration's prompt has disallowLoopExit set

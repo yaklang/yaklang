@@ -28,18 +28,9 @@ func (r *ReAct) persistTaskUserInput(task aicommon.AIStatefulTask) {
 	if task == nil {
 		return
 	}
-	userInput := strings.TrimSpace(task.GetUserInput())
-	if userInput == "" {
+	userInput := task.GetUserInput()
+	if strings.TrimSpace(userInput) == "" {
 		return
-	}
-
-	if r.config.Timeline != nil {
-		r.config.Timeline.PushUserInteraction(
-			aicommon.UserInteractionStage_FreeInput,
-			r.config.AcquireId(),
-			"",
-			userInput,
-		)
 	}
 
 	quotedHistory, err := r.config.AppendUserInputHistory(userInput, task.GetCreatedAt())

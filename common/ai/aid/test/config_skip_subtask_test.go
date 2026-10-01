@@ -16,6 +16,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/ai/aid"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
+	aicommon_testutil "github.com/yaklang/yaklang/common/ai/aid/aicommon/testutil"
 	"github.com/yaklang/yaklang/common/ai/aid/aimem"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/schema"
@@ -27,6 +28,9 @@ import (
 // extractCurrentTaskContent 从 prompt 中提取 <|CURRENT_TASK_{{nonce}}|> 和 <|CURRENT_TASK_END_{{nonce}}|> 之间的内容
 // 返回提取的内容，如果未找到则返回空字符串
 func extractCurrentTaskContent(prompt string) string {
+	if current := aicommon_testutil.ExtractPlanCurrentTask(prompt); current != "" {
+		return current
+	}
 	splitRes := aiprojection.Split(prompt)
 	for _, chunk := range splitRes.Chunks {
 		if chunk.Section == aiprojection.SectionDynamic {

@@ -9,10 +9,14 @@ func BuildVerificationTodoScope(task AIStatefulTask) VerificationTodoScope {
 	if task == nil {
 		return VerificationTodoScope{}
 	}
-	return VerificationTodoScope{
+	scope := VerificationTodoScope{
 		TaskID:    strings.TrimSpace(task.GetId()),
 		TaskIndex: strings.TrimSpace(task.GetIndex()),
 	}.normalize()
+	if provider, ok := task.(interface{ GetPlanPromptVersion() string }); ok {
+		scope.PlanVersion = provider.GetPlanPromptVersion()
+	}
+	return scope
 }
 
 // GetBlockingVerificationTodoItems returns the active TODOs owned by the given

@@ -739,7 +739,7 @@ func (pm *PromptManager) GenerateAIBlueprintForgeParamsPrompt(
 func (pm *PromptManager) GenerateRequireConversationTitlePrompt(timeline string, userInput string) (string, error) {
 	return pm.executeTemplate("conversation-title", conversationTitlePrompt, map[string]interface{}{
 		"Timeline":     timeline,
-		"CurrentInput": userInput,
+		"CurrentInput": pm.wrapUserInputForPrompt(userInput),
 	})
 }
 

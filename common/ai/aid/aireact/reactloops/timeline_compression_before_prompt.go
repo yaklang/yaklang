@@ -3,11 +3,12 @@ package reactloops
 import (
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/log"
+	"strings"
 )
 
 // Called once before assembling the next loop request, never during an action
 // or in a Timeline writer. Independent prompt fields are actual rendered values.
-func (r *ReActLoop) compressTimelineBeforePrompt(userInput, frozenUserContext, todo, instruction string) error {
+func (r *ReActLoop) compressTimelineBeforePrompt(userInput, frozenUserContext, todo, instruction string, planContext ...string) error {
 	provider, ok := r.config.(interface{ GetTimeline() *aicommon.Timeline })
 	if !ok || provider.GetTimeline() == nil {
 		return nil
@@ -19,7 +20,7 @@ func (r *ReActLoop) compressTimelineBeforePrompt(userInput, frozenUserContext, t
 	_, err := provider.GetTimeline().CompressBeforePrompt(aicommon.TimelineCompressionOptions{
 		Context: ctx,
 		RetainedContext: map[string]string{"user_query": userInput, "frozen_user_context": frozenUserContext,
-			"todo": todo, "task_instruction": instruction},
+			"todo": todo, "task_instruction": instruction, "plan_context": strings.Join(planContext, "\n")},
 	})
 	if err != nil {
 		if ctx.Err() != nil {

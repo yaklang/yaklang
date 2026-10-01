@@ -23,6 +23,9 @@ import (
 )
 
 func extractCurrentTaskContentFromPrompt(t *testing.T, prompt string) string {
+	if current := aicommon_testutil.ExtractPlanCurrentTask(prompt); current != "" {
+		return current
+	}
 	if idx := strings.LastIndex(prompt, "--- CURRENT_TASK ---"); idx >= 0 {
 		rest := prompt[idx+len("--- CURRENT_TASK ---"):]
 		if end := strings.Index(rest, "--- CURRENT_TASK_END ---"); end >= 0 {

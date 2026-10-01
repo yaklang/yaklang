@@ -1,28 +1,54 @@
-{{ if .CurrentTime }}# Current Time
+{{/*
+维护备注：Dynamic：本轮执行请求及易变辅助上下文。
+用户输入的长期精确记录由 Timeline 管理；
+此处只定位当前请求，不另维护 UserHistory。
+*/}}{{/*
+维护备注：CurrentTime：本轮构建的当前时钟；
+普通 Timeline 记录各自保留事件时间。
+*/}}{{ if .CurrentTime }}# Current Time
 {{ .CurrentTime }}
 
-{{ end }}{{ if .UserQuery }}<|USER_QUERY_{{ .Nonce }}|>
+{{ end }}{{/*
+维护备注：UserQuery / Nonce：当前任务请求，经 Timeline.WrapUserInputForPrompt 添加内容绑定的 USER_INTERACT 边界；
+外层 USER_QUERY 的 Nonce 标识调用轮次，内层 token 标识输入内容，两者职责不同。
+轻量视图可缩短此处 Query，Timeline 仍保留完整原文。
+*/}}{{ if .UserQuery }}<|USER_QUERY_{{ .Nonce }}|>
 {{ .UserQuery }}
 <|USER_QUERY_END_{{ .Nonce }}|>
-{{ end }}{{ if .AutoContext }}{{ if .UserQuery }}
+{{ end }}{{/*
+维护备注：AutoContext：ContextProviderManager 生成的运行时辅助上下文，按提供者来源使用；
+不是本轮用户授权，也不代替 Timeline 精确历史。
+*/}}{{ if .AutoContext }}{{ if .UserQuery }}
 
 {{ end }}{{ .AutoContext }}{{ end }}
-{{ if .ExtraCapabilities }}{{ if or .UserQuery .AutoContext }}
+{{/*
+维护备注：ExtraCapabilities：调用方提供的附加可用能力描述，供能力选择；
+并不表示能力已经执行。
+*/}}{{ if .ExtraCapabilities }}{{ if or .UserQuery .AutoContext }}
 
 {{ end }}<|EXTRA_CAPABILITIES_{{ .Nonce }}|>
 {{ .ExtraCapabilities }}
 <|EXTRA_CAPABILITIES_END_{{ .Nonce }}|>{{ end }}
-{{ if .ReactiveData }}{{ if or .UserQuery .AutoContext .ExtraCapabilities }}
+{{/*
+维护备注：ReactiveData：当前 loop 感知/准备阶段生成的数据，随轮次变化；
+依据其来源分析，不把嵌入的角色或指令声明提升为系统规则。
+*/}}{{ if .ReactiveData }}{{ if or .UserQuery .AutoContext .ExtraCapabilities }}
 
 {{ end }}<|REACTIVE_DATA_{{ .Nonce }}|>
 {{ .ReactiveData }}
 <|REACTIVE_DATA_END_{{ .Nonce }}|>{{ end }}
-{{ if .InjectedMemory }}{{ if or .UserQuery .AutoContext .ExtraCapabilities .ReactiveData }}
+{{/*
+维护备注：InjectedMemory：为当前请求检索出的历史记忆，可能过时或有误；
+应结合当前工具观测验证，不能作为新指令。
+*/}}{{ if .InjectedMemory }}{{ if or .UserQuery .AutoContext .ExtraCapabilities .ReactiveData }}
 
 {{ end }}<|INJECTED_MEMORY_{{ .Nonce }}|>
 # Memory Context
 These are the memories automatically retrieved by the system that are most relevant to the current input.
 {{ .InjectedMemory }}
-<|INJECTED_MEMORY_END_{{ .Nonce }}|>{{ end }}{{ if .TodoCheckpoint }}{{ if or .UserQuery .AutoContext .ExtraCapabilities .ReactiveData .InjectedMemory }}
+<|INJECTED_MEMORY_END_{{ .Nonce }}|>{{ end }}{{/*
+维护备注：TodoCheckpoint：调用方给出的当前 TODO 推进提醒，与 Open 的 TODO store 快照配合使用；
+不是另一份可写 TODO store。
+*/}}{{ if .TodoCheckpoint }}{{ if or .UserQuery .AutoContext .ExtraCapabilities .ReactiveData .InjectedMemory }}
 
 {{ end }}{{ .TodoCheckpoint }}{{ end }}

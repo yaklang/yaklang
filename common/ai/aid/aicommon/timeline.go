@@ -33,10 +33,12 @@ type Timeline struct {
 	// compressedHead 是运行态唯一有效压缩段（single source of truth）
 	compressedHead *TimelineCompressedHead
 	// compressedHistory 仅用于追溯，不参与当前并列渲染
-	compressedHistory   []*TimelineCompressedHistoryNode
-	promotedState       *TimelinePromotedState
-	freezeState         *TimelineFreezeState
-	evidenceInitialized bool // namespace survives rollback and empty serialized journals
+	compressedHistory []*TimelineCompressedHistoryNode
+	promotedState     *TimelinePromotedState
+	freezeState       *TimelineFreezeState
+	// Private framing key: persisted only in the internal Timeline snapshot.
+	userInputBoundaryKey string
+	evidenceInitialized  bool // namespace survives rollback and empty serialized journals
 
 	// this limit is used to limit the timeline dump content size (in tokens).
 	totalDumpContentLimit int64
@@ -218,6 +220,7 @@ func (m *Timeline) CopyReducibleTimelineWithMemory() *Timeline {
 		compressedHistory:     cloneTimelineCompressedHistory(m.compressedHistory),
 		promotedState:         cloneTimelinePromotedState(m.promotedState),
 		freezeState:           cloneTimelineFreezeState(m.freezeState),
+		userInputBoundaryKey:  m.userInputBoundaryKey,
 		evidenceInitialized:   m.evidenceInitialized,
 		totalDumpContentLimit: m.totalDumpContentLimit,
 		bucketByteSize:        m.bucketByteSize,
@@ -250,6 +253,7 @@ func (m *Timeline) CreateSubTimeline(ids ...int64) *Timeline {
 
 func (m *Timeline) createSubTimelineLocked(ids ...int64) *Timeline {
 	tl := NewTimeline(m.ai, m.extraMetaInfo)
+	tl.userInputBoundaryKey = m.userInputBoundaryKey
 	if m.config != nil {
 		tl.config = m.config
 	}
@@ -305,14 +309,15 @@ func (m *Timeline) SoftBindConfig(config AICallerConfigIf, aiCaller AICaller) {
 
 func NewTimeline(ai AICaller, extraMetaInfo func() string) *Timeline {
 	return &Timeline{
-		extraMetaInfo:    extraMetaInfo,
-		ai:               ai,
-		tsToTimelineItem: omap.NewOrderedMap(map[int64]*TimelineItem{}),
-		idToTimelineItem: omap.NewOrderedMap(map[int64]*TimelineItem{}),
-		idToTs:           omap.NewOrderedMap(map[int64]int64{}),
-		promotedState:    newTimelinePromotedState(),
-		freezeState:      &TimelineFreezeState{},
-		branchTimeline:   false,
+		extraMetaInfo:        extraMetaInfo,
+		ai:                   ai,
+		tsToTimelineItem:     omap.NewOrderedMap(map[int64]*TimelineItem{}),
+		idToTimelineItem:     omap.NewOrderedMap(map[int64]*TimelineItem{}),
+		idToTs:               omap.NewOrderedMap(map[int64]int64{}),
+		promotedState:        newTimelinePromotedState(),
+		freezeState:          &TimelineFreezeState{},
+		userInputBoundaryKey: newUserInputBoundaryKey(),
+		branchTimeline:       false,
 	}
 }
 
@@ -536,7 +541,7 @@ func (m *Timeline) DumpForPrompt() string {
 // item exceeds the whole budget, only that item's head and tail are retained so
 // the helper prompt remains bounded.
 func (m *Timeline) DumpRecentForPrompt(tokenLimit int) string {
-	return m.dumpRecentForPrompt(tokenLimit, false)
+	return m.dumpRecentForPrompt(tokenLimit, false, false)
 }
 
 // DumpRecentForPromptWithLatestModelReplay is the main ReAct counterpart of
@@ -544,10 +549,16 @@ func (m *Timeline) DumpRecentForPrompt(tokenLimit int) string {
 // same hard budget and recent-item ordering while allowing only the newest
 // successful decision replay into the projection.
 func (m *Timeline) DumpRecentForPromptWithLatestModelReplay(tokenLimit int) string {
-	return m.dumpRecentForPrompt(tokenLimit, true)
+	return m.dumpRecentForPrompt(tokenLimit, true, false)
 }
 
-func (m *Timeline) dumpRecentForPrompt(tokenLimit int, includeLatestModelReplay bool) string {
+// DumpRecentOrdinaryForPrompt is paired with the exact user-input projection in
+// lightweight loops. The independent recent-event budget never clips user input.
+func (m *Timeline) DumpRecentOrdinaryForPrompt(tokenLimit int, includeLatestModelReplay bool) string {
+	return m.dumpRecentForPrompt(tokenLimit, includeLatestModelReplay, true)
+}
+
+func (m *Timeline) dumpRecentForPrompt(tokenLimit int, includeLatestModelReplay bool, excludeUserInput bool) string {
 	if m == nil || tokenLimit <= 0 {
 		return ""
 	}
@@ -585,6 +596,11 @@ func (m *Timeline) dumpRecentForPrompt(tokenLimit int, includeLatestModelReplay 
 		item, ok := m.tsToTimelineItem.GetByIndex(i)
 		if !ok || item == nil || item.deleted || isPromotableTimelineItem(item) {
 			continue
+		}
+		if excludeUserInput {
+			if op := timelinePromotionForItem(item); op != nil && op.Kind == TimelinePromotedKindUserInput {
+				continue
+			}
 		}
 		textItem, isText := timelineTextItem(item)
 		isActionResponse := isText && normalizeTimelinePromptCategory(extractTextEntryType(textItem.Text)) == "FUNCTION_CALL_ACTION_RESPONSE"

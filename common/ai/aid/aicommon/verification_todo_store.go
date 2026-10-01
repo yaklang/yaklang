@@ -32,11 +32,14 @@ type VerificationTodoStats struct {
 }
 
 type VerificationTodoScope struct {
-	TaskID    string `json:"task_id,omitempty"`
-	TaskIndex string `json:"task_index,omitempty"`
+	// PlanVersion is optional for ordinary ReAct and old persisted TODOs.
+	PlanVersion string `json:"plan_version,omitempty"`
+	TaskID      string `json:"task_id,omitempty"`
+	TaskIndex   string `json:"task_index,omitempty"`
 }
 
 func (s VerificationTodoScope) normalize() VerificationTodoScope {
+	s.PlanVersion = strings.TrimSpace(s.PlanVersion)
 	s.TaskID = strings.TrimSpace(s.TaskID)
 	s.TaskIndex = strings.TrimSpace(s.TaskIndex)
 	return s
@@ -53,11 +56,12 @@ type VerificationTodoItem struct {
 	CreatedAt int                    `json:"created_at"`
 	UpdatedAt int                    `json:"updated_at"`
 
-	ScopeTaskID    string      `json:"scope_task_id,omitempty"`
-	ScopeTaskIndex string      `json:"scope_task_index,omitempty"`
-	Outcome        TodoOutcome `json:"outcome,omitempty"`
-	Reason         string      `json:"reason,omitempty"`
-	Refs           []string    `json:"refs,omitempty"`
+	ScopePlanVersion string      `json:"scope_plan_version,omitempty"`
+	ScopeTaskID      string      `json:"scope_task_id,omitempty"`
+	ScopeTaskIndex   string      `json:"scope_task_index,omitempty"`
+	Outcome          TodoOutcome `json:"outcome,omitempty"`
+	Reason           string      `json:"reason,omitempty"`
+	Refs             []string    `json:"refs,omitempty"`
 
 	CreatedTs       int64 `json:"created_ts,omitempty"`
 	FocusStartedTs  int64 `json:"focus_started_ts,omitempty"`
@@ -68,10 +72,11 @@ type VerificationTodoItem struct {
 }
 
 func (i VerificationTodoItem) scope() VerificationTodoScope {
-	return VerificationTodoScope{TaskID: i.ScopeTaskID, TaskIndex: i.ScopeTaskIndex}.normalize()
+	return VerificationTodoScope{TaskID: i.ScopeTaskID, TaskIndex: i.ScopeTaskIndex, PlanVersion: i.ScopePlanVersion}.normalize()
 }
 
 type TodoOpenItem struct {
+	PlanVersion    string `json:"plan_version,omitempty"`
 	ID             string `json:"id"`
 	Text           string `json:"text"`
 	CreatedAt      int    `json:"created_at"`
@@ -83,6 +88,7 @@ type TodoOpenItem struct {
 }
 
 type TodoClosedItem struct {
+	PlanVersion     string      `json:"plan_version,omitempty"`
 	ID              string      `json:"id"`
 	Text            string      `json:"text"`
 	Outcome         TodoOutcome `json:"outcome"`
@@ -332,7 +338,7 @@ func (s *VerificationTodoStore) applyTodoDelta(scope VerificationTodoScope, delt
 			results = append(results, todoDeltaFailure(operation, state.closedTodoRecoveryHint(closed)))
 			continue
 		}
-		state.OpenTodos = append(state.OpenTodos, &TodoOpenItem{ID: item.ID, Text: item.Text, CreatedAt: revision, UpdatedAt: revision, CreatedTs: now})
+		state.OpenTodos = append(state.OpenTodos, &TodoOpenItem{PlanVersion: scope.normalize().PlanVersion, ID: item.ID, Text: item.Text, CreatedAt: revision, UpdatedAt: revision, CreatedTs: now})
 		results = append(results, todoDeltaSuccess(operation))
 	}
 	for _, item := range delta.Update {
@@ -346,11 +352,12 @@ func (s *VerificationTodoStore) applyTodoDelta(scope VerificationTodoScope, delt
 			}
 			continue
 		}
-		if open.Text == item.Text {
+		if open.Text == item.Text && open.PlanVersion == scope.normalize().PlanVersion {
 			results = append(results, todoDeltaNoOp(operation, "todo text is already unchanged"))
 			continue
 		}
 		open.Text, open.UpdatedAt = item.Text, revision
+		open.PlanVersion = scope.normalize().PlanVersion
 		results = append(results, todoDeltaSuccess(operation))
 	}
 	for _, item := range delta.Close {
@@ -364,9 +371,13 @@ func (s *VerificationTodoStore) applyTodoDelta(scope VerificationTodoScope, delt
 			}
 			continue
 		}
+		if scope.PlanVersion != "" && open.PlanVersion != scope.PlanVersion && item.Outcome == TodoOutcomeResolved {
+			results = append(results, todoDeltaFailure(operation, "plan definition changed: explicitly re-evaluate this TODO with todo_delta.update before resolving it under the current plan version"))
+			continue
+		}
 		state.OpenTodos = append(state.OpenTodos[:openIndex], state.OpenTodos[openIndex+1:]...)
 		state.ClosedTodos = append(state.ClosedTodos, &TodoClosedItem{
-			ID: open.ID, Text: open.Text, Outcome: item.Outcome, Reason: item.Reason,
+			PlanVersion: open.PlanVersion, ID: open.ID, Text: open.Text, Outcome: item.Outcome, Reason: item.Reason,
 			Refs: append([]string(nil), item.Refs...), CreatedAt: open.CreatedAt, UpdatedAt: revision,
 			CreatedTs: open.CreatedTs, FocusStartedTs: open.FocusStartedTs, ClosedTs: now,
 		})
@@ -389,6 +400,8 @@ func (s *VerificationTodoStore) applyTodoDelta(scope VerificationTodoScope, delt
 			} else {
 				results = append(results, todoDeltaFailure(operation, "current must reference an open TODO in the current task scope after add/update/close are applied; open todo ids: "+state.openIDSummary()))
 			}
+		} else if open := state.findOpen(current); open != nil && scope.PlanVersion != "" && open.PlanVersion != scope.PlanVersion {
+			results = append(results, todoDeltaFailure(operation, "plan definition changed: explicitly re-evaluate this TODO with todo_delta.update before making it current"))
 		} else if state.CurrentTodoID == current {
 			results = append(results, todoDeltaNoOp(operation, "current focus already matches"))
 		} else {
@@ -529,14 +542,14 @@ func projectScope(state *TodoScopeState) []VerificationTodoItem {
 		if item.ID == state.CurrentTodoID {
 			status = VerificationTodoStatusDoing
 		}
-		items = append(items, VerificationTodoItem{ID: item.ID, Content: item.Text, Status: status, CreatedAt: item.CreatedAt, UpdatedAt: item.UpdatedAt, ScopeTaskID: state.TaskID, ScopeTaskIndex: state.TaskIndex, CreatedTs: item.CreatedTs, FocusStartedTs: item.FocusStartedTs})
+		items = append(items, VerificationTodoItem{ID: item.ID, Content: item.Text, Status: status, CreatedAt: item.CreatedAt, UpdatedAt: item.UpdatedAt, ScopePlanVersion: item.PlanVersion, ScopeTaskID: state.TaskID, ScopeTaskIndex: state.TaskIndex, CreatedTs: item.CreatedTs, FocusStartedTs: item.FocusStartedTs})
 	}
 	for _, item := range state.ClosedTodos {
 		if item == nil {
 			continue
 		}
 		status := map[TodoOutcome]VerificationTodoStatus{TodoOutcomeResolved: VerificationTodoStatusDone, TodoOutcomeDismissed: VerificationTodoStatusDeleted, TodoOutcomeDeferred: VerificationTodoStatusSkipped}[item.Outcome]
-		items = append(items, VerificationTodoItem{ID: item.ID, Content: item.Text, Status: status, CreatedAt: item.CreatedAt, UpdatedAt: item.UpdatedAt, ScopeTaskID: state.TaskID, ScopeTaskIndex: state.TaskIndex, Outcome: item.Outcome, Reason: item.Reason, Refs: append([]string(nil), item.Refs...), CreatedTs: item.CreatedTs, FocusStartedTs: item.FocusStartedTs, ClosedTs: item.ClosedTs})
+		items = append(items, VerificationTodoItem{ID: item.ID, Content: item.Text, Status: status, CreatedAt: item.CreatedAt, UpdatedAt: item.UpdatedAt, ScopePlanVersion: item.PlanVersion, ScopeTaskID: state.TaskID, ScopeTaskIndex: state.TaskIndex, Outcome: item.Outcome, Reason: item.Reason, Refs: append([]string(nil), item.Refs...), CreatedTs: item.CreatedTs, FocusStartedTs: item.FocusStartedTs, ClosedTs: item.ClosedTs})
 	}
 	return items
 }
@@ -628,6 +641,17 @@ func (s *VerificationTodoStore) RenderWithCurrentScope(scope VerificationTodoSco
 	}
 	lines := []todoRenderLine{{text: formatVerificationTodoCurrentTaskHeader(scope)}}
 	current := s.SnapshotItemsByScope(scope)
+	if scope.PlanVersion != "" {
+		for i := range current {
+			if current[i].ScopePlanVersion != scope.PlanVersion {
+				label := "旧计划 TODO，需核对后 update / close"
+				if current[i].Status != VerificationTodoStatusPending && current[i].Status != VerificationTodoStatusDoing {
+					label = "历史计划记录，不能证明当前计划完成"
+				}
+				current[i].Content = "[" + label + "] " + current[i].Content
+			}
+		}
+	}
 	if len(current) == 0 {
 		lines = append(lines, todoRenderLine{text: "- (当前任务无 TODO；空清单不代表任务完成)"})
 	} else {
@@ -702,6 +726,9 @@ func formatVerificationTodoCurrentTaskHeader(scope VerificationTodoScope) string
 
 func formatScope(scope VerificationTodoScope) string {
 	scope = scope.normalize()
+	if scope.PlanVersion != "" {
+		return fmt.Sprintf("[task_index=%s, task_id=%s, plan_version=%s]", scope.TaskIndex, scope.TaskID, scope.PlanVersion)
+	}
 	return fmt.Sprintf("[task_index=%s, task_id=%s]", scope.TaskIndex, scope.TaskID)
 }
 
@@ -844,7 +871,7 @@ func migrateLegacyTodoItems(items []*VerificationTodoItem) *VerificationTodoStor
 		if item == nil {
 			continue
 		}
-		scope := VerificationTodoScope{TaskID: item.ScopeTaskID, TaskIndex: item.ScopeTaskIndex}
+		scope := VerificationTodoScope{TaskID: item.ScopeTaskID, TaskIndex: item.ScopeTaskIndex, PlanVersion: item.ScopePlanVersion}
 		state := store.ensureScope(scope)
 		if item.UpdatedAt > state.Revision {
 			state.Revision = item.UpdatedAt
@@ -854,13 +881,13 @@ func migrateLegacyTodoItems(items []*VerificationTodoItem) *VerificationTodoStor
 		}
 		switch item.Status {
 		case VerificationTodoStatusPending, VerificationTodoStatusDoing:
-			state.OpenTodos = append(state.OpenTodos, &TodoOpenItem{ID: item.ID, Text: item.Content, CreatedAt: item.CreatedAt, UpdatedAt: item.UpdatedAt, CreatedTs: item.CreatedTs, FocusStartedTs: item.FocusStartedTs})
+			state.OpenTodos = append(state.OpenTodos, &TodoOpenItem{PlanVersion: item.ScopePlanVersion, ID: item.ID, Text: item.Content, CreatedAt: item.CreatedAt, UpdatedAt: item.UpdatedAt, CreatedTs: item.CreatedTs, FocusStartedTs: item.FocusStartedTs})
 			if item.Status == VerificationTodoStatusDoing && newestDoing[state.TaskID] == item {
 				state.CurrentTodoID = item.ID
 			}
 		case VerificationTodoStatusDone, VerificationTodoStatusDeleted, VerificationTodoStatusSkipped:
 			outcome := map[VerificationTodoStatus]TodoOutcome{VerificationTodoStatusDone: TodoOutcomeResolved, VerificationTodoStatusDeleted: TodoOutcomeDismissed, VerificationTodoStatusSkipped: TodoOutcomeDeferred}[item.Status]
-			state.ClosedTodos = append(state.ClosedTodos, &TodoClosedItem{ID: item.ID, Text: item.Content, Outcome: outcome, Reason: legacyTodoReason, Refs: []string{}, CreatedAt: item.CreatedAt, UpdatedAt: item.UpdatedAt, CreatedTs: item.CreatedTs, FocusStartedTs: item.FocusStartedTs, ClosedTs: item.ClosedTs})
+			state.ClosedTodos = append(state.ClosedTodos, &TodoClosedItem{PlanVersion: item.ScopePlanVersion, ID: item.ID, Text: item.Content, Outcome: outcome, Reason: legacyTodoReason, Refs: []string{}, CreatedAt: item.CreatedAt, UpdatedAt: item.UpdatedAt, CreatedTs: item.CreatedTs, FocusStartedTs: item.FocusStartedTs, ClosedTs: item.ClosedTs})
 		}
 	}
 	return store

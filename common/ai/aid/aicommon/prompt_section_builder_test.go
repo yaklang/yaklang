@@ -133,3 +133,21 @@ func TestBuildTaggedPromptSectionsWithSectionNamesAndForce_KeepsEmptySemiWrapper
 	require.NotEmpty(t, sections[aiprojection.SectionSemiDynamic1])
 	require.Empty(t, sections[aiprojection.SectionRaw])
 }
+
+func TestPromptPrefixBuilder_ClockInDynamicKeepsEmptyOpenEnvelope(t *testing.T) {
+	builder := NewDefaultPromptPrefixBuilder()
+	materials := &PromptMaterials{CurrentTime: "CLOCK_DYNAMIC_ONLY"}
+	prompt, err := builder.AssemblePromptWithDynamicSection(materials, "clock-test", "CURRENT_QUERY", nil, "turn")
+	require.NoError(t, err)
+	require.Contains(t, prompt, aiprojection.CreateTemplate("<|PROMPT_SECTION_timeline-open|>"))
+	sections := promptBuilderChunksBySection(t, prompt)
+	for _, chunks := range sections {
+		for _, chunk := range chunks {
+			if chunk.Section != aiprojection.SectionDynamic {
+				require.NotContains(t, chunk.Content, "CLOCK_DYNAMIC_ONLY")
+			}
+		}
+	}
+	require.Len(t, sections[aiprojection.SectionDynamic], 1)
+	require.Contains(t, sections[aiprojection.SectionDynamic][0].Content, "CLOCK_DYNAMIC_ONLY")
+}

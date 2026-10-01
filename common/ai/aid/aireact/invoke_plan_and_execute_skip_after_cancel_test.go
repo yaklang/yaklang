@@ -145,7 +145,7 @@ func TestReAct_PlanAndExecute_SkipAfterCancel(t *testing.T) {
 				return rsp, nil
 			}
 
-			if utils.MatchAllOfSubString(prompt, "PROGRESS_TASK_", planFlag) {
+			if utils.MatchAllOfSubString(prompt, "# Plan Runtime State", planFlag) {
 				rsp := i.NewAIResponse()
 				rsp.EmitOutputStream(bytes.NewBufferString(`
 {"@action": "require_tool", "tool_require_payload": "` + mockToolName + `", 
@@ -156,7 +156,7 @@ func TestReAct_PlanAndExecute_SkipAfterCancel(t *testing.T) {
 			}
 
 			if isPrimaryDecisionPrompt(prompt) &&
-				!utils.MatchAllOfSubString(prompt, "PROGRESS_TASK_") {
+				!utils.MatchAllOfSubString(prompt, "# Plan Runtime State") {
 				rsp := i.NewAIResponse()
 				rsp.EmitOutputStream(bytes.NewBufferString(`
 {"@action": "object", "next_action": { "type": "require_ai_blueprint", "blueprint_payload": "` + testForgeName + `" },
@@ -173,7 +173,7 @@ func TestReAct_PlanAndExecute_SkipAfterCancel(t *testing.T) {
 				return rsp, nil
 			}
 
-			if utils.MatchAllOfSubString(prompt, "任务执行引擎", "task_long_summary") && !utils.MatchAllOfSubString(prompt, "PROGRESS_TASK_") {
+			if utils.MatchAllOfSubString(prompt, "任务执行引擎", "task_long_summary") && !utils.MatchAllOfSubString(prompt, "# Plan Runtime State") {
 				rsp := i.NewAIResponse()
 				rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "summary", "status_summary": "done", "task_short_summary": "completed", "task_long_summary": "task completed"}`))
 				rsp.Close()

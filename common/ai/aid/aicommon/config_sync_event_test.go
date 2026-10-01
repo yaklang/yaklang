@@ -3,6 +3,7 @@ package aicommon
 import (
 	"context"
 	"encoding/json"
+	"strings"
 	"testing"
 	"time"
 
@@ -219,8 +220,8 @@ func TestHandleSyncUserIntervention(t *testing.T) {
 
 		entries := c.Timeline.ToTimelineItemOutputLastN(1)
 		require.Len(t, entries, 1)
-		require.Equal(t, "text", entries[0].Type)
-		require.Equal(t, "[User Intervention] "+content, entries[0].Content)
+		require.Equal(t, "user_interaction", entries[0].Type)
+		require.Contains(t, entries[0].Content, "user-answer: "+content)
 		history := c.GetUserInputHistory()
 		require.Len(t, history, 1)
 		require.Equal(t, content, history[0].UserInput)
@@ -279,7 +280,7 @@ func TestProcessInputEvent_SyncUserIntervention(t *testing.T) {
 
 	require.Eventually(t, func() bool {
 		entries := c.Timeline.ToTimelineItemOutputLastN(1)
-		return len(entries) == 1 && entries[0].Content == "[User Intervention] "+content
+		return len(entries) == 1 && strings.Contains(entries[0].Content, "user-answer: "+content)
 	}, time.Second, 20*time.Millisecond)
 
 	history := c.GetUserInputHistory()

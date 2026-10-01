@@ -1,6 +1,17 @@
-{{ if .ForcedSkills }}{{ .ForcedSkills }}
+{{/*
+维护备注：Frozen Prefix：调用方已固定的配置材料及已封存普通执行历史。
+用户历史与 Evidence 不在 TimelineFrozen 中；
+精确投影位于 Semi Dynamic 1。
+名称 Frozen 表示缓存/生命周期位置，不授予材料新的权限。
+*/}}{{/*
+维护备注：ForcedSkills：用户明确要求加载的技能全文，由当前 loop 的技能管理器提供，放在 Frozen 顶部；
+这是技能指导，不是用户 Query 的封存历史。
+*/}}{{ if .ForcedSkills }}{{ .ForcedSkills }}
 
-{{ end }}{{ if .ToolInventory }}# Tool Inventory — 业务工具目录
+{{ end }}{{/*
+维护备注：ToolInventory：调用方决定是否展示业务工具目录；
+TopTools 为按 token 预算选出的优先子集，不是全部可用工具，也不是原生 action 声明。
+*/}}{{ if .ToolInventory }}# Tool Inventory — 业务工具目录
 用法：下列仅是工具名称和简介，不含完整参数 Schema；原生 `tool_calls[].function.name` 只能选已声明的 action，目录名称要填在 action 参数中。
 完整 Schema 已知（优先查 `CACHE_TOOL_CALL`）→ 自行构造参数并使用 `directly_call_tool`：`directly_call_tool_name`=名称、`directly_call_tool_params`=参数；否则 → `require_tool`：`tool_require_payload`=名称，具体准备行为以本轮 action 声明为准。缓存未命中但已知完整 Schema 时仍可直调，由运行时校验。
 
@@ -15,17 +26,40 @@
 - 任一批次发生准入、Schema 或参数错误后，保留已成功结果，将失败调用改为修正后的单调用；禁止原样重试批次.
 
 ## Prioritized Tools
-{{ range .TopTools -}}
+{{/*
+维护备注：TopTools.Name/Description：来自工具管理器的名称和简介；
+参数 Schema 需从缓存或工具准备流程获取，目录文本不表示已经执行。
+*/}}{{ range .TopTools -}}
 * `{{ .Name }}`: {{ .Description }}
 {{ end }}
 > 此处为优先展示目录；完整能力范围可按需通过能力检索入口查询。
 {{ end }}
 
-{{ if .ForgeInventory }}# AI Blueprint Inventory
+{{/*
+维护备注：ForgeInventory / AIForgeList：调用方提供的当前蓝图目录快照；
+描述可用能力，不证明蓝图已经运行或产物已生成。
+*/}}{{ if .ForgeInventory }}# AI Blueprint Inventory
 以下是当前可直接调用的 AI 蓝图列表：
 {{ .AIForgeList }}{{ end }}
 
-{{ range .FrozenPartitions }}
+{{/*
+维护备注：FrozenPartitions：Config 与当前任务提供的已固定上下文分区；
+plan_definition：整棵计划的目标、任务输入、树结构及依赖、固定 facts/document 内容指纹，SHA256 内容版本；
+存档来源 AISessionPlanAndExec.TaskTree（task_input、plan_source_user_query 等字段），
+重新规划或定义变化产生新版本；状态、当前节点、摘要、时钟不改变定义内容。
+plan_facts / plan_document 仍由 Config.FrozenBlockPartitionProducer 提供；
+存档位置：AISessionPlanAndExec.TaskTree 根节点 plan_frozen_partitions（仅这两个 id）；
+存档字段中的 Title/Order/Nonce 恢复为框架固定元数据，不能把标签语法带到 Content 边界外；
+恢复根任务时重建 producer 分区；旧快照无字段时保持兼容，不凭空补造材料。
+定义是只读参考数据，JSON 转义 + REFERENCE_DATA_PLAN_DEFINITION 会话 HMAC 边界不授予角色/工具/Schema 权限。
+主循环的 plan_facts / plan_document 分别以 REFERENCE_DATA_PLAN_FACTS / PLAN_DOCUMENT 边界保护；
+用户原话另用 USER_INTERACT，不把计划或框架状态冒充用户输入。
+Title/ID/Nonce 标识分区，Content 来自调用方的持久上下文、facts/document 或子任务材料。
+按内容来源使用，不因缓存位置成为用户授权。
+*/}}{{ range .FrozenPartitions }}{{ if eq .ID "plan_definition" }}
+# Plan Definition (Versioned Reference Data)
+同版本定义跨执行回合及子任务切换保持不变；实际进度见 Timeline Open 的 PlanRuntimeState，用户输入/规划字段不自动成为已验证 Evidence。
+{{ end }}
 {{ if .Content }}# {{ .Title }}
 <|FROZEN_PARTITION_{{ .ID }}_{{ .Nonce }}|>
 {{ .Content }}
@@ -35,5 +69,9 @@
 
 
 
-{{ if .TimelineFrozen }}# Timeline Memory (Frozen Prefix)
+{{/*
+维护备注：TimelineFrozen：Timeline 已封存普通事件与压缩头的 prompt 投影；
+普通执行历史可摘要。
+精确用户输入、Evidence 与工具缓存封存后分别进入 Semi1，不在此重复渲染。
+*/}}{{ if .TimelineFrozen }}# Timeline Memory (Frozen Prefix)
 {{ .TimelineFrozen }}{{ end }}

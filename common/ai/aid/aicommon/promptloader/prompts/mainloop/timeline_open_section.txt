@@ -1,27 +1,53 @@
-{{ if .TimelineOpen }}# Timeline Memory (Open Tail)
+{{/*
+维护备注：Timeline Open：各缓存前缀之后的可变尾部。
+TimelineOpen、PlanRuntimeState、TodoSnapshot、PlanContext、ReportedRisks 的来源不同，不能把尾部所有内容都当作普通 Timeline 事件。
+当前时钟只在 Dynamic；事件和用户输入自带的发生时间保留在各自记录中。
+*/}}{{/*
+维护备注：TimelineOpen：RenderTimelineFrozenOpenWithOptions() 输出未封存 journal；
+包含用户输入原文、Evidence/工具缓存 delta 与普通执行事件。
+封存时用户输入原文和 Evidence/缓存分别提升至 Semi1，普通执行历史进入 Frozen 或压缩摘要。
+*/}}{{ if .TimelineOpen }}# Timeline Memory (Open Tail)
 
-开放时间线记录的是当前回合"刚刚发生过的事情"——最近若干步工具调用、其返回的观察结果与流程事件，按时间先后追加，是会话内最易变的"近期记忆"段。
-请把它作为"目前已经做了什么"的事实依据：判断任务进度、确认已经尝试过哪些路径、避免重复发起同一工具调用。
+开放时间线记录的是当前回合"刚刚发生过的事情"——尚未封存的用户输入原文、工具调用、观察结果、Evidence/工具缓存变更与流程事件，按时间先后追加，是会话内最易变的"近期记忆"段。
+用户输入用于理解需求与回复，不自动成为已验证事实；Evidence delta 按同 id 的最新 UPSERT/DELETE 生效，封存后投影到 Semi Dynamic 1。普通执行事件用于判断"目前已经做了什么"：判断任务进度、确认已经尝试过哪些路径、避免重复发起同一工具调用。
 
 {{ .TimelineOpen }}{{ end }}
 
 
 
-{{ if .TodoSnapshot }}
+{{/*
+维护备注：PlanRuntimeState：AiTask.GetPlanPromptContext() 从真实任务树/依赖图构建，
+含 PlanVersion、当前节点、父节点、TODO scope、节点状态、未完成依赖。
+REFERENCE_DATA_PLAN_RUNTIME_STATE 标识框架只读观测，区别于 USER_INTERACT 用户原文；
+会话 HMAC 边界只界定数据，不授予系统/缓存/Schema/工具权限。
+存档来源：AISessionPlanAndExec.TaskTree / TaskProgress；恢复后由真实状态重建；
+不是另一个 Timeline Evidence store，不等待封桶，也不进入任何缓存边界。
+此处先展示计划层状态，再展示节点内 TODO；状态、摘要、时钟不进入 Frozen 定义版本。
+*/}}{{ if .PlanRuntimeState }}# Plan Runtime State (Read Only)
+计划定义见 Frozen 中同 plan_version 的 plan_definition；计划状态约束当前 TODO，不能用 TODO 完成代替整棵任务树完成。
+{{ .PlanRuntimeState }}
+{{ end }}
+
+{{/*
+维护备注：PlanContext：PromptMaterials.FrozenUserContext 经 TimelineOpenData 映射得到的当前计划/父任务上下文；
+名字里的 Frozen 不代表其位于 Frozen Prefix。
+legacy 调用方使用；新计划已分成 Frozen 定义 / Semi2 规则 / TODO 前实时状态。
+它随当前任务变化，留在缓存之外，供参考当前执行范围。
+*/}}{{ if .PlanContext }}{{ .PlanContext }}{{ end }}
+{{/*
+维护备注：TodoSnapshot：SessionPromptState 的 TODO store 只读快照，按当前任务 scope 与 plan_version 渲染；旧版本未关闭项继续阻塞，需要显式 update 复核，旧关闭项仅作历史参考；
+存档来源 SessionPromptState 的 VerificationTodoStore（canonical 项 plan_version，兼容投影 scope_plan_version）；
+每轮读取当前状态，不参加 Timeline 封存。
+通过既有 todo_delta 规则写入，不能直接改这段文本。
+*/}}{{ if .TodoSnapshot }}
 
 TODO LIST 是当前任务的只读状态快照；执行和写入规则见 High Static 的 TODO 状态维护。优先推进 CURRENT，新发现先登记。
 
 {{ .TodoSnapshot }}
 {{ end }}
 
-{{ if .UserHistory }}
-以下 PREV_USER_INPUT 块是当前会话内用户在此前各轮的原始输入文本，按时间先后给出，用于跨回合维持上下文连贯：理解用户的真实意图、追溯尚未完成的请求、避免反复询问用户早已明确说过的信息。
-注意：这里列出的是"历史输入"，当前回合的实际指令以 USER_QUERY 块为准，本块仅作背景参考。
-{{ .UserHistory }}
-{{ end }}
-{{ if .CurrentTime }}# Current Time
-{{ .CurrentTime }}{{ end }}
-
-{{ if .PlanContext }}{{ .PlanContext }}{{ end }}
-{{ if .ReportedRisks }}
+{{/*
+维护备注：ReportedRisks：SessionPromptState 中已报告漏洞记录的只读渲染，供调用 cybersecurity-risk 前去重；
+随上报更新，不是新的用户指令，也不与 Evidence 存储混同。
+*/}}{{ if .ReportedRisks }}
 {{ .ReportedRisks }}{{ end }}

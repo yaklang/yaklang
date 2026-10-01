@@ -104,12 +104,16 @@ func (m *Timeline) freezeBudgetGroupsLocked(useSizer bool) TimelineIntervalBlock
 		if !ok || item == nil || item.deleted || id <= through {
 			continue
 		}
-		if control, ok := item.value.(*PromotableTimelineItem); ok {
+		if control := timelinePromotionForItem(item); control != nil {
+			openText := m.promotableOpenPromptTextLocked(control)
 			item = &TimelineItem{createdAt: item.createdAt, value: &TextTimelineItem{
-				ID: id, Text: control.OpenPromptText(),
+				ID: id, Text: openText,
 			}}
+			if control.Kind == TimelinePromotedKindUserInput {
+				item.value = &timelineUserInputPromptItem{TextTimelineItem{ID: id, Text: openText}}
+			}
 			if control.Kind == TimelinePromotedKindRecentTool {
-				item.value = &timelineToolCachePromptItem{TextTimelineItem{ID: id, Text: control.OpenPromptText()}}
+				item.value = &timelineToolCachePromptItem{TextTimelineItem{ID: id, Text: openText}}
 			}
 		}
 		view.idToTimelineItem.OrderInsert(id, item, lessInt64)
@@ -173,7 +177,7 @@ func (m *Timeline) freezeLocked(all bool) TimelineFreezeResult {
 				result.ThroughID = id
 			}
 			if original, ok := m.idToTimelineItem.Get(id); ok {
-				if control, ok := original.value.(*PromotableTimelineItem); ok {
+				if control := timelinePromotionForItem(original); control != nil {
 					result.Promotions = append(result.Promotions, *control)
 				}
 			}
@@ -199,9 +203,9 @@ func (m *Timeline) freezeLocked(all bool) TimelineFreezeResult {
 // rendered in place; frozen controls appear only in semi-dynamic snapshots.
 // Filtering occurs after bucket selection, so helper prompts share the same
 // freeze boundaries without receiving unrelated tool-cache schemas.
-func (m *Timeline) frozenPromptBlocksLocked(excludeToolCache bool) TimelineRenderableBlocks {
+func (m *Timeline) frozenPromptBlocksLocked(excludeToolCache bool, onlyUserInput bool) TimelineRenderableBlocks {
 	var blocks TimelineRenderableBlocks
-	if m.compressedHead != nil && strings.TrimSpace(m.compressedHead.Text) != "" {
+	if !onlyUserInput && m.compressedHead != nil && strings.TrimSpace(m.compressedHead.Text) != "" {
 		blocks = append(blocks, &TimelineCompressedHeadBlock{
 			CoveredEndItemID: m.compressedHead.CoveredEndItemID, CoveredEndAtMs: m.compressedHead.CoveredEndAtMs,
 			Version: m.compressedHead.Version, Text: m.compressedHead.Text,
@@ -217,22 +221,29 @@ func (m *Timeline) frozenPromptBlocksLocked(excludeToolCache bool) TimelineRende
 			if !ok || item == nil || item.deleted {
 				continue
 			}
-			if isPromotableTimelineItem(item) {
-				op := item.value.(*PromotableTimelineItem)
-				if !open || op == nil {
+			op := timelinePromotionForItem(item)
+			if onlyUserInput && (op == nil || op.Kind != TimelinePromotedKindUserInput) {
+				continue
+			}
+			if op != nil {
+				if !open {
 					continue
 				}
 				if op.Kind == TimelinePromotedKindRecentTool && excludeToolCache {
 					filteredToolCache = true
 					continue
 				}
-				if op.Kind != TimelinePromotedKindEvidence && op.Kind != TimelinePromotedKindRecentTool {
+				if op.Kind != TimelinePromotedKindEvidence && op.Kind != TimelinePromotedKindRecentTool && op.Kind != TimelinePromotedKindUserInput {
 					continue
 				}
 				// A detached prompt view preserves the journal, reducer exclusion and UI audit.
-				item = &TimelineItem{createdAt: item.createdAt, value: &TextTimelineItem{ID: id, Text: op.OpenPromptText()}}
+				openText := m.promotableOpenPromptTextLocked(op)
+				item = &TimelineItem{createdAt: item.createdAt, value: &TextTimelineItem{ID: id, Text: openText}}
+				if op.Kind == TimelinePromotedKindUserInput {
+					item.value = &timelineUserInputPromptItem{TextTimelineItem{ID: id, Text: openText}}
+				}
 				if op.Kind == TimelinePromotedKindRecentTool {
-					item.value = &timelineToolCachePromptItem{TextTimelineItem{ID: id, Text: op.OpenPromptText()}}
+					item.value = &timelineToolCachePromptItem{TextTimelineItem{ID: id, Text: openText}}
 				}
 			}
 			block.Items = append(block.Items, item)
