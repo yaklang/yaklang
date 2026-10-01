@@ -77,6 +77,51 @@ type declarationScanner struct {
 	index, end int
 }
 
+// A leading generic or empty array type followed by :: cannot be an ordinary
+// primary expression. Recognize only this expensive overlap; dotted member
+// chains, annotated types and restricted final type identifiers retain ATN.
+// Generated typeArguments still validates the bounded token skeleton.
+func typeReferencePrefix(input antlr.TokenStream) bool {
+	stream, ok := input.(*antlr.CommonTokenStream)
+	if !ok {
+		return false
+	}
+	index := input.Index()
+	if index < 0 || !stream.Sync(index) || stream.Get(index).GetChannel() != antlr.TokenDefaultChannel {
+		return false
+	}
+	first, second := input.LA(1), input.LA(2)
+	if !((isIdentifier(first) && second == JavaParserLT) ||
+		((isIdentifier(first) || isPrimitive(first)) && second == JavaParserLBRACK && input.LA(3) == JavaParserRBRACK)) {
+		return false
+	}
+	s := declarationScanner{stream: stream, index: index, end: index + declarationPrefixTokens}
+	s.index++
+	last := first
+	if !isPrimitive(first) {
+		for {
+			if s.next() == JavaParserLT && !s.typeArguments() {
+				return false
+			}
+			if s.next() != JavaParserDOT {
+				break
+			}
+			s.index++
+			last = s.next()
+			if !isIdentifier(last) {
+				return false
+			}
+			s.index++
+		}
+		// classOrInterfaceType ends with typeIdentifier, which excludes these
+		// identifiers even though qualified prefixes may contain them.
+		if last == JavaParserVAR || last == JavaParserYIELD {
+			return false
+		}
+	}
+	return s.arrayDimensions() && s.next() == JavaParserCOLONCOLON
+}
+
 // The qualified-type loop asks whether identifier typeArguments? is followed
 // by a dot. Repeated ATN exploration of nested arguments otherwise revisits
 // the same generic suffix at each nesting level. Scan only that bounded suffix.

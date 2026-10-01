@@ -16,6 +16,16 @@ func TestPredictionSSAValues(t *testing.T) {
 `, []string{"3", "2"}, t)
 }
 
+func TestPredictionSSAReferenceAndPrecedence(t *testing.T) {
+	CheckJavaPrintlnValue(`Object factory = T<X>::new;
+        int a = 1, b = 2, c = 3;
+        println(a + b * c);
+        println((a + b) * c);
+        a += b * c;
+        println(a);
+`, []string{"7", "9", "7"}, t)
+}
+
 func BenchmarkJavaPredictionSSA(b *testing.B) {
 	for _, fixture := range []struct{ name, source string }{
 		{"small", "class C { int m(){ return 1+2; } }"},
@@ -23,6 +33,7 @@ func BenchmarkJavaPredictionSSA(b *testing.B) {
 		{"linear_8KiB", "class C { int m(){ int a=0,b=1;" + strings.Repeat("a=b+1; b=a+1;", 630) + "return a;}}"},
 		{"lambda_16", "class C { Object m(){ return " + strings.Repeat("f(x -> ", 16) + "x" + strings.Repeat(")", 16) + "; }}"},
 		{"generics_16", "class C {" + strings.Repeat("T<", 16) + "X" + strings.Repeat(">", 16) + " x;}"},
+		{"reference_generics_16", "class C { Object m(){ return " + strings.Repeat("T<", 16) + "X" + strings.Repeat(">", 16) + "::new; }}"},
 	} {
 		b.Run(fixture.name, func(b *testing.B) {
 			parse := func() {
