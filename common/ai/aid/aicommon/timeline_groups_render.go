@@ -523,6 +523,14 @@ func timelineItemTaskContext(item *TimelineItem) (taskID string, explicit bool) 
 		return "", false
 	}
 	text, ok := item.value.(*TextTimelineItem)
+	if exact, exactOK := item.value.(*timelineUserInputPromptItem); exactOK {
+		body := exact.Text
+		if end := strings.IndexByte(body, '\n'); end >= 0 {
+			body = body[end+1:]
+		}
+		text = &TextTimelineItem{Text: body}
+		ok = true
+	}
 	if !ok {
 		return "", false
 	}
@@ -609,6 +617,11 @@ func renderTimelineEntry(item *TimelineItem, bucketStart time.Time, state *timel
 	state.firstEntry = false
 	if explicitTask {
 		state.activeTaskID = taskID
+	}
+	if exact, ok := item.value.(*timelineUserInputPromptItem); ok {
+		buf.WriteByte('\n')
+		buf.WriteString(exact.Text)
+		return buf.String()
 	}
 	content := selectShrunkContent(item)
 	// Preserve literal AITAGs in data. aiprojection authenticates control tags
@@ -832,6 +845,8 @@ func renderItemTypeVerbose(item *TimelineItem) string {
 	switch v := item.value.(type) {
 	case *timelineToolCachePromptItem:
 		return "cache/tool"
+	case *timelineUserInputPromptItem:
+		return "user/input"
 	case *aitool.ToolResult:
 		name := strings.TrimSpace(v.Name)
 		if name == "" {

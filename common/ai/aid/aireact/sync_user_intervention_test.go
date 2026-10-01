@@ -73,7 +73,7 @@ LOOP:
 	require.Equal(t, content, payload["content"])
 
 	require.Eventually(t, func() bool {
-		return strings.Contains(ins.DumpTimeline(), "[User Intervention] "+content)
+		return strings.Contains(ins.DumpTimeline(), "user-answer: "+content)
 	}, time.Second, 20*time.Millisecond)
 
 	history := ins.config.GetUserInputHistory()
@@ -201,9 +201,11 @@ func TestReAct_SyncUserIntervention_PromptContainsHistoryForAI(t *testing.T) {
 	}, time.Second, 20*time.Millisecond)
 
 	userQueryBlock := aicommon_testutil.MustExtractAITagBlock(t, prompt, "USER_QUERY")
-	require.Equal(t, userInput, userQueryBlock.Body)
+	inputBlock := aicommon_testutil.MustExtractAITagBlock(t, userQueryBlock.Body, "USER_INTERACT")
+	require.Equal(t, userInput, inputBlock.Body)
 
-	prevUserInputBlock := aicommon_testutil.MustExtractAITagBlock(t, prompt, "PREV_USER_INPUT")
-	require.Equal(t, strings.TrimSpace(ins.config.FormatUserInputHistory()), prevUserInputBlock.Body)
+	require.Contains(t, prompt, "User Input: "+content)
+	require.Contains(t, prompt, "User Input: "+userInput)
+	require.NotContains(t, prompt, "<|PREV_USER_INPUT_", "pending inputs belong to Open, not a separately rendered history block")
 	require.NotContains(t, userQueryBlock.Body, content)
 }

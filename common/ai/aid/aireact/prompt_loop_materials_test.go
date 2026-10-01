@@ -314,7 +314,7 @@ func TestPromptManager_AssembleLoopPrompt_SectionOrder(t *testing.T) {
 	timelineOpenSectionIdx := strings.Index(prompt, aiprojection.CreateTemplate("<|PROMPT_SECTION_timeline-open|>"))
 	userQueryIdx := strings.Index(prompt, "<|USER_QUERY_n123|>")
 	autoCtxIdx := strings.Index(prompt, "<|AUTO_PROVIDE_CTX_[n123_provider_one]_START key=provider-one|>")
-	prevUserInputIdx := strings.Index(prompt, "<|PREV_USER_INPUT_n123|>")
+	prevUserInputIdx := strings.Index(prompt, "User Input: previous input")
 	reactiveDataIdx := strings.Index(prompt, "<|REACTIVE_DATA_n123|>")
 	injectedMemoryIdx := strings.Index(prompt, "<|INJECTED_MEMORY_n123|>")
 	checkpointIdx := strings.Index(prompt, "[CURRENT TODO CHECKPOINT]")
@@ -358,9 +358,7 @@ func TestPromptManager_AssembleLoopPrompt_SectionOrder(t *testing.T) {
 	// timelineIdx 是首次出现的 "# Timeline Memory", 此用例下 frozen 段无 timeline
 	// 内容 (单 timeline 事件全部落在最末桶), 因此首次出现位置必在 timeline_open 段。
 	require.Less(t, timelineOpenSectionIdx, timelineIdx)
-	// P1-C3: 段内新顺序 — Timeline -> Workspace -> PREV_USER_INPUT ->
-	// Current Time. SessionEvidence 在本测试中未注入 (LoopPromptAssemblyInput
-	// 未设 SessionEvidence), 模板会跳过空块, 不影响其它字段相对位置。
+	// Pending user input is rendered at its journal position inside Open.
 	require.Less(t, timelineIdx, prevUserInputIdx)
 	require.Less(t, prevUserInputIdx, currentTimeIdx)
 	require.Less(t, currentTimeIdx, userQueryIdx)
@@ -416,23 +414,13 @@ func TestPromptManager_AssembleLoopPrompt_SectionOrder(t *testing.T) {
 	require.Equal(t, reactloops.PromptSectionRoleSemiDynamic2, sections[3].Children[2].Role)
 
 	// timeline_open 段子结构 (P1-C3 段内重排后):
-	//   timeline_open ->
-	//   workspace -> user_history -> current_time -> plan_context (本用例
-	//   FrozenUserContext 为空被过滤).
-	// filterIncludedPromptSections 会过滤空段, 故实际剩 4 个 children:
-	//   [0] timeline_open
-	//   [1] workspace
-	//   [2] user_history
-	//   [3] current_time
-	// 关键词: timeline_open children Name 去前缀, P1-C3 子项顺序
+	// User history is part of the Open journal until promotion; there is no
+	// separate history child in the volatile section.
 	require.GreaterOrEqual(t, len(sections[2].Children), 2)
 	require.Equal(t, "section.semi_dynamic_1.workspace", sections[2].Children[0].Key)
-	require.GreaterOrEqual(t, len(sections[4].Children), 2)
+	require.Len(t, sections[4].Children, 1)
 	require.Equal(t, "section.timeline_open.timeline_open", sections[4].Children[0].Key)
 	require.Equal(t, "Timeline (Open Tail)", sections[4].Children[0].Label)
-	require.Equal(t, "section.timeline_open.user_history", sections[4].Children[1].Key)
-	require.Equal(t, "User History", sections[4].Children[1].Label)
-	require.Equal(t, reactloops.PromptSectionRoleTimelineOpen, sections[4].Children[1].Role)
 
 	require.GreaterOrEqual(t, len(sections[5].Children), 3)
 	require.Equal(t, "section.dynamic.current_time", sections[5].Children[0].Key)

@@ -16,6 +16,7 @@ type PromptMaterials struct {
 	AllowToolCall     bool
 	AllowPlanAndExec  bool
 	HasLoadCapability bool
+	PromoteUserInput  bool
 
 	TaskInstruction     string
 	ExecutionPolicy     string
@@ -53,16 +54,18 @@ type PromptMaterials struct {
 	ForgeInventory bool
 	AIForgeList    string
 
-	TimelineFrozen             string
-	TimelineOpen               string
-	PromotedTimelineOpen       string
-	TimelineFrozenTimeUnix     int64
-	FrozenPartitions           []FrozenBlockPartition
-	SessionArtifactsFrozen     string
-	SessionArtifactsOpen       string
-	SessionEvidenceFrozen      string
-	SessionEvidenceOpen        string
+	TimelineFrozen         string
+	TimelineOpen           string
+	PromotedTimelineOpen   string
+	TimelineFrozenTimeUnix int64
+	FrozenPartitions       []FrozenBlockPartition
+	SessionArtifactsFrozen string
+	SessionArtifactsOpen   string
+	SessionEvidenceFrozen  string
+	SessionEvidenceOpen    string
+	// SessionEvidenceSemiDynamic is Timeline-owned sealed Evidence, not a second store.
 	SessionEvidenceSemiDynamic string
+	PromptedUserInputHistory   string
 	CurrentTime                string
 	Workspace                  bool
 	OSArch                     string
@@ -77,7 +80,9 @@ type PromptMaterials struct {
 	// 缓存边界包裹, 避免污染上游 prefix cache.
 	//
 	// 关键词: TodoSnapshot, 全局 TODO 块, timeline-open 段位
-	TodoSnapshot      string
+	TodoSnapshot string
+	// Deprecated: main prompts derive PromptedUserInputHistory and TimelineOpen
+	// from the exact Timeline journal. Kept for bounded legacy helper callers.
 	UserHistory       string
 	FrozenUserContext string
 
@@ -90,9 +95,12 @@ type PromptMaterials struct {
 	ReportedRisks string
 }
 
-// HighStaticData only selects between two stable protocol prefixes.
+// HighStaticData selects the stable protocol and main-context source rules.
 func (m *PromptMaterials) HighStaticData() map[string]any {
-	return map[string]any{"FunctionCallMode": m != nil && m.FunctionCallMode}
+	return map[string]any{
+		"FunctionCallMode": m != nil && m.FunctionCallMode,
+		"PromoteUserInput": m != nil && m.PromoteUserInput,
+	}
 }
 
 // SemiDynamicData 供 caller-specific semi-dynamic 模板消费。
@@ -105,6 +113,7 @@ func (m *PromptMaterials) SemiDynamicData() map[string]any {
 		"SkillsContext":              m.SkillsContext,
 		"PromotedSemiDynamic1":       m.PromotedSemiDynamic1,
 		"SessionEvidenceSemiDynamic": m.SessionEvidenceSemiDynamic,
+		"PromptedUserInputHistory":   m.PromptedUserInputHistory,
 		"PlanHelp":                   m.PlanHelp,
 		"OriginalUserInput":          m.OriginalUserInput,
 		"StableInstruction":          m.StableInstruction,
@@ -176,11 +185,12 @@ func (m *PromptMaterials) TimelineOpenData() map[string]any {
 }
 
 type TimelineFrozenOpenBlocks struct {
-	Frozen               string
-	Open                 string
-	PromotedSemiDynamic1 string
-	FrozenTimeUnix       int64
-	EvidenceSemiDynamic  string
+	Frozen                   string
+	Open                     string
+	PromotedSemiDynamic1     string
+	FrozenTimeUnix           int64
+	EvidenceSemiDynamic      string
+	PromptedUserInputHistory string
 }
 
 func RenderTimelineFrozenOpen(timeline *Timeline) TimelineFrozenOpenBlocks {
@@ -200,6 +210,11 @@ func RenderTimelineFrozenOpenWithLatestModelReplay(timeline *Timeline) TimelineF
 type TimelinePromptOptions struct {
 	IncludeLatestModelReplay bool
 	ExcludeToolCache         bool
+	// PromoteUserInput is opt-in for main context construction. Helper and
+	// parameter prompts retain typed user records in their ordinary history.
+	PromoteUserInput bool
+	// UserInputOnly supplies exact user context to lightweight loops.
+	UserInputOnly bool
 }
 
 func RenderTimelineFrozenOpenWithOptions(timeline *Timeline, options TimelinePromptOptions) TimelineFrozenOpenBlocks {
@@ -209,12 +224,15 @@ func RenderTimelineFrozenOpenWithOptions(timeline *Timeline, options TimelinePro
 	// Freeze is committed on writes/import, never as a rendering side effect.
 	timeline.mu.RLock()
 	defer timeline.mu.RUnlock()
-	rb := timeline.frozenPromptBlocksLocked(options.ExcludeToolCache)
+	rb := timeline.frozenPromptBlocksLocked(options.ExcludeToolCache, options.UserInputOnly, options.PromoteUserInput || options.UserInputOnly)
 	var promotedSemi1 string
-	if !options.ExcludeToolCache {
+	if !options.ExcludeToolCache && !options.UserInputOnly {
 		promotedSemi1 = renderPromotedRecentTools(timeline.promotedState)
 	}
-	evidenceSemi := timeline.projectEvidenceLocked()
+	evidenceSemi := ""
+	if !options.UserInputOnly {
+		evidenceSemi = timeline.projectEvidenceLocked()
+	}
 	promptBlocks := projectTimelineRenderableBlocksForPrompt(rb)
 	if options.IncludeLatestModelReplay {
 		promptBlocks = projectTimelineRenderableBlocksForPromptWithLatestModelReplay(rb)
@@ -231,16 +249,22 @@ func RenderTimelineFrozenOpenWithOptions(timeline *Timeline, options TimelinePro
 		}
 		promptBlocks = visible
 	}
+	userHistory := ""
+	if options.PromoteUserInput || options.UserInputOnly {
+		userHistory = timeline.projectUserInputHistoryLocked()
+	}
 	return TimelineFrozenOpenBlocks{
-		Frozen:               promptBlocks.RenderFrozenOnly(TimelineDumpDefaultAITagName),
-		Open:                 promptBlocks.RenderOpenOnly(TimelineDumpDefaultAITagName),
-		PromotedSemiDynamic1: promotedSemi1,
-		FrozenTimeUnix:       timelineFrozenTimeUnixFromRenderable(rb),
-		EvidenceSemiDynamic:  evidenceSemi,
+		Frozen:                   promptBlocks.RenderFrozenOnly(TimelineDumpDefaultAITagName),
+		Open:                     promptBlocks.RenderOpenOnly(TimelineDumpDefaultAITagName),
+		PromotedSemiDynamic1:     promotedSemi1,
+		FrozenTimeUnix:           timelineFrozenTimeUnixFromRenderable(rb),
+		EvidenceSemiDynamic:      evidenceSemi,
+		PromptedUserInputHistory: userHistory,
 	}
 }
 
 type PromptFrozenOpenMaterials struct {
+	PromoteUserInput       bool
 	TimelineFrozen         string
 	TimelineOpen           string
 	PromotedSemiDynamic1   string
@@ -251,7 +275,9 @@ type PromptFrozenOpenMaterials struct {
 	SessionArtifactsFrozen string
 	SessionArtifactsOpen   string
 
+	// SessionEvidenceSemiDynamic is Timeline-owned sealed Evidence, not a second store.
 	SessionEvidenceSemiDynamic string
+	PromptedUserInputHistory   string
 
 	// ReportedRisks is the rendered "已报告漏洞清单" block for the
 	// timeline-open section. Populated from SessionPromptState.
@@ -278,12 +304,14 @@ func BuildPromptFrozenOpenMaterialsWithOptions(config *Config, options TimelineP
 	timelineBlocks := RenderTimelineFrozenOpenWithOptions(config.GetTimeline(), options)
 	reportedRisks := config.GetSessionPromptState().GetReportedRisksRendered()
 	return PromptFrozenOpenMaterials{
+		PromoteUserInput:           options.PromoteUserInput || options.UserInputOnly,
 		TimelineFrozen:             timelineBlocks.Frozen,
 		TimelineOpen:               timelineBlocks.Open,
 		PromotedSemiDynamic1:       timelineBlocks.PromotedSemiDynamic1,
 		TimelineFrozenTimeUnix:     timelineBlocks.FrozenTimeUnix,
 		FrozenPartitions:           FrozenBlockPartitionsFromConfig(config),
 		SessionEvidenceSemiDynamic: timelineBlocks.EvidenceSemiDynamic,
+		PromptedUserInputHistory:   timelineBlocks.PromptedUserInputHistory,
 		ReportedRisks:              reportedRisks,
 	}
 }
@@ -292,12 +320,14 @@ func ApplyPromptFrozenOpenMaterials(materials *PromptMaterials, frozenOpen Promp
 	if materials == nil {
 		return
 	}
+	materials.PromoteUserInput = frozenOpen.PromoteUserInput
 	materials.TimelineFrozen = frozenOpen.TimelineFrozen
 	materials.TimelineOpen = frozenOpen.TimelineOpen
 	materials.PromotedSemiDynamic1 = frozenOpen.PromotedSemiDynamic1
 	materials.TimelineFrozenTimeUnix = frozenOpen.TimelineFrozenTimeUnix
 	materials.FrozenPartitions = append([]FrozenBlockPartition(nil), NormalizeFrozenBlockPartitions(frozenOpen.FrozenPartitions)...)
 	materials.SessionEvidenceSemiDynamic = frozenOpen.SessionEvidenceSemiDynamic
+	materials.PromptedUserInputHistory = frozenOpen.PromptedUserInputHistory
 	materials.ReportedRisks = frozenOpen.ReportedRisks
 }
 

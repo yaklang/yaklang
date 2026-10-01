@@ -169,9 +169,13 @@ func (pm *PromptManager) AssembleLoopPrompt(tools []*aitool.Tool, input *reactlo
 	if err != nil {
 		return nil, err
 	}
-	if input.IncludeLatestModelReplay {
-		base.PromptFrozenOpenMaterials = aicommon.BuildPromptFrozenOpenMaterialsWithLatestModelReplay(pm.react.config, input.Nonce)
-	}
+	// Only the main decision context promotes exact user history. Shared base
+	// materials continue to serve parameter generation and other helper prompts.
+	base.PromptFrozenOpenMaterials = aicommon.BuildPromptFrozenOpenMaterialsWithOptions(pm.react.config, aicommon.TimelinePromptOptions{
+		IncludeLatestModelReplay: input.IncludeLatestModelReplay,
+		PromoteUserInput:         true,
+	})
+	base.UserHistory = ""
 	effectiveInput := input
 	if input.Lightweight {
 		base, effectiveInput = pm.projectLightweightLoopMaterials(base, input)
@@ -184,6 +188,7 @@ func (pm *PromptManager) AssembleLoopPrompt(tools []*aitool.Tool, input *reactlo
 		return nil, err
 	}
 	dynamicData := pm.buildLoopPromptSectionData(base, effectiveInput)
+	dynamicData["UserQuery"] = pm.wrapUserInputForPrompt(effectiveInput.UserQuery)
 	dynamic, err := pm.renderLoopDynamicSection(dynamicData)
 	if err != nil {
 		return nil, err
@@ -224,9 +229,9 @@ const (
 )
 
 // projectLightweightLoopMaterials keeps the ReAct protocol and task-specific
-// schema intact while removing the full-session context that is uneconomical
-// for speed-priority models. The recent Timeline window is the sole historical
-// execution source; volatile auxiliary fields receive explicit budgets.
+// schema and exact user inputs intact while bounding execution history for
+// speed-priority models. Ordinary events use a recent Timeline window;
+// volatile auxiliary fields receive explicit budgets.
 func (pm *PromptManager) projectLightweightLoopMaterials(
 	base *reactloops.LoopPromptBaseMaterials,
 	input *reactloops.LoopPromptAssemblyInput,
@@ -236,6 +241,7 @@ func (pm *PromptManager) projectLightweightLoopMaterials(
 	}
 	lightBase := *base
 	lightBase.PromptFrozenOpenMaterials = aicommon.PromptFrozenOpenMaterials{}
+	lightBase.PromoteUserInput = true
 	// Preserve ReportedRisks in lightweight mode: the dedup list is critical
 	// for preventing duplicate vulnerability reports even on speed-priority
 	// models. Budget-limited via the render function's internal token cap.
@@ -243,11 +249,10 @@ func (pm *PromptManager) projectLightweightLoopMaterials(
 		lightBase.PromptFrozenOpenMaterials.ReportedRisks = pm.react.config.GetReportedRisksRendered()
 	}
 	if pm != nil && pm.react != nil && pm.react.config != nil && pm.react.config.GetTimeline() != nil {
-		if input.IncludeLatestModelReplay {
-			lightBase.TimelineOpen = pm.react.config.GetTimeline().DumpRecentForPromptWithLatestModelReplay(lightweightLoopRecentTimelineTokens)
-		} else {
-			lightBase.TimelineOpen = pm.react.config.GetTimeline().DumpRecentForPrompt(lightweightLoopRecentTimelineTokens)
-		}
+		timeline := pm.react.config.GetTimeline()
+		exact := aicommon.BuildPromptFrozenOpenMaterialsWithOptions(pm.react.config, aicommon.TimelinePromptOptions{UserInputOnly: true})
+		lightBase.PromptedUserInputHistory = exact.PromptedUserInputHistory
+		lightBase.TimelineOpen = exact.TimelineOpen + "\n" + timeline.DumpRecentOrdinaryForPrompt(lightweightLoopRecentTimelineTokens, input.IncludeLatestModelReplay)
 	}
 	lightBase.AutoContext = ""
 	lightBase.UserHistory = ""
@@ -330,7 +335,7 @@ func (pm *PromptManager) NewPromptMaterials(base *reactloops.LoopPromptBaseMater
 		materials.TodoSnapshot = input.TodoSnapshot
 		// PE-TASK PLAN 产物 (PARENT_TASK + CURRENT_TASK + INSTRUCTION) 通过
 		// FrozenUserContext 字段透传, 渲染时位于 timeline-open 段最末尾
-		// (UserHistory 之后), 落在所有 cache 边界之外。早期版本曾尝试
+		// (Timeline / Todo 之后), 落在所有 cache 边界之外。早期版本曾尝试
 		// frozen-block / semi-dynamic, 但子任务切换会让 PlanContext 内容
 		// 抖动, 破坏上游缓存命中, 现采用"放弃自身缓存, 保护上游缓存"策略。
 		// 关键词: FrozenUserContext 透传, PLAN_CONTEXT, timeline-open 末尾,
@@ -343,7 +348,7 @@ func (pm *PromptManager) NewPromptMaterials(base *reactloops.LoopPromptBaseMater
 		materials.AutoLoadedSkills = input.AutoLoadedSkills
 	}
 	if base != nil {
-		// UserHistory 来自 LoopPromptBaseMaterials (config.FormatUserInputHistoryAITag)
+		// Legacy helper prompts retain their bounded history view.
 		materials.UserHistory = base.UserHistory
 	}
 
@@ -615,7 +620,7 @@ func (pm *PromptManager) buildFrozenBlockObservation(
 // 三个标签已经用 plan-scoped 稳定 nonce 渲染好了, 外层 PLAN_CONTEXT 包装只
 // 需要给观测层一个稳定的边界标记, 与内层标签命名空间互不冲突。
 //
-// 物理位置: timeline-open 段最末尾 (UserHistory 之后)。timeline-open 段不被
+// 物理位置: timeline-open 段最末尾 (Timeline / Todo 之后)。timeline-open 段不被
 // AI_CACHE_FROZEN / AI_CACHE_SEMI 任何缓存边界包裹, 是"易变尾段"。这样安排
 // 是因为 PlanContext 内容会随 PE-TASK 子任务切换抖动 (CURRENT_TASK 内容变化)。
 //
@@ -680,6 +685,7 @@ func (pm *PromptManager) buildSemiDynamic1Observation(
 			true,
 			materials.PromotedSemiDynamic1,
 		),
+		reactloops.NewPromptSectionObservation("section.semi_dynamic_1.user_history", "User Input History", reactloops.PromptSectionRoleSemiDynamic1, true, materials.PromptedUserInputHistory),
 		reactloops.NewPromptSectionObservation("section.semi_dynamic_1.evidence", "Session Evidence", reactloops.PromptSectionRoleSemiDynamic1, true, materials.SessionEvidenceSemiDynamic),
 	}
 	section.Children = filterIncludedPromptSections(children)
@@ -804,17 +810,12 @@ func (pm *PromptManager) buildTimelineOpenObservation(
 			true,
 			materials.TodoSnapshot,
 		),
-		// P1-C3: UserHistory 在 Workspace 之后, 与下方 Current Time 共同
-		// 构成"用户输入历史 -> 现在"的时序前缀.
+		// Legacy helpers keep their bounded history field; main prompts clear it
+		// and use the exact Open/Semi1 projection instead.
 		reactloops.NewPromptSectionObservation(
-			"section.timeline_open.user_history",
-			"User History",
-			reactloops.PromptSectionRoleTimelineOpen,
-			false,
-			materials.UserHistory,
+			"section.timeline_open.user_history", "User History",
+			reactloops.PromptSectionRoleTimelineOpen, false, materials.UserHistory,
 		),
-		// P1-C3: Current Time 紧跟 User History, 充当时序末端锚点;
-		// 同时与下方 PlanContext (任务规划) 形成"现在 -> 任务"语义衔接.
 		// PlanContext (PE-TASK PLAN 产物) 末尾注入: 该字段仅 PE-TASK 子任务
 		// 非空, 内容随子任务切换抖动, 不适合放任何 cache 边界内。
 		// 放 timeline-open 段最末让其落在所有
@@ -860,7 +861,7 @@ func (pm *PromptManager) buildDynamicObservation(
 			"User Query",
 			reactloops.PromptSectionRoleDynamic,
 			false,
-			renderUserQueryBlock(input.Nonce, input.UserQuery),
+			renderUserQueryBlock(input.Nonce, pm.wrapUserInputForPrompt(input.UserQuery)),
 		),
 		reactloops.NewPromptSectionObservation(
 			"section.dynamic.auto_context",
@@ -1110,6 +1111,14 @@ func renderCurrentTimeBlock(materials *reactloops.PromptPrefixMaterials) string 
 		return ""
 	}
 	return "# Current Time\n" + materials.CurrentTime
+}
+
+func (pm *PromptManager) wrapUserInputForPrompt(content string) string {
+	var timeline *aicommon.Timeline
+	if pm != nil && pm.react != nil && pm.react.config != nil {
+		timeline = pm.react.config.GetTimeline()
+	}
+	return timeline.WrapUserInputForPrompt(content)
 }
 
 func renderUserQueryBlock(nonce string, userQuery string) string {
