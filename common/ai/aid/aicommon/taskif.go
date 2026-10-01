@@ -139,6 +139,12 @@ type AIStatefulTask interface {
 	SetRecoveryData(*RecoveryTaskData)
 }
 
+// PlanStatusProvider supplies a read-only plan execution snapshot for the main
+// decision loop. Ordinary tasks and auxiliary prompts do not include it.
+type PlanStatusProvider interface {
+	GetPlanStatusForPrompt() string
+}
+
 type AIStatefulTaskBase struct {
 	*Emitter
 

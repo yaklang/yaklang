@@ -70,6 +70,8 @@ type PromptMaterials struct {
 	WorkingDir                 string
 	AIArtifactsDir             string
 
+	// PlanStatus is the read-only execution snapshot immediately before TODO.
+	PlanStatus string
 	// TodoSnapshot 是会话级 TODO 列表渲染结果 (含 <|TODO_LIST_<nonce>|>...
 	// 边界标签的整段块). 物理位置在普通 Timeline 之后，落在 timeline-open 段, 不被 AI_CACHE_FROZEN / AI_CACHE_SEMI 任何
 	// 缓存边界包裹, 避免污染上游 prefix cache.
@@ -163,6 +165,7 @@ func (m *PromptMaterials) TimelineOpenData() map[string]any {
 	return map[string]any{
 		"TimelineOpen":           m.TimelineOpen,
 		"TimelineFrozenTimeUnix": m.TimelineFrozenTimeUnix,
+		"PlanStatus":             m.PlanStatus,
 		"TodoSnapshot":           m.TodoSnapshot,
 		"UserHistory":            m.UserHistory,
 		"CurrentTime":            m.CurrentTime,

@@ -391,6 +391,10 @@ func (r *ReActLoop) generateLoopPrompt(
 	if err := r.compressTimelineBeforePrompt(userInput, frozenUserContext, todoSnapshot, persistent); err != nil {
 		return "", err
 	}
+	var planStatus string
+	if provider, ok := r.GetCurrentTask().(aicommon.PlanStatusProvider); ok {
+		planStatus = provider.GetPlanStatusForPrompt()
+	}
 
 	result, err := r.invoker.AssembleLoopPrompt(tools, &LoopPromptAssemblyInput{
 		Nonce:                    nonce,
@@ -407,6 +411,7 @@ func (r *ReActLoop) generateLoopPrompt(
 		ForcedSkills:             forcedSkillsBlock,
 		AutoLoadedSkills:         autoSkillsBlock,
 		ExtraCapabilities:        extraCapabilities,
+		PlanStatus:               planStatus,
 		TodoSnapshot:             todoSnapshot,
 		ReactiveData:             reactiveData,
 		InjectedMemory:           memory,

@@ -167,20 +167,10 @@ func (t *AiTask) execute() error {
 				lastVerificationInfo = fmt.Sprintf("satisfied=%v, reasoning=%s", lastRecord.Satisfactory, lastRecord.Reason)
 			}
 
+			// Live plan states are read through PlanStatusProvider into Timeline Open.
+			// Keep only verification and iteration feedback in the dynamic section.
 			reactiveData := utils.MustRenderTemplate(`
-当前 Plan-Execution 模式进度信息：
-
-<|PROGRESS_TASK_{{.Nonce}}|>
-{{ .Progress }}
-
---- CURRENT_TASK ---
-{{ .CurrentProgress }}
---- CURRENT_TASK_END ---
-
-<|PROGRESS_TASK_END_{{ .Nonce }}|>
-
 --- TASK_EXECUTION_INFO ---
-{{ if .StatusSummary }}当前状态分析: {{ .StatusSummary }}{{ end }}
 {{ if .LastVerificationInfo }}上次验证结果: {{ .LastVerificationInfo }}{{ end }}
 {{ if .FeedbackMessages }}
 最近反馈信息:
@@ -188,35 +178,8 @@ func (t *AiTask) execute() error {
 {{ end }}
 --- TASK_EXECUTION_INFO_END ---
 
-- 进度信息语义约定：
-  1) 任务树状态约定
-     - 标记含义：
-       - [-] 表示该节点任务“执行中”
-       - [ ] 表示该节点任务“未开始”
-       - [x] 表示该节点任务“已完成”
-     - 层级缩进表示父子任务关系；只处理与“当前任务”对应的子树。
-  2) 当前任务边界
-     - “当前任务(CURRENT_TASK)”指明你唯一允许推进的任务节点。你必须严格在此节点范围内产出计划、步骤与执行说明。
-     - 禁止启动、描述或完成非当前节点的兄弟/父层/子层任务，除非该节点内部明确需要的子步骤（且这些子步骤不改变其他节点状态）。
-  3) 行为准则（必须遵守）
-     - 不要假设或回填未在进度信息中出现的状态。
-     - 不要“预完成”尚未执行的步骤；只就“当前任务”进行计划、细化与必要的状态更新建议。
-     - 持续以新证据驱动下一步；反复失败时更换工具、假设或验证方法。
-     - 若需要外部信息或权限，先在输出中请求或声明前置条件，而非擅自推进其他任务。
-  4) 只读规则（重要）
-     - 进度信息对 AI 是只读的。框架会根据实际执行进度自动更新任务清单与状态。
-     - 禁止 AI 主动修改、覆盖或判定任何任务节点的状态（包括但不限于从 [ ] 改为 [-]/[x]、新增/删除任务节点、调整层级）。
-     - 如需表达状态变化的建议，请以“建议”形式描述，不得当作实际状态变更执行。
-  5) 进度的使用方式
-     - 用于理解：识别“当前任务”的上下文位置、其父任务目标与已进行的子步骤。
-     - 用于计划：仅对“当前任务”制定可执行的下一步子步骤清单与完成判据（Done Criteria）。
-
 `, map[string]interface{}{
-				"Progress":             t.rootTask.Progress(),
-				"CurrentProgress":      t.Progress(),
-				"Nonce":                nonce,
 				"FeedbackMessages":     feedback.String(),
-				"StatusSummary":        t.StatusSummary,
 				"LastVerificationInfo": lastVerificationInfo,
 			})
 
