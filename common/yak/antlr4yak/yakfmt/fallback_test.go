@@ -43,6 +43,8 @@ func TestFormatLLCheckpointEquivalence(t *testing.T) {
 		"func(a){if(a){return a}else{return 0}}\n",
 		"select{case x:= <-ch:f(x);default:}\n",
 		"switch a{case 1:a++;default:a--}\n",
+		"prefix=f\"原文 ${f(1,2)} ; //\"\n",
+		"prefix=<<<TAG\r\n原文 ; // ${x}\r\nTAG\n",
 	}
 	for i, sample := range grammarSamples {
 		t.Run(fmt.Sprintf("%d/whole", i), func(t *testing.T) {
