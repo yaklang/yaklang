@@ -1,6 +1,8 @@
 package aireact
 
 import (
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -12,6 +14,57 @@ import (
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 )
+
+func TestUserInputAttachmentQueryStaysOutOfMainDynamic(t *testing.T) {
+	const query = "ATTACHMENT_TASK_QUERY"
+	const fileBody = "User Prompt: legitimate attachment text\nFILE_ATTACHMENT_CONTENT"
+	path := filepath.Join(t.TempDir(), "attachment.txt")
+	require.NoError(t, os.WriteFile(path, []byte(fileBody), 0o600))
+	react, err := NewTestReAct()
+	require.NoError(t, err)
+	react.config.GetTimeline().SetTimelineBucketByteSize(-1)
+	react.config.ContextProviderManager.RegisterTracedContent("file", aicommon.FileContextProvider(path, query))
+	task := aicommon.NewStatefulTaskBase("attachment-task", query, react.config.GetContext(), react.config.GetEmitter())
+	task.SetAttachedDatas([]*aicommon.AttachedResource{{
+		Type: aicommon.CONTEXT_PROVIDER_TYPE_FILE, Key: aicommon.CONTEXT_PROVIDER_KEY_FILE_CONTENT, Value: "INLINE_ATTACHMENT_CONTENT",
+	}})
+	t.Cleanup(installTaskInlineAttachmentProvider(react.config.ContextProviderManager, task))
+	_, err = react.config.AppendUserInputHistory(query, time.Now())
+	require.NoError(t, err)
+	tool := aitool.NewWithoutCallback("read_file", aitool.WithStringParam("path"))
+	for _, frozen := range []bool{false, true} {
+		if frozen {
+			react.config.GetTimeline().FreezeAll()
+		}
+		for _, native := range []bool{false, true} {
+			for _, lightweight := range []bool{false, true} {
+				// Helpers retain the original query header, even when interleaved
+				// with main prompt assembly using the same traced attachment.
+				base, err := react.promptManager.GetLoopPromptBaseMaterials(nil, "helper")
+				require.NoError(t, err)
+				require.Contains(t, base.AutoContext, "User Prompt: "+query)
+				helper, err := react.promptManager.GenerateToolParamsPromptWithMetaForTask(task, tool)
+				require.NoError(t, err)
+				require.Contains(t, helper.Prompt, query)
+				nativeHelper, err := react.promptManager.GenerateFunctionCallToolParamsPromptForTask(task, tool, aicommon.ToolParamsCallIntent{})
+				require.NoError(t, err)
+				require.Contains(t, nativeHelper, query)
+				assembled, err := react.promptManager.AssembleLoopPrompt(nil, &reactloops.LoopPromptAssemblyInput{
+					Nonce: "attachment", FunctionCallMode: native, Lightweight: lightweight,
+				})
+				require.NoError(t, err)
+				require.Equal(t, 1, strings.Count(assembled.Prompt, query))
+				dynamic := aicommon_testutil.MustExtractAITagBlock(t, assembled.Prompt, "PROMPT_SECTION_dynamic").Body
+				require.NotContains(t, dynamic, query)
+				if !lightweight {
+					require.Contains(t, dynamic, fileBody, "attachment content must not be filtered by text matching")
+					require.Contains(t, dynamic, path)
+					require.Contains(t, dynamic, "INLINE_ATTACHMENT_CONTENT")
+				}
+			}
+		}
+	}
+}
 
 func TestUserInputHistoryPromptPromotionAcrossModes(t *testing.T) {
 	for _, functionCall := range []bool{false, true} {

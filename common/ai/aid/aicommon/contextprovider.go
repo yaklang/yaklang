@@ -59,6 +59,17 @@ type ContextProviderEntry struct {
 
 type ContextProvider func(config AICallerConfigIf, emitter *Emitter, key string) (string, error)
 
+// Only the main-loop attachment view omits the echoed query. Helper prompts
+// receive the original config and retain their existing attachment context.
+type mainLoopContextProviderConfig struct{ AICallerConfigIf }
+
+func attachmentUserPrompt(config AICallerConfigIf, userPrompt []string) string {
+	if _, mainLoop := config.(*mainLoopContextProviderConfig); mainLoop {
+		return ""
+	}
+	return fmt.Sprintf("User Prompt: %s\n", strings.Join(userPrompt, " "))
+}
+
 // isTextMimeType 判断是否为文本类型的 MIME
 func isTextMimeType(mimeType string) bool {
 	// 移除 charset 等参数，只保留主类型
@@ -162,7 +173,7 @@ const MaxFileContentSize = 1024
 func FileContextProvider(filePath string, userPrompt ...string) ContextProvider {
 	return func(config AICallerConfigIf, emitter *Emitter, key string) (string, error) {
 		// 构建基本信息（即使出错也要包含）
-		baseInfo := fmt.Sprintf("User Prompt: %s\nFile: %s\n", strings.Join(userPrompt, " "), filePath)
+		baseInfo := attachmentUserPrompt(config, userPrompt) + fmt.Sprintf("File: %s\n", filePath)
 
 		if !utils.FileExists(filePath) {
 			return baseInfo + "[Error: file does not exist]", utils.Errorf("file %s does not exist", filePath)
@@ -259,12 +270,12 @@ func FileContextProvider(filePath string, userPrompt ...string) ContextProvider 
 func FileContentContextProvider(content string, userPrompt ...string) ContextProvider {
 	resource := &AttachedFileContentResourceData{}
 	_ = resource.Unmarshal(content)
-	return func(_ AICallerConfigIf, emitter *Emitter, _ string) (string, error) {
+	return func(config AICallerConfigIf, emitter *Emitter, _ string) (string, error) {
 		rendered, err := resource.render(emitter)
 		if err != nil {
 			return "", err
 		}
-		return fmt.Sprintf("User Prompt: %s\n%s", strings.Join(userPrompt, " "), rendered), nil
+		return attachmentUserPrompt(config, userPrompt) + rendered, nil
 	}
 }
 
@@ -605,13 +616,39 @@ func (r *ContextProviderManager) WithoutTaskContext() *ContextProviderManager {
 }
 
 func (r *ContextProviderManager) RegisterTracedContent(name string, cb ContextProvider) {
+	update := newContextProviderTrace()
+	mainLoopUpdate := newContextProviderTrace()
+	wrapper := func(config AICallerConfigIf, emitter *Emitter, key string) (string, error) {
+		result, err := cb(config, emitter, key)
+		trace := update
+		if _, mainLoop := config.(*mainLoopContextProviderConfig); mainLoop {
+			// Helper-only query headers must never return via a change diff.
+			trace = mainLoopUpdate
+		}
+		extra := trace(result, err)
+		if err != nil {
+			if extra == "" {
+				return result, err
+			}
+			return result + "\n\n" + extra, err
+		}
+		log.Infof("ContextProvider %s result: %s", name, utils.ShrinkString(result, 200))
+		if extra == "" {
+			return result, nil
+		}
+		return result + "\n\n" + extra, nil
+	}
+	r.Register(name, wrapper)
+}
+
+func newContextProviderTrace() func(string, error) string {
 	var m = new(sync.Mutex)
 	var firstCall = utils.NewOnce()
 	var lastErr error
 	var lastContent string
 	var buf bytes.Buffer
 
-	update := func(content string, newErr error) string {
+	return func(content string, newErr error) string {
 		m.Lock()
 		defer m.Unlock()
 		var result string
@@ -665,23 +702,6 @@ func (r *ContextProviderManager) RegisterTracedContent(name string, cb ContextPr
 		})
 		return result
 	}
-
-	wrapper := func(config AICallerConfigIf, emitter *Emitter, key string) (string, error) {
-		result, err := cb(config, emitter, key)
-		extra := update(result, err)
-		if err != nil {
-			if extra == "" {
-				return result, err
-			}
-			return result + "\n\n" + extra + "", err
-		}
-		log.Infof("ContextProvider %s result: %s", name, utils.ShrinkString(result, 200))
-		if extra == "" {
-			return result, nil
-		}
-		return result + "\n\n" + extra, nil
-	}
-	r.Register(name, wrapper)
 }
 
 func (r *ContextProviderManager) Register(name string, cb ContextProvider) {
@@ -737,6 +757,12 @@ func (r *ContextProviderManager) ExecuteWithNonce(config AICallerConfigIf, emitt
 	return r.executeWithTagStrategy(config, emitter, func(name string) string {
 		return contextProviderTagWithNonce(nonce, name)
 	})
+}
+
+// ExecuteMainLoopWithNonce retains attachment contents and coordinates while
+// leaving task queries exclusively in Timeline Open / promoted user history.
+func (r *ContextProviderManager) ExecuteMainLoopWithNonce(config AICallerConfigIf, emitter *Emitter, nonce string) string {
+	return r.ExecuteWithNonce(&mainLoopContextProviderConfig{config}, emitter, nonce)
 }
 
 func (r *ContextProviderManager) executeWithTagStrategy(

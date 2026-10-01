@@ -1,8 +1,6 @@
 package aireact
 
 import (
-	"fmt"
-
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
@@ -44,13 +42,9 @@ func (r *ReAct) _requireUserInteract(question string, options []map[string]any) 
 	params := ep.GetParams()
 	r.config.EmitInteractiveRelease(ep.GetId(), params)
 	r.config.CallAfterInteractiveEventReleased(ep.GetId(), params)
+	r.SaveTimeline()
 	suggestion := params.GetAnyToString("suggestion")
 	extra := params.GetAnyToString("extra_info")
-	r.AddToTimeline(
-		"user-clarification",
-		fmt.Sprintf("User clarification requested: %s result: %v",
-			question, suggestion),
-	)
 	return suggestion, extra, nil
 }
 
