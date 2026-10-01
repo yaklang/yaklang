@@ -7,7 +7,10 @@
 
 
 
-{{ if .TodoSnapshot }}
+{{/* PlanStatus: 当前 PLAN 的实时只读状态快照，突出当前任务并展示其他任务状态；不含文档、任务目标或结果摘要，不进入缓存前缀。 */ -}}
+{{ if .PlanStatus }}{{ .PlanStatus }}
+
+{{ end }}{{ if .TodoSnapshot }}
 
 TODO LIST 是当前任务的只读状态快照；执行和写入规则见 High Static 的 TODO 状态维护。优先推进 CURRENT，新发现先登记。
 

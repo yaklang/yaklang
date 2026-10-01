@@ -266,8 +266,11 @@ type LoopPromptAssemblyInput struct {
 	FunctionCallSchemas string
 	SkillsContext       string
 	ExtraCapabilities   string
+	// PlanStatus is the live, read-only plan state displayed between Timeline Open
+	// and TODO. It does not contain task goals, documents, or result summaries.
+	PlanStatus string
 	// TodoSnapshot 是全局 TODO 列表的渲染输出 (含 <|TODO_LIST_<nonce>|>...
-	// 边界标签的整段块), 紧跟在 普通 Timeline 后面注入到 timeline-open 段。
+	// 边界标签的整段块), 在普通 Timeline / PLAN STATUS 后注入到 timeline-open 段。
 	// 落在所有缓存边界外, 保证不污染上游 prefix cache.
 	// 空字符串时 timeline-open 模板自动跳过该块。
 	//

@@ -341,6 +341,7 @@ func (pm *PromptManager) NewPromptMaterials(base *reactloops.LoopPromptBaseMater
 		// prompt 任何一次 iteration 都能看到当前 TODO 全貌.
 		// 关键词: TodoSnapshot 透传, timeline-open, Timeline 中的 evidence delta 之后
 		materials.TodoSnapshot = input.TodoSnapshot
+		materials.PlanStatus = input.PlanStatus
 		// PE-TASK PLAN 产物 (PARENT_TASK + CURRENT_TASK + INSTRUCTION) 通过
 		// FrozenUserContext 字段透传, 渲染时位于 timeline-open 段最末尾
 		// (Timeline / Todo 之后), 落在所有 cache 边界之外。早期版本曾尝试
@@ -817,7 +818,11 @@ func (pm *PromptManager) buildTimelineOpenObservation(
 			renderTimelineOpenBlock(materials),
 		),
 
-		// TODO 快照紧跟 Open Timeline；状态由普通 ReAct action 更新。
+		reactloops.NewPromptSectionObservation(
+			"section.timeline_open.plan_status", "PLAN STATUS",
+			reactloops.PromptSectionRoleTimelineOpen, false, materials.PlanStatus,
+		),
+		// TODO 快照紧跟 Open Timeline / PLAN STATUS；状态由普通 ReAct action 更新。
 		// 段位仍属 timeline-open, 落在所有 cache 边界外, 不污染上游 prefix cache.
 		reactloops.NewPromptSectionObservation(
 			"section.timeline_open.todo_list",
