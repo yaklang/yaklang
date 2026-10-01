@@ -68,6 +68,8 @@ func TestSpeedLoopLiteForgeIntegration(t *testing.T) {
 					if attempt == 1 {
 						firstPrompt = req.GetPrompt()
 						require.Equal(t, 1, strings.Count(firstPrompt, "perform auxiliary round"))
+						require.Contains(t, firstPrompt, "TIMELINE_")
+						require.NotContains(t, firstPrompt, "USER_QUERY_")
 						if mode == "functioncall" {
 							require.NotContains(t, firstPrompt, "# Response Schema")
 						} else {

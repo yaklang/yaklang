@@ -319,6 +319,14 @@ func (m *MockInvoker) AssembleLoopPrompt(tools []*aitool.Tool, input *aicommon.L
 	if input == nil {
 		return nil, utils.Error("loop prompt assembly input is nil")
 	}
+	var timeline aicommon.PromptFrozenOpenMaterials
+	if cfg, ok := m.GetConfig().(*aicommon.Config); ok {
+		// Real Config ingress now lives in Timeline, including auxiliary loops
+		// exercised by this mock; preserve the same prompt visibility here.
+		timeline = aicommon.BuildPromptFrozenOpenMaterialsWithOptions(cfg, aicommon.TimelinePromptOptions{
+			PromoteUserInput: true, UserInputOnly: input.Lightweight,
+		})
+	}
 
 	highStatic := wrapMockPromptSection("high-static", joinMockPromptParts(
 		renderMockTitledBlock("Task Instruction", input.TaskInstruction),
@@ -327,7 +335,10 @@ func (m *MockInvoker) AssembleLoopPrompt(tools []*aitool.Tool, input *aicommon.L
 	semiDynamic := wrapMockPromptSection("semi-dynamic", joinMockPromptParts(
 		renderMockTitledBlock("Skills Context", input.SkillsContext),
 		renderMockSchemaBlock(input.Schema),
+		timeline.TimelineFrozen,
+		timeline.PromotedUserInputHistory,
 	))
+	timelineOpen := wrapMockPromptSection("timeline-open", timeline.TimelineOpen)
 	dynamic := wrapMockPromptSectionWithNonce("dynamic", joinMockPromptParts(
 		renderMockUserQueryBlock(input.Nonce, input.UserQuery),
 		renderMockTaggedBlock("EXTRA_CAPABILITIES", input.Nonce, input.ExtraCapabilities),
@@ -337,7 +348,7 @@ func (m *MockInvoker) AssembleLoopPrompt(tools []*aitool.Tool, input *aicommon.L
 	), input.Nonce)
 
 	return &aicommon.LoopPromptAssemblyResult{
-		Prompt:   joinMockPromptParts(highStatic, semiDynamic, dynamic),
+		Prompt:   joinMockPromptParts(highStatic, semiDynamic, timelineOpen, dynamic),
 		Sections: nil,
 	}, nil
 }
