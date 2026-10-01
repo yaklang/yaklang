@@ -22,7 +22,10 @@ func isTimelineUserInput(item *TimelineItem) bool {
 	case *UserInteraction:
 		return true
 	case *TextTimelineItem:
-		return extractTextEntryType(value.Text) == TIMELINE_ITEM_TYPE_CURRENT_TASK_USER_INPUT
+		switch extractTextEntryType(value.Text) {
+		case TIMELINE_ITEM_TYPE_CURRENT_TASK_USER_INPUT, "user-clarification":
+			return true // Include clarification records saved by older sessions.
+		}
 	case *PromotableTimelineItem:
 		return value.Kind == TimelinePromotedKindUserInput
 	}
@@ -58,9 +61,8 @@ func timelinePromotionForItem(item *TimelineItem) *PromotableTimelineItem {
 		}
 		payload += "\nUser Input: " + value.UserExtraPrompt
 	case *TextTimelineItem:
-		// These records are written by the loop at task start, including nested
-		// tasks. Preserve the complete original text, task identity and whitespace.
-		if extractTextEntryType(value.Text) != TIMELINE_ITEM_TYPE_CURRENT_TASK_USER_INPUT {
+		// Preserve task ingress and legacy clarification records verbatim.
+		if !isTimelineUserInput(item) {
 			return nil
 		}
 		payload = value.Text

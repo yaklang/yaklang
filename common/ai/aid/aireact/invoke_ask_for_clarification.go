@@ -2,7 +2,7 @@ package aireact
 
 import (
 	"context"
-	"fmt"
+
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 
 	"github.com/yaklang/yaklang/common/log"
@@ -24,7 +24,6 @@ func (r *ReAct) AskForClarification(ctx context.Context, question string, payloa
 	}
 
 	r.currentUserInteractiveCount++
-	r.AddToTimeline("question-for-clarification", question)
 	ep := r.config.Epm.CreateEndpointWithEventType(schema.EVENT_TYPE_REQUIRE_USER_INTERACTIVE)
 	ep.SetDefaultSuggestionContinue()
 	var opts []map[string]any
@@ -55,11 +54,7 @@ func (r *ReAct) AskForClarification(ctx context.Context, question string, payloa
 	params := ep.GetParams()
 	r.config.EmitInteractiveRelease(ep.GetId(), params)
 	r.config.CallAfterInteractiveEventReleased(ep.GetId(), params)
+	r.SaveTimeline()
 	suggestion := utils.InterfaceToString(params)
-	r.AddToTimeline(
-		"user-clarification",
-		fmt.Sprintf("User clarification requested: %s result: %v",
-			question, suggestion),
-	)
 	return suggestion
 }

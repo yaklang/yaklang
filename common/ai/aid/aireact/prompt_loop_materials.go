@@ -112,8 +112,12 @@ func (pm *PromptManager) getLoopPromptBaseMaterials(
 		materials.ForgeName = forgeName
 	}
 	materials.TaskType = taskType
-	if !options.UserInputOnly {
-		materials.AutoContext = pm.AutoContextWithNonce(nonce)
+	if !options.UserInputOnly && pm.cpm != nil {
+		if options.PromoteUserInput {
+			materials.AutoContext = pm.cpm.ExecuteMainLoopWithNonce(pm.react.config, pm.react.config.Emitter, nonce)
+		} else {
+			materials.AutoContext = pm.AutoContextWithNonce(nonce)
+		}
 	}
 	if !options.PromoteUserInput && !options.UserInputOnly {
 		materials.UserHistory = pm.UserHistoryContextWithNonce(nonce)

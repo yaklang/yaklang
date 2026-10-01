@@ -3513,8 +3513,23 @@ func (c *Config) GetEndpointManager() *EndpointManager {
 	return c.Epm
 }
 
-func (c *Config) CallAfterInteractiveEventReleased(s string, params aitool.InvokeParams) {
-	//c.memory.StoreInteractiveUserInput(eventID, invoke)
+func (c *Config) CallAfterInteractiveEventReleased(eventID string, params aitool.InvokeParams) {
+	if c.Timeline == nil || c.Epm == nil || len(params) == 0 {
+		return
+	}
+	ep, found := c.Epm.LoadEndpoint(eventID)
+	if !found || ep.GetReviewType() != schema.EVENT_TYPE_REQUIRE_USER_INTERACTIVE {
+		return // Tool/plan reviews are already recorded by CallAfterReview.
+	}
+	select {
+	case <-ep.sig.Done():
+	default:
+		return // A cancelled wait without an answer must not record a default choice.
+	}
+	// Preserve the question, option meanings and complete response, including
+	// selected values and extra_info, in the exact user-input Timeline journal.
+	c.Timeline.PushUserInteraction(UserInteractionStage_Review, c.AcquireId(),
+		string(utils.Jsonify(ep.GetReviewMaterials())), string(utils.Jsonify(params)))
 }
 
 func (c *Config) CallAfterReview(seq int64, reviewQuestion string, userInput aitool.InvokeParams) {
