@@ -67,7 +67,7 @@ func TestPredictionRootChangesOnReusedParser(t *testing.T) {
 
 var challengeTypeReferences = []string{
 	"T<X>::new", "T<X>::m", "T<X>::<Y>m", "T<X>.U<Y>::new", "T<X>[]::new", "T<X>[][]::m", "int[]::new", "int[][]::new",
-	"T<X>.var::new", "T<X>.yield::new", "var<X>.T::new", "yield<X>.T::new", "T<@A X>::new", "T<X>.@A U::new", "T<X> @A []::new",
+	"T<X>.var::new", "T<X>.yield::new", "var<X>.T::new", "yield<X>.T::new", "T<@A X>::new", "T<X>.@A U::new", "T<X> @A []::new", "T<X>[] @A []::new", "int[] @A []::new", "T<X> a.b.@A []::new", "T<X>[] a.b.@A []::new", "int[] a.@A []::new",
 	"T<X>::", "T<>::new", "T<X,,Y>::new", "T<X[>::new", "T<X>::?", "T<X>+y", "a[x]::m", "T<X>.m()", "a<b>>c", "a<b>c", "T<X> x",
 }
 
@@ -93,11 +93,11 @@ func TestPredictionTypeReferenceConflicts(t *testing.T) {
 func TestPredictionTypeReferenceScannerContract(t *testing.T) {
 	for _, fixture := range []struct {
 		source string
-		want   bool
+		want   int
 	}{
-		{"T<X>::new", true}, {"T<X>.U<Y>[]::m", true}, {"int[][]::new", true},
-		{"T<X>.var::new", false}, {"T<X>.yield::new", false}, {"T<@A X>::new", false}, {"T<X>.@A U::new", false},
-		{"a[0]::m", false}, {"T<X> x", false}, {"T<X>.int::new", false}, {"T<X>[]x", false}, {"T<X+>::new", false},
+		{"T<X>::new", 3}, {"T<X>.U<Y>[]::m", 3}, {"int[][]::new", 3},
+		{"T<X>.var::new", 0}, {"T<X>.yield::new", 0}, {"T<@A X>::new", 0}, {"T<X>.@A U::new", 0}, {"T<X>[] @A []::new", 0}, {"int[] @A []::new", 0}, {"T<X> a.b.@A []::new", 0}, {"T<X>[] a.b.@A []::new", 0},
+		{"a[0]::m", 0}, {"T<X> x", 0}, {"T<X>.int::new", 1}, {"T<X>[]x", 0}, {"T<X+>::new", 1}, {"a<b", 1},
 	} {
 		stream := predictionTokens(fixture.source)
 		index := stream.Index()
@@ -110,31 +110,47 @@ func TestPredictionTypeReferenceScannerContract(t *testing.T) {
 	}
 	for _, depth := range []int{511, 512, 513} {
 		stream := predictionTokens(strings.Repeat("T<", depth) + "X" + strings.Repeat(">", depth) + "::new")
-		if typeReferencePrefix(stream) != (depth <= declarationPrefixDepth) {
+		want := 0
+		if depth <= declarationPrefixDepth {
+			want = 3
+		}
+		if typeReferencePrefix(stream) != want {
 			t.Fatalf("depth bound %d", depth)
 		}
 	}
 	for _, count := range []int{4090, 4091, 4092, 4093, 4094, 4095, 4096} {
 		stream := predictionTokens("T<" + strings.Repeat("/*c*/", count) + "X>::new")
 		got := typeReferencePrefix(stream)
-		if got != (count <= 4091) { // T, <, X, > and :: occupy five raw tokens.
+		want := 0
+		if count <= 4091 { // T, <, X, > and :: occupy five raw tokens.
+			want = 3
+		}
+		if got != want {
 			t.Fatalf("raw-token bound %d: %v", count, got)
 		}
 		if len(stream.GetAllTokens()) > declarationPrefixTokens+1 {
 			t.Fatal("reference scanner exceeded raw-token budget")
 		}
 	}
+	arrayBudget := predictionTokens("T<X>[" + strings.Repeat("/*c*/", declarationPrefixTokens) + "]::new")
+	arrayIndex := arrayBudget.Index()
+	if typeReferencePrefix(arrayBudget) != 0 || arrayBudget.Index() != arrayIndex {
+		t.Fatal("array dimension budget exhaustion must preserve input and use ATN")
+	}
+	if len(arrayBudget.GetAllTokens()) > declarationPrefixTokens+1 {
+		t.Fatal("array dimension scanner exceeded raw-token budget")
+	}
 	stream := predictionTokens("T<X>::new")
-	if typeReferencePrefix(otherPredictionStream{stream}) {
+	if typeReferencePrefix(otherPredictionStream{stream}) != 0 {
 		t.Fatal("non-common stream must use ATN")
 	}
 	hidden := antlr.NewCommonTokenStream(NewJavaLexer(antlr.NewInputStream(" /*c*/ T<X>::new")), antlr.TokenHiddenChannel)
 	hidden.LA(1)
-	if typeReferencePrefix(hidden) {
+	if typeReferencePrefix(hidden) != 0 {
 		t.Fatal("hidden-channel stream must use ATN")
 	}
 	empty := antlr.NewCommonTokenStream(NewJavaLexer(antlr.NewInputStream("T<X>::new")), 0)
-	if typeReferencePrefix(empty) {
+	if typeReferencePrefix(empty) != 0 {
 		t.Fatal("uninitialized stream must use ATN")
 	}
 }
