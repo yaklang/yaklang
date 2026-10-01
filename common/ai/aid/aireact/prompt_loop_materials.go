@@ -188,12 +188,25 @@ func (pm *PromptManager) AssembleLoopPrompt(tools []*aitool.Tool, input *reactlo
 	if err != nil {
 		return nil, err
 	}
+	// Keep the existing shared plan_document storage; relocate only its main-loop
+	// presentation. Extract before lightweight projection so the full document survives.
+	prefixMaterials := pm.NewPromptMaterials(base, input)
+	for i, partition := range prefixMaterials.FrozenPartitions {
+		if partition.ID == "plan_document" {
+			prefixMaterials.PlanDocument = fmt.Sprintf("# PLAN DOCUMENT\n<|PLAN_DOCUMENT_%s|>\n%s\n<|PLAN_DOCUMENT_END_%s|>",
+				partition.Nonce, partition.Content, partition.Nonce)
+			prefixMaterials.FrozenPartitions = append(prefixMaterials.FrozenPartitions[:i], prefixMaterials.FrozenPartitions[i+1:]...)
+			break
+		}
+	}
 	effectiveInput := input
 	if input.Lightweight {
 		base, effectiveInput = pm.projectLightweightLoopMaterials(base, input)
+		planDocument := prefixMaterials.PlanDocument
+		prefixMaterials = pm.NewPromptMaterials(base, effectiveInput)
+		prefixMaterials.PlanDocument = planDocument
 	}
 
-	prefixMaterials := pm.NewPromptMaterials(base, effectiveInput)
 	prefixMaterials.CurrentTime = ""
 	prefix, err := pm.AssemblePromptPrefix(prefixMaterials)
 	if err != nil {
@@ -640,7 +653,7 @@ func renderPlanContextBlock(materials *reactloops.PromptPrefixMaterials) string 
 }
 
 // buildSemiDynamic1Observation 给"PROMPT_SECTION_semi-dynamic-1 段"做观测树:
-// 工作区、技能，以及从 Timeline 提升的工具、用户输入和 Evidence。
+// 工作区、技能、已确认的 PLAN DOCUMENT，以及从 Timeline 提升的工具、用户输入和 Evidence。
 // 物理上对应 hijacker 5 段切分中的 user2
 // (string content, 不打 cc), 与 buildSemiDynamic2Observation 一起被 dashscope
 // 视作合并 prefix cache 计算.
@@ -684,6 +697,10 @@ func (pm *PromptManager) buildSemiDynamic1Observation(
 		reactloops.NewPromptSectionObservation(
 			"section.semi_dynamic_1.user_history", "User Input History",
 			reactloops.PromptSectionRoleSemiDynamic1, true, materials.PromotedUserInputHistory,
+		),
+		reactloops.NewPromptSectionObservation(
+			"section.semi_dynamic_1.plan_document", "PLAN DOCUMENT",
+			reactloops.PromptSectionRoleSemiDynamic1, false, materials.PlanDocument,
 		),
 		reactloops.NewPromptSectionObservation("section.semi_dynamic_1.evidence", "Session Evidence", reactloops.PromptSectionRoleSemiDynamic1, true, materials.SessionEvidenceSemiDynamic),
 	}

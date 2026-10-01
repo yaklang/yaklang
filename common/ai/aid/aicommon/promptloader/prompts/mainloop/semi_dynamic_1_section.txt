@@ -11,5 +11,8 @@
 
 {{ .PromotedUserInputHistory }}{{ end }}
 
-{{/* SessionEvidenceSemiDynamic: Timeline 冻结后提升的会话 Evidence，保留工具验证事实供后续决策引用。 */ -}}
+{{/* PlanDocument: 当前已确认的 PLAN 原始文档，主循环完整展示，不拼接任务树和执行状态；共享存储和 helper 上下文保持原有路径。 */ -}}
+{{ if .PlanDocument }}{{ .PlanDocument }}
+
+{{ end }}{{/* SessionEvidenceSemiDynamic: Timeline 冻结后提升的会话 Evidence，保留工具验证事实供后续决策引用。 */ -}}
 {{ if .SessionEvidenceSemiDynamic }}{{ .SessionEvidenceSemiDynamic }}{{ end }}
