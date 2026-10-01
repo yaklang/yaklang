@@ -1,9 +1,6 @@
 package pythonparser
 
-import (
-	"github.com/yaklang/antlr/v4"
-	"github.com/yaklang/yaklang/common/yak/antlr4util"
-)
+import "github.com/yaklang/antlr/v4"
 
 // SetFastPrediction permits differential testing against the original ATN.
 // Recovering strategies, LL and exact ambiguity diagnostics retain the ATN.
@@ -19,7 +16,8 @@ func (p *PythonParser) AdaptivePredict(base *antlr.BaseParser, input antlr.Token
 	if p.disableFastPrediction || interpreter.GetPredictionMode() != antlr.PredictionModeSLL {
 		return interpreter.AdaptivePredict(base, input, decision, ctx)
 	}
-	_, bail := p.GetErrorHandler().(*antlr4util.BailErrorStrategy)
+	strategy, marked := p.GetErrorHandler().(interface{ BailsOnSyntaxError() bool })
+	bail := marked && strategy.BailsOnSyntaxError()
 	if !bail {
 		_, bail = p.GetErrorHandler().(*antlr.BailErrorStrategy)
 	}
