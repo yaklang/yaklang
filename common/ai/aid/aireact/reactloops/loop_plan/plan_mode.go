@@ -31,7 +31,7 @@ func isDeepPlanMode(loop *reactloops.ReActLoop) bool {
 
 func shouldEnterDeepPlanModeFromAction(actionType string) bool {
 	switch actionType {
-	case "finish_exploration", "output_facts", "begin_deep_planning":
+	case "finish_exploration", "begin_deep_planning":
 		return true
 	}
 	for _, name := range infoGatheringActions {
@@ -105,13 +105,11 @@ func disableSimpleModeExplorationActions(loop *reactloops.ReActLoop) {
 		loop.RemoveAction(name)
 	}
 	loop.RemoveAction("finish_exploration")
-	loop.RemoveAction("output_facts")
 }
 
 func restoreDeepPlanningActions(loop *reactloops.ReActLoop, r aicommon.AIInvokeRuntime) {
 	options := []reactloops.ReActLoopOption{
 		finishExploration(r),
-		outputFactsAction(r),
 		searchKnowledge(r),
 		readFileAction(r),
 		findFilesAction(r),
@@ -124,12 +122,4 @@ func restoreDeepPlanningActions(loop *reactloops.ReActLoop, r aicommon.AIInvokeR
 		opt(loop)
 	}
 	loop.RemoveAction("generate_direct_plan")
-}
-
-func bootstrapFactsFromUserInput(userInput string) string {
-	userInput = strings.TrimSpace(userInput)
-	if userInput == "" {
-		return ""
-	}
-	return normalizeFactsDocument(fmt.Sprintf("## 用户需求\n\n%s", userInput))
 }

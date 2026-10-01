@@ -1,8 +1,6 @@
 package loop_plan
 
 import (
-	"strings"
-
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
 	"github.com/yaklang/yaklang/common/log"
@@ -16,11 +14,6 @@ var generateDirectPlan = func(r aicommon.AIInvokeRuntime) reactloops.ReActLoopOp
 		nil,
 		func(loop *reactloops.ReActLoop, action *aicommon.Action, op *reactloops.LoopActionHandlerOperator) {
 			task := loop.GetCurrentTask()
-			if strings.TrimSpace(loop.Get(PLAN_FACTS_KEY)) == "" && task != nil {
-				if incoming := bootstrapFactsFromUserInput(task.GetUserInput()); incoming != "" {
-					appendPlanFacts(loop, incoming)
-				}
-			}
 
 			reactloops.EmitStatusI18n(loop, "正在直接生成任务计划...", "Generating direct plan...")
 			planData := generateDirectPlanFromUserInput(loop, task)

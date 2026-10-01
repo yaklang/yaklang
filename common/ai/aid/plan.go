@@ -84,12 +84,6 @@ func (pr *planRequest) CallQualityPriorityAI(request *aicommon.AIRequest) (*aico
 
 type PlanResponse struct {
 	RootTask *AiTask `json:"root_task"`
-	// Facts is a read-only field populated by loop_plan's output_facts action.
-	// It contains all concrete factual evidence gathered during planning, in Markdown format.
-	Facts string `json:"facts,omitempty"`
-	// Evidence is a read-only field populated during plan execution.
-	// It contains runtime discoveries accumulated from verification and output_evidence.
-	Evidence string `json:"evidence,omitempty"`
 	// Document is the guidance document generated at the end of the planning loop,
 	// organized using cybernetics & scientific methodology frameworks.
 	// It serves as the foundational reference for all subtask execution.
@@ -149,9 +143,6 @@ func (pr *planRequest) Invoke() (*PlanResponse, error) {
 			pr.cod.standardizeTaskTreeAndNotify(planRes.RootTask, "mock plan initialized")
 		}
 		if pr.cod.Config != nil {
-			if strings.TrimSpace(planRes.Facts) != "" {
-				appendPlanFactsFrozenPartition(pr.cod.Config, planRes.Facts)
-			}
 			if strings.TrimSpace(planRes.Document) != "" {
 				appendPlanDocumentFrozenPartition(pr.cod.Config, planRes.Document)
 			}
@@ -160,7 +151,6 @@ func (pr *planRequest) Invoke() (*PlanResponse, error) {
 	}
 
 	var rootTask = pr.cod.generateAITaskWithName("root-default", "root-default")
-	var planFacts string
 	var planDocument string
 
 	planTask := aicommon.NewStatefulTaskBase(
@@ -261,13 +251,6 @@ func (pr *planRequest) Invoke() (*PlanResponse, error) {
 						log.Errorf("plan action missing main_task")
 					}
 
-					if facts := loop.Get(loop_plan.PLAN_FACTS_KEY); facts != "" {
-						planFacts = facts
-						if pr.cod.Config != nil {
-							appendPlanFactsFrozenPartition(pr.cod.Config, facts)
-						}
-					}
-
 					if doc := loop.Get(loop_plan.PLAN_DOCUMENT_KEY); doc != "" {
 						planDocument = doc
 						if pr.cod.Config != nil {
@@ -282,17 +265,12 @@ func (pr *planRequest) Invoke() (*PlanResponse, error) {
 	}
 	pr.cod.standardizeTaskTreeAndNotify(rootTask, "initial plan generated")
 
-	if planFacts != "" && rootTask.Coordinator != nil && rootTask.Coordinator.Config != nil {
-		appendPlanFactsFrozenPartition(rootTask.Coordinator.Config, planFacts)
-	}
 	if planDocument != "" && rootTask.Coordinator != nil && rootTask.Coordinator.Config != nil {
 		appendPlanDocumentFrozenPartition(rootTask.Coordinator.Config, planDocument)
 	}
 
 	resp := pr.cod.newPlanResponse(rootTask)
-	resp.Facts = planFacts
 	resp.Document = planDocument
-	resp.Evidence = getTaskPlanEvidence(rootTask)
 	return resp, nil
 }
 

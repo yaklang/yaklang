@@ -340,7 +340,6 @@ type LoopPromptAssemblyResult struct {
 type ExecutePlanInput struct {
 	PlanPayload  string
 	PlanData     string
-	PlanFacts    string
 	PlanDocument string
 }
 

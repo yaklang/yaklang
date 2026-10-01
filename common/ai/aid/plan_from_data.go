@@ -68,7 +68,7 @@ func (c *Coordinator) BuildRootTaskFromPlanData(planData string, rawInput string
 }
 
 // CommitApprovedPlan stores an approved plan and persists plan_ready state when possible.
-func (c *Coordinator) CommitApprovedPlan(root *AiTask, facts, document string) error {
+func (c *Coordinator) CommitApprovedPlan(root *AiTask, document string) error {
 	if c == nil {
 		return utils.Error("coordinator is nil")
 	}
@@ -86,9 +86,6 @@ func (c *Coordinator) CommitApprovedPlan(root *AiTask, facts, document string) e
 	c.rootTask = root
 	if c.ContextProvider != nil {
 		c.ContextProvider.StoreRootTask(root)
-	}
-	if strings.TrimSpace(facts) != "" {
-		appendPlanFactsFrozenPartition(c.Config, facts)
 	}
 	if strings.TrimSpace(document) != "" {
 		appendPlanDocumentFrozenPartition(c.Config, document)

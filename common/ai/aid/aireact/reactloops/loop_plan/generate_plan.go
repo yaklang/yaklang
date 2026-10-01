@@ -119,7 +119,7 @@ var finishExploration = func(r aicommon.AIInvokeRuntime) reactloops.ReActLoopOpt
 	_ = r
 	return reactloops.WithRegisterLoopAction(
 		"finish_exploration",
-		"Signal that information gathering is complete. The system will automatically generate a guidance document and execution plan based on the collected FACTS and evidence.",
+		"Signal that information gathering is complete. The system will automatically generate a guidance document and execution plan based on shared session evidence.",
 		nil,
 		nil,
 		func(loop *reactloops.ReActLoop, action *aicommon.Action, op *reactloops.LoopActionHandlerOperator) {

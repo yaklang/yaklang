@@ -260,7 +260,6 @@ func handleDetachedRequestPlan(
 	planInput := &aicommon.ExecutePlanInput{
 		PlanPayload:  rewriteQuery,
 		PlanData:     planData,
-		PlanFacts:    planLoop.Get(loop_plan.PLAN_FACTS_KEY),
 		PlanDocument: planLoop.Get(loop_plan.PLAN_DOCUMENT_KEY),
 	}
 
@@ -286,4 +285,3 @@ func handleLegacyAsyncPlanAndExecute(
 	}
 	operator.Exit()
 }
-

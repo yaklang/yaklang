@@ -21,6 +21,10 @@ type SessionPromptState struct {
 	// mutations, freeze boundaries and prompt rendering.
 	// Persisted to DB alongside UserInputHistory under the same persistent session.
 	evidenceJSON string
+	// evidenceTimeline owns the session journal. PLAN task timelines import its
+	// exact mutations for local freeze/promotion; they do not own evidence writes.
+	// Sub-agent forks use a separate SessionPromptState and retain isolation.
+	evidenceTimeline *Timeline
 
 	// todoJSON is the session's in-memory, task-scoped TODO work set. Normal
 	// ReAct actions update it; main-loop prompts project it after the Open Timeline.

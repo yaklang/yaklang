@@ -5,9 +5,9 @@
 ## 用户诉求
 {{ .UserInput }}
 
-{{ if .Facts }}
-## 已知事实（FACTS）
-{{ .Facts }}
+{{ if .Evidence }}
+## 已知事实（EVIDENCE）
+{{ .Evidence }}
 {{ end }}
 
 {{ if .Context }}

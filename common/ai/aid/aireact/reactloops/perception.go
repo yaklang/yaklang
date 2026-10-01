@@ -375,9 +375,8 @@ func (r *ReActLoop) buildPerceptionInput(trigger string) (string, map[string]str
 		extra["BaseFrame"] = baseFrameStr
 	}
 
-	if facts := strings.TrimSpace(r.Get("plan_facts")); facts != "" {
-		facts = aicommon.ShrinkTextBlockByTokens(facts, 2048)
-		extra["Facts"] = facts
+	if evidence := strings.TrimSpace(r.config.GetSessionEvidenceRendered()); evidence != "" {
+		extra["Evidence"] = aicommon.ShrinkTextBlockByTokens(evidence, 2048)
 	}
 
 	cfg := r.config

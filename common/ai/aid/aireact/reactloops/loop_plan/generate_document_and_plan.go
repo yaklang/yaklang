@@ -30,7 +30,6 @@ func generateGuidanceDocument(loop *reactloops.ReActLoop, task aicommon.AIStatef
 		userInput = task.GetUserInput()
 	}
 
-	facts := loop.Get(PLAN_FACTS_KEY)
 	// Guidance generation consumes the current business evidence view. This dedicated
 	// request is separate from the loop prefix, whose evidence promotion waits for freeze.
 	evidence := ""
@@ -41,7 +40,6 @@ func generateGuidanceDocument(loop *reactloops.ReActLoop, task aicommon.AIStatef
 
 	templateData := loop.GetBaseFrameContext()
 	templateData["UserInput"] = userInput
-	templateData["Facts"] = facts
 	templateData["Evidence"] = evidence
 	templateData["Context"] = loopContext
 
@@ -128,7 +126,7 @@ func generatePlanFromDocument(loop *reactloops.ReActLoop, task aicommon.AIStatef
 	templateData := loop.GetBaseFrameContext()
 	templateData["UserInput"] = userInput
 	templateData["Document"] = loop.Get(PLAN_DOCUMENT_KEY)
-	templateData["Facts"] = loop.Get(PLAN_FACTS_KEY)
+	templateData["Evidence"] = loop.GetConfig().GetSessionEvidenceRendered()
 	templateData["Context"] = getLoopTaskContext(loop)
 
 	prompt, err := utils.RenderTemplate(planFromDocumentPrompt, templateData)
@@ -246,7 +244,7 @@ func generateDirectPlanFromUserInput(loop *reactloops.ReActLoop, task aicommon.A
 
 			templateData := loop.GetBaseFrameContext()
 			templateData["UserInput"] = userInput
-			templateData["Facts"] = loop.Get(PLAN_FACTS_KEY)
+			templateData["Evidence"] = loop.GetConfig().GetSessionEvidenceRendered()
 			templateData["Context"] = getLoopTaskContext(loop)
 
 			prompt, err := utils.RenderTemplate(planDirectPrompt, templateData)

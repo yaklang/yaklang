@@ -41,7 +41,6 @@ var PLAN_PROMPT_KEY = "plan_prompt"
 var PLAN_FILE_RESULTS_KEY = "plan_file_results"
 var PLAN_WEB_RESULTS_KEY = "plan_web_results"
 var PLAN_RECON_RESULTS_KEY = "plan_recon_results"
-var PLAN_FACTS_KEY = "plan_facts"
 var PLAN_DOCUMENT_KEY = "plan_document"
 
 const PlanMaxIterations = 4
@@ -75,7 +74,7 @@ func init() {
 				"search_knowledge",
 				"read_file", "find_files", "grep_text",
 				"web_search", "scan_port", "simple_crawler",
-				"output_facts",
+				schema.AI_REACT_LOOP_ACTION_SAVE_EVIDENCE,
 				schema.AI_REACT_LOOP_ACTION_LOADING_SKILLS,
 			}
 			if r.GetConfig().GetAllowUserInteraction() {
@@ -87,7 +86,6 @@ func init() {
 				reactloops.WithAllowToolCall(false),
 				reactloops.WithAllowAIForge(false),
 				reactloops.WithAllowPlanAndExec(false),
-				reactloops.WithAITagFieldWithAINodeId(PlanFactsAITagName, PlanFactsFieldName, PlanFactsAINodeID, aicommon.TypeTextMarkdown),
 				reactloops.WithInitTask(buildPlanInitTask(r)),
 				reactloops.WithDisablePeriodicVerification(true),
 				reactloops.WithMaxIterations(PlanMaxIterations),
@@ -139,17 +137,15 @@ func init() {
 						"FileResults":       fileResults,
 						"WebResults":        webResults,
 						"ReconResults":      reconResults,
-						"Facts":             loop.Get(PLAN_FACTS_KEY),
 						"PlanMode":          loop.Get(PLAN_MODE_KEY),
 						"PlanModeReason":    loop.Get(PLAN_MODE_REASON_KEY),
 					}
 					return utils.RenderTemplate(reactiveData, renderMap)
 				}),
-				buildPlanPostIterationHook(r),
+				buildPlanPostIterationHook(),
 				generateDirectPlan(r),
 				beginDeepPlanning(r),
 				finishExploration(r),
-				outputFactsAction(r),
 				searchKnowledge(r),
 				readFileAction(r),
 				findFilesAction(r),
@@ -170,7 +166,7 @@ func init() {
 * When direct planning was chosen but you realize more exploration is needed:
   {"@action": "begin_deep_planning", "human_readable_thought": "The target environment is unknown and requires information gathering before planning"}
 * When you have gathered enough information and are ready to finalize:
-  {"@action": "finish_exploration", "human_readable_thought": "I have collected sufficient facts and evidence to generate a comprehensive guidance document and plan"}
+  {"@action": "finish_exploration", "human_readable_thought": "I have collected sufficient evidence to generate a comprehensive guidance document and plan"}
 * When needing to understand project structure before planning:
   {"@action": "find_files", "dir": "/project/root", "pattern": "*.go"}
 * When needing external best practices:

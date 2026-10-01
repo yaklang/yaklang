@@ -144,7 +144,7 @@
 **正确的探索流程：**
 1. 先调用 `scan_port` 扫描目标端口 → 获取真实的开放端口和服务信息
 2. 再调用 `simple_crawler` 爬取目标 Web 应用 → 获取真实的 URL、表单、参数列表
-3. 调用 `output_facts` 记录所有侦查发现
+3. 调用 `save_evidence` 记录所有侦查发现
 4. 事实充分后调用 `finish_exploration` → 系统自动基于侦查数据生成指导性文档和执行计划
 
 #### **10. 当你已经收集了足够的信息，使用 `finish_exploration` 结束探索**
@@ -152,166 +152,27 @@
 **使用场景:**
 在通过信息收集工具获取了必要的事实数据后，调用 `finish_exploration` 结束探索阶段。系统将自动：
 1. 生成一篇基于控制论与科学方法论的指导性文档
-2. 基于指导性文档和 FACTS 自动生成结构化执行计划
+2. 基于指导性文档和 EVIDENCE 自动生成结构化执行计划
 
 ```json
 {
     "@action": "finish_exploration",
-    "human_readable_thought": "I have gathered sufficient facts about the project structure, tech stack, open ports, and web endpoints. The FACTS document contains all the specific data points needed for plan generation."
+    "human_readable_thought": "I have gathered sufficient facts about the project structure, tech stack, open ports, and web endpoints. The EVIDENCE document contains all the specific data points needed for plan generation."
 }
 ```
 
 ---
 
-#### **11. 信息收集后立即调用 output_facts（重要）**
+#### **11. 保存后续决策需要的证据**
 
-**每次信息收集操作之后，必须立即使用 `output_facts` 将本轮新增事实记录下来。** 系统会自动把这些事实与历史 FACTS 合并累积。
-
-**示例一：端口扫描后记录事实**
-
-第 1 轮：调用 `scan_port` 扫描目标
-第 2 轮：立即调用 `output_facts` 记录结果
+信息收集后使用统一的 `save_evidence` 动作保存已确认发现，规划和任务执行均可读取同一份 session Evidence。
 
 ```json
 {
-    "@action": "output_facts"
+    "@action": "save_evidence",
+    "evidence_id": "target.http.endpoints",
+    "evidence_content": "已爬取 http://127.0.0.1:8787，响应中确认存在 /api/users 和 /api/orders 两个入口，后续任务需要分别验证。"
 }
 ```
 
-```markdown
-<|FACTS_CURRENT_NONCE|>
-## 目标信息
-
-- IP: 10.0.0.50
-- 扫描时间: 迭代 2
-
-## 开放端口与服务
-
-- 22/TCP: OpenSSH 7.6p1 Ubuntu
-- 80/TCP: Apache httpd 2.4.29
-- 443/TCP: Apache httpd 2.4.29 (TLS 1.2, 证书 CN=shop.example.com)
-- 3306/TCP: MySQL 5.7.38 (本地绑定, 仅允许 127.0.0.1)
-- 8080/TCP: Apache Tomcat 9.0.65
-<|FACTS_END_CURRENT_NONCE|>
-```
-
-**示例二：文件搜索后记录事实**
-
-```json
-{
-    "@action": "output_facts"
-}
-```
-
-```markdown
-<|FACTS_CURRENT_NONCE|>
-## 项目根目录
-
-- 路径: /Users/dev/myproject
-
-## 构建系统
-
-- 类型: Go module
-- go.mod 位置: /Users/dev/myproject/go.mod
-- Go 版本要求: go 1.21
-- 模块名: github.com/example/myproject
-
-## 技术依赖
-
-- gin v1.9.1: HTTP 框架
-- gorm v1.25.4: ORM
-- redis v9.0.5: 缓存客户端
-<|FACTS_END_CURRENT_NONCE|>
-```
-
-**示例三：Web 爬取后记录事实（重点演示"中文标题 + 公共前缀抽取 + 不重复动词前缀"）**
-
-第 N 轮：调用 `simple_crawler`
-第 N+1 轮：立即调用 `output_facts` 记录发现的 URL
-
-```json
-{
-    "@action": "output_facts"
-}
-```
-
-```markdown
-<|FACTS_CURRENT_NONCE|>
-## 已发现 URL (base: http://127.0.0.1:8787)
-
-- /_/
-- /_/submit-ai-practice
-- /_/ws
-- /api/
-- /api/get-challenge
-- /api/pipeline/
-- /api/pipeline/docs
-- /bruteplayground/
-- /bruteplayground/by-order-id
-- /bruteplayground/by-order-id-2
-- /bruteplayground/by-order-id-3
-- /common/
-- /common/vulinbox
-- /crypto/challenge-api-docs
-- /crypto/js/basic
-- /crypto/js/lib/aes/cbc
-- /crypto/js/lib/aes/ecb
-- /crypto/js/lib/aes/ecb/sqli
-- /crypto/js/lib/aes/ecb/sqli/bypass
-- /crypto/js/rsa/fromserver
-- /crypto/js/rsa/fromserver/response
-- /crypto/js/rsa/fromserver/response/aes-gcm
-- /fastjson/json-in-cookie
-- /fastjson/json-in-authorization
-- /fastjson/jackson-in-query
-
-## HTTP 响应头
-
-- Content-Type: text/html; charset=UTF8
-- Content-Length: 36310
-- Date: Thu, 23 Apr 2026 03:48:22 GMT
-
-## 静态资源引用
-
-- /static/favicon.ico
-- /static/js/bootstrap_5.3/bootstrap.min.css
-- /static/js/bootstrap_5.3/bootstrap.min.js
-- /static/js/bootstrap_5.3/popper.min.js
-
-## 页面特征
-
-- HTML 标题: Vulinbox - Agent
-- 服务协议: HTTP/1.1
-<|FACTS_END_CURRENT_NONCE|>
-```
-
-**注意对比**（错误写法 — 禁止）：
-```markdown
-- URL discovered: http://127.0.0.1:8787/_/
-- URL discovered: http://127.0.0.1:8787/_/submit-ai-practice
-- URL discovered: http://127.0.0.1:8787/_/ws
-- Server response header Content-Type: text/html
-- Static CSS file referenced: /static/js/bootstrap_5.3/bootstrap.min.css
-```
-上面每条 bullet 都复述了 "URL discovered / Server response header / Static ... file referenced" 这样的动词前缀，以及完整域名 `http://127.0.0.1:8787`——全是冗余噪声。正确做法是把分类和公共前缀抽到 `##` 标题，bullet 只写差异部分。
-
-**关键规则**：
-- **语言跟随 USER INPUT**：section 标题、说明语、bullet 描述的语言必须与用户原始输入保持一致；用户说中文就全部中文，用户说英文就全部英文。**严禁**使用 `URL discovered: ...`、`Open port discovered: ...`、`Server response header ...`、`Static file referenced: ...` 之类的固定英文动词短语作为 bullet 前缀——这既是语言错位，也是重复冗余
-- **信息密度（去重复前缀）**：同类事实要集中到同一 `##` section，section 标题承担分类语义，bullet 里只写**差异值**；公共前缀（域名、base URL、目录根）抽到 section 标题的括号里或开头一行说明里，bullet 只写相对路径
-  - 反例：40 行 `- URL discovered: http://host/xxx`（每行都复述 "URL discovered" 和完整主机名）
-  - 正例：`## 已发现 URL (base: http://host)` 下面 40 行 `- /xxx` bullet（标题定分类，前缀抽公共）
-- **N 对 N 硬量化**：来源里出现了 N 条同类条目，FACTS 就必须写 N 行 bullet。上方示例中扫描得到 5 个开放端口，FACTS 里就恰好 5 行；如果实际扫到 155 个 URL，就必须写 155 行，不允许合并、不允许省略、不允许概括。信息密度规则是"bullet 里不重复前缀"，不是"压缩 bullet 数量"
-- **严禁任何概括词**：不允许出现 "等"、"其他"、"相关"、"类似"、"若干"、"一些"、"多个"、"若干个"、"数个"、"部分"、"主要" 以及对应英文（etc. / and more / and so on / various / several / others / similar / including…）；出现任一即视为不合格
-- 反例：`已扫描端口`、`发现了若干服务`、`包含认证相关文件等`、`/_/, /api, /bruteplayground 等目录`、`/fastjson/json-in-cookie 等 FastJSON 端点`
-- 正例：每一个端口 / URL / 文件 / 目录 / 接口独占一行 bullet，把"等"后面被吞掉的条目也全部写出来
-- **过长处理**：担心输出长度？拆分为多次 `output_facts` 调用分批提交，系统会自动合并去重；**禁止用概括词压缩条目数**
-- 每次调用只需要写**本轮新增事实**，系统会自动合并到累积 FACTS 中
-- 优先使用 `{"@action": "output_facts"}` + `FACTS` AITag 输出，让界面可以直接看到 markdown
-- 如果你漏掉显式 `output_facts`，系统会在 post-action hook 中自动补一次，但你仍应主动调用
-- output_facts 记录的内容是后续自动生成指导性文档和执行计划的事实基础，精确性直接影响计划质量，任何被"等"吞掉的条目都将直接导致下游覆盖率漏洞
-
-# 探索阶段输出要求：
-*. 每次信息收集后调用 `output_facts` 记录发现
-*. 确保 FACTS 中每条事实都是具体、可验证的
-*. 信息收集充分后调用 `finish_exploration`
-*. 每个子任务建议提供 subtask_identifier 字段（英文蛇形命名），用于语义标识和目录命名
+仅记录已观察或已验证的数据，注明来源。复用 evidence_id 更新同一个发现；省略 ID 时按内容去重。保存完成后继续探索，信息充分后调用 `finish_exploration`。

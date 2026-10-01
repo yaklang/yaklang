@@ -688,8 +688,14 @@ func NewConfig(ctx context.Context, opts ...ConfigOption) *Config {
 		config.AiToolManager.SetDisallowMCPServers(config.DisallowMCPServers)
 	}
 
-	// Restore persistent session if configured
-	if !config.InitStatus.IsPersistentSessionRestored() {
+	// Only the session owner restores the persistent journal. Inherited task
+	// configs already share that session; restoring again would replace their
+	// explicitly supplied Timeline branch with an older DB snapshot.
+	promptState := config.GetSessionPromptState()
+	promptState.m.RLock()
+	hasSessionTimeline := promptState.evidenceTimeline != nil
+	promptState.m.RUnlock()
+	if !config.InitStatus.IsPersistentSessionRestored() && !hasSessionTimeline {
 		config.restorePersistentSession()
 	}
 
@@ -3609,7 +3615,7 @@ func (c *Config) AppendUserInputHistory(userInput string, timestamp time.Time) (
 
 func (c *Config) GetSessionEvidenceRendered() string {
 	if c != nil {
-		if timeline := c.GetTimeline(); timeline != nil {
+		if timeline := c.sessionEvidenceTimeline(); timeline != nil {
 			if store, found := timeline.evidenceStore(); found {
 				return store.Render()
 			}

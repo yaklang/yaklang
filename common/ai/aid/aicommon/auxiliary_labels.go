@@ -36,7 +36,6 @@ const (
 	CallerLabelKnowledgeCompressBench         = "knowledge-compress-bench"
 	CallerLabelSelectKnowledgeBase            = "select_knowledge_base"
 	CallerLabelEvaluateNextSearch             = "evaluate-next-search"
-	CallerLabelPlanFactsHook                  = "plan_facts_hook"
 	CallerLabelPlanDirect                     = "plan_direct"
 	CallerLabelAnalyzeRequirementAndSearch    = "analyze-requirement-and-search"
 	CallerLabelExtractRankedLines             = "extract-ranked-lines"

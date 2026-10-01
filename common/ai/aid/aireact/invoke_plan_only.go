@@ -185,13 +185,6 @@ func appendApprovedPlanArtifactOptions(baseOpts []aicommon.ConfigOption, input *
 	if input == nil {
 		return baseOpts
 	}
-	if facts := strings.TrimSpace(input.PlanFacts); facts != "" {
-		factsCopy := facts
-		baseOpts = append(baseOpts, func(c *aicommon.Config) error {
-			c.AppendFrozenBlockPartition("plan_facts", "Plan Facts", factsCopy, aicommon.PlanFactsFrozenPartitionOrder)
-			return nil
-		})
-	}
 	if document := strings.TrimSpace(input.PlanDocument); document != "" {
 		documentCopy := document
 		baseOpts = append(baseOpts, func(c *aicommon.Config) error {

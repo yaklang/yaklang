@@ -8,6 +8,9 @@ import (
 // Called once before assembling the next loop request, never during an action
 // or in a Timeline writer. Independent prompt fields are actual rendered values.
 func (r *ReActLoop) compressTimelineBeforePrompt(userInput, frozenUserContext, todo, instruction string) error {
+	if config, ok := r.config.(*aicommon.Config); ok {
+		config.SyncSessionEvidenceTimeline()
+	}
 	provider, ok := r.config.(interface{ GetTimeline() *aicommon.Timeline })
 	if !ok || provider.GetTimeline() == nil {
 		return nil

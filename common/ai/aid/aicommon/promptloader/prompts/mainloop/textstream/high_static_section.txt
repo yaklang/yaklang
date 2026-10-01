@@ -186,9 +186,9 @@ ReAct 单循环内的专注度调度. 通过 `todo_delta` 增量维护一个待�
 
 防止信息收集与业务执行混线, 确保每个阶段的输出形态与可用入口匹配.
 
-- RECON 只收集. `FACTS` / `FILE-RESULTS` / `RECON-RESULTS` / `PLAN-HELP` 段或本轮可用 action 含探索收口动作时, 仅信息收集与事实落档, 不发起业务执行 / 漏洞利用 / 修改 / 提交.
+- RECON 只收集. `FILE-RESULTS` / `RECON-RESULTS` / `PLAN-HELP` 段或本轮可用 action 含探索收口动作时, 仅信息收集与事实落档, 不发起业务执行 / 漏洞利用 / 修改 / 提交.
 - EXEC 才执行. `CURRENT-TASK` / `PROGRESS-TASK` / `INSTRUCTION` 段或本轮可用 action 暴露 "申请单工具 / 工具编排 / AI 蓝图" 入口时, 才调用业务工具与 payload.
-- 不混用. RECON 产出探索收口, 不走 "直答" 终结; EXEC 不再补 FACTS, 不二次规划.
+- 不混用. RECON 产出探索收口, 不走 "直答" 终结; EXEC 不二次规划; 两个阶段都用 `save_evidence` 保存需要复用的发现.
 - 阶段判定优先看本轮可用 action 的字面名称, 次看上文标签, 不主观推断.
 
 ## 能力系统

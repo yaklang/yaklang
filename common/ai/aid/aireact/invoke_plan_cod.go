@@ -55,7 +55,6 @@ func (s *planCoordinatorSession) ReviewPlan(ctx context.Context) error {
 
 	planRsp := &aid.PlanResponse{
 		RootTask: rootTask,
-		Facts:    s.planInput.PlanFacts,
 		Document: s.planInput.PlanDocument,
 	}
 
@@ -73,7 +72,7 @@ func (s *planCoordinatorSession) ReviewPlan(ctx context.Context) error {
 		return err
 	}
 
-	if err := s.cod.CommitApprovedPlan(approvedRsp.RootTask, approvedRsp.Facts, approvedRsp.Document); err != nil {
+	if err := s.cod.CommitApprovedPlan(approvedRsp.RootTask, approvedRsp.Document); err != nil {
 		s.fail(err)
 		return utils.Errorf("failed to commit approved plan: %v", err)
 	}
@@ -244,18 +243,13 @@ func executePlanInputFromPlanResponse(planPayload string, rsp *aid.PlanResponse,
 	if rsp == nil || rsp.RootTask == nil {
 		return nil
 	}
-	facts := rsp.Facts
 	document := rsp.Document
-	if facts == "" && fallback != nil {
-		facts = fallback.PlanFacts
-	}
 	if document == "" && fallback != nil {
 		document = fallback.PlanDocument
 	}
 	return &aicommon.ExecutePlanInput{
 		PlanPayload:  planPayload,
 		PlanData:     aid.SerializeRootTaskToPlanData(rsp.RootTask),
-		PlanFacts:    facts,
 		PlanDocument: document,
 	}
 }

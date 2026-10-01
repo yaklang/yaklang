@@ -114,6 +114,20 @@ func (f *TimelineFork) MergeBack() (*TimelineMergeResult, error) {
 	// 2) preserve those IDs on merge (no rebasing);
 	// 3) regenerate timestamps as a monotonic merge sequence when branch timestamps
 	//    would break parent ordering.
+	// Session evidence was already journaled in the parent at save time. Imported
+	// copies must neither collide nor replay stale evidence over a newer mutation.
+	mergedItems := activeItems[:0]
+	for _, active := range activeItems {
+		if op, ok := active.item.value.(*PromotableTimelineItem); ok && op.Kind == TimelinePromotedKindEvidence {
+			if existing, ok := parent.idToTimelineItem.Get(active.id); ok {
+				if prior, ok := existing.value.(*PromotableTimelineItem); ok && *prior == *op {
+					continue
+				}
+			}
+		}
+		mergedItems = append(mergedItems, active)
+	}
+	activeItems = mergedItems
 	for _, active := range activeItems {
 		if compressedHead != nil && active.id == compressedHead.CoveredEndItemID {
 			return nil, utils.Errorf("timeline fork merge: summary id %d collides with active branch entry", active.id)

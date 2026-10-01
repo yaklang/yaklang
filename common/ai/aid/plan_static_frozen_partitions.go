@@ -2,13 +2,6 @@ package aid
 
 import "github.com/yaklang/yaklang/common/ai/aid/aicommon"
 
-func appendPlanFactsFrozenPartition(config *aicommon.Config, facts string) {
-	if config == nil {
-		return
-	}
-	config.AppendFrozenBlockPartition("plan_facts", "Plan Facts", facts, aicommon.PlanFactsFrozenPartitionOrder)
-}
-
 func appendPlanDocumentFrozenPartition(config *aicommon.Config, document string) {
 	if config == nil {
 		return
@@ -23,7 +16,7 @@ func BuildPlanStaticFrozenPartitions(producer *aicommon.FrozenBlockPartitionProd
 	var out []aicommon.FrozenBlockPartition
 	for _, partition := range producer.ProducePartitions() {
 		switch partition.ID {
-		case "plan_facts", "plan_document":
+		case "plan_document":
 			out = append(out, partition)
 		}
 	}

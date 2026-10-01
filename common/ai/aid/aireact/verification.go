@@ -140,7 +140,7 @@ func (r *ReAct) VerifyUserSatisfaction(ctx context.Context, originalQuery string
 						var out bytes.Buffer
 						var outputReader = io.TeeReader(displayReader, &out)
 						_, err = boundEmitter.EmitDefaultSystemStreamEvent(
-							"plan-evidence",
+							"evidence_content",
 							outputReader,
 							rsp.GetTaskIndex(),
 							func() {},
