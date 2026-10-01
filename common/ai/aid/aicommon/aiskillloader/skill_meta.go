@@ -43,6 +43,9 @@ const (
 	SkillMetadataDisplayNamePrefix = "display_name_"
 	SkillLocaleZhCN                = "zh-CN"
 	SkillMetadataDisplayNameZhCN   = SkillMetadataDisplayNamePrefix + SkillLocaleZhCN
+	// Skills with auto_load:true enter each new loop's context without an AI
+	// loading_skills round. The reference catalog remains opt-in.
+	SkillMetadataAutoLoad = "auto_load"
 )
 
 // GetDisplayName returns a localized display name from the SKILL spec metadata

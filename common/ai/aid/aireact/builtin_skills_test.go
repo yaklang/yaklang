@@ -11,6 +11,7 @@ import (
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon/aiskillloader"
 	"github.com/yaklang/yaklang/common/ai/aid/aimem"
+	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/mutate"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
@@ -549,5 +550,60 @@ func TestBuiltinSkills_DisabledDoesNotExtractBuiltinFiles(t *testing.T) {
 	}
 	if raw := yakit.GetKey(builtinSkillReleaseDB(), builtinSkillReleaseKey(relPath)); raw != "" {
 		t.Fatalf("expected no release record when auto-skills are disabled, got %q", raw)
+	}
+}
+
+func TestBuiltinFuzztagDefaultContext(t *testing.T) {
+	loader, err := aiskillloader.NewAutoSkillLoader(aiskillloader.WithAutoLoad_FileSystem(GetBuiltinSkillsFS()))
+	if err != nil {
+		t.Fatal(err)
+	}
+	manager := aiskillloader.NewSkillsContextManager(loader)
+	if !manager.IsAutoSkillLoadedAndUnfolded("fuzztag") {
+		t.Fatal("fuzztag must load without a loading_skills round")
+	}
+	if manager.IsSkillLoaded("fuzztag-reference") {
+		t.Fatal("reference must remain on demand")
+	}
+	rendered := manager.RenderAutoLoadedSkills()
+	for _, text := range []string{"FuzzTag 文本生成", "do_http_request", "batch_do_http_request"} {
+		if !strings.Contains(rendered, text) {
+			t.Errorf("default prompt missing %q", text)
+		}
+	}
+	if manager.IsForcedSkill("fuzztag") {
+		t.Fatal("default loading must not impersonate a user-forced skill")
+	}
+}
+
+func TestBuiltinFuzztagDefaultReActLoop(t *testing.T) {
+	useTempBuiltinSkillReleaseDB(t)
+	useTempYakitHome(t)
+	react, err := NewReAct(
+		aicommon.WithMemoryTriage(aimem.NewMockMemoryTriage()),
+		aicommon.WithDisallowMCPServers(true),
+		aicommon.WithDisableSessionTitleGeneration(true),
+		aicommon.WithDisableIntentRecognition(true),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	loop, err := reactloops.CreateLoopByName("default", react)
+	if err != nil {
+		t.Fatal(err)
+	}
+	manager := loop.GetSkillsContextManager()
+	if manager == nil || !manager.IsAutoSkillLoadedAndUnfolded("fuzztag") {
+		t.Fatal("fresh ReAct loop must include fuzztag")
+	}
+	if manager.IsSkillLoaded("fuzztag-reference") {
+		t.Fatal("fresh ReAct loop must not include reference body")
+	}
+	forge, err := yakit.GetAIForgeByName(builtinSkillReleaseDB(), "fuzztag")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(forge.Tags, "auto_load:true") {
+		t.Fatal("default-load metadata must survive skill-to-forge synchronization")
 	}
 }
