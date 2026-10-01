@@ -32,9 +32,12 @@ type PromptMaterials struct {
 	PromotedRecentTools string
 	// PromotedUserInputHistory contains exact user inputs from frozen Timeline records.
 	PromotedUserInputHistory string
-	PlanHelp                 string
-	OriginalUserInput        string
-	StableInstruction        string
+	// PlanDocument contains the confirmed plan document rendered in main-loop SemiDynamic1.
+	// Task tree and execution status remain in their existing context paths.
+	PlanDocument      string
+	PlanHelp          string
+	OriginalUserInput string
+	StableInstruction string
 
 	// ForcedSkills 是「用户强制加载」SKILL 满内容, 进 frozen_block 顶部 (最高优先级).
 	// 空时 frozen_block 顶部子块不渲染.
@@ -96,6 +99,7 @@ func (m *PromptMaterials) SemiDynamicData() map[string]any {
 		"SkillsContext":              m.SkillsContext,
 		"PromotedRecentTools":        m.PromotedRecentTools,
 		"PromotedUserInputHistory":   m.PromotedUserInputHistory,
+		"PlanDocument":               m.PlanDocument,
 		"SessionEvidenceSemiDynamic": m.SessionEvidenceSemiDynamic,
 		"PlanHelp":                   m.PlanHelp,
 		"OriginalUserInput":          m.OriginalUserInput,
