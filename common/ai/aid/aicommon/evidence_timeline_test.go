@@ -73,7 +73,7 @@ func TestTimelineEvidenceAndToolPromoteInSameTransaction(t *testing.T) {
 	require.Len(t, receipt.Promotions, 2)
 	materials := BuildPromptFrozenOpenMaterials(c)
 	require.Contains(t, materials.SessionEvidenceSemiDynamic, "finding")
-	require.Contains(t, materials.PromotedSemiDynamic1, "TOOL_SCHEMA")
+	require.Contains(t, materials.PromotedRecentTools, "TOOL_SCHEMA")
 	require.Empty(t, materials.TimelineOpen)
 	require.Empty(t, c.Timeline.GetTimelineItemIDs(), "neither evidence nor schema is AI reducer input")
 }

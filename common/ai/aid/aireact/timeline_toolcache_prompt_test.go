@@ -57,10 +57,10 @@ func TestTimelineToolCachePromptProjection(t *testing.T) {
 				require.NotContains(t, result.Prompt, "Promoted State Updates")
 				materials := aicommon.BuildPromptFrozenOpenMaterials(react.config)
 				if frozen {
-					require.Contains(t, materials.PromotedSemiDynamic1, "CACHE_SCHEMA_MARKER")
+					require.Contains(t, materials.PromotedRecentTools, "CACHE_SCHEMA_MARKER")
 					require.NotContains(t, materials.TimelineFrozen+materials.TimelineOpen, "CACHE_SCHEMA_MARKER")
 				} else {
-					require.Empty(t, materials.PromotedSemiDynamic1)
+					require.Empty(t, materials.PromotedRecentTools)
 					require.Less(t, strings.Index(materials.TimelineOpen, "HISTORY_BEFORE_TOOLCACHE"), strings.Index(materials.TimelineOpen, "CACHE_SCHEMA_MARKER"))
 					require.Less(t, strings.Index(materials.TimelineOpen, "CACHE_SCHEMA_MARKER"), strings.Index(materials.TimelineOpen, "RESULT_AFTER_TOOLCACHE"))
 				}

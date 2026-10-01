@@ -45,7 +45,7 @@ func TestTimelineToolCacheUsageDefaultsToFunctionCallMode(t *testing.T) {
 			WithEnableFunctionCallMode(native),
 			WithToolManager(buildinaitools.NewToolManager(buildinaitools.WithOnlyTools(tool))))
 		restoreCacheTimeline(t, cfg.Timeline, restored)
-		restoredView := RenderTimelineFrozenOpen(restored.Timeline).PromotedSemiDynamic1
+		restoredView := RenderTimelineFrozenOpen(restored.Timeline).PromotedRecentTools
 		require.Contains(t, restoredView, "JSON_ONLY")
 		require.NotContains(t, restoredView, "AITAG_ONLY")
 	}
@@ -63,14 +63,14 @@ func TestTimelineToolCacheRuntimeRestoreLifecycle(t *testing.T) {
 	cfg.RecordRecentlyUsedTool(b)
 	tl := cfg.GetTimeline()
 	tl.FreezeAll()
-	frozen := RenderTimelineFrozenOpen(tl).PromotedSemiDynamic1
+	frozen := RenderTimelineFrozenOpen(tl).PromotedRecentTools
 	cfg.RecordRecentlyUsedTool(a)
-	require.Equal(t, frozen, RenderTimelineFrozenOpen(tl).PromotedSemiDynamic1)
+	require.Equal(t, frozen, RenderTimelineFrozenOpen(tl).PromotedRecentTools)
 	require.NotContains(t, RenderTimelineFrozenOpen(tl).Open, "Direct Params Schema")
 	next := cacheRuntimeConfig(a, b)
 	restoreCacheTimeline(t, tl, next)
 	require.Equal(t, []string{"beta", "alpha"}, next.GetAiToolManager().GetRecentToolNames())
-	require.Equal(t, frozen, RenderTimelineFrozenOpen(next.Timeline).PromotedSemiDynamic1)
+	require.Equal(t, frozen, RenderTimelineFrozenOpen(next.Timeline).PromotedRecentTools)
 	before, err := MarshalTimeline(next.Timeline)
 	require.NoError(t, err)
 	next.restoreRecentToolsFromTimeline()
@@ -78,7 +78,7 @@ func TestTimelineToolCacheRuntimeRestoreLifecycle(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, before, after, "unchanged restore is read-only and idempotent")
 	next.RecordRecentlyUsedTool(b)
-	require.Equal(t, frozen, RenderTimelineFrozenOpen(next.Timeline).PromotedSemiDynamic1)
+	require.Equal(t, frozen, RenderTimelineFrozenOpen(next.Timeline).PromotedRecentTools)
 	next.Timeline.FreezeAll()
 	requireToolCacheOrder(t, next.Timeline, "## Tool: alpha", "## Tool: beta")
 
@@ -88,8 +88,8 @@ func TestTimelineToolCacheRuntimeRestoreLifecycle(t *testing.T) {
 	changed := cacheRuntimeConfig(a2)
 	restoreCacheTimeline(t, next.Timeline, changed)
 	view := RenderTimelineFrozenOpen(changed.Timeline)
-	require.NotContains(t, view.PromotedSemiDynamic1, "new_path")
-	require.Contains(t, view.PromotedSemiDynamic1, "## Tool: beta")
+	require.NotContains(t, view.PromotedRecentTools, "new_path")
+	require.Contains(t, view.PromotedRecentTools, "## Tool: beta")
 	require.Contains(t, view.Open, "[UPSERT] alpha")
 	require.Contains(t, view.Open, "new_path")
 	require.Contains(t, view.Open, "[DELETE] beta")
@@ -99,8 +99,8 @@ func TestTimelineToolCacheRuntimeRestoreLifecycle(t *testing.T) {
 	require.Equal(t, id, changed.Timeline.GetMaxID())
 	changed.Timeline.FreezeAll()
 	view = RenderTimelineFrozenOpen(changed.Timeline)
-	require.Contains(t, view.PromotedSemiDynamic1, "new_path")
-	require.NotContains(t, view.PromotedSemiDynamic1, "## Tool: beta")
+	require.Contains(t, view.PromotedRecentTools, "new_path")
+	require.NotContains(t, view.PromotedRecentTools, "## Tool: beta")
 	require.Empty(t, view.Open)
 }
 
@@ -111,16 +111,16 @@ func TestTimelineToolCacheRuntimeEvictionAndSmallerRestoreBudget(t *testing.T) {
 	cfg.RecordRecentlyUsedTool(a)
 	cfg.RecordRecentlyUsedTool(b)
 	cfg.Timeline.FreezeAll()
-	frozen := RenderTimelineFrozenOpen(cfg.Timeline).PromotedSemiDynamic1
+	frozen := RenderTimelineFrozenOpen(cfg.Timeline).PromotedRecentTools
 	cfg.RecordRecentlyUsedTool(a) // A is newest, including after restore.
 	manager := buildinaitools.NewToolManager(buildinaitools.WithOnlyTools(a, b), buildinaitools.WithRecentToolCacheMaxTokens(1))
 	next := NewConfig(context.Background(), WithDisableAutoSkills(true), WithToolManager(manager))
 	restoreCacheTimeline(t, cfg.Timeline, next)
 	require.Equal(t, []string{"alpha"}, manager.GetRecentToolNames())
-	require.Equal(t, frozen, RenderTimelineFrozenOpen(next.Timeline).PromotedSemiDynamic1)
+	require.Equal(t, frozen, RenderTimelineFrozenOpen(next.Timeline).PromotedRecentTools)
 	require.Contains(t, RenderTimelineFrozenOpen(next.Timeline).Open, "[DELETE] beta")
 	next.Timeline.FreezeAll()
-	sealed := RenderTimelineFrozenOpen(next.Timeline).PromotedSemiDynamic1
+	sealed := RenderTimelineFrozenOpen(next.Timeline).PromotedRecentTools
 	require.NotContains(t, sealed, "## Tool: beta")
 
 	mutation := next.RecordRecentlyUsedTool(b)
@@ -128,11 +128,11 @@ func TestTimelineToolCacheRuntimeEvictionAndSmallerRestoreBudget(t *testing.T) {
 	require.Equal(t, "alpha", mutation.Deleted[0].Name)
 	require.Equal(t, []string{"beta"}, manager.GetRecentToolNames())
 	view := RenderTimelineFrozenOpen(next.Timeline)
-	require.Equal(t, sealed, view.PromotedSemiDynamic1)
+	require.Equal(t, sealed, view.PromotedRecentTools)
 	require.Contains(t, view.Open, "[UPSERT] beta")
 	require.Contains(t, view.Open, "[DELETE] alpha")
 	next.Timeline.FreezeAll()
-	require.NotContains(t, RenderTimelineFrozenOpen(next.Timeline).PromotedSemiDynamic1, "## Tool: alpha")
+	require.NotContains(t, RenderTimelineFrozenOpen(next.Timeline).PromotedRecentTools, "## Tool: alpha")
 
 	// A stale pre-seeded manager must not resurrect a deleted journal key.
 	reloaded := cacheRuntimeConfig(a, b)
@@ -194,7 +194,7 @@ func TestTimelineToolCacheRuntimeForkMergeAndRollback(t *testing.T) {
 	parent.RecordRecentlyUsedTool(b)
 	parent.Timeline.FreezeAll()
 	checkpoint := parent.Timeline.GetMaxID()
-	frozen := RenderTimelineFrozenOpen(parent.Timeline).PromotedSemiDynamic1
+	frozen := RenderTimelineFrozenOpen(parent.Timeline).PromotedRecentTools
 	child := cacheRuntimeConfig(a, b, c)
 	child.SeqIdProvider = parent.SeqIdProvider
 	fork, err := parent.Timeline.ForkForTask("cache-child", "cache child", child, child)
@@ -203,7 +203,7 @@ func TestTimelineToolCacheRuntimeForkMergeAndRollback(t *testing.T) {
 	child.restoreRecentToolsFromTimeline()
 	child.RecordRecentlyUsedTool(a)
 	child.RecordRecentlyUsedTool(c)
-	require.Equal(t, frozen, RenderTimelineFrozenOpen(parent.Timeline).PromotedSemiDynamic1)
+	require.Equal(t, frozen, RenderTimelineFrozenOpen(parent.Timeline).PromotedRecentTools)
 	require.NotContains(t, RenderTimelineFrozenOpen(parent.Timeline).Open, "gamma")
 	require.Equal(t, []string{"alpha", "beta"}, parent.GetAiToolManager().GetRecentToolNames())
 	_, err = fork.MergeBack()
@@ -211,9 +211,9 @@ func TestTimelineToolCacheRuntimeForkMergeAndRollback(t *testing.T) {
 	parent.restoreRecentToolsFromTimeline()
 	require.Equal(t, []string{"beta", "alpha", "gamma"}, parent.GetAiToolManager().GetRecentToolNames())
 	parent.Timeline.FreezeAll()
-	require.Contains(t, RenderTimelineFrozenOpen(parent.Timeline).PromotedSemiDynamic1, "## Tool: gamma")
+	require.Contains(t, RenderTimelineFrozenOpen(parent.Timeline).PromotedRecentTools, "## Tool: gamma")
 	parent.Timeline.TruncateAfter(checkpoint)
 	parent.restoreRecentToolsFromTimeline()
 	require.Equal(t, []string{"alpha", "beta"}, parent.GetAiToolManager().GetRecentToolNames())
-	require.Equal(t, frozen, RenderTimelineFrozenOpen(parent.Timeline).PromotedSemiDynamic1)
+	require.Equal(t, frozen, RenderTimelineFrozenOpen(parent.Timeline).PromotedRecentTools)
 }

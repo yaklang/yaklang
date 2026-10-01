@@ -113,7 +113,7 @@ func (b *PromptPrefixBuilder) AssemblePromptPrefix(materials *PromptMaterials) (
 		}
 	}
 
-	highStatic, err := RenderPromptTemplate(b.HighStaticTemplateName, highStaticTemplate, materials.HighStaticData())
+	highStatic, err := RenderPromptTemplate(b.HighStaticTemplateName, highStaticTemplate, nil)
 	if err != nil {
 		return nil, err
 	}

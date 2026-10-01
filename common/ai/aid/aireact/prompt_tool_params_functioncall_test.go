@@ -225,7 +225,7 @@ func TestFunctionCallToolParamsExcludesOpenAndPromotedToolCache(t *testing.T) {
 		require.NoError(t, err)
 		parentBefore := aicommon.BuildPromptFrozenOpenMaterials(react.config)
 		if sealed {
-			require.Contains(t, parentBefore.PromotedSemiDynamic1, "CACHE_ONLY_DESCRIPTION_R2")
+			require.Contains(t, parentBefore.PromotedRecentTools, "CACHE_ONLY_DESCRIPTION_R2")
 		} else {
 			require.Contains(t, parentBefore.TimelineOpen, "CACHE_ONLY_DESCRIPTION_R2")
 		}
@@ -253,7 +253,7 @@ func TestFunctionCallToolParamsExcludesOpenAndPromotedToolCache(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, rawBefore, rawAfter)
 		parentAfter := aicommon.BuildPromptFrozenOpenMaterials(react.config)
-		require.Equal(t, parentBefore.PromotedSemiDynamic1, parentAfter.PromotedSemiDynamic1)
+		require.Equal(t, parentBefore.PromotedRecentTools, parentAfter.PromotedRecentTools)
 		require.Equal(t, parentBefore.TimelineOpen, parentAfter.TimelineOpen)
 	}
 }

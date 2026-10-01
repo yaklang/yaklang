@@ -14,7 +14,6 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/utils/filesys"
 )
 
 // PlanningReviewControl is a callback that reviews plan or task decisions
@@ -45,17 +44,16 @@ type PlanReviewPromptData struct {
 }
 
 type TaskReviewPromptData struct {
-	CurrentTime      string
-	OSArch           string
-	WorkingDir       string
-	WorkingDirGlance string
-	Nonce            string
-	TaskDetails      string
-	ShortSummary     string
-	LongSummary      string
-	Language         string
-	Progress         string
-	PendingTasks     string
+	CurrentTime  string
+	OSArch       string
+	WorkingDir   string
+	Nonce        string
+	TaskDetails  string
+	ShortSummary string
+	LongSummary  string
+	Language     string
+	Progress     string
+	PendingTasks string
 }
 
 func generatePlanReviewPrompt(config *Config, materials aitool.InvokeParams) (string, error) {
@@ -83,21 +81,16 @@ func generatePlanReviewPrompt(config *Config, materials aitool.InvokeParams) (st
 	frozenOpen := BuildPromptFrozenOpenMaterials(config)
 
 	workingDir := config.Workdir
-	var workingDirGlance string
-	if workingDir != "" {
-		workingDirGlance = filesys.Glance(workingDir)
-	}
 	osArch := fmt.Sprintf("%s/%s", runtime.GOOS, runtime.GOARCH)
 
 	prefixMaterials := &PromptMaterials{
-		TaskInstruction:  strings.TrimSpace(aiPlanReviewInstructionTemplate),
-		Schema:           strings.TrimSpace(aiPlanReviewSchemaTemplate),
-		OutputExample:    strings.TrimSpace(aiPlanReviewOutputExampleTemplate),
-		CurrentTime:      time.Now().Format("2006-01-02 15:04"),
-		OSArch:           osArch,
-		WorkingDir:       workingDir,
-		WorkingDirGlance: workingDirGlance,
-		Workspace:        strings.TrimSpace(osArch+workingDir+workingDirGlance) != "",
+		TaskInstruction: strings.TrimSpace(aiPlanReviewInstructionTemplate),
+		Schema:          strings.TrimSpace(aiPlanReviewSchemaTemplate),
+		OutputExample:   strings.TrimSpace(aiPlanReviewOutputExampleTemplate),
+		CurrentTime:     time.Now().Format("2006-01-02 15:04"),
+		OSArch:          osArch,
+		WorkingDir:      workingDir,
+		Workspace:       strings.TrimSpace(osArch+workingDir) != "",
 	}
 	ApplyPromptFrozenOpenMaterials(prefixMaterials, frozenOpen)
 
@@ -122,9 +115,6 @@ func generateTaskReviewPrompt(config *Config, materials aitool.InvokeParams) (st
 	}
 
 	data.WorkingDir = config.Workdir
-	if data.WorkingDir != "" {
-		data.WorkingDirGlance = filesys.Glance(data.WorkingDir)
-	}
 
 	frozenOpen := BuildPromptFrozenOpenMaterials(config)
 
@@ -150,14 +140,13 @@ func generateTaskReviewPrompt(config *Config, materials aitool.InvokeParams) (st
 	}
 
 	prefixMaterials := &PromptMaterials{
-		TaskInstruction:  strings.TrimSpace(aiTaskReviewInstructionTemplate),
-		Schema:           strings.TrimSpace(aiTaskReviewSchemaTemplate),
-		OutputExample:    strings.TrimSpace(aiTaskReviewOutputExampleTemplate),
-		CurrentTime:      data.CurrentTime,
-		OSArch:           data.OSArch,
-		WorkingDir:       data.WorkingDir,
-		WorkingDirGlance: data.WorkingDirGlance,
-		Workspace:        strings.TrimSpace(data.OSArch+data.WorkingDir+data.WorkingDirGlance) != "",
+		TaskInstruction: strings.TrimSpace(aiTaskReviewInstructionTemplate),
+		Schema:          strings.TrimSpace(aiTaskReviewSchemaTemplate),
+		OutputExample:   strings.TrimSpace(aiTaskReviewOutputExampleTemplate),
+		CurrentTime:     data.CurrentTime,
+		OSArch:          data.OSArch,
+		WorkingDir:      data.WorkingDir,
+		Workspace:       strings.TrimSpace(data.OSArch+data.WorkingDir) != "",
 	}
 	ApplyPromptFrozenOpenMaterials(prefixMaterials, frozenOpen)
 	if err := PopulateToolInventoryFromConfig(prefixMaterials, config); err != nil {

@@ -1,10 +1,15 @@
+{{/* WorkspaceContext: 工作区目录、运行平台等共享环境信息。 */ -}}
 {{ if .WorkspaceContext }}{{ .WorkspaceContext }}
 
-{{ end }}{{ if .SkillsContext }}{{ .SkillsContext }}{{ end }}
-{{ if .PromotedSemiDynamic1 }}
+{{ end }}{{/* SkillsContext: 当前已加载的技能说明。 */ -}}
+{{ if .SkillsContext }}{{ .SkillsContext }}{{ end }}
+{{/* PromotedRecentTools: Timeline 冻结后提升的工具说明和直接调用参数 schema；未冻结的变更留在 Timeline Open。 */ -}}
+{{ if .PromotedRecentTools }}
 
-{{ .PromotedSemiDynamic1 }}{{ end }}
+{{ .PromotedRecentTools }}{{ end }}{{/* PromotedUserInputHistory: Timeline 冻结后提升的用户输入原文，含当前任务输入和后续补充；未冻结的输入留在 Timeline Open。 */ -}}
+{{ if .PromotedUserInputHistory }}
 
-{{ if .PromptedUserInputHistory }}{{ .PromptedUserInputHistory }}
+{{ .PromotedUserInputHistory }}{{ end }}
 
-{{ end }}{{ if .SessionEvidenceSemiDynamic }}{{ .SessionEvidenceSemiDynamic }}{{ end }}
+{{/* SessionEvidenceSemiDynamic: Timeline 冻结后提升的会话 Evidence，保留工具验证事实供后续决策引用。 */ -}}
+{{ if .SessionEvidenceSemiDynamic }}{{ .SessionEvidenceSemiDynamic }}{{ end }}

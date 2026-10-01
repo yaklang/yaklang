@@ -221,9 +221,9 @@ func (m *Timeline) frozenPromptBlocksLocked(excludeToolCache bool, onlyUserInput
 			if !ok || item == nil || item.deleted {
 				continue
 			}
-			op := timelinePromotionForItem(item)
-			if !promoteUserInput && op != nil && op.Kind == TimelinePromotedKindUserInput {
-				op = nil // Keep the original audit representation for helper prompts.
+			var op *PromotableTimelineItem
+			if promoteUserInput || !isTimelineUserInput(item) {
+				op = timelinePromotionForItem(item)
 			}
 			if onlyUserInput && (op == nil || op.Kind != TimelinePromotedKindUserInput) {
 				continue

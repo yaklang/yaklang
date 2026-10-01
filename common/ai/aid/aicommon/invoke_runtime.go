@@ -257,10 +257,9 @@ type LoopPromptAssemblyInput struct {
 	// execution semantics do not change.
 	Lightweight bool
 
-	// UserQuery is ingested into Timeline by main-loop assembly. Helper prompt
-	// builders keep their existing direct-query behavior.
+	// UserQuery is used by helper prompts. Main-loop prompts read user input
+	// from Timeline instead.
 	UserQuery           string
-	CurrentTaskID       string
 	TaskInstruction     string
 	OutputExample       string
 	Schema              string

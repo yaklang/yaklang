@@ -42,7 +42,7 @@
 
 ### 3.1 semi-dynamic-1 段统一 SkillsContext
 
-5 个子角色（R4/R5/R6/R7/R8）的 `SkillsContext` 从 `""` 改为 `pm.renderSkillsContextForPrompt()`，R7 删除了 `PromotedSemiDynamic1 = ""` 和 `PromotedTimelineOpen = ""`。所有 R1~R8 的 semi-1 段渲染产物一致。
+5 个子角色（R4/R5/R6/R7/R8）的 `SkillsContext` 从 `""` 改为 `pm.renderSkillsContextForPrompt()`，R7 使用共享 Timeline 材料。所有 R1~R8 的 semi-1 段渲染产物一致。
 
 ### 3.2 semi-dynamic-2 段 Schema 移到末尾
 

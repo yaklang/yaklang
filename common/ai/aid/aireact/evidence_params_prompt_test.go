@@ -14,7 +14,7 @@ import (
 func TestEvidenceFunctionCallToolParamsFrozenAndSemiOneRouting(t *testing.T) {
 	sections, err := newFunctionCallToolParamsPrefixBuilder().AssemblePromptPrefix(&aicommon.PromptMaterials{
 		TimelineFrozen: "FROZEN_TIMELINE_R2", SessionEvidenceSemiDynamic: "PROMOTED_EVIDENCE_R2",
-		OriginalUserInput: "COMPLETE_USER_INPUT_R2", PromotedSemiDynamic1: "STABLE_TIMELINE_R2",
+		OriginalUserInput: "COMPLETE_USER_INPUT_R2", PromotedRecentTools: "STABLE_TIMELINE_R2",
 		FunctionCallSchemas: "FIXED_TOOL_TAGS_R2", TaskInstruction: "SELECTED_TOOL_R2",
 	})
 	require.NoError(t, err)
