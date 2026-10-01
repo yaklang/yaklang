@@ -26171,7 +26171,7 @@ func (p *PHPParser) expression(_p int) (localctx IExpressionContext) {
 	_startState := 204
 	p.EnterRecursionRule(localctx, 204, PHPParserRULE_expression, _p)
 
-	if interpreter := p.GetInterpreter(); interpreter.GetPredictionMode() == antlr.PredictionModeSLL && p.IsCallResultAssignmentAhead() {
+	if interpreter := p.GetInterpreter(); interpreter.GetPredictionMode() == antlr.PredictionModeSLL && (p.IsCallResultAssignmentAhead() || p.IsDynamicStaticVariableAhead()) {
 		interpreter.SetPredictionMode(antlr.PredictionModeLL)
 		defer interpreter.SetPredictionMode(antlr.PredictionModeSLL)
 	}

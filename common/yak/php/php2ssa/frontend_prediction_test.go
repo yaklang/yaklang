@@ -205,6 +205,75 @@ func TestFrontendFastPredictionMinimalReproductions(t *testing.T) {
 	}
 }
 
+// Batch the operator matrix in one source so the reference parser exercises
+// every pair without repeatedly initializing its ATN and DFA for each sample.
+func TestFrontendFastPredictionOperatorBindingTrees(t *testing.T) {
+	operators := []string{
+		"**", "instanceof", "*", "/", "%", "+", "-", ".", "<<", ">>",
+		"<", "<=", ">", ">=", "===", "!==", "==", "!=", "&", "^", "|",
+		"&&", "||", "??", "<=>", "and", "xor", "or",
+	}
+	var source strings.Builder
+	source.WriteString("<?php\n")
+	for _, left := range operators {
+		for _, right := range operators {
+			fmt.Fprintf(&source, "$value = $a %s $b %s $c;\n", left, right)
+		}
+	}
+	source.WriteString(`
+$a = -$x ** 2 + 3;
+$b = $a ? ($b ? $c : $d) : $e ?? $f;
+$c = $a ? $b : $c ? $d : $e;
+$d = ($object->method)($argument)->items()[0] + 1;
+$e = (new Item(fn($x) => $x))->get()?->items()[0] ?? 0;
+$f = ($object)->{'name'}($argument)[0];
+$g = $object->{};
+println('tail');`)
+	ast, parser, err := parsePredictionTree(source.String(), antlr.PredictionModeSLL)
+	require.NoError(t, err, "known operator bindings must finish without restarting in LL")
+	defer antlr4util.DetachParserATNSimulatorCaches(parser)
+	reference, original, err := parsePredictionTree(source.String(), antlr.PredictionModeLL, false)
+	require.NoError(t, err)
+	defer antlr4util.DetachParserATNSimulatorCaches(original)
+	require.Equal(t, predictionTreeShape(reference), predictionTreeShape(ast))
+}
+
+func TestFrontendFastPredictionArrayAndForeachBoundaries(t *testing.T) {
+	cases := []struct{ name, source string }{
+		{"positional and keyed keyword arrays", `<?php $a = array(1, 2); $b = array('key' => 1); $c = array(array('key' => 1)); $d = array(foo: 1);`},
+		{"lambda arrows are not array keys", `<?php $a = array(fn($x) => $x); $b = array($key => fn($x) => $x); $c = array((fn($x) => $x));`},
+		{"spread and reference arguments", `<?php $a = array(&$value, ...$values); $b = array(($ready ? 1 : 2), ...$values); $c = [fn($x) => &$value, ...fn($x) => $x];`},
+		{"keyed reference array elements", `<?php $a = [($key) => &$value, [1] => &$other, $key + 1 => &$third, &$value];`},
+		{"conditional and closure array elements", `<?php $a = [($ready ? [Type::make(fn($x) => $x)->get()] : [])]; $b = [Type::make(function ($x) { return $x + 1; })->get()];`},
+		{"array indexing and destructuring", `<?php $a = [1, 2][0]; $b = ['key' => 1]{0}; [$first, $second] = $values;`},
+		{"list calls and assignment holes", `<?php list($a, , $b) = $values; $x = list($a, $b); $y = list($key => 1);`},
+		{"constant arrays and expression suffixes", `<?php class A { const X = [1, 2]; const Y = array('key' => 1); public $z = [...$values]; } const B = [1, 2][0]; const C = array(1) + 2;`},
+		{"constant named arguments and lambda return types", `<?php class A { const X = array(foo: 1); public $y = array(fn($x): int => $x); }`},
+		// Keep the language accepted by the original grammar, even where its
+		// placeholder/spread forms differ from executable PHP.
+		{"constant placeholder and repeated leading spread", `<?php class A { const X = array(...); public $y = [...]; public $z = [... ...$values]; }`},
+		{"chain foreach source", `<?php foreach ($values as $value) { println($value); } foreach ($values->items() as &$value): println($value); endforeach;`},
+		{"call foreach source and keyed references", `<?php foreach (config_get('list', []) as $key => &$value) { println($value); }`},
+		{"array and grouped foreach sources", `<?php foreach ([1, 2] as $key => $value) { println($value); } foreach (($values ?? []) as $value) { println($value); }`},
+		{"foreach destructuring and list holes", `<?php foreach ($values as [$a, $b]) { println($a, $b); } foreach ($values as list($a, , $b)) { println($a, $b); }`},
+		{"keyed foreach list and indexed binding", `<?php foreach ($values as $key => list($a, $b)) { println($a, $b); } foreach ($values as $value[0]) { println($value); }`},
+		{"variable callbacks and repeated callable results", `<?php $value = $callback(fn($x) => $x + 1)()->items()[0]; $other = $callback($argument)?->value;`},
+		{"variable callback static and assignment suffixes", `<?php $type = $callback($argument)->get()::name($value); $callback($argument)[0] = &$reference;`},
+		{"variable callback closure and nested array", `<?php $value = $callback('mapping', [Type::make(function ($x) { return $x + 1; })->get(), fn($v) => $v]);`},
+		{"grouped assignable suffix and dynamic constructor", `<?php ($object)->items[0] = 1; $a = new ($type->name)($argument); $b = new factory($argument)->name();`},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			ast, err := Frontend(tc.source+` println('tail');`, CreateBuilder().GetAntlrCache())
+			require.NoError(t, err)
+			reference, parser, err := parsePredictionTree(tc.source+` println('tail');`, antlr.PredictionModeLL, false)
+			require.NoError(t, err)
+			defer antlr4util.DetachParserATNSimulatorCaches(parser)
+			require.Equal(t, predictionTreeShape(reference), predictionTreeShape(ast))
+		})
+	}
+}
+
 func TestFrontendFastPredictionMalformedPrefixes(t *testing.T) {
 	for _, source := range []string{
 		`<?php if ($x): $a = 1; }`,
@@ -215,6 +284,12 @@ func TestFrontendFastPredictionMalformedPrefixes(t *testing.T) {
 		`<?php $object->items()->value += ;`,
 		`<?php $value = new $object->className(;`,
 		`<?php if ($x) { echo 1; } else { echo 2;`,
+		`<?php $value = $left * ;`,
+		`<?php $value = $ready ? ;`,
+		`<?php foreach ($values as => $value) { echo 1; }`,
+		`<?php foreach ($values as $key => &) { echo 1; }`,
+		`<?php const X = [1, 2][;`,
+		`<?php list($a, $b) = ;`,
 	} {
 		_, err := Frontend(source, CreateBuilder().GetAntlrCache())
 		require.Error(t, err, "fast prediction must preserve malformed-input rejection: %s", source)
@@ -262,10 +337,17 @@ func BenchmarkFrontendPrediction(b *testing.B) {
 	}
 	for _, tc := range []struct{ directory, path string }{
 		{"syntax", "cms/src__Http__Controllers__CP__Collections__EntriesController.php"},
+		{"syntax", "cms/src__Fieldtypes__Entries.php"},
 		{"syntax", "filament/tests__src__Panels__Commands__MakeRelationManagerCommandTest.php"},
 		{"syntax", "pfsense/status_dhcp_leases.php"},
+		{"syntax", "grav_slow/system__src__Grav__Framework__Flex__FlexCollection.php"},
 		{"large", "qloapps/tools__tcpdf__tcpdf.php"},
 		{"large", "filament/packages__actions__src__Concerns__CanExportRecords.php"},
+		{"large", "filament/packages__forms__src__Components__Select.php"},
+		{"large", "filament/packages__infolists__src__Components__TextEntry.php"},
+		{"large", "cms/tests__Antlers__Runtime__TemplateTest.php"},
+		{"large", "prestashop/classes__controller__AdminController.php"},
+		{"large", "prestashop/tests__Integration__Behaviour__Features__Context__Domain__OrderFeatureContext.php"},
 	} {
 		source, err := os.ReadFile(filepath.Join("..", "tests", tc.directory, tc.path))
 		if err != nil {
