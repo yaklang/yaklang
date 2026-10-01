@@ -67,7 +67,7 @@ func (m *Timeline) CompressBeforePrompt(options TimelineCompressionOptions) (*Ti
 		for _, id := range snapshot.ExactItemIDs {
 			if id > snapshot.FrozenThroughID {
 				item, _ := m.idToTimelineItem.Get(id)
-				pending.WriteString(item.value.(*PromotableTimelineItem).OpenPromptText())
+				pending.WriteString(m.promotableOpenPromptTextLocked(timelinePromotionForItem(item)))
 				pending.WriteByte('\n')
 			}
 		}

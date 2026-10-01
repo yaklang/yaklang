@@ -17,6 +17,7 @@ import (
 //   - Summary 字段已废弃（dead code），新数据不再写入；仅在反序列化老数据时容忍其存在并静默忽略。
 //   - Reducers/ReducerTs 字段已废弃，新数据不再写入；仅在反序列化老数据时做一次性迁移为 CompressedHead。
 type timelineSerializable struct {
+	UserInputBoundaryKey  string                           `json:"user_input_boundary_key,omitempty"`
 	ProjectionNonce       string                           `json:"projection_nonce,omitempty"`
 	IdToTs                map[string]int64                 `json:"id_to_ts"`
 	TsToTimelineItem      map[string]*TimelineItem         `json:"ts_to_timeline_item"`
@@ -80,6 +81,7 @@ func marshalTimelineUnlocked(i *Timeline) (string, error) {
 
 	serializable := &timelineSerializable{
 		ProjectionNonce:       aiprojection.Nonce(),
+		UserInputBoundaryKey:  i.userInputBoundaryKey,
 		IdToTs:                idToTsMap,
 		TsToTimelineItem:      tsToTimelineItemMap,
 		IdToTimelineItem:      idToTimelineItemMap,
@@ -111,6 +113,9 @@ func UnmarshalTimeline(s string) (*Timeline, error) {
 		return nil, err
 	}
 	rebindTimelineProjectionNonce(&serializable)
+	if serializable.UserInputBoundaryKey == "" {
+		serializable.UserInputBoundaryKey = newUserInputBoundaryKey()
+	}
 
 	// 恢复 Timeline 结构体
 	timeline := &Timeline{
@@ -120,6 +125,7 @@ func UnmarshalTimeline(s string) (*Timeline, error) {
 		freezeState:           cloneTimelineFreezeState(serializable.FreezeState),
 		evidenceInitialized:   serializable.EvidenceInitialized,
 		bucketByteSize:        serializable.BucketByteSize,
+		userInputBoundaryKey:  serializable.UserInputBoundaryKey,
 	}
 
 	// 恢复 idToTs
@@ -157,6 +163,7 @@ func UnmarshalTimeline(s string) (*Timeline, error) {
 	timeline.restoreCompressionHistory(&serializable)
 
 	timeline.restoreFreezeStateLocked()
+	timeline.rebuildPromotedStateLocked(timeline.frozenThroughLocked())
 	return timeline, nil
 }
 

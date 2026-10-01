@@ -3573,11 +3573,23 @@ func (c *Config) GetUserInputHistory() []schema.AIAgentUserInputRecord {
 }
 
 func (c *Config) SetUserInputHistory(history []schema.AIAgentUserInputRecord) {
-	c.GetSessionPromptState().SetUserInputHistory(history)
+	state := c.GetSessionPromptState()
+	state.m.Lock()
+	defer state.m.Unlock()
+	state.UserInputHistory = append([]schema.AIAgentUserInputRecord(nil), history...)
+	c.GetTimeline().importUserInputHistory(history, c.AcquireId)
 }
 
 func (c *Config) AppendUserInputHistory(userInput string, timestamp time.Time) (string, error) {
-	return c.GetSessionPromptState().AppendUserInputHistory(userInput, timestamp)
+	state := c.GetSessionPromptState()
+	state.m.Lock()
+	defer state.m.Unlock()
+	record := schema.AIAgentUserInputRecord{Round: len(state.UserInputHistory) + 1, Timestamp: timestamp, UserInput: userInput}
+	if timeline := c.GetTimeline(); timeline != nil {
+		timeline.pushUserInputRecord(record, c.AcquireId())
+	}
+	state.UserInputHistory = append(state.UserInputHistory, record)
+	return schema.QuoteUserInputHistory(state.UserInputHistory)
 }
 
 func (c *Config) GetSessionEvidenceRendered() string {

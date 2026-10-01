@@ -5,4 +5,6 @@
 
 {{ .PromotedSemiDynamic1 }}{{ end }}
 
-{{ if .SessionEvidenceSemiDynamic }}{{ .SessionEvidenceSemiDynamic }}{{ end }}
+{{ if .PromptedUserInputHistory }}{{ .PromptedUserInputHistory }}
+
+{{ end }}{{ if .SessionEvidenceSemiDynamic }}{{ .SessionEvidenceSemiDynamic }}{{ end }}

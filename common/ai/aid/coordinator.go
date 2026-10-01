@@ -338,6 +338,9 @@ func NewCoordinatorContext(ctx context.Context, userInput string, options ...aic
 	c.ContextProvider = GetDefaultContextProvider()
 	c.ContextProvider.SetTimelineInstance(config.Timeline)
 	c.ContextProvider.BindCoordinator(c)
+	if strings.TrimSpace(userInput) != "" {
+		config.Timeline.PushText(config.AcquireId(), "[%s]:\n%s", aicommon.TIMELINE_ITEM_TYPE_CURRENT_TASK_USER_INPUT, userInput)
+	}
 	if err := c.loadToolsViaOptions(); err != nil {
 		return nil, utils.Errorf("coordinator: load tools (post-init) failed: %v", err)
 	}
