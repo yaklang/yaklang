@@ -56,8 +56,8 @@ func (p *JavaParser) AdaptivePredict(base *antlr.BaseParser, input antlr.TokenSt
 					if alt := expressionPrefix(input); alt != 0 {
 						return alt
 					}
-					if typeReferencePrefix(input) {
-						return 3
+					if alt := typeReferencePrefix(input); alt != 0 {
+						return alt
 					}
 				}
 			case JavaParserRULE_primary:

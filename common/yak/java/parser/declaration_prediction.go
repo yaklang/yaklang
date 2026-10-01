@@ -75,25 +75,28 @@ func (p *JavaParser) declarationPrefix(input antlr.TokenStream) int {
 type declarationScanner struct {
 	stream     *antlr.CommonTokenStream
 	index, end int
+	uncertain  bool
 }
 
 // A leading generic or empty array type followed by :: cannot be an ordinary
 // primary expression. Recognize only this expensive overlap; dotted member
 // chains, annotated types and restricted final type identifiers retain ATN.
+// A definitely non-reference prefix selects primary=1; an identified reference
+// selects typeType=3. Bounds and unsupported type syntax remain unknown=0.
 // Generated typeArguments still validates the bounded token skeleton.
-func typeReferencePrefix(input antlr.TokenStream) bool {
+func typeReferencePrefix(input antlr.TokenStream) int {
 	stream, ok := input.(*antlr.CommonTokenStream)
 	if !ok {
-		return false
+		return 0
 	}
 	index := input.Index()
 	if index < 0 || !stream.Sync(index) || stream.Get(index).GetChannel() != antlr.TokenDefaultChannel {
-		return false
+		return 0
 	}
 	first, second := input.LA(1), input.LA(2)
 	if !((isIdentifier(first) && second == JavaParserLT) ||
 		((isIdentifier(first) || isPrimitive(first)) && second == JavaParserLBRACK && input.LA(3) == JavaParserRBRACK)) {
-		return false
+		return 0
 	}
 	s := declarationScanner{stream: stream, index: index, end: index + declarationPrefixTokens}
 	s.index++
@@ -101,7 +104,10 @@ func typeReferencePrefix(input antlr.TokenStream) bool {
 	if !isPrimitive(first) {
 		for {
 			if s.next() == JavaParserLT && !s.typeArguments() {
-				return false
+				if s.uncertain {
+					return 0
+				}
+				return 1
 			}
 			if s.next() != JavaParserDOT {
 				break
@@ -109,17 +115,35 @@ func typeReferencePrefix(input antlr.TokenStream) bool {
 			s.index++
 			last = s.next()
 			if !isIdentifier(last) {
-				return false
+				if last == JavaParserAT || s.uncertain {
+					return 0
+				}
+				return 1
 			}
 			s.index++
 		}
 		// classOrInterfaceType ends with typeIdentifier, which excludes these
 		// identifiers even though qualified prefixes may contain them.
 		if last == JavaParserVAR || last == JavaParserYIELD {
-			return false
+			return 0
 		}
 	}
-	return s.arrayDimensions() && s.next() == JavaParserCOLONCOLON
+	if s.next() == JavaParserAT || isIdentifier(s.next()) || s.uncertain {
+		return 0
+	}
+	if !s.arrayDimensions() {
+		if s.uncertain {
+			return 0
+		}
+		return 1
+	}
+	if s.next() == JavaParserAT || isIdentifier(s.next()) {
+		return 0
+	}
+	if s.next() == JavaParserCOLONCOLON {
+		return 3
+	}
+	return 1
 }
 
 // The qualified-type loop asks whether identifier typeArguments? is followed
@@ -160,6 +184,7 @@ func (s *declarationScanner) next() int {
 		}
 		s.index++
 	}
+	s.uncertain = true
 	return antlr.TokenInvalidType
 }
 
@@ -181,6 +206,7 @@ func (s *declarationScanner) typeArguments() bool {
 		switch token {
 		case JavaParserLT:
 			if depth == declarationPrefixDepth {
+				s.uncertain = true
 				return false
 			}
 			depth++
@@ -193,6 +219,9 @@ func (s *declarationScanner) typeArguments() bool {
 		case JavaParserDOT, JavaParserCOMMA, JavaParserQUESTION, JavaParserEXTENDS, JavaParserSUPER,
 			JavaParserLBRACK, JavaParserRBRACK:
 		default:
+			if token == JavaParserAT {
+				s.uncertain = true
+			}
 			if !isIdentifier(token) && !isPrimitive(token) {
 				return false
 			}
