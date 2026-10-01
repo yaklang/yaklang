@@ -1,10 +1,12 @@
 package python2ssa
 
 import (
+	"errors"
 	"path/filepath"
 	"regexp"
 	"strings"
 
+	"github.com/yaklang/antlr/v4"
 	"github.com/yaklang/yaklang/common/utils"
 	fi "github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
 	"github.com/yaklang/yaklang/common/utils/memedit"
@@ -780,18 +782,34 @@ func FrontendWithCache(src string, caches ...*ssa.AntlrCache) (pythonparser.IRoo
 	if len(caches) > 0 {
 		cache = caches[0]
 	}
-	return antlr4util.ParseASTWithSLLFirst(
+	lexicalErrors := antlr4util.NewErrorListener()
+	ast, err := antlr4util.ParseASTWithSLLFirst(
 		src,
-		pythonparser.NewPythonLexer,
+		func(input antlr.CharStream) *frontendPythonLexer {
+			return &frontendPythonLexer{pythonparser.NewPythonLexer(input), lexicalErrors}
+		},
 		pythonparser.NewPythonParser,
 		nil,
-		func(lexer *pythonparser.PythonLexer, parser *pythonparser.PythonParser) {
+		func(lexer *frontendPythonLexer, parser *pythonparser.PythonParser) {
 			ssa.ParserSetAntlrCache(parser, lexer, cache)
 		},
 		func(parser *pythonparser.PythonParser) pythonparser.IRootContext {
 			return parser.Root()
 		},
 	)
+	return ast, errors.Join(err, lexicalErrors.Error())
+}
+
+// Keep lexical diagnostics across the SLL to LL listener replacement. The LL
+// pass reuses tokens, so it cannot rediscover characters discarded by the lexer.
+type frontendPythonLexer struct {
+	*pythonparser.PythonLexer
+	lexicalErrors *antlr4util.ErrorListener
+}
+
+func (lexer *frontendPythonLexer) RemoveErrorListeners() {
+	lexer.PythonLexer.RemoveErrorListeners()
+	lexer.PythonLexer.AddErrorListener(lexer.lexicalErrors)
 }
 
 // Frontend parses Python source code and returns the root AST node.
