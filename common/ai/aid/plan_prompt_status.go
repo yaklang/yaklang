@@ -20,8 +20,8 @@ func (t *AiTask) GetPlanStatusForPrompt() string {
 	nonce := aicommon.PlanScopedNonce(root.GetId(), "plan_status")
 	var body strings.Builder
 	fmt.Fprintf(&body, "# PLAN STATUS\n<|PLAN_STATUS_%s|>\n", nonce)
-	body.WriteString("计划状态为执行器维护的只读快照。只推进 CURRENT TASK，其他任务状态仅供参考。\n\n")
-	fmt.Fprintf(&body, "## CURRENT TASK\n- Task: %s %q\n- Status: %s\n",
+	body.WriteString("PLAN 任务状态由执行器维护，只推进 CURRENT PLAN TASK；created 表示 PLAN 任务未开始，queueing 表示等待执行。\n\n")
+	fmt.Fprintf(&body, "## CURRENT PLAN TASK\n- Task: %s %q\n- Status: %s\n",
 		t.GetIndex(), t.Name, t.GetStatus())
 	var others strings.Builder
 	for _, task := range executableLeafTasks(root) {
@@ -31,7 +31,7 @@ func (t *AiTask) GetPlanStatusForPrompt() string {
 		fmt.Fprintf(&others, "- %s %q: %s\n", task.GetIndex(), task.Name, task.GetStatus())
 	}
 	if others.Len() > 0 {
-		body.WriteString("\n## OTHER TASKS\n")
+		body.WriteString("\n## OTHER PLAN TASKS\n")
 		body.WriteString(others.String())
 	}
 	fmt.Fprintf(&body, "<|PLAN_STATUS_END_%s|>", nonce)
