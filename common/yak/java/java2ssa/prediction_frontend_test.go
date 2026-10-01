@@ -17,6 +17,7 @@ func TestFrontendPredictionRejectsInvalidSource(t *testing.T) {
 		"class C { int x = #1; }", "class C { int x = ; int y = #2; }",
 		"class C {} junk", "class C {} @", "class C {} 1", "class C { int x=1; } /* unfinished",
 		"class C { int x = ; }", "class C { void m(){ return (x; } }",
+		"package p; class C {} package p; class D {}",
 	} {
 		t.Run(source, func(t *testing.T) {
 			for _, cached := range []bool{false, true} {

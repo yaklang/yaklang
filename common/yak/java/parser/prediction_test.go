@@ -256,6 +256,8 @@ func TestPredictionRealJavaCorpus(t *testing.T) {
 	if err != nil || len(files) == 0 {
 		t.Fatalf("missing corpus: %v", err)
 	}
+	template := filepath.Join("..", "..", "..", "sfweb", "templates", "java", "cwe-1336-ssti.java")
+	files = append(files, template)
 	reference := newPredictionAutomata()
 	for _, file := range files {
 		t.Run(filepath.Base(file), func(t *testing.T) {
@@ -263,7 +265,7 @@ func TestPredictionRealJavaCorpus(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			checkPrediction(t, string(source), reference, false)
+			checkPrediction(t, string(source), reference, file == template)
 		})
 	}
 }
