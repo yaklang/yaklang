@@ -10,6 +10,8 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/antlr/v4"
 	"github.com/yaklang/yaklang/common/yak/antlr4util"
+	phpparser "github.com/yaklang/yaklang/common/yak/php/parser"
+	"github.com/yaklang/yaklang/common/yak/ssa"
 )
 
 // Generated from the original LL predictor with SetFastPrediction(false).
@@ -30,6 +32,59 @@ var predictionAmbiguityReferenceHashes = map[string]string{
 	"TestFrontendPredictionStaticVariableSuffixes":                         "9b834a5eb792ce5bfc6889c829d3c6ac2686db870192ef6716bb7b3736fb3f61",
 	"TestFrontendPredictionConstantInitializerBoundaries":                  "4b7310392571a8c0445064b1fb0a45f35ad183c5cf3b5aabe701566271ae570f",
 	"TestFrontendPredictionParenthesizedStaticReceivers":                   "af10eff28e15b88311c084a222eaf86e9997c54eee926ba8723a381754ed5817",
+}
+
+// Small samples have independent parsers and error listeners, but can reuse a
+// test's private DFA caches. Separate original LL, fast LL, strict SLL and the
+// production path so oracle configurations never depend on a fast prediction.
+// Explicit oracle audits still deserialize a fresh cache for every parse.
+type predictionAmbiguityCaches struct {
+	originalLL *ssa.AntlrCache
+	fastLL     *ssa.AntlrCache
+	sll        *ssa.AntlrCache
+	production *ssa.AntlrCache
+}
+
+func newPredictionAmbiguityCaches(t *testing.T) *predictionAmbiguityCaches {
+	t.Helper()
+	if os.Getenv("YAK_PHP_PREDICTION_ORACLE") == "1" {
+		return nil
+	}
+	caches := &predictionAmbiguityCaches{}
+	t.Cleanup(func() {
+		caches.originalLL.Clear()
+		caches.fastLL.Clear()
+		caches.sll.Clear()
+		caches.production.Clear()
+	})
+	return caches
+}
+
+func predictionAmbiguityCache(cache **ssa.AntlrCache) *ssa.AntlrCache {
+	if *cache == nil {
+		*cache = CreateBuilder().GetAntlrCache()
+	}
+	return *cache
+}
+
+func (c *predictionAmbiguityCaches) parse(source string, mode int, fastPrediction ...bool) (phpparser.IHtmlDocumentContext, *phpparser.PHPParser, error) {
+	if c == nil {
+		return parsePredictionTree(source, mode, fastPrediction...)
+	}
+	cache := &c.fastLL
+	if mode == antlr.PredictionModeSLL {
+		cache = &c.sll
+	} else if len(fastPrediction) > 0 && !fastPrediction[0] {
+		cache = &c.originalLL
+	}
+	return parsePredictionTreeWithCache(source, mode, predictionAmbiguityCache(cache), fastPrediction...)
+}
+
+func (c *predictionAmbiguityCaches) frontend(source string) (phpparser.IHtmlDocumentContext, error) {
+	if c == nil {
+		return Frontend(source, CreateBuilder().GetAntlrCache())
+	}
+	return Frontend(source, predictionAmbiguityCache(&c.production))
 }
 
 // Each batch shares an ATN/DFA initialization. Bound the source size so neither
@@ -88,17 +143,21 @@ func predictionAmbiguitySource(statements []string) string {
 	return "<?php\n" + strings.Join(statements, "\n") + "\nprintln('matrix tail');"
 }
 
-func assertPredictionAmbiguitySource(t *testing.T, statements []string) string {
+func assertPredictionAmbiguitySource(t *testing.T, statements []string, shared ...*predictionAmbiguityCaches) string {
 	t.Helper()
+	var caches *predictionAmbiguityCaches
+	if len(shared) > 0 {
+		caches = shared[0]
+	}
 	source := predictionAmbiguitySource(statements)
-	reference, original, err := parsePredictionTree(source, antlr.PredictionModeLL, false)
+	reference, original, err := caches.parse(source, antlr.PredictionModeLL, false)
 	require.NoError(t, err, "reference grammar rejected batch")
 	defer antlr4util.DetachParserATNSimulatorCaches(original)
 	expected := predictionTreeShape(reference)
-	ast, err := Frontend(source, CreateBuilder().GetAntlrCache())
+	ast, err := caches.frontend(source)
 	require.NoError(t, err, "production parser rejected reference input")
 	assertPredictionShapeEqual(t, expected, predictionTreeShape(ast), "production", source)
-	fastLL, parser, err := parsePredictionTree(source, antlr.PredictionModeLL)
+	fastLL, parser, err := caches.parse(source, antlr.PredictionModeLL)
 	require.NoError(t, err, "fast LL rejected reference input")
 	defer antlr4util.DetachParserATNSimulatorCaches(parser)
 	require.Equal(t, antlr.PredictionModeLL, parser.GetInterpreter().GetPredictionMode())
@@ -270,6 +329,7 @@ func TestFrontendPredictionForeachTypeRefCrossProduct(t *testing.T) {
 }
 
 func TestFrontendPredictionNamespaceHeaderBoundaries(t *testing.T) {
+	caches := newPredictionAmbiguityCaches(t)
 	for index, source := range []string{
 		`namespace First; $a = 1; namespace Second; $b = factory(fn($x) => $x);`,
 		`namespace First { $a = 1; } namespace Second { $b = 2; } namespace { consume($a); }`,
@@ -284,7 +344,7 @@ func TestFrontendPredictionNamespaceHeaderBoundaries(t *testing.T) {
 		"namespace " + strings.TrimSuffix(strings.Repeat("Segment\\", 128), "\\") + ` { consume($tail); } namespace Last { consume($tail); }`,
 	} {
 		t.Run(fmt.Sprintf("case %d", index), func(t *testing.T) {
-			assertPredictionAmbiguitySource(t, []string{source})
+			assertPredictionAmbiguitySource(t, []string{source}, caches)
 		})
 	}
 }
@@ -349,6 +409,7 @@ func TestFrontendPredictionConstantInitializerBoundaries(t *testing.T) {
 }
 
 func TestFrontendPredictionDynamicStaticRestoresSLL(t *testing.T) {
+	caches := newPredictionAmbiguityCaches(t)
 	for _, source := range []string{
 		`<?php consume($object::$definition['fields']); println('tail');`,
 		`<?php $value = isset($object::$definition['fields']); println('tail');`,
@@ -360,11 +421,11 @@ func TestFrontendPredictionDynamicStaticRestoresSLL(t *testing.T) {
 		`<?php factory(fn($x) => $x) /* } ] */ -> /* ( */ class += $value; println('tail');`,
 	} {
 		t.Run(source, func(t *testing.T) {
-			ast, parser, err := parsePredictionTree(source, antlr.PredictionModeSLL)
+			ast, parser, err := caches.parse(source, antlr.PredictionModeSLL)
 			require.NoError(t, err, "known ambiguity must finish without restarting the file")
 			defer antlr4util.DetachParserATNSimulatorCaches(parser)
 			require.Equal(t, antlr.PredictionModeSLL, parser.GetInterpreter().GetPredictionMode())
-			reference, original, err := parsePredictionTree(source, antlr.PredictionModeLL, false)
+			reference, original, err := caches.parse(source, antlr.PredictionModeLL, false)
 			require.NoError(t, err)
 			defer antlr4util.DetachParserATNSimulatorCaches(original)
 			assertPredictionShapeEqual(t, predictionTreeShape(reference), predictionTreeShape(ast), "SLL", source)
@@ -379,11 +440,11 @@ func TestFrontendPredictionDynamicStaticRestoresSLL(t *testing.T) {
 		`<?php factory(fn($x) => $x)->class = &;`,
 	} {
 		t.Run(source, func(t *testing.T) {
-			_, parser, err := parsePredictionTree(source, antlr.PredictionModeSLL)
+			_, parser, err := caches.parse(source, antlr.PredictionModeSLL)
 			require.Error(t, err)
 			defer antlr4util.DetachParserATNSimulatorCaches(parser)
 			require.Equal(t, antlr.PredictionModeSLL, parser.GetInterpreter().GetPredictionMode(), "restore the caller's mode on cancellation")
-			_, original, err := parsePredictionTree(source, antlr.PredictionModeLL, false)
+			_, original, err := caches.parse(source, antlr.PredictionModeLL, false)
 			require.Error(t, err)
 			defer antlr4util.DetachParserATNSimulatorCaches(original)
 		})
@@ -504,6 +565,7 @@ func TestFrontendPredictionClassConstructorLegacyIndex(t *testing.T) {
 }
 
 func TestFrontendPredictionAmbiguityRejectsIncompleteOperands(t *testing.T) {
+	caches := newPredictionAmbiguityCaches(t)
 	// Invalid samples cannot share one recovered source: a later error would
 	// conceal a fast decision that incorrectly accepted an earlier statement.
 	for _, fragment := range []string{
@@ -526,12 +588,12 @@ func TestFrontendPredictionAmbiguityRejectsIncompleteOperands(t *testing.T) {
 	} {
 		t.Run(fragment, func(t *testing.T) {
 			source := "<?php " + fragment + " println('tail');"
-			_, original, err := parsePredictionTree(source, antlr.PredictionModeLL, false)
+			_, original, err := caches.parse(source, antlr.PredictionModeLL, false)
 			require.Error(t, err, "reference must reject this incomplete operand")
 			antlr4util.DetachParserATNSimulatorCaches(original)
-			_, err = Frontend(source, CreateBuilder().GetAntlrCache())
+			_, err = caches.frontend(source)
 			require.Error(t, err, "production must preserve reference rejection")
-			_, parser, err := parsePredictionTree(source, antlr.PredictionModeLL)
+			_, parser, err := caches.parse(source, antlr.PredictionModeLL)
 			require.Error(t, err, "fast LL must preserve reference rejection")
 			antlr4util.DetachParserATNSimulatorCaches(parser)
 		})
