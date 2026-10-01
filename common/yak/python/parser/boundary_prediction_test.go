@@ -183,3 +183,30 @@ func TestPredictionUnexpectedTokenStreams(t *testing.T) {
 		}
 	}
 }
+
+type recoveringPredictionStrategy struct{ *antlr.DefaultErrorStrategy }
+
+func (*recoveringPredictionStrategy) BailsOnSyntaxError() bool { return false }
+
+func TestPredictionNonBailingMarker(t *testing.T) {
+	for _, source := range []string{"print x\n", "nonlocal x\n", "x:T=1\n"} {
+		parse := func(fast bool) (string, error, int, PythonVersion) {
+			listener := antlr4util.NewErrorListener()
+			p := NewPythonParser(boundaryTokens(source))
+			newPredictionAutomata().apply(p)
+			p.Version = PythonVersion3
+			p.SetFastPrediction(fast)
+			p.GetInterpreter().SetPredictionMode(antlr.PredictionModeSLL)
+			p.SetErrorHandler(&recoveringPredictionStrategy{antlr.NewDefaultErrorStrategy()})
+			p.RemoveErrorListeners()
+			p.AddErrorListener(listener)
+			tree := p.Root()
+			return predictionSnapshot(tree), listener.Error(), p.GetTokenStream().LA(1), p.Version
+		}
+		want, err, next, version := parse(false)
+		got, gotErr, gotNext, gotVersion := parse(true)
+		if want != got || fmt.Sprint(err) != fmt.Sprint(gotErr) || next != gotNext || version != gotVersion {
+			t.Fatal("false bailout marker enabled shortcuts")
+		}
+	}
+}
