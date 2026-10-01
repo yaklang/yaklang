@@ -194,6 +194,14 @@ func TestExecLoopPromptCompare_HighStaticProtocol(t *testing.T) {
 	require.NotEqual(t, textPrompt, functionPrompt)
 	require.NotContains(t, aicommon.MainloopHighStaticTemplate(false), "FunctionCallMode")
 	require.NotContains(t, aicommon.MainloopHighStaticTemplate(true), "FunctionCallMode")
+	for _, functionCallMode := range []bool{false, true} {
+		template := aicommon.MainloopHighStaticTemplate(functionCallMode)
+		require.NotContains(t, template, "{{", "main High Static must contain no template conditions")
+		require.Contains(t, template, "关注 Timeline 中的用户输入")
+		rendered, err := aicommon.RenderPromptTemplate("loop-high-static-no-materials", template, nil)
+		require.NoError(t, err)
+		require.Equal(t, render(functionCallMode), rendered)
+	}
 	require.Contains(t, textPrompt, "caller 每轮给 JSON SCHEMA")
 	require.Contains(t, textPrompt, "## NONCE 与 AITAG")
 	require.NotContains(t, textPrompt, "本轮使用原生 function call")

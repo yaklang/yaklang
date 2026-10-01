@@ -200,12 +200,14 @@ func TestReAct_SyncUserIntervention_PromptContainsHistoryForAI(t *testing.T) {
 			history[1].UserInput == userInput
 	}, time.Second, 20*time.Millisecond)
 
-	userQueryBlock := aicommon_testutil.MustExtractAITagBlock(t, prompt, "USER_QUERY")
-	inputBlock := aicommon_testutil.MustExtractAITagBlock(t, userQueryBlock.Body, "USER_INTERACT")
-	require.Equal(t, userInput, inputBlock.Body)
-
-	require.Contains(t, prompt, "User Input: "+content)
-	require.Contains(t, prompt, "User Input: "+userInput)
+	open := r2PromptSection(t, prompt, "timeline-open")
+	require.Contains(t, open, "User Input: "+content)
+	require.Contains(t, open, "User Input: "+userInput)
+	require.Equal(t, 1, strings.Count(prompt, userInput), "loop startup must reuse the queue ingress record")
+	require.NotContains(t, prompt, "CURRENT_TASK_INPUT")
+	require.NotContains(t, prompt, "USER_QUERY")
 	require.NotContains(t, prompt, "<|PREV_USER_INPUT_", "pending inputs belong to Open, not a separately rendered history block")
-	require.NotContains(t, userQueryBlock.Body, content)
+	dynamic := aicommon_testutil.MustExtractAITagBlock(t, prompt, "PROMPT_SECTION_dynamic").Body
+	require.NotContains(t, dynamic, userInput)
+	require.NotContains(t, dynamic, content)
 }

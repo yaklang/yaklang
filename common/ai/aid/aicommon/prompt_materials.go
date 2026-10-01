@@ -16,7 +16,6 @@ type PromptMaterials struct {
 	AllowToolCall     bool
 	AllowPlanAndExec  bool
 	HasLoadCapability bool
-	PromoteUserInput  bool
 
 	TaskInstruction     string
 	ExecutionPolicy     string
@@ -95,11 +94,10 @@ type PromptMaterials struct {
 	ReportedRisks string
 }
 
-// HighStaticData selects the stable protocol and main-context source rules.
+// HighStaticData retains the protocol mode for custom prefix templates.
 func (m *PromptMaterials) HighStaticData() map[string]any {
 	return map[string]any{
 		"FunctionCallMode": m != nil && m.FunctionCallMode,
-		"PromoteUserInput": m != nil && m.PromoteUserInput,
 	}
 }
 
@@ -264,7 +262,6 @@ func RenderTimelineFrozenOpenWithOptions(timeline *Timeline, options TimelinePro
 }
 
 type PromptFrozenOpenMaterials struct {
-	PromoteUserInput       bool
 	TimelineFrozen         string
 	TimelineOpen           string
 	PromotedSemiDynamic1   string
@@ -304,7 +301,6 @@ func BuildPromptFrozenOpenMaterialsWithOptions(config *Config, options TimelineP
 	timelineBlocks := RenderTimelineFrozenOpenWithOptions(config.GetTimeline(), options)
 	reportedRisks := config.GetSessionPromptState().GetReportedRisksRendered()
 	return PromptFrozenOpenMaterials{
-		PromoteUserInput:           options.PromoteUserInput || options.UserInputOnly,
 		TimelineFrozen:             timelineBlocks.Frozen,
 		TimelineOpen:               timelineBlocks.Open,
 		PromotedSemiDynamic1:       timelineBlocks.PromotedSemiDynamic1,
@@ -320,7 +316,6 @@ func ApplyPromptFrozenOpenMaterials(materials *PromptMaterials, frozenOpen Promp
 	if materials == nil {
 		return
 	}
-	materials.PromoteUserInput = frozenOpen.PromoteUserInput
 	materials.TimelineFrozen = frozenOpen.TimelineFrozen
 	materials.TimelineOpen = frozenOpen.TimelineOpen
 	materials.PromotedSemiDynamic1 = frozenOpen.PromotedSemiDynamic1

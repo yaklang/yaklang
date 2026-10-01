@@ -261,8 +261,8 @@ func applyToolBatchSchemaMaxItems(schemaText string, maxCalls int) (string, erro
 //
 // 参数:
 //   - nonce: 当前 turn 的 nonce, 用于动态段标签
-//   - userInput: 进入 dynamic 段 USER_QUERY 块的用户原始输入 / 当前任务 query
-//     (跨 turn 不必稳定, 例如普通 ReAct 的用户当前轮次输入)
+//   - userInput: 当前任务 query，在主循环组装前写入或复用 Timeline 输入记录；
+//     原文由 Open / Semi1 提供，纯动态区不再承载用户 Query。
 //   - frozenUserContext: PE-TASK 的 PARENT_TASK + CURRENT_TASK + INSTRUCTION
 //     三联块等"用户上下文块". 注入 timeline-open 段最末尾 (UserHistory 之后),
 //     落在所有 cache 边界之外. 字段名虽含 "frozen", 但 PE-TASK 子任务切换
@@ -393,12 +393,17 @@ func (r *ReActLoop) generateLoopPrompt(
 		return "", err
 	}
 
+	currentTaskID := ""
+	if task := r.GetCurrentTask(); task != nil {
+		currentTaskID = task.GetId()
+	}
 	result, err := r.invoker.AssembleLoopPrompt(tools, &LoopPromptAssemblyInput{
 		Nonce:                    nonce,
 		FunctionCallMode:         r.functionCallMode,
 		IncludeLatestModelReplay: true,
 		Lightweight:              r.useSpeedPriorityAI,
 		UserQuery:                userInput,
+		CurrentTaskID:            currentTaskID,
 		FrozenUserContext:        frozenUserContext,
 		FrozenPartitions:         frozenPartitions,
 		TaskInstruction:          persistent,
