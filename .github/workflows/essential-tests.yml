@@ -166,6 +166,10 @@ jobs:
           failed-labels: 'do-not-merge,work in progress,wip,rfc'
           cache-key-prefix: 'essential-tests'
 
+      - name: Essential Tests Gate regression coverage
+        if: steps.target.outputs.is_same_repo == 'true'
+        run: bash scripts/ci/test-essential-tests-gate.sh
+
       - name: Set run flag from Pre-Check
         if: steps.target.outputs.is_pull_request == 'true' && steps.target.outputs.is_same_repo == 'true'
         run: echo "SHOULD_RUN=${{ steps.pre_check.outputs.should_run_tests }}" >> $GITHUB_ENV
@@ -1534,6 +1538,7 @@ jobs:
     steps:
       - name: Verify selected test scope
         env:
+          PRECHECK_RESULT: ${{ needs.check-wip.result }}
           SHOULD_RUN_TESTS: ${{ needs.check-wip.outputs.should_run_tests }}
           TEST_SCOPE: ${{ needs.check-wip.outputs.test_scope }}
           SCANNODE_RESULT: ${{ needs.scannode-focused.result }}
@@ -1545,7 +1550,22 @@ jobs:
           YAKGRPC_RESULT: ${{ needs.test-prepared-yakgrpc.result }}
           COREPLUGIN_RESULT: ${{ needs.test-prepared-coreplugin.result }}
         run: |
-          if [ "$SHOULD_RUN_TESTS" != "true" ]; then
+          if [ "$PRECHECK_RESULT" != "success" ]; then
+            echo "Pre-check did not pass: $PRECHECK_RESULT" >&2
+            exit 1
+          fi
+
+          case "$TEST_SCOPE" in
+            full|scannode) ;;
+            *) echo "Invalid test scope: $TEST_SCOPE" >&2; exit 1 ;;
+          esac
+
+          case "$SHOULD_RUN_TESTS" in
+            true|false) ;;
+            *) echo "Missing or invalid pre-check run flag: $SHOULD_RUN_TESTS" >&2; exit 1 ;;
+          esac
+
+          if [ "$SHOULD_RUN_TESTS" = "false" ]; then
             echo "Tests were intentionally disabled by the pre-check."
             exit 0
           fi
