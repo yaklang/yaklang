@@ -38,6 +38,12 @@ options {
     tokenVocab = JavaLexer;
 }
 
+// Resolve only bounded SLL prefixes; preserve the generated ATN and LL recovery.
+@parser::adaptivePredict {}
+@parser::structmembers {
+    disableFastPrediction bool
+}
+
 compilationUnit
     : packageDeclaration? (importDeclaration | ';')* (typeDeclaration | ';')*
     | moduleDeclaration EOF

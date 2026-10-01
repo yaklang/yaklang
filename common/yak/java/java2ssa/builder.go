@@ -1,9 +1,11 @@
 package java2ssa
 
 import (
+	"errors"
 	"fmt"
 	"path/filepath"
 
+	"github.com/yaklang/antlr/v4"
 	"github.com/yaklang/javajive/classparser"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
@@ -128,18 +130,39 @@ func Frontend(src string, caches ...*ssa.AntlrCache) (javaparser.ICompilationUni
 	src = preprocessJavaUnicodeEscapes(src)
 	src = preprocessJavaRecordPatternSwitchCases(src)
 	src = normalizeDecompiledJava(src)
-	return antlr4util.ParseASTWithSLLFirst(
+	lexicalErrors := antlr4util.NewErrorListener()
+	ast, err := antlr4util.ParseASTWithSLLFirst(
 		src,
-		javaparser.NewJavaLexer,
+		func(input antlr.CharStream) *frontendJavaLexer {
+			return &frontendJavaLexer{javaparser.NewJavaLexer(input), lexicalErrors}
+		},
 		javaparser.NewJavaParser,
 		nil,
-		func(lexer *javaparser.JavaLexer, parser *javaparser.JavaParser) {
+		func(lexer *frontendJavaLexer, parser *javaparser.JavaParser) {
 			ssa.ParserSetAntlrCache(parser, lexer, cache)
 		},
 		func(parser *javaparser.JavaParser) javaparser.ICompilationUnitContext {
-			return parser.CompilationUnit()
+			ast := parser.CompilationUnit()
+			if parser.GetTokenStream().LA(1) != antlr.TokenEOF {
+				parser.NotifyErrorListeners("unexpected trailing input after Java compilation unit", parser.GetCurrentToken(), nil)
+			}
+			return ast
 		},
 	)
+	return ast, errors.Join(err, lexicalErrors.Error())
+}
+
+// The two-stage helper replaces listeners between SLL and LL, then reuses the
+// already lexed tokens. Keep lexical errors independently, otherwise LL can
+// accept a recovered token stream without seeing the original invalid source.
+type frontendJavaLexer struct {
+	*javaparser.JavaLexer
+	lexicalErrors *antlr4util.ErrorListener
+}
+
+func (lexer *frontendJavaLexer) RemoveErrorListeners() {
+	lexer.JavaLexer.RemoveErrorListeners()
+	lexer.JavaLexer.AddErrorListener(lexer.lexicalErrors)
 }
 
 func (b *singleFileBuilder) AssignConst(name string, value ssa.Value) bool {
