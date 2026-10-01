@@ -2,8 +2,6 @@ package python2ssa
 
 import (
 	"fmt"
-	"os"
-	"os/exec"
 	"strings"
 	"sync"
 	"testing"
@@ -44,19 +42,10 @@ func TestFrontendPredictionRejectsInvalidSource(t *testing.T) {
 }
 
 func TestFrontendPredictionLLOnly(t *testing.T) {
-	if os.Getenv("YAK_PYTHON_TEST_LL_CHILD") == "1" {
-		TestFrontendPredictionRejectsInvalidSource(t)
-		return
+	if antlr4util.SLLFirstEnabled() {
+		t.Skip("run with YAK_ANTLR_SLL_FIRST=0 to exercise the LL-only frontend")
 	}
-	binary, err := os.Executable()
-	if err != nil {
-		t.Fatal(err)
-	}
-	cmd := exec.Command(binary, "-test.run=^TestFrontendPredictionLLOnly$", "-test.timeout=1m")
-	cmd.Env = append(os.Environ(), "YAK_ANTLR_SLL_FIRST=0", "YAK_PYTHON_TEST_LL_CHILD=1")
-	if output, err := cmd.CombinedOutput(); err != nil {
-		t.Fatalf("LL-only regression: %v\n%s", err, output)
-	}
+	TestFrontendPredictionRejectsInvalidSource(t)
 }
 
 func frontendSnapshot(tree antlr.Tree) string {

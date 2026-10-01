@@ -108,3 +108,9 @@ jobs:
       - name: Python grammar and prediction differential fuzz
         if: matrix.package == './common/yak/python/test'
         run: go test -run '^$' -fuzz '^FuzzPrediction$' -fuzztime=30s -parallel=2 -timeout=3m ./common/yak/python/parser
+
+      - name: Python frontend LL-only race regressions
+        if: matrix.package == './common/yak/python/test'
+        env:
+          YAK_ANTLR_SLL_FIRST: "0"
+        run: go test -race -count=1 -timeout 3m -run '^TestFrontendPrediction' ./common/yak/python/python2ssa
