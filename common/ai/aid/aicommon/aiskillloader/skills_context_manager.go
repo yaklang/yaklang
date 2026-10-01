@@ -137,6 +137,16 @@ func NewSkillsContextManager(loader SkillLoader, opts ...ManagerOption) *SkillsC
 		opt(m)
 	}
 	m.initializeSkillSearchPersistence()
+	if loader != nil {
+		for _, meta := range loader.AllSkillMetas() {
+			if meta.DisableModelInvocation || !strings.EqualFold(strings.TrimSpace(meta.Metadata[SkillMetadataAutoLoad]), "true") {
+				continue
+			}
+			if _, err := m.LoadAutoSkill(meta.Name); err != nil {
+				log.Warnf("failed to load default skill %q: %v", meta.Name, err)
+			}
+		}
+	}
 	return m
 }
 

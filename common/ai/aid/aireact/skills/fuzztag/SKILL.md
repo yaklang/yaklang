@@ -2,6 +2,7 @@
 name: fuzztag
 metadata:
   display_name_zh-CN: FuzzTag 文本生成
+  auto_load: "true"
 description: 使用 Yaklang/Yakit FuzzTag 模板生成文本、HTTP 数据包、字典及编码解码变体；用于编写、渲染或调试模板。
 ---
 
@@ -31,9 +32,21 @@ Host: example.com
 
 ```
 
-渲染后 id 为 eyJhIjoxfQ==。查询值含 +、/、= 时可再套 urlescape；实际报文用 CRLF 行尾（可插入 `{{crlf}}`），空行结束头部。本工具生成报文文本，发送用 HTTP 工具。
+渲染后 id 为 eyJhIjoxfQ==。查询值含 +、/、= 时可再套 urlescape；实际报文用 CRLF 行尾（可插入 `{{crlf}}`），空行结束头部。exec_fuzztag 生成报文文本；HTTP 工具也能直接渲染并发送。
 
 保留重复项；limit 默认 1000，范围 1–100000。检查 success、count、truncated、output_file、bytes 和 preview，截断时 count 只是已输出数。`fuzz.Strings` 会去重。未知标签可能变空串，须检查样本；文件词表需 enable-file-tags，插件/热加载需对应宿主。
+
+## 直接辅助 HTTP 测试
+
+少量编码或随机字段直接用 `do_http_request`，设置 `fuzztag:true`，在 `packet` 或 URL 模式的 `url`、`headers`、`body`、`query`/`form` 值中写标签。它要求恰好一份渲染结果；多结果改用 `batch_do_http_request`。普通请求默认原样发送，模板里的局部字面文本用 raw。
+
+多路径、多载荷优先一次调用 `batch_do_http_request`，无需先生成字典文件或逐个调用单请求工具。默认启用 FuzzTag：`paths:"/users/{{int(1-3)}}"` 配 `form:{"input":"{{params(payload)}}"}` 与 `variables:{"payload":["normal","a & b"]}` 得 3×2=6 份请求。先小样本核对，再设置合适的 `max-requests`、`concurrent`、响应筛选条件。
+
+URL 模式先一起渲染各字段，再对 query/form 的原始值编码一次；不要对结构化值再套 urlenc。`paths:"/users/{{int::row(1-2)}}"` 与 `query:{"role":"{{list::row(reader|admin)}}"}` 同步成两份请求。精确 packet 模式自行编码，如 `{{urlescape({{base64({{params(payload)}})}})}}`；`{{PATH}}` 是当前 paths 行的字面值，路径与 packet 分阶段展开成笛卡尔积，需要同步的标签写在同一份 packet 中。
+
+变量标量/数组用 params 注入，值里的标签不再次执行；批量旧 `{{name}}` 仍兼容。重复项保留，`repeat(3)` 可测试重复请求的稳定性。批量 `max-requests` 默认100、最多500，限制展开后的总数，超限整批不发送。未知标签、缺失变量、未闭合模板在发包前报错；HTTP 入口不启用文件/插件标签。批量 `disable-fuzztag:true` 全部原样发送，包括 PATH。
+
+以实际 request packet 和结构化 request/response/status/transport_error 为准：先保留正常基线，一次改变一个变量，比较状态、内容、响应头和耗时；一次未命中不能代表漏洞不存在。
 
 ## 查看全集
 
