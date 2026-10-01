@@ -69,6 +69,11 @@ func TestPredictionTokenMutations(t *testing.T) {
 }
 
 func FuzzPrediction(f *testing.F) {
+	for _, expr := range adversarialConflictExpressions {
+		f.Add(methodSource("return "+expr+";"), uint16(0), uint8(0))
+	}
+	f.Add("class C { T<> x; }", uint16(0), uint8(15))
+	f.Add(methodSource("return a -> ;"), uint16(0), uint8(15))
 	for _, expr := range predictionExpressions {
 		f.Add(methodSource("return "+expr+";"), uint16(0), uint8(0))
 	}
@@ -92,6 +97,9 @@ func FuzzPrediction(f *testing.F) {
 			return
 		}
 		checkPrediction(t, source, reference, false)
+		if action&15 == 15 {
+			checkRecoveringPrediction(t, source)
+		}
 		// Check that failures and cached prefix decisions cannot affect the next
 		// parser instance, including source changes at the same token index.
 		if strings.Contains(source, "<") {
