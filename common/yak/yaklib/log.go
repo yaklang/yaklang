@@ -2,7 +2,6 @@ package yaklib
 
 import (
 	"fmt"
-	"os"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -67,16 +66,13 @@ func CreateYakLogger(yakFiles ...string) *YakLogger {
 	loggerRaw, ok := _logs.Load(_fixYakModName(yakFile))
 	if !ok {
 		logger = log.GetLogger(_fixYakModName(yakFile))
-		logger.SetOutput(os.Stdout)
-		logger.Level = log.DefaultLogger.Level
-		logger.Printer.IsTerminal = true
 		_logs.Store(_fixYakModName(yakFile), logger)
 	} else {
 		logger = loggerRaw.(*log.Logger)
 	}
 
 	res := &YakLogger{Logger: logger}
-	res.SetLevel = logger.SetLevel
+	res.SetLevel = logger.Logger.SetLevel
 	return res
 }
 

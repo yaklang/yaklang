@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"reflect"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"github.com/yaklang/yaklang/common/schema"
@@ -1143,13 +1144,10 @@ func NewWordCloud(graphName ...string) *YakitGraph {
 	}
 }
 
-var (
-	yakitClientInstance  *YakitClient
-	yakitClientInstanceP = &yakitClientInstance
-)
+var yakitClientInstance atomic.Pointer[YakitClient]
 
 func GetYakitClientInstance() *YakitClient {
-	return yakitClientInstance
+	return yakitClientInstance.Load()
 }
 
 // YakitTextBlock 向 Yakit 输出一个文本块（导出名为 yakit.Text）
@@ -1535,7 +1533,7 @@ func init() {
 // yakit.InitYakit(client)
 // ```
 func InitYakit(y *YakitClient) {
-	*yakitClientInstanceP = y
+	yakitClientInstance.Store(y)
 }
 
 // AutoInitYakit 根据命令行参数自动初始化 Yakit 客户端（导出名为 yakit.AutoInitYakit）
@@ -1552,25 +1550,22 @@ func InitYakit(y *YakitClient) {
 // yakit.Info("hello from yak")
 // ```
 func AutoInitYakit() *YakitClient {
-	if yakitClientInstance != nil {
+	if GetYakitClientInstance() != nil {
 		return nil
 	}
 	// The self-contained AOT runtime may omit the optional cli module. In
 	// that case cli.DefaultCliApp's package init has not run; use the same
 	// empty client as the no-webhook path instead of dereferencing it.
-	if cli.DefaultCliApp == nil {
-		InitYakit(emptyVirtualClient)
-		return emptyVirtualClient
+	client := emptyVirtualClient
+	if cli.DefaultCliApp != nil {
+		if addr := cli.DefaultCliApp.String("yakit-webhook"); addr != "" {
+			client = NewYakitClient(addr)
+		}
 	}
-	addr := cli.DefaultCliApp.String("yakit-webhook")
-	if addr != "" {
-		client := NewYakitClient(addr)
-		InitYakit(client)
-		return client
-	} else {
-		InitYakit(emptyVirtualClient)
-		return emptyVirtualClient
+	if !yakitClientInstance.CompareAndSwap(nil, client) {
+		return nil
 	}
+	return client
 }
 
 // updateYakitStore 从本地数据库更新 Yakit 插件商店（导出名为 yakit.UpdateYakitStore）

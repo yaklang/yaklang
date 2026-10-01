@@ -252,9 +252,26 @@ type MethodBuilder interface {
 	GetMethodNames(Type) []string
 }
 
+// ExternMethodBuilder is the default for standalone type queries and programs
+// without a configured method builder. Parse configurations belong to Program.
 var ExternMethodBuilder MethodBuilder
 
 func GetMethod(t Type, id string, peek ...bool) *Function {
+	return getMethodWithBuilder(t, id, ExternMethodBuilder, peek...)
+}
+
+func (prog *Program) getMethod(t Type, id string, peek ...bool) *Function {
+	return getMethodWithBuilder(t, id, prog.getExternMethodBuilder(), peek...)
+}
+
+func (prog *Program) getExternMethodBuilder() MethodBuilder {
+	if prog != nil && prog.externMethodBuilder != nil {
+		return prog.externMethodBuilder
+	}
+	return ExternMethodBuilder
+}
+
+func getMethodWithBuilder(t Type, id string, builder MethodBuilder, peek ...bool) *Function {
 	var f *Function
 	if utils.IsNil(t) {
 		log.Error("[BUG]: type is nil")
@@ -268,8 +285,8 @@ func GetMethod(t Type, id string, peek ...bool) *Function {
 		}
 	}
 
-	if f == nil && ExternMethodBuilder != nil {
-		f = ExternMethodBuilder.Build(t, id)
+	if f == nil && builder != nil {
+		f = builder.Build(t, id)
 		if f != nil {
 			t.AddMethod(id, f)
 		}
@@ -281,15 +298,29 @@ func GetMethod(t Type, id string, peek ...bool) *Function {
 }
 
 func GetMethodsName(t Type) []string {
+	return getMethodsNameWithBuilder(t, ExternMethodBuilder)
+}
+
+func getMethodsNameWithBuilder(t Type, builder MethodBuilder) []string {
 	ret := make([]string, 0)
 	ret = append(ret, lo.Keys(t.GetMethod())...)
-	if ExternMethodBuilder != nil {
-		ret = append(ret, ExternMethodBuilder.GetMethodNames(t)...)
+	if builder != nil {
+		ret = append(ret, builder.GetMethodNames(t)...)
 	}
 	return ret
 }
 
 func GetAllKey(t Type) []string {
+	return getAllKeyWithBuilder(t, ExternMethodBuilder)
+}
+
+// GetAllKey includes this program's configured methods when suggesting member
+// names. Standalone type queries retain the default method-builder fallback.
+func (prog *Program) GetAllKey(t Type) []string {
+	return getAllKeyWithBuilder(t, prog.getExternMethodBuilder())
+}
+
+func getAllKeyWithBuilder(t Type, builder MethodBuilder) []string {
 	if t == nil {
 		return []string{}
 	}
@@ -300,7 +331,7 @@ func GetAllKey(t Type) []string {
 		if !ok {
 			break
 		}
-		ret = append(ret, GetAllKey(a.GetType())...)
+		ret = append(ret, getAllKeyWithBuilder(a.GetType(), builder)...)
 	case FunctionTypeKind:
 	case ObjectTypeKind, SliceTypeKind, MapTypeKind, StructTypeKind:
 		ot, ok := ToObjectType(t)
@@ -310,7 +341,7 @@ func GetAllKey(t Type) []string {
 		ret = append(ret, lo.Map(ot.Keys, func(v Value, _ int) string { return v.String() })...)
 		fallthrough
 	default:
-		ret = append(ret, GetMethodsName(t)...)
+		ret = append(ret, getMethodsNameWithBuilder(t, builder)...)
 	}
 	return ret
 }

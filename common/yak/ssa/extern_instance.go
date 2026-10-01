@@ -37,7 +37,12 @@ func (b *FunctionBuilder) WithExternBuildValueHandler(m map[string]func(b *Funct
 }
 
 func (b *FunctionBuilder) WithExternMethod(builder MethodBuilder) {
-	ExternMethodBuilder = builder
+	if b == nil || b.Function == nil {
+		return
+	}
+	if prog := b.GetProgram(); prog != nil {
+		prog.externMethodBuilder = builder
+	}
 }
 
 func (b *FunctionBuilder) WithDefineFunction(defineFunc map[string]any) {

@@ -9,7 +9,12 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 )
 
-var Log = log.GetLogger("ssa2llvmTrace").SetLevel("disable").SetOutput(os.Stderr)
+var Log = func() *log.Logger {
+	logger := log.GetLogger("ssa2llvmTrace")
+	logger.SetLevel("disable")
+	logger.SetOutput(os.Stderr)
+	return logger
+}()
 
 func SetEnabled(v bool) {
 	if v {

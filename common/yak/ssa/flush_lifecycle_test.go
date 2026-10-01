@@ -15,6 +15,22 @@ import (
 	"time"
 )
 
+// closeUnsavedFlushFixture is for fixtures that only flush during compilation.
+// SaveToDatabase normally closes the index and offset savers; these fixtures
+// never call it, so keep the auxiliary store until instruction workers stop.
+// Fixtures that save must not use this helper: their auxiliary savers are
+// already closed by SaveToDatabase.
+func closeUnsavedFlushFixture(t *testing.T, prog *Program) func() {
+	t.Helper()
+	indexes := prog.Cache.indexes
+	return sync.OnceFunc(func() {
+		prog.Cache.CloseWithoutSave()
+		if err := indexes.Close(); err != nil {
+			t.Errorf("close fixture index and offset savers: %v", err)
+		}
+	})
+}
+
 // --- from async_compile_flush_test.go ---
 
 // TestFlushCompileUnitIsAsync proves that FlushCompileUnit does not block
@@ -29,6 +45,8 @@ func TestFlushCompileUnitIsAsync(t *testing.T) {
 	cfg.SetCompileUnitSplit(true)
 
 	prog := NewProgram(cfg, ProgramCacheDBWrite, Application, nil, "", 1)
+	closeFixture := closeUnsavedFlushFixture(t, prog)
+	defer closeFixture()
 	builder := prog.GetAndCreateFunctionBuilder("", string(MainFunctionName))
 	for i := 0; i < 20; i++ {
 		left := builder.EmitUndefined("left")
@@ -47,10 +65,10 @@ func TestFlushCompileUnitIsAsync(t *testing.T) {
 	require.Less(t, elapsed, 5*time.Second,
 		"FlushCompileUnit must be async (took %v)", elapsed)
 
-	// Instructions should eventually be persisted
-	require.Eventually(t, func() bool {
-		return prog.Cache.InstructionPersistedCount() > 0
-	}, 5*time.Second, 50*time.Millisecond,
+	// Wait after measuring FlushCompileUnit, so its async timing boundary
+	// stays separate from persistence completion and fixture cleanup.
+	prog.Cache.FlushInstructionSaver()
+	require.Greater(t, prog.Cache.InstructionPersistedCount(), 0,
 		"instructions should be persisted after async flush")
 }
 
@@ -65,6 +83,7 @@ func TestSaveToDatabaseUsesBarrier(t *testing.T) {
 	cfg.SetCompileUnitSplit(true)
 
 	prog := NewProgram(cfg, ProgramCacheDBWrite, Application, nil, "", 1)
+	defer prog.Cache.CloseWithoutSave()
 	builder := prog.GetAndCreateFunctionBuilder("", string(MainFunctionName))
 	left := builder.EmitUndefined("left")
 	right := builder.EmitUndefined("right")
@@ -103,6 +122,7 @@ func TestPerBatchFlushPersistsInstructionsMidCompile(t *testing.T) {
 	cfg.SetCompileUnitSplit(true)
 
 	prog := NewProgram(cfg, ProgramCacheDBWrite, Application, nil, "", 1)
+	defer prog.Cache.CloseWithoutSave()
 	builder := prog.GetAndCreateFunctionBuilder("", string(MainFunctionName))
 
 	// Emit some ordinary instructions.
@@ -156,6 +176,7 @@ func TestPerBatchFlushKeepsBoundaryResident(t *testing.T) {
 	cfg.SetCompileUnitSplit(true)
 
 	prog := NewProgram(cfg, ProgramCacheDBWrite, Application, nil, "", 1)
+	defer prog.Cache.CloseWithoutSave()
 	builder := prog.GetAndCreateFunctionBuilder("testFunc", string(MainFunctionName))
 	param := builder.NewParam("arg")
 	_ = builder.EmitUndefined("body")
@@ -187,6 +208,7 @@ func TestPerBatchFlushNoFeedBlockPanic(t *testing.T) {
 	cfg.SetCompileUnitSplit(true)
 
 	prog := NewProgram(cfg, ProgramCacheDBWrite, Application, nil, "", 1)
+	defer prog.Cache.CloseWithoutSave()
 
 	// Unit A: create and flush.
 	builderA := prog.GetAndCreateFunctionBuilder("funcA", string(MainFunctionName))
@@ -226,6 +248,7 @@ func TestPerBatchFlushDoesNotLoseInstructionsDefaultSplit(t *testing.T) {
 	require.False(t, cfg.GetCompileUnitSplit())
 
 	prog := NewProgram(cfg, ProgramCacheDBWrite, Application, nil, "", 1)
+	defer prog.Cache.CloseWithoutSave()
 
 	// Unit A: create instructions and flush
 	builderA := prog.GetAndCreateFunctionBuilder("funcA", string(MainFunctionName))
@@ -297,6 +320,8 @@ func TestFlushLogHasEnqueuedAndCompleted(t *testing.T) {
 	cfg.SetCompileUnitSplit(true)
 
 	prog := NewProgram(cfg, ProgramCacheDBWrite, Application, nil, "", 1)
+	closeFixture := closeUnsavedFlushFixture(t, prog)
+	defer closeFixture()
 	builder := prog.GetAndCreateFunctionBuilder("", string(MainFunctionName))
 	for i := 0; i < 20; i++ {
 		l := builder.EmitUndefined("l")
@@ -305,15 +330,18 @@ func TestFlushLogHasEnqueuedAndCompleted(t *testing.T) {
 	}
 	builder.Finish()
 
-	var logBuf bytes.Buffer
+	var logBuf flushLogBuffer
 	yaklog.SetOutput(&logBuf)
 	yaklog.SetLevel(yaklog.DebugLevel)
 	defer func() {
+		// Stop the fixture's workers before restoring shared logging state.
+		closeFixture()
 		yaklog.SetOutput(os.Stdout)
 		yaklog.SetLevel(yaklog.InfoLevel)
 	}()
 
 	prog.Cache.FlushCompileUnit("test-unit")
+	prog.Cache.FlushInstructionSaver()
 
 	logOutput := logBuf.String()
 	t.Logf("Log (%d bytes):\n%s", len(logOutput), logOutput)
@@ -333,6 +361,7 @@ func TestFlushLogHasWriterSummary(t *testing.T) {
 	require.NoError(t, err)
 
 	prog := NewProgram(cfg, ProgramCacheDBWrite, Application, nil, "", 1)
+	defer prog.Cache.CloseWithoutSave()
 	builder := prog.GetAndCreateFunctionBuilder("", string(MainFunctionName))
 	for i := 0; i < 10; i++ {
 		l := builder.EmitUndefined("l")
@@ -341,16 +370,18 @@ func TestFlushLogHasWriterSummary(t *testing.T) {
 	}
 	builder.Finish()
 
-	var logBuf bytes.Buffer
+	var logBuf flushLogBuffer
 	yaklog.SetOutput(&logBuf)
 	yaklog.SetLevel(yaklog.InfoLevel)
 	defer func() {
+		// Stop the fixture's workers before restoring shared logging state.
+		prog.Cache.CloseWithoutSave()
 		yaklog.SetOutput(os.Stdout)
 		yaklog.SetLevel(yaklog.InfoLevel)
 	}()
 
 	prog.Cache.FlushCompileUnit("unit-a")
-	prog.Cache.SaveToDatabase()
+	require.NoError(t, prog.Cache.SaveToDatabase())
 
 	logOutput := logBuf.String()
 
@@ -372,14 +403,17 @@ func TestFlushLogFinalBarrierHasRemainingAndSaved(t *testing.T) {
 	require.NoError(t, err)
 
 	prog := NewProgram(cfg, ProgramCacheDBWrite, Application, nil, "", 1)
+	defer prog.Cache.CloseWithoutSave()
 	builder := prog.GetAndCreateFunctionBuilder("", string(MainFunctionName))
 	builder.EmitUndefined("x")
 	builder.Finish()
 
-	var logBuf bytes.Buffer
+	var logBuf flushLogBuffer
 	yaklog.SetOutput(&logBuf)
 	yaklog.SetLevel(yaklog.InfoLevel)
 	defer func() {
+		// Stop the fixture's workers before restoring shared logging state.
+		prog.Cache.CloseWithoutSave()
 		yaklog.SetOutput(os.Stdout)
 		yaklog.SetLevel(yaklog.InfoLevel)
 	}()
@@ -428,6 +462,8 @@ func TestFlushRequestLogHasStructuredFields(t *testing.T) {
 	cfg.SetCompileUnitSplit(true)
 
 	prog := NewProgram(cfg, ProgramCacheDBWrite, Application, nil, "", 1)
+	closeFixture := closeUnsavedFlushFixture(t, prog)
+	defer closeFixture()
 	builder := prog.GetAndCreateFunctionBuilder("", string(MainFunctionName))
 	left := builder.EmitUndefined("left")
 	right := builder.EmitUndefined("right")
@@ -438,14 +474,15 @@ func TestFlushRequestLogHasStructuredFields(t *testing.T) {
 	yaklog.SetOutput(&logBuf)
 	yaklog.SetLevel(yaklog.DebugLevel)
 	defer func() {
+		// Stop the fixture's workers before restoring shared logging state.
+		closeFixture()
 		yaklog.SetOutput(os.Stdout)
 		yaklog.SetLevel(yaklog.InfoLevel)
 	}()
 
 	prog.Cache.FlushCompileUnit("test-unit")
-	require.Eventually(t, func() bool {
-		return strings.Contains(logBuf.String(), "event=completed")
-	}, 3*time.Second, 10*time.Millisecond,
+	prog.Cache.FlushInstructionSaver()
+	require.Contains(t, logBuf.String(), "event=completed",
 		"completed flush log must be emitted after async persistence settles")
 
 	logOutput := logBuf.String()
@@ -479,17 +516,22 @@ func TestFinalBarrierLogHasCoverageAndPressureReduction(t *testing.T) {
 	require.NoError(t, err)
 
 	prog := NewProgram(cfg, ProgramCacheDBWrite, Application, nil, "", 1)
+	defer prog.Cache.CloseWithoutSave()
 	builder := prog.GetAndCreateFunctionBuilder("", string(MainFunctionName))
 	builder.EmitUndefined("x")
 	builder.Finish()
 
-	// Mid-flush to create some persisted count
+	// Mid-flush to create some persisted count. Settle its workers before
+	// changing shared logging state for the final barrier capture.
 	prog.Cache.FlushCompileUnit("unit-a")
+	prog.Cache.FlushInstructionSaver()
 
-	var logBuf bytes.Buffer
+	var logBuf flushLogBuffer
 	yaklog.SetOutput(&logBuf)
 	yaklog.SetLevel(yaklog.InfoLevel)
 	defer func() {
+		// Stop the fixture's workers before restoring shared logging state.
+		prog.Cache.CloseWithoutSave()
 		yaklog.SetOutput(os.Stdout)
 		yaklog.SetLevel(yaklog.InfoLevel)
 	}()
@@ -520,6 +562,8 @@ func TestFitRangeNotLoggedPerInstruction(t *testing.T) {
 	cfg.SetCompileUnitSplit(true)
 
 	prog := NewProgram(cfg, ProgramCacheDBWrite, Application, nil, "", 1)
+	closeFixture := closeUnsavedFlushFixture(t, prog)
+	defer closeFixture()
 	builder := prog.GetAndCreateFunctionBuilder("", string(MainFunctionName))
 	left := builder.EmitUndefined("left")
 	right := builder.EmitUndefined("right")
@@ -528,7 +572,10 @@ func TestFitRangeNotLoggedPerInstruction(t *testing.T) {
 
 	// Set DebugLevel but NOT event debug — fitRange should NOT log
 	yaklog.SetLevel(yaklog.DebugLevel)
-	defer yaklog.SetLevel(yaklog.InfoLevel)
+	defer func() {
+		closeFixture()
+		yaklog.SetLevel(yaklog.InfoLevel)
+	}()
 
 	prog.Cache.FlushCompileUnit("unit-a")
 
@@ -557,6 +604,7 @@ func TestC_FinalBarrierAccounting(t *testing.T) {
 	cfg.SetCompileUnitSplit(true)
 
 	prog := NewProgram(cfg, ProgramCacheDBWrite, Application, nil, "", 1)
+	defer prog.Cache.CloseWithoutSave()
 	builder := prog.GetAndCreateFunctionBuilder("", string(MainFunctionName))
 
 	// Emit ordinary instructions
@@ -628,6 +676,7 @@ func TestE_MidFlushReducesFinalRemaining(t *testing.T) {
 	cfg.SetCompileUnitSplit(true)
 
 	prog := NewProgram(cfg, ProgramCacheDBWrite, Application, nil, "", 1)
+	defer prog.Cache.CloseWithoutSave()
 	builder := prog.GetAndCreateFunctionBuilder("", string(MainFunctionName))
 
 	// Emit several ordinary instructions
@@ -684,6 +733,7 @@ func TestFastPathFinalAccountingUsesUniquePersistedRows(t *testing.T) {
 	cfg.SetCompileProjectBytes(fastPathProjectByteThreshold / 2)
 
 	prog := NewProgram(cfg, ProgramCacheDBWrite, Application, filesys.NewVirtualFs(), "", 1)
+	defer prog.Cache.CloseWithoutSave()
 	require.Equal(t, "resident-fast-path", prog.Cache.InstructionCacheMode())
 	builder := prog.GetAndCreateFunctionBuilder("", string(MainFunctionName))
 	for i := 0; i < 8; i++ {
@@ -699,10 +749,12 @@ func TestFastPathFinalAccountingUsesUniquePersistedRows(t *testing.T) {
 	require.NotNil(t, inst)
 	inst.SetExtern(true)
 
-	var logBuf bytes.Buffer
+	var logBuf flushLogBuffer
 	yaklog.SetOutput(&logBuf)
 	yaklog.SetLevel(yaklog.InfoLevel)
 	defer func() {
+		// Stop the fixture's workers before restoring shared logging state.
+		prog.Cache.CloseWithoutSave()
 		yaklog.SetOutput(os.Stdout)
 		yaklog.SetLevel(yaklog.InfoLevel)
 	}()

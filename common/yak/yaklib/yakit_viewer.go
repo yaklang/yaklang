@@ -35,7 +35,7 @@ type YakitFeature struct {
 // yakit.EnableWebsiteTrees("example.com")
 // ```
 func yakitEnableCrawlerViewer(targets string) {
-	yakitClientInstance.Output(&YakitFeature{
+	GetYakitClientInstance().Output(&YakitFeature{
 		Feature: "website-trees",
 		Params: map[string]interface{}{
 			"targets":          targets,
@@ -58,7 +58,7 @@ func yakitEnableCrawlerViewer(targets string) {
 // yakit.TableData("Result", {"name": "a", "value": "1"})
 // ```
 func yakitEnableFixedTable(tableName string, columns []string) {
-	yakitClientInstance.Output(&YakitFeature{
+	GetYakitClientInstance().Output(&YakitFeature{
 		Feature: "fixed-table",
 		Params: map[string]interface{}{
 			"table_name": tableName,
@@ -80,7 +80,7 @@ func yakitEnableFixedTable(tableName string, columns []string) {
 // yakit.OutputDotGraph("Graph", "digraph G { a -> b }")
 // ```
 func yakitEnableDotGraphTab(tabName string) {
-	yakitClientInstance.Output(&YakitFeature{
+	GetYakitClientInstance().Output(&YakitFeature{
 		Feature: "dot-graph-tab",
 		Params: map[string]interface{}{
 			"tab_name": tabName,
@@ -101,7 +101,7 @@ func yakitEnableDotGraphTab(tabName string) {
 // yakit.TextTabData("Log", "hello yak")
 // ```
 func yakitEnableText(tabName string) {
-	yakitClientInstance.Output(&YakitFeature{
+	GetYakitClientInstance().Output(&YakitFeature{
 		Feature: "text",
 		Params: map[string]interface{}{
 			"tab_name": tabName,
@@ -139,8 +139,8 @@ func yakitTableData(tableName string, data any) *YakitFixedTableData {
 		tableData.Data = map[string]interface{}{}
 	}
 	tableData.Data["uuid"] = uuid.New().String()
-	if yakitClientInstance != nil {
-		yakitClientInstance.Output(tableData)
+	if client := GetYakitClientInstance(); client != nil {
+		client.Output(tableData)
 	}
 	return nil
 }
@@ -168,8 +168,8 @@ func yakitDotGraphData(tabName string, data string) {
 		TabName: tabName,
 		Data:    data,
 	}
-	if yakitClientInstance != nil {
-		yakitClientInstance.Output(tabData)
+	if client := GetYakitClientInstance(); client != nil {
+		client.Output(tabData)
 	}
 }
 
@@ -196,8 +196,8 @@ func yakitTextTabData(tabName string, data string) {
 		TableName: tabName,
 		Data:      data,
 	}
-	if yakitClientInstance != nil {
-		yakitClientInstance.Output(tabData)
+	if client := GetYakitClientInstance(); client != nil {
+		client.Output(tabData)
 	}
 }
 
@@ -221,7 +221,7 @@ type YakitStatusCard struct {
 // yakit.StatusCard("Open Ports", 12, "scan")
 // ```
 func yakitStatusCard(id string, data interface{}, tags ...string) {
-	yakitClientInstance.StatusCard(id, data, tags...)
+	GetYakitClientInstance().StatusCard(id, data, tags...)
 }
 
 // StatusCard 在 Yakit UI 中输出/更新一个状态卡片（导出名为 yakit.StatusCard）

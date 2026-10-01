@@ -121,7 +121,7 @@ func (b *FunctionBuilder) createDefaultMember(res checkMemberResult, object, key
 		if keyName == "" {
 			keyName = key.String()
 		}
-		if fun := GetMethod(object.GetType(), keyName); fun != nil {
+		if fun := object.GetProgram().getMethod(object.GetType(), keyName); fun != nil {
 			typ = fun.GetType()
 		}
 	}

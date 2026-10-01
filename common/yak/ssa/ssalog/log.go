@@ -18,5 +18,9 @@ func resolveSSALogLevel() string {
 }
 
 var (
-	Log = log.GetLogger("ssaLog").SetLevel(resolveSSALogLevel())
+	Log = func() *log.Logger {
+		logger := log.GetLogger("ssaLog")
+		logger.SetLevel(resolveSSALogLevel())
+		return logger
+	}()
 )
