@@ -679,7 +679,7 @@ if p.HasError() {
 
 <endif>
 
-switch p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), <choice.decision>, p.GetParserRuleContext()) {
+switch <adaptivePredict(choice)> {
 <if(alts)>
 <alts:{alt | case <i>:
 	<alt>}; separator="\n\n">
@@ -695,7 +695,7 @@ p.GetErrorHandler().Sync(p)
 
 <if(alts)>
 
-<alts:{alt | if p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), <choice.decision>, p.GetParserRuleContext()) == <i><if(!choice.ast.greedy)>+1<endif> {
+<alts:{alt | if <adaptivePredict(choice)> == <i><if(!choice.ast.greedy)>+1<endif> {
 	<alt>
 	\} else if p.HasError() { // JIM
 		goto errorExit}; separator="} else ">
@@ -709,7 +709,7 @@ p.GetErrorHandler().Sync(p)
 if p.HasError() {
 	goto errorExit
 }
-_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), <choice.decision>, p.GetParserRuleContext())
+_alt = <adaptivePredict(choice)>
 if p.HasError() {
 	goto errorExit
 }
@@ -727,7 +727,7 @@ for _alt != <choice.exitAlt> && _alt != antlr.ATNInvalidAltNumber {
 	if p.HasError() {
     	goto errorExit
     }
-	_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), <choice.decision>, p.GetParserRuleContext())
+	_alt = <adaptivePredict(choice)>
 	if p.HasError() {
 		goto errorExit
 	}
@@ -757,7 +757,7 @@ for ok := true; ok; ok = _alt != <choice.exitAlt> && _alt != antlr.ATNInvalidAlt
 
 	p.SetState(<choice.loopBackStateNumber>)<! loopback/exit decision !>
 	p.GetErrorHandler().Sync(p)
-	_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), <choice.decision>, p.GetParserRuleContext())
+	_alt = <adaptivePredict(choice)>
 	if p.HasError() {
 		goto errorExit
 	}
@@ -765,6 +765,12 @@ for ok := true; ok; ok = _alt != <choice.exitAlt> && _alt != antlr.ATNInvalidAlt
 >>
 
 Sync(s) ::= "Sync(<s.expecting.name>)"
+
+// Grammars can opt into a predictor that delegates uncertain inputs to the ATN.
+// Without @parser::adaptivePredict, generated calls remain unchanged.
+adaptivePredict(choice) ::= <<
+<if(choice.factory.grammar.namedActions.adaptivePredict)>p.AdaptivePredict<else>p.GetInterpreter().AdaptivePredict<endif>(p.BaseParser, p.GetTokenStream(), <choice.decision>, p.GetParserRuleContext())
+>>
 
 ThrowNoViableAlt(t) ::= <<
 p.SetError(antlr.NewNoViableAltException(p, nil, nil, nil, nil, nil))
