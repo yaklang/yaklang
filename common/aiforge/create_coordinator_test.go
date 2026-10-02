@@ -4,8 +4,8 @@ import (
 	"context"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
-	"github.com/yaklang/yaklang/common/ai/aid"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
+	"github.com/yaklang/yaklang/common/ai/aid/coordinator_legacy"
 	"testing"
 )
 
@@ -13,9 +13,9 @@ func TestPlanMocker(t *testing.T) {
 	token := uuid.NewString()
 
 	forge := NewForgeBlueprint("test-plan-mocker",
-		WithPlanMocker(func(config *aid.Coordinator) *aid.PlanResponse {
-			return &aid.PlanResponse{
-				RootTask: &aid.AiTask{
+		WithPlanMocker(func(config *coordinator_legacy.Coordinator) *coordinator_legacy.PlanResponse {
+			return &coordinator_legacy.PlanResponse{
+				RootTask: &coordinator_legacy.AiTask{
 					Name: token,
 				},
 			}

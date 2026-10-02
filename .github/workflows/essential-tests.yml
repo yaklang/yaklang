@@ -993,7 +993,7 @@ jobs:
             package_workers: "2"
             test_configs: |
               [
-                {"package": "./common/ai/aid/...", "timeout": "12m", "parallel": 1, "exclude_packages": ["./common/ai/aid/aireact/...", "./common/ai/aid/test"], "retry": 1, "retry_delay": 5},
+                {"package": "./common/ai/aid/...", "timeout": "12m", "parallel": 1, "exclude_packages": ["./common/ai/aid/aireact/...", "./common/ai/aid/coordinator_legacy/integration"], "retry": 1, "retry_delay": 5},
                 {"package": "./common/browser", "timeout": "10s", "run": "^TestWaitFunction", "parallel": 1}
               ]
 
@@ -1001,7 +1001,7 @@ jobs:
             package_workers: "2"
             test_configs: |
               [
-                {"package": "./common/ai/aid/test", "timeout": "12m", "parallel": 1, "retry": 1, "retry_delay": 5},
+                {"package": "./common/ai/aid/coordinator_legacy/integration", "timeout": "12m", "parallel": 1, "retry": 1, "retry_delay": 5},
                 {"package": "./common/ai/rag/pq/...", "timeout": "60s", "parallel": 1},
                 {"package": "./common/ai/rag/hnsw/...", "timeout": "60s", "parallel": 1},
                 {"package": "./common/ai/rag/entityrepos/...", "timeout": "60s", "parallel": 1},
@@ -1144,7 +1144,7 @@ jobs:
             artifact_file: "essential-tests-yakgrpc.tar.gz"
             test_configs: |
               [
-                {"package": "./common/yakgrpc", "timeout": "2m", "run": "^(TestInMemoryClient|TestUploadPayloadToOnline|TestDownloadPayload|TestUploadHotPatchTemplateToOnline|TestDownloadHotPatchTemplate|TestProbeReasoningEffort.*|TestIsLikelyErrorResponse|TestUploadSyntaxFlowRule|TestDownloadSyntaxFlowRule|TestSyntaxFlowOnlineFailures|TestGetApiKey_ReplaceAPIKeys|TestAIGlobalConfig_GRPC_Local|TestUpdateApiKey_ReplaceAllAPIKeys|TestDoHTTPFlowsToOnline|TestSSARiskFeedbackToOnline)$"}
+                {"package": "./common/yakgrpc", "timeout": "2m", "run": "^(TestInMemoryClient|TestUploadPayloadToOnline|TestDownloadPayload|TestUploadHotPatchTemplateToOnline|TestDownloadHotPatchTemplate|TestProbeReasoningEffort.*|TestIsLikelyErrorResponse|TestUploadSyntaxFlowRule|TestDownloadSyntaxFlowRule|TestSyntaxFlowOnlineFailures|TestGetApiKey_ReplaceAPIKeys|TestAIGlobalConfig_GRPC_Local|TestUpdateApiKey_ReplaceAllAPIKeys|TestDoHTTPFlowsToOnline|TestSSARiskFeedbackToOnline|TestStartAIReActDetachedApprovalExecutesAndKeepsStreamOpen)$"}
               ]
 
           - name: "Test gRPC MUSTPASS MITM"

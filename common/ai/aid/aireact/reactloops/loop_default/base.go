@@ -104,6 +104,11 @@ func init() {
 						log.Infof("iteration %d: action is directly answer, exiting loop and returning final answer", iteration)
 						return
 					}
+					if lastAction.ActionType == schema.AI_REACT_LOOP_ACTION_REQUEST_PLAN || lastAction.ActionType == schema.AI_REACT_LOOP_ACTION_REQUEST_PLAN_EXECUTION {
+						// Coordinator owns the review panel and final report. Another
+						// model summary here delays the root task's terminal event.
+						return
+					}
 					if strings.TrimSpace(loop.Get("intent_hint")) == "simple_query" {
 						log.Infof("iteration %d: simple query task, skip post-iteration summary", iteration)
 						return
@@ -136,37 +141,15 @@ func init() {
 	if err != nil {
 		log.Errorf("build default react loop failed: %v", err)
 	}
+}
 
-	err = reactloops.RegisterLoopFactory(
-		schema.AI_REACT_LOOP_NAME_PE_TASK,
-		func(r aicommon.AIInvokeRuntime, opts ...reactloops.ReActLoopOption) (*reactloops.ReActLoop, error) {
-			preset := []reactloops.ReActLoopOption{
-				reactloops.WithAllowRAG(true),
-				reactloops.WithAllowToolCall(true),
-				reactloops.WithInitTask(buildPETaskInitTask(r)),
-				reactloops.WithAllowUserInteract(r.GetConfig().GetAllowUserInteraction()),
-				reactloops.WithMaxIterations(resolveMaxIterations(r.GetConfig())),
-				reactloops.WithPersistentInstruction(instruction),
-				reactloops.WithOutputExample(outputExample),
-				buildDefaultReactiveDataBuilder(),
-			}
-
-			preset = append(preset, opts...)
-			loop, err := reactloops.NewReActLoop(schema.AI_REACT_LOOP_NAME_DEFAULT, r, preset...)
-			return loop, err
-		},
-		reactloops.WithLoopDescription("Plan-execution task mode for structured PE workflows with predefined objectives and execution context."),
-		reactloops.WithLoopDescriptionZh("渗透任务执行模式：面向结构化渗透测试工作流，在既定目标和上下文下推进任务执行。"),
-		reactloops.WithLoopUsagePrompt("Used internally for PE task orchestration when the system has already prepared execution-oriented initialization context and constraints."),
-		reactloops.WithLoopOutputExample(`
-* When entering a structured PE execution task:
-  {"@action": "pe_task", "human_readable_thought": "I will execute the prepared PE task flow with the provided constraints and goals"}
-`),
-		reactloops.WithLoopIsHidden(true),
-		reactloops.WithVerboseName("PE Task Executor"),
-		reactloops.WithVerboseNameZh("渗透任务执行模式"),
-	)
-	if err != nil {
-		log.Errorf("build default react loop failed: %v", err)
+// BaseOptions supplies shared prompt materials and iteration limits without
+// selecting a role, initialization policy, or PLAN implementation.
+func BaseOptions(cfg aicommon.AICallerConfigIf) []reactloops.ReActLoopOption {
+	return []reactloops.ReActLoopOption{
+		reactloops.WithMaxIterations(resolveMaxIterations(cfg)),
+		reactloops.WithPersistentInstruction(instruction),
+		reactloops.WithOutputExample(outputExample),
+		buildDefaultReactiveDataBuilder(),
 	}
 }

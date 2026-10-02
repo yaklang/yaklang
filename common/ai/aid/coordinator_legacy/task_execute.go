@@ -1,0 +1,759 @@
+package coordinator_legacy
+
+import (
+	"bytes"
+	"fmt"
+	"io"
+	"os"
+	"path/filepath"
+	"strings"
+	"time"
+
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
+	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
+	"github.com/yaklang/yaklang/common/ai/aid/aitool"
+	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/schema"
+	"github.com/yaklang/yaklang/common/utils"
+)
+
+func (t *AiTask) execute() error {
+	t.ContextProvider.StoreCurrentTask(t)
+	taskUserInput := t.GetUserInput()
+	utils.Debug(func() {
+		fmt.Println("-----------------------TASK FORMATTED USER INPUT-----------------------")
+		fmt.Println(taskUserInput)
+		fmt.Println("-----------------------------------------------------------------------")
+	})
+
+	// Record task start time for duration calculation
+	t.taskStartTime = time.Now()
+
+	// Record timeline baseline before task execution starts
+	// We use the global timeline differ to track changes during task execution
+	if timeline := t.CurrentTimeline(); timeline != nil {
+		// Create a new TimelineDiffer for this task to track changes during execution
+		// This differ will be used to calculate the diff at the end of task execution
+		taskTimelineDiffer := aicommon.NewTimelineDiffer(timeline)
+		taskTimelineDiffer.SetBaseline()
+		// Store the differ for later use in generateTaskSummary
+		t.taskTimelineDiffer = taskTimelineDiffer
+		log.Debugf("task %s timeline baseline recorded, baseline content length: %d", t.Index, len(taskTimelineDiffer.GetLastDump()))
+	}
+
+	// Emit task execution start status
+	t.planUserStatus(
+		fmt.Sprintf("正在处理「%s」", t.Name),
+		fmt.Sprintf("Working on %q", t.Name),
+		aicommon.WithStatusCode("plan.task_running"),
+	)
+
+	err := t.ExecuteLoopTask(
+		schema.AI_REACT_LOOP_NAME_PE_TASK,
+		t,
+		reactloops.WithOnPostIteraction(func(loop *reactloops.ReActLoop, iteration int, task aicommon.AIStatefulTask, isDone bool, reason any, operator *reactloops.OnPostIterationOperator) {
+			t.EmitInfo("ReAct Loop iteration %d completed for task: %s, isDone: %v, reason: %v", iteration, t.Name, isDone, reason)
+
+			// Log current task status for debugging - similar to prompt context format
+			log.Infof("=== Post Iteration Task Status ===")
+			log.Infof("Current Task Index: %s", t.Index)
+			log.Infof("Current Task Name: %s", t.Name)
+			log.Infof("Current Task Goal: %s", t.GetUserInput())
+			log.Infof("Current Task Status: %s", t.GetStatus())
+			if t.rootTask != nil {
+				log.Infof("Root Task Progress:\n%s", t.rootTask.Progress())
+			}
+			log.Infof("=== End Task Status ===")
+
+			// Check if completed_task_index indicates this task should be marked as done
+			// This provides an additional mechanism to end tasks beyond just isDone
+			lastRecord := loop.GetLastSatisfactionRecordFull()
+			var summary, completedTaskIndex, nextSteps string
+			if lastRecord != nil {
+				summary = lastRecord.Reason
+				completedTaskIndex = lastRecord.CompletedTaskIndex
+				// 注: verification 收缩为纯观测角色后不再产出 TodoDelta,
+				// nextSteps 保持空串 (TODO 推进交由主循环 todo_delta).
+				// 下游 generateTaskSummary / updateProcessingStatus / saveTaskArtifacts
+				// 都有 `if nextSteps != ""` 守卫, 空串会被优雅跳过.
+				// Evidence 仍是 verification 的核心产出, 保留.
+
+				var allOps []aicommon.EvidenceOperation
+				allOps = append(allOps, lastRecord.EvidenceOps...)
+				allOps = append(allOps, buildVerificationCarryoverEvidenceOps(t, summary)...)
+				if len(allOps) > 0 {
+					// EVIDENCE 单写到 Timeline，Open 原位展示 delta，freeze 后聚合到 semi。
+					// 历史曾把 EVIDENCE 块嵌入 root user input, 但这会让 PlanContext
+					// 跨子任务抖动并破坏多个 prompt cache 命中。现仅保留
+					// Timeline 单一记录源；基础 save_evidence 与 PE 兼容
+					// save_evidence action 也直接写入同一个 Session Evidence Store。
+					// 关键词: EVIDENCE 单写, ApplySessionEvidenceOps, PlanContext 抖动修复
+					log.Infof("task %s applying session evidence ops, count=%d", t.Index, len(allOps))
+					if incremental := aicommon.FormatEvidenceOpsLines(allOps, t.GetLanguage()); incremental != "" {
+						if _, emitErr := t.EmitTextMarkdownStreamEvent(
+							"evidence_content",
+							strings.NewReader(incremental),
+							t.GetIndex(),
+						); emitErr != nil {
+							log.Warnf("failed to emit evidence incremental: %v", emitErr)
+						}
+					}
+					t.ApplySessionEvidenceOps(allOps)
+				}
+			}
+
+			// Check if current task index is in the completed_task_index list
+			shouldComplete := isDone
+			if !shouldComplete && completedTaskIndex != "" {
+				// completed_task_index can be a single index like "1-1" or multiple like "1-1,1-2"
+				completedIndexes := strings.Split(completedTaskIndex, ",")
+				for _, idx := range completedIndexes {
+					trimmedIdx := strings.TrimSpace(idx)
+					if trimmedIdx == t.Index {
+						log.Infof("task %s marked as completed via completed_task_index: %s", t.Name, completedTaskIndex)
+						t.EmitInfo("Task %s completed via completed_task_index mechanism", t.Name)
+						shouldComplete = true
+						break
+					}
+				}
+			}
+
+			if shouldComplete {
+				// Emit task completing status
+				t.planUserStatus(
+					fmt.Sprintf("正在归纳「%s」的结果", t.Name),
+					fmt.Sprintf("Summarizing the results of %q", t.Name),
+					aicommon.WithStatusCode("plan.task_summarizing"),
+				)
+
+				err := t.generateTaskSummary(summary, nextSteps)
+				if err != nil {
+					log.Errorf("iteration task summary failed: %v", err)
+					t.planUserStatus(fmt.Sprintf("暂时没能归纳「%s」的结果", t.Name), fmt.Sprintf("Unable to summarize %q", t.Name), aicommon.WithStatusCode("plan.task_summary_failed"), aicommon.WithStatusState(aicommon.StatusStateError))
+				} else {
+					t.planUserStatus(fmt.Sprintf("「%s」已经完成", t.Name), fmt.Sprintf("%q is complete", t.Name), aicommon.WithStatusCode("plan.task_completed"), aicommon.WithStatusState(aicommon.StatusStateSuccess))
+				}
+
+				// Signal the loop to end - this ensures the loop terminates after this iteration
+				operator.EndIteration("task completed via completed_task_index or isDone")
+			} else {
+				// Emit continuing status
+				t.planUserStatus(fmt.Sprintf("正在继续处理「%s」", t.Name), fmt.Sprintf("Continuing to work on %q", t.Name), aicommon.WithStatusCode("plan.task_continuing"))
+
+				// Combine summary (reasoning) and todo_delta as Processing status
+				// This ensures both are captured in StatusSummary to avoid context loss
+				t.updateProcessingStatus(summary, nextSteps)
+
+				if t.Coordinator != nil && summary != "" {
+					timelineMsg := fmt.Sprintf(
+						"[task-verification] Task %s verification: not yet complete. Reason: %s",
+						t.Index, summary,
+					)
+					if nextSteps != "" {
+						timelineMsg += fmt.Sprintf(" | Suggested next steps: %s", nextSteps)
+					}
+					if timeline := t.CurrentTimeline(); timeline != nil {
+						timeline.PushText(t.Coordinator.AcquireId(), timelineMsg)
+					}
+				}
+			}
+		}),
+		reactloops.WithReactiveDataBuilder(func(loop *reactloops.ReActLoop, feedback *bytes.Buffer, nonce string) (string, error) {
+			var lastVerificationInfo string
+			if lastRecord := loop.GetLastSatisfactionRecordFull(); lastRecord != nil {
+				// 注: verification 收缩为纯观测角色后不再产出 TodoDelta,
+				// 这里只沉淀 satisfied + reasoning 作为观测信号.
+				lastVerificationInfo = fmt.Sprintf("satisfied=%v, reasoning=%s", lastRecord.Satisfactory, lastRecord.Reason)
+			}
+
+			// Live plan states are read through PlanStatusProvider into Timeline Open.
+			// Keep only verification and iteration feedback in the dynamic section.
+			reactiveData := utils.MustRenderTemplate(`
+--- TASK_EXECUTION_INFO ---
+{{ if .LastVerificationInfo }}上次验证结果: {{ .LastVerificationInfo }}{{ end }}
+{{ if .FeedbackMessages }}
+最近反馈信息:
+{{ .FeedbackMessages }}
+{{ end }}
+--- TASK_EXECUTION_INFO_END ---
+
+`, map[string]interface{}{
+				"FeedbackMessages":     feedback.String(),
+				"LastVerificationInfo": lastVerificationInfo,
+			})
+
+			return reactiveData, nil
+		}),
+	)
+	if err != nil {
+		if t.GetStatus() == aicommon.AITaskState_Processing {
+			t.SetStatus(aicommon.AITaskState_Aborted)
+		}
+		if t.GetStatus() == aicommon.AITaskState_Skipped {
+			// 用户通过 sync 事件跳过了任务（HandleSkipSubtaskInPlan），
+			// 取消确认消息已通过 asyncDeferCallback 延迟注册，
+			// 此处 loop 已退出，触发回调发送取消确认消息。
+			t.CallAsyncDeferCallback(nil)
+			return nil
+		}
+		return err
+	}
+	// 正常完成时，如果有用户取消标记（例如在 execute 完成后才收到取消），
+	// 也触发回调发送取消确认消息。
+	if t.IsUserCancelled() {
+		t.CallAsyncDeferCallback(nil)
+	}
+	return nil
+}
+
+func (t *AiTask) executeTaskPushTaskIndex() error {
+	// 在执行任务之前，推送事件到事件栈
+	t.Emitter = t.GetEmitter().PushEventProcesser(func(event *schema.AiOutputEvent) *schema.AiOutputEvent {
+		if event.TaskIndex == "" {
+			event.TaskIndex = t.Index
+		}
+		return event
+	})
+	defer func() {
+		t.Emitter = t.GetEmitter().PopEventProcesser()
+	}()
+
+	// 执行实际的任务
+	return t.executeTask()
+}
+
+// executeTask 实际执行任务并返回结果
+func (t *AiTask) executeTask() error {
+	if t.IsCtxDone() {
+		if t.GetStatus() == aicommon.AITaskState_Processing {
+			t.SetStatus(aicommon.AITaskState_Aborted)
+		}
+		t.planUserStatus(fmt.Sprintf("「%s」已经停止", t.Name), fmt.Sprintf("%q has stopped", t.Name), aicommon.WithStatusCode("plan.task_stopped"), aicommon.WithStatusState(aicommon.StatusStateWarning))
+		return utils.Errorf("context is done")
+	}
+
+	// Execute the task
+	if err := t.execute(); err != nil {
+		t.planUserStatus(fmt.Sprintf("处理「%s」时遇到问题", t.Name), fmt.Sprintf("A problem occurred while working on %q", t.Name), aicommon.WithStatusCode("plan.task_failed"), aicommon.WithStatusState(aicommon.StatusStateError))
+		return err
+	}
+
+	if t.GetStatus() != aicommon.AITaskState_Skipped {
+		// Start to wait for user review
+		t.planUserStatus(fmt.Sprintf("「%s」已经处理好，等你确认", t.Name), fmt.Sprintf("%q is ready for your review", t.Name), aicommon.WithStatusCode("plan.task_awaiting_review"), aicommon.WithStatusState(aicommon.StatusStateWaiting))
+		ep := t.Epm.CreateEndpointWithEventType(schema.EVENT_TYPE_TASK_REVIEW_REQUIRE)
+		ep.SetDefaultSuggestionContinue()
+		t.EmitInfo("start to wait for user review current task")
+
+		t.EmitRequireReviewForTask(t, ep.GetId())
+
+		log.Infof("task %s waiting for user review event: %v, now status: %v", t.Name, ep.GetId(), t.GetStatus())
+
+		t.DoWaitAgree(t.Ctx, ep)
+
+		// User review finished
+		t.planUserStatus(fmt.Sprintf("正在根据你的意见调整「%s」", t.Name), fmt.Sprintf("Updating %q based on your feedback", t.Name), aicommon.WithStatusCode("plan.task_revising"))
+		reviewResult := ep.GetParams()
+		t.ReleaseInteractiveEvent(ep.GetId(), reviewResult)
+		t.EmitInfo("start to handle review task event: %v", ep.GetId())
+		err := t.handleReviewResult(reviewResult)
+		t.CallAfterReview(ep.GetSeq(), "请审查当前任务的执行结果", reviewResult)
+		// 价值评估 (review_decision): 监控任务审批通路, 区分人工与策略自动放行.
+		t.SubmitReviewValueFeedbackFromEndpoint(ep, aicommon.ReviewFocusModeTask, "请审查当前任务的执行结果")
+		if err != nil {
+			log.Warnf("error handling review result: %v", err)
+		}
+	} else {
+		t.planUserStatus(fmt.Sprintf("已跳过「%s」", t.Name), fmt.Sprintf("Skipped %q", t.Name), aicommon.WithStatusCode("plan.task_skipped"), aicommon.WithStatusState(aicommon.StatusStateWarning))
+		t.EmitInfo("task %s was skipped by user, skip review", t.Name)
+		log.Infof("task %s was skipped by user, skip review", t.Name)
+	}
+
+	return nil
+}
+
+func (t *AiTask) generateTaskSummary(summary, nextSteps string) error {
+	t.planUserStatus(fmt.Sprintf("正在整理「%s」的关键信息", t.Name), fmt.Sprintf("Organizing the key information from %q", t.Name), aicommon.WithStatusCode("plan.task_summary_preparing"))
+
+	summaryPromptWellFormed, err := t.GenerateTaskSummaryPrompt()
+	if err != nil {
+		t.EmitError("error generating summary prompt: %v", err)
+		return fmt.Errorf("error generating summary prompt: %w", err)
+	}
+
+	var shortSummary, statusSummary, taskSummary, longSummary string
+
+	t.planUserStatus(fmt.Sprintf("正在归纳「%s」的结果", t.Name), fmt.Sprintf("Summarizing the results of %q", t.Name), aicommon.WithStatusCode("plan.task_summarizing"))
+	extractStart := time.Now()
+	err = t.CallAITransaction(summaryPromptWellFormed, func(summaryReader *aicommon.AIResponse) error { // 异步过程 使用无 id的 原始ai callback
+		boundEmitter := summaryReader.BindEmitter(t.GetEmitter())
+		action, err := aicommon.ExtractValidActionFromStream(t.Ctx, summaryReader.GetUnboundStreamReader(false), "summary",
+			aicommon.WithActionFieldStreamHandler(
+				[]string{"task_long_summary"},
+				func(key string, r io.Reader) {
+					// Recover from any panic in stream handler
+					defer func() {
+						if rec := recover(); rec != nil {
+							log.Errorf("summary stream handler for field [%s] panic recovered: %v", key, rec)
+						}
+					}()
+
+					log.Debugf("summary stream handler started for field [%s]", key)
+
+					nodeId := "summary-long"
+
+					_, emitErr := boundEmitter.EmitTextMarkdownStreamEvent(
+						nodeId, utils.JSONStringReader(utils.UTF8Reader(r)), t.GetIndex(),
+					)
+
+					if emitErr != nil {
+						log.Errorf("failed to emit %s stream event: %v", key, emitErr)
+						return
+					}
+					log.Debugf("summary stream handler for field [%s] emit completed", key)
+				},
+			))
+		log.Infof("ExtractValidActionFromStream for summary completed, took %v", time.Since(extractStart))
+		if err != nil {
+			return fmt.Errorf("error reading summary: %w", err)
+		}
+		if action == nil {
+			return utils.Errorf("error: summary is empty, retry it until summary finished")
+		}
+		statusSummary = action.GetString("status_summary")
+		shortSummary = action.GetString("task_short_summary")
+		longSummary = action.GetString("task_long_summary")
+
+		_, taskSummary = selectTaskSummaries(statusSummary, shortSummary, longSummary)
+		if shortSummary == "" && statusSummary == "" && longSummary == "" {
+			return utils.Errorf("error: short summary ,stats summary ,long summary are empty, retry it until summary finished")
+		}
+		return nil
+	}, aicommon.WithAIRequest_CallerLabel("task-summary"))
+	if longSummary == "" && taskSummary != "" {
+		_, err = t.EmitTextMarkdownStreamEvent("summary-long", strings.NewReader(taskSummary), t.GetIndex())
+		if err != nil {
+			log.Warnf("emit fallback task summary failed: %v", err)
+		}
+	}
+
+	if statusSummary != "" {
+		t.StatusSummary = statusSummary
+	}
+	conciseTaskSummary, _ := selectTaskSummaries(statusSummary, shortSummary, longSummary)
+	if conciseTaskSummary != "" {
+		t.TaskSummary = conciseTaskSummary
+	}
+	if shortSummary != "" {
+		t.ShortSummary = shortSummary
+	}
+	if longSummary != "" {
+		t.LongSummary = longSummary
+	} else if taskSummary != "" {
+		t.LongSummary = taskSummary
+	}
+
+	displaySummary := strings.TrimSpace(longSummary)
+	if displaySummary == "" {
+		displaySummary = strings.TrimSpace(taskSummary)
+	}
+	if displaySummary != "" {
+		summaryOps := buildSummaryEvidenceOps(t, displaySummary)
+		if len(summaryOps) > 0 {
+			// EVIDENCE 单写到 Timeline，Open 原位展示 delta，freeze 后聚合到 semi,
+			// 同上方 verify-stage 处理理由。
+			// 关键词: EVIDENCE 单写, ApplySessionEvidenceOps, PlanContext 抖动修复
+			log.Infof("task %s applying session summary evidence ops, count=%d", t.Index, len(summaryOps))
+			if incremental := aicommon.FormatEvidenceOpsLines(summaryOps, t.GetLanguage()); incremental != "" {
+				if _, emitErr := t.EmitTextMarkdownStreamEvent(
+					"evidence_content",
+					strings.NewReader(incremental),
+					t.GetIndex(),
+				); emitErr != nil {
+					log.Warnf("failed to emit summary evidence incremental: %v", emitErr)
+				}
+			}
+			t.ApplySessionEvidenceOps(summaryOps)
+		}
+	}
+
+	t.planUserStatus(fmt.Sprintf("「%s」的结果已经整理完成", t.Name), fmt.Sprintf("The results of %q are ready", t.Name), aicommon.WithStatusCode("plan.task_summary_ready"), aicommon.WithStatusState(aicommon.StatusStateSuccess))
+
+	// Save timeline diff and result summary artifacts
+	if err := t.saveTaskArtifacts(summary, nextSteps, statusSummary, taskSummary, shortSummary, longSummary); err != nil {
+		log.Warnf("failed to save task artifacts for task %s: %v", t.Index, err)
+		// Don't return error, as summary generation is already successful
+	}
+
+	return nil
+}
+
+func selectTaskSummaries(statusSummary, shortSummary, longSummary string) (conciseSummary string, displaySummary string) {
+	if shortSummary != "" {
+		conciseSummary = shortSummary
+	} else if longSummary != "" {
+		conciseSummary = longSummary
+	} else {
+		conciseSummary = statusSummary
+	}
+
+	if longSummary != "" {
+		displaySummary = longSummary
+	} else if shortSummary != "" {
+		displaySummary = shortSummary
+	} else {
+		displaySummary = statusSummary
+	}
+
+	return conciseSummary, displaySummary
+}
+
+// saveTaskArtifacts saves timeline diff and result summary to files in the task directory
+func (t *AiTask) saveTaskArtifacts(summary, nextSteps, statusSummary, taskSummary, shortSummary, longSummary string) error {
+	// Get workdir
+	workdir := ""
+	if t.Coordinator != nil && t.Coordinator.Workdir != "" {
+		workdir = t.Coordinator.Workdir
+	}
+	if workdir == "" && t.Coordinator != nil {
+		workdir = t.Coordinator.GetOrCreateWorkDir()
+	}
+	if workdir == "" {
+		workdir = consts.GetDefaultBaseHomeDir()
+	}
+
+	// Build task directory path: task_{index}_{name}
+	taskIndex := t.Index
+	if taskIndex == "" {
+		taskIndex = "0"
+	}
+	taskDir := filepath.Join(workdir, aicommon.BuildTaskDirName(taskIndex, t.GetSemanticIdentifier()))
+
+	// Ensure task directory exists
+	if err := os.MkdirAll(taskDir, 0755); err != nil {
+		return fmt.Errorf("failed to create task directory %s: %w", taskDir, err)
+	}
+
+	// Save timeline diff
+	if err := t.saveTimelineDiff(taskDir); err != nil {
+		log.Warnf("failed to save timeline diff for task %s: %v", t.Index, err)
+	}
+
+	// Save result summary
+	if err := t.saveResultSummary(taskDir, summary, nextSteps, statusSummary, taskSummary, shortSummary, longSummary); err != nil {
+		log.Warnf("failed to save result summary for task %s: %v", t.Index, err)
+	}
+
+	return nil
+}
+
+// saveTimelineDiff saves the timeline diff to task_{{index}}_{{semantic_identifier}}_timeline_diff.txt
+// It gets the diff from the ReactLoop which tracks timeline changes during task execution
+func (t *AiTask) saveTimelineDiff(taskDir string) error {
+	// Get task index for filename
+	taskIndex := t.Index
+	if taskIndex == "" {
+		taskIndex = "0"
+	}
+
+	var diff string
+	var err error
+
+	// Try to get diff from ReactLoop first (this is the correct source)
+	if t.GetReActLoop() != nil {
+		diff, err = t.GetReActLoop().GetTimelineDiff()
+		if err != nil {
+			log.Warnf("failed to get timeline diff from ReactLoop: %v", err)
+		}
+	}
+
+	// Fallback to taskTimelineDiffer if ReactLoop didn't provide a diff
+	if diff == "" && t.taskTimelineDiffer != nil {
+		diff, err = t.taskTimelineDiffer.Diff()
+		if err != nil {
+			log.Warnf("failed to calculate timeline diff from taskTimelineDiffer: %v", err)
+		}
+	}
+
+	// Build content with header information
+	var contentBuilder strings.Builder
+	contentBuilder.WriteString(fmt.Sprintf("# Task %s Timeline Diff\n", taskIndex))
+	contentBuilder.WriteString(fmt.Sprintf("# Generated at: %s\n", time.Now().Format("2006-01-02 15:04:05")))
+	contentBuilder.WriteString("\n")
+
+	if diff == "" {
+		// If diff is empty, provide debug information
+		contentBuilder.WriteString("## Note: No changes detected during task execution\n\n")
+
+		// Try to get current timeline content for debugging
+		if t.taskTimelineDiffer != nil {
+			currentDump := t.taskTimelineDiffer.GetCurrentDump()
+			lastDump := t.taskTimelineDiffer.GetLastDump()
+			contentBuilder.WriteString(fmt.Sprintf("Baseline content length: %d bytes\n", len(lastDump)))
+			contentBuilder.WriteString(fmt.Sprintf("Current content length: %d bytes\n", len(currentDump)))
+
+			if currentDump != "" {
+				contentBuilder.WriteString("\n## Current Timeline Content:\n")
+				contentBuilder.WriteString(currentDump)
+			} else {
+				contentBuilder.WriteString("\n(Timeline is empty)\n")
+			}
+		}
+	} else {
+		contentBuilder.WriteString("## Timeline Changes:\n\n")
+		contentBuilder.WriteString(diff)
+	}
+
+	// Save to file with task index and semantic identifier in filename
+	timelineDiffPath := filepath.Join(taskDir, aicommon.BuildTaskTimelineDiffFilename(taskIndex, t.GetSemanticIdentifier()))
+	if err := os.WriteFile(timelineDiffPath, []byte(contentBuilder.String()), 0644); err != nil {
+		return fmt.Errorf("failed to write timeline diff file: %w", err)
+	}
+
+	// Emit pin filename event
+	if t.GetEmitter() != nil {
+		t.GetEmitter().EmitPinFilename(timelineDiffPath)
+		log.Infof("saved timeline diff to file: %s (diff length: %d)", timelineDiffPath, len(diff))
+	}
+
+	return nil
+}
+
+// saveResultSummary saves the result summary to task_{{index}}_{{semantic_identifier}}_result_summary.txt
+func (t *AiTask) saveResultSummary(taskDir string, summary, nextSteps, statusSummary, taskSummary, shortSummary, longSummary string) error {
+	// Get task index for filename
+	taskIndex := t.Index
+	if taskIndex == "" {
+		taskIndex = "0"
+	}
+
+	var contentBuilder strings.Builder
+
+	// === Header Section ===
+	contentBuilder.WriteString("=" + strings.Repeat("=", 59) + "\n")
+	contentBuilder.WriteString(fmt.Sprintf(" Task %s Result Summary\n", taskIndex))
+	contentBuilder.WriteString("=" + strings.Repeat("=", 59) + "\n\n")
+
+	// === Basic Information Section ===
+	contentBuilder.WriteString("## Basic Information\n\n")
+	contentBuilder.WriteString(fmt.Sprintf("Task Index: %s\n", taskIndex))
+	contentBuilder.WriteString(fmt.Sprintf("Task Name: %s\n", t.Name))
+	contentBuilder.WriteString(fmt.Sprintf("Task Goal: %s\n", t.Goal))
+	contentBuilder.WriteString(fmt.Sprintf("Generated At: %s\n", time.Now().Format("2006-01-02 15:04:05")))
+
+	// Calculate and display execution duration
+	if !t.taskStartTime.IsZero() {
+		duration := time.Since(t.taskStartTime)
+		contentBuilder.WriteString(fmt.Sprintf("Execution Duration: %s\n", formatDuration(duration)))
+		contentBuilder.WriteString(fmt.Sprintf("Start Time: %s\n", t.taskStartTime.Format("2006-01-02 15:04:05")))
+		contentBuilder.WriteString(fmt.Sprintf("End Time: %s\n", time.Now().Format("2006-01-02 15:04:05")))
+	}
+
+	// Task status
+	contentBuilder.WriteString(fmt.Sprintf("Task Status: %s\n", t.GetStatus()))
+
+	// Tool call statistics
+	toolCallResults := t.GetAllToolCallResults()
+	successCount := 0
+	failCount := 0
+	for _, result := range toolCallResults {
+		if result.Success {
+			successCount++
+		} else {
+			failCount++
+		}
+	}
+	contentBuilder.WriteString(fmt.Sprintf("Total Tool Calls: %d (Completed: %d, Protocol Failed: %d)\n", len(toolCallResults), successCount, failCount))
+
+	contentBuilder.WriteString("\n")
+
+	// === Task Input Section ===
+	contentBuilder.WriteString("## Task Input\n\n")
+	userInput := t.GetUserInput()
+	if userInput != "" {
+		// Limit input display to avoid very long content
+		if len(userInput) > 2000 {
+			contentBuilder.WriteString(userInput[:2000])
+			contentBuilder.WriteString("\n... (truncated, total " + fmt.Sprintf("%d", len(userInput)) + " chars)\n")
+		} else {
+			contentBuilder.WriteString(userInput)
+		}
+	} else {
+		contentBuilder.WriteString("(No input provided)\n")
+	}
+	contentBuilder.WriteString("\n")
+
+	// === Progress Information Section ===
+	contentBuilder.WriteString("## Progress Information\n\n")
+	if t.rootTask != nil {
+		progress := t.rootTask.Progress()
+		if progress != "" {
+			contentBuilder.WriteString(progress)
+		} else {
+			contentBuilder.WriteString("(No progress information available)\n")
+		}
+	} else {
+		contentBuilder.WriteString("(No root task available)\n")
+	}
+	contentBuilder.WriteString("\n")
+
+	// === Summary Results Section ===
+	contentBuilder.WriteString("## Summary Results\n\n")
+
+	hasContent := false
+	if summary != "" {
+		contentBuilder.WriteString("### Summary\n")
+		contentBuilder.WriteString(summary)
+		contentBuilder.WriteString("\n\n")
+		hasContent = true
+	}
+	if nextSteps != "" {
+		contentBuilder.WriteString("### Next Steps\n")
+		contentBuilder.WriteString(nextSteps)
+		contentBuilder.WriteString("\n\n")
+		hasContent = true
+	}
+	if statusSummary != "" && statusSummary != taskSummary && statusSummary != longSummary {
+		contentBuilder.WriteString("### Status Summary\n")
+		contentBuilder.WriteString(statusSummary)
+		contentBuilder.WriteString("\n\n")
+		hasContent = true
+	}
+	if taskSummary != "" {
+		contentBuilder.WriteString("### Task Summary\n")
+		contentBuilder.WriteString(taskSummary)
+		contentBuilder.WriteString("\n\n")
+		hasContent = true
+	}
+	if shortSummary != "" && shortSummary != taskSummary && shortSummary != longSummary {
+		contentBuilder.WriteString("### Short Summary\n")
+		contentBuilder.WriteString(shortSummary)
+		contentBuilder.WriteString("\n\n")
+		hasContent = true
+	}
+	if longSummary != "" && longSummary != taskSummary {
+		contentBuilder.WriteString("### Long Summary\n")
+		contentBuilder.WriteString(longSummary)
+		contentBuilder.WriteString("\n\n")
+		hasContent = true
+	}
+
+	if !hasContent {
+		contentBuilder.WriteString("(No summary content available)\n\n")
+	}
+
+	// === Footer ===
+	contentBuilder.WriteString("=" + strings.Repeat("=", 59) + "\n")
+	contentBuilder.WriteString(" End of Task " + taskIndex + " Result Summary\n")
+	contentBuilder.WriteString("=" + strings.Repeat("=", 59) + "\n")
+
+	// Save to file with task index and semantic identifier in filename
+	resultSummaryPath := filepath.Join(taskDir, aicommon.BuildTaskResultSummaryFilename(taskIndex, t.GetSemanticIdentifier()))
+	if err := os.WriteFile(resultSummaryPath, []byte(contentBuilder.String()), 0644); err != nil {
+		return fmt.Errorf("failed to write result summary file: %w", err)
+	}
+
+	// Emit pin filename event
+	if t.GetEmitter() != nil {
+		t.GetEmitter().EmitPinFilename(resultSummaryPath)
+		log.Infof("saved result summary to file: %s", resultSummaryPath)
+	}
+
+	return nil
+}
+
+// formatDuration formats a duration in a human-readable format
+func formatDuration(d time.Duration) string {
+	if d < time.Minute {
+		return fmt.Sprintf("%.2f seconds", d.Seconds())
+	}
+	if d < time.Hour {
+		minutes := int(d.Minutes())
+		seconds := int(d.Seconds()) % 60
+		return fmt.Sprintf("%d min %d sec", minutes, seconds)
+	}
+	hours := int(d.Hours())
+	minutes := int(d.Minutes()) % 60
+	seconds := int(d.Seconds()) % 60
+	return fmt.Sprintf("%d hr %d min %d sec", hours, minutes, seconds)
+}
+
+func (t *AiTask) GenerateTaskSummaryPrompt() (string, error) {
+	if t == nil || t.Coordinator == nil || t.Coordinator.ContextProvider == nil {
+		return "", fmt.Errorf("context provider is nil")
+	}
+	cp := clonePromptContextForTask(t.ContextProvider, t)
+	return assembleTaskSummaryPrompt(
+		t.Coordinator.Config,
+		cp.Schema()["TaskSummarySchema"],
+		cp.CurrentTaskInfo(),
+	)
+}
+
+type taskSummaryDynamicData struct {
+	CurrentTaskInfo string
+}
+
+func assembleTaskSummaryPrompt(config *aicommon.Config, schema string, currentTaskInfo string) (string, error) {
+	materials := &aicommon.PromptMaterials{
+		TaskInstruction: strings.TrimSpace(__prompt_TaskSummaryInstruction),
+		Schema:          strings.TrimSpace(schema),
+		OutputExample:   strings.TrimSpace(__prompt_TaskSummaryOutputExample),
+	}
+	aicommon.ApplyPromptFrozenOpenMaterials(materials, aicommon.BuildPromptFrozenOpenMaterials(config))
+	if err := aicommon.PopulateToolInventoryFromConfig(materials, config); err != nil {
+		return "", fmt.Errorf("populate task summary tool inventory failed: %w", err)
+	}
+	return aicommon.NewDefaultPromptPrefixBuilder().AssemblePromptWithDynamicSection(
+		materials,
+		"aid-task-summary-dynamic",
+		__prompt_TaskSummary,
+		taskSummaryDynamicData{
+			CurrentTaskInfo: strings.TrimSpace(currentTaskInfo),
+		},
+		utils.RandStringBytes(6),
+	)
+}
+
+func SelectSummary(task *AiTask, callResult *aitool.ToolResult) string {
+	if callResult.ShrinkResult != "" {
+		return callResult.ShrinkResult
+	}
+	if callResult.ShrinkSimilarResult != "" {
+		return callResult.ShrinkSimilarResult
+	}
+	if task.TaskSummary != "" {
+		return task.TaskSummary
+	}
+	if task.StatusSummary != "" {
+		return task.StatusSummary
+	}
+	return string(utils.Jsonify(callResult.Data))
+}
+
+// updateProcessingStatus combines summary (reasoning) and todo_delta into StatusSummary
+// This ensures both the current status analysis and next action plan are preserved
+// to avoid context loss when timeline becomes too long
+func (t *AiTask) updateProcessingStatus(summary string, nextSteps string) {
+	if summary == "" && nextSteps == "" {
+		return
+	}
+
+	var statusParts []string
+
+	// Add summary (reasoning) as current status
+	if summary != "" {
+		statusParts = append(statusParts, fmt.Sprintf("【当前状态】%s", summary))
+	}
+
+	// Add todo_delta as action plan
+	if nextSteps != "" {
+		statusParts = append(statusParts, fmt.Sprintf("【下一步计划】%s", nextSteps))
+	}
+
+	// Combine both parts into StatusSummary
+	t.StatusSummary = strings.Join(statusParts, "\n")
+
+	log.Infof("task %s processing status updated: summary=%q, nextSteps=%q", t.Index, summary, nextSteps)
+}

@@ -163,12 +163,14 @@ func (r *ReAct) HandleSyncTypeRecoveryPlanAndExecEvent(event *ypb.AIInputEvent) 
 		r.EmitSyncEventError("recover_plan_and_exec", err, event.SyncID)
 		return nil
 	}
-	r.EmitSyncEvent("recover_plan_and_exec", map[string]interface{}{
-		"started":        true,
-		"session_id":     sessionID,
-		"coordinator_id": coordinatorID,
-		"start_task_id":  startTaskID,
-	}, event.SyncID)
+	if record.SessionID != "" && record.SessionID != sessionID {
+		r.EmitSyncEventError("recover_plan_and_exec", errors.New("session_id mismatch for plan recovery"), event.SyncID)
+		return nil
+	}
+	if _, err := r.coordinatorChannel(coordinatorID); err != nil {
+		r.EmitSyncEventError("recover_plan_and_exec", err, event.SyncID)
+		return nil
+	}
 
 	// Create a recovery task and enqueue it so the QueueProcessor
 	// handles it serially alongside normal free-input tasks.
@@ -189,6 +191,12 @@ func (r *ReAct) HandleSyncTypeRecoveryPlanAndExecEvent(event *ypb.AIInputEvent) 
 		r.EmitSyncEventError("recover_plan_and_exec", err, event.SyncID)
 		return nil
 	}
+	r.EmitSyncEvent("recover_plan_and_exec", map[string]interface{}{
+		"started":        true,
+		"session_id":     sessionID,
+		"coordinator_id": coordinatorID,
+		"start_task_id":  startTaskID,
+	}, event.SyncID)
 	return nil
 }
 

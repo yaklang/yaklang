@@ -1,0 +1,17 @@
+// Deterministic native-function-call smoke. The Go harness injects a scripted
+// provider, event recorder and isolated options; the actual Yak/aim runtime runs
+// both coordinator and pe_task loops, approval, evidence and report channels.
+// Plan review is manual: RECORD_EVENT supplies one confirmation through aim's
+// operator, after which both tasks and the final report proceed automatically.
+err = aim.InvokeReAct(
+    "创建两个有依赖的验证任务，保存 session evidence，逐项验收，并产出 Markdown 报告。",
+    aim.planEngine("coordinator"),
+    aim.maxIteration(30),
+    aim.timeout(60),
+    aim.reviewPolicy("yolo"),
+    aim.aiCallback(NATIVE_MODEL),
+    aim.onEvent(RECORD_EVENT),
+    aim.workdir(SMOKE_WORKDIR),
+    SMOKE_OPTIONS...,
+)
+die(err)

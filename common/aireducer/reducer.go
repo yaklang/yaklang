@@ -10,7 +10,7 @@ import (
 	"strings"
 
 	"github.com/davecgh/go-spew/spew"
-	"github.com/yaklang/yaklang/common/ai/aid"
+	"github.com/yaklang/yaklang/common/ai/aid/coordinator_legacy"
 	"github.com/yaklang/yaklang/common/chunkmaker"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/chanx"
@@ -23,7 +23,7 @@ type Reducer struct {
 
 func (r *Reducer) Run() error {
 	if r.config.Memory == nil {
-		r.config.Memory = aid.GetDefaultContextProvider()
+		r.config.Memory = coordinator_legacy.GetDefaultContextProvider()
 	}
 	ch := r.input.OutputChannel()
 	for {

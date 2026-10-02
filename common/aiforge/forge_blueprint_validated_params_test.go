@@ -3,10 +3,9 @@ package aiforge
 import (
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
+	"github.com/yaklang/yaklang/common/ai/aid/coordinator_legacy"
 	"strings"
 	"testing"
-
-	"github.com/yaklang/yaklang/common/ai/aid"
 )
 
 func TestParameterRenderingPreservesPlainTemplate(t *testing.T) {
@@ -14,7 +13,7 @@ func TestParameterRenderingPreservesPlainTemplate(t *testing.T) {
 	prompt, _, err := blueprint.GenerateFirstPromptWithMemoryOptionWithQueryAndParams("caller query", []Parameter{{Key: "topic", Value: "input"}})
 	require.NoError(t, err)
 	require.Equal(t, blueprint.InitializePrompt, prompt, "shared renderer must not append platform input policy")
-	memory := aid.GetDefaultContextProvider()
+	memory := coordinator_legacy.GetDefaultContextProvider()
 	memory.StoreQuery("caller input")
 	blueprint.ResultPrompt = "Return only JSON."
 	result, err := blueprint.renderResultPrompt(memory)

@@ -9,9 +9,9 @@ import (
 	"time"
 
 	"github.com/samber/lo"
-	"github.com/yaklang/yaklang/common/ai/aid"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
+	"github.com/yaklang/yaklang/common/ai/aid/coordinator_legacy"
 	"github.com/yaklang/yaklang/common/aireducer"
 	"github.com/yaklang/yaklang/common/chunkmaker"
 	"github.com/yaklang/yaklang/common/consts"
@@ -103,7 +103,7 @@ func (s *Server) StartAITriage(stream ypb.Yak_StartAITriageServer) error {
 		}
 	}()
 
-	cod, err := aid.NewCoordinatorContext(baseCtx, "", aicommonOptions...)
+	cod, err := coordinator_legacy.NewCoordinatorContext(baseCtx, "", aicommonOptions...)
 	if err != nil {
 		return err
 	}
@@ -146,7 +146,7 @@ func (s *Server) StartAITriage(stream ypb.Yak_StartAITriageServer) error {
 	}
 	reducer, err := aireducer.NewReducerFromInputChunk(
 		freeInputChan,
-		aireducer.WithReducerCallback(func(config *aireducer.Config, memory *aid.PromptContextProvider, chunk chunkmaker.Chunk) error {
+		aireducer.WithReducerCallback(func(config *aireducer.Config, memory *coordinator_legacy.PromptContextProvider, chunk chunkmaker.Chunk) error {
 			query := strings.TrimSpace(string(chunk.Data()))
 			memory.PushUserInteraction(aicommon.UserInteractionStage_FreeInput, cod.AcquireId(), "", query) // push user input timeline
 			defer emitEvent(Triage_Event_Finish, []byte("意图识别完成"))

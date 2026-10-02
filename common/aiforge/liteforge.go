@@ -10,10 +10,10 @@ import (
 	"text/template"
 
 	"github.com/samber/lo"
-	"github.com/yaklang/yaklang/common/ai/aid"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon/promptloader"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
+	"github.com/yaklang/yaklang/common/ai/aid/coordinator_legacy"
 	"github.com/yaklang/yaklang/common/jsonextractor"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
@@ -263,8 +263,8 @@ func WithLiteForge_OutputJsonHook(hook ...jsonextractor.CallbackOption) LiteForg
 func WithLiteForge_OutputMemoryOP() LiteForgeOption {
 	return func(l *LiteForge) error {
 		t := aitool.NewWithoutCallback(
-			"output", aid.MemoryOpSchemaOption...)
-		return WithLiteForge_OutputSchemaRaw(aid.MemoryOpAction, t.ParamsJsonSchemaString())(l)
+			"output", coordinator_legacy.MemoryOpSchemaOption...)
+		return WithLiteForge_OutputSchemaRaw(coordinator_legacy.MemoryOpAction, t.ParamsJsonSchemaString())(l)
 	}
 }
 
@@ -384,7 +384,7 @@ func (l *LiteForge) ExecuteEx(ctx context.Context, params []*ypb.ExecParamItem, 
 	// cancellation. Stop it only after the response has been fully processed.
 	invocationCtx, stop := context.WithCancel(ctx)
 	defer stop()
-	cod, err := aid.NewCoordinatorContext(invocationCtx, l.Prompt, append(l.ExtendAIDOptions, opts...)...)
+	cod, err := coordinator_legacy.NewCoordinatorContext(invocationCtx, l.Prompt, append(l.ExtendAIDOptions, opts...)...)
 	if err != nil {
 		return nil, utils.Errorf("cannot create coordinator: %v", err)
 	}

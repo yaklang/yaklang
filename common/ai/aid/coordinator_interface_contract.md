@@ -1,6 +1,6 @@
 # Coordinator 接口与 Yakit 兼容契约
 
-本文描述本次实现的接口；[架构文档](coordinator_architecture.md)说明职责和状态，[模块 README](loop_coordinator/README.md)提供使用及测试入口。Yakit 源码依据固定为 master 87904ea55a4af130b4fa8c22dc806405f62e3332；不修改 frontend 或 protobuf。
+本文描述本次实现的接口；[架构文档](coordinator_architecture.md)说明职责和状态，[模块 README](coordinator/README.md)提供使用及测试入口。Yakit 源码依据固定为 master 87904ea55a4af130b4fa8c22dc806405f62e3332；不修改 frontend 或 protobuf。
 
 ## 1. 三层接口
 
@@ -119,6 +119,6 @@ worker 执行完成先保留 processing，由可见 stream 说明待验收；验
 
 ## 6. 使用与验证边界
 
-选择新引擎不改变 RPC。最上层通过 aim.focus("coordinator") / aim.focus("coordinator_legacy") 区分两条独立通道，aim.planEngine(...) 仅为入口别名。Go 新运行体使用 loop_coordinator.NewSession；aid.NewCoordinatorContext 始终保留旧语义。新 Session 自己拥有任务树 DTO、审批、进度和恢复适配，不调用旧 Coordinator 的内部方法。plan_engine 仅保存在记录中，恢复入口根据原归属选版本；不因当前 focus 改变历史任务所属引擎。
+选择新引擎不改变 RPC。未指定 focus 的 PLAN 请求通过默认循环进入新版 coordinator；旧 plan / coordinator_legacy focus 名称也转入新版，公开列表不再展示旧模式。aim.planEngine(...) 仅为 focus 别名。Go 新运行体使用 coordinator.NewSession；coordinator_legacy.NewCoordinatorContext 始终保留旧语义。新 Session 自己拥有任务树 DTO、审批、进度和恢复适配，不调用旧 Coordinator 的内部方法。plan_engine 仅保存在记录中，恢复入口校验原归属；旧记录在入队之前返回明确停用错误，要求重新生成新版计划，不隐式迁移旧状态。
 
 本次自动化验证包括原生协议拒绝普通 JSON、审批与结果门闩、版本和尝试冲突、依赖调度、any/all、取消实际退出、恢复、PLAN-only、分离计划编辑字段和真实 Yak/aim 运行事件。确定性 provider 运行测试不替代实际模型质量、缓存指标或完整 Electron UI 人工验收。

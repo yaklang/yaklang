@@ -11,10 +11,10 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
-	"github.com/yaklang/yaklang/common/ai/aid"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
-	"github.com/yaklang/yaklang/common/ai/aid/loop_coordinator"
+	"github.com/yaklang/yaklang/common/ai/aid/coordinator"
+	"github.com/yaklang/yaklang/common/ai/aid/coordinator_legacy"
 	"github.com/yaklang/yaklang/common/ai/aispec"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
@@ -29,14 +29,14 @@ func TestCoordinatorChannelsNeverConstructTheOtherRuntime(t *testing.T) {
 	t.Cleanup(func() { newCoordinatorContextForPlanExec = original })
 	legacyCalls := 0
 	legacyResult := errors.New("legacy route selected")
-	newCoordinatorContextForPlanExec = func(ctx context.Context, _ string, opts ...aicommon.ConfigOption) (*aid.Coordinator, error) {
+	newCoordinatorContextForPlanExec = func(ctx context.Context, _ string, opts ...aicommon.ConfigOption) (*coordinator_legacy.Coordinator, error) {
 		legacyCalls++
 		cfg := aicommon.NewConfig(ctx, opts...)
 		require.Nil(t, cfg.LiteForgeExecutor, "legacy must not inherit native helper injection")
 		return nil, legacyResult
 	}
 	var calls atomic.Int64
-	r, err := NewTestReAct(aicommon.WithContext(ctx), aicommon.WithFocus(loop_coordinator.Name), aicommon.WithDisableCreateDBRuntime(true), aicommon.WithWorkdir(t.TempDir()), aicommon.WithAgreeYOLO(), aicommon.WithAICallback(func(c aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+	r, err := NewTestReAct(aicommon.WithContext(ctx), aicommon.WithFocus(coordinator.Name), aicommon.WithDisableCreateDBRuntime(true), aicommon.WithWorkdir(t.TempDir()), aicommon.WithAgreeYOLO(), aicommon.WithAICallback(func(c aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 		wire := aispec.NewDefaultAIConfig(req.GetExtraSpecOpts()...)
 		if wire.ToolCallCallback == nil || wire.FinishReasonCallback == nil {
 			return nil, fmt.Errorf("native channel emitted a text request")
@@ -68,16 +68,19 @@ func TestCoordinatorChannelsNeverConstructTheOtherRuntime(t *testing.T) {
 	}
 	require.Equal(t, int64(3), calls.Load())
 	require.Zero(t, legacyCalls)
-	r.config.Focus = loop_coordinator.LegacyName
-	err = r.invokePlanOnly(make(chan struct{}), ctx, WithInvokePlanAndExecuteTask(task), WithInvokePlanAndExecutePlanPayload(task.GetUserInput()))
-	require.ErrorContains(t, err, legacyResult.Error())
-	require.Equal(t, 1, legacyCalls)
-	require.Equal(t, int64(3), calls.Load())
-	for _, name := range []string{loop_coordinator.Name, loop_coordinator.LegacyName} {
-		metadata, ok := reactloops.GetLoopMetadata(name)
-		require.True(t, ok)
-		require.False(t, metadata.IsHidden)
+	for _, focus := range []string{"", "plan", coordinator_legacy.Name, coordinator.Name} {
+		r.config.Focus = focus
+		channel, err := r.coordinatorChannel("")
+		require.NoError(t, err)
+		require.Equal(t, coordinator.Name, channel)
 	}
+	require.Zero(t, legacyCalls)
+	require.Equal(t, int64(3), calls.Load())
+	metadata, ok := reactloops.GetLoopMetadata(coordinator.Name)
+	require.True(t, ok)
+	require.False(t, metadata.IsHidden)
+	_, ok = reactloops.GetLoopMetadata(coordinator_legacy.Name)
+	require.False(t, ok, "retired focus must not be registered")
 }
 
 func TestCoordinatorRecoverySelectsStoredOwner(t *testing.T) {
@@ -90,11 +93,15 @@ func TestCoordinatorRecoverySelectsStoredOwner(t *testing.T) {
 	cfg := aicommon.NewConfig(ctx, aicommon.WithDisableCreateDBRuntime(true), aicommon.WithWorkdir(t.TempDir()))
 	cfg.BaseCheckpointableStorage = aicommon.NewCheckpointableStorageWithDB(cfg.Id, db)
 	r := &ReAct{config: cfg}
-	for _, test := range []struct{ id, progress, expected string }{{"old", `{"phase":"NotCompleted"}`, loop_coordinator.LegacyName}, {"old-named", `{"plan_engine":"coordinator_legacy"}`, loop_coordinator.LegacyName}, {"native", `{"plan_engine":"coordinator"}`, loop_coordinator.Name}, {"native-snapshot", `{"coordinator_state":{"schema":1}}`, loop_coordinator.Name}} {
+	for _, test := range []struct{ id, progress, expected string }{{"old", `{"phase":"NotCompleted"}`, coordinator_legacy.Name}, {"old-named", `{"plan_engine":"coordinator_legacy"}`, coordinator_legacy.Name}, {"native", `{"plan_engine":"coordinator"}`, coordinator.Name}, {"native-snapshot", `{"coordinator_state":{"schema":1}}`, coordinator.Name}} {
 		require.NoError(t, yakit.CreateOrUpdateAISessionPlanAndExec(db, &schema.AISessionPlanAndExec{SessionID: "session", CoordinatorID: test.id, TaskTree: "{}", TaskProgress: test.progress}))
-		for _, current := range []string{loop_coordinator.Name, loop_coordinator.LegacyName} {
+		for _, current := range []string{coordinator.Name, coordinator_legacy.Name} {
 			cfg.Focus = current
 			channel, err := r.coordinatorChannel(test.id)
+			if test.expected == coordinator_legacy.Name {
+				require.ErrorContains(t, err, "legacy PLAN execution is disabled")
+				continue
+			}
 			require.NoError(t, err)
 			require.Equal(t, test.expected, channel)
 		}
@@ -111,13 +118,13 @@ func TestCoordinatorNativeReviewAndDetachedAdapters(t *testing.T) {
 	defer cancel()
 	original := newCoordinatorContextForPlanExec
 	t.Cleanup(func() { newCoordinatorContextForPlanExec = original })
-	newCoordinatorContextForPlanExec = func(context.Context, string, ...aicommon.ConfigOption) (*aid.Coordinator, error) {
+	newCoordinatorContextForPlanExec = func(context.Context, string, ...aicommon.ConfigOption) (*coordinator_legacy.Coordinator, error) {
 		return nil, errors.New("native adapter called legacy constructor")
 	}
 	in := make(chan *ypb.AIInputEvent, 4)
 	var mu sync.Mutex
 	var panel map[string]any
-	cfg := aicommon.NewConfig(ctx, aicommon.WithFocus(loop_coordinator.Name), aicommon.WithPersistentSessionId(utils.RandStringBytes(30)), aicommon.WithDisableCreateDBRuntime(true), aicommon.WithNoOpMemoryTriage(), aicommon.WithDisableAutoSkills(true), aicommon.WithWorkdir(t.TempDir()), aicommon.WithAgreeYOLO(), aicommon.WithEventInputChan(in), aicommon.WithAICallback(func(aicommon.AICallerConfigIf, *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+	cfg := aicommon.NewConfig(ctx, aicommon.WithFocus(coordinator.Name), aicommon.WithPersistentSessionId(utils.RandStringBytes(30)), aicommon.WithDisableCreateDBRuntime(true), aicommon.WithNoOpMemoryTriage(), aicommon.WithDisableAutoSkills(true), aicommon.WithWorkdir(t.TempDir()), aicommon.WithAgreeYOLO(), aicommon.WithEventInputChan(in), aicommon.WithAICallback(func(aicommon.AICallerConfigIf, *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 		return nil, errors.New("review/publish adapter must not request a model")
 	}), aicommon.WithEventHandler(func(e *schema.AiOutputEvent) {
 		if e.Type == schema.EVENT_TYPE_PLAN_REVIEW_REQUIRE {
@@ -145,7 +152,7 @@ func TestCoordinatorNativeReviewAndDetachedAdapters(t *testing.T) {
 	require.Contains(t, review.ApprovedPlanInput().PlanData, "Edited task brief")
 	channel, err := r.coordinatorChannel(review.CoordinatorID())
 	require.NoError(t, err)
-	require.Equal(t, loop_coordinator.Name, channel)
+	require.Equal(t, coordinator.Name, channel)
 	review.Close()
 
 	id, err := r.PublishDetachedPlan(ctx, input, "explicit-parent-task")

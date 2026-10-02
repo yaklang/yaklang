@@ -6,8 +6,8 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
+	"github.com/yaklang/yaklang/common/ai/aid/coordinator_legacy"
 
-	"github.com/yaklang/yaklang/common/ai/aid"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 )
@@ -15,8 +15,8 @@ import (
 const recoveryTaskIDPrefix = "react-recovery-"
 
 var (
-	newCoordinatorContextForPlanExec = aid.NewCoordinatorContext
-	runCoordinatorForPlanExec        = func(c *aid.Coordinator) error { return c.Run() }
+	newCoordinatorContextForPlanExec = coordinator_legacy.NewCoordinatorContext
+	runCoordinatorForPlanExec        = func(c *coordinator_legacy.Coordinator) error { return c.Run() }
 )
 
 type invokePlanAndExecuteOptions struct {

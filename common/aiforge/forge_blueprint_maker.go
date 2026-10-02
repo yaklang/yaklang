@@ -7,8 +7,8 @@ import (
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools/yakscripttools"
+	"github.com/yaklang/yaklang/common/ai/aid/coordinator_legacy"
 
-	"github.com/yaklang/yaklang/common/ai/aid"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
@@ -192,10 +192,10 @@ func (c *YakForgeBlueprintConfig) Build() (*ForgeBlueprint, error) {
 		aidOpts = c.YakForgeBlueprintAIDOptionsConfig.ToOptions()
 	}
 
-	var planMocker func(cfg *aid.Coordinator) *aid.PlanResponse
+	var planMocker func(cfg *coordinator_legacy.Coordinator) *coordinator_legacy.PlanResponse
 	if c.PlanPrompt != "" {
-		planMocker = func(cfg *aid.Coordinator) *aid.PlanResponse {
-			plan, err := aid.ExtractPlan(cfg, config.PlanPrompt)
+		planMocker = func(cfg *coordinator_legacy.Coordinator) *coordinator_legacy.PlanResponse {
+			plan, err := coordinator_legacy.ExtractPlan(cfg, config.PlanPrompt)
 			if err != nil {
 				cfg.EmitError("mock SMART Plan failed: %v", err)
 				return nil
