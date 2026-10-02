@@ -1,6 +1,8 @@
 name: YakVM hardening
 
 on:
+  # Random fuzzing, repeated stress, coverage and benchmarks are opt-in.
+  workflow_dispatch:
   pull_request:
     branches: [main]
     paths:
@@ -13,50 +15,138 @@ permissions:
   contents: read
 
 concurrency:
-  group: yakvm-hardening-${{ github.event.pull_request.number }}
+  group: yakvm-hardening-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:
   boundaries:
     runs-on: ubuntu-22.04
-    timeout-minutes: 30
+    timeout-minutes: ${{ github.event_name == 'workflow_dispatch' && 30 || 20 }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+      - name: Select checks from the PR merge diff
+        id: scope
+        run: |
+          python3 - <<'PY'
+          import json
+          import os
+          import subprocess
+
+          flags = dict.fromkeys(('runtime', 'compiler', 'formatter', 'dap', 'tooling'), False)
+          deep = os.environ['GITHUB_EVENT_NAME'] == 'workflow_dispatch'
+          if deep:
+              flags = dict.fromkeys(flags, True)
+          else:
+              event = json.load(open(os.environ['GITHUB_EVENT_PATH']))
+              parents = subprocess.check_output(['git', 'rev-list', '--parents', '-n', '1', 'HEAD'], text=True).split()
+              # A shallow checkout contains the synthetic PR merge and its
+              # parents. Compare to its first parent, not to a moving main or
+              # just the last commit; renames must check both old/new paths.
+              if len(parents) != 3 or parents[2] != event['pull_request']['head']['sha']:
+                  flags = dict.fromkeys(flags, True)
+                  print('Unexpected checkout shape; conservatively select all checks')
+              else:
+                  paths = subprocess.check_output(['git', 'diff', '--name-only', '--no-renames', '-z', 'HEAD^1', 'HEAD']).decode().split('\0')
+                  prefix = 'common/yak/antlr4yak/'
+                  for path in filter(None, paths):
+                      if path in ('go.mod', 'go.sum', '.github/workflows/yakvm-hardening.yml'):
+                          flags = dict.fromkeys(flags, True)
+                      elif path.startswith(prefix) and (not path.endswith('.md') or '/testdata/' in path):
+                          relative = path[len(prefix):]
+                          if relative.startswith('yakvm/'):
+                              flags['runtime'] = True
+                              if relative.startswith('yakvm/debugger') or relative in ('yakvm/vm.go', 'yakvm/vm_exec.go', 'yakvm/virtual_machine.go'):
+                                  flags['dap'] = True
+                          elif relative.startswith(('yakast/', 'parser/')) or relative.endswith('.g4'):
+                              for key in ('runtime', 'compiler', 'formatter', 'dap'):
+                                  flags[key] = True
+                          elif relative.startswith('yakfmt/') or relative.startswith(('format', 'prediction', 'lexer_')):
+                              flags['formatter'] = True
+                          elif relative.startswith(('dap/', 'lsp/', 'cmd/', '_fixup/')):
+                              flags['tooling'] = True
+                              flags['dap'] |= relative.startswith('dap/')
+                          elif '/' not in relative and relative.endswith('.go'):
+                              flags['runtime'] = True
+                              if relative in ('engine.go', 'builtin_functions.go', 'engine_compile_to_bytes.go'):
+                                  flags['compiler'] = flags['formatter'] = True
+                          else:
+                              flags = dict.fromkeys(flags, True)
+          flags.update(deep=deep, any=any(flags.values()))
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as output:
+              for name, enabled in flags.items():
+                  output.write(f'{name}={str(enabled).lower()}\n')
+          print('Selected checks:', flags)
+          PY
       - uses: actions/setup-go@v5
+        if: steps.scope.outputs.any == 'true'
         with:
           go-version-file: go.mod
           cache: true
+          # Separate this build/race cache from unrelated Go workflows.
+          cache-dependency-path: |
+            go.sum
+            .github/workflows/yakvm-hardening.yml
       - name: Install native build dependencies
+        if: steps.scope.outputs.any == 'true'
         run: sudo apt-get update && sudo apt-get install -y libpcap-dev
       - name: Preserve complete Yak engine and tooling regression coverage
+        if: steps.scope.outputs.deep == 'true'
         run: go test ./common/yak/antlr4yak/... -count=1 -timeout=15m
-      - name: VM and compiler race coverage
-        run: go test -race ./common/yak/antlr4yak/yakvm/... ./common/yak/antlr4yak/yakast -count=1 -timeout=5m
+      # The existing new-yak-engine-test workflow runs the complete engine
+      # suite on PRs. Keep full changed-subpackage tests here, including fuzz
+      # seeds, plus the engine's concurrent integration/boundary tests.
+      - name: VM race, deterministic differential and allocation guards
+        if: steps.scope.outputs.runtime == 'true'
+        run: go test -race ./common/yak/antlr4yak/yakvm/... -count=1 -timeout=5m
+      - name: Compiler race coverage
+        if: steps.scope.outputs.compiler == 'true'
+        run: go test -race ./common/yak/antlr4yak/yakast ./common/yak/antlr4yak/parser -count=1 -timeout=5m
+      - name: Changed tooling regression coverage
+        if: steps.scope.outputs.tooling == 'true' && steps.scope.outputs.deep != 'true'
+        run: go test ./common/yak/antlr4yak/dap ./common/yak/antlr4yak/lsp ./common/yak/antlr4yak/parser ./common/yak/antlr4yak/cmd -count=1 -timeout=5m
       - name: Concurrent debugger and DAP event ordering regression
-        run: go test -race ./common/yak/antlr4yak/dap -run '^Test(ThreadsRequest|ContinueImmediatelyAfterDebuggerInit|PreSetBreakPoint)$' -count=20 -timeout=3m
+        if: steps.scope.outputs.dap == 'true'
+        env:
+          REPEAT: ${{ steps.scope.outputs.deep == 'true' && '20' || '1' }}
+        run: go test -race ./common/yak/antlr4yak/dap -run '^Test(ThreadsRequest|ContinueImmediatelyAfterDebuggerInit|PreSetBreakPoint)$' -count="$REPEAT" -timeout=3m
       - name: Incremental engine boundary race coverage
+        if: steps.scope.outputs.runtime == 'true'
         run: go test -race ./common/yak/antlr4yak -run '^TestCore' -count=1 -timeout=3m
       - name: Repeat incremental VM ownership, snapshots and allocation guards
+        if: steps.scope.outputs.deep == 'true'
         run: go test -race ./common/yak/antlr4yak/yakvm ./common/yak/antlr4yak -run '^TestCoreIncremental' -count=5 -coverpkg=./common/yak/antlr4yak/yakvm,./common/yak/antlr4yak -coverprofile=yakvm-incremental-coverage.out -timeout=5m
       - name: LL-only semantic and boundary coverage
+        if: steps.scope.outputs.compiler == 'true'
         env:
           YAK_ANTLR_SLL_FIRST: '0'
         run: go test ./common/yak/antlr4yak ./common/yak/antlr4yak/yakast -run '^TestCore' -count=1 -timeout=3m
       - name: Formatter grammar, layout and concurrent API race coverage
-        run: go test -race ./common/yak/antlr4yak/yakfmt ./common/yak/antlr4yak -run '^Test(Format|CompilerLargeLiteral)' -count=1 -timeout=8m
+        if: steps.scope.outputs.formatter == 'true'
+        run: |
+          go test -race ./common/yak/antlr4yak/yakfmt -count=1 -timeout=8m
+          go test -race ./common/yak/antlr4yak -run '^Test(Format|CompilerLargeLiteral)' -count=1 -timeout=3m
       - name: Formatter round-trip fuzz smoke test
+        if: steps.scope.outputs.deep == 'true'
         run: go test ./common/yak/antlr4yak/yakfmt -run '^$' -fuzz '^FuzzFormat$' -fuzztime=30s -parallel=2 -timeout=3m
       - name: SLL prediction grammar and diagnostics differential fuzz
+        if: steps.scope.outputs.deep == 'true'
         run: go test ./common/yak/antlr4yak/yakfmt -run '^$' -fuzz '^FuzzFormatPrediction$' -fuzztime=30s -parallel=2 -timeout=3m
       - name: Bounded bytecode fuzz smoke test
-        run: go test ./common/yak/antlr4yak/yakvm -run '^$' -fuzz '^FuzzCoreDecode$' -fuzztime=30s -parallel=2
+        if: steps.scope.outputs.deep == 'true'
+        run: go test ./common/yak/antlr4yak/yakvm -run '^$' -fuzz '^FuzzCoreDecode$' -fuzztime=30s -parallel=2 -timeout=3m
       - name: Scalar decoder compatibility fuzz test
-        run: go test ./common/yak/antlr4yak/yakvm -run '^$' -fuzz '^FuzzCoreDecodeScalar$' -fuzztime=30s -parallel=2
+        if: steps.scope.outputs.deep == 'true'
+        run: go test ./common/yak/antlr4yak/yakvm -run '^$' -fuzz '^FuzzCoreDecodeScalar$' -fuzztime=30s -parallel=2 -timeout=3m
       - name: Parameter binding compatibility differential fuzz
+        if: steps.scope.outputs.deep == 'true'
         run: go test ./common/yak/antlr4yak/yakvm -run '^$' -fuzz '^FuzzCoreIncrementalBinding$' -fuzztime=30s -parallel=2 -timeout=3m
       - name: Fused and ordinary assignment differential fuzz
+        if: steps.scope.outputs.deep == 'true'
         run: go test ./common/yak/antlr4yak/yakvm -run '^$' -fuzz '^FuzzCoreIncrementalAssignment$' -fuzztime=30s -parallel=2 -timeout=3m
       - name: Record incremental runtime performance without a noisy time gate
+        if: steps.scope.outputs.deep == 'true'
         env:
           GOMAXPROCS: '2'
         run: |
@@ -67,9 +157,10 @@ jobs:
             go test ./common/yak/antlr4yak/yakvm ./common/yak/antlr4yak -run '^$' -bench '^BenchmarkCoreIncremental' -benchmem -benchtime=200ms -count=3 -timeout=3m
           } | tee yakvm-incremental-benchmarks.txt
       - name: Preserve benchmark measurements and incremental coverage
+        if: steps.scope.outputs.deep == 'true'
         uses: actions/upload-artifact@v4
         with:
-          name: yakvm-incremental-benchmarks-${{ github.event.pull_request.head.sha }}
+          name: yakvm-incremental-benchmarks-${{ github.sha }}
           path: |
             yakvm-incremental-benchmarks.txt
             yakvm-incremental-coverage.out
