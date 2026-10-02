@@ -2,6 +2,7 @@ package aireact
 
 import (
 	"bytes"
+	"context"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -244,211 +245,38 @@ LOOP:
 	}
 }
 
-// TestReAct_PlanExec_DeepIntentRecognition verifies that deep intent
-// recognition runs during both plan generation and PE task execution
-// when using the full request_plan_and_execution flow.
-//
-// Flow:
-//  1. Main loop → request_plan_and_execution
-//  2. Coordinator starts: plan loop init → intent recognition
-//  3. Plan loop AI → generate plan
-//  4. Plan review → auto-approve
-//  5. PE task init → intent recognition
-//  6. PE task AI → directly_answer
-//  7. Assert: intent loop called at least once
-func TestReAct_PlanExec_DeepIntentRecognition(t *testing.T) {
-	testNonce := utils.RandStringBytes(16)
-	planPayload := "plan_intent_test_" + testNonce
-	subtaskName := "subtask_intent_" + testNonce
-
-	in := make(chan *ypb.AIInputEvent, 10)
-	out := make(chan *ypb.AIOutputEvent, 100)
-
-	var intentLoopCalled int32
-	var planLoopCalled int32
-	var peTaskCalled int32
-
-	_, err := NewTestReAct(
-		aicommon.WithDisableIntentRecognition(false),
-		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
-			prompt := r.GetPrompt()
-
-			// Phase: Intent loop — single LiteForge "intent-keyword-gen" call
-			// (during plan or PE task init).
-			if aicommon.IsIntentKeywordGenPrompt(prompt) &&
-				!strings.Contains(prompt, "PLAN_STATUS_") &&
-				!strings.Contains(prompt, "search_knowledge") {
-				atomic.AddInt32(&intentLoopCalled, 1)
-				log.Infof("intent loop (intent-keyword-gen) called")
-				rsp := i.NewAIResponse()
-				rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "intent-keyword-gen", "intent_summary": "test intent analysis", "search_keywords": ["test"], "tags": ["test"], "questions": ["what capabilities are available?"]}`))
-				rsp.Close()
-				return rsp, nil
+// Native PLAN uses coordinator and worker loops directly. The legacy intent
+// initialization must not introduce another loop, even when enabled globally.
+func TestReAct_PlanExec_DoesNotStartLegacyIntentLoops(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+	native := newNativePlanTestModel("")
+	var coordinatorCalls, workerCalls int32
+	ins, err := NewTestReAct(aicommon.WithContext(ctx), aicommon.WithWorkdir(t.TempDir()),
+		aicommon.WithDisableCreateDBRuntime(true), aicommon.WithNoOpMemoryTriage(),
+		aicommon.WithDisableIntentRecognition(false), aicommon.WithAgreeYOLO(),
+		aicommon.WithEventHandler(func(*schema.AiOutputEvent) {}),
+		aicommon.WithAICallback(func(c aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+			if strings.Contains(req.GetPrompt(), "Execute the assigned frozen plan task.") {
+				atomic.AddInt32(&workerCalls, 1)
+			} else if strings.Contains(req.GetCallerLabel(), "coordinator") {
+				atomic.AddInt32(&coordinatorCalls, 1)
+			} else {
+				return nil, utils.Errorf("unexpected auxiliary loop: %s", req.GetCallerLabel())
 			}
-
-			// Phase: Intent capability recommendation (conditional second call)
-			if aicommon.IsIntentRecommendPrompt(prompt) {
-				rsp := i.NewAIResponse()
-				rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "intent-capability-recommend", "recommended_capabilities": []}`))
-				rsp.Close()
-				return rsp, nil
+			rsp, handled, err := native(c, req, "native")
+			if !handled {
+				return nil, utils.Error("native PLAN requires function calls")
 			}
-
-			// Phase: Capability catalog match (BM25 chunk matching LiteForge)
-			if aicommon.IsCapabilityCatalogMatchPrompt(prompt) {
-				rsp := i.NewAIResponse()
-				rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "capability-catalog-match", "matched_identifiers": []}`))
-				rsp.Close()
-				return rsp, nil
-			}
-
-			// Phase: Plan loop (contains search_knowledge + plan actions)
-			if strings.Contains(prompt, "search_knowledge") &&
-				strings.Contains(prompt, "plan") &&
-				!strings.Contains(prompt, "directly_answer") &&
-				!strings.Contains(prompt, "PLAN_STATUS_") {
-				atomic.AddInt32(&planLoopCalled, 1)
-				log.Infof("plan loop AI called")
-				rsp := i.NewAIResponse()
-				rsp.EmitOutputStream(bytes.NewBufferString(`{
-  "@action": "plan",
-  "main_task": "` + planPayload + `",
-  "main_task_goal": "test plan with intent recognition",
-  "tasks": [
-    {"task_name": "` + subtaskName + `", "task_description": "execute test subtask"}
-  ]
-}`))
-				rsp.Close()
-				return rsp, nil
-			}
-
-			// Phase: PE task execution
-			if strings.Contains(prompt, "PLAN_STATUS_") {
-				atomic.AddInt32(&peTaskCalled, 1)
-				log.Infof("PE task main loop called")
-				rsp := i.NewAIResponse()
-				rsp.EmitOutputStream(bytes.NewBufferString(`
-{"@action": "directly_answer", "answer_payload": "subtask done ` + testNonce + `", "human_readable_thought": "completing subtask"}
-`))
-				rsp.Close()
-				return rsp, nil
-			}
-
-			// Phase: Satisfaction verification
-			if isVerifySatisfactionPrompt(prompt) {
-				rsp := i.NewAIResponse()
-				rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "verify-satisfaction", "user_satisfied": true, "reasoning": "done"}`))
-				rsp.Close()
-				return rsp, nil
-			}
-
-			// Phase: Main loop → request_plan_and_execution
-			if isPrimaryDecisionPrompt(prompt) &&
-				!strings.Contains(prompt, "PLAN_STATUS_") {
-				rsp := i.NewAIResponse()
-				rsp.EmitOutputStream(bytes.NewBufferString(`
-{"@action": "object", "next_action": { "type": "request_plan_and_execution", "plan_request_payload": "` + planPayload + `" },
-"human_readable_thought": "requesting plan execution", "cumulative_summary": "plan exec test"}
-`))
-				rsp.Close()
-				return rsp, nil
-			}
-
-			// Phase: Task summary
-			if strings.Contains(prompt, "任务执行引擎") && strings.Contains(prompt, "task_long_summary") && !strings.Contains(prompt, "PLAN_STATUS_") {
-				rsp := i.NewAIResponse()
-				rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "summary", "status_summary": "done", "task_short_summary": "completed", "task_long_summary": "task completed"}`))
-				rsp.Close()
-				return rsp, nil
-			}
-
-			// Phase: FINAL_ANSWER (post-iteration DirectlyAnswer)
-			if isDirectAnswerPrompt(prompt) {
-				rsp := i.NewAIResponse()
-				rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "directly_answer", "answer_payload": "mocked summary"}`))
-				rsp.Close()
-				return rsp, nil
-			}
-
-			// Phase: Main loop → request_plan_and_execution
-			if isPrimaryDecisionPrompt(prompt) {
-				rsp := i.NewAIResponse()
-				rsp.EmitOutputStream(bytes.NewBufferString(`
-{"@action": "object", "next_action": { "type": "request_plan_and_execution", "plan_request_payload": "` + planPayload + `" },
-"human_readable_thought": "requesting plan execution", "cumulative_summary": "plan exec test"}
-`))
-				rsp.Close()
-				return rsp, nil
-			}
-
-			log.Warnf("unexpected prompt in TestReAct_PlanExec_DeepIntentRecognition, length=%d", len(prompt))
-			rsp := i.NewAIResponse()
-			rsp.EmitOutputStream(bytes.NewBufferString(`
-{"@action": "directly_answer", "answer_payload": "fallback", "human_readable_thought": "fallback"}
-`))
-			rsp.Close()
-			return rsp, nil
-		}),
-		aicommon.WithEventInputChan(in),
-		aicommon.WithEventHandler(func(e *schema.AiOutputEvent) {
-			out <- e.ToGRPC()
-		}),
-		aicommon.WithAgreeYOLO(true),
-		aicommon.WithAllowPlanUserInteract(true),
-		aicommon.WithDisableDynamicPlanning(true),
-	)
+			return rsp, err
+		}))
 	if err != nil {
 		t.Fatal(err)
 	}
-
-	go func() {
-		in <- &ypb.AIInputEvent{
-			IsFreeInput: true,
-			FreeInput:   "plan security assessment",
-		}
-	}()
-
-	du := time.Duration(30)
-	if utils.InGithubActions() {
-		du = 15
+	if err := ins.PlanAndExecute(ctx, "Plan one deterministic check"); err != nil {
+		t.Fatal(err)
 	}
-	after := time.After(du * time.Second)
-
-	planStarted := false
-	planEnded := false
-
-LOOP:
-	for {
-		select {
-		case e := <-out:
-			if e.Type == string(schema.EVENT_TYPE_START_PLAN_AND_EXECUTION) {
-				planStarted = true
-				log.Infof("plan execution started")
-			}
-			if e.Type == string(schema.EVENT_TYPE_END_PLAN_AND_EXECUTION) {
-				planEnded = true
-				log.Infof("plan execution ended")
-				break LOOP
-			}
-		case <-after:
-			t.Log("timeout reached")
-			break LOOP
-		}
-	}
-	close(in)
-
-	intentCount := atomic.LoadInt32(&intentLoopCalled)
-	planCount := atomic.LoadInt32(&planLoopCalled)
-	peCount := atomic.LoadInt32(&peTaskCalled)
-
-	t.Logf("intent loop: %d, plan loop: %d, PE task: %d", intentCount, planCount, peCount)
-	t.Logf("plan started: %v, plan ended: %v", planStarted, planEnded)
-
-	if !planStarted {
-		t.Fatal("plan execution did not start")
-	}
-
-	if intentCount == 0 {
-		t.Fatal("intent loop was NOT called - deep intent recognition did not trigger during plan/PE init")
+	if atomic.LoadInt32(&coordinatorCalls) < 5 || atomic.LoadInt32(&workerCalls) != 2 {
+		t.Fatalf("incomplete coordinator/worker flow: %d/%d", coordinatorCalls, workerCalls)
 	}
 }

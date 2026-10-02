@@ -52,10 +52,14 @@ func TestReAct_PlanAndExecute_InheritsDistinctCallbacks(t *testing.T) {
 	)
 	require.NoError(t, err)
 
+	nativeModel := newNativePlanTestModel("mock_callback_inherit_tool")
 	allPromptsHandler := func(modelName string, afterPlan *int32) aicommon.AICallbackType {
 		return func(i aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			if atomic.LoadInt32(&planStarted) > 0 {
 				atomic.AddInt32(afterPlan, 1)
+			}
+			if rsp, handled, err := nativeModel(i, req, modelName); handled {
+				return rsp, err
 			}
 
 			rsp := i.NewAIResponse()
