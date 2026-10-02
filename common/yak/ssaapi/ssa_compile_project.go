@@ -405,41 +405,21 @@ func removeProgramNamePrefixFromFS(fs fi.FileSystem, programName string) (fi.Fil
 	if programName == "" {
 		return fs, nil
 	}
-
-	vfs := filesys.NewVirtualFs()
-
-	err := filesys.Recursive(".", filesys.WithFileSystem(fs), filesys.WithStat(func(isDir bool, pathname string, info os.FileInfo) error {
-		if isDir {
-			return nil
+	// Aggregated paths are already stored without the program name. This hook
+	// only rewrites a leftover prefix on lookup, and leaves "." unchanged so
+	// VirtualFS listings still resolve.
+	hooked := filesys.NewHookFS(fs)
+	hooked.SetPathHook(func(name string) (string, error) {
+		if name == "" || name == "." || name == "/" {
+			return name, nil
 		}
-		if pathname == "" {
-			return nil
+		cleaned := removeProgramNamePrefix(name, programName)
+		if cleaned == "" || cleaned == "/" {
+			return name, nil
 		}
-
-		content, err := fs.ReadFile(pathname)
-		if err != nil {
-			log.Warnf("failed to read file %s: %v", pathname, err)
-			return nil
-		}
-
-		cleanPath := removeProgramNamePrefix(pathname, programName)
-		if cleanPath == "" || cleanPath == "/" {
-			return nil
-		}
-		vfsPath := overlayAggregatedFSPath(ensureOverlayPathSlash(cleanPath))
-		if vfsPath == "" {
-			return nil
-		}
-
-		vfs.AddFile(vfsPath, string(content))
-		return nil
-	}))
-
-	if err != nil {
-		return nil, utils.Wrap(err, "failed to traverse file system")
-	}
-
-	return vfs, nil
+		return strings.TrimPrefix(cleaned, "/"), nil
+	})
+	return hooked, nil
 }
 
 func buildFileSystemFromProgramName(programName string) (fi.FileSystem, error) {
