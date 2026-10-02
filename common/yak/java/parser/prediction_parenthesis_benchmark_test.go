@@ -15,7 +15,9 @@ func parenthesisPredictionSources() []struct{ name, source string } {
 		{"lambda_lvti_32", methodSource("return " + strings.Repeat("f((var x) -> ", 32) + "x" + strings.Repeat(")", 32) + ";")},
 		{"grouped_calls_32", methodSource("return " + strings.Repeat("(f(", 32) + "x" + strings.Repeat("))", 32) + ";")},
 		{"reference_generics_32", methodSource("return " + strings.Repeat("T<", 32) + "X" + strings.Repeat(">", 32) + "::new;")},
+		{"class_literal_generics_32", methodSource("return " + strings.Repeat("T<", 32) + "X" + strings.Repeat(">", 32) + ".class;")},
 		{"relational_chain_512", methodSource("return a" + strings.Repeat("<a", 512) + ";")},
+		{"shift_chain_256", methodSource("return a" + strings.Repeat("<<a", 256) + ";")},
 		{"member_chain_512", methodSource("return a" + strings.Repeat(".a", 512) + ";")},
 	}
 }
@@ -32,6 +34,25 @@ func BenchmarkJavaParenthesisPrediction(b *testing.B) {
 				parse := func() {
 					if cold {
 						cache = newPredictionAutomata()
+					}
+					// The old predictor cancels SLL on generic class literals.
+					// Include the real LL fallback instead of benchmarking a panic.
+					if fixture.name == "class_literal_generics_32" {
+						_, err := antlr4util.ParseASTWithSLLFirst(fixture.source, NewJavaLexer, func(input antlr.TokenStream) *JavaParser {
+							p := NewJavaParser(input)
+							cache.apply(p)
+							return p
+						}, nil, nil, func(p *JavaParser) ICompilationUnitContext {
+							tree := p.CompilationUnit()
+							if p.GetTokenStream().LA(1) != antlr.TokenEOF {
+								b.Fatal("unconsumed class literal")
+							}
+							return tree
+						})
+						if err != nil {
+							b.Fatal(err)
+						}
+						return
 					}
 					lexer := NewJavaLexer(antlr.NewInputStream(fixture.source))
 					lexer.RemoveErrorListeners()

@@ -12,6 +12,9 @@ func BenchmarkJavaFrontend(b *testing.B) {
 		{"lambda_64", "class C { Object m(){ return " + strings.Repeat("f(x -> ", 64) + "x" + strings.Repeat(")", 64) + "; }}"},
 		{"generics_64", "class C {" + strings.Repeat("T<", 64) + "X" + strings.Repeat(">", 64) + " x;}"},
 		{"reference_generics_32", "class C { Object m(){ return " + strings.Repeat("T<", 32) + "X" + strings.Repeat(">", 32) + "::new; }}"},
+		{"shift_chain_256", "class C { int m(int a){ return a" + strings.Repeat("<<a", 256) + "; }}"},
+		{"class_literal_qualified", "class C { Object m(){ return a.b.T.class; }}"},
+		{"class_literal_generics_32", "class C { Object m(){ return " + strings.Repeat("T<", 32) + "X" + strings.Repeat(">", 32) + ".class; }}"},
 	} {
 		b.Run(fixture.name, func(b *testing.B) {
 			builder := CreateBuilder().(*SSABuilder)

@@ -26,6 +26,14 @@ func TestPredictionSSAReferenceAndPrecedence(t *testing.T) {
 `, []string{"7", "9", "7"}, t)
 }
 
+func TestPredictionSSAShiftPrecedence(t *testing.T) {
+	CheckJavaPrintlnValue(`int a = 1;
+        println(a << a << a);
+        println(a << 1 + 1);
+        println((a << 1) + 1);
+`, []string{"4", "4", "3"}, t)
+}
+
 func BenchmarkJavaPredictionSSA(b *testing.B) {
 	for _, fixture := range []struct{ name, source string }{
 		{"small", "class C { int m(){ return 1+2; } }"},
@@ -34,6 +42,7 @@ func BenchmarkJavaPredictionSSA(b *testing.B) {
 		{"lambda_16", "class C { Object m(){ return " + strings.Repeat("f(x -> ", 16) + "x" + strings.Repeat(")", 16) + "; }}"},
 		{"generics_16", "class C {" + strings.Repeat("T<", 16) + "X" + strings.Repeat(">", 16) + " x;}"},
 		{"reference_generics_16", "class C { Object m(){ return " + strings.Repeat("T<", 16) + "X" + strings.Repeat(">", 16) + "::new; }}"},
+		{"shift_chain_128", "class C { int m(int a){ return a" + strings.Repeat("<<a", 128) + "; }}"},
 	} {
 		b.Run(fixture.name, func(b *testing.B) {
 			parse := func() {

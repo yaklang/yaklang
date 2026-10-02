@@ -70,6 +70,7 @@ func TestPredictionQualifiedTypeScanner(t *testing.T) {
 		alt    int
 	}{
 		{"T.X", 1}, {"T<X>.Y", 1}, {"T<X<Y>> /*c*/ .Z", 1}, {"T<X<Y>> name", 2}, {"T[]", 2}, {"T;", 2},
+		{"T.class", 2}, {"T<X>.class", 2}, {"T<X>./*c*/class", 2}, {"T. @A X", 1},
 		{"@A T", 0}, {"int", 0}, {"T<@A X>", 0}, {"T<(X)>", 0}, {"T<X", 0}, {"", 0},
 	} {
 		t.Run(fixture.source, func(t *testing.T) {
@@ -87,6 +88,9 @@ func TestPredictionQualifiedTypeScanner(t *testing.T) {
 		if qualifiedTypePrefix(predictionTokens(strings.Repeat("T<", n)+"X"+strings.Repeat(">", n))) != 0 {
 			t.Fatal("qualified scan exceeded bound")
 		}
+	}
+	if qualifiedTypePrefix(predictionTokens("T."+strings.Repeat("/*c*/", declarationPrefixTokens)+"class")) != 0 {
+		t.Fatal("lookahead beyond a qualified dot exceeded the raw-token budget")
 	}
 }
 
