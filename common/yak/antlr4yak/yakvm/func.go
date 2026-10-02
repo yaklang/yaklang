@@ -135,21 +135,31 @@ func YakVMValuesToFunctionMap(f *Function, vs []*Value, argumentCheck bool) map[
 		}
 	}
 	// newVm := vm.CreateSubVirtualMachine(f.codes, f.symbolTable)
-	params := make(map[int]*Value)
+	params := make(map[int]*Value, len(f.paramSymbols))
 	if argumentCheck {
 		if stableArgumentsNumber > len(vs) {
 			panic(fmt.Sprintf("runtime error: function %s need at least %d params, got %d params", funcName, stableArgumentsNumber, len(vs)))
 		}
 	}
-	otherVs := make([]*Value, 0)
-	for _, v := range vs {
-		if v != nil && v.SymbolId != 0 {
-			params[v.SymbolId] = v
-		} else {
-			otherVs = append(otherVs, v)
+	// Ordinary positional calls can read the caller's slice directly. Only
+	// mixed named arguments need a filtered slice; never compact vs in place,
+	// since native callers may reuse it or retain its Values.
+	for firstNamed, value := range vs {
+		if value == nil || value.SymbolId == 0 {
+			continue
 		}
+		positional := make([]*Value, firstNamed, len(vs)-1)
+		copy(positional, vs[:firstNamed])
+		for _, value := range vs[firstNamed:] {
+			if value != nil && value.SymbolId != 0 {
+				params[value.SymbolId] = value
+			} else {
+				positional = append(positional, value)
+			}
+		}
+		vs = positional
+		break
 	}
-	vs = otherVs
 	i := 0
 	t := 0
 	for ; t < stableArgumentsNumber; t++ {

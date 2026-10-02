@@ -504,6 +504,9 @@ func (v *Frame) _execCode(c *Code, debug bool) {
 		if c.Unary <= 0 {
 			return
 		}
+		if c.Unary == 1 && !debug && !v.vm.debugMode && v.vm.config.vmMode == YAK && v.tryAssignSingle() {
+			return
+		}
 		v.push(&Value{
 			TypeVerbose: "__opcode_list__",
 			Value:       v.popArgN(c.Unary),
