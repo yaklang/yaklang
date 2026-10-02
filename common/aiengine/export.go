@@ -10,6 +10,7 @@ var Exports = map[string]interface{}{
 
 	// config options
 	"focus":                     WithFocus,
+	"planEngine":                WithPlanEngine,
 	"timeout":                   WithTimeout,
 	"context":                   WithContext,
 	"aiService":                 WithAIService,

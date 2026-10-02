@@ -256,7 +256,6 @@ func (r *ReAct) AsyncRecoverPlanAndExecute(ctx context.Context, coordinatorID st
 	}
 }
 
-
 // RequireAIForgeAndExecute is the synchronous version of RequireAIForgeAndAsyncExecute.
 // It invokes the AI Blueprint and blocks until execution completes.
 func (r *ReAct) RequireAIForgeAndExecute(ctx context.Context, forgeName string) error {
@@ -494,9 +493,11 @@ func (r *ReAct) invokePlanAndExecute(doneChannel chan struct{}, ctx context.Cont
 	}()
 
 	hotpatchChan := r.config.HotPatchBroadcaster.Subscribe()
+	defer r.config.HotPatchBroadcaster.Unsubscribe(hotpatchChan)
 	baseOpts := aicommon.ConvertConfigToOptions(r.config)
 	baseOpts = append(baseOpts,
 		aicommon.WithID(uid),
+		func(c *aicommon.Config) error { c.SetConfig("coordinator_parent_id", r.config.Id); return nil },
 		aicommon.WithTimeline(r.config.Timeline),
 		aicommon.WithAICallbacks(r.config.GetRawAICallbacks()),
 		aicommon.WithAllowPlanUserInteract(true),
@@ -597,7 +598,6 @@ func (r *ReAct) invokePlanAndExecute(doneChannel chan struct{}, ctx context.Cont
 		}
 		_ = result
 		r.AddToTimeline("forge output log", stdOut.String())
-		r.config.HotPatchBroadcaster.Unsubscribe(hotpatchChan)
 		return nil
 	} else {
 		cod, err := newCoordinatorContextForPlanExec(planCtx, planPayload, baseOpts...)
@@ -605,13 +605,32 @@ func (r *ReAct) invokePlanAndExecute(doneChannel chan struct{}, ctx context.Cont
 			log.Errorf("Failed to create coordinator for plan execution: %v", err)
 			return utils.Errorf("failed to create coordinator for plan execution: %v", err)
 		}
+		// Intervention is journaled by the outer session, and intentionally not
+		// mirrored above. Relay only its completed notification to the new planner.
+		wakeID := "coordinator-input-" + uid
+		r.config.InputEventManager.RegisterAfterInputEvent(wakeID, func(event *ypb.AIInputEvent) {
+			if event.SyncType == aicommon.SYNC_TYPE_USER_INTERVENTION {
+				cod.InputEventManager.CallAfterInputEvent(event)
+			}
+		})
+		defer r.config.InputEventManager.UnregisterAfterInputEvent(wakeID)
 
 		done()
-		if err := runCoordinatorForPlanExec(cod); err != nil {
+		run := runCoordinatorForPlanExec
+		if cfg.executePlanInput != nil {
+			root, err := cod.BuildRootTaskFromPlanData(cfg.executePlanInput.PlanData, planPayload)
+			if err != nil {
+				return utils.Errorf("invalid approved plan: %w", err)
+			}
+			if err := cod.CommitApprovedPlan(root, cfg.executePlanInput.PlanDocument); err != nil {
+				return err
+			}
+			run = runCoordinatorForExecuteApprovedPlan
+		}
+		if err := run(cod); err != nil {
 			log.Errorf("Plan execution failed: %v", err)
 			return utils.Errorf("plan execution failed: %v", err)
 		}
-		r.config.HotPatchBroadcaster.Unsubscribe(hotpatchChan)
 		return nil
 	}
 }

@@ -1,0 +1,11 @@
+// Uses the Yak engine's configured AI provider/model. Configure credentials
+// outside this file; no API key or provider-specific secret belongs in the repo.
+err = aim.InvokeReAct(
+    "先读取当前目录，规划两个有依赖的只读验证任务：确认目录中存在的文件，再根据第一步结果检查 README。执行并逐项验收，保存 evidence，最后用 write_report 产出 Markdown 报告。不要运行外部命令或修改业务文件。",
+    aim.focus("coordinator"),
+    aim.planEngine("coordinator"),
+    aim.maxIteration(30),
+    aim.timeout(180),
+    aim.reviewPolicy("yolo"),
+)
+die(err)

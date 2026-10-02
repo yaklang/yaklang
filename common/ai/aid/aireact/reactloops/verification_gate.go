@@ -226,7 +226,9 @@ func (r *ReActLoop) MaybeVerifyUserSatisfaction(
 	isToolCall bool,
 	payload string,
 ) (*aicommon.VerifySatisfactionResult, bool, error) {
-	if r == nil || r.invoker == nil {
+	// Tool completion also enters here directly, outside the loop's periodic
+	// checkpoint. Respect the same switch before creating a watchdog or calling AI.
+	if r == nil || r.invoker == nil || r.DisablePeriodicVerification {
 		return nil, false, nil
 	}
 	r.touchVerificationWatchdog()
@@ -304,6 +306,9 @@ func (r *ReActLoop) rescheduleVerificationWatchdog(task aicommon.AIStatefulTask)
 		r.verificationWatchdogTimer.Stop()
 		r.verificationWatchdogTimer = nil
 	}
+	if r.DisablePeriodicVerification {
+		return
+	}
 	delay := r.nextVerificationWatchdogDelay()
 	r.verificationWatchdogTimer = time.AfterFunc(delay, func() {
 		r.triggerVerificationWatchdog(task)
@@ -323,7 +328,7 @@ func (r *ReActLoop) startVerificationWatchdog(task aicommon.AIStatefulTask) {
 }
 
 func (r *ReActLoop) touchVerificationWatchdog() {
-	if r == nil {
+	if r == nil || r.DisablePeriodicVerification {
 		return
 	}
 	task := r.GetCurrentTask()
@@ -355,7 +360,7 @@ func (r *ReActLoop) stopVerificationWatchdogForTask(task aicommon.AIStatefulTask
 }
 
 func (r *ReActLoop) triggerVerificationWatchdog(task aicommon.AIStatefulTask) {
-	if r == nil || task == nil || task.IsFinished() {
+	if r == nil || task == nil || task.IsFinished() || r.DisablePeriodicVerification {
 		return
 	}
 	if r.verificationMutex != nil {
@@ -443,7 +448,7 @@ func (r *ReActLoop) buildVerificationWatchdogPayload(task aicommon.AIStatefulTas
 //
 //	末轮兜底保留
 func (r *ReActLoop) shouldTriggerAutomaticVerification(current *VerificationRuntimeSnapshot) bool {
-	if r == nil || current == nil {
+	if r == nil || current == nil || r.DisablePeriodicVerification {
 		return false
 	}
 	// 末轮兜底
