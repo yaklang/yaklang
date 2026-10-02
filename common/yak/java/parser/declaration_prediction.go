@@ -78,6 +78,29 @@ type declarationScanner struct {
 	uncertain  bool
 }
 
+// primary also overlaps identifier and typeType '.' CLASS. A definitely
+// incomplete generic suffix cannot be a class literal. Choosing identifier here
+// avoids re-exploring the entire remaining relational chain for each operand.
+// Balanced, annotated or budget-limited suffixes still use the original ATN.
+func nonTypePrimaryPrefix(input antlr.TokenStream) int {
+	stream, ok := input.(*antlr.CommonTokenStream)
+	if !ok {
+		return 0
+	}
+	index := input.Index()
+	if index < 0 || !stream.Sync(index) || stream.Get(index).GetChannel() != antlr.TokenDefaultChannel {
+		return 0
+	}
+	if !isIdentifier(input.LA(1)) || input.LA(2) != JavaParserLT {
+		return 0
+	}
+	s := declarationScanner{stream: stream, index: index + 1, end: index + declarationPrefixTokens}
+	if !s.typeArguments() && !s.uncertain {
+		return 5
+	}
+	return 0
+}
+
 // A leading generic or empty array type followed by :: cannot be an ordinary
 // primary expression. Recognize only this expensive overlap; dotted member
 // chains, annotated types and restricted final type identifiers retain ATN.
@@ -168,6 +191,15 @@ func qualifiedTypePrefix(input antlr.TokenStream) int {
 	}
 	switch s.next() {
 	case JavaParserDOT:
+		s.index++
+		// The dot before CLASS belongs to primary's class literal, not
+		// another identifier in the qualified type. Do not consume it.
+		if s.next() == JavaParserCLASS {
+			return 2
+		}
+		if s.uncertain {
+			return 0
+		}
 		return 1
 	case antlr.TokenInvalidType:
 		return 0
@@ -201,10 +233,16 @@ func (s *declarationScanner) arrayDimensions() bool {
 
 func (s *declarationScanner) typeArguments() bool {
 	depth := 0
+	previous := antlr.TokenInvalidType
 	for {
 		token := s.next()
 		switch token {
 		case JavaParserLT:
+			// typeArgument cannot start with '<'. Adjacent '<' tokens are
+			// a shift prefix, not nested generics, even across hidden trivia.
+			if previous == JavaParserLT {
+				return false
+			}
 			if depth == declarationPrefixDepth {
 				s.uncertain = true
 				return false
@@ -226,6 +264,7 @@ func (s *declarationScanner) typeArguments() bool {
 				return false
 			}
 		}
+		previous = token
 		s.index++
 	}
 }

@@ -178,7 +178,9 @@ func primaryPrefix(input antlr.TokenStream) int {
 	}
 	if isIdentifier(token) {
 		switch input.LA(2) {
-		case JavaParserDOT, JavaParserLBRACK, JavaParserLT:
+		case JavaParserLT:
+			return nonTypePrimaryPrefix(input)
+		case JavaParserDOT, JavaParserLBRACK:
 			return 0
 		default:
 			return 5
