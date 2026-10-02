@@ -27,6 +27,11 @@ type AISession struct {
 
 	// RelatedRuntimeIDS stores a JSON-encoded string array of related runtime UUIDs.
 	RelatedRuntimeIDS string `json:"related_runtime_ids" gorm:"column:related_runtime_ids;type:text"`
+
+	// Snapshot stores the latest versioned session snapshot document. The document
+	// contains both the cumulative session projection and the latest/final
+	// projection for every task in this session.
+	Snapshot string `json:"snapshot" gorm:"column:snapshot;type:text"`
 }
 
 func (a *AISession) TableName() string {
