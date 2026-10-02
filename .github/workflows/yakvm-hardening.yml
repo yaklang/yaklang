@@ -36,6 +36,8 @@ jobs:
         run: go test -race ./common/yak/antlr4yak/dap -run '^Test(ThreadsRequest|ContinueImmediatelyAfterDebuggerInit|PreSetBreakPoint)$' -count=20 -timeout=3m
       - name: Incremental engine boundary race coverage
         run: go test -race ./common/yak/antlr4yak -run '^TestCore' -count=1 -timeout=3m
+      - name: Repeat incremental VM ownership, snapshots and allocation guards
+        run: go test -race ./common/yak/antlr4yak/yakvm ./common/yak/antlr4yak -run '^TestCoreIncremental' -count=5 -coverpkg=./common/yak/antlr4yak/yakvm,./common/yak/antlr4yak -coverprofile=yakvm-incremental-coverage.out -timeout=5m
       - name: LL-only semantic and boundary coverage
         env:
           YAK_ANTLR_SLL_FIRST: '0'
@@ -50,3 +52,25 @@ jobs:
         run: go test ./common/yak/antlr4yak/yakvm -run '^$' -fuzz '^FuzzCoreDecode$' -fuzztime=30s -parallel=2
       - name: Scalar decoder compatibility fuzz test
         run: go test ./common/yak/antlr4yak/yakvm -run '^$' -fuzz '^FuzzCoreDecodeScalar$' -fuzztime=30s -parallel=2
+      - name: Parameter binding compatibility differential fuzz
+        run: go test ./common/yak/antlr4yak/yakvm -run '^$' -fuzz '^FuzzCoreIncrementalBinding$' -fuzztime=30s -parallel=2 -timeout=3m
+      - name: Fused and ordinary assignment differential fuzz
+        run: go test ./common/yak/antlr4yak/yakvm -run '^$' -fuzz '^FuzzCoreIncrementalAssignment$' -fuzztime=30s -parallel=2 -timeout=3m
+      - name: Record incremental runtime performance without a noisy time gate
+        env:
+          GOMAXPROCS: '2'
+        run: |
+          set -o pipefail
+          {
+            go version
+            go env GOOS GOARCH
+            go test ./common/yak/antlr4yak/yakvm ./common/yak/antlr4yak -run '^$' -bench '^BenchmarkCoreIncremental' -benchmem -benchtime=200ms -count=3 -timeout=3m
+          } | tee yakvm-incremental-benchmarks.txt
+      - name: Preserve benchmark measurements and incremental coverage
+        uses: actions/upload-artifact@v4
+        with:
+          name: yakvm-incremental-benchmarks-${{ github.event.pull_request.head.sha }}
+          path: |
+            yakvm-incremental-benchmarks.txt
+            yakvm-incremental-coverage.out
+          retention-days: 14
