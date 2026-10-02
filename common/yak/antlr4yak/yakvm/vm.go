@@ -3,7 +3,6 @@ package yakvm
 import (
 	"context"
 	"github.com/yaklang/yaklang/common/utils/limitedmap"
-	"sync"
 
 	"github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm/vmstack"
 )
@@ -51,8 +50,8 @@ type Frame struct {
 	tryStack *vmstack.Stack
 	exitCode ExitCodeType
 
-	// hijacks map[sha1(libName, memberName)]func(any)any
-	hijackMapMemberCallHandlers sync.Map
+	// Immutable member-call handlers captured when this frame is created.
+	hijackMapMemberCallHandlers mapMemberCallHandlers
 	ctx                         context.Context
 	contextData                 map[string]interface{} // 用于引擎执行时函数栈之间的数据传递
 	runeCache                   map[*Value][]rune      // bounded frame-local cache for immutable string values
@@ -150,10 +149,7 @@ func NewSubFrame(parent *Frame) *Frame {
 		asyncExecution: parent.asyncExecution,
 		ThreadID:       parent.ThreadID,
 	}
-	parent.hijackMapMemberCallHandlers.Range(func(key, value any) bool {
-		frame.hijackMapMemberCallHandlers.Store(key, value)
-		return true
-	})
+	frame.hijackMapMemberCallHandlers = parent.hijackMapMemberCallHandlers
 	return frame
 }
 
@@ -191,10 +187,7 @@ func NewFrame(vm *VirtualMachine) *Frame {
 	// Re-linking that shared SafeMap for every call races under concurrent hooks
 	// and is redundant after engine initialization.
 	frame.GlobalVariables = vm.runtimeGlobalVar
-	vm.hijackMapMemberCallHandlers.Range(func(key, value any) bool {
-		frame.hijackMapMemberCallHandlers.Store(key, value)
-		return true
-	})
+	frame.hijackMapMemberCallHandlers = vm.hijackMapMemberCallHandlers.loadSnapshot()
 
 	// debug, 将rootScope加入到debugger中
 	if vm.debugMode && vm.debugger != nil {
