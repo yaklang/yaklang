@@ -3,7 +3,6 @@ package ssaapi
 import (
 	"context"
 	"fmt"
-	"os"
 	"strings"
 
 	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
@@ -38,14 +37,13 @@ func (l *ProgramLayer) Ref(name string) Values {
 // Core model per layer:
 //   - Diff[i].File = this layer's owned additions/modifications (include for scan)
 //   - ExcludeFile  = ∪ all layers' additions ∪ deletions (Base must skip these)
+//
 // Ownership of a path is Diff[i].File itself (no separate owner index).
 type ProgramOverLay struct {
 	Base *Program
 	Diff []*ProgramLayer
 	// ExcludeFile: paths base Ref/Match must skip (owned ∪ deleted).
 	ExcludeFile []string
-
-	AggregatedFS fi.FileSystem
 }
 
 // IsIncrementalCompile 判断这个 program 是否是增量编译的
@@ -307,53 +305,6 @@ func addFileToAggregatedFS(vfs *filesys.VirtualFS, canonicalPath, content string
 	vfs.AddFile(vfsPath, content)
 }
 
-func deleteFileFromAggregatedFS(vfs *filesys.VirtualFS, canonicalPath string) {
-	if vfs == nil || canonicalPath == "" {
-		return
-	}
-	vfsPath := overlayAggregatedFSPath(canonicalPath)
-	if vfsPath == "" {
-		return
-	}
-	if exists, _ := vfs.Exists(vfsPath); exists {
-		_ = vfs.Delete(vfsPath)
-	}
-}
-
-// cloneAndPatchAggregatedFS copies prev FS then applies newLayer FileHashMap (-1 delete, else upsert).
-func cloneAndPatchAggregatedFS(prev fi.FileSystem, newLayer *Program) (*filesys.VirtualFS, error) {
-	out := filesys.NewVirtualFs()
-	if prev != nil {
-		err := filesys.Recursive(".", filesys.WithFileSystem(prev), filesys.WithFileStat(func(path string, info os.FileInfo) error {
-			content, err := prev.ReadFile(path)
-			if err != nil {
-				return nil
-			}
-			addFileToAggregatedFS(out, overlayPathFromAggregatedFS(path), string(content))
-			return nil
-		}))
-		if err != nil {
-			return nil, err
-		}
-	}
-	if newLayer == nil || newLayer.Program == nil {
-		return out, nil
-	}
-	fileHashMap := newLayer.Program.FileHashMap
-	progName := newLayer.GetProgramName()
-	for filePath, hash := range fileHashMap {
-		path := normalizeOverlayFilePath(filePath, progName)
-		if hash == -1 {
-			deleteFileFromAggregatedFS(out, path)
-			continue
-		}
-		if content, ok := readProgramFileContent(newLayer, path); ok {
-			addFileToAggregatedFS(out, path, content)
-		}
-	}
-	return out, nil
-}
-
 // applyLayerFileHashMap appends a Diff layer and applies its FileHashMap directly:
 //   - add/mod  → strip from older Diff.File, own on new layer.File, add to ExcludeFile
 //   - delete   → strip from older Diff.File, add to ExcludeFile (not owned)
@@ -458,42 +409,18 @@ func extendOverlayWithNewLayer(baseOverlay *ProgramOverLay, newLayerProgram *Pro
 	}
 
 	wireOverlayPrograms(overlay)
-	if baseOverlay.AggregatedFS != nil {
-		patched, err := cloneAndPatchAggregatedFS(baseOverlay.AggregatedFS, newLayerProgram)
-		if err != nil {
-			log.Warnf("patch AggregatedFS failed, falling back to full rebuild: %v", err)
-			overlay.rebuildAggregatedFS()
-		} else {
-			overlay.AggregatedFS = patched
-		}
-	} else {
-		overlay.rebuildAggregatedFS()
-	}
 
 	log.Infof("ProgramOverLay: Extended base+%d diffs, exclude=%d files",
 		len(overlay.Diff), len(overlay.ExcludeFile))
 	return overlay
 }
 
-// finishBuild wires programs and builds AggregatedFS from Diff.File + Base − ExcludeFile.
+// finishBuild wires programs. The full source tree is built only by ExpandIncrementalSources.
 func (p *ProgramOverLay) finishBuild() {
 	if p == nil {
 		return
 	}
 	wireOverlayPrograms(p)
-	p.rebuildAggregatedFS()
-}
-
-func (p *ProgramOverLay) rebuildAggregatedFS() {
-	if p == nil {
-		return
-	}
-	aggregatedFS, err := p.aggregateFileSystems()
-	if err != nil {
-		log.Errorf("failed to aggregate file systems: %v", err)
-		return
-	}
-	p.AggregatedFS = aggregatedFS
 }
 
 func NewProgramOverLay(layers ...*Program) *ProgramOverLay {
@@ -513,14 +440,14 @@ func NewProgramOverLay(layers ...*Program) *ProgramOverLay {
 	return createOverlayFromLayers(valid...)
 }
 
-// aggregateFileSystems builds the effective FS from ownership:
-// Diff[i].File → that layer; base FileList − ExcludeFile → Base.
-func (p *ProgramOverLay) aggregateFileSystems() (fi.FileSystem, error) {
+// expandOverlaySources materializes Diff ownership plus base files that are still visible.
+// ExpandIncrementalSources is the only caller.
+func (p *ProgramOverLay) expandOverlaySources() (fi.FileSystem, error) {
 	if p == nil || p.Base == nil {
-		return nil, utils.Errorf("aggregateFileSystems requires Base program")
+		return nil, utils.Errorf("expand overlay sources requires Base program")
 	}
 	if len(p.Diff) == 0 {
-		return nil, utils.Errorf("aggregateFileSystems requires at least one Diff layer")
+		return nil, utils.Errorf("expand overlay sources requires at least one Diff layer")
 	}
 
 	aggregated := filesys.NewVirtualFs()
@@ -575,15 +502,6 @@ func (p *ProgramOverLay) GetFileCount() int {
 	if p == nil {
 		return 0
 	}
-	// Prefer already-built AggregatedFS (exact visible set).
-	if p.AggregatedFS != nil {
-		n := 0
-		_ = filesys.Recursive(".", filesys.WithFileSystem(p.AggregatedFS), filesys.WithFileStat(func(_ string, _ os.FileInfo) error {
-			n++
-			return nil
-		}))
-		return n
-	}
 	// Diff[i].File paths are exclusive after applyLayerFileHashMap; ExcludeFile ⊇ owned.
 	n := 0
 	for _, layer := range p.Diff {
@@ -605,22 +523,6 @@ func (p *ProgramOverLay) GetFileCount() int {
 		}
 	}
 	return n
-}
-
-// GetAggregatedFileSystem 获取聚合后的文件系统
-func (p *ProgramOverLay) GetAggregatedFileSystem() fi.FileSystem {
-	if p == nil {
-		return nil
-	}
-	if p.AggregatedFS == nil {
-		aggregatedFS, err := p.aggregateFileSystems()
-		if err != nil {
-			log.Warnf("failed to rebuild aggregated file system: %v", err)
-			return nil
-		}
-		p.AggregatedFS = aggregatedFS
-	}
-	return p.AggregatedFS
 }
 
 func getValueFilePath(v *Value) string {

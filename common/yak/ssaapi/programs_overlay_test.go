@@ -80,7 +80,7 @@ public class C {
 				require.GreaterOrEqual(t, len(layerNames), 2)
 				require.NotEmpty(t, layerNames[len(layerNames)-1])
 
-				aggFS := overlay.GetAggregatedFileSystem()
+				aggFS := ssatest.ExpandedSources(t, overlay)
 				require.NotNil(t, aggFS)
 				fileSet := make(map[string]bool)
 				filesys.Recursive(".", filesys.WithFileSystem(aggFS), filesys.WithFileStat(func(p string, info fs.FileInfo) error {
@@ -390,7 +390,7 @@ public class NewFile {
 			},
 			Check: func(overlay *ssaapi.ProgramOverLay, _ ssatest.IncrementalCheckStage) {
 				require.NotNil(t, overlay)
-				aggFS := overlay.GetAggregatedFileSystem()
+				aggFS := ssatest.ExpandedSources(t, overlay)
 				require.NotNil(t, aggFS)
 				fileSet := make(map[string]bool)
 				filesys.Recursive(".", filesys.WithFileSystem(aggFS), filesys.WithFileStat(func(p string, info fs.FileInfo) error {
@@ -481,7 +481,7 @@ public class NewFile {
 					return
 				}
 				require.NotNil(t, overlay)
-				aggFS := overlay.GetAggregatedFileSystem()
+				aggFS := ssatest.ExpandedSources(t, overlay)
 				require.NotNil(t, aggFS)
 				fileSet := make(map[string]bool)
 				filesys.Recursive(".", filesys.WithFileSystem(aggFS), filesys.WithFileStat(func(p string, info fs.FileInfo) error {

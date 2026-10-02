@@ -76,7 +76,7 @@ public class NewFile {
 				require.NotNil(t, latestIR)
 				require.True(t, latestIR.IsOverlay)
 
-				agg := overlay.GetAggregatedFileSystem()
+				agg := ssatest.ExpandedSources(t, overlay)
 				require.NotNil(t, agg)
 				fileSet := map[string]bool{}
 				filesys.Recursive(".", filesys.WithFileSystem(agg), filesys.WithFileStat(func(p string, info fs.FileInfo) error {
@@ -260,7 +260,7 @@ public class C {
 				require.Empty(t, overlay.Ref("B"))
 				require.Empty(t, overlay.Ref("Utils"))
 
-				agg := overlay.GetAggregatedFileSystem()
+				agg := ssatest.ExpandedSources(t, overlay)
 				require.NotNil(t, agg)
 				fileSet := map[string]bool{}
 				filesys.Recursive(".", filesys.WithFileSystem(agg), filesys.WithFileStat(func(p string, info fs.FileInfo) error {
