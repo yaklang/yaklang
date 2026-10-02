@@ -142,8 +142,8 @@ func TestBatchDoHTTPRequestUsageExplainsSurveyAndRecovery(t *testing.T) {
 	assert.Assert(t, strings.Contains(usage, "不证明目标安全"))
 	assert.Assert(t, strings.Contains(usage, "用 do_http_request 深测"))
 	assert.Assert(t, strings.Contains(usage, "response_received_count"))
-	assert.Assert(t, !strings.Contains(usage, "{{int("), "usage should not promote range tags")
-	assert.Assert(t, !strings.Contains(usage, "{{list("), "usage should not promote list tags")
+	assert.Assert(t, strings.Contains(usage, "{{int("), "usage should explain bounded FuzzTag range expansion")
+	assert.Assert(t, strings.Contains(usage, "{{list::row("), "usage should explain synchronized FuzzTag expansion")
 	assert.Assert(t, strings.Contains(usage, "{{PATH}}"))
 	assert.Assert(t, strings.Contains(usage, "{{tenant}}"))
 }

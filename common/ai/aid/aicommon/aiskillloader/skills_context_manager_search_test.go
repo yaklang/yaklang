@@ -3,9 +3,10 @@ package aiskillloader
 import (
 	"testing"
 
-	"github.com/yaklang/gorm"
 	_ "github.com/mattn/go-sqlite3"
+	"github.com/yaklang/gorm"
 	"github.com/yaklang/yaklang/common/schema"
+	"github.com/yaklang/yaklang/common/utils/filesys"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 )
 
@@ -180,5 +181,22 @@ func TestManager_DBLoaderIsLazy(t *testing.T) {
 
 	if err := m.LoadSkill("hidden-skill"); err != nil {
 		t.Fatalf("LoadSkill from lazy DB source failed: %v", err)
+	}
+}
+
+func TestDefaultSkillMetadataRespectsExplicitInvocation(t *testing.T) {
+	vfs := filesys.NewVirtualFs()
+	vfs.AddFile("default/SKILL.md", "---\nname: default\ndescription: Auto loaded\nmetadata:\n  auto_load: true\n---\nDefault body")
+	vfs.AddFile("manual/SKILL.md", "---\nname: manual\ndescription: Explicit only\ndisable-model-invocation: true\nmetadata:\n  auto_load: true\n---\nManual body")
+	loader, err := NewAutoSkillLoader(WithAutoLoad_FileSystem(vfs))
+	if err != nil {
+		t.Fatal(err)
+	}
+	manager := NewSkillsContextManager(loader)
+	if !manager.IsAutoSkillLoadedAndUnfolded("default") {
+		t.Fatal("default skill was not loaded")
+	}
+	if manager.IsAutoSkillLoadedAndUnfolded("manual") {
+		t.Fatal("explicit-only skill was loaded automatically")
 	}
 }
