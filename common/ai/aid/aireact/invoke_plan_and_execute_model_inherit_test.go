@@ -48,7 +48,7 @@ func TestReAct_RequestPlanAndExecution_PreservesQualityModelInsideAid(t *testing
 		switch {
 		// Outer ReAct: trigger plan-and-execute (exclude inner subtask loops)
 		case isPrimaryDecisionPrompt(prompt) &&
-			!utils.MatchAllOfSubString(prompt, "PROGRESS_TASK_"):
+			!utils.MatchAllOfSubString(prompt, "PLAN_STATUS_"):
 			rsp.EmitOutputStream(bytes.NewBufferString(`
 {"@action": "object", "next_action": { "type": "request_plan_and_execution", "plan_request_payload": "execute mock tool in aid" },
 "human_readable_thought": "delegate to plan execution", "cumulative_summary": "delegate to aid"}
@@ -70,14 +70,14 @@ func TestReAct_RequestPlanAndExecution_PreservesQualityModelInsideAid(t *testing
 		// verification 收缩为纯观测角色后, satisfied=true 不再自动退出. 内层
 		// 子任务在工具协议执行完毕后 (prompt 中出现中性 "tool/<name>" 标记) 再次进入
 		// 主决策时, 主动 finish 收口子任务.
-		case utils.MatchAllOfSubString(prompt, "PROGRESS_TASK_", "directly_answer", "require_tool") &&
+		case utils.MatchAllOfSubString(prompt, "PLAN_STATUS_", "directly_answer", "require_tool") &&
 			strings.Contains(prompt, "tool/mock_plan_exec_tool"):
 			rsp.EmitOutputStream(bytes.NewBufferString(`{
   "@action": "finish",
   "human_readable_thought": "mocked: subtask tool done"
 }`))
 		// Inner subtask ReAct loop: require tool (no tool output yet)
-		case utils.MatchAllOfSubString(prompt, "PROGRESS_TASK_", "directly_answer", "require_tool"):
+		case utils.MatchAllOfSubString(prompt, "PLAN_STATUS_", "directly_answer", "require_tool"):
 			rsp.EmitOutputStream(bytes.NewBufferString(`
 {"@action": "object", "next_action": { "type": "require_tool", "tool_require_payload": "mock_plan_exec_tool" },
 "human_readable_thought": "call delegated tool", "cumulative_summary": "call delegated tool"}
@@ -95,7 +95,7 @@ func TestReAct_RequestPlanAndExecution_PreservesQualityModelInsideAid(t *testing
   "task_short_summary": "mock tool completed"
 }`))
 		// Task summary
-		case utils.MatchAllOfSubString(prompt, "任务执行引擎", "task_long_summary") && !utils.MatchAllOfSubString(prompt, "PROGRESS_TASK_"):
+		case utils.MatchAllOfSubString(prompt, "任务执行引擎", "task_long_summary") && !utils.MatchAllOfSubString(prompt, "PLAN_STATUS_"):
 			rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "summary", "status_summary": "done", "task_short_summary": "completed", "task_long_summary": "task completed"}`))
 		// verify-satisfaction
 		case utils.MatchAllOfSubString(prompt, "verify-satisfaction", "user_satisfied", "reasoning"):
@@ -147,11 +147,11 @@ func TestReAct_RequestPlanAndExecution_PreservesQualityModelInsideAid(t *testing
 }`))
 		case utils.MatchAllOfSubString(prompt, "verify-satisfaction", "user_satisfied", "reasoning"):
 			rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "verify-satisfaction", "user_satisfied": true, "reasoning": "inner task completed"}`))
-		case utils.MatchAllOfSubString(prompt, "任务执行引擎", "task_long_summary") && !utils.MatchAllOfSubString(prompt, "PROGRESS_TASK_"):
+		case utils.MatchAllOfSubString(prompt, "任务执行引擎", "task_long_summary") && !utils.MatchAllOfSubString(prompt, "PLAN_STATUS_"):
 			rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "summary", "status_summary": "done", "task_short_summary": "completed", "task_long_summary": "inner task completed"}`))
 		case utils.MatchAllOfSubString(prompt, "FINAL_ANSWER", "answer_payload") && !utils.MatchAllOfSubString(prompt, "require_tool"):
 			rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "directly_answer", "answer_payload": "inner summary"}`))
-		case utils.MatchAllOfSubString(prompt, "PROGRESS_TASK_", "directly_answer", "require_tool"):
+		case utils.MatchAllOfSubString(prompt, "PLAN_STATUS_", "directly_answer", "require_tool"):
 			rsp.EmitOutputStream(bytes.NewBufferString(`
 {"@action": "object", "next_action": { "type": "require_tool", "tool_require_payload": "mock_plan_exec_tool" },
 "human_readable_thought": "call delegated tool", "cumulative_summary": "call delegated tool"}

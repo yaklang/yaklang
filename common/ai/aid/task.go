@@ -90,7 +90,7 @@ func (t *AiTask) GetUserInput() string {
 
 		// 添加当前层父任务的输入
 		if task.ParentTask.AIStatefulTaskBase != nil {
-			input := stripPlanContextBlocks(task.ParentTask.AIStatefulTaskBase.GetUserInput())
+			input := strings.TrimSpace(task.ParentTask.AIStatefulTaskBase.GetUserInput())
 			if input != "" {
 				inputs = append(inputs, input)
 			}
@@ -108,7 +108,7 @@ func (t *AiTask) GetUserInput() string {
 	// 获取当前任务的输入
 	var currentInput string
 	if t.AIStatefulTaskBase != nil {
-		currentInput = stripPlanContextBlocks(t.AIStatefulTaskBase.GetUserInput())
+		currentInput = strings.TrimSpace(t.AIStatefulTaskBase.GetUserInput())
 	}
 
 	var rawUserInput string

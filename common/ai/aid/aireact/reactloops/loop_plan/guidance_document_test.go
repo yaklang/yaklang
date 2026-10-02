@@ -226,7 +226,6 @@ func TestGuidanceDocumentTemplate_SectionOrder(t *testing.T) {
 		"WorkingDir":  "/opt/project",
 		"Timeline":    "timeline content",
 		"UserInput":   "user request",
-		"Facts":       "some facts",
 		"Evidence":    "some evidence",
 		"Context":     "some context",
 		"Nonce":       "TEST",
@@ -237,11 +236,11 @@ func TestGuidanceDocumentTemplate_SectionOrder(t *testing.T) {
 	timeIdx := strings.Index(rendered, "Current Time:")
 	timelineIdx := strings.Index(rendered, "Timeline Memory")
 	userInputIdx := strings.Index(rendered, "user request")
-	factsIdx := strings.Index(rendered, "some facts")
+	evidenceIdx := strings.Index(rendered, "some evidence")
 	outputIdx := strings.Index(rendered, "# 输出要求")
 
 	assert.Greater(t, timelineIdx, timeIdx, "Timeline should come after CurrentTime header")
 	assert.Greater(t, userInputIdx, timelineIdx, "UserInput should come after Timeline")
-	assert.Greater(t, factsIdx, userInputIdx, "Facts should come after UserInput")
-	assert.Greater(t, outputIdx, factsIdx, "Output requirements should come after Facts")
+	assert.Greater(t, evidenceIdx, userInputIdx, "Evidence should come after UserInput")
+	assert.Greater(t, outputIdx, evidenceIdx, "Output requirements should come after Evidence")
 }

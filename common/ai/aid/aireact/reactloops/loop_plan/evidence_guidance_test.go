@@ -9,13 +9,12 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 )
 
-func TestGuidanceDocumentTemplate_WithFactsAndEvidence(t *testing.T) {
+func TestGuidanceDocumentTemplate_WithSessionEvidence(t *testing.T) {
 	data := map[string]any{
 		"CurrentTime": "2026-04-14 12:00:00",
 		"OSArch":      "darwin/arm64",
 		"UserInput":   "analyze the target",
-		"Facts":       "- Target is running on port 8080\n- Framework: Spring Boot",
-		"Evidence":    "Nmap scan results show open ports 80, 443, 8080",
+		"Evidence":    "- Target is running on port 8080\n- Framework: Spring Boot\n- Nmap scan results show open ports 80, 443, 8080",
 		"Context":     "## Scan results\nDetailed scan output here",
 		"Timeline":    "- [12:00] Task started",
 		"WorkingDir":  "/home/user/project",

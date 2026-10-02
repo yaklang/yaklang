@@ -66,11 +66,6 @@ func isPlanExplorationPrompt(prompt string) bool {
 		strings.Contains(prompt, "finish_exploration")
 }
 
-func isPlanFactsHookLiteForge(prompt string) bool {
-	return strings.Contains(prompt, "数据处理和总结提示小助手") &&
-		strings.Contains(prompt, `"const": "plan_facts_hook"`)
-}
-
 func isPlanGuidanceDocLiteForge(prompt string) bool {
 	return strings.Contains(prompt, "数据处理和总结提示小助手") &&
 		strings.Contains(prompt, `"const": "plan_guidance_document"`)
@@ -92,13 +87,6 @@ func tryHandleNewPlanFlowPrompt(t *testing.T, config aicommon.AICallerConfigIf, 
 
 		rsp := config.NewAIResponse()
 		rsp.EmitOutputStream(strings.NewReader(`{"@action": "finish_exploration", "human_readable_thought": "Ready to generate plan"}`))
-		rsp.Close()
-		return rsp, true
-	}
-
-	if isPlanFactsHookLiteForge(prompt) {
-		rsp := config.NewAIResponse()
-		rsp.EmitOutputStream(strings.NewReader(`{"@action": "plan_facts_hook", "facts": ""}`))
 		rsp.Close()
 		return rsp, true
 	}

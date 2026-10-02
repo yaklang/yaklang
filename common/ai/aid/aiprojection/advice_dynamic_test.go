@@ -53,7 +53,7 @@ func TestAdvice_DynamicSectionUnderThresholdNoWarning(t *testing.T) {
 func TestAdvice_ReusableAITagInDynamic(t *testing.T) {
 	gc := newGlobalCache(32)
 
-	body := "stable plan facts content - " + strings.Repeat("a", 64)
+	body := "stable plan content content - " + strings.Repeat("a", 64)
 	// 让 dynamic chunk 足够大, 避免 dynamic_section_oversized 干扰 (但顶层 nonce
 	// 用同一字面量, 让 dynamic chunk 自身 hash 也稳定)
 	makeDynamicWithSubtag := func(subtagNonce string) string {
@@ -101,10 +101,10 @@ func TestAdvice_ReusableAITagInDynamic(t *testing.T) {
 func TestAdvice_ReusableAITagStableNonceDoesNotTrigger(t *testing.T) {
 	gc := newGlobalCache(32)
 
-	body := "stable plan facts content - " + strings.Repeat("b", 64)
+	body := "stable plan content content - " + strings.Repeat("b", 64)
 	stableNonce := "abcdef"
 	makeDynamicWithSubtag := func(outerN string) string {
-		inner := "<|FACTS_" + stableNonce + "|>\n" + body + "\n<|FACTS_END_" + stableNonce + "|>"
+		inner := "<|CONTENT_" + stableNonce + "|>\n" + body + "\n<|CONTENT_END_" + stableNonce + "|>"
 		return "<|PROMPT_SECTION_dynamic_" + outerN + "|>\n" + inner + "\n<|PROMPT_SECTION_dynamic_END_" + outerN + "|>"
 	}
 
@@ -115,8 +115,8 @@ func TestAdvice_ReusableAITagStableNonceDoesNotTrigger(t *testing.T) {
 
 	drifts := gc.GetReusableDynamicSubtagDrifts(reusableAITagMinOccurrences)
 	for _, d := range drifts {
-		require.NotEqualf(t, "FACTS", d.TagName,
-			"FACTS subtag uses stable nonce, should not be reported as drift, got: %+v", d)
+		require.NotEqualf(t, "CONTENT", d.TagName,
+			"CONTENT subtag uses stable nonce, should not be reported as drift, got: %+v", d)
 	}
 }
 
@@ -132,7 +132,7 @@ func TestParseDynamicSubtagStartToken_RecognizesValidPatterns(t *testing.T) {
 		nonce   string
 	}{
 		{"PARENT_TASK_abc123", true, "PARENT_TASK", "abc123"},
-		{"FACTS_xyz9", true, "FACTS", "xyz9"},
+		{"CONTENT_xyz9", true, "CONTENT", "xyz9"},
 		{"INSTRUCTION_aBcDeF", true, "INSTRUCTION", "aBcDeF"},
 		{"PARENT_TASK_END_abc123", false, "", ""},
 		{"_abc123", false, "", ""},

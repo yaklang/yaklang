@@ -68,13 +68,13 @@ func TestReAct_PlanAndExecute_InheritsDistinctCallbacks(t *testing.T) {
 			// 时产出的 human_readable_thought="delegate" 会出现在 timeline-open 段.
 			// 检测到它说明 plan 已触发过一轮, 主动 finish 收口.
 			case isPrimaryDecisionPrompt(prompt) &&
-				!utils.MatchAllOfSubString(prompt, "PROGRESS_TASK_") &&
+				!utils.MatchAllOfSubString(prompt, "PLAN_STATUS_") &&
 				strings.Contains(prompt, "plan-exec-delegate-marker"):
 				rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "finish", "human_readable_thought": "mocked: task done after plan execution"}`))
 
 			// Outer ReAct: first free-input → trigger plan-and-execute
 			case isPrimaryDecisionPrompt(prompt) &&
-				!utils.MatchAllOfSubString(prompt, "PROGRESS_TASK_"):
+				!utils.MatchAllOfSubString(prompt, "PLAN_STATUS_"):
 				rsp.EmitOutputStream(bytes.NewBufferString(`
 {"@action": "object", "next_action": { "type": "request_plan_and_execution", "plan_request_payload": "execute callback inherit test" },
 "human_readable_thought": "plan-exec-delegate-marker", "cumulative_summary": "delegate to plan execution"}
@@ -98,7 +98,7 @@ func TestReAct_PlanAndExecute_InheritsDistinctCallbacks(t *testing.T) {
 			// verification 收缩为纯观测角色后, satisfied=true 不再自动退出. 内层
 			// 子任务在工具协议执行完毕后 (prompt 中出现中性 "tool/<name>" 标记) 再次进入
 			// 主决策时, 主动 finish 收口子任务.
-			case utils.MatchAllOfSubString(prompt, "PROGRESS_TASK_", "directly_answer", "require_tool") &&
+			case utils.MatchAllOfSubString(prompt, "PLAN_STATUS_", "directly_answer", "require_tool") &&
 				strings.Contains(prompt, "tool/mock_callback_inherit_tool"):
 				rsp.EmitOutputStream(bytes.NewBufferString(`{
   "@action": "finish",
@@ -106,7 +106,7 @@ func TestReAct_PlanAndExecute_InheritsDistinctCallbacks(t *testing.T) {
 }`))
 
 			// Inner: subtask ReAct loop → require tool (no tool output yet)
-			case utils.MatchAllOfSubString(prompt, "PROGRESS_TASK_", "directly_answer", "require_tool"):
+			case utils.MatchAllOfSubString(prompt, "PLAN_STATUS_", "directly_answer", "require_tool"):
 				rsp.EmitOutputStream(bytes.NewBufferString(`
 {"@action": "object", "next_action": { "type": "require_tool", "tool_require_payload": "mock_callback_inherit_tool" },
 "human_readable_thought": "call tool", "cumulative_summary": "call tool"}
@@ -128,7 +128,7 @@ func TestReAct_PlanAndExecute_InheritsDistinctCallbacks(t *testing.T) {
 
 			// Inner: task summary
 			case utils.MatchAllOfSubString(prompt, "任务执行引擎", "task_long_summary") &&
-				!utils.MatchAllOfSubString(prompt, "PROGRESS_TASK_"):
+				!utils.MatchAllOfSubString(prompt, "PLAN_STATUS_"):
 				rsp.EmitOutputStream(bytes.NewBufferString(`{
   "@action": "summary",
   "status_summary": "done",

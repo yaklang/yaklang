@@ -30,9 +30,9 @@ func collectNodeStreamContent(events []*schema.AiOutputEvent, nodeID string) str
 
 func TestReActLoop_AITagEmptyStreamDoesNotEmitFrontendStream(t *testing.T) {
 	const (
-		factsNodeID = "test-empty-aitag-node"
-		factsTag    = "FACTS"
-		factsField  = "facts"
+		contentNodeID = "test-empty-aitag-node"
+		contentTag    = "CONTENT"
+		contentField  = "content"
 	)
 
 	var (
@@ -47,7 +47,7 @@ func TestReActLoop_AITagEmptyStreamDoesNotEmitFrontendStream(t *testing.T) {
 			rsp := i.NewAIResponse()
 			if callCount == 1 {
 				rsp.EmitOutputStream(bytes.NewBufferString(
-					`{"@action":"capture_facts"}<|FACTS_CURRENT_NONCE|><|FACTS_END_CURRENT_NONCE|>`,
+					`{"@action":"capture_content"}<|CONTENT_CURRENT_NONCE|><|CONTENT_END_CURRENT_NONCE|>`,
 				))
 			} else {
 				rsp.EmitOutputStream(bytes.NewBufferString(`{"@action":"finish","answer":"done"}`))
@@ -64,10 +64,10 @@ func TestReActLoop_AITagEmptyStreamDoesNotEmitFrontendStream(t *testing.T) {
 	require.NoError(t, err)
 
 	loop, err := reactloops.NewReActLoop("empty-aitag-loop", reactIns,
-		reactloops.WithAITagFieldWithAINodeId(factsTag, factsField, factsNodeID, aicommon.TypeTextMarkdown),
+		reactloops.WithAITagFieldWithAINodeId(contentTag, contentField, contentNodeID, aicommon.TypeTextMarkdown),
 		reactloops.WithRegisterLoopAction(
-			"capture_facts",
-			"capture empty facts for empty-stream emit test",
+			"capture_content",
+			"capture empty content for empty-stream emit test",
 			nil,
 			nil,
 			func(loop *reactloops.ReActLoop, action *aicommon.Action, op *reactloops.LoopActionHandlerOperator) {
@@ -91,7 +91,7 @@ func TestReActLoop_AITagEmptyStreamDoesNotEmitFrontendStream(t *testing.T) {
 
 	var streamStartCount, streamDeltaCount int
 	for _, e := range events {
-		if e == nil || e.NodeId != factsNodeID {
+		if e == nil || e.NodeId != contentNodeID {
 			continue
 		}
 		if e.Type == schema.EVENT_TYPE_STREAM_START {
@@ -104,10 +104,10 @@ func TestReActLoop_AITagEmptyStreamDoesNotEmitFrontendStream(t *testing.T) {
 
 	require.Equalf(t, 0, streamStartCount,
 		"empty AITag body should not create frontend stream start on node %q; callCount=%d",
-		factsNodeID, callCount)
+		contentNodeID, callCount)
 	require.Equalf(t, 0, streamDeltaCount,
 		"empty AITag body should not emit frontend stream delta on node %q; callCount=%d",
-		factsNodeID, callCount)
+		contentNodeID, callCount)
 }
 
 func TestReActLoop_FieldEmptyStreamDoesNotEmitFrontendStream(t *testing.T) {
@@ -192,10 +192,10 @@ func TestReActLoop_FieldEmptyStreamDoesNotEmitFrontendStream(t *testing.T) {
 
 func TestReActLoop_AITagChineseStreamKeepsUTF8(t *testing.T) {
 	const (
-		factsNodeID = "test-chinese-aitag-node"
-		factsTag    = "FACTS"
-		factsField  = "facts"
-		expected    = "中文事实：用于验证首字节预读不会打坏 UTF-8。"
+		contentNodeID = "test-chinese-aitag-node"
+		contentTag    = "CONTENT"
+		contentField  = "content"
+		expected      = "中文事实：用于验证首字节预读不会打坏 UTF-8。"
 	)
 
 	var (
@@ -210,7 +210,7 @@ func TestReActLoop_AITagChineseStreamKeepsUTF8(t *testing.T) {
 			rsp := i.NewAIResponse()
 			if callCount == 1 {
 				rsp.EmitOutputStream(bytes.NewBufferString(
-					`{"@action":"capture_facts"}<|FACTS_CURRENT_NONCE|>` + expected + `<|FACTS_END_CURRENT_NONCE|>`,
+					`{"@action":"capture_content"}<|CONTENT_CURRENT_NONCE|>` + expected + `<|CONTENT_END_CURRENT_NONCE|>`,
 				))
 			} else {
 				rsp.EmitOutputStream(bytes.NewBufferString(`{"@action":"finish","answer":"done"}`))
@@ -227,10 +227,10 @@ func TestReActLoop_AITagChineseStreamKeepsUTF8(t *testing.T) {
 	require.NoError(t, err)
 
 	loop, err := reactloops.NewReActLoop("chinese-aitag-loop", reactIns,
-		reactloops.WithAITagFieldWithAINodeId(factsTag, factsField, factsNodeID, aicommon.TypeTextMarkdown),
+		reactloops.WithAITagFieldWithAINodeId(contentTag, contentField, contentNodeID, aicommon.TypeTextMarkdown),
 		reactloops.WithRegisterLoopAction(
-			"capture_facts",
-			"capture chinese facts for utf8 stream test",
+			"capture_content",
+			"capture chinese content for utf8 stream test",
 			nil,
 			nil,
 			func(loop *reactloops.ReActLoop, action *aicommon.Action, op *reactloops.LoopActionHandlerOperator) {
@@ -251,7 +251,7 @@ func TestReActLoop_AITagChineseStreamKeepsUTF8(t *testing.T) {
 
 	eventsMu.Lock()
 	defer eventsMu.Unlock()
-	require.Equal(t, expected, collectNodeStreamContent(events, factsNodeID))
+	require.Equal(t, expected, collectNodeStreamContent(events, contentNodeID))
 }
 
 func TestReActLoop_FieldChineseStreamKeepsUTF8(t *testing.T) {

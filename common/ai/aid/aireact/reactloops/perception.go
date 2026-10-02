@@ -289,7 +289,7 @@ func (pc *perceptionController) getCurrent() *PerceptionState {
 // token budget (~20K tokens). Individual sections are shrunk only when the total
 // would exceed perceptionMaxInputTokens.
 // It returns the core input string and a map of extra template variables
-// (BaseFrame, Facts, Evidence, DynamicContext) for the prompt template.
+// (BaseFrame, Evidence, DynamicContext) for the prompt template.
 func (r *ReActLoop) buildPerceptionInput(trigger string) (string, map[string]string) {
 	var buf strings.Builder
 	extra := make(map[string]string)

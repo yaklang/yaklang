@@ -23,7 +23,7 @@ import (
 
 func isTaskSummaryPrompt(prompt string) bool {
 	return utils.MatchAllOfSubString(prompt, "任务执行引擎", "task_long_summary") &&
-		!utils.MatchAllOfSubString(prompt, "PROGRESS_TASK_")
+		!utils.MatchAllOfSubString(prompt, "PLAN_STATUS_")
 }
 
 func isTestToolParamPrompt(prompt string) bool {

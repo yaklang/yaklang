@@ -19,10 +19,10 @@ func TestPlanningHandoffDoesNotRequestWithdrawnExploration(t *testing.T) {
 	for _, closed := range []bool{false, true} {
 		prompt, err := utils.RenderTemplate(reactiveData, map[string]any{
 			"PlanMode": "deep", "ExplorationClosed": closed,
-			"Facts": "known fact", "Nonce": "test",
+			"Evidence": "SESSION_EVIDENCE_SENTINEL", "Nonce": "test",
 		})
 		require.NoError(t, err)
-		require.Contains(t, prompt, "known fact")
+		require.NotContains(t, prompt, "SESSION_EVIDENCE_SENTINEL", "session evidence belongs to Timeline, not the reactive area")
 		if closed {
 			require.Contains(t, prompt, "当前已关闭信息收集入口")
 			require.Contains(t, prompt, "调用 `finish_exploration`")

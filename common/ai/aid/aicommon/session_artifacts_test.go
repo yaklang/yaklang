@@ -125,7 +125,7 @@ func TestBuildPromptFrozenOpenMaterialsCoordinatesTimelineAndArtifacts(t *testin
 	cfg := NewConfig(context.Background())
 	cfg.Workdir = dir
 	cfg.Timeline = timeline
-	partition, ok := NewFrozenBlockPartition("plan_facts", "Plan Facts", "stable facts", 100)
+	partition, ok := NewFrozenBlockPartition("test_static_context", "Test Static Context", "stable context", 100)
 	require.True(t, ok)
 	cfg.GetOrCreateFrozenBlockPartitionProducer().AppendPartition(partition)
 
@@ -134,7 +134,7 @@ func TestBuildPromptFrozenOpenMaterialsCoordinatesTimelineAndArtifacts(t *testin
 	require.Contains(t, materials.TimelineFrozen, "scan-ok")
 	require.Contains(t, materials.TimelineOpen, "verify-ok")
 	require.Len(t, materials.FrozenPartitions, 1)
-	require.Equal(t, "plan_facts", materials.FrozenPartitions[0].ID)
+	require.Equal(t, "test_static_context", materials.FrozenPartitions[0].ID)
 }
 
 func TestSessionArtifactsAreNotRenderedByPromptTemplates(t *testing.T) {

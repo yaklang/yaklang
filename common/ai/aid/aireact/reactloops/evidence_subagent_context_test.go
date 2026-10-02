@@ -20,7 +20,7 @@ func TestEvidenceSubAgents_ContextModeMixedBatch(t *testing.T) {
 	_, err := cfg.AppendUserInputHistory("PARENT_USER_SENTINEL", time.Now())
 	require.NoError(t, err)
 	require.NoError(t, aicommon.WithPlanPrompt("PARENT_PLAN_SENTINEL")(cfg))
-	cfg.GetOrCreateFrozenBlockPartitionProducer().AppendNewPartition("plan_facts", "plan", "PARENT_FROZEN_SENTINEL", 1)
+	cfg.GetOrCreateFrozenBlockPartitionProducer().AppendNewPartition("test_static_context", "plan", "PARENT_FROZEN_SENTINEL", 1)
 	cfg.ContextProviderManager.Register("host", aicommon.FileContentContextProvider("HOST_CONTEXT_SENTINEL"))
 	end := cfg.ContextProviderManager.BeginTaskContext("attachment", aicommon.FileContentContextProvider("PARENT_ATTACHMENT_SENTINEL"))
 	defer end()

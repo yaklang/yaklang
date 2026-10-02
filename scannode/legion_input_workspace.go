@@ -338,12 +338,12 @@ func legacyAISessionAttachmentRefs(command *aiv1.BindAISessionCommand) []aiSessi
 func managedInputActionAllowed(loopName, actionName string) bool {
 	if loopName == schema.AI_REACT_LOOP_NAME_PLAN {
 		switch actionName {
-		case "finish_exploration", "generate_direct_plan", "begin_deep_planning", "output_facts", "read_file":
+		case "finish_exploration", "generate_direct_plan", "begin_deep_planning", "read_file":
 			return true
 		}
 	}
 	switch actionName {
-	case "finish", "directly_answer", "require_tool", "directly_call_tool", "tool_compose", "tool_batch", "dispatch_sub_react_agents", "request_plan", "request_plan_and_execution", "ask_for_clarification", "list_async_tasks":
+	case schema.AI_REACT_LOOP_ACTION_SAVE_EVIDENCE, "finish", "directly_answer", "require_tool", "directly_call_tool", "tool_compose", "tool_batch", "dispatch_sub_react_agents", "request_plan", "request_plan_and_execution", "ask_for_clarification", "list_async_tasks":
 		return true
 	}
 	if loopName == schema.AI_REACT_LOOP_NAME_PLAN {

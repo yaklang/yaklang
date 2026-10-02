@@ -2,9 +2,12 @@ package aireact
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"strings"
+	"sync"
 	"testing"
+	"time"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	aicommon_testutil "github.com/yaklang/yaklang/common/ai/aid/aicommon/testutil"
@@ -32,8 +35,10 @@ func TestReAct_AnswerWithKnowledge_FullFlow_AITAG_ANSWER(t *testing.T) {
 	manager, token := aicommon.NewMockEKManagerAndToken()
 
 	syncSignal := make(chan bool)
+	var syncOnce sync.Once
 
-	ctx := utils.TimeoutContextSeconds(10)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
 
 	callback := func(i aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 		prompt := req.GetPrompt()
@@ -73,9 +78,13 @@ Go is a statically typed, compiled programming language designed at Google. It s
 			return rsp, nil
 		}
 		if utils.MatchAllOfSubString(prompt, "verify-satisfaction", "user_satisfied") {
-			in <- &ypb.AIInputEvent{ // 触发同步知识事件
+			select {
+			case in <- &ypb.AIInputEvent{ // 触发同步知识事件
 				IsSyncMessage: true,
 				SyncType:      SYNC_TYPE_KNOWLEDGE,
+			}:
+			case <-ctx.Done():
+				return nil, ctx.Err()
 			}
 
 			select {
@@ -91,10 +100,14 @@ Go is a statically typed, compiled programming language designed at Google. It s
 	}
 
 	_, err := NewTestReAct(
+		aicommon.WithContext(ctx),
 		aicommon.WithAICallback(callback),
 		aicommon.WithEventInputChan(in),
 		aicommon.WithEventHandler(func(e *schema.AiOutputEvent) {
-			out <- e.ToGRPC()
+			select {
+			case out <- e.ToGRPC():
+			case <-ctx.Done():
+			}
 		}),
 		aicommon.WithEnhanceKnowledgeManager(manager),
 	)
@@ -128,7 +141,7 @@ LOOP:
 			if e.Type == string(schema.EVENT_TYPE_TASK_ABOUT_KNOWLEDGE) {
 				if utils.MatchAllOfSubString(e.Content, token) {
 					gotSyncKnowledge = true
-					close(syncSignal)
+					syncOnce.Do(func() { close(syncSignal) })
 				}
 			}
 
@@ -145,7 +158,7 @@ LOOP:
 			break LOOP
 		}
 	}
-	close(in)
+	cancel()
 
 	if !gotKnowledge {
 		t.Fatal("Expected knowledge event")

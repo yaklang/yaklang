@@ -157,7 +157,7 @@
 ```json
 {
     "@action": "finish_exploration",
-    "human_readable_thought": "I have gathered sufficient facts about the project structure, tech stack, open ports, and web endpoints. The EVIDENCE document contains all the specific data points needed for plan generation."
+    "human_readable_thought": "I have gathered sufficient evidence about the project structure, tech stack, open ports, and web endpoints. The session evidence contains all the specific data points needed for plan generation."
 }
 ```
 

@@ -31,7 +31,7 @@ func TestStablePromptNonce_DiffPartsDiffNonce(t *testing.T) {
 		StablePromptNonce("plan-scope", "root-1", "PARENT_TASK"),
 		StablePromptNonce("plan-scope", "root-2", "PARENT_TASK"),
 		StablePromptNonce("plan-scope", "root-1", "CURRENT_TASK"),
-		StablePromptNonce("plan-scope", "root-1", "FACTS"),
+		StablePromptNonce("plan-scope", "root-1", "CONTENT"),
 		StablePromptNonce("plan-scope", "root-1", "DOCUMENT"),
 		StablePromptNonce("plan-scope", "root-1", "INSTRUCTION"),
 	}

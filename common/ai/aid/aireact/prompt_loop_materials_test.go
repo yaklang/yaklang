@@ -613,8 +613,8 @@ func TestPromptManager_AssemblePromptPrefix(t *testing.T) {
 	require.Len(t, prefix.Sections, 5)
 	require.Contains(t, prefix.Prompt, "<|TRAITS|>")
 	require.Contains(t, prefix.Prompt, "<|SCHEMA|>")
-	require.NotContains(t, prefix.Prompt, "Plan Facts")
-	require.NotContains(t, prefix.Prompt, "Plan Document")
+	require.NotContains(t, prefix.Prompt, "Test Static Context")
+	require.NotContains(t, prefix.Prompt, "Test Static Guidance")
 	require.Equal(t, "section.high_static", prefix.Sections[0].Key)
 	require.Equal(t, "section.frozen_block", prefix.Sections[1].Key)
 	require.Equal(t, "section.semi_dynamic_1", prefix.Sections[2].Key)
@@ -633,20 +633,20 @@ func TestPromptManager_AssemblePromptPrefix_FrozenPartitionsInFrozenBlock(t *tes
 	)
 	require.NoError(t, err)
 
-	facts, ok := aicommon.NewFrozenBlockPartition("plan_facts", "Plan Facts", "## Facts\n- stable", 100)
+	context, ok := aicommon.NewFrozenBlockPartition("test_static_context", "Test Static Context", "## Context\n- stable", 100)
 	require.True(t, ok)
-	document, ok := aicommon.NewFrozenBlockPartition("plan_document", "Plan Document", "## Document\n- stable", 110)
+	guidance, ok := aicommon.NewFrozenBlockPartition("test_static_guidance", "Test Static Guidance", "## Guidance\n- stable", 110)
 	require.True(t, ok)
 
 	prefix, err := react.promptManager.AssemblePromptPrefix(&aicommon.PromptMaterials{
-		FrozenPartitions: []aicommon.FrozenBlockPartition{document, facts},
+		FrozenPartitions: []aicommon.FrozenBlockPartition{guidance, context},
 	})
 	require.NoError(t, err)
-	require.Contains(t, prefix.FrozenBlock, "# Plan Facts")
-	require.Contains(t, prefix.FrozenBlock, "# Plan Document")
-	require.Less(t, strings.Index(prefix.FrozenBlock, "# Plan Facts"), strings.Index(prefix.FrozenBlock, "# Plan Document"))
-	require.Contains(t, prefix.FrozenBlock, "<|FROZEN_PARTITION_plan_facts_"+facts.Nonce+"|>")
-	require.Contains(t, prefix.FrozenBlock, "<|FROZEN_PARTITION_END_plan_document_"+document.Nonce+"|>")
+	require.Contains(t, prefix.FrozenBlock, "# Test Static Context")
+	require.Contains(t, prefix.FrozenBlock, "# Test Static Guidance")
+	require.Less(t, strings.Index(prefix.FrozenBlock, "# Test Static Context"), strings.Index(prefix.FrozenBlock, "# Test Static Guidance"))
+	require.Contains(t, prefix.FrozenBlock, "<|FROZEN_PARTITION_test_static_context_"+context.Nonce+"|>")
+	require.Contains(t, prefix.FrozenBlock, "<|FROZEN_PARTITION_END_test_static_guidance_"+guidance.Nonce+"|>")
 
 	frozen := prefix.Sections[1]
 	require.Equal(t, "section.frozen_block", frozen.Key)
@@ -654,12 +654,12 @@ func TestPromptManager_AssemblePromptPrefix_FrozenPartitionsInFrozenBlock(t *tes
 	for _, child := range frozen.Children {
 		keys = append(keys, child.Key)
 	}
-	require.Contains(t, keys, "section.frozen_block.partition.plan_facts")
-	require.Contains(t, keys, "section.frozen_block.partition.plan_document")
+	require.Contains(t, keys, "section.frozen_block.partition.test_static_context")
+	require.Contains(t, keys, "section.frozen_block.partition.test_static_guidance")
 }
 
 func TestPromptManager_NewPromptMaterials_ConfigFrozenPartitionProducer(t *testing.T) {
-	produced, ok := aicommon.NewFrozenBlockPartition("plan_facts", "Plan Facts", "## Facts\n- from config", 100)
+	produced, ok := aicommon.NewFrozenBlockPartition("test_static_context", "Test Static Context", "## Context\n- from config", 100)
 	require.True(t, ok)
 	producer := aicommon.NewFrozenBlockPartitionProducer(produced)
 	react, err := NewTestReAct(
@@ -676,7 +676,7 @@ func TestPromptManager_NewPromptMaterials_ConfigFrozenPartitionProducer(t *testi
 		PromptFrozenOpenMaterials: aicommon.BuildPromptFrozenOpenMaterials(react.config),
 	}, nil)
 	require.Len(t, materials.FrozenPartitions, 1)
-	require.Equal(t, "plan_facts", materials.FrozenPartitions[0].ID)
+	require.Equal(t, "test_static_context", materials.FrozenPartitions[0].ID)
 	require.Equal(t, produced.Content, materials.FrozenPartitions[0].Content)
 }
 

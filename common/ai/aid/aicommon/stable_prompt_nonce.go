@@ -91,7 +91,7 @@ type CacheableUserInputProvider interface {
 //     plan-scoped nonce 随之变化, 旧 prefix cache 自然失效, 不会污染新 plan。
 //
 // salt 让同一个 plan 周期内派生多个互不冲突的 nonce (如 "user_query" /
-// "facts" / "document"), 不需要在调用方手工维护 nonce 命名空间。
+// "document" / "context"), 不需要在调用方手工维护 nonce 命名空间。
 //
 // 关键词: PlanScopedNonce, plan epoch nonce, prefix cache, PE-TASK 缓存稳定
 func PlanScopedNonce(rootIdentifier string, salt string) string {

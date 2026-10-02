@@ -66,7 +66,7 @@ type globalCache struct {
 // dynamicSubtagSighting 是 dynamic 段内子 AITag (tag-name + body) 的全局观测.
 // 关键词: dynamicSubtagSighting, AITag drift
 type dynamicSubtagSighting struct {
-	// TagName 是 AITag 名 (例如 "PARENT_TASK", "FACTS")
+	// TagName 是 AITag 名 (例如 "PARENT_TASK", "CONTENT")
 	TagName string
 	// BodyBytes 是 body 字节长度
 	BodyBytes int

@@ -141,8 +141,8 @@ func TestReAct_PlanAndExecute_TaskCancel(t *testing.T) {
 				return rsp, nil
 			}
 
-			// PE 子任务执行 - 匹配包含 PROGRESS_TASK_ 和 planFlag 的 prompt
-			if utils.MatchAllOfSubString(prompt, "PROGRESS_TASK_", planFlag) {
+			// PE 子任务执行 - 匹配包含 PLAN_STATUS_ 和 planFlag 的 prompt
+			if utils.MatchAllOfSubString(prompt, "PLAN_STATUS_", planFlag) {
 				rsp := i.NewAIResponse()
 				rsp.EmitOutputStream(bytes.NewBufferString(`
 {"@action": "require_tool", "tool_require_payload": "` + mockToolName + `", 
@@ -154,7 +154,7 @@ func TestReAct_PlanAndExecute_TaskCancel(t *testing.T) {
 
 			// ReAct 主循环的响应 - 请求 blueprint (forge)
 			if isPrimaryDecisionPrompt(prompt) &&
-				!utils.MatchAllOfSubString(prompt, "PROGRESS_TASK_") {
+				!utils.MatchAllOfSubString(prompt, "PLAN_STATUS_") {
 				rsp := i.NewAIResponse()
 				rsp.EmitOutputStream(bytes.NewBufferString(`
 		{"@action": "object", "next_action": { "type": "require_ai_blueprint", "blueprint_payload": "` + testForgeName + `" },
@@ -171,7 +171,7 @@ func TestReAct_PlanAndExecute_TaskCancel(t *testing.T) {
 				return rsp, nil
 			}
 
-			if utils.MatchAllOfSubString(prompt, "任务执行引擎", "task_long_summary") && !utils.MatchAllOfSubString(prompt, "PROGRESS_TASK_") {
+			if utils.MatchAllOfSubString(prompt, "任务执行引擎", "task_long_summary") && !utils.MatchAllOfSubString(prompt, "PLAN_STATUS_") {
 				rsp := i.NewAIResponse()
 				rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "summary", "status_summary": "done", "task_short_summary": "completed", "task_long_summary": "task completed"}`))
 				rsp.Close()

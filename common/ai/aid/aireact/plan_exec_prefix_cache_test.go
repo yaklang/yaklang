@@ -25,7 +25,6 @@ import (
 func TestPlanExec_PrefixCacheStableWithMockedTieredAI(t *testing.T) {
 	const (
 		intelligentModel = "mock-intelligent-planexec"
-		lightweightModel = "mock-lightweight-planexec"
 		toolName         = "mock_plan_exec_prefix_cache_tool"
 	)
 
@@ -280,7 +279,7 @@ func TestPlanExec_PrefixCacheStableWithMockedTieredAI(t *testing.T) {
 			})), nil
 
 		case isPrimaryDecisionPrompt(prompt) &&
-			!strings.Contains(prompt, "PROGRESS_TASK_"):
+			!strings.Contains(prompt, "PLAN_STATUS_"):
 			return newMockAIResponse(i, intelligentModel, mustJSONString(map[string]any{
 				"@action": "object",
 				"next_action": map[string]any{
@@ -320,7 +319,7 @@ func TestPlanExec_PrefixCacheStableWithMockedTieredAI(t *testing.T) {
 				"reasoning":      "all deterministic mock subtasks finished successfully",
 			})), nil
 
-		case utils.MatchAllOfSubString(prompt, "PROGRESS_TASK_", "directly_answer", "require_tool"):
+		case utils.MatchAllOfSubString(prompt, "PLAN_STATUS_", "directly_answer", "require_tool"):
 			stageCursorMu.Lock()
 			if remainingSubtaskFinishes > 0 {
 				// 本子任务 verification 已观测到 satisfied；finish 后推进 progress 流程。
@@ -364,7 +363,7 @@ func TestPlanExec_PrefixCacheStableWithMockedTieredAI(t *testing.T) {
 			})), nil
 
 		case utils.MatchAllOfSubString(prompt, "任务执行引擎", "task_long_summary") &&
-			!strings.Contains(prompt, "PROGRESS_TASK_"):
+			!strings.Contains(prompt, "PLAN_STATUS_"):
 			return newMockAIResponse(i, intelligentModel, mustJSONString(map[string]any{
 				"@action":            "summary",
 				"status_summary":     "all mocked subtasks completed",
@@ -382,27 +381,10 @@ func TestPlanExec_PrefixCacheStableWithMockedTieredAI(t *testing.T) {
 		return nil, utils.Errorf("unexpected intelligent prompt: %s", utils.ShrinkString(prompt, 240))
 	}
 
-	lightweightMock := func(i aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
-		prompt := req.GetPrompt()
-
-		switch {
-		case isPlanExecFactsHookPrompt(prompt):
-			return newMockAIResponse(i, lightweightModel, mustJSONString(map[string]any{
-				"@action": "plan_facts_hook",
-				"facts": strings.Join([]string{
-					"- 当前链路使用纯 mock AI callback",
-					"- 所有工具结果均由 deterministic mock tool 产生",
-				}, "\n"),
-			})), nil
-		}
-
-		return nil, utils.Errorf("unexpected lightweight prompt: %s", utils.ShrinkString(prompt, 240))
-	}
-
 	_, err = NewTestReAct(
 		aicommon.WithAICallback(intelligentMock),
 		aicommon.WithQualityPriorityAICallback(intelligentMock),
-		aicommon.WithSpeedPriorityAICallback(lightweightMock),
+		aicommon.WithSpeedPriorityAICallback(intelligentMock),
 		aicommon.WithEventInputChan(in),
 		aicommon.WithEventHandler(func(e *schema.AiOutputEvent) {
 			out <- e
@@ -879,11 +861,6 @@ func extractLastCurrentTaskBlock(prompt string) string {
 
 func isPlanExecPlanExplorationPrompt(prompt string) bool {
 	return strings.Contains(prompt, "任务规划使命") && strings.Contains(prompt, "finish_exploration")
-}
-
-func isPlanExecFactsHookPrompt(prompt string) bool {
-	return strings.Contains(prompt, `"const": "plan_facts_hook"`) ||
-		(strings.Contains(prompt, "plan_facts_hook") && strings.Contains(prompt, `"facts"`))
 }
 
 func isPlanExecGuidanceDocPrompt(prompt string) bool {

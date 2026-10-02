@@ -9,7 +9,7 @@ import (
 
 // dynamicSectionOversizeThreshold 是 dynamic 段告警阈值。
 // 单次 prompt 的 dynamic 段超过该阈值时, advice 会提示 "dynamic 段过大", 引导
-// 开发者把里面跨 turn 字节稳定的子标签 (PARENT_TASK / FACTS / DOCUMENT 等)
+// 开发者把里面跨 turn 字节稳定的子标签 (PARENT_TASK / CONTENT / DOCUMENT 等)
 // 迁到 frozen-block 段以提升缓存命中率。
 //
 // 阈值参考 DashScope explicit cache 最低创建大小 (≈ 1024 tokens ≈ 4 KB),
@@ -139,7 +139,7 @@ func buildAdvicesWithCache(rep *HitReport, split *PromptSplit, gc *globalCache) 
 	}
 
 	// 5.0 dynamic 段过大告警: 单次 prompt 的 dynamic chunk 字节超过阈值时, 提示
-	// 开发者考虑把内部跨 turn 字节稳定的子 AITag (PARENT_TASK / FACTS /
+	// 开发者考虑把内部跨 turn 字节稳定的子 AITag (PARENT_TASK / CONTENT /
 	// DOCUMENT / CURRENT_TASK / INSTRUCTION 等) 迁到 frozen-block 段以提升
 	// 缓存命中率。
 	//
@@ -151,7 +151,7 @@ func buildAdvicesWithCache(rep *HitReport, split *PromptSplit, gc *globalCache) 
 		if ch.Bytes > dynamicSectionOversizeThreshold {
 			advices = append(advices, fmt.Sprintf(
 				"[dynamic_section_oversized] dynamic section is %d bytes (> %d threshold); "+
-					"consider hoisting plan-scoped subtags (PARENT_TASK / FACTS / DOCUMENT / CURRENT_TASK / INSTRUCTION) into frozen-block",
+					"consider hoisting plan-scoped subtags (PARENT_TASK / CONTENT / DOCUMENT / CURRENT_TASK / INSTRUCTION) into frozen-block",
 				ch.Bytes, dynamicSectionOversizeThreshold,
 			))
 		}

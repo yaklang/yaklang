@@ -109,12 +109,11 @@ func (r *ReActLoop) buildActionTagOption(emitter *aicommon.Emitter, streamWG *sy
 		// (例如 [current-nonce]), 也会一并注册.
 		//
 		// 兜底 CURRENT_NONCE 的原因: 各 loop 的 persistent_instruction /
-		// output_example 等示例 prompt 普遍写成 `<|FACTS_CURRENT_NONCE|>` /
+		// output_example 等示例 prompt 普遍写成 `<|CONTENT_CURRENT_NONCE|>` /
 		// `<|FINAL_ANSWER_CURRENT_NONCE|>` 等占位符形式, 设计本意是让 AI 替换
 		// 为本 turn 实际 nonce. 但实测部分模型会把 CURRENT_NONCE 当作字面量
 		// 直接照抄输出, 此时只用 turn nonce 注册 callback 会匹配失败, 内容
-		// 丢失, 触发 verifier 5 次重试黑洞 (典型: output_facts: facts content
-		// is required). 双注册让两种输出格式都能命中.
+		// 丢失并触发 verifier 重试。双注册让两种输出格式都能命中。
 		//
 		// 用例: CACHE_TOOL_CALL 块内 TOOL_PARAM_xxx 在 prompt 中用占位符字面量
 		// nonce "[current-nonce]" 渲染保持字节稳定; LLM 既可能照抄字面量,
@@ -153,26 +152,9 @@ func (r *ReActLoop) buildActionTagOption(emitter *aicommon.Emitter, streamWG *sy
 					return
 				}
 
-				// JSON-embedded AITag wrapper de-dup:
-				// 同一个字段 (例如 facts) 会被 ActionMaker 同时通过 JSON 字段流和 AITag
-				// 流两条路径推到当前 handler 里, 各 emit 一次, 导致前端"事实"事件重复.
-				//
-				// 实测中, 如果 AI 把 `<|FACTS_<nonce>|>...<|FACTS_END_<nonce>|>` 整段
-				// 塞进 JSON `facts` 字符串值 (不论是把 wrappers 当字面量包进去, 还是
-				// 同时又在 JSON 外再写一遍 AITag 块), JSON 路径会带着 wrappers 推到这
-				// 里, 而 AITag 路径会另起一路推干净的内层. 用户看到一条带 `<|...|>` 字
-				// 面量+反斜杠 n 的丑文本, 一条干净的 markdown, 极差体验.
-				//
-				// 修法: peek 流首批字节, 若 (跳过 JSON token 边界字符如外层 `"` 与
-				// 空白后) 以本 tag 的起始 token `<|TagName_` 开头, 判定这是 JSON 路径
-				// 误报的重复, 静默 drain 不再 emit, 让 AITag 路径专心输出干净版本.
-				// 注意 JSON 字段流推过来的 raw bytes 通常包含外层引号 (例如
-				// `"<|FACTS_...<|FACTS_END_..."`), 这是和 AITag 路径推过来的纯内层
-				// 内容的关键区分点; 不能只匹配 `<|TagName_` 而要兼容前置 `"` /
-				// whitespace.
-				//
-				// 关键词: 字段流去重, JSON-embedded AITag, FACTS 重复 emit 修复,
-				//        peek 检测 <|TagName_ 前缀, 兼容 JSON 外层引号, drain 静默丢弃
+				// AITag 包裹出现在 JSON 字段中时，两条流路径可能重复输出同一内容。
+				// 跳过引号和空白后检测起始标签，丢弃 JSON 路径的重复流；
+				// AITag 路径仍输出干净的内层内容。
 				wrapperToken := "<|" + v.TagName + "_"
 				const peekWindow = 32
 				peeked, _ := peekedReader.Peek(peekWindow)
