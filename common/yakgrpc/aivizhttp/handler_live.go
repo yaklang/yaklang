@@ -3,8 +3,8 @@ package aivizhttp
 import (
 	"net/http"
 
-	"github.com/yaklang/yaklang/common/ai/aid"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact"
+	"github.com/yaklang/yaklang/common/ai/aid/coordinator_legacy"
 )
 
 // LiveSession 表示一个正在运行的 AI agent session
@@ -42,7 +42,7 @@ func (s *VizHTTPServer) handleListLiveSessions(w http.ResponseWriter, r *http.Re
 	}
 
 	// 2. Coordinator sessions
-	for _, c := range aid.GetRunningCoordinators() {
+	for _, c := range coordinator_legacy.GetRunningCoordinators() {
 		if c == nil || c.Config == nil {
 			continue
 		}

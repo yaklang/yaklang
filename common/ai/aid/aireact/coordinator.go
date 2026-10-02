@@ -8,8 +8,8 @@ import (
 	"sync"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
-	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
-	"github.com/yaklang/yaklang/common/ai/aid/loop_coordinator"
+	"github.com/yaklang/yaklang/common/ai/aid/coordinator"
+	"github.com/yaklang/yaklang/common/ai/aid/coordinator_legacy"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 )
@@ -29,27 +29,24 @@ func (r *ReAct) coordinatorChannel(id string) (string, error) {
 		if err := json.Unmarshal([]byte(record.TaskProgress), &progress); err != nil {
 			return "", err
 		}
-		if progress.Engine != "" && progress.Engine != loop_coordinator.Name && progress.Engine != "legacy" && progress.Engine != loop_coordinator.LegacyName {
+		if progress.Engine != "" && progress.Engine != coordinator.Name && progress.Engine != "legacy" && progress.Engine != coordinator_legacy.Name {
 			return "", fmt.Errorf("unknown stored plan engine %q", progress.Engine)
 		}
 		hasSnapshot := len(progress.State) > 0 && string(progress.State) != "null"
-		if hasSnapshot && (progress.Engine == "legacy" || progress.Engine == loop_coordinator.LegacyName) {
+		if hasSnapshot && (progress.Engine == "legacy" || progress.Engine == coordinator_legacy.Name) {
 			return "", fmt.Errorf("stored legacy plan contains a native coordinator snapshot")
 		}
-		if progress.Engine == loop_coordinator.Name || hasSnapshot {
-			return loop_coordinator.Name, nil
+		if progress.Engine == coordinator.Name || hasSnapshot {
+			return coordinator.Name, nil
 		}
-		return loop_coordinator.LegacyName, nil
+		return "", fmt.Errorf("legacy PLAN execution is disabled; create a new coordinator plan")
 	}
-	if r.config.Focus == loop_coordinator.Name {
-		return loop_coordinator.Name, nil
-	}
-	return loop_coordinator.LegacyName, nil
+	return coordinator.Name, nil
 }
 
 type nativePlanCoordinatorSession struct {
 	r               *ReAct
-	session         *loop_coordinator.Session
+	session         *coordinator.Session
 	input, approved *aicommon.ExecutePlanInput
 	manual          bool
 	events          map[string]any
@@ -71,13 +68,6 @@ func (s *nativePlanCoordinatorSession) ReviewPlan(ctx context.Context) error {
 }
 
 func (r *ReAct) BeginPlanCoordinatorSession(ctx context.Context, input *aicommon.ExecutePlanInput, forceManual bool) (aicommon.PlanCoordinatorSession, error) {
-	channel, err := r.coordinatorChannel("")
-	if err != nil {
-		return nil, err
-	}
-	if channel == loop_coordinator.LegacyName {
-		return r.beginLegacyPlanCoordinatorSession(ctx, input, forceManual)
-	}
 	if input == nil || strings.TrimSpace(input.PlanData) == "" {
 		return nil, fmt.Errorf("execute plan input is empty")
 	}
@@ -93,7 +83,7 @@ func (r *ReAct) BeginPlanCoordinatorSession(ctx context.Context, input *aicommon
 	return &nativePlanCoordinatorSession{r: r, session: session, input: input, manual: forceManual, events: events}, nil
 }
 
-func (r *ReAct) newNativeInputSession(ctx context.Context, query, taskID string) (*loop_coordinator.Session, error) {
+func (r *ReAct) newNativeInputSession(ctx context.Context, query, taskID string) (*coordinator.Session, error) {
 	if ctx == nil {
 		ctx = r.config.GetContext()
 	}
@@ -104,17 +94,10 @@ func (r *ReAct) newNativeInputSession(ctx context.Context, query, taskID string)
 		}
 		task = aicommon.NewStatefulTaskBase(taskID, query, ctx, r.Emitter, true)
 	}
-	return loop_coordinator.FromRuntime(ctx, r, task, "")
+	return coordinator.FromRuntime(ctx, r, task, "")
 }
 
 func (r *ReAct) PublishDetachedPlan(ctx context.Context, input *aicommon.ExecutePlanInput, reactTaskID string) (string, error) {
-	channel, err := r.coordinatorChannel("")
-	if err != nil {
-		return "", err
-	}
-	if channel == loop_coordinator.LegacyName {
-		return r.publishLegacyDetachedPlan(ctx, input, reactTaskID)
-	}
 	if input == nil {
 		return "", fmt.Errorf("execute plan input is nil")
 	}
@@ -130,37 +113,28 @@ func (r *ReAct) PublishDetachedPlan(ctx context.Context, input *aicommon.Execute
 }
 
 func (r *ReAct) invokePlanOnly(done chan struct{}, ctx context.Context, opts ...InvokePlanAndExecuteOption) error {
-	channel, err := r.coordinatorChannel(newInvokePlanAndExecuteOptions(opts...).coordinatorID)
+	_, err := r.coordinatorChannel(newInvokePlanAndExecuteOptions(opts...).coordinatorID)
 	if err != nil {
 		close(done)
 		return err
-	}
-	if channel == loop_coordinator.LegacyName {
-		return r.invokeLegacyPlanOnly(done, ctx, opts...)
 	}
 	return r.invokeNativeCoordinator(done, ctx, true, opts...)
 }
 
 func (r *ReAct) invokePlanExecuteOnly(done chan struct{}, ctx context.Context, opts ...InvokePlanAndExecuteOption) error {
-	channel, err := r.coordinatorChannel(newInvokePlanAndExecuteOptions(opts...).coordinatorID)
+	_, err := r.coordinatorChannel(newInvokePlanAndExecuteOptions(opts...).coordinatorID)
 	if err != nil {
 		close(done)
 		return err
-	}
-	if channel == loop_coordinator.LegacyName {
-		return r.invokeLegacyPlanExecuteOnly(done, ctx, opts...)
 	}
 	return r.invokeNativeCoordinator(done, ctx, false, opts...)
 }
 
 func (r *ReAct) invokeExecutePlan(done chan struct{}, ctx context.Context, opts ...InvokePlanAndExecuteOption) error {
-	channel, err := r.coordinatorChannel(newInvokePlanAndExecuteOptions(opts...).coordinatorID)
+	_, err := r.coordinatorChannel(newInvokePlanAndExecuteOptions(opts...).coordinatorID)
 	if err != nil {
 		close(done)
 		return err
-	}
-	if channel == loop_coordinator.LegacyName {
-		return r.invokeLegacyExecutePlan(done, ctx, opts...)
 	}
 	if newInvokePlanAndExecuteOptions(opts...).executePlanInput == nil {
 		close(done)
@@ -169,29 +143,9 @@ func (r *ReAct) invokeExecutePlan(done chan struct{}, ctx context.Context, opts 
 	return r.invokeNativeCoordinator(done, ctx, false, opts...)
 }
 
-func init() {
-	// Expose the legacy channel through the same focus metadata API. Normal
-	// entry dispatches before loop construction; this adapter also supports a
-	// caller that directly uses the loop registry, without an extra model call.
-	_ = reactloops.RegisterLoopFactory(loop_coordinator.LegacyName, func(r aicommon.AIInvokeRuntime, opts ...reactloops.ReActLoopOption) (*reactloops.ReActLoop, error) {
-		owner, ok := r.(*ReAct)
-		if !ok {
-			return nil, fmt.Errorf("coordinator_legacy requires a ReAct session")
-		}
-		opts = append(opts, reactloops.WithInitTask(func(_ *reactloops.ReActLoop, task aicommon.AIStatefulTask, op *reactloops.InitTaskOperator) {
-			if err := owner.invokeLegacyPlanAndExecute(make(chan struct{}), task.GetContext(), WithInvokePlanAndExecuteTask(task), WithInvokePlanAndExecutePlanPayload(task.GetUserInput())); err != nil {
-				op.Failed(err)
-			} else {
-				op.Done()
-			}
-		}))
-		return reactloops.NewReActLoop(loop_coordinator.LegacyName, r, opts...)
-	}, reactloops.WithVerboseName("Coordinator Legacy"), reactloops.WithVerboseNameZh("任务协调（旧版）"), reactloops.WithLoopDescription("Original PLAN implementation, isolated from the native coordinator runtime."))
-}
-
 func configureCoordinatorChannel(cfg *aicommon.Config) {
-	if cfg.Focus == loop_coordinator.Name {
-		_ = loop_coordinator.WithNativeHelpers()(cfg)
+	if cfg.Focus == coordinator.Name {
+		_ = coordinator.WithNativeHelpers()(cfg)
 	}
 }
 
@@ -206,8 +160,9 @@ func (r *ReAct) invokePlanAndExecute(done chan struct{}, ctx context.Context, op
 }
 
 func (r *ReAct) invokeCoordinatorChannel(channel string, done chan struct{}, ctx context.Context, opts ...InvokePlanAndExecuteOption) (err error) {
-	if channel == loop_coordinator.LegacyName {
-		return r.invokeLegacyPlanAndExecute(done, ctx, opts...)
+	if channel != coordinator.Name {
+		close(done)
+		return fmt.Errorf("legacy PLAN execution is disabled; use coordinator")
 	}
 	return r.invokeNativeCoordinator(done, ctx, false, opts...)
 }
@@ -227,7 +182,7 @@ func (r *ReAct) invokeNativeCoordinator(done chan struct{}, ctx context.Context,
 	if task == nil {
 		task = aicommon.NewStatefulTaskBase("coordinator-request", cfg.planPayload, ctx, r.Emitter, true)
 	}
-	session, err := loop_coordinator.FromRuntime(ctx, r, task, cfg.coordinatorID)
+	session, err := coordinator.FromRuntime(ctx, r, task, cfg.coordinatorID)
 	if err != nil {
 		return err
 	}

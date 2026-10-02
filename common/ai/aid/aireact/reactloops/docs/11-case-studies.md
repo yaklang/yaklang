@@ -166,7 +166,7 @@ finalAnswerAction(r),
 
 ### 关键配置
 
-源码 [loop_plan/init.go](../loop_plan/init.go)（以下节选关键配置）：
+源码 [coordinator_legacy/loop_plan/init.go](../../../coordinator_legacy/loop_plan/init.go)（以下节选关键配置）：
 
 ```go
 reactloops.WithAllowRAG(false)
@@ -213,7 +213,7 @@ if isLastIteration {
 2. `generatePlanFromDocument`：再把文档转成可执行计划
 3. 流式输出到不同 NodeId
 
-源码 [loop_plan/generate_document_and_plan.go](../loop_plan/generate_document_and_plan.go)。
+源码 [loop_plan/generate_document_and_plan.go](../../../coordinator_legacy/loop_plan/generate_document_and_plan.go)。
 
 ### 学到什么
 

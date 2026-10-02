@@ -4,8 +4,8 @@ import (
 	"context"
 	"slices"
 
-	"github.com/yaklang/yaklang/common/ai/aid"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
+	"github.com/yaklang/yaklang/common/ai/aid/coordinator_legacy"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools/yakscripttools"
 	"github.com/yaklang/yaklang/common/schema"
@@ -146,8 +146,8 @@ var (
 	}
 	WithDisallowRequireForUserPrompt = aicommon.WithDisallowRequireForUserPrompt
 	WithAICallback                   = aicommon.WithAICallback
-	WithPromptContextProvider        = aid.WithPromptContextProvider
-	WithResultHandler                = aid.WithResultHandler
+	WithPromptContextProvider        = coordinator_legacy.WithPromptContextProvider
+	WithResultHandler                = coordinator_legacy.WithResultHandler
 
 	// aitools
 	AllYakScriptTools = yakscripttools.GetAllYakScriptAiTools
@@ -198,7 +198,7 @@ func NewForgeBlueprint(name string, opts ...any) *aiforge.ForgeBlueprint {
 	aiforgeOpts = append(aiforgeOpts, aiforge.WithAIOptions(ag.AICommonOptions()...))
 	return aiforge.NewForgeBlueprint(name, aiforgeOpts...)
 }
-func NewExecutorFromForge(forge *aiforge.ForgeBlueprint, i any, opts ...any) (*aid.Coordinator, error) {
+func NewExecutorFromForge(forge *aiforge.ForgeBlueprint, i any, opts ...any) (*coordinator_legacy.Coordinator, error) {
 	ag := NewAgent(opts...)
 	ag.ForgeName = forge.Name
 	params := aiforge.Any2ExecParams(i)
@@ -221,7 +221,7 @@ func NewExecutorFromForge(forge *aiforge.ForgeBlueprint, i any, opts ...any) (*a
 // coordinator = aiagent.NewExecutorFromJson(forgeJson, {"query": "hello"})~
 // dump(coordinator)
 // ```
-func NewExecutorFromJson(json string, i any, opts ...any) (*aid.Coordinator, error) {
+func NewExecutorFromJson(json string, i any, opts ...any) (*coordinator_legacy.Coordinator, error) {
 	bp, err := aiforge.NewYakForgeBlueprintConfigFromJson(json)
 	if err != nil {
 		return nil, err
@@ -246,7 +246,7 @@ func NewExecutorFromJson(json string, i any, opts ...any) (*aid.Coordinator, err
 // coordinator = aiagent.NewExecutor("my-forge", {"query": "hello"})~
 // dump(coordinator)
 // ```
-func NewForgeExecutor(name string, i any, opts ...any) (*aid.Coordinator, error) {
+func NewForgeExecutor(name string, i any, opts ...any) (*coordinator_legacy.Coordinator, error) {
 	params := aiforge.Any2ExecParams(i)
 	ag := NewAgent(opts...)
 	bp := NewForgeBlueprint(name, opts...)

@@ -7,7 +7,7 @@ import (
 )
 
 // This file provides shared prompt-matcher helpers used by test mock AI
-// callbacks across packages (common/ai/aid/test, common/ai/aid/aireact, and
+// callbacks across packages (common/ai/aid/coordinator_legacy/integration, common/ai/aid/aireact, and
 // reactloopstests) to classify which role-prompt the AI received so the mock
 // can return an appropriate canned response.
 //

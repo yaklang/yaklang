@@ -5,9 +5,9 @@ import (
 	"os"
 	"strings"
 
-	"github.com/yaklang/yaklang/common/ai/aid"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon/promptloader"
+	"github.com/yaklang/yaklang/common/ai/aid/coordinator_legacy"
 	"github.com/yaklang/yaklang/common/aireducer"
 	"github.com/yaklang/yaklang/common/chunkmaker"
 	"github.com/yaklang/yaklang/common/utils/chanx"
@@ -644,7 +644,7 @@ func AnalyzeSingleMedia(mediaPath string, opts ...any) (<-chan AnalysisResult, e
 	indexedChannel := chanx.NewUnlimitedChan[chunkmaker.Chunk](analyzeConfig.Ctx, 100)
 	count := 0
 	ar, err := aireducer.NewReducerEx(cm,
-		aireducer.WithReducerCallback(func(config *aireducer.Config, memory *aid.PromptContextProvider, chunk chunkmaker.Chunk) error {
+		aireducer.WithReducerCallback(func(config *aireducer.Config, memory *coordinator_legacy.PromptContextProvider, chunk chunkmaker.Chunk) error {
 			analyzeConfig.AnalyzeLog("chunk index[%d] size:%v Analyzing media type [%s]", count, utils.ByteSize(uint64(chunk.BytesSize())), chunk.MIMEType().String())
 			indexedChannel.SafeFeed(chunk)
 			count++

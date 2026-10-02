@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
+	"github.com/yaklang/yaklang/common/ai/aid/coordinator_legacy"
 
 	"github.com/yaklang/yaklang/common/ai/aid"
 	"github.com/yaklang/yaklang/common/ai/aispec"
@@ -130,7 +131,7 @@ func (s *Server) StartAITask(stream ypb.Yak_StartAITaskServer) error {
 	} else {
 		log.Info("call without forgeName, use 'forge_triage' as default")
 
-		cod, err := aid.NewCoordinatorContext(baseCtx, utils.InterfaceToString(params), append(configOption, aicommon.WithID(currentCoordinatorId))...)
+		cod, err := coordinator_legacy.NewCoordinatorContext(baseCtx, utils.InterfaceToString(params), append(configOption, aicommon.WithID(currentCoordinatorId))...)
 		if err != nil {
 			log.Errorf("create ai coordinator failed: %v", err)
 			return err

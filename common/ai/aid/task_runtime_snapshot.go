@@ -74,7 +74,7 @@ type TaskRuntimeReport struct {
 }
 
 // BuildTaskRuntimeReport aggregates async / executing tasks and recent timeline text.
-func BuildTaskRuntimeReport(source ReactRuntimeSource) *TaskRuntimeReport {
+func BuildTaskRuntimeReport(source ReactRuntimeSource, plans ...PlanExecutionRuntimeSnapshot) *TaskRuntimeReport {
 	report := &TaskRuntimeReport{
 		GeneratedAt: time.Now().Format(time.RFC3339),
 	}
@@ -127,12 +127,8 @@ func BuildTaskRuntimeReport(source ReactRuntimeSource) *TaskRuntimeReport {
 		addUnique(&queuedTasks, entry)
 	}
 
-	for _, coordinator := range snapshotRunningCoordinators() {
-		peSnapshot := buildPlanExecutionSnapshot(coordinator, source.GetCurrentPlanExecutionTask())
-		if peSnapshot == nil {
-			continue
-		}
-		report.PlanExecutions = append(report.PlanExecutions, *peSnapshot)
+	for _, peSnapshot := range plans {
+		report.PlanExecutions = append(report.PlanExecutions, peSnapshot)
 		for _, entry := range peSnapshot.Tasks {
 			if entry.AsyncMode {
 				addUnique(&asyncTasks, entry)
@@ -149,56 +145,6 @@ func BuildTaskRuntimeReport(source ReactRuntimeSource) *TaskRuntimeReport {
 	return report
 }
 
-func buildPlanExecutionSnapshot(c *Coordinator, planHolder aicommon.AIStatefulTask) *PlanExecutionRuntimeSnapshot {
-	if c == nil || c.Config == nil {
-		return nil
-	}
-	snapshot := &PlanExecutionRuntimeSnapshot{
-		CoordinatorID: c.Config.Id,
-	}
-	if planHolder != nil {
-		snapshot.AsyncReactTaskID = planHolder.GetId()
-	}
-	if c.runtime != nil {
-		progress := c.runtime.progressSnapshot()
-		snapshot.CurrentStage = progress.currentStage
-		snapshot.ActiveTaskIDs = append([]string(nil), progress.activeTaskIDs...)
-		snapshot.CurrentTaskID = progress.currentTaskID
-		snapshot.TotalTasks = progress.totalTasks
-		snapshot.CompletedTasks = progress.currentIndex - len(progress.activeTaskIDs)
-		if snapshot.CompletedTasks < 0 {
-			snapshot.CompletedTasks = 0
-		}
-	}
-	root := c.rootTask
-	if root == nil && c.runtime != nil {
-		root = c.runtime.RootTask
-	}
-	if root != nil {
-		snapshot.RootTaskName = root.Name
-		activeSet := make(map[string]struct{}, len(snapshot.ActiveTaskIDs))
-		for _, id := range snapshot.ActiveTaskIDs {
-			activeSet[id] = struct{}{}
-		}
-		walkAiTaskTree(root, "", func(task *AiTask, parentIndex string) {
-			if task == nil {
-				return
-			}
-			_, inActive := activeSet[task.TaskId]
-			entry := buildAiTaskEntry("plan_exec", snapshot.CoordinatorID, reportReActIDFromCoordinator(c), task, parentIndex, inActive || task.executing())
-			snapshot.Tasks = append(snapshot.Tasks, entry)
-		})
-	}
-	return snapshot
-}
-
-func reportReActIDFromCoordinator(c *Coordinator) string {
-	if c == nil || c.Config == nil {
-		return ""
-	}
-	return c.Config.Id
-}
-
 func buildStatefulTaskEntry(scope, reactID, coordinatorID string, task aicommon.AIStatefulTask, fallbackTimeline *aicommon.Timeline, forceExecuting bool) TaskRuntimeEntry {
 	entry := TaskRuntimeEntry{
 		Scope:         scope,
@@ -212,10 +158,12 @@ func buildStatefulTaskEntry(scope, reactID, coordinatorID string, task aicommon.
 	if name := task.GetName(); name != "" {
 		entry.Name = name
 	}
-	if peTask, ok := task.(*AiTask); ok {
-		entry = enrichAiTaskEntry(entry, peTask, "")
+	if provider, ok := task.(interface {
+		EnrichTaskRuntimeEntry(TaskRuntimeEntry) TaskRuntimeEntry
+	}); ok {
+		entry = provider.EnrichTaskRuntimeEntry(entry)
 	} else {
-		entry.RecentTextOutputs = recentTextOutputsFromTimeline(fallbackTimeline, defaultRecentTextOutputLimit)
+		entry.RecentTextOutputs = RecentTaskTextOutputs(fallbackTimeline, defaultRecentTextOutputLimit)
 	}
 	if entry.AsyncMode && !task.IsFinished() {
 		entry.Executing = true
@@ -223,57 +171,7 @@ func buildStatefulTaskEntry(scope, reactID, coordinatorID string, task aicommon.
 	return entry
 }
 
-func buildAiTaskEntry(scope, coordinatorID, reactID string, task *AiTask, parentIndex string, forceExecuting bool) TaskRuntimeEntry {
-	entry := TaskRuntimeEntry{
-		Scope:         scope,
-		ReActID:       reactID,
-		CoordinatorID: coordinatorID,
-		TaskIndex:     task.Index,
-		Name:          task.Name,
-		Goal:          utils.ShrinkString(task.Goal, 240),
-		ParentIndex:   parentIndex,
-		Executing:     forceExecuting || task.executing(),
-	}
-	if task.AIStatefulTaskBase != nil {
-		entry.TaskID = task.GetId()
-		entry.Status = string(task.GetStatus())
-		entry.AsyncMode = task.IsAsyncMode()
-		entry.Executing = entry.Executing || task.GetStatus() == aicommon.AITaskState_Processing
-		if name := task.GetName(); name != "" && entry.Name == "" {
-			entry.Name = name
-		}
-	} else {
-		entry.TaskID = task.Index
-		if entry.Name == "" {
-			entry.Name = task.Index
-		}
-	}
-	entry = enrichAiTaskEntry(entry, task, parentIndex)
-	return entry
-}
-
-func enrichAiTaskEntry(entry TaskRuntimeEntry, task *AiTask, parentIndex string) TaskRuntimeEntry {
-	if task == nil {
-		return entry
-	}
-	if entry.TaskIndex == "" {
-		entry.TaskIndex = task.Index
-	}
-	if parentIndex != "" {
-		entry.ParentIndex = parentIndex
-	} else if task.ParentTask != nil {
-		entry.ParentIndex = task.ParentTask.Index
-	}
-	entry.HasTimelineFork = task.timelineFork != nil && task.timelineFork.Branch != nil
-	timeline := task.CurrentTimeline()
-	if timeline == nil && task.Coordinator != nil && task.Coordinator.Config != nil {
-		timeline = task.Coordinator.Config.GetTimeline()
-	}
-	entry.RecentTextOutputs = recentTextOutputsFromTimeline(timeline, defaultRecentTextOutputLimit)
-	return entry
-}
-
-func recentTextOutputsFromTimeline(timeline *aicommon.Timeline, limit int) []TaskTextOutput {
+func RecentTaskTextOutputs(timeline *aicommon.Timeline, limit int) []TaskTextOutput {
 	if timeline == nil || limit <= 0 {
 		return nil
 	}
@@ -297,14 +195,4 @@ func recentTextOutputsFromTimeline(timeline *aicommon.Timeline, limit int) []Tas
 		})
 	}
 	return result
-}
-
-func walkAiTaskTree(task *AiTask, parentIndex string, visit func(task *AiTask, parentIndex string)) {
-	if task == nil || visit == nil {
-		return
-	}
-	visit(task, parentIndex)
-	for _, sub := range task.Subtasks {
-		walkAiTaskTree(sub, task.Index, visit)
-	}
 }

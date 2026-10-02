@@ -190,6 +190,11 @@ func (s *Server) startAIReActWithOptions(stream ypb.Yak_StartAIReActServer, load
 			if event.GetIsStart() {
 				continue
 			}
+			if event.GetIsSyncMessage() && event.GetSyncType() == "execute_detached_plan" {
+				// Log routing metadata only: approval payloads may contain private
+				// plan documents. Pair this with the admission/rejection log.
+				log.Infof("detached plan approval received: session=%s sync=%s", startParams.GetTimelineSessionID(), event.GetSyncID())
+			}
 			if err := connection.Send(event); err != nil {
 				if !createdRuntime && event.GetIsSyncMessage() && event.GetSyncType() == aicommon.SYNC_TYPE_RECOVERY_HISTORY {
 					log.Warnf("send attached recovery history failed: %v", err)

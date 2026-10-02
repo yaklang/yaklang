@@ -4,7 +4,7 @@ import (
 	"context"
 	"time"
 
-	"github.com/yaklang/yaklang/common/ai/aid"
+	"github.com/yaklang/yaklang/common/ai/aid/coordinator_legacy"
 	"github.com/yaklang/yaklang/common/chunkmaker"
 	"github.com/yaklang/yaklang/common/utils"
 )
@@ -52,14 +52,14 @@ graph TD
   style K fill:#e8f5e8
 */
 
-type ReducerCallbackType func(config *Config, memory *aid.PromptContextProvider, chunk chunkmaker.Chunk) error
+type ReducerCallbackType func(config *Config, memory *coordinator_legacy.PromptContextProvider, chunk chunkmaker.Chunk) error
 
 type Config struct {
 	ctx    context.Context
 	cancel context.CancelFunc
 
 	// save status in timeline and memory
-	Memory *aid.PromptContextProvider
+	Memory *coordinator_legacy.PromptContextProvider
 
 	// time trigger mean chunk trigger interval, if set to 0, it will not trigger by time.
 	TimeTriggerInterval time.Duration
@@ -79,7 +79,7 @@ type Config struct {
 
 	// Reducer Worker Callback
 	callback       ReducerCallbackType
-	finishCallback func(config *Config, memory *aid.PromptContextProvider) error
+	finishCallback func(config *Config, memory *coordinator_legacy.PromptContextProvider) error
 }
 
 type Option func(*Config)
@@ -168,7 +168,7 @@ func WithReducerCallback(callback ReducerCallbackType) Option {
 // ```
 func WithSimpleCallback(callback func(chunk chunkmaker.Chunk)) Option {
 	return func(c *Config) {
-		c.callback = func(config *Config, memory *aid.PromptContextProvider, chunk chunkmaker.Chunk) (ret error) {
+		c.callback = func(config *Config, memory *coordinator_legacy.PromptContextProvider, chunk chunkmaker.Chunk) (ret error) {
 			defer func() {
 				if err := recover(); err != nil {
 					ret = utils.Error(err)
@@ -180,7 +180,7 @@ func WithSimpleCallback(callback func(chunk chunkmaker.Chunk)) Option {
 	}
 }
 
-func WithFinishCallback(callback func(config *Config, memory *aid.PromptContextProvider) error) Option {
+func WithFinishCallback(callback func(config *Config, memory *coordinator_legacy.PromptContextProvider) error) Option {
 	return func(c *Config) {
 		c.finishCallback = callback
 	}
@@ -199,7 +199,7 @@ func WithFinishCallback(callback func(config *Config, memory *aid.PromptContextP
 // opt = aireducer.memory(memory)
 // println(opt)
 // ```
-func WithMemory(memory *aid.PromptContextProvider) Option {
+func WithMemory(memory *coordinator_legacy.PromptContextProvider) Option {
 	return func(c *Config) {
 		c.Memory = memory
 	}
@@ -314,7 +314,7 @@ func WithEnableLineNumber(enable bool) Option {
 
 func NewConfig(opts ...Option) *Config {
 	c := &Config{
-		Memory:              aid.GetDefaultContextProvider(),
+		Memory:              coordinator_legacy.GetDefaultContextProvider(),
 		TimeTriggerInterval: 0,
 	}
 	for _, opt := range opts {

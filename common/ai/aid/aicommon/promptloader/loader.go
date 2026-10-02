@@ -1,4 +1,4 @@
-// Package promptloader is the single source for embedded AI prompt resources.
+// Package promptloader owns shared embedded AI prompt resources.
 // Local builds embed editable source files; release builds embed their gzip archive.
 package promptloader
 

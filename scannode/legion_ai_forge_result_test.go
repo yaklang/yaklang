@@ -3,14 +3,14 @@ package scannode
 import (
 	"errors"
 	"github.com/stretchr/testify/require"
-	"github.com/yaklang/yaklang/common/ai/aid"
+	"github.com/yaklang/yaklang/common/ai/aid/coordinator_legacy"
 	"strings"
 	"testing"
 )
 
 // Adapt a deterministic response source to the real adapter wrapper.
 func runLegionResultGenerator(prompt string, call func(string) (string, error)) (string, error) {
-	return legionForgeResultGenerator(func(_ *aid.Coordinator, value string) (string, error) { return call(value) }, true, "original input")(&aid.Coordinator{ContextProvider: aid.GetDefaultContextProvider()}, prompt)
+	return legionForgeResultGenerator(func(_ *coordinator_legacy.Coordinator, value string) (string, error) { return call(value) }, true, "original input")(&coordinator_legacy.Coordinator{ContextProvider: coordinator_legacy.GetDefaultContextProvider()}, prompt)
 }
 func TestRetryEmptyForgeResult(t *testing.T) {
 	calls := 0
@@ -63,7 +63,7 @@ func TestLegionForgeResultRetryPreservesPartialFailure(t *testing.T) {
 
 func TestValidatedInvocationResultRetainsInputAndEvidence(t *testing.T) {
 	promptTemplate := "Return a Markdown analysis."
-	memory := aid.GetDefaultContextProvider()
+	memory := coordinator_legacy.GetDefaultContextProvider()
 	memory.StoreQuery("internal rendered task instructions")
 	memory.PushText(1, "Observed credential request; no network request was performed")
 	prompt, err := renderLegionForgeResultPrompt(promptTemplate, "email-content: billing@example.test; expires in one hour", memory)

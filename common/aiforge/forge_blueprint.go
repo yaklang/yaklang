@@ -8,8 +8,7 @@ import (
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon/promptloader"
-
-	"github.com/yaklang/yaklang/common/ai/aid"
+	"github.com/yaklang/yaklang/common/ai/aid/coordinator_legacy"
 
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
@@ -28,7 +27,7 @@ type ForgeBlueprint struct {
 	Name string
 
 	// Plan
-	PlanMocker func(config *aid.Coordinator) *aid.PlanResponse
+	PlanMocker func(config *coordinator_legacy.Coordinator) *coordinator_legacy.PlanResponse
 
 	// InitializePrompt 是AI助手初始化时使用的提示词，用于设置AI的基本行为和知识
 	InitializePrompt string
@@ -43,7 +42,7 @@ type ForgeBlueprint struct {
 	// ResultGenerator optionally replaces final-result generation using the rendered
 	// prompt. The default calls GenerateResult once; ResultHandler receives the
 	// completed result exactly once regardless of the generator implementation.
-	ResultGenerator func(*aid.Coordinator, string) (string, error)
+	ResultGenerator func(*coordinator_legacy.Coordinator, string) (string, error)
 
 	// Tools 是AI助手可以使用的工具列表，这些工具可以扩展AI的能力
 	Tools []*aitool.Tool
@@ -90,7 +89,7 @@ func WithAIOptions(options ...aicommon.ConfigOption) Option {
 // opt = aiagent.forgePlanMocker(func(coordinator) { return nil })
 // println(opt)
 // ```
-func WithPlanMocker(plan func(config *aid.Coordinator) *aid.PlanResponse) Option {
+func WithPlanMocker(plan func(config *coordinator_legacy.Coordinator) *coordinator_legacy.PlanResponse) Option {
 	return func(f *ForgeBlueprint) {
 		f.PlanMocker = plan
 	}
@@ -296,7 +295,7 @@ func (f *ForgeBlueprint) GenerateFirstPromptWithMemoryOptionWithQueryAndParams(
 // and parameter-validation boundary.
 func (f *ForgeBlueprint) coordinatorOptions(
 	persistentPrompt string,
-	renderResult func(*aid.PromptContextProvider) (string, error),
+	renderResult func(*coordinator_legacy.PromptContextProvider) (string, error),
 ) []aicommon.ConfigOption {
 	var opts []aicommon.ConfigOption
 	if persistentPrompt != "" {
@@ -306,11 +305,11 @@ func (f *ForgeBlueprint) coordinatorOptions(
 		opts = append(opts, aicommon.WithTools(f.Tools...))
 	}
 	if f.PlanMocker != nil {
-		opts = append(opts, aid.WithPlanMocker(f.PlanMocker))
+		opts = append(opts, coordinator_legacy.WithPlanMocker(f.PlanMocker))
 	}
 	opts = append(opts, f.AIOptions...)
 	if f.ResultPrompt != "" && f.ResultHandler != nil {
-		opts = append(opts, aid.WithResultHandler(func(cod *aid.Coordinator) {
+		opts = append(opts, coordinator_legacy.WithResultHandler(func(cod *coordinator_legacy.Coordinator) {
 			prompt, err := renderResult(cod.ContextProvider)
 			if err != nil {
 				f.ResultHandler("", utils.Errorf("render result prompt failed: %v", err))
@@ -395,7 +394,7 @@ type PluginParamSelectData struct {
 
 // GenerateResult issues one final-result request for a rendered prompt without
 // invoking ResultHandler. Callers retain ownership of request configuration.
-func (f *ForgeBlueprint) GenerateResult(cod *aid.Coordinator, prompt string) (string, error) {
+func (f *ForgeBlueprint) GenerateResult(cod *coordinator_legacy.Coordinator, prompt string) (string, error) {
 	config := cod.Config
 	rsp, err := config.CallAI(aicommon.NewAIRequest(prompt, aicommon.WithAIRequest_CallerLabel("forge-blueprint")))
 	if err != nil {

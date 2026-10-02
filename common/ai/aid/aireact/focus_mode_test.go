@@ -107,3 +107,22 @@ func TestReAct_SelectLoopForTask_FocusModeOverridesDirective(t *testing.T) {
 	require.Equal(t, "hello", parsedQuery)
 	require.Equal(t, schema.AI_REACT_LOOP_NAME_DEFAULT, focus)
 }
+
+func TestReAct_ParseLoopDirectives_RichTextAndWhitespace(t *testing.T) {
+	r := &ReAct{}
+	for _, query := range []string{
+		"@__FOCUS__coordinator Review C:/Users/V/.codex/repo",
+		"@__FOCUS__coordinator\nReview C:/Users/V/.codex/repo",
+		"@__FOCUS__coordinator\tReview C:/Users/V/.codex/repo",
+		"@__FOCUS__coordinator\u3000Review C:/Users/V/.codex/repo",
+		`@\_\_FOCUS\_\_coordinator Review C:/Users/V/.codex/repo`,
+	} {
+		parsed, focus, _ := r.parseLoopDirectives(query, "")
+		require.Equal(t, "coordinator", focus, query)
+		require.Equal(t, "Review C:/Users/V/.codex/repo", parsed, query)
+	}
+	query := `@\_\_FOCUS\_\_coordinator Keep \_escaped\_ content`
+	parsed, focus, _ := r.parseLoopDirectives(query, "coordinator_legacy")
+	require.Equal(t, "coordinator_legacy", focus, "explicit config still wins")
+	require.Equal(t, `Keep \_escaped\_ content`, parsed)
+}

@@ -19,9 +19,9 @@ import (
 
 	"golang.org/x/net/idna"
 
-	"github.com/yaklang/yaklang/common/ai/aid"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
+	"github.com/yaklang/yaklang/common/ai/aid/coordinator_legacy"
 	"github.com/yaklang/yaklang/common/aiforge"
 	"github.com/yaklang/yaklang/common/aireducer"
 	"github.com/yaklang/yaklang/common/chunkmaker"
@@ -3910,7 +3910,7 @@ func runAIJSExtract(ctx context.Context, code string, cfg *AIJSExtractConfig, on
 		// chunk per candidate - the "--- end ---" separator only acts as a
 		// preferred cut boundary within the chunkSize window.
 		aireducer.WithSeparatorAsBoundary(true),
-		aireducer.WithReducerCallback(func(rcfg *aireducer.Config, _ *aid.PromptContextProvider, ch chunkmaker.Chunk) error {
+		aireducer.WithReducerCallback(func(rcfg *aireducer.Config, _ *coordinator_legacy.PromptContextProvider, ch chunkmaker.Chunk) error {
 			body := ch.DumpWithOverlap(cfg.OverlapBytes)
 			payload := redactAIJSModelEvidence(buildRequestContextBlock(cfg) + body)
 			if cfg.MaxTokens > 0 {

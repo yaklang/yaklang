@@ -1,16 +1,12 @@
 package loopinfra
 
 import (
-	"fmt"
 	"strings"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
-	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops/loop_plan"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/schema"
-	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 )
 
 const requestPlanDescription = `Request a multi-step plan for a complex task. Your responsibility ends at submitting the plan need—the planning system produces a plan for user review. Do not execute plan steps yourself; the user approves whether and when to run it. To revise an existing plan, call this action again; in plan_request_payload describe only the new plan requirements (not as a modification diff). Do not use directly_answer to acknowledge plan changes.`
@@ -167,119 +163,9 @@ func handleRequestPlanAction(loop *reactloops.ReActLoop, action *aicommon.Action
 		rewriteQuery = task.GetUserInput()
 	}
 
-	if isDetachedPlanEnabled(invoker) {
-		handleDetachedRequestPlan(loop, invoker, task, rewriteQuery, operator)
-		return
-	}
-	handleLegacyAsyncPlanAndExecute(loop, invoker, task, rewriteQuery, operator)
-}
-
-func isDetachedPlanEnabled(invoker aicommon.AIInvokeRuntime) bool {
-	if invoker == nil {
-		return false
-	}
-	cfg := invoker.GetConfig()
-	if cfg == nil {
-		return false
-	}
-	getter, ok := cfg.(interface{ GetEnableDetachedPlan() bool })
-	if !ok {
-		return false
-	}
-	return getter.GetEnableDetachedPlan()
-}
-
-func handleDetachedRequestPlan(
-	loop *reactloops.ReActLoop,
-	invoker aicommon.AIInvokeRuntime,
-	task aicommon.AIStatefulTask,
-	rewriteQuery string,
-	operator *reactloops.LoopActionHandlerOperator,
-) {
-	planTask := aicommon.NewStatefulTaskBase(
-		task.GetId()+"_plan",
-		rewriteQuery,
-		task.GetContext(),
-		task.GetEmitter(),
-	)
-
-	appendPlanPrompt := func(tagName, prompt string) string {
-		if strings.TrimSpace(prompt) == "" {
-			return ""
-		}
-		nonce := utils.RandStringBytes(8)
-		return fmt.Sprintf(
-			"\n<|%s_%s|>\n"+
-				"%s\n"+
-				"<|%s_END_%s|>\n",
-			tagName, nonce, prompt, tagName, nonce)
-	}
-
-	var planPrompt string
-	if globalConfig := yakit.GetCachedAIGlobalConfig(); globalConfig != nil && globalConfig.GetAIPlanPrompt() != "" {
-		planPrompt += appendPlanPrompt("AI_PLAN", globalConfig.GetAIPlanPrompt())
-	}
-	cfg := invoker.GetConfig()
-	if cfg != nil {
-		if userPlanPrompt := cfg.GetConfigString("plan_prompt"); userPlanPrompt != "" {
-			planPrompt += appendPlanPrompt("USER_PLAN", userPlanPrompt)
-		}
-		if planPrompt != "" {
-			cfg.SetConfig(loop_plan.PLAN_PROMPT_KEY, planPrompt)
-		}
-	}
-
-	var planLoop *reactloops.ReActLoop
-	opts := []any{
-		reactloops.WithOnLoopInstanceCreated(func(l *reactloops.ReActLoop) {
-			planLoop = l
-		}),
-	}
-
-	_, err := invoker.ExecuteLoopTaskIF(schema.AI_REACT_LOOP_NAME_PLAN, planTask, opts...)
-	if err != nil {
-		if planLoop != nil {
-			operator.Fail(reactloops.ErrorWithLastAIResponse(planLoop, utils.InterfaceToString(err)))
-		} else {
-			operator.Fail(err)
-		}
-		return
-	}
-
-	if planLoop == nil {
-		operator.Fail(utils.Error("plan loop instance not created"))
-		return
-	}
-
-	planData := planLoop.Get(loop_plan.PLAN_DATA_KEY)
-	if planData == "" {
-		operator.Fail(reactloops.ErrorWithLastAIResponse(planLoop, "plan loop finished without producing plan data"))
-		return
-	}
-
-	planInput := &aicommon.ExecutePlanInput{
-		PlanPayload:  rewriteQuery,
-		PlanData:     planData,
-		PlanDocument: planLoop.Get(loop_plan.PLAN_DOCUMENT_KEY),
-	}
-
-	if _, err = invoker.PublishDetachedPlan(task.GetContext(), planInput, task.GetId()); err != nil {
-		operator.Fail(err)
-		return
-	}
-
-	operator.Exit()
-}
-
-func handleLegacyAsyncPlanAndExecute(
-	loop *reactloops.ReActLoop,
-	invoker aicommon.AIInvokeRuntime,
-	task aicommon.AIStatefulTask,
-	rewriteQuery string,
-	operator *reactloops.LoopActionHandlerOperator,
-) {
+	// The runtime owns engine selection, detached approval and execution.
+	// The default loop must never construct the legacy plan sub-loop.
 	if err := invoker.PlanAndExecute(task.GetContext(), rewriteQuery); err != nil {
-		loop.FinishAsyncTask(task, err)
 		operator.Fail(err)
 		return
 	}

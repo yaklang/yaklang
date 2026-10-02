@@ -7,8 +7,8 @@ import (
 	"sync"
 
 	"github.com/google/uuid"
-	"github.com/yaklang/yaklang/common/ai/aid"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
+	"github.com/yaklang/yaklang/common/ai/aid/coordinator_legacy"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
@@ -17,8 +17,8 @@ import (
 )
 
 var (
-	runCoordinatorForPlanOnly    = func(c *aid.Coordinator) error { return c.RunPlanOnly() }
-	runCoordinatorForExecuteOnly = func(c *aid.Coordinator) error { return c.RunExecuteOnly() }
+	runCoordinatorForPlanOnly    = func(c *coordinator_legacy.Coordinator) error { return c.RunPlanOnly() }
+	runCoordinatorForExecuteOnly = func(c *coordinator_legacy.Coordinator) error { return c.RunExecuteOnly() }
 )
 
 // AsyncPlanOnly runs plan loop + user review, then asynchronously executes the approved plan.
@@ -262,7 +262,7 @@ func (r *ReAct) invokeLegacyPlanExecuteOnly(doneChannel chan struct{}, ctx conte
 
 	baseOpts := buildPlanExecBaseOptions(r, uid, planCtx, inputChannel, hotpatchChan)
 	if cfg.startTaskID != "" {
-		baseOpts = append(baseOpts, aid.WithRecoveryStartTaskID(cfg.startTaskID))
+		baseOpts = append(baseOpts, coordinator_legacy.WithRecoveryStartTaskID(cfg.startTaskID))
 	}
 
 	cod, err := newCoordinatorContextForPlanExec(planCtx, "", baseOpts...)
