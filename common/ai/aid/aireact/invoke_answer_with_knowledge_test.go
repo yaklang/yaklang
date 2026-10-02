@@ -2,7 +2,9 @@ package aireact
 
 import (
 	"bytes"
+	"context"
 	"fmt"
+	"sync"
 	"testing"
 	"time"
 
@@ -32,8 +34,10 @@ func TestReAct_AnswerWithKnowledge_FullFlow(t *testing.T) {
 	manager, token := aicommon.NewMockEKManagerAndToken()
 
 	syncSignal := make(chan bool)
+	var syncOnce sync.Once
 
-	ctx := utils.TimeoutContextSeconds(10)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
 
 	callback := func(i aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 		prompt := req.GetPrompt()
@@ -76,9 +80,13 @@ func TestReAct_AnswerWithKnowledge_FullFlow(t *testing.T) {
 			return rsp, nil
 		}
 		if utils.MatchAllOfSubString(prompt, "verify-satisfaction", "user_satisfied") {
-			in <- &ypb.AIInputEvent{ // 触发同步知识事件
+			select {
+			case in <- &ypb.AIInputEvent{ // 触发同步知识事件
 				IsSyncMessage: true,
 				SyncType:      SYNC_TYPE_KNOWLEDGE,
+			}:
+			case <-ctx.Done():
+				return nil, ctx.Err()
 			}
 
 			select {
@@ -94,10 +102,14 @@ func TestReAct_AnswerWithKnowledge_FullFlow(t *testing.T) {
 	}
 
 	_, err := NewTestReAct(
+		aicommon.WithContext(ctx),
 		aicommon.WithAICallback(callback),
 		aicommon.WithEventInputChan(in),
 		aicommon.WithEventHandler(func(e *schema.AiOutputEvent) {
-			out <- e.ToGRPC()
+			select {
+			case out <- e.ToGRPC():
+			case <-ctx.Done():
+			}
 		}),
 		aicommon.WithEnhanceKnowledgeManager(manager),
 	)
@@ -129,7 +141,7 @@ LOOP:
 			if e.Type == string(schema.EVENT_TYPE_TASK_ABOUT_KNOWLEDGE) {
 				if utils.MatchAllOfSubString(e.Content, token) {
 					gotSyncKnowledge = true
-					close(syncSignal)
+					syncOnce.Do(func() { close(syncSignal) })
 				}
 			}
 
@@ -146,7 +158,9 @@ LOOP:
 			break LOOP
 		}
 	}
-	close(in)
+	// The verification callback can still be running. Cancel its runtime
+	// instead of closing an input channel that callback may send into.
+	cancel()
 
 	if !gotKnowledge {
 		t.Fatal("Expected knowledge event")
