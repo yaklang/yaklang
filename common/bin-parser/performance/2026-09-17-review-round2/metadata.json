@@ -1,0 +1,39 @@
+{
+  "baseline": "2de6e21e4e8aabcb343440bbe4dc7e023e6594f9",
+  "implementation": "59de5abdef15f4f31b8789f47e7450dcea108858",
+  "go": "go1.22.12 darwin/arm64",
+  "cpu": "Apple M1 Max",
+  "os": "macOS 14.1.2",
+  "samples": 5,
+  "benchtime": "300ms",
+  "gomaxprocs": 4,
+  "matrix_procs": [
+    1,
+    2,
+    4,
+    8
+  ],
+  "matrix_workers": [
+    1,
+    2,
+    4
+  ],
+  "inputs_sha256": {
+    "common/bin-parser/testdata/protocol-corpus/captures/ndpi/ndpi-http.pcapng": "e0c7de05f6993a726cd08702755bc4da9d15728fff44dcef55a8384ffd930ae7",
+    "common/bin-parser/testdata/protocol-corpus/captures/ndpi/ndpi-tls.pcap": "800fff50915c7af25a83e8f0f41c79a4dadc9f32277e9019e4e276812ec7b351",
+    "common/bin-parser/testdata/protocol-corpus/captures/ndpi/ndpi-mqtt.pcap": "7d6552eb815eead6eabe0adbaa13366b4863b4c1c54dbb6fa65dec68a9738465",
+    "common/bin-parser/testdata/protocol-corpus/captures/ndpi/ndpi-dns.pcap": "61276b4f63f00eba469b7cab626bca8a7f820f60a698169ca603fd73d40fe362",
+    "common/bin-parser/testdata/protocol-corpus/captures/ndpi/ndpi-cassandra.pcap": "5992c6bbbd1f84fafb84052520e710adec4144fbf5f71b75a8a6d74bad57d155",
+    "common/bin-parser/testdata/protocol-corpus/captures/ndpi/ndpi-http-connect.pcap": "7c3b01d2a9d2620a392a45c13b6ce9c42e492b0e9a000723b9d6ecf61df64b56",
+    "common/bin-parser/testdata/protocol-corpus/captures/wireshark-tests/wireshark-http.pcap": "69e489a26a59208a1dd56fbea4c606b1e59e8ac32d3d4789ca6cc81e71bad3f2",
+    "common/bin-parser/testdata/protocol-corpus/captures/google-samples/google-http-ascii.pcap": "70c1f7300366d402e4a7853482188dbe141ef05024031d51643c73d2fc508292",
+    "common/pcapx/pcaputil/testdata/protocol-sessions/http2-multiplex.pcap": "863b52523daa19711ba54f3e3d23a49e06624d5f78c54a926cae830ebf8b99c1",
+    "common/pcapx/pcaputil/testdata/protocol-sessions/mysql-classic.pcap": "a2562f5cbc945cab45f6ae1aad4d47068dd9ccd0bfd82fed851ec0283544e6f7"
+  },
+  "binaries_sha256": {
+    "after-pcap.test": "ecc5c039837be6d10807c84346dc1361720f4205ec3c427082fb152d6ffab1a3",
+    "after-stream.test": "cd4cb6633a2521b7de6a6fd4fac40106dc6a08ced92b37e6c65c4ed4a6f4d4f5",
+    "before-pcap.test": "97edc60301ce899e7b4ce6c867fbae6e05bd1e0fc220e30edca5e4ea2f8052ba",
+    "before-stream.test": "7134288b9f1e3780c0aa60a99a0fe1e041e37d798e187e66189f30106b59e1d1"
+  }
+}

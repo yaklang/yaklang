@@ -1,0 +1,139 @@
+{
+  "schema_version": 1,
+  "source_capture": "captures/wireshark-tests/wireshark-http3-qpack.pcapng",
+  "source_capture_sha256": "09aa88ee755cae2c441af94c7da2a2577de8d761d19b4521c753d10bcdd1d051",
+  "extraction": {
+    "tool": "TShark (Wireshark) 4.4.8 (v4.4.8-0-g0d289c003bfb).",
+    "command": [
+      "-r",
+      "captures/wireshark-tests/wireshark-http3-qpack.pcapng",
+      "-o",
+      "tls.keylog_file:",
+      "-Y",
+      "quic.stream_data && !icmp && !icmpv6",
+      "-T",
+      "json",
+      "-J",
+      "frame ip ipv6 udp quic",
+      "--no-duplicate-keys"
+    ],
+    "input_keys": "public source capture embedded DSB; external TLS keylog disabled",
+    "coordinates": "decrypted QUIC stream byte offsets, not original packet wire offsets",
+    "binparser_decryption_performed": false,
+    "icmp_quotations_excluded": true
+  },
+  "fragment_count": 6,
+  "stream_count": 4,
+  "streams": [
+    {
+      "stream_id": 2,
+      "source_address": "10.0.2.15",
+      "source_port": 41625,
+      "destination_address": "127.0.0.1",
+      "destination_port": 443,
+      "fragments": [
+        {
+          "frame": 2,
+          "offset": 0,
+          "length": 41,
+          "fin": false,
+          "sha256": "20e2082db500bd4ddf5375428acb6c4ec971c0b8b8c68a83d21eac7dea9eeae1",
+          "hex": "00041d01800100000680040000074064c00000061b5a0e99c0000000d368b04ec0000015d59dffc900",
+          "retransmission": false
+        },
+        {
+          "frame": 7,
+          "offset": 41,
+          "length": 12,
+          "fin": false,
+          "sha256": "9e094d6e257d4a1e090a6575a19f30970e36d0dedcc4ad1cc6e54963404d286f",
+          "hex": "800f07000700753d312c2069",
+          "retransmission": false
+        }
+      ],
+      "length": 53,
+      "sha256": "a955ba2b3b39a1645360028a5301b877f34f6d51d1fd87ab2130c7371729d0a3",
+      "hex": "00041d01800100000680040000074064c00000061b5a0e99c0000000d368b04ec0000015d59dffc900800f07000700753d312c2069",
+      "fin_observed": false,
+      "boundary": "contiguous observed prefix; stream end not observed"
+    },
+    {
+      "stream_id": 3,
+      "source_address": "127.0.0.1",
+      "source_port": 443,
+      "destination_address": "10.0.2.15",
+      "destination_port": 41625,
+      "fragments": [
+        {
+          "frame": 4,
+          "offset": 0,
+          "length": 46,
+          "fin": false,
+          "sha256": "4264251f72e2021c2ea9a4330fb9b93bb730167d2cc61d4a56d3b72357db20c1",
+          "hex": "00041f018001000006800100000740640801c0000001dc1b9525c0000000c542b192c000000f7a0b5c92033136a5",
+          "retransmission": false
+        }
+      ],
+      "length": 46,
+      "sha256": "4264251f72e2021c2ea9a4330fb9b93bb730167d2cc61d4a56d3b72357db20c1",
+      "hex": "00041f018001000006800100000740640801c0000001dc1b9525c0000000c542b192c000000f7a0b5c92033136a5",
+      "fin_observed": false,
+      "boundary": "contiguous observed prefix; stream end not observed"
+    },
+    {
+      "stream_id": 10,
+      "source_address": "10.0.2.15",
+      "source_port": 41625,
+      "destination_address": "127.0.0.1",
+      "destination_port": 443,
+      "fragments": [
+        {
+          "frame": 7,
+          "offset": 0,
+          "length": 1202,
+          "fin": false,
+          "sha256": "5a97077eff70d3b1c766507c5c8feb687db0b85933fbe5459917b7dafabe859c",
+          "hex": "023fe1ff033fe1ff03c098b2c12cb2c8a96ecd4becb53b42f31cf3505ee690a75c87a7c1ffdc0663b9a429eba07ea3193aff85f359ac2c0171f7dc71c69d0fc14d0793f1d5fbcd99355a2bf45af6b4e673b9e19be0d5c0e897101f5c2c8170b2d7c1a480eb438737acfbebaf2f6db7bc56cd30d57b56d3dfd0ee566ddcecb9b5e3ede6f7659ec5cbb0be0c91cd032fbdf03324732200b2caa2bc165a545782cb6a8af05971515e0b80545784d09515e134caa2bc269a545784d3aa8af09d79515e13ef2a2bcc804a8af32fb4a8af32fb6a8af32fb8a8af32fbaa8af32fbdf083db610b07a3da9b632fc585ed69ac2a11441e8a8f8a6782767e29a60642a8af09ff8a6a81152dd9a97d96a76854579152dd9a96872a911f14a201daa8af5925bf14f7829f8a7b9a017c5744017be0d51924f15491d68802165975b07c22b241c39617e504d5bfce9e8f705a3451919064f2fe74f9e9e896efeb1fb8b5e0f1fb9b67c77aecef007e11debb49007e29352583b9a429d5161a6b6be2a4417b9d22d4df2e0cfe0316afcca7c2de2e280035fc4c6b20f4547c1282d5036f802d3416be24b6c804e3cb85b0fc514a600b82784265a7dc038d3420fc529802e3efb8d34db4ffc4bdcd5c0dfc75296b1d06ee583d151f1297cd7009a001d134e7c4653488804d32d80017be09072c177e13e6b802db226996be2a835f8261fc0e03c91b40e1e3e1158ec1d2880be6b358554578a654578d5aa2bc691515e19923990a8af20f6d842aa2bd617b5a6b0a8450a8af22b22a2bddebb3baa2bc8ef5da45457a935255457aa42a2bd31ac545789416a5457a4b6c5457a8a53f1422b1d83a510533aa2bd4d2a8af5352a2bd4a1515ea7baa2bd4f732a2bd5d0a8af1aa3249e2a923ad1f1420d3410e87b1462478dbb324dc89ddebaef8f56f0875c77b7bdb19c9e51efbf9f4d76a74d38f225edd6eceb574b5d6af64d97b8f9ecef1c0fc58fb628d9727a35227c68af0d37f9bd4ddeb93f7363dd7f85afcb92785566faacdff81d1641e8a8f841a6821d39fc16687c6d9b24f0eb8f3e7670d69b3f770306ced92f5ee5e51bbf59d63f6de4772f86ef109ef27603d5eb84d821e8dfbaa9d91788bde59e28f99315f4adda6df2b909f6fa89c5b27ebb9bf3160d4b5ad2acdff825754179ee7fb45fe4d5ad5dcdd56ba1f82772d900971004c842102e002e007c583aa62c017de6df79e7561044cbcc801f16550320f8b23b6581b00196fe2b3a60d14b5a891c2f1a9b31e785bcbbab733f36fc3b486f547cd7f68ed1f2f58f69862cd92de389e0b4b699e5bb99fbb5492d4de3a9cd9dbd2376e6c9d8d3394056d14e0fd4fee7c2b4fc320e5c12d92a00159abfbe1892ddef1e0d66bcbeef62e1bb573ee9f626f5f64753f3d6387af9edaeec4ee1dba1ed9041f16d35c01f84592f7ae00ffc40132674148b1275ad1ffa3fe6f4f61e935b4ff3f7de0fe4217ff9fa53f9d274ff90c576c1d527f3f7de0fe44d7f36b4148b1275ad1ad49e33505023f30ff20ced07f66a281b0dae053fafc087ed4ce6aadf2a7979c89c6bfb521aeba0bc8b1e632586d975765c53facd8f7e8cff4a506ea5531149d4ffda97a7b0f4958085f5c0b817029b8728ec330db2eaecb9f6a4148b1275ad1ac3b093f052278383622704148b1275ad1ad2db450b772d8831e",
+          "retransmission": false
+        },
+        {
+          "frame": 8,
+          "offset": 1202,
+          "length": 303,
+          "fin": false,
+          "sha256": "15c3a0b4247b72af671c601548f6af8ab480a0b644881154ce8c4aac87b8dfb6",
+          "hex": "af8dfe4217d702ee01a6d70899fe7f734148b1275ad1ad5d034ca7b295bb96c418f57f0722362e362e3122734148b1275ad1ad2db450b772d8831ea5a83213affe6f4f61e935b4ff3f7de0fe4217d702ee01a6d70899fe7e94fe749d3fe4315db07549fcfdf783f9134b81702e0fe76c4148b1275ad1ad199351508f04223634226b4148b1275ad1ad49e42d1f0222226b4148b1275ad1ade0fe1c6b023f306d4148b1275ad1ad5d034ca7b29f07224c696e757822ff1b919d29ad171863c78f0bfa3da9b632ae43d369f2b128316a4ad20d2387bd9af62f5e30416a4148b4a549275906497f872587421641925f6a4148b4a549275a93c85f8321ec476a4148b4a549275a42a13f842d35a7d7cd929d29ad171863c78f0bfa3da9b632ae43d2c7ff098b2d4b70ddf45abefb4005df",
+          "retransmission": false
+        }
+      ],
+      "length": 1505,
+      "sha256": "aad63884db762873a14ca6aa2beff48666fda249e9072a54ec225729823d94e1",
+      "hex": "023fe1ff033fe1ff03c098b2c12cb2c8a96ecd4becb53b42f31cf3505ee690a75c87a7c1ffdc0663b9a429eba07ea3193aff85f359ac2c0171f7dc71c69d0fc14d0793f1d5fbcd99355a2bf45af6b4e673b9e19be0d5c0e897101f5c2c8170b2d7c1a480eb438737acfbebaf2f6db7bc56cd30d57b56d3dfd0ee566ddcecb9b5e3ede6f7659ec5cbb0be0c91cd032fbdf03324732200b2caa2bc165a545782cb6a8af05971515e0b80545784d09515e134caa2bc269a545784d3aa8af09d79515e13ef2a2bcc804a8af32fb4a8af32fb6a8af32fb8a8af32fbaa8af32fbdf083db610b07a3da9b632fc585ed69ac2a11441e8a8f8a6782767e29a60642a8af09ff8a6a81152dd9a97d96a76854579152dd9a96872a911f14a201daa8af5925bf14f7829f8a7b9a017c5744017be0d51924f15491d68802165975b07c22b241c39617e504d5bfce9e8f705a3451919064f2fe74f9e9e896efeb1fb8b5e0f1fb9b67c77aecef007e11debb49007e29352583b9a429d5161a6b6be2a4417b9d22d4df2e0cfe0316afcca7c2de2e280035fc4c6b20f4547c1282d5036f802d3416be24b6c804e3cb85b0fc514a600b82784265a7dc038d3420fc529802e3efb8d34db4ffc4bdcd5c0dfc75296b1d06ee583d151f1297cd7009a001d134e7c4653488804d32d80017be09072c177e13e6b802db226996be2a835f8261fc0e03c91b40e1e3e1158ec1d2880be6b358554578a654578d5aa2bc691515e19923990a8af20f6d842aa2bd617b5a6b0a8450a8af22b22a2bddebb3baa2bc8ef5da45457a935255457aa42a2bd31ac545789416a5457a4b6c5457a8a53f1422b1d83a510533aa2bd4d2a8af5352a2bd4a1515ea7baa2bd4f732a2bd5d0a8af1aa3249e2a923ad1f1420d3410e87b1462478dbb324dc89ddebaef8f56f0875c77b7bdb19c9e51efbf9f4d76a74d38f225edd6eceb574b5d6af64d97b8f9ecef1c0fc58fb628d9727a35227c68af0d37f9bd4ddeb93f7363dd7f85afcb92785566faacdff81d1641e8a8f841a6821d39fc16687c6d9b24f0eb8f3e7670d69b3f770306ced92f5ee5e51bbf59d63f6de4772f86ef109ef27603d5eb84d821e8dfbaa9d91788bde59e28f99315f4adda6df2b909f6fa89c5b27ebb9bf3160d4b5ad2acdff825754179ee7fb45fe4d5ad5dcdd56ba1f82772d900971004c842102e002e007c583aa62c017de6df79e7561044cbcc801f16550320f8b23b6581b00196fe2b3a60d14b5a891c2f1a9b31e785bcbbab733f36fc3b486f547cd7f68ed1f2f58f69862cd92de389e0b4b699e5bb99fbb5492d4de3a9cd9dbd2376e6c9d8d3394056d14e0fd4fee7c2b4fc320e5c12d92a00159abfbe1892ddef1e0d66bcbeef62e1bb573ee9f626f5f64753f3d6387af9edaeec4ee1dba1ed9041f16d35c01f84592f7ae00ffc40132674148b1275ad1ffa3fe6f4f61e935b4ff3f7de0fe4217ff9fa53f9d274ff90c576c1d527f3f7de0fe44d7f36b4148b1275ad1ad49e33505023f30ff20ced07f66a281b0dae053fafc087ed4ce6aadf2a7979c89c6bfb521aeba0bc8b1e632586d975765c53facd8f7e8cff4a506ea5531149d4ffda97a7b0f4958085f5c0b817029b8728ec330db2eaecb9f6a4148b1275ad1ac3b093f052278383622704148b1275ad1ad2db450b772d8831eaf8dfe4217d702ee01a6d70899fe7f734148b1275ad1ad5d034ca7b295bb96c418f57f0722362e362e3122734148b1275ad1ad2db450b772d8831ea5a83213affe6f4f61e935b4ff3f7de0fe4217d702ee01a6d70899fe7e94fe749d3fe4315db07549fcfdf783f9134b81702e0fe76c4148b1275ad1ad199351508f04223634226b4148b1275ad1ad49e42d1f0222226b4148b1275ad1ade0fe1c6b023f306d4148b1275ad1ad5d034ca7b29f07224c696e757822ff1b919d29ad171863c78f0bfa3da9b632ae43d369f2b128316a4ad20d2387bd9af62f5e30416a4148b4a549275906497f872587421641925f6a4148b4a549275a93c85f8321ec476a4148b4a549275a42a13f842d35a7d7cd929d29ad171863c78f0bfa3da9b632ae43d2c7ff098b2d4b70ddf45abefb4005df",
+      "fin_observed": false,
+      "boundary": "contiguous observed prefix; stream end not observed"
+    },
+    {
+      "stream_id": 0,
+      "source_address": "10.0.2.15",
+      "source_port": 41625,
+      "destination_address": "127.0.0.1",
+      "destination_port": 443,
+      "fragments": [
+        {
+          "frame": 8,
+          "offset": 0,
+          "length": 33,
+          "fin": true,
+          "sha256": "26347d1b467074e2bdfa008ea09e3e49aaf4de1f246157fc1f25209983d98f5f",
+          "hex": "011b1600d494d7939291908f8e8d8c8b8a898887dd868584838281df8000027800",
+          "retransmission": false
+        }
+      ],
+      "length": 33,
+      "sha256": "26347d1b467074e2bdfa008ea09e3e49aaf4de1f246157fc1f25209983d98f5f",
+      "hex": "011b1600d494d7939291908f8e8d8c8b8a898887dd868584838281df8000027800",
+      "fin_observed": true,
+      "boundary": "observed FIN"
+    }
+  ]
+}

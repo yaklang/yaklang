@@ -1,0 +1,429 @@
+[31m[ERRO][0m 2026-09-17 09:11:42 [capture_fast:44] TCP assembly callback panic: test callback
+Current goroutine call stack:
+goroutine 2936 [running]:
+github.com/yaklang/yaklang/common/utils.PrintCurrentGoroutineRuntimeStack()
+	/Users/v1ll4n/.codex/worktrees/4dde/yaklang/common/utils/debugprint.go:12 +0x38
+github.com/yaklang/yaklang/common/pcapx/pcaputil.(*offlineDecoder).feed.func1()
+	/Users/v1ll4n/.codex/worktrees/4dde/yaklang/common/pcapx/pcaputil/capture_fast.go:45 +0xc0
+panic({0x102307ac0?, 0x10266b9f8?})
+	/Users/v1ll4n/.goenv/versions/1.22.12/src/runtime/panic.go:770 +0x124
+github.com/yaklang/yaklang/common/pcapx/pcaputil.TestOfflineDecoderCallbackPanic.func1(0x3?, 0x8?, 0x0?)
+	/Users/v1ll4n/.codex/worktrees/4dde/yaklang/common/pcapx/pcaputil/capture_fast_test.go:145 +0x2c
+github.com/yaklang/yaklang/common/pcapx/pcaputil.(*TrafficFlow).init.func2(0x14000268000, 0x14000982000, 0x140003864b0)
+	/Users/v1ll4n/.codex/worktrees/4dde/yaklang/common/pcapx/pcaputil/reassemble_flow.go:242 +0x4c
+github.com/yaklang/yaklang/common/pcapx/pcaputil.(*TrafficFlow).onFrame(0x14000268000, 0x1400006aa78)
+	/Users/v1ll4n/.codex/worktrees/4dde/yaklang/common/pcapx/pcaputil/reassemble_flow.go:167 +0x1e8
+github.com/yaklang/yaklang/common/pcapx/pcaputil.(*TrafficConnection).Write(0x14000982000, {0x14001b920f6, 0x3, 0x3ff0a}, 0x14000cd0b28?, {0x100c784f4?, 0x100c938d0?, 0x1035f6740?})
+	/Users/v1ll4n/.codex/worktrees/4dde/yaklang/common/pcapx/pcaputil/reassembly.go:174 +0x12c
+github.com/yaklang/yaklang/common/pcapx/pcaputil.(*TrafficConnection).consume(0x14000982000, 0x7b2def8?, {0x14001b920f6?, 0x101bfae54?, 0x14000cd0b98?}, 0x30?, {0x14000cd0c28?, 0x101bfd2e4?, 0x1035f6740?})
+	/Users/v1ll4n/.codex/worktrees/4dde/yaklang/common/pcapx/pcaputil/reassembly.go:286 +0x1bc
+github.com/yaklang/yaklang/common/pcapx/pcaputil.(*TrafficConnection).FeedClient(0x14000982000, 0x140006627a8, {0xffffc0000201?, 0x14001b920da?, 0x1035f6740?})
+	/Users/v1ll4n/.codex/worktrees/4dde/yaklang/common/pcapx/pcaputil/reassembly.go:416 +0x2ac
+github.com/yaklang/yaklang/common/pcapx/pcaputil.(*TrafficPool).Feed(0x140008cc200, 0x14000662598, {0x10267d118?, 0x14000662638?}, 0x140006627a8, {0x14000cd1048, 0x1, 0x0?})
+	/Users/v1ll4n/.codex/worktrees/4dde/yaklang/common/pcapx/pcaputil/trafficpool.go:244 +0x6dc
+github.com/yaklang/yaklang/common/pcapx/pcaputil.(*offlineDecoder).feed(0x14000662588, {0x102685380?, 0x14000386460?}, {0x14001b920c0?, 0x10000?, 0x800000?}, {{0x0, 0xe7791f764, 0x1035f6740}, 0x3c, ...})
+	/Users/v1ll4n/.codex/worktrees/4dde/yaklang/common/pcapx/pcaputil/capture_fast.go:114 +0x878
+github.com/yaklang/yaklang/common/pcapx/pcaputil.replayWithConfig({0x102670b38, 0x14001186060}, 0x14000fe24e0)
+	/Users/v1ll4n/.codex/worktrees/4dde/yaklang/common/pcapx/pcaputil/capture_reader.go:159 +0xbf4
+github.com/yaklang/yaklang/common/pcapx/pcaputil.replayFileWithConfig({0x14000278070?, 0x100c621dc?}, 0x14000fe24e0)
+	/Users/v1ll4n/.codex/worktrees/4dde/yaklang/common/pcapx/pcaputil/capture_reader.go:36 +0x94
+github.com/yaklang/yaklang/common/pcapx/pcaputil.Start({0x140008f4060, 0x4, 0x14000b20100?})
+	/Users/v1ll4n/.codex/worktrees/4dde/yaklang/common/pcapx/pcaputil/capture.go:85 +0x180
+github.com/yaklang/yaklang/common/pcapx/pcaputil.OpenPcapFile({0x14000278070, 0x67}, {0x14000322f28, 0x2, 0x2})
+	/Users/v1ll4n/.codex/worktrees/4dde/yaklang/common/pcapx/pcaputil/exports.go:91 +0x11c
+github.com/yaklang/yaklang/common/pcapx/pcaputil.TestOfflineDecoderCallbackPanic(0x14000fe2000)
+	/Users/v1ll4n/.codex/worktrees/4dde/yaklang/common/pcapx/pcaputil/capture_fast_test.go:145 +0x154
+testing.tRunner(0x14000fe2000, 0x102665fc8)
+	/Users/v1ll4n/.goenv/versions/1.22.12/src/testing/testing.go:1689 +0xec
+created by testing.(*T).Run in goroutine 1
+	/Users/v1ll4n/.goenv/versions/1.22.12/src/testing/testing.go:1742 +0x318
+
+[36m[INFO][0m 2026-09-17 09:11:42 [capture_daemon:215] mock background iface: en1 is start...
+[31m[ERRO][0m 2026-09-17 09:11:44 [capture_daemon:227] d257df9e-eb7c-481c-af23-022e4820a1fd handler error: context deadline exceeded
+(int64) 20
+(int64) 39
+[35m[WARN][0m 2026-09-17 09:11:46 [capture:154] convert iface name (cache-created-order-test) failed: fetch net.Interface failed: route ip+net: no such network interface, use default
+[36m[INFO][0m 2026-09-17 09:11:46 [capture_daemon:215] mock background iface: cache-created-order-test is start...
+lo0
+convert iface name failed: lo0
+
+gif0
+convert iface name failed: gif0
+
+stf0
+convert iface name failed: stf0
+
+anpi2
+convert iface name failed: anpi2
+
+anpi1
+convert iface name failed: anpi1
+
+anpi0
+convert iface name failed: anpi0
+
+en4
+convert iface name failed: en4
+
+en5
+convert iface name failed: en5
+
+en6
+convert iface name failed: en6
+
+en1
+convert iface name failed: en1
+
+en2
+convert iface name failed: en2
+
+en3
+convert iface name failed: en3
+
+ap1
+convert iface name failed: ap1
+
+en0
+convert iface name failed: en0
+
+awdl0
+convert iface name failed: awdl0
+
+llw0
+convert iface name failed: llw0
+
+bridge0
+convert iface name failed: bridge0
+
+feth7347
+convert iface name failed: feth7347
+
+feth2347
+convert iface name failed: feth2347
+
+utun0
+convert iface name failed: utun0
+
+utun1
+convert iface name failed: utun1
+
+utun2
+convert iface name failed: utun2
+
+utun3
+convert iface name failed: utun3
+
+utun4
+convert iface name failed: utun4
+
+utun5
+convert iface name failed: utun5
+
+utun6
+convert iface name failed: utun6
+
+--------------------------------
+en0
+awdl0
+llw0
+feth7347
+feth2347
+utun0
+utun1
+utun2
+utun3
+utun4
+utun5
+utun6
+lo0
+anpi2
+anpi1
+anpi0
+en4
+en5
+en6
+en1
+en2
+en3
+bridge0
+gif0
+stf0
+ap1
+[31m[ERRO][0m 2026-09-17 09:11:46 [capture_daemon:227] 2acf3715-1df2-41db-8377-29ede60c8ab6 handler error: context deadline exceeded
+--- FAIL: TestProtocolAPIDocumentation (0.06s)
+    --- FAIL: TestProtocolAPIDocumentation/pcap_outputFile (0.00s)
+        protocol_api_doc_test.go:32: 
+            	Error Trace:	/Users/v1ll4n/.codex/worktrees/4dde/yaklang/common/pcapx/pcaputil/protocol_api_doc_test.go:32
+            	Error:      	Not equal: 
+            	            	expected: "pcap_outputFile 将捕获到的原始包保存为新的 pcap 文件，配合 StartSniff 或 OpenPcapFile 使用。\n\n文件在捕获/回放开始时创建，结束或出错时由 pcapx 关闭；已存在的文件不会被覆盖。\n\n保存发生在协议分析前，回调中的显示筛选不影响保存内容，BPF 输入过滤仍生效。\n\n输出为单链路类型的纳秒精度 pcap；不同链路类型应分开捕获。使用 256 KiB 有界缓冲，\n\n结束时 Flush 并关闭文件，写入和关闭失败均返回错误；Flush 不承诺 fsync 耐久性。\n\n\n\n参数:\n\n  - filename: 尚不存在的非空输出文件路径，父目录必须存在。不能与 pcap_captureWriter 同时使用。\n\n\n\n返回值:\n\n  - 抓包配置选项。\n\n\n\nExample:\n```\npcapx.OpenPcapFile(\"input.pcapng\", pcapx.pcap_outputFile(\"output.pcap\"))~\n```\n"
+            	            	actual  : "pcap_outputFile 将捕获到的原始包保存为新的 pcap 文件，配合 StartSniff 或 OpenPcapFile 使用。\n\n文件在捕获/回放开始时创建，结束或出错时由 pcapx 关闭；已存在的文件不会被覆盖。\n\n保存发生在协议分析前，回调中的显示筛选不影响保存内容，BPF 输入过滤仍生效。\n\n输出为单链路类型的纳秒精度 pcap；不同链路类型应分开捕获。写入失败会返回错误。\n\n\n\n参数:\n\n  - filename: 尚不存在的非空输出文件路径，父目录必须存在。不能与 pcap_captureWriter 同时使用。\n\n\n\n返回值:\n\n  - 抓包配置选项。\n\n\n\nExample:\n```\npcapx.OpenPcapFile(\"input.pcapng\", pcapx.pcap_outputFile(\"output.pcap\"))~\n```\n"
+            	            	
+            	            	Diff:
+            	            	--- Expected
+            	            	+++ Actual
+            	            	@@ -6,5 +6,3 @@
+            	            	 
+            	            	-输出为单链路类型的纳秒精度 pcap；不同链路类型应分开捕获。使用 256 KiB 有界缓冲，
+            	            	-
+            	            	-结束时 Flush 并关闭文件，写入和关闭失败均返回错误；Flush 不承诺 fsync 耐久性。
+            	            	+输出为单链路类型的纳秒精度 pcap；不同链路类型应分开捕获。写入失败会返回错误。
+            	            	 
+            	Test:       	TestProtocolAPIDocumentation/pcap_outputFile
+[31m[ERRO][0m 2026-09-17 09:11:46 [capture_daemon:227] 83593926-7e69-4140-bbc5-0622b641120b handler error: context canceled
+[31m[ERRO][0m 2026-09-17 09:11:46 [config:453] http flow panic with: HTTP consumer failed
+[31m[ERRO][0m 2026-09-17 09:11:46 [config:453] http flow panic with: HTTP consumer failed
+[31m[ERRO][0m 2026-09-17 09:11:46 [capture_fast:44] TCP assembly callback panic: HTTP consumer failed
+[31m[ERRO][0m 2026-09-17 09:11:46 [config:453] http flow panic with: HTTP consumer failed
+Current goroutine call stack:
+goroutine 4467 [running]:
+github.com/yaklang/yaklang/common/utils.PrintCurrentGoroutineRuntimeStack()
+	/Users/v1ll4n/.codex/worktrees/4dde/yaklang/common/utils/debugprint.go:12 +0x38
+github.com/yaklang/yaklang/common/pcapx/pcaputil.(*offlineDecoder).feed.func1()
+	/Users/v1ll4n/.codex/worktrees/4dde/yaklang/common/pcapx/pcaputil/capture_fast.go:45 +0xc0
+panic({0x102307ac0?, 0x10266b9d8?})
+	/Users/v1ll4n/.goenv/versions/1.22.12/src/runtime/panic.go:770 +0x124
+github.com/yaklang/yaklang/common/pcapx/pcaputil.TestTCPWorkersHTTPCallbackPanic.func2(0x14000258f00?, 0x101dea189?, 0x14004331050?)
+	/Users/v1ll4n/.codex/worktrees/4dde/yaklang/common/pcapx/pcaputil/reassembly_workers_stress_test.go:119 +0x2c
+github.com/yaklang/yaklang/common/pcapx/pcaputil.(*TrafficPool).drainHTTP(0x140026d4c00, 0x14000258f00)
+	/Users/v1ll4n/.codex/worktrees/4dde/yaklang/common/pcapx/pcaputil/trafficpool.go:145 +0x84
+github.com/yaklang/yaklang/common/pcapx/pcaputil.(*TrafficPool).Feed(0x140026d4c00, 0x0, {0x10267d118?, 0x140054000b8?}, 0x14005400228, {0x1400395b6f8, 0x1, 0x1?})
+	/Users/v1ll4n/.codex/worktrees/4dde/yaklang/common/pcapx/pcaputil/trafficpool.go:212 +0x358
+github.com/yaklang/yaklang/common/pcapx/pcaputil.(*offlineDecoder).feed(0x14005400008, {0x102685198?, 0x1400082e2a0?}, {0x140055976a6?, 0x14000bdb828?, 0x100d56268?}, {{0x6dfc400, 0xedc8bee01, 0x0}, 0x2c, ...})
+	/Users/v1ll4n/.codex/worktrees/4dde/yaklang/common/pcapx/pcaputil/capture_fast.go:114 +0x878
+github.com/yaklang/yaklang/common/pcapx/pcaputil.(*tcpWorkers).run.func1(0x140052e0000?, 0xb800?, 0x0?, 0x14005400008?)
+	/Users/v1ll4n/.codex/worktrees/4dde/yaklang/common/pcapx/pcaputil/reassembly_workers.go:450 +0x2e8
+github.com/yaklang/yaklang/common/pcapx/pcaputil.(*tcpWorkers).run(0x14003629d40, 0x1400099ab00)
+	/Users/v1ll4n/.codex/worktrees/4dde/yaklang/common/pcapx/pcaputil/reassembly_workers.go:464 +0x2e4
+created by github.com/yaklang/yaklang/common/pcapx/pcaputil.(*TrafficPool).startWorkers in goroutine 4318
+	/Users/v1ll4n/.codex/worktrees/4dde/yaklang/common/pcapx/pcaputil/reassembly_workers.go:161 +0x578
+
+[31m[ERRO][0m 2026-09-17 09:11:46 [capture_fast:44] TCP assembly callback panic: HTTP consumer failed
+Current goroutine call stack:
+goroutine 4467 [running]:
+github.com/yaklang/yaklang/common/utils.PrintCurrentGoroutineRuntimeStack()
+	/Users/v1ll4n/.codex/worktrees/4dde/yaklang/common/utils/debugprint.go:12 +0x38
+github.com/yaklang/yaklang/common/pcapx/pcaputil.(*offlineDecoder).feed.func1()
+	/Users/v1ll4n/.codex/worktrees/4dde/yaklang/common/pcapx/pcaputil/capture_fast.go:45 +0xc0
+panic({0x102307ac0?, 0x10266b9d8?})
+	/Users/v1ll4n/.goenv/versions/1.22.12/src/runtime/panic.go:770 +0x124
+github.com/yaklang/yaklang/common/pcapx/pcaputil.TestTCPWorkersHTTPCallbackPanic.func2(0x14000259040?, 0x101dea189?, 0x14004331050?)
+	/Users/v1ll4n/.codex/worktrees/4dde/yaklang/common/pcapx/pcaputil/reassembly_workers_stress_test.go:119 +0x2c
+github.com/yaklang/yaklang/common/pcapx/pcaputil.(*TrafficPool).drainHTTP(0x140026d4c00, 0x14000259040)
+	/Users/v1ll4n/.codex/worktrees/4dde/yaklang/common/pcapx/pcaputil/trafficpool.go:145 +0x84
+github.com/yaklang/yaklang/common/pcapx/pcaputil.(*TrafficPool).Feed(0x140026d4c00, 0x0, {0x10267d118?, 0x140054000b8?}, 0x14005400228, {0x1400395b6f8, 0x1, 0x1?})
+	/Users/v1ll4n/.codex/worktrees/4dde/yaklang/common/pcapx/pcaputil/trafficpool.go:212 +0x358
+github.com/yaklang/yaklang/common/pcapx/pcaputil.(*offlineDecoder).feed(0x14005400008, {0x102685198?, 0x1400082e2a0?}, {0x140055976fe?, 0x14000bdb828?, 0x100d56268?}, {{0x7c11b80, 0xedc8bee01, 0x0}, 0x2c, ...})
+	/Users/v1ll4n/.codex/worktrees/4dde/yaklang/common/pcapx/pcaputil/capture_fast.go:114 +0x878
+github.com/yaklang/yaklang/common/pcapx/pcaputil.(*tcpWorkers).run.func1(0x140052e0000?, 0xb800?, 0x0?, 0x14005400008?)
+	/Users/v1ll4n/.codex/worktrees/4dde/yaklang/common/pcapx/pcaputil/reassembly_workers.go:450 +0x2e8
+github.com/yaklang/yaklang/common/pcapx/pcaputil.(*tcpWorkers).run(0x14003629d40, 0x1400099ab00)
+	/Users/v1ll4n/.codex/worktrees/4dde/yaklang/common/pcapx/pcaputil/reassembly_workers.go:464 +0x2e4
+created by github.com/yaklang/yaklang/common/pcapx/pcaputil.(*TrafficPool).startWorkers in goroutine 4318
+	/Users/v1ll4n/.codex/worktrees/4dde/yaklang/common/pcapx/pcaputil/reassembly_workers.go:161 +0x578
+
+[31m[ERRO][0m 2026-09-17 09:11:46 [capture_fast:44] TCP assembly callback panic: HTTP consumer failed
+Current goroutine call stack:
+goroutine 4467 [running]:
+github.com/yaklang/yaklang/common/utils.PrintCurrentGoroutineRuntimeStack()
+	/Users/v1ll4n/.codex/worktrees/4dde/yaklang/common/utils/debugprint.go:12 +0x38
+github.com/yaklang/yaklang/common/pcapx/pcaputil.(*offlineDecoder).feed.func1()
+	/Users/v1ll4n/.codex/worktrees/4dde/yaklang/common/pcapx/pcaputil/capture_fast.go:45 +0xc0
+panic({0x102307ac0?, 0x10266b9d8?})
+	/Users/v1ll4n/.goenv/versions/1.22.12/src/runtime/panic.go:770 +0x124
+github.com/yaklang/yaklang/common/pcapx/pcaputil.TestTCPWorkersHTTPCallbackPanic.func2(0x14000259180?, 0x101dea189?, 0x14004331050?)
+	/Users/v1ll4n/.codex/worktrees/4dde/yaklang/common/pcapx/pcaputil/reassembly_workers_stress_test.go:119 +0x2c
+github.com/yaklang/yaklang/common/pcapx/pcaputil.(*TrafficPool).drainHTTP(0x140026d4c00, 0x14000259180)
+	/Users/v1ll4n/.codex/worktrees/4dde/yaklang/common/pcapx/pcaputil/trafficpool.go:145 +0x84
+github.com/yaklang/yaklang/common/pcapx/pcaputil.(*TrafficPool).Feed(0x140026d4c00, 0x0, {0x10267d118?, 0x140054000b8?}, 0x14005400228, {0x1400395b6f8, 0x1, 0x1?})
+	/Users/v1ll4n/.codex/worktrees/4dde/yaklang/common/pcapx/pcaputil/trafficpool.go:212 +0x358
+github.com/yaklang/yaklang/common/pcapx/pcaputil.(*offlineDecoder).feed(0x14005400008, {0x102685198?, 0x1400082e2a0?}, {0x14005597756?, 0x14000bdb828?, 0x100d56268?}, {{0x7c27340, 0xedc8bee01, 0x0}, 0x2c, ...})
+	/Users/v1ll4n/.codex/worktrees/4dde/yaklang/common/pcapx/pcaputil/capture_fast.go:114 +0x878
+github.com/yaklang/yaklang/common/pcapx/pcaputil.(*tcpWorkers).run.func1(0x140052e0000?, 0xb800?, 0x0?, 0x14005400008?)
+	/Users/v1ll4n/.codex/worktrees/4dde/yaklang/common/pcapx/pcaputil/reassembly_workers.go:450 +0x2e8
+github.com/yaklang/yaklang/common/pcapx/pcaputil.(*tcpWorkers).run(0x14003629d40, 0x1400099ab00)
+	/Users/v1ll4n/.codex/worktrees/4dde/yaklang/common/pcapx/pcaputil/reassembly_workers.go:464 +0x2e4
+created by github.com/yaklang/yaklang/common/pcapx/pcaputil.(*TrafficPool).startWorkers in goroutine 4318
+	/Users/v1ll4n/.codex/worktrees/4dde/yaklang/common/pcapx/pcaputil/reassembly_workers.go:161 +0x578
+
+[31m[ERRO][0m 2026-09-17 09:11:46 [capture_fast:44] TCP assembly callback panic: HTTP consumer failed
+Current goroutine call stack:
+goroutine 4321 [running]:
+github.com/yaklang/yaklang/common/utils.PrintCurrentGoroutineRuntimeStack()
+	/Users/v1ll4n/.codex/worktrees/4dde/yaklang/common/utils/debugprint.go:12 +0x38
+github.com/yaklang/yaklang/common/pcapx/pcaputil.(*offlineDecoder).feed.func1()
+	/Users/v1ll4n/.codex/worktrees/4dde/yaklang/common/pcapx/pcaputil/capture_fast.go:45 +0xc0
+panic({0x102307ac0?, 0x10266b9d8?})
+	/Users/v1ll4n/.goenv/versions/1.22.12/src/runtime/panic.go:770 +0x124
+github.com/yaklang/yaklang/common/pcapx/pcaputil.TestTCPWorkersHTTPCallbackPanic.func2(0x14000dbd7c0?, 0x101dea189?, 0x14004330f30?)
+	/Users/v1ll4n/.codex/worktrees/4dde/yaklang/common/pcapx/pcaputil/reassembly_workers_stress_test.go:119 +0x2c
+github.com/yaklang/yaklang/common/pcapx/pcaputil.(*TrafficPool).drainHTTP(0x140026d4600, 0x14000dbd7c0)
+	/Users/v1ll4n/.codex/worktrees/4dde/yaklang/common/pcapx/pcaputil/trafficpool.go:145 +0x84
+github.com/yaklang/yaklang/common/pcapx/pcaputil.(*TrafficPool).Feed(0x140026d4600, 0x0, {0x10267d118?, 0x14000662638?}, 0x140006627a8, {0x140055e36f8, 0x1, 0x1?})
+	/Users/v1ll4n/.codex/worktrees/4dde/yaklang/common/pcapx/pcaputil/trafficpool.go:212 +0x358
+github.com/yaklang/yaklang/common/pcapx/pcaputil.(*offlineDecoder).feed(0x14000662588, {0x102685198?, 0x1400082e240?}, {0x140050815ea?, 0x14000bdb7a8?, 0x6?}, {{0x6dfc018, 0xedc8bee01, 0x0}, 0x2c, ...})
+	/Users/v1ll4n/.codex/worktrees/4dde/yaklang/common/pcapx/pcaputil/capture_fast.go:114 +0x878
+github.com/yaklang/yaklang/common/pcapx/pcaputil.(*tcpWorkers).run.func1(0x1400099aa60?, 0x14000bdbf60?, 0x0?, 0x14000662588?)
+	/Users/v1ll4n/.codex/worktrees/4dde/yaklang/common/pcapx/pcaputil/reassembly_workers.go:450 +0x2e8
+github.com/yaklang/yaklang/common/pcapx/pcaputil.(*tcpWorkers).run(0x14003629d40, 0x1400099aa60)
+	/Users/v1ll4n/.codex/worktrees/4dde/yaklang/common/pcapx/pcaputil/reassembly_workers.go:464 +0x2e4
+created by github.com/yaklang/yaklang/common/pcapx/pcaputil.(*TrafficPool).startWorkers in goroutine 4318
+	/Users/v1ll4n/.codex/worktrees/4dde/yaklang/common/pcapx/pcaputil/reassembly_workers.go:161 +0x578
+
+[31m[ERRO][0m 2026-09-17 09:11:46 [capture_fast:44] TCP assembly callback panic: consumer failed
+Current goroutine call stack:
+goroutine 4812 [running]:
+github.com/yaklang/yaklang/common/utils.PrintCurrentGoroutineRuntimeStack()
+	/Users/v1ll4n/.codex/worktrees/4dde/yaklang/common/utils/debugprint.go:12 +0x38
+github.com/yaklang/yaklang/common/pcapx/pcaputil.(*offlineDecoder).feed.func1()
+	/Users/v1ll4n/.codex/worktrees/4dde/yaklang/common/pcapx/pcaputil/capture_fast.go:45 +0xc0
+panic({0x102307ac0?, 0x10266b9b8?})
+	/Users/v1ll4n/.goenv/versions/1.22.12/src/runtime/panic.go:770 +0x124
+github.com/yaklang/yaklang/common/pcapx/pcaputil.TestTCPWorkersFailuresAreVisible.func3.2(0x50?, 0x103c3ab38?, 0x50?)
+	/Users/v1ll4n/.codex/worktrees/4dde/yaklang/common/pcapx/pcaputil/reassembly_workers_test.go:212 +0x2c
+github.com/yaklang/yaklang/common/pcapx/pcaputil.(*TrafficFlow).init.func1(0x140037ea640, 0x1400063cb40, 0x140026440f0)
+	/Users/v1ll4n/.codex/worktrees/4dde/yaklang/common/pcapx/pcaputil/reassemble_flow.go:235 +0x4c
+github.com/yaklang/yaklang/common/pcapx/pcaputil.(*TrafficFlow).flushFrame(0x140037ea640)
+	/Users/v1ll4n/.codex/worktrees/4dde/yaklang/common/pcapx/pcaputil/reassemble_flow.go:147 +0x13c
+github.com/yaklang/yaklang/common/pcapx/pcaputil.(*TrafficFlow).onFrame(0x140037ea640, 0x14003329128)
+	/Users/v1ll4n/.codex/worktrees/4dde/yaklang/common/pcapx/pcaputil/reassemble_flow.go:221 +0x828
+github.com/yaklang/yaklang/common/pcapx/pcaputil.(*TrafficConnection).Write(0x1400063cb40, {0x1400367e0ae, 0x3, 0x6}, 0x140033291d8?, {0x100c784f4?, 0x100c938d0?, 0x1035f6740?})
+	/Users/v1ll4n/.codex/worktrees/4dde/yaklang/common/pcapx/pcaputil/reassembly.go:174 +0x12c
+github.com/yaklang/yaklang/common/pcapx/pcaputil.(*TrafficConnection).consume(0x1400063cb40, 0x1c9aff80?, {0x1400367e0ae?, 0x101bfae54?, 0x14003329248?}, 0x30?, {0x140033292d8?, 0x101bfd2e4?, 0x1035f6740?})
+	/Users/v1ll4n/.codex/worktrees/4dde/yaklang/common/pcapx/pcaputil/reassembly.go:286 +0x1bc
+github.com/yaklang/yaklang/common/pcapx/pcaputil.(*TrafficConnection).FeedClient(0x1400063cb40, 0x14004382328, {0xffffc0000201?, 0x1400367e092?, 0x1035f6740?})
+	/Users/v1ll4n/.codex/worktrees/4dde/yaklang/common/pcapx/pcaputil/reassembly.go:416 +0x2ac
+github.com/yaklang/yaklang/common/pcapx/pcaputil.(*TrafficPool).Feed(0x140027c5200, 0x14004382118, {0x10267d118?, 0x140043821b8?}, 0x14004382328, {0x140033296f8, 0x1, 0x1?})
+	/Users/v1ll4n/.codex/worktrees/4dde/yaklang/common/pcapx/pcaputil/trafficpool.go:244 +0x6dc
+github.com/yaklang/yaklang/common/pcapx/pcaputil.(*offlineDecoder).feed(0x14004382108, {0x102685198?, 0x140053a82e0?}, {0x1400367e078?, 0x140002ea7a8?, 0x140002eaee8?}, {{0x0, 0xe7791f764, 0x1035f6740}, 0x3c, ...})
+	/Users/v1ll4n/.codex/worktrees/4dde/yaklang/common/pcapx/pcaputil/capture_fast.go:114 +0x878
+github.com/yaklang/yaklang/common/pcapx/pcaputil.(*tcpWorkers).run.func1(0x1400028c420?, 0x140002eaf60?, 0x0?, 0x14004382108?)
+	/Users/v1ll4n/.codex/worktrees/4dde/yaklang/common/pcapx/pcaputil/reassembly_workers.go:450 +0x2e8
+github.com/yaklang/yaklang/common/pcapx/pcaputil.(*tcpWorkers).run(0x14000cd6240, 0x1400028c420)
+	/Users/v1ll4n/.codex/worktrees/4dde/yaklang/common/pcapx/pcaputil/reassembly_workers.go:464 +0x2e4
+created by github.com/yaklang/yaklang/common/pcapx/pcaputil.(*TrafficPool).startWorkers in goroutine 4810
+	/Users/v1ll4n/.codex/worktrees/4dde/yaklang/common/pcapx/pcaputil/reassembly_workers.go:161 +0x578
+
+(string) (len=15) "observer failed"
+Current goroutine call stack:
+goroutine 4589 [running]:
+github.com/yaklang/yaklang/common/utils.PrintCurrentGoroutineRuntimeStack()
+	/Users/v1ll4n/.codex/worktrees/4dde/yaklang/common/utils/debugprint.go:12 +0x38
+github.com/yaklang/yaklang/common/pcapx/pcaputil.(*CaptureConfig).packetHandler.func1()
+	/Users/v1ll4n/.codex/worktrees/4dde/yaklang/common/pcapx/pcaputil/config.go:498 +0x94
+panic({0x102307ac0?, 0x10266b9c8?})
+	/Users/v1ll4n/.goenv/versions/1.22.12/src/runtime/panic.go:770 +0x124
+github.com/yaklang/yaklang/common/pcapx/pcaputil.TestTCPWorkersFailuresAreVisible.func4.2({0x10269abe0?, 0x14000228160?})
+	/Users/v1ll4n/.codex/worktrees/4dde/yaklang/common/pcapx/pcaputil/reassembly_workers_test.go:219 +0x2c
+github.com/yaklang/yaklang/common/pcapx/pcaputil.(*CaptureConfig).packetHandler.func2()
+	/Users/v1ll4n/.codex/worktrees/4dde/yaklang/common/pcapx/pcaputil/config.go:513 +0x64
+github.com/yaklang/yaklang/common/pcapx/pcaputil.(*CaptureConfig).packetHandler(0x140036d01a0, {0x3c?, 0x102670ad8?}, {0x10269abe0, 0x14000228160})
+	/Users/v1ll4n/.codex/worktrees/4dde/yaklang/common/pcapx/pcaputil/config.go:572 +0x51c
+github.com/yaklang/yaklang/common/pcapx/pcaputil.replayWithConfig({0x102670b38, 0x1400217a1e8}, 0x140036d01a0)
+	/Users/v1ll4n/.codex/worktrees/4dde/yaklang/common/pcapx/pcaputil/capture_reader.go:148 +0x998
+github.com/yaklang/yaklang/common/pcapx/pcaputil.replayFileWithConfig({0x14003a74000?, 0x100c621dc?}, 0x140036d01a0)
+	/Users/v1ll4n/.codex/worktrees/4dde/yaklang/common/pcapx/pcaputil/capture_reader.go:36 +0x94
+github.com/yaklang/yaklang/common/pcapx/pcaputil.Start({0x140033105d0, 0x5, 0x14000066540?})
+	/Users/v1ll4n/.codex/worktrees/4dde/yaklang/common/pcapx/pcaputil/capture.go:85 +0x180
+github.com/yaklang/yaklang/common/pcapx/pcaputil.OpenPcapFile({0x14003a74000, 0x78}, {0x140002eaf38, 0x3, 0x3})
+	/Users/v1ll4n/.codex/worktrees/4dde/yaklang/common/pcapx/pcaputil/exports.go:91 +0x11c
+github.com/yaklang/yaklang/common/pcapx/pcaputil.TestTCPWorkersFailuresAreVisible.func4(0x140036d0000)
+	/Users/v1ll4n/.codex/worktrees/4dde/yaklang/common/pcapx/pcaputil/reassembly_workers_test.go:219 +0x148
+testing.tRunner(0x140036d0000, 0x102666390)
+	/Users/v1ll4n/.goenv/versions/1.22.12/src/testing/testing.go:1689 +0xec
+created by testing.(*T).Run in goroutine 4429
+	/Users/v1ll4n/.goenv/versions/1.22.12/src/testing/testing.go:1742 +0x318
+
+(string) (len=15) "observer failed"
+Current goroutine call stack:
+goroutine 4589 [running]:
+github.com/yaklang/yaklang/common/utils.PrintCurrentGoroutineRuntimeStack()
+	/Users/v1ll4n/.codex/worktrees/4dde/yaklang/common/utils/debugprint.go:12 +0x38
+github.com/yaklang/yaklang/common/pcapx/pcaputil.(*CaptureConfig).packetHandler.func1()
+	/Users/v1ll4n/.codex/worktrees/4dde/yaklang/common/pcapx/pcaputil/config.go:498 +0x94
+panic({0x102307ac0?, 0x10266b9c8?})
+	/Users/v1ll4n/.goenv/versions/1.22.12/src/runtime/panic.go:770 +0x124
+github.com/yaklang/yaklang/common/pcapx/pcaputil.TestTCPWorkersFailuresAreVisible.func4.2({0x10269abe0?, 0x140002282c0?})
+	/Users/v1ll4n/.codex/worktrees/4dde/yaklang/common/pcapx/pcaputil/reassembly_workers_test.go:219 +0x2c
+github.com/yaklang/yaklang/common/pcapx/pcaputil.(*CaptureConfig).packetHandler.func2()
+	/Users/v1ll4n/.codex/worktrees/4dde/yaklang/common/pcapx/pcaputil/config.go:513 +0x64
+github.com/yaklang/yaklang/common/pcapx/pcaputil.(*CaptureConfig).packetHandler(0x140036d01a0, {0x3c?, 0x102670ad8?}, {0x10269abe0, 0x140002282c0})
+	/Users/v1ll4n/.codex/worktrees/4dde/yaklang/common/pcapx/pcaputil/config.go:572 +0x51c
+github.com/yaklang/yaklang/common/pcapx/pcaputil.replayWithConfig({0x102670b38, 0x1400217a1e8}, 0x140036d01a0)
+	/Users/v1ll4n/.codex/worktrees/4dde/yaklang/common/pcapx/pcaputil/capture_reader.go:148 +0x998
+github.com/yaklang/yaklang/common/pcapx/pcaputil.replayFileWithConfig({0x14003a74000?, 0x100c621dc?}, 0x140036d01a0)
+	/Users/v1ll4n/.codex/worktrees/4dde/yaklang/common/pcapx/pcaputil/capture_reader.go:36 +0x94
+github.com/yaklang/yaklang/common/pcapx/pcaputil.Start({0x140033105d0, 0x5, 0x14000066540?})
+	/Users/v1ll4n/.codex/worktrees/4dde/yaklang/common/pcapx/pcaputil/capture.go:85 +0x180
+github.com/yaklang/yaklang/common/pcapx/pcaputil.OpenPcapFile({0x14003a74000, 0x78}, {0x140002eaf38, 0x3, 0x3})
+	/Users/v1ll4n/.codex/worktrees/4dde/yaklang/common/pcapx/pcaputil/exports.go:91 +0x11c
+github.com/yaklang/yaklang/common/pcapx/pcaputil.TestTCPWorkersFailuresAreVisible.func4(0x140036d0000)
+	/Users/v1ll4n/.codex/worktrees/4dde/yaklang/common/pcapx/pcaputil/reassembly_workers_test.go:219 +0x148
+testing.tRunner(0x140036d0000, 0x102666390)
+	/Users/v1ll4n/.goenv/versions/1.22.12/src/testing/testing.go:1689 +0xec
+created by testing.(*T).Run in goroutine 4429
+	/Users/v1ll4n/.goenv/versions/1.22.12/src/testing/testing.go:1742 +0x318
+
+(string) (len=15) "observer failed"
+Current goroutine call stack:
+goroutine 4589 [running]:
+github.com/yaklang/yaklang/common/utils.PrintCurrentGoroutineRuntimeStack()
+	/Users/v1ll4n/.codex/worktrees/4dde/yaklang/common/utils/debugprint.go:12 +0x38
+github.com/yaklang/yaklang/common/pcapx/pcaputil.(*CaptureConfig).packetHandler.func1()
+	/Users/v1ll4n/.codex/worktrees/4dde/yaklang/common/pcapx/pcaputil/config.go:498 +0x94
+panic({0x102307ac0?, 0x10266b9c8?})
+	/Users/v1ll4n/.goenv/versions/1.22.12/src/runtime/panic.go:770 +0x124
+github.com/yaklang/yaklang/common/pcapx/pcaputil.TestTCPWorkersFailuresAreVisible.func4.2({0x10269abe0?, 0x140002289a0?})
+	/Users/v1ll4n/.codex/worktrees/4dde/yaklang/common/pcapx/pcaputil/reassembly_workers_test.go:219 +0x2c
+github.com/yaklang/yaklang/common/pcapx/pcaputil.(*CaptureConfig).packetHandler.func2()
+	/Users/v1ll4n/.codex/worktrees/4dde/yaklang/common/pcapx/pcaputil/config.go:513 +0x64
+github.com/yaklang/yaklang/common/pcapx/pcaputil.(*CaptureConfig).packetHandler(0x140036d01a0, {0x3c?, 0x102670ad8?}, {0x10269abe0, 0x140002289a0})
+	/Users/v1ll4n/.codex/worktrees/4dde/yaklang/common/pcapx/pcaputil/config.go:572 +0x51c
+github.com/yaklang/yaklang/common/pcapx/pcaputil.replayWithConfig({0x102670b38, 0x1400217a1e8}, 0x140036d01a0)
+	/Users/v1ll4n/.codex/worktrees/4dde/yaklang/common/pcapx/pcaputil/capture_reader.go:148 +0x998
+github.com/yaklang/yaklang/common/pcapx/pcaputil.replayFileWithConfig({0x14003a74000?, 0x100c621dc?}, 0x140036d01a0)
+	/Users/v1ll4n/.codex/worktrees/4dde/yaklang/common/pcapx/pcaputil/capture_reader.go:36 +0x94
+github.com/yaklang/yaklang/common/pcapx/pcaputil.Start({0x140033105d0, 0x5, 0x14000066540?})
+	/Users/v1ll4n/.codex/worktrees/4dde/yaklang/common/pcapx/pcaputil/capture.go:85 +0x180
+github.com/yaklang/yaklang/common/pcapx/pcaputil.OpenPcapFile({0x14003a74000, 0x78}, {0x140002eaf38, 0x3, 0x3})
+	/Users/v1ll4n/.codex/worktrees/4dde/yaklang/common/pcapx/pcaputil/exports.go:91 +0x11c
+github.com/yaklang/yaklang/common/pcapx/pcaputil.TestTCPWorkersFailuresAreVisible.func4(0x140036d0000)
+	/Users/v1ll4n/.codex/worktrees/4dde/yaklang/common/pcapx/pcaputil/reassembly_workers_test.go:219 +0x148
+testing.tRunner(0x140036d0000, 0x102666390)
+	/Users/v1ll4n/.goenv/versions/1.22.12/src/testing/testing.go:1689 +0xec
+created by testing.(*T).Run in goroutine 4429
+	/Users/v1ll4n/.goenv/versions/1.22.12/src/testing/testing.go:1742 +0x318
+
+(string) (len=15) "observer failed"
+Current goroutine call stack:
+goroutine 4589 [running]:
+github.com/yaklang/yaklang/common/utils.PrintCurrentGoroutineRuntimeStack()
+	/Users/v1ll4n/.codex/worktrees/4dde/yaklang/common/utils/debugprint.go:12 +0x38
+github.com/yaklang/yaklang/common/pcapx/pcaputil.(*CaptureConfig).packetHandler.func1()
+	/Users/v1ll4n/.codex/worktrees/4dde/yaklang/common/pcapx/pcaputil/config.go:498 +0x94
+panic({0x102307ac0?, 0x10266b9c8?})
+	/Users/v1ll4n/.goenv/versions/1.22.12/src/runtime/panic.go:770 +0x124
+github.com/yaklang/yaklang/common/pcapx/pcaputil.TestTCPWorkersFailuresAreVisible.func4.2({0x10269abe0?, 0x14000228c60?})
+	/Users/v1ll4n/.codex/worktrees/4dde/yaklang/common/pcapx/pcaputil/reassembly_workers_test.go:219 +0x2c
+github.com/yaklang/yaklang/common/pcapx/pcaputil.(*CaptureConfig).packetHandler.func2()
+	/Users/v1ll4n/.codex/worktrees/4dde/yaklang/common/pcapx/pcaputil/config.go:513 +0x64
+github.com/yaklang/yaklang/common/pcapx/pcaputil.(*CaptureConfig).packetHandler(0x140036d01a0, {0x3c?, 0x102670ad8?}, {0x10269abe0, 0x14000228c60})
+	/Users/v1ll4n/.codex/worktrees/4dde/yaklang/common/pcapx/pcaputil/config.go:572 +0x51c
+github.com/yaklang/yaklang/common/pcapx/pcaputil.replayWithConfig({0x102670b38, 0x1400217a1e8}, 0x140036d01a0)
+	/Users/v1ll4n/.codex/worktrees/4dde/yaklang/common/pcapx/pcaputil/capture_reader.go:148 +0x998
+github.com/yaklang/yaklang/common/pcapx/pcaputil.replayFileWithConfig({0x14003a74000?, 0x100c621dc?}, 0x140036d01a0)
+	/Users/v1ll4n/.codex/worktrees/4dde/yaklang/common/pcapx/pcaputil/capture_reader.go:36 +0x94
+github.com/yaklang/yaklang/common/pcapx/pcaputil.Start({0x140033105d0, 0x5, 0x14000066540?})
+	/Users/v1ll4n/.codex/worktrees/4dde/yaklang/common/pcapx/pcaputil/capture.go:85 +0x180
+github.com/yaklang/yaklang/common/pcapx/pcaputil.OpenPcapFile({0x14003a74000, 0x78}, {0x140002eaf38, 0x3, 0x3})
+	/Users/v1ll4n/.codex/worktrees/4dde/yaklang/common/pcapx/pcaputil/exports.go:91 +0x11c
+github.com/yaklang/yaklang/common/pcapx/pcaputil.TestTCPWorkersFailuresAreVisible.func4(0x140036d0000)
+	/Users/v1ll4n/.codex/worktrees/4dde/yaklang/common/pcapx/pcaputil/reassembly_workers_test.go:219 +0x148
+testing.tRunner(0x140036d0000, 0x102666390)
+	/Users/v1ll4n/.goenv/versions/1.22.12/src/testing/testing.go:1689 +0xec
+created by testing.(*T).Run in goroutine 4429
+	/Users/v1ll4n/.goenv/versions/1.22.12/src/testing/testing.go:1742 +0x318
+
+FAIL
+FAIL	github.com/yaklang/yaklang/common/pcapx/pcaputil	6.312s
+ok  	github.com/yaklang/yaklang/common/pcapx/cmd/pcap-inspect	1.139s
+FAIL

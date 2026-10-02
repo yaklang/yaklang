@@ -1,0 +1,233 @@
+{
+  "client": "stomp.py",
+  "client_version": "8.2.0",
+  "stomp_version": "1.2",
+  "assertions": {
+    "body_roundtrip": true,
+    "header_roundtrip": true,
+    "abort_not_delivered": true
+  },
+  "events": [
+    {
+      "direction": "client",
+      "command": "STOMP",
+      "headers": {
+        "accept-version": "1.2",
+        "host": "/",
+        "login": "fixture",
+        "passcode": "fixture"
+      },
+      "body_base64": ""
+    },
+    {
+      "direction": "server",
+      "command": "CONNECTED",
+      "headers": {
+        "server": "RabbitMQ/4.1.0",
+        "session": "session-pbHmq0nd4qfm99N5SMKeSQ",
+        "heart-beat": "0,0",
+        "version": "1.2"
+      },
+      "body_base64": ""
+    },
+    {
+      "direction": "client",
+      "command": "SUBSCRIBE",
+      "headers": {
+        "receipt": "subscribed",
+        "auto-delete": "true",
+        "destination": "/queue/pr5013-12",
+        "id": "sub-1",
+        "ack": "client-individual"
+      },
+      "body_base64": ""
+    },
+    {
+      "direction": "server",
+      "command": "RECEIPT",
+      "headers": {
+        "receipt-id": "subscribed"
+      },
+      "body_base64": ""
+    },
+    {
+      "direction": "client",
+      "command": "BEGIN",
+      "headers": {
+        "transaction": "aborted"
+      },
+      "body_base64": ""
+    },
+    {
+      "direction": "client",
+      "command": "SEND",
+      "headers": {
+        "transaction": "aborted",
+        "destination": "/queue/pr5013-12",
+        "content-length": 13
+      },
+      "body_base64": "bmV2ZXItZGVsaXZlcg=="
+    },
+    {
+      "direction": "client",
+      "command": "ABORT",
+      "headers": {
+        "transaction": "aborted"
+      },
+      "body_base64": ""
+    },
+    {
+      "direction": "client",
+      "command": "BEGIN",
+      "headers": {
+        "transaction": "committed"
+      },
+      "body_base64": ""
+    },
+    {
+      "direction": "client",
+      "command": "SEND",
+      "headers": {
+        "transaction": "committed",
+        "x-variant": "escaped\\ccolon\\nnewline",
+        "content-type": "application/octet-stream",
+        "destination": "/queue/pr5013-12",
+        "content-length": 12
+      },
+      "body_base64": "Zml4dHVyZQBib2R5"
+    },
+    {
+      "direction": "client",
+      "command": "COMMIT",
+      "headers": {
+        "receipt": "committed",
+        "transaction": "committed"
+      },
+      "body_base64": ""
+    },
+    {
+      "direction": "server",
+      "command": "RECEIPT",
+      "headers": {
+        "receipt-id": "committed"
+      },
+      "body_base64": ""
+    },
+    {
+      "direction": "server",
+      "command": "MESSAGE",
+      "headers": {
+        "subscription": "sub-1",
+        "destination": "/queue/pr5013-12",
+        "message-id": "T_sub-1@@session-pbHmq0nd4qfm99N5SMKeSQ@@1",
+        "redelivered": "false",
+        "ack": "T_sub-1@@session-pbHmq0nd4qfm99N5SMKeSQ@@1",
+        "transaction": "committed",
+        "x-variant": "escaped:colon\nnewline",
+        "content-type": "application/octet-stream",
+        "content-length": "12"
+      },
+      "body_base64": "Zml4dHVyZQBib2R5"
+    },
+    {
+      "direction": "client",
+      "command": "ACK",
+      "headers": {
+        "id": "T_sub-1@@session-pbHmq0nd4qfm99N5SMKeSQ@@1",
+        "receipt": "acked"
+      },
+      "body_base64": ""
+    },
+    {
+      "direction": "server",
+      "command": "RECEIPT",
+      "headers": {
+        "receipt-id": "acked"
+      },
+      "body_base64": ""
+    },
+    {
+      "direction": "client",
+      "command": "SEND",
+      "headers": {
+        "receipt": "sent-nack",
+        "destination": "/queue/pr5013-12",
+        "content-length": 16
+      },
+      "body_base64": "bmFjay1hbmQtZGlzY2FyZA=="
+    },
+    {
+      "direction": "server",
+      "command": "MESSAGE",
+      "headers": {
+        "subscription": "sub-1",
+        "destination": "/queue/pr5013-12",
+        "message-id": "T_sub-1@@session-pbHmq0nd4qfm99N5SMKeSQ@@2",
+        "redelivered": "false",
+        "ack": "T_sub-1@@session-pbHmq0nd4qfm99N5SMKeSQ@@2",
+        "receipt": "sent-nack",
+        "content-length": "16"
+      },
+      "body_base64": "bmFjay1hbmQtZGlzY2FyZA=="
+    },
+    {
+      "direction": "server",
+      "command": "RECEIPT",
+      "headers": {
+        "receipt-id": "sent-nack"
+      },
+      "body_base64": ""
+    },
+    {
+      "direction": "client",
+      "command": "NACK",
+      "headers": {
+        "id": "T_sub-1@@session-pbHmq0nd4qfm99N5SMKeSQ@@2",
+        "requeue": "false",
+        "receipt": "nacked"
+      },
+      "body_base64": ""
+    },
+    {
+      "direction": "server",
+      "command": "RECEIPT",
+      "headers": {
+        "receipt-id": "nacked"
+      },
+      "body_base64": ""
+    },
+    {
+      "direction": "client",
+      "command": "UNSUBSCRIBE",
+      "headers": {
+        "receipt": "unsubscribed",
+        "id": "sub-1"
+      },
+      "body_base64": ""
+    },
+    {
+      "direction": "server",
+      "command": "RECEIPT",
+      "headers": {
+        "receipt-id": "unsubscribed"
+      },
+      "body_base64": ""
+    },
+    {
+      "direction": "client",
+      "command": "DISCONNECT",
+      "headers": {
+        "receipt": "disconnected"
+      },
+      "body_base64": ""
+    },
+    {
+      "direction": "server",
+      "command": "RECEIPT",
+      "headers": {
+        "receipt-id": "disconnected"
+      },
+      "body_base64": ""
+    }
+  ]
+}

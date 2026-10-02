@@ -1,0 +1,152 @@
+{
+  "kind": "native",
+  "started_utc": "2026-09-30T01:09:55.164650+00:00",
+  "broker": {
+    "name": "RabbitMQ",
+    "version": "4.1.0",
+    "image": "rabbitmq@sha256:d5172fdc63a9d0e8b31c57b4b473f73c19f47b75ef0cf2a49af06a86f8c0541d",
+    "license": "MPL-2.0",
+    "source": "https://github.com/rabbitmq/rabbitmq-server/tree/v4.1.0"
+  },
+  "client": {
+    "name": "stomp.py",
+    "version": "8.2.0",
+    "license": "Apache-2.0",
+    "source": "https://github.com/jasonrbriggs/stomp.py/tree/v8.2.0",
+    "source_commit": "abb4d8244d6640f6a7cf260dc75c106aaa078841",
+    "dependencies": {
+      "docopt": "0.6.2",
+      "websocket-client": "1.9.2"
+    }
+  },
+  "capture": {
+    "interface": "lo0",
+    "port": 46164,
+    "original_packets_unmodified": true,
+    "credentials": "fixture/fixture are disposable local lab credentials",
+    "license": "CC0-1.0"
+  },
+  "oracle": {
+    "application": "stomp.py callbacks and asserted body/header round trips, no aborted delivery, receipt/ACK/NACK outcomes",
+    "server": "broker version, listeners, post-session queue state, unmodified broker log",
+    "tshark": "4.4.8 has no STOMP dissector; only listed TCP/frame fields are applicable"
+  },
+  "variants": [
+    "1.0 client acknowledgements",
+    "1.1 client-individual acknowledgements and NACK",
+    "1.2 embedded NUL body, client-individual ACK and NACK"
+  ],
+  "files": [
+    {
+      "file": "broker-image.json",
+      "sha256": "a00b44560025e7ac55ce9af2b233d5d9ed571fa246a83e9d59291ae6ce12fee1",
+      "bytes": 3001
+    },
+    {
+      "file": "broker-listeners.txt",
+      "sha256": "00aa51dc8dc4f655ceada177e1469478eb2fcb7193d26bb4f119db1713c56b34",
+      "bytes": 339
+    },
+    {
+      "file": "broker-version.txt",
+      "sha256": "3b10b6ad566eadbcacadb33c591f1ec629593d6adf47442e56e0f61996829ef7",
+      "bytes": 6
+    },
+    {
+      "file": "broker.log",
+      "sha256": "91c3cc953265c361434c5e1a4ea5e649d82269ec5c48961f2bfd0546dd306581",
+      "bytes": 20750
+    },
+    {
+      "file": "rabbitmq-4.1.0-stomp-1.0-broker-queues.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "file": "rabbitmq-4.1.0-stomp-1.0-capture.log",
+      "sha256": "fc360b17a26a69df91c5da3c5978b4c362e5c59685f68bbfef87a545cbfffdaf",
+      "bytes": 165
+    },
+    {
+      "file": "rabbitmq-4.1.0-stomp-1.0-client-oracle.json",
+      "sha256": "dc1b7d1c98516aa7e1e7827a0c83d07bc3ed5e0ebcca879c39b157d54c12934d",
+      "bytes": 4009
+    },
+    {
+      "file": "rabbitmq-4.1.0-stomp-1.0-tcp-oracle.tsv",
+      "sha256": "6454e38e314862fb2e95651cdc966d69ffa2ca99605649b28c8ce0f1349748b0",
+      "bytes": 6219
+    },
+    {
+      "file": "rabbitmq-4.1.0-stomp-1.0.pcap",
+      "sha256": "f67a3321db4469ad6b0c5f67ad1df942dd9d62d7fe8fac0f7132546ce90c5ff7",
+      "bytes": 4120
+    },
+    {
+      "file": "rabbitmq-4.1.0-stomp-1.1-broker-queues.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "file": "rabbitmq-4.1.0-stomp-1.1-capture.log",
+      "sha256": "b013e6aefb9617c4e47c89b4b0637797c78581c36c4393547777da7ff901451c",
+      "bytes": 166
+    },
+    {
+      "file": "rabbitmq-4.1.0-stomp-1.1-client-oracle.json",
+      "sha256": "b01a203af9c810f407163c637c2d1705177d3423b5cd7cac92093b61f41b3b97",
+      "bytes": 5308
+    },
+    {
+      "file": "rabbitmq-4.1.0-stomp-1.1-tcp-oracle.tsv",
+      "sha256": "190d9182656f8a830191794b146cd893cea1baf5d7660a455f55e9310e561a57",
+      "bytes": 8321
+    },
+    {
+      "file": "rabbitmq-4.1.0-stomp-1.1.pcap",
+      "sha256": "d39c2edb5d134ea691664a29431ff49c7c2b92e2ccd32b0fc67b898fc30bb552",
+      "bytes": 5478
+    },
+    {
+      "file": "rabbitmq-4.1.0-stomp-1.2-broker-queues.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "file": "rabbitmq-4.1.0-stomp-1.2-capture.log",
+      "sha256": "fadd42e160eda0b8153ac10317161574cfcc5f08b181fee44e4782a3599f96b1",
+      "bytes": 166
+    },
+    {
+      "file": "rabbitmq-4.1.0-stomp-1.2-client-oracle.json",
+      "sha256": "92b9f30f3d3959d59e4c5128dcbad9a72ed4a75d478e975adfdfc78e32020ae7",
+      "bytes": 5348
+    },
+    {
+      "file": "rabbitmq-4.1.0-stomp-1.2-tcp-oracle.tsv",
+      "sha256": "f04bee88cc9074aac319a354cb168ca5ec048c608301f6f443bd6c0cc51afe49",
+      "bytes": 8824
+    },
+    {
+      "file": "rabbitmq-4.1.0-stomp-1.2.pcap",
+      "sha256": "08b6387255a51e4459c268ba7c8a098e052ce5a74d362a33298f4469ae9c089f",
+      "bytes": 5806
+    },
+    {
+      "file": "tcpdump-version.txt",
+      "sha256": "ea110ade07cc1ac454235db0e68368b6ff79a6a12282007ff6a4a049deb1f4fa",
+      "bytes": 82
+    },
+    {
+      "file": "tshark-version.txt",
+      "sha256": "3f48cb9d8d96491a97bf9c883eac2807d57728c3efacdd3c7a04d36a979be0de",
+      "bytes": 1216
+    }
+  ],
+  "references": [
+    "https://stomp.github.io/stomp-specification-1.0.html",
+    "https://stomp.github.io/stomp-specification-1.1.html",
+    "https://stomp.github.io/stomp-specification-1.2.html",
+    "https://www.rabbitmq.com/docs/stomp"
+  ]
+}

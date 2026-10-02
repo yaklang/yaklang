@@ -1,0 +1,12 @@
+1	0x0064	False		0x00	True	native.test	2	1		
+2	0x0064	True	0	0x00	True	native.test	2	2	192.0.2.53	
+3	0x0065	False		0x00	True	native.test	15	1		
+4	0x0065	True	0	0x00	True	native.test	15	2	192.0.2.25	mail.native.test
+5	0x0066	False		0x00	True	native.test	1	1		
+6	0x0066	True	0	0x01	False	native.test	1	1		
+11	0x0067	False		0x00	True	native.test	2	1		
+13	0x0067	True	0	0x00	True	native.test	2	2	192.0.2.53	
+23	0x0068	False		0x00	True	native.test	15	1		
+25	0x0068	True	0	0x00	True	native.test	15	2	192.0.2.25	mail.native.test
+33	0x0069	False		0x00	True	native.test	1	1		
+37	0x0069	True	0	0x01	False	native.test	1	1		

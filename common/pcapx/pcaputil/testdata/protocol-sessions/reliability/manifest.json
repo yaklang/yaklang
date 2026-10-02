@@ -1,0 +1,50 @@
+{
+  "profile": "N01-N03 reliability regression",
+  "generated_utc": "2026-09-22",
+  "provenance": {
+    "tls-hrr": "Go 1.22.12 crypto/tls native client and server, P256-only server, X25519-first client. Real loopback capture. Keylog is ephemeral fixture-only material. Wireshark 4.4.8 independently identifies CH1/HRR/CH2/SH.",
+    "redis-reply": "Redis 7.2.5 native server, standard-library Python RESP client; socket reply and silence oracle. OFF/ON, SKIP, repeated SKIP, ON override, prior pipeline and ACL denial. Isolated ACL setup has no parser role evidence.",
+    "dns-lan": "Controlled RFC-encoded Python UDP peers, not an independent DNS daemon. Literal dot versus two labels, ASCII case, real IPv4 multicast LLMNR query and unicast response. Port 19553 requires explicit DNS DecodeAs; LLMNR port 5355 auto-admitted. IPv6/multiple responder/flow reuse negatives are separate constructed unit tests."
+  },
+  "generators": [
+    "scripts/protocol-tests/generate-reliability/tls.go",
+    "scripts/protocol-tests/generate-reliability/redis.py",
+    "scripts/protocol-tests/generate-reliability/dns.py"
+  ],
+  "references": [
+    "https://redis.io/docs/latest/commands/client-reply/",
+    "https://www.rfc-editor.org/rfc/rfc8446.html#section-4.1.4",
+    "https://www.rfc-editor.org/rfc/rfc1035.html",
+    "https://www.rfc-editor.org/rfc/rfc4795.html"
+  ],
+  "limitations": [
+    "TLS HRR PSK binder changes explicitly unsupported; no certificate trust claim.",
+    "Redis CLIENT REPLY inside transactions and subscriptions under reply suppression require context; ambiguous error responses do not get guessed associations.",
+    "LLMNR responder matches are observations, not authenticated identities."
+  ],
+  "files": [
+    {
+      "file": "dns-lan.pcap",
+      "bytes": 744,
+      "sha256": "8b6683b4080dbdbe0adee1f0b61324605bf17eaab717d2a844bd655c5fb17698",
+      "packets": 10
+    },
+    {
+      "file": "redis-reply.pcapng",
+      "bytes": 8484,
+      "sha256": "a9b581f4c3581fd0b6578dac61af12d458f41e2671a6a931eb3e41d7d9d32c53",
+      "packets": 84
+    },
+    {
+      "file": "tls-hrr.keys",
+      "bytes": 632,
+      "sha256": "76285ca2b8c673ed269cefacd5c0c13760ab4d26ed5ebee465bd90c473a451ed"
+    },
+    {
+      "file": "tls-hrr.pcapng",
+      "bytes": 5040,
+      "sha256": "dd8a517c7f6271dfbfd286aa3fb3224f038475acb4e6fa6c93efff5de6fb650d",
+      "packets": 29
+    }
+  ]
+}

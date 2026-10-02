@@ -1,0 +1,48 @@
+1	0															
+2	0															
+3	0															
+4	0															
+5	0															
+6	0															
+7	0															
+8	0															
+9	0															
+10	0															
+11	0															
+12	0															
+13	0															
+14	0															
+15	0		0x0000	False		a.native.test	1	0x0001							POST	
+16	0															
+17	0		0x0000	True	0	a.native.test	1	0x0001	192.0.2.10							200
+18	0															
+19	0														GET	
+20	0															
+21	0		0x0000	True	0	a.native.test	28	0x0001		2001:db8::10						200
+22	0															
+23	0															
+24	0		0x0000	False		alias.native.test	1	0x0001							POST	
+25	0															
+26	0															
+27	0		0x0000	True	0	alias.native.test	1	0x0001	192.0.2.10		a.native.test					200
+28	0															
+29	0														GET	
+30	0															
+31	0		0x0000	True	3	missing.native.test	1	0x0001								200
+32	0															
+33	0															
+34	0															
+35	0		0x0000	False		text.native.test	16	0x0001							POST	
+36	0															
+37	0		0x0000	True	0	text.native.test	16	0x0001				independent CoreDNS oracle,two TXT strings				200
+38	0															
+39	0														GET	
+40	0															
+41	0		0x0000	True	0	native.test	6	0x0001								200
+42	0															
+43	0															
+44	0															
+45	0															
+46	0															
+47	0															
+48	0															

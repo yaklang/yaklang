@@ -1,0 +1,107 @@
+{
+  "client_stats": {
+    "publisher": {
+      "InMsgs": 10,
+      "OutMsgs": 13,
+      "InBytes": 2363,
+      "OutBytes": 875,
+      "Reconnects": 0
+    },
+    "subscriber": {
+      "InMsgs": 4,
+      "OutMsgs": 0,
+      "InBytes": 281,
+      "OutBytes": 0,
+      "Reconnects": 0
+    }
+  },
+  "generator": "official nats.go API over real TCP; no handcrafted protocol frames",
+  "headers_supported": true,
+  "nats_go_version": "1.39.1",
+  "observations": [
+    {
+      "name": "multi-value-case-sensitive-binary",
+      "subject": "native.headers",
+      "headers": {
+        "ASCII": [
+          "\u0000\u0001"
+        ],
+        "Colon": [
+          "left:right"
+        ],
+        "Empty": [
+          ""
+        ],
+        "Tab": [
+          "left\tright"
+        ],
+        "X-Trace": [
+          "alpha",
+          "beta, gamma"
+        ],
+        "x-trace": [
+          "lower"
+        ]
+      },
+      "body_base64": "bmF0aXZlAA0KUElORw0KYm9keQ=="
+    },
+    {
+      "name": "empty-header-section",
+      "subject": "native.headers",
+      "headers": {},
+      "body_base64": ""
+    },
+    {
+      "name": "reply-and-header-only",
+      "subject": "native.headers",
+      "reply": "native.reply",
+      "headers": {
+        "Reply-Case": [
+          "present",
+          "twice"
+        ]
+      },
+      "body_base64": ""
+    },
+    {
+      "name": "server-status-503",
+      "subject": "native.absent",
+      "headers": null,
+      "body_base64": null,
+      "error": "nats: no responders available for request"
+    },
+    {
+      "name": "server-status-404-description",
+      "subject": "_INBOX.WlXrBdUWQhgNmoil8fqOqm.YaUpcifT",
+      "headers": {
+        "Description": [
+          "No Messages"
+        ],
+        "Status": [
+          "404"
+        ]
+      },
+      "body_base64": ""
+    },
+    {
+      "name": "server-status-100-heartbeat",
+      "subject": "native.heartbeat",
+      "headers": {
+        "Description": [
+          "Idle Heartbeat"
+        ],
+        "Nats-Last-Consumer": [
+          "0"
+        ],
+        "Nats-Last-Stream": [
+          "0"
+        ],
+        "Status": [
+          "100"
+        ]
+      },
+      "body_base64": ""
+    }
+  ],
+  "server_version": "2.10.26"
+}

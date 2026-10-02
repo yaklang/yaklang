@@ -1,0 +1,39 @@
+# Explicit complete TLS 1.2 CertificateRequest and CertificateVerify layouts.
+# RFC 5246 4.7, 7.4.4/7.4.8, erratum 1585 (appendix signature list omission).
+# The caller supplies plaintext, reassembly, version and sender context.
+# Unknown/reserved identifiers remain raw numeric values, not usable algorithms.
+# Distinguished names and signatures are opaque, not verified DER or identities.
+# No TLS state machine, automatic port dispatch or structured generation.
+endian: big
+unit: byte
+Package:
+  TLS12CertificateRequest:
+    operator: |
+      err = parseTLS12CertificateAuth(13)
+      if err != nil { panic(err) }
+  TLS12CertificateVerify:
+    operator: |
+      err = parseTLS12CertificateAuth(15)
+      if err != nil { panic(err) }
+  TLS12CertificateRequestCarrier:
+    operator: |
+      if !this.HasMaxLength() || this.GetMaxLength("bit") == 0 || this.GetMaxLength("bit") % 8 != 0 { panic("tls-certificate-auth: explicit nonempty byte boundary required") }
+      if this.GetMaxLength() > 131333 { panic("tls-certificate-auth: carrier exceeds 131333-byte resource limit") }
+      candidate, trial = this.TryProcessByType("TLS12CertificateRequestExact", "TLS12CertificateRequest")
+      if trial.OK { trial.Save(); return }
+      trial.Recovery()
+      raw = this.NewUnknownNode("Unparsed TLS Certificate Request")
+      raw.SetMaxLength(this.GetMaxLength())
+      raw.Process()
+  TLS12CertificateVerifyCarrier:
+    operator: |
+      if !this.HasMaxLength() || this.GetMaxLength("bit") == 0 || this.GetMaxLength("bit") % 8 != 0 { panic("tls-certificate-auth: explicit nonempty byte boundary required") }
+      if this.GetMaxLength() > 131333 { panic("tls-certificate-auth: carrier exceeds 131333-byte resource limit") }
+      candidate, trial = this.TryProcessByType("TLS12CertificateVerifyExact", "TLS12CertificateVerify")
+      if trial.OK { trial.Save(); return }
+      trial.Recovery()
+      raw = this.NewUnknownNode("Unparsed TLS Certificate Verify")
+      raw.SetMaxLength(this.GetMaxLength())
+      raw.Process()
+TLS12CertificateRequestExact: "import:application-layer/tls_certificate_auth.yaml;node:TLS12CertificateRequest"
+TLS12CertificateVerifyExact: "import:application-layer/tls_certificate_auth.yaml;node:TLS12CertificateVerify"

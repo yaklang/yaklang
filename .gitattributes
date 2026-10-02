@@ -1,3 +1,23 @@
 # Prompt bytes are part of the model protocol and cache prefix on every OS.
 # Existing prompt whitespace is intentional and must survive relocation.
 common/ai/aid/aicommon/promptloader/prompts/** text eol=lf -whitespace
+common/bin-parser/rules/**/*.yaml text eol=lf
+common/bin-parser/rules/*.yaml text eol=lf
+*.zst binary
+
+# Wire fixtures (including text protocols) must retain exact CR/LF bytes.
+common/bin-parser/testdata/protocol-recognition-regressions/** -text
+# CRLF and terminal blank header lines are protocol bytes, not source whitespace.
+common/bin-parser/testdata/protocol-recognition-regressions/messaging/*.txt whitespace=cr-at-eol,-blank-at-eof
+
+common/pcapx/pcaputil/testdata/protocol-sessions/first-batch-m2a/*.tsv whitespace=-blank-at-eol
+# Raw TShark TSV exports retain tab delimiters for empty trailing columns.
+common/pcapx/pcaputil/testdata/protocol-sessions/first-batch-oracles/*.tsv whitespace=-blank-at-eol
+scripts/protocol-tests/generate-dcerpc-session/*.tsv whitespace=-blank-at-eol
+
+# Native captures and independent tool exports are byte-preserved evidence.
+common/bin-parser/testdata/protocol-native/** -text
+common/bin-parser/testdata/protocol-native/**/*.tsv whitespace=-blank-at-eol
+common/bin-parser/testdata/protocol-native/nats/*.bin whitespace=cr-at-eol,-blank-at-eof,-blank-at-eol
+common/bin-parser/testdata/protocol-native/nats/server.log whitespace=-blank-at-eol
+common/bin-parser/testdata/protocol-native/nats/client-build-info.txt whitespace=-blank-at-eof,-blank-at-eol

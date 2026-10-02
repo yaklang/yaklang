@@ -1,0 +1,101 @@
+# FC-BB-5 Rev 2.00 (2009-06-04), not the pre-T11 two-byte experiment or FCIP.
+# Section 7.7 tables 22/23 restrict the FCoE delimiter sets to five SOFs and
+# four EOFs. The broader Linux/RFC FC encapsulation enums are not this profile.
+# Same-version T11 draft text mirror (the original PDF endpoint is unavailable):
+# https://www.scribd.com/document/68578775/Fibre-Channel-Backbone
+# Pinned wire definitions and checksum implementation:
+# https://github.com/torvalds/linux/blob/adc218676eef25575469234709c2d87185ca223a/include/scsi/fc/fc_fcoe.h
+# https://github.com/torvalds/linux/blob/adc218676eef25575469234709c2d87185ca223a/drivers/scsi/fcoe/fcoe.c
+# https://github.com/torvalds/linux/blob/adc218676eef25575469234709c2d87185ca223a/include/scsi/fc/fc_encaps.h
+# https://github.com/wireshark/wireshark/blob/57bf672140761a871aaad0f709fb7f7c32fd186b/epan/dissectors/packet-fcoe.c
+#
+# An explicit FCS-free message boundary is the default. fcoeTrailerLength=4
+# explicitly retains an Ethernet FCS, without checking it. No EOF scanning or
+# reserved-byte heuristic is used to guess a different boundary/old format.
+# CRC32 covers the complete FC region including VFT, optional headers and fill.
+# Reserved fields are retained (send zero / ignore on receive), not rejected.
+# This rule is a bounded parser. Structured GenerateBinary is not supported;
+# NodeToBytes of a parsed tree preserves the original input representation.
+endian: big
+Package:
+  FCoE: FCoEMessage
+  FCoECarrier:
+    operator: |
+      if !this.HasMaxLength() { panic("fcoe: explicit carrier boundary required") }
+      if this.GetMaxLength("bit") % 8 != 0 { panic("fcoe: byte-sized carrier boundary required") }
+      if this.GetMaxLength() == 0 { panic("fcoe: empty carrier has no message") }
+      candidate, trial = this.TryProcessByType("FCoEFrame")
+      if trial.OK { trial.Save(); return }
+      trial.Recovery()
+      raw = this.NewUnknownNode("Unparsed FCoE Payload")
+      raw.SetMaxLength(this.GetMaxLength())
+      raw.Process()
+
+FCoEFrame: "import:fcoe.yaml;node:FCoE"
+FCoEInnerFrame: "import:fibre_channel.yaml;node:FibreChannel"
+
+FCoEMessage:
+  operator: |
+    if !this.HasMaxLength() { panic("fcoe: explicit message boundary required") }
+    if this.GetMaxLength("bit") % 8 != 0 { panic("fcoe: byte-sized message boundary required") }
+    total = this.GetMaxLength()
+    if total > 2170 { panic("fcoe: exceeds the supported 2170-byte framing profile") }
+    trailer = 0
+    if hasCtx("fcoeTrailerLength") {
+      trailer = getCtx("fcoeTrailerLength")
+      if trailer != 0 && trailer != 4 { panic("fcoe: external trailer length must be zero or four") }
+    }
+    if total < 46+trailer { panic("fcoe: incomplete minimum frame") }
+    fcLength = total-22-trailer
+    if fcLength % 4 != 0 { panic("fcoe: FC region is not word-aligned") }
+    version = this.ProcessSubNode("Version Byte")
+    if int(version.Child("FCoE Version").Value) != 0 { panic("fcoe: unsupported version") }
+    this.ProcessSubNode("FCoE Header Reserved")
+    sof = int(this.ProcessSubNode("SOF").Value)
+    if sof != 0x28 && sof != 0x2d && sof != 0x2e && sof != 0x35 && sof != 0x36 {
+      panic("fcoe: unknown SOF delimiter")
+    }
+    // A temporary terminal extracts exact bytes even at a non-byte global
+    // bit offset. Recovery removes the probe and restores reader/writer state.
+    this.GetSubNode("Frame Check Probe").SetMaxLength(fcLength+8)
+    probe, attempt = this.TryProcessSubNode("Frame Check Probe")
+    attempt.Recovery()
+    if !attempt.OK { panic("fcoe: truncated FC region or trailer") }
+    checked = probe.Value
+    expected = int(checked[fcLength]) | (int(checked[fcLength+1]) << 8) | (int(checked[fcLength+2]) << 16) | (int(checked[fcLength+3]) << 24)
+    if int(fcoeCRC32IEEE(checked[:fcLength])) != expected { panic("fcoe: FC CRC32 mismatch") }
+    eof = int(checked[fcLength+4])
+    if eof != 0x41 && eof != 0x42 && eof != 0x49 && eof != 0x50 {
+      panic("fcoe: unknown EOF delimiter")
+    }
+    fc = this.GetSubNode("FC Frame")
+    fc.SetMaxLength(fcLength)
+    fc.SetCfg("FC EOF", eof)
+    fc.SetCfg("FC SOF", sof)
+    fc.Process()
+    this.ProcessSubNode("FC CRC32")
+    this.ProcessSubNode("EOF")
+    this.ProcessSubNode("FCoE Trailer Reserved")
+    if trailer != 0 { this.ProcessSubNode("Ethernet FCS") }
+    if this.Length() != total { panic("fcoe: frame did not consume its boundary") }
+    this.AddInfo("FC CRC32 Verified", true)
+    this.AddInfo("FC Region Length", fcLength)
+    this.AddInfo("Ethernet FCS Verified", false)
+    this.AddInfo("Trailer Length", int(trailer))
+    this.AddInfo("Trailer Length Explicit", hasCtx("fcoeTrailerLength"))
+    this.AddInfo("Frame Content Declared Invalid", eof == 0x49)
+    this.AddInfo("Frame Aborted", eof == 0x50)
+    this.AddInfo("Session State Validated", false)
+  Version Byte:
+    FCoE Version: uint8,4bit
+    FCoE Version Reserved: uint8,4bit
+  FCoE Header Reserved: raw,12
+  SOF: uint8
+  Frame Check Probe: raw
+  FC Frame: FCoEInnerFrame
+  FC CRC32:
+    type: uint32
+    endian: little
+  EOF: uint8
+  FCoE Trailer Reserved: raw,3
+  Ethernet FCS: raw,4

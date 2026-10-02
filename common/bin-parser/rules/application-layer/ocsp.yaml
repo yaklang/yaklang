@@ -1,0 +1,190 @@
+endian: big
+Package:
+  OCSPRequest:
+    operator: |
+      this.ProcessSubNode("Request Tag")
+      if getNodeResult("Request Tag").Value != 0x30 {
+        panic("ocsp: request must be a DER sequence")
+      }
+      this.ProcessSubNode("Request Length")
+      length = getNodeResult("Request Length").Value
+      if length != this.GetMaxLength() - this.Length() {
+        panic("ocsp: request length does not match input")
+      }
+      this.GetSubNode("TBS Request").SetMaxLength(length)
+      this.ProcessSubNode("TBS Request")
+    Request Tag: uint8
+    Request Length: OCSPDERLength
+    TBS Request:
+      operator: |
+        this.ProcessSubNode("Tag")
+        if getNodeResult("Tag").Value != 0x30 {
+          panic("ocsp: tbsRequest must be a DER sequence")
+        }
+        this.ProcessSubNode("Length")
+        length = getNodeResult("Length").Value
+        if length != this.GetMaxLength() - this.Length() {
+          panic("ocsp: tbsRequest length does not match input")
+        }
+        this.GetSubNode("Request List").SetMaxLength(length)
+        this.ProcessSubNode("Request List")
+      Tag: uint8
+      Length: OCSPDERLength
+      Request List:
+        operator: |
+          this.ProcessSubNode("Tag")
+          if getNodeResult("Tag").Value != 0x30 {
+            panic("ocsp: requestList must be a DER sequence")
+          }
+          this.ProcessSubNode("Length")
+          length = getNodeResult("Length").Value
+          if length != this.GetMaxLength() - this.Length() {
+            panic("ocsp: requestList length does not match input")
+          }
+          this.GetSubNode("Request").SetMaxLength(length)
+          this.ProcessSubNode("Request")
+        Tag: uint8
+        Length: OCSPDERLength
+        Request:
+          operator: |
+            this.ProcessSubNode("Tag")
+            if getNodeResult("Tag").Value != 0x30 {
+              panic("ocsp: request item must be a DER sequence")
+            }
+            this.ProcessSubNode("Length")
+            length = getNodeResult("Length").Value
+            if length != this.GetMaxLength() - this.Length() {
+              panic("ocsp: request item length does not match input")
+            }
+            this.GetSubNode("Certificate ID").SetMaxLength(length)
+            this.ProcessSubNode("Certificate ID")
+          Tag: uint8
+          Length: OCSPDERLength
+          Certificate ID:
+            operator: |
+              this.ProcessSubNode("Tag")
+              if getNodeResult("Tag").Value != 0x30 {
+                panic("ocsp: CertID must be a DER sequence")
+              }
+              this.ProcessSubNode("Length")
+              length = getNodeResult("Length").Value
+              if length != this.GetMaxLength() - this.Length() {
+                panic("ocsp: CertID length does not match input")
+              }
+              this.ProcessSubNode("Hash Algorithm")
+              this.ProcessSubNode("Issuer Name Hash Tag")
+              if getNodeResult("Issuer Name Hash Tag").Value != 0x04 {
+                panic("ocsp: issuerNameHash must be an octet string")
+              }
+              this.ProcessSubNode("Issuer Name Hash Length")
+              nameLength = getNodeResult("Issuer Name Hash Length").Value
+              if nameLength == 0 || nameLength > this.GetMaxLength() - this.Length() {
+                panic("ocsp: invalid issuerNameHash length")
+              }
+              this.GetSubNode("Issuer Name Hash").SetMaxLength(nameLength)
+              this.ProcessSubNode("Issuer Name Hash")
+              this.ProcessSubNode("Issuer Key Hash Tag")
+              if getNodeResult("Issuer Key Hash Tag").Value != 0x04 {
+                panic("ocsp: issuerKeyHash must be an octet string")
+              }
+              this.ProcessSubNode("Issuer Key Hash Length")
+              keyLength = getNodeResult("Issuer Key Hash Length").Value
+              if keyLength == 0 || keyLength > this.GetMaxLength() - this.Length() {
+                panic("ocsp: invalid issuerKeyHash length")
+              }
+              this.GetSubNode("Issuer Key Hash").SetMaxLength(keyLength)
+              this.ProcessSubNode("Issuer Key Hash")
+              this.ProcessSubNode("Serial Number Tag")
+              if getNodeResult("Serial Number Tag").Value != 0x02 {
+                panic("ocsp: serialNumber must be an integer")
+              }
+              this.ProcessSubNode("Serial Number Length")
+              serialLength = getNodeResult("Serial Number Length").Value
+              if serialLength == 0 || serialLength != this.GetMaxLength() - this.Length() {
+                panic("ocsp: invalid serialNumber length")
+              }
+              this.GetSubNode("Serial Number").SetMaxLength(serialLength)
+              this.ProcessSubNode("Serial Number")
+            Tag: uint8
+            Length: OCSPDERLength
+            Hash Algorithm:
+              operator: |
+                this.ProcessSubNode("Tag")
+                if getNodeResult("Tag").Value != 0x30 {
+                  panic("ocsp: hashAlgorithm must be a DER sequence")
+                }
+                this.ProcessSubNode("Length")
+                length = getNodeResult("Length").Value
+                if length == 0 || length > this.GetMaxLength() - this.Length() {
+                  panic("ocsp: invalid hashAlgorithm length")
+                }
+                this.SetMaxLength(this.Length() + length)
+                this.ProcessSubNode("OID Tag")
+                if getNodeResult("OID Tag").Value != 0x06 {
+                  panic("ocsp: hashAlgorithm identifier must be an OID")
+                }
+                this.ProcessSubNode("OID Length")
+                oidLength = getNodeResult("OID Length").Value
+                if oidLength == 0 || oidLength > this.GetMaxLength() - this.Length() {
+                  panic("ocsp: invalid algorithm OID length")
+                }
+                this.GetSubNode("Algorithm OID").SetMaxLength(oidLength)
+                this.ProcessSubNode("Algorithm OID")
+                if this.Length() < this.GetMaxLength() {
+                  this.ProcessSubNode("Parameters Tag")
+                  if getNodeResult("Parameters Tag").Value != 0x05 {
+                    panic("ocsp: unsupported algorithm parameters")
+                  }
+                  this.ProcessSubNode("Parameters Length")
+                  if getNodeResult("Parameters Length").Value != 0 {
+                    panic("ocsp: SHA parameters must be NULL")
+                  }
+                }
+              Tag: uint8
+              Length: OCSPDERLength
+              OID Tag: uint8
+              OID Length: OCSPDERLength
+              Algorithm OID: raw
+              Parameters Tag: uint8
+              Parameters Length: OCSPDERLength
+            Issuer Name Hash Tag: uint8
+            Issuer Name Hash Length: OCSPDERLength
+            Issuer Name Hash: raw
+            Issuer Key Hash Tag: uint8
+            Issuer Key Hash Length: OCSPDERLength
+            Issuer Key Hash: raw
+            Serial Number Tag: uint8
+            Serial Number Length: OCSPDERLength
+            Serial Number: raw
+
+OCSPDERLength:
+  list: true
+  Octet: uint8
+  out: |
+    octets = data.Value
+    first = octets[0].Value
+    if first >> 7 == 0 {
+      return first
+    }
+    value = 0
+    for index, octet = range octets {
+      if index > 0 {
+        value = (value << 8) + octet.Value
+      }
+    }
+    return value
+  operator: |
+    first = this.NewElement().Process().Value
+    if first == 0x80 {
+      panic("ocsp: indefinite DER length is not allowed")
+    }
+    if first >> 7 == 0 {
+      return
+    }
+    width = first & 0x7f
+    if width == 0 || width > 4 {
+      panic("ocsp: unsupported DER length width")
+    }
+    for range int(width) {
+      this.NewElement().Process()
+    }

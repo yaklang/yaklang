@@ -1,0 +1,47 @@
+# Explicit complete base ASCII command or seven-bit dot-terminated DATA block.
+# RFC 5321 4.1/4.5.2/4.5.3 and RFC 5322 2.2 header layout/unfolding.
+# https://www.rfc-editor.org/rfc/rfc5321.html
+# https://www.rfc-editor.org/rfc/rfc5322.html
+# Local DATA cap: 1 MiB, 8192 content lines, 1024 header fields.
+# Base command cap: 512 bytes, path 256, local part 64, domain/literal 255.
+# Command keywords are case-insensitive; trailing SP/HT is receiver-compatible.
+# IPv4/IPv6 literals only; other tags/extension commands retain raw fallback.
+# DATA removes one leading dot as a receiver, retaining each original dot and
+# recording whether sender dot-stuffing was canonical. Content lines <=1000
+# decoded octets including CRLF. No 8BITMIME/BINARYMIME/SMTPUTF8 negotiation.
+# Header field bodies are unfolded, not validated as addresses/dates/MIME.
+# No required-header conformance, TCP reconstruction or delivery-state claim.
+# Historical smtp.yaml and the complete smtp_reply.yaml entry are unchanged.
+endian: big
+unit: byte
+Package:
+  SMTPCommandFields:
+    operator: |
+      err = parseSMTPFields(false)
+      if err != nil { panic(err) }
+  SMTPDataFields:
+    operator: |
+      err = parseSMTPFields(true)
+      if err != nil { panic(err) }
+  SMTPCommandFieldsCarrier:
+    operator: |
+      if !this.HasMaxLength() || this.GetMaxLength("bit") == 0 || this.GetMaxLength("bit") % 8 != 0 { panic("smtp-fields: explicit nonempty byte boundary required") }
+      if this.GetMaxLength() > 512 { panic("smtp-fields: command exceeds 512-byte resource limit") }
+      candidate, trial = this.TryProcessByType("SMTPCommandExact", "SMTPCommandFields")
+      if trial.OK { trial.Save(); return }
+      trial.Recovery()
+      raw = this.NewUnknownNode("Unparsed SMTP Wire")
+      raw.SetMaxLength(this.GetMaxLength())
+      raw.Process()
+  SMTPDataFieldsCarrier:
+    operator: |
+      if !this.HasMaxLength() || this.GetMaxLength("bit") == 0 || this.GetMaxLength("bit") % 8 != 0 { panic("smtp-fields: explicit nonempty byte boundary required") }
+      if this.GetMaxLength() > 1048576 { panic("smtp-fields: DATA exceeds 1048576-byte resource limit") }
+      candidate, trial = this.TryProcessByType("SMTPDataExact", "SMTPDataFields")
+      if trial.OK { trial.Save(); return }
+      trial.Recovery()
+      raw = this.NewUnknownNode("Unparsed SMTP Wire")
+      raw.SetMaxLength(this.GetMaxLength())
+      raw.Process()
+SMTPCommandExact: "import:application-layer/smtp_fields.yaml;node:SMTPCommandFields"
+SMTPDataExact: "import:application-layer/smtp_fields.yaml;node:SMTPDataFields"

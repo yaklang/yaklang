@@ -1,0 +1,36 @@
+1	QUIC	Initial, DCID=bb367602fc1b56ff, SCID=072ebc0e0165b7eb, PKN: 0, CRYPTO
+2	QUIC	Handshake, DCID=072ebc0e0165b7eb, SCID=1dd33ada1e8d3740, PKN: 1, CRYPTO
+3	HTTP3	Protected Payload (KP0), DCID=072ebc0e0165b7eb, PKN: 3, STREAM(3), SETTINGS, STREAM(7), STREAM(11)
+4	QUIC	Handshake, DCID=1dd33ada1e8d3740, SCID=072ebc0e0165b7eb, PKN: 2, ACK
+5	HTTP3	Protected Payload (KP0), DCID=1dd33ada1e8d3740, PKN: 4, ACK, NCI, NCI, NCI, NCI, NCI, NCI, NCI, STREAM(2), SETTINGS, MAX_PUSH_ID, STREAM(6), STREAM(10)
+6	HTTP3	Protected Payload (KP0), DCID=072ebc0e0165b7eb, PKN: 4, DONE, NCI, NCI, NCI, NCI, NCI, NCI, NCI, STREAM(7)
+7	HTTP3	Protected Payload (KP0), DCID=1dd33ada1e8d3740, PKN: 5, STREAM(0), HEADERS: GET /m2/0
+8	HTTP3	Protected Payload (KP0), DCID=1dd33ada1e8d3740, PKN: 6, STREAM(6), STREAM(4), HEADERS: GET /m2/1
+9	HTTP3	Protected Payload (KP0), DCID=072ebc0e0165b7eb, PKN: 5, STREAM(0), HEADERS: 200 OK, DATA, HEADERS
+10	HTTP3	Protected Payload (KP0), DCID=072ebc0e0165b7eb, PKN: 6, STREAM(11), STREAM(7), STREAM(4), HEADERS: 200 OK, DATA, HEADERS
+11	HTTP3	Protected Payload (KP0), DCID=1dd33ada1e8d3740, PKN: 7, STREAM(10)
+12	QUIC	Protected Payload (KP1), DCID=1dd33ada1e8d3740, PKN: 8, PING, PADDING
+13	QUIC	Protected Payload (KP0), DCID=072ebc0e0165b7eb, PKN: 7, ACK
+14	QUIC	Protected Payload (KP1), DCID=1dd33ada1e8d3740, PKN: 9, ACK
+15	QUIC	Protected Payload (KP1), DCID=072ebc0e0165b7eb, PKN: 8, ACK
+16	QUIC	Protected Payload (KP1), DCID=1dd33ada1e8d3740, PKN: 10, CC
+17	QUIC	Initial, DCID=e73b17883eec278e, SCID=da5777c2a83dc63a, PKN: 0, CRYPTO
+18	QUIC	Handshake, DCID=da5777c2a83dc63a, SCID=ca4a3b97db7c53c0, PKN: 1, CRYPTO
+19	QUIC	Handshake, DCID=da5777c2a83dc63a, SCID=ca4a3b97db7c53c0, PKN: 2, CRYPTO
+20	QUIC	Handshake, DCID=ca4a3b97db7c53c0, SCID=da5777c2a83dc63a, PKN: 2, ACK
+21	QUIC	Protected Payload (KP0), DCID=ca4a3b97db7c53c0, PKN: 4, NCI, NCI, NCI, NCI, NCI, NCI, NCI
+22	QUIC	Protected Payload (KP0), DCID=da5777c2a83dc63a, PKN: 3, DONE, NCI, NCI, NCI, NCI, NCI, NCI, NCI
+23	DNS	[Malformed Packet]
+24	QUIC	Protected Payload (KP0), DCID=da5777c2a83dc63a, PKN: 4, ACK
+25	QUIC	Protected Payload (KP0), DCID=ca4a3b97db7c53c0, PKN: 6, ACK
+26	DNS	Standard query 0x0001[Malformed Packet]
+27	DNS	[Malformed Packet]
+28	DNS	Standard query response 0x0000 A m2x.example A 192.0.2.10
+29	QUIC	Protected Payload (KP0), DCID=da5777c2a83dc63a, PKN: 6, ACK
+30	QUIC	Protected Payload (KP0), DCID=ca4a3b97db7c53c0, PKN: 9, ACK
+31	DNS	Standard query 0x0001[Malformed Packet]
+32	DNS	Standard query response 0x0000 A m2x.example A 192.0.2.10
+33	QUIC	Protected Payload (KP1), DCID=ca4a3b97db7c53c0, PKN: 11, PING, PADDING
+34	QUIC	Protected Payload (KP1), DCID=da5777c2a83dc63a, PKN: 8, ACK
+35	QUIC	Protected Payload (KP1), DCID=ca4a3b97db7c53c0, PKN: 12, ACK
+36	QUIC	Protected Payload (KP1), DCID=ca4a3b97db7c53c0, PKN: 13, CC

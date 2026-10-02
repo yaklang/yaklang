@@ -1,0 +1,20 @@
+TShark (Wireshark) 4.4.8 (v4.4.8-0-g0d289c003bfb).
+
+Copyright 1998-2025 Gerald Combs <gerald@wireshark.org> and contributors.
+Licensed under the terms of the GNU General Public License (version 2 or later).
+This is free software; see the file named COPYING in the distribution. There is
+NO WARRANTY; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+
+Compiled (64-bit) using Clang 14.0.3 (clang-1403.0.22.14.1), with GLib 2.80.3,
+with libpcap, without POSIX capabilities, with zlib 1.2.11, with zlib-ng 2.1.6,
+with PCRE2, with Lua 5.4.6, with GnuTLS 3.8.4 and PKCS #11 support, with Gcrypt
+1.10.2, with Kerberos (MIT), with MaxMind, with nghttp2 1.62.1, with nghttp3
+1.1.0, with brotli, with LZ4, with Zstandard, with Snappy, with libxml2 2.11.9,
+with libsmi 0.4.8, with binary plugins.
+
+Running on macOS 14.1.2, build 23B92 (Darwin 23.1.0), with Apple M1 Max, with
+65536 MB of physical memory, with GLib 2.80.3, with libpcap 1.10.1, with zlib
+1.2.12, with PCRE2 10.39 2021-10-29, with c-ares 1.31.0, with GnuTLS 3.8.4, with
+Gcrypt 1.10.2, with nghttp2 1.62.1, with nghttp3 1.1.0, with brotli 1.0.9, with
+LZ4 1.10.0, with Zstandard 1.5.6, with libsmi 0.4.8, with LC_TYPE=C, binary
+plugins supported.

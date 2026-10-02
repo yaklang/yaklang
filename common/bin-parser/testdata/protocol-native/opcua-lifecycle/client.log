@@ -1,0 +1,17 @@
+[2026-09-30 14:29:33.912 (UTC+0800)] [32minfo/network[0m	TCP 3	| Opening a connection to "127.0.0.1" on port 14846
+[2026-09-30 14:29:33.912 (UTC+0800)] [32minfo/channel[0m	TCP 3	| SC 1	| SecureChannel opened with SecurityMode None for SecurityPolicy http://opcfoundation.org/UA/SecurityPolicy#None and a revised lifetime of 2.0s
+[2026-09-30 14:29:33.912 (UTC+0800)] [32minfo/client[0m	Client Status: ChannelState: Open, SessionState: Closed, ConnectStatus: Good
+[2026-09-30 14:29:33.912 (UTC+0800)] [32minfo/client[0m	The initially defined EndpointURL opc.tcp://127.0.0.1:14846 is valid for the server
+[2026-09-30 14:29:33.913 (UTC+0800)] [32minfo/client[0m	Endpoint 0: Best endpoint so far with UserTokenPolicy open62541-anonymous-policy-none#None
+[2026-09-30 14:29:33.913 (UTC+0800)] [32minfo/client[0m	Endpoint 0 selected with SecurityMode None, SecurityPolicy http://opcfoundation.org/UA/SecurityPolicy#None and UserTokenPolicy open62541-anonymous-policy-none#None
+[2026-09-30 14:29:33.913 (UTC+0800)] [32minfo/client[0m	CreateSession: Using UserTokenPolicy open62541-anonymous-policy-none#None
+[2026-09-30 14:29:33.913 (UTC+0800)] [32minfo/client[0m	Client Status: ChannelState: Open, SessionState: Created, ConnectStatus: Good
+[2026-09-30 14:29:33.913 (UTC+0800)] [32minfo/client[0m	ActivateSession: Using UserTokenPolicy open62541-anonymous-policy-none#None
+[2026-09-30 14:29:33.913 (UTC+0800)] [32minfo/client[0m	Client Status: ChannelState: Open, SessionState: Activated, ConnectStatus: Good
+ORACLE round=1 results=2048 all=Running
+[2026-09-30 14:29:35.916 (UTC+0800)] [32minfo/channel[0m	TCP 3	| SC 1	| SecureChannel renewed with a revised lifetime of 2.0s
+[2026-09-30 14:29:37.916 (UTC+0800)] [32minfo/channel[0m	TCP 3	| SC 1	| SecureChannel renewed with a revised lifetime of 2.0s
+ORACLE round=2 results=2048 all=Running
+[2026-09-30 14:29:38.019 (UTC+0800)] [32minfo/channel[0m	TCP 3	| SC 1	| SecureChannel closed
+[2026-09-30 14:29:38.019 (UTC+0800)] [32minfo/client[0m	Client Status: ChannelState: Closed, SessionState: Closed, ConnectStatus: BadConnectionClosed
+[2026-09-30 14:29:38.019 (UTC+0800)] [32minfo/network[0m	TCP 3	| Socket closed

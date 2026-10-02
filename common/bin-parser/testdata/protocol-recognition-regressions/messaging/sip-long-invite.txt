@@ -1,0 +1,8 @@
+INVITE sip:useruseruseruseruseruseruseruseruseruseruseruseruseruseruseruseruseruseruseruseruseruseruseruser@example.test SIP/2.0
+Via: SIP/2.0/TCP client.example.test;branch=z9hG4bKlong
+From: <sip:alice@example.test>;tag=1
+To: <sip:bob@example.test>
+Call-ID: long@example.test
+CSeq: 1 INVITE
+Content-Length: 0
+

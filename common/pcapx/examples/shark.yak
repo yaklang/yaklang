@@ -1,0 +1,69 @@
+// A small message-oriented shark, using only pcapx's public capture API.
+cli.SetDoc("抓包或回放，显示协议消息。-Y 按协议名筛选，-V 查看完整字段。")
+list = cli.Bool("list,D", cli.setHelp("列出可抓包网卡"))
+iface = cli.String("interface,i", cli.setHelp("网卡编号或名称"))
+input = cli.String("read,r", cli.setHelp("回放 pcap / pcapng 文件"))
+output = cli.String("write,w", cli.setHelp("保存原始抓包到新文件"))
+bpf = cli.String("filter,f", cli.setHelp("BPF 捕获过滤，例如 tcp port 80"))
+protocol = cli.String("protocol,Y", cli.setHelp("显示的协议名，例如 http、dns、tls、mqtt"))
+count = cli.Int("count,c", cli.setDefault(0), cli.setHelp("显示指定条数后停止，0 不限"))
+seconds = cli.Float("duration", cli.setDefault(0), cli.setHelp("运行秒数，0 表示等到 Ctrl-C 或文件结束"))
+verbose = cli.Bool("verbose,V", cli.setHelp("显示消息的完整结构化字段"))
+cli.check()
+
+if list {
+    for index, device = range pcapx.ListDevices()~ {
+        printf("%d. %s  %s\n", index + 1, device.Name, device.Description)
+    }
+    return
+}
+if input == "" && iface == "" { die("请选择 -i 网卡或 -r 文件，使用 -D 列出网卡") }
+if input != "" && iface != "" { die("-i 和 -r 请选择一个") }
+if count < 0 { die("-c 必须大于等于 0") }
+if input == "" {
+    for index, device = range pcapx.ListDevices()~ {
+        if iface == sprintf("%d", index + 1) { iface = device.Name; break }
+    }
+}
+
+ctx, stop = pcapx.CaptureContext(seconds)~
+defer stop()
+shown = 0
+printf("ID     TIME         PROTOCOL  SOURCE -> DESTINATION  BYTES STATUS          INFO\n")
+options = [
+    pcapx.pcap_context(ctx),
+    pcapx.pcap_bpfFilter(bpf),
+    pcapx.pcap_onProtocolMessage(func(message) {
+        if protocol != "" && message.Protocol != protocol { return }
+        if count > 0 && shown >= count { return }
+        shown++
+        printf("%-6d %s %-9s %s -> %s %5d %-15s %s\n",
+            message.ID, message.Timestamp.Format("15:04:05.000"), message.Protocol,
+            message.Source, message.Destination, message.Length, message.Status, message.Summary)
+        if message.Error != "" { printf("  %s\n", message.Error) }
+        if verbose { dump(message.Fields) }
+        if count > 0 && shown >= count { stop() }
+    }),
+    pcapx.pcap_onProtocolStats(func(stats) {
+        printf("分析: messages=%d decoded=%d unknown=%d incomplete=%d malformed=%d bytes=%d\n",
+            stats.Messages, stats.Decoded, stats.Unknown, stats.Incomplete, stats.Malformed, stats.InputBytes)
+    }),
+    pcapx.pcap_onTCPReassemblyStats(func(stats) {
+        printf("抓包: packets=%d bytes=%d\n", stats.CapturedPackets, stats.CapturedBytes)
+        for _, device = range stats.Devices {
+            if device.Available {
+                printf("%s: dropped=%d interfaceDropped=%d\n", device.Device, device.Dropped, device.InterfaceDropped)
+            } else {
+                printf("%s: 抓包丢包统计不可用 %s\n", device.Device, device.Error)
+            }
+        }
+    }),
+]
+if output != "" {
+    options = append(options, pcapx.pcap_outputFile(output))
+}
+if input != "" {
+    pcapx.OpenPcapFile(input, options...)~
+} else {
+    pcapx.StartSniff(iface, options...)~
+}

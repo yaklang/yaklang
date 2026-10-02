@@ -1,0 +1,39 @@
+5	HEL	F					
+7	ACK	F					
+9	OPN	F					446
+11	OPN	F	1				449
+13	MSG	F		1			422
+15	MSG	F		1			425
+17	MSG	F		1			428
+19	MSG	F		1			431
+21	MSG	F		1			461
+23	MSG	F		1			464
+25	MSG	F		1			467
+27	MSG	F		1			470
+29	MSG	F		1			631
+31	MSG	F		1			634
+33	MSG	C		1			
+34	MSG	C		1			
+36	MSG	C		1			
+39	MSG	C		1			
+40	MSG	F		1			631
+43	MSG	C		1			
+44	MSG	C		1			
+46	MSG	C		1			
+47	MSG	F		1			634
+51	OPN	F					446
+53	OPN	F	1				449
+55	OPN	F					446
+57	OPN	F	1				449
+59	MSG	C		3			
+60	MSG	C		3			
+61	MSG	C		3			
+63	MSG	C		3			
+64	MSG	F		3			631
+68	MSG	C		3			
+69	MSG	C		3			
+71	MSG	C		3			
+72	MSG	F		3			634
+76	MSG	F		3			473
+78	MSG	F		3			476
+80	CLO	F		3			452

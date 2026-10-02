@@ -1,0 +1,34 @@
+File: after-pcap.test
+Type: cpu
+Time: Sep 17, 2026 at 9:10am (CST)
+Duration: 4.32s, Total samples = 10.27s (237.79%)
+Active filters:
+   hide=^runtime\.
+Showing nodes accounting for 0.80s, 7.79% of 10.27s total
+Showing top 25 nodes out of 139
+      flat  flat%   sum%        cum   cum%
+     0.02s  0.19%  0.19%      1.82s 17.72%  github.com/yaklang/yaklang/common/pcapx/pcaputil.(*tcpWorkers).run
+         0     0%  0.19%      1.79s 17.43%  github.com/yaklang/yaklang/common/pcapx/pcaputil.(*offlineDecoder).feed
+         0     0%  0.19%      1.79s 17.43%  github.com/yaklang/yaklang/common/pcapx/pcaputil.(*tcpWorkers).run.func1
+     0.04s  0.39%  0.58%      1.76s 17.14%  github.com/yaklang/yaklang/common/pcapx/pcaputil.(*TrafficPool).Feed
+         0     0%  0.58%      1.61s 15.68%  github.com/yaklang/yaklang/common/pcapx/pcaputil.(*TrafficConnection).FeedClient
+     0.01s 0.097%  0.68%      1.61s 15.68%  github.com/yaklang/yaklang/common/pcapx/pcaputil.(*TrafficConnection).Write
+         0     0%  0.68%      1.61s 15.68%  github.com/yaklang/yaklang/common/pcapx/pcaputil.(*TrafficConnection).consume
+     0.01s 0.097%  0.78%      1.60s 15.58%  github.com/yaklang/yaklang/common/pcapx/pcaputil.(*TrafficFlow).onFrame
+     0.01s 0.097%  0.88%      1.59s 15.48%  github.com/yaklang/yaklang/common/pcapx/pcaputil.(*binFlow).feed
+         0     0%  0.88%      0.92s  8.96%  github.com/yaklang/yaklang/common/pcapx/pcaputil.(*ProtocolEvent).Decode
+         0     0%  0.88%      0.48s  4.67%  github.com/yaklang/yaklang/common/bin-parser/parser.(*StructuredPlan).Parse
+         0     0%  0.88%      0.47s  4.58%  github.com/yaklang/yaklang/common/bin-parser/parser/stream_parser.structuredNativeDecoder.func4
+         0     0%  0.88%      0.39s  3.80%  github.com/yaklang/yaklang/common/pcapx/pcaputil.(*binFlow).frameDirection
+     0.17s  1.66%  2.53%      0.35s  3.41%  github.com/yaklang/yaklang/common/bin-parser/parser/stream_parser.decodeMQTTFields
+         0     0%  2.53%      0.35s  3.41%  github.com/yaklang/yaklang/common/bin-parser/parser/stream_parser.structuredNativeDecoder.func2
+         0     0%  2.53%      0.34s  3.31%  github.com/yaklang/yaklang/common/bin-parser/parser.ParseStructuredWithConfig
+     0.23s  2.24%  4.77%      0.32s  3.12%  github.com/yaklang/yaklang/common/bin-parser/parser.captureHTTPStructured
+         0     0%  4.77%      0.27s  2.63%  net/http.ReadRequest
+     0.02s  0.19%  4.97%      0.27s  2.63%  net/http.readRequest
+     0.18s  1.75%  6.72%      0.19s  1.85%  github.com/yaklang/yaklang/common/pcapx/pcaputil.(*binFlow).event (inline)
+         0     0%  6.72%      0.13s  1.27%  net/textproto.(*Reader).ReadMIMEHeader (inline)
+     0.06s  0.58%  7.30%      0.13s  1.27%  net/textproto.readMIMEHeader
+     0.03s  0.29%  7.59%      0.12s  1.17%  fmt.Sprintf
+     0.02s  0.19%  7.79%      0.12s  1.17%  github.com/yaklang/yaklang/common/bin-parser/parser/stream_parser.projectStructuredFieldsWithArena
+         0     0%  7.79%      0.10s  0.97%  github.com/yaklang/yaklang/common/bin-parser/parser.ParseStructured

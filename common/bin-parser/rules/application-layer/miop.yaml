@@ -1,0 +1,101 @@
+# MIOP 1.0 PacketHeader and bounded packet body; CORBA 3.2 Interoperability
+# (OMG formal/2011-11-02), 11.1.2-11.1.4, printed pages 181-183.
+# https://www.omg.org/spec/CORBA/3.2/Interoperability/PDF
+# Packet Length excludes the complete header, including UID sequence length
+# and CDR padding. Body alignment is relative to this packet, not its parent.
+# Number of Packets=0 means unknown; it does not mean zero packets. CDR
+# padding has no required octet value and is retained without zero checks.
+# Only a complete one-packet collection is interpreted as one exact GIOP
+# request/fragment. Other packets retain raw body bytes: no reassembly, UID
+# uniqueness, cross-packet consistency or UIPMC profile dispatch is claimed.
+# The 65807-byte bound is derived from the largest 272-byte aligned header and
+# uint16 Packet Length; it is not a promise that a UDP transport accepts it.
+# Structured GenerateBinary needs an input boundary and is unsupported.
+endian: big
+Package:
+  MIOP: MIOPPacket
+  MIOPCarrier:
+    operator: |
+      if !this.HasMaxLength() { panic("miop: explicit carrier boundary required") }
+      if this.GetMaxLength("bit") % 8 != 0 { panic("miop: explicit byte boundary required") }
+      if this.GetMaxLength() == 0 { panic("miop: empty carrier has no packet") }
+      candidate, trial = this.TryProcessByType("MIOPFrame")
+      if trial.OK { trial.Save(); return }
+      trial.Recovery()
+      raw = this.NewUnknownNode("Unparsed MIOP Payload")
+      raw.SetMaxLength(this.GetMaxLength())
+      raw.Process()
+
+MIOPFrame: "import:application-layer/miop.yaml;node:MIOP"
+
+MIOPPacket:
+  operator: |
+    if !this.HasMaxLength() { panic("miop: explicit packet boundary required") }
+    if this.GetMaxLength("bit") % 8 != 0 { panic("miop: explicit byte boundary required") }
+    total = this.GetMaxLength()
+    if total < 24 { panic("miop: truncated aligned packet header") }
+    if total > 65807 { panic("miop: packet exceeds representable header and body bound") }
+    if this.ProcessSubNode("MIOP Magic").Value != "MIOP" { panic("miop: invalid magic") }
+    if this.ProcessSubNode("MIOP Major").Value != 1 || this.ProcessSubNode("MIOP Minor").Value != 0 { panic("miop: unsupported packet version") }
+    if this.ProcessSubNode("Reserved Flags").Value != 0 { panic("miop: reserved flags must be zero") }
+    stop = int(this.ProcessSubNode("Stop Flag").Value)
+    little = int(this.ProcessSubNode("Little Endian Flag").Value)
+    order = "big"
+    if little == 1 { order = "little" }
+    for _, name = range []string{"Packet Length", "Packet Number", "Number of Packets", "Unique ID Length"} {
+      this.GetSubNode(name).SetCfg("endian", order)
+    }
+    length = int(this.ProcessSubNode("Packet Length").Value)
+    number = int(this.ProcessSubNode("Packet Number").Value)
+    count = int(this.ProcessSubNode("Number of Packets").Value)
+    uidLength = int(this.ProcessSubNode("Unique ID Length").Value)
+    if uidLength > 252 { panic("miop: unique ID exceeds 252 octets") }
+    padding = (8-(20+uidLength)%8)%8
+    headerLength = 20 + uidLength + padding
+    if headerLength + length != total { panic("miop: packet length does not equal bounded body") }
+    if count > 0 {
+      if number >= count { panic("miop: packet number exceeds collection count") }
+      if (stop == 1) != (number == count-1) { panic("miop: stop flag conflicts with known collection count") }
+    }
+    if uidLength > 0 {
+      this.GetSubNode("Unique ID").SetMaxLength(uidLength)
+      this.ProcessSubNode("Unique ID")
+    }
+    if padding > 0 {
+      this.GetSubNode("Header Padding").SetMaxLength(padding)
+      this.ProcessSubNode("Header Padding")
+    }
+    single = number == 0 && stop == 1 && (count == 0 || count == 1)
+    if single {
+      giop = this.GetSubNode("GIOP")
+      giop.SetMaxLength(length)
+      result = giop.Process()
+      kind = int(result.Child("Message Type").Value)
+      if kind != 0 && kind != 7 { panic("miop: only GIOP request and fragment messages are permitted") }
+    } else if length > 0 {
+      this.GetSubNode("Packet Fragment Data").SetMaxLength(length)
+      this.ProcessSubNode("Packet Fragment Data")
+    }
+    if this.Length() != total { panic("miop: unconsumed packet bytes") }
+    this.AddInfo("Header Bytes", headerLength)
+    this.AddInfo("Packet Byte Order", order)
+    this.AddInfo("Single Packet Collection", single)
+    this.AddInfo("Declared Collection Count Known", count != 0)
+    this.AddInfo("Packet Reassembly Performed", false)
+    this.AddInfo("Unique ID Uniqueness Validated", false)
+    this.AddInfo("Cross-Packet Consistency Validated", false)
+    this.AddInfo("UIPMC Profile Semantics Decoded", false)
+  MIOP Magic: string,4
+  MIOP Major: uint8,4bit
+  MIOP Minor: uint8,4bit
+  Reserved Flags: uint8,6bit
+  Stop Flag: uint8,1bit
+  Little Endian Flag: uint8,1bit
+  Packet Length: uint16
+  Packet Number: uint32
+  Number of Packets: uint32
+  Unique ID Length: uint32
+  Unique ID: raw
+  Header Padding: raw
+  GIOP: "import:application-layer/iiop.yaml;node:GIOP"
+  Packet Fragment Data: raw

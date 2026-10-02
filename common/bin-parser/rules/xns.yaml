@@ -1,0 +1,112 @@
+# Xerox XSIS 028112 (December 1981), sections 3.4 and 6.2:
+# https://bitsavers.trailing-edge.com/pdf/xerox/xns/standards/XSIS_028112-Internet_Transport_Protocols_198112.pdf
+# Field-layout cross-check: Wireshark v4.4.0, epan/dissectors/packet-idp.c.
+# 576 bytes is the nominal interoperable maximum, not a wire-format limit.
+# Odd IDP lengths carry a real, possibly nonzero garbage byte in the checksum.
+endian: big
+Package:
+  XNS: XNSDatagram
+  XNSCarrier:
+    operator: |
+      if !this.HasMaxLength() { panic("xns: explicit carrier boundary required") }
+      if this.GetMaxLength() == 0 { panic("xns: empty carrier has no datagram") }
+      candidate, operation = this.TryProcessByType("XNSCandidate")
+      if operation.OK {
+        operation.Save()
+        if this.Length() < this.GetMaxLength() {
+          tail = this.NewUnknownNode("XNS Link Trailer")
+          tail.SetMaxLength(this.GetMaxLength()-this.Length())
+          tail.Process()
+        }
+        return
+      }
+      operation.Recovery()
+      raw = this.NewUnknownNode("XNS Payload")
+      raw.SetMaxLength(this.GetMaxLength())
+      raw.Process()
+
+XNSCandidate:
+  operator: |
+    prefix, operation = this.TryProcessByType("XNSLengthPrefix")
+    operation.Recovery()
+    if !operation.OK { panic("xns: truncated length prefix") }
+    length = prefix.Value & 0xffff
+    size = length + length % 2
+    if length < 30 || size > this.GetMaxLength() { panic("xns: datagram length outside carrier bounds") }
+    message = this.GetSubNode("Message")
+    message.SetMaxLength(size)
+    message.Process()
+  Message: XNSDatagram
+
+XNSLengthPrefix: uint32
+XNSDatagram:
+  operator: |
+    if !this.HasMaxLength() { panic("xns: explicit datagram boundary required") }
+    size = this.GetMaxLength()
+    if size < 30 || size > 65536 { panic("xns: datagram wire size must be 30 through 65536 bytes") }
+    start = getCurrentPosition()
+    checksum = this.ProcessSubNode("Checksum").Value
+    length = this.ProcessSubNode("Datagram Length").Value
+    if length < 30 || length + length % 2 != size { panic("xns: declared length does not match datagram wire boundary") }
+    // The specification asks senders to zero these bits but defines no
+    // receive-side rejection. Preserve them independently from the hop count.
+    this.ProcessSubNode("Reserved")
+    this.ProcessSubNode("Hop Count")
+    kind = this.ProcessSubNode("Packet Type").Value
+    this.ProcessSubNode("Destination Network")
+    this.ProcessSubNode("Destination Host")
+    this.ProcessSubNode("Destination Socket")
+    this.ProcessSubNode("Source Network")
+    this.ProcessSubNode("Source Host")
+    this.ProcessSubNode("Source Socket")
+    this.AddInfo("Echo Decoded", false)
+    if kind == 2 {
+      if length < 32 { panic("xns: truncated echo operation") }
+      this.GetSubNode("Echo").SetMaxLength(length-30)
+      this.ProcessSubNode("Echo")
+      this.AddInfo("Echo Decoded", true)
+    } else if length > 30 {
+      this.GetSubNode("IDP Data").SetMaxLength(length-30)
+      this.ProcessSubNode("IDP Data")
+    }
+    if length % 2 != 0 { this.ProcessSubNode("Garbage Byte") }
+    this.AddInfo("Checksum Present", checksum != 0xffff)
+    this.AddInfo("Checksum Validated", false)
+    if checksum != 0xffff {
+      bytes = getCtx("buffer").Bytes()[start+2:start+size]
+      sum = 0
+      for i = 0; i < len(bytes); i += 2 {
+        sum += (int(bytes[i]) << 8) | int(bytes[i+1])
+        sum = (sum & 0xffff) + (sum >> 16)
+        sum = ((sum << 1) | (sum >> 15)) & 0xffff
+      }
+      if sum == 0xffff { sum = 0 }
+      if checksum != sum { panic("xns: checksum mismatch") }
+      this.AddInfo("Checksum Validated", true)
+    }
+  Checksum: uint16
+  Datagram Length: uint16
+  Reserved: uint8,4bit
+  Hop Count: uint8,4bit
+  Packet Type: uint8
+  Destination Network: uint32
+  Destination Host: raw,6
+  Destination Socket: uint16
+  Source Network: uint32
+  Source Host: raw,6
+  Source Socket: uint16
+  Echo: XNSEcho
+  IDP Data: raw
+  Garbage Byte: uint8
+
+XNSEcho:
+  operator: |
+    operation = this.ProcessSubNode("Echo Operation").Value
+    if operation != 1 && operation != 2 { panic("xns: unsupported echo operation") }
+    size = this.GetMaxLength()
+    if size > 2 {
+      this.GetSubNode("Echo Data").SetMaxLength(size-2)
+      this.ProcessSubNode("Echo Data")
+    }
+  Echo Operation: uint16
+  Echo Data: raw

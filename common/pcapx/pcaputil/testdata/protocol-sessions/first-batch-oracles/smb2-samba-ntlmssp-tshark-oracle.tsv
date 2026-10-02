@@ -1,0 +1,6 @@
+frame.number	gss-api.OID	spnego.MechType	spnego.supportedMech	ntlmssp.messagetype	ntlmssp.challenge.target_name	ntlmssp.ntlmserverchallenge	ntlmssp.auth.username	ntlmssp.auth.domain	smb2.nt_status	smb2.ses_flags.guest
+6	1.3.6.1.5.5.2	1.3.6.1.4.1.311.2.2.10							0x00000000	
+8	1.3.6.1.5.5.2	1.3.6.1.4.1.311.2.2.10		0x00000001						
+9			1.3.6.1.4.1.311.2.2.10	0x00000002	SMBLDAP	ac15d0dd66391b0d			0xc0000016	False
+10				0x00000003			root	WORKGROUP		
+11									0x00000000	True

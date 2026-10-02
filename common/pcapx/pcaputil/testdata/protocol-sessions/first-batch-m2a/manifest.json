@@ -1,0 +1,36 @@
+{
+  "base": "0cdf63cc48763e32a0fb0337bfa386b4b64f7556",
+  "capture_kind": "native-loopback-original",
+  "capture_tool": "macOS tcpdump lo0, DLT_NULL",
+  "packets": 235,
+  "kernel_drops": 0,
+  "services": {
+    "redis": "7.2.5 built from https://github.com/redis/redis/releases/tag/7.2.5",
+    "kafka": "3.9.1 Apache binary distribution, single-node KRaft, Java 17"
+  },
+  "generator": "scripts/protocol-tests/generate-m2a/client.py",
+  "oracle": "Actual broker replies, client assertions, Apache Kafka 3.9.1 message schemas and TShark 4.4.8 kafka field export",
+  "notes": [
+    "No synthetic TCP wrapping or packet rewriting.",
+    "AUTH contains only a deliberately invalid test password.",
+    "RESP3 attributes and malformed/fragmentation variants use separate crafted tests, not mislabeled native captures.",
+    "native-oracle.json stores raw Kafka request/reply hex from actual sockets; semantic expectations are independently asserted in tests."
+  ],
+  "files": [
+    {
+      "path": "kafka.tshark.tsv",
+      "bytes": 786,
+      "sha256": "eefe10c6a1d806c9fcd8b057d531c34aab4654f8dbd34f5b967bd173cb9a5e59"
+    },
+    {
+      "path": "m2-native.pcap",
+      "bytes": 32250,
+      "sha256": "c38be16d88dca760bb8fb1065baa2ff553d78ebca3956b592804a140a8b766bd"
+    },
+    {
+      "path": "native-oracle.json",
+      "bytes": 37708,
+      "sha256": "1d7c94db24ef59dd289dda31229b37eee89b99eec2711a1c581596af0b19b49f"
+    }
+  ]
+}

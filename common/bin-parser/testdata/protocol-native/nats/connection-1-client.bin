@@ -1,0 +1,7 @@
+CONNECT {"verbose":false,"pedantic":false,"tls_required":false,"name":"native-oracle-subscriber","lang":"go","version":"1.39.1","protocol":1,"echo":true,"headers":true,"no_responders":true}
+PING
+SUB native.headers  1
+PING
+SUB native.heartbeat  2
+PING
+PING

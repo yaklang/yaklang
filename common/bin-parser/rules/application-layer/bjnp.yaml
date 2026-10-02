@@ -1,0 +1,29 @@
+Package:
+  BJNP:
+    operator: |
+      this.ProcessSubNode("Magic")
+      if string(getNodeResult("Magic").Value) != "BJNP" { panic("bjnp: invalid magic") }
+      this.ProcessSubNode("Device Type")
+      role = getNodeResult("Device Type").Value
+      if role != 0x01 && role != 0x81 { panic("bjnp: invalid direction") }
+      this.ProcessSubNode("Command")
+      command = getNodeResult("Command").Value
+      if command != 0x01 && command != 0x10 && command != 0x20 && command != 0x30 { panic("bjnp: unsupported command") }
+      this.ProcessSubNode("Sequence")
+      if getNodeResult("Sequence").Value == 0 { panic("bjnp: zero sequence") }
+      this.ProcessSubNode("Session")
+      if command == 0x01 && role == 0x01 && getNodeResult("Session").Value != 0 { panic("bjnp: discovery session") }
+      this.ProcessSubNode("Payload Length")
+      n = getNodeResult("Payload Length").Value
+      if n != this.GetMaxLength() - this.Length() { panic("bjnp: payload length mismatch") }
+      if n > 0 {
+        this.GetSubNode("Payload").SetMaxLength(n)
+        this.ProcessSubNode("Payload")
+      }
+    Magic: raw,4
+    Device Type: uint8
+    Command: uint8
+    Sequence: uint32
+    Session: uint16
+    Payload Length: uint32
+    Payload: raw

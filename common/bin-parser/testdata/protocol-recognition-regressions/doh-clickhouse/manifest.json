@@ -1,0 +1,49 @@
+{
+  "kind": "synthetic",
+  "references": [
+    "https://www.rfc-editor.org/rfc/rfc8484.html#section-4.1",
+    "https://www.rfc-editor.org/rfc/rfc8484.html#section-4.2.1",
+    "https://github.com/ClickHouse/clickhouse-docs/blob/main/docs/native-protocol/client.md",
+    "https://github.com/ClickHouse/clickhouse-docs/blob/main/docs/native-protocol/server.md",
+    "https://www.rfc-editor.org/rfc/rfc1035.html#section-4.1.1"
+  ],
+  "construction": "Generated with pcaputil sessionTestPCAP, h2TestFrame, h2TestHeaders, dohExchangeH2GET/dohExchangeH2Response and ClickHouse Hello fixture helpers. TCP headers and application messages are synthetic; no deployed resolver/server capture is claimed. DoH captures contain plaintext HTTP carrier bytes and do not demonstrate TLS decryption.",
+  "files": [
+    {
+      "file": "clickhouse-client-first-coalesced.pcapng",
+      "sha256": "a52ce59efe0c25cbd4604b62edc9259823bd36fd25385a94a95bb0220677c5bd",
+      "bytes": 924,
+      "description": "Conventional ClickHouse client name with empty password, Hello+Ping coalesced, followed by server Hello+Pong. Both roles and all four messages are established."
+    },
+    {
+      "file": "clickhouse-server-hello-pong-ambiguous.pcapng",
+      "sha256": "59b314393ea08b9798f6ff63aba1fa4d6bd4539f76889940d490007967dd8ff0",
+      "bytes": 796,
+      "description": "Capture starts with a synthetic server Hello and coalesced Pong. Its bytes also form a client Hello with a one-byte password; role context is required."
+    },
+    {
+      "file": "doh-h1-id-zero-pipeline.pcapng",
+      "sha256": "835f38b88308c07d4428a15c96fcf30225e5d7059e53ddf3d21ddfc6803307d0",
+      "bytes": 1352,
+      "description": "Two pipelined HTTP/1.1 DoH GET exchanges both use DNS ID zero; responses must match one.example then two.example."
+    },
+    {
+      "file": "doh-h2-error-followed-valid.pcapng",
+      "sha256": "0528a19fcf0c95392cc9a3420d4676ac82335cc869cf8d96e877ae96041c8928",
+      "bytes": 1864,
+      "description": "HTTP/2 stream 1 returns HTTP 415 text/plain with DATA body error; stream 3 then completes a valid DNS exchange."
+    },
+    {
+      "file": "doh-h2-id-zero-reordered.pcapng",
+      "sha256": "b3bc3953383d24e4b94832b27eab19c25f15798ebf783f8d3af304850811d46a",
+      "bytes": 1908,
+      "description": "Concurrent HTTP/2 streams 1 and 3 both use DNS ID zero; stream 3 responds before stream 1."
+    },
+    {
+      "file": "doh-h2-dns-semantics.pcapng",
+      "sha256": "398c40621e1d6210e763ef2288223c3ee4535559b5ad0c48a023e25fdb802510",
+      "bytes": 9752,
+      "description": "Synthetic HTTP/2 streams with wrong DNS QR and mismatched QCLASS, followed by a SERVFAIL without questions and a NOERROR/NODATA answer. Invalid streams are isolated; the two later responses remain matched. TCP payloads are fragmented into seven-byte segments."
+    }
+  ]
+}

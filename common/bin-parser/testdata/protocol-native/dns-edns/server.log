@@ -1,0 +1,8 @@
+maxprocs: Leaving GOMAXPROCS=10: CPU quota undefined
+native.test.:19555
+CoreDNS-1.12.0
+linux/arm64, go1.23.3, 51e11f1
+[INFO] 192.168.215.1:35056 - 100 "NS IN native.test. udp 40 true 1232" NOERROR qr,aa,rd 98 0.000500335s
+[INFO] 192.168.215.1:54299 - 101 "MX IN native.test. udp 40 true 1232" NOERROR qr,aa,rd 143 0.000096125s
+[INFO] 192.168.215.1:49886 - 103 "NS IN native.test. tcp 40 true 65535" NOERROR qr,aa,rd 98 0.000124292s
+[INFO] 192.168.215.1:49900 - 104 "MX IN native.test. tcp 40 true 65535" NOERROR qr,aa,rd 143 0.000128417s

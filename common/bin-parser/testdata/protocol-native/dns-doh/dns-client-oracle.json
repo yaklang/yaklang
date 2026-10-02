@@ -1,0 +1,670 @@
+[
+  {
+    "transport": "udp",
+    "request": {
+      "id": 16640,
+      "qr": false,
+      "rcode": 0,
+      "question": [
+        {
+          "name": "a.native.test.",
+          "type": 1,
+          "class": 1
+        }
+      ],
+      "answer": [],
+      "authority": [],
+      "additional": [],
+      "edns": 0,
+      "udp_payload": 1232,
+      "edns_flags": 0,
+      "edns_options": []
+    },
+    "response": {
+      "id": 16640,
+      "qr": true,
+      "rcode": 0,
+      "question": [
+        {
+          "name": "a.native.test.",
+          "type": 1,
+          "class": 1
+        }
+      ],
+      "answer": [
+        {
+          "name": "a.native.test.",
+          "type": 1,
+          "class": 1,
+          "ttl": 300,
+          "data": [
+            "192.0.2.10"
+          ]
+        }
+      ],
+      "authority": [
+        "native.test. 300 IN NS ns.native.test."
+      ],
+      "additional": [],
+      "edns": 0,
+      "udp_payload": 1232,
+      "edns_flags": 0,
+      "edns_options": []
+    },
+    "request_wire": "QQABAAABAAAAAAABAWEGbmF0aXZlBHRlc3QAAAEAAQAAKQTQAAAAAAAA",
+    "response_wire": "QQCFAAABAAEAAQABAWEGbmF0aXZlBHRlc3QAAAEAAQFhBm5hdGl2ZQR0ZXN0AAABAAEAAAEsAATAAAIKBm5hdGl2ZQR0ZXN0AAACAAEAAAEsABACbnMGbmF0aXZlBHRlc3QAAAApBNAAAAAAAAA="
+  },
+  {
+    "transport": "tcp",
+    "request": {
+      "id": 16640,
+      "qr": false,
+      "rcode": 0,
+      "question": [
+        {
+          "name": "a.native.test.",
+          "type": 1,
+          "class": 1
+        }
+      ],
+      "answer": [],
+      "authority": [],
+      "additional": [],
+      "edns": 0,
+      "udp_payload": 1232,
+      "edns_flags": 0,
+      "edns_options": []
+    },
+    "response": {
+      "id": 16640,
+      "qr": true,
+      "rcode": 0,
+      "question": [
+        {
+          "name": "a.native.test.",
+          "type": 1,
+          "class": 1
+        }
+      ],
+      "answer": [
+        {
+          "name": "a.native.test.",
+          "type": 1,
+          "class": 1,
+          "ttl": 300,
+          "data": [
+            "192.0.2.10"
+          ]
+        }
+      ],
+      "authority": [
+        "native.test. 300 IN NS ns.native.test."
+      ],
+      "additional": [],
+      "edns": 0,
+      "udp_payload": 1232,
+      "edns_flags": 0,
+      "edns_options": []
+    },
+    "request_wire": "QQABAAABAAAAAAABAWEGbmF0aXZlBHRlc3QAAAEAAQAAKQTQAAAAAAAA",
+    "response_wire": "QQCFAAABAAEAAQABAWEGbmF0aXZlBHRlc3QAAAEAAQFhBm5hdGl2ZQR0ZXN0AAABAAEAAAEsAATAAAIKBm5hdGl2ZQR0ZXN0AAACAAEAAAEsABACbnMGbmF0aXZlBHRlc3QAAAApBNAAAAAAAAA="
+  },
+  {
+    "transport": "udp",
+    "request": {
+      "id": 16641,
+      "qr": false,
+      "rcode": 0,
+      "question": [
+        {
+          "name": "a.native.test.",
+          "type": 28,
+          "class": 1
+        }
+      ],
+      "answer": [],
+      "authority": [],
+      "additional": [],
+      "edns": 0,
+      "udp_payload": 1232,
+      "edns_flags": 0,
+      "edns_options": []
+    },
+    "response": {
+      "id": 16641,
+      "qr": true,
+      "rcode": 0,
+      "question": [
+        {
+          "name": "a.native.test.",
+          "type": 28,
+          "class": 1
+        }
+      ],
+      "answer": [
+        {
+          "name": "a.native.test.",
+          "type": 28,
+          "class": 1,
+          "ttl": 300,
+          "data": [
+            "2001:db8::10"
+          ]
+        }
+      ],
+      "authority": [
+        "native.test. 300 IN NS ns.native.test."
+      ],
+      "additional": [],
+      "edns": 0,
+      "udp_payload": 1232,
+      "edns_flags": 0,
+      "edns_options": []
+    },
+    "request_wire": "QQEBAAABAAAAAAABAWEGbmF0aXZlBHRlc3QAABwAAQAAKQTQAAAAAAAA",
+    "response_wire": "QQGFAAABAAEAAQABAWEGbmF0aXZlBHRlc3QAABwAAQFhBm5hdGl2ZQR0ZXN0AAAcAAEAAAEsABAgAQ24AAAAAAAAAAAAAAAQBm5hdGl2ZQR0ZXN0AAACAAEAAAEsABACbnMGbmF0aXZlBHRlc3QAAAApBNAAAAAAAAA="
+  },
+  {
+    "transport": "tcp",
+    "request": {
+      "id": 16641,
+      "qr": false,
+      "rcode": 0,
+      "question": [
+        {
+          "name": "a.native.test.",
+          "type": 28,
+          "class": 1
+        }
+      ],
+      "answer": [],
+      "authority": [],
+      "additional": [],
+      "edns": 0,
+      "udp_payload": 1232,
+      "edns_flags": 0,
+      "edns_options": []
+    },
+    "response": {
+      "id": 16641,
+      "qr": true,
+      "rcode": 0,
+      "question": [
+        {
+          "name": "a.native.test.",
+          "type": 28,
+          "class": 1
+        }
+      ],
+      "answer": [
+        {
+          "name": "a.native.test.",
+          "type": 28,
+          "class": 1,
+          "ttl": 300,
+          "data": [
+            "2001:db8::10"
+          ]
+        }
+      ],
+      "authority": [
+        "native.test. 300 IN NS ns.native.test."
+      ],
+      "additional": [],
+      "edns": 0,
+      "udp_payload": 1232,
+      "edns_flags": 0,
+      "edns_options": []
+    },
+    "request_wire": "QQEBAAABAAAAAAABAWEGbmF0aXZlBHRlc3QAABwAAQAAKQTQAAAAAAAA",
+    "response_wire": "QQGFAAABAAEAAQABAWEGbmF0aXZlBHRlc3QAABwAAQFhBm5hdGl2ZQR0ZXN0AAAcAAEAAAEsABAgAQ24AAAAAAAAAAAAAAAQBm5hdGl2ZQR0ZXN0AAACAAEAAAEsABACbnMGbmF0aXZlBHRlc3QAAAApBNAAAAAAAAA="
+  },
+  {
+    "transport": "udp",
+    "request": {
+      "id": 16642,
+      "qr": false,
+      "rcode": 0,
+      "question": [
+        {
+          "name": "alias.native.test.",
+          "type": 1,
+          "class": 1
+        }
+      ],
+      "answer": [],
+      "authority": [],
+      "additional": [],
+      "edns": 0,
+      "udp_payload": 1232,
+      "edns_flags": 0,
+      "edns_options": []
+    },
+    "response": {
+      "id": 16642,
+      "qr": true,
+      "rcode": 0,
+      "question": [
+        {
+          "name": "alias.native.test.",
+          "type": 1,
+          "class": 1
+        }
+      ],
+      "answer": [
+        {
+          "name": "alias.native.test.",
+          "type": 5,
+          "class": 1,
+          "ttl": 300,
+          "data": [
+            "a.native.test."
+          ]
+        },
+        {
+          "name": "a.native.test.",
+          "type": 1,
+          "class": 1,
+          "ttl": 300,
+          "data": [
+            "192.0.2.10"
+          ]
+        }
+      ],
+      "authority": [
+        "native.test. 300 IN NS ns.native.test."
+      ],
+      "additional": [],
+      "edns": 0,
+      "udp_payload": 1232,
+      "edns_flags": 0,
+      "edns_options": []
+    },
+    "request_wire": "QQIBAAABAAAAAAABBWFsaWFzBm5hdGl2ZQR0ZXN0AAABAAEAACkE0AAAAAAAAA==",
+    "response_wire": "QQKFAAABAAIAAQABBWFsaWFzBm5hdGl2ZQR0ZXN0AAABAAEFYWxpYXMGbmF0aXZlBHRlc3QAAAUAAQAAASwADwFhBm5hdGl2ZQR0ZXN0AAFhBm5hdGl2ZQR0ZXN0AAABAAEAAAEsAATAAAIKBm5hdGl2ZQR0ZXN0AAACAAEAAAEsABACbnMGbmF0aXZlBHRlc3QAAAApBNAAAAAAAAA="
+  },
+  {
+    "transport": "tcp",
+    "request": {
+      "id": 16642,
+      "qr": false,
+      "rcode": 0,
+      "question": [
+        {
+          "name": "alias.native.test.",
+          "type": 1,
+          "class": 1
+        }
+      ],
+      "answer": [],
+      "authority": [],
+      "additional": [],
+      "edns": 0,
+      "udp_payload": 1232,
+      "edns_flags": 0,
+      "edns_options": []
+    },
+    "response": {
+      "id": 16642,
+      "qr": true,
+      "rcode": 0,
+      "question": [
+        {
+          "name": "alias.native.test.",
+          "type": 1,
+          "class": 1
+        }
+      ],
+      "answer": [
+        {
+          "name": "alias.native.test.",
+          "type": 5,
+          "class": 1,
+          "ttl": 300,
+          "data": [
+            "a.native.test."
+          ]
+        },
+        {
+          "name": "a.native.test.",
+          "type": 1,
+          "class": 1,
+          "ttl": 300,
+          "data": [
+            "192.0.2.10"
+          ]
+        }
+      ],
+      "authority": [
+        "native.test. 300 IN NS ns.native.test."
+      ],
+      "additional": [],
+      "edns": 0,
+      "udp_payload": 1232,
+      "edns_flags": 0,
+      "edns_options": []
+    },
+    "request_wire": "QQIBAAABAAAAAAABBWFsaWFzBm5hdGl2ZQR0ZXN0AAABAAEAACkE0AAAAAAAAA==",
+    "response_wire": "QQKFAAABAAIAAQABBWFsaWFzBm5hdGl2ZQR0ZXN0AAABAAEFYWxpYXMGbmF0aXZlBHRlc3QAAAUAAQAAASwADwFhBm5hdGl2ZQR0ZXN0AAFhBm5hdGl2ZQR0ZXN0AAABAAEAAAEsAATAAAIKBm5hdGl2ZQR0ZXN0AAACAAEAAAEsABACbnMGbmF0aXZlBHRlc3QAAAApBNAAAAAAAAA="
+  },
+  {
+    "transport": "udp",
+    "request": {
+      "id": 16643,
+      "qr": false,
+      "rcode": 0,
+      "question": [
+        {
+          "name": "missing.native.test.",
+          "type": 1,
+          "class": 1
+        }
+      ],
+      "answer": [],
+      "authority": [],
+      "additional": [],
+      "edns": 0,
+      "udp_payload": 1232,
+      "edns_flags": 0,
+      "edns_options": []
+    },
+    "response": {
+      "id": 16643,
+      "qr": true,
+      "rcode": 3,
+      "question": [
+        {
+          "name": "missing.native.test.",
+          "type": 1,
+          "class": 1
+        }
+      ],
+      "answer": [],
+      "authority": [
+        "native.test. 300 IN SOA ns.native.test. hostmaster.native.test. 2026093001 3600 600 86400 300"
+      ],
+      "additional": [],
+      "edns": 0,
+      "udp_payload": 1232,
+      "edns_flags": 0,
+      "edns_options": []
+    },
+    "request_wire": "QQMBAAABAAAAAAABB21pc3NpbmcGbmF0aXZlBHRlc3QAAAEAAQAAKQTQAAAAAAAA",
+    "response_wire": "QQOFAwABAAAAAQABB21pc3NpbmcGbmF0aXZlBHRlc3QAAAEAAQZuYXRpdmUEdGVzdAAABgABAAABLAA8Am5zBm5hdGl2ZQR0ZXN0AApob3N0bWFzdGVyBm5hdGl2ZQR0ZXN0AHjDuckAAA4QAAACWAABUYAAAAEsAAApBNAAAAAAAAA="
+  },
+  {
+    "transport": "tcp",
+    "request": {
+      "id": 16643,
+      "qr": false,
+      "rcode": 0,
+      "question": [
+        {
+          "name": "missing.native.test.",
+          "type": 1,
+          "class": 1
+        }
+      ],
+      "answer": [],
+      "authority": [],
+      "additional": [],
+      "edns": 0,
+      "udp_payload": 1232,
+      "edns_flags": 0,
+      "edns_options": []
+    },
+    "response": {
+      "id": 16643,
+      "qr": true,
+      "rcode": 3,
+      "question": [
+        {
+          "name": "missing.native.test.",
+          "type": 1,
+          "class": 1
+        }
+      ],
+      "answer": [],
+      "authority": [
+        "native.test. 300 IN SOA ns.native.test. hostmaster.native.test. 2026093001 3600 600 86400 300"
+      ],
+      "additional": [],
+      "edns": 0,
+      "udp_payload": 1232,
+      "edns_flags": 0,
+      "edns_options": []
+    },
+    "request_wire": "QQMBAAABAAAAAAABB21pc3NpbmcGbmF0aXZlBHRlc3QAAAEAAQAAKQTQAAAAAAAA",
+    "response_wire": "QQOFAwABAAAAAQABB21pc3NpbmcGbmF0aXZlBHRlc3QAAAEAAQZuYXRpdmUEdGVzdAAABgABAAABLAA8Am5zBm5hdGl2ZQR0ZXN0AApob3N0bWFzdGVyBm5hdGl2ZQR0ZXN0AHjDuckAAA4QAAACWAABUYAAAAEsAAApBNAAAAAAAAA="
+  },
+  {
+    "transport": "udp",
+    "request": {
+      "id": 16644,
+      "qr": false,
+      "rcode": 0,
+      "question": [
+        {
+          "name": "text.native.test.",
+          "type": 16,
+          "class": 1
+        }
+      ],
+      "answer": [],
+      "authority": [],
+      "additional": [],
+      "edns": 0,
+      "udp_payload": 1232,
+      "edns_flags": 0,
+      "edns_options": [
+        {
+          "code": 65001,
+          "value": "aW5kZXBlbmRlbnQ="
+        }
+      ]
+    },
+    "response": {
+      "id": 16644,
+      "qr": true,
+      "rcode": 0,
+      "question": [
+        {
+          "name": "text.native.test.",
+          "type": 16,
+          "class": 1
+        }
+      ],
+      "answer": [
+        {
+          "name": "text.native.test.",
+          "type": 16,
+          "class": 1,
+          "ttl": 300,
+          "data": [
+            "\"independent CoreDNS oracle\" \"two TXT strings\""
+          ]
+        }
+      ],
+      "authority": [
+        "native.test. 300 IN NS ns.native.test."
+      ],
+      "additional": [],
+      "edns": 0,
+      "udp_payload": 1232,
+      "edns_flags": 0,
+      "edns_options": []
+    },
+    "request_wire": "QQQBAAABAAAAAAABBHRleHQGbmF0aXZlBHRlc3QAABAAAQAAKQTQAAAAAAAP/ekAC2luZGVwZW5kZW50",
+    "response_wire": "QQSFAAABAAEAAQABBHRleHQGbmF0aXZlBHRlc3QAABAAAQR0ZXh0Bm5hdGl2ZQR0ZXN0AAAQAAEAAAEsACsaaW5kZXBlbmRlbnQgQ29yZUROUyBvcmFjbGUPdHdvIFRYVCBzdHJpbmdzBm5hdGl2ZQR0ZXN0AAACAAEAAAEsABACbnMGbmF0aXZlBHRlc3QAAAApBNAAAAAAAAA="
+  },
+  {
+    "transport": "tcp",
+    "request": {
+      "id": 16644,
+      "qr": false,
+      "rcode": 0,
+      "question": [
+        {
+          "name": "text.native.test.",
+          "type": 16,
+          "class": 1
+        }
+      ],
+      "answer": [],
+      "authority": [],
+      "additional": [],
+      "edns": 0,
+      "udp_payload": 1232,
+      "edns_flags": 0,
+      "edns_options": [
+        {
+          "code": 65001,
+          "value": "aW5kZXBlbmRlbnQ="
+        }
+      ]
+    },
+    "response": {
+      "id": 16644,
+      "qr": true,
+      "rcode": 0,
+      "question": [
+        {
+          "name": "text.native.test.",
+          "type": 16,
+          "class": 1
+        }
+      ],
+      "answer": [
+        {
+          "name": "text.native.test.",
+          "type": 16,
+          "class": 1,
+          "ttl": 300,
+          "data": [
+            "\"independent CoreDNS oracle\" \"two TXT strings\""
+          ]
+        }
+      ],
+      "authority": [
+        "native.test. 300 IN NS ns.native.test."
+      ],
+      "additional": [],
+      "edns": 0,
+      "udp_payload": 1232,
+      "edns_flags": 0,
+      "edns_options": []
+    },
+    "request_wire": "QQQBAAABAAAAAAABBHRleHQGbmF0aXZlBHRlc3QAABAAAQAAKQTQAAAAAAAP/ekAC2luZGVwZW5kZW50",
+    "response_wire": "QQSFAAABAAEAAQABBHRleHQGbmF0aXZlBHRlc3QAABAAAQR0ZXh0Bm5hdGl2ZQR0ZXN0AAAQAAEAAAEsACsaaW5kZXBlbmRlbnQgQ29yZUROUyBvcmFjbGUPdHdvIFRYVCBzdHJpbmdzBm5hdGl2ZQR0ZXN0AAACAAEAAAEsABACbnMGbmF0aXZlBHRlc3QAAAApBNAAAAAAAAA="
+  },
+  {
+    "transport": "udp",
+    "request": {
+      "id": 16645,
+      "qr": false,
+      "rcode": 0,
+      "question": [
+        {
+          "name": "native.test.",
+          "type": 6,
+          "class": 1
+        }
+      ],
+      "answer": [],
+      "authority": [],
+      "additional": [],
+      "edns": 0,
+      "udp_payload": 1232,
+      "edns_flags": 0,
+      "edns_options": []
+    },
+    "response": {
+      "id": 16645,
+      "qr": true,
+      "rcode": 0,
+      "question": [
+        {
+          "name": "native.test.",
+          "type": 6,
+          "class": 1
+        }
+      ],
+      "answer": [
+        {
+          "name": "native.test.",
+          "type": 6,
+          "class": 1,
+          "ttl": 300,
+          "data": [
+            "ns.native.test. hostmaster.native.test. 2026093001 3600 600 86400 300"
+          ]
+        }
+      ],
+      "authority": [
+        "native.test. 300 IN NS ns.native.test."
+      ],
+      "additional": [],
+      "edns": 0,
+      "udp_payload": 1232,
+      "edns_flags": 0,
+      "edns_options": []
+    },
+    "request_wire": "QQUBAAABAAAAAAABBm5hdGl2ZQR0ZXN0AAAGAAEAACkE0AAAAAAAAA==",
+    "response_wire": "QQWFAAABAAEAAQABBm5hdGl2ZQR0ZXN0AAAGAAEGbmF0aXZlBHRlc3QAAAYAAQAAASwAPAJucwZuYXRpdmUEdGVzdAAKaG9zdG1hc3RlcgZuYXRpdmUEdGVzdAB4w7nJAAAOEAAAAlgAAVGAAAABLAZuYXRpdmUEdGVzdAAAAgABAAABLAAQAm5zBm5hdGl2ZQR0ZXN0AAAAKQTQAAAAAAAA"
+  },
+  {
+    "transport": "tcp",
+    "request": {
+      "id": 16645,
+      "qr": false,
+      "rcode": 0,
+      "question": [
+        {
+          "name": "native.test.",
+          "type": 6,
+          "class": 1
+        }
+      ],
+      "answer": [],
+      "authority": [],
+      "additional": [],
+      "edns": 0,
+      "udp_payload": 1232,
+      "edns_flags": 0,
+      "edns_options": []
+    },
+    "response": {
+      "id": 16645,
+      "qr": true,
+      "rcode": 0,
+      "question": [
+        {
+          "name": "native.test.",
+          "type": 6,
+          "class": 1
+        }
+      ],
+      "answer": [
+        {
+          "name": "native.test.",
+          "type": 6,
+          "class": 1,
+          "ttl": 300,
+          "data": [
+            "ns.native.test. hostmaster.native.test. 2026093001 3600 600 86400 300"
+          ]
+        }
+      ],
+      "authority": [
+        "native.test. 300 IN NS ns.native.test."
+      ],
+      "additional": [],
+      "edns": 0,
+      "udp_payload": 1232,
+      "edns_flags": 0,
+      "edns_options": []
+    },
+    "request_wire": "QQUBAAABAAAAAAABBm5hdGl2ZQR0ZXN0AAAGAAEAACkE0AAAAAAAAA==",
+    "response_wire": "QQWFAAABAAEAAQABBm5hdGl2ZQR0ZXN0AAAGAAEGbmF0aXZlBHRlc3QAAAYAAQAAASwAPAJucwZuYXRpdmUEdGVzdAAKaG9zdG1hc3RlcgZuYXRpdmUEdGVzdAB4w7nJAAAOEAAAAlgAAVGAAAABLAZuYXRpdmUEdGVzdAAAAgABAAABLAAQAm5zBm5hdGl2ZQR0ZXN0AAAAKQTQAAAAAAAA"
+  }
+]

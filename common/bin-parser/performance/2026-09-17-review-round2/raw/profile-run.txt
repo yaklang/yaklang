@@ -1,0 +1,5 @@
+goos: darwin
+goarch: arm64
+pkg: github.com/yaklang/yaklang/common/pcapx/pcaputil
+BenchmarkPcapBinParser/mixed=true/full/workers=2-4         	     499	   6820080 ns/op	 242.20 MB/s	        15.73 cpu-ms/batch	      5106 cpu-ns/message	         4.000 gomaxprocs	      3080 messages/batch	      2214 ns/message	22003256 B/op	   95053 allocs/op
+PASS

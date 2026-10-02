@@ -1,0 +1,77 @@
+endian: big
+Package:
+  FTPData:
+    operator: |
+      rest = 0
+      if this.GetMaxLength() > this.Length() {
+        rest = this.GetMaxLength() - this.Length()
+      }
+      if rest == 0 {
+        panic("ftp-data: empty payload")
+      }
+      res, op = this.TryProcessByType("FTPBlockProbe")
+      if op.OK {
+        op.Recovery()
+        if rest < 3 {
+          panic("ftp-data: truncated block header")
+        }
+        this.ProcessSubNode("Blocks")
+        return
+      }
+      err = op.Recovery()
+      if rest > 0 && rest < 1048576 {
+        this.GetSubNode("File Data").SetMaxLength(rest)
+        this.ProcessSubNode("File Data")
+        return
+      }
+      panic("ftp-data: empty payload")
+    Blocks:
+      list: true
+      Block: FTPBlock
+      operator: |
+        for {
+          ele = this.NewElement()
+          if ele.GetMaxLength() == 0 {
+            if this.Length() == 0 {
+              panic("ftp-data: empty payload")
+            }
+            break
+          }
+          if ele.GetMaxLength() < 3 {
+            panic("ftp-data: truncated block header")
+          }
+          ele.Process()
+          if this.GetMaxLength() > 0 && this.Length() >= this.GetMaxLength() {
+            break
+          }
+        }
+    File Data: string
+FTPBlockProbe:
+  operator: |
+    this.ProcessSubNode("Descriptor")
+    d = getNodeResult("Descriptor").Value
+    low = d & 0x0f
+    high = d & 0xf0
+    if low != 0 || high == 0 {
+      panic("ftp-data: stream payload")
+    }
+  Descriptor: uint8
+FTPBlock:
+  operator: |
+    this.ProcessSubNode("Descriptor")
+    this.ProcessSubNode("Byte Count")
+    n = getNodeResult("Byte Count").Value
+    if n > 0 {
+      avail = 0
+      if this.Length() < this.GetMaxLength() {
+        avail = this.GetMaxLength() - this.Length()
+      }
+      if n > avail {
+        panic("ftp-data: byte count exceeds remaining")
+      }
+      this.GetSubNode("File Data").SetMaxLength(n)
+      this.ProcessSubNode("File Data")
+    }
+  Descriptor: uint8
+  Byte Count: uint16
+  File Data: string

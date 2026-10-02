@@ -1,0 +1,154 @@
+// This standalone generator uses a temporary, pinned module; it is not a Yaklang dependency.
+package main
+
+import (
+	"encoding/json"
+	"fmt"
+	"net"
+	"os"
+	"path/filepath"
+	"sync"
+	"time"
+
+	"github.com/nats-io/nats.go"
+)
+
+type recordedConn struct {
+	net.Conn
+	sent, received *os.File
+}
+
+func (c *recordedConn) Read(p []byte) (int, error) {
+	n, e := c.Conn.Read(p)
+	if n > 0 {
+		if _, w := c.received.Write(p[:n]); w != nil {
+			panic(w)
+		}
+	}
+	return n, e
+}
+func (c *recordedConn) Write(p []byte) (int, error) {
+	n, e := c.Conn.Write(p)
+	if n > 0 {
+		if _, w := c.sent.Write(p[:n]); w != nil {
+			panic(w)
+		}
+	}
+	return n, e
+}
+
+type dialer struct {
+	mu          sync.Mutex
+	out         string
+	connections []*recordedConn
+}
+
+func (d *dialer) Dial(network, address string) (net.Conn, error) {
+	c, e := net.DialTimeout(network, address, 2*time.Second)
+	if e != nil {
+		return nil, e
+	}
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	id := len(d.connections) + 1
+	sent, e := os.Create(filepath.Join(d.out, fmt.Sprintf("connection-%d-client.bin", id)))
+	must(e)
+	received, e := os.Create(filepath.Join(d.out, fmt.Sprintf("connection-%d-server.bin", id)))
+	must(e)
+	r := &recordedConn{c, sent, received}
+	d.connections = append(d.connections, r)
+	return r, nil
+}
+func must(e error) {
+	if e != nil {
+		panic(e)
+	}
+}
+
+type observation struct {
+	Name    string      `json:"name"`
+	Subject string      `json:"subject"`
+	Reply   string      `json:"reply,omitempty"`
+	Header  nats.Header `json:"headers"`
+	Body    []byte      `json:"body_base64"`
+	Error   string      `json:"error,omitempty"`
+}
+
+func observed(name string, m *nats.Msg) observation {
+	return observation{Name: name, Subject: m.Subject, Reply: m.Reply, Header: m.Header, Body: m.Data}
+}
+func main() {
+	if len(os.Args) != 3 {
+		panic("usage: native-client nats://127.0.0.1:44222 OUTPUT")
+	}
+	out := os.Args[2]
+	d := &dialer{out: out}
+	connect := func(name string) *nats.Conn {
+		c, e := nats.Connect(os.Args[1], nats.Name(name), nats.SetCustomDialer(d), nats.NoReconnect(), nats.Timeout(2*time.Second))
+		must(e)
+		return c
+	}
+	subClient := connect("native-oracle-subscriber")
+	pubClient := connect("native-oracle-publisher")
+	sub, e := subClient.SubscribeSync("native.headers")
+	must(e)
+	must(subClient.Flush())
+	cases := []observation{}
+	send := func(name string, h nats.Header, reply string, body []byte) {
+		must(pubClient.PublishMsg(&nats.Msg{Subject: "native.headers", Reply: reply, Header: h, Data: body}))
+		must(pubClient.Flush())
+		m, e := sub.NextMsg(2 * time.Second)
+		must(e)
+		cases = append(cases, observed(name, m))
+	}
+	send("multi-value-case-sensitive-binary", nats.Header{"X-Trace": {"alpha", "beta, gamma"}, "x-trace": {"lower"}, "Empty": {""}, "Colon": {"left:right"}, "Tab": {"left\tright"}, "ASCII": {"\x00\x01\x7f"}}, "", []byte("native\x00\r\nPING\r\nbody"))
+	send("empty-header-section", nats.Header{"Omitted": nil}, "", []byte{})
+	send("reply-and-header-only", nats.Header{"Reply-Case": {"present", "twice"}}, "native.reply", []byte{})
+	_, e = pubClient.Request("native.absent", []byte("request"), 2*time.Second)
+	if e != nats.ErrNoResponders {
+		panic(fmt.Sprintf("expected ErrNoResponders, got %v", e))
+	}
+	cases = append(cases, observation{Name: "server-status-503", Subject: "native.absent", Error: e.Error()})
+	js, e := pubClient.JetStream()
+	must(e)
+	_, e = js.AddStream(&nats.StreamConfig{Name: "NATIVE", Subjects: []string{"native.js.data"}, Storage: nats.MemoryStorage})
+	must(e)
+	_, e = js.AddConsumer("NATIVE", &nats.ConsumerConfig{Durable: "C", AckPolicy: nats.AckExplicitPolicy})
+	must(e)
+	m, e := pubClient.Request("$JS.API.CONSUMER.MSG.NEXT.NATIVE.C", []byte(`{"batch":1,"no_wait":true}`), 2*time.Second)
+	must(e)
+	if m.Header.Get("Status") != "404" || m.Header.Get("Description") != "No Messages" {
+		panic(fmt.Sprintf("bad 404 oracle: %+v", m))
+	}
+	cases = append(cases, observed("server-status-404-description", m))
+	// The server creates the inline 100 status; the generator never serializes NATS frames.
+	hb, e := subClient.SubscribeSync("native.heartbeat")
+	must(e)
+	must(subClient.Flush())
+	_, e = js.AddConsumer("NATIVE", &nats.ConsumerConfig{Durable: "HB", AckPolicy: nats.AckNonePolicy, DeliverSubject: "native.heartbeat", Heartbeat: 100 * time.Millisecond})
+	must(e)
+	m, e = hb.NextMsg(2 * time.Second)
+	must(e)
+	if m.Header.Get("Status") != "100" || m.Header.Get("Description") != "Idle Heartbeat" {
+		panic(fmt.Sprintf("bad heartbeat oracle: %+v", m))
+	}
+	cases = append(cases, observed("server-status-100-heartbeat", m))
+	must(js.DeleteConsumer("NATIVE", "HB"))
+	must(js.DeleteConsumer("NATIVE", "C"))
+	must(js.DeleteStream("NATIVE"))
+	serverVersion := pubClient.ConnectedServerVersion()
+	stats := map[string]any{"subscriber": subClient.Stats(), "publisher": pubClient.Stats()}
+	must(subClient.Flush())
+	must(pubClient.Flush())
+	subClient.Close()
+	pubClient.Close()
+	// Successful synchronous requests/Flush calls fence the recorded application traffic.
+	for _, c := range d.connections {
+		must(c.sent.Close())
+		must(c.received.Close())
+	}
+	result := map[string]any{"generator": "official nats.go API over real TCP; no handcrafted protocol frames", "nats_go_version": nats.Version, "server_version": serverVersion, "headers_supported": true, "observations": cases, "client_stats": stats}
+	data, e := json.MarshalIndent(result, "", "  ")
+	must(e)
+	must(os.WriteFile(filepath.Join(out, "client-oracle.json"), append(data, '\n'), 0644))
+}

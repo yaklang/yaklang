@@ -1,0 +1,104 @@
+# LINKTYPE_USBPCAP records, not Linux usbmon. Layout is defined by USBPcap's
+# capture format and Windows fixed-width DDK types (ULONG is 32 bits).
+# No device-specific HID/report schema or cross-record IRP state is inferred.
+endian: little
+Package:
+  USBPcap:
+    operator: |
+      if !this.HasMaxLength() { panic("usbpcap: record boundary is required") }
+      size = this.GetMaxLength()
+      limit = getCtx("usbPcapRecordLimit")
+      if !hasCtx("usbPcapRecordLimit") { limit = 1048576 }
+      if size < 27 || limit <= 0 || size > limit { panic("usbpcap: invalid record size") }
+      headerLength = this.ProcessSubNode("Header Length").Value
+      if headerLength < 27 || headerLength > size { panic("usbpcap: invalid header length") }
+      this.ProcessSubNode("IRP ID")
+      this.ProcessSubNode("Status")
+      this.ProcessSubNode("Function")
+      information = this.ProcessSubNode("Information").Value
+      if information > 1 { panic("usbpcap: information reserved bits must be zero") }
+      this.AddInfo("Completion", information == 1)
+      this.AddInfo("Status Valid", information == 1)
+      this.ProcessSubNode("Bus")
+      this.ProcessSubNode("Device")
+      endpoint = this.ProcessSubNode("Endpoint").Value
+      if endpoint & 0x70 != 0 { panic("usbpcap: endpoint reserved bits must be zero") }
+      this.AddInfo("Endpoint Number", endpoint & 15)
+      this.AddInfo("Transfer In", endpoint & 128 != 0)
+      transfer = this.ProcessSubNode("Transfer Type").Value
+      if transfer > 3 { panic("usbpcap: unsupported transfer type") }
+      dataLength = this.ProcessSubNode("Data Length").Value
+      if dataLength != size-headerLength { panic("usbpcap: data length differs from record boundary") }
+      stage = -1
+      if transfer == 0 {
+        if headerLength < 39 { panic("usbpcap: truncated isochronous header") }
+        this.ProcessSubNode("Start Frame")
+        count = this.ProcessSubNode("Packet Count").Value
+        this.ProcessSubNode("Error Count")
+        if count > (headerLength-39)/12 { panic("usbpcap: isochronous count exceeds header boundary") }
+        if count > 0 {
+          this.GetSubNode("Isochronous Packets").SetCfg("packetCount", count)
+          this.ProcessSubNode("Isochronous Packets")
+        }
+        // Descriptor length/status are meaningful only on completions;
+        // descriptor offsets are not dereferenced without transfer context.
+        this.AddInfo("Isochronous Results Valid", information == 1)
+      } else if transfer == 2 {
+        if headerLength < 28 { panic("usbpcap: truncated control header") }
+        stage = this.ProcessSubNode("Control Stage").Value
+        if stage > 3 { panic("usbpcap: unsupported control stage") }
+        if stage == 0 && information != 0 { panic("usbpcap: setup stage must be a request") }
+        if (stage == 2 || stage == 3) && information != 1 { panic("usbpcap: status or complete stage must be a completion") }
+        if stage == 2 && dataLength != 0 { panic("usbpcap: status stage cannot carry data") }
+      }
+      if headerLength > this.Length() {
+        this.GetSubNode("Header Extension").SetMaxLength(headerLength-this.Length())
+        this.ProcessSubNode("Header Extension")
+      }
+      if stage == 0 {
+        if dataLength < 8 { panic("usbpcap: truncated USB setup request") }
+        requestType = this.ProcessSubNode("Request Type").Value
+        this.ProcessSubNode("Request")
+        this.ProcessSubNode("Value")
+        this.ProcessSubNode("Index")
+        this.ProcessSubNode("Requested Length")
+        this.AddInfo("Request In", requestType & 128 != 0)
+        this.AddInfo("Request Kind", (requestType >> 5) & 3)
+        this.AddInfo("Recipient", requestType & 31)
+      }
+      this.AddInfo("Device Data Decoded", false)
+      if size > this.Length() {
+        this.GetSubNode("Data").SetMaxLength(size-this.Length())
+        this.ProcessSubNode("Data")
+      }
+      if this.Length() != size { panic("usbpcap: record was not consumed exactly") }
+    Header Length: uint16
+    IRP ID: uint64
+    Status: uint32
+    Function: uint16
+    Information: uint8
+    Bus: uint16
+    Device: uint16
+    Endpoint: uint8
+    Transfer Type: uint8
+    Data Length: uint32
+    Start Frame: uint32
+    Packet Count: uint32
+    Error Count: uint32
+    Isochronous Packets:
+      list: true
+      Packet: USBPcapIsochronousPacket
+      operator: |
+        for index = 0; index < this.GetCfg("packetCount"); index++ { this.NewElement().Process() }
+    Control Stage: uint8
+    Header Extension: raw
+    Request Type: uint8
+    Request: uint8
+    Value: uint16
+    Index: uint16
+    Requested Length: uint16
+    Data: raw
+USBPcapIsochronousPacket:
+  Offset: uint32
+  Length: uint32
+  Status: uint32

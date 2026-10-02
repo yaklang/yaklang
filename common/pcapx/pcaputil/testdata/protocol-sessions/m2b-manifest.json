@@ -1,0 +1,59 @@
+{
+  "representation": "native loopback UDP QUIC and TCP database capture; no stream carrier substitution",
+  "producer": {
+    "quic": "aioquic 1.2.0 AES128GCM, two TLS ClientRandoms, H3 and DoQ",
+    "mysql": "MariaDB 11.4.13, mysql-connector-python 9.2.0 and go-sql-driver/mysql 1.7.1",
+    "postgresql": "PostgreSQL 16.15, psycopg 3.2.6"
+  },
+  "capture": "tcpdump -i lo0 -s0 -U; no kernel drops",
+  "data": "synthetic public fixture values and fixture-only credentials; key log is test-only",
+  "files": [
+    {
+      "path": "m2b-database-native.pcap",
+      "sha256": "70959335dd6d83c9040dfff1f0f477ef053f3c4c074807921f950e73f1985668"
+    },
+    {
+      "path": "m2b-quic-native.pcap",
+      "sha256": "1cb12f6737ed147cc210c7d37fc11998a8b440e09187b24a8a79556b403dc7bd"
+    },
+    {
+      "path": "m2b-quic.keys",
+      "sha256": "dc83b0416e75df64784a8c68dea946a16061aa6ec0c2b1f59a46fe01dcd0296a"
+    },
+    {
+      "path": "m2b-quic-oracle.json",
+      "sha256": "3430a2b8f0387b326f08521d3429b65ae1e76ea4d76690ce8cc1426e60770102"
+    },
+    {
+      "path": "m2b-database-oracle.json",
+      "sha256": "0f03b6fa2e95f9b4e754805a484106c45d820099f0216e417e45c23ca102a7e2"
+    },
+    {
+      "path": "m2b-mysql-go-oracle.json",
+      "sha256": "7d7aa4459e1cdea5ec648679373a885ad045dc5df4827421802330a4562cc17e"
+    },
+    {
+      "path": "m2b-database-tshark.tsv",
+      "sha256": "c7685c650cf4d1443a41b1950133174f7a71a9628a924341875417a906199a1a"
+    },
+    {
+      "path": "m2b-quic-tshark.tsv",
+      "sha256": "6e519ca39156ccdbf4530e28c4568e827d1be1e3e25052158b5c2ac7271455dd"
+    }
+  ],
+  "independent_oracle_notes": "aioquic reconstructs both fragmented DoQ requests and returns the expected A records. TShark 4.4.8 decodes H3 and DoQ responses; its per-frame DoQ display marks split length-prefix request fragments malformed. The raw capture and that divergent output are retained. TSV lines have trailing whitespace removed.",
+  "bounded_profiles": {
+    "quic": "v1 Initial, AES128GCM keylog Handshake/1RTT, CID and zero-CID tuple, directional PN/stream/CRYPTO; key updates retain one previous generation",
+    "http3": "ALPN h3, request/control/QPACK streams, blocked/resume, headers/data/trailers; push payload remains opaque",
+    "doq": "ALPN doq, client bidirectional stream, ID zero, one DNS per direction plus FIN",
+    "mysql": "classic protocol41 prepared with fresh metadata, execute type reuse, reset/close/fetch, binary scalars and rows; native samples use two clients against MariaDB common classic capabilities",
+    "postgresql": "protocol3 observed statements/portals, extended cycle association, COPY IN/OUT native and BOTH unit profile, unknown OIDs remain raw",
+    "kafka": "M2A version-accurate legacy profiles retained; ApiVersions3/Metadata9/Produce9/Fetch12 flexible remain a separate version extension"
+  },
+  "unsupported_extensions": [
+    "QUIC Retry continuation and 0-RTT",
+    "HTTP3 push bodies",
+    "MySQL LONG_DATA, compression, query attributes and optional/cached metadata",
+    "PostgreSQL arbitrary binary type interpretation and auth proof verification"
+  ]
+}

@@ -1,0 +1,34 @@
+{
+  "evidence_kind": "independent-native-capture",
+  "fixture_license": "CC0-1.0",
+  "files": [
+    {
+      "file": "capture.log",
+      "sha256": "fd1e8a867761baa290a9c00a26d4e0a56df36f0feeaa2415a2da649e9cf240c9"
+    },
+    {
+      "file": "client.log",
+      "sha256": "98d596c7255b48e7b4a2bca1883ef4b80ca4070aed7ead4604aa04451ff29cf2"
+    },
+    {
+      "file": "endpoint-oracle.json",
+      "sha256": "df529b08186de461cd38ec9118822b2dd3b83b13efc5dc8a16398d60a71fd875"
+    },
+    {
+      "file": "native.pcap",
+      "sha256": "61ea89b589bc2234689a070ae3dc635c31d16d01e2fb4eb35c8161442234f4a6"
+    },
+    {
+      "file": "server.log",
+      "sha256": "6045f3b347e80a8b1bc5fd939c1a364231977f536bc98d345bd35d244bcad83e"
+    },
+    {
+      "file": "tshark.tsv",
+      "sha256": "5a5e402b22544743c1872ec4559b7ebd49e17d2faa3e4501eb6ff759fa7d706c"
+    }
+  ],
+  "generators": {
+    "generate.py": "576f051d70a4e71ecaf0f85e11392ad45d419378c2fe016643989021ad49e291",
+    "endpoint.c": "95579e55049a4118571bfbdc4bb76d0737067f0071f9d273a086f1903b64f063"
+  }
+}

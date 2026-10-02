@@ -1,0 +1,78 @@
+endian: big
+Package:
+  TFTP:
+    operator: |
+      this.ProcessSubNode("Opcode")
+      op = getNodeResult("Opcode").Value
+      if op < 1 || op > 6 {
+        panic("tftp: unknown opcode")
+      }
+      if op == 1 || op == 2 {
+        this.ProcessSubNode("Filename")
+        this.ProcessSubNode("Mode")
+        res, op2 = this.TryProcessByType("TFTPOption")
+        op2.Recovery()
+        if op2.OK {
+          this.ProcessSubNode("Options")
+        }
+        return
+      }
+      if op == 3 {
+        this.ProcessSubNode("Block")
+        if this.GetMaxLength() > this.Length() && this.GetMaxLength() < 1048576 {
+          rest = this.GetMaxLength() - this.Length()
+          if rest > 0 {
+            this.GetSubNode("File Data").SetMaxLength(rest)
+            this.ProcessSubNode("File Data")
+          }
+        }
+        return
+      }
+      if op == 4 {
+        this.ProcessSubNode("Block")
+        return
+      }
+      if op == 5 {
+        this.ProcessSubNode("Error Code")
+        this.ProcessSubNode("Error Message")
+        return
+      }
+      if op == 6 {
+        res, op2 = this.TryProcessByType("TFTPOption")
+        op2.Recovery()
+        if op2.OK {
+          this.ProcessSubNode("Options")
+        }
+        return
+      }
+    Opcode: uint16
+    Filename: "del:\x00;type:string"
+    Mode: "del:\x00;type:string"
+    Block: uint16
+    File Data: string
+    Error Code: uint16
+    Error Message: "del:\x00;type:string"
+    Options:
+      list: true
+      Option: TFTPOption
+      operator: |
+        for {
+          res, op = this.TryProcessByType("TFTPOption")
+          if !op.OK {
+            op.Recovery()
+            break
+          }
+          op.Recovery()
+          ele = this.NewElement()
+          ele.Process()
+        }
+TFTPOption:
+  operator: |
+    this.ProcessSubNode("Name")
+    n = getNodeResult("Name").Value
+    if n == "" {
+      panic("tftp: empty option name")
+    }
+    this.ProcessSubNode("Value")
+  Name: "del:\x00;type:string"
+  Value: "del:\x00;type:string"

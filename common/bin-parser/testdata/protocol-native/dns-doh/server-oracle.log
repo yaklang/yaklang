@@ -1,0 +1,29 @@
+maxprocs: Leaving GOMAXPROCS=10: CPU quota undefined
+https://native.test.:19544
+native.test.:19553
+CoreDNS-1.12.0
+linux/arm64, go1.23.3, 51e11f1
+[INFO] 192.168.215.1:48024 - 16640 "A IN a.native.test. udp 42 false 1232" NOERROR qr,aa,rd 99 0.000310957s
+[INFO] 192.168.215.1:46640 - 16640 "A IN a.native.test. tcp 42 false 65535" NOERROR qr,aa,rd 99 0.000129249s
+[INFO] 192.168.215.1:51512 - 16641 "AAAA IN a.native.test. udp 42 false 1232" NOERROR qr,aa,rd 111 0.000130749s
+[INFO] 192.168.215.1:46646 - 16641 "AAAA IN a.native.test. tcp 42 false 65535" NOERROR qr,aa,rd 111 0.0000955s
+[INFO] 192.168.215.1:48737 - 16642 "A IN alias.native.test. udp 46 false 1232" NOERROR qr,aa,rd 147 0.000604247s
+[INFO] 192.168.215.1:46662 - 16642 "A IN alias.native.test. tcp 46 false 65535" NOERROR qr,aa,rd 147 0.00009025s
+[INFO] 192.168.215.1:35149 - 16643 "A IN missing.native.test. udp 48 false 1232" NXDOMAIN qr,aa,rd 120 0.000126333s
+[INFO] 192.168.215.1:46666 - 16643 "A IN missing.native.test. tcp 48 false 65535" NXDOMAIN qr,aa,rd 120 0.000117499s
+[INFO] 192.168.215.1:41193 - 16644 "TXT IN text.native.test. udp 45 false 1232" NOERROR qr,aa,rd 144 0.000128291s
+[INFO] 192.168.215.1:46674 - 16644 "TXT IN text.native.test. tcp 45 false 65535" NOERROR qr,aa,rd 144 0.000087416s
+[INFO] 192.168.215.1:40991 - 16645 "SOA IN native.test. udp 40 false 1232" NOERROR qr,aa,rd 151 0.000186291s
+[INFO] 192.168.215.1:46688 - 16645 "SOA IN native.test. tcp 40 false 65535" NOERROR qr,aa,rd 151 0.000133958s
+[INFO] 192.168.215.1:34440 - 0 "A IN a.native.test. tcp 42 false 65535" NOERROR qr,aa,rd 99 0.000031667s
+[INFO] 192.168.215.1:34440 - 0 "AAAA IN a.native.test. tcp 42 false 65535" NOERROR qr,aa,rd 111 0.000022917s
+[INFO] 192.168.215.1:34440 - 0 "A IN alias.native.test. tcp 46 false 65535" NOERROR qr,aa,rd 147 0.000025417s
+[INFO] 192.168.215.1:34440 - 0 "A IN missing.native.test. tcp 48 false 65535" NXDOMAIN qr,aa,rd 120 0.000024041s
+[INFO] 192.168.215.1:34440 - 0 "TXT IN text.native.test. tcp 45 false 65535" NOERROR qr,aa,rd 144 0.000016s
+[INFO] 192.168.215.1:34440 - 0 "SOA IN native.test. tcp 40 false 65535" NOERROR qr,aa,rd 151 0.0000175s
+[INFO] 192.168.215.1:34446 - 0 "A IN a.native.test. tcp 42 false 65535" NOERROR qr,aa,rd 99 0.000034667s
+[INFO] 192.168.215.1:34446 - 0 "AAAA IN a.native.test. tcp 42 false 65535" NOERROR qr,aa,rd 111 0.000023333s
+[INFO] 192.168.215.1:34446 - 0 "A IN alias.native.test. tcp 46 false 65535" NOERROR qr,aa,rd 147 0.000048083s
+[INFO] 192.168.215.1:34446 - 0 "A IN missing.native.test. tcp 48 false 65535" NXDOMAIN qr,aa,rd 120 0.0000345s
+[INFO] 192.168.215.1:34446 - 0 "TXT IN text.native.test. tcp 45 false 65535" NOERROR qr,aa,rd 144 0.000022792s
+[INFO] 192.168.215.1:34446 - 0 "SOA IN native.test. tcp 40 false 65535" NOERROR qr,aa,rd 151 0.000009667s

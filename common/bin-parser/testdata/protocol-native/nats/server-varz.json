@@ -1,0 +1,78 @@
+{
+  "server_id": "NAVJL4YXB2VUGTDNVJ4CAXULVXAG2YPX3NCWDNXMYIEYR7DXSWMJVSZL",
+  "server_name": "nats-native-fixture",
+  "version": "2.10.26",
+  "proto": 1,
+  "git_commit": "14fa949",
+  "go": "go1.23.6",
+  "host": "127.0.0.1",
+  "port": 44222,
+  "max_connections": 65536,
+  "ping_interval": 120000000000,
+  "ping_max": 2,
+  "http_host": "127.0.0.1",
+  "http_port": 44223,
+  "http_base_path": "",
+  "https_port": 0,
+  "auth_timeout": 2,
+  "max_control_line": 4096,
+  "max_payload": 1048576,
+  "max_pending": 67108864,
+  "cluster": {},
+  "gateway": {},
+  "leaf": {},
+  "mqtt": {},
+  "websocket": {},
+  "jetstream": {
+    "config": {
+      "max_memory": 51539607552,
+      "max_storage": 86220678144,
+      "store_dir": "/var/folders/jp/j2r6mvsx5ss5r448p6gzwckc0000gn/T/nats-native-rsy0qip2/jetstream/jetstream",
+      "sync_interval": 120000000000
+    },
+    "stats": {
+      "memory": 0,
+      "storage": 0,
+      "reserved_memory": 0,
+      "reserved_storage": 0,
+      "accounts": 1,
+      "ha_assets": 0,
+      "api": {
+        "total": 8,
+        "errors": 2
+      }
+    }
+  },
+  "tls_timeout": 2,
+  "write_deadline": 10000000000,
+  "start": "2026-09-30T01:11:50.568223Z",
+  "now": "2026-09-30T01:11:51.645921Z",
+  "uptime": "1s",
+  "mem": 16416768,
+  "cores": 10,
+  "gomaxprocs": 10,
+  "cpu": 1.3,
+  "connections": 0,
+  "total_connections": 2,
+  "routes": 0,
+  "remotes": 0,
+  "leafnodes": 0,
+  "in_msgs": 13,
+  "out_msgs": 13,
+  "in_bytes": 875,
+  "out_bytes": 2628,
+  "slow_consumers": 0,
+  "subscriptions": 64,
+  "http_req_stats": {
+    "/healthz": 1,
+    "/varz": 1
+  },
+  "config_load_time": "2026-09-30T01:11:50.568223Z",
+  "system_account": "$SYS",
+  "slow_consumer_stats": {
+    "clients": 0,
+    "routes": 0,
+    "gateways": 0,
+    "leafs": 0
+  }
+}

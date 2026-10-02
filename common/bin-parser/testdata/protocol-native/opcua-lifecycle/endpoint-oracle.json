@@ -1,0 +1,14 @@
+{
+  "producer": "open62541 v1.5.5",
+  "commit": "3bdeed5dfe8309cecabf36e04afe956b7f72ebd8",
+  "source": "https://github.com/open62541/open62541/tree/3bdeed5dfe8309cecabf36e04afe956b7f72ebd8",
+  "license": "MPL-2.0; no library code or binary redistributed",
+  "security_policy": "None",
+  "negotiated_buffer": 8192,
+  "requested_channel_lifetime_ms": 2000,
+  "oracles": [
+    "ORACLE round=1 results=2048 all=Running",
+    "ORACLE round=2 results=2048 all=Running"
+  ],
+  "wire_mutation": "none"
+}

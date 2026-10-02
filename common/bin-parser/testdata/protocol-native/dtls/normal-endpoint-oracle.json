@@ -1,0 +1,10 @@
+{
+  "client_request": "native-dtls-client-request",
+  "server_response": "native-dtls-server-response",
+  "verified_test_certificate": true,
+  "cipher": "ECDHE-RSA-AES128-GCM-SHA256",
+  "version": "-dtls1_2",
+  "mtu": 1500,
+  "transport": "udp",
+  "producer": "OpenSSL 3.6.2 7 Apr 2026 (Library: OpenSSL 3.6.2 7 Apr 2026)"
+}

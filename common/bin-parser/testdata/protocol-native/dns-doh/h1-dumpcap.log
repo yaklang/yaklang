@@ -1,0 +1,4 @@
+Capturing on 'Loopback: lo0'
+File: /private/tmp/pr5013-complete/dns/expanded-capture/h1-native.pcapng
+Packets: 48 Packets captured: 48
+Packets received/dropped on interface 'Loopback: lo0': 48/0 (pcap:0/dumpcap:0/flushed:0/ps_ifdrop:0) (100.0%)

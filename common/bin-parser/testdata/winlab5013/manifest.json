@@ -1,0 +1,231 @@
+{
+  "schema_version": 1,
+  "source_pr": "https://github.com/yaklang/yaklang/pull/5174",
+  "source_commit": "305f34eaa7eb54e59dd59cd1c9bc4a3cb6afc068",
+  "license": "CC0-1.0",
+  "evidence_kind": "generated-lab",
+  "bundles": [
+    {
+      "name": "ctf-dns-labels",
+      "readme": "oracles/ctf-dns-labels.md",
+      "readme_sha256": "43c6d1bcef5e33d58b61fce38963f5d28f7624eb0f54ff6e41fbcef69bbaac07",
+      "captures": [
+        {
+          "file": "ctf-01-dns.pcapng",
+          "sha256": "7e5e7c649dfbc4f3cb53e570b5c40068fd7f7ff70e644ad8bc839db28610fb18",
+          "size_bytes": 1208,
+          "packet_count": 8
+        }
+      ]
+    },
+    {
+      "name": "ctf-ftp-reassembly",
+      "readme": "oracles/ctf-ftp-reassembly.md",
+      "readme_sha256": "b4fb2567a24cb1557d0fd9ec343bef229452c73a02c5946ed0acf93b4d2d0f1c",
+      "captures": [
+        {
+          "file": "ctf-01-ftp.pcapng",
+          "sha256": "ab7cedf32d17a93a68533a9088f63d504a9dbb2f720cb9eadd41828a7ca11600",
+          "size_bytes": 3856,
+          "packet_count": 38
+        }
+      ]
+    },
+    {
+      "name": "topic-blueteam",
+      "readme": "oracles/topic-blueteam.md",
+      "readme_sha256": "b6ca75c61994e30e3f1076d440439b47c8cbf6c87daec2d48b5ea451e8d38e6d",
+      "captures": [
+        {
+          "file": "blue-01-stratum.pcapng",
+          "sha256": "8e24d6895849600f69701c1ab5ab6f997f52eb873e2820d650d64a54d9b67d8b",
+          "size_bytes": 3600,
+          "packet_count": 32
+        },
+        {
+          "file": "blue-02-beacon.pcapng",
+          "sha256": "9efc1e3613114bd70495b229192a66c64c5df2640d7d268b542e7bf983956bd7",
+          "size_bytes": 2096,
+          "packet_count": 19
+        }
+      ]
+    },
+    {
+      "name": "topic-ics",
+      "readme": "oracles/topic-ics.md",
+      "readme_sha256": "07c8b7c1f89e6fd6e0548b7aa9156d8af324a0b9866d4a595c4183946067004a",
+      "captures": [
+        {
+          "file": "ics-01-modbus.pcapng",
+          "sha256": "f1c00a25747b055de45fd26e9a9f204ac1f5b6fc9b84689d56e732e4bcc1de94",
+          "size_bytes": 1568,
+          "packet_count": 15
+        },
+        {
+          "file": "ics-02-bacnet.pcapng",
+          "sha256": "bbde8345b97c353083f8e1dae75674b1990f81565006dc9d0242882ed6ad24b1",
+          "size_bytes": 684,
+          "packet_count": 6
+        },
+        {
+          "file": "ics-03-enip-cip.pcapng",
+          "sha256": "c4f595b56a95025549cc94533bac9f8b0f1a0f2a936297d6b5e05106062faf00",
+          "size_bytes": 2380,
+          "packet_count": 22
+        }
+      ]
+    },
+    {
+      "name": "topic-power",
+      "readme": "oracles/topic-power.md",
+      "readme_sha256": "534eabd87c5914b12c1cae8581af9930eaf04957dfe8c3986b0b2fe8112c8a65",
+      "captures": [
+        {
+          "file": "power-01-iec104.pcapng",
+          "sha256": "3f02af795ad1258cb3a5e717de5e9d730b4b945941978fab123570b019db7f1f",
+          "size_bytes": 1468,
+          "packet_count": 14
+        },
+        {
+          "file": "power-02-goose.pcapng",
+          "sha256": "07d9da77d7ee338e23343934db23fc756f3f55aa4e6f32111715b99858ea8317",
+          "size_bytes": 396,
+          "packet_count": 2
+        },
+        {
+          "file": "power-03-c37118.pcapng",
+          "sha256": "7f553e0ca67b37dc3d66b3881bd4bb394fbaf00c77d91d157de4acd4375937bd",
+          "size_bytes": 1508,
+          "packet_count": 14
+        }
+      ]
+    },
+    {
+      "name": "win-protocols-20",
+      "readme": "oracles/win-protocols-20.md",
+      "readme_sha256": "3c281b792d7c812bdebbdfe03fde36b2f8384722e9547f8fa43602d294f31f94",
+      "captures": [
+        {
+          "file": "01-socks5.pcapng",
+          "sha256": "c0681aa39ab129e7592428f9401e11d3ccaf54e135f171a19b4ff38b5fa77f20",
+          "size_bytes": 2040,
+          "packet_count": 19
+        },
+        {
+          "file": "02-finger.pcapng",
+          "sha256": "21b0fe35842ccde164fa92afa1715896cf8aabc086f1ea811eca50d7712e879c",
+          "size_bytes": 1308,
+          "packet_count": 12
+        },
+        {
+          "file": "03-whois.pcapng",
+          "sha256": "02d3d5111057e4f2370b64ffebaea8124dd7a185019b53e4602a1bff2a384aed",
+          "size_bytes": 1416,
+          "packet_count": 13
+        },
+        {
+          "file": "04-gopher.pcapng",
+          "sha256": "fdb296c2a33d6994913cc3c5fe5f438f6a199e28b8bb14bb9692206d4e06c67d",
+          "size_bytes": 2136,
+          "packet_count": 21
+        },
+        {
+          "file": "05-dict.pcapng",
+          "sha256": "f8167020c117bf59866681a1586df5cb11c2bf39e231730abf0ab218970db939",
+          "size_bytes": 2240,
+          "packet_count": 20
+        },
+        {
+          "file": "06-bjnp.pcapng",
+          "sha256": "ad41277dc98207000c1f8d2cf688ec854312649faffb33d870578622f170cff7",
+          "size_bytes": 904,
+          "packet_count": 8
+        },
+        {
+          "file": "07-zookeeper.pcapng",
+          "sha256": "e2f09c6315c71e6335d2cd884d3d5919c74177b6626a95a3a0c472b0f9857fd8",
+          "size_bytes": 2724,
+          "packet_count": 25
+        },
+        {
+          "file": "08-mqttsn.pcapng",
+          "sha256": "d57651b77ca675deb298bc9f55337f64ef209a02eac87bf6c98bde7844a316ca",
+          "size_bytes": 884,
+          "packet_count": 9
+        },
+        {
+          "file": "09-turn.pcapng",
+          "sha256": "57a73c29c715c42b0663ad7e8e78b010add6f89df5914e93bfd43f762f6814bb",
+          "size_bytes": 1172,
+          "packet_count": 10
+        },
+        {
+          "file": "10-caldav.pcapng",
+          "sha256": "823ecccb82aa53b45a7b1d2b2157eb787d635dfdf8a7a594c21e52f9e959894d",
+          "size_bytes": 9588,
+          "packet_count": 84
+        },
+        {
+          "file": "11-carddav.pcapng",
+          "sha256": "b5b655c93904baddae5ea18df4c8fca33741c4f7efb546d4de08ae0486de3976",
+          "size_bytes": 7044,
+          "packet_count": 62
+        },
+        {
+          "file": "12-scgi.pcapng",
+          "sha256": "bb760229e822fe2fa8f169a0a00a993653b3865c73004d59bb5da07f2a3e6a4f",
+          "size_bytes": 2336,
+          "packet_count": 21
+        },
+        {
+          "file": "13-hessian2.pcapng",
+          "sha256": "d08dae1640619ef065d981fb6b482d628795327420ce67dacb1f94f757397c2f",
+          "size_bytes": 3464,
+          "packet_count": 31
+        },
+        {
+          "file": "14-msgpack-rpc.pcapng",
+          "sha256": "a54caafde804a66ab0658b9438d54ebf8aed3dad55f7d7b6fd3b35c2d18d1765",
+          "size_bytes": 1276,
+          "packet_count": 12
+        },
+        {
+          "file": "15-clickhouse.pcapng",
+          "sha256": "b6a8a531159e55934ec0a0e2e9730debb5b6b9f2cea98c1a8fbe5fa112bde409",
+          "size_bytes": 1168,
+          "packet_count": 11
+        },
+        {
+          "file": "16-bittorrent-dht.pcapng",
+          "sha256": "73d6d75249381dfc0f527e3920fbbc1544a7099c0a1e1aaeeed77da83cd984c1",
+          "size_bytes": 1364,
+          "packet_count": 8
+        },
+        {
+          "file": "17-ms-bits.pcapng",
+          "sha256": "085a22413da7332c09cde747d57f914d506b6426e1ecf940b00d5018abf3e759",
+          "size_bytes": 7328,
+          "packet_count": 65
+        },
+        {
+          "file": "18-consul.pcapng",
+          "sha256": "17b25d86aafb2b968e2bf846bcec79f5125c6054ac40474bfd35e8d0f7c3c8b8",
+          "size_bytes": 5260,
+          "packet_count": 47
+        },
+        {
+          "file": "19-gearman.pcapng",
+          "sha256": "26971ec97e0a280771fb46ea29180a703a42946e3e36832d4d1642d5788986bd",
+          "size_bytes": 2988,
+          "packet_count": 29
+        },
+        {
+          "file": "20-beanstalkd.pcapng",
+          "sha256": "99d7beeb52ba15c2c7112b58036c20d1392606e5eac3c412d6c97613d786766d",
+          "size_bytes": 1576,
+          "packet_count": 15
+        }
+      ]
+    }
+  ]
+}

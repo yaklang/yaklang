@@ -1,0 +1,14 @@
+=== RUN   TestProtocolReviewFullOutput
+    protocol_review_export_test.go:35: ndpi/ndpi-http.pcapng events=2 sha256=1a95517149920617fae854a059a42fc7bc672e1980ecb2d382f3edcf1a2534c6
+    protocol_review_export_test.go:35: ndpi/ndpi-tls.pcap events=6 sha256=f520d4d4ae11a16ff6466de1bc99a97a830c22469cc6f67acb5ad9230af75687
+    protocol_review_export_test.go:35: ndpi/ndpi-mqtt.pcap events=8 sha256=40a97fb9aa38140501d5e82ac8386ae31a934eb00b931014324421fae9bb5526
+    protocol_review_export_test.go:35: ndpi/ndpi-dns.pcap events=4 sha256=0d39dbe21709a3eff306c5ab70ee3f4dcd3d456e143a378813e64b3a2b1245eb
+    protocol_review_export_test.go:35: ndpi/ndpi-cassandra.pcap events=6 sha256=be75b48f983d135ecf6998586e8ec1b345e3271db666c343cbc36d855562925a
+    protocol_review_export_test.go:35: ndpi/ndpi-http-connect.pcap events=76 sha256=c1c275a1ca383a5eb8602842698695de682beaa2a470a67622493e2f91c3f6d4
+    protocol_review_export_test.go:35: wireshark-tests/wireshark-http.pcap events=1 sha256=239e838d4f2f78a563bc014a4b0abaa8be9f1e1ab4c33899964155821d4ba6e2
+    protocol_review_export_test.go:35: google-samples/google-http-ascii.pcap events=12 sha256=1176ecc07bd0fac239bd94967282ecc9f3b3102b0440a01a5633992ed67f1e18
+    protocol_review_export_test.go:35: session/http2-multiplex events=12 sha256=300367fac527a730884bf1a9ce468fff87ec8d2108ce0233346baef8e03db89c
+    protocol_review_export_test.go:35: session/mysql-classic events=14 sha256=93f148391001b8011fccf7433ea7fca318e8389b0b3a1894f7b1e5e8207e115d
+--- PASS: TestProtocolReviewFullOutput (0.04s)
+PASS
+ok  	github.com/yaklang/yaklang/common/pcapx/pcaputil	0.559s

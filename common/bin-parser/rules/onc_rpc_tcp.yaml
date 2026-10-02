@@ -1,0 +1,30 @@
+endian: big
+# TCP record framing is separate from the unframed ONC RPC root entry.
+Package:
+  ONCRPCTCP:
+    operator: |
+      this.ProcessSubNode("Record Mark")
+      rm = getNodeResult("Record Mark").Value
+      n = rm & 0x7fffffff
+      last = (rm & 0x80000000) != 0
+      if n < 8 || n > 1048576 {
+        panic("onc_rpc: invalid record mark")
+      }
+      if last {
+        this.GetSubNode("RPC").SetMaxLength(n)
+        this.ProcessSubNode("RPC")
+        return
+      }
+      this.GetSubNode("Fragment").SetMaxLength(n)
+      this.ProcessSubNode("Fragment")
+      if this.HasMaxLength() && this.GetMaxLength() > this.Length() {
+        rest = this.GetMaxLength() - this.Length()
+        if rest > 0 && rest < 1048576 {
+          this.GetSubNode("More").SetMaxLength(rest)
+          this.ProcessSubNode("More")
+        }
+      }
+    Record Mark: uint32
+    RPC: "import:onc_rpc.yaml;node:ONCRPC"
+    Fragment: raw
+    More: raw
