@@ -2,7 +2,6 @@ package yakvm
 
 import (
 	"context"
-	"fmt"
 	"runtime"
 	"sync"
 	"sync/atomic"
@@ -306,7 +305,7 @@ func (v *VirtualMachine) execYakFunctionWithParentFrame(ctx context.Context, par
 	}
 	err := v.execWithFrameFactory(ctx, parentFrame, frameFactory, func(frame *Frame) {
 		name := f.GetActualName()
-		frame.SetVerbose(fmt.Sprintf("function: %s", name))
+		frame.SetVerbose("function: " + name)
 		frame.SetFunction(f)
 		if f.sourceCode != "" {
 			frame.SetOriginCode(f.sourceCode)

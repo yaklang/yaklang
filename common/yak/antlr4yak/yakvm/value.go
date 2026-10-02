@@ -1064,7 +1064,7 @@ func (v *Value) Int64() int64 {
 func NewValueRef(id int) *Value {
 	return &Value{
 		TypeVerbose: "ref",
-		Literal:     `__symbol_` + fmt.Sprint(id) + `__`,
+		Literal:     `__symbol_` + strconv.Itoa(id) + `__`,
 		SymbolId:    id,
 	}
 }

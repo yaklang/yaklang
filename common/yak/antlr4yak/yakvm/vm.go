@@ -154,12 +154,14 @@ func NewSubFrame(parent *Frame) *Frame {
 }
 
 func NewFrame(vm *VirtualMachine) *Frame {
+	binaryHandlers := buildinBinaryOperatorHandler[vm.config.vmMode]
+	unaryHandlers := buildinUnaryOperatorOperatorHandler[vm.config.vmMode]
 	frame := &Frame{
 		vm:                  vm,
 		codePointer:         0,
-		BinaryOperatorTable: make(map[OpcodeFlag]func(*Value, *Value) *Value),
-		UnaryOperatorTable:  make(map[OpcodeFlag]func(*Value) *Value),
-		GlobalVariables:     limitedmap.NewSafeMap(map[string]any{}),
+		BinaryOperatorTable: make(map[OpcodeFlag]func(*Value, *Value) *Value, len(binaryHandlers)),
+		UnaryOperatorTable:  make(map[OpcodeFlag]func(*Value) *Value, len(unaryHandlers)),
+		GlobalVariables:     vm.runtimeGlobalVar,
 		tryStack:            vmstack.New(),
 		// YakGlobalFunctions:  make(map[string]*Function),
 		iteratorStack:  vmstack.New(),
@@ -171,22 +173,17 @@ func NewFrame(vm *VirtualMachine) *Frame {
 		asyncExecution: &asyncExecution{},
 		ownsThreadID:   true,
 	}
-	if v1, ok := buildinBinaryOperatorHandler[vm.config.vmMode]; ok {
-		for k, v := range v1 {
-			frame.BinaryOperatorTable[k] = v
-		}
+	for k, v := range binaryHandlers {
+		frame.BinaryOperatorTable[k] = v
 	}
-	if v1, ok := buildinUnaryOperatorOperatorHandler[vm.config.vmMode]; ok {
-		for k, v := range v1 {
-			frame.UnaryOperatorTable[k] = v
-		}
+	for k, v := range unaryHandlers {
+		frame.UnaryOperatorTable[k] = v
 	}
 
 	// VM initialization and ImportLibs link runtimeGlobalVar to the immutable
 	// global library chain.
 	// Re-linking that shared SafeMap for every call races under concurrent hooks
 	// and is redundant after engine initialization.
-	frame.GlobalVariables = vm.runtimeGlobalVar
 	frame.hijackMapMemberCallHandlers = vm.hijackMapMemberCallHandlers.loadSnapshot()
 
 	// debug, 将rootScope加入到debugger中

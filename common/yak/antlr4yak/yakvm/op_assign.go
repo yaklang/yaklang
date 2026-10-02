@@ -4,6 +4,42 @@ import (
 	"fmt"
 )
 
+// tryAssignSingle consumes the compiler's scalar variable assignment sequence:
+// OpList(1), OpPushLeftRef, OpList(1), OpAssign. The two lists are only wrappers
+// consumed by assign; bypassing them leaves the same RHS and fresh left ref for
+// Value.Assign, including channel receives and per-binding CallerRef metadata.
+// Function binding, complex left values, other language modes and debugging
+// retain the individual instructions. Compiled Code and Values stay immutable.
+func (v *Frame) tryAssignSingle() bool {
+	if v.codePointer+3 >= len(v.codes) {
+		return false
+	}
+	leftRef := v.codes[v.codePointer+1]
+	leftList := v.codes[v.codePointer+2]
+	assignment := v.codes[v.codePointer+3]
+	if leftRef == nil || leftRef.Opcode != OpPushLeftRef || leftRef.Unary <= 0 ||
+		leftList == nil || leftList.Opcode != OpList || leftList.Unary != 1 ||
+		assignment == nil || assignment.Opcode != OpAssign {
+		return false
+	}
+	right := v.peek()
+	if right == nil || right.IsYakFunction() {
+		return false
+	}
+	// Keep cancellation at the assignment boundary and report any assignment
+	// panic at OpAssign, just as the unfused sequence does.
+	select {
+	case <-v.ctx.Done():
+		v.codePointer = len(v.codes)
+		return true
+	default:
+	}
+	v.codePointer += 3
+	v.pop()
+	NewValueRef(leftRef.Unary).Assign(v, right)
+	return true
+}
+
 // canBindDirectFunctionInPlace recognizes the compiler's single-value direct
 // assignment shape:
 //
