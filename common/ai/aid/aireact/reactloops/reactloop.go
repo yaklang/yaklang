@@ -62,9 +62,11 @@ type ActionRecord struct {
 }
 
 type ReActLoop struct {
-	invoker aicommon.AIInvokeRuntime
-	config  aicommon.AICallerConfigIf
-	emitter *aicommon.Emitter
+	// planStatusProvider reads owner-managed PLAN state for Timeline Open.
+	planStatusProvider func() string
+	invoker            aicommon.AIInvokeRuntime
+	config             aicommon.AICallerConfigIf
+	emitter            *aicommon.Emitter
 
 	maxIterations                 int
 	disableIncreaseIterationCount bool

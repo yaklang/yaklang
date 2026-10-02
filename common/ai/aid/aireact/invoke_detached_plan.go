@@ -23,6 +23,7 @@ const (
 )
 
 type detachedPlanProgress struct {
+	PlanEngine   string `json:"plan_engine,omitempty"`
 	Phase        string `json:"phase"`
 	ReactTaskID  string `json:"react_task_id"`
 	PlanPayload  string `json:"plan_payload"`
@@ -157,7 +158,7 @@ func appendDetachedPlanTaskLines(sb *strings.Builder, tasks []*aid.AiTask, depth
 
 func (r *ReAct) buildRootTaskForDetachedPlan(ctx context.Context, planPayload string, input *aicommon.ExecutePlanInput) (*aid.AiTask, error) {
 	baseOpts := aicommon.ConvertConfigToOptions(r.config)
-	baseOpts = append(baseOpts, aicommon.WithContext(ctx))
+	baseOpts = append(baseOpts, aicommon.WithContext(ctx), aicommon.WithDisableCreateDBRuntime(true))
 	cod, err := newCoordinatorContextForPlanExec(ctx, planPayload, baseOpts...)
 	if err != nil {
 		return nil, utils.Errorf("failed to create coordinator for detached plan: %v", err)
@@ -175,6 +176,7 @@ func (r *ReAct) saveDetachedPlanSession(
 	input *aicommon.ExecutePlanInput,
 ) error {
 	progress := &detachedPlanProgress{
+		PlanEngine:   r.config.GetConfigString("plan_engine"),
 		Phase:        detachedPlanPhasePendingApproval,
 		ReactTaskID:  reactTaskID,
 		PlanPayload:  planPayload,
@@ -243,19 +245,14 @@ func (r *ReAct) HandleSyncTypeExecuteDetachedPlanEvent(event *ypb.AIInputEvent) 
 
 	var detectPlan detachedPlanProgress
 	json.Unmarshal([]byte(record.TaskProgress), &detectPlan)
+	if detectPlan.Phase != detachedPlanPhasePendingApproval && detectPlan.Phase != aid.Phase_PlanReady {
+		r.EmitSyncEventError("execute_detached_plan", errors.New("plan is already executing or is no longer pending approval"), event.SyncID)
+		return nil
+	}
 
 	if sessionID != "" {
 		record.SessionID = sessionID
 	}
-	record.TaskProgress = string(utils.Jsonify(&aid.PlanAndExecProgress{
-		Phase:     aid.Phase_NotCompleted,
-		UpdatedAt: time.Now().Unix(),
-	}))
-	if err := yakit.CreateOrUpdateAISessionPlanAndExec(db, record); err != nil {
-		r.EmitSyncEventError("execute_detached_plan", err, event.SyncID)
-		return nil
-	}
-
 	if input.PlanPayload == "" {
 		input.PlanPayload = detectPlan.PlanPayload
 	}
@@ -271,13 +268,25 @@ func (r *ReAct) HandleSyncTypeExecuteDetachedPlanEvent(event *ypb.AIInputEvent) 
 		PlanData:     input.PlanData,
 		PlanDocument: input.PlanDocument,
 	}
-
-	r.EmitSyncEvent("execute_detached_plan", map[string]any{
-		"started":        true,
-		"session_id":     record.SessionID,
-		"coordinator_id": coordinatorID,
-		"react_task_id":  reactTaskID,
-	}, event.SyncID)
+	// Yakit submits the edited plans.root_task. Validate it before changing the
+	// persisted phase or acknowledging execution, and keep the approved edit.
+	root, err := r.buildRootTaskForDetachedPlan(r.config.GetContext(), input.PlanPayload, approvedInput)
+	if err != nil {
+		r.EmitSyncEventError("execute_detached_plan", err, event.SyncID)
+		return nil
+	}
+	oldTree, oldProgress := record.TaskTree, record.TaskProgress
+	tree, err := json.Marshal(root)
+	if err != nil {
+		r.EmitSyncEventError("execute_detached_plan", err, event.SyncID)
+		return nil
+	}
+	record.TaskTree = string(tree)
+	record.TaskProgress = string(utils.Jsonify(&aid.PlanAndExecProgress{PlanEngine: detectPlan.PlanEngine, Phase: aid.Phase_NotCompleted, UpdatedAt: time.Now().Unix()}))
+	if err := yakit.CreateOrUpdateAISessionPlanAndExec(db, record); err != nil {
+		r.EmitSyncEventError("execute_detached_plan", err, event.SyncID)
+		return nil
+	}
 
 	// Create a recovery task and enqueue it so the QueueProcessor
 	// handles it serially alongside normal free-input tasks.
@@ -296,9 +305,12 @@ func (r *ReAct) HandleSyncTypeExecuteDetachedPlanEvent(event *ypb.AIInputEvent) 
 	})
 	recoveryTask.SetStatus(aicommon.AITaskState_Queueing)
 	if err := r.taskQueue.Append(recoveryTask); err != nil {
+		record.TaskTree, record.TaskProgress = oldTree, oldProgress
+		_ = yakit.CreateOrUpdateAISessionPlanAndExec(db, record)
 		r.EmitSyncEventError("execute_detached_plan", err, event.SyncID)
 		return nil
 	}
+	r.EmitSyncEvent("execute_detached_plan", map[string]any{"started": true, "session_id": record.SessionID, "coordinator_id": coordinatorID, "react_task_id": reactTaskID}, event.SyncID)
 	return nil
 }
 
@@ -354,6 +366,19 @@ func parseExecuteDetachedPlanParams(syncJSON string) (coordinatorID, sessionID, 
 		PlanPayload:  utils.InterfaceToString(params["plan_payload"]),
 		PlanData:     utils.InterfaceToString(params["plan_data"]),
 		PlanDocument: utils.InterfaceToString(params["plan_document"]),
+	}
+	if plans, ok := params["plans"].(map[string]any); ok {
+		if root, exists := plans["root_task"]; exists {
+			object, ok := root.(map[string]any)
+			if !ok || len(object) == 0 {
+				return "", "", "", nil, errors.New("plans.root_task must be a nonempty object")
+			}
+			data, marshalErr := json.Marshal(object)
+			if marshalErr != nil {
+				return "", "", "", nil, marshalErr
+			}
+			input.PlanData = string(data)
+		}
 	}
 	return coordinatorID, sessionID, reactTaskID, input, nil
 }

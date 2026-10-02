@@ -524,9 +524,7 @@ func (r *ReActLoop) ExecuteWithExistedTask(task aicommon.AIStatefulTask) (finalE
 		if clearWatchdogToolHooks != nil {
 			clearWatchdogToolHooks()
 		}
-		if !r.DisablePeriodicVerification {
-			r.stopVerificationWatchdogForTask(task) // 退出循环则停止验证看门狗，因为异步长任务不需要验证
-		}
+		r.stopVerificationWatchdogForTask(task)
 	}()
 
 	done := utils.NewOnce()

@@ -306,6 +306,11 @@ func WithPersistentContextProvider(provider ContextProviderFunc) ReActLoopOption
 	}
 }
 
+// WithPlanStatusProvider places live plan state after Timeline Open and before TODO.
+func WithPlanStatusProvider(provider func() string) ReActLoopOption {
+	return func(r *ReActLoop) { r.planStatusProvider = provider }
+}
+
 func WithOutputExample(example string) ReActLoopOption {
 	return WithOutputExampleContextProvider(func(loop *ReActLoop, nonce string) (string, error) {
 		_, result, err := loop.getRenderValues()

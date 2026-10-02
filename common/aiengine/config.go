@@ -90,9 +90,10 @@ type AIEngineConfig struct {
 	OnSessionID          func(sessionID string)                                                                                 // 会话 ID 就绪回调
 
 	// 高级配置
-	Focus    string // 焦点，用于聚焦某个任务，如 yaklang_code
-	Workdir  string // 工作目录
-	Language string // 响应语言偏好
+	Focus      string // 焦点，用于聚焦某个任务，如 yaklang_code
+	PlanEngine string // PLAN implementation: legacy or coordinator.
+	Workdir    string // 工作目录
+	Language   string // 响应语言偏好
 
 	ExtOptions []aicommon.ConfigOption
 
@@ -103,6 +104,12 @@ type AIEngineConfig struct {
 
 // AIEngineConfigOption 配置选项函数
 type AIEngineConfigOption func(*AIEngineConfig)
+
+// WithPlanEngine selects the coordinator or legacy engine behind existing PLAN
+// entrypoints. The coordinator engine enters its owning loop directly.
+func WithPlanEngine(engine string) AIEngineConfigOption {
+	return func(c *AIEngineConfig) { c.PlanEngine = engine }
+}
 
 // NewAIEngineConfig 创建默认配置
 func NewAIEngineConfig(options ...AIEngineConfigOption) *AIEngineConfig {

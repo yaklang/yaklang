@@ -533,6 +533,9 @@ func (r *ReActLoop) callAIFunctionTransaction(
 	// AIRequestOption is applied for each retry. Keeping the collector scoped to
 	// that request prevents fragments from a rejected attempt entering the next.
 	captureOption := aicommon.AIRequestOption(func(req *aicommon.AIRequest) {
+		if task := r.GetCurrentTask(); task != nil {
+			req.SetTaskIndex(task.GetIndex())
+		}
 		descriptor.resetProviderCompletion()
 		collectorMu.Lock()
 		currentCollector = newCollector()

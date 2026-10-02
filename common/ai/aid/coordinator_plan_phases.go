@@ -185,6 +185,9 @@ func (c *Coordinator) runReportAndFinishPhases() error {
 
 // RunPlanOnly executes the plan loop and user review, then persists plan_ready without running subtasks.
 func (c *Coordinator) RunPlanOnly() error {
+	if c.usesCoordinatorLoop() {
+		return c.runCoordinatorLoopMode(true)
+	}
 	c.planUserStatus("正在准备任务规划", "Preparing task planning", aicommon.WithStatusCode("plan.preparing"))
 
 	c.registerPEModeInputEventCallback()
@@ -203,6 +206,9 @@ func (c *Coordinator) RunPlanOnly() error {
 
 // RunExecuteApprovedPlan executes an in-memory approved plan without running the plan loop.
 func (c *Coordinator) RunExecuteApprovedPlan() error {
+	if c.usesCoordinatorLoop() {
+		return c.runCoordinatorLoop()
+	}
 	c.planUserStatus("正在准备执行计划", "Preparing to execute the plan", aicommon.WithStatusCode("plan.preparing"))
 
 	c.registerPEModeInputEventCallback()
@@ -233,6 +239,9 @@ func (c *Coordinator) RunExecuteApprovedPlan() error {
 
 // RunExecuteOnly executes a previously approved plan (plan_ready in DB) without re-running plan loop.
 func (c *Coordinator) RunExecuteOnly() error {
+	if c.usesCoordinatorLoop() {
+		return c.runCoordinatorLoop()
+	}
 	c.planUserStatus("正在恢复执行方案", "Restoring the execution plan", aicommon.WithStatusCode("plan.recovering"), aicommon.WithStatusState(aicommon.StatusStateRecovering))
 
 	c.registerPEModeInputEventCallback()

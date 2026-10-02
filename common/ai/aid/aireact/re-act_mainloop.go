@@ -259,6 +259,11 @@ func (r *ReAct) selectLoopForTask(task aicommon.AIStatefulTask) (string, string,
 	if focus == "" {
 		focus = schema.AI_REACT_LOOP_NAME_DEFAULT
 	}
+	if r.config.GetConfigString("plan_engine") == "coordinator" {
+		// Selecting the new PLAN engine enters its owning loop directly; an
+		// outer default/planning loop would introduce a third ReAct role.
+		focus = "coordinator"
+	}
 	return parsedQuery, focus, loopOptions
 }
 
