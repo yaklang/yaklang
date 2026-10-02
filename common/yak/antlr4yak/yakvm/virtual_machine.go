@@ -57,8 +57,8 @@ type (
 		BreakPoint    []BreakPointFactoryFun
 		ThreadIDCount uint64 // atomically allocated VM execution thread IDs
 		config        *VirtualMachineConfig
-		// map[sha1(caller, callee)]func(any)any
-		hijackMapMemberCallHandlers sync.Map
+		// Member-call handlers are published as immutable frame snapshots.
+		hijackMapMemberCallHandlers mapMemberCallHandlerRegistry
 		globalVarFallback           func(string) interface{}
 		GetExternalVar              func(name string) (any, bool)
 
@@ -70,7 +70,7 @@ type (
 )
 
 func (n *VirtualMachine) RegisterMapMemberCallHandler(caller, callee string, h func(interface{}) interface{}) {
-	n.hijackMapMemberCallHandlers.Store(utils.CalcSha1(caller, callee), h)
+	n.hijackMapMemberCallHandlers.register(mapMemberCallKey{caller, callee}, h)
 }
 
 func (n *VirtualMachine) RegisterGlobalVariableFallback(h func(string) interface{}) {
