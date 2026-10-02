@@ -311,7 +311,7 @@ type LoopPromptAssemblyInput struct {
 	FrozenUserContext string
 
 	// FrozenPartitions 是业务侧提供的通用 frozen-block 分区。共享模板只识别
-	// FrozenBlockPartition，不直接依赖 planAndExec / FACTS / DOCUMENT 等业务类型。
+	// FrozenBlockPartition，不直接依赖 planAndExec / CONTENT / DOCUMENT 等业务类型。
 	FrozenPartitions []FrozenBlockPartition
 
 	// ForcedSkills 是「用户强制加载」SKILL 的满内容渲染 (含 USER_FORCED_SKILL 边界).

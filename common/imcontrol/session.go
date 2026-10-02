@@ -798,7 +798,7 @@ func (e *Engine) readAgentOutput(sess *imSession, stream AIReActStream) {
 }
 
 // internalTagRe 匹配所有 AITAG 内部标记（<|FINAL_ANSWER_xxx|> ... <|FINAL_ANSWER_END_xxx|>、
-// <|AI_CACHE_xxx|>、<|FACTS_xxx|> 等），这些是 AI agent 的传输层标记，不应展示给 IM 用户。
+// <|AI_CACHE_xxx|> 等），这些是 AI agent 的传输层标记，不应展示给 IM 用户。
 var internalTagRe = regexp.MustCompile(`<\|[A-Z_]+(_[A-Za-z0-9]+)?\|>`)
 
 // cleanIMText 清理发给 IM 用户的消息文本：

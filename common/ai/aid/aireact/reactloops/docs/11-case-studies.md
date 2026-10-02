@@ -12,7 +12,7 @@ reactloops 目录下当前已注册 17 个专注模式。本章给出横向对�
 | [loop_intent](../loop_intent) | 中 | InitTask + OnPostIteraction | 2（query_capabilities, finalize_enrichment） | 否（用 finalize_enrichment 替代） | DeepIntent 实现 | 多 | persistent_instruction + reactive_data | 内部意图识别 |
 | [loop_smart_qa](../loop_smart_qa) | 中 | InitTask | 7（search_knowledge, web_search 等） | 否（用 final_answer） | 否 | 多 | persistent_instruction | 智能问答 |
 | [loop_knowledge_enhance](../loop_knowledge_enhance) | 中 | OnPostIteraction（finalize fallback） | 1（search） | 否 | finalize fallback | 1 | persistent_instruction | 知识库增强 |
-| [loop_plan](../loop_plan) | 高 | InitTask + OnPostIteraction | 8（output_facts, search_knowledge, scan_port 等） | 否（用 finish_exploration） | 多个 LiteForge 步骤生成文档/计划 | 多（含 AITag） | persistent + plan_from_document + guidance_document | 任务规划 |
+| [loop_plan](../loop_plan) | 高 | InitTask + OnPostIteraction | save_evidence、信息收集与规划交接动作 | 否（用 finish_exploration） | 多个 LiteForge 步骤生成文档/计划 | 多（含 AITag） | persistent + plan_from_document + guidance_document | 任务规划 |
 | [loop_http_fuzztest](../loop_http_fuzztest) | 极高 | InitTask + OnPostIteraction | 9（set_http_request, fuzz_method, fuzz_path 等） | 是 | 初始化 + finalize 多次 | 多（AITag + Stream） | persistent + reactive_data + output_example | HTTP 安全模糊测试 |
 | [loop_http_flow_analyze](../loop_http_flow_analyze) | 高 | OnPostIteraction（强制 fallback） | 4（filter, match, get_detail, output_findings） | 是 | finalize fallback | 多 | persistent + reactive_data | HTTP 流量分析 |
 | [loop_code_security_audit](../loop_code_security_audit) | 极高 | InitTask + 多阶段 | 多（phase1 + phase2 扫描） | 是 | 多个 phase 内部 | 多 | persistent + 多 phase | 代码安全审计 |
@@ -166,7 +166,7 @@ finalAnswerAction(r),
 
 ### 关键配置
 
-源码 [loop_plan/init.go:72-176](../loop_plan/init.go)：
+源码 [loop_plan/init.go](../loop_plan/init.go)（以下节选关键配置）：
 
 ```go
 reactloops.WithAllowRAG(false)
@@ -179,11 +179,12 @@ reactloops.WithPersistentContextProvider(func(loop, nonce) (string, error) {
         "Nonce": nonce, "UserInput": ..., "PlanPrompt": planPrompt,
     })
 })
-// AITag 字段：让 LLM 输出 facts 段
-reactloops.WithAITagFieldWithAINodeId(PlanFactsAITagName, ..., aicommon.TypeTextMarkdown),
+// save_evidence 使用公共 action，证据保存到 session timeline。
+// ActionFilter 保留 schema.AI_REACT_LOOP_ACTION_SAVE_EVIDENCE。
 reactloops.WithMaxIterations(PlanMaxIterations),  // 4
-// 8 个 action：
-finishExploration(r), outputFactsAction(r), searchKnowledge(r),
+// 规划入口与信息收集 actions：
+generateDirectPlan(r), beginDeepPlanning(r), finishExploration(r),
+searchKnowledge(r),
 readFileAction(r), findFilesAction(r), grepTextAction(r),
 webSearchAction(r), scanPortAction(r), simpleCrawlerAction(r),
 ```
@@ -208,7 +209,7 @@ if isLastIteration {
 
 `finish_exploration` 触发后，`OnPostIteraction` 会调多个 LiteForge：
 
-1. `generateGuidanceDocument`：把 facts + evidence 转成结构化文档
+1. `generateGuidanceDocument`：根据 session evidence 生成结构化文档
 2. `generatePlanFromDocument`：再把文档转成可执行计划
 3. 流式输出到不同 NodeId
 
@@ -219,7 +220,7 @@ if isLastIteration {
 - **PersistentContextProvider vs PersistentInstruction**：后者是字符串，前者是动态渲染（每轮都跑一次）
 - **末轮强制收尾**：LLM 不主动 finish 时，框架强行剥夺它的选项
 - **多 LiteForge 串联**：复杂的"工程化生成"用 LiteForge 拆步
-- **AITagField 用于结构化 markdown 输出**：facts 段比 JSON 字段流更适合 markdown
+- **共享证据**：规划与执行通过 `save_evidence` 保存证据，由 session Timeline 统一管理和提升。
 
 ---
 

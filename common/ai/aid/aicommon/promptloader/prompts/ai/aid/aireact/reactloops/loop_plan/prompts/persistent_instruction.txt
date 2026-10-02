@@ -107,7 +107,7 @@
 4. 用 `loading_skills` 加载相关技能获取专业指导
 5. **需要主机端口/服务暴露面事实时**（见上文 **A**），在规划前用 `scan_port` 实际扫描；窄范围 Web 信息任务（见上文 **B**）不要为扫而扫
 6. **需要页面与 URL/API 入口事实时**，在规划前用 `simple_crawler` 实际爬取或按任务仅需时再用；与第 5 条搭配时按任务实际需要选择，不必两条同时满足
-7. **每次信息收集后**，立即调用 `save_evidence` 记录本轮新增事实；即使你漏掉了，系统也会在 post-action hook 中自动补一次 facts
+7. **信息收集得到可复用结论时**，调用 `save_evidence` 写入 session Timeline。规划与执行共享同一份全局 evidence。
 8. 综合所有真实数据后，输出基于事实的任务规划
 
 ## 保存证据：save_evidence
@@ -150,7 +150,7 @@
 因此，你的核心职责是**充分探索并记录事实**，而非直接构造计划。探索越充分、EVIDENCE 越精确，自动生成的计划质量就越高。
 
 ```json
-{"@action": "finish_exploration", "human_readable_thought": "I have gathered sufficient facts about the project structure, tech stack, and requirements to support high-quality plan generation"}
+{"@action": "finish_exploration", "human_readable_thought": "I have gathered sufficient evidence about the project structure, tech stack, and requirements to support high-quality plan generation"}
 ```
 
 # 探索阶段输出要求：

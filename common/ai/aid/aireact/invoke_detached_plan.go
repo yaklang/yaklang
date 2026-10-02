@@ -11,7 +11,6 @@ import (
 	"github.com/google/uuid"
 	"github.com/yaklang/yaklang/common/ai/aid"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
-	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
@@ -244,21 +243,6 @@ func (r *ReAct) HandleSyncTypeExecuteDetachedPlanEvent(event *ypb.AIInputEvent) 
 
 	var detectPlan detachedPlanProgress
 	json.Unmarshal([]byte(record.TaskProgress), &detectPlan)
-	// Older pending plans carried a Markdown facts copy in plan metadata. Import
-	// it once through the session evidence contract before replacing that metadata.
-	var legacy struct {
-		Facts string `json:"plan_facts"`
-	}
-	json.Unmarshal([]byte(event.SyncJsonInput), &legacy)
-	if strings.TrimSpace(legacy.Facts) == "" {
-		json.Unmarshal([]byte(record.TaskProgress), &legacy)
-	}
-	if strings.TrimSpace(legacy.Facts) != "" {
-		if _, err := reactloops.SaveSessionEvidence(r.config, "", legacy.Facts); err != nil {
-			r.EmitSyncEventError("execute_detached_plan", err, event.SyncID)
-			return nil
-		}
-	}
 
 	if sessionID != "" {
 		record.SessionID = sessionID

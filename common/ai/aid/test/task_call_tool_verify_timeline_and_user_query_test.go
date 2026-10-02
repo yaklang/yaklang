@@ -149,10 +149,6 @@ func TestAITaskCallToolStdOut_VerifyTimelineAndUserQuery(t *testing.T) {
 				return rsp, err
 			}
 
-			if isPlanFactsHookPrompt(prompt) {
-				return mockedToolCalling(i, r, "print", fmt.Sprintf(`{"@action": "call-tool", "tool": "print", "params": {"output": "%s","err":"%s"}}`, outputToken, errToken))
-			}
-
 			if !strings.Contains(prompt, userRawInput) {
 				fmt.Println(prompt)
 				t.Fatal("no user raw input found in prompt")

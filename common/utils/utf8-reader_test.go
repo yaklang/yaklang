@@ -381,7 +381,7 @@ func TestUTF8PeekableReader_PeekOnePreservesChinese(t *testing.T) {
 }
 
 func TestUTF8PeekableReader_PeekOneThenExpandWindow(t *testing.T) {
-	text := "\"<|FACTS_CURRENT_NONCE|>中文内容<|FACTS_END_CURRENT_NONCE|>\""
+	text := "\"<|CONTENT_CURRENT_NONCE|>中文内容<|CONTENT_END_CURRENT_NONCE|>\""
 	reader := NewUTF8PeekableReader(&mockBytewiseReader{data: []byte(text)})
 
 	first, err := reader.Peek(1)
@@ -396,7 +396,7 @@ func TestUTF8PeekableReader_PeekOneThenExpandWindow(t *testing.T) {
 	if err != nil && err != io.EOF {
 		t.Fatalf("unexpected second peek error: %v", err)
 	}
-	if !strings.HasPrefix(string(window), "\"<|FACTS_CURRENT_NONCE|>") {
+	if !strings.HasPrefix(string(window), "\"<|CONTENT_CURRENT_NONCE|>") {
 		t.Fatalf("unexpected expanded peek content: %q", string(window))
 	}
 

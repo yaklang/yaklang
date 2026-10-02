@@ -108,7 +108,6 @@ Timeline 两处压缩和 Interval Review 已统一通过 `ScheduleAuxiliaryTask 
 | `knowledge-compress-bench` | Knowledge Bench 压缩 | `Config.ScheduleAuxiliaryTask` |
 | `select_knowledge_base` | 知识库选择 | `Config.ScheduleAuxiliaryTask` |
 | `evaluate-next-search` | 知识增强搜索评估 | `Config.ScheduleAuxiliaryTask` |
-| `plan_facts_hook` | Plan Facts 增量维护 | `Config.ScheduleAuxiliaryTask` |
 | `plan_direct` | Speed 模型直接计划生成 | `Config.ScheduleAuxiliaryTask` |
 | `analyze-requirement-and-search` | SyntaxFlow/Yaklang InitTask | `Config.ScheduleAuxiliaryTask` |
 | `extract-ranked-lines` | Yaklang 示例片段抽取 | `Config.ScheduleAuxiliaryTask` |

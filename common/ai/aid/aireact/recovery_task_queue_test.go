@@ -261,7 +261,6 @@ func TestAIStatefulTaskBase_RecoveryData_WithExecutePlanInput(t *testing.T) {
 	input := &aicommon.ExecutePlanInput{
 		PlanPayload:  "test payload",
 		PlanData:     "test data",
-		PlanFacts:    "test facts",
 		PlanDocument: "test doc",
 	}
 	data := &aicommon.RecoveryTaskData{
@@ -331,7 +330,6 @@ func TestRecoveryTaskData_JSONRoundTrip(t *testing.T) {
 		ExecutePlanInput: &aicommon.ExecutePlanInput{
 			PlanPayload:  "payload-json",
 			PlanData:     "data-json",
-			PlanFacts:    "facts-json",
 			PlanDocument: "doc-json",
 		},
 	}

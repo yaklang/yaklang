@@ -43,7 +43,6 @@ func TestPublishDetachedPlan_PersistsSessionAndEmitsEvent(t *testing.T) {
 	input := &aicommon.ExecutePlanInput{
 		PlanPayload:  "user query",
 		PlanData:     planData,
-		PlanFacts:    "facts",
 		PlanDocument: "document",
 	}
 
@@ -101,7 +100,6 @@ func TestFormatDetachedPlanTimelineContent_IncludesNestedTasks(t *testing.T) {
 		&aicommon.ExecutePlanInput{
 			PlanPayload:  "user query",
 			PlanData:     `{"@action":"plan","main_task":"main-plan"}`,
-			PlanFacts:    "facts",
 			PlanDocument: "document",
 		},
 	)
@@ -109,7 +107,6 @@ func TestFormatDetachedPlanTimelineContent_IncludesNestedTasks(t *testing.T) {
 	require.Contains(t, content, "# main-plan")
 	require.Contains(t, content, "- parent-task")
 	require.Contains(t, content, "- child-task")
-	require.Contains(t, content, "## plan_facts")
 	require.Contains(t, content, "## plan_document")
 	require.Contains(t, content, "## plan_data")
 }
@@ -155,7 +152,6 @@ func TestHandleSyncTypeExecuteDetachedPlanEvent_UsesRecoveryPath(t *testing.T) {
 	input := &aicommon.ExecutePlanInput{
 		PlanPayload:  "user query",
 		PlanData:     planData,
-		PlanFacts:    "facts",
 		PlanDocument: "document",
 	}
 	coordinatorID, err := reactIns.PublishDetachedPlan(context.Background(), input, "react-task-async")
@@ -171,7 +167,6 @@ func TestHandleSyncTypeExecuteDetachedPlanEvent_UsesRecoveryPath(t *testing.T) {
 		"react_task_id":  "react-task-async",
 		"plan_payload":   input.PlanPayload,
 		"plan_data":      input.PlanData,
-		"plan_facts":     input.PlanFacts,
 		"plan_document":  input.PlanDocument,
 	})
 	require.NoError(t, err)

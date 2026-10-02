@@ -1,7 +1,7 @@
 Current Time: {{ .CurrentTime }}  OS/Arch: {{ .OSArch }}
 {{ if .WorkingDir }}Working Dir: {{ .WorkingDir }}{{ end }}
 
-You are generating a structured execution plan based on a guidance document and verified facts.
+You are generating a structured execution plan based on a guidance document and verified evidence.
 
 ## Language Rule
 

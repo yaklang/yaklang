@@ -629,7 +629,7 @@ func TestReAct_ForgeExecution_Task_UserQueryContext(t *testing.T) {
 
 			// ReAct main loop - match action keywords that are always in the JSON schema
 			if isPrimaryDecisionPrompt(prompt) &&
-				!utils.MatchAllOfSubString(prompt, "PROGRESS_TASK_") {
+				!utils.MatchAllOfSubString(prompt, "PLAN_STATUS_") {
 				log.Infof("✓ User query found in ReAct main loop prompt")
 
 				rsp := i.NewAIResponse()
@@ -661,7 +661,7 @@ func TestReAct_ForgeExecution_Task_UserQueryContext(t *testing.T) {
 				rsp.Close()
 				return rsp, nil
 			}
-			if utils.MatchAllOfSubString(prompt, planFlag, "PROGRESS_TASK_") {
+			if utils.MatchAllOfSubString(prompt, planFlag, "PLAN_STATUS_") {
 				hasUserQueryFoundInTaskExec = strings.Contains(prompt, userOriginalQuery)
 				hasAIQueryFoundInTaskExec = strings.Contains(prompt, aiGeneratedQuery)
 				rsp := i.NewAIResponse()
@@ -671,7 +671,7 @@ func TestReAct_ForgeExecution_Task_UserQueryContext(t *testing.T) {
 				finishedCh <- true
 				return rsp, nil
 			}
-			if utils.MatchAllOfSubString(prompt, "任务执行引擎", "task_long_summary") && !utils.MatchAllOfSubString(prompt, "PROGRESS_TASK_") {
+			if utils.MatchAllOfSubString(prompt, "任务执行引擎", "task_long_summary") && !utils.MatchAllOfSubString(prompt, "PLAN_STATUS_") {
 				rsp := i.NewAIResponse()
 				rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "summary", "status_summary": "done", "task_short_summary": "completed", "task_long_summary": "task completed"}`))
 				rsp.Close()

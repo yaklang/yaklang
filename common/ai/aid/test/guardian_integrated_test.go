@@ -68,11 +68,6 @@ func mockedToolCalling(i aicommon.AICallerConfigIf, req *aicommon.AIRequest, too
 		return rsp, nil
 	}
 
-	if isPlanFactsHookPrompt(prompt) {
-		rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "plan_facts_hook", "facts": ""}`))
-		return rsp, nil
-	}
-
 	if isPlanReviewLiteForgePrompt(prompt) {
 		rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "plan_review", "suggestion": "continue", "reason": "继续执行。"}`))
 		return rsp, nil

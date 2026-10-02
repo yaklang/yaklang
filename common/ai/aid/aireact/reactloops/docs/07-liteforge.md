@@ -222,7 +222,7 @@ state.OneLinerSummary = action.GetString("summary")
 
 ### D. 计划生成
 
-[loop_plan/generate_document_and_plan.go](../loop_plan/generate_document_and_plan.go) / [loop_plan/facts.go](../loop_plan/facts.go) 一系列 LiteForge 步骤生成正式的多步任务计划。
+[loop_plan/generate_document_and_plan.go](../loop_plan/generate_document_and_plan.go) 一系列 LiteForge 步骤生成正式的多步任务计划。
 
 ### F. HTTP fuzz 初始化
 

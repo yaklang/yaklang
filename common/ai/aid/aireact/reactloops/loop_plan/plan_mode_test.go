@@ -22,18 +22,6 @@ func TestBuildPlanDataFromLiteForgeAction(t *testing.T) {
 	assert.Contains(t, planData, "请求目标")
 }
 
-func TestBootstrapFactsFromUserInput(t *testing.T) {
-	got := bootstrapFactsFromUserInput("  hello world  ")
-	assert.Contains(t, got, "## 用户需求")
-	assert.Contains(t, got, "hello world")
-}
-
-func TestShouldAutoFactsForAction_DirectPlanExcluded(t *testing.T) {
-	assert.False(t, shouldAutoFactsForAction("generate_direct_plan"))
-	assert.False(t, shouldAutoFactsForAction("begin_deep_planning"))
-	assert.False(t, shouldAutoFactsForAction("finish_exploration"))
-}
-
 func TestShouldEnterDeepPlanModeFromAction(t *testing.T) {
 	assert.True(t, shouldEnterDeepPlanModeFromAction("read_file"))
 	assert.True(t, shouldEnterDeepPlanModeFromAction("finish_exploration"))
