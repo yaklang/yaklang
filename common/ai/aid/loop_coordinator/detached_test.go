@@ -13,8 +13,9 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
-	"github.com/yaklang/yaklang/common/ai/aid"
+
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
+	"github.com/yaklang/yaklang/common/ai/aid/loop_coordinator"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
@@ -49,7 +50,7 @@ func TestCoordinatorLoopDetachedNativeApprovalAndRecovery(t *testing.T) {
 			events = append(events, &copy)
 		}),
 	}
-	initialOptions := append(append([]aicommon.ConfigOption(nil), options...), aid.WithCoordinatorLoop(true), aicommon.WithAICallback(func(c aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+	initialOptions := append(append([]aicommon.ConfigOption(nil), options...), aicommon.WithAICallback(func(c aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 		switch calls.Add(1) {
 		case 1:
 			return nativeResponse(c, req, "create_plan", map[string]any{"plan": map[string]any{"name": "Detached", "goal": "Execute only after approval", "tasks": []any{map[string]any{"name": "Check", "goal": "Original task brief", "identifier": "check", "depends_on": []string{}}}}, "plan_document": "# Pending document"})
@@ -62,7 +63,7 @@ func TestCoordinatorLoopDetachedNativeApprovalAndRecovery(t *testing.T) {
 			return nativeResponse(c, req, "finish", map[string]any{})
 		}
 	}))
-	initial, err := aid.NewCoordinatorContext(ctx, "Prepare a detached plan", initialOptions...)
+	initial, err := loop_coordinator.NewSession(ctx, "Prepare a detached plan", initialOptions...)
 	require.NoError(t, err)
 	initial.Config.BaseCheckpointableStorage = aicommon.NewCheckpointableStorageWithDB(initial.GetRuntimeId(), db)
 	require.NoError(t, initial.RunPlanOnly())
@@ -120,12 +121,12 @@ func TestCoordinatorLoopDetachedNativeApprovalAndRecovery(t *testing.T) {
 		}
 	}))
 	// A legacy client does not send an engine selector on recovery.
-	resumed, err := aid.NewCoordinatorContext(ctx, "Execute the approved edit", resumeOptions...)
+	resumed, err := loop_coordinator.NewSession(ctx, "Execute the approved edit", resumeOptions...)
 	require.NoError(t, err)
 	resumed.Config.BaseCheckpointableStorage = aicommon.NewCheckpointableStorageWithDB(resumed.GetRuntimeId(), db)
 	root, err := resumed.BuildRootTaskFromPlanData(string(editedJSON), "Execute the approved edit")
 	require.NoError(t, err)
-	require.Equal(t, "coordinator", resumed.GetConfigString("plan_engine"))
+	require.NotNil(t, resumed.LiteForgeExecutor)
 	require.NoError(t, resumed.CommitApprovedPlan(root, "# Approved edited document"))
 	require.NoError(t, resumed.RunExecuteApprovedPlan())
 	require.Equal(t, int64(2), workerCalls.Load())

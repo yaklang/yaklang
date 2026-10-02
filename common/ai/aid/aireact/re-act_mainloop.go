@@ -259,11 +259,7 @@ func (r *ReAct) selectLoopForTask(task aicommon.AIStatefulTask) (string, string,
 	if focus == "" {
 		focus = schema.AI_REACT_LOOP_NAME_DEFAULT
 	}
-	if r.config.GetConfigString("plan_engine") == "coordinator" {
-		// Selecting the new PLAN engine enters its owning loop directly; an
-		// outer default/planning loop would introduce a third ReAct role.
-		focus = "coordinator"
-	}
+
 	return parsedQuery, focus, loopOptions
 }
 
@@ -333,6 +329,9 @@ func (r *ReAct) ExecuteLoopTaskIF(taskTypeName string, task aicommon.AIStatefulT
 }
 
 func (r *ReAct) ExecuteLoopTask(taskTypeName string, task aicommon.AIStatefulTask, options ...reactloops.ReActLoopOption) (bool, error) {
+	if taskTypeName == "coordinator" || taskTypeName == "coordinator_legacy" {
+		return false, r.invokeCoordinatorChannel(taskTypeName, make(chan struct{}), task.GetContext(), WithInvokePlanAndExecuteTask(task), WithInvokePlanAndExecutePlanPayload(task.GetUserInput()))
+	}
 	memoryFlushBuffer := aicommon.NewMemoryFlushBuffer("react", r.config.TimelineDiffer, nil)
 	defer memoryFlushBuffer.Close()
 	defaultOptions := reactloops.BasicAICommonConfigOption(r.config)

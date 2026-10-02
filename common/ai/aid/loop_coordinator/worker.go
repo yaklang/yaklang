@@ -15,7 +15,7 @@ import (
 // planners, specialized loops, blueprints or generic subagent runtimes.
 func NewWorkerLoop(r aicommon.AIInvokeRuntime, opts ...reactloops.ReActLoopOption) (*reactloops.ReActLoop, error) {
 	if cfg, ok := r.GetConfig().(*aicommon.Config); ok {
-		_ = aicommon.WithPlanEngine(Name)(cfg)
+		_ = aicommon.WithLiteForgeExecutor(executeNativeHelper)(cfg)
 		_ = aicommon.WithEnableFunctionCallMode(true)(cfg)
 		_ = aicommon.WithAiAgreeRiskControl(NativeRiskReview)(cfg)
 	}

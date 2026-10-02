@@ -1,5 +1,5 @@
-// Package loop_coordinator owns PLAN control operations. It deliberately does
-// not import aid: the legacy Coordinator supplies the execution and UI bridge.
+// Package loop_coordinator owns the native PLAN runtime, scheduler and Yakit
+// adapter. It does not depend on the legacy aid.Coordinator implementation.
 package loop_coordinator
 
 import (

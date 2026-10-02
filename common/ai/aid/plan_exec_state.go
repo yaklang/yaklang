@@ -4,7 +4,6 @@ import (
 	"time"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
-	"github.com/yaklang/yaklang/common/ai/aid/loop_coordinator"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
@@ -17,22 +16,20 @@ const (
 )
 
 type PlanAndExecProgress struct {
-	PlanEngine       string                     `json:"plan_engine,omitempty"`
-	CoordinatorState *loop_coordinator.Snapshot `json:"coordinator_state,omitempty"`
-	TotalTasks       int                        `json:"total_tasks"`
-	CompletedTasks   int                        `json:"completed_tasks"`
-	SkippedTasks     int                        `json:"skipped_tasks"`
-	AbortedTasks     int                        `json:"aborted_tasks"`
-	TotalStages      int                        `json:"total_stages"`
-	CompletedStages  int                        `json:"completed_stages"`
-	CurrentStage     int                        `json:"current_stage"`
-	CurrentIndex     int                        `json:"current_index"`
-	CurrentTaskID    string                     `json:"current_task_id"`
-	CurrentTask      string                     `json:"current_task"`
-	CurrentGoal      string                     `json:"current_goal"`
-	ActiveTaskIDs    []string                   `json:"active_task_ids,omitempty"`
-	Phase            string                     `json:"phase"`
-	UpdatedAt        int64                      `json:"updated_at"`
+	TotalTasks      int      `json:"total_tasks"`
+	CompletedTasks  int      `json:"completed_tasks"`
+	SkippedTasks    int      `json:"skipped_tasks"`
+	AbortedTasks    int      `json:"aborted_tasks"`
+	TotalStages     int      `json:"total_stages"`
+	CompletedStages int      `json:"completed_stages"`
+	CurrentStage    int      `json:"current_stage"`
+	CurrentIndex    int      `json:"current_index"`
+	CurrentTaskID   string   `json:"current_task_id"`
+	CurrentTask     string   `json:"current_task"`
+	CurrentGoal     string   `json:"current_goal"`
+	ActiveTaskIDs   []string `json:"active_task_ids,omitempty"`
+	Phase           string   `json:"phase"`
+	UpdatedAt       int64    `json:"updated_at"`
 }
 
 func (c *Coordinator) savePlanAndExecState(phase string, currentTask *AiTask) {
@@ -82,7 +79,6 @@ func (c *Coordinator) buildPlanAndExecProgress(root *AiTask, currentTask *AiTask
 	}
 
 	progress := &PlanAndExecProgress{
-		PlanEngine:      c.GetConfigString("plan_engine"),
 		TotalTasks:      total,
 		CompletedTasks:  completed,
 		SkippedTasks:    skipped,
@@ -94,10 +90,6 @@ func (c *Coordinator) buildPlanAndExecProgress(root *AiTask, currentTask *AiTask
 		ActiveTaskIDs:   snapshot.activeTaskIDs,
 		Phase:           phase,
 		UpdatedAt:       time.Now().Unix(),
-	}
-	if c.coordinatorLoop != nil {
-		state := c.coordinatorLoop.controller.Snapshot()
-		progress.CoordinatorState = &state
 	}
 
 	if c.runtime != nil {

@@ -206,6 +206,9 @@ type Config struct {
 	*/
 	AICallbacks *AICallbacks
 
+	// Optional per-runtime helper implementation; the default uses the registered LiteForge.
+	LiteForgeExecutor LiteForgeExecuteCallback
+
 	// userUsageCallback 由用户脚本通过 ai.usageCallback(...) 注册并经
 	// aiengine.WithAIConfig 透传. Tiered AI 路径
 	// (GetXxxAIModelCallback -> CreateCallbackFromConfig) 重新构造 callback 时
@@ -2517,19 +2520,6 @@ func WithPlanExecTaskConcurrency(n int) ConfigOption {
 	}
 }
 
-// WithPlanEngine selects the PLAN control engine without changing client RPCs.
-// Selection is carried into PLAN clones, while execution workers explicitly
-// disable nested planning. Existing callers retain the legacy engine.
-func WithPlanEngine(engine string) ConfigOption {
-	return func(c *Config) error {
-		if engine != "legacy" && engine != "coordinator" {
-			return utils.Errorf("unknown plan engine %q", engine)
-		}
-		c.SetConfig("plan_engine", engine)
-		return nil
-	}
-}
-
 func WithHijackPERequest(fn func(ctx context.Context, planPayload string) error) ConfigOption {
 	return func(c *Config) error {
 		if c.m == nil {
@@ -4384,14 +4374,10 @@ func ConvertConfigToOptions(i *Config) []ConfigOption {
 	if i.ToolComposeConcurrency > 0 {
 		opts = append(opts, WithToolComposeConcurrency(i.ToolComposeConcurrency))
 	}
+	if i.LiteForgeExecutor != nil {
+		opts = append(opts, WithLiteForgeExecutor(i.LiteForgeExecutor))
+	}
 	if i.KeyValueConfig != nil {
-		if i.HaveConfig("plan_engine") {
-			opts = append(opts, WithPlanEngine(i.GetConfigString("plan_engine")))
-		}
-		if i.HaveConfig("coordinator_parent_id") {
-			parentID := i.GetConfigString("coordinator_parent_id")
-			opts = append(opts, func(c *Config) error { c.SetConfig("coordinator_parent_id", parentID); return nil })
-		}
 		if i.HaveConfig(ConfigKeyToolBatchMaxCalls) {
 			opts = append(opts, WithToolBatchMaxCalls(i.GetConfigInt(ConfigKeyToolBatchMaxCalls, DefaultToolBatchMaxCalls)))
 		}
@@ -4619,8 +4605,8 @@ func (c *Config) invokeSpeedPriorityLiteForge(prompt string, opts ...any) (*Forg
 func (c *Config) invokeLiteForgeWithCallback(prompt string, callback AICallbackType, opts ...any) (*ForgeResult, error) {
 	opts = append(opts, WithFastAICallback(callback))
 	opts = append(opts, WithDisableCreateDBRuntime(true)) // Avoid creating runtime records for lite forge calls
-	if c.GetConfigString("plan_engine") == "coordinator" {
-		opts = append(opts, WithPlanEngine("coordinator"), WithEnableFunctionCallMode(true))
+	if c.LiteForgeExecutor != nil {
+		return c.LiteForgeExecutor(prompt, opts...)
 	}
 	return InvokeLiteForge(prompt, opts...)
 }

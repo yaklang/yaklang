@@ -16,10 +16,6 @@ import (
 )
 
 func (c *Coordinator) ExecuteLoopTask(taskTypeName string, task aicommon.AIStatefulTask, options ...reactloops.ReActLoopOption) error {
-	return c.executeLoopTask(taskTypeName, task, nil, options...)
-}
-
-func (c *Coordinator) executeLoopTask(taskTypeName string, task aicommon.AIStatefulTask, factory reactloops.LoopFactory, options ...reactloops.ReActLoopOption) error {
 	memoryFlushDiffer := c.timelineDifferForTask(task)
 	memoryFlushBuffer := aicommon.NewMemoryFlushBuffer("coordinator", memoryFlushDiffer, nil)
 	defer memoryFlushBuffer.Close()
@@ -27,9 +23,6 @@ func (c *Coordinator) executeLoopTask(taskTypeName string, task aicommon.AIState
 	inputChannel := chanx.NewUnlimitedChan[*ypb.AIInputEvent](taskCtx, 10)
 	uid := uuid.NewString()
 	c.InputEventManager.RegisterMirrorOfAIInputEvent(uid, func(event *ypb.AIInputEvent) {
-		if c.GetConfigString("plan_engine") == "coordinator" && event.SyncType == aicommon.SYNC_TYPE_USER_INTERVENTION {
-			return // The owning session has already journaled this shared input.
-		}
 		go func() {
 			switch event.SyncType {
 			case "queue_info":
@@ -45,7 +38,6 @@ func (c *Coordinator) executeLoopTask(taskTypeName string, task aicommon.AIState
 	ctx, cancel := context.WithCancel(taskCtx)
 	defer cancel()
 	hotpatchChan := c.Config.HotPatchBroadcaster.Subscribe()
-	defer c.Config.HotPatchBroadcaster.Unsubscribe(hotpatchChan)
 	baseOpts := aicommon.ConvertConfigToOptions(c.Config)
 	if peTask, ok := task.(*AiTask); ok && peTask.timelineFork != nil && peTask.timelineFork.Branch != nil {
 		baseOpts = append(baseOpts, aicommon.WithTimeline(peTask.timelineFork.Branch))
@@ -137,12 +129,10 @@ func (c *Coordinator) executeLoopTask(taskTypeName string, task aicommon.AIState
 
 	defaultOptions = append(defaultOptions, options...)
 
-	var mainloop *reactloops.ReActLoop
-	if factory != nil {
-		mainloop, err = factory(invoker, defaultOptions...)
-	} else {
-		mainloop, err = reactloops.CreateLoopByName(taskTypeName, invoker, defaultOptions...)
-	}
+	mainloop, err := reactloops.CreateLoopByName(
+		taskTypeName, invoker,
+		defaultOptions...,
+	)
 	if err != nil {
 		return utils.Errorf("failed to create main loop runtime instance: %v", err)
 	}

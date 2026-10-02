@@ -204,6 +204,7 @@ func (r *ReAct) UnregisterMirrorOfAIInputEvent(id string) {
 func NewReAct(opts ...aicommon.ConfigOption) (*ReAct, error) {
 	configLoadingStart := time.Now()
 	cfg := aicommon.NewConfig(context.Background(), opts...)
+	configureCoordinatorChannel(cfg)
 
 	// Extract built-in skills to ~/yakit-projects/ai-skills/ only when auto-skills
 	// are enabled, then load from the local directory so users can modify them on disk.

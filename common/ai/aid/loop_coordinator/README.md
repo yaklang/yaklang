@@ -2,15 +2,17 @@
 
 `coordinator` 是新的 PLAN 引擎和专注模式。它负责探索、计划文档、用户审批、任务调度、等待、验收、重试和报告；`pe_task` 执行批准的任务书。新引擎只有这两种 ReAct 循环，均强制使用原生 `tool_calls`，不能通过配置切换到 JSON 响应动作，也不会回退到旧 PLAN/replan/task-review/report 循环。
 
-这个目录包括控制对象、模型 actions、worker 工厂、工具权限、审批辅助调用以及测试。现有 `aid.Coordinator` 提供运行宿主，通过 [coordinator_loop.go](../coordinator_loop.go) 适配 Yakit 事件、交互端点、输入控制、session Timeline 和持久化。它不只是一个提示词专注模式。
+这个目录独立拥有 [Session](session.go)、计划树与 DAG、控制对象、模型 actions、worker、工具权限、原生辅助调用，以及 [Yakit 事件和存储适配](session_events.go)。新运行体不构造或调用 `aid.Coordinator`、旧 `AiTask`、旧 PLAN runtime，也不借用旧 LiteForge 构造通道。
+
+最上层在 [coordinator.go](../aireact/coordinator.go) 选择 `coordinator` 或 `coordinator_legacy`。旧分支位于 [coordinator_legacy.go](../aireact/coordinator_legacy.go)，只调用原有 `aid.Coordinator`。两边共享 aicommon、reactloops、Timeline、事件封套和数据库表这些通用基础设施，不共享执行状态机。
 
 ## 启用与替换
 
 旧引擎仍是默认值；迁移调用方只需选择 `coordinator`，不修改 protobuf 或前端。选择新引擎后，普通 ReAct 输入直接进入协调员循环。执行任务、恢复和 PLAN-only 入口也使用同一协调循环。
 
 ```go
-// 保留原来的 Coordinator.Run / RunPlanOnly / RunExecuteApprovedPlan 等入口。
-c, err := aid.NewCoordinatorContext(ctx, query, aid.WithCoordinatorLoop(true), options...)
+// 显式构造新运行体；AIRuntimeInvokerGetter 由 aireact 注册。
+c, err := loop_coordinator.NewSession(ctx, query, options...)
 if err != nil { return err }
 return c.Run()
 ```
@@ -18,16 +20,16 @@ return c.Run()
 ```yak
 err = aim.InvokeReAct(
     "读取目录，规划并执行两个有依赖的验证任务，逐项验收后写报告。",
-    aim.planEngine("coordinator"),
+    aim.focus("coordinator"),
     aim.maxIteration(30),
     aim.reviewPolicy("yolo"),
 )
 die(err)
 ```
 
-也可以选 `aim.focus("coordinator")`；它同样强制 native function call。`EnablePlan=false` 禁止从该 focus 开启 PLAN。工具的原有人工/AI/YOLO 策略继续生效，AI 风险评估使用一次原生 `review_risk` 调用。Timeline 压缩、附件提取等继承新引擎的单步辅助输出也使用原生函数调用，不新增 ReAct 角色。
+`aim.focus("coordinator_legacy")` 直接进入旧版；`aim.planEngine("coordinator")` / `aim.planEngine("coordinator_legacy")` 保留为 focus 的入口别名。新分支强制 native function call。`EnablePlan=false` 禁止从该 focus 开启 PLAN。工具的原有人工/AI/YOLO 策略继续生效，AI 风险评估使用一次原生 `review_risk` 调用。Timeline 压缩、附件提取等继承新引擎的单步辅助输出也使用原生函数调用，不新增 ReAct 角色。
 
-`aim.planEngine("legacy")` / `aid.WithCoordinatorLoop(false)` 可以显式选择旧路径。记录中的 `plan_engine` 与 `coordinator_state` 使旧客户端的恢复请求能够找回对应引擎。
+旧 `aid.NewCoordinatorContext` 始终构造旧运行体，不再接受新引擎替换开关。兼容别名 `aim.planEngine("legacy")` 映射 `coordinator_legacy`。运行 Config 不传递 `plan_engine`；该字段只保留在持久化协议中，与 `coordinator_state` 一起让外层恢复路由找回原版本。旧记录不隐式导入新调度器，新快照也不回退到旧恢复逻辑。
 
 ## 模型 actions
 
@@ -81,7 +83,7 @@ worker 的 `submit_task_result(summary, artifacts?, evidence_ids?)` 提交结果
 
 `wait_tasks` 使用通知等待。用户交互、计划修改或尝试替换会让等待返回，协调员重新评估。`all` 不能等待尚未派发的任务；不能把还未获验收的依赖当成已完成。
 
-`user_intervention` 由会话宿主写入共享 Timeline 后再通知协调员，不重复转交给每个 worker 记录。普通 `FreeInput` 保持外层队列语义，供下一任务执行。要求报告时由 `write_report` 完成；已有 `ResultHandler` 仍优先负责收尾。
+`user_intervention` 由会话宿主写入共享 Timeline 后再通知协调员，不重复转交给每个 worker 记录。普通 `FreeInput` 保持外层队列语义，供下一任务执行。新运行体要求报告时由 `write_report` 完成。旧 `CoordinatorOption` / `ResultHandler` 只属于旧版，不注入新运行体。
 
 ## 工具边界与上下文
 
@@ -121,10 +123,12 @@ PLAN STATUS 包含草稿/批准版本、逻辑 task ID、状态、尝试和结�
 
 ```powershell
 go test ./common/ai/aid/loop_coordinator -count=1
-go test ./common/ai/aid ./common/ai/aid/aireact -run 'TestCoordinatorRecovery|TestCoordinatorDetached|TestPublishDetachedPlan|TestHandleSyncTypeExecuteDetachedPlanEvent' -count=1
+go test ./common/ai/aid ./common/ai/aid/aireact -run 'TestCoordinator|TestPublishDetachedPlan|TestHandleSyncTypeExecuteDetachedPlanEvent|TestReAct_RecoveryPlanAndExec' -count=1
 ```
 
-[native_coordinator.yak](smoke/native_coordinator.yak) 由测试通过真实 Yak 引擎执行，调用 `aim.InvokeReAct`。只有模型 provider 使用可重复的原生函数调用响应；协调员、worker、审批、Timeline、报告和 Yakit 事件适配均运行实际代码。测试核对真实文件读取、两个有依赖的任务、共享 evidence、逐项验收、push/pop、报告文件及两种 loop_marker。另有实际 AID detached 提交、编辑、引擎恢复及执行测试，以及干预入 Timeline 后通知的时序测试。
+[native_coordinator.yak](smoke/native_coordinator.yak) 由测试通过真实 Yak 引擎执行，调用 `aim.InvokeReAct`。只有模型 provider 使用可重复的原生函数调用响应；协调员、worker、审批、Timeline、报告和 Yakit 事件适配均运行实际代码。测试核对真实文件读取、两个有依赖的任务、共享 evidence、逐项验收、push/pop、报告文件及两种 loop_marker。另有独立 Session 的 detached 提交、编辑、引擎恢复及执行测试，以及干预入 Timeline 后通知的时序测试。
+
+[通道测试](../aireact/coordinator_channels_test.go) 拦截旧构造器，验证新版规划、人工审核编辑、detached 发布及恢复均不调用它；反向选择旧通道时不注入新版辅助执行器。恢复以存储归属为准，未知版本或旧标记与新快照冲突会报错。新包的生产依赖图不包含父级 `aid` 或 `aiforge`。
 
 [live_coordinator.yak](smoke/live_coordinator.yak) 可使用本机配置的实际 provider/model 执行；凭据由外部配置，不写入脚本。确定性冒烟不衡量模型任务质量或真实 provider 的缓存命中率。
 

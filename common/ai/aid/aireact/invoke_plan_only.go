@@ -54,7 +54,7 @@ func (r *ReAct) AsyncPlanOnly(ctx context.Context, planPayload string, onFinishe
 	}
 }
 
-func (r *ReAct) invokePlanOnly(doneChannel chan struct{}, ctx context.Context, opts ...InvokePlanAndExecuteOption) (finalErr error) {
+func (r *ReAct) invokeLegacyPlanOnly(doneChannel chan struct{}, ctx context.Context, opts ...InvokePlanAndExecuteOption) (finalErr error) {
 	cfg := newInvokePlanAndExecuteOptions(opts...)
 	task := cfg.task
 	planPayload := cfg.planPayload
@@ -205,6 +205,7 @@ func buildPlanExecBaseOptions(
 	baseOpts := aicommon.ConvertConfigToOptions(r.config)
 	baseOpts = append(baseOpts,
 		aicommon.WithID(uid),
+		aicommon.WithLiteForgeExecutor(nil),
 		aicommon.WithTimeline(r.config.Timeline),
 		aicommon.WithInheritTieredAICallback(r.config, false),
 		aicommon.WithAllowPlanUserInteract(true),
@@ -220,7 +221,7 @@ func buildPlanExecBaseOptions(
 }
 
 // invokePlanExecuteOnly runs subtask execution for a coordinator that already has plan_ready state.
-func (r *ReAct) invokePlanExecuteOnly(doneChannel chan struct{}, ctx context.Context, opts ...InvokePlanAndExecuteOption) error {
+func (r *ReAct) invokeLegacyPlanExecuteOnly(doneChannel chan struct{}, ctx context.Context, opts ...InvokePlanAndExecuteOption) error {
 	cfg := newInvokePlanAndExecuteOptions(opts...)
 	coordinatorID := cfg.coordinatorID
 	task := cfg.task

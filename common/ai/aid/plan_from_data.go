@@ -2,11 +2,9 @@ package aid
 
 import (
 	"context"
-	"encoding/json"
 	"strings"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
-	"github.com/yaklang/yaklang/common/ai/aid/loop_coordinator"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 )
@@ -19,33 +17,6 @@ func (c *Coordinator) BuildRootTaskFromPlanData(planData string, rawInput string
 	planData = strings.TrimSpace(planData)
 	if planData == "" {
 		return nil, utils.Error("plan data is empty")
-	}
-	// A recovery request can infer the engine from persisted progress. Pin it
-	// before accepting an edited root, so CommitApprovedPlan preserves that choice.
-	if c.usesCoordinatorLoop() {
-		_ = aicommon.WithPlanEngine(loop_coordinator.Name)(c.Config)
-	}
-	var fields map[string]json.RawMessage
-	if json.Unmarshal([]byte(planData), &fields) == nil && fields["name"] != nil {
-		root, err := c.decodeCoordinatorTree([]byte(planData))
-		if err != nil {
-			return nil, err
-		}
-		c.standardizeTaskTree(root)
-		if _, err := buildStrictExecutableTaskGraph(root); err != nil {
-			return nil, err
-		}
-		return c.standardizeTaskTreeAndNotify(root, "approved edited plan prepared"), nil
-	}
-	if c.usesCoordinatorLoop() {
-		bridge := &coordinatorLoopBridge{owner: c}
-		bridge.controller = loop_coordinator.New(c.GetContext(), bridge, c.GetPlanExecTaskConcurrency())
-		defer bridge.controller.Close()
-		plan, err := bridge.Prepare(c.GetContext(), planData, "")
-		if err != nil {
-			return nil, err
-		}
-		return c.decodeCoordinatorTree(plan.Tree)
 	}
 
 	action, err := aicommon.ExtractAction(planData, "plan", "plan")
@@ -91,9 +62,6 @@ func (c *Coordinator) BuildRootTaskFromPlanData(planData string, rawInput string
 	}
 	if len(rootTask.Subtasks) <= 0 {
 		return nil, utils.Error("plan has no subtasks")
-	}
-	if _, err := buildStrictExecutableTaskGraph(rootTask); err != nil {
-		return nil, err
 	}
 
 	return c.standardizeTaskTreeAndNotify(rootTask, "approved plan prepared"), nil

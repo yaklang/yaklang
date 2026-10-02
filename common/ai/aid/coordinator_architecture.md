@@ -21,25 +21,28 @@
 
 ```mermaid
 flowchart TD
-    Entry[旧 ReAct / AID / PLAN-only / 恢复入口] --> Bridge[aid.Coordinator 兼容宿主]
-    Bridge --> Planner[coordinator 原生 ReAct]
-    Planner --> Control[loop_coordinator.Controller]
-    Control --> Prepare[Prepare / Approve：任务树、DAG、用户审批]
+    Entry[aim / ReAct / Yakit 输入] --> Select{顶层版本选择}
+    Select -->|coordinator| Native[loop_coordinator.Session]
+    Select -->|coordinator_legacy| Legacy[原 aid.Coordinator]
+    Native --> Planner[coordinator 原生 ReAct]
+    Native --> Control[Controller：版本、调度、验收]
     Control --> Worker[pe_task 原生 ReAct]
-    Worker --> Evidence[session Timeline evidence / artifacts]
-    Evidence --> Planner
-    Control --> Snapshot[版本、尝试、结果、验收快照]
-    Snapshot --> Bridge
-    Bridge --> UI[Yakit 原事件 / 输入控制 / 历史存储]
+    Native --> Wire[独立计划 DTO / 审批 / 事件 / 存储适配]
+    Wire --> UI[Yakit 原协议]
+    Legacy --> UI
+    Planner --> Shared[aicommon / reactloops / session Timeline]
+    Worker --> Shared
 ```
 
-[Controller](loop_coordinator/controller.go) 不依赖 aid 包。它拥有草稿、批准版本、当前尝试、通知等待和状态校验。[Host](loop_coordinator/controller.go) 提供 Prepare、Approve、Execute、Changed 四个操作。[兼容桥](coordinator_loop.go) 实现这些操作，连接现有 Coordinator、ReAct invoker、审批端点、Timeline 和数据库，避免包依赖环。
+版本选择只在 [aireact/coordinator.go](aireact/coordinator.go) 进行，旧通道入口位于 [aireact/coordinator_legacy.go](aireact/coordinator_legacy.go)。[Session](loop_coordinator/session.go) 实现 [Host](loop_coordinator/controller.go) 的 Prepare、Approve、Execute、Changed，独立持有新调度器、任务运行体、输入镜像和生命周期。[PlanNode](loop_coordinator/plan_wire.go) 只复用 Yakit JSON 字段，不继承旧 AiTask。
+
+旧 aid.Coordinator、计划阶段和进度结构均不包含新版本判断、桥或 Snapshot 字段。辅助调用通过每个 Config 的执行器接口注入；新执行器直接使用原生 function call，旧 aiforge.LiteForge 保持原实现。共同基础设施只负责工具、消息、Timeline、观测与模型调用，不解释 PLAN 版本。
 
 模型只能请求操作。状态由校验后的操作和实际 worker 退出更新；没有任意设置 completed 的 update_plan_status。状态快照按 revision 顺序发布，宿主获得独立副本，异步 worker 不持有可变草稿。
 
 ## 3. 计划与派发
 
-create_plan 保存完整候选文档和任务 DAG。modify_plan 使用确切草稿版本完整替换候选计划。草稿不会自动替换批准执行内容；submit_plan 经过旧审批通道后才采用批准树。
+create_plan 保存完整候选文档和任务 DAG。modify_plan 使用确切草稿版本完整替换候选计划。草稿不会自动替换批准执行内容；submit_plan 通过独立审批适配器发出兼容事件，取得用户批准后才采用批准树。
 
 新原生参数采用平面 DAG，使用稳定 identifier 和 depends_on；旧客户端的嵌套 root_task、语义依赖和逻辑 task_id 继续支持。宿主解析依赖，校验重复、未知引用及环，并保留未变任务的逻辑 ID。
 
@@ -57,7 +60,7 @@ retry_task 检查当前已结算尝试，原子分配下一尝试，并撤销受
 
 cancel_tasks 先进入 cancelling，worker 退出后才进入 cancelled。旧 skip 回执同样等待真正退出。取消未完成的必需任务不等于 PLAN 成功；协调员需要根据用户意图调整并重新批准计划，或由外层停止流程结束运行。
 
-恢复保存草稿/批准/提交版本、状态、当前尝试、结果、观察和验收理由。中断的 running/cancelling 尝试恢复为 failed，不暗中重启。旧 PLAN 已完成结果可导入为已验收结果。指定 start_task_id 恢复时，只重置该任务及依赖它的结果，保留独立已完成工作。
+恢复保存草稿/批准/提交版本、状态、当前尝试、结果、观察和验收理由。中断的 running/cancelling 尝试恢复为 failed，不暗中重启。旧 PLAN 记录由 coordinator_legacy 恢复；不隐式导入新运行体。指定 start_task_id 恢复时，只重置该任务及依赖它的结果，保留独立已完成工作。
 
 正常 finish 检查当前草稿已批准、所有必需任务已观察并验收、无活跃 worker、微观 TODO 已解决，以及要求的报告已保存。prompt 构造后到达的新用户信息会阻止本轮 finish，必须先读取 Timeline。
 
@@ -87,7 +90,7 @@ EnableDetachedPlan 使用旧 detached_plan_require 面板。submit_plan 保存�
 
 ## 7. 接入与验证
 
-AID 通过 aid.WithCoordinatorLoop(true) 选择新路径，保留 Run、RunPlanOnly、RunExecuteApprovedPlan、RunExecuteOnly 方法。aim 通过 aim.planEngine("coordinator") 直接进入协调员；也提供 coordinator focus metadata。RPC 消息定义不变。
+Go 显式使用 loop_coordinator.NewSession 构造新运行体，提供 Run、RunPlanOnly、RunExecuteApprovedPlan、RunExecuteOnly。aid.NewCoordinatorContext 永远是旧版。aim.focus("coordinator") / aim.focus("coordinator_legacy") 在最上层分流；aim.planEngine 是 focus 的兼容别名。Config 不携带 plan_engine；只有持久化保留该标记供恢复路由使用。RPC 消息定义不变。
 
 本次测试覆盖批准/依赖、重复派发、观察与验收、重试失效、版本冲突、活动下游保护、取消真实退出、通知等待、any/all、快照恢复、panic、原生协议强制、JSON 动作及错误参数拒绝、worker 结果门闩、PLAN-only、detached 编辑恢复、干预记录时序、风险评估及辅助原生输出。真实 Yak 引擎执行 aim 脚本，核对真实文件读取、两个依赖任务、共享 evidence、报告和 Yakit push/pop/loop_marker 事件。
 

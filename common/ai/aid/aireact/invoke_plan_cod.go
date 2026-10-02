@@ -121,7 +121,7 @@ func (s *planCoordinatorSession) fail(err error) {
 // BeginPlanCoordinatorSession creates a plan-exec coordinator from external plan loop output,
 // emits start_plan_and_execution for task-channel UI routing, and keeps the coordinator alive
 // until ReviewPlan completes.
-func (r *ReAct) BeginPlanCoordinatorSession(
+func (r *ReAct) beginLegacyPlanCoordinatorSession(
 	ctx context.Context,
 	input *aicommon.ExecutePlanInput,
 	forceManualReview bool,

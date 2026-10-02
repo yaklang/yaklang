@@ -10,7 +10,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
-	"github.com/yaklang/yaklang/common/ai/aid"
+
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon/mock"
 	"github.com/yaklang/yaklang/common/ai/aid/aiprojection"
@@ -99,7 +99,7 @@ func TestCoordinatorLoopNativeOnlyEvenWithTextModeOption(t *testing.T) {
 	task := aicommon.NewStatefulTaskBase("native-coordinator", "check", ctx, cfg.GetEmitter(), true)
 	loop, err := loop_coordinator.NewLoop(&projectedInvoker{inv}, loop_coordinator.WithController(c), reactloops.WithFunctionCallMode(false), reactloops.WithDisableLoopPerception(true), reactloops.WithDisableIncreaseIteration(true))
 	require.NoError(t, err)
-	require.Equal(t, "coordinator", cfg.GetConfigString("plan_engine"), "direct focus must make auxiliary output native too")
+	require.NotNil(t, cfg.LiteForgeExecutor, "native loops install their own helper implementation")
 	require.NoError(t, loop.ExecuteWithExistedTask(task))
 	require.NoError(t, c.CanFinish())
 	require.GreaterOrEqual(t, calls.Load(), int64(6))
@@ -124,7 +124,7 @@ func TestCoordinatorLoopWorkerNativeResultGate(t *testing.T) {
 	task := aicommon.NewStatefulTaskBase("native-worker", "verify", ctx, cfg.GetEmitter(), true)
 	loop, err := loop_coordinator.NewWorkerLoop(&projectedInvoker{inv}, reactloops.WithFunctionCallMode(false), reactloops.WithDisableLoopPerception(true))
 	require.NoError(t, err)
-	require.Equal(t, "coordinator", cfg.GetConfigString("plan_engine"))
+	require.NotNil(t, cfg.LiteForgeExecutor)
 	require.NoError(t, loop.ExecuteWithExistedTask(task))
 	require.Equal(t, int64(3), calls.Load())
 	result, ok := loop.GetVariable("coordinator_task_result").(loop_coordinator.Result)
@@ -161,7 +161,7 @@ func TestCoordinatorLoopAuxiliaryUsesNativeOutput(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	var calls atomic.Int64
-	cfg := aicommon.NewConfig(ctx, aicommon.WithPlanEngine("coordinator"), aicommon.WithAITransactionAutoRetry(1), aicommon.WithDisableCreateDBRuntime(true), aicommon.WithWorkdir(t.TempDir()), aicommon.WithAICallback(func(c aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+	cfg := aicommon.NewConfig(ctx, aicommon.WithAITransactionAutoRetry(1), aicommon.WithDisableCreateDBRuntime(true), aicommon.WithWorkdir(t.TempDir()), aicommon.WithAICallback(func(c aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 		wire := aispec.NewDefaultAIConfig(req.GetExtraSpecOpts()...)
 		require.Len(t, wire.Tools, 1)
 		require.Equal(t, map[string]any{"type": "function", "function": map[string]any{"name": wire.Tools[0].Function.Name}}, wire.ToolChoice)
@@ -173,6 +173,9 @@ func TestCoordinatorLoopAuxiliaryUsesNativeOutput(t *testing.T) {
 		calls.Add(1)
 		return nativeResponse(c, req, wire.Tools[0].Function.Name, map[string]any{"summary": "native infrastructure summary"})
 	}), aicommon.WithEnableFunctionCallMode(true))
+	for _, option := range loop_coordinator.NativeOptions() {
+		require.NoError(t, option(cfg))
+	}
 	var summary string
 	var outputErr error
 	cfg.ScheduleAuxiliaryTask(ctx, "coordinator-native-summary", func() string { return "Summarize these verified facts." }, func(a *aicommon.Action) { summary = a.GetString("summary") }, aicommon.WithAuxiliaryOutputs(aitool.WithStringParam("summary", aitool.WithParam_Required())), aicommon.WithAuxiliaryOnError(func(err error) { outputErr = err }))
@@ -186,7 +189,7 @@ func TestCoordinatorLoopPlanOnlyUsesSameNativeLoop(t *testing.T) {
 	defer cancel()
 	var calls atomic.Int64
 	var lastPrompt string
-	c, err := aid.NewCoordinatorContext(ctx, "Prepare an approved plan without executing it", aid.WithCoordinatorLoop(true), aicommon.WithDisableCreateDBRuntime(true), aicommon.WithDisableAutoSkills(true), aicommon.WithDisablePerception(true), aicommon.WithNoOpMemoryTriage(), aicommon.WithWorkdir(t.TempDir()), aicommon.WithAgreeYOLO(), aicommon.WithAICallback(func(c aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+	c, err := loop_coordinator.NewSession(ctx, "Prepare an approved plan without executing it", aicommon.WithDisableCreateDBRuntime(true), aicommon.WithDisableAutoSkills(true), aicommon.WithDisablePerception(true), aicommon.WithNoOpMemoryTriage(), aicommon.WithWorkdir(t.TempDir()), aicommon.WithAgreeYOLO(), aicommon.WithAICallback(func(c aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 		lastPrompt = req.GetPrompt()
 		switch calls.Add(1) {
 		case 1:
@@ -261,7 +264,7 @@ func TestCoordinatorLoopRejectsMalformedFunctionArguments(t *testing.T) {
 func TestCoordinatorLoopKeywordSearchUsesNativeAuxiliary(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	c, err := aid.NewCoordinatorContext(ctx, "Find a reading tool", aid.WithCoordinatorLoop(true), aicommon.WithDisableCreateDBRuntime(true), aicommon.WithWorkdir(t.TempDir()), aicommon.WithAICallback(func(c aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+	c, err := loop_coordinator.NewSession(ctx, "Find a reading tool", aicommon.WithDisableCreateDBRuntime(true), aicommon.WithWorkdir(t.TempDir()), aicommon.WithAICallback(func(c aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 		require.NotContains(t, req.GetPrompt(), "<|SCHEMA_")
 		return nativeResponse(c, req, "keyword_search", map[string]any{"matches": []any{map[string]any{"tool": "read_file", "matched_keywords": []string{"read"}}}})
 	}))
