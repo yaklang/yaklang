@@ -18,6 +18,12 @@ type ForgeResult struct {
 
 type LiteForgeExecuteCallback func(prompt string, opts ...any) (*ForgeResult, error)
 
+// WithLiteForgeExecutor installs an isolated helper implementation on this
+// runtime. It does not replace the process-wide legacy registration.
+func WithLiteForgeExecutor(execute LiteForgeExecuteCallback) ConfigOption {
+	return func(c *Config) error { c.LiteForgeExecutor = execute; return nil }
+}
+
 // LiteForgeInvokeRequest carries the typed invocation data needed by Config's
 // auxiliary-task scheduler through the aicommon -> aiforge registration bridge.
 // It lives in aicommon so Config can request a LiteForge execution without

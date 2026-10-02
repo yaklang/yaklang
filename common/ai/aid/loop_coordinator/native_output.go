@@ -1,4 +1,4 @@
-package aiforge
+package loop_coordinator
 
 import (
 	"encoding/json"

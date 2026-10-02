@@ -57,7 +57,7 @@ func (r *ReAct) AsyncExecutePlan(ctx context.Context, input *aicommon.ExecutePla
 	}
 }
 
-func (r *ReAct) invokeExecutePlan(doneChannel chan struct{}, ctx context.Context, opts ...InvokePlanAndExecuteOption) (finalErr error) {
+func (r *ReAct) invokeLegacyExecutePlan(doneChannel chan struct{}, ctx context.Context, opts ...InvokePlanAndExecuteOption) (finalErr error) {
 	cfg := newInvokePlanAndExecuteOptions(opts...)
 	task := cfg.task
 	input := cfg.executePlanInput

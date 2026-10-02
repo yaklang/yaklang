@@ -2,8 +2,6 @@ package aid
 
 import (
 	"context"
-	"encoding/json"
-	"fmt"
 	"io"
 	"strings"
 
@@ -222,8 +220,7 @@ type Coordinator struct {
 
 	ResultHandler func(cod *Coordinator)
 
-	rootTask        *AiTask
-	coordinatorLoop *coordinatorLoopBridge
+	rootTask *AiTask
 }
 
 func (c *Coordinator) GetAIConfig() *aicommon.Config {
@@ -278,34 +275,6 @@ func (c *Coordinator) HandleSearch(query string, items *omap.OrderedMap[string, 
 		})
 		return true
 	})
-	if c.usesCoordinatorLoop() {
-		_ = aicommon.WithPlanEngine("coordinator")(c.Config)
-		result, err := c.InvokeLiteForge(fmt.Sprintf("Match the query against this tool catalog. Submit only names present in the catalog; an empty matches array is valid.\nQuery: %s\nCatalog: %s", utils.Jsonify(query), utils.Jsonify(toolsLists)), &aicommon.LiteForgeInvokeRequest{
-			Context: c.GetContext(), ActionName: "keyword_search", Outputs: []aitool.ToolOption{
-				aitool.WithStructArrayParam("matches", []aitool.PropertyOption{aitool.WithParam_Required()}, nil,
-					aitool.WithStringParam("tool", aitool.WithParam_Required()), aitool.WithStringArrayParam("matched_keywords")),
-			},
-		})
-		if err != nil {
-			return nil, err
-		}
-		if result == nil || result.Action == nil {
-			return nil, utils.Error("native keyword search returned no result")
-		}
-		matches := make([]*searchtools.KeywordSearchResult, 0)
-		seen := make(map[string]bool)
-		for _, match := range result.GetInvokeParamsArray("matches") {
-			name := match.GetString("tool")
-			if !items.Have(name) {
-				return nil, utils.Errorf("keyword search returned unknown tool %q", name)
-			}
-			if !seen[name] {
-				matches = append(matches, &searchtools.KeywordSearchResult{Key: name, MatchedKeywords: match.GetStringSlice("matched_keywords")})
-				seen[name] = true
-			}
-		}
-		return matches, nil
-	}
 	var nonce = strings.ToLower(utils.RandStringBytes(6))
 	prompt, err := c.quickBuildPrompt(__prompt_KeywordSearchPrompt, map[string]any{
 		"NONCE":           nonce,
@@ -442,9 +411,6 @@ func (c *Coordinator) Run() error {
 		coordinatorID = c.Config.Id
 	}
 	defer unregisterRunningCoordinator(coordinatorID)
-	if c.usesCoordinatorLoop() {
-		return c.runCoordinatorLoop()
-	}
 	c.planUserStatus("正在准备任务", "Preparing the task", aicommon.WithStatusCode("plan.preparing"))
 
 	c.registerPEModeInputEventCallback()
@@ -475,20 +441,6 @@ func (c *Coordinator) GetPromptContextProvider() *PromptContextProvider {
 
 func (c *Coordinator) registerPEModeInputEventCallback() {
 	c.InputEventManager.RegisterSyncCallback(aicommon.SYNC_TYPE_PLAN, func(event *ypb.AIInputEvent) error {
-		if c.coordinatorLoop != nil {
-			b := c.coordinatorLoop
-			b.mu.Lock()
-			var payload map[string]any
-			if c.rootTask != nil {
-				data, _ := json.Marshal(c.rootTask)
-				var root any
-				_ = json.Unmarshal(data, &root)
-				payload = map[string]any{"root_task": root}
-			}
-			b.mu.Unlock()
-			c.EmitSyncJSON(schema.EVENT_TYPE_PLAN, "system", payload, event.SyncID)
-			return nil
-		}
 		if c.rootTask != nil {
 			c.EmitSyncJSON(schema.EVENT_TYPE_PLAN, "system", map[string]any{
 				"root_task": c.rootTask,
@@ -684,9 +636,6 @@ func (c *Coordinator) AppendTask(t *AiTask) {
 //
 // 注意：此函数不会返回错误导致整体中断，而是通过同步响应返回失败信息
 func (c *Coordinator) HandleSkipSubtaskInPlan(event *ypb.AIInputEvent) error {
-	if c.coordinatorLoop != nil {
-		return c.coordinatorLoop.control(event, false)
-	}
 	// 容错处理：捕获可能的 panic
 	defer func() {
 		if r := recover(); r != nil {
@@ -816,9 +765,6 @@ func (c *Coordinator) HandleSkipSubtaskInPlan(event *ypb.AIInputEvent) error {
 //
 // 注意：此函数不会返回错误导致整体中断，而是通过同步响应返回失败信息
 func (c *Coordinator) HandleRedoSubtaskInPlan(event *ypb.AIInputEvent) error {
-	if c.coordinatorLoop != nil {
-		return c.coordinatorLoop.control(event, true)
-	}
 	// 容错处理：捕获可能的 panic
 	defer func() {
 		if r := recover(); r != nil {

@@ -11,6 +11,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/yaklang/yaklang/common/ai/aid"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
+	"github.com/yaklang/yaklang/common/ai/aid/loop_coordinator"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
@@ -32,7 +33,7 @@ type detachedPlanProgress struct {
 }
 
 // PublishDetachedPlan emits a non-blocking detached plan review panel and persists the plan into session storage.
-func (r *ReAct) PublishDetachedPlan(ctx context.Context, input *aicommon.ExecutePlanInput, reactTaskID string) (string, error) {
+func (r *ReAct) publishLegacyDetachedPlan(ctx context.Context, input *aicommon.ExecutePlanInput, reactTaskID string) (string, error) {
 	if input == nil {
 		return "", utils.Error("execute plan input is nil")
 	}
@@ -158,12 +159,21 @@ func appendDetachedPlanTaskLines(sb *strings.Builder, tasks []*aid.AiTask, depth
 
 func (r *ReAct) buildRootTaskForDetachedPlan(ctx context.Context, planPayload string, input *aicommon.ExecutePlanInput) (*aid.AiTask, error) {
 	baseOpts := aicommon.ConvertConfigToOptions(r.config)
-	baseOpts = append(baseOpts, aicommon.WithContext(ctx), aicommon.WithDisableCreateDBRuntime(true))
+	baseOpts = append(baseOpts, aicommon.WithContext(ctx), aicommon.WithDisableCreateDBRuntime(true), aicommon.WithLiteForgeExecutor(nil))
 	cod, err := newCoordinatorContextForPlanExec(ctx, planPayload, baseOpts...)
 	if err != nil {
 		return nil, utils.Errorf("failed to create coordinator for detached plan: %v", err)
 	}
-	rootTask, err := cod.BuildRootTaskFromPlanData(input.PlanData, planPayload)
+	planData := input.PlanData
+	var wire map[string]json.RawMessage
+	if json.Unmarshal([]byte(planData), &wire) == nil && wire["name"] != nil {
+		var tree aid.AiTask
+		if err := json.Unmarshal([]byte(planData), &tree); err != nil {
+			return nil, err
+		}
+		planData = aid.SerializeRootTaskToPlanData(&tree)
+	}
+	rootTask, err := cod.BuildRootTaskFromPlanData(planData, planPayload)
 	if err != nil {
 		return nil, err
 	}
@@ -176,7 +186,7 @@ func (r *ReAct) saveDetachedPlanSession(
 	input *aicommon.ExecutePlanInput,
 ) error {
 	progress := &detachedPlanProgress{
-		PlanEngine:   r.config.GetConfigString("plan_engine"),
+		PlanEngine:   "coordinator_legacy",
 		Phase:        detachedPlanPhasePendingApproval,
 		ReactTaskID:  reactTaskID,
 		PlanPayload:  planPayload,
@@ -242,9 +252,26 @@ func (r *ReAct) HandleSyncTypeExecuteDetachedPlanEvent(event *ypb.AIInputEvent) 
 		r.EmitSyncEventError("execute_detached_plan", errors.New("session_id mismatch for detached plan"), event.SyncID)
 		return nil
 	}
+	channel, err := r.coordinatorChannel(coordinatorID)
+	if err != nil {
+		r.EmitSyncEventError("execute_detached_plan", err, event.SyncID)
+		return nil
+	}
 
 	var detectPlan detachedPlanProgress
 	json.Unmarshal([]byte(record.TaskProgress), &detectPlan)
+	if channel == loop_coordinator.Name && detectPlan.PlanDocument == "" {
+		var native loop_coordinator.Progress
+		if json.Unmarshal([]byte(record.TaskProgress), &native) == nil && native.CoordinatorState != nil {
+			plan := native.CoordinatorState.Approved
+			if plan == nil {
+				plan = native.CoordinatorState.Draft
+			}
+			if plan != nil {
+				detectPlan.PlanDocument = plan.Document
+			}
+		}
+	}
 	if detectPlan.Phase != detachedPlanPhasePendingApproval && detectPlan.Phase != aid.Phase_PlanReady {
 		r.EmitSyncEventError("execute_detached_plan", errors.New("plan is already executing or is no longer pending approval"), event.SyncID)
 		return nil
@@ -270,7 +297,16 @@ func (r *ReAct) HandleSyncTypeExecuteDetachedPlanEvent(event *ypb.AIInputEvent) 
 	}
 	// Yakit submits the edited plans.root_task. Validate it before changing the
 	// persisted phase or acknowledging execution, and keep the approved edit.
-	root, err := r.buildRootTaskForDetachedPlan(r.config.GetContext(), input.PlanPayload, approvedInput)
+	var root any
+	if channel == loop_coordinator.Name {
+		var plan *loop_coordinator.Plan
+		plan, err = loop_coordinator.ParsePlan(approvedInput.PlanData, approvedInput.PlanDocument, nil)
+		if err == nil {
+			root = plan.Tree
+		}
+	} else {
+		root, err = r.buildRootTaskForDetachedPlan(r.config.GetContext(), input.PlanPayload, approvedInput)
+	}
 	if err != nil {
 		r.EmitSyncEventError("execute_detached_plan", err, event.SyncID)
 		return nil
@@ -282,7 +318,7 @@ func (r *ReAct) HandleSyncTypeExecuteDetachedPlanEvent(event *ypb.AIInputEvent) 
 		return nil
 	}
 	record.TaskTree = string(tree)
-	record.TaskProgress = string(utils.Jsonify(&aid.PlanAndExecProgress{PlanEngine: detectPlan.PlanEngine, Phase: aid.Phase_NotCompleted, UpdatedAt: time.Now().Unix()}))
+	record.TaskProgress = string(utils.Jsonify(map[string]any{"plan_engine": channel, "phase": aid.Phase_NotCompleted, "updated_at": time.Now().Unix()}))
 	if err := yakit.CreateOrUpdateAISessionPlanAndExec(db, record); err != nil {
 		r.EmitSyncEventError("execute_detached_plan", err, event.SyncID)
 		return nil

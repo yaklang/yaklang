@@ -12,6 +12,18 @@ import (
 )
 
 func (r *ReAct) invokeLiteForgeWithCallback(cb aicommon.AICallbackType, ctx context.Context, actionName string, prompt string, outputs []aitool.ToolOption, opts ...aicommon.GeneralKVConfigOption) (*aicommon.Action, error) {
+	if execute := r.config.LiteForgeExecutor; execute != nil {
+		if cb == nil {
+			cb = r.config.GetOriginalAICallback()
+		}
+		result, err := execute(prompt, &aicommon.LiteForgeInvokeRequest{Context: ctx, ActionName: actionName, Outputs: outputs, Options: opts, Emitter: r.config.Emitter},
+			aicommon.WithFastAICallback(cb), aicommon.WithAITransactionAutoRetry(r.config.GetAITransactionAutoRetryCount()),
+			aicommon.WithAIRetryWaitFunc(r.config.GetAIRetryWaitFunc()), aicommon.WithUserUsageCallback(r.config.GetUserUsageCallback()))
+		if err != nil {
+			return nil, err
+		}
+		return result.Action, nil
+	}
 	var rawOutputs []any
 	for _, output := range outputs {
 		var rawOpt any = output

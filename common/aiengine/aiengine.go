@@ -737,9 +737,6 @@ func buildReActOptions(ctx context.Context, config *AIEngineConfig, outputChan c
 	}
 
 	options = append(options, config.ExtOptions...)
-	if config.PlanEngine != "" {
-		options = append(options, aicommon.WithPlanEngine(config.PlanEngine))
-	}
 
 	// S3c: 会话持久化 ID + 无状态模式短路。
 	// 有状态(默认):传 config.SessionID,re-act.go 正常落盘

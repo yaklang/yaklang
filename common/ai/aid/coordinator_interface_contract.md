@@ -119,6 +119,6 @@ worker 执行完成先保留 processing，由可见 stream 说明待验收；验
 
 ## 6. 使用与验证边界
 
-选择新引擎不改变 RPC。后端通过 aid.WithCoordinatorLoop(true) 或 aicommon.WithPlanEngine("coordinator") 接入；aim 使用 aim.planEngine("coordinator")，专注模式也已注册。旧引擎默认保留，供逐步替换。
+选择新引擎不改变 RPC。最上层通过 aim.focus("coordinator") / aim.focus("coordinator_legacy") 区分两条独立通道，aim.planEngine(...) 仅为入口别名。Go 新运行体使用 loop_coordinator.NewSession；aid.NewCoordinatorContext 始终保留旧语义。新 Session 自己拥有任务树 DTO、审批、进度和恢复适配，不调用旧 Coordinator 的内部方法。plan_engine 仅保存在记录中，恢复入口根据原归属选版本；不因当前 focus 改变历史任务所属引擎。
 
 本次自动化验证包括原生协议拒绝普通 JSON、审批与结果门闩、版本和尝试冲突、依赖调度、any/all、取消实际退出、恢复、PLAN-only、分离计划编辑字段和真实 Yak/aim 运行事件。确定性 provider 运行测试不替代实际模型质量、缓存指标或完整 Electron UI 人工验收。

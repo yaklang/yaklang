@@ -21,10 +21,6 @@ start_tasks returns immediately. inspect_tasks/wait_tasks deliver execution resu
 Modify a draft with its exact version and submit it again. Cancel and wait for active affected tasks before changing their briefs or retrying an upstream task.
 Use PLAN STATUS for scheduling and the microscopic TODO list for your own next steps. Finish only after every approved task is accepted, all results observed and all TODOs resolved. Use write_report for artifact reports and directly_answer for messages. Both stay in this coordinator loop.`
 
-// HostFactory is installed by aid to construct the compatibility bridge when
-// coordinator is selected directly as a focus. Explicit owners use WithController.
-var HostFactory func(aicommon.AIInvokeRuntime) (Host, error)
-
 func WithController(c *Controller) reactloops.ReActLoopOption {
 	return func(loop *reactloops.ReActLoop) { loop.Set("coordinator_controller", c) }
 }
@@ -162,7 +158,7 @@ func actionOptions() []reactloops.ReActLoopOption {
 // The tool guard is per-loop, so execution workers retain their own tool policy.
 func NewLoop(r aicommon.AIInvokeRuntime, opts ...reactloops.ReActLoopOption) (*reactloops.ReActLoop, error) {
 	if cfg, ok := r.GetConfig().(*aicommon.Config); ok {
-		_ = aicommon.WithPlanEngine(Name)(cfg)
+		_ = aicommon.WithLiteForgeExecutor(executeNativeHelper)(cfg)
 		_ = aicommon.WithEnableFunctionCallMode(true)(cfg)
 		_ = aicommon.WithAiAgreeRiskControl(NativeRiskReview)(cfg)
 		_ = aicommon.WithDisableDynamicPlanning(true)(cfg)
@@ -208,31 +204,9 @@ func NewLoop(r aicommon.AIInvokeRuntime, opts ...reactloops.ReActLoopOption) (*r
 		return nil, err
 	}
 	if controller(loop) == nil {
-		if HostFactory == nil {
-			return nil, fmt.Errorf("coordinator host factory is not registered; use WithController")
-		}
-		host, err := HostFactory(r)
-		if err != nil {
-			return nil, err
-		}
-		var c *Controller
-		if provider, ok := host.(interface{ GetController() *Controller }); ok {
-			c = provider.GetController()
-		} else {
-			c = New(r.GetConfig().GetContext(), host, 1)
-		}
-		WithController(c)(loop)
-		if host, ok := host.(interface{ PlanningOnly() bool }); ok && host.PlanningOnly() {
-			WithPlanningOnly()(loop)
-		}
+		return nil, fmt.Errorf("coordinator requires an owning Session or WithController")
 	}
-	reactloops.WithOnPostIteraction(func(_ *reactloops.ReActLoop, _ int, _ aicommon.AIStatefulTask, isDone bool, _ any, _ *reactloops.OnPostIterationOperator) {
-		if isDone {
-			if host, ok := controller(loop).host.(interface{ LoopFinished() }); ok {
-				host.LoopFinished()
-			}
-		}
-	})(loop)
+
 	// Preserve the existing TODO/goal/subagent completion gates as well.
 	reactloops.WithPlanStatusProvider(func() string {
 		c := controller(loop)
@@ -306,16 +280,9 @@ func NewLoop(r aicommon.AIInvokeRuntime, opts ...reactloops.ReActLoopOption) (*r
 	return loop, nil
 }
 
-// planData is a wire adapter only. The model supplies native tool arguments;
-// this internal legacy JSON representation never selects an action or a mode.
 func planData(a *aicommon.Action) string {
-	p := a.GetInvokeParams("plan")
-	tasks := make([]map[string]any, 0)
-	for _, t := range p.GetObjectArray("tasks") {
-		tasks = append(tasks, map[string]any{"subtask_name": t.GetString("name"), "subtask_goal": t.GetString("goal"), "subtask_identifier": t.GetString("identifier"), "depends_on": t.GetStringSlice("depends_on")})
-	}
-	b, _ := json.Marshal(map[string]any{"@action": "plan", "main_task": p.GetString("name"), "main_task_goal": p.GetString("goal"), "tasks": tasks})
-	return string(b)
+	data, _ := json.Marshal(a.GetInvokeParams("plan"))
+	return string(data)
 }
 
 func init() {
