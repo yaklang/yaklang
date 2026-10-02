@@ -1,12 +1,12 @@
 package aireact
 
 import (
-	"bytes"
-	"encoding/json"
+	"context"
 	"fmt"
 	"io"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 	"unicode/utf8"
@@ -16,498 +16,69 @@ import (
 	"github.com/yaklang/yaklang/common/ai/aid/aiprojection"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/ai/ytoken"
-	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/schema"
-	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
+// Measure reusable prompt prefixes with deterministic native calls. This is
+// a regression measure of prefix stability, not a provider cache-hit reading.
 func TestPlanExec_PrefixCacheStableWithMockedTieredAI(t *testing.T) {
-	const (
-		intelligentModel = "mock-intelligent-planexec"
-		toolName         = "mock_plan_exec_prefix_cache_tool"
-	)
-
-	originalTiered := consts.GetTieredAIConfig()
-	consts.SetTieredAIConfig(nil)
-	t.Cleanup(func() {
-		consts.SetTieredAIConfig(originalTiered)
-	})
-
-	stages := []planExecMockStage{
-		{
-			Name:       "整理输入上下文",
-			Identifier: "inventory_inputs",
-			Goal:       "调用 mock_plan_exec_prefix_cache_tool 为 inventory_inputs 生成固定的输入目录快照，确认执行边界与约束信息。",
-			ToolParam:  "inventory_inputs",
-			Stdout: buildPlanExecMockToolStdout(
-				"inventory_inputs",
-				"captured deterministic input snapshot",
-				[]string{
-					"workspace tree normalized for deterministic replay",
-					"input boundaries locked for prefix cache inspection",
-				},
-				[]string{
-					"artifact://inventory_inputs/input_snapshot.json",
-					"artifact://inventory_inputs/constraints.md",
-				},
-			),
-			Result: buildPlanExecMockToolResult(
-				"inventory_inputs",
-				"captured deterministic input snapshot",
-				[]string{
-					"pure-mock-ai",
-					"no-network",
-					"timeline-regression-fixture",
-				},
-				[]string{
-					"workspace tree normalized for deterministic replay",
-					"input boundaries locked for prefix cache inspection",
-				},
-				[]string{
-					"artifact://inventory_inputs/input_snapshot.json",
-					"artifact://inventory_inputs/constraints.md",
-				},
-				"",
-			),
-		},
-		{
-			Name:       "提取稳定执行证据",
-			Identifier: "collect_evidence",
-			Goal:       "调用 mock_plan_exec_prefix_cache_tool 为 collect_evidence 产出固定证据，沉淀可复查的执行结论。",
-			ToolParam:  "collect_evidence",
-			Stdout: buildPlanExecMockToolStdout(
-				"collect_evidence",
-				"collected deterministic evidence pack",
-				[]string{
-					"tool output envelope kept stable across deterministic replay",
-					"timeline shared prefix preserved in evidence packaging",
-				},
-				[]string{
-					"artifact://collect_evidence/evidence_bundle.json",
-					"artifact://collect_evidence/replay_notes.md",
-				},
-			),
-			Result: buildPlanExecMockToolResult(
-				"collect_evidence",
-				"collected deterministic evidence pack",
-				[]string{
-					"tool-output-stable",
-					"timeline-shared-prefix",
-					"prompt-prefix-cache-regression",
-				},
-				[]string{
-					"tool output envelope kept stable across deterministic replay",
-					"timeline shared prefix preserved in evidence packaging",
-				},
-				[]string{
-					"artifact://collect_evidence/evidence_bundle.json",
-					"artifact://collect_evidence/replay_notes.md",
-				},
-				"",
-			),
-		},
-		{
-			Name:       "交叉核对结果",
-			Identifier: "cross_check_results",
-			Goal:       "调用 mock_plan_exec_prefix_cache_tool 为 cross_check_results 执行固定核对，确认前序信息相互一致。",
-			ToolParam:  "cross_check_results",
-			Stdout: buildPlanExecMockToolStdout(
-				"cross_check_results",
-				"cross-check completed deterministically",
-				[]string{
-					"shared artifacts aligned with previously captured evidence",
-					"no unexpected drift detected in deterministic replay output",
-				},
-				[]string{
-					"artifact://cross_check_results/alignment_report.json",
-					"artifact://cross_check_results/mismatch_index.txt",
-				},
-			),
-			Result: buildPlanExecMockToolResult(
-				"cross_check_results",
-				"cross-check completed deterministically",
-				[]string{
-					"mismatches=0",
-					"alignment=stable",
-					"timeline-prefix-reuse=confirmed",
-				},
-				[]string{
-					"shared artifacts aligned with previously captured evidence",
-					"no unexpected drift detected in deterministic replay output",
-				},
-				[]string{
-					"artifact://cross_check_results/alignment_report.json",
-					"artifact://cross_check_results/mismatch_index.txt",
-				},
-				"",
-			),
-		},
-		{
-			Name:       "汇总交付结论",
-			Identifier: "finalize_delivery",
-			Goal:       "调用 mock_plan_exec_prefix_cache_tool 为 finalize_delivery 生成最终交付摘要输入，准备完成整个任务。",
-			ToolParam:  "finalize_delivery",
-			Stdout: buildPlanExecMockToolStdout(
-				"finalize_delivery",
-				"prepared final delivery package",
-				[]string{
-					"delivery payload assembled from deterministic intermediate artifacts",
-					"final note ready for prefix cache regression handoff",
-				},
-				[]string{
-					"artifact://finalize_delivery/delivery_package.md",
-					"artifact://finalize_delivery/execution_note.txt",
-				},
-			),
-			Result: buildPlanExecMockToolResult(
-				"finalize_delivery",
-				"prepared final delivery package",
-				[]string{
-					"handoff-ready",
-					"deterministic-mock-output",
-					"prefix-cache-guardrail-preserved",
-				},
-				[]string{
-					"delivery payload assembled from deterministic intermediate artifacts",
-					"final note ready for prefix cache regression handoff",
-				},
-				[]string{
-					"artifact://finalize_delivery/delivery_package.md",
-					"artifact://finalize_delivery/execution_note.txt",
-				},
-				"mock final execution note",
-			),
-		},
-	}
-
-	stageByToolParam := make(map[string]planExecMockStage, len(stages))
-	for _, stage := range stages {
-		stageByToolParam[stage.ToolParam] = stage
-	}
-
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+	defer cancel()
+	const toolName = "mock_plan_exec_prefix_cache_tool"
+	var calls atomic.Int32
+	tool, err := aitool.New(toolName, aitool.WithSimpleCallback(func(_ aitool.InvokeParams, stdout, stderr io.Writer) (any, error) {
+		stage := calls.Add(1)
+		_, _ = io.WriteString(stdout, strings.Repeat("deterministic tool observation; session evidence and artifacts remain available.\n", 20))
+		return map[string]any{"stage": stage, "summary": "Verified deterministic execution", "evidence": strings.Repeat("stable observation\n", 30)}, nil
+	}))
+	require.NoError(t, err)
+	model := newNativePlanTestModel(toolName, 4)
 	probe := newPlanExecPromptProbe()
-	in := make(chan *ypb.AIInputEvent, 10)
-	out := make(chan *schema.AiOutputEvent, 256)
-
-	var toolCallsMu sync.Mutex
-	var toolCalls []string
-	var stageCursorMu sync.Mutex
-	decisionStageIdx := 0
-	toolParamStageIdx := 0
-	progressStageIdx := 0
-	// verification 收缩为纯观测角色后, satisfied=true 不再自动结束子任务.
-	// 无开放 TODO 的子任务只需一次显式 finish。
-	remainingSubtaskFinishes := 0
-
-	mockTool, err := aitool.New(
-		toolName,
-		aitool.WithStringParam("subtask_id", aitool.WithParam_Required(true)),
-		aitool.WithSimpleCallback(func(params aitool.InvokeParams, stdout io.Writer, stderr io.Writer) (any, error) {
-			subtaskID := params.GetString("subtask_id")
-			stage, ok := stageByToolParam[subtaskID]
-			if !ok {
-				return nil, utils.Errorf("unexpected subtask_id: %s", subtaskID)
-			}
-			toolCallsMu.Lock()
-			toolCalls = append(toolCalls, subtaskID)
-			toolCallsMu.Unlock()
-			_, _ = io.WriteString(stdout, stage.Stdout)
-			return stage.Result, nil
+	var mu sync.Mutex
+	roleHashes := map[string]string{}
+	ins, err := NewTestReAct(aicommon.WithContext(ctx), aicommon.WithWorkdir(t.TempDir()),
+		aicommon.WithDisableCreateDBRuntime(true), aicommon.WithNoOpMemoryTriage(),
+		aicommon.WithAgreeYOLO(), aicommon.WithTools(tool),
+		aicommon.WithEventHandler(func(*schema.AiOutputEvent) {}),
+		aicommon.WithAICallback(func(c aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+			return nil, fmt.Errorf("unexpected original callback: %s", req.GetCallerLabel())
 		}),
-	)
-	require.NoError(t, err)
-
-	intelligentMock := func(i aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
-		prompt := req.GetPrompt()
-		probe.Observe(prompt)
-
-		switch {
-		case isPlanExecPlanExplorationPrompt(prompt):
-			return newMockAIResponse(i, intelligentModel, mustJSONString(map[string]any{
-				"@action":                "finish_exploration",
-				"human_readable_thought": "已收集足够事实，开始生成指导文档和执行计划",
-			})), nil
-
-		case isPlanExecGuidanceDocPrompt(prompt):
-			return newMockAIResponse(i, intelligentModel, mustJSONString(map[string]any{
-				"@action": "plan_guidance_document",
-				"document": strings.Join([]string{
-					"# 目标定义",
-					"- 以纯 mock 方式完成 PlanAndExec 长链路验证。",
-					"# 执行路径（方法论视角）",
-					"- 先固定规划，再按子任务顺序执行 deterministic mock tool。",
-					"# 验收标准",
-					"- 所有子任务都要落下可复查的固定结果。",
-					"# 动态重规划与纠错纠偏",
-					"- 若 mock 输出不匹配预期，立即停止并报告。",
-				}, "\n"),
-			})), nil
-
-		case isPlanExecPlanFromDocPrompt(prompt):
-			return newMockAIResponse(i, intelligentModel, mustJSONString(map[string]any{
-				"@action":              "plan_from_document",
-				"main_task":            "验证纯 mock 的 PlanAndExec prefix cache 稳定性",
-				"main_task_identifier": "verify_plan_exec_prefix_cache",
-				"main_task_goal":       "以纯 mock 的方式走完整条 PlanAndExec 链路，并保证主模型 prompt 前缀稳定。",
-				"tasks": []map[string]any{
-					{
-						"subtask_name":       stages[0].Name,
-						"subtask_identifier": stages[0].Identifier,
-						"subtask_goal":       stages[0].Goal,
-						"depends_on":         []string{},
-					},
-					{
-						"subtask_name":       stages[1].Name,
-						"subtask_identifier": stages[1].Identifier,
-						"subtask_goal":       stages[1].Goal,
-						"depends_on":         []string{stages[0].Name},
-					},
-					{
-						"subtask_name":       stages[2].Name,
-						"subtask_identifier": stages[2].Identifier,
-						"subtask_goal":       stages[2].Goal,
-						"depends_on":         []string{stages[1].Name},
-					},
-					{
-						"subtask_name":       stages[3].Name,
-						"subtask_identifier": stages[3].Identifier,
-						"subtask_goal":       stages[3].Goal,
-						"depends_on":         []string{stages[2].Name},
-					},
-				},
-			})), nil
-
-		case isPrimaryDecisionPrompt(prompt) &&
-			!strings.Contains(prompt, "PLAN_STATUS_"):
-			return newMockAIResponse(i, intelligentModel, mustJSONString(map[string]any{
-				"@action": "object",
-				"next_action": map[string]any{
-					"type":                 "request_plan_and_execution",
-					"plan_request_payload": "为纯 mock prefix cache 回归测试执行稳定的 plan and execute 长链路",
-				},
-				"human_readable_thought": "复杂任务需要进入 plan and execute",
-				"cumulative_summary":     "delegate to mocked plan and execution",
-			})), nil
-
-		case isToolParamGenerationPrompt(prompt, toolName):
-			stageCursorMu.Lock()
-			if toolParamStageIdx >= len(stages) {
-				stageCursorMu.Unlock()
-				return nil, utils.Errorf("unexpected intelligent tool-param prompt overflow: %s", utils.ShrinkString(prompt, 240))
+		aicommon.WithQualityPriorityAICallback(func(c aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+			rec := probe.Observe(req.GetPrompt())
+			role := "coordinator"
+			if strings.Contains(req.GetPrompt(), "Execute the assigned frozen plan task.") {
+				role = "pe_task"
 			}
-			stage := stages[toolParamStageIdx]
-			toolParamStageIdx++
-			stageCursorMu.Unlock()
-			return newMockAIResponse(i, intelligentModel, mustJSONString(map[string]any{
-				"@action": "call-tool",
-				"tool":    toolName,
-				"params": map[string]any{
-					"subtask_id": stage.ToolParam,
-				},
-			})), nil
-
-		case isVerifySatisfactionPrompt(prompt):
-			// verification 收缩为纯观测角色后, satisfied=true 不再自动退出.
-			// 安排一次 finish，当前子任务无开放 TODO 即可结束.
-			stageCursorMu.Lock()
-			remainingSubtaskFinishes = 1
-			stageCursorMu.Unlock()
-			return newMockAIResponse(i, intelligentModel, mustJSONString(map[string]any{
-				"@action":        "verify-satisfaction",
-				"user_satisfied": true,
-				"reasoning":      "all deterministic mock subtasks finished successfully",
-			})), nil
-
-		case utils.MatchAllOfSubString(prompt, "PLAN_STATUS_", "directly_answer", "require_tool"):
-			stageCursorMu.Lock()
-			if remainingSubtaskFinishes > 0 {
-				// 本子任务 verification 已观测到 satisfied；finish 后推进 progress 流程。
-				remainingSubtaskFinishes--
-				stageCursorMu.Unlock()
-				return newMockAIResponse(i, intelligentModel, mustJSONString(map[string]any{
-					"@action":                "finish",
-					"human_readable_thought": "mocked: subtask done after verification satisfied",
-				})), nil
+			mu.Lock()
+			if previous, ok := roleHashes[role]; ok {
+				require.Equal(t, previous, rec.HighStaticHash, "high-static changed within %s", role)
 			}
-			if decisionStageIdx >= len(stages) {
-				stageCursorMu.Unlock()
-				return nil, utils.Errorf("unexpected intelligent subtask decision prompt overflow: %s", utils.ShrinkString(prompt, 240))
-			}
-			stage := stages[decisionStageIdx]
-			decisionStageIdx++
-			stageCursorMu.Unlock()
-			return newMockAIResponse(i, intelligentModel, mustJSONString(map[string]any{
-				"@action": "object",
-				"next_action": map[string]any{
-					"type":                 "require_tool",
-					"tool_require_payload": toolName,
-				},
-				"human_readable_thought": fmt.Sprintf("执行子任务 %s，需要调用 mock tool", stage.Identifier),
-				"cumulative_summary":     fmt.Sprintf("%s ready for deterministic tool execution", stage.Identifier),
-			})), nil
-
-		case utils.MatchAllOfSubString(prompt, "continue-current-task", "proceed-next-task", "task-failed"):
-			stageCursorMu.Lock()
-			if progressStageIdx >= len(stages) {
-				stageCursorMu.Unlock()
-				return nil, utils.Errorf("unexpected intelligent task-progress prompt overflow: %s", utils.ShrinkString(prompt, 240))
-			}
-			stage := stages[progressStageIdx]
-			progressStageIdx++
-			stageCursorMu.Unlock()
-			return newMockAIResponse(i, intelligentModel, mustJSONString(map[string]any{
-				"@action":            "proceed-next-task",
-				"status_summary":     fmt.Sprintf("%s 已生成稳定结果", stage.Identifier),
-				"task_short_summary": fmt.Sprintf("%s done", stage.Identifier),
-			})), nil
-
-		case utils.MatchAllOfSubString(prompt, "任务执行引擎", "task_long_summary") &&
-			!strings.Contains(prompt, "PLAN_STATUS_"):
-			return newMockAIResponse(i, intelligentModel, mustJSONString(map[string]any{
-				"@action":            "summary",
-				"status_summary":     "all mocked subtasks completed",
-				"task_short_summary": "completed",
-				"task_long_summary":  "all deterministic mocked subtasks finished and the prefix cache regression guardrail stayed stable",
-			})), nil
-
-		case isDirectAnswerPrompt(prompt):
-			return newMockAIResponse(i, intelligentModel, mustJSONString(map[string]any{
-				"@action":        "directly_answer",
-				"answer_payload": "mocked plan and execution completed successfully",
-			})), nil
-		}
-
-		return nil, utils.Errorf("unexpected intelligent prompt: %s", utils.ShrinkString(prompt, 240))
-	}
-
-	_, err = NewTestReAct(
-		aicommon.WithAICallback(intelligentMock),
-		aicommon.WithQualityPriorityAICallback(intelligentMock),
-		aicommon.WithSpeedPriorityAICallback(intelligentMock),
-		aicommon.WithEventInputChan(in),
-		aicommon.WithEventHandler(func(e *schema.AiOutputEvent) {
-			out <- e
+			roleHashes[role] = rec.HighStaticHash
+			mu.Unlock()
+			rsp, handled, err := model(c, req, "mock-intelligent-planexec")
+			require.True(t, handled, "coordinator and worker require native function calls")
+			return rsp, err
 		}),
-		aicommon.WithAgreeYOLO(true),
-		aicommon.WithEnablePlanAndExec(true),
-		aicommon.WithGenerateReport(false),
-		aicommon.WithTools(mockTool),
-	)
+		aicommon.WithSpeedPriorityAICallback(func(c aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+			return nil, fmt.Errorf("unexpected speed fallback: %s", req.GetCallerLabel())
+		}))
 	require.NoError(t, err)
-
-	in <- &ypb.AIInputEvent{
-		IsFreeInput: true,
-		FreeInput:   "请用纯 mock 方式执行 PlanAndExec prefix cache 回归链路",
-	}
-
-	var (
-		sawPlanStart      bool
-		sawPlanEnd        bool
-		reactTaskComplete bool
-		summaryModels     []string
-	)
-
-	timeout := time.After(30 * time.Second)
-LOOP:
-	for {
-		select {
-		case e := <-out:
-			switch e.Type {
-			case schema.EVENT_TYPE_START_PLAN_AND_EXECUTION:
-				sawPlanStart = true
-			case schema.EVENT_TYPE_END_PLAN_AND_EXECUTION:
-				sawPlanEnd = true
-			case schema.EVENT_TYPE_AI_CALL_SUMMARY:
-				var payload map[string]any
-				if err := json.Unmarshal(e.Content, &payload); err == nil {
-					summaryModels = append(summaryModels, utils.InterfaceToString(payload["model_name"]))
-				}
-			case schema.EVENT_TYPE_STRUCTURED:
-				if e.NodeId != "react_task_status_changed" {
-					continue
-				}
-				var payload map[string]any
-				require.NoError(t, json.Unmarshal(e.Content, &payload))
-				if utils.InterfaceToString(payload["react_task_now_status"]) == "completed" {
-					reactTaskComplete = true
-				}
-			}
-			toolCallsMu.Lock()
-			toolCallCount := len(toolCalls)
-			toolCallsMu.Unlock()
-			if sawPlanStart && sawPlanEnd && reactTaskComplete && toolCallCount == len(stages) {
-				break LOOP
-			}
-		case <-timeout:
-			break LOOP
-		}
-	}
-
+	require.NoError(t, ins.PlanAndExecute(ctx, "Execute four dependent deterministic checks and review every result"))
+	require.EqualValues(t, 4, calls.Load(), "each worker must execute its tool exactly once")
 	records := probe.Records()
 	diagnostics := formatPlanExecProbeDiagnostics(records)
-
-	require.Truef(t, sawPlanStart, "expected EVENT_TYPE_START_PLAN_AND_EXECUTION\nmodels=%v\n%s", summaryModels, diagnostics)
-	require.Truef(t, sawPlanEnd, "expected EVENT_TYPE_END_PLAN_AND_EXECUTION\nmodels=%v\n%s", summaryModels, diagnostics)
-	require.Truef(t, reactTaskComplete, "expected react_task_status_changed=completed\nmodels=%v\n%s", summaryModels, diagnostics)
-
-	toolCallsMu.Lock()
-	gotToolCalls := append([]string(nil), toolCalls...)
-	toolCallsMu.Unlock()
-	require.Equal(t,
-		[]string{
-			stages[0].ToolParam,
-			stages[1].ToolParam,
-			stages[2].ToolParam,
-			stages[3].ToolParam,
-		},
-		gotToolCalls,
-		"expected each mocked subtask to execute the deterministic tool exactly once",
-	)
-
-	require.GreaterOrEqualf(t, len(records), 5, "expected at least 5 intelligent prompts\n%s", diagnostics)
-
+	require.GreaterOrEqual(t, len(records), 20, diagnostics)
 	for _, rec := range records {
-		require.NotContainsf(t, rec.Sections, aiprojection.SectionRaw, "intelligent prompt must not contain raw section\n%s", formatPlanExecProbeRecord(rec))
-		require.Containsf(t, rec.Sections, aiprojection.SectionHighStatic, "intelligent prompt must contain high-static\n%s", formatPlanExecProbeRecord(rec))
-		require.Containsf(t, rec.Sections, aiprojection.SectionDynamic, "intelligent prompt must contain dynamic\n%s", formatPlanExecProbeRecord(rec))
-		require.NotEmptyf(t, rec.HighStaticHash, "intelligent prompt must expose a high-static hash\n%s", formatPlanExecProbeRecord(rec))
+		require.NotContains(t, rec.Sections, aiprojection.SectionRaw, diagnostics)
+		require.Contains(t, rec.Sections, aiprojection.SectionHighStatic, diagnostics)
+		require.Contains(t, rec.Sections, aiprojection.SectionDynamic, diagnostics)
+		require.NotEmpty(t, rec.HighStaticHash, diagnostics)
 	}
-
-	var totalPromptTokens int
-	var totalHitPrefixTokens int
-	var promptsWithPrefixHits int
-	highStaticHashes := make(map[string]struct{})
-	for _, rec := range records {
-		totalPromptTokens += rec.TotalPromptTokens
-		totalHitPrefixTokens += rec.HitPrefixTokens
-		if rec.HitPrefixTokens > 0 {
-			promptsWithPrefixHits++
-		}
-		highStaticHashes[rec.HighStaticHash] = struct{}{}
-	}
-	require.Positivef(t, totalPromptTokens, "expected positive total prompt tokens\n%s", diagnostics)
-	globalHitTokenRatio := planExecRatio(totalHitPrefixTokens, totalPromptTokens)
-
-	require.GreaterOrEqualf(t, globalHitTokenRatio, 0.30, "global hit token ratio below threshold: %.4f\n%s", globalHitTokenRatio, diagnostics)
-	require.Positivef(t, promptsWithPrefixHits, "expected at least one intelligent prompt with prefix hit\n%s", diagnostics)
-	require.NotEmptyf(t, highStaticHashes, "expected at least one intelligent high-static hash\n%s", diagnostics)
-
-	t.Logf("intelligent prompts=%d", len(records))
-	t.Logf("total prompt tokens=%d", totalPromptTokens)
-	t.Logf("total hit prefix tokens=%d", totalHitPrefixTokens)
-	t.Logf("global hit token ratio=%.4f", globalHitTokenRatio)
-	t.Logf("intelligent prompts with prefix hits=%d", promptsWithPrefixHits)
-	t.Logf("distinct intelligent high-static hashes=%d", len(highStaticHashes))
-}
-
-type planExecMockStage struct {
-	Name       string
-	Identifier string
-	Goal       string
-	ToolParam  string
-	Result     map[string]any
-	Stdout     string
+	total, hits := summarizePlanExecProbe(records)
+	require.Positive(t, total)
+	require.GreaterOrEqual(t, planExecRatio(hits, total), 0.30, diagnostics)
+	require.Len(t, roleHashes, 2, "exercise both coordinator and worker prompts")
+	t.Log(diagnostics)
 }
 
 type planExecPromptProbe struct {
@@ -725,148 +296,4 @@ func shortPlanExecHash(hash string) string {
 		return hash
 	}
 	return hash[:8]
-}
-
-func buildPlanExecMockToolStdout(stageID, summary string, checkpoints, artifacts []string) string {
-	lines := []string{
-		"mock-tool-stage-report",
-		"stage_id: " + stageID,
-		"summary: " + summary,
-		"shared_prefix: timeline-fixture: deterministic-prefix-cache-regression",
-	}
-	for i, checkpoint := range checkpoints {
-		lines = append(lines, fmt.Sprintf("checkpoint[%d]: %s", i+1, checkpoint))
-	}
-	for i, artifact := range artifacts {
-		lines = append(lines, fmt.Sprintf("artifact[%d]: %s", i+1, artifact))
-	}
-	base := strings.Join(lines, "\n")
-
-	const targetStdoutBytes = 1024
-	if len(base) >= targetStdoutBytes {
-		return base
-	}
-
-	var stdout strings.Builder
-	stdout.WriteString(base)
-	fillerTemplate := "payload_fill[%02d]: deterministic-prefix-cache-regression timeline-fixture block=abcdefghijklmnopqrstuvwxyz0123456789 repeated-content-for-mock-stdout-padding"
-	for i := 1; stdout.Len() < targetStdoutBytes; i++ {
-		stdout.WriteString("\n")
-		stdout.WriteString(fmt.Sprintf(fillerTemplate, i))
-	}
-	return stdout.String()
-}
-
-func buildPlanExecMockToolResult(stageID, summary string, evidence, checkpoints, artifacts []string, deliverable string) map[string]any {
-	result := map[string]any{
-		"stage":         stageID,
-		"summary":       summary,
-		"shared_prefix": "timeline-fixture: deterministic-prefix-cache-regression",
-		"evidence":      evidence,
-		"checkpoints":   checkpoints,
-		"timeline_note": strings.Join([]string{
-			"Mock tool result intentionally returns richer deterministic material.",
-			"These fields are used to exercise larger timeline payloads without changing AI routing behavior.",
-		}, "\n"),
-		"metrics": map[string]any{
-			"deterministic_replay":         true,
-			"expected_timeline_artifacts":  len(artifacts),
-			"prefix_cache_guardrail":       "global_hit_token_ratio>=0.30",
-			"timeline_payload_profile":     "expanded-mock-result",
-			"tool_output_contract_version": "v2",
-		},
-	}
-
-	artifactRecords := make([]map[string]any, 0, len(artifacts))
-	for i, artifact := range artifacts {
-		artifactRecords = append(artifactRecords, map[string]any{
-			"index":   i + 1,
-			"path":    artifact,
-			"kind":    "mock-artifact",
-			"status":  "stable",
-			"profile": "timeline-regression-fixture",
-		})
-	}
-	result["artifacts"] = artifactRecords
-
-	if deliverable != "" {
-		result["deliverable"] = deliverable
-	}
-	return result
-}
-
-func newMockAIResponse(i aicommon.AICallerConfigIf, modelName string, payload string) *aicommon.AIResponse {
-	rsp := i.NewAIResponse()
-	rsp.SetModelInfo("mock-provider", modelName)
-	rsp.EmitOutputStream(bytes.NewBufferString(payload))
-	rsp.Close()
-	return rsp
-}
-
-func mustJSONString(v any) string {
-	return string(utils.Jsonify(v))
-}
-
-func matchPlanExecStage(prompt string, stages []planExecMockStage) (planExecMockStage, bool) {
-	searchScopes := []string{
-		extractLastCurrentTaskBlock(prompt),
-		prompt,
-	}
-
-	for _, scope := range searchScopes {
-		if scope == "" {
-			continue
-		}
-		for _, stage := range stages {
-			if strings.Contains(scope, "任务名称: "+stage.Name) ||
-				strings.Contains(scope, "任务目标: "+stage.Goal) ||
-				strings.Contains(scope, stage.Identifier) ||
-				strings.Contains(scope, stage.Name) ||
-				strings.Contains(scope, stage.ToolParam) {
-				return stage, true
-			}
-		}
-	}
-	return planExecMockStage{}, false
-}
-
-func extractLastCurrentTaskBlock(prompt string) string {
-	bestStart := -1
-	bestBlock := ""
-	for _, pair := range [][2]string{
-		{"--- CURRENT_TASK ---", "--- CURRENT_TASK_END ---"},
-		{"<|CURRENT_TASK_", "<|CURRENT_TASK_END_"},
-	} {
-		start := strings.LastIndex(prompt, pair[0])
-		if start < 0 {
-			continue
-		}
-
-		rest := prompt[start:]
-		end := strings.Index(rest, pair[1])
-		if end < 0 {
-			if start > bestStart {
-				bestStart = start
-				bestBlock = rest
-			}
-			continue
-		}
-		if start > bestStart {
-			bestStart = start
-			bestBlock = rest[:end]
-		}
-	}
-	return bestBlock
-}
-
-func isPlanExecPlanExplorationPrompt(prompt string) bool {
-	return strings.Contains(prompt, "任务规划使命") && strings.Contains(prompt, "finish_exploration")
-}
-
-func isPlanExecGuidanceDocPrompt(prompt string) bool {
-	return strings.Contains(prompt, `"const": "plan_guidance_document"`)
-}
-
-func isPlanExecPlanFromDocPrompt(prompt string) bool {
-	return strings.Contains(prompt, `"const": "plan_from_document"`)
 }

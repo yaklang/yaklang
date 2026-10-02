@@ -7,10 +7,12 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/google/uuid"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/coordinator"
 	"github.com/yaklang/yaklang/common/ai/aid/coordinator_legacy"
 	"github.com/yaklang/yaklang/common/schema"
+	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 )
 
@@ -175,8 +177,43 @@ func (r *ReAct) invokeNativeCoordinator(done chan struct{}, ctx context.Context,
 	if cfg.task != nil {
 		defer func() { cfg.task.CallAsyncDeferCallback(err) }()
 	}
+	// Preserve the public execution override at the outer boundary. It owns
+	// execution when provided, and must not construct either planner engine.
+	if override := r.config.HijackPERequest; override != nil {
+		id := cfg.coordinatorID
+		if id == "" {
+			id = uuid.NewString()
+		}
+		payload := cfg.planPayload
+		if payload == "" && cfg.executePlanInput != nil {
+			payload = cfg.executePlanInput.PlanPayload
+		}
+		if payload == "" {
+			payload = utils.InterfaceToString(cfg.forgeParams)
+		}
+		taskID := ""
+		if cfg.task != nil {
+			taskID = cfg.task.GetId()
+			if input := cfg.task.GetUserInput(); cfg.forgeName == "" && input != "" && !strings.Contains(payload, input) {
+				payload = input + "\n\n" + payload
+			}
+		}
+		if ctx == nil {
+			ctx = r.config.GetContext()
+		}
+		events := map[string]any{"coordinator_id": id, "re-act_id": r.config.Id, "re-act_task": taskID, "start_task_id": cfg.startTaskID}
+		r.EmitJSON(schema.EVENT_TYPE_START_PLAN_AND_EXECUTION, r.config.Id, events)
+		defer func() {
+			if err != nil {
+				r.EmitPlanExecFail(err.Error())
+			}
+			r.EmitJSON(schema.EVENT_TYPE_END_PLAN_AND_EXECUTION, r.config.Id, events)
+		}()
+		ready()
+		return override(ctx, payload)
+	}
 	if cfg.forgeName != "" {
-		return fmt.Errorf("coordinator business execution requires plan tasks; forge execution belongs to coordinator_legacy")
+		return r.executeBlueprint(ctx, cfg, ready)
 	}
 	task := cfg.task
 	if task == nil {

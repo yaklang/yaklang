@@ -39,8 +39,12 @@ func TestReAct_RequestPlanAndExecution_PreservesQualityModelInsideAid(t *testing
 	)
 	require.NoError(t, err)
 
+	nativeModel := newNativePlanTestModel("mock_plan_exec_tool")
 	qualityCallback := func(i aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 		atomic.AddInt32(&qualityCallCount, 1)
+		if rsp, handled, err := nativeModel(i, req, qualityModel); handled {
+			return rsp, err
+		}
 		rsp := i.NewAIResponse()
 		rsp.SetModelInfo("mock-provider", qualityModel)
 
@@ -115,6 +119,9 @@ func TestReAct_RequestPlanAndExecution_PreservesQualityModelInsideAid(t *testing
 
 	fastCallback := func(i aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 		atomic.AddInt32(&fastCallCount, 1)
+		if rsp, handled, err := nativeModel(i, req, fastModel); handled {
+			return rsp, err
+		}
 		rsp := i.NewAIResponse()
 		rsp.SetModelInfo("mock-provider", fastModel)
 
