@@ -41,7 +41,7 @@ flowchart TD
 
 入口约束位于 [aireact/coordinator.go](aireact/coordinator.go)。旧适配 [aireact/coordinator_legacy.go](aireact/coordinator_legacy.go) 不再被 PLAN 路由调用。[Session](coordinator/session.go) 实现 [Host](coordinator/controller.go) 的 Prepare、Approve、Execute、Changed，独立持有新调度器、任务运行体、输入镜像和生命周期。[PlanNode](coordinator/plan_wire.go) 只复用 Yakit JSON 字段，不继承旧 AiTask。
 
-旧 coordinator_legacy.Coordinator、计划阶段和进度结构均不包含新版本判断、桥或 Snapshot 字段。辅助调用通过每个 Config 的执行器接口注入；新执行器直接使用原生 function call，旧 aiforge.LiteForge 保持原实现。共同基础设施只负责工具、消息、Timeline、观测与模型调用，不解释 PLAN 版本。
+旧 coordinator_legacy.Coordinator、计划阶段和进度结构均不包含新版本判断、桥或 Snapshot 字段。结构化辅助调用统一使用 [aid/liteforge](liteforge/README.md) 的独立执行器，应用封装归入 [liteforgeapp](liteforge/liteforgeapp/README.md)；协议遵循 Config，支持原生 function call 和文本 JSON 流。共同基础设施只负责工具、消息、Timeline、观测与模型调用，不解释 PLAN 版本。
 
 模型只能请求操作。状态由校验后的操作和实际 worker 退出更新；没有任意设置 completed 的 update_plan_status。状态快照按 revision 顺序发布，宿主获得独立副本，异步 worker 不持有可变草稿。
 

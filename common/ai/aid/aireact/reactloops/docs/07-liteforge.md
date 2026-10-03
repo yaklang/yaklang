@@ -13,7 +13,7 @@ LiteForge 是 reactloops 把"非确定 LLM"变成"确定中间步骤"的关键�
 
 ## 7.1 定位：单步结构化抽取
 
-源码 [common/aiforge/liteforge.go:49-57](../../../../aiforge/liteforge.go) 的注释说得很清楚：
+源码 [liteforgeapp/liteforge.go](../../../liteforge/liteforgeapp/liteforge.go) 的注释说得很清楚：
 
 > LiteForge 被设计只允许提取数据，生成结构化（单步），如果需要多步拆解，不能使用 LiteForge
 
@@ -150,8 +150,8 @@ outputs := []aitool.ToolOption{
 **方式 B：原始 schema 字符串**
 
 ```go
-forge, _ := aiforge.NewLiteForge("my_forge",
-    aiforge.WithLiteForge_OutputSchemaRaw("my-action", `{
+forge, _ := liteforgeapp.NewLiteForge("my_forge",
+    liteforgeapp.WithLiteForge_OutputSchemaRaw("my-action", `{
         "type": "object",
         "properties": {
             "@action": {"const": "my-action"},
@@ -162,7 +162,7 @@ forge, _ := aiforge.NewLiteForge("my_forge",
 )
 ```
 
-**方式 C：直接拿 `aiforge.LiteForge`（不通过 ReAct invoker）**
+**方式 C：直接拿 `liteforgeapp.LiteForge`（不通过 ReAct invoker）**
 
 参考 reactloops 内部一些直接构造 LiteForge 的代码（如 `perception.go`）。
 
@@ -401,39 +401,17 @@ func deliverFinalAnswerFallback(loop *reactloops.ReActLoop, invoker aicommon.AII
 
 ## 7.8 LiteForge 的 prompt 模板
 
-LiteForge 内部用了一个固定模板（[liteforge.go:242-276](../../../../aiforge/liteforge.go)）：
+独立执行器通过 [prompt.go](../../../liteforge/prompt.go) 和 promptloader 加载两套模板。Config 默认使用 function call，调用方可通过 `aicommon.WithFunctionCallMode(false)` 选择文本 JSON 流。两套模板使用相同的分层边界：
 
 ```text
-# Preset
-你现在在一个任务引擎中，是一个输出JSON的数据处理和总结提示小助手...
-
-<background_<NONCE>>
-{你传入的 prompt}
-</background_<NONCE>>
-
-<timeline_<NONCE>>
-{自动从 ContextProvider 拿到的 timeline}
-</timeline_<NONCE>>
-
-# 牢记
-{自动从 ContextProvider 拿到的 PersistentMemory}
-
-<params_<NONCE>>
-{你传入的 params（一般是 query=prompt）}
-</params_<NONCE>>
-
-# Output Formatter
-
-请你根据下面 SCHEMA 构建数据 ...
-
-# SCHEMA
-
-<schema_<NONCE>>
-{自动渲染的 OutputSchema}
-</schema_<NONCE>>
+high-static: 稳定的角色、输出协议与校验约束
+semi-dynamic: schema、静态业务指令与持久记忆
+frozen: session Timeline 冻结内容（有内容时）
+timeline-open: session Timeline 未冻结内容
+dynamic: 本次 prompt 和 params
 ```
 
-所以你**不需要**在 prompt 里手动写 schema 或要求"返回 JSON"，LiteForge 自己处理。
+文本模式流式解析 JSON；function call 模式由 aiprojection 在请求发送时切出工具 schema，流式解析 arguments。调用方只提供 schema 和材料，无须手动注入工具或要求返回 JSON。完整接口见 [LiteForge README](../../../liteforge/README.md)。
 
 ## 7.9 常见陷阱
 
@@ -475,6 +453,6 @@ LLM 会"省略"它觉得不重要的字段，结果 `action.GetString("xxx")` �
 - [08-determinism-mechanisms.md](08-determinism-mechanisms.md)：感知、验证门和 TODO 软检查点
 - [09-capabilities.md](09-capabilities.md)：capability_search 用 LiteForge 做分块匹配
 - 源码：
-  - [common/aiforge/liteforge.go](../../../../aiforge/liteforge.go)
+  - [common/ai/aid/liteforge/liteforgeapp/liteforge.go](../../../liteforge/liteforgeapp/liteforge.go)
   - [common/ai/aid/aireact/invoke_liteforge.go](../../invoke_liteforge.go)
-  - [common/aiforge/extra_general_config.go](../../../../aiforge/extra_general_config.go)（`WithGeneralConfigStreamableFieldXxx`）
+  - [common/ai/aid/aicommon/general_config_option.go](../../../aicommon/general_config_option.go)（`WithGeneralConfigStreamableFieldXxx`）
