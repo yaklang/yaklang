@@ -1,0 +1,14 @@
+// Go harness 注入确定性模型与审核回复，运行的仍是真实 Yak/aim 入口。
+// A/B独立，C依赖A，D依赖B/C。仅审核计划一次；运行时自动调度和等待。
+err = aim.InvokeReAct(
+    "进入新版 PLAN：只读检查 source.txt，建立 A/B/C/D DAG，A/B 独立，C 依赖 A，D 依赖 B/C。任务保存真实 evidence，验证结果后提交最终 artifacts 报告。",
+    aim.planEngine("coordinator"),
+    aim.reviewPolicy(REVIEW_POLICY),
+    aim.maxIteration(35),
+    aim.timeout(30),
+    aim.aiCallback(EXEC_MODEL),
+    aim.onEvent(EXEC_EVENT),
+    aim.workdir(SMOKE_WORKDIR),
+    SMOKE_OPTIONS...,
+)
+die(err)

@@ -1,178 +1,105 @@
-# 新版 coordinator 上下文与计划控制 review
+# Coordinator 第一阶段：上下文与本地验收
 
-本轮本地修改：中文职责说明通过 promptloader 加载；生成计划恢复旧版嵌套字段与 DAG 语义；支持原生预设计划与 mocker；将草案和已批准任务书放入 SemiDynamic1 的 PLAN DEFINITION。接口事件和执行状态机继续使用新版 coordinator，不引入旧运行体。
+本文保留第一阶段 PLAN 完成时的采样与验收记录。第二阶段 EXEC 已继续实现，当前执行上下文、自动调度、审核和报告以 [执行验收记录](execution_review.md) 为准。两阶段修改均留在本地，没有提交、push 或重启服务。
 
-## 实际上下文顺序
+## 当前结构
 
-coordinator 和 pe_task 复用 mainloop 的分区装配。以下列出可出现的材料；没有数据的可选字段不渲染。High Static 本轮未修改，保持纯静态。
+内部是一份 Plan：完整 Document、无状态嵌套任务定义树、由树派生的叶任务 DAG。PLAN 与 EXEC 为两个阶段；审核等待是 PLAN 的锁定状态。不存在 Draft/Approved 双份当前计划、计划版本参数或 edit revision。
 
-| 分区 | 实际材料 | 变化来源 |
+| 分区 | 本轮实际内容 | 更新规则 |
 | --- | --- | --- |
-| High Static | 工作方法论、Timeline 用户信息关注规则、TODO、Evidence、工具及完成规则 | 模板版本；不含本次用户输入、任务状态或角色条件 |
-| Frozen Block | 强制技能、工具目录名称及说明、其他固定分区、普通冻结 Timeline 历史 | 工具配置、材料写入、Timeline 冻结/压缩 |
-| SemiDynamic1 | WorkspaceContext、SkillsContext、PromotedRecentTools、PromotedUserInputHistory、PlanDocument、PlanDefinition、SessionEvidenceSemiDynamic | 工作区、技能及工具加载、用户输入/Evidence 提升、计划版本变更 |
-| SemiDynamic2 | ExecutionPolicy、TaskInstruction、AutoLoadedSkills、Schema（文本流）或 FunctionCallSchemas（原生） | 执行策略、角色/规划阶段、技能、允许的 actions |
-| Timeline Open | TimelineOpen → PLAN STATUS → TODO；还可包含旧执行上下文或 ReportedRisks | 最近事件、用户补充、工具调用、任务进度和微观待办 |
-| Dynamic | CurrentTime、AutoContext、ExtraCapabilities、ReactiveData、InjectedMemory、TodoCheckpoint | 当前时间、观测提供器、本轮动作反馈和检索结果 |
+| High Static | 原主循环方法论、工具、用户信息、TODO、Evidence 规则 | 本轮没有修改，没有角色或阶段条件 |
+| Frozen Block | 固定工具目录、材料、冻结的普通 Timeline 历史 | 沿既有冻结/压缩机制 |
+| SemiDynamic1 / PLAN DOCUMENT | 唯一当前完整 Markdown 文档 | 只在正文实际改变时更新 |
+| SemiDynamic1 / PLAN DEFINITION | 唯一当前嵌套定义及派生叶 DAG，稳定 task_id、语义标识、依赖 | 只在定义实际改变时更新；没有运行状态 |
+| SemiDynamic1 / 会话材料 | 用户信息、环境/工作区材料、提升后的 session Evidence 与工具说明 | 沿既有会话提升机制，不丢失原材料 |
+| SemiDynamic2 | promptloader 中文 PLAN 指令、规划偏好、当前协议声明 | 固定阶段与探索开关下保持字节稳定 |
+| Timeline Open | 近期工具与 Evidence、变更/拒绝回执、patch 引用、用户交互、调查交付 | 不按动作强制 Freeze；大正文不复制到 action feedback/Evidence |
+| PLAN STATUS → TODO | PLAN 阶段、是否已有计划、审核锁、必要调查状态 → 协调员微观事项 | 不把正式任务树复写为微观 TODO |
+| Dynamic | 当前时间、运行状态、近期反馈、既有感知信息 | 没有永久 USER QUERY 或另一份计划正文 |
 
-Frozen 中的用户输入、Evidence、最近工具材料经过已有提升机制进入各自的 SemiDynamic1 字段。当前输入先进入 Open，冻结后提升；Dynamic 不额外复制 USER QUERY。环境观测等普通 Timeline 记录仍保留在冻结历史，未因本次拆分被丢弃。
+PLAN 角色从 [planning.txt](../aicommon/promptloader/prompts/ai/aid/coordinator/planning.txt) 加载；EXEC 保留 [instruction.txt](../aicommon/promptloader/prompts/ai/aid/coordinator/instruction.txt)，worker 保留原冻结任务书。两种协议共用中文参数、验证器和 handler；文本流用 JSON @action/AITAG，原生调用用 tool_calls。PLAN 只声明三个计划动作；EXEC 专属动作既不声明，也不能绕过 handler/Controller 执行。
 
-计划定义经已有 FrozenBlockPartitionProducer 保存，装配主循环时分别提取 plan_document 和 plan_definition 到 SemiDynamic1；其余分区继续留在 Frozen。轻量提示也保留完整计划定义。观测树新增 section.semi_dynamic_1.plan_definition，可单独查看该材料的长度和位置。
-
-## 中文职责说明
-
-资源位置：
-
-- [instruction.txt](../aicommon/promptloader/prompts/ai/aid/coordinator/instruction.txt)：协调员的计划、DAG、调度、验收、Evidence、工具范围及完成规则。
-- [planning_only.txt](../aicommon/promptloader/prompts/ai/aid/coordinator/planning_only.txt)：仅规划或 detached 发布阶段的限制。
-- [worker_instruction.txt](../aicommon/promptloader/prompts/ai/aid/coordinator/worker_instruction.txt)：执行批准的冻结任务书、提交结果，禁止另起规划循环。
-
-使用 promptloader.MustLoad，与 mainloop 共用资源加载和发布归档机制。角色说明放在 SemiDynamic2；全局 AIPlanPrompt/UserPlanPrompt 仅附加在规划阶段，不传播为 worker 角色指令。两个循环沿用主循环的 EnableFunctionCallMode。中文指令按 FunctionCallMode 选择文本流 JSON action 或原生 function call；TODO 分别使用 JSON action.todo_delta 或 adjust_todolist.arguments.todo_delta。
-
-协调员指令开头为：
+## 实际文档与状态案例
 
 ```text
-你是计划协调员，负责维护 PLAN、调度任务、验收结果和交付报告。关注 Timeline 中的用户输入及补充要求。
-```
-
-## 真实运行样本
-
-新增 `TestCoordinatorPlanningSubmissionSmoke` 专门验证提交前的规划链路，覆盖探索、preset、mocker × function call/text stream，共六个运行组合。模型使用确定性响应，其他模块走真实 Session 和工具/交互通道；探索中的文件观测来自实际 `read_file`，附带计划中的已有 Evidence 则是测试夹具读取本地文件后提供的会话材料。测试显式调用已有 `FreezeAll` 来检验 Open 冻结后的用户输入和 Evidence 提升，不依赖生产默认桶恰好在短任务中到达阈值。
-
-四份主样本捕获同一时点：计划正文已装载、即将调用 `submit_plan`。测试随后通过 `plan_review_require` 收到审核事件，向输入通道只提交一次 `continue`，确认计划已批准且保留两项叶任务及依赖；仅规划运行不派发 worker。批准后的 prompt 另行验证 PLAN DOCUMENT、批准版本及派发门闩。预设/mocker 分别独立运行并核对相同的文档、任务结构与依赖；附带计划样本采用 preset 的请求代表两者。
-
-设置 `COORDINATOR_CONTEXT_REVIEW_DIR` 后，在 `planning-submission` 子目录输出：
-
-| 完整 prompt 文件 | 路径与协议 |
-| --- | --- |
-| exploration-function-call.prompt.txt | 真实读取 → Evidence → 创建计划 → 核对 → 提交，原生协议 |
-| exploration-text-stream.prompt.txt | 同一探索提交链路，文本流协议 |
-| preset-function-call.prompt.txt | 附带计划 → 核对 → 提交，原生协议 |
-| preset-text-stream.prompt.txt | 同一附带计划提交链路，文本流协议 |
-
-每个 prompt 的同名 `.request.json` 保存离线投影后的 messages、原生 tools（文本流为空）、实际 action 顺序、一次审核 payload 和最终批准的 plan。它们用于检查装配和协议，并非上游 provider 的 HTTP 抓包，不提供在线模型质量或缓存命中结论。
-
-样本由 TestCoordinatorPresetPlanApprovalContext 和 TestCoordinatorPresetExecutesDependentWorkers 捕获实际模型请求；审批上下文样本使用确定性的原生 function call，依赖执行样本同时覆盖文本流与原生两种协议。用户约束和 source.location 是测试注入材料，不代表对真实 source.txt 做了检查。实际工具读取与 Yak/aim 执行另外由既有 native_coordinator.yak 冒烟覆盖。
-
-设置 COORDINATOR_CONTEXT_REVIEW_DIR 后测试会输出：
-
-| 文件 | 捕获时点 |
-| --- | --- |
-| 01-draft.txt | 草案已装载，即将提交 |
-| 03-approved.txt | 同步批准后，尚未派发任务 |
-| 04-awaiting-review.txt | 后继任务已提交结果，协调员已观察，等待验收 |
-| 05-dependent-worker.txt | 后继 worker，含前置 session Evidence |
-
-03-approved 的 SemiDynamic1 实际内容包括以下片段，长任务树及路径省略：
-
-```text
-# Workspace Context
-OS/Arch: windows/amd64
-working dir: ...本次测试工作区...
-AI Artifacts dir: ...本次测试工作区...
-
-# Session User Input History
-User Input: 已有约束：只读，不访问外部网络。
-
 # PLAN DOCUMENT
-Approved PLAN version 1
-# 核对方案
-只读检查来源，保存证据，交付报告。
+# 检查计划
+先核对来源。
+记录来源路径与验证依据。
 
 # PLAN DEFINITION
-Task briefs and prerequisite relationships. Runtime states are in PLAN STATUS.
-## Approved version 1
-...任务树：来源核对 -> 读取来源 / 复核来源...
-...每个节点包含 task_id、index、name、goal、semantic_identifier、depends_on...
-Executable leaf DAG (task_id <- prerequisite task_ids):
-...读取来源 <- []...
-...复核来源 <- [读取来源的 task_id]...
+当前嵌套任务定义：来源检查 → 检查组 → 来源读取、来源复核
+稳定 ID：从实际定义取 task_id；read 的语义标识改为 read_checked 后 ID 不变。
+派生叶 DAG：来源复核 <- 来源读取
 
-## 已知观测（Evidence）
-[id: source.location]
-主体：source.txt；动作：检查工作区；观测：文件位于当前工作区；控制含义：后续任务可在本地读取。
-```
-
-同一请求的 Open 中仍有当前用户输入“请核对 source.txt，计划确认一次后执行。”及 submit_plan 调用记录。PLAN STATUS 在它们之后，微观 TODO 再后。下面保留实际任务 ID：
-
-```text
 # PLAN STATUS
-Draft version: 1; approved version: 1
-## PLAN 未开始任务
-- 1 "读取来源" [plan-task4b494532-57f4-4feb-8e09-e65044211ce1]: pending; attempt=0
-  Dispatch: ready
-- 2 "复核来源" [plan-task67fd7bea-4a54-4534-b793-fb93c780653a]: pending; attempt=0
-  Dispatch: blocked; waiting for accepted prerequisites [plan-task4b494532-57f4-4feb-8e09-e65044211ce1]
-
-## 待办清单（TODO）
-### CURRENT TASK [...协调员本轮任务标识...]
-- (无 TODO；空清单不代表任务完成)
+阶段：PLAN；已有计划：true；等待审核：false
+业务任务尚未获批，不可执行。
 ```
 
-Dynamic 的完整有效材料为：
+这段为完整样本的节选，完整 JSON、UUID 和传输 marker 以导出的 provider 请求为准。文档覆盖、严格 diff 和任务 patch 后，下一次请求看到实际新内容。无效依赖导致组合事务回滚，当前文档与定义仍为原内容。原生协议历史里可能包含被拒绝调用的原始参数，它是传输审计历史，不能解释为当前文档。
 
-```text
-# Current Time
-2026-10-03 10:52:31
-submit_plan: {"approved_version":1,"draft_version":1}
+modify_plan 仅有 document/document_patch/tasks/tasks_patch 四个业务参数，支持覆盖、严格单文件 unified diff，以及有序 add/delete/update。成功回执只有 updated/unchanged、组件、必要 ID 与 patch artifact；无效调用保留明确拒绝理由。待审核期间不可编辑或重复 submit，用户要求修订后恢复编辑，批准用户最终编辑的内容后才移交 EXEC。
+
+## 三类 Yak／aim 冒烟
+
+脚本：[planning_phase.yak](smoke/planning_phase.yak)；harness：[planning_phase_yak_test.go](planning_phase_yak_test.go)。实际运行 Yak、aim、coordinator、读取工具、session Evidence、generic 调查 Agent、审核端点及持久化；只有模型决策使用确定性 provider。业务 worker 启动数始终为 0。
+
+| 任务入口 | native/text × 探索关闭/开启 | 验收 |
+| --- | --- | --- |
+| 调查生成 | 4 种 | 实际 read_file → save_evidence → create_plan → 文档/任务编辑 → submit_plan → 编辑后批准 |
+| preset | 4 种 | 原嵌套计划与文档初始化 → 调查/局部修改 → submit；不调用 create_plan，不丢已有 Evidence |
+| mocker | 4 种 | 同 preset，回调只初始化一次；单独测试恢复不重复构建 |
+
+每个组合包含文档覆盖、tasks 覆盖、文档 diff + 任务更新的组合事务、任务增删改、稳定 ID、最终 DAG、无效依赖回滚、unchanged、重复 Evidence 和一次最终批准。探索打开时另有一次提前提交：调查尚未退出时拒绝，不能弹审核卡。
+
+调查子 Agent 先交付新 Evidence，再继续调查，最后退出；协调员自动挂起两次。屏障期间模型计数不增加，重复 Evidence 不唤醒，新发现/真实退出会唤醒。父级只有明确共享的 Evidence 与结果引用，没有 CHILD_PRIVATE_REASON_SENTINEL 私有 Timeline。调查实际执行权限阻止写文件、命令、递归派发、计划编辑和专注循环。generic 取消/超时及 cleanup_pending 回归继续覆盖真实退出保护。
+
+新增真实审核回归在两种协议下验证：要求调整 → 解锁 → 修改 → 新端点审核；旧端点回复不批准新内容，重复回复不重复移交；最终采用用户编辑文档。另覆盖持久化失败、并发严格 patch、定义/DAG 一致性、实际 handler 绕过 verifier 时的拒绝和默认关闭配置继承。
+
+## 采样和缓存
+
+```powershell
+$env:COORDINATOR_CONTEXT_REVIEW_DIR = '<本地采样目录>'
+go test ./common/ai/aid/coordinator -run '^TestPlanPhaseYakSmoke$' -count=2 -v
 ```
 
-04-awaiting-review 则重点展示当前待验收任务，已验收的前置任务列在其他状态中：
+输出位于 planning-phase/<source>-native-<bool>-explore-<bool>/。每组提供创建/加载后、修改后、提交前的 prompt.txt、实际 native tools 或文本 schema JSON、投影 messages.json 与 summary.json。preset/mocker 额外采样初始化首轮。相应 JSON 记录模型/辅助调用数、自动等待数及运行轨迹。
 
-```text
-# PLAN STATUS
-Draft version: 1; approved version: 1
-## 当前执行 / 待验收
-- 2 "Second" [plan-task2188505d-a255-4be7-a735-0761cc0d0001]: awaiting_review; attempt=2
-## 其他任务状态
-- 1 "First" [plan-task80696a7f-037e-4357-b732-9f8ae55e30f4]: accepted; attempt=1
-```
+缓存验收比较真实 provider-visible messages：所有 PLAN 轮的 High Static、Frozen、SemiDynamic2 和 tools/schema 字节稳定；编辑只更新有变化的当前文档/定义；普通 Evidence 探针的前四条 message 保持相同。summary 的比例是这些可复用 message 与原生 tools 的字节占本轮输入的比例；文本 schema 已在 message 中，不重复计入。它不是模型网关缓存命中率，不能由此推断真实命中或 token 花费。
 
-这些 state/attempt 变化不会改写 PLAN DEFINITION。任务结果、artifacts 和 evidence_ids 写入 session Timeline Evidence，冻结后进入 SemiDynamic1，供 review_task 决策；feedback 只提供记录位置，不复制结果正文。前置 Evidence 在 worker 合并时进入 session journal，后继 worker 的真实请求包含 preset.source.1。
-
-## 计划维护与 DAG
-
-两种协议的 create_plan/modify_plan 接受旧字段 main_task/main_task_goal/tasks，以及递归 subtask_name/subtask_goal/subtask_identifier/sub_subtasks；保留现有平面别名。root_task 编辑和恢复协议不变。
-
-- 结构父节点不执行，只执行叶任务。
-- 节点排列不产生依赖，depends_on 显式描述关系。
-- 依赖一个任务组，等待该组全部叶任务被接受。
-- 组的前置条件只作用于组内入口叶任务，组内已有依赖继续传递先后关系。
-- 同一语义标识在修改时保留 task_id；重复标识、未知/歧义引用、循环依赖仍拒绝。
-
-例如 Scope -> Sources 组 -> Report，组内 First -> Second，叶 DAG 为：
+## 时序与批准边界
 
 ```mermaid
-flowchart LR
-    Scope --> First --> Second
-    First --> Report
-    Second --> Report
+sequenceDiagram
+    participant U as 用户 / Yakit
+    participant C as coordinator PLAN
+    participant J as generic 调查子 Agent
+    participant S as Session Timeline / 当前 Plan / DB
+    C->>C: FC 或文本 action：read_file / save_evidence
+    opt 探索开关打开
+        C->>J: action：dispatch_sub_react_agents
+        C->>C: 系统自动挂起（非模型调用）
+        J->>S: action：save_evidence，明确共享
+        S-->>C: 新发现通知（非 FC）
+        C->>C: 检查输入；提前 submit 被拒绝
+        C->>C: 系统自动挂起（非模型调用）
+        J->>S: 完成交付及实际退出/清理
+        S-->>C: 终态通知及结果引用（非 FC）
+    end
+    C->>S: create_plan / modify_plan：候选校验 → 原子保存 → 当前视图
+    C->>S: submit_plan：保存审核锁与当前完整内容
+    S-->>U: plan_review_require 或 detached_plan_require（非 FC）
+    U->>S: 既有审核事件 / interactive_id
+    alt 要求调整
+        S-->>C: 解锁，留在 PLAN
+    else 批准最终编辑
+        S->>S: 校验最终内容、原子保存 Phase=EXEC
+        S-->>C: 交还既有执行入口；此冒烟到交接结束
+    end
 ```
 
-WithPresetPlan 和新版 WithPlanMocker 均只创建草案，随后通过 submit_plan 和同一批准门禁执行。已有恢复草案不重复调用 mocker。modify_plan 产生新草案；获批前保留原已批准版本，SemiDynamic1 同时显示两份定义，PLAN STATUS 明确说明执行仍使用已批准版本。
+普通审核沿 existing checkpoint/interactive_id；detached 先发布并结束规划，确认后通过原 session 队列执行。最终批准树及 EXEC 快照在入队前保存；失败按原机制回滚。两条路径保留原事件、选择器、前端 description/tools 默认值和 protobuf。
 
-## Actions 与工具边界
-
-协调员专属 actions：create_plan、modify_plan、submit_plan、start_tasks、wait_tasks、review_task、retry_task、cancel_tasks、write_report。
-
-共享 actions：save_evidence、require_tool/directly_call_tool 的协议对应版本、ask_for_clarification、knowledge_enhance_answer、load_skills、change_skill_view_offset、load_skill_resources、search_capabilities、directly_answer、finish。原生模式提供 adjust_todolist，文本流使用主循环 todo_delta。worker 使用 submit_task_result 及允许的共享 actions，不开放协调员 actions、directly_answer、蓝图、其他专注循环或通用 sub-agent。
-
-协调员执行工具白名单：read_file、read_file_lines、list_dir、list_files、find_file、find_files、tree、grep、grep_files、search_files、search_knowledge、query_knowledge_base、yakdoc；write_file 仅允许工作目录 artifacts 下的 .md，仍检查路径和符号链接。未知工具、MCP 命令包装器、脚本及业务修改拒绝，由 worker 执行。
-
-尚需后续细化的控制点：当前 Frozen 工具目录来自共享 AiToolManager，可能展示协调员无权执行的工具。执行守卫已限制权限，但“目录可见”与“允许执行”尚未统一过滤。技能/能力搜索也不能等同于执行授权。本轮如实保留现状，没有扩大协调员权限。Forge 适配不在这次修改范围。
-
-## 验证范围
-
-缓存收敛：动作结果、拒绝原因与验收理由写入 Timeline Evidence。Controller 自动保存每个任务尝试的状态、完整结果及 Evidence/artifact 引用；wait 只引用观测 ID，feedback 只提供处理状态和记录位置。请求送达标记不写入 Evidence，避免验收门槛变化改写稳定前缀。
-
-动作不强制触发冻结。相同查询使用稳定 ID，内容相同不新增 journal 项；Open 冻结后沿现有 Evidence 提升到 SemiDynamic1，后续变化先写 Open，冻结前不改已提升前缀。有副作用的版本操作和验收理由按内容保存独立记录，后续查询不能覆盖它们。所有记录沿用 session Evidence 的共享、恢复与现有容量策略。
-
-`action_xxx.go` / `action_xxx_test.go` 分别承载 9 个计划动作、答复/完成适配及 worker 结果提交；`actions.go` 仅负责注册、双协议定义和公共校验，`action_outcome.go` 负责观测写入。`action_outcome_test.go` 验证 Open → 冻结/提升 → 新结果 Open → 再提升、独立任务结果保留、Timeline 恢复，以及写入失败不能返回成功。设置 `COORDINATOR_CONTEXT_REVIEW_DIR` 后，在 `action-observations` 输出四个实际阶段的上下文材料 JSON。
-
-`TestCoordinatorPlanCacheStableAcrossRepeatedRequests` 在两种协议下各使用 32 项长任务书和长文档连续请求 18 次。它比较投影后的 High Static、Frozen、SemiDynamic1、SemiDynamic2 的实际消息和 native tools，要求同版本内稳定前缀逐字节不变；批准只允许改变 SemiDynamic1，不能扰动共享规则、工具或 schema。测试隔离时间/桶阈值引起的合法提升；另有状态变化测试核对计划分区正文和 nonce 不变，生命周期冒烟验证用户输入及 Evidence 的正常冻结提升。字节比例用于缓存回归门槛，不作为真实 provider 命中率。
-
-专属 action 的中文说明与参数使用 Options/Description 和 NativeOptions/NativeDescription 分别生成两套定义，共用校验和处理函数。测试核对实际文本提示与 provider tools，确保不会混入另一协议的说明。
-
-本地覆盖两种 action 协议的完整依赖执行链、历史嵌套参数校验、组依赖展开、稳定任务 ID、状态与定义分离、预设/mocker 草案审核、当前输入单次记录、两个依赖 worker 的执行与验收、session Evidence 传递。既有 Yak 引擎 + aim、ReAct 审核、detached、gRPC 和共享提示分区回归继续运行。
-
-确定性 provider 验证代码和协议链路，不代表真实模型规划质量或真实缓存命中率；样本的字节数也不是 token 数或缓存用量。本轮不改 protobuf、不改前端、不提交或推送，等待用户本地 review。
+本地回归证明接口和执行契约，不证明外部模型规划质量或真实缓存命中率；没有进行 Electron UI 的手动验收。EXEC 的后续设计另行 review，本轮没有实现自动 DAG 调度的新方案或执行期间编辑。

@@ -4,6 +4,7 @@ import (
 	"crypto/sha256"
 	"encoding/json"
 	"fmt"
+	"path/filepath"
 	"sort"
 	"strings"
 
@@ -12,7 +13,7 @@ import (
 )
 
 func taskResultEvidence(cfg aicommon.AICallerConfigIf, observation taskResultRecord) (string, string) {
-	key := fmt.Sprintf("%s:%s:%d:%d", cfg.GetRuntimeId(), observation.TaskID, observation.PlanVersion, observation.AttemptID)
+	key := fmt.Sprintf("%s:%s:%d", cfg.GetRuntimeId(), observation.TaskID, observation.AttemptID)
 	digest := sha256.Sum256([]byte(key))
 	data, _ := json.Marshal(observation) // Only serializable task/result fields.
 	return fmt.Sprintf("coordinator.task.%x", digest[:16]), "任务执行结果与验收记录（实时状态以 PLAN STATUS 为准）：\n" + string(data)
@@ -54,6 +55,11 @@ func (c *Controller) attachResultTimeline(cfg aicommon.AICallerConfigIf) error {
 	defer c.publishMu.Unlock()
 	c.mu.Lock()
 	c.resultConfig = cfg
+	if c.patchDir == "" {
+		if concrete, ok := cfg.(*aicommon.Config); ok {
+			c.patchDir = filepath.Join(concrete.GetOrCreateWorkDir(), "artifacts", "coordinator-"+concrete.GetRuntimeId(), "plan-patches")
+		}
+	}
 	c.resultHashes = make(map[string][32]byte)
 	c.pendingResults = make(map[string]taskResultRecord)
 	for _, a := range c.state.Attempts {

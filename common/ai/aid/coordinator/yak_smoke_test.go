@@ -77,14 +77,14 @@ func TestCoordinatorLoopYakAIMNativeSmoke(t *testing.T) {
 			explored = true
 			return nativeResponse(c, req, "directly_call_tool", map[string]any{"directly_call_tool_name": "read_file", "directly_call_tool_params": map[string]any{"file": sourceFile}, "directly_call_reason": "Read the source before preparing the plan."})
 		}
-		if !strings.Contains(prompt, "Draft version: 1") {
+		if strings.Contains(prompt, "已有计划：false") {
 			return nativeResponse(c, req, "create_plan", map[string]any{"plan": map[string]any{"name": "Native smoke plan", "goal": "Verify shared evidence and native scheduling", "tasks": []any{
 				map[string]any{"name": "Verify source", "goal": "Confirm the first result and save evidence", "identifier": "source", "depends_on": []string{}},
 				map[string]any{"name": "Verify dependent", "goal": "Use the first accepted result to confirm the second result", "identifier": "dependent", "depends_on": []string{"source"}},
 			}}, "plan_document": "# Native smoke plan\nVerify two dependent tasks, review both and write the report."})
 		}
-		if strings.Contains(prompt, "approved version: 0") {
-			return nativeResponse(c, req, "submit_plan", map[string]any{"plan_version": 1})
+		if strings.Contains(prompt, "阶段：PLAN") {
+			return nativeResponse(c, req, "submit_plan", map[string]any{})
 		}
 		matches := taskPattern.FindAllStringSubmatch(prompt, -1)
 		if len(matches) < 2 {
@@ -98,23 +98,26 @@ func TestCoordinatorLoopYakAIMNativeSmoke(t *testing.T) {
 		}
 		for _, m := range matches {
 			if m[2] == "running" {
-				return nativeResponse(c, req, "wait_tasks", map[string]any{"task_ids": []string{m[1]}, "timeout_seconds": 1})
+				return nativeResponse(c, req, "directly_answer", map[string]any{"answer_payload": "检查新发现，等待任务结算。"})
 			}
 		}
 		for _, m := range matches {
 			if m[2] == "pending" {
-				return nativeResponse(c, req, "start_tasks", map[string]any{})
+				return nativeResponse(c, req, "wait_messages", map[string]any{})
 			}
 		}
 		if !saved {
 			saved = true
 			return nativeResponse(c, req, "save_evidence", map[string]any{"evidence_id": "smoke.coordinator", "evidence_content": "Both dependent tasks were inspected and accepted; their evidence is shared with the session."})
 		}
+		if !strings.Contains(prompt, "当前任务图和关键消息已经收尾") {
+			return nativeResponse(c, req, "directly_answer", map[string]any{"answer_payload": "核对新增事实，任务已审核。"})
+		}
 		if !reported {
 			reported = true
-			return nativeResponse(c, req, "write_report", map[string]any{"title": "Native coordinator smoke", "markdown": "# Native coordinator smoke\nTwo dependent tasks executed and were individually accepted. Shared session evidence was saved.", "summary": "Two tasks passed acceptance."})
+			return nativeResponse(c, req, "create_report", map[string]any{"title": "Native coordinator smoke", "document": "# Native coordinator smoke\nTwo dependent tasks executed and were individually accepted. Shared session evidence was saved."})
 		}
-		return nativeResponse(c, req, "finish", map[string]any{})
+		return nativeResponse(c, req, "submit_report", map[string]any{"summary": "Two tasks passed acceptance."})
 	}
 	record := func(op aicommon.AIEngineOperator, e *schema.AiOutputEvent) {
 		eventsMu.Lock()

@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"path/filepath"
 	"sync"
 	"time"
 
@@ -12,6 +13,7 @@ import (
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon/promptloader"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
 	"github.com/yaklang/yaklang/common/schema"
+	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/chanx"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
@@ -21,23 +23,28 @@ import (
 // plan builder, execution runtime or persistence implementation is involved.
 type Session struct {
 	*aicommon.Config
-	invoker        aicommon.AITaskInvokeRuntime
-	controller     *Controller
-	query          string
-	cancel         context.CancelFunc
-	cleanup        func()
-	parent         *aicommon.Config
-	parentTaskID   string
-	planningOnly   bool
-	detached       bool
-	startTaskID    string
-	mu             sync.Mutex
-	last           Snapshot
-	lastTree       json.RawMessage
-	opened, closed map[string]bool
-	tasks          map[string]*aicommon.AIStatefulTaskBase
-	stateErr       error
-	closeOnce      sync.Once
+	invoker                aicommon.AITaskInvokeRuntime
+	controller             *Controller
+	query                  string
+	cancel                 context.CancelFunc
+	cleanup                func()
+	parent                 *aicommon.Config
+	parentTaskID           string
+	planningOnly           bool
+	detached               bool
+	startTaskID            string
+	mu                     sync.Mutex
+	evidenceMu             sync.Mutex
+	last                   Snapshot
+	lastTree               json.RawMessage
+	opened, closed         map[string]bool
+	tasks                  map[string]*aicommon.AIStatefulTaskBase
+	stateErr               error
+	taskReviewEndpoints    map[string]bool
+	recordedReviewFeedback map[string]bool
+	planReviewEndpoints    map[string]bool
+	persisted              uint64
+	closeOnce              sync.Once
 }
 
 func NewSession(ctx context.Context, query string, opts ...aicommon.ConfigOption) (*Session, error) {
@@ -47,6 +54,10 @@ func NewSession(ctx context.Context, query string, opts ...aicommon.ConfigOption
 	ctx, cancel := context.WithCancel(ctx)
 	opts = append(append([]aicommon.ConfigOption{}, opts...), NativeOptions()...)
 	opts = append(opts, aicommon.WithContext(ctx))
+	opts = append(opts, func(cfg *aicommon.Config) error {
+		cfg.EnhanceKnowledgeManager = cfg.EnhanceKnowledgeManager.ForkForSubAgent()
+		return nil
+	})
 	runtime, err := aicommon.AIRuntimeInvokerGetter(ctx, opts...)
 	if err != nil {
 		cancel()
@@ -67,6 +78,7 @@ func NewSession(ctx context.Context, query string, opts ...aicommon.ConfigOption
 		}
 	}
 	s.controller = New(ctx, s, cfg.GetPlanExecTaskConcurrency())
+	s.controller.patchDir = filepath.Join(cfg.GetOrCreateWorkDir(), "artifacts", "coordinator-"+cfg.GetRuntimeId(), "plan-patches")
 	return s, nil
 }
 
@@ -108,6 +120,8 @@ func FromRuntime(ctx context.Context, r aicommon.AIInvokeRuntime, task aicommon.
 		return nil, err
 	}
 	s.parent, s.parentTaskID = parent, task.GetId()
+	// Preserve the caller's database boundary, including isolated test/session stores.
+	s.BaseCheckpointableStorage = aicommon.NewCheckpointableStorageWithDB(id, parent.GetDB())
 	key := "coordinator-input-" + id
 	parent.InputEventManager.RegisterMirrorOfAIInputEvent(key, func(e *ypb.AIInputEvent) {
 		switch e.SyncType {
@@ -120,7 +134,7 @@ func FromRuntime(ctx context.Context, r aicommon.AIInvokeRuntime, task aicommon.
 	})
 	parent.InputEventManager.RegisterAfterInputEvent(key, func(e *ypb.AIInputEvent) {
 		if e.IsInteractiveMessage || e.SyncType == aicommon.SYNC_TYPE_USER_INTERVENTION {
-			s.controller.Wake()
+			s.notifyUserInput(e)
 		}
 	})
 	s.cleanup = func() {
@@ -161,11 +175,11 @@ func (s *Session) SubmitInput(ctx context.Context, input *aicommon.ExecutePlanIn
 	}
 	s.detached, s.planningOnly = detached, true
 	_ = aicommon.WithForceManualPlanReview(forceManual)(s.Config)
-	version, err := s.controller.CreatePlan(ctx, input.PlanData, input.PlanDocument)
+	_, err := s.controller.CreatePlan(ctx, input.PlanData, input.PlanDocument)
 	if err != nil {
 		return nil, err
 	}
-	if err := s.controller.SubmitPlan(ctx, version); err != nil {
+	if err := s.controller.SubmitPlan(ctx); err != nil {
 		return nil, err
 	}
 	s.mu.Lock()
@@ -175,10 +189,7 @@ func (s *Session) SubmitInput(ctx context.Context, input *aicommon.ExecutePlanIn
 		return nil, err
 	}
 	snapshot := s.controller.Snapshot()
-	p := snapshot.Approved
-	if detached {
-		p = snapshot.Draft
-	}
+	p := snapshot.Plan
 	if p == nil {
 		return nil, fmt.Errorf("plan was not submitted")
 	}
@@ -190,10 +201,7 @@ func (s *Session) Prepare(ctx context.Context, data, document string) (*Plan, er
 		return nil, err
 	}
 	snapshot := s.controller.Snapshot()
-	previous := snapshot.Draft
-	if previous == nil {
-		previous = snapshot.Approved
-	}
+	previous := snapshot.Plan
 	return ParsePlan(data, document, previous)
 }
 
@@ -216,16 +224,13 @@ func (s *Session) CommitApprovedPlan(root *PlanNode, document string) error {
 	if err != nil {
 		return err
 	}
-	snapshot := Snapshot{Schema: 1, DraftVersion: 1, ApprovedVersion: 1, Draft: p, Approved: p, Attempts: map[string]Attempt{}}
-	for _, task := range p.Tasks {
-		snapshot.Attempts[task.ID] = Attempt{Task: task, PlanVersion: 1, State: Pending}
-	}
+
 	s.detached = false
-	return s.controller.Restore(snapshot)
+	return s.controller.LoadApproved(p)
 }
 
 func (s *Session) restore() error {
-	if s.controller.Snapshot().Draft != nil {
+	if s.controller.Snapshot().Plan != nil {
 		return nil
 	}
 	if s.GetDB() == nil {
@@ -251,19 +256,19 @@ func (s *Session) restore() error {
 	if err := resetCoordinatorRecovery(progress.State, s.startTaskID); err != nil {
 		return err
 	}
-	if progress.State.Approved != nil {
+	if progress.State.Phase == PhaseExec {
 		s.detached = false
 	}
 	return s.controller.Restore(*progress.State)
 }
 
 func (s *Session) run(planningOnly bool) (err error) {
-	defer s.Close()
+	defer func() { s.Close(); s.controller.owned.Wait() }()
 	s.planningOnly = planningOnly
 	if err = s.restore(); err != nil {
 		return err
 	}
-	if s.controller.Snapshot().Approved != nil {
+	if s.controller.Snapshot().Phase == PhaseExec {
 		s.detached = false
 	}
 	s.registerControls()
@@ -272,7 +277,7 @@ func (s *Session) run(planningOnly bool) (err error) {
 	s.InputEventManager.RegisterAfterInputEvent(key, func(e *ypb.AIInputEvent) {
 		// Forwarded input is journaled and notified by its owning parent once.
 		if s.parent == nil && (e.IsInteractiveMessage || e.SyncType == aicommon.SYNC_TYPE_USER_INTERVENTION) {
-			s.controller.Wake()
+			s.notifyUserInput(e)
 		}
 	})
 	defer s.InputEventManager.UnregisterAfterInputEvent(key)
@@ -280,7 +285,11 @@ func (s *Session) run(planningOnly bool) (err error) {
 		payload := map[string]any{"coordinator_id": s.Id, "re-act_id": s.parent.Id, "re-act_task": s.parentTaskID, "start_task_id": s.startTaskID}
 		s.parent.EmitJSON(schema.EVENT_TYPE_START_PLAN_AND_EXECUTION, "plan", payload)
 		defer func() {
+			payload["completed"] = err == nil && s.Snapshot().Finished
 			if err != nil {
+				s.controller.Close()
+				s.controller.owned.Wait()
+				payload["completed"] = false
 				s.parent.EmitPlanExecFail(err.Error())
 			}
 			s.parent.EmitJSON(schema.EVENT_TYPE_END_PLAN_AND_EXECUTION, "plan", payload)
@@ -311,6 +320,16 @@ func (s *Session) run(planningOnly bool) (err error) {
 	if err != nil {
 		return err
 	}
+	if !s.PlanningOnly() {
+		interval := s.IntervalReviewDuration
+		if interval <= 0 {
+			interval = 60 * time.Second
+		}
+		if s.DisableIntervalReview {
+			interval = 0
+		}
+		s.controller.EnableExecution(usesManualTaskReview(s.AgreePolicy), interval)
+	}
 	err = executeLoop(s.Config, s.invoker, loop, task)
 	if err != nil {
 		return err
@@ -319,6 +338,9 @@ func (s *Session) run(planningOnly bool) (err error) {
 		err = s.controller.CanFinishPlanning()
 	} else {
 		err = s.controller.CanFinish()
+		if err == nil && (!s.Snapshot().Finished || !s.Snapshot().Report.Submitted) {
+			err = fmt.Errorf("EXEC ended without a current submitted report and host completion")
+		}
 	}
 	if err != nil {
 		return err
@@ -364,6 +386,11 @@ func (s *Session) Execute(ctx context.Context, a Attempt) (result Result, retErr
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 	opts := aicommon.ConvertConfigToOptions(s.Config)
+	opts = append(opts, aicommon.WithEnhanceKnowledgeManager(s.EnhanceKnowledgeManager.ForkForSubAgent()))
+	if a.Plan != nil {
+		state := s.GetSessionPromptState().ForkForSubAgent()
+		opts = append(opts, aicommon.WithSessionPromptState(state), aicommon.WithFrozenBlockPartitionProducer(aicommon.NewFrozenBlockPartitionProducer(s.GetOrCreateFrozenBlockPartitionProducer().ProducePartitions()...)))
+	}
 	input := chanx.NewUnlimitedChan[*ypb.AIInputEvent](ctx, 10)
 	key := "worker-" + uuid.NewString()
 	s.InputEventManager.RegisterMirrorOfAIInputEvent(key, func(e *ypb.AIInputEvent) {
@@ -374,7 +401,7 @@ func (s *Session) Execute(ctx context.Context, a Attempt) (result Result, retErr
 	defer s.InputEventManager.UnregisterMirrorOfAIInputEvent(key)
 	hotpatch := s.HotPatchBroadcaster.Subscribe()
 	defer s.HotPatchBroadcaster.Unsubscribe(hotpatch)
-	s.Timeline.PushText(s.AcquireId(), "[PLAN_TASK_DISPATCH]\nTask: %s (%s)\nAttempt: %d; approved version: %d\nFrozen execution brief: %s", a.Task.Name, a.Task.ID, a.ID, a.PlanVersion, a.Task.Goal)
+	s.Timeline.PushText(s.AcquireId(), "[PLAN_TASK_DISPATCH]\nTask: %s (%s)\nAttempt: %d\nFrozen execution brief: %s", a.Task.Name, a.Task.ID, a.ID, a.Task.Goal)
 	fork, err := s.Timeline.ForkForTask(a.Task.Index, a.Task.Name, s.Config, s.Config)
 	if err != nil {
 		return result, err
@@ -395,7 +422,7 @@ func (s *Session) Execute(ctx context.Context, a Attempt) (result Result, retErr
 	}
 	aicommon.WithStatefulTaskBaseContext(ctx)(task)
 	task.SetName(a.Task.Name)
-	opts = append(opts, aicommon.WithContext(ctx), aicommon.WithID(s.Id), aicommon.WithAICallbacks(s.GetRawAICallbacks()), aicommon.WithEventInputChanx(input), aicommon.WithHotPatchOptionChan(hotpatch), aicommon.WithDisableCreateDBRuntime(true), aicommon.WithEnablePlanAndExec(false), aicommon.WithEmitter(s.GetEmitter().PushEventProcesser(func(e *schema.AiOutputEvent) *schema.AiOutputEvent {
+	opts = append(opts, aicommon.WithDisableToolCallerIntervalReview(true), aicommon.WithContext(ctx), aicommon.WithID(s.Id), aicommon.WithAICallbacks(s.GetRawAICallbacks()), aicommon.WithEventInputChanx(input), aicommon.WithHotPatchOptionChan(hotpatch), aicommon.WithDisableCreateDBRuntime(true), aicommon.WithEnablePlanAndExec(false), aicommon.WithEmitter(s.GetEmitter().PushEventProcesser(func(e *schema.AiOutputEvent) *schema.AiOutputEvent {
 		e.TaskUUID = task.GetUUID()
 		e.TaskId = task.GetId()
 		return e
@@ -406,17 +433,35 @@ func (s *Session) Execute(ctx context.Context, a Attempt) (result Result, retErr
 		return result, err
 	}
 	cfg := runtime.GetConfig().(*aicommon.Config)
+	cfg.BaseCheckpointableStorage = aicommon.NewCheckpointableStorageWithDB(cfg.GetRuntimeId(), s.GetDB())
 	task.SetEmitter(cfg.GetEmitter())
 	runtime.SetCurrentTask(task)
+	if a.Plan != nil {
+		cfg.AppendFrozenBlockPartition("plan_document", "PLAN DOCUMENT", "# PLAN DOCUMENT\n"+a.Plan.Document, aicommon.PlanDocumentFrozenPartitionOrder)
+		cfg.AppendFrozenBlockPartition("plan_definition", "PLAN DEFINITION", (Snapshot{Plan: a.Plan}).PlanDefinition(), aicommon.PlanDocumentFrozenPartitionOrder+1)
+	}
 	workerOptions := append(reactloops.BasicAICommonConfigOption(cfg), func(l *reactloops.ReActLoop) {
 		// session 相同，但每次任务尝试的结果记录必须独立。
-		l.Set("coordinator_worker_attempt", workerAttemptRef{TaskID: a.Task.ID, AttemptID: a.ID, PlanVersion: a.PlanVersion})
-		l.Set("coordinator_discovery_callback", func() { s.controller.taskDiscovered(a.Task.ID, a.ID) })
+		l.Set("coordinator_worker_attempt", workerAttemptRef{TaskID: a.Task.ID, AttemptID: a.ID})
+		l.Set("coordinator_discovery_callback", func(id, content string) error {
+			return s.saveTaskDiscovery(a, id, content)
+		})
 	})
+	brief, _ := json.Marshal(map[string]any{"task_id": a.Task.ID, "attempt_id": a.ID, "name": a.Task.Name, "goal": a.Task.Goal, "accepted_predecessors": taskResultRecords(a.Predecessors), "unaccepted_prior_results": taskResultRecords(a.PriorResults)})
+
 	loop, err := NewWorkerLoop(runtime, workerOptions...)
 	if err != nil {
 		return result, err
 	}
+	// Apply after NewWorkerLoop's invariant role options so the frozen brief is
+	// not overwritten by WithPersistentInstruction. This is scoped to this worker.
+	reactloops.WithPersistentContextProvider(func(l *reactloops.ReActLoop, _ string) (string, error) {
+		role, err := utils.RenderTemplate(workerInstruction, map[string]any{"FunctionCallMode": l.FunctionCallModeEnabled()})
+		if err != nil {
+			return "", err
+		}
+		return role + "\n[CURRENT_EXECUTION]\n" + string(brief) + "\n本次任务书已冻结；基于直接前置的已验收结果执行并验证。历史初步结果仅供背景参考。", nil
+	})(loop)
 	if err := executeLoop(cfg, runtime, loop, task); err != nil {
 		// Preserve an already-submitted partial result when later execution fails.
 		result, _ = loop.GetVariable("coordinator_task_result").(Result)
@@ -430,20 +475,30 @@ func (s *Session) Execute(ctx context.Context, a Attempt) (result Result, retErr
 }
 
 func (s *Session) Approve(ctx context.Context, p *Plan) (*Plan, error) {
+	displayTree, err := displayPlanTree(p)
+	if err != nil {
+		return nil, err
+	}
 	if s.detached {
 		if s.PersistentSessionId == "" || s.GetDB() == nil {
 			return nil, fmt.Errorf("detached plans require a persistent session")
 		}
-		payload := map[string]any{"id": s.Id, "coordinator_id": s.Id, "session_id": s.PersistentSessionId, "re-act_task": s.parentTaskID, "plan_payload": s.query, "detached": true, "selectors": []map[string]any{{"id": "detached-plan-execute-" + s.Id, "value": "continue", "prompt": "允许执行", "prompt_english": "Allow plan execution", "allow_extra_prompt": false}, {"id": "detached-plan-close-" + s.Id, "value": "close", "prompt": "关闭", "prompt_english": "Close review panel", "allow_extra_prompt": false}}, "plans": map[string]any{"root_task": p.Tree, "document": p.Document}, "plans_id": uuid.NewString()}
+		payload := map[string]any{"id": s.Id, "coordinator_id": s.Id, "session_id": s.PersistentSessionId, "re-act_task": s.parentTaskID, "plan_payload": s.query, "detached": true, "selectors": []map[string]any{{"id": "detached-plan-execute-" + s.Id, "value": "continue", "prompt": "允许执行", "prompt_english": "Allow plan execution", "allow_extra_prompt": false}, {"id": "detached-plan-close-" + s.Id, "value": "close", "prompt": "关闭", "prompt_english": "Close review panel", "allow_extra_prompt": false}}, "plans": map[string]any{"root_task": displayTree, "document": p.Document}, "plans_id": uuid.NewString()}
 		if s.parent != nil {
 			payload["re-act_id"] = s.parent.Id
 		}
 		s.EmitJSON(schema.EVENT_TYPE_DETACHED_PLAN_REQUIRE, "detached-plan", payload)
-		s.Timeline.PushText(s.AcquireId(), "[DETACHED_PLAN]\nCoordinator: %s\nSession: %s\nPlan document: %s\nPlan data: %s", s.Id, s.PersistentSessionId, p.Document, p.Tree)
+		s.Timeline.PushText(s.AcquireId(), "[DETACHED_PLAN]\nCoordinator: %s\nSession: %s\n等待用户审核当前 PLAN DOCUMENT 和 PLAN DEFINITION。", s.Id, s.PersistentSessionId)
 		return nil, ErrDetachedPlanPublished
 	}
 	ep := s.Epm.CreateEndpointWithEventType(schema.EVENT_TYPE_PLAN_REVIEW_REQUIRE)
 	ep.SetDefaultSuggestionContinue()
+	s.mu.Lock()
+	if s.planReviewEndpoints == nil {
+		s.planReviewEndpoints = map[string]bool{}
+	}
+	s.planReviewEndpoints[ep.GetId()] = true
+	s.mu.Unlock()
 	selectors := []map[string]any{}
 	for i, item := range []struct{ value, zh, en string }{{"freedom-review", "审阅模式", "Review and edit the plan"}, {"unclear", "目标不明确", "Clarify objectives"}, {"incomplete", "有遗漏", "Complete missing work"}, {"create-subtask", "需要拆分子任务", "Split tasks"}, {"continue", "继续执行", "Continue execution"}} {
 		selector := map[string]any{"id": fmt.Sprintf("plan-review-suggestion-%s-%d", s.Id, i), "value": item.value, "prompt": item.zh, "prompt_english": item.en, "allow_extra_prompt": item.value != "continue"}
@@ -452,13 +507,13 @@ func (s *Session) Approve(ctx context.Context, p *Plan) (*Plan, error) {
 		}
 		selectors = append(selectors, selector)
 	}
-	payload := map[string]any{"id": ep.GetId(), "selectors": selectors, "plans": map[string]any{"root_task": p.Tree, "document": p.Document}, "plans_id": uuid.NewString()}
+	payload := map[string]any{"id": ep.GetId(), "selectors": selectors, "plans": map[string]any{"root_task": displayTree, "document": p.Document}, "plans_id": uuid.NewString()}
 	if s.ForceManualPlanReview {
 		payload["force_manual_review"] = true
 	}
 	ep.SetReviewMaterials(payload)
 	if err := s.SubmitCheckpointRequest(ep.GetCheckpoint(), payload); err != nil {
-		s.EmitError("save plan review checkpoint: %v", err)
+		return nil, fmt.Errorf("save plan review checkpoint: %w", err)
 	}
 	s.EmitInteractiveJSON(ep.GetId(), schema.EVENT_TYPE_PLAN_REVIEW_REQUIRE, "review-require", payload)
 	if s.ForceManualPlanReview {
@@ -477,7 +532,7 @@ func (s *Session) Approve(ctx context.Context, p *Plan) (*Plan, error) {
 	s.CallAfterReview(ep.GetSeq(), "Review the coordinator plan", params)
 	suggestion := params.GetString("suggestion")
 	if suggestion != "continue" && suggestion != "freedom-review" {
-		return nil, fmt.Errorf("plan revision requested: %s", params)
+		return nil, s.planRevisionFeedback(ep.GetId(), params)
 	}
 	data, document := string(p.Tree), p.Document
 	// Yakit's editor submits the final tree with freedom-review. This is the

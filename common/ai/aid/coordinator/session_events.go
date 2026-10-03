@@ -36,13 +36,12 @@ type Progress struct {
 	UpdatedAt        int64     `json:"updated_at"`
 }
 
+func (s *Session) StateError() error { s.mu.Lock(); defer s.mu.Unlock(); return s.stateErr }
+
 func (s *Session) Changed(snapshot Snapshot) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	p := snapshot.Approved
-	if p == nil {
-		p = snapshot.Draft
-	}
+	p := snapshot.Plan
 	if p == nil {
 		s.last = snapshot
 		return
@@ -53,7 +52,7 @@ func (s *Session) Changed(snapshot Snapshot) {
 		return
 	}
 	progress := Progress{PlanEngine: Name, CoordinatorState: &snapshot, ReactTaskID: s.parentTaskID, PlanPayload: s.query, PlanDocument: p.Document, TotalTasks: len(p.Tasks), Phase: "NotCompleted", UpdatedAt: time.Now().Unix()}
-	if snapshot.Approved == nil {
+	if snapshot.Phase == PhasePlan {
 		progress.Phase = aicommon.PlanExecPhaseDetachedPendingApproval
 	} else if s.planningOnly {
 		progress.Phase = "plan_ready"
@@ -103,6 +102,9 @@ func (s *Session) Changed(snapshot Snapshot) {
 		order[t.ID] = i
 	}
 	root.walk(func(n *PlanNode) {
+		if n.Tools == nil {
+			n.Tools = []string{}
+		}
 		if len(n.Subtasks) > 0 {
 			return
 		}
@@ -155,20 +157,20 @@ func (s *Session) Changed(snapshot Snapshot) {
 			}
 		}
 	})
-	if snapshot.Approved != nil && snapshot.ApprovedVersion != s.last.ApprovedVersion {
-		// Even an empty replacement document must supersede the previous version.
-		document := strings.TrimSpace(p.Document)
-		if document == "" {
-			document = "本版本未提供独立计划文档；任务书以 PLAN DEFINITION 为准。"
-		}
-		s.AppendFrozenBlockPartition("plan_document", "Plan Document", fmt.Sprintf("Approved PLAN version %d\n%s", snapshot.ApprovedVersion, document), aicommon.PlanDocumentFrozenPartitionOrder)
+	if s.last.Plan == nil || p.Document != s.last.Plan.Document {
+		// Frozen views are replaced only when their source actually changes.
+		s.AppendFrozenBlockPartition("plan_document", "PLAN DOCUMENT", "# PLAN DOCUMENT\n"+p.Document, aicommon.PlanDocumentFrozenPartitionOrder)
 	}
-	if snapshot.DraftVersion != s.last.DraftVersion || snapshot.ApprovedVersion != s.last.ApprovedVersion {
-		s.AppendFrozenBlockPartition("plan_definition", "Plan Definition", snapshot.PlanDefinition(), aicommon.PlanDocumentFrozenPartitionOrder+1)
+	if s.last.Plan == nil || string(p.Tree) != string(s.last.Plan.Tree) {
+		s.AppendFrozenBlockPartition("plan_definition", "PLAN DEFINITION", snapshot.PlanDefinition(), aicommon.PlanDocumentFrozenPartitionOrder+1)
 	}
+	if snapshot.Report.Path != "" && (s.last.Report.Path != snapshot.Report.Path || s.last.Report.Document != snapshot.Report.Document) {
+		s.AppendFrozenBlockPartition("current_report", "CURRENT REPORT", "# CURRENT REPORT\n路径："+snapshot.Report.Path+"\n"+snapshot.Report.Document, aicommon.PlanDocumentFrozenPartitionOrder+2)
+	}
+	aggregatePlanProgress(&root)
 	s.EmitJSON(schema.EVENT_TYPE_PLAN, "system", map[string]any{"root_task": root})
 	s.lastTree, _ = json.Marshal(root)
-	if s.PersistentSessionId != "" && s.GetDB() != nil {
+	if s.PersistentSessionId != "" && s.GetDB() != nil && snapshot.Revision > s.persisted {
 		tree, err := json.Marshal(root)
 		if err == nil {
 			var raw []byte
@@ -180,9 +182,66 @@ func (s *Session) Changed(snapshot Snapshot) {
 		if err != nil {
 			s.stateErr = err
 			s.EmitError("save coordinator state: %v", err)
+		} else {
+			s.persisted = snapshot.Revision
 		}
 	}
 	s.last = snapshot
+}
+
+// Groups organize leaves and require neither a worker nor an extra review.
+func aggregatePlanProgress(n *PlanNode) string {
+	if len(n.Subtasks) == 0 {
+		return n.Progress
+	}
+	completed, resolved, active := true, true, false
+	for _, child := range n.Subtasks {
+		state := aggregatePlanProgress(child)
+		completed = completed && state == "completed"
+		resolved = resolved && (state == "completed" || state == "skipped")
+		active = active || state == "processing"
+	}
+	switch {
+	case completed:
+		n.Progress = "completed"
+	case resolved:
+		n.Progress = "skipped"
+	case active:
+		n.Progress = "processing"
+	default:
+		n.Progress = ""
+	}
+	return n.Progress
+}
+
+// CommitPlan persists the entire candidate before Controller exposes an edit or
+// approval transition. Changed adds only the compatible UI projection afterwards.
+func (s *Session) CommitPlan(snapshot Snapshot) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.PersistentSessionId == "" || s.GetDB() == nil {
+		return nil
+	}
+	tree, err := displayPlanTree(snapshot.Plan)
+	if err != nil {
+		return err
+	}
+	phase := "NotCompleted"
+	if snapshot.Phase == PhasePlan {
+		phase = aicommon.PlanExecPhaseDetachedPendingApproval
+	} else if s.PlanningOnly() {
+		phase = "plan_ready"
+	}
+	progress := Progress{PlanEngine: Name, CoordinatorState: &snapshot, ReactTaskID: s.parentTaskID, PlanPayload: s.query, PlanDocument: snapshot.Plan.Document, TotalTasks: len(snapshot.Plan.Tasks), Phase: phase, UpdatedAt: time.Now().Unix()}
+	data, err := json.Marshal(progress)
+	if err != nil {
+		return err
+	}
+	if err = yakit.CreateOrUpdateAISessionPlanAndExec(s.GetDB(), &schema.AISessionPlanAndExec{SessionID: s.PersistentSessionId, CoordinatorID: s.Id, TaskTree: string(tree), TaskProgress: string(data)}); err != nil {
+		return err
+	}
+	s.persisted = snapshot.Revision
+	return nil
 }
 
 func (s *Session) registerControls() {

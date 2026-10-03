@@ -74,9 +74,10 @@ func TestPublishDetachedPlan_PersistsSessionAndEmitsEvent(t *testing.T) {
 	timelineText := collectTimelineText(reactIns)
 	require.Contains(t, timelineText, "[DETACHED_PLAN]")
 	require.Contains(t, timelineText, coordinatorID)
-	require.Contains(t, timelineText, "step-1")
-	require.Contains(t, timelineText, "do something")
-	require.Contains(t, timelineText, "Plan data:")
+	require.Contains(t, timelineText, "PLAN DEFINITION")
+	require.NotContains(t, timelineText, "Plan data:")
+	require.Contains(t, record.TaskTree, "step-1")
+	require.Contains(t, record.TaskTree, "do something")
 }
 
 func TestFormatDetachedPlanTimelineContent_IncludesNestedTasks(t *testing.T) {
@@ -255,4 +256,19 @@ func TestHandleSyncTypeExecuteDetachedPlanEvent_LegacyStoredAndEditedTree(t *tes
 			require.Contains(t, record.TaskProgress, aicommon.PlanExecPhaseDetachedPendingApproval)
 		})
 	}
+}
+
+func TestParseExecuteDetachedPlanParams_RejectsEmptyEditedDocument(t *testing.T) {
+	for _, value := range []any{"", "  \n", nil, 42} {
+		raw, err := json.Marshal(map[string]any{"coordinator_id": "pending-plan", "plans": map[string]any{"document": value}})
+		require.NoError(t, err)
+		_, _, _, _, err = parseExecuteDetachedPlanParams(string(raw))
+		require.Error(t, err, "an explicitly invalid edit must not fall back to the stored document")
+	}
+	_, _, _, input, err := parseExecuteDetachedPlanParams(`{"coordinator_id":"pending-plan","plans":{"document":"# 用户最终文档"}}`)
+	require.NoError(t, err)
+	require.Equal(t, "# 用户最终文档", input.PlanDocument)
+	_, _, _, input, err = parseExecuteDetachedPlanParams(`{"coordinator_id":"pending-plan"}`)
+	require.NoError(t, err, "omitted fields retain the existing stored-plan contract")
+	require.Empty(t, input.PlanDocument)
 }

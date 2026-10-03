@@ -15,6 +15,11 @@ func configureCoordinatorFinish(loop *reactloops.ReActLoop) error {
 	wrapped := *finish
 	original := finish.ActionHandler
 	wrapped.ActionHandler = func(l *reactloops.ReActLoop, a *aicommon.Action, op *reactloops.LoopActionHandlerOperator) {
+		if !planningOnly(l) && controller(l).Snapshot().Phase == PhaseExec {
+			op.Feedback("EXEC 由宿主在 submit_report 后检查收尾，主模型不能 finish。")
+			op.Continue()
+			return
+		}
 		check := controller(l).CanFinish
 		if planningOnly(l) {
 			check = controller(l).CanFinishPlanning
@@ -32,17 +37,6 @@ func configureCoordinatorFinish(loop *reactloops.ReActLoop) error {
 				return
 			}
 			continueAfterFinishRejection(l, a, op, err)
-			return
-		}
-		requireReport := false
-		if cfg, ok := l.GetConfig().(*aicommon.Config); ok {
-			requireReport = cfg.GenerateReport
-		}
-		if host, ok := controller(l).host.(interface{ ReportRequired() bool }); ok {
-			requireReport = host.ReportRequired()
-		}
-		if !planningOnly(l) && requireReport && l.Get("coordinator_report_path") == "" {
-			continueAfterFinishRejection(l, a, op, fmt.Errorf("write_report is required before finishing this PLAN"))
 			return
 		}
 		gate := reactloops.NewActionHandlerOperator(op.GetTask())

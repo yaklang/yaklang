@@ -191,10 +191,7 @@ func (r *ReAct) HandleSyncTypeExecuteDetachedPlanEvent(event *ypb.AIInputEvent) 
 	if channel == coordinator.Name && detectPlan.PlanDocument == "" {
 		var native coordinator.Progress
 		if json.Unmarshal([]byte(record.TaskProgress), &native) == nil && native.CoordinatorState != nil {
-			plan := native.CoordinatorState.Approved
-			if plan == nil {
-				plan = native.CoordinatorState.Draft
-			}
+			plan := native.CoordinatorState.Plan
 			if plan != nil {
 				detectPlan.PlanDocument = plan.Document
 			}
@@ -226,12 +223,30 @@ func (r *ReAct) HandleSyncTypeExecuteDetachedPlanEvent(event *ypb.AIInputEvent) 
 	// Yakit submits the edited plans.root_task. Validate it before changing the
 	// persisted phase or acknowledging execution, and keep the approved edit.
 	var root any
+	var approvedState *coordinator.Snapshot
 	if channel == coordinator.Name {
+		var stored coordinator.Progress
+		if err = json.Unmarshal([]byte(record.TaskProgress), &stored); err != nil || stored.CoordinatorState == nil {
+			reject(errors.New("detached coordinator snapshot is missing or invalid"))
+			return nil
+		}
+		state := stored.CoordinatorState
+		if state.Phase != coordinator.PhasePlan || !state.ReviewPending {
+			reject(errors.New("coordinator plan is no longer awaiting this approval"))
+			return nil
+		}
 		var plan *coordinator.Plan
-		plan, err = coordinator.ParseReviewedPlan(approvedInput.PlanData, approvedInput.PlanDocument, nil)
+		plan, err = coordinator.ParseReviewedPlan(approvedInput.PlanData, approvedInput.PlanDocument, state.Plan)
 		if err == nil {
 			root = plan.Tree
 			approvedInput.PlanData = string(plan.Tree)
+			state.Plan, state.Phase, state.ReviewPending = plan, coordinator.PhaseExec, false
+			state.Revision++
+			state.Attempts = make(map[string]coordinator.Attempt, len(plan.Tasks))
+			for _, task := range plan.Tasks {
+				state.Attempts[task.ID] = coordinator.Attempt{Task: task, State: coordinator.Pending}
+			}
+			approvedState = state
 		}
 	} else {
 		root, err = r.buildRootTaskForDetachedPlan(r.config.GetContext(), input.PlanPayload, approvedInput)
@@ -247,7 +262,11 @@ func (r *ReAct) HandleSyncTypeExecuteDetachedPlanEvent(event *ypb.AIInputEvent) 
 		return nil
 	}
 	record.TaskTree = string(tree)
-	record.TaskProgress = string(utils.Jsonify(map[string]any{"plan_engine": channel, "phase": coordinator_legacy.Phase_NotCompleted, "updated_at": time.Now().Unix()}))
+	if approvedState != nil {
+		record.TaskProgress = string(utils.Jsonify(coordinator.Progress{PlanEngine: channel, CoordinatorState: approvedState, ReactTaskID: detectPlan.ReactTaskID, PlanPayload: approvedInput.PlanPayload, PlanDocument: approvedInput.PlanDocument, TotalTasks: len(approvedState.Plan.Tasks), Phase: coordinator_legacy.Phase_NotCompleted, UpdatedAt: time.Now().Unix()}))
+	} else {
+		record.TaskProgress = string(utils.Jsonify(map[string]any{"plan_engine": channel, "phase": coordinator_legacy.Phase_NotCompleted, "updated_at": time.Now().Unix()}))
+	}
 	if err := yakit.CreateOrUpdateAISessionPlanAndExec(db, record); err != nil {
 		reject(err)
 		return nil
@@ -343,6 +362,9 @@ func parseExecuteDetachedPlanParams(syncJSON string) (coordinatorID, sessionID, 
 			input.PlanDocument, valid = raw.(string)
 			if !valid {
 				return "", "", "", nil, errors.New("plans.document must be a string")
+			}
+			if strings.TrimSpace(input.PlanDocument) == "" {
+				return "", "", "", nil, errors.New("plans.document must be nonempty")
 			}
 		}
 		if root, exists := plans["root_task"]; exists {

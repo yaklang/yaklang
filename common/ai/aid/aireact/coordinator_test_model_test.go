@@ -59,17 +59,17 @@ func newNativePlanTestModel(tool string, taskCount ...int) func(aicommon.AICalle
 			case 1:
 				name, args = "submit_task_result", map[string]any{"summary": "The deterministic check completed."}
 			}
-		case strings.Contains(prompt, "Draft version: 0"):
+		case strings.Contains(prompt, "已有计划：false"):
 			name, args = "create_plan", map[string]any{"plan": map[string]any{"name": "Callback inheritance", "goal": "Run the deterministic tool through the inherited model", "tasks": tasks}, "plan_document": "# Run the approved check"}
-		case strings.Contains(prompt, "approved version: 0"):
-			name, args = "submit_plan", map[string]any{"plan_version": 1}
+		case strings.Contains(prompt, "阶段：PLAN"):
+			name, args = "submit_plan", map[string]any{}
 		default:
 			for _, state := range statePattern.FindAllStringSubmatch(prompt, -1) {
 				switch state[2] {
 				case "pending":
-					name = "start_tasks"
+					name = "wait_messages"
 				case "running":
-					name, args = "wait_tasks", map[string]any{"timeout_seconds": 1}
+					name, args = "wait_messages", map[string]any{"timeout_seconds": 1}
 				case "awaiting_review":
 					attempt, _ := strconv.Atoi(state[3])
 					name, args = "review_task", map[string]any{"task_id": state[1], "attempt_id": attempt, "decision": "accept", "reason": "The delivered result completes the deterministic check."}
@@ -77,6 +77,15 @@ func newNativePlanTestModel(tool string, taskCount ...int) func(aicommon.AICalle
 				if state[2] == "running" || state[2] == "awaiting_review" {
 					break
 				}
+			}
+		}
+		if name == "finish" && strings.Contains(prompt, "阶段：EXEC") {
+			if !strings.Contains(prompt, "当前任务图和关键消息已经收尾") {
+				name, args = "directly_answer", map[string]any{"answer_payload": "核对新增结果。"}
+			} else if !strings.Contains(prompt, "# CURRENT REPORT") {
+				name, args = "create_report", map[string]any{"title": "检查报告", "document": "# 检查报告\n实际检查已经完成审核。"}
+			} else {
+				name, args = "submit_report", map[string]any{"summary": "检查完成。"}
 			}
 		}
 		native := wire.ToolCallCallback != nil && wire.FinishReasonCallback != nil

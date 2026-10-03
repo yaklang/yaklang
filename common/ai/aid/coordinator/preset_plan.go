@@ -18,7 +18,7 @@ type planSource struct {
 }
 
 // WithPresetPlan bypasses model plan generation, but never bypasses DAG
-// validation, versioning, approval or the coordinator/worker execution gates.
+// validation, approval or the coordinator/worker execution gates.
 func WithPresetPlan(data, document string) aicommon.ConfigOption {
 	return aicommon.WithAppendOtherOption(planSource{build: func(*Session) (string, string, error) {
 		return data, document, nil
@@ -26,7 +26,7 @@ func WithPresetPlan(data, document string) aicommon.ConfigOption {
 }
 
 // WithPlanMocker supplies a native preset task tree. It is called once for a new
-// plan; restored plans retain their stored version and do not call it again.
+// plan; restored plans retain their current definition and do not call it again.
 func WithPlanMocker(build func(*Session) *PlanResponse) aicommon.ConfigOption {
 	return aicommon.WithAppendOtherOption(planSource{build: func(s *Session) (string, string, error) {
 		if build == nil {
@@ -52,7 +52,7 @@ func nativePlanOptions(cfg *aicommon.Config) []aicommon.ConfigOption {
 }
 
 func (s *Session) preparePresetPlan() error {
-	if s.controller.Snapshot().Draft != nil {
+	if s.controller.Snapshot().Plan != nil {
 		return nil
 	}
 	var source *planSource
@@ -69,9 +69,9 @@ func (s *Session) preparePresetPlan() error {
 	if err != nil {
 		return err
 	}
-	version, err := s.controller.CreatePlan(s.GetContext(), data, document)
+	_, err = s.controller.CreatePlan(s.GetContext(), data, document)
 	if err == nil {
-		s.Timeline.PushText(s.AcquireId(), "[PRESET_PLAN]\nDraft version %d loaded; validate and submit this draft before execution. Do not generate a replacement unless the user's requirements change.", version)
+		s.Timeline.PushText(s.AcquireId(), "[PRESET_PLAN]\n当前计划已加载；完善后提交审核，无需再次创建。")
 	}
 	return err
 }

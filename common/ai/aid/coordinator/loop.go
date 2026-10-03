@@ -14,7 +14,9 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 )
 
+var planInstruction = promptloader.MustLoad("ai/aid/coordinator/planning.txt")
 var instruction = promptloader.MustLoad("ai/aid/coordinator/instruction.txt")
+var reportInstruction = promptloader.MustLoad("ai/aid/coordinator/reporting.txt")
 var planningOnlyInstruction = promptloader.MustLoad("ai/aid/coordinator/planning_only.txt")
 
 func WithController(c *Controller) reactloops.ReActLoopOption {
@@ -37,13 +39,15 @@ func controller(loop *reactloops.ReActLoop) *Controller {
 	return c
 }
 
-var ActionNames = []string{"create_plan", "modify_plan", "submit_plan", "start_tasks", "wait_tasks", "review_task", "retry_task", "cancel_tasks", "write_report"}
+var ActionNames = []string{"create_plan", "modify_plan", "submit_plan", "wait_messages", "inspect_task", "review_task", "retry_task", "cancel_tasks", "create_report", "modify_report", "submit_report"}
 
 // NewLoop uses the main loop's configured action protocol and Timeline assembly.
 // The tool guard is per-loop, so execution workers retain their own tool policy.
 func NewLoop(r aicommon.AIInvokeRuntime, opts ...reactloops.ReActLoopOption) (*reactloops.ReActLoop, error) {
 	// These are planning preferences, scoped to this coordinator's role
 	// instructions (semi-dynamic 2), never worker instructions or high static.
+	var owningController *Controller
+	var planningOnlyForOwner bool
 	var preferences strings.Builder
 	if global := yakit.GetCachedAIGlobalConfig(); global != nil && strings.TrimSpace(global.GetAIPlanPrompt()) != "" {
 		fmt.Fprintf(&preferences, "\n<planning_preferences>\n%s\n</planning_preferences>\n", global.GetAIPlanPrompt())
@@ -56,14 +60,25 @@ func NewLoop(r aicommon.AIInvokeRuntime, opts ...reactloops.ReActLoopOption) (*r
 		_ = aicommon.WithAiAgreeRiskControl(NativeRiskReview)(cfg)
 		_ = aicommon.WithDisableDynamicPlanning(true)(cfg)
 	}
+	explorationConfig := false
+	if cfg, ok := r.GetConfig().(*aicommon.Config); ok {
+		explorationConfig = cfg.EnableSubagentsInPlan
+		cfg.EnableDispatchSubReactAgents = explorationConfig
+	}
 	preset := []reactloops.ReActLoopOption{
 		reactloops.WithFunctionCallActionVariants(), reactloops.WithAllowToolCall(true), reactloops.WithAllowUserInteract(true), reactloops.WithAllowPlanAndExec(false), reactloops.WithAllowAIForge(false),
 		reactloops.WithPersistentContextProvider(func(l *reactloops.ReActLoop, _ string) (string, error) {
-			text, err := utils.RenderTemplate(instruction, map[string]any{"FunctionCallMode": l.FunctionCallModeEnabled()})
+			template := instruction
+			if controller(l).Snapshot().Phase == PhasePlan {
+				template = planInstruction
+			} else if !planningOnly(l) && controller(l).ReportReady() {
+				template = reportInstruction
+			}
+			text, err := utils.RenderTemplate(template, map[string]any{"FunctionCallMode": l.FunctionCallModeEnabled(), "ExplorationEnabled": explorationEnabled(l)})
 			if err != nil {
 				return "", err
 			}
-			if controller(l).Snapshot().Approved == nil {
+			if controller(l).Snapshot().Phase == PhasePlan {
 				text += preferences.String()
 			}
 			if planningOnly(l) {
@@ -85,11 +100,16 @@ func NewLoop(r aicommon.AIInvokeRuntime, opts ...reactloops.ReActLoopOption) (*r
 		reactloops.WithActionFilter(func(a *reactloops.LoopAction) bool {
 			for _, name := range ActionNames {
 				if a.ActionType == name {
-					return true
+					return owningController.actionAllowed(name)
 				}
 			}
+			if a.ActionType == "dispatch_sub_react_agents" || reactloops.IsSubAgentControlAction(a.ActionType) {
+				return owningController.Snapshot().Phase == PhasePlan && explorationConfig
+			}
 			switch a.ActionType {
-			case "finish", "directly_answer", "save_evidence", "adjust_todolist", "require_tool", "directly_call_tool", "ask_for_clarification", "knowledge_enhance_answer", "load_skills", "change_skill_view_offset", "load_skill_resources", "search_capabilities":
+			case "finish":
+				return owningController.Snapshot().Phase == PhasePlan || planningOnlyForOwner
+			case "directly_answer", "save_evidence", "adjust_todolist", "require_tool", "directly_call_tool", "ask_for_clarification", "knowledge_enhance_answer", "load_skills", "change_skill_view_offset", "load_skill_resources", "search_capabilities":
 				return true
 			}
 			return false
@@ -109,13 +129,32 @@ func NewLoop(r aicommon.AIInvokeRuntime, opts ...reactloops.ReActLoopOption) (*r
 		return nil, err
 	}
 
+	owningController = controller(loop)
+	planningOnlyForOwner = planningOnly(loop)
+	if err := configureExploration(loop); err != nil {
+		return nil, err
+	}
 	// Preserve the existing TODO/goal/subagent completion gates as well.
 	reactloops.WithPlanStatusProvider(func() string {
 		c := controller(loop)
+		through, err := c.deliverMessages()
+		if err != nil {
+			loop.Set("coordinator_wait_error", err)
+		}
+		loop.Set("coordinator_message_cursor", through)
 		s, revision := c.contextSnapshot()
+		status := s.PromptStatus()
+		if m := loop.GetSubAgentManager(); m != nil {
+			cursor, _ := m.ChangeCursor()
+			loop.Set("coordinator_exploration_cursor", cursor)
+			jobs, _ := m.Inspect(nil)
+			for _, job := range jobs {
+				status += fmt.Sprintf("探索 %s [%s]: %s; cleanup_pending=%t\n", job.Identifier, job.ID, job.State, job.CleanupPending)
+			}
+		}
 		loop.Set("coordinator_observed_user_revision", s.UserRevision)
 		loop.Set("coordinator_event_revision", revision)
-		return s.PromptStatus()
+		return status
 	})(loop)
 	if err := configureCoordinatorFinish(loop); err != nil {
 		return nil, err
@@ -123,6 +162,7 @@ func NewLoop(r aicommon.AIInvokeRuntime, opts ...reactloops.ReActLoopOption) (*r
 	if err := configureCoordinatorAnswer(loop); err != nil {
 		return nil, err
 	}
+	configureDecisionBoundary(loop)
 	configureAutomaticWait(loop)
 	return loop, nil
 }
@@ -134,7 +174,7 @@ func planData(a *aicommon.Action) string {
 
 func init() {
 	_ = reactloops.RegisterLoopFactory(Name, NewLoop,
-		reactloops.WithLoopDescription("Plan coordination: explore, approve, dispatch, wait, review, replan and report through compatible PLAN channels."),
+		reactloops.WithLoopDescription("计划协调：PLAN 调查并提交审核；EXEC 自动 DAG 调度、消息驱动审核与调整，最终提交 artifacts 报告。"),
 		reactloops.WithVerboseName("Coordinator"), reactloops.WithVerboseNameZh("任务协调"),
 		reactloops.WithLoopDescriptionZh("计划协调运行体：探索、审批、调度、等待、验收、重试和报告，兼容已有 PLAN 与 Yakit 通道。"))
 }

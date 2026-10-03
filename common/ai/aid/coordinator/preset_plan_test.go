@@ -46,7 +46,7 @@ func TestCoordinatorPresetPlanApprovalContext(t *testing.T) {
 					prompts = append(prompts, req.GetPrompt())
 					switch len(prompts) {
 					case 1:
-						return nativeResponse(c, req, "submit_plan", map[string]any{"plan_version": 1})
+						return nativeResponse(c, req, "submit_plan", map[string]any{})
 					default:
 						return nativeResponse(c, req, "finish", map[string]any{})
 					}
@@ -78,7 +78,7 @@ func TestCoordinatorPresetPlanApprovalContext(t *testing.T) {
 				require.NotContains(t, dynamic, "请核对 source.txt")
 				require.NotContains(t, dynamic, "已有约束：")
 			}
-			require.Contains(t, prompts[0], "PLAN 草案任务（未批准）")
+			require.Contains(t, prompts[0], "阶段：PLAN；已有计划：true")
 			require.NotContains(t, prompts[1], `"draft":{`, "actions must not replay the complete plan")
 			require.NotContains(t, prompts[1], "(*coordinator.Plan)")
 			require.Contains(t, prompts[1], "# PLAN DOCUMENT")

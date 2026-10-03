@@ -10,9 +10,8 @@ import (
 )
 
 type workerAttemptRef struct {
-	TaskID      string `json:"task_id"`
-	AttemptID   uint64 `json:"attempt_id"`
-	PlanVersion uint64 `json:"plan_version"`
+	TaskID    string `json:"task_id"`
+	AttemptID uint64 `json:"attempt_id"`
 }
 
 func actionSubmitTaskResult() reactloops.ReActLoopOption {

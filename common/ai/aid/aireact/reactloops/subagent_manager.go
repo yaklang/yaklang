@@ -79,17 +79,18 @@ type managedSubAgent struct {
 // synchronous DispatchSubAgents calls do not acquire this manager's slots:
 // a category worker may synchronously wait for its own search worker.
 type SubAgentManager struct {
-	mu               sync.Mutex
-	ctx              context.Context
-	closed           bool
-	jobs             map[string]*managedSubAgent
-	order            []string
-	receipts         map[string]SubAgentReceipt
-	slots            chan struct{}
-	changed          chan struct{}
-	revision         uint64
-	evidenceRevision uint64
-	wg               sync.WaitGroup
+	mu                   sync.Mutex
+	ctx                  context.Context
+	closed               bool
+	jobs                 map[string]*managedSubAgent
+	order                []string
+	receipts             map[string]SubAgentReceipt
+	slots                chan struct{}
+	changed              chan struct{}
+	revision             uint64
+	evidenceRevision     uint64
+	notificationRevision uint64
+	wg                   sync.WaitGroup
 }
 
 func newSubAgentManager(ctx context.Context, concurrency int) *SubAgentManager {
@@ -128,6 +129,13 @@ func (r *ReActLoop) SubmitSubAgents(task aicommon.AIStatefulTask, jobs []SubAgen
 	}
 	if r.IsSubAgent() {
 		return nil, fmt.Errorf("only a top-level loop may submit background sub-agents")
+	}
+	if policy, ok := r.GetVariable("sub_agent_submission_policy").(func([]SubAgentJob, SubAgentOptions) (SubAgentOptions, error)); ok {
+		var err error
+		opts, err = policy(jobs, opts)
+		if err != nil {
+			return nil, err
+		}
 	}
 	for _, job := range jobs {
 		if job.ContextMode != "" && job.ContextMode != SubAgentContextFork && job.ContextMode != SubAgentContextTaskOnly {
@@ -396,8 +404,34 @@ func (m *SubAgentManager) settle(entry *managedSubAgent, result *SubAgentResult,
 	entry.snapshot.Iterations = record.ProcessStats.Iterations
 	entry.snapshot.ToolCalls = record.ProcessStats.ToolCalls
 	entry.snapshot.CleanupPending = false
+	m.notificationRevision++
 	close(m.changed)
 	m.changed = make(chan struct{})
+}
+
+// ChangeCursor binds subscriptions to durable discoveries or terminal cleanup,
+// never streaming fragments/tool counters. Existing result revisions stay separate.
+func (m *SubAgentManager) ChangeCursor() (uint64, <-chan struct{}) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return m.notificationRevision, m.changed
+}
+
+// NotifyDiscovery is called only after explicitly shared evidence was saved.
+func (m *SubAgentManager) NotifyDiscovery() {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if m.closed {
+		return
+	}
+	m.notificationRevision++
+	m.evidenceRevision++
+	close(m.changed)
+	m.changed = make(chan struct{})
+}
+
+func WithSubAgentSubmissionPolicy(policy func([]SubAgentJob, SubAgentOptions) (SubAgentOptions, error)) ReActLoopOption {
+	return func(r *ReActLoop) { r.Set("sub_agent_submission_policy", policy) }
 }
 
 func (m *SubAgentManager) snapshotsLocked(ids []string) ([]SubAgentSnapshot, error) {
@@ -504,7 +538,7 @@ func (m *SubAgentManager) FinishBlockReason(seen uint64, closeOwner bool) string
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	for _, entry := range m.jobs {
-		if !entry.snapshot.terminal() {
+		if !entry.snapshot.terminal() || entry.snapshot.CleanupPending {
 			return "Sub-agents are still active. Continue independent work, inspect progress, or wait_sub_react_agents (default 30s). Cancel unwanted jobs explicitly before finishing."
 		}
 	}

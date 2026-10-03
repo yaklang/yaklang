@@ -2,6 +2,7 @@ package coordinator
 
 import (
 	"context"
+	"time"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
@@ -30,23 +31,26 @@ func (c *Controller) contextSnapshot() (Snapshot, uint64) {
 
 // taskDiscovered runs after session evidence is saved. Old attempts and closed
 // sessions cannot wake the current planner. It is not a user intervention.
-func (c *Controller) taskDiscovered(taskID string, attemptID uint64) {
+func (c *Controller) taskDiscovered(taskID string, attemptID uint64, refs ...string) {
 	c.mu.Lock()
-	defer c.mu.Unlock()
 	a, ok := c.state.Attempts[taskID]
-	if !c.closed && ok && a.ID == attemptID && a.State == Running {
-		c.signalLocked()
-		if c.discoveries == nil {
-			c.discoveries = make(map[string]uint64)
-		}
-		c.discoveries[taskID] = c.eventRevision
+	if c.closed || !ok || a.ID != attemptID || a.State != Running {
+		c.mu.Unlock()
+		return
 	}
+	c.enqueueLocked("task_discovery", taskID, attemptID, "任务保存了新的关键 Evidence，请核对发现及影响。", refs, true)
+	if c.discoveries == nil {
+		c.discoveries = make(map[string]uint64)
+	}
+	c.discoveries[taskID] = c.eventRevision + 1
+	c.mu.Unlock()
+	c.publish()
 }
 
 // idleLocked only suspends when workers are the remaining source of progress.
 // Review, failures, changed drafts and available DAG slots belong to the planner.
 func (c *Controller) idleLocked() bool {
-	if c.reviewing || c.state.Approved == nil || c.state.DraftVersion != c.state.ApprovedVersion || len(c.workers) == 0 {
+	if c.reviewing || c.state.Phase != PhaseExec || c.state.Plan == nil || len(c.workers) == 0 {
 		return false
 	}
 	for _, a := range c.state.Attempts {
@@ -95,7 +99,7 @@ func (c *Controller) waitWhenIdle(ctx context.Context, after uint64, onWait func
 
 func configureAutomaticWait(loop *reactloops.ReActLoop) {
 	reactloops.WithOnPostIteraction(func(l *reactloops.ReActLoop, _ int, task aicommon.AIStatefulTask, done bool, _ any, op *reactloops.OnPostIterationOperator) {
-		if done || planningOnly(l) || len(aicommon.GetBlockingVerificationTodoItems(l.GetConfig(), task)) > 0 {
+		if done || len(aicommon.GetBlockingVerificationTodoItems(l.GetConfig(), task)) > 0 {
 			return
 		}
 		op.DeferAfterCallbacks(func() {
@@ -103,6 +107,34 @@ func configureAutomaticWait(loop *reactloops.ReActLoop) {
 				return
 			}
 			after, _ := l.GetVariable("coordinator_event_revision").(uint64)
+			if controller(l).Snapshot().Phase == PhasePlan {
+				if err := waitForExploration(task.GetContext(), l); err != nil {
+					l.Set("coordinator_wait_error", err)
+					op.EndIteration(err)
+				}
+				return
+			}
+			if planningOnly(l) {
+				return
+			}
+			if controller(l).automatic {
+				through, _ := l.GetVariable("coordinator_message_cursor").(uint64)
+				name, _ := l.GetVariable("coordinator_last_action").(string)
+				if name != "wait_messages" && name != "finish" && name != "inspect_task" && name != "rejected" {
+					controller(l).checkedMessages(through)
+				}
+				if controller(l).Snapshot().Report.Submitted && controller(l).FinalizeReport() == nil {
+					op.EndIteration()
+					return
+				}
+				if err := controller(l).waitMessages(task.GetContext(), 30*time.Second, func() {
+					l.UserStatus("正在等待任务或用户消息", "Waiting for messages", aicommon.WithStatusCode("plan.waiting_for_messages"))
+				}, false); err != nil {
+					l.Set("coordinator_wait_error", err)
+					op.EndIteration(err)
+				}
+				return
+			}
 			if err := controller(l).waitWhenIdle(task.GetContext(), after, func() {
 				l.UserStatus("正在等待子任务的新发现或状态变化", "Waiting for task discoveries or state changes", aicommon.WithStatusCode("plan.waiting_for_tasks"))
 			}); err != nil {
@@ -127,11 +159,56 @@ func configureWorkerDiscovery(loop *reactloops.ReActLoop) error {
 		if done, _ := op.IsTerminated(); done {
 			return
 		}
-		if callback, ok := l.GetVariable("coordinator_discovery_callback").(func()); ok && l.GetConfig().GetSessionEvidenceRendered() != before {
-			callback()
+		if callback, ok := l.GetVariable("coordinator_discovery_callback").(func(string, string) error); ok {
+			id, content := a.GetString("evidence_id"), a.GetString("evidence_content")
+			if id == "" {
+				id = a.GetInvokeParams("next_action").GetString("evidence_id")
+			}
+			if content == "" {
+				content = a.GetInvokeParams("next_action").GetString("evidence_content")
+			}
+			if err := callback(id, content); err != nil {
+				op.Fail(err)
+			}
+		} else if l.GetConfig().GetSessionEvidenceRendered() != before {
+			switch callback := l.GetVariable("coordinator_discovery_callback").(type) {
+			case func(...string):
+				callback(a.GetString("evidence_id"))
+			case func():
+				callback()
+			}
 		}
 	}
 	wrapped.FunctionCallAction = nil
 	reactloops.WithOverrideLoopAction(&wrapped)(loop)
+	return nil
+}
+
+// Compare this normalized finding, not the whole shared store: another worker's
+// concurrent save must not turn an identical finding into a false discovery.
+func (s *Session) saveTaskDiscovery(a Attempt, id, content string) error {
+	op, err := aicommon.BuildSessionEvidenceUpsert(id, content)
+	if err != nil {
+		return err
+	}
+	s.evidenceMu.Lock()
+	defer s.evidenceMu.Unlock()
+	s.controller.mu.Lock()
+	current := s.controller.state.Attempts[a.Task.ID]
+	active := !s.controller.closed && current.ID == a.ID && current.State == Running
+	s.controller.mu.Unlock()
+	if !active {
+		return nil
+	}
+	store := aicommon.UnmarshalEvidenceStore(s.GetSessionPromptState().GetSessionEvidence())
+	for _, item := range store.Items {
+		if item.ID == op.ID && item.Content == op.Content {
+			return nil
+		}
+	}
+	if _, err := reactloops.SaveSessionEvidence(s.Config, op.ID, op.Content); err != nil {
+		return err
+	}
+	s.controller.taskDiscovered(a.Task.ID, a.ID, op.ID)
 	return nil
 }

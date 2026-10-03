@@ -18,5 +18,6 @@ func TestCoordinatorActionReviewTask(t *testing.T) {
 	require.Equal(t, Accepted, f.c.Snapshot().Attempts["a"].State)
 	f.cfg.Timeline.FreezeAll()
 	require.Contains(t, f.cfg.GetSessionEvidenceRendered(), "e1 confirms actual result")
-	f.invoke("start_tasks", map[string]any{"task_ids": []string{"b"}}, false)
+	_, err = f.c.StartTasks([]string{"b"})
+	require.NoError(t, err)
 }

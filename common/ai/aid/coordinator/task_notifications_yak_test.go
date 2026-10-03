@@ -94,11 +94,11 @@ func TestCoordinatorYakAutomaticTaskNotifications(t *testing.T) {
 					}
 				}
 				mainCalls.Add(1)
-				if !strings.Contains(prompt, "Draft version: 1") {
+				if strings.Contains(prompt, "已有计划：false") {
 					return protocolResponse(cfg, req, native, "create_plan", map[string]any{"plan": map[string]any{"main_task": "通知实验", "main_task_goal": "验证主协调员自动等待和唤醒", "tasks": []any{map[string]any{"subtask_name": "检查来源", "subtask_goal": "保存证据并提交验证结果", "subtask_identifier": "source", "depends_on": []string{}}}}, "plan_document": "# 通知实验\n子任务运行期间报告发现，完成后自动验收。"})
 				}
-				if strings.Contains(prompt, "approved version: 0") {
-					return protocolResponse(cfg, req, native, "submit_plan", map[string]any{"plan_version": 1})
+				if strings.Contains(prompt, "阶段：PLAN") {
+					return protocolResponse(cfg, req, native, "submit_plan", map[string]any{})
 				}
 				match := pattern.FindStringSubmatch(prompt)
 				if len(match) == 0 {
@@ -106,8 +106,8 @@ func TestCoordinatorYakAutomaticTaskNotifications(t *testing.T) {
 				}
 				switch match[2] {
 				case "pending":
-					record("主协调员：start_tasks")
-					return protocolResponse(cfg, req, native, "start_tasks", map[string]any{})
+					record("运行时：批准后自动派发")
+					return protocolResponse(cfg, req, native, "wait_messages", map[string]any{})
 				case "running":
 					if strings.Contains(prompt, "notification-discovery-sentinel") {
 						record("主协调员：被发现通知唤醒，读取到新证据；任务仍 running")
@@ -115,7 +115,7 @@ func TestCoordinatorYakAutomaticTaskNotifications(t *testing.T) {
 						return protocolResponse(cfg, req, native, "directly_answer", map[string]any{"answer_payload": "已经收到子任务的新发现，继续等待完成。"})
 					}
 					record("主协调员：无其他工作，finish 转为系统自动等待")
-					return protocolResponse(cfg, req, native, "finish", map[string]any{})
+					return protocolResponse(cfg, req, native, "wait_messages", map[string]any{})
 				case "awaiting_review":
 					if !strings.Contains(prompt, "notification-result-sentinel") {
 						return nil, fmt.Errorf("settlement woke planner before result publication")
@@ -125,7 +125,7 @@ func TestCoordinatorYakAutomaticTaskNotifications(t *testing.T) {
 					return protocolResponse(cfg, req, native, "review_task", map[string]any{"task_id": match[1], "attempt_id": id, "decision": "accept", "reason": "notification.discovery 与实际完成结果一致"})
 				case "accepted":
 					record("主协调员：finish")
-					return protocolResponse(cfg, req, native, "finish", map[string]any{})
+					return reportResponse(cfg, req, native, strings.Contains(prompt, "# CURRENT REPORT"))
 				default:
 					return nil, fmt.Errorf("unexpected task state: %s", match[2])
 				}
@@ -133,7 +133,7 @@ func TestCoordinatorYakAutomaticTaskNotifications(t *testing.T) {
 			event := func(op aicommon.AIEngineOperator, e *schema.AiOutputEvent) {
 				var data map[string]any
 				_ = json.Unmarshal(e.Content, &data)
-				if data["code"] == "plan.waiting_for_tasks" {
+				if data["code"] == "plan.waiting_for_messages" {
 					waitEvents.Add(1)
 					select {
 					case waiting <- struct{}{}:
@@ -162,8 +162,8 @@ func TestCoordinatorYakAutomaticTaskNotifications(t *testing.T) {
 			require.EqualValues(t, 1, approvals.Load())
 			require.EqualValues(t, 2, waitEvents.Load())
 			require.EqualValues(t, 3, workerCalls.Load())
-			require.LessOrEqual(t, mainCalls.Load(), int64(7), "no model polling or explicit wait action")
-			t.Logf("Yak/aim notification smoke: planner=%d, worker=%d, automatic waits=%d, approvals=%d, explicit wait_tasks=0", mainCalls.Load(), workerCalls.Load(), waitEvents.Load(), approvals.Load())
+			require.LessOrEqual(t, mainCalls.Load(), int64(8), "no model polling or explicit wait action")
+			t.Logf("Yak/aim notification smoke: planner=%d, worker=%d, automatic waits=%d, approvals=%d, explicit wait_messages=0", mainCalls.Load(), workerCalls.Load(), waitEvents.Load(), approvals.Load())
 		})
 	}
 }

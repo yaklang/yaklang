@@ -41,6 +41,20 @@ func (n *PlanNode) walk(f func(*PlanNode)) {
 	}
 }
 
+// Only the frontend adapter adds editor defaults; internal trees are stateless.
+func displayPlanTree(p *Plan) (json.RawMessage, error) {
+	var root PlanNode
+	if err := json.Unmarshal(p.Tree, &root); err != nil {
+		return nil, err
+	}
+	root.walk(func(n *PlanNode) {
+		if n.Tools == nil {
+			n.Tools = []string{}
+		}
+	})
+	return json.Marshal(root)
+}
+
 // ParseReviewedPlan applies Yakit's soft deletions before validating the
 // approved tree. UI-only removal flags never enter stored or executable plans.
 // Dependencies on deleted tasks remain invalid and must be corrected explicitly.
@@ -203,7 +217,7 @@ func ParsePlan(data, document string, previous *Plan) (*Plan, error) {
 			return fmt.Errorf("duplicate or empty semantic identifier %q", n.Identifier)
 		}
 		identifiers[n.Identifier] = true
-		if id := oldIDs[n.Identifier]; id != "" {
+		if id := oldIDs[n.Identifier]; n.TaskID == "" && id != "" {
 			n.TaskID = id
 		}
 		if n.TaskID == "" {
@@ -328,7 +342,7 @@ func ParsePlan(data, document string, previous *Plan) (*Plan, error) {
 		return nil, err
 	}
 	var err error
-	p.Tree, err = json.Marshal(root)
+	p.Tree, err = json.Marshal(definitionTree(root))
 	return p, err
 }
 

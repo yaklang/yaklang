@@ -61,17 +61,17 @@ func TestCoordinatorPresetExecutesDependentWorkers(t *testing.T) {
 									}
 								}
 							}
-							require.Len(t, seen, len(coordinator.ActionNames))
+							require.Len(t, seen, 3)
 						} else {
 							require.Contains(t, prompt, "文本流模式通过 @action")
-							require.Contains(t, prompt, "完整的嵌套 PLAN DAG")
+							require.Contains(t, prompt, "嵌套 PLAN DAG")
 							require.NotContains(t, prompt, "原生调用通过函数名")
 						}
 					}
 					if native {
 						require.NotContains(t, prompt, "本轮使用文本流 JSON action")
 					} else {
-						require.Contains(t, prompt, "本轮使用文本流 JSON action")
+						require.Contains(t, prompt, "文本流 JSON")
 						require.NotContains(t, prompt, "本轮使用原生 function call：")
 					}
 					if strings.Contains(prompt, "执行已批准的冻结任务书。") {
@@ -107,10 +107,10 @@ func TestCoordinatorPresetExecutesDependentWorkers(t *testing.T) {
 						}
 					}
 					snapshot := session.Snapshot()
-					if snapshot.Approved == nil {
-						return protocolResponse(c, req, native, "submit_plan", map[string]any{"plan_version": snapshot.DraftVersion})
+					if snapshot.Phase == coordinator.PhasePlan {
+						return protocolResponse(c, req, native, "submit_plan", map[string]any{})
 					}
-					for _, task := range snapshot.Approved.Tasks {
+					for _, task := range snapshot.Plan.Tasks {
 						a := snapshot.Attempts[task.ID]
 						if a.State == coordinator.AwaitingReview {
 							prompts["04-awaiting-review.txt"] = prompt
@@ -119,15 +119,15 @@ func TestCoordinatorPresetExecutesDependentWorkers(t *testing.T) {
 					}
 					for _, a := range snapshot.Attempts {
 						if a.State == coordinator.Running {
-							return protocolResponse(c, req, native, "wait_tasks", map[string]any{"task_ids": []string{a.Task.ID}})
+							return protocolResponse(c, req, native, "directly_answer", map[string]any{"answer_payload": "已检查新发现，继续执行。"})
 						}
 					}
 					for _, a := range snapshot.Attempts {
 						if a.State == coordinator.Pending {
-							return protocolResponse(c, req, native, "start_tasks", map[string]any{})
+							return protocolResponse(c, req, native, "wait_messages", map[string]any{})
 						}
 					}
-					return protocolResponse(c, req, native, "finish", map[string]any{})
+					return reportResponse(c, req, native, snapshot.Report.Path != "")
 				}))
 			require.NoError(t, err)
 			session = s

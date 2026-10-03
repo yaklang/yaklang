@@ -111,7 +111,7 @@ func runPlanningSubmissionSmoke(t *testing.T, native bool, source string) {
 				actions = append(actions, name)
 				return protocolResponse(c, req, native, name, args)
 			}
-			if source == "exploration" && state.Draft == nil {
+			if source == "exploration" && state.Plan == nil {
 				switch len(actions) {
 				case 0:
 					return respond("directly_call_tool", map[string]any{
@@ -130,12 +130,12 @@ func runPlanningSubmissionSmoke(t *testing.T, native bool, source string) {
 					return respond("create_plan", map[string]any{"plan": plan, "plan_document": document})
 				}
 			}
-			if state.Approved == nil {
+			if state.Phase == coordinator.PhasePlan {
 				submitPrompt = prompt
 				wire := aispec.NewDefaultAIConfig(req.GetExtraSpecOpts()...)
 				submitTools = wire.Tools
 				submitMessages = aiprojection.Project(aiprojection.ProjectionInput{Prompt: prompt, ActionTools: wire.Tools}).Messages
-				return respond("submit_plan", map[string]any{"plan_version": state.DraftVersion})
+				return respond("submit_plan", map[string]any{})
 			}
 			approvedPrompt = prompt
 			return respond("finish", map[string]any{})
@@ -169,16 +169,15 @@ func runPlanningSubmissionSmoke(t *testing.T, native bool, source string) {
 	require.NoError(t, s.RunPlanOnly())
 
 	state := s.Snapshot()
-	require.EqualValues(t, 1, state.DraftVersion)
-	require.EqualValues(t, 1, state.ApprovedVersion)
-	require.NotNil(t, state.Approved)
-	require.Equal(t, document, state.Approved.Document)
-	require.Len(t, state.Approved.Tasks, 2, "structural parent must not be dispatched")
-	first, second := state.Approved.Tasks[0], state.Approved.Tasks[1]
+	require.Equal(t, coordinator.PhaseExec, state.Phase)
+	require.NotNil(t, state.Plan)
+	require.Equal(t, document, state.Plan.Document)
+	require.Len(t, state.Plan.Tasks, 2, "structural parent must not be dispatched")
+	first, second := state.Plan.Tasks[0], state.Plan.Tasks[1]
 	require.Equal(t, "核对来源", first.Name)
 	require.Equal(t, "形成报告", second.Name)
 	var approvedRoot coordinator.PlanNode
-	require.NoError(t, json.Unmarshal(state.Approved.Tree, &approvedRoot))
+	require.NoError(t, json.Unmarshal(state.Plan.Tree, &approvedRoot))
 	require.Equal(t, "read_source", approvedRoot.Subtasks[0].Subtasks[0].Identifier)
 	require.Equal(t, "report", approvedRoot.Subtasks[0].Subtasks[1].Identifier)
 	require.Equal(t, []string{first.ID}, second.DependsOn)
@@ -234,30 +233,30 @@ func runPlanningSubmissionSmoke(t *testing.T, native bool, source string) {
 			require.Less(t, historyAt, statusAt)
 		}
 	}
-	require.Contains(t, submitPrompt, "Draft version: 1; approved version: 0")
+	require.Contains(t, submitPrompt, "阶段：PLAN；已有计划：true")
 	require.NotContains(t, submitPrompt, "inspect_plan")
 	require.NotContains(t, submitPrompt, "inspect_tasks")
 	require.Contains(t, submitPrompt, "PLAN DEFINITION")
 	require.NotContains(t, submitPrompt, `"draft":{`, "actions must not replay the complete draft")
 	require.Contains(t, approvedPrompt, "# PLAN DOCUMENT")
-	require.Contains(t, approvedPrompt, "Approved PLAN version 1")
+	require.Contains(t, approvedPrompt, "# PLAN DOCUMENT")
 	require.Contains(t, approvedPrompt, "Dispatch: blocked")
 	if native {
-		require.Contains(t, submitPrompt, "本轮使用原生 function call：")
-		require.NotContains(t, submitPrompt, "本轮使用文本流 JSON action：")
+		require.Contains(t, submitPrompt, "使用原生 function call：")
+		require.NotContains(t, submitPrompt, "使用文本流 JSON action：")
 		seen := map[string]bool{}
 		for _, tool := range submitTools {
 			seen[tool.Function.Name] = true
 		}
-		for _, name := range coordinator.ActionNames {
+		for _, name := range []string{"create_plan", "modify_plan", "submit_plan"} {
 			require.True(t, seen[name], "missing native action %s", name)
 		}
 		require.False(t, seen["inspect_plan"])
 		require.False(t, seen["inspect_tasks"])
 	} else {
 		require.Empty(t, submitTools)
-		require.Contains(t, submitPrompt, "本轮使用文本流 JSON action：")
-		require.NotContains(t, submitPrompt, "本轮使用原生 function call：")
+		require.Contains(t, submitPrompt, "使用文本流 JSON action：")
+		require.NotContains(t, submitPrompt, "使用原生 function call：")
 		require.Contains(t, submitPrompt, "文本流模式通过 @action")
 	}
 	// Preset and mocker run independently with the same plan/document/DAG
@@ -276,7 +275,7 @@ func runPlanningSubmissionSmoke(t *testing.T, native bool, source string) {
 			"scenario": source, "protocol": protocol, "sample_stage": "immediately before submit_plan",
 			"model":   "deterministic fixture; real coordinator, tools, Timeline and manual approval",
 			"actions": actions, "prompt_bytes": len(submitPrompt), "messages": submitMessages, "tools": submitTools,
-			"manual_confirmation_count": len(reviewPayloads), "plan_review_payload": approval, "approved_plan": state.Approved,
+			"manual_confirmation_count": len(reviewPayloads), "plan_review_payload": approval, "approved_plan": state.Plan,
 		}, "", "  ")
 		require.NoError(t, err)
 		require.NoError(t, os.WriteFile(filepath.Join(dir, stem+".request.json"), sample, 0600))

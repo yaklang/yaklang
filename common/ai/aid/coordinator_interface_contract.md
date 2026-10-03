@@ -7,7 +7,7 @@
 | 层次 | 调用者 | 约束 |
 | --- | --- | --- |
 | 模型动作 | coordinator / pe_task | 继承主循环协议：文本流 JSON @action 或 provider tool_calls；提示词按模式选择，两种协议不混用 |
-| Controller / Host | action handlers、客户端控制适配 | 校验版本、任务归属、依赖和生命周期；产生真实状态 |
+| Controller / Host | action handlers、客户端控制适配 | 校验阶段、审核锁、任务归属、依赖和生命周期；产生真实状态 |
 | AIInputEvent / AIOutputEvent | Yakit、RPC、aim | 保留原字段、事件名、路由、审批和恢复行为 |
 
 专属 actions 分别提供中文 Options/Description 和 NativeOptions/NativeDescription：前者用于文本流 JSON Schema，后者用于原生函数定义；共用参数语义与执行校验。JSON 也继续作为 Content、旧 task_tree/task_progress 字符串及后台快照的数据格式。
@@ -21,47 +21,49 @@
 | re-act_id / re-act_task | 外层 ReAct 与问题/恢复任务身份 |
 | task_id | 稳定逻辑任务 ID；原任务树、输入控制及任务卡继续使用 |
 | task_uuid | 当前运行体 UUID，不用于替代逻辑 ID |
-| plan_version | 当前草稿版本，用于 modify/submit 的过期检查 |
-| approved_version | 当前允许执行的批准版本 |
-| submitted_version | detached 草稿已发布版本，不代表批准 |
+| phase / review_pending | PLAN 或 EXEC，以及本次审核等待锁 |
 | attempt_id | 当前尝试，重试增加；review/retry 必须匹配 |
 | InteractiveId / id | 一次用户审批或交互端点 |
 | SyncID | 同步请求关联，不能解释为 worker 已完成 |
 | EventUUID / event_writer_id | stream 生命周期关联，沿用原 emitter |
 
-AISessionPlanAndExec 不增加新表。task_tree、task_progress 保持 JSON 字符串；progress 增加可忽略的 plan_engine 和 coordinator_state。快照记录版本、当前尝试、结果引用和验收状态，不序列化 goroutine、context 或 callback。Timeline 保存历史调用和用户/模型决策。
+AISessionPlanAndExec 不增加新表。task_tree、task_progress 保持 JSON 字符串；progress 增加可忽略的 plan_engine 和 coordinator_state。schema 2 快照记录一份当前 Plan、阶段、审核锁、当前/历史尝试、结果引用、验收状态、inbox 游标和当前报告，不序列化 goroutine、context 或 callback。Timeline 保存历史调用和用户/模型决策。
 
-状态变更先经 Controller 校验，再向宿主发布独立快照。状态快照保存沿用旧持久化设施；数据库错误会发送/记录错误，不能将它当成已验证的耐久写入保障。后续若需要数据库事务级操作回执，应单独扩展 Host 契约。
+状态变更先经 Controller 校验，再向宿主发布独立快照。计划编辑和批准移交在 Host.CommitPlan 成功后才暴露候选内容；数据库失败不发布新当前视图或成功回执。执行阶段状态沿用原发布与错误上报通道。
 
 ## 3. Actions
 
 | Action | 参数 | 返回语义 |
 | --- | --- | --- |
-| create_plan | plan, plan_document | 新草稿版本，不执行 |
-| modify_plan | plan_version, plan, plan_document | 完整新草稿版本，批准内容尚未切换 |
-| submit_plan | plan_version | 普通审批后采用合法编辑；detached 保存提交版本并等待执行请求 |
-| start_tasks | task_ids optional | 指定 ready tasks 或当前 ready 集合的派发回执 |
-| wait_tasks | task_ids optional, mode optional, timeout_seconds optional | any/all 等待的原因及快照 |
-| review_task | task_id, attempt_id, decision, reason | accept/reject；只能审阅已观察的 awaiting_review |
+| create_plan | plan, plan_document | PLAN 首次创建，返回 updated 与组件；不执行 |
+| modify_plan | document / document_patch / tasks / tasks_patch | PLAN/EXEC 原子编辑；EXEC 保护受影响尝试，无再次审批 |
+| submit_plan | 无业务参数 | PLAN 锁定、审核、保存最终编辑并移交 EXEC；detached 发布待审核卡 |
+| wait_messages | timeout_seconds optional | inbox 等待，默认30秒；空超时不轮询主模型 |
+| inspect_task | task_id, attempt_id optional, details optional | 单任务当前/历史状态及引用，详情按需 |
+| review_task | task_id, attempt_id, decision, reason | YOLO 接受/拒绝/深入/取消；不能绕过人工策略 |
 | retry_task | task_id, attempt_id, reason | 新尝试，受影响下游旧结果失效 |
 | cancel_tasks | task_ids optional, reason | 请求取消；实际退出后结算 |
-| write_report | title, markdown, summary | Markdown artifact 路径及既有 report_finish |
+| create_report | title, document | 门禁通过后创建唯一 Markdown artifact |
+| modify_report | document / document_patch | 更新报告正文或严格 diff，当前视图同步到 SemiDynamic1 |
+| submit_report | summary | 交付最新正文、report_finish；宿主复查后结束 |
 | directly_answer | 原有协议对应的答案参数 | 可见消息；继续协调 |
-| finish | 原有参数 | 经过完成门闩结束 |
+| finish | 原有参数 | 仅 PLAN-only 适配保留；完整 EXEC 不开放正常退出 |
 
 plan 沿用嵌套的 main_task、main_task_goal、tasks，以及递归的 subtask_name、subtask_goal、subtask_identifier、sub_subtasks、depends_on；平面 name/goal/identifier 保留为兼容别名。语义标识在修改时保持稳定；模型不自填执行状态或 UUID。父节点仅组织任务，后端校验 DAG 并解析叶任务逻辑 IDs。
 
-表中的返回语义是持久化动作观测的内容。模型 handler 将版本回执、结果、拒绝原因及验收理由写入 session Timeline Evidence；feedback 仅给出处理状态和记录 ID。Open 冻结后，沿已有 Evidence 通道提升到 SemiDynamic1，不按 action 强制冻结。
+表中的返回语义是持久化动作观测的内容。模型 handler 将小型变更回执、结果、拒绝原因及验收理由写入 session Timeline Evidence；feedback 仅给出处理状态和记录 ID。Open 冻结后，沿已有 Evidence 通道提升到 SemiDynamic1，不按 action 强制冻结。
 
-计划正文和 DAG 读取 SemiDynamic1 的 PLAN DEFINITION / PLAN DOCUMENT，实时版本、任务状态读取 PLAN STATUS。模型 actions 已移除 inspect_plan / inspect_tasks；内部 InspectTasks 保留为读取状态的接口。任务结果包含 task_id、attempt_id、plan_version、state、完整 result 和 review_reason，由 Controller 在结算和验收时自动保存，每次尝试独立记录。review_task 校验当前已结算 attempt 与验收理由，不再解析 AIRequest 或登记 seen。历史快照中的 seen 字段被忽略，其他版本与任务状态字段保持兼容。
+计划正文、DAG 和当前报告读取 SemiDynamic1，阶段与任务状态读取 PLAN STATUS。移除 inspect_plan/inspect_tasks，保留按需 inspect_task；默认只返回有界摘要与引用。任务结果由 Controller 在实际结算和验收时自动保存，每次尝试独立记录。review_task 校验当前已结算 attempt 与理由，不解析 AIRequest、不登记 Seen。schema 1 只在 snapshot_compat.go 读取转换，不恢复模型版本参数或双份替换草案。
 
-协调员空闲而子任务仍执行时，系统自动等待，不要求显式 wait_tasks。子任务保存新的 session evidence 后通知协调员；子任务退出及 Timeline 合并完成后，Controller 先发布执行结果，再唤醒等待方。通知使用运行期版本游标，不增加 UserRevision，不触发并发主模型推理；普通流式输出和重复证据不唤醒。用户输入由所属通道记录并通知一次，现有 gRPC 审核、任务树和结束事件无需变更。
+协调员空闲时自动等待，无须模型 wait_messages。有效 Evidence 变化先保存再入队，实际 worker 退出及 Timeline 交接后才结算。消息携带 id/sequence/coordinator_id/task_id/attempt_id/type/summary/references；投递游标与处理游标分离，事实在 Timeline。回调不触发并发主模型；普通流式输出、重复证据及空超时不唤醒。正常人工通过直接推进 DAG，必要反馈通知模型。gRPC 审核、任务树与事件定义不变。
 
-task_ids 缺省的含义由各函数明确声明。原生参数格式不正确由 schema/状态校验拒绝，不将格式错误转换为全选。未知任务、重复派发、过期版本或尝试、未验收依赖、活动任务冲突和配额不足返回可纠正反馈，不执行部分选中任务。
+task_ids 缺省的含义由各函数明确声明。原生参数格式不正确由 schema/状态校验拒绝，不将格式错误转换为全选。未知任务、重复派发、过期审核或尝试、未验收依赖、活动任务冲突和配额不足返回可纠正反馈，不执行部分选中任务。
 
-wait 默认 any、30 秒，上限 60 秒；all 要求选中的任务已派发。返回原因包括 new_result、all_settled、changed、timeout；用户信息、批准版本或目标尝试变化会中断等待。超时不取消。new_result/结算不是业务验收。
+wait_messages 默认30秒、最大60秒，不提供 task_ids 或 any/all。已有消息立即返回；空超时给运行时一次检查机会，没有主动工作则继续休眠，不取消 worker。模型 start_tasks/wait_tasks/write_report 已删除；内部调度与状态读取方法不属于模型接口。
 
 worker 只有执行职责，额外提供 submit_task_result(summary, artifacts?, evidence_ids?)。它与原有 TODO finish 门闩结合；不能接受自己的结果。共同基础 actions 包括 save_evidence、工具、澄清及技能/知识检索。没有任意设置状态的 update_plan_status，也不开放嵌套专注循环/蓝图/sub-agent。
+
+PLAN 提供三个计划动作；EXEC 保留 modify_plan 并提供执行/报告动作，Controller/handler 同样检查阶段与门禁。四参数存在性、null、互斥、类型及有序 patch 再次校验。开启 WithEnableSubagentsInPlan 时复用 generic 调查 job，提交必须等待实际退出与交接。通知不改变工具声明，声明只随真实阶段或报告门禁变化。
 
 ## 4. 客户端输入保持不变
 
@@ -120,10 +122,10 @@ Yakit 使用 currentChatStatus.coordinatorId 与事件 CoordinatorId 匹配区�
 | failed / rejected | aborted |
 | cancelled | skipped |
 
-worker 执行完成先保留 processing，由可见 stream 说明待验收；验收通过才发 completed/pop。旧 task_review_require 自动 continue 不构成新验收；新的 review_task 是协调员动作。[旧审阅处理](https://github.com/yaklang/yakit/blob/87904ea55a4af130b4fa8c22dc806405f62e3332/app/renderer/src/main/src/pages/ai-re-act/hooks/grpcStreamHandler/aiReview.ts#L9)。
+worker 执行完成先保留 processing，释放执行槽位并由任务管理器发起人工 task_review_require；用户通过才发 completed/pop，并立即释放后继。YOLO 由协调员 review_task 判断实际结果。审核 context 属于 session，不随已退出 worker 取消。沿用 [审阅处理](https://github.com/yaklang/yakit/blob/87904ea55a4af130b4fa8c22dc806405f62e3332/app/renderer/src/main/src/pages/ai-re-act/hooks/grpcStreamHandler/aiReview.ts#L9) 的端点与 selectors。
 
 ## 6. 使用与验证边界
 
 选择新引擎不改变 RPC。未指定 focus 的 PLAN 请求通过默认循环进入新版 coordinator；旧 plan / coordinator_legacy focus 名称也转入新版，公开列表不再展示旧模式。aim.planEngine(...) 仅为 focus 别名。Go 新运行体使用 coordinator.NewSession；coordinator_legacy.NewCoordinatorContext 始终保留旧语义。新 Session 自己拥有任务树 DTO、审批、进度和恢复适配，不调用旧 Coordinator 的内部方法。plan_engine 仅保存在记录中，恢复入口校验原归属；旧记录在入队之前返回明确停用错误，要求重新生成新版计划，不隐式迁移旧状态。
 
-本次自动化验证包括两种协议运行、原生模式拒绝文本 JSON action、审批与结果门闩、版本和尝试冲突、依赖调度、any/all、取消实际退出、恢复、PLAN-only、分离计划编辑字段和真实 Yak/aim 运行事件。确定性 provider 运行测试不替代实际模型质量、缓存指标或完整 Electron UI 人工验收。
+自动化验证包含两种协议 × 人工/YOLO 的真实 Yak/aim DAG、普通/编辑/detached 确认、审核反馈重试、消息与等待、局部编辑、取消实际退出、恢复、报告与晚到消息，以及 PLAN-only/预设/mocker 回归。确定性 provider 只脚本化模型决定，不替代实际供应商模型质量、缓存命中率或完整 Electron UI 人工验收。详见 [本地验收记录](coordinator/execution_review.md)。

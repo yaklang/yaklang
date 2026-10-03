@@ -68,7 +68,7 @@ func TestCoordinatorApprovalContinuesThroughInputQueue(t *testing.T) {
 					}
 					return respond("finish", map[string]any{})
 				}
-				if strings.Contains(prompt, "Draft version: 0") {
+				if strings.Contains(prompt, "已有计划：false") {
 					if !strings.Contains(prompt, "PLANNER ONLY PREFERENCE") {
 						return nil, fmt.Errorf("planner preference was lost at the default-loop handoff")
 					}
@@ -81,21 +81,21 @@ func TestCoordinatorApprovalContinuesThroughInputQueue(t *testing.T) {
 					}
 					return respond("create_plan", map[string]any{"plan": map[string]any{"name": "Single approval", "goal": "Run both tasks after one approval", "tasks": tasks}, "plan_document": "# Execute both tasks after approval"})
 				}
-				if strings.Contains(prompt, "Detached submitted version:") {
+				if strings.Contains(prompt, "等待审核：true") {
 					if mode == "detached_interrupt" {
 						<-c.GetContext().Done()
 						return nil, c.GetContext().Err()
 					}
 					return respond("finish", map[string]any{})
 				}
-				if strings.Contains(prompt, "approved version: 0") {
-					return respond("submit_plan", map[string]any{"plan_version": 1})
+				if strings.Contains(prompt, "阶段：PLAN") {
+					return respond("submit_plan", map[string]any{})
 				}
 				// Repeated submission of an already approved version must not
 				// force the user to approve the same plan a second time.
 				if !submittedAgain {
 					submittedAgain = true
-					return respond("submit_plan", map[string]any{"plan_version": 1})
+					return respond("submit_plan", map[string]any{})
 				}
 				matches := pattern.FindAllStringSubmatch(prompt, -1)
 				for _, m := range matches {
@@ -107,15 +107,21 @@ func TestCoordinatorApprovalContinuesThroughInputQueue(t *testing.T) {
 				}
 				for _, m := range matches {
 					if m[2] == "running" {
-						return respond("wait_tasks", map[string]any{"timeout_seconds": 1})
+						return respond("wait_messages", map[string]any{"timeout_seconds": 1})
 					}
 				}
 				for _, m := range matches {
 					if m[2] == "pending" {
-						return respond("start_tasks", map[string]any{})
+						return respond("wait_messages", map[string]any{})
 					}
 				}
-				return respond("finish", map[string]any{})
+				if !strings.Contains(prompt, "当前任务图和关键消息已经收尾") {
+					return respond("directly_answer", map[string]any{"answer_payload": "检查本批次结果，准备交付。"})
+				}
+				if !strings.Contains(prompt, "# CURRENT REPORT") {
+					return respond("create_report", map[string]any{"title": "检查报告", "document": "# 检查报告\n实际任务结果与验收已保存。"})
+				}
+				return respond("submit_report", map[string]any{"summary": "检查完成，交付报告。"})
 			}
 			focus := coordinator.Name
 			if defaultEntry {

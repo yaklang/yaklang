@@ -19,7 +19,11 @@ type testHost struct {
 	revisions []uint64
 }
 
-func (h *testHost) Prepare(context.Context, string, string) (*Plan, error) { return clone(h.plan), nil }
+func (h *testHost) Prepare(_ context.Context, _ string, document string) (*Plan, error) {
+	p := clone(h.plan)
+	p.Document = document
+	return p, nil
+}
 func (h *testHost) Approve(ctx context.Context, p *Plan) (*Plan, error) {
 	if h.approve != nil {
 		return h.approve(ctx, p)
@@ -38,7 +42,11 @@ func (h *testHost) Changed(s Snapshot) {
 	h.revisions = append(h.revisions, s.Revision)
 }
 func testPlan() *Plan {
-	return &Plan{Tree: json.RawMessage(`{"name":"test"}`), Tasks: []Task{{ID: "a", Name: "A", Goal: "verify A"}, {ID: "b", Name: "B", Goal: "verify B", DependsOn: []string{"a"}}}}
+	p, err := ParsePlan(`{"task_id":"root","name":"test","goal":"verify","semantic_identifier":"root","subtasks":[{"task_id":"a","name":"A","goal":"verify A","semantic_identifier":"a"},{"task_id":"b","name":"B","goal":"verify B","semantic_identifier":"b","depends_on":["a"]}]}`, "document", nil)
+	if err != nil {
+		panic(err)
+	}
+	return p
 }
 func readyController(t *testing.T, h *testHost, concurrency int) *Controller {
 	t.Helper()
@@ -46,9 +54,9 @@ func readyController(t *testing.T, h *testHost, concurrency int) *Controller {
 	t.Cleanup(cancel)
 	c := New(ctx, h, concurrency)
 	t.Cleanup(c.Close)
-	v, err := c.CreatePlan(ctx, "plan", "document")
+	_, err := c.CreatePlan(ctx, "plan", "document")
 	require.NoError(t, err)
-	require.NoError(t, c.SubmitPlan(ctx, v))
+	require.NoError(t, c.SubmitPlan(ctx))
 	return c
 }
 func awaitResult(t *testing.T, c *Controller, id string) Attempt {
@@ -105,16 +113,15 @@ func TestCoordinatorLoopApprovedSubmissionIsIdempotent(t *testing.T) {
 	a := awaitResult(t, c, "a")
 	require.NoError(t, c.ReviewTask("a", a.ID, "accept", "verified"))
 	before := c.Snapshot()
-	require.NoError(t, c.SubmitPlan(context.Background(), 1))
+	require.Error(t, c.SubmitPlan(context.Background()))
 	require.Equal(t, 1, approvals)
 	require.Equal(t, before, c.Snapshot(), "resubmission must preserve accepted results")
 
-	h.plan = clone(h.plan)
-	h.plan.Tasks[1].Goal = "Updated task brief"
-	version, err := c.ModifyPlan(context.Background(), 1, "updated", "updated document")
+	_, err = c.ModifyPlan(context.Background(), map[string]any{"document": "changed"})
 	require.NoError(t, err)
-	require.NoError(t, c.SubmitPlan(context.Background(), version))
-	require.Equal(t, 2, approvals, "a changed plan still needs approval")
+	require.Equal(t, PhaseExec, c.Snapshot().Phase)
+	require.Equal(t, before.Attempts, c.Snapshot().Attempts, "document edits preserve accepted results")
+	require.Equal(t, 1, approvals, "EXEC editing does not ask for plan approval")
 }
 
 func TestCoordinatorLoopRetryInvalidatesDependentsAndRejectsStaleAttempt(t *testing.T) {
@@ -173,26 +180,6 @@ func TestCoordinatorLoopCancelWaitTimeoutAndWake(t *testing.T) {
 	require.Error(t, c.CanFinish())
 }
 
-func TestCoordinatorLoopDraftVersionAndActiveBriefProtection(t *testing.T) {
-	release := make(chan struct{})
-	h := &testHost{plan: testPlan(), execute: func(context.Context, Attempt) (Result, error) { <-release; return Result{Summary: "done"}, nil }}
-	c := readyController(t, h, 1)
-	_, err := c.StartTasks([]string{"a"})
-	require.NoError(t, err)
-	h.plan = clone(h.plan)
-	h.plan.Tasks[0].Goal = "new goal"
-	v, err := c.ModifyPlan(context.Background(), 1, "replacement", "new document")
-	require.NoError(t, err)
-	require.Equal(t, uint64(2), v)
-	require.Equal(t, "verify A", c.Snapshot().Approved.Tasks[0].Goal)
-	require.Error(t, c.SubmitPlan(context.Background(), 1))
-	require.ErrorContains(t, c.SubmitPlan(context.Background(), 2), "active task")
-	close(release)
-	awaitResult(t, c, "a")
-	require.NoError(t, c.SubmitPlan(context.Background(), 2))
-	require.Equal(t, Pending, c.Snapshot().Attempts["a"].State)
-}
-
 func TestCoordinatorLoopPersistenceInterruptedAttemptsAndPanic(t *testing.T) {
 	h := &testHost{plan: testPlan(), execute: func(context.Context, Attempt) (Result, error) { panic("worker bug") }}
 	c := readyController(t, h, 1)
@@ -202,7 +189,7 @@ func TestCoordinatorLoopPersistenceInterruptedAttemptsAndPanic(t *testing.T) {
 	require.Equal(t, Failed, a.State)
 	require.Contains(t, a.Result.Error, "worker panic")
 	s := c.Snapshot()
-	s.Attempts["a"] = Attempt{Task: s.Approved.Tasks[0], ID: 1, PlanVersion: 1, State: Running}
+	s.Attempts["a"] = Attempt{Task: s.Plan.Tasks[0], ID: 1, State: Running}
 	s.NextAttempt = 1
 	data, err := json.Marshal(s)
 	require.NoError(t, err)
@@ -247,38 +234,14 @@ func TestCoordinatorLoopFinishMustObserveNewUserInput(t *testing.T) {
 	require.True(t, c.Snapshot().Finished)
 }
 
-func TestCoordinatorLoopUpstreamEditCannotInvalidateActiveDependent(t *testing.T) {
-	started, release := make(chan struct{}), make(chan struct{})
-	h := &testHost{plan: testPlan(), execute: func(_ context.Context, a Attempt) (Result, error) {
-		if a.Task.ID == "b" {
-			close(started)
-			<-release
-		}
-		return Result{Summary: "checked"}, nil
-	}}
-	c := readyController(t, h, 1)
-	_, err := c.StartTasks([]string{"a"})
-	require.NoError(t, err)
-	a := awaitResult(t, c, "a")
-	require.NoError(t, c.ReviewTask("a", a.ID, "accept", "checked"))
-	_, err = c.StartTasks([]string{"b"})
-	require.NoError(t, err)
-	<-started
-	h.plan = clone(h.plan)
-	h.plan.Tasks[0].Goal = "changed upstream input"
-	v, err := c.ModifyPlan(context.Background(), 1, "edit", "edit")
-	require.NoError(t, err)
-	require.ErrorContains(t, c.SubmitPlan(context.Background(), v), "active task")
-	close(release)
-	awaitResult(t, c, "b")
-	require.NoError(t, c.SubmitPlan(context.Background(), v))
-	require.Equal(t, Pending, c.Snapshot().Attempts["b"].State)
-	require.Empty(t, c.Snapshot().Attempts["b"].Result)
-}
-
 func TestCoordinatorLoopRejectedRetryDoesNotPartiallyInvalidateResults(t *testing.T) {
 	plan := testPlan()
-	plan.Tasks = append(plan.Tasks, Task{ID: "independent", Name: "C", Goal: "check independently"})
+	var root PlanNode
+	require.NoError(t, json.Unmarshal(plan.Tree, &root))
+	root.Subtasks = append(root.Subtasks, &PlanNode{TaskID: "independent", Name: "C", Goal: "check independently", Identifier: "independent"})
+	raw, _ := json.Marshal(root)
+	plan, err := ParsePlan(string(raw), plan.Document, plan)
+	require.NoError(t, err)
 	release := make(chan struct{})
 	h := &testHost{plan: plan, execute: func(_ context.Context, a Attempt) (Result, error) {
 		if a.Task.ID == "independent" {
@@ -287,7 +250,7 @@ func TestCoordinatorLoopRejectedRetryDoesNotPartiallyInvalidateResults(t *testin
 		return Result{Summary: "checked"}, nil
 	}}
 	c := readyController(t, h, 1)
-	_, err := c.StartTasks([]string{"a"})
+	_, err = c.StartTasks([]string{"a"})
 	require.NoError(t, err)
 	a := awaitResult(t, c, "a")
 	require.NoError(t, c.ReviewTask("a", a.ID, "accept", "checked"))
@@ -310,8 +273,8 @@ func TestCoordinatorLoopRestoresDraftAndRejectsFalseCompletion(t *testing.T) {
 	next := New(context.Background(), h, 1)
 	defer next.Close()
 	require.NoError(t, next.Restore(c.Snapshot()))
-	require.Nil(t, next.Snapshot().Approved)
-	require.NoError(t, next.SubmitPlan(context.Background(), 1))
+	require.Equal(t, PhasePlan, next.Snapshot().Phase)
+	require.NoError(t, next.SubmitPlan(context.Background()))
 	s := next.Snapshot()
 	s.Finished = true
 	bad := New(context.Background(), h, 1)
@@ -321,7 +284,12 @@ func TestCoordinatorLoopRestoresDraftAndRejectsFalseCompletion(t *testing.T) {
 
 func TestCoordinatorLoopAllWaitRequiresEverySelectedAttempt(t *testing.T) {
 	plan := testPlan()
-	plan.Tasks[1].DependsOn = nil
+	var root PlanNode
+	require.NoError(t, json.Unmarshal(plan.Tree, &root))
+	root.Subtasks[1].DependsOn = nil
+	raw, _ := json.Marshal(root)
+	plan, err := ParsePlan(string(raw), plan.Document, plan)
+	require.NoError(t, err)
 	first, second := make(chan struct{}), make(chan struct{})
 	h := &testHost{plan: plan, execute: func(_ context.Context, a Attempt) (Result, error) {
 		if a.Task.ID == "a" {
@@ -332,7 +300,7 @@ func TestCoordinatorLoopAllWaitRequiresEverySelectedAttempt(t *testing.T) {
 		return Result{Summary: "done"}, nil
 	}}
 	c := readyController(t, h, 2)
-	_, err := c.WaitTasksMode(context.Background(), nil, time.Second, "all")
+	_, err = c.WaitTasksMode(context.Background(), nil, time.Second, "all")
 	require.Error(t, err)
 	_, err = c.StartTasks(nil)
 	require.NoError(t, err)
@@ -362,13 +330,13 @@ func TestCoordinatorLoopDetachedSubmitDoesNotApproveExecution(t *testing.T) {
 	h := &testHost{plan: testPlan(), approve: func(context.Context, *Plan) (*Plan, error) { return nil, ErrDetachedPlanPublished }}
 	c := New(context.Background(), h, 1)
 	defer c.Close()
-	v, err := c.CreatePlan(context.Background(), "draft", "document")
+	_, err := c.CreatePlan(context.Background(), "draft", "document")
 	require.NoError(t, err)
-	require.NoError(t, c.SubmitPlan(context.Background(), v))
-	require.Nil(t, c.Snapshot().Approved)
+	require.NoError(t, c.SubmitPlan(context.Background()))
+	require.Equal(t, PhasePlan, c.Snapshot().Phase)
 	_, err = c.StartTasks(nil)
 	require.Error(t, err)
 	require.Error(t, c.CanFinish())
 	require.NoError(t, c.CanFinishPlanning())
-	require.Contains(t, c.PromptStatus(), "Detached submitted version: 1")
+	require.Contains(t, c.PromptStatus(), "等待审核：true")
 }
