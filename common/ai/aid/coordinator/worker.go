@@ -45,5 +45,8 @@ func NewWorkerLoop(r aicommon.AIInvokeRuntime, opts ...reactloops.ReActLoopOptio
 	if err := configureWorkerFinish(loop); err != nil {
 		return nil, err
 	}
+	if err := configureWorkerDiscovery(loop); err != nil {
+		return nil, err
+	}
 	return loop, nil
 }

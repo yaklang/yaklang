@@ -13,8 +13,7 @@ func TestCoordinatorActionReviewTask(t *testing.T) {
 	require.NoError(t, err)
 	require.Eventually(t, func() bool { return f.c.Snapshot().Attempts["a"].State == AwaitingReview }, time.Second, time.Millisecond)
 	args := map[string]any{"task_id": "a", "attempt_id": f.c.Snapshot().Attempts["a"].ID, "decision": "accept", "reason": "e1 confirms actual result"}
-	f.invoke("review_task", args, true)
-	f.invoke("inspect_tasks", map[string]any{"task_ids": []string{"a"}}, false)
+	f.flushResults()
 	f.invoke("review_task", args, false)
 	require.Equal(t, Accepted, f.c.Snapshot().Attempts["a"].State)
 	f.cfg.Timeline.FreezeAll()

@@ -23,7 +23,7 @@ import (
 
 // Only the model is scripted. Read-file, Evidence, DAG preparation, action
 // parsing, prompt assembly and manual approval all use production channels.
-// Sample immediately before submit_plan, after inspect_plan confirmed its version.
+// Sample immediately before submit_plan, with the draft already visible in context.
 func TestCoordinatorPlanningSubmissionSmoke(t *testing.T) {
 	for _, native := range []bool{false, true} {
 		for _, source := range []string{"exploration", "preset", "mocker"} {
@@ -131,9 +131,6 @@ func runPlanningSubmissionSmoke(t *testing.T, native bool, source string) {
 				}
 			}
 			if state.Approved == nil {
-				if len(actions) == 0 || actions[len(actions)-1] == "create_plan" {
-					return respond("inspect_plan", map[string]any{})
-				}
 				submitPrompt = prompt
 				wire := aispec.NewDefaultAIConfig(req.GetExtraSpecOpts()...)
 				submitTools = wire.Tools
@@ -189,7 +186,7 @@ func runPlanningSubmissionSmoke(t *testing.T, native bool, source string) {
 		require.Zero(t, attempt.ID, "this smoke stops after submission, without a worker")
 		require.Equal(t, coordinator.Pending, attempt.State)
 	}
-	expected := []string{"inspect_plan", "submit_plan", "finish"}
+	expected := []string{"submit_plan", "finish"}
 	if source == "exploration" {
 		expected = append([]string{"directly_call_tool", "save_evidence", "create_plan"}, expected...)
 	}
@@ -238,8 +235,10 @@ func runPlanningSubmissionSmoke(t *testing.T, native bool, source string) {
 		}
 	}
 	require.Contains(t, submitPrompt, "Draft version: 1; approved version: 0")
-	require.Contains(t, submitPrompt, `"context":"SemiDynamic1: PLAN DEFINITION / PLAN DOCUMENT"`)
-	require.NotContains(t, submitPrompt, `"draft":{`, "inspect_plan must not replay the complete draft")
+	require.NotContains(t, submitPrompt, "inspect_plan")
+	require.NotContains(t, submitPrompt, "inspect_tasks")
+	require.Contains(t, submitPrompt, "PLAN DEFINITION")
+	require.NotContains(t, submitPrompt, `"draft":{`, "actions must not replay the complete draft")
 	require.Contains(t, approvedPrompt, "# PLAN DOCUMENT")
 	require.Contains(t, approvedPrompt, "Approved PLAN version 1")
 	require.Contains(t, approvedPrompt, "Dispatch: blocked")
@@ -253,6 +252,8 @@ func runPlanningSubmissionSmoke(t *testing.T, native bool, source string) {
 		for _, name := range coordinator.ActionNames {
 			require.True(t, seen[name], "missing native action %s", name)
 		}
+		require.False(t, seen["inspect_plan"])
+		require.False(t, seen["inspect_tasks"])
 	} else {
 		require.Empty(t, submitTools)
 		require.Contains(t, submitPrompt, "本轮使用文本流 JSON action：")
@@ -272,7 +273,7 @@ func runPlanningSubmissionSmoke(t *testing.T, native bool, source string) {
 		stem := source + "-" + protocol
 		require.NoError(t, os.WriteFile(filepath.Join(dir, stem+".prompt.txt"), []byte(submitPrompt), 0600))
 		sample, err := json.MarshalIndent(map[string]any{
-			"scenario": source, "protocol": protocol, "sample_stage": "after inspect_plan; immediately before submit_plan",
+			"scenario": source, "protocol": protocol, "sample_stage": "immediately before submit_plan",
 			"model":   "deterministic fixture; real coordinator, tools, Timeline and manual approval",
 			"actions": actions, "prompt_bytes": len(submitPrompt), "messages": submitMessages, "tools": submitTools,
 			"manual_confirmation_count": len(reviewPayloads), "plan_review_payload": approval, "approved_plan": state.Approved,

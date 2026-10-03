@@ -91,7 +91,7 @@ func TestCoordinatorLoopDetachedNativeApprovalAndRecovery(t *testing.T) {
 	editedJSON, err := json.Marshal(edited)
 	require.NoError(t, err)
 	var workerCalls atomic.Int64
-	taskPattern := regexp.MustCompile(`\[([^\]]+)\]: ([a-z_]+); attempt=(\d+); observed=(true|false)`)
+	taskPattern := regexp.MustCompile(`\[([^\]]+)\]: ([a-z_]+); attempt=(\d+)`)
 	resumeOptions := append(append([]aicommon.ConfigOption(nil), options...), aicommon.WithID(initial.GetRuntimeId()), aicommon.WithAICallback(func(c aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 		prompt := req.GetPrompt()
 		if strings.Contains(prompt, "执行已批准的冻结任务书。") {
@@ -111,11 +111,8 @@ func TestCoordinatorLoopDetachedNativeApprovalAndRecovery(t *testing.T) {
 		case "running":
 			return nativeResponse(c, req, "wait_tasks", map[string]any{"timeout_seconds": 1})
 		case "awaiting_review":
-			if match[4] == "false" {
-				return nativeResponse(c, req, "inspect_tasks", map[string]any{})
-			}
 			id, _ := strconv.ParseUint(match[3], 10, 64)
-			return nativeResponse(c, req, "review_task", map[string]any{"task_id": match[1], "attempt_id": id, "decision": "accept", "reason": "The inspected execution verified the approved edit."})
+			return nativeResponse(c, req, "review_task", map[string]any{"task_id": match[1], "attempt_id": id, "decision": "accept", "reason": "The delivered execution verified the approved edit."})
 		default:
 			return nativeResponse(c, req, "finish", map[string]any{})
 		}

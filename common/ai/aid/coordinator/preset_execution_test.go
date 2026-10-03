@@ -25,7 +25,6 @@ func TestCoordinatorPresetExecutesDependentWorkers(t *testing.T) {
 			var session *coordinator.Session
 			var mu sync.Mutex
 			steps := map[string]int{}
-			inspected := false
 			reviews := 0
 			calls := 0
 			prompts := map[string]string{}
@@ -108,10 +107,6 @@ func TestCoordinatorPresetExecutesDependentWorkers(t *testing.T) {
 						}
 					}
 					snapshot := session.Snapshot()
-					if !inspected {
-						inspected = true
-						return protocolResponse(c, req, native, "inspect_plan", map[string]any{})
-					}
 					if snapshot.Approved == nil {
 						return protocolResponse(c, req, native, "submit_plan", map[string]any{"plan_version": snapshot.DraftVersion})
 					}
@@ -119,9 +114,6 @@ func TestCoordinatorPresetExecutesDependentWorkers(t *testing.T) {
 						a := snapshot.Attempts[task.ID]
 						if a.State == coordinator.AwaitingReview {
 							prompts["04-awaiting-review.txt"] = prompt
-							if !a.Seen {
-								return protocolResponse(c, req, native, "inspect_tasks", map[string]any{"task_ids": []string{task.ID}})
-							}
 							return protocolResponse(c, req, native, "review_task", map[string]any{"task_id": task.ID, "attempt_id": a.ID, "decision": "accept", "reason": "结果与实际保存的 Evidence 一致"})
 						}
 					}

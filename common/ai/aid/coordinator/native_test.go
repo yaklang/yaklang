@@ -100,8 +100,6 @@ func TestCoordinatorLoopNativeProtocol(t *testing.T) {
 				name = "start_tasks"
 			case s.Attempts["a"].State == coordinator.Running:
 				name = "wait_tasks"
-			case s.Attempts["a"].State == coordinator.AwaitingReview && !s.Attempts["a"].Seen:
-				name = "inspect_tasks"
 			case s.Attempts["a"].State == coordinator.AwaitingReview:
 				name = "review_task"
 				args = map[string]any{"task_id": "a", "attempt_id": s.Attempts["a"].ID, "decision": "accept", "reason": "native.evidence verifies the result"}
@@ -122,7 +120,7 @@ func TestCoordinatorLoopNativeProtocol(t *testing.T) {
 	require.NotNil(t, cfg.LiteForgeExecutor, "native loops install their own helper implementation")
 	require.NoError(t, loop.ExecuteWithExistedTask(task))
 	require.NoError(t, c.CanFinish())
-	require.GreaterOrEqual(t, calls.Load(), int64(6))
+	require.GreaterOrEqual(t, calls.Load(), int64(5))
 }
 
 func TestCoordinatorLoopWorkerNativeResultGate(t *testing.T) {

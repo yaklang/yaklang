@@ -25,11 +25,11 @@ func TestCoordinatorPlanReceiptDoesNotScaleWithPlan(t *testing.T) {
 func TestCoordinatorTaskObservationPreservesReviewFactsWithoutBrief(t *testing.T) {
 	a := Attempt{
 		Task: Task{ID: "logical-a", Goal: strings.Repeat("static-brief", 10000), DependsOn: []string{"upstream"}},
-		ID:   7, PlanVersion: 3, State: AwaitingReview, Seen: true,
+		ID:   7, PlanVersion: 3, State: AwaitingReview,
 		Result:       Result{Summary: strings.Repeat("actual-result", 1000), Artifacts: []string{"artifacts/report.md"}, EvidenceIDs: []string{"source.observed"}, Error: "verification detail"},
 		ReviewReason: "prior review detail",
 	}
-	data, err := json.Marshal(taskObservations([]Attempt{a}))
+	data, err := json.Marshal(taskResultRecords([]Attempt{a}))
 	require.NoError(t, err)
 	require.NotContains(t, string(data), "static-brief")
 	require.NotContains(t, string(data), "upstream")
@@ -40,7 +40,7 @@ func TestCoordinatorTaskObservationPreservesReviewFactsWithoutBrief(t *testing.T
 	require.EqualValues(t, 7, item["attempt_id"])
 	require.EqualValues(t, 3, item["plan_version"])
 	require.Equal(t, string(AwaitingReview), item["state"])
-	require.Equal(t, true, item["seen"])
+	require.NotContains(t, item, "seen", "请求送达状态不应改写持久化观测")
 	require.Equal(t, a.ReviewReason, item["review_reason"])
 	result, err := json.Marshal(item["result"])
 	require.NoError(t, err)

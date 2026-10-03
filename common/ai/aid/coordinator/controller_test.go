@@ -75,7 +75,7 @@ func TestCoordinatorLoopApprovalDependenciesReviewAndFinish(t *testing.T) {
 	require.Len(t, started, 1)
 	require.Eventually(t, func() bool { return c.Snapshot().Attempts["a"].State == AwaitingReview }, time.Second, time.Millisecond)
 	a := c.Snapshot().Attempts["a"]
-	require.Error(t, c.ReviewTask("a", a.ID, "accept", "actual evidence"))
+	require.Error(t, c.ReviewTask("a", a.ID+1, "accept", "stale attempt"))
 	_, err = c.StartTasks([]string{"b"})
 	require.Error(t, err)
 	a = awaitResult(t, c, "a")

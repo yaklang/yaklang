@@ -1,0 +1,15 @@
+// 快速、确定性通知实验：由 Go harness 注入模型回调及同步屏障。
+// 使用真实 Yak + aim + coordinator + pe_task；协调员不调用 wait_tasks。
+// 子任务保存新证据唤醒一次，任务结算再唤醒一次，最后自动验收并结束。
+err = aim.InvokeReAct(
+    "创建一个验证任务，提交审核后自动执行；子任务有发现时检查证据，完成后验收。无需显式等待，不生成报告。",
+    aim.planEngine("coordinator"),
+    aim.maxIteration(15),
+    aim.timeout(20),
+    aim.reviewPolicy("yolo"),
+    aim.aiCallback(NOTIFICATION_MODEL),
+    aim.onEvent(NOTIFICATION_EVENT),
+    aim.workdir(SMOKE_WORKDIR),
+    SMOKE_OPTIONS...,
+)
+die(err)

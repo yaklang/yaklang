@@ -89,7 +89,7 @@ func TestCoordinatorTaskStateChangesKeepPlanPartitionsStable(t *testing.T) {
 	changed.Attempts[p.Tasks[0].ID] = a
 	s.Changed(changed)
 	require.Equal(t, before, s.GetOrCreateFrozenBlockPartitionProducer().ProducePartitions(), "task result/status must not rewrite plan content or its partition nonce")
-	a.State, a.Seen = Accepted, true
+	a.State = Accepted
 	changed.Attempts[p.Tasks[0].ID] = a
 	s.Changed(changed)
 	require.Equal(t, before, s.GetOrCreateFrozenBlockPartitionProducer().ProducePartitions(), "review must preserve the stable plan partitions")
@@ -117,7 +117,7 @@ func TestCoordinatorNestedDAGRetainsGroupEntrySemantics(t *testing.T) {
 	definition := s.PlanDefinition()
 	require.Contains(t, definition, "Compare with first source")
 	require.NotContains(t, definition, `"progress"`)
-	s.Attempts[scope.ID] = Attempt{Task: scope, State: Accepted, ID: 9, Seen: true, Result: Result{Summary: "volatile result"}}
+	s.Attempts[scope.ID] = Attempt{Task: scope, State: Accepted, ID: 9, Result: Result{Summary: "volatile result"}}
 	require.Equal(t, definition, s.PlanDefinition(), "execution must not change cacheable plan definitions")
 	require.Contains(t, s.PromptStatus(), "Dispatch: ready")
 	require.Contains(t, s.PromptStatus(), "Dispatch: blocked")

@@ -6,11 +6,10 @@ type planContextReceipt struct {
 	DraftVersion     uint64 `json:"draft_version"`
 	ApprovedVersion  uint64 `json:"approved_version"`
 	SubmittedVersion uint64 `json:"submitted_version"`
-	Context          string `json:"context"`
 }
 
 func planReceipt(s Snapshot) planContextReceipt {
-	return planContextReceipt{s.DraftVersion, s.ApprovedVersion, s.SubmittedVersion, "SemiDynamic1: PLAN DEFINITION / PLAN DOCUMENT"}
+	return planContextReceipt{s.DraftVersion, s.ApprovedVersion, s.SubmittedVersion}
 }
 
 func (c *Controller) planReceipt() planContextReceipt {
@@ -20,22 +19,21 @@ func (c *Controller) planReceipt() planContextReceipt {
 	return planReceipt(c.state)
 }
 
-// 任务观测仅保留可用于调度与验收的执行事实，不重复静态目标、依赖和任务书。
+// 任务结果仅保留可用于调度与验收的执行事实，不重复静态目标、依赖和任务书。
 // Result 保留完整内容；不得为了缩短上下文丢失验收依据或 Evidence/artifact 引用。
-type taskObservation struct {
+type taskResultRecord struct {
 	TaskID       string `json:"task_id"`
 	AttemptID    uint64 `json:"attempt_id"`
 	PlanVersion  uint64 `json:"plan_version"`
 	State        State  `json:"state"`
-	Seen         bool   `json:"seen"`
 	Result       Result `json:"result"`
 	ReviewReason string `json:"review_reason,omitempty"`
 }
 
-func taskObservations(tasks []Attempt) []taskObservation {
-	out := make([]taskObservation, 0, len(tasks))
+func taskResultRecords(tasks []Attempt) []taskResultRecord {
+	out := make([]taskResultRecord, 0, len(tasks))
 	for _, a := range tasks {
-		out = append(out, taskObservation{a.Task.ID, a.ID, a.PlanVersion, a.State, a.Seen, a.Result, a.ReviewReason})
+		out = append(out, taskResultRecord{a.Task.ID, a.ID, a.PlanVersion, a.State, a.Result, a.ReviewReason})
 	}
 	return out
 }

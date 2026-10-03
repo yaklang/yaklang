@@ -18,7 +18,7 @@ import (
 func newNativePlanTestModel(tool string, taskCount ...int) func(aicommon.AICallerConfigIf, *aicommon.AIRequest, string) (*aicommon.AIResponse, bool, error) {
 	var mu sync.Mutex
 	workerSteps := map[string]int{}
-	statePattern := regexp.MustCompile(`\[([^\]]+)\]: ([a-z_]+); attempt=(\d+); observed=(true|false)`)
+	statePattern := regexp.MustCompile(`\[([^\]]+)\]: ([a-z_]+); attempt=(\d+)`)
 	count := 1
 	if len(taskCount) > 0 {
 		count = taskCount[0]
@@ -71,11 +71,8 @@ func newNativePlanTestModel(tool string, taskCount ...int) func(aicommon.AICalle
 				case "running":
 					name, args = "wait_tasks", map[string]any{"timeout_seconds": 1}
 				case "awaiting_review":
-					name = "inspect_tasks"
-					if state[4] == "true" {
-						attempt, _ := strconv.Atoi(state[3])
-						name, args = "review_task", map[string]any{"task_id": state[1], "attempt_id": attempt, "decision": "accept", "reason": "The observed result completes the deterministic check."}
-					}
+					attempt, _ := strconv.Atoi(state[3])
+					name, args = "review_task", map[string]any{"task_id": state[1], "attempt_id": attempt, "decision": "accept", "reason": "The delivered result completes the deterministic check."}
 				}
 				if state[2] == "running" || state[2] == "awaiting_review" {
 					break

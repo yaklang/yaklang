@@ -46,8 +46,6 @@ func TestCoordinatorPresetPlanApprovalContext(t *testing.T) {
 					prompts = append(prompts, req.GetPrompt())
 					switch len(prompts) {
 					case 1:
-						return nativeResponse(c, req, "inspect_plan", map[string]any{})
-					case 2:
 						return nativeResponse(c, req, "submit_plan", map[string]any{"plan_version": 1})
 					default:
 						return nativeResponse(c, req, "finish", map[string]any{})
@@ -63,7 +61,7 @@ func TestCoordinatorPresetPlanApprovalContext(t *testing.T) {
 			s.ApplySessionEvidenceOps([]aicommon.EvidenceOperation{evidence})
 			s.Timeline.FreezeAll()
 			require.NoError(t, s.RunPlanOnly())
-			require.Len(t, prompts, 3)
+			require.Len(t, prompts, 2)
 			if mocker {
 				require.Equal(t, 1, mockerCalls)
 			}
@@ -81,14 +79,13 @@ func TestCoordinatorPresetPlanApprovalContext(t *testing.T) {
 				require.NotContains(t, dynamic, "已有约束：")
 			}
 			require.Contains(t, prompts[0], "PLAN 草案任务（未批准）")
-			require.Contains(t, prompts[1], `"context":"SemiDynamic1: PLAN DEFINITION / PLAN DOCUMENT"`)
-			require.NotContains(t, prompts[1], `"draft":{`, "inspect_plan must not replay the complete plan")
+			require.NotContains(t, prompts[1], `"draft":{`, "actions must not replay the complete plan")
 			require.NotContains(t, prompts[1], "(*coordinator.Plan)")
-			require.Contains(t, prompts[2], "# PLAN DOCUMENT")
-			require.Contains(t, prompts[2], "Dispatch: blocked")
+			require.Contains(t, prompts[1], "# PLAN DOCUMENT")
+			require.Contains(t, prompts[1], "Dispatch: blocked")
 			if dir := os.Getenv("COORDINATOR_CONTEXT_REVIEW_DIR"); dir != "" && !mocker {
 				require.NoError(t, os.MkdirAll(dir, 0755))
-				for i, filename := range []string{"01-draft.txt", "02-inspected-draft.txt", "03-approved.txt"} {
+				for i, filename := range []string{"01-draft.txt", "03-approved.txt"} {
 					require.NoError(t, os.WriteFile(filepath.Join(dir, filename), []byte(prompts[i]), 0600))
 				}
 			}

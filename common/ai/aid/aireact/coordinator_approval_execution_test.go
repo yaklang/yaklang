@@ -34,7 +34,7 @@ func TestCoordinatorApprovalContinuesThroughInputQueue(t *testing.T) {
 			var mu sync.Mutex
 			workers := map[string]int{}
 			accepted, submittedAgain := 0, false
-			pattern := regexp.MustCompile(`\[([^\]]+)\]: ([a-z_]+); attempt=(\d+); observed=(true|false)`)
+			pattern := regexp.MustCompile(`\[([^\]]+)\]: ([a-z_]+); attempt=(\d+)`)
 			model := func(c aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 				mu.Lock()
 				defer mu.Unlock()
@@ -100,9 +100,6 @@ func TestCoordinatorApprovalContinuesThroughInputQueue(t *testing.T) {
 				matches := pattern.FindAllStringSubmatch(prompt, -1)
 				for _, m := range matches {
 					if m[2] == "awaiting_review" {
-						if m[4] == "false" {
-							return respond("inspect_tasks", map[string]any{})
-						}
 						attempt, _ := strconv.Atoi(m[3])
 						accepted++
 						return respond("review_task", map[string]any{"task_id": m[1], "attempt_id": attempt, "decision": "accept", "reason": "The inspected result satisfies the approved task."})

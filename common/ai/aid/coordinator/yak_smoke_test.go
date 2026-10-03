@@ -46,7 +46,7 @@ func TestCoordinatorLoopYakAIMNativeSmoke(t *testing.T) {
 	reported := false
 	var prompts []string
 	explored := false
-	taskPattern := regexp.MustCompile(`\[([^\]]+)\]: ([a-z_]+); attempt=(\d+); observed=(true|false)`)
+	taskPattern := regexp.MustCompile(`\[([^\]]+)\]: ([a-z_]+); attempt=(\d+)`)
 	model := func(c aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 		mu.Lock()
 		defer mu.Unlock()
@@ -92,11 +92,8 @@ func TestCoordinatorLoopYakAIMNativeSmoke(t *testing.T) {
 		}
 		for _, m := range matches {
 			if m[2] == "awaiting_review" {
-				if m[4] == "false" {
-					return nativeResponse(c, req, "inspect_tasks", map[string]any{"task_ids": []string{m[1]}})
-				}
 				id, _ := strconv.ParseUint(m[3], 10, 64)
-				return nativeResponse(c, req, "review_task", map[string]any{"task_id": m[1], "attempt_id": id, "decision": "accept", "reason": "The inspected worker result and session evidence confirm this task."})
+				return nativeResponse(c, req, "review_task", map[string]any{"task_id": m[1], "attempt_id": id, "decision": "accept", "reason": "The delivered worker result and session evidence confirm this task."})
 			}
 		}
 		for _, m := range matches {
