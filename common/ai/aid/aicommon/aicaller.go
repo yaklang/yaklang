@@ -6,6 +6,7 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"io"
 	"strings"
+	"sync/atomic"
 
 	"github.com/yaklang/yaklang/common/ai"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
@@ -89,14 +90,14 @@ func AIChatToAICallbackType(cb func(prompt string, opts ...aispec.AIConfigOption
 		resp := NewAIResponse(aicf)
 		go func() {
 			defer resp.Close()
-			isStream := false
+			var isStream atomic.Bool
 			optList := []aispec.AIConfigOption{
 				aispec.WithStreamHandler(func(reader io.Reader) {
-					isStream = true
+					isStream.Store(true)
 					resp.EmitOutputStream(reader)
 				}),
 				aispec.WithReasonStreamHandler(func(reader io.Reader) {
-					isStream = true
+					isStream.Store(true)
 					resp.EmitReasonStream(reader)
 				}),
 				aispec.WithModelInfoCallback(func(provider, model, thinkingLevel string) {
@@ -159,7 +160,7 @@ func AIChatToAICallbackType(cb func(prompt string, opts ...aispec.AIConfigOption
 			// are unaffected — arguments stay only in ToolCallCallback.
 			if req.IsToolCallArgumentsStreamEnabled() {
 				optList = append(optList, aispec.WithToolCallArgumentsStreamHandler(func(reader io.Reader) {
-					isStream = true
+					isStream.Store(true)
 					// Preserve argument bytes: the action parser handles JSON whitespace,
 					// while literal newlines and tabs may belong to an argument value.
 					resp.EmitOutputStream(reader)
@@ -173,7 +174,7 @@ func AIChatToAICallbackType(cb func(prompt string, opts ...aispec.AIConfigOption
 				log.Errorf("chat error: %v", err)
 				resp.SetError(err)
 			}
-			if !isStream {
+			if !isStream.Load() {
 				resp.EmitOutputStream(strings.NewReader(output))
 			}
 		}()

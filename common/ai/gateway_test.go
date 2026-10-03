@@ -3,6 +3,7 @@ package ai
 import (
 	"context"
 	_ "embed"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"github.com/stretchr/testify/assert"
@@ -16,6 +17,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -203,7 +205,18 @@ func (t *TestGateway) StructuredStream(s string, function ...any) (chan *aispec.
 	return ch, nil
 }
 
+func emitStructuredGatewayResult(cfg *aispec.AIConfig, value map[string]any) (string, error) {
+	data, _ := json.Marshal(value)
+	cfg.ToolCallCallback([]*aispec.ToolCall{{ID: "call_output", Function: aispec.FuncReturn{Name: "object", Arguments: string(data)}}})
+	cfg.ToolCallArgumentsStreamHandler(strings.NewReader(string(data)))
+	cfg.FinishReasonCallback("tool_calls", nil)
+	return "", nil
+}
+
 func (t *TestGateway) Chat(s string, function ...any) (string, error) {
+	if t.config.ToolCallCallback != nil {
+		return emitStructuredGatewayResult(t.config, map[string]any{"provider": t.config.Type, "model": t.config.Model})
+	}
 	if t.config.StreamHandler != nil {
 		t.config.StreamHandler(nil)
 	}
@@ -571,7 +584,7 @@ func TestFunctionCallSupportsPreferredTier(t *testing.T) {
 		}},
 	})
 
-	funcs := map[string]any{"echo": func(input string) string { return input }}
+	funcs := map[string]any{"provider": "返回实际 provider", "model": "返回实际 model"}
 
 	t.Run("quality priority", func(t *testing.T) {
 		result, err := FunctionCall("hello", funcs, aispec.WithQualityPriority())

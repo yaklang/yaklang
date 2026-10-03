@@ -10,6 +10,7 @@ import (
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
+	"github.com/yaklang/yaklang/common/ai/aispec"
 	"github.com/yaklang/yaklang/common/jsonextractor"
 )
 
@@ -41,6 +42,7 @@ type Request struct {
 	Validate                     func(*aicommon.Action) error
 	ResponseHandler              aicommon.AuxiliaryResponseHandler
 	ExtraOptions                 []aicommon.AIRequestOption
+	ModelOptions                 []aispec.AIConfigOption
 }
 
 // ExecuteTyped adapts aicommon's typed invocation. Public Yak/Go LiteForge
