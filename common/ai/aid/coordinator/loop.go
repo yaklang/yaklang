@@ -8,20 +8,16 @@ import (
 	"time"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon/promptloader"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/schema"
+	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 )
 
-const instruction = `You coordinate a plan and its execution tasks. Read user information in Timeline.
-Explore with read/search tools, save_evidence, and clarification. Call create_plan with a structured plan and plan_document, submit it for approval, then dispatch ready tasks.
-After approval, advance execution and review_task automatically. Do not request another user confirmation for the same plan version or for each task result.
-Respond with native function calls. Prose, JSON actions and response-format JSON schemas cannot invoke actions.
-Business commands, scripts and changes belong in pe_task workers. Coordinator tools permit bounded exploration and report writing only.
-start_tasks returns immediately. inspect_tasks/wait_tasks deliver execution results. review_task accepts or rejects an inspected attempt based on its evidence and artifacts. Execution completion is not acceptance; dependencies start only after acceptance.
-Modify a draft with its exact version and submit it again. Cancel and wait for active affected tasks before changing their briefs or retrying an upstream task.
-Use PLAN STATUS for scheduling and the microscopic TODO list for your own next steps. Finish only after every approved task is accepted, all results observed and all TODOs resolved. Use write_report for artifact reports and directly_answer for messages. Both stay in this coordinator loop.`
+var instruction = promptloader.MustLoad("ai/aid/coordinator/instruction.txt")
+var planningOnlyInstruction = promptloader.MustLoad("ai/aid/coordinator/planning_only.txt")
 
 func WithController(c *Controller) reactloops.ReActLoopOption {
 	return func(loop *reactloops.ReActLoop) { loop.Set("coordinator_controller", c) }
@@ -43,7 +39,7 @@ func controller(loop *reactloops.ReActLoop) *Controller {
 	return c
 }
 
-var ActionNames = []string{"create_plan", "modify_plan", "submit_plan", "start_tasks", "inspect_tasks", "wait_tasks", "review_task", "retry_task", "cancel_tasks", "write_report"}
+var ActionNames = []string{"create_plan", "modify_plan", "inspect_plan", "submit_plan", "start_tasks", "inspect_tasks", "wait_tasks", "review_task", "retry_task", "cancel_tasks", "write_report"}
 
 // Providers can return malformed native arguments. Validate the advertised
 // types before getters coerce them (e.g. null task_ids must not become all tasks).
@@ -63,32 +59,30 @@ func actionOptions() []reactloops.ReActLoopOption {
 	str := func(name, description string) aitool.ToolOption {
 		return aitool.WithStringParam(name, aitool.WithParam_Description(description), aitool.WithParam_Required())
 	}
-	version := aitool.WithIntegerParam("plan_version", aitool.WithParam_Description("Exact current draft version returned by create_plan/modify_plan."), aitool.WithParam_Required())
-	ids := aitool.WithStringArrayParam("task_ids", aitool.WithParam_Description("Logical task IDs; omitted means all ready tasks (start), or all approved tasks (inspect/wait/cancel)."))
-	attempt := aitool.WithIntegerParam("attempt_id", aitool.WithParam_Description("Exact attempt_id from the latest inspected result."), aitool.WithParam_Required())
-	plan := aitool.WithStructParam("plan", []aitool.PropertyOption{aitool.WithParam_Required()},
-		str("name", "Plan name."), str("goal", "Overall goal."),
-		aitool.WithStructArrayParam("tasks", []aitool.PropertyOption{aitool.WithParam_Required()}, nil,
-			str("name", "Task name."), str("goal", "Frozen execution brief."), str("identifier", "Stable, unique semantic identifier; retain it for unchanged tasks."), aitool.WithStringArrayParam("depends_on", aitool.WithParam_Description("Semantic identifiers of prerequisites; explicit [] means independent."))))
+	version := aitool.WithIntegerParam("plan_version", aitool.WithParam_Description("create_plan 或 modify_plan 返回的当前草案版本，必须精确匹配。"), aitool.WithParam_Required())
+	ids := aitool.WithStringArrayParam("task_ids", aitool.WithParam_Description("逻辑任务 ID 列表；start_tasks 省略时选择全部可派发任务，inspect/wait/cancel 省略时选择全部已批准任务。"))
+	attempt := aitool.WithIntegerParam("attempt_id", aitool.WithParam_Description("最近一次已观察结果中的 attempt_id，必须精确匹配。"), aitool.WithParam_Required())
+	plan := planParameter()
 	definitions := []struct {
 		name, description string
 		options           []aitool.ToolOption
 	}{
-		{"create_plan", "Create and validate a draft; does not approve or dispatch it.", []aitool.ToolOption{plan, str("plan_document", "Stable Markdown plan document.")}},
-		{"modify_plan", "Replace a draft at an exact version; approved work remains unchanged until submission.", []aitool.ToolOption{version, plan, str("plan_document", "Complete replacement Markdown document.")}},
-		{"submit_plan", "Submit the draft for user approval and adopt the approved tree. Repeating an approved version does not request review again. After approval, call start_tasks to advance execution.", []aitool.ToolOption{version}},
-		{"start_tasks", "Dispatch selected ready tasks without waiting; never dispatch unapproved dependencies.", []aitool.ToolOption{ids}},
-		{"inspect_tasks", "Read task states, attempts, results and artifact/evidence references.", []aitool.ToolOption{ids}},
-		{"wait_tasks", "Wait for results or a control change; timeout does not cancel tasks.", []aitool.ToolOption{ids, aitool.WithStringParam("mode", aitool.WithParam_Description("any (default): first update; all: all selected dispatched attempts settle. User input or plan changes interrupt either mode.")), aitool.WithIntegerParam("timeout_seconds", aitool.WithParam_Description("Default 30, maximum 60 seconds."))}},
-		{"review_task", "Accept or reject a completed inspected attempt using its actual evidence and artifacts.", []aitool.ToolOption{str("task_id", "Logical task ID."), attempt, str("decision", "accept or reject"), str("reason", "Evidence-backed review conclusion, with artifact/evidence references.")}},
-		{"retry_task", "Retry a settled attempt; invalidates downstream results. Active dependents must first stop.", []aitool.ToolOption{str("task_id", "Logical task ID."), attempt, str("reason", "Why the current attempt needs another execution.")}},
-		{"cancel_tasks", "Request cancellation; cancelling is not settled until the worker has exited.", []aitool.ToolOption{ids, str("reason", "Reason for stopping selected tasks.")}},
-		{"write_report", "Write a Markdown report artifact in this loop and publish the existing report_finish event.", []aitool.ToolOption{str("title", "Report title."), str("markdown", "Complete report content."), str("summary", "Short report summary for the existing UI.")}},
+		{"create_plan", "创建并校验计划草案；不批准、不派发任务。", []aitool.ToolOption{plan, str("plan_document", "稳定的 Markdown 计划文档。")}},
+		{"modify_plan", "按精确版本完整替换草案；新版本获批前，原已批准计划继续有效。", []aitool.ToolOption{version, plan, str("plan_document", "完整替换后的 Markdown 计划文档。")}},
+		{"inspect_plan", "读取完整草案和已批准计划，包括版本、文档和任务 DAG；不批准、不修改计划。", nil},
+		{"submit_plan", "提交草案供用户审核并采用批准的任务树；重复提交同一已批准版本不再次审核。批准后调用 start_tasks 自动推进执行。", []aitool.ToolOption{version}},
+		{"start_tasks", "立即派发选定的可执行任务，不等待完成；仅执行已批准且前置任务均已验收的任务。", []aitool.ToolOption{ids}},
+		{"inspect_tasks", "读取任务状态、执行尝试、结果及 artifacts/Evidence 引用，并标记结果已被观察。", []aitool.ToolOption{ids}},
+		{"wait_tasks", "等待任务结果或控制变化；超时不取消任务。", []aitool.ToolOption{ids, aitool.WithStringParam("mode", aitool.WithParam_Description("any（默认）：等待首次更新；all：等待选中的已派发尝试全部结算。用户补充或计划变更会唤醒两种等待。")), aitool.WithIntegerParam("timeout_seconds", aitool.WithParam_Description("默认 30 秒，最多 60 秒。"))}},
+		{"review_task", "依据真实 Evidence 和 artifacts，接受或拒绝已结束且已观察的执行尝试。", []aitool.ToolOption{str("task_id", "逻辑任务 ID。"), attempt, str("decision", "accept 表示接受；reject 表示拒绝。"), str("reason", "有证据支持的验收结论，包含 artifacts/Evidence 引用。")}},
+		{"retry_task", "重试已结算的尝试并使下游结果失效；仍在运行的受影响任务必须先停止。", []aitool.ToolOption{str("task_id", "逻辑任务 ID。"), attempt, str("reason", "当前尝试需要重新执行的原因。")}},
+		{"cancel_tasks", "请求取消任务；worker 实际退出前 cancelling 不代表任务已经停止。", []aitool.ToolOption{ids, str("reason", "停止选定任务的原因。")}},
+		{"write_report", "在当前协调循环写入 Markdown 报告产物，并发布兼容的 report_finish 事件。", []aitool.ToolOption{str("title", "报告标题。"), str("markdown", "完整报告正文。"), str("summary", "供现有界面展示的报告摘要。")}},
 	}
 	opts := make([]reactloops.ReActLoopOption, 0, len(definitions))
 	for _, definition := range definitions {
 		d := definition
-		opts = append(opts, reactloops.WithRegisterLoopAction(d.name, d.description, d.options, validateActionParameters(d.name, d.options), func(loop *reactloops.ReActLoop, a *aicommon.Action, op *reactloops.LoopActionHandlerOperator) {
+		opts = append(opts, registerAction(d.name, d.description, d.options, func(loop *reactloops.ReActLoop, a *aicommon.Action, op *reactloops.LoopActionHandlerOperator) {
 			c := controller(loop)
 			if c == nil {
 				op.Fail("coordinator controller missing")
@@ -104,6 +98,9 @@ func actionOptions() []reactloops.ReActLoopOption {
 				value, err = c.CreatePlan(op.GetContext(), planData(a), a.GetString("plan_document"))
 			case "modify_plan":
 				value, err = c.ModifyPlan(op.GetContext(), version, planData(a), a.GetString("plan_document"))
+			case "inspect_plan":
+				s := c.Snapshot()
+				value = map[string]any{"draft_version": s.DraftVersion, "approved_version": s.ApprovedVersion, "submitted_version": s.SubmittedVersion, "draft": s.Draft, "approved": s.Approved}
 			case "submit_plan":
 				err = c.SubmitPlan(op.GetContext(), version)
 				s := c.Snapshot()
@@ -148,7 +145,8 @@ func actionOptions() []reactloops.ReActLoopOption {
 			if err != nil {
 				op.Feedback(fmt.Sprintf("%s rejected: %v", d.name, err))
 			} else {
-				op.Feedback(fmt.Sprintf("%s: %#v", d.name, value))
+				encoded, _ := json.Marshal(value)
+				op.Feedback(fmt.Sprintf("%s: %s", d.name, encoded))
 			}
 			op.Continue()
 		}))
@@ -156,7 +154,16 @@ func actionOptions() []reactloops.ReActLoopOption {
 	return opts
 }
 
-// NewLoop uses native function calls and the shared Timeline assembly.
+// registerAction supplies separate text-stream and native function definitions,
+// with one Chinese parameter contract and one execution/validation path.
+func registerAction(name, description string, options []aitool.ToolOption, handler reactloops.LoopActionHandlerFunc) reactloops.ReActLoopOption {
+	return reactloops.WithRegisterLoopActionWithStreamField(name, description+"文本流模式通过 @action 选择本动作，参数遵循当前 JSON Schema。", options, nil, validateActionParameters(name, options), handler, func(action *reactloops.LoopAction) {
+		action.NativeDescription = description + "原生调用通过函数名选择本动作，参数写入 arguments。"
+		action.NativeOptions = append([]aitool.ToolOption{}, options...)
+	})
+}
+
+// NewLoop uses the main loop's configured action protocol and Timeline assembly.
 // The tool guard is per-loop, so execution workers retain their own tool policy.
 func NewLoop(r aicommon.AIInvokeRuntime, opts ...reactloops.ReActLoopOption) (*reactloops.ReActLoop, error) {
 	// These are planning preferences, scoped to this coordinator's role
@@ -170,19 +177,21 @@ func NewLoop(r aicommon.AIInvokeRuntime, opts ...reactloops.ReActLoopOption) (*r
 	}
 	if cfg, ok := r.GetConfig().(*aicommon.Config); ok {
 		_ = aicommon.WithLiteForgeExecutor(executeNativeHelper)(cfg)
-		_ = aicommon.WithEnableFunctionCallMode(true)(cfg)
 		_ = aicommon.WithAiAgreeRiskControl(NativeRiskReview)(cfg)
 		_ = aicommon.WithDisableDynamicPlanning(true)(cfg)
 	}
 	preset := []reactloops.ReActLoopOption{
 		reactloops.WithFunctionCallActionVariants(), reactloops.WithAllowToolCall(true), reactloops.WithAllowUserInteract(true), reactloops.WithAllowPlanAndExec(false), reactloops.WithAllowAIForge(false),
 		reactloops.WithPersistentContextProvider(func(l *reactloops.ReActLoop, _ string) (string, error) {
-			text := instruction
+			text, err := utils.RenderTemplate(instruction, map[string]any{"FunctionCallMode": l.FunctionCallModeEnabled()})
+			if err != nil {
+				return "", err
+			}
 			if controller(l).Snapshot().Approved == nil {
 				text += preferences.String()
 			}
 			if planningOnly(l) {
-				return text + "\nThis invocation is planning-only: submit the draft for approval, then finish. Do not dispatch tasks or write the execution report.", nil
+				return text + "\n" + planningOnlyInstruction, nil
 			}
 			return text, nil
 		}),
@@ -212,8 +221,7 @@ func NewLoop(r aicommon.AIInvokeRuntime, opts ...reactloops.ReActLoopOption) (*r
 	}
 	preset = append(preset, actionOptions()...)
 	preset = append(preset, opts...)
-	// This is a protocol invariant, not a user/configurable fallback.
-	preset = append(preset, reactloops.WithFunctionCallMode(true), reactloops.WithDisablePeriodicVerification(true), reactloops.WithDisableLoopPerception(true))
+	preset = append(preset, reactloops.WithDisablePeriodicVerification(true), reactloops.WithDisableLoopPerception(true))
 	loop, err := reactloops.NewReActLoop(Name, r, preset...)
 	if err != nil {
 		return nil, err
@@ -285,12 +293,19 @@ func NewLoop(r aicommon.AIInvokeRuntime, opts ...reactloops.ReActLoopOption) (*r
 		return nil, err
 	}
 	answerCopy := *answer
+	answerCopy.Description = "向用户说明进展或答复，之后继续协调。短答复使用 answer_payload；长答复使用主循环声明的 FINAL_ANSWER AITAG，两者不可同时输出。"
+	answerCopy.NativeDescription = "向用户说明进展或答复，之后继续协调；完整正文写入 arguments.answer_payload，不使用外置 AITAG。"
+	answerCopy.Options = []aitool.ToolOption{aitool.WithStringParam("answer_payload", aitool.WithParam_Description("短答复正文；长答复使用主循环声明的 FINAL_ANSWER AITAG，两者不可同时输出。"))}
+	answerCopy.NativeOptions = []aitool.ToolOption{aitool.WithStringParam("answer_payload", aitool.WithParam_Description("向用户交付的完整答复，支持 Markdown 或代码；不使用外置 AITAG。"), aitool.WithParam_Required())}
 	answerCopy.ActionHandler = func(l *reactloops.ReActLoop, a *aicommon.Action, op *reactloops.LoopActionHandlerOperator) {
+		if !l.FunctionCallModeEnabled() {
+			answer.ActionHandler(l, a, op)
+			return
+		}
 		l.GetEmitter().EmitTextMarkdownStreamEvent("re-act-loop-answer-payload", strings.NewReader(a.GetString("answer_payload")), "")
 		op.Continue()
 	}
 	answerCopy.FunctionCallAction = nil
-	answerCopy.Options = reactloops.NativeDirectlyAnswerOptions()
 	reactloops.WithOverrideLoopAction(&answerCopy)(loop)
 	return loop, nil
 }

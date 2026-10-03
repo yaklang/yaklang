@@ -54,7 +54,7 @@ func TestCoordinatorApprovalContinuesThroughInputQueue(t *testing.T) {
 				if defaultEntry && strings.Contains(req.GetCallerLabel(), "default") {
 					return respond("request_plan_and_execution", map[string]any{"plan_request_payload": "Plan and execute two dependent checks"})
 				}
-				if strings.Contains(prompt, "Execute the assigned frozen plan task.") {
+				if strings.Contains(prompt, "执行已批准的冻结任务书。") {
 					if strings.Contains(prompt, "PLANNER ONLY PREFERENCE") {
 						return nil, fmt.Errorf("planning preferences leaked into worker role")
 					}

@@ -33,8 +33,10 @@ type PromptMaterials struct {
 	// PromotedUserInputHistory contains exact user inputs from frozen Timeline records.
 	PromotedUserInputHistory string
 	// PlanDocument contains the confirmed plan document rendered in main-loop SemiDynamic1.
-	// Task tree and execution status remain in their existing context paths.
-	PlanDocument      string
+	PlanDocument string
+	// PlanDefinition is the versioned draft/approved task tree and executable DAG,
+	// without worker status or results. Only native coordinator sessions supply it.
+	PlanDefinition    string
 	PlanHelp          string
 	OriginalUserInput string
 	StableInstruction string
@@ -102,6 +104,7 @@ func (m *PromptMaterials) SemiDynamicData() map[string]any {
 		"PromotedRecentTools":        m.PromotedRecentTools,
 		"PromotedUserInputHistory":   m.PromotedUserInputHistory,
 		"PlanDocument":               m.PlanDocument,
+		"PlanDefinition":             m.PlanDefinition,
 		"SessionEvidenceSemiDynamic": m.SessionEvidenceSemiDynamic,
 		"PlanHelp":                   m.PlanHelp,
 		"OriginalUserInput":          m.OriginalUserInput,

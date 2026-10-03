@@ -36,7 +36,7 @@ func TestCoordinatorChannelsNeverConstructTheOtherRuntime(t *testing.T) {
 		return nil, legacyResult
 	}
 	var calls atomic.Int64
-	r, err := NewTestReAct(aicommon.WithContext(ctx), aicommon.WithFocus(coordinator.Name), aicommon.WithDisableCreateDBRuntime(true), aicommon.WithWorkdir(t.TempDir()), aicommon.WithAgreeYOLO(), aicommon.WithAICallback(func(c aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+	r, err := NewTestReAct(aicommon.WithContext(ctx), aicommon.WithEnableFunctionCallMode(true), aicommon.WithFocus(coordinator.Name), aicommon.WithDisableCreateDBRuntime(true), aicommon.WithWorkdir(t.TempDir()), aicommon.WithAgreeYOLO(), aicommon.WithAICallback(func(c aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 		wire := aispec.NewDefaultAIConfig(req.GetExtraSpecOpts()...)
 		if wire.ToolCallCallback == nil || wire.FinishReasonCallback == nil {
 			return nil, fmt.Errorf("native channel emitted a text request")

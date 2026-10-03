@@ -36,7 +36,7 @@ func TestPlanExec_PrefixCacheStableWithMockedTieredAI(t *testing.T) {
 	probe := newPlanExecPromptProbe()
 	var mu sync.Mutex
 	roleHashes := map[string]string{}
-	ins, err := NewTestReAct(aicommon.WithContext(ctx), aicommon.WithWorkdir(t.TempDir()),
+	ins, err := NewTestReAct(aicommon.WithContext(ctx), aicommon.WithEnableFunctionCallMode(true), aicommon.WithWorkdir(t.TempDir()),
 		aicommon.WithDisableCreateDBRuntime(true), aicommon.WithNoOpMemoryTriage(),
 		aicommon.WithAgreeYOLO(), aicommon.WithTools(tool),
 		aicommon.WithEventHandler(func(*schema.AiOutputEvent) {}),
@@ -46,7 +46,7 @@ func TestPlanExec_PrefixCacheStableWithMockedTieredAI(t *testing.T) {
 		aicommon.WithQualityPriorityAICallback(func(c aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			rec := probe.Observe(req.GetPrompt())
 			role := "coordinator"
-			if strings.Contains(req.GetPrompt(), "Execute the assigned frozen plan task.") {
+			if strings.Contains(req.GetPrompt(), "执行已批准的冻结任务书。") {
 				role = "pe_task"
 			}
 			mu.Lock()

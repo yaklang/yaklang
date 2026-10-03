@@ -13,7 +13,7 @@ import (
 )
 
 // The callback-inheritance tests use the ordinary default loop at the entry
-// and the native coordinator/worker protocol after handing off the request.
+// and the inherited coordinator/worker protocol after handing off the request.
 // Model selection remains entirely under the runtime being tested.
 func newNativePlanTestModel(tool string, taskCount ...int) func(aicommon.AICallerConfigIf, *aicommon.AIRequest, string) (*aicommon.AIResponse, bool, error) {
 	var mu sync.Mutex
@@ -33,7 +33,7 @@ func newNativePlanTestModel(tool string, taskCount ...int) func(aicommon.AICalle
 	}
 	return func(c aicommon.AICallerConfigIf, req *aicommon.AIRequest, model string) (*aicommon.AIResponse, bool, error) {
 		wire := aispec.NewDefaultAIConfig(req.GetExtraSpecOpts()...)
-		if wire.ToolCallCallback == nil || wire.FinishReasonCallback == nil {
+		if req.GetCallerLabel() != "react-loop:coordinator" && req.GetCallerLabel() != "react-loop:pe_task" {
 			return nil, false, nil
 		}
 		mu.Lock()
@@ -41,9 +41,15 @@ func newNativePlanTestModel(tool string, taskCount ...int) func(aicommon.AICalle
 		name, args := "finish", map[string]any{}
 		prompt := req.GetPrompt()
 		switch {
-		case strings.Contains(prompt, "Execute the assigned frozen plan task."):
-			step := workerSteps[req.GetTaskIndex()]
-			workerSteps[req.GetTaskIndex()]++
+		case strings.Contains(prompt, "执行已批准的冻结任务书。"):
+			key := req.GetTaskIndex()
+			if key == "" {
+				if match := regexp.MustCompile(`CURRENT TASK \[task_index=([^,\]]+)`).FindStringSubmatch(prompt); len(match) > 1 {
+					key = match[1]
+				}
+			}
+			step := workerSteps[key]
+			workerSteps[key]++
 			if tool == "" {
 				step++
 			}
@@ -76,13 +82,21 @@ func newNativePlanTestModel(tool string, taskCount ...int) func(aicommon.AICalle
 				}
 			}
 		}
+		native := wire.ToolCallCallback != nil && wire.FinishReasonCallback != nil
+		if !native {
+			args["@action"] = name
+		}
 		data, err := json.Marshal(args)
 		if err != nil {
 			return nil, true, err
 		}
-		wire.ToolCallCallback([]*aispec.ToolCall{{ID: fmt.Sprintf("inherit-%d", req.GetSeqId()), Type: "function", Function: aispec.FuncReturn{Name: name, Arguments: string(data)}}})
-		wire.FinishReasonCallback("tool_calls", nil)
 		rsp := c.NewAIResponse()
+		if native {
+			wire.ToolCallCallback([]*aispec.ToolCall{{ID: fmt.Sprintf("inherit-%d", req.GetSeqId()), Type: "function", Function: aispec.FuncReturn{Name: name, Arguments: string(data)}}})
+			wire.FinishReasonCallback("tool_calls", nil)
+		} else {
+			rsp.EmitOutputStream(strings.NewReader(string(data)))
+		}
 		rsp.SetModelInfo("mock", model)
 		rsp.Close()
 		return rsp, true, nil

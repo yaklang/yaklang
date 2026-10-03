@@ -15,7 +15,7 @@
 | coordinator | 探索、证据、计划文档、审批、调度、等待、验收、调整计划、报告 | 执行业务命令/脚本，递归开启其他 PLAN、专注循环或 sub-agent |
 | pe_task | 执行批准的冻结任务书，产出 artifacts/evidence，提交结果 | 批准计划、接受自己的结果、修改调度、开启其他循环 |
 
-两种循环均强制使用原生 tool_calls。传入文本模式选项也不会切换协议；普通 JSON 响应不能触发动作。工具参数使用 JSON schema 定义类型，客户端 Content 与存储仍使用 JSON，这些属于参数和数据格式。
+两种循环均继承主循环的协议配置。文本模式使用流式 JSON @action 和声明的 AITAG，原生模式使用 tool_calls；中文指令按模式渲染，专属动作分别提供中文 Options 与 NativeOptions，由共享主循环构建对应参数定义。两种协议共用执行、校验与权限门禁；原生模式不接受文本 JSON action。客户端 Content 与存储格式保持不变。
 
 旧 plan/replan/task-review JSON 循环不进入新路径。报告由协调员 write_report 完成；AI 风险评估和继承新引擎的压缩/附件等单步基础设施输出使用原生函数调用，不新增 ReAct 循环。
 
@@ -25,9 +25,9 @@
 flowchart TD
     Entry[aim / ReAct / Yakit 输入] --> Select[默认循环转交 / 显式 focus / 旧名称升级]
     Select --> Native[coordinator.Session]
-    Native --> Planner[coordinator 原生 ReAct]
+    Native --> Planner[coordinator ReAct]
     Native --> Control[Controller：版本、调度、验收]
-    Control --> Worker[pe_task 原生 ReAct]
+    Control --> Worker[pe_task ReAct]
     Native --> Wire[独立计划 DTO / 审批 / 事件 / 存储适配]
     Wire --> UI[Yakit 原协议]
     Planner --> Shared[aicommon / reactloops / session Timeline]
@@ -44,7 +44,7 @@ flowchart TD
 
 create_plan 保存完整候选文档和任务 DAG。modify_plan 使用确切草稿版本完整替换候选计划。草稿不会自动替换批准执行内容；submit_plan 通过独立审批适配器发出兼容事件，取得用户批准后才采用批准树。
 
-新原生参数采用平面 DAG，使用稳定 identifier 和 depends_on；旧客户端的嵌套 root_task、语义依赖和逻辑 task_id 继续支持。宿主解析依赖，校验重复、未知引用及环，并保留未变任务的逻辑 ID。
+计划参数沿用旧版嵌套任务书及 sub_subtasks，使用稳定 identifier 和 depends_on；组的前置条件作用于入口叶任务，依赖组时等待其全部叶任务验收。旧客户端的嵌套 root_task 与逻辑 task_id 继续支持。宿主解析依赖，校验重复、未知引用及环，并保留未变任务的逻辑 ID。
 
 start_tasks 原子检查批准、并发配额、状态和依赖，登记新的 attempt_id 后立即返回。它只派发指定的可执行任务，不调用旧 runtime.Invoke 推进整棵树。省略 task_ids 时选择当前 ready 的 tasks，受 PlanExecTaskConcurrency 限制。
 
@@ -92,6 +92,6 @@ EnableDetachedPlan 使用旧 detached_plan_require 面板。submit_plan 保存�
 
 Go 显式使用 coordinator.NewSession 构造新运行体，提供 Run、RunPlanOnly、RunExecuteApprovedPlan、RunExecuteOnly。coordinator_legacy.NewCoordinatorContext 永远是旧版。ReAct 默认使用新版，aim.focus("coordinator") 可直接进入；旧 focus 名称在最上层升级为新版。aim.planEngine 是 focus 的兼容别名。Config 不携带 plan_engine；只有持久化保留该标记供恢复路由使用。RPC 消息定义不变。
 
-本次测试覆盖批准/依赖、重复派发、观察与验收、重试失效、版本冲突、活动下游保护、取消真实退出、通知等待、any/all、快照恢复、panic、原生协议强制、JSON 动作及错误参数拒绝、worker 结果门闩、PLAN-only、detached 编辑恢复、干预记录时序、风险评估及辅助原生输出。真实 Yak 引擎执行 aim 脚本，核对真实文件读取、两个依赖任务、共享 evidence、报告和 Yakit push/pop/loop_marker 事件。
+本次测试覆盖批准/依赖、重复派发、观察与验收、重试失效、版本冲突、活动下游保护、取消真实退出、通知等待、any/all、快照恢复、panic、两种协议继承、原生模式拒绝文本 JSON 动作及错误参数校验、worker 结果门闩、PLAN-only、detached 编辑恢复、干预记录时序、风险评估及辅助原生输出。真实 Yak 引擎执行 aim 脚本，核对真实文件读取、两个依赖任务、共享 evidence、报告和 Yakit push/pop/loop_marker 事件。
 
 确定性 provider 测试验证运行契约。实际模型任务质量、网关缓存命中率及完整 Yakit 人工交互仍需使用实际 provider 与前端进行后续探索。

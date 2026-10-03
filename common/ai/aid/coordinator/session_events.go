@@ -155,8 +155,16 @@ func (s *Session) Changed(snapshot Snapshot) {
 			}
 		}
 	})
-	if snapshot.Approved != nil && snapshot.ApprovedVersion != s.last.ApprovedVersion && strings.TrimSpace(p.Document) != "" {
-		s.AppendFrozenBlockPartition("plan_document", "Plan Document", fmt.Sprintf("Approved PLAN version %d\n%s", snapshot.ApprovedVersion, p.Document), aicommon.PlanDocumentFrozenPartitionOrder)
+	if snapshot.Approved != nil && snapshot.ApprovedVersion != s.last.ApprovedVersion {
+		// Even an empty replacement document must supersede the previous version.
+		document := strings.TrimSpace(p.Document)
+		if document == "" {
+			document = "本版本未提供独立计划文档；任务书以 PLAN DEFINITION 为准。"
+		}
+		s.AppendFrozenBlockPartition("plan_document", "Plan Document", fmt.Sprintf("Approved PLAN version %d\n%s", snapshot.ApprovedVersion, document), aicommon.PlanDocumentFrozenPartitionOrder)
+	}
+	if snapshot.DraftVersion != s.last.DraftVersion || snapshot.ApprovedVersion != s.last.ApprovedVersion {
+		s.AppendFrozenBlockPartition("plan_definition", "Plan Definition", snapshot.PlanDefinition(), aicommon.PlanDocumentFrozenPartitionOrder+1)
 	}
 	s.EmitJSON(schema.EVENT_TYPE_PLAN, "system", map[string]any{"root_task": root})
 	s.lastTree, _ = json.Marshal(root)

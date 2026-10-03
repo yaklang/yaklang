@@ -84,7 +84,7 @@ func ConvertStartParamsToReActConfig(i *ypb.AIStartParams) []aicommon.ConfigOpti
 	// EnablePlan 晚于 DisableAISearchForge 应用，用于控制 PE / 蓝图动作；与 AI 搜索 Forge 工具独立。
 	opts = append(opts, aicommon.WithEnablePlanAndExec(i.GetEnablePlan()))
 	if i.GetEnablePlan() {
-		opts = append(opts, aicommon.WithEnableFunctionCallMode(true), coordinator.WithNativeHelpers())
+		opts = append(opts, coordinator.WithNativeHelpers())
 	}
 	if i.GetEnableDetachedPlan() {
 		opts = append(opts, aicommon.WithEnableDetachedPlan(true))

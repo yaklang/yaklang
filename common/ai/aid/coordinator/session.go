@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"strings"
 	"sync"
 	"time"
 
@@ -92,6 +91,7 @@ func FromRuntime(ctx context.Context, r aicommon.AIInvokeRuntime, task aicommon.
 	input := chanx.NewUnlimitedChan[*ypb.AIInputEvent](ctx, 10)
 	hotpatch := parent.HotPatchBroadcaster.Subscribe()
 	opts := aicommon.ConvertConfigToOptions(parent)
+	opts = append(opts, nativePlanOptions(parent)...)
 	opts = append(opts, aicommon.WithForceManualPlanReview(parent.ForceManualPlanReview))
 	opts = append(opts, aicommon.WithPlanPrompt(parent.PlanPrompt))
 	opts = append(opts, aicommon.WithID(id), aicommon.WithContext(ctx), aicommon.WithEventInputChanx(input), aicommon.WithHotPatchOptionChan(hotpatch), aicommon.WithAICallbacks(parent.GetRawAICallbacks()), aicommon.WithEventHandler(func(e *schema.AiOutputEvent) {
@@ -148,6 +148,7 @@ func (s *Session) RunPlanOnly() error               { return s.run(true) }
 func (s *Session) RunExecuteApprovedPlan() error    { return s.run(false) }
 func (s *Session) RunExecuteOnly() error            { return s.run(false) }
 func (s *Session) SetRecoveryStartTaskID(id string) { s.startTaskID = id }
+func (s *Session) Snapshot() Snapshot               { return s.controller.Snapshot() }
 
 // SubmitInput adapts an existing RPC plan payload to this runtime's own
 // approval and persistence. It never invokes a legacy planner or model loop.
@@ -284,9 +285,6 @@ func (s *Session) run(planningOnly bool) (err error) {
 			s.parent.EmitJSON(schema.EVENT_TYPE_END_PLAN_AND_EXECUTION, "plan", payload)
 		}()
 	}
-	if s.parent == nil && strings.TrimSpace(s.query) != "" {
-		s.Timeline.PushText(s.AcquireId(), "[%s]:\n%s", aicommon.TIMELINE_ITEM_TYPE_CURRENT_TASK_USER_INPUT, s.query)
-	}
 	input := s.query
 	if s.parent != nil {
 		// The parent owns user-input ingress. A nested loop must not journal
@@ -296,6 +294,14 @@ func (s *Session) run(planningOnly bool) (err error) {
 	task := aicommon.NewStatefulTaskBase("coordinator-"+s.Id, input, s.GetContext(), s.GetEmitter(), true)
 	task.SetUserInput(s.query)
 	s.invoker.SetCurrentTask(task)
+	if s.parent == nil {
+		// The loop reuses this ingress receipt instead of recording the same
+		// standalone Session query a second time under another timeline item.
+		s.Timeline.EnsureTaskUserInput(task.GetId(), task.GetOriginUserInput(), s.AcquireId)
+	}
+	if err := s.preparePresetPlan(); err != nil {
+		return fmt.Errorf("prepare preset plan: %w", err)
+	}
 	opts := append(reactloops.BasicAICommonConfigOption(s.Config), WithController(s.controller))
 	if s.PlanningOnly() {
 		opts = append(opts, WithPlanningOnly())

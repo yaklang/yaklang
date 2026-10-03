@@ -3,6 +3,7 @@ package coordinator
 import (
 	"encoding/json"
 	"fmt"
+	"sort"
 	"strings"
 
 	"github.com/google/uuid"
@@ -123,6 +124,8 @@ func ParsePlan(data, document string, previous *Plan) (*Plan, error) {
 				Name           string            `json:"name"`
 				Goal           string            `json:"goal"`
 				Identifier     string            `json:"identifier"`
+				SemanticID     string            `json:"semantic_identifier"`
+				TaskID         string            `json:"task_id"`
 				MainName       string            `json:"main_task"`
 				MainGoal       string            `json:"main_task_goal"`
 				MainIdentifier string            `json:"main_task_identifier"`
@@ -131,12 +134,16 @@ func ParsePlan(data, document string, previous *Plan) (*Plan, error) {
 				SubIdentifier  string            `json:"subtask_identifier"`
 				Tasks          []json.RawMessage `json:"tasks"`
 				Children       []json.RawMessage `json:"sub_subtasks"`
+				Subtasks       []json.RawMessage `json:"subtasks"`
 				DependsOn      []string          `json:"depends_on"`
 			}
 			if err := json.Unmarshal(raw, &node); err != nil {
 				return nil, err
 			}
-			n := &PlanNode{Name: node.Name, Goal: node.Goal, Identifier: node.Identifier, DependsOn: node.DependsOn}
+			n := &PlanNode{TaskID: node.TaskID, Name: node.Name, Goal: node.Goal, Identifier: node.Identifier, DependsOn: node.DependsOn}
+			if n.Identifier == "" {
+				n.Identifier = node.SemanticID
+			}
 			if n.Name == "" {
 				if top {
 					n.Name, n.Goal, n.Identifier = node.MainName, node.MainGoal, node.MainIdentifier
@@ -145,7 +152,10 @@ func ParsePlan(data, document string, previous *Plan) (*Plan, error) {
 				}
 			}
 			children := node.Children
-			if top {
+			if children == nil {
+				children = node.Subtasks
+			}
+			if top || children == nil {
 				children = node.Tasks
 			}
 			for _, raw := range children {
@@ -224,39 +234,95 @@ func ParsePlan(data, document string, previous *Plan) (*Plan, error) {
 		return nil, err
 	}
 	p := &Plan{Document: document}
-	// A dependency on a group means all leaves in that group. Group-level
-	// prerequisites apply to every descendant, matching the UI's nested tree.
-	var build func(*PlanNode, []string) error
-	build = func(n *PlanNode, inherited []string) error {
-		deps := append(append([]string{}, inherited...), n.DependsOn...)
-		if len(n.Subtasks) > 0 {
-			for _, c := range n.Subtasks {
-				if err := build(c, deps); err != nil {
-					return err
-				}
+	// Preserve the old DAG semantics: group references expand to all leaves,
+	// while a group's prerequisites attach only to its internal entry leaves.
+	leaves := map[*PlanNode][]*PlanNode{}
+	var collect func(*PlanNode) []*PlanNode
+	collect = func(n *PlanNode) []*PlanNode {
+		if len(n.Subtasks) == 0 {
+			leaves[n] = []*PlanNode{n}
+		} else {
+			for _, child := range n.Subtasks {
+				leaves[n] = append(leaves[n], collect(child)...)
 			}
-			return nil
 		}
-		brief := Task{ID: n.TaskID, Index: n.Index, Name: n.Name, Goal: n.Goal}
+		return leaves[n]
+	}
+	collect(root)
+	briefs := map[string]*Task{}
+	resolve := func(deps []string) ([]string, error) {
+		var ids []string
 		seen := map[string]bool{}
 		for _, ref := range deps {
 			ref = strings.TrimSpace(ref)
+			if ref == "" {
+				continue
+			}
 			target := refs[ref]
 			if target == nil || ambiguous[ref] {
-				return fmt.Errorf("unknown or ambiguous dependency %q", ref)
+				return nil, fmt.Errorf("unknown or ambiguous dependency %q", ref)
 			}
-			target.walk(func(t *PlanNode) {
-				if len(t.Subtasks) == 0 && !seen[t.TaskID] {
-					brief.DependsOn = append(brief.DependsOn, t.TaskID)
-					seen[t.TaskID] = true
+			for _, leaf := range leaves[target] {
+				if !seen[leaf.TaskID] {
+					ids = append(ids, leaf.TaskID)
+					seen[leaf.TaskID] = true
 				}
-			})
+			}
 		}
-		p.Tasks = append(p.Tasks, brief)
+		return ids, nil
+	}
+	var build func(*PlanNode) error
+	build = func(n *PlanNode) error {
+		if len(n.Subtasks) > 0 {
+			for _, c := range n.Subtasks {
+				if err := build(c); err != nil {
+					return err
+				}
+			}
+		} else {
+			briefs[n.TaskID] = &Task{ID: n.TaskID, Index: n.Index, Name: n.Name, Goal: n.Goal}
+		}
+		deps, err := resolve(n.DependsOn)
+		if err != nil {
+			return err
+		}
+		subtree := map[string]bool{}
+		for _, leaf := range leaves[n] {
+			subtree[leaf.TaskID] = true
+		}
+		for _, leaf := range leaves[n] {
+			brief := briefs[leaf.TaskID]
+			entry := true
+			for _, dep := range brief.DependsOn {
+				if subtree[dep] {
+					entry = false
+					break
+				}
+			}
+			if entry {
+				brief.DependsOn = append(brief.DependsOn, deps...)
+			}
+		}
 		return nil
 	}
-	if err := build(root, nil); err != nil {
+	if err := build(root); err != nil {
 		return nil, err
+	}
+	order := map[string]int{}
+	for i, leaf := range leaves[root] {
+		order[leaf.TaskID] = i
+	}
+	for _, leaf := range leaves[root] {
+		brief := *briefs[leaf.TaskID]
+		sort.Slice(brief.DependsOn, func(i, j int) bool { return order[brief.DependsOn[i]] < order[brief.DependsOn[j]] })
+		var unique []string
+		for _, dep := range brief.DependsOn {
+			if len(unique) == 0 || dep != unique[len(unique)-1] {
+				unique = append(unique, dep)
+			}
+		}
+		brief.DependsOn = unique
+		p.Tasks = append(p.Tasks, brief)
 	}
 	if err := validate(p); err != nil {
 		return nil, err

@@ -1,6 +1,6 @@
 # Coordinator：PLAN 的协调运行体
 
-`coordinator` 是新的 PLAN 引擎和专注模式。它负责探索、计划文档、用户审批、任务调度、等待、验收、重试和报告；`pe_task` 执行批准的任务书。新引擎只有这两种 ReAct 循环，均强制使用原生 `tool_calls`，不能通过配置切换到 JSON 响应动作，也不会回退到旧 PLAN/replan/task-review/report 循环。
+`coordinator` 是新的 PLAN 引擎和专注模式。它负责探索、计划文档、用户审批、任务调度、等待、验收、重试和报告；`pe_task` 执行批准的任务书。新引擎只有这两种 ReAct 循环，沿用主循环的协议配置：文本流 JSON action 或原生 `tool_calls`。提示词按当前模式选择对应的中文指令及参数定义；不会回退到旧 PLAN/replan/task-review/report 循环。
 
 这个目录独立拥有 [Session](session.go)、计划树与 DAG、控制对象、模型 actions、worker、工具权限、原生辅助调用，以及 [Yakit 事件和存储适配](session_events.go)。新运行体不构造或调用 `coordinator_legacy.Coordinator`、旧 `AiTask`、旧 PLAN runtime，也不借用旧 LiteForge 构造通道。
 
@@ -29,7 +29,7 @@ err = aim.InvokeReAct(
 die(err)
 ```
 
-`aim.planEngine("coordinator")` 保留为 focus 的入口别名；旧 focus 别名现在也升级为新版，不再启用旧运行体。新分支强制 native function call。`EnablePlan=false` 禁止从该 focus 开启 PLAN。工具的原有人工/AI/YOLO 策略继续生效，AI 风险评估使用一次原生 `review_risk` 调用。Timeline 压缩、附件提取等继承新引擎的单步辅助输出也使用原生函数调用，不新增 ReAct 角色。
+`aim.planEngine("coordinator")` 保留为 focus 的入口别名；旧 focus 别名现在也升级为新版，不再启用旧运行体。两个循环继承会话的 `EnableFunctionCallMode`，不因开启 PLAN 覆盖主循环协议。`EnablePlan=false` 禁止从该 focus 开启 PLAN。工具的原有人工/AI/YOLO 策略继续生效，AI 风险评估使用一次原生 `review_risk` 调用。Timeline 压缩、附件提取等继承新引擎的单步辅助输出也使用原生函数调用，不新增 ReAct 角色。
 
 旧 `coordinator_legacy.NewCoordinatorContext` 仍是隔离的旧库实现。ReAct 不开放其执行入口。`plan_engine` 只保留在持久化协议中，与 `coordinator_state` 一起校验恢复数据。旧记录可供查看，但批准或恢复会返回明确的停用错误，需要重新生成新版计划；不隐式导入新调度器。
 
@@ -91,12 +91,15 @@ detached 不等于清空上下文，也不承诺自动提高缓存命中率。se
 
 ## 模型 actions
 
-参数 schema 是原生函数的参数定义。JSON 仍用于工具参数、事件 Content 和存储；模型的普通 JSON 响应不能选择或执行动作。
+每个专属 action 注册两套中文定义：`Options/Description` 供主循环构建文本流 JSON Schema，`NativeOptions/NativeDescription` 供主循环构建 function call。两套使用相同参数语义与校验、执行处理。文本模式使用 `@action` 和声明的 AITAG；原生模式使用函数名和 `arguments`，不混用协议。JSON 还用于事件 Content 和存储。
+
+`aicommon.WithEnableFunctionCallMode(false)` 选择文本流，`true` 选择原生调用；Session、嵌套 coordinator、worker 以及 gRPC 的 EnablePlan 转换不强制覆盖该配置。原生风险评估和单步辅助输出仍使用自己的独立函数调用契约。
 
 | Action | 参数 | 作用 |
 | --- | --- | --- |
 | `create_plan` | `plan`, `plan_document` | 校验并保存草稿，返回版本；不执行任务 |
 | `modify_plan` | `plan_version`, `plan`, `plan_document` | 完整替换对应版本的草稿，批准版本继续有效 |
+| `inspect_plan` | 无 | 返回完整草案和已批准计划、文档、版本及 DAG；不改变状态 |
 | `submit_plan` | `plan_version` | 进入现有用户审批；采用合法编辑树；detached 只发布待批准计划 |
 | `start_tasks` | `task_ids` 可省略 | 原子检查并发、依赖、批准和当前状态，立即派发；省略时选择当前可执行任务 |
 | `inspect_tasks` | `task_ids` 可省略 | 返回状态、尝试、结果和引用，并记录结果已被观察 |
@@ -105,25 +108,41 @@ detached 不等于清空上下文，也不承诺自动提高缓存命中率。se
 | `retry_task` | `task_id`, `attempt_id`, `reason` | 重试已结算的当前尝试，撤销下游旧结果；受影响 worker 必须先退出 |
 | `cancel_tasks` | `task_ids` 可省略，`reason` | 请求停止；运行中的任务先进入 `cancelling`，退出后才是 `cancelled` |
 | `write_report` | `title`, `markdown`, `summary` | 在当前协调循环写 Markdown artifact，发送既有 `report_finish` |
-| `directly_answer` | 既有原生答案参数 | 发布进展/答案，继续协调循环 |
+| `directly_answer` | 既有协议对应的答案参数 | 发布进展/答案，继续协调循环 |
 | `finish` | 既有参数 | 经过批准、验收、未读结果、worker、TODO、用户输入及报告门闩后结束 |
 
 继续复用 `save_evidence`、`adjust_todolist`、`ask_for_clarification`、工具加载/调用、知识及技能检索 actions。不存在任意改状态的 `update_plan_status`：状态来自执行、观察、验收和取消的真实结果。
 
-`plan` 的首版原生参数采用平面任务 DAG：
+`create_plan` 和 `modify_plan` 的两套参数定义均沿用旧版嵌套任务书字段。任务组组织叶任务，实际调度仍是叶任务 DAG：
 
 ```json
 {
-  "name": "验证方案",
-  "goal": "确认两个步骤的结果",
+  "main_task": "验证方案",
+  "main_task_goal": "确认两个步骤的结果",
   "tasks": [
-    {"name": "验证来源", "goal": "读取来源并保存 evidence", "identifier": "source", "depends_on": []},
-    {"name": "验证结论", "goal": "依据来源检查结论", "identifier": "conclusion", "depends_on": ["source"]}
+    {"subtask_name": "验证来源", "subtask_goal": "读取来源并保存 evidence", "subtask_identifier": "source", "depends_on": []},
+    {"subtask_name": "验证结论", "subtask_goal": "依据来源检查结论", "subtask_identifier": "conclusion", "depends_on": ["source"]}
   ]
 }
 ```
 
-`identifier` 保持稳定且唯一，`depends_on` 使用这些语义标识。宿主分配稳定 `task_id`，解析依赖并拒绝重复标识、未知依赖和环。客户端编辑及恢复仍接受原有嵌套 `root_task`，不改变 Yakit 任务树协议。首版修改采用完整草稿替换，避免另造一套 delta 解释器。
+子节点放在 `sub_subtasks`，语义标识保持稳定且唯一，`depends_on` 引用这些标识。依赖一个组时等待该组全部叶任务验收；组自身的前置条件只传播到组内入口叶任务，沿用旧版 DAG 语义。列表顺序不产生隐含依赖。宿主分配稳定 `task_id`，拒绝重复标识、未知依赖和环。已有平面 `name/goal/identifier` 参数作为别名继续可用。客户端编辑及恢复仍接受原有嵌套 `root_task`，Yakit 任务树事件结构不变。修改采用完整草稿替换。
+
+新版提供自己的预设计划及 mocker 入口，不构造旧版运行体：
+
+```go
+// JSON 可以使用上面的旧版任务书字段，或现有 root_task/PlanNode。
+option := coordinator.WithPresetPlan(planJSON, markdownDocument)
+// 程序构造任务树；回调只生成草案，审批和执行仍走新版同一套门禁。
+option = coordinator.WithPlanMocker(func(s *coordinator.Session) *coordinator.PlanResponse {
+    return &coordinator.PlanResponse{RootTask: root, Document: markdownDocument}
+})
+c, err := coordinator.NewSession(ctx, query, option)
+if err != nil { return err }
+return c.Run()
+```
+
+预设草案进入上下文后，协调员通过 `inspect_plan -> submit_plan` 核对并提交；不能绕过用户批准。恢复已有草案时不重复调用 mocker。这里提供的是新版 Go 接口，旧版回调的类型不能直接混用；Forge 迁移另行处理。
 
 ## 任务与结果
 
@@ -151,12 +170,16 @@ worker 的 `submit_task_result(summary, artifacts?, evidence_ids?)` 提交结果
 
 ```text
 High static：现有纯静态系统指令
-SemiDynamic1：提升后的用户信息 / session evidence / 批准的 PLAN DOCUMENT
-SemiDynamic2：协调员或 worker 的稳定职责说明
-Dynamic：Timeline Open -> PLAN STATUS -> 微观 TODO -> 运行状态
+Frozen：工具目录、固定分区、普通冻结 Timeline 历史
+SemiDynamic1：工作区 / 提升后的用户信息 / session evidence / PLAN DOCUMENT / PLAN DEFINITION
+SemiDynamic2：执行策略 / 中文 INSTRUCTION / 技能材料 / 当前协议的 action 参数定义
+Timeline Open：近期事件 -> PLAN STATUS -> 微观 TODO
+Dynamic：当前时间 / 自动观测上下文 / 本轮反馈 / 检索记忆等
 ```
 
-PLAN STATUS 包含草稿/批准版本、逻辑 task ID、状态、尝试和结果观察状态。它不复制用户输入或计划文档。无状态 PLAN TREE 的重新设计仍单独待定。
+PLAN DEFINITION 展示草案、已批准任务树、任务目标及叶任务 DAG，随计划版本更新，不包含执行状态、结果或计数。PLAN STATUS 展示草稿/批准版本、当前及其他任务状态、尝试、结果观察情况、依赖是否允许派发。详细实际样本、字段和工具边界见 [上下文 review](context_review.md)。
+
+中文职责指令与 mainloop 一样通过 `promptloader.MustLoad` 加载；资源位于 `ai/aid/coordinator/instruction.txt`、`planning_only.txt`、`worker_instruction.txt`。不在纯静态 High Static 中添加条件或协调员专属变量。
 
 ## Yakit 与旧接口
 
@@ -171,7 +194,7 @@ PLAN STATUS 包含草稿/批准版本、逻辑 task ID、状态、尝试和结�
 | 恢复/历史 | 保留 `recovery_plan_and_exec` 请求及 `recover_plan_and_exec` 回复拼写；`task_tree/task_progress` 仍是 JSON 字符串 |
 | 展示/观测 | 沿用 stream、status、能力、消耗、prompt profile、session snapshot、artifact 和 `report_finish` 通道 |
 
-旧 `task_review_require` 面板的自动 continue 不是新的业务验收；新协调员通过原生 `review_task` 作出验收，利用已有 stream 展示理由。整个新流程不要求修改 Yakit。
+旧 `task_review_require` 面板的自动 continue 不是新的业务验收；新协调员通过 `review_task` 作出验收，利用已有 stream 展示理由。整个新流程不要求修改 Yakit。
 
 用户对同一版计划只确认一次。普通 `continue` 和编辑器的 `freedom-review` + `reviewed-task-tree` 都直接采用合法的批准结果，随后协调员自动调度、验收并结束。重复 `submit_plan` 不再弹出审核或重置任务；修改后产生的新版本仍需审批。编辑树里的 `isRemove` 会移除相应子树；已删除的依赖引用必须修正，不能默默执行原计划。Detached 的确认仍使用 `execute_detached_plan`，接入队列后直接执行批准树。
 
@@ -184,19 +207,7 @@ PLAN STATUS 包含草稿/批准版本、逻辑 task ID、状态、尝试和结�
 ```powershell
 go test ./common/ai/aid/coordinator -count=1
 go test ./common/ai/aid/aireact -run 'TestCoordinator|TestPublishDetachedPlan|TestHandleSyncTypeExecuteDetachedPlanEvent|TestReAct_RecoveryPlanAndExec' -count=1
-go test ./common/yakgrpc -run '^TestStartAIReActDetachedApprovalExecutesAndKeepsStreamOpen
-```
-
-[native_coordinator.yak](smoke/native_coordinator.yak) 由测试通过真实 Yak 引擎执行，调用 `aim.InvokeReAct`。只有模型 provider 使用可重复的原生函数调用响应；协调员、worker、审批、Timeline、报告和 Yakit 事件适配均运行实际代码。测试核对真实文件读取、两个有依赖的任务、共享 evidence、逐项验收、push/pop、报告文件及两种 loop_marker。另有独立 Session 的 detached 提交、编辑、引擎恢复及执行测试，以及干预入 Timeline 后通知的时序测试。
-
-[审核到执行测试](../aireact/coordinator_approval_execution_test.go) 通过真实输入事件和任务队列覆盖普通确认、编辑后提交、detached 确认、detached 编辑，以及 Yakit 先停止规划再提交执行的路径；每条路径只提供一次用户确认，验证两个依赖任务全部验收、事件闭合及完成状态持久化。Yak 冒烟也使用人工审批策略，由事件回调发送这一次确认。
-
-[通道测试](../aireact/coordinator_channels_test.go) 拦截旧构造器，验证新版规划、人工审核编辑、detached 发布及恢复均不调用它；反向选择旧通道时不注入新版辅助执行器。恢复以存储归属为准，未知版本或旧标记与新快照冲突会报错。新包的生产依赖图不包含父级 `aid` 或 `aiforge`。
-
-[live_coordinator.yak](smoke/live_coordinator.yak) 可使用本机配置的实际 provider/model 执行；凭据由外部配置，不写入脚本。确定性冒烟不衡量模型任务质量或真实 provider 的缓存命中率。
-
-新增 actions 应放在此包，状态变化通过 Controller，外部渠道通过 Host。不在 worker 中暗中恢复旧 review/replan 循环，也不新增第三种 ReAct 角色。
- -count=1
+go test ./common/yakgrpc -run '^TestStartAIReActDetachedApprovalExecutesAndKeepsStreamOpen' -count=1
 ```
 
 [native_coordinator.yak](smoke/native_coordinator.yak) 由测试通过真实 Yak 引擎执行，调用 `aim.InvokeReAct`。只有模型 provider 使用可重复的原生函数调用响应；协调员、worker、审批、Timeline、报告和 Yakit 事件适配均运行实际代码。测试核对真实文件读取、两个有依赖的任务、共享 evidence、逐项验收、push/pop、报告文件及两种 loop_marker。另有独立 Session 的 detached 提交、编辑、引擎恢复及执行测试，以及干预入 Timeline 后通知的时序测试。
