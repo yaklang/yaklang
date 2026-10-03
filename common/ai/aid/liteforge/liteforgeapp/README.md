@@ -37,3 +37,9 @@ yak common/ai/aid/liteforge/smoke_default_task.yak
 ```powershell
 yak common/ai/aid/liteforge/liteforgeapp/smoke.yak
 ```
+
+[smoke_applications.yak](smoke_applications.yak) 进一步验证文件读取、搜索索引和知识分片索引：两种协议各请求一次，检查问题数量、入库、原文及知识条目关联和检索结果。使用临时数据库及 mock embedding，不调用外部服务。两份脚本由 `TestYakMigrationSmoke` 原样执行，纳入 CI 的 `./common/ai/aid/...` 测试范围，不注入 Go 侧业务变量。
+
+```powershell
+yak common/ai/aid/liteforge/liteforgeapp/smoke_applications.yak
+```
