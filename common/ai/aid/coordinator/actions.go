@@ -45,22 +45,22 @@ func (d coordinatorAction) option() reactloops.ReActLoopOption {
 			return
 		}
 		if !c.actionAllowed(d.name) {
-			if recordActionOutcome(loop, a, op, d.name, nil, fmt.Errorf("当前阶段不允许 %s", d.name)) {
-				op.Continue()
-			}
-			return
-		}
-		if err := validateActionParameters(d.name, d.options)(loop, a); err != nil {
+			err := fmt.Errorf("当前阶段不允许 %s", d.name)
+			recordDecision(loop, d.name, err)
 			if recordActionOutcome(loop, a, op, d.name, nil, err) {
 				op.Continue()
 			}
 			return
 		}
-		loop.Set("coordinator_last_action", d.name)
-		value, err := d.execute(c, loop, a, op)
-		if err != nil {
-			loop.Set("coordinator_last_action", "rejected")
+		if err := validateActionParameters(d.name, d.options)(loop, a); err != nil {
+			recordDecision(loop, d.name, err)
+			if recordActionOutcome(loop, a, op, d.name, nil, err) {
+				op.Continue()
+			}
+			return
 		}
+		value, err := d.execute(c, loop, a, op)
+		recordDecision(loop, d.name, err)
 		if recordActionOutcome(loop, a, op, d.name, value, err) {
 			op.Continue()
 		}

@@ -48,7 +48,6 @@ func configureCoordinatorAnswer(loop *reactloops.ReActLoop) error {
 		return nil
 	}
 	answerCopy.ActionHandler = func(l *reactloops.ReActLoop, a *aicommon.Action, op *reactloops.LoopActionHandlerOperator) {
-		l.Set("coordinator_last_action", "directly_answer")
 		l.Set("coordinator_answer_cursor", l.GetVariable("coordinator_message_cursor"))
 		if !l.FunctionCallModeEnabled() {
 			gate := reactloops.NewActionHandlerOperator(op.GetTask())
@@ -58,10 +57,12 @@ func configureCoordinatorAnswer(loop *reactloops.ReActLoop) error {
 				return
 			}
 			op.Continue()
+			recordDecision(l, "directly_answer", nil)
 			return
 		}
 		l.GetEmitter().EmitTextMarkdownStreamEvent("re-act-loop-answer-payload", strings.NewReader(a.GetString("answer_payload")), "")
 		op.Continue()
+		recordDecision(l, "directly_answer", nil)
 	}
 	answerCopy.FunctionCallAction = nil
 	reactloops.WithOverrideLoopAction(&answerCopy)(loop)

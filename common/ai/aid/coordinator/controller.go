@@ -135,6 +135,10 @@ type Controller struct {
 	// Notification cursor is runtime-only; it never claims the model read a result.
 	eventRevision uint64
 	discoveries   map[string]uint64
+	// A fixed deadline from the first ordinary notification; later arrivals
+	// cannot postpone delivery. Runtime-only, so restoring old snapshots is safe.
+	messageBatchDelay time.Duration
+	messageBatchDue   time.Time
 	// Owned Timeline sink; initialized by NewLoop, never propagated to workers.
 	resultConfig aicommon.AICallerConfigIf
 	resultErr    error
@@ -153,7 +157,7 @@ func New(ctx context.Context, host Host, concurrency int) *Controller {
 	}
 	ctx, cancel := context.WithCancel(ctx)
 	return &Controller{ctx: ctx, cancel: cancel, host: host, concurrency: concurrency,
-		workers: make(map[string]context.CancelFunc), changed: make(chan struct{}),
+		workers: make(map[string]context.CancelFunc), changed: make(chan struct{}), messageBatchDelay: 5 * time.Second,
 		state: Snapshot{Schema: 2, Phase: PhasePlan, Attempts: make(map[string]Attempt)}}
 }
 

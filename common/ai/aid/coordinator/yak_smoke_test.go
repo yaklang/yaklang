@@ -40,7 +40,7 @@ func TestCoordinatorLoopYakAIMNativeSmoke(t *testing.T) {
 	var eventsMu sync.Mutex
 	var events []*schema.AiOutputEvent
 	var approvalErr error
-	var workerCalls, coordinatorCalls int
+	var workerCalls, coordinatorCalls, modelReviews int
 	workerStep := make(map[string]int)
 	saved := false
 	reported := false
@@ -92,6 +92,7 @@ func TestCoordinatorLoopYakAIMNativeSmoke(t *testing.T) {
 		}
 		for _, m := range matches {
 			if m[2] == "awaiting_review" {
+				modelReviews++
 				id, _ := strconv.ParseUint(m[3], 10, 64)
 				return nativeResponse(c, req, "review_task", map[string]any{"task_id": m[1], "attempt_id": id, "decision": "accept", "reason": "The delivered worker result and session evidence confirm this task."})
 			}
@@ -202,7 +203,8 @@ func TestCoordinatorLoopYakAIMNativeSmoke(t *testing.T) {
 	_, err = os.Stat(reportPath)
 	require.NoError(t, err)
 	require.GreaterOrEqual(t, workerCalls, 6)
-	require.GreaterOrEqual(t, coordinatorCalls, 9)
+	require.Equal(t, 2, modelReviews, "both real results must still be reviewed")
+	require.LessOrEqual(t, coordinatorCalls, 12, "notifications must not introduce empty model polling")
 	combined := strings.Join(prompts, "\n")
 	require.Contains(t, combined, "smoke.task.")
 	require.Contains(t, combined, "smoke.coordinator")
