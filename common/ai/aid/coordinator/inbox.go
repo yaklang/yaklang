@@ -42,6 +42,9 @@ func (c *Controller) enqueueLocked(kind, task string, attempt uint64, summary st
 		id = c.resultConfig.GetRuntimeId()
 	}
 	c.state.Inbox = append(c.state.Inbox, Message{ID: fmt.Sprintf("%s:message:%d", id, c.state.NextMessage), Sequence: c.state.NextMessage, CoordinatorID: id, Type: kind, TaskID: task, AttemptID: attempt, Summary: boundedText(summary, 600), References: refs, NeedsDecision: decision})
+	if ordinaryMessage(kind) && c.messageBatchDue.IsZero() {
+		c.messageBatchDue = time.Now().Add(c.messageBatchDelay)
+	}
 	if decision {
 		c.state.Report.Submitted = false
 		c.state.Finished = false
@@ -95,6 +98,9 @@ func (c *Controller) deliverMessages() (uint64, error) {
 	c.mu.Lock()
 	if through > c.state.DeliveredThrough {
 		c.state.DeliveredThrough = through
+		if through == c.state.NextMessage {
+			c.messageBatchDue = time.Time{}
+		}
 		c.notifyLocked()
 	}
 	c.mu.Unlock()
@@ -121,9 +127,67 @@ func (c *Controller) checkedMessages(through uint64) {
 	c.publish()
 }
 
+func ordinaryMessage(kind string) bool {
+	return kind == "task_discovery" || kind == "review_due"
+}
+
+// Completion is selective: a read/wait does not resolve user requirements or
+// accept a task. Removed notifications remain immutable facts in Timeline.
+// Gaps are retained, so handling a later task cannot swallow an earlier user edit.
+func (c *Controller) completeDecision(through uint64, d *decisionBoundary) {
+	if d == nil || !d.considered || d.rejected {
+		return
+	}
+	c.mu.Lock()
+	if through > c.state.DeliveredThrough {
+		c.mu.Unlock()
+		return
+	}
+	kept := c.state.Inbox[:0]
+	for _, m := range c.state.Inbox {
+		resolved := !m.NeedsDecision || ordinaryMessage(m.Type)
+		switch m.Type {
+		case "user_message":
+			resolved = d.handledUser
+		case "task_settled", "task_reviewed":
+			a, ok := c.state.Attempts[m.TaskID]
+			resolved = resolved || !ok || a.ID != m.AttemptID || a.State == Accepted || a.State == Rejected || (a.State == Cancelled && a.ReviewReason != "")
+		case "scheduler_blocked":
+			resolved = len(c.workers) > 0 || c.canFinishLocked() == nil
+		}
+		if m.Sequence > through || !resolved {
+			kept = append(kept, m)
+		}
+	}
+	changed := len(kept) != len(c.state.Inbox)
+	c.state.Inbox = kept
+	checked := through
+	for _, m := range kept {
+		if m.Sequence <= checked {
+			checked = m.Sequence - 1
+		}
+	}
+	if checked > c.state.CheckedThrough {
+		c.state.CheckedThrough = checked
+		changed = true
+	}
+	if changed {
+		c.notifyLocked()
+	}
+	c.mu.Unlock()
+	c.publish()
+}
+
 func (c *Controller) actionableLocked() bool {
 	for _, m := range c.state.Inbox {
-		if m.NeedsDecision && m.Sequence > c.state.CheckedThrough {
+		if m.NeedsDecision && !ordinaryMessage(m.Type) && m.Sequence > c.state.CheckedThrough {
+			// A completed review supersedes its old settlement notification.
+			if m.Type == "task_settled" || m.Type == "task_reviewed" {
+				a, ok := c.state.Attempts[m.TaskID]
+				if !ok || a.ID != m.AttemptID || a.State == Accepted || a.State == Rejected || (a.State == Cancelled && a.ReviewReason != "") {
+					continue
+				}
+			}
 			return true
 		}
 	}
@@ -168,15 +232,33 @@ func (c *Controller) waitMessages(ctx context.Context, timeout time.Duration, on
 			return err
 		}
 		c.reviewDueLocked(time.Now())
-		// An explicit action yields for any queued batch. Automatic idling may
-		// sleep through already-handled manual acceptances, avoiding model reviews.
-		if c.actionableLocked() || (explicit && len(c.state.Inbox) > 0) {
+		now := time.Now()
+		ordinary := false
+		unseen := false
+		for _, m := range c.state.Inbox {
+			if m.Sequence > c.state.DeliveredThrough {
+				unseen = true
+				ordinary = ordinary || ordinaryMessage(m.Type)
+			}
+		}
+		if ordinary && c.messageBatchDue.IsZero() {
+			// Restored notifications get one bounded aggregation window; no
+			// arrival timestamps need to be added to the persisted/UI contract.
+			c.messageBatchDue = now.Add(c.messageBatchDelay)
+		}
+		batchReady := ordinary && !now.Before(c.messageBatchDue)
+		if c.actionableLocked() || batchReady || (explicit && unseen && !ordinary) {
 			c.mu.Unlock()
 			c.publish()
 			return nil
 		}
 		changed := c.changed
 		wait := timeout
+		if ordinary {
+			if d := time.Until(c.messageBatchDue); d > 0 && d < wait {
+				wait = d
+			}
+		}
 		for id, due := range c.reviewAt {
 			if c.state.Attempts[id].State == Running && c.reviewInterval > 0 {
 				if d := time.Until(due); d > 0 && d < wait {

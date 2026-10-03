@@ -30,7 +30,9 @@
 
 [inbox.go](inbox.go) 持久化新增消息与投递/处理游标。回调只记录事实、入队和通知，不调用主模型。下一 prompt 边界批量交接，投递不代表验收；action 期间收到的消息留给下一轮。终态、用户消息和不同发现不被容量淘汰。结果正文沿原有 Timeline Evidence 保存，队列只带有界摘要和引用。
 
-无主动工作时运行时自动进入30秒等待，与 wait_messages 共用实现。空超时只检查运行时，不取消 worker、不调用模型、不生成新的 Evidence；review_due 合并同任务/尝试尚未处理的提醒，定时器不调用辅助模型。人工正常通过无需主模型二次检查。
+无可执行工作时运行时自动等待，未完成微观 TODO 仍阻止结束，但不阻止消息确认或睡眠。`wait_messages` 请求在整批动作结束后等待，前后顺序不掩盖本轮实际验收；工具结果仍交给下一轮处理。确认仅覆盖本轮 prompt 的消息，普通读取不会解决用户变更或验收任务；对应任务实际验收后旧结算通知收口，事实仍在 Timeline。晚到消息保留到下一轮。
+
+普通 Evidence 发现与 review_due 从首条通知开始最多合并5秒，后续通知不延长截止时间。用户要求、失败和可验收结果提前放行，并携带整个已积累批次。空等待默认30秒检查运行时，不取消 worker、不调用模型、不生成新的 Evidence；已投递的普通旧通知不触发重复等待返回。人工正常通过推进 DAG，无需主模型二次检查。通知与处理回归见 [decision_boundary_test.go](decision_boundary_test.go) 和 [wait_convergence_test.go](wait_convergence_test.go)，覆盖双协议及同轮 wait/验收两种排列。
 
 [report.go](report.go) 管理唯一当前 artifacts 草稿，create_report / modify_report 保存文件，submit_report 才发布 report_finish。计划、任务、关键消息和用户要求共同控制写作门禁；提交与宿主结束分别复查。草稿基于写作开始时的消息基准，新要求到达后需修订。报告写作仍属 EXEC，没有第三循环。
 
@@ -141,7 +143,7 @@ detached 不等于清空上下文，也不承诺自动提高缓存命中率。se
 | `create_plan` | `plan`, `plan_document` | PLAN 首次创建完整文档和任务树，返回小型回执；不执行 |
 | `modify_plan` | `document`, `document_patch`, `tasks`, `tasks_patch` | PLAN/EXEC 原子编辑；EXEC 仅停止受影响尝试，无再次审批 |
 | `submit_plan` | 无业务参数 | PLAN 锁定并提交审核；批准最终内容后移交 EXEC |
-| `wait_messages` | `timeout_seconds` 可省略 | 默认30、最多60秒；已有消息立即返回，空超时不轮询模型 |
+| `wait_messages` | `timeout_seconds` 可省略 | 本轮动作后等待；默认30、最多60秒检查运行时，普通发现最多合并5秒，空超时不轮询模型 |
 | `inspect_task` | `task_id`, `attempt_id` 可省略, `details` 可省略 | 按需查看当前或历史尝试，默认有界状态与引用 |
 | `review_task` | `task_id`, `attempt_id`, `decision`, `reason` | YOLO 对已结算结果接受/拒绝/深入/取消，不绕过人工策略 |
 | `retry_task` | `task_id`, `attempt_id`, `reason` | 重试已结算的当前尝试，撤销下游旧结果；受影响 worker 必须先退出 |

@@ -2,7 +2,6 @@ package coordinator
 
 import (
 	"context"
-	"time"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
@@ -99,7 +98,7 @@ func (c *Controller) waitWhenIdle(ctx context.Context, after uint64, onWait func
 
 func configureAutomaticWait(loop *reactloops.ReActLoop) {
 	reactloops.WithOnPostIteraction(func(l *reactloops.ReActLoop, _ int, task aicommon.AIStatefulTask, done bool, _ any, op *reactloops.OnPostIterationOperator) {
-		if done || len(aicommon.GetBlockingVerificationTodoItems(l.GetConfig(), task)) > 0 {
+		if done {
 			return
 		}
 		op.DeferAfterCallbacks(func() {
@@ -108,6 +107,9 @@ func configureAutomaticWait(loop *reactloops.ReActLoop) {
 			}
 			after, _ := l.GetVariable("coordinator_event_revision").(uint64)
 			if controller(l).Snapshot().Phase == PhasePlan {
+				if len(aicommon.GetBlockingVerificationTodoItems(l.GetConfig(), task)) > 0 {
+					return
+				}
 				if err := waitForExploration(task.GetContext(), l); err != nil {
 					l.Set("coordinator_wait_error", err)
 					op.EndIteration(err)
@@ -119,15 +121,16 @@ func configureAutomaticWait(loop *reactloops.ReActLoop) {
 			}
 			if controller(l).automatic {
 				through, _ := l.GetVariable("coordinator_message_cursor").(uint64)
-				name, _ := l.GetVariable("coordinator_last_action").(string)
-				if name != "wait_messages" && name != "finish" && name != "inspect_task" && name != "rejected" {
-					controller(l).checkedMessages(through)
-				}
-				if controller(l).Snapshot().Report.Submitted && controller(l).FinalizeReport() == nil {
+				d := currentDecision(l)
+				controller(l).completeDecision(through, d)
+				if len(aicommon.GetBlockingVerificationTodoItems(l.GetConfig(), task)) == 0 && controller(l).Snapshot().Report.Submitted && controller(l).FinalizeReport() == nil {
 					op.EndIteration()
 					return
 				}
-				if err := controller(l).waitMessages(task.GetContext(), 30*time.Second, func() {
+				if d.rejected || d.toolResult || (d.continuation && !d.yield) {
+					return
+				}
+				if err := controller(l).waitMessages(task.GetContext(), d.timeout, func() {
 					l.UserStatus("正在等待任务或用户消息", "Waiting for messages", aicommon.WithStatusCode("plan.waiting_for_messages"))
 				}, false); err != nil {
 					l.Set("coordinator_wait_error", err)

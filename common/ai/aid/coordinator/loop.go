@@ -142,6 +142,7 @@ func NewLoop(r aicommon.AIInvokeRuntime, opts ...reactloops.ReActLoopOption) (*r
 			loop.Set("coordinator_wait_error", err)
 		}
 		loop.Set("coordinator_message_cursor", through)
+		loop.Set("coordinator_decision_boundary", &decisionBoundary{})
 		s, revision := c.contextSnapshot()
 		status := s.PromptStatus()
 		if m := loop.GetSubAgentManager(); m != nil {
