@@ -4,10 +4,12 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"reflect"
 	"sort"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aispec"
+	"github.com/yaklang/yaklang/common/utils"
 )
 
 func init() {
@@ -34,7 +36,11 @@ func ExecuteFunctionCall(input string, fields map[string]any, chat aispec.Genera
 			case map[string]any:
 				property = value
 			default:
-				property["description"] = fmt.Sprintf("输出字段，声明类型为 %T", field)
+				if field != nil && reflect.TypeOf(field).Kind() == reflect.Map {
+					property = utils.InterfaceToGeneralMap(field)
+				} else {
+					property["description"] = fmt.Sprintf("输出字段，声明类型为 %T", field)
+				}
 			}
 			properties[name] = property
 			required = append(required, name)
@@ -57,7 +63,7 @@ func ExecuteFunctionCall(input string, fields map[string]any, chat aispec.Genera
 	if config.FunctionCallMode != nil {
 		options = append(options, aicommon.WithEnableFunctionCallMode(*config.FunctionCallMode))
 	}
-	result, err := Execute(ctx, Request{Name: "ai.FunctionCall", ActionName: "object", Schema: string(encoded), Prompt: input}, options...)
+	result, err := Execute(ctx, Request{Name: "ai.FunctionCall", ActionName: "object", Schema: string(encoded), Prompt: input, ModelOptions: opts}, options...)
 	if err != nil {
 		return nil, err
 	}
