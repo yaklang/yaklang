@@ -28,6 +28,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"github.com/yaklang/yaklang/common/ai/aid/liteforge/liteforgeapp"
 	"strings"
 	"sync"
 	"time"
@@ -35,7 +36,6 @@ import (
 	"github.com/segmentio/ksuid"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
-	"github.com/yaklang/yaklang/common/aiforge"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
@@ -227,13 +227,13 @@ func submitValueFeedbackInternal(ctx context.Context, cfg *aicommon.Config, reco
 		return
 	}
 
-	forge, err := aiforge.NewLiteForge(
+	forge, err := liteforgeapp.NewLiteForge(
 		valueFeedbackActionName,
-		aiforge.WithLiteForge_Prompt(prompt),
-		aiforge.WithLiteForge_DisableTimeline(),
-		aiforge.WithLiteForge_OutputSchemaRaw(valueFeedbackActionName, outputSchema),
-		aiforge.WithLiteForge_SpeedPriority(),
-		aiforge.WithExtendLiteForge_AIOption(aicommon.WithFastAICallback(cb)),
+		liteforgeapp.WithLiteForge_Prompt(prompt),
+		liteforgeapp.WithLiteForge_DisableTimeline(),
+		liteforgeapp.WithLiteForge_OutputSchemaRaw(valueFeedbackActionName, outputSchema),
+		liteforgeapp.WithLiteForge_SpeedPriority(),
+		liteforgeapp.WithExtendLiteForge_AIOption(aicommon.WithFastAICallback(cb)),
 	)
 	if err != nil {
 		log.Warnf("aive create liteforge failed: %v", err)

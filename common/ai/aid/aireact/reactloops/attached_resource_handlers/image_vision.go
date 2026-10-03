@@ -3,12 +3,12 @@ package attachedresourcehandlers
 import (
 	"context"
 	"fmt"
+	"github.com/yaklang/yaklang/common/ai/aid/liteforge/liteforgeapp"
 	"path/filepath"
 	"strings"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
-	"github.com/yaklang/yaklang/common/aiforge"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 )
@@ -75,18 +75,18 @@ In cumulative_summary, besides an objective description of the image, explicitly
 
 		log.Infof("attached extra resources: vision analyze attached image %q (%d/%d)", imagePath, i+1, len(imagePaths))
 		analysisOptions := []any{
-			aiforge.WithAnalyzeContext(runCtx),
-			aiforge.WithExtraPrompt(extra),
-			aiforge.WithAnalyzeStatusCard(statusCb),
+			liteforgeapp.WithAnalyzeContext(runCtx),
+			liteforgeapp.WithExtraPrompt(extra),
+			liteforgeapp.WithAnalyzeStatusCard(statusCb),
 		}
 		if config, ok := loop.GetConfig().(interface {
 			GetVisionPriorityAICallback() aicommon.AICallbackType
 		}); ok {
 			if callback := config.GetVisionPriorityAICallback(); callback != nil {
-				analysisOptions = append(analysisOptions, aiforge.WithVisionAICallback(callback))
+				analysisOptions = append(analysisOptions, liteforgeapp.WithVisionAICallback(callback))
 			}
 		}
-		analysis, err := aiforge.AnalyzeImageFile(imagePath, analysisOptions...)
+		analysis, err := liteforgeapp.AnalyzeImageFile(imagePath, analysisOptions...)
 
 		buf.WriteString(fmt.Sprintf("### %s\n\n", imagePath))
 		if err != nil {

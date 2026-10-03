@@ -5,6 +5,7 @@ import (
 	_ "embed"
 	"encoding/json"
 	"fmt"
+	"github.com/yaklang/yaklang/common/ai/aid/liteforge/liteforgeapp"
 	"io"
 	"strings"
 	"testing"
@@ -18,7 +19,6 @@ import (
 	"github.com/yaklang/yaklang/common/ai/aid/liteforge"
 	"github.com/yaklang/yaklang/common/ai/aispec"
 	"github.com/yaklang/yaklang/common/aiengine"
-	"github.com/yaklang/yaklang/common/aiforge"
 	"github.com/yaklang/yaklang/common/yak"
 	"github.com/yaklang/yaklang/common/yak/antlr4yak"
 )
@@ -103,7 +103,7 @@ func TestLiteForgeYakAIMBothProtocols(t *testing.T) {
 func TestLiteForgeLegacyEnvelope(t *testing.T) {
 	for _, native := range []bool{false, true} {
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-		forge, err := aiforge.NewLiteForge("legacy-envelope", aiforge.WithLiteForge_OutputSchema(aitool.WithStringParam("summary", aitool.WithParam_Required())))
+		forge, err := liteforgeapp.NewLiteForge("legacy-envelope", liteforgeapp.WithLiteForge_OutputSchema(aitool.WithStringParam("summary", aitool.WithParam_Required())))
 		require.NoError(t, err)
 		result, err := forge.Execute(ctx, nil, aicommon.WithAITransactionAutoRetry(1), aicommon.WithEnableFunctionCallMode(native), aicommon.WithAICallback(func(c aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			value := map[string]any{"tool": "output", "params": map[string]any{"summary": "兼容嵌套参数"}}
@@ -133,7 +133,7 @@ func TestLiteForgePublicDefaultAndProtocolOverride(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 			defer cancel()
-			forge, err := aiforge.NewLiteForge("default-protocol", aiforge.WithLiteForge_OutputSchemaRaw("result",
+			forge, err := liteforgeapp.NewLiteForge("default-protocol", liteforgeapp.WithLiteForge_OutputSchemaRaw("result",
 				`{"type":"object","properties":{"summary":{"type":"string"}},"required":["summary"]}`))
 			require.NoError(t, err)
 			options := []aicommon.ConfigOption{aicommon.WithAITransactionAutoRetry(1), aicommon.WithAICallback(func(c aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
@@ -151,8 +151,8 @@ func TestLiteForgePublicDefaultAndProtocolOverride(t *testing.T) {
 func TestLiteForgeCustomHandlerStillOwnsPrompt(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	forge, err := aiforge.NewLiteForge("custom", aiforge.WithLiteForge_Prompt("raw custom prompt"),
-		aiforge.WithLiteForge_ResponseHandler(func(resp *aicommon.AIResponse) (*aicommon.Action, error) {
+	forge, err := liteforgeapp.NewLiteForge("custom", liteforgeapp.WithLiteForge_Prompt("raw custom prompt"),
+		liteforgeapp.WithLiteForge_ResponseHandler(func(resp *aicommon.AIResponse) (*aicommon.Action, error) {
 			data, err := io.ReadAll(resp.GetUnboundStreamReader(false))
 			if err != nil {
 				return nil, err

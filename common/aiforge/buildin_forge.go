@@ -12,6 +12,7 @@ import (
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon/promptloader"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools/yakscripttools/metadata"
+	"github.com/yaklang/yaklang/common/ai/aid/liteforge/liteforgeapp"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
@@ -58,17 +59,17 @@ var generateMetadataPrompt = promptloader.MustLoad("inline/aiforge/buildin_forge
 func GenerateForgeMetadata(forgeContent string) (*GenerateMetadataResult, error) {
 	fallback := generateForgeMetadataFallback(forgeContent)
 
-	var lfopts []LiteForgeOption
+	var lfopts []liteforgeapp.LiteForgeOption
 	lfopts = append(lfopts,
 		// P0-B4: prompt 是 100% 静态指令, 实际 forgeContent 通过 params 传入
-		WithLiteForge_StaticInstruction(generateMetadataPrompt))
-	lfopts = append(lfopts, WithLiteForge_OutputSchema(
+		liteforgeapp.WithLiteForge_StaticInstruction(generateMetadataPrompt))
+	lfopts = append(lfopts, liteforgeapp.WithLiteForge_OutputSchema(
 		aitool.WithStringParam("language", aitool.WithParam_Required(true), aitool.WithParam_Description("语言，固定为chinese")),
 		aitool.WithStringParam("description", aitool.WithParam_Required(true), aitool.WithParam_Description("forge功能描述")),
 		aitool.WithStringArrayParam("keywords", aitool.WithParam_Required(true), aitool.WithParam_Description("关键词数组")),
 	))
 
-	lf, err := NewLiteForge("generate_metadata", lfopts...)
+	lf, err := liteforgeapp.NewLiteForge("generate_metadata", lfopts...)
 	if err != nil {
 		return nil, err
 	}

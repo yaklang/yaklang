@@ -26,7 +26,7 @@ func WithGeneralConfigStreamableField(fieldKey string) GeneralKVConfigOption {
 }
 
 // WithLiteForgeStaticInstruction 携带 LiteForge 的系统侧静态指令到 GeneralKVConfig.
-// 该指令最终会被 invoke_liteforge.go 解析并通过 aiforge.WithLiteForge_StaticInstruction
+// 该指令最终会被 invoke_liteforge.go 解析并通过 liteforgeapp.WithLiteForge_StaticInstruction
 // 传给 LiteForge. P0-B1 之后进入 semi-dynamic 段 (历史曾在 high-static 段, 因
 // schema/instruction 按 forge 维度变化导致跨 forge cache miss, 已下移),
 // 跨同一 forge 多次调用稳定哈希.
@@ -129,7 +129,7 @@ func WithLiteForgeOutputValidator(validate func(*Action) error) GeneralKVConfigO
 // WithGeneralConfigExtraRequestOpts carries AIRequestOption values through
 // the GeneralKVConfig layer. These options are consumed by
 // invokeLiteForgeWithCallback and forwarded to LiteForge via
-// aiforge.WithLiteForge_ExtraRequestOpts, ultimately reaching
+// liteforgeapp.WithLiteForge_ExtraRequestOpts, ultimately reaching
 // AIRequest.extraSpecOpts and the underlying AI call.
 //
 // Carries caller-supplied request settings without changing scheduling policy.

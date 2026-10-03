@@ -1,4 +1,4 @@
-package aiforge
+package liteforgeapp
 
 import (
 	"context"
@@ -281,7 +281,7 @@ func _withImageCompress(anyImageInput ...any) LiteForgeExecOption {
 // )~
 // dump(result)
 // ```
-func _executeLiteForgeTemp(query string, opts ...any) (*ForgeResult, error) {
+func _executeLiteForgeTemp(query string, opts ...any) (*aicommon.ForgeResult, error) {
 	cfg := &liteforgeConfig{
 		query:  query,
 		action: "object",
@@ -317,7 +317,7 @@ func _executeLiteForgeTemp(query string, opts ...any) (*ForgeResult, error) {
 			}
 		case aicommon.LiteForgeStaticInstruction:
 			// 关键词: aicache, PROMPT_SECTION, StaticInstruction, LiteForgeStaticInstruction, B 档无循环依赖
-			// 下游包（如 enhancesearch）通过此 marker 类型携带系统侧静态指令，避免 import aiforge 造成循环依赖
+			// 下游包（如 enhancesearch）通过 aicommon 的 marker 类型携带系统侧静态指令，避免导入应用层造成循环依赖
 			cfg.staticInstruction = string(opt)
 		}
 	}

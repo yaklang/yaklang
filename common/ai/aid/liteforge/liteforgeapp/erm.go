@@ -1,8 +1,9 @@
-package aiforge
+package liteforgeapp
 
 import (
 	"fmt"
 	"github.com/google/uuid"
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon/promptloader"
 	"github.com/yaklang/yaklang/common/ai/rag/entityrepos"
 	"github.com/yaklang/yaklang/common/jsonextractor"
@@ -87,7 +88,7 @@ func (e *ERMAnalysisResult) ShowDotGraph() {
 	fmt.Println(art)
 }
 
-var DetectPrompt = promptloader.MustLoad("inline/aiforge/liteforge_erm/DetectPrompt.txt")
+var DetectPrompt = promptloader.MustLoad("ai/aid/liteforge/liteforgeapp/prompts/erm/DetectPrompt.txt")
 
 var detectDomainSchema = aitool.NewObjectSchemaWithAction(
 	aitool.WithStringParam(
@@ -97,13 +98,13 @@ var detectDomainSchema = aitool.NewObjectSchemaWithAction(
 	),
 )
 
-var ermCodePrompt = promptloader.MustLoad("aiforge/liteforge_prompt/entity_analyze_code.txt")
+var ermCodePrompt = promptloader.MustLoad("ai/aid/liteforge/liteforgeapp/prompts/entity_analyze_code.txt")
 
-var ermRulesPrompt = promptloader.MustLoad("aiforge/liteforge_prompt/entity_analyze_rule.txt")
+var ermRulesPrompt = promptloader.MustLoad("ai/aid/liteforge/liteforgeapp/prompts/entity_analyze_rule.txt")
 
-var ermLogPrompt = promptloader.MustLoad("aiforge/liteforge_prompt/entity_analyze_log.txt")
+var ermLogPrompt = promptloader.MustLoad("ai/aid/liteforge/liteforgeapp/prompts/entity_analyze_log.txt")
 
-var ermOtherPrompt = promptloader.MustLoad("aiforge/liteforge_prompt/entity_analyze_other.txt")
+var ermOtherPrompt = promptloader.MustLoad("ai/aid/liteforge/liteforgeapp/prompts/entity_analyze_other.txt")
 
 func DetectERMPrompt(input string, options ...any) (string, error) {
 	analyzeConfig := NewAnalysisConfig(options...)
@@ -294,7 +295,7 @@ func invokeParams2ERMRelationship(params aitool.InvokeParams) *TemporaryRelation
 	}
 }
 
-func Result2ERMAnalysisResult(ermResult *ForgeResult) *ERMAnalysisResult {
+func Result2ERMAnalysisResult(ermResult *aicommon.ForgeResult) *ERMAnalysisResult {
 	result := &ERMAnalysisResult{
 		Entities:      make([]*schema.ERModelEntity, 0),
 		Relationships: make([]*TemporaryRelationship, 0),
@@ -519,7 +520,7 @@ var resolveEntitySchema = aitool.NewObjectSchemaWithAction(
 	),
 )
 
-var resolveEntityPrompt = promptloader.MustLoad("aiforge/liteforge_prompt/resolve_same_entity.txt")
+var resolveEntityPrompt = promptloader.MustLoad("ai/aid/liteforge/liteforgeapp/prompts/resolve_same_entity.txt")
 
 func ResolveEntity(oldEntity *schema.ERModelEntity, newEntity *schema.ERModelEntity, options ...any) (*schema.ERModelEntity, bool, error) {
 	analyzeConfig := NewAnalysisConfig(options...)

@@ -197,4 +197,4 @@ for needPath in mustHave {
 
 log.info("== zip archive verification passed ==")
 log.info("==> all artifacts saved at: %v", finalZip)
-log.info("==> use this zip to redistill skills via aiforge.AnalyzeVideoOmni on streamcopy.mp4")
+log.info("==> use this zip to redistill skills via liteforgeapp.AnalyzeVideoOmni on streamcopy.mp4")

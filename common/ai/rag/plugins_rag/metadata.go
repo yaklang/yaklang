@@ -3,32 +3,32 @@ package plugins_rag
 import (
 	"context"
 	"fmt"
+	"github.com/yaklang/yaklang/common/ai/aid/liteforge/liteforgeapp"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon/promptloader"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
-	"github.com/yaklang/yaklang/common/aiforge"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
 var generateMetadataPrompt = promptloader.MustLoad("ai/rag/plugins_rag/prompt/init.txt")
 
 func GenerateYakScriptMetadata(forgeContent string) (*GenerateResult, error) {
-	var lfopts []aiforge.LiteForgeOption
+	var lfopts []liteforgeapp.LiteForgeOption
 	lfopts = append(lfopts,
 		// P0-B4: prompt/init.txt 是 100% 静态指令, 用 StaticInstruction 上移到
 		// semi-dynamic 段以让多次调用时 byte-stable.
-		aiforge.WithLiteForge_StaticInstruction(generateMetadataPrompt))
-	lfopts = append(lfopts, aiforge.WithLiteForge_OutputSchema(
+		liteforgeapp.WithLiteForge_StaticInstruction(generateMetadataPrompt))
+	lfopts = append(lfopts, liteforgeapp.WithLiteForge_OutputSchema(
 		aitool.WithStringParam("language", aitool.WithParam_Required(true), aitool.WithParam_Description("语言，固定为chinese")),
 		aitool.WithStringParam("description", aitool.WithParam_Required(true), aitool.WithParam_Description("脚本功能描述")),
 		aitool.WithStringArrayParam("keywords", aitool.WithParam_Required(true), aitool.WithParam_Description("关键词数组")),
 	))
 
-	lfopts = append(lfopts, aiforge.WithExtendLiteForge_AIOption(
+	lfopts = append(lfopts, liteforgeapp.WithExtendLiteForge_AIOption(
 	// aid.WithDebugPrompt(true),
 	))
 
-	lf, err := aiforge.NewLiteForge("generate_metadata", lfopts...)
+	lf, err := liteforgeapp.NewLiteForge("generate_metadata", lfopts...)
 	if err != nil {
 		return nil, err
 	}

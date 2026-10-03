@@ -3,6 +3,7 @@ package aibp
 import (
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon/promptloader"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
+	"github.com/yaklang/yaklang/common/ai/aid/liteforge/liteforgeapp"
 	"github.com/yaklang/yaklang/common/aiforge"
 	"github.com/yaklang/yaklang/common/log"
 )
@@ -12,8 +13,8 @@ var sf_test_cases_completion_prompt = promptloader.MustLoad("aiforge/aibp/sf_tes
 func init() {
 	err := aiforge.RegisterLiteForge("sf_test_cases_completion",
 		// P0-B4: 嵌入式 prompt 是 100% 静态指令, 上移到 StaticInstruction
-		aiforge.WithLiteForge_StaticInstruction(sf_test_cases_completion_prompt),
-		aiforge.WithLiteForge_OutputSchema(
+		liteforgeapp.WithLiteForge_StaticInstruction(sf_test_cases_completion_prompt),
+		liteforgeapp.WithLiteForge_OutputSchema(
 			aitool.WithStructArrayParam("positive_test_cases", []aitool.PropertyOption{
 				aitool.WithParam_Description("正向测试用例列表"),
 				aitool.WithParam_Required(false),

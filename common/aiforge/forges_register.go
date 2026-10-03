@@ -6,6 +6,7 @@ import (
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
+	"github.com/yaklang/yaklang/common/ai/aid/liteforge/liteforgeapp"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/schema"
 
@@ -44,16 +45,22 @@ func RegisterYakAiForge(cfg *YakForgeBlueprintConfig) error {
 	})
 }
 
-func RegisterLiteForge(i string, params ...LiteForgeOption) error {
-	lf, err := NewLiteForge(i, params...)
+func RegisterLiteForge(i string, params ...liteforgeapp.LiteForgeOption) error {
+	lf, err := liteforgeapp.NewLiteForge(i, params...)
 	if err != nil {
 		return utils.Errorf("build lite forge failed: %v", err)
 	}
-	return RegisterForgeExecutor(i, lf.Execute)
+	return RegisterForgeExecutor(i, func(ctx context.Context, params []*ypb.ExecParamItem, opts ...aicommon.ConfigOption) (*ForgeResult, error) {
+		result, err := lf.Execute(ctx, params, opts...)
+		if err != nil {
+			return nil, err
+		}
+		return &ForgeResult{Action: result.Action}, nil
+	})
 }
 
-func RegisterAIDBuildInForge(i string, params ...LiteForgeOption) error {
-	lf, err := NewLiteForge(i, params...)
+func RegisterAIDBuildInForge(i string, params ...liteforgeapp.LiteForgeOption) error {
+	lf, err := liteforgeapp.NewLiteForge(i, params...)
 	if err != nil {
 		return utils.Errorf("build lite forge failed: %v", err)
 	}

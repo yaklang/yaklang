@@ -1,4 +1,4 @@
-package aiforge
+package liteforgeapp
 
 import (
 	"strings"

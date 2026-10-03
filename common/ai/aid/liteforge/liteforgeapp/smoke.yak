@@ -1,0 +1,23 @@
+// 直接执行：yak common/ai/aid/liteforge/liteforgeapp/smoke.yak
+// 只替换模型响应；保留真实 Yak 模块、协议投影、流式解析与结果校验。
+schema = `{"type":"object","properties":{"summary":{"type":"string"},"payload":{}},"required":["summary","payload"],"additionalProperties":true}`
+for native in [false, true] {
+    calls = 0
+    callback = ai.MockAIService(func(prompt) {
+        calls++
+        return `{"@action":"object","summary":"应用已迁移","payload":{"未知键":[true,3,null]}}`
+    })
+    result = liteforge.Execute("验证应用包的结构化输出。",
+        liteforge.output(schema),
+        aiagent.aiCallback(callback),
+        ai.withFunctionCallMode(native),
+    )~
+    assert calls == 1, "each protocol must make exactly one model request"
+    assert result.GetString("summary") == "应用已迁移"
+    payload = result.GetInvokeParams("payload")
+    assert len(payload["未知键"]) == 3
+    assert payload["未知键"][0] == true
+    assert payload["未知键"][1] == 3
+    assert payload["未知键"][2] == nil
+    printf("liteforgeapp smoke passed: function_call=%v, requests=%d\n", native, calls)
+}

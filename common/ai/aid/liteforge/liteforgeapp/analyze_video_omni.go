@@ -1,4 +1,4 @@
-package aiforge
+package liteforgeapp
 
 import (
 	"context"
@@ -611,17 +611,17 @@ func VideoOmniPresetPlus() VideoOmniOption {
 }
 
 // 默认中文专业知识抽取提示，针对 omni 视频
-var defaultOmniVideoSystemPrompt = promptloader.MustLoad("inline/aiforge/liteforge_analyze_video_omni/defaultOmniVideoSystemPrompt.txt")
+var defaultOmniVideoSystemPrompt = promptloader.MustLoad("ai/aid/liteforge/liteforgeapp/prompts/analyze_video_omni/defaultOmniVideoSystemPrompt.txt")
 
-var defaultOmniVideoQueryPrompt = promptloader.MustLoad("inline/aiforge/liteforge_analyze_video_omni/defaultOmniVideoQueryPrompt.txt")
+var defaultOmniVideoQueryPrompt = promptloader.MustLoad("ai/aid/liteforge/liteforgeapp/prompts/analyze_video_omni/defaultOmniVideoQueryPrompt.txt")
 
 // AnalyzeVideoOmni 把视频切片送进 omni 模型做端到端理解，按段返回 AnalysisResult。
 //
 // example:
 //
-//	ch, err := aiforge.AnalyzeVideoOmni("xss-learn.mp4",
-//	    aiforge.VideoOmniPresetFlash(),
-//	    aiforge.WithVideoOmniAPIKey(key),
+//	ch, err := liteforgeapp.AnalyzeVideoOmni("xss-learn.mp4",
+//	    liteforgeapp.VideoOmniPresetFlash(),
+//	    liteforgeapp.WithVideoOmniAPIKey(key),
 //	)
 //
 // 关键词: AnalyzeVideoOmni, omni 视频端到端
@@ -636,7 +636,7 @@ var defaultOmniVideoQueryPrompt = promptloader.MustLoad("inline/aiforge/liteforg
 // Example:
 // ```
 // // 需要可用的 omni 模型与 API Key（示意性示例）
-// ch = aiforge.AnalyzeVideoOmni("/tmp/demo.mp4", liteforge.omniPresetFlash(), liteforge.omniAPIKey("your-key"))~
+// ch = liteforge.AnalyzeVideoOmni("/tmp/demo.mp4", liteforge.omniPresetFlash(), liteforge.omniAPIKey("your-key"))~
 //
 //	for result := range ch {
 //	    dump(result)

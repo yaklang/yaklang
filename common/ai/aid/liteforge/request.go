@@ -46,7 +46,7 @@ type Request struct {
 }
 
 // ExecuteTyped adapts aicommon's typed invocation. Public Yak/Go LiteForge
-// options are translated by aiforge into the same Request and Execute path.
+// options are translated by liteforgeapp into the same Request and Execute path.
 func ExecuteTyped(prompt string, opts ...any) (*aicommon.ForgeResult, error) {
 	var typed *aicommon.LiteForgeInvokeRequest
 	var configOptions []aicommon.ConfigOption

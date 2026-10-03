@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
+	"github.com/yaklang/yaklang/common/ai/aid/liteforge/liteforgeapp"
 	"github.com/yaklang/yaklang/common/aiforge"
 
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
@@ -11,7 +12,7 @@ import (
 
 // LoginElementExtractor 登录元素提取器
 type LoginElementExtractor struct {
-	*aiforge.LiteForge
+	*liteforgeapp.LiteForge
 }
 
 // LoginElements 登录元素结构
@@ -79,9 +80,9 @@ func NewLoginElementExtractor() (*LoginElementExtractor, error) {
 	// P0-B4: prompt 是 100% 静态指令 (角色 + 任务 + 输出规则), 真正的动态内容
 	// (html_content) 通过 params 传入. 上移到 StaticInstruction 以让 semi-dynamic
 	// 段在跨调用时 byte-stable.
-	lf, err := aiforge.NewLiteForge("LoginElementExtractor",
-		aiforge.WithLiteForge_StaticInstruction(getLoginExtractionPrompt()),
-		aiforge.WithLiteForge_OutputSchemaRaw("extract_login_elements", outputSchema),
+	lf, err := liteforgeapp.NewLiteForge("LoginElementExtractor",
+		liteforgeapp.WithLiteForge_StaticInstruction(getLoginExtractionPrompt()),
+		liteforgeapp.WithLiteForge_OutputSchemaRaw("extract_login_elements", outputSchema),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create login element extractor: %v", err)

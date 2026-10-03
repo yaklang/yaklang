@@ -1,4 +1,4 @@
-package aiforge
+package liteforgeapp
 
 import (
 	"bytes"
@@ -8,7 +8,7 @@ import (
 	"text/template"
 )
 
-var splitPrompt = promptloader.MustLoad("inline/aiforge/liteforge_split/splitPrompt.txt")
+var splitPrompt = promptloader.MustLoad("ai/aid/liteforge/liteforgeapp/prompts/split/splitPrompt.txt")
 
 var splitSchema = aitool.NewObjectSchemaWithAction(
 	aitool.WithStringArrayParam("text_list", aitool.WithParam_Description("The list of text blocks after splitting")),
