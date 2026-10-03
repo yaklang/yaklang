@@ -9,7 +9,7 @@ import (
 // The host-state unit tests cannot import aiforge from package aicommon.
 // Register a scoped adapter for reducers only, and restore the prior callback.
 // The real renderer, streaming callbacks and lifecycle are exercised separately
-// in aiforge/liteforge_auxiliary_stream_test.go.
+// in aid/liteforge/liteforgeapp/auxiliary_stream_test.go.
 func registerTimelineTestLiteForge(t testing.TB) {
 	t.Helper()
 	previous := liteforgeExecuteFunc
