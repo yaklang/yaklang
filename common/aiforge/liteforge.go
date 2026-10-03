@@ -10,6 +10,7 @@ import (
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	aidliteforge "github.com/yaklang/yaklang/common/ai/aid/liteforge"
+	"github.com/yaklang/yaklang/common/ai/aispec"
 	"github.com/yaklang/yaklang/common/jsonextractor"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
@@ -71,6 +72,7 @@ type LiteForge struct {
 	// reqOpts during Execute, allowing callers to inject parameters like
 	// aispec.WithThinkingLevel("none") through the LiteForge option chain.
 	extraRequestOpts []aicommon.AIRequestOption
+	modelOptions     []aispec.AIConfigOption
 	responseHandler  aicommon.AuxiliaryResponseHandler
 }
 
@@ -376,7 +378,7 @@ func (l *LiteForge) ExecuteEx(ctx context.Context, params []*ypb.ExecParamItem, 
 		PreferSpeed: l.PreferSpeedPriority, DisableTimeline: l.DisableTimeline,
 		MaxPromptTokens: l.maxPromptTokens, Images: imageData, Emitter: l.emitter,
 		JSONHooks: l.OutputJsonHook, Validate: l.OutputValidator, ResponseHandler: l.responseHandler,
-		ExtraOptions: l.extraRequestOpts}
+		ExtraOptions: l.extraRequestOpts, ModelOptions: l.modelOptions}
 	for _, field := range l.streamFields.Values() {
 		request.StreamFields = append(request.StreamFields, aidliteforge.StreamField{NodeID: field.AINodeId, Key: field.FieldKey})
 	}

@@ -1,12 +1,18 @@
 # LiteForge 单次请求底层
 
-`common/ai/aid/liteforge` 是独立的单次结构化请求执行器。公开 `aiforge.LiteForge`、Yak `liteforge.Execute` 和基于 `aicommon` 的 typed helper 共用它。执行器使用 `aicommon.Config` 的模型选择、重试和用量通道，以及 `aiprojection` 的请求投影；不依赖 coordinator、coordinator_legacy、ReAct 或 aiforge，也不创建 PLAN、任务循环或旧事件循环。Forge 的多步执行暂不迁移。
+`common/ai/aid/liteforge` 是独立的单次结构化请求执行器。公开 `aiforge.LiteForge`、Yak `liteforge.Execute`、`ai.FunctionCall`（含分级模型入口）和基于 `aicommon` 的 typed helper 共用它。执行器使用 `aicommon.Config` 的模型选择、重试和用量通道，以及 `aiprojection` 的请求投影；不依赖 coordinator、coordinator_legacy、ReAct 或 aiforge，也不创建 PLAN、任务循环或旧事件循环。Forge 的多步执行暂不迁移。
 
 `Request → 构建稳定提示词与 schema → 调用模型 → 流式字段回调 → 完整结果校验 → Action`。
 
 ## 两种协议
 
 默认开启 function call，包括自定义模型 callback 的独立调用。调用方用 `aicommon.WithEnableFunctionCallMode(false)` 选择旧文本协议，或用 `true` 显式开启。ReAct 和 Config 的辅助调用继承父配置，也允许一次调用显式覆盖；选项按传入顺序生效，后面的协议选项优先。
+
+Yak 的两个公开入口都接受 `ai.withFunctionCallMode(true/false)`。`liteforge.Execute` 完整传递 `ai.*` 的 provider/model/APIKey/BaseURL 等配置；`ai.onStream` 在文本模式接收 JSON 文本，在原生模式接收增量 arguments，同时保持内部解析流和字段流独立。`ai.FunctionCall` 接受字段描述 map、字段 schema map 或完整 object schema，返回业务 map，移除内部 `@action` 标记；描述字段保持任意 JSON 类型，显式字段 schema 则检查最低约束，扩展字段保留。
+
+Gateway 的显式、按层级和按策略选择只负责选模型，结果均进入此执行器，不再调用 provider `ExtractData`，也不回退旧抽取实现。ReAct 的重复 LiteForge 构造分支已删除。provider 的底层 `ExtractData` 接口仍有 CVE、chaosmaker 的直接调用，不属于上述两个入口。
+
+为避免 `ai → liteforge → aicommon → ai` 的依赖环，gateway 通过 `aispec` 中的执行器注册桥接调用。Yak/aid 的正常初始化已加载本包；只导入 `common/ai` 的独立 Go 程序需要额外导入 `_ "github.com/yaklang/yaklang/common/ai/aid/liteforge"`。未加载时明确报错，不启用旧底层。
 
 - 文本流：按输出 schema 生成 JSON，由 ActionMaker 解析。已有 `@action` 与 `call-tool / params` 包装保持兼容；开放业务对象无需自行声明 `@action`，系统在校验后绑定 action。
 - Function call：只声明一个输出函数，并用 tool choice 指定它。和 mainloop 一样，`aiprojection.CreateActionSchema` 构建受信任的函数声明，放在 `semi-dynamic-2`，由 ChatBase 发送前的投影转换为 provider `tools`，同时从消息正文移除；执行器不直接设置 `WithTools`。参数沿用业务 schema，仅移除根部的传输字段 `@action`。必须是一次完整、名称正确、以 `tool_calls` 结束的函数调用；普通文本、多个调用、截断参数不会被当成成功。
@@ -43,3 +49,12 @@ Function call 的字段流直接读取 `ToolCallArgumentsStreamHandler` 提供�
 `TestProtocolsProjectAtSendAndStreamBeforeResponseEnds` 使用本地 HTTP/SSE 服务验证实际发送路径：默认开启原生协议，关闭后兼容旧 `@action` JSON；工具必须由发送前的投影注入；服务端只有收到字段回调通知后才发送剩余响应，保证两种协议都能增量处理字段。
 
 `TestLiteForgeYakAIMBothProtocols` 执行 [smoke.yak](smoke.yak)：抽取、分类、总结 × 文本流/function call，逐个验证 aim 与公开 LiteForge 入口。只有模型 provider 使用确定性响应，其余执行真实代码；每个入口恰好请求一次。这些测试验证链路与参数语义，不代表实际模型质量或 provider 缓存命中率。
+
+`TestYakLiteForgeAndFunctionCallCrossProtocols` 用真实 Yak ScriptEngine 执行 [smoke_liteforge.yak](smoke_liteforge.yak) 和 [smoke_functioncall.yak](smoke_functioncall.yak)，共四次 HTTP/SSE 请求。检查实际 tools、tool_choice、消息投影、认证和模型选项；服务端等待 `onStream` 读到首字节才发送剩余结果，验证普通文本和 arguments 都增量输出。脚本的 INPUT、OPTIONS、VERIFY 由运行器注入，不替换模块函数。
+
+```powershell
+go test ./common/ai/aid/liteforge -run '^TestYakLiteForgeAndFunctionCallCrossProtocols$' -count=1 -v
+# 从环境变量提供凭据，使用相同两个脚本验证真实模型，凭据不写入脚本。
+# LITEFORGE_SMOKE_API_KEY 必填，PROVIDER/MODEL 默认为 aibalance/deepseek-v4.1-flash。
+go test ./common/ai/aid/liteforge -run '^TestYakGatewayLiveSmoke$' -count=1 -v
+```

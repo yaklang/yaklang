@@ -11,6 +11,8 @@ import (
 
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
+	"github.com/yaklang/yaklang/common/ai/aid/aiprojection"
+	"github.com/yaklang/yaklang/common/ai/aispec"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
@@ -561,8 +563,18 @@ func mockSpeedActionAI(actionName string, actionParams map[string]any) aicommon.
 		for k, v := range actionParams {
 			action[k] = v
 		}
-		b, _ := json.Marshal(action)
-		rsp.EmitOutputStream(strings.NewReader(string(b)))
+		wire := aispec.NewDefaultAIConfig(req.GetExtraSpecOpts()...)
+		if wire.ToolCallCallback != nil {
+			delete(action, "@action")
+			b, _ := json.Marshal(action)
+			projected := aiprojection.ProjectAndObserve("mini-task-test", req.GetPrompt())
+			wire.ToolCallCallback([]*aispec.ToolCall{{ID: "output", Function: aispec.FuncReturn{Name: projected.Tools[0].Function.Name, Arguments: string(b)}}})
+			wire.ToolCallArgumentsStreamHandler(strings.NewReader(string(b)))
+			wire.FinishReasonCallback("tool_calls", nil)
+		} else {
+			b, _ := json.Marshal(action)
+			rsp.EmitOutputStream(strings.NewReader(string(b)))
+		}
 		rsp.Close()
 		return rsp, nil
 	}
@@ -639,7 +651,7 @@ func TestHandleTodoDraft_MissingUserInput(t *testing.T) {
 func TestHandleTodoDraft_Success(t *testing.T) {
 	r, err := NewTestReAct(
 		aicommon.WithSpeedPriorityAICallback(mockSpeedActionAI("todo_draft", map[string]any{
-			"todo_text":            "对目标网站 example.com 执行端口扫描，确认开放端口及服务版本。来源：用户要求。验收：扫描结果中列出所有开放端口及其服务版本标识，无开放端口需注明。",
+			"todo_text":           "对目标网站 example.com 执行端口扫描，确认开放端口及服务版本。来源：用户要求。验收：扫描结果中列出所有开放端口及其服务版本标识，无开放端口需注明。",
 			"target":              "对 example.com 执行端口扫描并确认开放端口",
 			"source":              "用户要求",
 			"acceptance_criteria": "扫描结果列出所有开放端口及服务版本，无端口需注明",
@@ -680,7 +692,7 @@ func TestHandleTodoDraft_ViaSyncEvent(t *testing.T) {
 	r, err := NewTestReAct(
 		aicommon.WithEventHandler(func(e *schema.AiOutputEvent) {}),
 		aicommon.WithSpeedPriorityAICallback(mockSpeedActionAI("todo_draft", map[string]any{
-			"todo_text":            "测试 todo 草稿文本",
+			"todo_text":           "测试 todo 草稿文本",
 			"target":              "测试目标",
 			"source":              "用户要求",
 			"acceptance_criteria": "验收标准",

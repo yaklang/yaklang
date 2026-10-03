@@ -3,6 +3,7 @@ package aiforge
 import (
 	"context"
 
+	"github.com/yaklang/yaklang/common/ai"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/ai/aispec"
@@ -288,9 +289,9 @@ func _executeLiteForgeTemp(query string, opts ...any) (*ForgeResult, error) {
 		ctx:    context.Background(),
 	}
 
-	// Collect aispec.AIConfigOption to build aicommon.WithAIChatInfo
+	// Retain all provider options; schema and stream ownership stay in LiteForge.
 	var aiSpecConfig aispec.AIConfig
-	var hasAiSpecOpts bool
+	var aiSpecOpts []aispec.AIConfigOption
 
 	for _, optRaw := range opts {
 		switch opt := optRaw.(type) {
@@ -304,9 +305,16 @@ func _executeLiteForgeTemp(query string, opts ...any) (*ForgeResult, error) {
 		case aicommon.ConfigOption:
 			cfg.aidOptions = append(cfg.aidOptions, opt)
 		case aispec.AIConfigOption:
-			// Collect aispec options to extract Type and Model
+			previousMode := aiSpecConfig.FunctionCallMode
+			previousContext := aiSpecConfig.Context
 			opt(&aiSpecConfig)
-			hasAiSpecOpts = true
+			aiSpecOpts = append(aiSpecOpts, opt)
+			if aiSpecConfig.FunctionCallMode != previousMode {
+				cfg.aidOptions = append(cfg.aidOptions, aicommon.WithEnableFunctionCallMode(*aiSpecConfig.FunctionCallMode))
+			}
+			if aiSpecConfig.Context != previousContext {
+				cfg.ctx = aiSpecConfig.Context
+			}
 		case aicommon.LiteForgeStaticInstruction:
 			// 关键词: aicache, PROMPT_SECTION, StaticInstruction, LiteForgeStaticInstruction, B 档无循环依赖
 			// 下游包（如 enhancesearch）通过此 marker 类型携带系统侧静态指令，避免 import aiforge 造成循环依赖
@@ -314,10 +322,11 @@ func _executeLiteForgeTemp(query string, opts ...any) (*ForgeResult, error) {
 		}
 	}
 
-	// Convert collected aispec options to aicommon.ConfigOption
-	if hasAiSpecOpts {
-		if aiSpecConfig.Type != "" || aiSpecConfig.Model != "" {
-			cfg.aidOptions = append(cfg.aidOptions, aicommon.WithAIChatInfo(aiSpecConfig.Type, aiSpecConfig.Model))
+	// An explicit gateway selection must work without a global aid configuration.
+	if len(aiSpecOpts) > 0 {
+		if aiSpecConfig.Type != "" || aiSpecConfig.Model != "" || aiSpecConfig.APIKey != "" || aiSpecConfig.BaseURL != "" || aiSpecConfig.PreferredTier != "" {
+			cfg.aidOptions = append(cfg.aidOptions, aicommon.WithFastAICallback(aicommon.AIChatToAICallbackType(ai.Chat)),
+				aicommon.WithAITransactionAutoRetry(int64(aispec.NewDefaultAIConfig(aiSpecOpts...).FunctionCallRetryTimes)))
 		}
 	}
 
@@ -349,6 +358,7 @@ func _executeLiteForgeTemp(query string, opts ...any) (*ForgeResult, error) {
 	// are rejected before invoking the model.
 
 	var liteForgeOpts []LiteForgeOption
+	liteForgeOpts = append(liteForgeOpts, func(l *LiteForge) error { l.modelOptions = aiSpecOpts; return nil })
 	liteForgeOpts = append(liteForgeOpts, WithLiteForge_OutputJsonHook(cfg.jsonExtractHook...))
 	if cfg.output != "" {
 		liteForgeOpts = append(liteForgeOpts, WithLiteForge_OutputSchemaRaw(cfg.action, cfg.output))

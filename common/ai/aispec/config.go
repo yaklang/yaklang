@@ -67,6 +67,9 @@ type AIConfig struct {
 	Context       context.Context
 
 	FunctionCallRetryTimes int
+	// FunctionCallMode selects the structured-output transport. Nil uses the
+	// LiteForge default (native function calls); false selects legacy JSON text.
+	FunctionCallMode *bool
 
 	HTTPErrorHandler func(error)
 
@@ -1256,6 +1259,12 @@ func WithFunctionCallRetryTimes(times int) AIConfigOption {
 	return func(c *AIConfig) {
 		c.FunctionCallRetryTimes = times
 	}
+}
+
+// WithFunctionCallMode selects native arguments or JSON text for structured
+// output. It does not alter ordinary Chat requests.
+func WithFunctionCallMode(enable bool) AIConfigOption {
+	return func(c *AIConfig) { c.FunctionCallMode = &enable }
 }
 
 func WithHTTPErrorHandler(h func(error)) AIConfigOption {

@@ -19,6 +19,9 @@ func (g *singleModelTestGateway) Chat(string, ...any) (string, error) {
 	if err := g.observe(g.config); err != nil {
 		return "", err
 	}
+	if g.config.ToolCallCallback != nil {
+		return emitStructuredGatewayResult(g.config, map[string]any{"model": g.config.Model})
+	}
 	if g.config.StreamHandler != nil {
 		g.config.StreamHandler(nil)
 	}
@@ -66,7 +69,7 @@ func TestSingleModelDoesNotInterceptGateway(t *testing.T) {
 		result, err := Chat("direct", opts...)
 		require.NoError(t, err)
 		require.Equal(t, "explicit-model", result)
-		_, err = FunctionCall("direct", map[string]any{}, opts...)
+		_, err = FunctionCall("direct", map[string]any{"model": "实际模型名称"}, opts...)
 		require.NoError(t, err)
 		_, err = StructuredStream("direct", opts...)
 		require.NoError(t, err)

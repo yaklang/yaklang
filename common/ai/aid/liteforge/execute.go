@@ -102,6 +102,9 @@ func Execute(ctx context.Context, r Request, opts ...aicommon.ConfigOption) (*ai
 	if protocol != nil {
 		reqOptions = append(reqOptions, protocol.requestOption())
 	}
+	if len(r.ModelOptions) > 0 {
+		reqOptions = append(reqOptions, modelRequestOption(native, r.ModelOptions))
+	}
 	if protocol != nil {
 		// Install the binder inside the ordinary model wrappers: those wrappers
 		// can wait for the provider before returning their tee response.
