@@ -8,9 +8,22 @@ import (
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aiprojection"
+	aidliteforge "github.com/yaklang/yaklang/common/ai/aid/liteforge"
 	"github.com/yaklang/yaklang/common/ai/ytoken"
 	"github.com/yaklang/yaklang/common/utils"
 )
+
+const liteForgeRecentTimelineTokens = aidliteforge.RecentTimelineTokens
+
+type liteForgePromptParams = aidliteforge.PromptParams
+
+func liteForgeRecentTimeline(timeline *aicommon.Timeline) string {
+	return aidliteforge.RecentTimeline(timeline)
+}
+
+func renderLiteForgePrompt(p liteForgePromptParams) (string, error) {
+	return aidliteforge.RenderPrompt(p, false)
+}
 
 func TestLiteForgeRecentTimelineIsBoundedAndExcludesOldHistory(t *testing.T) {
 	timeline := aicommon.NewTimeline(nil, nil)
@@ -178,11 +191,11 @@ func TestLiteForgePrompt_TimelineEmptyOmitsSection(t *testing.T) {
 		TimelineDump:      "",
 	})
 	require.NoError(t, err)
-	require.NotContains(t, rendered, "<|PROMPT_SECTION_timeline|>",
+	require.NotContains(t, rendered, aiprojection.CreateTemplate("<|PROMPT_SECTION_timeline|>"),
 		"老 timeline 段在没有 frozen / dump 时不应出现")
-	require.Contains(t, rendered, "<|PROMPT_SECTION_timeline-open|>",
+	require.Contains(t, rendered, aiprojection.CreateTemplate("<|PROMPT_SECTION_timeline-open|>"),
 		"timeline-open 段必须无条件输出 (即便为空), 保证 4 段对齐")
-	require.Contains(t, rendered, "<|PROMPT_SECTION_END_timeline-open|>")
+	require.Contains(t, rendered, aiprojection.CreateTemplate("<|PROMPT_SECTION_END_timeline-open|>"))
 
 	split := aiprojection.Split(rendered)
 	require.NotNil(t, split)
@@ -304,13 +317,13 @@ func TestLiteForgePrompt_TimelineFrozenOpen_RendersBothSections(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	require.Contains(t, renderA, "<|AI_CACHE_FROZEN_semi-dynamic|>",
+	require.Contains(t, renderA, aiprojection.CreateTemplate("<|AI_CACHE_FROZEN_semi-dynamic|>"),
 		"timeline frozen wrap tag must appear when TimelineFrozenBlock is non-empty")
-	require.Contains(t, renderA, "<|AI_CACHE_FROZEN_END_semi-dynamic|>")
-	require.Contains(t, renderA, "<|PROMPT_SECTION_timeline-open|>",
+	require.Contains(t, renderA, aiprojection.CreateTemplate("<|AI_CACHE_FROZEN_END_semi-dynamic|>"))
+	require.Contains(t, renderA, aiprojection.CreateTemplate("<|PROMPT_SECTION_timeline-open|>"),
 		"timeline-open section tag must appear when TimelineOpen is non-empty")
-	require.Contains(t, renderA, "<|PROMPT_SECTION_END_timeline-open|>")
-	require.NotContains(t, renderA, "<|PROMPT_SECTION_timeline|>",
+	require.Contains(t, renderA, aiprojection.CreateTemplate("<|PROMPT_SECTION_END_timeline-open|>"))
+	require.NotContains(t, renderA, aiprojection.CreateTemplate("<|PROMPT_SECTION_timeline|>"),
 		"legacy single-timeline tag must NOT appear when frozen+open path is used")
 
 	splitA := aiprojection.Split(renderA)
@@ -373,12 +386,12 @@ func TestLiteForgePrompt_TimelineLegacyDumpFallback(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	require.Contains(t, rendered, "<|PROMPT_SECTION_timeline|>",
+	require.Contains(t, rendered, aiprojection.CreateTemplate("<|PROMPT_SECTION_timeline|>"),
 		"legacy TimelineDump fallback must render PROMPT_SECTION_timeline tag")
 	require.Contains(t, rendered, "legacy timeline dump body")
-	require.NotContains(t, rendered, "<|AI_CACHE_FROZEN_semi-dynamic|>",
+	require.NotContains(t, rendered, aiprojection.CreateTemplate("<|AI_CACHE_FROZEN_semi-dynamic|>"),
 		"frozen wrap must not appear when TimelineFrozenBlock is empty")
-	require.NotContains(t, rendered, "<|PROMPT_SECTION_timeline-open|>",
+	require.NotContains(t, rendered, aiprojection.CreateTemplate("<|PROMPT_SECTION_timeline-open|>"),
 		"timeline-open section must not appear when TimelineOpen is empty")
 }
 

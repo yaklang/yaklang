@@ -17,7 +17,8 @@ func (r *ReAct) invokeLiteForgeWithCallback(cb aicommon.AICallbackType, ctx cont
 			cb = r.config.GetOriginalAICallback()
 		}
 		result, err := execute(prompt, &aicommon.LiteForgeInvokeRequest{Context: ctx, ActionName: actionName, Outputs: outputs, Options: opts, Emitter: r.config.Emitter},
-			aicommon.WithFastAICallback(cb), aicommon.WithAITransactionAutoRetry(r.config.GetAITransactionAutoRetryCount()),
+			aicommon.WithFastAICallback(cb), aicommon.WithEnableFunctionCallMode(r.config.EnableFunctionCallMode),
+			aicommon.WithTimeline(r.config.Timeline), aicommon.WithAppendPersistentContext(r.config.PersistentMemory...), aicommon.WithAITransactionAutoRetry(r.config.GetAITransactionAutoRetryCount()),
 			aicommon.WithAIRetryWaitFunc(r.config.GetAIRetryWaitFunc()), aicommon.WithUserUsageCallback(r.config.GetUserUsageCallback()))
 		if err != nil {
 			return nil, err
@@ -97,6 +98,9 @@ func (r *ReAct) invokeLiteForgeWithCallback(cb aicommon.AICallbackType, ctx cont
 		aicommon.WithAITransactionAutoRetry(r.config.GetAITransactionAutoRetryCount()),
 		aicommon.WithAIAutoRetry(r.config.AiAutoRetry),
 		aicommon.WithFastAICallback(execCb),
+		aicommon.WithEnableFunctionCallMode(r.config.EnableFunctionCallMode),
+		aicommon.WithTimeline(r.config.Timeline),
+		aicommon.WithAppendPersistentContext(r.config.PersistentMemory...),
 		aicommon.WithPersistentSessionId(r.config.PersistentSessionId),
 		aicommon.WithDisableCreateDBRuntime(true), // disable create db runtime because ReAct loop will create it before invoking liteforge, and creating it again in liteforge may
 	}

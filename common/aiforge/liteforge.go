@@ -5,27 +5,17 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"os"
 	"strings"
-	"text/template"
 
-	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
-	"github.com/yaklang/yaklang/common/ai/aid/aicommon/promptloader"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
-	"github.com/yaklang/yaklang/common/ai/aid/coordinator_legacy"
+	aidliteforge "github.com/yaklang/yaklang/common/ai/aid/liteforge"
 	"github.com/yaklang/yaklang/common/jsonextractor"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/omap"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
-
-// liteForgeRecentTimelineTokens keeps one-shot LiteForge helpers lightweight.
-// LiteForge callers already pass the task-specific material in Prompt/Params;
-// the parent Timeline is only supporting context and must not grow with the
-// lifetime of a persistent session.
-const liteForgeRecentTimelineTokens = 4 * 1024
 
 func init() {
 	utils.Debug(func() {
@@ -56,7 +46,7 @@ type streamableField struct {
 // LiteForge 被设计只允许提取数据，生成结构化（单步），如果需要多步拆解，不能使用 LiteForge
 //
 // 字段语义（关键词: aicache, PROMPT_SECTION, LiteForge 字段语义）：
-//   - StaticInstruction: 系统侧稳定指令（不含用户输入/动态内容），渲染进 high-static 段，跨调用稳定哈希
+//   - StaticInstruction: 系统侧稳定指令（不含用户输入/动态内容），渲染进 semi-dynamic 段，同一用途跨调用稳定
 //   - Prompt: 调用方动态上下文（可含用户输入、变化标签、动态参数等），渲染进 dynamic 段，外层 PROMPT_SECTION_dynamic_NONCE 已防 prompt-injection
 type LiteForge struct {
 	ForgeName           string
@@ -260,14 +250,6 @@ func WithLiteForge_OutputJsonHook(hook ...jsonextractor.CallbackOption) LiteForg
 	}
 }
 
-func WithLiteForge_OutputMemoryOP() LiteForgeOption {
-	return func(l *LiteForge) error {
-		t := aitool.NewWithoutCallback(
-			"output", coordinator_legacy.MemoryOpSchemaOption...)
-		return WithLiteForge_OutputSchemaRaw(coordinator_legacy.MemoryOpAction, t.ParamsJsonSchemaString())(l)
-	}
-}
-
 func WithExtendLiteForge_AIOption(opts ...aicommon.ConfigOption) LiteForgeOption {
 	return func(l *LiteForge) error {
 		if l.ExtendAIDOptions == nil {
@@ -376,242 +358,38 @@ func (l *LiteForge) Execute(ctx context.Context, params []*ypb.ExecParamItem, op
 }
 
 func (l *LiteForge) ExecuteEx(ctx context.Context, params []*ypb.ExecParamItem, imageData []*aicommon.ImageData, opts ...aicommon.ConfigOption) (*ForgeResult, error) {
-	if ctx == nil {
-		ctx = context.Background()
-	}
-	// A LiteForge invocation owns its Coordinator. Give its event and hotpatch
-	// loops a request-scoped lifetime while retaining the caller's deadline and
-	// cancellation. Stop it only after the response has been fully processed.
-	invocationCtx, stop := context.WithCancel(ctx)
-	defer stop()
-	cod, err := coordinator_legacy.NewCoordinatorContext(invocationCtx, l.Prompt, append(l.ExtendAIDOptions, opts...)...)
-	if err != nil {
-		return nil, utils.Errorf("cannot create coordinator: %v", err)
-	}
-
-	if l.OutputSchema == "" {
-		l.OutputSchema = cod.GetAIConfig().LiteForgeOutputSchema
-		l.OutputActionName = cod.GetAIConfig().LiteForgeActionName
-	}
-
-	if l.OutputSchema == "" && l.responseHandler == nil {
-		return nil, utils.Error("liteforge output schema is required, you should set it via aiforge.WithLiteForge_OutputSchema or aicommon.WithLiteForgeOutputSchema config option")
-	}
-
-	rendered := l.Prompt
-	if l.responseHandler == nil {
-		nonce := strings.ToLower(utils.RandStringBytes(6))
-		var callBuffer bytes.Buffer
-		if len(params) == 1 {
-			callBuffer.WriteString(params[0].Value)
-		} else {
-			for _, i := range params {
-				if strings.Contains(i.Value, "\n") {
-					callBuffer.WriteString(i.Key + ": \n")
-					callBuffer.WriteString(utils.PrefixLines(i.Value, "  "))
-				} else {
-					callBuffer.WriteString(fmt.Sprintf("%v: %v\n", i.Key, i.Value))
-				}
-			}
-		}
-		call := callBuffer.String()
-
-		// A LiteForge created with the parent persistent-session ID restores the
-		// parent's Timeline. Feeding its complete Frozen/Open projection here made
-		// every speed-priority helper call grow with the whole session, even though
-		// the ReAct lightweight loop itself was already bounded. Keep only a recent
-		// prompt projection and deliberately leave the frozen block empty: this is a
-		// one-shot helper context, not a second copy of the main loop's history.
-		var timelineOpen string
-		if !l.DisableTimeline {
-			timelineOpen = liteForgeRecentTimeline(cod.ContextProvider.GetTimelineInstance())
-		}
-		rendered, err = renderLiteForgePrompt(liteForgePromptParams{
-			Nonce:               nonce,
-			Prompt:              string(l.Prompt),
-			StaticInstruction:   string(l.StaticInstruction),
-			Params:              call,
-			Schema:              string(l.OutputSchema),
-			PersistentMemory:    cod.ContextProvider.PersistentMemory(),
-			TimelineFrozenBlock: "",
-			TimelineOpen:        timelineOpen,
-		})
-		if err != nil {
-			return nil, err
-		}
-	}
-	var action *aicommon.Action
-	if l.maxPromptTokens > 0 {
-		if tokens := aicommon.MeasureTokens(rendered); tokens > l.maxPromptTokens {
-			return nil, utils.Errorf("liteforge prompt exceeds %d-token hard limit: %d", l.maxPromptTokens, tokens)
-		}
-	}
-	aiCallback := cod.CallAI
-	if l.PreferSpeedPriority {
-		aiCallback = cod.CallSpeedPriorityAI
-	}
-	forgeLabelName := l.ForgeName
-	if forgeLabelName == "" {
-		forgeLabelName = "LiteForge"
-	}
-	reqOpts := lo.Map(imageData, func(item *aicommon.ImageData, _ int) aicommon.AIRequestOption {
-		return aicommon.WithAIRequest_ImageData(item)
-	})
-	// Inherited callbacks can close over the parent Agent config. Carry the
-	// invocation context on the request so its deadline reaches the Provider.
-	reqOpts = append(reqOpts,
-		aicommon.WithAIRequest_Context(invocationCtx),
-		aicommon.WithAIRequest_CallerLabel(fmt.Sprintf("liteforge[%v]", forgeLabelName)),
-	)
-	if len(l.extraRequestOpts) > 0 {
-		reqOpts = append(reqOpts, l.extraRequestOpts...)
-	}
-	transactionErr := aicommon.CallAITransactionWithFailureExtra(cod, rendered, aiCallback,
-		func(response *aicommon.AIResponse) error {
-			if l.responseHandler != nil {
-				var parseErr error
-				action, parseErr = l.responseHandler(response)
-				if parseErr == nil && action == nil {
-					return utils.Error("liteforge response handler returned no action")
-				}
-				return parseErr
-			}
-			boundEmitter := response.BindEmitter(l.emitter)
-			if l.ForgeName == "" {
-				l.ForgeName = "LiteForge"
-			}
-			result := response.GetOutputStreamReader(fmt.Sprintf(`liteforge[%v]`, l.ForgeName), true, cod.GetEmitter())
-			var mirrored bytes.Buffer
-			var actionOpts = []aicommon.ActionMakerOption{
-				aicommon.WithActionJSONCallback(l.OutputJsonHook...),
-			}
-
-			// add streamable fields handlers
-			for _, i := range l.streamFields.Values() {
-				i := i
-				actionOpts = append(actionOpts, aicommon.WithActionFieldStreamHandler([]string{i.FieldKey}, func(key string, r io.Reader) {
-					r = utils.JSONStringReader(r)
-					if utils.IsNil(l.emitter) {
-						r = io.TeeReader(r, os.Stdout)
-						io.Copy(io.Discard, r)
-						return
-					}
-
-					utils.Debug(func() {
-						r = io.TeeReader(r, os.Stdout)
-					})
-					boundEmitter.EmitDefaultStreamEvent(i.AINodeId, r, response.GetTaskIndex())
-				}))
-			}
-
-			// add user-defined field stream callbacks
-			for _, item := range l.fieldStreamCallbacks {
-				item := item
-				actionOpts = append(actionOpts, aicommon.WithActionFieldStreamHandler(item.FieldKeys, func(key string, r io.Reader) {
-					if item.Callback != nil {
-						item.Callback(key, r, boundEmitter)
-					} else if item.ResponseCallback != nil {
-						item.ResponseCallback(key, r, response, boundEmitter)
-					}
-				}))
-			}
-
-			actionNames := []string{}
-			if l.OutputActionName == "" {
-				actionNames = append(actionNames, "call-tool", "object")
+	var call bytes.Buffer
+	if len(params) == 1 {
+		call.WriteString(params[0].Value)
+	} else {
+		for _, item := range params {
+			if strings.Contains(item.Value, "\n") {
+				call.WriteString(item.Key + ": \n")
+				call.WriteString(utils.PrefixLines(item.Value, "  "))
 			} else {
-				actionNames = append(actionNames, l.OutputActionName)
+				fmt.Fprintf(&call, "%v: %v\n", item.Key, item.Value)
 			}
-			actionOpts = append(actionOpts, aicommon.WithActionAlias(actionNames...))
-
-			action, err = aicommon.ExtractValidActionFromStream(invocationCtx, io.TeeReader(result, &mirrored), "object", actionOpts...)
-			if err != nil {
-				return utils.Errorf("extract action failed: %v", err)
-			}
-			if action == nil {
-				return utils.Errorf("action is nil(unknown reason): \n%v", mirrored.String())
-			}
-			if l.OutputValidator != nil {
-				if err := l.OutputValidator(action); err != nil {
-					action = nil
-					return utils.Errorf("auxiliary output validation failed: %w", err)
-				}
-			}
-			return nil
-		},
-		map[string]any{
-			"liteforge_action": l.ForgeName,
-		},
-		reqOpts...,
-	)
-	if transactionErr != nil {
-		return nil, utils.Wrap(transactionErr, "liteforge execute failed")
+		}
 	}
-	result := &ForgeResult{Action: action}
-	return result, nil
-}
-
-func liteForgeRecentTimeline(timeline *aicommon.Timeline) string {
-	if timeline == nil {
-		return ""
+	request := aidliteforge.Request{Name: l.ForgeName, ActionName: l.OutputActionName, Schema: l.OutputSchema,
+		Prompt: l.Prompt, Params: call.String(), StaticInstruction: l.StaticInstruction,
+		PreferSpeed: l.PreferSpeedPriority, DisableTimeline: l.DisableTimeline,
+		MaxPromptTokens: l.maxPromptTokens, Images: imageData, Emitter: l.emitter,
+		JSONHooks: l.OutputJsonHook, Validate: l.OutputValidator, ResponseHandler: l.responseHandler,
+		ExtraOptions: l.extraRequestOpts}
+	for _, field := range l.streamFields.Values() {
+		request.StreamFields = append(request.StreamFields, aidliteforge.StreamField{NodeID: field.AINodeId, Key: field.FieldKey})
 	}
-	return timeline.DumpRecentForPrompt(liteForgeRecentTimelineTokens)
-}
-
-// liteForgePromptParams 是 LiteForge prompt 渲染时传入模板的字段集合。
-//
-// aicache 5 段稳定性分层 (P0-B1 / P0-B3) 必填字段:
-//   - TimelineFrozenBlock: timeline 的 reducer + 非末 interval (frozen 前缀, 字节稳定)
-//   - TimelineOpen: timeline 的开放内容 (易变尾段)
-//   - TimelineDump: 兼容字段, 仅当 TimelineFrozenBlock + TimelineOpen 全为空
-//     时回退到 legacy 渲染路径
-//
-// 关键词: aicache, PROMPT_SECTION, LiteForge 模板, liteForgePromptParams,
-//
-//	TimelineFrozenBlock, TimelineOpen
-type liteForgePromptParams struct {
-	Nonce               string
-	Prompt              string
-	StaticInstruction   string
-	Params              string
-	Schema              string
-	PersistentMemory    string
-	TimelineDump        string // legacy 兼容字段
-	TimelineFrozenBlock string // frozen 前缀, 进 AI_CACHE_FROZEN 块
-	TimelineOpen        string // 易变尾段, 进 PROMPT_SECTION_timeline-open
-}
-
-// liteForgePromptTemplate 是 LiteForge 的 prompt 模板，按 aicache 5 段稳定性
-// 分层框架包装：
-//   - high-static 段：# Preset / # Output Formatter（仅放真正系统级、跨 forge 字节稳定的内容）
-//   - semi-dynamic 段：# SCHEMA / # Instruction / # 牢记 (PersistentMemory)
-//     这三个字段都是"按 forge 维度稳定但跨 forge 不同"，不放高静态段，避免污染
-//     不同 forge 调用之间的 high-static hash
-//   - frozen-block 段：TimelineFrozenBlock (RenderWithFrozenBoundary 的 frozen 前缀)
-//   - timeline-open 段：TimelineOpen (RenderWithFrozenBoundary 的 open 尾段)
-//   - dynamic 段：<context_NONCE>...</context_NONCE>（调用方动态上下文）+ <params_NONCE>...</params_NONCE>（用户参数）；
-//     外层 PROMPT_SECTION_dynamic_NONCE 屏蔽 prompt-injection
-//
-// 之前的实现把 .Schema 与 .StaticInstruction 放进 high-static 段, 导致每个 forge
-// 都创建一份新的 high-static hash (cachebench 实测 16 个不同 hash, 应当为 1)，
-// P0-B1 把它们下移到 semi-dynamic, 让真正系统级的 # Preset / # Output Formatter
-// 段 hash 在所有 forge / 跨调用中保持完全一致。
-//
-// 关键词: aicache, P0-B1, AI_CACHE_SYSTEM, PROMPT_SECTION, LiteForge 模板,
-//
-//	liteForgePromptTemplate, schema 下移 semi-dynamic, instruction 下移
-var liteForgePromptTemplate = promptloader.MustLoad("inline/aiforge/liteforge/liteForgePromptTemplate.txt")
-
-// renderLiteForgePrompt 按 4 段 PROMPT_SECTION 框架渲染 LiteForge prompt
-// 关键词: aicache, PROMPT_SECTION, LiteForge 模板, renderLiteForgePrompt
-func renderLiteForgePrompt(p liteForgePromptParams) (string, error) {
-	tmp, err := template.New("liteforge").Parse(liteForgePromptTemplate)
+	for _, field := range l.fieldStreamCallbacks {
+		request.FieldCallbacks = append(request.FieldCallbacks, aidliteforge.FieldCallback{
+			Keys: field.FieldKeys, Callback: field.Callback, Response: field.ResponseCallback})
+	}
+	// Use Config's default native protocol; callers can explicitly select text.
+	configOptions := append([]aicommon.ConfigOption{}, l.ExtendAIDOptions...)
+	configOptions = append(configOptions, opts...)
+	result, err := aidliteforge.Execute(ctx, request, configOptions...)
 	if err != nil {
-		return "", utils.Errorf("template parse failed: %v", err)
+		return nil, err
 	}
-	var buf bytes.Buffer
-	if err := tmp.Execute(&buf, p); err != nil {
-		return "", utils.Errorf("template execute failed: %v", err)
-	}
-	return buf.String(), nil
+	return &ForgeResult{Action: result.Action}, nil
 }

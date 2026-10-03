@@ -153,7 +153,7 @@ func TestPR5128_AuxiliaryLifecycle_ErrorWhileParentAlive(t *testing.T) {
 				response.EmitOutputStream(strings.NewReader(`{"@action":"wrong","text":"ignored"}`))
 				response.Close()
 				return response, nil
-			}, aicommon.WithAITransactionAutoRetry(2))
+			}, aicommon.WithEnableFunctionCallMode(false), aicommon.WithAITransactionAutoRetry(2))
 			label := "error-" + failure
 			baseEvents, baseHotpatches, _ := pr5128LabeledLoops(t, label)
 			var gotError error
@@ -260,8 +260,8 @@ func TestPR5128_AuxiliaryLifecycle_DrainBeforeCleanup(t *testing.T) {
 		t.Fatal("field stream did not start")
 	}
 	events, hotpatches, stacks := pr5128LabeledLoops(t, label)
-	require.Greater(t, events, baseEvents, "child event loop was not observed while the field stream was active: %s", stacks)
-	require.Greater(t, hotpatches, baseHotpatches, "child hotpatch loop was not observed while the field stream was active: %s", stacks)
+	require.Equal(t, baseEvents, events, "one-shot LiteForge must not start a coordinator event loop: %s", stacks)
+	require.Equal(t, baseHotpatches, hotpatches, "one-shot LiteForge must not start a coordinator hotpatch loop: %s", stacks)
 	select {
 	case <-finished:
 		t.Fatal("auxiliary result was delivered before the final field segment")

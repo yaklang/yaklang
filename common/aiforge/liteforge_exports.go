@@ -7,7 +7,6 @@ import (
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/ai/aispec"
 	"github.com/yaklang/yaklang/common/jsonextractor"
-	"github.com/yaklang/yaklang/common/jsonpath"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/ffmpegutils"
@@ -345,17 +344,9 @@ func _executeLiteForgeTemp(query string, opts ...any) (*ForgeResult, error) {
 		}
 	}
 
-	// When cfg.output is set via LiteForgeExecOption, validate the schema here.
-	// When schema is passed via aicommon.ConfigOption (in cfg.aidOptions), skip validation here
-	// and let ExecuteEx handle it - it will extract schema from coordinator's config.
-	// Typed invocations supply their output action explicitly and may use enum
-	// rather than const (e.g. interval-toolcall-review). ExecuteEx passes that
-	// action name to the streaming parser for response validation.
-	if cfg.output != "" && cfg.invokeRequest == nil {
-		if ret := utils.InterfaceToString(jsonpath.FindFirst(cfg.output, "$..properties..const")); ret != cfg.action {
-			return nil, utils.Errorf("jsonschema output must have '@action' - const value '%s', lite: ..."+`.."@action": {"const": "`+cfg.action+`"}`+"..., found: %v, expect: %v", cfg.action, ret, cfg.action)
-		}
-	}
+	// ExecuteEx validates the selected schema and action together. Open object
+	// schemas need no transport marker; explicit conflicting @action constants
+	// are rejected before invoking the model.
 
 	var liteForgeOpts []LiteForgeOption
 	liteForgeOpts = append(liteForgeOpts, WithLiteForge_OutputJsonHook(cfg.jsonExtractHook...))
@@ -367,7 +358,7 @@ func _executeLiteForgeTemp(query string, opts ...any) (*ForgeResult, error) {
 	}
 	// 关键词: aicache, PROMPT_SECTION, StaticInstruction, _executeLiteForgeTemp, B 档
 	// 调用方可以通过 LiteForgeExecWithStaticInstruction 携带系统侧静态指令
-	// 该指令进入 high-static 段，跨调用稳定哈希
+	// 该指令进入 semi-dynamic 段，同一用途跨调用稳定
 	if cfg.staticInstruction != "" {
 		liteForgeOpts = append(liteForgeOpts, WithLiteForge_StaticInstruction(cfg.staticInstruction))
 	}

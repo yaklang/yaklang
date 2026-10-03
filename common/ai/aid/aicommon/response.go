@@ -53,6 +53,7 @@ type AIResponseOutputStream struct {
 }
 
 type AIResponse struct {
+	taskIndexMu         sync.RWMutex
 	taskIndex           string
 	ch                  *chanx.UnlimitedChan[*AIResponseOutputStream]
 	enableDebug         bool
@@ -550,6 +551,8 @@ func (a *AIResponse) GetTotalOutputTokens() int64 {
 }
 
 func (a *AIResponse) GetTaskIndex() string {
+	a.taskIndexMu.RLock()
+	defer a.taskIndexMu.RUnlock()
 	return a.taskIndex
 }
 
@@ -557,6 +560,8 @@ func (a *AIResponse) SetTaskIndex(taskIndex string) {
 	if a == nil {
 		return
 	}
+	a.taskIndexMu.Lock()
+	defer a.taskIndexMu.Unlock()
 	a.taskIndex = taskIndex
 }
 

@@ -17,7 +17,7 @@ func TestAuxiliaryOutputValidationRetriesBeforeReturning(t *testing.T) {
 	for _, recoverOutput := range []bool{true, false} {
 		t.Run(fmt.Sprint(recoverOutput), func(t *testing.T) {
 			var calls atomic.Int32
-			r, err := NewTestReAct(aicommon.WithAIAutoRetry(1), aicommon.WithAIRetryWaitFunc(func(context.Context, time.Duration) error { return nil }), aicommon.WithAITransactionAutoRetry(2), aicommon.WithSpeedPriorityAICallback(func(cfg aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+			r, err := NewTestReAct(aicommon.WithAIAutoRetry(1), aicommon.WithAIRetryWaitFunc(func(context.Context, time.Duration) error { return nil }), aicommon.WithEnableFunctionCallMode(false), aicommon.WithAITransactionAutoRetry(2), aicommon.WithSpeedPriorityAICallback(func(cfg aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 				n := calls.Add(1)
 				body := `{"@action":"memory-triage","memory_entities":[{"content":"valid prefix"},[]]}`
 				if n > 1 {

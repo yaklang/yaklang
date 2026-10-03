@@ -42,7 +42,7 @@ func TestAuxiliaryLiteForgeResponseStreamAndLegacyCallback(t *testing.T) {
 		aicommon.WithDisableAutoSkills(true),
 		aicommon.WithDisableCreateDBRuntime(true),
 		aicommon.WithAIAutoRetry(1),
-		aicommon.WithAITransactionAutoRetry(1),
+		aicommon.WithEnableFunctionCallMode(false), aicommon.WithAITransactionAutoRetry(1),
 		aicommon.WithQualityPriorityAICallback(func(aicommon.AICallerConfigIf, *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			qualityCalls.Add(1)
 			return nil, errors.New("quality must not be called")
@@ -135,7 +135,7 @@ func TestAuxiliaryLiteForgeErrorSkipAndCancellation(t *testing.T) {
 			cfg := aicommon.NewConfig(ctx,
 				aicommon.WithDisableAutoSkills(true),
 				aicommon.WithDisableCreateDBRuntime(true),
-				aicommon.WithAITransactionAutoRetry(1),
+				aicommon.WithEnableFunctionCallMode(false), aicommon.WithAITransactionAutoRetry(1),
 				aicommon.WithFastAICallback(func(c aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 					calls.Add(1)
 					if mode == "cancelled" {

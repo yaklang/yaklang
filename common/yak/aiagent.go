@@ -294,7 +294,6 @@ var AIAgentExport = map[string]any{
 	"liteForgeOutputSchema":    aiforge.WithLiteForge_OutputSchema,
 	"liteForgedRequireParams":  aiforge.WithLiteForge_RequireParams,
 	"liteForgeOutputSchemaRaw": aiforge.WithLiteForge_OutputSchemaRaw,
-	// "liteForgeOutputMemoryOP":  aiforge.WithLiteForge_OutputMemoryOP, // !已废弃
 
 	// forge
 	"tools":                 aicommon.WithTools,

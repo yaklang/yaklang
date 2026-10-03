@@ -4605,6 +4605,10 @@ func (c *Config) invokeSpeedPriorityLiteForge(prompt string, opts ...any) (*Forg
 }
 
 func (c *Config) invokeLiteForgeWithCallback(prompt string, callback AICallbackType, opts ...any) (*ForgeResult, error) {
+	// The child request retains the parent's protocol and bounded supporting
+	// context. Explicit invocation options can still override these defaults.
+	opts = append([]any{WithEnableFunctionCallMode(c.EnableFunctionCallMode),
+		WithTimeline(c.Timeline), WithAppendPersistentContext(c.PersistentMemory...)}, opts...)
 	opts = append(opts, WithFastAICallback(callback))
 	opts = append(opts, WithDisableCreateDBRuntime(true)) // Avoid creating runtime records for lite forge calls
 	if c.LiteForgeExecutor != nil {

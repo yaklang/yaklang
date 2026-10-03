@@ -41,7 +41,7 @@ func TestAuxiliaryMemoryValidationRetriesBeforePersistence(t *testing.T) {
 			const accepted = "Go channels support communication between goroutines."
 			cfg := aicommon.NewConfig(ctx,
 				aicommon.WithDisableAutoSkills(true), aicommon.WithDisableCreateDBRuntime(true),
-				aicommon.WithAIAutoRetry(1), aicommon.WithAITransactionAutoRetry(2),
+				aicommon.WithAIAutoRetry(1), aicommon.WithEnableFunctionCallMode(false), aicommon.WithAITransactionAutoRetry(2),
 				aicommon.WithAIRetryWaitFunc(func(context.Context, time.Duration) error { return nil }),
 				aicommon.WithQualityPriorityAICallback(func(aicommon.AICallerConfigIf, *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 					qualityCalls.Add(1)
@@ -55,7 +55,7 @@ func TestAuxiliaryMemoryValidationRetriesBeforePersistence(t *testing.T) {
 					require.Zero(t, count, "rejected response must not persist its valid prefix before retry")
 					body := `{"@action":"memory-triage","memory_entities":[{"content":"rejected prefix must not be saved"},[]]}`
 					if attempt > 1 {
-						require.Contains(t, req.GetPrompt(), "array item 1")
+						require.Contains(t, req.GetPrompt(), "/memory_entities/1")
 						switch mode {
 						case "repair-empty":
 							body = `{"@action":"memory-triage","memory_entities":[]}`
@@ -79,7 +79,7 @@ func TestAuxiliaryMemoryValidationRetriesBeforePersistence(t *testing.T) {
 			defer memory.Close()
 			err = memory.HandleMemory("Store a durable fact about Go channels.")
 			if mode == "invalid" {
-				require.ErrorContains(t, err, "array item 1")
+				require.ErrorContains(t, err, "/memory_entities/1")
 			} else {
 				require.NoError(t, err)
 			}

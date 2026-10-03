@@ -222,15 +222,17 @@ func TestCoordinatorLoopAuxiliaryUsesNativeOutput(t *testing.T) {
 	var calls atomic.Int64
 	cfg := aicommon.NewConfig(ctx, aicommon.WithAITransactionAutoRetry(1), aicommon.WithDisableCreateDBRuntime(true), aicommon.WithWorkdir(t.TempDir()), aicommon.WithEnableFunctionCallMode(true), aicommon.WithAICallback(func(c aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 		wire := aispec.NewDefaultAIConfig(req.GetExtraSpecOpts()...)
-		require.Len(t, wire.Tools, 1)
-		require.Equal(t, map[string]any{"type": "function", "function": map[string]any{"name": wire.Tools[0].Function.Name}}, wire.ToolChoice)
+		require.Empty(t, wire.Tools, "LiteForge tools are projected at send time")
+		projected := aiprojection.ProjectAndObserve("coordinator-helper-test", req.GetPrompt())
+		require.Len(t, projected.Tools, 1)
+		require.Equal(t, map[string]any{"type": "function", "function": map[string]any{"name": projected.Tools[0].Function.Name}}, wire.ToolChoice)
 		require.NotContains(t, req.GetPrompt(), "输出 JSON")
 		messages := aiprojection.Project(aiprojection.ProjectionInput{Prompt: req.GetPrompt()}).Messages
 		require.NotEmpty(t, messages)
 		require.Equal(t, "system", messages[0].Role)
-		require.Contains(t, fmt.Sprint(messages[0].Content), "advertised native function exactly once")
+		require.Contains(t, fmt.Sprint(messages[0].Content), "仅调用这个指定函数一次")
 		calls.Add(1)
-		return nativeResponse(c, req, wire.Tools[0].Function.Name, map[string]any{"summary": "native infrastructure summary"})
+		return nativeResponse(c, req, projected.Tools[0].Function.Name, map[string]any{"summary": "native infrastructure summary"})
 	}), aicommon.WithEnableFunctionCallMode(true))
 	for _, option := range coordinator.NativeOptions() {
 		require.NoError(t, option(cfg))
