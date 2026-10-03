@@ -404,7 +404,11 @@ func (s *Session) Execute(ctx context.Context, a Attempt) (result Result, retErr
 	cfg := runtime.GetConfig().(*aicommon.Config)
 	task.SetEmitter(cfg.GetEmitter())
 	runtime.SetCurrentTask(task)
-	loop, err := NewWorkerLoop(runtime, reactloops.BasicAICommonConfigOption(cfg)...)
+	workerOptions := append(reactloops.BasicAICommonConfigOption(cfg), func(l *reactloops.ReActLoop) {
+		// session 相同，但每次任务尝试的结果记录必须独立。
+		l.Set("coordinator_worker_attempt", workerAttemptRef{TaskID: a.Task.ID, AttemptID: a.ID, PlanVersion: a.PlanVersion})
+	})
+	loop, err := NewWorkerLoop(runtime, workerOptions...)
 	if err != nil {
 		return result, err
 	}

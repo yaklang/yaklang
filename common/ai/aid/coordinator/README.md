@@ -99,7 +99,7 @@ detached 不等于清空上下文，也不承诺自动提高缓存命中率。se
 | --- | --- | --- |
 | `create_plan` | `plan`, `plan_document` | 校验并保存草稿，返回版本；不执行任务 |
 | `modify_plan` | `plan_version`, `plan`, `plan_document` | 完整替换对应版本的草稿，批准版本继续有效 |
-| `inspect_plan` | 无 | 返回完整草案和已批准计划、文档、版本及 DAG；不改变状态 |
+| `inspect_plan` | 无 | 只返回草案/批准/提交版本及正文位置；完整文档、任务书和 DAG 读取 SemiDynamic1，不重复写入动态反馈 |
 | `submit_plan` | `plan_version` | 进入现有用户审批；采用合法编辑树；detached 只发布待批准计划 |
 | `start_tasks` | `task_ids` 可省略 | 原子检查并发、依赖、批准和当前状态，立即派发；省略时选择当前可执行任务 |
 | `inspect_tasks` | `task_ids` 可省略 | 返回状态、尝试、结果和引用，并记录结果已被观察 |
@@ -179,6 +179,8 @@ Dynamic：当前时间 / 自动观测上下文 / 本轮反馈 / 检索记忆等
 
 PLAN DEFINITION 展示草案、已批准任务树、任务目标及叶任务 DAG，随计划版本更新，不包含执行状态、结果或计数。PLAN STATUS 展示草稿/批准版本、当前及其他任务状态、尝试、结果观察情况、依赖是否允许派发。详细实际样本、字段和工具边界见 [上下文 review](context_review.md)。
 
+`inspect_plan` 的回执大小不随文档和任务数增长；重复查询不改写计划分区。任务 actions 的反馈仅返回逻辑 task ID、attempt、状态和完整验收结果/证据引用，不再次附带静态任务书及依赖。Controller、存储和前端的全量树保持原契约。缓存回归直接比较两种协议投影后的稳定 messages 和 tools，并验证大计划反复查询及批准时的变化边界；此测量不等同于上游 provider 的真实缓存命中率。
+
 中文职责指令与 mainloop 一样通过 `promptloader.MustLoad` 加载；资源位于 `ai/aid/coordinator/instruction.txt`、`planning_only.txt`、`worker_instruction.txt`。不在纯静态 High Static 中添加条件或协调员专属变量。
 
 ## Yakit 与旧接口
@@ -218,4 +220,10 @@ go test ./common/yakgrpc -run '^TestStartAIReActDetachedApprovalExecutesAndKeeps
 
 [live_coordinator.yak](smoke/live_coordinator.yak) 可使用本机配置的实际 provider/model 执行；凭据由外部配置，不写入脚本。确定性冒烟不衡量模型任务质量或真实 provider 的缓存命中率。
 
+[规划提交冒烟](planning_submission_smoke_test.go) 对探索生成、预设计划和 mocker 各跑文本流与原生两种协议，共六个组合。探索实际执行 `read_file → save_evidence → create_plan → inspect_plan → submit_plan`；预设/mocker 直接 `inspect_plan → submit_plan`，不额外生成计划。所有组合通过真实交互事件确认一次，验证完整嵌套 DAG、Evidence/用户输入提升、上下文分区及未派发 worker。设置 `COORDINATOR_CONTEXT_REVIEW_DIR` 后，在其 `planning-submission` 子目录生成四份提交前完整 prompt 和对应 request JSON；预设样本代表已独立验证的两个附带计划入口。详情见 [上下文 review](context_review.md)。
+
 新增 actions 应放在此包，状态变化通过 Controller，外部渠道通过 Host。不在 worker 中暗中恢复旧 review/replan 循环，也不新增第三种 ReAct 角色。
+
+每个计划动作独立放在 `action_xxx.go`，配同名测试；`actions.go` 集中注册、双协议定义和参数校验。答复/finish 适配及 worker 的结果提交也有独立文件。动作观测通过 `action_outcome.go` 写入 session Timeline Evidence，Open 冻结后提升到 SemiDynamic1；feedback 只提供记录 ID。每个任务尝试独立保存完整结果，验收结论单独保留，inspect/wait 只引用已有观测，重复查询不重复写日志。计划与报告正文继续使用原有稳定分区和 artifacts，不复制到动作记录。
+
+`TestCoordinatorAction*` 逐项检查版本冲突、审批幂等、依赖放行、先观察后验收、取消实际退出、结果提交与 finish/TODO 门闩；`TestCoordinatorActionOutcomeLifecycle` 验证冻结提升、跨任务结果保留和 Timeline 恢复。现有两种协议的探索/预设/mocker、完整任务执行、Yak + aim 和 Yakit/gRPC 链路继续运行。

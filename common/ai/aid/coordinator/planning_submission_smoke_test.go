@@ -23,7 +23,7 @@ import (
 
 // Only the model is scripted. Read-file, Evidence, DAG preparation, action
 // parsing, prompt assembly and manual approval all use production channels.
-// Sample immediately before submit_plan, after inspect_plan exposed the draft.
+// Sample immediately before submit_plan, after inspect_plan confirmed its version.
 func TestCoordinatorPlanningSubmissionSmoke(t *testing.T) {
 	for _, native := range []bool{false, true} {
 		for _, source := range []string{"exploration", "preset", "mocker"} {
@@ -198,11 +198,13 @@ func runPlanningSubmissionSmoke(t *testing.T, native bool, source string) {
 		require.Equal(t, 1, mockerCalls)
 	}
 	eventsMu.Lock()
-	require.Empty(t, approvalErrors)
-	require.Len(t, approvals, 1, "submit_plan requires exactly one manual confirmation")
-	var approval map[string]any
-	require.NoError(t, json.Unmarshal(approvals[0], &approval))
+	errors := append([]error(nil), approvalErrors...)
+	reviewPayloads := append([]json.RawMessage(nil), approvals...)
 	eventsMu.Unlock()
+	require.Empty(t, errors)
+	require.Len(t, reviewPayloads, 1, "submit_plan requires exactly one manual confirmation")
+	var approval map[string]any
+	require.NoError(t, json.Unmarshal(reviewPayloads[0], &approval))
 	require.Equal(t, true, approval["force_manual_review"])
 	require.NotEmpty(t, approval["selectors"])
 	require.NotEmpty(t, approval["plans_id"])
@@ -213,16 +215,31 @@ func runPlanningSubmissionSmoke(t *testing.T, native bool, source string) {
 		require.Contains(t, prompt, "只读检查组")
 		require.Contains(t, prompt, evidenceID)
 		require.Contains(t, prompt, constraint)
+		require.Contains(t, prompt, "环境观测：当前工作区 source.txt 已由测试夹具创建")
+		semi1 := regexp.MustCompile(`(?s)<\|PROMPT_SECTION_semi-dynamic-1_[^|]+\|>(.*?)<\|PROMPT_SECTION_END_semi-dynamic-1_`).FindStringSubmatch(prompt)
+		require.Len(t, semi1, 2, "missing SemiDynamic1 section")
+		require.Contains(t, semi1[1], "# PLAN DEFINITION")
+		require.Contains(t, semi1[1], "[id: "+evidenceID+"]", "frozen evidence must be promoted")
+		require.Contains(t, semi1[1], constraint, "frozen user input must be promoted")
+		require.NotContains(t, semi1[1], "# PLAN STATUS", "live states must stay outside stable plan context")
 		require.Equal(t, 1, strings.Count(prompt, query), "user input appears once, only in Timeline or promoted history")
 		dynamic := regexp.MustCompile(`(?s)<\|PROMPT_SECTION_dynamic_[^|]+\|>(.*?)<\|PROMPT_SECTION_dynamic_END_`).FindStringSubmatch(prompt)
 		require.Len(t, dynamic, 2, "missing Dynamic section")
 		require.NotContains(t, dynamic[1], query)
 		require.NotContains(t, dynamic[1], constraint)
-		require.Less(t, strings.Index(prompt, "# Timeline Memory (Open Tail)"), strings.Index(prompt, "# PLAN STATUS"))
-		require.Less(t, strings.Index(prompt, "# PLAN STATUS"), strings.Index(prompt, "## 待办清单（TODO）"))
+		open := regexp.MustCompile(`(?s)<\|PROMPT_SECTION_timeline-open_[^|]+\|>(.*?)<\|PROMPT_SECTION_END_timeline-open_`).FindStringSubmatch(prompt)
+		require.Len(t, open, 2, "missing Timeline Open section")
+		statusAt, todoAt := strings.Index(open[1], "# PLAN STATUS"), strings.Index(open[1], "## 待办清单（TODO）")
+		require.GreaterOrEqual(t, statusAt, 0)
+		require.GreaterOrEqual(t, todoAt, 0)
+		require.Less(t, statusAt, todoAt)
+		if historyAt := strings.Index(open[1], "# Timeline Memory (Open Tail)"); historyAt >= 0 {
+			require.Less(t, historyAt, statusAt)
+		}
 	}
 	require.Contains(t, submitPrompt, "Draft version: 1; approved version: 0")
-	require.Contains(t, submitPrompt, `"draft":{`, "inspect_plan must expose complete draft before submission")
+	require.Contains(t, submitPrompt, `"context":"SemiDynamic1: PLAN DEFINITION / PLAN DOCUMENT"`)
+	require.NotContains(t, submitPrompt, `"draft":{`, "inspect_plan must not replay the complete draft")
 	require.Contains(t, approvedPrompt, "# PLAN DOCUMENT")
 	require.Contains(t, approvedPrompt, "Approved PLAN version 1")
 	require.Contains(t, approvedPrompt, "Dispatch: blocked")
@@ -258,7 +275,7 @@ func runPlanningSubmissionSmoke(t *testing.T, native bool, source string) {
 			"scenario": source, "protocol": protocol, "sample_stage": "after inspect_plan; immediately before submit_plan",
 			"model":   "deterministic fixture; real coordinator, tools, Timeline and manual approval",
 			"actions": actions, "prompt_bytes": len(submitPrompt), "messages": submitMessages, "tools": submitTools,
-			"manual_confirmation_count": len(approvals), "plan_review_payload": approval, "approved_plan": state.Approved,
+			"manual_confirmation_count": len(reviewPayloads), "plan_review_payload": approval, "approved_plan": state.Approved,
 		}, "", "  ")
 		require.NoError(t, err)
 		require.NoError(t, os.WriteFile(filepath.Join(dir, stem+".request.json"), sample, 0600))

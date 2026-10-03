@@ -67,6 +67,34 @@ func TestCoordinatorApprovedContextSupersedesPreviousDocument(t *testing.T) {
 	require.NotContains(t, definition, "Approved version 1")
 }
 
+func TestCoordinatorTaskStateChangesKeepPlanPartitionsStable(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	s := &Session{Config: aicommon.NewConfig(ctx, aicommon.WithDisableCreateDBRuntime(true))}
+	p, err := ParsePlan(nestedPresetPlan, "immutable plan document", nil)
+	require.NoError(t, err)
+	snapshot := Snapshot{DraftVersion: 1, ApprovedVersion: 1, Draft: p, Approved: p, Attempts: map[string]Attempt{}}
+	for _, task := range p.Tasks {
+		snapshot.Attempts[task.ID] = Attempt{Task: task, State: Pending}
+	}
+	s.Changed(snapshot)
+	before := s.GetOrCreateFrozenBlockPartitionProducer().ProducePartitions()
+	changed := Snapshot{DraftVersion: 1, ApprovedVersion: 1, Draft: p, Approved: p, Attempts: map[string]Attempt{}}
+	for id, attempt := range snapshot.Attempts {
+		changed.Attempts[id] = attempt
+	}
+	a := changed.Attempts[p.Tasks[0].ID]
+	a.ID, a.PlanVersion, a.State = 1, 1, AwaitingReview
+	a.Result = Result{Summary: "new volatile result", EvidenceIDs: []string{"verified.source"}}
+	changed.Attempts[p.Tasks[0].ID] = a
+	s.Changed(changed)
+	require.Equal(t, before, s.GetOrCreateFrozenBlockPartitionProducer().ProducePartitions(), "task result/status must not rewrite plan content or its partition nonce")
+	a.State, a.Seen = Accepted, true
+	changed.Attempts[p.Tasks[0].ID] = a
+	s.Changed(changed)
+	require.Equal(t, before, s.GetOrCreateFrozenBlockPartitionProducer().ProducePartitions(), "review must preserve the stable plan partitions")
+}
+
 func TestCoordinatorNestedDAGRetainsGroupEntrySemantics(t *testing.T) {
 	p, err := ParsePlan(nestedPresetPlan, "Stable document", nil)
 	require.NoError(t, err)
