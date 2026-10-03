@@ -1,4 +1,4 @@
-package aiforge
+package liteforgeapp
 
 import (
 	"fmt"
@@ -14,7 +14,7 @@ import (
 	"github.com/yaklang/yaklang/common/utils/chanx"
 )
 
-var AUDIO_OUTPUT_SCHEMA = promptloader.MustLoad("aiforge/liteforge_schema/liteforge_audio.schema.json")
+var AUDIO_OUTPUT_SCHEMA = promptloader.MustLoad("ai/aid/liteforge/liteforgeapp/schemas/liteforge_audio.schema.json")
 
 type TimelineSegment struct {
 	StartSeconds   float64 `json:"start_seconds"`
@@ -93,7 +93,7 @@ func AnalyzeAudioFile(audio string, opts ...any) (<-chan *AudioAnalysisResult, e
 	}
 	srtReader := utils.NewCRLFtoLFReader(fp)
 
-	prompt := promptloader.MustLoad("inline/aiforge/liteforge_analyze_audio/prompt.txt") + analyzeConfig.ExtraPrompt
+	prompt := promptloader.MustLoad("ai/aid/liteforge/liteforgeapp/prompts/analyze_audio/prompt.txt") + analyzeConfig.ExtraPrompt
 
 	allResult := make([]*AudioAnalysisResult, 0)
 	resultChan := chanx.NewUnlimitedChan[*AudioAnalysisResult](analyzeConfig.Ctx, 100)

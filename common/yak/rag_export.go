@@ -1,6 +1,7 @@
 package yak
 
 import (
+	"github.com/yaklang/yaklang/common/ai/aid/liteforge/liteforgeapp"
 	"path/filepath"
 
 	"github.com/samber/lo"
@@ -13,7 +14,6 @@ import (
 	"github.com/yaklang/gorm"
 	"github.com/yaklang/yaklang/common/ai/rag"
 	"github.com/yaklang/yaklang/common/ai/rag/vectorstore"
-	"github.com/yaklang/yaklang/common/aiforge"
 	"github.com/yaklang/yaklang/common/consts"
 )
 
@@ -76,14 +76,14 @@ var RagExports = map[string]interface{}{
 	"NewTempRagDatabase":   _newTempRagDatabase,
 	"EnableMockMode":       _enableMockMode,
 
-	"ctx":                aiforge.WithAnalyzeContext,     // use for analyzeContext
-	"log":                aiforge.WithAnalyzeLog,         // use for analyzeLog
-	"statusCard":         aiforge.WithAnalyzeStatusCard,  // use for analyzeStatusCard
-	"analyzeConcurrency": aiforge.WithAnalyzeConcurrency, // 控制知识构建分析并发数
-	"extraPrompt":        aiforge.WithExtraPrompt,        // use for analyzeImage and analyzeImageFile
-	"entryLength":        aiforge.RefineWithKnowledgeEntryLength,
-	"disableIndex":       aiforge.RefineWithDisableBuildIndex, // disable building index knowledge
-	"disableERM":         aiforge.RefineWithDisableERMBuild,   // disable building entity repository model
+	"ctx":                liteforgeapp.WithAnalyzeContext,     // use for analyzeContext
+	"log":                liteforgeapp.WithAnalyzeLog,         // use for analyzeLog
+	"statusCard":         liteforgeapp.WithAnalyzeStatusCard,  // use for analyzeStatusCard
+	"analyzeConcurrency": liteforgeapp.WithAnalyzeConcurrency, // 控制知识构建分析并发数
+	"extraPrompt":        liteforgeapp.WithExtraPrompt,        // use for analyzeImage and analyzeImageFile
+	"entryLength":        liteforgeapp.RefineWithKnowledgeEntryLength,
+	"disableIndex":       liteforgeapp.RefineWithDisableBuildIndex, // disable building index knowledge
+	"disableERM":         liteforgeapp.RefineWithDisableERMBuild,   // disable building entity repository model
 	"chunkSize":          chunkmaker.WithChunkSize,
 	"khopk":              rag.WithKHopK,
 	"khopLimit":          rag.WithKHopLimit,
@@ -94,11 +94,11 @@ var RagExports = map[string]interface{}{
 	"pathDepth":          rag.WithKHopPathDepth,
 	"getEntityFilter":    schema.SimpleBuildEntityFilter,
 
-	"BuildCollectionFromFile":   aiforge.BuildKnowledgeFromFile,
-	"BuildCollectionFromReader": aiforge.BuildKnowledgeFromReader,
-	"BuildCollectionFromRaw":    aiforge.BuildKnowledgeFromBytes,
+	"BuildCollectionFromFile":   liteforgeapp.BuildKnowledgeFromFile,
+	"BuildCollectionFromReader": liteforgeapp.BuildKnowledgeFromReader,
+	"BuildCollectionFromRaw":    liteforgeapp.BuildKnowledgeFromBytes,
 
-	"BuildKnowledgeFromEntityRepos": aiforge.BuildKnowledgeFromEntityReposByName,
+	"BuildKnowledgeFromEntityRepos": liteforgeapp.BuildKnowledgeFromEntityReposByName,
 
 	"BuildIndexKnowledgeFromFile": BuildIndexKnowledgeFromFile,
 
@@ -167,7 +167,7 @@ var RagExports = map[string]interface{}{
 // rag.BuildIndexKnowledgeFromFile("my-kb", "/tmp/doc.txt")~
 // ```
 func BuildIndexKnowledgeFromFile(kbName string, path string, option ...any) error {
-	entries, err := aiforge.BuildIndexKnowledgeFromFile(kbName, path, option...)
+	entries, err := liteforgeapp.BuildIndexKnowledgeFromFile(kbName, path, option...)
 	if err != nil {
 		return err
 	}
@@ -223,8 +223,8 @@ func _lazyEmbedding(lazy ...bool) rag.RAGSystemConfigOption {
 // result = rag.BuildSearchIndexKnowledge("my-tools", text)~
 // println("Generated questions:", result.Questions)
 // ```
-func BuildSearchIndexKnowledge(kbName string, text string, option ...any) (*aiforge.SearchIndexResult, error) {
-	result, err := aiforge.BuildSearchIndexKnowledge(kbName, text, option...)
+func BuildSearchIndexKnowledge(kbName string, text string, option ...any) (*liteforgeapp.SearchIndexResult, error) {
+	result, err := liteforgeapp.BuildSearchIndexKnowledge(kbName, text, option...)
 	if err != nil {
 		return nil, err
 	}
@@ -252,8 +252,8 @@ func BuildSearchIndexKnowledge(kbName string, text string, option ...any) (*aifo
 // result = rag.BuildSearchIndexKnowledgeFromFile("my-tools", "/path/to/tool-description.txt")~
 // println("Generated questions:", result.Questions)
 // ```
-func BuildSearchIndexKnowledgeFromFile(kbName string, filename string, option ...any) (*aiforge.SearchIndexResult, error) {
-	result, err := aiforge.BuildSearchIndexKnowledgeFromFile(kbName, filename, option...)
+func BuildSearchIndexKnowledgeFromFile(kbName string, filename string, option ...any) (*liteforgeapp.SearchIndexResult, error) {
+	result, err := liteforgeapp.BuildSearchIndexKnowledgeFromFile(kbName, filename, option...)
 	if err != nil {
 		return nil, err
 	}

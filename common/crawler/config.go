@@ -1030,7 +1030,7 @@ func WithJSParser(enable ...bool) ConfigOpt {
 // 该通道按以下三阶段工作：
 //  1. 宽松正则预筛选可疑窗口（URL / 路径风格）
 //  2. aireducer 按字节切片，DumpWithOverlap 跨切片折叠
-//  3. aiforge.LiteForge SpeedPriority 抽取结构化路径列表
+//  3. liteforgeapp.LiteForge SpeedPriority 抽取结构化路径列表
 //
 // 参数:
 //   - opts: 可选的 AI JS 抽取配置项，例如 crawler.aiJSMaxTokens

@@ -2,6 +2,7 @@ package yak
 
 import (
 	"context"
+	"github.com/yaklang/yaklang/common/ai/aid/liteforge/liteforgeapp"
 	"slices"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
@@ -169,8 +170,8 @@ var (
 // lf = aiagent.CreateLiteForge("demo", aiagent.liteForgePrompt("extract the title"))~
 // dump(lf)
 // ```
-func NewLiteForge(name string, opts ...any) (*aiforge.LiteForge, error) {
-	return aiforge.NewLiteForge(name, BuildLiteForgeCreateOption(opts...)...)
+func NewLiteForge(name string, opts ...any) (*liteforgeapp.LiteForge, error) {
+	return liteforgeapp.NewLiteForge(name, BuildLiteForgeCreateOption(opts...)...)
 }
 
 // NewForgeBlueprint 创建一个 Forge 蓝图（导出名为 aiagent.CreateForge）

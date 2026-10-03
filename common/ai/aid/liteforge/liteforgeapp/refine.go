@@ -1,4 +1,4 @@
-package aiforge
+package liteforgeapp
 
 import (
 	"bytes"
@@ -22,11 +22,11 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 )
 
-var refineSchema = promptloader.MustLoad("aiforge/liteforge_schema/liteforge_refine.schema.json")
+var refineSchema = promptloader.MustLoad("ai/aid/liteforge/liteforgeapp/schemas/liteforge_refine.schema.json")
 
-var refinePrompt = promptloader.MustLoad("aiforge/liteforge_prompt/liteforge_refine_prompt.txt")
+var refinePrompt = promptloader.MustLoad("ai/aid/liteforge/liteforgeapp/prompts/liteforge_refine_prompt.txt")
 
-var refineERMPrompt = promptloader.MustLoad("aiforge/liteforge_prompt/liteforge_refine_erm.txt")
+var refineERMPrompt = promptloader.MustLoad("ai/aid/liteforge/liteforgeapp/prompts/liteforge_refine_erm.txt")
 
 func Action2RagKnowledgeEntries(
 	action *aicommon.Action,
@@ -483,10 +483,10 @@ func BuildKnowledgeFromEntityReposByName(name string, option ...any) (<-chan *sc
 //
 // example:
 //
-//	ch, err := aiforge.BuildVideoKnowledgeFromOmni(
+//	ch, err := liteforgeapp.BuildVideoKnowledgeFromOmni(
 //	    "xss-learn-omni-flash", "/path/to/xss-learn.mp4",
-//	    aiforge.VideoOmniPresetFlash(),
-//	    aiforge.WithVideoOmniAPIKey(key),
+//	    liteforgeapp.VideoOmniPresetFlash(),
+//	    liteforgeapp.WithVideoOmniAPIKey(key),
 //	)
 //
 // 参数:

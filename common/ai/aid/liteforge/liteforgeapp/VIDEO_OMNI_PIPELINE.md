@@ -62,7 +62,7 @@ flowchart LR
 -   **aispec / 千问 omni 通路**：`aispec.WithVideoUrl` / `WithVideoBase64` / `WithVideoRaw`，
     在 ChatMessage 内自动设置 `modalities=["text"]`、`stream_options.include_usage=true`、
     把 `video_url` 排在 `text` 之前，并对相同 URL 做去重，规避 "Multiple inputs of the same modality"。
--   **aiforge 知识管线**：`AnalyzeVideoOmni` -> `*VideoOmniSegmentResult` ->
+-   **liteforgeapp 知识管线**：`AnalyzeVideoOmni` -> `*VideoOmniSegmentResult` ->
     `BuildVideoKnowledgeFromOmni` -> `_buildKnowledge` -> RAG 入库。
     可选的 `videoSegmentArchiver` 把整条流的所有素材落入一个 zip。
 
@@ -99,12 +99,12 @@ common/ai/tongyi/gateway.go        # 把 g.config.Videos 注入到 chat options
 common/ai/gateway.go               # AIChatExports：videoUrl/videoBase64/videoRaw 三个 yak 导出
 common/mediautils/ffmpeg.go        # 把 ExtractVideoSliceFromVideo + WithSlice* 暴露给 yak
 
-common/aiforge/
-    liteforge_analyze_video_omni.go    # AnalyzeVideoOmni、VideoOmniConfig、VideoOmniSegmentResult
-    liteforge_video_archiver.go        # videoSegmentArchiver：流式 zip 归档
-    liteforge_refine.go                # BuildVideoKnowledgeFromOmni：注入 kbName + 接 RAG
-    liteforge_exports.go               # liteforge.* yak 导出
-    example/
+common/ai/aid/liteforge/liteforgeapp/
+    analyze_video_omni.go              # AnalyzeVideoOmni、VideoOmniConfig、VideoOmniSegmentResult
+    video_archiver.go                  # videoSegmentArchiver：流式 zip 归档
+    refine.go                         # BuildVideoKnowledgeFromOmni：注入 kbName + 接 RAG
+    exports.go                        # liteforge.* yak 导出
+    examples/
         build-video-knowledge-omni.yak           # KB 入库样例
         build-video-knowledge-omni-with-zip.yak  # KB + zip 归档样例
     VIDEO_OMNI_PIPELINE.md         # 本文档
@@ -128,12 +128,12 @@ common/aiforge/
 
 `VideoSliceResult` 字段：`Index / FilePath / StartTime / EndTime / SizeBytes / RawData / Error`。
 
-### 4.2 aiforge omni 视频通路
+### 4.2 liteforgeapp omni 视频通路
 
 | Go API | yak 名 | 返回值 |
 | --- | --- | --- |
-| `aiforge.AnalyzeVideoOmni(video, opts...)` | `liteforge.AnalyzeVideoOmni` | `<-chan AnalysisResult`（每段一条 `*VideoOmniSegmentResult`） |
-| `aiforge.BuildVideoKnowledgeFromOmni(kbName, video, opts...)` | `liteforge.BuildVideoKnowledgeFromOmni` | `<-chan *schema.KnowledgeBaseEntry`（直接接入 RAG） |
+| `liteforgeapp.AnalyzeVideoOmni(video, opts...)` | `liteforge.AnalyzeVideoOmni` | `<-chan AnalysisResult`（每段一条 `*VideoOmniSegmentResult`） |
+| `liteforgeapp.BuildVideoKnowledgeFromOmni(kbName, video, opts...)` | `liteforge.BuildVideoKnowledgeFromOmni` | `<-chan *schema.KnowledgeBaseEntry`（直接接入 RAG） |
 
 可用选项：
 
@@ -172,12 +172,12 @@ common/aiforge/
 
 ### 5.1 yak 脚本：仅 KB 入库（无 zip 归档）
 
-参见 [`example/build-video-knowledge-omni.yak`](./example/build-video-knowledge-omni.yak)：
+参见 [`examples/build-video-knowledge-omni.yak`](./examples/build-video-knowledge-omni.yak)：
 
 ```shell
 # 优先 env，回退到本地 key 文件
 export DASHSCOPE_API_KEY=sk-***
-yak example/build-video-knowledge-omni.yak \
+yak examples/build-video-knowledge-omni.yak \
     --video /path/to/lecture.mp4 \
     --model flash \
     --kb-name my-lecture-flash \
@@ -186,11 +186,11 @@ yak example/build-video-knowledge-omni.yak \
 
 ### 5.2 yak 脚本：KB + zip 归档（推荐生产用）
 
-参见 [`example/build-video-knowledge-omni-with-zip.yak`](./example/build-video-knowledge-omni-with-zip.yak)：
+参见 [`examples/build-video-knowledge-omni-with-zip.yak`](./examples/build-video-knowledge-omni-with-zip.yak)：
 
 ```shell
 export DASHSCOPE_API_KEY=sk-***
-yak example/build-video-knowledge-omni-with-zip.yak \
+yak examples/build-video-knowledge-omni-with-zip.yak \
     --video /path/to/lecture.mp4 \
     --model plus \
     --max-segments 1 \
@@ -221,7 +221,7 @@ import (
     "fmt"
     "os"
 
-    "github.com/yaklang/yaklang/common/aiforge"
+    "github.com/yaklang/yaklang/common/ai/aid/liteforge/liteforgeapp"
 )
 
 func main() {
@@ -230,13 +230,13 @@ func main() {
         panic("DASHSCOPE_API_KEY not set")
     }
 
-    entries, err := aiforge.BuildVideoKnowledgeFromOmni(
+    entries, err := liteforgeapp.BuildVideoKnowledgeFromOmni(
         "demo-kb",
         "/path/to/lecture.mp4",
-        aiforge.VideoOmniPresetPlus(),
-        aiforge.WithVideoOmniAPIKey(apiKey),
-        aiforge.WithVideoOmniMaxSegments(1),
-        aiforge.WithVideoOmniZipDir("/tmp/video-omni-zips"),
+        liteforgeapp.VideoOmniPresetPlus(),
+        liteforgeapp.WithVideoOmniAPIKey(apiKey),
+        liteforgeapp.WithVideoOmniMaxSegments(1),
+        liteforgeapp.WithVideoOmniZipDir("/tmp/video-omni-zips"),
     )
     if err != nil {
         panic(err)
@@ -288,11 +288,11 @@ token 估算（来自百炼公开文档）：
 
 `zip` 不是终点而是"原料库"。建议的下一步：
 
-1. **重新跑模型不花切片钱**：解压 `streamcopy.mp4` 后用 `aiforge.AnalyzeVideoOmni`
+1. **重新跑模型不花切片钱**：解压 `streamcopy.mp4` 后用 `liteforgeapp.AnalyzeVideoOmni`
     + 自定义 prompt 直接对其再跑一遍，例如把 prompt 换成"把这一段视频压缩成 cybersecurity skill"，
     省去重新切片 / 重编码 / I/O 的开销。
 2. **人工审校再回灌 RAG**：编辑 `dump.md`，把不准确的 storyline 修正后通过
-    `aiforge.BuildKnowledgeFromBytes` 重新进 KB；原 KB 不动，作为新版本平滑迭代。
+    `liteforgeapp.BuildKnowledgeFromBytes` 重新进 KB；原 KB 不动，作为新版本平滑迭代。
 3. **跨段 storyline 聚合**：合并所有 `analysis.json`，按时间序构造大纲与因果链，
     再灌入 KB 作为 "meta knowledge"。
 4. **批量化离线作业**：用一个 yak 脚本读 `manifest.json`，并行对多 zip 做加工，
@@ -320,10 +320,10 @@ token 估算（来自百炼公开文档）：
     可以在 vendor gateway 里自己拦一层把 dataURI 改写；不要去动 `aispec.WithVideoBase64` 的默认实现。
 3. **modalities / stream_options**：如果对方不需要这些字段，
     可以在 vendor gateway 里清掉 ChatMessage 上的对应字段后再发出。
-4. **aiforge 层**：扩展 `VideoOmniConfig.AIType` 支持新 type 名（同 `aispec.WithType`）；
+4. **liteforgeapp 层**：扩展 `VideoOmniConfig.AIType` 支持新 type 名（同 `aispec.WithType`）；
     `WithVideoOmniType("<vendor>")` 即可切换。
 5. **预设**：如果新模型也想要 preset，仿照 `VideoOmniPresetPlus` 加一个 `VideoOmniPresetXxx`，
-    强制覆盖 `c.Model`，并在 `liteforge_exports.go` 暴露。
+    强制覆盖 `c.Model`，并在 `exports.go` 暴露。
 
 ## 11. 后续路线
 

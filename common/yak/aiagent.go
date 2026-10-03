@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/yaklang/yaklang/common/ai/aid/liteforge/liteforgeapp"
 	"io"
 	"reflect"
 	"strings"
@@ -290,10 +291,10 @@ var AIAgentExport = map[string]any{
 	"aiCallback":     aicommon.WithAICallback,
 
 	// liteforge options
-	"liteForgePrompt":          aiforge.WithLiteForge_Prompt,
-	"liteForgeOutputSchema":    aiforge.WithLiteForge_OutputSchema,
-	"liteForgedRequireParams":  aiforge.WithLiteForge_RequireParams,
-	"liteForgeOutputSchemaRaw": aiforge.WithLiteForge_OutputSchemaRaw,
+	"liteForgePrompt":          liteforgeapp.WithLiteForge_Prompt,
+	"liteForgeOutputSchema":    liteforgeapp.WithLiteForge_OutputSchema,
+	"liteForgedRequireParams":  liteforgeapp.WithLiteForge_RequireParams,
+	"liteForgeOutputSchemaRaw": liteforgeapp.WithLiteForge_OutputSchemaRaw,
 
 	// forge
 	"tools":                 aicommon.WithTools,

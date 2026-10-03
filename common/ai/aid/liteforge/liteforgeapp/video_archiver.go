@@ -1,4 +1,4 @@
-package aiforge
+package liteforgeapp
 
 import (
 	"archive/zip"
@@ -38,15 +38,15 @@ type videoSegmentArchiver struct {
 // archiveManifest zip 顶层 manifest.json 的结构
 // 关键词: zip manifest 结构
 type archiveManifest struct {
-	SourceVideo      string                  `json:"source_video"`
-	Model            string                  `json:"model"`
-	KBName           string                  `json:"kb_name"`
-	CreatedAt        string                  `json:"created_at"`
-	Generator        string                  `json:"generator"`
-	GeneratorVersion string                  `json:"generator_version"`
-	Segments         []*archiveSegmentEntry  `json:"segments"`
-	ErrorCount       int                     `json:"error_count"`
-	Notes            map[string]string       `json:"notes,omitempty"`
+	SourceVideo      string                 `json:"source_video"`
+	Model            string                 `json:"model"`
+	KBName           string                 `json:"kb_name"`
+	CreatedAt        string                 `json:"created_at"`
+	Generator        string                 `json:"generator"`
+	GeneratorVersion string                 `json:"generator_version"`
+	Segments         []*archiveSegmentEntry `json:"segments"`
+	ErrorCount       int                    `json:"error_count"`
+	Notes            map[string]string      `json:"notes,omitempty"`
 }
 
 // archiveSegmentEntry 单个分片在 manifest 中的条目
@@ -390,8 +390,8 @@ func buildArchiveReadme(m *archiveManifest) string {
 	sb.WriteString("```\n\n")
 
 	sb.WriteString("## Suggested next steps\n\n")
-	sb.WriteString("1. Re-distill skills from `streamcopy.mp4` with a different prompt using `aiforge.AnalyzeVideoOmni` directly.\n")
-	sb.WriteString("2. Audit `dump.md` and edit before re-ingesting via `aiforge.BuildKnowledgeFromBytes` or a custom RAG flow.\n")
+	sb.WriteString("1. Re-distill skills from `streamcopy.mp4` with a different prompt using `liteforgeapp.AnalyzeVideoOmni` directly.\n")
+	sb.WriteString("2. Audit `dump.md` and edit before re-ingesting via `liteforgeapp.BuildKnowledgeFromBytes` or a custom RAG flow.\n")
 	sb.WriteString("3. Combine `analysis.json` across segments to build cross-segment storyline graphs.\n\n")
 
 	if len(m.Segments) > 0 {

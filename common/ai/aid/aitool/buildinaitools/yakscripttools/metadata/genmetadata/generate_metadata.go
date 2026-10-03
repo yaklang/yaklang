@@ -4,13 +4,13 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"github.com/yaklang/yaklang/common/ai/aid/liteforge/liteforgeapp"
 	"html/template"
 	"strings"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon/promptloader"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools/yakscripttools/metadata"
-	"github.com/yaklang/yaklang/common/aiforge"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
@@ -84,13 +84,13 @@ func GenerateMetadataFromCodeContent(name string, code string) (*metadata.YakScr
 	}, nil
 }
 
-func newForge() (*aiforge.LiteForge, error) {
+func newForge() (*liteforgeapp.LiteForge, error) {
 	// P0-B4: aitool_generate_key_word_prompt 是嵌入式 prompt 模板字符串
 	// (包含字面 "{{ .Code }}", 实际 Code 通过 lf.Execute 的 params 注入,
 	// 不会触发 Go template 二次渲染), 因此 Prompt 字段本身 100% 静态.
 	// 上移到 StaticInstruction 让 semi-dynamic 段跨调用 byte-stable.
-	lf, err := aiforge.NewLiteForge("generate_metadata", aiforge.WithLiteForge_StaticInstruction(aitool_generate_key_word_prompt),
-		aiforge.WithLiteForge_OutputSchema(
+	lf, err := liteforgeapp.NewLiteForge("generate_metadata", liteforgeapp.WithLiteForge_StaticInstruction(aitool_generate_key_word_prompt),
+		liteforgeapp.WithLiteForge_OutputSchema(
 			aitool.WithStringParam("language", aitool.WithParam_Required(true), aitool.WithParam_Description("语言，固定为chinese")),
 			aitool.WithStringParam("description", aitool.WithParam_Required(true), aitool.WithParam_Description("ai工具功能描述")),
 			aitool.WithStringArrayParam("keywords", aitool.WithParam_Required(true), aitool.WithParam_Description("关键词数组")),

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"github.com/yaklang/yaklang/common/ai/aid/liteforge/liteforgeapp"
 	"io"
 	"os"
 	"path/filepath"
@@ -16,8 +17,6 @@ import (
 	"github.com/yaklang/yaklang/common/netstack_exports"
 	"github.com/yaklang/yaklang/common/tcpmitm"
 	"github.com/yaklang/yaklang/common/utils/netutil"
-
-	"github.com/yaklang/yaklang/common/aiforge"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/ai/rag"
@@ -355,7 +354,7 @@ func initYaklangLib() {
 
 	yaklang.Import("aim", aiengine.Exports)
 
-	yaklang.Import("liteforge", aiforge.LiteForgeExport)
+	yaklang.Import("liteforge", liteforgeapp.LiteForgeExport)
 	yaklang.Import("jsonschema", aitool.SchemaGeneratorExports)
 
 	yaklang.Import("aireducer", aireducer.Exports)

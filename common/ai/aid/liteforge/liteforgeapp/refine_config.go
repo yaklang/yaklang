@@ -1,4 +1,4 @@
-package aiforge
+package liteforgeapp
 
 import (
 	"github.com/google/uuid"

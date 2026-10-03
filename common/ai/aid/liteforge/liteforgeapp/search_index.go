@@ -1,4 +1,4 @@
-package aiforge
+package liteforgeapp
 
 import (
 	"os"
@@ -13,7 +13,7 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 )
 
-var searchIndexBuildPrompt = promptloader.MustLoad("aiforge/liteforge_prompt/search_index_build.txt")
+var searchIndexBuildPrompt = promptloader.MustLoad("ai/aid/liteforge/liteforgeapp/prompts/search_index_build.txt")
 
 // searchIndexSchema defines the schema for search index generation
 // It generates 5-10 questions that users might ask to find this content

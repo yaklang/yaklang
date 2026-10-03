@@ -17,8 +17,8 @@ type PromptParams struct {
 	TimelineDump, TimelineFrozenBlock, TimelineOpen                    string
 }
 
-var textTemplate = template.Must(template.New("liteforge-text").Parse(aiprojection.CreateTemplate(promptloader.MustLoad("inline/aiforge/liteforge/liteForgePromptTemplate.txt"))))
-var functionTemplate = template.Must(template.New("liteforge-function").Parse(aiprojection.CreateTemplate(promptloader.MustLoad("inline/aiforge/liteforge/liteForgeFunctionPromptTemplate.txt"))))
+var textTemplate = template.Must(template.New("liteforge-text").Parse(aiprojection.CreateTemplate(promptloader.MustLoad("ai/aid/liteforge/liteForgePromptTemplate.txt"))))
+var functionTemplate = template.Must(template.New("liteforge-function").Parse(aiprojection.CreateTemplate(promptloader.MustLoad("ai/aid/liteforge/liteForgeFunctionPromptTemplate.txt"))))
 
 func RenderPrompt(p PromptParams, native bool) (string, error) {
 	t := textTemplate

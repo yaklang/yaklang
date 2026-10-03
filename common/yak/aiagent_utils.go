@@ -3,11 +3,12 @@ package yak
 import (
 	"context"
 	"encoding/json"
-	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
-	"github.com/yaklang/yaklang/common/ai/aid/coordinator_legacy"
 	"os"
 	"strings"
 
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
+	"github.com/yaklang/yaklang/common/ai/aid/coordinator_legacy"
+	"github.com/yaklang/yaklang/common/ai/aid/liteforge/liteforgeapp"
 	"github.com/yaklang/yaklang/common/aiforge"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
@@ -70,7 +71,7 @@ func BuildLiteForgeExecOption(anyOptions ...any) []any {
 	var ag = NewAgent()
 	for _, opt := range anyOptions {
 		switch o := opt.(type) {
-		case aiforge.LiteForgeExecOption:
+		case liteforgeapp.LiteForgeExecOption:
 			liteForgeExecOpts = append(liteForgeExecOpts, o)
 		case aicommon.ConfigOption:
 			extendAIDOptions = append(extendAIDOptions, o)
@@ -82,20 +83,20 @@ func BuildLiteForgeExecOption(anyOptions ...any) []any {
 		}
 	}
 	extendAIDOptions = append(ag.AICommonOptions(), extendAIDOptions...)
-	liteForgeExecOpts = append(liteForgeExecOpts, aiforge.LiteForgeExecWithContext(ag.ctx))
+	liteForgeExecOpts = append(liteForgeExecOpts, liteforgeapp.LiteForgeExecWithContext(ag.ctx))
 	for _, opt := range extendAIDOptions {
 		liteForgeExecOpts = append(liteForgeExecOpts, opt)
 	}
 	return liteForgeExecOpts
 }
 
-func BuildLiteForgeCreateOption(anyOptions ...any) []aiforge.LiteForgeOption {
+func BuildLiteForgeCreateOption(anyOptions ...any) []liteforgeapp.LiteForgeOption {
 	var extendAIDOptions []aicommon.ConfigOption
-	var liteForgeOpts []aiforge.LiteForgeOption
+	var liteForgeOpts []liteforgeapp.LiteForgeOption
 	var aiagent = NewAgent()
 	for _, opt := range anyOptions {
 		switch o := opt.(type) {
-		case aiforge.LiteForgeOption:
+		case liteforgeapp.LiteForgeOption:
 			liteForgeOpts = append(liteForgeOpts, o)
 		case aicommon.ConfigOption:
 			extendAIDOptions = append(extendAIDOptions, o)
@@ -107,7 +108,7 @@ func BuildLiteForgeCreateOption(anyOptions ...any) []aiforge.LiteForgeOption {
 		}
 	}
 	extendAIDOptions = append(aiagent.AICommonOptions(), extendAIDOptions...)
-	return append(liteForgeOpts, aiforge.WithExtendLiteForge_AIOption(extendAIDOptions...))
+	return append(liteForgeOpts, liteforgeapp.WithExtendLiteForge_AIOption(extendAIDOptions...))
 }
 
 func BindAIConfigToEngine(nIns *antlr4yak.Engine, agentOptions ...any) {
@@ -155,9 +156,9 @@ func BindAIConfigToEngine(nIns *antlr4yak.Engine, agentOptions ...any) {
 	})
 
 	nIns.GetVM().RegisterMapMemberCallHandler("aiagent", "CreateLiteForge", func(i interface{}) interface{} {
-		originFunc, ok := i.(func(name string, opts ...any) (*aiforge.LiteForge, error))
+		originFunc, ok := i.(func(name string, opts ...any) (*liteforgeapp.LiteForge, error))
 		if ok {
-			return func(name string, opts ...any) (*aiforge.LiteForge, error) {
+			return func(name string, opts ...any) (*liteforgeapp.LiteForge, error) {
 				opts = append(agentOptions, opts...)
 				return originFunc(name, opts...)
 			}
@@ -166,9 +167,9 @@ func BindAIConfigToEngine(nIns *antlr4yak.Engine, agentOptions ...any) {
 	})
 
 	nIns.GetVM().RegisterMapMemberCallHandler("liteforge", "Execute", func(i interface{}) interface{} {
-		originFunc, ok := i.(func(query string, opts ...any) (*aiforge.ForgeResult, error))
+		originFunc, ok := i.(func(query string, opts ...any) (*aicommon.ForgeResult, error))
 		if ok {
-			return func(query string, opts ...any) (*aiforge.ForgeResult, error) {
+			return func(query string, opts ...any) (*aicommon.ForgeResult, error) {
 				opts = append(BuildLiteForgeExecOption(agentOptions...), opts...)
 				return originFunc(query, opts...)
 			}

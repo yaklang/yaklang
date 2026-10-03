@@ -1,4 +1,4 @@
-package aiforge
+package liteforgeapp
 
 import (
 	"bytes"
@@ -22,21 +22,7 @@ func init() {
 	utils.Debug(func() {
 		log.Info("liteforge.go is already registered aicommon.LiteForgeExecuteCallback")
 	})
-	aicommon.RegisterLiteForgeExecuteCallback(func(prompt string, opts ...any) (*aicommon.ForgeResult, error) {
-		result, err := _executeLiteForgeTemp(prompt, opts...)
-		if err != nil {
-			return nil, err
-		}
-		final := &aicommon.ForgeResult{
-			Action: result.Action,
-		}
-		if !utils.IsNil(result.Forge) {
-			final.Name = result.Forge.Name
-		} else {
-			final.Name = "liteforge"
-		}
-		return final, nil
-	})
+	aicommon.RegisterLiteForgeExecuteCallback(_executeLiteForgeTemp)
 }
 
 type streamableField struct {
@@ -355,11 +341,11 @@ func NewLiteForge(i string, opts ...LiteForgeOption) (*LiteForge, error) {
 	return lf, nil
 }
 
-func (l *LiteForge) Execute(ctx context.Context, params []*ypb.ExecParamItem, opts ...aicommon.ConfigOption) (*ForgeResult, error) {
+func (l *LiteForge) Execute(ctx context.Context, params []*ypb.ExecParamItem, opts ...aicommon.ConfigOption) (*aicommon.ForgeResult, error) {
 	return l.ExecuteEx(ctx, params, nil, opts...)
 }
 
-func (l *LiteForge) ExecuteEx(ctx context.Context, params []*ypb.ExecParamItem, imageData []*aicommon.ImageData, opts ...aicommon.ConfigOption) (*ForgeResult, error) {
+func (l *LiteForge) ExecuteEx(ctx context.Context, params []*ypb.ExecParamItem, imageData []*aicommon.ImageData, opts ...aicommon.ConfigOption) (*aicommon.ForgeResult, error) {
 	var call bytes.Buffer
 	if len(params) == 1 {
 		call.WriteString(params[0].Value)
@@ -393,5 +379,5 @@ func (l *LiteForge) ExecuteEx(ctx context.Context, params []*ypb.ExecParamItem, 
 	if err != nil {
 		return nil, err
 	}
-	return &ForgeResult{Action: result.Action}, nil
+	return result, nil
 }

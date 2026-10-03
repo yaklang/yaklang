@@ -1,4 +1,4 @@
-package aiforge
+package liteforgeapp
 
 import (
 	"fmt"
@@ -15,7 +15,7 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 )
 
-var IMAGE_OUTPUT_SCHEMA = promptloader.MustLoad("aiforge/liteforge_schema/liteforge_image.schema.json")
+var IMAGE_OUTPUT_SCHEMA = promptloader.MustLoad("ai/aid/liteforge/liteforgeapp/schemas/liteforge_image.schema.json")
 
 // TemporalQualifier represents the temporal nature of a relationship
 type TemporalQualifier string
@@ -444,7 +444,7 @@ func (i *ImageAnalysisResult) Stats() map[string]interface{} {
 }
 
 // AnalyzeImageFile reads an image from disk and runs structured vision analysis via a temporary LiteForge.
-// opts may include aiforge.AnalysisOption values (e.g. WithExtraPrompt, WithAnalyzeContext, WithVisionAICallback)
+// opts may include liteforgeapp.AnalysisOption values (e.g. WithExtraPrompt, WithAnalyzeContext, WithVisionAICallback)
 // and aicommon.ConfigOption values forwarded to the forge. Unless overridden by WithVisionAICallback, the
 // vision call uses aicommon.MustGetVisionAIModelCallback() (TierVision). WithVisionAICallback, when set,
 // is registered via WithFastAICallback so LiteForge's speed-priority path still invokes that callback.
@@ -468,7 +468,7 @@ func AnalyzeImage(image any, opts ...any) (*ImageAnalysisResult, error) {
 	imgCfg.fallbackOptions = append(imgCfg.fallbackOptions, _withImageCompress(image), _withForceImage(true))
 	imgCfg.fallbackOptions = append(imgCfg.fallbackOptions, WithOutputJSONSchema(IMAGE_OUTPUT_SCHEMA))
 	// 构建详细的分析提示
-	prompt := promptloader.MustLoad("inline/aiforge/liteforge_analyze_image/prompt.txt") + imgCfg.ExtraPrompt
+	prompt := promptloader.MustLoad("ai/aid/liteforge/liteforgeapp/prompts/analyze_image/prompt.txt") + imgCfg.ExtraPrompt
 
 	forgeResult, err := _executeLiteForgeTemp(prompt, imgCfg.ForgeExecOption(IMAGE_OUTPUT_SCHEMA)...)
 	if err != nil {

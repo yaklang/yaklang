@@ -3,13 +3,14 @@ package forge
 import (
 	"context"
 	"fmt"
+	"github.com/yaklang/yaklang/common/ai/aid/liteforge/liteforgeapp"
 	"github.com/yaklang/yaklang/common/aiforge"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 )
 
 type CatpchaDetector struct {
-	*aiforge.LiteForge
+	*liteforgeapp.LiteForge
 }
 
 type CaptchaResult struct {
@@ -23,9 +24,9 @@ type CaptchaResult struct {
 func NewCaptchaDetector() (*CatpchaDetector, error) {
 	// P0-B4: prompt 是 100% 静态指令 (角色 + 规则), 用 StaticInstruction 上移到
 	// semi-dynamic 段, 让多次调用同一 forge 时 semi-dynamic 段 byte-stable.
-	lf, err := aiforge.NewLiteForge("CaptchaDetector",
-		aiforge.WithLiteForge_StaticInstruction(getCaptchaDetectPrompt()),
-		aiforge.WithLiteForge_OutputSchemaRaw("detect_captcha", getCaptchaDetectSchema()),
+	lf, err := liteforgeapp.NewLiteForge("CaptchaDetector",
+		liteforgeapp.WithLiteForge_StaticInstruction(getCaptchaDetectPrompt()),
+		liteforgeapp.WithLiteForge_OutputSchemaRaw("detect_captcha", getCaptchaDetectSchema()),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create login element extractor: %v", err)

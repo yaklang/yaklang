@@ -1,4 +1,4 @@
-package aiforge
+package liteforgeapp
 
 import (
 	"fmt"
@@ -16,7 +16,7 @@ import (
 	"github.com/yaklang/yaklang/common/utils/chanx"
 )
 
-var indexBuildPrompt = promptloader.MustLoad("aiforge/liteforge_prompt/knowledge_index_build.txt")
+var indexBuildPrompt = promptloader.MustLoad("ai/aid/liteforge/liteforgeapp/prompts/knowledge_index_build.txt")
 
 var indexBuildSchema = aitool.NewObjectSchemaWithAction(
 	// chunk_list: 聚合后的“知识分片”(稍大)列表；每个分片包含标题、答案范围、以及若干个可检索问题

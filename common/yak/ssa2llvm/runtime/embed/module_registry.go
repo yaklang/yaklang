@@ -650,9 +650,9 @@ var moduleRegistry = map[string]ModuleImportSpec{
 	},
 	"liteforge": {
 		ModuleName:   "liteforge",
-		GoImportPath: "github.com/yaklang/yaklang/common/aiforge",
-		ImportAlias:  "aiforge",
-		ExportExpr:   "aiforge.LiteForgeExport",
+		GoImportPath: "github.com/yaklang/yaklang/common/ai/aid/liteforge/liteforgeapp",
+		ImportAlias:  "liteforgeapp",
+		ExportExpr:   "liteforgeapp.LiteForgeExport",
 	},
 	"rag": {
 		ModuleName:   "rag",
