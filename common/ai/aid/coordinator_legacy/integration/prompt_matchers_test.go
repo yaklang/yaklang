@@ -32,8 +32,29 @@ import (
 	"strings"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
+	"github.com/yaklang/yaklang/common/ai/rag"
 	"github.com/yaklang/yaklang/common/utils"
 )
+
+// Auxiliary requests must not consume task decision counters or receive a ReAct action.
+func tryHandleAuxiliaryRequest(config aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+	var output string
+	switch req.GetCallerLabel() {
+	case "liteforge[task-short-id]":
+		output = `{"@action":"task-short-id","identifier":"fixture_task"}`
+	case "liteforge[intent-keyword-gen]":
+		output = aicommon.MockedIntentKeywordGenActionJSON
+	case "liteforge[intent-capability-recommend]":
+		output = aicommon.MockedIntentRecommendActionJSON
+	case "liteforge[tool-call-reason]":
+		output = aicommon.MockedToolCallReasonActionJSON
+	default:
+		return nil, nil
+	}
+	return rag.MockAIService(func(string) string {
+		return output
+	})(config, req)
+}
 
 func isIntentEnrichmentPrompt(prompt string) bool {
 	return strings.Contains(prompt, "意图识别与上下文增强系统") ||
@@ -43,7 +64,8 @@ func isIntentEnrichmentPrompt(prompt string) bool {
 }
 
 func isMemorySummaryPrompt(prompt string) bool {
-	if isPlanGuidanceDocLiteForge(prompt) || isPlanFromDocLiteForge(prompt) {
+	if isPlanGuidanceDocLiteForge(prompt) || isPlanFromDocLiteForge(prompt) ||
+		isPlanReviewLiteForgePrompt(prompt) || isCapabilityCatalogMatchPrompt(prompt) {
 		return false
 	}
 	return strings.Contains(prompt, "数据处理和总结提示小助手") ||
@@ -112,6 +134,31 @@ var defaultTestPlanFromDocJSON = `{
 
 // tryHandleNewPlanFlowPrompt covers exploration, guidance document, and plan generation.
 func tryHandleNewPlanFlowPrompt(config aicommon.AICallerConfigIf, prompt string, planJSON string) (*aicommon.AIResponse, error) {
+	// These legacy text-protocol fixtures share the planning callback with auxiliary requests.
+	if strings.Contains(prompt, `{"@action":"task-short-id","identifier":"YOUR_IDENTIFIER"}`) {
+		rsp := config.NewAIResponse()
+		rsp.EmitOutputStream(strings.NewReader(`{"@action":"task-short-id","identifier":"fixture_task"}`))
+		rsp.Close()
+		return rsp, nil
+	}
+	if aicommon.IsToolCallReasonLiteForgePrompt(prompt) {
+		rsp := config.NewAIResponse()
+		rsp.EmitOutputStream(strings.NewReader(aicommon.MockedToolCallReasonActionJSON))
+		rsp.Close()
+		return rsp, nil
+	}
+	if aicommon.IsIntentRecommendPrompt(prompt) {
+		rsp := config.NewAIResponse()
+		rsp.EmitOutputStream(strings.NewReader(aicommon.MockedIntentRecommendActionJSON))
+		rsp.Close()
+		return rsp, nil
+	}
+	if aicommon.IsIntentKeywordGenPrompt(prompt) {
+		rsp := config.NewAIResponse()
+		rsp.EmitOutputStream(strings.NewReader(aicommon.MockedIntentKeywordGenActionJSON))
+		rsp.Close()
+		return rsp, nil
+	}
 	if isPlanExplorationPrompt(prompt) {
 		rsp := config.NewAIResponse()
 		rsp.EmitOutputStream(strings.NewReader(

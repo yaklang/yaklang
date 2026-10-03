@@ -37,6 +37,9 @@ var mockedToolCallingPlanJSON = `{
 }`
 
 func mockedToolCalling(i aicommon.AICallerConfigIf, req *aicommon.AIRequest, toolName string, params string) (*aicommon.AIResponse, error) {
+	if rsp, err := tryHandleAuxiliaryRequest(i, req); rsp != nil || err != nil {
+		return rsp, err
+	}
 	prompt := req.GetPrompt()
 	fmt.Println("===========" + "request:" + "===========\n" + req.GetPrompt())
 

@@ -11,6 +11,7 @@ import (
 	"testing"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
+	"github.com/yaklang/yaklang/common/ai/rag"
 	"github.com/yaklang/yaklang/common/utils"
 
 	"github.com/google/uuid"
@@ -115,6 +116,21 @@ func MockAICallback(t *testing.T, initFlag, persistentFlag, planFlag string) aic
 	// 关键词: directly_answer 永不 Exit, finish 唯一终结器, 答复后追加 finish 收尾
 	var primaryDecisionCount int32
 	return func(i aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+		if req.GetCallerLabel() == "liteforge[intent-capability-recommend]" {
+			return rag.MockAIService(func(string) string {
+				return aicommon.MockedIntentRecommendActionJSON
+			})(i, req)
+		}
+		if req.GetCallerLabel() == "liteforge[intent-keyword-gen]" {
+			return rag.MockAIService(func(string) string {
+				return aicommon.MockedIntentKeywordGenActionJSON
+			})(i, req)
+		}
+		if req.GetCallerLabel() == "liteforge[task-short-id]" {
+			return rag.MockAIService(func(string) string {
+				return `{"@action":"task-short-id","identifier":"calculate_result"}`
+			})(i, req)
+		}
 		prompt := req.GetPrompt()
 		rsp := i.NewAIResponse()
 		defer rsp.Close()
