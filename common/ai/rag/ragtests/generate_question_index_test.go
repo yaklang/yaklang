@@ -5,8 +5,6 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
-	"github.com/yaklang/yaklang/common/ai/aispec"
 	"github.com/yaklang/yaklang/common/ai/rag"
 	"github.com/yaklang/yaklang/common/ai/rag/vectorstore"
 	_ "github.com/yaklang/yaklang/common/aiforge"
@@ -27,7 +25,7 @@ func TestMUSTPASS_RAGSystem_GenerateQuestionIndex(t *testing.T) {
 	question1 := mockEmbedding.GenerateRandomText(5)
 	question2 := mockEmbedding.GenerateRandomText(5)
 
-	mockAICallback := aicommon.AIChatToAICallbackType(func(prompt string, opts ...aispec.AIConfigOption) (string, error) {
+	mockAICallback := rag.MockAIService(func(prompt string) string {
 		rspStr := `{
 			"@action": "object",
 			"question_list": [
@@ -35,7 +33,7 @@ func TestMUSTPASS_RAGSystem_GenerateQuestionIndex(t *testing.T) {
 				{"question": "%s","answer_location": {"start_line": 2, "end_line": 3}}
 			]
 		}`
-		return fmt.Sprintf(rspStr, question1, question2), nil
+		return fmt.Sprintf(rspStr, question1, question2)
 	})
 
 	ragSystem, err := rag.Get(exportCollectionName,
@@ -111,7 +109,7 @@ func TestMUSTPASS_RAGSystem_GenerateQuestionIndex_With_Multiple_Inputs(t *testin
 	question4 := mockEmbedding.GenerateRandomText(5)
 	question5 := mockEmbedding.GenerateRandomText(5)
 
-	mockAICallback := aicommon.AIChatToAICallbackType(func(prompt string, opts ...aispec.AIConfigOption) (string, error) {
+	mockAICallback := rag.MockAIService(func(prompt string) string {
 		// 简单的模拟返回，根据 prompt 内容或者直接返回固定结构
 		// 这里我们直接返回两个问题，分别对应第1行和第2行
 		rspStr := `{
@@ -124,7 +122,7 @@ func TestMUSTPASS_RAGSystem_GenerateQuestionIndex_With_Multiple_Inputs(t *testin
 				{"question": "%s","answer_location": {"start_line": 5, "end_line": 5}}
 			]
 		}`
-		return fmt.Sprintf(rspStr, question1, question2, question3, question4, question5), nil
+		return fmt.Sprintf(rspStr, question1, question2, question3, question4, question5)
 	})
 
 	ragSystem, err := rag.Get(exportCollectionName,

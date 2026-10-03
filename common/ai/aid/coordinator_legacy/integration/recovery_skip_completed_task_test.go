@@ -203,6 +203,9 @@ func TestRecovery_SkipCompletedTasks(t *testing.T) {
 			}
 		}),
 		aicommon.WithAICallback(func(config aicommon.AICallerConfigIf, request *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+			if rsp, err := tryHandleAuxiliaryRequest(config, request); rsp != nil || err != nil {
+				return rsp, err
+			}
 			prompt := request.GetPrompt()
 			block := extractCurrentTaskContent(prompt)
 			if strings.Contains(block, doneMarker) {
@@ -385,6 +388,9 @@ func TestRecovery_StartFromSpecifiedTask(t *testing.T) {
 			mu.Unlock()
 		}),
 		aicommon.WithAICallback(func(config aicommon.AICallerConfigIf, request *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+			if rsp, err := tryHandleAuxiliaryRequest(config, request); rsp != nil || err != nil {
+				return rsp, err
+			}
 			block := extractCurrentTaskContent(request.GetPrompt())
 			mu.Lock()
 			switch {
@@ -569,6 +575,9 @@ func TestRecovery_StartEarlierThanPreviousCursorResetsCompletedTasks(t *testing.
 			mu.Unlock()
 		}),
 		aicommon.WithAICallback(func(config aicommon.AICallerConfigIf, request *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+			if rsp, err := tryHandleAuxiliaryRequest(config, request); rsp != nil || err != nil {
+				return rsp, err
+			}
 			block := extractCurrentTaskContent(request.GetPrompt())
 			mu.Lock()
 			switch {
@@ -682,6 +691,9 @@ func TestRecovery_CancelledTaskPersistsAbortedState(t *testing.T) {
 			return &coordinator_legacy.PlanResponse{RootTask: root}
 		}),
 		aicommon.WithAICallback(func(config aicommon.AICallerConfigIf, request *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+			if rsp, err := tryHandleAuxiliaryRequest(config, request); rsp != nil || err != nil {
+				return rsp, err
+			}
 			if strings.Contains(extractCurrentTaskContent(request.GetPrompt()), cancelMarker) {
 				return nil, context.Canceled
 			}
@@ -836,6 +848,9 @@ func TestRecovery_ConcurrentSameStageAllTasksExecute(t *testing.T) {
 			mu.Unlock()
 		}),
 		aicommon.WithAICallback(func(config aicommon.AICallerConfigIf, request *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+			if rsp, err := tryHandleAuxiliaryRequest(config, request); rsp != nil || err != nil {
+				return rsp, err
+			}
 			block := extractCurrentTaskContent(request.GetPrompt())
 			mu.Lock()
 			for i, m := range markers {

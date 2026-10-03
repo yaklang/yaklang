@@ -18,6 +18,9 @@ import (
 )
 
 func mockedClarification(i aicommon.AICallerConfigIf, req *aicommon.AIRequest, flag string) (*aicommon.AIResponse, error) {
+	if rsp, err := tryHandleAuxiliaryRequest(i, req); rsp != nil || err != nil {
+		return rsp, err
+	}
 	prompt := req.GetPrompt()
 
 	fmt.Println("===========" + "request:" + "===========\n" + req.GetPrompt())

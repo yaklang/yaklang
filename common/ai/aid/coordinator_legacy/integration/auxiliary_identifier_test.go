@@ -3,7 +3,6 @@ package test
 import (
 	"context"
 	"errors"
-	"strings"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -11,6 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/coordinator_legacy"
+	"github.com/yaklang/yaklang/common/ai/rag"
 	_ "github.com/yaklang/yaklang/common/aiforge"
 )
 
@@ -38,10 +38,9 @@ func TestSemanticIdentifierAuxiliaryProtocolAndFallback(t *testing.T) {
 					if mode == "failure" {
 						return nil, errors.New("identifier unavailable")
 					}
-					response := c.NewAIResponse()
-					response.EmitOutputStream(strings.NewReader(`{"@action":"task-short-id","identifier":"review_code"}`))
-					response.Close()
-					return response, nil
+					return rag.MockAIService(func(string) string {
+						return `{"@action":"task-short-id","identifier":"review_code"}`
+					})(c, req)
 				}),
 			)
 			coordinator := &coordinator_legacy.Coordinator{Config: cfg}
