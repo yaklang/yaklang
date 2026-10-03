@@ -44,6 +44,12 @@ Function call 的字段流直接读取 `ToolCallArgumentsStreamHandler` 提供�
 
 ## 验证
 
+普通默认主循环的真实模型冒烟使用独立 [smoke_default_task.yak](smoke_default_task.yak)，直接由 Yak CLI 执行，不需要 Go 运行器注入变量。脚本通过 `aim.InvokeReAct` 读取订单材料、保存 evidence 并写对账报告；校验金额、去重和异常数组，输出 provider 用量、调用事件、提示词快照路径及按 token 加权的缓存率。凭据从 `LITEFORGE_SMOKE_API_KEY` 读取；可用 `LITEFORGE_TASK_DIR` 指定新的输出目录，`LITEFORGE_SMOKE_MODEL` 指定模型，默认 `deepseek-v4.1-flash`。总体缓存统计包含收到 provider usage 的请求；没有完整用量的取消请求保留在事件与日志中，不计入此分母。
+
+```powershell
+yak common/ai/aid/liteforge/smoke_default_task.yak
+```
+
 `go test ./common/ai/aid/liteforge` 覆盖开放 map、任意 JSON 值、必填约束、重试、原生调用身份和截断拒绝、增量回调、缓存前缀与伪造边界，以及旧嵌套参数包装。
 
 `TestProtocolsProjectAtSendAndStreamBeforeResponseEnds` 使用本地 HTTP/SSE 服务验证实际发送路径：默认开启原生协议，关闭后兼容旧 `@action` JSON；工具必须由发送前的投影注入；服务端只有收到字段回调通知后才发送剩余响应，保证两种协议都能增量处理字段。
