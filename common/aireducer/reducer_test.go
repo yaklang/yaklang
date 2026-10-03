@@ -12,7 +12,6 @@ import (
 
 	_ "embed"
 
-	"github.com/yaklang/yaklang/common/ai/aid/coordinator_legacy"
 	"github.com/yaklang/yaklang/common/chunkmaker"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils/chanx"
@@ -34,7 +33,7 @@ func TestAIReducer(t *testing.T) {
 	count := 0
 	reducer, err := NewReducerFromString(
 		string(raw),
-		WithReducerCallback(func(config *Config, memory *coordinator_legacy.PromptContextProvider, chunk chunkmaker.Chunk) error {
+		WithReducerCallback(func(config *Config, memory any, chunk chunkmaker.Chunk) error {
 			count++
 			log.Infof("Processing chunk: %d bytes", len(chunk.Data()))
 			return nil
@@ -70,9 +69,6 @@ func TestConfigOptions(t *testing.T) {
 				}
 				if c.TimeTriggerInterval != 0 {
 					t.Errorf("Expected default TimeTriggerInterval 0, got %v", c.TimeTriggerInterval)
-				}
-				if c.Memory == nil {
-					t.Error("Expected Memory to be initialized")
 				}
 			},
 		},
@@ -135,18 +131,6 @@ func TestConfigOptions(t *testing.T) {
 				}
 			},
 		},
-		{
-			name: "Custom memory",
-			config: func() *Config {
-				memory := coordinator_legacy.GetDefaultContextProvider()
-				return NewConfig(WithMemory(memory))
-			},
-			check: func(t *testing.T, c *Config) {
-				if c.Memory == nil {
-					t.Error("Expected Memory to be set")
-				}
-			},
-		},
 	}
 
 	for _, tt := range tests {
@@ -168,7 +152,7 @@ func TestReducerCreation(t *testing.T) {
 		{
 			name: "From string",
 			createFn: func() (*Reducer, error) {
-				return NewReducerFromString(testData, WithReducerCallback(func(config *Config, memory *coordinator_legacy.PromptContextProvider, chunk chunkmaker.Chunk) error {
+				return NewReducerFromString(testData, WithReducerCallback(func(config *Config, memory any, chunk chunkmaker.Chunk) error {
 					return nil
 				}))
 			},
@@ -176,7 +160,7 @@ func TestReducerCreation(t *testing.T) {
 		{
 			name: "From reader",
 			createFn: func() (*Reducer, error) {
-				return NewReducerFromReader(strings.NewReader(testData), WithReducerCallback(func(config *Config, memory *coordinator_legacy.PromptContextProvider, chunk chunkmaker.Chunk) error {
+				return NewReducerFromReader(strings.NewReader(testData), WithReducerCallback(func(config *Config, memory any, chunk chunkmaker.Chunk) error {
 					return nil
 				}))
 			},
@@ -197,7 +181,7 @@ func TestReducerCreation(t *testing.T) {
 				}
 				tmpFile.Close()
 
-				return NewReducerFromFile(tmpFile.Name(), WithReducerCallback(func(config *Config, memory *coordinator_legacy.PromptContextProvider, chunk chunkmaker.Chunk) error {
+				return NewReducerFromFile(tmpFile.Name(), WithReducerCallback(func(config *Config, memory any, chunk chunkmaker.Chunk) error {
 					return nil
 				}))
 			},
@@ -227,7 +211,11 @@ func TestReducerCallbacks(t *testing.T) {
 
 		reducer, err := NewReducerFromString(testData,
 			WithChunkSize(10), // Small chunk size to ensure multiple chunks
-			WithReducerCallback(func(config *Config, memory *coordinator_legacy.PromptContextProvider, chunk chunkmaker.Chunk) error {
+			WithMemory(map[string]any{"ignored": true}),
+			WithReducerCallback(func(config *Config, memory any, chunk chunkmaker.Chunk) error {
+				if memory != nil {
+					t.Fatal("Compatibility memory argument must remain nil")
+				}
 				mu.Lock()
 				chunks = append(chunks, string(chunk.Data()))
 				mu.Unlock()
@@ -257,10 +245,14 @@ func TestReducerCallbacks(t *testing.T) {
 		finishCalled := false
 
 		reducer, err := NewReducerFromString(testData,
-			WithReducerCallback(func(config *Config, memory *coordinator_legacy.PromptContextProvider, chunk chunkmaker.Chunk) error {
+			WithMemory("ignored"),
+			WithReducerCallback(func(config *Config, memory any, chunk chunkmaker.Chunk) error {
 				return nil
 			}),
-			WithFinishCallback(func(config *Config, memory *coordinator_legacy.PromptContextProvider) error {
+			WithFinishCallback(func(config *Config, memory any) error {
+				if memory != nil {
+					t.Fatal("Finish compatibility memory argument must remain nil")
+				}
 				finishCalled = true
 				return nil
 			}))
@@ -317,7 +309,7 @@ func TestErrorHandling(t *testing.T) {
 		expectedErr := errors.New("callback error")
 
 		reducer, err := NewReducerFromString("test data",
-			WithReducerCallback(func(config *Config, memory *coordinator_legacy.PromptContextProvider, chunk chunkmaker.Chunk) error {
+			WithReducerCallback(func(config *Config, memory any, chunk chunkmaker.Chunk) error {
 				return expectedErr
 			}))
 		if err != nil {
@@ -335,7 +327,7 @@ func TestErrorHandling(t *testing.T) {
 
 	t.Run("File not found error", func(t *testing.T) {
 		_, err := NewReducerFromFile("/non/existent/file.txt",
-			WithReducerCallback(func(config *Config, memory *coordinator_legacy.PromptContextProvider, chunk chunkmaker.Chunk) error {
+			WithReducerCallback(func(config *Config, memory any, chunk chunkmaker.Chunk) error {
 				return nil
 			}))
 		if err == nil {
@@ -362,10 +354,10 @@ func TestErrorHandling(t *testing.T) {
 		expectedErr := errors.New("finish error")
 
 		reducer, err := NewReducerFromString("test data",
-			WithReducerCallback(func(config *Config, memory *coordinator_legacy.PromptContextProvider, chunk chunkmaker.Chunk) error {
+			WithReducerCallback(func(config *Config, memory any, chunk chunkmaker.Chunk) error {
 				return nil
 			}),
-			WithFinishCallback(func(config *Config, memory *coordinator_legacy.PromptContextProvider) error {
+			WithFinishCallback(func(config *Config, memory any) error {
 				return expectedErr
 			}))
 		if err != nil {
@@ -391,7 +383,7 @@ func TestSeparatorChunking(t *testing.T) {
 
 	reducer, err := NewReducerFromString(testData,
 		WithSeparatorTrigger("|"),
-		WithReducerCallback(func(config *Config, memory *coordinator_legacy.PromptContextProvider, chunk chunkmaker.Chunk) error {
+		WithReducerCallback(func(config *Config, memory any, chunk chunkmaker.Chunk) error {
 			mu.Lock()
 			chunks = append(chunks, string(chunk.Data()))
 			mu.Unlock()
@@ -424,7 +416,7 @@ func TestContextCancellation(t *testing.T) {
 	reducer, err := NewReducerFromString(largeData,
 		WithContext(ctx),
 		WithChunkSize(100),
-		WithReducerCallback(func(config *Config, memory *coordinator_legacy.PromptContextProvider, chunk chunkmaker.Chunk) error {
+		WithReducerCallback(func(config *Config, memory any, chunk chunkmaker.Chunk) error {
 			// Cancel after first chunk
 			cancel()
 			return nil
@@ -444,7 +436,7 @@ func TestEdgeCases(t *testing.T) {
 		callbackCalled := false
 
 		reducer, err := NewReducerFromString("",
-			WithReducerCallback(func(config *Config, memory *coordinator_legacy.PromptContextProvider, chunk chunkmaker.Chunk) error {
+			WithReducerCallback(func(config *Config, memory any, chunk chunkmaker.Chunk) error {
 				callbackCalled = true
 				return nil
 			}))
@@ -466,7 +458,7 @@ func TestEdgeCases(t *testing.T) {
 		var mu sync.Mutex
 
 		reducer, err := NewReducerFromString("a",
-			WithReducerCallback(func(config *Config, memory *coordinator_legacy.PromptContextProvider, chunk chunkmaker.Chunk) error {
+			WithReducerCallback(func(config *Config, memory any, chunk chunkmaker.Chunk) error {
 				mu.Lock()
 				chunks = append(chunks, string(chunk.Data()))
 				mu.Unlock()
@@ -496,7 +488,7 @@ func TestEdgeCases(t *testing.T) {
 
 		reducer, err := NewReducerFromString(testData,
 			WithChunkSize(1000000), // Much larger than data
-			WithReducerCallback(func(config *Config, memory *coordinator_legacy.PromptContextProvider, chunk chunkmaker.Chunk) error {
+			WithReducerCallback(func(config *Config, memory any, chunk chunkmaker.Chunk) error {
 				mu.Lock()
 				chunks = append(chunks, string(chunk.Data()))
 				mu.Unlock()
@@ -533,36 +525,6 @@ func TestEdgeCases(t *testing.T) {
 	})
 }
 
-// Test memory functionality
-func TestMemoryIntegration(t *testing.T) {
-	testData := "data line 1\ndata line 2\ndata line 3"
-	memory := coordinator_legacy.GetDefaultContextProvider()
-
-	var processedChunks int
-
-	reducer, err := NewReducerFromString(testData,
-		WithMemory(memory),
-		WithReducerCallback(func(config *Config, memory *coordinator_legacy.PromptContextProvider, chunk chunkmaker.Chunk) error {
-			processedChunks++
-			if memory == nil {
-				t.Error("Memory should not be nil in callback")
-			}
-			return nil
-		}))
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	err = reducer.Run()
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	if processedChunks == 0 {
-		t.Error("No chunks were processed")
-	}
-}
-
 // Test concurrent processing safety
 func TestConcurrentSafety(t *testing.T) {
 	testData := strings.Repeat("concurrent test line\n", 100)
@@ -578,7 +540,7 @@ func TestConcurrentSafety(t *testing.T) {
 			var chunkCount int
 			reducer, err := NewReducerFromString(testData,
 				WithChunkSize(50),
-				WithReducerCallback(func(config *Config, memory *coordinator_legacy.PromptContextProvider, chunk chunkmaker.Chunk) error {
+				WithReducerCallback(func(config *Config, memory any, chunk chunkmaker.Chunk) error {
 					chunkCount++
 					return nil
 				}))
@@ -614,7 +576,7 @@ func TestTimeTriggerChunking(t *testing.T) {
 	reducer, err := NewReducerFromString(testData,
 		WithTimeTriggerInterval(100*time.Millisecond), // Short interval for testing
 		WithChunkSize(1000),                           // Large chunk size so time trigger takes precedence
-		WithReducerCallback(func(config *Config, memory *coordinator_legacy.PromptContextProvider, chunk chunkmaker.Chunk) error {
+		WithReducerCallback(func(config *Config, memory any, chunk chunkmaker.Chunk) error {
 			mu.Lock()
 			chunks = append(chunks, string(chunk.Data()))
 			timestamps = append(timestamps, time.Now())
@@ -728,7 +690,7 @@ func TestLinesChunking(t *testing.T) {
 			reducer, err := NewReducerFromString(tt.data,
 				WithLines(tt.lines),
 				WithChunkSize(tt.chunkSize),
-				WithReducerCallback(func(config *Config, memory *coordinator_legacy.PromptContextProvider, chunk chunkmaker.Chunk) error {
+				WithReducerCallback(func(config *Config, memory any, chunk chunkmaker.Chunk) error {
 					mu.Lock()
 					chunks = append(chunks, string(chunk.Data()))
 					mu.Unlock()
@@ -858,7 +820,7 @@ line 12`
 	reducer, err := NewReducerFromFile(tmpFile.Name(),
 		WithLines(3), // 3 lines per chunk
 		WithChunkSize(1024),
-		WithReducerCallback(func(config *Config, memory *coordinator_legacy.PromptContextProvider, chunk chunkmaker.Chunk) error {
+		WithReducerCallback(func(config *Config, memory any, chunk chunkmaker.Chunk) error {
 			mu.Lock()
 			chunks = append(chunks, string(chunk.Data()))
 			mu.Unlock()
@@ -915,7 +877,7 @@ func TestLinesWithChunkSizeConstraint(t *testing.T) {
 	reducer, err := NewReducerFromString(testData,
 		WithLines(3),       // 3 lines per chunk
 		WithChunkSize(150), // Should force splitting since 3*101 > 150
-		WithReducerCallback(func(config *Config, memory *coordinator_legacy.PromptContextProvider, chunk chunkmaker.Chunk) error {
+		WithReducerCallback(func(config *Config, memory any, chunk chunkmaker.Chunk) error {
 			mu.Lock()
 			chunks = append(chunks, string(chunk.Data()))
 			mu.Unlock()
@@ -977,7 +939,7 @@ Line 10: Final line wraps up everything`
 		reducer, err := NewReducerFromString(exampleText,
 			WithLines(3),        // 每3行创建一个chunk
 			WithChunkSize(1024), // 足够大的chunk size，不会触发分割
-			WithReducerCallback(func(config *Config, memory *coordinator_legacy.PromptContextProvider, chunk chunkmaker.Chunk) error {
+			WithReducerCallback(func(config *Config, memory any, chunk chunkmaker.Chunk) error {
 				mu.Lock()
 				chunks = append(chunks, string(chunk.Data()))
 				mu.Unlock()
@@ -1029,7 +991,7 @@ Line 10: Final line wraps up everything`
 		reducer, err := NewReducerFromString(exampleText,
 			WithLines(3),       // 每3行创建一个chunk
 			WithChunkSize(100), // 小的chunk size会强制分割
-			WithReducerCallback(func(config *Config, memory *coordinator_legacy.PromptContextProvider, chunk chunkmaker.Chunk) error {
+			WithReducerCallback(func(config *Config, memory any, chunk chunkmaker.Chunk) error {
 				mu.Lock()
 				chunks = append(chunks, string(chunk.Data()))
 				mu.Unlock()
@@ -1083,7 +1045,7 @@ func TestChunkSizeHardConstraint(t *testing.T) {
 		reducer, err := NewReducerFromString(testData,
 			WithLines(3), // 3行per chunk，但由于行很长，会被ChunkSize覆盖
 			WithChunkSize(smallChunkSize),
-			WithReducerCallback(func(config *Config, memory *coordinator_legacy.PromptContextProvider, chunk chunkmaker.Chunk) error {
+			WithReducerCallback(func(config *Config, memory any, chunk chunkmaker.Chunk) error {
 				mu.Lock()
 				chunks = append(chunks, string(chunk.Data()))
 				mu.Unlock()
@@ -1126,7 +1088,7 @@ func TestChunkSizeHardConstraint(t *testing.T) {
 		reducer, err := NewReducerFromString(separatorData,
 			WithSeparatorTrigger("|"),     // 分隔符触发
 			WithChunkSize(smallChunkSize), // 小的ChunkSize
-			WithReducerCallback(func(config *Config, memory *coordinator_legacy.PromptContextProvider, chunk chunkmaker.Chunk) error {
+			WithReducerCallback(func(config *Config, memory any, chunk chunkmaker.Chunk) error {
 				mu.Lock()
 				chunks = append(chunks, string(chunk.Data()))
 				mu.Unlock()
@@ -1164,7 +1126,7 @@ func TestChunkSizeHardConstraint(t *testing.T) {
 		reducer, err := NewReducerFromString(longData,
 			WithTimeTriggerInterval(100*time.Millisecond), // 时间触发
 			WithChunkSize(smallChunkSize),                 // 小的ChunkSize
-			WithReducerCallback(func(config *Config, memory *coordinator_legacy.PromptContextProvider, chunk chunkmaker.Chunk) error {
+			WithReducerCallback(func(config *Config, memory any, chunk chunkmaker.Chunk) error {
 				mu.Lock()
 				chunks = append(chunks, string(chunk.Data()))
 				mu.Unlock()
@@ -1217,7 +1179,7 @@ func TestNewReducerFromInputChunk(t *testing.T) {
 	var mu sync.Mutex
 
 	reducer, err := NewReducerFromInputChunk(inputChan,
-		WithReducerCallback(func(config *Config, memory *coordinator_legacy.PromptContextProvider, chunk chunkmaker.Chunk) error {
+		WithReducerCallback(func(config *Config, memory any, chunk chunkmaker.Chunk) error {
 			mu.Lock()
 			processedChunks = append(processedChunks, string(chunk.Data()))
 			mu.Unlock()
@@ -1248,7 +1210,7 @@ func TestNewReducerFromInputChunk(t *testing.T) {
 func TestNewReducerFromInputChunkErrors(t *testing.T) {
 	t.Run("Nil input channel", func(t *testing.T) {
 		_, err := NewReducerFromInputChunk(nil,
-			WithReducerCallback(func(config *Config, memory *coordinator_legacy.PromptContextProvider, chunk chunkmaker.Chunk) error {
+			WithReducerCallback(func(config *Config, memory any, chunk chunkmaker.Chunk) error {
 				return nil
 			}))
 
@@ -1444,34 +1406,6 @@ func TestRunEdgeCases(t *testing.T) {
 		log.Info("Run without callback test completed")
 	})
 
-	t.Run("Run with nil memory", func(t *testing.T) {
-		var chunkReceived bool
-
-		reducer := &Reducer{
-			config: &Config{
-				Memory: nil, // 故意设置为nil
-				callback: func(config *Config, memory *coordinator_legacy.PromptContextProvider, chunk chunkmaker.Chunk) error {
-					chunkReceived = true
-					if memory == nil {
-						t.Error("Memory should be initialized automatically")
-					}
-					return nil
-				},
-			},
-			input: createMockChunkMaker([]string{"test chunk"}),
-		}
-
-		err := reducer.Run()
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		if !chunkReceived {
-			t.Error("Chunk should have been received")
-		}
-
-		log.Info("Run with nil memory test completed")
-	})
 }
 
 // Mock ChunkMaker for testing
@@ -1533,7 +1467,7 @@ Line 10 wraps everything up nicely`
 			WithSeparatorTrigger("\n"), // 换行符触发
 			WithTimeTriggerInterval(50*time.Millisecond), // 时间触发
 			WithChunkSize(40), // 很小的chunk size，应该覆盖所有其他选项
-			WithReducerCallback(func(config *Config, memory *coordinator_legacy.PromptContextProvider, chunk chunkmaker.Chunk) error {
+			WithReducerCallback(func(config *Config, memory any, chunk chunkmaker.Chunk) error {
 				mu.Lock()
 				chunks = append(chunks, string(chunk.Data()))
 				mu.Unlock()
@@ -1586,7 +1520,7 @@ Line 10 wraps everything up nicely`
 		reducer, err := NewReducerFromString(binaryLikeData,
 			WithLines(3),
 			WithChunkSize(25), // 小chunk size
-			WithReducerCallback(func(config *Config, memory *coordinator_legacy.PromptContextProvider, chunk chunkmaker.Chunk) error {
+			WithReducerCallback(func(config *Config, memory any, chunk chunkmaker.Chunk) error {
 				mu.Lock()
 				chunks = append(chunks, string(chunk.Data()))
 				mu.Unlock()
@@ -1634,7 +1568,7 @@ func TestEnableLineNumber(t *testing.T) {
 
 		reducer, err := NewReducerFromString(testData,
 			WithEnableLineNumber(true),
-			WithReducerCallback(func(config *Config, memory *coordinator_legacy.PromptContextProvider, chunk chunkmaker.Chunk) error {
+			WithReducerCallback(func(config *Config, memory any, chunk chunkmaker.Chunk) error {
 				mu.Lock()
 				chunks = append(chunks, string(chunk.Data()))
 				mu.Unlock()
@@ -1681,7 +1615,7 @@ func TestEnableLineNumber(t *testing.T) {
 		reducer, err := NewReducerFromString(testData,
 			WithEnableLineNumber(true),
 			WithChunkSize(20), // 很小的chunk size，会强制分割
-			WithReducerCallback(func(config *Config, memory *coordinator_legacy.PromptContextProvider, chunk chunkmaker.Chunk) error {
+			WithReducerCallback(func(config *Config, memory any, chunk chunkmaker.Chunk) error {
 				mu.Lock()
 				chunks = append(chunks, string(chunk.Data()))
 				mu.Unlock()
@@ -1730,7 +1664,7 @@ func TestEnableLineNumber(t *testing.T) {
 		reducer, err := NewReducerFromString(testData,
 			WithEnableLineNumber(true),
 			WithLines(2), // 2行per chunk
-			WithReducerCallback(func(config *Config, memory *coordinator_legacy.PromptContextProvider, chunk chunkmaker.Chunk) error {
+			WithReducerCallback(func(config *Config, memory any, chunk chunkmaker.Chunk) error {
 				mu.Lock()
 				chunks = append(chunks, string(chunk.Data()))
 				mu.Unlock()
@@ -1785,7 +1719,7 @@ func TestEnableLineNumber(t *testing.T) {
 			WithEnableLineNumber(true),
 			WithLines(2),      // 2行per chunk
 			WithChunkSize(50), // 小的chunk size，应该会分割长行
-			WithReducerCallback(func(config *Config, memory *coordinator_legacy.PromptContextProvider, chunk chunkmaker.Chunk) error {
+			WithReducerCallback(func(config *Config, memory any, chunk chunkmaker.Chunk) error {
 				mu.Lock()
 				chunks = append(chunks, string(chunk.Data()))
 				mu.Unlock()
@@ -1847,7 +1781,7 @@ func TestEnableLineNumber(t *testing.T) {
 
 		reducer, err := NewReducerFromFile(tmpFile.Name(),
 			WithEnableLineNumber(true),
-			WithReducerCallback(func(config *Config, memory *coordinator_legacy.PromptContextProvider, chunk chunkmaker.Chunk) error {
+			WithReducerCallback(func(config *Config, memory any, chunk chunkmaker.Chunk) error {
 				mu.Lock()
 				chunks = append(chunks, string(chunk.Data()))
 				mu.Unlock()
@@ -1913,7 +1847,7 @@ func TestEnableLineNumber(t *testing.T) {
 				var mu sync.Mutex
 
 				reducer, err := NewReducerFromString(testContent, append(tt.opts,
-					WithReducerCallback(func(config *Config, memory *coordinator_legacy.PromptContextProvider, chunk chunkmaker.Chunk) error {
+					WithReducerCallback(func(config *Config, memory any, chunk chunkmaker.Chunk) error {
 						mu.Lock()
 						chunks = append(chunks, string(chunk.Data()))
 						mu.Unlock()
@@ -1967,7 +1901,7 @@ func TestEnableLineNumber(t *testing.T) {
 
 		reducer, err := NewReducerFromString(testData,
 			WithEnableLineNumber(false), // 显式禁用
-			WithReducerCallback(func(config *Config, memory *coordinator_legacy.PromptContextProvider, chunk chunkmaker.Chunk) error {
+			WithReducerCallback(func(config *Config, memory any, chunk chunkmaker.Chunk) error {
 				mu.Lock()
 				chunks = append(chunks, string(chunk.Data()))
 				mu.Unlock()
@@ -2018,7 +1952,7 @@ func TestDumpWithOverlap(t *testing.T) {
 
 		reducer, err := NewReducerFromString(testData,
 			WithChunkSize(100), // Small chunk size to force splitting
-			WithReducerCallback(func(config *Config, memory *coordinator_legacy.PromptContextProvider, chunk chunkmaker.Chunk) error {
+			WithReducerCallback(func(config *Config, memory any, chunk chunkmaker.Chunk) error {
 				mu.Lock()
 				chunks = append(chunks, chunk)
 				mu.Unlock()
@@ -2082,7 +2016,7 @@ func TestDumpWithOverlap(t *testing.T) {
 
 		reducer, err := NewReducerFromString(testData,
 			WithChunkSize(100),
-			WithReducerCallback(func(config *Config, memory *coordinator_legacy.PromptContextProvider, chunk chunkmaker.Chunk) error {
+			WithReducerCallback(func(config *Config, memory any, chunk chunkmaker.Chunk) error {
 				mu.Lock()
 				chunks = append(chunks, chunk)
 				mu.Unlock()
@@ -2122,7 +2056,7 @@ func TestDumpWithOverlap(t *testing.T) {
 		reducer, err := NewReducerFromString("line1\nline2\nline3\nline4\nline5\nline6\nline7\nline8\n",
 			WithEnableLineNumber(true),
 			WithChunkSize(30), // Small enough to split numbered lines
-			WithReducerCallback(func(config *Config, memory *coordinator_legacy.PromptContextProvider, chunk chunkmaker.Chunk) error {
+			WithReducerCallback(func(config *Config, memory any, chunk chunkmaker.Chunk) error {
 				mu.Lock()
 				chunks = append(chunks, chunk)
 				mu.Unlock()

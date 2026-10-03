@@ -4,62 +4,17 @@ import (
 	"context"
 	"time"
 
-	"github.com/yaklang/yaklang/common/ai/aid/coordinator_legacy"
 	"github.com/yaklang/yaklang/common/chunkmaker"
 	"github.com/yaklang/yaklang/common/utils"
 )
 
-/*
-Mermaid diagram for Reducer:
+// ReducerCallbackType keeps memory as a compatibility placeholder, always nil.
+type ReducerCallbackType func(config *Config, memory any, chunk chunkmaker.Chunk) error
 
-graph TD
-  A[用户输入/触发事件] --> B[Reducer 执行器]
-  C[初始状态/上次状态] --> B
-
-  B --> D{执行处理逻辑}
-  D --> E[生成执行结果]
-
-  E --> F{结果分发}
-  F --> G[用户输出部分]
-  F --> H[状态更新部分]
-
-  G --> I[返回给用户]
-  H --> J[更新系统状态]
-  J --> K[状态持久化存储]
-  K --> C
-
-  subgraph "Reducer 核心"
-      B
-      D
-      E
-  end
-
-  subgraph "状态管理"
-      C
-      H
-      J
-      K
-  end
-
-  subgraph "用户交互"
-      A
-      G
-      I
-  end
-
-  style B fill:#e1f5fe
-  style F fill:#f3e5f5
-  style K fill:#e8f5e8
-*/
-
-type ReducerCallbackType func(config *Config, memory *coordinator_legacy.PromptContextProvider, chunk chunkmaker.Chunk) error
-
+// Config controls chunking and callbacks. Processing state belongs to the caller.
 type Config struct {
 	ctx    context.Context
 	cancel context.CancelFunc
-
-	// save status in timeline and memory
-	Memory *coordinator_legacy.PromptContextProvider
 
 	// time trigger mean chunk trigger interval, if set to 0, it will not trigger by time.
 	TimeTriggerInterval time.Duration
@@ -79,7 +34,7 @@ type Config struct {
 
 	// Reducer Worker Callback
 	callback       ReducerCallbackType
-	finishCallback func(config *Config, memory *coordinator_legacy.PromptContextProvider) error
+	finishCallback func(config *Config, memory any) error
 }
 
 type Option func(*Config)
@@ -140,7 +95,7 @@ func WithContext(ctx context.Context) Option {
 
 // WithReducerCallback 设置 chunk 处理回调（导出名为 aireducer.callback / aireducer.reducerCallback）
 // 参数:
-//   - callback: 回调函数，参数为 (config, memory, chunk)
+//   - callback: 回调函数，参数为 (config, memory, chunk)，memory 始终为 nil，累计状态由调用方保存
 //
 // 返回值:
 //   - 切分可选项
@@ -168,7 +123,7 @@ func WithReducerCallback(callback ReducerCallbackType) Option {
 // ```
 func WithSimpleCallback(callback func(chunk chunkmaker.Chunk)) Option {
 	return func(c *Config) {
-		c.callback = func(config *Config, memory *coordinator_legacy.PromptContextProvider, chunk chunkmaker.Chunk) (ret error) {
+		c.callback = func(config *Config, _ any, chunk chunkmaker.Chunk) (ret error) {
 			defer func() {
 				if err := recover(); err != nil {
 					ret = utils.Error(err)
@@ -180,29 +135,17 @@ func WithSimpleCallback(callback func(chunk chunkmaker.Chunk)) Option {
 	}
 }
 
-func WithFinishCallback(callback func(config *Config, memory *coordinator_legacy.PromptContextProvider) error) Option {
+// WithFinishCallback keeps memory as a compatibility placeholder, always nil.
+func WithFinishCallback(callback func(config *Config, memory any) error) Option {
 	return func(c *Config) {
 		c.finishCallback = callback
 	}
 }
 
-// WithMemory 设置 reducer 使用的记忆/上下文提供者（导出名为 aireducer.memory）
-// 参数:
-//   - memory: 上下文提供者对象
-//
-// 返回值:
-//   - 切分可选项
-//
-// Example:
-// ```
-// // memory 通常由 AI 相关流程提供（示意性示例）
-// opt = aireducer.memory(memory)
-// println(opt)
-// ```
-func WithMemory(memory *coordinator_legacy.PromptContextProvider) Option {
-	return func(c *Config) {
-		c.Memory = memory
-	}
+// WithMemory preserves aireducer.memory calls without retaining the supplied value.
+// Deprecated: this compatibility option has no effect.
+func WithMemory(_ any) Option {
+	return func(*Config) {}
 }
 
 // WithChunkSize 设置每个 chunk 的最大字节数（导出名为 aireducer.chunkSize）
@@ -314,7 +257,6 @@ func WithEnableLineNumber(enable bool) Option {
 
 func NewConfig(opts ...Option) *Config {
 	c := &Config{
-		Memory:              coordinator_legacy.GetDefaultContextProvider(),
 		TimeTriggerInterval: 0,
 	}
 	for _, opt := range opts {
