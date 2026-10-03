@@ -6,7 +6,6 @@ import (
 	"strings"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon/promptloader"
-	"github.com/yaklang/yaklang/common/ai/aid/coordinator_legacy"
 	"github.com/yaklang/yaklang/common/aireducer"
 	"github.com/yaklang/yaklang/common/chunkmaker"
 	"github.com/yaklang/yaklang/common/go-funk"
@@ -131,7 +130,7 @@ func AnalyzeAudioFile(audio string, opts ...any) (<-chan *AudioAnalysisResult, e
 	legacyData := ""
 
 	reducerOpts := append(analyzeConfig.ReducerOptions(),
-		aireducer.WithReducerCallback(func(config *aireducer.Config, memory *coordinator_legacy.PromptContextProvider, chunk chunkmaker.Chunk) error {
+		aireducer.WithReducerCallback(func(config *aireducer.Config, _ any, chunk chunkmaker.Chunk) error {
 			srtData := string(chunk.Data())
 			index := strings.LastIndex(srtData, "\n\n")
 			if index != -1 {
@@ -150,7 +149,7 @@ func AnalyzeAudioFile(audio string, opts ...any) (<-chan *AudioAnalysisResult, e
 			analyzeConfig.AnalyzeLog("audio analysis processed chunk %d, cumulative summary length: %d, timeline segments: %d", processedCount, len(cumulativeSummary), len(allResult))
 			return nil
 		}),
-		aireducer.WithFinishCallback(func(config *aireducer.Config, memory *coordinator_legacy.PromptContextProvider) error {
+		aireducer.WithFinishCallback(func(config *aireducer.Config, _ any) error {
 			if !funk.IsEmpty(legacyData) {
 				err := analyze(legacyData)
 				if err != nil {

@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"github.com/davecgh/go-spew/spew"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon/promptloader"
-	"github.com/yaklang/yaklang/common/ai/aid/coordinator_legacy"
 	"io"
 	"sort"
 	"strconv"
@@ -120,7 +119,7 @@ func (r *ReAct) CompressLongTextWithDestination(
 		aireducer.WithContext(ctx),
 		aireducer.WithEnableLineNumber(true),         // 自动添加行号，格式：N | content
 		aireducer.WithChunkSize(int64(maxChunkSize)), // 块大小硬限制
-		aireducer.WithReducerCallback(func(config *aireducer.Config, memory *coordinator_legacy.PromptContextProvider, chunk chunkmaker.Chunk) error {
+		aireducer.WithReducerCallback(func(config *aireducer.Config, _ any, chunk chunkmaker.Chunk) error {
 			currentBlockSize++
 			if currentBlockSize > maxChunks {
 				isOversize = true

@@ -23,7 +23,7 @@ return cod.Run()
 
 [aireact/coordinator_legacy.go](../aireact/coordinator_legacy.go) 暂存旧 ReAct 宿主适配，供后续清理；当前 detached、恢复、PLAN-only 路由均不调用它。旧执行机制归本目录所有。公共任务观测接收 `CollectPlanExecutionSnapshots` 的结果，不依赖具体旧任务类型。
 
-`aiforge`、`aireducer`、`yak/aiagent`、部分 gRPC 和扫描入口目前仍显式调用旧引擎。它们的 Go import 已改为 `coordinator_legacy`；Yak 导出名、前端事件、数据库结构没有随目录迁移改名。
+`aiforge`、`yak/aiagent` 和扫描入口目前仍显式调用旧引擎，运行观测也仍读取旧实例。它们的 Go import 已改为 `coordinator_legacy`；Yak 导出名、前端事件、数据库结构没有随目录迁移改名。`aireducer` 已移除旧上下文依赖，仅负责分块和处理回调。旧 gRPC `StartAITask`、`StartAITriage` 已停用，保留协议签名并立即返回过时错误，执行统一使用 `StartAIReAct`。
 
 未来移除旧版时，需要先迁移这些显式调用方和旧历史数据恢复入口，再删除宿主旧适配、`reactinit` 中旧循环的注册和本目录。不能只删除目录而保留调用方。新增 PLAN 行为应实现于兄弟目录 `coordinator`，不往公共层添加旧版兼容别名。
 

@@ -7,7 +7,6 @@ import (
 	"os"
 	"strings"
 
-	"github.com/yaklang/yaklang/common/ai/aid/coordinator_legacy"
 	"github.com/yaklang/yaklang/common/aireducer"
 	"github.com/yaklang/yaklang/common/chunkmaker"
 	"github.com/yaklang/yaklang/common/log"
@@ -72,7 +71,7 @@ func AnalyzeReader(rawReader io.Reader, opts ...any) (<-chan AnalysisResult, err
 	indexedChannel := chanx.NewUnlimitedChan[chunkmaker.Chunk](analyzeConfig.Ctx, 100)
 	count := 0
 	ar, err := aireducer.NewReducerEx(cm,
-		aireducer.WithReducerCallback(func(config *aireducer.Config, memory *coordinator_legacy.PromptContextProvider, chunk chunkmaker.Chunk) error {
+		aireducer.WithReducerCallback(func(config *aireducer.Config, _ any, chunk chunkmaker.Chunk) error {
 			analyzeConfig.AnalyzeLog("chunk index[%d] size:%v ", count, utils.ByteSize(uint64(chunk.BytesSize())))
 			indexedChannel.SafeFeed(chunk)
 			count++

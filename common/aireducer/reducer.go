@@ -10,7 +10,6 @@ import (
 	"strings"
 
 	"github.com/davecgh/go-spew/spew"
-	"github.com/yaklang/yaklang/common/ai/aid/coordinator_legacy"
 	"github.com/yaklang/yaklang/common/chunkmaker"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/chanx"
@@ -22,21 +21,18 @@ type Reducer struct {
 }
 
 func (r *Reducer) Run() error {
-	if r.config.Memory == nil {
-		r.config.Memory = coordinator_legacy.GetDefaultContextProvider()
-	}
 	ch := r.input.OutputChannel()
 	for {
 		select {
 		case chunk, ok := <-ch:
 			if !ok {
 				if r.config.finishCallback != nil {
-					return r.config.finishCallback(r.config, r.config.Memory)
+					return r.config.finishCallback(r.config, nil)
 				}
 				return nil
 			}
 			if r.config.callback != nil {
-				err := r.config.callback(r.config, r.config.Memory, chunk)
+				err := r.config.callback(r.config, nil, chunk)
 				if err != nil {
 					return fmt.Errorf("reducer callback error: %w", err)
 				}
