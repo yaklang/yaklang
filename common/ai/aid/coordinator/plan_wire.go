@@ -360,7 +360,7 @@ func resetCoordinatorRecovery(s *Snapshot, reference string) error {
 	}
 	for key := range affected {
 		a := s.Attempts[key]
-		a.ID, a.State, a.Seen, a.Result = 0, Pending, false, Result{}
+		a.ID, a.State, a.Result = 0, Pending, Result{}
 		a.ReviewReason = "User requested recovery from this task."
 		s.Attempts[key] = a
 	}

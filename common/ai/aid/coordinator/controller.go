@@ -12,6 +12,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 )
 
 const Name = "coordinator"
@@ -64,7 +66,6 @@ type Attempt struct {
 	PlanVersion  uint64 `json:"plan_version"`
 	State        State  `json:"state"`
 	Result       Result `json:"result"`
-	Seen         bool   `json:"seen"`
 	ReviewReason string `json:"review_reason,omitempty"`
 }
 
@@ -107,6 +108,16 @@ type Controller struct {
 	concurrency int
 	reviewing   bool
 	closed      bool
+	// Notification cursor is runtime-only; it never claims the model read a result.
+	eventRevision uint64
+	discoveries   map[string]uint64
+	// Owned Timeline sink; initialized by NewLoop, never propagated to workers.
+	resultConfig aicommon.AICallerConfigIf
+	resultErr    error
+	// Guard unchanged observations against reinsertion after Evidence eviction.
+	// Accessed under publishMu; stores hashes only, never duplicate result bodies.
+	resultHashes   map[string][32]byte
+	pendingResults map[string]taskResultRecord
 }
 
 func New(ctx context.Context, host Host, concurrency int) *Controller {
@@ -171,6 +182,10 @@ func validate(p *Plan) error {
 
 func (c *Controller) notifyLocked() {
 	c.state.Revision++
+}
+
+func (c *Controller) signalLocked() {
+	c.eventRevision++
 	close(c.changed)
 	c.changed = make(chan struct{})
 }
@@ -184,14 +199,28 @@ func (c *Controller) publish() {
 		return
 	}
 	s := clone(c.state)
+	results := clone(c.pendingResults)
 	c.mu.Unlock()
 	if s.Revision <= c.published {
 		return
 	}
+	if c.resultConfig != nil {
+		err := persistTaskResults(c.resultConfig, results, c.resultHashes)
+		c.mu.Lock()
+		c.resultErr = err
+		if err == nil {
+			c.clearPublishedResultsLocked(results)
+		}
+		c.mu.Unlock()
+	}
 	if c.host != nil {
 		c.host.Changed(s)
 	}
+	// Publish facts and the compatible UI snapshot before waking any waiter.
+	c.mu.Lock()
 	c.published = s.Revision
+	c.signalLocked()
+	c.mu.Unlock()
 }
 
 func (c *Controller) Snapshot() Snapshot { c.mu.Lock(); defer c.mu.Unlock(); return clone(c.state) }
@@ -231,7 +260,7 @@ func (s Snapshot) PromptStatus() string {
 				fmt.Fprintf(&b, "## %s\n", heading)
 				written = true
 			}
-			fmt.Fprintf(&b, "- %s %q [%s]: %s; attempt=%d; observed=%v\n", t.Index, t.Name, t.ID, a.State, a.ID, a.Seen)
+			fmt.Fprintf(&b, "- %s %q [%s]: %s; attempt=%d\n", t.Index, t.Name, t.ID, a.State, a.ID)
 			if a.State == Pending {
 				var blocked []string
 				for _, dep := range t.DependsOn {
@@ -253,6 +282,9 @@ func (s Snapshot) PromptStatus() string {
 func (c *Controller) checkLocked() error {
 	if c.closed {
 		return fmt.Errorf("coordinator is closed")
+	}
+	if c.resultErr != nil {
+		return fmt.Errorf("task Timeline result publication failed: %w", c.resultErr)
 	}
 	return c.ctx.Err()
 }
@@ -276,7 +308,7 @@ func (c *Controller) edit(ctx context.Context, data, document string, version ui
 	}
 	if c.reviewing || (create && c.state.Draft != nil) || (!create && (version != c.state.DraftVersion || c.state.Draft == nil)) {
 		c.mu.Unlock()
-		return 0, fmt.Errorf("draft changed or is under review; inspect current plan")
+		return 0, fmt.Errorf("draft changed or is under review; read the current plan context")
 	}
 	base := c.state.DraftVersion
 	c.mu.Unlock()
@@ -402,7 +434,6 @@ func (c *Controller) adoptLocked(p *Plan, version uint64) error {
 					a.State = Pending
 					a.ID = 0
 					a.Result = Result{}
-					a.Seen = false
 					retained[t.ID] = a
 					changed = true
 					break
@@ -508,7 +539,6 @@ func (c *Controller) startLocked(ids []string) ([]Attempt, []context.Context) {
 		a.ID = c.state.NextAttempt
 		a.PlanVersion = c.state.ApprovedVersion
 		a.State = Running
-		a.Seen = false
 		a.Result = Result{}
 		a.ReviewReason = ""
 		ctx, cancel := context.WithCancel(c.ctx)
@@ -548,7 +578,6 @@ func (c *Controller) execute(ctx context.Context, a Attempt) {
 	}
 	delete(c.workers, a.Task.ID)
 	current.Result = result
-	current.Seen = false
 	if current.State == Cancelling || ctx.Err() != nil {
 		current.State = Cancelled
 		current.Result.Error = "task cancelled"
@@ -564,6 +593,7 @@ func (c *Controller) execute(ctx context.Context, a Attempt) {
 		current.State = AwaitingReview
 	}
 	c.state.Attempts[a.Task.ID] = current
+	c.queueResultLocked(current)
 	c.notifyLocked()
 	c.mu.Unlock()
 	c.publish()
@@ -571,14 +601,14 @@ func (c *Controller) execute(ctx context.Context, a Attempt) {
 
 func (c *Controller) InspectTasks(ids []string) ([]Attempt, error) {
 	c.mu.Lock()
-	out, err := c.inspectLocked(ids, true)
+	out, err := c.inspectLocked(ids)
 	c.mu.Unlock()
 	if err == nil {
 		c.publish()
 	}
 	return out, err
 }
-func (c *Controller) inspectLocked(ids []string, mark bool) ([]Attempt, error) {
+func (c *Controller) inspectLocked(ids []string) ([]Attempt, error) {
 	if err := c.checkLocked(); err != nil {
 		return nil, err
 	}
@@ -593,18 +623,9 @@ func (c *Controller) inspectLocked(ids []string, mark bool) ([]Attempt, error) {
 		}
 	}
 	out := make([]Attempt, 0, len(ids))
-	updated := false
 	for _, id := range ids {
 		a := c.state.Attempts[id]
-		if mark && a.ID > 0 && a.State != Running && a.State != Cancelling && !a.Seen {
-			a.Seen = true
-			c.state.Attempts[id] = a
-			updated = true
-		}
 		out = append(out, clone(a))
-	}
-	if updated {
-		c.notifyLocked()
 	}
 	return out, nil
 }
@@ -628,8 +649,9 @@ func (c *Controller) WaitTasksMode(ctx context.Context, ids []string, timeout ti
 		return WaitResult{}, fmt.Errorf("wait mode must be any or all")
 	}
 	c.mu.Lock()
-	initial, err := c.inspectLocked(ids, false)
+	initial, err := c.inspectLocked(ids)
 	userRevision, planVersion := c.state.UserRevision, c.state.ApprovedVersion
+	discoveryRevision := c.eventRevision
 	bound := make(map[string]uint64)
 	for _, a := range initial {
 		bound[a.Task.ID] = a.ID
@@ -651,18 +673,26 @@ func (c *Controller) WaitTasksMode(ctx context.Context, ids []string, timeout ti
 	defer timer.Stop()
 	for {
 		c.mu.Lock()
-		tasks, err := c.inspectLocked(ids, false)
+		tasks, err := c.inspectLocked(ids)
 		interrupted := c.state.UserRevision != userRevision || c.state.ApprovedVersion != planVersion
+		discovered := false
 		for id, attempt := range bound {
+			if c.discoveries[id] > discoveryRevision {
+				discovered = true
+			}
 			if c.state.Attempts[id].ID != attempt {
 				interrupted = true
 			}
 		}
-		if err == nil && interrupted {
-			tasks, _ = c.inspectLocked(ids, true)
+		if err == nil && (interrupted || discovered) {
+			tasks, _ = c.inspectLocked(ids)
 			c.mu.Unlock()
 			c.publish()
-			return WaitResult{"changed", tasks}, nil
+			reason := "changed"
+			if discovered && !interrupted {
+				reason = "discovery"
+			}
+			return WaitResult{reason, tasks}, nil
 		}
 		changed := c.changed
 		if err != nil {
@@ -674,21 +704,21 @@ func (c *Controller) WaitTasksMode(ctx context.Context, ids []string, timeout ti
 			return WaitResult{}, fmt.Errorf("no approved tasks to wait for")
 		}
 		settled := true
-		unseen := false
+		hasResult := false
 		for _, a := range tasks {
 			if a.State == Running || a.State == Cancelling || a.State == Pending {
 				settled = false
 			}
-			if a.ID > 0 && !a.Seen && a.State != Running && a.State != Cancelling {
-				unseen = true
+			if a.ID > 0 && a.State != Running && a.State != Cancelling {
+				hasResult = true
 			}
 		}
-		if (unseen && mode == "any") || settled {
+		if (hasResult && mode == "any") || settled {
 			reason := "all_settled"
-			if unseen && mode == "any" {
+			if hasResult && mode == "any" {
 				reason = "new_result"
 			}
-			tasks, _ = c.inspectLocked(ids, true)
+			tasks, _ = c.inspectLocked(ids)
 			c.mu.Unlock()
 			c.publish()
 			return WaitResult{reason, tasks}, nil
@@ -704,17 +734,8 @@ func (c *Controller) WaitTasksMode(ctx context.Context, ids []string, timeout ti
 			return WaitResult{"timeout", tasks}, err
 		case <-changed:
 			if mode == "all" {
-				c.mu.Lock()
-				interrupted := c.state.UserRevision != userRevision || c.state.ApprovedVersion != planVersion
-				for id, attempt := range bound {
-					if c.state.Attempts[id].ID != attempt {
-						interrupted = true
-					}
-				}
-				c.mu.Unlock()
-				if !interrupted {
-					continue
-				}
+				// Re-evaluate scoped discoveries, controls and settlement above.
+				continue
 			}
 			// Any plan/control/user change yields ownership back to the planner.
 			tasks, err = c.InspectTasks(ids)
@@ -736,9 +757,9 @@ func (c *Controller) ReviewTask(id string, attemptID uint64, decision, reason st
 		return err
 	}
 	a, ok := c.state.Attempts[id]
-	if !ok || a.ID != attemptID || a.State != AwaitingReview || !a.Seen {
+	if !ok || a.ID != attemptID || a.State != AwaitingReview {
 		c.mu.Unlock()
-		return fmt.Errorf("inspect the current awaiting_review attempt before reviewing it")
+		return fmt.Errorf("review requires the current settled awaiting_review attempt")
 	}
 	if decision == "accept" {
 		a.State = Accepted
@@ -747,6 +768,7 @@ func (c *Controller) ReviewTask(id string, attemptID uint64, decision, reason st
 	}
 	a.ReviewReason = reason
 	c.state.Attempts[id] = a
+	c.queueResultLocked(a)
 	c.notifyLocked()
 	c.mu.Unlock()
 	c.publish()
@@ -801,7 +823,6 @@ func (c *Controller) RetryTask(id string, attemptID uint64, reason string) ([]At
 		t.State = Pending
 		t.ID = 0
 		t.Result = Result{}
-		t.Seen = false
 		t.ReviewReason = reason
 		c.state.Attempts[tid] = t
 	}
@@ -843,6 +864,7 @@ func (c *Controller) CancelTasks(ids []string, reason string) error {
 		}
 		a.ReviewReason = reason
 		c.state.Attempts[id] = a
+		c.queueResultLocked(a)
 	}
 	c.notifyLocked()
 	c.mu.Unlock()
@@ -929,8 +951,8 @@ func (c *Controller) canFinishLocked() error {
 		return fmt.Errorf("plan approval or active workers remain")
 	}
 	for id, a := range c.state.Attempts {
-		if a.State != Accepted || !a.Seen {
-			return fmt.Errorf("task %q has not been inspected and accepted (%s)", id, a.State)
+		if a.State != Accepted {
+			return fmt.Errorf("task %q has not been reviewed and accepted (%s)", id, a.State)
 		}
 	}
 	return nil
@@ -944,6 +966,7 @@ func (c *Controller) Close() {
 	}
 	c.closed = true
 	c.notifyLocked()
+	c.signalLocked()
 	c.mu.Unlock()
 	c.cancel()
 }
@@ -981,7 +1004,7 @@ func (c *Controller) Restore(s Snapshot) error {
 		if a.PlanVersion == 0 || a.PlanVersion > s.ApprovedVersion || (a.State != Pending && a.State != Cancelled && a.ID == 0) {
 			return fmt.Errorf("invalid attempt identity/version for %q", t.ID)
 		}
-		if s.Finished && (a.State != Accepted || !a.Seen || s.DraftVersion != s.ApprovedVersion) {
+		if s.Finished && (a.State != Accepted || s.DraftVersion != s.ApprovedVersion) {
 			return fmt.Errorf("finished snapshot contains unfinished work")
 		}
 		switch a.State {
@@ -991,8 +1014,7 @@ func (c *Controller) Restore(s Snapshot) error {
 		}
 		if a.State == Running || a.State == Cancelling {
 			a.State = Failed
-			a.Result.Error = "execution interrupted; inspect and retry explicitly"
-			a.Seen = false
+			a.Result.Error = "execution interrupted; read Timeline and retry explicitly"
 			s.Attempts[t.ID] = a
 		}
 	}
@@ -1009,6 +1031,9 @@ func (c *Controller) Restore(s Snapshot) error {
 		return fmt.Errorf("restore requires an empty controller")
 	}
 	c.state = clone(s)
+	for _, a := range c.state.Attempts {
+		c.queueResultLocked(a)
+	}
 	c.notifyLocked()
 	c.mu.Unlock()
 	c.publish()

@@ -54,7 +54,7 @@ func testStartAIReActDetachedApproval(t *testing.T, interruptPlanning, native bo
 	base := newScheduleTestServer(t)
 	var workers atomic.Int32
 	var workerCalls sync.Map
-	pattern := regexp.MustCompile(`\[([^\]]+)\]: ([a-z_]+); attempt=(\d+); observed=(true|false)`)
+	pattern := regexp.MustCompile(`\[([^\]]+)\]: ([a-z_]+); attempt=(\d+)`)
 	srv := &detachedApprovalTestServer{Server: base, options: []aicommon.ConfigOption{
 		aicommon.WithEnableFunctionCallMode(native),
 		aicommon.WithWorkdir(t.TempDir()), aicommon.WithDisableCreateDBRuntime(true),
@@ -116,9 +116,6 @@ func testStartAIReActDetachedApproval(t *testing.T, interruptPlanning, native bo
 			matches := pattern.FindAllStringSubmatch(prompt, -1)
 			for _, m := range matches {
 				if m[2] == "awaiting_review" {
-					if m[4] == "false" {
-						return respond("inspect_tasks", map[string]any{})
-					}
 					attempt, _ := strconv.Atoi(m[3])
 					return respond("review_task", map[string]any{"task_id": m[1], "attempt_id": attempt, "decision": "accept", "reason": "Verified the result"})
 				}

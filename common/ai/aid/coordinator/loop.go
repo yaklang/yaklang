@@ -37,7 +37,7 @@ func controller(loop *reactloops.ReActLoop) *Controller {
 	return c
 }
 
-var ActionNames = []string{"create_plan", "modify_plan", "inspect_plan", "submit_plan", "start_tasks", "inspect_tasks", "wait_tasks", "review_task", "retry_task", "cancel_tasks", "write_report"}
+var ActionNames = []string{"create_plan", "modify_plan", "submit_plan", "start_tasks", "wait_tasks", "review_task", "retry_task", "cancel_tasks", "write_report"}
 
 // NewLoop uses the main loop's configured action protocol and Timeline assembly.
 // The tool guard is per-loop, so execution workers retain their own tool policy.
@@ -105,12 +105,16 @@ func NewLoop(r aicommon.AIInvokeRuntime, opts ...reactloops.ReActLoopOption) (*r
 	if controller(loop) == nil {
 		return nil, fmt.Errorf("coordinator requires an owning Session or WithController")
 	}
+	if err := controller(loop).attachResultTimeline(loop.GetConfig()); err != nil {
+		return nil, err
+	}
 
 	// Preserve the existing TODO/goal/subagent completion gates as well.
 	reactloops.WithPlanStatusProvider(func() string {
 		c := controller(loop)
-		s := c.Snapshot()
+		s, revision := c.contextSnapshot()
 		loop.Set("coordinator_observed_user_revision", s.UserRevision)
+		loop.Set("coordinator_event_revision", revision)
 		return s.PromptStatus()
 	})(loop)
 	if err := configureCoordinatorFinish(loop); err != nil {
@@ -119,6 +123,7 @@ func NewLoop(r aicommon.AIInvokeRuntime, opts ...reactloops.ReActLoopOption) (*r
 	if err := configureCoordinatorAnswer(loop); err != nil {
 		return nil, err
 	}
+	configureAutomaticWait(loop)
 	return loop, nil
 }
 

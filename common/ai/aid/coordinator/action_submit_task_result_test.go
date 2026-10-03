@@ -27,9 +27,9 @@ func TestCoordinatorActionSubmitTaskResult(t *testing.T) {
 			f.invoke("submit_task_result", map[string]any{"summary": "second result"}, false)
 			f.cfg.Timeline.FreezeAll()
 			semi := aicommon.BuildPromptFrozenOpenMaterials(f.cfg).SessionEvidenceSemiDynamic
-			require.Contains(t, semi, "confirmed source")
-			require.Contains(t, semi, "second result")
-			require.Contains(t, semi, "source.1")
+			require.NotContains(t, semi, "confirmed source", "only Controller settlement publishes the canonical result")
+			require.NotContains(t, semi, "second result")
+			require.Contains(t, semi, `"action":"submit_task_result"`)
 		})
 	}
 }

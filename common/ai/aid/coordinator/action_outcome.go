@@ -21,14 +21,9 @@ func recordActionOutcome(loop *reactloops.ReActLoop, a *aicommon.Action, op *rea
 		}
 	}
 	// 不重复保存计划正文、任务书或报告正文；保留完整结果和实际产物引用。
-	observations := result
+	resultReferences := result
 	if actionErr == nil {
-		var err error
-		observations, err = saveTaskObservations(loop, result)
-		if err != nil {
-			op.Fail(fmt.Errorf("%s 已处理，但任务观测保存失败：%w；请核对状态，勿盲目重试", name, err))
-			return false
-		}
+		resultReferences = taskResultReferences(loop, result)
 	}
 	outcome := struct {
 		Action     string            `json:"action"`
@@ -38,8 +33,8 @@ func recordActionOutcome(loop *reactloops.ReActLoop, a *aicommon.Action, op *rea
 		Worker     any               `json:"worker,omitempty"`
 		Result     any               `json:"result,omitempty"`
 		Error      string            `json:"error,omitempty"`
-	}{Action: name, Status: "completed", Parameters: params, Result: observations}
-	if c := controller(loop); c != nil && name != "inspect_plan" && name != "submit_plan" {
+	}{Action: name, Status: "completed", Parameters: params, Result: resultReferences}
+	if c := controller(loop); c != nil && name != "submit_plan" {
 		receipt := c.planReceipt()
 		outcome.Plan = map[string]uint64{"draft_version": receipt.DraftVersion, "approved_version": receipt.ApprovedVersion}
 	}
@@ -59,7 +54,7 @@ func recordActionOutcome(loop *reactloops.ReActLoop, a *aicommon.Action, op *rea
 	// 查询复用固定槽位；有副作用的操作按结果寻址，保留每次版本/验收结论。
 	// 循环共享同一 session，但不同协调实例、任务尝试不会覆盖彼此的记录。
 	scope := string(data)
-	if actionErr == nil && (name == "inspect_plan" || name == "inspect_tasks" || name == "wait_tasks") {
+	if actionErr == nil && name == "wait_tasks" {
 		scope = "latest"
 	}
 	key := fmt.Sprintf("%s:%s:%s", loop.GetConfig().GetRuntimeId(), name, scope)
@@ -75,9 +70,8 @@ func recordActionOutcome(loop *reactloops.ReActLoop, a *aicommon.Action, op *rea
 	return true
 }
 
-// 一个任务尝试一个观测槽位，选择 a、b 或 a+b 不会覆盖其他任务的结果，
-// inspect/wait/start 也不反复复制同一份结果。验收理由另存为不可变动作记录。
-func saveTaskObservations(loop *reactloops.ReActLoop, value any) (any, error) {
+// 动作回执只引用结果，不能写入或降级 Controller 发布的最终结果。
+func taskResultReferences(loop *reactloops.ReActLoop, value any) any {
 	var tasks []Attempt
 	var reason string
 	switch v := value.(type) {
@@ -90,27 +84,20 @@ func saveTaskObservations(loop *reactloops.ReActLoop, value any) (any, error) {
 			// 提交结果时 worker 仍在运行；最终状态由 Controller 随后结算。
 			tasks = []Attempt{{Task: Task{ID: ref.TaskID}, ID: ref.AttemptID, PlanVersion: ref.PlanVersion, State: Running, Result: v}}
 		} else {
-			return value, nil
+			return value
 		}
 	default:
-		return value, nil
+		return value
 	}
 	refs := make([]string, 0, len(tasks))
-	for _, task := range taskObservations(tasks) {
-		key := fmt.Sprintf("%s:%s:%d:%d", loop.GetConfig().GetRuntimeId(), task.TaskID, task.PlanVersion, task.AttemptID)
-		digest := sha256.Sum256([]byte(key))
-		id := fmt.Sprintf("coordinator.task.%x", digest[:16])
-		data, err := json.Marshal(task)
-		if err != nil {
-			return nil, err
-		}
-		if _, err := reactloops.SaveSessionEvidence(loop.GetConfig(), id, "任务尝试历史观测（实时状态以 PLAN STATUS 为准）：\n"+string(data)); err != nil {
-			return nil, err
-		}
+	for _, task := range taskResultRecords(tasks) {
+		// Controller alone publishes the canonical result after the worker has
+		// exited and Timeline merge has finished; receipts contain references.
+		id, _ := taskResultEvidence(loop.GetConfig(), task)
 		refs = append(refs, id)
 	}
 	return struct {
-		Reason       string   `json:"reason,omitempty"`
-		Observations []string `json:"observations"`
-	}{reason, refs}, nil
+		Reason           string   `json:"reason,omitempty"`
+		ResultReferences []string `json:"result_refs"`
+	}{reason, refs}
 }

@@ -6,7 +6,7 @@
 - 沿用嵌套计划结构：main_task / main_task_goal / tasks；每个节点使用 subtask_name / subtask_goal / subtask_identifier，子节点放入 sub_subtasks。
 - 父节点用于组织任务，只有叶节点执行。depends_on 明确描述前置关系；列表排列顺序不产生依赖，[] 表示独立任务。
 - 依赖一个任务组，表示等待该组全部叶任务通过验收；任务组的前置条件作用于组内入口叶任务。禁止自身依赖、循环依赖和不存在的引用。
-- 从 SemiDynamic1 的 PLAN DEFINITION / PLAN DOCUMENT 读取完整草案、已批准任务书、文档及 DAG。PLAN STATUS 保存实时状态；inspect_plan 仅核对版本和正文位置，不重复返回计划。
+- 从 SemiDynamic1 的 PLAN DEFINITION / PLAN DOCUMENT 读取完整草案、已批准任务书、文档及 DAG，从 PLAN STATUS 读取当前版本和实时状态。
 - 修改计划使用 modify_plan，携带当前草案版本和完整替换内容；提交并批准之前，执行仍使用原有已批准版本。
 - 修改正在执行的任务书或重试其上游前，先取消受影响任务并等待它们退出；不能把取消请求视为已经停止。
 
@@ -14,7 +14,9 @@
 
 - 同一版本获得批准后自动推进，不再要求用户逐项批准执行或验收结果。
 - start_tasks 只调度已批准且前置任务已通过验收的任务，调用后立即返回。
-- 使用 inspect_tasks 查看结果，使用 wait_tasks 等待一个或多个任务。超时不会取消任务；用户补充或计划变更会唤醒等待。
+- 子任务的新发现、执行结果、失败和取消原因保存在会话共享的 Timeline Open 或 SemiDynamic1 Evidence 中，直接依据证据验收。
+- 没有可调度、待验收或其他需要处理的工作时，系统自动等待仍在执行的子任务；新发现、任务状态变化或用户补充会唤醒下一轮检查，不需要专门调用 wait_tasks。不要反复询问进度、重复答复或重试 finish 来等待。
+- 需要控制等待范围时，可以使用 wait_tasks 等待指定任务；超时不取消任务，重要发现、用户补充或计划变更也会返回协调员处理。
 - 动作的版本回执、结果、拒绝原因和验收依据保存在 Timeline Open 或 SemiDynamic1 的 Evidence 中。feedback 只提供记录位置；动作记录是历史观测，实时任务状态以 PLAN STATUS 为准。
 - 执行结束不等于验收通过。核对实际 Evidence 和 artifacts 后，使用 review_task 接受或拒绝对应 attempt_id；后继任务只有在前置任务被接受后才能开始。
 - 使用 retry_task 重试已停止的任务；上游结果变化会使下游结果失效。使用 cancel_tasks 请求停止任务。
@@ -25,7 +27,7 @@
 - 使用读取、搜索工具进行必要探索，使用 save_evidence 保存会话共享证据，需要真实信息时使用 ask_for_clarification。
 - 业务命令、脚本和业务文件修改交给 pe_task。协调员只执行受限探索和报告写入，不启动其他专注模式、子 Agent 或旧规划循环。
 - 使用 write_report 将完整 Markdown 报告写入 artifacts；directly_answer 用于向用户说明进展，两者都留在当前协调循环。
-- 全部已批准任务通过验收、结果已查看、微观 TODO 已处理，并完成要求的报告后才能 finish。存在未解决的工作时继续推进。
+- 全部已批准任务通过验收、微观 TODO 已处理，并完成要求的报告后才能 finish。子任务仍在执行时不会结束协调循环；存在其他未解决的工作时继续推进。
 
 ## 调用协议
 

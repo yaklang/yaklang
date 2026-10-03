@@ -1,6 +1,6 @@
 # 新版 coordinator 上下文与计划控制 review
 
-本轮本地修改：中文职责说明通过 promptloader 加载；生成计划恢复旧版嵌套字段与 DAG 语义；新增 inspect_plan、原生预设计划与 mocker；将草案和已批准任务书放入 SemiDynamic1 的 PLAN DEFINITION。接口事件和执行状态机继续使用新版 coordinator，不引入旧运行体。
+本轮本地修改：中文职责说明通过 promptloader 加载；生成计划恢复旧版嵌套字段与 DAG 语义；支持原生预设计划与 mocker；将草案和已批准任务书放入 SemiDynamic1 的 PLAN DEFINITION。接口事件和执行状态机继续使用新版 coordinator，不引入旧运行体。
 
 ## 实际上下文顺序
 
@@ -39,7 +39,7 @@ Frozen 中的用户输入、Evidence、最近工具材料经过已有提升机�
 
 新增 `TestCoordinatorPlanningSubmissionSmoke` 专门验证提交前的规划链路，覆盖探索、preset、mocker × function call/text stream，共六个运行组合。模型使用确定性响应，其他模块走真实 Session 和工具/交互通道；探索中的文件观测来自实际 `read_file`，附带计划中的已有 Evidence 则是测试夹具读取本地文件后提供的会话材料。测试显式调用已有 `FreezeAll` 来检验 Open 冻结后的用户输入和 Evidence 提升，不依赖生产默认桶恰好在短任务中到达阈值。
 
-四份主样本捕获同一时点：`inspect_plan` 已完成、即将调用 `submit_plan`。测试随后通过 `plan_review_require` 收到审核事件，向输入通道只提交一次 `continue`，确认计划已批准且保留两项叶任务及依赖；仅规划运行不派发 worker。批准后的 prompt 另行验证 PLAN DOCUMENT、批准版本及派发门闩。预设/mocker 分别独立运行并核对相同的文档、任务结构与依赖；附带计划样本采用 preset 的请求代表两者。
+四份主样本捕获同一时点：计划正文已装载、即将调用 `submit_plan`。测试随后通过 `plan_review_require` 收到审核事件，向输入通道只提交一次 `continue`，确认计划已批准且保留两项叶任务及依赖；仅规划运行不派发 worker。批准后的 prompt 另行验证 PLAN DOCUMENT、批准版本及派发门闩。预设/mocker 分别独立运行并核对相同的文档、任务结构与依赖；附带计划样本采用 preset 的请求代表两者。
 
 设置 `COORDINATOR_CONTEXT_REVIEW_DIR` 后，在 `planning-submission` 子目录输出：
 
@@ -58,8 +58,7 @@ Frozen 中的用户输入、Evidence、最近工具材料经过已有提升机�
 
 | 文件 | 捕获时点 |
 | --- | --- |
-| 01-draft.txt | 草案已装载，尚未 inspect_plan |
-| 02-inspected-draft.txt | inspect_plan 已核对版本；完整草案仍在 SemiDynamic1，尚未提交 |
+| 01-draft.txt | 草案已装载，即将提交 |
 | 03-approved.txt | 同步批准后，尚未派发任务 |
 | 04-awaiting-review.txt | 后继任务已提交结果，协调员已观察，等待验收 |
 | 05-dependent-worker.txt | 后继 worker，含前置 session Evidence |
@@ -94,15 +93,15 @@ Executable leaf DAG (task_id <- prerequisite task_ids):
 主体：source.txt；动作：检查工作区；观测：文件位于当前工作区；控制含义：后续任务可在本地读取。
 ```
 
-同一请求的 Open 中仍有当前用户输入“请核对 source.txt，计划确认一次后执行。”及 inspect_plan/submit_plan 调用记录。PLAN STATUS 在它们之后，微观 TODO 再后。下面保留实际任务 ID：
+同一请求的 Open 中仍有当前用户输入“请核对 source.txt，计划确认一次后执行。”及 submit_plan 调用记录。PLAN STATUS 在它们之后，微观 TODO 再后。下面保留实际任务 ID：
 
 ```text
 # PLAN STATUS
 Draft version: 1; approved version: 1
 ## PLAN 未开始任务
-- 1 "读取来源" [plan-task4b494532-57f4-4feb-8e09-e65044211ce1]: pending; attempt=0; observed=false
+- 1 "读取来源" [plan-task4b494532-57f4-4feb-8e09-e65044211ce1]: pending; attempt=0
   Dispatch: ready
-- 2 "复核来源" [plan-task67fd7bea-4a54-4534-b793-fb93c780653a]: pending; attempt=0; observed=false
+- 2 "复核来源" [plan-task67fd7bea-4a54-4534-b793-fb93c780653a]: pending; attempt=0
   Dispatch: blocked; waiting for accepted prerequisites [plan-task4b494532-57f4-4feb-8e09-e65044211ce1]
 
 ## 待办清单（TODO）
@@ -124,12 +123,12 @@ submit_plan: {"approved_version":1,"draft_version":1}
 # PLAN STATUS
 Draft version: 1; approved version: 1
 ## 当前执行 / 待验收
-- 2 "Second" [plan-task2188505d-a255-4be7-a735-0761cc0d0001]: awaiting_review; attempt=2; observed=true
+- 2 "Second" [plan-task2188505d-a255-4be7-a735-0761cc0d0001]: awaiting_review; attempt=2
 ## 其他任务状态
-- 1 "First" [plan-task80696a7f-037e-4357-b732-9f8ae55e30f4]: accepted; attempt=1; observed=true
+- 1 "First" [plan-task80696a7f-037e-4357-b732-9f8ae55e30f4]: accepted; attempt=1
 ```
 
-这些 state/attempt/observed 变化不会改写 PLAN DEFINITION。任务结果、artifacts 和 evidence_ids 写入 session Timeline Evidence，冻结后进入 SemiDynamic1，供 review_task 决策；feedback 只提供记录位置，不复制结果正文。前置 Evidence 在 worker 合并时进入 session journal，后继 worker 的真实请求包含 preset.source.1。
+这些 state/attempt 变化不会改写 PLAN DEFINITION。任务结果、artifacts 和 evidence_ids 写入 session Timeline Evidence，冻结后进入 SemiDynamic1，供 review_task 决策；feedback 只提供记录位置，不复制结果正文。前置 Evidence 在 worker 合并时进入 session journal，后继 worker 的真实请求包含 preset.source.1。
 
 ## 计划维护与 DAG
 
@@ -150,11 +149,11 @@ flowchart LR
     Second --> Report
 ```
 
-WithPresetPlan 和新版 WithPlanMocker 均只创建草案，随后通过 inspect_plan/submit_plan 和同一批准门禁执行。已有恢复草案不重复调用 mocker。modify_plan 产生新草案；获批前保留原已批准版本，SemiDynamic1 同时显示两份定义，PLAN STATUS 明确说明执行仍使用已批准版本。
+WithPresetPlan 和新版 WithPlanMocker 均只创建草案，随后通过 submit_plan 和同一批准门禁执行。已有恢复草案不重复调用 mocker。modify_plan 产生新草案；获批前保留原已批准版本，SemiDynamic1 同时显示两份定义，PLAN STATUS 明确说明执行仍使用已批准版本。
 
 ## Actions 与工具边界
 
-协调员专属 actions：create_plan、modify_plan、inspect_plan、submit_plan、start_tasks、inspect_tasks、wait_tasks、review_task、retry_task、cancel_tasks、write_report。
+协调员专属 actions：create_plan、modify_plan、submit_plan、start_tasks、wait_tasks、review_task、retry_task、cancel_tasks、write_report。
 
 共享 actions：save_evidence、require_tool/directly_call_tool 的协议对应版本、ask_for_clarification、knowledge_enhance_answer、load_skills、change_skill_view_offset、load_skill_resources、search_capabilities、directly_answer、finish。原生模式提供 adjust_todolist，文本流使用主循环 todo_delta。worker 使用 submit_task_result 及允许的共享 actions，不开放协调员 actions、directly_answer、蓝图、其他专注循环或通用 sub-agent。
 
@@ -164,13 +163,13 @@ WithPresetPlan 和新版 WithPlanMocker 均只创建草案，随后通过 inspec
 
 ## 验证范围
 
-缓存收敛：`inspect_plan` 的版本和正文位置、各动作的结果/拒绝原因与验收理由保存在 Timeline Evidence。每个任务尝试有独立观测记录，完整保留结果及 Evidence/artifact 引用；查询记录只引用这些观测，不重复任务书、依赖、报告正文或结果正文。feedback 仅返回动作处理状态和记录 ID。Controller 公开返回值、存储快照和 Yakit 事件结构保持原契约。
+缓存收敛：动作结果、拒绝原因与验收理由写入 Timeline Evidence。Controller 自动保存每个任务尝试的状态、完整结果及 Evidence/artifact 引用；wait 只引用观测 ID，feedback 只提供处理状态和记录位置。请求送达标记不写入 Evidence，避免验收门槛变化改写稳定前缀。
 
 动作不强制触发冻结。相同查询使用稳定 ID，内容相同不新增 journal 项；Open 冻结后沿现有 Evidence 提升到 SemiDynamic1，后续变化先写 Open，冻结前不改已提升前缀。有副作用的版本操作和验收理由按内容保存独立记录，后续查询不能覆盖它们。所有记录沿用 session Evidence 的共享、恢复与现有容量策略。
 
-`action_xxx.go` / `action_xxx_test.go` 分别承载 11 个计划动作、答复/完成适配及 worker 结果提交；`actions.go` 仅负责注册、双协议定义和公共校验，`action_outcome.go` 负责观测写入。`action_outcome_test.go` 验证 Open → 冻结/提升 → 新结果 Open → 再提升、独立任务结果保留、Timeline 恢复，以及写入失败不能返回成功。设置 `COORDINATOR_CONTEXT_REVIEW_DIR` 后，在 `action-observations` 输出四个实际阶段的上下文材料 JSON。
+`action_xxx.go` / `action_xxx_test.go` 分别承载 9 个计划动作、答复/完成适配及 worker 结果提交；`actions.go` 仅负责注册、双协议定义和公共校验，`action_outcome.go` 负责观测写入。`action_outcome_test.go` 验证 Open → 冻结/提升 → 新结果 Open → 再提升、独立任务结果保留、Timeline 恢复，以及写入失败不能返回成功。设置 `COORDINATOR_CONTEXT_REVIEW_DIR` 后，在 `action-observations` 输出四个实际阶段的上下文材料 JSON。
 
-`TestCoordinatorPlanCacheStableAcrossRepeatedInspection` 在两种协议下各使用 32 项长任务书和长文档连续请求 18 次。它比较投影后的 High Static、Frozen、SemiDynamic1、SemiDynamic2 的实际消息和 native tools，要求同版本内稳定前缀逐字节不变；批准只允许改变 SemiDynamic1，不能扰动共享规则、工具或 schema。测试隔离时间/桶阈值引起的合法提升；另有状态变化测试核对计划分区正文和 nonce 不变，生命周期冒烟验证用户输入及 Evidence 的正常冻结提升。字节比例用于缓存回归门槛，不作为真实 provider 命中率。
+`TestCoordinatorPlanCacheStableAcrossRepeatedRequests` 在两种协议下各使用 32 项长任务书和长文档连续请求 18 次。它比较投影后的 High Static、Frozen、SemiDynamic1、SemiDynamic2 的实际消息和 native tools，要求同版本内稳定前缀逐字节不变；批准只允许改变 SemiDynamic1，不能扰动共享规则、工具或 schema。测试隔离时间/桶阈值引起的合法提升；另有状态变化测试核对计划分区正文和 nonce 不变，生命周期冒烟验证用户输入及 Evidence 的正常冻结提升。字节比例用于缓存回归门槛，不作为真实 provider 命中率。
 
 专属 action 的中文说明与参数使用 Options/Description 和 NativeOptions/NativeDescription 分别生成两套定义，共用校验和处理函数。测试核对实际文本提示与 provider tools，确保不会混入另一协议的说明。
 

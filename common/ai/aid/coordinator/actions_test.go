@@ -68,6 +68,11 @@ func actionForTest(t *testing.T, name string, params map[string]any) *aicommon.A
 	return a
 }
 
+func (f *actionFixture) flushResults() {
+	f.t.Helper()
+	f.c.publish()
+}
+
 func (f *actionFixture) invoke(name string, params map[string]any, rejected bool) *reactloops.LoopActionHandlerOperator {
 	f.t.Helper()
 	h, err := f.loop.GetActionHandler(name)

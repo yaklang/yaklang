@@ -58,7 +58,7 @@ func TestReAct_RecoveryPlanAndExec_NativeSnapshot(t *testing.T) {
 			ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 			defer cancel()
 			out := make(chan *schema.AiOutputEvent, 4096)
-			pattern := regexp.MustCompile(`\[([^\]]+)\]: ([a-z_]+); attempt=(\d+); observed=(true|false)`)
+			pattern := regexp.MustCompile(`\[([^\]]+)\]: ([a-z_]+); attempt=(\d+)`)
 			var mu sync.Mutex
 			workers := map[string]int{}
 			model := func(cfg aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
@@ -92,9 +92,6 @@ func TestReAct_RecoveryPlanAndExec_NativeSnapshot(t *testing.T) {
 						return reply("retry_task", map[string]any{"task_id": m[1], "attempt_id": attempt, "reason": "Resume interrupted work"})
 					}
 					if m[2] == "awaiting_review" {
-						if m[4] == "false" {
-							return reply("inspect_tasks", map[string]any{})
-						}
 						return reply("review_task", map[string]any{"task_id": m[1], "attempt_id": attempt, "decision": "accept", "reason": "Result meets the approved brief"})
 					}
 				}
@@ -136,7 +133,7 @@ func TestReAct_RecoveryPlanAndExec_NativeSnapshot(t *testing.T) {
 						state = coordinator.Pending
 					}
 				}
-				snapshot.Attempts[task.ID] = coordinator.Attempt{Task: task, ID: uint64(i + 1), PlanVersion: 1, State: state, Seen: state == coordinator.Accepted, Result: coordinator.Result{Summary: "Persisted prior result"}}
+				snapshot.Attempts[task.ID] = coordinator.Attempt{Task: task, ID: uint64(i + 1), PlanVersion: 1, State: state, Result: coordinator.Result{Summary: "Persisted prior result"}}
 			}
 			snapshot.Finished = fromTask != ""
 			progress, _ := json.Marshal(coordinator.Progress{PlanEngine: coordinator.Name, CoordinatorState: &snapshot, Phase: "NotCompleted"})

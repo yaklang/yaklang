@@ -20,6 +20,17 @@ func configureCoordinatorFinish(loop *reactloops.ReActLoop) error {
 			check = controller(l).CanFinishPlanning
 		}
 		if err := check(); err != nil {
+			c := controller(l)
+			c.mu.Lock()
+			idle := !planningOnly(l) && c.idleLocked()
+			c.mu.Unlock()
+			if idle {
+				// The post-iteration hook waits locally; this is not a rejected
+				// action or a new Evidence record on every waiting turn.
+				op.Feedback("子任务仍在执行；系统自动等待通知，之后继续检查。")
+				op.Continue()
+				return
+			}
 			continueAfterFinishRejection(l, a, op, err)
 			return
 		}

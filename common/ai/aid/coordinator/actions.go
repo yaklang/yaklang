@@ -52,7 +52,7 @@ func (d coordinatorAction) option() reactloops.ReActLoopOption {
 	})
 }
 func actionOptions() []reactloops.ReActLoopOption {
-	definitions := []coordinatorAction{actionCreatePlan(), actionModifyPlan(), actionInspectPlan(), actionSubmitPlan(), actionStartTasks(), actionInspectTasks(), actionWaitTasks(), actionReviewTask(), actionRetryTask(), actionCancelTasks(), actionWriteReport()}
+	definitions := []coordinatorAction{actionCreatePlan(), actionModifyPlan(), actionSubmitPlan(), actionStartTasks(), actionWaitTasks(), actionReviewTask(), actionRetryTask(), actionCancelTasks(), actionWriteReport()}
 	opts := make([]reactloops.ReActLoopOption, 0, len(definitions))
 	for _, d := range definitions {
 		opts = append(opts, d.option())
@@ -66,8 +66,8 @@ func planVersionParameter() aitool.ToolOption {
 	return aitool.WithIntegerParam("plan_version", aitool.WithParam_Description("create_plan 或 modify_plan 返回的当前草案版本，必须精确匹配。"), aitool.WithParam_Required())
 }
 func taskIDsParameter() aitool.ToolOption {
-	return aitool.WithStringArrayParam("task_ids", aitool.WithParam_Description("逻辑任务 ID 列表；start_tasks 省略时选择全部可派发任务，inspect/wait/cancel 省略时选择全部已批准任务。"))
+	return aitool.WithStringArrayParam("task_ids", aitool.WithParam_Description("逻辑任务 ID 列表；start_tasks 省略时选择全部可派发任务，wait/cancel 省略时选择全部已批准任务。"))
 }
 func attemptParameter() aitool.ToolOption {
-	return aitool.WithIntegerParam("attempt_id", aitool.WithParam_Description("最近一次已观察结果中的 attempt_id，必须精确匹配。"), aitool.WithParam_Required())
+	return aitool.WithIntegerParam("attempt_id", aitool.WithParam_Description("PLAN STATUS 与 Timeline 执行结果中的当前 attempt_id，必须精确匹配。"), aitool.WithParam_Required())
 }

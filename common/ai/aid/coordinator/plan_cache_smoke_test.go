@@ -21,7 +21,7 @@ import (
 // Compare the provider-facing stable messages, not raw prompt tags/nonces.
 // Large-plan queries must change only the open tail; document/approval changes
 // may update SemiDynamic1, but must never invalidate static rules/tool schemas.
-func TestCoordinatorPlanCacheStableAcrossRepeatedInspection(t *testing.T) {
+func TestCoordinatorPlanCacheStableAcrossRepeatedRequests(t *testing.T) {
 	for _, native := range []bool{false, true} {
 		t.Run(fmt.Sprintf("function_call_%v", native), func(t *testing.T) {
 			ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
@@ -49,7 +49,7 @@ func TestCoordinatorPlanCacheStableAcrossRepeatedInspection(t *testing.T) {
 				aicommon.WithAICallback(func(c aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 					require.Equal(t, "react-loop:coordinator", req.GetCallerLabel())
 					if calls >= 18 {
-						return nil, fmt.Errorf("inspection did not converge")
+						return nil, fmt.Errorf("requests did not converge")
 					}
 					wire := aispec.NewDefaultAIConfig(req.GetExtraSpecOpts()...)
 					projected := aiprojection.Project(aiprojection.ProjectionInput{Prompt: req.GetPrompt(), ActionTools: wire.Tools})
@@ -75,11 +75,13 @@ func TestCoordinatorPlanCacheStableAcrossRepeatedInspection(t *testing.T) {
 					state := s.Snapshot()
 					phase := fmt.Sprintf("draft_%d_approved_%d", state.DraftVersion, state.ApprovedVersion)
 					if previous, ok := stable[phase]; ok {
-						require.Equal(t, previous, prefix, "ordinary inspection must preserve the complete stable prefix")
+						require.Equal(t, previous, prefix, "ordinary requests must preserve the complete stable prefix")
 						messages, err := json.Marshal(projected.Messages)
 						require.NoError(t, err)
-						ratio := float64(prefixBytes) / float64(len(messages))
-						require.Greater(t, ratio, 0.85, "stable prefix must dominate even with a large plan")
+						// Native tool declarations are also a stable part of the
+						// provider request. Count both messages and tools consistently.
+						ratio := float64(prefixBytes+len(declaredTools)) / float64(len(messages)+len(declaredTools))
+						require.Greater(t, ratio, 0.85, "stable messages and tools must dominate even with a large plan")
 						ratios = append(ratios, ratio)
 					}
 					stable[phase] = prefix
@@ -91,7 +93,7 @@ func TestCoordinatorPlanCacheStableAcrossRepeatedInspection(t *testing.T) {
 					dynamic := req.GetPrompt()[dynamicAt:]
 					require.NotContains(t, dynamic, documentSentinel)
 					require.NotContains(t, dynamic, "冻结任务书：")
-					require.Less(t, len(dynamic), 512, "inspect feedback must not grow with the plan")
+					require.Less(t, len(dynamic), 512, "action receipt must not grow with the plan")
 					step := calls
 					calls++
 					switch step {
@@ -100,7 +102,7 @@ func TestCoordinatorPlanCacheStableAcrossRepeatedInspection(t *testing.T) {
 					case 17:
 						return protocolResponse(c, req, native, "finish", map[string]any{})
 					default:
-						return protocolResponse(c, req, native, "inspect_plan", map[string]any{})
+						return protocolResponse(c, req, native, "save_evidence", map[string]any{"evidence_id": "cache.probe", "evidence_content": "same"})
 					}
 				}))
 			require.NoError(t, err)
@@ -117,10 +119,10 @@ func TestCoordinatorPlanCacheStableAcrossRepeatedInspection(t *testing.T) {
 					minimum = ratio
 				}
 			}
-			t.Logf("native=%v: %d requests; stable prefix identical within each plan version; minimum reusable message bytes=%.2f%%; dynamic <=512 bytes", native, calls, minimum*100)
+			t.Logf("native=%v: %d requests; stable prefix identical within each plan version; minimum reusable message/tool bytes=%.2f%%; dynamic <=512 bytes", native, calls, minimum*100)
 			if dir := os.Getenv("COORDINATOR_CONTEXT_REVIEW_DIR"); dir != "" {
 				require.NoError(t, os.MkdirAll(dir, 0700))
-				summary, err := json.MarshalIndent(map[string]any{"function_call": native, "requests": calls, "phase_requests": phaseCalls, "minimum_reusable_message_byte_ratio": minimum, "stable_prefix_unchanged_within_version": true, "tools_unchanged": true, "provider_cache_hit_rate": nil}, "", "  ")
+				summary, err := json.MarshalIndent(map[string]any{"function_call": native, "requests": calls, "phase_requests": phaseCalls, "minimum_reusable_message_and_tool_byte_ratio": minimum, "stable_prefix_unchanged_within_version": true, "tools_unchanged": true, "provider_cache_hit_rate": nil}, "", "  ")
 				require.NoError(t, err)
 				require.NoError(t, os.WriteFile(filepath.Join(dir, fmt.Sprintf("plan-cache-function-call-%v.json", native)), summary, 0600))
 			}

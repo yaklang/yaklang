@@ -270,7 +270,8 @@ func (s *Session) run(planningOnly bool) (err error) {
 	s.EmitCurrentConfigInfo()
 	key := "coordinator-wake-" + s.GetRuntimeId()
 	s.InputEventManager.RegisterAfterInputEvent(key, func(e *ypb.AIInputEvent) {
-		if e.IsInteractiveMessage || e.SyncType == aicommon.SYNC_TYPE_USER_INTERVENTION {
+		// Forwarded input is journaled and notified by its owning parent once.
+		if s.parent == nil && (e.IsInteractiveMessage || e.SyncType == aicommon.SYNC_TYPE_USER_INTERVENTION) {
 			s.controller.Wake()
 		}
 	})
@@ -351,6 +352,9 @@ func executeLoop(cfg *aicommon.Config, invoker aicommon.AITaskInvokeRuntime, loo
 	aicommon.BeginSessionSnapshotExecutionForTask(cfg, task, time.Now())
 	reactloops.EmitSessionSnapshot(cfg, loop, task)
 	err := loop.ExecuteWithExistedTask(task)
+	if waitErr, ok := loop.GetVariable("coordinator_wait_error").(error); err == nil && ok {
+		err = waitErr
+	}
 	aicommon.FinalizeSessionSnapshotExecutionForTask(cfg, task, time.Now())
 	reactloops.EmitSessionSnapshot(cfg, loop, task)
 	return err
@@ -407,12 +411,15 @@ func (s *Session) Execute(ctx context.Context, a Attempt) (result Result, retErr
 	workerOptions := append(reactloops.BasicAICommonConfigOption(cfg), func(l *reactloops.ReActLoop) {
 		// session 相同，但每次任务尝试的结果记录必须独立。
 		l.Set("coordinator_worker_attempt", workerAttemptRef{TaskID: a.Task.ID, AttemptID: a.ID, PlanVersion: a.PlanVersion})
+		l.Set("coordinator_discovery_callback", func() { s.controller.taskDiscovered(a.Task.ID, a.ID) })
 	})
 	loop, err := NewWorkerLoop(runtime, workerOptions...)
 	if err != nil {
 		return result, err
 	}
 	if err := executeLoop(cfg, runtime, loop, task); err != nil {
+		// Preserve an already-submitted partial result when later execution fails.
+		result, _ = loop.GetVariable("coordinator_task_result").(Result)
 		return result, err
 	}
 	result, ok := loop.GetVariable("coordinator_task_result").(Result)
