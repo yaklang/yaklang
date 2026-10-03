@@ -813,6 +813,9 @@ func tieredFunctionCall(input string, funcs any, opts ...aispec.AIConfigOption) 
 }
 
 func TieredFunctionCallWithTier(tier ModelTier, input string, funcs any, opts ...aispec.AIConfigOption) (map[string]any, error) {
+	if err := aispec.RequireStructuredOutputExecutor(); err != nil {
+		return nil, err
+	}
 	if !consts.IsTieredAIModelConfigEnabled() {
 		log.Debugf("Tiered AI config not enabled, using direct provider selection")
 		return directFunctionCall(input, funcs, opts...)
@@ -1051,6 +1054,9 @@ func ListModelByProviderType(providerType string, opts ...aispec.AIConfigOption)
 // dump(result)
 // ```
 func FunctionCall(input string, funcs any, opts ...aispec.AIConfigOption) (map[string]any, error) {
+	if err := aispec.RequireStructuredOutputExecutor(); err != nil {
+		return nil, err
+	}
 	config := aispec.NewDefaultAIConfig(opts...)
 	if config.Type != "" {
 		return directFunctionCall(input, funcs, opts...)
