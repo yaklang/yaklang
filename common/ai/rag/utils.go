@@ -8,6 +8,8 @@ import (
 	"github.com/google/uuid"
 	"github.com/yaklang/gorm"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
+	"github.com/yaklang/yaklang/common/ai/aid/aiprojection"
+	"github.com/yaklang/yaklang/common/ai/aispec"
 	"github.com/yaklang/yaklang/common/ai/localmodel"
 	"github.com/yaklang/yaklang/common/ai/rag/vectorstore"
 	"github.com/yaklang/yaklang/common/schema"
@@ -284,7 +286,23 @@ func MockAIService(handle func(message string) string) aicommon.AICallbackType {
 	return func(config aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 		rsp := config.NewAIResponse()
 		rspMsg := handle(req.GetPrompt())
-		rsp.EmitOutputStream(strings.NewReader(rspMsg))
+		wire := aispec.NewDefaultAIConfig(req.GetExtraSpecOpts()...)
+		projected := aiprojection.ProjectAndObserve("mock-ai-service", req.GetPrompt())
+		// Match the advertised one-shot protocol. Text-only mock responses cannot
+		// satisfy a native request's arguments and finish-reason callbacks.
+		if projected != nil && len(projected.Tools) == 1 && wire.ToolCallCallback != nil {
+			wire.ToolCallCallback([]*aispec.ToolCall{{ID: "mock-output", Function: aispec.FuncReturn{
+				Name: projected.Tools[0].Function.Name, Arguments: rspMsg,
+			}}})
+			if wire.ToolCallArgumentsStreamHandler != nil {
+				wire.ToolCallArgumentsStreamHandler(strings.NewReader(rspMsg))
+			}
+			if wire.FinishReasonCallback != nil {
+				wire.FinishReasonCallback("tool_calls", nil)
+			}
+		} else {
+			rsp.EmitOutputStream(strings.NewReader(rspMsg))
+		}
 		rsp.Close()
 		return rsp, nil
 	}
