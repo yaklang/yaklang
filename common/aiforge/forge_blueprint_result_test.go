@@ -11,8 +11,8 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
-	"github.com/yaklang/yaklang/common/ai/aid"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
+	"github.com/yaklang/yaklang/common/ai/aid/coordinator_legacy"
 	"github.com/yaklang/yaklang/common/ai/aispec"
 )
 
@@ -61,7 +61,7 @@ func TestForgeResultDefaultPreservesModelBudgetAndStructuredAction(t *testing.T)
 	}
 }
 
-func newForgeResultTestCoordinator(t *testing.T, blueprint *ForgeBlueprint, callback aicommon.AICallbackType) *aid.Coordinator {
+func newForgeResultTestCoordinator(t *testing.T, blueprint *ForgeBlueprint, callback aicommon.AICallbackType) *coordinator_legacy.Coordinator {
 	t.Helper()
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	t.Cleanup(cancel)
@@ -96,7 +96,7 @@ func TestForgeResultGeneratorDeliversOnce(t *testing.T) {
 			require.Equal(t, "partial or complete", value)
 			require.ErrorIs(t, err, failure)
 		}))
-		blueprint.ResultGenerator = func(_ *aid.Coordinator, prompt string) (string, error) {
+		blueprint.ResultGenerator = func(_ *coordinator_legacy.Coordinator, prompt string) (string, error) {
 			generations++
 			require.Contains(t, prompt, "original format")
 			return "partial or complete", failure

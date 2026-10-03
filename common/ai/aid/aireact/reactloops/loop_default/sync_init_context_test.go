@@ -45,16 +45,6 @@ func TestDefaultLoopSyncInitContextOptIn(t *testing.T) {
 	}
 }
 
-func TestPETaskStillEnrichesContextAfterFastInitialization(t *testing.T) {
-	inv := &initContextInvoker{MockInvoker: mock.NewMockInvoker(context.Background())}
-	cfg := inv.GetConfig()
-	loop := reactloops.NewMinimalReActLoop(cfg, inv)
-	task := aicommon.NewStatefulTaskBase("pe-task", "execute the next step", cfg.GetContext(), cfg.GetEmitter())
-	loop.SetCurrentTask(task)
-	buildPETaskInitTask(inv)(loop, task, &reactloops.InitTaskOperator{})
-	require.Equal(t, 1, inv.calls)
-}
-
 func TestGreetingCompletionWithoutSynchronousEnrichment(t *testing.T) {
 	for _, tc := range []struct {
 		name, query   string

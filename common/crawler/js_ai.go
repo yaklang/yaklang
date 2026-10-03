@@ -6,6 +6,7 @@ import (
 	"crypto/sha256"
 	"encoding/json"
 	"fmt"
+	"github.com/yaklang/yaklang/common/ai/aid/liteforge/liteforgeapp"
 	"net"
 	"net/url"
 	"path"
@@ -19,10 +20,8 @@ import (
 
 	"golang.org/x/net/idna"
 
-	"github.com/yaklang/yaklang/common/ai/aid"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
-	"github.com/yaklang/yaklang/common/aiforge"
 	"github.com/yaklang/yaklang/common/aireducer"
 	"github.com/yaklang/yaklang/common/chunkmaker"
 	"github.com/yaklang/yaklang/common/log"
@@ -3473,14 +3472,14 @@ func invokeLiteForgeForPaths(ctx context.Context, cfg *AIJSExtractConfig, payloa
 		return nil
 	}
 
-	forge, err := aiforge.NewLiteForge(
+	forge, err := liteforgeapp.NewLiteForge(
 		"crawler-js-path-extract",
 		// P0-B4: aiJSExtractPromptTpl 是 100% 静态角色 + 任务 + 拼接规则,
 		// 真正的动态内容 (REQUEST CONTEXT + candidate 窗口) 通过 payload 传入,
 		// 上移到 StaticInstruction 让 semi-dynamic 段跨 slice 调用 byte-stable.
-		aiforge.WithLiteForge_StaticInstruction(aiJSExtractPromptTpl),
-		aiforge.WithLiteForge_SpeedPriority(true),
-		aiforge.WithLiteForge_OutputSchema(
+		liteforgeapp.WithLiteForge_StaticInstruction(aiJSExtractPromptTpl),
+		liteforgeapp.WithLiteForge_SpeedPriority(true),
+		liteforgeapp.WithLiteForge_OutputSchema(
 			aitool.WithStructArrayParam(
 				"requests",
 				[]aitool.PropertyOption{
@@ -3501,7 +3500,7 @@ func invokeLiteForgeForPaths(ctx context.Context, cfg *AIJSExtractConfig, payloa
 				),
 			),
 		),
-		aiforge.WithExtendLiteForge_AIOption(cfg.AIOptions...),
+		liteforgeapp.WithExtendLiteForge_AIOption(cfg.AIOptions...),
 	)
 	if err != nil {
 		return utils.Errorf("build liteforge failed: %v", err)
@@ -3910,7 +3909,7 @@ func runAIJSExtract(ctx context.Context, code string, cfg *AIJSExtractConfig, on
 		// chunk per candidate - the "--- end ---" separator only acts as a
 		// preferred cut boundary within the chunkSize window.
 		aireducer.WithSeparatorAsBoundary(true),
-		aireducer.WithReducerCallback(func(rcfg *aireducer.Config, _ *aid.PromptContextProvider, ch chunkmaker.Chunk) error {
+		aireducer.WithReducerCallback(func(rcfg *aireducer.Config, _ any, ch chunkmaker.Chunk) error {
 			body := ch.DumpWithOverlap(cfg.OverlapBytes)
 			payload := redactAIJSModelEvidence(buildRequestContextBlock(cfg) + body)
 			if cfg.MaxTokens > 0 {

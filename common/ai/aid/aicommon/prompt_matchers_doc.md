@@ -4,7 +4,7 @@
 
 多角色 AI Agent 系统在测试时，mock AI 回调需要根据收到的 prompt 判断当前是哪个角色（R1 主循环决策 / R2 参数生成 / R3 工具参数重生成 / R5 蓝图参数生成 / R6 切换蓝图 / 意图识别 / 满意度审查 等），然后返回对应的 canned response。
 
-之前各测试包（`common/ai/aid/test`、`common/ai/aid/aireact`、`reactloopstests`）各自维护一套 `MatchAllOfSubString` 关键词匹配，存在两个核心问题：
+之前各测试包（`common/ai/aid/coordinator_legacy/integration`、`common/ai/aid/aireact`、`reactloopstests`）各自维护一套 `MatchAllOfSubString` 关键词匹配，存在两个核心问题：
 
 1. **匹配误命中**：R1 instruction 散文里会出现 R2 的标记（如 `# Tool Context`、`<|TOOL_SCHEMA_...|>` 在反引号散文中），导致 R1 prompt 被误判为 R2。
 2. **维护分散**：同样的判定逻辑在三个包里各写一遍，prompt 改动后容易遗漏同步。
@@ -32,7 +32,7 @@
 
 **`common/ai/aid/aireact` 包内测试**：通过 `test_prompt_matchers_test.go` 中的薄包装函数（小写开头），如 `isPrimaryDecisionPrompt`、`isToolParamGenPromptForTool` 等，直接调用。
 
-**`common/ai/aid/test` 包内测试**：通过 `prompt_matchers_test.go` 中的薄包装函数，如 `isNextActionDecisionPrompt`、`isToolParamGenerationPrompt` 等。
+**`common/ai/aid/coordinator_legacy/integration` 包内测试**：通过 `prompt_matchers_test.go` 中的薄包装函数，如 `isNextActionDecisionPrompt`、`isToolParamGenerationPrompt` 等。
 
 **`reactloopstests` 包内测试**：直接调用 `aicommon.IsPrimaryDecisionPrompt`、`aicommon.IsToolParamGenPromptForTool` 等导出函数。
 
@@ -105,6 +105,6 @@ if isToolParamGenPromptForTool(prompt, "") {
 |------|------|
 | `common/ai/aid/aicommon/prompt_matchers.go` | 共享判定函数（导出） |
 | `common/ai/aid/aireact/test_prompt_matchers_test.go` | aireact 包薄包装 |
-| `common/ai/aid/test/prompt_matchers_test.go` | test 包薄包装 |
+| `common/ai/aid/coordinator_legacy/integration/prompt_matchers_test.go` | test 包薄包装 |
 | `common/ai/aid/aireact/prompts/tool-params/dynamic.txt` | R2 动态段（含 `# Parameter Generation Task` 和 `<\|PARAM_REGENERATION_CONTEXT\|>` 标记） |
 | `common/ai/aid/aireact/prompts/change-blueprint/instruction.txt` | R6 instruction（含 `# Change AI Blueprint Task` 标题） |

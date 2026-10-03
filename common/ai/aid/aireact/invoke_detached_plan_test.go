@@ -3,14 +3,15 @@ package aireact
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
-	"github.com/yaklang/yaklang/common/ai/aid"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
+	"github.com/yaklang/yaklang/common/ai/aid/coordinator_legacy"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
@@ -73,26 +74,27 @@ func TestPublishDetachedPlan_PersistsSessionAndEmitsEvent(t *testing.T) {
 	timelineText := collectTimelineText(reactIns)
 	require.Contains(t, timelineText, "[DETACHED_PLAN]")
 	require.Contains(t, timelineText, coordinatorID)
-	require.Contains(t, timelineText, "step-1")
-	require.Contains(t, timelineText, "do something")
-	require.Contains(t, timelineText, "plan_data")
+	require.Contains(t, timelineText, "PLAN DEFINITION")
+	require.NotContains(t, timelineText, "Plan data:")
+	require.Contains(t, record.TaskTree, "step-1")
+	require.Contains(t, record.TaskTree, "do something")
 }
 
 func TestFormatDetachedPlanTimelineContent_IncludesNestedTasks(t *testing.T) {
-	root := &aid.AiTask{
+	root := &coordinator_legacy.AiTask{
 		Name: "main-plan",
 		Goal: "main goal",
-		Subtasks: []*aid.AiTask{
+		Subtasks: []*coordinator_legacy.AiTask{
 			{
 				Name: "parent-task",
 				Goal: "parent goal",
-				Subtasks: []*aid.AiTask{
+				Subtasks: []*coordinator_legacy.AiTask{
 					{Name: "child-task", Goal: "child goal"},
 				},
 			},
 		},
 	}
-	content := formatDetachedPlanTimelineContent(
+	content := coordinator_legacy.FormatDetachedPlanTimelineContent(
 		"coord-1",
 		"session-1",
 		"react-task-1",
@@ -209,4 +211,64 @@ func evtContent(evt *ypb.AIOutputEvent) []byte {
 		return nil
 	}
 	return []byte(evt.GetContent())
+}
+
+func TestHandleSyncTypeExecuteDetachedPlanEvent_LegacyStoredAndEditedTree(t *testing.T) {
+	for _, edited := range []bool{false, true} {
+		t.Run(map[bool]string{false: "stored_tree", true: "edited_tree"}[edited], func(t *testing.T) {
+			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+			defer cancel()
+			var syncError, visibleError bool
+			cfg := aicommon.NewConfig(ctx, aicommon.WithPersistentSessionId(uuid.NewString()), aicommon.WithDisableCreateDBRuntime(true), aicommon.WithWorkdir(t.TempDir()), aicommon.WithNoOpMemoryTriage(), aicommon.WithEventHandler(func(e *schema.AiOutputEvent) {
+				var data map[string]any
+				_ = json.Unmarshal(e.Content, &data)
+				if e.NodeId == "execute_detached_plan" && e.IsSync && e.SyncID == "approve-legacy" && data["error"] != nil {
+					syncError = true
+				}
+				if data["level"] == "error" && strings.Contains(fmt.Sprint(data["message"]), "计划未能开始执行") {
+					visibleError = true
+				}
+			}))
+			require.NoError(t, cfg.GetDB().AutoMigrate(&schema.AISessionPlanAndExec{}).Error)
+			// Retired records stay intact for inspection. Approval must reject
+			// them rather than silently constructing the old execution runtime.
+			r := &ReAct{config: cfg, Emitter: cfg.GetEmitter(), taskQueue: NewTaskQueue(MainTaskQueueName)}
+			id := uuid.NewString()
+			tree := `{"name":"Plan","goal":"Check sources","semantic_identifier":"plan","subtasks":[{"name":"Group","goal":"Collect","semantic_identifier":"group","subtasks":[{"name":"Read","goal":"Original brief","semantic_identifier":"read"}]},{"name":"Verify","goal":"Check result","semantic_identifier":"verify","depends_on":["read"]}]}`
+			require.NoError(t, yakit.CreateOrUpdateAISessionPlanAndExec(cfg.GetDB(), &schema.AISessionPlanAndExec{SessionID: cfg.PersistentSessionId, CoordinatorID: id, TaskTree: tree, TaskProgress: string(utils.Jsonify(map[string]any{"plan_engine": "coordinator_legacy", "phase": aicommon.PlanExecPhaseDetachedPendingApproval, "plan_document": "Keep document"}))}))
+			payload := map[string]any{"coordinator_id": id}
+			if edited {
+				payload["plans"] = map[string]any{"root_task": json.RawMessage(strings.ReplaceAll(tree, "Original brief", "Approved edited brief"))}
+			}
+			raw, err := json.Marshal(payload)
+			require.NoError(t, err)
+			require.NotPanics(t, func() {
+				require.NoError(t, r.HandleSyncTypeExecuteDetachedPlanEvent(&ypb.AIInputEvent{SyncJsonInput: string(raw), SyncID: "approve-legacy"}))
+			})
+			require.Empty(t, r.taskQueue.GetQueueingTasks())
+			require.True(t, syncError, "approval must receive an error acknowledgement")
+			require.True(t, visibleError, "clients that close the review panel need a visible failure")
+			record, err := yakit.GetAISessionPlanAndExecByCoordinatorID(cfg.GetDB(), id)
+			require.NoError(t, err)
+			require.Contains(t, record.TaskTree, `"semantic_identifier":"read"`)
+			require.Contains(t, record.TaskTree, `"depends_on":["read"]`)
+			require.Equal(t, tree, record.TaskTree)
+			require.Contains(t, record.TaskProgress, aicommon.PlanExecPhaseDetachedPendingApproval)
+		})
+	}
+}
+
+func TestParseExecuteDetachedPlanParams_RejectsEmptyEditedDocument(t *testing.T) {
+	for _, value := range []any{"", "  \n", nil, 42} {
+		raw, err := json.Marshal(map[string]any{"coordinator_id": "pending-plan", "plans": map[string]any{"document": value}})
+		require.NoError(t, err)
+		_, _, _, _, err = parseExecuteDetachedPlanParams(string(raw))
+		require.Error(t, err, "an explicitly invalid edit must not fall back to the stored document")
+	}
+	_, _, _, input, err := parseExecuteDetachedPlanParams(`{"coordinator_id":"pending-plan","plans":{"document":"# 用户最终文档"}}`)
+	require.NoError(t, err)
+	require.Equal(t, "# 用户最终文档", input.PlanDocument)
+	_, _, _, input, err = parseExecuteDetachedPlanParams(`{"coordinator_id":"pending-plan"}`)
+	require.NoError(t, err, "omitted fields retain the existing stored-plan contract")
+	require.Empty(t, input.PlanDocument)
 }

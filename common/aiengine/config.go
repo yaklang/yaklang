@@ -104,6 +104,15 @@ type AIEngineConfig struct {
 // AIEngineConfigOption 配置选项函数
 type AIEngineConfigOption func(*AIEngineConfig)
 
+// WithPlanEngine is a compatibility alias for the top-level coordinator focus.
+// New callers can select coordinator or coordinator_legacy with WithFocus.
+func WithPlanEngine(engine string) AIEngineConfigOption {
+	if engine == "legacy" {
+		engine = "coordinator_legacy"
+	}
+	return WithFocus(engine)
+}
+
 // NewAIEngineConfig 创建默认配置
 func NewAIEngineConfig(options ...AIEngineConfigOption) *AIEngineConfig {
 	config := &AIEngineConfig{

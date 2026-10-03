@@ -382,7 +382,7 @@ func WithToolCaller_InvokeRuntime(rt AIInvokeRuntime) ToolCallerOption {
 
 var toolCallReasonOutputs = []aitool.ToolOption{
 	aitool.WithStringParam("reason",
-		aitool.WithParam_Description("A terse phrase (under 15 words) stating WHAT this tool call does right now. No transitions or prior-step summaries. Match the language of the user input."),
+		aitool.WithParam_Description("A terse phrase (at most 30 characters, including spaces) stating WHAT this tool call does right now. No transitions or prior-step summaries. Match the language of the user input."),
 		aitool.WithParam_MaxLength(30),
 		aitool.WithParam_Required(true)),
 }
@@ -395,10 +395,10 @@ var toolCallReasonOutputs = []aitool.ToolOption{
 // distinguishes siblings that use the same tool and have no explicit reason.
 func buildToolCallReasonPrompt(tool *aitool.Tool, params aitool.InvokeParams, task AITask, intentIdentifier string) string {
 	var sb strings.Builder
-	sb.WriteString("Generate a terse reason (under 15 words) stating WHAT this tool call does right now. " +
+	sb.WriteString("Generate a terse reason (at most 30 characters, including spaces) stating WHAT this tool call does right now. " +
 		"Focus on the concrete current action, not on prior steps or transitions. " +
 		"Bad: '端口扫描完成，接下来需要执行简单爬虫收集页面' / 'previous scan found open ports, now crawling'. " +
-		"Good: '爬取目标站点页面与API端点' / 'crawl site pages and API endpoints'.\n")
+		"Good: '爬取目标站点页面与API端点' / 'crawl site pages and APIs'.\n")
 	sb.WriteString(fmt.Sprintf("Tool: %s\n", tool.Name))
 	if desc := strings.TrimSpace(tool.Description); desc != "" {
 		sb.WriteString(fmt.Sprintf("Tool description: %s\n", desc))

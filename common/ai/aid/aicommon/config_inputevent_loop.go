@@ -166,6 +166,7 @@ func (c *Config) processInputEvent(event *ypb.AIInputEvent) error {
 
 	if c.InputEventManager != nil {
 		c.InputEventManager.CallMirrorOfAIInputEvent(event)
+		defer c.InputEventManager.CallAfterInputEvent(event)
 	}
 
 	if event.IsInteractiveMessage { // interactive message is fixed
@@ -204,6 +205,7 @@ type AIInputEventProcessor struct {
 	syncCallback      map[string]func(event *ypb.AIInputEvent) error
 	freeInputCallback func(event *ypb.AIInputEvent) error
 	mirrorCallback    map[string]func(event *ypb.AIInputEvent)
+	afterCallback     map[string]func(event *ypb.AIInputEvent)
 	mu                sync.Mutex
 }
 
@@ -211,6 +213,7 @@ func NewAIInputEventProcessor() *AIInputEventProcessor {
 	return &AIInputEventProcessor{
 		syncCallback:   make(map[string]func(event *ypb.AIInputEvent) error),
 		mirrorCallback: make(map[string]func(event *ypb.AIInputEvent)),
+		afterCallback:  make(map[string]func(event *ypb.AIInputEvent)),
 		mu:             sync.Mutex{},
 	}
 }
@@ -286,4 +289,35 @@ func (p *AIInputEventProcessor) UnregisterMirrorOfAIInputEvent(id string) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	delete(p.mirrorCallback, id)
+}
+
+// RegisterAfterInputEvent observes an input after its endpoint/sync handler
+// has processed it. A scheduler can wake only after user history is recorded.
+func (p *AIInputEventProcessor) RegisterAfterInputEvent(id string, callback func(*ypb.AIInputEvent)) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	if p.afterCallback == nil {
+		p.afterCallback = make(map[string]func(*ypb.AIInputEvent))
+	}
+	p.afterCallback[id] = callback
+}
+
+func (p *AIInputEventProcessor) UnregisterAfterInputEvent(id string) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	delete(p.afterCallback, id)
+}
+
+// CallAfterInputEvent can also forward a parent's processed notification to a
+// nested runtime which shares its Timeline, without replaying the input handler.
+func (p *AIInputEventProcessor) CallAfterInputEvent(event *ypb.AIInputEvent) {
+	p.mu.Lock()
+	callbacks := make([]func(*ypb.AIInputEvent), 0, len(p.afterCallback))
+	for _, callback := range p.afterCallback {
+		callbacks = append(callbacks, callback)
+	}
+	p.mu.Unlock()
+	for _, callback := range callbacks {
+		callback(event)
+	}
 }

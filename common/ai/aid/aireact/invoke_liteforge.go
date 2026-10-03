@@ -5,113 +5,27 @@ import (
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
-	"github.com/yaklang/yaklang/common/aiforge"
-	"github.com/yaklang/yaklang/common/schema"
-	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
+	"github.com/yaklang/yaklang/common/ai/aid/liteforge"
 )
 
 func (r *ReAct) invokeLiteForgeWithCallback(cb aicommon.AICallbackType, ctx context.Context, actionName string, prompt string, outputs []aitool.ToolOption, opts ...aicommon.GeneralKVConfigOption) (*aicommon.Action, error) {
-	var rawOutputs []any
-	for _, output := range outputs {
-		var rawOpt any = output
-		rawOutputs = append(rawOutputs, rawOpt)
+	execute := r.config.LiteForgeExecutor
+	if execute == nil {
+		execute = liteforge.ExecuteTyped
 	}
-
-	gconfig := aicommon.NewGeneralKVConfig(opts...)
-
-	fopts := []aiforge.LiteForgeOption{
-		aiforge.WithLiteForge_Prompt(prompt),
-		aiforge.WithLiteForge_OutputSchemaRaw(
-			actionName,
-			aitool.NewObjectSchemaWithActionName(actionName, rawOutputs...),
-		),
+	if cb == nil {
+		cb = r.config.GetOriginalAICallback()
 	}
-	// 关键词: aicache, PROMPT_SECTION, StaticInstruction, invokeLiteForgeWithCallback
-	// 调用方可以通过 aicommon.WithLiteForgeStaticInstruction 携带系统侧静态指令.
-	// P0-B1 之后该字段进入 semi-dynamic 段 (而非 high-static), 跨同一 forge
-	// 调用稳定哈希; 真正动态的内容应由 prompt 参数 (进入 dynamic 段) 承载.
-	if staticInstruction := gconfig.GetLiteForgeStaticInstruction(); staticInstruction != "" {
-		fopts = append(fopts, aiforge.WithLiteForge_StaticInstruction(staticInstruction))
-	}
-	if validate := gconfig.GetLiteForgeOutputValidator(); validate != nil {
-		fopts = append(fopts, aiforge.WithLiteForge_OutputValidator(validate))
-	}
-	if gconfig.GetLiteForgeDisableTimeline() {
-		fopts = append(fopts, aiforge.WithLiteForge_DisableTimeline())
-	}
-	if limit := gconfig.GetLiteForgeMaxPromptTokens(); limit > 0 {
-		fopts = append(fopts, aiforge.WithLiteForge_MaxPromptTokens(limit))
-	}
-	for _, i := range gconfig.GetStreamableFields() {
-		fopts = append(fopts, aiforge.WithLiteForge_StreamableFieldWithAINodeId(i.AINodeId(), i.FieldKey()))
-	}
-	// add user-defined field stream callbacks from GeneralKVConfig
-	for _, item := range gconfig.GetStreamableFieldCallbacks() {
-		if item == nil {
-			continue
-		}
-		if item.Callback != nil {
-			fopts = append(fopts, aiforge.WithLiteForge_FieldStreamEmitterCallback(item.FieldKeys, aiforge.FieldStreamEmitterCallback(item.Callback)))
-		}
-		if item.ResponseCallback != nil {
-			fopts = append(fopts, aiforge.WithLiteForge_FieldStreamResponseCallback(item.FieldKeys, item.ResponseCallback))
-		}
-	}
-	// Consume extra AIRequestOption values from GeneralKVConfig (e.g.
-	// thinking-level degradation injected by the auxiliary task scheduler).
-	if extraReqOpts := gconfig.GetExtraRequestOpts(); len(extraReqOpts) > 0 {
-		fopts = append(fopts, aiforge.WithLiteForge_ExtraRequestOpts(extraReqOpts...))
-	}
-	fopts = append(fopts, aiforge.WithLiteForge_Emitter(r.config.Emitter))
-
-	if !utils.IsNil(cb) {
-		fopts = append(fopts, aiforge.WithExtendLiteForge_AIOption(aicommon.WithFastAICallback(cb)))
-	}
-
-	f, err := aiforge.NewLiteForge(actionName, fopts...)
+	result, err := execute(prompt, &aicommon.LiteForgeInvokeRequest{Context: ctx, ActionName: actionName, Outputs: outputs, Options: opts, Emitter: r.config.Emitter},
+		aicommon.WithFastAICallback(cb), aicommon.WithEnableFunctionCallMode(r.config.EnableFunctionCallMode),
+		aicommon.WithTimeline(r.config.Timeline), aicommon.WithAppendPersistentContext(r.config.PersistentMemory...),
+		aicommon.WithPersistentSessionId(r.config.PersistentSessionId), aicommon.WithEventHandler(r.config.EventHandler),
+		aicommon.WithAIAutoRetry(r.config.AiAutoRetry), aicommon.WithAITransactionAutoRetry(r.config.GetAITransactionAutoRetryCount()),
+		aicommon.WithAIRetryWaitFunc(r.config.GetAIRetryWaitFunc()), aicommon.WithUserUsageCallback(r.config.GetUserUsageCallback()))
 	if err != nil {
-		return nil, utils.Wrap(err, "create liteforge failed")
+		return nil, err
 	}
-	execCb := cb
-	if utils.IsNil(execCb) {
-		execCb = r.config.GetOriginalAICallback()
-	}
-	// 关键词: invokeLiteForgeWithCallback, ai.usageCallback 透传, WithUserUsageCallback
-	// 子 coordinator 走 WithFastAICallback path, 必须把父 ReAct 的 user UsageCallback
-	// 一并继承, 否则 raw chat 末帧 token usage 不会触达 ai.usageCallback(...).
-	execOpts := []aicommon.ConfigOption{
-		aicommon.WithAgreeYOLO(),
-		aicommon.WithAITransactionAutoRetry(r.config.GetAITransactionAutoRetryCount()),
-		aicommon.WithAIAutoRetry(r.config.AiAutoRetry),
-		aicommon.WithFastAICallback(execCb),
-		aicommon.WithPersistentSessionId(r.config.PersistentSessionId),
-		aicommon.WithDisableCreateDBRuntime(true), // disable create db runtime because ReAct loop will create it before invoking liteforge, and creating it again in liteforge may
-	}
-	if retryWait := r.config.GetAIRetryWaitFunc(); retryWait != nil {
-		execOpts = append(execOpts, aicommon.WithAIRetryWaitFunc(retryWait))
-	}
-	if userUsageCb := r.config.GetUserUsageCallback(); userUsageCb != nil {
-		execOpts = append(execOpts, aicommon.WithUserUsageCallback(userUsageCb))
-	}
-	if eventHandler := r.config.EventHandler; eventHandler != nil {
-		execOpts = append(execOpts, aicommon.WithEventHandler(func(e *schema.AiOutputEvent) {
-			eventHandler(e)
-		}))
-	}
-	// P0-B4 (round2): 之前同时把 prompt 通过 WithLiteForge_Prompt 注入 dynamic 段
-	// <context_NONCE>, 又在这里再以 ExecParamItem(key="query") 的形式注入 dynamic
-	// 段 <params_NONCE>, 同一份内容被写入 2 次, 直接让 dynamic 段字节翻倍, 上游
-	// prefix cache 命中比例被稀释一半. WithLiteForge_Prompt 已经覆盖了 prompt
-	// 在 dynamic 段的暴露需求, 这里改成空 ExecParamItem, 让 LiteForge.Execute 内部
-	// callBuffer 拿到空字符串, liteForgePromptTemplate 中的 {{ if .Params }} 整段
-	// 自动省略, dynamic 段只剩 <context_NONCE>{prompt}</context_NONCE>.
-	// 关键词: invokeLiteForgeWithCallback dedup, dynamic 段字节减半, P0-B4
-	forgeResult, err := f.Execute(ctx, []*ypb.ExecParamItem{}, execOpts...)
-	if err != nil {
-		return nil, utils.Wrap(err, "invoke liteforge failed")
-	}
-	return forgeResult.Action, nil
+	return result.Action, nil
 }
 
 // InvokeSpeedPriorityLiteForge is retained for compatibility.

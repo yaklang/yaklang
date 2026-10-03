@@ -1314,7 +1314,7 @@ func buildModulePackageMap(modules []string) map[string][]string {
 		"nuclei":     {"github.com/yaklang/yaklang/common/yak/httptpl"},
 		"httptpl":    {"github.com/yaklang/yaklang/common/yak/httptpl"},
 		"ai":         {"github.com/yaklang/yaklang/common/ai"},
-		"liteforge":  {"github.com/yaklang/yaklang/common/aiforge"},
+		"liteforge":  {"github.com/yaklang/yaklang/common/ai/aid/liteforge/liteforgeapp"},
 		"hids":       {"github.com/yaklang/yaklang/common/hids"},
 		"java":       {"github.com/yaklang/yaklang/common/yserx"},
 		"t3":         {"github.com/yaklang/yaklang/common/t3"},

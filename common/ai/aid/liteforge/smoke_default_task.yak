@@ -1,0 +1,137 @@
+// 从仓库根目录直接执行：yak common/ai/aid/liteforge/smoke_default_task.yak
+// LITEFORGE_SMOKE_API_KEY 必填；输出目录和模型可通过下面的环境变量覆盖。
+// 使用默认主循环；材料、模型用量采样和业务校验全部在本脚本中完成。
+key = os.Getenv("LITEFORGE_SMOKE_API_KEY")
+assert key != "", "Set LITEFORGE_SMOKE_API_KEY before running this smoke test"
+model = os.Getenv("LITEFORGE_SMOKE_MODEL")
+if model == "" { model = "deepseek-v4.1-flash" }
+root = os.Getenv("LITEFORGE_TASK_DIR")
+if root == "" { root = file.Join(os.TempDir(), sprintf("liteforge-default-%d", time.Now().UnixNano())) }
+root = str.ReplaceAll(file.Abs(root), "\\", "/")
+fixture = file.Join(root, "fixture")
+file.MkdirAll(fixture)~
+// 打开现有提示词观测落盘，采样中不保存 HTTP 认证头。
+os.Setenv("YAKLANGDEBUG", "1")
+fixtures = {
+    "catalog.json": `{"Widget":19.5,"Gadget":10.0}`,
+    "batch1.csv": "order_id,sku,quantity,unit_price,status\nA001,Widget,2,19.5,paid\nA002,Gadget,3,10,paid\nA003,Widget,1,19.5,paid\n",
+    "batch2.csv": "order_id,sku,quantity,unit_price,status\nA004,Widget,1,19.5,refunded\nA005,Gadget,4,10,paid\n",
+    "batch3.csv": "order_id,sku,quantity,unit_price,status\nA005,Gadget,4,10,paid\nA006,Unknown,2,8,paid\nA007,Widget,5,19.5,pending\n",
+    "rules.txt": "按 batch1、batch2、batch3 顺序读取。订单号重复只计第一次，将重复订单号记录在 duplicates。未知 SKU 的订单记录在 unknown_skus，并排除金额。pending 订单记录在 pending_orders，并排除金额。paid 金额合计为 paid_total，refunded 金额合计为 refund_total；net_total = paid_total - refund_total。单价应与 catalog 一致。保留原始行数 raw_rows 和去重订单数 unique_orders。",
+}
+for name, content in fixtures { file.Save(file.Join(fixture, name), content)~ }
+task = sprintf(`请用默认主循环完成普通订单对账，不进入 PLAN、不创建子任务。逐个读取 %s/fixture 中的 catalog.json、rules.txt、batch1.csv、batch2.csv、batch3.csv，按规则去重、核对单价、排除未知 SKU 和待付款，计算实收净额。保存关键 evidence，把中文 audit.md 和 audit.json 写到 %s。JSON 必须包含 raw_rows、unique_orders、paid_total、refund_total、net_total、duplicates、unknown_skus、pending_orders，异常数组只保存订单号。报告列出逐订单计算依据与异常解释，最终回答给出结果和文件路径。只用文件读写与 evidence，不执行命令、不访问业务网络。`, root, root)
+file.Save(file.Join(root, "task.txt"), task)~
+
+mu = sync.NewMutex()
+events, calls, usages, streams = [], [], [], []
+runtimeConfig = nil
+captureEvent = func(op, event) {
+    eventType = string(event.Type)
+    if eventType == "stream" || eventType == "stream_start" || eventType == "stream_end" { return }
+    mu.Lock()
+    defer mu.Unlock()
+    runtimeConfig = op.GetConfig()
+    content = string(event.Content)
+    events = append(events, {"type": eventType, "node": event.NodeId, "content": content})
+    file.SaveJson(file.Join(root, "events.json"), events)~
+    if eventType == "ai_call_summary" {
+        call = json.loads(content)
+        calls = append(calls, call)
+        file.SaveJson(file.Join(root, "calls.json"), calls)~
+        printf("CALL caller=%s input=%v cached=%v source=%s\n", call.caller_label, call.input_tokens, call.cache_hit_token, call.token_source)
+    }
+}
+captureUsage = func(usage) {
+    if usage == nil { return }
+    cached = 0
+    if usage.PromptTokensDetails != nil { cached = usage.PromptTokensDetails.CachedTokens }
+    mu.Lock()
+    defer mu.Unlock()
+    usages = append(usages, {"prompt_tokens": usage.PromptTokens, "cached_tokens": cached,
+        "completion_tokens": usage.CompletionTokens, "correlation_id": usage.MirrorCorrelationID})
+    file.SaveJson(file.Join(root, "usage.json"), usages)~
+}
+captureStream = func(op, event, node, content) {
+    mu.Lock()
+    defer mu.Unlock()
+    streams = append(streams, {"node": node, "content": string(content)})
+    file.SaveJson(file.Join(root, "streams.json"), streams)~
+}
+modelOptions = [ai.apiKey(key), ai.model(model), ai.usageCallback(captureUsage)]
+started = time.Now()
+// 同一模型用于各档，便于本次实测；不代表生产环境的角色分配建议。
+err = aim.InvokeReAct(task,
+    aim.aiConfig("aibalance", modelOptions...),
+    aim.qualityPriorityAIConfig("aibalance", modelOptions...),
+    aim.speedPriorityAIConfig("aibalance", modelOptions...),
+    aim.sessionID(sprintf("liteforge-default-%d", started.UnixNano())),
+    aim.context(context.Seconds(300)), aim.maxIteration(24), aim.reviewPolicy("yolo"),
+    aim.allowUserInteract(false), aim.disableMCPServers(true), aim.disableAIForge(true),
+    aim.includeToolNames("read_file", "find_file", "grep", "write_file"),
+    aim.onEvent(captureEvent), aim.onStreamContent(captureStream),
+)
+// 与事件回调串行汇总；缓存率是 token 加权值，不平均每次调用的百分比。
+mu.Lock()
+defer mu.Unlock()
+groups = {}
+for call in calls {
+    group = "other"
+    if str.HasPrefix(call.caller_label, "react-loop:") || str.HasPrefix(call.caller_label, "react-loop[") { group = "main_loop" }
+    if str.Contains(call.caller_label, "liteforge[") { group = "liteforge" }
+    // 部分辅助请求没有 call_summary；此处只统计具备用量事件的调用。
+    if call.token_source != "usage" { continue }
+    for name in ["tracked_calls", group] {
+        if groups[name] == nil {
+            groups[name] = {"calls": 0, "input_tokens": 0, "cached_tokens": 0}
+        }
+        groups[name].calls++
+        groups[name].input_tokens += int(call.input_tokens)
+        groups[name].cached_tokens += int(call.cache_hit_token)
+    }
+}
+// 总体口径取 provider usage，包含未经过 call_summary 包装的辅助请求。
+groups["all"] = {"calls": len(usages), "input_tokens": 0, "cached_tokens": 0}
+for usage in usages {
+    groups["all"].input_tokens += int(usage.prompt_tokens)
+    groups["all"].cached_tokens += int(usage.cached_tokens)
+    // 关联 provider 用量与现有提示词快照，补齐不发送 call_summary 的 LiteForge 请求。
+    if usage.correlation_id != "" {
+        sample, sampleErr = file.ReadFile(file.Join(ai.aicacheSession(), sprintf("%06d.txt", parseInt(usage.correlation_id))))
+        if sampleErr == nil && str.Contains(string(sample), "LiteForge 是单步结构化抽取器") {
+            if groups["liteforge_template"] == nil {
+                groups["liteforge_template"] = {"calls": 0, "input_tokens": 0, "cached_tokens": 0}
+            }
+            groups["liteforge_template"].calls++
+            groups["liteforge_template"].input_tokens += int(usage.prompt_tokens)
+            groups["liteforge_template"].cached_tokens += int(usage.cached_tokens)
+        }
+    }
+}
+cacheRates = {}
+for name, stats in groups {
+    if stats.input_tokens > 0 { cacheRates[name] = sprintf("%.2f%%", 100.0 * float(stats.cached_tokens) / float(stats.input_tokens)) }
+}
+audit = {}
+failed = []
+raw, readErr = file.ReadFile(file.Join(root, "audit.json"))
+if readErr == nil {
+    audit = json.loads(string(raw))
+    for name, expected in {"raw_rows": 8, "unique_orders": 7, "paid_total": 128.5, "refund_total": 19.5, "net_total": 109} {
+        if audit[name] != expected { failed = append(failed, name) }
+    }
+    for name, expected in {"duplicates": "A005", "unknown_skus": "A006", "pending_orders": "A007"} {
+        if len(audit[name]) != 1 || audit[name][0] != expected { failed = append(failed, name) }
+    }
+} else { failed = append(failed, "audit.json missing") }
+if runtimeConfig != nil {
+    file.Save(file.Join(root, "timeline.txt"), runtimeConfig.GetTimeline().Dump())~
+    file.Save(file.Join(root, "evidence.txt"), runtimeConfig.GetSessionEvidenceRendered())~
+}
+pass = err == nil && len(failed) == 0
+file.SaveJson(file.Join(root, "result.json"), {"semantic_pass": pass, "error": sprintf("%v", err),
+    "failed_checks": failed, "audit": audit, "groups": groups, "cache_percent": cacheRates, "seconds": time.Since(started).Seconds(),
+    "prompt_samples": ai.aicacheSession(), "root": root})~
+printf("RESULT semantic_pass=%v failed=%v cache=%v root=%s\n", pass, failed, cacheRates, root)
+die(err)
+assert pass, "Order reconciliation output failed semantic checks; inspect result.json"

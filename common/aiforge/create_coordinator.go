@@ -4,11 +4,11 @@ import (
 	"context"
 	"slices"
 
-	"github.com/yaklang/yaklang/common/ai/aid"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
+	"github.com/yaklang/yaklang/common/ai/aid/coordinator_legacy"
 )
 
-func (t *ForgeBlueprint) CreateCoordinatorWithQuery(ctx context.Context, originQuery string, opts ...aicommon.ConfigOption) (*aid.Coordinator, error) {
+func (t *ForgeBlueprint) CreateCoordinatorWithQuery(ctx context.Context, originQuery string, opts ...aicommon.ConfigOption) (*coordinator_legacy.Coordinator, error) {
 	firstQuery, extraOpts, err := t.GenerateFirstPromptWithMemoryOptionWithQuery(originQuery)
 	if err != nil {
 		return nil, err
@@ -24,7 +24,7 @@ func (t *ForgeBlueprint) CreateCoordinatorWithQueryAndParams(
 	originQuery string,
 	params []Parameter,
 	opts ...aicommon.ConfigOption,
-) (*aid.Coordinator, error) {
+) (*coordinator_legacy.Coordinator, error) {
 	firstQuery, extraOpts, err := t.GenerateFirstPromptWithMemoryOptionWithQueryAndParams(originQuery, params)
 	if err != nil {
 		return nil, err
@@ -37,16 +37,16 @@ func (t *ForgeBlueprint) createCoordinatorWithRenderedPrompt(
 	firstQuery string,
 	extraOpts []aicommon.ConfigOption,
 	opts ...aicommon.ConfigOption,
-) (*aid.Coordinator, error) {
+) (*coordinator_legacy.Coordinator, error) {
 	extraOpts = append(extraOpts, aicommon.WithForgeName(t.Name))
 	extraOpts = append(extraOpts, opts...)
 
 	finalOpts := slices.Clone(t.AIOptions)
 	finalOpts = append(finalOpts, extraOpts...)
-	return aid.NewCoordinatorContext(ctx, firstQuery, finalOpts...)
+	return coordinator_legacy.NewCoordinatorContext(ctx, firstQuery, finalOpts...)
 }
 
-func (t *ForgeBlueprint) CreateCoordinator(ctx context.Context, i any, opts ...aicommon.ConfigOption) (*aid.Coordinator, error) {
+func (t *ForgeBlueprint) CreateCoordinator(ctx context.Context, i any, opts ...aicommon.ConfigOption) (*coordinator_legacy.Coordinator, error) {
 	params := Any2ExecParams(i)
 	firstQuery, extraOpts, err := t.GenerateFirstPromptWithMemoryOption(params)
 	if err != nil {
@@ -62,5 +62,5 @@ func (t *ForgeBlueprint) CreateCoordinator(ctx context.Context, i any, opts ...a
 	finalOpts = append(finalOpts, extraOpts...)
 	finalOpts = append(finalOpts, opts...)
 
-	return aid.NewCoordinatorContext(ctx, rawInput, finalOpts...)
+	return coordinator_legacy.NewCoordinatorContext(ctx, rawInput, finalOpts...)
 }

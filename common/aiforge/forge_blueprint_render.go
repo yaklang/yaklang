@@ -6,9 +6,8 @@ import (
 	"strings"
 	"text/template"
 
+	"github.com/yaklang/yaklang/common/ai/aid/coordinator_legacy"
 	"github.com/yaklang/yaklang/common/ai/aispec"
-
-	"github.com/yaklang/yaklang/common/ai/aid"
 
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
@@ -221,7 +220,7 @@ func (f *ForgeBlueprint) renderPersistentPrompt(query string) (string, error) {
 	return buf.String(), nil
 }
 
-func (f *ForgeBlueprint) renderResultPrompt(memory *aid.PromptContextProvider) (string, error) {
+func (f *ForgeBlueprint) renderResultPrompt(memory *coordinator_legacy.PromptContextProvider) (string, error) {
 	tmpl, err := template.New("result").Parse(f.ResultPrompt)
 	if err != nil {
 		log.Errorf("parse result prompt failed: %v", err)

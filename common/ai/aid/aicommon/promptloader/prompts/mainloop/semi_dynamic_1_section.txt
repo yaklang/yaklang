@@ -14,5 +14,11 @@
 {{/* PlanDocument: 当前已确认的 PLAN 原始文档，主循环完整展示，不拼接任务树和执行状态；共享存储和 helper 上下文保持原有路径。 */ -}}
 {{ if .PlanDocument }}{{ .PlanDocument }}
 
+{{ end }}{{/* PlanDefinition: 新 coordinator 的当前任务书和 DAG 依赖；实际编辑时更新，不含执行状态、结果或计数。 */ -}}
+{{ if .PlanDefinition }}{{ .PlanDefinition }}
+
 {{ end }}{{/* SessionEvidenceSemiDynamic: Timeline 冻结后提升的会话 Evidence，保留工具验证事实供后续决策引用。 */ -}}
 {{ if .SessionEvidenceSemiDynamic }}{{ .SessionEvidenceSemiDynamic }}{{ end }}
+
+{{/* CurrentReport: 当前报告草稿的唯一正文视图；写作时更新，位于半动态1，避免改写 Frozen 稳定前缀。 */ -}}
+{{ if .CurrentReport }}{{ .CurrentReport }}{{ end }}

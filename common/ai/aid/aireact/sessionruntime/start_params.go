@@ -6,6 +6,7 @@ import (
 	"github.com/yaklang/gorm"
 	"github.com/yaklang/yaklang/common/ai/aid"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
+	"github.com/yaklang/yaklang/common/ai/aid/coordinator"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
@@ -82,6 +83,9 @@ func ConvertStartParamsToReActConfig(i *ypb.AIStartParams) []aicommon.ConfigOpti
 
 	// EnablePlan 晚于 DisableAISearchForge 应用，用于控制 PE / 蓝图动作；与 AI 搜索 Forge 工具独立。
 	opts = append(opts, aicommon.WithEnablePlanAndExec(i.GetEnablePlan()))
+	if i.GetEnablePlan() {
+		opts = append(opts, coordinator.WithNativeHelpers())
+	}
 	if i.GetEnableDetachedPlan() {
 		opts = append(opts, aicommon.WithEnableDetachedPlan(true))
 	}

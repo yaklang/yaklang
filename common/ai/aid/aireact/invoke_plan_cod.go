@@ -6,8 +6,8 @@ import (
 	"sync"
 
 	"github.com/google/uuid"
-	"github.com/yaklang/yaklang/common/ai/aid"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
+	"github.com/yaklang/yaklang/common/ai/aid/coordinator_legacy"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
@@ -15,7 +15,7 @@ import (
 
 type planCoordinatorSession struct {
 	r                   *ReAct
-	cod                 *aid.Coordinator
+	cod                 *coordinator_legacy.Coordinator
 	uid                 string
 	planPayload         string
 	planInput           *aicommon.ExecutePlanInput
@@ -53,7 +53,7 @@ func (s *planCoordinatorSession) ReviewPlan(ctx context.Context) error {
 		return utils.Errorf("failed to build root task for plan review: %v", err)
 	}
 
-	planRsp := &aid.PlanResponse{
+	planRsp := &coordinator_legacy.PlanResponse{
 		RootTask: rootTask,
 		Document: s.planInput.PlanDocument,
 	}
@@ -121,7 +121,7 @@ func (s *planCoordinatorSession) fail(err error) {
 // BeginPlanCoordinatorSession creates a plan-exec coordinator from external plan loop output,
 // emits start_plan_and_execution for task-channel UI routing, and keeps the coordinator alive
 // until ReviewPlan completes.
-func (r *ReAct) BeginPlanCoordinatorSession(
+func (r *ReAct) beginLegacyPlanCoordinatorSession(
 	ctx context.Context,
 	input *aicommon.ExecutePlanInput,
 	forceManualReview bool,
@@ -239,7 +239,7 @@ func (r *ReAct) AsyncExecuteCod(ctx context.Context, coordinatorID string, onFin
 	}()
 }
 
-func executePlanInputFromPlanResponse(planPayload string, rsp *aid.PlanResponse, fallback *aicommon.ExecutePlanInput) *aicommon.ExecutePlanInput {
+func executePlanInputFromPlanResponse(planPayload string, rsp *coordinator_legacy.PlanResponse, fallback *aicommon.ExecutePlanInput) *aicommon.ExecutePlanInput {
 	if rsp == nil || rsp.RootTask == nil {
 		return nil
 	}
@@ -249,7 +249,7 @@ func executePlanInputFromPlanResponse(planPayload string, rsp *aid.PlanResponse,
 	}
 	return &aicommon.ExecutePlanInput{
 		PlanPayload:  planPayload,
-		PlanData:     aid.SerializeRootTaskToPlanData(rsp.RootTask),
+		PlanData:     coordinator_legacy.SerializeRootTaskToPlanData(rsp.RootTask),
 		PlanDocument: document,
 	}
 }

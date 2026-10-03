@@ -28,6 +28,11 @@ func (r *ReAct) persistTaskUserInput(task aicommon.AIStatefulTask) {
 	if task == nil {
 		return
 	}
+	// Approval/recovery queue entries are internal execution commands. Their
+	// display labels must not become another user instruction in the timeline.
+	if task.GetTaskKind() == aicommon.AITaskKind_Recovery {
+		return
+	}
 	userInput := task.GetUserInput()
 	if strings.TrimSpace(userInput) == "" {
 		return
@@ -164,6 +169,12 @@ func (r *ReAct) processReActTask(task aicommon.AIStatefulTask) {
 	r.currentIteration = 0
 	skipStatus, err := r.executeMainLoop(task)
 	if err != nil {
+		if task.IsUserCancelled() {
+			log.Infof("Task cancelled by user: %s", task.GetId())
+			task.SetStatus(aicommon.AITaskState_Skipped)
+			r.AddToTimeline("cancelled", "Task cancelled by user")
+			return
+		}
 		log.Errorf("Task execution failed: %v", err)
 		task.SetStatus(aicommon.AITaskState_Aborted)
 		r.AddToTimeline("error", fmt.Sprintf("Task execution failed: %v", err))
@@ -259,6 +270,7 @@ func (r *ReAct) selectLoopForTask(task aicommon.AIStatefulTask) (string, string,
 	if focus == "" {
 		focus = schema.AI_REACT_LOOP_NAME_DEFAULT
 	}
+
 	return parsedQuery, focus, loopOptions
 }
 
@@ -289,17 +301,23 @@ func (r *ReAct) parseLoopDirectives(userQuery string, defaultFocus string) (stri
 func extractDirectiveToken(query string, prefix string) (string, string, bool) {
 	idx := strings.Index(query, prefix)
 	if idx == -1 {
+		// Rich-text clients can escape underscores when serializing Markdown.
+		// Normalize only the directive marker, preserving all user content.
+		prefix = strings.ReplaceAll(prefix, "_", `\_`)
+		idx = strings.Index(query, prefix)
+	}
+	if idx == -1 {
 		return "", query, false
 	}
 	remaining := query[idx+len(prefix):]
 	if remaining == "" {
 		return "", strings.TrimSpace(query[:idx]), true
 	}
-	spaceIdx := strings.Index(remaining, " ")
+	spaceIdx := strings.IndexFunc(remaining, unicode.IsSpace)
 	if spaceIdx == -1 {
 		return remaining, strings.TrimSpace(query[:idx]), true
 	}
-	return remaining[:spaceIdx], strings.TrimSpace(query[:idx] + remaining[spaceIdx+1:]), true
+	return remaining[:spaceIdx], strings.TrimSpace(query[:idx] + strings.TrimLeftFunc(remaining[spaceIdx:], unicode.IsSpace)), true
 }
 
 func hasLoopConfigFlag(token string, flag string) bool {
@@ -328,6 +346,14 @@ func (r *ReAct) ExecuteLoopTaskIF(taskTypeName string, task aicommon.AIStatefulT
 }
 
 func (r *ReAct) ExecuteLoopTask(taskTypeName string, task aicommon.AIStatefulTask, options ...reactloops.ReActLoopOption) (bool, error) {
+	// Cached frontend focus names are upgraded at the outer boundary. They
+	// must never instantiate the retired legacy planner.
+	if taskTypeName == "plan" || taskTypeName == "coordinator_legacy" {
+		taskTypeName = "coordinator"
+	}
+	if taskTypeName == "coordinator" {
+		return false, r.invokeCoordinatorChannel(taskTypeName, make(chan struct{}), task.GetContext(), WithInvokePlanAndExecuteTask(task), WithInvokePlanAndExecutePlanPayload(task.GetUserInput()))
+	}
 	memoryFlushBuffer := aicommon.NewMemoryFlushBuffer("react", r.config.TimelineDiffer, nil)
 	defer memoryFlushBuffer.Close()
 	defaultOptions := reactloops.BasicAICommonConfigOption(r.config)
@@ -345,6 +371,12 @@ func (r *ReAct) ExecuteLoopTask(taskTypeName string, task aicommon.AIStatefulTas
 			// of callback registration order. Without deferral, this callback might
 			// check ShouldIgnoreError() before a later callback has called IgnoreError().
 			operator.DeferAfterCallbacks(func() {
+				if task.IsUserCancelled() {
+					// Cancellation has its own acknowledgement and skipped status.
+					// Yakit also cancels planning before detached approval; emitting
+					// fail here paints that normal handoff as an execution failure.
+					return
+				}
 				// 收尾表态统一交给纯决策函数 ClassifyLoopFinishEmission (便于单测):
 				//   - IgnoreError -> 静默 (隐藏/内部 loop 自管收尾, 不污染 UI);
 				//   - 迭代上限软中断 -> "自然结束"(success), 与具体 loop / 专注模式无关.

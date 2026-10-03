@@ -5,8 +5,6 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
-	"github.com/yaklang/yaklang/common/ai/aispec"
 	"github.com/yaklang/yaklang/common/ai/rag"
 	"github.com/yaklang/yaklang/common/ai/rag/knowledgebase"
 	"github.com/yaklang/yaklang/common/ai/rag/vectorstore"
@@ -27,7 +25,7 @@ func TestMUSTPASS_RAGSystem_AddKnowledgeEntryQuestion(t *testing.T) {
 
 	knowledgeDetails := mockEmbedding.GenerateRandomText(10)
 
-	mockAICallback := aicommon.AIChatToAICallbackType(func(prompt string, opts ...aispec.AIConfigOption) (string, error) {
+	mockAICallback := rag.MockAIService(func(prompt string) string {
 		rspStr := `{
 			"@action": "object",
 			"question_list": [
@@ -36,7 +34,7 @@ func TestMUSTPASS_RAGSystem_AddKnowledgeEntryQuestion(t *testing.T) {
 				{"question": "%s","answer_location": {"start_line": 3, "end_line": 4}}
 			]
 		}`
-		return fmt.Sprintf(rspStr, question1, question2, question3), nil
+		return fmt.Sprintf(rspStr, question1, question2, question3)
 	})
 	ragSystem, err := rag.Get(exportCollectionName,
 		rag.WithDB(db),

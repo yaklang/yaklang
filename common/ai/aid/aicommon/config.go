@@ -206,6 +206,9 @@ type Config struct {
 	*/
 	AICallbacks *AICallbacks
 
+	// Optional per-runtime helper implementation; the default uses the registered LiteForge.
+	LiteForgeExecutor LiteForgeExecuteCallback
+
 	// userUsageCallback 由用户脚本通过 ai.usageCallback(...) 注册并经
 	// aiengine.WithAIConfig 透传. Tiered AI 路径
 	// (GetXxxAIModelCallback -> CreateCallbackFromConfig) 重新构造 callback 时
@@ -261,6 +264,7 @@ type Config struct {
 	EnableAISearch               bool
 	DisableWebSearch             bool  // disable enhanced web search tool, default false (enabled)
 	DisallowMCPServers           bool  // 禁用 MCP Servers，默认为 false（即默认启用）
+	EnableSubagentsInPlan        bool  // PLAN 阶段允许派发调查子 Agent，默认关闭；不授予执行或递归派发权限。
 	EnableDispatchSubReactAgents bool  // Enable dispatching sub ReAct agents for parallel execution of subtasks (default: false, disabled)
 	PreferDispatchSubReactAgents bool  // Bias the top-level loop toward dispatch_sub_react_agents for parallelizable work.
 	MaxSubAgents                 int64 // Max simultaneous sub-agent concurrency (multi-agent mode).
@@ -4336,6 +4340,7 @@ func ConvertConfigToOptions(i *Config) []ConfigOption {
 	opts = append(opts, WithAllowPlanUserInteract(i.AllowPlanUserInteract))
 	opts = append(opts, WithEnablePlanAndExec(i.EnablePlanAndExec))
 	opts = append(opts, WithEnableDetachedPlan(i.EnableDetachedPlan))
+	opts = append(opts, WithEnableSubagentsInPlan(i.EnableSubagentsInPlan))
 	opts = append(opts, WithGenerateReport(i.GenerateReport))
 	// EnableDispatchSubReactAgents is intentionally omitted: only the top-level
 	// ReAct agent may dispatch sub ReAct agents; forked child configs must not inherit it.
@@ -4370,6 +4375,9 @@ func ConvertConfigToOptions(i *Config) []ConfigOption {
 	}
 	if i.ToolComposeConcurrency > 0 {
 		opts = append(opts, WithToolComposeConcurrency(i.ToolComposeConcurrency))
+	}
+	if i.LiteForgeExecutor != nil {
+		opts = append(opts, WithLiteForgeExecutor(i.LiteForgeExecutor))
 	}
 	if i.KeyValueConfig != nil {
 		if i.HaveConfig(ConfigKeyToolBatchMaxCalls) {
@@ -4597,7 +4605,14 @@ func (c *Config) invokeSpeedPriorityLiteForge(prompt string, opts ...any) (*Forg
 }
 
 func (c *Config) invokeLiteForgeWithCallback(prompt string, callback AICallbackType, opts ...any) (*ForgeResult, error) {
+	// The child request retains the parent's protocol and bounded supporting
+	// context. Explicit invocation options can still override these defaults.
+	opts = append([]any{WithEnableFunctionCallMode(c.EnableFunctionCallMode),
+		WithTimeline(c.Timeline), WithAppendPersistentContext(c.PersistentMemory...)}, opts...)
 	opts = append(opts, WithFastAICallback(callback))
 	opts = append(opts, WithDisableCreateDBRuntime(true)) // Avoid creating runtime records for lite forge calls
+	if c.LiteForgeExecutor != nil {
+		return c.LiteForgeExecutor(prompt, opts...)
+	}
 	return InvokeLiteForge(prompt, opts...)
 }

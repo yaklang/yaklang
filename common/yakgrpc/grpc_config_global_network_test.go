@@ -2,6 +2,7 @@ package yakgrpc
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -16,6 +17,7 @@ import (
 	"github.com/yaklang/yaklang/common/utils/spacengine/base"
 
 	"github.com/yaklang/yaklang/common/ai"
+	"github.com/yaklang/yaklang/common/ai/aid/aiprojection"
 	"github.com/yaklang/yaklang/common/ai/aispec"
 
 	"github.com/stretchr/testify/assert"
@@ -37,10 +39,11 @@ import (
 type GatewayClient struct {
 	valid              bool
 	functionCallHandle func(msg string) (map[string]any, error)
+	config             *aispec.AIConfig
 }
 
 func (g *GatewayClient) GetConfig() *aispec.AIConfig {
-	return nil
+	return g.config
 }
 
 func (g *GatewayClient) SupportedStructuredStream() bool {
@@ -64,6 +67,30 @@ func (g *GatewayClient) CheckValid() error {
 }
 
 func (g *GatewayClient) Chat(s string, function ...any) (string, error) {
+	if g.valid && g.functionCallHandle != nil {
+		result, err := g.functionCallHandle(s)
+		if err != nil {
+			return "", err
+		}
+		arguments, err := json.Marshal(result)
+		if err != nil {
+			return "", err
+		}
+		projected := aiprojection.ProjectAndObserve("priority-mock", s)
+		if g.config != nil && projected != nil && len(projected.Tools) == 1 && g.config.ToolCallCallback != nil {
+			g.config.ToolCallCallback([]*aispec.ToolCall{{ID: "priority-output", Function: aispec.FuncReturn{
+				Name: projected.Tools[0].Function.Name, Arguments: string(arguments),
+			}}})
+			if g.config.ToolCallArgumentsStreamHandler != nil {
+				g.config.ToolCallArgumentsStreamHandler(strings.NewReader(string(arguments)))
+			}
+			if g.config.FinishReasonCallback != nil {
+				g.config.FinishReasonCallback("tool_calls", nil)
+			}
+			return "", nil
+		}
+		return string(arguments), nil
+	}
 	if g.valid {
 		return "ok", nil
 	}
@@ -79,6 +106,7 @@ func (g *GatewayClient) ChatStream(s string) (io.Reader, error) {
 }
 
 func (g *GatewayClient) LoadOption(opt ...aispec.AIConfigOption) {
+	g.config = aispec.NewDefaultAIConfig(opt...)
 }
 
 func (g *GatewayClient) BuildHTTPOptions() ([]poc.PocConfigOption, error) {
@@ -180,6 +208,7 @@ func TestAiApiPriority(t *testing.T) {
 		}}
 	})
 	res, err := ai.FunctionCall("test", map[string]any{"translate": "翻译为英文"}, aispec.WithType("functionCall"))
+	require.NoError(t, err)
 	if !functionCallOk {
 		t.Fatal("ai api priority failed")
 	}

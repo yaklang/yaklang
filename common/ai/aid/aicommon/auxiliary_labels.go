@@ -3,7 +3,7 @@ package aicommon
 // AuxiliaryCallerLabel constants identify auxiliary AI tasks.
 // These values identify tasks whose execution path explicitly selects the
 // Speed model tier (LiteForge or direct CallSpeedPriorityAI),
-// which are formatted as liteforge[<actionName>] at aiforge/liteforge.go
+// which are formatted as liteforge[<actionName>] by aid/liteforge
 // and written into AIRequest.CallerLabel.
 const (
 	// ── Skip (subsystem entry gates + non-critical auxiliary steps) ──

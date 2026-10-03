@@ -191,20 +191,31 @@ func (pm *PromptManager) AssembleLoopPrompt(tools []*aitool.Tool, input *reactlo
 	// Keep the existing shared plan_document storage; relocate only its main-loop
 	// presentation. Extract before lightweight projection so the full document survives.
 	prefixMaterials := pm.NewPromptMaterials(base, input)
-	for i, partition := range prefixMaterials.FrozenPartitions {
-		if partition.ID == "plan_document" {
+	var remaining []aicommon.FrozenBlockPartition
+	for _, partition := range prefixMaterials.FrozenPartitions {
+		switch partition.ID {
+		case "plan_document":
 			prefixMaterials.PlanDocument = fmt.Sprintf("# PLAN DOCUMENT\n<|PLAN_DOCUMENT_%s|>\n%s\n<|PLAN_DOCUMENT_END_%s|>",
 				partition.Nonce, partition.Content, partition.Nonce)
-			prefixMaterials.FrozenPartitions = append(prefixMaterials.FrozenPartitions[:i], prefixMaterials.FrozenPartitions[i+1:]...)
-			break
+		case "plan_definition":
+			prefixMaterials.PlanDefinition = partition.Content
+		case "current_report":
+			prefixMaterials.CurrentReport = partition.Content
+		default:
+			remaining = append(remaining, partition)
 		}
 	}
+	prefixMaterials.FrozenPartitions = remaining
 	effectiveInput := input
 	if input.Lightweight {
 		base, effectiveInput = pm.projectLightweightLoopMaterials(base, input)
 		planDocument := prefixMaterials.PlanDocument
+		planDefinition := prefixMaterials.PlanDefinition
+		currentReport := prefixMaterials.CurrentReport
 		prefixMaterials = pm.NewPromptMaterials(base, effectiveInput)
 		prefixMaterials.PlanDocument = planDocument
+		prefixMaterials.PlanDefinition = planDefinition
+		prefixMaterials.CurrentReport = currentReport
 	}
 
 	prefixMaterials.CurrentTime = ""
@@ -703,7 +714,12 @@ func (pm *PromptManager) buildSemiDynamic1Observation(
 			"section.semi_dynamic_1.plan_document", "PLAN DOCUMENT",
 			reactloops.PromptSectionRoleSemiDynamic1, false, materials.PlanDocument,
 		),
+		reactloops.NewPromptSectionObservation(
+			"section.semi_dynamic_1.plan_definition", "PLAN DEFINITION",
+			reactloops.PromptSectionRoleSemiDynamic1, false, materials.PlanDefinition,
+		),
 		reactloops.NewPromptSectionObservation("section.semi_dynamic_1.evidence", "Session Evidence", reactloops.PromptSectionRoleSemiDynamic1, true, materials.SessionEvidenceSemiDynamic),
+		reactloops.NewPromptSectionObservation("section.semi_dynamic_1.current_report", "CURRENT REPORT", reactloops.PromptSectionRoleSemiDynamic1, false, materials.CurrentReport),
 	}
 	section.Children = filterIncludedPromptSections(children)
 	if strings.TrimSpace(rendered) != "" {

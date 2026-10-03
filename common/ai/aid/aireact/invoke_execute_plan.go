@@ -6,15 +6,15 @@ import (
 	"sync"
 
 	"github.com/google/uuid"
-	"github.com/yaklang/yaklang/common/ai/aid"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
+	"github.com/yaklang/yaklang/common/ai/aid/coordinator_legacy"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 )
 
 var (
-	runCoordinatorForExecuteApprovedPlan = func(c *aid.Coordinator) error { return c.RunExecuteApprovedPlan() }
+	runCoordinatorForExecuteApprovedPlan = func(c *coordinator_legacy.Coordinator) error { return c.RunExecuteApprovedPlan() }
 )
 
 // AsyncExecutePlan runs an already-generated plan through Coordinator execution only.
@@ -57,7 +57,7 @@ func (r *ReAct) AsyncExecutePlan(ctx context.Context, input *aicommon.ExecutePla
 	}
 }
 
-func (r *ReAct) invokeExecutePlan(doneChannel chan struct{}, ctx context.Context, opts ...InvokePlanAndExecuteOption) (finalErr error) {
+func (r *ReAct) invokeLegacyExecutePlan(doneChannel chan struct{}, ctx context.Context, opts ...InvokePlanAndExecuteOption) (finalErr error) {
 	cfg := newInvokePlanAndExecuteOptions(opts...)
 	task := cfg.task
 	input := cfg.executePlanInput

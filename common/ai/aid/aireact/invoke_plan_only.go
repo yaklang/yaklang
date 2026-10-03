@@ -7,8 +7,8 @@ import (
 	"sync"
 
 	"github.com/google/uuid"
-	"github.com/yaklang/yaklang/common/ai/aid"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
+	"github.com/yaklang/yaklang/common/ai/aid/coordinator_legacy"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
@@ -17,8 +17,8 @@ import (
 )
 
 var (
-	runCoordinatorForPlanOnly    = func(c *aid.Coordinator) error { return c.RunPlanOnly() }
-	runCoordinatorForExecuteOnly = func(c *aid.Coordinator) error { return c.RunExecuteOnly() }
+	runCoordinatorForPlanOnly    = func(c *coordinator_legacy.Coordinator) error { return c.RunPlanOnly() }
+	runCoordinatorForExecuteOnly = func(c *coordinator_legacy.Coordinator) error { return c.RunExecuteOnly() }
 )
 
 // AsyncPlanOnly runs plan loop + user review, then asynchronously executes the approved plan.
@@ -54,7 +54,7 @@ func (r *ReAct) AsyncPlanOnly(ctx context.Context, planPayload string, onFinishe
 	}
 }
 
-func (r *ReAct) invokePlanOnly(doneChannel chan struct{}, ctx context.Context, opts ...InvokePlanAndExecuteOption) (finalErr error) {
+func (r *ReAct) invokeLegacyPlanOnly(doneChannel chan struct{}, ctx context.Context, opts ...InvokePlanAndExecuteOption) (finalErr error) {
 	cfg := newInvokePlanAndExecuteOptions(opts...)
 	task := cfg.task
 	planPayload := cfg.planPayload
@@ -205,6 +205,7 @@ func buildPlanExecBaseOptions(
 	baseOpts := aicommon.ConvertConfigToOptions(r.config)
 	baseOpts = append(baseOpts,
 		aicommon.WithID(uid),
+		aicommon.WithLiteForgeExecutor(nil),
 		aicommon.WithTimeline(r.config.Timeline),
 		aicommon.WithInheritTieredAICallback(r.config, false),
 		aicommon.WithAllowPlanUserInteract(true),
@@ -220,7 +221,7 @@ func buildPlanExecBaseOptions(
 }
 
 // invokePlanExecuteOnly runs subtask execution for a coordinator that already has plan_ready state.
-func (r *ReAct) invokePlanExecuteOnly(doneChannel chan struct{}, ctx context.Context, opts ...InvokePlanAndExecuteOption) error {
+func (r *ReAct) invokeLegacyPlanExecuteOnly(doneChannel chan struct{}, ctx context.Context, opts ...InvokePlanAndExecuteOption) error {
 	cfg := newInvokePlanAndExecuteOptions(opts...)
 	coordinatorID := cfg.coordinatorID
 	task := cfg.task
@@ -261,7 +262,7 @@ func (r *ReAct) invokePlanExecuteOnly(doneChannel chan struct{}, ctx context.Con
 
 	baseOpts := buildPlanExecBaseOptions(r, uid, planCtx, inputChannel, hotpatchChan)
 	if cfg.startTaskID != "" {
-		baseOpts = append(baseOpts, aid.WithRecoveryStartTaskID(cfg.startTaskID))
+		baseOpts = append(baseOpts, coordinator_legacy.WithRecoveryStartTaskID(cfg.startTaskID))
 	}
 
 	cod, err := newCoordinatorContextForPlanExec(planCtx, "", baseOpts...)

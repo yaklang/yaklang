@@ -392,7 +392,9 @@ func (r *ReActLoop) generateLoopPrompt(
 		return "", err
 	}
 	var planStatus string
-	if provider, ok := r.GetCurrentTask().(aicommon.PlanStatusProvider); ok {
+	if r.planStatusProvider != nil {
+		planStatus = r.planStatusProvider()
+	} else if provider, ok := r.GetCurrentTask().(aicommon.PlanStatusProvider); ok {
 		planStatus = provider.GetPlanStatusForPrompt()
 	}
 

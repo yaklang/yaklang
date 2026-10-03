@@ -10,7 +10,6 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/yaklang/yaklang/common/ai/aid"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon/promptloader"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
@@ -69,7 +68,7 @@ func BenchCompressLongText(
 		aireducer.WithContext(ctx),
 		aireducer.WithEnableLineNumber(true),
 		aireducer.WithChunkSize(int64(maxChunkSize)),
-		aireducer.WithReducerCallback(func(config *aireducer.Config, memory *aid.PromptContextProvider, chunk chunkmaker.Chunk) error {
+		aireducer.WithReducerCallback(func(config *aireducer.Config, _ any, chunk chunkmaker.Chunk) error {
 			currentBlockSize++
 			if currentBlockSize > maxChunks {
 				return nil

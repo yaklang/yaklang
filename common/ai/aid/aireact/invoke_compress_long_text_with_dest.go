@@ -12,7 +12,6 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/yaklang/yaklang/common/ai/aid"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/ai/ytoken"
@@ -120,7 +119,7 @@ func (r *ReAct) CompressLongTextWithDestination(
 		aireducer.WithContext(ctx),
 		aireducer.WithEnableLineNumber(true),         // 自动添加行号，格式：N | content
 		aireducer.WithChunkSize(int64(maxChunkSize)), // 块大小硬限制
-		aireducer.WithReducerCallback(func(config *aireducer.Config, memory *aid.PromptContextProvider, chunk chunkmaker.Chunk) error {
+		aireducer.WithReducerCallback(func(config *aireducer.Config, _ any, chunk chunkmaker.Chunk) error {
 			currentBlockSize++
 			if currentBlockSize > maxChunks {
 				isOversize = true

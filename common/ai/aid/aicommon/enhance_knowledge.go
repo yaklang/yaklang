@@ -74,6 +74,29 @@ type EnhanceKnowledgeManager struct {
 	taskToKnowledgeUUID map[string]*KnowledgeCollection
 }
 
+// ForkForSubAgent preserves the knowledge source and a snapshot of existing
+// knowledge, while keeping the child emitter and task collections independent.
+// Concurrent workers must not replace the parent's (or each other's) emitter.
+func (m *EnhanceKnowledgeManager) ForkForSubAgent() *EnhanceKnowledgeManager {
+	if m == nil {
+		return nil
+	}
+	m.mux.Lock()
+	defer m.mux.Unlock()
+	child := NewEnhanceKnowledgeManagerWithCollectionLimitGetter(m.knowledgeGetter)
+	for id, knowledge := range m.knowledgeMap {
+		child.knowledgeMap[id] = knowledge
+	}
+	for task, collection := range m.taskToKnowledgeUUID {
+		copy := NewKnowledgeCollection()
+		for _, knowledge := range collection.GetKnowledgeList() {
+			copy.Append(knowledge)
+		}
+		child.taskToKnowledgeUUID[task] = copy
+	}
+	return child
+}
+
 func (m *EnhanceKnowledgeManager) SetEmitter(emitter *Emitter) {
 	if m == nil {
 		return

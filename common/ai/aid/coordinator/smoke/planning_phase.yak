@@ -1,0 +1,17 @@
+// 第一阶段：真实 Yak + aim + 默认入口的计划专注流程。
+// harness 只注入确定性模型、事件记录、测试配置、输入夹具及完成屏障。
+// 审核批准后结束规划交接，不启动 pe_task。
+engine = aim.NewAIEngine(
+    aim.planEngine("coordinator"),
+    aim.maxIteration(40),
+    aim.timeout(30),
+    aim.reviewPolicy("yolo"),
+    aim.aiCallback(PLAN_MODEL),
+    aim.onEvent(PLAN_EVENT),
+    aim.workdir(SMOKE_WORKDIR),
+    SMOKE_OPTIONS...,
+)~
+defer engine.Close()
+PLAN_SETUP(engine.GetOperator(), PLAN_QUERY)
+engine.GetOperator().AsyncPlanOnly(SMOKE_CONTEXT, PLAN_QUERY, PLAN_FINISHED)
+die(PLAN_WAIT())

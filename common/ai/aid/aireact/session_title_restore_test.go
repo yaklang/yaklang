@@ -7,6 +7,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
+	"github.com/yaklang/yaklang/common/ai/rag"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
@@ -82,9 +83,9 @@ func TestPersistentSessionPlaceholderDoesNotBlockAsyncTitleGeneration(t *testing
 	react, err := NewTestReAct(
 		aicommon.WithContext(ctx),
 		aicommon.WithDisableSessionTitleGeneration(false),
-		aicommon.WithSpeedPriorityAICallback(func(c aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
-			return mockedLoopDirectlyAnswerOutput(c, `{"@action":"session-title-generator","session_title":"持久化会话标题"}`)
-		}),
+		aicommon.WithSpeedPriorityAICallback(rag.MockAIService(func(string) string {
+			return `{"@action":"session-title-generator","session_title":"持久化会话标题"}`
+		})),
 	)
 	require.NoError(t, err)
 	defer func() {

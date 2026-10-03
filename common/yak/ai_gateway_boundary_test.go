@@ -2,6 +2,8 @@ package yak
 
 import (
 	"context"
+	"encoding/json"
+	"strings"
 	"testing"
 	"time"
 
@@ -19,9 +21,18 @@ type rawScriptGateway struct {
 func (g *rawScriptGateway) LoadOption(opts ...aispec.AIConfigOption) {
 	g.config = aispec.NewDefaultAIConfig(opts...)
 }
-func (g *rawScriptGateway) GetConfig() *aispec.AIConfig         { return g.config }
-func (g *rawScriptGateway) CheckValid() error                   { return nil }
-func (g *rawScriptGateway) Chat(string, ...any) (string, error) { return g.config.Model, nil }
+func (g *rawScriptGateway) GetConfig() *aispec.AIConfig { return g.config }
+func (g *rawScriptGateway) CheckValid() error           { return nil }
+func (g *rawScriptGateway) Chat(string, ...any) (string, error) {
+	if g.config.ToolCallCallback != nil {
+		data, _ := json.Marshal(map[string]any{"model": g.config.Model})
+		g.config.ToolCallCallback([]*aispec.ToolCall{{ID: "output", Function: aispec.FuncReturn{Name: "object", Arguments: string(data)}}})
+		g.config.ToolCallArgumentsStreamHandler(strings.NewReader(string(data)))
+		g.config.FinishReasonCallback("tool_calls", nil)
+		return "", nil
+	}
+	return g.config.Model, nil
+}
 func (g *rawScriptGateway) ExtractData(string, string, map[string]any) (map[string]any, error) {
 	return map[string]any{"model": g.config.Model}, nil
 }

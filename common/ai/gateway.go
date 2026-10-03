@@ -716,35 +716,23 @@ func VisionChat(msg string, opts ...aispec.AIConfigOption) (string, error) {
 	return TieredChatWithTier(TierVision, msg, opts...)
 }
 
-func legacyFunctionCall(input string, funcs any, opts ...aispec.AIConfigOption) (map[string]any, error) {
+func directFunctionCall(input string, funcs any, opts ...aispec.AIConfigOption) (map[string]any, error) {
 	config := aispec.NewDefaultAIConfig(opts...)
-	var responseRsp map[string]any
-	var err error
-	err = tryCreateAIGateway(config.Type, config.DisableProviderFallback, func(typ string, gateway aispec.AIClient) (bool, error) {
-		gateway.LoadOption(append([]aispec.AIConfigOption{aispec.WithType(typ)}, opts...)...)
+	var result map[string]any
+	err := tryCreateAIGateway(config.Type, config.DisableProviderFallback, func(typ string, gateway aispec.AIClient) (bool, error) {
+		callOpts := append([]aispec.AIConfigOption{aispec.WithType(typ)}, opts...)
+		gateway.LoadOption(callOpts...)
 		if err := gateway.CheckValid(); err != nil {
-			log.Debugf("check valid by %s failed: %s", typ, err)
 			return false, err
 		}
-		var ok bool
-		for i := 0; i < config.FunctionCallRetryTimes; i++ {
-			responseRsp, err = gateway.ExtractData(input, "", utils.InterfaceToGeneralMap(funcs))
-			if err != nil {
-				log.Warnf("chat by %s failed: %s, retry times: %d", typ, err, i)
-			} else {
-				ok = true
-				break
-			}
-		}
-		if !ok {
+		chat, err := LoadChater(typ)
+		if err != nil {
 			return false, err
 		}
-		return true, nil
+		result, err = aispec.ExecuteStructuredOutput(input, utils.InterfaceToGeneralMap(funcs), chat, callOpts...)
+		return err == nil, err
 	})
-	if err != nil {
-		return nil, err
-	}
-	return responseRsp, nil
+	return result, err
 }
 
 func functionCallWithModelConfig(input string, funcs any, cfg *ypb.AIModelConfig, opts ...aispec.AIConfigOption) (map[string]any, error) {
@@ -772,17 +760,11 @@ func functionCallWithModelConfig(input string, funcs any, cfg *ypb.AIModelConfig
 		return nil, err
 	}
 
-	config := aispec.NewDefaultAIConfig(allOpts...)
-	var response map[string]any
-	var err error
-	for i := 0; i < config.FunctionCallRetryTimes; i++ {
-		response, err = agent.ExtractData(input, "", utils.InterfaceToGeneralMap(funcs))
-		if err == nil {
-			return response, nil
-		}
-		log.Warnf("function call by %s failed: %s, retry times: %d", providerType, err, i)
+	chat, err := LoadChater(providerType)
+	if err != nil {
+		return nil, err
 	}
-	return nil, err
+	return aispec.ExecuteStructuredOutput(input, utils.InterfaceToGeneralMap(funcs), chat, allOpts...)
 }
 
 func functionCallWithConfigs(input string, funcs any, configs []*ypb.AIModelConfig, opts ...aispec.AIConfigOption) (map[string]any, error) {
@@ -809,8 +791,8 @@ func tieredFunctionCall(input string, funcs any, opts ...aispec.AIConfigOption) 
 	policy := consts.GetTieredAIRoutingPolicy()
 	configs := getConfigsForPolicy(policy)
 	if len(configs) == 0 {
-		log.Warnf("No tiered AI config available for policy %s, falling back to legacy function call", policy)
-		return legacyFunctionCall(input, funcs, opts...)
+		log.Warnf("No tiered AI config available for policy %s, using direct provider selection", policy)
+		return directFunctionCall(input, funcs, opts...)
 	}
 
 	result, err := functionCallWithConfigs(input, funcs, configs, opts...)
@@ -826,14 +808,17 @@ func tieredFunctionCall(input string, funcs any, opts ...aispec.AIConfigOption) 
 		}
 	}
 
-	log.Warnf("All tiered configs failed for function call, falling back to legacy path")
-	return legacyFunctionCall(input, funcs, opts...)
+	log.Warnf("All tiered configs failed for function call, using direct provider selection")
+	return directFunctionCall(input, funcs, opts...)
 }
 
 func TieredFunctionCallWithTier(tier ModelTier, input string, funcs any, opts ...aispec.AIConfigOption) (map[string]any, error) {
+	if err := aispec.RequireStructuredOutputExecutor(); err != nil {
+		return nil, err
+	}
 	if !consts.IsTieredAIModelConfigEnabled() {
-		log.Debugf("Tiered AI config not enabled, using legacy function call")
-		return legacyFunctionCall(input, funcs, opts...)
+		log.Debugf("Tiered AI config not enabled, using direct provider selection")
+		return directFunctionCall(input, funcs, opts...)
 	}
 
 	configs := getConfigsForTier(tier)
@@ -1069,9 +1054,12 @@ func ListModelByProviderType(providerType string, opts ...aispec.AIConfigOption)
 // dump(result)
 // ```
 func FunctionCall(input string, funcs any, opts ...aispec.AIConfigOption) (map[string]any, error) {
+	if err := aispec.RequireStructuredOutputExecutor(); err != nil {
+		return nil, err
+	}
 	config := aispec.NewDefaultAIConfig(opts...)
 	if config.Type != "" {
-		return legacyFunctionCall(input, funcs, opts...)
+		return directFunctionCall(input, funcs, opts...)
 	}
 	if preferredTier, ok := resolvePreferredTier(config); ok {
 		return TieredFunctionCallWithTier(preferredTier, input, funcs, opts...)
@@ -1079,7 +1067,7 @@ func FunctionCall(input string, funcs any, opts ...aispec.AIConfigOption) (map[s
 	if consts.IsTieredAIModelConfigEnabled() {
 		return tieredFunctionCall(input, funcs, opts...)
 	}
-	return legacyFunctionCall(input, funcs, opts...)
+	return directFunctionCall(input, funcs, opts...)
 }
 
 func LoadChater(name string, defaultOpts ...aispec.AIConfigOption) (aispec.GeneralChatter, error) {
@@ -1159,6 +1147,7 @@ var Exports = map[string]any{
 	"enableEndpoint":                 aispec.WithEnableEndpoint,
 	"apiType":                        aispec.WithAPIType,
 	"extraHeader":                    WithExtraHeader,
+	"withFunctionCallMode":           aispec.WithFunctionCallMode,
 	"onStream":                       aispec.WithStreamHandler,
 	"onReasonStream":                 aispec.WithReasonStreamHandler,
 	"debugStream":                    aispec.WithDebugStream,
