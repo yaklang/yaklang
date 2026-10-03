@@ -61,28 +61,42 @@ type Result struct {
 }
 
 type Attempt struct {
-	Task         Task   `json:"task"`
-	ID           uint64 `json:"attempt_id"`
-	PlanVersion  uint64 `json:"plan_version"`
-	State        State  `json:"state"`
-	Result       Result `json:"result"`
-	ReviewReason string `json:"review_reason,omitempty"`
+	Task         Task      `json:"task"`
+	ID           uint64    `json:"attempt_id"`
+	State        State     `json:"state"`
+	Result       Result    `json:"result"`
+	ReviewReason string    `json:"review_reason,omitempty"`
+	Plan         *Plan     `json:"-"`
+	Predecessors []Attempt `json:"-"`
+	PriorResults []Attempt `json:"-"`
 }
 
 // Snapshot is also the on-disk contract. Runtime contexts, callbacks and worker
 // goroutines are never serialized. Interrupted workers require an explicit retry.
+type Phase string
+
+const (
+	PhasePlan Phase = "PLAN"
+	PhaseExec Phase = "EXEC"
+)
+
 type Snapshot struct {
-	Schema           int                `json:"schema"`
-	Revision         uint64             `json:"revision"`
-	DraftVersion     uint64             `json:"draft_version"`
-	ApprovedVersion  uint64             `json:"approved_version"`
-	SubmittedVersion uint64             `json:"submitted_version,omitempty"`
-	Draft            *Plan              `json:"draft,omitempty"`
-	Approved         *Plan              `json:"approved,omitempty"`
-	Attempts         map[string]Attempt `json:"attempts"`
-	NextAttempt      uint64             `json:"next_attempt"`
-	UserRevision     uint64             `json:"user_revision"`
-	Finished         bool               `json:"finished"`
+	Schema           int                  `json:"schema"`
+	Revision         uint64               `json:"revision"`
+	Phase            Phase                `json:"phase"`
+	Plan             *Plan                `json:"plan,omitempty"`
+	ReviewPending    bool                 `json:"review_pending,omitempty"`
+	Attempts         map[string]Attempt   `json:"attempts"`
+	NextAttempt      uint64               `json:"next_attempt"`
+	UserRevision     uint64               `json:"user_revision"`
+	Finished         bool                 `json:"finished"`
+	History          map[string][]Attempt `json:"history,omitempty"`
+	Inbox            []Message            `json:"inbox,omitempty"`
+	NextMessage      uint64               `json:"next_message,omitempty"`
+	DeliveredThrough uint64               `json:"delivered_through,omitempty"`
+	CheckedThrough   uint64               `json:"checked_through,omitempty"`
+	ApprovalRecorded bool                 `json:"approval_recorded,omitempty"`
+	Report           ReportDraft          `json:"report"`
 }
 
 // Host implements the existing PLAN construction, approval, pe_task execution,
@@ -96,18 +110,28 @@ type Host interface {
 }
 
 type Controller struct {
-	mu          sync.Mutex
-	publishMu   sync.Mutex
-	published   uint64
-	ctx         context.Context
-	cancel      context.CancelFunc
-	host        Host
-	state       Snapshot
-	workers     map[string]context.CancelFunc
-	changed     chan struct{}
-	concurrency int
-	reviewing   bool
-	closed      bool
+	mu               sync.Mutex
+	owned            sync.WaitGroup
+	editMu           sync.Mutex
+	patchDir         string
+	explorationCheck func() error
+	publishMu        sync.Mutex
+	published        uint64
+	ctx              context.Context
+	cancel           context.CancelFunc
+	host             Host
+	state            Snapshot
+	workers          map[string]context.CancelFunc
+	changed          chan struct{}
+	concurrency      int
+	reviewing        bool
+	closed           bool
+	automatic        bool
+	manualReview     bool
+	editing          bool
+	reviewJobs       map[string]context.CancelFunc
+	reviewAt         map[string]time.Time
+	reviewInterval   time.Duration
 	// Notification cursor is runtime-only; it never claims the model read a result.
 	eventRevision uint64
 	discoveries   map[string]uint64
@@ -130,7 +154,7 @@ func New(ctx context.Context, host Host, concurrency int) *Controller {
 	ctx, cancel := context.WithCancel(ctx)
 	return &Controller{ctx: ctx, cancel: cancel, host: host, concurrency: concurrency,
 		workers: make(map[string]context.CancelFunc), changed: make(chan struct{}),
-		state: Snapshot{Schema: 1, Attempts: make(map[string]Attempt)}}
+		state: Snapshot{Schema: 2, Phase: PhasePlan, Attempts: make(map[string]Attempt)}}
 }
 
 func clone[T any](v T) T { b, _ := json.Marshal(v); var out T; _ = json.Unmarshal(b, &out); return out }
@@ -215,6 +239,13 @@ func (c *Controller) publish() {
 	}
 	if c.host != nil {
 		c.host.Changed(s)
+		if host, ok := c.host.(interface{ StateError() error }); ok {
+			if err := host.StateError(); err != nil {
+				c.mu.Lock()
+				c.resultErr = err
+				c.mu.Unlock()
+			}
+		}
 	}
 	// Publish facts and the compatible UI snapshot before waking any waiter.
 	c.mu.Lock()
@@ -231,26 +262,26 @@ func (c *Controller) PromptStatus() string {
 
 func (s Snapshot) PromptStatus() string {
 	var b strings.Builder
-	fmt.Fprintf(&b, "# PLAN STATUS\nDraft version: %d; approved version: %d\n", s.DraftVersion, s.ApprovedVersion)
-	if s.SubmittedVersion > 0 && s.Approved == nil {
-		fmt.Fprintf(&b, "Detached submitted version: %d; awaiting the user's execution request.\n", s.SubmittedVersion)
-	}
-	if s.Approved == nil {
-		b.WriteString("PLAN awaits approval; no tasks may execute.\n")
-		if s.Draft != nil {
-			b.WriteString("## PLAN 草案任务（未批准）\n")
-			for _, t := range s.Draft.Tasks {
-				fmt.Fprintf(&b, "- %s %q [%s]: draft\n", t.Index, t.Name, t.ID)
-			}
-		}
+	fmt.Fprintf(&b, "# PLAN STATUS\n阶段：%s；已有计划：%t；等待审核：%t\n", s.Phase, s.Plan != nil, s.ReviewPending)
+	if s.Phase == PhasePlan {
+		b.WriteString("业务任务尚未获批，不可执行。\n")
 		return b.String()
 	}
-	if s.DraftVersion != s.ApprovedVersion {
-		b.WriteString("A replacement draft awaits submission; execution still uses the approved version.\n")
+	counts := map[State]int{}
+	for _, a := range s.Attempts {
+		counts[a.State]++
 	}
+	fmt.Fprintf(&b, "运行/退出中：%d；待审核：%d；未开始：%d；已审核：%d；失败/拒绝：%d\n", counts[Running]+counts[Cancelling], counts[AwaitingReview], counts[Pending], counts[Accepted], counts[Failed]+counts[Rejected])
+	critical := 0
+	for _, m := range s.Inbox {
+		if m.NeedsDecision && m.Sequence > s.CheckedThrough {
+			critical++
+		}
+	}
+	fmt.Fprintf(&b, "待检查关键消息：%d；报告草稿：%t；报告已提交：%t\n", critical, s.Report.Path != "", s.Report.Submitted)
 	for group, heading := range []string{"当前执行 / 待验收", "PLAN 未开始任务", "其他任务状态"} {
 		written := false
-		for _, t := range s.Approved.Tasks {
+		for _, t := range s.Plan.Tasks {
 			a := s.Attempts[t.ID]
 			active := a.State == Running || a.State == Cancelling || a.State == AwaitingReview
 			if (group == 0 && !active) || (group == 1 && a.State != Pending) || (group == 2 && (active || a.State == Pending)) {
@@ -289,189 +320,6 @@ func (c *Controller) checkLocked() error {
 	return c.ctx.Err()
 }
 
-// CreatePlan and ModifyPlan replace only the draft. Approval is a separate
-// version-checked operation; existing approved work can continue meanwhile.
-func (c *Controller) CreatePlan(ctx context.Context, data, document string) (uint64, error) {
-	return c.edit(ctx, data, document, 0, true)
-}
-func (c *Controller) ModifyPlan(ctx context.Context, version uint64, data, document string) (uint64, error) {
-	return c.edit(ctx, data, document, version, false)
-}
-func (c *Controller) edit(ctx context.Context, data, document string, version uint64, create bool) (uint64, error) {
-	if c.host == nil {
-		return 0, fmt.Errorf("coordinator host is missing")
-	}
-	c.mu.Lock()
-	if err := c.checkLocked(); err != nil {
-		c.mu.Unlock()
-		return 0, err
-	}
-	if c.reviewing || (create && c.state.Draft != nil) || (!create && (version != c.state.DraftVersion || c.state.Draft == nil)) {
-		c.mu.Unlock()
-		return 0, fmt.Errorf("draft changed or is under review; read the current plan context")
-	}
-	base := c.state.DraftVersion
-	c.mu.Unlock()
-	p, err := c.host.Prepare(ctx, data, document)
-	if err != nil {
-		return 0, err
-	}
-	if err = validate(p); err != nil {
-		return 0, err
-	}
-	c.mu.Lock()
-	if err = c.checkLocked(); err != nil {
-		c.mu.Unlock()
-		return 0, err
-	}
-	if c.reviewing || c.state.DraftVersion != base {
-		c.mu.Unlock()
-		return 0, fmt.Errorf("draft changed while preparing plan")
-	}
-	c.state.Draft = clone(p)
-	c.state.DraftVersion++
-	c.state.Finished = false
-	v := c.state.DraftVersion
-	c.notifyLocked()
-	c.mu.Unlock()
-	c.publish()
-	return v, nil
-}
-
-func (c *Controller) SubmitPlan(ctx context.Context, version uint64) error {
-	c.mu.Lock()
-	if err := c.checkLocked(); err != nil {
-		c.mu.Unlock()
-		return err
-	}
-	if c.reviewing || c.state.Draft == nil || c.state.DraftVersion != version {
-		c.mu.Unlock()
-		return fmt.Errorf("draft changed or is already under review")
-	}
-	// Retrying the action must not request a second approval or reset tasks
-	// that are already executing under this approved version.
-	if (c.state.Approved != nil && c.state.ApprovedVersion == version) ||
-		(c.state.Approved == nil && c.state.SubmittedVersion == version) {
-		c.mu.Unlock()
-		return nil
-	}
-	c.reviewing = true
-	draft := clone(c.state.Draft)
-	c.mu.Unlock()
-	p, err := c.host.Approve(ctx, draft)
-	detached := errors.Is(err, ErrDetachedPlanPublished)
-	if detached {
-		err = nil
-	}
-	if err == nil && !detached {
-		err = validate(p)
-	}
-	c.mu.Lock()
-	c.reviewing = false
-	if err == nil {
-		err = c.checkLocked()
-	}
-	if err == nil && c.state.DraftVersion != version {
-		err = fmt.Errorf("approval is stale")
-	}
-	if err == nil && detached {
-		c.state.SubmittedVersion = version
-	} else if err == nil {
-		err = c.adoptLocked(p, version)
-	}
-	c.notifyLocked()
-	c.mu.Unlock()
-	c.publish()
-	return err
-}
-
-func (c *Controller) adoptLocked(p *Plan, version uint64) error {
-	newTasks := make(map[string]Task)
-	for _, t := range p.Tasks {
-		newTasks[t.ID] = t
-	}
-	affected := make(map[string]bool)
-	for id, a := range c.state.Attempts {
-		if t, ok := newTasks[id]; !ok || !reflect.DeepEqual(t, a.Task) {
-			affected[id] = true
-		}
-	}
-	for changed := true; changed; {
-		changed = false
-		for _, t := range p.Tasks {
-			for _, dep := range t.DependsOn {
-				if affected[dep] && !affected[t.ID] {
-					affected[t.ID], changed = true, true
-				}
-			}
-		}
-	}
-	for id := range c.workers {
-		a := c.state.Attempts[id]
-		t, ok := newTasks[id]
-		if !ok || affected[id] || !reflect.DeepEqual(t, a.Task) {
-			return fmt.Errorf("cancel and wait for active task %q before replacing its brief", id)
-		}
-	}
-	retained := make(map[string]Attempt)
-	for _, t := range p.Tasks {
-		if a, ok := c.state.Attempts[t.ID]; ok && !affected[t.ID] && reflect.DeepEqual(t, a.Task) {
-			retained[t.ID] = a
-		} else {
-			retained[t.ID] = Attempt{Task: clone(t), State: Pending, PlanVersion: version}
-		}
-	}
-	// A changed input invalidates all downstream accepted results as well.
-	for changed := true; changed; {
-		changed = false
-		for _, t := range p.Tasks {
-			a := retained[t.ID]
-			if a.State != Accepted {
-				continue
-			}
-			for _, dep := range t.DependsOn {
-				if retained[dep].State != Accepted {
-					a.State = Pending
-					a.ID = 0
-					a.Result = Result{}
-					retained[t.ID] = a
-					changed = true
-					break
-				}
-			}
-		}
-	}
-	c.state.Draft = clone(p)
-	c.state.Approved = clone(p)
-	c.state.ApprovedVersion = version
-	c.state.Attempts = retained
-	c.state.Finished = false
-	return nil
-}
-
-// LoadApproved is for existing approved/detached plans. It bypasses no approval:
-// callers must already own an approved plan through the legacy review endpoint.
-func (c *Controller) LoadApproved(p *Plan) error {
-	if err := validate(p); err != nil {
-		return err
-	}
-	c.mu.Lock()
-	if c.state.Approved != nil || c.state.Draft != nil {
-		c.mu.Unlock()
-		return fmt.Errorf("plan already loaded")
-	}
-	if err := c.checkLocked(); err != nil {
-		c.mu.Unlock()
-		return err
-	}
-	c.state.DraftVersion = 1
-	err := c.adoptLocked(p, 1)
-	c.notifyLocked()
-	c.mu.Unlock()
-	c.publish()
-	return err
-}
-
 func (c *Controller) readyLocked(a Attempt) bool {
 	if a.State != Pending {
 		return false
@@ -492,12 +340,12 @@ func (c *Controller) StartTasks(ids []string) ([]Attempt, error) {
 		c.mu.Unlock()
 		return nil, err
 	}
-	if c.state.Approved == nil {
+	if c.state.Phase != PhaseExec || c.state.Plan == nil {
 		c.mu.Unlock()
 		return nil, fmt.Errorf("submit and approve a plan first")
 	}
 	if len(ids) == 0 {
-		for _, t := range c.state.Approved.Tasks {
+		for _, t := range c.state.Plan.Tasks {
 			if c.readyLocked(c.state.Attempts[t.ID]) {
 				ids = append(ids, t.ID)
 			}
@@ -537,15 +385,34 @@ func (c *Controller) startLocked(ids []string) ([]Attempt, []context.Context) {
 		a := c.state.Attempts[id]
 		c.state.NextAttempt++
 		a.ID = c.state.NextAttempt
-		a.PlanVersion = c.state.ApprovedVersion
 		a.State = Running
 		a.Result = Result{}
 		a.ReviewReason = ""
 		ctx, cancel := context.WithCancel(c.ctx)
 		c.workers[id] = cancel
 		c.state.Attempts[id] = a
-		started = append(started, clone(a))
+		if c.reviewAt == nil {
+			c.reviewAt = make(map[string]time.Time)
+		}
+		c.reviewAt[id] = time.Now().Add(c.reviewInterval)
+		frozen := clone(a)
+		frozen.Plan = clone(c.state.Plan)
+		for _, dep := range a.Task.DependsOn {
+			frozen.Predecessors = append(frozen.Predecessors, clone(c.state.Attempts[dep]))
+		}
+		// A split group retains its preliminary attempts as background, never as
+		// accepted prerequisites. Index ancestry comes from the validated tree.
+		for _, records := range c.state.History {
+			for _, previous := range records {
+				if strings.HasPrefix(a.Task.Index, previous.Task.Index+"-") && previous.Result.Summary != "" {
+					frozen.PriorResults = append(frozen.PriorResults, clone(previous))
+				}
+			}
+		}
+		sort.Slice(frozen.PriorResults, func(i, j int) bool { return frozen.PriorResults[i].ID < frozen.PriorResults[j].ID })
+		started = append(started, frozen)
 		contexts = append(contexts, ctx)
+		c.owned.Add(1)
 	}
 	c.state.Finished = false
 	c.notifyLocked()
@@ -554,12 +421,35 @@ func (c *Controller) startLocked(ids []string) ([]Attempt, []context.Context) {
 
 func (c *Controller) launch(started []Attempt, contexts []context.Context) {
 	c.publish()
+	c.mu.Lock()
+	publicationErr := c.resultErr
+	c.mu.Unlock()
 	for i, a := range started {
+		if publicationErr != nil {
+			// Admission could not be durably published. Do not execute tools for
+			// a task whose dispatch cannot be recovered.
+			c.mu.Lock()
+			if cancel := c.workers[a.Task.ID]; cancel != nil {
+				cancel()
+				delete(c.workers, a.Task.ID)
+			}
+			current := c.state.Attempts[a.Task.ID]
+			current.State = Failed
+			current.Result.Error = publicationErr.Error()
+			c.state.Attempts[a.Task.ID] = current
+			c.archiveLocked(current)
+			c.notifyLocked()
+			c.signalLocked()
+			c.mu.Unlock()
+			c.owned.Done()
+			continue
+		}
 		go c.execute(contexts[i], a)
 	}
 }
 
 func (c *Controller) execute(ctx context.Context, a Attempt) {
+	defer c.owned.Done()
 	var result Result
 	var err error
 	func() {
@@ -572,7 +462,11 @@ func (c *Controller) execute(ctx context.Context, a Attempt) {
 	}()
 	c.mu.Lock()
 	current, ok := c.state.Attempts[a.Task.ID]
-	if !ok || current.ID != a.ID {
+	if c.closed || !ok || current.ID != a.ID {
+		if ok && current.ID == a.ID {
+			delete(c.workers, a.Task.ID)
+			c.signalLocked()
+		}
 		c.mu.Unlock()
 		return
 	}
@@ -593,10 +487,21 @@ func (c *Controller) execute(ctx context.Context, a Attempt) {
 		current.State = AwaitingReview
 	}
 	c.state.Attempts[a.Task.ID] = current
+	c.archiveLocked(current)
 	c.queueResultLocked(current)
+	refs := append(append([]string{}, current.Result.EvidenceIDs...), current.Result.Artifacts...)
+	if c.resultConfig != nil {
+		id, _ := taskResultEvidence(c.resultConfig, taskResultRecords([]Attempt{current})[0])
+		refs = append(refs, id)
+	}
+	c.enqueueLocked("task_settled", a.Task.ID, a.ID, string(current.State)+": "+current.Result.Summary+" "+current.Result.Error, refs, !c.manualReview || current.State == Failed)
 	c.notifyLocked()
 	c.mu.Unlock()
 	c.publish()
+	c.schedule()
+	if current.State == AwaitingReview {
+		c.beginTaskReview(current)
+	}
 }
 
 func (c *Controller) InspectTasks(ids []string) ([]Attempt, error) {
@@ -609,11 +514,11 @@ func (c *Controller) InspectTasks(ids []string) ([]Attempt, error) {
 	return out, err
 }
 func (c *Controller) inspectLocked(ids []string) ([]Attempt, error) {
-	if err := c.checkLocked(); err != nil {
+	if err := c.checkExecLocked(); err != nil {
 		return nil, err
 	}
-	if len(ids) == 0 && c.state.Approved != nil {
-		for _, t := range c.state.Approved.Tasks {
+	if len(ids) == 0 && c.state.Plan != nil {
+		for _, t := range c.state.Plan.Tasks {
 			ids = append(ids, t.ID)
 		}
 	}
@@ -650,7 +555,7 @@ func (c *Controller) WaitTasksMode(ctx context.Context, ids []string, timeout ti
 	}
 	c.mu.Lock()
 	initial, err := c.inspectLocked(ids)
-	userRevision, planVersion := c.state.UserRevision, c.state.ApprovedVersion
+	userRevision := c.state.UserRevision
 	discoveryRevision := c.eventRevision
 	bound := make(map[string]uint64)
 	for _, a := range initial {
@@ -674,7 +579,7 @@ func (c *Controller) WaitTasksMode(ctx context.Context, ids []string, timeout ti
 	for {
 		c.mu.Lock()
 		tasks, err := c.inspectLocked(ids)
-		interrupted := c.state.UserRevision != userRevision || c.state.ApprovedVersion != planVersion
+		interrupted := c.state.UserRevision != userRevision
 		discovered := false
 		for id, attempt := range bound {
 			if c.discoveries[id] > discoveryRevision {
@@ -745,34 +650,7 @@ func (c *Controller) WaitTasksMode(ctx context.Context, ids []string, timeout ti
 }
 
 func (c *Controller) ReviewTask(id string, attemptID uint64, decision, reason string) error {
-	if strings.TrimSpace(reason) == "" {
-		return fmt.Errorf("review requires an evidence-backed reason")
-	}
-	if decision != "accept" && decision != "reject" {
-		return fmt.Errorf("review decision must be accept or reject")
-	}
-	c.mu.Lock()
-	if err := c.checkLocked(); err != nil {
-		c.mu.Unlock()
-		return err
-	}
-	a, ok := c.state.Attempts[id]
-	if !ok || a.ID != attemptID || a.State != AwaitingReview {
-		c.mu.Unlock()
-		return fmt.Errorf("review requires the current settled awaiting_review attempt")
-	}
-	if decision == "accept" {
-		a.State = Accepted
-	} else {
-		a.State = Rejected
-	}
-	a.ReviewReason = reason
-	c.state.Attempts[id] = a
-	c.queueResultLocked(a)
-	c.notifyLocked()
-	c.mu.Unlock()
-	c.publish()
-	return nil
+	return c.applyReview(id, attemptID, decision, reason, false)
 }
 
 func (c *Controller) RetryTask(id string, attemptID uint64, reason string) ([]Attempt, error) {
@@ -780,7 +658,7 @@ func (c *Controller) RetryTask(id string, attemptID uint64, reason string) ([]At
 		return nil, fmt.Errorf("retry requires a reason")
 	}
 	c.mu.Lock()
-	if err := c.checkLocked(); err != nil {
+	if err := c.checkExecLocked(); err != nil {
 		c.mu.Unlock()
 		return nil, err
 	}
@@ -808,23 +686,32 @@ func (c *Controller) RetryTask(id string, attemptID uint64, reason string) ([]At
 			return nil, fmt.Errorf("cancel and wait for dependent task %q before retry", tid)
 		}
 	}
-	if len(c.workers) >= c.concurrency {
+	if !c.automatic && len(c.workers) >= c.concurrency {
 		c.mu.Unlock()
 		return nil, fmt.Errorf("no free worker slot for retry")
 	}
 	for _, dep := range a.Task.DependsOn {
-		if c.state.Attempts[dep].State != Accepted {
+		if !c.automatic && c.state.Attempts[dep].State != Accepted {
 			c.mu.Unlock()
 			return nil, fmt.Errorf("retry requires accepted dependencies")
 		}
 	}
 	for tid := range affected {
 		t := c.state.Attempts[tid]
+		c.archiveLocked(t)
 		t.State = Pending
 		t.ID = 0
 		t.Result = Result{}
 		t.ReviewReason = reason
 		c.state.Attempts[tid] = t
+	}
+	if c.automatic {
+		c.state.Report.Submitted = false
+		c.notifyLocked()
+		c.mu.Unlock()
+		c.publish()
+		c.schedule()
+		return []Attempt{c.Snapshot().Attempts[id]}, nil
 	}
 	started, contexts := c.startLocked([]string{id})
 	c.mu.Unlock()
@@ -837,7 +724,7 @@ func (c *Controller) CancelTasks(ids []string, reason string) error {
 		return fmt.Errorf("cancel requires a reason")
 	}
 	c.mu.Lock()
-	if err := c.checkLocked(); err != nil {
+	if err := c.checkExecLocked(); err != nil {
 		c.mu.Unlock()
 		return err
 	}
@@ -853,6 +740,25 @@ func (c *Controller) CancelTasks(ids []string, reason string) error {
 			return fmt.Errorf("unknown task %q", id)
 		}
 	}
+	// Explicit cancellation also resolves dependent goals, never silently accepting them.
+	if c.automatic {
+		selected := map[string]bool{}
+		for _, id := range ids {
+			selected[id] = true
+		}
+		for changed := true; changed; {
+			changed = false
+			for id, a := range c.state.Attempts {
+				for _, dep := range a.Task.DependsOn {
+					if selected[dep] && !selected[id] {
+						selected[id] = true
+						ids = append(ids, id)
+						changed = true
+					}
+				}
+			}
+		}
+	}
 	cancels := make([]context.CancelFunc, 0)
 	for _, id := range ids {
 		a := c.state.Attempts[id]
@@ -863,6 +769,7 @@ func (c *Controller) CancelTasks(ids []string, reason string) error {
 			a.State = Cancelled
 		}
 		a.ReviewReason = reason
+		c.archiveLocked(a)
 		c.state.Attempts[id] = a
 		c.queueResultLocked(a)
 	}
@@ -882,6 +789,7 @@ func (c *Controller) Wake() {
 		return
 	}
 	c.state.UserRevision++
+	c.enqueueLocked("user_message", "", 0, "用户输入或审核反馈已保存到 Timeline，请核对最新要求。", nil, true)
 	c.state.Finished = false
 	c.notifyLocked()
 	c.mu.Unlock()
@@ -923,10 +831,8 @@ func (c *Controller) canFinishPlanningLocked() error {
 	if err := c.checkLocked(); err != nil {
 		return err
 	}
-	approved := c.state.Approved != nil && c.state.ApprovedVersion == c.state.DraftVersion
-	detached := c.state.Approved == nil && c.state.SubmittedVersion > 0 && c.state.SubmittedVersion == c.state.DraftVersion
-	if c.reviewing || (!approved && !detached) || len(c.workers) > 0 {
-		return fmt.Errorf("approve the current draft before completing planning")
+	if c.state.Plan == nil || (!c.state.ReviewPending && c.state.Phase != PhaseExec) || (c.reviewing && !c.state.ReviewPending) || len(c.workers) > 0 {
+		return fmt.Errorf("submit the current plan before completing planning")
 	}
 	return nil
 }
@@ -947,12 +853,12 @@ func (c *Controller) canFinishLocked() error {
 	if err := c.checkLocked(); err != nil {
 		return err
 	}
-	if c.reviewing || c.state.Approved == nil || c.state.DraftVersion != c.state.ApprovedVersion || len(c.workers) > 0 {
+	if c.reviewing || c.state.Phase != PhaseExec || c.state.Plan == nil || len(c.workers) > 0 {
 		return fmt.Errorf("plan approval or active workers remain")
 	}
 	for id, a := range c.state.Attempts {
-		if a.State != Accepted {
-			return fmt.Errorf("task %q has not been reviewed and accepted (%s)", id, a.State)
+		if a.State != Accepted && !(a.State == Cancelled && strings.TrimSpace(a.ReviewReason) != "") {
+			return fmt.Errorf("task %q has not been reviewed or explicitly resolved (%s)", id, a.State)
 		}
 	}
 	return nil
@@ -973,38 +879,38 @@ func (c *Controller) Close() {
 
 func (c *Controller) Restore(s Snapshot) error {
 	s = clone(s)
-	if s.Schema != 1 || s.DraftVersion == 0 || s.DraftVersion < s.ApprovedVersion || s.SubmittedVersion > s.DraftVersion || (s.Approved == nil && s.Draft == nil) {
+	if s.Schema != 2 || (s.Phase != PhasePlan && s.Phase != PhaseExec) || s.Plan == nil {
 		return fmt.Errorf("invalid coordinator snapshot")
 	}
-	if s.Approved != nil {
-		if s.ApprovedVersion == 0 {
-			return fmt.Errorf("approved snapshot is missing its version")
+	if s.CheckedThrough > s.DeliveredThrough || s.DeliveredThrough > s.NextMessage {
+		return fmt.Errorf("invalid inbox delivery cursors")
+	}
+	seenMessages := make(map[uint64]bool)
+	for _, message := range s.Inbox {
+		if message.ID == "" || message.Sequence <= s.CheckedThrough || message.Sequence > s.NextMessage || seenMessages[message.Sequence] {
+			return fmt.Errorf("invalid pending inbox message")
 		}
-		if err := validate(s.Approved); err != nil {
-			return err
-		}
+		seenMessages[message.Sequence] = true
 	}
-	if s.Approved == nil && (s.ApprovedVersion != 0 || len(s.Attempts) > 0 || s.Finished) {
-		return fmt.Errorf("unapproved snapshot contains executable state")
+	if err := validateDocument(s.Plan); err != nil {
+		return err
 	}
-	var approvedTasks []Task
-	if s.Approved != nil {
-		approvedTasks = s.Approved.Tasks
+	if s.Phase == PhasePlan && (len(s.Attempts) > 0 || s.Finished) {
+		return fmt.Errorf("PLAN snapshot contains executable state")
 	}
-	if s.Draft != nil {
-		if err := validate(s.Draft); err != nil {
-			return err
-		}
+	if s.Phase == PhaseExec && s.ReviewPending {
+		return fmt.Errorf("EXEC snapshot cannot await plan approval")
 	}
-	for _, t := range approvedTasks {
+	var tasks []Task
+	if s.Phase == PhaseExec {
+		tasks = s.Plan.Tasks
+	}
+	for _, t := range tasks {
 		a, ok := s.Attempts[t.ID]
-		if !ok || !reflect.DeepEqual(t, a.Task) || a.ID > s.NextAttempt {
+		if !ok || !reflect.DeepEqual(t, a.Task) || a.ID > s.NextAttempt || (a.State != Pending && a.State != Cancelled && a.ID == 0) {
 			return fmt.Errorf("invalid attempt snapshot for %q", t.ID)
 		}
-		if a.PlanVersion == 0 || a.PlanVersion > s.ApprovedVersion || (a.State != Pending && a.State != Cancelled && a.ID == 0) {
-			return fmt.Errorf("invalid attempt identity/version for %q", t.ID)
-		}
-		if s.Finished && (a.State != Accepted || s.DraftVersion != s.ApprovedVersion) {
+		if s.Finished && a.State != Accepted && a.State != Cancelled {
 			return fmt.Errorf("finished snapshot contains unfinished work")
 		}
 		switch a.State {
@@ -1018,21 +924,25 @@ func (c *Controller) Restore(s Snapshot) error {
 			s.Attempts[t.ID] = a
 		}
 	}
-	if len(s.Attempts) != len(approvedTasks) {
-		return fmt.Errorf("snapshot contains tasks outside approved plan")
+	if len(s.Attempts) != len(tasks) {
+		return fmt.Errorf("snapshot contains tasks outside current EXEC plan")
 	}
 	c.mu.Lock()
 	if err := c.checkLocked(); err != nil {
 		c.mu.Unlock()
 		return err
 	}
-	if c.state.Approved != nil || len(c.workers) > 0 {
+	if c.state.Plan != nil || len(c.workers) > 0 {
 		c.mu.Unlock()
 		return fmt.Errorf("restore requires an empty controller")
 	}
-	c.state = clone(s)
-	for _, a := range c.state.Attempts {
+	c.state = s
+	for _, a := range s.Attempts {
+		c.archiveLocked(a)
 		c.queueResultLocked(a)
+		if a.State == Failed {
+			c.enqueueLocked("task_settled", a.Task.ID, a.ID, a.Result.Error, a.Result.EvidenceIDs, true)
+		}
 	}
 	c.notifyLocked()
 	c.mu.Unlock()

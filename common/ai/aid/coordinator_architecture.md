@@ -12,12 +12,12 @@
 
 | 角色 | 职责 | 不能自行做的事 |
 | --- | --- | --- |
-| coordinator | 探索、证据、计划文档、审批、调度、等待、验收、调整计划、报告 | 执行业务命令/脚本，递归开启其他 PLAN、专注循环或 sub-agent |
+| coordinator | PLAN 调查、证据、文档及审批；EXEC 消息检查、YOLO 审核、调整和报告 | 执行业务命令/脚本、逐项派发、接受人工待审结果、主动正常退出 |
 | pe_task | 执行批准的冻结任务书，产出 artifacts/evidence，提交结果 | 批准计划、接受自己的结果、修改调度、开启其他循环 |
 
 两种循环均继承主循环的协议配置。文本模式使用流式 JSON @action 和声明的 AITAG，原生模式使用 tool_calls；中文指令按模式渲染，专属动作分别提供中文 Options 与 NativeOptions，由共享主循环构建对应参数定义。两种协议共用执行、校验与权限门禁；原生模式不接受文本 JSON action。客户端 Content 与存储格式保持不变。
 
-旧 plan/replan/task-review JSON 循环不进入新路径。报告由协调员 write_report 完成；AI 风险评估和继承新引擎的压缩/附件等单步基础设施输出使用原生函数调用，不新增 ReAct 循环。
+旧 plan/replan/task-review JSON 循环不进入新路径。报告通过 create_report、modify_report、submit_report 完成，属于 EXEC 收尾，不增加第三种循环或阶段。调度、消息通知、人工任务审核管理与定时器不调用辅助模型。
 
 ## 2. 组件与依赖
 
@@ -26,8 +26,13 @@ flowchart TD
     Entry[aim / ReAct / Yakit 输入] --> Select[默认循环转交 / 显式 focus / 旧名称升级]
     Select --> Native[coordinator.Session]
     Native --> Planner[coordinator ReAct]
-    Native --> Control[Controller：版本、调度、验收]
-    Control --> Worker[pe_task ReAct]
+    Native --> Control[Controller：单一 Plan、阶段、事务、调度、验收]
+    Control --> Pump[自动 DAG pump]
+    Pump --> Worker[pe_task ReAct]
+    Worker --> Queue[Inbox / Timeline / 结果引用]
+    Queue --> Planner
+    Worker --> Review[任务审核管理器]
+    Review --> Control
     Native --> Wire[独立计划 DTO / 审批 / 事件 / 存储适配]
     Wire --> UI[Yakit 原协议]
     Planner --> Shared[aicommon / reactloops / session Timeline]
@@ -42,27 +47,33 @@ flowchart TD
 
 ## 3. 计划与派发
 
-create_plan 保存完整候选文档和任务 DAG。modify_plan 使用确切草稿版本完整替换候选计划。草稿不会自动替换批准执行内容；submit_plan 通过独立审批适配器发出兼容事件，取得用户批准后才采用批准树。
+create_plan 首次保存完整 Document 和无状态定义树，叶任务 DAG 从树派生。modify_plan 使用 document/document_patch/tasks/tasks_patch 对当前 Plan 的拷贝进行严格覆盖或 patch，最后校验并原子保存；没有双份 Draft/Approved 或计划版本。submit_plan 锁定审核内容，用户要求修订则恢复编辑，用户批准最终内容后才切换为 EXEC。
 
 计划参数沿用旧版嵌套任务书及 sub_subtasks，使用稳定 identifier 和 depends_on；组的前置条件作用于入口叶任务，依赖组时等待其全部叶任务验收。旧客户端的嵌套 root_task 与逻辑 task_id 继续支持。宿主解析依赖，校验重复、未知引用及环，并保留未变任务的逻辑 ID。
 
-start_tasks 原子检查批准、并发配额、状态和依赖，登记新的 attempt_id 后立即返回。它只派发指定的可执行任务，不调用旧 runtime.Invoke 推进整棵树。省略 task_ids 时选择当前 ready 的 tasks，受 PlanExecTaskConcurrency 限制。
+批准即触发唯一 DAG pump，原子检查并发配额、状态和已验收依赖，登记 attempt_id，再在状态锁外构造 worker。批准、实际退出、审核通过、编辑与重试都自动重算就绪任务；模型没有 start_tasks。worker 冻结本次 Plan、任务书、直接前置的已验收结果和相关历史初步结果，受 PlanExecTaskConcurrency 限制。
 
-修改或删除活动任务，以及改变其上游输入，都必须先取消并等待实际退出。采用新的批准版本后，受影响的下游结果失效；未变且无受影响输入的结果保留。
+EXEC 复用 modify_plan 的四参数编辑，不回退 PLAN、不再次请求计划审批。事务计算新旧 DAG 的受影响闭包，仅取消受影响尝试并等待实际退出，再原子采用新定义。未受影响 worker 保留 context、attempt 和冻结输入。拆分 A 为 A1/A2 时保留 A 的组身份；依赖 A 的后继等待全部新叶验收，无额外组审核。
 
-## 4. 观察、验收与恢复
+PLAN 的调查子 Agent 复用 generic 管理器，默认关闭。只读调查权限同时约束声明和 handler；明确共享的新 Evidence 与终态清理通知唤醒空闲协调员，普通流式输出不唤醒。提交审核要求全部调查退出且结果已进入下一轮输入。私有 Timeline 不 MergeBack。
 
-worker 用 submit_task_result 提交摘要和实际 artifacts/evidence 引用，再通过既有 TODO 完成门闩结束。执行成功进入 awaiting_review。inspect_tasks 和 wait_tasks 交付结果并登记已观察；协调员再以目标、结果及证据决定 accept/reject。只有 accepted 能放行依赖。
+## 4. 消息、验收与恢复
 
-wait_tasks 使用状态通知。any 返回更新；all 等选中的已派发尝试全部结算；用户介入、批准版本改变或尝试替换会返回控制权。默认 30 秒，上限 60 秒，超时不取消 worker。
+worker 用 submit_task_result 提交摘要和实际 artifacts/evidence 引用，再通过既有 TODO 门闩结束。实际退出、Timeline 交接和清理完成后，统一保存结果并释放执行槽位。成功进入 awaiting_review；初始化失败、panic、无结果和取消走同一结算入口。只有 accepted 能放行依赖。
 
-retry_task 检查当前已结算尝试，原子分配下一尝试，并撤销受影响下游结果。若配额不足或依赖不满足，不部分改变旧验收。Timeline 保留历史调用和审阅，快照保存当前尝试及其版本。
+人工任务审核管理器用 session context 独立等待 task_review_require。用户通过直接进入公共审核状态机并推进 DAG；YOLO 由 inbox 通知协调员，以 review_task 判断实际证据、接受或要求深入。正常人工结果不强制唤醒主模型二次验收。
 
-cancel_tasks 先进入 cancelling，worker 退出后才进入 cancelled。旧 skip 回执同样等待真正退出。取消未完成的必需任务不等于 PLAN 成功；协调员需要根据用户意图调整并重新批准计划，或由外层停止流程结束运行。
+inbox 保存 task_discovery、task_settled、user_message、review_due 和 scheduler_blocked 的有界摘要与引用。关键消息不被淘汰；游标区分投递与决策边界，不等同于验收。回调只持久化与通知，当前 action/batch 完成后才交接下一批。inspect_task 是可选的单任务查询，默认有界状态与引用，需要时再读取详情或历史尝试。
 
-恢复保存草稿/批准/提交版本、状态、当前尝试、结果、观察和验收理由。中断的 running/cancelling 尝试恢复为 failed，不暗中重启。旧 PLAN 记录在恢复入队前返回停用错误；不隐式导入新运行体。指定 start_task_id 恢复时，只重置该任务及依赖它的结果，保留独立已完成工作。
+wait_messages 与自动空闲等待共用实现，默认 30 秒、上限 60 秒。显式调用在已有消息时立即返回；自动等待不为已处理的普通人工结果反复调用模型。空超时仅检查运行时；review_due 对同任务同尝试的未处理提醒去重，不自动验收、不调用辅助模型。
 
-正常 finish 检查当前草稿已批准、所有必需任务已观察并验收、无活跃 worker、微观 TODO 已解决，以及要求的报告已保存。prompt 构造后到达的新用户信息会阻止本轮 finish，必须先读取 Timeline。
+retry_task 检查当前已结算尝试，原子分配下一尝试，并撤销受影响下游结果。若配额不足或依赖不满足，不部分改变旧验收。Timeline 保留历史调用和审阅，快照保存当前尝试及其身份。
+
+cancel_tasks 先进入 cancelling，实际退出后才进入 cancelled，并明确处理依赖它的后继。旧 skip 回执同样等待真正退出。未解决失败或阻塞不能进入报告；明确取消/不再需要的目标可以收尾，但报告必须保留失败、重试和未完成范围。
+
+schema 2 恢复保存当前 Plan、PLAN/EXEC、审核锁、当前及历史尝试、结果、inbox、投递/处理游标与当前报告。中断的 running/cancelling 恢复为 failed 并通知决策，不暗中重启；损坏游标被拒绝。旧 PLAN 不隐式导入新运行体。指定 start_task_id 只重置该任务及受影响后继，保留独立已完成工作。
+
+EXEC 不开放正常 finish。全部任务已验收或明确解决、无 owned active/待审尝试及未处理关键消息时才开放报告动作。报告原子写入实例 artifacts，当前正文放入 SemiDynamic1。submit_report 交付最新正文；宿主再次检查用户要求与消息，包括完成快照发布期间到达的事件，然后自动结束。用户停止、取消及真实错误仍及时中断。
 
 ## 5. PLAN-only 与 detached
 
@@ -78,9 +89,10 @@ EnableDetachedPlan 使用旧 detached_plan_require 面板。submit_plan 保存�
 
 1. 用户输入、澄清回答、选项及重做说明进入 session Timeline Open，再经冻结/压缩提升。
 2. evidence 绑定 session journal，协调员与所有 worker 共享、去重并沿已有机制提升。
-3. 批准的 PLAN DOCUMENT 放入 SemiDynamic1；动态状态不写进文档。
+3. 当前 PLAN DOCUMENT 和无状态 PLAN DEFINITION 独立放入 SemiDynamic1；动态状态不写进文档。
 4. Dynamic 顺序为 Timeline Open → PLAN STATUS → 微观 TODO → 系统运行状态，不附加永久 USER QUERY。
-5. 无状态 PLAN TREE 的重新设计继续待定，放在后续独立步骤，不影响本次调度实现。
+5. 定义树只含任务定义、稳定 ID 和依赖；前端显示所需的 description/tools/progress 由适配器提供。
+6. 中文 PLAN/EXEC/报告角色经 promptloader 放入 SemiDynamic2；High Static 与 Frozen 不携带调度状态。新增消息批次进入 Timeline Open，工具声明只随真实阶段或报告能力边界变化。
 
 协调员的工具调用经过显式内置读取/搜索 allowlist；文件写入限定在工作目录 artifacts 下的 Markdown，检查路径和符号链接。业务工具保留在 worker，继续继承会话的工具权限及审阅策略。不能通过动态加载或未知 MCP 工具绕过角色边界。
 
@@ -92,6 +104,6 @@ EnableDetachedPlan 使用旧 detached_plan_require 面板。submit_plan 保存�
 
 Go 显式使用 coordinator.NewSession 构造新运行体，提供 Run、RunPlanOnly、RunExecuteApprovedPlan、RunExecuteOnly。coordinator_legacy.NewCoordinatorContext 永远是旧版。ReAct 默认使用新版，aim.focus("coordinator") 可直接进入；旧 focus 名称在最上层升级为新版。aim.planEngine 是 focus 的兼容别名。Config 不携带 plan_engine；只有持久化保留该标记供恢复路由使用。RPC 消息定义不变。
 
-本次测试覆盖批准/依赖、重复派发、观察与验收、重试失效、版本冲突、活动下游保护、取消真实退出、通知等待、any/all、快照恢复、panic、两种协议继承、原生模式拒绝文本 JSON 动作及错误参数校验、worker 结果门闩、PLAN-only、detached 编辑恢复、干预记录时序、风险评估及辅助原生输出。真实 Yak 引擎执行 aim 脚本，核对真实文件读取、两个依赖任务、共享 evidence、报告和 Yakit push/pop/loop_marker 事件。
+测试覆盖自动 DAG、人工/YOLO 审核、局部拆分、受影响闭包、实际取消退出、重试历史、消息批次及游标、定时去重、报告门禁、真实 artifact、晚到用户消息、恢复、两种协议及原生参数校验。Yak/aim 四种执行组合使用 A/B 独立、C 依赖 A、D 依赖 B/C，运行实际读取工具、Evidence、任务与报告事件。采样、时序与验证记录见 [执行验收记录](coordinator/execution_review.md)。
 
 确定性 provider 测试验证运行契约。实际模型任务质量、网关缓存命中率及完整 Yakit 人工交互仍需使用实际 provider 与前端进行后续探索。

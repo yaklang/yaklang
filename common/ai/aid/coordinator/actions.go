@@ -9,13 +9,12 @@ import (
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 )
 
-// Providers can return malformed native arguments. Validate the advertised
-// types before getters coerce them (e.g. null task_ids must not become all tasks).
+// Accept extra action fields for compatibility, but validate every declared
+// parameter before getters coerce it (e.g. null task_ids must not cancel all tasks).
 func validateActionParameters(name string, options []aitool.ToolOption) reactloops.LoopActionVerifierFunc {
 	tool := aitool.NewWithoutCallback(name, options...)
 	return func(_ *reactloops.ReActLoop, action *aicommon.Action) error {
-		params := action.GetParams()
-		delete(params, "@action")
+		params := declaredActionParameters(action, tool)
 		if valid, problems := tool.ValidateParams(params); !valid {
 			return fmt.Errorf("invalid %s arguments: %s", name, strings.Join(problems, "; "))
 		}
@@ -45,28 +44,78 @@ func (d coordinatorAction) option() reactloops.ReActLoopOption {
 			op.Fail("coordinator controller missing")
 			return
 		}
+		if !c.actionAllowed(d.name) {
+			if recordActionOutcome(loop, a, op, d.name, nil, fmt.Errorf("当前阶段不允许 %s", d.name)) {
+				op.Continue()
+			}
+			return
+		}
+		if err := validateActionParameters(d.name, d.options)(loop, a); err != nil {
+			if recordActionOutcome(loop, a, op, d.name, nil, err) {
+				op.Continue()
+			}
+			return
+		}
+		loop.Set("coordinator_last_action", d.name)
 		value, err := d.execute(c, loop, a, op)
+		if err != nil {
+			loop.Set("coordinator_last_action", "rejected")
+		}
 		if recordActionOutcome(loop, a, op, d.name, value, err) {
 			op.Continue()
 		}
 	})
 }
 func actionOptions() []reactloops.ReActLoopOption {
-	definitions := []coordinatorAction{actionCreatePlan(), actionModifyPlan(), actionSubmitPlan(), actionStartTasks(), actionWaitTasks(), actionReviewTask(), actionRetryTask(), actionCancelTasks(), actionWriteReport()}
+	definitions := []coordinatorAction{actionCreatePlan(), actionModifyPlan(), actionSubmitPlan(), actionWaitMessages(), actionInspectTask(), actionReviewTask(), actionRetryTask(), actionCancelTasks(), actionCreateReport(), actionModifyReport(), actionSubmitReport()}
 	opts := make([]reactloops.ReActLoopOption, 0, len(definitions))
 	for _, d := range definitions {
 		opts = append(opts, d.option())
 	}
 	return opts
 }
+
+func (c *Controller) actionAllowed(name string) bool {
+	c.mu.Lock()
+	phase := c.state.Phase
+	manual := c.automatic && c.manualReview
+	c.mu.Unlock()
+	switch name {
+	case "create_plan", "submit_plan":
+		return phase == PhasePlan
+	case "modify_plan":
+		return phase == PhasePlan || phase == PhaseExec
+	case "create_report", "modify_report", "submit_report":
+		return phase == PhaseExec && c.ReportReady()
+	case "review_task":
+		return phase == PhaseExec && !manual
+	case "wait_messages", "inspect_task", "retry_task", "cancel_tasks":
+		return phase == PhaseExec
+	default:
+		return false
+	}
+}
+
+// Unknown fields remain available to the shared loop (e.g. todo_delta), but
+// never reach component edits or change their cardinality/atomicity checks.
+func declaredActionParameters(a *aicommon.Action, tool *aitool.Tool) map[string]any {
+	params := make(map[string]any)
+	for key, value := range a.GetParams() {
+		if tool.Params().Have(key) {
+			params[key] = value
+		}
+	}
+	return params
+}
+func modifyArguments(a *aicommon.Action, options []aitool.ToolOption) map[string]any {
+	return declaredActionParameters(a, aitool.NewWithoutCallback("modify", options...))
+}
 func requiredString(name, description string) aitool.ToolOption {
 	return aitool.WithStringParam(name, aitool.WithParam_Description(description), aitool.WithParam_Required())
 }
-func planVersionParameter() aitool.ToolOption {
-	return aitool.WithIntegerParam("plan_version", aitool.WithParam_Description("create_plan 或 modify_plan 返回的当前草案版本，必须精确匹配。"), aitool.WithParam_Required())
-}
+
 func taskIDsParameter() aitool.ToolOption {
-	return aitool.WithStringArrayParam("task_ids", aitool.WithParam_Description("逻辑任务 ID 列表；start_tasks 省略时选择全部可派发任务，wait/cancel 省略时选择全部已批准任务。"))
+	return aitool.WithStringArrayParam("task_ids", aitool.WithParam_Description("待取消的稳定任务 ID 列表；省略时取消全部当前任务，同时明确处理受影响后继。"))
 }
 func attemptParameter() aitool.ToolOption {
 	return aitool.WithIntegerParam("attempt_id", aitool.WithParam_Description("PLAN STATUS 与 Timeline 执行结果中的当前 attempt_id，必须精确匹配。"), aitool.WithParam_Required())

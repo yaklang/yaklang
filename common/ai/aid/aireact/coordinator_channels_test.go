@@ -48,7 +48,7 @@ func TestCoordinatorChannelsNeverConstructTheOtherRuntime(t *testing.T) {
 			args = map[string]any{"plan": map[string]any{"name": "Plan", "goal": "Approve only", "tasks": []any{map[string]any{"name": "Check", "goal": "Execute later", "identifier": "check", "depends_on": []string{}}}}, "plan_document": "# Independent document"}
 		case 2:
 			name = "submit_plan"
-			args = map[string]any{"plan_version": 1}
+			args = map[string]any{}
 		}
 		data, _ := json.Marshal(args)
 		wire.ToolCallCallback([]*aispec.ToolCall{{ID: "native-call", Type: "function", Function: aispec.FuncReturn{Name: name, Arguments: string(data)}}})

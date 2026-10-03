@@ -34,9 +34,11 @@ type PromptMaterials struct {
 	PromotedUserInputHistory string
 	// PlanDocument contains the confirmed plan document rendered in main-loop SemiDynamic1.
 	PlanDocument string
-	// PlanDefinition is the versioned draft/approved task tree and executable DAG,
+	// PlanDefinition is the current task tree and executable DAG,
 	// without worker status or results. Only native coordinator sessions supply it.
-	PlanDefinition    string
+	PlanDefinition string
+	// CurrentReport is the editable report view in SemiDynamic1, never Frozen.
+	CurrentReport     string
 	PlanHelp          string
 	OriginalUserInput string
 	StableInstruction string
@@ -105,6 +107,7 @@ func (m *PromptMaterials) SemiDynamicData() map[string]any {
 		"PromotedUserInputHistory":   m.PromotedUserInputHistory,
 		"PlanDocument":               m.PlanDocument,
 		"PlanDefinition":             m.PlanDefinition,
+		"CurrentReport":              m.CurrentReport,
 		"SessionEvidenceSemiDynamic": m.SessionEvidenceSemiDynamic,
 		"PlanHelp":                   m.PlanHelp,
 		"OriginalUserInput":          m.OriginalUserInput,

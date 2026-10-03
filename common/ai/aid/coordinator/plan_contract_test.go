@@ -41,15 +41,15 @@ func TestCoordinatorApprovedContextSupersedesPreviousDocument(t *testing.T) {
 	s := &Session{Config: aicommon.NewConfig(ctx, aicommon.WithDisableCreateDBRuntime(true))}
 	p, err := ParsePlan(nestedPresetPlan, "previous document must disappear", nil)
 	require.NoError(t, err)
-	snapshot := Snapshot{DraftVersion: 1, ApprovedVersion: 1, Draft: p, Approved: p, Attempts: map[string]Attempt{}}
+	snapshot := Snapshot{Phase: PhaseExec, Plan: p, Attempts: map[string]Attempt{}}
 	for _, task := range p.Tasks {
 		snapshot.Attempts[task.ID] = Attempt{Task: task, State: Pending}
 	}
 	s.Changed(snapshot)
 	replacement := *p
-	replacement.Document = ""
-	snapshot.DraftVersion, snapshot.ApprovedVersion = 2, 2
-	snapshot.Draft, snapshot.Approved = &replacement, &replacement
+	replacement.Document = "updated document"
+
+	snapshot.Plan = &replacement
 	s.Changed(snapshot)
 	partitions := s.GetOrCreateFrozenBlockPartitionProducer().ProducePartitions()
 	var document, definition string
@@ -61,10 +61,10 @@ func TestCoordinatorApprovedContextSupersedesPreviousDocument(t *testing.T) {
 			definition = partition.Content
 		}
 	}
-	require.Contains(t, document, "Approved PLAN version 2")
+	require.Contains(t, document, "updated document")
 	require.NotContains(t, document, "previous document must disappear")
-	require.Contains(t, definition, "Approved version 2")
-	require.NotContains(t, definition, "Approved version 1")
+	require.Contains(t, definition, "PLAN DEFINITION")
+	require.NotContains(t, definition, "version")
 }
 
 func TestCoordinatorTaskStateChangesKeepPlanPartitionsStable(t *testing.T) {
@@ -73,18 +73,18 @@ func TestCoordinatorTaskStateChangesKeepPlanPartitionsStable(t *testing.T) {
 	s := &Session{Config: aicommon.NewConfig(ctx, aicommon.WithDisableCreateDBRuntime(true))}
 	p, err := ParsePlan(nestedPresetPlan, "immutable plan document", nil)
 	require.NoError(t, err)
-	snapshot := Snapshot{DraftVersion: 1, ApprovedVersion: 1, Draft: p, Approved: p, Attempts: map[string]Attempt{}}
+	snapshot := Snapshot{Phase: PhaseExec, Plan: p, Attempts: map[string]Attempt{}}
 	for _, task := range p.Tasks {
 		snapshot.Attempts[task.ID] = Attempt{Task: task, State: Pending}
 	}
 	s.Changed(snapshot)
 	before := s.GetOrCreateFrozenBlockPartitionProducer().ProducePartitions()
-	changed := Snapshot{DraftVersion: 1, ApprovedVersion: 1, Draft: p, Approved: p, Attempts: map[string]Attempt{}}
+	changed := Snapshot{Phase: PhaseExec, Plan: p, Attempts: map[string]Attempt{}}
 	for id, attempt := range snapshot.Attempts {
 		changed.Attempts[id] = attempt
 	}
 	a := changed.Attempts[p.Tasks[0].ID]
-	a.ID, a.PlanVersion, a.State = 1, 1, AwaitingReview
+	a.ID, a.State = 1, AwaitingReview
 	a.Result = Result{Summary: "new volatile result", EvidenceIDs: []string{"verified.source"}}
 	changed.Attempts[p.Tasks[0].ID] = a
 	s.Changed(changed)
@@ -110,7 +110,7 @@ func TestCoordinatorNestedDAGRetainsGroupEntrySemantics(t *testing.T) {
 	for i := range p.Tasks {
 		require.Equal(t, p.Tasks[i].ID, updated.Tasks[i].ID)
 	}
-	s := Snapshot{DraftVersion: 1, ApprovedVersion: 1, Draft: p, Approved: p, Attempts: map[string]Attempt{}}
+	s := Snapshot{Phase: PhaseExec, Plan: p, Attempts: map[string]Attempt{}}
 	for _, task := range p.Tasks {
 		s.Attempts[task.ID] = Attempt{Task: task, State: Pending}
 	}

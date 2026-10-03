@@ -32,8 +32,18 @@ func (p *projectedInvoker) AddToTimelineWithPromptProjection(entry, display, pro
 	}
 }
 
-func (h *nativeHost) Prepare(context.Context, string, string) (*coordinator.Plan, error) {
-	return h.plan, nil
+func (h *nativeHost) Prepare(_ context.Context, _ string, document string) (*coordinator.Plan, error) {
+	copy := *h.plan
+	copy.Document = document
+	if len(copy.Tree) == 0 {
+		root := &coordinator.PlanNode{TaskID: "root", Name: "test", Goal: "check", Identifier: "root"}
+		for _, task := range copy.Tasks {
+			root.Subtasks = append(root.Subtasks, &coordinator.PlanNode{TaskID: task.ID, Name: task.Name, Goal: task.Goal, Identifier: task.ID, DependsOn: task.DependsOn})
+		}
+		raw, _ := json.Marshal(root)
+		return coordinator.ParsePlan(string(raw), document, nil)
+	}
+	return &copy, nil
 }
 func (h *nativeHost) Approve(_ context.Context, p *coordinator.Plan) (*coordinator.Plan, error) {
 	return p, nil
@@ -90,23 +100,22 @@ func TestCoordinatorLoopNativeProtocol(t *testing.T) {
 			name := ""
 			args := map[string]any{}
 			switch {
-			case s.Draft == nil:
+			case s.Plan == nil:
 				name = "create_plan"
 				args = map[string]any{"plan": map[string]any{"name": "plan", "goal": "check", "tasks": []any{map[string]any{"name": "A", "goal": "check", "identifier": "a", "depends_on": []string{}}}}, "plan_document": "document"}
-			case s.Approved == nil:
+			case s.Phase == coordinator.PhasePlan:
 				name = "submit_plan"
-				args["plan_version"] = s.DraftVersion
 			case s.Attempts["a"].State == coordinator.Pending:
-				name = "start_tasks"
+				name = "wait_messages"
 			case s.Attempts["a"].State == coordinator.Running:
-				name = "wait_tasks"
+				name = "wait_messages"
 			case s.Attempts["a"].State == coordinator.AwaitingReview:
 				name = "review_task"
 				args = map[string]any{"task_id": "a", "attempt_id": s.Attempts["a"].ID, "decision": "accept", "reason": "native.evidence verifies the result"}
 			default:
-				name = "finish"
+				return reportResponse(config, req, true, s.Report.Path != "")
 			}
-			if s.Approved != nil {
+			if s.Phase == coordinator.PhaseExec {
 				require.Contains(t, req.GetPrompt(), "PLAN STATUS")
 			}
 			require.NotContains(t, req.GetPrompt(), "<|SCHEMA_")
@@ -118,8 +127,9 @@ func TestCoordinatorLoopNativeProtocol(t *testing.T) {
 	loop, err := coordinator.NewLoop(&projectedInvoker{inv}, coordinator.WithController(c), reactloops.WithFunctionCallMode(true), reactloops.WithDisableLoopPerception(true), reactloops.WithDisableIncreaseIteration(true))
 	require.NoError(t, err)
 	require.NotNil(t, cfg.LiteForgeExecutor, "native loops install their own helper implementation")
+	c.EnableExecution(false, 0)
 	require.NoError(t, loop.ExecuteWithExistedTask(task))
-	require.NoError(t, c.CanFinish())
+	require.True(t, c.Snapshot().Finished)
 	require.GreaterOrEqual(t, calls.Load(), int64(5))
 }
 
@@ -153,6 +163,37 @@ func TestCoordinatorLoopWorkerNativeResultGate(t *testing.T) {
 	}
 }
 
+func TestCoordinatorLoopWorkerCompatibleArguments(t *testing.T) {
+	for _, native := range []bool{false, true} {
+		t.Run(fmt.Sprintf("function_call_%v", native), func(t *testing.T) {
+			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+			defer cancel()
+			var calls atomic.Int64
+			cfg := aicommon.NewConfig(ctx, aicommon.WithDisableCreateDBRuntime(true), aicommon.WithDisableAutoSkills(true), aicommon.WithDisablePerception(true), aicommon.WithWorkdir(t.TempDir()), aicommon.WithEnableFunctionCallMode(native), aicommon.WithAICallback(func(c aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+				if calls.Add(1) == 1 {
+					args := map[string]any{"summary": "verified result", "evidence_ids": []string{"e1"}, "future_business_context": map[string]any{"version": 2}}
+					if !native {
+						args["human_readable_thought"] = "提交真实结果"
+						args["todo_delta"] = map[string]any{}
+					}
+					return protocolResponse(c, req, native, "submit_task_result", args)
+				}
+				return protocolResponse(c, req, native, "finish", map[string]any{})
+			}))
+			inv := mock.NewMockInvoker(ctx)
+			inv.SetConfig(cfg)
+			loop, err := coordinator.NewWorkerLoop(&projectedInvoker{inv}, reactloops.WithFunctionCallMode(native), reactloops.WithDisableLoopPerception(true))
+			require.NoError(t, err)
+			task := aicommon.NewStatefulTaskBase("compatible-worker", "check", ctx, cfg.GetEmitter(), true)
+			require.NoError(t, loop.ExecuteWithExistedTask(task))
+			require.Equal(t, int64(2), calls.Load(), "extra fields must not trigger transaction retries")
+			result, ok := loop.GetVariable("coordinator_task_result").(coordinator.Result)
+			require.True(t, ok)
+			require.Equal(t, "verified result", result.Summary)
+		})
+	}
+}
+
 func TestCoordinatorLoopRejectsJSONResponseActions(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
@@ -172,7 +213,7 @@ func TestCoordinatorLoopRejectsJSONResponseActions(t *testing.T) {
 	require.NoError(t, err)
 	task := aicommon.NewStatefulTaskBase("reject-json", "check", ctx, cfg.GetEmitter(), true)
 	require.Error(t, loop.ExecuteWithExistedTask(task))
-	require.Nil(t, c.Snapshot().Draft)
+	require.Nil(t, c.Snapshot().Plan)
 }
 
 func TestCoordinatorLoopAuxiliaryUsesNativeOutput(t *testing.T) {
@@ -213,7 +254,7 @@ func TestCoordinatorLoopPlanOnlyUsesSameNativeLoop(t *testing.T) {
 		case 1:
 			return nativeResponse(c, req, "create_plan", map[string]any{"plan": map[string]any{"name": "Planning only", "goal": "Prepare execution", "tasks": []any{map[string]any{"name": "Check", "goal": "Check after approval", "identifier": "check", "depends_on": []string{}}}}, "plan_document": "# Approved document"})
 		case 2:
-			return nativeResponse(c, req, "submit_plan", map[string]any{"plan_version": 1})
+			return nativeResponse(c, req, "submit_plan", map[string]any{})
 		default:
 			return nativeResponse(c, req, "finish", map[string]any{})
 		}
@@ -264,8 +305,7 @@ func TestCoordinatorLoopRejectsMalformedFunctionArguments(t *testing.T) {
 		params aitool.InvokeParams
 	}{
 		{"cancel_tasks", aitool.InvokeParams{"task_ids": nil, "reason": "stop"}},
-		{"start_tasks", aitool.InvokeParams{"task_ids": "all"}},
-		{"submit_plan", aitool.InvokeParams{"plan_version": "1"}},
+		{"wait_messages", aitool.InvokeParams{"timeout_seconds": "all"}},
 		{"review_task", aitool.InvokeParams{"task_id": "a", "attempt_id": 1, "decision": "accept"}},
 		{"create_plan", aitool.InvokeParams{"plan": map[string]any{"name": "test", "goal": "check", "tasks": []any{map[string]any{"name": "step", "goal": "check"}}}, "plan_document": "document"}},
 	} {
@@ -273,10 +313,10 @@ func TestCoordinatorLoopRejectsMalformedFunctionArguments(t *testing.T) {
 		require.NoError(t, err)
 		require.Error(t, handler.ActionVerifier(loop, aicommon.NewSimpleAction(test.name, test.params)), test.name)
 	}
-	handler, err := loop.GetActionHandler("start_tasks")
+	handler, err := loop.GetActionHandler("wait_messages")
 	require.NoError(t, err)
-	require.NoError(t, handler.ActionVerifier(loop, aicommon.NewSimpleAction("start_tasks", aitool.InvokeParams{})))
-	require.Nil(t, c.Snapshot().Draft)
+	require.NoError(t, handler.ActionVerifier(loop, aicommon.NewSimpleAction("wait_messages", aitool.InvokeParams{})))
+	require.Nil(t, c.Snapshot().Plan)
 }
 
 func TestCoordinatorLoopKeywordSearchUsesNativeAuxiliary(t *testing.T) {

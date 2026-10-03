@@ -55,10 +55,10 @@ func TestCoordinatorLoopDetachedNativeApprovalAndRecovery(t *testing.T) {
 		case 1:
 			return nativeResponse(c, req, "create_plan", map[string]any{"plan": map[string]any{"name": "Detached", "goal": "Execute only after approval", "tasks": []any{map[string]any{"name": "Check", "goal": "Original task brief", "identifier": "check", "depends_on": []string{}}}}, "plan_document": "# Pending document"})
 		case 2:
-			return nativeResponse(c, req, "submit_plan", map[string]any{"plan_version": 1})
+			return nativeResponse(c, req, "submit_plan", map[string]any{})
 		case 3:
 			// Publication is not execution permission, even under YOLO.
-			return nativeResponse(c, req, "start_tasks", map[string]any{})
+			return nativeResponse(c, req, "directly_answer", map[string]any{"answer_payload": "已提交 detached 审核，尚未执行。"})
 		default:
 			return nativeResponse(c, req, "finish", map[string]any{})
 		}
@@ -107,14 +107,14 @@ func TestCoordinatorLoopDetachedNativeApprovalAndRecovery(t *testing.T) {
 		}
 		switch match[2] {
 		case "pending":
-			return nativeResponse(c, req, "start_tasks", map[string]any{})
+			return nativeResponse(c, req, "wait_messages", map[string]any{})
 		case "running":
-			return nativeResponse(c, req, "wait_tasks", map[string]any{"timeout_seconds": 1})
+			return nativeResponse(c, req, "wait_messages", map[string]any{"timeout_seconds": 1})
 		case "awaiting_review":
 			id, _ := strconv.ParseUint(match[3], 10, 64)
 			return nativeResponse(c, req, "review_task", map[string]any{"task_id": match[1], "attempt_id": id, "decision": "accept", "reason": "The delivered execution verified the approved edit."})
 		default:
-			return nativeResponse(c, req, "finish", map[string]any{})
+			return reportResponse(c, req, true, strings.Contains(prompt, "# CURRENT REPORT"))
 		}
 	}))
 	// A legacy client does not send an engine selector on recovery.

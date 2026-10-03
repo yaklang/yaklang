@@ -10,11 +10,17 @@ import (
 
 func TestCoordinatorActionFinish(t *testing.T) {
 	f := newActionFixture(t, true)
-	f.invoke("finish", nil, true)
+	h, err := f.loop.GetActionHandler("finish")
+	require.NoError(t, err)
+	op := reactloops.NewActionHandlerOperator(f.task)
+	h.ActionHandler(f.loop, actionForTest(t, "finish", nil), op)
+	done, err := op.IsTerminated()
+	require.NoError(t, err)
+	require.False(t, done)
 	require.False(t, f.c.Snapshot().Finished)
 	WithPlanningOnly()(f.loop)
-	op := f.invoke("finish", nil, false)
-	done, err := op.IsTerminated()
+	op = f.invoke("finish", nil, false)
+	done, err = op.IsTerminated()
 	require.NoError(t, err)
 	require.True(t, done)
 	require.False(t, f.c.Snapshot().Finished, "规划结束不能将未执行任务标成完成")
@@ -26,11 +32,14 @@ func TestCoordinatorActionFinish(t *testing.T) {
 		a := awaitResult(t, f.c, id)
 		require.NoError(t, f.c.ReviewTask(id, a.ID, "accept", "actual evidence checked"))
 	}
-	op = f.invoke("finish", nil, false)
+	h, err = f.loop.GetActionHandler("finish")
+	require.NoError(t, err)
+	op = reactloops.NewActionHandlerOperator(f.task)
+	h.ActionHandler(f.loop, actionForTest(t, "finish", nil), op)
 	done, err = op.IsTerminated()
 	require.NoError(t, err)
-	require.True(t, done)
-	require.True(t, f.c.Snapshot().Finished)
+	require.False(t, done)
+	require.False(t, f.c.Snapshot().Finished, "even accepted work requires a submitted report")
 }
 
 func TestCoordinatorActionFinishRetainsSharedTodoGate(t *testing.T) {

@@ -44,9 +44,9 @@ func newActionFixture(t *testing.T, approved bool) *actionFixture {
 	c := New(ctx, &testHost{plan: testPlan()}, 1)
 	t.Cleanup(c.Close)
 	if approved {
-		v, err := c.CreatePlan(ctx, "plan", "document")
+		_, err := c.CreatePlan(ctx, "plan", "document")
 		require.NoError(t, err)
-		require.NoError(t, c.SubmitPlan(ctx, v))
+		require.NoError(t, c.SubmitPlan(ctx))
 	}
 	loop, err := NewLoop(runtime, WithController(c))
 	require.NoError(t, err)

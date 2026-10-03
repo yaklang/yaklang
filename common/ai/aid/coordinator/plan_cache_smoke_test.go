@@ -30,7 +30,7 @@ func TestCoordinatorPlanCacheStableAcrossRepeatedRequests(t *testing.T) {
 			for i := 0; i < 32; i++ {
 				tasks = append(tasks, map[string]any{"subtask_name": fmt.Sprintf("核对 %d", i), "subtask_goal": fmt.Sprintf("任务 %d 的冻结任务书：", i) + strings.Repeat("核对真实来源并保留验收依据。", 16), "subtask_identifier": fmt.Sprintf("source_%d", i), "depends_on": []string{}})
 			}
-			data, err := json.Marshal(map[string]any{"main_task": "大计划缓存验证", "main_task_goal": "反复核对版本且不复制计划内容", "tasks": tasks})
+			data, err := json.Marshal(map[string]any{"main_task": "大计划缓存验证", "main_task_goal": "反复核对当前计划且不复制计划内容", "tasks": tasks})
 			require.NoError(t, err)
 			const documentSentinel = "immutable-plan-document-sentinel"
 			document := documentSentinel + "\n" + strings.Repeat("原始计划文档：约束、来源、验收标准不随查询改变。\n", 512)
@@ -38,7 +38,7 @@ func TestCoordinatorPlanCacheStableAcrossRepeatedRequests(t *testing.T) {
 			var s *coordinator.Session
 			stable := map[string][4][32]byte{}
 			phaseCalls := map[string]int{}
-			var permanent [3][32]byte // High Static, Frozen, SemiDynamic2.
+			var permanent [2][32]byte // High Static and Frozen remain fixed across the phase handoff.
 			var toolsHash [32]byte
 			var ratios []float64
 			s, err = coordinator.NewSession(ctx, "核对预设大计划并提交，批准一次后结束本次规划。",
@@ -65,15 +65,19 @@ func TestCoordinatorPlanCacheStableAcrossRepeatedRequests(t *testing.T) {
 					}
 					declaredTools, err := json.Marshal(projected.Tools)
 					require.NoError(t, err)
-					fixed := [3][32]byte{prefix[0], prefix[1], prefix[3]}
+					fixed := [2][32]byte{prefix[0], prefix[1]}
 					if calls == 0 {
-						permanent, toolsHash = fixed, sha256.Sum256(declaredTools)
+						permanent = fixed
 					} else {
-						require.Equal(t, permanent, fixed, "query or approval must not rewrite High Static/Frozen/SemiDynamic2")
-						require.Equal(t, toolsHash, sha256.Sum256(declaredTools), "tool contracts must remain stable")
+						require.Equal(t, permanent, fixed, "query or approval must not rewrite High Static/Frozen")
+
 					}
 					state := s.Snapshot()
-					phase := fmt.Sprintf("draft_%d_approved_%d", state.DraftVersion, state.ApprovedVersion)
+					phase := string(state.Phase)
+					if phaseCalls[phase] > 0 {
+						require.Equal(t, toolsHash, sha256.Sum256(declaredTools), "tool contracts stay stable within phase")
+					}
+					toolsHash = sha256.Sum256(declaredTools)
 					if previous, ok := stable[phase]; ok {
 						require.Equal(t, previous, prefix, "ordinary requests must preserve the complete stable prefix")
 						messages, err := json.Marshal(projected.Messages)
@@ -98,7 +102,7 @@ func TestCoordinatorPlanCacheStableAcrossRepeatedRequests(t *testing.T) {
 					calls++
 					switch step {
 					case 8:
-						return protocolResponse(c, req, native, "submit_plan", map[string]any{"plan_version": 1})
+						return protocolResponse(c, req, native, "submit_plan", map[string]any{})
 					case 17:
 						return protocolResponse(c, req, native, "finish", map[string]any{})
 					default:
@@ -112,17 +116,17 @@ func TestCoordinatorPlanCacheStableAcrossRepeatedRequests(t *testing.T) {
 			s.Timeline.SetTimelineBucketByteSize(-1)
 			require.NoError(t, s.RunPlanOnly())
 			require.Equal(t, 18, calls)
-			require.Equal(t, map[string]int{"draft_1_approved_0": 9, "draft_1_approved_1": 9}, phaseCalls)
+			require.Equal(t, map[string]int{"PLAN": 9, "EXEC": 9}, phaseCalls)
 			minimum := 1.0
 			for _, ratio := range ratios {
 				if ratio < minimum {
 					minimum = ratio
 				}
 			}
-			t.Logf("native=%v: %d requests; stable prefix identical within each plan version; minimum reusable message/tool bytes=%.2f%%; dynamic <=512 bytes", native, calls, minimum*100)
+			t.Logf("native=%v: %d requests; stable prefix identical within each phase; minimum reusable message/tool bytes=%.2f%%; dynamic <=512 bytes", native, calls, minimum*100)
 			if dir := os.Getenv("COORDINATOR_CONTEXT_REVIEW_DIR"); dir != "" {
 				require.NoError(t, os.MkdirAll(dir, 0700))
-				summary, err := json.MarshalIndent(map[string]any{"function_call": native, "requests": calls, "phase_requests": phaseCalls, "minimum_reusable_message_and_tool_byte_ratio": minimum, "stable_prefix_unchanged_within_version": true, "tools_unchanged": true, "provider_cache_hit_rate": nil}, "", "  ")
+				summary, err := json.MarshalIndent(map[string]any{"function_call": native, "requests": calls, "phase_requests": phaseCalls, "minimum_reusable_message_and_tool_byte_ratio": minimum, "stable_prefix_unchanged_within_phase": true, "tools_unchanged": true, "provider_cache_hit_rate": nil}, "", "  ")
 				require.NoError(t, err)
 				require.NoError(t, os.WriteFile(filepath.Join(dir, fmt.Sprintf("plan-cache-function-call-%v.json", native)), summary, 0600))
 			}

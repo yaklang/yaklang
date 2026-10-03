@@ -264,6 +264,7 @@ type Config struct {
 	EnableAISearch               bool
 	DisableWebSearch             bool  // disable enhanced web search tool, default false (enabled)
 	DisallowMCPServers           bool  // 禁用 MCP Servers，默认为 false（即默认启用）
+	EnableSubagentsInPlan        bool  // PLAN 阶段允许派发调查子 Agent，默认关闭；不授予执行或递归派发权限。
 	EnableDispatchSubReactAgents bool  // Enable dispatching sub ReAct agents for parallel execution of subtasks (default: false, disabled)
 	PreferDispatchSubReactAgents bool  // Bias the top-level loop toward dispatch_sub_react_agents for parallelizable work.
 	MaxSubAgents                 int64 // Max simultaneous sub-agent concurrency (multi-agent mode).
@@ -4339,6 +4340,7 @@ func ConvertConfigToOptions(i *Config) []ConfigOption {
 	opts = append(opts, WithAllowPlanUserInteract(i.AllowPlanUserInteract))
 	opts = append(opts, WithEnablePlanAndExec(i.EnablePlanAndExec))
 	opts = append(opts, WithEnableDetachedPlan(i.EnableDetachedPlan))
+	opts = append(opts, WithEnableSubagentsInPlan(i.EnableSubagentsInPlan))
 	opts = append(opts, WithGenerateReport(i.GenerateReport))
 	// EnableDispatchSubReactAgents is intentionally omitted: only the top-level
 	// ReAct agent may dispatch sub ReAct agents; forked child configs must not inherit it.

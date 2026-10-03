@@ -13,9 +13,24 @@ import (
 // 不强制冻结，不写时间戳/调用 ID；相同查询不会扰动稳定前缀。
 // 这是历史观测而非实时状态，实时调度仍以 PLAN STATUS 为准。
 func recordActionOutcome(loop *reactloops.ReActLoop, a *aicommon.Action, op *reactloops.LoopActionHandlerOperator, name string, result any, actionErr error) bool {
+	if receipt, ok := result.(PlanEditReceipt); ok {
+		if actionErr == nil && receipt.Status == "unchanged" {
+			op.Feedback(name + " unchanged；当前计划无需更新。")
+			return true
+		}
+		if actionErr != nil {
+			receipt.Status = "rejected"
+			receipt.Components = nil
+			receipt.TaskIDs = nil
+			result = receipt
+		}
+		if receipt.PatchArtifact != "" && loop.GetEmitter() != nil {
+			loop.GetEmitter().EmitPinFilename(receipt.PatchArtifact)
+		}
+	}
 	params := map[string]any{}
 	arguments := a.GetParams()
-	for _, key := range []string{"plan_version", "task_ids", "task_id", "attempt_id", "decision", "reason", "mode", "timeout_seconds"} {
+	for _, key := range []string{"task_ids", "task_id", "attempt_id", "decision", "reason", "mode", "timeout_seconds"} {
 		if value, ok := arguments[key]; ok {
 			params[key] = value
 		}
@@ -26,18 +41,14 @@ func recordActionOutcome(loop *reactloops.ReActLoop, a *aicommon.Action, op *rea
 		resultReferences = taskResultReferences(loop, result)
 	}
 	outcome := struct {
-		Action     string            `json:"action"`
-		Status     string            `json:"status"`
-		Parameters map[string]any    `json:"parameters,omitempty"`
-		Plan       map[string]uint64 `json:"plan,omitempty"`
-		Worker     any               `json:"worker,omitempty"`
-		Result     any               `json:"result,omitempty"`
-		Error      string            `json:"error,omitempty"`
+		Action     string         `json:"action"`
+		Status     string         `json:"status"`
+		Parameters map[string]any `json:"parameters,omitempty"`
+		Worker     any            `json:"worker,omitempty"`
+		Result     any            `json:"result,omitempty"`
+		Error      string         `json:"error,omitempty"`
 	}{Action: name, Status: "completed", Parameters: params, Result: resultReferences}
-	if c := controller(loop); c != nil && name != "submit_plan" {
-		receipt := c.planReceipt()
-		outcome.Plan = map[string]uint64{"draft_version": receipt.DraftVersion, "approved_version": receipt.ApprovedVersion}
-	}
+
 	if worker := loop.GetVariable("coordinator_worker_attempt"); worker != nil {
 		outcome.Worker = worker
 	} else if controller(loop) == nil {
@@ -51,12 +62,9 @@ func recordActionOutcome(loop *reactloops.ReActLoop, a *aicommon.Action, op *rea
 		op.Fail(fmt.Errorf("%s 已执行，但无法编码动作观测：%w；请核对状态，勿盲目重试", name, err))
 		return false
 	}
-	// 查询复用固定槽位；有副作用的操作按结果寻址，保留每次版本/验收结论。
+	// 操作按结果寻址，保留组件变更与验收结论。
 	// 循环共享同一 session，但不同协调实例、任务尝试不会覆盖彼此的记录。
 	scope := string(data)
-	if actionErr == nil && name == "wait_tasks" {
-		scope = "latest"
-	}
 	key := fmt.Sprintf("%s:%s:%s", loop.GetConfig().GetRuntimeId(), name, scope)
 	digest := sha256.Sum256([]byte(key))
 	id := fmt.Sprintf("coordinator.%s.%x", name, digest[:16])
@@ -82,7 +90,7 @@ func taskResultReferences(loop *reactloops.ReActLoop, value any) any {
 	case Result:
 		if ref, ok := loop.GetVariable("coordinator_worker_attempt").(workerAttemptRef); ok {
 			// 提交结果时 worker 仍在运行；最终状态由 Controller 随后结算。
-			tasks = []Attempt{{Task: Task{ID: ref.TaskID}, ID: ref.AttemptID, PlanVersion: ref.PlanVersion, State: Running, Result: v}}
+			tasks = []Attempt{{Task: Task{ID: ref.TaskID}, ID: ref.AttemptID, State: Running, Result: v}}
 		} else {
 			return value
 		}

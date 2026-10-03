@@ -199,6 +199,8 @@ func (pm *PromptManager) AssembleLoopPrompt(tools []*aitool.Tool, input *reactlo
 				partition.Nonce, partition.Content, partition.Nonce)
 		case "plan_definition":
 			prefixMaterials.PlanDefinition = partition.Content
+		case "current_report":
+			prefixMaterials.CurrentReport = partition.Content
 		default:
 			remaining = append(remaining, partition)
 		}
@@ -209,9 +211,11 @@ func (pm *PromptManager) AssembleLoopPrompt(tools []*aitool.Tool, input *reactlo
 		base, effectiveInput = pm.projectLightweightLoopMaterials(base, input)
 		planDocument := prefixMaterials.PlanDocument
 		planDefinition := prefixMaterials.PlanDefinition
+		currentReport := prefixMaterials.CurrentReport
 		prefixMaterials = pm.NewPromptMaterials(base, effectiveInput)
 		prefixMaterials.PlanDocument = planDocument
 		prefixMaterials.PlanDefinition = planDefinition
+		prefixMaterials.CurrentReport = currentReport
 	}
 
 	prefixMaterials.CurrentTime = ""
@@ -715,6 +719,7 @@ func (pm *PromptManager) buildSemiDynamic1Observation(
 			reactloops.PromptSectionRoleSemiDynamic1, false, materials.PlanDefinition,
 		),
 		reactloops.NewPromptSectionObservation("section.semi_dynamic_1.evidence", "Session Evidence", reactloops.PromptSectionRoleSemiDynamic1, true, materials.SessionEvidenceSemiDynamic),
+		reactloops.NewPromptSectionObservation("section.semi_dynamic_1.current_report", "CURRENT REPORT", reactloops.PromptSectionRoleSemiDynamic1, false, materials.CurrentReport),
 	}
 	section.Children = filterIncludedPromptSections(children)
 	if strings.TrimSpace(rendered) != "" {

@@ -6,19 +6,43 @@
 
 最上层 [coordinator.go](../aireact/coordinator.go) 默认使用新版。旧引擎的实现、任务和私有资源仍集中在同层 [coordinator_legacy](../coordinator_legacy/README.md)，供后续移除；ReAct 的 PLAN 入口不再调用它。两边共享 aicommon、reactloops、Timeline、事件封套和数据库表这些通用基础设施，不共享执行状态机。父级 `aid` 只保留公共接口，不提供旧类型的兼容别名。
 
-## 自动等待与任务通知
+## 第一阶段 PLAN
 
-协调员没有可调度任务、待验收结果或未完成微观 TODO，且仍有 worker 运行时，循环在当前轮结束后自动挂起。挂起不调用模型、不使用定时轮询，也不要求模型调用 `wait_tasks`。此时 `finish` 只交还控制权，不终止任务，不反复生成拒绝 Evidence。
+内部仅保存一份当前 `Plan` 和 `Phase = PLAN | EXEC`。PLAN 负责调查、文档、无状态任务定义与派生 DAG；只有 `create_plan / modify_plan / submit_plan` 三个计划动作。提交锁定内容，用户要求调整则恢复编辑，批准最终内容后保存批准历史并进入自动 EXEC。EXEC 复用 modify_plan 调整当前任务图，不回退 PLAN、不再次审批。
 
-worker 成功保存发生变化的 `save_evidence` 后，通过当前任务尝试的回调通知协调员。worker 退出、Timeline 合并完成后，Controller 统一结算成功、失败或取消，先保存结果 Evidence 和兼容状态，再通知等待方。重复证据和过期 attempt 不唤醒；任务发现不增加 `UserRevision`。多条通知通过同一个版本游标合并，推理期间到达的通知留给下一轮处理。
+`modify_plan` 只有四个可选业务参数：`document / document_patch / tasks / tasks_patch`。同组件覆盖与 patch 互斥，至少提供一个。文档与任务树在副本上一次校验并提交；失败完全回滚，严格 diff 不使用 fuzz 或 shell。patch 目标只能是 `plan_document.md`，产物保存在工作区 `artifacts/coordinator-<实例ID>/plan-patches`，失败也可 review。任务 patch 按稳定 `task_id` 有序增删改，语义依赖必须在同批修正。
 
-任务结果只由 Controller 发布；action 回执仅保存引用。普通 Running/Cancelling 状态由 PLAN STATUS 展示，等待期间不新增 Evidence。冻结、压缩和提升沿用会话 Timeline 的原有机制；保留小型结果去重摘要，避免无关状态更新把已删除或淘汰的结果重新插入。`Seen` 和解析 AIRequest 内容的观察回调已移除。Yakit/Memfit 的审批、任务树和结束事件契约不变。
+两种协议的 action 参数都允许附带额外字段；业务校验及组件编辑只读取已声明参数。`human_readable_thought`、`todo_delta` 等公共字段保留给主循环处理，不因业务 action 不声明它们而失败。必填字段、已声明字段的类型、任务身份、DAG 和事务互斥规则仍必须满足；额外字段不能替代必填字段或作为实际编辑内容。
 
-快速实验脚本：[task_notifications.yak](smoke/task_notifications.yak)。脚本由 Go harness 注入确定性模型与事件屏障，实际执行 Yak/aim、审核、coordinator、pe_task 和共享 Evidence；覆盖 function call 与 text stream。子任务先报告发现，等主协调员检查后再完成；两段自动等待都检查没有额外主模型调用。
+`WithEnableSubagentsInPlan(true)` 显式开启只读调查，默认关闭。配置复制保留此开关，但通用 `EnableDispatchSubReactAgents` 仍不自动继承。调查复用 generic 子 Agent 管理器和结果通道；运行时权限阻止计划编辑、命令、写入、专注循环和递归派发。明确共享的 Evidence 与完成清理通知可唤醒协调员，私有 Timeline 不合并。所有调查实际退出且结果已经交接后才能审核。
 
-```powershell
-go test ./common/ai/aid/coordinator -run '^TestCoordinatorYakAutomaticTaskNotifications$' -count=1 -v
-```
+持久化格式是 schema 2，保存 phase、plan、review_pending、当前/历史尝试、inbox 游标及当前报告。schema 1 的旧双计划读取集中在 `snapshot_compat.go`；旧记录有一份可确定计划时转换，有执行中的替换草案则明确拒绝。`Revision` 只为状态发布顺序服务，模型没有计划版本或 edit revision。
+
+[第一阶段实际上下文、样本和验收](context_review.md)；新增 [Yak/aim 脚本](smoke/planning_phase.yak) 覆盖调查、preset、mocker × 双协议 × 探索开关，共 12 个组合。
+
+## EXEC 自动调度、审核和报告
+
+[scheduler.go](scheduler.go) 在批准、实际退出释放槽位、审核通过、修改事务和明确重试后自动推进 DAG。模型不再拥有 start_tasks / wait_tasks / write_report，EXEC 也不开放正常 finish。每次 pe_task 派发冻结当前 Plan、任务身份和已验收的直接前置结果；局部拆分仅停止受影响后继闭包，无关 running 分支保持原 attempt 与上下文。
+
+[task_review.go](task_review.go) 在 worker 实际退出后管理人工审核，使用 Session context 和既有 task_review_require。用户通过直接释放 DAG；YOLO 才由协调员依据实际结果调用 review_task。历史失败、拒绝、取消和初步结果保留，不将线程退出当成验收。
+
+原有 `ai / ai-auto / auto` 审阅偏好也走协调员质量判断，不被改成人工任务等待、不新增辅助 task-review 模型；工具风险审阅仍继承原配置。
+
+[inbox.go](inbox.go) 持久化新增消息与投递/处理游标。回调只记录事实、入队和通知，不调用主模型。下一 prompt 边界批量交接，投递不代表验收；action 期间收到的消息留给下一轮。终态、用户消息和不同发现不被容量淘汰。结果正文沿原有 Timeline Evidence 保存，队列只带有界摘要和引用。
+
+无主动工作时运行时自动进入30秒等待，与 wait_messages 共用实现。空超时只检查运行时，不取消 worker、不调用模型、不生成新的 Evidence；review_due 合并同任务/尝试尚未处理的提醒，定时器不调用辅助模型。人工正常通过无需主模型二次检查。
+
+[report.go](report.go) 管理唯一当前 artifacts 草稿，create_report / modify_report 保存文件，submit_report 才发布 report_finish。计划、任务、关键消息和用户要求共同控制写作门禁；提交与宿主结束分别复查。草稿基于写作开始时的消息基准，新要求到达后需修订。报告写作仍属 EXEC，没有第三循环。
+
+High Static 不变。PLAN DOCUMENT/DEFINITION、共享 Evidence 和 CURRENT REPORT 位于 SemiDynamic1；中文执行/写作角色从 promptloader 进入 SemiDynamic2。动态 PLAN STATUS 仅保存状态、消息和写作概览。观察批次走 Timeline Open，冻结后沿原有提升机制保留。
+
+[execution_phase.yak](smoke/execution_phase.yak) 通过真实 Yak/aim 跑 A/B独立、C依赖A、D依赖B/C，覆盖 function call/text stream × 人工/YOLO。脚本化的是模型决策与用户回复，调度、worker、只读工具、Evidence、审核和 artifacts 写入均由实际运行时执行。快速通知屏障测试保留在 [task_notifications.yak](smoke/task_notifications.yak)。
+
+~~~powershell
+go test ./common/ai/aid/coordinator -count=1
+go test ./common/ai/aid/coordinator -run '^TestCoordinatorYakExecutionPhaseMatrix$' -count=1 -v
+go test -race ./common/ai/aid/coordinator -run '^TestExecution|^TestCoordinatorYakExecutionPhaseMatrix$' -count=1
+~~~
 
 ## 启用与替换
 
@@ -73,23 +97,24 @@ sequenceDiagram
     RPC->>D: 用户输入进入 Timeline Open
     D->>C: FC request_plan_and_execution
     C->>C: FC 探索 / save_evidence / create_plan / submit_plan
-    C->>DB: 保存草案、版本及 coordinator_state
+    C->>DB: 保存当前 Plan、审核锁及 coordinator_state
     C-->>UI: detached_plan_require（gRPC 事件，非 FC）
     C-->>D: 规划阶段结束
     D-->>UI: 根任务终止状态（非 FC，无额外模型总结）
     UI->>RPC: execute_detached_plan（批准，可附编辑后的任务树）
-    RPC->>DB: 校验版本、保存批准的任务树
+    RPC->>DB: 校验本次审核归属、保存最终 Plan 并移交 EXEC
     RPC->>C: 原 session 队列执行已批准计划
     C-->>UI: start_plan_and_execution / plan
-    C->>C: FC start_tasks
+    C->>C: 宿主自动 DAG 派发（非 FC）
     C->>W: 冻结任务书 + Timeline fork
     W->>W: FC 业务工具 / save_evidence / submit_task_result / finish
     W->>DB: 合并 Timeline / 共享 evidence
     W-->>C: 新证据 / 任务结算通知（非 FC）
     C->>C: 空闲时系统自动等待；通知后重新检查（非 FC）
     C->>C: FC review_task
-    Note over C,W: 上游验收后才放行依赖任务，不再向用户逐项要确认
-    C->>C: FC write_report / finish
+    Note over C,W: 上游验收后自动放行后继；人工审核由任务管理器处理，YOLO由C判断
+    C->>C: FC/JSON create_report / modify_report / submit_report
+    C->>C: 宿主复查任务、inbox与用户要求后正常结束（非 FC）
     C-->>UI: report_finish / end_plan_and_execution / 根任务终止状态
 ```
 
@@ -113,17 +138,19 @@ detached 不等于清空上下文，也不承诺自动提高缓存命中率。se
 
 | Action | 参数 | 作用 |
 | --- | --- | --- |
-| `create_plan` | `plan`, `plan_document` | 校验并保存草稿，返回版本；不执行任务 |
-| `modify_plan` | `plan_version`, `plan`, `plan_document` | 完整替换对应版本的草稿，批准版本继续有效 |
-| `submit_plan` | `plan_version` | 进入现有用户审批；采用合法编辑树；detached 只发布待批准计划 |
-| `start_tasks` | `task_ids` 可省略 | 原子检查并发、依赖、批准和当前状态，立即派发；省略时选择当前可执行任务 |
-| `wait_tasks` | `task_ids`, `mode`, `timeout_seconds` 均可省略 | `any` 默认等待更新；`all` 等选中的已派发尝试全部结算；默认 30、最多 60 秒，超时不取消 |
-| `review_task` | `task_id`, `attempt_id`, `decision`, `reason` | 对已观察的 `awaiting_review` 尝试作出 `accept` 或 `reject` |
+| `create_plan` | `plan`, `plan_document` | PLAN 首次创建完整文档和任务树，返回小型回执；不执行 |
+| `modify_plan` | `document`, `document_patch`, `tasks`, `tasks_patch` | PLAN/EXEC 原子编辑；EXEC 仅停止受影响尝试，无再次审批 |
+| `submit_plan` | 无业务参数 | PLAN 锁定并提交审核；批准最终内容后移交 EXEC |
+| `wait_messages` | `timeout_seconds` 可省略 | 默认30、最多60秒；已有消息立即返回，空超时不轮询模型 |
+| `inspect_task` | `task_id`, `attempt_id` 可省略, `details` 可省略 | 按需查看当前或历史尝试，默认有界状态与引用 |
+| `review_task` | `task_id`, `attempt_id`, `decision`, `reason` | YOLO 对已结算结果接受/拒绝/深入/取消，不绕过人工策略 |
 | `retry_task` | `task_id`, `attempt_id`, `reason` | 重试已结算的当前尝试，撤销下游旧结果；受影响 worker 必须先退出 |
 | `cancel_tasks` | `task_ids` 可省略，`reason` | 请求停止；运行中的任务先进入 `cancelling`，退出后才是 `cancelled` |
-| `write_report` | `title`, `markdown`, `summary` | 在当前协调循环写 Markdown artifact，发送既有 `report_finish` |
+| `create_report` | `title`, `document` | 收尾门禁通过后创建实例独立 Markdown artifact |
+| `modify_report` | `document` 或 `document_patch` | 修改当前报告；严格 diff，当前正文位于 SemiDynamic1 |
+| `submit_report` | `summary` | 发布 report_finish；宿主复查真实状态后结束 |
 | `directly_answer` | 既有协议对应的答案参数 | 发布进展/答案，继续协调循环 |
-| `finish` | 既有参数 | 经过批准、验收、未读结果、worker、TODO、用户输入及报告门闩后结束 |
+| `finish` | 既有参数 | 仅 PLAN-only 适配保留；完整 EXEC 不开放正常退出 |
 
 继续复用 `save_evidence`、`adjust_todolist`、`ask_for_clarification`、工具加载/调用、知识及技能检索 actions。不存在任意改状态的 `update_plan_status`：状态来自执行、观察、验收和取消的真实结果。
 
@@ -140,7 +167,7 @@ detached 不等于清空上下文，也不承诺自动提高缓存命中率。se
 }
 ```
 
-子节点放在 `sub_subtasks`，语义标识保持稳定且唯一，`depends_on` 引用这些标识。依赖一个组时等待该组全部叶任务验收；组自身的前置条件只传播到组内入口叶任务，沿用旧版 DAG 语义。列表顺序不产生隐含依赖。宿主分配稳定 `task_id`，拒绝重复标识、未知依赖和环。已有平面 `name/goal/identifier` 参数作为别名继续可用。客户端编辑及恢复仍接受原有嵌套 `root_task`，Yakit 任务树事件结构不变。修改采用完整草稿替换。
+子节点放在 `sub_subtasks`，语义标识保持稳定且唯一，`depends_on` 引用这些标识。依赖一个组时等待该组全部叶任务验收；组自身的前置条件只传播到组内入口叶任务，沿用旧版 DAG 语义。列表顺序不产生隐含依赖。宿主分配稳定 `task_id`，拒绝重复标识、未知依赖和环。已有平面 `name/goal/identifier` 参数作为别名继续可用。客户端编辑及恢复仍接受原有嵌套 `root_task`，Yakit 任务树事件结构不变。修改可以覆盖完整定义或按稳定 ID 批量 patch；显示 index 不作为编辑身份。
 
 新版提供自己的预设计划及 mocker 入口，不构造旧版运行体：
 
@@ -168,13 +195,13 @@ running -> cancelling -> cancelled
 settled -> retry -> running（新的 attempt_id）
 ```
 
-worker 的 `submit_task_result(summary, artifacts?, evidence_ids?)` 提交结果，随后 `finish` 经过原有微观 TODO 门闩。worker 返回并不意味着验收通过，也不会自动放行依赖任务。协调员读取结果及引用，再调用 `review_task`；需要额外验证时派发批准范围内的验证 task。
+worker 的 `submit_task_result(summary, artifacts?, evidence_ids?)` 提交结果，随后 `finish` 经过原有微观 TODO 门闩。实际退出释放执行槽位，但 awaiting_review 不放行依赖。人工审核由任务管理器自行发起，用户通过直接推进 DAG；YOLO 由协调员 review_task 判断证据质量。
 
-任务书在派发时冻结。批准新版本前，改变任务书或上游输入的活动任务必须停止；改变输入后，下游已完成或待验收的旧结果也会失效。重试使用新尝试序号，保留 Timeline 中的调用、结果和审阅记录；快照保存当前尝试。恢复不自动重启曾在运行的 worker，先标记 interrupted/failed，交给协调员显式重试。
+任务书在每次派发时冻结。EXEC 可修改当前计划，无关 worker 不变；改变已派发目标或必要依赖时先确认受影响尝试实际退出。重试校验下游退出及依赖，撤销受影响旧验收，并以新 attempt 保存全部历史事实。恢复不暗中重启 running worker，先转为 failed 并通知决策。
 
-`wait_tasks` 使用通知等待。用户交互、计划修改或尝试替换会让等待返回，协调员重新评估。`all` 不能等待尚未派发的任务；不能把还未获验收的依赖当成已完成。
+`wait_messages` 与运行时自动等待复用同一消息链路。投递游标不等于业务处理，消息批次进入 Timeline 后状态仍保持待审核/失败，直到实际决策。正常人工通过无需主模型二次验收。
 
-`user_intervention` 由会话宿主写入共享 Timeline 后再通知协调员，不重复转交给每个 worker 记录。普通 `FreeInput` 保持外层队列语义，供下一任务执行。新运行体要求报告时由 `write_report` 完成。旧 `CoordinatorOption` / `ResultHandler` 只属于旧版，不注入新运行体。
+`user_intervention` 由会话宿主写入共享 Timeline 后通知协调员，不重复转交 worker 记录。普通 `FreeInput` 保持外层队列语义。完整 EXEC 必须提交最新报告后由宿主复查收尾；用户停止及真实错误仍中断运行。旧 `CoordinatorOption` / `ResultHandler` 只属于旧版。
 
 ## 工具边界与上下文
 
@@ -191,11 +218,11 @@ Timeline Open：近期事件 -> PLAN STATUS -> 微观 TODO
 Dynamic：当前时间 / 自动观测上下文 / 本轮反馈 / 检索记忆等
 ```
 
-PLAN DEFINITION 展示草案、已批准任务树、任务目标及叶任务 DAG，随计划版本更新，不包含执行状态、结果或计数。PLAN STATUS 展示草稿/批准版本、当前及其他任务状态、尝试、结果观察情况、依赖是否允许派发。详细实际样本、字段和工具边界见 [上下文 review](context_review.md)。
+PLAN DOCUMENT 和 PLAN DEFINITION 分别展示唯一当前正文与无状态任务树/叶 DAG，仅实际内容变化时更新各自分区。PLAN STATUS 在 PLAN 只展示阶段、是否已有计划、审核锁及必要调查状态；EXEC 沿用任务、尝试和依赖状态。详细实际样本、字段和工具边界见 [上下文 review](context_review.md)。
 
 计划动作回执不复制文档和任务书。任务状态结算由 Controller 自动保存到 session Timeline Evidence；等待回执仅引用已有观测。Controller、存储和前端全量树保留原契约。缓存回归比较两种协议投影后的稳定 messages 和 tools；这不是 provider 的真实缓存命中率。
 
-中文职责指令与 mainloop 一样通过 `promptloader.MustLoad` 加载；资源位于 `ai/aid/coordinator/instruction.txt`、`planning_only.txt`、`worker_instruction.txt`。不在纯静态 High Static 中添加条件或协调员专属变量。
+中文职责指令与 mainloop 一样通过 `promptloader.MustLoad` 加载；资源位于 `ai/aid/coordinator/planning.txt`、`instruction.txt`、`planning_only.txt`、`worker_instruction.txt`。不在纯静态 High Static 中添加条件或协调员专属变量。
 
 ## Yakit 与旧接口
 
@@ -212,7 +239,7 @@ PLAN DEFINITION 展示草案、已批准任务树、任务目标及叶任务 DAG
 
 旧 `task_review_require` 面板的自动 continue 不是新的业务验收；新协调员通过 `review_task` 作出验收，利用已有 stream 展示理由。整个新流程不要求修改 Yakit。
 
-用户对同一版计划只确认一次。普通 `continue` 和编辑器的 `freedom-review` + `reviewed-task-tree` 都直接采用合法的批准结果，随后协调员自动调度、验收并结束。重复 `submit_plan` 不再弹出审核或重置任务；修改后产生的新版本仍需审批。编辑树里的 `isRemove` 会移除相应子树；已删除的依赖引用必须修正，不能默默执行原计划。Detached 的确认仍使用 `execute_detached_plan`，接入队列后直接执行批准树。
+用户对同一版计划只确认一次。普通 `continue` 和编辑器的 `freedom-review` + `reviewed-task-tree` 都直接采用合法的批准结果，随后协调员自动调度、验收并结束。审核期间及 EXEC 的重复 `submit_plan` 被拒绝，不弹出新审核或重置任务；用户要求修订后留在 PLAN，可修改再审核。编辑树里的 `isRemove` 会移除相应子树；已删除的依赖引用必须修正，不能默默执行原计划。Detached 的确认仍使用 `execute_detached_plan`，接入队列后直接执行批准树。
 
 更多字段与依据见 [接口契约](../coordinator_interface_contract.md)，组件关系见 [架构文档](../coordinator_architecture.md)。
 
@@ -230,7 +257,7 @@ go test ./common/yakgrpc -run '^TestStartAIReActDetachedApprovalExecutesAndKeeps
 
 [审核到执行测试](../aireact/coordinator_approval_execution_test.go) 通过真实输入事件和任务队列覆盖普通确认、编辑后提交、detached 确认、detached 编辑，以及 Yakit 先停止规划再提交执行的路径；每条路径只提供一次用户确认，验证两个依赖任务全部验收、事件闭合及完成状态持久化。Yak 冒烟也使用人工审批策略，由事件回调发送这一次确认。
 
-[通道测试](../aireact/coordinator_channels_test.go) 拦截旧构造器，验证新版规划、人工审核编辑、detached 发布及恢复均不调用它；反向选择旧通道时不注入新版辅助执行器。恢复以存储归属为准，未知版本或旧标记与新快照冲突会报错。新包的生产依赖图不包含父级 `aid` 或 `aiforge`。
+[通道测试](../aireact/coordinator_channels_test.go) 拦截旧构造器，验证新版规划、人工审核编辑、detached 发布及恢复均不调用它；反向选择旧通道时不注入新版辅助执行器。恢复以存储归属为准，未知快照格式或旧引擎标记与新快照冲突会报错。新包的生产依赖图不包含父级 `aid` 或 `aiforge`。
 
 [live_coordinator.yak](smoke/live_coordinator.yak) 可使用本机配置的实际 provider/model 执行；凭据由外部配置，不写入脚本。确定性冒烟不衡量模型任务质量或真实 provider 的缓存命中率。
 
@@ -240,6 +267,6 @@ go test ./common/yakgrpc -run '^TestStartAIReActDetachedApprovalExecutesAndKeeps
 
 每个计划动作独立放在 `action_xxx.go`，配同名测试；`actions.go` 集中注册、双协议定义和参数校验。答复/finish 适配及 worker 的结果提交也有独立文件。动作观测通过 `action_outcome.go` 写入 session Timeline Evidence，Open 冻结后提升到 SemiDynamic1；feedback 只提供记录 ID。每个任务尝试独立保存完整结果，验收结论单独保留，wait 只引用已有观测，重复查询不重复写日志。计划与报告正文继续使用原有稳定分区和 artifacts，不复制到动作记录。
 
-`TestCoordinatorAction*` 逐项检查版本冲突、审批幂等、依赖放行、先观察后验收、取消实际退出、结果提交与 finish/TODO 门闩；`TestCoordinatorActionOutcomeLifecycle` 验证冻结提升、跨任务结果保留和 Timeline 恢复。现有两种协议的探索/预设/mocker、完整任务执行、Yak + aim 和 Yakit/gRPC 链路继续运行。
+`TestCoordinatorAction*` 逐项检查原子编辑、审核锁定和审批幂等、依赖放行、先观察后验收、取消实际退出、结果提交与 finish/TODO 门闩；`TestCoordinatorActionOutcomeLifecycle` 验证冻结提升、跨任务结果保留和 Timeline 恢复。现有两种协议的探索/预设/mocker、完整任务执行、Yak + aim 和 Yakit/gRPC 链路继续运行。
 
-任务完成、异常、取消、验收和恢复均自动维护 Timeline 执行结果。`review_task` 必须对应当前已结算 attempt，并提供实际证据支持的验收理由。空闲等待由循环自动处理，`wait_tasks` 保留为指定任务范围的可选动作。Open 冻结后由共享 Evidence 提升机制进入 SemiDynamic1，沿用 session 的容量策略。结果发布见 [task_results.go](task_results.go)，通知与自动等待见 [task_notifications.go](task_notifications.go)，边界回归见对应测试文件。
+任务完成、异常、取消、验收和恢复均自动维护 Timeline 结果。`review_task` 必须对应当前已结算 attempt 并提供证据支持的理由。空闲自动等待，wait_messages 仅为可选消息动作；inspect_task 不构成 Seen 门禁。Open 冻结后由共享 Evidence 提升到 SemiDynamic1。结果发布见 [task_results.go](task_results.go)，通知见 [task_notifications.go](task_notifications.go)，本轮时序和结果见 [执行验收记录](execution_review.md)。

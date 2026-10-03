@@ -97,15 +97,21 @@ func TestReAct_RecoveryPlanAndExec_NativeSnapshot(t *testing.T) {
 				}
 				for _, m := range matches {
 					if m[2] == "running" {
-						return reply("wait_tasks", map[string]any{"timeout_seconds": 1})
+						return reply("wait_messages", map[string]any{"timeout_seconds": 1})
 					}
 				}
 				for _, m := range matches {
 					if m[2] == "pending" {
-						return reply("start_tasks", map[string]any{})
+						return reply("wait_messages", map[string]any{})
 					}
 				}
-				return reply("finish", map[string]any{})
+				if !strings.Contains(prompt, "当前任务图和关键消息已经收尾") {
+					return reply("directly_answer", map[string]any{"answer_payload": "检查本批次结果，准备交付。"})
+				}
+				if !strings.Contains(prompt, "# CURRENT REPORT") {
+					return reply("create_report", map[string]any{"title": "检查报告", "document": "# 检查报告\n实际任务结果与验收已保存。"})
+				}
+				return reply("submit_report", map[string]any{"summary": "检查完成，交付报告。"})
 			}
 			r, err := NewTestReAct(aicommon.WithContext(ctx), aicommon.WithPersistentSessionId(uuid.NewString()),
 				aicommon.WithEnableFunctionCallMode(true), aicommon.WithWorkdir(t.TempDir()), aicommon.WithNoOpMemoryTriage(),
@@ -122,7 +128,7 @@ func TestReAct_RecoveryPlanAndExec_NativeSnapshot(t *testing.T) {
     {"name":"Resume","goal":"Resume interrupted check","semantic_identifier":"resume","depends_on":["done"]},
     {"name":"Verify","goal":"Verify resumed result","semantic_identifier":"verify","depends_on":["resume"]}]}`, "# Approved checks", nil)
 			require.NoError(t, err)
-			snapshot := coordinator.Snapshot{Schema: 1, DraftVersion: 1, ApprovedVersion: 1, Draft: plan, Approved: plan, NextAttempt: 3, Attempts: map[string]coordinator.Attempt{}}
+			snapshot := coordinator.Snapshot{Schema: 2, Phase: coordinator.PhaseExec, Plan: plan, NextAttempt: 3, Attempts: map[string]coordinator.Attempt{}}
 			for i, task := range plan.Tasks {
 				state := coordinator.Accepted
 				if fromTask == "" {
@@ -133,7 +139,7 @@ func TestReAct_RecoveryPlanAndExec_NativeSnapshot(t *testing.T) {
 						state = coordinator.Pending
 					}
 				}
-				snapshot.Attempts[task.ID] = coordinator.Attempt{Task: task, ID: uint64(i + 1), PlanVersion: 1, State: state, Result: coordinator.Result{Summary: "Persisted prior result"}}
+				snapshot.Attempts[task.ID] = coordinator.Attempt{Task: task, ID: uint64(i + 1), State: state, Result: coordinator.Result{Summary: "Persisted prior result"}}
 			}
 			snapshot.Finished = fromTask != ""
 			progress, _ := json.Marshal(coordinator.Progress{PlanEngine: coordinator.Name, CoordinatorState: &snapshot, Phase: "NotCompleted"})
