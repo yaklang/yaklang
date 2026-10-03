@@ -81,7 +81,8 @@ func TestCoordinatorPresetPlanApprovalContext(t *testing.T) {
 				require.NotContains(t, dynamic, "已有约束：")
 			}
 			require.Contains(t, prompts[0], "PLAN 草案任务（未批准）")
-			require.Contains(t, prompts[1], `"draft":{`)
+			require.Contains(t, prompts[1], `"context":"SemiDynamic1: PLAN DEFINITION / PLAN DOCUMENT"`)
+			require.NotContains(t, prompts[1], `"draft":{`, "inspect_plan must not replay the complete plan")
 			require.NotContains(t, prompts[1], "(*coordinator.Plan)")
 			require.Contains(t, prompts[2], "# PLAN DOCUMENT")
 			require.Contains(t, prompts[2], "Dispatch: blocked")

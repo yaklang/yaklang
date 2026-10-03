@@ -39,6 +39,7 @@ AISessionPlanAndExec 不增加新表。task_tree、task_progress 保持 JSON 字
 | --- | --- | --- |
 | create_plan | plan, plan_document | 新草稿版本，不执行 |
 | modify_plan | plan_version, plan, plan_document | 完整新草稿版本，批准内容尚未切换 |
+| inspect_plan | 无 | 草案/批准/提交版本及稳定正文位置，不重复返回计划树和文档 |
 | submit_plan | plan_version | 普通审批后采用合法编辑；detached 保存提交版本并等待执行请求 |
 | start_tasks | task_ids optional | 指定 ready tasks 或当前 ready 集合的派发回执 |
 | inspect_tasks | task_ids optional | 当前状态、尝试、结果和引用，登记结果已观察 |
@@ -50,7 +51,11 @@ AISessionPlanAndExec 不增加新表。task_tree、task_progress 保持 JSON 字
 | directly_answer | 原有协议对应的答案参数 | 可见消息；继续协调 |
 | finish | 原有参数 | 经过完成门闩结束 |
 
-plan 使用 name、goal、tasks；每个 task 使用 name、goal、identifier、depends_on。identifier 在修改时保持稳定；模型不自填执行状态或 UUID。后端校验 DAG 并解析逻辑 IDs。原生首版采用平面 DAG；旧嵌套 root_task 在编辑/恢复通道继续使用。
+plan 沿用嵌套的 main_task、main_task_goal、tasks，以及递归的 subtask_name、subtask_goal、subtask_identifier、sub_subtasks、depends_on；平面 name/goal/identifier 保留为兼容别名。语义标识在修改时保持稳定；模型不自填执行状态或 UUID。父节点仅组织任务，后端校验 DAG 并解析叶任务逻辑 IDs。
+
+表中的返回语义是持久化动作观测的内容。模型 handler 将版本回执、结果、拒绝原因及验收理由写入 session Timeline Evidence；feedback 仅给出处理状态和记录 ID。Open 冻结后，沿已有 Evidence 通道提升到 SemiDynamic1，不按 action 强制冻结。
+
+`inspect_plan` 的观测只含草案/批准/提交版本及 PLAN DEFINITION / PLAN DOCUMENT 位置。任务观测保留 task_id、attempt_id、plan_version、state、seen、完整 result 及 review_reason；每个任务尝试独立保存，查询动作引用观测 ID，避免重复正文。版本变更和验收理由有独立记录。相同查询幂等，实时状态仍以 PLAN STATUS 为准。Controller 公开返回值、存储快照及 Yakit 的计划/任务事件结构不变；沿用 session Evidence 的共享和容量策略。
 
 task_ids 缺省的含义由各函数明确声明。原生参数格式不正确由 schema/状态校验拒绝，不将格式错误转换为全选。未知任务、重复派发、过期版本或尝试、未验收依赖、活动任务冲突和配额不足返回可纠正反馈，不执行部分选中任务。
 
