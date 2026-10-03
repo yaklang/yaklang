@@ -6,9 +6,12 @@ import (
 	"strings"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon/promptloader"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 )
+
+var workerInstruction = promptloader.MustLoad("ai/aid/coordinator/worker_instruction.txt")
 
 // NewWorkerLoop is the only execution loop in the new PLAN architecture.
 // It shares session evidence and the ordinary tool policy, but cannot spawn
@@ -16,19 +19,18 @@ import (
 func NewWorkerLoop(r aicommon.AIInvokeRuntime, opts ...reactloops.ReActLoopOption) (*reactloops.ReActLoop, error) {
 	if cfg, ok := r.GetConfig().(*aicommon.Config); ok {
 		_ = aicommon.WithLiteForgeExecutor(executeNativeHelper)(cfg)
-		_ = aicommon.WithEnableFunctionCallMode(true)(cfg)
 		_ = aicommon.WithAiAgreeRiskControl(NativeRiskReview)(cfg)
 	}
 	resultOptions := []aitool.ToolOption{
-		aitool.WithStringParam("summary", aitool.WithParam_Required()), aitool.WithStringArrayParam("artifacts"), aitool.WithStringArrayParam("evidence_ids"),
+		aitool.WithStringParam("summary", aitool.WithParam_Description("本次执行尝试的实际结果摘要。"), aitool.WithParam_Required()),
+		aitool.WithStringArrayParam("artifacts", aitool.WithParam_Description("实际产出的文件或其他 artifacts 引用。")),
+		aitool.WithStringArrayParam("evidence_ids", aitool.WithParam_Description("已经保存到 session 的真实 Evidence ID 列表。")),
 	}
 	preset := append([]reactloops.ReActLoopOption{}, opts...)
 	preset = append(preset,
-		reactloops.WithFunctionCallMode(true), reactloops.WithFunctionCallActionVariants(),
+		reactloops.WithFunctionCallActionVariants(),
 		reactloops.WithAllowPlanAndExec(false), reactloops.WithAllowAIForge(false), reactloops.WithAllowToolCall(true),
-		reactloops.WithPersistentContextProvider(func(*reactloops.ReActLoop, string) (string, error) {
-			return `Execute the assigned frozen plan task. Read user information and prior results in Timeline. Use native function calls only; JSON actions cannot invoke anything. Use tools for business execution, save_evidence for durable session facts, and adjust_todolist for microscopic work. Produce concrete artifacts/evidence, call submit_task_result with the summary and actual references, then finish. Acceptance and retries belong to the coordinator.`, nil
-		}),
+		reactloops.WithPersistentInstruction(workerInstruction),
 		reactloops.WithReactiveDataBuilder(func(_ *reactloops.ReActLoop, b *bytes.Buffer, _ string) (string, error) { return b.String(), nil }),
 		reactloops.WithDisablePeriodicVerification(true),
 		reactloops.WithDisableLoopPerception(true),
@@ -39,7 +41,7 @@ func NewWorkerLoop(r aicommon.AIInvokeRuntime, opts ...reactloops.ReActLoopOptio
 			}
 			return false
 		}),
-		reactloops.WithRegisterLoopAction("submit_task_result", "Submit this execution attempt's results; does not accept the task or finish the loop.", resultOptions, validateActionParameters("submit_task_result", resultOptions), func(loop *reactloops.ReActLoop, a *aicommon.Action, op *reactloops.LoopActionHandlerOperator) {
+		registerAction("submit_task_result", "提交本次执行尝试的结果；不代表任务验收通过，也不结束循环。", resultOptions, func(loop *reactloops.ReActLoop, a *aicommon.Action, op *reactloops.LoopActionHandlerOperator) {
 			if strings.TrimSpace(a.GetString("summary")) == "" {
 				op.Feedback("result summary is required")
 				op.Continue()

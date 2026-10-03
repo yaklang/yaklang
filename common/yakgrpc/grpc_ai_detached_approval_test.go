@@ -37,14 +37,18 @@ func (s *detachedApprovalTestServer) StartAIReAct(stream ypb.Yak_StartAIReActSer
 // Exercise the frontend's protobuf transport, runtime input delivery and real
 // executor together. A start acknowledgement alone does not mean a plan ran.
 func TestStartAIReActDetachedApprovalExecutesAndKeepsStreamOpen(t *testing.T) {
-	for _, interruptPlanning := range []bool{false, true} {
-		t.Run(map[bool]string{false: "after_planning_completed", true: "cancel_then_approve"}[interruptPlanning], func(t *testing.T) {
-			testStartAIReActDetachedApproval(t, interruptPlanning)
+	for _, native := range []bool{false, true} {
+		t.Run(fmt.Sprintf("function_call_%v", native), func(t *testing.T) {
+			for _, interruptPlanning := range []bool{false, true} {
+				t.Run(map[bool]string{false: "after_planning_completed", true: "cancel_then_approve"}[interruptPlanning], func(t *testing.T) {
+					testStartAIReActDetachedApproval(t, interruptPlanning, native)
+				})
+			}
 		})
 	}
 }
 
-func testStartAIReActDetachedApproval(t *testing.T, interruptPlanning bool) {
+func testStartAIReActDetachedApproval(t *testing.T, interruptPlanning, native bool) {
 	ctx, cancel := context.WithTimeout(context.Background(), 25*time.Second)
 	defer cancel()
 	base := newScheduleTestServer(t)
@@ -52,6 +56,7 @@ func testStartAIReActDetachedApproval(t *testing.T, interruptPlanning bool) {
 	var workerCalls sync.Map
 	pattern := regexp.MustCompile(`\[([^\]]+)\]: ([a-z_]+); attempt=(\d+); observed=(true|false)`)
 	srv := &detachedApprovalTestServer{Server: base, options: []aicommon.ConfigOption{
+		aicommon.WithEnableFunctionCallMode(native),
 		aicommon.WithWorkdir(t.TempDir()), aicommon.WithDisableCreateDBRuntime(true),
 		aicommon.WithNoOpMemoryTriage(), aicommon.WithDisallowMCPServers(true),
 		aicommon.WithDisableSessionTitleGeneration(true), aicommon.WithDisableIntentRecognition(true),
@@ -60,14 +65,21 @@ func testStartAIReActDetachedApproval(t *testing.T, interruptPlanning bool) {
 		aicommon.WithPeriodicVerificationInterval(0), aicommon.WithDisableIncreaseIteration(true),
 		aicommon.WithAICallback(func(c aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			wire := aispec.NewDefaultAIConfig(req.GetExtraSpecOpts()...)
-			if wire.ToolCallCallback == nil || wire.FinishReasonCallback == nil {
-				return nil, fmt.Errorf("PLAN must use function calls: %s", req.GetCallerLabel())
+			if (wire.ToolCallCallback != nil) != native {
+				return nil, fmt.Errorf("PLAN did not inherit the configured action protocol: %s", req.GetCallerLabel())
 			}
 			respond := func(name string, args any) (*aicommon.AIResponse, error) {
+				if !native {
+					args.(map[string]any)["@action"] = name
+				}
 				data, _ := json.Marshal(args)
-				wire.ToolCallCallback([]*aispec.ToolCall{{ID: fmt.Sprintf("rpc-%d", req.GetSeqId()), Type: "function", Function: aispec.FuncReturn{Name: name, Arguments: string(data)}}})
-				wire.FinishReasonCallback("tool_calls", nil)
 				rsp := c.NewAIResponse()
+				if native {
+					wire.ToolCallCallback([]*aispec.ToolCall{{ID: fmt.Sprintf("rpc-%d", req.GetSeqId()), Type: "function", Function: aispec.FuncReturn{Name: name, Arguments: string(data)}}})
+					wire.FinishReasonCallback("tool_calls", nil)
+				} else {
+					rsp.EmitOutputStream(strings.NewReader(string(data)))
+				}
 				rsp.Close()
 				return rsp, nil
 			}
@@ -75,8 +87,14 @@ func testStartAIReActDetachedApproval(t *testing.T, interruptPlanning bool) {
 			if strings.Contains(req.GetCallerLabel(), "default") {
 				return respond("request_plan_and_execution", map[string]any{"plan_request_payload": "Complete two dependent checks"})
 			}
-			if strings.Contains(prompt, "Execute the assigned frozen plan task.") {
-				if _, loaded := workerCalls.LoadOrStore(req.GetTaskIndex(), true); !loaded {
+			if strings.Contains(prompt, "执行已批准的冻结任务书。") {
+				key := req.GetTaskIndex()
+				if key == "" {
+					if match := regexp.MustCompile(`CURRENT TASK \[task_index=([^,\]]+)`).FindStringSubmatch(prompt); len(match) > 1 {
+						key = match[1]
+					}
+				}
+				if _, loaded := workerCalls.LoadOrStore(key, true); !loaded {
 					workers.Add(1)
 					return respond("submit_task_result", map[string]any{"summary": "Check completed"})
 				}

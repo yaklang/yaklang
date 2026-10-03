@@ -10,10 +10,10 @@ import (
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 )
 
-// NativeOptions is the protocol policy for this runtime and its workers.
-// Helper calls use a Config directly; they never construct a legacy Coordinator.
+// NativeOptions installs native helpers without overriding the main-loop action
+// protocol. Helper calls never construct a legacy Coordinator.
 func NativeOptions() []aicommon.ConfigOption {
-	return []aicommon.ConfigOption{aicommon.WithEnableFunctionCallMode(true), aicommon.WithDisableDynamicPlanning(true), aicommon.WithAiAgreeRiskControl(NativeRiskReview), aicommon.WithLiteForgeExecutor(executeNativeHelper)}
+	return []aicommon.ConfigOption{aicommon.WithDisableDynamicPlanning(true), aicommon.WithAiAgreeRiskControl(NativeRiskReview), aicommon.WithLiteForgeExecutor(executeNativeHelper)}
 }
 
 func WithNativeHelpers() aicommon.ConfigOption {

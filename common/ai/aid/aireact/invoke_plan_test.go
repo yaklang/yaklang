@@ -19,7 +19,7 @@ func TestReAct_PlanLoop_Basic(t *testing.T) {
 	defer cancel()
 	model := newNativePlanTestModel("")
 	coordinatorCalls, workerCalls := 0, 0
-	ins, err := NewTestReAct(aicommon.WithContext(ctx), aicommon.WithWorkdir(t.TempDir()),
+	ins, err := NewTestReAct(aicommon.WithContext(ctx), aicommon.WithEnableFunctionCallMode(true), aicommon.WithWorkdir(t.TempDir()),
 		aicommon.WithDisableCreateDBRuntime(true), aicommon.WithNoOpMemoryTriage(), aicommon.WithAgreeYOLO(),
 		aicommon.WithEventHandler(func(*schema.AiOutputEvent) {}),
 		aicommon.WithAICallback(func(c aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
@@ -32,7 +32,7 @@ func TestReAct_PlanLoop_Basic(t *testing.T) {
 			for _, name := range []string{"request_plan", "request_plan_and_execution", "require_ai_blueprint", "load_capability", "dispatch_sub_react_agents"} {
 				require.NotContains(t, names, name)
 			}
-			if strings.Contains(req.GetPrompt(), "Execute the assigned frozen plan task.") {
+			if strings.Contains(req.GetPrompt(), "执行已批准的冻结任务书。") {
 				workerCalls++
 				require.Contains(t, names, "submit_task_result")
 			} else {

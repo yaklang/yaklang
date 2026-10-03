@@ -257,7 +257,7 @@ func TestReAct_PlanExec_DoesNotStartLegacyIntentLoops(t *testing.T) {
 		aicommon.WithDisableIntentRecognition(false), aicommon.WithAgreeYOLO(),
 		aicommon.WithEventHandler(func(*schema.AiOutputEvent) {}),
 		aicommon.WithAICallback(func(c aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
-			if strings.Contains(req.GetPrompt(), "Execute the assigned frozen plan task.") {
+			if strings.Contains(req.GetPrompt(), "执行已批准的冻结任务书。") {
 				atomic.AddInt32(&workerCalls, 1)
 			} else if strings.Contains(req.GetCallerLabel(), "coordinator") {
 				atomic.AddInt32(&coordinatorCalls, 1)

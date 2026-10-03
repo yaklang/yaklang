@@ -6,11 +6,11 @@
 
 | 层次 | 调用者 | 约束 |
 | --- | --- | --- |
-| 原生模型函数 | coordinator / pe_task | 只接受 provider tool_calls；普通 JSON 响应无执行能力 |
+| 模型动作 | coordinator / pe_task | 继承主循环协议：文本流 JSON @action 或 provider tool_calls；提示词按模式选择，两种协议不混用 |
 | Controller / Host | action handlers、客户端控制适配 | 校验版本、任务归属、依赖和生命周期；产生真实状态 |
 | AIInputEvent / AIOutputEvent | Yakit、RPC、aim | 保留原字段、事件名、路由、审批和恢复行为 |
 
-函数参数的 JSON schema 仍用于参数校验；不使用 response-format JSON schema 驱动新循环。JSON 也继续作为 Content、旧 task_tree/task_progress 字符串及后台快照的数据格式。
+专属 actions 分别提供中文 Options/Description 和 NativeOptions/NativeDescription：前者用于文本流 JSON Schema，后者用于原生函数定义；共用参数语义与执行校验。JSON 也继续作为 Content、旧 task_tree/task_progress 字符串及后台快照的数据格式。
 
 ## 2. 身份与持久化
 
@@ -33,7 +33,7 @@ AISessionPlanAndExec 不增加新表。task_tree、task_progress 保持 JSON 字
 
 状态变更先经 Controller 校验，再向宿主发布独立快照。状态快照保存沿用旧持久化设施；数据库错误会发送/记录错误，不能将它当成已验证的耐久写入保障。后续若需要数据库事务级操作回执，应单独扩展 Host 契约。
 
-## 3. 原生 actions
+## 3. Actions
 
 | Action | 参数 | 返回语义 |
 | --- | --- | --- |
@@ -47,7 +47,7 @@ AISessionPlanAndExec 不增加新表。task_tree、task_progress 保持 JSON 字
 | retry_task | task_id, attempt_id, reason | 新尝试，受影响下游旧结果失效 |
 | cancel_tasks | task_ids optional, reason | 请求取消；实际退出后结算 |
 | write_report | title, markdown, summary | Markdown artifact 路径及既有 report_finish |
-| directly_answer | 原有原生答案参数 | 可见消息；继续协调 |
+| directly_answer | 原有协议对应的答案参数 | 可见消息；继续协调 |
 | finish | 原有参数 | 经过完成门闩结束 |
 
 plan 使用 name、goal、tasks；每个 task 使用 name、goal、identifier、depends_on。identifier 在修改时保持稳定；模型不自填执行状态或 UUID。后端校验 DAG 并解析逻辑 IDs。原生首版采用平面 DAG；旧嵌套 root_task 在编辑/恢复通道继续使用。
@@ -115,10 +115,10 @@ Yakit 使用 currentChatStatus.coordinatorId 与事件 CoordinatorId 匹配区�
 | failed / rejected | aborted |
 | cancelled | skipped |
 
-worker 执行完成先保留 processing，由可见 stream 说明待验收；验收通过才发 completed/pop。旧 task_review_require 自动 continue 不构成新验收；新的 review_task 是协调员原生动作。[旧审阅处理](https://github.com/yaklang/yakit/blob/87904ea55a4af130b4fa8c22dc806405f62e3332/app/renderer/src/main/src/pages/ai-re-act/hooks/grpcStreamHandler/aiReview.ts#L9)。
+worker 执行完成先保留 processing，由可见 stream 说明待验收；验收通过才发 completed/pop。旧 task_review_require 自动 continue 不构成新验收；新的 review_task 是协调员动作。[旧审阅处理](https://github.com/yaklang/yakit/blob/87904ea55a4af130b4fa8c22dc806405f62e3332/app/renderer/src/main/src/pages/ai-re-act/hooks/grpcStreamHandler/aiReview.ts#L9)。
 
 ## 6. 使用与验证边界
 
 选择新引擎不改变 RPC。未指定 focus 的 PLAN 请求通过默认循环进入新版 coordinator；旧 plan / coordinator_legacy focus 名称也转入新版，公开列表不再展示旧模式。aim.planEngine(...) 仅为 focus 别名。Go 新运行体使用 coordinator.NewSession；coordinator_legacy.NewCoordinatorContext 始终保留旧语义。新 Session 自己拥有任务树 DTO、审批、进度和恢复适配，不调用旧 Coordinator 的内部方法。plan_engine 仅保存在记录中，恢复入口校验原归属；旧记录在入队之前返回明确停用错误，要求重新生成新版计划，不隐式迁移旧状态。
 
-本次自动化验证包括原生协议拒绝普通 JSON、审批与结果门闩、版本和尝试冲突、依赖调度、any/all、取消实际退出、恢复、PLAN-only、分离计划编辑字段和真实 Yak/aim 运行事件。确定性 provider 运行测试不替代实际模型质量、缓存指标或完整 Electron UI 人工验收。
+本次自动化验证包括两种协议运行、原生模式拒绝文本 JSON action、审批与结果门闩、版本和尝试冲突、依赖调度、any/all、取消实际退出、恢复、PLAN-only、分离计划编辑字段和真实 Yak/aim 运行事件。确定性 provider 运行测试不替代实际模型质量、缓存指标或完整 Electron UI 人工验收。

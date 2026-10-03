@@ -52,7 +52,7 @@ func TestCoordinatorLoopYakAIMNativeSmoke(t *testing.T) {
 		defer mu.Unlock()
 		prompt := req.GetPrompt()
 		prompts = append(prompts, prompt)
-		if strings.Contains(prompt, "Execute the assigned frozen plan task.") {
+		if strings.Contains(prompt, "执行已批准的冻结任务书。") {
 			workerCalls++
 			index := req.GetTaskIndex()
 			if index == "" {
@@ -138,7 +138,7 @@ func TestCoordinatorLoopYakAIMNativeSmoke(t *testing.T) {
 	}
 	engine := yak.NewScriptEngine(1)
 	engine.RegisterEngineHooks(func(e *antlr4yak.Engine) error {
-		e.SetVars(map[string]any{"NATIVE_MODEL": model, "RECORD_EVENT": record, "SMOKE_WORKDIR": workdir, "SMOKE_OPTIONS": []aiengine.AIEngineConfigOption{aiengine.WithExtOptions(aicommon.WithDisableAutoSkills(true), aicommon.WithDisablePerception(true), aicommon.WithNoOpMemoryTriage(), aicommon.WithGenerateReport(true), aicommon.WithDisableCreateDBRuntime(true), aicommon.WithForceManualPlanReview(true))}})
+		e.SetVars(map[string]any{"NATIVE_MODEL": model, "RECORD_EVENT": record, "SMOKE_WORKDIR": workdir, "SMOKE_OPTIONS": []aiengine.AIEngineConfigOption{aiengine.WithExtOptions(aicommon.WithEnableFunctionCallMode(true), aicommon.WithDisableAutoSkills(true), aicommon.WithDisablePerception(true), aicommon.WithNoOpMemoryTriage(), aicommon.WithGenerateReport(true), aicommon.WithDisableCreateDBRuntime(true), aicommon.WithForceManualPlanReview(true))}})
 		return nil
 	})
 	_, err := engine.ExecuteExWithContext(ctx, nativeYakSmoke, map[string]any{})

@@ -35,7 +35,7 @@ func TestCoordinatorLoopDetachedNativeApprovalAndRecovery(t *testing.T) {
 	options := []aicommon.ConfigOption{
 		aicommon.WithPersistentSessionId("native-detached-session"),
 		aicommon.WithEnableDetachedPlan(true),
-		aicommon.WithGenerateReport(false),
+		aicommon.WithEnableFunctionCallMode(true), aicommon.WithGenerateReport(false),
 		aicommon.WithDisableCreateDBRuntime(true),
 		aicommon.WithDisableAutoSkills(true),
 		aicommon.WithDisablePerception(true),
@@ -94,7 +94,7 @@ func TestCoordinatorLoopDetachedNativeApprovalAndRecovery(t *testing.T) {
 	taskPattern := regexp.MustCompile(`\[([^\]]+)\]: ([a-z_]+); attempt=(\d+); observed=(true|false)`)
 	resumeOptions := append(append([]aicommon.ConfigOption(nil), options...), aicommon.WithID(initial.GetRuntimeId()), aicommon.WithAICallback(func(c aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 		prompt := req.GetPrompt()
-		if strings.Contains(prompt, "Execute the assigned frozen plan task.") {
+		if strings.Contains(prompt, "执行已批准的冻结任务书。") {
 			require.Contains(t, prompt, "Approved edited task brief")
 			if workerCalls.Add(1) == 1 {
 				return nativeResponse(c, req, "submit_task_result", map[string]any{"summary": "Approved edit verified"})

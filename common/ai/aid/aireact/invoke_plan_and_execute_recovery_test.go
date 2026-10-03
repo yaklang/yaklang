@@ -77,7 +77,7 @@ func TestReAct_RecoveryPlanAndExec_NativeSnapshot(t *testing.T) {
 					return rsp, nil
 				}
 				prompt := req.GetPrompt()
-				if strings.Contains(prompt, "Execute the assigned frozen plan task.") {
+				if strings.Contains(prompt, "执行已批准的冻结任务书。") {
 					index := req.GetTaskIndex()
 					workers[index]++
 					if workers[index] == 1 {

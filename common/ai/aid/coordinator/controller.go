@@ -208,7 +208,16 @@ func (s Snapshot) PromptStatus() string {
 	}
 	if s.Approved == nil {
 		b.WriteString("PLAN awaits approval; no tasks may execute.\n")
+		if s.Draft != nil {
+			b.WriteString("## PLAN 草案任务（未批准）\n")
+			for _, t := range s.Draft.Tasks {
+				fmt.Fprintf(&b, "- %s %q [%s]: draft\n", t.Index, t.Name, t.ID)
+			}
+		}
 		return b.String()
+	}
+	if s.DraftVersion != s.ApprovedVersion {
+		b.WriteString("A replacement draft awaits submission; execution still uses the approved version.\n")
 	}
 	for group, heading := range []string{"当前执行 / 待验收", "PLAN 未开始任务", "其他任务状态"} {
 		written := false
@@ -223,6 +232,19 @@ func (s Snapshot) PromptStatus() string {
 				written = true
 			}
 			fmt.Fprintf(&b, "- %s %q [%s]: %s; attempt=%d; observed=%v\n", t.Index, t.Name, t.ID, a.State, a.ID, a.Seen)
+			if a.State == Pending {
+				var blocked []string
+				for _, dep := range t.DependsOn {
+					if s.Attempts[dep].State != Accepted {
+						blocked = append(blocked, dep)
+					}
+				}
+				if len(blocked) == 0 {
+					b.WriteString("  Dispatch: ready\n")
+				} else {
+					fmt.Fprintf(&b, "  Dispatch: blocked; waiting for accepted prerequisites [%s]\n", strings.Join(blocked, ", "))
+				}
+			}
 		}
 	}
 	return b.String()
