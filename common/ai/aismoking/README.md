@@ -8,7 +8,7 @@
 yak common/ai/aismoking/run.yak
 ```
 
-总入口逐个以当前 Yak 可执行文件启动独立进程，相当于 `yak xxx.yak`。每例拥有独立的 `YAKIT_HOME`、材料目录、日志和采样，避免会话污染及 SQLite 锁冲突。默认只访问本地 mock provider，不需要 API key。模型回答可控；协议投影、HTTP/SSE、循环、工具、审核、调度、Timeline 和 artifacts 使用真实实现。
+总入口逐个以当前 Yak 可执行文件启动独立进程，相当于 `yak xxx.yak`。每例拥有独立的 `YAKIT_HOME`、材料目录、日志和采样，避免会话污染及 SQLite 锁冲突。总入口用 `yak tiered-ai-config --enable --config-file` 写入测试专用 profile：全局模型指向关闭的 loopback 端口，并禁用 fallback，使后台价值评估快速失败，不访问外部模型。不能用空模型列表或已过时的 `enabled=false` 实现隔离，启动会自动补齐默认模型；这些设置只影响临时 profile，不改变开发者自己的配置。业务模型通过正常工作的本地 mock provider，不需要 API key。模型回答可控；协议投影、HTTP/SSE、循环、工具、审核、调度、Timeline 和 artifacts 使用真实实现。
 
 | 脚本 | 覆盖内容 |
 | --- | --- |
@@ -21,10 +21,10 @@ yak common/ai/aismoking/run.yak
 | [coordinator.yak](coordinator.yak) | `aim.InvokeReAct` 手动选择 Coordinator；native/text × 人工/YOLO；A/B 独立、C 依赖 A、D 依赖 B/C、真实工具、前置验收、一次计划批准、push/pop、报告创建/patch/提交 |
 | [notifications.yak](notifications.yak) | 两种协议；不调用 wait action，idle 自动休眠、发现先保存再唤醒、重复 Evidence 不唤醒、完成后自动验收；休眠屏障确认没有模型轮询 |
 | [controls.yak](controls.yak) | 两种协议；inspect、reject、retry、cancel、唯一新尝试、取消任务不启动、最终交付保留拒绝/取消事实 |
-| [forge.yak](forge.yak) | 自由规划/preset/mocker × 两种协议；新 coordinator 底层、依赖任务、共享 Evidence、一次业务格式化、开放结果对象、一次结果回调及重复 Run 幂等；附带默认 aim 入口 |
+| [forge.yak](forge.yak) | 自由规划/preset/mocker × 两种协议；新 coordinator 底层、依赖任务、持久业务指令传入协调员/worker/结果上下文、共享 Evidence、一次业务格式化、开放结果对象、一次结果回调及重复 Run 幂等；附带默认 aim 入口 |
 | [cache/selftest.yak](cache/selftest.yak) | usage 与 dump 的 correlation ID 对齐、缺失与取消、模型分组、加权缓存统计，不把缺失用量当作零命中 |
 
-每份脚本均可独立执行，例如：
+每份脚本均可独立执行，例如（直接运行时沿用当前 profile 的全局后台价值评估配置；需要完全隔离时用总入口的 `AISMOKING_CASE`）：
 
 ```text
 yak common/ai/aismoking/planning.yak

@@ -259,13 +259,13 @@ go test ./common/ai/aid/aireact -run 'TestCoordinator|TestPublishDetachedPlan|Te
 go test ./common/yakgrpc -run '^TestStartAIReActDetachedApprovalExecutesAndKeepsStreamOpen' -count=1
 ```
 
-[native_coordinator.yak](../../aismoking/coordinator.yak) 由测试通过真实 Yak 引擎执行，调用 `aim.InvokeReAct`。只有模型 provider 使用可重复的原生函数调用响应；协调员、worker、审批、Timeline、报告和 Yakit 事件适配均运行实际代码。测试核对真实文件读取、两个有依赖的任务、共享 evidence、逐项验收、push/pop、报告文件及两种 loop_marker。另有独立 Session 的 detached 提交、编辑、引擎恢复及执行测试，以及干预入 Timeline 后通知的时序测试。
+[coordinator.yak](../../aismoking/coordinator.yak) 在本地直接以 `yak common/ai/aismoking/coordinator.yak` 执行，调用 `aim.InvokeReAct`，覆盖原生/文本协议与人工/YOLO 策略四种组合。模型 provider 使用确定性 HTTP/SSE 响应；协调员、worker、审批、Timeline、报告和 Yakit 事件适配均运行实际代码。脚本核对真实文件读取、四个 DAG 任务、共享 Evidence、逐项验收、push/pop、报告文件及两种 loop_marker。统一入口为 [AI 冒烟测试](../../aismoking/README.md)，仅供本地开发，不进入 CI。另有普通 Go 集成测试覆盖 detached 提交、编辑、恢复、执行及通知时序。
 
 [审核到执行测试](../aireact/coordinator_approval_execution_test.go) 通过真实输入事件和任务队列覆盖普通确认、编辑后提交、detached 确认、detached 编辑，以及 Yakit 先停止规划再提交执行的路径；每条路径只提供一次用户确认，验证两个依赖任务全部验收、事件闭合及完成状态持久化。Yak 冒烟也使用人工审批策略，由事件回调发送这一次确认。
 
 [通道测试](../aireact/coordinator_channels_test.go) 拦截旧构造器，验证新版规划、人工审核编辑、detached 发布及恢复均不调用它；反向选择旧通道时不注入新版辅助执行器。恢复以存储归属为准，未知快照格式或旧引擎标记与新快照冲突会报错。新包的生产依赖图不包含父级 `aid` 或 `aiforge`。
 
-[live_coordinator.yak](../../aismoking/live/coordinator.yak) 可使用本机配置的实际 provider/model 执行；凭据由外部配置，不写入脚本。确定性冒烟不衡量模型任务质量或真实 provider 的缓存命中率。
+[live/coordinator.yak](../../aismoking/live/coordinator.yak) 可使用本机配置的实际 provider/model 执行；凭据由外部配置，不写入脚本。确定性冒烟不衡量模型任务质量或真实 provider 的缓存命中率。
 
 [规划提交冒烟](planning_submission_smoke_test.go) 对探索生成、预设计划和 mocker 各跑文本流与原生两种协议，共六个组合。探索实际执行 `read_file → save_evidence → create_plan → submit_plan`；预设/mocker 直接 `submit_plan`，不额外生成计划。所有组合通过真实交互事件确认一次，验证完整嵌套 DAG、Evidence/用户输入提升、上下文分区及未派发 worker。设置 `COORDINATOR_CONTEXT_REVIEW_DIR` 后，在其 `planning-submission` 子目录生成四份提交前完整 prompt 和对应 request JSON；预设样本代表已独立验证的两个附带计划入口。详情见 [上下文 review](context_review.md)。
 

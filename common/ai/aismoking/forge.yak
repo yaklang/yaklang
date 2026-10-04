@@ -78,6 +78,7 @@ go httpserver.Serve("127.0.0.1", port, httpserver.context(ctx), httpserver.handl
         } else { answer(w, native, "finish", {}) }
         return
     }
+    assert "Keep source provenance" in prompt, "Forge persistent prompt was not rendered in coordinator/worker/result context"
     state = execution.Snapshot()
     if len(body.tools) == 1 && body.tools[0]["function"].name == "business_result" || "单步结构化抽取器" in prompt {
         formatCalls++

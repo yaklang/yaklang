@@ -5,6 +5,7 @@ sourceFile = file.Join(smokeRoot,"exploration-source.txt")
 file.Save(sourceFile,"exploration-source-sentinel: real source for plan investigation")~
 execution, dispatched, childCalls, mainCalls, approvals, waits = nil,false,0,0,0,0
 waiting, discoveryRead = make(chan bool,8),make(chan bool,1)
+discoverySignalled = false
 func sleepCheck() {
     select {
     case <-waiting:
@@ -67,12 +68,14 @@ smokeHandler = func(w,body) {
     }
     if string(state.Phase) == "EXEC" { smokeAnswer(w,native,"finish",{}); return }
     assert "exploration.source" in prompt
-    if childCalls == 3 { discoveryRead <- true }
+    // Discovery can reach the planner before the child enters its next model call.
+    // A buffered acknowledgement is independent of that scheduling race.
+    if !discoverySignalled { discoverySignalled = true; discoveryRead <- true }
     // First submit is refused while the child is running; runtime resumes only on actual exit.
     smokeAnswer(w,native,"submit_plan",{})
 }
 for native in [true,false] {
-    dispatched,childCalls,mainCalls,approvals,waits = false,0,0,0,0
+    dispatched,childCalls,mainCalls,approvals,waits,discoverySignalled = false,0,0,0,0,false
     execution = aiagent.NewExecutorFromJson(`{"name":"exploration-smoking","init_prompt":"调查来源，然后提交计划；本次只规划。"}`,{"query":"只读调查来源后提交计划"},aiagent.context(smokeCtx),aiagent.agreeYOLO(),aiagent.aiCallback(smokeModel),aiagent.onEvent(event),aiagent.functionCallMode(native),aiagent.extendAIDOptions(func(c) {
         c.DisableCreateDBRuntime,c.DisablePerception,c.DisableMemoryTriage,c.DisallowMCPServers = true,true,true,true
         c.EnableSubagentsInPlan,c.ForceManualPlanReview = true,true

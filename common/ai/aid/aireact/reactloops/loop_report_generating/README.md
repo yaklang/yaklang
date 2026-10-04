@@ -108,7 +108,7 @@ loop_report_generating/
 │   ├── persistent_instruction.txt   # AI 角色定义
 │   ├── reactive_data.txt            # 响应数据模板
 │   └── output_example.txt # 输出示例
-└── examples/
+└── 测试已迁移：common/ai/aismoking/live/focused/loop_report_generating/
     ├── test_basic_report.yak          # 基础报告生成测试
     ├── test_grep_reference.yak        # grep 搜索测试
     ├── test_multi_file_analysis.yak   # 多文件分析测试

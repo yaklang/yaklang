@@ -1,16 +1,18 @@
 package aibp_test
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
+	"regexp"
 	"strconv"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"testing"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
+	"github.com/yaklang/yaklang/common/ai/aispec"
 	"github.com/yaklang/yaklang/common/ai/rag"
 	"github.com/yaklang/yaklang/common/utils"
 
@@ -33,195 +35,113 @@ var planJson = `{
   "tasks": [
     {
       "subtask_name": "计算1+1的值",
-      "subtask_goal": "计算1+1的值"
+      "subtask_goal": "计算1+1的值",
+      "subtask_identifier": "calculate_result"
     }
   ]
 }`
-var finishJson = `{
-  "@action": "direct-answer",
-  "status_summary": "已完成计算1+1的值任务，成功计算了1+1的值。",
-  "task_long_summary": "本次任务完成了对1+1的值的计算。通过计算，我们得到了1+1的值为2。",
-  "task_short_summary": "完成计算1+1的值任务，成功计算了1+1的值。",
-  "direct_answer": "result is 2",
-  "direct_answer_long": "本次任务完成了对1+1的值的计算。通过计算，我们得到了1+1的值为2。",
-  "shrink_similar_tool_call_result": "",
-  "summary_tool_call_result": ""
-}`
 
-var planFromDocumentJSON = `{
-	"@action": "plan_from_document",
-	"main_task": "计算1+1的值",
-	"main_task_goal": "计算1+1的值",
-	"tasks": [
-		{
-			"subtask_name": "计算1+1的值",
-			"subtask_goal": "计算1+1的值"
+// The VM/factory assertions below exercise production Forge handles. Respond to
+// the current coordinator/worker lifecycle, matching the requested wire protocol;
+// obsolete legacy prompt fragments must not drive these integration fixtures.
+func forgeBuilderResponse(i aicommon.AICallerConfigIf, req *aicommon.AIRequest, name string, args map[string]any) (*aicommon.AIResponse, error) {
+	wire := aispec.NewDefaultAIConfig(req.GetExtraSpecOpts()...)
+	rsp := i.NewAIResponse()
+	if wire.ToolCallCallback != nil {
+		raw, err := json.Marshal(args)
+		if err != nil {
+			return nil, err
 		}
-	]
-}`
-
-var summaryJson = `result is 2`
-
-func isPlanExplorationPrompt(prompt string) bool {
-	return strings.Contains(prompt, "任务规划使命") &&
-		strings.Contains(prompt, "finish_exploration")
-}
-
-func isPlanGuidanceDocLiteForge(prompt string) bool {
-	return strings.Contains(prompt, "数据处理和总结提示小助手") &&
-		strings.Contains(prompt, `"const": "plan_guidance_document"`)
-}
-
-func isPlanFromDocLiteForge(prompt string) bool {
-	return strings.Contains(prompt, "数据处理和总结提示小助手") &&
-		strings.Contains(prompt, `"const": "plan_from_document"`)
-}
-
-func tryHandleNewPlanFlowPrompt(t *testing.T, config aicommon.AICallerConfigIf, prompt string, initFlag, planFlag string) (*aicommon.AIResponse, bool) {
-	if isPlanExplorationPrompt(prompt) {
-		if initFlag != "" && !strings.Contains(prompt, initFlag) {
-			t.Fatalf("init flag not found in prompt: %s", prompt)
+		wire.ToolCallCallback([]*aispec.ToolCall{{ID: fmt.Sprintf("forge-builder-%d", req.GetSeqId()), Type: "function", Function: aispec.FuncReturn{Name: name, Arguments: string(raw)}}})
+		wire.FinishReasonCallback("tool_calls", nil)
+	} else {
+		args["@action"], args["identifier"] = name, name
+		raw, err := json.Marshal(args)
+		if err != nil {
+			return nil, err
 		}
-		if planFlag != "" && !strings.Contains(prompt, planFlag) {
-			t.Fatalf("plan flag not found in prompt: %s", prompt)
-		}
-
-		rsp := config.NewAIResponse()
-		rsp.EmitOutputStream(strings.NewReader(`{"@action": "finish_exploration", "human_readable_thought": "Ready to generate plan"}`))
-		rsp.Close()
-		return rsp, true
+		rsp.EmitOutputStream(strings.NewReader(string(raw)))
 	}
-
-	if isPlanGuidanceDocLiteForge(prompt) {
-		rsp := config.NewAIResponse()
-		rsp.EmitOutputStream(strings.NewReader(`{"@action": "plan_guidance_document", "document": "Mock guidance document for testing."}`))
-		rsp.Close()
-		return rsp, true
-	}
-
-	if isPlanFromDocLiteForge(prompt) {
-		rsp := config.NewAIResponse()
-		rsp.EmitOutputStream(strings.NewReader(planFromDocumentJSON))
-		rsp.Close()
-		return rsp, true
-	}
-
-	return nil, false
+	rsp.Close()
+	return rsp, nil
 }
 
 func MockAICallback(t *testing.T, initFlag, persistentFlag, planFlag string) aicommon.AICallbackType {
-	// 去 Exit 化后 directly_answer 只发答复并继续循环, 真正终结整个 ReAct 循环
-	// 只能由唯一终结器 finish 完成. 主决策第一次发 directly_answer 交付答案,
-	// 第二次发 finish 收口, 避免 directly_answer 无限循环导致测试超时.
-	// 关键词: directly_answer 永不 Exit, finish 唯一终结器, 答复后追加 finish 收尾
-	var primaryDecisionCount int32
+	var calls int32
+	var mu sync.Mutex
+	workers := map[string]int{}
+	briefPattern := regexp.MustCompile(`\[CURRENT_EXECUTION\]\n([^\n]+)`)
+	reviewPattern := regexp.MustCompile(`\[([^\]]+)\]: awaiting_review; attempt=(\d+)`)
 	return func(i aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
-		if req.GetCallerLabel() == "liteforge[intent-capability-recommend]" {
-			return rag.MockAIService(func(string) string {
-				return aicommon.MockedIntentRecommendActionJSON
-			})(i, req)
-		}
-		if req.GetCallerLabel() == "liteforge[intent-keyword-gen]" {
-			return rag.MockAIService(func(string) string {
-				return aicommon.MockedIntentKeywordGenActionJSON
-			})(i, req)
-		}
-		if req.GetCallerLabel() == "liteforge[task-short-id]" {
-			return rag.MockAIService(func(string) string {
-				return `{"@action":"task-short-id","identifier":"calculate_result"}`
-			})(i, req)
+		if atomic.AddInt32(&calls, 1) > 32 {
+			return nil, fmt.Errorf("Forge builder fixture did not converge: %s", req.GetCallerLabel())
 		}
 		prompt := req.GetPrompt()
-		rsp := i.NewAIResponse()
-		defer rsp.Close()
-
-		if handledRsp, handled := tryHandleNewPlanFlowPrompt(t, i, prompt, initFlag, planFlag); handled {
-			return handledRsp, nil
+		switch req.GetCallerLabel() {
+		case "liteforge[intent-capability-recommend]":
+			return rag.MockAIService(func(string) string { return aicommon.MockedIntentRecommendActionJSON })(i, req)
+		case "liteforge[intent-keyword-gen]":
+			return rag.MockAIService(func(string) string { return aicommon.MockedIntentKeywordGenActionJSON })(i, req)
+		case "liteforge[task-short-id]":
+			return rag.MockAIService(func(string) string { return `{"@action":"task-short-id","identifier":"calculate_result"}` })(i, req)
+		case "liteforge[session-title-generator]":
+			return rag.MockAIService(func(string) string { return `{"@action":"session-title-generator","session_title":"Forge builder"}` })(i, req)
+		case "liteforge[memory-triage]":
+			return rag.MockAIService(func(string) string { return `{"@action":"memory-triage","memory_entities":[]}` })(i, req)
+		case "liteforge[tag-selection]":
+			return rag.MockAIService(func(string) string { return `{"@action":"tag-selection","tags":["test"]}` })(i, req)
 		}
-
-		if strings.Contains(prompt, "意图识别与上下文增强系统") {
-			rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "finalize_enrichment", "intent_summary": "mocked intent analysis", "recommended_capabilities": "", "context_notes": ""}`))
-			return rsp, nil
-		}
-
-		if utils.MatchAllOfSubString(prompt, "capability matcher", "matched_identifiers") ||
-			utils.MatchAllOfSubString(prompt, `"const": "capability-catalog-match"`, "matched_identifiers") {
-			rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "capability-catalog-match", "matched_identifiers": []}`))
-			return rsp, nil
-		}
-
-		if strings.Contains(prompt, "数据处理和总结提示小助手") {
-			if strings.Contains(prompt, "tag-selection") {
-				rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "tag-selection", "tags": ["test"]}`))
-			} else if strings.Contains(prompt, "memory-triage") {
-				rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "memory-triage", "memory_entities": []}`))
-			} else {
-				rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "object"}`))
+		if brief := briefPattern.FindStringSubmatch(prompt); len(brief) == 2 {
+			if persistentFlag != "" && !strings.Contains(prompt, persistentFlag) {
+				return nil, fmt.Errorf("persistent flag missing from worker brief")
 			}
-			return rsp, nil
-		}
-
-		if utils.MatchAllOfSubString(prompt, "plan: when user needs to create or refine a plan for a specific task") {
-			if initFlag != "" && !strings.Contains(req.GetPrompt(), initFlag) {
-				t.Fatalf("init flag not found in prompt: %s", req.GetPrompt())
+			var task struct {
+				ID string `json:"task_id"`
 			}
-			if planFlag != "" && !strings.Contains(req.GetPrompt(), planFlag) {
-				t.Fatalf("plan flag not found in prompt: %s", req.GetPrompt())
+			if err := json.Unmarshal([]byte(brief[1]), &task); err != nil {
+				return nil, err
 			}
-			rsp.EmitOutputStream(strings.NewReader(`
-{
-  "@action": "plan",
-  "main_task": "计算1+1的值",
-  "main_task_goal": "计算1+1的值",
-  "tasks": [
-    {
-      "subtask_name": "计算1+1的值",
-      "subtask_goal": "计算1+1的值"
-    }
-  ]
-}
-			`))
-			return rsp, nil
-		}
-
-		if utils.MatchAllOfSubString(prompt, "directly_answer", "require_tool") {
-			if atomic.AddInt32(&primaryDecisionCount, 1) == 1 {
-				rsp.EmitOutputStream(bytes.NewBufferString(`
-{"@action": "object", "next_action": { "type": "directly_answer", "answer_payload": "result is 2" },
-"human_readable_thought": "mocked thought for tool calling", "cumulative_summary": "..cumulative-mocked for tool calling.."}
-`))
-				return rsp, nil
+			mu.Lock()
+			step := workers[task.ID]
+			workers[task.ID] = step + 1
+			mu.Unlock()
+			if step == 0 {
+				return forgeBuilderResponse(i, req, "submit_task_result", map[string]any{"summary": "result is 2"})
 			}
-			rsp.EmitOutputStream(bytes.NewBufferString(`
-{"@action": "object", "next_action": { "type": "finish" },
-"human_readable_thought": "finish after answer delivered", "cumulative_summary": "..cumulative-mocked for finish.."}
-`))
-			return rsp, nil
+			return forgeBuilderResponse(i, req, "finish", map[string]any{})
 		}
-
-		if utils.MatchAllOfSubString(prompt, "verify-satisfaction", "user_satisfied", "reasoning") {
-			rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "verify-satisfaction", "user_satisfied": true, "reasoning": "abc-mocked-reason"}`))
-			return rsp, nil
-		}
-
-		if utils.MatchAllOfSubString(prompt, "short_summary") {
-			if persistentFlag != "" && !strings.Contains(req.GetPrompt(), persistentFlag) {
-				t.Fatalf("persistent flag not found in prompt: %s", req.GetPrompt())
+		if req.GetCallerLabel() == "react-loop:coordinator" {
+			start := strings.LastIndex(prompt, "# PLAN STATUS")
+			if start < 0 {
+				return nil, fmt.Errorf("coordinator lost its plan status")
 			}
-			rsp.EmitOutputStream(bytes.NewBufferString(`{
-  "@action": "summary",
-  "status_summary": "已完成计算1+1的值任务，成功计算了1+1的值。",
-  "task_long_summary": "本次任务完成了对1+1的值的计算。通过计算，我们得到了1+1的值为2。",
-  "task_short_summary": "result is 2",
-}`))
-			return rsp, nil
+			status := prompt[start:]
+			if strings.Contains(status, "已有计划：false") {
+				for _, flag := range []string{initFlag, planFlag} {
+					if flag != "" && !strings.Contains(prompt, flag) {
+						return nil, fmt.Errorf("initial/plan flag missing from coordinator context")
+					}
+				}
+				var plan map[string]any
+				if err := json.Unmarshal([]byte(planJson), &plan); err != nil {
+					return nil, err
+				}
+				delete(plan, "@action")
+				return forgeBuilderResponse(i, req, "create_plan", map[string]any{"plan": plan, "plan_document": "# 计算表达式\n验证 1+1。"})
+			}
+			if strings.Contains(status, "阶段：PLAN") {
+				return forgeBuilderResponse(i, req, "submit_plan", map[string]any{})
+			}
+			if match := reviewPattern.FindStringSubmatch(status); len(match) == 3 {
+				attempt, _ := strconv.ParseUint(match[2], 10, 64)
+				return forgeBuilderResponse(i, req, "review_task", map[string]any{"task_id": match[1], "attempt_id": attempt, "decision": "accept", "reason": "计算结果为 2，与冻结任务书一致。"})
+			}
+			return forgeBuilderResponse(i, req, "wait_messages", map[string]any{})
 		}
-
-		fmt.Println("Unexpected prompt:", prompt)
-
-		return nil, utils.Errorf("unexpected prompt: %s", prompt)
+		return nil, fmt.Errorf("unexpected Forge builder request: %s", req.GetCallerLabel())
 	}
 }
+
 func runTestForgeByAICommon(t *testing.T, forge *schema.AIForge, initFlag, persistentFlag string) (any, error) {
 	db := consts.GetGormProfileDatabase()
 	forge.IsTemporary = true
@@ -240,7 +160,6 @@ func runTestForgeByAICommon(t *testing.T, forge *schema.AIForge, initFlag, persi
 		aicommon.WithAICallback(MockAICallback(t, initFlag, persistentFlag, "")),
 		aicommon.WithAgreeYOLO(),
 		aicommon.WithDisableDynamicPlanning(true),
-		aicommon.WithDebugPrompt(true),
 	)
 	if err != nil {
 		return nil, err
