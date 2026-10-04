@@ -8,7 +8,11 @@
 
 ## 两种协议
 
-默认开启 function call，包括自定义模型 callback 的独立调用。调用方用 `aicommon.WithEnableFunctionCallMode(false)` 选择旧文本协议，或用 `true` 显式开启。ReAct 和 Config 的辅助调用继承父配置，也允许一次调用显式覆盖；选项按传入顺序生效，后面的协议选项优先。
+**LiteForge 默认使用 text stream，流式生成并解析 JSON，不继承父 Config 的 `EnableFunctionCallMode`。** 独立调用、ReAct 的 LiteForge 调用、Config 的辅助请求、Yak 绑定调用和 Forge 的结果抽取都遵循这个默认值。主循环或 coordinator 开启 function call，不会自动给这些单步请求开启 function call。
+
+在本项目当前轻量模型的实测中，**text stream 处理 JSON 的稳定性比 function call 强得多**：记忆筛选的五类场景各重复三轮，`memfit-light-free` 文本流 15/15 同时通过协议与语义检查；function call 只有 8/15 通过协议、6/15 通过语义，且这六次都是合法的空记忆结果，有记忆的九次均未通过。原生模式出现普通 content 代替调用、记忆字段拆散、tags 膨胀和超时。相同测试的主模型 `deepseek-v4.1-flash` 两种协议各 10/10 通过；这里的默认值依据当前轻量任务的实测，不意味着所有模型的 function call 都不稳定。
+
+需要测试或使用原生模式时，可在单次 LiteForge 调用中显式传入 `aicommon.WithEnableFunctionCallMode(true)`；传入 `false` 选择文本流。选项按传入顺序生效，后面的协议选项优先。ReAct 的 `InvokeLiteForge` 和辅助调度默认使用文本流；需要单独选择原生协议时使用支持显式配置的 LiteForge 入口。
 
 Yak 的两个公开入口都接受 `ai.withFunctionCallMode(true/false)`。`liteforge.Execute` 完整传递 `ai.*` 的 provider/model/APIKey/BaseURL 等配置；`ai.onStream` 在文本模式接收 JSON 文本，在原生模式接收增量 arguments，同时保持内部解析流和字段流独立。`ai.FunctionCall` 接受字段描述 map、字段 schema map 或完整 object schema，返回业务 map，移除内部 `@action` 标记；描述字段保持任意 JSON 类型，显式字段 schema 则检查最低约束，扩展字段保留。
 
@@ -60,6 +64,6 @@ yak common/ai/aismoking/live/default_task.yak
 yak common/ai/aismoking/liteforge.yak
 ```
 
-脚本使用本地 HTTP/SSE provider，实际验证 LiteForge 与 `ai.FunctionCall` × 两种协议四条链路；服务端等待 `onStream` 读到首字节才发送剩余响应，验证文本和 arguments 的增量处理。另覆盖抽取、分类、总结 × 双协议 × aim/public 两个入口，共 16 次请求；检查 tools、tool_choice、投影、开放 JSON 和字段语义，不需要 Go 注入。
+脚本使用本地 HTTP/SSE provider，实际验证 LiteForge 与 `ai.FunctionCall` × 默认文本流/显式原生/显式文本三种选择；服务端等待 `onStream` 读到首字节才发送剩余响应，验证文本和 arguments 的增量处理。另覆盖抽取、分类、总结 × 父循环双协议 × aim/public 两个入口：aim 请求始终使用文本流，public 请求可以显式选择原生；检查 tools、tool_choice、投影、开放 JSON 和字段语义，不需要 Go 注入。
 
-内部 Go 回归 `TestLiteForgeAIMBothProtocols` 保留流式输出与结果断言，测试公开 AI engine 集成；provider 缓存率需真实模型 usage，mock 只验证分区与执行链路。
+内部 Go 回归 `TestLiteForgeAIMDefaultsToTextAndPublicBothProtocols` 保留流式输出与结果断言，测试公开 AI engine 集成和协议隔离；provider 缓存率需真实模型 usage，mock 只验证分区与执行链路。

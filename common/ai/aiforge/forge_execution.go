@@ -133,7 +133,8 @@ func (e *ForgeExecution) deliver(ctx context.Context, _ *coordinator.Session, st
 		} else {
 			name := e.blueprint.ResultActionNames[0]
 			opts := aicommon.ConvertConfigToOptionsWithoutHotPatch(e.Config)
-			opts = append(opts, aicommon.WithAICallbacks(e.GetRawAICallbacks()), aicommon.WithEnableFunctionCallMode(e.EnableFunctionCallMode))
+			// Result extraction is a LiteForge request, independent of the loops' protocol.
+			opts = append(opts, aicommon.WithAICallbacks(e.GetRawAICallbacks()), aicommon.WithEnableFunctionCallMode(false))
 			output, callErr := liteforge.Execute(ctx, liteforge.Request{Name: e.blueprint.Name + "-result", ActionName: name, ActionAliases: e.blueprint.ResultActionNames[1:],
 				Schema: forgeResultSchema(e.blueprint.ResultPrompt, name), Prompt: prompt, DisableTimeline: true, Emitter: e.GetEmitter()}, opts...)
 			err = callErr

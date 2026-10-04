@@ -80,8 +80,9 @@ go httpserver.Serve("127.0.0.1", port, httpserver.context(ctx), httpserver.handl
     }
     assert "Keep source provenance" in prompt, "Forge persistent prompt was not rendered in coordinator/worker/result context"
     state = execution.Snapshot()
-    if len(body.tools) == 1 && body.tools[0]["function"].name == "business_result" || "单步结构化抽取器" in prompt {
+    if "smoke_caller:liteforge[native-forge-smoke-result]" in prompt {
         formatCalls++
+        assert !native, "Forge result extraction must not inherit the coordinator protocol"
         assert string(state.Phase) == "EXEC"
         for _, attempt in state.Attempts { assert string(attempt.State) == "accepted" }
         answer(w, native, "business_result", {"summary":"sources verified","payload":{"ok":true,"values":[1,"two",nil]}})

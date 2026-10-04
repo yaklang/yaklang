@@ -401,7 +401,7 @@ func deliverFinalAnswerFallback(loop *reactloops.ReActLoop, invoker aicommon.AII
 
 ## 7.8 LiteForge 的 prompt 模板
 
-独立执行器通过 [prompt.go](../../../liteforge/prompt.go) 和 promptloader 加载两套模板。Config 默认使用 function call，调用方可通过 `aicommon.WithFunctionCallMode(false)` 选择文本 JSON 流。两套模板使用相同的分层边界：
+独立执行器通过 [prompt.go](../../../liteforge/prompt.go) 和 promptloader 加载两套模板。LiteForge 默认使用文本 JSON 流，不继承父 Config 的 function call 模式。独立调用可通过 `aicommon.WithEnableFunctionCallMode(true)` 显式选择原生协议；ReAct 的 `InvokeLiteForge` 和辅助请求保持文本流。两套模板使用相同的分层边界：
 
 ```text
 high-static: 稳定的角色、输出协议与校验约束

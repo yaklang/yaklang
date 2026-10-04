@@ -20,14 +20,9 @@ func TestForgeResultAliasesAndOpenBusinessData(t *testing.T) {
 			wire := aispec.NewDefaultAIConfig(req.GetExtraSpecOpts()...)
 			const data = `{"@action":"old_result","nested":{"values":[1,"two",null],"ok":true}}`
 			response := c.NewAIResponse()
-			if native {
-				require.NotNil(t, wire.ToolCallCallback)
-				wire.ToolCallCallback([]*aispec.ToolCall{{ID: "alias-output", Type: "function", Function: aispec.FuncReturn{Name: "result", Arguments: data}}})
-				wire.FinishReasonCallback("tool_calls", nil)
-			} else {
-				require.Empty(t, wire.Tools)
-				response.EmitOutputStream(strings.NewReader(data))
-			}
+			require.Empty(t, wire.Tools)
+			require.Nil(t, wire.ToolCallCallback, "result extraction must not inherit the parent protocol")
+			response.EmitOutputStream(strings.NewReader(data))
 			response.Close()
 			return response, nil
 		})

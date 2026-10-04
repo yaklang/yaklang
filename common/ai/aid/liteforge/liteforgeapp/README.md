@@ -16,7 +16,7 @@
 
 Go 应用导入本包；返回值使用 `aicommon.ForgeResult`，不携带多步 Forge 的 `ForgeBlueprint`。`aiforge.RegisterLiteForge` 只在多步 Forge 注册表边界转换返回值，执行仍由本包和核心完成。
 
-Yak 继续使用 `liteforge.Execute`、多媒体及知识构建选项，`aiagent.CreateLiteForge` 和 `rag.*` 导出也指向本包。LLVM 模块登记的导入路径同步更新。函数调用与文本流的选择仍由 `aicommon.Config.EnableFunctionCallMode` 控制。
+Yak 继续使用 `liteforge.Execute`、多媒体及知识构建选项，`aiagent.CreateLiteForge` 和 `rag.*` 导出也指向本包。LLVM 模块登记的导入路径同步更新。LiteForge 默认使用文本 JSON 流，不继承父 Config 的 `EnableFunctionCallMode`；只有单次调用的显式协议选项才开启原生 function call，具体行为和稳定性实测见 [核心 README](../README.md)。
 
 ## 验证
 

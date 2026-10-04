@@ -12,6 +12,7 @@ import (
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact"
 	"github.com/yaklang/yaklang/common/ai/aid/coordinator"
+	"github.com/yaklang/yaklang/common/ai/aid/liteforge/liteforgeapp"
 	"github.com/yaklang/yaklang/common/ai/aiforge"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/schema"
@@ -44,6 +45,37 @@ func TestForgeYakFactoriesInheritBoundConfig(t *testing.T) {
 VERIFY(aiagent.NewExecutor("bound-forge", {"query":"bound query"})~, BOUND_NATIVE)
 VERIFY(aiagent.NewExecutorFromJson("{\"name\":\"bound-json\",\"init_prompt\":\"Bound plan\"}", {"query":"bound query"})~, BOUND_NATIVE)
 VERIFY(aiagent.NewExecutor("bound-override", {"query":"bound query"}, aiagent.functionCallMode(!BOUND_NATIVE))~, !BOUND_NATIVE)
+`, nil)
+			require.NoError(t, err)
+			require.Equal(t, 3, verified)
+		})
+	}
+}
+
+func TestLiteForgeYakFactoryDoesNotInheritBoundProtocol(t *testing.T) {
+	for _, parentNative := range []bool{false, true} {
+		t.Run(fmt.Sprint(parentNative), func(t *testing.T) {
+			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+			defer cancel()
+			verified := 0
+			engine := yak.NewScriptEngine(1)
+			engine.RegisterEngineHooks(func(vm *antlr4yak.Engine) error {
+				vm.SetVars(map[string]any{"VERIFY_LITEFORGE": func(lf *liteforgeapp.LiteForge, expected bool) {
+					verified++
+					cfg := aicommon.NewConfig(ctx, lf.ExtendAIDOptions...)
+					require.Equal(t, expected, cfg.EnableFunctionCallMode)
+					require.Equal(t, []string{"bound business preference"}, cfg.PersistentMemory)
+				}})
+				yak.BindAIConfigToEngine(vm, aicommon.WithEnableFunctionCallMode(parentNative),
+					aicommon.WithAppendPersistentContext("bound business preference"),
+					aicommon.WithDisableCreateDBRuntime(true), aicommon.WithDisableAutoSkills(true),
+					aicommon.WithWorkdir(t.TempDir()))
+				return nil
+			})
+			_, err := engine.ExecuteExWithContext(ctx, `
+VERIFY_LITEFORGE(aiagent.CreateLiteForge("bound-default")~, false)
+VERIFY_LITEFORGE(aiagent.CreateLiteForge("bound-native", aiagent.functionCallMode(true))~, true)
+VERIFY_LITEFORGE(aiagent.CreateLiteForge("bound-text", aiagent.functionCallMode(false))~, false)
 `, nil)
 			require.NoError(t, err)
 			require.Equal(t, 3, verified)

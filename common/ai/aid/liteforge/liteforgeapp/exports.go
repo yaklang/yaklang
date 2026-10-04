@@ -515,10 +515,8 @@ func _withSpeedPriority(b ...bool) LiteForgeExecOption {
 	}
 }
 
-// LiteForgeExecWithStaticInstruction 是 B 档新增 LiteForgeExecOption
-// 携带系统侧静态指令到 _executeLiteForgeTemp 路径，最终通过 WithLiteForge_StaticInstruction
-// 进入 LiteForge 的 high-static 段，跨调用稳定哈希
-// 关键词: aicache, PROMPT_SECTION, StaticInstruction, LiteForgeExecWithStaticInstruction, B 档
+// LiteForgeExecWithStaticInstruction 设置稳定的业务指令（Yak: liteforge.instruction）。
+// 指令进入 semi-dynamic 段；查询资料留在 dynamic 段，不改变通用 high-static。
 func LiteForgeExecWithStaticInstruction(s string) LiteForgeExecOption {
 	return func(cfg *liteforgeConfig) {
 		cfg.staticInstruction = s

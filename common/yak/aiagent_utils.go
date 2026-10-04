@@ -158,7 +158,10 @@ func BindAIConfigToEngine(nIns *antlr4yak.Engine, agentOptions ...any) {
 		originFunc, ok := i.(func(name string, opts ...any) (*liteforgeapp.LiteForge, error))
 		if ok {
 			return func(name string, opts ...any) (*liteforgeapp.LiteForge, error) {
-				opts = append(agentOptions, opts...)
+				// Bound loop options must not select the LiteForge protocol.
+				inherited := append([]any{}, agentOptions...)
+				inherited = append(inherited, aicommon.WithEnableFunctionCallMode(false))
+				opts = append(inherited, opts...)
 				return originFunc(name, opts...)
 			}
 		}
@@ -169,7 +172,8 @@ func BindAIConfigToEngine(nIns *antlr4yak.Engine, agentOptions ...any) {
 		originFunc, ok := i.(func(query string, opts ...any) (*aicommon.ForgeResult, error))
 		if ok {
 			return func(query string, opts ...any) (*aicommon.ForgeResult, error) {
-				opts = append(BuildLiteForgeExecOption(agentOptions...), opts...)
+				inherited := append(BuildLiteForgeExecOption(agentOptions...), aicommon.WithEnableFunctionCallMode(false))
+				opts = append(inherited, opts...)
 				return originFunc(query, opts...)
 			}
 		}

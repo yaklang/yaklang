@@ -18,9 +18,9 @@ func Execute(ctx context.Context, r Request, opts ...aicommon.ConfigOption) (*ai
 	}
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
-	// Explicitly establish the native default even when a custom model callback
-	// activates Config's legacy text default. Caller options still take priority.
-	opts = append([]aicommon.ConfigOption{aicommon.WithEnableFunctionCallMode(true)}, opts...)
+	// LiteForge owns its protocol default independently of the parent loop.
+	// Only options explicitly supplied for this invocation may enable native calls.
+	opts = append([]aicommon.ConfigOption{aicommon.WithEnableFunctionCallMode(false)}, opts...)
 	// One-shot calls have no event loop, skills, task lifecycle or memory triage.
 	opts = append(append([]aicommon.ConfigOption{}, opts...), aicommon.WithContext(ctx),
 		aicommon.WithDisableCreateDBRuntime(true), aicommon.WithDisableAutoSkills(true), aicommon.WithNoOpMemoryTriage())
@@ -41,7 +41,7 @@ func Execute(ctx context.Context, r Request, opts ...aicommon.ConfigOption) (*ai
 		return nil, fmt.Errorf("liteforge output schema is required")
 	}
 	// A custom response handler owns its prompt and transport (e.g. AI tags).
-	// Ordinary structured requests inherit the caller's selected action protocol.
+	// Ordinary structured requests use this invocation's selected action protocol.
 	native := cfg.EnableFunctionCallMode && r.ResponseHandler == nil
 	var protocol *nativeOutput
 	parse := r.ResponseHandler
