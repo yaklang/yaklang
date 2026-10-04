@@ -1,6 +1,6 @@
 # Legacy 接口迁移：aiforge 底层与边缘兼容
 
-> 状态：A/B 源码迁移已在本地实现，尚未提交，等待 review。第 14 节说明实际接口、验收记录与未验证边界。
+> 状态：A/B 源码迁移已提交，PR #5240 的提交 `1cabc84cc` 已通过全部适用 CI。第 14 节保留迁移时的本地验收记录；第 15 节规定旧包整包保留、包外零导入的隔离边界。
 >
 > 基线：2026-10-04，提交 `f735dcc66f5b2b7f18e975f83734db991dae33b7`。
 >
@@ -814,4 +814,22 @@ Blueprint 外层仍拥有 `start_plan_and_execution / end_plan_and_execution`；
 
 Windows 上 scannode 的常规测试编译被两份原有测试引用仅 Linux 定义的 helper 阻塞；本次改动的 Legion 结果、计划和发布测试用显式源文件集验证，不声称整个 scannode suite 通过。common/yak 全套另有依赖本机 openrouter.txt 的原有测试，未把它改成 skip。测试数据库先通过正常 Yak CLI 初始化内置工具，避免无工具的空数据库产生探索假失败。
 
-本次未提交、未推送、未运行远端 CI，也未在 Yakit/Memfit 实机重新点击验证。完整 CI、客户端实机与真实模型采样需要在本地 review 通过后单独验收。
+以上是迁移阶段的本地验收记录。该迁移随后已提交并推送，提交 `1cabc84cc` 的全部适用 CI 已通过，包括 Linux 上的完整 ScanNode 测试；未将这些结果计作 Yakit/Memfit 实机点击或真实模型质量验收。
+
+## 15. 旧包保留与包外零导入
+
+`coordinator_legacy` 整包保留，不删除其 Coordinator、AiTask、循环、提示词、恢复实现或独立命令入口。它属于隔离的旧源码：包外生产 Go 代码和测试均不得导入该包或其子包，不得用旧类型、旧辅助函数或 blank import 注册旧循环。
+
+本节隔离调整为后续本地改动，尚未提交；之前提交的 CI 成功不能替代本轮验证。
+
+- ReAct、Forge、Yak 工厂、扫描入口、任务看板和 `/live` 统一消费新版 Session、任务及运行注册表。
+- 包外 detached 测试通过新版 PublishDetachedPlan 验证嵌套树、文档、快照和 Timeline 回执，不再构造旧 AiTask。
+- 工具 schema 回归通过新版 NewWorkerLoop 构造 worker，不依赖旧包初始化时注册的 pe_task；文本与 function call 的 action 隔离断言继续有效。
+- 旧目录中验证新版 Forge 的两项持久上下文回归迁到 `common/ai/aiforge/forge_prompt_markers_test.go`；两种协议、实际任务执行、原始 query、初始化内容和持久指令不重复的断言继续保留。
+- 正式 CI 停止收集旧包及子包的测试，继续运行新版 coordinator、ReAct、Forge 和全部其他现有测试。旧包自己的测试可在其目录内单独运行；本地 Yak 冒烟仍不进入 CI。
+
+旧 focus 名称、历史 `plan_engine` 值、旧 RPC 过时错误和迁移文档可以保留。它们是协议数据或说明，不是 Go 包依赖：focus 只映射到新版，历史旧执行快照明确拒绝恢复，不允许因此重新接入旧引擎。
+
+本轮本地验证已通过：coordinator、ReAct、aiforge、LiteForge、liteforgeapp、aiengine 和 aivizhttp 全包回归；gRPC detached 双协议审核后执行及旧 RPC 过时错误回归。协调员测试使用正常 Yak 脚本启动初始化内置工具后的隔离数据库，未修改断言或跳过失败用例。保留的旧包及子包另完成独立编译检查，不将无匹配测试计作旧引擎行为验收。
+
+全仓包外 Go 源文件扫描及主要执行入口连同测试的 go list 传递依赖检查均未发现 legacy 包依赖。CI 测试配置继续收集新版协调员、ReAct 和 Forge；未新增 Yak 冒烟 CI 任务。

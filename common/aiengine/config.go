@@ -105,7 +105,7 @@ type AIEngineConfig struct {
 type AIEngineConfigOption func(*AIEngineConfig)
 
 // WithPlanEngine is a compatibility alias for the top-level coordinator focus.
-// New callers can select coordinator or coordinator_legacy with WithFocus.
+// New callers should use coordinator. ReAct remaps historical focus names to it.
 func WithPlanEngine(engine string) AIEngineConfigOption {
 	if engine == "legacy" {
 		engine = "coordinator_legacy"

@@ -2,7 +2,7 @@
 
 本文描述本次实现。新包位于 [coordinator](coordinator/README.md)，专注模式名为 coordinator，中文名为“任务协调”。接口字段和 Yakit 契约见 [接口文档](coordinator_interface_contract.md)。
 
-旧引擎集中在同层 [coordinator_legacy](coordinator_legacy/README.md)，包含旧 Coordinator、任务、规划/执行循环、提示词、测试和示例。`aid` 根包只保留公共能力，不再承载旧实现或兼容别名。Go 调用方显式导入对应引擎，运行时事件和 Yakit 契约保持不变。
+旧引擎整包保留在同层 [coordinator_legacy](coordinator_legacy/README.md)，包含旧 Coordinator、任务、规划/执行循环、提示词、测试和示例。包外生产代码和测试均不导入它或其子包，正式执行统一使用新版。`aid` 根包只保留公共能力，不再承载旧实现或兼容别名。运行时事件和 Yakit 契约保持不变。
 
 核对基线：yaklang main a0d6763d0d20a2c307f8e116ee3c1d45ceaad400；Yakit master 87904ea55a4af130b4fa8c22dc806405f62e3332。当前 ReAct / gRPC PLAN 入口统一使用新版；旧 focus 隐藏，历史旧计划停止执行。
 
@@ -39,7 +39,7 @@ flowchart TD
     Worker --> Shared
 ```
 
-入口约束位于 [aireact/coordinator.go](aireact/coordinator.go)。旧适配 [aireact/coordinator_legacy.go](aireact/coordinator_legacy.go) 不再被 PLAN 路由调用。[Session](coordinator/session.go) 实现 [Host](coordinator/controller.go) 的 Prepare、Approve、Execute、Changed，独立持有新调度器、任务运行体、输入镜像和生命周期。[PlanNode](coordinator/plan_wire.go) 只复用 Yakit JSON 字段，不继承旧 AiTask。
+入口约束位于 [aireact/coordinator.go](aireact/coordinator.go)，旧 ReAct 宿主适配已删除。[Session](coordinator/session.go) 实现 [Host](coordinator/controller.go) 的 Prepare、Approve、Execute、Changed，独立持有新调度器、任务运行体、输入镜像和生命周期。[PlanNode](coordinator/plan_wire.go) 只复用 Yakit JSON 字段，不继承旧 AiTask。
 
 旧 coordinator_legacy.Coordinator、计划阶段和进度结构均不包含新版本判断、桥或 Snapshot 字段。结构化辅助调用统一使用 [aid/liteforge](liteforge/README.md) 的独立执行器，应用封装归入 [liteforgeapp](liteforge/liteforgeapp/README.md)；协议遵循 Config，支持原生 function call 和文本 JSON 流。共同基础设施只负责工具、消息、Timeline、观测与模型调用，不解释 PLAN 版本。
 

@@ -13,6 +13,7 @@ import (
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
+	"github.com/yaklang/yaklang/common/ai/aid/coordinator"
 	"github.com/yaklang/yaklang/common/ai/aispec"
 )
 
@@ -98,15 +99,19 @@ func TestNativeMainLoopLoadSchemasThenDirectExecution(t *testing.T) {
 	require.NoError(t, loop.Execute("schema-load-probe", ctx, "Load the probe schemas, then execute and report."))
 	require.EqualValues(t, 6, decisions.Load())
 	require.EqualValues(t, 3, executions.Load())
-	// Constructing another loop must not inherit the experiment via shared actions.
-	for _, tc := range []struct {
-		name   string
-		native bool
-	}{{"default", false}, {"pe_task", true}} {
-		other, err := reactloops.CreateLoopByName(tc.name, react, reactloops.WithFunctionCallMode(tc.native))
-		require.NoError(t, err)
-		action, err := other.GetActionHandler("require_tool")
-		require.NoError(t, err)
-		require.Contains(t, action.Description, "生成参数")
-	}
+	// A text loop retains its own action variant. Native workers are created
+	// by the coordinator factory, not an implicitly registered legacy pe_task.
+	textLoop, err := reactloops.CreateLoopByName("default", react, reactloops.WithFunctionCallMode(false))
+	require.NoError(t, err)
+	textAction, err := textLoop.GetActionHandler("require_tool")
+	require.NoError(t, err)
+	require.Contains(t, textAction.Description, "生成参数")
+	worker, err := coordinator.NewWorkerLoop(react, reactloops.WithFunctionCallMode(true))
+	require.NoError(t, err)
+	workerAction, err := worker.GetActionHandler("require_tool")
+	require.NoError(t, err)
+	require.Contains(t, workerAction.Description, "Load business-tool parameter schemas")
+	mainAction, err := loop.GetActionHandler("require_tool")
+	require.NoError(t, err)
+	require.Contains(t, mainAction.Description, "Load business-tool parameter schemas", "constructing another loop must not mutate shared action variants")
 }
