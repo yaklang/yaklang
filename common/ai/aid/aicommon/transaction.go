@@ -256,7 +256,8 @@ func callAITransaction(
 			rec.PostHandlerErr = postHandlerErr
 			attemptHistory = append(attemptHistory, rec)
 			retryCorrectionErr = nil
-			if rsp.GetHTTPStatusCode() < 400 {
+			if rsp.GetHTTPStatusCode() < 400 &&
+				!(rsp.GetError() != nil && rec.PlainOutput == "" && len(rec.ToolCalls) == 0) {
 				retryCorrectionErr = &retryCorrectionError{cause: postHandlerErr, attempt: rec}
 			}
 			rspEmitter := bindEmitter(rsp)

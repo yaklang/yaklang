@@ -202,6 +202,29 @@ func TestTransactionFailureDiagnosticsKeepFinalProviderCalls(t *testing.T) {
 	require.Equal(t, "new", calls[0].(map[string]any)["id"])
 }
 
+func TestTransactionEmptyAsyncTransportErrorKeepsOriginalPrompt(t *testing.T) {
+	cfg := &retryPromptTestConfig{newTransactionTestConfig(context.Background())}
+	cfg.retryMax = 2
+	var attempt int
+	err := CallAITransaction(cfg, "original", func(req *AIRequest) (*AIResponse, error) {
+		attempt++
+		require.Equal(t, "original", req.GetPrompt())
+		resp := NewAIResponse(nil)
+		if attempt == 1 {
+			resp.SetError(errors.New("connection reset before model output"))
+		}
+		resp.Close()
+		return resp, nil
+	}, func(*AIResponse) error {
+		if attempt == 1 {
+			return errors.New("missing action")
+		}
+		return nil
+	})
+	require.NoError(t, err)
+	require.Equal(t, 2, attempt)
+}
+
 func TestRetryCorrectionBoundsResponseAndPreservesErrorChain(t *testing.T) {
 	trace := &retryResponseTrace{}
 	wire := aispec.NewDefaultAIConfig(aispec.WithToolCallCallback(func([]*aispec.ToolCall) {}), trace.option())
