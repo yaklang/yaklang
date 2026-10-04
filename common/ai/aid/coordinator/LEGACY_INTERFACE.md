@@ -820,7 +820,7 @@ Windows 上 scannode 的常规测试编译被两份原有测试引用仅 Linux �
 
 `coordinator_legacy` 整包保留，不删除其 Coordinator、AiTask、循环、提示词、恢复实现或独立命令入口。它属于隔离的旧源码：包外生产 Go 代码和测试均不得导入该包或其子包，不得用旧类型、旧辅助函数或 blank import 注册旧循环。
 
-本节隔离调整为后续本地改动，尚未提交；之前提交的 CI 成功不能替代本轮验证。
+本节隔离调整已完成本地验收并获准提交；之前提交的 CI 成功不能替代本轮最新提交的验证。
 
 - ReAct、Forge、Yak 工厂、扫描入口、任务看板和 `/live` 统一消费新版 Session、任务及运行注册表。
 - 包外 detached 测试通过新版 PublishDetachedPlan 验证嵌套树、文档、快照和 Timeline 回执，不再构造旧 AiTask。
