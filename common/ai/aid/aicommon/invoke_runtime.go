@@ -419,7 +419,7 @@ type AITaskInvokeRuntime interface {
 }
 
 var AIRuntimeInvokerGetter = func(ctx context.Context, options ...ConfigOption) (AITaskInvokeRuntime, error) {
-	return nil, utils.Errorf("not registered default AI runtime invoker")
+	return nil, utils.Errorf("default AI runtime invoker is not registered; add a blank import: import _ \"github.com/yaklang/yaklang/common/ai/aid/aireact\". Standard Yak entrypoints load it automatically")
 }
 
 func RegisterDefaultAIRuntimeInvoker(getter func(ctx context.Context, options ...ConfigOption) (AITaskInvokeRuntime, error)) {

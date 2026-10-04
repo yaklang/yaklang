@@ -1,8 +1,0 @@
-// 两种协议都使用公开 liteforge 模块，由运行器传入 provider/model 配置。
-schema = `{"type":"object","properties":{"summary":{"type":"string"},"payload":{}},"required":["summary","payload"],"additionalProperties":true}`
-for mode in [true, false] {
-    callOptions = append(OPTIONS, ai.withFunctionCallMode(mode))
-    result = liteforge.Execute(INPUT, liteforge.action("object"), liteforge.output(schema),
-        callOptions...)~
-    VERIFY("liteforge", mode, result.Action.GetParams())
-}

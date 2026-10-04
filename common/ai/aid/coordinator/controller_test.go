@@ -340,3 +340,26 @@ func TestCoordinatorLoopDetachedSubmitDoesNotApproveExecution(t *testing.T) {
 	require.NoError(t, c.CanFinishPlanning())
 	require.Contains(t, c.PromptStatus(), "等待审核：true")
 }
+
+// Retrying an upstream result invalidates downstream inputs, but cannot expand
+// the scope by reviving a task the caller explicitly cancelled.
+func TestCoordinatorRetryPreservesCancelledDependents(t *testing.T) {
+	c := readyController(t, &testHost{plan: testPlan()}, 2)
+	_, err := c.StartTasks([]string{"a"})
+	require.NoError(t, err)
+	a := awaitResult(t, c, "a")
+	require.NoError(t, c.ReviewTask("a", a.ID, "reject", "verify source again"))
+	require.NoError(t, c.CancelTasks([]string{"b"}, "outside requested scope"))
+	cancelled := c.Snapshot().Attempts["b"]
+	require.Equal(t, Cancelled, cancelled.State)
+	_, err = c.RetryTask("a", a.ID, "repair source")
+	require.NoError(t, err)
+	next := awaitResult(t, c, "a")
+	require.Greater(t, next.ID, a.ID)
+	require.NoError(t, c.ReviewTask("a", next.ID, "accept", "source verified"))
+	require.Equal(t, cancelled, c.Snapshot().Attempts["b"])
+	// An explicit retry of B can still restore it after A is accepted.
+	_, err = c.RetryTask("b", cancelled.ID, "caller explicitly restores B")
+	require.NoError(t, err)
+	require.Equal(t, AwaitingReview, awaitResult(t, c, "b").State)
+}

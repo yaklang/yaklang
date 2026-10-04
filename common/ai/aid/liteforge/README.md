@@ -46,23 +46,20 @@ Function call 的字段流直接读取 `ToolCallArgumentsStreamHandler` 提供�
 
 ## 验证
 
-普通默认主循环的真实模型冒烟使用独立 [smoke_default_task.yak](smoke_default_task.yak)，直接由 Yak CLI 执行，不需要 Go 运行器注入变量。脚本通过 `aim.InvokeReAct` 读取订单材料、保存 evidence 并写对账报告；校验金额、去重和异常数组，输出 provider 用量、调用事件、提示词快照路径及按 token 加权的缓存率。凭据从 `LITEFORGE_SMOKE_API_KEY` 读取；可用 `LITEFORGE_TASK_DIR` 指定新的输出目录，`LITEFORGE_SMOKE_MODEL` 指定模型，默认 `deepseek-v4.1-flash`。总体缓存统计包含收到 provider usage 的请求；没有完整用量的取消请求保留在事件与日志中，不计入此分母。
+普通默认主循环的真实模型冒烟使用独立 [default_task.yak](../../aismoking/live/default_task.yak)，直接由 Yak CLI 执行，不需要 Go 运行器注入变量。脚本通过 `aim.InvokeReAct` 读取订单材料、保存 evidence 并写对账报告；校验金额、去重和异常数组，输出 provider 用量、调用事件、提示词快照路径及按 token 加权的缓存率。凭据从 `LITEFORGE_SMOKE_API_KEY` 读取；可用 `LITEFORGE_TASK_DIR` 指定新的输出目录，`LITEFORGE_SMOKE_MODEL` 指定模型，默认 `deepseek-v4.1-flash`。总体缓存统计包含收到 provider usage 的请求；没有完整用量的取消请求保留在事件与日志中，不计入此分母。
 
 ```powershell
-yak common/ai/aid/liteforge/smoke_default_task.yak
+yak common/ai/aismoking/live/default_task.yak
 ```
 
 `go test ./common/ai/aid/liteforge` 覆盖开放 map、任意 JSON 值、必填约束、重试、原生调用身份和截断拒绝、增量回调、缓存前缀与伪造边界，以及旧嵌套参数包装。
 
-`TestProtocolsProjectAtSendAndStreamBeforeResponseEnds` 使用本地 HTTP/SSE 服务验证实际发送路径：默认开启原生协议，关闭后兼容旧 `@action` JSON；工具必须由发送前的投影注入；服务端只有收到字段回调通知后才发送剩余响应，保证两种协议都能增量处理字段。
+统一验证入口在 [AI 冒烟测试](../../aismoking/README.md)。直接执行：
 
-`TestLiteForgeYakAIMBothProtocols` 执行 [smoke.yak](smoke.yak)：抽取、分类、总结 × 文本流/function call，逐个验证 aim 与公开 LiteForge 入口。只有模型 provider 使用确定性响应，其余执行真实代码；每个入口恰好请求一次。这些测试验证链路与参数语义，不代表实际模型质量或 provider 缓存命中率。
-
-`TestYakLiteForgeAndFunctionCallCrossProtocols` 用真实 Yak ScriptEngine 执行 [smoke_liteforge.yak](smoke_liteforge.yak) 和 [smoke_functioncall.yak](smoke_functioncall.yak)，共四次 HTTP/SSE 请求。检查实际 tools、tool_choice、消息投影、认证和模型选项；服务端等待 `onStream` 读到首字节才发送剩余结果，验证普通文本和 arguments 都增量输出。脚本的 INPUT、OPTIONS、VERIFY 由运行器注入，不替换模块函数。
-
-```powershell
-go test ./common/ai/aid/liteforge -run '^TestYakLiteForgeAndFunctionCallCrossProtocols$' -count=1 -v
-# 从环境变量提供凭据，使用相同两个脚本验证真实模型，凭据不写入脚本。
-# LITEFORGE_SMOKE_API_KEY 必填，PROVIDER/MODEL 默认为 aibalance/deepseek-v4.1-flash。
-go test ./common/ai/aid/liteforge -run '^TestYakGatewayLiveSmoke$' -count=1 -v
+```text
+yak common/ai/aismoking/liteforge.yak
 ```
+
+脚本使用本地 HTTP/SSE provider，实际验证 LiteForge 与 `ai.FunctionCall` × 两种协议四条链路；服务端等待 `onStream` 读到首字节才发送剩余响应，验证文本和 arguments 的增量处理。另覆盖抽取、分类、总结 × 双协议 × aim/public 两个入口，共 16 次请求；检查 tools、tool_choice、投影、开放 JSON 和字段语义，不需要 Go 注入。
+
+内部 Go 回归 `TestLiteForgeAIMBothProtocols` 保留流式输出与结果断言，测试公开 AI engine 集成；provider 缓存率需真实模型 usage，mock 只验证分区与执行链路。

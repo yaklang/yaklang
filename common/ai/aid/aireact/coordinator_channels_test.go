@@ -14,7 +14,6 @@ import (
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
 	"github.com/yaklang/yaklang/common/ai/aid/coordinator"
-	"github.com/yaklang/yaklang/common/ai/aid/coordinator_legacy"
 	"github.com/yaklang/yaklang/common/ai/aispec"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
@@ -25,16 +24,6 @@ import (
 func TestCoordinatorChannelsNeverConstructTheOtherRuntime(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	original := newCoordinatorContextForPlanExec
-	t.Cleanup(func() { newCoordinatorContextForPlanExec = original })
-	legacyCalls := 0
-	legacyResult := errors.New("legacy route selected")
-	newCoordinatorContextForPlanExec = func(ctx context.Context, _ string, opts ...aicommon.ConfigOption) (*coordinator_legacy.Coordinator, error) {
-		legacyCalls++
-		cfg := aicommon.NewConfig(ctx, opts...)
-		require.Nil(t, cfg.LiteForgeExecutor, "legacy must not inherit native helper injection")
-		return nil, legacyResult
-	}
 	var calls atomic.Int64
 	r, err := NewTestReAct(aicommon.WithContext(ctx), aicommon.WithEnableFunctionCallMode(true), aicommon.WithFocus(coordinator.Name), aicommon.WithDisableCreateDBRuntime(true), aicommon.WithWorkdir(t.TempDir()), aicommon.WithAgreeYOLO(), aicommon.WithAICallback(func(c aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 		wire := aispec.NewDefaultAIConfig(req.GetExtraSpecOpts()...)
@@ -67,19 +56,17 @@ func TestCoordinatorChannelsNeverConstructTheOtherRuntime(t *testing.T) {
 		t.Fatal("native ready channel was not closed")
 	}
 	require.Equal(t, int64(3), calls.Load())
-	require.Zero(t, legacyCalls)
-	for _, focus := range []string{"", "plan", coordinator_legacy.Name, coordinator.Name} {
+	for _, focus := range []string{"", "plan", "coordinator_legacy", coordinator.Name} {
 		r.config.Focus = focus
 		channel, err := r.coordinatorChannel("")
 		require.NoError(t, err)
 		require.Equal(t, coordinator.Name, channel)
 	}
-	require.Zero(t, legacyCalls)
 	require.Equal(t, int64(3), calls.Load())
 	metadata, ok := reactloops.GetLoopMetadata(coordinator.Name)
 	require.True(t, ok)
 	require.False(t, metadata.IsHidden)
-	_, ok = reactloops.GetLoopMetadata(coordinator_legacy.Name)
+	_, ok = reactloops.GetLoopMetadata("coordinator_legacy")
 	require.False(t, ok, "retired focus must not be registered")
 }
 
@@ -93,12 +80,12 @@ func TestCoordinatorRecoverySelectsStoredOwner(t *testing.T) {
 	cfg := aicommon.NewConfig(ctx, aicommon.WithDisableCreateDBRuntime(true), aicommon.WithWorkdir(t.TempDir()))
 	cfg.BaseCheckpointableStorage = aicommon.NewCheckpointableStorageWithDB(cfg.Id, db)
 	r := &ReAct{config: cfg}
-	for _, test := range []struct{ id, progress, expected string }{{"old", `{"phase":"NotCompleted"}`, coordinator_legacy.Name}, {"old-named", `{"plan_engine":"coordinator_legacy"}`, coordinator_legacy.Name}, {"native", `{"plan_engine":"coordinator"}`, coordinator.Name}, {"native-snapshot", `{"coordinator_state":{"schema":1}}`, coordinator.Name}} {
+	for _, test := range []struct{ id, progress, expected string }{{"old", `{"phase":"NotCompleted"}`, "coordinator_legacy"}, {"old-named", `{"plan_engine":"coordinator_legacy"}`, "coordinator_legacy"}, {"native", `{"plan_engine":"coordinator"}`, coordinator.Name}, {"native-snapshot", `{"coordinator_state":{"schema":1}}`, coordinator.Name}} {
 		require.NoError(t, yakit.CreateOrUpdateAISessionPlanAndExec(db, &schema.AISessionPlanAndExec{SessionID: "session", CoordinatorID: test.id, TaskTree: "{}", TaskProgress: test.progress}))
-		for _, current := range []string{coordinator.Name, coordinator_legacy.Name} {
+		for _, current := range []string{coordinator.Name, "coordinator_legacy"} {
 			cfg.Focus = current
 			channel, err := r.coordinatorChannel(test.id)
-			if test.expected == coordinator_legacy.Name {
+			if test.expected == "coordinator_legacy" {
 				require.ErrorContains(t, err, "legacy PLAN execution is disabled")
 				continue
 			}
@@ -116,11 +103,6 @@ func TestCoordinatorRecoverySelectsStoredOwner(t *testing.T) {
 func TestCoordinatorNativeReviewAndDetachedAdapters(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	original := newCoordinatorContextForPlanExec
-	t.Cleanup(func() { newCoordinatorContextForPlanExec = original })
-	newCoordinatorContextForPlanExec = func(context.Context, string, ...aicommon.ConfigOption) (*coordinator_legacy.Coordinator, error) {
-		return nil, errors.New("native adapter called legacy constructor")
-	}
 	in := make(chan *ypb.AIInputEvent, 4)
 	var mu sync.Mutex
 	var panel map[string]any

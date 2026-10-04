@@ -20,6 +20,4 @@ import (
 	_ "github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops/loop_write_python_script"
 	_ "github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops/loop_yaklangcode"
 	_ "github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops/loopinfra"
-	_ "github.com/yaklang/yaklang/common/ai/aid/coordinator_legacy/loop_plan"
-	_ "github.com/yaklang/yaklang/common/ai/aid/coordinator_legacy/loop_task"
 )

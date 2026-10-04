@@ -208,12 +208,12 @@ err = aim.InvokeReAct(
 ```bash
 # 运行基础测试
 cd /Users/v1ll4n/Projects/yaklang
-go run common/yak/cmd/yak.go common/ai/aid/aireact/reactloops/loop_report_generating/examples/test_basic_report.yak
+yak common/ai/aismoking/live/focused/loop_report_generating/test_basic_report.yak
 
 # 运行所有测试
 for f in common/ai/aid/aireact/reactloops/loop_report_generating/examples/*.yak; do
     echo "Running: $f"
-    go run common/yak/cmd/yak.go "$f"
+    yak "$f"
 done
 ```
 

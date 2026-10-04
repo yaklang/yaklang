@@ -172,12 +172,12 @@ common/ai/aid/liteforge/liteforgeapp/
 
 ### 5.1 yak 脚本：仅 KB 入库（无 zip 归档）
 
-参见 [`examples/build-video-knowledge-omni.yak`](./examples/build-video-knowledge-omni.yak)：
+参见 [`../../../aismoking/live/video/build-video-knowledge-omni.yak`](./../../../aismoking/live/video/build-video-knowledge-omni.yak)：
 
 ```shell
 # 优先 env，回退到本地 key 文件
 export DASHSCOPE_API_KEY=sk-***
-yak examples/build-video-knowledge-omni.yak \
+yak ../../../aismoking/live/video/build-video-knowledge-omni.yak \
     --video /path/to/lecture.mp4 \
     --model flash \
     --kb-name my-lecture-flash \
@@ -186,11 +186,11 @@ yak examples/build-video-knowledge-omni.yak \
 
 ### 5.2 yak 脚本：KB + zip 归档（推荐生产用）
 
-参见 [`examples/build-video-knowledge-omni-with-zip.yak`](./examples/build-video-knowledge-omni-with-zip.yak)：
+参见 [`../../../aismoking/live/video/build-video-knowledge-omni-with-zip.yak`](./../../../aismoking/live/video/build-video-knowledge-omni-with-zip.yak)：
 
 ```shell
 export DASHSCOPE_API_KEY=sk-***
-yak examples/build-video-knowledge-omni-with-zip.yak \
+yak ../../../aismoking/live/video/build-video-knowledge-omni-with-zip.yak \
     --video /path/to/lecture.mp4 \
     --model plus \
     --max-segments 1 \

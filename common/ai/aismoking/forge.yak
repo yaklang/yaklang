@@ -1,0 +1,163 @@
+// Run directly: yak common/ai/aismoking/forge.yak
+// A local OpenAI SSE fixture exercises real transport, fragmented arguments,
+// text actions, planning, approval, DAG workers, delivery and the public Yak API.
+println("Starting native Forge smoke")
+ctx, cancel = context.WithCancel(context.WithTimeoutSeconds(180))
+defer cancel()
+root = os.Getenv("AISMOKING_OUTPUT")
+if root == "" { root = file.Join(os.TempDir(),sprintf("ai-forge-smoking-%d",time.Now().UnixNano())) }
+file.MkdirAll(root)~
+port = os.GetRandomAvailableTCPPort()
+base = "http://" + str.HostPort("127.0.0.1", port)
+lock = sync.NewMutex()
+execution = nil
+mainMode = false
+mainSteps = 0
+plan = {"main_task":"Forge smoke", "main_task_goal":"Compare two sources", "tasks":[
+    {"subtask_name":"Read A", "subtask_goal":"Verify A", "subtask_identifier":"a", "depends_on":[]},
+    {"subtask_name":"Compare B", "subtask_goal":"Compare B to A", "subtask_identifier":"b", "depends_on":["a"]},
+]}
+mockPlan = json.loads(string(json.Marshal(plan)~))
+mockPlan["@action"] = "plan"
+planJSON = string(json.Marshal(mockPlan)~)
+steps = {}
+formatCalls = 0
+requests = 0
+submitted = false
+
+model = func(config, req) {
+    result, err = ai.Chat("smoke_caller:" + req.GetCallerLabel() + "\n" + req.GetPrompt(), ai.type("openai"), ai.baseURL(base + "/v1/chat/completions"), ai.apiKey("local-fixture"), ai.model("forge-smoke"), ai.noHttps(true), func(c) { c.Context = ctx; c.DisableProviderFallback = true; c.FunctionCallRetryTimes = 1 }, req.GetExtraSpecOpts()...)
+    if err != nil { return nil, err }
+    response = config.NewAIResponse()
+    response.EmitOutputStream(str.NewReader(result))
+    response.Close()
+    return response, nil
+}
+
+func emit(w, payload) { w.Write("data: " + string(json.Marshal(payload)~) + "\n\n")~; w.Flush() }
+func answer(w, native, name, args) {
+    w.Header().Set("Content-Type", "text/event-stream")
+    if native {
+        raw = string(json.Marshal(args)~)
+        half = len(raw) / 2
+        emit(w, {"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"id":"forge-smoke","type":"function","function":{"name":name,"arguments":raw[:half]}}]}}]})
+        emit(w, {"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":raw[half:]}}]}}]})
+        emit(w, {"choices":[{"index":0,"delta":{},"finish_reason":"tool_calls"}]})
+    } else {
+        args["@action"] = name
+        args["identifier"] = name
+        emit(w, {"choices":[{"index":0,"delta":{"content":string(json.Marshal(args)~)}}]})
+        emit(w, {"choices":[{"index":0,"delta":{},"finish_reason":"stop"}]})
+    }
+    w.Write("data: [DONE]\n\n")
+}
+go httpserver.Serve("127.0.0.1", port, httpserver.context(ctx), httpserver.handler(func(w, req) {
+    if req.URL.Path == "/ready" { w.Write("ready"); return }
+    body = json.loads(string(io.ReadAll(req.Body)~))
+    prompt = ""
+    for message in body.messages { prompt += string(message.content) + "\n" }
+    native = len(body.tools) > 0
+    lock.Lock()
+    defer lock.Unlock()
+    requests++
+    file.SaveJson(file.Join(root,sprintf("request-%v-%s-%03d.json",native,source,requests)),body)~
+    printf("SSE fixture request %d, native=%v\n",requests,native)
+    assert requests < 50, "fixture did not converge"
+    if mainMode {
+        // A separate aim call confirms that deleting the old adapters did not
+        // disrupt the default main-loop entrypoint or its selected protocol.
+        if "smoke_caller:liteforge[session-title-generator]" in prompt {
+            name = "session-title-generator"
+            if native { name = body.tools[0]["function"].name }
+            answer(w, native, name, {"session_title":"Forge smoke"})
+            return
+        }
+        if mainSteps == 0 {
+            mainSteps++
+            answer(w, native, "directly_answer", {"answer_payload":"Forge migration smoke passed"})
+        } else { answer(w, native, "finish", {}) }
+        return
+    }
+    state = execution.Snapshot()
+    if len(body.tools) == 1 && body.tools[0]["function"].name == "business_result" || "单步结构化抽取器" in prompt {
+        formatCalls++
+        assert string(state.Phase) == "EXEC"
+        for _, attempt in state.Attempts { assert string(attempt.State) == "accepted" }
+        answer(w, native, "business_result", {"summary":"sources verified","payload":{"ok":true,"values":[1,"two",nil]}})
+        return
+    }
+    if "执行已批准的冻结任务书。" in prompt {
+        id = ""
+        for key, attempt in state.Attempts { if string(attempt.State) == "running" { id = key } }
+        assert id != "", "no running worker"
+        step = steps[id]
+        if step == nil { step = 0 }
+        steps[id] = step + 1
+        evidence = "forge-source-" + state.Attempts[id].Task.Index
+        if step == 0 { answer(w, native, "save_evidence", {"evidence_id":evidence,"evidence_content":"Source checked against the frozen task brief."}); return }
+        if step == 1 { answer(w, native, "submit_task_result", {"summary":"source verified","evidence_ids":[evidence]}); return }
+        answer(w, native, "finish", {})
+        return
+    }
+    if state.Plan == nil { answer(w, native, "create_plan", {"plan":plan,"plan_document":"# Sources\nCheck A then compare B."}); return }
+    if string(state.Phase) == "PLAN" { submitted = true; answer(w, native, "submit_plan", {}); return }
+    for _, attempt in state.Attempts {
+        if string(attempt.State) == "awaiting_review" { answer(w, native, "review_task", {"task_id":attempt.Task.ID,"attempt_id":attempt.ID,"decision":"accept","reason":"Verified against the saved session evidence"}); return }
+    }
+    answer(w, native, "wait_messages", {})
+}))
+for i = 0; i < 100; i++ {
+    _, err = http.Get(base + "/ready")
+    if err == nil { break }
+    time.Sleep(0.02)
+}
+
+for native in [false, true] {
+    for source in ["generated", "preset", "mocker"] {
+        definition = {"name":"native-forge-smoke", "init_prompt":"Verify sources", "persistent_prompt":"Keep source provenance", "result_prompt":"Return the business result in JSON", "actions":"business_result,alias_result"}
+        if source == "preset" { definition.plan_prompt = planJSON }
+        builds = 0
+        callbacks = 0
+        opts = [aiagent.context(ctx), aiagent.agreeYOLO(), aiagent.aiCallback(model), aiagent.functionCallMode(native), aiagent.resultHandler(func(e) {
+            callbacks++
+            assert e.Snapshot().Finished
+            assert e.GetContextProvider().CurrentTask.TaskSummary == "source verified"
+        }), aiagent.extendAIDOptions(func(config) {
+            config.DisableCreateDBRuntime = true
+            config.Workdir = root
+            config.DisablePerception = true
+            config.DisableMemoryTriage = true
+            config.DisallowMCPServers = true
+            return nil
+        })]
+        if source == "mocker" { opts = append(opts, aiagent.plan(func(s) { builds++; return aiagent.ExtractPlan(s, planJSON)~ })) }
+        lock.Lock()
+        steps, formatCalls, requests, submitted = {}, 0, 0, false
+        lock.Unlock()
+        printf("Starting Forge: %s, function_call=%v\n", source, native)
+        execution = aiagent.NewExecutorFromJson(string(json.Marshal(definition)~), {"query":"compare A and B"}, opts...)~
+        defer execution.Close()
+        die(execution.Run())
+        die(execution.Run())
+        assert submitted && execution.Snapshot().Finished
+        result = execution.Result()
+        assert result.Action.GetString("summary") == "sources verified"
+        assert result.Action.GetInvokeParams("payload").GetBool("ok")
+        assert formatCalls == 1 && callbacks == 1
+        if source == "mocker" { assert builds == 1 }
+        assert "forge-source-1" in execution.GetSessionEvidenceRendered()
+        assert "forge-source-2" in execution.GetSessionEvidenceRendered()
+        printf("Forge passed: source=%s function_call=%v requests=%d formatter=%d callback=%d\n", source, native, requests, formatCalls, callbacks)
+    }
+    mainMode = true
+    mainSteps = 0
+    requests = 0
+    die(aim.InvokeReAct("Give the Forge migration smoke result", aim.timeout(15), aim.maxIteration(4), aim.reviewPolicy("yolo"), aim.disableAIForge(true), aim.disableToolUse(true), aim.disableMCPServers(true), aim.workdir(file.Join(root,"mainloop")), aim.aiCallback(model), func(c) {
+        c.Stateless = true
+        c.ExtOptions = append(c.ExtOptions, aiagent.functionCallMode(native), aiagent.aiCallback(model))
+    }))
+    mainMode = false
+    printf("aim.InvokeReAct passed: function_call=%v\n", native)
+}
+
+println("AISMOKING_PASS")

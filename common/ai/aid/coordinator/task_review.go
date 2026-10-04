@@ -8,7 +8,6 @@ import (
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
-	"github.com/yaklang/yaklang/common/ai/aid/coordinator_legacy"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
@@ -36,7 +35,7 @@ func (s *Session) ReviewExecutionTask(ctx context.Context, a Attempt) error {
 	s.taskReviewEndpoints[ep.GetId()] = true
 	s.mu.Unlock()
 	state := s.Snapshot()
-	payload := map[string]any{"id": ep.GetId(), "selectors": coordinator_legacy.TaskReviewSuggestions, "task": map[string]any{"task_id": a.Task.ID, "index": a.Task.Index, "name": a.Task.Name, "goal": a.Task.Goal, "attempt_id": a.ID, "summary": a.Result.Summary, "short_summary": a.Result.Summary, "long_summary": a.Result.Summary}, "short_summary": a.Result.Summary, "long_summary": a.Result.Summary, "result": a.Result, "progress": map[string]any{"phase": "NotCompleted", "total_tasks": len(state.Attempts)}, "pending_tasks": []any{}}
+	payload := map[string]any{"id": ep.GetId(), "selectors": aicommon.TaskReviewSuggestions, "task": map[string]any{"task_id": a.Task.ID, "index": a.Task.Index, "name": a.Task.Name, "goal": a.Task.Goal, "attempt_id": a.ID, "summary": a.Result.Summary, "short_summary": a.Result.Summary, "long_summary": a.Result.Summary}, "short_summary": a.Result.Summary, "long_summary": a.Result.Summary, "result": a.Result, "progress": map[string]any{"phase": "NotCompleted", "total_tasks": len(state.Attempts)}, "pending_tasks": []any{}}
 	ep.SetReviewMaterials(payload)
 	if err := s.SubmitCheckpointRequest(ep.GetCheckpoint(), payload); err != nil {
 		return fmt.Errorf("persist task review checkpoint: %w", err)

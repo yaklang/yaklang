@@ -7,7 +7,7 @@ on:
     paths:
       - 'common/syntaxflow/sfbuildin/buildin/**'
       - 'common/ai/aid/aitool/buildinaitools/yakscripttools/yakscriptforai/**'
-      - 'common/aiforge/buildinforge/**'
+      - 'common/ai/aiforge/buildinforge/**'
       - 'common/coreplugin/base-yak-plugin/**'
 
 permissions:
@@ -51,7 +51,7 @@ jobs:
           RESOURCE_DIRS=(
             "common/coreplugin/base-yak-plugin"
             "common/syntaxflow/sfbuildin/buildin"
-            "common/aiforge/buildinforge"
+            "common/ai/aiforge/buildinforge"
             "common/ai/aid/aitool/buildinaitools/yakscripttools/yakscriptforai"
           )
 

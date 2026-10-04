@@ -22,7 +22,7 @@ type SkillSelection struct {
 // This callback type is defined in aiskillloader (rather than using aicommon types
 // directly) to avoid circular imports, since aiskillloader is a subpackage of aicommon.
 //
-// The caller (who has access to aicommon/aiforge) is responsible for:
+// The caller (who has access to aicommon/ai/aiforge) is responsible for:
 //   - Invoking LiteForge with the prompt and schema
 //   - Configuring FieldStream for the "reason" field with nodeId "thought"
 //   - Parsing the ForgeResult into []SkillSelection

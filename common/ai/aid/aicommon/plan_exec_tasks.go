@@ -8,6 +8,8 @@ import (
 )
 
 const PlanExecPhaseDetachedPendingApproval = "plan_pending_approval"
+const PlanExecPhasePlanReady = "plan_ready"
+const PlanExecPhaseNotCompleted = "NotCompleted"
 
 func planExecPhaseFromProgress(taskProgress string) string {
 	taskProgress = strings.TrimSpace(taskProgress)

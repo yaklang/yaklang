@@ -1,0 +1,85 @@
+// yak common/ai/aismoking/notifications.yak
+// No explicit wait action: durable discoveries/settlement wake an idle coordinator.
+include "common/ai/aismoking/mock.inc"
+waiting, discoveryRead = make(chan bool,8), make(chan bool,1)
+mainCalls, workerCalls, waits, approvals, checked, reportStep = 0,0,0,0,false,0
+func sleeping() {
+    select {
+    case <-waiting:
+    case <-smokeCtx.Done(): die("runtime did not enter automatic wait")
+    }
+    before = mainCalls
+    time.Sleep(0.08)
+    assert mainCalls == before, "idle coordinator polled the model"
+}
+notifyEvent = func(op,e) {
+    if !e.IsJson { return }
+    data = json.loads(string(e.Content))
+    if data.code == "plan.waiting_for_messages" { waits++; waiting <- true }
+    if string(e.Type) == "plan_review_require" { approvals++; smokeApprove(op,data,{"suggestion":"continue"}) }
+}
+smokeHandler = func(w,body) {
+    native = len(body.tools) > 0
+    prompt = smokePrompt(body)
+    if "SMOKE_CALLER:liteforge[session-title-generator]" in prompt {
+        name = "session-title-generator"
+        if native { name = body.tools[0]["function"].name }
+        smokeAnswer(w,native,name,{"session_title":"通知验证"}); return
+    }
+    if "执行已批准的冻结任务书。" in prompt {
+        workerCalls++
+        if workerCalls == 1 {
+            sleeping()
+            smokeAnswer(w,native,"save_evidence",{"evidence_id":"notification.discovery","evidence_content":"notification-discovery-sentinel：运行中的任务已确认来源。"}); return
+        }
+        if workerCalls == 2 {
+            select {
+            case <-discoveryRead:
+            case <-smokeCtx.Done(): die("discovery did not wake the coordinator")
+            }
+            sleeping()
+            smokeAnswer(w,native,"save_evidence",{"evidence_id":"notification.discovery","evidence_content":"notification-discovery-sentinel：运行中的任务已确认来源。"}); return
+        }
+        if workerCalls == 3 {
+            before = mainCalls
+            time.Sleep(0.08)
+            assert before == mainCalls, "duplicate evidence woke the coordinator"
+            smokeAnswer(w,native,"submit_task_result",{"summary":"notification-result-sentinel：来源已完整验证","evidence_ids":["notification.discovery"]}); return
+        }
+        smokeAnswer(w,native,"finish",{}); return
+    }
+    mainCalls++
+    assert mainCalls <= 10, "empty model wake-ups exceeded the bounded smoke budget"
+    if "已有计划：false" in prompt { smokeAnswer(w,native,"create_plan",{"plan":{"name":"通知验证","goal":"自动等待与通知","tasks":[{"name":"来源检查","goal":"保存发现并提交结果","identifier":"source"}]},"plan_document":"# 通知验证\n发现先持久化，再唤醒协调员。"}); return }
+    if "阶段：PLAN" in prompt { smokeAnswer(w,native,"submit_plan",{}); return }
+    parts = str.Split(prompt,"# PLAN STATUS")
+    state = re.FindSubmatch(parts[len(parts)-1],`\[([^\]]+)\]: ([a-z_]+); attempt=(\d+)`)
+    assert len(state) == 4
+    if state[2] == "running" && "notification-discovery-sentinel" in prompt && !checked {
+        checked = true
+        discoveryRead <- true
+    }
+    if state[2] == "awaiting_review" {
+        assert checked && "notification-result-sentinel" in prompt, "settlement preceded result publication"
+        smokeAnswer(w,native,"review_task",{"task_id":state[1],"attempt_id":parseInt(state[3]),"decision":"accept","reason":"共享发现与完成结果一致"}); return
+    }
+    if state[2] == "accepted" && "当前任务图和关键消息已经收尾" in prompt {
+        reportStep++
+        if reportStep == 1 { smokeAnswer(w,native,"create_report",{"title":"通知验证","document":"# 通知验证\n发现通知、去重、结算及自动验收均通过。"}); return }
+        smokeAnswer(w,native,"submit_report",{"summary":"自动通知验证完成"}); return
+    }
+    smokeAnswer(w,native,"directly_answer",{"answer_payload":"核对最新发现，继续等待任务结算。"})
+}
+for native in [true,false] {
+    mainCalls,workerCalls,waits,approvals,checked,reportStep = 0,0,0,0,false,0
+    die(aim.InvokeReAct("进入 PLAN；任务有发现时通知我，完成后自动验收。",aim.planEngine("coordinator"),aim.context(smokeCtx),aim.timeout(60),aim.maxIteration(20),aim.reviewPolicy("yolo"),aim.workdir(smokeRoot),aim.disableMCPServers(true),aim.onEvent(notifyEvent),aim.aiCallback(smokeModel),aim.configOptions(aiagent.aiCallback(smokeModel),aiagent.functionCallMode(native),func(c) {
+        c.DisableCreateDBRuntime,c.DisablePerception,c.DisableMemoryTriage = true,true,true
+        c.ForceManualPlanReview = true
+        c.AiAutoRetry,c.AiTransactionAutoRetry = 1,1
+        c.GetTimeline().SetTimelineBucketByteSize(-1)
+        return nil
+    }),func(c) { c.Stateless = true }))
+    assert approvals == 1 && workerCalls == 4 && checked && waits >= 2
+    printf("PASS automatic notifications: function_call=%v planner=%d worker=%d waits=%d explicit_wait=0\n",native,mainCalls,workerCalls,waits)
+}
+smokeCheck()

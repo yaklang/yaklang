@@ -5,7 +5,7 @@
 ## 运行方式
 
 ```bash
-go run common/yak/cmd/yak.go common/ai/aid/aireact/reactloops/loop_knowledge_enhance/examples/test_xxx.yak
+yak common/ai/aid/aireact/reactloops/loop_knowledge_enhance/examples/test_xxx.yak
 ```
 
 ## 前置条件

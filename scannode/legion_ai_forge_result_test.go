@@ -1,16 +1,24 @@
 package scannode
 
 import (
+	"context"
 	"errors"
 	"github.com/stretchr/testify/require"
-	"github.com/yaklang/yaklang/common/ai/aid/coordinator_legacy"
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
+	"github.com/yaklang/yaklang/common/ai/aid/coordinator"
+	"github.com/yaklang/yaklang/common/ai/aiforge"
 	"strings"
 	"testing"
 )
 
 // Adapt a deterministic response source to the real adapter wrapper.
 func runLegionResultGenerator(prompt string, call func(string) (string, error)) (string, error) {
-	return legionForgeResultGenerator(func(_ *coordinator_legacy.Coordinator, value string) (string, error) { return call(value) }, true, "original input")(&coordinator_legacy.Coordinator{ContextProvider: coordinator_legacy.GetDefaultContextProvider()}, prompt)
+	execution, err := aiforge.NewForgeBlueprint("result-unit").CreateCoordinator(context.Background(), "", aicommon.WithDisableCreateDBRuntime(true), aicommon.WithDisableAutoSkills(true), aicommon.WithNoOpMemoryTriage())
+	if err != nil {
+		return "", err
+	}
+	defer execution.Close()
+	return legionForgeResultGenerator(func(_ *aiforge.ForgeExecution, value string) (string, error) { return call(value) }, true, "original input")(execution, prompt)
 }
 func TestRetryEmptyForgeResult(t *testing.T) {
 	calls := 0
@@ -63,10 +71,10 @@ func TestLegionForgeResultRetryPreservesPartialFailure(t *testing.T) {
 
 func TestValidatedInvocationResultRetainsInputAndEvidence(t *testing.T) {
 	promptTemplate := "Return a Markdown analysis."
-	memory := coordinator_legacy.GetDefaultContextProvider()
+	memory := coordinator.GetDefaultContextProvider()
 	memory.StoreQuery("internal rendered task instructions")
-	memory.PushText(1, "Observed credential request; no network request was performed")
-	prompt, err := renderLegionForgeResultPrompt(promptTemplate, "email-content: billing@example.test; expires in one hour", memory)
+	memory.Timeline.PushText(1, "Observed credential request; no network request was performed")
+	prompt, err := renderLegionForgeResultPrompt(promptTemplate, "email-content: billing@example.test; expires in one hour", memory.Snapshot())
 	require.NotContains(t, prompt, "internal rendered task instructions")
 	if err != nil {
 		t.Fatal(err)

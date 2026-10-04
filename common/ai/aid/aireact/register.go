@@ -2,7 +2,7 @@ package aireact
 
 import (
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
-	"github.com/yaklang/yaklang/common/aiforge"
+	"github.com/yaklang/yaklang/common/ai/aiforge"
 )
 
 func init() {

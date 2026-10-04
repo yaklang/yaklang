@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/yaklang/yaklang/common/ai/aid/reactservice"
-	"github.com/yaklang/yaklang/common/aiforge"
+	"github.com/yaklang/yaklang/common/ai/aiforge"
 	"github.com/yaklang/yaklang/common/browser"
 	"github.com/yaklang/yaklang/common/imcontrol"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"

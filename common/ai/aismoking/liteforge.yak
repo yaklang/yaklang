@@ -1,0 +1,95 @@
+// yak common/ai/aismoking/liteforge.yak
+// Four public HTTP/SSE requests, plus aim.InvokeLiteForge/public extraction tasks.
+include "common/ai/aismoking/mock.inc"
+schema = `{"type":"object","properties":{"summary":{"type":"string"},"payload":{}},"required":["summary","payload"],"additionalProperties":true}`
+started = make(chan bool, 8)
+observed = []
+func capture(reader) {
+    println("STREAM observer started")
+    first = make([]byte, 1)
+    n, err = reader.Read(first)
+    if n == 0 { return }
+    println("STREAM observer read prefix")
+    started <- true
+    tail = io.ReadAll(reader)~
+    smokeMutex.Lock()
+    observed = append(observed, string(first[:n]) + string(tail))
+    smokeMutex.Unlock()
+}
+smokeHandler = func(w, body) {
+    native = len(body.tools) == 1
+    prompt = smokePrompt(body)
+    assert body.model == "ai-smoking"
+    assert body.messages[0].role == "system"
+    assert "LiteForge" in prompt
+    assert !("FUNCTION_CALL_ACTION_SCHEMA" in prompt)
+    if native {
+        tool = body.tools[0]["function"]
+        assert tool.parameters.properties.summary.type == "string"
+        assert len(tool.parameters.properties.payload) == 0, "any payload must stay unconstrained"
+        assert !("@action" in json.dumps(tool.parameters))
+        assert body.tool_choice != nil
+    } else { assert body.tool_choice == nil }
+    if "SMOKE_CALLER:" in prompt {
+        name = "result"
+        if native { name = body.tools[0]["function"].name }
+        smokeAnswer(w, native, name, {"summary":"材料处理完成","payload":{"items":[nil,true,2.5]},"business_extension":"保留"})
+        return
+    }
+    // Hold the response tail until the caller reads one byte. This proves
+    // native arguments and legacy text are observable before response completion.
+    w.Header().Set("Content-Type", "text/event-stream")
+    if native {
+        smokeFrame(w, {"tool_calls":[{"index":0,"id":"stream-output","type":"function","function":{"name":"object","arguments":`{"summary":"增量`}}]}, nil)
+    } else { smokeFrame(w, {"content":`{"@action":"object","summary":"增量`}, nil) }
+    println("STREAM fixture flushed prefix")
+    select {
+    case <-started:
+    case <-smokeCtx.Done(): die("stream observer did not receive the response prefix")
+    }
+    tail = `输出成功","payload":{"items":[null,true,2.5],"nested":{"source":"yak"}},"business_extension":"保留"}`
+    if native {
+        smokeFrame(w, {"tool_calls":[{"index":0,"function":{"arguments":tail}}]}, nil)
+        smokeFrame(w, {}, "tool_calls")
+    } else { smokeFrame(w, {"content":tail}, "stop") }
+    w.Write("data: [DONE]\n\n")~
+}
+func verify(value) {
+    assert value.summary == "增量输出成功"
+    assert value.payload.items[0] == nil && value.payload.items[1] == true && value.payload.items[2] == 2.5
+    assert value.payload.nested.source == "yak"
+    assert value.business_extension == "保留"
+}
+for entry in ["liteforge", "functioncall"] {
+    for native in [true, false] {
+        options = [func(c) { c.DisableProviderFallback = true; c.Context = smokeCtx; c.FunctionCallRetryTimes = 1 },ai.timeout(15),ai.type("openai"),ai.baseURL(smokeBase + "/v1/chat/completions"),ai.apiKey("local-fixture"),ai.model("ai-smoking"),ai.noHttps(true),ai.withFunctionCallMode(native),ai.onStream(capture)]
+        if entry == "liteforge" {
+            output = liteforge.Execute("原样提取 summary、payload 及扩展字段。",liteforge.output(schema),options...)~
+            verify(output.Action.GetParams())
+        } else {
+            value = ai.FunctionCall("原样提取 summary、payload 及扩展字段。",{"summary":{"type":"string"},"payload":{}},options...)~
+            assert !("@action" in value)
+            verify(value)
+        }
+        printf("PASS %s: function_call=%v\n",entry,native)
+    }
+}
+assert len(observed) == 4, "all four streams must reach the observer"
+for raw in observed { json.loads(raw)~ }
+for task in ["extract", "classify", "summarize"] {
+    for native in [true, false] {
+        engine = aim.NewAIEngine(aim.aiCallback(smokeModel),aim.workdir(smokeRoot),aim.configOptions(aiagent.functionCallMode(native),aiagent.aiCallback(smokeModel)),func(c) {
+            c.Stateless = true
+        })~
+        fields = [jsonschema.paramString("summary",jsonschema.required(true)),jsonschema.paramRaw("payload",{},jsonschema.required(true))]
+        action = engine.GetOperator().InvokeLiteForge(smokeCtx,"result",task + " 输入材料",fields)~
+        assert action.GetString("summary") == "材料处理完成"
+        assert action.GetInvokeParams("payload")["items"][1] == true
+        output = liteforge.Execute(task + " 输入材料",liteforge.action("result"),liteforge.output(schema),aiagent.aiCallback(smokeModel),aiagent.functionCallMode(native))~
+        assert output.Action.GetString("business_extension") == "保留"
+        engine.Close()
+    }
+}
+assert len(smokeRequests) == 16, "one model request per extraction entry"
+smokeCheck()
+

@@ -1,0 +1,137 @@
+// yak common/ai/aismoking/coordinator.yak
+// aim.InvokeReAct: manual/YOLO × native/text. Real tools, DAG, evidence and report.
+include "common/ai/aismoking/mock.inc"
+sourceFile = file.Join(smokeRoot,"source.txt")
+file.Save(sourceFile,"execution-source-sentinel: validated local source")~
+steps, starts, mainCalls, workerCalls, modelReviews, reportStep = {}, {}, 0, 0, 0, 0
+approvals, taskReviews, pushes, pops, ends, reports, reportPath = 0, 0, 0, 0, 0, 0, ""
+permanent, roleTools, cacheSamples = nil, {}, []
+func record(op,e) {
+    typ = string(e.Type)
+    if typ in ["stream","stream_start","stream_end"] { return }
+    data = {}
+    if e.IsJson { data = json.loads(string(e.Content)) }
+    smokeMutex.Lock()
+    if typ == "plan_review_require" { approvals++ }
+    if typ == "task_review_require" { taskReviews++ }
+    if typ == "report_finish" { reports++; reportPath = data.report_path }
+    if typ == "end_plan_and_execution" { ends++ }
+    if e.NodeId == "system" {
+        if data.type == "push_task" { pushes++; assert approvals == 1 }
+        if data.type == "pop_task" { pops++ }
+    }
+    smokeMutex.Unlock()
+    if typ in ["plan_review_require","task_review_require","tool_use_review_require"] {
+        smokeApprove(op,data,{"suggestion":"continue"})
+    }
+}
+smokeHandler = func(w,body) {
+    native = len(body.tools) > 0
+    prompt = smokePrompt(body)
+    if "SMOKE_CALLER:liteforge[session-title-generator]" in prompt {
+        name = "session-title-generator"
+        if native { name = body.tools[0]["function"].name }
+        smokeAnswer(w,native,name,{"session_title":"DAG冒烟测试"}); return
+    }
+    brief = re.FindSubmatch(prompt,`\[CURRENT_EXECUTION\]\n([^\n]+)`)
+    if len(brief) > 0 {
+        task = json.loads(brief[1])
+        smokeMutex.Lock()
+        step = steps[task.task_id]
+        if step == nil { step = 0 }
+        steps[task.task_id] = step + 1
+        workerCalls++
+        if step == 0 {
+            assert starts[task.name] == nil, "duplicate worker dispatch"
+            starts[task.name] = task.attempt_id
+        }
+        smokeMutex.Unlock()
+        if step == 0 {
+            if task.name == "C" { assert len(task.accepted_predecessors) == 1, "C must wait for accepted A" }
+            if task.name == "D" { assert len(task.accepted_predecessors) == 2, "D must wait for accepted B/C" }
+            smokeAnswer(w,native,"directly_call_tool",{"directly_call_tool_name":"read_file","directly_call_tool_params":{"file":sourceFile},"directly_call_reason":"读取实际来源"}); return
+        }
+        assert "execution-source-sentinel" in prompt, "worker lost actual read_file result"
+        if step == 1 { smokeAnswer(w,native,"save_evidence",{"evidence_id":"execution." + task.name,"evidence_content":"execution-source-sentinel，任务 " + task.name + " 实际读取了 " + sourceFile}); return }
+        if step == 2 { smokeAnswer(w,native,"submit_task_result",{"summary":task.name + " 已核对真实来源","evidence_ids":["execution." + task.name]}); return }
+        smokeAnswer(w,native,"finish",{}); return
+    }
+    mainCalls++
+    assert mainCalls < 32, "coordinator polled without progress"
+    assert len(body.messages) >= 5, "cache regions collapsed"
+    prefix = json.dumps(body.messages[:2])
+    if permanent == nil { permanent = prefix } else { assert permanent == prefix, "notifications rewrote static/frozen messages" }
+    role = "PLAN"
+    if "阶段：EXEC" in prompt { role = "EXEC" }
+    if "当前任务图和关键消息已经收尾" in prompt { role = "REPORT" }
+    declarations = json.dumps(body.tools)
+    if roleTools[role] != nil { assert roleTools[role] == declarations, "tools changed within a coordinator phase" }
+    roleTools[role] = declarations
+    cacheSamples = append(cacheSamples,{"request":mainCalls,"phase":role,"permanent_bytes":len(prefix),"message_bytes":len(json.dumps(body.messages)),"provider_cache_hit_rate":nil})
+    if mainCalls == 1 { smokeAnswer(w,native,"directly_call_tool",{"directly_call_tool_name":"read_file","directly_call_tool_params":{"file":sourceFile},"directly_call_reason":"先确认规划来源"}); return }
+    if "已有计划：false" in prompt {
+        tasks = []
+        for name in ["A","B","C","D"] {
+            deps = []
+            if name == "C" { deps = ["a"] }
+            if name == "D" { deps = ["b","c"] }
+            tasks = append(tasks,{"name":name,"goal":"读取 source.txt，保存 evidence 并验证结果","identifier":str.ToLower(name),"depends_on":deps})
+        }
+        smokeAnswer(w,native,"create_plan",{"plan":{"name":"执行实验","goal":"验证 DAG 与交付","tasks":tasks},"plan_document":"# 执行实验\nA/B独立，C等待A，D等待B/C。只读本地来源。"}); return
+    }
+    if role == "PLAN" { smokeAnswer(w,native,"submit_plan",{}); return }
+    parts = str.Split(prompt,"# PLAN STATUS")
+    status = parts[len(parts)-1]
+    states = re.FindSubmatchAll(status,`\[([^\]]+)\]: ([a-z_]+); attempt=(\d+)`)
+    accepted = 0
+    for state in states {
+        if state[2] == "accepted" { accepted++ }
+        assert !(state[2] in ["failed","rejected"]), "task failed: " + status
+        if state[2] == "awaiting_review" && !manual {
+            assert "execution." in prompt, "settlement preceded evidence publication"
+            modelReviews++
+            smokeAnswer(w,native,"review_task",{"task_id":state[1],"attempt_id":parseInt(state[3]),"decision":"accept","reason":"实际读取、共享证据和结果一致"}); return
+        }
+    }
+    if accepted < 4 || role != "REPORT" {
+        // No explicit wait action. Runtime idle/notification hooks own suspension.
+        smokeAnswer(w,native,"directly_answer",{"answer_payload":"已检查最新状态和发现，等待任务结算。"}); return
+    }
+    assert "execution.A" in prompt && "execution.D" in prompt, "session evidence not propagated"
+    reportStep++
+    if reportStep == 1 { smokeAnswer(w,native,"create_report",{"title":"DAG执行检查","document":"# DAG执行检查\nA/B/C/D已审核；共享 Evidence 完整。\n"}); return }
+    if reportStep == 2 {
+        assert "# CURRENT REPORT" in prompt
+        smokeAnswer(w,native,"modify_report",{"document_patch":"--- coordinator-report.md\n+++ coordinator-report.md\n@@ -1,2 +1,3 @@\n # DAG执行检查\n A/B/C/D已审核；共享 Evidence 完整。\n+运行时自动派发，未发生重复执行。\n"}); return
+    }
+    smokeAnswer(w,native,"submit_report",{"summary":"DAG、证据和验收完成。"})
+}
+configure = func(cfg) {
+    cfg.DisableCreateDBRuntime,cfg.DisablePerception,cfg.DisableMemoryTriage = true,true,true
+    cfg.ForceManualPlanReview = true
+    cfg.PlanExecTaskConcurrency = 2
+    cfg.AiAutoRetry,cfg.AiTransactionAutoRetry = 1,1
+    cfg.GetTimeline().SetTimelineBucketByteSize(-1)
+    return nil
+}
+for native in [true,false] {
+    for manual in [false,true] {
+        steps,starts,mainCalls,workerCalls,modelReviews,reportStep = {},{},0,0,0,0
+        approvals,taskReviews,pushes,pops,ends,reports,reportPath = 0,0,0,0,0,0,""
+        permanent,roleTools,cacheSamples = nil,{},[]
+        policy = "yolo"
+        if manual { policy = "manual" }
+        die(aim.InvokeReAct("进入 PLAN，创建 A/B/C/D DAG，读取真实来源，保存 evidence，审核并交付报告。",
+            aim.planEngine("coordinator"),aim.context(smokeCtx),aim.timeout(90),aim.maxIteration(40),aim.workdir(smokeRoot),aim.reviewPolicy(policy),
+            aim.disableMCPServers(true),aim.aiCallback(smokeModel),aim.onEvent(record),aim.configOptions(aiagent.functionCallMode(native),aiagent.aiCallback(smokeModel),configure),func(c) {
+                c.Stateless = true
+            }))
+        assert approvals == 1 && reports == 1 && ends == 1
+        assert pushes == 4 && pops == 4 && len(starts) == 4 && workerCalls == 16
+        if manual { assert taskReviews == 4 && modelReviews == 0 } else { assert taskReviews == 0 && modelReviews == 4 }
+        assert "未发生重复执行" in string(file.ReadFile(reportPath)~)
+        file.SaveJson(file.Join(smokeRoot,sprintf("cache-native-%v-manual-%v.json",native,manual)),cacheSamples)~
+        printf("PASS aim coordinator: function_call=%v manual=%v planner=%d worker=%d approval=1 DAG=4 report=1\n",native,manual,mainCalls,workerCalls)
+    }
+}
+smokeCheck()

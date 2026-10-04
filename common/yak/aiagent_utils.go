@@ -7,9 +7,8 @@ import (
 	"strings"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
-	"github.com/yaklang/yaklang/common/ai/aid/coordinator_legacy"
 	"github.com/yaklang/yaklang/common/ai/aid/liteforge/liteforgeapp"
-	"github.com/yaklang/yaklang/common/aiforge"
+	"github.com/yaklang/yaklang/common/ai/aiforge"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
@@ -135,9 +134,9 @@ func BindAIConfigToEngine(nIns *antlr4yak.Engine, agentOptions ...any) {
 		return i
 	})
 	nIns.GetVM().RegisterMapMemberCallHandler("aiagent", "NewExecutor", func(i interface{}) interface{} {
-		ofunc, ok := i.(func(forgeName string, i any, opts ...any) (*coordinator_legacy.Coordinator, error))
+		ofunc, ok := i.(func(forgeName string, i any, opts ...any) (*aiforge.ForgeExecution, error))
 		if ok {
-			return func(forgeName string, i any, opts ...any) (*coordinator_legacy.Coordinator, error) {
+			return func(forgeName string, i any, opts ...any) (*aiforge.ForgeExecution, error) {
 				opts = append(agentOptions, opts...)
 				return ofunc(forgeName, i, opts...)
 			}
@@ -145,9 +144,9 @@ func BindAIConfigToEngine(nIns *antlr4yak.Engine, agentOptions ...any) {
 		return i
 	})
 	nIns.GetVM().RegisterMapMemberCallHandler("aiagent", "NewExecutorFromJson", func(i interface{}) interface{} {
-		ofunc, ok := i.(func(forgeName string, i any, opts ...any) (*coordinator_legacy.Coordinator, error))
+		ofunc, ok := i.(func(forgeName string, i any, opts ...any) (*aiforge.ForgeExecution, error))
 		if ok {
-			return func(forgeName string, i any, opts ...any) (*coordinator_legacy.Coordinator, error) {
+			return func(forgeName string, i any, opts ...any) (*aiforge.ForgeExecution, error) {
 				opts = append(agentOptions, opts...)
 				return ofunc(forgeName, i, opts...)
 			}

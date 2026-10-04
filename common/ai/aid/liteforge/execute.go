@@ -67,13 +67,18 @@ func Execute(ctx context.Context, r Request, opts ...aicommon.ConfigOption) (*ai
 		} else {
 			parse = func(resp *aicommon.AIResponse) (*aicommon.Action, error) {
 				reader := resp.GetOutputStreamReader("liteforge["+r.Name+"]", true, cfg.GetEmitter())
-				a := aicommon.NewActionMaker(r.ActionName, r.actionOptions(resp)...).ReadFromReader(ctx, reader)
+				actionOptions := append(r.actionOptions(resp), aicommon.WithActionAlias(r.ActionAliases...))
+				a := aicommon.NewActionMaker(r.ActionName, actionOptions...).ReadFromReader(ctx, reader)
 				err := a.WaitParseResult(ctx)
 				a.WaitStream(ctx)
 				if err != nil {
 					return nil, err
 				}
-				return admitOutput(a.GetParams(), r.ActionName, validator, false)
+				value := a.GetParams()
+				if marker, ok := value["@action"].(string); ok && utils.StringArrayContains(r.ActionAliases, marker) {
+					value["@action"] = r.ActionName
+				}
+				return admitOutput(value, r.ActionName, validator, false)
 			}
 		}
 		var timeline string

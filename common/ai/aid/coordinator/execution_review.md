@@ -63,7 +63,7 @@ sequenceDiagram
 
 ## Yak/aim 四种执行组合
 
-[smoke/execution_phase.yak](smoke/execution_phase.yak) 由 [Go harness](execution_phase_yak_test.go) 使用真实 Yak 引擎运行。DAG 为 A/B 独立、C 依赖 A、D 依赖 B/C，并发上限2。模型响应与用户点击由 harness 脚本化；循环、调度、工具读取、Evidence、用户端点、结果与报告文件均运行实际代码。
+下面保留的是此前实验的历史采样数据。当前 [coordinator.yak](../../aismoking/coordinator.yak) 直接由 Yak CLI 执行，HTTP/SSE 模型、用户点击与断言写在 Yak 中；[Go 集成回归](execution_phase_integration_test.go) 另验证同一 DAG 的内部同步和缓存边界。DAG 为 A/B 独立、C 依赖 A、D 依赖 B/C，并发上限2；循环、调度、工具、Evidence、审核与报告均使用实际实现。
 
 最后一次采样运行如下；消息合并时机可能使主模型次数小幅变化，不代表额外调度循环。
 

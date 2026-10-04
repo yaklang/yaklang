@@ -214,7 +214,7 @@ Timeline 两处压缩和 Interval Review 已统一通过 `ScheduleAuxiliaryTask 
 - Interval Review 定向回归通过：并发工具事件归属、取消隔离、独立 checkpoint、调用期望、额外指令、上下文取消。
 - Mini AI Task 定向回归通过：普通模式不注入降级参数、单模型模式注入 `thinking=none` 且仍返回结果、只调用 Config 的 Speed callback、错误传播及 Sync 响应。
 - Timeline 状态测试通过：压缩后的序列化与恢复、Head 滚动与精简、失败规则回退、失败不删除原条目。
-- `common/ai/aid/...` 和 `common/aiforge` 全部通过只编译检查；未运行整个 AID 的全部行为测试。
+- `common/ai/aid/...` 和 `common/ai/aiforge` 全部通过只编译检查；未运行整个 AID 的全部行为测试。
 
 Timeline 内部状态单测按用例注册 reducer 测试桥并在结束时恢复；真实 LiteForge 流式链路在 aiforge 集成测试中验证，避免全局注册改变其他单元测试的环境。
 
@@ -245,4 +245,4 @@ Timeline 内部状态单测按用例注册 reducer 测试桥并在结束时恢�
 
 新增测试分两层：reactloops 验证调度入口与原有响应协议；aiforge 使用真实 Config/LiteForge 桥运行完整 Loop，覆盖普通、functioncall、单模型 PassThrough、校验重试及任务取消。另有响应回调的 Skip/LiteCall、空 Action 和错误路径测试。
 
-本轮验证：aicommon 整包通过（107.603s），reactloops 整包通过（30.453s），LiteForge/Mini Task/目标验收定向回归通过，`common/ai/aid/...` 和 `common/aiforge` 全部编译通过。整包回归暴露了 4 个仍模拟旧 runtime helper 的感知测试，已将测试桩移到 Config 调度入口，原生产逻辑和断言保持不变。未运行全 AID 行为测试。
+本轮验证：aicommon 整包通过（107.603s），reactloops 整包通过（30.453s），LiteForge/Mini Task/目标验收定向回归通过，`common/ai/aid/...` 和 `common/ai/aiforge` 全部编译通过。整包回归暴露了 4 个仍模拟旧 runtime helper 的感知测试，已将测试桩移到 Config 调度入口，原生产逻辑和断言保持不变。未运行全 AID 行为测试。

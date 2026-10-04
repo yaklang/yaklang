@@ -37,7 +37,11 @@ func WithPlanMocker(build func(*Session) *PlanResponse) aicommon.ConfigOption {
 			return "", "", fmt.Errorf("plan mocker returned no root task")
 		}
 		data, err := json.Marshal(p.RootTask)
-		return string(data), p.Document, err
+		document := p.Document
+		if document == "" {
+			document = PlanDocument(p.RootTask)
+		}
+		return string(data), document, err
 	}})
 }
 

@@ -123,6 +123,13 @@ func configureAutomaticWait(loop *reactloops.ReActLoop) {
 				through, _ := l.GetVariable("coordinator_message_cursor").(uint64)
 				d := currentDecision(l)
 				controller(l).completeDecision(through, d)
+				if len(aicommon.GetBlockingVerificationTodoItems(l.GetConfig(), task)) == 0 {
+					done, err := deliverForLoop(l, task)
+					if err != nil || done {
+						op.EndIteration(err)
+						return
+					}
+				}
 				if len(aicommon.GetBlockingVerificationTodoItems(l.GetConfig(), task)) == 0 && controller(l).Snapshot().Report.Submitted && controller(l).FinalizeReport() == nil {
 					op.EndIteration()
 					return

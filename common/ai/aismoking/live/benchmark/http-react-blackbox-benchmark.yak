@@ -1,0 +1,838 @@
+// ReAct 工具黑盒诊断 runner（HTTP + 文件编辑/Python 迭代）。
+//
+// 每个 case 独立声明需要暴露的工具，记录工具参数、耗时、结果、落盘
+// artifact、工作文件检查和 ReAct action timeline。HTTP case 仅访问公开测试
+// 站点；文件编辑 case 使用独立临时目录。
+//
+// 用法（仓库根目录）：
+//   yak common/ai/aismoking/live/benchmark/http-react-blackbox-benchmark.yak \
+//     --suite execution-semantics --intelligent-model memfit-standard-free
+//
+// API key 只从环境变量读取，不接受 CLI 参数，也不会进入报告。
+
+configFile = cli.String("config", cli.setDefault("common/ai/aismoking/live/benchmark/http-react-blackbox-cases.json"), cli.setHelp("测试任务 JSON"))
+caseName = cli.String("case", cli.setDefault(""), cli.setHelp("只运行指定 case；留空运行全部"))
+outputDir = cli.String("output-dir", cli.setDefault("./benchmark-reports/tool-react-blackbox"), cli.setHelp("报告输出目录"))
+timeoutSec = cli.Int("timeout", cli.setDefault(120), cli.setHelp("每个 case 的硬超时秒数"))
+maxIteration = cli.Int("max-iteration", cli.setDefault(6), cli.setHelp("每个 case 的最大 ReAct 迭代数"))
+suiteName = cli.String("suite", cli.setDefault(""), cli.setHelp("只运行指定 suite；留空运行全部"))
+phaseName = cli.String("phase", cli.setDefault("candidate"), cli.setHelp("实验阶段标签，例如 baseline/candidate"))
+providerName = cli.String("provider", cli.setDefault("aibalance"), cli.setHelp("AI provider"))
+aiDomain = cli.String("domain", cli.setDefault("https://aibalance.yaklang.com/"), cli.setHelp("AI provider HTTPS domain"))
+intelligentModel = cli.String("intelligent-model", cli.setDefault("memfit-standard-free"), cli.setHelp("主循环/质量模型"))
+lightweightModel = cli.String("lightweight-model", cli.setDefault("memfit-light-free"), cli.setHelp("轻量模型"))
+apiKeyEnv = cli.String("api-key-env", cli.setDefault("AIBALANCE_API_KEY"), cli.setHelp("API key 环境变量名；值不会落盘"))
+cli.check()
+
+apiKey = os.Getenv(apiKeyEnv)
+if str.TrimSpace(apiKey) == "" {
+    die("missing AI API key environment variable: " + apiKeyEnv)
+}
+
+func clean(value) {
+    if value == nil || value == undefined {
+        return ""
+    }
+    return str.TrimSpace(sprintf("%v", value))
+}
+
+func parseEventContent(content) {
+    if len(content) == 0 {
+        return {}
+    }
+    raw = str.TrimSpace(string(content))
+    // 部分事件合法地携带 JSON array/string；采集器只需要 object 字段，
+    // 先做形态判断，避免对 slice 使用 map key 导致回调 panic。
+    if !str.HasPrefix(raw, "{") {
+        return {}
+    }
+    try {
+        value = json.loads(raw)
+        if value != nil && value != undefined {
+            return value
+        }
+    } catch err {
+    }
+    return {}
+}
+
+func getOrCreateToolCall(toolCalls, callID) {
+    if clean(callID) == "" {
+        callID = "unknown"
+    }
+    if toolCalls[callID] == nil || toolCalls[callID] == undefined {
+        toolCalls[callID] = {
+            "call_tool_id": callID,
+            "tool": "",
+            "params": {},
+            "status": "started",
+            "duration_ms": 0,
+            "total_duration_ms": 0,
+            "result_bytes": 0,
+            "result_empty": false,
+            "result_preview": "",
+            "log_path": "",
+            "call_dir": "",
+            "combined_output_bytes": 0,
+            "raw_result_bytes": 0,
+        }
+    }
+    return toolCalls[callID]
+}
+
+func preview(text, limit) {
+    text = clean(text)
+    if len(text) <= limit {
+        return text
+    }
+    return text[:limit] + "..."
+}
+
+// A local controlled HTTP oracle makes HTTP status, timeout and request-count
+// assertions independent from public network behavior. Every request is logged
+// separately from the agent event stream.
+oracleRequests = []
+oracleLock = sync.NewLock()
+
+func startHTTPOracle() {
+    oracleCtx, oracleCancel = context.WithCancel(context.Background())
+    oraclePort = os.GetRandomAvailableTCPPort()
+    oracleURL = "http://" + str.HostPort("127.0.0.1", oraclePort)
+    go func {
+        serveErr = httpserver.Serve("127.0.0.1", oraclePort,
+            httpserver.context(oracleCtx),
+            httpserver.handler(func(w, req) {
+                body, _ = io.ReadAll(req.Body)
+                oracleLock.Lock()
+                oracleRequests = append(oracleRequests, {
+                    "timestamp_unix_ms": time.Now().UnixMilli(),
+                    "method": req.Method,
+                    "path": req.URL.Path,
+                    "body_size": len(body),
+                    "body_sha256": codec.Sha256(body),
+                })
+                oracleLock.Unlock()
+
+                switch req.URL.Path {
+                case "/status/404":
+                    w.WriteHeader(404)
+                    w.Write("oracle-not-found")
+                case "/status/500":
+                    w.WriteHeader(500)
+                    w.Write("oracle-server-error")
+                case "/delay/3":
+                    time.sleep(3)
+                    w.WriteHeader(200)
+                    w.Write("oracle-delayed")
+                case "/no-response":
+                    time.sleep(timeoutSec + 2)
+                    w.WriteHeader(200)
+                    w.Write("oracle-too-late")
+                case "/echo":
+                    w.WriteHeader(200)
+                    w.Write(body)
+                default:
+                    w.WriteHeader(200)
+                    w.Write("oracle-ok")
+                }
+            }),
+        )
+        if serveErr != nil && oracleCtx.Err() == nil {
+            log.error("controlled HTTP oracle stopped unexpectedly: %v", serveErr)
+        }
+    }
+    os.WaitConnect(str.HostPort("127.0.0.1", oraclePort), 5)~
+
+    // Resolve a currently unused port without starting a listener. Connection
+    // refusal is therefore an objective transport oracle, not an HTTP status.
+    refusedPort = os.GetRandomAvailableTCPPort()
+    refusedURL = "http://" + str.HostPort("127.0.0.1", refusedPort)
+    return {
+        "url": oracleURL,
+        "refused_url": refusedURL,
+        "cancel": oracleCancel,
+    }
+}
+
+func oracleRequestOffset() {
+    oracleLock.Lock()
+    defer oracleLock.Unlock()
+    return len(oracleRequests)
+}
+
+func oracleRequestsSince(offset) {
+    oracleLock.Lock()
+    defer oracleLock.Unlock()
+    snapshot = []
+    if offset < 0 {
+        offset = 0
+    }
+    for idx = offset; idx < len(oracleRequests); idx++ {
+        snapshot = append(snapshot, oracleRequests[idx])
+    }
+    return snapshot
+}
+
+func readSize(path) {
+    if path == "" || !file.IsExisted(path) {
+        return 0
+    }
+    info, err = file.Stat(path)
+    if err != nil {
+        return 0
+    }
+    return info.Size()
+}
+
+func prepareWorkspace(caseConfig, startedAt) {
+    workspaceDir = file.Join(os.TempDir(), sprintf("yak-react-tool-benchmark-%s-%d", caseConfig["name"], startedAt.UnixNano()))
+    err = file.MkdirAll(workspaceDir)
+    if err != nil {
+        die(sprintf("create case workspace failed: %v", err))
+    }
+    setupFiles = caseConfig["setup_files"]
+    if setupFiles != nil && setupFiles != undefined {
+        for setupFile in setupFiles {
+            relativePath = clean(setupFile["path"])
+            if relativePath == "" || str.Contains(relativePath, "..") || str.HasPrefix(relativePath, "/") {
+                die("unsafe setup file path: " + relativePath)
+            }
+            targetPath = file.Join(workspaceDir, relativePath)
+            err = file.MkdirAll(file.GetDirPath(targetPath))
+            if err != nil {
+                die(sprintf("create setup file directory failed: %v", err))
+            }
+            err = file.Save(targetPath, clean(setupFile["content"]))
+            if err != nil {
+                die(sprintf("write setup file failed: %v", err))
+            }
+        }
+    }
+    return workspaceDir
+}
+
+func renderCasePrompt(caseConfig, workspaceDir, oracle) {
+    prompt = clean(caseConfig["prompt"])
+    prompt = str.ReplaceAll(prompt, "{{WORKDIR}}", workspaceDir)
+    prompt = str.ReplaceAll(prompt, "{{ORACLE_URL}}", oracle["url"])
+    prompt = str.ReplaceAll(prompt, "{{REFUSED_URL}}", oracle["refused_url"])
+    return prompt
+}
+
+func inspectWorkspace(caseConfig, result) {
+    checks = []
+    expectedFiles = caseConfig["expected_files"]
+    if expectedFiles == nil || expectedFiles == undefined {
+        result["file_checks"] = checks
+        return
+    }
+    for spec in expectedFiles {
+        relativePath = clean(spec["path"])
+        targetPath = file.Join(result["workspace_dir"], relativePath)
+        exists = file.IsExisted(targetPath)
+        content = ""
+        if exists {
+            raw, err = file.ReadFile(targetPath)
+            if err == nil {
+                content = string(raw)
+            }
+        }
+        missingTokens = []
+        forbiddenTokens = []
+        for token in spec["contains"] {
+            if !str.Contains(content, clean(token)) {
+                missingTokens = append(missingTokens, clean(token))
+            }
+        }
+        if spec["not_contains"] != nil && spec["not_contains"] != undefined {
+            for token in spec["not_contains"] {
+                if str.Contains(content, clean(token)) {
+                    forbiddenTokens = append(forbiddenTokens, clean(token))
+                }
+            }
+        }
+        checks = append(checks, {
+            "path": targetPath,
+            "exists": exists,
+            "size": len(content),
+            "sha256": exists ? file.Sha256(targetPath) : "",
+            "missing_tokens": missingTokens,
+            "forbidden_tokens_found": forbiddenTokens,
+            "content_preview": preview(content, 1600),
+            "passed": exists && len(missingTokens) == 0 && len(forbiddenTokens) == 0,
+        })
+    }
+    result["file_checks"] = checks
+}
+
+func runFileVerifications(caseConfig, result) {
+    verifications = []
+    commands = caseConfig["verification_commands"]
+    if commands == nil || commands == undefined {
+        result["verification_checks"] = verifications
+        return
+    }
+    for spec in commands {
+        command = str.ReplaceAll(clean(spec["command"]), "{{WORKDIR}}", result["workspace_dir"])
+        verifyCtx, verifyCancel = context.WithTimeout(context.Background(), time.ParseDuration("15s")~)
+        cmd, commandErr = exec.CommandContext(verifyCtx, command)
+        output = ""
+        exitCode = nil
+        exitCodeAvailable = false
+        if commandErr == nil {
+            rawOutput, runErr = cmd.CombinedOutput()
+            output = string(rawOutput)
+            if cmd.ProcessState != nil {
+                processExitCode = cmd.ProcessState.ExitCode()
+                if processExitCode >= 0 {
+                    exitCode = processExitCode
+                    exitCodeAvailable = true
+                }
+            }
+            if runErr != nil {
+                commandErr = runErr
+            }
+        }
+        verifyCancel()
+        missingTokens = []
+        for token in spec["expected_tokens"] {
+            if !str.Contains(output, clean(token)) {
+                missingTokens = append(missingTokens, clean(token))
+            }
+        }
+        verifications = append(verifications, {
+            "command": command,
+            "output": preview(output, 2000),
+            "error": commandErr == nil ? "" : sprintf("%v", commandErr),
+            "exit_code": exitCode,
+            "exit_code_available": exitCodeAvailable,
+            "missing_tokens": missingTokens,
+            "passed": commandErr == nil && len(missingTokens) == 0,
+        })
+    }
+    result["verification_checks"] = verifications
+}
+
+func inspectTimeline(result, pinnedActionFiles) {
+    taskDir = result["task_dir"]
+    if taskDir == "" || !file.IsDir(taskDir) {
+        return
+    }
+
+    actionCounts = {
+        "total": 0,
+        "require_tool": 0,
+        "directly_call_tool": 0,
+        "directly_answer": 0,
+        "finish": 0,
+        "other": 0,
+    }
+    actionFiles = pinnedActionFiles
+    for name in actionFiles {
+        actionCounts["total"]++
+        matched = false
+        for actionType in ["require_tool", "directly_call_tool", "directly_answer", "finish"] {
+            if str.Contains(name, "_" + actionType + ".md") {
+                actionCounts[actionType]++
+                matched = true
+            }
+        }
+        if !matched {
+            actionCounts["other"]++
+        }
+    }
+    actionDir = file.Join(taskDir, "loop_default_action_calls")
+    if len(actionFiles) == 0 && file.IsDir(actionDir) {
+        infos, err = file.ReadDirInfoInDirectory(actionDir)
+        if err == nil {
+            for info in infos {
+                name = info.Name
+                if !str.HasSuffix(name, ".md") {
+                    continue
+                }
+                actionCounts["total"]++
+                actionFiles = append(actionFiles, name)
+                matched = false
+                for actionType in ["require_tool", "directly_call_tool", "directly_answer", "finish"] {
+                    if str.Contains(name, "_" + actionType + ".md") {
+                        actionCounts[actionType]++
+                        matched = true
+                    }
+                }
+                if !matched {
+                    actionCounts["other"]++
+                }
+            }
+        }
+    }
+
+    firstFinishIndex = -1
+    workActionsAfterFirstFinish = 0
+    answersAfterFirstFinish = 0
+    actionIndex = 0
+    for name in actionFiles {
+        if str.Contains(name, "_finish.md") {
+            if firstFinishIndex < 0 {
+                firstFinishIndex = actionIndex
+            }
+            actionIndex++
+            continue
+        }
+        if firstFinishIndex >= 0 && actionIndex > firstFinishIndex {
+            if str.Contains(name, "_directly_answer.md") {
+                answersAfterFirstFinish++
+            } else {
+                workActionsAfterFirstFinish++
+            }
+        }
+        actionIndex++
+    }
+    result["timeline"] = {
+        "action_counts": actionCounts,
+        "action_files": actionFiles,
+        "has_finish_action": actionCounts["finish"] > 0,
+        "first_finish_action_index": firstFinishIndex,
+        "work_actions_after_first_finish": workActionsAfterFirstFinish,
+        "answers_after_first_finish": answersAfterFirstFinish,
+    }
+}
+
+func inspectFinishStability(result, traceText) {
+    lower = str.ToLower(traceText)
+    result["finish_stability"] = {
+        "soft_checkpoint_count": len(re.FindAll(traceText, `SOFT_TODO_CHECKPOINT(_REQUESTED)?`)),
+        "finish_blocked_by_todo_count": len(re.FindAll(traceText, `FINISH_BLOCKED_BY_TODO`)),
+        "todo_delta_error_count": len(re.FindAll(traceText, `TODO_DELTA_ERROR`)),
+        "duplicate_answer_rejection_count": len(re.FindAll(lower, `assistant output was already delivered`)),
+        "iteration_deadline_leak_count": len(re.FindAll(lower, `(last|final|current) iteration|最后一次迭代|最后一轮迭代|当前迭代|迭代上限`)),
+        "administrative_todo_close_language_count": len(re.FindAll(lower, `(bulk|batch|force|批量|强行).{0,24}(close|reset|done|resolved|deferred|关闭|清空)`)),
+    }
+}
+
+func inspectToolArtifacts(result) {
+    combinedTotal = 0
+    rawResultTotal = 0
+    combinedEmpty = 0
+    rawResultEmpty = 0
+    for call in result["tool_calls"] {
+        callDir = call["call_dir"]
+        if callDir == "" {
+            continue
+        }
+        combinedBytes = readSize(file.Join(callDir, "combined_output.txt"))
+        // Structured semantic results are persisted as result.json. Keep the
+        // legacy text fallback so the same runner can measure origin/main.
+        rawResultBytes = readSize(file.Join(callDir, "result.json"))
+        if rawResultBytes == 0 {
+            rawResultBytes = readSize(file.Join(callDir, "result.txt"))
+        }
+        call["combined_output_bytes"] = combinedBytes
+        call["raw_result_bytes"] = rawResultBytes
+        combinedTotal += combinedBytes
+        rawResultTotal += rawResultBytes
+        if combinedBytes == 0 {
+            combinedEmpty++
+        }
+        if rawResultBytes == 0 {
+            rawResultEmpty++
+        }
+    }
+    result["artifact_summary"] = {
+        "combined_output_total_bytes": combinedTotal,
+        "combined_output_empty_count": combinedEmpty,
+        "raw_result_total_bytes": rawResultTotal,
+        "raw_result_empty_count": rawResultEmpty,
+    }
+}
+
+func evaluateCase(caseConfig, result, allResultText) {
+    reasons = []
+    calls = result["tool_calls"]
+    callCount = len(calls)
+    minCalls = int(caseConfig["min_tool_calls"])
+    maxCalls = int(caseConfig["max_tool_calls"])
+
+    if callCount < minCalls {
+        reasons = append(reasons, sprintf("tool calls %d < expected minimum %d", callCount, minCalls))
+    }
+    if maxCalls > 0 && callCount > maxCalls {
+        reasons = append(reasons, sprintf("tool calls %d > expected maximum %d", callCount, maxCalls))
+    }
+
+    actualTools = {}
+    toolCounts = {}
+    emptyResults = 0
+    terminalEvents = 0
+    for call in calls {
+        actualTools[call["tool"]] = true
+        toolCounts[call["tool"]] = int(toolCounts[call["tool"]]) + 1
+        if call["result_empty"] {
+            emptyResults++
+        }
+        if call["status"] == "completed" || call["status"] == "protocol_error" {
+            terminalEvents++
+        }
+    }
+    for expectedTool in caseConfig["expected_tools"] {
+        if !actualTools[expectedTool] {
+            reasons = append(reasons, "missing expected tool: " + expectedTool)
+        }
+    }
+    minToolCounts = caseConfig["expected_tool_min_counts"]
+    if minToolCounts != nil && minToolCounts != undefined {
+        for toolName, expectedCount in minToolCounts {
+            actualCount = int(toolCounts[toolName])
+            if actualCount < int(expectedCount) {
+                reasons = append(reasons, sprintf("tool %s calls %d < expected minimum %d", toolName, actualCount, int(expectedCount)))
+            }
+        }
+    }
+    maxToolCounts = caseConfig["expected_tool_max_counts"]
+    if maxToolCounts != nil && maxToolCounts != undefined {
+        for toolName, expectedCount in maxToolCounts {
+            actualCount = int(toolCounts[toolName])
+            if actualCount > int(expectedCount) {
+                reasons = append(reasons, sprintf("tool %s calls %d > expected maximum %d", toolName, actualCount, int(expectedCount)))
+            }
+        }
+    }
+    forbiddenTools = caseConfig["forbidden_tools"]
+    if forbiddenTools != nil && forbiddenTools != undefined {
+        for toolName in forbiddenTools {
+            if int(toolCounts[toolName]) > 0 {
+                reasons = append(reasons, sprintf("forbidden tool used: %s (%d calls)", toolName, int(toolCounts[toolName])))
+            }
+        }
+    }
+    if emptyResults > 0 {
+        reasons = append(reasons, sprintf("empty tool_call_result: %d", emptyResults))
+    }
+    if terminalEvents < callCount {
+        reasons = append(reasons, sprintf("terminal tool events %d < starts %d", terminalEvents, callCount))
+    }
+    for token in caseConfig["expected_result_tokens"] {
+        if !str.Contains(allResultText, token) {
+            reasons = append(reasons, "missing result evidence: " + token)
+        }
+    }
+    for check in result["file_checks"] {
+        if !check["passed"] {
+            reasons = append(reasons, "file postcondition failed: " + check["path"])
+        }
+    }
+    for check in result["verification_checks"] {
+        if !check["passed"] {
+            reasons = append(reasons, "verification command failed: " + check["command"])
+        }
+    }
+    if result["hard_timeout_triggered"] {
+        reasons = append(reasons, "InvokeReAct did not return before hard timeout")
+    }
+    if !result["finished_callback"] {
+        reasons = append(reasons, "aim.onFinished was not called")
+    }
+    timeline = result["timeline"]
+    if timeline != nil && timeline != undefined && !timeline["has_finish_action"] {
+        reasons = append(reasons, "timeline has no finish action")
+    }
+    finishActionCount = 0
+    directAnswerCount = 0
+    if timeline != nil && timeline != undefined {
+        finishActionCount = int(timeline["action_counts"]["finish"])
+        directAnswerCount = int(timeline["action_counts"]["directly_answer"])
+    }
+    if int(caseConfig["min_finish_actions"]) > 0 && finishActionCount < int(caseConfig["min_finish_actions"]) {
+        reasons = append(reasons, sprintf("finish actions %d < expected minimum %d", finishActionCount, int(caseConfig["min_finish_actions"])))
+    }
+    if caseConfig["max_finish_actions"] != nil && caseConfig["max_finish_actions"] != undefined && finishActionCount > int(caseConfig["max_finish_actions"]) {
+        reasons = append(reasons, sprintf("finish actions %d > expected maximum %d", finishActionCount, int(caseConfig["max_finish_actions"])))
+    }
+    if caseConfig["max_direct_answers"] != nil && caseConfig["max_direct_answers"] != undefined && directAnswerCount > int(caseConfig["max_direct_answers"]) {
+        reasons = append(reasons, sprintf("direct answers %d > expected maximum %d", directAnswerCount, int(caseConfig["max_direct_answers"])))
+    }
+    stability = result["finish_stability"]
+    if int(stability["todo_delta_error_count"]) > int(caseConfig["max_todo_delta_errors"]) {
+        reasons = append(reasons, sprintf("todo_delta errors %d > expected maximum %d", int(stability["todo_delta_error_count"]), int(caseConfig["max_todo_delta_errors"])))
+    }
+    if int(stability["iteration_deadline_leak_count"]) > int(caseConfig["max_iteration_deadline_leaks"]) {
+        reasons = append(reasons, sprintf("agent-visible iteration deadline leaks %d > expected maximum %d", int(stability["iteration_deadline_leak_count"]), int(caseConfig["max_iteration_deadline_leaks"])))
+    }
+
+    result["evaluation"] = {
+        "passed": len(reasons) == 0,
+        "reasons": reasons,
+        "tool_call_count": callCount,
+        "empty_result_count": emptyResults,
+        "terminal_event_count": terminalEvents,
+        "tool_counts": toolCounts,
+    }
+}
+
+func runCase(caseConfig, oracle) {
+    startedAt = time.Now()
+    sessionID = sprintf("tool-react-blackbox-%s-%s-%s-%d", phaseName, intelligentModel, caseConfig["name"], startedAt.Unix())
+    workspaceDir = prepareWorkspace(caseConfig, startedAt)
+    renderedPrompt = renderCasePrompt(caseConfig, workspaceDir, oracle)
+    oracleOffset = oracleRequestOffset()
+    benchCtx, benchCancel = context.WithTimeout(context.Background(), time.ParseDuration(sprint(timeoutSec) + "s")~)
+    finishedCallback = false
+    hardTimeoutTriggered = false
+    resultText = ""
+    eventCounts = {}
+    eventRecords = []
+    toolCalls = {}
+    pinnedActionFiles = []
+    taskDir = ""
+    timelineText = ""
+    timelineContextSamples = []
+    modelOutputs = []
+    activeToolCalls = 0
+    maxConcurrentToolCalls = 0
+    toolStartTimes = []
+    eventLock = sync.NewLock()
+
+    includeTools = caseConfig["include_tools"]
+    if includeTools == nil || includeTools == undefined || len(includeTools) == 0 {
+        includeTools = ["do_http_request", "batch_do_http_request"]
+    }
+
+    opts = [
+        aim.sessionID(sessionID),
+        aim.context(benchCtx),
+        aim.timeout(timeoutSec),
+        aim.maxIteration(maxIteration),
+        aim.language("zh"),
+        aim.yoloMode(),
+        aim.allowUserInteract(false),
+        aim.includeToolNames(includeTools...),
+        aim.aiConfig(providerName,
+            ai.apiKey(apiKey), ai.domain(aiDomain), ai.model(intelligentModel)),
+        aim.qualityPriorityAIConfig(providerName,
+            ai.apiKey(apiKey), ai.domain(aiDomain), ai.model(intelligentModel)),
+        aim.speedPriorityAIConfig(providerName,
+            ai.apiKey(apiKey), ai.domain(aiDomain), ai.model(lightweightModel)),
+        aim.onFinished(func(react) {
+            eventLock.Lock()
+            finishedCallback = true
+            eventLock.Unlock()
+            // 给 finish/timeline 落盘留出时间；若 InvokeReAct 的后台收尾卡住，主动取消。
+            go func {
+                time.sleep(2)
+                benchCancel()
+            }
+        }),
+        aim.onStreamContent(func(react, event, nodeID, totalContent) {
+            if len(totalContent) == 0 {
+                return
+            }
+            eventLock.Lock()
+            defer eventLock.Unlock()
+            modelOutputs = append(modelOutputs, {
+                "node_id": nodeID,
+                "event_type": string(event.Type),
+                "content": preview(string(totalContent), 8000),
+                "content_bytes": len(totalContent),
+            })
+        }),
+        aim.onEvent(func(react, event) {
+            eventLock.Lock()
+            defer eventLock.Unlock()
+            eventType = string(event.Type)
+            eventCounts[eventType] = int(eventCounts[eventType]) + 1
+            payload = parseEventContent(event.Content)
+            callID = clean(payload["call_tool_id"])
+
+            if eventType == "filesystem_pin_filename" {
+                pinnedPath = clean(payload["path"])
+                if str.Contains(pinnedPath, "/loop_default_action_calls/") && str.HasSuffix(pinnedPath, ".md") {
+                    pinnedActionFiles = append(pinnedActionFiles, file.GetBase(pinnedPath))
+                }
+            }
+
+            if eventType == "timeline_item" {
+                timelineItemText = string(event.Content)
+                timelineText += "\n" + timelineItemText
+                timelineContextSamples = append(timelineContextSamples, preview(timelineItemText, 5000))
+            }
+
+            if eventType == "tool_call_start" {
+                call = getOrCreateToolCall(toolCalls, callID)
+                call["tool"] = clean(payload["tool"]["name"])
+                call["started_unix_ms"] = time.Now().UnixMilli()
+                activeToolCalls++
+                if activeToolCalls > maxConcurrentToolCalls {
+                    maxConcurrentToolCalls = activeToolCalls
+                }
+                toolStartTimes = append(toolStartTimes, call["started_unix_ms"])
+            } else if eventType == "tool_call_param" {
+                call = getOrCreateToolCall(toolCalls, callID)
+                call["params"] = payload["params"]
+            } else if eventType == "tool_call_done" || eventType == "tool_call_error" {
+                call = getOrCreateToolCall(toolCalls, callID)
+                call["status"] = eventType == "tool_call_done" ? "completed" : "protocol_error"
+                call["ended_unix_ms"] = time.Now().UnixMilli()
+                if activeToolCalls > 0 {
+                    activeToolCalls--
+                }
+                call["duration_ms"] = int(payload["duration_ms"])
+                call["total_duration_ms"] = int(payload["total_duration_ms"])
+                if eventType == "tool_call_error" {
+                    errorText = clean(payload["error"])
+                    call["error"] = errorText
+                    call["result_bytes"] = len(errorText)
+                    call["result_empty"] = errorText == ""
+                    call["result_preview"] = preview(errorText, 1200)
+                    resultText += "\n" + errorText
+                }
+            } else if eventType == "tool_call_result" {
+                call = getOrCreateToolCall(toolCalls, callID)
+                text = clean(payload["result"])
+                call["result_bytes"] = len(text)
+                call["result_empty"] = text == "" || text == "(empty)" || str.Contains(text, "COMBINED OUTPUT: (empty)")
+                call["result_preview"] = preview(text, 1200)
+                resultText += "\n" + text
+            } else if eventType == "tool_call_log_dir" {
+                call = getOrCreateToolCall(toolCalls, callID)
+                logPath = clean(payload["dir_path"])
+                call["log_path"] = logPath
+                callDir = logPath
+                if !file.IsDir(callDir) {
+                    callDir = file.GetDirPath(callDir)
+                }
+                call["call_dir"] = callDir
+                if callDir != "" {
+                    // file.GetDirPath 会保留尾部斜杠；直接按稳定的 tool_calls
+                    // 目录边界截取，避免把单个 call 目录误当 task 根目录。
+                    marker = "/tool_calls/"
+                    markerIndex = str.Index(callDir, marker)
+                    if markerIndex > 0 {
+                        taskDir = callDir[:markerIndex]
+                    }
+                }
+            }
+
+            // 完整保留工具生命周期；其余事件只保留短预览，足够重建 timeline。
+            keepFull = str.HasPrefix(eventType, "tool_call_") || eventType == "timeline_item"
+            content = string(event.Content)
+            eventRecords = append(eventRecords, {
+                "index": len(eventRecords) + 1,
+                "timestamp": event.Timestamp,
+                "type": eventType,
+                "node_id": event.NodeId,
+                "content": keepFull ? content : preview(content, 500),
+            })
+        }),
+    ]
+
+    invokeErr = aim.InvokeReAct(renderedPrompt, opts...)
+    hardTimeoutTriggered = sprint(benchCtx.Err()) == "context deadline exceeded"
+    benchCancel()
+    endedAt = time.Now()
+
+    eventLock.Lock()
+    calls = []
+    for _, call in toolCalls {
+        calls = append(calls, call)
+    }
+    result = {
+        "case": caseConfig["name"],
+        "description": caseConfig["description"],
+        "suite": caseConfig["suite"],
+        "phase": phaseName,
+        "provider": providerName,
+        "intelligent_model": intelligentModel,
+        "lightweight_model": lightweightModel,
+        "prompt": renderedPrompt,
+        "included_tools": includeTools,
+        "workspace_dir": workspaceDir,
+        "session_id": sessionID,
+        "start_time": startedAt.Format("2006-01-02 15:04:05"),
+        "duration_ms": endedAt.Sub(startedAt).Milliseconds(),
+        "invoke_error": invokeErr == nil ? "" : sprintf("%v", invokeErr),
+        "finished_callback": finishedCallback,
+        "hard_timeout_triggered": hardTimeoutTriggered,
+        "event_counts": eventCounts,
+        "events": eventRecords,
+        "model_outputs": modelOutputs,
+        "timeline_model_context_samples": timelineContextSamples,
+        "timeline_semantic_violations": {
+            "legacy_tool_header_count": len(re.FindAll(timelineText, `\[tool/[^\]]+ (ok|fail)\]`)),
+            "success_boolean_count": len(re.FindAll(timelineText, `success["']?\s*[:=]\s*true`)),
+        },
+        "tool_calls": calls,
+        "task_dir": taskDir,
+        "efficiency": {
+            "max_concurrent_tool_calls": maxConcurrentToolCalls,
+            "tool_start_times_unix_ms": toolStartTimes,
+        },
+        "oracle_requests": oracleRequestsSince(oracleOffset),
+    }
+    eventLock.Unlock()
+    inspectTimeline(result, pinnedActionFiles)
+    traceText = timelineText
+    // Timeline additions are transported as structured events in current
+    // builds, while older builds used timeline_item. Scan both representations
+    // so finish/TODO diagnostics are comparable across baseline and candidate.
+    for eventRecord in eventRecords {
+        traceText += "\n" + clean(eventRecord["content"])
+    }
+    for output in modelOutputs {
+        traceText += "\n" + clean(output["content"])
+    }
+    inspectFinishStability(result, traceText)
+    inspectToolArtifacts(result)
+    inspectWorkspace(caseConfig, result)
+    runFileVerifications(caseConfig, result)
+    evaluateCase(caseConfig, result, resultText)
+    return result
+}
+
+content, err = file.ReadFile(configFile)
+if err != nil {
+    die(sprintf("read cases failed: %v", err))
+}
+cases = json.loads(content)
+selected = []
+for caseConfig in cases {
+    caseMatches = caseName == "" || caseConfig["name"] == caseName
+    suiteMatches = suiteName == "" || clean(caseConfig["suite"]) == suiteName
+    if caseMatches && suiteMatches {
+        selected = append(selected, caseConfig)
+    }
+}
+if len(selected) == 0 {
+    die("no matching case: " + caseName)
+}
+
+file.MkdirAll(outputDir)~
+oracle = startHTTPOracle()
+stopOracle = oracle["cancel"]
+defer stopOracle()
+results = []
+currentCase = 0
+for caseConfig in selected {
+    currentCase++
+    log.info("[%d/%d] running ReAct tool blackbox case: %s", currentCase, len(selected), caseConfig["name"])
+    result = runCase(caseConfig, oracle)
+    results = append(results, result)
+    log.info("case=%s passed=%v tool_calls=%d duration_ms=%d task_dir=%s",
+        result["case"], result["evaluation"]["passed"], len(result["tool_calls"]), result["duration_ms"], result["task_dir"])
+}
+
+report = {
+    "report_type": "tool-react-blackbox-benchmark",
+    "generated_at": time.Now().Format("2006-01-02 15:04:05"),
+    "config": configFile,
+    "suite": suiteName,
+    "phase": phaseName,
+    "provider": providerName,
+    "domain": aiDomain,
+    "intelligent_model": intelligentModel,
+    "lightweight_model": lightweightModel,
+    "timeout_seconds": timeoutSec,
+    "max_iteration": maxIteration,
+    "results": results,
+}
+reportPath = file.Join(outputDir, sprintf("tool-react-blackbox-%s.json", time.Now().Format("20060102-150405")))
+file.Save(reportPath, json.dumps(report, json.withIndent("  ")))~
+println("REPORT_PATH=" + reportPath)

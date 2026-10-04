@@ -31,6 +31,8 @@ type Session struct {
 	parent                 *aicommon.Config
 	parentTaskID           string
 	planningOnly           bool
+	delivery               ResultDelivery
+	externalLifecycle      bool
 	detached               bool
 	startTaskID            string
 	mu                     sync.Mutex
@@ -39,6 +41,7 @@ type Session struct {
 	lastTree               json.RawMessage
 	opened, closed         map[string]bool
 	tasks                  map[string]*aicommon.AIStatefulTaskBase
+	workerTimelines        map[string]*aicommon.Timeline
 	stateErr               error
 	taskReviewEndpoints    map[string]bool
 	recordedReviewFeedback map[string]bool
@@ -69,6 +72,11 @@ func NewSession(ctx context.Context, query string, opts ...aicommon.ConfigOption
 		return nil, fmt.Errorf("coordinator requires Config-backed runtime")
 	}
 	s := &Session{Config: cfg, invoker: runtime, query: query, cancel: cancel, detached: cfg.EnableDetachedPlan, opened: map[string]bool{}, closed: map[string]bool{}, tasks: map[string]*aicommon.AIStatefulTaskBase{}}
+	for _, option := range cfg.OtherOption {
+		if d, ok := option.(deliveryOption); ok {
+			s.delivery = d.handler
+		}
+	}
 	cfg.Guardian.SetOutputEmitter(cfg.Id, cfg.EventHandler)
 	cfg.Guardian.SetAICaller(cfg)
 	if cfg.EnableAISearch {
@@ -86,11 +94,18 @@ func NewSession(ctx context.Context, query string, opts ...aicommon.ConfigOption
 // parent; only completed notifications wake the coordinator. Each child owns
 // its event processor and lifecycle, so no handlers overwrite the parent.
 func FromRuntime(ctx context.Context, r aicommon.AIInvokeRuntime, task aicommon.AIStatefulTask, id string) (*Session, error) {
+	return fromRuntime(ctx, r, task, id, false)
+}
+
+func fromRuntime(ctx context.Context, r aicommon.AIInvokeRuntime, task aicommon.AIStatefulTask, id string, forge bool, extra ...aicommon.ConfigOption) (*Session, error) {
+	if r == nil {
+		return nil, fmt.Errorf("coordinator requires a parent runtime")
+	}
 	parent, ok := r.GetConfig().(*aicommon.Config)
 	if !ok || task == nil {
 		return nil, fmt.Errorf("coordinator requires a session task")
 	}
-	if !parent.EnablePlanAndExec {
+	if !parent.EnablePlanAndExec && !forge {
 		return nil, fmt.Errorf("PLAN is disabled for this session")
 	}
 	if id == "" {
@@ -100,47 +115,71 @@ func FromRuntime(ctx context.Context, r aicommon.AIInvokeRuntime, task aicommon.
 		ctx = task.GetContext()
 	}
 	ctx, cancel := context.WithCancel(ctx)
-	input := chanx.NewUnlimitedChan[*ypb.AIInputEvent](ctx, 10)
-	hotpatch := parent.HotPatchBroadcaster.Subscribe()
-	opts := aicommon.ConvertConfigToOptions(parent)
-	opts = append(opts, nativePlanOptions(parent)...)
+	// The Blueprint adapter already owns a private event channel and hotpatch
+	// subscription. Adopt them for Forge instead of adding a second mirror.
+	owned := []aicommon.ConfigOption{aicommon.WithID(id), aicommon.WithContext(ctx)}
+	var input *chanx.UnlimitedChan[*ypb.AIInputEvent]
+	var hotpatch *chanx.UnlimitedChan[aicommon.ConfigOption]
+	if !forge {
+		input = chanx.NewUnlimitedChan[*ypb.AIInputEvent](ctx, 10)
+		hotpatch = parent.HotPatchBroadcaster.Subscribe()
+		owned = append(owned, aicommon.WithEventInputChanx(input), aicommon.WithHotPatchOptionChan(hotpatch))
+	}
+	var opts []aicommon.ConfigOption
+	if !forge {
+		opts = aicommon.ConvertConfigToOptionsWithoutHotPatch(parent)
+		opts = append(opts, nativePlanOptions(parent)...)
+		opts = append(opts, aicommon.WithPlanPrompt(parent.PlanPrompt))
+	}
+	// Forge's outer adapter already supplied the inherited configuration.
+	// Reapplying it here would duplicate append-only options and could carry
+	// the parent's preset plan into an unrelated Blueprint invocation.
 	opts = append(opts, aicommon.WithForceManualPlanReview(parent.ForceManualPlanReview))
-	opts = append(opts, aicommon.WithPlanPrompt(parent.PlanPrompt))
-	opts = append(opts, aicommon.WithID(id), aicommon.WithContext(ctx), aicommon.WithEventInputChanx(input), aicommon.WithHotPatchOptionChan(hotpatch), aicommon.WithAICallbacks(parent.GetRawAICallbacks()), aicommon.WithEventHandler(func(e *schema.AiOutputEvent) {
+	opts = append(opts, aicommon.WithAICallbacks(parent.GetRawAICallbacks()), aicommon.WithEventHandler(func(e *schema.AiOutputEvent) {
 		e.CoordinatorId = id
 		if e.Type == schema.EVENT_TYPE_DETACHED_PLAN_REQUIRE {
 			e.CoordinatorId = parent.Id
 		}
-		parent.EventHandler(e)
+		if parent.EventHandler != nil {
+			parent.EventHandler(e)
+		}
 	}))
+	opts = append(opts, extra...)
+	opts = append(opts, owned...)
 	s, err := NewSession(ctx, task.GetUserInput(), opts...)
 	if err != nil {
 		cancel()
-		parent.HotPatchBroadcaster.Unsubscribe(hotpatch)
+		if !forge {
+			parent.HotPatchBroadcaster.Unsubscribe(hotpatch)
+		}
 		return nil, err
 	}
 	s.parent, s.parentTaskID = parent, task.GetId()
 	// Preserve the caller's database boundary, including isolated test/session stores.
 	s.BaseCheckpointableStorage = aicommon.NewCheckpointableStorageWithDB(id, parent.GetDB())
 	key := "coordinator-input-" + id
-	parent.InputEventManager.RegisterMirrorOfAIInputEvent(key, func(e *ypb.AIInputEvent) {
-		switch e.SyncType {
-		case aicommon.SYNC_TYPE_USER_INTERVENTION, "queue_info", "react_cancel_task", "react_cancel_current_task":
-			// The outer runtime owns queue cancellation. Its context already
-			// cancels this child; replaying the root task ID here is invalid.
-			return
-		}
-		input.SafeFeed(e)
-	})
+	if !forge {
+		parent.InputEventManager.RegisterMirrorOfAIInputEvent(key, func(e *ypb.AIInputEvent) {
+			switch e.SyncType {
+			case aicommon.SYNC_TYPE_USER_INTERVENTION, "queue_info", "react_cancel_task", "react_cancel_current_task":
+				// The outer runtime owns queue cancellation. Its context already
+				// cancels this child; replaying the root task ID here is invalid.
+				return
+			}
+			input.SafeFeed(e)
+		})
+	}
 	parent.InputEventManager.RegisterAfterInputEvent(key, func(e *ypb.AIInputEvent) {
 		if e.IsInteractiveMessage || e.SyncType == aicommon.SYNC_TYPE_USER_INTERVENTION {
 			s.notifyUserInput(e)
 		}
 	})
 	s.cleanup = func() {
-		parent.InputEventManager.UnregisterMirrorOfAIInputEvent(key)
+		if !forge {
+			parent.InputEventManager.UnregisterMirrorOfAIInputEvent(key)
+			parent.HotPatchBroadcaster.Unsubscribe(hotpatch)
+		}
 		parent.InputEventManager.UnregisterAfterInputEvent(key)
-		parent.HotPatchBroadcaster.Unsubscribe(hotpatch)
 		cancel()
 	}
 	return s, nil
@@ -173,6 +212,10 @@ func (s *Session) SubmitInput(ctx context.Context, input *aicommon.ExecutePlanIn
 	if ctx == nil {
 		ctx = s.GetContext()
 	}
+	// A directly submitted plan is live while its approval call is pending,
+	// even though no ReAct loop has started yet.
+	runningSessions.Store(s.Id, s)
+	defer runningSessions.Delete(s.Id)
 	s.detached, s.planningOnly = detached, true
 	_ = aicommon.WithForceManualPlanReview(forceManual)(s.Config)
 	_, err := s.controller.CreatePlan(ctx, input.PlanData, input.PlanDocument)
@@ -248,7 +291,7 @@ func (s *Session) restore() error {
 		return err
 	}
 	if progress.Engine != "" && progress.Engine != Name {
-		return fmt.Errorf("stored plan belongs to coordinator_legacy; select its route")
+		return fmt.Errorf("stored plan belongs to coordinator_legacy, whose execution route is disabled; create a new native coordinator plan")
 	}
 	if progress.State == nil {
 		return fmt.Errorf("coordinator snapshot is missing; refusing implicit legacy recovery")
@@ -263,7 +306,8 @@ func (s *Session) restore() error {
 }
 
 func (s *Session) run(planningOnly bool) (err error) {
-	defer func() { s.Close(); s.controller.owned.Wait() }()
+	runningSessions.Store(s.Id, s)
+	defer func() { s.Close(); s.controller.owned.Wait(); runningSessions.Delete(s.Id) }()
 	s.planningOnly = planningOnly
 	if err = s.restore(); err != nil {
 		return err
@@ -281,7 +325,7 @@ func (s *Session) run(planningOnly bool) (err error) {
 		}
 	})
 	defer s.InputEventManager.UnregisterAfterInputEvent(key)
-	if s.parent != nil && !s.detached {
+	if s.parent != nil && !s.detached && !s.externalLifecycle {
 		payload := map[string]any{"coordinator_id": s.Id, "re-act_id": s.parent.Id, "re-act_task": s.parentTaskID, "start_task_id": s.startTaskID}
 		s.parent.EmitJSON(schema.EVENT_TYPE_START_PLAN_AND_EXECUTION, "plan", payload)
 		defer func() {
@@ -385,7 +429,7 @@ func executeLoop(cfg *aicommon.Config, invoker aicommon.AITaskInvokeRuntime, loo
 func (s *Session) Execute(ctx context.Context, a Attempt) (result Result, retErr error) {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
-	opts := aicommon.ConvertConfigToOptions(s.Config)
+	opts := aicommon.ConvertConfigToOptionsWithoutHotPatch(s.Config)
 	opts = append(opts, aicommon.WithEnhanceKnowledgeManager(s.EnhanceKnowledgeManager.ForkForSubAgent()))
 	if a.Plan != nil {
 		state := s.GetSessionPromptState().ForkForSubAgent()
@@ -408,6 +452,12 @@ func (s *Session) Execute(ctx context.Context, a Attempt) (result Result, retErr
 	}
 	if fork != nil {
 		opts = append(opts, aicommon.WithTimeline(fork.Branch))
+		s.mu.Lock()
+		if s.workerTimelines == nil {
+			s.workerTimelines = map[string]*aicommon.Timeline{}
+		}
+		s.workerTimelines[a.Task.ID] = fork.Branch
+		s.mu.Unlock()
 		defer func() {
 			if _, err := fork.MergeBack(); err != nil && retErr == nil {
 				retErr = err

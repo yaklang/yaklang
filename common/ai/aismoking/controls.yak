@@ -1,0 +1,71 @@
+// yak common/ai/aismoking/controls.yak
+// Forge native controller actions: inspect, reject, retry and cancel in both protocols.
+include "common/ai/aismoking/mock.inc"
+execution, cancelled, inspected, retries, rejected, callbacks = nil,false,false,0,false,0
+workers = {}
+plan = {"name":"控制动作验证","goal":"保留拒绝、重试和取消的事实","tasks":[
+    {"name":"A","goal":"保存来源后提交可验收结果","identifier":"a"},
+    {"name":"B","goal":"依赖A的可取消任务","identifier":"b","depends_on":["a"]},
+]}
+smokeHandler = func(w,body) {
+    native = len(body.tools)>0
+    prompt = smokePrompt(body)
+    state = execution.Snapshot()
+    if "执行已批准的冻结任务书。" in prompt {
+        brief = re.FindSubmatch(prompt,`\[CURRENT_EXECUTION\]\n([^\n]+)`)
+        task = json.loads(brief[1])
+        assert task.name == "A", "cancelled B must never start"
+        id = sprintf("%d",int(task.attempt_id))
+        step = workers[id]
+        if step == nil { step = 0 }
+        workers[id] = step + 1
+        if step == 0 { smokeAnswer(w,native,"save_evidence",{"evidence_id":"control." + id,"evidence_content":"attempt " + id + " verified its source"}); return }
+        if step == 1 { smokeAnswer(w,native,"submit_task_result",{"summary":"attempt " + id + " result","evidence_ids":["control." + id]}); return }
+        smokeAnswer(w,native,"finish",{}); return
+    }
+    if state.Plan == nil { smokeAnswer(w,native,"create_plan",{"plan":plan,"plan_document":"# 控制动作验证\n取消B；A第一次结果拒绝，重试后验收。"}); return }
+    if string(state.Phase) == "PLAN" { smokeAnswer(w,native,"submit_plan",{}); return }
+    if !cancelled {
+        cancelled = true
+        smokeAnswer(w,native,"cancel_tasks",{"task_ids":[state.Plan.Tasks[1].ID],"reason":"实验明确不执行B，最终报告须保留取消范围"}); return
+    }
+    a = state.Attempts[state.Plan.Tasks[0].ID]
+    assert string(a.State) != "failed", "worker failed instead of producing a reviewable result"
+    if string(a.State) == "awaiting_review" {
+        if !inspected {
+            inspected = true
+            smokeAnswer(w,native,"inspect_task",{"task_id":a.Task.ID,"attempt_id":a.ID,"details":true}); return
+        }
+        decision = "accept"
+        if !rejected { rejected = true; decision = "reject" }
+        smokeAnswer(w,native,"review_task",{"task_id":a.Task.ID,"attempt_id":a.ID,"decision":decision,"reason":"按本次验收要求核对真实结果与共享 evidence"}); return
+    }
+    if string(a.State) == "rejected" {
+        retries++
+        assert retries == 1
+        smokeAnswer(w,native,"retry_task",{"task_id":a.Task.ID,"attempt_id":a.ID,"reason":"重新验证一次来源；原拒绝结果必须保留"}); return
+    }
+    smokeAnswer(w,native,"wait_messages",{})
+}
+for native in [true,false] {
+    cancelled,inspected,retries,rejected,callbacks,workers = false,false,0,false,0,{}
+    execution = aiagent.NewExecutorFromJson(`{"name":"control-smoking","init_prompt":"验证控制动作","persistent_prompt":"保留所有重试与取消事实"}`,{"query":"验证任务生命周期"},aiagent.context(smokeCtx),aiagent.aiCallback(smokeModel),aiagent.agreeYOLO(),aiagent.functionCallMode(native),aiagent.resultHandler(func(e) { callbacks++; assert e.Snapshot().Finished }),aiagent.extendAIDOptions(func(c) {
+        c.DisableCreateDBRuntime,c.DisablePerception,c.DisableMemoryTriage,c.DisallowMCPServers = true,true,true,true
+        c.Workdir = smokeRoot
+        c.AiAutoRetry,c.AiTransactionAutoRetry = 1,1
+        c.GetTimeline().SetTimelineBucketByteSize(-1)
+        return nil
+    }))~
+    die(execution.Run())
+    state = execution.Snapshot()
+    assert state.Finished && cancelled && inspected && rejected && retries == 1 && callbacks == 1
+    assert len(workers) == 2, "retry must create exactly one new worker attempt"
+    for _,count in workers { assert count == 3 }
+    assert string(state.Attempts[state.Plan.Tasks[0].ID].State) == "accepted"
+    assert string(state.Attempts[state.Plan.Tasks[1].ID].State) == "cancelled"
+    proof = string(file.ReadFile(state.Report.Path)~)
+    assert "cancelled" in proof && "rejected" in proof, "delivery hid non-successful attempts"
+    execution.Close()
+    printf("PASS controls: function_call=%v inspect=1 reject=1 retry=1 cancel=1 callback=1\n",native)
+}
+smokeCheck()

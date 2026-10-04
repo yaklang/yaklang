@@ -1,8 +1,0 @@
-// 真实 Yak + aim 和公开 liteforge.Execute 共用新版单次请求底层。
-// harness 只提供模型响应与输入；解析、schema 校验、上下文和回调使用实际实现。
-engine = aim.NewAIEngine(aim.aiCallback(MODEL), ENGINE_OPTIONS...)~
-defer engine.Close()
-action = engine.GetOperator().InvokeLiteForge(SMOKE_CONTEXT, "result", INPUT, OUTPUTS)~
-VERIFY(action)
-public = liteforge.Execute(INPUT, liteforge.action("result"), liteforge.output(SCHEMA), CONFIG_OPTIONS...)~
-VERIFY(public.Action)

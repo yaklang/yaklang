@@ -21,7 +21,7 @@ import (
 	"time"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools/yakscripttools"
-	"github.com/yaklang/yaklang/common/aiforge"
+	"github.com/yaklang/yaklang/common/ai/aiforge"
 
 	"github.com/antchfx/xmlquery"
 	"github.com/yaklang/pcap"

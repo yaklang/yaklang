@@ -3,7 +3,7 @@ package aireact
 import (
 	"github.com/yaklang/yaklang/common/ai/aid"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
-	"github.com/yaklang/yaklang/common/ai/aid/coordinator_legacy"
+	"github.com/yaklang/yaklang/common/ai/aid/coordinator"
 )
 
 var _ aid.TaskRuntimeReportProvider = (*ReAct)(nil)
@@ -13,7 +13,7 @@ func (r *ReAct) CollectTaskRuntimeReport() *aid.TaskRuntimeReport {
 	if r == nil {
 		return aid.BuildTaskRuntimeReport(nil)
 	}
-	return aid.BuildTaskRuntimeReport(r, coordinator_legacy.CollectPlanExecutionSnapshots(r.GetCurrentPlanExecutionTask())...)
+	return aid.BuildTaskRuntimeReport(r, coordinator.CollectPlanExecutionSnapshots(r.GetReActID(), r.GetCurrentPlanExecutionTask())...)
 }
 
 func (r *ReAct) GetReActID() string {

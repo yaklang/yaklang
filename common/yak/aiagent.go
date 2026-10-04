@@ -13,7 +13,7 @@ import (
 	"github.com/davecgh/go-spew/spew"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
-	"github.com/yaklang/yaklang/common/ai/aid/coordinator_legacy"
+	"github.com/yaklang/yaklang/common/ai/aid/coordinator"
 	// blank-import aive 触发价值评估 submitter 的 init() 注册 (默认开启).
 	// 关键词: aive blank import, RegisterValueFeedbackSubmitter 触发
 	_ "github.com/yaklang/yaklang/common/ai/aid/aive"
@@ -21,7 +21,7 @@ import (
 	// 关键词: aistats blank import, RegisterStatsRecorder 触发
 	_ "github.com/yaklang/yaklang/common/ai/aid/aistats"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools/yakscripttools/metadata/genmetadata"
-	"github.com/yaklang/yaklang/common/aiforge"
+	"github.com/yaklang/yaklang/common/ai/aiforge"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools/yakscripttools"
@@ -286,9 +286,11 @@ var AIAgentExport = map[string]any{
 	"NewExecutorFromJson": NewExecutorFromJson,
 	"CreateLiteForge":     NewLiteForge,
 
-	"planAICallback": aicommon.WithQualityPriorityAICallback,
-	"taskAICallback": aicommon.WithSpeedPriorityAICallback,
-	"aiCallback":     aicommon.WithAICallback,
+	"planAICallback":   aicommon.WithQualityPriorityAICallback,
+	"taskAICallback":   aicommon.WithSpeedPriorityAICallback,
+	"aiCallback":       aicommon.WithAICallback,
+	"onEvent":          aicommon.WithEventHandler,
+	"functionCallMode": aicommon.WithEnableFunctionCallMode,
 
 	// liteforge options
 	"liteForgePrompt":          liteforgeapp.WithLiteForge_Prompt,
@@ -304,8 +306,8 @@ var AIAgentExport = map[string]any{
 	"persistentPrompt":      aiforge.WithPersistentPrompt,
 	"persistentPromptForge": aiforge.WithPersistentPrompt, // similar to persistentPrompt above
 	"resultPrompt":          aiforge.WithResultPrompt,
-	"resultPromptForge":     aiforge.WithResultPrompt,          // similar to resultPrompt above
-	"plan":                  coordinator_legacy.WithPlanMocker, // plan mocker
+	"resultPromptForge":     aiforge.WithResultPrompt,   // similar to resultPrompt above
+	"plan":                  coordinator.WithPlanMocker, // plan mocker
 	"forgePlanMocker":       aiforge.WithPlanMocker,
 
 	"resultHandlerForge":   aiforge.WithResultHandler,
@@ -323,7 +325,7 @@ var AIAgentExport = map[string]any{
 	"agreeManual":                  aicommon.WithAgreeManual,
 	"agreePolicy":                  aicommon.WithAgreePolicy,
 	"extendedActionCallback":       aicommon.WithExtendedActionCallback,
-	"resultHandler":                coordinator_legacy.WithResultHandler,
+	"resultHandler":                aiforge.WithExecutorResultHandler,
 	"forgeName":                    WithForgeName,
 	"context":                      WithContext,
 	"extendAIDOptions":             WithExtendAICommonOptions,
@@ -345,9 +347,9 @@ var AIAgentExport = map[string]any{
 	/*
 		ai utils api
 	*/
-	"ExtractPlan":               coordinator_legacy.ExtractPlan,
+	"ExtractPlan":               coordinator.ExtractPlan,
 	"ExtractAction":             aicommon.ExtractAction,
-	"GetDefaultContextProvider": coordinator_legacy.GetDefaultContextProvider,
+	"GetDefaultContextProvider": coordinator.GetDefaultContextProvider,
 	"AllYakScriptAiTools":       AllYakScriptTools,
 	"UpdateYakScriptMetaData":   genmetadata.UpdateYakScriptMetaData,
 	"ParseYakScriptToAiTools":   yakscripttools.LoadYakScriptToAiTools,

@@ -13,7 +13,8 @@ var registerMutex = new(sync.Mutex)
 type ForgeResult struct {
 	*Action
 
-	Name string
+	Name     string
+	Formated any
 }
 
 type LiteForgeExecuteCallback func(prompt string, opts ...any) (*ForgeResult, error)
@@ -32,6 +33,7 @@ type LiteForgeInvokeRequest struct {
 	Context          context.Context
 	ActionName       string
 	OutputActionName string
+	Formated         any
 	OutputSchema     string
 	Outputs          []aitool.ToolOption
 	Options          []GeneralKVConfigOption
@@ -50,7 +52,7 @@ func RegisterLiteForgeExecuteCallback(f LiteForgeExecuteCallback) {
 
 func InvokeLiteForge(prompt string, opts ...any) (*ForgeResult, error) {
 	if liteforgeExecuteFunc == nil {
-		return nil, utils.Error("liteforge execute callback is not registered, check if `common/aiforge` is imported.")
+		return nil, utils.Error("liteforge execute callback is not registered, check if `common/ai/aiforge` is imported.")
 	}
 	return liteforgeExecuteFunc(prompt, opts...)
 }

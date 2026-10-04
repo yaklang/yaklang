@@ -3,7 +3,7 @@ package yakcmds
 import (
 	"fmt"
 	"github.com/yaklang/yaklang/common/urfavecli"
-	"github.com/yaklang/yaklang/common/aiforge"
+	"github.com/yaklang/yaklang/common/ai/aiforge"
 	"github.com/yaklang/yaklang/common/log"
 	"os"
 )

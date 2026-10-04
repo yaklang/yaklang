@@ -26,8 +26,11 @@ type FieldCallback struct {
 }
 
 type Request struct {
-	Name                         string
-	ActionName                   string
+	Name       string
+	ActionName string
+	// ActionAliases admits existing text action names; the native wire function
+	// and the returned result always use ActionName.
+	ActionAliases                []string
 	Schema                       string
 	Prompt                       string
 	Params                       string

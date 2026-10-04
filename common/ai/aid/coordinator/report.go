@@ -10,12 +10,14 @@ import (
 )
 
 type ReportDraft struct {
-	Title           string `json:"title,omitempty"`
-	Path            string `json:"path,omitempty"`
-	Document        string `json:"document,omitempty"`
-	Submitted       bool   `json:"submitted,omitempty"`
-	UserRevision    uint64 `json:"user_revision,omitempty"`
-	MessageSequence uint64 `json:"message_sequence,omitempty"`
+	Title               string `json:"title,omitempty"`
+	Path                string `json:"path,omitempty"`
+	Document            string `json:"document,omitempty"`
+	Submitted           bool   `json:"submitted,omitempty"`
+	UserRevision        uint64 `json:"user_revision,omitempty"`
+	MessageSequence     uint64 `json:"message_sequence,omitempty"`
+	DeliveryPath        string `json:"delivery_path,omitempty"`
+	DeliveryContentType string `json:"delivery_content_type,omitempty"`
 }
 
 func (c *Controller) reportReadyLocked() error {
@@ -200,37 +202,15 @@ func (c *Controller) SubmitReport(observedUser, observedMessage uint64) (ReportD
 		return r, fmt.Errorf("report already submitted")
 	}
 	// Include objective incomplete/failure facts even if the authored prose omitted them.
-	var facts strings.Builder
-	history := clone(c.state.History)
-	if history == nil {
-		history = make(map[string][]Attempt)
-	}
-	for id, a := range c.state.Attempts {
-		if a.ID == 0 && a.State == Cancelled {
-			history[id] = append(history[id], a)
-		}
-	}
-	keys := make([]string, 0, len(history))
-	for id := range history {
-		keys = append(keys, id)
-	}
-	sort.Strings(keys)
-	for _, id := range keys {
-		attempts := history[id]
-		for _, a := range attempts {
-			if a.State == Failed || a.State == Rejected || a.State == Cancelled {
-				fmt.Fprintf(&facts, "\n- %s / attempt %d: %s；%s；%s", a.Task.ID, a.ID, a.State, a.Result.Error, a.ReviewReason)
-			}
-		}
-	}
+	facts := reportResolutionFacts(c.state)
 	c.mu.Unlock()
 	const resolutionMarker = "<!-- coordinator-resolution-facts -->"
 	document := r.Document
 	if at := strings.Index(document, resolutionMarker); at >= 0 {
 		document = strings.TrimRight(document[:at], "\r\n")
 	}
-	if facts.Len() > 0 {
-		document += "\n\n" + resolutionMarker + "\n## 系统记录的失败、重试与未完成范围\n" + facts.String() + "\n"
+	if facts != "" {
+		document += "\n\n" + resolutionMarker + "\n## 系统记录的失败、重试与未完成范围\n" + facts + "\n"
 	}
 	if document != r.Document {
 		r.Document = document
@@ -276,4 +256,31 @@ func (c *Controller) FinalizeReport() error {
 		return fmt.Errorf("new work arrived while publishing completion")
 	}
 	return c.reportReadyLocked()
+}
+
+func reportResolutionFacts(state Snapshot) string {
+	var facts strings.Builder
+	history := clone(state.History)
+	if history == nil {
+		history = make(map[string][]Attempt)
+	}
+	for id, a := range state.Attempts {
+		if a.ID == 0 && a.State == Cancelled {
+			history[id] = append(history[id], a)
+		}
+	}
+	keys := make([]string, 0, len(history))
+	for id := range history {
+		keys = append(keys, id)
+	}
+	sort.Strings(keys)
+	for _, id := range keys {
+		attempts := history[id]
+		for _, a := range attempts {
+			if a.State == Failed || a.State == Rejected || a.State == Cancelled {
+				fmt.Fprintf(&facts, "\n- %s / attempt %d: %s；%s；%s", a.Task.ID, a.ID, a.State, a.Result.Error, a.ReviewReason)
+			}
+		}
+	}
+	return facts.String()
 }

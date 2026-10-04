@@ -32,6 +32,12 @@ func TestLegionForgePresetObservationPlanParsesWithoutModel(t *testing.T) {
 			release.PlanPrompt = tc.prompt
 			rehashLegionContextForgeRelease(t, release)
 			_, blueprint, params, err := buildContextForgeBlueprint(release, "original user input")
+			if !tc.valid {
+				if err == nil {
+					t.Fatal("natural-language prose was accepted as a preset plan")
+				}
+				return
+			}
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -49,10 +55,11 @@ func TestLegionForgePresetObservationPlanParsesWithoutModel(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			if coordinator.PlanMocker == nil {
+			defer coordinator.Close()
+			if blueprint.PlanMocker == nil {
 				t.Fatal("coordinator lost the release preset plan")
 			}
-			plan := coordinator.PlanMocker(coordinator)
+			plan := blueprint.PlanMocker(coordinator.Session)
 			if !tc.valid {
 				if plan != nil {
 					t.Fatal("natural-language prose unexpectedly parsed as a preset plan")

@@ -2,9 +2,9 @@
 
 ## 文件位置
 
-- 脚本: `common/aiengine/aibenchmark/generic-event-benchmark.yak`
-- 示例配置: `common/aiengine/aibenchmark/generic-event-benchmark.example.json`
-- 快速启动脚本: `common/aiengine/aibenchmark/run-generic-event-benchmark.sh`
+- 脚本: `common/ai/aismoking/live/benchmark/generic-event-benchmark.yak`
+- 示例配置: `common/ai/aismoking/live/benchmark/generic-event-benchmark.example.json`
+- 统一脚本目录：[AI 冒烟](../../ai/aismoking/README.md)；旧 Go 启动包装已移除，请直接用 Yak CLI。
 
 ## 功能说明
 
@@ -90,35 +90,10 @@
 
 在**仓库根目录**执行。
 
-### 方式 1：直接用 go run 入口执行
+直接使用 Yak CLI；旧 Go 启动包装已移除：
 
-```bash
-go run common/yak/cmd/yak.go \
-  common/aiengine/aibenchmark/generic-event-benchmark.yak \
-  --config common/aiengine/aibenchmark/generic-event-benchmark.example.json
-```
-
-### 方式 2：使用包装脚本执行
-
-```bash
-common/aiengine/aibenchmark/run-generic-event-benchmark.sh
-```
-
-指定配置文件：
-
-```bash
-common/aiengine/aibenchmark/run-generic-event-benchmark.sh \
-  common/aiengine/aibenchmark/generic-event-benchmark.example.json
-```
-
-传额外参数：
-
-```bash
-common/aiengine/aibenchmark/run-generic-event-benchmark.sh \
-  common/aiengine/aibenchmark/generic-event-benchmark.example.json \
-  --timeout 300 \
-  --max-iteration 8 \
-  --language zh
+```text
+yak common/ai/aismoking/live/benchmark/generic-event-benchmark.yak --config common/ai/aismoking/live/benchmark/generic-event-benchmark.example.json --timeout 300 --max-iteration 8 --language zh
 ```
 
 ## 示例
