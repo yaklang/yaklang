@@ -216,33 +216,37 @@ func TestCoordinatorLoopRejectsJSONResponseActions(t *testing.T) {
 	require.Nil(t, c.Snapshot().Plan)
 }
 
-func TestCoordinatorLoopAuxiliaryUsesNativeOutput(t *testing.T) {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-	var calls atomic.Int64
-	cfg := aicommon.NewConfig(ctx, aicommon.WithAITransactionAutoRetry(1), aicommon.WithDisableCreateDBRuntime(true), aicommon.WithWorkdir(t.TempDir()), aicommon.WithEnableFunctionCallMode(true), aicommon.WithAICallback(func(c aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
-		wire := aispec.NewDefaultAIConfig(req.GetExtraSpecOpts()...)
-		require.Empty(t, wire.Tools, "LiteForge tools are projected at send time")
-		projected := aiprojection.ProjectAndObserve("coordinator-helper-test", req.GetPrompt())
-		require.Len(t, projected.Tools, 1)
-		require.Equal(t, map[string]any{"type": "function", "function": map[string]any{"name": projected.Tools[0].Function.Name}}, wire.ToolChoice)
-		require.NotContains(t, req.GetPrompt(), "输出 JSON")
-		messages := aiprojection.Project(aiprojection.ProjectionInput{Prompt: req.GetPrompt()}).Messages
-		require.NotEmpty(t, messages)
-		require.Equal(t, "system", messages[0].Role)
-		require.Contains(t, fmt.Sprint(messages[0].Content), "仅调用这个指定函数一次")
-		calls.Add(1)
-		return nativeResponse(c, req, projected.Tools[0].Function.Name, map[string]any{"summary": "native infrastructure summary"})
-	}), aicommon.WithEnableFunctionCallMode(true))
-	for _, option := range coordinator.NativeOptions() {
-		require.NoError(t, option(cfg))
+func TestCoordinatorLoopAuxiliaryDefaultsToText(t *testing.T) {
+	for _, native := range []bool{false, true} {
+		t.Run(fmt.Sprintf("parent_function_call_%v", native), func(t *testing.T) {
+			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer cancel()
+			var calls atomic.Int64
+			cfg := aicommon.NewConfig(ctx, aicommon.WithAITransactionAutoRetry(1), aicommon.WithDisableCreateDBRuntime(true), aicommon.WithWorkdir(t.TempDir()), aicommon.WithEnableFunctionCallMode(native), aicommon.WithAICallback(func(c aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+				wire := aispec.NewDefaultAIConfig(req.GetExtraSpecOpts()...)
+				require.Empty(t, wire.Tools)
+				require.Nil(t, wire.ToolChoice)
+				require.Nil(t, wire.ToolCallCallback)
+				projected := aiprojection.ProjectAndObserve("coordinator-helper-test", req.GetPrompt())
+				require.Empty(t, projected.Tools, "auxiliary calls must not inherit the parent protocol")
+				require.NotEmpty(t, projected.Messages)
+				require.Equal(t, "system", projected.Messages[0].Role)
+				require.Contains(t, fmt.Sprint(projected.Messages[0].Content), "# 文本提交协议")
+				calls.Add(1)
+				return protocolResponse(c, req, false, "coordinator-summary", map[string]any{"summary": "infrastructure summary"})
+			}))
+			for _, option := range coordinator.NativeOptions() {
+				require.NoError(t, option(cfg))
+			}
+			var summary string
+			var outputErr error
+			cfg.ScheduleAuxiliaryTask(ctx, "coordinator-summary", func() string { return "Summarize these verified facts." }, func(a *aicommon.Action) { summary = a.GetString("summary") }, aicommon.WithAuxiliaryOutputs(aitool.WithStringParam("summary", aitool.WithParam_Required())), aicommon.WithAuxiliaryOnError(func(err error) { outputErr = err }))
+			require.NoError(t, outputErr)
+			require.Equal(t, "infrastructure summary", summary)
+			require.Equal(t, int64(1), calls.Load())
+			require.Equal(t, native, cfg.EnableFunctionCallMode, "helper calls must leave the parent protocol unchanged")
+		})
 	}
-	var summary string
-	var outputErr error
-	cfg.ScheduleAuxiliaryTask(ctx, "coordinator-native-summary", func() string { return "Summarize these verified facts." }, func(a *aicommon.Action) { summary = a.GetString("summary") }, aicommon.WithAuxiliaryOutputs(aitool.WithStringParam("summary", aitool.WithParam_Required())), aicommon.WithAuxiliaryOnError(func(err error) { outputErr = err }))
-	require.NoError(t, outputErr)
-	require.Equal(t, "native infrastructure summary", summary)
-	require.Equal(t, int64(1), calls.Load())
 }
 
 func TestCoordinatorLoopPlanOnlyUsesSameNativeLoop(t *testing.T) {
@@ -321,18 +325,28 @@ func TestCoordinatorLoopRejectsMalformedFunctionArguments(t *testing.T) {
 	require.Nil(t, c.Snapshot().Plan)
 }
 
-func TestCoordinatorLoopKeywordSearchUsesNativeAuxiliary(t *testing.T) {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-	c, err := coordinator.NewSession(ctx, "Find a reading tool", aicommon.WithDisableCreateDBRuntime(true), aicommon.WithWorkdir(t.TempDir()), aicommon.WithEnableFunctionCallMode(true), aicommon.WithAICallback(func(c aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
-		require.NotContains(t, req.GetPrompt(), "<|SCHEMA_")
-		return nativeResponse(c, req, "keyword_search", map[string]any{"matches": []any{map[string]any{"tool": "read_file", "matched_keywords": []string{"read"}}}})
-	}))
-	require.NoError(t, err)
-	catalog := omap.NewOrderedMap[string, []string](nil)
-	catalog.Set("read_file", []string{"read", "file"})
-	results, err := c.HandleSearch("read source", catalog)
-	require.NoError(t, err)
-	require.Len(t, results, 1)
-	require.Equal(t, "read_file", results[0].Key)
+func TestCoordinatorLoopKeywordSearchDefaultsToText(t *testing.T) {
+	for _, native := range []bool{false, true} {
+		t.Run(fmt.Sprintf("parent_function_call_%v", native), func(t *testing.T) {
+			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer cancel()
+			var calls atomic.Int64
+			c, err := coordinator.NewSession(ctx, "Find a reading tool", aicommon.WithDisableCreateDBRuntime(true), aicommon.WithWorkdir(t.TempDir()), aicommon.WithEnableFunctionCallMode(native), aicommon.WithAICallback(func(c aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+				projected := aiprojection.ProjectAndObserve("coordinator-keyword-search-test", req.GetPrompt())
+				require.Empty(t, projected.Tools)
+				require.NotEmpty(t, projected.Messages)
+				require.Contains(t, fmt.Sprint(projected.Messages[0].Content), "# 文本提交协议")
+				calls.Add(1)
+				return protocolResponse(c, req, false, "keyword_search", map[string]any{"matches": []any{map[string]any{"tool": "read_file", "matched_keywords": []string{"read"}}}})
+			}))
+			require.NoError(t, err)
+			catalog := omap.NewOrderedMap[string, []string](nil)
+			catalog.Set("read_file", []string{"read", "file"})
+			results, err := c.HandleSearch("read source", catalog)
+			require.NoError(t, err)
+			require.Len(t, results, 1)
+			require.Equal(t, "read_file", results[0].Key)
+			require.Equal(t, int64(1), calls.Load())
+		})
+	}
 }
