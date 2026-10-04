@@ -3,6 +3,7 @@ package loop_http_fuzztest
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -153,7 +154,7 @@ func TestLoopHTTPFuzztestDirectlyAnswerVerifier_RejectsPayloadAndTagTogether(t *
 // 本测试主要验证"hint 已被注入到下一轮 prompt 里", AI 是否真自纠正属于上游策略,
 // 此处不强求 (loop 内部状态机/stream 处理顺序在 retry 路径下有自身复杂度).
 //
-// 关键词: directly_answer 5 次重试黑洞修复 回归测试, AITAG retry hint 注入,
+// 关键词: directly_answer 5 次重试黑洞修复 回归测试, AITAG 纠正 注入,
 // CallAITransaction 重试, ReAct Loop directly_answer
 func TestLoopHTTPFuzztestExecute_DirectlyAnswerEmptyPayloadRetryWithAITAGHint(t *testing.T) {
 	var (
@@ -170,7 +171,7 @@ func TestLoopHTTPFuzztestExecute_DirectlyAnswerEmptyPayloadRetryWithAITAGHint(t 
 		atomic.AddInt32(&attempts, 1)
 
 		// 始终返回空 payload 让 verifier 持续失败, 这样可以严格抓到"第二轮 prompt
-		// 必须包含 AITAG retry hint"这一关键回归点. 即便 retry 全部用尽, 测试只关心
+		// 必须包含 AITAG 纠正"这一关键回归点. 即便 retry 全部用尽, 测试只关心
 		// hint 是否被注入到下一轮 prompt, 不关心最终是否成功 (那是上游 AI 行为).
 		rsp := i.NewAIResponse()
 		rsp.EmitOutputStream(bytes.NewBufferString(
@@ -212,19 +213,26 @@ func TestLoopHTTPFuzztestExecute_DirectlyAnswerEmptyPayloadRetryWithAITAGHint(t 
 		t.Fatalf("expected at least 2 captured prompts, got %d", len(captured))
 	}
 	// 第一条 prompt 是干净的 (没有任何重试 hint 注入).
-	if strings.Contains(captured[0], "AITAG retry hint") {
+	if strings.Contains(captured[0], "AITAG 纠正") {
 		t.Fatalf("first prompt should not contain retry hint, got: %s", captured[0])
 	}
-	// 第二条 prompt 必须包含我们注入的 AITAG retry hint, 且包含 nonce 化模板,
+	// 第二条 prompt 必须包含我们注入的 AITAG 纠正, 且包含 nonce 化模板,
 	// AI 才能照抄正确格式. 这是修 5 次重试黑洞的核心修复点.
 	nonce := aicommon_testutil.MustExtractDynamicSectionNonce(t, captured[1])
-	if !strings.Contains(captured[1], "AITAG retry hint") {
-		t.Fatalf("second prompt MUST contain 'AITAG retry hint' (no hint = no self-correction), got prompt[1]: %s", captured[1])
+	_, data, _ := strings.Cut(captured[1], "最近一次失败（错误、响应）：\n")
+	data, _, _ = strings.Cut(data, "\n# 纠正结束")
+	var details map[string]any
+	if err := json.Unmarshal([]byte(data), &details); err != nil {
+		t.Fatalf("retry diagnostics are not JSON: %v", err)
 	}
-	if !strings.Contains(captured[1], "<|FINAL_ANSWER_"+nonce+"|>") {
+	hint, _ := details["correction"].(string)
+	if !strings.Contains(captured[1], "AITAG 纠正") {
+		t.Fatalf("second prompt MUST contain 'AITAG 纠正' (no hint = no self-correction), got prompt[1]: %s", captured[1])
+	}
+	if !strings.Contains(hint, "<|FINAL_ANSWER_"+nonce+"|>") {
 		t.Fatalf("second prompt MUST contain nonce-tagged FINAL_ANSWER template (nonce=%s), got prompt[1]: %s", nonce, captured[1])
 	}
-	if !strings.Contains(captured[1], "MUST emit AITAG block") {
+	if !strings.Contains(hint, "必须用 AITAG") {
 		t.Fatalf("second prompt MUST instruct AI to emit AITAG block, got prompt[1]: %s", captured[1])
 	}
 	if !strings.Contains(captured[1], "answer_payload is required for ActionDirectlyAnswer but empty") &&

@@ -575,7 +575,8 @@ func (a *AIResponse) Debug(i ...bool) {
 }
 
 // GetPlainOutput returns the pure AI output text captured automatically
-// while the output stream is consumed via GetOutputStreamReader. It may be
+// while the output stream is consumed. Unbound readers retain a bounded prefix
+// for retry diagnostics without invoking output callbacks. It may be
 // empty when the stream was never consumed or callAi failed before any output
 // arrived.
 func (a *AIResponse) GetPlainOutput() string {
@@ -641,6 +642,9 @@ func (a *AIResponse) GetUnboundStreamReaderEx(onFirstByte func(), onClose func()
 			if i == nil {
 				continue
 			}
+			// Unbound readers are used by native loops and tee responses too.
+			// Capture them without invoking output/field callbacks a second time.
+			i.out = io.TeeReader(i.out, unboundResponseTextWriter{response: a, reason: i.IsReason})
 
 			if !haveFirstByte.IsSet() {
 				var buf = make([]byte, 1)
@@ -688,11 +692,28 @@ func (a *AIResponse) GetUnboundStreamReader(haveReason bool) io.Reader {
 			if haveReason && !i.IsReason {
 				continue
 			}
-			targetStream := i.out
+			targetStream := io.TeeReader(i.out, unboundResponseTextWriter{response: a, reason: i.IsReason})
 			io.Copy(pw, targetStream)
 		}
 	}()
 	return pr
+}
+
+type unboundResponseTextWriter struct {
+	response *AIResponse
+	reason   bool
+}
+
+func (w unboundResponseTextWriter) Write(p []byte) (int, error) {
+	w.response.plainTextMu.Lock()
+	defer w.response.plainTextMu.Unlock()
+	target := &w.response.plainOutput
+	if w.reason {
+		target = &w.response.plainReason
+	}
+	part, _ := clipRetryText(string(p), retryResponseLimit-len(*target))
+	*target += part
+	return len(p), nil
 }
 
 func (a *AIResponse) GetOutputStreamReader(nodeId string, system bool, emitter *Emitter) io.Reader {

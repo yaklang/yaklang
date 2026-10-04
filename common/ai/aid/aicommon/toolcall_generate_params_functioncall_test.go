@@ -3,7 +3,9 @@ package aicommon
 import (
 	"bytes"
 	"context"
+	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
@@ -76,6 +78,42 @@ func TestFunctionCallGenerateParamsSubmissionAndAbandonment(t *testing.T) {
 			require.Contains(t, result.RawAIResponse, `"params"`)
 		})
 	}
+}
+
+func TestFunctionCallGenerateParamsRetryCarriesRejectedArguments(t *testing.T) {
+	tool := aitool.NewWithoutCallback("read_file", aitool.WithStringParam("path", aitool.WithParam_Required(true)))
+	const bad = `{"params":{"path">/tmp/report</parameter>}}`
+	var attempts int
+	cfg := NewTestConfig(context.Background(), WithEnableFunctionCallMode(true), WithAITransactionAutoRetry(2),
+		WithAIRetryWaitFunc(func(context.Context, time.Duration) error { return nil }),
+		WithAICallback(func(c AICallerConfigIf, req *AIRequest) (*AIResponse, error) {
+			attempts++
+			if attempts == 2 {
+				require.True(t, strings.HasPrefix(req.GetPrompt(), "native prompt\n"))
+				detail := retryDetail(t, req.GetPrompt())
+				call := detail["tool_calls"].([]any)[0].(map[string]any)
+				require.Equal(t, SubmitToolParamsFunctionName, call["name"])
+				require.Equal(t, bad, call["arguments"])
+			}
+			args := bad
+			if attempts == 2 {
+				args = `{"params":{"path":"/tmp/report","extension":true},"identifier":"read_report"}`
+			}
+			wire := aispec.NewDefaultAIConfig(req.GetExtraSpecOpts()...)
+			wire.ToolCallCallback([]*aispec.ToolCall{{ID: "params", Function: aispec.FuncReturn{Name: SubmitToolParamsFunctionName, Arguments: args}}})
+			resp := c.NewAIResponse()
+			resp.Close()
+			return resp, nil
+		}))
+	caller, err := NewToolCaller(context.Background(), WithToolCaller_AICallerConfig(cfg), WithToolCaller_AICaller(cfg),
+		WithToolCaller_Emitter(cfg.GetEmitter()), WithToolCaller_Task(cfg.DefaultTask),
+		WithToolCaller_FunctionCallParamsPromptBuilder(func(*aitool.Tool, string, ToolParamsCallIntent) (string, error) { return "native prompt", nil }))
+	require.NoError(t, err)
+	result, err := caller.generateParams(tool, func(any) {})
+	require.NoError(t, err)
+	require.Equal(t, 2, attempts)
+	require.Equal(t, "/tmp/report", result.Params.GetString("path"))
+	require.True(t, result.Params.GetBool("extension"), "open business parameters remain intact")
 }
 
 func TestNativeParamSubmissionRejectsOtherOrMultipleCalls(t *testing.T) {

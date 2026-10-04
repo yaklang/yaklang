@@ -795,8 +795,14 @@ func TestCallAILoopTransactionRequiresBothCallbacks(t *testing.T) {
 
 func TestCallAILoopTransactionFunctionModeRetryKeepsAcceptedResponse(t *testing.T) {
 	var attempts int
-	loop := newCallAILoopTransactionTestLoop(t, true, func(_ *aicommon.AIRequest, cfg *aispec.AIConfig) (*aicommon.AIResponse, error) {
+	loop := newCallAILoopTransactionTestLoop(t, true, func(req *aicommon.AIRequest, cfg *aispec.AIConfig) (*aicommon.AIResponse, error) {
 		attempts++
+		if attempts == 2 {
+			require.True(t, strings.HasPrefix(req.GetPrompt(), "prompt\n"))
+			require.Contains(t, req.GetPrompt(), `"protocol":"function_call"`)
+			require.Contains(t, req.GetPrompt(), `"arguments":"{\"value\":"`)
+			require.Contains(t, req.GetPrompt(), `"name":"accept"`)
+		}
 		id, arguments := "bad_attempt", `{"value":`
 		if attempts == 2 {
 			id, arguments = "accepted_call", `{"value":"accepted"}`
