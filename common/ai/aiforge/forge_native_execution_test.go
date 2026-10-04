@@ -57,7 +57,7 @@ func TestForgeParentRuntimeInheritsConfigurationAndOwnsOneInputChannel(t *testin
 	defer cancel()
 	calls := 0
 	parentFrozen := aicommon.NewFrozenBlockPartitionProducer()
-	parent, err := aireact.NewTestReAct(aicommon.WithContext(ctx), aicommon.WithEnablePlanAndExec(false), aicommon.WithWorkdir(t.TempDir()), aicommon.WithEnableFunctionCallMode(false), aicommon.WithPlanExecTaskConcurrency(3), aicommon.WithFrozenBlockPartitionProducer(parentFrozen), aicommon.WithAppendPersistentContext("parent preference"), aicommon.WithAICallback(func(c aicommon.AICallerConfigIf, _ *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+	parent, err := aireact.NewTestReAct(aicommon.WithContext(ctx), aicommon.WithEnablePlanAndExec(false), aicommon.WithEnableDetachedPlan(true), aicommon.WithWorkdir(t.TempDir()), aicommon.WithEnableFunctionCallMode(false), aicommon.WithPlanExecTaskConcurrency(3), aicommon.WithFrozenBlockPartitionProducer(parentFrozen), aicommon.WithAppendPersistentContext("parent preference"), aicommon.WithAICallback(func(c aicommon.AICallerConfigIf, _ *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 		calls++
 		response := c.NewAIResponse()
 		response.Close()
@@ -77,6 +77,9 @@ func TestForgeParentRuntimeInheritsConfigurationAndOwnsOneInputChannel(t *testin
 	defer execution.Close()
 	require.Equal(t, "owned-forge-id", execution.Id)
 	require.False(t, execution.EnableFunctionCallMode)
+	require.False(t, execution.EnableDetachedPlan, "a Forge must keep approval and delivery in its own live invocation")
+	require.False(t, execution.PlanningOnly())
+	require.True(t, parentConfig.EnableDetachedPlan, "ordinary detached PLAN must remain available in the parent")
 	require.Equal(t, parentConfig.GetPlanExecTaskConcurrency(), execution.GetPlanExecTaskConcurrency())
 	require.Contains(t, execution.PersistentMemory, "parent preference")
 	require.Equal(t, []string{"parent preference"}, execution.PersistentMemory, "parent append-only options must be applied exactly once")
@@ -119,7 +122,7 @@ func TestForgeNativeExecutionMigration(t *testing.T) {
 				workerSteps := map[string]int{}
 				requests, reviews, callbacks, formatCalls := 0, 0, 0, 0
 				execution, err = blueprint.CreateCoordinator(ctx, map[string]any{"query": "compare A and B"},
-					aicommon.WithEnableFunctionCallMode(native), aicommon.WithDisableCreateDBRuntime(true), aicommon.WithDisableAutoSkills(true), aicommon.WithDisablePerception(true), aicommon.WithNoOpMemoryTriage(), aicommon.WithDisallowMCPServers(true), aicommon.WithWorkdir(t.TempDir()), aicommon.WithAgreeYOLO(),
+					aicommon.WithEnableFunctionCallMode(native), aicommon.WithEnableDetachedPlan(true), aicommon.WithDisableCreateDBRuntime(true), aicommon.WithDisableAutoSkills(true), aicommon.WithDisablePerception(true), aicommon.WithNoOpMemoryTriage(), aicommon.WithDisallowMCPServers(true), aicommon.WithWorkdir(t.TempDir()), aicommon.WithAgreeYOLO(),
 					aiforge.WithExecutorResultHandler(func(e *aiforge.ForgeExecution) {
 						callbacks++
 						require.Equal(t, "completed", e.GetContextProvider().RootTask.Progress)

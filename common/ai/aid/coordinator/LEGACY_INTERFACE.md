@@ -776,6 +776,8 @@ Blueprint 的 PersistentPrompt 及其他 PersistentMemory 业务指令保存在�
 
 [WithForgeParent](parent_runtime.go) 用 context 携带父 runtime、当前任务和新的 coordinator_id。外层 executeBlueprint 提供已复制的配置及其私有输入/热更新通道；NewForgeSession 不再次复制父选项、不再次镜像输入。显式 Forge 调用不依赖普通 PLAN action 的能力开关；这不为默认主循环增加未经授权的 PLAN action。
 
+Forge 是完整业务调用，不继承父会话的 `EnableDetachedPlan` 偏好。它在自己的实时计划审核端点等待原有审批策略，批准后由同一执行器继续调度 DAG、验收并交付业务结果，避免发布 detached 审核后销毁结果处理器。父会话的普通 detached PLAN 和显式 `RunPlanOnly` 仍保留。`ForgeExecution.Run` 若未完整交付就结束，会返回错误；`hostscan` 自定义 Yak handler 也会将执行或结果缺失错误返回给调用者，不再静默成功。
+
 `ExecuteForgeFromDB` 到 Yak 的注册桥新增带显式 context 的注册形状，标准 Yak 注册把它转为 Agent 的 context 选项，确保父 runtime 标记和取消链能到达实际构造函数。原 `RegisterForgeYakEngineCallback` 保留适配形状，已有注册调用仍能使用；它不构造任何旧协调器。
 
 Blueprint 外层仍拥有 `start_plan_and_execution / end_plan_and_execution`；内部 Session 标记 externalLifecycle，避免重复发布。审核、task push/pop、任务树更新、Evidence、快照和 report_finish 沿现有事件封套。外层接住 Action 或 Formated 并保存到父 Timeline，日志展示不再是唯一业务结果。

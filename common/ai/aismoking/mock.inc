@@ -1,11 +1,15 @@
 // Support library; runnable cases live beside this file. Includes are relative to repository root.
-smokeCtx, smokeCancel = context.WithCancel(context.WithTimeoutSeconds(240))
+smokeTimeout = 240
+if os.Getenv("AISMOKING_TIMEOUT_SECONDS") != "" { smokeTimeout = parseInt(os.Getenv("AISMOKING_TIMEOUT_SECONDS")) }
+assert smokeTimeout > 0 && smokeTimeout <= 600, "smoke timeout must be between 1 and 600 seconds"
+smokeCtx, smokeCancel = context.WithCancel(context.WithTimeoutSeconds(smokeTimeout))
 defer smokeCancel()
 smokeRoot = os.Getenv("AISMOKING_OUTPUT")
 if smokeRoot == "" { smokeRoot = file.Join(os.TempDir(), sprintf("ai-smoking-%d", time.Now().UnixNano())) }
 file.MkdirAll(smokeRoot)~
 smokeMutex = sync.NewMutex()
 smokeRequests, smokeErrors, smokeHandler = [], [], nil
+smokeRequestLimit = 200
 smokePort = os.GetRandomAvailableTCPPort()
 smokeBase = "http://" + str.HostPort("127.0.0.1", smokePort)
 
@@ -56,7 +60,7 @@ go httpserver.Serve("127.0.0.1", smokePort, httpserver.context(smokeCtx), httpse
         smokeRequests = append(smokeRequests, body)
         seq = len(smokeRequests)
         smokeMutex.Unlock()
-        assert seq < 200, "mock provider did not converge"
+        assert seq < smokeRequestLimit, "mock provider did not converge"
         // Credentials/headers are never included in samples.
         file.SaveJson(file.Join(smokeRoot, sprintf("request-%03d.json", seq)), body)~
         smokeHandler(w, body)

@@ -1,0 +1,155 @@
+// yak common/ai/aismoking/hostscan.yak
+// Real built-in hostscan, invoked through the default aim loop. The provider
+// simulates checks by reading a local fixture; this does not scan the host.
+if os.Getenv("AISMOKING_TIMEOUT_SECONDS") == "" { os.Setenv("AISMOKING_TIMEOUT_SECONDS","360") }
+include "common/ai/aismoking/mock.inc"
+smokeRequestLimit = 320 // Four full eight-task lifecycles, including discovery wakes.
+sourceFile = file.Join(smokeRoot,"hostscan-source.txt")
+file.Save(sourceFile,"hostscan-source-sentinel: local compatibility fixture")~
+predecessorCounts = {"获取操作系统类型":0,"系统配置检查":1,"进程检查":1,"网络连接检查":1,"文件系统检查":1,"Web服务配置检查":3,"安全风险分析":3,"体检报告生成":6}
+steps, starts, approvals, detached, pushes, pops, formatCalls, ends, parentSteps = {}, {}, 0, 0, 0, 0, 0, 0, 0
+trace = []
+activeEntry = ""
+rejectProvider = false
+func record(op,e) {
+    typ = string(e.Type)
+    data = {}
+    if e.IsJson { data = json.loads(string(e.Content)) }
+    smokeMutex.Lock()
+    if typ == "plan_review_require" { approvals++ }
+    if typ == "detached_plan_require" { detached++ }
+    if typ == "end_plan_and_execution" { ends++ }
+    if e.NodeId == "system" {
+        if data.type == "push_task" { pushes++ }
+        if data.type == "pop_task" { pops++ }
+    }
+    if typ in ["exec_aiforge_review_require","plan_review_require","detached_plan_require","start_plan_and_execution","end_plan_and_execution","report_finish","fail_plan_and_execution"] || e.NodeId == "timeline_item" {
+        trace = append(trace,{"type":typ,"coordinator_id":e.CoordinatorId,"data":data})
+    }
+    smokeMutex.Unlock()
+    if typ in ["exec_aiforge_review_require","plan_review_require","task_review_require","tool_use_review_require"] {
+        smokeApprove(op,data,{"suggestion":"continue"})
+    }
+}
+smokeHandler = func(w,body) {
+    if rejectProvider { w.WriteHeader(500); w.Write(`{"error":{"message":"hostscan-provider-failure-sentinel"}}`); return }
+    native = len(body.tools) > 0
+    prompt = smokePrompt(body)
+    if "SMOKE_CALLER:liteforge[session-title-generator]" in prompt {
+        name = "session-title-generator"
+        if native { name = body.tools[0]["function"].name }
+        smokeAnswer(w,native,name,{"session_title":"hostscan兼容性验证"}); return
+    }
+    if "SMOKE_CALLER:blueprint\n" in prompt {
+        assert !native
+        smokeAnswer(w,false,"call-ai-blueprint",{"params":{"query":"本地 hostscan 兼容性模拟：只读测试材料，不实际扫描，不修改系统。"}}); return
+    }
+    if "SMOKE_CALLER:directly-answer" in prompt {
+        w.Header().Set("Content-Type","text/event-stream")
+        smokeFrame(w,{"content":"hostscan 生命周期检查结束；实际结果由冒烟断言核验。"},"stop")
+        w.Write("data: [DONE]\n\n")~; return
+    }
+    if "SMOKE_CALLER:timeline-compress" in prompt {
+        assert !native
+        w.Header().Set("Content-Type","text/event-stream")
+        smokeFrame(w,{"content":json.dumps({"@action":"timeline-summary","summary":"本次为 hostscan 本地兼容性模拟，不实际扫描。已启动的任务通过真实 read_file 读取 hostscan-source-sentinel。共享 Evidence 保留各任务发现；当前任务和验收进度以 PLAN STATUS 为准，继续完成剩余 DAG 并交付报告。"})},"stop")
+        w.Write("data: [DONE]\n\n")~; return
+    }
+    if "SMOKE_CALLER:liteforge[hostscan-result]" in prompt {
+        formatCalls++
+        assert !native && len(starts) == 8 && pops == 8, "business delivery ran before all eight tasks settled"
+        smokeAnswer(w,false,"hostscan_result",{
+            "scan_summary":{"target":"local-fixture","scan_time":"模拟时间","scan_duration":"模拟耗时","overall_health":"Good","total_issues":0},
+            "system_info":{"os":"fixture","version":"fixture","architecture":"fixture","hostname":"local-fixture","uptime":"fixture"},
+            "resource_status":{"cpu":{"usage_percent":0,"cores":1,"load_average":[]},"memory":{"total":"fixture","used":"fixture","available":"fixture","usage_percent":0},"disk":{"total":"fixture","used":"fixture","available":"fixture","usage_percent":0},"network":{"interfaces":[],"active_connections":0}},
+            "security_issues":{"critical":[],"high":[],"medium":[],"low":[]},
+            "recommendations":{"immediate":[],"short_term":[],"long_term":[]},
+            "open_ports":[],"processes":[]
+        }); return
+    }
+    brief = re.FindSubmatch(prompt,`\[CURRENT_EXECUTION\]\n([^\n]+)`)
+    if len(brief) > 0 {
+        task = json.loads(brief[1])
+        smokeMutex.Lock()
+        step = steps[task.task_id]
+        if step == nil {
+            step = 0
+            assert starts[task.name] == nil, "duplicate hostscan dispatch"
+            assert len(task.accepted_predecessors) == predecessorCounts[task.name], "hostscan lost its preset DAG dependencies"
+            starts[task.name] = task.attempt_id
+        }
+        steps[task.task_id] = step + 1
+        smokeMutex.Unlock()
+        assert approvals == 1 && detached == 0, "worker started outside the live approved Forge"
+        if step == 0 { smokeAnswer(w,native,"directly_call_tool",{"directly_call_tool_name":"read_file","directly_call_tool_params":{"file":sourceFile},"directly_call_reason":"验证真实工具链路，不实际执行扫描"}); return }
+        assert "hostscan-source-sentinel" in prompt
+        evidence = "hostscan." + task.task_id
+        if step == 1 { smokeAnswer(w,native,"save_evidence",{"evidence_id":evidence,"evidence_content":task.name + " 已只读核对本地模拟材料：hostscan-source-sentinel"}); return }
+        if step == 2 { smokeAnswer(w,native,"submit_task_result",{"summary":task.name + " 的兼容性模拟通过","evidence_ids":[evidence]}); return }
+        smokeAnswer(w,native,"finish",{}); return
+    }
+    if "SMOKE_CALLER:react-loop:coordinator" in prompt {
+        assert "已有计划：true" in prompt, "built-in hostscan preset was not loaded"
+        if detached > 0 { smokeAnswer(w,native,"finish",{}); return }
+        if !("阶段：EXEC" in prompt) { smokeAnswer(w,native,"submit_plan",{}); return }
+        parts = str.Split(prompt,"# PLAN STATUS")
+        states = re.FindSubmatchAll(parts[len(parts)-1],`\[([^\]]+)\]: ([a-z_]+); attempt=(\d+)`)
+        accepted = 0
+        for state in states {
+            if state[2] == "accepted" { accepted++ }
+            assert !(state[2] in ["failed","rejected"]), "hostscan worker failed"
+            if state[2] == "awaiting_review" { smokeAnswer(w,native,"review_task",{"task_id":state[1],"attempt_id":parseInt(state[3]),"decision":"accept","reason":"已核对实际只读工具与共享 Evidence"}); return }
+        }
+        if accepted == 8 { smokeAnswer(w,native,"directly_answer",{"answer_payload":"八个任务均已验收；已检查各任务发现与共享 Evidence，交付模拟报告。"}); return }
+        // A wait request alone does not settle user/critical discovery messages.
+        // Consume the observed batch, then let the runtime wait for workers.
+        smokeAnswer(w,native,"directly_answer",{"answer_payload":"已核对最新任务状态、审核反馈和共享发现，等待其余体检任务结算。"}); return
+    }
+    assert "SMOKE_CALLER:react-loop:default" in prompt || "SMOKE_CALLER:react-loop:main" in prompt, "unexpected hostscan request"
+    parentSteps++
+    if parentSteps == 1 {
+        if activeEntry == "load_capability" { smokeAnswer(w,native,"load_capability",{"capability_identifier":"hostscan"}) } else { smokeAnswer(w,native,"require_ai_blueprint",{"blueprint_payload":"hostscan"}) }
+        return
+    }
+    smokeAnswer(w,native,"finish",{})
+}
+selectedMode,selectedEntry = os.Getenv("AISMOKING_HOSTSCAN_MODE"),os.Getenv("AISMOKING_HOSTSCAN_ENTRY")
+assert selectedMode in ["","true","false"] && selectedEntry in ["","load_capability","require_ai_blueprint"], "invalid hostscan smoke selector"
+caseResults = []
+for native in [true,false] {
+    if selectedMode != "" && selectedMode != sprintf("%v",native) { continue }
+    for entry in ["load_capability","require_ai_blueprint"] {
+        if selectedEntry != "" && selectedEntry != entry { continue }
+        steps,starts,approvals,detached,pushes,pops,formatCalls,ends,parentSteps = {},{},0,0,0,0,0,0,0
+        trace = []
+        activeEntry = entry
+        err = aim.InvokeReAct("执行一次 hostscan；本次为本地兼容性模拟，只读测试材料，不实际扫描。",
+            aim.context(smokeCtx),aim.timeout(120),aim.maxIteration(40),aim.workdir(smokeRoot),aim.reviewPolicy("yolo"),aim.disableMCPServers(true),aim.sessionID(sprintf("hostscan-smoking-%v-%s",native,entry)),
+            aim.aiCallback(smokeModel),aim.onEvent(record),aim.configOptions(aiagent.functionCallMode(native),aiagent.aiCallback(smokeModel),func(c) {
+                // Matches StartReAct's inherited detached-plan preference.
+                c.EnableDetachedPlan,c.ForceManualPlanReview = true,true
+                c.DisableCreateDBRuntime,c.DisablePerception,c.DisableMemoryTriage = true,true,true
+                c.PlanExecTaskConcurrency,c.AiAutoRetry,c.AiTransactionAutoRetry = 2,1,1
+                c.GetTimeline().SetTimelineBucketByteSize(-1)
+                return nil
+            }))
+        file.SaveJson(file.Join(smokeRoot,sprintf("events-native-%v-%s.json",native,entry)),trace)~
+        die(err)
+        assert detached == 0, "BUG: hostscan inherited detached plan-only mode and returned before execution"
+        assert approvals == 1 && pushes == 8 && pops == 8 && len(starts) == 8 && formatCalls == 1 && ends == 1, "incomplete hostscan lifecycle"
+        caseResults = append(caseResults,{"function_call":native,"entry":entry,"approvals":approvals,"workers":len(starts),"deliveries":formatCalls,"passed":true})
+        printf("PASS hostscan: function_call=%v entry=%s approval=1 workers=8 tool_reads=8 delivery=1\n",native,entry)
+    }
+}
+// The real built-in Yak handler must propagate a failed default execution.
+rejectProvider = true
+result,err = aiagent.ExecuteForge("hostscan",{"query":"验证失败传播，不执行扫描"},aiagent.context(smokeCtx),aiagent.aiCallback(smokeModel),aiagent.agreeYOLO(),aiagent.extendAIDOptions(func(c) {
+    c.DisableCreateDBRuntime,c.DisablePerception,c.DisableMemoryTriage = true,true,true
+    c.AiAutoRetry,c.AiTransactionAutoRetry = 1,1
+    c.Workdir = smokeRoot
+    return nil
+}))
+assert err != nil && "hostscan execution failed" in string(err), "hostscan swallowed the provider failure"
+file.SaveJson(file.Join(smokeRoot,"hostscan-results.json"),{"cases":caseResults,"failure_propagated":true})~
+println("PASS hostscan provider failure: returned error instead of empty success")
+smokeCheck()
