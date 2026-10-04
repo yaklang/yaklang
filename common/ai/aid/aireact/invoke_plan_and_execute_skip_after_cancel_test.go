@@ -118,9 +118,13 @@ func TestReAct_PlanAndExecute_SkipAfterCancel(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	native := newNativePlanTestModel(mockToolName)
 	_, err = NewTestReAct(
 		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			prompt := r.GetPrompt()
+			if rsp, handled, err := native(i, r, "forge-cancel-skip"); handled {
+				return rsp, err
+			}
 
 			if isToolParamGenerationPrompt(prompt, mockToolName) {
 				rsp := i.NewAIResponse()
@@ -140,16 +144,6 @@ func TestReAct_PlanAndExecute_SkipAfterCancel(t *testing.T) {
 				rsp.EmitOutputStream(bytes.NewBufferString(`
 {"@action": "call-ai-blueprint","blueprint": "` + testForgeName + `", "params": {"target": "http://example.com", "query": "test"},
 "human_readable_thought": "generating blueprint parameters", "cumulative_summary": "forge parameters"}
-`))
-				rsp.Close()
-				return rsp, nil
-			}
-
-			if utils.MatchAllOfSubString(prompt, "PLAN_STATUS_", planFlag) {
-				rsp := i.NewAIResponse()
-				rsp.EmitOutputStream(bytes.NewBufferString(`
-{"@action": "require_tool", "tool_require_payload": "` + mockToolName + `", 
-"human_readable_thought": "using mock tool to trigger cancel and skip sequence"}
 `))
 				rsp.Close()
 				return rsp, nil
