@@ -42,6 +42,7 @@ var LiteForgeExport = map[string]interface{}{
 	"verboseName":       _withVerboseName,
 	"forceImage":        _withForceImage,
 	"speedPriority":     _withSpeedPriority,
+	"instruction":       LiteForgeExecWithStaticInstruction,
 
 	"knowledgeBaseName":    RefineWithKnowledgeBaseName,
 	"knowledgeBaseDesc":    RefineWithKnowledgeBaseDesc,

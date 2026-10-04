@@ -32,9 +32,11 @@ func registerTimelineTestLiteForge(t testing.TB) {
 		}
 		cfg := NewConfig(req.Context, append([]ConfigOption{WithDisableAutoSkills(true)}, configOpts...)...)
 		if req.ActionName == CallerLabelTimelineCompress {
-			require.True(t, NewGeneralKVConfig(req.Options...).GetLiteForgeDisableTimeline(), "the snapshot is the only history source")
+			g := NewGeneralKVConfig(req.Options...)
+			require.True(t, g.GetLiteForgeDisableTimeline(), "the snapshot is the only history source")
+			require.Equal(t, timelineCompressionInstruction, g.GetLiteForgeStaticInstruction())
 		}
-		request := NewAIRequest(prompt+"\n"+req.OutputSchema,
+		request := NewAIRequest(NewGeneralKVConfig(req.Options...).GetLiteForgeStaticInstruction()+"\n"+prompt+"\n"+req.OutputSchema,
 			NewGeneralKVConfig(req.Options...).GetExtraRequestOpts()...)
 		response, err := cfg.CallAI(request)
 		if err != nil {

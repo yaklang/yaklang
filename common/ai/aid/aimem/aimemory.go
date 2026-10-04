@@ -17,6 +17,8 @@ var memoryTriagePrompt = promptloader.MustLoad("ai/aid/aimem/memory_triage.txt")
 
 var corepactPrinciplesPrompt = promptloader.MustLoad("ai/aid/aimem/corepact_principle.txt")
 
+var memoryTriageInstruction = promptloader.MustLoad("ai/aid/aimem/memory_triage_instruction.txt") + "\n" + corepactPrinciplesPrompt
+
 func Session2MemoryName(sessionId string) string {
 	return fmt.Sprintf("ai-memory-%s", sessionId)
 }

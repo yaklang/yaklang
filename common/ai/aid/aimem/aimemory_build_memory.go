@@ -6,6 +6,8 @@ package aimem
 // speed-priority request.
 
 import (
+	"encoding/json"
+
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aiprojection"
 
@@ -50,29 +52,30 @@ func (r *AIMemoryTriage) AddRawText(i string) (entities []*aicommon.MemoryEntity
 		aicommon.WithAuxiliaryOutputs(aitool.WithStructArrayParam(
 			"memory_entities",
 			[]aitool.PropertyOption{
-				aitool.WithParam_Description("根据用户的输入的内容，分析用户行为，生成一个或多个记忆条目"),
+				aitool.WithParam_Description("从资料中提取有依据、可复用的长期记忆；只有临时日志或无符合条件的事实时使用空数组"),
 			},
 			[]aitool.PropertyOption{
 				aitool.WithParam_Description("记忆实体，Content 为要记忆的东西，Tags 为要记忆的标签（领域），"),
 			},
-			aitool.WithStringParam("content", aitool.WithParam_Description("需要作为记忆内容，你需要摘出来，尽量包含原文，尊重原意，去掉一些不和谐的东西或者乱七八糟的符号，如果有代码的话，保持代码原文")),
+			aitool.WithStringParam("content", aitool.WithParam_Description("独立可理解的记忆事实，保留来源、适用范围和关键限定；不编造偏好，不使用依赖当前上下文的指代")),
 			aitool.WithStringArrayParam("tags", aitool.WithParam_Description("要记忆的标签（领域）,不要太多，尊重备选内容，如果万不得已你再创建新的，如果已经有了记忆标签，请你使用已有的")),
 			aitool.WithStringArrayParam("potential_questions", aitool.WithParam_Description("这个记忆可能引发的问题，你可以根据这个记忆生成一些问题，用于后续的RAG搜索")),
 			aitool.WithNumberParam("t", aitool.WithParam_Description("时效评分，核心问题：这个记忆应该如何被保留?"), aitool.WithParam_Min(0.0), aitool.WithParam_Max(1.0)),
 			aitool.WithNumberParam("a", aitool.WithParam_Description("可操作性评分，是否可以从学习中改进未来行为？"), aitool.WithParam_Min(0.0), aitool.WithParam_Max(1.0)),
 			aitool.WithNumberParam("p", aitool.WithParam_Description("个人偏好评分，这个行为或者问题是否绑定了用户个人风格，品味？"), aitool.WithParam_Min(0.0), aitool.WithParam_Max(1.0)),
 			aitool.WithNumberParam("o", aitool.WithParam_Description("来源与确定性评分，这个信息从哪来？有多可信？"), aitool.WithParam_Min(0.0), aitool.WithParam_Max(1.0)),
-			aitool.WithNumberParam("e", aitool.WithParam_Description("情感评分，用户在表达这个信息时的情绪如何？越低越消极，消极评分时一般伴随信息源不可信"), aitool.WithParam_Min(0.0), aitool.WithParam_Max(1.0)),
+			aitool.WithNumberParam("e", aitool.WithParam_Description("情感评分：负面较低、中性居中、正面较高；情绪不决定信息可信度"), aitool.WithParam_Min(0.0), aitool.WithParam_Max(1.0)),
 			aitool.WithNumberParam("r", aitool.WithParam_Description("相关性评分，这个信息对用户的目的有多关键？无关紧要？锦上添花？还是成败在此一举？"), aitool.WithParam_Min(0.0), aitool.WithParam_Max(1.0)),
 			aitool.WithNumberParam("c", aitool.WithParam_Description("关联度评分，这个记忆与其他记忆如何关联？这是一个一次性事实，几乎与其他事实没有什么关联程度"), aitool.WithParam_Min(0.0), aitool.WithParam_Max(1.0)),
 		)),
-		aicommon.WithAuxiliaryOpts(aicommon.WithLiteForgeDisableTimeline(), aicommon.WithLiteForgeOutputValidator(validateMemoryTriageAction)),
+		aicommon.WithAuxiliaryOpts(aicommon.WithLiteForgeDisableTimeline(),
+			aicommon.WithLiteForgeStaticInstruction(memoryTriageInstruction),
+			aicommon.WithLiteForgeOutputValidator(validateMemoryTriageAction)),
 	)
 	return entities, err
 }
 
 func (r *AIMemoryTriage) buildRawTextPrompt(i string) (string, error) {
-	nonce := utils.RandStringBytes(4)
 	i = aicommon.ShrinkTextBlockByTokens(i, memoryTriageInputTokenLimit)
 
 	var dynContext string
@@ -90,12 +93,16 @@ func (r *AIMemoryTriage) buildRawTextPrompt(i string) (string, error) {
 	}
 	dynContext += existedTag
 
-	promptResult, err := utils.RenderTemplate(aiprojection.CreateTemplate(memoryTriagePrompt), map[string]any{
-		"Nonce":              nonce,
-		"Query":              i,
-		"HaveDynamicContext": dynContext != "",
-		"DynamicContext":     dynContext,
-		"CorePactPrinciple":  corepactPrinciplesPrompt,
+	// Encode historical tags and roles as data, never nested prompt sections.
+	source, err := json.MarshalIndent(map[string]string{
+		"dynamic_context": aiprojection.RedactNonce(dynContext),
+		"query":           aiprojection.RedactNonce(i),
+	}, "", "  ")
+	if err != nil {
+		return "", err
+	}
+	promptResult, err := utils.RenderTemplate(memoryTriagePrompt, map[string]any{
+		"Source": string(source),
 	})
 	if err != nil {
 		return "", err

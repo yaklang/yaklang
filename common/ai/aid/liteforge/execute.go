@@ -51,9 +51,10 @@ func Execute(ctx context.Context, r Request, opts ...aicommon.ConfigOption) (*ai
 		if err != nil {
 			return nil, err
 		}
-		promptSchema, functionCallSchema := r.Schema, ""
+		promptSchema, functionCallSchema, functionName := r.Schema, "", ""
 		if native {
 			protocol = newNativeOutput(ctx, r, validator)
+			functionName = protocol.wireName
 			defer protocol.close()
 			parse = protocol.parse
 			// Like mainloop, declare the output function in the trusted schema
@@ -88,7 +89,7 @@ func Execute(ctx context.Context, r Request, opts ...aicommon.ConfigOption) (*ai
 		memory := "<persistent_memory>\n" + strings.Join(cfg.PersistentMemory, "\n") + "\n</persistent_memory>\n"
 		prompt, err = RenderPrompt(PromptParams{Nonce: strings.ToLower(utils.RandStringBytes(6)),
 			Prompt: r.Prompt, Params: r.Params, StaticInstruction: r.StaticInstruction,
-			Schema: promptSchema, FunctionCallSchema: functionCallSchema, PersistentMemory: memory, TimelineOpen: timeline}, native)
+			Schema: promptSchema, FunctionCallSchema: functionCallSchema, FunctionName: functionName, PersistentMemory: memory, TimelineOpen: timeline}, native)
 		if err != nil {
 			return nil, err
 		}
