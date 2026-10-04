@@ -92,4 +92,3 @@ for task in ["extract", "classify", "summarize"] {
 }
 assert len(smokeRequests) == 16, "one model request per extraction entry"
 smokeCheck()
-
