@@ -372,7 +372,7 @@ func (l *LiteForge) ExecuteEx(ctx context.Context, params []*ypb.ExecParamItem, 
 		request.FieldCallbacks = append(request.FieldCallbacks, aidliteforge.FieldCallback{
 			Keys: field.FieldKeys, Callback: field.Callback, Response: field.ResponseCallback})
 	}
-	// Use Config's default native protocol; callers can explicitly select text.
+	// LiteForge defaults to text; invocation options may explicitly select native.
 	configOptions := append([]aicommon.ConfigOption{}, l.ExtendAIDOptions...)
 	configOptions = append(configOptions, opts...)
 	result, err := aidliteforge.Execute(ctx, request, configOptions...)

@@ -55,3 +55,29 @@ func TestMemoryAuxiliaryCallbacksSkipPreparationAndPreserveErrors(t *testing.T) 
 		}
 	}
 }
+
+func TestMemoryTriageUsesTextInstructionRegardlessOfParentMode(t *testing.T) {
+	for _, native := range []bool{false, true} {
+		t.Run(map[bool]string{false: "text", true: "function_call"}[native], func(t *testing.T) {
+			invoker := mock.NewMockInvoker(context.Background())
+			cfg := invoker.GetConfig().(*mock.MockedAIConfig)
+			cfg.SetConfig("EnableFunctionCallMode", native)
+			scheduled := false
+			cfg.ScheduleAuxiliaryTaskFunc = func(_ context.Context, name string, _ func() string, _ func(*aicommon.Action), opts ...aicommon.AuxiliaryTaskOption) {
+				scheduled = true
+				require.Equal(t, aicommon.CallerLabelMemoryTriage, name)
+				spec := &aicommon.AuxiliaryTaskSpec{}
+				for _, opt := range opts {
+					opt(spec)
+				}
+				instruction := aicommon.NewGeneralKVConfig(spec.Opts...).GetLiteForgeStaticInstruction()
+				require.Contains(t, instruction, "七个评分")
+				require.Equal(t, memoryTriageInstruction, instruction)
+				require.NotContains(t, instruction, "原生函数 arguments 示例")
+			}
+			memory := &AIMemoryTriage{ctx: context.Background(), invoker: invoker}
+			_, _ = memory.AddRawText("runtime input")
+			require.True(t, scheduled)
+		})
+	}
+}

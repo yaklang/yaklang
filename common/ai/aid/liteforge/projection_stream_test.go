@@ -101,9 +101,9 @@ func TestProtocolsProjectAtSendAndStreamBeforeResponseEnds(t *testing.T) {
 					}()
 					return resp, nil
 				})}
-			// Native exercises the actual default, including a custom callback.
-			if !native {
-				options = append(options, aicommon.WithEnableFunctionCallMode(false))
+			// Text exercises the default, including a custom callback.
+			if native {
+				options = append(options, aicommon.WithEnableFunctionCallMode(true))
 			}
 			result, err := Execute(ctx, request, options...)
 			require.NoError(t, err)

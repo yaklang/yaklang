@@ -1,0 +1,60 @@
+// Local diagnostic regression: yak common/ai/aismoking/live/memory_capture_selftest.yak
+// All responses come from the local HTTP/SSE fixture; no remote model is used.
+include "common/ai/aismoking/mock.inc"
+include "common/ai/aismoking/live/memory_capture.inc"
+blank = memoryDecodeResponse("")
+assert blank.content == "" && len(blank.tool_calls) == 0 && len(blank.parse_errors) == 0, "empty response decoding failed"
+partial = memoryDecodeResponse(`data: {"choices":[{"delta":`)
+assert len(partial.parse_errors) == 1 && len(partial.tool_calls) == 0, "truncated response must not be repaired into a function call"
+prefix = str.Repeat("ordinary content beyond the HTTP preview; ",180)
+fixtures = [
+    {"id":"native-empty-with-content","native":true,"content":prefix,"arguments":`{"memory_entities":[]}`,"finish":"tool_calls","passed":true},
+    {"id":"native-content-only","native":true,"content":`{"memory_entities":[]}`,"arguments":"","finish":"stop","passed":false},
+    {"id":"native-incomplete-arguments","native":true,"content":"","arguments":`{"memory_entities":[`,"finish":"length","passed":false},
+    {"id":"native-no-output","native":true,"content":"","arguments":"","finish":"stop","passed":false},
+    {"id":"text-empty","native":false,"content":`{"@action":"memory-triage","memory_entities":[]}`,"arguments":"","finish":"stop","passed":true},
+]
+for fixture in fixtures {
+    smokeHandler = func(w,body) {
+        w.Header().Set("Content-Type","text/event-stream")
+        smokeFrame(w,{"reasoning_content":"fixture reasoning"},nil)
+        if fixture.content != "" { smokeFrame(w,{"content":fixture.content},nil) }
+        if fixture.arguments != "" {
+            half = len(fixture.arguments) / 2
+            smokeFrame(w,{"tool_calls":[{"index":0,"id":"memory-capture-call","type":"function","function":{"name":"memory-triage","arguments":fixture.arguments[:half]}}]},nil)
+            smokeFrame(w,{"tool_calls":[{"index":0,"function":{"arguments":fixture.arguments[half:]}}]},nil)
+        }
+        smokeFrame(w,{},fixture.finish)
+        w.Write("data: [DONE]\n\n")~
+    }
+    captured = []
+    result,err = liteforge.Execute("诊断夹具",
+        liteforge.action("memory-triage"),liteforge.output(`{"type":"object","properties":{"memory_entities":{"type":"array","items":{"type":"object"}}},"required":["memory_entities"]}`),
+        ai.type("openai"),ai.baseURL(smokeBase+"/v1/chat/completions"),ai.apiKey("local-fixture"),ai.model("capture-fixture"),ai.noHttps(true),
+        ai.withFunctionCallMode(fixture.native),ai.funcCallRetryTimes(1),aiagent.aiAutoRetry(1),aiagent.aiTransactionRetry(1),
+        ai.finishReasonCallback(func(reason,body) {
+            decoded = memoryDecodeResponse(string(body))
+            decoded.finish_reason,decoded.raw_body = reason,string(body)
+            captured = append(captured,decoded)
+        }))
+    assert (err == nil) == fixture.passed, fixture.id + ": unexpected admission result"
+    assert len(captured) > 0, fixture.id + ": missing terminal response capture"
+    final = captured[len(captured)-1]
+    assert final.content == fixture.content, fixture.id + ": content was lost or mixed with arguments"
+    assert final.reasoning_content == "fixture reasoning", fixture.id + ": reasoning was mixed with content"
+    assert final.finish_reason == fixture.finish, fixture.id + ": finish reason was lost"
+    assert len(final.parse_errors) == 0, fixture.id + ": response decoding failed"
+    if fixture.arguments != "" {
+        assert len(final.tool_calls) == 1 && final.tool_calls[0].arguments == fixture.arguments, fixture.id + ": arguments fragments were lost"
+    } else { assert len(final.tool_calls) == 0, fixture.id + ": invented function call" }
+    if fixture.id == "native-empty-with-content" { assert len(final.content) > 4096, "full content must survive the HTTP preview limit" }
+    // Deliberately split an SSE JSON key across two HTTP chunks.
+    entityBody = "data: " + string(json.Marshal({"choices":[{"index":0,"delta":{"content":fixture.content,"tool_calls":[{"index":0,"function":{"name":"memory-triage","arguments":fixture.arguments}}]}}]})~) + "\n\n"
+    chunked = sprintf("%x\r\n%s\r\n%x\r\n%s\r\n0\r\n\r\n",17,entityBody[:17],len(entityBody)-17,entityBody[17:])
+    reassembled = memoryDecodeResponse(chunked)
+    assert reassembled.content == fixture.content, "HTTP chunk boundary lost content"
+    assert reassembled.tool_calls[0].arguments == fixture.arguments, "HTTP chunk boundary lost arguments"
+    assert len(reassembled.parse_errors) == 0, "HTTP chunk boundary decoding failed"
+    file.SaveJson(smokeRoot+"/"+fixture.id+".json",{"responses":captured,"error":sprintf("%v",err),"expected_pass":fixture.passed})~
+}
+println("AISMOKING_PASS memory_capture_selftest")

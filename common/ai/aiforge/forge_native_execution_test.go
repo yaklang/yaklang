@@ -146,7 +146,8 @@ func TestForgeNativeExecutionMigration(t *testing.T) {
 							for _, a := range state.Attempts {
 								require.Equal(t, coordinator.Accepted, a.State)
 							}
-							return forgeResponse(c, req, native, "business_result", map[string]any{"summary": "两份来源已核对", "payload": map[string]any{"ok": true, "values": []any{1, "two", nil}}})
+							require.False(t, c.GetConfigBool("EnableFunctionCallMode"), "result extraction must not inherit the loop protocol")
+							return forgeResponse(c, req, false, "business_result", map[string]any{"summary": "两份来源已核对", "payload": map[string]any{"ok": true, "values": []any{1, "two", nil}}})
 						}
 						if strings.Contains(prompt, "执行已批准的冻结任务书。") {
 							require.Contains(t, prompt, "keep source provenance", "worker lost the Forge persistent prompt")

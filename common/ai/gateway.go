@@ -1164,6 +1164,7 @@ var Exports = map[string]any{
 	"videoBase64":                    aispec.WithVideoBase64,
 	"videoRaw":                       aispec.WithVideoRaw,
 	"toolCallCallback":               aispec.WithToolCallCallback,
+	"finishReasonCallback":           aispec.WithFinishReasonCallback,
 	"modelInfoCallback":              aispec.WithModelInfoCallback,
 	"modelInfoConfirmCallback":       aispec.WithModelInfoConfirmCallback,
 	"rawHTTPResponseHeaderCallback":  aispec.WithRawHTTPResponseHeaderCallback,

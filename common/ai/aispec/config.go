@@ -68,7 +68,7 @@ type AIConfig struct {
 
 	FunctionCallRetryTimes int
 	// FunctionCallMode selects the structured-output transport. Nil uses the
-	// LiteForge default (native function calls); false selects legacy JSON text.
+	// LiteForge default (JSON text stream); true explicitly selects native calls.
 	FunctionCallMode *bool
 
 	HTTPErrorHandler func(error)

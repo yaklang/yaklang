@@ -13,7 +13,7 @@ yak common/ai/aismoking/run.yak
 | 脚本 | 覆盖内容 |
 | --- | --- |
 | [mainloop.yak](mainloop.yak) | 默认 `aim.InvokeReAct` × 两种协议；实际读文件、session Evidence、冻结提升和纯动态区不重复展示用户输入 |
-| [liteforge.yak](liteforge.yak) | `liteforge.Execute`、`ai.FunctionCall` × 两种协议；HTTP/SSE 首字节屏障、arguments/text 增量流、tools/tool_choice、开放 map/任意 JSON；抽取/分类/总结 × 两种协议 × aim/public 两个入口，共 16 次请求 |
+| [liteforge.yak](liteforge.yak) | `liteforge.Execute`、`ai.FunctionCall` × 默认文本/显式原生/显式文本；HTTP/SSE 首字节屏障、arguments/text 增量流、tools/tool_choice、开放 map/任意 JSON；抽取/分类/总结 × 父循环双协议 × aim/public 两个入口，验证 aim 辅助请求始终为文本流，共 18 次请求 |
 | [liteforgeapp.yak](liteforgeapp.yak) | 迁移后的公共应用入口，两种协议各一次请求，未知键及嵌套任意 JSON |
 | [rag_applications.yak](rag_applications.yak) | 真实文件读取、问题索引、知识分片、临时入库、关联与检索；模型和 embedding 使用 mock |
 | [planning.yak](planning.yak) | 自由探索生成、preset、mocker × 两种协议；读来源、Evidence、文档和任务修改、无效 DAG 原子回滚、稳定 task ID、编辑后一次审核；停在批准后的交接点，不启动业务 worker |
@@ -41,6 +41,9 @@ yak common/ai/aismoking/forge.yak
 
 这些入口直接 `yak xxx.yak`，不会由默认套件自动执行：
 
+- [live/memory_capture_selftest.yak](live/memory_capture_selftest.yak)：本地 HTTP/SSE 夹具检查完整 content、reasoning、分片 arguments、空记忆、错误协议、截断参数和无输出的诊断采样；不访问真实模型。
+
+- [live/memory_protocol.yak](live/memory_protocol.yak)：沿用配置中的轻量模型，对比记忆筛选与 Timeline 摘要的 function call / 文本流；覆盖短约束、已有记忆不重复收录、临时日志、长期约束、范围纠正、待返回调用、引用中的旧协议和 DAG 衔接，默认重复 3 轮。设置 `AISMOKING_OUTPUT` 保存无认证头的实际请求、完整响应体、分别还原的 content / function call arguments、finish reason、评分及语义断言；每次响应和最终结果均落盘，超时、协议失败与语义错误分别记录。`AISMOKING_MEMORY_SOURCE` 可附加已脱敏历史回放，`AISMOKING_MEMORY_KIND=triage/summary`、`AISMOKING_MEMORY_CASE`、`AISMOKING_MEMORY_MODE=function-call/text-stream` 可单独复测；`AISMOKING_MEMORY_EXAMPLES=0` 关闭原生参数示例以做对照，`AISMOKING_MEMORY_SPEED=0` 使用主模型。脚本不持久化记忆；请求或语义检查失败会返回非零，并保留失败采样。
 - [live/default_task.yak](live/default_task.yak)：普通对账任务，使用 `aim.InvokeReAct`，校验金额、去重、异常及报告，采样 usage/cache。要求 `LITEFORGE_SMOKE_API_KEY`，模型和输出目录由脚本列出的环境变量设置。
 - [live/coordinator.yak](live/coordinator.yak)：读取本地目录与 README，使用已配置的 provider，自动计划/执行/报告。
 - [live/comprehensive.yak](live/comprehensive.yak)：真实综合任务，直接 `aim.NewInputEvent` 回复一次计划卡，保存事件、流、Evidence、Timeline 和 usage。要求 `YAK_BENCH_API_KEY`、`YAK_BENCH_DIR/fixture/task.txt`；`YAK_BENCH_TEXT_STREAM=1` 选择文本协议。

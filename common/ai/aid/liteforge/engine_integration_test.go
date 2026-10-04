@@ -46,7 +46,7 @@ func liteForgeResponse(c aicommon.AICallerConfigIf, req *aicommon.AIRequest, nat
 	return resp
 }
 
-func TestLiteForgeAIMBothProtocols(t *testing.T) {
+func TestLiteForgeAIMDefaultsToTextAndPublicBothProtocols(t *testing.T) {
 	for _, native := range []bool{false, true} {
 		for _, task := range []string{"extract", "classify", "summarize"} {
 			t.Run(fmt.Sprintf("%s/native_%v", task, native), func(t *testing.T) {
@@ -60,9 +60,11 @@ func TestLiteForgeAIMBothProtocols(t *testing.T) {
 					wire := aispec.NewDefaultAIConfig(req.GetExtraSpecOpts()...)
 					require.Empty(t, wire.Tools, "tools must be supplied by projection")
 					projected := aiprojection.ProjectAndObserve("liteforge-yak-test", req.GetPrompt())
-					require.Equal(t, native, len(projected.Tools) == 1)
+					// ReAct's helper stays text even when the parent loop is native.
+					wantNative := calls == 2 && native
+					require.Equal(t, wantNative, len(projected.Tools) == 1)
 					require.Equal(t, "system", projected.Messages[0].Role)
-					return liteForgeResponse(c, req, native, value), nil
+					return liteForgeResponse(c, req, wantNative, value), nil
 				}
 				config := []aicommon.ConfigOption{aicommon.WithDisableCreateDBRuntime(true), aicommon.WithDisableAutoSkills(true),
 					aicommon.WithDisablePerception(true), aicommon.WithNoOpMemoryTriage(), aicommon.WithAITransactionAutoRetry(1),
@@ -84,6 +86,7 @@ func TestLiteForgeAIMBothProtocols(t *testing.T) {
 				action, err := engine.GetOperator().(*aireact.ReAct).InvokeLiteForge(ctx, "result", task+" 输入材料", []aitool.ToolOption{aitool.WithStringParam("summary", aitool.WithParam_Required()), aitool.WithRawParam("payload", map[string]any{}, aitool.WithParam_Required())})
 				require.NoError(t, err)
 				verify(action)
+				require.Equal(t, native, engine.GetOperator().(*aireact.ReAct).GetConfig().GetConfigBool("EnableFunctionCallMode"))
 				forge, err := liteforgeapp.NewLiteForge("result", liteforgeapp.WithLiteForge_Prompt(task+" 输入材料"), liteforgeapp.WithLiteForge_OutputSchemaRaw("result", schema))
 				require.NoError(t, err)
 				result, err := forge.Execute(ctx, nil, append(config, aicommon.WithAICallback(model))...)
@@ -122,7 +125,8 @@ func TestLiteForgePublicDefaultAndProtocolOverride(t *testing.T) {
 		native  bool
 		options []aicommon.ConfigOption
 	}{
-		{"default", true, nil},
+		{"default", false, nil},
+		{"native", true, []aicommon.ConfigOption{aicommon.WithEnableFunctionCallMode(true)}},
 		{"text", false, []aicommon.ConfigOption{aicommon.WithEnableFunctionCallMode(false)}},
 		{"last_option_wins", true, []aicommon.ConfigOption{aicommon.WithEnableFunctionCallMode(false), aicommon.WithEnableFunctionCallMode(true)}},
 	} {
@@ -140,6 +144,46 @@ func TestLiteForgePublicDefaultAndProtocolOverride(t *testing.T) {
 			result, err := forge.Execute(ctx, nil, append(options, tc.options...)...)
 			require.NoError(t, err)
 			require.Equal(t, "默认及覆盖选项生效", result.Action.GetString("summary"))
+		})
+	}
+}
+
+func TestLiteForgeConfigAndAuxiliaryDoNotInheritProtocol(t *testing.T) {
+	for _, parentNative := range []bool{false, true} {
+		t.Run(fmt.Sprint(parentNative), func(t *testing.T) {
+			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+			defer cancel()
+			wantNative, calls := false, 0
+			cfg := aicommon.NewConfig(ctx, aicommon.WithEnableFunctionCallMode(parentNative),
+				aicommon.WithDisableCreateDBRuntime(true), aicommon.WithDisableAutoSkills(true),
+				aicommon.WithNoOpMemoryTriage(), aicommon.WithSingleAIModelMode(false), aicommon.WithAITransactionAutoRetry(1),
+				aicommon.WithLiteForgeExecutor(liteforge.ExecuteTyped),
+				aicommon.WithSpeedPriorityAICallback(func(c aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+					calls++
+					projected := aiprojection.ProjectAndObserve("config-helper-protocol", req.GetPrompt())
+					require.Equal(t, wantNative, len(projected.Tools) == 1)
+					return liteForgeResponse(c, req, wantNative, map[string]any{"@action": "result", "summary": "已验证"}), nil
+				}))
+			request := &aicommon.LiteForgeInvokeRequest{Context: ctx, ActionName: "result",
+				Outputs: []aitool.ToolOption{aitool.WithStringParam("summary", aitool.WithParam_Required())}}
+			result, err := cfg.InvokeLiteForge("检查默认协议", request)
+			require.NoError(t, err)
+			require.Equal(t, "已验证", result.Action.GetString("summary"))
+			for _, name := range []string{aicommon.CallerLabelMemoryTriage, aicommon.CallerLabelMiniTimelineSummary} {
+				completed := false
+				cfg.ScheduleAuxiliaryTask(ctx, name, func() string { return "检查辅助协议" }, func(action *aicommon.Action) {
+					completed = true
+					require.Equal(t, "已验证", action.GetString("summary"))
+				}, aicommon.WithAuxiliaryOutputSchema("result", `{"type":"object","properties":{"summary":{"type":"string"}},"required":["summary"]}`),
+					aicommon.WithAuxiliaryOnError(func(err error) { require.NoError(t, err) }))
+				require.True(t, completed)
+			}
+			wantNative = true
+			result, err = cfg.InvokeLiteForge("显式启用原生协议", request, aicommon.WithEnableFunctionCallMode(true))
+			require.NoError(t, err)
+			require.Equal(t, "已验证", result.Action.GetString("summary"))
+			require.Equal(t, 4, calls)
+			require.Equal(t, parentNative, cfg.EnableFunctionCallMode, "child calls must not modify the parent")
 		})
 	}
 }

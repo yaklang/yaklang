@@ -17,7 +17,7 @@ func (r *ReAct) invokeLiteForgeWithCallback(cb aicommon.AICallbackType, ctx cont
 		cb = r.config.GetOriginalAICallback()
 	}
 	result, err := execute(prompt, &aicommon.LiteForgeInvokeRequest{Context: ctx, ActionName: actionName, Outputs: outputs, Options: opts, Emitter: r.config.Emitter},
-		aicommon.WithFastAICallback(cb), aicommon.WithEnableFunctionCallMode(r.config.EnableFunctionCallMode),
+		aicommon.WithFastAICallback(cb), aicommon.WithEnableFunctionCallMode(false),
 		aicommon.WithTimeline(r.config.Timeline), aicommon.WithAppendPersistentContext(r.config.PersistentMemory...),
 		aicommon.WithPersistentSessionId(r.config.PersistentSessionId), aicommon.WithEventHandler(r.config.EventHandler),
 		aicommon.WithAIAutoRetry(r.config.AiAutoRetry), aicommon.WithAITransactionAutoRetry(r.config.GetAITransactionAutoRetryCount()),

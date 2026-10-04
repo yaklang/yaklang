@@ -1,9 +1,10 @@
 // yak common/ai/aismoking/liteforge.yak
-// Four public HTTP/SSE requests, plus aim.InvokeLiteForge/public extraction tasks.
+// Default text and explicit dual protocols, plus isolated aim/public helpers.
 include "common/ai/aismoking/mock.inc"
 schema = `{"type":"object","properties":{"summary":{"type":"string"},"payload":{}},"required":["summary","payload"],"additionalProperties":true}`
 started = make(chan bool, 8)
 observed = []
+expectedNative = false
 func capture(reader) {
     println("STREAM observer started")
     first = make([]byte, 1)
@@ -18,6 +19,7 @@ func capture(reader) {
 }
 smokeHandler = func(w, body) {
     native = len(body.tools) == 1
+    assert native == expectedNative, "LiteForge protocol leaked from the parent or ignored an explicit option"
     prompt = smokePrompt(body)
     assert body.model == "ai-smoking"
     assert body.messages[0].role == "system"
@@ -61,8 +63,10 @@ func verify(value) {
     assert value.business_extension == "保留"
 }
 for entry in ["liteforge", "functioncall"] {
-    for native in [true, false] {
-        options = [func(c) { c.DisableProviderFallback = true; c.Context = smokeCtx; c.FunctionCallRetryTimes = 1 },ai.timeout(15),ai.type("openai"),ai.baseURL(smokeBase + "/v1/chat/completions"),ai.apiKey("local-fixture"),ai.model("ai-smoking"),ai.noHttps(true),ai.withFunctionCallMode(native),ai.onStream(capture)]
+    for selectedMode in [nil, true, false] {
+        expectedNative = selectedMode == true
+        options = [func(c) { c.DisableProviderFallback = true; c.Context = smokeCtx; c.FunctionCallRetryTimes = 1 },ai.timeout(15),ai.type("openai"),ai.baseURL(smokeBase + "/v1/chat/completions"),ai.apiKey("local-fixture"),ai.model("ai-smoking"),ai.noHttps(true),ai.onStream(capture)]
+        if selectedMode != nil { options = append(options,ai.withFunctionCallMode(selectedMode)) }
         if entry == "liteforge" {
             output = liteforge.Execute("原样提取 summary、payload 及扩展字段。",liteforge.output(schema),options...)~
             verify(output.Action.GetParams())
@@ -71,10 +75,10 @@ for entry in ["liteforge", "functioncall"] {
             assert !("@action" in value)
             verify(value)
         }
-        printf("PASS %s: function_call=%v\n",entry,native)
+        printf("PASS %s: selected_mode=%v, function_call=%v\n",entry,selectedMode,expectedNative)
     }
 }
-assert len(observed) == 4, "all four streams must reach the observer"
+assert len(observed) == 6, "default text and explicit protocol streams must reach the observer"
 for raw in observed { json.loads(raw)~ }
 for task in ["extract", "classify", "summarize"] {
     for native in [true, false] {
@@ -82,13 +86,16 @@ for task in ["extract", "classify", "summarize"] {
             c.Stateless = true
         })~
         fields = [jsonschema.paramString("summary",jsonschema.required(true)),jsonschema.paramRaw("payload",{},jsonschema.required(true))]
+        expectedNative = false
         action = engine.GetOperator().InvokeLiteForge(smokeCtx,"result",task + " 输入材料",fields)~
         assert action.GetString("summary") == "材料处理完成"
         assert action.GetInvokeParams("payload")["items"][1] == true
+        assert engine.GetOperator().GetConfig().EnableFunctionCallMode == native, "LiteForge must not change the parent loop mode"
+        expectedNative = native
         output = liteforge.Execute(task + " 输入材料",liteforge.action("result"),liteforge.output(schema),aiagent.aiCallback(smokeModel),aiagent.functionCallMode(native))~
         assert output.Action.GetString("business_extension") == "保留"
         engine.Close()
     }
 }
-assert len(smokeRequests) == 16, "one model request per extraction entry"
+assert len(smokeRequests) == 18, "one model request per extraction entry"
 smokeCheck()
