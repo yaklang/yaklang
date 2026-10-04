@@ -4037,29 +4037,7 @@ func (c *Config) GetAllowUserInteraction() bool {
 }
 
 func (c *Config) RetryPromptBuilder(s string, err error) string {
-	if err == nil {
-		return s
-	}
-	errText := strings.TrimSpace(err.Error())
-	if errText == "" {
-		errText = "(empty error)"
-	}
-
-	var b strings.Builder
-	b.WriteString(s)
-	if !strings.HasSuffix(s, "\n") {
-		b.WriteString("\n")
-	}
-	b.WriteString("\n# RETRY CORRECTION - PREVIOUS RESPONSE WAS REJECTED\n")
-	b.WriteString("[Retry due to error: see validation error block below]\n\n")
-	b.WriteString("The previous response failed validation. Treat this retry correction as mandatory and higher priority than the failed response.\n")
-	b.WriteString("You MUST correct the exact validation error below in the next response.\n")
-	b.WriteString("Do NOT repeat the same invalid output. Do NOT explain the retry. Return a fresh valid response only.\n")
-	b.WriteString("If the error mentions a required tag, nonce, JSON field, schema, action name, or output format, follow that requirement exactly.\n\n")
-	b.WriteString("Validation error:\n---\n")
-	b.WriteString(errText)
-	b.WriteString("\n---\n# END RETRY CORRECTION")
-	return b.String()
+	return buildRetryPrompt(s, err)
 }
 
 func (c *Config) GetEmitter() *Emitter {

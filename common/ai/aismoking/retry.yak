@@ -1,0 +1,87 @@
+// yak common/ai/aismoking/retry.yak
+// Real projection/HTTP/SSE; replay malformed DSML arguments and correct them.
+include "common/ai/aismoking/mock.inc"
+entry, selectedNative, step, firstRequest = "", false, 0, nil
+samples = []
+badArguments = `{"identifier": "await_risk_settlement_continue", "timeout_seconds">60</｜｜DSML｜｜: "await_risk_settlement_continue", "timeout_seconds": 60}`
+
+func rawAnswer(w, native, name, raw) {
+    w.Header().Set("Content-Type", "text/event-stream")
+    if native {
+        half = len(raw) / 2
+        smokeFrame(w, {"tool_calls":[{"index":0,"id":"retry-case","type":"function","function":{"name":name,"arguments":raw[:half]}}]}, nil)
+        smokeFrame(w, {"tool_calls":[{"index":0,"function":{"arguments":raw[half:]}}]}, nil)
+        smokeFrame(w, {}, "tool_calls")
+    } else { smokeFrame(w, {"content":raw}, "stop") }
+    w.Write("data: [DONE]\n\n")~
+}
+
+smokeHandler = func(w, body) {
+    native = len(body.tools) > 0
+    prompt = smokePrompt(body)
+    if "SMOKE_CALLER:liteforge[session-title-generator]" in prompt {
+        smokeAnswer(w, false, "session-title-generator", {"session_title":"重试协议验证"}); return
+    }
+    if "SMOKE_CALLER:verification" in prompt {
+        smokeAnswer(w, false, "verify-satisfaction", {"user_satisfied":true,"reasoning":"本地协议验证完成","evidence":[]}); return
+    }
+    assert native == selectedNative, "retry changed the selected protocol"
+    step++
+    if step == 1 { firstRequest = body }
+    if step == 2 {
+        assert json.dumps(body.tools) == json.dumps(firstRequest.tools), "retry changed tool schemas"
+        assert json.dumps(body.messages[:len(body.messages)-1]) == json.dumps(firstRequest.messages[:len(firstRequest.messages)-1]), "retry rewrote cacheable messages"
+        tail = string(body.messages[len(body.messages)-1].content)
+        initial = string(firstRequest.messages[len(firstRequest.messages)-1].content)
+        assert str.HasPrefix(tail, initial), "retry correction must be appended at the prompt tail"
+        assert "# 重试纠正" in tail
+        details = str.Split(str.Split(tail,"最近一次失败（错误、响应）：\n")[1],"\n# 纠正结束")[0]
+        details = json.loads(details)
+        if native {
+            assert details.protocol == "function_call" && details.finish_reason == "tool_calls"
+            assert details.tool_calls[0].arguments == badArguments
+            assert details.json_error_offset != nil, "JSON error byte offset is missing"
+        } else { assert details.protocol == "text_stream" && details.content == badArguments }
+        sample = {"entry":entry,"native":native,"details":details,"retry_suffix":tail[len(initial):],"cache_prefix_unchanged":true,"provider_cache_hit_rate":nil}
+        samples = append(samples, sample)
+        file.SaveJson(file.Join(smokeRoot,sprintf("retry-%s-%v.json",entry,native)),sample)~
+    }
+    name = "object"
+    if native { name = body.tools[0]["function"].name }
+    if entry == "mainloop" { name = "directly_answer" }
+    if step == 1 { rawAnswer(w,native,name,badArguments); return }
+    if entry == "mainloop" {
+        if step == 2 { smokeAnswer(w,native,name,{"answer_payload":"统一重试协议已验证。"}); return }
+        smokeAnswer(w,native,"finish",{}); return
+    }
+    smokeAnswer(w,native,name,{"summary":"校验通过","payload":{"source":"yak","items":[nil,true,3]},"extension":"保留"})
+}
+
+schema = `{"type":"object","properties":{"summary":{"type":"string"},"payload":{}},"required":["summary","payload"],"additionalProperties":true}`
+for currentEntry in ["mainloop","liteforge","functioncall"] {
+    entry = currentEntry
+    for native in [true,false] {
+        selectedNative,step,firstRequest = native,0,nil
+        if entry == "mainloop" {
+            die(aim.InvokeReAct("回答本地协议验证结论，然后结束。",aim.context(smokeCtx),aim.workdir(smokeRoot),aim.reviewPolicy("yolo"),aim.maxIteration(5),aim.timeout(45),aim.disableMCPServers(true),aim.disableAIForge(true),aim.aiCallback(smokeModel),aim.configOptions(aiagent.aiCallback(smokeModel),aiagent.functionCallMode(native),func(c) {
+                c.DisableCreateDBRuntime,c.DisablePerception,c.DisableMemoryTriage = true,true,true
+                c.AiAutoRetry,c.AiTransactionAutoRetry = 1,2
+                c.GetTimeline().SetTimelineBucketByteSize(-1)
+                return nil
+            }),func(c) { c.Stateless = true }))
+            assert step == 3
+        } else {
+            options = [ai.type("openai"),ai.baseURL(smokeBase + "/v1/chat/completions"),ai.apiKey("local-fixture"),ai.model("ai-smoking"),ai.noHttps(true),ai.timeout(15),ai.withFunctionCallMode(native),func(c) { c.Context = smokeCtx; c.DisableProviderFallback = true; c.FunctionCallRetryTimes = 2 }]
+            value = nil
+            if entry == "liteforge" {
+                result = liteforge.Execute("提取 summary 和 payload，保留扩展字段。",liteforge.output(schema),options...)~
+                value = result.Action.GetParams()
+            } else { value = ai.FunctionCall("提取 summary 和 payload，保留扩展字段。",{"summary":{"type":"string"},"payload":{}},options...)~ }
+            assert step == 2 && value.summary == "校验通过" && value.extension == "保留"
+            assert value.payload.items[0] == nil && value.payload.items[1] == true
+        }
+        printf("PASS retry %s native=%v: rejected=1 accepted=1 prefix_unchanged=true\n",entry,native)
+    }
+}
+assert len(samples) == 6
+smokeCheck()

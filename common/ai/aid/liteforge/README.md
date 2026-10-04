@@ -25,6 +25,8 @@ Gateway 的显式、按层级和按策略选择只负责选模型，结果均进
 
 两种协议都检查业务 schema 的最低约束，再执行调用方 OutputValidator；失败使用现有事务重试预算。开放对象与未知字段不裁剪，任意值使用 `{}`，未知键值 map 使用 `additionalProperties: true`。结果仍是一个对象；任意数组或标量可放在 schema 为 `{}` 的字段中。
 
+校验失败共用 `aicommon` 重试纠正：仅在原提示词末尾追加简短中文说明、具体英文错误，以及最近一次失败的 content / function arguments 和 finish reason。响应按 JSON 数据转义并限长，不重复累计历史、不复制 reasoning、不改原 schema 或缓存前缀，也不自动切换协议。函数参数必须为合法 JSON；文本流继续使用原来的 schema、`@action` 和 AITAG/nonce。网络错误与限流沿用原退避规则，不把 HTTP 错误页当作模型响应。
+
 ```json
 {
   "type": "object",

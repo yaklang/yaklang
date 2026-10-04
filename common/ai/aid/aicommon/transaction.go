@@ -107,6 +107,7 @@ func callAITransaction(
 		trcRetry = 3
 	}
 	var postHandlerErr error
+	var retryCorrectionErr error
 	var lastErr error
 	var lastCallAiErr error // 保留 API 调用错误，防止被 postHandler 错误覆盖
 	var lastRsp *AIResponse
@@ -146,7 +147,7 @@ func callAITransaction(
 		if c.IsCtxDone() {
 			return c.GetContext().Err()
 		}
-		finalPrompt := c.RetryPromptBuilder(prompt, postHandlerErr)
+		finalPrompt := c.RetryPromptBuilder(prompt, retryCorrectionErr)
 
 		utils.Debug(func() {
 			if i == 0 {
@@ -161,6 +162,12 @@ func callAITransaction(
 			append(requestOpts, WithAIRequest_SeqId(getSeq()))...,
 		)
 		lastReq = aiReq
+		aiReq.retryTrace = &retryResponseTrace{}
+		recordAttempt := func(attempt int64, callErr error, response *AIResponse) transactionAttemptRecord {
+			rec := buildAttemptRecord(attempt, finalPrompt, callErr, response)
+			aiReq.retryTrace.fillRecord(&rec)
+			return rec
+		}
 		rsp, err := callAi(aiReq)
 		// A request-scoped cancellation is a terminal control signal, not an AI
 		// failure. Check it before classifying callAi errors so a task finishing
@@ -170,6 +177,9 @@ func callAITransaction(
 			return ctxErr
 		}
 		if err != nil {
+			// Transport failures do not reject model output. Never recycle an
+			// older validation failure or provider/authentication body as advice.
+			retryCorrectionErr = nil
 			lastErr = err
 			lastCallAiErr = err
 			lastRsp = rsp
@@ -179,7 +189,7 @@ func callAITransaction(
 				if is429Retryable(transactionCtx, rsp) {
 					// 频率限流/过载类：可重试，不消耗重试次数。
 					rspEmitter.EmitWarning("429 rate limit detected in transaction layer (seq=%d), will retry without counting attempt", getSeq())
-					attemptHistory = append(attemptHistory, buildAttemptRecord(i+1, finalPrompt, err, rsp))
+					attemptHistory = append(attemptHistory, recordAttempt(i+1, err, rsp))
 					retryAfter := parseRetryAfterSeconds(rsp, 5)
 					waitSec := capRetryAfterSeconds(jitterSeconds(retryAfter, 3), 1, 120)
 					if waitErr := waitBeforeAIRetry(transactionCtx, c, time.Duration(waitSec)*time.Second); waitErr != nil {
@@ -192,7 +202,7 @@ func callAITransaction(
 			}
 
 			i++
-			attemptHistory = append(attemptHistory, buildAttemptRecord(i, finalPrompt, err, rsp))
+			attemptHistory = append(attemptHistory, recordAttempt(i, err, rsp))
 			rspEmitter.EmitError("call ai api error (attempt %d/%d): %v", i, trcRetry, err)
 			if isNonRetryableAIHTTPResponse(rsp) {
 				nonRetryableHTTPFailure = true
@@ -242,9 +252,13 @@ func callAITransaction(
 		if postHandlerErr != nil {
 			lastErr = postHandlerErr
 			i++
-			rec := buildAttemptRecord(i, finalPrompt, nil, rsp)
+			rec := recordAttempt(i, nil, rsp)
 			rec.PostHandlerErr = postHandlerErr
 			attemptHistory = append(attemptHistory, rec)
+			retryCorrectionErr = nil
+			if rsp.GetHTTPStatusCode() < 400 {
+				retryCorrectionErr = &retryCorrectionError{cause: postHandlerErr, attempt: rec}
+			}
 			rspEmitter := bindEmitter(rsp)
 			rspEmitter.EmitError("ai transaction postHandler error (attempt %d/%d): %v", i, trcRetry, postHandlerErr)
 			if isNonRetryableAIHTTPResponse(rsp) {

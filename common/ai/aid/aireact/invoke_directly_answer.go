@@ -3,6 +3,7 @@ package aireact
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"sync"
 	"sync/atomic"
 
@@ -58,12 +59,8 @@ func (r *ReAct) DirectlyAnswer(ctx context.Context, query string, tools []*aitoo
 		if err == nil {
 			return nil
 		}
-		return utils.Wrapf(
-			err,
-			"AITAG retry hint: previous response format was invalid. If your final answer is long, multi-line, markdown, or code, you MUST use AITAG instead of answer_payload. Example:\n{\"@action\":\"directly_answer\"}\n<|FINAL_ANSWER_%s|>\n# your markdown answer\n<|FINAL_ANSWER_END_%s|>",
-			nonceStr,
-			nonceStr,
-		)
+		return aicommon.WithRetryInstruction(err, fmt.Sprintf(
+			"AITAG 纠正：补全 answer_payload；长文本、多行或 Markdown 必须用 AITAG。示例：\n{\"@action\":\"directly_answer\"}\n<|FINAL_ANSWER_%s|>\n正文\n<|FINAL_ANSWER_END_%s|>", nonceStr, nonceStr))
 	}
 
 	var finalResult string

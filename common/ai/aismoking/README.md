@@ -13,6 +13,7 @@ yak common/ai/aismoking/run.yak
 | 脚本 | 覆盖内容 |
 | --- | --- |
 | [mainloop.yak](mainloop.yak) | 默认 `aim.InvokeReAct` × 两种协议；实际读文件、session Evidence、冻结提升和纯动态区不重复展示用户输入 |
+| [retry.yak](retry.yak) | `aim.InvokeReAct`、`liteforge.Execute`、`ai.FunctionCall` × 两种协议；回放真实 DSML 格式错误后重试，核对原始 arguments/content、中文纠正、schema 和缓存前缀不变，采样六份重试提示 |
 | [liteforge.yak](liteforge.yak) | `liteforge.Execute`、`ai.FunctionCall` × 默认文本/显式原生/显式文本；HTTP/SSE 首字节屏障、arguments/text 增量流、tools/tool_choice、开放 map/任意 JSON；抽取/分类/总结 × 父循环双协议 × aim/public 两个入口，验证 aim 辅助请求始终为文本流，共 18 次请求 |
 | [liteforgeapp.yak](liteforgeapp.yak) | 迁移后的公共应用入口，两种协议各一次请求，未知键及嵌套任意 JSON |
 | [rag_applications.yak](rag_applications.yak) | 真实文件读取、问题索引、知识分片、临时入库、关联与检索；模型和 embedding 使用 mock |

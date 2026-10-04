@@ -648,11 +648,17 @@ func (r *ReActLoop) callAIFunctionTransaction(
 			}
 			params := make(map[string]any)
 			dec := json.NewDecoder(strings.NewReader(rawCall.Function.Arguments))
-			if err := dec.Decode(&params); err != nil || params == nil {
-				return utils.Errorf("invalid JSON arguments for tool call %q: %v", rawCall.ID, err)
+			if err := dec.Decode(&params); err != nil {
+				return fmt.Errorf("invalid JSON arguments for tool call %q: %w", rawCall.ID, err)
+			}
+			if params == nil {
+				return utils.Errorf("invalid JSON arguments for tool call %q: expected a non-null object", rawCall.ID)
 			}
 			var extra any
 			if err := dec.Decode(&extra); err != io.EOF {
+				if err != nil {
+					return fmt.Errorf("trailing JSON arguments for tool call %q: %w", rawCall.ID, err)
+				}
 				return utils.Errorf("trailing JSON arguments for tool call %q", rawCall.ID)
 			}
 			if proposed, exists := params["@action"]; exists && proposed != rawCall.Function.Name {

@@ -32,6 +32,9 @@ type AIRequest struct {
 	// WithTools / WithToolChoice / WithToolCallCallback.
 	extraSpecOpts []aispec.AIConfigOption
 
+	// Installed by the transaction, not inherited from a parent loop's mode.
+	retryTrace *retryResponseTrace
+
 	// enableToolCallArgumentsStream, when true, tells aicaller.go to wire
 	// up ToolCallArgumentsStreamHandler → resp.EmitOutputStream so that
 	// tool_call arguments flow through the same output channel as regular
@@ -232,7 +235,12 @@ func (a *AIRequest) GetExtraSpecOpts() []aispec.AIConfigOption {
 	if a == nil {
 		return nil
 	}
-	return a.extraSpecOpts
+	if a.retryTrace == nil {
+		return a.extraSpecOpts
+	}
+	// Copy so repeated reads cannot grow or mutate the request's option list.
+	opts := append([]aispec.AIConfigOption(nil), a.extraSpecOpts...)
+	return append(opts, a.retryTrace.option())
 }
 
 // WithAIRequest_EnableToolCallArgumentsStream tells aicaller.go to stream

@@ -60,6 +60,11 @@ type transactionAttemptRecord struct {
 	// AsyncCallbackErr is the error stored on the response via SetError by
 	// the async AI callback goroutine (e.g. timeout while streaming).
 	AsyncCallbackErr error
+
+	Protocol, FinishReason           string
+	ToolCalls                        []retryToolCall
+	ToolCallsTruncated               bool
+	OutputTruncated, ReasonTruncated bool
 }
 
 // buildAttemptRecord collects a snapshot of the current attempt's diagnostic
@@ -85,15 +90,23 @@ func buildAttemptRecord(attempt int64, prompt string, callAiErr error, rsp *AIRe
 // ToMap converts the attempt record into a JSON-friendly map suitable for
 // inclusion in the structured AI call failure event payload.
 func (r transactionAttemptRecord) ToMap() map[string]any {
+	output, outputClipped := clipRetryText(r.PlainOutput, 4096)
+	reason, reasonClipped := clipRetryText(r.PlainReason, 4096)
 	m := map[string]any{
-		"attempt":      r.Attempt,
-		"prompt":       r.PromptSummary,
-		"http_status":  r.HTTPStatus,
-		"provider":     r.ProviderName,
-		"model":        r.ModelName,
-		"output":       utils.ShrinkString(r.PlainOutput, 4096),
-		"reason":       utils.ShrinkString(r.PlainReason, 4096),
-		"raw_response": utils.ShrinkString(r.RawHTTPResponseDump, 4096),
+		"attempt":              r.Attempt,
+		"prompt":               r.PromptSummary,
+		"http_status":          r.HTTPStatus,
+		"provider":             r.ProviderName,
+		"model":                r.ModelName,
+		"output":               output,
+		"reason":               reason,
+		"raw_response":         utils.ShrinkString(r.RawHTTPResponseDump, 4096),
+		"protocol":             r.Protocol,
+		"finish_reason":        r.FinishReason,
+		"tool_calls":           r.ToolCalls,
+		"tool_calls_truncated": r.ToolCallsTruncated,
+		"output_truncated":     r.OutputTruncated || outputClipped,
+		"reason_truncated":     r.ReasonTruncated || reasonClipped,
 	}
 	if r.CallAiErr != nil {
 		m["call_ai_error"] = r.CallAiErr.Error()
@@ -108,10 +121,13 @@ func (r transactionAttemptRecord) ToMap() map[string]any {
 }
 
 // FailedAIOutput returns a shrunk copy of the AI output text that caused this
-// attempt to fail. It prefers the plain output, then the plain reason. The
+// attempt to fail. It prefers native arguments, then output and reason. The
 // raw HTTP response dump is intentionally excluded — showing raw HTTP to the
 // AI is meaningless for retry correction.
 func (r transactionAttemptRecord) FailedAIOutput() string {
+	if len(r.ToolCalls) > 0 {
+		return utils.ShrinkString(r.failedArguments(), 2048)
+	}
 	if r.PlainOutput != "" {
 		return utils.ShrinkString(r.PlainOutput, 2048)
 	}
@@ -153,6 +169,9 @@ func (r transactionAttemptRecord) String() string {
 	}
 	if r.PlainOutput != "" {
 		fmt.Fprintf(&b, "    output: %s\n", utils.ShrinkString(r.PlainOutput, 2048))
+	}
+	if len(r.ToolCalls) > 0 {
+		fmt.Fprintf(&b, "    function calls (finish_reason=%s): %s\n", r.FinishReason, utils.ShrinkString(r.failedArguments(), 2048))
 	}
 	// Only show the raw HTTP dump when no plain output was captured, to avoid
 	// drowning the readable text in a hard-to-parse HTTP blob.

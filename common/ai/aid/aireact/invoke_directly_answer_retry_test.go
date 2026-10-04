@@ -129,15 +129,15 @@ func TestReAct_DirectlyAnswer_RetryIncludesLastErrorAndAITAGHint(t *testing.T) {
 	if len(capturedPrompts) != 3 {
 		t.Fatalf("expected 3 captured prompts, got %d", len(capturedPrompts))
 	}
-	if strings.Contains(capturedPrompts[0], "AITAG retry hint:") {
+	if strings.Contains(capturedPrompts[0], "AITAG 纠正：") {
 		t.Fatalf("first prompt should not contain retry hint: %s", capturedPrompts[0])
 	}
 	if !utils.MatchAllOfSubString(
 		capturedPrompts[1],
-		"Retry due to error:",
+		"# 重试纠正",
 		"no answer_payload key in stream",
-		"AITAG retry hint:",
-		"MUST use AITAG",
+		"AITAG 纠正：",
+		"必须用 AITAG",
 		"<|FINAL_ANSWER_",
 	) {
 		t.Fatalf("second prompt should include retry reason and AITAG hint, got: %s", capturedPrompts[1])

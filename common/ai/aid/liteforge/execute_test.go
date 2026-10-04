@@ -86,9 +86,19 @@ func TestProtocolsValidateMinimumFieldsAndRetry(t *testing.T) {
 			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 			defer cancel()
 			var calls atomic.Int32
+			var initialPrompt string
 			result, err := Execute(ctx, Request{ActionName: "result", Schema: openSchema}, append(testOptions(native, func(c aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 				if calls.Add(1) == 1 {
+					initialPrompt = req.GetPrompt()
 					return response(c, req, native, `{"payload":null}`), nil
+				}
+				require.True(t, strings.HasPrefix(req.GetPrompt(), initialPrompt))
+				if native {
+					require.Contains(t, req.GetPrompt(), `"protocol":"function_call"`)
+					require.Contains(t, req.GetPrompt(), `"arguments":"{\"payload\":null}"`)
+				} else {
+					require.Contains(t, req.GetPrompt(), `"protocol":"text_stream"`)
+					require.Contains(t, req.GetPrompt(), `"content":"{\"payload\":null}"`)
 				}
 				require.Contains(t, req.GetPrompt(), "summary")
 				return response(c, req, native, `{"summary":"合法结果","payload":null,"extra":true}`), nil

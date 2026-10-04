@@ -2,6 +2,7 @@ package reactloops
 
 import (
 	"context"
+	"errors"
 	"io"
 	"strings"
 	"testing"
@@ -39,6 +40,13 @@ func newMinimalLoopForHelperTest() *ReActLoop {
 	return &ReActLoop{vars: omap.NewEmptyOrderedMap[string, any]()}
 }
 
+func answerRetryInstruction(t *testing.T, err error) string {
+	t.Helper()
+	var hint interface{ RetryInstruction() string }
+	require.True(t, errors.As(err, &hint))
+	return hint.RetryInstruction()
+}
+
 func TestWrapDirectlyAnswerError_NilErrReturnsNil(t *testing.T) {
 	loop := newMinimalLoopForHelperTest()
 	loop.Set("last_ai_decision_nonce", "abcd1234")
@@ -49,16 +57,16 @@ func TestWrapDirectlyAnswerError_NoLoopFallback(t *testing.T) {
 	got := WrapDirectlyAnswerError(nil, utils.Error("inner"))
 	require.Error(t, got)
 	assert.Contains(t, got.Error(), "inner")
-	assert.Contains(t, got.Error(), "AITAG retry hint")
+	assert.Contains(t, answerRetryInstruction(t, got), "answer_payload")
 }
 
 func TestWrapDirectlyAnswerError_NoNonceFallback(t *testing.T) {
 	got := WrapDirectlyAnswerError(newMinimalLoopForHelperTest(), utils.Error("answer_payload required"))
 	require.Error(t, got)
 	assert.Contains(t, got.Error(), "answer_payload required")
-	assert.Contains(t, got.Error(), "AITAG retry hint")
-	assert.Contains(t, got.Error(), "missing nonce")
-	assert.NotContains(t, got.Error(), "<|FINAL_ANSWER_")
+	assert.Contains(t, answerRetryInstruction(t, got), "AITAG 纠正")
+	assert.Contains(t, answerRetryInstruction(t, got), "缺少 nonce")
+	assert.NotContains(t, answerRetryInstruction(t, got), "<|FINAL_ANSWER_")
 }
 
 func TestWrapDirectlyAnswerError_FullHint(t *testing.T) {
@@ -68,13 +76,13 @@ func TestWrapDirectlyAnswerError_FullHint(t *testing.T) {
 
 	got := WrapDirectlyAnswerError(loop, utils.Error("answer_payload is required for ActionDirectlyAnswer but empty"))
 	require.Error(t, got)
-	msg := got.Error()
-	assert.Contains(t, msg, "AITAG retry hint")
+	msg := answerRetryInstruction(t, got)
+	assert.Contains(t, msg, "AITAG 纠正")
 	assert.Contains(t, msg, "<|FINAL_ANSWER_"+nonce+"|>")
 	assert.Contains(t, msg, "<|FINAL_ANSWER_END_"+nonce+"|>")
-	assert.Contains(t, msg, "MUST emit AITAG block")
+	assert.Contains(t, msg, "必须用 AITAG")
 	assert.Contains(t, msg, `{"@action":"directly_answer"}`)
-	assert.Contains(t, msg, "answer_payload is required for ActionDirectlyAnswer but empty")
+	assert.Equal(t, "answer_payload is required for ActionDirectlyAnswer but empty", got.Error())
 }
 
 func TestWrapDirectlyAnswerError_NonceTrim(t *testing.T) {
@@ -83,7 +91,7 @@ func TestWrapDirectlyAnswerError_NonceTrim(t *testing.T) {
 
 	got := WrapDirectlyAnswerError(loop, utils.Error("x"))
 	require.Error(t, got)
-	msg := got.Error()
+	msg := answerRetryInstruction(t, got)
 	assert.Contains(t, msg, "<|FINAL_ANSWER_trimmed-nonce|>")
 	assert.NotContains(t, msg, "<|FINAL_ANSWER_   trimmed")
 }
@@ -97,9 +105,23 @@ func TestActionBuiltinDirectlyAnswerVerifier_EmptyPayloadEmitsAITAGHint(t *testi
 	require.NoError(t, err)
 	verr := loopAction_DirectlyAnswer.ActionVerifier(loop, action)
 	require.Error(t, verr)
-	assert.Contains(t, verr.Error(), "AITAG retry hint")
-	assert.Contains(t, verr.Error(), "<|FINAL_ANSWER_"+nonce+"|>")
+	assert.Contains(t, answerRetryInstruction(t, verr), "AITAG 纠正")
+	assert.Contains(t, answerRetryInstruction(t, verr), "<|FINAL_ANSWER_"+nonce+"|>")
 	assert.Contains(t, verr.Error(), "answer_payload is required")
+}
+
+func TestWrapDirectlyAnswerError_NativeHintDoesNotRequestTextTags(t *testing.T) {
+	loop := newMinimalLoopForHelperTest()
+	loop.functionCallMode = true
+	cause := errors.New("answer_payload is required")
+	err := WrapDirectlyAnswerError(loop, cause)
+	require.ErrorIs(t, err, cause)
+	require.Equal(t, cause.Error(), err.Error(), "console error stays English")
+	hint := answerRetryInstruction(t, err)
+	require.Contains(t, hint, "arguments.answer_payload")
+	require.Contains(t, hint, `{"answer_payload":"# 结论\n验证结果"}`)
+	require.NotContains(t, hint, "<|FINAL_ANSWER_")
+	require.NotContains(t, hint, `{"@action"`)
 }
 
 func TestActionBuiltinDirectlyAnswerVerifier_HasPayloadPasses(t *testing.T) {

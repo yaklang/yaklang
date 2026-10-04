@@ -9,7 +9,7 @@ file.MkdirAll(root)~
 // A reused output directory must not retain the success marker of an older run.
 if file.IsExisted(file.Join(root,"PASS")) { file.Remove(file.Join(root,"PASS"))~ }
 binary = os.Executable()~
-cases = ["mainloop","liteforge","liteforgeapp","rag_applications","planning","exploration","coordinator","notifications","controls","forge","hostscan","cache/selftest"]
+cases = ["mainloop","retry","liteforge","liteforgeapp","rag_applications","planning","exploration","coordinator","notifications","controls","forge","hostscan","cache/selftest"]
 selected = os.Getenv("AISMOKING_CASE")
 if selected != "" {
     if !(selected in cases) { println("Unknown AISMOKING_CASE; choose a case listed in README.md"); os.Exit(1) }

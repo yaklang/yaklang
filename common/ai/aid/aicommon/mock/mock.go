@@ -246,10 +246,7 @@ func (m *MockedAIConfig) GetPlanExecTaskConcurrency() int {
 }
 
 func (m *MockedAIConfig) RetryPromptBuilder(originalPrompt string, err error) string {
-	if err == nil {
-		return originalPrompt
-	}
-	return fmt.Sprintf("Retry prompt for error: %v\nOriginal: %s", err, originalPrompt)
+	return (&aicommon.Config{}).RetryPromptBuilder(originalPrompt, err)
 }
 
 func (m *MockedAIConfig) GetEmitter() *aicommon.Emitter {
