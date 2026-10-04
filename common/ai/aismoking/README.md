@@ -22,6 +22,7 @@ yak common/ai/aismoking/run.yak
 | [notifications.yak](notifications.yak) | 两种协议；不调用 wait action，idle 自动休眠、发现先保存再唤醒、重复 Evidence 不唤醒、完成后自动验收；休眠屏障确认没有模型轮询 |
 | [controls.yak](controls.yak) | 两种协议；inspect、reject、retry、cancel、唯一新尝试、取消任务不启动、最终交付保留拒绝/取消事实 |
 | [forge.yak](forge.yak) | 自由规划/preset/mocker × 两种协议；新 coordinator 底层、依赖任务、持久业务指令传入协调员/worker/结果上下文、共享 Evidence、一次业务格式化、开放结果对象、一次结果回调及重复 Run 幂等；附带默认 aim 入口 |
+| [hostscan.yak](hostscan.yak) | 默认 `aim.InvokeReAct` 的 load_capability / require_ai_blueprint × 两种协议；父会话启用 detached PLAN，内置 hostscan 保持实时审核、八个预置 DAG 任务及前置验收、真实只读工具、共享 Evidence、验收和一次业务报告；提供方失败向调用者返回错误。模型用本地夹具模拟结果，不实际扫描主机 |
 | [cache/selftest.yak](cache/selftest.yak) | usage 与 dump 的 correlation ID 对齐、缺失与取消、模型分组、加权缓存统计，不把缺失用量当作零命中 |
 
 每份脚本均可独立执行，例如（直接运行时沿用当前 profile 的全局后台价值评估配置；需要完全隔离时用总入口的 `AISMOKING_CASE`）：
@@ -34,6 +35,8 @@ yak common/ai/aismoking/forge.yak
 ```
 
 总入口可通过环境变量 `AISMOKING_CASE` 只运行表中的一个文件名（不含 `.yak`，缓存例为 `cache/selftest`）。`AISMOKING_OUTPUT` 指定输出根目录；缺省保存在系统临时目录。`results.json` 记录各例结果和耗时，子目录含 `run.log`、实际 provider 请求采样及上下文检查数据。总入口要求子例输出完成标记且没有 Yak panic，任一失败以非零退出；这也防止旧 CLI 在脚本 panic 后仍返回 0 被误算为通过。
+
+`hostscan.yak` 默认运行四条完整链路，限定总时长 360 秒、单次调用 120 秒，失败传播例不执行扫描。复测单路时，可设置 `AISMOKING_HOSTSCAN_MODE=true/false` 和 `AISMOKING_HOSTSCAN_ENTRY=load_capability/require_ai_blueprint`；结果写入 `hostscan-results.json`，事件和 provider 请求均保留。共享夹具默认总时长 240 秒，`AISMOKING_TIMEOUT_SECONDS` 可指定 1–600 秒的有限预算。
 
 缓存断言检查固定分区和同阶段工具声明稳定，保留请求采样；native replay 可能拆成更多 messages，按分区标记查找内容。mock 不报告实际 provider 缓存利用率。真实用量缺失时保留 `null`，只有 live provider usage 能计算实际缓存比例。
 

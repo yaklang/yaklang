@@ -74,6 +74,9 @@ func (e *ForgeExecution) Result() *ForgeResult {
 func (e *ForgeExecution) Run() error {
 	e.runOnce.Do(func() {
 		e.err = e.Session.Run()
+		if e.err == nil && !e.Snapshot().Finished {
+			e.err = fmt.Errorf("Forge execution ended before business delivery (phase=%s, review_pending=%t)", e.Snapshot().Phase, e.Snapshot().ReviewPending)
+		}
 		if e.err == nil && e.Snapshot().Report.DeliveryPath != "" && e.Result().Formated == nil {
 			raw, err := os.ReadFile(e.Snapshot().Report.DeliveryPath)
 			if err != nil {
