@@ -12,6 +12,8 @@ import (
 
 var timelineCompressionTemplate = promptloader.MustLoad("ai/aid/aicommon/prompts/timeline/compression.txt")
 
+var timelineCompressionInstruction = promptloader.MustLoad("ai/aid/aicommon/prompts/timeline/compression_instruction.txt")
+
 var timelineCompressionSchema = promptloader.MustLoad("ai/aid/aicommon/prompts/timeline/compression.json")
 
 // renderCompressionSummaryPrompt renders one complete reduction request. Native
@@ -75,7 +77,7 @@ func (m *Timeline) summarizeCompressionSnapshot(snapshot *timelineCompressionSna
 	if ctx == nil {
 		ctx = m.config.GetContext()
 	}
-	if limit.MaxInputTokens > 0 && TokenCountExceeds(prompt+"\n"+timelineCompressionSchema, limit.MaxInputTokens) {
+	if limit.MaxInputTokens > 0 && TokenCountExceeds(timelineCompressionInstruction+"\n"+prompt+"\n"+timelineCompressionSchema, limit.MaxInputTokens) {
 		return "", fmt.Errorf("timeline compression input exceeds safety limit %d; source preserved", limit.MaxInputTokens)
 	}
 	var summary string
@@ -119,6 +121,7 @@ func (m *Timeline) summarizeCompressionSnapshot(snapshot *timelineCompressionSna
 		WithAuxiliaryOutputSchema("timeline-summary", timelineCompressionSchema),
 		WithAuxiliaryOnError(func(err error) { resultErr = fmt.Errorf("timeline compression request failed: %w", err) }),
 		WithAuxiliaryOpts(WithLiteForgeDisableTimeline(),
+			WithLiteForgeStaticInstruction(timelineCompressionInstruction),
 			WithLiteForgeMaxPromptTokens(limit.MaxInputTokens),
 			WithGeneralConfigExtraRequestOpts(WithAIRequest_CallerLabel(CallerLabelTimelineCompress))),
 	)

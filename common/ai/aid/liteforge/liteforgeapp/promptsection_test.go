@@ -77,11 +77,11 @@ func TestLiteForgePrompt_SplitsIntoFourSections(t *testing.T) {
 	require.Contains(t, sections, aiprojection.SectionTimeline)
 	require.Contains(t, sections, aiprojection.SectionDynamic)
 
-	// high-static 段：仅含 Preset / Output Formatter 通用文案 (P0-B1: SCHEMA 与
+	// high-static 段：仅含协议与通用格式规则 (P0-B1: SCHEMA 与
 	// Instruction 已下移到 semi-dynamic 段, 让 high-static 跨 forge byte-stable)
 	hs := sections[aiprojection.SectionHighStatic]
 	require.Contains(t, hs.Content, "# Preset")
-	require.Contains(t, hs.Content, "# Output Formatter")
+	require.Contains(t, hs.Content, "# JSON 序列化")
 	require.NotContains(t, hs.Content, "# SCHEMA",
 		"P0-B1: SCHEMA must NOT appear in high-static anymore (moved to semi-dynamic)")
 	require.NotContains(t, hs.Content, "<schema>",

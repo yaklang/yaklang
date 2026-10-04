@@ -2,6 +2,7 @@ package aimem
 
 import (
 	"context"
+	"encoding/json"
 	"strings"
 	"testing"
 
@@ -19,16 +20,15 @@ func TestAddRawText_BoundsMemoryTriageInput(t *testing.T) {
 	mockInvoker := NewAdvancedMockInvoker(context.Background())
 	mockInvoker.SetPromptValidator("memory-triage", func(prompt string) bool {
 		prompt = strings.ReplaceAll(prompt, "\r\n", "\n")
-		queryStart := strings.Index(prompt, "<|QUERY_")
+		queryStart := strings.Index(prompt, "{\n")
 		if queryStart < 0 {
 			return false
 		}
-		queryStart = strings.Index(prompt[queryStart:], "|>\n") + queryStart + len("|>\n")
-		queryEnd := strings.Index(prompt[queryStart:], "\n<|QUERY_END_")
-		if queryStart < len("|>\n") || queryEnd < 0 {
+		var source map[string]string
+		if json.Unmarshal([]byte(prompt[queryStart:]), &source) != nil {
 			return false
 		}
-		query := prompt[queryStart : queryStart+queryEnd]
+		query := source["query"]
 		return ytoken.CalcTokenCount(query) <= memoryTriageInputTokenLimit &&
 			strings.Contains(query, "HEAD_SENTINEL") &&
 			strings.Contains(query, "TAIL_SENTINEL") &&
@@ -165,9 +165,10 @@ func TestHandleMemory_PromptContainsDurableMemoryRules(t *testing.T) {
 	mockInvoker := NewAdvancedMockInvoker(context.Background())
 	mockInvoker.SetPromptValidator("memory-triage", func(prompt string) bool {
 		prompt = strings.ReplaceAll(prompt, "\r\n", "\n")
-		return strings.Contains(prompt, "Do NOT create memory for one-off events") &&
-			strings.Contains(prompt, "Do NOT use pronouns or deictic references") &&
-			strings.Contains(prompt, "return an empty memory_entities array")
+		return strings.Contains(prompt, "没有符合标准的内容时，memory_entities 为真正的空数组") &&
+			strings.Contains(prompt, "每条 content 应单独可理解") &&
+			strings.Contains(prompt, "不能凭空扩写成未来都沿用既定方案") &&
+			!strings.Contains(prompt, "<|AI_CACHE_SYSTEM_high-static|>")
 	})
 
 	memory, err := CreateTestAIMemory(t, sessionID, WithInvoker(mockInvoker))

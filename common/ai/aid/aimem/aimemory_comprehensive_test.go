@@ -133,6 +133,10 @@ func (m *AdvancedMockInvoker) InvokeQualityPriorityLiteForge(ctx context.Context
 }
 
 func (m *AdvancedMockInvoker) InvokeLiteForge(ctx context.Context, actionName string, prompt string, outputs []aitool.ToolOption, opts ...aicommon.GeneralKVConfigOption) (*aicommon.Action, error) {
+	// Match the production separation of stable instructions and input data.
+	if instruction := aicommon.NewGeneralKVConfig(opts...).GetLiteForgeStaticInstruction(); instruction != "" {
+		prompt = instruction + "\n" + prompt
+	}
 	// Capture configuration under the lock, then allow concurrent work and validators.
 	m.mu.Lock()
 	m.capturedActions = append(m.capturedActions, actionName)

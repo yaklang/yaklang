@@ -13,7 +13,7 @@ const RecentTimelineTokens = 4 * 1024
 
 type PromptParams struct {
 	Nonce, Prompt, StaticInstruction, Params, Schema, PersistentMemory string
-	FunctionCallSchema                                                 string
+	FunctionCallSchema, FunctionName                                   string
 	TimelineDump, TimelineFrozenBlock, TimelineOpen                    string
 }
 
