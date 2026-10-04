@@ -11,7 +11,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
-	"github.com/yaklang/yaklang/common/ai/aid/coordinator_legacy"
+	"github.com/yaklang/yaklang/common/ai/aid/coordinator"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
@@ -80,37 +80,47 @@ func TestPublishDetachedPlan_PersistsSessionAndEmitsEvent(t *testing.T) {
 	require.Contains(t, record.TaskTree, "do something")
 }
 
-func TestFormatDetachedPlanTimelineContent_IncludesNestedTasks(t *testing.T) {
-	root := &coordinator_legacy.AiTask{
-		Name: "main-plan",
-		Goal: "main goal",
-		Subtasks: []*coordinator_legacy.AiTask{
-			{
-				Name: "parent-task",
-				Goal: "parent goal",
-				Subtasks: []*coordinator_legacy.AiTask{
-					{Name: "child-task", Goal: "child goal"},
-				},
-			},
-		},
+func TestPublishDetachedPlan_PreservesNestedDefinitionAndDocument(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	sessionID := uuid.NewString()
+	db := consts.GetGormProjectDatabase()
+	require.NoError(t, db.AutoMigrate(&schema.AISessionPlanAndExec{}).Error)
+	reactIns, err := NewTestReAct(aicommon.WithContext(ctx), aicommon.WithPersistentSessionId(sessionID), aicommon.WithWorkdir(t.TempDir()))
+	require.NoError(t, err)
+	input := &aicommon.ExecutePlanInput{
+		PlanPayload: "user query",
+		PlanData: `{"name":"main-plan","goal":"main goal","subtasks":[
+			{"name":"parent-task","goal":"parent goal","subtasks":[
+				{"name":"child-task","goal":"child goal"}
+			]}
+		]}`,
+		PlanDocument: "# Nested plan document",
 	}
-	content := coordinator_legacy.FormatDetachedPlanTimelineContent(
-		"coord-1",
-		"session-1",
-		"react-task-1",
-		root,
-		&aicommon.ExecutePlanInput{
-			PlanPayload:  "user query",
-			PlanData:     `{"@action":"plan","main_task":"main-plan"}`,
-			PlanDocument: "document",
-		},
-	)
-	require.Contains(t, content, "coordinator_id: coord-1")
-	require.Contains(t, content, "# main-plan")
-	require.Contains(t, content, "- parent-task")
-	require.Contains(t, content, "- child-task")
-	require.Contains(t, content, "## plan_document")
-	require.Contains(t, content, "## plan_data")
+	coordinatorID, err := reactIns.PublishDetachedPlan(ctx, input, "react-task-1")
+	require.NoError(t, err)
+	record, err := yakit.GetAISessionPlanAndExecByCoordinatorID(db, coordinatorID)
+	require.NoError(t, err)
+	require.Equal(t, sessionID, record.SessionID)
+	content := collectTimelineText(reactIns)
+	require.Contains(t, content, "[DETACHED_PLAN]")
+	require.Contains(t, content, coordinatorID)
+	// The native snapshot owns the document and definition used to rebuild
+	// stable context partitions. The Timeline carries the publication receipt.
+	var progress coordinator.Progress
+	require.NoError(t, json.Unmarshal([]byte(record.TaskProgress), &progress))
+	require.Equal(t, coordinator.Name, progress.PlanEngine)
+	require.NotNil(t, progress.CoordinatorState)
+	require.NotNil(t, progress.CoordinatorState.Plan)
+	require.True(t, progress.CoordinatorState.ReviewPending)
+	definition := progress.CoordinatorState.PlanDefinition()
+	for _, name := range []string{"main-plan", "parent-task", "child-task"} {
+		require.Contains(t, record.TaskTree, name)
+		require.Contains(t, definition, name)
+	}
+	require.Contains(t, definition, "PLAN DEFINITION")
+	require.Equal(t, input.PlanDocument, progress.CoordinatorState.Plan.Document)
+	require.NotContains(t, content, "child goal", "the publication receipt must not duplicate the plan tree")
 }
 
 func collectTimelineText(reactIns *ReAct) string {

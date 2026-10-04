@@ -4,7 +4,7 @@
 
 这个目录独立拥有 [Session](session.go)、计划树与 DAG、控制对象、模型 actions、worker、工具权限、原生辅助调用，以及 [Yakit 事件和存储适配](session_events.go)。新运行体不构造或调用 `coordinator_legacy.Coordinator`、旧 `AiTask`、旧 PLAN runtime，也不借用旧 LiteForge 构造通道。
 
-最上层 [coordinator.go](../aireact/coordinator.go) 默认使用新版。旧引擎的实现、任务和私有资源仍集中在同层 [coordinator_legacy](../coordinator_legacy/README.md)，供后续移除；ReAct 的 PLAN 入口不再调用它。两边共享 aicommon、reactloops、Timeline、事件封套和数据库表这些通用基础设施，不共享执行状态机。父级 `aid` 只保留公共接口，不提供旧类型的兼容别名。
+最上层 [coordinator.go](../aireact/coordinator.go) 默认使用新版。旧引擎的实现、任务和私有资源整包保留在同层 [coordinator_legacy](../coordinator_legacy/README.md)，包外生产代码和测试不再导入它或其子包。两边共享 aicommon、reactloops、Timeline、事件封套和数据库表这些通用基础设施，不共享执行状态机。父级 `aid` 只保留公共接口，不提供旧类型的兼容别名。
 
 [Legacy 接口迁移契约](LEGACY_INTERFACE.md) 分别定义 aiforge 底层迁移和边缘 legacy coordinator 接口兼容，包含接入清单、mocker/结果交付、Yak 配置继承、审核事件、观测、恢复与双协议验收要求。当前默认 Forge 已切换到新版，具体接口、边界与本地验收见该文档第 14 节。
 

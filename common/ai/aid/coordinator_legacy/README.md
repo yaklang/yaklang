@@ -1,6 +1,6 @@
 # coordinator_legacy：旧 PLAN 引擎
 
-这个目录集中保存旧引擎的实现和专属资源，供后续按模块移除。ReAct / gRPC PLAN 已默认使用新版，旧专注入口不再开放，历史旧计划禁止继续执行。`aid` 根包不再代理旧构造器或提供类型别名；新 `coordinator` 不依赖此包。
+这个目录整包保留旧引擎的实现和专属资源，不删除旧执行代码。包外生产代码和测试不再导入本包或其子包。ReAct / gRPC PLAN、Forge、Yak 工厂、扫描入口与任务观测均使用新版，旧专注入口不再开放，历史旧计划禁止继续执行。`aid` 根包不再代理旧构造器或提供类型别名。
 
 ## 包内职责
 
@@ -19,13 +19,13 @@ if err != nil { return err }
 return cod.Run()
 ```
 
-## 宿主适配和移除边界
+## 包外隔离边界
 
-[aireact/coordinator_legacy.go](../aireact/coordinator_legacy.go) 暂存旧 ReAct 宿主适配，供后续清理；当前 detached、恢复、PLAN-only 路由均不调用它。旧执行机制归本目录所有。公共任务观测接收 `CollectPlanExecutionSnapshots` 的结果，不依赖具体旧任务类型。
+旧 ReAct 宿主适配已删除，旧执行机制仅保留在本目录。公共任务观测接收新版 `coordinator.CollectPlanExecutionSnapshots` 的结果，不读取旧任务或旧注册表。
 
-`aiforge`、`yak/aiagent` 和扫描入口目前仍显式调用旧引擎，运行观测也仍读取旧实例。它们的 Go import 已改为 `coordinator_legacy`；Yak 导出名、前端事件、数据库结构没有随目录迁移改名。`aireducer` 已移除旧上下文依赖，仅负责分块和处理回调。旧 gRPC `StartAITask`、`StartAITriage` 已停用，保留协议签名并立即返回过时错误，执行统一使用 `StartAIReAct`。
+Yak 导出名、前端事件和数据库结构保留原有契约；必要适配由新版或公共边界承担，不构造旧对象。旧 focus 名称只映射到新版，旧数据库运行快照继续返回明确拒绝恢复错误。旧 gRPC `StartAITask`、`StartAITriage` 已停用，保留协议签名并立即返回过时错误，执行统一使用 `StartAIReAct`。
 
-未来移除旧版时，需要先迁移这些显式调用方和旧历史数据恢复入口，再删除宿主旧适配、`reactinit` 中旧循环的注册和本目录。不能只删除目录而保留调用方。新增 PLAN 行为应实现于兄弟目录 `coordinator`，不往公共层添加旧版兼容别名。
+新增 PLAN 行为应实现于兄弟目录 `coordinator`，不往公共层添加旧版兼容别名，也不从包外导入本包以获取测试夹具、常量或格式化函数。旧库自身的测试和 `cmd` 示例仍可在本目录内显式调用旧实现，正式入口不加载旧循环注册。
 
 审批校验和执行入口统一使用 `BuildRootTaskFromPlanData`，同时接受模型的 `@action: plan` 和前端/存储的 `name/subtasks` 任务树。不能只在发布或入队时转换：detached 确认默认读取已保存的任务树，队列实际执行时也必须能初始化它。
 
@@ -38,4 +38,4 @@ go test ./common/ai/aid/coordinator_legacy/integration
 
 当前默认入口的审核、执行和 gRPC 回归位于新版 [coordinator](../coordinator/README.md)，使用真实队列和执行器，检查两个依赖任务完成及原连接继续可用。
 
-CI 的旧集成测试分组已跟随迁移到 `coordinator_legacy/integration`。新引擎的 Yak/aim 原生函数调用冒烟在 [coordinator](../coordinator/README.md)，不经过旧状态机。
+正式 CI 不再运行本目录测试。两项新版 Forge 持久上下文回归已迁到 `common/ai/aiforge/forge_prompt_markers_test.go`，继续交叉验证 function call / text stream；包外 detached 回归直接验证新版发布和快照。新引擎的 Yak/aim 冒烟在 [aismoking](../../aismoking/README.md)，仅供本地开发运行。

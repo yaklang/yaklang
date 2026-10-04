@@ -32,8 +32,8 @@ Evidence 的事实源是 Timeline journal。`evidenceJSON` / 数据库 `quoted_e
 | 完整小链路 | `aireact/evidence_lifecycle_test.go` | 真实 Action→Config→Timeline→完整 loop prompt；回执不重复；freeze；删除 |
 | Prompt 位置 | `aireact/evidence_prompt_test.go`、`evidence_params_prompt_test.go` | 主循环、TODO 相对位置和参数生成 Open/semi 路由 |
 | 数据库恢复 | `aireact/evidence_persistence_test.go` | 跨运行持久化、连续空闲重启、冻结范围保留、删除不复活 |
-| Plan | `aireact/reactloops/loopinfra/evidence_action_test.go`、`coordinator_legacy/evidence_plan_context_test.go` | 共享 save_evidence 写入 session journal，动态提示词不重复展示共享证据 |
-| 验证/指导提示词 | `aireact/evidence_verification*_test.go`、`evidence_policy_test.go`、`evidence_tool_history_test.go`、`coordinator_legacy/loop_plan/evidence_guidance_test.go` | mock 验证输出解析、证据纪律、历史工具信息和指导文档 |
+| Plan | `coordinator/task_results_test.go`、`action_outcome_test.go`、`planning_submission_smoke_test.go` | 共享证据及任务结果写入 session journal，冻结后提升，动态提示词不重复展示共享证据 |
+| 验证/指导提示词 | `aireact/evidence_verification*_test.go`、`evidence_policy_test.go`、`evidence_tool_history_test.go` | mock 验证输出解析、证据纪律、历史工具信息和指导文档 |
 | 子任务 | `aireact/reactloops/evidence_subagent_context_test.go` | 排队快照、继承/隔离模式、清洁时间线的上下文继承 |
 | 专用分析循环 | `aireact/reactloops/loop_http_flow_analyze/evidence_findings_prompt_test.go` | 独立 evidence 字段及答复职责 |
 
@@ -46,5 +46,5 @@ rg --files common/ai/aid -g 'evidence_*_test.go'
 运行全部 Evidence 测试（无需远端模型；持久化测试使用测试运行时的本地数据库）：
 
 ```powershell
-go test -p 1 ./common/ai/aid/aicommon ./common/ai/aid/aiprojection ./common/ai/aid/aireact ./common/ai/aid/coordinator_legacy ./common/ai/aid/aireact/reactloops ./common/ai/aid/aireact/reactloops/loopinfra ./common/ai/aid/coordinator_legacy/loop_plan ./common/ai/aid/aireact/reactloops/loop_http_flow_analyze -run Evidence -count=1 -timeout 120s
+go test -p 1 ./common/ai/aid/aicommon ./common/ai/aid/aiprojection ./common/ai/aid/aireact ./common/ai/aid/coordinator ./common/ai/aid/aireact/reactloops ./common/ai/aid/aireact/reactloops/loopinfra ./common/ai/aid/aireact/reactloops/loop_http_flow_analyze -run 'Evidence|CoordinatorTask(Result|Observation)|CoordinatorActionOutcome|CoordinatorPlanningSubmissionSmoke' -count=1 -timeout 120s
 ```
