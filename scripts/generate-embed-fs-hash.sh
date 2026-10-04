@@ -24,7 +24,7 @@ run_yak embed-fs-hash \
   --type syntaxflow --dir common/syntaxflow/sfbuildin/buildin \
   --output-file common/consts/syntaxflow-hash.go
 run_yak embed-fs-hash \
-  --type forge --dir common/aiforge/buildinforge \
+  --type forge --dir common/ai/aiforge/buildinforge \
   --output-file common/consts/forge-hash.go
 run_yak embed-fs-hash \
   --type aitool --dir common/ai/aid/aitool/buildinaitools/yakscripttools/yakscriptforai \

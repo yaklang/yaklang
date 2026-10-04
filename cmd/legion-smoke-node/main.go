@@ -15,7 +15,7 @@ import (
 	"time"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools/yakscripttools"
-	"github.com/yaklang/yaklang/common/aiforge"
+	"github.com/yaklang/yaklang/common/ai/aiforge"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/node"
 	"github.com/yaklang/yaklang/common/spec"

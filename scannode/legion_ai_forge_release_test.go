@@ -151,14 +151,11 @@ func TestBuildContextForgeBlueprintUsesPlatformResultGenerator(t *testing.T) {
 			release.RetryEmptyOutput = test.retry
 			release.ResultPrompt = "Return only JSON with a report field."
 			rehashLegionContextForgeRelease(t, release)
-			config, blueprint, params, err := buildContextForgeBlueprint(release, "original user input")
+			_, blueprint, params, err := buildContextForgeBlueprint(release, "original user input")
 			require.NoError(t, err)
 			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 			defer cancel()
-			callbacks := 0
-			var deliveredErr error
-			originalHandler := blueprint.ResultHandler
-			blueprint.ResultHandler = func(value string, err error) { callbacks++; deliveredErr = err; originalHandler(value, err) }
+
 			var prompts []string
 			var budgets []int64
 			coordinator, err := blueprint.CreateCoordinatorWithQueryAndParams(ctx, "summarize the supplied facts", params,
@@ -187,9 +184,8 @@ func TestBuildContextForgeBlueprintUsesPlatformResultGenerator(t *testing.T) {
 					return response, nil
 				}))
 			require.NoError(t, err)
-			require.NotNil(t, coordinator.ResultHandler)
-			coordinator.ResultHandler(coordinator)
-			require.Equal(t, 1, callbacks, "deliver only the final generation result")
+			defer coordinator.Close()
+			result, deliveredErr := blueprint.ResultGenerator(coordinator, release.ResultPrompt)
 
 			wantBudgets := []int64{8192}
 			if test.wantCalls == 2 {
@@ -209,12 +205,12 @@ func TestBuildContextForgeBlueprintUsesPlatformResultGenerator(t *testing.T) {
 			if test.wantCalls == 2 {
 				require.Contains(t, prompts[1], "最终输出通道")
 				if test.wantError {
-					require.Empty(t, config.ForgeResult.Formated)
+					require.Empty(t, result)
 				} else {
-					require.Equal(t, test.output, config.ForgeResult.Formated)
+					require.Equal(t, test.output, result)
 				}
 			} else {
-				require.Empty(t, config.ForgeResult.Formated)
+				require.Empty(t, result)
 			}
 		})
 	}

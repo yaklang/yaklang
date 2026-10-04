@@ -4,7 +4,7 @@ import (
 	"context"
 	"strings"
 
-	"github.com/yaklang/yaklang/common/aiforge"
+	"github.com/yaklang/yaklang/common/ai/aiforge"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools/yakscripttools"

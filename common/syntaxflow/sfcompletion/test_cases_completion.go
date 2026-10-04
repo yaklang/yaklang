@@ -8,8 +8,8 @@ import (
 
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/ai/aispec"
-	"github.com/yaklang/yaklang/common/aiforge"
-	_ "github.com/yaklang/yaklang/common/aiforge/aibp"
+	"github.com/yaklang/yaklang/common/ai/aiforge"
+	_ "github.com/yaklang/yaklang/common/ai/aiforge/aibp"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/syntaxflow/sfanalysis"

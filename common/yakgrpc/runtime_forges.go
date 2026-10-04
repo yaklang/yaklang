@@ -8,8 +8,8 @@ import (
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools/browsertools"
-	"github.com/yaklang/yaklang/common/aiforge"
-	"github.com/yaklang/yaklang/common/aiforge/browsercrypto"
+	"github.com/yaklang/yaklang/common/ai/aiforge"
+	"github.com/yaklang/yaklang/common/ai/aiforge/browsercrypto"
 	"github.com/yaklang/yaklang/common/browser"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )

@@ -34,7 +34,7 @@
 - 记忆测试在 Config 层提供调度 mock，保留原结果和数据库断言；异步调用计数改为原子读取/更新。
 - 两个 Yak 查询测试使用独立临时 profile 数据库，载入仓库内的真实 HTTP 工具脚本，测试结束恢复原数据库绑定。HTTP 执行错误也纳入断言。
 
-验证范围为 `./common/ai/aid/... ./common/aiforge`，仍使用临时 `YAKIT_HOME`：
+验证范围为 `./common/ai/aid/... ./common/ai/aiforge`，仍使用临时 `YAKIT_HOME`：
 
 - 之前失败的四个包相关定向用例全部通过。
 - 全量运行中 57 个有测试包直接通过，22 个包无测试，包括 aireact 整包（156.8s）、aicommon、aimem、aiforge、Loop 集成和 Yak 工具整包。
@@ -58,7 +58,7 @@
 
 **未全绿，不应将此前定向回归通过视为完整回归通过。**
 
-首轮执行 `go test -p 4 ./common/ai/aid/... ./common/aiforge -json -count=1 -timeout=5m`，共 81 个包：55 个通过，4 个失败，22 个无测试。记录到 4237 个通过、13 个失败、13 个跳过的测试事件（包含子用例，不能等同于顶层测试数量）。aireact 和 aid/test 达到包级 5 分钟上限，未执行到的用例不能算通过。
+首轮执行 `go test -p 4 ./common/ai/aid/... ./common/ai/aiforge -json -count=1 -timeout=5m`，共 81 个包：55 个通过，4 个失败，22 个无测试。记录到 4237 个通过、13 个失败、13 个跳过的测试事件（包含子用例，不能等同于顶层测试数量）。aireact 和 aid/test 达到包级 5 分钟上限，未执行到的用例不能算通过。
 
 使用独立临时 `YAKIT_HOME` 隔离数据库和工作目录。main 对照在独立 detached worktree 和全新测试目录下运行，没有切换或修改用户当前分支。
 
@@ -68,7 +68,7 @@
 - `aireact/reactloops` 整包：30.796s；`reactloopstests` 集成包通过。
 - `aimem`、`aiforge` 整包通过。
 - Mini Task、Goal 验收、Speed Loop 的调度/协议/重试/取消相关测试包含在上述包中。
-- 新增真实链路测试 `common/aiforge/liteforge_memory_validation_test.go`，单独运行 3 个子用例全部通过：
+- 新增真实链路测试 `common/ai/aiforge/liteforge_memory_validation_test.go`，单独运行 3 个子用例全部通过：
   - 持续非法记忆数组：两次调用（一次重试）后失败，数据库始终为空。
   - 首次非法、修复为空数组：成功返回，数据库为空。
   - 首次非法、修复为合法记忆：只保存修复后的单条记忆。

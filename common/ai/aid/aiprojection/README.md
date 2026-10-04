@@ -135,11 +135,11 @@ usage 回调的 `MirrorCorrelationID`，用于对齐调试 dump。
 离线检查 dump 可运行：
 
 ```sh
-go run common/yak/cmd/yak.go \
-  common/ai/aid/aiprojection/cachebench/analyze.yak \
+yak \
+  common/ai/aismoking/cache/analyze.yak \
   --session-dir /path/to/aicache/session \
   --output-dir /tmp/cachebench-report
 ```
 
-`cachebench/selftest.yak` 验证 dump 与 usage 的关联逻辑；
-`cachebench/run_react.yak` 用真实模型运行 ReAct 并生成缓存报告。
+`common/ai/aismoking/cache/selftest.yak` 验证 dump 与 usage 的关联逻辑；
+`common/ai/aismoking/cache/run_react.yak` 用真实模型运行 ReAct 并生成缓存报告。

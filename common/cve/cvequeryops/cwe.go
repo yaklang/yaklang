@@ -28,7 +28,7 @@ import (
 	"github.com/yaklang/yaklang/common/utils/ziputil"
 
 	// import aiforge to register liteforge callback
-	_ "github.com/yaklang/yaklang/common/aiforge"
+	_ "github.com/yaklang/yaklang/common/ai/aiforge"
 )
 
 // DefaultCWEURL is the default URL to download CWE data from MITRE

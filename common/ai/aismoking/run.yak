@@ -1,0 +1,43 @@
+// From repository root: yak common/ai/aismoking/run.yak
+// Each case is a fresh `yak xxx.yak` process, with its own home and samples.
+// AISMOKING_CASE can select one mandatory case; optional live tests are explicit.
+if !file.IsExisted("go.mod") || !file.IsExisted("common/ai/aismoking") { println("Run from the yaklang repository root"); os.Exit(1) }
+root = os.Getenv("AISMOKING_OUTPUT")
+if root == "" { root = file.Join(os.TempDir(),sprintf("aismoking-suite-%d",time.Now().UnixNano())) }
+root = file.Abs(root)
+file.MkdirAll(root)~
+// A reused output directory must not retain the success marker of an older run.
+if file.IsExisted(file.Join(root,"PASS")) { file.Remove(file.Join(root,"PASS"))~ }
+binary = os.Executable()~
+cases = ["mainloop","liteforge","liteforgeapp","rag_applications","planning","exploration","coordinator","notifications","controls","forge","cache/selftest"]
+selected = os.Getenv("AISMOKING_CASE")
+if selected != "" {
+    if !(selected in cases) { println("Unknown AISMOKING_CASE; choose a case listed in README.md"); os.Exit(1) }
+    cases = [selected]
+}
+results = []
+for name in cases {
+    output = file.Join(root,str.ReplaceAll(name,"/","-"))
+    file.MkdirAll(output)~
+    os.Setenv("AISMOKING_OUTPUT",output)
+    os.Setenv("YAKIT_HOME",file.Join(output,"home"))
+    command = exec.CommandContext(context.WithTimeoutSeconds(480),sprintf('"%s"',str.ReplaceAll(binary,"\\","/")))~
+    // Set argv directly: paths/arguments are not interpolated into a shell.
+    command.Args = []string{binary,file.Join("common/ai/aismoking",name + ".yak")}
+    println("RUN ",name)
+    started = time.Now().UnixMilli()
+    data,err = command.CombinedOutput()
+    file.Save(file.Join(output,"run.log"),data)~
+    text = string(data)
+    passed = err == nil && "AISMOKING_PASS" in text && !("[FTAL]" in text) && !("YakVM Panic:" in text)
+    results = append(results,{"case":name,"passed":passed,"duration_ms":time.Now().UnixMilli()-started,"log":file.Join(output,"run.log")})
+    file.SaveJson(file.Join(root,"results.json"),results)~
+    if !passed {
+        println(text)
+        println("FAIL ",name,"; log: ",file.Join(output,"run.log"))
+        os.Exit(1)
+    }
+    printf("PASS %s (%dms)\n",name,time.Now().UnixMilli()-started)
+}
+file.Save(file.Join(root,"PASS"),"All selected AI smoke cases passed\n")~
+println("AISMOKING_SUITE_PASS ",root)

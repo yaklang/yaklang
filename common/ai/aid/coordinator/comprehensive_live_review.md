@@ -4,7 +4,7 @@
 
 ## 实验与本地改动
 
-使用 [Yak 脚本](smoke/comprehensive_live.yak) 调用 aim.NewAIEngine / SendMsg；[运行桥接](smoke/live_runner/main.go) 只构造一次带 endpoint ID 的真实 AIInputEvent，模拟计划卡确认。计划、执行、质量验收及报告决策均由真实模型产生，没有脚本化模型响应。主模型为 aibalance / deepseek-v4.1-flash，辅助模型为 memfit-light-free。每轮隔离 session、数据库和材料目录。
+使用 [Yak 脚本](../../aismoking/live/comprehensive.yak) 调用 aim.NewAIEngine / SendMsg；此历史实验原由 Go 桥接构造审核消息；现在桥接已删除，独立脚本直接用 `aim.NewInputEvent` 构造带 endpoint ID 的真实审核消息。计划、执行、质量验收及报告决策均由真实模型产生，没有脚本化模型响应。主模型为 aibalance / deepseek-v4.1-flash，辅助模型为 memfit-light-free。每轮隔离 session、数据库和材料目录。
 
 综合任务是离线「发布验收审计」：26 条审批事件、8 条缓存样本、C1-C8 契约和含六条错误/待验证主张的宣传稿。检查普通确认、编辑、detached、重复确认、旧卡、失败重试、取消证据与缓存口径。五叶任务、并发最多 2：
 

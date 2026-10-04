@@ -1,0 +1,91 @@
+// yak common/ai/aismoking/exploration.yak
+// Read-only fork investigator, discovery wake-up, submit barrier and shared Evidence.
+include "common/ai/aismoking/mock.inc"
+sourceFile = file.Join(smokeRoot,"exploration-source.txt")
+file.Save(sourceFile,"exploration-source-sentinel: real source for plan investigation")~
+execution, dispatched, childCalls, mainCalls, approvals, waits = nil,false,0,0,0,0
+waiting, discoveryRead = make(chan bool,8),make(chan bool,1)
+func sleepCheck() {
+    select {
+    case <-waiting:
+    case <-smokeCtx.Done(): die("planner did not sleep while investigator was running")
+    }
+    before = mainCalls
+    time.Sleep(0.08)
+    assert mainCalls == before, "exploration wait polled the planner model"
+}
+event = func(e) {
+    if !e.IsJson { return }
+    data = json.loads(string(e.Content))
+    if data.code == "plan.waiting_for_exploration" { waits++; waiting <- true }
+    if string(e.Type) == "plan_review_require" {
+        approvals++
+        assert childCalls >= 4, "approval was opened before the investigator exited"
+        execution.EventInputChan.SafeFeed(aim.NewInputEvent({"IsInteractiveMessage":true,"InteractiveId":data.id,"InteractiveJSONInput":`{"suggestion":"continue"}`})~)
+    }
+}
+smokeHandler = func(w,body) {
+    native = len(body.tools)>0
+    prompt = smokePrompt(body)
+    if "SMOKE_CALLER:verification" in prompt {
+        w.Header().Set("Content-Type","text/event-stream")
+        smokeFrame(w,{"content":`{"@action":"verify-satisfaction","user_satisfied":false,"reasoning":"交付调查结果并结束本次子任务。","evidence":[]}`},"stop")
+        w.Write("data: [DONE]\n\n")~
+        return
+    }
+    if "SMOKE_CALLER:directly-answer" in prompt {
+        w.Header().Set("Content-Type","text/event-stream")
+        smokeFrame(w,{"content":"调查完成；真实来源已确认，证据 exploration.source。"},"stop")
+        w.Write("data: [DONE]\n\n")~
+        return
+    }
+    if "你是调查子 Agent。" in prompt {
+        childCalls++
+        if childCalls == 1 {
+            sleepCheck()
+            smokeAnswer(w,native,"directly_call_tool",{"directly_call_tool_name":"read_file","directly_call_tool_params":{"file":sourceFile},"directly_call_reason":"CHILD_PRIVATE_REASON_SENTINEL"}); return
+        }
+        assert "exploration-source-sentinel" in prompt
+        if childCalls == 2 { smokeAnswer(w,native,"save_evidence",{"evidence_id":"exploration.source","evidence_content":"exploration-source-sentinel；来源：" + sourceFile}); return }
+        if childCalls == 3 {
+            select {
+            case <-discoveryRead:
+            case <-smokeCtx.Done(): die("shared discovery did not reach the planner")
+            }
+            sleepCheck()
+            smokeAnswer(w,native,"directly_answer",{"answer_payload":"调查完成；真实来源已确认，证据 exploration.source。"}); return
+        }
+        smokeAnswer(w,native,"finish",{}); return
+    }
+    mainCalls++
+    assert !("CHILD_PRIVATE_REASON_SENTINEL" in prompt), "fork-private timeline leaked into planner context"
+    state = execution.Snapshot()
+    if state.Plan == nil { smokeAnswer(w,native,"create_plan",{"plan":{"name":"调查计划","goal":"调查交接，不执行业务","tasks":[{"name":"正式验证","goal":"使用调查得到的证据","identifier":"verify"}]},"plan_document":"# 调查计划\n先收集来源，再提交最终任务书。"}); return }
+    if !dispatched {
+        dispatched = true
+        smokeAnswer(w,native,"dispatch_sub_react_agents",{"dispatches":[{"identifier":"investigator","goal":"只读调查 " + sourceFile + "，保存共享 Evidence 后交付结论；禁止写文件、命令、递归派发。","result_contract":"保存来源证据和可审阅结论","context_mode":"fork"}]}); return
+    }
+    if string(state.Phase) == "EXEC" { smokeAnswer(w,native,"finish",{}); return }
+    assert "exploration.source" in prompt
+    if childCalls == 3 { discoveryRead <- true }
+    // First submit is refused while the child is running; runtime resumes only on actual exit.
+    smokeAnswer(w,native,"submit_plan",{})
+}
+for native in [true,false] {
+    dispatched,childCalls,mainCalls,approvals,waits = false,0,0,0,0
+    execution = aiagent.NewExecutorFromJson(`{"name":"exploration-smoking","init_prompt":"调查来源，然后提交计划；本次只规划。"}`,{"query":"只读调查来源后提交计划"},aiagent.context(smokeCtx),aiagent.agreeYOLO(),aiagent.aiCallback(smokeModel),aiagent.onEvent(event),aiagent.functionCallMode(native),aiagent.extendAIDOptions(func(c) {
+        c.DisableCreateDBRuntime,c.DisablePerception,c.DisableMemoryTriage,c.DisallowMCPServers = true,true,true,true
+        c.EnableSubagentsInPlan,c.ForceManualPlanReview = true,true
+        c.Workdir = smokeRoot
+        c.AiAutoRetry,c.AiTransactionAutoRetry = 1,1
+        c.GetTimeline().SetTimelineBucketByteSize(-1)
+        return nil
+    }))~
+    die(execution.RunPlanOnly())
+    assert approvals == 1 && waits == 2 && childCalls >= 4
+    assert "exploration.source" in execution.GetSessionEvidenceRendered()
+    for _,a in execution.Snapshot().Attempts { assert a.ID == 0 }
+    execution.Close()
+    printf("PASS PLAN exploration: function_call=%v planner=%d child=%d automatic_waits=%d approval=1 business_workers=0\n",native,mainCalls,childCalls,waits)
+}
+smokeCheck()

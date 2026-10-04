@@ -23,23 +23,23 @@ Yak 继续使用 `liteforge.Execute`、多媒体及知识构建选项，`aiagent
 已有 LiteForge 应用测试随实现迁入本包，覆盖辅助请求生命周期、流式字段、协议透传、内存校验、缓存分段和速度优先循环。
 
 ```powershell
-go test ./common/ai/aid/liteforge/... ./common/aiforge
+go test ./common/ai/aid/liteforge/... ./common/ai/aiforge
 ```
 
-核心目录保留独立 Yak 冒烟脚本；直接执行，不需要 Go 注入业务脚本变量：
+[统一 AI 测试目录](../../../aismoking/README.md) 保留独立 Yak 冒烟脚本；直接执行，不需要 Go 注入业务脚本变量：
 
 ```powershell
-yak common/ai/aid/liteforge/smoke_default_task.yak
+yak common/ai/aismoking/live/default_task.yak
 ```
 
-本包的 [smoke.yak](smoke.yak) 使用 `ai.MockAIService` 验证文本流和 function call 两套真实处理链路，各请求一次，保留未知键和任意 JSON 值。脚本只 mock 模型响应，直接用 Yak CLI 执行：
+本包的 [liteforgeapp.yak](../../../aismoking/liteforgeapp.yak) 使用 `ai.MockAIService` 验证文本流和 function call 两套真实处理链路，各请求一次，保留未知键和任意 JSON 值。脚本只 mock 模型响应，直接用 Yak CLI 执行：
 
 ```powershell
-yak common/ai/aid/liteforge/liteforgeapp/smoke.yak
+yak common/ai/aismoking/liteforgeapp.yak
 ```
 
-[smoke_applications.yak](smoke_applications.yak) 进一步验证文件读取、搜索索引和知识分片索引：两种协议各请求一次，检查问题数量、入库、原文及知识条目关联和检索结果。使用临时数据库及 mock embedding，不调用外部服务。两份脚本由 `TestYakMigrationSmoke` 原样执行，纳入 CI 的 `./common/ai/aid/...` 测试范围，不注入 Go 侧业务变量。
+[rag_applications.yak](../../../aismoking/rag_applications.yak) 进一步验证文件读取、搜索索引和知识分片索引：两种协议各请求一次，检查问题数量、入库、原文及知识条目关联和检索结果。使用临时数据库及 mock embedding，不调用外部服务。两份脚本由 `aismoking/run.yak` 启动独立 Yak 进程，只供本地开发测试与 review，不在 CI 中执行，不注入 Go 侧业务变量。
 
 ```powershell
-yak common/ai/aid/liteforge/liteforgeapp/smoke_applications.yak
+yak common/ai/aismoking/rag_applications.yak
 ```

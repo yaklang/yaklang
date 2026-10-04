@@ -1017,8 +1017,8 @@ jobs:
                 {"package": "./common/ai/embedding", "timeout": "30s", "parallel": 1, "retry": 1, "retry_delay": 5},
                 {"package": "./common/ai/ollama/...", "timeout": "60s", "parallel": 1},
                 {"package": "./common/aireducer/...", "timeout": "60s", "parallel": 1},
-                {"package": "./common/aiforge/aibp", "timeout": "2m30s", "parallel": 1, "run": "^(TestBuildForgeFromYak|TestNewForgeExecutor)$"},
-                {"package": "./common/aiforge", "timeout": "3m", "parallel": 1},
+                {"package": "./common/ai/aiforge/aibp", "timeout": "2m30s", "parallel": 1, "run": "^(TestBuildForgeFromYak|TestNewForgeExecutor)$"},
+                {"package": "./common/ai/aiforge", "timeout": "3m", "parallel": 1},
                 {"package": "./common/yakgrpc/aihttp/tests/...", "timeout": "1m"},
                 {"package": "./common/yakgrpc/airaghttp/...", "timeout": "2m", "parallel": 1}
               ]

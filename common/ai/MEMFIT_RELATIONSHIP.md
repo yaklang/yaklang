@@ -32,7 +32,8 @@ flowchart TB
     AIDirA["common/ai/aid/aireact<br/>ReAct main loop"]
     AIDirL["common/ai/aid/aireact/reactloops<br/>Focus modes"]
     AICommon["common/ai/aid/aicommon<br/>Config, Emitter, Skills"]
-    Forge["common/aiforge<br/>LiteForge / AI Forge"]
+    Forge["common/ai/aiforge<br/>AI Forge / 新 Coordinator"]
+    LiteForge["common/ai/aid/liteforge<br/>单步结构化输出 / 应用"]
     Reducer["common/aireducer<br/>Streaming aggregator"]
     RAG["common/ai/rag<br/>Knowledge enhance"]
     OpenAI["common/ai/openai<br/>Gateway (aispec)"]
@@ -51,6 +52,7 @@ flowchart TB
   AIDirA --> AIDirL
   AIDirA --> AICommon
   AIDirA --> Forge
+  AIDirA --> LiteForge
   AIDirA --> Reducer
   AIDirA --> RAG
   AIDirA --> OpenAI
@@ -80,7 +82,8 @@ flowchart TB
 
 | 路径 | 定位 | 关键入口 | 对外暴露 |
 |---|---|---|---|
-| `common/aiforge/` | **LiteForge / AI Forge** 实现（**不在 `common/ai/`**） | `LiteForge.Invoke`、`InvokeSpeedPriority` / `InvokeQualityPriority` | gRPC `QueryAIForge` / `CreateAIForge` 等；DB CRUD |
+| `common/ai/aiforge/` | 多步 Forge 蓝图、注册、结果格式化；底层使用新版 coordinator | `ForgeBlueprint.CreateCoordinator`、`ForgeExecution.Run` | Yak `aiagent.*`、gRPC Forge CRUD |
+| `common/ai/aid/liteforge/` | 单步结构化输出、function call / text stream、流式字段 | `Execute`、`Request` | 通过 `liteforgeapp` 暴露 Yak `liteforge.*`；网关 `ai.FunctionCall` 使用同一核心 |
 | `common/aireducer/` | 流式聚合 / 长文本压缩（**不在 `common/ai/`**） | `NewReducerFromReader` / `NewReducerFromString` | yak DSL `Exports` 暴露给脚本 |
 | `common/ai/rag/` | RAG：向量库、HNSW、knowledgebase、`RagEnhanceKnowledgeManager` | `NewRagEnhanceKnowledgeManager`、`NewRAGSystem` | gRPC `RAGCollectionSearch` 等；ReAct 通过 `WithEnhanceKnowledgeManager` 接入 |
 | `common/ai/aispec/` | 上层 AI 抽象：`AIClient`、`Chat`、`StructuredStream` | `AIConfig`、`ChatBase` | 所有 gateway 客户端（openai/chatglm/...）实现该接口 |
@@ -90,10 +93,11 @@ flowchart TB
 
 ### 3.3 命名陷阱（容易踩的坑）
 
-- **`liteforge` 实现在 `common/aiforge/`**，**不在** `common/ai/liteforge/`（不存在该目录）
-- **`aireducer` 在 `common/aireducer/`**，**不在** `common/ai/aireducer/`
-- **`aiforge` 在 `common/aiforge/`**，**不在** `common/ai/aiforge/`
-- 上面三个目录是**与 `common/ai/` 平级**的顶层包；改它们不会污染 `common/ai/` 的测试
+- LiteForge 核心在 `common/ai/aid/liteforge/`，应用在其子包 `liteforgeapp/`。
+- 多步 Forge 在 `common/ai/aiforge/`，与 `aid/`、`rag/` 同属 `common/ai/`。
+- 新版规划和任务执行在 `common/ai/aid/coordinator/`；旧版接口集中在 `coordinator_legacy/`，不用于新版 Forge。
+- `aireducer` 仍在 `common/aireducer/`。
+- AI Yak 冒烟统一在 `common/ai/aismoking/`，从仓库根目录执行 `yak common/ai/aismoking/run.yak`。
 - `aireact` 通过 `init()` 注册到 `aicommon` 工厂，新增 `loop_xxx/` 必须在 [reactinit/init.go](aid/aireact/reactloops/reactinit/init.go) 加空白 import
 
 ## 4. gRPC 接口边界（关键 RPC 速查）
@@ -104,7 +108,7 @@ flowchart TB
 |---|---|---|---|
 | `StartAIReAct` (stream) | [grpc_ai_re-act.go](../yakgrpc/grpc_ai_re-act.go) `(*Server).StartAIReAct` | `aireact.NewReAct(...)` + `inputEvent.SafeFeed` + `rag.NewRagEnhanceKnowledgeManager` + `reactloops_yak.EnsureUserFocusModesLoaded` | `yakit/app/main/handlers/ai-agent.js` 的 `start-ai-re-act` IPC，renderer `pages/ai-re-act/hooks/useChatIPC.ts` 的 `ipcRenderer.invoke('start-ai-re-act', ...)` |
 | `QueryAIFocus` (unary) | [grpc_ai_focus.go](../yakgrpc/grpc_ai_focus.go) `(*Server).QueryAIFocus` | `reactloops_yak.EnsureUserFocusModesLoaded` + `reactloops.GetAllLoopMetadata` | `pages/ai-agent/grpc.ts` 的 `grpcQueryAIFocus`，UI 在 `aiFocusMode/AIFocusMode.tsx` 与 `aiChatMention/AIChatMention.tsx` 中调用 |
-| `QueryAIForge` / `CreateAIForge` / `UpdateAIForge` / ... | [grpc_ai_forge.go](../yakgrpc/grpc_ai_forge.go) | `common/aiforge` + DB（`yakit.AIForge`） | renderer Forge 管理页（`pages/ai-agent/...`） |
+| `QueryAIForge` / `CreateAIForge` / `UpdateAIForge` / ... | [grpc_ai_forge.go](../yakgrpc/grpc_ai_forge.go) | `common/ai/aiforge` + DB（`yakit.AIForge`） | renderer Forge 管理页（`pages/ai-agent/...`） |
 | `RAGCollectionSearch` / `CreateRAGCollection` / ... | [grpc_rag_collection.go](../yakgrpc/grpc_rag_collection.go) | `common/ai/rag` 配置 + 流式搜索 | renderer RAG 知识库页 |
 | `ListAiModel` | [grpc_ai.go](../yakgrpc/grpc_ai.go) `(*Server).ListAiModel` | `common/ai/aispec` + 各 gateway 客户端 | 模型选择面板 |
 | `StartMcpServer` / `ListMcp...` | [grpc_mcp*.go](../yakgrpc/) | `common/mcp` | MCP 配置面板 |
@@ -130,7 +134,7 @@ flowchart TB
   grpc_ai_forge.go         AI Forge CRUD
   grpc_rag_collection.go   RAG 集合 / 搜索
         ↓
-[common/ai 实现层]                          ← yaklang/common/ai/ + common/aiforge/ + common/aireducer/
+[common/ai 实现层]                          ← yaklang/common/ai/ + common/aireducer/
 ```
 
 > **renderer 不直接 import yaklang Go 代码**。所有调用必须经过 IPC → gRPC。
@@ -159,7 +163,7 @@ flowchart TB
 | **加一个新工具（yak 脚本形式）** | `aid/aitool/buildinaitools/yakscripttools/yakscriptforai/<name>/<name>.yak` → embed |
 | **加一个新工具（Go 实现）** | `aid/aitool/buildinaitools/` 加 `aitool.Tool` 实现 + 注册 |
 | **改 prompt 模板** | 5 段公共前缀在 `aid/aicommon/prompts/prefix/*.txt`；loop 专属 prompt 在 `aid/aireact/reactloops/loop_xxx/prompts/persistent_instruction.txt` 等 |
-| **加一个新 LiteForge** | `common/aiforge/` 写 `LiteForge` 实现 → 通过 `WithLiteForgeAt` 等接入 |
+| **加一个新 LiteForge 应用** | `common/ai/aid/liteforge/liteforgeapp/`；底层通过核心 `Request → Execute` |
 | **改 AI 提供方（gateway）** | `common/ai/openai/` / `chatglm/` / ... 同级目录新增 / 修改 `gateway.go` |
 | **想看用户配置 AI 模型时走哪里** | `common/ai/aid/aicommon/aiconfig/` + `aispec.AIConfig` |
 | **想做记忆 / RAG 的事** | `common/ai/aid/aimem/`（短期）+ `common/ai/rag/`（长期） |

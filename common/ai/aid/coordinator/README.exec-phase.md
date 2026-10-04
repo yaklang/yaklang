@@ -354,7 +354,7 @@ FC/JSON 标注的是模型动作；审核事件、队列通知、调度、worker
 
 ## 15. 冒烟与回归验收
 
-新增 `smoke/execution_phase.yak`，真实 Yak/aim + coordinator + workers + Evidence + 前端事件；由 Go harness 注入可控模型、审核回复、临时工具和同步屏障。分别跑 function call 与 text stream。
+[coordinator.yak](../../aismoking/coordinator.yak) 使用真实 Yak/aim、coordinator、workers、Evidence 和前端事件，直接执行 `yak common/ai/aismoking/coordinator.yak`。确定性 HTTP/SSE 模型、审核回复、材料和断言都在 Yak 脚本内；双协议通知由 [notifications.yak](../../aismoking/notifications.yak) 验证，拒绝/重试/取消由 [controls.yak](../../aismoking/controls.yak) 验证。细粒度屏障、权限、恢复和状态机另保留普通 Go 集成回归。
 
 核心 DAG：A、B 独立并发，C 依赖 A，D 依赖 B/C。通过屏障检查任务启动、结束、验收及并发上限，模型脚本从不调用 start_tasks/create_task。
 

@@ -11,7 +11,7 @@ import (
 	"github.com/segmentio/ksuid"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
-	_ "github.com/yaklang/yaklang/common/aiforge" // register liteforge callback
+	_ "github.com/yaklang/yaklang/common/ai/aiforge" // register liteforge callback
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/jsonpath"
 	"github.com/yaklang/yaklang/common/log"

@@ -10,7 +10,7 @@ import (
 	"strings"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
-	"github.com/yaklang/yaklang/common/aiforge"
+	"github.com/yaklang/yaklang/common/ai/aiforge"
 	aiv1 "github.com/yaklang/yaklang/scannode/gen/legionpb/legion/ai/v1"
 	"google.golang.org/protobuf/proto"
 )
@@ -271,7 +271,7 @@ func executeContextForgeRelease(
 	userInput string,
 	options ...aicommon.ConfigOption,
 ) (*aiforge.ForgeResult, error) {
-	config, blueprint, params, err := buildContextForgeBlueprint(release, userInput)
+	_, blueprint, params, err := buildContextForgeBlueprint(release, userInput)
 	if err != nil {
 		return nil, err
 	}
@@ -282,5 +282,5 @@ func executeContextForgeRelease(
 	if err := coordinator.Run(); err != nil {
 		return nil, err
 	}
-	return config.ForgeResult, nil
+	return coordinator.Result(), nil
 }

@@ -14,7 +14,7 @@ import (
 	"google.golang.org/protobuf/proto"
 
 	scriptmetadata "github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools/yakscripttools/metadata"
-	forgepkg "github.com/yaklang/yaklang/common/aiforge"
+	forgepkg "github.com/yaklang/yaklang/common/ai/aiforge"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"

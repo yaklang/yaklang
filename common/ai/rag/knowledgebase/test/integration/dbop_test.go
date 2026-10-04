@@ -11,7 +11,7 @@ import (
 	"gotest.tools/v3/assert"
 
 	_ "github.com/yaklang/yaklang/common/ai/rag/plugins_rag"
-	_ "github.com/yaklang/yaklang/common/aiforge"
+	_ "github.com/yaklang/yaklang/common/ai/aiforge"
 )
 
 // TestKnowledgeBaseDBOperation 测试知识库和向量存储的同步操作

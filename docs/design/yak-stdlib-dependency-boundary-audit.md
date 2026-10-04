@@ -314,7 +314,7 @@ Acceptance checks:
 
 Evidence:
 
-- `common/yak/script_engine.go` directly imports AI packages such as `common/aiengine`, `common/aiforge`, `common/ai/aid/aitool`, `common/ai/rag`, `common/aireducer`, `common/ai`, and `common/ai/aispec`.
+- `common/yak/script_engine.go` directly imports AI packages such as `common/aiengine`, `common/ai/aiforge`, `common/ai/aid/aitool`, `common/ai/rag`, `common/aireducer`, `common/ai`, and `common/ai/aispec`.
 - The same file imports `common/yakgrpc/ypb`, `common/yak/yaklib`, and `common/yakgrpc/yakit`.
 - It registers many Yak modules in one file through `yaklang.Import(...)`.
 - `common/yak/ssa2llvm/runtime/embed/script_engine_libs.go` can parse this file to derive Yak module to Go export mappings, but parsing the source does not solve the package-level import coupling in the normal Yak engine.

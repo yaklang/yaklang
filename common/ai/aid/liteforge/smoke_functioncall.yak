@@ -1,8 +1,0 @@
-// FunctionCall 保留 map 输入与 map 返回值，使用与 LiteForge 相同的流式执行器。
-fields = {"summary": {"type":"string", "description":"材料中的摘要"}, "payload": {}}
-for mode in [true, false] {
-    callOptions = append(OPTIONS, ai.withFunctionCallMode(mode))
-    result = ai.FunctionCall(INPUT, fields, callOptions...)~
-    assert !("@action" in result)
-    VERIFY("ai.FunctionCall", mode, result)
-}

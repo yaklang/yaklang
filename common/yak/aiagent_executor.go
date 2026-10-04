@@ -8,7 +8,7 @@ import (
 	"github.com/yaklang/yaklang/common/yak/yaklib"
 
 	"github.com/google/uuid"
-	"github.com/yaklang/yaklang/common/aiforge"
+	"github.com/yaklang/yaklang/common/ai/aiforge"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
@@ -20,7 +20,9 @@ import (
 )
 
 func init() {
-	aicommon.RegisterForgeYakEngineCallback(ExecuteForge)
+	aicommon.RegisterForgeYakEngineCallbackWithContext(func(ctx context.Context, name string, input any, opts ...any) (any, error) {
+		return ExecuteForge(name, input, append([]any{WithContext(ctx)}, opts...)...)
+	})
 }
 
 var HOOK_AI_FORGE = "forgeHandle"
@@ -194,9 +196,7 @@ func buildDefaultForgeHandle(ctx context.Context, forgeIns *schema.AIForge, engi
 		if err != nil {
 			return nil, err
 		}
-		if err := ins.Run(); err != nil {
-			return nil, err
-		}
-		return cfg.ForgeResult, nil
+		err = ins.Run()
+		return ins.Result(), err
 	}
 }

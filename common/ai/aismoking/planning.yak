@@ -1,0 +1,92 @@
+// yak common/ai/aismoking/planning.yak
+// Generated/preset/mocker × native/text; stop after one approved submit_plan.
+include "common/ai/aismoking/mock.inc"
+execution, step, approvals, mockerCalls, reads, editStage = nil, 0, 0, 0, 0, 0
+plan = {"main_task":"来源检查","main_task_goal":"规划移交，不执行业务","tasks":[
+    {"subtask_name":"读取来源","subtask_goal":"读取 source.txt","subtask_identifier":"read","depends_on":[]},
+    {"subtask_name":"复核来源","subtask_goal":"依据前置结果验证","subtask_identifier":"verify","depends_on":["read"]},
+]}
+sourceFile = file.Join(smokeRoot,"source.txt")
+file.Save(sourceFile,"planning-source-sentinel: 本地来源可读")~
+originalIDs, stable, tools = nil, nil, nil
+smokeHandler = func(w, body) {
+    native = len(body.tools) > 0
+    prompt = smokePrompt(body)
+    state = execution.Snapshot()
+    assert !("执行已批准的冻结任务书。" in prompt), "planning-only cannot dispatch business workers"
+    assert len(body.messages) >= 5, "cache projection partitions collapsed"
+    prefix = json.dumps(body.messages[:2])
+    if stable == nil { stable = prefix } else { assert stable == prefix, "plan edits changed static/frozen messages" }
+    declarations = json.dumps(body.tools)
+    if string(state.Phase) == "PLAN" {
+        if tools == nil { tools = declarations } else { assert tools == declarations, "PLAN action declarations changed" }
+    }
+    if native && string(state.Phase) == "PLAN" {
+        for tool in body.tools { assert !(tool["function"].name in ["start_tasks","review_task","create_report"]), "EXEC action leaked into PLAN" }
+    }
+    step++
+    if step == 1 {
+        reads++
+        smokeAnswer(w,native,"directly_call_tool",{"directly_call_tool_name":"read_file","directly_call_tool_params":{"file":sourceFile},"directly_call_reason":"确认真实规划来源"}); return
+    }
+    assert "planning-source-sentinel" in prompt, "real tool result must survive plan edits"
+    if step == 2 { smokeAnswer(w,native,"save_evidence",{"evidence_id":"planning.source","evidence_content":"planning-source-sentinel；来源：" + sourceFile}); return }
+    if state.Plan == nil { smokeAnswer(w,native,"create_plan",{"plan":plan,"plan_document":"# 初始计划\n先核对来源。\n"}); return }
+    if originalIDs == nil {
+        originalIDs = [state.Plan.Tasks[0].ID,state.Plan.Tasks[1].ID]
+    }
+    assert state.Plan.Tasks[0].ID == originalIDs[0] && state.Plan.Tasks[1].ID == originalIDs[1], "plan editing changed task identities"
+    if string(state.Phase) == "EXEC" { smokeAnswer(w,native,"finish",{}); return }
+    if editStage == 0 {
+        editStage++
+        smokeAnswer(w,native,"modify_plan",{"document":"# 最终计划\n先核对来源。\n"}); return
+    }
+    if editStage == 1 {
+        editStage++
+        smokeAnswer(w,native,"modify_plan",{"document":"ROLLBACK_SENTINEL","tasks_patch":[{"operator":"update","task_id":originalIDs[1],"changes":{"depends_on":["missing"]}}]}); return
+    }
+    if editStage == 2 {
+        assert state.Plan.Document == "# 最终计划\n先核对来源。\n", "invalid DAG transaction leaked document"
+        editStage++
+        smokeAnswer(w,native,"modify_plan",{"tasks_patch":[{"operator":"update","task_id":originalIDs[1],"changes":{"subtask_goal":"依据真实来源与前置结果复核"}}]}); return
+    }
+    assert "planning.source" in prompt
+    smokeAnswer(w,native,"submit_plan",{})
+}
+planEvent = func(e) {
+    if string(e.Type) != "plan_review_require" { return }
+    approvals++
+    assert approvals == 1, "only one approval is allowed"
+    payload = json.loads(string(e.Content))
+    assert payload.force_manual_review == true
+    execution.EventInputChan.SafeFeed(aim.NewInputEvent({"IsInteractiveMessage":true,"InteractiveId":payload.id,"InteractiveJSONInput":json.dumps({"suggestion":"continue","plans":{"root_task":payload.plans.root_task,"document":"# 最终计划\n先核对来源。\n用户确认范围。\n"}})})~)
+}
+for native in [true,false] {
+    for source in ["generated","preset","mocker"] {
+        step,approvals,mockerCalls,reads,originalIDs,stable,tools,editStage = 0,0,0,0,nil,nil,nil,0
+        definition = {"name":"plan-smoking","init_prompt":"根据来源维护计划，停在审核交接。"}
+        if source == "preset" { definition.plan_prompt = json.dumps(plan) }
+        options = [aiagent.context(smokeCtx),aiagent.agreeYOLO(),aiagent.aiCallback(smokeModel),aiagent.onEvent(planEvent),aiagent.functionCallMode(native),aiagent.extendAIDOptions(func(c) {
+            c.DisableCreateDBRuntime = true
+            c.Workdir = smokeRoot
+            c.DisablePerception,c.DisableMemoryTriage,c.DisallowMCPServers = true,true,true
+            c.ForceManualPlanReview = true
+            c.GetTimeline().SetTimelineBucketByteSize(-1)
+            c.AiAutoRetry,c.AiTransactionAutoRetry = 1,1
+            return nil
+        })]
+        if source == "mocker" { options = append(options,aiagent.plan(func(s) { mockerCalls++; return aiagent.ExtractPlan(s,json.dumps(plan))~ })) }
+        execution = aiagent.NewExecutorFromJson(json.dumps(definition),{"query":"仅规划并审核，不执行业务"},options...)~
+        die(execution.RunPlanOnly())
+        state = execution.Snapshot()
+        assert approvals == 1 && reads == 1
+        assert string(state.Phase) == "EXEC" && !state.Finished
+        assert state.Plan.Document == "# 最终计划\n先核对来源。\n用户确认范围。\n"
+        for _,a in state.Attempts { assert string(a.State) == "pending" && a.ID == 0 }
+        assert "planning.source" in execution.GetSessionEvidenceRendered()
+        if source == "mocker" { assert mockerCalls == 1 }
+        execution.Close()
+        printf("PASS planning-only: source=%s function_call=%v steps=%d approval=1 workers=0\n",source,native,step)
+    }
+}
+smokeCheck()

@@ -11,7 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
-	_ "github.com/yaklang/yaklang/common/aiforge"
+	_ "github.com/yaklang/yaklang/common/ai/aiforge"
 	"github.com/yaklang/yaklang/common/schema"
 	_ "github.com/yaklang/yaklang/common/yak"
 )

@@ -4285,12 +4285,26 @@ func (c *Config) CallAITransaction(
 }
 
 func ConvertConfigToOptions(i *Config) []ConfigOption {
+	return convertConfigToOptions(i, true)
+}
+
+// ConvertConfigToOptionsWithoutHotPatch copies configuration without acquiring
+// a subscription. Adapters which own their event channels, and one-shot result
+// formatters, use this to avoid leaving an unused channel on the parent.
+func ConvertConfigToOptionsWithoutHotPatch(i *Config) []ConfigOption {
+	return convertConfigToOptions(i, false)
+}
+
+func convertConfigToOptions(i *Config, inheritHotPatch bool) []ConfigOption {
 	// Return nil for nil input
 	if i == nil {
 		return nil
 	}
 
 	opts := make([]ConfigOption, 0)
+	if len(i.PersistentMemory) > 0 {
+		opts = append(opts, WithAppendPersistentContext(i.PersistentMemory...))
+	}
 
 	opts = append(opts, WithAllowRequireForUserInteract(i.AllowRequireForUserInteract))
 
@@ -4462,7 +4476,7 @@ func ConvertConfigToOptions(i *Config) []ConfigOption {
 		opts = append(opts, WithUserUsageCallback(i.GetUserUsageCallback()))
 	}
 
-	if i.HotPatchBroadcaster != nil {
+	if inheritHotPatch && i.HotPatchBroadcaster != nil {
 		hotPatchChan := i.HotPatchBroadcaster.Subscribe()
 		opts = append(opts, WithHotPatchOptionChan(hotPatchChan))
 	}

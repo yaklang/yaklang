@@ -20,7 +20,7 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 
 	// import aiforge to register liteforge callback
-	_ "github.com/yaklang/yaklang/common/aiforge"
+	_ "github.com/yaklang/yaklang/common/ai/aiforge"
 )
 
 // CVEAICompleteConfig holds configuration for CVE AI completion

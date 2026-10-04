@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/yaklang/yaklang/common/ai/aid/liteforge/liteforgeapp"
-	"github.com/yaklang/yaklang/common/aiforge"
+	"github.com/yaklang/yaklang/common/ai/aiforge"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 )

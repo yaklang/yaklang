@@ -1,0 +1,96 @@
+// 真实模型综合实验。只自动回复一次 plan_review；任务质量审核由 coordinator 决定。
+// 环境：YAK_BENCH_DIR（含 fixture/task.txt）、YAK_BENCH_API_KEY。
+// 通过 aim.NewInputEvent 直接构造计划审核回复，不依赖 Go 注入。
+// 采样运行时 prompt、事件和 provider usage；认证不写入采样文件。
+root = str.ReplaceAll(os.Getenv("YAK_BENCH_DIR"), "\\", "/")
+key = os.Getenv("YAK_BENCH_API_KEY")
+if root == "" || key == "" { die("missing benchmark environment") }
+model = os.Getenv("YAK_BENCH_MODEL")
+if model == "" { model = "deepseek-v4.1-flash" }
+os.Setenv("YAKLANGDEBUG", "1")
+mu = sync.NewMutex()
+events = []
+usages = []
+streams = {}
+planConfirms = 0
+start = time.Now().UnixMilli()
+
+func usageCallback(u) {
+    mu.Lock()
+    defer mu.Unlock()
+    if u == nil {
+        usages = append(usages, {"missing":true,"ts":time.Now().UnixMilli()})
+    } else {
+        cached = nil
+        if u.PromptTokensDetails != nil { cached = u.PromptTokensDetails.CachedTokens }
+        usages = append(usages, {"id":u.MirrorCorrelationID,"ts":time.Now().UnixMilli(),"prompt":u.PromptTokens,"completion":u.CompletionTokens,"cached":cached})
+        printf("USAGE id=%s prompt=%d cached=%v completion=%d\n",u.MirrorCorrelationID,u.PromptTokens,cached,u.CompletionTokens)
+    }
+    file.Save(root + "/usage.json",json.dumps(usages))
+}
+
+func onEvent(op,event) {
+    typ = string(event.Type)
+    if typ == "stream" || typ == "stream_start" || typ == "stream_end" { return }
+    text = string(event.Content)
+    mu.Lock()
+    events = append(events,{"seq":len(events)+1,"ts":time.Now().UnixMilli(),"type":typ,"node":event.NodeId,"task":event.TaskIndex,"coordinator":event.CoordinatorId,"content":text})
+    shouldConfirm = typ == "plan_review_require" && planConfirms == 0
+    if shouldConfirm { planConfirms++ }
+    if typ == "ai_call_summary" || typ == "plan_review_require" || typ == "report_finish" || typ == "end_plan_and_execution" || typ == "fail_plan_and_execution" || typ == "error" {
+        printf("EVENT %s node=%s %s\n",typ,event.NodeId,text)
+    }
+    if shouldConfirm || typ == "report_finish" || typ == "end_plan_and_execution" {
+        file.Save(root + "/events.json",json.dumps(events))
+    }
+    mu.Unlock()
+    if shouldConfirm {
+        payload = json.loads(text)
+        // 只模拟计划卡“立即执行”，不脚本化任何模型回答或任务审核决定。
+        op.SendInputEvent(aim.NewInputEvent({"IsInteractiveMessage":true,"InteractiveId":payload["id"],"InteractiveJSONInput":`{"suggestion":"continue"}`})~)~
+        println("BENCH_PLAN_CONFIRMED_ONCE")
+    }
+}
+
+func onStream(op,event,node,data) {
+    mu.Lock()
+    defer mu.Unlock()
+    id = sprintf("%s|%s|%s",event.CoordinatorId,event.TaskIndex,node)
+    if streams[id] == nil { streams[id] = {"coordinator":event.CoordinatorId,"task":event.TaskIndex,"node":node,"text":""} }
+    streams[id]["text"] += string(data)
+}
+
+modelOpts = [ai.apiKey(key),ai.model(model),ai.timeout(120),ai.usageCallback(usageCallback)]
+speedOpts = [ai.apiKey(key),ai.model("memfit-light-free"),ai.timeout(120),ai.usageCallback(usageCallback)]
+engine = aim.NewAIEngine(
+    aim.focus("coordinator"),aim.planEngine("coordinator"),
+    aim.aiConfig("aibalance",modelOpts...),
+    aim.qualityPriorityAIConfig("aibalance",modelOpts...),
+    aim.speedPriorityAIConfig("aibalance",speedOpts...),
+    aim.sessionID(sprintf("coordinator-comprehensive-%d-%d",time.Now().Unix(),os.Getpid())),
+    aim.workdir(root + "/fixture"),
+    aim.maxIteration(55),aim.timeout(1200),aim.context(context.WithTimeoutSeconds(1200)),
+    aim.reviewPolicy("yolo"),aim.allowUserInteract(false),aim.disableMCPServers(true),
+    aim.includeToolNames("read_file","read_file_lines","list_dir","grep","write_file"),
+    aim.onEvent(onEvent),aim.onStream(onStream),
+)~
+defer engine.Close()
+cfg = engine.GetOperator().GetConfig()
+cfg.ForceManualPlanReview = true
+cfg.PlanExecTaskConcurrency = 2
+if os.Getenv("YAK_BENCH_TEXT_STREAM") == "1" {
+    cfg.EnableFunctionCallMode = false
+    cfg.SetConfig("EnableFunctionCallMode", false)
+}
+task = "输入目录的绝对路径是 " + root + "/fixture/。所有读取使用此目录下的绝对路径。\n" + string(file.ReadFile(root + "/fixture/task.txt")~)
+err = engine.SendMsg(task)
+time.sleep(1)
+mu.Lock()
+file.Save(root + "/events.json",json.dumps(events))
+file.Save(root + "/streams.json",json.dumps(streams))
+file.Save(root + "/timeline.txt",cfg.GetTimeline().Dump())
+file.Save(root + "/evidence.txt",cfg.GetSessionEvidenceRendered())
+file.Save(root + "/result.json",json.dumps({"error":sprintf("%v",err),"durationMs":time.Now().UnixMilli()-start,"dumpDir":ai.aicacheSession(),"usageCount":len(usages),"finished":engine.IsFinished(),"planConfirms":planConfirms,"model":model}))
+mu.Unlock()
+println("RUN_FINISHED error=",err," usage=",len(usages))
+die(err)

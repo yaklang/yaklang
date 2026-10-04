@@ -44,7 +44,7 @@ modify_plan 仅有 document/document_patch/tasks/tasks_patch 四个业务参数�
 
 ## 三类 Yak／aim 冒烟
 
-脚本：[planning_phase.yak](smoke/planning_phase.yak)；harness：[planning_phase_yak_test.go](planning_phase_yak_test.go)。实际运行 Yak、aim、coordinator、读取工具、session Evidence、generic 调查 Agent、审核端点及持久化；只有模型决策使用确定性 provider。业务 worker 启动数始终为 0。
+脚本：[planning_phase.yak](../../aismoking/planning.yak)；harness：[planning_phase_integration_test.go](planning_phase_integration_test.go)。实际运行 Yak、aim、coordinator、读取工具、session Evidence、generic 调查 Agent、审核端点及持久化；只有模型决策使用确定性 provider。业务 worker 启动数始终为 0。
 
 | 任务入口 | native/text × 探索关闭/开启 | 验收 |
 | --- | --- | --- |

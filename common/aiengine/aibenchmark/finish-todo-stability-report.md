@@ -108,14 +108,14 @@ execution and the TODO store's terminal-state model are otherwise unchanged.
 
 The suite and evaluator live in:
 
-- `common/aiengine/aibenchmark/http-react-blackbox-benchmark.yak`
-- `common/aiengine/aibenchmark/http-react-blackbox-cases.json`
+- `common/ai/aismoking/live/benchmark/http-react-blackbox-benchmark.yak`
+- `common/ai/aismoking/live/benchmark/http-react-blackbox-cases.json`
 
 Example (key intentionally omitted):
 
 ```bash
 AIBALANCE_API_KEY=... yak \
-  common/aiengine/aibenchmark/http-react-blackbox-benchmark.yak \
+  common/ai/aismoking/live/benchmark/http-react-blackbox-benchmark.yak \
   --suite finish-stability \
   --phase candidate \
   --provider aibalance \

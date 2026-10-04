@@ -269,7 +269,7 @@ Timeline 历史按现有冻结/压缩/提升路径保存。完整正文不同时
 
 ## 9. Yak/aim 第一阶段冒烟
 
-新增一个 `smoke/planning_phase.yak`，由 Go harness 注入确定性模型、事件 recorder、临时工作区及配置。实际执行 Yak + aim + coordinator + 工具 + 探索 Agent + 审核链路，仅替换模型决策，避免外部模型随机性掩盖实现问题。
+[planning.yak](../../aismoking/planning.yak) 直接由 Yak CLI 执行：`yak common/ai/aismoking/planning.yak`。本地 HTTP/SSE 模型、审核回复、临时工作区和断言全部写在脚本中。探索 Agent 的通知/退出门禁另由 [exploration.yak](../../aismoking/exploration.yak) 验证。内部状态机、开关、权限和恢复矩阵由 `planning_phase_integration_test.go` 等 Go 回归覆盖，不再用 Go 注入业务脚本。
 
 主要矩阵：function call/text stream × EnableSubagentsInPlan 开/关。另覆盖 preset 和 mocker 来源。
 

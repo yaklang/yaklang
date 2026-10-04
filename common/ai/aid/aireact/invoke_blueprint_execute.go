@@ -10,6 +10,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
+	"github.com/yaklang/yaklang/common/ai/aid/coordinator"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/chanx"
@@ -17,7 +18,7 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
-// Blueprints retain their own executor outside the native PLAN runtime.
+// The selected Blueprint's ForgeExecution runs on the native coordinator.
 // The default loop may invoke them; coordinator and pe_task do not expose
 // blueprint actions. This adapter does not construct a legacy coordinator.
 func (r *ReAct) executeBlueprint(ctx context.Context, request *invokePlanAndExecuteOptions, ready func()) (err error) {
@@ -52,7 +53,7 @@ func (r *ReAct) executeBlueprint(ctx context.Context, request *invokePlanAndExec
 	defer r.config.HotPatchBroadcaster.Unsubscribe(hotpatch)
 	var output bytes.Buffer
 	var outputMu sync.Mutex
-	opts := aicommon.ConvertConfigToOptions(r.config)
+	opts := aicommon.ConvertConfigToOptionsWithoutHotPatch(r.config)
 	opts = append(opts, aicommon.WithID(id), aicommon.WithContext(ctx),
 		aicommon.WithLiteForgeExecutor(nil), aicommon.WithAICallbacks(r.config.GetRawAICallbacks()),
 		aicommon.WithAllowPlanUserInteract(true), aicommon.WithEventInputChanx(input), aicommon.WithHotPatchOptionChan(hotpatch),
@@ -85,11 +86,38 @@ func (r *ReAct) executeBlueprint(ctx context.Context, request *invokePlanAndExec
 			params = copy
 		}
 	}
+	task := request.task
+	if task == nil {
+		task = aicommon.NewStatefulTaskBase("forge-"+id, utils.InterfaceToString(params), ctx, r.Emitter, true)
+	}
+	ctx = coordinator.WithForgeParent(ctx, r, task, id)
 	ready()
-	_, err = aicommon.ExecuteForgeFromDB(request.forgeName, ctx, params, opts...)
+	result, err := aicommon.ExecuteForgeFromDB(request.forgeName, ctx, params, opts...)
 	outputMu.Lock()
 	logOutput := output.String()
 	outputMu.Unlock()
 	r.AddToTimeline("forge output log", logOutput)
+	if result != nil {
+		var business *aicommon.ForgeResult
+		switch output := result.(type) {
+		case interface{ GetForgeResult() *aicommon.ForgeResult }:
+			business = output.GetForgeResult()
+		case *aicommon.ForgeResult:
+			business = output
+		}
+		content := ""
+		if business != nil {
+			content = utils.InterfaceToString(business.Formated)
+			if business.Action != nil {
+				raw, _ := json.Marshal(business.Action.GetParams())
+				content = string(raw)
+			}
+		} else {
+			content = utils.InterfaceToString(result)
+		}
+		if content != "" {
+			r.AddToTimeline("forge result: "+request.forgeName, content)
+		}
+	}
 	return err
 }

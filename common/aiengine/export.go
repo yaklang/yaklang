@@ -6,7 +6,9 @@ var Exports = map[string]interface{}{
 	"InvokeReActAsync": InvokeReActAsync,
 
 	// new ai engine
-	"NewAIEngine": NewAIEngine,
+	"NewAIEngine":   NewAIEngine,
+	"NewInputEvent": NewInputEvent,
+	"configOptions": WithExtOptions,
 
 	// config options
 	"focus":                     WithFocus,

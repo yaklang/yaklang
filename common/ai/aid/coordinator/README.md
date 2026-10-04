@@ -6,6 +6,10 @@
 
 最上层 [coordinator.go](../aireact/coordinator.go) 默认使用新版。旧引擎的实现、任务和私有资源仍集中在同层 [coordinator_legacy](../coordinator_legacy/README.md)，供后续移除；ReAct 的 PLAN 入口不再调用它。两边共享 aicommon、reactloops、Timeline、事件封套和数据库表这些通用基础设施，不共享执行状态机。父级 `aid` 只保留公共接口，不提供旧类型的兼容别名。
 
+[Legacy 接口迁移契约](LEGACY_INTERFACE.md) 分别定义 aiforge 底层迁移和边缘 legacy coordinator 接口兼容，包含接入清单、mocker/结果交付、Yak 配置继承、审核事件、观测、恢复与双协议验收要求。当前默认 Forge 已切换到新版，具体接口、边界与本地验收见该文档第 14 节。
+
+Forge 使用 [ForgeExecution](../../aiforge/forge_execution.go) 包装本次 Session；计划、审核、DAG 和 worker 仍由此目录负责。结果模板读取 [ContextSnapshot](context_snapshot.go)，不接入旧 provider 回调。任务全部验收、消息处理完成后，[ResultDelivery](delivery.go) 保存业务结果及确定性的执行证明，再通过完成门禁；不额外调用模型生成通用报告。独立入口和父 ReAct Blueprint 入口复用同一机制，协议由 `EnableFunctionCallMode` 决定。独立冒烟可运行 `yak common/ai/aismoking/forge.yak`。
+
 ## 第一阶段 PLAN
 
 内部仅保存一份当前 `Plan` 和 `Phase = PLAN | EXEC`。PLAN 负责调查、文档、无状态任务定义与派生 DAG；只有 `create_plan / modify_plan / submit_plan` 三个计划动作。提交锁定内容，用户要求调整则恢复编辑，批准最终内容后保存批准历史并进入自动 EXEC。EXEC 复用 modify_plan 调整当前任务图，不回退 PLAN、不再次审批。
@@ -18,7 +22,7 @@
 
 持久化格式是 schema 2，保存 phase、plan、review_pending、当前/历史尝试、inbox 游标及当前报告。schema 1 的旧双计划读取集中在 `snapshot_compat.go`；旧记录有一份可确定计划时转换，有执行中的替换草案则明确拒绝。`Revision` 只为状态发布顺序服务，模型没有计划版本或 edit revision。
 
-[第一阶段实际上下文、样本和验收](context_review.md)；新增 [Yak/aim 脚本](smoke/planning_phase.yak) 覆盖调查、preset、mocker × 双协议 × 探索开关，共 12 个组合。
+[第一阶段实际上下文、样本和验收](context_review.md)；新增 [Yak/aim 脚本](../../aismoking/planning.yak) 覆盖调查、preset、mocker × 双协议 × 探索开关，共 12 个组合。
 
 ## EXEC 自动调度、审核和报告
 
@@ -38,7 +42,7 @@
 
 High Static 不变。PLAN DOCUMENT/DEFINITION、共享 Evidence 和 CURRENT REPORT 位于 SemiDynamic1；中文执行/写作角色从 promptloader 进入 SemiDynamic2。动态 PLAN STATUS 仅保存状态、消息和写作概览。观察批次走 Timeline Open，冻结后沿原有提升机制保留。
 
-[execution_phase.yak](smoke/execution_phase.yak) 通过真实 Yak/aim 跑 A/B独立、C依赖A、D依赖B/C，覆盖 function call/text stream × 人工/YOLO。脚本化的是模型决策与用户回复，调度、worker、只读工具、Evidence、审核和 artifacts 写入均由实际运行时执行。快速通知屏障测试保留在 [task_notifications.yak](smoke/task_notifications.yak)。
+[execution_phase.yak](../../aismoking/coordinator.yak) 通过真实 Yak/aim 跑 A/B独立、C依赖A、D依赖B/C，覆盖 function call/text stream × 人工/YOLO。脚本化的是模型决策与用户回复，调度、worker、只读工具、Evidence、审核和 artifacts 写入均由实际运行时执行。快速通知屏障测试保留在 [task_notifications.yak](../../aismoking/notifications.yak)。
 
 ~~~powershell
 go test ./common/ai/aid/coordinator -count=1
@@ -255,13 +259,13 @@ go test ./common/ai/aid/aireact -run 'TestCoordinator|TestPublishDetachedPlan|Te
 go test ./common/yakgrpc -run '^TestStartAIReActDetachedApprovalExecutesAndKeepsStreamOpen' -count=1
 ```
 
-[native_coordinator.yak](smoke/native_coordinator.yak) 由测试通过真实 Yak 引擎执行，调用 `aim.InvokeReAct`。只有模型 provider 使用可重复的原生函数调用响应；协调员、worker、审批、Timeline、报告和 Yakit 事件适配均运行实际代码。测试核对真实文件读取、两个有依赖的任务、共享 evidence、逐项验收、push/pop、报告文件及两种 loop_marker。另有独立 Session 的 detached 提交、编辑、引擎恢复及执行测试，以及干预入 Timeline 后通知的时序测试。
+[native_coordinator.yak](../../aismoking/coordinator.yak) 由测试通过真实 Yak 引擎执行，调用 `aim.InvokeReAct`。只有模型 provider 使用可重复的原生函数调用响应；协调员、worker、审批、Timeline、报告和 Yakit 事件适配均运行实际代码。测试核对真实文件读取、两个有依赖的任务、共享 evidence、逐项验收、push/pop、报告文件及两种 loop_marker。另有独立 Session 的 detached 提交、编辑、引擎恢复及执行测试，以及干预入 Timeline 后通知的时序测试。
 
 [审核到执行测试](../aireact/coordinator_approval_execution_test.go) 通过真实输入事件和任务队列覆盖普通确认、编辑后提交、detached 确认、detached 编辑，以及 Yakit 先停止规划再提交执行的路径；每条路径只提供一次用户确认，验证两个依赖任务全部验收、事件闭合及完成状态持久化。Yak 冒烟也使用人工审批策略，由事件回调发送这一次确认。
 
 [通道测试](../aireact/coordinator_channels_test.go) 拦截旧构造器，验证新版规划、人工审核编辑、detached 发布及恢复均不调用它；反向选择旧通道时不注入新版辅助执行器。恢复以存储归属为准，未知快照格式或旧引擎标记与新快照冲突会报错。新包的生产依赖图不包含父级 `aid` 或 `aiforge`。
 
-[live_coordinator.yak](smoke/live_coordinator.yak) 可使用本机配置的实际 provider/model 执行；凭据由外部配置，不写入脚本。确定性冒烟不衡量模型任务质量或真实 provider 的缓存命中率。
+[live_coordinator.yak](../../aismoking/live/coordinator.yak) 可使用本机配置的实际 provider/model 执行；凭据由外部配置，不写入脚本。确定性冒烟不衡量模型任务质量或真实 provider 的缓存命中率。
 
 [规划提交冒烟](planning_submission_smoke_test.go) 对探索生成、预设计划和 mocker 各跑文本流与原生两种协议，共六个组合。探索实际执行 `read_file → save_evidence → create_plan → submit_plan`；预设/mocker 直接 `submit_plan`，不额外生成计划。所有组合通过真实交互事件确认一次，验证完整嵌套 DAG、Evidence/用户输入提升、上下文分区及未派发 worker。设置 `COORDINATOR_CONTEXT_REVIEW_DIR` 后，在其 `planning-submission` 子目录生成四份提交前完整 prompt 和对应 request JSON；预设样本代表已独立验证的两个附带计划入口。详情见 [上下文 review](context_review.md)。
 

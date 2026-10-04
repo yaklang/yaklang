@@ -18,7 +18,7 @@ bash scripts/generate-compressed-assets.sh
 "$GZIP_EMBED" -cache --source ./common/ai/aid/aireact/skills --gz ./common/ai/aid/aireact/skills.tar.gz --root-path --no-embed
 "$GZIP_EMBED" -cache --source ./common/coreplugin/base-yak-plugin --gz ./common/coreplugin/base-yak-plugin.tar.gz --root-path --no-embed
 "$GZIP_EMBED" -cache --source ./common/syntaxflow/sfbuildin/buildin --gz ./common/syntaxflow/sfbuildin/buildin.tar.gz --no-embed
-"$GZIP_EMBED" -cache --source ./common/aiforge/buildinforge --gz ./common/aiforge/buildinforge.tar.gz --no-embed
+"$GZIP_EMBED" -cache --source ./common/ai/aiforge/buildinforge --gz ./common/ai/aiforge/buildinforge.tar.gz --no-embed
 
 # ---------- 3. 编译（-tags gzip_embed 会编入 //go:build gzip_embed 的代码） ----------
 echo "[build] building yak..."

@@ -11,7 +11,7 @@ import (
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/coordinator_legacy"
 	"github.com/yaklang/yaklang/common/ai/rag"
-	_ "github.com/yaklang/yaklang/common/aiforge"
+	_ "github.com/yaklang/yaklang/common/ai/aiforge"
 )
 
 func TestSemanticIdentifierAuxiliaryProtocolAndFallback(t *testing.T) {

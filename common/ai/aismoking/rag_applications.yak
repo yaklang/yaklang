@@ -1,0 +1,60 @@
+// 直接执行：yak common/ai/aismoking/rag_applications.yak
+// 模型与 embedding 使用确定性 mock；文件、LiteForge 协议、入库和检索执行真实代码。
+rag.EnableMockMode()
+source = "Go context.Context 传播取消信号。\n调用 cancel 后，子任务应停止处理。\n子任务退出后由协调员收集执行结果。"
+path = file.TempFileName("liteforgeapp-migration-*.txt")~
+file.Save(path, source)~
+defer file.Remove(path)
+
+for native in [false, true] {
+    db = rag.NewTempRagDatabase()~
+    defer db.Close()
+    name = "liteforgeapp-migration-" + randstr(12)
+    searchCalls = 0
+    searchModel = ai.MockAIService(func(prompt) {
+        searchCalls++
+        assert source in prompt, "file contents must reach the model"
+        return `{"@action":"object","question_list":[{"question":"Go context.Context 如何传播取消信号？"},{"question":"Go 子任务收到取消信号后如何退出？"},{"question":"Go 协调员如何收集子任务执行结果？"}]}`
+    })
+    search = rag.BuildSearchIndexKnowledgeFromFile(name, path,
+        rag.db(db), rag.aiService(searchModel),
+        ai.withFunctionCallMode(native), rag.docMetadata("search_target", "migration-search"),
+    )~
+    assert searchCalls == 1, "search indexing must use one model request"
+    assert search.OriginalContent == source
+    assert len(search.Questions) == 3
+    assert search.EntryID != ""
+    assert search.KnowledgeBaseEntry != nil
+    collection = rag.Get(name, rag.db(db))~
+    matches = collection.Query(search.Questions[0], 3)~
+    assert len(matches) == 3, "all generated questions must be indexed"
+    for match in matches {
+        assert match.KnowledgeBaseEntry != nil
+        assert match.KnowledgeBaseEntry.HiddenIndex == search.EntryID
+        assert match.KnowledgeBaseEntry.KnowledgeDetails == source
+    }
+
+    indexCalls = 0
+    indexModel = ai.MockAIService(func(prompt) {
+        indexCalls++
+        assert "context.Context" in prompt
+        return `{"@action":"object","chunk_list":[{"title":"Go 子任务取消与结果收集","answer_location":{"start_line":1,"end_line":3},"question_list":["Go 子任务如何响应 context.Context 取消？","Go 协调员如何收集退出的子任务结果？"]}]}`
+    })
+    indexName = name + "-chunks"
+    rag.BuildIndexKnowledgeFromFile(indexName, path,
+        rag.db(db), rag.aiService(indexModel),
+        ai.withFunctionCallMode(native), rag.analyzeConcurrency(1),
+    )~
+    assert indexCalls == 1, "file analysis and chunk indexing must use one model request"
+    indexed = rag.Get(indexName, rag.db(db))~
+    chunks = indexed.Query("Go 子任务如何响应 context.Context 取消？", 2)~
+    assert len(chunks) == 2, "both chunk questions must be indexed"
+    for item in chunks {
+        assert item.KnowledgeBaseEntry != nil
+        assert item.KnowledgeBaseEntry.KnowledgeTitle == "Go 子任务取消与结果收集"
+        assert "context.Context" in item.KnowledgeBaseEntry.KnowledgeDetails
+    }
+    printf("liteforgeapp applications passed: function_call=%v, search_requests=%d, index_requests=%d\n", native, searchCalls, indexCalls)
+}
+
+println("AISMOKING_PASS")

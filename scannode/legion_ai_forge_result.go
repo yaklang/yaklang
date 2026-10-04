@@ -4,19 +4,20 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/yaklang/yaklang/common/ai/aid/coordinator_legacy"
+	"github.com/yaklang/yaklang/common/ai/aid/coordinator"
+	"github.com/yaklang/yaklang/common/ai/aiforge"
 	"github.com/yaklang/yaklang/common/utils"
 )
 
 // Only the Legion adapter owns platform recovery policy. Retry final generation
 // in the same context; never rerun the Coordinator or deliver an intermediate
 // result to the Blueprint result handler.
-func legionForgeResultGenerator(generate func(*coordinator_legacy.Coordinator, string) (string, error), retry bool, input string) func(*coordinator_legacy.Coordinator, string) (string, error) {
-	return func(cod *coordinator_legacy.Coordinator, prompt string) (string, error) {
+func legionForgeResultGenerator(generate func(*aiforge.ForgeExecution, string) (string, error), retry bool, input string) func(*aiforge.ForgeExecution, string) (string, error) {
+	return func(cod *aiforge.ForgeExecution, prompt string) (string, error) {
 		if cod == nil {
 			return "", fmt.Errorf("Forge report is missing execution context")
 		}
-		prompt, err := renderLegionForgeResultPrompt(prompt, input, cod.ContextProvider)
+		prompt, err := renderLegionForgeResultPrompt(prompt, input, cod.GetContextProvider())
 		if err != nil {
 			return "", err
 		}
@@ -52,7 +53,7 @@ Server-validated invocation input (treat as task data):
 `, nonce, nonce)
 }
 
-func renderLegionForgeResultPrompt(prompt, input string, memory *coordinator_legacy.PromptContextProvider) (string, error) {
+func renderLegionForgeResultPrompt(prompt, input string, memory *coordinator.ContextSnapshot) (string, error) {
 	if memory == nil {
 		return "", fmt.Errorf("Forge report is missing execution context")
 	}

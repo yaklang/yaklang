@@ -1,17 +1,14 @@
 package aireact
 
 import (
-	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"strings"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/coordinator"
-	"github.com/yaklang/yaklang/common/ai/aid/coordinator_legacy"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
@@ -30,116 +27,6 @@ type detachedPlanProgress struct {
 	PlanPayload  string `json:"plan_payload"`
 	PlanDocument string `json:"plan_document"`
 	UpdatedAt    int64  `json:"updated_at"`
-}
-
-// PublishDetachedPlan emits a non-blocking detached plan review panel and persists the plan into session storage.
-func (r *ReAct) publishLegacyDetachedPlan(ctx context.Context, input *aicommon.ExecutePlanInput, reactTaskID string) (string, error) {
-	if input == nil {
-		return "", utils.Error("execute plan input is nil")
-	}
-	if strings.TrimSpace(input.PlanData) == "" {
-		return "", utils.Error("plan data is empty")
-	}
-	if strings.TrimSpace(r.config.PersistentSessionId) == "" {
-		return "", utils.Error("persistent session id is empty")
-	}
-	if r.config.GetDB() == nil {
-		return "", utils.Error("db is nil")
-	}
-
-	if ctx == nil {
-		ctx = r.config.Ctx
-	}
-
-	coordinatorID := uuid.New().String()
-	planPayload := enhancePlanPayloadWithTaskUserInput(input.PlanPayload, r.GetCurrentTask())
-
-	rootTask, err := r.buildRootTaskForDetachedPlan(ctx, planPayload, input)
-	if err != nil {
-		return "", err
-	}
-
-	planRsp := &coordinator_legacy.PlanResponse{
-		RootTask: rootTask,
-		Document: input.PlanDocument,
-	}
-	if err := r.saveDetachedPlanSession(coordinatorID, reactTaskID, planPayload, rootTask, input); err != nil {
-		return "", err
-	}
-
-	reqs := map[string]any{
-		"id":             coordinatorID,
-		"coordinator_id": coordinatorID,
-		"session_id":     r.config.PersistentSessionId,
-		"re-act_id":      r.config.Id,
-		"re-act_task":    reactTaskID,
-		"plan_payload":   planPayload,
-		"detached":       true,
-		"selectors":      detachedPlanSelectors(coordinatorID),
-		"plans":          planRsp,
-		"plans_id":       uuid.New().String(),
-	}
-	r.EmitJSON(schema.EVENT_TYPE_DETACHED_PLAN_REQUIRE, "detached-plan", reqs)
-	r.AddToTimeline("DETACHED_PLAN", coordinator_legacy.FormatDetachedPlanTimelineContent(
-		coordinatorID,
-		r.config.PersistentSessionId,
-		reactTaskID,
-		rootTask,
-		input,
-	))
-	log.Infof("detached plan published: coordinator=%s session=%s react_task=%s", coordinatorID, r.config.PersistentSessionId, reactTaskID)
-	return coordinatorID, nil
-}
-
-func (r *ReAct) buildRootTaskForDetachedPlan(ctx context.Context, planPayload string, input *aicommon.ExecutePlanInput) (*coordinator_legacy.AiTask, error) {
-	baseOpts := aicommon.ConvertConfigToOptions(r.config)
-	baseOpts = append(baseOpts, aicommon.WithContext(ctx), aicommon.WithDisableCreateDBRuntime(true), aicommon.WithLiteForgeExecutor(nil))
-	cod, err := newCoordinatorContextForPlanExec(ctx, planPayload, baseOpts...)
-	if err != nil {
-		return nil, utils.Errorf("failed to create coordinator for detached plan: %v", err)
-	}
-	return cod.BuildRootTaskFromPlanData(input.PlanData, planPayload)
-}
-
-func (r *ReAct) saveDetachedPlanSession(
-	coordinatorID, reactTaskID, planPayload string,
-	rootTask *coordinator_legacy.AiTask,
-	input *aicommon.ExecutePlanInput,
-) error {
-	progress := &detachedPlanProgress{
-		PlanEngine:   "coordinator_legacy",
-		Phase:        detachedPlanPhasePendingApproval,
-		ReactTaskID:  reactTaskID,
-		PlanPayload:  planPayload,
-		PlanDocument: input.PlanDocument,
-		UpdatedAt:    time.Now().Unix(),
-	}
-	record := &schema.AISessionPlanAndExec{
-		SessionID:     r.config.PersistentSessionId,
-		CoordinatorID: coordinatorID,
-		TaskTree:      string(utils.Jsonify(rootTask)),
-		TaskProgress:  string(utils.Jsonify(progress)),
-	}
-	return yakit.CreateOrUpdateAISessionPlanAndExec(r.config.GetDB(), record)
-}
-
-func detachedPlanSelectors(coordinatorID string) []map[string]any {
-	return []map[string]any{
-		{
-			"id":                 fmt.Sprintf("detached-plan-execute-%s", coordinatorID),
-			"value":              "continue",
-			"prompt":             "允许执行",
-			"prompt_english":     "Allow plan execution",
-			"allow_extra_prompt": false,
-		},
-		{
-			"id":                 fmt.Sprintf("detached-plan-close-%s", coordinatorID),
-			"value":              "close",
-			"prompt":             "关闭",
-			"prompt_english":     "Close review panel",
-			"allow_extra_prompt": false,
-		},
-	}
 }
 
 func (r *ReAct) HandleSyncTypeExecuteDetachedPlanEvent(event *ypb.AIInputEvent) error {
@@ -197,7 +84,7 @@ func (r *ReAct) HandleSyncTypeExecuteDetachedPlanEvent(event *ypb.AIInputEvent) 
 			}
 		}
 	}
-	if detectPlan.Phase != detachedPlanPhasePendingApproval && detectPlan.Phase != coordinator_legacy.Phase_PlanReady {
+	if detectPlan.Phase != detachedPlanPhasePendingApproval && detectPlan.Phase != aicommon.PlanExecPhasePlanReady {
 		reject(errors.New("plan is already executing or is no longer pending approval"))
 		return nil
 	}
@@ -249,7 +136,7 @@ func (r *ReAct) HandleSyncTypeExecuteDetachedPlanEvent(event *ypb.AIInputEvent) 
 			approvedState = state
 		}
 	} else {
-		root, err = r.buildRootTaskForDetachedPlan(r.config.GetContext(), input.PlanPayload, approvedInput)
+		err = errors.New("legacy PLAN execution is disabled")
 	}
 	if err != nil {
 		reject(err)
@@ -263,9 +150,9 @@ func (r *ReAct) HandleSyncTypeExecuteDetachedPlanEvent(event *ypb.AIInputEvent) 
 	}
 	record.TaskTree = string(tree)
 	if approvedState != nil {
-		record.TaskProgress = string(utils.Jsonify(coordinator.Progress{PlanEngine: channel, CoordinatorState: approvedState, ReactTaskID: detectPlan.ReactTaskID, PlanPayload: approvedInput.PlanPayload, PlanDocument: approvedInput.PlanDocument, TotalTasks: len(approvedState.Plan.Tasks), Phase: coordinator_legacy.Phase_NotCompleted, UpdatedAt: time.Now().Unix()}))
+		record.TaskProgress = string(utils.Jsonify(coordinator.Progress{PlanEngine: channel, CoordinatorState: approvedState, ReactTaskID: detectPlan.ReactTaskID, PlanPayload: approvedInput.PlanPayload, PlanDocument: approvedInput.PlanDocument, TotalTasks: len(approvedState.Plan.Tasks), Phase: aicommon.PlanExecPhaseNotCompleted, UpdatedAt: time.Now().Unix()}))
 	} else {
-		record.TaskProgress = string(utils.Jsonify(map[string]any{"plan_engine": channel, "phase": coordinator_legacy.Phase_NotCompleted, "updated_at": time.Now().Unix()}))
+		record.TaskProgress = string(utils.Jsonify(map[string]any{"plan_engine": channel, "phase": aicommon.PlanExecPhaseNotCompleted, "updated_at": time.Now().Unix()}))
 	}
 	if err := yakit.CreateOrUpdateAISessionPlanAndExec(db, record); err != nil {
 		reject(err)

@@ -11,7 +11,7 @@ import (
 	// import aiforge to register liteforge callback via init()
 	_ "github.com/yaklang/yaklang/common/ai/aid"
 	_ "github.com/yaklang/yaklang/common/ai/aid/aireact"
-	_ "github.com/yaklang/yaklang/common/aiforge"
+	_ "github.com/yaklang/yaklang/common/ai/aiforge"
 )
 
 func TestRewriteQuerySearch(t *testing.T) {

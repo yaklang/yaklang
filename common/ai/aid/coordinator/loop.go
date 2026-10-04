@@ -18,6 +18,7 @@ var planInstruction = promptloader.MustLoad("ai/aid/coordinator/planning.txt")
 var instruction = promptloader.MustLoad("ai/aid/coordinator/instruction.txt")
 var reportInstruction = promptloader.MustLoad("ai/aid/coordinator/reporting.txt")
 var planningOnlyInstruction = promptloader.MustLoad("ai/aid/coordinator/planning_only.txt")
+var deliveryInstruction = promptloader.MustLoad("ai/aid/coordinator/delivery.txt")
 
 func WithController(c *Controller) reactloops.ReActLoopOption {
 	return func(loop *reactloops.ReActLoop) { loop.Set("coordinator_controller", c) }
@@ -71,7 +72,7 @@ func NewLoop(r aicommon.AIInvokeRuntime, opts ...reactloops.ReActLoopOption) (*r
 			template := instruction
 			if controller(l).Snapshot().Phase == PhasePlan {
 				template = planInstruction
-			} else if !planningOnly(l) && controller(l).ReportReady() {
+			} else if !planningOnly(l) && controller(l).ReportReady() && !hasDelivery(controller(l)) {
 				template = reportInstruction
 			}
 			text, err := utils.RenderTemplate(template, map[string]any{"FunctionCallMode": l.FunctionCallModeEnabled(), "ExplorationEnabled": explorationEnabled(l)})
@@ -80,6 +81,9 @@ func NewLoop(r aicommon.AIInvokeRuntime, opts ...reactloops.ReActLoopOption) (*r
 			}
 			if controller(l).Snapshot().Phase == PhasePlan {
 				text += preferences.String()
+			}
+			if s, ok := controller(l).host.(*Session); ok && s.HasResultDelivery() && !planningOnly(l) {
+				text += "\n" + deliveryInstruction
 			}
 			if planningOnly(l) {
 				return text + "\n" + planningOnlyInstruction, nil
@@ -98,6 +102,12 @@ func NewLoop(r aicommon.AIInvokeRuntime, opts ...reactloops.ReActLoopOption) (*r
 			return false, "Coordinator cannot execute this tool. Put business execution in a plan task."
 		}),
 		reactloops.WithActionFilter(func(a *reactloops.LoopAction) bool {
+			if hasDelivery(owningController) {
+				switch a.ActionType {
+				case "create_report", "modify_report", "submit_report":
+					return false
+				}
+			}
 			for _, name := range ActionNames {
 				if a.ActionType == name {
 					return owningController.actionAllowed(name)

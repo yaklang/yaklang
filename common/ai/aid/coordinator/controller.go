@@ -702,6 +702,11 @@ func (c *Controller) RetryTask(id string, attemptID uint64, reason string) ([]At
 	}
 	for tid := range affected {
 		t := c.state.Attempts[tid]
+		// Invalidating an input must not revoke an explicit scope cancellation.
+		// Only naming that cancelled task as the retry target can reopen it.
+		if tid != id && t.State == Cancelled {
+			continue
+		}
 		c.archiveLocked(t)
 		t.State = Pending
 		t.ID = 0

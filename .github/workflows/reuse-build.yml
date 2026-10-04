@@ -314,7 +314,7 @@ jobs:
           "$GZIP_EMBED" -cache --source ./common/yso/resources/static --gz ./common/yso/resources/static.tar.gz --xor-key yaklang-yso-v1 --no-embed --root-path
           "$GZIP_EMBED" -cache --source ./common/coreplugin/base-yak-plugin --gz ./common/coreplugin/base-yak-plugin.tar.gz --root-path --no-embed
           "$GZIP_EMBED" -cache --source ./common/syntaxflow/sfbuildin/buildin --gz ./common/syntaxflow/sfbuildin/buildin.tar.gz --root-path --no-embed
-          "$GZIP_EMBED" -cache --source ./common/aiforge/buildinforge --gz ./common/aiforge/buildinforge.tar.gz --root-path --no-embed
+          "$GZIP_EMBED" -cache --source ./common/ai/aiforge/buildinforge --gz ./common/ai/aiforge/buildinforge.tar.gz --root-path --no-embed
           "$GZIP_EMBED" -cache --source ./common/wsm/payloads/templates/static --gz ./common/wsm/payloads/templates/static.tar.gz --xor-key yaklang-wsm-v1 --no-embed
           "$GZIP_EMBED" -cache --source ./common/yak/yaklib/tools/dicts/static --gz ./common/yak/yaklib/tools/dicts/static.tar.gz --xor-key yaklang-dicts-v1 --no-embed
           "$GZIP_EMBED" -cache --source ./common/yak/yaklib/static --gz ./common/yak/yaklib/static.tar.gz --xor-key yaklang-sigs-v1 --no-embed

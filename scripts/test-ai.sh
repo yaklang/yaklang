@@ -65,8 +65,8 @@ cat > "$TEST_CONFIG" <<'EOF'
   {"package": "./common/ai/rag/hnsw/...", "timeout": "60s", "parallel": 1},
   {"package": "./common/ai/aispec/...", "timeout": "60s", "parallel": 1},
   {"package": "./common/aireducer/...", "timeout": "60s", "parallel": 1},
-  {"package": "./common/aiforge/aibp", "timeout": "2m30s", "parallel": 1, "run": "^(TestBuildForgeFromYak|TestNewForgeExecutor)"},
-  {"package": "./common/aiforge", "timeout": "3m", "parallel": 1},
+  {"package": "./common/ai/aiforge/aibp", "timeout": "2m30s", "parallel": 1, "run": "^(TestBuildForgeFromYak|TestNewForgeExecutor)"},
+  {"package": "./common/ai/aiforge", "timeout": "3m", "parallel": 1},
   {"package": "./common/ai/rag/entityrepos/...", "timeout": "60s", "parallel": 1},
   {"package": "./common/ai/rag", "timeout": "1m", "run": "TestMUSTPASS", "parallel": 1},
   {"package": "./common/ai/rag/plugins_rag/...", "timeout": "1m", "run": "TestMUSTPASS", "parallel": 1}

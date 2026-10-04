@@ -10,7 +10,6 @@ import (
 	"github.com/google/uuid"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/coordinator"
-	"github.com/yaklang/yaklang/common/ai/aid/coordinator_legacy"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
@@ -31,11 +30,11 @@ func (r *ReAct) coordinatorChannel(id string) (string, error) {
 		if err := json.Unmarshal([]byte(record.TaskProgress), &progress); err != nil {
 			return "", err
 		}
-		if progress.Engine != "" && progress.Engine != coordinator.Name && progress.Engine != "legacy" && progress.Engine != coordinator_legacy.Name {
+		if progress.Engine != "" && progress.Engine != coordinator.Name && progress.Engine != "legacy" && progress.Engine != "coordinator_legacy" {
 			return "", fmt.Errorf("unknown stored plan engine %q", progress.Engine)
 		}
 		hasSnapshot := len(progress.State) > 0 && string(progress.State) != "null"
-		if hasSnapshot && (progress.Engine == "legacy" || progress.Engine == coordinator_legacy.Name) {
+		if hasSnapshot && (progress.Engine == "legacy" || progress.Engine == "coordinator_legacy") {
 			return "", fmt.Errorf("stored legacy plan contains a native coordinator snapshot")
 		}
 		if progress.Engine == coordinator.Name || hasSnapshot {

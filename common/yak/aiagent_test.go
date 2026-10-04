@@ -15,7 +15,7 @@ import (
 	"github.com/yaklang/gorm"
 	_ "github.com/mattn/go-sqlite3"
 	"github.com/stretchr/testify/require"
-	"github.com/yaklang/yaklang/common/aiforge"
+	"github.com/yaklang/yaklang/common/ai/aiforge"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/chanx"

@@ -6,12 +6,12 @@ import (
 	"slices"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
-	"github.com/yaklang/yaklang/common/ai/aid/coordinator_legacy"
+	"github.com/yaklang/yaklang/common/ai/aid/coordinator"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools/yakscripttools"
 	"github.com/yaklang/yaklang/common/schema"
 
-	"github.com/yaklang/yaklang/common/aiforge"
+	"github.com/yaklang/yaklang/common/ai/aiforge"
 	"github.com/yaklang/yaklang/common/log"
 )
 
@@ -147,8 +147,8 @@ var (
 	}
 	WithDisallowRequireForUserPrompt = aicommon.WithDisallowRequireForUserPrompt
 	WithAICallback                   = aicommon.WithAICallback
-	WithPromptContextProvider        = coordinator_legacy.WithPromptContextProvider
-	WithResultHandler                = coordinator_legacy.WithResultHandler
+	WithPromptContextProvider        = coordinator.WithPromptContextProvider
+	WithResultHandler                = aiforge.WithExecutorResultHandler
 
 	// aitools
 	AllYakScriptTools = yakscripttools.GetAllYakScriptAiTools
@@ -199,11 +199,11 @@ func NewForgeBlueprint(name string, opts ...any) *aiforge.ForgeBlueprint {
 	aiforgeOpts = append(aiforgeOpts, aiforge.WithAIOptions(ag.AICommonOptions()...))
 	return aiforge.NewForgeBlueprint(name, aiforgeOpts...)
 }
-func NewExecutorFromForge(forge *aiforge.ForgeBlueprint, i any, opts ...any) (*coordinator_legacy.Coordinator, error) {
+func NewExecutorFromForge(forge *aiforge.ForgeBlueprint, i any, opts ...any) (*aiforge.ForgeExecution, error) {
 	ag := NewAgent(opts...)
 	ag.ForgeName = forge.Name
 	params := aiforge.Any2ExecParams(i)
-	return forge.CreateCoordinator(context.Background(), params, ag.AICommonOptions()...)
+	return forge.CreateCoordinator(ag.ctx, params, ag.AICommonOptions()...)
 }
 
 // NewExecutorFromJson 通过 JSON 描述的 Forge 蓝图创建执行器（导出名为 aiagent.NewExecutorFromJson）
@@ -222,7 +222,7 @@ func NewExecutorFromForge(forge *aiforge.ForgeBlueprint, i any, opts ...any) (*c
 // coordinator = aiagent.NewExecutorFromJson(forgeJson, {"query": "hello"})~
 // dump(coordinator)
 // ```
-func NewExecutorFromJson(json string, i any, opts ...any) (*coordinator_legacy.Coordinator, error) {
+func NewExecutorFromJson(json string, i any, opts ...any) (*aiforge.ForgeExecution, error) {
 	bp, err := aiforge.NewYakForgeBlueprintConfigFromJson(json)
 	if err != nil {
 		return nil, err
@@ -247,11 +247,14 @@ func NewExecutorFromJson(json string, i any, opts ...any) (*coordinator_legacy.C
 // coordinator = aiagent.NewExecutor("my-forge", {"query": "hello"})~
 // dump(coordinator)
 // ```
-func NewForgeExecutor(name string, i any, opts ...any) (*coordinator_legacy.Coordinator, error) {
+func NewForgeExecutor(name string, i any, opts ...any) (*aiforge.ForgeExecution, error) {
 	params := aiforge.Any2ExecParams(i)
 	ag := NewAgent(opts...)
-	bp := NewForgeBlueprint(name, opts...)
-	ins, err := bp.CreateCoordinator(context.Background(), params, ag.AICommonOptions()...)
+	// Apply invocation configuration once. NewForgeBlueprint also stores the
+	// same agent options on the blueprint, which would duplicate append-only
+	// context and callbacks when CreateCoordinator receives them again.
+	bp := aiforge.NewForgeBlueprint(name, ag.AiForgeOptions...)
+	ins, err := bp.CreateCoordinator(ag.ctx, params, ag.AICommonOptions()...)
 	if err != nil {
 		return nil, err
 	}
