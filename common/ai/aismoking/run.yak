@@ -21,6 +21,19 @@ for name in cases {
     file.MkdirAll(output)~
     os.Setenv("AISMOKING_OUTPUT",output)
     os.Setenv("YAKIT_HOME",file.Join(output,"home"))
+    // Background value evaluation uses global routing independently of the
+    // business callback. Confine it to a closed loopback endpoint in this
+    // disposable profile; never inherit a developer's remote providers.
+    // Empty model lists / the deprecated Enabled flag are backfilled at startup.
+    localModel = {"type":"openai","api_key":"local-fixture","domain":"http://127.0.0.1:1","model":"ai-smoking-offline"}
+    profile = file.Join(output,"mock-profile.json")
+    file.SaveJson(profile,{"enabled":true,"routing_policy":"balance","disable_fallback":true,
+        "intelligent_configs":[localModel],"lightweight_configs":[localModel],"vision_configs":[localModel]})~
+    setup = exec.CommandContext(context.WithTimeoutSeconds(30),sprintf('"%s"',str.ReplaceAll(binary,"\\","/")))~
+    setup.Args = []string{binary,"tiered-ai-config","--enable","--config-file",profile}
+    configured,setupError = setup.CombinedOutput()
+    file.Save(file.Join(output,"setup.log"),configured)~
+    if setupError != nil { println(string(configured)); println("Failed to prepare isolated mock home: ",setupError); os.Exit(1) }
     command = exec.CommandContext(context.WithTimeoutSeconds(480),sprintf('"%s"',str.ReplaceAll(binary,"\\","/")))~
     // Set argv directly: paths/arguments are not interpolated into a shell.
     command.Args = []string{binary,file.Join("common/ai/aismoking",name + ".yak")}

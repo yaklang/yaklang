@@ -104,10 +104,10 @@ common/ai/aid/liteforge/liteforgeapp/
     video_archiver.go                  # videoSegmentArchiver：流式 zip 归档
     refine.go                         # BuildVideoKnowledgeFromOmni：注入 kbName + 接 RAG
     exports.go                        # liteforge.* yak 导出
-    examples/
-        build-video-knowledge-omni.yak           # KB 入库样例
-        build-video-knowledge-omni-with-zip.yak  # KB + zip 归档样例
     VIDEO_OMNI_PIPELINE.md         # 本文档
+common/ai/aismoking/live/video/
+    build-video-knowledge-omni.yak           # KB 入库样例
+    build-video-knowledge-omni-with-zip.yak  # KB + zip 归档样例
 ```
 
 ## 4. 关键 API 速查
@@ -177,7 +177,7 @@ common/ai/aid/liteforge/liteforgeapp/
 ```shell
 # 优先 env，回退到本地 key 文件
 export DASHSCOPE_API_KEY=sk-***
-yak ../../../aismoking/live/video/build-video-knowledge-omni.yak \
+yak common/ai/aismoking/live/video/build-video-knowledge-omni.yak \
     --video /path/to/lecture.mp4 \
     --model flash \
     --kb-name my-lecture-flash \
@@ -190,7 +190,7 @@ yak ../../../aismoking/live/video/build-video-knowledge-omni.yak \
 
 ```shell
 export DASHSCOPE_API_KEY=sk-***
-yak ../../../aismoking/live/video/build-video-knowledge-omni-with-zip.yak \
+yak common/ai/aismoking/live/video/build-video-knowledge-omni-with-zip.yak \
     --video /path/to/lecture.mp4 \
     --model plus \
     --max-segments 1 \

@@ -758,6 +758,8 @@ import _ "github.com/yaklang/yaklang/common/ai/aid/aireact"
 
 High Static、冻结块和 Evidence 提升机制保持原入口。结果快照与格式化材料只在交付边界读取，不在每轮动态反馈里追加整份执行历史。此轮没有真实 provider 缓存命中率测量。
 
+Blueprint 的 PersistentPrompt 及其他 PersistentMemory 业务指令保存在稳定的 `persistent_context` 冻结分区，协调员与所有 worker 都能看到；只复制 Config 而不渲染这些内容不满足旧接口语义。子会话复制冻结分区 producer，使用固定 ID 替换继承的同名分区，避免重复追加及修改父会话的缓存前缀。持久指令不进入纯动态反馈。
+
 ### 14.4 业务交付与完成门禁
 
 [WithResultDelivery](delivery.go) 是新版宿主交付适配点。它只在 ReportReady、任务已验收、阻塞消息及微观验证事项已处理后工作：
@@ -792,7 +794,7 @@ Blueprint 外层仍拥有 `start_plan_and_execution / end_plan_and_execution`；
 - [注册表](registry_test.go)：父身份隔离、嵌套 DAG 阶段、真实 worker Timeline 和快照不可写回。
 - [计划输入](plan_input_test.go)：裸 JSON、围栏和原 @action、嵌套组与 DAG，本地解析不请求模型。
 - [配置复制](../aicommon/config_clone_hotpatch_test.go)：持久业务上下文、并发、协议以及通道所有权。
-- [Yak 配置与数据库桥](../../aiforge/forge_yak_binding_test.go)：两个 VM 工厂与显式覆写、双协议实际 submit；数据库默认 handle 保留父 context、原所属任务、原生注册表身份及实际退出注销。
+- [Yak 配置与数据库桥](../../aiforge/forge_yak_binding_test.go)：两个 VM 工厂的父配置继承与显式覆写；真实 submit 由独立 Yak 全流程和 Go 执行集成验证；数据库默认 handle 保留父 context、原所属任务、原生注册表身份及实际退出注销。
 - [HTTP 活跃会话](../../../yakgrpc/aivizhttp/handler_live_native_test.go)：实际运行中的新版 Session 出现在 /live，取消并实际退出后不再出现在注册表。
 
 [独立 Yak 冒烟](../../aismoking/forge.yak) 已直接通过 Yak CLI 运行：自由规划、preset、mocker × 双协议六条 Forge 链路，以及 `aim.InvokeReAct` 双协议。模型由本地 HTTP SSE fixture 提供，真实运行参数分片、计划提交、worker、审核、Evidence 和交付。每条 Forge 一次 formatter、一次结果回调；自由规划 11 次请求，preset/mocker 各 10 次。这个记录验证运行链路，不证明真实模型业务质量或服务端缓存命中率。

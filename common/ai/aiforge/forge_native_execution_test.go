@@ -14,8 +14,8 @@ import (
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact"
 	"github.com/yaklang/yaklang/common/ai/aid/coordinator"
-	"github.com/yaklang/yaklang/common/ai/aispec"
 	"github.com/yaklang/yaklang/common/ai/aiforge"
+	"github.com/yaklang/yaklang/common/ai/aispec"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils/chanx"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
@@ -56,7 +56,8 @@ func TestForgeParentRuntimeInheritsConfigurationAndOwnsOneInputChannel(t *testin
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	calls := 0
-	parent, err := aireact.NewTestReAct(aicommon.WithContext(ctx), aicommon.WithEnablePlanAndExec(false), aicommon.WithWorkdir(t.TempDir()), aicommon.WithEnableFunctionCallMode(false), aicommon.WithPlanExecTaskConcurrency(3), aicommon.WithAppendPersistentContext("parent preference"), aicommon.WithAICallback(func(c aicommon.AICallerConfigIf, _ *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+	parentFrozen := aicommon.NewFrozenBlockPartitionProducer()
+	parent, err := aireact.NewTestReAct(aicommon.WithContext(ctx), aicommon.WithEnablePlanAndExec(false), aicommon.WithWorkdir(t.TempDir()), aicommon.WithEnableFunctionCallMode(false), aicommon.WithPlanExecTaskConcurrency(3), aicommon.WithFrozenBlockPartitionProducer(parentFrozen), aicommon.WithAppendPersistentContext("parent preference"), aicommon.WithAICallback(func(c aicommon.AICallerConfigIf, _ *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 		calls++
 		response := c.NewAIResponse()
 		response.Close()
@@ -79,6 +80,9 @@ func TestForgeParentRuntimeInheritsConfigurationAndOwnsOneInputChannel(t *testin
 	require.Equal(t, parentConfig.GetPlanExecTaskConcurrency(), execution.GetPlanExecTaskConcurrency())
 	require.Contains(t, execution.PersistentMemory, "parent preference")
 	require.Equal(t, []string{"parent preference"}, execution.PersistentMemory, "parent append-only options must be applied exactly once")
+	require.NotSame(t, parentFrozen, execution.FrozenBlockPartitionProducer)
+	require.Empty(t, parentFrozen.ProducePartitions(), "child business context must not rewrite the parent prefix")
+	require.Contains(t, execution.FrozenBlockPartitionProducer.ProducePartitions()[0].Content, "parent preference")
 	require.Same(t, input, execution.EventInputChan)
 	require.Same(t, hotpatch, execution.HotPatchOptionChan)
 	require.Same(t, parentConfig.Timeline, execution.Timeline)
@@ -145,6 +149,7 @@ func TestForgeNativeExecutionMigration(t *testing.T) {
 							return forgeResponse(c, req, native, "business_result", map[string]any{"summary": "两份来源已核对", "payload": map[string]any{"ok": true, "values": []any{1, "two", nil}}})
 						}
 						if strings.Contains(prompt, "执行已批准的冻结任务书。") {
+							require.Contains(t, prompt, "keep source provenance", "worker lost the Forge persistent prompt")
 							id := req.GetTaskIndex()
 							if state.Attempts[id].Task.ID == "" {
 								for k, a := range state.Attempts {

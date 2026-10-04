@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"path/filepath"
+	"strings"
 	"sync"
 	"time"
 
@@ -70,6 +71,14 @@ func NewSession(ctx context.Context, query string, opts ...aicommon.ConfigOption
 	if !ok {
 		cancel()
 		return nil, fmt.Errorf("coordinator requires Config-backed runtime")
+	}
+	if content := strings.TrimSpace(strings.Join(cfg.PersistentMemory, "\n")); content != "" {
+		// Legacy Forge exposed persistent business instructions in frozen context.
+		// Own a copy so adding this invocation's instructions cannot change the
+		// parent's prefix. A stable ID replaces inherited context without doubling it.
+		producer := aicommon.NewFrozenBlockPartitionProducer(aicommon.FrozenBlockPartitionsFromConfig(cfg)...)
+		producer.AppendNewPartition("persistent_context", "persistent_context", content, aicommon.PersistentMemoryOrder)
+		_ = aicommon.WithFrozenBlockPartitionProducer(producer)(cfg)
 	}
 	s := &Session{Config: cfg, invoker: runtime, query: query, cancel: cancel, detached: cfg.EnableDetachedPlan, opened: map[string]bool{}, closed: map[string]bool{}, tasks: map[string]*aicommon.AIStatefulTaskBase{}}
 	for _, option := range cfg.OtherOption {

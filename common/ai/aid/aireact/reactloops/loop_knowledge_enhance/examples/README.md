@@ -1,11 +1,11 @@
 # loop_knowledge_enhance 测试示例
 
-本目录包含 `loop_knowledge_enhance` 的测试脚本，用于验证知识增强循环的各项功能。
+测试脚本已迁到 `common/ai/aismoking/live/focused/loop_knowledge_enhance/`，用于验证知识增强循环的各项功能。
 
 ## 运行方式
 
 ```bash
-yak common/ai/aid/aireact/reactloops/loop_knowledge_enhance/examples/test_xxx.yak
+yak common/ai/aismoking/live/focused/loop_knowledge_enhance/test_basic_knowledge_search.yak
 ```
 
 ## 前置条件
