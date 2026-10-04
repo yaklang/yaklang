@@ -107,6 +107,7 @@ func TestReAct_PlanAndExecute_TaskCancel(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	native := newNativePlanTestModel(mockToolName)
 	reactIns, err = NewTestReAct(
 		// aicommon.WithAICallback(aiCallback),
 		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
@@ -114,6 +115,9 @@ func TestReAct_PlanAndExecute_TaskCancel(t *testing.T) {
 				callAIAfterCancelTask = true
 			}
 			prompt := r.GetPrompt()
+			if rsp, handled, err := native(i, r, "forge-cancel"); handled {
+				return rsp, err
+			}
 
 			// 工具参数生成 - 最先匹配，避免被其他条件误匹配
 			if isToolParamGenerationPrompt(prompt, mockToolName) {
@@ -136,17 +140,6 @@ func TestReAct_PlanAndExecute_TaskCancel(t *testing.T) {
 				rsp.EmitOutputStream(bytes.NewBufferString(`
 		{"@action": "call-ai-blueprint","blueprint": "` + testForgeName + `", "params": {"target": "http://example.com", "query": "` + "abc" + `"},
 		"human_readable_thought": "generating blueprint parameters (AI rewrote the query)", "cumulative_summary": "forge parameters"}
-		`))
-				rsp.Close()
-				return rsp, nil
-			}
-
-			// PE 子任务执行 - 匹配包含 PLAN_STATUS_ 和 planFlag 的 prompt
-			if utils.MatchAllOfSubString(prompt, "PLAN_STATUS_", planFlag) {
-				rsp := i.NewAIResponse()
-				rsp.EmitOutputStream(bytes.NewBufferString(`
-{"@action": "require_tool", "tool_require_payload": "` + mockToolName + `", 
-"human_readable_thought": "为了取消当前任务，我需要使用` + mockToolName + `工具。当前任务明确要求使用该工具，无需其他参数，直接执行即可取消当前任务。"}
 		`))
 				rsp.Close()
 				return rsp, nil

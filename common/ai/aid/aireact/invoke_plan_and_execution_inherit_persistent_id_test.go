@@ -575,20 +575,19 @@ LOOP:
 
 // TestReAct_ForgeExecution_Task_UserQueryContext 测试 forge execution 的任务执行提示词包含用户原始输入
 func TestReAct_ForgeExecution_Task_UserQueryContext(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
 	// 生成测试专用的 nonce token，用于精确匹配 mock 条件
 	testNonce := utils.RandStringBytes(16)
 
 	persistentId := "persistent_id_userquery_" + testNonce
 	userOriginalQuery := "user_original_query_" + testNonce
 	aiGeneratedQuery := "ai_generated_query_" + testNonce
-	finishTaskFlag := "finish_task_flag_" + testNonce
 	var hasUserQueryFoundInTaskExec, hasAIQueryFoundInTaskExec, userQueryFoundInCallAiBlueprintPrompt bool
 
 	in := make(chan *ypb.AIInputEvent, 10)
 	out := make(chan *ypb.AIOutputEvent, 10)
 
-	finishedCh := make(chan bool, 1)
-	defer close(finishedCh)
 	testForgeName := "test_forge_userquery_" + testNonce
 	planFlag := "plan_flag_userquery_" + testNonce
 	forge := &schema.AIForge{
@@ -623,9 +622,18 @@ func TestReAct_ForgeExecution_Task_UserQueryContext(t *testing.T) {
 			ForgeName: testForgeName,
 		})
 	}()
+	native := newNativePlanTestModel("")
 	_, err := NewTestReAct(
+		aicommon.WithContext(ctx),
 		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			prompt := r.GetPrompt()
+			if rsp, handled, err := native(i, r, "forge-query"); handled {
+				if r.GetCallerLabel() == "react-loop:pe_task" {
+					hasUserQueryFoundInTaskExec = strings.Contains(prompt, userOriginalQuery)
+					hasAIQueryFoundInTaskExec = strings.Contains(prompt, aiGeneratedQuery)
+				}
+				return rsp, err
+			}
 
 			// ReAct main loop - match action keywords that are always in the JSON schema
 			if isPrimaryDecisionPrompt(prompt) &&
@@ -659,16 +667,6 @@ func TestReAct_ForgeExecution_Task_UserQueryContext(t *testing.T) {
 `))
 
 				rsp.Close()
-				return rsp, nil
-			}
-			if utils.MatchAllOfSubString(prompt, planFlag, "PLAN_STATUS_") {
-				hasUserQueryFoundInTaskExec = strings.Contains(prompt, userOriginalQuery)
-				hasAIQueryFoundInTaskExec = strings.Contains(prompt, aiGeneratedQuery)
-				rsp := i.NewAIResponse()
-				rsp.EmitOutputStream(bytes.NewBufferString(`
-{"@action": "directly_answer","answer_payload":"` + finishTaskFlag + `"}`))
-				rsp.Close()
-				finishedCh <- true
 				return rsp, nil
 			}
 			if utils.MatchAllOfSubString(prompt, "任务执行引擎", "task_long_summary") && !utils.MatchAllOfSubString(prompt, "PLAN_STATUS_") {
@@ -716,8 +714,6 @@ func TestReAct_ForgeExecution_Task_UserQueryContext(t *testing.T) {
 LOOP:
 	for {
 		select {
-		case <-finishedCh:
-			break LOOP
 		case e := <-out:
 			if e.Type == string(schema.EVENT_TYPE_START_PLAN_AND_EXECUTION) {
 				forgeStarted = true

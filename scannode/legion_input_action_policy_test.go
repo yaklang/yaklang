@@ -9,9 +9,9 @@ import (
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
+	"github.com/yaklang/yaklang/common/ai/aid/coordinator"
 	"github.com/yaklang/yaklang/common/schema"
 	"net/http"
-	"strings"
 	"testing"
 	"time"
 )
@@ -42,12 +42,8 @@ func TestManagedInputPlanningUsesScopedTools(t *testing.T) {
 		require.Equal(t, enabled, cfg.GetEnablePlanAndExec())
 		require.Equal(t, enabled, cfg.GetEnableDetachedPlan())
 	}
-	opts = append(opts, aicommon.WithContext(ctx), aicommon.WithAgreeAuto(), aicommon.WithDisableToolCallerIntervalReview(true), aicommon.WithAICallback(func(cfg aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
-		require.Contains(t, req.GetPrompt(), "tool-call-reason")
-		response := cfg.NewAIResponse()
-		response.EmitOutputStream(strings.NewReader(`{"@action":"tool-call-reason","reason":"Read scoped planning input"}`))
-		response.Close()
-		return response, nil
+	opts = append(opts, aicommon.WithContext(ctx), aicommon.WithEnableFunctionCallMode(true), aicommon.WithAgreeAuto(), aicommon.WithDisableToolCallerIntervalReview(true), aicommon.WithAICallback(func(_ aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+		return nil, fmt.Errorf("scoped direct tool call unexpectedly requested AI: %s", req.GetCallerLabel())
 	}), aicommon.WithDisableAutoSkills(true), aicommon.WithLegionResultRuntime(runtime))
 	invoker, err := aireact.NewReAct(opts...)
 	require.NoError(t, err)
@@ -63,11 +59,13 @@ func TestManagedInputPlanningUsesScopedTools(t *testing.T) {
 		_, err := defaultLoop.GetActionHandler(name)
 		require.Error(t, err, name)
 	}
-	factory, ok := reactloops.GetLoopFactory(schema.AI_REACT_LOOP_NAME_PLAN)
+	factory, ok := reactloops.GetLoopFactory(coordinator.Name)
 	require.True(t, ok)
-	loop, err := factory(invoker)
+	controller := coordinator.New(ctx, nil, 1)
+	defer controller.Close()
+	loop, err := factory(invoker, coordinator.WithController(controller))
 	require.NoError(t, err)
-	for _, name := range []string{"generate_direct_plan", "finish_exploration", "read_file"} {
+	for _, name := range []string{"create_plan", "modify_plan", "submit_plan", "directly_call_tool"} {
 		_, err := loop.GetActionHandler(name)
 		require.NoError(t, err, name)
 	}
@@ -76,23 +74,30 @@ func TestManagedInputPlanningUsesScopedTools(t *testing.T) {
 		require.Error(t, err, name)
 		require.NotContains(t, loop.GetAllActionNames(), name)
 	}
-	read, err := loop.GetActionHandler("read_file")
+	tool, err := invoker.GetConfig().GetAiToolManager().GetToolByName("read_file")
 	require.NoError(t, err)
-	require.Contains(t, read.Description, "bounded page")
+	require.Contains(t, tool.Description, "bounded page")
+	read, err := loop.GetActionHandler("directly_call_tool")
+	require.NoError(t, err)
+	task := aicommon.NewStatefulTaskBase("scoped-planning", "Read authorized input", ctx, invoker.GetConfig().GetEmitter(), true)
+	loop.SetCurrentTask(task)
 	path := command.InputManifest.Resources[0].RelativePath
-	action, err := aicommon.ExtractAction(fmt.Sprintf(`{"@action":"read_file","path":%q}`, path), "read_file")
+	action, err := aicommon.ExtractAction(fmt.Sprintf(`{"@action":"directly_call_tool","directly_call_tool_name":"read_file","directly_call_tool_params":{"path":%q},"directly_call_reason":"Read scoped planning input"}`, path), "directly_call_tool")
 	require.NoError(t, err)
-	op := reactloops.NewActionHandlerOperator(nil)
+	require.NoError(t, read.ActionVerifier(loop, action))
+	op := reactloops.NewActionHandlerOperator(task)
 	read.ActionHandler(loop, action, op)
-	require.Contains(t, op.GetFeedback().String(), "completed")
-	require.Contains(t, loop.Get("plan_file_results"), content)
-	denied, err := aicommon.ExtractAction(`{"@action":"read_file","path":"/etc/passwd"}`, "read_file")
+	require.Equal(t, 1, op.GetExecutedToolCallCount(), "the scoped read callback must settle")
+	cfg := invoker.GetConfig().(*aicommon.Config)
+	require.Contains(t, cfg.GetSessionEvidenceRendered(), content)
+	denied, err := aicommon.ExtractAction(`{"@action":"directly_call_tool","directly_call_tool_name":"read_file","directly_call_tool_params":{"path":"/etc/passwd"},"directly_call_reason":"Verify path confinement"}`, "directly_call_tool")
 	require.NoError(t, err)
-	beforeDenied := loop.Get("plan_file_results")
-	op = reactloops.NewActionHandlerOperator(nil)
+	beforeDenied := cfg.GetSessionEvidenceRendered()
+	require.NoError(t, read.ActionVerifier(loop, denied))
+	op = reactloops.NewActionHandlerOperator(task)
 	read.ActionHandler(loop, denied, op)
-	require.Contains(t, op.GetFeedback().String(), "failed")
-	require.Equal(t, beforeDenied, loop.Get("plan_file_results"))
+	require.Contains(t, cfg.Timeline.Dump(), "input_path_denied")
+	require.Equal(t, beforeDenied, cfg.GetSessionEvidenceRendered())
 	for _, name := range []string{"request_plan", "request_plan_and_execution", "ask_for_clarification", "list_async_tasks", "dispatch_sub_react_agents"} {
 		require.True(t, managedInputActionAllowed("default", name))
 	}

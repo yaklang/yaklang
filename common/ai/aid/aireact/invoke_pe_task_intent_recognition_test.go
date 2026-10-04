@@ -19,23 +19,12 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
-// TestReAct_PETask_DeepIntentRecognition verifies that pe_task init runs
-// deep intent recognition when intent recognition is enabled.
-//
-// Uses a SHORT user input (<100 runes) so the default loop's init uses
-// fast matching (not deep intent). Only the PE task's init unconditionally
-// runs deep intent, so any intent loop calls must come from the PE task.
-//
-// Flow:
-//  1. Create a forge with PlanPrompt generating one sub-task
-//  2. Enable intent recognition (override NewTestReAct default)
-//  3. Main loop → require_ai_blueprint (short input → fast match in default init)
-//  4. Blueprint params → call-ai-blueprint
-//  5. Forge executes, plan is generated from PlanPrompt, PE task starts
-//  6. PE task init → deep intent recognition → intent loop AI called
-//  7. PE task main loop → directly_answer
-//  8. Assert: intent loop was invoked during PE task phase
-func TestReAct_PETask_DeepIntentRecognition(t *testing.T) {
+// The DB Forge entry must inherit the native coordinator/worker lifecycle.
+// Globally enabling intent recognition must not start a legacy intent loop in
+// its worker. A short user input keeps the ordinary default entry in fast match.
+func TestReAct_ForgePETask_DoesNotStartLegacyIntentLoops(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
 	testNonce := utils.RandStringBytes(16)
 	testForgeName := "test_forge_pe_intent_" + testNonce
 	planFlag := "plan_flag_pe_intent_" + testNonce
@@ -78,12 +67,19 @@ func TestReAct_PETask_DeepIntentRecognition(t *testing.T) {
 
 	var intentLoopCalled int32
 	var peTaskCalled int32
-	finishedCh := make(chan bool, 1)
+	native := newNativePlanTestModel("")
 
 	_, err := NewTestReAct(
+		aicommon.WithContext(ctx),
 		aicommon.WithDisableIntentRecognition(false),
 		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			prompt := r.GetPrompt()
+			if rsp, handled, err := native(i, r, "forge-intent"); handled {
+				if r.GetCallerLabel() == "react-loop:pe_task" {
+					atomic.AddInt32(&peTaskCalled, 1)
+				}
+				return rsp, err
+			}
 
 			// Phase: Intent loop — single LiteForge "intent-keyword-gen" call
 			// (during PE task init). The simplified loop_intent runs entirely
@@ -111,22 +107,6 @@ func TestReAct_PETask_DeepIntentRecognition(t *testing.T) {
 				rsp := i.NewAIResponse()
 				rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "capability-catalog-match", "matched_identifiers": []}`))
 				rsp.Close()
-				return rsp, nil
-			}
-
-			// Phase: PE task execution (contains PLAN_STATUS_ and planFlag)
-			if strings.Contains(prompt, "PLAN_STATUS_") && strings.Contains(prompt, planFlag) {
-				atomic.AddInt32(&peTaskCalled, 1)
-				log.Infof("PE task main loop called")
-				rsp := i.NewAIResponse()
-				rsp.EmitOutputStream(bytes.NewBufferString(`
-{"@action": "directly_answer", "answer_payload": "task done ` + testNonce + `", "human_readable_thought": "completing task"}
-`))
-				rsp.Close()
-				select {
-				case finishedCh <- true:
-				default:
-				}
 				return rsp, nil
 			}
 
@@ -213,8 +193,6 @@ func TestReAct_PETask_DeepIntentRecognition(t *testing.T) {
 LOOP:
 	for {
 		select {
-		case <-finishedCh:
-			break LOOP
 		case e := <-out:
 			// Only break when forge/plan execution ends (EVENT_TYPE_END_PLAN_AND_EXECUTION)
 			// NOT on react_task_status_changed, because sub-loops (intent loop)
@@ -237,8 +215,8 @@ LOOP:
 
 	t.Logf("intent loop called %d time(s), PE task called %d time(s)", intentCount, peCount)
 
-	if intentCount == 0 {
-		t.Fatal("intent loop was NOT called during PE task init - deep intent recognition did not trigger for pe_task")
+	if intentCount != 0 {
+		t.Fatal("native Forge worker unexpectedly started a legacy intent loop")
 	}
 	if peCount == 0 {
 		t.Fatal("PE task main loop was NOT called - PE task did not execute")

@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"regexp"
+	"strconv"
 	"strings"
 	"sync"
 	"testing"
@@ -14,6 +16,7 @@ import (
 	"github.com/yaklang/yaklang/common/ai/aid/aimem"
 	"github.com/yaklang/yaklang/common/ai/aid/coordinator_legacy"
 	_ "github.com/yaklang/yaklang/common/ai/aiforge"
+	"github.com/yaklang/yaklang/common/ai/aispec"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
@@ -23,7 +26,7 @@ import (
 
 // Execute the real registered forge synchronously. Dispatch lifecycle is covered
 // separately; these tests must finish the plan before inspecting prompt counts.
-func testForgePromptMarkers(t *testing.T, steps int) {
+func testForgePromptMarkers(t *testing.T, steps int, native bool) {
 	t.Helper()
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
@@ -33,12 +36,9 @@ func testForgePromptMarkers(t *testing.T, steps int) {
 	queryMarker := "USER_QUERY_MARKER_" + nonce
 	tasks := make([]map[string]string, steps)
 	for i := range tasks {
-		tasks[i] = map[string]string{"subtask_name": fmt.Sprintf("step-%d", i), "subtask_goal": "verify prompt markers"}
+		tasks[i] = map[string]string{"subtask_name": fmt.Sprintf("step-%d", i), "subtask_goal": "verify prompt markers", "subtask_identifier": fmt.Sprintf("step_%d", i)}
 	}
-	plan, err := json.Marshal(map[string]any{
-		"@action": "plan_from_document", "main_task": "verify markers", "main_task_goal": "verify prompt markers", "tasks": tasks,
-	})
-	require.NoError(t, err)
+	plan := map[string]any{"main_task": "verify markers", "main_task_goal": "verify prompt markers", "tasks": tasks}
 	forge := &schema.AIForge{
 		ForgeName:        "test_forge_markers_" + nonce,
 		ForgeVerboseName: "Prompt marker test",
@@ -54,10 +54,14 @@ func testForgePromptMarkers(t *testing.T, steps int) {
 	})
 
 	var mu sync.Mutex
-	decisions := 0
+	calls, decisions := 0, 0
+	workers := map[string]int{}
+	briefPattern := regexp.MustCompile(`\[CURRENT_EXECUTION\]\n([^\n]+)`)
+	reviewPattern := regexp.MustCompile(`\[([^\]]+)\]: awaiting_review; attempt=(\d+)`)
 	maxPersistent := 0
 	sawInit, sawQuery := false, false
-	_, err = aicommon.ExecuteForgeFromDB(forge.ForgeName, ctx, map[string]any{"query": queryMarker},
+	_, err := aicommon.ExecuteForgeFromDB(forge.ForgeName, ctx, map[string]any{"query": queryMarker},
+		aicommon.WithEnableFunctionCallMode(native),
 		aicommon.WithAgreeYOLO(true),
 		aicommon.WithDisableIntentRecognition(true),
 		aicommon.WithDisableAutoSkills(true),
@@ -71,26 +75,77 @@ func testForgePromptMarkers(t *testing.T, steps int) {
 		aicommon.WithAICallback(func(cfg aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			prompt := req.GetPrompt()
 			mu.Lock()
+			defer mu.Unlock()
+			calls++
+			if calls > 16+8*steps {
+				return nil, fmt.Errorf("Forge marker fixture did not converge: %s", req.GetCallerLabel())
+			}
 			maxPersistent = max(maxPersistent, strings.Count(prompt, persistentMarker))
 			sawInit = sawInit || strings.Contains(prompt, initMarker)
 			sawQuery = sawQuery || strings.Contains(prompt, queryMarker)
-			if isNextActionDecisionPrompt(prompt) {
-				decisions++
+			respond := func(name string, args map[string]any) (*aicommon.AIResponse, error) {
+				wire := aispec.NewDefaultAIConfig(req.GetExtraSpecOpts()...)
+				if (wire.ToolCallCallback != nil) != native {
+					return nil, fmt.Errorf("Forge lost its configured function-call mode")
+				}
+				rsp := cfg.NewAIResponse()
+				if native {
+					raw, err := json.Marshal(args)
+					if err != nil {
+						return nil, err
+					}
+					wire.ToolCallCallback([]*aispec.ToolCall{{ID: fmt.Sprintf("forge-markers-%d", req.GetSeqId()), Type: "function", Function: aispec.FuncReturn{Name: name, Arguments: string(raw)}}})
+					wire.FinishReasonCallback("tool_calls", nil)
+				} else {
+					args["@action"], args["identifier"] = name, name
+					raw, err := json.Marshal(args)
+					if err != nil {
+						return nil, err
+					}
+					rsp.EmitOutputStream(strings.NewReader(string(raw)))
+				}
+				rsp.Close()
+				return rsp, nil
 			}
-			mu.Unlock()
-			if rsp, err := tryHandleNewPlanFlowPrompt(cfg, prompt, string(plan)); rsp != nil {
-				return rsp, err
+			// The DB Forge entry now runs the native coordinator and pe_task;
+			// legacy planning prompt matchers cannot drive this lifecycle.
+			if brief := briefPattern.FindStringSubmatch(prompt); len(brief) == 2 {
+				var task struct {
+					ID string `json:"task_id"`
+				}
+				if err := json.Unmarshal([]byte(brief[1]), &task); err != nil {
+					return nil, err
+				}
+				step := workers[task.ID]
+				workers[task.ID]++
+				if step == 0 {
+					decisions++
+					return respond("submit_task_result", map[string]any{"summary": "markers verified"})
+				}
+				return respond("finish", map[string]any{})
 			}
-			response := `{"@action":"finish","reason":"markers verified"}`
-			if isVerifySatisfactionPrompt(prompt) {
-				response = `{"@action":"verify-satisfaction","user_satisfied":true,"reasoning":"done"}`
-			} else if isSummaryPrompt(prompt) {
-				response = `{"@action":"summary","task_summary":"done","task_short_summary":"done","task_long_summary":"done"}`
+			if req.GetCallerLabel() == "react-loop:coordinator" {
+				start := strings.LastIndex(prompt, "# PLAN STATUS")
+				if start < 0 {
+					return nil, fmt.Errorf("Forge coordinator lost its plan status")
+				}
+				status := prompt[start:]
+				if strings.Contains(status, "已有计划：false") {
+					return respond("create_plan", map[string]any{"plan": plan, "plan_document": "# Prompt markers\nVerify each task's markers."})
+				}
+				if strings.Contains(status, "阶段：PLAN") {
+					return respond("submit_plan", map[string]any{})
+				}
+				if match := reviewPattern.FindStringSubmatch(status); len(match) == 3 {
+					attempt, err := strconv.ParseUint(match[2], 10, 64)
+					if err != nil {
+						return nil, err
+					}
+					return respond("review_task", map[string]any{"task_id": match[1], "attempt_id": attempt, "decision": "accept", "reason": "markers verified"})
+				}
+				return respond("wait_messages", map[string]any{})
 			}
-			rsp := cfg.NewAIResponse()
-			rsp.EmitOutputStream(strings.NewReader(response))
-			rsp.Close()
-			return rsp, nil
+			return nil, fmt.Errorf("unexpected Forge marker request: %s", req.GetCallerLabel())
 		}),
 	)
 	require.NoError(t, err, "forge execution must complete successfully")
@@ -104,11 +159,15 @@ func testForgePromptMarkers(t *testing.T, steps int) {
 }
 
 func TestForge_PersistentContentOnlyOnce(t *testing.T) {
-	testForgePromptMarkers(t, 1)
+	for _, native := range []bool{false, true} {
+		t.Run(fmt.Sprintf("function_call_%v", native), func(t *testing.T) { testForgePromptMarkers(t, 1, native) })
+	}
 }
 
 func TestForge_PersistentAndInitNotDuplicated(t *testing.T) {
-	testForgePromptMarkers(t, 2)
+	for _, native := range []bool{false, true} {
+		t.Run(fmt.Sprintf("function_call_%v", native), func(t *testing.T) { testForgePromptMarkers(t, 2, native) })
+	}
 }
 
 func TestCoordinator_PlanPrompt_OnlyInPlanPhase(t *testing.T) {
