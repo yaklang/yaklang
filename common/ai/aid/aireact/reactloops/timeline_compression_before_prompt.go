@@ -7,7 +7,7 @@ import (
 
 // Called once before assembling the next loop request, never during an action
 // or in a Timeline writer. Independent prompt fields are actual rendered values.
-func (r *ReActLoop) compressTimelineBeforePrompt(userInput, frozenUserContext, todo, instruction string) error {
+func (r *ReActLoop) compressTimelineBeforePrompt(userInput, frozenUserContext, todo string) error {
 	if config, ok := r.config.(*aicommon.Config); ok {
 		config.SyncSessionEvidenceTimeline()
 	}
@@ -22,7 +22,7 @@ func (r *ReActLoop) compressTimelineBeforePrompt(userInput, frozenUserContext, t
 	_, err := provider.GetTimeline().CompressBeforePrompt(aicommon.TimelineCompressionOptions{
 		Context: ctx,
 		RetainedContext: map[string]string{"user_query": userInput, "frozen_user_context": frozenUserContext,
-			"todo": todo, "task_instruction": instruction},
+			"todo": todo},
 	})
 	if err != nil {
 		if ctx.Err() != nil {

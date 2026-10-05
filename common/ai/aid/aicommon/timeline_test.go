@@ -38,7 +38,7 @@ func (m *mockedAI) CallAI(req *AIRequest) (*AIResponse, error) {
 	rsp := NewUnboundAIResponse()
 	defer rsp.Close()
 
-	rsp.EmitOutputStream(strings.NewReader(`{"@action":"timeline-summary","summary":"Verified history; next step pending."}`))
+	rsp.EmitOutputStream(strings.NewReader(`{"@action":"timeline-summary","summary":"Verified history; next step pending.","ratain_timeline_item_range":"","memory_entities":[]}`))
 	return rsp, nil
 }
 

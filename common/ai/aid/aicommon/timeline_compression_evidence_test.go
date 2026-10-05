@@ -8,14 +8,14 @@ import (
 )
 
 // Exercise the actual one-shot compression transaction, not just FreezeAll.
-// Exact evidence never enters the reducer input, and remains recoverable after dump/restore.
+// Exact evidence informs extraction but is never replaced by a summary; it survives restore.
 func TestEvidenceSurvivesHistoryCompression(t *testing.T) {
 	registerTimelineTestLiteForge(t)
 	requests := 0
 	cfg := NewConfig(context.Background(), WithDisableAutoSkills(true),
 		WithSpeedPriorityAICallback(func(_ AICallerConfigIf, req *AIRequest) (*AIResponse, error) {
 			requests++
-			require.NotContains(t, req.GetPrompt(), "EXACT_EVIDENCE_SECRET")
+			require.Contains(t, req.GetPrompt(), "EXACT_EVIDENCE_SECRET")
 			rsp := NewUnboundAIResponse()
 			rsp.EmitOutputStream(strings.NewReader(compressionMockSummary("Verified observation; further checks pending.")))
 			rsp.Close()

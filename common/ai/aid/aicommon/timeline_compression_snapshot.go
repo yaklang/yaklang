@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/yaklang/yaklang/common/ai/aid/aiprojection"
+	"github.com/yaklang/yaklang/common/ai/aispec"
 	"github.com/yaklang/yaklang/common/utils"
 	"sort"
 	"strings"
@@ -28,9 +29,20 @@ type timelineCompressionSnapshot struct {
 	RetainedContext         map[string]string // caller-owned prompt parts, copied before the AI request
 	SourceState             string            // live ordinary + exact journal entries through ThroughID
 	FreezeVersion           int64
-	SummaryPrompt           string               `json:"-"` // actual rendered request source, runtime-only
-	CommittedFreeze         TimelineFreezeResult `json:"-"` // detached receipt, populated only after validation
-	NotifyCommitted         func()               `json:"-"` // observers captured at commit, called after unlock
+	Evidence                string // detached effective session evidence, including pending mutations
+	UserContexts            []timelineCompressionUserContext
+	SessionMemoryCandidates []any                          // completed session extractions, detached from listeners and storage
+	MemoryCompletion        *timelineCompressionCompletion `json:"-"`
+	Output                  *timelineCompressionOutput     `json:"-"`
+	SummaryPrompt           string                         `json:"-"` // actual rendered request source, runtime-only
+	CommittedFreeze         TimelineFreezeResult           `json:"-"` // detached receipt, populated only after validation
+	NotifyCommitted         func()                         `json:"-"` // observers captured at commit, called after unlock
+}
+
+type timelineCompressionUserContext struct {
+	ID     int64
+	Frozen bool
+	Text   string
 }
 
 type timelineCompressionSnapshotItem struct {
@@ -88,6 +100,7 @@ func (m *Timeline) captureCompressionSnapshotLocked() (snapshot *timelineCompres
 	snapshot = &timelineCompressionSnapshot{
 		Head:      cloneTimelineCompressedHead(m.compressedHead),
 		ThroughID: m.getMaxIDLocked(), FrozenThroughID: m.frozenThroughLocked(),
+		SessionMemoryCandidates: m.sessionMemory.snapshot(),
 	}
 	if m.freezeState != nil {
 		snapshot.FreezeVersion = m.freezeState.Version
@@ -95,6 +108,9 @@ func (m *Timeline) captureCompressionSnapshotLocked() (snapshot *timelineCompres
 	snapshot.SourceState, err = m.compressionSourceStateLocked(snapshot.ThroughID)
 	if err != nil {
 		return nil, err
+	}
+	if evidence, found := m.evidenceStoreLocked(); found {
+		snapshot.Evidence = renderEvidenceItems(evidence.Items)
 	}
 	ids := append([]int64(nil), m.idToTimelineItem.Keys()...)
 	sort.Slice(ids, func(i, j int) bool { return ids[i] < ids[j] })
@@ -108,6 +124,9 @@ func (m *Timeline) captureCompressionSnapshotLocked() (snapshot *timelineCompres
 		}
 		if isPromotableTimelineItem(item) || isTimelineUserInput(item) {
 			snapshot.ExactItemIDs = append(snapshot.ExactItemIDs, id)
+			if control := timelinePromotionForItem(item); control != nil && control.Kind == TimelinePromotedKindUserInput {
+				snapshot.UserContexts = append(snapshot.UserContexts, timelineCompressionUserContext{id, id <= snapshot.FrozenThroughID, control.Payload})
+			}
 			continue
 		}
 		ts, ok := m.idToTs.Get(id)
@@ -118,6 +137,7 @@ func (m *Timeline) captureCompressionSnapshotLocked() (snapshot *timelineCompres
 		// envelope in PromptText. Reject a broken envelope instead of choosing
 		// a cut through an incomplete protocol group. Literal tags in ordinary
 		// tool/user data are not interpreted here.
+		var replayText string
 		if text, ok := timelineTextItem(item); ok &&
 			normalizeTimelinePromptCategory(extractTextEntryType(text.Text)) == "FUNCTION_CALL_ACTION_RESPONSE" &&
 			strings.TrimSpace(text.PromptText) != "" {
@@ -134,6 +154,21 @@ func (m *Timeline) captureCompressionSnapshotLocked() (snapshot *timelineCompres
 			if _, err := aiprojection.RebindReplayNonce(body, aiprojection.Nonce()); err != nil {
 				return nil, fmt.Errorf("incomplete action replay at timeline item %d: %w", id, err)
 			}
+			// Decode the validated group to historical data. Keep business call IDs,
+			// arguments and receipts together, without reasoning or replay controls.
+			payload := body[strings.Index(body, "|>")+2 : strings.LastIndex(body, "<|")]
+			var messages []aispec.ChatDetail
+			if err := json.Unmarshal([]byte(payload), &messages); err != nil {
+				return nil, fmt.Errorf("decode compression replay at item %d: %w", id, err)
+			}
+			var plain strings.Builder
+			for _, message := range messages {
+				fmt.Fprintf(&plain, "%s tool_call_id=%s\n%v\n", message.Role, message.ToolCallID, message.Content)
+				for _, call := range message.ToolCalls {
+					fmt.Fprintf(&plain, "function=%s tool_call_id=%s\narguments:\n%s\n", call.Function.Name, call.ID, call.Function.Arguments)
+				}
+			}
+			replayText = plain.String()
 		}
 		raw, err := json.Marshal(item)
 		if err != nil {
@@ -142,13 +177,18 @@ func (m *Timeline) captureCompressionSnapshotLocked() (snapshot *timelineCompres
 		entry := timelineCompressionSnapshotItem{
 			ID: id, Timestamp: ts, Frozen: id <= snapshot.FrozenThroughID, SourceJSON: string(raw),
 		}
-		if projected := projectTimelineItemForPromptWithModelReplay(item, true); projected != nil {
+		if projected := projectTimelineItemForPrompt(item); projected != nil &&
+			normalizeTimelinePromptCategory(extractTextEntryType(projected.String())) != "ITERATION" {
 			// Keep the entire prompt body, including long single-line replay JSON.
 			// The presentation renderer uses a bounded line scanner and may omit
 			// oversized lines; it must not determine compression cuts or budgets.
 			// Do not substitute previous per-item shrink results for full originals.
+			body := projected.value.String()
+			if replayText != "" {
+				body = replayText
+			}
 			entry.PromptText = fmt.Sprintf("# item=%d timestamp_ms=%d [%s]\n%s",
-				id, ts, renderItemTypeVerbose(projected), projected.value.String())
+				id, ts, renderItemTypeVerbose(projected), body)
 		}
 		snapshot.Items = append(snapshot.Items, entry)
 	}

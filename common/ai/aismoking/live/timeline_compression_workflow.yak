@@ -1,0 +1,221 @@
+// yak common/ai/aismoking/live/timeline_compression_workflow.yak
+// Runs the production before-prompt compression through aim.InvokeReAct.
+// Real tool-driven fixture task and configured model; no user task on 8087 is touched.
+// AISMOKING_OUTPUT is required; AISMOKING_TOOL_MODEL defaults to deepseek-v4.1-flash.
+// Saves request bodies and responses, never authentication headers or seedPacket.
+include "common/ai/aismoking/live/memory_capture.inc"
+root = os.Getenv("AISMOKING_OUTPUT")
+assert root != "", "Set AISMOKING_OUTPUT to a fresh sample directory"
+assert !file.IsExisted(file.Join(root,"result.json")), "Choose a fresh sample directory"
+file.MkdirAll(root)~
+model = os.Getenv("AISMOKING_TOOL_MODEL")
+if model == "" { model = "deepseek-v4.1-flash" }
+seedPacket = nil
+_, seedErr = ai.IntelligentChat("只回答 OK。",ai.model(model),ai.timeout(35),
+    ai.rawHTTPRequestResponseCallback(func(packet,header,body,usage) { seedPacket = packet }),
+    func(c) { c.Context = context.Seconds(40); c.DisableProviderFallback = true })
+assert seedPacket != nil, "Configured provider request was not captured"
+port = os.GetRandomAvailableTCPPort()
+base = "http://" + str.HostPort("127.0.0.1",port)
+mu = sync.NewMutex()
+requests, receipts = [], []
+memoryCompleted = 0
+runtimeConfig = nil
+itemCopies, commits, streams = {}, [], []
+previousSummary, previousRetained = "", []
+armedPending = false
+go httpserver.Serve("127.0.0.1",port,httpserver.context(context.Seconds(600)),httpserver.handler(func(w,req) {
+    if req.URL.Path == "/ready" { w.Write("ready"); return }
+    body = json.loads(string(io.ReadAll(req.Body)~))
+    mu.Lock()
+    seq = len(requests)+1
+    row = {"seq":seq,"native":("tools" in body && len(body.tools)>0),"compression":false}
+    requests = append(requests,row)
+    mu.Unlock()
+    texts = []
+    for message in body.messages {
+        if message.content != nil { texts = append(texts,string(message.content)) }
+    }
+    prompt = str.Join(texts,"\n\n")
+    row.compression = "ratain_timeline_item_range" in prompt && "FROZEN_TIMELINE_" in prompt
+    file.SaveJson(file.Join(root,sprintf("request-%03d.json",seq)),body)~
+    file.Save(file.Join(root,sprintf("prompt-%03d.txt",seq)),prompt)~
+    response,_,relayErr = poc.HTTP(seedPacket,poc.https(true),poc.replaceBody([]byte(json.dumps(body)),false),
+        poc.timeout(75),poc.retryTimes(0),poc.redirectTimes(0),poc.save(false))
+    if relayErr != nil { w.WriteHeader(502); w.Write("Provider transport failed"); return }
+    split = str.SplitN(string(response),"\r\n\r\n",2)
+    header,raw = split[0],split[1]
+    if "transfer-encoding: chunked" in str.ToLower(header) { raw = string(codec.DecodeChunked([]byte(raw))~) }
+    decoded = memoryDecodeResponse(raw)
+    row.finish_reason = decoded.finish_reason
+    row.tool_calls = decoded.tool_calls
+    row.content = decoded.content
+    row.usage = {}
+    for line in str.Split(raw,"\n") {
+        if str.HasPrefix(str.TrimSpace(line),"data:") {
+            payload = str.TrimSpace(str.TrimPrefix(str.TrimSpace(line),"data:"))
+            if payload != "" && payload != "[DONE]" {
+                frame,frameErr = json.New(payload)
+                if frameErr == nil && "usage" in frame.Value() && frame.Value().usage != nil { row.usage = frame.Value().usage }
+            }
+        }
+    }
+    file.SaveJson(file.Join(root,sprintf("response-%03d.json",seq)),decoded)~
+    file.Save(file.Join(root,sprintf("response-%03d.sse",seq)),raw)~
+    if row.compression { file.Save(file.Join(root,sprintf("compression-output-%03d.json",seq)),decoded.content)~ }
+    file.SaveJson(file.Join(root,"requests.json"),requests)~
+    status = parseInt(str.Split(str.Split(header,"\r\n")[0]," ")[1])
+    w.Header().Set("Content-Type","text/event-stream")
+    w.WriteHeader(status)
+    w.Write(raw)~
+}))
+for i=0;i<100;i++ { _,err=http.Get(base+"/ready"); if err==nil { break }; time.Sleep(0.02) }
+opts = [ai.model(model),ai.apiKey("local-diagnostic-relay"),ai.baseURL(base+"/v1/chat/completions"),ai.noHttps(true),ai.timeout(80),func(c) { c.DisableProviderFallback = true }]
+
+// Fixtures include verbose import logs to create ordinary history organically.
+// No seeded Timeline history and no artificial summary/retention answers.
+fixture = file.Join(root,"fixture")
+file.MkdirAll(fixture)~
+padding = str.Repeat("DEBUG import: row checksum validated; trace only, no accounting adjustment.\n",75)
+files = {
+    "01-rules.txt":"依次读取编号文件。按订单ID去重，仅保留第一次；pending 和未知SKU排除金额。paid_total 为有效paid合计，refund_total 为refunded合计，net_total=paid_total-refund_total。accepted 不是执行成功，不应用调整；只有成功回执才应用。今后的工程报告用中文，并明确实际验证范围；未经明确要求不要提交或推送代码。\ncatalog: A=60,B=80,C=10,R=30,P=55。日志DEBUG行不影响业务。",
+    "02-batch1.txt": "order_id,sku,quantity,unit_price,status\nA001,A,2,60,paid\nA002,B,1,80,paid\n"+padding,
+    "03-adjustment-pending.json":json.dumps({"correlation_id":"LEDGER-ADJUST-9","status":"accepted","operations":[{"order_id":"A002","op":"void"},{"order_id":"A001","op":"replace_unit_price","unit_price":62.5}],"signed_notice":"ACK-9-v1: ACCEPTED IS NOT EXECUTED; reconcile only on matching successful receipt."}),
+    "04-batch2.txt":"order_id,sku,quantity,unit_price,status\nA001,A,2,60,paid\nA003,C,4,10,paid\nR001,R,1,30,refunded\n"+padding,
+    "05-batch3.txt":"order_id,sku,quantity,unit_price,status\nP001,P,1,55,pending\nU001,Unknown,1,66,paid\n"+padding,
+    "06-adjustment-receipt.json":json.dumps({"correlation_id":"LEDGER-ADJUST-9","status":"succeeded","applied":[{"order_id":"A002","op":"void"},{"order_id":"A001","op":"replace_unit_price","unit_price":62.5}],"receipt_id":"FINAL-9-OK"}),
+}
+for name,content in files { file.Save(file.Join(fixture,name),content)~ }
+path = str.ReplaceAll(root,"\\","/")
+task = sprintf(`我明确要求今后的工程报告使用中文并写明实际验证结果，未经明确要求不要提交或推送代码。用默认主循环完成这次订单对账，不进入 PLAN，不创建子任务。材料目录 %s/fixture，严格按01到06编号逐个读取文件，每次只读取一个，读完处理再读下一个，不可一次批量读取。按照01-rules处理重复、未知SKU、pending与异步调整。读到03时保存 pending evidence，明确 accepted 尚未生效；读到06后按 correlation_id 与先前通知核对、应用已成功的调整，并更新 evidence。不要将DEBUG日志当业务。最终保存关键evidence，并用write_file写 %s/audit.json 和 %s/audit.md。duplicates、unknown_skus、pending_orders 必须是订单 ID 的数组，不能只给数量。JSON必须包含 raw_rows、unique_orders、duplicates、unknown_skus、pending_orders、before_adjustment（paid_total/refund_total/net_total）、after_adjustment（同三项）、correlation_id、receipt_id、signed_notice 原文。中文报告说明实际读取与验证范围，区分accepted和succeeded，给出调整前后逐项数字与依据。只读这些本地文件、写报告、保存evidence；不执行命令，不访问业务网络，不提交代码。`,path,path,path)
+file.Save(file.Join(root,"task.txt"),task)~
+started = time.Now()
+runErr = aim.InvokeReAct(task,aim.aiConfig("openai",opts...),aim.speedPriorityAIConfig("openai",opts...),aim.qualityPriorityAIConfig("openai",opts...),
+    aim.sessionID("compression-workflow-"+randstr(12)),aim.context(context.Seconds(540)),aim.timeout(540),aim.workdir(root),
+    aim.reviewPolicy("yolo"),aim.timelineContentLimit(100000),aim.allowUserInteract(false),aim.maxIteration(40),aim.disableMCPServers(true),aim.disableAIForge(true),
+    aim.includeToolNames("read_file","write_file"),
+    aim.onStreamContent(func(op,e,node,data) { streams = append(streams,{"node":node,"text":string(data)}) }),
+    aim.configOptions(aiagent.functionCallMode(true),func(c) {
+        c.DisableCreateDBRuntime,c.DisablePerception,c.DisableMemoryTriage = true,true,true
+        c.AiAutoRetry,c.AiTransactionAutoRetry = 1,2
+        return nil
+    }),aim.onEvent(func(op,event) {
+        if event.NodeId != "react_task_enqueue" || runtimeConfig != nil { return }
+        c = op.GetConfig()
+        runtimeConfig = c
+        tl = c.GetTimeline()
+        tl.SetTimelineBucketByteSize(-1)
+        tl.RegisterItemInputCallback("capture",func(event) {
+            itemCopies[string(event.ID)] = event.ItemJSON
+            // Arm at real business receipts rather than directory/schema setup.
+            if !armedPending && "ACK-9-v1" in event.ItemJSON {
+                armedPending = true
+                tl.SetTimelineContentLimit(1)
+            } else if len(receipts)==1 && "U001,Unknown" in event.ItemJSON {
+                tl.SetTimelineContentLimit(1)
+            }
+        })
+        tl.RegisterSummaryCallback("capture",func(event) {
+            index = len(receipts)+1
+            summary = string(io.ReadAll(event.Summary)~)
+            frozen,open = tl.DumpFrozenOpen()
+            receipt = {"index":index,"through_id":event.ThroughID,"summary":summary,"retained_ids":event.RetainedIDs,"retained_range":event.RetainedRange,"memory_entities":[],
+                "previous_summary_visible":previousSummary=="" || previousSummary in event.Prompt,
+                "previous_retained_visible":true,"source_chars":len(event.Prompt),"frozen_chars":len(frozen),"open_chars":len(open)}
+            for id in previousRetained { if !(sprintf("# item=%v ",id) in event.Prompt) { receipt.previous_retained_visible=false } }
+            receipt.previous_memory_visible = true
+            for prior in receipts {
+                for candidate in prior.memory_entities {
+                    if !(candidate.content in event.Prompt) { receipt.previous_memory_visible = false }
+                }
+            }
+            previousSummary = summary
+            mu.Lock()
+            receipts = append(receipts,receipt)
+            mu.Unlock()
+            file.Save(file.Join(root,sprintf("compression-%02d-source.txt",index)),event.Prompt)~
+            file.Save(file.Join(root,sprintf("compression-%02d-summary.txt",index)),summary)~
+            file.Save(file.Join(root,sprintf("compression-%02d-frozen.txt",index)),frozen)~
+            file.Save(file.Join(root,sprintf("compression-%02d-open.txt",index)),open)~
+            file.SaveJson(file.Join(root,"receipts.json"),receipts)~
+            // The next real business receipt arms the next compression.
+            tl.SetTimelineContentLimit(100000)
+        })
+        tl.RegisterMemoryCallback("capture",func(event) {
+            mu.Lock()
+            defer mu.Unlock()
+            for receipt in receipts {
+                if receipt.through_id == event.ThroughID {
+                    receipt.memory_entities = event.MemoryEntities
+                    receipt.memory_error = sprintf("%v",event.Err)
+                    memoryCompleted++
+                }
+            }
+            file.SaveJson(file.Join(root,"receipts.json"),receipts)~
+        })
+        tl.RegisterCompressFreezeCallback("capture",func(event) {
+            result = event.Compression
+            checks = []
+            kept = []
+            for id in result.RetainedIDs {
+                item,found = tl.GetIdToTimelineItem().Get(id)
+                matches = false
+                if found {
+                    raw = string(item.MarshalJSON()~)
+                    matches = string(id) in itemCopies && raw == itemCopies[string(id)]
+                    file.Save(file.Join(root,sprintf("retained-%02d-%v.json",len(commits)+1,id)),raw)~
+                }
+                if !matches { checks = append(checks,sprintf("retained_item_changed_%v",id)) }
+                kept = append(kept,{"id":id,"exists":found,"unchanged":matches})
+            }
+            previousRetained = result.RetainedIDs
+            commit = {"index":len(commits)+1,"result":result,"retained_checks":kept,"errors":checks,"freeze":event.Freeze}
+            commits = append(commits,commit)
+            file.SaveJson(file.Join(root,"commits.json"),commits)~
+        })
+    }),func(c) { c.Stateless = true })
+for i=0;i<1000;i++ {
+    mu.Lock(); complete = memoryCompleted == len(receipts); mu.Unlock()
+    if complete { break }; time.Sleep(0.05)
+}
+checks = []
+if memoryCompleted != len(receipts) { checks = append(checks,"memory_notification_timeout") }
+if runErr != nil { checks = append(checks,"runtime_error") }
+if len(receipts)<2 { checks = append(checks,"fewer_than_two_compressions") }
+if len(receipts)>0 && len(receipts[0].memory_entities)==0 { checks = append(checks,"missing_explicit_durable_preferences") }
+selectedCount = 0
+for commit in commits { selectedCount += len(commit.retained_checks); for err in commit.errors { checks = append(checks,err) } }
+if selectedCount==0 { checks = append(checks,"no_retained_originals_selected") }
+for receipt in receipts {
+    if receipt.memory_error != "<nil>" { checks = append(checks,sprintf("compression_%v_memory_error",receipt.index)) }
+    if !receipt.previous_summary_visible || !receipt.previous_retained_visible { checks = append(checks,sprintf("compression_%v_missing_previous_state",receipt.index)) }
+    if !receipt.previous_memory_visible { checks = append(checks,sprintf("compression_%v_missing_previous_memory",receipt.index)) }
+}
+raw,reportErr = file.ReadFile(file.Join(root,"audit.json"))
+if reportErr != nil { checks = append(checks,"missing_audit_json") } else {
+    audit = json.loads(string(raw))
+    for key,expected in {"raw_rows":7,"unique_orders":6,"correlation_id":"LEDGER-ADJUST-9","receipt_id":"FINAL-9-OK","signed_notice":"ACK-9-v1: ACCEPTED IS NOT EXECUTED; reconcile only on matching successful receipt."} {
+        if !(key in audit) || audit[key] != expected { checks = append(checks,"incorrect_"+key) }
+    }
+    for group,values in {"before_adjustment":{"paid_total":240,"refund_total":30,"net_total":210},"after_adjustment":{"paid_total":165,"refund_total":30,"net_total":135}} {
+        if !(group in audit) { checks = append(checks,"missing_"+group); continue }
+        for key,expected in values { if !(key in audit[group]) || audit[group][key] != expected { checks = append(checks,"incorrect_"+group+"_"+key) } }
+    }
+    for key,id in {"duplicates":"A001","unknown_skus":"U001","pending_orders":"P001"} {
+        if !(key in audit) || !str.HasPrefix(json.dumps(audit[key]),"[") || len(audit[key]) != 1 || (audit[key][0] != id && audit[key][0].order_id != id) { checks=append(checks,"incorrect_"+key) }
+    }
+}
+if !file.IsExisted(file.Join(root,"audit.md")) { checks=append(checks,"missing_audit_md") }
+if runtimeConfig != nil {
+    frozen,open = runtimeConfig.GetTimeline().DumpFrozenOpen()
+    file.Save(file.Join(root,"final-frozen.txt"),frozen)~
+    file.Save(file.Join(root,"final-open.txt"),open)~
+    file.Save(file.Join(root,"final-evidence.txt"),runtimeConfig.GetSessionEvidenceRendered())~
+    file.SaveJson(file.Join(root,"session-memory-candidates.json"),runtimeConfig.GetTimeline().GetSessionMemoryCandidates())~
+}
+file.SaveJson(file.Join(root,"streams.json"),streams)~
+result = {"passed":len(checks)==0,"checks":checks,"error":sprintf("%v",runErr),"model":model,"compressions":len(receipts),"requests":len(requests),"retained_checks":selectedCount,"seconds":time.Since(started).Seconds()}
+file.SaveJson(file.Join(root,"result.json"),result)~
+printf("COMPRESSION_WORKFLOW %v\n",result)
+assert result.passed,"Compression workflow failed; inspect captured artifacts"
+println("AISMOKING_PASS timeline_compression_workflow")

@@ -2,10 +2,10 @@ package aicommon
 
 import (
 	"bytes"
-	"encoding/json"
 	"fmt"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon/promptloader"
 	"github.com/yaklang/yaklang/common/ai/aid/aiprojection"
+	"sort"
 	"strings"
 	"text/template"
 )
@@ -18,8 +18,8 @@ var timelineCompressionSchema = promptloader.MustLoad("ai/aid/aicommon/prompts/t
 
 // renderCompressionSummaryPrompt renders one complete reduction request. Native
 // replay is historical data here, not messages to execute/project in this helper.
-// Redact the process nonce on this request-only copy, then JSON-encode the source
-// so embedded tags cannot become projection controls or source delimiters.
+// Redact the process nonce on this request-only copy; stable data frames display
+// raw text without JSON escaping or executable projection envelopes.
 // The output schema is supplied once by the auxiliary scheduler.
 func renderCompressionSummaryPrompt(snapshot *timelineCompressionSnapshot) (string, error) {
 	if snapshot == nil {
@@ -33,14 +33,59 @@ func renderCompressionSummaryPrompt(snapshot *timelineCompressionSnapshot) (stri
 	if strings.TrimSpace(previous) == "" && strings.TrimSpace(history) == "" {
 		return "", fmt.Errorf("timeline compression has no history to summarize")
 	}
-	source, err := json.MarshalIndent(struct {
-		RetainedContext map[string]string `json:"retained_context,omitempty"`
-		PreviousSummary string            `json:"previous_summary"`
-		OlderHistory    string            `json:"history_to_summarize"`
-	}{snapshot.RetainedContext, aiprojection.RedactNonce(previous), aiprojection.RedactNonce(history)}, "", "  ")
-	if err != nil {
-		return "", fmt.Errorf("encode compression source: %w", err)
+	var source strings.Builder
+	keys := []string{"user_query", "frozen_user_context", "todo"}
+	labels := map[string]string{"user_query": "ORIGINAL_USER_QUERY", "frozen_user_context": "FROZEN_USER_CONTEXT", "todo": "TODO"}
+	var extra []string
+	for key := range snapshot.RetainedContext {
+		// Framework instructions are not task history, including older callers.
+		if key == "task_instruction" {
+			continue
+		}
+		if _, known := labels[key]; !known {
+			extra = append(extra, key)
+		}
 	}
+	sort.Strings(extra)
+	keys = append(keys, extra...)
+	for _, key := range keys {
+		label := labels[key]
+		if label == "" {
+			label = "RETAINED_CONTEXT"
+		}
+		content := snapshot.RetainedContext[key]
+		if label == "RETAINED_CONTEXT" {
+			content = key + ":\n" + content
+		}
+		if key == "frozen_user_context" && content == "" {
+			for _, entry := range snapshot.UserContexts {
+				if entry.Frozen {
+					content += entry.Text + "\n"
+				}
+			}
+		}
+		source.WriteString(compressionSourceTag(label, content))
+	}
+	var openUser strings.Builder
+	for _, entry := range snapshot.UserContexts {
+		if !entry.Frozen {
+			fmt.Fprintf(&openUser, "# item=%d\n%s\n", entry.ID, entry.Text)
+		}
+	}
+	source.WriteString(compressionSourceTag("OPEN_USER_CONTEXT", openUser.String()))
+	source.WriteString(compressionSourceTag("SESSION_EVIDENCE", snapshot.Evidence))
+	source.WriteString(compressionSourceTag("SESSION_MEMORY_CANDIDATES", renderSessionMemoryCandidates(snapshot.SessionMemoryCandidates)))
+	source.WriteString(compressionSourceTag("PREVIOUS_SUMMARY", previous))
+	var frozen, open []timelineCompressionSnapshotItem
+	for _, item := range snapshot.Items {
+		if item.Frozen {
+			frozen = append(frozen, item)
+		} else {
+			open = append(open, item)
+		}
+	}
+	source.WriteString(compressionSourceTag("FROZEN_TIMELINE", renderCompressionSnapshotItems(frozen)))
+	source.WriteString(compressionSourceTag("OPEN_TIMELINE", renderCompressionSnapshotItems(open)))
 	tmpl, err := template.New("timeline-compression").Parse(timelineCompressionTemplate)
 	if err != nil {
 		return "", err
@@ -48,11 +93,20 @@ func renderCompressionSummaryPrompt(snapshot *timelineCompressionSnapshot) (stri
 	var buf bytes.Buffer
 	err = tmpl.Execute(&buf, struct {
 		Source string
-	}{aiprojection.RedactNonce(string(source))})
+	}{source.String()})
 	if err != nil {
 		return "", err
 	}
 	return buf.String(), nil
+}
+
+// Plain-text data frames have stable content hashes, not authenticated replay
+// tags. Redacting historical projection nonces prevents their control envelopes
+// from becoming outgoing assistant/tool messages in the compression helper.
+func compressionSourceTag(label, content string) string {
+	content = aiprojection.RedactNonce(content)
+	hash := StablePromptNonce("timeline-compression", label, content)
+	return fmt.Sprintf("<|%s_%s|>\n%s\n<|%s_END_%s|>\n\n", label, hash, content, label, hash)
 }
 
 // summarizeCompressionSnapshot schedules one complete reduction for the
@@ -81,50 +135,36 @@ func (m *Timeline) summarizeCompressionSnapshot(snapshot *timelineCompressionSna
 	if limit.MaxInputTokens > 0 && TokenCountExceeds(timelineCompressionInstruction+"\n"+prompt+"\n"+timelineCompressionSchema, limit.MaxInputTokens) {
 		return "", fmt.Errorf("timeline compression input exceeds safety limit %d; source preserved", limit.MaxInputTokens)
 	}
-	var summary string
-	resultErr := fmt.Errorf("timeline compression skipped or returned no result")
-	m.config.ScheduleAuxiliaryTask(ctx, CallerLabelTimelineCompress,
-		func() string { return prompt },
-		func(action *Action) {
-			if action == nil {
-				resultErr = fmt.Errorf("timeline compression returned no action")
-				return
-			}
-			if err := action.WaitParseResult(ctx); err != nil {
-				resultErr = fmt.Errorf("parse timeline compression: %w", err)
-				return
-			}
-			if !action.ValidCheck("timeline-summary") {
-				resultErr = fmt.Errorf("timeline compression returned an unexpected action")
-				return
-			}
-			raw, exists := action.LookupCanonicalParam("summary")
-			text, isString := raw.(string)
-			if !exists || !isString {
-				resultErr = fmt.Errorf("timeline compression summary must be a root string field")
-				return
-			}
-			text = strings.TrimSpace(text)
-			if text == "" {
-				resultErr = fmt.Errorf("timeline compression returned an empty summary")
-				return
-			}
-			if strings.Contains(text, aiprojection.Nonce()) {
-				resultErr = fmt.Errorf("timeline compression returned a projection control token")
-				return
-			}
-			if limit.MaxSummaryTokens > 0 && TokenCountExceeds(text, limit.MaxSummaryTokens) {
-				resultErr = fmt.Errorf("timeline compression summary exceeds safety limit %d", limit.MaxSummaryTokens)
-				return
-			}
-			summary, resultErr = text, nil
-		},
-		WithAuxiliaryOutputSchema("timeline-summary", timelineCompressionSchema),
-		WithAuxiliaryOnError(func(err error) { resultErr = fmt.Errorf("timeline compression request failed: %w", err) }),
-		WithAuxiliaryOpts(WithLiteForgeDisableTimeline(),
-			WithLiteForgeStaticInstruction(timelineCompressionInstruction),
-			WithLiteForgeMaxPromptTokens(limit.MaxInputTokens),
-			WithGeneralConfigExtraRequestOpts(WithAIRequest_CallerLabel(CallerLabelTimelineCompress))),
-	)
-	return summary, resultErr
+	// Keep the complete output contract in the model prompt. The response
+	// handler uses ActionMaker's jsonextractor without enforcing that schema.
+	requestPrompt := aiprojection.CreateTag("PROMPT_SECTION", "system", timelineCompressionInstruction+"\n\n"+timelineCompressionSchema) +
+		aiprojection.CreateTag("PROMPT_SECTION", "user", prompt)
+	ready, completion := m.startCompressionResponse(snapshot, limit, requestPrompt)
+	snapshot.MemoryCompletion = completion
+	select {
+	case output := <-ready:
+		snapshot.Output = output
+		return output.Summary, nil
+	case <-completion.done:
+		// A late memory error cannot reject an already usable selection.
+		select {
+		case output := <-ready:
+			snapshot.Output = output
+			return output.Summary, nil
+		default:
+		}
+		if completion.err != nil && completion.output == nil {
+			return "", completion.err
+		}
+		output := completion.output
+		if output == nil {
+			return "", fmt.Errorf("timeline compression returned no summary")
+		}
+		// Only summary and selection belong to the atomic Timeline commit.
+		snapshot.Output = &timelineCompressionOutput{Summary: output.Summary, RetainedRange: output.RetainedRange,
+			RetainedIDs: append([]int64(nil), output.RetainedIDs...)}
+		return output.Summary, nil
+	case <-ctx.Done():
+		return "", ctx.Err()
+	}
 }

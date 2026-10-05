@@ -38,6 +38,10 @@ func (m *Timeline) ForkForTask(taskIndex, taskName string, config AICallerConfig
 	// Derive the fork boundary from the same serialized snapshot, not a second
 	// parent read that can race an append or compression commit.
 	baseMaxID := branch.GetMaxID()
+	// Session extraction history is shared; ordinary task history stays private.
+	m.mu.RLock()
+	branch.sessionMemory = m.sessionMemory
+	m.mu.RUnlock()
 	branch.SoftBindConfig(config, ai)
 	branch.markBranchTimeline(true)
 

@@ -112,22 +112,20 @@ func TestTimelineCompressionSnapshotKeepsWholeAssistantToolGroup(t *testing.T) {
 	importFreezeItem(tl, 260, time.Unix(260, 0), &TextTimelineItem{ID: 260, Text: "latest execution outcome"})
 	kept, err := tl.buildCompressionSnapshot()
 	require.NoError(t, err)
-	require.Contains(t, kept.InputText, replay)
-	// Actual projection must still produce one assistant followed by both tools.
+	require.Contains(t, kept.InputText, "inspect both targets")
+	require.Contains(t, kept.InputText, "call_a")
+	require.Contains(t, kept.InputText, "call_b")
+	require.Contains(t, kept.InputText, "accepted A")
+	require.Contains(t, kept.InputText, "accepted B")
+	require.NotContains(t, kept.InputText, aiprojection.Nonce())
+	// The helper sees historical data, not a new assistant/tool exchange.
 	projected := aiprojection.ProjectAndObserve("compression-snapshot-test",
 		aiprojection.CreateTag("PROMPT_SECTION", "timeline-open", kept.InputText))
 	require.NotNil(t, projected)
-	var roles, ids []string
 	for _, message := range projected.Messages {
-		if message.Role == "assistant" || message.Role == "tool" {
-			roles = append(roles, message.Role)
-			if message.Role == "tool" {
-				ids = append(ids, message.ToolCallID)
-			}
-		}
+		require.Equal(t, "user", message.Role)
 	}
-	require.Equal(t, []string{"assistant", "tool", "tool"}, roles)
-	require.Equal(t, []string{"call_a", "call_b"}, ids)
+
 }
 
 func TestTimelineCompressionSnapshotRejectsIncompleteReplay(t *testing.T) {

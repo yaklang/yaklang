@@ -484,6 +484,7 @@ type ActionMaker struct {
 	actionName       string
 	alias            []string
 	jsonCallback     []jsonextractor.CallbackOption
+	onRootFields     func(map[string]any)
 	onReaderFinished []func()
 	tagToKey         map[string]string // tag to param name mapping
 	// tagToExtraNonces 给单个 tag 注册额外的 nonce 候选 (与 m.nonce 并列, 不替代).
@@ -513,6 +514,14 @@ func WithActionAlias(alias ...string) ActionMakerOption {
 	return func(maker *ActionMaker) {
 		maker.alias = alias
 	}
+}
+
+// WithActionRootFieldsCallback observes completed fields of the current root
+// object before EOF. Each callback receives a separate, shallow map.
+// It does not admit a complete action; execution consumers must still wait for
+// WaitParseResult and the canonical object. Nested fields are never forwarded.
+func WithActionRootFieldsCallback(callback func(map[string]any)) ActionMakerOption {
+	return func(maker *ActionMaker) { maker.onRootFields = callback }
 }
 
 func WithActionJSONCallback(opts ...jsonextractor.CallbackOption) ActionMakerOption {
@@ -745,6 +754,7 @@ func (m *ActionMaker) ReadFromReader(ctx context.Context, reader io.Reader) *Act
 		var fallbackParams map[string]any
 		var pendingActionType string
 		var canonicalKeySeen, canonicalObjectFound bool
+		var rootFields map[string]any
 
 		opts := m.jsonCallback
 
@@ -755,6 +765,17 @@ func (m *ActionMaker) ReadFromReader(ctx context.Context, reader io.Reader) *Act
 			}
 			keyString := utils.InterfaceToString(key)
 			if len(parents) == 0 && !canonicalObjectFound {
+				if m.onRootFields != nil {
+					if rootFields == nil {
+						rootFields = make(map[string]any)
+					}
+					rootFields[keyString] = data
+					fields := make(map[string]any, len(rootFields))
+					for k, v := range rootFields {
+						fields[k] = v
+					}
+					m.onRootFields(fields)
+				}
 				switch keyString {
 				case ActionMagicKey:
 					canonicalKeySeen = true
@@ -790,6 +811,7 @@ func (m *ActionMaker) ReadFromReader(ctx context.Context, reader io.Reader) *Act
 		}
 
 		opts = append(opts, jsonextractor.WithRootMapCallback(func(data map[string]any) {
+			rootFields = nil
 			if canonicalObjectFound {
 				return
 			}

@@ -46,6 +46,8 @@ var errTimelineCompressionBeforePromptChanged = errors.New("timeline changed aft
 type TimelineCompressionResult struct {
 	ThroughID     int64
 	RetiredIDs    []int64
+	RetainedIDs   []int64
+	RetainedRange string
 	Summary       string
 	InputTokens   int
 	SummaryTokens int
@@ -153,6 +155,10 @@ func (m *Timeline) compressOnce(options TimelineCompressionOptions, checked *tim
 	if snapshot.InputText == "" {
 		return m.commitCompressionSnapshot(snapshot, "")
 	}
+	if err := m.sessionMemory.wait(options.Context); err != nil {
+		return nil, err
+	}
+	snapshot.SessionMemoryCandidates = m.sessionMemory.snapshot()
 	summary, err := m.summarizeCompressionSnapshot(snapshot, options)
 	if err != nil {
 		return nil, err
@@ -187,13 +193,23 @@ func (m *Timeline) commitCompressionSnapshot(snapshot *timelineCompressionSnapsh
 	}
 	result := &TimelineCompressionResult{ThroughID: snapshot.ThroughID, Summary: summary,
 		InputTokens: snapshot.InputTokens, SummaryTokens: MeasureTokens(summary)}
+	selected := make(map[int64]bool)
+	if snapshot.Output != nil {
+		result.RetainedIDs = append([]int64(nil), snapshot.Output.RetainedIDs...)
+		result.RetainedRange = snapshot.Output.RetainedRange
+		for _, id := range result.RetainedIDs {
+			selected[id] = true
+		}
+	}
 	snapshot.NotifyCommitted = m.compressionCallbackLocked(snapshot, result)
 	head := &TimelineCompressedHead{Text: summary}
 	if snapshot.Head != nil {
 		head.CoveredEndItemID, head.CoveredEndAtMs = snapshot.Head.CoveredEndItemID, snapshot.Head.CoveredEndAtMs
 	}
 	for _, item := range snapshot.Items {
-		result.RetiredIDs = append(result.RetiredIDs, item.ID)
+		if !selected[item.ID] {
+			result.RetiredIDs = append(result.RetiredIDs, item.ID)
+		}
 		if item.ID >= head.CoveredEndItemID {
 			head.CoveredEndItemID, head.CoveredEndAtMs = item.ID, item.Timestamp
 		}
@@ -201,6 +217,7 @@ func (m *Timeline) commitCompressionSnapshot(snapshot *timelineCompressionSnapsh
 	// Exact journals retain freeze membership. The watermark sentinel survives
 	// serialization even when every ordinary original has been retired.
 	ids := append([]int64(nil), snapshot.ExactItemIDs...)
+	ids = append(ids, result.RetainedIDs...)
 	ids = append(ids, snapshot.ThroughID)
 	sort.Slice(ids, func(i, j int) bool { return ids[i] < ids[j] })
 	unique := ids[:0]
@@ -230,6 +247,12 @@ func (m *Timeline) commitCompressionSnapshot(snapshot *timelineCompressionSnapsh
 	m.updateCompressedHead(head)
 	for _, id := range result.RetiredIDs {
 		m.retireTimelineItemLocked(id)
+	}
+	if snapshot.MemoryCompletion != nil {
+		if m.sessionMemory == nil {
+			m.sessionMemory = newTimelineSessionMemory(m, nil)
+		}
+		m.sessionMemory.record(snapshot.MemoryCompletion)
 	}
 	if snapshot.NotifyCommitted != nil {
 		for _, pending := range m.freezeBudgetGroupsLocked(false) {

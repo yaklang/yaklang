@@ -31,13 +31,25 @@ type TimelineCompressFreezeEvent struct {
 // Summary is a completed, independent reader for each callback, not the live AI
 // stream. Prompt is the rendered compression source; Instruction is its static
 // instruction. Protocol wrapping/retry corrections are not included.
-// MemoryEntities is reserved for future extraction and is currently empty.
+// RetainedIDs/RetainedRange select whole originals beside the committed summary.
 type TimelineSummaryEvent struct {
+	ThroughID     int64
+	Summary       io.Reader
+	Prompt        string
+	Instruction   string
+	RetainedIDs   []int64
+	RetainedRange string
+}
+
+// TimelineMemoryEvent is delivered independently after the summary commit and
+// full response. Err reports a failed memory tail; summary state is unchanged.
+// Candidates are detached JSON, not persisted memory records.
+type TimelineMemoryEvent struct {
 	ThroughID      int64
-	Summary        io.Reader
 	Prompt         string
 	Instruction    string
 	MemoryEntities []any
+	Err            error
 }
 
 type timelineCallback[T any] struct {
@@ -86,8 +98,9 @@ func invokeTimelineCallback[T any](entry timelineCallback[T], event T) {
 }
 
 // Registration replaces the callback with the same ID in the same event kind.
-// A nil callback unregisters that ID. Callbacks run synchronously after commit,
-// outside Timeline.mu, in registration order. They should enqueue slow work.
+// A nil callback unregisters that ID. Input/freeze/summary callbacks run
+// synchronously after commit, outside Timeline.mu, in registration order.
+// Memory completion is asynchronous. Callbacks should enqueue slow work.
 // Concurrent writers can deliver callbacks concurrently. Panics are isolated.
 // Registrations are runtime-only: they are not persisted, copied or forked.
 func (m *Timeline) RegisterItemInputCallback(id string, fn func(TimelineItemInputEvent)) {
@@ -104,6 +117,12 @@ func (m *Timeline) RegisterCompressFreezeCallback(id string, fn func(TimelineCom
 
 func (m *Timeline) RegisterSummaryCallback(id string, fn func(TimelineSummaryEvent)) {
 	m.summaryCallbacks.register(id, fn)
+}
+
+// Memory delivery runs separately so storage or slow consumers cannot block
+// the summary commit or the next loop. Replacing/unregistering uses the same ID.
+func (m *Timeline) RegisterMemoryCallback(id string, fn func(TimelineMemoryEvent)) {
+	m.memoryCallbacks.register(id, fn)
 }
 
 // Capture under Timeline.mu; invoke only after the complete write is unlocked.
@@ -157,12 +176,13 @@ func (m *Timeline) notifyFreeze(result TimelineFreezeResult) {
 }
 
 func (m *Timeline) compressionCallbackLocked(snapshot *timelineCompressionSnapshot, result *TimelineCompressionResult) func() {
-	// Capture both lists before invoking user code. Registration changes made by
+	// Capture all lists before invoking user code. Registration changes made by
 	// one callback apply to later transactions, not later stages of this commit.
 	freezeCallbacks := m.freezeCallbacks.snapshot()
 	compressCallbacks := m.compressFreezeCallbacks.snapshot()
 	summaryCallbacks := m.summaryCallbacks.snapshot()
-	if len(freezeCallbacks)+len(compressCallbacks)+len(summaryCallbacks) == 0 {
+	memoryCallbacks := m.memoryCallbacks.snapshot()
+	if len(freezeCallbacks)+len(compressCallbacks)+len(summaryCallbacks)+len(memoryCallbacks) == 0 {
 		return nil
 	}
 	freeze := TimelineFreezeResult{Version: snapshot.FreezeVersion + 1, ThroughID: snapshot.ThroughID}
@@ -190,6 +210,7 @@ func (m *Timeline) compressionCallbackLocked(snapshot *timelineCompressionSnapsh
 		for _, callback := range compressCallbacks {
 			compression := *result
 			compression.RetiredIDs = append([]int64(nil), result.RetiredIDs...)
+			compression.RetainedIDs = append([]int64(nil), result.RetainedIDs...)
 			invokeTimelineCallback(callback, TimelineCompressFreezeEvent{cloneTimelineFreezeResult(freeze), compression})
 		}
 		// Exact-only commits promote journals without asking AI for a summary.
@@ -200,8 +221,24 @@ func (m *Timeline) compressionCallbackLocked(snapshot *timelineCompressionSnapsh
 			invokeTimelineCallback(callback, TimelineSummaryEvent{
 				ThroughID: result.ThroughID, Summary: strings.NewReader(result.Summary),
 				Prompt: snapshot.SummaryPrompt, Instruction: timelineCompressionInstruction,
-				MemoryEntities: []any{},
+				RetainedIDs: append([]int64(nil), result.RetainedIDs...), RetainedRange: result.RetainedRange,
 			})
 		}
+		if len(memoryCallbacks) == 0 || snapshot.MemoryCompletion == nil {
+			return
+		}
+		go func() {
+			completion := snapshot.MemoryCompletion
+			<-completion.done
+			var entities []any
+			if completion.err == nil && completion.output != nil {
+				entities = completion.output.MemoryEntities
+			}
+			for _, callback := range memoryCallbacks {
+				invokeTimelineCallback(callback, TimelineMemoryEvent{ThroughID: result.ThroughID,
+					Prompt: snapshot.SummaryPrompt, Instruction: timelineCompressionInstruction,
+					MemoryEntities: cloneCompressionMemoryEntities(entities), Err: completion.err})
+			}
+		}()
 	}
 }

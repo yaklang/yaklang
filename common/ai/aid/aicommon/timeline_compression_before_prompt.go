@@ -79,7 +79,14 @@ func (m *Timeline) CompressBeforePrompt(options TimelineCompressionOptions) (*Ti
 		}
 		m.mu.Unlock()
 		_ = prepareCompressionSnapshot(snapshot)
-		if (len(snapshot.Items) == 0 && pending.Len() == 0) || int64(MeasureTokens(snapshot.InputText+pending.String())) < limit {
+		hasNewHistory := false
+		for _, item := range snapshot.Items {
+			if snapshot.Head == nil || item.ID > snapshot.Head.CoveredEndItemID || !item.Frozen {
+				hasNewHistory = true
+				break
+			}
+		}
+		if (!hasNewHistory && pending.Len() == 0) || int64(MeasureTokens(snapshot.InputText+pending.String())) < limit {
 			return nil, nil
 		}
 		result, err := m.compressOnce(options, snapshot)

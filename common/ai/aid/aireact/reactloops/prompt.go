@@ -388,7 +388,7 @@ func (r *ReActLoop) generateLoopPrompt(
 		return "", err
 	}
 	r.lastLoopSchema = schema
-	if err := r.compressTimelineBeforePrompt(userInput, frozenUserContext, todoSnapshot, persistent); err != nil {
+	if err := r.compressTimelineBeforePrompt(userInput, frozenUserContext, todoSnapshot); err != nil {
 		return "", err
 	}
 	var planStatus string

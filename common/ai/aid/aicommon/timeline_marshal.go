@@ -17,21 +17,22 @@ import (
 //   - Summary 字段已废弃（dead code），新数据不再写入；仅在反序列化老数据时容忍其存在并静默忽略。
 //   - Reducers/ReducerTs 字段已废弃，新数据不再写入；仅在反序列化老数据时做一次性迁移为 CompressedHead。
 type timelineSerializable struct {
-	UserInputBoundaryKey  string                           `json:"user_input_boundary_key,omitempty"`
-	ProjectionNonce       string                           `json:"projection_nonce,omitempty"`
-	IdToTs                map[string]int64                 `json:"id_to_ts"`
-	TsToTimelineItem      map[string]*TimelineItem         `json:"ts_to_timeline_item"`
-	IdToTimelineItem      map[string]*TimelineItem         `json:"id_to_timeline_item"`
-	Summary               map[string]*TimelineItem         `json:"summary,omitempty"` // deprecated: 仅做向后兼容反序列化
-	CompressedHead        *TimelineCompressedHead          `json:"compressed_head,omitempty"`
-	CompressedHistory     []*TimelineCompressedHistoryNode `json:"compressed_history,omitempty"`
-	Reducers              map[string]string                `json:"reducers,omitempty"`   // legacy read only: migrated to CompressedHead on unmarshal
-	ReducerTs             map[string]int64                 `json:"reducer_ts,omitempty"` // legacy read only
-	TotalDumpContentLimit int64                            `json:"total_dump_content_limit"`
-	PromotedState         *TimelinePromotedState           `json:"promoted_state,omitempty"`
-	FreezeState           *TimelineFreezeState             `json:"freeze_state,omitempty"`
-	BucketByteSize        int64                            `json:"bucket_byte_size,omitempty"`
-	EvidenceInitialized   bool                             `json:"evidence_initialized,omitempty"`
+	UserInputBoundaryKey    string                           `json:"user_input_boundary_key,omitempty"`
+	ProjectionNonce         string                           `json:"projection_nonce,omitempty"`
+	IdToTs                  map[string]int64                 `json:"id_to_ts"`
+	TsToTimelineItem        map[string]*TimelineItem         `json:"ts_to_timeline_item"`
+	IdToTimelineItem        map[string]*TimelineItem         `json:"id_to_timeline_item"`
+	Summary                 map[string]*TimelineItem         `json:"summary,omitempty"` // deprecated: 仅做向后兼容反序列化
+	CompressedHead          *TimelineCompressedHead          `json:"compressed_head,omitempty"`
+	CompressedHistory       []*TimelineCompressedHistoryNode `json:"compressed_history,omitempty"`
+	SessionMemoryCandidates []any                            `json:"session_memory_candidates,omitempty"`
+	Reducers                map[string]string                `json:"reducers,omitempty"`   // legacy read only: migrated to CompressedHead on unmarshal
+	ReducerTs               map[string]int64                 `json:"reducer_ts,omitempty"` // legacy read only
+	TotalDumpContentLimit   int64                            `json:"total_dump_content_limit"`
+	PromotedState           *TimelinePromotedState           `json:"promoted_state,omitempty"`
+	FreezeState             *TimelineFreezeState             `json:"freeze_state,omitempty"`
+	BucketByteSize          int64                            `json:"bucket_byte_size,omitempty"`
+	EvidenceInitialized     bool                             `json:"evidence_initialized,omitempty"`
 }
 
 // MarshalTimeline serializes a Timeline into a string.
@@ -80,18 +81,19 @@ func marshalTimelineUnlocked(i *Timeline) (string, error) {
 	})
 
 	serializable := &timelineSerializable{
-		ProjectionNonce:       aiprojection.Nonce(),
-		UserInputBoundaryKey:  i.userInputBoundaryKey,
-		IdToTs:                idToTsMap,
-		TsToTimelineItem:      tsToTimelineItemMap,
-		IdToTimelineItem:      idToTimelineItemMap,
-		CompressedHead:        cloneTimelineCompressedHead(i.compressedHead),
-		CompressedHistory:     cloneTimelineCompressedHistory(i.compressedHistory),
-		TotalDumpContentLimit: i.totalDumpContentLimit,
-		PromotedState:         cloneTimelinePromotedState(i.promotedState),
-		FreezeState:           cloneTimelineFreezeState(i.freezeState),
-		EvidenceInitialized:   i.evidenceInitialized,
-		BucketByteSize:        i.bucketByteSize,
+		ProjectionNonce:         aiprojection.Nonce(),
+		UserInputBoundaryKey:    i.userInputBoundaryKey,
+		IdToTs:                  idToTsMap,
+		TsToTimelineItem:        tsToTimelineItemMap,
+		IdToTimelineItem:        idToTimelineItemMap,
+		CompressedHead:          cloneTimelineCompressedHead(i.compressedHead),
+		CompressedHistory:       cloneTimelineCompressedHistory(i.compressedHistory),
+		SessionMemoryCandidates: i.sessionMemory.snapshot(),
+		TotalDumpContentLimit:   i.totalDumpContentLimit,
+		PromotedState:           cloneTimelinePromotedState(i.promotedState),
+		FreezeState:             cloneTimelineFreezeState(i.freezeState),
+		EvidenceInitialized:     i.evidenceInitialized,
+		BucketByteSize:          i.bucketByteSize,
 	}
 
 	data, err := json.Marshal(serializable)
@@ -127,6 +129,8 @@ func UnmarshalTimeline(s string) (*Timeline, error) {
 		bucketByteSize:        serializable.BucketByteSize,
 		userInputBoundaryKey:  serializable.UserInputBoundaryKey,
 	}
+
+	timeline.sessionMemory = newTimelineSessionMemory(timeline, serializable.SessionMemoryCandidates)
 
 	// 恢复 idToTs
 	timeline.idToTs = omap.NewOrderedMap(map[int64]int64{})
