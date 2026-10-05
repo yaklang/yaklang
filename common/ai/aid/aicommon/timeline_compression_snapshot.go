@@ -28,6 +28,9 @@ type timelineCompressionSnapshot struct {
 	RetainedContext         map[string]string // caller-owned prompt parts, copied before the AI request
 	SourceState             string            // live ordinary + exact journal entries through ThroughID
 	FreezeVersion           int64
+	SummaryPrompt           string               `json:"-"` // actual rendered request source, runtime-only
+	CommittedFreeze         TimelineFreezeResult `json:"-"` // detached receipt, populated only after validation
+	NotifyCommitted         func()               `json:"-"` // observers captured at commit, called after unlock
 }
 
 type timelineCompressionSnapshotItem struct {

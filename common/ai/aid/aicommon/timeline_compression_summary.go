@@ -67,6 +67,7 @@ func (m *Timeline) summarizeCompressionSnapshot(snapshot *timelineCompressionSna
 	if err != nil {
 		return "", err
 	}
+	snapshot.SummaryPrompt = prompt
 	// Capture the safety limits before invoking callbacks; don't reread mutable state
 	// or the caller's snapshot after the request has started.
 	var limit TimelineCompressionOptions

@@ -97,7 +97,8 @@ func (f *TimelineFork) MergeBack() (*TimelineMergeResult, error) {
 
 	parent := f.Parent
 	parent.mu.Lock()
-	defer parent.mu.Unlock()
+	var notifications []func()
+	defer parent.unlockAndNotifyTimeline(&notifications)
 
 	result := &TimelineMergeResult{TaskIndex: f.TaskIndex}
 
@@ -152,6 +153,7 @@ func (f *TimelineFork) MergeBack() (*TimelineMergeResult, error) {
 		parent.idToTimelineItem.OrderInsert(active.id, active.item, lessInt64)
 		parent.idToTs.Set(active.id, ts)
 		parent.tsToTimelineItem.OrderInsert(ts, active.item, lessInt64)
+		parent.collectItemInputCallbackLocked(&notifications, active.item)
 		if !isPromotableTimelineItem(active.item) {
 			result.ActiveItemsMerged++
 		}
@@ -170,6 +172,7 @@ func (f *TimelineFork) MergeBack() (*TimelineMergeResult, error) {
 		parent.idToTimelineItem.OrderInsert(coveredID, item, lessInt64)
 		parent.idToTs.Set(coveredID, nextTS)
 		parent.tsToTimelineItem.OrderInsert(nextTS, item, lessInt64)
+		parent.collectItemInputCallbackLocked(&notifications, item)
 
 		result.CompressedHeadsMerged++
 	}

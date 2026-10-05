@@ -129,6 +129,9 @@ func (m *Timeline) compressOnce(options TimelineCompressionOptions, checked *tim
 		close(m.compressionDone)
 		m.compressionDone = nil
 		m.mu.Unlock()
+		if err == nil && result != nil && snapshot.NotifyCommitted != nil {
+			snapshot.NotifyCommitted()
+		}
 	}()
 	snapshot.RetainedContext = make(map[string]string, len(options.RetainedContext))
 	for key, value := range options.RetainedContext {
@@ -184,6 +187,7 @@ func (m *Timeline) commitCompressionSnapshot(snapshot *timelineCompressionSnapsh
 	}
 	result := &TimelineCompressionResult{ThroughID: snapshot.ThroughID, Summary: summary,
 		InputTokens: snapshot.InputTokens, SummaryTokens: MeasureTokens(summary)}
+	snapshot.NotifyCommitted = m.compressionCallbackLocked(snapshot, result)
 	head := &TimelineCompressedHead{Text: summary}
 	if snapshot.Head != nil {
 		head.CoveredEndItemID, head.CoveredEndAtMs = snapshot.Head.CoveredEndItemID, snapshot.Head.CoveredEndAtMs
@@ -226,6 +230,11 @@ func (m *Timeline) commitCompressionSnapshot(snapshot *timelineCompressionSnapsh
 	m.updateCompressedHead(head)
 	for _, id := range result.RetiredIDs {
 		m.retireTimelineItemLocked(id)
+	}
+	if snapshot.NotifyCommitted != nil {
+		for _, pending := range m.freezeBudgetGroupsLocked(false) {
+			snapshot.CommittedFreeze.PendingBytes += len(pending.Render())
+		}
 	}
 	return result, nil
 }

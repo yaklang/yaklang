@@ -105,7 +105,8 @@ func (m *Timeline) EnsureTaskUserInput(taskID, input string, acquireID func() in
 		return
 	}
 	m.mu.Lock()
-	defer m.mu.Unlock()
+	var notifications []func()
+	defer m.unlockAndNotifyTimeline(&notifications)
 	ids := m.idToTimelineItem.Keys()
 	for i := len(ids) - 1; i >= 0; i-- {
 		item, ok := m.idToTimelineItem.Get(ids[i])
@@ -146,17 +147,18 @@ func (m *Timeline) EnsureTaskUserInput(taskID, input string, acquireID func() in
 		}
 		item := &TimelineItem{createdAt: now, value: &TextTimelineItem{ID: id, Text: header + ":\n" + input}}
 		m.idToTs.Set(id, ts)
-		m.pushTimelineItem(ts, id, item)
+		m.pushTimelineItem(ts, id, item, &notifications)
 	}
 }
 
 func (m *Timeline) pushUserInputRecord(record schema.AIAgentUserInputRecord, id int64) {
 	m.mu.Lock()
-	defer m.mu.Unlock()
-	m.pushUserInputRecordLocked(record, id)
+	var notifications []func()
+	defer m.unlockAndNotifyTimeline(&notifications)
+	m.pushUserInputRecordLocked(record, id, &notifications)
 }
 
-func (m *Timeline) pushUserInputRecordLocked(record schema.AIAgentUserInputRecord, id int64) {
+func (m *Timeline) pushUserInputRecordLocked(record schema.AIAgentUserInputRecord, id int64, notifications *[]func()) {
 	now := time.Now()
 	ts := now.UnixMilli()
 	for m.tsToTimelineItem.Have(ts) {
@@ -166,7 +168,7 @@ func (m *Timeline) pushUserInputRecordLocked(record schema.AIAgentUserInputRecor
 	m.pushTimelineItem(ts, id, &TimelineItem{createdAt: now, value: &UserInteraction{
 		ID: id, Stage: UserInteractionStage_FreeInput, UserExtraPrompt: record.UserInput,
 		Round: record.Round, InputTimestamp: record.Timestamp,
-	}})
+	}}, notifications)
 }
 
 // Import legacy DB history once. Matching occurrences (rather than unique text)
@@ -192,7 +194,7 @@ func (m *Timeline) importUserInputHistory(history []schema.AIAgentUserInputRecor
 			existing[record.UserInput]--
 			continue
 		}
-		m.pushUserInputRecordLocked(record, acquireID())
+		m.pushUserInputRecordLocked(record, acquireID(), nil)
 	}
 	// Old frozen interactions now also have an exact Semi1 projection.
 	m.rebuildPromotedStateLocked(m.frozenThroughLocked())

@@ -20,6 +20,11 @@ import (
 
 type Timeline struct {
 	mu sync.RWMutex
+	// Runtime observers have independent locks and never enter persistence or prompts.
+	itemInputCallbacks      timelineCallbackRegistry[TimelineItemInputEvent]
+	freezeCallbacks         timelineCallbackRegistry[TimelineFreezeResult]
+	compressFreezeCallbacks timelineCallbackRegistry[TimelineCompressFreezeEvent]
+	summaryCallbacks        timelineCallbackRegistry[TimelineSummaryEvent]
 	// Serializes runtime cache updates and their journal deltas across shared configs.
 	toolCacheMu sync.Mutex
 
@@ -391,7 +396,8 @@ func (m *Timeline) setAICaller(ai AICaller) {
 
 func (m *Timeline) PushToolResult(toolResult *aitool.ToolResult) {
 	m.mu.Lock()
-	defer m.mu.Unlock()
+	var notifications []func()
+	defer m.unlockAndNotifyTimeline(&notifications)
 	now := time.Now()
 	ts := now.UnixMilli()
 	for m.tsToTimelineItem.Have(ts) {
@@ -412,15 +418,16 @@ func (m *Timeline) PushToolResult(toolResult *aitool.ToolResult) {
 		value:     toolResult,
 	}
 
-	m.pushTimelineItem(ts, toolResult.GetID(), item)
+	m.pushTimelineItem(ts, toolResult.GetID(), item, &notifications)
 }
 
-func (m *Timeline) pushTimelineItem(ts int64, id int64, item *TimelineItem) {
+func (m *Timeline) pushTimelineItem(ts int64, id int64, item *TimelineItem, notifications *[]func()) {
 	m.invalidateFreezeFromLocked(id)
 	m.OrderInsertId(id, item)
 	m.OrderInsertTs(ts, item)
 
 	m.emitTimelineItemAsync(item)
+	m.collectItemInputCallbackLocked(notifications, item)
 }
 
 func (m *Timeline) emitTimelineItemAsync(item *TimelineItem) {
@@ -448,7 +455,8 @@ func (m *Timeline) emitTimelineItemAsync(item *TimelineItem) {
 
 func (m *Timeline) PushUserInteraction(stage UserInteractionStage, id int64, systemPrompt string, userExtraPrompt string) {
 	m.mu.Lock()
-	defer m.mu.Unlock()
+	var notifications []func()
+	defer m.unlockAndNotifyTimeline(&notifications)
 	now := time.Now()
 	ts := now.UnixMilli()
 	for m.tsToTimelineItem.Have(ts) {
@@ -466,7 +474,7 @@ func (m *Timeline) PushUserInteraction(stage UserInteractionStage, id int64, sys
 		},
 	}
 
-	m.pushTimelineItem(ts, id, item)
+	m.pushTimelineItem(ts, id, item, &notifications)
 }
 
 // TimelineDumpDefaultIntervalMinutes 是 Dump / String / DumpBefore 默认使用的分桶分钟数
@@ -805,7 +813,8 @@ func (m *Timeline) PushTextWithPromptProjection(id int64, text, promptText strin
 
 func (m *Timeline) pushTextWithPromptProjection(id int64, text, promptText string) {
 	m.mu.Lock()
-	defer m.mu.Unlock()
+	var notifications []func()
+	defer m.unlockAndNotifyTimeline(&notifications)
 	now := time.Now()
 	ts := now.UnixMilli()
 	for m.tsToTimelineItem.Have(ts) {
@@ -822,7 +831,7 @@ func (m *Timeline) pushTextWithPromptProjection(id int64, text, promptText strin
 		},
 	}
 
-	m.pushTimelineItem(ts, id, item)
+	m.pushTimelineItem(ts, id, item, &notifications)
 }
 
 // TimelineEntry 时间线条目
