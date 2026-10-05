@@ -1,14 +1,125 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "type": "object",
-  "required": ["@action", "summary"],
+  "required": [
+    "@action",
+    "summary",
+    "ratain_timeline_item_range",
+    "memory_entities"
+  ],
   "additionalProperties": false,
   "properties": {
-    "@action": { "type": "string", "const": "timeline-summary" },
+    "@action": {
+      "type": "string",
+      "const": "timeline-summary"
+    },
     "summary": {
       "type": "string",
       "minLength": 1,
-      "description": "替换旧摘要及全部普通历史的新摘要：保留有依据的进展、关键发现、独有约束、未解决问题与衔接线索，避免重复独立保留的上下文。"
+      "description": "合并旧摘要与未保留原文后的历史总结，说明进展、依据、问题和衔接线索。"
+    },
+    "ratain_timeline_item_range": {
+      "type": "string",
+      "description": "原样保留的普通 Timeline item ID，逗号分隔 ID 或闭区间，例如 12-18,23；空字符串表示无保留。"
+    },
+    "memory_entities": {
+      "type": "array",
+      "description": "有依据且适合以后使用的记忆候选，没有则为空数组。",
+      "items": {
+        "type": "object",
+        "required": [
+          "title",
+          "content",
+          "potential_questions",
+          "tags",
+          "scores"
+        ],
+        "properties": {
+          "title": {
+            "type": "string",
+            "minLength": 1,
+            "description": "简明记忆标题。"
+          },
+          "content": {
+            "type": "string",
+            "minLength": 1,
+            "description": "需要记住的内容、依据和适用限制。"
+          },
+          "potential_questions": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "description": "以后可以由该记忆回答的问题。"
+          },
+          "tags": {
+            "type": "array",
+            "maxItems": 5,
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "description": "至多五个检索标签。"
+          },
+          "scores": {
+            "type": "object",
+            "required": [
+              "temporality",
+              "actionability",
+              "perference",
+              "origin",
+              "emotion",
+              "relevance",
+              "connectivity"
+            ],
+            "properties": {
+              "temporality": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1,
+                "description": "长期有效程度。"
+              },
+              "actionability": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1,
+                "description": "可用于行动的程度。"
+              },
+              "perference": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1,
+                "description": "用户明确偏好强度。"
+              },
+              "origin": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1,
+                "description": "来源可信度。"
+              },
+              "emotion": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1,
+                "description": "情绪关联强度。"
+              },
+              "relevance": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1,
+                "description": "对用户或任务的重要性。"
+              },
+              "connectivity": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1,
+                "description": "与其他知识的关联程度。"
+              }
+            }
+          }
+        }
+      }
     }
   }
 }

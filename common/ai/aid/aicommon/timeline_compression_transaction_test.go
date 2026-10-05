@@ -45,7 +45,7 @@ func bindCompressionMock(t *testing.T, tl *Timeline, callback func(*AIRequest) (
 }
 
 func compressionMockSummary(summary string) string {
-	payload, _ := json.Marshal(map[string]string{"@action": "timeline-summary", "summary": summary})
+	payload, _ := json.Marshal(map[string]any{"@action": "timeline-summary", "summary": summary, "ratain_timeline_item_range": "", "memory_entities": []any{}})
 	return string(payload)
 }
 

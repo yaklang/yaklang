@@ -52,7 +52,7 @@ smokeHandler = func(w,body) {
     if "SMOKE_CALLER:timeline-compress" in prompt {
         assert !native
         w.Header().Set("Content-Type","text/event-stream")
-        smokeFrame(w,{"content":json.dumps({"@action":"timeline-summary","summary":"本次为 hostscan 本地兼容性模拟，不实际扫描。已启动的任务通过真实 read_file 读取 hostscan-source-sentinel。共享 Evidence 保留各任务发现；当前任务和验收进度以 PLAN STATUS 为准，继续完成剩余 DAG 并交付报告。"})},"stop")
+        smokeFrame(w,{"content":json.dumps({"@action":"timeline-summary","ratain_timeline_item_range":"","memory_entities":[],"summary":"本次为 hostscan 本地兼容性模拟，不实际扫描。已启动的任务通过真实 read_file 读取 hostscan-source-sentinel。共享 Evidence 保留各任务发现；当前任务和验收进度以 PLAN STATUS 为准，继续完成剩余 DAG 并交付报告。"})},"stop")
         w.Write("data: [DONE]\n\n")~; return
     }
     if "SMOKE_CALLER:liteforge[hostscan-result]" in prompt {

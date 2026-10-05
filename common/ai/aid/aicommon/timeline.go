@@ -25,6 +25,7 @@ type Timeline struct {
 	freezeCallbacks         timelineCallbackRegistry[TimelineFreezeResult]
 	compressFreezeCallbacks timelineCallbackRegistry[TimelineCompressFreezeEvent]
 	summaryCallbacks        timelineCallbackRegistry[TimelineSummaryEvent]
+	memoryCallbacks         timelineCallbackRegistry[TimelineMemoryEvent]
 	// Serializes runtime cache updates and their journal deltas across shared configs.
 	toolCacheMu sync.Mutex
 
@@ -39,6 +40,7 @@ type Timeline struct {
 	compressedHead *TimelineCompressedHead
 	// compressedHistory 仅用于追溯，不参与当前并列渲染
 	compressedHistory []*TimelineCompressedHistoryNode
+	sessionMemory     *timelineSessionMemory // shared session extraction ledger; compression input only
 	promotedState     *TimelinePromotedState
 	freezeState       *TimelineFreezeState
 	// Private framing key: persisted only in the internal Timeline snapshot.
@@ -223,6 +225,7 @@ func (m *Timeline) CopyReducibleTimelineWithMemory() *Timeline {
 		idToTimelineItem:      m.idToTimelineItem.Copy(),
 		compressedHead:        cloneTimelineCompressedHead(m.compressedHead),
 		compressedHistory:     cloneTimelineCompressedHistory(m.compressedHistory),
+		sessionMemory:         m.sessionMemory,
 		promotedState:         cloneTimelinePromotedState(m.promotedState),
 		freezeState:           cloneTimelineFreezeState(m.freezeState),
 		userInputBoundaryKey:  m.userInputBoundaryKey,
@@ -267,6 +270,7 @@ func (m *Timeline) createSubTimelineLocked(ids ...int64) *Timeline {
 	tl.bucketSizer = m.bucketSizer
 	tl.compressedHead = cloneTimelineCompressedHead(m.compressedHead)
 	tl.compressedHistory = cloneTimelineCompressedHistory(m.compressedHistory)
+	tl.sessionMemory = m.sessionMemory
 	for _, id := range ids {
 		ts, ok := m.idToTs.Get(id)
 		if !ok {
@@ -313,7 +317,7 @@ func (m *Timeline) SoftBindConfig(config AICallerConfigIf, aiCaller AICaller) {
 }
 
 func NewTimeline(ai AICaller, extraMetaInfo func() string) *Timeline {
-	return &Timeline{
+	tl := &Timeline{
 		extraMetaInfo:        extraMetaInfo,
 		ai:                   ai,
 		tsToTimelineItem:     omap.NewOrderedMap(map[int64]*TimelineItem{}),
@@ -324,6 +328,8 @@ func NewTimeline(ai AICaller, extraMetaInfo func() string) *Timeline {
 		userInputBoundaryKey: newUserInputBoundaryKey(),
 		branchTimeline:       false,
 	}
+	tl.sessionMemory = newTimelineSessionMemory(tl, nil)
+	return tl
 }
 
 func (m *Timeline) ExtraMetaInfo() string {

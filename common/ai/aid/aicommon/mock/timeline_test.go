@@ -12,7 +12,7 @@ type mockedAI struct{}
 
 func (*mockedAI) CallAI(*aicommon.AIRequest) (*aicommon.AIResponse, error) {
 	response := aicommon.NewUnboundAIResponse()
-	response.EmitOutputStream(strings.NewReader(`{"@action":"timeline-summary","summary":"Verified history; next step pending."}`))
+	response.EmitOutputStream(strings.NewReader(`{"@action":"timeline-summary","summary":"Verified history; next step pending.","ratain_timeline_item_range":"","memory_entities":[]}`))
 	response.Close()
 	return response, nil
 }

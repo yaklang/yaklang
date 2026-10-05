@@ -146,8 +146,7 @@ func TestTimelineCallbacksCompressionCommit(t *testing.T) {
 		body, err := io.ReadAll(firstReader)
 		require.NoError(t, err)
 		require.Equal(t, "verified findings; continue the next task", string(body))
-		require.NotNil(t, event.MemoryEntities)
-		require.Empty(t, event.MemoryEntities)
+		require.Empty(t, event.RetainedIDs)
 	})
 	tl.RegisterSummaryCallback("second", func(event TimelineSummaryEvent) {
 		order = append(order, "summary-second")
@@ -165,7 +164,7 @@ func TestTimelineCallbacksCompressionCommit(t *testing.T) {
 	require.Contains(t, summaryEvent.Prompt, "already frozen finding")
 	require.Contains(t, summaryEvent.Prompt, "new ordinary finding")
 	require.NotContains(t, summaryEvent.Prompt, "arrived during compression")
-	require.NotContains(t, summaryEvent.Prompt, "exact evidence", "existing compression excludes exact journals")
+	require.Contains(t, summaryEvent.Prompt, "exact evidence", "effective evidence informs extraction without being retired")
 	require.Contains(t, requestPrompt, summaryEvent.Prompt, "must capture the prompt actually used")
 	require.Contains(t, requestPrompt, summaryEvent.Instruction)
 	// Reader remains usable after the callback and is not exhausted by its peer.
@@ -198,6 +197,7 @@ func TestTimelineCallbacksFailedCompression(t *testing.T) {
 			tl.RegisterFreezeCallback("unexpected", func(TimelineFreezeResult) { t.Fatal("failed transaction") })
 			tl.RegisterCompressFreezeCallback("unexpected", func(TimelineCompressFreezeEvent) { t.Fatal("failed transaction") })
 			tl.RegisterSummaryCallback("unexpected", func(TimelineSummaryEvent) { t.Fatal("failed transaction") })
+			tl.RegisterMemoryCallback("unexpected", func(TimelineMemoryEvent) { t.Error("failed transaction emitted memory") })
 			options := compressionTestOptions()
 			options.Context = ctx
 			_, err := tl.CompressOnce(options)
@@ -286,6 +286,7 @@ func TestTimelineCallbacksDoNotPersistOrInherit(t *testing.T) {
 	parent.RegisterFreezeCallback("audit", func(TimelineFreezeResult) { t.Fatal("inherited freeze listener") })
 	parent.RegisterCompressFreezeCallback("audit", func(TimelineCompressFreezeEvent) { t.Fatal("inherited compress listener") })
 	parent.RegisterSummaryCallback("audit", func(TimelineSummaryEvent) { t.Fatal("inherited summary listener") })
+	parent.RegisterMemoryCallback("audit", func(TimelineMemoryEvent) { t.Fatal("inherited memory listener") })
 	after, err := MarshalTimeline(parent)
 	require.NoError(t, err)
 	require.Equal(t, string(before), string(after), "listeners do not alter persisted state or cache inputs")
@@ -302,6 +303,7 @@ func TestTimelineCallbacksDoNotPersistOrInherit(t *testing.T) {
 		require.Empty(t, detached.itemInputCallbacks.snapshot())
 		require.Empty(t, detached.compressFreezeCallbacks.snapshot())
 		require.Empty(t, detached.summaryCallbacks.snapshot())
+		require.Empty(t, detached.memoryCallbacks.snapshot())
 	}
 	require.Empty(t, inputs)
 	_, err = fork.MergeBack()
@@ -350,8 +352,11 @@ func ExampleTimeline_RegisterItemInputCallback() {
 	})
 	tl.RegisterSummaryCallback("memory-batch", func(event TimelineSummaryEvent) {
 		summary, _ := io.ReadAll(event.Summary)
-		// MemoryEntities stays []any{} until memory extraction is implemented.
-		_, _, _ = strings.TrimSpace(string(summary)), event.Prompt, event.MemoryEntities
+		_, _, _ = strings.TrimSpace(string(summary)), event.Prompt, event.RetainedIDs
+	})
+	tl.RegisterMemoryCallback("memory-batch", func(event TimelineMemoryEvent) {
+		// Enqueue candidates for storage independently of summary consumers.
+		_, _ = event.MemoryEntities, event.Err
 	})
 	tl.PushText(1, "verified observation")
 	tl.FreezeAll()

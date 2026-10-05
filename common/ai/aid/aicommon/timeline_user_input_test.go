@@ -54,7 +54,7 @@ func TestTimelineUserClarificationSurvivesCompressionAndRestore(t *testing.T) {
 				require.Empty(t, before, "an Open answer must be promoted by compression itself")
 			}
 			bindCompressionMock(t, cfg.Timeline, func(req *AIRequest) (string, error) {
-				require.NotContains(t, req.GetPrompt(), "EXACT_CLARIFICATION", "user answers must bypass lossy summarization")
+				require.Contains(t, req.GetPrompt(), "EXACT_CLARIFICATION", "user answers inform extraction and remain independently preserved")
 				return compressionMockSummary("execution state summarized"), nil
 			})
 			result, err := cfg.Timeline.CompressOnce(compressionTestOptions())

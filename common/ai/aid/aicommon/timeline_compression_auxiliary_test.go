@@ -36,13 +36,21 @@ func registerTimelineTestLiteForge(t testing.TB) {
 			require.True(t, g.GetLiteForgeDisableTimeline(), "the snapshot is the only history source")
 			require.Equal(t, timelineCompressionInstruction, g.GetLiteForgeStaticInstruction())
 		}
-		request := NewAIRequest(NewGeneralKVConfig(req.Options...).GetLiteForgeStaticInstruction()+"\n"+prompt+"\n"+req.OutputSchema,
-			NewGeneralKVConfig(req.Options...).GetExtraRequestOpts()...)
+		requestPrompt := prompt
+		if req.ResponseHandler == nil {
+			requestPrompt = NewGeneralKVConfig(req.Options...).GetLiteForgeStaticInstruction() + "\n" + prompt + "\n" + req.OutputSchema
+		}
+		request := NewAIRequest(requestPrompt, NewGeneralKVConfig(req.Options...).GetExtraRequestOpts()...)
 		response, err := cfg.CallAI(request)
 		if err != nil {
 			return nil, err
 		}
-		action, err := ExtractValidActionFromStream(req.Context, response.GetUnboundStreamReader(false), req.OutputActionName)
+		var action *Action
+		if req.ResponseHandler != nil {
+			action, err = req.ResponseHandler(response)
+		} else {
+			action, err = ExtractValidActionFromStream(req.Context, response.GetUnboundStreamReader(false), req.OutputActionName)
+		}
 		if err != nil {
 			return nil, err
 		}

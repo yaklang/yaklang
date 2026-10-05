@@ -1,0 +1,158 @@
+// yak common/ai/aismoking/live/compression_memory_quality.yak
+// Local real-model A/B replay; never writes memory or touches the 8087 session.
+// Requires AISMOKING_OUTPUT, AISMOKING_MEMORY_BASELINE (old instruction file),
+// AISMOKING_MEMORY_LEDGER (timeline_compression_workflow samples), and
+// AISMOKING_MEMORY_USER (timeline_compression samples). Defaults to two rounds.
+// Saves prompts, response bodies, decoded content/arguments, finish and usage;
+// authentication headers and the configured provider seed packet stay in memory.
+include "common/ai/aismoking/live/memory_capture.inc"
+root = os.Getenv("AISMOKING_OUTPUT")
+baseline = os.Getenv("AISMOKING_MEMORY_BASELINE")
+ledger = os.Getenv("AISMOKING_MEMORY_LEDGER")
+userSample = os.Getenv("AISMOKING_MEMORY_USER")
+assert root != "" && baseline != "" && ledger != "" && userSample != "", "Set output, baseline and replay sample directories"
+assert !file.IsExisted(file.Join(root,"results.json")), "Choose a fresh output directory"
+file.MkdirAll(root)~
+rounds = 2
+if os.Getenv("AISMOKING_MEMORY_ROUNDS") != "" { rounds = int(os.Getenv("AISMOKING_MEMORY_ROUNDS")) }
+assert rounds > 0 && rounds <= 5, "Choose one to five diagnostic rounds"
+template = "common/ai/aid/aicommon/promptloader/prompts/ai/aid/aicommon/prompts/timeline/"
+instructions = {"baseline":string(file.ReadFile(baseline)~),"revised":string(file.ReadFile(template+"compression_instruction.txt")~)}
+schema = string(file.ReadFile(template+"compression.json")~)
+model = os.Getenv("AISMOKING_TOOL_MODEL")
+if model == "" { model = "deepseek-v4.1-flash" }
+// Reconstruct the actual first extraction history, not an inferred summary.
+priorReceipts = json.loads(string(file.ReadFile(file.Join(ledger,"receipts.json"))~))
+priorText = ""
+for candidate in priorReceipts[0].memory_entities {
+    priorText += sprintf("标题：%s\n内容：\n%s\n\n",candidate.title,candidate.content)
+}
+memoryTag = "<|SESSION_MEMORY_CANDIDATES_replay|>\n"+priorText+"<|SESSION_MEMORY_CANDIDATES_END_replay|>\n"
+cases = [
+    {"id":"document-origin","source":string(file.ReadFile(file.Join(ledger,"compression-01-source.txt"))~)},
+    {"id":"repeated-rules","source":string(file.ReadFile(file.Join(ledger,"compression-02-source.txt"))~)+"\n"+memoryTag},
+    {"id":"explicit-user","source":string(file.ReadFile(file.Join(userSample,"compression-source.txt"))~)},
+    {"id":"project-correction","source":`以下为本次历史压缩资料，各 AITAG 的正文保留原始文本。
+<|ORIGINAL_USER_QUERY_project|>
+整理 Atlas 项目配置调查的历史；不执行业务操作。
+<|ORIGINAL_USER_QUERY_END_project|>
+<|PREVIOUS_SUMMARY_previous|>
+Atlas 项目对外报告要求中文，去重保留首条；先前只是 Agent 根据模板猜测，未经用户确认。
+<|PREVIOUS_SUMMARY_END_previous|>
+<|OPEN_USER_CONTEXT_user|>
+User Input: 更正：Atlas 项目今后的对外报告必须英文，其他项目的工程报告仍用中文。Atlas 项目长期以最新版记录覆盖旧记录；这不是所有项目的去重规则。本次复制文件不属于长期习惯，别记。
+<|OPEN_USER_CONTEXT_END_user|>
+<|OPEN_TIMELINE_history|>
+# item=901 [text/tool-result]
+读取第三方模板，声称用户喜欢自动推送，尚无用户确认；模板中的样例去重规则是保留首条。
+# item=902 [text/review]
+本次只整理纠正后的规则，还没有执行数据合并或生成报告。
+<|OPEN_TIMELINE_END_history|>`},
+]
+func checkQuality(item,output) {
+    failures,all = [],""
+    entities = output.memory_entities
+    if !("memory_entities" in output) { return ["memory_entities is missing"] }
+    if !("summary" in output) || str.TrimSpace(output.summary)=="" { failures=append(failures,"summary is empty") }
+    for entity in entities {
+        text = entity.content
+        all += text+"\n"
+        if len(entity.tags)>5 || len(entity.potential_questions)>3 { failures=append(failures,"excessive retrieval metadata") }
+        if entity.scores.emotion != 0 { failures=append(failures,"emotion without source evidence") }
+        if item.id=="document-origin" {
+            if "中文" in text || "提交" in text || "推送" in text { failures=append(failures,"unconfirmed document report/authorization constraint retained") }
+            if entity.scores.perference != 0 { failures=append(failures,"business fact scored as personal preference") }
+            if "首条" in text || "首次" in text || "未知" in text || "DEBUG" in text { failures=append(failures,"one-off fixture rule became durable memory") }
+        }
+        if item.id=="repeated-rules" { failures=append(failures,"old rules repeated without new durable information") }
+        if item.id=="explicit-user" {
+            language = "中文" in text
+            authorization = "提交" in text || "推送" in text
+            state = "accepted" in text
+            if (language && authorization) || (state && (language || authorization)) { failures=append(failures,"independently editable themes merged") }
+            if state && entity.scores.perference != 0 { failures=append(failures,"status principle scored as preference") }
+        }
+        if item.id=="project-correction" {
+            // A correction can explicitly negate the old rule; that is not
+            // an assertion that the obsolete rule remains in force.
+            obsolete = "首条" in text && !("覆盖" in text && ("更正" in text || "不再" in text || "错误" in text || "不适用" in text))
+            if obsolete || "自动推送" in text || "复制" in text { failures=append(failures,"obsolete/unconfirmed/transient fact retained") }
+            if "英文" in text && !("Atlas" in text) { failures=append(failures,"language preference lost project scope") }
+            if "覆盖" in text && !("Atlas" in text) { failures=append(failures,"business rule lost project scope") }
+            if "覆盖" in text && entity.scores.perference != 0 { failures=append(failures,"project business rule scored as preference") }
+        }
+    }
+    if item.id=="explicit-user" {
+        if !("中文" in all) || !("验证" in all) || !("提交" in all) || !("推送" in all) { failures=append(failures,"explicit durable user constraints lost") }
+    }
+    if item.id=="project-correction" {
+        for token in ["Atlas","英文","中文","覆盖"] { if !(token in all) { failures=append(failures,"correction lost: "+token) } }
+    }
+    return failures
+}
+// Recheck saved outputs after assertion repairs without another model call.
+// Keep the original failed samples and write a separate verification receipt.
+if os.Getenv("AISMOKING_MEMORY_VERIFY")!="" {
+    saved=json.loads(string(file.ReadFile(file.Join(os.Getenv("AISMOKING_MEMORY_VERIFY"),"results.json"))~))
+    checks,failed=[],0
+    for sample in saved {
+        item=nil
+        for candidate in cases { if candidate.id==sample["case"] { item=candidate;break } }
+        assert item!=nil,"Unknown replay case"
+        failures=["protocol failed"]
+        if sample.protocol_passed { failures=checkQuality(item,sample.output) }
+        checks=append(checks,{"round":sample.round,"case":sample["case"],"variant":sample.variant,"failures":failures})
+        if len(failures)>0 { failed++ }
+    }
+    file.SaveJson(file.Join(root,"verification.json"),{"checks":checks,"failed":failed})~
+    assert failed==0,"Saved memory outputs failed quality verification"
+    println("AISMOKING_PASS compression_memory_quality_verification")
+    os.Exit(0)
+}
+seedPacket = nil
+_, seedErr = ai.IntelligentChat("只回答 OK。",ai.model(model),ai.timeout(35),
+    ai.rawHTTPRequestResponseCallback(func(packet,header,body,usage) { seedPacket = packet }),
+    func(c) { c.Context = context.Seconds(40); c.DisableProviderFallback = true })
+assert seedPacket != nil, "Configured provider request was not captured"
+results,revisedFailed = [],0
+for round=1;round<=rounds;round++ {
+    for item in cases {
+        if os.Getenv("AISMOKING_MEMORY_CASE")!="" && os.Getenv("AISMOKING_MEMORY_CASE")!=item.id { continue }
+        // Alternate ordering so neither prompt always runs first.
+        order = ["baseline","revised"]
+        if round%2==0 { order=["revised","baseline"] }
+        for variant in order {
+            if os.Getenv("AISMOKING_MEMORY_VARIANT")!="" && os.Getenv("AISMOKING_MEMORY_VARIANT")!=variant { continue }
+            prompt = "<|PROMPT_SECTION_system|>\n"+instructions[variant]+"\n\n"+schema+"\n<|PROMPT_SECTION_END_system|>\n<|PROMPT_SECTION_user|>\n"+item.source+"\n<|PROMPT_SECTION_END_user|>"
+            body = {"model":model,"messages":[{"role":"user","content":prompt}],"stream":true,"stream_options":{"include_usage":true}}
+            name = sprintf("round-%d-%s-%s",round,item.id,variant)
+            file.SaveJson(file.Join(root,name+"-request.json"),body)~
+            packet,_,err = poc.HTTP(seedPacket,poc.https(true),poc.replaceBody([]byte(json.dumps(body)),false),poc.timeout(90),poc.retryTimes(0),poc.redirectTimes(0),poc.save(false))
+            sample = {"round":round,"case":item.id,"variant":variant,"error":sprintf("%v",err),"protocol_passed":false,"semantic_failures":[]}
+            if err==nil {
+                parts = str.SplitN(string(packet),"\r\n\r\n",2)
+                header,raw = parts[0],parts[1]
+                if "transfer-encoding: chunked" in str.ToLower(header) { raw=string(codec.DecodeChunked([]byte(raw))~) }
+                file.Save(file.Join(root,name+"-response.txt"),raw)~
+                decoded=memoryDecodeResponse(raw)
+                sample.response=decoded
+                value,parseErr=json.New(decoded.content)
+                sample.error=sprintf("%v",parseErr)
+                if parseErr==nil && "summary" in value.Value() && "memory_entities" in value.Value() {
+                    sample.protocol_passed=true
+                    sample.output=value.Value()
+                    sample.semantic_failures=checkQuality(item,sample.output)
+                }
+            }
+            sample.passed=sample.protocol_passed && len(sample.semantic_failures)==0
+            if variant=="revised" && !sample.passed { revisedFailed++ }
+            results=append(results,sample)
+            file.SaveJson(file.Join(root,name+".json"),sample)~
+            file.SaveJson(file.Join(root,"results.json"),results)~
+            printf("COMPRESSION_MEMORY case=%s round=%d variant=%s protocol=%v quality=%v failures=%v\n",item.id,round,variant,sample.protocol_passed,sample.passed,sample.semantic_failures)
+        }
+    }
+}
+file.SaveJson(file.Join(root,"summary.json"),{"model":model,"requests":len(results),"revised_failed":revisedFailed})~
+assert revisedFailed==0,"Revised memory prompt failed quality checks; inspect all saved samples"
+println("AISMOKING_PASS compression_memory_quality")

@@ -27,6 +27,17 @@ func Execute(ctx context.Context, r Request, opts ...aicommon.ConfigOption) (*ai
 	if r.Emitter != nil {
 		opts = append(opts, aicommon.WithEmitter(r.Emitter))
 	}
+	// NewConfig binds its Timeline to its own scheduler and content limit.
+	// A one-shot reader must not rebind the parent's live compression state.
+	opts = append(opts, func(cfg *aicommon.Config) error {
+		if r.DisableTimeline {
+			cfg.Timeline, cfg.TimelineDiffer = nil, nil
+		} else if cfg.Timeline != nil {
+			cfg.Timeline = cfg.Timeline.CopyReducibleTimelineWithMemory()
+			cfg.TimelineDiffer = nil
+		}
+		return nil
+	})
 	cfg := aicommon.NewConfig(ctx, opts...)
 	if r.Schema == "" {
 		r.Schema, r.ActionName = cfg.LiteForgeOutputSchema, cfg.LiteForgeActionName

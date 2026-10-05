@@ -21,21 +21,16 @@ func TestTimelineCompressionSummaryPrompt(t *testing.T) {
 		Text: "[FUNCTION_CALL_ACTION_RESPONSE]:\naccepted", PromptText: replay})
 	snapshot, err := tl.buildCompressionSnapshot()
 	require.NoError(t, err)
-	snapshot.RetainedContext = map[string]string{"user_query": "current task"}
+	snapshot.RetainedContext = map[string]string{"user_query": "current task", "task_instruction": "FRAMEWORK_RULES_NOT_HISTORY"}
 	prompt, err := renderCompressionSummaryPrompt(snapshot)
 	require.NoError(t, err)
-	// Decode the actual source document: every byte of ordinary history occurs
-	// in exactly one region; the old head is included, exact journals are not.
-	var source struct {
-		Previous string            `json:"previous_summary"`
-		Older    string            `json:"history_to_summarize"`
-		Retained map[string]string `json:"retained_context"`
-	}
-	require.NoError(t, json.Unmarshal([]byte(prompt[strings.Index(prompt, "{\n"):]), &source))
-	require.Equal(t, snapshot.Head.Text, source.Previous)
-	require.Equal(t, aiprojection.RedactNonce(renderCompressionSnapshotItems(snapshot.Items)), source.Older)
-	require.Equal(t, "current task", source.Retained["user_query"])
-	require.NotContains(t, prompt, "EXACT_EVIDENCE")
+	require.Contains(t, prompt, compressionSourceTag("PREVIOUS_SUMMARY", snapshot.Head.Text))
+	require.Contains(t, prompt, compressionSourceTag("ORIGINAL_USER_QUERY", "current task"))
+	require.Contains(t, prompt, "FROZEN_TIMELINE_")
+	require.Contains(t, prompt, "OPEN_TIMELINE_")
+	require.Contains(t, prompt, "EXACT_EVIDENCE")
+	require.NotContains(t, prompt, "FRAMEWORK_RULES_NOT_HISTORY")
+	require.NotContains(t, prompt, "TASK_INSTRUCTION")
 	require.NotContains(t, prompt, "EXACT_SCHEMA")
 	require.NotContains(t, prompt, aiprojection.Nonce())
 	// Historical native calls must not turn into assistant/tool messages in
@@ -47,8 +42,8 @@ func TestTimelineCompressionSummaryPrompt(t *testing.T) {
 	for _, message := range projected.Messages {
 		require.Equal(t, "user", message.Role)
 	}
-	require.Contains(t, source.Older, "call_a")
-	require.Contains(t, source.Older, "call_b")
+	require.Contains(t, prompt, "call_a")
+	require.Contains(t, prompt, "call_b")
 	_, err = renderCompressionSummaryPrompt(nil)
 	require.Error(t, err)
 	snapshot.Head, snapshot.Items = nil, nil
@@ -89,7 +84,7 @@ func TestTimelineCompressionSummarySingleRequest(t *testing.T) {
 					case "control_token":
 						summary = aiprojection.CreateTag("FUNCTION_CALL_ACTION_RESPONSE", "", "[]")
 					}
-					payload, err := json.Marshal(map[string]any{"@action": "timeline-summary", "summary": summary})
+					payload, err := json.Marshal(map[string]any{"@action": "timeline-summary", "summary": summary, "ratain_timeline_item_range": "", "memory_entities": []any{}})
 					require.NoError(t, err)
 					if mode == "invalid_json" {
 						payload = []byte("no structured result")

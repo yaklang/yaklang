@@ -1,0 +1,127 @@
+// yak common/ai/aismoking/live/timeline_compression.yak
+// Runs the production before-prompt compression through aim.InvokeReAct.
+// Synthetic history, real configured model; no user task on 8087 is touched.
+// AISMOKING_OUTPUT is required; AISMOKING_TOOL_MODEL defaults to deepseek-v4.1-flash.
+// Saves request bodies and responses, never authentication headers or seedPacket.
+include "common/ai/aismoking/live/memory_capture.inc"
+root = os.Getenv("AISMOKING_OUTPUT")
+assert root != "", "Set AISMOKING_OUTPUT to a fresh sample directory"
+assert !file.IsExisted(file.Join(root,"result.json")), "Choose a fresh sample directory"
+file.MkdirAll(root)~
+model = os.Getenv("AISMOKING_TOOL_MODEL")
+if model == "" { model = "deepseek-v4.1-flash" }
+seedPacket = nil
+_, seedErr = ai.IntelligentChat("只回答 OK。",ai.model(model),ai.timeout(35),
+    ai.rawHTTPRequestResponseCallback(func(packet,header,body,usage) { seedPacket = packet }),
+    func(c) { c.Context = context.Seconds(40); c.DisableProviderFallback = true })
+assert seedPacket != nil, "Configured provider request was not captured"
+port = os.GetRandomAvailableTCPPort()
+base = "http://" + str.HostPort("127.0.0.1",port)
+mu = sync.NewMutex()
+requests, receipts = [], []
+memoryCompleted = 0
+runtimeConfig = nil
+go httpserver.Serve("127.0.0.1",port,httpserver.context(context.Seconds(240)),httpserver.handler(func(w,req) {
+    if req.URL.Path == "/ready" { w.Write("ready"); return }
+    body = json.loads(string(io.ReadAll(req.Body)~))
+    mu.Lock()
+    seq = len(requests)+1
+    row = {"seq":seq,"native":("tools" in body && len(body.tools)>0),"compression":false}
+    requests = append(requests,row)
+    mu.Unlock()
+    texts = []
+    for message in body.messages {
+        if message.content != nil { texts = append(texts,string(message.content)) }
+    }
+    prompt = str.Join(texts,"\n\n")
+    row.compression = "ratain_timeline_item_range" in prompt && "FROZEN_TIMELINE_" in prompt
+    file.SaveJson(file.Join(root,sprintf("request-%03d.json",seq)),body)~
+    file.Save(file.Join(root,sprintf("prompt-%03d.txt",seq)),prompt)~
+    response,_,relayErr = poc.HTTP(seedPacket,poc.https(true),poc.replaceBody([]byte(json.dumps(body)),false),
+        poc.timeout(75),poc.retryTimes(0),poc.redirectTimes(0),poc.save(false))
+    if relayErr != nil { w.WriteHeader(502); w.Write("Provider transport failed"); return }
+    split = str.SplitN(string(response),"\r\n\r\n",2)
+    header,raw = split[0],split[1]
+    if "transfer-encoding: chunked" in str.ToLower(header) { raw = string(codec.DecodeChunked([]byte(raw))~) }
+    decoded = memoryDecodeResponse(raw)
+    row.finish_reason = decoded.finish_reason
+    file.SaveJson(file.Join(root,sprintf("response-%03d.json",seq)),decoded)~
+    file.Save(file.Join(root,sprintf("response-%03d.sse",seq)),raw)~
+    if row.compression { file.Save(file.Join(root,"compression-output.json"),decoded.content)~ }
+    file.SaveJson(file.Join(root,"requests.json"),requests)~
+    status = parseInt(str.Split(str.Split(header,"\r\n")[0]," ")[1])
+    w.Header().Set("Content-Type","text/event-stream")
+    w.WriteHeader(status)
+    w.Write(raw)~
+}))
+for i=0;i<100;i++ { _,err=http.Get(base+"/ready"); if err==nil { break }; time.Sleep(0.02) }
+opts = [ai.model(model),ai.apiKey("local-diagnostic-relay"),ai.baseURL(base+"/v1/chat/completions"),ai.noHttps(true),ai.timeout(80),func(c) { c.DisableProviderFallback = true }]
+task = "请根据 Timeline 中配置合并调查的结果，给出简洁中文状态报告。明确已验证范围、仍待关联的调用和下一步，不把 accepted 当作成功。今后的工程报告也应使用中文并写明实际验证结果；未经明确要求不要提交代码。只总结现有材料，不调用工具、不执行命令、不访问业务网络。"
+runErr = aim.InvokeReAct(task,aim.aiConfig("openai",opts...),aim.speedPriorityAIConfig("openai",opts...),aim.qualityPriorityAIConfig("openai",opts...),
+    aim.sessionID("compression-sample-"+randstr(12)),aim.context(context.Seconds(210)),aim.timeout(210),aim.workdir(root),
+    aim.reviewPolicy("yolo"),aim.timelineContentLimit(1),aim.allowUserInteract(false),aim.maxIteration(5),aim.disableMCPServers(true),aim.disableAIForge(true),
+    aim.configOptions(aiagent.functionCallMode(true),aiagent.timelineContentLimit(1),func(c) {
+        c.DisableCreateDBRuntime,c.DisablePerception,c.DisableMemoryTriage = true,true,true
+        c.AiAutoRetry,c.AiTransactionAutoRetry = 1,2
+        return nil
+    }),aim.onEvent(func(op,event) {
+        if event.NodeId != "react_task_enqueue" || runtimeConfig != nil { return }
+        c = op.GetConfig()
+        runtimeConfig = c
+        tl = c.GetTimeline()
+        tl.SetTimelineBucketByteSize(-1)
+        c.AppendUserInputHistory("今后的工程报告都使用中文，附实际验证结果；没有明确要求不要提交或推送。",time.Now())~
+        tl.PushText(c.AcquireId(),"[review]: 已定位 merge.go 中显式空值被默认值覆盖。已修改内部判断，公开接口保持不变；尚未提交代码。")
+        tl.PushText(c.AcquireId(),"[tool-result]: 顶层空值、缺失值、正常值验证通过。报告路径 C:\\repo\\artifacts\\config-tests.txt。")
+        tl.FreezeAll()
+        tl.PushPromotable(c.AcquireId(),"session-evidence","semi-dynamic-1","config.top-level","upsert",json.dumps({"id":"config.top-level","content":"顶层三类输入已验证通过；嵌套验证只有 accepted，尚无执行结果。"}))
+        tl.PushText(c.AcquireId(),"[MODEL_THINKING]: SMOKE_THOUGHT_MUST_NOT_APPEAR")
+        tl.PushText(c.AcquireId(),"[ITERATION]: SMOKE_ITERATION_MUST_NOT_APPEAR")
+        tl.PushText(c.AcquireId(),"[tool-result]: 嵌套验证 call_nested_7 仅 accepted，结果未到。保留该 ID 以关联后续回执；不能认定嵌套验证成功。")
+        tl.SetTimelineContentLimit(1)
+        tl.RegisterSummaryCallback("sample",func(event) {
+            summary = string(io.ReadAll(event.Summary)~)
+            receipt = {"through_id":event.ThroughID,"summary":summary,"retained_ids":event.RetainedIDs,"retained_range":event.RetainedRange,"memory_entities":[]}
+            mu.Lock()
+            receipts = append(receipts,receipt)
+            mu.Unlock()
+            file.Save(file.Join(root,"compression-source.txt"),event.Prompt)~
+            file.Save(file.Join(root,"compression-instruction.txt"),event.Instruction)~
+            file.SaveJson(file.Join(root,"receipts.json"),receipts)~
+            // Keep this diagnostic to one compression, followed by a real loop.
+            tl.SetTimelineContentLimit(100000)
+        })
+        tl.RegisterMemoryCallback("sample",func(event) {
+            mu.Lock()
+            defer mu.Unlock()
+            for receipt in receipts {
+                if receipt.through_id == event.ThroughID {
+                    receipt.memory_entities = event.MemoryEntities
+                    receipt.memory_error = sprintf("%v",event.Err)
+                    memoryCompleted++
+                }
+            }
+            file.SaveJson(file.Join(root,"receipts.json"),receipts)~
+        })
+        tl.RegisterCompressFreezeCallback("sample",func(event) {
+            file.SaveJson(file.Join(root,"compression-commit.json"),event.Compression)~
+        })
+    }),func(c) { c.Stateless = true })
+for i=0;i<1000;i++ {
+    mu.Lock(); complete = memoryCompleted == len(receipts); mu.Unlock()
+    if complete { break }; time.Sleep(0.05)
+}
+if runtimeConfig != nil { file.Save(file.Join(root,"final-timeline.txt"),runtimeConfig.GetTimeline().DumpForPrompt())~ }
+passed = runErr == nil && len(receipts) == 1 && memoryCompleted == 1 && receipts[0].memory_error == "<nil>"
+file.SaveJson(file.Join(root,"result.json"),{"passed":passed,"error":sprintf("%v",runErr),"model":model,"compressions":len(receipts),"requests":len(requests)})~
+printf("TIMELINE_COMPRESSION passed=%v model=%s requests=%d compressions=%d root=%s\n",passed,model,len(requests),len(receipts),root)
+assert passed,"Production compression failed; inspect saved request and response samples"
+source = string(file.ReadFile(file.Join(root,"compression-source.txt"))~)
+assert !("TASK_INSTRUCTION" in source),"Framework instructions leaked into compression source"
+assert !("SMOKE_THOUGHT_MUST_NOT_APPEAR" in source) && !("SMOKE_ITERATION_MUST_NOT_APPEAR" in source),"Compression included thought or iteration noise"
+assert "ORIGINAL_USER_QUERY_" in source && "FROZEN_USER_CONTEXT_" in source && "SESSION_EVIDENCE_" in source && "FROZEN_TIMELINE_" in source && "OPEN_TIMELINE_" in source
+assert len(receipts[0].memory_entities)>0,"Expected the explicit durable report preference"
+for entity in receipts[0].memory_entities {
+    assert !("call_nested_7" in entity.content) && !("config-tests.txt" in entity.content),"Temporary progress was extracted as durable memory"
+}
+println("AISMOKING_PASS timeline_compression")

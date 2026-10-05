@@ -31,7 +31,7 @@ func (c *compressionBeforePromptConfig) ScheduleAuxiliaryTask(ctx context.Contex
 	builder func() string, result func(*aicommon.Action), opts ...aicommon.AuxiliaryTaskOption) {
 	c.calls++
 	c.prompt = builder()
-	action, err := aicommon.ExtractValidActionFromStream(ctx, strings.NewReader(`{"@action":"timeline-summary","summary":"COMPACTED_BEFORE_ASSEMBLY"}`), "timeline-summary")
+	action, err := aicommon.ExtractValidActionFromStream(ctx, strings.NewReader(`{"@action":"timeline-summary","summary":"COMPACTED_BEFORE_ASSEMBLY","ratain_timeline_item_range":"","memory_entities":[]}`), "timeline-summary")
 	if err == nil {
 		result(action)
 	}
@@ -53,7 +53,8 @@ func TestTimelineCompressionBeforeLoopPrompt(t *testing.T) {
 	require.Equal(t, 1, cfg.calls)
 	require.Contains(t, cfg.prompt, "ORIGINAL_HISTORY")
 	require.Contains(t, cfg.prompt, "CURRENT_QUERY")
-	require.Contains(t, cfg.prompt, "CURRENT_INSTRUCTION")
+	require.NotContains(t, cfg.prompt, "CURRENT_INSTRUCTION")
+	require.NotContains(t, cfg.prompt, "TASK_INSTRUCTION")
 	require.Contains(t, cfg.prompt, "FROZEN_USER_CONTEXT")
 	view := aicommon.RenderTimelineFrozenOpen(cfg.Timeline)
 	require.Contains(t, view.Frozen, "COMPACTED_BEFORE_ASSEMBLY")

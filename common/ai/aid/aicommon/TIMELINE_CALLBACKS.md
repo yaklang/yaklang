@@ -1,84 +1,79 @@
 # Timeline 监听回调
 
-本轮只提供监听基础设施。回调不负责记忆抽取、存储或检索；压缩模型、输出 schema、提示词和调度策略沿用当前实现。`MemoryEntities` 暂时为 `[]any{}`。
+在 session Timeline 上注册监听。摘要提交与记忆候选生成是两个独立节点：模型完成 `summary` 和 `ratain_timeline_item_range` 后，Timeline 校验并原子提交，主循环即可继续；同一次请求随后完成 `memory_entities`，通过独立订阅交给消费者。这里不写入记忆库。
 
 ## 注册接口
 
-在需要监听的 session Timeline 上直接注册：
-
 ```go
-timeline.RegisterItemInputCallback("memory", func(event aicommon.TimelineItemInputEvent) {
-    // 将不可变的输入快照交给后续消费者。
-    // event.ID / event.Timestamp / event.ItemJSON
+timeline.RegisterItemInputCallback("consumer", func(event aicommon.TimelineItemInputEvent) {
+    // 已提交的输入快照：ID、Timestamp、ItemJSON。
 })
-
-timeline.RegisterFreezeCallback("memory", func(event aicommon.TimelineFreezeResult) {
-    // 本次新冻结的 ID，以及原样提升的用户输入、evidence、工具缓存变更。
-    // event.Version / event.ThroughID / event.NewlyFrozenIDs / event.Promotions
+timeline.RegisterFreezeCallback("consumer", func(event aicommon.TimelineFreezeResult) {
+    // NewlyFrozenIDs、Promotions 是本次新冻结内容。
 })
-
-timeline.RegisterCompressFreezeCallback("memory", func(event aicommon.TimelineCompressFreezeEvent) {
-    // 一次原子提交的冻结收据和压缩结果。
-    // event.Freeze / event.Compression
+timeline.RegisterCompressFreezeCallback("consumer", func(event aicommon.TimelineCompressFreezeEvent) {
+    // Freeze 冻结收据 + Compression 摘要/保留原文提交收据。
 })
-
-timeline.RegisterSummaryCallback("memory", func(event aicommon.TimelineSummaryEvent) {
+timeline.RegisterSummaryCallback("next-loop", func(event aicommon.TimelineSummaryEvent) {
     summary, err := io.ReadAll(event.Summary)
     if err != nil {
         return
     }
-    // summary: 已提交的完整摘要。
-    // event.Prompt: 本次实际使用的压缩正文，包含旧摘要、待总结历史、RetainedContext。
-    // event.Instruction: 静态压缩指令。
-    // event.MemoryEntities: 当前始终为空，后续才接入记忆候选内容。
-    _, _, _, _ = summary, event.Prompt, event.Instruction, event.MemoryEntities
+    // 摘要已提交。RetainedIDs / RetainedRange 对应原样保留的普通 item。
+    // ThroughID 是本次处理边界；Prompt / Instruction 是请求资料与静态指令。
+    _, _, _ = summary, event.RetainedIDs, event.RetainedRange
+})
+timeline.RegisterMemoryCallback("memory-storage", func(event aicommon.TimelineMemoryEvent) {
+    if event.Err != nil {
+        // 记录或交给上层处理；摘要和保留原文不回滚。
+        return
+    }
+    // 向存储消费者入队 event.MemoryEntities（[]any）；本层不负责落库。
+    // 使用 event.ThroughID 关联对应摘要，避免误用当前 Timeline 状态。
 })
 ```
 
-同一种事件里，相同 ID 的注册替换原回调；传入 `nil` 注销。不同事件的 ID 互不影响：
+同一种事件里，相同 ID 替换原回调；传入 `nil` 注销。不同事件的 ID 互不影响：
 
 ```go
-timeline.RegisterSummaryCallback("memory", nil)
+timeline.RegisterMemoryCallback("memory-storage", nil)
 ```
 
-## 事件时机与内容
+## 通知时机
 
 | 操作 | 通知 |
 | --- | --- |
-| 文本、工具结果、用户交互、当前任务输入、evidence / 工具缓存写入 | 完整写入提交后，逐 item 通知 input |
-| 分支合并 | 仅通知本次真正写入父 Timeline 的 item，包含分支摘要条目 |
-| `Freeze` / `FreezeAll` | 有新冻结内容时通知 freeze；空操作不通知 |
-| `CompressOnce` / 超阈值的 `CompressBeforePrompt` 成功 | 按顺序通知 freeze → compress-freeze → summary |
-| 只有原样保留内容的压缩提交 | 不调用 AI；通知 freeze 和 compress-freeze，无 summary |
-| 压缩已冻结历史，没有新冻结 item | 通知 compress-freeze 和生成的 summary，无普通 freeze |
-| 压缩失败、取消、快照过期，或未达到压缩阈值 | 不通知压缩成功事件 |
-| 复制、恢复、创建分支、导入旧用户历史或同步已有 session evidence | 不重放历史 input，也不继承监听者 |
+| 输入、工具结果、用户交互、evidence / 工具缓存写入 | 完整写入提交后逐 item 通知 input |
+| 分支合并 | 仅通知真正写入父 Timeline 的 item |
+| `Freeze` / `FreezeAll` | 有新冻结内容时通知 freeze |
+| 压缩的摘要与保留范围可用、快照校验通过 | 提交后按顺序通知 freeze → compress-freeze → summary |
+| 同一次压缩请求的完整响应结束 | 在摘要成功提交后，异步通知 memory；可为空候选或带 Err |
+| 只有原样提升内容的提交 | 无 AI 请求；通知 freeze、compress-freeze，无 summary / memory |
+| 压缩已冻结历史、没有新冻结 item | 通知 compress-freeze、summary，随后独立通知 memory |
+| 摘要无效、取消或快照过期，未能提交 | 不通知 summary / memory |
+| 复制、恢复、分支、导入历史或同步已有 evidence | 不重放历史，不继承监听者 |
 
-Input 的 `ItemJSON` 使用现有 `TimelineItem` 序列化，可以解码为独立的 `TimelineItem`，不暴露活跃 item 指针。它包含用户交互的回答和元信息、原始文本及 prompt projection、工具结果、原样提升的数据，避免普通展示省略 evidence 等内容。无法序列化的 item 会记录英文 warning，写入仍然成功。
+兼容旧的仅 `summary` 响应时，需要等完整对象解析后提交。常规响应先输出摘要和范围，因此不必等待记忆尾部。晚到的记忆解析错误、超预算、取消或与已提交摘要不一致，会通过 `TimelineMemoryEvent.Err` 报告，候选为空，不撤销摘要，也不会将失败尾部认作记忆。原始快照失效而未提交的请求不会产生记忆通知。
 
-Freeze 的 `Promotions` 是**本次新冻结**的原样变更，含删除记录，不是完整 evidence 库，也不是 AI 总结。Compression 的 `RetiredIDs` 则包含本次被摘要替换的旧 Frozen 和 Open 普通历史。压缩过程中追加的新 item 保持 Open，不进入这次收据或摘要。
+`ItemJSON` 使用已有 `TimelineItem` 序列化，包含交互回答、元信息、文本、工具结果和提升数据。`Promotions` 是本次新冻结的原样变更，包含删除记录；`RetiredIDs` 是被摘要替换的普通历史，`RetainedIDs` 是原样保留的普通历史。压缩期间新写入的 item 保持 Open。
 
-Summary 的 `io.Reader` 来自已校验并提交的摘要。每个监听者都有独立 reader，回调返回后仍然可读；一个监听者读完不会消耗另一个监听者的数据。这里没有提前暴露模型参数流，失败输出也不会作为成功摘要通知。
-
-`Prompt` 和 `Instruction` 是本次压缩请求的核心正文及指令，排除了传输协议外壳和重试纠正后缀。当前正文沿用普通历史压缩逻辑，**不会新加入原样 user input / evidence / 工具缓存 payload**；它们仍通过独立的提升机制保存。这次尚未实现未来的“历史 + evidence → memory”联合抽取。
+摘要 reader 和 ID 切片按监听者隔离，记忆候选深拷贝；一个消费者不会耗尽或改坏另一个消费者的数据。`Prompt` 是 AITAG 分段的原文资料，包括用户数据、session evidence、旧摘要与冻结/即将冻结历史；`Instruction` 是静态指令。两者不含传输协议外壳或重试纠正后缀。
 
 ## 执行与隔离
 
-- 同步通知，释放 `Timeline.mu` 后执行；压缩标志与等待通道也先释放。可以在回调里读取 Timeline、注册回调或追加 item。
-- 一次收据按注册顺序通知。回调注册变更不影响已捕获的通知名单；压缩的三个阶段使用同一提交时捕获的名单。
-- 并发写入可能并发执行监听者，跨操作不保证通知的全局顺序。消费者应保护自身状态，并以事件 ID / freeze version 识别具体提交，不能把回调期间再次读取的当前状态当成原快照。
-- 回调应只做轻量处理或向消费者入队。慢消费者、批处理、取消和重试由接入方负责；调用方自身持有的业务锁不由 Timeline 释放。
-- 每个监听者获得独立的切片收据；回调 panic 被记录并隔离，不改变已提交状态，也不阻断后续监听者。
-- 注册信息、压缩通知和 prompt 快照只存在于运行态，不写入持久化 Timeline 或主循环 prompt，不改变上下文前缀。没有监听者时，不生成 input JSON 快照或压缩回调收据，也不增加 AI 请求。
+- input、freeze、compress-freeze、summary 同步通知，释放 Timeline 锁和压缩等待标志后执行。回调可以读取 Timeline、注册回调或追加 item，应只做轻量处理。
+- memory 在独立 goroutine 中等完整响应，不阻塞摘要提交或后续循环。其消费者也应入队处理，避免长时间占用通知 goroutine。请求取消后会报告完成错误，不保证取消的会话能继续生成记忆。
+- 各阶段使用提交时捕获的名单；注册变更只作用于后续提交。同一提交内按注册顺序通知，跨提交和并发写入不保证全局顺序。消费者需保护自己的状态。
+- 注册信息与请求快照只存在于运行态，不写入持久化 Timeline 或主循环 prompt，不增加 AI 请求。只有记忆订阅、没有摘要订阅也能收到记忆通知。
+- 回调 panic 被记录并隔离，不改变已提交状态。
 
-## 使用与回归测试
+## 验证
 
-`timeline_callbacks_test.go` 包含四个接口的组合示例，覆盖实际 item 写入、evidence 原子批次、普通冻结、自动压缩、原样内容提交、失败与取消、压缩期间追加、摘要 reader 隔离、回调重入、复制恢复、分支合并、并发注册和 panic 隔离。
+`timeline_compression_stream_test.go` 使用可控管道，验证记忆未输出时摘要已返回、后续输入可写入；覆盖失败尾部、摘要后改写、慢记忆消费者及独立记忆订阅。`timeline_callbacks_test.go` 和 `timeline_compression_output_test.go` 覆盖原子提交、过期快照、隔离、重入和候选容错。
 
 ```shell
-go test ./common/ai/aid/aicommon -run '^TestTimelineCallbacks' -count=1
-go test -race ./common/ai/aid/aicommon -run '^TestTimelineCallbacks' -count=3
 go test ./common/ai/aid/aicommon -count=1
+go test -race ./common/ai/aid/aicommon -run 'TestTimeline(Compression|Callbacks)|TestAction' -count=1
 ```
 
-测试位于 Timeline 所属包，复用现有压缩 mock，不调用真实模型，也不新增 `common/yak` 测试或 Yak 冒烟 CI 项。
+本地独立 Yak 冒烟位于 `common/ai/aismoking`，不加入 CI。
