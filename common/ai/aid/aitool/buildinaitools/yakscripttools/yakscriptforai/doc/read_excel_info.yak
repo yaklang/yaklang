@@ -34,17 +34,27 @@ Excel 文件结构探索工具 —— 用于 JSON 工具调用的参数说明
 
 示例：
 
+[[- if .FunctionCallMode -]]
+arguments 示例：
 ```json
 {
-  "@action": "call-tool",
-  "tool": "read_excel_info",
-  "identifier": "explore_transaction_data",
-  "params": {
+  "input": "/path/to/transactions.xlsx",
+  "preview_rows": 3
+}
+```
+[[- else -]]
+文本流 action：
+```json
+{
+  "@action": "directly_call_tool",
+  "directly_call_tool_name": "read_excel_info",
+  "directly_call_tool_params": {
     "input": "/path/to/transactions.xlsx",
     "preview_rows": 3
   }
 }
 ```
+[[- end -]]
 USAGE_BLOCK
 
 yakit.AutoInitYakit()

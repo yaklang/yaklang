@@ -1,0 +1,171 @@
+// yak common/ai/aismoking/live/tool_protocol.yak
+// Real provider PLAN smoke; the relay preserves the runtime's tool_choice.
+// Uses configured credentials in memory, never writes authentication headers.
+// Does not connect to or approve any user task on 8087.
+include "common/ai/aismoking/live/memory_capture.inc"
+root = os.Getenv("AISMOKING_OUTPUT")
+assert root != "", "Set AISMOKING_OUTPUT to a fresh local sample directory"
+assert !file.IsExisted(file.Join(root,"summary.json")), "AISMOKING_OUTPUT already contains samples; use a fresh directory"
+file.MkdirAll(root)~
+model = os.Getenv("AISMOKING_TOOL_MODEL")
+if model == "" { model = "deepseek-v4.1-flash" }
+mu = sync.NewMutex()
+seedPacket = nil
+_, seedErr = ai.IntelligentChat("只回答 OK。", ai.model(model), ai.thinkingLevel("low"), ai.timeout(35), ai.rawHTTPRequestResponseCallback(func(packet,header,body,usage) { seedPacket = packet }), func(c) { c.Context = context.Seconds(40); c.DisableProviderFallback = true })
+assert seedPacket != nil, "Configured provider request was not captured"
+port = os.GetRandomAvailableTCPPort()
+base = "http://" + str.HostPort("127.0.0.1",port)
+relayContext = context.Seconds(1200)
+caseSnapshots = {}
+allResults = []
+go httpserver.Serve("127.0.0.1",port,httpserver.context(relayContext),httpserver.handler(func(w, req) {
+    if req.URL.Path == "/ready" { w.Write("ready"); return }
+    try {
+        caseKey := str.Split(str.TrimPrefix(req.URL.Path,"/"),"/")[0]
+        mu.Lock()
+        requestCase := caseSnapshots[caseKey]
+        mu.Unlock()
+        assert requestCase != nil, "Unknown diagnostic case path"
+        body = json.loads(string(io.ReadAll(req.Body)~))
+        native = "tools" in body && len(body.tools) > 0
+        originalChoice = body.tool_choice
+        if native { assert originalChoice == "auto", "Native runtime tool_choice must be auto" }
+        body.model, body.thinking, body.reasoning_effort = model, {"type":"enabled"}, "low"
+        delete(body,"enable_thinking")
+        requestStarted = time.Now()
+        mu.Lock()
+        seq = len(requestCase.requests) + 1
+        requestRow := {"seq":seq,"case":requestCase.name,"native":native,"original_choice":originalChoice,"choice":body.tool_choice,"completed":false}
+        requestCase.requests = append(requestCase.requests,requestRow)
+        localDir = requestCase.dir
+        mu.Unlock()
+        file.SaveJson(file.Join(localDir,sprintf("request-%03d.json",seq)),body)~
+        response,_,transportErr = poc.HTTP(seedPacket,poc.https(true),poc.replaceBody([]byte(json.dumps(body)),false),poc.timeout(75),poc.retryTimes(0),poc.redirectTimes(0),poc.save(false))
+        if transportErr != nil {
+            mu.Lock()
+            requestRow.transport_error,requestRow.completed = "Provider transport failed",true
+            file.SaveJson(file.Join(localDir,"requests.json"),requestCase.requests)~
+            mu.Unlock()
+            w.WriteHeader(502); w.Write("Provider transport failed"); return
+        }
+        split = str.SplitN(string(response),"\r\n\r\n",2)
+        header,raw = split[0],split[1]
+        if str.Contains(str.ToLower(header),"transfer-encoding: chunked") { raw = string(codec.DecodeChunked([]byte(raw))~) }
+        file.Save(file.Join(localDir,sprintf("response-%03d.sse",seq)),raw)~
+        mu.Lock()
+        requestRow.usage = nil
+        for line in str.Split(raw,"\n") {
+            if !str.HasPrefix(line,"data:") { continue }
+            frame,parseErr = json.New(str.TrimSpace(line[5:]))
+            if parseErr == nil && "usage" in frame.Value() { requestRow.usage = frame.Value().usage }
+        }
+        requestRow.status = str.Split(header,"\r\n")[0]
+        decoded = memoryDecodeResponse(raw)
+        requestRow.reasoning_bytes,requestRow.content_bytes,requestRow.finish_reason,requestRow.tool_calls = len(decoded.reasoning_content),len(decoded.content),decoded.finish_reason,len(decoded.tool_calls)
+        requestRow.names,requestRow.arguments_valid,requestRow.unadvertised = [],true,false
+        declared = []
+        for tool in body.tools { declared = append(declared,tool["function"].name) }
+        for call in decoded.tool_calls {
+            requestRow.names = append(requestRow.names,call.name)
+            if !(call.name in declared) { requestRow.unadvertised = true }
+            _, argumentErr = json.New(call.arguments)
+            if argumentErr != nil { requestRow.arguments_valid = false }
+        }
+        requestRow.seconds = time.Since(requestStarted).Seconds()
+        requestRow.retry_prompt = "# 重试纠正" in json.dumps(body.messages)
+        file.SaveJson(file.Join(localDir,sprintf("response-%03d.json",seq)),decoded)~
+        requestRow.completed = true
+        file.SaveJson(file.Join(localDir,"requests.json"),requestCase.requests)~
+        mu.Unlock()
+        printf("PROBE case=%s seq=%d native=%v choice=%v names=%v finish=%s reason=%d retry=%v\n",requestCase.name,seq,native,body.tool_choice,requestRow.names,requestRow.finish_reason,requestRow.reasoning_bytes,requestRow.retry_prompt)
+        status = 200
+        statusParts = str.Split(requestRow.status," ")
+        if len(statusParts) > 1 { status = parseInt(statusParts[1]) }
+        w.Header().Set("Content-Type","text/event-stream")
+        w.WriteHeader(status)
+        w.Write(raw)~
+    } catch relayErr {
+        println("RELAY_ERROR: ",relayErr)
+        w.WriteHeader(500); w.Write("Diagnostic relay failed")
+    }
+}))
+for i=0;i<100;i++ { _,e=http.Get(base+"/ready"); if e == nil { break }; time.Sleep(0.02) }
+func eventCapture(sample) {
+    return func(op,e) {
+        typ := string(e.Type)
+        if typ in ["stream","stream_start","stream_end"] { return }
+        data := {}
+        if e.IsJson { data = json.loads(string(e.Content)) }
+        mu.Lock()
+        sample.config = op.GetConfig()
+        sample.events = append(sample.events,{"type":typ,"node":e.NodeId,"data":data})
+        confirm := typ == "plan_review_require"
+        if confirm { sample.approvals++ }
+        mu.Unlock()
+        if confirm { op.SendInputEvent(aim.NewInputEvent({"IsInteractiveMessage":true,"InteractiveId":data.id,"InteractiveJSONInput":`{"suggestion":"continue"}`})~)~ }
+    }
+}
+func streamCapture(sample) {
+    return func(op,e,node,data) {
+        mu.Lock(); defer mu.Unlock()
+        sample.streams = append(sample.streams,{"node":node,"text":string(data)})
+    }
+}
+choices = ["auto","text"]
+selectedChoices = os.Getenv("AISMOKING_TOOL_CHOICES")
+if selectedChoices != "" { choices = str.SplitAndTrim(selectedChoices,",") }
+for choice in choices {
+    assert choice in ["auto","text"], "AISMOKING_TOOL_CHOICES supports auto,text"
+    nativeMode = choice != "text"
+    caseName = sprintf("plan-%s-%d",choice,len(allResults)+1)
+    caseDir = file.Join(root,caseName)
+    file.MkdirAll(caseDir)~
+    sample = {"name":caseName,"dir":caseDir,"choice":choice,"requests":[],"events":[],"streams":[],"approvals":0,"config":nil}
+    mu.Lock()
+    caseSnapshots[caseName] = sample
+    mu.Unlock()
+    orders = [{"id":"O1","quantity":2,"price":7.5,"status":"paid"},{"id":"O2","quantity":3,"price":4,"status":"paid"},{"id":"O1","quantity":2,"price":7.5,"status":"paid"},{"id":"O3","quantity":2,"price":3,"status":"refunded"}]
+    file.SaveJson(file.Join(caseDir,"orders.json"),orders)~
+    path = str.ReplaceAll(caseDir,"\\","/")
+    task = "先创建恰好两个有依赖的任务并submit_plan。T1：读取 "+path+"/orders.json，按id去重保留第一次，计算paid_total、refund_total、net_total、raw_rows、unique_orders、duplicates（重复id数组），写入 "+path+"/result.json并保存evidence。T2依赖T1：独立读取原始orders.json和result.json，核对去重、退款、净额，保存验收evidence，发现错误则修复。任务只能读写这些本地文件。计划确认一次后自动执行、审核结果，最终提交中文报告说明各项精确数字和去重规则，不再询问用户，不执行命令。"
+    opts = [ai.model(model),ai.apiKey("diagnostic-relay"),ai.baseURL(base+"/"+caseName+"/v1/chat/completions"),ai.noHttps(true),ai.timeout(85),func(c) { c.DisableProviderFallback = true }]
+    options = [aim.aiConfig("openai",opts...),aim.qualityPriorityAIConfig("openai",opts...),aim.speedPriorityAIConfig("openai",opts...),aim.context(context.Seconds(240)),aim.timeout(240),aim.maxIteration(35),aim.workdir(caseDir),aim.reviewPolicy("yolo"),aim.allowUserInteract(false),aim.disableMCPServers(true),aim.disableAIForge(false),aim.includeToolNames("read_file","read_file_lines","write_file","list_dir"),aim.onEvent(eventCapture(sample)),aim.onStreamContent(streamCapture(sample)),aim.configOptions(aiagent.functionCallMode(nativeMode),func(c) {
+        c.DisableCreateDBRuntime,c.DisablePerception,c.DisableMemoryTriage = true,true,true
+        c.ForceManualPlanReview = true
+        c.PlanExecTaskConcurrency = 1
+        c.AiAutoRetry,c.AiTransactionAutoRetry = 1,2
+        return nil
+    }),func(c) { c.Stateless = true }]
+    options = append(options,aim.focus("coordinator"),aim.planEngine("coordinator"))
+    began = time.Now()
+    runErr = nil
+    try { runErr = aim.InvokeReAct(task,options...) } catch caught { runErr = caught }
+    checks = []
+    if sprintf("%v",runErr) != "<nil>" { checks = append(checks,"runtime_error") }
+    data,readErr = file.ReadFile(file.Join(caseDir,"result.json"))
+    if readErr != nil { checks = append(checks,"missing_result_json") } else {
+        value,valueErr = json.New(string(data))
+        if valueErr != nil { checks = append(checks,"invalid_result_json") } else {
+            result = value.Value()
+            for key,expected in {"paid_total":27,"refund_total":6,"net_total":21,"raw_rows":4,"unique_orders":3} { if result[key] != expected { checks = append(checks,"incorrect_"+key) } }
+            if len(result.duplicates) != 1 || result.duplicates[0] != "O1" { checks = append(checks,"incorrect_duplicates") }
+        }
+    }
+    mu.Lock()
+    if sample.config == nil || sample.config.GetSessionEvidenceRendered() == "" { checks = append(checks,"missing_evidence") }
+    if sample.approvals != 1 { checks = append(checks,"approval_count") }
+    ended,reports,failed = 0,0,0
+    for e in sample.events { if e.type == "end_plan_and_execution" { ended++ }; if e.type == "report_finish" { reports++ }; if e.type == "fail_plan_and_execution" { failed++ } }
+    if ended != 1 || reports != 1 || failed != 0 { checks = append(checks,"plan_delivery_incomplete") }
+    nativeCount,noCalls,retries,invalid,reasonCount,unknown = 0,0,0,0,0,0
+    for r in sample.requests { if r.native { nativeCount++; if r.tool_calls == 0 { noCalls++ }; if r.retry_prompt { retries++ }; if r.arguments_valid == false { invalid++ }; if r.unadvertised { unknown++ }; if r.reasoning_bytes > 0 { reasonCount++ } } }
+    row = {"case":caseName,"pass":len(checks)==0,"checks":checks,"seconds":time.Since(began).Seconds(),"requests":len(sample.requests),"native_requests":nativeCount,"native_no_calls":noCalls,"retry_requests":retries,"invalid_json":invalid,"unadvertised_functions":unknown,"native_with_reason":reasonCount,"plan_approvals":sample.approvals,"runtime_error":sprintf("%v",runErr)}
+    allResults = append(allResults,row)
+    file.SaveJson(file.Join(caseDir,"events.json"),sample.events)~
+    file.SaveJson(file.Join(caseDir,"streams.json"),sample.streams)~
+    file.SaveJson(file.Join(root,"summary.json"),allResults)~
+    mu.Unlock()
+    printf("CASE_RESULT %s\n",json.dumps(row))
+}
+for result in allResults { assert result.pass, "Live tool protocol case failed; inspect summary.json and captured responses" }
+println("AI_TOOL_PROTOCOL_SMOKE_COMPLETE")

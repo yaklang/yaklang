@@ -765,11 +765,7 @@ func handleToolBatchActionResult(
 		if outcome.Result != nil && outcome.Result.Success {
 			reactloops.MarkEditBeforeExecutionCompleted(loop, toolName)
 			if cachedTool, lookupErr := loop.GetConfig().GetAiToolManager().GetToolByName(toolName); lookupErr == nil {
-				if cfg, ok := loop.GetConfig().(*aicommon.Config); ok {
-					cfg.RecordRecentlyUsedTool(cachedTool)
-				} else {
-					loop.GetConfig().GetAiToolManager().AddRecentlyUsedTool(cachedTool)
-				}
+				loop.RecordRecentlyUsedTool(cachedTool)
 			}
 		}
 	}

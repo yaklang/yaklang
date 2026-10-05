@@ -4,51 +4,37 @@ __VERBOSE_NAME_ZH__ = "文件写入"
 __KEYWORDS__ = "file write,文件写入,文件创建,file creation,content writing,文件操作,file operations,text file,binary file,file save,保存文件,创建文件,写入内容,文件处理"
 
 __USAGE__ = <<<USAGE_BLOCK
-File Write Tool - Parameter Description for JSON Tool Calls
+创建文件或完整覆写文件。`file` 为目标路径，缺少的父目录会自动创建；`content` 为完整文件正文。已存在文件只有 force=true 才覆写，否则保留原文件并返回未写入提示。局部修改优先使用 modify_file。
 
-Required Parameters:
-  file            (string)  The target file path to write to. If the parent directory
-                            does not exist, it will be created automatically.
-  content         (string)  The content to write into the file.
-
-Optional Parameters:
-  force           (bool)    Force overwrite if the file already exists.
-                            When false (default), the tool will refuse to overwrite
-                            an existing file and return an error.
-                            Set to true to allow overwriting. Default: false.
-
-IMPORTANT - Use AITAG for the `content` parameter:
-  The `content` parameter often contains multi-line text, code, scripts, JSON,
-  or other structured content with special characters (quotes, backslashes,
-  newlines, tabs, etc.). Using standard JSON string encoding for such content
-  is error-prone and frequently causes JSON parse failures.
-
-  You MUST use AITAG format to wrap the `content` parameter for safe delivery:
-
-  Example:
-  ```json
-  {
-    "@action": "call-tool",
-    "tool": "write_file",
-    "identifier": "create_config_file",
-    "params": {
-      "file": "/path/to/target/file.txt",
-      "force": true
-    }
+调用示例：
+[[- if .FunctionCallMode -]]
+全部参数放入 JSON 对象；content 是完整字符串，换行、双引号和反斜杠按 JSON 转义。不要输出外置正文。
+arguments 示例：
+```json
+{
+  "file": "/absolute/path/report.txt",
+  "force": true,
+  "content": "第一行\n第二行：\"引用\""
+}
+```
+[[- else -]]
+JSON 提交路径和覆盖选项，多行 content 使用本次 nonce 的 AITAG 原样提交；它与 JSON 参数合并。
+文本流 action：
+```json
+{
+  "@action": "directly_call_tool",
+  "directly_call_tool_name": "write_file",
+  "directly_call_tool_params": {
+    "file": "/absolute/path/report.txt",
+    "force": true
   }
-  ```
-
-  <|TOOL_PARAM_content_{nonce}|>
-  Your file content here - raw text, no escaping needed.
-  Supports multi-line content, "quotes", \backslashes\,
-  code blocks, JSON, YAML, scripts, etc.
-  <|TOOL_PARAM_content_END_{nonce}|>
-
-  Where {nonce} is the current session nonce provided in the tool-params prompt.
-
-  DO NOT put large or multi-line content directly in the JSON "params.content" field.
-  AITAG values automatically override the same-named JSON parameter, so you can
-  safely omit "content" from the JSON params object when using AITAG.
+}
+```
+<|TOOL_PARAM_content_{NONCE}|>
+第一行
+第二行："引用"
+<|TOOL_PARAM_content_END_{NONCE}|>
+[[- end -]]
 USAGE_BLOCK
 
 yakit.AutoInitYakit()

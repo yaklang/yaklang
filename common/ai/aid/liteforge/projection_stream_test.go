@@ -122,7 +122,7 @@ func TestProtocolsProjectAtSendAndStreamBeforeResponseEnds(t *testing.T) {
 				require.Equal(t, "result", sent.Tools[0].Function.Name)
 				require.NotContains(t, fmt.Sprint(sent.Tools[0].Function.Parameters), "@action")
 				require.NotContains(t, string(encodedMessages), `"properties"`)
-				require.Equal(t, map[string]any{"type": "function", "function": map[string]any{"name": "result"}}, sent.ToolChoice)
+				require.Equal(t, "auto", sent.ToolChoice)
 			} else {
 				require.Nil(t, sent.ToolChoice)
 				require.Contains(t, strings.ReplaceAll(string(encodedMessages), `\"`, `"`), `"@action"`)

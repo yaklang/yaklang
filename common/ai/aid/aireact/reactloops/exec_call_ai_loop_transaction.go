@@ -542,7 +542,7 @@ func (r *ReActLoop) callAIFunctionTransaction(
 		collectorMu.Unlock()
 		aicommon.WithAIRequest_ExtraSpecOpts(
 			aispec.WithTools(advertisedTools),
-			aispec.WithToolChoice("required"),
+			aispec.WithToolChoice("auto"),
 			// A tiered provider may retry/fall back inside one AIRequest. Each
 			// response needs its own collector or calls from a discarded response
 			// can be executed together with the accepted response.

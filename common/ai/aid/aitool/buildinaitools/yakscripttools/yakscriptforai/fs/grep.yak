@@ -84,6 +84,33 @@ Filter Evaluation Order (for each file during recursive scan):
   4. include-ext extension whitelist (file extension match)
   5. file-size-max check
   6. pattern matching (substr/isubstr/regexp)
+
+调用示例：
+[[- if .FunctionCallMode -]]
+arguments 示例：
+```json
+{
+  "path": "/absolute/path/project",
+  "pattern": "func main",
+  "pattern-mode": "substr",
+  "limit": 20
+}
+```
+[[- else -]]
+文本流 action：
+```json
+{
+  "@action": "directly_call_tool",
+  "directly_call_tool_name": "grep",
+  "directly_call_tool_params": {
+    "path": "/absolute/path/project",
+    "pattern": "func main",
+    "pattern-mode": "substr",
+    "limit": 20
+  }
+}
+```
+[[- end -]]
 USAGE_BLOCK
 
 yakit.AutoInitYakit()

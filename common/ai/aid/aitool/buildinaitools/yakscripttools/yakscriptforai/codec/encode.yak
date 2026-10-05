@@ -25,37 +25,73 @@ Parameters:
 ## Few-Shot Examples
 
 Example 1 - Encode text to Base64:
+[[- if .FunctionCallMode -]]
+arguments 示例：
+```json
 {
-  "@action": "call-tool",
-  "tool": "encode",
-  "identifier": "encode_base64_text",
-  "params": {
+  "type": "base64",
+  "text": "Hello World"
+}
+```
+[[- else -]]
+文本流 action：
+```json
+{
+  "@action": "directly_call_tool",
+  "directly_call_tool_name": "encode",
+  "directly_call_tool_params": {
     "type": "base64",
     "text": "Hello World"
   }
 }
+```
+[[- end -]]
 
 Example 2 - Encode text to Hex:
+[[- if .FunctionCallMode -]]
+arguments 示例：
+```json
 {
-  "@action": "call-tool",
-  "tool": "encode",
-  "identifier": "encode_hex_text",
-  "params": {
+  "type": "hex",
+  "text": "Hello"
+}
+```
+[[- else -]]
+文本流 action：
+```json
+{
+  "@action": "directly_call_tool",
+  "directly_call_tool_name": "encode",
+  "directly_call_tool_params": {
     "type": "hex",
     "text": "Hello"
   }
 }
+```
+[[- end -]]
 
 Example 3 - URL percent-encode text:
+[[- if .FunctionCallMode -]]
+arguments 示例：
+```json
 {
-  "@action": "call-tool",
-  "tool": "encode",
-  "identifier": "encode_url_text",
-  "params": {
+  "type": "url",
+  "text": "key=value&name=hello world"
+}
+```
+[[- else -]]
+文本流 action：
+```json
+{
+  "@action": "directly_call_tool",
+  "directly_call_tool_name": "encode",
+  "directly_call_tool_params": {
     "type": "url",
     "text": "key=value&name=hello world"
   }
 }
+```
+[[- end -]]
 USAGE_BLOCK
 
 tn := cli.String("type", cli.setRequired(true), cli.setHelp("encode method, available options: base64/b64, base64url, base32, hex, doubleurl, quote/ascii, html/htmlentity, htmlhex, url, unicode"))

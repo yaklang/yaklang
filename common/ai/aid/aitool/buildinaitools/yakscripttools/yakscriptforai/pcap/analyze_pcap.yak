@@ -13,6 +13,29 @@ Optional Parameters:
   filter          (string)  Optional BPF filter expression used to limit packets.
                             Example: "tcp port 80".
   max-packets     (int)     Maximum packet count to process. Default: 50000.
+
+调用示例：
+[[- if .FunctionCallMode -]]
+arguments 示例：
+```json
+{
+  "file": "/absolute/path/capture.pcapng",
+  "max-packets": 1000
+}
+```
+[[- else -]]
+文本流 action：
+```json
+{
+  "@action": "directly_call_tool",
+  "directly_call_tool_name": "analyze_pcap",
+  "directly_call_tool_params": {
+    "file": "/absolute/path/capture.pcapng",
+    "max-packets": 1000
+  }
+}
+```
+[[- end -]]
 USAGE_BLOCK
 
 /*

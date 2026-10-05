@@ -19,50 +19,106 @@ Parameters:
   page-size    (int, optional) Results per page. Default: 10
 
 Example 1 - FOFA search:
+[[- if .FunctionCallMode -]]
+arguments 示例：
+```json
 {
-  "@action": "call-tool",
-  "tool": "network_space_search",
-  "identifier": "fofa_search_login_pages",
-  "params": {
+  "engine": "fofa",
+  "query": "title=\"login\" && country=\"CN\"",
+  "max-records": 50
+}
+```
+[[- else -]]
+文本流 action：
+```json
+{
+  "@action": "directly_call_tool",
+  "directly_call_tool_name": "network_space_search",
+  "directly_call_tool_params": {
     "engine": "fofa",
     "query": "title=\"login\" && country=\"CN\"",
     "max-records": 50
   }
 }
+```
+[[- end -]]
 
 Example 2 - Shodan search:
+[[- if .FunctionCallMode -]]
+arguments 示例：
+```json
 {
-  "@action": "call-tool",
-  "tool": "network_space_search",
-  "identifier": "shodan_search_apache",
-  "params": {
+  "engine": "shodan",
+  "query": "apache port:443",
+  "max-records": 20
+}
+```
+[[- else -]]
+文本流 action：
+```json
+{
+  "@action": "directly_call_tool",
+  "directly_call_tool_name": "network_space_search",
+  "directly_call_tool_params": {
     "engine": "shodan",
     "query": "apache port:443",
     "max-records": 20
   }
 }
+```
+[[- end -]]
 
 Example 3 - Quake search:
+[[- if .FunctionCallMode -]]
+arguments 示例：
+```json
 {
-  "@action": "call-tool",
-  "tool": "network_space_search",
-  "identifier": "quake_search_linux_http",
-  "params": {
+  "engine": "quake",
+  "query": "service:http AND os:linux",
+  "max-records": 30,
+  "max-page": 3
+}
+```
+[[- else -]]
+文本流 action：
+```json
+{
+  "@action": "directly_call_tool",
+  "directly_call_tool_name": "network_space_search",
+  "directly_call_tool_params": {
     "engine": "quake",
     "query": "service:http AND os:linux",
     "max-records": 30,
     "max-page": 3
   }
 }
+```
+[[- end -]]
 
 Example 4 - Zone (零零测绘) search:
+[[- if .FunctionCallMode -]]
+arguments 示例：
+```json
 {
-  "params": {
+  "engine": "zone",
+  "query": "(country=中国)&&(status_code=200)",
+  "max-records": 50
+}
+```
+[[- else -]]
+文本流 action：
+```json
+{
+  "@action": "directly_call_tool",
+  "directly_call_tool_name": "network_space_search",
+  "directly_call_tool_params": {
     "engine": "zone",
     "query": "(country=中国)&&(status_code=200)",
     "max-records": 50
   }
 }
+```
+[[- end -]]
 USAGE_BLOCK
 
 yakit.AutoInitYakit()

@@ -13,24 +13,46 @@ Parameters:
   ip  (string, required) IP address or comma-separated list of IPs to query
 
 Example 1 - Single IP:
+[[- if .FunctionCallMode -]]
+arguments 示例：
+```json
 {
-  "@action": "call-tool",
-  "tool": "ip_info",
-  "identifier": "lookup_single_ip",
-  "params": {
+  "ip": "8.8.8.8"
+}
+```
+[[- else -]]
+文本流 action：
+```json
+{
+  "@action": "directly_call_tool",
+  "directly_call_tool_name": "ip_info",
+  "directly_call_tool_params": {
     "ip": "8.8.8.8"
   }
 }
+```
+[[- end -]]
 
 Example 2 - Multiple IPs:
+[[- if .FunctionCallMode -]]
+arguments 示例：
+```json
 {
-  "@action": "call-tool",
-  "tool": "ip_info",
-  "identifier": "lookup_multiple_ips",
-  "params": {
+  "ip": "1.1.1.1,8.8.4.4,114.114.114.114"
+}
+```
+[[- else -]]
+文本流 action：
+```json
+{
+  "@action": "directly_call_tool",
+  "directly_call_tool_name": "ip_info",
+  "directly_call_tool_params": {
     "ip": "1.1.1.1,8.8.4.4,114.114.114.114"
   }
 }
+```
+[[- end -]]
 USAGE_BLOCK
 
 yakit.AutoInitYakit()

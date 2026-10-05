@@ -17,6 +17,33 @@ Optional Parameters:
                             offset for paginated (chunked) reading. Default: 20.
   offset          (int)     Number of blame lines to skip from the start. Used together
                             with limit for paginated reading. Default: 0.
+
+调用示例：
+[[- if .FunctionCallMode -]]
+arguments 示例：
+```json
+{
+  "repos": "/absolute/path/project",
+  "filename": "main.go",
+  "limit": 20,
+  "offset": 0
+}
+```
+[[- else -]]
+文本流 action：
+```json
+{
+  "@action": "directly_call_tool",
+  "directly_call_tool_name": "git-blame",
+  "directly_call_tool_params": {
+    "repos": "/absolute/path/project",
+    "filename": "main.go",
+    "limit": 20,
+    "offset": 0
+  }
+}
+```
+[[- end -]]
 USAGE_BLOCK
 
 yakit.AutoInitYakit()

@@ -11,5 +11,5 @@
 <|PERSISTENT_END|>{{ end }}{{ if .AutoLoadedSkills }}
 {{ .AutoLoadedSkills }}{{ end }}
 
-本轮通过原生工具调用选择 action。工具名即 action 名；所有执行所需内容必须写入该工具的 arguments，不输出外置 AITAG。以下每个标签供请求投影为一个原生工具：
+原生函数只选择请求 tools 中声明的 action；业务工具名称写在 action 参数中。执行所需内容放入对应 arguments，不输出外置 AITAG。
 {{ .FunctionCallSchemas }}

@@ -14,6 +14,27 @@ Optional Parameters:
                             If omitted, uses the input file directory.
   output-name     (string)  Custom output filename without extension.
                             If omitted, uses input filename.
+
+调用示例：
+[[- if .FunctionCallMode -]]
+arguments 示例：
+```json
+{
+  "input": "/absolute/path/report.md"
+}
+```
+[[- else -]]
+文本流 action：
+```json
+{
+  "@action": "directly_call_tool",
+  "directly_call_tool_name": "markdown_to_docx",
+  "directly_call_tool_params": {
+    "input": "/absolute/path/report.md"
+  }
+}
+```
+[[- end -]]
 USAGE_BLOCK
 
 yakit.AutoInitYakit()

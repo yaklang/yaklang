@@ -14,6 +14,31 @@ Optional Parameters:
                             Default: 100.
   offset          (int)     Start offset (entry index) for pagination.
                             Default: 0.
+
+调用示例：
+[[- if .FunctionCallMode -]]
+arguments 示例：
+```json
+{
+  "filepath": "/absolute/path/archive.zip",
+  "limit": 20,
+  "offset": 0
+}
+```
+[[- else -]]
+文本流 action：
+```json
+{
+  "@action": "directly_call_tool",
+  "directly_call_tool_name": "zip_viewer",
+  "directly_call_tool_params": {
+    "filepath": "/absolute/path/archive.zip",
+    "limit": 20,
+    "offset": 0
+  }
+}
+```
+[[- end -]]
 USAGE_BLOCK
 
 yakit.AutoInitYakit()

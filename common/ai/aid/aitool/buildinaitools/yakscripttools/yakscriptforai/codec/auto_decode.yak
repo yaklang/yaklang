@@ -39,44 +39,88 @@ Parameters:
 ## Few-Shot Examples
 
 Example 1 - Auto-decode URL encoded text:
+[[- if .FunctionCallMode -]]
+arguments 示例：
+```json
 {
-  "@action": "call-tool",
-  "tool": "auto_decode",
-  "identifier": "auto_decode_url_text",
-  "params": {
+  "text": "Hello%20World%21"
+}
+```
+[[- else -]]
+文本流 action：
+```json
+{
+  "@action": "directly_call_tool",
+  "directly_call_tool_name": "auto_decode",
+  "directly_call_tool_params": {
     "text": "Hello%20World%21"
   }
 }
+```
+[[- end -]]
 
 Example 2 - Auto-decode Base64 text:
+[[- if .FunctionCallMode -]]
+arguments 示例：
+```json
 {
-  "@action": "call-tool",
-  "tool": "auto_decode",
-  "identifier": "auto_decode_base64_text",
-  "params": {
+  "text": "SGVsbG8gV29ybGQ="
+}
+```
+[[- else -]]
+文本流 action：
+```json
+{
+  "@action": "directly_call_tool",
+  "directly_call_tool_name": "auto_decode",
+  "directly_call_tool_params": {
     "text": "SGVsbG8gV29ybGQ="
   }
 }
+```
+[[- end -]]
 
 Example 3 - Auto-decode multi-layer encoding (Base64 containing URL encoding):
+[[- if .FunctionCallMode -]]
+arguments 示例：
+```json
 {
-  "@action": "call-tool",
-  "tool": "auto_decode",
-  "identifier": "auto_decode_multi_layer",
-  "params": {
+  "text": "SGVsbG8lMjBXb3JsZA=="
+}
+```
+[[- else -]]
+文本流 action：
+```json
+{
+  "@action": "directly_call_tool",
+  "directly_call_tool_name": "auto_decode",
+  "directly_call_tool_params": {
     "text": "SGVsbG8lMjBXb3JsZA=="
   }
 }
+```
+[[- end -]]
 
 Example 4 - Auto-decode a JWT token:
+[[- if .FunctionCallMode -]]
+arguments 示例：
+```json
 {
-  "@action": "call-tool",
-  "tool": "auto_decode",
-  "identifier": "auto_decode_jwt_token",
-  "params": {
+  "text": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTE2MjM5MDIyfQ.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c"
+}
+```
+[[- else -]]
+文本流 action：
+```json
+{
+  "@action": "directly_call_tool",
+  "directly_call_tool_name": "auto_decode",
+  "directly_call_tool_params": {
     "text": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTE2MjM5MDIyfQ.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c"
   }
 }
+```
+[[- end -]]
 
 ## Fallback
 

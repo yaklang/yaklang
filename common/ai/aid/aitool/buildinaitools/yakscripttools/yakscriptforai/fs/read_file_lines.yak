@@ -4,54 +4,34 @@ __VERBOSE_NAME_ZH__ = "按行读取文件"
 __KEYWORDS__ = "file reading,line reading,log analysis,text processing,large file,line by line,pagination,streaming read,binary detection,mimetype,read_excel_info,parse_office_to_text"
 
 __USAGE__ = <<<USAGE_BLOCK
-Line-Based File Reader Tool - Parameter Description for JSON Tool Calls
+按行分页读取文本文件，返回行号；路径参数是 `file`，不是 `path`。使用绝对路径，路径不确定时先定位文件。
 
-Reads text files line by line with pagination. Uses mimetype (magic bytes)
-to detect binary files and redirects to appropriate tools.
+offset 为起始行号（1-based，默认 1）；lines 默认 200，未显式指定时尽量返回约 10KB；line-size 默认 1024。二进制文件改用工具推荐的对应格式读取入口。
 
-Required Parameters:
-    file            (string)  The target file ABSOLUTE path you want to read line by line.
-                                                        For AI JSON tool calls, always use an absolute path.
-                                                        Do NOT use relative paths such as "test.txt", "./test.txt", or "../test.txt".
-
-Optional Parameters:
-  offset          (int)     Starting line number (1-based). Default: 1.
-    lines           (int)     Number of lines to read. Default: 200. If omitted, the tool tries to return about 10KB of text.
-    line-size       (int)     Max characters per line (truncated if exceeded). Default: 1024.
-
-Path Rules:
-    - Prefer a full absolute filesystem path in every AI tool call.
-    - If you only know a filename or a relative path, first use another tool to locate the file and get its absolute path.
-    - Good: "/Users/alice/project/main.go"
-    - Bad:  "main.go", "./main.go", "../project/main.go"
-
-Binary File Detection:
-  Same as read_file - detects binary formats and recommends built-in tools.
-  See read_file tool documentation for details.
-
-## Few-Shot Examples
-
-Example 1 - Read the first section of a file with a wider default page:
+以下仅是业务参数示例，按当前 action 协议提交，不以 read_file_lines 为原生函数名：
+[[- if .FunctionCallMode -]]
+arguments 示例：
+```json
 {
-  "@action": "call-tool",
-  "tool": "read_file_lines",
-  "identifier": "read_source_file",
-  "params": {
-    "file": "/home/user/project/main.go"
-  }
+  "file": "/absolute/path/source.txt",
+  "offset": 100,
+  "lines": 30
 }
-
-Example 2 - Read lines 100-130 of a log file:
+```
+[[- else -]]
+文本流 action：
+```json
 {
-  "@action": "call-tool",
-  "tool": "read_file_lines",
-  "identifier": "read_log_lines",
-  "params": {
-    "file": "/var/log/app.log",
+  "@action": "directly_call_tool",
+  "directly_call_tool_name": "read_file_lines",
+  "directly_call_tool_params": {
+    "file": "/absolute/path/source.txt",
     "offset": 100,
     "lines": 30
   }
 }
+```
+[[- end -]]
 USAGE_BLOCK
 
 /*

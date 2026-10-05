@@ -19,6 +19,29 @@ Optional Parameters:
   detect-c2       (string)  Enable C2 communication detection logic.
                             Accepted values: "true"/"false". Default: "true".
   max-packets     (int)     Maximum packet count to process. Default: 100000.
+
+调用示例：
+[[- if .FunctionCallMode -]]
+arguments 示例：
+```json
+{
+  "file": "/absolute/path/capture.pcapng",
+  "max-packets": 1000
+}
+```
+[[- else -]]
+文本流 action：
+```json
+{
+  "@action": "directly_call_tool",
+  "directly_call_tool_name": "decrypt_pcap",
+  "directly_call_tool_params": {
+    "file": "/absolute/path/capture.pcapng",
+    "max-packets": 1000
+  }
+}
+```
+[[- end -]]
 USAGE_BLOCK
 
 /*

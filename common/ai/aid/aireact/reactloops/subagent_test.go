@@ -1,7 +1,9 @@
-﻿package reactloops
+package reactloops
 
 import (
 	"context"
+	"io"
+	"sync"
 	"sync/atomic"
 	"testing"
 
@@ -9,6 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	mock "github.com/yaklang/yaklang/common/ai/aid/aicommon/mock"
+	"github.com/yaklang/yaklang/common/ai/aispec"
 	"github.com/yaklang/yaklang/common/schema"
 )
 
@@ -36,7 +39,6 @@ func TestBuildForwardingEmitterForTask_StampsTaskIdAndUUID(t *testing.T) {
 	require.Equal(t, subTaskID, captured[0].TaskId)
 	require.Equal(t, subTask.GetUUID(), captured[0].TaskUUID)
 }
-
 
 func TestBuildForkTaskID_StableSegment(t *testing.T) {
 	task := aicommon.NewStatefulTaskBase("parent-abc", "x", context.Background(), aicommon.NewDummyEmitter(), true)
@@ -76,9 +78,6 @@ func TestForkSubTaskCompletionDoesNotCancelJobCtx(t *testing.T) {
 	}
 }
 
-
-
-
 // newSubReactAICallbackProbe returns a distinct AI callback closure that increments its own
 // hit counter each time it is invoked.
 func newSubReactAICallbackProbe() (aicommon.AICallbackType, *int64) {
@@ -111,6 +110,52 @@ func newSubAgentTestConfigInvoker(ctx context.Context, cfg *aicommon.Config) *su
 }
 
 func (c *subAgentTestConfigInvoker) GetConfig() aicommon.AICallerConfigIf { return c.cfg }
+
+func TestBuildSubAgentInvoker_InheritsNativeProtocolAndAuto(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	var requests int
+	parentCfg := aicommon.NewConfig(ctx, aicommon.WithDisableAutoSkills(true),
+		aicommon.WithEnableFunctionCallMode(true), aicommon.WithAITransactionAutoRetry(1),
+		aicommon.WithAICallback(func(c aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+			requests++
+			wire := aispec.NewDefaultAIConfig(req.GetExtraSpecOpts()...)
+			require.Equal(t, "auto", wire.ToolChoice)
+			require.NotEmpty(t, wire.Tools)
+			require.NotNil(t, wire.ToolCallCallback)
+			resp := c.NewAIResponse()
+			wire.ToolCallCallback([]*aispec.ToolCall{{Index: 0, ID: "child-native", Type: "function",
+				Function: aispec.FuncReturn{Name: "accept", Arguments: `{}`}}})
+			wire.FinishReasonCallback("tool_calls", nil)
+			resp.Close()
+			return resp, nil
+		}))
+	fork, err := parentCfg.GetTimeline().ForkForTask("sub-native", "child", parentCfg, parentCfg)
+	require.NoError(t, err)
+	original := aicommon.AIRuntimeInvokerGetter
+	defer func() { aicommon.AIRuntimeInvokerGetter = original }()
+	aicommon.AIRuntimeInvokerGetter = func(ctx context.Context, opts ...aicommon.ConfigOption) (aicommon.AITaskInvokeRuntime, error) {
+		return newSubAgentTestConfigInvoker(ctx, aicommon.NewConfig(ctx, opts...)), nil
+	}
+	child, err := BuildSubAgentInvokerForTest(parentCfg, fork, ctx, aicommon.NewDummyEmitter())
+	require.NoError(t, err)
+	childCfg := child.GetConfig().(*aicommon.Config)
+	require.True(t, childCfg.EnableFunctionCallMode)
+	require.True(t, childCfg.GetConfigBool("EnableFunctionCallMode"))
+	loop, err := NewReActLoop("child-native", child, WithDisableLoopPerception(true),
+		WithAllowToolCall(false), WithAllowRAG(false), WithAllowAIForge(false), WithAllowPlanAndExec(false),
+		WithRegisterLoopAction("require_tool", "unused routing fixture", nil, nil, nil))
+	require.NoError(t, err)
+	require.True(t, loop.FunctionCallModeEnabled(), "child decision loop must retain the parent's native protocol")
+	loop.actions.Set("accept", &LoopAction{ActionType: "accept"})
+	calls, stop, _, err := loop.callAILoopTransaction(&sync.WaitGroup{}, "child protocol probe", "nonce", nil,
+		func(io.Reader, io.Reader) {}, func(string, string, io.Reader, io.Reader) {})
+	require.NoError(t, err)
+	require.Equal(t, LoopStopToolCalls, stop)
+	require.Len(t, calls, 1)
+	require.Equal(t, "child-native", calls[0].ToolCallID)
+	require.Equal(t, 1, requests)
+}
 
 // TestBuildSubAgentInvoker_ChildEmitterForwardsAndStampsTaskId 验证子 invoker
 // 的 emitter 转发到父 emitter 并打上子任务 ID。
@@ -309,4 +354,3 @@ func TestBuildSubAgentInvoker_ChildHasFreshHotPatchOptionChan(t *testing.T) {
 	assert.NotSame(t, parentCfg.HotPatchOptionChan, childCfg.HotPatchOptionChan,
 		"child must NOT share the parent's HotPatchOptionChan")
 }
-

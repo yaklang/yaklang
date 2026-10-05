@@ -9,6 +9,27 @@ IANA WHOIS Query Tool - Parameter Description for JSON Tool Calls
 Required Parameters:
   domain          (string)  Target domain name for WHOIS query.
                             Example: "example.com".
+
+调用示例：
+[[- if .FunctionCallMode -]]
+arguments 示例：
+```json
+{
+  "domain": "example.com"
+}
+```
+[[- else -]]
+文本流 action：
+```json
+{
+  "@action": "directly_call_tool",
+  "directly_call_tool_name": "whois",
+  "directly_call_tool_params": {
+    "domain": "example.com"
+  }
+}
+```
+[[- end -]]
 USAGE_BLOCK
 
 domainString = cli.String("domain", cli.setRequired(true), cli.setHelp("whois target domain"))

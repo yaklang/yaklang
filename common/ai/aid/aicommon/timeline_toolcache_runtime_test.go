@@ -27,7 +27,7 @@ func restoreCacheTimeline(t *testing.T, source *Timeline, cfg *Config) {
 	cfg.restoreRecentToolsFromTimeline()
 }
 
-func TestTimelineToolCacheUsageDefaultsToFunctionCallMode(t *testing.T) {
+func TestTimelineToolCacheUsageMatchesConfigProtocol(t *testing.T) {
 	tool := aitool.NewWithoutCallback("mode_sensitive",
 		aitool.WithStringParam("command"),
 		aitool.WithUsage("SHARED [[- if .FunctionCallMode -]]JSON_ONLY[[- else -]]AITAG_ONLY[[- end -]]"))
@@ -38,16 +38,20 @@ func TestTimelineToolCacheUsageDefaultsToFunctionCallMode(t *testing.T) {
 		cfg.RecordRecentlyUsedTool(tool)
 		view := RenderTimelineFrozenOpen(cfg.Timeline).Open
 		require.Contains(t, view, "SHARED")
-		require.Contains(t, view, "JSON_ONLY")
-		require.NotContains(t, view, "AITAG_ONLY")
+		want, absent := "AITAG_ONLY", "JSON_ONLY"
+		if native {
+			want, absent = absent, want
+		}
+		require.Contains(t, view, want)
+		require.NotContains(t, view, absent)
 		cfg.Timeline.FreezeAll()
 		restored := NewConfig(context.Background(), WithDisableAutoSkills(true),
 			WithEnableFunctionCallMode(native),
 			WithToolManager(buildinaitools.NewToolManager(buildinaitools.WithOnlyTools(tool))))
 		restoreCacheTimeline(t, cfg.Timeline, restored)
 		restoredView := RenderTimelineFrozenOpen(restored.Timeline).PromotedRecentTools
-		require.Contains(t, restoredView, "JSON_ONLY")
-		require.NotContains(t, restoredView, "AITAG_ONLY")
+		require.Contains(t, restoredView, want)
+		require.NotContains(t, restoredView, absent)
 	}
 }
 

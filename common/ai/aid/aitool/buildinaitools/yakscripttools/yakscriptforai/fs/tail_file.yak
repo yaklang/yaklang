@@ -23,6 +23,29 @@ Optional Parameters:
                             Only effective when mode is "lines".
   hexdump         (bool)    When set to true, displays the result as a hex dump.
                             Only effective when mode is "bytes". Default: false.
+
+调用示例：
+[[- if .FunctionCallMode -]]
+arguments 示例：
+```json
+{
+  "filename": "/absolute/path/report.txt",
+  "limit": 20
+}
+```
+[[- else -]]
+文本流 action：
+```json
+{
+  "@action": "directly_call_tool",
+  "directly_call_tool_name": "tail_file",
+  "directly_call_tool_params": {
+    "filename": "/absolute/path/report.txt",
+    "limit": 20
+  }
+}
+```
+[[- end -]]
 USAGE_BLOCK
 
 /*

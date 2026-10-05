@@ -9,6 +9,27 @@ Git HEAD Hash Tool - Parameter Description for JSON Tool Calls
 Required Parameters:
   repos           (string)  The local path to the target Git repository.
                             Returns the commit hash of the current HEAD.
+
+调用示例：
+[[- if .FunctionCallMode -]]
+arguments 示例：
+```json
+{
+  "repos": "/absolute/path/project"
+}
+```
+[[- else -]]
+文本流 action：
+```json
+{
+  "@action": "directly_call_tool",
+  "directly_call_tool_name": "git-head",
+  "directly_call_tool_params": {
+    "repos": "/absolute/path/project"
+  }
+}
+```
+[[- end -]]
 USAGE_BLOCK
 
 yakit.AutoInitYakit()

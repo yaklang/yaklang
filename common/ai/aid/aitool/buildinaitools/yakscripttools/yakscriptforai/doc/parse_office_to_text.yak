@@ -14,6 +14,27 @@ Optional Parameters:
   output          (string)  Output text file path. If omitted, parsed content is printed.
   metadata        (bool)    Whether to include metadata information in output.
                             Default: true.
+
+调用示例：
+[[- if .FunctionCallMode -]]
+arguments 示例：
+```json
+{
+  "input": "/absolute/path/report.docx"
+}
+```
+[[- else -]]
+文本流 action：
+```json
+{
+  "@action": "directly_call_tool",
+  "directly_call_tool_name": "parse_office_to_text",
+  "directly_call_tool_params": {
+    "input": "/absolute/path/report.docx"
+  }
+}
+```
+[[- end -]]
 USAGE_BLOCK
 
 yakit.AutoInitYakit()

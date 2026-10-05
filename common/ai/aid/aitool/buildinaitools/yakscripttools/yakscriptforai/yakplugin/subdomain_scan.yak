@@ -14,6 +14,29 @@ Optional Parameters:
                             Default: false (recursive enabled).
   wildcard-to-stop (bool)   Stop on wildcard DNS detection.
                             Default: false.
+
+调用示例：
+[[- if .FunctionCallMode -]]
+arguments 示例：
+```json
+{
+  "target": "example.com",
+  "not-recursive": true
+}
+```
+[[- else -]]
+文本流 action：
+```json
+{
+  "@action": "directly_call_tool",
+  "directly_call_tool_name": "subdomain_scan",
+  "directly_call_tool_params": {
+    "target": "example.com",
+    "not-recursive": true
+  }
+}
+```
+[[- end -]]
 USAGE_BLOCK
 
 target = cli.String("target",cli.setVerboseName("目标域名"),cli.setHelp("扫描目标"), cli.setRequired(true))

@@ -278,6 +278,7 @@ func TestCoordinatorLoopRiskReviewNativeRequiredFields(t *testing.T) {
 			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 			defer cancel()
 			cfg := aicommon.NewConfig(ctx, aicommon.WithAITransactionAutoRetry(1), aicommon.WithAICallback(func(c aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+				require.Equal(t, "auto", aispec.NewDefaultAIConfig(req.GetExtraSpecOpts()...).ToolChoice)
 				args := map[string]any{"reason": "Read-only authorized exploration"}
 				if valid {
 					args["risk_score"] = 0.1

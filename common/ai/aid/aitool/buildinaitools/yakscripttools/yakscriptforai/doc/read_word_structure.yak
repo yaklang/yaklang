@@ -24,16 +24,25 @@ Optional Parameters:
 
 Example:
 
+[[- if .FunctionCallMode -]]
+arguments 示例：
 ```json
 {
-  "@action": "call-tool",
-  "tool": "read_word_structure",
-  "identifier": "read_contract_doc",
-  "params": {
+  "input": "/path/to/contract.docx"
+}
+```
+[[- else -]]
+文本流 action：
+```json
+{
+  "@action": "directly_call_tool",
+  "directly_call_tool_name": "read_word_structure",
+  "directly_call_tool_params": {
     "input": "/path/to/contract.docx"
   }
 }
 ```
+[[- end -]]
 USAGE_BLOCK
 
 yakit.AutoInitYakit()

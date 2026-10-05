@@ -49,6 +49,7 @@ yak common/ai/aismoking/forge.yak
 
 - [live/memory_protocol.yak](live/memory_protocol.yak)：沿用配置中的轻量模型，对比记忆筛选与 Timeline 摘要的 function call / 文本流；覆盖短约束、已有记忆不重复收录、临时日志、长期约束、范围纠正、待返回调用、引用中的旧协议和 DAG 衔接，默认重复 3 轮。设置 `AISMOKING_OUTPUT` 保存无认证头的实际请求、完整响应体、分别还原的 content / function call arguments、finish reason、评分及语义断言；每次响应和最终结果均落盘，超时、协议失败与语义错误分别记录。`AISMOKING_MEMORY_SOURCE` 可附加已脱敏历史回放，`AISMOKING_MEMORY_KIND=triage/summary`、`AISMOKING_MEMORY_CASE`、`AISMOKING_MEMORY_MODE=function-call/text-stream` 可单独复测；`AISMOKING_MEMORY_EXAMPLES=0` 关闭原生参数示例以做对照，`AISMOKING_MEMORY_SPEED=0` 使用主模型。脚本不持久化记忆；请求或语义检查失败会返回非零，并保留失败采样。
 - [live/default_task.yak](live/default_task.yak)：普通对账任务，使用 `aim.InvokeReAct`，校验金额、去重、异常及报告，采样 usage/cache。要求 `LITEFORGE_SMOKE_API_KEY`，模型和输出目录由脚本列出的环境变量设置。
+- [live/tool_protocol.yak](live/tool_protocol.yak)：通过 `aim.InvokeReAct` 执行文件对账、计划确认、依赖任务、Evidence 与验收报告；原样转发并断言生产原生请求的 `tool_choice` 为 `auto`，不由测试代理覆盖。采样实际请求、完整响应、非法函数名、重试和 usage。沿用本地已配置的 provider，设置 `AISMOKING_OUTPUT` 为新的采样目录；`AISMOKING_TOOL_MODEL` 可指定模型，`AISMOKING_TOOL_CHOICES=auto,text` 可选定组合。脚本仅确认自己的隔离测试计划，不持久化认证头。直接运行 `yak common/ai/aismoking/live/tool_protocol.yak`，仅供本地开发。
 - [live/coordinator.yak](live/coordinator.yak)：读取本地目录与 README，使用已配置的 provider，自动计划/执行/报告。
 - [live/comprehensive.yak](live/comprehensive.yak)：真实综合任务，直接 `aim.NewInputEvent` 回复一次计划卡，保存事件、流、Evidence、Timeline 和 usage。要求 `YAK_BENCH_API_KEY`、`YAK_BENCH_DIR/fixture/task.txt`；`YAK_BENCH_TEXT_STREAM=1` 选择文本协议。
 - `live/benchmark/`：通用事件、工具 HTTP 黑盒、SPA 爬虫指导三个已有模型实验及 JSON cases；默认不执行外部目标，按各脚本参数显式启动。

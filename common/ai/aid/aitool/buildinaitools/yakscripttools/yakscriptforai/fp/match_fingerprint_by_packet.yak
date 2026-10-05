@@ -13,6 +13,27 @@ Input Parameters (exactly one is required):
 Rules:
   - Provide either "packet" or "file_path".
   - Do not provide both at the same time.
+
+调用示例：
+[[- if .FunctionCallMode -]]
+arguments 示例：
+```json
+{
+  "file_path": "/absolute/path/response.txt"
+}
+```
+[[- else -]]
+文本流 action：
+```json
+{
+  "@action": "directly_call_tool",
+  "directly_call_tool_name": "match_fingerprint_by_packet",
+  "directly_call_tool_params": {
+    "file_path": "/absolute/path/response.txt"
+  }
+}
+```
+[[- end -]]
 USAGE_BLOCK
 
 packet = cli.Text("packet", cli.setVerboseName("数据包"), cli.setHelp("需要指纹匹配的数据包原文(packet 和 file_path 必须二选一)"))

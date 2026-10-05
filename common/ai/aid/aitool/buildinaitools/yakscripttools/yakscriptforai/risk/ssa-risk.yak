@@ -7,9 +7,27 @@ __USAGE__ = <<<USAGE_BLOCK
 `risk_id` 必须是大于 0 的 SSA 风险记录 ID；`get_full_code` 必填。先用 `false` 查看风险和数据流，只有定位代码需要完整上下文时才改为 `true`，此时返回内容可能明显增加。
 
 典型案例：
+[[- if .FunctionCallMode -]]
+arguments 示例：
 ```json
-{"risk_id":123,"get_full_code":false}
+{
+  "risk_id": 123,
+  "get_full_code": false
+}
 ```
+[[- else -]]
+文本流 action：
+```json
+{
+  "@action": "directly_call_tool",
+  "directly_call_tool_name": "ssa-risk",
+  "directly_call_tool_params": {
+    "risk_id": 123,
+    "get_full_code": false
+  }
+}
+```
+[[- end -]]
 USAGE_BLOCK
 
 # 获取参数

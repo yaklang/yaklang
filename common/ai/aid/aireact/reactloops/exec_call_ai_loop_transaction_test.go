@@ -24,7 +24,11 @@ func newCallAILoopTransactionTestLoop(t *testing.T, functionMode bool, respond f
 	base.SetConfig("AiTransactionAutoRetry", 1)
 	config := &fcTestConfig{MockedAIConfig: base}
 	config.aiCallback = func(req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
-		return respond(req, aispec.NewDefaultAIConfig(req.GetExtraSpecOpts()...))
+		wire := aispec.NewDefaultAIConfig(req.GetExtraSpecOpts()...)
+		if functionMode {
+			require.Equal(t, "auto", wire.ToolChoice, "every native request and retry must use auto")
+		}
+		return respond(req, wire)
 	}
 	invoker := mock.NewMockInvoker(context.Background())
 	invoker.SetConfig(config)

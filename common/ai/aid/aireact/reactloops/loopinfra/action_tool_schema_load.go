@@ -17,16 +17,16 @@ const actionStateToolSchemaNames = "native_tool_schema_names"
 
 var nativeToolSchemaLoadAction = &reactloops.LoopAction{
 	ActionType: schema.AI_REACT_LOOP_ACTION_REQUIRE_TOOL,
-	Description: "Load business-tool parameter schemas into the timeline only. This does not generate arguments or execute tools. " +
-		"Use tool_require_payload for one tool or tool_require_calls for several. After observing the loaded schemas in the next response, " +
-		"construct arguments yourself and use directly_call_tool (single or batch). If a complete schema is already visible, call directly instead of loading it again.",
+	Description: "只加载业务工具完整参数 Schema 到 Timeline，不生成参数、不执行工具。" +
+		"单个名称用 tool_require_payload，多个名称用 tool_require_calls。下一轮读取 CACHE_TOOL_CALL，按真实字段自行构造参数并调用 directly_call_tool。" +
+		"原生函数名是 require_tool，业务工具名称只能写在参数中；已有完整 Schema 时直接复用，不重复加载。",
 	Options: []aitool.ToolOption{
-		aitool.WithStringParam("tool_require_payload", aitool.WithParam_Description("Exact tool name to load. Omit when tool_require_calls is present.")),
+		aitool.WithStringParam("tool_require_payload", aitool.WithParam_Description("要加载定义的业务工具名称；与 tool_require_calls 二选一。")),
 		aitool.WithStructArrayParam("tool_require_calls", []aitool.PropertyOption{
-			aitool.WithParam_Description("Load several schemas; no business operations are executed. Each item identifies a tool, not an execution request. Mutually exclusive with tool_require_payload."),
+			aitool.WithParam_Description("批量加载 Schema，每项只指定业务工具，不执行业务操作；与 tool_require_payload 二选一。"),
 			aitool.WithParam_Raw("minItems", 1), aitool.WithParam_Raw("maxItems", aicommon.DefaultToolBatchMaxCalls),
 		}, nil,
-			aitool.WithStringParam("tool_name", aitool.WithParam_Required(true), aitool.WithParam_Description("Exact tool name to load.")),
+			aitool.WithStringParam("tool_name", aitool.WithParam_Required(true), aitool.WithParam_Description("要加载定义的业务工具准确名称。")),
 		),
 	},
 	ActionVerifier: verifyToolSchemaLoad,
@@ -112,7 +112,7 @@ func loadToolSchemas(loop *reactloops.ReActLoop, action *aicommon.Action, operat
 			entry["detail"] = fmt.Sprintf("Tool unavailable: %v", err)
 			continue
 		}
-		mutation := config.RecordRecentlyUsedTool(tool)
+		mutation := loop.RecordRecentlyUsedTool(tool)
 		if mutation.Upsert == nil && mutation.Reuse == nil {
 			entry["detail"] = "Schema could not be cached within the current tool-cache budget"
 			continue

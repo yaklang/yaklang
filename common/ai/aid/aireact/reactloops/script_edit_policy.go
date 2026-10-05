@@ -3,8 +3,6 @@ package reactloops
 import (
 	"fmt"
 	"strings"
-
-	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 )
 
 const (
@@ -159,11 +157,7 @@ func PreloadSingleRecommendedTool(loop *ReActLoop, recommendedCaps []string) boo
 	if invoker := loop.GetInvoker(); invoker != nil {
 		invoker.AddToTimeline("recent_tool_preloaded", fmt.Sprintf("精准推荐仅命中一个工具，已自动加入最近工具缓存: %s", toolName))
 	}
-	if realCfg, ok := loop.GetConfig().(*aicommon.Config); ok {
-		realCfg.RecordRecentlyUsedTool(tool)
-	} else {
-		mgr.AddRecentlyUsedTool(tool)
-	}
+	loop.RecordRecentlyUsedTool(tool)
 	return true
 }
 

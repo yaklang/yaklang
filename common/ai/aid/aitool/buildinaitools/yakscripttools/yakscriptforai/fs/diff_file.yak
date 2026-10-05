@@ -12,6 +12,29 @@ Required Parameters:
   file2           (string)  The path to the second file to compare.
                             Must be an existing readable file.
                             The diff output shows changes needed to transform file1 into file2.
+
+调用示例：
+[[- if .FunctionCallMode -]]
+arguments 示例：
+```json
+{
+  "file1": "/absolute/path/before.txt",
+  "file2": "/absolute/path/after.txt"
+}
+```
+[[- else -]]
+文本流 action：
+```json
+{
+  "@action": "directly_call_tool",
+  "directly_call_tool_name": "diff_file",
+  "directly_call_tool_params": {
+    "file1": "/absolute/path/before.txt",
+    "file2": "/absolute/path/after.txt"
+  }
+}
+```
+[[- end -]]
 USAGE_BLOCK
 
 /*

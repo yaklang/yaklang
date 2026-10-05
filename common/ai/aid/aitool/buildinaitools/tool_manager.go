@@ -616,6 +616,11 @@ func (m *AiToolManager) totalCacheSize() int {
 // AddRecentlyUsedTool caches a tool for later directly_call_tool usage.
 // Duplicates are moved to the tail (most recent); FIFO eviction when over budget.
 func (m *AiToolManager) AddRecentlyUsedTool(tool *aitool.Tool) RecentToolCacheMutation {
+	return m.AddRecentlyUsedToolForMode(tool, true)
+}
+
+// AddRecentlyUsedToolForMode renders examples for the consuming loop protocol.
+func (m *AiToolManager) AddRecentlyUsedToolForMode(tool *aitool.Tool, native bool) RecentToolCacheMutation {
 	var mutation RecentToolCacheMutation
 	if tool == nil {
 		return mutation
@@ -623,16 +628,16 @@ func (m *AiToolManager) AddRecentlyUsedTool(tool *aitool.Tool) RecentToolCacheMu
 	m.recentToolsMu.Lock()
 	defer m.recentToolsMu.Unlock()
 
-	return m.addRecentlyUsedToolLocked(tool)
+	return m.addRecentlyUsedToolLocked(tool, native)
 }
 
-func (m *AiToolManager) addRecentlyUsedToolLocked(tool *aitool.Tool) RecentToolCacheMutation {
+func (m *AiToolManager) addRecentlyUsedToolLocked(tool *aitool.Tool, native bool) RecentToolCacheMutation {
 	var mutation RecentToolCacheMutation
 	name := tool.GetName()
 	desc := tool.GetDescription()
 	schemaStr := tool.ToJSONSchemaString()
 	usage := tool.GetUsage()
-	renderedUsage, err := aitool.RenderUsageForMode(usage, true)
+	renderedUsage, err := aitool.RenderUsageForMode(usage, native)
 	if err != nil {
 		log.Warnf("cannot render Usage for cached tool %q: %v", name, err)
 		renderedUsage = ""
@@ -683,12 +688,16 @@ func (m *AiToolManager) addRecentlyUsedToolLocked(tool *aitool.Tool) RecentToolC
 // It does not append journal events; the session owner reconciles the returned
 // bounded snapshot with its persisted Timeline. Returned entries are copies.
 func (m *AiToolManager) RestoreRecentlyUsedTools(tools []*aitool.Tool) []*RecentToolEntry {
+	return m.RestoreRecentlyUsedToolsForMode(tools, true)
+}
+
+func (m *AiToolManager) RestoreRecentlyUsedToolsForMode(tools []*aitool.Tool, native bool) []*RecentToolEntry {
 	m.recentToolsMu.Lock()
 	defer m.recentToolsMu.Unlock()
 	m.recentToolsCache = nil
 	for _, tool := range tools {
 		if tool != nil {
-			m.addRecentlyUsedToolLocked(tool)
+			m.addRecentlyUsedToolLocked(tool, native)
 		}
 	}
 	entries := make([]*RecentToolEntry, 0, len(m.recentToolsCache))

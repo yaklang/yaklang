@@ -14,6 +14,29 @@ Optional Parameters:
   language        (string)  Target application language for template adaptation.
   include_examples (bool)   Whether to include usage examples in generated templates.
                             Default: true.
+
+调用示例：
+[[- if .FunctionCallMode -]]
+arguments 示例：
+```json
+{
+  "vuln_type": "xss",
+  "language": "javascript"
+}
+```
+[[- else -]]
+文本流 action：
+```json
+{
+  "@action": "directly_call_tool",
+  "directly_call_tool_name": "poc_template_searcher",
+  "directly_call_tool_params": {
+    "vuln_type": "xss",
+    "language": "javascript"
+  }
+}
+```
+[[- end -]]
 USAGE_BLOCK
 
 yakit.AutoInitYakit()
