@@ -20,6 +20,7 @@ func (m *Timeline) ReassignIDs(generator func() int64) int64 {
 	}
 	m.mu.Lock()
 	defer m.mu.Unlock()
+	wasCovered := m.memoryCoveredState != "" && m.memoryCoveredState == m.memoryFingerprintLocked()
 	ids := make(map[int64]bool)
 	items := make(map[int64]*TimelineItem)
 	for _, id := range m.idToTimelineItem.Keys() {
@@ -120,6 +121,9 @@ func (m *Timeline) ReassignIDs(generator func() int64) int64 {
 	}
 	m.rebuildPromotedStateLocked(m.frozenThroughLocked())
 	m.compressionLastFailure = ""
+	if wasCovered {
+		m.memoryCoveredState = m.memoryFingerprintLocked()
+	}
 	return last
 }
 

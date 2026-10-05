@@ -619,6 +619,62 @@ func (s *SQLiteVectorStoreHNSW) FuzzSearch(ctx context.Context, query string, li
 	return results.OutputChannel(), nil
 }
 
+// RestoreDocumentGraph repairs an existing document's graph node using its
+// durable embedding. It never asks the embedding provider to regenerate it.
+func (s *SQLiteVectorStoreHNSW) RestoreDocumentGraph(ctx context.Context, id string) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	if err := s.requireWriteCollection(); err != nil {
+		return err
+	}
+	doc, found, err := s.Get(id)
+	if err != nil {
+		return err
+	}
+	if !found || len(doc.Embedding) == 0 || len(doc.Embedding) != s.collection.Dimension {
+		return fmt.Errorf("document %s has no valid persisted embedding", id)
+	}
+	node := hnsw.MakeInputNodeFromID(id, hnswspec.LazyNodeID(id), func(hnswspec.LazyNodeID) ([]float32, error) {
+		return doc.Embedding, nil
+	})
+	if _, err := s.hnsw.AddWithError(node); err != nil {
+		return err
+	}
+	return s.PersistGraph(ctx)
+}
+
+// PersistGraph is an explicit durable barrier for callers maintaining storage
+// receipts. Automatic layer-change callbacks only log persistence failures.
+// Queue with graph writes so export and persistence see a coherent snapshot.
+func (s *SQLiteVectorStoreHNSW) PersistGraph(ctx context.Context) error {
+	done := make(chan struct{})
+	var err error
+	if !s.hnsw.submit(&graphOp{opType: opTypeWrite, desc: "PersistGraph", fn: func() {
+		defer close(done)
+		defer func() {
+			if recovered := recover(); recovered != nil {
+				err = fmt.Errorf("persist graph: %v", recovered)
+			}
+		}()
+		if err = ctx.Err(); err != nil {
+			return
+		}
+		if err = s.requireWriteCollection(); err != nil {
+			return
+		}
+		err = updateDatabaseGraphInfoInLock(s.db, s.collection.UUID, s.hnsw)
+	}}) {
+		return errors.New("graph wrapper is closed")
+	}
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-done:
+		return err
+	}
+}
+
 // Search 根据查询文本检索相关文档
 func (s *SQLiteVectorStoreHNSW) Search(query string, page, limit int) ([]SearchResult, error) {
 	return s.SearchWithFilter(query, page, limit, nil)

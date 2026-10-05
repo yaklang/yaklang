@@ -19,7 +19,8 @@ import (
 )
 
 type Timeline struct {
-	mu sync.RWMutex
+	persistMu sync.Mutex // serialize snapshot + DB write; older saves cannot overwrite a newer receipt
+	mu        sync.RWMutex
 	// Runtime observers have independent locks and never enter persistence or prompts.
 	itemInputCallbacks      timelineCallbackRegistry[TimelineItemInputEvent]
 	freezeCallbacks         timelineCallbackRegistry[TimelineFreezeResult]
@@ -68,6 +69,8 @@ type Timeline struct {
 	compressionLastFailure string
 	compressionRetryAfter  time.Time
 	branchTimeline         bool
+	memoryCoveredState     string // internal extraction watermark; never rendered into prompts
+	memoryFinalizePending  bool   // normal completion or interruption still requires memory processing
 }
 
 func (m *Timeline) OrderInsertId(id int64, item *TimelineItem) {
@@ -226,6 +229,8 @@ func (m *Timeline) CopyReducibleTimelineWithMemory() *Timeline {
 		compressedHead:        cloneTimelineCompressedHead(m.compressedHead),
 		compressedHistory:     cloneTimelineCompressedHistory(m.compressedHistory),
 		sessionMemory:         m.sessionMemory,
+		memoryCoveredState:    m.memoryCoveredState,
+		memoryFinalizePending: m.memoryFinalizePending,
 		promotedState:         cloneTimelinePromotedState(m.promotedState),
 		freezeState:           cloneTimelineFreezeState(m.freezeState),
 		userInputBoundaryKey:  m.userInputBoundaryKey,
@@ -307,12 +312,16 @@ func (m *Timeline) markBranchTimeline(branch bool) {
 }
 
 func (m *Timeline) SoftBindConfig(config AICallerConfigIf, aiCaller AICaller) {
+	m.mu.Lock()
 	if config != nil {
 		m.config = config
-		m.SetTimelineContentLimit(config.GetTimelineContentSizeLimit())
 	}
 	if utils.IsNil(m.ai) && !utils.IsNil(aiCaller) {
 		m.setAICaller(aiCaller)
+	}
+	m.mu.Unlock()
+	if config != nil {
+		m.SetTimelineContentLimit(config.GetTimelineContentSizeLimit())
 	}
 }
 
@@ -329,6 +338,14 @@ func NewTimeline(ai AICaller, extraMetaInfo func() string) *Timeline {
 		branchTimeline:       false,
 	}
 	tl.sessionMemory = newTimelineSessionMemory(tl, nil)
+	return tl
+}
+
+// NewPrivateTimeline starts an empty agent history. It is not a session owner;
+// its private source is archived by the parent when that agent is released.
+func NewPrivateTimeline(ai AICaller, extraMetaInfo func() string) *Timeline {
+	tl := NewTimeline(ai, extraMetaInfo)
+	tl.markBranchTimeline(true)
 	return tl
 }
 

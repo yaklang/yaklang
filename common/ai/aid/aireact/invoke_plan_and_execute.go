@@ -14,13 +14,14 @@ import (
 const recoveryTaskIDPrefix = "react-recovery-"
 
 type invokePlanAndExecuteOptions struct {
-	task             aicommon.AIStatefulTask
-	planPayload      string
-	forgeName        string
-	forgeParams      any
-	coordinatorID    string
-	startTaskID      string
-	executePlanInput *aicommon.ExecutePlanInput
+	task                     aicommon.AIStatefulTask
+	planPayload              string
+	forgeName                string
+	forgeParams              any
+	coordinatorID            string
+	startTaskID              string
+	executePlanInput         *aicommon.ExecutePlanInput
+	finalizeMemoryExternally bool
 }
 
 type InvokePlanAndExecuteOption func(*invokePlanAndExecuteOptions)
@@ -60,6 +61,11 @@ func WithInvokePlanAndExecuteExecutePlanInput(input *aicommon.ExecutePlanInput) 
 	return func(cfg *invokePlanAndExecuteOptions) {
 		cfg.executePlanInput = input
 	}
+}
+
+// The async wrapper owns the full boundary, including final artifact records.
+func withExternalMemoryFinalization(cfg *invokePlanAndExecuteOptions) {
+	cfg.finalizeMemoryExternally = true
 }
 
 func newInvokePlanAndExecuteOptions(opts ...InvokePlanAndExecuteOption) *invokePlanAndExecuteOptions {
@@ -137,6 +143,8 @@ func (r *ReAct) RequireAIForgeAndAsyncExecute(
 
 	cb := utils.NewCondBarrierContext(ctx)
 	startupBarrier := cb.CreateBarrier("startup")
+	task := r.GetCurrentTask()
+	releaseMemory := r.beginUserTaskMemory(task)
 	taskDone := make(chan struct{})
 	go func() {
 		var finalError error
@@ -150,10 +158,12 @@ func (r *ReAct) RequireAIForgeAndAsyncExecute(
 				r.AddToTimeline("plan_executeion", fmt.Sprintf("plan/forge: %v is finished", utils.ShrinkString(forgeName, 128)))
 			}
 			r.emitArtifactsSummaryToTimeline()
+			r.finishAsyncUserTaskMemory(task, finalError, releaseMemory)
 			done(finalError)
 		}()
 		finalError = r.invokePlanAndExecute(taskDone, ctx,
-			WithInvokePlanAndExecuteTask(r.GetCurrentTask()),
+			WithInvokePlanAndExecuteTask(task),
+			withExternalMemoryFinalization,
 			WithInvokePlanAndExecuteForge(forgeName, forgeParams),
 		)
 		if finalError != nil {
@@ -171,6 +181,8 @@ func (r *ReAct) AsyncPlanAndExecute(ctx context.Context, planPayload string, onF
 	cb := utils.NewCondBarrierContext(ctx)
 	startupBarrier := cb.CreateBarrier("startup")
 
+	task := r.GetCurrentTask()
+	releaseMemory := r.beginUserTaskMemory(task)
 	taskDone := make(chan struct{})
 	go func() {
 		var finalError error
@@ -180,12 +192,14 @@ func (r *ReAct) AsyncPlanAndExecute(ctx context.Context, planPayload string, onF
 			}
 			r.AddToTimeline("plan_executeion", fmt.Sprintf("plan: %v is finished", utils.ShrinkString(planPayload, 128)))
 			r.emitArtifactsSummaryToTimeline()
+			r.finishAsyncUserTaskMemory(task, finalError, releaseMemory)
 			if onFinished != nil {
 				onFinished(finalError)
 			}
 		}()
 		finalError = r.invokePlanAndExecute(taskDone, ctx,
-			WithInvokePlanAndExecuteTask(r.GetCurrentTask()),
+			WithInvokePlanAndExecuteTask(task),
+			withExternalMemoryFinalization,
 			WithInvokePlanAndExecutePlanPayload(planPayload),
 		)
 		if finalError != nil {
@@ -205,6 +219,7 @@ func (r *ReAct) AsyncRecoverPlanAndExecute(ctx context.Context, coordinatorID st
 
 	recoveryTask := newRecoveryPlanExecTask(ctx, r.Emitter, coordinatorID)
 	r.AddRuntimeTask(recoveryTask)
+	releaseMemory := r.beginUserTaskMemory(recoveryTask)
 
 	taskDone := make(chan struct{})
 	go func() {
@@ -215,12 +230,14 @@ func (r *ReAct) AsyncRecoverPlanAndExecute(ctx context.Context, coordinatorID st
 			}
 			r.AddToTimeline("plan_executeion", fmt.Sprintf("plan recovery: %v is finished", utils.ShrinkString(coordinatorID, 128)))
 			r.emitArtifactsSummaryToTimeline()
+			r.finishAsyncUserTaskMemory(recoveryTask, finalError, releaseMemory)
 			if onFinished != nil {
 				onFinished(finalError)
 			}
 		}()
 		invokeOpts := []InvokePlanAndExecuteOption{
 			WithInvokePlanAndExecuteTask(recoveryTask),
+			withExternalMemoryFinalization,
 			WithInvokePlanAndExecuteCoordinatorID(coordinatorID),
 			WithInvokePlanAndExecuteStartTaskID(startTaskID),
 		}

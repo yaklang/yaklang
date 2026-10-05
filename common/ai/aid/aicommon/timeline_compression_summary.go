@@ -30,7 +30,8 @@ func renderCompressionSummaryPrompt(snapshot *timelineCompressionSnapshot) (stri
 		previous = snapshot.Head.Text
 	}
 	history := renderCompressionSnapshotItems(snapshot.Items)
-	if strings.TrimSpace(previous) == "" && strings.TrimSpace(history) == "" {
+	if strings.TrimSpace(previous) == "" && strings.TrimSpace(history) == "" &&
+		(!snapshot.FinalizingMemory || (len(snapshot.UserContexts) == 0 && strings.TrimSpace(snapshot.Evidence) == "")) {
 		return "", fmt.Errorf("timeline compression has no history to summarize")
 	}
 	var source strings.Builder
@@ -114,7 +115,11 @@ func compressionSourceTag(label, content string) string {
 // truncation. Transport/parser retries still follow the existing Config policy.
 // It never commits, freezes, promotes or retires any Timeline content.
 func (m *Timeline) summarizeCompressionSnapshot(snapshot *timelineCompressionSnapshot, limits ...TimelineCompressionOptions) (string, error) {
-	if m == nil || m.config == nil {
+	if m == nil {
+		return "", fmt.Errorf("timeline compression requires an auxiliary scheduler")
+	}
+	config := m.compressionCallerConfig()
+	if config == nil {
 		return "", fmt.Errorf("timeline compression requires an auxiliary scheduler")
 	}
 	prompt, err := renderCompressionSummaryPrompt(snapshot)
@@ -128,9 +133,10 @@ func (m *Timeline) summarizeCompressionSnapshot(snapshot *timelineCompressionSna
 	if len(limits) > 0 {
 		limit = limits[0]
 	}
+	snapshot.MemoryInputLimit, snapshot.MemoryOutputLimit = limit.MaxInputTokens, limit.MaxSummaryTokens
 	ctx := limit.Context
 	if ctx == nil {
-		ctx = m.config.GetContext()
+		ctx = config.GetContext()
 	}
 	if limit.MaxInputTokens > 0 && TokenCountExceeds(timelineCompressionInstruction+"\n"+prompt+"\n"+timelineCompressionSchema, limit.MaxInputTokens) {
 		return "", fmt.Errorf("timeline compression input exceeds safety limit %d; source preserved", limit.MaxInputTokens)

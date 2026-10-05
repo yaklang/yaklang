@@ -1,6 +1,9 @@
 // yak common/ai/aismoking/coordinator.yak
 // aim.InvokeReAct: manual/YOLO × native/text. Real tools, DAG, evidence and report.
 include "common/ai/aismoking/mock.inc"
+memoryFinalization = os.Getenv("AISMOKING_MEMORY_FINALIZATION") == "1"
+memoryCompressions, memorySaves, memoryIndexes = 0,0,0
+memoryNamespace = ""
 sourceFile = file.Join(smokeRoot,"source.txt")
 file.Save(sourceFile,"execution-source-sentinel: validated local source")~
 steps, starts, mainCalls, workerCalls, modelReviews, reportStep = {}, {}, 0, 0, 0, 0
@@ -8,6 +11,8 @@ approvals, taskReviews, pushes, pops, ends, reports, reportPath = 0, 0, 0, 0, 0,
 permanent, roleTools, cacheSamples = nil, {}, []
 func record(op,e) {
     typ = string(e.Type)
+    if e.NodeId == "memory-save" { memorySaves++ }
+    if e.NodeId == "memory-index" { memoryIndexes++ }
     if typ in ["stream","stream_start","stream_end"] { return }
     data = {}
     if e.IsJson { data = json.loads(string(e.Content)) }
@@ -28,6 +33,16 @@ func record(op,e) {
 smokeHandler = func(w,body) {
     native = len(body.tools) > 0
     prompt = smokePrompt(body)
+    assert !("SMOKE_CALLER:memory-triage" in prompt), "retired automatic triage was invoked"
+    if "SMOKE_CALLER:timeline-compress" in prompt {
+        assert memoryFinalization && reports == 1 && pops == 4 && ends == 1, "stage/wait/worker boundary triggered memory finalization"
+        assert !native && "execution.A" in prompt && "execution.D" in prompt
+        memoryCompressions++
+        smokeAnswer(w,false,"timeline-summary",{"summary":"DAG任务、共享证据和报告均已完成审核。","ratain_timeline_item_range":"", "memory_entities":[
+            {"content":"工程报告需要列明实际核对范围。","tags":["报告"],"potential_questions":["工程报告需包含什么验证范围？"],
+            "scores":{"connectivity":0.2,"origin":1,"relevance":0.8,"emotion":0,"perference":1,"actionability":0.8,"temporality":0.9}}]})
+        return
+    }
     if "SMOKE_CALLER:liteforge[session-title-generator]" in prompt {
         name = "session-title-generator"
         if native { name = body.tools[0]["function"].name }
@@ -107,7 +122,7 @@ smokeHandler = func(w,body) {
     smokeAnswer(w,native,"submit_report",{"summary":"DAG、证据和验收完成。"})
 }
 configure = func(cfg) {
-    cfg.DisableCreateDBRuntime,cfg.DisablePerception,cfg.DisableMemoryTriage = true,true,true
+    cfg.DisableCreateDBRuntime,cfg.DisablePerception,cfg.DisableMemoryTriage = true,true,!memoryFinalization
     cfg.ForceManualPlanReview = true
     cfg.PlanExecTaskConcurrency = 2
     cfg.AiAutoRetry,cfg.AiTransactionAutoRetry = 1,1
@@ -117,16 +132,24 @@ configure = func(cfg) {
 for native in [true,false] {
     for manual in [false,true] {
         steps,starts,mainCalls,workerCalls,modelReviews,reportStep = {},{},0,0,0,0
+        memoryCompressions,memorySaves,memoryIndexes = 0,0,0
+        memoryNamespace = "smoke-plan-memory-"+randstr(12)
         approvals,taskReviews,pushes,pops,ends,reports,reportPath = 0,0,0,0,0,0,""
         permanent,roleTools,cacheSamples = nil,{},[]
         policy = "yolo"
         if manual { policy = "manual" }
-        die(aim.InvokeReAct("进入 PLAN，创建 A/B/C/D DAG，读取真实来源，保存 evidence，审核并交付报告。",
-            aim.planEngine("coordinator"),aim.context(smokeCtx),aim.timeout(90),aim.maxIteration(40),aim.workdir(smokeRoot),aim.reviewPolicy(policy),
-            aim.disableMCPServers(true),aim.aiCallback(smokeModel),aim.onEvent(record),aim.configOptions(aiagent.functionCallMode(native),aiagent.aiCallback(smokeModel),configure),func(c) {
-                c.Stateless = true
+        die(aim.InvokeReAct("进入 PLAN，创建 A/B/C/D DAG，读取真实来源，保存 evidence，审核并交付报告。工程报告需要列明实际核对范围。",
+            aim.sessionID(memoryNamespace),aim.planEngine("coordinator"),aim.context(smokeCtx),aim.timeout(90),aim.maxIteration(40),aim.workdir(smokeRoot),aim.reviewPolicy(policy),
+            aim.disableMCPServers(true),aim.aiCallback(smokeModel),aim.speedPriorityAICallback(smokeModel),aim.onEvent(record),aim.configOptions(aiagent.functionCallMode(native),aiagent.aiCallback(smokeModel),configure),func(c) {
+                c.Stateless = !memoryFinalization
             }))
         assert approvals == 1 && reports == 1 && ends == 1
+        if memoryFinalization {
+            assert memoryCompressions == 1 && memorySaves == 1 && memoryIndexes == 1, "normal PLAN completion must wait for one final durable save"
+            memories = aimemory.SearchMemory("工程报告",aimemory.memoryNamespace(memoryNamespace),aimemory.memorySearchMode("bm25"))~
+            assert len(memories)==1
+            printf("PASS PLAN memory: native=%v manual=%v compression=1 save=1 index=1 searchable=1 old_triage=0\n",native,manual)
+        }
         assert pushes == 4 && pops == 4 && len(starts) == 4 && workerCalls == 16
         if manual { assert taskReviews == 4 && modelReviews == 0 } else { assert taskReviews == 0 && modelReviews == 4 }
         assert "未发生重复执行" in string(file.ReadFile(reportPath)~)

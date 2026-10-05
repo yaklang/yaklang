@@ -27,7 +27,7 @@ func TestTimelineSessionMemoryAcrossCompressionsWithoutObservers(t *testing.T) {
 	require.Len(t, prompts, 2)
 	require.Contains(t, prompts[1], "<|SESSION_MEMORY_CANDIDATES_")
 	require.Contains(t, prompts[1], candidate["content"])
-	require.Contains(t, prompts[1], candidate["title"])
+	require.NotContains(t, prompts[1], "标题：")
 	for _, field := range []string{"tags：", "potential_questions：", "scores：", "# candidate="} {
 		require.NotContains(t, prompts[1], field, "session memory metadata must stay out of compression materials")
 	}
@@ -54,7 +54,7 @@ func TestTimelineSessionMemoryRestoreForkAndIsolation(t *testing.T) {
 	correction := compressionMemoryFixture()
 	correction["content"] = "用户更正先前要求；仅在当前项目使用英文报告。"
 	completion := &timelineCompressionCompletion{done: make(chan struct{}), output: &timelineCompressionOutput{MemoryEntities: []any{correction}}}
-	fork.Branch.sessionMemory.record(completion)
+	fork.Branch.sessionMemory.record(&timelineCompressionSnapshot{MemoryCompletion: completion})
 	close(completion.done)
 	require.Len(t, tl.GetSessionMemoryCandidates(), 2)
 	require.Len(t, tl.CopyReducibleTimelineWithMemory().GetSessionMemoryCandidates(), 2)
@@ -72,7 +72,7 @@ func TestTimelineSessionMemoryRestoreForkAndIsolation(t *testing.T) {
 func TestTimelineSessionMemoryPendingTailAndFailure(t *testing.T) {
 	h := newTimelineSessionMemory(nil, nil)
 	completion := &timelineCompressionCompletion{done: make(chan struct{})}
-	h.record(completion)
+	h.record(&timelineCompressionSnapshot{MemoryCompletion: completion})
 	require.Empty(t, h.snapshot(), "prompt assembly must not wait for a pending tail")
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Millisecond)
 	defer cancel()
@@ -82,7 +82,7 @@ func TestTimelineSessionMemoryPendingTailAndFailure(t *testing.T) {
 	require.NoError(t, h.wait(context.Background()))
 	require.Len(t, h.snapshot(), 1)
 	failed := &timelineCompressionCompletion{done: make(chan struct{}), output: completion.output, err: errors.New("invalid memory tail")}
-	h.record(failed)
+	h.record(&timelineCompressionSnapshot{MemoryCompletion: failed})
 	close(failed.done)
 	require.Len(t, h.snapshot(), 1)
 }
@@ -105,7 +105,7 @@ func TestTimelineSessionMemoryNextCompressionWaitsWithinContext(t *testing.T) {
 	tl := NewTimeline(nil, nil)
 	tl.PushText(1, "new observation after the published summary")
 	completion := &timelineCompressionCompletion{done: make(chan struct{})}
-	tl.sessionMemory.record(completion)
+	tl.sessionMemory.record(&timelineCompressionSnapshot{MemoryCompletion: completion})
 	var calls int
 	bindCompressionMock(t, tl, func(request *AIRequest) (string, error) {
 		calls++

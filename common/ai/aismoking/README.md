@@ -6,7 +6,7 @@
 
 库复用 RAG BM25/向量查询及已有 memory 表接口，返回现有 `AIMemoryEntity` 行，限量、去重、过滤过期/删除项并限制正文 token；输出格式在 `search_memory.yak` 中维护。`bm25` 还补充正文/标签关键词匹配，缺少索引可回退；`hybrid` 向量不可用时保留关键词结果并记录英文诊断，`vector` 明确报错。无匹配返回空数组，不创建 memory 集、不初始化 triage。`smart_qa` 仍是已注册的专注模式，其 memory action 转发至同一脚本。
 
-自动 injection 只在意图识别结果落地时复用现有 `SearchMemoryWithoutAI` 检索一次，最多 5 条、1200 tokens；没有意图识别不自动检索。同一意图的空结果也不重搜，后续工具步骤和记忆写入不刷新快照。显式搜索仅进入普通工具 Timeline 及冻结块，不修改 injection。本轮不改变 triage 写入频率。
+自动 injection 只在意图识别结果落地时复用现有 `SearchMemoryWithoutAI` 检索一次，最多 5 条、1200 tokens；没有意图识别不自动检索。同一意图的空结果也不重搜，后续工具步骤和记忆写入不刷新快照。显式搜索仅进入普通工具 Timeline 及冻结块，不修改 injection。自动沉淀仅来自 Timeline 压缩产生的 memory entities；执行中沿用原阈值，完整用户任务正常结束且有新增业务内容时额外收尾。审核等待、idle wait、阶段切换不触发抽取。取消/断连只记下待处理来源，恢复后补处理；手动创建记忆及管理接口保留。
 
 所有 AI mock、冒烟和模型观测脚本集中在这里。业务流程、模型夹具、审核回复和断言写在 Yak 中，不需要 Go 注入变量或启动 Go 业务运行器。Go 单元与集成测试继续验证内部状态机、并发、恢复、权限及 VM 绑定。
 
@@ -53,6 +53,11 @@ yak common/ai/aismoking/forge.yak
 
 这些入口直接 `yak xxx.yak`，不会由默认套件自动执行：
 
+- [live/timeline_memory_finalization.yak](live/timeline_memory_finalization.yak)：`aim.InvokeReAct` 双协议 × 短任务、阈值压缩长任务、空记忆，共六组；正常返回前等待真实保存/索引完成，重复结束不再请求模型，内部进度不进入静态上下文或压缩输入。需可用 embedding 服务，使用临时 `YAKIT_HOME`，仅在本地运行。
+- `AISMOKING_MEMORY_FINALIZATION=1 yak common/ai/aismoking/coordinator.yak`：双协议 × 人工/YOLO 的四任务 DAG，全程只在业务报告交付后收尾；验证真实保存、索引、检索及旧自动 triage 为零。Windows 可先在 PowerShell 设置 `$env:AISMOKING_MEMORY_FINALIZATION='1'` 再执行该 Yak 脚本。
+
+- [live/timeline_memory_persistence.yak](live/timeline_memory_persistence.yak)：`aim.InvokeReAct` 的 function call/text stream × 正常、空记忆、部分失败自动重试、失败耗尽、全新 runtime 恢复，共十组；重复投递和恢复不重复写入或通知，已有候选恢复时仅重试保存；中断的压缩尾段从已持久化来源补提取。保存状态不进入模型上下文。使用本地模型夹具及真实记忆后端，需要可用 embedding 服务来验证问题索引。请使用临时 `YAKIT_HOME`；只供本地开发，不进 CI。
+
 - [live/memory_capture_selftest.yak](live/memory_capture_selftest.yak)：本地 HTTP/SSE 夹具检查完整 content、reasoning、分片 arguments、空记忆、错误协议、截断参数和无输出的诊断采样；不访问真实模型。
 
 - [live/memory_protocol.yak](live/memory_protocol.yak)：沿用配置中的轻量模型，对比记忆筛选与 Timeline 摘要的 function call / 文本流；覆盖短约束、已有记忆不重复收录、临时日志、长期约束、范围纠正、待返回调用、引用中的旧协议和 DAG 衔接，默认重复 3 轮。设置 `AISMOKING_OUTPUT` 保存无认证头的实际请求、完整响应体、分别还原的 content / function call arguments、finish reason、评分及语义断言；每次响应和最终结果均落盘，超时、协议失败与语义错误分别记录。`AISMOKING_MEMORY_SOURCE` 可附加已脱敏历史回放，`AISMOKING_MEMORY_KIND=triage/summary`、`AISMOKING_MEMORY_CASE`、`AISMOKING_MEMORY_MODE=function-call/text-stream` 可单独复测；`AISMOKING_MEMORY_EXAMPLES=0` 关闭原生参数示例以做对照，`AISMOKING_MEMORY_SPEED=0` 使用主模型。脚本不持久化记忆；请求或语义检查失败会返回非零，并保留失败采样。
@@ -81,3 +86,6 @@ yak common/ai/aismoking/forge.yak
 `aiforge/buildinforge` 的生产蓝图、`yakscriptforai` 的生产工具、Yak 编译器/网络 mock fixtures 不属于 AI 冒烟，不移动或删除。旧评测文档保留历史数据，但入口统一指向本目录。
 
 这套 Yak 冒烟仅用于本地开发与 review，不由 CI 执行，也不作为 CI gate。CI 继续运行已有 Go 单元和集成回归。
+
+- [live/timeline_memory_longrun.yak](live/timeline_memory_longrun.yak)：真实配置模型的长程记忆对照，默认 DeepSeek v4.1 flash。通过 `aim.InvokeReAct` 逐批核对 18 份本地材料、逐批保存 Evidence、经历两次阈值压缩及正常任务收尾，检查异步回执与报告数字，记录原生主循环和文本流辅助请求、完整响应、provider usage、原文保留及真实记忆保存/索引。分别使用改动前、后 Yak 二进制直接运行同一脚本，设置 `AISMOKING_VARIANT=baseline/current` 和不同的新 `AISMOKING_OUTPUT`；会话与记忆 namespace 自动隔离。需要已配置的 AI 与 embedding 服务，单轮预算最多 1500 秒；收尾仍遵循生产的有界生命周期，待处理状态会使验收失败。仅本地使用，不进 CI。
+- [live/timeline_memory_longrun_verify.yak](live/timeline_memory_longrun_verify.yak)：用同一 `AISMOKING_OUTPUT` 离线复核业务数字、摘要衔接、保留原文和公开 BM25 记忆查询，不重新调用 AI、不覆盖原始结果。业务/检索通过不能代替收尾通过，仍须查看 `result.json` 与运行日志。

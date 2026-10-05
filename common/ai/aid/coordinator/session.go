@@ -12,6 +12,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon/promptloader"
+	"github.com/yaklang/yaklang/common/ai/aid/aimem"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
@@ -356,6 +357,17 @@ func (s *Session) run(planningOnly bool) (err error) {
 	}
 	task := aicommon.NewStatefulTaskBase("coordinator-"+s.Id, input, s.GetContext(), s.GetEmitter(), true)
 	task.SetUserInput(s.query)
+	if _, enabled := s.Config.MemoryTriage.(aimem.TimelineMemoryPersister); enabled && s.parent == nil && !s.PlanningOnly() {
+		release := task.DeferCompletion()
+		defer release()
+		defer func() {
+			if err != nil || s.GetContext().Err() != nil {
+				if saveErr := s.Timeline.RequestMemoryFinalization(); saveErr != nil {
+					s.EmitError("save interrupted PLAN memory source failed: %v", saveErr)
+				}
+			}
+		}()
+	}
 	s.invoker.SetCurrentTask(task)
 	if s.parent == nil {
 		// The loop reuses this ingress receipt instead of recording the same
@@ -401,29 +413,16 @@ func (s *Session) run(planningOnly bool) (err error) {
 	s.mu.Lock()
 	err = s.stateErr
 	s.mu.Unlock()
+	if err == nil && s.parent == nil && !s.PlanningOnly() {
+		if finalizeErr := aimem.CompleteTimelineMemory(s.Config, s.GetContext(), s.query); finalizeErr != nil {
+			s.EmitError("memory finalization pending: %v", finalizeErr)
+		}
+	}
 	return err
 }
 
 func executeLoop(cfg *aicommon.Config, invoker aicommon.AITaskInvokeRuntime, loop *reactloops.ReActLoop, task aicommon.AIStatefulTask) error {
 	invoker.SetCurrentTask(task)
-	differ := aicommon.NewTimelineDiffer(cfg.Timeline)
-	differ.SetBaseline()
-	buffer := aicommon.NewMemoryFlushBuffer(Name, differ, nil)
-	defer buffer.Close()
-	reactloops.WithOnPostIteraction(func(_ *reactloops.ReActLoop, iteration int, task aicommon.AIStatefulTask, done bool, reason any, op *reactloops.OnPostIterationOperator) {
-		op.DeferAfterCallbacks(func() {
-			if cfg.MemoryTriage == nil {
-				return
-			}
-			buffer.ProcessAsync(aicommon.MemoryFlushSignal{Iteration: iteration, Task: task, IsDone: done, Reason: reason, ShouldEndIteration: op.ShouldEndIteration()}, func(payload *aicommon.MemoryFlushPayload, err error) {
-				if err == nil && payload != nil {
-					if err := cfg.MemoryTriage.HandleMemory(payload.ContextualInput); err != nil {
-						cfg.EmitError("memory triage: %v", err)
-					}
-				}
-			})
-		})
-	})(loop)
 	aicommon.BeginSessionSnapshotExecutionForTask(cfg, task, time.Now())
 	reactloops.EmitSessionSnapshot(cfg, loop, task)
 	err := loop.ExecuteWithExistedTask(task)

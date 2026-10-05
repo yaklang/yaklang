@@ -129,6 +129,9 @@ func (r *ReAct) processReActFromQueue() {
 
 // processReActTask 处理单个 Task
 func (r *ReAct) processReActTask(task aicommon.AIStatefulTask) {
+	releaseCompletion := r.beginUserTaskMemory(task)
+	defer r.memoryContinuations.Delete(task.GetId())
+	defer releaseCompletion()
 	// Recovery tasks have a different execution path: they skip the ReAct loop
 	// and directly invoke plan-and-execute with the recovery parameters.
 	if task.GetTaskKind() == aicommon.AITaskKind_Recovery {
@@ -184,6 +187,9 @@ func (r *ReAct) processReActTask(task aicommon.AIStatefulTask) {
 		task.SetStatus(aicommon.AITaskState_Completed)
 	}
 	skipStatusFallback.SetTo(skipStatus)
+	if !skipStatus {
+		r.completeUserTaskMemory(task)
+	}
 }
 
 // applyTaskExecutionPolicy keeps unattended policy scoped to the scheduled
@@ -258,6 +264,7 @@ func (r *ReAct) processRecoveryTask(task aicommon.AIStatefulTask) {
 	r.AddToTimeline("success", "recovery task execution succeeded")
 	r.AddToTimeline("plan_executeion", fmt.Sprintf("plan recovery: %v is finished", utils.ShrinkString(data.CoordinatorID, 128)))
 	r.emitArtifactsSummaryToTimeline()
+	r.completeUserTaskMemory(task)
 }
 
 func (r *ReAct) selectLoopForTask(task aicommon.AIStatefulTask) (string, string, []reactloops.ReActLoopOption) {
@@ -354,8 +361,6 @@ func (r *ReAct) ExecuteLoopTask(taskTypeName string, task aicommon.AIStatefulTas
 	if taskTypeName == "coordinator" {
 		return false, r.invokeCoordinatorChannel(taskTypeName, make(chan struct{}), task.GetContext(), WithInvokePlanAndExecuteTask(task), WithInvokePlanAndExecutePlanPayload(task.GetUserInput()))
 	}
-	memoryFlushBuffer := aicommon.NewMemoryFlushBuffer("react", r.config.TimelineDiffer, nil)
-	defer memoryFlushBuffer.Close()
 	defaultOptions := reactloops.BasicAICommonConfigOption(r.config)
 	defaultOptions = append(defaultOptions,
 		reactloops.WithOnAsyncTaskTrigger(func(i *reactloops.LoopAction, task aicommon.AIStatefulTask) {
@@ -398,49 +403,7 @@ func (r *ReAct) ExecuteLoopTask(taskTypeName string, task aicommon.AIStatefulTas
 					r.Emitter.EmitReActSuccess("ReAct task execution success")
 				}
 			})
-			operator.DeferAfterCallbacks(func() {
-				if r.memoryTriage == nil {
-					return
-				}
-				memoryFlushBuffer.ProcessAsync(aicommon.MemoryFlushSignal{
-					Iteration:          iteration,
-					Task:               task,
-					IsDone:             isDone,
-					Reason:             reason,
-					ShouldEndIteration: operator.ShouldEndIteration(),
-				}, func(payload *aicommon.MemoryFlushPayload, err error) {
-					if err != nil {
-						log.Warnf("timeline differ call failed: %v", err)
-						return
-					}
-					if payload == nil && !isDone {
-						return
-					}
 
-					go func() {
-						defer func() {
-							if err := recover(); err != nil {
-								log.Errorf("intelligent memory processing panic: %v", err)
-								utils.PrintCurrentGoroutineRuntimeStack()
-							}
-						}()
-
-						if payload != nil {
-							if r.config.DebugEvent {
-								log.Infof("processing memory flush[%s] for iteration %d with %d pending diffs (%d bytes)", payload.FlushReason, iteration, payload.PendingIterations, payload.PendingBytes)
-							}
-							if err := r.memoryTriage.HandleMemory(payload.ContextualInput); err != nil {
-								if r.config.GetContext().Err() != nil {
-									log.Debugf("memory processing stopped with runtime: %v", err)
-									return
-								}
-								log.Warnf("intelligent memory processing failed: %v", err)
-								return
-							}
-						}
-					}()
-				})
-			})
 		}),
 		reactloops.WithAllowAIForge(r.config.EnablePlanAndExec),
 		reactloops.WithAllowPlanAndExec(r.config.EnablePlanAndExec),
@@ -776,6 +739,7 @@ func BuildReActInvoker(ctx context.Context, options ...aicommon.ConfigOption) (a
 	if cfg.TimelineDiffer == nil {
 		cfg.TimelineDiffer = aicommon.NewTimelineDiffer(cfg.Timeline)
 	}
+	aimem.RegisterTimelineMemoryPersistence(cfg.Timeline, invoker.memoryTriage, cfg.GetContext())
 	cfg.EnhanceKnowledgeManager.SetEmitter(cfg.Emitter)
 	// Initialize prompt manager (workdir does not depend on artifacts, which is lazy)
 	workdir := cfg.Workdir

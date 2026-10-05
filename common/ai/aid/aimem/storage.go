@@ -38,30 +38,35 @@ func CalcExpiresAt(tScore float64, createdAt time.Time) *time.Time {
 	return &expires
 }
 
-// SaveMemoryEntities 保存记忆条目到数据库并索引到RAG系统和HNSW。
-//
-// 容错策略 (best-effort batch save)：单个 entity 的任何子步骤失败 (db /
-// hnsw / rag) 都不能阻断其余 entity 的保存。这避免了之前在 CI 上观察到的
-// "ShouldSaveMemoryEntities 返回 N 个 entity, 但 SaveMemoryEntities 只入库
-// 第一个就因为某步报错 return, 后续 entity 静默丢失" 的诡异现象 —— 例如
-// TestReAct_ToolUse_Reject_WithAIMemory 在 CI 上偶发只能找到 1/2 条 memory，
-// 期待 \"系统行为\" 那条永远丢失.
-//
-// 错误返回语义：
-//   - 所有 entity 都失败入库时返回最后一个错误，便于上层感知整体失败。
-//   - 任何一个 entity 成功入库，返回 nil（其余子步骤错误降级为日志，与本函数
-//     之前对 RAG 错误的处理一致）。
-//
-// 关键词: SaveMemoryEntities 容错批量保存, 单 entity 失败不阻断后续 entity,
-//
-//	TestReAct_ToolUse_Reject_WithAIMemory CI 偶发丢条修复
+// SaveMemoryEntities keeps the existing triage entry point compatible.
+// Persistence itself has no dependency on the extraction runtime.
 func (r *AIMemoryTriage) SaveMemoryEntities(entities ...*aicommon.MemoryEntity) error {
-	db := r.SafeGetDB()
-	if db == nil {
-		return utils.Errorf("database connection is nil")
-	}
+	return r.memoryStore().SaveMemoryEntities(entities...)
+}
 
-	emitter := r.GetEmitter()
+func (r *AIMemoryTriage) memoryStore() *MemoryStore {
+	return &MemoryStore{
+		sessionID: r.sessionID, db: r.SafeGetDB(), rag: r.rag,
+		hnswBackend: r.hnswBackend, emitter: r.GetEmitter(),
+	}
+}
+
+func memoryEntityRow(namespace string, entity *aicommon.MemoryEntity) schema.AIMemoryEntity {
+	return schema.AIMemoryEntity{MemoryID: entity.Id, SessionID: namespace, Content: entity.Content,
+		Tags: schema.StringArray(entity.Tags), PotentialQuestions: schema.StringArray(entity.PotentialQuestions),
+		C_Score: entity.C_Score, O_Score: entity.O_Score, R_Score: entity.R_Score, E_Score: entity.E_Score,
+		P_Score: entity.P_Score, A_Score: entity.A_Score, T_Score: entity.T_Score,
+		CorePactVector: schema.FloatArray(entity.CorePactVector)}
+}
+
+// SaveMemoryEntities saves each entity independently and indexes its questions.
+// Index failures are logged; a batch returns an error only if every DB write fails.
+func (r *MemoryStore) SaveMemoryEntities(entities ...*aicommon.MemoryEntity) error {
+	db := r.db
+	if db == nil {
+		return utils.Error("database connection is nil")
+	}
+	emitter := r.emitter
 	var lastDBErr error
 	savedCount := 0
 	for _, entity := range entities {
@@ -70,21 +75,8 @@ func (r *AIMemoryTriage) SaveMemoryEntities(entities ...*aicommon.MemoryEntity) 
 		}
 
 		// 保存到数据库
-		dbEntity := &schema.AIMemoryEntity{
-			MemoryID:           entity.Id,
-			SessionID:          r.sessionID,
-			Content:            entity.Content,
-			Tags:               schema.StringArray(entity.Tags),
-			PotentialQuestions: schema.StringArray(entity.PotentialQuestions),
-			C_Score:            entity.C_Score,
-			O_Score:            entity.O_Score,
-			R_Score:            entity.R_Score,
-			E_Score:            entity.E_Score,
-			P_Score:            entity.P_Score,
-			A_Score:            entity.A_Score,
-			T_Score:            entity.T_Score,
-			CorePactVector:     schema.FloatArray(entity.CorePactVector),
-		}
+		row := memoryEntityRow(r.sessionID, entity)
+		dbEntity := &row
 
 		// 根据T_Score自动计算过期时间
 		now := time.Now()
@@ -94,7 +86,7 @@ func (r *AIMemoryTriage) SaveMemoryEntities(entities ...*aicommon.MemoryEntity) 
 			dbEntity.ExpiresAt = entity.ExpiresAt
 		}
 
-		if err := db.Table(r.entityTableName()).Create(dbEntity).Error; err != nil {
+		if err := db.Table((&schema.AIMemoryEntity{}).TableName()).Create(dbEntity).Error; err != nil {
 			log.Errorf("save memory entity to database failed: %v (entity id=%s)", err, entity.Id)
 			// 记录最后一次 db 错误，继续尝试保存其他 entity。
 			// 关键词: best-effort, 不因单条 db 写入失败丢失整批 memory

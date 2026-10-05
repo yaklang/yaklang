@@ -1,0 +1,88 @@
+// yak common/ai/aismoking/live/timeline_memory_finalization.yak
+// Local developer smoke: real aim runtime/tools/SQLite/indexes, mocked model.
+// Use a disposable YAKIT_HOME with a working configured embedding service.
+include "common/ai/aismoking/mock.inc"
+variant, config, namespace, step = "", nil, "", 0
+compressions, saves, indexes, thresholdSummaries = 0,0,0,0
+static = nil
+source = file.Join(smokeRoot,"memory-business-source.txt")
+file.Save(source,"business-source-sentinel: actual local source, verified")~
+candidate = {"content":"工程报告需要列明实际核对范围。","tags":["报告"],"potential_questions":["工程报告需包含什么验证范围？"],
+    "scores":{"connectivity":0.2,"origin":1,"relevance":0.8,"emotion":0,"perference":1,"actionability":0.8,"temporality":0.9}}
+smokeHandler = func(w,body) {
+    native, prompt = len(body.tools)>0, smokePrompt(body)
+    assert !("SMOKE_CALLER:memory-triage" in prompt), "old automatic extractor was invoked"
+    if "SMOKE_CALLER:timeline-compress" in prompt {
+        assert !native, "compression keeps its own text-stream protocol"
+        compressions++
+        assert "ORIGINAL_USER_QUERY_" in prompt && "SESSION_EVIDENCE_" in prompt && "SESSION_MEMORY_CANDIDATES_" in prompt
+        assert "工程报告" in prompt
+        for field in ["memory_finalize_pending","memory_covered_state","memory_processed_sources","memory_retries","aimemory-timeline-v1/"] {
+            assert !(field in prompt), "storage state leaked into compression input"
+        }
+        entities = [candidate]
+        if variant == "empty" || compressions > 1 { entities = [] }
+        smokeAnswer(w,false,"timeline-summary",{"summary":"用户要求工程报告列明实际核对范围；已保存的来源检查和证据有效。","ratain_timeline_item_range":"","memory_entities":entities})
+        return
+    }
+    if "SMOKE_CALLER:directly-answer" in prompt {
+        w.Header().Set("Content-Type","text/event-stream")
+        smokeFrame(w,{"content":"实际来源核对完成。"},"stop"); w.Write("data: [DONE]\n\n")~; return
+    }
+    assert "SMOKE_CALLER:react-loop:default" in prompt || "SMOKE_CALLER:react-loop:main" in prompt
+    prefix = json.dumps(body.messages[0])
+    if static == nil { static = prefix } else { assert static == prefix, "memory persistence rewrote high-static context" }
+    step++
+    if variant == "long" {
+        if step <= 4 {
+            if step == 2 { config.GetTimeline().SetTimelineContentLimit(1) }
+            smokeAnswer(w,native,"directly_call_tool",{"directly_call_tool_name":"read_file","directly_call_tool_params":{"file":source},"directly_call_reason":"验证实际本地来源"}); return
+        }
+        if step == 5 { smokeAnswer(w,native,"save_evidence",{"evidence_id":"finalization.source","evidence_content":"business-source-sentinel：实际读取了 " + source}); return }
+        if step == 6 { smokeAnswer(w,native,"directly_answer",{"answer_payload":"实际来源与证据已验证。"}); return }
+    } else {
+        if step == 1 { smokeAnswer(w,native,"directly_answer",{"answer_payload":"已确认工程报告需列明核对范围。"}); return }
+    }
+    smokeAnswer(w,native,"finish",{})
+}
+for native in [true,false] {
+    for scenario in ["short","long","empty"] {
+        variant,config,namespace,step,static = scenario,nil,"smoke-finalization-"+randstr(12),0,nil
+        compressions,saves,indexes,thresholdSummaries = 0,0,0,0
+        die(aim.InvokeReAct("只核对已有材料。工程报告需要列明实际核对范围；完成后结束。",aim.sessionID(namespace),aim.context(smokeCtx),
+            aim.workdir(smokeRoot),aim.reviewPolicy("yolo"),aim.maxIteration(10),aim.timeout(65),aim.disableMCPServers(true),aim.disableAIForge(true),
+            aim.aiCallback(smokeModel),aim.speedPriorityAICallback(smokeModel),aim.onEvent(func(op,e) {
+                if e.NodeId == "memory-save" { saves++ }
+                if e.NodeId == "memory-index" { indexes++ }
+                if e.NodeId != "react_task_enqueue" { return }
+                config = op.GetConfig()
+                tl = config.GetTimeline()
+                tl.SetTimelineBucketByteSize(-1)
+                tl.SetTimelineContentLimit(100000)
+                tl.RegisterSummaryCallback("bounded-threshold",func(event) {
+                    thresholdSummaries++
+                    tl.SetTimelineContentLimit(100000)
+                })
+            }),aim.configOptions(aiagent.functionCallMode(native),aiagent.aiCallback(smokeModel),func(c) {
+                c.DisableCreateDBRuntime,c.DisablePerception,c.DisableIntentRecognition = true,true,true
+                c.SetConfig("disable_session_title_generation",true)
+                c.DisableMemoryTriage = false
+                c.AiAutoRetry,c.AiTransactionAutoRetry = 1,1
+                return nil
+            })))
+        expected = 1
+        if scenario == "empty" { expected = 0 }
+        assert saves == expected && indexes == expected, "InvokeReAct returned before memory persistence completed"
+        assert !config.GetTimeline().HasPendingMemoryFinalization()
+        assert compressions == thresholdSummaries
+        if scenario == "long" { assert compressions == 2 } else { assert compressions == 1 }
+        before = compressions
+        // Repeated end with no new business data: no extraction and no new save.
+        config.GetTimeline().FinalizeMemory(smokeCtx)~
+        assert compressions == before && saves == expected && indexes == expected
+        memories = aimemory.SearchMemory("工程报告",aimemory.memoryNamespace(namespace),aimemory.memorySearchMode("bm25"))~
+        assert len(memories)==expected
+        printf("PASS memory finalization: native=%v scenario=%s compression=%d save=%d index=%d searchable=%d old_triage=0\n",native,scenario,compressions,saves,indexes,len(memories))
+    }
+}
+smokeCheck()

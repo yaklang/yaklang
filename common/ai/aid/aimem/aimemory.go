@@ -3,12 +3,10 @@ package aimem
 import (
 	"context"
 	"fmt"
-	"time"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon/promptloader"
 	"github.com/yaklang/yaklang/common/ai/rag"
-	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 )
@@ -34,48 +32,9 @@ func newAIMemory(sessionId string, requireInvoker bool, opts ...Option) (*AIMemo
 		opt(config)
 	}
 
-	name := fmt.Sprintf("ai-memory-%s", sessionId)
-	if config.database == nil {
-		config.database = consts.GetGormProjectDatabase()
-	}
-	db := config.database
-
-	// 使用配置中的RAG选项
-	ragOpts := config.ragOptions
-	ragCheckingOpts := append([]rag.RAGSystemConfigOption{rag.WithDB(db)}, ragOpts...)
-
-	// 检查 embedding 服务可用性，如果不可用，记录警告但继续
-	var system *rag.RAGSystem
-	var embeddingAvailable bool
-	var err error
-
-	ragCheckingStart := time.Now()
-	embeddingAvailable = config.embeddingAvailabilityCheck(ragCheckingOpts...)
-	if du := time.Since(ragCheckingStart); du > 500*time.Millisecond {
-		log.Warnf("[AI-Memory(%v)] checking embedding availability took %v", name, du)
-	}
-	//  检查是否有默认的嵌入模型可用
-	if embeddingAvailable {
-		collectionStart := time.Now()
-		system, err = rag.GetRagSystem(name, ragCheckingOpts...)
-		if du := time.Since(collectionStart); du > 500*time.Millisecond {
-			log.Warnf("[AI-Memory(%v)] loading RAG system took %v", name, du)
-		}
-		if err != nil {
-			log.Warnf("failed to create RAG collection, semantic search will be unavailable: %v", err)
-			system = nil
-			embeddingAvailable = false
-		}
-	}
-
-	// 创建HNSW后端
-	hnswBackendStart := time.Now()
-	hnswBackend, err := NewAIMemoryHNSWBackend(WithHNSWSessionID(sessionId), WithHNSWDatabase(db))
-	if du := time.Since(hnswBackendStart); du > 500*time.Millisecond {
-		log.Warnf("[AI-Memory(%v)] creating HNSW backend took %v, it's abnormal case.", name, du)
-	}
+	store, err := newMemoryStore(sessionId, config)
 	if err != nil {
-		return nil, utils.Errorf("create HNSW backend failed: %v", err)
+		return nil, err
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -83,14 +42,14 @@ func newAIMemory(sessionId string, requireInvoker bool, opts ...Option) (*AIMemo
 	triage := &AIMemoryTriage{
 		ctx:                ctx,
 		cancel:             cancel,
-		rag:                system,
+		rag:                store.rag,
 		invoker:            config.invoker,
 		contextProvider:    config.contextProvider,
 		sessionID:          sessionId,
-		hnswBackend:        hnswBackend,
-		db:                 db,
+		hnswBackend:        store.hnswBackend,
+		db:                 store.db,
 		keywordMatcher:     NewKeywordMatcher(), // 初始化关键词匹配器
-		embeddingAvailable: embeddingAvailable,
+		embeddingAvailable: store.embeddingAvailable,
 	}
 
 	if requireInvoker && triage.invoker == nil && config.autoReActInvoker {

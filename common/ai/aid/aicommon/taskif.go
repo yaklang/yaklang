@@ -148,18 +148,20 @@ type PlanStatusProvider interface {
 type AIStatefulTaskBase struct {
 	*Emitter
 
-	id              string
-	name            string
-	userInput       string
-	originUserInput string
-	result          string
-	ctx             context.Context
-	cancel          context.CancelFunc
-	taskMutex       *sync.Mutex
-	statusMu        sync.RWMutex
-	status          AITaskState
-	createdAt       time.Time
-	asyncMode       bool
+	id                  string
+	name                string
+	userInput           string
+	originUserInput     string
+	result              string
+	ctx                 context.Context
+	cancel              context.CancelFunc
+	taskMutex           *sync.Mutex
+	statusMu            sync.RWMutex
+	status              AITaskState
+	completionHolds     int
+	completionRequested bool
+	createdAt           time.Time
+	asyncMode           bool
 
 	summary       string
 	statusSummary string
@@ -685,6 +687,27 @@ func (s *AIStatefulTaskBase) SetStatus(status AITaskState) {
 	s.setStatus(status, false)
 }
 
+// DeferCompletion keeps normal completion (including its event and context
+// cancellation) behind an outer task's bounded finalization. Stop/abort bypass
+// this gate. Nested holders release once; only the last release publishes it.
+func (s *AIStatefulTaskBase) DeferCompletion() func() {
+	s.statusMu.Lock()
+	s.completionHolds++
+	s.statusMu.Unlock()
+	var once sync.Once
+	return func() {
+		once.Do(func() {
+			s.statusMu.Lock()
+			s.completionHolds--
+			complete := s.completionHolds == 0 && s.completionRequested
+			s.statusMu.Unlock()
+			if complete {
+				s.SetStatus(AITaskState_Completed)
+			}
+		})
+	}
+}
+
 // ForceSetStatus bypasses the finished-state guard while preserving
 // lifecycle side effects such as event emission and cancellation when
 // entering a terminal state. Callers must ensure the task has a usable
@@ -698,6 +721,11 @@ func (s *AIStatefulTaskBase) setStatus(status AITaskState, force bool) {
 		return
 	}
 	s.statusMu.Lock()
+	if status == AITaskState_Completed && !force && s.completionHolds > 0 {
+		s.completionRequested = true
+		s.statusMu.Unlock()
+		return
+	}
 	if !force && isFinishedTaskStatus(s.status) {
 		s.statusMu.Unlock()
 		return // 已完成的任务状态不可更改

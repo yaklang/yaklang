@@ -11,9 +11,11 @@ import (
 // The immutable result is published by closing done. Summary consumers never
 // wait for the memory tail; memory observers read this only after the commit.
 type timelineCompressionCompletion struct {
-	done   chan struct{}
-	output *timelineCompressionOutput
-	err    error
+	done     chan struct{}
+	notified chan struct{}
+	retryKey string
+	output   *timelineCompressionOutput
+	err      error
 }
 
 func validateCompressionSelection(output *timelineCompressionOutput, snapshot *timelineCompressionSnapshot, limit TimelineCompressionOptions) error {
@@ -33,12 +35,12 @@ func validateCompressionSelection(output *timelineCompressionOutput, snapshot *t
 
 func (m *Timeline) startCompressionResponse(snapshot *timelineCompressionSnapshot, limit TimelineCompressionOptions, requestPrompt string) (<-chan *timelineCompressionOutput, *timelineCompressionCompletion) {
 	ready := make(chan *timelineCompressionOutput, 1)
-	completion := &timelineCompressionCompletion{done: make(chan struct{})}
+	completion := &timelineCompressionCompletion{done: make(chan struct{}), notified: make(chan struct{})}
+	config := m.compressionCallerConfig()
 	ctx := limit.Context
 	if ctx == nil {
-		ctx = m.config.GetContext()
+		ctx = config.GetContext()
 	}
-	config := m.config
 	var publish sync.Once
 	var published *timelineCompressionOutput
 	go func() {

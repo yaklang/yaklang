@@ -392,6 +392,11 @@ LOOP:
 	}
 	fmt.Println("--------------------------------------")
 
+	// Automatic per-iteration triage is retired. Keep the old public/manual
+	// extraction and management coverage by explicitly invoking it here.
+	require.Zero(t, mockInvoker.memoryTriageCallCount.Load(), "normal ReAct must not call legacy triage")
+	require.NoError(t, ins.memoryTriage.HandleMemory(tl))
+
 	var memoryEntities []schema.AIMemoryEntity
 	require.Eventually(t, func() bool {
 		return mockInvoker.memoryTriageCallCount.Load() > 0

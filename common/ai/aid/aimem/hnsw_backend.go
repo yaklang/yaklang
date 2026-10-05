@@ -222,14 +222,13 @@ func (b *AIMemoryHNSWBackend) SaveGraph() error {
 	b.graphMutex.Lock()
 	defer b.graphMutex.Unlock()
 
-	// A different backend may have cleaned this session since we loaded it.
-	// Rebase on the durable survivor graph, retaining only locally added nodes
-	// whose authoritative entity rows still exist.
+	// Another backend may have persisted memories or cleaned this session.
+	// Merge its durable graph with live local nodes before publishing a snapshot.
 	var current schema.AIMemoryCollection
 	if err := b.db.Table(b.collectionTable()).Where("session_id = ?", b.sessionID).First(&current).Error; err != nil {
 		return err
 	}
-	if current.CleanupVersion != b.collection.CleanupVersion {
+	if current.CleanupVersion != b.collection.CleanupVersion || !bytes.Equal(current.GraphBinary, b.collection.GraphBinary) {
 		if err := b.rebaseAfterCleanup(&current); err != nil {
 			return err
 		}
@@ -238,15 +237,21 @@ func (b *AIMemoryHNSWBackend) SaveGraph() error {
 	if err != nil {
 		return err
 	}
-	result := b.db.Table(b.collectionTable()).
-		Where("session_id = ? AND COALESCE(cleanup_version,0) = ?", b.sessionID, current.CleanupVersion).
-		Update("graph_binary", binaryData)
+	query := b.db.Table(b.collectionTable()).
+		Where("session_id = ? AND COALESCE(cleanup_version,0) = ?", b.sessionID, current.CleanupVersion)
+	if len(current.GraphBinary) == 0 {
+		query = query.Where("graph_binary IS NULL OR length(graph_binary) = 0")
+	} else {
+		query = query.Where("graph_binary = ?", current.GraphBinary)
+	}
+	result := query.Update("graph_binary", binaryData)
 	if result.Error != nil {
 		return result.Error
 	}
 	if result.RowsAffected != 1 {
-		return utils.Error("memory graph changed during cleanup; retry save")
+		return utils.Error("memory graph changed concurrently; retry save")
 	}
+	b.collection.GraphBinary = binaryData
 	return nil
 }
 
@@ -336,6 +341,15 @@ func (b *AIMemoryHNSWBackend) deleteAndSave(ctx context.Context, ids []string, d
 	defer b.saveMutex.Unlock()
 	b.graphMutex.Lock()
 	defer b.graphMutex.Unlock()
+	var current schema.AIMemoryCollection
+	if err := b.db.Table(b.collectionTable()).Where("session_id = ?", b.sessionID).First(&current).Error; err != nil {
+		return err
+	}
+	if current.CleanupVersion != b.collection.CleanupVersion || !bytes.Equal(current.GraphBinary, b.collection.GraphBinary) {
+		if err := b.rebaseAfterCleanup(&current); err != nil {
+			return err
+		}
+	}
 	_, err := b.graph.Load().DeleteBatchWithCommit(ids, func() error {
 		if err := ctx.Err(); err != nil {
 			return err
@@ -357,9 +371,14 @@ func (b *AIMemoryHNSWBackend) deleteAndSave(ctx context.Context, ids []string, d
 				}
 			}
 		}
-		result := tx.Table(b.collectionTable()).
-			Where("session_id = ? AND COALESCE(cleanup_version,0) = ?", b.sessionID, b.collection.CleanupVersion).
-			Updates(map[string]interface{}{"graph_binary": binaryData, "cleanup_version": gorm.Expr("COALESCE(cleanup_version,0) + 1")})
+		query := tx.Table(b.collectionTable()).
+			Where("session_id = ? AND COALESCE(cleanup_version,0) = ?", b.sessionID, current.CleanupVersion)
+		if len(current.GraphBinary) == 0 {
+			query = query.Where("graph_binary IS NULL OR length(graph_binary) = 0")
+		} else {
+			query = query.Where("graph_binary = ?", current.GraphBinary)
+		}
+		result := query.Updates(map[string]interface{}{"graph_binary": binaryData, "cleanup_version": gorm.Expr("COALESCE(cleanup_version,0) + 1")})
 		if result.Error != nil {
 			return result.Error
 		}
@@ -370,6 +389,7 @@ func (b *AIMemoryHNSWBackend) deleteAndSave(ctx context.Context, ids []string, d
 			return err
 		}
 		b.collection.CleanupVersion++
+		b.collection.GraphBinary = binaryData
 		return nil
 	})
 	return err

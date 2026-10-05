@@ -1,0 +1,231 @@
+// yak common/ai/aismoking/live/timeline_memory_longrun.yak
+// Real configured DeepSeek, tools, compression and memory storage. Local only.
+// Run the same file with baseline/current binaries and separate AISMOKING_OUTPUT.
+include "common/ai/aismoking/live/memory_capture.inc"
+root = os.Getenv("AISMOKING_OUTPUT")
+assert root != "" && !file.IsExisted(file.Join(root,"result.json")), "Choose a fresh AISMOKING_OUTPUT"
+file.MkdirAll(root)~
+variant = os.Getenv("AISMOKING_VARIANT")
+if variant == "" { variant = "current" }
+model = os.Getenv("AISMOKING_TOOL_MODEL")
+if model=="" { model="deepseek-v4.1-flash" }
+namespace = "longrun-" + variant + "-" + randstr(12)
+seedPacket = nil
+_, seedErr = ai.IntelligentChat("只回答 OK。",ai.model(model),ai.timeout(40),
+    ai.rawHTTPRequestResponseCallback(func(packet,header,body,usage) { seedPacket = packet }),
+    func(c) { c.Context = context.Seconds(45); c.DisableProviderFallback = true })
+assert seedPacket != nil && seedErr == nil, "Configured DeepSeek provider is unavailable"
+port = os.GetRandomAvailableTCPPort()
+base = "http://" + str.HostPort("127.0.0.1",port)
+runCtx = context.Seconds(1500)
+mu = sync.NewMutex()
+requests,receipts,commits,events = [],[],[],[]
+config, memorySaves, memoryIndexes = nil,0,0
+armed = {}
+itemCopies = {}
+previousSummary,previousCandidates = "",[]
+go httpserver.Serve("127.0.0.1",port,httpserver.context(runCtx),httpserver.handler(func(w,req) {
+    if req.URL.Path == "/ready" { w.Write("ready"); return }
+    caller = str.TrimSuffix(str.TrimPrefix(req.URL.Path,"/"),"/v1/chat/completions")
+    body = json.loads(string(io.ReadAll(req.Body)~))
+    body.stream_options = {"include_usage":true}
+    mu.Lock()
+    seq = len(requests)+1
+    row = {"seq":seq,"caller":caller,"model":body.model,"native":("tools" in body && len(body.tools)>0),"completed":false}
+    requests = append(requests,row)
+    file.SaveJson(file.Join(root,"requests.json"),requests)~
+    mu.Unlock()
+    prompt = ""
+    for message in body.messages { if message.content != nil { prompt += string(message.content)+"\n\n" } }
+    row.prompt_chars = len(prompt)
+    row.retry_prompt = "# 重试纠正" in prompt
+    file.SaveJson(file.Join(root,sprintf("request-%03d.json",seq)),body)~
+    file.Save(file.Join(root,sprintf("prompt-%03d.txt",seq)),prompt)~
+    began = time.Now()
+    response,_,relayErr = poc.HTTP(seedPacket,poc.https(true),poc.replaceBody([]byte(json.dumps(body)),false),
+        poc.timeout(130),poc.retryTimes(0),poc.redirectTimes(0),poc.save(false))
+    if relayErr != nil {
+        mu.Lock(); row.transport_error,row.completed = "Provider transport failed",true; file.SaveJson(file.Join(root,"requests.json"),requests)~; mu.Unlock()
+        w.WriteHeader(502); w.Write("Provider transport failed"); return
+    }
+    split = str.SplitN(string(response),"\r\n\r\n",2)
+    header,raw = split[0],split[1]
+    if "transfer-encoding: chunked" in str.ToLower(header) { raw = string(codec.DecodeChunked([]byte(raw))~) }
+    decoded = memoryDecodeResponse(raw)
+    mu.Lock()
+    row.finish_reason,row.tool_calls,row.content,row.reasoning_bytes = decoded.finish_reason,decoded.tool_calls,decoded.content,len(decoded.reasoning_content)
+    row.usage = nil
+    for line in str.Split(raw,"\n") {
+        if !str.HasPrefix(str.TrimSpace(line),"data:") { continue }
+        payload = str.TrimSpace(str.TrimPrefix(str.TrimSpace(line),"data:"))
+        frame,frameErr = json.New(payload)
+        if frameErr == nil && "usage" in frame.Value() && frame.Value().usage != nil { row.usage = frame.Value().usage }
+    }
+    row.seconds,row.completed = time.Since(began).Seconds(),true
+    row.status = str.Split(header,"\r\n")[0]
+    file.SaveJson(file.Join(root,sprintf("response-%03d.json",seq)),decoded)~
+    file.Save(file.Join(root,sprintf("response-%03d.sse",seq)),raw)~
+    file.SaveJson(file.Join(root,"requests.json"),requests)~
+    mu.Unlock()
+    printf("LONGRUN_REQUEST seq=%d caller=%s native=%v seconds=%.2f finish=%s\n",seq,caller,row.native,row.seconds,row.finish_reason)
+    status = parseInt(str.Split(row.status," ")[1])
+    w.Header().Set("Content-Type","text/event-stream")
+    w.WriteHeader(status)
+    w.Write(raw)~
+}))
+for i=0;i<100;i++ { _,err=http.Get(base+"/ready"); if err==nil { break }; time.Sleep(0.02) }
+// Preserve the production projection and per-call protocol; caller identity is
+// only in the local relay URL and is not inserted into the model's prompt.
+modelCall = func(callerConfig,request) {
+    response = callerConfig.NewAIResponse()
+    go func() {
+        defer response.Close()
+        options = [ai.type("openai"),ai.model(model),ai.apiKey("diagnostic-relay"),
+            ai.baseURL(base+"/"+request.GetCallerLabel()+"/v1/chat/completions"),ai.noHttps(true),ai.timeout(140),
+            ai.onStream(func(reader) { response.EmitOutputStream(reader) }),
+            ai.onReasonStream(func(reader) { response.EmitReasonStream(reader) }),
+            ai.rawHTTPRequestResponseCallback(func(packet,header,body,usage) { response.SetUsageInfo(usage) }),
+            func(c) { c.Context=request.GetContext(); c.DisableProviderFallback=true; c.FunctionCallRetryTimes=1 }]
+        options = append(options,request.GetExtraSpecOpts()...)
+        if request.IsToolCallArgumentsStreamEnabled() {
+            options=append(options,func(c) { c.ToolCallArgumentsStreamHandler=func(reader) { response.EmitOutputStream(reader) } })
+        }
+        _,err=ai.Chat(request.GetPrompt(),options...)
+        if err!=nil { response.SetError(err) }
+    }()
+    return response,nil
+}
+
+fixture = file.Join(root,"fixture")
+file.MkdirAll(fixture)~
+file.Save(file.Join(fixture,"00-rules.txt"),"本次对账：按order_id去重保留首次。paid计入收入，refunded计入退款，pending和未知SKU排除金额。净额=收入-退款。SKU只有A、R、P。accepted不表示执行成功，只有correlation_id一致的succeeded回执才能应用调整。各批DEBUG日志只作噪声，不是业务记录。")~
+padding = str.Repeat("DEBUG import: row checksum verified; diagnostic trace only; no additional order or adjustment.\n",45)
+for i=1;i<=18;i++ {
+    data = sprintf("LEDGER_BATCH_%02d\norder_id,sku,quantity,unit_price,status\nO%02d,A,1,%d,paid\nR%02d,R,1,%d,refunded\nP%02d,P,1,%d,pending\n",i,i,i*10,i,i,i,i*2)
+    if i==2 { data += "O01,A,1,10,paid\nU01,Unknown,1,66,paid\n" }
+    if i==6 { data += `NOTICE: {"correlation_id":"LONG-ADJUST-9","status":"accepted","operations":[{"order_id":"O02","op":"void"},{"order_id":"O01","op":"replace_unit_price","unit_price":12}],"signed_notice":"LONG-ACK-9: ACCEPTED IS NOT EXECUTED"}` + "\n" }
+    if i==18 { data += `RECEIPT: {"correlation_id":"LONG-ADJUST-9","status":"succeeded","applied":[{"order_id":"O02","op":"void"},{"order_id":"O01","op":"replace_unit_price","unit_price":12}],"receipt_id":"LONG-FINAL-9"}` + "\n" }
+    file.Save(file.Join(fixture,sprintf("batch-%02d.txt",i)),data+padding)~
+}
+path = str.ReplaceAll(root,"\\","/")
+task = sprintf(`我明确要求今后的工程报告用中文，并写清实际核对范围；未经我明确要求，不要提交或推送代码。这次用默认主循环完成长程订单对账，不进入PLAN、不创建子任务。
+材料在%s/fixture。先读取00-rules.txt，然后严格按batch-01至batch-18编号逐个读取，每次只读一个，不能批量读取或编写脚本一次处理全部。每读取一个批次后，必须用save_evidence更新longrun.progress，记录已经处理到的批次、累计paid/refund/net金额、去重和排除情况，然后再读下一批。因此至少完成18次读取和18次进度证据更新。03之后不要重复读取前面材料，依据证据和历史继续。
+batch-06有accepted通知，保存独立longrun.adjustment证据，当时不应用调整；batch-18有succeeded回执，匹配correlation_id后应用并更新该证据。区分业务CSV、通知和DEBUG噪声。最终用write_file写%s/audit.json和%s/audit.md。JSON包含raw_rows、unique_orders、duplicates、unknown_skus、pending_orders、before_adjustment和after_adjustment（paid_total/refund_total/net_total）、correlation_id、receipt_id、signed_notice原文。异常字段是订单ID数组。中文报告写清读取的18批、去重、pending排除、通知未生效和最终回执生效、调整前后数字。不要把DEBUG行计入原始订单行数。只能读这些材料、写本目录报告、保存证据，不执行命令，不访问业务网络，不要求用户补充信息。`,path,path,path)
+file.Save(file.Join(root,"task.txt"),task)~
+started = time.Now()
+runErr = aim.InvokeReAct(task,aim.sessionID(namespace),aim.context(runCtx),aim.timeout(1450),aim.workdir(root),
+    aim.aiCallback(modelCall),aim.speedPriorityAICallback(modelCall),aim.qualityPriorityAICallback(modelCall),
+    aim.reviewPolicy("yolo"),aim.timelineContentLimit(100000),aim.allowUserInteract(false),aim.maxIteration(90),
+    aim.disableMCPServers(true),aim.disableAIForge(true),aim.includeToolNames("read_file","write_file"),
+    aim.configOptions(aiagent.functionCallMode(true),aiagent.aiCallback(modelCall),func(c) {
+        c.DisablePerception,c.DisableIntentRecognition,c.DisableMemoryTriage = true,true,false
+        c.MemoryTriageId = namespace
+        c.SetConfig("disable_session_title_generation",true)
+        c.AiAutoRetry,c.AiTransactionAutoRetry = 1,2
+        return nil
+    }),aim.onEvent(func(op,e) {
+        typ,node = string(e.Type),e.NodeId
+        if typ in ["stream","stream_start","stream_end"] { return }
+        if node in ["memory-save","memory-index","memory-build"] {
+            mu.Lock()
+            if node=="memory-save" { memorySaves++ }
+            if node=="memory-index" { memoryIndexes++ }
+            events = append(events,{"type":typ,"node":node,"content":string(e.Content)})
+            file.SaveJson(file.Join(root,"memory-events.json"),events)~
+            mu.Unlock()
+        }
+        if node!="react_task_enqueue" || config!=nil { return }
+        config = op.GetConfig()
+        tl = config.GetTimeline()
+        tl.SetTimelineBucketByteSize(-1)
+        tl.RegisterItemInputCallback("longrun.sample",func(event) {
+            mu.Lock()
+            itemCopies[string(event.ID)] = event.ItemJSON
+            for marker in ["LEDGER_BATCH_06","LEDGER_BATCH_12"] {
+                if !(marker in armed) && marker in event.ItemJSON {
+                    armed[marker] = true
+                    tl.SetTimelineContentLimit(1)
+                }
+            }
+            mu.Unlock()
+        })
+        tl.RegisterSummaryCallback("longrun.sample",func(event) {
+            summary = string(io.ReadAll(event.Summary)~)
+            frozen,open = tl.DumpFrozenOpen()
+            mu.Lock()
+            index = len(receipts)+1
+            visible = true
+            for candidate in previousCandidates { if !(candidate.content in event.Prompt) { visible=false } }
+            receipt = {"index":index,"through_id":event.ThroughID,"summary":summary,"source_chars":len(event.Prompt),
+                "frozen_chars":len(frozen),"open_chars":len(open),"retained_ids":event.RetainedIDs,"retained_range":event.RetainedRange,
+                "previous_summary_visible":previousSummary=="" || previousSummary in event.Prompt,"previous_memory_visible":visible,
+                "memory_entities":[],"memory_error":"pending"}
+            receipts=append(receipts,receipt); previousSummary=summary
+            file.Save(file.Join(root,sprintf("compression-%02d-source.txt",index)),event.Prompt)~
+            file.Save(file.Join(root,sprintf("compression-%02d-summary.txt",index)),summary)~
+            file.Save(file.Join(root,sprintf("compression-%02d-frozen.txt",index)),frozen)~
+            file.SaveJson(file.Join(root,"receipts.json"),receipts)~
+            mu.Unlock()
+            tl.SetTimelineContentLimit(100000)
+        })
+        tl.RegisterMemoryCallback("longrun.sample",func(event) {
+            mu.Lock()
+            for receipt in receipts {
+                if receipt.through_id==event.ThroughID { receipt.memory_entities=event.MemoryEntities; receipt.memory_error=sprintf("%v",event.Err) }
+            }
+            previousCandidates = tl.GetSessionMemoryCandidates()
+            file.SaveJson(file.Join(root,"receipts.json"),receipts)~
+            mu.Unlock()
+        })
+        tl.RegisterCompressFreezeCallback("longrun.sample",func(event) {
+            checks = []
+            for id in event.Compression.RetainedIDs {
+                item,found = tl.GetIdToTimelineItem().Get(id)
+                matches = found && string(id) in itemCopies && string(item.MarshalJSON()~)==itemCopies[string(id)]
+                checks=append(checks,{"id":id,"unchanged":matches})
+            }
+            mu.Lock(); commits=append(commits,{"compression":event.Compression,"retained_checks":checks}); file.SaveJson(file.Join(root,"commits.json"),commits)~; mu.Unlock()
+        })
+    }))
+checks = []
+if runErr!=nil { checks=append(checks,"runtime_error") }
+if config==nil { checks=append(checks,"runtime_not_captured") }
+auditRaw,auditErr = file.ReadFile(file.Join(root,"audit.json"))
+if auditErr!=nil { checks=append(checks,"missing_audit") } else {
+    audit = json.loads(string(auditRaw))
+    for key,value in {"raw_rows":56,"correlation_id":"LONG-ADJUST-9","receipt_id":"LONG-FINAL-9","signed_notice":"LONG-ACK-9: ACCEPTED IS NOT EXECUTED"} {
+        if audit[key]!=value { checks=append(checks,"incorrect_"+key) }
+    }
+    if audit.unique_orders!=55 && len(audit.unique_orders)!=55 { checks=append(checks,"incorrect_unique_orders") }
+    for group,values in {"before_adjustment":{"paid_total":1710,"refund_total":171,"net_total":1539},"after_adjustment":{"paid_total":1692,"refund_total":171,"net_total":1521}} {
+        for key,value in values { if audit[group][key]!=value { checks=append(checks,"incorrect_"+group+"_"+key) } }
+    }
+    if len(audit.duplicates)!=1 || audit.duplicates[0]!="O01" { checks=append(checks,"duplicates") }
+    if len(audit.unknown_skus)!=1 || audit.unknown_skus[0]!="U01" { checks=append(checks,"unknown_skus") }
+    if len(audit.pending_orders)!=18 { checks=append(checks,"pending_orders") }
+}
+if !file.IsExisted(file.Join(root,"audit.md")) { checks=append(checks,"missing_report") }
+for receipt in receipts {
+    if receipt.memory_error!="<nil>" { checks=append(checks,"compression_tail_incomplete") }
+    if !receipt.previous_summary_visible || !receipt.previous_memory_visible { checks=append(checks,"missing_previous_state") }
+}
+for commit in commits { for retained in commit.retained_checks { if !retained.unchanged { checks=append(checks,"retained_original_changed") } } }
+if len(receipts)<2 { checks=append(checks,"missing_threshold_compression") }
+if config!=nil {
+    frozen,open = config.GetTimeline().DumpFrozenOpen()
+    file.Save(file.Join(root,"final-frozen.txt"),frozen)~
+    file.Save(file.Join(root,"final-open.txt"),open)~
+    file.Save(file.Join(root,"final-evidence.txt"),config.GetSessionEvidenceRendered())~
+    file.SaveJson(file.Join(root,"session-candidates.json"),config.GetTimeline().GetSessionMemoryCandidates())~
+}
+memories,searchErr = aimemory.SearchMemory("工程报告",aimemory.memoryNamespace(namespace),aimemory.memorySearchMode("bm25"),aimemory.memoryTokenLimit(8192))
+if searchErr!=nil { checks=append(checks,"search_error:"+sprintf("%v",searchErr)) }
+file.SaveJson(file.Join(root,"search-memories.json"),memories)~
+pending=false
+if variant=="current" { pending=config.GetTimeline().HasPendingMemoryFinalization(); if pending { checks=append(checks,"memory_finalization_pending") } }
+result={"memory_finalization_pending":pending,"passed":len(checks)==0,"checks":checks,"variant":variant,"model":model,"namespace":namespace,"error":sprintf("%v",runErr),
+    "seconds":time.Since(started).Seconds(),"requests":len(requests),"compressions":len(receipts),"memory_saves":memorySaves,"memory_indexes":memoryIndexes,"searchable_report_memories":len(memories)}
+file.SaveJson(file.Join(root,"result.json"),result)~
+printf("LONGRUN_RESULT %s\n",json.dumps(result))
+assert result.passed,"Long-run validation failed; inspect captured artifacts"
+println("AISMOKING_PASS timeline_memory_longrun")

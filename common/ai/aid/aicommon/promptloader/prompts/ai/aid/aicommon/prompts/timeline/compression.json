@@ -28,18 +28,12 @@
       "items": {
         "type": "object",
         "required": [
-          "title",
           "content",
           "potential_questions",
           "tags",
           "scores"
         ],
         "properties": {
-          "title": {
-            "type": "string",
-            "minLength": 1,
-            "description": "简明记忆标题。"
-          },
           "content": {
             "type": "string",
             "minLength": 1,

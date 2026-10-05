@@ -1,0 +1,23 @@
+// yak common/ai/aismoking/live/timeline_memory_longrun_verify.yak
+// Verify captured business artifacts and actual BM25 memory, without AI calls.
+root=os.Getenv("AISMOKING_OUTPUT")
+result=json.loads(string(file.ReadFile(file.Join(root,"result.json"))~))
+audit=json.loads(string(file.ReadFile(file.Join(root,"audit.json"))~))
+assert audit.raw_rows==56 && (audit.unique_orders==55 || len(audit.unique_orders)==55)
+assert audit.before_adjustment.paid_total==1710 && audit.before_adjustment.refund_total==171 && audit.before_adjustment.net_total==1539
+assert audit.after_adjustment.paid_total==1692 && audit.after_adjustment.refund_total==171 && audit.after_adjustment.net_total==1521
+assert len(audit.duplicates)==1 && audit.duplicates[0]=="O01"
+assert len(audit.unknown_skus)==1 && audit.unknown_skus[0]=="U01" && len(audit.pending_orders)==18
+assert audit.correlation_id=="LONG-ADJUST-9" && audit.receipt_id=="LONG-FINAL-9"
+assert audit.signed_notice=="LONG-ACK-9: ACCEPTED IS NOT EXECUTED"
+receipts=json.loads(string(file.ReadFile(file.Join(root,"receipts.json"))~))
+commits=json.loads(string(file.ReadFile(file.Join(root,"commits.json"))~))
+for receipt in receipts { assert receipt.previous_summary_visible && receipt.previous_memory_visible && receipt.memory_error=="<nil>" }
+for commit in commits { for retained in commit.retained_checks { assert retained.unchanged } }
+report=aimemory.SearchMemory("工程报告",aimemory.memoryNamespace(result.namespace),aimemory.memorySearchMode("bm25"),aimemory.memoryTokenLimit(8192))~
+commit=aimemory.SearchMemory("提交",aimemory.memoryNamespace(result.namespace),aimemory.memorySearchMode("bm25"),aimemory.memoryTokenLimit(8192))~
+assert len(report)>0 && len(commit)>0,"Saved preferences are not searchable"
+file.SaveJson(file.Join(root,"verified-report-memories.json"),report)~
+file.SaveJson(file.Join(root,"verified-commit-memories.json"),commit)~
+file.SaveJson(file.Join(root,"verification.json"),{"business_passed":true,"compression_passed":true,"report_memories":len(report),"commit_memories":len(commit),"original_result_preserved":true})~
+println("AISMOKING_PASS timeline_memory_longrun_verify (business/compression/search only; inspect finalization separately)")

@@ -34,6 +34,7 @@ func parseTimelineCompressionOutput(action *Action, snapshot *timelineCompressio
 	}
 	for _, value := range entities {
 		if validCompressionMemoryEntity(value) {
+			delete(value.(map[string]any), "title")
 			output.MemoryEntities = append(output.MemoryEntities, value)
 		}
 	}
@@ -55,11 +56,9 @@ func validCompressionMemoryEntity(value any) bool {
 	if !ok {
 		return false
 	}
-	for _, key := range []string{"title", "content"} {
-		text, ok := entity[key].(string)
-		if !ok || strings.TrimSpace(text) == "" || strings.Contains(text, aiprojection.Nonce()) {
-			return false
-		}
+	content, ok := entity["content"].(string)
+	if !ok || strings.TrimSpace(content) == "" || strings.Contains(content, aiprojection.Nonce()) {
+		return false
 	}
 	for _, key := range []string{"tags", "potential_questions"} {
 		values, ok := entity[key].([]any)
@@ -153,6 +152,13 @@ func cloneCompressionMemoryEntities(entities []any) []any {
 	_ = json.Unmarshal(raw, &cloned)
 	if cloned == nil {
 		return []any{}
+	}
+	// Older responses and snapshots may contain a title; it is no longer part
+	// of the memory contract and must not propagate to callbacks or history.
+	for _, value := range cloned {
+		if entity, ok := value.(map[string]any); ok {
+			delete(entity, "title")
+		}
 	}
 	return cloned
 }
