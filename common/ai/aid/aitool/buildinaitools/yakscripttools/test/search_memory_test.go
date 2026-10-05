@@ -1,18 +1,19 @@
-package yak
+package test
 
 import (
 	"context"
 	"encoding/json"
+	"path/filepath"
+	"testing"
+
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/gorm"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools/yakscripttools"
 	"github.com/yaklang/yaklang/common/schema"
-	"path/filepath"
-	"testing"
 )
 
-func TestYakMemorySearchRuntimeBinding(t *testing.T) {
+func TestSearchMemoryRuntimeBinding(t *testing.T) {
 	db, err := gorm.Open("sqlite3", filepath.Join(t.TempDir(), "bound.db"))
 	require.NoError(t, err)
 	defer db.Close()
@@ -22,8 +23,11 @@ func TestYakMemorySearchRuntimeBinding(t *testing.T) {
 	}
 	content, err := yakscripttools.GetEmbedFS().ReadFile("yakscriptforai/memory/search_memory.yak")
 	require.NoError(t, err)
-	source := &schema.AIYakTool{Name: "search_memory", Params: `{"type":"object","properties":{"query":{"type":"string"},"namespace":{"type":"string"}},"required":["query"]}`, Content: string(content)}
-	tool := YakTool2AITool([]*schema.AIYakTool{source})[0]
+	source := yakscripttools.LoadYakScriptToAiTools("search_memory", string(content))
+	require.NotNil(t, source)
+	tools := yakscripttools.ConvertTools([]*schema.AIYakTool{source})
+	require.Len(t, tools, 1)
+	tool := tools[0]
 	config := aitool.NewToolInvokeConfig()
 	aitool.WithRuntimeConfig(&aitool.ToolRuntimeConfig{ProjectDatabase: db, MemoryNamespace: "host-bound"})(config)
 	result, err := tool.ExecuteToolWithCapture(context.Background(), map[string]any{"query": "report", "search_mode": "bm25"}, config)
