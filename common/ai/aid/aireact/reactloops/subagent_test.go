@@ -116,6 +116,7 @@ func TestBuildSubAgentInvoker_InheritsNativeProtocolAndAuto(t *testing.T) {
 	defer cancel()
 	var requests int
 	parentCfg := aicommon.NewConfig(ctx, aicommon.WithDisableAutoSkills(true),
+		aicommon.WithDisallowMCPServers(true),
 		aicommon.WithEnableFunctionCallMode(true), aicommon.WithAITransactionAutoRetry(1),
 		aicommon.WithAICallback(func(c aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			requests++
@@ -144,11 +145,14 @@ func TestBuildSubAgentInvoker_InheritsNativeProtocolAndAuto(t *testing.T) {
 	require.True(t, childCfg.GetConfigBool("EnableFunctionCallMode"))
 	loop, err := NewReActLoop("child-native", child, WithDisableLoopPerception(true),
 		WithAllowToolCall(false), WithAllowRAG(false), WithAllowAIForge(false), WithAllowPlanAndExec(false),
+		WithAllowUserInteract(false),
 		WithRegisterLoopAction("require_tool", "unused routing fixture", nil, nil, nil))
 	require.NoError(t, err)
 	require.True(t, loop.FunctionCallModeEnabled(), "child decision loop must retain the parent's native protocol")
 	loop.actions.Set("accept", &LoopAction{ActionType: "accept"})
-	calls, stop, _, err := loop.callAILoopTransaction(&sync.WaitGroup{}, "child protocol probe", "nonce", nil,
+	prompt, err := loop.generateLoopPrompt("nonce", "child protocol probe", "", nil, "", nil)
+	require.NoError(t, err)
+	calls, stop, _, err := loop.callAILoopTransaction(&sync.WaitGroup{}, prompt, "nonce", nil,
 		func(io.Reader, io.Reader) {}, func(string, string, io.Reader, io.Reader) {})
 	require.NoError(t, err)
 	require.Equal(t, LoopStopToolCalls, stop)
