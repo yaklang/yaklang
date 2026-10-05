@@ -142,6 +142,8 @@ detached 不等于清空上下文，也不承诺自动提高缓存命中率。se
 
 `aicommon.WithEnableFunctionCallMode(false)` 选择文本流，`true` 选择原生调用；Session、嵌套 coordinator、worker 以及 gRPC 的 EnablePlan 转换不强制覆盖该配置。原生风险评估和单步辅助输出仍使用自己的独立函数调用契约。
 
+主循环、coordinator、worker、子 Agent、原生风险评估及显式原生 LiteForge 的内部请求统一使用 `tool_choice: "auto"`。是否使用 Function call 由协议配置决定，与 `auto` 无关；原生模式只接纳声明的函数与合法 arguments，纯文本或缺少调用的响应仍走重试纠正。子 Agent 继承父协议；默认文本流的验证和 LiteForge 辅助请求不会改变其决策循环的协议。
+
 | Action | 参数 | 作用 |
 | --- | --- | --- |
 | `create_plan` | `plan`, `plan_document` | PLAN 首次创建完整文档和任务树，返回小型回执；不执行 |
