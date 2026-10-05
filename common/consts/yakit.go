@@ -526,6 +526,13 @@ func doAIEventPatch(db *gorm.DB) {
 			{"idx_ai_output_events_task_index", `CREATE INDEX IF NOT EXISTS "idx_ai_output_events_task_index" ON "ai_output_events" ("task_index");`},
 			{"idx_ai_output_events_task_uuid", `CREATE INDEX IF NOT EXISTS "idx_ai_output_events_task_uuid" ON "ai_output_events" ("task_uuid");`},
 			{"idx_ai_output_events_call_tool_id", `CREATE INDEX IF NOT EXISTS "idx_ai_output_events_call_tool_id" ON "ai_output_events" ("call_tool_id");`},
+			// Recovery filters by session before selecting anchors or expanding a
+			// block. Keep the original indexes for other queries and old binaries;
+			// IF NOT EXISTS upgrades existing databases once without rebuilding on
+			// subsequent opens. Anchor pagination also counts without a soft-delete
+			// filter, so id precedes deleted_at to keep that range query indexed.
+			{"idx_ai_output_events_session_recovery_anchor", `CREATE INDEX IF NOT EXISTS "idx_ai_output_events_session_recovery_anchor" ON "ai_output_events" ("session_id", "is_recovery_block", "id", "deleted_at");`},
+			{"idx_ai_output_events_session_recovery_block", `CREATE INDEX IF NOT EXISTS "idx_ai_output_events_session_recovery_block" ON "ai_output_events" ("session_id", "recovery_index_id", "deleted_at", "id");`},
 		}
 		for _, idx := range indexQueries {
 			if err := db.Exec(idx.query).Error; err != nil {
