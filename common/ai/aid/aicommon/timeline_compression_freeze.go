@@ -74,23 +74,26 @@ func (m *Timeline) frozenThroughLocked() int64 {
 // The production before-prompt check does not call this primitive.
 // The last bucket stays open unless its own rendered size reaches the budget.
 func (m *Timeline) Freeze() TimelineFreezeResult {
+	return m.freezeAndNotify(false)
+}
+
+func (m *Timeline) freezeAndNotify(all bool) TimelineFreezeResult {
 	if m == nil {
 		return TimelineFreezeResult{}
 	}
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	return m.freezeLocked(false)
+	result := func() TimelineFreezeResult {
+		m.mu.Lock()
+		defer m.mu.Unlock()
+		return m.freezeLocked(all)
+	}()
+	m.notifyFreeze(result)
+	return result
 }
 
 // FreezeAll explicitly closes the current tail too, e.g. before emergency
 // compression. It is the compatibility path for the former ForcePromoteAll.
 func (m *Timeline) FreezeAll() TimelineFreezeResult {
-	if m == nil {
-		return TimelineFreezeResult{}
-	}
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	return m.freezeLocked(true)
+	return m.freezeAndNotify(true)
 }
 
 // freezeBudgetGroupsLocked uses the existing fixed/adaptive bucket algorithm

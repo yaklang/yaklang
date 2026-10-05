@@ -136,7 +136,8 @@ func (m *Timeline) PushPromotable(id int64, kind, targetSection, key, operation,
 	now := time.Now()
 	ts := now.UnixMilli()
 	m.mu.Lock()
-	defer m.mu.Unlock()
+	var notifications []func()
+	defer m.unlockAndNotifyTimeline(&notifications)
 	// Journal entries are immutable, including tombstones retained for rollback.
 	// Reusing an ID would also leave a second timestamp index pointing at it.
 	if m.idToTimelineItem.Have(id) {
@@ -154,7 +155,7 @@ func (m *Timeline) PushPromotable(id int64, kind, targetSection, key, operation,
 	m.pushTimelineItem(ts, id, &TimelineItem{createdAt: now, value: &PromotableTimelineItem{
 		ID: id, Kind: kind, TargetSection: targetSection, Key: key,
 		Operation: operation, Payload: payload, PayloadHash: promotedPayloadHash(payload),
-	}})
+	}}, &notifications)
 	return true
 }
 

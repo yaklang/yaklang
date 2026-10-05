@@ -120,8 +120,9 @@ func (m *Timeline) replaceEvidence(store *EvidenceStore, acquireID func() int64)
 		return fmt.Errorf("evidence timeline and ID allocator are required")
 	}
 	m.mu.Lock()
-	defer m.mu.Unlock()
-	return m.replaceEvidenceLocked(store, acquireID)
+	var notifications []func()
+	defer m.unlockAndNotifyTimeline(&notifications)
+	return m.replaceEvidenceLocked(store, acquireID, &notifications)
 }
 
 // Read/apply/journal under one Timeline lock: a concurrent fork merge or rollback
@@ -131,20 +132,21 @@ func (m *Timeline) applyEvidenceOperations(ops []EvidenceOperation, legacyJSON s
 		return nil, fmt.Errorf("evidence timeline and ID allocator are required")
 	}
 	m.mu.Lock()
-	defer m.mu.Unlock()
+	var notifications []func()
+	defer m.unlockAndNotifyTimeline(&notifications)
 	store, found := m.evidenceStoreLocked()
 	if !found {
 		store = UnmarshalEvidenceStore(legacyJSON)
 	}
 	store.ApplyOperations(ops)
 	store.ShrinkToTokenBudget(sessionEvidenceTokenBudget)
-	if err := m.replaceEvidenceLocked(store, acquireID); err != nil {
+	if err := m.replaceEvidenceLocked(store, acquireID, &notifications); err != nil {
 		return nil, err
 	}
 	return store, nil
 }
 
-func (m *Timeline) replaceEvidenceLocked(store *EvidenceStore, acquireID func() int64) error {
+func (m *Timeline) replaceEvidenceLocked(store *EvidenceStore, acquireID func() int64, notifications *[]func()) error {
 	previous, _ := m.evidenceStoreLocked()
 	next := make(map[string]EvidenceItem, len(store.Items))
 	old := make(map[string]EvidenceItem, len(previous.Items))
@@ -198,6 +200,7 @@ func (m *Timeline) replaceEvidenceLocked(store *EvidenceStore, acquireID func() 
 		m.idToTs.Set(op.ID, ts)
 		m.OrderInsertId(op.ID, item)
 		m.OrderInsertTs(ts, item)
+		m.collectItemInputCallbackLocked(notifications, item)
 	}
 	m.evidenceInitialized = true
 	for _, op := range mutations {
