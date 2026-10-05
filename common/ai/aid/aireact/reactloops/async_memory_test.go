@@ -27,7 +27,7 @@ func (m *blockedRecallMemory) SearchMemoryWithoutAI(any, int) (*aicommon.SearchM
 	m.once.Do(func() { close(m.started) })
 	<-m.release
 	return &aicommon.SearchMemoryResult{
-		Memories: []*aicommon.MemoryEntity{{Id: "async-memory", Content: "remembered asynchronous context"}},
+		Memories: []*aicommon.MemoryEntity{{Id: "async-memory", Content: "remembered asynchronous context", O_Score: 0.8, R_Score: 0.8}},
 	}, nil
 }
 
@@ -73,6 +73,10 @@ func TestAsyncMemoryDoesNotBlockIterationsAndReachesLaterPrompt(t *testing.T) {
 		WithAllowUserInteract(false),
 		WithRegisterLoopAction("require_tool", "unused tool routing", nil, nil, nil),
 		WithMemoryTriage(memory),
+		WithInitTask(func(loop *ReActLoop, task aicommon.AIStatefulTask, _ *InitTaskOperator) {
+			loop.RecallMemoryForIntent(task, "test_intent")
+			loop.RecallMemoryForIntent(task, "test_intent")
+		}),
 		WithDisableLoopPerception(true),
 		WithDisablePeriodicVerification(true),
 		WithDisableIncreaseIteration(true),
@@ -117,6 +121,7 @@ func TestAsyncMemoryDoesNotBlockIterationsAndReachesLaterPrompt(t *testing.T) {
 	}, 2*time.Second, 10*time.Millisecond)
 	responses <- struct{}{}
 	require.Contains(t, nextPrompt(), "remembered asynchronous context")
+	require.EqualValues(t, 1, memory.calls.Load(), "completed recall must not repeat on later iterations")
 	responses <- struct{}{}
 	select {
 	case err := <-done:

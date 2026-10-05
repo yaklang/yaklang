@@ -405,6 +405,7 @@ func (r *ReActLoop) ExecuteWithExistedTask(task aicommon.AIStatefulTask) (finalE
 	}
 
 	r.SetCurrentTask(task)
+	r.resetIntentMemory()
 	r.ensureLoopDirectory(task)
 
 	// Emit loop-enter lifecycle marker. This records the loop name, the task it
@@ -633,21 +634,6 @@ func (r *ReActLoop) ExecuteWithExistedTask(task aicommon.AIStatefulTask) (finalE
 	stopStallHeartbeat := r.startStallHeartbeat(task.GetContext(), task)
 	defer stopStallHeartbeat()
 
-	if !r.isSimpleQueryWithoutWork() {
-		if !utils.IsNil(r.memoryTriage) {
-			go func() {
-				log.Info("start to handle searching memory for ReActLoop with AI")
-				result, err := r.memoryTriage.SearchMemory(task, 5*1024)
-				if err != nil {
-					log.Warnf("search memory failed: %v", err)
-				}
-				if task.GetContext().Err() == nil {
-					r.PushMemory(result)
-				}
-			}()
-		}
-	}
-
 	needSummary := utils.NewBool(false)
 LOOP:
 	for {
@@ -694,7 +680,6 @@ LOOP:
 		if err := task.GetContext().Err(); err != nil {
 			return utils.Errorf("task context done before execute ReActLoop: %v", err)
 		}
-		r.refreshFastMemoryAsync(task)
 
 		r.UserStatus(
 			"正在推进下一步",

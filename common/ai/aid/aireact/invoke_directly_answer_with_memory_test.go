@@ -38,7 +38,9 @@ func TestReAct_DirectlyWithMemory(t *testing.T) {
 	// 第一轮决策发 directly_answer (产出带 flag 的 result), 第二轮发 finish 收口.
 	// 关键词: directly_answer 永不 Exit, finish 唯一终结器, 答复后追加 finish
 	var decisionCount int32
-	ins, err := NewTestReAct(
+	var ins *ReAct
+	var err error
+	ins, err = NewTestReAct(
 		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			prompt := r.GetPrompt()
 			if isVerifySatisfactionPrompt(prompt) {
@@ -46,6 +48,13 @@ func TestReAct_DirectlyWithMemory(t *testing.T) {
 			}
 			if isPrimaryDecisionPrompt(prompt) {
 				if atomic.AddInt32(&decisionCount, 1) == 1 {
+					// Keep legacy pool clipping/sync coverage with explicit fixtures.
+					// An ordinary task must not retrieve memories on every turn.
+					memories, searchErr := ins.memoryTriage.SearchMemoryWithoutAI("explicit pool fixture", 300)
+					if searchErr != nil {
+						return nil, searchErr
+					}
+					ins.GetCurrentLoop().PushMemory(memories)
 					return mockedFreeInputOutputWithMemory(i, flag)
 				}
 				return mockedFinishOutput(i)
@@ -60,12 +69,11 @@ func TestReAct_DirectlyWithMemory(t *testing.T) {
 		aicommon.WithMemoryPoolSize(300),
 	)
 
-	if o, ok := ins.memoryTriage.(*aimem.MockMemoryTriage); ok {
-		o.SetOverSearch(true)
-	}
-
 	if err != nil {
 		t.Fatal(err)
+	}
+	if o, ok := ins.memoryTriage.(*aimem.MockMemoryTriage); ok {
+		o.SetOverSearch(true)
 	}
 	_ = ins
 	go func() {
@@ -192,8 +200,8 @@ LOOP:
 	if removeMem <= 0 {
 		t.Fatal("Expected to have some memory remove events, but got none")
 	}
-	if !haveMemorySearched {
-		t.Fatal("Expected to have memory searched event, but got none")
+	if haveMemorySearched {
+		t.Fatal("Ordinary task without intent recognition must not trigger automatic memory search")
 	}
 	if !haveMemoryContext {
 		t.Fatal("Expected to have memory context event, but got none")

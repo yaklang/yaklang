@@ -120,6 +120,7 @@ func ApplyDeepIntentResult(r aicommon.AIInvokeRuntime, loop *ReActLoop, result *
 	}
 
 	PopulateExtraCapabilitiesFromDeepIntent(r, loop, result)
+	loop.RecallMemoryForIntent(loop.GetCurrentTask(), "deep_analysis:"+result.IntentAnalysis)
 
 	if result.MatchedToolNames != "" && strings.Contains(result.MatchedToolNames, "web_search") {
 		r.AddToTimeline("web_search_recommended",

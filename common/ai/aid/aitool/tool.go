@@ -29,6 +29,9 @@ type ToolRuntimeConfig struct {
 	// invocation. Durable tools use it for provenance while keeping their
 	// normalized execution payload separate.
 	CurrentTaskUserInput string
+	// MemoryNamespace is the actual memory set ID used by this runtime,
+	// independently of the persistent conversation ID and the process default DB.
+	MemoryNamespace string
 	// RiskSaveHandler replaces the process-local SQLite write for a risk when
 	// the current AI runtime is bound to a platform-owned result sink.
 	RiskSaveHandler func(context.Context, *schema.Risk) error

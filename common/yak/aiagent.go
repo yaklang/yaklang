@@ -235,6 +235,7 @@ func yakTool2AITool(aitools []*schema.AIYakTool, invokeForgeHandle bool) []*aito
 						ae,
 						pluginContext,
 					)
+					bindMemorySearchToEngine(ae, ctx, runtimeConfig)
 					return nil
 				})
 

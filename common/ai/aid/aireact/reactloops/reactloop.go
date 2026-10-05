@@ -114,12 +114,14 @@ type ReActLoop struct {
 	currentTask aicommon.AIStatefulTask
 
 	// memory management
-	memorySizeLimit          int
-	currentMemories          *omap.OrderedMap[string, *aicommon.MemoryEntity]
-	memoryTriage             aicommon.MemoryTriage
-	memoryUpdateMu           sync.Mutex
-	fastMemorySearchMu       sync.Mutex
-	fastMemorySearchInFlight bool
+	memorySizeLimit        int
+	currentMemories        *omap.OrderedMap[string, *aicommon.MemoryEntity]
+	memoryTriage           aicommon.MemoryTriage
+	memoryUpdateMu         sync.Mutex
+	intentMemoryGeneration uint64
+	intentMemoryKey        string
+	intentMemoryActive     bool
+	intentMemorySnapshot   string
 
 	// task status control
 	onTaskCreated         func(task aicommon.AIStatefulTask)

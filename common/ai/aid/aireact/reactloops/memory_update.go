@@ -24,6 +24,9 @@ func (r *ReActLoop) PushMemory(result *aicommon.SearchMemoryResult) {
 	defer r.memoryUpdateMu.Unlock()
 	mems := result.Memories
 	for _, m := range mems {
+		if m == nil {
+			continue
+		}
 		//log.Infof("start to handle memory content bytes: %v", utils.ShrinkString(m.Content, 256))
 		if _, ok := r.currentMemories.Get(m.Id); ok {
 			r.currentMemories.Delete(m.Id)
@@ -55,9 +58,13 @@ func (r *ReActLoop) PushMemory(result *aicommon.SearchMemoryResult) {
 }
 
 func (r *ReActLoop) GetCurrentMemoriesContent() string {
-	if r.currentMemories.Len() <= 0 {
+	r.memoryUpdateMu.Lock()
+	defer r.memoryUpdateMu.Unlock()
+	if r.intentMemoryActive {
+		return r.intentMemorySnapshot
+	}
+	if r.currentMemories == nil || r.currentMemories.Len() <= 0 {
 		return ""
 	}
-
 	return aicommon.BuildPromptMemoriesMarkdownFromEntities(r.currentMemories.Values(), aicommon.MemoryIntentGeneric)
 }

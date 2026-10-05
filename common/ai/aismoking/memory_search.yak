@@ -1,0 +1,117 @@
+// yak common/ai/aismoking/memory_search.yak
+// Real SQL + Yak tool + aim.InvokeReAct; only provider responses are mocked.
+include "common/ai/aismoking/mock.inc"
+namespace = "smoke-memory-" + randstr(12)
+fixtureID = "memory-smoke-" + randstr(12)
+sentinel = "memory-smoke-sentinel-report：报告应简洁，保留来源。"
+fixtureDB, config, step, seeded, mode = nil, nil, 0, false, "bm25"
+fixtureNamespaces = []
+query = "查找本工作区记忆中以前的报告格式偏好，并给出依据。"
+defer func() { if fixtureDB != nil { for ns in fixtureNamespaces { fixtureDB.Exec("DELETE FROM ai_memory_entities_v1 WHERE session_id IN (?,?)",ns,ns+"-other") } } }()
+func seedMemoryFixtures() {
+    if seeded { return }
+    assert config != nil
+    fixtureDB = config.GetDB()
+    for row in [[fixtureID,namespace,sentinel,nil,nil],[fixtureID+"-foreign",namespace+"-other","foreign-memory-smoke-sentinel",nil,nil],[fixtureID+"-expired",namespace,"expired-memory-smoke-sentinel-report","2000-01-01 00:00:00",nil],[fixtureID+"-deleted",namespace,"deleted-memory-smoke-sentinel-report",nil,"2000-01-01 00:00:00"]] {
+        inserted = fixtureDB.Exec("INSERT INTO ai_memory_entities_v1(memory_id,session_id,content,created_at,updated_at,expires_at,deleted_at,o_score,r_score) VALUES(?,?,?,datetime('now'),datetime('now'),?,?,0.8,0.8)",row[0],row[1],row[2],row[3],row[4])
+        assert inserted.Error == nil, string(inserted.Error)
+    }
+    seeded = true
+    fixtureNamespaces = append(fixtureNamespaces,namespace)
+}
+func callMemory(w,native) {
+    smokeAnswer(w,native,"directly_call_tool",{"directly_call_tool_name":"search_memory","directly_call_tool_params":{"query":"memory-smoke-sentinel-report","search_mode":mode,"limit":5,"token_limit":1000},"directly_call_reason":"只搜索一次报告偏好"})
+}
+smokeHandler = func(w,body) {
+    native, prompt = len(body.tools)>0, smokePrompt(body)
+    if "SMOKE_CALLER:verification" in prompt {
+        w.Header().Set("Content-Type","text/event-stream")
+        smokeFrame(w,{"content":`{"@action":"verify-satisfaction","user_satisfied":false,"reasoning":"继续提交搜索依据。","evidence":[]}`},"stop")
+        w.Write("data: [DONE]\n\n")~; return
+    }
+    if "SMOKE_CALLER:liteforge[session-title-generator]" in prompt {
+        name = "session-title-generator"
+        if native { name = body.tools[0]["function"].name }
+        smokeAnswer(w,native,name,{"session_title":"记忆搜索验证"}); return
+    }
+    if "SMOKE_CALLER:directly-answer" in prompt {
+        assert sentinel in prompt
+        w.Header().Set("Content-Type","text/event-stream")
+        smokeFrame(w,{"content":"记忆搜索验证通过；报告应简洁，保留来源。"},"stop")
+        w.Write("data: [DONE]\n\n")~; return
+    }
+    if "SMOKE_CALLER:react-loop:smart_qa" in prompt {
+        step++
+        if step == 1 {
+            seedMemoryFixtures()
+            smokeAnswer(w,native,"search_persistent_memory",{"query":"memory-smoke-sentinel-report","search_mode":"bm25","limit":5,"bytes_limit":1000}); return
+        }
+        assert sentinel in prompt && fixtureID in prompt, "smart_qa action did not execute the shared Yak tool"
+        smokeAnswer(w,native,"final_answer",{"answer":"历史偏好已查明：报告应简洁，保留来源。"}); return
+    }
+    assert "SMOKE_CALLER:react-loop:default" in prompt || "SMOKE_CALLER:react-loop:main" in prompt
+    step++
+    if step == 1 {
+        seedMemoryFixtures()
+        assert !("<|INJECTED_MEMORY_" in prompt), "memory injected without intent recognition"
+        if native { smokeAnswer(w,native,"require_tool",{"tool_require_payload":"search_memory"}) } else { callMemory(w,native) }
+        return
+    }
+    if step == 2 && native {
+        assert "search_memory" in prompt && "token_limit" in prompt
+        callMemory(w,native); return
+    }
+    assert sentinel in prompt && fixtureID in prompt, "search result missing from Timeline"
+    assert !("foreign-memory-smoke-sentinel" in prompt) && !("expired-memory-smoke-sentinel" in prompt)
+    answerStep = 2
+    if native { answerStep = 3 }
+    if step == answerStep {
+        config.GetTimeline().FreezeAll()
+        smokeAnswer(w,native,"directly_answer",{"answer_payload":"按历史偏好采用简洁报告并保留来源；以当前要求为准。"}); return
+    }
+    frozen = false
+    for message in body.messages {
+        if "AI_CACHE_FROZEN_END_" in string(message.content) && fixtureID in string(message.content) { frozen = true }
+    }
+    assert frozen, "memory search result not retained in the frozen Timeline"
+    smokeAnswer(w,native,"finish",{})
+}
+for native in [true,false] {
+    for searchMode in ["bm25","hybrid"] {
+        step,config,mode,seeded = 0,nil,searchMode,false
+        namespace,fixtureID = "smoke-memory-" + randstr(12), "memory-smoke-" + randstr(12)
+        die(aim.InvokeReAct(query,aim.sessionID(namespace),aim.context(smokeCtx),aim.workdir(smokeRoot),aim.reviewPolicy("yolo"),aim.maxIteration(6),aim.timeout(45),aim.disableMCPServers(true),aim.disableAIForge(true),aim.aiCallback(smokeModel),aim.onEvent(func(op,e) { config = op.GetConfig() }),aim.configOptions(aiagent.aiCallback(smokeModel),aiagent.functionCallMode(native),func(c) {
+            c.DisableCreateDBRuntime,c.DisablePerception,c.DisableMemoryTriage = true,true,true
+            c.AiAutoRetry,c.AiTransactionAutoRetry = 1,1
+            c.GetTimeline().SetTimelineBucketByteSize(-1)
+            return nil
+        })))
+        expectedSteps = 3
+        if native { expectedSteps = 4 }
+        assert step == expectedSteps && config != nil
+        printf("PASS memory search: function_call=%v mode=%s namespace=1 expired=0 auto_injection=0 frozen_timeline=1\n",native,mode)
+    }
+}
+for native in [true,false] {
+    step,config,seeded = 0,nil,false
+    namespace,fixtureID = "smoke-memory-" + randstr(12), "memory-smoke-" + randstr(12)
+    die(aim.InvokeReAct(query,aim.focus("smart_qa"),aim.sessionID(namespace),aim.context(smokeCtx),aim.workdir(smokeRoot),aim.reviewPolicy("yolo"),aim.maxIteration(4),aim.timeout(45),aim.disableMCPServers(true),aim.disableAIForge(true),aim.aiCallback(smokeModel),aim.onEvent(func(op,e) { config = op.GetConfig() }),aim.configOptions(aiagent.aiCallback(smokeModel),aiagent.functionCallMode(native),func(c) {
+        c.DisableCreateDBRuntime,c.DisablePerception,c.DisableMemoryTriage = true,true,true
+        c.AiAutoRetry,c.AiTransactionAutoRetry = 1,1
+        return nil
+    })))
+    assert step == 2
+    printf("PASS smart_qa shared Yak search: function_call=%v calls=1 namespace=1\n",native)
+}
+for searchMode in ["bm25","vector","hybrid"] {
+    missing = aimemory.SearchMemory("report",aimemory.memoryNamespace(namespace+"-missing"),aimemory.memorySearchMode(searchMode))~
+    assert len(missing) == 0
+}
+foreign = aimemory.SearchMemory("foreign-memory-smoke-sentinel",aimemory.memoryNamespace(namespace+"-other"),aimemory.memorySearchMode("bm25"))~
+assert len(foreign) == 1 && foreign[0].MemoryID == fixtureID+"-foreign"
+_,err = aimemory.SearchMemory("report",aimemory.memoryNamespace(namespace),aimemory.memoryLimit(21))
+assert err != nil && "limit" in string(err)
+_,err = aimemory.SearchMemory("report",aimemory.memoryNamespace(namespace),aimemory.memorySearchMode("vector"))
+assert err != nil && "vector index is unavailable" in string(err)
+println("PASS standalone aimemory.SearchMemory: namespace=1 empty=1 limit_error=1 vector_error=1")
+smokeCheck()
