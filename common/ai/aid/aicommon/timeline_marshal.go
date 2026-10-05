@@ -26,6 +26,10 @@ type timelineSerializable struct {
 	CompressedHead          *TimelineCompressedHead          `json:"compressed_head,omitempty"`
 	CompressedHistory       []*TimelineCompressedHistoryNode `json:"compressed_history,omitempty"`
 	SessionMemoryCandidates []any                            `json:"session_memory_candidates,omitempty"`
+	MemoryProcessedSources  []string                         `json:"memory_processed_sources,omitempty"`
+	MemoryRetries           []timelineMemoryRetry            `json:"memory_retries,omitempty"`
+	MemoryCoveredState      string                           `json:"memory_covered_state,omitempty"`
+	MemoryFinalizePending   bool                             `json:"memory_finalize_pending,omitempty"`
 	Reducers                map[string]string                `json:"reducers,omitempty"`   // legacy read only: migrated to CompressedHead on unmarshal
 	ReducerTs               map[string]int64                 `json:"reducer_ts,omitempty"` // legacy read only
 	TotalDumpContentLimit   int64                            `json:"total_dump_content_limit"`
@@ -89,6 +93,10 @@ func marshalTimelineUnlocked(i *Timeline) (string, error) {
 		CompressedHead:          cloneTimelineCompressedHead(i.compressedHead),
 		CompressedHistory:       cloneTimelineCompressedHistory(i.compressedHistory),
 		SessionMemoryCandidates: i.sessionMemory.snapshot(),
+		MemoryRetries:           i.sessionMemory.retrySnapshot(),
+		MemoryProcessedSources:  i.sessionMemory.processedSnapshot(),
+		MemoryCoveredState:      i.memoryCoveredState,
+		MemoryFinalizePending:   i.memoryFinalizePending,
 		TotalDumpContentLimit:   i.totalDumpContentLimit,
 		PromotedState:           cloneTimelinePromotedState(i.promotedState),
 		FreezeState:             cloneTimelineFreezeState(i.freezeState),
@@ -128,9 +136,18 @@ func UnmarshalTimeline(s string) (*Timeline, error) {
 		evidenceInitialized:   serializable.EvidenceInitialized,
 		bucketByteSize:        serializable.BucketByteSize,
 		userInputBoundaryKey:  serializable.UserInputBoundaryKey,
+		memoryCoveredState:    serializable.MemoryCoveredState,
+		memoryFinalizePending: serializable.MemoryFinalizePending,
 	}
 
 	timeline.sessionMemory = newTimelineSessionMemory(timeline, serializable.SessionMemoryCandidates)
+	for _, job := range serializable.MemoryRetries {
+		timeline.sessionMemory.retries[job.Key] = job
+	}
+
+	for _, key := range serializable.MemoryProcessedSources {
+		timeline.sessionMemory.processed[key] = true
+	}
 
 	// 恢复 idToTs
 	timeline.idToTs = omap.NewOrderedMap(map[int64]int64{})

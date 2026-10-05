@@ -1,0 +1,139 @@
+// yak common/ai/aismoking/live/timeline_memory_persistence.yak
+// Local mock model, real aim runtime and memory storage. The configured embedding
+// backend must be available to verify completed question indexes.
+// Run in a disposable YAKIT_HOME. This local developer smoke is not a CI gate.
+include "common/ai/aismoking/mock.inc"
+config, namespace, variant = nil, "", ""
+expected, expectedCompression, prefix, dropOnSave = 0, 1, nil, false
+compressionCalls, loopCalls, tailCalls, saves, indexes, oldTriageCalls = 0,0,0,0,0,0
+sentinel = "timeline-memory-persistence-sentinel：用户要求工程报告附实际验证范围。"
+smokeHandler = func(w,body) {
+    native, prompt = len(body.tools)>0, smokePrompt(body)
+    if "SMOKE_CALLER:timeline-compress" in prompt {
+        assert !native, "compression keeps its existing text-stream protocol"
+        compressionCalls++
+        assert "SESSION_MEMORY_CANDIDATES_" in prompt
+        if loopCalls == 0 { assert sentinel in prompt }
+        candidate = {"content":sentinel,"tags":["报告"],"potential_questions":["工程报告应该附什么验证范围？"],
+            "scores":{"connectivity":0.2,"origin":1,"relevance":0.8,"emotion":0,"perference":1,"actionability":0.8,"temporality":0.9}}
+        entities = []
+        if variant in ["valid","exhausted"] { entities = [candidate] }
+        if variant == "partial" {
+            failed = json.loads(string(json.Marshal(candidate)~)); failed["content"] = sentinel + "：失败后恢复项"
+            good = json.loads(string(json.Marshal(candidate)~)); good["content"] = sentinel + "：成功项"
+            entities = [failed,good]
+        }
+        smokeAnswer(w,false,"timeline-summary",{"summary":"来源已验证；后续报告附实际验证范围。","ratain_timeline_item_range":"","memory_entities":entities})
+        return
+    }
+    assert !("SMOKE_CALLER:memory-triage" in prompt), "old automatic triage must not run"
+    if "SMOKE_CALLER:liteforge[session-title-generator]" in prompt {
+        smokeAnswer(w,native,"session-title-generator",{"session_title":"压缩记忆保存验证"}); return
+    }
+    if "SMOKE_CALLER:directly-answer" in prompt {
+        w.Header().Set("Content-Type","text/event-stream")
+        smokeFrame(w,{"content":"压缩记忆通知和保存已验证。"},"stop")
+        w.Write("data: [DONE]\n\n")~; return
+    }
+    if "SMOKE_CALLER:verification" in prompt {
+        smokeAnswer(w,native,"verify-satisfaction",{"user_satisfied":false,"reasoning":"继续结束验证任务。","evidence":[]}); return
+    }
+    assert "SMOKE_CALLER:react-loop:default" in prompt || "SMOKE_CALLER:react-loop:main" in prompt
+    loopCalls++
+    assert !("aimemory-timeline-v1/" in prompt), "storage receipts leaked into model context"
+    static = json.dumps(body.messages[:2])
+    if prefix == nil { prefix = static } else { assert prefix == static, "persistence rewrote cached prompt regions" }
+    completed = false
+    for i=0;i<1750;i++ {
+        smokeMutex.Lock()
+        completed = tailCalls == 1
+        if variant == "recovery" { completed = saves == 1 && indexes == 1 }
+        smokeMutex.Unlock()
+        if completed { break }
+        time.Sleep(0.02)
+    }
+    assert completed, "memory tail/save callback did not complete within 35 seconds"
+    assert compressionCalls == expectedCompression, "recovery requested another model extraction"
+    assert saves == expected && indexes == expected, "incorrect save/index acknowledgements"
+    if loopCalls == 1 {
+        // Repeat the committed payload and run recovery again. Neither operation
+        // may produce another entity, successful embedding or UI save event.
+        if variant in ["valid","partial","recovery"] {
+            entries = config.GetTimeline().GetSessionMemoryCandidates()
+            config.MemoryTriage.PersistTimelineMemories(smokeCtx,entries)~
+            config.MemoryTriage.PersistTimelineMemories(smokeCtx,entries)~
+            config.MemoryTriage.PersistTimelineMemories(smokeCtx,nil)~
+            assert saves == expected && indexes == expected, "duplicate delivery repeated completed stages"
+        }
+    }
+    if loopCalls == 1 { smokeAnswer(w,native,"directly_answer",{"answer_payload":"报告约束及压缩记忆保存已验证。"}); return }
+    smokeAnswer(w,native,"finish",{})
+}
+for native in [true,false] {
+    for scenario in ["valid","empty","partial","exhausted","recovery"] {
+        if scenario == "recovery" {
+            // End the failed runtime, remove the injected fault, and create a
+            // completely new runtime. Its Timeline is empty: only the outbox can
+            // supply the pending memory, without a second compression request.
+            result = config.GetDB().Exec("DROP TRIGGER smoke_fail_timeline_memory")
+            assert result.Error == nil, string(result.Error)
+        } else { namespace = "smoke-compression-memory-"+randstr(12) }
+        config,variant,prefix,dropOnSave = nil,scenario,nil,scenario == "partial"
+        expected,expectedCompression = 1,1
+        if scenario == "partial" { expected = 2 }
+        if scenario in ["empty","exhausted"] { expected = 0 }
+        if scenario == "recovery" { expectedCompression = 0 }
+        compressionCalls,loopCalls,tailCalls,saves,indexes,oldTriageCalls = 0,0,0,0,0,0
+        die(aim.InvokeReAct("只检查已有材料，给出简洁结论并结束。",aim.sessionID(namespace),aim.context(smokeCtx),
+            aim.workdir(smokeRoot),aim.reviewPolicy("yolo"),aim.maxIteration(4),aim.timeout(65),
+            aim.disableMCPServers(true),aim.disableAIForge(true),aim.aiCallback(smokeModel),aim.speedPriorityAICallback(smokeModel),
+            aim.onEvent(func(op,e) {
+                c = op.GetConfig()
+                if e.NodeId == "memory-save" {
+                    payload = json.loads(string(e.Content))
+                    assert payload.memory_session_id == namespace
+                    assert str.HasPrefix(payload.memory.Content,sentinel)
+                    smokeMutex.Lock(); saves++; smokeMutex.Unlock()
+                    if dropOnSave {
+                        result = c.GetDB().Exec("DROP TRIGGER smoke_fail_timeline_memory")
+                        assert result.Error == nil, string(result.Error)
+                        dropOnSave = false
+                    }
+                }
+                if e.NodeId == "memory-index" { smokeMutex.Lock(); indexes++; smokeMutex.Unlock() }
+                if e.NodeId != "react_task_enqueue" || config != nil { return }
+                config = c
+                if variant in ["partial","exhausted"] {
+                    trigger = "CREATE TRIGGER smoke_fail_timeline_memory BEFORE INSERT ON ai_memory_entities_v1"
+                    if variant == "partial" { trigger += " WHEN NEW.content LIKE '%失败后恢复项'" }
+                    trigger += " BEGIN SELECT RAISE(ABORT, 'injected smoke memory failure'); END"
+                    result = c.GetDB().Exec(trigger)
+                    assert result.Error == nil, string(result.Error)
+                }
+                tl = c.GetTimeline()
+                tl.SetTimelineBucketByteSize(-1)
+                tl.PushText(c.AcquireId(),"[review]: "+sentinel)
+                tl.RegisterSummaryCallback("sample",func(event) { tl.SetTimelineContentLimit(100000) })
+                tl.RegisterSessionMemoryCallback("smoke-receipt",func(event) {
+                    assert event.Err == nil, sprintf("%v",event.Err)
+                    if variant in ["valid","exhausted"] { assert len(event.MemoryEntities)==1 && !("title" in event.MemoryEntities[0]) }
+                    if variant == "partial" { assert len(event.MemoryEntities)==2 }
+                    if variant == "empty" { assert len(event.MemoryEntities)==0 }
+                    smokeMutex.Lock(); tailCalls++; smokeMutex.Unlock()
+                })
+                if variant == "recovery" { tl.SetTimelineContentLimit(100000) } else { tl.SetTimelineContentLimit(1) }
+            }),aim.configOptions(aiagent.aiCallback(smokeModel),aiagent.functionCallMode(native),func(c) {
+                c.DisableCreateDBRuntime,c.DisablePerception,c.DisableIntentRecognition = true,true,true
+				c.SetConfig("disable_session_title_generation",true)
+                c.DisableMemoryTriage = false
+                c.AiAutoRetry,c.AiTransactionAutoRetry = 1,1
+                return nil
+            })))
+        memories = aimemory.SearchMemory("timeline-memory-persistence-sentinel",aimemory.memoryNamespace(namespace),aimemory.memorySearchMode("bm25"))~
+        assert len(memories)==expected,"persisted memory not searchable in the session namespace"
+        assert oldTriageCalls == 0
+        printf("PASS memory notification: native=%v scenario=%s compression=%d save=%d index=%d searchable=%d old_triage_calls=%d\n",
+            native,scenario,compressionCalls,saves,indexes,len(memories),oldTriageCalls)
+    }
+}
+smokeCheck()

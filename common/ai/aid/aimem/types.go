@@ -18,6 +18,7 @@ type Config struct {
 	contextProvider            func() (string, error)
 	ragOptions                 []rag.RAGSystemConfigOption
 	database                   *gorm.DB
+	emitter                    *aicommon.Emitter
 	embeddingAvailabilityCheck func(...rag.RAGSystemConfigOption) bool
 
 	// autoReActInvoker enables building a lightweight invoker automatically when invoker is required.
@@ -80,6 +81,14 @@ func WithRAGOptions(opts ...rag.RAGSystemConfigOption) Option {
 func WithDatabase(db *gorm.DB) Option {
 	return func(config *Config) {
 		config.database = db
+	}
+}
+
+// WithMemoryEmitter sets the persistence event emitter for NewMemoryStore.
+// It does not require an AI invoker.
+func WithMemoryEmitter(emitter *aicommon.Emitter) Option {
+	return func(config *Config) {
+		config.emitter = emitter
 	}
 }
 

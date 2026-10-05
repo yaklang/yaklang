@@ -125,6 +125,43 @@ func (m *Timeline) RegisterMemoryCallback(id string, fn func(TimelineMemoryEvent
 	m.memoryCallbacks.register(id, fn)
 }
 
+// RegisterSessionMemoryCallback listens to committed memory tails across this
+// session's Timeline forks and copies. Registrations are runtime-only and must
+// be reattached after restore. A nil callback unregisters the given ID.
+func (m *Timeline) RegisterSessionMemoryCallback(id string, fn func(TimelineMemoryEvent)) {
+	m.mu.RLock()
+	history := m.sessionMemory
+	m.mu.RUnlock()
+	if history != nil {
+		history.callbacks.register(id, fn)
+	}
+}
+
+// RegisterSessionMemoryCallbackOnce attaches a session service without rebinding
+// it to nested runtimes that reuse the owner Timeline with a shorter context.
+func (m *Timeline) RegisterSessionMemoryCallbackOnce(id string, fn func(TimelineMemoryEvent)) bool {
+	m.mu.RLock()
+	history := m.sessionMemory
+	config := m.config
+	m.mu.RUnlock()
+	if history == nil || fn == nil {
+		return false
+	}
+	history.callbacks.mu.Lock()
+	for _, entry := range history.callbacks.entries {
+		if entry.id == id {
+			history.callbacks.mu.Unlock()
+			return false
+		}
+	}
+	history.callbacks.entries = append(history.callbacks.entries, timelineCallback[TimelineMemoryEvent]{id, fn})
+	history.callbacks.mu.Unlock()
+	history.mu.Lock()
+	history.persistenceConfig = config
+	history.mu.Unlock()
+	return true
+}
+
 // Capture under Timeline.mu; invoke only after the complete write is unlocked.
 // No serialization or event allocation is needed without input listeners.
 func (m *Timeline) collectItemInputCallbackLocked(notifications *[]func(), item *TimelineItem) {
@@ -182,7 +219,10 @@ func (m *Timeline) compressionCallbackLocked(snapshot *timelineCompressionSnapsh
 	compressCallbacks := m.compressFreezeCallbacks.snapshot()
 	summaryCallbacks := m.summaryCallbacks.snapshot()
 	memoryCallbacks := m.memoryCallbacks.snapshot()
-	if len(freezeCallbacks)+len(compressCallbacks)+len(summaryCallbacks)+len(memoryCallbacks) == 0 {
+	if m.sessionMemory != nil {
+		memoryCallbacks = append(memoryCallbacks, m.sessionMemory.callbacks.snapshot()...)
+	}
+	if len(freezeCallbacks)+len(compressCallbacks)+len(summaryCallbacks)+len(memoryCallbacks) == 0 && snapshot.MemoryCompletion == nil {
 		return nil
 	}
 	freeze := TimelineFreezeResult{Version: snapshot.FreezeVersion + 1, ThroughID: snapshot.ThroughID}
@@ -201,6 +241,9 @@ func (m *Timeline) compressionCallbackLocked(snapshot *timelineCompressionSnapsh
 	}
 	snapshot.CommittedFreeze = freeze
 	return func() {
+		if m.sessionMemory != nil && snapshot.MemoryCompletion != nil {
+			m.sessionMemory.saveOwner()
+		}
 		freeze := snapshot.CommittedFreeze
 		if len(freeze.NewlyFrozenIDs) > 0 {
 			for _, callback := range freezeCallbacks {
@@ -224,12 +267,21 @@ func (m *Timeline) compressionCallbackLocked(snapshot *timelineCompressionSnapsh
 				RetainedIDs: append([]int64(nil), result.RetainedIDs...), RetainedRange: result.RetainedRange,
 			})
 		}
-		if len(memoryCallbacks) == 0 || snapshot.MemoryCompletion == nil {
+		if snapshot.MemoryCompletion == nil {
 			return
 		}
 		go func() {
 			completion := snapshot.MemoryCompletion
+			defer close(completion.notified)
 			<-completion.done
+			notifyErr := completion.err
+			if notifyErr == nil && m.sessionMemory != nil {
+				// A delivered candidate/source receipt must survive restart before
+				// storage listeners start any entity/index writes.
+				if err := m.sessionMemory.saveOwner(); err != nil {
+					notifyErr = err
+				}
+			}
 			var entities []any
 			if completion.err == nil && completion.output != nil {
 				entities = completion.output.MemoryEntities
@@ -237,7 +289,7 @@ func (m *Timeline) compressionCallbackLocked(snapshot *timelineCompressionSnapsh
 			for _, callback := range memoryCallbacks {
 				invokeTimelineCallback(callback, TimelineMemoryEvent{ThroughID: result.ThroughID,
 					Prompt: snapshot.SummaryPrompt, Instruction: timelineCompressionInstruction,
-					MemoryEntities: cloneCompressionMemoryEntities(entities), Err: completion.err})
+					MemoryEntities: cloneCompressionMemoryEntities(entities), Err: notifyErr})
 			}
 		}()
 	}

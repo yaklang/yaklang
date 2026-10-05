@@ -31,8 +31,10 @@ func TestTimelineCompressionSummaryDoesNotWaitForMemoryStream(t *testing.T) {
 			tl.PushText(1, "original needed for later verification")
 			summaries := make(chan TimelineSummaryEvent, 1)
 			memory := make(chan TimelineMemoryEvent, 1)
+			sessionMemory := make(chan TimelineMemoryEvent, 1)
 			tl.RegisterSummaryCallback("next-loop", func(event TimelineSummaryEvent) { summaries <- event })
 			tl.RegisterMemoryCallback("storage", func(event TimelineMemoryEvent) { memory <- event })
+			tl.RegisterSessionMemoryCallback("session-storage", func(event TimelineMemoryEvent) { sessionMemory <- event })
 			type outcome struct {
 				result *TimelineCompressionResult
 				err    error
@@ -78,6 +80,13 @@ func TestTimelineCompressionSummaryDoesNotWaitForMemoryStream(t *testing.T) {
 			}
 			select {
 			case event := <-memory:
+				select {
+				case shared := <-sessionMemory:
+					require.Equal(t, event.Err, shared.Err)
+					require.Equal(t, event.MemoryEntities, shared.MemoryEntities)
+				case <-ctx.Done():
+					t.Fatal("missing session memory completion")
+				}
 				if mode == "memory" {
 					require.NoError(t, event.Err)
 					require.Len(t, event.MemoryEntities, 1)
@@ -110,7 +119,7 @@ func TestTimelineCompressionSlowMemoryConsumerDoesNotBlockSummary(t *testing.T) 
 			t.Error("memory observer did not stop")
 		}
 	})
-	tl.RegisterMemoryCallback("storage", func(event TimelineMemoryEvent) {
+	tl.RegisterSessionMemoryCallback("storage", func(event TimelineMemoryEvent) {
 		close(started)
 		<-release
 		close(stopped)

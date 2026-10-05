@@ -12,7 +12,7 @@ import (
 
 func compressionMemoryFixture() map[string]any {
 	return map[string]any{
-		"title": "工程报告偏好", "content": "用户明确要求工程报告使用中文，附实际验证结果。",
+		"content":             "用户明确要求工程报告使用中文，附实际验证结果。",
 		"potential_questions": []any{"工程报告应该如何撰写？"}, "tags": []any{"工程", "偏好"},
 		"scores": map[string]any{"temporality": 0.9, "actionability": 0.8, "perference": 1.0,
 			"origin": 1.0, "emotion": 0.1, "relevance": 0.8, "connectivity": 0.5},

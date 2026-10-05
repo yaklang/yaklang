@@ -16,6 +16,9 @@ import (
 // deletes, promotes or calls AI. Compression before prompt assembly reserves
 // and commits this snapshot atomically.
 type timelineCompressionSnapshot struct {
+	FinalizingMemory        bool
+	MemoryInputLimit        int
+	MemoryOutputLimit       int
 	Context                 context.Context `json:"-"`
 	BeforePromptFingerprint string          `json:"-"`
 	BeforePromptLimit       int64           `json:"-"`
@@ -76,7 +79,13 @@ func prepareCompressionSnapshot(snapshot *timelineCompressionSnapshot) error {
 	}
 	ordinary := renderCompressionSnapshotItems(snapshot.Items)
 	if strings.TrimSpace(previous) == "" && strings.TrimSpace(ordinary) == "" {
-		return fmt.Errorf("compression snapshot has no visible ordinary history")
+		if !snapshot.FinalizingMemory || (len(snapshot.UserContexts) == 0 && strings.TrimSpace(snapshot.Evidence) == "") {
+			return fmt.Errorf("compression snapshot has no visible ordinary history")
+		}
+		ordinary = snapshot.Evidence
+		for _, entry := range snapshot.UserContexts {
+			ordinary += "\n" + entry.Text
+		}
 	}
 	snapshot.InputText = strings.TrimSpace(previous + "\n" + ordinary)
 	snapshot.InputTokens = MeasureTokens(snapshot.InputText)

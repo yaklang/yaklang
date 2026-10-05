@@ -38,6 +38,7 @@ type TimelineCompressionOptions struct {
 	MaxInputTokens   int
 	MaxSummaryTokens int
 	RetainedContext  map[string]string // actual independent prompt fields, not inferred from their names
+	FinalizeMemory   bool              // include exact-only business context and wait for the full memory tail before commit
 }
 
 var errTimelineCompressionBusy = errors.New("timeline compression is already running")
@@ -111,6 +112,7 @@ func (m *Timeline) compressOnce(options TimelineCompressionOptions, checked *tim
 		return nil, errTimelineCompressionBeforePromptChanged
 	}
 	m.compressing, m.compressionSnapshot = true, snapshot
+	snapshot.FinalizingMemory = options.FinalizeMemory
 	m.compressionDone = make(chan struct{})
 	m.mu.Unlock()
 	defer func() {
@@ -142,8 +144,10 @@ func (m *Timeline) compressOnce(options TimelineCompressionOptions, checked *tim
 	if err := prepareCompressionSnapshot(snapshot); err != nil && len(snapshot.ExactItemIDs) == 0 {
 		return nil, err
 	}
-	if options.Context == nil && m.config != nil {
-		options.Context = m.config.GetContext()
+	if options.Context == nil {
+		if config := m.compressionCallerConfig(); config != nil {
+			options.Context = config.GetContext()
+		}
 	}
 	if options.Context == nil {
 		options.Context = context.Background()
@@ -163,7 +167,23 @@ func (m *Timeline) compressOnce(options TimelineCompressionOptions, checked *tim
 	if err != nil {
 		return nil, err
 	}
+	if options.FinalizeMemory {
+		select {
+		case <-snapshot.MemoryCompletion.done:
+			if snapshot.MemoryCompletion.err != nil {
+				return nil, snapshot.MemoryCompletion.err
+			}
+		case <-options.Context.Done():
+			return nil, options.Context.Err()
+		}
+	}
 	if err := options.Context.Err(); err != nil {
+		return nil, err
+	}
+	// Persist the detached original before retirement. A database failure must
+	// leave the live source unchanged, including threshold compressions whose
+	// summary can arrive before their memory tail.
+	if err := m.checkpointCompressionMemory(snapshot); err != nil {
 		return nil, err
 	}
 	return m.commitCompressionSnapshot(snapshot, summary)
@@ -175,21 +195,9 @@ func (m *Timeline) commitCompressionSnapshot(snapshot *timelineCompressionSnapsh
 	if snapshot == nil || m.compressionSnapshot != snapshot || (strings.TrimSpace(summary) == "" && snapshot.InputText != "") {
 		return nil, fmt.Errorf("invalid or inactive compression transaction")
 	}
-	if snapshot.Context != nil {
-		if err := snapshot.Context.Err(); err != nil {
-			return nil, err
-		}
-	}
-	version := int64(0)
-	if m.freezeState != nil {
-		version = m.freezeState.Version
-	}
-	state, err := m.compressionSourceStateLocked(snapshot.ThroughID)
+	version, err := m.validateCompressionSourceLocked(snapshot)
 	if err != nil {
 		return nil, err
-	}
-	if version != snapshot.FreezeVersion || !sameTimelineCompressedHead(m.compressedHead, snapshot.Head) || state != snapshot.SourceState {
-		return nil, fmt.Errorf("timeline changed inside compression snapshot; discarding stale summary")
 	}
 	result := &TimelineCompressionResult{ThroughID: snapshot.ThroughID, Summary: summary,
 		InputTokens: snapshot.InputTokens, SummaryTokens: MeasureTokens(summary)}
@@ -252,7 +260,8 @@ func (m *Timeline) commitCompressionSnapshot(snapshot *timelineCompressionSnapsh
 		if m.sessionMemory == nil {
 			m.sessionMemory = newTimelineSessionMemory(m, nil)
 		}
-		m.sessionMemory.record(snapshot.MemoryCompletion)
+		m.sessionMemory.record(snapshot)
+		m.markCompressionMemoryCoveredLocked(snapshot)
 	}
 	if snapshot.NotifyCommitted != nil {
 		for _, pending := range m.freezeBudgetGroupsLocked(false) {
@@ -323,4 +332,24 @@ func sameTimelineCompressedHead(a, b *TimelineCompressedHead) bool {
 		return a == nil && b == nil
 	}
 	return *a == *b
+}
+
+func (m *Timeline) validateCompressionSourceLocked(snapshot *timelineCompressionSnapshot) (int64, error) {
+	if snapshot.Context != nil {
+		if err := snapshot.Context.Err(); err != nil {
+			return 0, err
+		}
+	}
+	version := int64(0)
+	if m.freezeState != nil {
+		version = m.freezeState.Version
+	}
+	state, err := m.compressionSourceStateLocked(snapshot.ThroughID)
+	if err != nil {
+		return 0, err
+	}
+	if version != snapshot.FreezeVersion || !sameTimelineCompressedHead(m.compressedHead, snapshot.Head) || state != snapshot.SourceState {
+		return 0, fmt.Errorf("timeline changed inside compression snapshot; discarding stale summary")
+	}
+	return version, nil
 }

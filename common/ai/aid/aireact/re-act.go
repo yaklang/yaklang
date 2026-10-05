@@ -96,9 +96,10 @@ type ReAct struct {
 	saveTimelineThrottle func(func())
 	artifacts            *filesys.RelLocalFs
 
-	wg           *sync.WaitGroup
-	lifecycleWG  *sync.WaitGroup
-	memoryTriage aicommon.MemoryTriage
+	wg                  *sync.WaitGroup
+	lifecycleWG         *sync.WaitGroup
+	memoryTriage        aicommon.MemoryTriage
+	memoryContinuations sync.Map // planning/handoff boundaries, runtime-only task IDs
 
 	taskHandoffMu      sync.Mutex
 	taskHandoffs       int
@@ -310,6 +311,7 @@ func NewReAct(opts ...aicommon.ConfigOption) (*ReAct, error) {
 	if cfg.TimelineDiffer == nil {
 		cfg.TimelineDiffer = aicommon.NewTimelineDiffer(cfg.Timeline)
 	}
+	aimem.RegisterTimelineMemoryPersistence(cfg.Timeline, react.memoryTriage, cfg.GetContext())
 	// Initialize prompt manager (workdir does not depend on artifacts, which is lazy)
 	workdir := cfg.Workdir
 	if workdir == "" {

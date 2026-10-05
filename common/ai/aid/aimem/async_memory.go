@@ -109,6 +109,14 @@ func (m *AsyncAIMemory) SaveMemoryEntities(entities ...*aicommon.MemoryEntity) e
 	return memory.SaveMemoryEntities(entities...)
 }
 
+func (m *AsyncAIMemory) PersistTimelineMemories(ctx context.Context, candidates []any) error {
+	memory, err := m.WaitReady(ctx)
+	if err != nil {
+		return err
+	}
+	return memory.PersistTimelineMemories(ctx, candidates)
+}
+
 func (m *AsyncAIMemory) SearchBySemantics(query string, limit int) ([]*aicommon.SearchResult, error) {
 	memory, err := m.WaitReady(m.ctx)
 	if err != nil {

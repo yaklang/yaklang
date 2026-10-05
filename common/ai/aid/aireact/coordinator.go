@@ -174,7 +174,17 @@ func (r *ReAct) invokeNativeCoordinator(done chan struct{}, ctx context.Context,
 	defer ready()
 	cfg := newInvokePlanAndExecuteOptions(opts...)
 	if cfg.task != nil {
-		defer func() { cfg.task.CallAsyncDeferCallback(err) }()
+		if cfg.task.IsAsyncMode() && !cfg.finalizeMemoryExternally {
+			release := r.beginUserTaskMemory(cfg.task)
+			defer r.memoryContinuations.Delete(cfg.task.GetId())
+			defer release()
+		}
+		defer func() {
+			if err == nil && cfg.task.IsAsyncMode() && !planningOnly && !cfg.finalizeMemoryExternally {
+				r.completeUserTaskMemory(cfg.task)
+			}
+			cfg.task.CallAsyncDeferCallback(err)
+		}()
 	}
 	// Preserve the public execution override at the outer boundary. It owns
 	// execution when provided, and must not construct either planner engine.
@@ -238,7 +248,12 @@ func (r *ReAct) invokeNativeCoordinator(done chan struct{}, ctx context.Context,
 	}
 	ready()
 	if planningOnly {
+		r.memoryContinuations.Store(task.GetId(), true)
 		return session.RunPlanOnly()
 	}
-	return session.Run()
+	err = session.Run()
+	if err == nil && session.PlanningOnly() {
+		r.memoryContinuations.Store(task.GetId(), true)
+	}
+	return err
 }

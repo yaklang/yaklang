@@ -90,6 +90,8 @@ func TestForgeDBGatewayPreservesNativeParentContext(t *testing.T) {
 			ctx, cancel := context.WithTimeout(context.WithValue(context.Background(), contextKey{}, "caller context"), 15*time.Second)
 			defer cancel()
 			name := "parent-gateway-" + uuid.NewString()
+			// Checkpoint replay is keyed by runtime ID; each protocol needs a fresh child.
+			childID, taskID := "gateway-child-"+uuid.NewString(), "gateway-task-"+uuid.NewString()
 			db := consts.GetGormProfileDatabase()
 			forge := &schema.AIForge{ForgeName: name, ForgeType: schema.FORGE_TYPE_Config,
 				InitPrompt: "Use the supplied source plan", PlanPrompt: forgePlan}
@@ -110,7 +112,7 @@ func TestForgeDBGatewayPreservesNativeParentContext(t *testing.T) {
 					return nil, fmt.Errorf("DB Forge lost the caller context")
 				}
 				views := coordinator.CollectPlanExecutionSnapshots(parent.GetReActID(), nil)
-				if len(views) != 1 || views[0].CoordinatorID != "gateway-child" || views[0].AsyncReactTaskID != "gateway-task" {
+				if len(views) != 1 || views[0].CoordinatorID != childID || views[0].AsyncReactTaskID != taskID {
 					return nil, fmt.Errorf("DB Forge lost its parent runtime: %#v", views)
 				}
 				if req.GetCallerLabel() == "react-loop:pe_task" {
@@ -124,7 +126,7 @@ func TestForgeDBGatewayPreservesNativeParentContext(t *testing.T) {
 					return forgeResponse(c, req, native, "finish", map[string]any{})
 				}
 				for _, s := range coordinator.GetRunningSessions() {
-					if s.Id != "gateway-child" {
+					if s.Id != childID {
 						continue
 					}
 					state := s.Snapshot()
@@ -144,8 +146,8 @@ func TestForgeDBGatewayPreservesNativeParentContext(t *testing.T) {
 				aicommon.WithEnableFunctionCallMode(native), aicommon.WithAgreeYOLO(), aicommon.WithWorkdir(t.TempDir()), aicommon.WithEventHandler(func(*schema.AiOutputEvent) {}))
 			require.NoError(t, err)
 			config := parent.GetConfig().(*aicommon.Config)
-			task := aicommon.NewStatefulTaskBase("gateway-task", "gateway caller query", ctx, parent.Emitter, true)
-			ownedContext := coordinator.WithForgeParent(ctx, parent, task, "gateway-child")
+			task := aicommon.NewStatefulTaskBase(taskID, "gateway caller query", ctx, parent.Emitter, true)
+			ownedContext := coordinator.WithForgeParent(ctx, parent, task, childID)
 			options := aicommon.ConvertConfigToOptionsWithoutHotPatch(config)
 			result, err := aicommon.ExecuteForgeFromDB(name, ownedContext, map[string]any{"query": "gateway caller query"}, options...)
 			require.NoError(t, err)

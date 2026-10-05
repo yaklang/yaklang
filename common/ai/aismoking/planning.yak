@@ -1,6 +1,7 @@
 // yak common/ai/aismoking/planning.yak
 // Generated/preset/mocker × native/text; stop after one approved submit_plan.
 include "common/ai/aismoking/mock.inc"
+memoryFinalization = os.Getenv("AISMOKING_MEMORY_FINALIZATION") == "1"
 execution, step, approvals, mockerCalls, reads, editStage = nil, 0, 0, 0, 0, 0
 plan = {"main_task":"来源检查","main_task_goal":"规划移交，不执行业务","tasks":[
     {"subtask_name":"读取来源","subtask_goal":"读取 source.txt","subtask_identifier":"read","depends_on":[]},
@@ -12,6 +13,7 @@ originalIDs, stable, tools = nil, nil, nil
 smokeHandler = func(w, body) {
     native = len(body.tools) > 0
     prompt = smokePrompt(body)
+    assert !("SMOKE_CALLER:timeline-compress" in prompt) && !("SMOKE_CALLER:memory-triage" in prompt), "review/phase handoff must not finalize user memory"
     state = execution.Snapshot()
     assert !("执行已批准的冻结任务书。" in prompt), "planning-only cannot dispatch business workers"
     assert len(body.messages) >= 5, "cache projection partitions collapsed"
@@ -66,10 +68,10 @@ for native in [true,false] {
         step,approvals,mockerCalls,reads,originalIDs,stable,tools,editStage = 0,0,0,0,nil,nil,nil,0
         definition = {"name":"plan-smoking","init_prompt":"根据来源维护计划，停在审核交接。"}
         if source == "preset" { definition.plan_prompt = json.dumps(plan) }
-        options = [aiagent.context(smokeCtx),aiagent.agreeYOLO(),aiagent.aiCallback(smokeModel),aiagent.onEvent(planEvent),aiagent.functionCallMode(native),aiagent.extendAIDOptions(func(c) {
+        options = [aiagent.context(smokeCtx),aiagent.agreeYOLO(),aiagent.aiCallback(smokeModel),aiagent.taskAICallback(smokeModel),aiagent.onEvent(planEvent),aiagent.functionCallMode(native),aiagent.extendAIDOptions(func(c) {
             c.DisableCreateDBRuntime = true
             c.Workdir = smokeRoot
-            c.DisablePerception,c.DisableMemoryTriage,c.DisallowMCPServers = true,true,true
+            c.DisablePerception,c.DisableMemoryTriage,c.DisallowMCPServers = true,!memoryFinalization,true
             c.ForceManualPlanReview = true
             c.GetTimeline().SetTimelineBucketByteSize(-1)
             c.AiAutoRetry,c.AiTransactionAutoRetry = 1,1
@@ -80,6 +82,7 @@ for native in [true,false] {
         die(execution.RunPlanOnly())
         state = execution.Snapshot()
         assert approvals == 1 && reads == 1
+        assert !execution.GetTimeline().HasPendingMemoryFinalization(), "planning-only handoff must not request final memory extraction"
         assert string(state.Phase) == "EXEC" && !state.Finished
         assert state.Plan.Document == "# 最终计划\n先核对来源。\n用户确认范围。\n"
         for _,a in state.Attempts { assert string(a.State) == "pending" && a.ID == 0 }

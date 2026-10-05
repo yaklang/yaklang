@@ -13,15 +13,31 @@ import (
 // Only successful, committed compression responses enter it. Pending streams are
 // runtime-only; snapshots persist completed candidates and tolerate older dumps.
 type timelineSessionMemory struct {
-	mu      sync.Mutex
-	owner   *Timeline
-	items   []any
-	seen    map[string]bool
-	pending []*timelineCompressionCompletion
+	mu                sync.Mutex
+	callbacks         timelineCallbackRegistry[TimelineMemoryEvent]
+	owner             *Timeline
+	items             []any
+	seen              map[string]bool
+	pending           []*timelineCompressionCompletion
+	retries           map[string]timelineMemoryRetry
+	processed         map[string]bool // durable source receipts, never prompt data
+	persistenceConfig AICallerConfigIf
+	work              chan struct{} // serialize finalization/recovery across session forks
+}
+
+// IsSessionTimeline identifies the owner of the shared extraction history.
+// Persistence is attached there, rather than rebound to a task's shorter lifetime.
+func (m *Timeline) IsSessionTimeline() bool {
+	if m == nil {
+		return false
+	}
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	return !m.branchTimeline && m.sessionMemory != nil && m.sessionMemory.owner == m
 }
 
 func newTimelineSessionMemory(owner *Timeline, items []any) *timelineSessionMemory {
-	h := &timelineSessionMemory{owner: owner, seen: make(map[string]bool)}
+	h := &timelineSessionMemory{owner: owner, seen: make(map[string]bool), retries: make(map[string]timelineMemoryRetry), processed: make(map[string]bool), work: make(chan struct{}, 1)}
 	h.appendLocked(cloneCompressionMemoryEntities(items))
 	return h
 }
@@ -53,6 +69,17 @@ func (h *timelineSessionMemory) collectLocked() bool {
 		case <-completion.done:
 			if completion.err == nil && completion.output != nil {
 				changed = h.appendLocked(cloneCompressionMemoryEntities(completion.output.MemoryEntities)) || changed
+				if len(completion.output.MemoryEntities) == 0 {
+					delete(h.retries, completion.retryKey)
+				}
+				h.processed[completion.retryKey] = true
+			}
+			if completion.notified != nil {
+				select {
+				case <-completion.notified:
+				default:
+					remaining = append(remaining, completion)
+				}
 			}
 		default:
 			remaining = append(remaining, completion)
@@ -88,15 +115,26 @@ func (h *timelineSessionMemory) wait(ctx context.Context) error {
 		case <-ctx.Done():
 			return ctx.Err()
 		}
+		if completion.notified != nil {
+			select {
+			case <-completion.notified:
+			case <-ctx.Done():
+				return ctx.Err()
+			}
+		}
 	}
 	return nil
 }
 
-func (h *timelineSessionMemory) record(completion *timelineCompressionCompletion) {
+func (h *timelineSessionMemory) record(snapshot *timelineCompressionSnapshot) {
+	completion := snapshot.MemoryCompletion
 	if h == nil || completion == nil {
 		return
 	}
 	h.mu.Lock()
+	job := newTimelineMemoryRetry(snapshot)
+	completion.retryKey = job.Key
+	h.retries[job.Key] = job
 	h.pending = append(h.pending, completion)
 	h.mu.Unlock()
 	go func() {
@@ -104,18 +142,44 @@ func (h *timelineSessionMemory) record(completion *timelineCompressionCompletion
 		h.mu.Lock()
 		h.collectLocked()
 		h.mu.Unlock()
-		if completion.err != nil || completion.output == nil || len(completion.output.MemoryEntities) == 0 {
-			return
-		}
 		// Persist after the tail as the main loop may have saved its summary
 		// already. Use the owning session, even when a task fork produced it.
-		owner := h.owner
-		if owner != nil {
-			if cfg, ok := owner.config.(*Config); ok && !cfg.DisableCreateDBRuntime && cfg.PersistentSessionId != "" {
-				owner.Save(cfg.GetDB(), cfg.PersistentSessionId)
-			}
-		}
+		h.saveOwner()
 	}()
+}
+
+func (h *timelineSessionMemory) saveOwner() error {
+	if h != nil && h.owner != nil {
+		h.mu.Lock()
+		config := h.persistenceConfig
+		h.mu.Unlock()
+		if config == nil {
+			h.owner.mu.RLock()
+			config = h.owner.config
+			h.owner.mu.RUnlock()
+		}
+		if cfg, ok := config.(*Config); ok && !cfg.DisableCreateDBRuntime && cfg.PersistentSessionId != "" {
+			return h.owner.saveChecked(cfg.GetDB(), cfg.PersistentSessionId)
+		}
+	}
+	return nil
+}
+
+// A nested coordinator may reuse this Timeline but bind a shorter Config.
+// Session compression/persistence keeps the original owning runtime; private
+// forks continue to use their own caller and context.
+func (m *Timeline) compressionCallerConfig() AICallerConfigIf {
+	m.mu.RLock()
+	config, history := m.config, m.sessionMemory
+	m.mu.RUnlock()
+	if history != nil && history.owner == m {
+		history.mu.Lock()
+		if history.persistenceConfig != nil {
+			config = history.persistenceConfig
+		}
+		history.mu.Unlock()
+	}
+	return config
 }
 
 // GetSessionMemoryCandidates returns an owned copy of completed candidates from
@@ -130,7 +194,7 @@ func (m *Timeline) GetSessionMemoryCandidates() []any {
 	return history.snapshot()
 }
 
-// Compression sees only titles and content; extraction metadata stays in storage.
+// Compression sees only content; extraction metadata stays in storage.
 func renderSessionMemoryCandidates(items []any) string {
 	var text strings.Builder
 	for _, value := range items {
@@ -138,7 +202,7 @@ func renderSessionMemoryCandidates(items []any) string {
 		if !ok {
 			continue
 		}
-		fmt.Fprintf(&text, "标题：%s\n内容：\n%s\n\n", item["title"], item["content"])
+		fmt.Fprintf(&text, "内容：\n%s\n\n", item["content"])
 	}
 	return text.String()
 }
