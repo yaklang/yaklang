@@ -13,6 +13,29 @@ Required Parameters:
 Optional Parameters:
   limit           (int)     Maximum result count per fingerprint. Default: 20.
   max-scan        (int)     Maximum scripts to scan per fingerprint. Default: 20000.
+
+调用示例：
+[[- if .FunctionCallMode -]]
+arguments 示例：
+```json
+{
+  "fingerprints": "nginx",
+  "limit": 10
+}
+```
+[[- else -]]
+文本流 action：
+```json
+{
+  "@action": "directly_call_tool",
+  "directly_call_tool_name": "query_plugin_by_fp",
+  "directly_call_tool_params": {
+    "fingerprints": "nginx",
+    "limit": 10
+  }
+}
+```
+[[- end -]]
 USAGE_BLOCK
 
 fpNames = cli.String("fingerprints", cli.setVerboseName("指纹名列表"),cli.setHelp("用于查找插件的指纹名列表，多个指纹名之间使用逗号分隔"),cli.setRequired(true))

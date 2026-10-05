@@ -103,31 +103,113 @@ __USAGE__ = <<<USAGE_BLOCK
 `paths` 是换行分隔的单个字符串，每行一个相对路径或完整 URL，不能传数组。URL 模式用 `base-url` 拼相对路径，或逐行传完整 URL；`prefix` 给相对路径统一加前缀。`query`/`form` 传原始值对象，由工具编码一次；`body` 覆盖 `form`。`concurrent` 默认 5，`max-requests` 默认 100、最多 500；先用少量路径核对实际请求包。
 
 典型案例 1：同一站点探测多个路径；JSON 中用 `\n` 分隔：
+[[- if .FunctionCallMode -]]
+arguments 示例：
 ```json
-{"base-url":"https://target.example","paths":"/health\n/api/users\n/admin","concurrent":3}
+{
+  "base-url": "https://target.example",
+  "paths": "/health\n/api/users\n/admin",
+  "concurrent": 3
+}
 ```
+[[- else -]]
+文本流 action：
+```json
+{
+  "@action": "directly_call_tool",
+  "directly_call_tool_name": "batch_do_http_request",
+  "directly_call_tool_params": {
+    "base-url": "https://target.example",
+    "paths": "/health\n/api/users\n/admin",
+    "concurrent": 3
+  }
+}
+```
+[[- end -]]
 
 典型案例 2：不同站点的完整 URL，不需要 `base-url`：
+[[- if .FunctionCallMode -]]
+arguments 示例：
 ```json
-{"paths":"https://a.example/status\nhttps://b.example/status","concurrent":2}
+{
+  "paths": "https://a.example/status\nhttps://b.example/status",
+  "concurrent": 2
+}
 ```
+[[- else -]]
+文本流 action：
+```json
+{
+  "@action": "directly_call_tool",
+  "directly_call_tool_name": "batch_do_http_request",
+  "directly_call_tool_params": {
+    "paths": "https://a.example/status\nhttps://b.example/status",
+    "concurrent": 2
+  }
+}
+```
+[[- end -]]
 
 典型案例 3：统一加前缀，实际请求 /v1/api/users 与 /v1/api/orders：
+[[- if .FunctionCallMode -]]
+arguments 示例：
 ```json
-{"base-url":"https://target.example","prefix":"/v1","paths":"/api/users\n/api/orders","max-requests":2}
+{
+  "base-url": "https://target.example",
+  "prefix": "/v1",
+  "paths": "/api/users\n/api/orders",
+  "max-requests": 2
+}
 ```
+[[- else -]]
+文本流 action：
+```json
+{
+  "@action": "directly_call_tool",
+  "directly_call_tool_name": "batch_do_http_request",
+  "directly_call_tool_params": {
+    "base-url": "https://target.example",
+    "prefix": "/v1",
+    "paths": "/api/users\n/api/orders",
+    "max-requests": 2
+  }
+}
+```
+[[- end -]]
 
 原始报文模式：`packet` 中用 `{{PATH}}` 表示当前 `paths` 行，用 `{{name}}` 读取 `variables` 对象中的同名字符串。`base-url` 与 `packet` 不同时使用；按目标协议设置 `https`。变量值直接替换进报文，放入路径、查询或 Body 前自行按目标格式编码；变量缺失会报错。先核对结果中的最终 request packet，再扩大范围。
 
 [[- if .FunctionCallMode -]]
 典型案例 4：同一报文验证两个订单路径，并用变量设置租户头；多行 `packet` 放在 JSON 字符串中：
+arguments 示例：
 ```json
-{"paths":"/orders/1001\n/orders/1002","packet":"GET {{PATH}}?view=summary HTTP/1.1\r\nHost: target.example\r\nX-Tenant: {{tenant}}\r\n\r\n","variables":{"tenant":"demo"},"https":"yes","concurrent":2,"max-requests":2}
+{
+  "paths": "/orders/1001\n/orders/1002",
+  "packet": "GET {{PATH}}?view=summary HTTP/1.1\r\nHost: target.example\r\nX-Tenant: {{tenant}}\r\n\r\n",
+  "variables": {
+    "tenant": "demo"
+  },
+  "https": "yes",
+  "concurrent": 2,
+  "max-requests": 2
+}
 ```
 [[- else -]]
 典型案例 4：同一报文验证两个订单路径，并用变量设置租户头；JSON 传控制参数，多行 `paths`/`packet` 用本次 nonce 的 AITAG：
+文本流 action：
 ```json
-{"variables":{"tenant":"demo"},"https":"yes","concurrent":2,"max-requests":2}
+{
+  "@action": "directly_call_tool",
+  "directly_call_tool_name": "batch_do_http_request",
+  "directly_call_tool_params": {
+    "variables": {
+      "tenant": "demo"
+    },
+    "https": "yes",
+    "concurrent": 2,
+    "max-requests": 2
+  }
+}
 ```
 <|TOOL_PARAM_paths_{NONCE}|>
 /orders/1001

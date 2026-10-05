@@ -19,16 +19,74 @@ enable-file-tags:true 开启本地 file/file:line/file:dir；codec/yak 扩展未
 {{hexdec({{base64dec({{params(encoded)}})}})}}：variables 注入编码值，每层必须保留完整 {{…}}。
 {{base64({{list(hello|world)}})}} → 两项，先枚举再编码。
 {{urlescape({{base64({{={"a":1}=}})}})}} → JSON → Base64 → URL 特殊字符转义。
-变量调用：{"template":"你好，{{params(name)}}","variables":{"name":["小王","小李"]},"format":"json"}。
+变量调用：
+[[- if .FunctionCallMode -]]
+arguments 示例：
+```json
+{
+  "template": "你好，{{params(name)}}",
+  "variables": {
+    "name": [
+      "小王",
+      "小李"
+    ]
+  },
+  "format": "json"
+}
+```
+[[- else -]]
+文本流 action：
+```json
+{
+  "@action": "directly_call_tool",
+  "directly_call_tool_name": "exec_fuzztag",
+  "directly_call_tool_params": {
+    "template": "你好，{{params(name)}}",
+    "variables": {
+      "name": [
+        "小王",
+        "小李"
+      ]
+    },
+    "format": "json"
+  }
+}
+```
+[[- end -]]
 
-多行/转义敏感模板用 AITAG 原样传入；JSON 只转义一次，字面 \n 不会自动变换行。
+[[- if .FunctionCallMode -]]
+多行业务参数放入 JSON 字符串，换行、引号和反斜杠正确转义；不要输出外置正文。
+[[- else -]]
+多行业务参数使用本次 nonce 的 AITAG 原样传入，其余参数用 JSON；两者会合并。
+[[- end -]]
 数据包示例：
-{"@action":"call-tool","tool":"exec_fuzztag","identifier":"build_packet","params":{"format":"json","output-file":"/tmp/packets.json"}}
+[[- if .FunctionCallMode -]]
+arguments 示例：
+```json
+{
+  "format": "json",
+  "output-file": "/tmp/packets.json",
+  "template": "GET /query?id={{base64({{={\"a\":1}=}})}} HTTP/1.1\nHost: example.com\n"
+}
+```
+[[- else -]]
+文本流 action：
+```json
+{
+  "@action": "directly_call_tool",
+  "directly_call_tool_name": "exec_fuzztag",
+  "directly_call_tool_params": {
+    "format": "json",
+    "output-file": "/tmp/packets.json"
+  }
+}
+```
 <|TOOL_PARAM_template_{NONCE}|>
 GET /query?id={{base64({{={"a":1}=}})}} HTTP/1.1
 Host: example.com
 
 <|TOOL_PARAM_template_END_{NONCE}|>
+[[- end -]]
 id 得 eyJhIjoxfQ==；查询值可再套 urlescape。实际报文用 CRLF 行尾（可插入 {{crlf}}）、空行结束头部。
 CLI：yak exec_fuzztag.yak --template '{{base64(hello)}}' --output-file /tmp/result.txt
 

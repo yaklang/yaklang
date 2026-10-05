@@ -38,7 +38,7 @@ func NativeRiskReview(ctx context.Context, cfg *aicommon.Config, ep *aicommon.En
 		reset()
 		aicommon.WithAIRequest_Context(ctx)(req)
 		aicommon.WithAIRequest_CallerLabel("coordinator:risk-review")(req)
-		aicommon.WithAIRequest_ExtraSpecOpts(aispec.WithContext(ctx), aispec.WithTools([]aispec.Tool{tool}), aispec.WithToolChoice("required"), aispec.AIConfigOption(func(c *aispec.AIConfig) {
+		aicommon.WithAIRequest_ExtraSpecOpts(aispec.WithContext(ctx), aispec.WithTools([]aispec.Tool{tool}), aispec.WithToolChoice("auto"), aispec.AIConfigOption(func(c *aispec.AIConfig) {
 			previous := c.RawHTTPResponseHeaderCallback
 			c.RawHTTPResponseHeaderCallback = func(header []byte) {
 				if previous != nil {

@@ -4,94 +4,63 @@ __VERBOSE_NAME_ZH__ = "文件读取"
 __KEYWORDS__ = "memory management,file reading,large file,file handling,reading,data processing,buffer,performance,offset,chunk size,streaming,line reading,binary detection,mimetype,excel,xlsx,pdf,docx,zip,pcap,office,read_excel_info,query_excel_data,parse_office_to_text"
 
 __USAGE__ = <<<USAGE_BLOCK
-Unified File Reader Tool - Parameter Description for JSON Tool Calls
+读取文本文件，返回带行号的结果；路径参数是 `file`，不是 `path`。使用绝对路径，路径不确定时先定位文件。
 
-This tool reads TEXT files safely. The default mode always outputs numbered lines
-so the AI can reference exact line numbers for code analysis.
+`mode` 默认 auto，与 lines 一样按行读取；offset 为起始行号（1-based，0 表示开头），lines 默认 200，line-size 默认 1024。chunk 按字节读取，offset 为字节偏移，不提供行号；chunk-size 默认/最大 30000。
+大文件先搜索或分页，不一次读取全文。二进制文件不会直接输出乱码，会推荐 Excel、Word、ZIP、PCAP 等对应工具。
 
-Required Parameters:
-    file            (string)  The target file ABSOLUTE path you want to read.
-                              For AI JSON tool calls, always use an absolute path.
-                              Do NOT use relative paths such as "test.txt", "./test.txt", or "../test.txt".
-                              If the path is wrong or the file does not exist,
-                              use find_file or grep to locate the correct path first.
-
-Optional Parameters:
-    mode            (string)  Read mode:
-                                - "auto" (default): always uses line-based reading with numbered
-                                  output. Recommended for all text/source files.
-                                - "lines": explicit line-based mode, same as auto.
-                                - "chunk": byte-chunk reading by byte offset. Use only when you
-                                  need precise byte-level positioning (e.g. resuming a partial read).
-                                  NOTE: chunk mode does NOT output line numbers.
-    offset          (int)     Line number to start reading from (mode=lines/auto, 1-based).
-                              Byte offset when mode=chunk. Default: 0 (start from beginning).
-    lines           (int)     Number of lines to read (mode=lines/auto). Default: 200.
-                              Set higher (e.g. 300-500) for long files.
-    line-size       (int)     Max characters per line (mode=lines/auto). Default: 1024.
-    chunk-size      (int)     Byte chunk size (mode=chunk only). Default/max: 30000.
-
-Path Rules:
-    - Prefer a full absolute filesystem path in every AI tool call.
-    - If you only know a filename or a relative path, first use another tool to locate the file and get its absolute path.
-    - Good: "/Users/alice/project/main.go"
-    - Bad:  "main.go", "./main.go", "../project/main.go"
-
-Binary File Detection:
-  Before reading, this tool detects binary formats using the mimetype library
-  (magic bytes analysis). When a binary file is detected:
-
-  - No garbled binary content is output.
-  - The file type and MIME type are reported.
-  - Appropriate built-in tools are recommended:
-
-    Excel (.xlsx/.xls)  -> read_excel_info, query_excel_data, parse_office_to_text
-    Word (.docx)        -> read_word_structure, parse_office_to_text
-    PPT (.pptx/.ppt)    -> parse_office_to_text
-    ZIP (.zip/.jar)     -> zip_viewer
-    PCAP (.pcap)        -> analyze_pcap
-    PDF (.pdf)          -> Python PyPDF2 via bash
-    SQLite (.db)        -> sqlite3 via bash
-
-  Always try the recommended built-in tool first. Use Python via bash as fallback.
-
-## Few-Shot Examples
-
-Example 1 - Read a large text file (default behavior may prefer a 20KB chunk first):
+以下仅是业务参数示例，按当前 action 协议提交，不以 read_file 为原生函数名：
+[[- if .FunctionCallMode -]]
+arguments 示例：
+```json
 {
-  "@action": "call-tool",
-  "tool": "read_file",
-  "identifier": "read_config_file",
-  "params": {
-    "file": "/etc/nginx/nginx.conf"
-  }
+  "file": "/absolute/path/source.txt",
+  "mode": "lines",
+  "offset": 100,
+  "lines": 120
 }
-
-Example 2 - Read with pagination (lines mode, start from line 100):
+```
+[[- else -]]
+文本流 action：
+```json
 {
-  "@action": "call-tool",
-  "tool": "read_file",
-  "identifier": "read_log_page2",
-  "params": {
-    "file": "/var/log/app.log",
+  "@action": "directly_call_tool",
+  "directly_call_tool_name": "read_file",
+  "directly_call_tool_params": {
+    "file": "/absolute/path/source.txt",
     "mode": "lines",
     "offset": 100,
     "lines": 120
   }
 }
-
-Example 3 - Read binary-safe with byte chunk mode:
+```
+[[- end -]]
+精确字节读取：
+[[- if .FunctionCallMode -]]
+arguments 示例：
+```json
 {
-  "@action": "call-tool",
-  "tool": "read_file",
-  "identifier": "read_file_chunk",
-  "params": {
-    "file": "/tmp/data.bin",
+  "file": "/absolute/path/data.txt",
+  "mode": "chunk",
+  "offset": 0,
+  "chunk-size": 20000
+}
+```
+[[- else -]]
+文本流 action：
+```json
+{
+  "@action": "directly_call_tool",
+  "directly_call_tool_name": "read_file",
+  "directly_call_tool_params": {
+    "file": "/absolute/path/data.txt",
     "mode": "chunk",
     "offset": 0,
     "chunk-size": 20000
   }
 }
+```
+[[- end -]]
 USAGE_BLOCK
 
 /*

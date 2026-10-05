@@ -10,6 +10,27 @@ Required Parameters:
   filename        (string)  The path to the file whose metadata you want to query.
                             Returns: is-directory (bool), file size (bytes),
                             permission mode, and last modified time.
+
+调用示例：
+[[- if .FunctionCallMode -]]
+arguments 示例：
+```json
+{
+  "filename": "/absolute/path/report.txt"
+}
+```
+[[- else -]]
+文本流 action：
+```json
+{
+  "@action": "directly_call_tool",
+  "directly_call_tool_name": "query_file_meta",
+  "directly_call_tool_params": {
+    "filename": "/absolute/path/report.txt"
+  }
+}
+```
+[[- end -]]
 USAGE_BLOCK
 
 yakit.AutoInitYakit()

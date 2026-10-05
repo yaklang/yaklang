@@ -203,6 +203,9 @@ func TestBashUsageShowsOnlyTheCurrentParameterProtocol(t *testing.T) {
 			for _, block := range regexp.MustCompile("(?s)```json\\n(.*?)\\n```").FindAllStringSubmatch(usage, -1) {
 				var params map[string]any
 				assert.NilError(t, json.Unmarshal([]byte(block[1]), &params))
+				if !tc.native {
+					params = params["directly_call_tool_params"].(map[string]any)
+				}
 				assert.Assert(t, params["accepted-exit-codes"] != nil)
 			}
 		})

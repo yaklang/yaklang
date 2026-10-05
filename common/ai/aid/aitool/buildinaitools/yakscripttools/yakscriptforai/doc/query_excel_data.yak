@@ -95,12 +95,24 @@ Python 方案将文件读取一次（~30s），所有计算在内存中完成（
 示例：
 
 1. 带过滤的基本查询（适合——单次查询）：
+[[- if .FunctionCallMode -]]
+arguments 示例：
 ```json
 {
-  "@action": "call-tool",
-  "tool": "query_excel_data",
-  "identifier": "filter_large_transactions",
-  "params": {
+  "input": "/path/to/data.xlsx",
+  "filter": "Amount>50000",
+  "sort_by": "Amount",
+  "sort_desc": true,
+  "limit": 20
+}
+```
+[[- else -]]
+文本流 action：
+```json
+{
+  "@action": "directly_call_tool",
+  "directly_call_tool_name": "query_excel_data",
+  "directly_call_tool_params": {
     "input": "/path/to/data.xlsx",
     "filter": "Amount>50000",
     "sort_by": "Amount",
@@ -109,14 +121,28 @@ Python 方案将文件读取一次（~30s），所有计算在内存中完成（
   }
 }
 ```
+[[- end -]]
 
 2. 聚合查询（适合——单次聚合）：
+[[- if .FunctionCallMode -]]
+arguments 示例：
 ```json
 {
-  "@action": "call-tool",
-  "tool": "query_excel_data",
-  "identifier": "sum_by_counterparty",
-  "params": {
+  "input": "/path/to/data.xlsx",
+  "group_by": "CounterpartyName",
+  "agg": "sum",
+  "agg_column": "Amount",
+  "sort_desc": true,
+  "limit": 20
+}
+```
+[[- else -]]
+文本流 action：
+```json
+{
+  "@action": "directly_call_tool",
+  "directly_call_tool_name": "query_excel_data",
+  "directly_call_tool_params": {
     "input": "/path/to/data.xlsx",
     "group_by": "CounterpartyName",
     "agg": "sum",
@@ -126,6 +152,7 @@ Python 方案将文件读取一次（~30s），所有计算在内存中完成（
   }
 }
 ```
+[[- end -]]
 
 3. 不推荐的做法——不要这样做：
    对同一个大文件反复调用本工具 5 次以上做不同维度的聚合。

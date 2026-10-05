@@ -66,6 +66,29 @@ Filter Evaluation Order:
   4. exclude-ext extension blacklist (file extension match, directories pass)
   5. include-ext extension whitelist (file extension match, directories pass)
   6. max-depth check
+
+调用示例：
+[[- if .FunctionCallMode -]]
+arguments 示例：
+```json
+{
+  "path": "/absolute/path/project",
+  "max-depth": 2
+}
+```
+[[- else -]]
+文本流 action：
+```json
+{
+  "@action": "directly_call_tool",
+  "directly_call_tool_name": "tree",
+  "directly_call_tool_params": {
+    "path": "/absolute/path/project",
+    "max-depth": 2
+  }
+}
+```
+[[- end -]]
 USAGE_BLOCK
 
 yakit.AutoInitYakit()

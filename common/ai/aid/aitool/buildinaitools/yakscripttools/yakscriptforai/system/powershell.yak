@@ -15,6 +15,31 @@ Optional Parameters:
   accepted-exit-codes (string) Comma-separated accepted exit codes. Default: "0".
                             This only affects exit_code_accepted; the raw code is preserved.
   accepted_exit_codes (string) Deprecated underscore alias; it must also be a comma-separated string.
+
+调用示例：
+[[- if .FunctionCallMode -]]
+arguments 示例：
+```json
+{
+  "command": "Get-Location",
+  "timeout": 10,
+  "accepted-exit-codes": "0"
+}
+```
+[[- else -]]
+文本流 action：
+```json
+{
+  "@action": "directly_call_tool",
+  "directly_call_tool_name": "powershell",
+  "directly_call_tool_params": {
+    "command": "Get-Location",
+    "timeout": 10,
+    "accepted-exit-codes": "0"
+  }
+}
+```
+[[- end -]]
 USAGE_BLOCK
 
 yakit.AutoInitYakit()

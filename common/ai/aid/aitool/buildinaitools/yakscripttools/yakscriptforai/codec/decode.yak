@@ -50,81 +50,165 @@ If you have binary data or complex encoding, use the bash tool with a Python scr
 ## Few-Shot Examples
 
 Example 1 - Decode Base64:
+[[- if .FunctionCallMode -]]
+arguments 示例：
+```json
 {
-  "@action": "call-tool",
-  "tool": "decode",
-  "identifier": "decode_base64_text",
-  "params": {
+  "type": "base64",
+  "text": "SGVsbG8gV29ybGQ="
+}
+```
+[[- else -]]
+文本流 action：
+```json
+{
+  "@action": "directly_call_tool",
+  "directly_call_tool_name": "decode",
+  "directly_call_tool_params": {
     "type": "base64",
     "text": "SGVsbG8gV29ybGQ="
   }
 }
+```
+[[- end -]]
 
 Example 2 - Decode URL encoding:
+[[- if .FunctionCallMode -]]
+arguments 示例：
+```json
 {
-  "@action": "call-tool",
-  "tool": "decode",
-  "identifier": "decode_url_encoding",
-  "params": {
+  "type": "url",
+  "text": "Hello%20World%21"
+}
+```
+[[- else -]]
+文本流 action：
+```json
+{
+  "@action": "directly_call_tool",
+  "directly_call_tool_name": "decode",
+  "directly_call_tool_params": {
     "type": "url",
     "text": "Hello%20World%21"
   }
 }
+```
+[[- end -]]
 
 Example 3 - Decode Hex string:
+[[- if .FunctionCallMode -]]
+arguments 示例：
+```json
 {
-  "@action": "call-tool",
-  "tool": "decode",
-  "identifier": "decode_hex_string",
-  "params": {
+  "type": "hex",
+  "text": "48656c6c6f"
+}
+```
+[[- else -]]
+文本流 action：
+```json
+{
+  "@action": "directly_call_tool",
+  "directly_call_tool_name": "decode",
+  "directly_call_tool_params": {
     "type": "hex",
     "text": "48656c6c6f"
   }
 }
+```
+[[- end -]]
 
 Example 4 - Decode Unicode escapes:
+[[- if .FunctionCallMode -]]
+arguments 示例：
+```json
 {
-  "@action": "call-tool",
-  "tool": "decode",
-  "identifier": "decode_unicode_escapes",
-  "params": {
+  "type": "unicode",
+  "text": "\\u0048\\u0065\\u006c\\u006c\\u006f"
+}
+```
+[[- else -]]
+文本流 action：
+```json
+{
+  "@action": "directly_call_tool",
+  "directly_call_tool_name": "decode",
+  "directly_call_tool_params": {
     "type": "unicode",
     "text": "\\u0048\\u0065\\u006c\\u006c\\u006f"
   }
 }
+```
+[[- end -]]
 
 Example 5 - Decode HTML entities:
+[[- if .FunctionCallMode -]]
+arguments 示例：
+```json
 {
-  "@action": "call-tool",
-  "tool": "decode",
-  "identifier": "decode_html_entities",
-  "params": {
+  "type": "html",
+  "text": "&lt;script&gt;alert(1)&lt;/script&gt;"
+}
+```
+[[- else -]]
+文本流 action：
+```json
+{
+  "@action": "directly_call_tool",
+  "directly_call_tool_name": "decode",
+  "directly_call_tool_params": {
     "type": "html",
     "text": "&lt;script&gt;alert(1)&lt;/script&gt;"
   }
 }
+```
+[[- end -]]
 
 Example 6 - Decode Double URL encoding:
+[[- if .FunctionCallMode -]]
+arguments 示例：
+```json
 {
-  "@action": "call-tool",
-  "tool": "decode",
-  "identifier": "decode_double_url",
-  "params": {
+  "type": "doubleurl",
+  "text": "%2548%2565%256c%256c%256f"
+}
+```
+[[- else -]]
+文本流 action：
+```json
+{
+  "@action": "directly_call_tool",
+  "directly_call_tool_name": "decode",
+  "directly_call_tool_params": {
     "type": "doubleurl",
     "text": "%2548%2565%256c%256c%256f"
   }
 }
+```
+[[- end -]]
 
 Example 7 - Decode Base64URL (JWT segments etc.):
+[[- if .FunctionCallMode -]]
+arguments 示例：
+```json
 {
-  "@action": "call-tool",
-  "tool": "decode",
-  "identifier": "decode_base64url_segment",
-  "params": {
+  "type": "base64url",
+  "text": "eyJhbGciOiJIUzI1NiJ9"
+}
+```
+[[- else -]]
+文本流 action：
+```json
+{
+  "@action": "directly_call_tool",
+  "directly_call_tool_name": "decode",
+  "directly_call_tool_params": {
     "type": "base64url",
     "text": "eyJhbGciOiJIUzI1NiJ9"
   }
 }
+```
+[[- end -]]
 
 ## Common Mistakes
 

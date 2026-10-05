@@ -151,7 +151,8 @@ func TestExecLoopPromptCompare_TextAndFunctionCallSchemas(t *testing.T) {
 
 	functionSection := parseComparedSemiDynamic2(t, functionPrompt)
 	require.NotContains(t, functionSection, `{"@action":"compare"}`)
-	require.Contains(t, functionSection, "通过原生工具调用选择 action")
+	require.Contains(t, functionSection, "原生函数只选择请求 tools 中声明的 action")
+	require.NotContains(t, functionSection, "工具名即 action 名")
 	require.NotContains(t, functionSection, schemaTag)
 	parsedTools, err := aitag.SplitViaTAG(functionSection, "FUNCTION_CALL_ACTION_SCHEMA")
 	require.NoError(t, err)

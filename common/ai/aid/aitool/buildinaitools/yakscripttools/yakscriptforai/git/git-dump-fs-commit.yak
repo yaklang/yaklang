@@ -32,6 +32,31 @@ Mode-Parameter Requirements:
   commit-range  : start-ref, end-ref
   date          : date
   date-range    : start-date, end-date
+
+调用示例：
+[[- if .FunctionCallMode -]]
+arguments 示例：
+```json
+{
+  "repos": "/absolute/path/project",
+  "mode": "single-commit",
+  "ref": "HEAD"
+}
+```
+[[- else -]]
+文本流 action：
+```json
+{
+  "@action": "directly_call_tool",
+  "directly_call_tool_name": "git-dump-fs-commit",
+  "directly_call_tool_params": {
+    "repos": "/absolute/path/project",
+    "mode": "single-commit",
+    "ref": "HEAD"
+  }
+}
+```
+[[- end -]]
 USAGE_BLOCK
 
 /*

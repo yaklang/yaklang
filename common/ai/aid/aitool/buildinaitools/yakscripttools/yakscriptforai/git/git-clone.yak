@@ -18,6 +18,29 @@ Optional Parameters:
   recursive       (bool)    Recursively clone submodules. Default: false.
   verify          (bool)    Verify TLS certificates when cloning over HTTPS.
                             Set to false to skip TLS verification. Default: true.
+
+调用示例：
+[[- if .FunctionCallMode -]]
+arguments 示例：
+```json
+{
+  "url": "https://example.com/team/project.git",
+  "local-path": "/absolute/path/project"
+}
+```
+[[- else -]]
+文本流 action：
+```json
+{
+  "@action": "directly_call_tool",
+  "directly_call_tool_name": "git-clone",
+  "directly_call_tool_params": {
+    "url": "https://example.com/team/project.git",
+    "local-path": "/absolute/path/project"
+  }
+}
+```
+[[- end -]]
 USAGE_BLOCK
 
 /*

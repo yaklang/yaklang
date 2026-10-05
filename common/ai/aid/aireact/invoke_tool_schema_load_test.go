@@ -55,7 +55,7 @@ func TestNativeMainLoopLoadSchemasThenDirectExecution(t *testing.T) {
 			}
 			switch step {
 			case 1:
-				require.Contains(t, req.GetPrompt(), "Load business-tool parameter schemas")
+				require.Contains(t, req.GetPrompt(), "只加载业务工具完整参数 Schema")
 				add("require_tool", `{"tool_require_calls":[{"tool_name":"schema_probe_a"},{"tool_name":"schema_probe_b"}]}`)
 			case 2:
 				require.Zero(t, executions.Load())
@@ -110,8 +110,8 @@ func TestNativeMainLoopLoadSchemasThenDirectExecution(t *testing.T) {
 	require.NoError(t, err)
 	workerAction, err := worker.GetActionHandler("require_tool")
 	require.NoError(t, err)
-	require.Contains(t, workerAction.Description, "Load business-tool parameter schemas")
+	require.Contains(t, workerAction.Description, "只加载业务工具完整参数 Schema")
 	mainAction, err := loop.GetActionHandler("require_tool")
 	require.NoError(t, err)
-	require.Contains(t, mainAction.Description, "Load business-tool parameter schemas", "constructing another loop must not mutate shared action variants")
+	require.Contains(t, mainAction.Description, "只加载业务工具完整参数 Schema", "constructing another loop must not mutate shared action variants")
 }

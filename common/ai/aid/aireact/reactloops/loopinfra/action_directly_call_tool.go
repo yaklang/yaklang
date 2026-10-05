@@ -559,7 +559,7 @@ Few-shot example 2 (valid direct retry):
 		// DirectlyCallTool emits the card (loading) first, then runs prepare (reads
 		// streaming params), then invokes — reusing the same card on fallback.
 		result, directly, callErr := invoker.DirectlyCallTool(ctx, toolName, action, prepare)
-		recordSuccessfulToolCache(loop.GetConfig(), toolName, result, callErr)
+		recordSuccessfulToolCache(loop, toolName, result, callErr)
 
 		handleToolCallResult(loop, ctx, invoker, toolName, result, directly, callErr, operator)
 	},

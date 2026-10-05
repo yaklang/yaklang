@@ -138,6 +138,31 @@ Filter Evaluation Order:
   5. include-ext whitelist (file extension match, directories pass)
   6. size filters (min-size, max-size)
   7. pattern match (substr/regexp: against full absolute path; glob: against filename/basename only)
+
+调用示例：
+[[- if .FunctionCallMode -]]
+arguments 示例：
+```json
+{
+  "dir": "/absolute/path/project",
+  "pattern": "*.go",
+  "max": 20
+}
+```
+[[- else -]]
+文本流 action：
+```json
+{
+  "@action": "directly_call_tool",
+  "directly_call_tool_name": "find_file",
+  "directly_call_tool_params": {
+    "dir": "/absolute/path/project",
+    "pattern": "*.go",
+    "max": 20
+  }
+}
+```
+[[- end -]]
 USAGE_BLOCK
 
 yakit.AutoInitYakit()

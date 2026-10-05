@@ -10,6 +10,7 @@ import (
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon/promptloader"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
+	"github.com/yaklang/yaklang/common/log"
 )
 
 const (
@@ -1050,42 +1051,16 @@ func renderToolInventoryBlock(materials *reactloops.PromptPrefixMaterials) strin
 	if materials == nil || !materials.ToolInventory || materials.ToolsCount <= 0 || len(materials.TopTools) == 0 {
 		return ""
 	}
-	var lines []string
-	if materials.FunctionCallMode {
-		lines = append(lines,
-			"# Tool Inventory — 业务工具目录",
-			"用法：下列仅是工具名称和简介，不含完整参数 Schema；原生 `tool_calls[].function.name` 只能选已声明的 action，目录名称要填在 action 参数中。",
-			"完整 Schema 已知（优先查 `CACHE_TOOL_CALL`）→ `directly_call_tool`：`directly_call_tool_name`=名称、`directly_call_tool_params`=参数；否则 → `require_tool`：`tool_require_payload`=名称，由运行时生成参数。缓存未命中但已知完整 Schema 时仍可直调，由运行时校验。",
-		)
-	} else {
-		lines = append(lines,
-			"# Tool Inventory",
-			"下列是按优先级选出的可用业务工具，完整目录可按需检索。",
-		)
+	// Observe the same protocol template that produces the model's inventory.
+	// Other frozen materials belong to their own observation nodes.
+	inventory := &aicommon.PromptMaterials{ToolInventory: true, TopTools: materials.TopTools}
+	rendered, err := aicommon.RenderPromptTemplate("tool-inventory-observation",
+		aicommon.MainloopFrozenBlockTemplate(materials.FunctionCallMode), inventory)
+	if err != nil {
+		log.Warnf("cannot render tool inventory observation: %v", err)
+		return ""
 	}
-	lines = append(lines,
-		"",
-		"## 工具调用模式（单调用、可选并发批次或 tool_compose）",
-		"",
-		"- 单工具入口: 默认选择；恰好一个调用、参数仍需生成、工具是嵌套 wrapper、调用有写入/页面状态或后续依赖结果时，使用标量形式.",
-		"- 独立并发批次（可选的延迟优化）: 仅当 2-8 个调用都是低风险、独立且互不干扰时使用. 每层完整参数都已从真实 Schema 确定时使用 `directly_call_tool_calls`; 参数仍需生成但各工具 Schema 简单无歧义时使用 `tool_require_calls`.",
-		"- 工具编排入口 (tool_compose): 只用于存在明确上游产物依赖的意图 DAG. 它的节点不承载模型直接给出的最终工具参数, 不能替代上述并发调用数组.",
-		"- 嵌套 wrapper、页面状态操作或参数有歧义时必须走单调用.",
-		"- 任一批次发生准入、Schema 或参数错误后，保留已成功结果，将失败调用改为修正后的单调用；禁止原样重试批次.",
-		"",
-		"## Prioritized Tools",
-	)
-	for _, tool := range materials.TopTools {
-		if tool == nil {
-			continue
-		}
-		lines = append(lines, fmt.Sprintf("* `%s`: %s", tool.Name, tool.Description))
-	}
-	lines = append(lines,
-		"",
-		"> 此处为优先展示目录；完整能力范围可按需通过能力检索入口查询。",
-	)
-	return strings.Join(lines, "\n")
+	return strings.TrimSpace(rendered)
 }
 
 func renderForgeInventoryBlock(materials *reactloops.PromptPrefixMaterials) string {

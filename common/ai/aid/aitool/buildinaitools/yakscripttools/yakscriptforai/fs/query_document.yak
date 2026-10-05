@@ -16,6 +16,29 @@ Optional Parameters:
                             If omitted, the tool defaults to generating a concise summary
                             of the document's key points.
                             Default: "Provide a concise summary of the key points in this document."
+
+调用示例：
+[[- if .FunctionCallMode -]]
+arguments 示例：
+```json
+{
+  "filename": "/absolute/path/report.docx",
+  "question": "总结主要结论及依据。"
+}
+```
+[[- else -]]
+文本流 action：
+```json
+{
+  "@action": "directly_call_tool",
+  "directly_call_tool_name": "query_document",
+  "directly_call_tool_params": {
+    "filename": "/absolute/path/report.docx",
+    "question": "总结主要结论及依据。"
+  }
+}
+```
+[[- end -]]
 USAGE_BLOCK
 
 filename := cli.String("filename", cli.setHelp("The path to the local document to be analyzed. This argument is required."), cli.setRequired(true))

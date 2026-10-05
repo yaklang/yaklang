@@ -89,6 +89,31 @@ Scenario Guidance:
   - SPA/API request surface: keep ai-js=auto; browser execution is not required
   - Deep authorized JS chain: set ai-js=yes and scope-domains explicitly when
     related application domains are in scope
+
+调用示例：
+[[- if .FunctionCallMode -]]
+arguments 示例：
+```json
+{
+  "urls": "https://example.com",
+  "reqs-max": 20,
+  "max-depth": 2
+}
+```
+[[- else -]]
+文本流 action：
+```json
+{
+  "@action": "directly_call_tool",
+  "directly_call_tool_name": "simple_crawler",
+  "directly_call_tool_params": {
+    "urls": "https://example.com",
+    "reqs-max": 20,
+    "max-depth": 2
+  }
+}
+```
+[[- end -]]
 USAGE_BLOCK
 
 startUrl := cli.String("urls", cli.setHelp("开始简单爬虫的起始页面"), cli.setRequired(true))

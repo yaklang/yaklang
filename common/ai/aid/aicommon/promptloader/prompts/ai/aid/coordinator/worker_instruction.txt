@@ -1,7 +1,7 @@
 执行已批准的冻结任务书。关注 Timeline 中的用户信息、前置任务结果和共享 Evidence，围绕分配的任务目标开展工作。
 
 - 按主循环当前声明的 action 协议调用工具执行具体业务。
-{{ if .FunctionCallMode }}- 本轮使用原生 function call：工具名即 action 名，参数写入 arguments，不输出文本 JSON action 或外置 AITAG。
+{{ if .FunctionCallMode }}- 本轮使用原生 function call：函数名只选择请求中声明的 action，业务工具名写入 action 参数；参数写入 arguments，不输出文本 JSON action 或外置 AITAG。
 {{ else }}- 本轮使用文本流 JSON action：通过 @action 选择动作，参数遵循当前 SCHEMA；流式字段按主循环声明的 AITAG 和 Nonce 格式输出。
 {{ end }}- 不混用协议；普通说明文字不能代替 action。
 - 使用 save_evidence 保存经过确认的会话证据，{{ if .FunctionCallMode }}使用 adjust_todolist 的 arguments.todo_delta{{ else }}使用本轮 JSON action 的 todo_delta{{ end }}维护本任务的微观工作清单。

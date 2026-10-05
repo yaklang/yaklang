@@ -49,19 +49,58 @@ __USAGE__ = <<<USAGE_BLOCK
 测试时先留正常基线，再一次改变一个变量并比较状态、内容、响应头和耗时。参数校验失败、超时、空响应或一次未命中都需要修正请求或换一个可区分的实验；响应揭示的新入口应记录到待办。
 
 典型案例：URL 模式提交表单，参数直接传对象：
+[[- if .FunctionCallMode -]]
+arguments 示例：
 ```json
-{"url":"https://target.example/submit","method":"POST","form":{"name":"a & b"},"timeout":10}
+{
+  "url": "https://target.example/submit",
+  "method": "POST",
+  "form": {
+    "name": "a & b"
+  },
+  "timeout": 10
+}
 ```
+[[- else -]]
+文本流 action：
+```json
+{
+  "@action": "directly_call_tool",
+  "directly_call_tool_name": "do_http_request",
+  "directly_call_tool_params": {
+    "url": "https://target.example/submit",
+    "method": "POST",
+    "form": {
+      "name": "a & b"
+    },
+    "timeout": 10
+  }
+}
+```
+[[- end -]]
 
 [[- if .FunctionCallMode -]]
 精确报文：所有参数直接放在 JSON 中，多行报文用 JSON 转义：
+arguments 示例：
 ```json
-{"packet":"POST /submit HTTP/1.1\r\nHost: target.example\r\nContent-Type: application/x-www-form-urlencoded\r\n\r\nname=a%20%26%20b","https":"yes","timeout":10}
+{
+  "packet": "POST /submit HTTP/1.1\r\nHost: target.example\r\nContent-Type: application/x-www-form-urlencoded\r\n\r\nname=a%20%26%20b",
+  "https": "yes",
+  "timeout": 10
+}
 ```
 [[- else -]]
 精确报文：其他参数用 JSON，多行 `packet` 使用本次 nonce 的 AITAG：
+文本流 action：
 ```json
-{"https":"yes","timeout":10}
+{
+  "@action": "directly_call_tool",
+  "directly_call_tool_name": "do_http_request",
+  "directly_call_tool_params": {
+    "https": "yes",
+    "timeout": 10
+  }
+}
 ```
 <|TOOL_PARAM_packet_{NONCE}|>
 POST /submit HTTP/1.1

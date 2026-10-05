@@ -7,6 +7,29 @@ __USAGE__ = <<<USAGE_BLOCK
 Leaf tool for sf_rule_completion forge subtask 1.
 At least one of: rule_name, file_path, file_content.
 Returns rule_content, suggested_path, written_path. By default persists merged rule to suggested_path.
+
+调用示例：
+[[- if .FunctionCallMode -]]
+arguments 示例：
+```json
+{
+  "file_path": "/absolute/path/rule.sf",
+  "write_output": false
+}
+```
+[[- else -]]
+文本流 action：
+```json
+{
+  "@action": "directly_call_tool",
+  "directly_call_tool_name": "syntaxflow_rule_completion",
+  "directly_call_tool_params": {
+    "file_path": "/absolute/path/rule.sf",
+    "write_output": false
+  }
+}
+```
+[[- end -]]
 USAGE_BLOCK
 
 yakit.AutoInitYakit()

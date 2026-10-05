@@ -18,6 +18,29 @@ Optional Parameters:
 
 Rules:
   - At least one of "ids" or "names" must be provided.
+
+调用示例：
+[[- if .FunctionCallMode -]]
+arguments 示例：
+```json
+{
+  "url": "https://example.com/",
+  "ids": "<query_plugin_by_fp 返回的实际调用标识>"
+}
+```
+[[- else -]]
+文本流 action：
+```json
+{
+  "@action": "directly_call_tool",
+  "directly_call_tool_name": "call_yak_plugin",
+  "directly_call_tool_params": {
+    "url": "https://example.com/",
+    "ids": "<query_plugin_by_fp 返回的实际调用标识>"
+  }
+}
+```
+[[- end -]]
 USAGE_BLOCK
 
 pluginIds = cli.String("ids", cli.setVerboseName("插件ID/UUID列表"), cli.setHelp("插件数据库ID或UUID列表，多个插件之间使用逗号分隔；可直接使用 query_plugin_by_fp 返回的调用标识"))

@@ -14,6 +14,27 @@ Rules:
   - At least one of "yaklang-code" or "path" must be provided.
   - If "yaklang-code" is provided, it is checked directly.
   - If "path" is provided, tool reads file content and then checks syntax.
+
+调用示例：
+[[- if .FunctionCallMode -]]
+arguments 示例：
+```json
+{
+  "yaklang-code": "println(\"hello\")"
+}
+```
+[[- else -]]
+文本流 action：
+```json
+{
+  "@action": "directly_call_tool",
+  "directly_call_tool_name": "check_yaklang_syntax",
+  "directly_call_tool_params": {
+    "yaklang-code": "println(\"hello\")"
+  }
+}
+```
+[[- end -]]
 USAGE_BLOCK
 
 code = cli.String(

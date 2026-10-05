@@ -14,12 +14,13 @@ import (
 
 // A failed or unsettled call cannot warm the execution cache. Scalar require,
 // scalar direct and batch children use the same result boundary.
-func recordSuccessfulToolCache(config aicommon.AICallerConfigIf, name string, result *aitool.ToolResult, callErr error) {
+func recordSuccessfulToolCache(loop *reactloops.ReActLoop, name string, result *aitool.ToolResult, callErr error) {
+	config := loop.GetConfig()
 	if config == nil || config.GetAiToolManager() == nil || callErr != nil || result == nil || !result.Success {
 		return
 	}
 	if tool, err := config.GetAiToolManager().GetToolByName(name); err == nil && tool != nil {
-		config.RecordRecentlyUsedTool(tool)
+		loop.RecordRecentlyUsedTool(tool)
 	}
 }
 

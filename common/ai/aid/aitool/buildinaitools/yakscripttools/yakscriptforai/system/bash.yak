@@ -14,15 +14,36 @@ __USAGE__ = <<<USAGE_BLOCK
 判断执行结果请查看 `RESULT.timed_out`、`process_completed`、`exit_code_available`、`exit_code_accepted` 和 `termination_reason`。工具调用成功不等于命令成功；超时可能没有可用退出码。
 执行完整脚本时，推荐从工作区提示读取 `AI Artifacts dir` 的实际绝对路径，先写入该目录，再 `chmod +x` 并执行；简单固定文本可用 `echo`，多行或含转义的脚本用 `printf '%s\n'`，并正确引用路径。工具内部自动生成的临时包装脚本会在调用结束时删除，不作为交付物。
 
-典型案例（仅展示工具参数）：
+典型调用案例：
 
 执行简单命令：
+[[- if .FunctionCallMode -]]
+arguments 示例：
 ```json
-{"command":"pwd","timeout":10,"accepted-exit-codes":"0"}
+{
+  "command": "pwd",
+  "timeout": 10,
+  "accepted-exit-codes": "0"
+}
 ```
+[[- else -]]
+文本流 action：
+```json
+{
+  "@action": "directly_call_tool",
+  "directly_call_tool_name": "bash",
+  "directly_call_tool_params": {
+    "command": "pwd",
+    "timeout": 10,
+    "accepted-exit-codes": "0"
+  }
+}
+```
+[[- end -]]
 
 [[- if .FunctionCallMode -]]
 在 Linux/macOS 上写入并执行较长的 Bash 脚本；把下方占位符换成工作区给出的真实 `AI Artifacts dir` 路径，脚本留在该目录。`rg` 查无匹配时脚本明确返回 1，因此预先接受退出码 1（其他错误码仍不接受）；Windows Bash 须按其路径格式调整：
+arguments 示例：
 ```json
 {
   "shell": "bash",
@@ -33,8 +54,17 @@ __USAGE__ = <<<USAGE_BLOCK
 ```
 [[- else -]]
 在 Linux/macOS 上写入并执行较长的 Bash 脚本；把下方占位符换成工作区给出的真实 `AI Artifacts dir` 路径，脚本留在该目录。`rg` 查无匹配时脚本明确返回 1，因此预先接受退出码 1（其他错误码仍不接受）；Windows Bash 须按其路径格式调整：
+文本流 action：
 ```json
-{"shell":"bash","timeout":30,"accepted-exit-codes":"0,1"}
+{
+  "@action": "directly_call_tool",
+  "directly_call_tool_name": "bash",
+  "directly_call_tool_params": {
+    "shell": "bash",
+    "timeout": 30,
+    "accepted-exit-codes": "0,1"
+  }
+}
 ```
 将下方 `{NONCE}` 替换为本次调用的 nonce：
 <|TOOL_PARAM_command_{NONCE}|>

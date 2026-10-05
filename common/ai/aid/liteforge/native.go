@@ -93,7 +93,7 @@ func (n *nativeOutput) requestOption() aicommon.AIRequestOption {
 		n.current, n.streams, n.response = nil, nil, nil
 		n.mu.Unlock()
 		aicommon.WithAIRequest_ExtraSpecOpts(
-			aispec.WithToolChoice(map[string]any{"type": "function", "function": map[string]any{"name": n.wireName}}),
+			aispec.WithToolChoice("auto"),
 			// Consume arguments separately from ordinary content/reason streams. Do
 			// not enable the flag that merges native arguments into response text.
 			aispec.WithToolCallArgumentsStreamHandler(n.argumentsStream),

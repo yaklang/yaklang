@@ -10,16 +10,22 @@ import (
 // explicit preloads. Runtime LRU changes immediately; prompt state changes only
 // through immutable Open events, then joins the next Timeline freeze.
 func (c *Config) RecordRecentlyUsedTool(tool *aitool.Tool) buildinaitools.RecentToolCacheMutation {
+	return c.RecordRecentlyUsedToolForMode(tool, c != nil && c.EnableFunctionCallMode)
+}
+
+// RecordRecentlyUsedToolForMode also supports an explicit loop-level protocol
+// override without changing the shared Config or rewriting frozen history.
+func (c *Config) RecordRecentlyUsedToolForMode(tool *aitool.Tool, native bool) buildinaitools.RecentToolCacheMutation {
 	if c == nil || tool == nil || c.GetAiToolManager() == nil {
 		return buildinaitools.RecentToolCacheMutation{}
 	}
 	if c.GetTimeline() == nil {
-		return c.GetAiToolManager().AddRecentlyUsedTool(tool)
+		return c.GetAiToolManager().AddRecentlyUsedToolForMode(tool, native)
 	}
 	tl := c.GetTimeline()
 	tl.toolCacheMu.Lock()
 	defer tl.toolCacheMu.Unlock()
-	mutation := c.GetAiToolManager().AddRecentlyUsedTool(tool)
+	mutation := c.GetAiToolManager().AddRecentlyUsedToolForMode(tool, native)
 	entry := mutation.Upsert
 	if entry == nil {
 		entry = mutation.Reuse
@@ -87,7 +93,7 @@ func (c *Config) restoreRecentToolsFromTimeline() {
 		tools = append(tools, tool)
 		byName[entry.Key] = tool
 	}
-	current := manager.RestoreRecentlyUsedTools(tools)
+	current := manager.RestoreRecentlyUsedToolsForMode(tools, c.EnableFunctionCallMode)
 	payloads := make(map[string]string, len(current))
 	for _, entry := range current {
 		payloads[entry.Name] = buildinaitools.RenderRecentToolEntryForPromotion(entry)
@@ -108,7 +114,7 @@ func (c *Config) restoreRecentToolsFromTimeline() {
 		for _, entry := range tl.effectivePromotedEntries(TimelinePromotedTargetSemiDynamic1, TimelinePromotedKindRecentTool) {
 			tools = append(tools, byName[entry.Key])
 		}
-		manager.RestoreRecentlyUsedTools(tools)
+		manager.RestoreRecentlyUsedToolsForMode(tools, c.EnableFunctionCallMode)
 	}
 	c.saveToolCacheDeltas(changed)
 }

@@ -7,6 +7,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
+	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools"
 )
@@ -27,7 +28,8 @@ func TestTimelineToolCacheActionResultBoundary(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			cfg := aicommon.NewConfig(context.Background(), aicommon.WithDisableAutoSkills(true),
 				aicommon.WithToolManager(buildinaitools.NewToolManager(buildinaitools.WithOnlyTools(tool))))
-			recordSuccessfulToolCache(cfg, tool.Name, tc.result, tc.err)
+			loop := reactloops.NewMinimalReActLoop(cfg, nil)
+			recordSuccessfulToolCache(loop, tool.Name, tc.result, tc.err)
 			require.Equal(t, tc.cached, cfg.GetAiToolManager().IsRecentlyUsedTool(tool.Name))
 			open := aicommon.RenderTimelineFrozenOpen(cfg.Timeline).Open
 			if tc.cached {

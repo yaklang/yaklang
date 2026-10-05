@@ -21,48 +21,77 @@ Optional Parameters:
 
 User intent: "Search for information about Yaklang security tool"
 
+[[- if .FunctionCallMode -]]
+arguments 示例：
 ```json
 {
-  "@action": "call-tool",
-  "tool": "web_search",
-  "identifier": "search_yaklang_info",
-  "params": {
+  "query": "Yaklang security tool features"
+}
+```
+[[- else -]]
+文本流 action：
+```json
+{
+  "@action": "directly_call_tool",
+  "directly_call_tool_name": "web_search",
+  "directly_call_tool_params": {
     "query": "Yaklang security tool features"
   }
 }
 ```
+[[- end -]]
 
 ### Example 2: Search with limited results
 
 User intent: "Research CVE-2024-1234 vulnerability"
 
+[[- if .FunctionCallMode -]]
+arguments 示例：
 ```json
 {
-  "@action": "call-tool",
-  "tool": "web_search",
-  "identifier": "research_cve",
-  "params": {
+  "query": "CVE-2024-1234 vulnerability details exploit",
+  "max_results": 10
+}
+```
+[[- else -]]
+文本流 action：
+```json
+{
+  "@action": "directly_call_tool",
+  "directly_call_tool_name": "web_search",
+  "directly_call_tool_params": {
     "query": "CVE-2024-1234 vulnerability details exploit",
     "max_results": 10
   }
 }
 ```
+[[- end -]]
 
 ### Example 3: Quick search with fewer results
 
 User intent: "Quickly check what results come up for a topic"
 
+[[- if .FunctionCallMode -]]
+arguments 示例：
 ```json
 {
-  "@action": "call-tool",
-  "tool": "web_search",
-  "identifier": "quick_search",
-  "params": {
+  "query": "golang concurrency patterns 2024",
+  "max_results": 5
+}
+```
+[[- else -]]
+文本流 action：
+```json
+{
+  "@action": "directly_call_tool",
+  "directly_call_tool_name": "web_search",
+  "directly_call_tool_params": {
     "query": "golang concurrency patterns 2024",
     "max_results": 5
   }
 }
 ```
+[[- end -]]
 
 ## Key Rules
 

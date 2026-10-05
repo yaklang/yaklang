@@ -19,24 +19,46 @@ Rules:
 ## Few-Shot Examples
 
 Example 1 - Check SyntaxFlow rule from code string:
+[[- if .FunctionCallMode -]]
+arguments 示例：
+```json
 {
-  "@action": "call-tool",
-  "tool": "check_syntaxflow_syntax",
-  "identifier": "check_sf_rule_string",
-  "params": {
+  "syntaxflow-code": "desc(title: 'XSS check')\n*?{opcode: call && <getFunc><name>?{have: innerHTML}} as $sink"
+}
+```
+[[- else -]]
+文本流 action：
+```json
+{
+  "@action": "directly_call_tool",
+  "directly_call_tool_name": "check_syntaxflow_syntax",
+  "directly_call_tool_params": {
     "syntaxflow-code": "desc(title: 'XSS check')\n*?{opcode: call && <getFunc><name>?{have: innerHTML}} as $sink"
   }
 }
+```
+[[- end -]]
 
 Example 2 - Check SyntaxFlow rule from file:
+[[- if .FunctionCallMode -]]
+arguments 示例：
+```json
 {
-  "@action": "call-tool",
-  "tool": "check_syntaxflow_syntax",
-  "identifier": "check_sf_rule_file",
-  "params": {
+  "path": "/path/to/rule.sf"
+}
+```
+[[- else -]]
+文本流 action：
+```json
+{
+  "@action": "directly_call_tool",
+  "directly_call_tool_name": "check_syntaxflow_syntax",
+  "directly_call_tool_params": {
     "path": "/path/to/rule.sf"
   }
 }
+```
+[[- end -]]
 USAGE_BLOCK
 
 code = cli.String(

@@ -101,7 +101,7 @@ Conditional:
   value     (string)  Text for op=fill/type/setfiles/select/press
   subop     (string)  Sub-op for "get": title, url, html, text, cookies, dialog
   action    (string)  For op=handle_dialog: accept|dismiss (aliases ok/cancel/yes/no)
-  js        (string)  JavaScript for op=eval. Use AITAG for multi-line JS.
+  js        (string)  JavaScript for op=eval；多行 js 按下方当前协议示例传入。
 
 Optional:
   timeout   (int)     Timeout in seconds. Default: 30.
@@ -112,6 +112,12 @@ Optional:
   tab-index (string)  Tab index for tab_switch/tab_close
   exe-path  (string)  Chrome/Chromium executable path. Defaults to yakit "global-chrome-path" config.
                      When set, this path is used instead of auto-detecting Chrome on the system.
+
+[[- if .FunctionCallMode -]]
+多行业务参数放入 JSON 字符串，换行、引号和反斜杠正确转义；不要输出外置正文。
+[[- else -]]
+多行业务参数使用本次 nonce 的 AITAG 原样传入，其余参数用 JSON；两者会合并。
+[[- end -]]
 
 ## JavaScript-First Strategy (for Login/Form Pages)
 
@@ -124,12 +130,23 @@ than snapshot+fill+click. A single eval call can:
 
 ### Example: Discover form fields with one eval call
 
+[[- if .FunctionCallMode -]]
+arguments 示例：
 ```json
 {
-  "@action": "call-tool",
-  "tool": "use_browser",
-  "identifier": "discover_form_fields",
-  "params": { "op": "eval" }
+  "op": "eval",
+  "js": "JSON.stringify(Array.from(document.querySelectorAll(\"input,select,textarea,button\")).map(el => ({\n  tag: el.tagName, type: el.type||\"\", name: el.name||\"\", id: el.id||\"\",\n  placeholder: el.placeholder||\"\", selector: el.id ? \"#\"+el.id : (el.name ? el.tagName.toLowerCase()+\"[name='\"+el.name+\"']\" : \"\"),\n  text: el.textContent.trim().slice(0,50)\n})))"
+}
+```
+[[- else -]]
+文本流 action：
+```json
+{
+  "@action": "directly_call_tool",
+  "directly_call_tool_name": "use_browser",
+  "directly_call_tool_params": {
+    "op": "eval"
+  }
 }
 ```
 
@@ -140,15 +157,27 @@ JSON.stringify(Array.from(document.querySelectorAll("input,select,textarea,butto
   text: el.textContent.trim().slice(0,50)
 })))
 <|TOOL_PARAM_js_END_{NONCE}|>
+[[- end -]]
 
 ### Example: Fill login form and submit in ONE eval call
 
+[[- if .FunctionCallMode -]]
+arguments 示例：
 ```json
 {
-  "@action": "call-tool",
-  "tool": "use_browser",
-  "identifier": "js_login",
-  "params": { "op": "eval" }
+  "op": "eval",
+  "js": "(function(){\n  var u = document.querySelector(\"input[name='username']\");\n  var p = document.querySelector(\"input[name='password']\");\n  var btn = document.querySelector(\"button[type='submit']\");\n  if(!u||!p||!btn) return JSON.stringify({error:\"form fields not found\", fields: document.querySelectorAll(\"input\").length});\n  u.value = \"admin\"; u.dispatchEvent(new Event(\"input\",{bubbles:true}));\n  p.value = \"password123\"; p.dispatchEvent(new Event(\"input\",{bubbles:true}));\n  btn.click();\n  return JSON.stringify({status:\"submitted\", username:\"admin\"});\n})()"
+}
+```
+[[- else -]]
+文本流 action：
+```json
+{
+  "@action": "directly_call_tool",
+  "directly_call_tool_name": "use_browser",
+  "directly_call_tool_params": {
+    "op": "eval"
+  }
 }
 ```
 
@@ -164,15 +193,27 @@ JSON.stringify(Array.from(document.querySelectorAll("input,select,textarea,butto
   return JSON.stringify({status:"submitted", username:"admin"});
 })()
 <|TOOL_PARAM_js_END_{NONCE}|>
+[[- end -]]
 
 ### Example: After login, check if succeeded
 
+[[- if .FunctionCallMode -]]
+arguments 示例：
 ```json
 {
-  "@action": "call-tool",
-  "tool": "use_browser",
-  "identifier": "check_login_result",
-  "params": { "op": "eval" }
+  "op": "eval",
+  "js": "JSON.stringify({\n  url: location.href,\n  title: document.title,\n  bodyText: document.body.innerText.slice(0,500),\n  cookies: document.cookie\n})"
+}
+```
+[[- else -]]
+文本流 action：
+```json
+{
+  "@action": "directly_call_tool",
+  "directly_call_tool_name": "use_browser",
+  "directly_call_tool_params": {
+    "op": "eval"
+  }
 }
 ```
 
@@ -184,6 +225,7 @@ JSON.stringify({
   cookies: document.cookie
 })
 <|TOOL_PARAM_js_END_{NONCE}|>
+[[- end -]]
 
 ## Snapshot + Refs Strategy (Simple Pages)
 
@@ -194,40 +236,150 @@ Step 4: Close when done (op=close)
 
 ### Example: Open and interact with refs
 
+[[- if .FunctionCallMode -]]
+arguments 示例：
 ```json
-{ "@action": "call-tool", "tool": "use_browser", "identifier": "open_page",
-  "params": { "op": "open", "url": "https://example.com", "timeout": 15 } }
+{
+  "op": "open",
+  "url": "https://example.com",
+  "timeout": 15
+}
 ```
+[[- else -]]
+文本流 action：
+```json
+{
+  "@action": "directly_call_tool",
+  "directly_call_tool_name": "use_browser",
+  "directly_call_tool_params": {
+    "op": "open",
+    "url": "https://example.com",
+    "timeout": 15
+  }
+}
+```
+[[- end -]]
 
+[[- if .FunctionCallMode -]]
+arguments 示例：
 ```json
-{ "@action": "call-tool", "tool": "use_browser", "identifier": "fill_field",
-  "params": { "op": "fill", "target": "@e1", "value": "user@example.com" } }
+{
+  "op": "fill",
+  "target": "@e1",
+  "value": "user@example.com"
+}
 ```
+[[- else -]]
+文本流 action：
+```json
+{
+  "@action": "directly_call_tool",
+  "directly_call_tool_name": "use_browser",
+  "directly_call_tool_params": {
+    "op": "fill",
+    "target": "@e1",
+    "value": "user@example.com"
+  }
+}
+```
+[[- end -]]
 
+[[- if .FunctionCallMode -]]
+arguments 示例：
 ```json
-{ "@action": "call-tool", "tool": "use_browser", "identifier": "click_btn",
-  "params": { "op": "click", "target": "@e3" } }
+{
+  "op": "click",
+  "target": "@e3"
+}
 ```
+[[- else -]]
+文本流 action：
+```json
+{
+  "@action": "directly_call_tool",
+  "directly_call_tool_name": "use_browser",
+  "directly_call_tool_params": {
+    "op": "click",
+    "target": "@e3"
+  }
+}
+```
+[[- end -]]
 
 ## Using CSS Selectors Directly (No Snapshot Needed)
 
 fill and click accept CSS selectors directly. After discovering selectors via eval,
 you can use them without needing snapshot refs:
 
+[[- if .FunctionCallMode -]]
+arguments 示例：
 ```json
-{ "@action": "call-tool", "tool": "use_browser", "identifier": "fill_username",
-  "params": { "op": "fill", "target": "input[name='username']", "value": "admin" } }
+{
+  "op": "fill",
+  "target": "input[name='username']",
+  "value": "admin"
+}
 ```
+[[- else -]]
+文本流 action：
+```json
+{
+  "@action": "directly_call_tool",
+  "directly_call_tool_name": "use_browser",
+  "directly_call_tool_params": {
+    "op": "fill",
+    "target": "input[name='username']",
+    "value": "admin"
+  }
+}
+```
+[[- end -]]
 
+[[- if .FunctionCallMode -]]
+arguments 示例：
 ```json
-{ "@action": "call-tool", "tool": "use_browser", "identifier": "fill_password",
-  "params": { "op": "fill", "target": "input[name='password']", "value": "pass123" } }
+{
+  "op": "fill",
+  "target": "input[name='password']",
+  "value": "pass123"
+}
 ```
+[[- else -]]
+文本流 action：
+```json
+{
+  "@action": "directly_call_tool",
+  "directly_call_tool_name": "use_browser",
+  "directly_call_tool_params": {
+    "op": "fill",
+    "target": "input[name='password']",
+    "value": "pass123"
+  }
+}
+```
+[[- end -]]
 
+[[- if .FunctionCallMode -]]
+arguments 示例：
 ```json
-{ "@action": "call-tool", "tool": "use_browser", "identifier": "click_login",
-  "params": { "op": "click", "target": "button[type='submit']" } }
+{
+  "op": "click",
+  "target": "button[type='submit']"
+}
 ```
+[[- else -]]
+文本流 action：
+```json
+{
+  "@action": "directly_call_tool",
+  "directly_call_tool_name": "use_browser",
+  "directly_call_tool_params": {
+    "op": "click",
+    "target": "button[type='submit']"
+  }
+}
+```
+[[- end -]]
 
 ## Snapshot Returns 0 Refs? (Troubleshooting)
 
@@ -296,7 +448,7 @@ Do NOT call op=eval until handle_dialog completes — eval will block or fail wh
 3. fill and click accept BOTH @eN refs AND CSS selectors (e.g. "input[name=username]").
 4. A single eval call can fill a form + click submit -- more efficient than multiple tool calls.
 5. After eval that submits a form, use another eval or get to check the result.
-6. Use AITAG for multi-line JavaScript in the "js" parameter.
+6. 多行 JavaScript 使用当前协议对应的 js 参数示例。
 7. Close the browser when done to release resources.
 8. The open op auto-snapshots, but if refs are 0, switch to JS immediately.
 9. For SPA pages: if eval finds 0 elements, WAIT 3 seconds then retry. Do NOT spin.

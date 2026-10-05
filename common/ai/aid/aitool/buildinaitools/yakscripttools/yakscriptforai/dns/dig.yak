@@ -15,6 +15,29 @@ Optional Parameters:
                             If omitted, tool checks common records (NS/A/AAAA/AXFR/TXT).
   dns-servers     (string)  Comma-separated DNS server list.
                             Example: "8.8.8.8,1.1.1.1".
+
+调用示例：
+[[- if .FunctionCallMode -]]
+arguments 示例：
+```json
+{
+  "domain": "example.com",
+  "type": "A"
+}
+```
+[[- else -]]
+文本流 action：
+```json
+{
+  "@action": "directly_call_tool",
+  "directly_call_tool_name": "dig",
+  "directly_call_tool_params": {
+    "domain": "example.com",
+    "type": "A"
+  }
+}
+```
+[[- end -]]
 USAGE_BLOCK
 
 target = cli.String("domain", cli.setRequired(true), cli.setHelp("the target domain u want to check")) //"www.example.com"

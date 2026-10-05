@@ -30,7 +30,7 @@ smokeHandler = func(w, body) {
         assert tool.parameters.properties.summary.type == "string"
         assert len(tool.parameters.properties.payload) == 0, "any payload must stay unconstrained"
         assert !("@action" in json.dumps(tool.parameters))
-        assert body.tool_choice != nil
+        assert body.tool_choice == "auto"
     } else { assert body.tool_choice == nil }
     if "SMOKE_CALLER:" in prompt {
         name = "result"

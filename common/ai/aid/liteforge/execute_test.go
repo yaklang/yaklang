@@ -23,7 +23,11 @@ const openSchema = `{"type":"object","properties":{"summary":{"type":"string"},"
 // discover advertised tools, rather than expecting direct request injection.
 func projectedTools(t *testing.T, req *aicommon.AIRequest) []aispec.Tool {
 	t.Helper()
-	require.Empty(t, aispec.NewDefaultAIConfig(req.GetExtraSpecOpts()...).Tools)
+	wire := aispec.NewDefaultAIConfig(req.GetExtraSpecOpts()...)
+	require.Empty(t, wire.Tools)
+	if wire.ToolCallCallback != nil {
+		require.Equal(t, "auto", wire.ToolChoice)
+	}
 	projected := aiprojection.ProjectAndObserve("liteforge-test", req.GetPrompt())
 	require.NotNil(t, projected)
 	return projected.Tools

@@ -13,6 +13,27 @@ Required Parameters:
 Optional Parameters:
   verbose         (bool)    Whether to print detailed per-command diagnostics.
                             Default: false.
+
+调用示例：
+[[- if .FunctionCallMode -]]
+arguments 示例：
+```json
+{
+  "commands": "git,python,node"
+}
+```
+[[- else -]]
+文本流 action：
+```json
+{
+  "@action": "directly_call_tool",
+  "directly_call_tool_name": "check_command_availability",
+  "directly_call_tool_params": {
+    "commands": "git,python,node"
+  }
+}
+```
+[[- end -]]
 USAGE_BLOCK
 
 yakit.AutoInitYakit()

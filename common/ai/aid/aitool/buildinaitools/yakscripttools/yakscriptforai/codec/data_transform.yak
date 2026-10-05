@@ -9,15 +9,14 @@ Data Format Converter - Usage Guide for AI Parameter Generation
 Converts between JSON, YAML, and XML formats. Also supports format validation
 and reformatting/prettifying.
 
-##############################################################################
-# CRITICAL RULE: AITAG IS MANDATORY FOR "input"                             #
-##############################################################################
-
-The "input" parameter contains multi-line structured data. You MUST use AITAG
-to preserve formatting. Do NOT put it in the JSON "params" object.
+[[- if .FunctionCallMode -]]
+多行业务参数放入 JSON 字符串，换行、引号和反斜杠正确转义；不要输出外置正文。
+[[- else -]]
+多行业务参数使用本次 nonce 的 AITAG 原样传入，其余参数用 JSON；两者会合并。
+[[- end -]]
 
 Parameters:
-  input   (string, REQUIRED, via AITAG) The data to convert/process.
+  input   (string, REQUIRED) The data to convert/process.
   from    (string, optional) Source format: "json", "yaml", "xml", or "auto" (default: "auto")
   to      (string, REQUIRED) Target format: "json", "yaml", or "xml"
   action  (string, optional) Action: "convert" (default), "format", or "validate"
@@ -26,12 +25,27 @@ Parameters:
           - "validate": Check if input is valid in 'from' format (ignores 'to')
 
 Example 1 - Convert JSON to YAML:
+[[- if .FunctionCallMode -]]
+arguments 示例：
+```json
 {
-  "@action": "call-tool",
-  "tool": "data_transform",
-  "identifier": "convert_json_to_yaml",
-  "params": { "from": "json", "to": "yaml" }
+  "from": "json",
+  "to": "yaml",
+  "input": "{\n  \"name\": \"example\",\n  \"version\": \"1.0\",\n  \"features\": [\"auth\", \"api\"]\n}"
 }
+```
+[[- else -]]
+文本流 action：
+```json
+{
+  "@action": "directly_call_tool",
+  "directly_call_tool_name": "data_transform",
+  "directly_call_tool_params": {
+    "from": "json",
+    "to": "yaml"
+  }
+}
+```
 <|TOOL_PARAM_input_{NONCE}|>
 {
   "name": "example",
@@ -39,14 +53,28 @@ Example 1 - Convert JSON to YAML:
   "features": ["auth", "api"]
 }
 <|TOOL_PARAM_input_END_{NONCE}|>
+[[- end -]]
 
 Example 2 - Convert YAML to JSON (auto-detect):
+[[- if .FunctionCallMode -]]
+arguments 示例：
+```json
 {
-  "@action": "call-tool",
-  "tool": "data_transform",
-  "identifier": "convert_yaml_to_json",
-  "params": { "to": "json" }
+  "to": "json",
+  "input": "name: example\nversion: \"1.0\"\nfeatures:\n  - auth\n  - api"
 }
+```
+[[- else -]]
+文本流 action：
+```json
+{
+  "@action": "directly_call_tool",
+  "directly_call_tool_name": "data_transform",
+  "directly_call_tool_params": {
+    "to": "json"
+  }
+}
+```
 <|TOOL_PARAM_input_{NONCE}|>
 name: example
 version: "1.0"
@@ -54,28 +82,65 @@ features:
   - auth
   - api
 <|TOOL_PARAM_input_END_{NONCE}|>
+[[- end -]]
 
 Example 3 - Validate JSON:
+[[- if .FunctionCallMode -]]
+arguments 示例：
+```json
 {
-  "@action": "call-tool",
-  "tool": "data_transform",
-  "identifier": "validate_json_input",
-  "params": { "from": "json", "to": "json", "action": "validate" }
+  "from": "json",
+  "to": "json",
+  "action": "validate",
+  "input": "{\"key\": \"value\"}"
 }
+```
+[[- else -]]
+文本流 action：
+```json
+{
+  "@action": "directly_call_tool",
+  "directly_call_tool_name": "data_transform",
+  "directly_call_tool_params": {
+    "from": "json",
+    "to": "json",
+    "action": "validate"
+  }
+}
+```
 <|TOOL_PARAM_input_{NONCE}|>
 {"key": "value"}
 <|TOOL_PARAM_input_END_{NONCE}|>
+[[- end -]]
 
 Example 4 - Format/prettify JSON:
+[[- if .FunctionCallMode -]]
+arguments 示例：
+```json
 {
-  "@action": "call-tool",
-  "tool": "data_transform",
-  "identifier": "prettify_json",
-  "params": { "from": "json", "to": "json", "action": "format" }
+  "from": "json",
+  "to": "json",
+  "action": "format",
+  "input": "{\"name\":\"compact\",\"items\":[1,2,3]}"
 }
+```
+[[- else -]]
+文本流 action：
+```json
+{
+  "@action": "directly_call_tool",
+  "directly_call_tool_name": "data_transform",
+  "directly_call_tool_params": {
+    "from": "json",
+    "to": "json",
+    "action": "format"
+  }
+}
+```
 <|TOOL_PARAM_input_{NONCE}|>
 {"name":"compact","items":[1,2,3]}
 <|TOOL_PARAM_input_END_{NONCE}|>
+[[- end -]]
 USAGE_BLOCK
 
 yakit.AutoInitYakit()

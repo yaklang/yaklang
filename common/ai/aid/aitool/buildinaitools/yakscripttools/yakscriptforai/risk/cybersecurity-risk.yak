@@ -9,19 +9,71 @@ __USAGE__ = <<<USAGE_BLOCK
 数据包可选。HTTP/Web 发现若有真实报文，优先附同一次验证的完整 `request` 和 `response`；也可用 `request-file`、`response-file` 指向已有文件，由工具读取。文件优先于同名内联报文，空文件或不存在的文件会报错。只有部分报文时只填已有部分；不要编造报文、混配不同请求的响应，或为了记录 Risk 强迫 HTTP 工具保存文件。单份报文超过 2 MiB 会被截断并提示。非 HTTP 见解可只提交可核对的观察证据。
 
 典型案例：无数据包的安全见解，给出观察入口和核对方法：
+[[- if .FunctionCallMode -]]
+arguments 示例：
 ```json
-{"target":"example.com:443","title":"公开服务暴露调试入口","summary":"发现调试入口可被外部访问，需要确认访问控制与可见信息范围。","reproduction":"访问 /debug/，记录返回状态和可见页面；在未登录会话中复核。","type":"info","severity":"info","evidence":"未登录请求返回调试页面标题；未进一步访问敏感数据。"}
+{
+  "target": "example.com:443",
+  "title": "公开服务暴露调试入口",
+  "summary": "发现调试入口可被外部访问，需要确认访问控制与可见信息范围。",
+  "reproduction": "访问 /debug/，记录返回状态和可见页面；在未登录会话中复核。",
+  "type": "info",
+  "severity": "info",
+  "evidence": "未登录请求返回调试页面标题；未进一步访问敏感数据。"
+}
 ```
+[[- else -]]
+文本流 action：
+```json
+{
+  "@action": "directly_call_tool",
+  "directly_call_tool_name": "cybersecurity-risk",
+  "directly_call_tool_params": {
+    "target": "example.com:443",
+    "title": "公开服务暴露调试入口",
+    "summary": "发现调试入口可被外部访问，需要确认访问控制与可见信息范围。",
+    "reproduction": "访问 /debug/，记录返回状态和可见页面；在未登录会话中复核。",
+    "type": "info",
+    "severity": "info",
+    "evidence": "未登录请求返回调试页面标题；未进一步访问敏感数据。"
+  }
+}
+```
+[[- end -]]
 
 [[- if .FunctionCallMode -]]
 HTTP 风险：所有参数直接写入 JSON；报文换行用 `\r\n` 转义：
+arguments 示例：
 ```json
-{"target":"https://example.com/orders/1002","title":"订单越权访问","summary":"普通用户可读取其他用户的订单摘要。","reproduction":"以普通用户登录，先读取自己的订单，再将 GET /orders/1001 中的订单 ID 改为 1002；响应返回另一用户的订单。","type":"unauth-access","severity":"high","parameter":"orderId","request":"GET /orders/1002 HTTP/1.1\r\nHost: example.com\r\nCookie: session=example\r\n\r\n","response":"HTTP/1.1 200 OK\r\nContent-Type: application/json\r\n\r\n{\"id\":1002,\"owner\":\"other-user\"}"}
+{
+  "target": "https://example.com/orders/1002",
+  "title": "订单越权访问",
+  "summary": "普通用户可读取其他用户的订单摘要。",
+  "reproduction": "以普通用户登录，先读取自己的订单，再将 GET /orders/1001 中的订单 ID 改为 1002；响应返回另一用户的订单。",
+  "type": "unauth-access",
+  "severity": "high",
+  "parameter": "orderId",
+  "request": "GET /orders/1002 HTTP/1.1\r\nHost: example.com\r\nCookie: session=example\r\n\r\n",
+  "response": "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\n\r\n{\"id\":1002,\"owner\":\"other-user\"}"
+}
 ```
 [[- else -]]
 HTTP 风险：普通参数写 JSON，多行报文用本次 nonce 的 AITAG：
+文本流 action：
 ```json
-{"target":"https://example.com/orders/1002","title":"订单越权访问","summary":"普通用户可读取其他用户的订单摘要。","reproduction":"以普通用户登录，先读取自己的订单，再将 GET /orders/1001 中的订单 ID 改为 1002；响应返回另一用户的订单。","type":"unauth-access","severity":"high","parameter":"orderId"}
+{
+  "@action": "directly_call_tool",
+  "directly_call_tool_name": "cybersecurity-risk",
+  "directly_call_tool_params": {
+    "target": "https://example.com/orders/1002",
+    "title": "订单越权访问",
+    "summary": "普通用户可读取其他用户的订单摘要。",
+    "reproduction": "以普通用户登录，先读取自己的订单，再将 GET /orders/1001 中的订单 ID 改为 1002；响应返回另一用户的订单。",
+    "type": "unauth-access",
+    "severity": "high",
+    "parameter": "orderId"
+  }
+}
 ```
 <|TOOL_PARAM_request_{NONCE}|>
 GET /orders/1002 HTTP/1.1

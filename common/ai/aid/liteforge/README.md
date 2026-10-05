@@ -48,6 +48,8 @@ Gateway 的显式、按层级和按策略选择只负责选模型，结果均进
 
 Function call 的字段流直接读取 `ToolCallArgumentsStreamHandler` 提供的原始 arguments reader，与普通 content/reason 流分开。ToolCallCallback 只收集调用身份及用于一致性核对的参数副本，不重复触发字段回调。仅实现旧 callback 的 provider 仍可兼容返回结果。
 
+显式开启 Function call 时，内部请求统一使用 `tool_choice: "auto"`，不强制 `required` 或指定函数。结果仍须包含声明的原生函数及合法 arguments；只有 content 的响应不会被当作结构化结果，交由已有重试纠正机制处理。
+
 字段流用于增量展示，可能来自最终被拒绝的尝试。只有完整结构、协议和业务校验都通过且字段回调已结束，才返回最终 Action。Provider 内部重试重新收集参数，不拼接前一次响应；若底层把多次 HTTP 响应混进同一个参数 reader，则拒绝该结果并使用事务重试。取消会结束参数管道。
 
 ## 验证
