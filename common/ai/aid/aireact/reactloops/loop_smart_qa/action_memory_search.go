@@ -2,15 +2,11 @@ package loop_smart_qa
 
 import (
 	"fmt"
-	"strings"
-
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
-	"github.com/yaklang/yaklang/common/ai/aid/aimem"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
-	"github.com/yaklang/yaklang/common/ai/ytoken"
-	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
+	"strings"
 )
 
 const memoryMaxTokenLimit = 10240
@@ -70,50 +66,27 @@ func makeMemorySearchAction(r aicommon.AIInvokeRuntime) reactloops.ReActLoopOpti
 				aicommon.WithStatusDetail(fmt.Sprintf("正在回顾与「%s」相关的内容", query), fmt.Sprintf("Reviewing information about %q", query)),
 			)
 
-			memTriage := loop.GetMemoryTriage()
-			if utils.IsNil(memTriage) {
-				op.Feedback("no memory triage available for this session")
-				op.Continue()
-				return
+			// Both the ordinary tool and this compatibility action execute
+			// the same Yak script; retrieval and formatting are not duplicated.
+			switch searchMode {
+			case "semantic":
+				searchMode = "vector"
+			case "keyword":
+				searchMode = "bm25"
+			case "all":
+				searchMode = "hybrid"
 			}
-
-			var content string
-			var err error
-			if asyncMemory, ok := memTriage.(*aimem.AsyncAIMemory); ok {
-				memTriage, err = asyncMemory.WaitReady(op.GetTask().GetContext())
-				if err != nil {
-					op.Feedback(fmt.Sprintf("memory search failed: %v", err))
-					op.Continue()
-					return
-				}
-			}
-
-			if triage, ok := memTriage.(*aimem.AIMemoryTriage); ok {
-				content, err = doMemorySearch(triage, query, searchMode, limit, tokenLimit)
-			} else {
-				var result *aicommon.SearchMemoryResult
-				result, err = memTriage.SearchMemoryWithoutAI(query, tokenLimit)
-				if err == nil && result != nil {
-					content = result.TotalContent
-				}
-			}
-
+			result, _, err := invoker.ExecuteToolRequiredAndCallWithoutRequired(op.GetTask().GetContext(), "search_memory", aitool.InvokeParams{
+				"query": query, "search_mode": searchMode, "limit": min(limit, 20), "token_limit": min(max(tokenLimit, 64), 8192),
+			}, aicommon.WithToolCaller_Reason("搜索历史记忆"))
 			if err != nil {
-				log.Warnf("memory search failed: %v", err)
 				op.Feedback(fmt.Sprintf("memory search failed: %v", err))
 				op.Continue()
 				return
 			}
-
-			if strings.TrimSpace(content) == "" {
-				op.Feedback("no relevant memories found")
-				op.Continue()
-				return
+			if result != nil {
+				appendMemoryResults(loop, result.String())
 			}
-
-			appendMemoryResults(loop, content)
-			invoker.AddToTimeline("memory_search_result",
-				fmt.Sprintf("Memory search (%s): %s\n\n%s", searchMode, query, utils.ShrinkString(content, 2048)))
 
 			op.Feedback(fmt.Sprintf("memory search completed for: '%s'", query))
 			op.Continue()
@@ -121,99 +94,4 @@ func makeMemorySearchAction(r aicommon.AIInvokeRuntime) reactloops.ReActLoopOpti
 	)
 }
 
-func doMemorySearch(triage *aimem.AIMemoryTriage, query, searchMode string, limit, tokenLimit int) (string, error) {
-	switch searchMode {
-	case "semantic":
-		results, err := triage.SearchBySemantics(query, limit)
-		if err != nil {
-			return "", err
-		}
-		return fmtSearchResults(results, tokenLimit, "semantic"), nil
-	case "bm25":
-		result, err := triage.SearchMemoryWithoutAI(query, tokenLimit)
-		if err != nil {
-			return "", err
-		}
-		if result == nil || len(result.Memories) == 0 {
-			return "", nil
-		}
-		return fmtMemoryEntities(result.Memories, tokenLimit, "bm25"), nil
-	case "keyword":
-		keywords := strings.Fields(query)
-		if len(keywords) == 0 {
-			keywords = []string{query}
-		}
-		entities, err := triage.SearchByTags(keywords, false, limit)
-		if err != nil {
-			return "", err
-		}
-		return fmtMemoryEntities(entities, tokenLimit, "keyword"), nil
-	default:
-		result, err := triage.SearchMemoryWithoutAI(query, tokenLimit)
-		if err != nil {
-			return "", err
-		}
-		if result == nil || len(result.Memories) == 0 {
-			return "", nil
-		}
-		return fmtMemoryEntities(result.Memories, tokenLimit, "all"), nil
-	}
-}
-
-func fmtSearchResults(results []*aicommon.SearchResult, tokenLimit int, mode string) string {
-	var sb strings.Builder
-	sb.WriteString(fmt.Sprintf("=== Memory Search (mode: %s) ===\n\n", mode))
-
-	totalTokens := 0
-	count := 0
-	for _, r := range results {
-		if r == nil || r.Entity == nil {
-			continue
-		}
-		entry := fmt.Sprintf("- [%s] (score: %.3f)\n  %s\n\n",
-			r.Entity.CreatedAt.Format("2006-01-02 15:04:05"),
-			r.Score, r.Entity.Content)
-		entryTokens := ytoken.CalcTokenCount(entry)
-		if totalTokens+entryTokens > tokenLimit {
-			break
-		}
-		sb.WriteString(entry)
-		totalTokens += entryTokens
-		count++
-	}
-	sb.WriteString(fmt.Sprintf("--- %d memories, %d tokens ---\n", count, totalTokens))
-	return sb.String()
-}
-
-func fmtMemoryEntities(entities []*aicommon.MemoryEntity, tokenLimit int, mode string) string {
-	var sb strings.Builder
-	sb.WriteString(fmt.Sprintf("=== Memory Search (mode: %s) ===\n\n", mode))
-
-	totalTokens := 0
-	count := 0
-	for _, e := range entities {
-		if e == nil {
-			continue
-		}
-		entry := fmt.Sprintf("- [%s]", e.CreatedAt.Format("2006-01-02 15:04:05"))
-		if len(e.Tags) > 0 {
-			for _, t := range e.Tags {
-				entry += " #" + t
-			}
-		}
-		entry += "\n  " + e.Content + "\n\n"
-		entryTokens := ytoken.CalcTokenCount(entry)
-		if totalTokens+entryTokens > tokenLimit {
-			break
-		}
-		sb.WriteString(entry)
-		totalTokens += entryTokens
-		count++
-	}
-	sb.WriteString(fmt.Sprintf("--- %d memories, %d tokens ---\n", count, totalTokens))
-	return sb.String()
-}
-
-var memorySearchAction = func(r aicommon.AIInvokeRuntime) reactloops.ReActLoopOption {
-	return makeMemorySearchAction(r)
-}
+var memorySearchAction = makeMemorySearchAction

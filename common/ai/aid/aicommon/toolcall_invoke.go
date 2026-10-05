@@ -468,6 +468,12 @@ func (a *ToolCaller) invoke(
 	if sessionProvider, ok := a.config.(interface{ GetPersistentSessionID() string }); ok {
 		runtimeCfg.PersistentSessionID = sessionProvider.GetPersistentSessionID()
 	}
+	if config, ok := c.(*Config); ok {
+		runtimeCfg.MemoryNamespace = config.MemoryTriageId
+		if memory := config.MemoryTriage; memory != nil && memory.GetSessionID() != "noop" {
+			runtimeCfg.MemoryNamespace = memory.GetSessionID()
+		}
+	}
 	if statefulTask, ok := a.task.(AIStatefulTask); ok && statefulTask != nil {
 		runtimeCfg.CurrentTaskUserInput = statefulTask.GetOriginUserInput()
 	} else if a.invokeRuntime != nil {

@@ -217,6 +217,7 @@ func executeNativeYakPlugin(ctx context.Context, script *schema.YakScript, param
 				WithCliApp(cliApp).
 				WithYakitClient(yakitClient),
 		)
+		bindMemorySearchToEngine(ae, ctx, runtimeConfig)
 		return nil
 	})
 

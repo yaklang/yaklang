@@ -78,6 +78,8 @@ func buildInitTask(r aicommon.AIInvokeRuntime) func(loop *reactloops.ReActLoop, 
 					} else if result.NeedsDeepAnalysis() {
 						log.Infof("short input with no fast matches detected, escalating to deep intent recognition")
 						needsDeepIntent = true
+					} else {
+						loop.RecallMemoryForIntent(task, "fast_match:"+result.ContextSummary)
 					}
 				}
 			} else {

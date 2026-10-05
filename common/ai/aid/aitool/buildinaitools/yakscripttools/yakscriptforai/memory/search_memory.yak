@@ -1,0 +1,41 @@
+__DESC__ = "Search persistent memories in the runtime project database and memory namespace. Supports BM25, vector and hybrid retrieval. Read-only: results enter the normal tool timeline, without updating automatic memory injection."
+__VERBOSE_NAME__ = "Memory Search"
+__VERBOSE_NAME_ZH__ = "记忆搜索"
+__KEYWORDS__ = "memory,search_memory,history,preference,namespace,bm25,vector,记忆,历史,偏好"
+
+__USAGE__ = <<<USAGE_BLOCK
+按需搜索过去的偏好、决定、事实或经验；当前用户要求与 Timeline 优先于历史记忆。不要每轮重复搜索同一问题。
+query 必填，表达需要找回的信息。namespace 默认使用当前运行时的记忆命名空间；它不是当前任务或会话 ID。只在明确知道目标空间时指定。
+search_mode：bm25 为索引关键词搜索，vector 为语义搜索，hybrid（默认）合并两者。缺少 BM25 索引时回退关键词匹配；关键词还覆盖未索引的记忆正文与标签。向量不可用时 hybrid 返回关键词结果，console 记录降级原因；vector 报错。
+limit 默认 5，范围 1–20；token_limit 为检索正文的 token 总预算，默认 1500，范围 64–8192。超长正文可能截断。
+结果包含 memory_id、正文、标签和时间。相同记忆去重，已删除与过期条目不返回。无匹配返回空 hits，不代表系统故障。
+
+[[- if .FunctionCallMode -]]
+arguments 示例：
+```json
+{"query":"用户偏好的报告格式","search_mode":"hybrid","limit":5,"token_limit":1500}
+```
+[[- else -]]
+文本流 action 示例：
+```json
+{"@action":"directly_call_tool","directly_call_tool_name":"search_memory","directly_call_tool_params":{"query":"用户偏好的报告格式","search_mode":"hybrid","limit":5,"token_limit":1500}}
+```
+[[- end -]]
+USAGE_BLOCK
+
+query = cli.String("query", cli.setRequired(true), cli.setHelp("需要搜索的记忆内容，1–1024 个字符"))
+namespace = cli.String("namespace", cli.setHelp("记忆命名空间；默认当前运行时绑定的空间"))
+mode = cli.String("search_mode", cli.setDefault("hybrid"), cli.setHelp("检索方式：bm25、vector、hybrid"))
+limit = cli.Int("limit", cli.setDefault(5), cli.setHelp("最多返回 1–20 条记忆"))
+tokenLimit = cli.Int("token_limit", cli.setDefault(1500), cli.setHelp("检索正文总 token 预算，64–8192"))
+cli.check()
+
+if namespace == "" { namespace = aimemory.CurrentNamespace() }
+memories = aimemory.SearchMemory(query, aimemory.memoryNamespace(namespace), aimemory.memoryTokenLimit(tokenLimit), aimemory.memoryLimit(limit), aimemory.memorySearchMode(mode))~
+hits = []
+for memory in memories {
+    tags = []
+    if len(memory.Tags) > 0 { tags = memory.Tags }
+    hits = append(hits, {"memory_id":memory.MemoryID,"content":memory.Content,"tags":tags,"created_at":memory.CreatedAt.Format("2006-01-02 15:04:05")})
+}
+RESULT = {"namespace":namespace,"search_mode":mode,"hits":hits}
