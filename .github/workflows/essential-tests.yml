@@ -996,6 +996,8 @@ jobs:
             test_configs: |
               [
                 {"package": "./common/ai/aid/...", "timeout": "12m", "parallel": 1, "exclude_packages": ["./common/ai/aid/aireact/...", "./common/ai/aid/coordinator_legacy/..."], "retry": 1, "retry_delay": 5},
+                {"package": "./common/ai/aimemory", "timeout": "1m", "parallel": 1},
+                {"package": "./common/yak", "timeout": "1m", "parallel": 1, "run": "^TestYakMemorySearchRuntimeBinding$"},
                 {"package": "./common/browser", "timeout": "10s", "run": "^TestWaitFunction", "parallel": 1}
               ]
 
