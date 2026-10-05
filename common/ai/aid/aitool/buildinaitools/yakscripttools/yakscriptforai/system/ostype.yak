@@ -4,10 +4,23 @@ __VERBOSE_NAME_ZH__ = "系统类型识别"
 __KEYWORDS__ = "操作系统类型,os type,系统识别,system identification,操作系统检测,os detection,系统环境,operating system,platform detection,系统平台,环境检测"
 
 __USAGE__ = <<<USAGE_BLOCK
-OS Type Detection Tool - Parameter Description for JSON Tool Calls
+识别当前运行环境的操作系统类型，无需业务参数。
 
-This tool takes no parameters.
-It reports the current runtime operating system type.
+调用示例：
+[[- if .FunctionCallMode -]]
+将以下 JSON 对象作为 arguments：
+```json
+{}
+```
+[[- else -]]
+```json
+{
+  "@action": "directly_call_tool",
+  "directly_call_tool_name": "ostype",
+  "directly_call_tool_params": {}
+}
+```
+[[- end -]]
 USAGE_BLOCK
 
 yakit.AutoInitYakit()
