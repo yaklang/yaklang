@@ -5,7 +5,6 @@ import (
 	"strings"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
-	"github.com/yaklang/yaklang/common/ai/aid/aicommon/aiskillloader"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/log"
@@ -144,86 +143,6 @@ func renderCapabilityForgeRecommendations(result *reactloops.CapabilitySearchRes
 		return ""
 	}
 	return "匹配蓝图 / Matched forges: " + strings.Join(result.MatchedForgeNames, ",")
-}
-
-func populateExtraCapabilitiesFromIntent(
-	invoker aicommon.AIInvokeRuntime,
-	loop *reactloops.ReActLoop,
-	matchedToolNames, matchedForgeNames, matchedSkillNames string,
-) {
-	ecm := loop.GetExtraCapabilities()
-	if ecm == nil {
-		return
-	}
-
-	cfg := invoker.GetConfig()
-
-	if matchedToolNames != "" {
-		toolNames := splitAndTrimNames(matchedToolNames)
-		toolMgr := cfg.GetAiToolManager()
-		if toolMgr != nil {
-			for _, name := range toolNames {
-				tool, err := toolMgr.GetToolByName(name)
-				if err != nil {
-					log.Debugf("search_capabilities: skip tool %q: %v", name, err)
-					continue
-				}
-				ecm.AddTools(tool)
-			}
-		}
-	}
-
-	if matchedForgeNames != "" && reactloops.IsPlanAndExecAllowed(loop, invoker) {
-		forgeNames := splitAndTrimNames(matchedForgeNames)
-		type forgeManagerProvider interface {
-			GetAIForgeManager() aicommon.AIForgeFactory
-		}
-		if provider, ok := cfg.(forgeManagerProvider); ok {
-			forgeMgr := provider.GetAIForgeManager()
-			if forgeMgr != nil {
-				for _, name := range forgeNames {
-					forge, err := forgeMgr.GetAIForge(name)
-					if err != nil {
-						log.Debugf("search_capabilities: skip forge %q: %v", name, err)
-						continue
-					}
-					ecm.AddForges(reactloops.ExtraForgeInfo{
-						Name:        forge.ForgeName,
-						VerboseName: forge.ForgeVerboseName,
-						Description: forge.Description,
-					})
-				}
-			}
-		}
-	}
-
-	if matchedSkillNames != "" {
-		skillNames := splitAndTrimNames(matchedSkillNames)
-		type skillLoaderProvider interface {
-			GetSkillLoader() aiskillloader.SkillLoader
-		}
-		if provider, ok := cfg.(skillLoaderProvider); ok {
-			skillLoader := provider.GetSkillLoader()
-			if skillLoader != nil && skillLoader.HasSkills() {
-				for _, name := range skillNames {
-					meta, err := aiskillloader.LookupSkillMeta(skillLoader, name)
-					if err != nil || meta == nil {
-						log.Debugf("search_capabilities: skip skill %q: %v", name, err)
-						continue
-					}
-					reactloops.AddUnloadedSkillsToExtraCapabilities(loop, reactloops.ExtraSkillInfo{
-						Name:        meta.Name,
-						Description: meta.Description,
-					})
-				}
-			}
-		}
-	}
-
-	if ecm.HasCapabilities() {
-		log.Infof("search_capabilities action: extra capabilities populated: %d tools, %d forges, %d skills",
-			ecm.ToolCount(), len(ecm.ListForges()), len(ecm.ListSkills()))
-	}
 }
 
 func splitAndTrimNames(s string) []string {

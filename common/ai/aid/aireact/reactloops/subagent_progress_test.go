@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
-	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 )
 
 // TestProgressRegistry_BasicRegisterUnregister 验证 Register/Unregister
@@ -237,6 +236,3 @@ func TestProgressRegistry_AllHandlesSnapshot(t *testing.T) {
 	// Internal state should be unaffected
 	require.Len(t, reg.AllHandles(), 2, "internal state should not be affected by modifying snapshot")
 }
-
-// Ensure unused import is consumed
-var _ aicommon.AIStatefulTask

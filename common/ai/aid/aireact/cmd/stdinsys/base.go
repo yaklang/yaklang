@@ -3,22 +3,18 @@ package stdinsys
 import (
 	"github.com/segmentio/ksuid"
 	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/utils"
 	"os"
 	"sync"
-	"time"
 )
 
 type StdinSys struct {
 	multiwriter *dynamicMultiWriter
 	m           *sync.Mutex
 	mirrors     map[string]*Mirror
-	multiWriter *dynamicMultiWriter
 }
 
 var stdinSys *StdinSys
 var createOnce sync.Once
-var started = utils.NewBool(false)
 
 func GetStdinSys() *StdinSys {
 	createOnce.Do(func() {
@@ -31,19 +27,8 @@ func GetStdinSys() *StdinSys {
 		defer close(done)
 		stdinSys.init(done)
 		<-done
-		started.IsSet()
 	})
 	return stdinSys
-}
-
-func (s *StdinSys) waitInit() {
-	for {
-		if started.IsSet() {
-			return
-		}
-		log.Debug("stdin-sys: Waiting for StdinSys to be initialized...")
-		time.Sleep(100 * time.Millisecond)
-	}
 }
 
 func (s *StdinSys) init(start chan struct{}) {

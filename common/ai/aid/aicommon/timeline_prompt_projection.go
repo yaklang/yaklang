@@ -107,10 +107,6 @@ func cloneTextTimelineItemForPrompt(item *TimelineItem, textItem *TextTimelineIt
 	return &TimelineItem{createdAt: item.createdAt, value: &textCopy}
 }
 
-func projectTimelineItemsForPrompt(items []*TimelineItem) []*TimelineItem {
-	return projectTimelineItemsForPromptWithModelReplay(items, false)
-}
-
 func projectTimelineItemsForPromptWithModelReplay(items []*TimelineItem, includeModelReplay bool) []*TimelineItem {
 	projected := make([]*TimelineItem, 0, len(items))
 	for _, item := range items {

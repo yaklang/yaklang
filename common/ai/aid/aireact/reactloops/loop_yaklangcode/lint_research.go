@@ -103,11 +103,6 @@ func wrapInitTaskBindLoopBox(
 	}
 }
 
-func isYaklangCodeMutatingAction(actionType string) bool {
-	_, ok := yaklangCodeMutatingActions[strings.TrimSpace(actionType)]
-	return ok
-}
-
 // needsBlockYaklangEarlyExit blocks finish/directly_answer until there is code
 // that passes lint (and self-test when applicable).
 func needsBlockYaklangEarlyExit(loop interface{ Get(string) string }) bool {

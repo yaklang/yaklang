@@ -97,8 +97,7 @@ type ReActLoop struct {
 	allowSkillViewOffset func() bool
 	actionFilters        []func(action *LoopAction) bool
 
-	toolsGetter         func() []*aitool.Tool
-	loopPromptGenerator ReActLoopCoreGenerateCode
+	toolsGetter func() []*aitool.Tool
 
 	// store variable
 	vars *omap.OrderedMap[string, any]

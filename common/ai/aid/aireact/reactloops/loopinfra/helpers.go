@@ -22,7 +22,6 @@ const (
 	loopInfraNodeQueryMCPTools      = "query_mcp_tools"
 	loopInfraNodeDispatchSubReact   = "dispatch_sub_react_agents"
 	loopInfraNodeSubReactReport     = "sub_react_agents_report"
-	loopInfraNodeSubReactGoal       = "sub_react_agent_goal"
 )
 
 func loopInfraStatus(loop *reactloops.ReActLoop, zh, en string) {
@@ -51,20 +50,6 @@ func loopInfraActionStart(loop *reactloops.ReActLoop, nodeID, line, statusZh, st
 
 func loopInfraActionFinish(loop *reactloops.ReActLoop, nodeID, line string, reference ...string) {
 	reactloops.EmitActionLog(loop, nodeID, line, reference...)
-}
-
-func loopInfraSaveReference(loop *reactloops.ReActLoop, prefix, content string, previewBytes int) (filename string, preview string) {
-	return reactloops.SaveContentReference(loop, prefix, content, previewBytes)
-}
-
-func loopInfraFileReferenceSummary(title, filename, preview string) string {
-	if filename == "" {
-		return preview
-	}
-	if preview == "" {
-		return fmt.Sprintf("%s: %s", title, filename)
-	}
-	return fmt.Sprintf("%s: %s\n\nPreview:\n%s", title, filename, preview)
 }
 
 const singleFileTimelinePreviewBytes = 800

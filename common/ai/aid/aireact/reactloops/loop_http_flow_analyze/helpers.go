@@ -51,10 +51,6 @@ func buildSearchParamSummary(action *aicommon.Action) string {
 	return strings.Join(parts, ", ")
 }
 
-func buildQueryRequestFromAction(action *aicommon.Action, defaultLimit int) *ypb.QueryHTTPFlowRequest {
-	return buildQueryRequestFromActionWithLoop(action, defaultLimit, nil)
-}
-
 func buildQueryRequestFromActionWithLoop(action *aicommon.Action, defaultLimit int, loop *reactloops.ReActLoop) *ypb.QueryHTTPFlowRequest {
 	limit := action.GetInt("limit", defaultLimit)
 	if limit <= 0 {

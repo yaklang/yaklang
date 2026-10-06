@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
-	"github.com/yaklang/yaklang/common/ai/rag/vectorstore"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 )
@@ -351,7 +350,6 @@ func runWithLLMRerank(
 	return metrics
 }
 
-
 // --- Phase 5: Full Matrix Report ---
 
 // TestPhase5_GenerateFullReport reads all saved metrics and generates the combined report.
@@ -421,6 +419,3 @@ func getTestInvoker(t *testing.T) aicommon.AIInvokeRuntime {
 	}
 	return invoker
 }
-
-// suppress unused import
-var _ = vectorstore.NewRAGQueryConfig

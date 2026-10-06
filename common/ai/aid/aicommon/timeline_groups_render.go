@@ -650,36 +650,6 @@ func renderTimelineEntry(item *TimelineItem, bucketStart time.Time, state *timel
 	return buf.String()
 }
 
-func isTrustedReplayProjection(item *TimelineItem) bool {
-	textItem, ok := timelineTextItem(item)
-	if !ok {
-		return false
-	}
-	promptText := strings.TrimSpace(textItem.PromptText)
-	if promptText == "" || strings.TrimSpace(textItem.Text) != promptText {
-		return false
-	}
-	switch normalizeTimelinePromptCategory(extractTextEntryType(textItem.Text)) {
-	case "MODEL_THINKING":
-		return strings.Contains(promptText, "<|TIMELINE_MODEL_THINKING_V1_") || strings.Contains(promptText, "<|TIMELINE_MODEL_THINKING_")
-	case "FUNCTION_CALL_ACTION_RESPONSE":
-		return strings.Contains(promptText, "<|FUNCTION_CALL_ACTION_RESPONSE_")
-	default:
-		return false
-	}
-}
-
-func isActionResponseReplayProjection(item *TimelineItem) bool {
-	textItem, ok := timelineTextItem(item)
-	if !ok || normalizeTimelinePromptCategory(extractTextEntryType(textItem.Text)) != "FUNCTION_CALL_ACTION_RESPONSE" {
-		return false
-	}
-	promptText := strings.TrimSpace(textItem.PromptText)
-	return promptText != "" && strings.TrimSpace(textItem.Text) == promptText &&
-		strings.Contains(promptText, "<|FUNCTION_CALL_ACTION_RESPONSE_"+aiprojection.Nonce()+"|>") &&
-		strings.HasSuffix(promptText, "<|FUNCTION_CALL_ACTION_RESPONSE_END_"+aiprojection.Nonce()+"|>")
-}
-
 func timelineIntervalBlockRenderedByteLen(block *TimelineIntervalBlock) int {
 	if block == nil || len(block.Items) == 0 {
 		return 0
@@ -1266,15 +1236,4 @@ func (bs TimelineRenderableBlocks) RenderOpenOnly(aitagName string) string {
 		return ""
 	}
 	return open.Render(aitagName)
-}
-
-func isPromptProjectionBlock(block TimelineRenderableBlock) bool {
-	switch b := block.(type) {
-	case *TimelineIntervalBlock:
-		return b != nil && b.promptProjection
-	case *TimelineCompressedHeadBlock:
-		return b != nil && b.promptProjection
-	default:
-		return false
-	}
 }

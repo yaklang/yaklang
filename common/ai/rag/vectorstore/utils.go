@@ -332,41 +332,10 @@ func ExportHNSWGraphToBinary(graph *hnsw.Graph[string]) (io.Reader, error) {
 	return pers.ToBinary(context.Background())
 }
 
-const (
-	uidTypeMd5        = "md5"
-	uidTypeID         = "id"
-	uidTypeDocumentID = "document_id"
-)
-
 func GetLazyNodeUIDByMd5(collectionName string, key string) []byte {
 	m := md5.Sum([]byte(collectionName + key))
 	return m[:]
 }
-
-func getLazyNodeUID(uidType string, collectionName string, data any) hnswspec.LazyNodeID {
-	switch uidType {
-	case uidTypeMd5:
-		key, ok := data.(string)
-		if !ok {
-			log.Errorf("expected string for key, got %T", data)
-			return nil
-		}
-		return GetLazyNodeUIDByMd5(collectionName, key)
-	case uidTypeID:
-		key := utils.InterfaceToInt(data)
-		return hnswspec.LazyNodeID(key)
-	case uidTypeDocumentID:
-		key, ok := data.(string)
-		if !ok {
-			log.Errorf("expected string for key, got %T", data)
-			return nil
-		}
-		return hnswspec.LazyNodeID(key)
-	}
-	return nil
-}
-
-var defaultUidType = uidTypeMd5
 
 func getDefaultHNSWGraphOptions(collectionName string) []hnsw.GraphOption[string] {
 	return []hnsw.GraphOption[string]{

@@ -11,7 +11,6 @@ import (
 
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
@@ -96,28 +95,6 @@ func (f *ForgeBlueprint) ToolPrompt() string {
 		return ""
 	}
 	return buf.String()
-}
-
-func (f *ForgeBlueprint) tmpParams(query string, params ...*ypb.ExecParamItem) map[string]any {
-	var paramBuf bytes.Buffer
-	if !utils.IsNil(params) {
-		for _, p := range params {
-			paramBuf.WriteString(codec.StrConvQuote(p.Key))
-			paramBuf.WriteString(": ")
-			paramBuf.WriteString(codec.StrConvQuote(p.Value))
-			paramBuf.WriteByte('\n')
-		}
-	}
-
-	return map[string]any{
-		"Forge": map[string]any{
-			"Tool":             f.Tools,
-			"UserParams":       paramBuf.String(),
-			"Init":             f.InitializePrompt,
-			"PersistentPrompt": f.PersistentPrompt,
-			"Result":           "",
-		},
-	}
 }
 
 func (f *ForgeBlueprint) renderInitPrompt(query string, params ...*ypb.ExecParamItem) (string, error) {

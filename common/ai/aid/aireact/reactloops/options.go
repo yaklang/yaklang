@@ -9,10 +9,10 @@ import (
 	"github.com/yaklang/yaklang/common/utils/omap"
 )
 
+// Deprecated: retained as a no-op. Prompt construction uses the loop's
+// registered context providers and protocol templates.
 func WithLoopPromptGenerator(generator ReActLoopCoreGenerateCode) ReActLoopOption {
-	return func(r *ReActLoop) {
-		r.loopPromptGenerator = generator
-	}
+	return func(*ReActLoop) {}
 }
 
 func WithAllowRAGGetter(allowRAG func() bool) ReActLoopOption {

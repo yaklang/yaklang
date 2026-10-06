@@ -28,7 +28,6 @@ const (
 	keyScopeHosts       = "infosec_scope_hosts"
 	keyMaxCrawlDepth    = "infosec_max_crawl_depth"
 	keyProbeConcurrency = "infosec_probe_concurrency"
-	keyLastReconSnippet = "infosec_recon_log_tail"
 	defaultCrawlDepth   = "2"
 	defaultProbeConc    = "6"
 )

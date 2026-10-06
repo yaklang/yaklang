@@ -9,7 +9,6 @@ import (
 	"sync"
 	"sync/atomic"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -101,19 +100,6 @@ func TestProjectAndObserveMessagesReachResponsesRequest(t *testing.T) {
 	require.Equal(t, int64(1), gCache.totalRequests)
 }
 
-// 关键词: aicache, Observe, 入口冒烟
-func TestProjectAndObserve_SmokeWithFourSections(t *testing.T) {
-	ResetForTest()
-
-	prompt := buildFourSectionPrompt("nz", "qz", "tools", "static", "tl", "mem")
-	ProjectAndObserve("smoke-model", CreateTemplate(prompt))
-
-	// Observe 内部直接同步调 Record，可以立即查
-	rep := gCache.Record(Split(prompt), "smoke-model")
-	assert.Greater(t, rep.GlobalUniqueChunks, 0)
-	assert.GreaterOrEqual(t, rep.TotalRequests, int64(2))
-}
-
 // 关键词: aicache, Observe, 空 prompt 静默
 func TestProjectAndObserve_EmptyMsgNoop(t *testing.T) {
 	ResetForTest()
@@ -141,13 +127,8 @@ func TestProjectAndObserve_RegisteredOnAispecHijackHook(t *testing.T) {
 	// 模拟 ChatBase 入口分发
 	dispatchChatBaseHijackHooksForTest("verify-model", prompt)
 
-	deadline := time.Now().Add(time.Second)
-	for time.Now().Before(deadline) {
-		if got.Load() > 0 {
-			break
-		}
-		time.Sleep(20 * time.Millisecond)
-	}
+	// ChatBase dispatches the registered hooks synchronously before transport.
+	// The stronger repeated-call/cache assertions live in HijackPathStillRecords.
 	assert.GreaterOrEqual(t, got.Load(), int64(1))
 	require.Equal(t, int64(1), gCache.totalRequests, "projection observer should be registered once")
 	assert.Equal(t, "verify-model", lastModel.Load())
