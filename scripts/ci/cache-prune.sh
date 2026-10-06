@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Bound weekly snapshots without letting one PR evict main's warm dependencies.
+# Bound build snapshots without letting one PR evict main's warm dependencies.
 # Older snapshots of the same namespace/ref are redundant; prune those first.
 # Under size/count pressure protect the remaining main and current-ref entries.
 CACHE_KEY_PREFIX="${CACHE_KEY_PREFIX:-}"
@@ -58,7 +58,7 @@ jq -s --arg prefix "$CACHE_KEY_PREFIX" --arg cutoff "$cutoff" \
   | reduce .[] as $entry ({seen: {}, keep: [], remove: []};
       # Strip only the refresh suffix, retaining toolchain/dependencies/role/ref.
       ($entry.ref + "|" + ($entry.key
-        | sub("-[a-f0-9]{40}-[0-9]+$"; "")
+        | sub("-[a-f0-9]{40}(-[0-9]+)?$"; "")
         | sub("-[0-9]{4}-W[0-9]{2}$"; ""))) as $group
       | if .seen[$group] then
           .remove += [$entry + {reason: "superseded snapshot"}]

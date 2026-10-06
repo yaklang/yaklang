@@ -9,7 +9,7 @@ inputs:
     default: 'false'
 outputs:
   build-key:
-    description: Immutable weekly suite key
+    description: Tested revision key, or weekly main seed key when priming
     value: ${{ steps.keys.outputs.build }}
   build-hit:
     description: Exact build cache hit
@@ -33,6 +33,7 @@ runs:
         CACHE_ROLE: ${{ inputs.role }}
         CACHE_PLATFORM: ${{ runner.os }}-${{ runner.arch }}
         CACHE_DEPS: ${{ hashFiles('go.mod', 'go.sum') }}
+        CACHE_PRIME: ${{ inputs.prime }}
       run: |
         mkdir -p "$RUNNER_TEMP/go-build-cache" "$RUNNER_TEMP/go-mod-cache"
         echo "GOCACHE=$RUNNER_TEMP/go-build-cache" >> "$GITHUB_ENV"
@@ -40,9 +41,17 @@ runs:
         # Include the resolved toolchain, not just the go directive in go.mod.
         prefix="${CACHE_PLATFORM%%-*}-essential-gobuild-v2-${CACHE_PLATFORM#*-}-$(go env GOVERSION)-${CACHE_DEPS}"
         week=$(date -u +%G-W%V)
-        echo "build=$prefix-$CACHE_ROLE-$week" >> "$GITHUB_OUTPUT"
+        revision=$(git rev-parse HEAD)
+        # Main supplies a bounded weekly seed. PRs retain their incremental
+        # compilations once per tested head, even when a main seed was restored.
+        # A weekly exact-hit key in PRs would freeze older source compilations
+        # and force every rerun to rebuild subsequent changes.
+        if [ "$CACHE_PRIME" = "true" ]; then
+          revision="$week"
+        fi
+        echo "build=$prefix-$CACHE_ROLE-$revision" >> "$GITHUB_OUTPUT"
         echo "role-prefix=$prefix-$CACHE_ROLE-" >> "$GITHUB_OUTPUT"
-        echo "base=$prefix-base-$week" >> "$GITHUB_OUTPUT"
+        echo "base=$prefix-base-$revision" >> "$GITHUB_OUTPUT"
         echo "base-prefix=$prefix-base-" >> "$GITHUB_OUTPUT"
         # Module sources do not depend on architecture or the Go patch release.
         echo "module=${CACHE_PLATFORM%%-*}-essential-gomod-v2-${CACHE_DEPS}" >> "$GITHUB_OUTPUT"
