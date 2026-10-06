@@ -61,6 +61,13 @@ func main() {
 `ChatBase` 保持原来的请求消息。调用方明确设置 `RawMessages` 时优先使用
 调用方的消息。
 
+自动发送时，模型名包含 `qwen`（大小写不敏感，包含带前后缀的别名）默认
+使用服务端隐式缓存：移除投影生成的 `cache_control`，保留消息切分、正文、
+工具定义和调用历史。这样增长中的历史前缀也能参与自动缓存，避免显式
+断点限制命中范围。其他模型沿用现有标记策略；命中率以服务端 `usage` 为准，
+隐式缓存不保证每次命中。调用方显式提供的 `RawMessages` 仍原样优先，
+直接调用不带模型参数的 `Project` 仍只计算投影。
+
 直接调用 `Project` 只计算结果，不会自动发请求；需要自行将
 `result.Messages` 传给 `aispec.WithChatBase_RawMessages`，并将
 `result.Tools` 传给 `aispec.WithChatBase_Tools`。当前自动 hook 只投影消息，
