@@ -1,0 +1,75 @@
+name: Essential Go cache
+description: Restore shared module sources and toolchain-specific suite build caches
+inputs:
+  role:
+    description: Build cache owner (base, ssa, utils-core, or utils-tooling)
+    default: base
+  prime:
+    description: Only download caches when this week's entry needs warming
+    default: 'false'
+outputs:
+  build-key:
+    description: Immutable weekly suite key
+    value: ${{ steps.keys.outputs.build }}
+  build-hit:
+    description: Exact build cache hit
+    value: ${{ steps.lookup.outputs.cache-hit || steps.build.outputs.cache-hit }}
+  module-key:
+    description: Dependency cache key
+    value: ${{ steps.keys.outputs.module }}
+  module-hit:
+    description: Exact dependency cache hit
+    value: ${{ steps.modules.outputs.cache-hit }}
+runs:
+  using: composite
+  steps:
+    - uses: actions/setup-go@v5
+      with:
+        go-version-file: go.mod
+        cache: false
+    - id: keys
+      shell: bash
+      env:
+        CACHE_ROLE: ${{ inputs.role }}
+        CACHE_PLATFORM: ${{ runner.os }}-${{ runner.arch }}
+        CACHE_DEPS: ${{ hashFiles('go.mod', 'go.sum') }}
+      run: |
+        mkdir -p "$RUNNER_TEMP/go-build-cache" "$RUNNER_TEMP/go-mod-cache"
+        echo "GOCACHE=$RUNNER_TEMP/go-build-cache" >> "$GITHUB_ENV"
+        echo "GOMODCACHE=$RUNNER_TEMP/go-mod-cache" >> "$GITHUB_ENV"
+        # Include the resolved toolchain, not just the go directive in go.mod.
+        prefix="${CACHE_PLATFORM%%-*}-essential-gobuild-v2-${CACHE_PLATFORM#*-}-$(go env GOVERSION)-${CACHE_DEPS}"
+        week=$(date -u +%G-W%V)
+        echo "build=$prefix-$CACHE_ROLE-$week" >> "$GITHUB_OUTPUT"
+        echo "role-prefix=$prefix-$CACHE_ROLE-" >> "$GITHUB_OUTPUT"
+        echo "base=$prefix-base-$week" >> "$GITHUB_OUTPUT"
+        echo "base-prefix=$prefix-base-" >> "$GITHUB_OUTPUT"
+        # Module sources do not depend on architecture or the Go patch release.
+        echo "module=${CACHE_PLATFORM%%-*}-essential-gomod-v2-${CACHE_DEPS}" >> "$GITHUB_OUTPUT"
+    - id: lookup
+      if: inputs.prime == 'true'
+      uses: actions/cache/restore@v4
+      continue-on-error: true
+      with:
+        path: ${{ runner.temp }}/go-build-cache
+        key: ${{ steps.keys.outputs.build }}
+        lookup-only: true
+    - id: modules
+      if: inputs.prime != 'true' || steps.lookup.outputs.cache-hit != 'true'
+      uses: actions/cache/restore@v4
+      continue-on-error: true
+      with:
+        path: ${{ runner.temp }}/go-mod-cache
+        key: ${{ steps.keys.outputs.module }}
+    - id: build
+      if: inputs.prime != 'true' || steps.lookup.outputs.cache-hit != 'true'
+      uses: actions/cache/restore@v4
+      continue-on-error: true
+      with:
+        path: ${{ runner.temp }}/go-build-cache
+        key: ${{ steps.keys.outputs.build }}
+        # Never substitute a different suite, architecture, or Go toolchain.
+        restore-keys: |
+          ${{ steps.keys.outputs.role-prefix }}
+          ${{ steps.keys.outputs.base }}
+          ${{ steps.keys.outputs.base-prefix }}

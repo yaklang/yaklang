@@ -1,0 +1,82 @@
+[
+  {
+    "package": "./common/yak/ssa/...",
+    "timeout": "20s"
+  },
+  {
+    "package": "./common/yak/ssaapi",
+    "timeout": "1m"
+  },
+  {
+    "package": "./common/yak/ssaapi/ssaconfig",
+    "timeout": "20s"
+  },
+  {
+    "package": "./common/yak/ssaapi/ssareducer",
+    "timeout": "1m"
+  },
+  {
+    "package": "./common/yak/ssaapi/test/ssatest/...",
+    "timeout": "1m"
+  },
+  {
+    "package": "./common/yak/ssaapi/test/...",
+    "timeout": "2m",
+    "exclude_packages": [
+      "./common/yak/ssaapi/test/yak/...",
+      "./common/yak/ssaapi/test/java/...",
+      "./common/yak/ssaapi/test/javascript/...",
+      "./common/yak/ssaapi/test/php/...",
+      "./common/yak/ssaapi/test/python/...",
+      "./common/yak/ssaapi/test/golang/...",
+      "./common/yak/ssaapi/test/c/...",
+      "./common/yak/ssaapi/test/syntaxflow/...",
+      "./common/yak/ssaapi/test/ssatest/..."
+    ]
+  },
+  {
+    "package": "./common/syntaxflow/tests",
+    "timeout": "20s"
+  },
+  {
+    "package": "./common/syntaxflow/sfdb/...",
+    "timeout": "20s",
+    "retry": 1,
+    "retry_delay": 5
+  },
+  {
+    "package": "./common/syntaxflow/sfrisk",
+    "timeout": "20s"
+  },
+  {
+    "package": "./common/syntaxflow/sfvm/...",
+    "timeout": "20s"
+  },
+  {
+    "package": "./common/syntaxflow/sfbuildin/...",
+    "timeout": "5m",
+    "parallel": 1,
+    "retry": 1,
+    "retry_delay": 5
+  },
+  {
+    "package": "./common/yak/ssaapi/test/syntaxflow/...",
+    "timeout": "1m"
+  },
+  {
+    "package": "./common/syntaxflow/sfanalysis/...",
+    "timeout": "2m",
+    "retry": 1,
+    "retry_delay": 5
+  },
+  {
+    "package": "./common/yak/static_analyzer/test/...",
+    "timeout": "20s"
+  },
+  {
+    "package": "./common/yak/syntaxflow_scan/...",
+    "timeout": "2m",
+    "retry": 1,
+    "retry_delay": 5
+  }
+]

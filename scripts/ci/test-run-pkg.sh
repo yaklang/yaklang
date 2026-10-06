@@ -15,6 +15,8 @@ TEST_TIMEOUT="${TEST_TIMEOUT:-2m}"
 TEST_VERBOSE="${TEST_VERBOSE:-1}"
 TEST_LOG_DIR="${TEST_LOG_DIR:-${TEST_BIN_DIR:-./test_binaries}}"
 PACKAGE_PARALLEL="${PACKAGE_PARALLEL:-}"   # extra -p for go test package loading
+PACKAGE_WORKERS="${PACKAGE_WORKERS:-1}"
+TEST_COMPILE_ONLY="${TEST_COMPILE_ONLY:-0}"  # warm build cache without executing test init
 
 if [[ -z "$TEST_CONFIG" || ! -f "$TEST_CONFIG" ]]; then
   echo "ERROR: TEST_CONFIG must point to an existing file"
@@ -22,6 +24,7 @@ if [[ -z "$TEST_CONFIG" || ! -f "$TEST_CONFIG" ]]; then
 fi
 
 mkdir -p "$TEST_LOG_DIR"
+TEST_LOG_DIR="$(cd "$TEST_LOG_DIR" && pwd)"
 
 list_test_pkgs() {
   # stdout is the package list. `go list` prints download/progress text on stderr,
@@ -79,6 +82,12 @@ run_package() {
   [[ -n "$PACKAGE_PARALLEL" ]] && args+=("-p" "$PACKAGE_PARALLEL")
   needs_race "$pkg" && args+=("-race")
 
+  # Main's cache warmer uses precisely the PR package/race selection. Keep the
+  # normal runner's -count=1; cache warming must never turn PR checks into hits
+  # in Go's test-result cache. Discard linked binaries to bound disk usage.
+  local warm_binary="$TEST_LOG_DIR/pkg_${safe}.warm.test"
+  [[ "$TEST_COMPILE_ONLY" == "1" ]] && args+=("-c" "-o" "$warm_binary")
+
   while (( attempt <= max_retries )); do
     if (( attempt > 0 )); then
       echo " retry ($((attempt + 1))/$((max_retries + 1))): $pkg"
@@ -94,6 +103,7 @@ run_package() {
     local TIMEFORMAT=$'real %3R\nuser %3U\nsys %3S'
     (cd "$pkg_dir" && time go test . "${args[@]}") >"$log" 2>&1
     local code=$?
+    [[ "$TEST_COMPILE_ONLY" == "1" ]] && rm -f "$warm_binary"
     # Keep the Actions log small: yak script suites print enormous traces, which is
     # why the compiled-binary runner wrapped its output in a grep filter.
     grep -aE '^(=== RUN|--- (PASS|FAIL|SKIP)|ok |FAIL( |$)|panic:|.*test timed out)' "$log" | tail -60
@@ -209,7 +219,7 @@ run_entry_task() {
 export -f run_entry_task
 export -f run_package
 export -f needs_race
-export TEST_CONFIG TEST_LOG_DIR TEST_TIMEOUT TEST_VERBOSE PACKAGE_PARALLEL failfile
+export TEST_CONFIG TEST_LOG_DIR TEST_TIMEOUT TEST_VERBOSE PACKAGE_PARALLEL TEST_COMPILE_ONLY failfile
 
 echo ""
 echo "=== running packages with PACKAGE_WORKERS=$PACKAGE_WORKERS ==="

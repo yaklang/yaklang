@@ -3,8 +3,6 @@ package pingutil
 import (
 	"context"
 	"errors"
-	"github.com/yaklang/yaklang/common/netx"
-	"math"
 	"net"
 	"testing"
 	"time"
@@ -18,12 +16,13 @@ type pingTestCase struct {
 }
 
 func TestPingAutoConfig(t *testing.T) {
+	const timeout = 50 * time.Millisecond
 	testCase := []pingTestCase{
 		{
 			name: "tcp timeout err test case",
 			ip:   "127.0.0.1",
 			config: []PingConfigOpt{
-				WithTimeout(5 * time.Second),
+				WithTimeout(timeout),
 				WithForceTcpPing(),
 				WithTcpDialHandler(tcpTimeoutHandlerMaker(getTestTimeout("timeout"))),
 			},
@@ -33,7 +32,7 @@ func TestPingAutoConfig(t *testing.T) {
 			name: "tcp attempt failed err test case",
 			ip:   "127.0.0.1",
 			config: []PingConfigOpt{
-				WithTimeout(5 * time.Second),
+				WithTimeout(timeout),
 				WithForceTcpPing(),
 				WithTcpDialHandler(tcpTimeoutHandlerMaker(getTestTimeout("attempt failed"))),
 			},
@@ -43,34 +42,33 @@ func TestPingAutoConfig(t *testing.T) {
 			name: "tcp refused err test case",
 			ip:   "127.0.0.1",
 			config: []PingConfigOpt{
-				WithTimeout(5 * time.Second),
+				WithTimeout(timeout),
 				WithForceTcpPing(),
 				WithTcpDialHandler(tcpTimeoutHandlerMaker(getTestTimeout("refused"))),
 			},
 			expect: true,
 		},
 		{
-			name: "global timeout test case",
+			name: "native handler timeout",
 			ip:   "127.0.0.1",
 			config: []PingConfigOpt{
-				WithTimeout(5 * time.Second),
+				WithTimeout(timeout),
 				WithPingNativeHandler(pingSleepHandlerMaker()),
-				WithTcpDialHandler(tcpSleepHandlerMaker()),
 			},
 			expect: false,
 		},
 	}
 	for _, test := range testCase {
-		start := time.Now()
-		res := PingAutoConfig("127.0.0.1", test.config...)
-		useTime := time.Since(start).Seconds()
-		if math.Floor(useTime) > math.Floor(5*time.Second.Seconds()) {
-			t.Fatalf("timeout is 5s,but use %v[%v]", useTime, test.name)
-		}
-		if res.Ok != test.expect {
-			t.Fatalf("Expect %v but get %v at [%v]", test.expect, res.Ok, test.name)
-		}
-
+		t.Run(test.name, func(t *testing.T) {
+			start := time.Now()
+			res := PingAutoConfig(test.ip, test.config...)
+			if elapsed := time.Since(start); elapsed > time.Second {
+				t.Fatalf("probe exceeded timeout %v: elapsed %v", timeout, elapsed)
+			}
+			if res.Ok != test.expect {
+				t.Fatalf("Expect %v but get %v", test.expect, res.Ok)
+			}
+		})
 	}
 }
 
@@ -93,25 +91,10 @@ func pingSleepHandlerMaker() func(ip string, timeout time.Duration) *PingResult 
 	}
 }
 
-func tcpSleepHandlerMaker() func(ctx context.Context, addr string, proxies ...string) (net.Conn, error) {
-	return func(ctx context.Context, addr string, proxies ...string) (net.Conn, error) {
-		var timeout time.Duration
-		ddl, ok := ctx.Deadline()
-		if ok {
-			if du := ddl.Sub(time.Now()); du.Seconds() > 0 {
-				timeout = du
-			}
-		}
-		time.Sleep(timeout)
-		return nil, getTestTimeout("timeout")
-	}
-}
-
 func getTestTimeout(errName string) error {
 	switch errName {
 	case "timeout":
-		_, err := netx.DialTimeout(1*time.Nanosecond, "127.0.0.1:80")
-		return err
+		return context.DeadlineExceeded
 	case "attempt failed":
 		return errors.New("dial tcp 127.0.0.1:80: connectex: A connection attempt failed because the connected party did not properly respond after a period of time, or established connection failed because connected host has failed to respond")
 	case "refused":

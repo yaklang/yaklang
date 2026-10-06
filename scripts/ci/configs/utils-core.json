@@ -1,0 +1,102 @@
+[
+  {
+    "package": "./common/log",
+    "timeout": "20s",
+    "race": true
+  },
+  {
+    "package": "./common/utils/omap/...",
+    "timeout": "30s",
+    "race": true
+  },
+  {
+    "package": "./common/utils",
+    "timeout": "1m"
+  },
+  {
+    "package": "./common/utils/appconfig",
+    "timeout": "20s",
+    "race": true
+  },
+  {
+    "package": "./common/utils/atomicbool",
+    "timeout": "20s",
+    "race": true
+  },
+  {
+    "package": "./common/utils/textvalidate",
+    "timeout": "20s"
+  },
+  {
+    "package": "./common/rpa/randomforest/...",
+    "timeout": "30s",
+    "race": true
+  },
+  {
+    "package": "./common/utils/dbcache",
+    "timeout": "1m",
+    "retry": 1,
+    "retry_delay": 5
+  },
+  {
+    "package": "./common/utils/imageutils/...",
+    "timeout": "20s"
+  },
+  {
+    "package": "./common/utils/xml2",
+    "timeout": "10s"
+  },
+  {
+    "package": "./common/utils/tlsutils/...",
+    "timeout": "20s"
+  },
+  {
+    "package": "./common/utils/linktable/...",
+    "timeout": "10s"
+  },
+  {
+    "package": "./common/utils/dot/...",
+    "timeout": "10s"
+  },
+  {
+    "package": "./common/utils/filesys/...",
+    "timeout": "30s"
+  },
+  {
+    "package": "./common/utils/memedit/.",
+    "timeout": "15s"
+  },
+  {
+    "package": "./common/utils/ziputil/...",
+    "timeout": "20s"
+  },
+  {
+    "package": "./common/utils/zipx/...",
+    "timeout": "30s"
+  },
+  {
+    "package": "./common/utils/yakgit/...",
+    "exclude_packages": [
+      "./common/utils/yakgit/yakdiff/..."
+    ]
+  },
+  {
+    "package": "./common/utils/suspect"
+  },
+  {
+    "package": "./common/utils/gzip_embed/test/...",
+    "timeout": "30s"
+  },
+  {
+    "package": "./common/utils/resources_monitor/...",
+    "timeout": "30s"
+  },
+  {
+    "package": "./common/utils/bizhelper/...",
+    "timeout": "20s"
+  },
+  {
+    "package": "./common/utils/yakgit/yakdiff/...",
+    "timeout": "20s"
+  }
+]

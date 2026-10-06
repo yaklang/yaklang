@@ -1,0 +1,112 @@
+name: Warm Essential Go Caches
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'common/**'
+      - 'embed/**'
+      - 'go.mod'
+      - 'go.sum'
+      - 'scripts/ci/**'
+      - '.github/actions/essential-go-cache/**'
+      - '.github/workflows/essential-cache-warm.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: essential-cache-warm-${{ github.ref }}
+  # Let a cache writer finish even if another main commit arrives.
+  cancel-in-progress: false
+
+jobs:
+  base:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-22.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/essential-go-cache
+        id: cache
+        with:
+          role: base
+          prime: 'true'
+      - name: Warm production dependencies
+        if: steps.cache.outputs.build-hit != 'true'
+        run: go build -o "$RUNNER_TEMP/yak" common/yak/cmd/yak.go
+      - uses: actions/cache/save@v4
+        if: steps.cache.outputs.build-hit != 'true' && steps.cache.outputs.module-hit != 'true'
+        continue-on-error: true
+        with:
+          path: ${{ runner.temp }}/go-mod-cache
+          key: ${{ steps.cache.outputs.module-key }}
+      - uses: actions/cache/save@v4
+        if: steps.cache.outputs.build-hit != 'true'
+        continue-on-error: true
+        with:
+          path: ${{ runner.temp }}/go-build-cache
+          key: ${{ steps.cache.outputs.build-key }}
+
+  suites:
+    needs: base
+    runs-on: ubuntu-22.04
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        role: [ssa, utils-core, utils-tooling]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/essential-go-cache
+        id: cache
+        with:
+          role: ${{ matrix.role }}
+          prime: 'true'
+      # Compile the same package/race selection as the PR jobs, without running
+      # test init/assertions or retaining large linked binaries. Subsequent main
+      # pushes only look up this week's key; they neither download nor rebuild it.
+      - name: Warm suite dependencies
+        if: steps.cache.outputs.build-hit != 'true'
+        env:
+          TEST_CONFIG: scripts/ci/configs/${{ matrix.role }}.json
+          TEST_LOG_DIR: ${{ runner.temp }}/cache-warm-logs
+          TEST_COMPILE_ONLY: '1'
+          PACKAGE_WORKERS: '2'
+          PACKAGE_PARALLEL: '1'
+        run: bash scripts/ci/test-run-pkg.sh
+      - uses: actions/cache/save@v4
+        if: steps.cache.outputs.build-hit != 'true'
+        continue-on-error: true
+        with:
+          path: ${{ runner.temp }}/go-build-cache
+          key: ${{ steps.cache.outputs.build-key }}
+
+  prune:
+    needs: [base, suites]
+    if: always() && needs.base.result == 'success'
+    runs-on: ubuntu-22.04
+    timeout-minutes: 10
+    continue-on-error: true
+    permissions:
+      contents: read
+      actions: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Prune superseded snapshots
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPOSITORY: ${{ github.repository }}
+          CACHE_MAX_AGE_DAYS: '14'
+          CACHE_MAX_SIZE_GB: '6'
+          CACHE_PROTECTED_REF: refs/heads/main
+        run: |
+          CACHE_KEY_PREFIX="${{ runner.os }}-essential-gobuild-" bash scripts/ci/cache-prune.sh
+          CACHE_KEY_PREFIX="${{ runner.os }}-essential-gomod-" CACHE_MAX_SIZE_GB=2 bash scripts/ci/cache-prune.sh
