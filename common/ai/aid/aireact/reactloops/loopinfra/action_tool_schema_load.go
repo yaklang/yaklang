@@ -101,11 +101,16 @@ func loadToolSchemas(loop *reactloops.ReActLoop, action *aicommon.Action, operat
 		return
 	}
 	names, _ := loop.GetActionExecutionValue(action, actionStateToolSchemaNames).([]string)
+	loadToolSchemasByNames(loop, names, operator)
+}
+
+// Both loading actions use the same cache, MCP checks and Timeline feedback.
+func loadToolSchemasByNames(loop *reactloops.ReActLoop, names []string, operator *reactloops.LoopActionHandlerOperator) bool {
 	config := loop.GetConfig()
 	if len(names) == 0 || config == nil || config.GetAiToolManager() == nil {
 		operator.Feedback("Tool schema loading unavailable; no tools were executed.")
 		operator.Continue()
-		return
+		return false
 	}
 	manager := config.GetAiToolManager()
 	ctx := toolBatchVerifierContext(loop)
@@ -135,17 +140,22 @@ func loadToolSchemas(loop *reactloops.ReActLoop, action *aicommon.Action, operat
 			continue
 		}
 		entry["status"] = "schema_loaded"
-		entry["detail"] = "Read CACHE_TOOL_CALL in the timeline, construct arguments, then use directly_call_tool. No execution has occurred."
+		entry["detail"] = fmt.Sprintf("工具 %q 的参数 Schema 已加载到 CACHE_TOOL_CALL，尚未执行。现在按 Schema 和当前任务构造完整参数，立即调用 directly_call_tool 继续完成本任务；不要重复加载，不要把加载当作任务完成或单独交付的阶段，也不要等待用户说继续。", name)
 	}
 	// Loading later entries can evict earlier ones. Do not report those entries
 	// as available in the final cache state of this load batch.
+	allLoaded := true
 	for _, entry := range results {
 		if entry["status"] == "schema_loaded" && !manager.IsRecentlyUsedTool(entry["tool_name"]) {
 			entry["status"], entry["detail"] = "evicted", "Schema was evicted by the tool-cache budget; load a smaller set."
+		}
+		if entry["status"] != "schema_loaded" {
+			allLoaded = false
 		}
 	}
 	body, _ := json.Marshal(results)
 	loop.GetInvoker().AddToTimeline("tool_schema_load", string(body))
 	operator.Feedback(string(body))
 	operator.Continue()
+	return allLoaded
 }

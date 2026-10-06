@@ -112,3 +112,31 @@ func TestNativeDirectToolMetadataAndNoParameterFallback(t *testing.T) {
 	require.ErrorContains(t, err, "never generates parameters")
 	require.Nil(t, loop.GetActionExecutionValue(invalid, actionStateNativeDirectParams))
 }
+
+// Native validation and batch admission recover the schema even when the model
+// attempted a direct call before loading it. An invalid batch executes no child.
+func TestDirectToolValidationLoadsSchemaForRetry(t *testing.T) {
+	for _, payload := range []string{
+		`{"@action":"directly_call_tool","directly_call_tool_name":"read_file","directly_call_tool_params":{}}`,
+		`{"@action":"directly_call_tool","directly_call_tool_name":"read_file","directly_call_tool_params":[]}`,
+		`{"@action":"directly_call_tool","directly_call_tool_calls":[{"tool_name":"read_file","params":{}},{"tool_name":"grep","params":{}}]}`,
+		`{"@action":"directly_call_tool","directly_call_tool_calls":[{"tool_name":"read_file"},{"tool_name":"grep","params":{}}]}`,
+	} {
+		t.Run(payload, func(t *testing.T) {
+			manager, _, _ := newToolBatchTestManager(t)
+			invoker := newTestInvoker(context.Background())
+			loop := reactloops.NewMinimalReActLoop(&aicommon.Config{AiToolManager: manager}, invoker)
+			action := parseToolBatchPromptExample(t, payload, "directly_call_tool")
+			require.False(t, manager.IsRecentlyUsedTool("read_file"))
+			err := nativeDirectToolAction.ActionVerifier(loop, action)
+			require.ErrorContains(t, err, "reason:")
+			require.ErrorContains(t, err, "retry:")
+			require.True(t, manager.IsRecentlyUsedTool("read_file"))
+			require.Contains(t, invoker.getTimelineString(), "完整 Schema 已放入 CACHE_TOOL_CALL")
+			require.Contains(t, invoker.getTimelineString(), "本次未执行工具")
+			require.Nil(t, loop.GetActionExecutionValue(action, actionStateNativeDirectParams))
+			require.Nil(t, loop.GetActionExecutionValue(action, actionStateDirectToolBatch))
+			require.False(t, invoker.toolCallCalled)
+		})
+	}
+}

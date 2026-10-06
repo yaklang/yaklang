@@ -355,18 +355,8 @@ var loopAction_directlyCallTool = &reactloops.LoopAction{
 		toolName, _ := loop.GetActionExecutionValue(action, "directly_call_tool_name").(string)
 		if toolName == "" {
 			loopInfraStatus(loop, "没有找到要使用的工具", "No suitable tool was found")
-			reportStatus(strings.TrimSpace(`
-Error: directly_call_tool_name is missing in verified action state.
-Fast-path directly_call_tool failed before execution and cannot be recovered in-place because the target tool is unknown.
-Next attempt MUST either switch to require_tool or retry directly_call_tool with both directly_call_tool_name and directly_call_tool_params.
-
-Few-shot example 1 (fallback to require_tool):
-{"@action":"require_tool","tool_require_payload":"<tool_name>"}
-
-Few-shot example 2 (valid directly_call_tool):
-{"@action":"directly_call_tool","directly_call_tool_name":"<tool_name>","directly_call_identifier":"<snake_case_intent>","directly_call_expectations":"~3s, load missing schemas before constructing params","directly_call_reason":"<why this call>","directly_call_tool_params":{"<param>":"<value>"}}
-`))
-			operator.Feedback(utils.Error("directly_call_tool requires tool_name; switch to require_tool or provide directly_call_tool_name + directly_call_tool_params"))
+			operator.Feedback(directToolRetryFeedback(loop, "", "directly_call_tool_name is missing in verified action state; provide directly_call_tool_name and directly_call_tool_params", false))
+			operator.Continue()
 			return
 		}
 		emitToolsPreparingStatus(loop, []string{toolName})
@@ -377,8 +367,8 @@ Few-shot example 2 (valid directly_call_tool):
 		if lookupErr != nil {
 			reportStatus(fmt.Sprintf("cached tool lookup failed for '%s': %v", toolName, lookupErr))
 			loopInfraStatus(loop, "当前工具暂时不可用，正在换一种方式继续", "The current tool is unavailable; trying another approach")
-			msg := fmt.Sprintf("directly_call_tool cached tool lookup failed for '%s'; switch to @action=require_tool", toolName)
-			operator.Feedback(utils.Error(msg))
+			msg := fmt.Sprintf("directly_call_tool cached tool lookup failed for '%s': %v", toolName, lookupErr)
+			operator.Feedback(directToolRetryFeedback(loop, toolName, msg, false))
 			invoker.AddToTimeline("DIRECT_CALL_PARAMS", msg)
 			operator.Continue()
 			return
@@ -461,10 +451,10 @@ Few-shot example 2 (valid directly_call_tool):
 				if validationSummary == "" {
 					validationSummary = "required params do not match the tool schema"
 				}
-				err := utils.Errorf("directly_call_tool params invalid for '%s': %s; load missing schemas with require_tool, then retry directly_call_tool with matching arguments", toolName, validationSummary)
+				err := utils.Errorf("directly_call_tool params invalid for '%s': %s", toolName, validationSummary)
 				reportStatus(err.Error())
 				finishProgress("[failed] params validation failed; no tool was executed")
-				return nil, false, tool, err
+				return nil, false, tool, directToolParameterError(loop, name, err)
 			}
 
 			feedbackItems := buildDirectlyCallParamFeedbackItems(params, mergedBlockParams)

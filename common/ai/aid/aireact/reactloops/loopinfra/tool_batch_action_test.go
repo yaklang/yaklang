@@ -875,7 +875,7 @@ func TestToolBatchActionHandler_ZeroInvokeDoesNotVerifyOrMarkExecution(t *testin
 	})
 }
 
-func TestToolBatchActionHandler_CachesOnlyProtocolCompleteChildren(t *testing.T) {
+func TestToolBatchActionHandler_CachesSuccessAndFailedSchemaForRetry(t *testing.T) {
 	ctx := context.Background()
 	manager, readFile, grep := newToolBatchTestManager(t)
 	cfg := &aicommon.Config{AiToolManager: manager, Timeline: aicommon.NewTimeline(nil, nil)}
@@ -897,11 +897,15 @@ func TestToolBatchActionHandler_CachesOnlyProtocolCompleteChildren(t *testing.T)
 	handleToolBatchActionResult(loop, ctx, invoker, request, invoker.result, nil, op)
 
 	require.True(t, manager.IsRecentlyUsedTool(readFile.Name), "a protocol-complete child must remain available for future scalar direct calls")
-	require.False(t, manager.IsRecentlyUsedTool(grep.Name), "a failed child must not be promoted into the direct-call cache")
-	require.Equal(t, []string{readFile.Name}, manager.GetRecentToolNames())
+	require.True(t, manager.IsRecentlyUsedTool(grep.Name), "a failed child must expose its schema for corrected direct retry")
+	require.ElementsMatch(t, []string{readFile.Name, grep.Name}, manager.GetRecentToolNames())
+	require.Contains(t, op.GetFeedback().String(), "reason: protocol-error: fixture failure")
+	require.Contains(t, op.GetFeedback().String(), "retry:")
+	require.Contains(t, op.GetFeedback().String(), "避免重复执行")
+	require.Equal(t, 2, op.GetExecutedToolCallCount(), "failed result is not converted to success or hidden")
 	materials := aicommon.RenderTimelineFrozenOpen(cfg.Timeline)
 	require.Contains(t, materials.Open+materials.PromotedRecentTools, readFile.Name)
-	require.NotContains(t, materials.Open+materials.PromotedRecentTools, grep.Name)
+	require.Contains(t, materials.Open+materials.PromotedRecentTools, grep.Name)
 	require.True(t, op.IsContinued())
 }
 

@@ -392,20 +392,20 @@ func parseDirectToolBatchActionWithMetadata(loop *reactloops.ReActLoop, action *
 
 		rawParams, exists := item["params"]
 		if !exists {
-			return nil, true, utils.Errorf("%s[%d].params is required (use {} for a parameterless tool)", directlyCallToolBatchField, index)
+			return nil, true, directToolParameterError(loop, toolName, utils.Errorf("%s[%d].params is required (use {} for a parameterless tool)", directlyCallToolBatchField, index))
 		}
 		params, err := strictBatchParams(rawParams)
 		if err != nil {
-			return nil, true, utils.Wrapf(err, "%s[%d]", directlyCallToolBatchField, index)
+			return nil, true, directToolParameterError(loop, toolName, utils.Wrapf(err, "%s[%d]", directlyCallToolBatchField, index))
 		}
 
 		tool, err := mgr.GetToolByName(toolName)
 		if err != nil {
-			return nil, true, utils.Wrapf(err, "%s[%d].tool_name %q is unavailable", directlyCallToolBatchField, index, toolName)
+			return nil, true, directToolParameterError(loop, toolName, utils.Wrapf(err, "%s[%d].tool_name %q is unavailable", directlyCallToolBatchField, index, toolName))
 		}
 		valid, validationErrors := tool.ValidateParams(params)
 		if !valid {
-			return nil, true, utils.Errorf("%s[%d].params are invalid for %q: %s", directlyCallToolBatchField, index, toolName, strings.Join(validationErrors, "; "))
+			return nil, true, directToolParameterError(loop, toolName, utils.Errorf("%s[%d].params are invalid for %q: %s", directlyCallToolBatchField, index, toolName, strings.Join(validationErrors, "; ")))
 		}
 
 		if !mgr.IsRecentlyUsedTool(toolName) && loop.GetEmitter() != nil {
@@ -589,11 +589,18 @@ func handleToolBatchActionResult(
 		msg := fmt.Sprintf("tool batch execution failed before completion: %v", err)
 		invoker.AddToTimeline("[TOOL_BATCH_ERROR]", msg)
 		operator.Feedback(msg)
+		if !errors.Is(err, context.Canceled) && !errors.Is(err, context.DeadlineExceeded) {
+			for _, call := range request.Calls {
+				operator.Feedback(directToolRetryFeedback(loop, call.ToolName, msg, true))
+			}
+		}
 		operator.Continue()
 		return
 	}
 	if result == nil {
-		operator.Feedback("tool batch returned no result")
+		for _, call := range request.Calls {
+			operator.Feedback(directToolRetryFeedback(loop, call.ToolName, "tool batch returned no result", true))
+		}
 		operator.Continue()
 		return
 	}
@@ -688,6 +695,9 @@ func handleToolBatchActionResult(
 			status += ": " + outcome.Result.Error
 		}
 		lines = append(lines, fmt.Sprintf("%d. %s: %s", outcome.Index+1, toolName, status))
+		if (outcome.Stage == aicommon.ToolCallStageInvokeFailed || outcome.Stage == aicommon.ToolCallStagePrepareFailed || outcome.Stage == aicommon.ToolCallStageValidationFailed || outcome.ExecutionStatus == aitool.ToolExecutionStatusFailed) && !errors.Is(outcome.Err, context.Canceled) && !errors.Is(outcome.Err, context.DeadlineExceeded) {
+			lines = append(lines, directToolRetryFeedback(loop, toolName, status, outcome.Result != nil))
+		}
 
 		if outcome.Result != nil && outcome.Result.Success {
 			reactloops.MarkEditBeforeExecutionCompleted(loop, toolName)

@@ -55,14 +55,14 @@ Use 'search_capabilities' to discover additional tools, AI forges (blueprints), 
 
 The `load_capability` action is a unified entry point that can automatically load **any** type of capability by its identifier:
 
-- **Tool** — provide a tool name and the system will detect it, request the tool, generate parameters, and execute the call. This is functionally equivalent to the standard tool-calling action.
+- **Tool** — 只加载完整参数 Schema；加载后立即按当前任务构参，以 `directly_call_tool` 执行。加载本身不生成参数、不执行工具。
 - **AI Blueprint / Forge** — provide the forge name and the system will start the blueprint in async mode. This is functionally equivalent to the blueprint-requesting action.
 - **Skill** — provide the skill name and the system will load the skill content into your context. This is functionally equivalent to the skill-loading action.
 - **Focused Mode Loop** — provide the loop name and the system will execute the focused mode sub-loop synchronously.
 
 When you know the exact name of a capability but are unsure of its type (tool, blueprint, skill, or focused mode), prefer using `load_capability`. The system will resolve the identifier automatically and dispatch to the correct handler. If the identifier cannot be matched to any known capability, the system will fall back to intent recognition to discover relevant capabilities.
 
-For tool calling, `load_capability` triggers the exact same execution pipeline as the dedicated tool-calling action — they are fully interchangeable.
+识别为工具时，`load_capability` 与 `require_tool` 都只加载完整参数 Schema，不生成参数、不执行工具。加载后立即读取 CACHE_TOOL_CALL，按当前任务构造参数，用 `directly_call_tool` 继续完成任务；不要重复加载、停止等待用户，或把加载定义当作单独的阶段交付。
 {{ end }}
 
 <|TRAITS|>

@@ -14,11 +14,11 @@ import (
 
 var loopAction_LoadCapability = &reactloops.LoopAction{
 	ActionType:  schema.AI_REACT_LOOP_ACTION_LOAD_CAPABILITY,
-	Description: "自动加载一些外部能力，这个外部能力可以被自动检测类型，并且加载。可以出现工具调用(tool)，专注模式(focus_mode)，技能(skill)或者模版/蓝图（forge/blueprint）",
+	Description: "自动加载一些外部能力，这个外部能力可以被自动检测类型，并且加载。支持工具(tool)、专注模式(focus_mode)、技能(skill)和模版/蓝图(forge/blueprint)。识别为工具时只加载参数 Schema，不生成参数、不执行；观察 CACHE_TOOL_CALL 后立即构造参数并用 directly_call_tool 继续本任务，不要额外等待用户说继续或把加载作为阶段成果。",
 	Options: []aitool.ToolOption{
 		aitool.WithStringParam(
 			"capability_identifier",
-			aitool.WithParam_Description(`只对 {"@action":"load_capability" ...} 时生效，这个标识符会被自动检测是 skill/tool/forge/focus_mode/filename, 然后自动加载`),
+			aitool.WithParam_Description(`只对 {"@action":"load_capability" ...} 时生效，这个标识符会被自动检测是 skill/tool/forge/focus_mode/filename, 然后自动加载；tool 只加载 Schema，随后立即通过 directly_call_tool 显式执行`),
 		),
 	},
 	ActionVerifier: loadCapabilityVerifier,
@@ -45,6 +45,11 @@ func loadCapabilityVerifier(loop *reactloops.ReActLoop, action *aicommon.Action)
 		altTypes = append(altTypes, string(alt.IdentityType))
 	}
 	loop.Set("_load_cap_alt_types", strings.Join(altTypes, ","))
+	// Native responses can verify several actions before executing any of them.
+	// Preserve each action's target instead of using the last global resolution.
+	for _, key := range []string{"_load_cap_identifier", "_load_cap_resolved_type", "_load_cap_alt_types"} {
+		loop.SetActionExecutionValue(action, key, loop.Get(key))
+	}
 
 	invoker := loop.GetInvoker()
 
@@ -73,13 +78,19 @@ func loadCapabilityVerifier(loop *reactloops.ReActLoop, action *aicommon.Action)
 }
 
 func loadCapabilityHandler(loop *reactloops.ReActLoop, action *aicommon.Action, op *reactloops.LoopActionHandlerOperator) {
-	identifier := loop.Get("_load_cap_identifier")
+	targetValue := func(key string) string {
+		if value, ok := loop.GetActionExecutionValue(action, key).(string); ok {
+			return value
+		}
+		return loop.Get(key)
+	}
+	identifier := targetValue("_load_cap_identifier")
 	if identifier == "" {
 		op.Fail("load_capability: identifier is empty")
 		return
 	}
 
-	resolvedType := aicommon.ResolvedIdentifierType(loop.Get("_load_cap_resolved_type"))
+	resolvedType := aicommon.ResolvedIdentifierType(targetValue("_load_cap_resolved_type"))
 	invoker := loop.GetInvoker()
 
 	ctx := invoker.GetConfig().GetContext()
@@ -88,7 +99,7 @@ func loadCapabilityHandler(loop *reactloops.ReActLoop, action *aicommon.Action, 
 		ctx = task.GetContext()
 	}
 
-	altTypesStr := loop.Get("_load_cap_alt_types")
+	altTypesStr := targetValue("_load_cap_alt_types")
 	hasSkillAlt := strings.Contains(altTypesStr, string(aicommon.ResolvedAs_Skill))
 	loopInfraActionStart(loop, loopInfraNodeLoadCapability,
 		fmt.Sprintf("加载能力: %s (%s) / Load capability: %s (%s)", identifier, resolvedType, identifier, resolvedType),
@@ -103,7 +114,7 @@ func loadCapabilityHandler(loop *reactloops.ReActLoop, action *aicommon.Action, 
 	}
 	switch resolvedType {
 	case aicommon.ResolvedAs_Tool:
-		handleLoadTool(loop, invoker, ctx, identifier, op)
+		handleLoadTool(loop, identifier, op)
 	case aicommon.ResolvedAs_Forge:
 		handleLoadForgeWithSkillFallback(loop, invoker, ctx, identifier, op, hasSkillAlt)
 	case aicommon.ResolvedAs_Skill:
@@ -115,27 +126,16 @@ func loadCapabilityHandler(loop *reactloops.ReActLoop, action *aicommon.Action, 
 	}
 }
 
-// handleLoadTool retains the explicit load_capability tool execution path.
-func handleLoadTool(
-	loop *reactloops.ReActLoop,
-	invoker aicommon.AIInvokeRuntime,
-	_ interface{ Done() <-chan struct{} },
-	identifier string,
-	op *reactloops.LoopActionHandlerOperator,
-) {
-	log.Infof("load_capability: dispatching '%s' as tool", identifier)
-	invoker.AddToTimeline("[LOAD_CAPABILITY_TOOL]", fmt.Sprintf("Executing tool '%s'", identifier))
-	loopInfraActionFinish(loop, loopInfraNodeLoadCapability,
-		fmt.Sprintf("已转入工具调用: %s / Routed to tool call: %s", identifier, identifier))
-
-	taskCtx := invoker.GetConfig().GetContext()
-	task := loop.GetCurrentTask()
-	if task != nil {
-		taskCtx = task.GetContext()
+// handleLoadTool loads the schema and resumes the current task without execution.
+func handleLoadTool(loop *reactloops.ReActLoop, identifier string, op *reactloops.LoopActionHandlerOperator) {
+	log.Infof("load_capability: loading tool schema for '%s'", identifier)
+	if loadToolSchemasByNames(loop, []string{identifier}, op) {
+		loopInfraActionFinish(loop, loopInfraNodeLoadCapability,
+			fmt.Sprintf("工具定义已加载: %s / Tool Schema Loaded: %s", identifier, identifier))
+	} else {
+		loopInfraActionFinish(loop, loopInfraNodeLoadCapability,
+			fmt.Sprintf("工具定义加载失败: %s / Tool Schema Load Failed: %s", identifier, identifier))
 	}
-
-	result, directly, err := invoker.ExecuteToolRequiredAndCall(taskCtx, identifier)
-	handleToolCallResult(loop, taskCtx, invoker, identifier, result, directly, err, op)
 }
 
 // handleLoadForgeWithSkillFallback tries loading as forge first. If forge is rejected

@@ -60,7 +60,7 @@ func verifyNativeDirectTool(loop *reactloops.ReActLoop, action *aicommon.Action)
 	rawParams, _ := lookupCanonicalActionParam(action, "directly_call_tool_params")
 	params, err := strictBatchParams(rawParams)
 	if err != nil {
-		return utils.Wrap(err, "directly_call_tool_params")
+		return directToolParameterError(loop, name, utils.Wrap(err, "directly_call_tool_params"))
 	}
 	manager := loop.GetConfig().GetAiToolManager()
 	if manager == nil {
@@ -68,10 +68,10 @@ func verifyNativeDirectTool(loop *reactloops.ReActLoop, action *aicommon.Action)
 	}
 	tool, err := manager.GetToolByName(name)
 	if err != nil || tool == nil {
-		return utils.Errorf("tool %q is unavailable; require_tool can load available schemas but does not execute tools", name)
+		return directToolParameterError(loop, name, utils.Errorf("tool %q is unavailable: %v", name, err))
 	}
 	if valid, errors := tool.ValidateParams(params); !valid {
-		return utils.Errorf("invalid arguments for %q: %s; correct directly_call_tool_params using the tool schema. require_tool only loads schemas, never generates parameters", name, strings.Join(errors, "; "))
+		return directToolParameterError(loop, name, utils.Errorf("invalid arguments for %q: %s", name, strings.Join(errors, "; ")))
 	}
 	reactloops.MaybeWarnBashBeforeEdit(loop, name)
 	loop.SetActionExecutionValue(action, "directly_call_tool_name", name)

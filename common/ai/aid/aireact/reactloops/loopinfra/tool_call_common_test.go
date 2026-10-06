@@ -30,6 +30,10 @@ func TestHandleToolCallResult_MCPInitializing_ErrorPath(t *testing.T) {
 	feedback := op.GetFeedback().String()
 	assert.Contains(t, feedback, "still connecting")
 	assert.Contains(t, feedback, "same tool")
+	assert.Contains(t, feedback, "directly_call_tool")
+	assert.Contains(t, feedback, "reason:")
+	assert.Contains(t, feedback, "retry:")
+	assert.NotContains(t, feedback, "with require_tool")
 	assert.True(t, op.IsContinued())
 	assert.Zero(t, op.GetExecutedToolCallCount(), "pre-invoke error has no settled ToolResult")
 }
@@ -54,6 +58,10 @@ func TestHandleToolCallResult_MCPInitializing_ResultErrorPath(t *testing.T) {
 	feedback := op.GetFeedback().String()
 	assert.Contains(t, feedback, "still initializing")
 	assert.Contains(t, feedback, "same tool")
+	assert.Contains(t, feedback, "directly_call_tool")
+	assert.Contains(t, feedback, "reason:")
+	assert.Contains(t, feedback, "retry:")
+	assert.NotContains(t, feedback, "with require_tool")
 	assert.True(t, op.IsContinued())
 	assert.Equal(t, 1, op.GetExecutedToolCallCount(), "failed ToolResult still proves callback execution")
 }

@@ -4,6 +4,7 @@ include "common/ai/aismoking/mock.inc"
 sourceFile = file.Join(smokeRoot,"mainloop-source.txt")
 file.Save(sourceFile,"mainloop-source-sentinel: read through a real tool")~
 step, config = 0, nil
+loadEntry = {"name":"require_tool"}
 query = "默认主循环读取 mainloop-source.txt，保存会话 evidence，再回答验证结论。"
 smokeHandler = func(w,body) {
     native = len(body.tools)>0
@@ -29,16 +30,28 @@ smokeHandler = func(w,body) {
     dynamic = re.FindSubmatch(string(body.messages[len(body.messages)-1].content),`(?s)<\|PROMPT_SECTION_dynamic_[^|]+\|>(.*)`)
     assert len(dynamic) == 2 && !(query in dynamic[1]), "user query leaked into pure dynamic region"
     step++
-    if step == 1 { smokeAnswer(w,native,"require_tool",{"tool_require_payload":"read_file"}); return }
+    if step == 1 {
+        args = {"tool_require_payload":"read_file"}
+        if loadEntry.name == "load_capability" { args = {"capability_identifier":"read_file"} }
+        smokeAnswer(w,native,loadEntry.name,args); return
+    }
     if step == 2 {
-        assert !("mainloop-source-sentinel" in prompt), "require_tool executed the tool"
-        assert "CACHE_TOOL_CALL" in prompt && "Direct Params Schema" in prompt, "tool schema missing after require_tool"
+        assert !("mainloop-source-sentinel" in prompt), "schema loading executed the tool"
+        assert "CACHE_TOOL_CALL" in prompt && "Direct Params Schema" in prompt, "tool schema missing after loading"
+        if loadEntry.name == "load_capability" { assert "LOAD_CAPABILITY_VERIFIED" in prompt, "load_capability branch was not actually exercised" }
+        assert "立即调用 directly_call_tool" in prompt, "missing continuation after schema load"
+        smokeAnswer(w,native,"directly_call_tool",{"directly_call_tool_name":"read_file","directly_call_tool_params":{},"directly_call_reason":"验证错误参数不会执行"}); return
+    }
+    if step == 3 {
+        assert !("mainloop-source-sentinel" in prompt), "invalid direct call executed the tool"
+        assert "reason:" in prompt && "retry:" in prompt, "missing explicit reason/retry"
+        assert "Direct Params Schema" in prompt, "schema missing during direct retry"
         smokeAnswer(w,native,"directly_call_tool",{"directly_call_tool_name":"read_file","directly_call_tool_params":{"file":sourceFile},"directly_call_reason":"读取本地实际来源"}); return
     }
     assert "mainloop-source-sentinel" in prompt
-    if step == 3 { smokeAnswer(w,native,"save_evidence",{"evidence_id":"mainloop.source","evidence_content":"mainloop-source-sentinel；来源：" + sourceFile}); return }
+    if step == 4 { smokeAnswer(w,native,"save_evidence",{"evidence_id":"mainloop.source","evidence_content":"mainloop-source-sentinel；来源：" + sourceFile}); return }
     assert "mainloop.source" in prompt
-    if step == 4 {
+    if step == 5 {
         config.GetTimeline().FreezeAll()
         smokeAnswer(w,native,"directly_answer",{"answer_payload":"实际文件读取与会话证据验证通过。"}); return
     }
@@ -49,16 +62,19 @@ smokeHandler = func(w,body) {
     assert promoted, "Evidence was not promoted to SemiDynamic1"
     smokeAnswer(w,native,"finish",{})
 }
-for native in [true,false] {
+for loading in ["require_tool","load_capability"] {
+ loadEntry.name = loading
+ for native in [true,false] {
     step,config = 0,nil
-    die(aim.InvokeReAct(query,aim.context(smokeCtx),aim.workdir(smokeRoot),aim.reviewPolicy("yolo"),aim.maxIteration(7),aim.timeout(45),aim.disableMCPServers(true),aim.disableAIForge(true),aim.aiCallback(smokeModel),aim.onEvent(func(op,e) { config = op.GetConfig() }),aim.configOptions(aiagent.aiCallback(smokeModel),aiagent.functionCallMode(native),func(c) {
+    die(aim.InvokeReAct(query,aim.context(smokeCtx),aim.workdir(smokeRoot),aim.reviewPolicy("yolo"),aim.maxIteration(9),aim.timeout(45),aim.disableMCPServers(true),aim.disableAIForge(true),aim.aiCallback(smokeModel),aim.onEvent(func(op,e) { config = op.GetConfig() }),aim.configOptions(aiagent.aiCallback(smokeModel),aiagent.functionCallMode(native),func(c) {
         c.DisableCreateDBRuntime,c.DisablePerception,c.DisableMemoryTriage = true,true,true
-        c.AiAutoRetry,c.AiTransactionAutoRetry = 1,1
+        c.AiAutoRetry,c.AiTransactionAutoRetry = 1,2
         c.GetTimeline().SetTimelineBucketByteSize(-1)
         return nil
     }),func(c) { c.Stateless = true }))
-    assert step == 5 && config != nil
+    assert step == 6 && config != nil
     assert "mainloop.source" in config.GetSessionEvidenceRendered()
-    printf("PASS default aim.InvokeReAct: function_call=%v schema_load=1 real_read=1 evidence=1 promotion=1\n",native)
+    printf("PASS default aim.InvokeReAct: loader=%s function_call=%v schema_load=1 reason_retry=1 real_read=1 evidence=1 promotion=1\n",loading,native)
+}
 }
 smokeCheck()
