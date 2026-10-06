@@ -197,7 +197,16 @@ func CheckConfigEmbeddingAvailable(opts ...RAGSystemConfigOption) bool {
 		modelName = config.modelName
 	}
 
-	checkerAny, _ := embeddingAvailableCache.LoadOrStore(modelName, newEmbeddingAvailableChecker(modelName))
+	checkerAny, exists := embeddingAvailableCache.Load(modelName)
+	if !exists {
+		candidate := newEmbeddingAvailableChecker(modelName)
+		var loaded bool
+		checkerAny, loaded = embeddingAvailableCache.LoadOrStore(modelName, candidate)
+		if loaded {
+			// The winning checker owns the cooldown; close the unused candidate.
+			candidate.close()
+		}
+	}
 	checker := checkerAny.(*embeddingAvailableChecker)
 	if checker.check() {
 		return true

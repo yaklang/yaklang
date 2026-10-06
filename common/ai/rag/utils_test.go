@@ -8,7 +8,7 @@ import (
 	"time"
 )
 
-func TestCheckConfigEmbeddingAvailable_ConcurrentSingleflightPerModel(t *testing.T) {
+func TestMUSTPASS_CheckConfigEmbeddingAvailable_ConcurrentSingleflightPerModel(t *testing.T) {
 	t.Cleanup(clearEmbeddingAvailableCache)
 	clearEmbeddingAvailableCache()
 
@@ -53,7 +53,7 @@ func TestCheckConfigEmbeddingAvailable_ConcurrentSingleflightPerModel(t *testing
 	}
 }
 
-func TestCheckConfigEmbeddingAvailable_NegativeCacheTTL(t *testing.T) {
+func TestMUSTPASS_CheckConfigEmbeddingAvailable_NegativeCacheTTL(t *testing.T) {
 	t.Cleanup(clearEmbeddingAvailableCache)
 	clearEmbeddingAvailableCache()
 
@@ -72,10 +72,14 @@ func TestCheckConfigEmbeddingAvailable_NegativeCacheTTL(t *testing.T) {
 		return "", fmt.Errorf("not found")
 	}
 
-	if CheckConfigEmbeddingAvailable(WithModelName("missing-model")) {
+	// Exercise the local negative cache independently of remote fallback availability.
+	checker := newEmbeddingAvailableChecker("missing-model")
+	t.Cleanup(checker.close)
+
+	if checker.check() {
 		t.Fatalf("expected unavailable")
 	}
-	if CheckConfigEmbeddingAvailable(WithModelName("missing-model")) {
+	if checker.check() {
 		t.Fatalf("expected unavailable")
 	}
 	if got := atomic.LoadInt64(&calls); got != 1 {
@@ -83,10 +87,32 @@ func TestCheckConfigEmbeddingAvailable_NegativeCacheTTL(t *testing.T) {
 	}
 
 	time.Sleep(embeddingAvailabilityNegativeCacheTTL + 20*time.Millisecond)
-	if CheckConfigEmbeddingAvailable(WithModelName("missing-model")) {
+	if checker.check() {
 		t.Fatalf("expected unavailable")
 	}
 	if got := atomic.LoadInt64(&calls); got != 2 {
 		t.Fatalf("expected getModelPath called again after TTL, got %d", got)
+	}
+}
+
+// Benchmark the warm availability path without network or model files.
+func BenchmarkCheckConfigEmbeddingAvailableCached(b *testing.B) {
+	clearEmbeddingAvailableCache()
+	oldGetModelPath := getModelPath
+	getModelPath = func(string) (string, error) { return "/tmp/fake-model.bin", nil }
+	b.Cleanup(func() {
+		clearEmbeddingAvailableCache()
+		getModelPath = oldGetModelPath
+	})
+	option := WithModelName("cached-benchmark-model")
+	if !CheckConfigEmbeddingAvailable(option) {
+		b.Fatal("expected available")
+	}
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		if !CheckConfigEmbeddingAvailable(option) {
+			b.Fatal("cached model became unavailable")
+		}
 	}
 }

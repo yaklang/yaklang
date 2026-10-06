@@ -488,17 +488,21 @@ func TestMUSTPASS_DeleteEmbeddingData(t *testing.T) {
 	}
 
 	test1024Embedder := func(text string) ([]float32, error) {
+		// Each topic needs a distinct, dense direction in every PQ sub-vector.
+		// Deep-learning entries also mention machine learning; do not collapse
+		// them onto the query's vector and make the first result a random tie.
+		topic := 0
+		switch {
+		case strings.Contains(text, "深度学习"):
+			topic = 1
+		case strings.Contains(text, "自然语言处理"):
+			topic = 2
+		}
 		embedding := make([]float32, 1024)
-		if strings.Contains(text, "机器学习") {
-			embedding[100] = 1.0
-			return embedding, nil
-		}
-		if strings.Contains(text, "自然语言处理") {
-			embedding[200] = 1.0
-			return embedding, nil
-		}
-		for i := range 1024 {
-			embedding[i] = float32(i)
+		for i := range embedding {
+			if i%3 == topic {
+				embedding[i] = 1
+			}
 		}
 		return embedding, nil
 	}
