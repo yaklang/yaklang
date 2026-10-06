@@ -45,7 +45,7 @@ Now, complete the user's search request efficiently and report your findings cle
 Use these loop actions instead of raw OpenAI tool names:
 - GLOB  -> `find_files` (or multiple items in one batch if patterns differ)
 - GREP  -> `grep_files_batch` when you have 3-8 known patterns; single pattern -> `grep_files`
-- READ  -> `read_file` via `require_tool` when you already know the path
+- READ  -> `read_file` via `directly_call_tool` with the known path after loading the schema with `require_tool`
 
 When you have enough evidence, call `submit_fast_context_result` with structured locations.
 Do NOT dump full grep stdout into your answer — only paths and line ranges matter.

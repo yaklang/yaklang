@@ -247,7 +247,7 @@ func TestReAct_ToolsSearch_Functionality(t *testing.T) {
 			if isPrimaryDecisionPrompt(prompt) {
 				rsp := i.NewAIResponse()
 				rsp.EmitOutputStream(bytes.NewBufferString(`
-{"@action": "object", "next_action": { "type": "require_tool", "tool_require_payload": "tools_search" },
+{"@action": "directly_call_tool", "directly_call_tool_name": "tools_search", "directly_call_tool_params": { "query" : "echo" },
 "human_readable_thought": "Need to search for available tools", "cumulative_summary": "Searching for tools"}`))
 				rsp.Close()
 				return rsp, nil
@@ -370,7 +370,7 @@ func TestReAct_ForgeSearch_Functionality(t *testing.T) {
 			if isPrimaryDecisionPrompt(prompt) {
 				rsp := i.NewAIResponse()
 				rsp.EmitOutputStream(bytes.NewBufferString(`
-{"@action": "object", "next_action": { "type": "require_tool", "tool_require_payload": "aiforge_search" },
+{"@action": "directly_call_tool", "directly_call_tool_name": "aiforge_search", "directly_call_tool_params": { "query" : "test" },
 "human_readable_thought": "Need to search for available forges", "cumulative_summary": "Searching for forges"}`))
 				rsp.Close()
 				return rsp, nil

@@ -63,7 +63,7 @@ func mockedToolCallingForFileEmit(i aicommon.AICallerConfigIf, req *aicommon.AIR
 		}
 		rsp := i.NewAIResponse()
 		rsp.EmitOutputStream(bytes.NewBufferString(fmt.Sprintf(`
-{"@action": "object", "next_action": { "type": "require_tool", "tool_require_payload": "%s" },
+{"@action": "directly_call_tool", "directly_call_tool_name": "%s", "directly_call_identifier": "test_file_output", "directly_call_tool_params": { "message" : "test message", "output_lines": 5 },
 "human_readable_thought": "mocked thought for tool calling file emit test", "cumulative_summary": "..cumulative-mocked for tool calling file emit test.."}
 `, toolName)))
 		rsp.Close()
@@ -308,7 +308,7 @@ func TestReAct_ToolCall_FileEmit_LargeResult(t *testing.T) {
 				}
 				rsp := i.NewAIResponse()
 				rsp.EmitOutputStream(bytes.NewBufferString(fmt.Sprintf(`
-{"@action": "object", "next_action": { "type": "require_tool", "tool_require_payload": "%s" },
+{"@action": "directly_call_tool", "directly_call_tool_name": "%s", "directly_call_identifier": "generate_large_data", "directly_call_tool_params": { "size" : 5242880 },
 "human_readable_thought": "mocked thought for large result test", "cumulative_summary": "..cumulative-mocked.."}
 `, toolName)))
 				rsp.Close()
@@ -446,7 +446,7 @@ func mockedToolCallingForEmptyOutput(i aicommon.AICallerConfigIf, req *aicommon.
 		}
 		rsp := i.NewAIResponse()
 		rsp.EmitOutputStream(bytes.NewBufferString(fmt.Sprintf(`
-{"@action": "object", "next_action": { "type": "require_tool", "tool_require_payload": "%s" },
+{"@action": "directly_call_tool", "directly_call_tool_name": "%s", "directly_call_identifier": "empty_output_test", "directly_call_tool_params": { "message" : "test message" },
 "human_readable_thought": "mocked thought for empty output test", "cumulative_summary": "..cumulative-mocked.."}
 `, toolName)))
 		rsp.Close()
@@ -620,9 +620,9 @@ func mockedToolCallingWithCustomIdentifier(i aicommon.AICallerConfigIf, req *aic
 		}
 		rsp := i.NewAIResponse()
 		rsp.EmitOutputStream(bytes.NewBufferString(fmt.Sprintf(`
-{"@action": "object", "next_action": { "type": "require_tool", "tool_require_payload": "%s" },
+{"@action": "directly_call_tool", "directly_call_tool_name": "%s", "directly_call_identifier": "%s", "directly_call_tool_params": { "message" : "test" },
 "human_readable_thought": "mocked thought for identifier test", "cumulative_summary": "..cumulative-mocked.."}
-`, toolName)))
+`, toolName, identifier)))
 		rsp.Close()
 		return rsp, nil
 	}
@@ -807,7 +807,7 @@ func TestReAct_ToolCall_FileEmit_WithoutIdentifier(t *testing.T) {
 			}
 			rsp := i.NewAIResponse()
 			rsp.EmitOutputStream(bytes.NewBufferString(fmt.Sprintf(`
-{"@action": "object", "next_action": { "type": "require_tool", "tool_require_payload": "%s" },
+{"@action": "directly_call_tool", "directly_call_tool_name": "%s", "directly_call_tool_params": { "message" : "test" },
 "human_readable_thought": "mocked-no-id-thought", "cumulative_summary": "..mocked.."}
 `, toolName)))
 			rsp.Close()

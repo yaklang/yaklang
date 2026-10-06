@@ -83,7 +83,7 @@ func TestReAct_RequestPlanAndExecution_PreservesQualityModelInsideAid(t *testing
 		// Inner subtask ReAct loop: require tool (no tool output yet)
 		case utils.MatchAllOfSubString(prompt, "PLAN_STATUS_", "directly_answer", "require_tool"):
 			rsp.EmitOutputStream(bytes.NewBufferString(`
-{"@action": "object", "next_action": { "type": "require_tool", "tool_require_payload": "mock_plan_exec_tool" },
+{"@action": "directly_call_tool", "directly_call_tool_name": "mock_plan_exec_tool", "directly_call_tool_params": { "seconds": 0.1 },
 "human_readable_thought": "call delegated tool", "cumulative_summary": "call delegated tool"}
 `))
 		// Tool parameter generation
@@ -160,7 +160,7 @@ func TestReAct_RequestPlanAndExecution_PreservesQualityModelInsideAid(t *testing
 			rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "directly_answer", "answer_payload": "inner summary"}`))
 		case utils.MatchAllOfSubString(prompt, "PLAN_STATUS_", "directly_answer", "require_tool"):
 			rsp.EmitOutputStream(bytes.NewBufferString(`
-{"@action": "object", "next_action": { "type": "require_tool", "tool_require_payload": "mock_plan_exec_tool" },
+{"@action": "directly_call_tool", "directly_call_tool_name": "mock_plan_exec_tool", "directly_call_tool_params": { "seconds": 0.1 },
 "human_readable_thought": "call delegated tool", "cumulative_summary": "call delegated tool"}
 `))
 		default:

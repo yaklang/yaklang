@@ -117,7 +117,7 @@ func mockedToolCallingForDB(i aicommon.AICallerConfigIf, req *aicommon.AIRequest
 	if isPrimaryDecisionPrompt(prompt) {
 		rsp := i.NewAIResponse()
 		rsp.EmitOutputStream(bytes.NewBufferString(`
-{"@action": "object", "next_action": { "type": "require_tool", "tool_require_payload": "` + toolName + `" },
+{"@action": "directly_call_tool", "directly_call_tool_name": "` + toolName + `", "directly_call_tool_params": { "message" : "test message" },
 "human_readable_thought": "mocked thought for tool calling from database", "cumulative_summary": "..cumulative-mocked for db tool calling.."}
 `))
 		rsp.Close()
@@ -198,7 +198,7 @@ func TestReAct_ToolUse_FromDB_ViaToolSearch(t *testing.T) {
 				if !toolSearchCalled {
 					rsp := i.NewAIResponse()
 					rsp.EmitOutputStream(bytes.NewBufferString(`
-{"@action": "object", "next_action": { "type": "require_tool", "tool_require_payload": "tools_search" },
+{"@action": "directly_call_tool", "directly_call_tool_name": "tools_search", "directly_call_tool_params": { "query" : "mock_db_tool" },
 "human_readable_thought": "need to search for the mock tool", "cumulative_summary": "searching for tools"}
 `))
 					rsp.Close()
@@ -548,7 +548,7 @@ func mockedToolCallingForYakScriptPlugin(i aicommon.AICallerConfigIf, req *aicom
 			return rsp, nil
 		}
 		rsp.EmitOutputStream(bytes.NewBufferString(`
-{"@action": "object", "next_action": { "type": "require_tool", "tool_require_payload": "` + toolName + `" },
+{"@action": "directly_call_tool", "directly_call_tool_name": "` + toolName + `", "directly_call_tool_params": { "seconds": 0.1 },
 "human_readable_thought": "calling YakScript plugin", "cumulative_summary": "testing yakscript plugin integration"}
 `))
 		rsp.Close()
@@ -740,7 +740,16 @@ yakit.Info("NATIVE_PLUGIN_EXECUTED: target=%s", target)
 
 			if isPrimaryDecisionPrompt(prompt) {
 				decisionCount++
-				if decisionCount > 1 {
+				if decisionCount == 1 {
+					rsp := i.NewAIResponse()
+					rsp.EmitOutputStream(strings.NewReader(`{"@action":"require_tool","tool_require_payload":"` + pluginName + `"}`))
+					rsp.Close()
+					return rsp, nil
+				}
+				if strings.Contains(prompt, "Scan a target host") {
+					secondaryDisclosure = true
+				}
+				if decisionCount > 2 {
 					rsp := i.NewAIResponse()
 					rsp.EmitOutputStream(strings.NewReader(`{"@action":"object","next_action":{"type":"finish"}}`))
 					rsp.Close()
@@ -748,23 +757,14 @@ yakit.Info("NATIVE_PLUGIN_EXECUTED: target=%s", target)
 				}
 				rsp := i.NewAIResponse()
 				rsp.EmitOutputStream(bytes.NewBufferString(`
-{"@action": "object", "next_action": { "type": "require_tool", "tool_require_payload": "` + pluginName + `" },
+{"@action": "directly_call_tool", "directly_call_tool_name": "` + pluginName + `", "directly_call_tool_params": { "target": "192.168.1.1" },
 "human_readable_thought": "calling native YakScript plugin", "cumulative_summary": "testing native plugin"}
 `))
 				rsp.Close()
 				return rsp, nil
 			}
-
-			if isToolParamGenPromptForTool(prompt, "") && strings.Contains(prompt, "call-tool") {
-				rsp := i.NewAIResponse()
-				// Verify secondary disclosure: the prompt should contain __USAGE__ content
-				if strings.Contains(prompt, "Scan a target host") {
-					secondaryDisclosure = true
-					log.Infof("secondary disclosure verified: __USAGE__ content found in tool-params prompt")
-				}
-				rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "call-tool", "params": { "target": "192.168.1.1" }}`))
-				rsp.Close()
-				return rsp, nil
+			if isToolParamGenPromptForTool(prompt, "") {
+				return nil, fmt.Errorf("require_tool must not request parameter generation")
 			}
 
 			if utils.MatchAllOfSubString(prompt, "verify-satisfaction", "user_satisfied", "reasoning") {
@@ -840,7 +840,7 @@ LOOP:
 	close(in)
 	ins.Wait()
 	if !secondaryDisclosure {
-		t.Fatal("native plugin usage was not disclosed during parameter generation")
+		t.Fatal("native plugin usage was not disclosed after schema loading")
 	}
 
 	if !pluginCalled {

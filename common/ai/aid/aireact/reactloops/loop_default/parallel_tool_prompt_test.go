@@ -19,14 +19,14 @@ func TestDefaultPromptTeachesScalarBeforeOptionalBatch(t *testing.T) {
 		"instruction": {
 			prompt:           instruction,
 			scalarMarker:     "标量 `tool_require_payload`",
-			directBatchRule:  "每层完整参数已从真实 Schema 确定",
-			requireBatchRule: "各工具 Schema 简单无歧义",
+			directBatchRule:  "严格给出每个完整 JSON 参数",
+			requireBatchRule: "仅加载缺少的定义",
 		},
 		"output_example": {
 			prompt:           outputExample,
 			scalarMarker:     `"tool_require_payload":"..[your-toolname].."`,
 			directBatchRule:  "每层参数全部明确",
-			requireBatchRule: "每个工具 Schema 简单无歧义",
+			requireBatchRule: "不生成参数、不执行工具",
 		},
 	} {
 		t.Run(name, func(t *testing.T) {
@@ -42,7 +42,7 @@ func TestDefaultPromptTeachesScalarBeforeOptionalBatch(t *testing.T) {
 	assert.Contains(t, instruction, "后序参数依赖前序真实输出")
 	assert.Contains(t, instruction, "严禁输出 `<@action=...>`")
 	assert.Contains(t, outputExample, "禁止 `<@action=...>`")
-	assert.Contains(t, instruction, "本轮输出 `require_tool` / `directly_call_tool` action 本身就是获得工具执行机会")
+	assert.Contains(t, instruction, "`require_tool` 只准备定义，实际执行必须使用 `directly_call_tool`")
 	assert.Contains(t, outputExample, "本轮工具 action 就是执行机会")
 	assert.Contains(t, instruction, "默认使用单调用")
 	assert.Contains(t, instruction, "嵌套 wrapper")

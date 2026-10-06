@@ -28,11 +28,9 @@ func isLoadCapabilityToolParamPrompt(prompt string) bool {
 	return false
 }
 
-// TestReActLoop_LoadCapability_ToolEquivalence verifies that using load_capability
-// with a tool identifier produces the same end-to-end tool execution flow as
-// require_tool. This is a near-exact copy of TestReActLoop_MultipleIterations
-// with the only difference being the action type (load_capability vs require_tool).
-func TestReActLoop_LoadCapability_ToolEquivalence(t *testing.T) {
+// TestReActLoop_LoadCapability_ToolExecutionCompatibility preserves the explicit
+// load_capability tool execution path. require_tool separately loads schemas only.
+func TestReActLoop_LoadCapability_ToolExecutionCompatibility(t *testing.T) {
 	iterationCount := 0
 
 	toolName := "sleep"

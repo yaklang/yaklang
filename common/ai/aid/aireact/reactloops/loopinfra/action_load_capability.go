@@ -115,7 +115,7 @@ func loadCapabilityHandler(loop *reactloops.ReActLoop, action *aicommon.Action, 
 	}
 }
 
-// handleLoadTool executes a tool call (mirrors require_tool logic).
+// handleLoadTool retains the explicit load_capability tool execution path.
 func handleLoadTool(
 	loop *reactloops.ReActLoop,
 	invoker aicommon.AIInvokeRuntime,
