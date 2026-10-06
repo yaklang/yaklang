@@ -19,6 +19,26 @@ import (
 	"gotest.tools/v3/assert"
 )
 
+const scanPortToolName = "scan_port"
+
+func getScanPortTool(t *testing.T) *aitool.Tool {
+	t.Helper()
+	embedFS := yakscripttools.GetEmbedFS()
+	content, err := embedFS.ReadFile("yakscriptforai/pentest/scan_port.yak")
+	if err != nil {
+		t.Fatalf("failed to read scan_port.yak from embed FS: %v", err)
+	}
+	aiTool := yakscripttools.LoadYakScriptToAiTools(scanPortToolName, string(content))
+	if aiTool == nil {
+		t.Fatalf("failed to parse scan_port.yak metadata")
+	}
+	tools := yakscripttools.ConvertTools([]*schema.AIYakTool{aiTool})
+	if len(tools) == 0 {
+		t.Fatalf("ConvertTools returned empty, toolCovertHandle may not be registered")
+	}
+	return tools[0]
+}
+
 // TestMUSTPASS_ScanPortTool_LoadsWithInjectedCTX 验证 scan_port.yak 在引用 AI 执行器
 // 注入的全局 CTX 之后, 仍能被 SSA 静态分析正确解析、提取 metadata 并转换成 AI tool.
 //

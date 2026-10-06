@@ -92,7 +92,9 @@ func TestExecFuzztagFile(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, float64(len(content)), receipt["bytes"])
 	require.Len(t, strings.Split(strings.TrimSuffix(string(content), "\n"), "\n"), 20)
-	require.Contains(t, stdout, target)
+	var displayedReceipt map[string]any
+	require.NoError(t, json.Unmarshal([]byte(strings.TrimPrefix(stdout, "[info] ")), &displayedReceipt))
+	require.Equal(t, target, displayedReceipt["output_file"], "displayed JSON must preserve the destination path")
 	require.NotContains(t, stdout, "item20", "file-only mode must not echo the full artifact")
 
 	params["template"] = "changed"
