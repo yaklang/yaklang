@@ -246,35 +246,6 @@ func TestMatchExplicitIdentifiersFromCatalogDoesNotUseSemanticSubstring(t *testi
 	}
 }
 
-func TestFormatRecommendedCapabilitiesDisplay_HidesEmptyArray(t *testing.T) {
-	if got := formatRecommendedCapabilitiesDisplay("[]"); got != "" {
-		t.Fatalf("expected empty output, got: %q", got)
-	}
-}
-
-func TestFormatRecommendedCapabilitiesDisplay_PreservesRawNonArray(t *testing.T) {
-	raw := "xss_tool; load_file_tool;"
-	if got := formatRecommendedCapabilitiesDisplay(raw); got != raw {
-		t.Fatalf("expected raw output %q, got %q", raw, got)
-	}
-}
-
-func TestFormatRecommendedCapabilitiesDisplay_FormatsJSONArray(t *testing.T) {
-	got := formatRecommendedCapabilitiesDisplay(`["xss_tool; load_file_tool;", "__DEFAULT__", "nuclei_scan"]`)
-	want := "1. xss_tool\n2. load_file_tool\n3. nuclei_scan"
-	if got != want {
-		t.Fatalf("unexpected formatted output:\nwant:\n%s\n\ngot:\n%s", want, got)
-	}
-}
-
-func TestFormatRecommendedCapabilitiesDisplay_UnquotesJSONStringArray(t *testing.T) {
-	got := formatRecommendedCapabilitiesDisplay(`"[\"xss_tool; load_file_tool;\"]"`)
-	want := "1. xss_tool\n2. load_file_tool"
-	if got != want {
-		t.Fatalf("unexpected formatted output:\nwant:\n%s\n\ngot:\n%s", want, got)
-	}
-}
-
 // --- Focus mode search tests (searchLoopMetadata) ---
 
 func TestSearchLoopMetadata_MatchesNonHiddenLoops(t *testing.T) {

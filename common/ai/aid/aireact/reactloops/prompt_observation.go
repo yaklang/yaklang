@@ -831,10 +831,3 @@ func (r *ReActLoop) GetLastPromptObservationStatus() *PromptObservationStatus {
 	status, _ := r.GetVariable(lastPromptObservationStatusLoopKey).(*PromptObservationStatus)
 	return status
 }
-
-func (r *ReActLoop) emitPromptObservationStatus(status *PromptObservationStatus) {
-	if r == nil || r.emitter == nil || status == nil {
-		return
-	}
-	r.emitter.EmitPromptProfile(status)
-}

@@ -1,7 +1,6 @@
 package knowledgebench
 
 import (
-	"bytes"
 	"context"
 	"fmt"
 	"io"
@@ -253,6 +252,3 @@ func deduplicateRanges(ranges []BenchScoredRange) []BenchScoredRange {
 	}
 	return result
 }
-
-// suppress unused import warnings
-var _ = bytes.NewBuffer

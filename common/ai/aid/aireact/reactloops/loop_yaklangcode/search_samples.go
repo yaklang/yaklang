@@ -33,12 +33,12 @@ const (
 
 // SampleHit is a unified search result item for init and runtime pipelines.
 type SampleHit struct {
-	Source  string
-	Pattern string
+	Source   string
+	Pattern  string
 	FileName string
-	Line    int
-	Score   float64
-	Content string
+	Line     int
+	Score    float64
+	Content  string
 }
 
 // SearchManifest records queries covered during init pre-search.
@@ -429,26 +429,6 @@ func SemanticAlreadyCovered(loop interface{ Get(string) string }, questions []st
 	}
 	msg := fmt.Sprintf(`【Init 已覆盖】语义问题已预检索：%s。见「预检索代码样例」。`, strings.Join(questions, "; "))
 	return true, msg
-}
-
-func shortGrepSuggestion(count int, pattern string) string {
-	if count < 3 {
-		return fmt.Sprintf("【提示】仅找到 %d 条匹配，可考虑扩大 pattern 或使用 semantic_search。", count)
-	}
-	if count > 15 {
-		return fmt.Sprintf("【提示】找到 %d 条匹配，已裁剪为 top 结果；可精确化 pattern。", count)
-	}
-	return fmt.Sprintf("【提示】找到 %d 条匹配，可基于样例开始编码。", count)
-}
-
-func shortSemanticSuggestion(count int) string {
-	if count < 5 {
-		return fmt.Sprintf("【提示】仅找到 %d 条语义匹配，可调整问题或降低 score_threshold。", count)
-	}
-	if count > 20 {
-		return fmt.Sprintf("【提示】找到 %d 条语义匹配，已裁剪为 top 结果。", count)
-	}
-	return fmt.Sprintf("【提示】找到 %d 条语义匹配，可基于样例开始编码。", count)
 }
 
 func rejectDuplicateQuery(loop *reactloops.ReActLoop, op *reactloops.LoopActionHandlerOperator, timelineKey, queryKey, currentQuery, msg string) bool {

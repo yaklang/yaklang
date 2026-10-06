@@ -11,8 +11,6 @@ package aireact
 // 关键词: prompt-mock 分流, high-static 散文污染, schema 字面量解耦
 
 import (
-	"strings"
-
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 )
 
@@ -73,8 +71,5 @@ func isVerifySatisfactionPrompt(prompt string) bool {
 func isToolCallReasonLiteForgePrompt(prompt string) bool {
 	return aicommon.IsToolCallReasonLiteForgePrompt(prompt)
 }
-
-// ensure strings is referenced even if no direct call remains after refactor
-var _ = strings.Contains
 
 const mockedToolCallReasonActionJSON = aicommon.MockedToolCallReasonActionJSON

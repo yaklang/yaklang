@@ -4,14 +4,12 @@ import (
 	"strings"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
-	"github.com/yaklang/yaklang/common/log"
 )
 
 const (
 	httpFlowEvidenceKey        = "http_flow_analysis_evidence"
 	httpFlowEvidenceActionName = "record_http_flow_evidence"
 	httpFlowEvidenceFieldName  = "http_flow_evidence"
-	httpFlowEvidenceAITagName  = "HTTP_FLOW_EVIDENCE"
 	httpFlowEvidenceAINodeID   = "http-flow-analysis-evidence"
 
 	httpFlowEvidenceGeneralSection = "## HTTP Flow Analysis Evidence"
@@ -133,21 +131,4 @@ func appendHTTPFlowEvidence(loop *reactloops.ReActLoop, incoming string) (string
 	}
 	loop.Set(httpFlowEvidenceKey, merged)
 	return merged, true
-}
-
-func emitHTTPFlowEvidenceMarkdown(loop *reactloops.ReActLoop, evidence string) {
-	evidence = normalizeHTTPFlowEvidence(evidence)
-	if evidence == "" {
-		return
-	}
-
-	taskIndex := ""
-	if task := loop.GetCurrentTask(); task != nil {
-		taskIndex = task.GetId()
-	}
-	if emitter := loop.GetEmitter(); emitter != nil {
-		if _, err := emitter.EmitTextMarkdownStreamEvent(httpFlowEvidenceAINodeID, strings.NewReader(evidence), taskIndex, func() {}); err != nil {
-			log.Warnf("http_flow_analyze: emit HTTP flow evidence markdown failed: %v", err)
-		}
-	}
 }

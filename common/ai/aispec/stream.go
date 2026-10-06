@@ -877,10 +877,6 @@ func handleResponsesJSONPayload(body []byte, outWriter io.Writer, reasonWriter i
 	return true
 }
 
-func handleResponsesSSEPayload(body []byte, outWriter io.Writer, reasonWriter io.Writer, toolCallArgumentsWriter io.Writer, toolCallCallback func([]*ToolCall)) {
-	handleResponsesSSEStream(bytes.NewReader(body), outWriter, reasonWriter, toolCallArgumentsWriter, toolCallCallback)
-}
-
 func handleResponsesSSEStream(reader io.Reader, outWriter io.Writer, reasonWriter io.Writer, toolCallArgumentsWriter io.Writer, toolCallCallback func([]*ToolCall)) error {
 	lineReader := bufio.NewReader(reader)
 	toolState := newResponsesToolCallState()

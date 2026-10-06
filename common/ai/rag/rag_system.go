@@ -10,7 +10,6 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/yaklang/gorm"
-	"github.com/yaklang/yaklang/common/ai/aid/aicommon/promptloader"
 	"github.com/yaklang/yaklang/common/ai/aispec"
 	"github.com/yaklang/yaklang/common/ai/rag/enhancesearch"
 	"github.com/yaklang/yaklang/common/ai/rag/entityrepos"
@@ -22,8 +21,6 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 )
-
-var genQuestionsPrompt = promptloader.MustLoad("ai/rag/prompt/gen_questions.txt")
 
 // RAGSystem 表示完整的 RAG 系统
 type RAGSystem struct {

@@ -492,18 +492,6 @@ func (r *ReActLoop) buildPerceptionKnowledgeSearchQuery(state *PerceptionState) 
 	return aicommon.ShrinkTextBlockByTokens(query, 2048)
 }
 
-func (r *ReActLoop) buildPerceptionKnowledgeKeywordQuery(state *PerceptionState) string {
-	if state == nil {
-		return ""
-	}
-
-	values := normalizeCapabilityStrings(append(append([]string{}, state.Keywords...), state.Topics...))
-	if len(values) == 0 {
-		return ""
-	}
-	return strings.Join(values, " ")
-}
-
 func splitPerceptionKnowledgeBaseNames(raw string) []string {
 	raw = strings.TrimSpace(raw)
 	if raw == "" {

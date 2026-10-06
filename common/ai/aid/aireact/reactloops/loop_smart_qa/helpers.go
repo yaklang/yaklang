@@ -35,12 +35,3 @@ func appendMemoryResults(loop *reactloops.ReActLoop, content string) {
 		loop.Set("memory_results", old+"\n\n"+content)
 	}
 }
-
-func appendFileResults(loop *reactloops.ReActLoop, content string) {
-	old := loop.Get("file_results")
-	if old == "" {
-		loop.Set("file_results", content)
-	} else {
-		loop.Set("file_results", old+"\n\n"+content)
-	}
-}

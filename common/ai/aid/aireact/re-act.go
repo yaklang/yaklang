@@ -23,7 +23,6 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/utils/chanx"
 	"github.com/yaklang/yaklang/common/utils/filesys"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
@@ -70,11 +69,8 @@ type ReAct struct {
 
 	currentIteration            int
 	currentUserInteractiveCount int64 // 当前用户交互次数
-	knowledgeEmitCounter        int   // Counter for knowledge emit events
 	config                      *aicommon.Config
 	promptManager               *PromptManager
-
-	inputChanx *chanx.UnlimitedChan[*ypb.AIInputEvent]
 
 	// 任务队列相关
 	currentTaskMu sync.RWMutex

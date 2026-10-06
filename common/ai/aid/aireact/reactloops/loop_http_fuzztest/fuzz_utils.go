@@ -523,28 +523,6 @@ func (s *loopHTTPFuzzOverviewStats) sortedResponseLengthGroups() []*loopHTTPFuzz
 	return groups
 }
 
-func (s *loopHTTPFuzzOverviewStats) shouldUseResponseLengthAnalysis() bool {
-	if s == nil || len(s.ResponseLengthGroups) < 2 {
-		return false
-	}
-	groups := s.sortedResponseLengthGroups()
-	if len(groups) < 2 {
-		return false
-	}
-
-	dominantCount := groups[0].Count
-	switch {
-	case s.TotalRequests > loopHTTPFuzzDetailedResultLimit:
-		return true
-	case s.SuccessfulResponses >= 15:
-		return true
-	case dominantCount >= 10:
-		return true
-	default:
-		return false
-	}
-}
-
 func (s *loopHTTPFuzzOverviewStats) finalizeResponseLengthGroups() {
 	if s == nil || len(s.ResponseLengthGroups) == 0 {
 		return
@@ -857,31 +835,6 @@ func getCurrentRequestSummary(loop *reactloops.ReActLoop) string {
 		return summary
 	}
 	return strings.TrimSpace(loop.Get("original_request_summary"))
-}
-
-func setLoopCurrentRequestState(loop *reactloops.ReActLoop, fuzzReq *mutate.FuzzHTTPRequest, requestRaw []byte, isHTTPS bool) {
-	if loop == nil {
-		return
-	}
-	_, summary := buildHTTPRequestStreamSummary(string(requestRaw), isHTTPS)
-	version := 1
-	if currentState := getLoopHTTPFuzzRequestState(loop); currentState != nil {
-		version = max(currentState.Version, 1)
-	}
-	loop.Set("fuzz_request", fuzzReq)
-	state := loopHTTPFuzzRequestState{
-		RawRequest:   string(requestRaw),
-		IsHTTPS:      isHTTPS,
-		Summary:      summary,
-		Version:      version,
-		SourceAction: loop.Get(loopHTTPFuzzRequestSourceActionKey),
-		ChangeReason: loop.Get(loopHTTPFuzzRequestChangeReasonKey),
-	}
-	loop.Set(loopHTTPFuzzRequestStateKey, state)
-	loop.Set(loopHTTPFuzzRequestVersionKey, state.Version)
-	loop.Set("current_request", string(requestRaw))
-	loop.Set("current_request_summary", summary)
-	loop.Set("is_https", utils.InterfaceToString(isHTTPS))
 }
 
 func buildRequestModificationFeedback(previousRequest, modifiedRequest []byte, isHTTPS bool, reason, reviewDecision string) string {

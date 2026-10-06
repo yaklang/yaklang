@@ -14,8 +14,7 @@ import (
 )
 
 const (
-	promptSectionTagName    = "PROMPT_SECTION"
-	promptSectionHighStatic = "high-static"
+	promptSectionTagName = "PROMPT_SECTION"
 	// promptSectionSemiDynamic1 / promptSectionSemiDynamic2 是 P1.1 把单一
 	// semi-dynamic 段拆成两块后, 内层 PROMPT_SECTION 用的两个 nonce. 老 nonce
 	// "semi-dynamic" 保留供老路径 (liteforge / aireduce) 与历史断言识别, 但
@@ -31,7 +30,6 @@ const (
 	// 包含开放历史及当前 TODO / 用户历史；工作区在 Semi，时钟在 Dynamic。
 	// 关键词: promptSectionTimelineOpen, timeline open
 	promptSectionTimelineOpen = "timeline-open"
-	promptSectionDynamic      = "dynamic"
 	// aiCacheSystemTagName 仅用于 high-static 段：把"跨调用稳定的系统级指令"
 	// 用独立 tagName 标记，让 aicache splitter / hijacker 与上游隐式缓存的
 	// system 边界对齐；其他段保持 PROMPT_SECTION。

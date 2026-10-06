@@ -30,8 +30,6 @@ type RAGSystemConfig struct {
 	CollectionModelEfSearch              int
 	CollectionModelEfConstruct           int
 
-	embeddingModel string
-
 	db                     *gorm.DB
 	description            string
 	tags                   []string
@@ -39,7 +37,6 @@ type RAGSystemConfig struct {
 	embeddingClient        aispec.EmbeddingCaller
 	enableEntityRepository bool
 	enableKnowledgeBase    bool
-	aiOptions              []aispec.AIConfigOption
 	forceNew               bool
 
 	vectorStore      *vectorstore.SQLiteVectorStoreHNSW
@@ -52,7 +49,6 @@ type RAGSystemConfig struct {
 	collectionLimit          int
 	enhance                  []string
 	enhanceSearchHandler     enhancesearch.SearchHandler
-	systemLoadConfig         []vectorstore.CollectionConfigFunc
 	similarityThreshold      float64
 	msgCallback              func(*RAGSearchResult)
 	logReader                func(reader io.Reader)
@@ -451,22 +447,23 @@ func WithVectorStore(store *vectorstore.SQLiteVectorStoreHNSW) RAGSystemConfigOp
 	}
 }
 
-// ragEmbeddingModel 设置 RAG 使用的 embedding 模型名称（导出名为 rag.ragEmbeddingModel）
+// ragEmbeddingModel 为旧调用保留的兼容选项，不参与当前集合模型配置。
+// 集合模型由 WithModelName 或 vectorstore 配置管理。
 //
 // 参数:
-//   - model: embedding 模型名称（如 text-embedding-3-small）
+//   - model: 旧参数，仅保留调用兼容，不执行模型切换
 //
 // 返回值:
-//   - RAG 系统配置选项
+//   - 无操作的 RAG 系统配置选项
 //
 // Example:
 // ```
 // db = rag.Get("my-rag", rag.ragEmbeddingModel("text-embedding-3-small"))~
 // ```
+// Deprecated: retained as a no-op for existing callers. Collection model
+// configuration belongs to the vector store, not this unused legacy option.
 func WithEmbeddingModel(model string) RAGSystemConfigOption {
-	return func(config *RAGSystemConfig) {
-		config.embeddingModel = model
-	}
+	return func(*RAGSystemConfig) {}
 }
 
 // db 指定 RAG 使用的数据库连接（导出名为 rag.db）
@@ -884,10 +881,9 @@ func (config *RAGSystemConfig) ConvertToKHopOptions() []entityrepos.KHopQueryOpt
 	return options
 }
 
+// Deprecated: retained as a no-op; RAG requests use WithAIService instead.
 func WithAIOptions(options ...aispec.AIConfigOption) RAGSystemConfigOption {
-	return func(config *RAGSystemConfig) {
-		config.aiOptions = options
-	}
+	return func(*RAGSystemConfig) {}
 }
 
 // Query configuration options for RAGSystemConfig

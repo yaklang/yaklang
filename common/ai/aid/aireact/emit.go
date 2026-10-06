@@ -80,7 +80,6 @@ func (r *ReAct) EmitResultAfterStream(result interface{}) {
 
 // EmitKnowledge emits a knowledge event using the embedded Emitter
 func (r *ReAct) EmitKnowledge(enhanceID string, knowledge aicommon.EnhanceKnowledge) {
-	r.knowledgeEmitCounter++
 	r.Emitter.EmitKnowledge("knowledge", enhanceID, knowledge)
 }
 

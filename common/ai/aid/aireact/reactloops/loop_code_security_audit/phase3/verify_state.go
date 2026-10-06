@@ -3,7 +3,6 @@ package phase3
 import (
 	"fmt"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops/loop_code_security_audit/internal/model"
-	"strings"
 	"sync"
 )
 
@@ -190,34 +189,4 @@ func (v *VerifyState) OrderIDs() []string {
 	out := make([]string, len(v.order))
 	copy(out, v.order)
 	return out
-}
-
-func formatVerifyIDList(ids []string, maxShow int) string {
-	if len(ids) == 0 {
-		return "  （无）\n"
-	}
-	var b strings.Builder
-	for i, id := range ids {
-		if i >= maxShow {
-			b.WriteString(fmt.Sprintf("  ... 另有 %d 个未列出\n", len(ids)-maxShow))
-			break
-		}
-		b.WriteString(fmt.Sprintf("  %d. %s\n", i+1, id))
-	}
-	return b.String()
-}
-
-func formatCompleteVerifyBlockedFeedback(verify *VerifyState) string {
-	remaining := verify.RemainingIDs()
-	done := verify.ConcludedCount()
-	total := verify.Total()
-	current := verify.CurrentFindingID()
-	var b strings.Builder
-	b.WriteString(fmt.Sprintf("[错误] 尚有 %d/%d 个 finding 未完成 conclude_finding，禁止调用 complete_verify。\n", total-done, total))
-	if current != "" {
-		b.WriteString(fmt.Sprintf("当前必须验证：%s\n", current))
-	}
-	b.WriteString("待验证 finding：\n")
-	b.WriteString(formatVerifyIDList(remaining, 30))
-	return b.String()
 }

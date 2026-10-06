@@ -7,44 +7,6 @@ import (
 	"github.com/yaklang/yaklang/common/utils/chanx"
 )
 
-var mockEnhanceKnowledgeList = []*BasicEnhanceKnowledge{
-	NewBasicEnhanceKnowledge(
-		"Go is a statically typed, compiled programming language designed at Google.",
-		"https://golang.org",
-		0.95,
-	),
-	NewBasicEnhanceKnowledge(
-		"Goroutines are lightweight threads managed by the Go runtime.",
-		"https://blog.golang.org/goroutines",
-		0.90,
-	),
-	NewBasicEnhanceKnowledge(
-		"The Go standard library provides extensive support for networking and web servers.",
-		"https://pkg.go.dev/std",
-		0.85,
-	),
-	NewBasicEnhanceKnowledge(
-		"Channels in Go provide a way for goroutines to communicate with each other and synchronize execution.",
-		"https://tour.golang.org/concurrency/2",
-		0.88,
-	),
-	NewBasicEnhanceKnowledge(
-		"Go modules are the standard for dependency management in modern Go projects.",
-		"https://blog.golang.org/using-go-modules",
-		0.80,
-	),
-	NewBasicEnhanceKnowledge(
-		"The Go tooling includes powerful features for testing, benchmarking, and profiling code.",
-		"https://golang.org/doc/go1.10#testing",
-		0.78,
-	),
-	NewBasicEnhanceKnowledge(
-		"Interfaces in Go provide a way to specify the behavior of an object: if something can do this, then it can be used here.",
-		"https://tour.golang.org/methods/9",
-		0.82,
-	),
-}
-
 func NewMockEKManagerAndToken() (*EnhanceKnowledgeManager, string) {
 	tokenUUID := uuid.NewString()
 	checkData := NewBasicEnhanceKnowledge(

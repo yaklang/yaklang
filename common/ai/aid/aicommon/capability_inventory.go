@@ -137,13 +137,6 @@ func collectEnabledMCPServers(disallow bool) []CapabilityInventoryNamedItem {
 	return result
 }
 
-func loopPromptCandidateTools(loop CapabilityInventoryLoopContext) []*aitool.Tool {
-	if loop == nil {
-		return nil
-	}
-	return loop.PromptCandidateTools()
-}
-
 // BuildCapabilityInventoryPayload builds the legacy capability_inventory payload
 // by flattening session_snapshot capabilities and supplementing MCP servers.
 func BuildCapabilityInventoryPayload(cfg *Config, loop CapabilityInventoryLoopContext) CapabilityInventoryPayload {

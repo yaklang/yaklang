@@ -1,12 +1,10 @@
 package loopinfra
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools"
 	"github.com/yaklang/yaklang/common/go-funk"
-	"io"
 	"sort"
 	"strings"
 	"time"
@@ -19,7 +17,6 @@ import (
 )
 
 const directlyCallToolParamsNodeID = "directly_call_tool_params"
-const directlyCallToolNonceLoopKey = "last_ai_decision_nonce"
 
 func getDirectlyCallToolParamNames(loop *reactloops.ReActLoop, toolName string) []string {
 	if loop == nil || loop.GetConfig() == nil || loop.GetConfig().GetAiToolManager() == nil {
@@ -97,45 +94,6 @@ func emitDirectlyCallParamProgress(emit func(string), params aitool.InvokeParams
 		}
 		emit(fmt.Sprintf("%s: %s", key, utils.ShrinkString(strings.ReplaceAll(utils.InterfaceToString(params[key]), "\n", `\\n`), 80)))
 	}
-}
-
-func streamDirectlyCallParamProgressFromRawResponse(ctx context.Context, rawResponse, nonce string, paramNames []string, writer io.Writer) error {
-	if strings.TrimSpace(rawResponse) == "" || writer == nil {
-		return nil
-	}
-
-	streamFieldNames := make([]string, 0, len(paramNames)*2+1)
-	var actionOpts []aicommon.ActionMakerOption
-	if nonce != "" {
-		actionOpts = append(actionOpts, aicommon.WithActionNonce(nonce))
-	}
-	for _, paramName := range paramNames {
-		streamFieldNames = append(streamFieldNames, paramName)
-		if nonce == "" {
-			continue
-		}
-		tagKey := fmt.Sprintf("__aitag__%s", paramName)
-		streamFieldNames = append(streamFieldNames, tagKey)
-		actionOpts = append(actionOpts, aicommon.WithActionTagToKey(fmt.Sprintf("TOOL_PARAM_%s", paramName), tagKey))
-	}
-	streamFieldNames = append(streamFieldNames, "directly_call_expectations")
-
-	actionOpts = append(actionOpts,
-		aicommon.WithActionFieldStreamHandler(streamFieldNames, func(key string, r io.Reader) {
-			if strings.HasPrefix(key, "__aitag__") {
-				_, _ = io.WriteString(writer, strings.TrimPrefix(key, "__aitag__")+"(BLOCK): ")
-			} else if key == "directly_call_expectations" {
-				_, _ = io.WriteString(writer, "[note] ")
-			} else {
-				_, _ = io.WriteString(writer, key+": ")
-			}
-			_, _ = io.Copy(writer, r)
-			_, _ = io.WriteString(writer, " -> ")
-		}),
-	)
-
-	_, err := aicommon.ExtractValidActionFromStream(ctx, strings.NewReader(rawResponse), "object", actionOpts...)
-	return err
 }
 
 func getDirectlyCallToolParamPayload(action *aicommon.Action) (string, aitool.InvokeParams) {

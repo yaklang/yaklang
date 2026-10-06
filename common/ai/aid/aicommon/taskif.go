@@ -163,8 +163,7 @@ type AIStatefulTaskBase struct {
 	createdAt           time.Time
 	asyncMode           bool
 
-	summary       string
-	statusSummary string
+	summary string
 
 	// index info
 	toolCallResultIds *omap.OrderedMap[int64, *aitool.ToolResult]

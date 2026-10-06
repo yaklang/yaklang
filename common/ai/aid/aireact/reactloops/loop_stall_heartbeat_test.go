@@ -7,7 +7,6 @@ import (
 
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
-	mockcfg "github.com/yaklang/yaklang/common/ai/aid/aicommon/mock"
 )
 
 // TestStallHeartbeat_FiresAfterThreshold 验证: 主循环 recordIterationTick
@@ -117,7 +116,8 @@ func TestStallHeartbeat_StopReleasesGoroutine(t *testing.T) {
 // 本测试是 hard abort 兜底机制的核心回归用例.
 //
 // 关键词: hard abort 兜底, [LOOP_STALL_HARD_ABORT], task.Cancel,
-//   主循环硬卡死自救
+//
+//	主循环硬卡死自救
 func TestStallHeartbeat_HardAbortsAfterLongStall(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -308,6 +308,3 @@ func TestStallHeartbeat_SubAgentInflightToolBypassesParent(t *testing.T) {
 			"parent must not hard-abort while nested sub-agent has an in-flight tool")
 	}
 }
-
-// Ensure NewMockInvoker compiles in this file even when unused locally.
-var _ = mockcfg.NewMockInvoker

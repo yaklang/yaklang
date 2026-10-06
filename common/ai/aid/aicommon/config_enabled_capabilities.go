@@ -473,10 +473,6 @@ func (c *Config) notifyCapabilityInventoryEmit() {
 	c.NotifySessionSnapshotEmit(true)
 }
 
-func (c *Config) notifySessionSnapshotEmitImmediate() {
-	c.NotifySessionSnapshotEmit(true)
-}
-
 func (c *Config) SetCapabilityHotpatchHandler(handler capabilityHotpatchHandler) {
 	if c == nil {
 		return
