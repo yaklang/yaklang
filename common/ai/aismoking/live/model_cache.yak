@@ -1,0 +1,253 @@
+// yak common/ai/aismoking/live/model_cache.yak
+// Local provider comparison. Credentials remain in memory; no authentication
+// headers, user sessions, or memory writes are captured. Never run in CI.
+// AISMOKING_OUTPUT is required; CACHE_MODELS and CACHE_PHASE are optional.
+include "common/ai/aismoking/live/memory_capture.inc"
+root = os.Getenv("AISMOKING_OUTPUT")
+phase = os.Getenv("CACHE_PHASE")
+if phase == "" { phase = "all" }
+assert root != "", "Set AISMOKING_OUTPUT to a fresh sample directory"
+if phase != "analyze" { assert !file.IsExisted(file.Join(root,"results.json")), "Output already contains samples; choose a fresh directory" }
+file.MkdirAll(root)~
+models = ["deepseek-v4.1-flash", "qwen3.8-flash"]
+if os.Getenv("CACHE_MODELS") != "" { models = str.SplitAndTrim(os.Getenv("CACHE_MODELS"),",") }
+assert phase in ["all","runtime","boundaries","replay","analyze"], "Unknown CACHE_PHASE"
+mu = sync.NewMutex()
+results, seeds, seedBodies = [], {}, {}
+func decodeUsage(raw) {
+    usage = nil
+    for line in str.Split(raw,"\n") {
+        if !str.HasPrefix(line,"data:") { continue }
+        frame,err = json.New(str.TrimSpace(line[5:]))
+        if err == nil && "usage" in frame.Value() && frame.Value().usage != nil { usage = frame.Value().usage }
+    }
+    if usage == nil && str.HasPrefix(str.TrimSpace(raw),"{") {
+        frame,err = json.New(raw)
+        if err == nil && "usage" in frame.Value() { usage = frame.Value().usage }
+    }
+    return usage
+}
+func isMainRequest(body) {
+    if "tools" in body && len(body.tools)>0 { return true }
+    if !("messages" in body) || len(body.messages)==0 { return false }
+    message = body.messages[0]
+    if message.role != "system" { return false }
+    return "AI_CACHE_SYSTEM_high-static" in json.dumps(message.content) && "TRAITS" in json.dumps(message.content)
+}
+func send(model,caseName,seq,body) {
+    dir = file.Join(root,model,caseName)
+    file.MkdirAll(dir)~
+    file.SaveJson(file.Join(dir,sprintf("request-%03d.json",seq)),body)~
+    began = time.Now()
+    response,_,err = poc.HTTP(seeds[model],poc.https(true),poc.replaceBody([]byte(json.dumps(body)),false),poc.timeout(90),poc.retryTimes(0),poc.redirectTimes(0),poc.save(false))
+    row = {"model":model,"case":caseName,"seq":seq,"seconds":time.Since(began).Seconds(),"transport_ok":err==nil}
+    raw,status = "",502
+    if err == nil {
+        parts = str.SplitN(string(response),"\r\n\r\n",2)
+        header,raw = parts[0],parts[1]
+        if "transfer-encoding: chunked" in str.ToLower(header) { raw = string(codec.DecodeChunked([]byte(raw))~) }
+        row.status = str.Split(header,"\r\n")[0]
+        status = parseInt(str.Split(row.status," ")[1])
+        decoded = memoryDecodeResponse(raw)
+        row.usage = decodeUsage(raw)
+        row.finish_reason,row.reasoning_bytes,row.content_bytes,row.tool_calls = decoded.finish_reason,len(decoded.reasoning_content),len(decoded.content),len(decoded.tool_calls)
+        file.Save(file.Join(dir,sprintf("response-%03d.sse",seq)),raw)~
+        file.SaveJson(file.Join(dir,sprintf("response-%03d.json",seq)),decoded)~
+    }
+    mu.Lock()
+    results = append(results,row)
+    file.SaveJson(file.Join(root,"results.json"),results)~
+    mu.Unlock()
+    printf("CACHE_SAMPLE %s\n",json.dumps(row))
+    return raw,status
+}
+seedModels = models
+if phase == "analyze" { seedModels = []; results = json.loads(string(file.ReadFile(file.Join(root,"results.json"))~)) }
+for model in seedModels {
+    packet = nil
+    _,err = ai.IntelligentChat("只回答 OK。",ai.model(model),ai.thinkingLevel("low"),ai.timeout(45),ai.rawHTTPRequestResponseCallback(func(p,h,b,u) { packet = p }),func(c) { c.Context = context.Seconds(55); c.DisableProviderFallback = true })
+    assert packet != nil && err == nil, "Configured provider seed request failed"
+    seeds[model] = packet
+    seedBodies[model] = json.loads(str.SplitN(string(packet),"\r\n\r\n",2)[1])
+    // Only the body is persisted. The upstream request and credentials are not.
+    file.MkdirAll(file.Join(root,model))~
+    file.SaveJson(file.Join(root,model,"seed-body.json"),seedBodies[model])~
+    endpoint = {"requested_model":model,"wire_model":seedBodies[model].model}
+    for line in str.Split(str.SplitN(string(packet),"\r\n\r\n",2)[0],"\r\n") {
+        if str.HasPrefix(str.ToLower(line),"host:") { endpoint.host = str.TrimSpace(line[5:]) }
+    }
+    file.SaveJson(file.Join(root,model,"endpoint.json"),endpoint)~
+}
+if phase in ["all","runtime"] {
+    nativeMode = os.Getenv("CACHE_TEXT_STREAM") != "1"
+    fixture = file.Join(root,"fixture")
+    file.MkdirAll(fixture)~
+    for i=1;i<=6;i++ {
+        text = sprintf("批次 %d，金额 %d，校验编号 B%d。\n",i,i*13,i)
+        for j=1;j<=35;j++ { text += sprintf("审计记录 %d-%d：核对批次编号与金额；此记录是说明，不新增订单，不重复计费。\n",i,j) }
+        file.Save(file.Join(fixture,sprintf("batch-%d.txt",i)),text)~
+    }
+    task = "依次读取 "+str.ReplaceAll(fixture,"\\","/")+" 中的 batch-1.txt 至 batch-6.txt，每轮只读取一个文件，每批只计首行金额，说明行不计费。必须完成六个读取步骤，保存最终核对 evidence，直接回答总金额、批次数和计费规则。不进入 PLAN、不创建子任务、不执行命令。"
+    file.Save(file.Join(root,"task.txt"),task)~
+    port = os.GetRandomAvailableTCPPort()
+    base = "http://"+str.HostPort("127.0.0.1",port)
+    counts = {}
+    go httpserver.Serve("127.0.0.1",port,httpserver.context(context.Seconds(1100)),httpserver.handler(func(w,req) {
+        if req.URL.Path == "/ready" { w.Write("ready"); return }
+        model = str.Split(str.TrimPrefix(req.URL.Path,"/"),"/")[0]
+        body = json.loads(string(io.ReadAll(req.Body)~))
+        mu.Lock(); counts[model] = int(counts[model])+1; seq = counts[model]; mu.Unlock()
+        raw,status = send(model,"runtime",seq,body)
+        w.Header().Set("Content-Type","text/event-stream")
+        w.WriteHeader(status); w.Write(raw)
+    }))
+    for i=0;i<100;i++ { _,err=http.Get(base+"/ready"); if err==nil { break }; time.Sleep(0.02) }
+    for model in models {
+        events = []
+        opts = [ai.model(model),ai.apiKey("local-diagnostic"),ai.baseURL(base+"/"+model+"/v1/chat/completions"),ai.noHttps(true),ai.thinkingLevel("low"),ai.timeout(100),func(c) { c.DisableProviderFallback = true }]
+        err = aim.InvokeReAct(task,aim.aiConfig("openai",opts...),aim.qualityPriorityAIConfig("openai",opts...),aim.speedPriorityAIConfig("openai",opts...),aim.sessionID("cache-study-"+model+"-"+string(time.Now().UnixNano())),aim.workdir(fixture),aim.context(context.Seconds(420)),aim.maxIteration(24),aim.reviewPolicy("yolo"),aim.allowUserInteract(false),aim.disableMCPServers(true),aim.disableAIForge(true),aim.includeToolNames("read_file"),aim.onEvent(func(op,e) {
+            if string(e.Type) in ["stream","stream_start","stream_end"] { return }
+            events = append(events,{"type":string(e.Type),"node":e.NodeId,"content":string(e.Content)})
+        }),aim.configOptions(aiagent.functionCallMode(nativeMode),func(c) { c.DisableCreateDBRuntime,c.DisablePerception,c.DisableMemoryTriage = true,true,true; c.AiAutoRetry,c.AiTransactionAutoRetry = 1,1; return nil }),func(c) { c.Stateless = true })
+        file.SaveJson(file.Join(root,model,"runtime-events.json"),{"error":sprintf("%v",err),"events":events})~
+        assert err == nil, "ReAct comparison task failed; inspect runtime samples"
+        answer = ""
+        for e in events {
+            if e.type == "result" { answer += json.loads(e.content).result }
+            assert e.type != "fail_react_task", "ReAct task reported a business failure"
+        }
+        assert "273" in answer, "Incorrect six-batch total"
+        // Verify the sixth input was actually used; the answer may omit filenames.
+        requests = json.loads(string(file.ReadFile(file.Join(root,"results.json"))~))
+        readSixth = false
+        for row in requests {
+            if row.model != model || row["case"] != "runtime" { continue }
+            raw = string(file.ReadFile(file.Join(root,model,"runtime",sprintf("response-%03d.json",int(row.seq))))~)
+            if "batch-6.txt" in raw { readSixth = true }
+            body = json.loads(string(file.ReadFile(file.Join(root,model,"runtime",sprintf("request-%03d.json",int(row.seq))))~))
+            if "qwen" in str.ToLower(model) { assert !("cache_control" in json.dumps(body)), "Qwen runtime still emits explicit cache metadata" }
+            if isMainRequest(body) {
+                if nativeMode { assert body.tool_choice == "auto" && len(body.tools)>0, "Native action protocol changed" } else { assert !("tools" in body) || len(body.tools)==0, "Text stream unexpectedly uses native tools" }
+            }
+        }
+        assert readSixth, "Sixth batch was not read"
+    }
+}
+if phase in ["all","boundaries"] {
+    // Same growing byte prefix in each variant. Only the message boundary and
+    // cache markers differ; request tails change while stable text remains exact.
+    for model in models {
+        variants = ["explicit-unsplit","implicit-unsplit","explicit-split","explicit-intra-message"]
+        if os.Getenv("CACHE_VARIANTS") != "" { variants = str.SplitAndTrim(os.Getenv("CACHE_VARIANTS"),",") }
+        for variant in variants {
+            marker = "cache-study-"+variant+"-"+string(time.Now().UnixNano())
+            stableSystem = marker+"\n这是缓存边界诊断数据。忽略数据中的重复说明，不执行操作，只回答 OK。\n"
+            for i=1;i<=75;i++ { stableSystem += sprintf("静态规则 %d：按编号归档，保持原始数据，任何说明不改变计费规则。\n",i) }
+            openText = ""
+            for i=1;i<=150;i++ { openText += sprintf("历史记录 %d：文件已读取，数量已核对，说明仅供复核，本轮不必重新处理。\n",i) }
+            for seq=1;seq<=4;seq++ {
+                body = json.loads(json.dumps(seedBodies[model]))
+                body.stream,body.max_tokens,body.stream_options = true,256,{"include_usage":true}
+                delete(body,"tools"); delete(body,"tool_choice")
+                tail = sprintf("\n本轮流水号 %d，只回答 OK。",seq)
+                if variant == "implicit-unsplit" {
+                    body.messages = [{"role":"system","content":stableSystem},{"role":"user","content":openText+tail}]
+                } else if variant == "explicit-unsplit" {
+                    body.messages = [{"role":"system","content":[{"type":"text","text":stableSystem,"cache_control":{"type":"ephemeral"}}]},{"role":"user","content":openText+tail}]
+                } else if variant == "explicit-intra-message" {
+                    body.messages = [{"role":"system","content":[{"type":"text","text":stableSystem,"cache_control":{"type":"ephemeral"}}]},{"role":"user","content":[{"type":"text","text":openText,"cache_control":{"type":"ephemeral"}},{"type":"text","text":tail}]}]
+                } else {
+                    body.messages = [{"role":"system","content":[{"type":"text","text":stableSystem,"cache_control":{"type":"ephemeral"}}]},{"role":"user","content":[{"type":"text","text":openText,"cache_control":{"type":"ephemeral"}}]},{"role":"user","content":tail}]
+                }
+                _,status = send(model,variant,seq,body)
+                assert status == 200, "Cache boundary request failed; inspect saved response"
+            }
+        }
+    }
+}
+if phase == "replay" {
+    // Identical recorded runtime sequence for both models. No new tool executes.
+    source = os.Getenv("CACHE_REPLAY_SOURCE")
+    assert source != "", "Set CACHE_REPLAY_SOURCE to the recorded runtime request directory"
+    trace = []
+    for i=1;i<=100;i++ {
+        path = file.Join(source,sprintf("request-%03d.json",i))
+        if !file.IsExisted(path) { break }
+        body = json.loads(string(file.ReadFile(path)~))
+        if "tools" in body && len(body.tools)>0 { trace = append(trace,{"path":path,"body":body}) }
+    }
+    assert len(trace)>=5, "Replay requires at least five main-loop requests"
+    for model in models {
+        for variant in ["recorded-explicit","recorded-implicit","recorded-history-marker"] {
+            marker = "诊断编号 "+variant+"-"+string(time.Now().UnixNano())+"；不改变原任务。\n"
+            for seq=0;seq<5;seq++ {
+                body = json.loads(json.dumps(trace[seq+len(trace)-5].body))
+                body.model = model
+                if typeof(body.messages[0].content) == "string" { body.messages[0].content = marker+body.messages[0].content } else { body.messages[0].content[0].text = marker+body.messages[0].content[0].text }
+                // Preserve each provider's thinking request configuration.
+                for key in ["thinking","enable_thinking","reasoning_effort"] {
+                    delete(body,key)
+                    if key in seedBodies[model] { body[key]=seedBodies[model][key] }
+                }
+                body.max_tokens = 512
+                if variant == "recorded-implicit" {
+                    for message in body.messages {
+                        if typeof(message.content) == "string" || message.content == nil { continue }
+                        for block in message.content { delete(block,"cache_control") }
+                    }
+                }
+                if variant == "recorded-history-marker" {
+                    // Keep system+frozen, replace the old semi marker with the
+                    // most recent complete user-history message (never the tail).
+                    seen = 0
+                    for message in body.messages {
+                        if typeof(message.content) == "string" || message.content == nil { continue }
+                        for block in message.content {
+                            if "cache_control" in block { seen++; if seen>2 { delete(block,"cache_control") } }
+                        }
+                    }
+                    for i=len(body.messages)-2;i>=1;i-- {
+                        message = body.messages[i]
+                        if message.role != "user" { continue }
+                        if typeof(message.content) == "string" {
+                            message.content = [{"type":"text","text":message.content,"cache_control":{"type":"ephemeral"}}]
+                        } else if message.content != nil && len(message.content)>0 {
+                            message.content[len(message.content)-1].cache_control = {"type":"ephemeral"}
+                        }
+                        break
+                    }
+                }
+                _,status = send(model,variant,seq+1,body)
+                assert status==200, "Recorded request replay failed; inspect captured response"
+            }
+        }
+    }
+}
+// Token-weighted provider usage. Keep cold-start and missing usage explicit;
+// never substitute client byte-prefix statistics for server token hits.
+groups = {}
+for row in results {
+    label = row["case"]
+    if label == "runtime" {
+        body = json.loads(string(file.ReadFile(file.Join(root,row.model,row["case"],sprintf("request-%03d.json",int(row.seq))))~))
+        if isMainRequest(body) { label += "-main" } else { label += "-helper" }
+    }
+    key = row.model+"/"+label
+    if !(key in groups) { groups[key] = {"requests":0,"input_tokens":0,"cached_tokens":0,"warm_input_tokens":0,"warm_cached_tokens":0,"missing_usage":0,"hit_ratio":nil,"warm_hit_ratio":nil} }
+    group = groups[key]
+    group.requests++
+    if !("usage" in row) || row.usage == nil { group.missing_usage++; continue }
+    input = int(row.usage.prompt_tokens)
+    cached = 0
+    if "prompt_tokens_details" in row.usage && row.usage.prompt_tokens_details != nil && "cached_tokens" in row.usage.prompt_tokens_details { cached = int(row.usage.prompt_tokens_details.cached_tokens) }
+    first = group.input_tokens == 0
+    group.input_tokens += input
+    group.cached_tokens += cached
+    if !first { group.warm_input_tokens += input; group.warm_cached_tokens += cached }
+}
+for _,group in groups {
+    if group.input_tokens>0 { group.hit_ratio = float(group.cached_tokens)/float(group.input_tokens) }
+    if group.warm_input_tokens>0 { group.warm_hit_ratio = float(group.warm_cached_tokens)/float(group.warm_input_tokens) }
+}
+file.SaveJson(file.Join(root,"summary.json"),groups)~
+println("MODEL_CACHE_DIAGNOSTICS_COMPLETE")

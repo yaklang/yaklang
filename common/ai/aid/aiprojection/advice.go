@@ -82,7 +82,7 @@ func buildAdvicesWithCache(rep *HitReport, split *PromptSplit, gc *globalCache) 
 	// 测算实际 Qwen BPE token 数, 不足 highStaticRecommendedTokens 时报警.
 	// 关键词: advice, high_static_too_short, ytoken token budget
 	for _, ch := range split.Chunks {
-		if ch == nil || ch.Section != SectionHighStatic {
+		if ch == nil || ch.Section != SectionHighStatic || modelUsesImplicitCache(rep.Model) {
 			continue
 		}
 		if ch.Content == "" {

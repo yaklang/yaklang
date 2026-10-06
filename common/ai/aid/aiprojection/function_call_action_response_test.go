@@ -48,10 +48,14 @@ func TestFunctionCallActionResponseProjectsToMatchedHistory(t *testing.T) {
 
 	for _, tc := range []struct {
 		name      string
+		model     string
 		responses bool
 	}{
-		{name: "chat_completions"},
-		{name: "responses", responses: true},
+		{name: "chat_completions", model: "projection-test-model"},
+		{name: "responses", model: "projection-test-model", responses: true},
+		{name: "qwen_chat_completions", model: "qwen3.8-flash"},
+		{name: "qwen_alias_chat_completions", model: "memfit-QWEN3.8-flash-free"},
+		{name: "qwen_responses", model: "qwen3.8-flash", responses: true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			bodies := make(chan []byte, 1)
@@ -70,7 +74,7 @@ func TestFunctionCallActionResponseProjectsToMatchedHistory(t *testing.T) {
 			if tc.responses {
 				url += "/responses"
 			}
-			_, err := aispec.ChatBase(url, "projection-test-model", CreateTemplate(prompt),
+			_, err := aispec.ChatBase(url, tc.model, CreateTemplate(prompt),
 				aispec.WithChatBase_DisableStream(true),
 				aispec.WithChatBase_PoCOptions(func() ([]poc.PocConfigOption, error) { return nil, nil }),
 			)
@@ -82,6 +86,11 @@ func TestFunctionCallActionResponseProjectsToMatchedHistory(t *testing.T) {
 			// Both provider formats must receive the original schema number,
 			// even when it cannot be represented exactly by float64.
 			require.Contains(t, string(body), `"const":9007199254740993`)
+			if tc.responses || strings.Contains(strings.ToLower(tc.model), "qwen") {
+				require.NotContains(t, string(body), `"cache_control"`)
+			} else {
+				require.Contains(t, string(body), `"cache_control":{"type":"ephemeral"}`)
+			}
 			if tc.responses {
 				var request struct {
 					Input []map[string]any `json:"input"`

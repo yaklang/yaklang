@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strconv"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -16,6 +17,63 @@ import (
 	"github.com/yaklang/yaklang/common/ai/aispec"
 	"github.com/yaklang/yaklang/common/utils/lowhttp/poc"
 )
+
+func TestQwenImplicitCachePreservesTextAndCallerMessages(t *testing.T) {
+	ResetForTest()
+	restoreThreshold := SetMinCachableUserSegmentBytesForTest(0)
+	t.Cleanup(restoreThreshold)
+	prompt := CreateTemplate("<|PROMPT_SECTION_high-static|>stable<|PROMPT_SECTION_END_high-static|>" +
+		"<|AI_CACHE_FROZEN_semi-dynamic|>frozen<|AI_CACHE_FROZEN_END_semi-dynamic|>" +
+		"<|PROMPT_SECTION_dynamic_n1|>question<|PROMPT_SECTION_dynamic_END_n1|>")
+	deepseek := ProjectAndObserve("deepseek-v4.1-flash", prompt)
+	qwen := ProjectAndObserve("Qwen/qwen3.8-flash", prompt)
+	require.True(t, qwen.IsHijacked)
+	require.NotEmpty(t, qwen.CorrelationID)
+	require.Len(t, qwen.Messages, len(deepseek.Messages))
+	for i, message := range qwen.Messages {
+		require.Equal(t, deepseek.Messages[i].Role, message.Role)
+		require.Equal(t, messageText(t, deepseek.Messages[i]), messageText(t, message))
+	}
+	encoded, err := json.Marshal(qwen.Messages)
+	require.NoError(t, err)
+	require.NotContains(t, string(encoded), "cache_control")
+	encoded, err = json.Marshal(deepseek.Messages)
+	require.NoError(t, err)
+	require.Contains(t, string(encoded), "cache_control")
+	split := Split("<|PROMPT_SECTION_high-static|>short<|PROMPT_SECTION_END_high-static|>")
+	require.Contains(t, strings.Join(buildAdvices(&HitReport{Model: "other-model"}, split), "\n"), "high_static_too_short")
+	require.NotContains(t, strings.Join(buildAdvices(&HitReport{Model: "qwen3.8-flash"}, split), "\n"), "high_static_too_short")
+
+	// An explicitly supplied message remains the caller's choice; the default
+	// projection policy must not rewrite its cache metadata or content.
+	raw := []aispec.ChatDetail{{Role: "user", Content: []*aispec.ChatContent{{Type: "text", Text: "caller text", CacheControl: map[string]any{"type": "ephemeral"}}}}}
+	bodies := make(chan []byte, 1)
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		body, _ := io.ReadAll(r.Body)
+		bodies <- body
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"choices":[{"message":{"content":"ok"}}]}`))
+	}))
+	defer server.Close()
+	_, err = aispec.ChatBase(server.URL, "qwen3.8-flash", prompt,
+		aispec.WithChatBase_RawMessages(raw), aispec.WithChatBase_DisableStream(true),
+		aispec.WithChatBase_PoCOptions(func() ([]poc.PocConfigOption, error) { return nil, nil }))
+	require.NoError(t, err)
+	require.Len(t, bodies, 1)
+	body := <-bodies
+	var request struct {
+		Messages []struct {
+			Role    string                `json:"role"`
+			Content []*aispec.ChatContent `json:"content"`
+		} `json:"messages"`
+	}
+	require.NoError(t, json.Unmarshal(body, &request))
+	require.Len(t, request.Messages, 1)
+	require.Equal(t, "user", request.Messages[0].Role)
+	require.Len(t, request.Messages[0].Content, 1)
+	require.Equal(t, "caller text", request.Messages[0].Content[0].Text)
+	require.Contains(t, string(body), `"cache_control":{"type":"ephemeral"}`)
+}
 
 func TestProjectAndObserveMessagesReachChatBaseRequest(t *testing.T) {
 	aispec.ResetChatBaseHijackHooksForTest()

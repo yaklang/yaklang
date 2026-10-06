@@ -75,10 +75,29 @@ func ProjectAndObserve(model, msg string) *aispec.ChatBaseHijackResult {
 		result.Tools = projection.Tools
 	}
 	restoreProjectionResult(result)
+	// Qwen's explicit cache disables automatic prefix caching and only matches
+	// complete message boundaries. Our open history grows beyond the generated
+	// frozen/semi markers, so default to implicit caching without changing roles,
+	// content, or tool replay. Explicit caller RawMessages still take precedence.
+	if modelUsesImplicitCache(model) {
+		for _, message := range result.Messages {
+			if parts, ok := message.Content.([]*aispec.ChatContent); ok {
+				for _, part := range parts {
+					if part != nil {
+						part.CacheControl = nil
+					}
+				}
+			}
+		}
+	}
 	if rep != nil && rep.SeqId > 0 {
 		result.CorrelationID = strconv.FormatInt(rep.SeqId, 10)
 	}
 	return result
+}
+
+func modelUsesImplicitCache(model string) bool {
+	return strings.Contains(strings.ToLower(model), "qwen")
 }
 
 // ResetForTest 仅测试使用: 重置全局状态
