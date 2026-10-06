@@ -78,6 +78,16 @@ else:
         self.assertNotEqual(result.returncode, 0)
         self.assertEqual(ids, [])
 
+    def test_incremental_pr_heads_replace_only_the_same_role_and_ref(self):
+        old = self.entry(1, 'v2-X64-go1.22-deps-ssa-' + 'a' * 40)
+        new = self.entry(2, 'v2-X64-go1.22-deps-ssa-' + 'b' * 40,
+                         created='2026-10-07T00:00:00Z')
+        other_role = self.entry(3, 'v2-X64-go1.22-deps-utils-core-' + 'a' * 40)
+        other_ref = dict(old, id=4, ref='refs/pull/3/merge')
+        result, ids = self.run_prune([[old, new, other_role, other_ref]])
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(ids, ['1'])
+
     def test_age_removes_expired_snapshots_without_touching_other_prefixes(self):
         stale = self.entry(1, 'old', created='2000-01-01T00:00:00Z')
         other = dict(stale, id=2, key='other-workflow')

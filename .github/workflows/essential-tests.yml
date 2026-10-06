@@ -230,9 +230,9 @@ jobs:
         env:
           SHOULD_RUN: ${{ env.SHOULD_RUN }}
 
-  # Cache production and test compilations separately, at most once per suite,
-  # toolchain/dependency set, branch and UTC week. Main's warming workflow provides
-  # reusable test dependencies to new PRs. Go validates source contents on restore;
+  # Cache production and test compilations separately, once per tested head.
+  # Main's weekly warming workflow supplies dependencies to new PRs; pruning
+  # retains one snapshot per namespace/ref. Go validates source contents on restore;
   # -count=1 still executes every selected test. The engine artifact matches the SHA.
   prepare-yak:
     timeout-minutes: 30
