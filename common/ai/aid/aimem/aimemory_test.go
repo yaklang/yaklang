@@ -3,7 +3,6 @@ package aimem
 import (
 	"context"
 	_ "embed"
-	"encoding/json"
 	"path/filepath"
 	"sync/atomic"
 	"testing"
@@ -25,27 +24,6 @@ import (
 
 //go:embed testdata/mock_embedding_data.json
 var mockEmbeddingDataJSON []byte
-
-// SaveEmbeddingToMockData 将embedding数据保存到mock数据（用于生成测试数据）
-func SaveEmbeddingToMockData(text string, embedding []float32) error {
-	var embeddingData map[string][]float32
-	if err := json.Unmarshal(mockEmbeddingDataJSON, &embeddingData); err != nil {
-		embeddingData = make(map[string][]float32)
-	}
-
-	embeddingData[text] = embedding
-
-	// 保存回JSON
-	data, err := json.MarshalIndent(embeddingData, "", "  ")
-	if err != nil {
-		return err
-	}
-
-	log.Infof("saved embedding for text: %s (dimension: %d)", utils.ShrinkString(text, 50), len(embedding))
-	log.Debugf("embedding data to save:\n%s", string(data))
-
-	return nil
-}
 
 // CreateTestAIMemory 创建用于测试的AIMemory实例，自动注入mock embedding，新建测试临时数据库
 func CreateTestAIMemory(t testing.TB, sessionID string, opts ...Option) (*AIMemoryTriage, error) {
@@ -521,31 +499,6 @@ func TestErrorHandling(t *testing.T) {
 	assert.Empty(t, results4)
 
 	log.Infof("error handling tests completed")
-}
-
-// 测试Mock Embedding的SaveEmbeddingToMockData函数
-func TestMockEmbeddingSave(t *testing.T) {
-	client, err := NewMockEmbeddingClient()
-	assert.NoError(t, err)
-
-	// 测试保存新的embedding数据（768维）
-	text := "测试文本"
-	vector := make([]float32, 768)
-	for i := range vector {
-		vector[i] = float32(i) * 0.001
-	}
-
-	err = SaveEmbeddingToMockData(text, vector)
-	assert.NoError(t, err)
-
-	// 验证保存的数据可以被读取
-	embedding, err := client.Embedding(text)
-	assert.NoError(t, err)
-	// 注意：由于SaveEmbeddingToMockData只是记录日志，实际不会更新内存中的数据
-	// 所以这里我们测试默认向量生成
-	assert.Len(t, embedding, 768)
-
-	log.Infof("mock embedding save test completed")
 }
 
 // 测试搜索的更多边界情况

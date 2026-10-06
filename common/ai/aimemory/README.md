@@ -18,6 +18,6 @@ memories = aimemory.SearchMemory(
 
 默认最多 5 条，范围 1–20；默认正文总预算 1500 tokens，范围 64–8192。超长正文可能截断。检索结果的字段选择、标签和时间展示统一在 `search_memory.yak` 中维护，普通工具与 smart_qa 的 memory action 都执行这个脚本，结果通过普通工具 Timeline 保存。
 
-自动 injection 独立复用现有 `SearchMemoryWithoutAI`，只在意图识别落地时执行一次；显式工具搜索不会更新其快照。本轮不调整 triage 写入策略。
+自动 injection 独立复用现有 `SearchMemoryWithoutAI`，只在意图识别落地时执行一次；显式工具搜索不会更新其快照。自动记忆抽取仅来自 Timeline 压缩：执行中沿用阈值压缩，完整用户任务正常结束且有新增业务内容时收尾。候选通过会话通知可靠保存，支持重复通知去重、部分失败重试及恢复补处理；审核等待、阶段切换和 gRPC 断开不作为正常收尾。手动创建记忆及查询、编辑、删除接口保留。
 
 本地冒烟：从仓库根目录设置 `AISMOKING_CASE=memory_search`，运行 `yak common/ai/aismoking/run.yak`。包含独立库、两种 action 协议及 smart_qa 转发；只供本地开发，不加入 CI。

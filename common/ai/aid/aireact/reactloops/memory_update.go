@@ -27,7 +27,6 @@ func (r *ReActLoop) PushMemory(result *aicommon.SearchMemoryResult) {
 		if m == nil {
 			continue
 		}
-		//log.Infof("start to handle memory content bytes: %v", utils.ShrinkString(m.Content, 256))
 		if _, ok := r.currentMemories.Get(m.Id); ok {
 			r.currentMemories.Delete(m.Id)
 			r.currentMemories.Set(m.Id, m)
@@ -40,13 +39,17 @@ func (r *ReActLoop) PushMemory(result *aicommon.SearchMemoryResult) {
 		}
 		r.currentMemories.Set(m.Id, m)
 
-		for r.currentMemorySize() > r.memorySizeLimit {
+		// Compute once per insertion rather than re-tokenizing every remaining
+		// entry after each eviction. Keep it local as entity contents may change.
+		size := r.currentMemorySize()
+		for size > r.memorySizeLimit {
 			// 删除最早的记忆
 			var removed *aicommon.MemoryEntity
 			removed = r.currentMemories.Shift()
 			if utils.IsNil(removed) {
 				continue
 			}
+			size -= ytoken.CalcTokenCount(removed.Content)
 			if e := r.GetEmitter(); e != nil {
 				r.GetEmitter().EmitJSON(schema.EVENT_TYPE_MEMORY_REMOVE_CONTEXT, "memory-triage", map[string]any{
 					"reason": "memory size limit exceeded",

@@ -81,7 +81,6 @@ type TimelineGroups struct{ /* private */ }
 
 func (g *TimelineGroups) IntervalMinutes() int
 func (g *TimelineGroups) GetBlocks() TimelineIntervalBlocks       // 仅 interval block
-func (g *TimelineGroups) GetReducerBlocks() []*TimelineReducerBlock  // legacy only
 func (g *TimelineGroups) GetAllRenderable() TimelineRenderableBlocks // compressed head 在前 + interval 在后
 ```
 
@@ -158,11 +157,11 @@ result-line-2
 user-answer
 ```
 
-### Reducer block 内容（不含 aitag 包裹）
+### Compressed head 内容（不含 aitag 包裹）
 
 ```
-# reducer key=42 ts=1746180000
-10:00:00 [reducer/memory]
+# compressed_head covered_end_item_id=42 covered_end_at_ms=1746180000000 version=1
+[compressed/head]
 batch-compress summary line 1
 batch-compress summary line 2
 ```
@@ -170,11 +169,11 @@ batch-compress summary line 2
 ### 整体 Render 输出（`groups.GetAllRenderable().Render("TL")` 裸渲染）
 
 ```
-<|TL_r42t1746179400|>
-# reducer key=42 ts=1746179400
-09:50:00 [reducer/memory]
+<|TL_h1746179400v1|>
+# compressed_head covered_end_item_id=42 covered_end_at_ms=1746179400000 version=1
+[compressed/head]
 compressed-batch-summary
-<|TL_END_r42t1746179400|>
+<|TL_END_h1746179400v1|>
 <|TL_b3t1746180000|>
 # bucket=2026/05/02 10:00:00-10:03:00 interval=3m
 10:00:30 [tool/scan]
@@ -193,11 +192,11 @@ noted-content
 
 ```
 <|AI_CACHE_FROZEN_semi-dynamic|>
-<|TL_r42t1746179400|>
-# reducer key=42 ts=1746179400
-09:50:00 [reducer/memory]
+<|TL_h1746179400v1|>
+# compressed_head covered_end_item_id=42 covered_end_at_ms=1746179400000 version=1
+[compressed/head]
 compressed-batch-summary
-<|TL_END_r42t1746179400|>
+<|TL_END_h1746179400v1|>
 <|TL_b3t1746180000|>
 # bucket=2026/05/02 10:00:00-10:03:00 interval=3m
 10:00:30 [tool/scan]
@@ -213,7 +212,7 @@ noted-content
 <|TL_END_b3t1746180180|>
 ```
 
-> reducer + 第一个时间桶被框入 `<|AI_CACHE_FROZEN_semi-dynamic|>...<|AI_CACHE_FROZEN_END_semi-dynamic|>`,
+> compressed head + 第一个时间桶被框入 `<|AI_CACHE_FROZEN_semi-dynamic|>...<|AI_CACHE_FROZEN_END_semi-dynamic|>`,
 > 因为它们 `IsOpen()==false` (frozen 段); 末尾时间桶 `b3t1746180180` 是 `Open=true`,
 > 留在边界外。下游 aicache hijacker 会按这对边界把 prompt 切成 `[high-static, frozen-prefix, open-tail]`
 > 三段, 给 system + frozen-prefix 各自打一个 `cache_control:{"type":"ephemeral"}`,
@@ -239,234 +238,27 @@ for _, blk := range result.GetTaggedBlocks() {
 
 ---
 
-## 5. DEMO：一个 timeline 在压缩前后到底变成什么样子
+## 5. 压缩、冻结与记忆
 
-下面给出**完整的对照例子**，让你直观看到压缩对 token / 字节数和 prompt cache 命中的影响。
+渲染不会调用 AI。执行前的阈值检查由 `CompressBeforePrompt` 负责；显式压缩入口是 `CompressOnce`。压缩快照包含已有摘要、投影后的 Frozen/Open 条目、用户信息、Evidence 和本会话已有记忆候选。
 
-### 5.1 压缩前
+当前没有“保留最新 1/4”的固定比例。模型输出摘要和原文 ID 范围，事务校验来源指纹后一起提交摘要、保留条目与冻结状态；请求期间新增的条目仍属于 Open 段。来源被修改、解析失败或提交失败时，不丢弃原始 Timeline。
 
-假设 timeline 中有 5 条相邻几分钟内产生的 ToolResult，每条原始数据都是一段 ~1KB 的扫描结果：
+压缩产生的记忆候选通过独立会话通知交付保存；摘要发布不等于记忆已经保存成功。完整用户任务的正常收尾由记忆层处理，渲染、普通 freeze、审核等待和阶段切换不自行触发抽取。
 
-```text
-id=101 09:50:01 [tool/scan]      data="<1024 字节扫描原文>"
-id=102 09:51:30 [tool/scan]      data="<1024 字节扫描原文>"
-id=103 09:53:11 [tool/scan]      data="<1024 字节扫描原文>"
-id=104 09:54:42 [tool/scan]      data="<1024 字节扫描原文>"
-id=105 09:55:22 [tool/scan]      data="<1024 字节扫描原文>"
-... 后续还有几条仍在活跃中的 entry：
-id=106 09:58:00 [tool/cat]       data="cat-result-A"
-id=107 10:01:30 [user/review]    "looks good"
-id=108 10:04:10 [text/note]      "[normal] noted"
-```
+## 6. 缓存边界
 
-调用 `groups.GetAllRenderable().Render("TL")`，输出大致是（**无 reducer**）：
+- interval nonce 来自时间桶和子桶序号；冻结后的内容不变时，渲染字节保持稳定。
+- compressed head nonce 为 `h{coveredEndSec}v{version}`；同一摘要稳定，新一轮压缩生成新版本。
+- `Render` 仅拼接块；`RenderWithFrozenBoundary` 另外标注 Frozen/Open 边界。
+- `Dump`/`String` 使用默认分组及冻结边界；`DumpForPrompt` 在同一桶布局上应用提示词投影，移除 bookkeeping 噪声。
+- `DumpBefore(beforeId)` 只渲染对应 ID 上界的子时间线，不能当作完整 `Dump` 的别名。
+- 字节稳定是缓存命中的必要条件，实际命中还取决于 provider 和完整请求前缀。
 
-```
-<|TL_b3t1746179400|>
-# bucket=2026/05/02 09:48:00-09:51:00 interval=3m
-09:50:01 [tool/scan]
-<1024 字节扫描原文>
-<|TL_END_b3t1746179400|>
-<|TL_b3t1746179580|>
-# bucket=2026/05/02 09:51:00-09:54:00 interval=3m
-09:51:30 [tool/scan]
-<1024 字节扫描原文>
-09:53:11 [tool/scan]
-<1024 字节扫描原文>
-<|TL_END_b3t1746179580|>
-<|TL_b3t1746179760|>
-# bucket=2026/05/02 09:54:00-09:57:00 interval=3m
-09:54:42 [tool/scan]
-<1024 字节扫描原文>
-09:55:22 [tool/scan]
-<1024 字节扫描原文>
-<|TL_END_b3t1746179760|>
-<|TL_b3t1746179940|>
-# bucket=2026/05/02 09:57:00-10:00:00 interval=3m
-09:58:00 [tool/cat]
-cat-result-A
-<|TL_END_b3t1746179940|>
-<|TL_b3t1746180060|>
-# bucket=2026/05/02 10:00:00-10:03:00 interval=3m
-10:01:30 [user/review]
-looks good
-<|TL_END_b3t1746180060|>
-<|TL_b3t1746180240|>
-# bucket=2026/05/02 10:03:00-10:06:00 interval=3m
-10:04:10 [text/note]
-[normal] noted
-<|TL_END_b3t1746180240|>
-```
+## 7. 回归测试
 
-总长度 ≈ 5KB（5 段原文）+ 桶头与 aitag 包裹开销。
+分组和 AITAG：[`timeline_groups_render_test.go`](timeline_groups_render_test.go)、[`timeline_groups_render_aitag_test.go`](timeline_groups_render_aitag_test.go)。
 
-### 5.2 触发批量压缩
+摘要时间戳、旧数据和缓存前缀：[`timeline_compression_render_test.go`](timeline_compression_render_test.go)，包括 `TestDumpCompressedHeadStable` 的正常时间戳与缺失时间戳两个案例。
 
-当活跃区 token 超过 `totalDumpContentLimit` 时，`compressForSizeLimit` 触发：
-- `keepTokens = currentSize / 4`，按 token 反向累加从最新端切分；
-- `[0, splitIdx)` 进入 `toCompress`（最旧的 ~3/4 token），`[splitIdx, end]` 进入 `recentKeep`（最新的 ~1/4 token）；
-- `Timeline.batchCompressOldestWithRecent(toCompress, recentKeep)` 把前 5 条 ToolResult（ID 101..105）作为一批
-  喂给 AI，**同时把 recentKeep 段一并塞入 prompt 的 RECENT_KEEP 块**，让 AI 基于"现在 agent 在做什么"判断"过去"哪些细节有价值需保留。AI 输出一条 `reducer_memory`，比如：
-
-```text
-"5 scan invocations between 09:50 and 09:55 against host X, all returned port 80 open, no other anomaly"
-```
-
-随后：
-
-- `m.idToTimelineItem.Delete(101..105)`，把这 5 条原始条目移出活跃区
-- `m.reducers.Set(105, "5 scan invocations ... no other anomaly")`
-- **新行为**：`m.reducerTs.Set(105, <ts(105)>)` 同步记录最末被压缩 item 的原始毫秒时间戳
-
-### 5.3 压缩后的 Render 输出
-
-再次调用 `groups.GetAllRenderable().Render("TL")`：
-
-```
-<|TL_r105t1746179722|>
-# reducer key=105 ts=1746179722
-09:55:22 [reducer/memory]
-5 scan invocations between 09:50 and 09:55 against host X, all returned port 80 open, no other anomaly
-<|TL_END_r105t1746179722|>
-<|TL_b3t1746179940|>
-# bucket=2026/05/02 09:57:00-10:00:00 interval=3m
-09:58:00 [tool/cat]
-cat-result-A
-<|TL_END_b3t1746179940|>
-<|TL_b3t1746180060|>
-# bucket=2026/05/02 10:00:00-10:03:00 interval=3m
-10:01:30 [user/review]
-looks good
-<|TL_END_b3t1746180060|>
-<|TL_b3t1746180240|>
-# bucket=2026/05/02 10:03:00-10:06:00 interval=3m
-10:04:10 [text/note]
-[normal] noted
-<|TL_END_b3t1746180240|>
-```
-
-观察要点：
-
-1. **5 条 1KB 扫描原文 → 1 行 reducer 摘要**。token 数从 ~5KB 直接降到几百字节，
-   节省比 ≈ 90%。
-2. **reducer 行使用稳定时间戳**（来自 `reducerTs[105] = 1746179722_000` ms），
-   `09:55:22 [reducer/memory]` 在多次 Dump / Render 间字节级一致。
-3. **后续多次调用同一个 timeline 的 Render**：
-   - 即使活跃区又新增条目，reducer block 的输出**永远不变**；
-   - 此前的 frozen interval block（如 `TL_b3t1746179940`）也不变；
-   - 只有最末一个 open 桶可能换 nonce 或新增 entry，需要重新计费。
-4. **传入 LLM**：在 `aitag.SplitViaTAG(..., "TL")` 之后，每个 block 仍然是独立的
-   tagged block，可以按需选择"全保留"或"丢掉 reducer 之外的早期 block"。
-
-> 在 prompt cache 视角下，这意味着只要 timeline 不再有 ID ≤ 105 的"重生"，
-> `<|TL_r105t1746179722|>...<|TL_END_r105t1746179722|>` 这一段就**永久 cache hit**。
-
----
-
-## 6. 缓存原理
-
-> 假设 timeline 每经过一段时间被 dump 一次给 LLM。
-
-| 时刻 | timeline 状态                          | render 出的 nonce 序列        |
-| ---- | -------------------------------------- | ----------------------------- |
-| T0   | bucket A                               | `[A]`                         |
-| T1   | bucket A, B                            | `[A, B]`                      |
-| T2   | bucket A, B, C                         | `[A, B, C]`                   |
-| T3   | bucket A, B, C+1                       | `[A, B, C]`（C 内容延长）     |
-| T4   | reducer R(覆盖 A)，bucket B, C         | `[R, B, C]`                   |
-
-- 在 T1 之后，桶 A 永远不会再有新条目，`block(A)` 字节级永久固定，
-  整段 `<|...A|>...<|...A_END|>` cache hit。
-- T3 相较 T2 只是给 C 加了条目，A、B 段完全不变，可继续命中。
-- T4 把 A 压缩成了 reducer R：R 的 nonce 由 `r{ReducerKeyID}t{unixSec(reducerTs)}`
-  决定，从此**任何时候只要再次 Dump 这同一个 timeline，R 的字节流都不变**。
-
-**关键不变量**
-
-1. `bucketStart` 由绝对时间决定；日历桶内条目按 id 升序参与字节打包，保证输出顺序稳定。
-2. interval nonce 依赖 `bucketStart`、`intervalMinutes`，若同一日历桶有多个子桶则还依赖 `SeqInBucket`（`s{seq}` 后缀）。
-3. reducer nonce 仅依赖 `ReducerKeyID` 与 `reducerTs[ReducerKeyID]`。
-4. body 首行（`# bucket=...` 或 `# reducer key=... ts=...`）也仅依赖上述参数（同一日历桶多子桶共享同一 `# bucket=...` 字面头目）。
-5. body 内 entry 行用 `HH:MM:SS [type/verbose]` + 直接续写内容（不加缩进）；
-   item 一旦写入就不会修改（除非被 `SoftDelete`，那是有意行为）。
-6. 短时间突发大量输出时，字节子桶把「已填满」的前缀提前冻结；open 仍只在整条 timeline 最末 interval 子桶——分裂瞬间较早子桶 nonce 可能从单桶形态变为带 `s0`，open 段本就不参与前缀缓存，稳态冻结后字节与 nonce 固定。
-
-> 测试 `TestGroupByMinutes_PrefixStabilityForCacheHit` /
-> `TestGroupByMinutes_CacheHitRatio_*` /
-> `TestDumpBefore_ReducerTimeStable` /
-> `TestGroupByMinutes_ReducerBlock_PrefixStability` 给出了字节级与比例级双重保障。
-
----
-
-## 7. 与 Dump 的差异
-
-> **注意**：自 2026-05 起，`Timeline.Dump()` / `Timeline.DumpBefore()` / `Timeline.String()`
-> 已经被实现为 `GroupByMinutes(3).GetAllRenderable().Render("TIMELINE")` 的便捷别名。
-> 这意味着两者的输出**已经完全一致**，aitag 包裹、reducer/interval block 拆分、
-> 字节级稳定都自动适用。
-
-```go
-// 这两行等价
-prompt := timeline.Dump()
-prompt := timeline.GroupByMinutes(3).GetAllRenderable().Render("TIMELINE")
-```
-
-简明总结当前 `Dump` 的输出特征：
-
-- **包含 reducer**：是（以独立的 `<|TIMELINE_r<id>t<sec>|>...<|TIMELINE_END_...|>` 块出现）
-- **包含 interval**：是（以独立的 `<|TIMELINE_b<N>t<sec>|>` 或 `<|TIMELINE_b<N>t<sec>s<seq>|>` ... `<|TIMELINE_END_...|>` 块出现）
-- **时间格式**：每个 entry 的行头使用 `HH:MM:SS`；block 首行 `# bucket=YYYY/MM/DD ...` 或
-  `# reducer key=<id> ts=<unixSec>` 提供完整时间。
-- **条目内容**：优先使用 `GetShrinkResult()` / `GetShrinkSimilarResult()`；缺失时回退 `item.String()`。
-- **缓存稳定性**：与 `GroupByMinutes` 完全一致，前面的 frozen block 字节级不变。
-
-
----
-
-## 8. 边界与不变量
-
-- `minutes <= 0` → 返回空 groups，不 panic。
-- 空 timeline → 0 interval blocks；若仍有 reducer，会产出 reducer block。
-- 整桶被 `SoftDelete` → 该桶不出现在 `GetBlocks()` 中。
-- 跨午夜的两个桶分别属于不同日。
-- 边界点（`t == bucketEnd`）落入下一个桶。
-- 对同一 timeline 反复调用 `GroupByMinutes(N)` 必产出 byte-equal 的渲染串。
-- 字节子桶：`bytesPerBucket < 0`（或 `SetTimelineBucketByteSize` 为负）时关闭，行为与「仅时间桶」旧版一致；单条 entry 大于预算时独占一个子桶；`compressForSizeLimit` 的 token 切分与此独立。
-- 反序列化老数据（含 `summary` 字段）：`summary` 内容被忽略，其余字段照常恢复。
-- `Timeline.Dump()` / `DumpBefore(beforeId)` / `String()` 输出与
-  `GroupByMinutes(3).GetAllRenderable().Render("TIMELINE")` 完全一致；
-  `DumpBefore(beforeId)` 内部通过 `CreateSubTimeline` 把 `id <= beforeId` 的条目
-  筛出后再走同一渲染路径，因此 archive ref 同样不会出现在 `DumpBefore` 输出中。
-
-详细见 [`timeline_groups_render_test.go`](timeline_groups_render_test.go) /
-[`timeline_groups_render_aitag_test.go`](timeline_groups_render_aitag_test.go) /
-[`timeline_reducer_block_test.go`](timeline_reducer_block_test.go)，覆盖了 40+ 用例。
-
----
-
-## 9. 选型说明（FAQ）
-
-**Q: 为什么 nonce 不直接用 sha256？**
-A: aitag 用最后一个 `_` 区分 tagName 与 nonce，nonce 必须**不含下划线**。
-   `b{N}t{unixSec}` / `r{key}t{unixSec}` 既是字母数字、又对人类可读、还能反推出处，便于调试。
-
-**Q: 为什么 status (frozen/open) 不写到内容里？**
-A: 一旦写进内容，桶从 `open` → `frozen` 时字节流就会变，整段就不再命中缓存。
-   状态由 `block.IsOpen()` 单独暴露，调用方自己决定要不要把 open 段切出来不缓存。
-
-**Q: 为什么 reducer block 总是 frozen？**
-A: reducer 是 batch/emergency compress 的产物，一旦写入就不会就地修改。
-   后续如果有新一轮压缩，会形成新的 `reducerKeyID` 与新的 reducer block，
-   不会回写原 block。
-
-**Q: 老数据中只有 reducer 没有 reducerTs（ts 为 0）会怎样？**
-A: 渲染时使用稳定占位（`# reducer key=<id> ts=0`、行头 `00:00:00`），
-   依然字节级稳定，不会破坏缓存。`DumpBefore` 也使用相同的 `1970/01/01 00:00:00`
-   占位字符串。
-
-**Q: 为什么删除 `Timeline.summary` 字段？**
-A: 代码搜索确认 `summary` 字段在生产路径里**没有任何写入**——它的语义
-   "单条 shrink 结果记录"已被 `TimelineItemValue.GetShrinkResult()` 取代。
-   保留这个字段只会在 marshal/reassign/softdelete 等多处带来无效分支与潜在 bug。
-   因此本次改动直接移除字段与所有读写路径，仅在反序列化时容忍老数据中残存的
-   `summary` JSON 字段并静默忽略。
+事务、来源冲突与原文保留：[`timeline_compression_transaction_test.go`](timeline_compression_transaction_test.go)、[`timeline_compression_output_test.go`](timeline_compression_output_test.go)。会话记忆和恢复：[`timeline_session_memory_test.go`](timeline_session_memory_test.go)、[`timeline_memory_lifecycle_test.go`](timeline_memory_lifecycle_test.go)。

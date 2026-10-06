@@ -171,7 +171,13 @@ func TestTimelineCompressionSnapshotPreservesFullBodies(t *testing.T) {
 	require.NoError(t, err)
 	require.Contains(t, plan.InputText, body)
 	require.NotContains(t, plan.InputText, "SHORT_OLD_SHRINK")
-	require.Contains(t, plan.Items[0].SourceJSON, "SHORT_OLD_SHRINK", "retain raw state for later conflict checks")
+	// Shrink state remains in the conflict fingerprint, outside AI materials.
+	tl.mu.Lock()
+	value.ShrinkResult = "CHANGED_SHRINK"
+	state, err := tl.compressionSourceStateLocked(plan.ThroughID)
+	tl.mu.Unlock()
+	require.NoError(t, err)
+	require.NotEqual(t, plan.SourceState, state)
 	require.Contains(t, plan.InputText, "item-240")
 }
 
