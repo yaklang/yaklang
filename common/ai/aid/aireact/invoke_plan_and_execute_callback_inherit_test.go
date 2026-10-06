@@ -112,7 +112,7 @@ func TestReAct_PlanAndExecute_InheritsDistinctCallbacks(t *testing.T) {
 			// Inner: subtask ReAct loop → require tool (no tool output yet)
 			case utils.MatchAllOfSubString(prompt, "PLAN_STATUS_", "directly_answer", "require_tool"):
 				rsp.EmitOutputStream(bytes.NewBufferString(`
-{"@action": "object", "next_action": { "type": "require_tool", "tool_require_payload": "mock_callback_inherit_tool" },
+{"@action": "directly_call_tool", "directly_call_tool_name": "mock_callback_inherit_tool", "directly_call_tool_params": { "seconds": 0.1 },
 "human_readable_thought": "call tool", "cumulative_summary": "call tool"}
 `))
 

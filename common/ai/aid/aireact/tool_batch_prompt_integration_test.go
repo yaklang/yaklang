@@ -159,7 +159,7 @@ func TestToolInventoryMirrorUsesBatchFailureRecoveryPolicy(t *testing.T) {
 	require.Contains(t, rendered, "批量执行使用 `directly_call_tool_calls`")
 	require.Contains(t, rendered, "调用须低风险、独立且互不干扰")
 	require.Contains(t, rendered, "从完整 Schema 构造每项参数")
-	require.Contains(t, rendered, "不代表工具已经执行")
+	require.Contains(t, rendered, "不生成参数、不执行工具")
 	require.Contains(t, rendered, "wrapper")
 	require.Contains(t, rendered, "禁止原样重试批次")
 }

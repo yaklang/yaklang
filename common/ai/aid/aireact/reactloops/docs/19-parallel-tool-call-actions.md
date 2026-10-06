@@ -2,6 +2,8 @@
 
 > 回到 [README](../README.md) | 相关章节：[03 Prompt 系统](03-prompt-system.md) · [04 Action 体系](04-actions.md) · [06 Emitter 与流式输出](06-emitter-and-streaming.md) · [08 确定性机制](08-determinism-mechanisms.md) · [12 调试与可观测性](12-debugging-and-observability.md)
 
+> 当前 action 语义：两种协议的 `require_tool` 都只加载 Schema 到 `CACHE_TOOL_CALL`，不生成参数、不执行工具。观察定义后，由模型用 `directly_call_tool` 显式提交参数执行。下面涉及 require 批量参数生成、并发执行的说明只描述保留的底层 `ToolCallModeRequire` 兼容接口，不再适用于主循环 `require_tool` action；指定工具和审核纠错接口在本轮未迁移。
+
 ## 文档元信息
 
 | 项目 | 内容 |

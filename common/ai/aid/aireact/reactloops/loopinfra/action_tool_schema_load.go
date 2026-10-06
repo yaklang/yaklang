@@ -46,6 +46,12 @@ func verifyToolSchemaLoad(loop *reactloops.ReActLoop, action *aicommon.Action) e
 	if single == batch {
 		return utils.Error("require_tool loads schemas only: provide either tool_require_payload or tool_require_calls")
 	}
+	if hasAnyCanonicalActionParam(action,
+		directlyCallToolBatchField, "directly_call_tool_name", "directly_call_tool_params",
+		"directly_call_identifier", "directly_call_expectations", "directly_call_reason",
+	) {
+		return utils.Error("require_tool cannot be combined with directly_call_tool fields")
+	}
 	var names []string
 	if single {
 		name, ok := raw.(string)
@@ -67,6 +73,11 @@ func verifyToolSchemaLoad(loop *reactloops.ReActLoop, action *aicommon.Action) e
 			if err != nil {
 				return err
 			}
+			for _, field := range []string{"identifier", "reason"} {
+				if _, err := strictBatchString(item, field, false); err != nil {
+					return err
+				}
+			}
 			names = append(names, name)
 		}
 	}
@@ -76,6 +87,7 @@ func verifyToolSchemaLoad(loop *reactloops.ReActLoop, action *aicommon.Action) e
 		if !seen[name] {
 			unique = append(unique, name)
 			seen[name] = true
+			reactloops.MaybeWarnBashBeforeEdit(loop, name)
 		}
 	}
 	loop.SetActionExecutionValue(action, actionStateToolSchemaNames, unique)
@@ -83,6 +95,11 @@ func verifyToolSchemaLoad(loop *reactloops.ReActLoop, action *aicommon.Action) e
 }
 
 func loadToolSchemas(loop *reactloops.ReActLoop, action *aicommon.Action, operator *reactloops.LoopActionHandlerOperator) {
+	if err := verifyToolSchemaLoad(loop, action); err != nil {
+		operator.Feedback("Tool schema loading rejected: " + err.Error())
+		operator.Continue()
+		return
+	}
 	names, _ := loop.GetActionExecutionValue(action, actionStateToolSchemaNames).([]string)
 	config := loop.GetConfig()
 	if len(names) == 0 || config == nil || config.GetAiToolManager() == nil {

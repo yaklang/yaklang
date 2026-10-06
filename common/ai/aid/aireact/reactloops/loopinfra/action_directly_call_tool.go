@@ -271,7 +271,7 @@ var loopAction_directlyCallTool = &reactloops.LoopAction{
 	Description: "直接调用已启用且参数完整的工具，跳过申请和参数生成阶段。默认使用 directly_call_tool_name 和 directly_call_tool_params 的单调用形式。" +
 		"仅当存在 2-8 个低风险、互不依赖、互不干扰，且每层参数都已从真实 Schema 确定的调用时，才可用 directly_call_tool_calls 并发；" +
 		"优先使用 CACHE_TOOL_CALL 中已展示参数 Schema 的工具；已启用但未缓存的工具仍可解析并产生告警。" +
-		"参数不确定或工具是参数未完整的嵌套 wrapper 时改用单次 require_tool；严禁混用单调用和批量字段，也不要为了凑数量发明调用。",
+		"缺少参数 Schema 时先用 require_tool 加载，再构造完整参数显式执行；严禁混用单调用和批量字段，也不要为了凑数量发明调用。",
 	Options: []aitool.ToolOption{
 		aitool.WithStringParam(
 			"directly_call_tool_name",
@@ -313,7 +313,7 @@ var loopAction_directlyCallTool = &reactloops.LoopAction{
 			if mgr == nil || !mgr.IsRecentlyUsedTool(toolName) {
 				// 工具不在 recently-used cache 中时只记录警告，不报错触发重试。
 				// 后续 ActionHandler 会通过 GetToolByName 自行决定：工具存在则继续
-				// 直接调用，工具不存在则走已有的 fallback 到 require_tool 路径。
+				// 直接调用，工具不存在则报告错误，由主循环决定下一步。
 				emit := loop.GetEmitter()
 				if emit != nil {
 					emit.EmitWarning("tool '%s' is not in the recently-used cache; handler will resolve it", toolName)
@@ -322,7 +322,7 @@ var loopAction_directlyCallTool = &reactloops.LoopAction{
 					"directly_call_cache_miss",
 					fmt.Sprintf(
 						"[DIRECT_CALL_CACHE_MISS] directly_call_tool selected '%s' but it is not in the recently-used cache. "+
-							"Letting handler resolve (call if tool exists, otherwise fall back to require_tool).",
+							"Letting handler resolve (call if tool exists, otherwise report the lookup failure).",
 						toolName,
 					),
 				)
@@ -364,7 +364,7 @@ Few-shot example 1 (fallback to require_tool):
 {"@action":"require_tool","tool_require_payload":"<tool_name>"}
 
 Few-shot example 2 (valid directly_call_tool):
-{"@action":"directly_call_tool","directly_call_tool_name":"<tool_name>","directly_call_identifier":"<snake_case_intent>","directly_call_expectations":"~3s, fallback to require_tool if params are uncertain","directly_call_reason":"<why this call>","directly_call_tool_params":{"<param>":"<value>"}}
+{"@action":"directly_call_tool","directly_call_tool_name":"<tool_name>","directly_call_identifier":"<snake_case_intent>","directly_call_expectations":"~3s, load missing schemas before constructing params","directly_call_reason":"<why this call>","directly_call_tool_params":{"<param>":"<value>"}}
 `))
 			operator.Feedback(utils.Error("directly_call_tool requires tool_name; switch to require_tool or provide directly_call_tool_name + directly_call_tool_params"))
 			return
@@ -422,8 +422,7 @@ Few-shot example 2 (valid directly_call_tool):
 		// prepare is the loop-layer callback run AFTER the tool-call card has been
 		// created (loading). It reads the streaming action's params (blocking until
 		// they arrive), normalizes/merges/validates them, streams progress, and either
-		// returns finalized params or signals fallbackToRequire (reusing the same card
-		// and switching to the AI param-generation path).
+		// returns finalized params or a validation error; it never generates parameters.
 		prepare := func(action *aicommon.Action, name string) (aitool.InvokeParams, bool, *aitool.Tool, error) {
 			emitProgress := func(string) {}
 			finishProgress := func(string) {}
@@ -444,7 +443,7 @@ Few-shot example 2 (valid directly_call_tool):
 			emitProgress("[解析缓存工具]")
 			tool, err := resolveTool(name)
 			if err != nil {
-				finishProgress("[failed] cached tool resolution failed; falling back to require_tool")
+				finishProgress("[failed] cached tool resolution failed; no tool was executed")
 				return nil, false, nil, err
 			}
 
@@ -462,29 +461,10 @@ Few-shot example 2 (valid directly_call_tool):
 				if validationSummary == "" {
 					validationSummary = "required params do not match the tool schema"
 				}
-				reportStatus(strings.TrimSpace(fmt.Sprintf(`
-directly_call_tool params validation failed for cached tool '%s'.
-The fast path already selected a cached tool, but the generated params do not satisfy the tool schema.
-Validation errors: %s
-Next attempt should prefer @action=require_tool for '%s' so the runtime can re-enter normal parameter generation and review, or retry directly_call_tool with schema-matching params.
-
-Few-shot example 1 (preferred fallback):
-{"@action":"require_tool","tool_require_payload":"%s"}
-
-Few-shot example 2 (valid direct retry):
-{"@action":"directly_call_tool","directly_call_tool_name":"%s","directly_call_identifier":"<snake_case_intent>","directly_call_expectations":"~3s, fallback to require_tool if params are uncertain","directly_call_reason":"<why this call>","directly_call_tool_params":{"<param>":"<value>"}}
-`, toolName, validationSummary, toolName, toolName, toolName)))
-				finishProgress("[failed] params validation failed; falling back to require_tool")
-				reportStatus(fmt.Sprintf("auto fallback: switching '%s' from directly_call_tool to @action=require_tool because schema validation failed", toolName))
-				reactloops.EmitStatusI18n(
-					loop,
-					"当前方式不太合适，正在调整调用方式",
-					"Adjusting the tool invocation approach",
-					aicommon.WithStatusCode("tool.adjusting"),
-					aicommon.WithStatusState(aicommon.StatusStateRecovering),
-				)
-				operator.Feedback(fmt.Sprintf("directly_call_tool params invalid for '%s': %s; automatically switching to @action=require_tool", toolName, validationSummary))
-				return nil, true, tool, nil
+				err := utils.Errorf("directly_call_tool params invalid for '%s': %s; load missing schemas with require_tool, then retry directly_call_tool with matching arguments", toolName, validationSummary)
+				reportStatus(err.Error())
+				finishProgress("[failed] params validation failed; no tool was executed")
+				return nil, false, tool, err
 			}
 
 			feedbackItems := buildDirectlyCallParamFeedbackItems(params, mergedBlockParams)
@@ -515,7 +495,7 @@ Few-shot example 2 (valid direct retry):
 		}
 
 		// DirectlyCallTool emits the card (loading) first, then runs prepare (reads
-		// streaming params), then invokes — reusing the same card on fallback.
+		// streaming params), then invokes or reports the validation error.
 		result, directly, callErr := invoker.DirectlyCallTool(ctx, toolName, action, prepare)
 		recordSuccessfulToolCache(loop, toolName, result, callErr)
 

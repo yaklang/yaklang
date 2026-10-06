@@ -19,7 +19,7 @@
 
 **IMPORTANT**: The script file already exists at the path above. Do NOT use `write_script` again. Use `modify_script` only if you need to fix errors.
 
-When you need to execute or test the script, use `require_tool` with `tool_require_payload: "bash"`, then run:
+执行或测试脚本时，先用 `require_tool` 加载 bash 的参数 Schema，再按 Schema 使用 `directly_call_tool` 提交命令：
 `{{ .PythonCommand }} {{ .Filename }} --help`
 
 **Code below includes line numbers for reference. Do NOT include line number prefixes when generating code.**
@@ -60,9 +60,9 @@ When you need to execute or test the script, use `require_tool` with `tool_requi
 {{ else if not .DepsChecked }}
 1. Run `check_and_install_dependencies` to detect missing packages
 {{ else if not .DepsInstalled }}
-1. Use `require_tool` with `tool_require_payload: "bash"` to install missing packages, then `check_and_install_dependencies` to verify
+1. 先用 `require_tool` 加载 bash 的参数 Schema，再按 Schema 使用 `directly_call_tool` 安装依赖，之后用 `check_and_install_dependencies` 验证。
 {{ else }}
-1. Use `require_tool` with `tool_require_payload: "bash"` to run: `{{ .PythonCommand }} {{ .Filename }} --help` to verify the script works
+1. 先用 `require_tool` 加载 bash 的参数 Schema，再按 Schema 使用 `directly_call_tool` 提交命令： `{{ .PythonCommand }} {{ .Filename }} --help`，验证脚本。
 2. If execution succeeds, use `directly_answer` to complete the task
 {{ end }}
 
@@ -86,7 +86,7 @@ Use `write_script` to create the Python script. Include:
 
 Take action based on the feedback:
 - **Syntax errors**: Fix with `modify_script`
-- **Missing dependencies**: Use `require_tool` with `tool_require_payload: "bash"` to install
+- **Missing dependencies**: 先用 `require_tool` 加载 bash 的参数 Schema，再按 Schema 使用 `directly_call_tool` 安装。
 - **Style warnings**: Non-blocking, may ignore
 
 {{ end }}

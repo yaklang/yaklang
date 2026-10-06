@@ -107,7 +107,7 @@ func init() {
 
 | ActionType | 异步? | 文件 | 何时启用 | 触发条件 |
 |------------|-------|------|----------|----------|
-| `require_tool` | 否 | `action_tool_require_and_call.go` | `allowToolCall=true` | 单个工具走 `tool_require_payload`；2–8 个独立工具可走 `tool_require_calls`，分别生成参数后有界并发 |
+| `require_tool` | 否 | `action_tool_require_and_call.go` | `allowToolCall=true` | 单个工具走 `tool_require_payload`，多个定义走 `tool_require_calls`；只加载 Schema，不生成参数、不执行工具 |
 | `directly_call_tool` | 否 | `action_directly_call_tool.go` | `allowToolCall=true` 且 `aiToolManager != nil` | 单个工具走旧标量字段；2–8 个独立、完整参数已知的调用可走 `directly_call_tool_calls`；recent-cache miss 仅告警 |
 | `tool_compose` | 是 | `action_tool_compose.go` | `allowToolCall=true` | 表达有硬数据依赖的意图 DAG；节点不承载模型直接输出的最终工具参数 |
 | `ask_for_clarification` | 否 | `action_ask_for_clarification.go` | `allowUserInteract=true` | 信息不足问用户 |
@@ -127,10 +127,10 @@ func init() {
 
 ### 独立批量工具调用与 `tool_compose`
 
-`require_tool` / `directly_call_tool` 现在可以在**一个 Action 的对象数组**中声明 2–8 个彼此独立的真实工具调用。它不是多个顶层 Action，也不是 Provider 原生 `tool_calls[]`。
+`require_tool` 用对象数组加载多个工具定义；`directly_call_tool` 在**一个 Action 的对象数组**中声明 2–8 个彼此独立的真实工具调用。它不是多个顶层 Action，也不是 Provider 原生 `tool_calls[]`。
 
 - 完整参数已知：`directly_call_tool_calls: [{tool_name, params, ...}]`；
-- 参数仍需生成：`tool_require_calls: [{tool_name, ...}]`；
+- 缺少 Schema：`tool_require_calls: [{tool_name, ...}]` 只加载定义，下一轮观察后自行构参并使用 `directly_call_tool` 执行；
 - 后一项依赖前一项结果：不要放进普通 batch，拆到下一轮或在确有硬依赖 DAG 时使用 `tool_compose`；
 - `tool_compose` 节点不承载最终插件参数，不能代替“模型直接输出多个工具和调用参数”的协议。
 

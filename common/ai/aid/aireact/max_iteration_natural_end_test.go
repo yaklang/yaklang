@@ -25,17 +25,10 @@ func mockedMaxIterationLoopForever(i aicommon.AICallerConfigIf, req *aicommon.AI
 	if isPrimaryDecisionPrompt(prompt) {
 		rsp := i.NewAIResponse()
 		rsp.EmitOutputStream(bytes.NewBufferString(`
-{"@action": "object", "next_action": { "type": "require_tool", "tool_require_payload": "` + toolName + `",
+{"@action": "object", "next_action": { "type": "directly_call_tool", "directly_call_tool_name": "` + toolName + `", "directly_call_tool_params": {"seconds": 0.05},
 "todo_delta":{"add":[{"text":"继续排查剩余的可疑流量"}]}},
 "human_readable_thought": "keep probing with the tool", "cumulative_summary": "..still working.."}
 `))
-		rsp.Close()
-		return rsp, nil
-	}
-
-	if isToolParamGenerationPrompt(prompt, toolName) {
-		rsp := i.NewAIResponse()
-		rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "call-tool", "params": { "seconds" : 0.05 }}`))
 		rsp.Close()
 		return rsp, nil
 	}

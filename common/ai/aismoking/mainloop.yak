@@ -29,11 +29,16 @@ smokeHandler = func(w,body) {
     dynamic = re.FindSubmatch(string(body.messages[len(body.messages)-1].content),`(?s)<\|PROMPT_SECTION_dynamic_[^|]+\|>(.*)`)
     assert len(dynamic) == 2 && !(query in dynamic[1]), "user query leaked into pure dynamic region"
     step++
-    if step == 1 { smokeAnswer(w,native,"directly_call_tool",{"directly_call_tool_name":"read_file","directly_call_tool_params":{"file":sourceFile},"directly_call_reason":"读取本地实际来源"}); return }
+    if step == 1 { smokeAnswer(w,native,"require_tool",{"tool_require_payload":"read_file"}); return }
+    if step == 2 {
+        assert !("mainloop-source-sentinel" in prompt), "require_tool executed the tool"
+        assert "CACHE_TOOL_CALL" in prompt && "Direct Params Schema" in prompt, "tool schema missing after require_tool"
+        smokeAnswer(w,native,"directly_call_tool",{"directly_call_tool_name":"read_file","directly_call_tool_params":{"file":sourceFile},"directly_call_reason":"读取本地实际来源"}); return
+    }
     assert "mainloop-source-sentinel" in prompt
-    if step == 2 { smokeAnswer(w,native,"save_evidence",{"evidence_id":"mainloop.source","evidence_content":"mainloop-source-sentinel；来源：" + sourceFile}); return }
+    if step == 3 { smokeAnswer(w,native,"save_evidence",{"evidence_id":"mainloop.source","evidence_content":"mainloop-source-sentinel；来源：" + sourceFile}); return }
     assert "mainloop.source" in prompt
-    if step == 3 {
+    if step == 4 {
         config.GetTimeline().FreezeAll()
         smokeAnswer(w,native,"directly_answer",{"answer_payload":"实际文件读取与会话证据验证通过。"}); return
     }
@@ -46,14 +51,14 @@ smokeHandler = func(w,body) {
 }
 for native in [true,false] {
     step,config = 0,nil
-    die(aim.InvokeReAct(query,aim.context(smokeCtx),aim.workdir(smokeRoot),aim.reviewPolicy("yolo"),aim.maxIteration(6),aim.timeout(45),aim.disableMCPServers(true),aim.disableAIForge(true),aim.aiCallback(smokeModel),aim.onEvent(func(op,e) { config = op.GetConfig() }),aim.configOptions(aiagent.aiCallback(smokeModel),aiagent.functionCallMode(native),func(c) {
+    die(aim.InvokeReAct(query,aim.context(smokeCtx),aim.workdir(smokeRoot),aim.reviewPolicy("yolo"),aim.maxIteration(7),aim.timeout(45),aim.disableMCPServers(true),aim.disableAIForge(true),aim.aiCallback(smokeModel),aim.onEvent(func(op,e) { config = op.GetConfig() }),aim.configOptions(aiagent.aiCallback(smokeModel),aiagent.functionCallMode(native),func(c) {
         c.DisableCreateDBRuntime,c.DisablePerception,c.DisableMemoryTriage = true,true,true
         c.AiAutoRetry,c.AiTransactionAutoRetry = 1,1
         c.GetTimeline().SetTimelineBucketByteSize(-1)
         return nil
     }),func(c) { c.Stateless = true }))
-    assert step == 4 && config != nil
+    assert step == 5 && config != nil
     assert "mainloop.source" in config.GetSessionEvidenceRendered()
-    printf("PASS default aim.InvokeReAct: function_call=%v real_read=1 evidence=1 promotion=1\n",native)
+    printf("PASS default aim.InvokeReAct: function_call=%v schema_load=1 real_read=1 evidence=1 promotion=1\n",native)
 }
 smokeCheck()

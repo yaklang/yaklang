@@ -264,7 +264,7 @@ func TestDirectlyCallTool_Verifier_AllowsEmptyParamsForParamlessTool(t *testing.
 	assert.NotContains(t, invoker.getTimelineString(), "params validation failed")
 }
 
-func TestDirectlyCallTool_Handler_RequiredParamMismatchAddsLatestFewShot(t *testing.T) {
+func TestDirectlyCallTool_Handler_RequiredParamMismatchDoesNotGenerateParams(t *testing.T) {
 	ctx := context.Background()
 	testTool := mustNewTool(
 		"sleep_test",
@@ -297,16 +297,15 @@ func TestDirectlyCallTool_Handler_RequiredParamMismatchAddsLatestFewShot(t *test
 	op := reactloops.NewActionHandlerOperator(task)
 	loopAction_directlyCallTool.ActionHandler(loop, action, op)
 
-	assert.Empty(t, invoker.withoutRequiredName)
-	assert.True(t, invoker.toolCallCalled)
-	assert.Equal(t, "sleep_test", invoker.toolCallName)
+	// Validation failure no longer falls back to require_tool (AI param generation).
+	// The handler reports the error so the model can correct params in the next
+	// iteration using the schema in CACHE_TOOL_CALL.
+	assert.False(t, invoker.toolCallCalled)
+	assert.Empty(t, invoker.toolCallName)
 	timeline := invoker.getTimelineString()
-	assert.Contains(t, timeline, "params validation failed for cached tool 'sleep_test'")
-	assert.Contains(t, timeline, "auto fallback: switching 'sleep_test' from directly_call_tool to @action=require_tool because schema validation failed")
-	assert.Contains(t, timeline, `{"@action":"require_tool","tool_require_payload":"sleep_test"}`)
-	assert.Contains(t, timeline, `{"@action":"directly_call_tool","directly_call_tool_name":"sleep_test"`)
-	assert.NotContains(t, timeline, `"next_action"`)
-	assert.Contains(t, op.GetFeedback().String(), "automatically switching to @action=require_tool")
+	assert.Contains(t, timeline, "directly_call_tool params invalid for 'sleep_test'")
+	assert.NotContains(t, timeline, "auto fallback")
+	assert.Contains(t, op.GetFeedback().String(), "load missing schemas with require_tool, then retry directly_call_tool with matching arguments")
 }
 
 func TestDirectlyCallTool_Verifier_PassesThroughWhenNotCached(t *testing.T) {

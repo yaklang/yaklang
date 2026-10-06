@@ -310,7 +310,7 @@ func TestReAct_CancelTask_InLoop(t *testing.T) {
 			if isPrimaryDecisionPrompt(prompt) {
 				rsp := i.NewAIResponse()
 				rsp.EmitOutputStream(bytes.NewBufferString(`
-{"@action": "require_tool", "tool_require_payload": "` + mockToolName + `", 
+{"@action": "directly_call_tool", "directly_call_tool_name": "` + mockToolName + `", "directly_call_tool_params": {},
 "human_readable_thought": "为了取消当前任务，我需要使用` + mockToolName + `工具。当前任务明确要求使用该工具，无需其他参数，直接执行即可取消当前任务。"}
 		`))
 				rsp.Close()

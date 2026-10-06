@@ -404,6 +404,7 @@ func TestReAct_DirectlyCallTool_RequireThenDirect(t *testing.T) {
 	require.NoError(t, err)
 
 	var verifyCount int32
+	var schemasLoaded bool
 
 	_, err = NewTestReAct(
 		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
@@ -421,12 +422,15 @@ func TestReAct_DirectlyCallTool_RequireThenDirect(t *testing.T) {
 					return rsp, nil
 				}
 				rsp := i.NewAIResponse()
-				if atomic.LoadInt32(&toolCallCount) == 0 {
+				if !schemasLoaded {
+					schemasLoaded = true
 					rsp.EmitOutputStream(bytes.NewBufferString(`
 {"@action": "object", "next_action": { "type": "require_tool", "tool_require_payload": "sleep_test" },
 "human_readable_thought": "first call via require", "cumulative_summary": "..phase1.."}
 `))
 				} else {
+					require.Contains(t, prompt, "CACHE_TOOL_CALL")
+					require.Contains(t, prompt, "seconds")
 					rsp.EmitOutputStream(bytes.NewBufferString(`
 {"@action": "object", "next_action": { "type": "directly_call_tool", "directly_call_tool_name": "sleep_test", "directly_call_identifier": "sleep_again", "directly_call_expectations": "~0.1s", "directly_call_tool_params": {"seconds": 0.1} },
 "human_readable_thought": "second call via directly", "cumulative_summary": "..phase2.."}
@@ -624,8 +628,20 @@ LOOP1:
 	out2 := make(chan *ypb.AIOutputEvent, 400)
 
 	var conv2ToolCallCount int32
+	var conv2DecisionCount int32
 	react2, err := newImmediatePersistenceTestReAct(
 		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+			if isPrimaryDecisionPrompt(r.GetPrompt()) {
+				// Restored history already contains old results; count this task's decisions.
+				rsp := i.NewAIResponse()
+				if atomic.AddInt32(&conv2DecisionCount, 1) == 1 {
+					rsp.EmitOutputStream(strings.NewReader(`{"@action":"directly_call_tool","directly_call_tool_name":"sleep_test","directly_call_tool_params":{"seconds":0.1}}`))
+				} else {
+					rsp.EmitOutputStream(strings.NewReader(`{"@action":"finish"}`))
+				}
+				rsp.Close()
+				return rsp, nil
+			}
 			return mockedDirectlyCallTool(i, r, "sleep_test")
 		}),
 		aicommon.WithEventInputChan(in2),

@@ -72,7 +72,7 @@ intent_summary 应为一句极短的意图标签，只保留核心目标，例�
 
 搜索到的能力分为以下四种类型，每种类型有不同的使用方式：
 
-- **工具（Tool）**：通过 `require_tool` 动作调用指定工具来执行具体任务。
+- **工具（Tool）**：通过 `require_tool` 加载工具定义，再用 `directly_call_tool` 显式提交参数执行任务。
 - **蓝图（Forge / Blueprint）**：通过 `require_ai_blueprint` 动作调用蓝图，由蓝图系统负责后续自动化执行编排。
 - **技能（Skill）**：技能会被自动加载到上下文中，为 AI 提供特定领域的知识和方法指引。
 - **专注模式（Focus Mode）**：通过 `enter_focus_mode` 进入专注模式，在独立的执行环境中专注完成特定类型任务。
