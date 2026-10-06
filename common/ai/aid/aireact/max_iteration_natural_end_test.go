@@ -154,8 +154,9 @@ LOOP:
 				}
 			}
 
-			// 收到自然结束终止事件且任务已 completed 即可结束观测.
-			if gotSuccessTerminal && taskCompleted {
+			// Summary streaming and terminal events have independent delivery paths.
+			// Wait for every required observation before ending the existing bounded wait.
+			if gotSuccessTerminal && taskCompleted && gotAnswerPayload {
 				break LOOP
 			}
 		case <-after:

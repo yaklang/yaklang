@@ -601,6 +601,9 @@ func TestReAct_ForgeExecution_Task_UserQueryContext(t *testing.T) {
 </content_wait_for_review>
 {{end}}
 **分析目标**: {{ .Forge.UserQuery }}`,
+		// InitPrompt is planner-only. Carry the actual rendered invocation through
+		// the explicit worker context contract instead of an async Timeline mirror.
+		PersistentPrompt: `本次执行参数：{{ .Forge.UserQuery }}`,
 		PlanPrompt: `{
   "@action": "plan",
   "query": "-",
