@@ -1250,6 +1250,9 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Delete shared yak artifact
+        # Failed jobs still need this binary for a targeted rerun. Cache pruning
+        # may run after failure, but artifact deletion must wait for green tests.
+        if: needs.prepared-startup.result == 'success' && needs.test-local.result == 'success' && needs.test-prepared-yakgrpc.result == 'success' && needs.test-prepared-coreplugin.result == 'success'
         env:
           ARTIFACT_ID: ${{ needs.prepare-yak.outputs.yak_artifact_id }}
           ARTIFACT_LABEL: shared-yak
