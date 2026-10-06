@@ -1,0 +1,29 @@
+// Optional external-lab experiment; never run by the default suite or CI.
+// Set AISMOKING_SCAN_TARGET to your lab host with known FTP/SSH/HTTP services.
+// yak common/ai/aismoking/live/scan_port.yak
+// Calls the production Yak tool directly; no model, Go wrapper, or fixed private host.
+target = os.Getenv("AISMOKING_SCAN_TARGET")
+assert target != "", "Set AISMOKING_SCAN_TARGET to the prepared lab host"
+assert str.IsIPv4(target), "Use one explicit IPv4 lab host"
+source = "common/ai/aid/aitool/buildinaitools/yakscripttools/yakscriptforai/pentest/scan_port.yak"
+assert file.IsExisted(source), "Run from the repository root"
+binary = os.Executable()~
+command = exec.CommandContext(context.WithTimeoutSeconds(60), sprintf('"%s"', str.ReplaceAll(binary,"\\","/")))~
+command.Args = []string{binary, source, "--hosts", target, "--ports", "21,22,80", "--mode", "syn", "--concurrent", "200", "--fp-concurrent", "20", "--active", "--web"}
+if os.Getenv("AISMOKING_SCAN_PREFLIGHT") == "1" {
+    println("AISMOKING_PREFLIGHT_PASS: production CLI command prepared; no network scan")
+} else {
+    data, err = command.CombinedOutput()
+    output = string(data)
+    println(output)
+    die(err)
+    assert !("[FTAL]" in output) && !("YakVM Panic:" in output), "Production scan script failed"
+    for failure in ["assemble arp packet failed", "invalid MAC address", "SetBPFFilter failed"] {
+        assert !(failure in output), "Unexpected point-to-point route failure"
+    }
+    assert target in output && "open:" in output && "scan completed" in output
+    for service in [{"name":"ftp", "port":"21"}, {"name":"ssh", "port":"22"}, {"name":"http", "port":"80"}] {
+        assert service.name in output || (target + ":" + service.port) in output, "Expected lab service was not observed"
+    }
+    println("AISMOKING_PASS")
+}

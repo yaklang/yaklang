@@ -1,5 +1,10 @@
 # 待解决：两个 ReAct 循环之外的辅助模型请求
 
+> 历史观测记录（2026-10-02），不是当前运行说明。本文保留原始统计与当时的修复过程，用于成本对照。
+> 当前自动记忆已经迁移到 Timeline 压缩候选及可靠保存，主循环和新 Coordinator 不再通过 MemoryFlushBuffer 自动调用 HandleMemory；该接口仍用于手动记忆及 legacy 包。
+> LiteForge 默认文本流，与父循环的 function-call 配置独立。自动 injection 使用非 AI 检索，稳定快照只在意图决策应用后更新。
+> 当前流程与验收入口见 [记忆接口说明](../../aimemory/README.md) 和 [本地 AI 冒烟](../../aismoking/README.md)。下文的旧 native 辅助协议建议、触发入口及待办不应直接用于当前系统。
+
 目标：逐项评估辅助请求的必要性、触发时机、输入范围和预算，最后形成统一机制。主循环只有 `coordinator` 与 `pe_task`；单次辅助调用虽然不是第三种 ReAct 循环，仍会消耗模型请求、token、时间和后台资源。
 
 ## 实测基线：7 类辅助请求，165 次响应
@@ -23,7 +28,7 @@
 
 更早一次冒烟把 Original、Quality、Speed 都覆盖成 DeepSeek，使正常轻量任务也使用主模型。那是脚本配置错误，不是 coordinator → worker 的分层配置丢失。上述基线已经分开模型。
 
-## 每类请求做什么、从哪里来
+## 当时每类请求做什么、从哪里来
 
 | 用途 | 入口及触发 | 结果去向 / 当前问题 |
 | --- | --- | --- |
@@ -37,7 +42,7 @@
 
 `save_evidence`、`review_task`、`write_report` 等属于两个主循环已经选出的 actions，其本地执行不应再被统计成额外模型请求。模型同一次响应的 reasoning 流也不是新请求。
 
-## memory triage 为什么会放大开销
+## 旧自动 memory triage 为什么会放大开销
 
 1. 它面向长期记忆，会从 Timeline 增量判断“什么值得以后记住”，并不是直接保存已经明确选出的 evidence。每轮筛选即使返回空数组，也消耗一次请求。
 2. coordinator 和 worker 都有 flush 入口。默认阈值是 **6 个有增量的迭代或 4096 字节**，另外任务完成、结束迭代和 async milestone 也能触发。因此并不保证“每 6 步才调用一次”；工具结果稍大即可提前触发。此轮 21 次首轮输入中，**17 次为 `batch_byte_limit`，4 次为 `task_done`**，主要触发源确实是字节门槛。

@@ -56,6 +56,9 @@ func TestBusinessToolUsagesKeepActionAndParameterProtocolsSeparate(t *testing.T)
 				if err != nil {
 					t.Fatal(err)
 				}
+				// Embedded sources use platform checkout newlines. AITAG examples
+				// must compare with JSON string values independently of CRLF/LF.
+				usage = strings.ReplaceAll(usage, "\r\n", "\n")
 				if strings.Contains(usage, "[[-") || (native && (strings.Contains(usage, "\"@action\"") || strings.Contains(usage, "\"directly_call_tool_name\"") || strings.Contains(usage, "\"directly_call_tool_params\""))) {
 					t.Fatalf("mode=%t: tool usage leaked a template or text action", native)
 				}

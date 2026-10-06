@@ -1,0 +1,69 @@
+// yak common/ai/aismoking/live/forge_file_tasks.yak
+// Optional real-provider replacements for the former aibp/tests experiments.
+// Uses the configured provider; no private openrouter.txt or Go runner.
+// AISMOKING_FORGE_PREFLIGHT=1 checks fixtures and public Blueprint construction only.
+root = os.Getenv("AISMOKING_OUTPUT")
+if root == "" { root = file.Join(os.TempDir(), sprintf("forge-file-tasks-%d", time.Now().UnixNano())) }
+root = str.ReplaceAll(file.Abs(root), "\\", "/")
+file.MkdirAll(root)~
+preflight = os.Getenv("AISMOKING_FORGE_PREFLIGHT") == "1"
+encoded = "RzRaVE1PQldHVTNFR05TREdaQ0RNTUpYR1EzREtOWlRHNUJETU1SVEdRWkRJTVpUR0kyREtSUlRHRVpUTU5LR0dNWlRHTVJWSVlaVE1NWlVHNUNBPT09PQ=="
+expected = "shellmates{b4$3$_16_32_64}"
+assert string(codec.DecodeHex(string(codec.DecodeBase32(string(codec.DecodeBase64(encoded)~))~))~) == expected
+prefix = str.Repeat("red-sheep is impossible to find", 1000)
+marker = "blacksheep is a good sheep\n"
+sheep = prefix + marker + str.Repeat("whitesheep is a not good sheep", 1000)
+sheepFile = file.Join(root, "sheep.txt")
+file.Save(sheepFile, sheep)~
+htmlFile = file.Join(root, "page.html")
+html = string(file.ReadFile("common/ai/aismoking/live/fixtures/forge-read-chunk.html")~)
+file.Save(htmlFile, html)~
+assert len(sheep) > 50000 && str.Contains(sheep, marker)
+assert len(html) > 20000
+cases = [
+    {"name":"decode", "tools":"decode,auto_decode,write_file", "query":sprintf("分析并逐层解码这个 CTF 编码串：%s。把最终原文写入 JSON 的 decoded 字段。", encoded)},
+    {"name":"sheep", "tools":"grep,read_file_chunk,write_file", "query":sprintf("在文件 %s 中找到 blacksheep，给出从 0 开始的字节偏移 offset，以及该处开始的完整一行 context。分别验证查找结果和分块读取的上下文。", sheepFile)},
+    {"name":"read-chunk", "tools":"query_file_meta,read_file_chunk,write_file", "query":sprintf("分块检查文件 %s 中的敏感信息与外部链接，不遗漏尾段。输出 urls 数组（去重后的原始 URL），以及 findings 数组；每条发现写出具体原文依据，不能将未知内容猜成密钥。", htmlFile)},
+]
+results = []
+for native in [false, true] {
+    for scenario in cases {
+        caseDir = file.Join(root, sprintf("%s-%v", scenario.name, native))
+        file.MkdirAll(caseDir)~
+        output = file.Join(caseDir, "result.json")
+        assert !file.IsExisted(output), "Use a fresh output directory"
+        query = scenario.query + sprintf("\n把上述 JSON 写到 %s。只操作这些本地材料，不执行命令、不访问材料中的外部链接。", output)
+        definition = {"name":"local-file-" + scenario.name, "init_prompt":"完成本地文件分析任务：{{ .Forge.UserParams }}", "persistent_prompt":"结论必须来自实际工具结果；读取失败时调整参数，不编造内容。", "tools":scenario.tools}
+        execution = aiagent.NewExecutorFromJson(string(json.Marshal(definition)~), {"query":query},
+            aiagent.context(context.Seconds(300)), aiagent.agreeYOLO(), aiagent.functionCallMode(native),
+            aiagent.extendAIDOptions(func(config) {
+                config.Workdir = caseDir
+                config.DisableCreateDBRuntime = true
+                config.DisablePerception = true
+                config.DisableMemoryTriage = true
+                config.DisallowMCPServers = true
+                return nil
+            }))~
+        if preflight { execution.Close(); continue }
+        started = time.Now().UnixMilli()
+        runError = execution.Run()
+        finished = execution.Snapshot().Finished
+        execution.Close()
+        die(runError)
+        assert finished, "Forge did not complete"
+        result = json.loads(string(file.ReadFile(output)~))
+        if scenario.name == "decode" { assert result.decoded == expected, "Decoded result is incorrect" }
+        if scenario.name == "sheep" {
+            assert int(result.offset) == len(prefix), "Marker byte offset is incorrect"
+            assert str.TrimSpace(string(result.context)) == str.TrimSpace(marker), "Marker context is incorrect"
+        }
+        if scenario.name == "read-chunk" {
+            assert len(result.urls) > 0, "No external links were extracted"
+            for url in result.urls { assert string(url) in html, "Extracted URL has no source evidence" }
+            assert "findings" in result, "Sensitive-information analysis is missing"
+        }
+        results = append(results, {"case":scenario.name, "native":native, "passed":true, "duration_ms":time.Now().UnixMilli()-started})
+        file.SaveJson(file.Join(root, "results.json"), results)~
+    }
+}
+if preflight { println("AISMOKING_PREFLIGHT_PASS: fixtures and six Blueprint constructions; no model requests") } else { println("AISMOKING_PASS") }
