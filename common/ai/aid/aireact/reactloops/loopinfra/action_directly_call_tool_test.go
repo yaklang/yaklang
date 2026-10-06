@@ -274,7 +274,7 @@ func TestDirectlyCallTool_Handler_RequiredParamMismatchDoesNotGenerateParams(t *
 		}),
 	)
 	cfg := &aicommon.Config{AiToolManager: newToolManagerWithTool(testTool)}
-	cfg.GetAiToolManager().AddRecentlyUsedTool(testTool)
+	require.False(t, cfg.GetAiToolManager().IsRecentlyUsedTool("sleep_test"))
 
 	invoker := &directlyCallTestInvoker{testInvoker: newTestInvoker(ctx)}
 	invoker.tool = testTool
@@ -305,7 +305,11 @@ func TestDirectlyCallTool_Handler_RequiredParamMismatchDoesNotGenerateParams(t *
 	timeline := invoker.getTimelineString()
 	assert.Contains(t, timeline, "directly_call_tool params invalid for 'sleep_test'")
 	assert.NotContains(t, timeline, "auto fallback")
-	assert.Contains(t, op.GetFeedback().String(), "load missing schemas with require_tool, then retry directly_call_tool with matching arguments")
+	assert.Contains(t, op.GetFeedback().String(), "reason:")
+	assert.Contains(t, op.GetFeedback().String(), "retry:")
+	assert.Contains(t, op.GetFeedback().String(), "完整 Schema 已放入 CACHE_TOOL_CALL")
+	assert.True(t, cfg.GetAiToolManager().IsRecentlyUsedTool("sleep_test"))
+	assert.Empty(t, invoker.withoutRequiredName)
 }
 
 func TestDirectlyCallTool_Verifier_PassesThroughWhenNotCached(t *testing.T) {

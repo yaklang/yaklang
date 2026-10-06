@@ -5,7 +5,7 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -16,22 +16,10 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 )
 
-func isLoadCapabilityToolParamPrompt(prompt string) bool {
-	// R2 now reuses R1 instruction; identify via dynamic-section markers.
-	if strings.Contains(prompt, "# Tool Context") && strings.Contains(prompt, "call-tool") {
-		return true
-	}
-	// Fallback: tool-params instruction still has "Generate appropriate parameters".
-	if strings.Contains(prompt, "Generate appropriate parameters") && strings.Contains(prompt, "call-tool") {
-		return true
-	}
-	return false
-}
-
-// TestReActLoop_LoadCapability_ToolExecutionCompatibility preserves the explicit
-// load_capability tool execution path. require_tool separately loads schemas only.
-func TestReActLoop_LoadCapability_ToolExecutionCompatibility(t *testing.T) {
+// Schema loading continues the same task; only an explicit direct action executes.
+func TestReActLoop_LoadCapability_LoadThenExplicitExecution(t *testing.T) {
 	iterationCount := 0
+	var executions atomic.Int32
 
 	toolName := "sleep"
 
@@ -39,6 +27,7 @@ func TestReActLoop_LoadCapability_ToolExecutionCompatibility(t *testing.T) {
 		"sleep",
 		aitool.WithNumberParam("seconds"),
 		aitool.WithSimpleCallback(func(params aitool.InvokeParams, stdout io.Writer, stderr io.Writer) (any, error) {
+			executions.Add(1)
 			sleepInt := params.GetFloat("seconds", 0.01)
 			if sleepInt <= 0 {
 				sleepInt = 0.01
@@ -69,19 +58,20 @@ func TestReActLoop_LoadCapability_ToolExecutionCompatibility(t *testing.T) {
 					return rsp, nil
 				}
 
-				// THE KEY DIFFERENCE: use load_capability instead of require_tool
+				if iterationCount > 1 {
+					if iterationCount == 2 && executions.Load() != 0 {
+						return nil, utils.Error("schema loading executed the tool")
+					}
+					rsp := i.NewAIResponse()
+					rsp.EmitOutputStream(bytes.NewBufferString(`{"@action":"directly_call_tool","directly_call_tool_name":"sleep","directly_call_tool_params":{"seconds":0.01},"directly_call_reason":"execute the loaded tool"}`))
+					rsp.Close()
+					return rsp, nil
+				}
 				rsp := i.NewAIResponse()
 				rsp.EmitOutputStream(bytes.NewBufferString(`
 {"@action": "load_capability", "capability_identifier": "` + toolName + `",
 "human_readable_thought": "mocked thought for tool calling via load_capability"}
 `))
-				rsp.Close()
-				return rsp, nil
-			}
-
-			if isLoadCapabilityToolParamPrompt(prompt) {
-				rsp := i.NewAIResponse()
-				rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "call-tool", "params": { "seconds" : 0.01 }}`))
 				rsp.Close()
 				return rsp, nil
 			}
@@ -125,6 +115,9 @@ func TestReActLoop_LoadCapability_ToolExecutionCompatibility(t *testing.T) {
 		t.Errorf("Expected at least 3 iterations, got %d", iterationCount)
 	}
 
+	if executions.Load() != 2 {
+		t.Fatalf("expected two explicit executions, got %d", executions.Load())
+	}
 	t.Logf("load_capability tool equivalence: completed %d iterations (same as require_tool)", iterationCount)
 }
 
@@ -133,6 +126,7 @@ func TestReActLoop_LoadCapability_ToolExecutionCompatibility(t *testing.T) {
 // correctly hits the max-iteration limit just like require_tool does.
 func TestReActLoop_LoadCapability_MaxIterationsLimit(t *testing.T) {
 	callCount := 0
+	var executions atomic.Int32
 
 	toolName := "sleep"
 
@@ -140,6 +134,7 @@ func TestReActLoop_LoadCapability_MaxIterationsLimit(t *testing.T) {
 		"sleep",
 		aitool.WithNumberParam("seconds"),
 		aitool.WithSimpleCallback(func(params aitool.InvokeParams, stdout io.Writer, stderr io.Writer) (any, error) {
+			executions.Add(1)
 			sleepInt := params.GetFloat("seconds", 0.01)
 			if sleepInt <= 0 {
 				sleepInt = 0.01
@@ -160,20 +155,13 @@ func TestReActLoop_LoadCapability_MaxIterationsLimit(t *testing.T) {
 		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			prompt := req.GetPrompt()
 			if aicommon.IsPrimaryDecisionPrompt(prompt) {
+				callCount++
 				// THE KEY DIFFERENCE: use load_capability instead of require_tool
 				rsp := i.NewAIResponse()
 				rsp.EmitOutputStream(bytes.NewBufferString(`
 {"@action": "load_capability", "capability_identifier": "` + toolName + `",
 "human_readable_thought": "mocked thought for tool calling via load_capability"}
 `))
-				rsp.Close()
-				return rsp, nil
-			}
-
-			if isLoadCapabilityToolParamPrompt(prompt) {
-				callCount++
-				rsp := i.NewAIResponse()
-				rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "call-tool", "params": { "seconds" : 0.01 }}`))
 				rsp.Close()
 				return rsp, nil
 			}
@@ -217,5 +205,11 @@ func TestReActLoop_LoadCapability_MaxIterationsLimit(t *testing.T) {
 		t.Errorf("Expected exactly %d tool calls (same as require_tool), got %d", maxIter, callCount)
 	}
 
+	if executions.Load() != 0 {
+		t.Fatalf("schema loading executed %d callbacks", executions.Load())
+	}
+	if !reactIns.GetConfig().GetAiToolManager().IsRecentlyUsedTool(toolName) {
+		t.Fatal("schema was not loaded")
+	}
 	t.Logf("load_capability max iterations: stopped after %d tool calls (max: %d)", callCount, maxIter)
 }

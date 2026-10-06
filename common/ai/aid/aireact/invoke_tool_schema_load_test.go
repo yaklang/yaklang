@@ -22,130 +22,151 @@ import (
 // arguments -> execute single/batch -> answer/finish. Any auxiliary parameter
 // generation request is an error, so a hidden legacy fallback cannot pass.
 func TestMainLoopLoadSchemasThenDirectExecution(t *testing.T) {
-	for _, nativeMode := range []bool{false, true} {
-		t.Run(fmt.Sprintf("native=%v", nativeMode), func(t *testing.T) {
-			var decisions, executions atomic.Int32
-			var react *ReAct
-			var tools []*aitool.Tool
-			for _, name := range []string{"schema_probe_a", "schema_probe_b"} {
-				tool, err := aitool.New(name, aitool.WithDangerousNoNeedUserReview(true),
-					aitool.WithStringParam("value", aitool.WithParam_Required(true)),
-					aitool.WithSimpleCallback(func(params aitool.InvokeParams, _, _ io.Writer) (any, error) {
-						executions.Add(1)
-						return params.GetString("value"), nil
+	for _, loader := range []string{"require_tool", "load_capability"} {
+		for _, nativeMode := range []bool{false, true} {
+			t.Run(fmt.Sprintf("loader=%s/native=%v", loader, nativeMode), func(t *testing.T) {
+				var decisions, executions atomic.Int32
+				var react *ReAct
+				var tools []*aitool.Tool
+				for _, name := range []string{"schema_probe_a", "schema_probe_b"} {
+					tool, err := aitool.New(name, aitool.WithDangerousNoNeedUserReview(true),
+						aitool.WithStringParam("value", aitool.WithParam_Required(true)),
+						aitool.WithSimpleCallback(func(params aitool.InvokeParams, _, _ io.Writer) (any, error) {
+							executions.Add(1)
+							return params.GetString("value"), nil
+						}))
+					require.NoError(t, err)
+					tools = append(tools, tool)
+				}
+				var err error
+				react, err = NewTestReAct(aicommon.WithWorkdir(t.TempDir()), aicommon.WithTools(tools...),
+					aicommon.WithEnableFunctionCallMode(nativeMode), aicommon.WithAgreeYOLO(),
+					aicommon.WithDisableToolCallerIntervalReview(true), aicommon.WithAIAutoRetry(1), aicommon.WithAITransactionAutoRetry(2),
+					aicommon.WithAICallback(func(cfg aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+						if aicommon.IsVerifySatisfactionPrompt(req.GetPrompt()) {
+							response := cfg.NewAIResponse()
+							response.EmitOutputStream(strings.NewReader(`{"@action":"verify-satisfaction","user_satisfied":false,"reasoning":"continue the probe sequence"}`))
+							response.Close()
+							return response, nil
+						}
+						if !aicommon.IsPrimaryDecisionPrompt(req.GetPrompt()) {
+							return nil, fmt.Errorf("unexpected auxiliary model request during schema load/direct execution")
+						}
+						step := decisions.Add(1)
+						var calls []*aispec.ToolCall
+						add := func(name, args string) {
+							calls = append(calls, &aispec.ToolCall{ID: fmt.Sprintf("call_%d_%d", step, len(calls)), Type: "function", Function: aispec.FuncReturn{Name: name, Arguments: args}})
+						}
+						switch step {
+						case 1:
+							require.Contains(t, req.GetPrompt(), "只加载业务工具完整参数 Schema")
+							if loader == "load_capability" {
+								add(loader, `{"capability_identifier":"schema_probe_a"}`)
+							} else {
+								add(loader, `{"tool_require_calls":[{"tool_name":"schema_probe_a"},{"tool_name":"schema_probe_b"}]}`)
+							}
+						case 2:
+							require.Zero(t, executions.Load())
+							open := aicommon.RenderTimelineFrozenOpen(react.config.Timeline)
+							require.Contains(t, open.Open, "[UPSERT] schema_probe_a")
+							expectedSchemas := 2
+							if loader == "load_capability" {
+								expectedSchemas = 1
+							}
+							require.Equal(t, expectedSchemas, strings.Count(open.Open, "Direct Params Schema"))
+							require.Contains(t, req.GetPrompt(), "立即调用 directly_call_tool")
+							require.Empty(t, open.PromotedRecentTools)
+							if loader == "load_capability" {
+								add(loader, `{"capability_identifier":"schema_probe_b"}`)
+							} else {
+								add(loader, `{"tool_require_payload":"schema_probe_a"}`)
+							}
+						case 3:
+							require.Zero(t, executions.Load())
+							if loader == "require_tool" {
+								require.Contains(t, aicommon.RenderTimelineFrozenOpen(react.config.Timeline).Open, "[REUSE] schema_probe_a")
+							} else {
+								require.Contains(t, aicommon.RenderTimelineFrozenOpen(react.config.Timeline).Open, "[UPSERT] schema_probe_b")
+							}
+							add("directly_call_tool", `{"directly_call_tool_name":"schema_probe_a","directly_call_tool_params":{}}`)
+						case 4:
+							require.Zero(t, executions.Load())
+							require.Contains(t, req.GetPrompt(), "reason:")
+							require.Contains(t, req.GetPrompt(), "retry:")
+							if nativeMode {
+								require.Contains(t, req.GetPrompt(), "never generates parameters")
+							} else {
+								require.Contains(t, req.GetPrompt(), "params invalid")
+							}
+							add("directly_call_tool", `{"directly_call_tool_name":"schema_probe_a","directly_call_tool_params":{"value":"single"}}`)
+						case 5:
+							require.EqualValues(t, 1, executions.Load())
+							add("directly_call_tool", `{"directly_call_tool_calls":[{"tool_name":"schema_probe_a","params":{"value":"batch-a"}},{"tool_name":"schema_probe_b","params":{"value":"batch-b"}}]}`)
+						case 6:
+							require.EqualValues(t, 3, executions.Load())
+							add("directly_answer", `{"answer_payload":"Both schemas loaded; single and batch execution completed."}`)
+							if nativeMode {
+								add("finish", `{}`)
+							}
+						case 7:
+							if nativeMode {
+								return nil, fmt.Errorf("unexpected native step %d", step)
+							}
+							add("finish", `{}`)
+						default:
+							return nil, fmt.Errorf("unexpected main-loop step %d", step)
+						}
+						response := cfg.NewAIResponse()
+						if !nativeMode {
+							var params map[string]any
+							if err := json.Unmarshal([]byte(calls[0].Function.Arguments), &params); err != nil {
+								return nil, err
+							}
+							params["@action"] = calls[0].Function.Name
+							raw, err := json.Marshal(params)
+							if err != nil {
+								return nil, err
+							}
+							response.EmitOutputStream(strings.NewReader(string(raw)))
+							response.Close()
+							return response, nil
+						}
+						options := aispec.NewDefaultAIConfig(req.GetExtraSpecOpts()...)
+						options.ToolCallCallback(calls)
+						options.FinishReasonCallback("tool_calls", []byte(`{"choices":[{"finish_reason":"tool_calls"}]}`))
+						response.Close()
+						return response, nil
 					}))
 				require.NoError(t, err)
-				tools = append(tools, tool)
-			}
-			var err error
-			react, err = NewTestReAct(aicommon.WithWorkdir(t.TempDir()), aicommon.WithTools(tools...),
-				aicommon.WithEnableFunctionCallMode(nativeMode), aicommon.WithAgreeYOLO(),
-				aicommon.WithDisableToolCallerIntervalReview(true), aicommon.WithAIAutoRetry(1), aicommon.WithAITransactionAutoRetry(2),
-				aicommon.WithAICallback(func(cfg aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
-					if aicommon.IsVerifySatisfactionPrompt(req.GetPrompt()) {
-						response := cfg.NewAIResponse()
-						response.EmitOutputStream(strings.NewReader(`{"@action":"verify-satisfaction","user_satisfied":false,"reasoning":"continue the probe sequence"}`))
-						response.Close()
-						return response, nil
-					}
-					if !aicommon.IsPrimaryDecisionPrompt(req.GetPrompt()) {
-						return nil, fmt.Errorf("unexpected auxiliary model request during schema load/direct execution")
-					}
-					step := decisions.Add(1)
-					var calls []*aispec.ToolCall
-					add := func(name, args string) {
-						calls = append(calls, &aispec.ToolCall{ID: fmt.Sprintf("call_%d_%d", step, len(calls)), Type: "function", Function: aispec.FuncReturn{Name: name, Arguments: args}})
-					}
-					switch step {
-					case 1:
-						require.Contains(t, req.GetPrompt(), "只加载业务工具完整参数 Schema")
-						add("require_tool", `{"tool_require_calls":[{"tool_name":"schema_probe_a"},{"tool_name":"schema_probe_b"}]}`)
-					case 2:
-						require.Zero(t, executions.Load())
-						open := aicommon.RenderTimelineFrozenOpen(react.config.Timeline)
-						require.Contains(t, open.Open, "[UPSERT] schema_probe_a")
-						require.Equal(t, 2, strings.Count(open.Open, "Direct Params Schema"))
-						require.Empty(t, open.PromotedRecentTools)
-						add("require_tool", `{"tool_require_payload":"schema_probe_a"}`)
-					case 3:
-						require.Zero(t, executions.Load())
-						require.Contains(t, aicommon.RenderTimelineFrozenOpen(react.config.Timeline).Open, "[REUSE] schema_probe_a")
-						add("directly_call_tool", `{"directly_call_tool_name":"schema_probe_a","directly_call_tool_params":{}}`)
-					case 4:
-						require.Zero(t, executions.Load())
-						if nativeMode {
-							require.Contains(t, req.GetPrompt(), "never generates parameters")
-						} else {
-							require.Contains(t, req.GetPrompt(), "params invalid")
-						}
-						add("directly_call_tool", `{"directly_call_tool_name":"schema_probe_a","directly_call_tool_params":{"value":"single"}}`)
-					case 5:
-						require.EqualValues(t, 1, executions.Load())
-						add("directly_call_tool", `{"directly_call_tool_calls":[{"tool_name":"schema_probe_a","params":{"value":"batch-a"}},{"tool_name":"schema_probe_b","params":{"value":"batch-b"}}]}`)
-					case 6:
-						require.EqualValues(t, 3, executions.Load())
-						add("directly_answer", `{"answer_payload":"Both schemas loaded; single and batch execution completed."}`)
-						if nativeMode {
-							add("finish", `{}`)
-						}
-					case 7:
-						if nativeMode {
-							return nil, fmt.Errorf("unexpected native step %d", step)
-						}
-						add("finish", `{}`)
-					default:
-						return nil, fmt.Errorf("unexpected main-loop step %d", step)
-					}
-					response := cfg.NewAIResponse()
-					if !nativeMode {
-						var params map[string]any
-						if err := json.Unmarshal([]byte(calls[0].Function.Arguments), &params); err != nil {
-							return nil, err
-						}
-						params["@action"] = calls[0].Function.Name
-						raw, err := json.Marshal(params)
-						if err != nil {
-							return nil, err
-						}
-						response.EmitOutputStream(strings.NewReader(string(raw)))
-						response.Close()
-						return response, nil
-					}
-					options := aispec.NewDefaultAIConfig(req.GetExtraSpecOpts()...)
-					options.ToolCallCallback(calls)
-					options.FinishReasonCallback("tool_calls", []byte(`{"choices":[{"finish_reason":"tool_calls"}]}`))
-					response.Close()
-					return response, nil
-				}))
-			require.NoError(t, err)
-			react.config.Timeline.SetTimelineBucketByteSize(-1)
-			loop, err := reactloops.CreateLoopByName("default", react,
-				reactloops.WithDisablePeriodicVerification(true), reactloops.WithDisableLoopPerception(true), reactloops.WithMaxIterations(8))
-			require.NoError(t, err)
-			ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
-			defer cancel()
-			require.NoError(t, loop.Execute("schema-load-probe", ctx, "Load the probe schemas, then execute and report."))
-			expectedDecisions := 7
-			if nativeMode {
-				expectedDecisions = 6
-			}
-			require.EqualValues(t, expectedDecisions, decisions.Load())
-			require.EqualValues(t, 3, executions.Load())
-			// A text loop retains its own action variant. Native workers are created
-			// by the coordinator factory, not an implicitly registered legacy pe_task.
-			textLoop, err := reactloops.CreateLoopByName("default", react, reactloops.WithFunctionCallMode(false))
-			require.NoError(t, err)
-			textAction, err := textLoop.GetActionHandler("require_tool")
-			require.NoError(t, err)
-			require.Contains(t, textAction.Description, "不生成参数、不执行工具")
-			worker, err := coordinator.NewWorkerLoop(react, reactloops.WithFunctionCallMode(true))
-			require.NoError(t, err)
-			workerAction, err := worker.GetActionHandler("require_tool")
-			require.NoError(t, err)
-			require.Contains(t, workerAction.Description, "只加载业务工具完整参数 Schema")
-			mainAction, err := loop.GetActionHandler("require_tool")
-			require.NoError(t, err)
-			require.Contains(t, mainAction.Description, "只加载业务工具完整参数 Schema", "constructing another loop must not mutate shared action variants")
-		})
+				react.config.Timeline.SetTimelineBucketByteSize(-1)
+				loop, err := reactloops.CreateLoopByName("default", react,
+					reactloops.WithDisablePeriodicVerification(true), reactloops.WithDisableLoopPerception(true), reactloops.WithMaxIterations(8))
+				require.NoError(t, err)
+				ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+				defer cancel()
+				require.NoError(t, loop.Execute("schema-load-probe", ctx, "Load the probe schemas, then execute and report."))
+				expectedDecisions := 7
+				if nativeMode {
+					expectedDecisions = 6
+				}
+				require.EqualValues(t, expectedDecisions, decisions.Load())
+				require.EqualValues(t, 3, executions.Load())
+				// A text loop retains its own action variant. Native workers are created
+				// by the coordinator factory, not an implicitly registered legacy pe_task.
+				textLoop, err := reactloops.CreateLoopByName("default", react, reactloops.WithFunctionCallMode(false))
+				require.NoError(t, err)
+				textAction, err := textLoop.GetActionHandler("require_tool")
+				require.NoError(t, err)
+				require.Contains(t, textAction.Description, "不生成参数、不执行工具")
+				worker, err := coordinator.NewWorkerLoop(react, reactloops.WithFunctionCallMode(true))
+				require.NoError(t, err)
+				workerAction, err := worker.GetActionHandler("require_tool")
+				require.NoError(t, err)
+				require.Contains(t, workerAction.Description, "只加载业务工具完整参数 Schema")
+				mainAction, err := loop.GetActionHandler("require_tool")
+				require.NoError(t, err)
+				require.Contains(t, mainAction.Description, "只加载业务工具完整参数 Schema", "constructing another loop must not mutate shared action variants")
+			})
+		}
 	}
 }

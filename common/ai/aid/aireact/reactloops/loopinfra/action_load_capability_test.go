@@ -251,12 +251,12 @@ func TestLoadCapability_Handler_Tool_Success(t *testing.T) {
 	action := buildAction("my-tool")
 	loopAction_LoadCapability.ActionHandler(loop, action, op)
 
-	assert.True(t, invoker.toolCallCalled, "tool should be called")
-	assert.Equal(t, "my-tool", invoker.toolCallName)
+	assert.False(t, invoker.toolCallCalled, "loading schema must not execute the tool")
+	assert.True(t, cfg.GetAiToolManager().IsRecentlyUsedTool("my-tool"))
+	assert.Contains(t, op.GetFeedback().String(), "立即调用 directly_call_tool")
+	assert.Contains(t, invoker.getTimelineString(), "tool_schema_load")
 
-	// verification 收缩为纯观测角色后, satisfied=true 不再触发 operator.Exit
-	// (退出职责迁移到 AI 主动 finish). load_capability 走 tool_call_common
-	// 路径, satisfied 仅作为观测信号, operator 不应被终止.
+	// Schema loading continues the current task without ending it.
 	terminated, err := op.IsTerminated()
 	assert.False(t, terminated, "should NOT exit on satisfied anymore; exit is delegated to AI finish")
 	assert.NoError(t, err)
@@ -264,7 +264,10 @@ func TestLoadCapability_Handler_Tool_Success(t *testing.T) {
 
 func TestLoadCapability_Handler_Tool_Error(t *testing.T) {
 	ctx := context.Background()
-	cfg := &aicommon.Config{}
+	cfg := &aicommon.Config{AiToolManager: newToolManagerWithTool(mustNewTool("available-tool", aitool.WithSimpleCallback(func(aitool.InvokeParams, io.Writer, io.Writer) (any, error) {
+		t.Fatal("schema loading executed a tool")
+		return nil, nil
+	})))}
 	invoker := newTestInvoker(ctx)
 	task := newTestTask(ctx)
 	invoker.currentTask = task
@@ -279,12 +282,13 @@ func TestLoadCapability_Handler_Tool_Error(t *testing.T) {
 	action := buildAction("broken-tool")
 	loopAction_LoadCapability.ActionHandler(loop, action, op)
 
-	assert.True(t, invoker.toolCallCalled)
+	assert.False(t, invoker.toolCallCalled)
 	assert.True(t, op.IsContinued(), "should continue on tool error to allow retry")
-	assert.Contains(t, op.GetFeedback().String(), "execution failed")
+	assert.Contains(t, op.GetFeedback().String(), "Tool unavailable")
+	assert.False(t, cfg.GetAiToolManager().IsRecentlyUsedTool("broken-tool"))
 }
 
-func TestLoadCapability_Handler_Tool_NilResult(t *testing.T) {
+func TestLoadCapability_Handler_Tool_MissingManager(t *testing.T) {
 	ctx := context.Background()
 	cfg := &aicommon.Config{}
 	invoker := newTestInvoker(ctx)
@@ -301,8 +305,9 @@ func TestLoadCapability_Handler_Tool_NilResult(t *testing.T) {
 	action := buildAction("nil-result-tool")
 	loopAction_LoadCapability.ActionHandler(loop, action, op)
 
-	assert.True(t, invoker.toolCallCalled)
-	assert.True(t, op.IsContinued(), "should continue when tool returns nil result")
+	assert.False(t, invoker.toolCallCalled)
+	assert.True(t, op.IsContinued(), "missing manager must not execute a tool")
+	assert.Contains(t, op.GetFeedback().String(), "unavailable")
 }
 
 // --- Handler Tests: Forge/Blueprint Branch ---
@@ -573,8 +578,9 @@ func TestLoadCapability_E2E_ToolFlow(t *testing.T) {
 	op := reactloops.NewActionHandlerOperator(task)
 	loopAction_LoadCapability.ActionHandler(loop, action, op)
 
-	assert.True(t, invoker.toolCallCalled, "tool should be executed")
-	assert.Equal(t, "e2e-tool", invoker.toolCallName)
+	assert.False(t, invoker.toolCallCalled, "tool schema loading must not execute")
+	assert.True(t, cfg.GetAiToolManager().IsRecentlyUsedTool("e2e-tool"))
+	assert.Contains(t, op.GetFeedback().String(), "立即调用 directly_call_tool")
 	assert.False(t, op.IsAsyncModeRequested(), "tool should not request async mode")
 }
 
@@ -928,4 +934,23 @@ func TestLoadCapability_Handler_Unknown_TimelinePressure(t *testing.T) {
 		"feedback should clearly state the identifier was not found")
 	assert.Contains(t, feedback, "Do NOT retry",
 		"feedback should discourage retrying")
+}
+
+func TestLoadCapability_VerifiedActionsKeepIndependentTargets(t *testing.T) {
+	manager, readFile, grep := newToolBatchTestManager(t)
+	invoker := newTestInvoker(context.Background())
+	loop := reactloops.NewMinimalReActLoop(&aicommon.Config{AiToolManager: manager}, invoker)
+	first, second := buildAction(readFile.Name), buildAction(grep.Name)
+	require.NoError(t, loadCapabilityVerifier(loop, first))
+	require.NoError(t, loadCapabilityVerifier(loop, second))
+	firstOp := reactloops.NewActionHandlerOperator(nil)
+	loadCapabilityHandler(loop, first, firstOp)
+	require.True(t, manager.IsRecentlyUsedTool(readFile.Name))
+	require.False(t, manager.IsRecentlyUsedTool(grep.Name))
+	require.Contains(t, firstOp.GetFeedback().String(), readFile.Name)
+	secondOp := reactloops.NewActionHandlerOperator(nil)
+	loadCapabilityHandler(loop, second, secondOp)
+	require.True(t, manager.IsRecentlyUsedTool(grep.Name))
+	require.Contains(t, secondOp.GetFeedback().String(), grep.Name)
+	require.False(t, invoker.toolCallCalled)
 }

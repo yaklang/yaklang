@@ -6,7 +6,7 @@ reactloops 把所有"AI 可调用的资源"统一抽象为**能力（Capability�
 
 | 类型 | 含义 | 调用方式 |
 |------|------|----------|
-| `tool` | 单步工具 | `require_tool` action |
+| `tool` | 单步工具 | `require_tool` / `load_capability` 加载 Schema，`directly_call_tool` 显式执行 |
 | `forge` | AI 蓝图（多步流程） | `require_ai_blueprint` action / async exec |
 | `skill` | 上下文加载的技能（SKILL.md） | `loading_skills` action / 自动加载 |
 | `focus_mode` | 子专注模式（另一个 ReActLoop） | `enter_focus_mode` / `load_capability` |
@@ -49,7 +49,7 @@ type CapabilitySearchResult struct {
 
 | 类型 | 中英文使用提示 |
 |------|----------------|
-| `tool` | 通过 `require_tool` 调用指定工具 / Use `require_tool` to invoke the tool |
+| `tool` | 通过 `require_tool` 加载 Schema，随后立即 `directly_call_tool` 执行 |
 | `forge` | 通过 `require_ai_blueprint` 调用蓝图 / Use `require_ai_blueprint` to execute the blueprint |
 | `skill` | 技能会被自动加载到上下文 / Skills are auto-loaded into context |
 | `focus_mode` | 通过 `enter_focus_mode` 进入专注模式 / Use `enter_focus_mode` to enter focus mode |
@@ -201,14 +201,13 @@ default:
 
 ### 9.4.1 Tool 身份
 
-走 `invoker.ExecuteToolRequiredAndCall(taskCtx, identifier)`：
+与 `require_tool` 共用 Schema 加载逻辑：
 
 ```go
-result, directly, err := invoker.ExecuteToolRequiredAndCall(taskCtx, identifier)
-handleToolCallResult(loop, taskCtx, invoker, identifier, result, directly, err, op)
+loadToolSchemasByNames(loop, []string{identifier}, op)
 ```
 
-行为等价于 `require_tool` action，会触发完整的 8 个 `tool_call_*` 事件。
+只加载参数 Schema，不生成参数、不执行工具。加载结果进入 Timeline；主循环立即按 Schema 构参，用 `directly_call_tool` 继续当前任务。实际执行时才触发工具调用事件。
 
 ### 9.4.2 Forge 身份（含 Skill fallback）
 
@@ -331,7 +330,7 @@ flowchart TD
     ECM --> Prompt["渲染进 prompt<br/>EXTRA_CAPABILITIES 段"]
     Prompt --> LLM["LLM 推理"]
     LLM --> Choice{"选择 action"}
-    Choice -->|require_tool| Tool["执行工具"]
+    Choice -->|require_tool| Tool["加载工具 Schema，随后直接调用"]
     Choice -->|require_ai_blueprint| Forge["异步 forge"]
     Choice -->|loading_skills| Skill["加载 skill 到 prompt"]
     Choice -->|enter_focus_mode<br/>load_capability| Sub["子 loop"]
