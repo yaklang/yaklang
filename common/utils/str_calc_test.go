@@ -1,13 +1,13 @@
 package utils
 
 import (
+	"math/rand"
 	"reflect"
 	"sort"
+	"testing"
 
 	"github.com/davecgh/go-spew/spew"
 	"github.com/stretchr/testify/assert"
-	"testing"
-	"time"
 )
 
 func TestSimilarityHash(t *testing.T) {
@@ -49,13 +49,33 @@ func TestSimilarStr(t *testing.T) {
 }
 
 func TestSimilarStrBIG(t *testing.T) {
-	println(time.Now().String())
-	for range make([]interface{}, 100) {
-		rand := RandStringBytes(900000)
-		r := CalcSimilarity([]byte(rand), []byte(rand))
-		_ = r
+	// Keep the large-input correctness guard; repeated throughput measurement
+	// belongs in the benchmark rather than every ordinary test run.
+	raw := largeSimilarityInput()
+	assert.Equal(t, 1.0, CalcSimilarity(raw, raw))
+}
+
+func BenchmarkCalcSimilarityLarge(b *testing.B) {
+	raw := largeSimilarityInput()
+	b.ReportAllocs()
+	b.SetBytes(int64(2 * len(raw)))
+	b.ResetTimer()
+	var score float64
+	for i := 0; i < b.N; i++ {
+		score = CalcSimilarity(raw, raw)
 	}
-	println(time.Now().String())
+	if score != 1 {
+		b.Fatalf("identical inputs have similarity %v", score)
+	}
+}
+
+func largeSimilarityInput() []byte {
+	rng := rand.New(rand.NewSource(1))
+	raw := make([]byte, 900000)
+	for i := range raw {
+		raw[i] = byte('a' + rng.Intn(26))
+	}
+	return raw
 }
 
 func TestGetSameSubStringsCompatibility(t *testing.T) {

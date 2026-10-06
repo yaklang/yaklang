@@ -76,6 +76,12 @@ func TestVerifiedRule(t *testing.T) {
 		capture.Stop()
 	})
 	for rule := range sfdb.YieldSyntaxFlowRules(db, context.Background()) {
+		// sfanalysis.TestBuiltinStructRules_VerifyFilesystem already runs the
+		// entire struct corpus with strict POS/NEG checks. Keep the database
+		// import above, but do not execute the same fixtures a second time.
+		if rule.IsStructMode() {
+			continue
+		}
 		caseName := strings.Join(append(strings.Split(rule.Tag, "|"), rule.RuleName), "/")
 		f, err := sfvm.NewSyntaxFlowVirtualMachine().Compile(rule.Content)
 		if err != nil {

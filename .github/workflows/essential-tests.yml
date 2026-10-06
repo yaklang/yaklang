@@ -23,6 +23,9 @@ on:
       - "embed/**"
       - "scannode/**"
       - ".github/workflows/essential-tests.yml"
+      - ".github/workflows/essential-cache-warm.yml"
+      - ".github/actions/essential-go-cache/**"
+      - ".github/actions/pre-check/**"
       # The suite/runner scripts below drive this workflow, so a change to them
       # must exercise it; otherwise a broken edit merges without ever running.
       - "scripts/ci/**"
@@ -152,7 +155,7 @@ jobs:
 
       - name: 'Check Out'
         if: steps.target.outputs.is_same_repo == 'true'
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           ref: ${{ steps.target.outputs.ref || github.ref }}
           repository: ${{ steps.target.outputs.fork_repo || github.repository }}
@@ -165,6 +168,8 @@ jobs:
         with:
           failed-labels: 'do-not-merge,work in progress,wip,rfc'
           cache-key-prefix: 'essential-tests'
+          # An explicit rerun must execute assertions even after a green status.
+          ignore-success-status: ${{ github.run_attempt > 1 }}
 
       - name: Set run flag from Pre-Check
         if: steps.target.outputs.is_pull_request == 'true' && steps.target.outputs.is_same_repo == 'true'
@@ -225,16 +230,10 @@ jobs:
         env:
           SHOULD_RUN: ${{ env.SHOULD_RUN }}
 
-  # Go build and module caches are shared through actions/cache instead of a per-run
-  # 656MB artifact, and the two are keyed separately on purpose:
-  #   - GOMODCACHE only changes with go.sum, so it lives in one long-lived entry;
-  #   - GOCACHE is republished by prepare-yak for every run, and the two heaviest
-  #     suites (ssa, utils) publish an extra tagged copy once their packages have
-  #     been compiled, so the next run inherits those compilations too.
-  # Consumers restore the exact per-run key and fall back to the newest entry with
-  # the same go.sum prefix. Cleanup prunes old entries so the repository cache
-  # quota stays predictable. The yak binary is still an artifact: it must match the
-  # tested commit exactly.
+  # Cache production and test compilations separately, at most once per suite,
+  # toolchain/dependency set, branch and UTC week. Main's warming workflow provides
+  # reusable test dependencies to new PRs. Go validates source contents on restore;
+  # -count=1 still executes every selected test. The engine artifact matches the SHA.
   prepare-yak:
     timeout-minutes: 30
     needs: check-wip
@@ -246,43 +245,18 @@ jobs:
       fork_repo: ${{ needs.check-wip.outputs.fork_repo }}
     steps:
       - name: Check out code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           repository: ${{ needs.check-wip.outputs.fork_repo || github.repository }}
           ref: ${{ needs.check-wip.outputs.target_ref || github.sha }}
           token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Set up Go 1.x
-        uses: actions/setup-go@v5
-        with:
-          go-version-file: "./go.mod"
-          cache: false
+      - name: Restore toolchain and Go caches
+        id: go_cache
+        uses: ./.github/actions/essential-go-cache
 
-      - name: Configure Go build directories
-        run: |
-          mkdir -p "$RUNNER_TEMP/go-build-cache" "$RUNNER_TEMP/go-mod-cache"
-          echo "GOCACHE=$RUNNER_TEMP/go-build-cache" >> $GITHUB_ENV
-          echo "GOMODCACHE=$RUNNER_TEMP/go-mod-cache" >> $GITHUB_ENV
-
-      - name: Restore Go module cache
-        id: gomod_cache
-        uses: actions/cache/restore@v4
-        continue-on-error: true
-        with:
-          path: ${{ runner.temp }}/go-mod-cache
-          key: ${{ runner.os }}-essential-gomod-${{ hashFiles('go.sum') }}
-
-      - name: Restore Go build cache
-        id: go_build_cache
-        uses: actions/cache/restore@v4
-        continue-on-error: true
-        with:
-          path: ${{ runner.temp }}/go-build-cache
-          key: ${{ runner.os }}-essential-gobuild-${{ hashFiles('go.sum') }}-base-${{ github.sha }}-${{ github.run_id }}
-          restore-keys: |
-            ${{ runner.os }}-essential-gobuild-${{ hashFiles('go.sum') }}-base-
-            ${{ runner.os }}-essential-gobuild-${{ hashFiles('go.sum') }}-
-            ${{ runner.os }}-essential-gobuild-
+      - name: Validate cache policy and compile-only runner
+        run: python3 -B -m unittest discover -s scripts/ci/tests -p 'test_*.py' -v
 
       - name: Build yak binary
         env:
@@ -311,19 +285,20 @@ jobs:
           du -sh "$RUNNER_TEMP/go-build-cache" "$RUNNER_TEMP/go-mod-cache"
 
       - name: Save Go module cache
-        if: steps.gomod_cache.outputs.cache-hit != 'true'
+        if: steps.go_cache.outputs.module-hit != 'true'
         continue-on-error: true
         uses: actions/cache/save@v4
         with:
           path: ${{ runner.temp }}/go-mod-cache
-          key: ${{ runner.os }}-essential-gomod-${{ hashFiles('go.sum') }}
+          key: ${{ steps.go_cache.outputs.module-key }}
 
       - name: Save Go build cache
+        if: steps.go_cache.outputs.build-hit != 'true'
         continue-on-error: true
         uses: actions/cache/save@v4
         with:
           path: ${{ runner.temp }}/go-build-cache
-          key: ${{ runner.os }}-essential-gobuild-${{ hashFiles('go.sum') }}-base-${{ github.sha }}-${{ github.run_id }}
+          key: ${{ steps.go_cache.outputs.build-key }}
 
   prepared-startup:
     name: Prepared engine startup smoke
@@ -338,32 +313,10 @@ jobs:
           repository: ${{ needs.prepare-yak.outputs.fork_repo || github.repository }}
           ref: ${{ needs.prepare-yak.outputs.target_ref || github.sha }}
           persist-credentials: false
-      - name: Set up Go
-        uses: actions/setup-go@v5
-        with:
-          go-version-file: go.mod
-          cache: false
-      - name: Configure Go build directories
-        run: |
-          mkdir -p "$RUNNER_TEMP/go-build-cache" "$RUNNER_TEMP/go-mod-cache"
-          echo "GOCACHE=$RUNNER_TEMP/go-build-cache" >> "$GITHUB_ENV"
-          echo "GOMODCACHE=$RUNNER_TEMP/go-mod-cache" >> "$GITHUB_ENV"
-      - name: Restore Go module cache
-        uses: actions/cache/restore@v4
-        continue-on-error: true
-        with:
-          path: ${{ runner.temp }}/go-mod-cache
-          key: ${{ runner.os }}-essential-gomod-${{ hashFiles('go.sum') }}
-      - name: Restore Go build cache
-        uses: actions/cache/restore@v4
-        continue-on-error: true
-        with:
-          path: ${{ runner.temp }}/go-build-cache
-          key: ${{ runner.os }}-essential-gobuild-${{ hashFiles('go.sum') }}-base-${{ github.sha }}-${{ github.run_id }}
-          restore-keys: |
-            ${{ runner.os }}-essential-gobuild-${{ hashFiles('go.sum') }}-base-
-            ${{ runner.os }}-essential-gobuild-${{ hashFiles('go.sum') }}-
-            ${{ runner.os }}-essential-gobuild-
+      - name: Restore toolchain and Go caches
+        id: go_cache
+        uses: ./.github/actions/essential-go-cache
+
       - name: Download prepared engine
         uses: actions/download-artifact@v4
         with:
@@ -467,35 +420,9 @@ jobs:
           ref: ${{ needs.check-wip.outputs.target_ref || github.sha }}
           token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Set up Go 1.x
-        uses: actions/setup-go@v5
-        with:
-          go-version-file: "./go.mod"
-          cache: false
-
-      - name: Configure Go build directories
-        run: |
-          mkdir -p "$RUNNER_TEMP/go-build-cache" "$RUNNER_TEMP/go-mod-cache"
-          echo "GOCACHE=$RUNNER_TEMP/go-build-cache" >> "$GITHUB_ENV"
-          echo "GOMODCACHE=$RUNNER_TEMP/go-mod-cache" >> "$GITHUB_ENV"
-
-      - name: Restore Go module cache
-        uses: actions/cache/restore@v4
-        continue-on-error: true
-        with:
-          path: ${{ runner.temp }}/go-mod-cache
-          key: ${{ runner.os }}-essential-gomod-${{ hashFiles('go.sum') }}
-
-      - name: Restore Go build cache
-        uses: actions/cache/restore@v4
-        continue-on-error: true
-        with:
-          path: ${{ runner.temp }}/go-build-cache
-          key: ${{ runner.os }}-essential-gobuild-${{ hashFiles('go.sum') }}-any-${{ github.sha }}-${{ github.run_id }}
-          restore-keys: |
-            ${{ runner.os }}-essential-gobuild-${{ hashFiles('go.sum') }}-any-
-            ${{ runner.os }}-essential-gobuild-${{ hashFiles('go.sum') }}-
-            ${{ runner.os }}-essential-gobuild-
+      - name: Restore toolchain and Go caches
+        id: go_cache
+        uses: ./.github/actions/essential-go-cache
 
       - name: Test ScanNode packages
         run: |
@@ -556,41 +483,15 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
       - name: Check out code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           repository: ${{ needs.prepare-yak.outputs.fork_repo || github.repository }}
           ref: ${{ needs.prepare-yak.outputs.target_ref || github.sha }}
           token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Set up Go 1.x
-        uses: actions/setup-go@v5
-        with:
-          go-version-file: "./go.mod"
-          cache: false
-
-      - name: Configure Go build directories
-        run: |
-          mkdir -p "$RUNNER_TEMP/go-build-cache" "$RUNNER_TEMP/go-mod-cache"
-          echo "GOCACHE=$RUNNER_TEMP/go-build-cache" >> "$GITHUB_ENV"
-          echo "GOMODCACHE=$RUNNER_TEMP/go-mod-cache" >> "$GITHUB_ENV"
-
-      - name: Restore Go module cache
-        uses: actions/cache/restore@v4
-        continue-on-error: true
-        with:
-          path: ${{ runner.temp }}/go-mod-cache
-          key: ${{ runner.os }}-essential-gomod-${{ hashFiles('go.sum') }}
-
-      - name: Restore Go build cache
-        uses: actions/cache/restore@v4
-        continue-on-error: true
-        with:
-          path: ${{ runner.temp }}/go-build-cache
-          key: ${{ runner.os }}-essential-gobuild-${{ hashFiles('go.sum') }}-any-${{ github.sha }}-${{ github.run_id }}
-          restore-keys: |
-            ${{ runner.os }}-essential-gobuild-${{ hashFiles('go.sum') }}-any-
-            ${{ runner.os }}-essential-gobuild-${{ hashFiles('go.sum') }}-
-            ${{ runner.os }}-essential-gobuild-
+      - name: Restore toolchain and Go caches
+        id: go_cache
+        uses: ./.github/actions/essential-go-cache
 
       - name: Slim gate test (irify_exclude)
         run: go test -tags irify_exclude -run '^TestSlimGate_' -timeout 5m ./common/yakgrpc ./common/yak/cmd/yakcmds ./common/syntaxflow/sfdb
@@ -606,41 +507,15 @@ jobs:
       fork_repo: ${{ needs.prepare-yak.outputs.fork_repo }}
     steps:
       - name: Check out code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           repository: ${{ needs.prepare-yak.outputs.fork_repo || github.repository }}
           ref: ${{ needs.prepare-yak.outputs.target_ref || github.sha }}
           token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Set up Go 1.x
-        uses: actions/setup-go@v5
-        with:
-          go-version-file: "./go.mod"
-          cache: false
-
-      - name: Configure Go build directories
-        run: |
-          mkdir -p "$RUNNER_TEMP/go-build-cache" "$RUNNER_TEMP/go-mod-cache"
-          echo "GOCACHE=$RUNNER_TEMP/go-build-cache" >> "$GITHUB_ENV"
-          echo "GOMODCACHE=$RUNNER_TEMP/go-mod-cache" >> "$GITHUB_ENV"
-
-      - name: Restore Go module cache
-        uses: actions/cache/restore@v4
-        continue-on-error: true
-        with:
-          path: ${{ runner.temp }}/go-mod-cache
-          key: ${{ runner.os }}-essential-gomod-${{ hashFiles('go.sum') }}
-
-      - name: Restore Go build cache
-        uses: actions/cache/restore@v4
-        continue-on-error: true
-        with:
-          path: ${{ runner.temp }}/go-build-cache
-          key: ${{ runner.os }}-essential-gobuild-${{ hashFiles('go.sum') }}-any-${{ github.sha }}-${{ github.run_id }}
-          restore-keys: |
-            ${{ runner.os }}-essential-gobuild-${{ hashFiles('go.sum') }}-any-
-            ${{ runner.os }}-essential-gobuild-${{ hashFiles('go.sum') }}-
-            ${{ runner.os }}-essential-gobuild-
+      - name: Restore toolchain and Go caches
+        id: go_cache
+        uses: ./.github/actions/essential-go-cache
 
       - name: Reject runtime patching dependencies
         run: ./scripts/ci/check-test-dependencies.sh
@@ -691,41 +566,15 @@ jobs:
       fork_repo: ${{ needs.prepare-yak.outputs.fork_repo }}
     steps:
       - name: Check out code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           repository: ${{ needs.prepare-yak.outputs.fork_repo || github.repository }}
           ref: ${{ needs.prepare-yak.outputs.target_ref || github.sha }}
           token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Set up Go 1.x
-        uses: actions/setup-go@v5
-        with:
-          go-version-file: "./go.mod"
-          cache: false
-
-      - name: Configure Go build directories
-        run: |
-          mkdir -p "$RUNNER_TEMP/go-build-cache" "$RUNNER_TEMP/go-mod-cache"
-          echo "GOCACHE=$RUNNER_TEMP/go-build-cache" >> "$GITHUB_ENV"
-          echo "GOMODCACHE=$RUNNER_TEMP/go-mod-cache" >> "$GITHUB_ENV"
-
-      - name: Restore Go module cache
-        uses: actions/cache/restore@v4
-        continue-on-error: true
-        with:
-          path: ${{ runner.temp }}/go-mod-cache
-          key: ${{ runner.os }}-essential-gomod-${{ hashFiles('go.sum') }}
-
-      - name: Restore Go build cache
-        uses: actions/cache/restore@v4
-        continue-on-error: true
-        with:
-          path: ${{ runner.temp }}/go-build-cache
-          key: ${{ runner.os }}-essential-gobuild-${{ hashFiles('go.sum') }}-any-${{ github.sha }}-${{ github.run_id }}
-          restore-keys: |
-            ${{ runner.os }}-essential-gobuild-${{ hashFiles('go.sum') }}-any-
-            ${{ runner.os }}-essential-gobuild-${{ hashFiles('go.sum') }}-
-            ${{ runner.os }}-essential-gobuild-
+      - name: Restore toolchain and Go caches
+        id: go_cache
+        uses: ./.github/actions/essential-go-cache
 
       - name: Generate prepare config
         run: |
@@ -836,67 +685,21 @@ jobs:
                 {"package": "./scannode/...", "timeout": "30s"}
               ]
 
-          - name: "Test Utils Common / Yak Tooling USE gRPC"
-            # Keep packages serial: competing builds made the RDP mock's
-            # CredSSP handshake hit its internal deadline in run 35064637684.
-            # Widening go test's timeout does not fix that resource contention.
-            # Only the independent Telnet banner cases overlap within their
-            # parent test, so they finish before any other package test runs.
-            test_configs: |
-              [
-                {"package": "./common/log", "timeout": "20s", "race": true},
-                {"package": "./common/yak/cmd/yakcmds/...", "timeout": "20s"},
-                {"package": "./common/yak/yaklib/codec", "timeout": "20s"},
-                {"package": "./common/yak/cartesian", "timeout": "20s"},
-                {"package": "./common/utils/omap/...", "timeout": "30s", "race": true},
-                {"package": "./common/utils", "timeout": "1m"},
-                {"package": "./common/utils/appconfig", "timeout": "20s", "race": true},
-                {"package": "./common/utils/atomicbool", "timeout": "20s", "race": true},
-                {"package": "./common/utils/textvalidate", "timeout": "20s"},
-                {"package": "./common/rpa/randomforest/...", "timeout": "30s", "race": true},
-                {"package": "./common/utils/dbcache", "timeout": "1m", "retry": 1, "retry_delay": 5},
-                {"package": "./common/utils/imageutils/...", "timeout": "20s"},
-                {"package": "./common/utils/xml2", "timeout": "10s"},
-                {"package": "./common/utils/tlsutils/...", "timeout": "20s"},
-                {"package": "./common/utils/linktable/...", "timeout": "10s"},
-                {"package": "./common/yak/yaklib", "timeout": "20s", "run": "^TestMUSTPASS_.*$"},
-                {"package": "./common/vulinbox/verificationcode", "timeout": "20s", "run": "^TestCaptchaScenarioLifecycle$"},
-                {"package": "./common/yak/yaklib/tools", "timeout": "1m", "run": "^(TestMUSTPASS_Fp.*|TestOracle.*|TestPing.*)$"},
-                {"package": "./common/utils/dot/...", "timeout": "10s"},
-                {"package": "./common/utils/filesys/...", "timeout": "30s"},
-                {"package": "./common/utils/bruteutils/.", "timeout": "2m", "retry": 1, "retry_delay": 5},
-                {"package": "./common/utils/bruteutils/internal/vncprobe", "timeout": "20s", "race": true},
-                {"package": "./common/utils/bruteutils/internal/oracleprobe", "timeout": "20s", "race": true},
-                {"package": "./common/netx", "timeout": "1m", "run": "^(TestDialContext.*|TestHTTPProxy.*|TestSocks.*|TestProxyCheckSocks5hDoesNotConnectToProxyItself)$", "race": true},
-                {"package": "./common/utils/memedit/.", "timeout": "15s"},
-                {"package": "./common/yak/yakurl/...", "timeout": "15s"},
-                {"package": "./common/utils/ziputil/...", "timeout": "20s"},
-                {"package": "./common/utils/zipx/...", "timeout": "30s"},
-                {"package": "./common/thirdparty_bin", "timeout": "1m", "skip": "^(TestFetchAllMD5|TestSingleURL|TestInstallMemoryUsage|TestMemoryUsageBaseline)$"},
-                {"package": "./common/utils/yakgit/...", "exclude_packages": ["./common/utils/yakgit/yakdiff/..."]},
-                {"package": "./common/utils/suspect"},
-                {"package": "./common/yak/antlr4nasl/tests/...", "timeout": "1m"},
-                {"package": "./common/utils/gzip_embed/test/...", "timeout": "30s"},
-                {"package": "./common/utils/resources_monitor/...", "timeout": "30s"},
-                {"package": "./common/yak/cmd/...", "timeout": "30s", "exclude_packages": ["./common/yak/cmd/yakcmds/..."]},
-                {"package": "./common/utils/pingutil", "timeout": "20s", "run": "^TestPing", "race": true},
-                {"package": "./common/lowtun/netstack/gvisor/pkg/icmp", "timeout": "20s", "run": "^TestPing", "race": true},
-                {"package": "./common/netstackvm", "timeout": "20s", "run": "^TestPCAPEndpointIPLinkTypes$", "race": true},
-                {"package": "./common/yak/yaktest", "timeout": "30s", "run": "^TestMisc_PingScan$"},
-                {"package": "./common/mutate_tests", "timeout": "20s"},
-                {"package": "./common/fuzztag", "timeout": "20s"},
-                {"package": "./common/fuzztagx", "timeout": "20s"},
-                {"package": "./common/mutate", "timeout": "30s"},
-                {"package": "./common/fuzzx", "timeout": "30s"},
-                {"package": "./common/utils/bizhelper/...", "timeout": "20s"},
-                {"package": "./common/utils/cli", "timeout": "1m"},
-                {"package": "./common/mcp/yakcliconvert", "timeout": "1m"},
-                {"package": "./common/mcp", "timeout": "2m", "run": "^TestLegacy.*$", "retry": 1, "retry_delay": 5},
-                {"package": "./common/mcp/...", "timeout": "2m", "skip": "^TestLegacy.*$", "exclude_packages": ["./common/mcp"]},
-                {"package": "./common/yak/yakdoc/...", "timeout": "3m"},
-                {"package": "./common/utils/yakgit/yakdiff/...", "timeout": "20s"},
-                {"package": "./common/yak/ssaapi/ssaconfig", "timeout": "20s"}
-              ]
+          # Pure utilities can build/run concurrently without competing with the
+          # RDP/CredSSP handshake's internal deadlines. Keep protocol mocks serial.
+          # memfit-cli belongs to AI/ReAct, netstackvm to Utils Infra, ssaconfig to SSA.
+          - name: "Test Utils Foundation"
+            cache_tag: "utils-core"
+            needs_grpc: "0"
+            package_workers: "2"
+            go_test_p: "1"
+            test_config_file: "scripts/ci/configs/utils-core.json"
+
+          - name: "Test Yak Tooling / Protocol Mocks"
+            cache_tag: "utils-tooling"
+            package_workers: "1"
+            go_test_p: "2"
+            test_config_file: "scripts/ci/configs/utils-tooling.json"
 
           - name: "Test SSA Frontend Java / JS(TS|ES) / Yak / Python / Golang / C / CSharp"
             package_workers: "2"
@@ -922,33 +725,13 @@ jobs:
               ]
 
           - name: "Test SSA / SSAAPI Core / SyntaxFlow / StaticAnalyze / SFDB / SFVM"
+            cache_tag: "ssa"
             package_workers: "2"
             sync_rule: "1"
             go_test_p: "1"
-            # sfbuildin's rule-verification subtests call t.Parallel() and share an
-            # antlr token collector that is not thread-safe, which aborted the
-            # package with "fatal error: concurrent map read and map write". Its
-            # entry below sets parallel:1 until that collector is fixed upstream.
-            # sfanalysis grew a builtin rule walker (source + struct POS/NEG
-            # verification) and now needs ~10s of real test time versus ~1s
-            # before, so its old 20s cap no longer survives a shared runner.
-            test_configs: |
-              [
-                {"package": "./common/yak/ssa/...", "timeout": "20s"},
-                {"package": "./common/yak/ssaapi", "timeout": "1m"},
-                {"package": "./common/yak/ssaapi/ssareducer", "timeout": "1m"},
-                {"package": "./common/yak/ssaapi/test/ssatest/...", "timeout": "1m"},
-                {"package": "./common/yak/ssaapi/test/...", "timeout": "2m", "exclude_packages": ["./common/yak/ssaapi/test/yak/...", "./common/yak/ssaapi/test/java/...", "./common/yak/ssaapi/test/javascript/...", "./common/yak/ssaapi/test/php/...", "./common/yak/ssaapi/test/python/...", "./common/yak/ssaapi/test/golang/...", "./common/yak/ssaapi/test/c/...", "./common/yak/ssaapi/test/syntaxflow/...", "./common/yak/ssaapi/test/ssatest/..."]},
-                {"package": "./common/syntaxflow/tests", "timeout": "20s"},
-                {"package": "./common/syntaxflow/sfdb/...", "timeout": "20s", "retry": 1, "retry_delay": 5},
-                {"package": "./common/syntaxflow/sfrisk", "timeout": "20s"},
-                {"package": "./common/syntaxflow/sfvm/...", "timeout": "20s"},
-                {"package": "./common/syntaxflow/sfbuildin/...", "timeout": "5m", "parallel": 1, "retry": 1, "retry_delay": 5},
-                {"package": "./common/yak/ssaapi/test/syntaxflow/...", "timeout": "1m"},
-                {"package": "./common/syntaxflow/sfanalysis/...", "timeout": "2m", "retry": 1, "retry_delay": 5},
-                {"package": "./common/yak/static_analyzer/test/...", "timeout": "20s"},
-                {"package": "./common/yak/syntaxflow_scan/...", "timeout": "2m", "retry": 1, "retry_delay": 5}
-              ]
+            # Builtin verification shares a non-thread-safe ANTLR token collector.
+            # Its config retains parallel:1; sfanalysis owns strict struct fixtures.
+            test_config_file: "scripts/ci/configs/ssa.json"
 
           - name: "Test SSA PHP / SSAAPI PHP / SFWeb / SFReport"
             # Two packages dominate this suite (php/tests ~122s, sfweb ~108s) and
@@ -1027,41 +810,17 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           repository: ${{ needs.prepare-yak.outputs.fork_repo || github.repository }}
           ref: ${{ needs.prepare-yak.outputs.target_ref || github.sha }}
           token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Set up Go 1.x
-        uses: actions/setup-go@v5
+      - name: Restore toolchain and Go caches
+        id: go_cache
+        uses: ./.github/actions/essential-go-cache
         with:
-          go-version-file: "./go.mod"
-          cache: false
-
-      - name: Configure Go build directories
-        run: |
-          mkdir -p "$RUNNER_TEMP/go-build-cache" "$RUNNER_TEMP/go-mod-cache"
-          echo "GOCACHE=$RUNNER_TEMP/go-build-cache" >> "$GITHUB_ENV"
-          echo "GOMODCACHE=$RUNNER_TEMP/go-mod-cache" >> "$GITHUB_ENV"
-
-      - name: Restore Go module cache
-        uses: actions/cache/restore@v4
-        continue-on-error: true
-        with:
-          path: ${{ runner.temp }}/go-mod-cache
-          key: ${{ runner.os }}-essential-gomod-${{ hashFiles('go.sum') }}
-
-      - name: Restore Go build cache
-        uses: actions/cache/restore@v4
-        continue-on-error: true
-        with:
-          path: ${{ runner.temp }}/go-build-cache
-          key: ${{ runner.os }}-essential-gobuild-${{ hashFiles('go.sum') }}-${{ matrix.cache_tag || 'any' }}-${{ github.sha }}-${{ github.run_id }}
-          restore-keys: |
-            ${{ runner.os }}-essential-gobuild-${{ hashFiles('go.sum') }}-${{ matrix.cache_tag || 'any' }}-
-            ${{ runner.os }}-essential-gobuild-${{ hashFiles('go.sum') }}-
-            ${{ runner.os }}-essential-gobuild-
+          role: ${{ matrix.cache_tag || 'base' }}
 
       - name: Download shared yak binary
         uses: actions/download-artifact@v4
@@ -1079,7 +838,7 @@ jobs:
           ./scripts/ci/artifact-unpackage.sh
 
       - name: Audit facade race tests
-        if: matrix.name == 'Test Utils Common / Yak Tooling USE gRPC'
+        if: matrix.cache_tag == 'utils-tooling'
         run: |
           time go test -race -count=1 -timeout=20s -v \
             common/hids/audit_monitor.go \
@@ -1087,10 +846,16 @@ jobs:
             common/hids/audit_monitor_linux_test.go
 
       - name: Generate test config
+        env:
+          CONFIG_FILE: ${{ matrix.test_config_file }}
         run: |
-          cat > "${{ runner.temp }}/test_config.json" <<'CONFIGEOF'
+          if [ -n "$CONFIG_FILE" ]; then
+            cp "$CONFIG_FILE" "${{ runner.temp }}/test_config.json"
+          else
+            cat > "${{ runner.temp }}/test_config.json" <<'CONFIGEOF'
           ${{ matrix.test_configs }}
           CONFIGEOF
+          fi
           cat "${{ runner.temp }}/test_config.json"
 
       - name: ${{ matrix.name }}
@@ -1113,6 +878,16 @@ jobs:
           export PACKAGE_PARALLEL="${{ matrix.go_test_p || '' }}"
           mkdir -p "$TEST_BIN_DIR"
           ./scripts/ci/test-run-suite.sh
+
+      # prepare-yak only warms production dependencies. Retain test/vet/race
+      # compilations too, otherwise these suites rebuild them on every run.
+      - name: Save suite Go build cache
+        if: success() && matrix.cache_tag != '' && steps.go_cache.outputs.build-hit != 'true'
+        continue-on-error: true
+        uses: actions/cache/save@v4
+        with:
+          path: ${{ runner.temp }}/go-build-cache
+          key: ${{ steps.go_cache.outputs.build-key }}
 
       - name: Generate safe artifact name
         if: always()
@@ -1228,7 +1003,7 @@ jobs:
               ]
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           repository: ${{ needs.prepare-yakgrpc.outputs.fork_repo || github.repository }}
           ref: ${{ needs.prepare-yakgrpc.outputs.target_ref || github.sha }}
@@ -1344,7 +1119,7 @@ jobs:
               ]
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           repository: ${{ needs.prepare-coreplugin.outputs.fork_repo || github.repository }}
           ref: ${{ needs.prepare-coreplugin.outputs.target_ref || github.sha }}
@@ -1394,7 +1169,7 @@ jobs:
           export TEST_CONFIG="${{ runner.temp }}/test_config.json"
           export SUITE_NAME="${{ matrix.name }}"
           export SUITE_NEEDS_GRPC="0"
-          export SUITE_SYNC_RULE="${{ matrix.sync_rule == '1' && '1' || '0' }}"
+          export SUITE_SYNC_RULE="0"
           ./scripts/ci/test-run-suite.sh
 
       - name: Generate safe artifact name
@@ -1425,7 +1200,7 @@ jobs:
       actions: write
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Delete yakgrpc artifact
         env:
@@ -1447,7 +1222,7 @@ jobs:
       actions: write
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Delete coreplugin artifact
         env:
@@ -1460,7 +1235,7 @@ jobs:
 
   cleanup-yak-artifact:
     needs: [prepare-yak, prepared-startup, test-local, test-prepared-yakgrpc, test-prepared-coreplugin]
-    if: needs.prepare-yak.result == 'success' && needs.prepared-startup.result == 'success' && needs.test-local.result == 'success' && needs.test-prepared-yakgrpc.result == 'success' && needs.test-prepared-coreplugin.result == 'success'
+    if: always() && needs.prepare-yak.result == 'success'
     runs-on: ubuntu-22.04
     # Hygiene only: deleting the shared binary and pruning caches reclaims
     # storage for the next run. A missing or already-expired entry is expected
@@ -1468,10 +1243,11 @@ jobs:
     continue-on-error: true
     timeout-minutes: 15
     permissions:
+      contents: read
       actions: write
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Delete shared yak artifact
         env:
@@ -1486,12 +1262,12 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           REPOSITORY: ${{ github.repository }}
-          CACHE_MAX_AGE_DAYS: "7"
-          CACHE_MAX_SIZE_GB: "4"
+          CACHE_MAX_AGE_DAYS: "14"
+          CACHE_MAX_SIZE_GB: "6"
+          CACHE_PROTECTED_REF: refs/heads/main
         run: |
-          # Age and size bounds keep the 10GB repository quota predictable even
-          # when several PRs run CI at once; a count cap would evict one PR's
-          # cache just because another PR published more entries.
+          # Remove superseded snapshots before applying quota pressure. Preserve
+          # main and this ref's latest entries so suite warmups survive cleanup.
           CACHE_KEY_PREFIX="${{ runner.os }}-essential-gobuild-" ./scripts/ci/cache-prune.sh
           CACHE_KEY_PREFIX="${{ runner.os }}-essential-gomod-" CACHE_MAX_AGE_DAYS=14 CACHE_MAX_SIZE_GB=2 ./scripts/ci/cache-prune.sh
 
@@ -1510,7 +1286,7 @@ jobs:
       statuses: write
     steps:
       - name: 'Check Out'
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           ref: ${{ github.event.pull_request.head.sha || needs.check-wip.outputs.target_ref || github.sha }}
 

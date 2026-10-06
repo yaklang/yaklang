@@ -1,0 +1,130 @@
+[
+  {
+    "package": "./common/yak/cmd/yakcmds/...",
+    "timeout": "20s",
+    "exclude_packages": [
+      "./common/yak/cmd/yakcmds/memfit-cli"
+    ]
+  },
+  {
+    "package": "./common/yak/yaklib/codec",
+    "timeout": "20s"
+  },
+  {
+    "package": "./common/yak/cartesian",
+    "timeout": "20s"
+  },
+  {
+    "package": "./common/yak/yaklib",
+    "timeout": "20s",
+    "run": "^TestMUSTPASS_.*$"
+  },
+  {
+    "package": "./common/vulinbox/verificationcode",
+    "timeout": "20s",
+    "run": "^TestCaptchaScenarioLifecycle$"
+  },
+  {
+    "package": "./common/yak/yaklib/tools",
+    "timeout": "1m",
+    "run": "^(TestMUSTPASS_Fp.*|TestOracle.*|TestPing.*)$"
+  },
+  {
+    "package": "./common/utils/bruteutils/.",
+    "timeout": "2m",
+    "retry": 1,
+    "retry_delay": 5
+  },
+  {
+    "package": "./common/utils/bruteutils/internal/vncprobe",
+    "timeout": "20s",
+    "race": true
+  },
+  {
+    "package": "./common/utils/bruteutils/internal/oracleprobe",
+    "timeout": "20s",
+    "race": true
+  },
+  {
+    "package": "./common/netx",
+    "timeout": "1m",
+    "run": "^(TestDialContext.*|TestHTTPProxy.*|TestSocks.*|TestProxyCheckSocks5hDoesNotConnectToProxyItself)$",
+    "race": true
+  },
+  {
+    "package": "./common/yak/yakurl/...",
+    "timeout": "15s"
+  },
+  {
+    "package": "./common/thirdparty_bin",
+    "timeout": "1m",
+    "skip": "^(TestFetchAllMD5|TestSingleURL|TestInstallMemoryUsage|TestMemoryUsageBaseline)$"
+  },
+  {
+    "package": "./common/yak/antlr4nasl/tests/...",
+    "timeout": "1m"
+  },
+  {
+    "package": "./common/yak/cmd/...",
+    "timeout": "30s",
+    "exclude_packages": [
+      "./common/yak/cmd/yakcmds/..."
+    ]
+  },
+  {
+    "package": "./common/utils/pingutil",
+    "timeout": "20s",
+    "run": "^TestPing",
+    "race": true
+  },
+  {
+    "package": "./common/lowtun/netstack/gvisor/pkg/icmp",
+    "timeout": "20s",
+    "run": "^TestPing",
+    "race": true
+  },
+  {
+    "package": "./common/yak/yaktest",
+    "timeout": "30s",
+    "run": "^TestMisc_PingScan$"
+  },
+  {
+    "package": "./common/mutate_tests",
+    "timeout": "20s"
+  },
+  {
+    "package": "./common/fuzztag",
+    "timeout": "20s"
+  },
+  {
+    "package": "./common/fuzztagx",
+    "timeout": "20s"
+  },
+  {
+    "package": "./common/mutate",
+    "timeout": "30s"
+  },
+  {
+    "package": "./common/fuzzx",
+    "timeout": "30s"
+  },
+  {
+    "package": "./common/utils/cli",
+    "timeout": "1m"
+  },
+  {
+    "package": "./common/mcp/yakcliconvert",
+    "timeout": "1m"
+  },
+  {
+    "package": "./common/mcp",
+    "timeout": "2m",
+    "run": "^TestLegacy.*$",
+    "retry": 1,
+    "retry_delay": 5
+  },
+  {
+    "package": "./common/yak/yakdoc/...",
+    "timeout": "3m"
+  }
+]

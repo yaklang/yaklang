@@ -13,6 +13,9 @@ inputs:
   cache-key-prefix:
     description: 'Suite context name used for the commit status'
     required: true
+  ignore-success-status:
+    description: 'Run again after an explicit rerun, while still enforcing labels'
+    default: 'false'
 
 outputs:
   should_run_tests:
@@ -85,7 +88,7 @@ runs:
     # Step 3: Check Commit Success Status (only if not skipping)
     - name: 'Check Commit Success Status'
       id: check_status
-      if: steps.check_skip.outputs.should_skip != 'true'
+      if: steps.check_skip.outputs.should_skip != 'true' && inputs.ignore-success-status != 'true'
       shell: bash
       env:
         GH_TOKEN: ${{ github.token }}
