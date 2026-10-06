@@ -9,14 +9,11 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
-	"github.com/yaklang/yaklang/common/consts"
-	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 )
 
 func TestSearchMemory_Basic(t *testing.T) {
 	sessionID := "search-memory-test-" + uuid.New().String()
-	defer cleanupEntryTestData(t, sessionID)
 
 	// 创建AI记忆系统
 	memory, err := CreateTestAIMemory(t, sessionID,
@@ -81,7 +78,6 @@ func TestSearchMemory_Basic(t *testing.T) {
 
 func TestSearchMemory_TokenLimit(t *testing.T) {
 	sessionID := "search-bytes-limit-test-" + uuid.New().String()
-	defer cleanupEntryTestData(t, sessionID)
 
 	// 创建AI记忆系统
 	memory, err := CreateTestAIMemory(t, sessionID,
@@ -137,7 +133,6 @@ func TestSearchMemory_TokenLimit(t *testing.T) {
 
 func TestSearchMemory_EmptyQuery(t *testing.T) {
 	sessionID := "search-empty-test-" + uuid.New().String()
-	defer cleanupEntryTestData(t, sessionID)
 
 	// 创建AI记忆系统
 	memory, err := CreateTestAIMemory(t, sessionID,
@@ -176,7 +171,6 @@ func TestSearchMemory_EmptyQuery(t *testing.T) {
 
 func TestSearchMemoryWithoutAI_TaskRetrievalInfo(t *testing.T) {
 	sessionID := "search-task-retrieval-test-" + uuid.New().String()
-	defer cleanupEntryTestData(t, sessionID)
 
 	memory, err := CreateTestAIMemory(t, sessionID,
 		WithInvoker(mock.NewMockInvoker(context.Background())),
@@ -242,18 +236,5 @@ func TestSearchMemoryWithoutAI_TaskRetrievalInfo(t *testing.T) {
 	}
 	if !strings.Contains(result.TotalContent, "Java 反编译代码需要重写") {
 		t.Fatalf("expected java rewrite memory in total content, got: %s", result.TotalContent)
-	}
-}
-
-func cleanupEntryTestData(t *testing.T, sessionID string) {
-	db := consts.GetGormProjectDatabase()
-	if db != nil {
-		// 清理测试数据
-		if err := db.Where("session_id = ?", sessionID).Delete(&schema.AIMemoryEntity{}).Error; err != nil {
-			t.Logf("cleanup AIMemoryEntity failed: %v", err)
-		}
-		if err := db.Where("session_id = ?", sessionID).Delete(&schema.AIMemoryCollection{}).Error; err != nil {
-			t.Logf("cleanup AIMemoryCollection failed: %v", err)
-		}
 	}
 }

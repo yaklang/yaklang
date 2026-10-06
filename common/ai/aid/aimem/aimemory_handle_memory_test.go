@@ -15,7 +15,6 @@ import (
 
 func TestAddRawText_BoundsMemoryTriageInput(t *testing.T) {
 	sessionID := "handle-bounded-input-test-" + uuid.New().String()
-	defer cleanupEntryTestData(t, sessionID)
 
 	mockInvoker := NewAdvancedMockInvoker(context.Background())
 	mockInvoker.SetPromptValidator("memory-triage", func(prompt string) bool {
@@ -47,7 +46,6 @@ func TestAddRawText_BoundsMemoryTriageInput(t *testing.T) {
 
 func TestHandleMemory_Basic(t *testing.T) {
 	sessionID := "handle-memory-test-" + uuid.New().String()
-	defer cleanupEntryTestData(t, sessionID)
 
 	// 创建AI记忆系统
 	memory, err := CreateTestAIMemory(t, sessionID,
@@ -105,7 +103,6 @@ func TestMemoryTriageEmptyArrayIsSuccessfulNoop(t *testing.T) {
 
 func TestHandleMemory_Deduplication(t *testing.T) {
 	sessionID := "handle-dedup-test-" + uuid.New().String()
-	defer cleanupEntryTestData(t, sessionID)
 
 	// 创建AI记忆系统
 	memory, err := CreateTestAIMemory(t, sessionID,
@@ -160,7 +157,6 @@ func TestHandleMemory_Deduplication(t *testing.T) {
 
 func TestHandleMemory_PromptContainsDurableMemoryRules(t *testing.T) {
 	sessionID := "handle-prompt-rules-test-" + uuid.New().String()
-	defer cleanupEntryTestData(t, sessionID)
 
 	mockInvoker := NewAdvancedMockInvoker(context.Background())
 	mockInvoker.SetPromptValidator("memory-triage", func(prompt string) bool {
@@ -185,7 +181,6 @@ func TestHandleMemory_PromptContainsDurableMemoryRules(t *testing.T) {
 
 func TestHandleMemory_RejectTransientVisitEvent(t *testing.T) {
 	sessionID := "handle-transient-event-test-" + uuid.New().String()
-	defer cleanupEntryTestData(t, sessionID)
 
 	mockInvoker := NewAdvancedMockInvoker(context.Background())
 	mockInvoker.SetReturnValue("memory-triage", `{
@@ -222,7 +217,6 @@ func TestHandleMemory_RejectTransientVisitEvent(t *testing.T) {
 
 func TestHandleMemory_RejectAmbiguousPronounMemory(t *testing.T) {
 	sessionID := "handle-pronoun-memory-test-" + uuid.New().String()
-	defer cleanupEntryTestData(t, sessionID)
 
 	mockInvoker := NewAdvancedMockInvoker(context.Background())
 	mockInvoker.SetReturnValue("memory-triage", `{
@@ -259,7 +253,6 @@ func TestHandleMemory_RejectAmbiguousPronounMemory(t *testing.T) {
 
 func TestHandleMemory_KeepDurableGeneralizedFact(t *testing.T) {
 	sessionID := "handle-durable-fact-test-" + uuid.New().String()
-	defer cleanupEntryTestData(t, sessionID)
 
 	mockInvoker := NewAdvancedMockInvoker(context.Background())
 	mockInvoker.SetReturnValue("memory-triage", `{

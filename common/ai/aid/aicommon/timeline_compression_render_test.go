@@ -8,77 +8,38 @@ import (
 
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon/aitag"
-	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 )
 
-// TestDumpBefore_ReducerTimeStable 验证 Dump 中 reducer block 使用稳定时间戳，多次调用字节级一致
-// 关键词: Dump reducer 稳定时间戳, 缓存稳定, aitag 格式
-// 历史背景: 旧实现 reducer 行用 time.Now() 渲染，导致 Dump 每次输出不同，破坏 LLM 前缀缓存。
-// 新格式: Dump 走 GroupByMinutes，reducer block 渲染为 <|TIMELINE_r<id>t<unixSec>|> 包裹的 aitag 块，
-// 内部首行 `# reducer key=<id> ts=<unixSec>`，时间字段使用 unixSec 而非 YYYY/MM/DD 字符串。
-func TestDumpBefore_ReducerTimeStable(t *testing.T) {
-	tl := NewTimeline(nil, nil)
-
-	baseTs := time.Date(2024, 6, 1, 10, 30, 0, 0, time.UTC)
-	for i := int64(1); i <= 3; i++ {
-		injectTimelineItem(tl, i, baseTs.Add(time.Duration(i)*time.Second), makeToolResult(i, "tool", true, "data"))
+// Compressed-head timestamps and nonces must remain stable, including old
+// dumps with no covered timestamp. Exact expectations catch use of time.Now
+// without introducing wall-clock sleeps into the cache regression.
+func TestDumpCompressedHeadStable(t *testing.T) {
+	base := time.Date(2024, 6, 1, 10, 30, 0, 0, time.UTC)
+	for _, test := range []struct {
+		name      string
+		timestamp int64
+		version   int64
+		nonce     string
+	}{
+		{"timestamp", base.UnixMilli(), 7, "h1717237800v7"},
+		{"legacy_missing_timestamp", 0, 1, "h0v1"},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			tl := NewTimeline(nil, nil)
+			injectTimelineItem(tl, 1, base, makeToolResult(1, "tool", true, "data"))
+			tl.compressedHead = &TimelineCompressedHead{
+				Text: "compressed history", CoveredEndItemID: 2,
+				CoveredEndAtMs: test.timestamp, Version: test.version,
+			}
+			dump := tl.Dump()
+			require.NotEmpty(t, dump)
+			require.Equal(t, dump, tl.Dump())
+			require.Contains(t, dump, "<|TIMELINE_"+test.nonce+"|>")
+			require.Contains(t, dump, fmt.Sprintf("# compressed_head covered_end_item_id=2 covered_end_at_ms=%d version=%d", test.timestamp, test.version))
+			require.Contains(t, dump, "[compressed/head]")
+			require.Contains(t, dump, "compressed history")
+		})
 	}
-
-	// 模拟批量压缩后只剩 reducer + 部分活跃条目
-	reducerKey := int64(2)
-	reducerTs := baseTs.UnixMilli()
-	tl.compressedHead = &TimelineCompressedHead{
-		Text:             "compressed batch memory",
-		CoveredEndItemID: reducerKey,
-		CoveredEndAtMs:   reducerTs,
-		Version:          7,
-	}
-
-	dump1 := tl.Dump()
-	require.NotEmpty(t, dump1)
-
-	// 短暂等待，确保 time.Now() 与第一次不同（如果实现仍依赖 Now，输出会变）
-	time.Sleep(50 * time.Millisecond)
-
-	dump2 := tl.Dump()
-	require.Equal(t, dump1, dump2, "Dump reducer block MUST be byte-identical across consecutive calls")
-
-	// 必须使用基于 reducerTs 派生的稳定 unix 秒戳作为 nonce 与首行 ts
-	expectedNonce := fmt.Sprintf("h%dv7", reducerTs/1000)
-	require.Contains(t, dump1, "<|TIMELINE_"+expectedNonce+"|>", "compressed head block aitag wrapper should use stable nonce")
-	require.Contains(t, dump1, fmt.Sprintf("# compressed_head covered_end_item_id=%d covered_end_at_ms=%d version=%d", reducerKey, reducerTs, int64(7)))
-	require.Contains(t, dump1, "[compressed/head]")
-	require.Contains(t, dump1, "compressed batch memory")
-}
-
-// TestDumpBefore_ReducerNoLegacyNow 验证当 reducerTs 缺失时也使用稳定占位，不再用 time.Now()
-// 关键词: Dump reducer fallback, 老数据稳定渲染, aitag 格式
-// 新格式: 老数据 reducerTs 缺失 → unix 秒戳为 0、行头 00:00:00、aitag nonce r<id>t0
-func TestDumpBefore_ReducerNoLegacyNow(t *testing.T) {
-	tl := NewTimeline(nil, nil)
-
-	baseTs := time.Date(2024, 6, 1, 10, 30, 0, 0, time.UTC)
-	injectTimelineItem(tl, int64(1), baseTs, makeToolResult(1, "tool", true, "data"))
-
-	// 仅设置 reducers，不设置 reducerTs（模拟老数据）
-	reducerKey := int64(1)
-	tl.compressedHead = &TimelineCompressedHead{
-		Text:             "legacy memory",
-		CoveredEndItemID: reducerKey,
-		CoveredEndAtMs:   0,
-		Version:          1,
-	}
-
-	dump1 := tl.Dump()
-	time.Sleep(50 * time.Millisecond)
-	dump2 := tl.Dump()
-
-	require.Equal(t, dump1, dump2, "Dump must remain stable even when reducerTs is missing")
-	// 老数据 fallback：使用 ts=0 占位，aitag nonce 为 r<id>t0，行头时间为 00:00:00
-	require.Contains(t, dump1, "<|TIMELINE_h0v1|>")
-	require.Contains(t, dump1, fmt.Sprintf("# compressed_head covered_end_item_id=%d covered_end_at_ms=0 version=1", reducerKey))
-	require.Contains(t, dump1, "[compressed/head]")
-	require.Contains(t, dump1, "legacy memory")
 }
 
 // TestGroupByMinutes_ReducerBlock_Basic 验证 GroupByMinutes 输出 reducer block
@@ -227,6 +188,3 @@ func TestSummaryFieldRemoved_BackwardCompat(t *testing.T) {
 	require.Equal(t, int64(101), tl2.compressedHead.CoveredEndItemID)
 	require.Equal(t, int64(1700000000000), tl2.compressedHead.CoveredEndAtMs)
 }
-
-// 关键词: ToolResult 占位避免 import 警告（commonPrefixLen 在 timeline_groups_render_aitag_test.go 已定义，本文件复用）
-var _ = aitool.ToolResult{}

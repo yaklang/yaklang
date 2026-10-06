@@ -52,7 +52,6 @@ type timelineCompressionSnapshotItem struct {
 	ID         int64
 	Timestamp  int64
 	Frozen     bool
-	SourceJSON string // original content, PromptText and shrink fields for later conflict checks
 	PromptText string // detached, rendered prompt view; empty for omitted bookkeeping
 }
 
@@ -179,12 +178,11 @@ func (m *Timeline) captureCompressionSnapshotLocked() (snapshot *timelineCompres
 			}
 			replayText = plain.String()
 		}
-		raw, err := json.Marshal(item)
-		if err != nil {
-			return nil, fmt.Errorf("snapshot timeline item %d: %w", id, err)
-		}
+		// SourceState already fingerprints every original field, including
+		// shrink state, for the commit conflict check. Do not serialize a
+		// second unused copy of each item while holding the read lock.
 		entry := timelineCompressionSnapshotItem{
-			ID: id, Timestamp: ts, Frozen: id <= snapshot.FrozenThroughID, SourceJSON: string(raw),
+			ID: id, Timestamp: ts, Frozen: id <= snapshot.FrozenThroughID,
 		}
 		if projected := projectTimelineItemForPrompt(item); projected != nil &&
 			normalizeTimelinePromptCategory(extractTextEntryType(projected.String())) != "ITERATION" {
