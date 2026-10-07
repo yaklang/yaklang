@@ -662,7 +662,7 @@ journalctl --no-pager -n 20 2>/dev/null || tail -20 /var/log/syslog 2>/dev/null 
 	}{
 		{"real_prompt_base", "mixed", "common/ai/aid/aireact/prompts/base/base.txt"},
 		{"real_prompt_verification", "chinese", "common/ai/aid/aireact/prompts/verification/verification.txt"},
-		{"real_prompt_tool_params", "mixed", "common/ai/aid/aireact/prompts/tool-params/tool-params.txt"},
+		{"real_prompt_forge_params", "mixed", "common/ai/aid/aicommon/promptloader/prompts/ai/aid/aireact/prompts/forge-params/dynamic.txt"},
 		{"real_prompt_interval_review", "english", "common/ai/aid/aireact/prompts/tool/interval-review.txt"},
 		{"real_prompt_security_audit", "chinese", "common/ai/aid/aireact/reactloops/loop_code_security_audit/phase2/prompts/scan_instruction.txt"},
 	}
@@ -867,11 +867,11 @@ func TestRealPrompt_Verification(t *testing.T) {
 		float64(utf8.RuneCountInString(text))/float64(tokens))
 }
 
-func TestRealPrompt_ToolParams(t *testing.T) {
-	text := loadPromptFile(t, "common/ai/aid/aireact/prompts/tool-params/tool-params.txt")
+func TestRealPrompt_ForgeParams(t *testing.T) {
+	text := loadPromptFile(t, "common/ai/aid/aicommon/promptloader/prompts/ai/aid/aireact/prompts/forge-params/dynamic.txt")
 	tokens := CalcTokenCount(text)
 	assertRoundtrip(t, text)
-	t.Logf("tool-params.txt: %d bytes, %d runes, %d tokens, B/T=%.2f, R/T=%.2f",
+	t.Logf("forge-params/dynamic.txt: %d bytes, %d runes, %d tokens, B/T=%.2f, R/T=%.2f",
 		len(text), utf8.RuneCountInString(text), tokens,
 		float64(len(text))/float64(tokens),
 		float64(utf8.RuneCountInString(text))/float64(tokens))

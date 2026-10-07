@@ -13,7 +13,7 @@ import (
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 )
 
-func TestExecuteToolBatch_ExplicitEditedParamsSecondReviewFeedbackAndReplay(t *testing.T) {
+func TestExecuteToolCallGroup_ExplicitEditedParamsSecondReviewFeedbackAndReplay(t *testing.T) {
 	var invoked int32
 	var callbackID int64
 	var siblingInvoked int32
@@ -63,7 +63,7 @@ func TestExecuteToolBatch_ExplicitEditedParamsSecondReviewFeedbackAndReplay(t *t
 	request := batchHardeningRequest(tool.Name, sibling.Name, aitool.InvokeParams{"id": 1})
 	ctx, cancel := context.WithTimeout(context.Background(), 8*time.Second)
 	defer cancel()
-	firstResult, execErr := first.ExecuteToolBatch(ctx, first.config.DefaultTask, request)
+	firstResult, execErr := first.ExecuteToolCallGroup(ctx, first.config.DefaultTask, request)
 	require.NoError(t, execErr)
 	require.Equal(t, int32(1), atomic.LoadInt32(&invoked))
 	require.Equal(t, int32(1), atomic.LoadInt32(&siblingInvoked))
@@ -85,7 +85,7 @@ func TestExecuteToolBatch_ExplicitEditedParamsSecondReviewFeedbackAndReplay(t *t
 		},
 		secondReviews, nil, tool, sibling,
 	)
-	secondResult, replayErr := second.ExecuteToolBatch(ctx, second.config.DefaultTask, request)
+	secondResult, replayErr := second.ExecuteToolCallGroup(ctx, second.config.DefaultTask, request)
 	require.NoError(t, replayErr)
 	require.Equal(t, int32(0), atomic.LoadInt32(&secondReviews.count), "both finished approvals replay without duplicate cards")
 	require.Equal(t, int32(1), atomic.LoadInt32(&invoked), "finished tool checkpoint suppresses a duplicate callback")
@@ -93,7 +93,7 @@ func TestExecuteToolBatch_ExplicitEditedParamsSecondReviewFeedbackAndReplay(t *t
 	require.Equal(t, int64(42), batchHardeningResultParams(t, secondResult.Outcomes[0].Result).GetInt("id"))
 }
 
-func TestExecuteToolBatch_WrongParamsExplicitEditSkipsAIRepair(t *testing.T) {
+func TestExecuteToolCallGroup_WrongParamsExplicitEditSkipsAIRepair(t *testing.T) {
 	var invoked int32
 	var siblingInvoked int32
 	tool, err := aitool.New(
@@ -135,7 +135,7 @@ func TestExecuteToolBatch_WrongParamsExplicitEditSkipsAIRepair(t *testing.T) {
 	)
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	result, execErr := react.ExecuteToolBatch(ctx, react.config.DefaultTask, batchHardeningRequest(
+	result, execErr := react.ExecuteToolCallGroup(ctx, react.config.DefaultTask, batchHardeningRequest(
 		tool.Name, sibling.Name, aitool.InvokeParams{"id": 1},
 	))
 	require.NoError(t, execErr)
@@ -145,7 +145,7 @@ func TestExecuteToolBatch_WrongParamsExplicitEditSkipsAIRepair(t *testing.T) {
 	require.Equal(t, int32(2), atomic.LoadInt32(&reviews.count))
 }
 
-func TestExecuteToolBatch_InvalidExplicitEditIsChildLocal(t *testing.T) {
+func TestExecuteToolCallGroup_InvalidExplicitEditIsChildLocal(t *testing.T) {
 	var rejectedInvoked int32
 	var siblingInvoked int32
 	rejected, err := aitool.New(
@@ -177,7 +177,7 @@ func TestExecuteToolBatch_InvalidExplicitEditIsChildLocal(t *testing.T) {
 	)
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	result, execErr := react.ExecuteToolBatch(ctx, react.config.DefaultTask, batchHardeningRequest(
+	result, execErr := react.ExecuteToolCallGroup(ctx, react.config.DefaultTask, batchHardeningRequest(
 		rejected.Name, sibling.Name, aitool.InvokeParams{"id": 1},
 	))
 	require.NoError(t, execErr)

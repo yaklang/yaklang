@@ -238,12 +238,20 @@ func applyToolBatchSchemaMaxItems(schemaText string, maxCalls int) (string, erro
 		return schemaText, nil
 	}
 	changed := false
-	for _, field := range []string{"directly_call_tool_calls", "tool_require_calls"} {
+	for _, field := range []string{"directly_call_tool_params_group", "require_tool_payload"} {
 		property, ok := properties[field].(map[string]any)
 		if !ok {
 			continue
 		}
-		property["maxItems"] = maxCalls
+		if branches, ok := property["oneOf"].([]any); ok {
+			for _, raw := range branches {
+				if branch, ok := raw.(map[string]any); ok && branch["type"] == "array" {
+					branch["maxItems"] = maxCalls
+				}
+			}
+		} else {
+			property["maxItems"] = maxCalls
+		}
 		changed = true
 	}
 	if !changed {

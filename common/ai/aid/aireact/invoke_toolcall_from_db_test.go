@@ -126,16 +126,7 @@ func mockedToolCallingForDB(i aicommon.AICallerConfigIf, req *aicommon.AIRequest
 
 	// Second stage: generate parameters for the tool
 	if isToolParamGenerationPrompt(prompt, "") {
-		rsp := i.NewAIResponse()
-		// For tools_search, provide query parameter
-		if strings.Contains(prompt, "tools_search") {
-			rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "call-tool", "params": { "query" : "mock_db_tool" }}`))
-		} else {
-			// For the actual mock tool, provide message parameter
-			rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "call-tool", "params": { "message" : "test message" }}`))
-		}
-		rsp.Close()
-		return rsp, nil
+		return nil, fmt.Errorf("unexpected retired tool parameter-generation request")
 	}
 
 	// Third stage: verify satisfaction
@@ -211,16 +202,7 @@ func TestReAct_ToolUse_FromDB_ViaToolSearch(t *testing.T) {
 
 			// Generate parameters
 			if isToolParamGenerationPrompt(prompt, "") {
-				rsp := i.NewAIResponse()
-				if strings.Contains(prompt, "tools_search") {
-					// Provide search query
-					rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "call-tool", "params": { "query" : "mock_db_tool" }}`))
-				} else {
-					// Provide parameters for the actual tool
-					rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "call-tool", "params": { "message" : "test from search" }}`))
-				}
-				rsp.Close()
-				return rsp, nil
+				return nil, fmt.Errorf("unexpected retired tool parameter-generation request")
 			}
 
 			// Verify satisfaction

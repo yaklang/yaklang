@@ -58,11 +58,6 @@ func TestPromptManager_ModelReasoningReplayOnlyEntersMainDecisionPrompt(t *testi
 	require.NoError(t, err)
 	require.Contains(t, mainResult.Prompt, "TIMELINE_MODEL_THINKING_V1_scope1")
 
-	tool := aitool.NewWithoutCallback("scope-tool", aitool.WithDescription("scope test tool"))
-	toolParams, err := react.promptManager.GenerateToolParamsPromptWithMeta(tool)
-	require.NoError(t, err)
-	require.NotContains(t, toolParams.Prompt, "TIMELINE_MODEL_THINKING_V1_scope1")
-
 	lightInput := mainInput
 	lightInput.Nonce = "scope-light"
 	lightInput.Lightweight = true
@@ -226,7 +221,7 @@ func TestPromptManager_AssembleLoopPrompt_LightweightUsesBoundedRecentTimeline(t
 	require.NotContains(t, result.Prompt, "evidence evidence evidence")
 	require.NotContains(t, result.Prompt, "Timeline Memory (Frozen)")
 	require.Contains(t, result.Prompt, "[CURRENT TODO CHECKPOINT]\nkeep this dynamic tail")
-	require.Contains(t, r2PromptSection(t, result.Prompt, "timeline-open"), strings.Repeat("query ", 5000))
+	require.Contains(t, loopPromptSection(t, result.Prompt, "timeline-open"), strings.Repeat("query ", 5000))
 	require.NotContains(t, result.Prompt, "USER_QUERY")
 	require.Contains(t, result.Prompt, strings.Repeat("todo ", 100))
 	require.NotContains(t, result.Prompt, "TODO snapshot omitted from lightweight prompt")

@@ -36,3 +36,12 @@ func TestParameterPromptMatchersIgnoreInventoryAndHistory(t *testing.T) {
 	require.True(t, IsToolParamGenerationPrompt(legacy, "first_tool"))
 	require.False(t, IsToolParamGenerationPrompt(legacy, "second_tool"))
 }
+
+func TestPrimaryDecisionPromptRecognizesUnifiedRequirePayload(t *testing.T) {
+	prefix := "<|PROMPT_SECTION_high-static|>\n<|TRAITS|>\n<|PROMPT_SECTION_dynamic_test|>\n"
+	for _, field := range []string{"require_tool_payload", "tool_require_payload"} {
+		prompt := prefix + fmt.Sprintf(`{"@action":"require_tool",%q:"read_file"}`, field)
+		require.True(t, IsPrimaryDecisionPrompt(prompt))
+		require.False(t, IsPrimaryDecisionPrompt(fmt.Sprintf(`{"@action":"require_tool",%q:"read_file"}`, field)), "an action excerpt is not a main-loop prompt")
+	}
+}

@@ -4,7 +4,7 @@
 
 `require_tool` 与 `load_capability` 的工具分支只加载完整参数定义到 Timeline 的 `CACHE_TOOL_CALL`。加载不执行业务工具，不请求辅助模型构造参数，也不交付阶段成果。所属循环随后读取定义并用 `directly_call_tool` 继续当前任务。
 
-`directly_call_tool` 接受完整显式参数，支持单个调用与独立调用批次。模型必须依据真实 Schema 构参。参数校验失败会补充可用 Schema，在 Timeline 中记录 reason/retry，交由同一循环修正；不转入自动参数生成。
+`directly_call_tool` 接受完整显式参数，支持单个调用与独立参数分组。模型必须依据真实 Schema 构参。参数校验失败会补充可用 Schema，在 Timeline 中记录 reason/retry，交由同一循环修正；不转入自动参数生成。
 
 后一调用依赖前一结果时，先执行前一调用，观察真实输出，再在下一轮构造后续参数。PLAN 的任务 DAG 继续负责任务依赖、派发及验收；普通工具调用不另建意图 DAG。
 
@@ -13,7 +13,7 @@
 原生 Function Call 通过函数名选择动作，以下对象直接写入 arguments，不携带 `@action`：
 
 ```json
-{"tool_require_payload":"read_file"}
+{"require_tool_payload":"read_file"}
 ```
 
 读取 Schema 后，调用 `directly_call_tool`：
@@ -25,29 +25,29 @@
 文本流使用完整动作对象：
 
 ```json
-{"@action":"require_tool","tool_require_payload":"read_file"}
+{"@action":"require_tool","require_tool_payload":"read_file"}
 ```
 
 ```json
 {"@action":"directly_call_tool","directly_call_tool_name":"read_file","directly_call_tool_params":{"file":"/workspace/README.md"},"directly_call_reason":"确认项目说明"}
 ```
 
-多个 Schema 可以用 `tool_require_calls` 加载，每项指定 `tool_name`。这仍是定义加载，不是执行批次。`load_capability` 使用准确 `capability_identifier`；非工具能力保留各自生命周期。
+多个 Schema 使用同一个 `require_tool_payload` 字段，例如 `["read_file", "grep"]`。这仍是定义加载，不是执行批次。`load_capability` 使用准确 `capability_identifier`；非工具能力保留各自生命周期。
 
-## 独立执行批次
+## 显式参数分组
 
-原生 `directly_call_tool` 的批次 arguments 示例：
+原生 `directly_call_tool` 的参数分组 arguments 示例：
 
 ```json
 {
-  "directly_call_tool_calls": [
+  "directly_call_tool_params_group": [
     {"tool_name":"read_file","params":{"file":"/workspace/a.txt"},"identifier":"read_a","reason":"核对来源 A"},
     {"tool_name":"read_file","params":{"file":"/workspace/b.txt"},"identifier":"read_b","reason":"核对独立来源 B"}
   ]
 }
 ```
 
-文本流在同一对象顶层增加 `"@action":"directly_call_tool"`。批次数组与单次字段互斥；每项必须提供完整 `params` 对象，不在数组内放 `@action`。调用相互独立、风险和规模符合门槛时才使用批次；同名工具的不同参数按数组顺序保留。
+文本流在同一对象顶层增加 `"@action":"directly_call_tool"`。参数分组与单次字段互斥；每项必须提供完整 `params` 对象，不在数组内放 `@action`。调用相互独立、风险和规模符合门槛时才使用批次；同名工具的不同参数按数组顺序保留。
 
 动作验证使用 canonical 参数，不读会把数组成员混合的 flattened 兼容缓存。原生同一响应中的多个动作拥有各自验证状态，不共享目标或批次。
 
@@ -81,7 +81,7 @@ settled 结果保留原顺序、请求工具、最终工具、stage、错误及�
 
 已完成的审核决定在恢复时按 checkpoint 应用，不重复展示审核卡。已结算的批次结果可重放，已完成回调不重新执行。被拒绝项重新尝试时，由所属循环给出新的显式调用；不能把旧拒绝变成批准。
 
-恢复重放应保留取消、直接回答、错误及部分完成状态，不能仅按成功项重新推断整批状态。旧低层 name-only 调用、参数生成及 checkpoint 兼容 API 尚未整体删除；它们不属于当前模型动作入口，将在后续迁移中单独处理。
+恢复重放应保留取消、直接回答、错误及部分完成状态，不能仅按成功项重新推断整批状态。`ExecuteToolRequiredAndCall`、批量 Require/Direct 模式及串行兼容执行入口已删除。低层直接调用拒绝参数时返回 reason/retry，补齐 Schema 后由所属循环重新显式构参。旧批量字段不再接受；旧恢复数据缺少完整显式参数时不执行、不请求辅助模型。
 
 ## 侦察模式与缓存
 
@@ -101,3 +101,9 @@ settled 结果保留原顺序、请求工具、最终工具、stage、错误及�
 - `common/ai/aismoking`：独立 Yak 本地业务冒烟，不加入 CI。
 
 公共 `ToolComposeConcurrency` 兼容选项仍被 fast-context grep 使用，因此保留；它不重新注册已删除的工具 DAG 动作。
+
+## 显式执行边界
+
+`ToolCaller.CallTool` 和旧 `generateParams` 文本流 / Function Call 实现已删除。`CallToolWithExistedParams(tool, params)` 仅接收显式对象；缺失对象返回 `reason/retry`，零参数工具需传 `{}`。工具参数的完整性、审核、执行、取消及检查点回放仍由现有显式流程处理。
+
+参数组中的每项须独立包含完整 `params`。旧检查点预留的 sequence 位置保持，以免历史结果与当前请求串用，但不再启动参数生成事务。Forge 启动参数使用独立 `forge-params` 模板，继续保留。

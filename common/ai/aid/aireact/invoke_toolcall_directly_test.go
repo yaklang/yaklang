@@ -2,6 +2,7 @@ package aireact
 
 import (
 	"bytes"
+	"fmt"
 	"io"
 	"strings"
 	"sync/atomic"
@@ -441,10 +442,7 @@ func TestReAct_DirectlyCallTool_RequireThenDirect(t *testing.T) {
 			}
 
 			if isToolParamGenerationPrompt(prompt, "sleep_test") {
-				rsp := i.NewAIResponse()
-				rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "call-tool", "identifier": "sleep_test", "params": { "seconds" : 0.1 }}`))
-				rsp.Close()
-				return rsp, nil
+				return nil, fmt.Errorf("unexpected retired tool parameter-generation request")
 			}
 
 			if isVerifySatisfactionPrompt(prompt) {

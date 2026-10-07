@@ -23,7 +23,7 @@ import (
 // TestReActLoop_DirectToolBatchPrimaryDecisionConcurrentOrderedE2E starts at
 // the same boundary as a real model response. The first primary decision is a
 // directly_call_tool action containing two array items; no test calls the
-// parser, verifier, handler, or ExecuteToolBatch directly.
+// parser, verifier, handler, or ExecuteToolCallGroup directly.
 //
 // Besides checking that both plugin callbacks run, the callback barrier makes
 // serial execution fail: each callback must observe the other before either is
@@ -141,7 +141,7 @@ func TestReActLoop_DirectToolBatchPrimaryDecisionConcurrentOrderedE2E(t *testing
   "@action": "directly_call_tool",
   "identifier": "parallel_main_loop_e2e",
   "human_readable_thought": "Run two independent tools concurrently",
-  "directly_call_tool_calls": [
+  "directly_call_tool_params_group": [
     {
       "tool_name": "main_loop_batch_e2e_first",
       "params": {},
@@ -339,7 +339,6 @@ func TestReActLoop_RequireSchemasThenDirectBatchConcurrentOrderedE2E(t *testing.
 		aicommon.WithWorkdir(t.TempDir()),
 		aicommon.WithTools(firstTool, secondTool),
 		aicommon.WithAgreeYOLO(),
-		aicommon.WithToolBatchParamConcurrency(2),
 		aicommon.WithToolBatchInvokeConcurrency(2),
 		aicommon.WithDisableToolCallerIntervalReview(true),
 		aicommon.WithAIAutoRetry(1),
@@ -365,18 +364,7 @@ func TestReActLoop_RequireSchemasThenDirectBatchConcurrentOrderedE2E(t *testing.
   "@action": "require_tool",
   "identifier": "parallel_require_main_loop_e2e",
   "human_readable_thought": "Load both schemas without executing tools",
-  "tool_require_calls": [
-    {
-      "tool_name": "main_loop_require_batch_e2e_first",
-      "identifier": "first_require_child",
-      "reason": "Generate isolated parameters for the first child"
-    },
-    {
-      "tool_name": "main_loop_require_batch_e2e_second",
-      "identifier": "second_require_child",
-      "reason": "Generate isolated parameters for the second child"
-    }
-  ]
+  "require_tool_payload":["main_loop_require_batch_e2e_first", "main_loop_require_batch_e2e_second"]
 }`)
 				}
 
@@ -387,7 +375,7 @@ func TestReActLoop_RequireSchemasThenDirectBatchConcurrentOrderedE2E(t *testing.
 					if !strings.Contains(prompt, "CACHE_TOOL_CALL") || !strings.Contains(prompt, "child_value") {
 						return nil, fmt.Errorf("loaded schemas missing from the next decision")
 					}
-					return respond(config, `{"@action":"directly_call_tool","directly_call_tool_calls":[{"tool_name":"`+firstToolName+`","params":{"child_value":"`+firstParamValue+`"}},{"tool_name":"`+secondToolName+`","params":{"child_value":"`+secondParamValue+`"}}]}`)
+					return respond(config, `{"@action":"directly_call_tool","directly_call_tool_params_group":[{"tool_name":"`+firstToolName+`","params":{"child_value":"`+firstParamValue+`"}},{"tool_name":"`+secondToolName+`","params":{"child_value":"`+secondParamValue+`"}}]}`)
 				}
 
 				if joinErr := assertJoinedAndCommitted(fmt.Sprintf("primary decision %d", decision)); joinErr != nil {

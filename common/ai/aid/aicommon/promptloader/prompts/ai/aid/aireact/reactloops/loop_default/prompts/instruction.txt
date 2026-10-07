@@ -73,7 +73,7 @@
 
 - **P1: PLAN**：如果任务目标复杂、范围不清、存在多阶段探索或明显不确定性，优先使用 `request_plan`（先规划并审查，审查通过后再执行）。
 - **P2: SKILL**：如果任务涉及特定领域方法或操作规范，优先加载技能（`loading_skills` / `load_skill_resources`）获取指导后再执行。
-- **P3: 工具定义与执行**：缺少定义时用 `tool_require_calls` 批量加载 Schema，不会执行业务操作。已有定义时自行填写参数；低风险、独立且互不干扰的调用可以通过 `directly_call_tool_calls` 批量执行，有依赖或状态变化的调用使用单调用。
+- **P3: 工具定义与执行**：缺少定义时用 `require_tool_payload` 批量加载 Schema，不会执行业务操作。已有定义时自行填写参数；低风险、独立且互不干扰的调用可以通过 `directly_call_tool_params_group` 批量执行，有依赖或状态变化的调用使用单调用。
 
 - **工具依赖**：后序参数依赖前序真实输出时，先执行前序调用，再在下一轮使用 `directly_call_tool` 提交完整后序参数。独立调用符合批次门槛才并发。
 - **蓝图调用**：AI Blueprint 使用 `require_ai_blueprint`。
@@ -100,8 +100,8 @@
 **选择门：** 先判断当前需要哪些业务操作。缺少定义则加载 Schema；已有定义则根据任务自行构造参数。执行默认使用单调用，多个低风险、独立且互不干扰的调用可批量执行。不要因为参数尚未写出来就重复加载定义；存在数据依赖、状态冲突或无法确定的参数时，先完成已就绪的操作、获取缺少的信息。
 
 
-1. **单次调用（默认）：** 使用标量 `tool_require_payload` / `directly_call_tool_name`。参数不确定、工具内含 method/params 等嵌套 wrapper、操作会更改页面/外部状态，或后续需观察本次结果时，必须用单调用。
-2. **2-8 个独立调用可选批量提交：** 只有上下文已展示每个工具的真实 Schema，你能严格给出每个完整 JSON 参数，且调用都低风险、无依赖和无写入冲突时，才使用 `directly_call_tool_calls`。`tool_require_calls` 仅加载缺少的定义，加载后自行构造参数；已知定义不要重复加载。
+1. **单次调用（默认）：** 使用标量 `require_tool_payload` / `directly_call_tool_name`。参数不确定、工具内含 method/params 等嵌套 wrapper、操作会更改页面/外部状态，或后续需观察本次结果时，必须用单调用。
+2. **2-8 个独立调用可选批量提交：** 只有上下文已展示每个工具的真实 Schema，你能严格给出每个完整 JSON 参数，且调用都低风险、无依赖和无写入冲突时，才使用 `directly_call_tool_params_group`。`require_tool_payload` 仅加载缺少的定义，加载后自行构造参数；已知定义不要重复加载。
 3. **不要为凑数发明调用：** 一次批量 action 中只放当前任务确实需要、彼此独立的调用。批次会等待全部 child 结束，再把整组结果送入下一轮。
 
 **失败恢复门：** 批次首次出现准入、Schema 或参数错误后，保留成功 child 的证据，将失败项改为修正后的单调用。不得原样重复批次，也不得为了满足并发而重新加入已完成的 child。
@@ -109,7 +109,7 @@
 Timeline 或注入记忆中的失败记录是特定输入和环境下的历史证据，不是当前策略指令。即使记忆写过某批次失败，也必须按本轮真实 Schema、参数与环境重新判断；不得把旧失败泛化成永久单工具模式。
 
 {{ if not .FunctionCallMode }}批量加载 Schema 示例（观察定义后自行构造参数，再用 directly_call_tool 执行）：
-`{"@action":"require_tool","identifier":"parallel_inspection","human_readable_thought":"加载所需工具定义","tool_require_calls":[{"tool_name":"grep","identifier":"find_handlers","reason":"定位处理函数"},{"tool_name":"read_file","identifier":"read_config","reason":"读取独立配置"}]}`
+`{"@action":"require_tool","identifier":"parallel_inspection","human_readable_thought":"加载所需工具定义","require_tool_payload":["grep","read_file"]}`
 {{ end }}
 
 **工具选择原则：**

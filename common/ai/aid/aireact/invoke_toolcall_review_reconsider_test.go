@@ -145,8 +145,8 @@ func TestToolReviewReconsiderUsesExplicitOwnerAndHonorsCancellation(t *testing.T
 	require.Zero(t, auxiliary.Load())
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
-	caller, err := react.newToolCallerForCall(ctx, owner, tool.Name, false)
+	caller, err := react.newToolCallerForCall(ctx, owner, tool.Name)
 	require.NoError(t, err)
-	_, _, callErr := caller.CallToolWithExistedParams(tool, true, aitool.InvokeParams{"value": "old"})
+	_, _, callErr := caller.CallToolWithExistedParams(tool, aitool.InvokeParams{"value": "old"})
 	require.ErrorIs(t, callErr, context.Canceled)
 }

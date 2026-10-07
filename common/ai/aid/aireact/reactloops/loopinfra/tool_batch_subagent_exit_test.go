@@ -102,8 +102,8 @@ func TestToolBatchUserAnswerCancelsChildrenAndExitsParent(t *testing.T) {
 			}),
 		reactloops.WithRegisterLoopAction("batch_review", "user selects direct answer during batch review", nil, nil,
 			func(loop *reactloops.ReActLoop, _ *aicommon.Action, op *reactloops.LoopActionHandlerOperator) {
-				handleToolBatchActionResult(loop, op.GetContext(), inv, &aicommon.ToolBatchRequest{},
-					&aicommon.ToolBatchResult{DirectlyAnswer: true}, nil, op)
+				handleToolBatchActionResult(loop, op.GetContext(), inv, &aicommon.ToolCallGroupRequest{},
+					&aicommon.ToolCallGroupResult{DirectlyAnswer: true}, nil, op)
 			}))
 	require.NoError(t, err)
 	require.NoError(t, loop.Execute("tool-batch-user-exit", ctx, "Investigate using parallel workers and tools"))

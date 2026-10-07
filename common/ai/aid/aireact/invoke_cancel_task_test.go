@@ -31,10 +31,7 @@ func mockedToolCallingForCancel(i aicommon.AICallerConfigIf, req *aicommon.AIReq
 	}
 
 	if isToolParamGenerationPrompt(prompt, toolName) {
-		rsp := i.NewAIResponse()
-		rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "call-tool", "params": { "seconds" : 10.0 }}`))
-		rsp.Close()
-		return rsp, nil
+		return nil, fmt.Errorf("unexpected retired tool parameter-generation request")
 	}
 
 	if utils.MatchAllOfSubString(prompt, "verify-satisfaction", "user_satisfied", "reasoning") {

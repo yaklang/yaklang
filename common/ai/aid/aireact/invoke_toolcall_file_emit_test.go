@@ -71,11 +71,7 @@ func mockedToolCallingForFileEmit(i aicommon.AICallerConfigIf, req *aicommon.AIR
 	}
 
 	if isToolParamGenerationPrompt(prompt, toolName) {
-		rsp := i.NewAIResponse()
-		// Include identifier field for new directory structure
-		rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "call-tool", "identifier": "test_file_output", "params": { "message" : "test message", "output_lines": 5 }}`))
-		rsp.Close()
-		return rsp, nil
+		return nil, fmt.Errorf("unexpected retired tool parameter-generation request")
 	}
 
 	if isVerifySatisfactionPrompt(prompt) {
@@ -316,11 +312,7 @@ func TestReAct_ToolCall_FileEmit_LargeResult(t *testing.T) {
 			}
 
 			if isToolParamGenerationPrompt(prompt, toolName) {
-				rsp := i.NewAIResponse()
-				// Include identifier field for new directory structure
-				rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "call-tool", "identifier": "generate_large_data", "params": { "size" : 5242880 }}`)) // 5MB
-				rsp.Close()
-				return rsp, nil
+				return nil, fmt.Errorf("unexpected retired tool parameter-generation request")
 			}
 
 			if isVerifySatisfactionPrompt(prompt) {
@@ -454,11 +446,7 @@ func mockedToolCallingForEmptyOutput(i aicommon.AICallerConfigIf, req *aicommon.
 	}
 
 	if isToolParamGenerationPrompt(prompt, toolName) {
-		rsp := i.NewAIResponse()
-		// Include identifier field for new directory structure
-		rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "call-tool", "identifier": "empty_output_test", "params": { "message" : "test message" }}`))
-		rsp.Close()
-		return rsp, nil
+		return nil, fmt.Errorf("unexpected retired tool parameter-generation request")
 	}
 
 	if isVerifySatisfactionPrompt(prompt) {
@@ -628,11 +616,7 @@ func mockedToolCallingWithCustomIdentifier(i aicommon.AICallerConfigIf, req *aic
 	}
 
 	if isToolParamGenerationPrompt(prompt, toolName) {
-		rsp := i.NewAIResponse()
-		// Include the custom identifier
-		rsp.EmitOutputStream(bytes.NewBufferString(fmt.Sprintf(`{"@action": "call-tool", "identifier": "%s", "params": { "message" : "test" }}`, identifier)))
-		rsp.Close()
-		return rsp, nil
+		return nil, fmt.Errorf("unexpected retired tool parameter-generation request")
 	}
 
 	if isVerifySatisfactionPrompt(prompt) {
@@ -815,11 +799,7 @@ func TestReAct_ToolCall_FileEmit_WithoutIdentifier(t *testing.T) {
 		}
 
 		if isToolParamGenerationPrompt(prompt, toolName) {
-			rsp := i.NewAIResponse()
-			// No identifier field - test fallback behavior
-			rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "call-tool", "params": { "message" : "test" }}`))
-			rsp.Close()
-			return rsp, nil
+			return nil, fmt.Errorf("unexpected retired tool parameter-generation request")
 		}
 
 		if isVerifySatisfactionPrompt(prompt) {

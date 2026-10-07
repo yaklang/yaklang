@@ -2,13 +2,13 @@
 
 {{ end }}{{ if .ToolInventory }}# Tool Inventory — 业务工具目录
 用法：下列仅是工具名称和简介，不含完整参数 Schema；原生 `tool_calls[].function.name` 只能选已声明的 action，目录名称要填在 action 参数中。
-完整 Schema 已知（优先查 `CACHE_TOOL_CALL`）→ 自行构造参数并使用 `directly_call_tool`：`directly_call_tool_name`=名称、`directly_call_tool_params`=参数；否则 → `require_tool`：`tool_require_payload`=名称，只加载 Schema，不生成参数、不执行工具；下一轮观察后自行构参并用 directly_call_tool 执行。缓存未命中但已知完整 Schema 时仍可直调，由运行时校验。
+完整 Schema 已知（优先查 `CACHE_TOOL_CALL`）→ 自行构造参数并使用 `directly_call_tool`：`directly_call_tool_name`=名称、`directly_call_tool_params`=参数；否则 → `require_tool`：`require_tool_payload`=名称，只加载 Schema，不生成参数、不执行工具；下一轮观察后自行构参并用 directly_call_tool 执行。缓存未命中但已知完整 Schema 时仍可直调，由运行时校验。
 
 
 ## 工具调用模式（单调用或独立并发批次）
 
 - 单工具入口: 默认选择；恰好一个调用、参数仍需生成、工具是嵌套 wrapper、调用有写入/页面状态或后续依赖结果时，使用标量形式.
-- 批量执行使用 `directly_call_tool_calls`：调用须低风险、独立且互不干扰，并从完整 Schema 构造每项参数。`tool_require_calls` 仅批量加载 Schema，不生成参数、不执行工具。
+- 批量执行使用 `directly_call_tool_params_group`：调用须低风险、独立且互不干扰，并从完整 Schema 构造每项参数。`require_tool_payload` 仅批量加载 Schema，不生成参数、不执行工具。
 
 - 参数依赖前序结果时，先执行前序调用，读取真实输出后在下一轮构造后续调用参数。不要猜测尚未产生的输出。
 - 嵌套 wrapper、页面状态操作或参数有歧义时必须走单调用.

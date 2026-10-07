@@ -247,7 +247,7 @@ func TestToolCallerDirectlyCallTool_EmitsStartBeforeLaterActionFields(t *testing
 	caller, err := NewToolCaller(
 		ctx,
 		WithToolCaller_AICallerConfig(cfg),
-		WithToolCaller_AICaller(cfg),
+
 		WithToolCaller_Task(cfg.DefaultTask),
 		WithToolCaller_Emitter(cfg.GetEmitter()),
 		WithToolCaller_CallToolID("streaming-direct-call"),

@@ -18,7 +18,7 @@ import (
 	"github.com/yaklang/yaklang/common/schema"
 )
 
-func TestExecuteToolBatch_IntervalReviewEventsStayWithChildAndCancelIsIsolated(t *testing.T) {
+func TestExecuteToolCallGroup_IntervalReviewEventsStayWithChildAndCancelIsIsolated(t *testing.T) {
 	const (
 		cancelCallID    = "interval-review-cancel-child"
 		continueCallID  = "interval-review-continue-child"
@@ -119,16 +119,14 @@ func TestExecuteToolBatch_IntervalReviewEventsStayWithChildAndCancelIsIsolated(t
 	require.NoError(t, err)
 	react.config.SetConfig(aicommon.ConfigKeyToolBatchInvokeConcurrency, 2)
 
-	request := &aicommon.ToolBatchRequest{Calls: []aicommon.ToolBatchCall{
+	request := &aicommon.ToolCallGroupRequest{Calls: []aicommon.ToolCallGroupCall{
 		{
-			Mode:            aicommon.ToolCallModeDirect,
 			ToolName:        tool.Name,
 			Reason:          "exercise cancellation for only one child",
 			Params:          aitool.InvokeParams{"marker": cancelMarker},
 			ExecutionCallID: cancelCallID,
 		},
 		{
-			Mode:            aicommon.ToolCallModeDirect,
 			ToolName:        tool.Name,
 			Reason:          "prove the sibling continues independently",
 			Params:          aitool.InvokeParams{"marker": continueMarker},
@@ -138,7 +136,7 @@ func TestExecuteToolBatch_IntervalReviewEventsStayWithChildAndCancelIsIsolated(t
 
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 	defer cancel()
-	result, execErr := react.ExecuteToolBatch(ctx, react.config.DefaultTask, request)
+	result, execErr := react.ExecuteToolCallGroup(ctx, react.config.DefaultTask, request)
 	require.NoError(t, execErr)
 	require.Len(t, result.Outcomes, 2)
 	select {

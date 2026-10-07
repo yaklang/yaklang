@@ -107,9 +107,9 @@ func emitToolBatchRunningStatus(loop *reactloops.ReActLoop, names []string) {
 	)
 }
 
-func buildToolBatchResultTools(
+func buildToolCallGroupResultTools(
 	loop *reactloops.ReActLoop,
-	request *aicommon.ToolBatchRequest,
+	request *aicommon.ToolCallGroupRequest,
 	outcomes []aicommon.ToolCallOutcome,
 ) ([]aicommon.StatusTool, int) {
 	if request == nil {
@@ -149,12 +149,12 @@ func buildToolBatchResultTools(
 	return tools, successful
 }
 
-func emitToolBatchResultStatus(
+func emitToolCallGroupResultStatus(
 	loop *reactloops.ReActLoop,
-	request *aicommon.ToolBatchRequest,
+	request *aicommon.ToolCallGroupRequest,
 	outcomes []aicommon.ToolCallOutcome,
 ) {
-	tools, successful := buildToolBatchResultTools(loop, request, outcomes)
+	tools, successful := buildToolCallGroupResultTools(loop, request, outcomes)
 	total := len(tools)
 	if total == 0 {
 		return

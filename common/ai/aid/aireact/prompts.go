@@ -3,7 +3,6 @@ package aireact
 import (
 	"fmt"
 	"runtime"
-	"sort"
 	"strings"
 	"time"
 
@@ -23,11 +22,11 @@ func nonce() string {
 	return utils.RandAlphaNumStringBytes(5)
 }
 
-var toolParamsInstructionText = promptloader.MustLoad("ai/aid/aireact/prompts/tool-params/instruction.txt")
+var forgeParamsInstructionText = promptloader.MustLoad("ai/aid/aireact/prompts/forge-params/instruction.txt")
 
-var toolParamsOutputExampleText = promptloader.MustLoad("ai/aid/aireact/prompts/tool-params/output_example.txt")
+var forgeParamsOutputExampleText = promptloader.MustLoad("ai/aid/aireact/prompts/forge-params/output_example.txt")
 
-var toolParamsDynamicTemplate = promptloader.MustLoad("ai/aid/aireact/prompts/tool-params/dynamic.txt")
+var forgeParamsDynamicTemplate = promptloader.MustLoad("ai/aid/aireact/prompts/forge-params/dynamic.txt")
 
 var verificationInstructionText = promptloader.MustLoad("ai/aid/aireact/prompts/verification/instruction.txt")
 
@@ -42,12 +41,6 @@ var directlyAnswerInstructionText = promptloader.MustLoad("ai/aid/aireact/prompt
 var directlyAnswerOutputExampleText = promptloader.MustLoad("ai/aid/aireact/prompts/answer/output_example.txt")
 
 var directlyAnswerDynamicTemplate = promptloader.MustLoad("ai/aid/aireact/prompts/answer/dynamic.txt")
-
-var wrongToolInstructionText = promptloader.MustLoad("ai/aid/aireact/prompts/tool/wrong-tool_instruction.txt")
-
-var wrongToolOutputExampleText = promptloader.MustLoad("ai/aid/aireact/prompts/tool/wrong-tool_output_example.txt")
-
-var wrongToolDynamicTemplate = promptloader.MustLoad("ai/aid/aireact/prompts/tool/wrong-tool_dynamic.txt")
 
 var intervalReviewInstructionText = promptloader.MustLoad("ai/aid/aireact/prompts/tool/interval-review_instruction.txt")
 
@@ -169,21 +162,6 @@ func loopSchema(loop *reactloops.ReActLoop) string {
 		return loop.GetLastLoopSchema()
 	}
 	return ""
-}
-
-// toolParamNames extracts and sorts the input parameter names declared on a
-// tool's JSON schema, used to render AITAG hints for the parameter generation
-// prompt.
-func toolParamNames(tool *aitool.Tool) []string {
-	var names []string
-	if tool.Tool != nil && tool.Tool.InputSchema.Properties != nil {
-		tool.Tool.InputSchema.Properties.ForEach(func(name string, _ any) bool {
-			names = append(names, name)
-			return true
-		})
-		sort.Strings(names)
-	}
-	return names
 }
 
 // GetBasicPromptInfo renders the legacy base.txt template map. It is the only
@@ -339,102 +317,6 @@ func (pm *PromptManager) applyLoopInstructionAndExampleForLoop(
 	materials.SkillsContext = renderSkillsContextForLoop(loop)
 }
 
-// ToolParamsPromptResult contains the generated prompt and metadata for AITAG
-// parsing.
-type ToolParamsPromptResult struct {
-	Prompt     string
-	Nonce      string
-	ParamNames []string
-}
-
-// GenerateToolParamsPromptWithMeta generates the tool parameter generation
-// prompt. It reuses the main loop's schema/instruction/example for R1→R2
-// prefix cache alignment; the tool-specific schema lives in the dynamic
-// section.
-func (pm *PromptManager) GenerateToolParamsPromptWithMeta(tool *aitool.Tool) (*ToolParamsPromptResult, error) {
-	var loop *reactloops.ReActLoop
-	if pm != nil && pm.react != nil {
-		loop = pm.react.GetCurrentLoop()
-	}
-	return pm.generateToolParamsPromptWithMetaForQueryAndLoop(pm.currentUserInput(), loop, tool)
-}
-
-// GenerateToolParamsPromptWithMetaForTask binds parameter generation to the
-// task that owns the ToolCaller. Concurrent batch workers must use this form
-// instead of resolving ReAct.currentTask while they are running.
-func (pm *PromptManager) GenerateToolParamsPromptWithMetaForTask(
-	task aicommon.AIStatefulTask,
-	tool *aitool.Tool,
-) (*ToolParamsPromptResult, error) {
-	userQuery := ""
-	if task != nil {
-		userQuery = task.GetUserInput()
-	}
-	return pm.generateToolParamsPromptWithMetaForQueryAndLoop(userQuery, promptLoopForTask(task), tool)
-}
-
-// GenerateToolParamsPromptWithMetaForQuery is the task-independent core used
-// when the owning query has already been captured by the caller.
-func (pm *PromptManager) GenerateToolParamsPromptWithMetaForQuery(
-	originalQuery string,
-	tool *aitool.Tool,
-) (*ToolParamsPromptResult, error) {
-	return pm.generateToolParamsPromptWithMetaForQueryAndLoop(originalQuery, nil, tool)
-}
-
-func (pm *PromptManager) generateToolParamsPromptWithMetaForQueryAndLoop(
-	originalQuery string,
-	loop *reactloops.ReActLoop,
-	tool *aitool.Tool,
-) (*ToolParamsPromptResult, error) {
-	nonceString := nonce()
-	toolSchema := ""
-	if tool.Tool != nil {
-		toolSchema = tool.ToJSONSchemaString()
-	}
-	paramNames := toolParamNames(tool)
-
-	_, prefixMaterials, err := pm.preparePromptPrefixMaterialsForLoop(nil, &reactloops.LoopPromptAssemblyInput{
-		Nonce:  nonceString,
-		Schema: loopSchema(loop),
-	}, loop)
-	if err != nil {
-		return nil, err
-	}
-	aicommon.ApplyPromptFrozenOpenMaterials(prefixMaterials,
-		aicommon.BuildPromptFrozenOpenMaterialsWithOptions(pm.react.config, aicommon.TimelinePromptOptions{ExcludeToolCache: true}))
-	prefixMaterials.AllowPlanAndExec = false
-	prefixMaterials.HasLoadCapability = false
-	pm.applyLoopInstructionAndExampleForLoop(prefixMaterials, loop, toolParamsInstructionText, toolParamsOutputExampleText)
-
-	dynamicData := pm.buildLoopPromptSectionData(nil, &reactloops.LoopPromptAssemblyInput{
-		Nonce:     nonceString,
-		UserQuery: originalQuery,
-	})
-	dynamicData["ToolName"] = tool.Name
-	dynamicData["ToolDescription"] = tool.Description
-	toolUsage, err := aitool.RenderUsageForMode(tool.Usage, false)
-	if err != nil {
-		return nil, fmt.Errorf("render Usage for tool %q: %w", tool.Name, err)
-	}
-	dynamicData["ToolUsage"] = toolUsage
-	dynamicData["ParamNames"] = paramNames
-	dynamicData["OriginalQuery"] = originalQuery
-	dynamicData["ToolSchema"] = toolSchema
-
-	prompt, err := pm.assemblePromptWithDynamicSection(
-		prefixMaterials, "tool-params-dynamic", toolParamsDynamicTemplate, dynamicData,
-	)
-	if err != nil {
-		return nil, err
-	}
-	return &ToolParamsPromptResult{
-		Prompt:     prompt,
-		Nonce:      nonceString,
-		ParamNames: paramNames,
-	}, nil
-}
-
 // GenerateVerificationPrompt generates the verification prompt using the shared
 // prefix assembly path. Verification-specific rules and few-shot live in
 // semi-dynamic-2; volatile per-iteration data lives in the dynamic tail.
@@ -499,142 +381,6 @@ func (pm *PromptManager) GenerateDirectlyAnswerPrompt(userQuery string, tools []
 		prefixMaterials, "directly-answer-dynamic", directlyAnswerDynamicTemplate, dynamicData,
 	)
 	return prompt, nonceString, err
-}
-
-// GenerateToolReSelectPrompt generates the tool reselection prompt used when a
-// previously chosen tool is deemed wrong for the task.
-func (pm *PromptManager) GenerateToolReSelectPrompt(
-	noUserInteract bool, oldTool *aitool.Tool, toolList []*aitool.Tool,
-) (string, error) {
-	var loop *reactloops.ReActLoop
-	if pm != nil && pm.react != nil {
-		loop = pm.react.GetCurrentLoop()
-	}
-	return pm.generateToolReSelectPromptForQueryAndLoop(
-		pm.currentUserInput(), loop, noUserInteract, oldTool, toolList,
-	)
-}
-
-// GenerateToolReSelectPromptForTask renders the wrong-tool review against the
-// task that owns the ToolCaller, not the mutable session-level current task.
-func (pm *PromptManager) GenerateToolReSelectPromptForTask(
-	task aicommon.AIStatefulTask,
-	noUserInteract bool,
-	oldTool *aitool.Tool,
-	toolList []*aitool.Tool,
-) (string, error) {
-	userQuery := ""
-	if task != nil {
-		userQuery = task.GetUserInput()
-	}
-	return pm.generateToolReSelectPromptForQueryAndLoop(
-		userQuery, promptLoopForTask(task), noUserInteract, oldTool, toolList,
-	)
-}
-
-// GenerateToolReSelectPromptForQuery is the task-independent prompt core.
-func (pm *PromptManager) GenerateToolReSelectPromptForQuery(
-	userQuery string,
-	noUserInteract bool,
-	oldTool *aitool.Tool,
-	toolList []*aitool.Tool,
-) (string, error) {
-	return pm.generateToolReSelectPromptForQueryAndLoop(
-		userQuery, nil, noUserInteract, oldTool, toolList,
-	)
-}
-
-func (pm *PromptManager) generateToolReSelectPromptForQueryAndLoop(
-	userQuery string,
-	loop *reactloops.ReActLoop,
-	noUserInteract bool,
-	oldTool *aitool.Tool,
-	toolList []*aitool.Tool,
-) (string, error) {
-	nonceString := utils.RandStringBytes(4)
-
-	_, prefixMaterials, err := pm.preparePromptPrefixMaterialsForLoop(toolList, &reactloops.LoopPromptAssemblyInput{
-		Nonce:     nonceString,
-		UserQuery: userQuery,
-		Schema:    getReSelectTool(noUserInteract),
-	}, loop)
-	if err != nil {
-		return "", err
-	}
-	prefixMaterials.AllowToolCall = true
-	prefixMaterials.AllowPlanAndExec = false
-	prefixMaterials.HasLoadCapability = false
-	prefixMaterials.TaskInstruction = strings.TrimSpace(wrongToolInstructionText)
-	prefixMaterials.OutputExample = strings.TrimSpace(wrongToolOutputExampleText)
-	prefixMaterials.SkillsContext = renderSkillsContextForLoop(loop)
-
-	dynamicData := pm.buildLoopPromptSectionData(nil, &reactloops.LoopPromptAssemblyInput{
-		Nonce:     nonceString,
-		UserQuery: userQuery,
-	})
-	if oldTool != nil {
-		dynamicData["OldToolName"] = oldTool.Name
-		dynamicData["OldToolDescription"] = oldTool.Description
-	} else {
-		dynamicData["OldToolName"] = ""
-		dynamicData["OldToolDescription"] = ""
-	}
-
-	return pm.assemblePromptWithDynamicSection(
-		prefixMaterials, "wrong-tool-dynamic", wrongToolDynamicTemplate, dynamicData,
-	)
-}
-
-// GenerateReGenerateToolParamsPromptWithMeta generates a tool parameter
-// regeneration prompt (retry after invalid params), reusing the main loop's
-// schema/instruction/example for R1→R3 prefix cache alignment.
-func (pm *PromptManager) GenerateReGenerateToolParamsPromptWithMeta(
-	userQuery string, oldParams aitool.InvokeParams, oldTool *aitool.Tool,
-) (*ToolParamsPromptResult, error) {
-	nonceString := nonce()
-	schemaString := oldTool.ToJSONSchemaString()
-	oldParamsDump := oldParams.Dump()
-	paramNames := toolParamNames(oldTool)
-
-	_, prefixMaterials, err := pm.preparePromptPrefixMaterials(nil, &reactloops.LoopPromptAssemblyInput{
-		Nonce:  nonceString,
-		Schema: pm.currentLoopSchema(),
-	})
-	if err != nil {
-		return nil, err
-	}
-	aicommon.ApplyPromptFrozenOpenMaterials(prefixMaterials,
-		aicommon.BuildPromptFrozenOpenMaterialsWithOptions(pm.react.config, aicommon.TimelinePromptOptions{ExcludeToolCache: true}))
-	prefixMaterials.AllowPlanAndExec = false
-	prefixMaterials.HasLoadCapability = false
-	pm.applyLoopInstructionAndExample(prefixMaterials, toolParamsInstructionText, toolParamsOutputExampleText)
-
-	dynamicData := pm.buildLoopPromptSectionData(nil, &reactloops.LoopPromptAssemblyInput{
-		Nonce:     nonceString,
-		UserQuery: userQuery,
-	})
-	dynamicData["ToolName"] = oldTool.Name
-	dynamicData["ToolDescription"] = oldTool.Description
-	toolUsage, err := aitool.RenderUsageForMode(oldTool.Usage, false)
-	if err != nil {
-		return nil, fmt.Errorf("render Usage for tool %q: %w", oldTool.Name, err)
-	}
-	dynamicData["ToolUsage"] = toolUsage
-	dynamicData["OldParams"] = oldParamsDump
-	dynamicData["ParamNames"] = paramNames
-	dynamicData["ToolSchema"] = schemaString
-
-	prompt, err := pm.assemblePromptWithDynamicSection(
-		prefixMaterials, "tool-params-dynamic", toolParamsDynamicTemplate, dynamicData,
-	)
-	if err != nil {
-		return nil, err
-	}
-	return &ToolParamsPromptResult{
-		Prompt:     prompt,
-		Nonce:      nonceString,
-		ParamNames: paramNames,
-	}, nil
 }
 
 // GenerateChangeAIBlueprintPrompt generates the prompt that asks the model to
@@ -706,22 +452,21 @@ func (pm *PromptManager) GenerateAIBlueprintForgeParamsPromptEx(
 	prefixMaterials.AllowToolCall = false
 	prefixMaterials.AllowPlanAndExec = true
 	prefixMaterials.HasLoadCapability = false
-	pm.applyLoopInstructionAndExample(prefixMaterials, toolParamsInstructionText, toolParamsOutputExampleText)
+	pm.applyLoopInstructionAndExample(prefixMaterials, forgeParamsInstructionText, forgeParamsOutputExampleText)
 
 	dynamicData := pm.buildLoopPromptSectionData(nil, &reactloops.LoopPromptAssemblyInput{
 		Nonce:     nonceString,
 		UserQuery: originalQuery,
 	})
-	dynamicData["ToolName"] = ins.ForgeName
-	dynamicData["ToolDescription"] = ins.Description
+	dynamicData["BlueprintName"] = ins.ForgeName
+	dynamicData["BlueprintDescription"] = ins.Description
 	dynamicData["OldParams"] = ""
 	if !utils.IsNil(oldParams) && len(oldParams) > 0 {
 		dynamicData["OldParams"] = oldParams.Dump()
 	}
-	dynamicData["IsBlueprint"] = true
 	dynamicData["ExtraPrompt"] = extraPrompt
 	return pm.assemblePromptWithDynamicSection(
-		prefixMaterials, "tool-params-dynamic", toolParamsDynamicTemplate, dynamicData,
+		prefixMaterials, "forge-params-dynamic", forgeParamsDynamicTemplate, dynamicData,
 	)
 }
 

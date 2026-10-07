@@ -149,7 +149,7 @@ func (t *ToolCaller) reviewWithEditedParams(
 	// Review 改了参数, 原始 reason 与新参数不符; 重置 reason 状态, 让递归的
 	// CallToolWithExistedParams 的统一 reason 处理点重新生成一次.
 	t.resetReasonForReview()
-	result, directlyAnswer, err := t.CallToolWithExistedParams(targetTool, true, editedParam)
+	result, directlyAnswer, err := t.CallToolWithExistedParams(targetTool, editedParam)
 	if err != nil {
 		var reconsider *ToolReviewReconsiderError
 		if !errors.As(err, &reconsider) {

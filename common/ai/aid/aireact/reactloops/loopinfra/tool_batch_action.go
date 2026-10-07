@@ -15,8 +15,8 @@ import (
 )
 
 const (
-	directlyCallToolBatchField = "directly_call_tool_calls"
-	requireToolBatchField      = "tool_require_calls"
+	directlyCallToolBatchField   = "directly_call_tool_params_group"
+	retiredRequireToolBatchField = "tool_require_calls"
 
 	actionStateDirectToolBatch = "directly_call_tool_batch"
 )
@@ -44,7 +44,7 @@ const directlyCallToolBatchOutputExampleJSON = `{
   "@action": "directly_call_tool",
   "identifier": "parallel_project_reads",
   "human_readable_thought": "并发读取两个独立文件",
-  "directly_call_tool_calls": [
+  "directly_call_tool_params_group": [
     {
       "tool_name": "read_file",
       "params": {"file": "/workspace/go.mod"},
@@ -66,26 +66,15 @@ const requireToolScalarOutputExampleJSON = `{
   "@action": "require_tool",
   "identifier": "search_auth_handlers",
   "human_readable_thought": "加载搜索工具参数定义",
-  "tool_require_payload": "grep",
+  "require_tool_payload": "grep",
   "tool_call_reason": "搜索认证处理逻辑"
 }`
 
 const requireToolBatchOutputExampleJSON = `{
   "@action": "require_tool",
-  "identifier": "parallel_project_search",
+  "identifier": "load_project_tools",
   "human_readable_thought": "加载搜索与文件读取工具定义",
-  "tool_require_calls": [
-    {
-      "tool_name": "grep",
-      "identifier": "find_auth_handlers",
-      "reason": "搜索认证处理逻辑"
-    },
-    {
-      "tool_name": "read_file",
-      "identifier": "read_project_config",
-      "reason": "读取独立项目配置"
-    }
-  ]
+  "require_tool_payload": ["grep", "read_file"]
 }`
 
 const directlyCallToolScalarOutputExamples = `
@@ -99,9 +88,9 @@ const directlyCallToolScalarOutputExamples = `
 `
 
 const directlyCallToolBatchOutputExamples = `
-### directly_call_tool 并发调用
+### directly_call_tool 参数分组
 
-这是可选的延迟优化。仅当 2-8 个已启用工具调用都低风险、彼此独立且每层完整 JSON 参数都已从真实 Schema 确定时，才使用 directly_call_tool_calls。嵌套 wrapper、页面状态操作、长文本参数或任一参数不确定时改用单调用。不要为凑数量发明调用，不要放置有先后依赖的调用，不要同时输出旧的 directly_call_tool_name 字段。批量参数不支持 AI-TAG。
+这是可选的延迟优化。仅当 2-8 个已启用工具调用都低风险、彼此独立且每层完整 JSON 参数都已从真实 Schema 确定时，才使用 directly_call_tool_params_group。嵌套 wrapper、页面状态操作、长文本参数或任一参数不确定时改用单调用。不要为凑数量发明调用，不要放置有先后依赖的调用，不要同时输出旧的 directly_call_tool_name 字段。参数分组使用内联 JSON，不支持外置 AI-TAG。
 
 下面的 JSON 是完整可解析格式（工具名和参数值应替换为当前已启用的真实工具，优先使用 CACHE_TOOL_CALL 中已展示 Schema 的工具）：
 
@@ -109,22 +98,13 @@ const directlyCallToolBatchOutputExamples = `
 `
 
 const requireToolScalarOutputExamples = `
-### require_tool 单个 Schema 加载
+### require_tool 加载工具定义
 
-缺少工具完整 Schema 时，使用标量字段 tool_require_payload 加载定义；观察 CACHE_TOOL_CALL 后自行构造参数并使用 directly_call_tool 执行。tool_require_payload 只填写工具名，严禁在该字段中携带参数。
-
-下面的 JSON 是完整可解析格式（工具名应替换为当前可用的真实工具）：
+require_tool_payload 填写一个工具名或工具名数组。只加载完整 Schema 到 AI TOOL CACHE，不生成参数、不执行工具。加载后在当前任务立即按真实 Schema 构造参数，用 directly_call_tool 完成操作；独立调用可通过参数分组一次提交，有依赖的调用按顺序执行。已有 Schema 直接复用。
 
 ` + requireToolScalarOutputExampleJSON + `
 `
-
 const requireToolBatchOutputExamples = `
-### require_tool 批量 Schema 加载
-
-需要多个工具的定义时，使用 tool_require_calls；只加载 Schema，不生成参数、不执行工具。每项只提供工具名、identifier 和 reason，严禁提供 params。不要为凑数量发明调用，不要同时输出旧的 tool_require_payload 字段。
-
-下面的 JSON 是完整可解析格式（工具名应替换为当前可用的真实工具）：
-
 ` + requireToolBatchOutputExampleJSON + `
 `
 
@@ -136,7 +116,7 @@ func directlyCallToolBatchSchemaOption() aitool.ToolOption {
 	return aitool.WithStructArrayParam(
 		directlyCallToolBatchField,
 		[]aitool.PropertyOption{
-			aitool.WithParam_Description("可选的延迟优化。仅当本轮已明确 2-8 个低风险、互不依赖、互不干扰且参数完整的直接调用时使用。必须与 directly_call_tool_name/directly_call_tool_params 二选一，严禁混用。每项必须包含已启用工具的准确名称和从真实 Schema 确定的完整内联 JSON 参数；嵌套 wrapper 的每层参数都必须完整。批量参数不支持 AI-TAG；不要为凑数量发明调用。下面是经过 CI 校验且可执行的格式：\n" + directlyCallToolBatchOutputExampleJSON),
+			aitool.WithParam_Description("可选的延迟优化。仅当本轮已明确 2-8 个低风险、互不依赖、互不干扰且参数完整的直接调用时使用。必须与 directly_call_tool_name/directly_call_tool_params 二选一，严禁混用。每项必须包含已启用工具的准确名称和从真实 Schema 确定的完整内联 JSON 参数；嵌套 wrapper 的每层参数都必须完整。参数分组使用内联 JSON，不支持外置 AI-TAG；不要为凑数量发明调用。下面是经过 CI 校验且可执行的格式：\n" + directlyCallToolBatchOutputExampleJSON),
 			aitool.WithParam_Raw("minItems", 2),
 			aitool.WithParam_Raw("maxItems", aicommon.DefaultToolBatchMaxCalls),
 		},
@@ -149,34 +129,13 @@ func directlyCallToolBatchSchemaOption() aitool.ToolOption {
 		aitool.WithRawParam("params", map[string]any{
 			"type":                 "object",
 			"additionalProperties": true,
-		}, aitool.WithParam_Required(true), aitool.WithParam_Description("该 child 工具调用的完整内联 JSON 参数。")),
+		}, aitool.WithParam_Required(true), aitool.WithParam_Description("该项 工具调用的完整内联 JSON 参数。")),
 		aitool.WithStringParam("identifier",
-			aitool.WithParam_Description("可选。该 child 调用的唯一 snake_case 目的标识。")),
+			aitool.WithParam_Description("可选。该项 调用的唯一 snake_case 目的标识。")),
 		aitool.WithStringParam("expectations",
-			aitool.WithParam_Description("可选。该 child 调用的预计耗时和回退策略。")),
+			aitool.WithParam_Description("可选。该项 调用的预计耗时和回退策略。")),
 		aitool.WithStringParam("reason",
 			aitool.WithParam_Description("可选。直接展示在该工具卡片上；用简短短语说明这个 child 具体做什么，同名工具的不同调用也要分别描述，不能照搬整批任务的理由。")),
-	)
-}
-
-func requireToolBatchSchemaOption() aitool.ToolOption {
-	return aitool.WithStructArrayParam(
-		requireToolBatchField,
-		[]aitool.PropertyOption{
-			aitool.WithParam_Description("批量加载本任务需要的工具 Schema，不生成参数、不执行工具。必须与 tool_require_payload 二选一，严禁混用。每项只填写工具名、identifier 和 reason，严禁提供 params；下一轮读取 CACHE_TOOL_CALL，自行构造参数并使用 directly_call_tool 执行。不要为凑数量发明调用。下面是批量 Schema 加载格式：\n" + requireToolBatchOutputExampleJSON),
-			aitool.WithParam_Raw("minItems", 2),
-			aitool.WithParam_Raw("maxItems", aicommon.DefaultToolBatchMaxCalls),
-		},
-		[]aitool.PropertyOption{
-			aitool.WithParam_Raw("additionalProperties", false),
-		},
-		aitool.WithStringParam("tool_name",
-			aitool.WithParam_Required(true),
-			aitool.WithParam_Description("需要加载 Schema 的工具准确名称。")),
-		aitool.WithStringParam("identifier",
-			aitool.WithParam_Description("可选。本次 Schema 加载的 snake_case 目的标识，不创建工具调用。")),
-		aitool.WithStringParam("reason",
-			aitool.WithParam_Description("可选。说明加载此工具定义的用途；不表示工具已执行。")),
 	)
 }
 
@@ -259,7 +218,7 @@ func toolBatchMaxCalls(loop *reactloops.ReActLoop) int {
 
 func validateBatchLength(loop *reactloops.ReActLoop, field string, items []aitool.InvokeParams) error {
 	if len(items) < 2 {
-		return utils.Errorf("%s requires at least 2 independent calls; use the legacy scalar fields for one call", field)
+		return utils.Errorf("%s requires at least 2 independent calls; use directly_call_tool_name and directly_call_tool_params for one call", field)
 	}
 	if maxCalls := toolBatchMaxCalls(loop); len(items) > maxCalls {
 		return utils.Errorf("%s contains %d calls, exceeding the configured maximum of %d", field, len(items), maxCalls)
@@ -326,15 +285,18 @@ func deepCloneInvokeParams(params aitool.InvokeParams) (aitool.InvokeParams, err
 	return cloned, nil
 }
 
-func parseDirectToolBatchAction(loop *reactloops.ReActLoop, action *aicommon.Action) (*aicommon.ToolBatchRequest, bool, error) {
+func parseDirectToolBatchAction(loop *reactloops.ReActLoop, action *aicommon.Action) (*aicommon.ToolCallGroupRequest, bool, error) {
 	return parseDirectToolBatchActionWithMetadata(loop, action, false)
 }
 
-func parseDirectToolBatchActionWithMetadata(loop *reactloops.ReActLoop, action *aicommon.Action, allowMetadata bool) (*aicommon.ToolBatchRequest, bool, error) {
+func parseDirectToolBatchActionWithMetadata(loop *reactloops.ReActLoop, action *aicommon.Action, allowMetadata bool) (*aicommon.ToolCallGroupRequest, bool, error) {
 	if err := action.WaitParseResult(toolBatchVerifierContext(loop)); err != nil {
 		return nil, false, utils.Wrap(err, "directly_call_tool action parse failed")
 	}
 
+	if hasAnyCanonicalActionParam(action, "directly_call_tool_calls", retiredRequireToolBatchField) {
+		return nil, false, utils.Error("reason: retired batch fields; retry: use require_tool_payload for schema loading or directly_call_tool_params_group for explicit calls")
+	}
 	items, hasBatch, err := parseCanonicalBatchItems(action, directlyCallToolBatchField)
 	if err != nil || !hasBatch {
 		return nil, hasBatch, err
@@ -344,8 +306,8 @@ func parseDirectToolBatchActionWithMetadata(loop *reactloops.ReActLoop, action *
 		return nil, true, utils.Errorf("%s cannot be combined with legacy directly_call_tool_* fields", directlyCallToolBatchField)
 	}
 	if hasAnyCanonicalActionParam(action,
-		requireToolBatchField,
-		"tool_require_payload",
+		retiredRequireToolBatchField,
+		"require_tool_payload", "tool_require_payload",
 		"tool_call_reason",
 	) {
 		return nil, true, utils.Errorf("%s cannot be combined with require_tool fields", directlyCallToolBatchField)
@@ -362,7 +324,7 @@ func parseDirectToolBatchActionWithMetadata(loop *reactloops.ReActLoop, action *
 		"tool_name": {}, "params": {}, "identifier": {}, "expectations": {}, "reason": {},
 	}
 	identifiers := make(map[string]int)
-	request := &aicommon.ToolBatchRequest{Calls: make([]aicommon.ToolBatchCall, 0, len(items))}
+	request := &aicommon.ToolCallGroupRequest{Calls: make([]aicommon.ToolCallGroupCall, 0, len(items))}
 	for index, item := range items {
 		if err := rejectUnknownBatchFields(item, allowed); err != nil {
 			return nil, true, utils.Wrapf(err, "%s[%d]", directlyCallToolBatchField, index)
@@ -412,9 +374,8 @@ func parseDirectToolBatchActionWithMetadata(loop *reactloops.ReActLoop, action *
 			loop.GetEmitter().EmitWarning("tool '%s' in %s[%d] is not in the recently-used cache; runtime will resolve it", toolName, directlyCallToolBatchField, index)
 		}
 		reactloops.MaybeWarnBashBeforeEdit(loop, toolName)
-		request.Calls = append(request.Calls, aicommon.ToolBatchCall{
+		request.Calls = append(request.Calls, aicommon.ToolCallGroupCall{
 			Index:        index,
-			Mode:         aicommon.ToolCallModeDirect,
 			ToolName:     toolName,
 			Params:       params,
 			Identifier:   identifier,
@@ -442,7 +403,7 @@ func executeVerifiedToolBatch(
 	operator *reactloops.LoopActionHandlerOperator,
 ) bool {
 	raw := loop.GetActionExecutionValue(action, stateKey)
-	request, ok := raw.(*aicommon.ToolBatchRequest)
+	request, ok := raw.(*aicommon.ToolCallGroupRequest)
 	if !ok || request == nil || len(request.Calls) == 0 {
 		return false
 	}
@@ -460,128 +421,30 @@ func executeVerifiedToolBatch(
 	}
 	emitToolsPreparingStatus(loop, toolNames)
 	emitToolBatchRunningStatus(loop, toolNames)
-	batchRuntime, supported := invoker.(aicommon.ToolBatchInvokeRuntime)
+	batchRuntime, supported := invoker.(aicommon.ToolCallGroupInvokeRuntime)
 	var (
-		result *aicommon.ToolBatchResult
+		result *aicommon.ToolCallGroupResult
 		err    error
 	)
 	if supported {
-		result, err = batchRuntime.ExecuteToolBatch(ctx, task, request)
+		result, err = batchRuntime.ExecuteToolCallGroup(ctx, task, request)
 	} else {
-		// Compatibility fallback for third-party runtimes and old test doubles.
-		// It deliberately stays serial because their emitter/task implementation
-		// has not declared itself concurrency-safe.
-		invoker.AddToTimeline("[TOOL_BATCH_COMPAT]", "runtime does not implement ToolBatchInvokeRuntime; executing the verified batch serially")
-		result = executeToolBatchSerialFallback(ctx, invoker, request)
+		for _, call := range request.Calls {
+			operator.Feedback(directToolRetryFeedback(loop, call.ToolName, "runtime does not support explicit parameter groups; submit one directly_call_tool at a time", false))
+		}
+		operator.Continue()
+		return true
 	}
 	handleToolBatchActionResult(loop, ctx, invoker, request, result, err, operator)
 	return true
-}
-
-func executeToolBatchSerialFallback(
-	ctx context.Context,
-	invoker aicommon.AIInvokeRuntime,
-	request *aicommon.ToolBatchRequest,
-) *aicommon.ToolBatchResult {
-	result := &aicommon.ToolBatchResult{BatchID: request.BatchID, Outcomes: make([]aicommon.ToolCallOutcome, len(request.Calls))}
-	cancelRemaining := func(start int, cause error) {
-		if cause == nil {
-			cause = context.Canceled
-		}
-		for remaining := start; remaining < len(request.Calls); remaining++ {
-			pending := request.Calls[remaining]
-			result.Outcomes[remaining] = aicommon.ToolCallOutcome{
-				Index:         pending.Index,
-				RequestedTool: pending.ToolName,
-				FinalTool:     pending.ToolName,
-				Stage:         aicommon.ToolCallStageCancelled,
-				Err:           cause,
-			}
-		}
-	}
-	for index, call := range request.Calls {
-		if ctx != nil {
-			if ctxErr := ctx.Err(); ctxErr != nil {
-				cancelRemaining(index, ctxErr)
-				break
-			}
-		}
-		var (
-			toolResult     *aitool.ToolResult
-			directlyAnswer bool
-			err            error
-		)
-		opts := []aicommon.ToolCallerOption{
-			aicommon.WithToolCaller_Reason(call.Reason),
-			aicommon.WithToolCaller_DestinationIdentifier(call.Identifier),
-		}
-		if call.Expectations != "" {
-			opts = append(opts, aicommon.WithToolCaller_CallExpectations(call.Expectations))
-		}
-		if call.Mode == aicommon.ToolCallModeRequire {
-			toolResult, directlyAnswer, err = invoker.ExecuteToolRequiredAndCall(ctx, call.ToolName, opts...)
-		} else {
-			params, cloneErr := deepCloneInvokeParams(call.Params)
-			if cloneErr != nil {
-				err = cloneErr
-			} else {
-				if call.Identifier != "" {
-					params[aicommon.ReservedKeyIdentifier] = call.Identifier
-				}
-				if call.Expectations != "" {
-					params[aicommon.ReservedKeyCallExpectations] = call.Expectations
-				}
-				toolResult, directlyAnswer, err = invoker.ExecuteToolRequiredAndCallWithoutRequired(ctx, call.ToolName, params, opts...)
-			}
-		}
-
-		stage := aicommon.ToolCallStageDone
-		cancelled := errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded)
-		if directlyAnswer || cancelled {
-			stage = aicommon.ToolCallStageCancelled
-		} else if toolResult == nil {
-			stage = aicommon.ToolCallStageInvokeFailed
-			if err == nil {
-				err = utils.Error("tool invocation returned no result")
-			}
-		} else if err != nil || !toolResult.Success {
-			stage = aicommon.ToolCallStageInvokeFailed
-		}
-		result.Outcomes[index] = aicommon.ToolCallOutcome{
-			Index:         call.Index,
-			RequestedTool: call.ToolName,
-			FinalTool:     call.ToolName,
-			Stage:         stage,
-			ExecutionStatus: func() aitool.ToolExecutionStatus {
-				if toolResult == nil {
-					return ""
-				}
-				status, _ := toolResult.GetExecutionStatus()
-				return status
-			}(),
-			Result:         toolResult,
-			Err:            err,
-			DirectlyAnswer: directlyAnswer,
-		}
-		if directlyAnswer {
-			result.DirectlyAnswer = true
-			cancelRemaining(index+1, context.Canceled)
-			break
-		}
-		if cancelled {
-			cancelRemaining(index+1, err)
-			break
-		}
-	}
-	return result
 }
 
 func handleToolBatchActionResult(
 	loop *reactloops.ReActLoop,
 	ctx context.Context,
 	invoker aicommon.AIInvokeRuntime,
-	request *aicommon.ToolBatchRequest,
-	result *aicommon.ToolBatchResult,
+	request *aicommon.ToolCallGroupRequest,
+	result *aicommon.ToolCallGroupResult,
 	err error,
 	operator *reactloops.LoopActionHandlerOperator,
 ) {
@@ -712,7 +575,7 @@ func handleToolBatchActionResult(
 	summary := strings.Join(lines, "\n")
 	invoker.AddToTimeline("[TOOL_BATCH_RESULT]", summary)
 	operator.Feedback(summary)
-	emitToolBatchResultStatus(loop, request, outcomes)
+	emitToolCallGroupResultStatus(loop, request, outcomes)
 	toolNames := make([]string, 0, len(request.Calls))
 	for _, call := range request.Calls {
 		toolNames = append(toolNames, call.ToolName)

@@ -44,9 +44,9 @@ func TestInferActionTypeFromPayload_DoesNotPromoteNestedType(t *testing.T) {
 		raw  string
 		want string
 	}{
-		{"plain_action", `{"action":"directly_call_tool","directly_call_tool_calls":[{"tool_name":"dig","params":{"type":"A"}}]}`, "directly_call_tool"},
-		{"missing_action", `{"directly_call_tool_calls":[{"tool_name":"dig","params":{"type":"A"}}]}`, "directly_call_tool"},
-		{"object_action", `{"@action":"object","directly_call_tool_calls":[{"tool_name":"dig","params":{"type":"A"}}]}`, "directly_call_tool"},
+		{"plain_action", `{"action":"directly_call_tool","directly_call_tool_params_group":[{"tool_name":"dig","params":{"type":"A"}}]}`, "directly_call_tool"},
+		{"missing_action", `{"directly_call_tool_params_group":[{"tool_name":"dig","params":{"type":"A"}}]}`, "directly_call_tool"},
+		{"object_action", `{"@action":"object","directly_call_tool_params_group":[{"tool_name":"dig","params":{"type":"A"}}]}`, "directly_call_tool"},
 		{"nested_only", `{"params":{"type":"A","next_action":{"type":"finish"}}}`, ""},
 		{"legacy_type", `{"params":{"type":"A"},"type":"require_tool"}`, "require_tool"},
 		{"legacy_next_action", `{"next_action":{"params":{"type":"A"},"type":"require_tool"}}`, "require_tool"},
@@ -82,7 +82,7 @@ func TestCallAITransaction_ActionKeyAliasBatch(t *testing.T) {
 							cfg.ToolCallCallback([]*aispec.ToolCall{{
 								Index: 0, ID: "call_batch", Type: "function",
 								Function: aispec.FuncReturn{Name: actionName, Arguments: `{"identifier":"initial_recon",
-									"directly_call_tool_calls":[
+									"directly_call_tool_params_group":[
 										{"tool_name":"dig","params":{"domain":"example.invalid","type":"A"}},
 										{"tool_name":"dig","params":{"domain":"example.invalid","type":"CNAME"}}
 									]}`},
@@ -91,7 +91,7 @@ func TestCallAITransaction_ActionKeyAliasBatch(t *testing.T) {
 							resp.EmitOutputStream(strings.NewReader("native function call"))
 						} else {
 							resp.EmitOutputStream(strings.NewReader(`{"action":"` + actionName + `","identifier":"initial_recon",
-							"directly_call_tool_calls":[
+							"directly_call_tool_params_group":[
 								{"tool_name":"dig","params":{"domain":"example.invalid","type":"A"}},
 								{"tool_name":"dig","params":{"domain":"example.invalid","type":"CNAME"}}
 							]}`))
@@ -109,7 +109,7 @@ func TestCallAITransaction_ActionKeyAliasBatch(t *testing.T) {
 					ActionType: "directly_call_tool",
 					ActionVerifier: func(_ *ReActLoop, action *aicommon.Action) error {
 						verifications.Add(1)
-						batch, exists, err := action.GetCanonicalObjectArray("directly_call_tool_calls")
+						batch, exists, err := action.GetCanonicalObjectArray("directly_call_tool_params_group")
 						require.NoError(t, err)
 						require.True(t, exists)
 						require.Len(t, batch, 2)

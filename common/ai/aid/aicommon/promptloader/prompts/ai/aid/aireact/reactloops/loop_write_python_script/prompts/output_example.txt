@@ -46,7 +46,7 @@ Step 1 - Check what's missing:
 {"@action": "check_and_install_dependencies", "human_readable_thought": "Checking if all dependencies are installed"}
 
 Step 2 - Install via bash (after check reports missing packages):
-{"@action": "require_tool", "tool_require_payload": "bash", "human_readable_thought": "加载 bash 参数定义，准备安装 requests"}
+{"@action": "require_tool", "require_tool_payload": "bash", "human_readable_thought": "加载 bash 参数定义，准备安装 requests"}
 
 观察 bash Schema 后，使用 directly_call_tool 提交安装命令：pip3 install --user requests。require_tool 本身不安装。
 
@@ -55,7 +55,7 @@ Step 3 - Verify installation:
 
 ### Example 4: Execute the script via bash
 
-{"@action": "require_tool", "tool_require_payload": "bash", "human_readable_thought": "加载 bash 参数定义，准备验证 --help"}
+{"@action": "require_tool", "require_tool_payload": "bash", "human_readable_thought": "加载 bash 参数定义，准备验证 --help"}
 
 观察 bash Schema 后，使用 directly_call_tool 提交验证命令：python3 /path/to/script.py --help。require_tool 本身不执行。
 

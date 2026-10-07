@@ -60,14 +60,14 @@ func TestToolCallReasonFallbackWhenAuxiliaryIsSkipped(t *testing.T) {
 	tool := aitool.NewWithoutCallback("do_http_request")
 	tc, err := NewToolCaller(context.Background(),
 		WithToolCaller_AICallerConfig(config),
-		WithToolCaller_AICaller(config),
+
 		WithToolCaller_DestinationIdentifier("portal_health"),
 	)
 	require.NoError(t, err)
 	require.False(t, config.ResolveAuxiliaryTask(CallerLabelToolCallReason).ShouldRun())
 	tc.generateReasonIfNeeded(tool, nil)
 	require.Equal(t, "portal health", tc.reason)
-	require.True(t, tc.reasonFinalized)
+
 }
 
 func TestBuildToolCallReasonPrompt_IncludesRecentSteps(t *testing.T) {
@@ -114,37 +114,6 @@ func TestBuildRecentToolCallSummary_NoResults(t *testing.T) {
 	require.Empty(t, buildRecentToolCallSummary(task, 5))
 }
 
-func TestWithToolCaller_Reason_SetsReasonFinalized(t *testing.T) {
-	task := NewStatefulTaskBase("task-1", "test", context.Background(), nil, true)
-	tc, err := NewToolCaller(
-		context.Background(),
-		WithToolCaller_AICallerConfig(NewTestConfig(context.Background())),
-		WithToolCaller_AICaller(&ProxyAICaller{callFunc: func(request *AIRequest) (*AIResponse, error) {
-			return &AIResponse{}, nil
-		}}),
-		WithToolCaller_Task(task),
-		WithToolCaller_Reason("specific reason for this call"),
-	)
-	require.NoError(t, err)
-	require.True(t, tc.reasonFinalized)
-	require.Equal(t, "specific reason for this call", tc.reason)
-}
-
-func TestWithToolCaller_Reason_EmptyDoesNotFinalize(t *testing.T) {
-	task := NewStatefulTaskBase("task-1", "test", context.Background(), nil, true)
-	tc, err := NewToolCaller(
-		context.Background(),
-		WithToolCaller_AICallerConfig(NewTestConfig(context.Background())),
-		WithToolCaller_AICaller(&ProxyAICaller{callFunc: func(request *AIRequest) (*AIResponse, error) {
-			return &AIResponse{}, nil
-		}}),
-		WithToolCaller_Task(task),
-		WithToolCaller_Reason(""),
-	)
-	require.NoError(t, err)
-	require.False(t, tc.reasonFinalized)
-}
-
 func TestBuildRecentToolCallSummary_TruncatesLongError(t *testing.T) {
 	task := NewStatefulTaskBase("task-1", "test", context.Background(), nil, true)
 	longErr := ""
@@ -173,9 +142,6 @@ func newToolCallerWithReasonRuntime(t *testing.T, rt AIInvokeRuntime) *ToolCalle
 	tc, err := NewToolCaller(
 		context.Background(),
 		WithToolCaller_AICallerConfig(NewTestConfig(context.Background())),
-		WithToolCaller_AICaller(&ProxyAICaller{callFunc: func(request *AIRequest) (*AIResponse, error) {
-			return &AIResponse{}, nil
-		}}),
 		WithToolCaller_Task(task),
 		WithToolCaller_InvokeRuntime(rt),
 	)

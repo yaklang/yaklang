@@ -115,8 +115,6 @@ func restoreDeepPlanningActions(loop *reactloops.ReActLoop, r aicommon.AIInvokeR
 		findFilesAction(r),
 		grepTextAction(r),
 		webSearchAction(r),
-		scanPortAction(r),
-		simpleCrawlerAction(r),
 	}
 	for _, opt := range options {
 		opt(loop)

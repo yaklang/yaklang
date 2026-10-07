@@ -45,7 +45,7 @@ Use `check_and_install_dependencies` to detect missing packages.
 缺少依赖时，先用 `require_tool` 加载 bash 的参数 Schema，再用 `directly_call_tool` 安装；以下仅为 Schema 加载示例：
 
 ```json
-{"@action": "require_tool", "tool_require_payload": "bash", "human_readable_thought": "加载 bash 参数定义，准备安装依赖"}
+{"@action": "require_tool", "require_tool_payload": "bash", "human_readable_thought": "加载 bash 参数定义，准备安装依赖"}
 ```
 观察 Schema 后，用 `directly_call_tool` 提交安装命令：`uv pip install --system <package>` 或 `pip3 install --user <package>`。
 
@@ -54,7 +54,7 @@ Use `check_and_install_dependencies` to detect missing packages.
 先加载 bash Schema，再用 `directly_call_tool` 显式执行脚本；以下仅为 Schema 加载示例。 脚本路径在下方动态数据中。
 
 ```json
-{"@action": "require_tool", "tool_require_payload": "bash", "human_readable_thought": "加载 bash 参数定义，准备验证脚本"}
+{"@action": "require_tool", "require_tool_payload": "bash", "human_readable_thought": "加载 bash 参数定义，准备验证脚本"}
 ```
 观察 Schema 后，用 `directly_call_tool` 提交命令：`python3 <script_path> --help`。
 

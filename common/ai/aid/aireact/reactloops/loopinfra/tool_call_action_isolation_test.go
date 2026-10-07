@@ -15,13 +15,10 @@ type isolatedToolCallTestInvoker struct {
 	*executingToolScalarTestInvoker
 }
 
-func (i *isolatedToolCallTestInvoker) ExecuteToolBatch(ctx context.Context, task aicommon.AIStatefulTask, request *aicommon.ToolBatchRequest) (*aicommon.ToolBatchResult, error) {
-	result := &aicommon.ToolBatchResult{BatchID: request.BatchID}
+func (i *isolatedToolCallTestInvoker) ExecuteToolCallGroup(ctx context.Context, task aicommon.AIStatefulTask, request *aicommon.ToolCallGroupRequest) (*aicommon.ToolCallGroupResult, error) {
+	result := &aicommon.ToolCallGroupResult{BatchID: request.BatchID}
 	for _, call := range request.Calls {
 		params := call.Params
-		if call.Mode == aicommon.ToolCallModeRequire {
-			params = i.generated[call.ToolName]
-		}
 		toolResult, _, err := i.invokeTool(ctx, call.ToolName, nil, params)
 		if err != nil {
 			return nil, err
@@ -40,10 +37,10 @@ func (i *isolatedToolCallTestInvoker) ExecuteToolBatch(ctx context.Context, task
 func TestToolCallsKeepTheirOwnVerifiedState(t *testing.T) {
 	directRead := `{"@action":"directly_call_tool","directly_call_tool_name":"read_file","directly_call_tool_params":{"file":"/first"}}`
 	directGrep := `{"@action":"directly_call_tool","directly_call_tool_name":"grep","directly_call_tool_params":{"path":"/second","pattern":"needle"}}`
-	directBatch := `{"@action":"directly_call_tool","directly_call_tool_calls":[{"tool_name":"read_file","params":{"file":"/batch-a"}},{"tool_name":"read_file","params":{"file":"/batch-b"}}]}`
+	directBatch := `{"@action":"directly_call_tool","directly_call_tool_params_group":[{"tool_name":"read_file","params":{"file":"/batch-a"}},{"tool_name":"read_file","params":{"file":"/batch-b"}}]}`
 	requireRead := `{"@action":"require_tool","tool_require_payload":"read_file"}`
 	requireGrep := `{"@action":"require_tool","tool_require_payload":"grep"}`
-	requireBatch := `{"@action":"require_tool","tool_require_calls":[{"tool_name":"grep"},{"tool_name":"read_file"}]}`
+	requireBatch := `{"@action":"require_tool","require_tool_payload":["grep", "read_file"]}`
 	for _, tc := range []struct {
 		name        string
 		calls       []string
@@ -54,7 +51,7 @@ func TestToolCallsKeepTheirOwnVerifiedState(t *testing.T) {
 		{"require distinct tools", []string{requireRead, requireGrep}, nil, nil},
 		{"direct scalar then batch", []string{directGrep, directBatch}, []string{"grep", "read_file", "read_file"}, []string{"/second", "/batch-a", "/batch-b"}},
 		{"direct batch then scalar", []string{directBatch, directGrep}, []string{"read_file", "read_file", "grep"}, []string{"/batch-a", "/batch-b", "/second"}},
-		{"two direct batches", []string{directBatch, `{"@action":"directly_call_tool","directly_call_tool_calls":[{"tool_name":"grep","params":{"path":"/batch-c","pattern":"third"}},{"tool_name":"read_file","params":{"file":"/batch-d"}}]}`}, []string{"read_file", "read_file", "grep", "read_file"}, []string{"/batch-a", "/batch-b", "/batch-c", "/batch-d"}},
+		{"two direct batches", []string{directBatch, `{"@action":"directly_call_tool","directly_call_tool_params_group":[{"tool_name":"grep","params":{"path":"/batch-c","pattern":"third"}},{"tool_name":"read_file","params":{"file":"/batch-d"}}]}`}, []string{"read_file", "read_file", "grep", "read_file"}, []string{"/batch-a", "/batch-b", "/batch-c", "/batch-d"}},
 		{"require scalar then batch", []string{requireRead, requireBatch}, nil, nil},
 		{"require batch then scalar", []string{requireBatch, requireGrep}, nil, nil},
 		{"mixed actions", []string{directRead, requireBatch, directGrep, requireRead}, []string{"read_file", "grep"}, []string{"/first", "/second"}},

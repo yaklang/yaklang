@@ -116,16 +116,14 @@ func batchHardeningResultParams(t *testing.T, result *aitool.ToolResult) aitool.
 	}
 }
 
-func batchHardeningRequest(targetTool, siblingTool string, params aitool.InvokeParams) *aicommon.ToolBatchRequest {
-	return &aicommon.ToolBatchRequest{Calls: []aicommon.ToolBatchCall{
+func batchHardeningRequest(targetTool, siblingTool string, params aitool.InvokeParams) *aicommon.ToolCallGroupRequest {
+	return &aicommon.ToolCallGroupRequest{Calls: []aicommon.ToolCallGroupCall{
 		{
-			Mode:     aicommon.ToolCallModeDirect,
 			ToolName: targetTool,
 			Params:   params,
 			Reason:   "exercise the review checkpoint",
 		},
 		{
-			Mode:     aicommon.ToolCallModeDirect,
 			ToolName: siblingTool,
 			Params:   aitool.InvokeParams{"id": 2},
 			Reason:   "exercise the batch barrier",
@@ -133,7 +131,7 @@ func batchHardeningRequest(targetTool, siblingTool string, params aitool.InvokeP
 	}}
 }
 
-func TestExecuteToolBatch_RequireGuardRejectionSkipsOnlyRejectedChild(t *testing.T) {
+func TestExecuteToolCallGroup_DirectGuardRejectionSkipsOnlyRejectedChild(t *testing.T) {
 	var rejectedParamCalls int32
 	var allowedParamCalls int32
 	var rejectedInvokes int32
@@ -166,10 +164,10 @@ func TestExecuteToolBatch_RequireGuardRejectionSkipsOnlyRejectedChild(t *testing
 			switch {
 			case isToolParamGenerationPrompt(prompt, rejectedTool.Name):
 				atomic.AddInt32(&rejectedParamCalls, 1)
-				return batchHardeningAIResponse(config, `{"@action":"call-tool","params":{"id":1}}`)
+				return nil, fmt.Errorf("unexpected retired parameter generation for rejected tool")
 			case isToolParamGenerationPrompt(prompt, allowedTool.Name):
 				atomic.AddInt32(&allowedParamCalls, 1)
-				return batchHardeningAIResponse(config, `{"@action":"call-tool","params":{"id":2}}`)
+				return nil, fmt.Errorf("unexpected retired parameter generation for allowed tool")
 			default:
 				return nil, fmt.Errorf("unexpected AI call: caller=%s", request.GetCallerLabel())
 			}
@@ -193,12 +191,12 @@ func TestExecuteToolBatch_RequireGuardRejectionSkipsOnlyRejectedChild(t *testing
 	require.NoError(t, err)
 	loop.SetCurrentTask(react.config.DefaultTask)
 
-	result, execErr := react.ExecuteToolBatch(
+	result, execErr := react.ExecuteToolCallGroup(
 		context.Background(),
 		react.config.DefaultTask,
-		&aicommon.ToolBatchRequest{Calls: []aicommon.ToolBatchCall{
-			{Mode: aicommon.ToolCallModeRequire, ToolName: rejectedTool.Name, Reason: "must be rejected"},
-			{Mode: aicommon.ToolCallModeRequire, ToolName: allowedTool.Name, Reason: "must continue"},
+		&aicommon.ToolCallGroupRequest{Calls: []aicommon.ToolCallGroupCall{
+			{Params: aitool.InvokeParams{"id": 1}, ToolName: rejectedTool.Name, Reason: "must be rejected"},
+			{Params: aitool.InvokeParams{"id": 2}, ToolName: allowedTool.Name, Reason: "must continue"},
 		}},
 	)
 	require.NoError(t, execErr)
@@ -210,11 +208,11 @@ func TestExecuteToolBatch_RequireGuardRejectionSkipsOnlyRejectedChild(t *testing
 	require.NotNil(t, result.Outcomes[1].Result)
 	require.Equal(t, int32(0), atomic.LoadInt32(&rejectedParamCalls), "guarded require child must not generate params")
 	require.Equal(t, int32(0), atomic.LoadInt32(&rejectedInvokes), "guarded require child must not invoke")
-	require.Equal(t, int32(1), atomic.LoadInt32(&allowedParamCalls), "valid sibling must still prepare once")
+	require.Equal(t, int32(0), atomic.LoadInt32(&allowedParamCalls), "explicit sibling must not generate arguments")
 	require.Equal(t, int32(1), atomic.LoadInt32(&allowedInvokes), "valid sibling must still invoke once")
 }
 
-func TestExecuteToolBatch_ManualReviewMaterialsCarryStableChildIdentity(t *testing.T) {
+func TestExecuteToolCallGroup_ManualReviewMaterialsCarryStableChildIdentity(t *testing.T) {
 	tool, err := aitool.New(
 		"batch_review_identity_tool",
 		aitool.WithIntegerParam("id", aitool.WithParam_Required(true)),
@@ -237,7 +235,7 @@ func TestExecuteToolBatch_ManualReviewMaterialsCarryStableChildIdentity(t *testi
 	)
 
 	request := batchHardeningRequest(tool.Name, tool.Name, aitool.InvokeParams{"id": 1})
-	result, execErr := react.ExecuteToolBatch(context.Background(), react.config.DefaultTask, request)
+	result, execErr := react.ExecuteToolCallGroup(context.Background(), react.config.DefaultTask, request)
 	require.NoError(t, execErr)
 	require.Len(t, result.Outcomes, 2)
 	materials := recorder.snapshot()
@@ -256,7 +254,7 @@ func TestExecuteToolBatch_ManualReviewMaterialsCarryStableChildIdentity(t *testi
 	}
 }
 
-func TestExecuteToolBatch_ManualReviewCheckpointReplay_DirectAnswer(t *testing.T) {
+func TestExecuteToolCallGroup_ManualReviewCheckpointReplay_DirectAnswer(t *testing.T) {
 	var targetInvoked int32
 	var siblingInvoked int32
 	target, err := aitool.New(
@@ -291,7 +289,7 @@ func TestExecuteToolBatch_ManualReviewCheckpointReplay_DirectAnswer(t *testing.T
 	)
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	firstResult, firstErr := first.ExecuteToolBatch(
+	firstResult, firstErr := first.ExecuteToolCallGroup(
 		ctx,
 		first.config.DefaultTask,
 		batchHardeningRequest(target.Name, sibling.Name, aitool.InvokeParams{"id": 1}),
@@ -310,7 +308,7 @@ func TestExecuteToolBatch_ManualReviewCheckpointReplay_DirectAnswer(t *testing.T
 	second := newBatchHardeningReplayRuntime(
 		t, runtimeID, sequenceStart, nil, secondReviews, nil, target, sibling,
 	)
-	secondResult, secondErr := second.ExecuteToolBatch(
+	secondResult, secondErr := second.ExecuteToolCallGroup(
 		ctx,
 		second.config.DefaultTask,
 		batchHardeningRequest(target.Name, sibling.Name, aitool.InvokeParams{"id": 1}),
@@ -328,7 +326,7 @@ func TestExecuteToolBatch_ManualReviewCheckpointReplay_DirectAnswer(t *testing.T
 
 // A rejected review settles only its own proposal. Recovery replays the same
 // rejection and completed sibling; a corrected explicit batch is a new proposal.
-func TestExecuteToolBatch_ReviewReconsiderAndReplay(t *testing.T) {
+func TestExecuteToolCallGroup_ReviewReconsiderAndReplay(t *testing.T) {
 	for _, kind := range []string{"wrong_tool", "wrong_params"} {
 		t.Run(kind, func(t *testing.T) {
 			var originalCalls, replacementCalls, siblingCalls, aiCalls atomic.Int32
@@ -357,10 +355,10 @@ func TestExecuteToolBatch_ReviewReconsiderAndReplay(t *testing.T) {
 				}, original, replacement, sibling)
 			ctx, cancel := context.WithTimeout(context.Background(), 8*time.Second)
 			defer cancel()
-			request := func() *aicommon.ToolBatchRequest {
+			request := func() *aicommon.ToolCallGroupRequest {
 				return batchHardeningRequest(original.Name, sibling.Name, aitool.InvokeParams{"id": 1})
 			}
-			result, err := first.ExecuteToolBatch(ctx, first.config.DefaultTask, request())
+			result, err := first.ExecuteToolCallGroup(ctx, first.config.DefaultTask, request())
 			require.NoError(t, err)
 			var rejected *aicommon.ToolReviewReconsiderError
 			require.ErrorAs(t, result.Outcomes[0].Err, &rejected)
@@ -379,7 +377,7 @@ func TestExecuteToolBatch_ReviewReconsiderAndReplay(t *testing.T) {
 			}
 			replayReviews := new(batchHardeningReviewRecorder)
 			replay := newBatchHardeningReplayRuntime(t, runtimeID, 12200, callback, replayReviews, nil, original, replacement, sibling)
-			restored, err := replay.ExecuteToolBatch(ctx, replay.config.DefaultTask, request())
+			restored, err := replay.ExecuteToolCallGroup(ctx, replay.config.DefaultTask, request())
 			require.NoError(t, err)
 			require.ErrorAs(t, restored.Outcomes[0].Err, &rejected)
 			require.Zero(t, replayReviews.count)
@@ -392,7 +390,7 @@ func TestExecuteToolBatch_ReviewReconsiderAndReplay(t *testing.T) {
 				next = replacement
 			}
 			retry := batchHardeningRequest(next.Name, sibling.Name, aitool.InvokeParams{"id": 42})
-			settled, err := replay.ExecuteToolBatch(ctx, replay.config.DefaultTask, retry)
+			settled, err := replay.ExecuteToolCallGroup(ctx, replay.config.DefaultTask, retry)
 			require.NoError(t, err)
 			require.Equal(t, aicommon.ToolCallStageDone, settled.Outcomes[0].Stage)
 			require.EqualValues(t, 42, batchHardeningResultParams(t, settled.Outcomes[0].Result).GetInt("id"))
@@ -403,49 +401,6 @@ func TestExecuteToolBatch_ReviewReconsiderAndReplay(t *testing.T) {
 }
 
 func TestToolCaller_CancellationAfterAdmissionBoundariesSkipsCallbacks(t *testing.T) {
-	t.Run("parameter generation gate", func(t *testing.T) {
-		var aiCalls int32
-		var toolCalls int32
-		var releases int32
-		tool, err := aitool.New(
-			"batch_hardening_cancel_after_param_gate",
-			aitool.WithIntegerParam("id", aitool.WithParam_Required(true)),
-			aitool.WithDangerousNoNeedUserReview(true),
-			aitool.WithSimpleCallback(func(_ aitool.InvokeParams, _ io.Writer, _ io.Writer) (any, error) {
-				atomic.AddInt32(&toolCalls, 1)
-				return "must not invoke", nil
-			}),
-		)
-		require.NoError(t, err)
-		react := newBatchTestReAct(t, tool, func(_ aicommon.AICallerConfigIf, _ *aicommon.AIRequest) (*aicommon.AIResponse, error) {
-			atomic.AddInt32(&aiCalls, 1)
-			return nil, fmt.Errorf("AI callback must not run after gate cancellation")
-		})
-		ctx, cancel := context.WithCancel(context.Background())
-		defer cancel()
-		caller, err := aicommon.NewToolCaller(
-			ctx,
-			aicommon.WithToolCaller_AICallerConfig(react.config),
-			aicommon.WithToolCaller_AICaller(react.config),
-			aicommon.WithToolCaller_RuntimeId(react.config.GetRuntimeId()),
-			aicommon.WithToolCaller_Emitter(react.config.GetEmitter()),
-			aicommon.WithToolCaller_Task(react.config.DefaultTask),
-			aicommon.WithToolCaller_Reason("cancel after parameter admission"),
-			aicommon.WithToolCaller_GenerateToolParamsBuilderWithMeta(func(_ *aitool.Tool, _ string) (*aicommon.ToolParamsPromptMeta, error) {
-				return &aicommon.ToolParamsPromptMeta{Prompt: "generate params"}, nil
-			}),
-			aicommon.WithToolCaller_ParamGenerationGate(func(context.Context) (func(), error) {
-				cancel()
-				return func() { atomic.AddInt32(&releases, 1) }, nil
-			}),
-		)
-		require.NoError(t, err)
-		_, _, callErr := caller.CallTool(tool)
-		require.ErrorContains(t, callErr, context.Canceled.Error())
-		require.Equal(t, int32(0), atomic.LoadInt32(&aiCalls))
-		require.Equal(t, int32(0), atomic.LoadInt32(&toolCalls))
-		require.Equal(t, int32(1), atomic.LoadInt32(&releases), "the acquired gate must be released on the cancellation re-check")
-	})
 
 	t.Run("before invoke hook", func(t *testing.T) {
 		var toolCalls int32
@@ -466,7 +421,7 @@ func TestToolCaller_CancellationAfterAdmissionBoundariesSkipsCallbacks(t *testin
 		caller, err := aicommon.NewToolCaller(
 			ctx,
 			aicommon.WithToolCaller_AICallerConfig(react.config),
-			aicommon.WithToolCaller_AICaller(react.config),
+
 			aicommon.WithToolCaller_RuntimeId(react.config.GetRuntimeId()),
 			aicommon.WithToolCaller_Emitter(react.config.GetEmitter()),
 			aicommon.WithToolCaller_Task(react.config.DefaultTask),
@@ -477,7 +432,7 @@ func TestToolCaller_CancellationAfterAdmissionBoundariesSkipsCallbacks(t *testin
 			}),
 		)
 		require.NoError(t, err)
-		_, _, callErr := caller.CallToolWithExistedParams(tool, true, aitool.InvokeParams{"id": 1})
+		_, _, callErr := caller.CallToolWithExistedParams(tool, aitool.InvokeParams{"id": 1})
 		require.ErrorIs(t, callErr, context.Canceled)
 		require.Equal(t, int32(0), atomic.LoadInt32(&toolCalls))
 		require.Equal(t, int32(1), atomic.LoadInt32(&releases), "beforeInvoke cleanup must run when cancellation wins after admission")

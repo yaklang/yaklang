@@ -76,8 +76,8 @@ func TestUserInteractionAnswersEnterTimeline(t *testing.T) {
 						if frozen {
 							section = "semi-dynamic-1"
 						}
-						require.Contains(t, r2PromptSection(t, assembled.Prompt, section), recorded.SystemPrompt)
-						require.Contains(t, r2PromptSection(t, assembled.Prompt, section), recorded.UserExtraPrompt)
+						require.Contains(t, loopPromptSection(t, assembled.Prompt, section), recorded.SystemPrompt)
+						require.Contains(t, loopPromptSection(t, assembled.Prompt, section), recorded.UserExtraPrompt)
 						dynamic := aicommon_testutil.MustExtractAITagBlock(t, assembled.Prompt, "PROMPT_SECTION_dynamic").Body
 						require.NotContains(t, dynamic, "EXTRA_REQUIREMENT")
 					}

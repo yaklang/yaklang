@@ -7,7 +7,6 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
-	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 )
 
 // TestSanitizeIdentifier tests the sanitizeIdentifier function
@@ -80,52 +79,6 @@ func TestSanitizeIdentifier(t *testing.T) {
 			require.Equal(t, tt.expected, result, "sanitizeIdentifier(%q) should return %q, got %q", tt.input, tt.expected, result)
 		})
 	}
-}
-
-// TestGenerateParamsResult tests the GenerateParamsResult structure
-func TestGenerateParamsResult(t *testing.T) {
-	t.Run("with identifier", func(t *testing.T) {
-		result := &GenerateParamsResult{
-			Params: aitool.InvokeParams{
-				"param1": "value1",
-				"param2": 123,
-			},
-			Identifier: "query_large_file",
-		}
-
-		require.NotNil(t, result.Params)
-		require.Equal(t, "value1", result.Params.GetString("param1"))
-		require.Equal(t, int64(123), result.Params.GetInt("param2"))
-		require.Equal(t, "query_large_file", result.Identifier)
-	})
-
-	t.Run("without identifier", func(t *testing.T) {
-		result := &GenerateParamsResult{
-			Params: aitool.InvokeParams{
-				"message": "hello",
-			},
-			Identifier: "",
-		}
-
-		require.NotNil(t, result.Params)
-		require.Equal(t, "hello", result.Params.GetString("message"))
-		require.Empty(t, result.Identifier)
-	})
-}
-
-// TestToolParamsPromptMetaWithIdentifier tests the ToolParamsPromptMeta structure with Identifier field
-func TestToolParamsPromptMetaWithIdentifier(t *testing.T) {
-	meta := &ToolParamsPromptMeta{
-		Prompt:     "test prompt",
-		Nonce:      "abc123",
-		ParamNames: []string{"param1", "param2"},
-		Identifier: "find_process",
-	}
-
-	require.Equal(t, "test prompt", meta.Prompt)
-	require.Equal(t, "abc123", meta.Nonce)
-	require.Len(t, meta.ParamNames, 2)
-	require.Equal(t, "find_process", meta.Identifier)
 }
 
 // TestExtractIdentifierFromAction tests extracting identifier from action response

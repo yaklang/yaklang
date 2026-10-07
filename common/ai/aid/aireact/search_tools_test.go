@@ -255,10 +255,7 @@ func TestReAct_ToolsSearch_Functionality(t *testing.T) {
 
 			// When AI generates parameters for tools_search
 			if isToolParamGenerationPrompt(prompt, "tools_search") {
-				rsp := i.NewAIResponse()
-				rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "call-tool", "params": { "query" : "echo" }}`))
-				rsp.Close()
-				return rsp, nil
+				return nil, fmt.Errorf("unexpected retired tool parameter-generation request")
 			}
 
 			// After tool execution, verify satisfaction
@@ -378,10 +375,7 @@ func TestReAct_ForgeSearch_Functionality(t *testing.T) {
 
 			// When AI generates parameters for forge_search
 			if isToolParamGenerationPrompt(prompt, "aiforge_search") {
-				rsp := i.NewAIResponse()
-				rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "call-tool", "params": { "query" : "test" }}`))
-				rsp.Close()
-				return rsp, nil
+				return nil, fmt.Errorf("unexpected retired tool parameter-generation request")
 			}
 
 			// After tool execution, verify satisfaction

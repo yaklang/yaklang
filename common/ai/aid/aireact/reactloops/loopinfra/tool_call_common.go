@@ -101,6 +101,12 @@ func handleToolCallResult(
 		operator.Continue()
 		return
 	}
+	var retry *aicommon.ToolCallRetryError
+	if errors.As(err, &retry) {
+		operator.Feedback(directToolRetryFeedback(loop, retry.ToolName, retry.Reason, false))
+		operator.Continue()
+		return
+	}
 	if err != nil {
 		errMsg := fmt.Sprintf("Tool '%s' invocation protocol failed: %v.", toolPayload, err)
 		invoker.AddToTimeline("[TOOL_PROTOCOL_ERROR]", errMsg)

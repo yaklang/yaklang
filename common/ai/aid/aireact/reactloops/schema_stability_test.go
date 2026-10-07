@@ -198,7 +198,7 @@ func TestGenerateSchema_ToolBatchMaxItemsMatchesRuntimeConfig(t *testing.T) {
 	direct, ok := loop.actions.Get(schema.AI_REACT_LOOP_ACTION_DIRECTLY_CALL_TOOL)
 	require.True(t, ok)
 	direct.Options = append(direct.Options, aitool.WithStructArrayParam(
-		"directly_call_tool_calls",
+		"directly_call_tool_params_group",
 		[]aitool.PropertyOption{
 			aitool.WithParam_Raw("minItems", 2),
 			aitool.WithParam_Raw("maxItems", aicommon.DefaultToolBatchMaxCalls),
@@ -208,26 +208,23 @@ func TestGenerateSchema_ToolBatchMaxItemsMatchesRuntimeConfig(t *testing.T) {
 	))
 	requireAction, ok := loop.actions.Get(schema.AI_REACT_LOOP_ACTION_REQUIRE_TOOL)
 	require.True(t, ok)
-	requireAction.Options = append(requireAction.Options, aitool.WithStructArrayParam(
-		"tool_require_calls",
-		[]aitool.PropertyOption{
-			aitool.WithParam_Raw("minItems", 2),
-			aitool.WithParam_Raw("maxItems", aicommon.DefaultToolBatchMaxCalls),
-		},
-		nil,
-		aitool.WithStringParam("tool_name"),
-	))
+	requireAction.Options = append(requireAction.Options, aitool.WithRawParam("require_tool_payload", map[string]any{"oneOf": []any{
+		map[string]any{"type": "string"}, map[string]any{"type": "array", "minItems": 1, "maxItems": aicommon.DefaultToolBatchMaxCalls, "items": map[string]any{"type": "string"}},
+	}}))
 
 	raw, err := loop.generateSchemaString(false)
 	require.NoError(t, err)
 	var root map[string]any
 	require.NoError(t, json.Unmarshal([]byte(raw), &root))
 	properties := root["properties"].(map[string]any)
-	for _, field := range []string{"directly_call_tool_calls", "tool_require_calls"} {
+	for _, field := range []string{"directly_call_tool_params_group"} {
 		property := properties[field].(map[string]any)
 		require.EqualValues(t, 3, property["maxItems"], field)
 		require.EqualValues(t, 2, property["minItems"], field)
 	}
+	load := properties["require_tool_payload"].(map[string]any)["oneOf"].([]any)[1].(map[string]any)
+	require.EqualValues(t, 3, load["maxItems"])
+	require.EqualValues(t, 1, load["minItems"])
 }
 
 // configWithNilToolManager wraps an AICallerConfigIf and forces GetAiToolManager

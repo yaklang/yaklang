@@ -32,10 +32,6 @@ func (r *reasonTestRuntime) GetCurrentTaskId() string { return "" }
 
 func (r *reasonTestRuntime) AddRuntimeTask(task AIStatefulTask) {}
 
-func (r *reasonTestRuntime) ExecuteToolRequiredAndCall(ctx context.Context, name string, opt ...ToolCallerOption) (*aitool.ToolResult, bool, error) {
-	return nil, false, nil
-}
-
 func (r *reasonTestRuntime) ExecuteToolRequiredAndCallWithoutRequired(ctx context.Context, toolName string, params aitool.InvokeParams, opt ...ToolCallerOption) (*aitool.ToolResult, bool, error) {
 	return nil, false, nil
 }

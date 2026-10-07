@@ -34,8 +34,8 @@ func TestEmitToolBatchRunningStatusNamesAndProgress(t *testing.T) {
 	require.Equal(t, "Running 2 tools: read_file, grep_files", statuses[0].ValueI18n.En)
 }
 
-func TestBuildToolBatchResultToolsPreservesActualState(t *testing.T) {
-	request := &aicommon.ToolBatchRequest{Calls: []aicommon.ToolBatchCall{
+func TestBuildToolCallGroupResultToolsPreservesActualState(t *testing.T) {
+	request := &aicommon.ToolCallGroupRequest{Calls: []aicommon.ToolCallGroupCall{
 		{Index: 0, ToolName: "read_file"},
 		{Index: 1, ToolName: "grep"},
 		{Index: 2, ToolName: "web_search"},
@@ -46,7 +46,7 @@ func TestBuildToolBatchResultToolsPreservesActualState(t *testing.T) {
 		{Index: 2, Stage: aicommon.ToolCallStageInvokeFailed, Err: errors.New("failed")},
 	}
 
-	tools, successful := buildToolBatchResultTools(nil, request, outcomes)
+	tools, successful := buildToolCallGroupResultTools(nil, request, outcomes)
 	require.Equal(t, 2, successful)
 	require.Len(t, tools, 3)
 	require.Equal(t, "read_file", tools[0].Name)

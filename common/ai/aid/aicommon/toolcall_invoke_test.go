@@ -257,9 +257,6 @@ func newToolCallerForCountTest(t *testing.T, callToolID string) (*ToolCaller, <-
 	tc, err := NewToolCaller(
 		context.Background(),
 		WithToolCaller_AICallerConfig(cfg),
-		WithToolCaller_AICaller(&ProxyAICaller{callFunc: func(request *AIRequest) (*AIResponse, error) {
-			return &AIResponse{}, nil
-		}}),
 		WithToolCaller_Emitter(cfg.Emitter),
 		WithToolCaller_CallToolID(callToolID),
 		WithToolCaller_RuntimeId(callToolID),
