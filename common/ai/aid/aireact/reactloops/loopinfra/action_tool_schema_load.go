@@ -2,13 +2,11 @@ package loopinfra
 
 import (
 	"encoding/json"
-	"fmt"
 	"strings"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
-	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 )
@@ -112,43 +110,9 @@ func loadToolSchemasByNames(loop *reactloops.ReActLoop, names []string, operator
 		operator.Continue()
 		return false
 	}
-	manager := config.GetAiToolManager()
-	ctx := toolBatchVerifierContext(loop)
-	results := make([]map[string]string, 0, len(names))
-	for _, name := range names {
-		entry := map[string]string{"tool_name": name, "status": "error"}
-		results = append(results, entry)
-		if err := ctx.Err(); err != nil {
-			entry["detail"] = err.Error()
-			continue
-		}
-		if buildinaitools.IsMCPToolName(name) && !aicommon.IsMCPServersAllowedConfig(config) {
-			entry["detail"] = "MCP tools are disabled"
-			continue
-		}
-		tool, err := manager.GetToolByName(name)
-		if err == nil && tool != nil && buildinaitools.IsMCPPendingStub(tool) {
-			tool, err = buildinaitools.WaitForMCPLiveTool(ctx, manager, name, buildinaitools.MCPToolInitWaitTimeout, buildinaitools.MCPToolInitPollInterval, nil)
-		}
-		if err != nil || tool == nil {
-			entry["detail"] = fmt.Sprintf("Tool unavailable: %v", err)
-			continue
-		}
-		mutation := loop.RecordRecentlyUsedTool(tool)
-		if mutation.Upsert == nil && mutation.Reuse == nil {
-			entry["detail"] = "Schema could not be cached within the current tool-cache budget"
-			continue
-		}
-		entry["status"] = "schema_loaded"
-		entry["detail"] = fmt.Sprintf("工具 %q 的参数 Schema 已加载到 CACHE_TOOL_CALL，尚未执行。现在按 Schema 和当前任务构造完整参数，立即调用 directly_call_tool 继续完成本任务；不要重复加载，不要把加载当作任务完成或单独交付的阶段，也不要等待用户说继续。", name)
-	}
-	// Loading later entries can evict earlier ones. Do not report those entries
-	// as available in the final cache state of this load batch.
+	results := loop.LoadToolSchemas(toolBatchVerifierContext(loop), names)
 	allLoaded := true
 	for _, entry := range results {
-		if entry["status"] == "schema_loaded" && !manager.IsRecentlyUsedTool(entry["tool_name"]) {
-			entry["status"], entry["detail"] = "evicted", "Schema was evicted by the tool-cache budget; load a smaller set."
-		}
 		if entry["status"] != "schema_loaded" {
 			allLoaded = false
 		}

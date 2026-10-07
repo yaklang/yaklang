@@ -695,7 +695,10 @@ func handleToolBatchActionResult(
 			status += ": " + outcome.Result.Error
 		}
 		lines = append(lines, fmt.Sprintf("%d. %s: %s", outcome.Index+1, toolName, status))
-		if (outcome.Stage == aicommon.ToolCallStageInvokeFailed || outcome.Stage == aicommon.ToolCallStagePrepareFailed || outcome.Stage == aicommon.ToolCallStageValidationFailed || outcome.ExecutionStatus == aitool.ToolExecutionStatusFailed) && !errors.Is(outcome.Err, context.Canceled) && !errors.Is(outcome.Err, context.DeadlineExceeded) {
+		var reconsider *aicommon.ToolReviewReconsiderError
+		if errors.As(outcome.Err, &reconsider) {
+			lines = append(lines, reconsider.Feedback)
+		} else if (outcome.Stage == aicommon.ToolCallStageInvokeFailed || outcome.Stage == aicommon.ToolCallStagePrepareFailed || outcome.Stage == aicommon.ToolCallStageValidationFailed || outcome.ExecutionStatus == aitool.ToolExecutionStatusFailed) && !errors.Is(outcome.Err, context.Canceled) && !errors.Is(outcome.Err, context.DeadlineExceeded) {
 			lines = append(lines, directToolRetryFeedback(loop, toolName, status, outcome.Result != nil))
 		}
 

@@ -74,7 +74,6 @@ const (
 	AI_REACT_LOOP_ACTION_REQUEST_PLAN              = "request_plan"
 	AI_REACT_LOOP_ACTION_REQUEST_PLAN_EXECUTION    = "request_plan_and_execution"
 	AI_REACT_LOOP_ACTION_HTTP_FLOW_ANALYZE         = "http_flow_analyze"
-	AI_REACT_LOOP_ACTION_TOOL_COMPOSE              = "tool_compose"
 	AI_REACT_LOOP_ACTION_LOADING_SKILLS            = "loading_skills"
 	AI_REACT_LOOP_ACTION_CHANGE_SKILL_VIEW_OFFSET  = "change_skill_view_offset"
 	AI_REACT_LOOP_ACTION_LOAD_SKILL_RESOURCES      = "load_skill_resources"

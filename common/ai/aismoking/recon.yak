@@ -1,0 +1,46 @@
+// yak common/ai/aismoking/recon.yak
+// Built-in recon mode, schema preload and explicit real file read; no network scanning.
+include "common/ai/aismoking/mock.inc"
+source = file.Join(smokeRoot,"recon-source.txt")
+file.Save(source,"RECON_EXPLICIT_SOURCE_SENTINEL")~
+step,config,prefix = 0,nil,nil
+smokeHandler = func(w,body) {
+    native = len(body.tools)>0
+    prompt = smokePrompt(body)
+    if "SMOKE_CALLER:liteforge[session-title-generator]" in prompt {
+        smokeAnswer(w,false,"session-title-generator",{"session_title":"侦察显式调用验证"}); return
+    }
+    if "SMOKE_CALLER:directly-answer" in prompt {
+        w.Header().Set("Content-Type","text/event-stream")
+        smokeFrame(w,{"content":"已核对本地侦察材料，未扫描外部目标。"},"stop")
+        w.Write("data: [DONE]\n\n")~; return
+    }
+    assert "SMOKE_CALLER:react-loop:infosec_recon" in prompt, "unexpected recon auxiliary request"
+    step++
+    assert "recon_schema_preload" in prompt && "CACHE_TOOL_CALL" in prompt, "missing mode-entry schema preload"
+    for name in ["scan_port","simple_crawler","banner_grab","dig","subdomain_scan","network_space_search","tool_compose"] {
+        for tool in body.tools { assert tool["function"].name != name, "implicit recon action still advertised" }
+        if !native { assert !(sprintf('"@action": "%s"',name) in prompt), "implicit text recon example still advertised" }
+    }
+    current = json.dumps(body.messages[:2])
+    if prefix == nil { prefix = current } else { assert prefix == current, "tool result rewrote the static/frozen cache prefix" }
+    if step == 1 {
+        assert !("RECON_EXPLICIT_SOURCE_SENTINEL" in prompt), "preload executed a tool"
+        assert config.GetAiToolManager().IsRecentlyUsedTool("read_file"), "enabled read_file was not preloaded"
+        smokeAnswer(w,native,"directly_call_tool",{"directly_call_tool_name":"read_file","directly_call_tool_params":{"file":source},"directly_call_reason":"显式读取本地侦察材料"}); return
+    }
+    assert step == 2 && "RECON_EXPLICIT_SOURCE_SENTINEL" in prompt
+    smokeAnswer(w,native,"finish",{})
+}
+for native in [false,true] {
+    step,config,prefix = 0,nil,nil
+    die(aim.InvokeReAct("只读取本地侦察材料，不发起网络扫描。",aim.focus("infosec_recon"),aim.context(smokeCtx),aim.workdir(smokeRoot),aim.reviewPolicy("yolo"),aim.maxIteration(5),aim.timeout(35),aim.disableMCPServers(true),aim.disableAIForge(true),aim.aiCallback(smokeModel),aim.onEvent(func(op,e) { config = op.GetConfig() }),aim.configOptions(aiagent.aiCallback(smokeModel),aiagent.functionCallMode(native),func(c) {
+        c.DisableCreateDBRuntime,c.DisablePerception,c.DisableMemoryTriage,c.DisableIntervalReview = true,true,true,true
+        c.AiAutoRetry,c.AiTransactionAutoRetry = 1,1
+        c.GetTimeline().SetTimelineBucketByteSize(-1)
+        return nil
+    }),func(c) { c.Stateless = true }))
+    assert step == 2 && config != nil
+    printf("PASS recon: native=%v preload_execution=0 explicit_read=1 static_prefix_stable=1\n",native)
+}
+smokeCheck()

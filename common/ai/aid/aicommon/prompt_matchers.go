@@ -12,7 +12,7 @@ import (
 // can return an appropriate canned response.
 //
 // Design contract: each schema keyword literal (e.g. "directly_answer" /
-// "require_tool" / "request_plan_and_execution" / "tool_compose" /
+// "require_tool" / "request_plan_and_execution" /
 // "require_ai_blueprint" / "verify-satisfaction" / etc.) only appears in the
 // schema block of the role that actually exposes that enum. Static system-level
 // prose must never contain concrete action literals (snake_case or

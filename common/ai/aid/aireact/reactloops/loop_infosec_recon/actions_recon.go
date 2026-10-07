@@ -21,73 +21,6 @@ func appendInfosecReconLog(loop *reactloops.ReActLoop, content string) {
 	}
 }
 
-func makeReconRequireAction(
-	actionName string,
-	targetToolName string,
-	desc string,
-) func(r aicommon.AIInvokeRuntime) reactloops.ReActLoopOption {
-	return func(r aicommon.AIInvokeRuntime) reactloops.ReActLoopOption {
-		return reactloops.WithRegisterLoopAction(
-			actionName,
-			desc,
-			nil,
-			nil,
-			func(loop *reactloops.ReActLoop, action *aicommon.Action, op *reactloops.LoopActionHandlerOperator) {
-				invoker := loop.GetInvoker()
-				ctx := loop.GetConfig().GetContext()
-				task := loop.GetCurrentTask()
-				if task != nil && !utils.IsNil(task.GetContext()) {
-					ctx = task.GetContext()
-				}
-
-				thought := action.GetString("human_readable_thought")
-				if thought != "" {
-					invoker.AddToTimeline(actionName+"_intent", thought)
-				}
-				reactloops.EmitActionLog(loop, infosecReconToolNodeID, fmt.Sprintf("开始: %s / Start: %s", actionName, targetToolName))
-				reactloops.EmitStatusI18n(loop, "执行侦察工具中", "Executing recon tool...")
-
-				result, directly, err := invoker.ExecuteToolRequiredAndCall(ctx, targetToolName)
-				if err != nil {
-					log.Warnf("%s tool call failed: %v", targetToolName, err)
-					failMsg := fmt.Sprintf(
-						"%s FAILED: %v. Try different parameters or another tool.",
-						actionName, err)
-					invoker.AddToTimeline(actionName+"_failed", failMsg)
-					op.Feedback(failMsg)
-					op.Continue()
-					return
-				}
-				if directly {
-					invoker.AddToTimeline(actionName+"_skipped", "user chose to skip tool execution")
-					op.Feedback(fmt.Sprintf("%s was skipped by user.", actionName))
-					op.Continue()
-					return
-				}
-				if result == nil {
-					emptyMsg := fmt.Sprintf("%s returned no result.", actionName)
-					invoker.AddToTimeline(actionName+"_empty", emptyMsg)
-					op.Feedback(emptyMsg)
-					op.Continue()
-					return
-				}
-				content := utils.InterfaceToString(result.Data)
-				if result.Error != "" {
-					invoker.AddToTimeline(actionName+"_error", result.Error)
-				}
-				thoughtHint := utils.ShrinkString(thought, 120)
-				entry := fmt.Sprintf("=== %s: %s ===\n%s", actionName, thoughtHint, utils.ShrinkString(content, 8192))
-				appendInfosecReconLog(loop, entry)
-				invoker.AddToTimeline(actionName+"_result", fmt.Sprintf("[%s] %s\n\n%s", targetToolName, thoughtHint, utils.ShrinkString(content, 4096)))
-				op.Feedback(fmt.Sprintf("%s completed (%d bytes).", actionName, len(content)))
-				reactloops.EmitStatusI18n(loop, "完成", "Complete")
-				reactloops.EmitActionLog(loop, infosecReconToolNodeID, fmt.Sprintf("完成: %s (%d bytes) / Done: %s (%d bytes)", actionName, len(content), targetToolName, len(content)))
-				op.Continue()
-			},
-		)
-	}
-}
-
 func makeToolForwardAction(
 	actionName string,
 	targetToolName string,
@@ -133,15 +66,6 @@ func makeToolForwardAction(
 		)
 	}
 }
-
-var (
-	scanPortAction      = makeReconRequireAction("scan_port", "scan_port", "Port scan (authorized targets only). Describe hosts and ports in human_readable_thought for the tool request phase.")
-	simpleCrawlerAction = makeReconRequireAction("simple_crawler", "simple_crawler", "Lightweight web crawl to discover URLs and pages. Describe start URL and depth in human_readable_thought.")
-	bannerGrabAction    = makeReconRequireAction("banner_grab", "banner_grab", "TCP banner grab on host:port. Describe targets in human_readable_thought.")
-	digAction           = makeReconRequireAction("dig", "dig", "DNS lookups. Describe domain and record types in human_readable_thought.")
-	subdomainScanAction = makeReconRequireAction("subdomain_scan", "subdomain_scan", "Subdomain brute / scan for a domain. Describe target domain in human_readable_thought.")
-	networkSpaceAction  = makeReconRequireAction("network_space_search", "network_space_search", "Space search engine query (FOFA/Shodan etc., needs API keys). Describe engine and query in human_readable_thought.")
-)
 
 var webSearchAction = func(r aicommon.AIInvokeRuntime) reactloops.ReActLoopOption {
 	return reactloops.WithRegisterLoopAction(

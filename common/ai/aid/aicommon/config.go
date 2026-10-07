@@ -359,7 +359,7 @@ type Config struct {
 	DisableIntervalReview             bool          // Disable interval review during tool execution (default: false, meaning enabled)
 	IntervalReviewDuration            time.Duration // Duration between reviews (default 60s)
 	ToolCallIntervalReviewExtraPrompt string        // Extra prompt injected into tool-call interval review
-	ToolComposeConcurrency            int           // Max concurrent tool calls in tool_compose DAG (default 2)
+	ToolComposeConcurrency            int           // Legacy shared concurrency option, still used by fast-context grep (default 2)
 	PlanExecTaskConcurrency           int           // Max concurrent executable tasks per PE DAG stage (default 1)
 
 	// verificationWatchdogToolBlockingStart/End are registered by reactloops.ReActLoop

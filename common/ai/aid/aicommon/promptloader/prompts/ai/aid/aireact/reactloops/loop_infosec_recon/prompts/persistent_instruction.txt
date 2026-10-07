@@ -90,3 +90,8 @@
 - 需要更多工具时可用 **search_capabilities** / **loading_skills** / **load_capability**。
 - **JS 禁令**：禁止自行解析 JS 源码找路由；应 **`crawl_js_collector` → `js_static_extract_ai`**（顺序见上文），或将已知 URL/路径**一次**传入 `paths`。
 - **工具命名**：**`crawl_js_collector`** 与 **`js_static_extract_ai`** 为 Yakit profile 中注册的 **AI 工具 id**（与 Loop 动作名一致）；**不要**向用户索要 `.yak` 路径或按「执行某脚本文件」来描述步骤。
+
+## 普通工具调用
+- 端口、爬虫、Banner、DNS、子域名和网络空间查询统一使用 `directly_call_tool`，提供工具名称和完整业务参数；不要输出同名专用 action，也不要仅以 thought 描述目标委托构参。
+- 进入模式时仅预加载常用且已启用的工具 Schema；先读取 `CACHE_TOOL_CALL`，缺失的定义用 `require_tool` 加载后立即显式调用。
+- 参数依赖前一步结果时分轮执行，读取真实结果后构造下一步参数；只将互不依赖的完整调用放入并发批次。继续遵守授权目标、范围和请求预算。

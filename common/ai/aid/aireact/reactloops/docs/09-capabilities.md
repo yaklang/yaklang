@@ -347,7 +347,7 @@ flowchart TD
 ```go
 reactloops.NewReActLoop(invoker,
     reactloops.WithAllowToolCall(true),  // 默认 true
-    // 默认就有 require_tool / tool_compose / load_capability 等 action
+    // 默认就有 require_tool / directly_call_tool / load_capability 等 action
 )
 ```
 

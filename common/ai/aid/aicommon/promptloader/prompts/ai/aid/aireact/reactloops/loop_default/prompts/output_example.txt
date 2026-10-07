@@ -52,13 +52,12 @@
 同时你必须遵循动作选择优先级：
 1. 复杂/不确定任务，或需要新建/修订 Plan：优先 `request_plan`
 2. 需要领域指导：优先加载技能（`loading_skills` / `load_skill_resources`）
-3. 仅在后序参数依赖前序真实输出时使用 `tool_compose`；低风险、独立的多调用只有满足上述直接批次或申请批次门槛时才考虑并发
-4. AI Blueprint 必须使用 `require_ai_blueprint`，禁止通过 `tool_compose` 代替
+3. 后序参数依赖前序输出时，先观察真实结果，再在下一轮显式调用；独立调用满足批次门槛才并发
+4. AI Blueprint 使用 `require_ai_blueprint`
 
 反例（禁止）：
-* 任务还没拆清楚就直接 `tool_compose`
-* 只有一个工具调用却使用 `tool_compose`
-* 把 Blueprint 当普通工具节点塞进 `tool_compose`
+* 猜测尚未产生的上游输出，提交依赖调用的并发批次
+* 把 Schema 加载当作业务工具已经执行或当前任务已完成
 {{end}}
 
 *. 当你在下方动态段看到 `# Tool Context` 或 `<|TOOL_SCHEMA_...|>` 时，说明系统要求你为指定工具生成参数：

@@ -94,7 +94,6 @@ func init() {
     reactloops.RegisterAction(loopAction_EnhanceKnowledgeAnswer)    // knowledge_enhance
     reactloops.RegisterAction(loopAction_RequestPlanAndExecution)   // request_plan_execution
     reactloops.RegisterAction(loopAction_RequireAIBlueprintForge)   // require_ai_blueprint
-    reactloops.RegisterAction(loopAction_toolCompose)               // tool_compose
     reactloops.RegisterAction(loopAction_LoadingSkills)             // loading_skills
     reactloops.RegisterAction(loopAction_ChangeSkillViewOffset)     // change_skill_view_offset
     reactloops.RegisterAction(loopAction_LoadSkillResources)        // load_skill_resources
@@ -109,7 +108,6 @@ func init() {
 |------------|-------|------|----------|----------|
 | `require_tool` | 否 | `action_tool_require_and_call.go` | `allowToolCall=true` | 单个工具走 `tool_require_payload`，多个定义走 `tool_require_calls`；只加载 Schema，不生成参数、不执行工具 |
 | `directly_call_tool` | 否 | `action_directly_call_tool.go` | `allowToolCall=true` 且 `aiToolManager != nil` | 单个工具走旧标量字段；2–8 个独立、完整参数已知的调用可走 `directly_call_tool_calls`；recent-cache miss 仅告警 |
-| `tool_compose` | 是 | `action_tool_compose.go` | `allowToolCall=true` | 表达有硬数据依赖的意图 DAG；节点不承载模型直接输出的最终工具参数 |
 | `ask_for_clarification` | 否 | `action_ask_for_clarification.go` | `allowUserInteract=true` | 信息不足问用户 |
 | `knowledge_enhance` | 否 | `action_enhance_knowledge_answer.go` | `allowRAG=true` | RAG 检索回答 |
 | `save_evidence` | 是 | `reactloops/action_save_evidence.go` | 总是 | 幂等写入共享 Session Evidence Store 后继续任务 |
@@ -125,14 +123,13 @@ func init() {
 
 详见 [09-capabilities.md](09-capabilities.md) 关于 `load_capability` 的 4 种身份。
 
-### 独立批量工具调用与 `tool_compose`
+### 独立批量工具调用与结果依赖
 
 `require_tool` 用对象数组加载多个工具定义；`directly_call_tool` 在**一个 Action 的对象数组**中声明 2–8 个彼此独立的真实工具调用。它不是多个顶层 Action，也不是 Provider 原生 `tool_calls[]`。
 
 - 完整参数已知：`directly_call_tool_calls: [{tool_name, params, ...}]`；
 - 缺少 Schema：`tool_require_calls: [{tool_name, ...}]` 只加载定义，下一轮观察后自行构参并使用 `directly_call_tool` 执行；
-- 后一项依赖前一项结果：不要放进普通 batch，拆到下一轮或在确有硬依赖 DAG 时使用 `tool_compose`；
-- `tool_compose` 节点不承载最终插件参数，不能代替“模型直接输出多个工具和调用参数”的协议。
+- 后一项依赖前一项结果：不要放进普通 batch，先读取真实结果，再在下一轮显式调用；
 
 完整业务解释、合法/非法输入、运行时并发与 barrier、审批/取消、checkpoint replay、Prompt 放置和 CI 闭环见 [19-parallel-tool-call-actions.md](19-parallel-tool-call-actions.md)。
 

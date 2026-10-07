@@ -808,12 +808,6 @@ func NewReActLoop(name string, invoker aicommon.AIInvokeRuntime, options ...ReAc
 		}
 	}
 
-	if _, ok := r.actions.Get(schema.AI_REACT_LOOP_ACTION_TOOL_COMPOSE); !ok {
-		if toolCompose := optionalRegisteredLoopAction(schema.AI_REACT_LOOP_ACTION_TOOL_COMPOSE, "optional composed tool routing"); toolCompose != nil {
-			r.actions.Set(toolCompose.ActionType, toolCompose)
-		}
-	}
-
 	if _, ok := r.actions.Get(schema.AI_REACT_LOOP_ACTION_LOAD_CAPABILITY); !ok {
 		if loadCap := optionalRegisteredLoopAction(schema.AI_REACT_LOOP_ACTION_LOAD_CAPABILITY, "optional capability discovery"); loadCap != nil {
 			r.actions.Set(loadCap.ActionType, loadCap)

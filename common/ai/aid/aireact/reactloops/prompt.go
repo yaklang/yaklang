@@ -113,7 +113,6 @@ func (r *ReActLoop) getFilteredActions(disallowExit bool, actionOperators ...*Lo
 
 	if r.allowToolCall != nil && !r.allowToolCall() {
 		disableActionList = append(disableActionList, schema.AI_REACT_LOOP_ACTION_REQUIRE_TOOL)
-		disableActionList = append(disableActionList, schema.AI_REACT_LOOP_ACTION_TOOL_COMPOSE)
 		disableActionList = append(disableActionList, schema.AI_REACT_LOOP_ACTION_DIRECTLY_CALL_TOOL)
 	}
 

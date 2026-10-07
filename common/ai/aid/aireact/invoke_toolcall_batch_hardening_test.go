@@ -326,467 +326,78 @@ func TestExecuteToolBatch_ManualReviewCheckpointReplay_DirectAnswer(t *testing.T
 	}
 }
 
-func TestExecuteToolBatch_ManualReviewCheckpointReplay_WrongParams(t *testing.T) {
-	var targetInvoked int32
-	var siblingInvoked int32
-	var finalID int64
-	var wrongParamsAICalls int32
-	target, err := aitool.New(
-		"batch_hardening_wrong_params_target",
-		aitool.WithIntegerParam("id", aitool.WithParam_Required(true)),
-		aitool.WithSimpleCallback(func(params aitool.InvokeParams, _ io.Writer, _ io.Writer) (any, error) {
-			atomic.AddInt32(&targetInvoked, 1)
-			atomic.StoreInt64(&finalID, params.GetInt("id"))
-			return params.GetInt("id"), nil
-		}),
-	)
-	require.NoError(t, err)
-	sibling, err := aitool.New(
-		"batch_hardening_wrong_params_sibling",
-		aitool.WithIntegerParam("id", aitool.WithParam_Required(true)),
-		aitool.WithDangerousNoNeedUserReview(true),
-		aitool.WithSimpleCallback(func(_ aitool.InvokeParams, _ io.Writer, _ io.Writer) (any, error) {
-			atomic.AddInt32(&siblingInvoked, 1)
-			return "sibling", nil
-		}),
-	)
-	require.NoError(t, err)
-
-	callback := func(config aicommon.AICallerConfigIf, request *aicommon.AIRequest) (*aicommon.AIResponse, error) {
-		switch {
-		case request.GetCallerLabel() == "toolcall-review-wrongparams":
-			atomic.AddInt32(&wrongParamsAICalls, 1)
-			return batchHardeningAIResponse(config, `{"@action":"call-tool","params":{"id":42}}`)
-		case aicommon.IsToolCallReasonLiteForgePrompt(request.GetPrompt()):
-			return batchHardeningAIResponse(config, aicommon.MockedToolCallReasonActionJSON)
-		default:
-			return nil, fmt.Errorf("unexpected AI call: caller=%s", request.GetCallerLabel())
-		}
-	}
-	runtimeID := "batch-hardening-wrong-params-" + ksuid.New().String()
-	const sequenceStart int64 = 12200
-	firstReviews := new(batchHardeningReviewRecorder)
-	first := newBatchHardeningReplayRuntime(
-		t, runtimeID, sequenceStart, callback, firstReviews,
-		func(index int, _ batchHardeningReviewMaterial) string {
-			if index == 0 {
-				return `{"suggestion":"wrong_params","extra_prompt":"use id 42"}`
+// A rejected review settles only its own proposal. Recovery replays the same
+// rejection and completed sibling; a corrected explicit batch is a new proposal.
+func TestExecuteToolBatch_ReviewReconsiderAndReplay(t *testing.T) {
+	for _, kind := range []string{"wrong_tool", "wrong_params"} {
+		t.Run(kind, func(t *testing.T) {
+			var originalCalls, replacementCalls, siblingCalls, aiCalls atomic.Int32
+			makeTool := func(name string, calls *atomic.Int32, skipReview bool) *aitool.Tool {
+				tool, err := aitool.New(name, aitool.WithIntegerParam("id", aitool.WithParam_Required(true)),
+					aitool.WithDangerousNoNeedUserReview(skipReview),
+					aitool.WithSimpleCallback(func(params aitool.InvokeParams, _, _ io.Writer) (any, error) {
+						calls.Add(1)
+						return params.GetInt("id"), nil
+					}))
+				require.NoError(t, err)
+				return tool
 			}
-			return `{"suggestion":"continue"}`
-		},
-		target, sibling,
-	)
-	ctx, cancel := context.WithTimeout(context.Background(), 8*time.Second)
-	defer cancel()
-	firstResult, firstErr := first.ExecuteToolBatch(
-		ctx,
-		first.config.DefaultTask,
-		batchHardeningRequest(target.Name, sibling.Name, aitool.InvokeParams{"id": 1}),
-	)
-	require.NoError(t, firstErr)
-	require.False(t, firstResult.DirectlyAnswer)
-	require.Equal(t, int32(2), atomic.LoadInt32(&firstReviews.count))
-	firstMaterials := firstReviews.snapshot()
-	require.Len(t, firstMaterials, 2)
-	require.Equal(t, target.Name, firstMaterials[0].Tool)
-	require.Equal(t, int64(1), firstMaterials[0].Params.GetInt("id"))
-	require.Equal(t, target.Name, firstMaterials[1].Tool)
-	require.Equal(t, int64(42), firstMaterials[1].Params.GetInt("id"))
-	require.Equal(t, int32(1), atomic.LoadInt32(&wrongParamsAICalls))
-	require.Equal(t, int32(1), atomic.LoadInt32(&targetInvoked))
-	require.Equal(t, int32(1), atomic.LoadInt32(&siblingInvoked))
-	require.Equal(t, int64(42), atomic.LoadInt64(&finalID))
-	require.Equal(t, target.Name, firstResult.Outcomes[0].FinalTool)
-	require.Equal(t, int64(42), batchTestResultParamInt(t, firstResult.Outcomes[0].Result, "id"))
-
-	secondReviews := new(batchHardeningReviewRecorder)
-	second := newBatchHardeningReplayRuntime(
-		t, runtimeID, sequenceStart, callback, secondReviews, nil, target, sibling,
-	)
-	secondResult, secondErr := second.ExecuteToolBatch(
-		ctx,
-		second.config.DefaultTask,
-		batchHardeningRequest(target.Name, sibling.Name, aitool.InvokeParams{"id": 1}),
-	)
-	require.NoError(t, secondErr)
-	require.Equal(t, int32(0), atomic.LoadInt32(&secondReviews.count), "both persisted review decisions must replay without cards")
-	require.Equal(t, int32(1), atomic.LoadInt32(&wrongParamsAICalls), "the finished wrong-params AI transaction must replay")
-	require.Equal(t, int32(1), atomic.LoadInt32(&targetInvoked), "finished tool checkpoint must suppress a second plugin callback")
-	require.Equal(t, int32(1), atomic.LoadInt32(&siblingInvoked), "sibling checkpoint must suppress a second plugin callback")
-	require.Equal(t, target.Name, secondResult.Outcomes[0].FinalTool)
-	require.Equal(t, int64(42), batchTestResultParamInt(t, secondResult.Outcomes[0].Result, "id"))
-	require.Equal(t, aicommon.ToolCallStageDone, secondResult.Outcomes[0].Stage)
-}
-
-func TestExecuteToolBatch_ManualReviewCheckpointReplay_WrongTool(t *testing.T) {
-	var originalInvoked int32
-	var replacementInvoked int32
-	var siblingInvoked int32
-	var replacementFinalID int64
-	var wrongToolAICalls int32
-	var paramGenerationAICalls int32
-	original, err := aitool.New(
-		"batch_hardening_wrong_tool_original",
-		aitool.WithIntegerParam("id", aitool.WithParam_Required(true)),
-		aitool.WithSimpleCallback(func(_ aitool.InvokeParams, _ io.Writer, _ io.Writer) (any, error) {
-			atomic.AddInt32(&originalInvoked, 1)
-			return "must not invoke", nil
-		}),
-	)
-	require.NoError(t, err)
-	replacement, err := aitool.New(
-		"batch_hardening_wrong_tool_replacement",
-		aitool.WithIntegerParam("id", aitool.WithParam_Required(true)),
-		aitool.WithSimpleCallback(func(params aitool.InvokeParams, _ io.Writer, _ io.Writer) (any, error) {
-			atomic.AddInt32(&replacementInvoked, 1)
-			atomic.StoreInt64(&replacementFinalID, params.GetInt("id"))
-			return params.GetInt("id"), nil
-		}),
-	)
-	require.NoError(t, err)
-	sibling, err := aitool.New(
-		"batch_hardening_wrong_tool_sibling",
-		aitool.WithIntegerParam("id", aitool.WithParam_Required(true)),
-		aitool.WithDangerousNoNeedUserReview(true),
-		aitool.WithSimpleCallback(func(_ aitool.InvokeParams, _ io.Writer, _ io.Writer) (any, error) {
-			atomic.AddInt32(&siblingInvoked, 1)
-			return "sibling", nil
-		}),
-	)
-	require.NoError(t, err)
-
-	callback := func(config aicommon.AICallerConfigIf, request *aicommon.AIRequest) (*aicommon.AIResponse, error) {
-		switch {
-		case request.GetCallerLabel() == "toolcall-review-wrongtool":
-			atomic.AddInt32(&wrongToolAICalls, 1)
-			return batchHardeningAIResponse(config, fmt.Sprintf(`{"@action":"require-tool","tool":%q}`, replacement.Name))
-		case request.GetCallerLabel() == "toolcall-params":
-			atomic.AddInt32(&paramGenerationAICalls, 1)
-			return batchHardeningAIResponse(config, `{"@action":"call-tool","params":{"id":77}}`)
-		case aicommon.IsToolCallReasonLiteForgePrompt(request.GetPrompt()):
-			return batchHardeningAIResponse(config, aicommon.MockedToolCallReasonActionJSON)
-		default:
-			return nil, fmt.Errorf("unexpected AI call: caller=%s", request.GetCallerLabel())
-		}
-	}
-	runtimeID := "batch-hardening-wrong-tool-" + ksuid.New().String()
-	const sequenceStart int64 = 12300
-	firstReviews := new(batchHardeningReviewRecorder)
-	first := newBatchHardeningReplayRuntime(
-		t, runtimeID, sequenceStart, callback, firstReviews,
-		func(index int, _ batchHardeningReviewMaterial) string {
-			if index == 0 {
-				return fmt.Sprintf(`{"suggestion":"wrong_tool","suggestion_tool":%q}`, replacement.Name)
-			}
-			return `{"suggestion":"continue"}`
-		},
-		original, replacement, sibling,
-	)
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-	firstResult, firstErr := first.ExecuteToolBatch(
-		ctx,
-		first.config.DefaultTask,
-		batchHardeningRequest(original.Name, sibling.Name, aitool.InvokeParams{"id": 1}),
-	)
-	require.NoError(t, firstErr)
-	require.False(t, firstResult.DirectlyAnswer)
-	require.Equal(t, int32(2), atomic.LoadInt32(&firstReviews.count))
-	firstMaterials := firstReviews.snapshot()
-	require.Len(t, firstMaterials, 2)
-	require.Equal(t, original.Name, firstMaterials[0].Tool)
-	require.Equal(t, int64(1), firstMaterials[0].Params.GetInt("id"))
-	require.Equal(t, replacement.Name, firstMaterials[1].Tool)
-	require.Equal(t, int64(77), firstMaterials[1].Params.GetInt("id"))
-	require.Equal(t, int32(1), atomic.LoadInt32(&wrongToolAICalls))
-	require.Equal(t, int32(1), atomic.LoadInt32(&paramGenerationAICalls))
-	require.Equal(t, int32(0), atomic.LoadInt32(&originalInvoked))
-	require.Equal(t, int32(1), atomic.LoadInt32(&replacementInvoked))
-	require.Equal(t, int32(1), atomic.LoadInt32(&siblingInvoked))
-	require.Equal(t, int64(77), atomic.LoadInt64(&replacementFinalID))
-	require.Equal(t, replacement.Name, firstResult.Outcomes[0].FinalTool)
-	require.Equal(t, int64(77), batchTestResultParamInt(t, firstResult.Outcomes[0].Result, "id"))
-
-	secondReviews := new(batchHardeningReviewRecorder)
-	second := newBatchHardeningReplayRuntime(
-		t, runtimeID, sequenceStart, callback, secondReviews, nil, original, replacement, sibling,
-	)
-	secondResult, secondErr := second.ExecuteToolBatch(
-		ctx,
-		second.config.DefaultTask,
-		batchHardeningRequest(original.Name, sibling.Name, aitool.InvokeParams{"id": 1}),
-	)
-	require.NoError(t, secondErr)
-	require.Equal(t, int32(0), atomic.LoadInt32(&secondReviews.count), "outer and replacement-tool reviews must both replay")
-	require.Equal(t, int32(1), atomic.LoadInt32(&wrongToolAICalls), "tool re-selection transaction must replay")
-	require.Equal(t, int32(1), atomic.LoadInt32(&paramGenerationAICalls), "replacement param transaction must replay")
-	require.Equal(t, int32(0), atomic.LoadInt32(&originalInvoked))
-	require.Equal(t, int32(1), atomic.LoadInt32(&replacementInvoked), "finished replacement-tool checkpoint must suppress a second callback")
-	require.Equal(t, int32(1), atomic.LoadInt32(&siblingInvoked))
-	require.Equal(t, replacement.Name, secondResult.Outcomes[0].FinalTool)
-	require.Equal(t, int64(77), batchTestResultParamInt(t, secondResult.Outcomes[0].Result, "id"))
-	require.Equal(t, aicommon.ToolCallStageDone, secondResult.Outcomes[0].Stage)
-}
-
-func TestExecuteToolBatch_DirectWrongToolMutatesEachFinalProposalExactlyOnce(t *testing.T) {
-	const markerParam = "proposal_marker"
-	var originalMutations int32
-	var replacementMutations int32
-	var replacementSawLeakedMarker int32
-	var originalInvoked int32
-	var replacementInvoked int32
-	var replacementCallbackMarker atomic.Value
-
-	original, err := aitool.New(
-		"batch_hardening_mutator_original",
-		aitool.WithIntegerParam("id", aitool.WithParam_Required(true)),
-		aitool.WithStringParam(markerParam),
-		aitool.WithSimpleCallback(func(_ aitool.InvokeParams, _ io.Writer, _ io.Writer) (any, error) {
-			atomic.AddInt32(&originalInvoked, 1)
-			return "must not invoke", nil
-		}),
-	)
-	require.NoError(t, err)
-	replacement, err := aitool.New(
-		"batch_hardening_mutator_replacement",
-		aitool.WithIntegerParam("id", aitool.WithParam_Required(true)),
-		aitool.WithStringParam(markerParam),
-		aitool.WithSimpleCallback(func(params aitool.InvokeParams, _ io.Writer, _ io.Writer) (any, error) {
-			atomic.AddInt32(&replacementInvoked, 1)
-			replacementCallbackMarker.Store(params.GetString(markerParam))
-			return params.GetInt("id"), nil
-		}),
-	)
-	require.NoError(t, err)
-	sibling, err := aitool.New(
-		"batch_hardening_mutator_sibling",
-		aitool.WithIntegerParam("id", aitool.WithParam_Required(true)),
-		aitool.WithDangerousNoNeedUserReview(true),
-		aitool.WithSimpleCallback(func(_ aitool.InvokeParams, _ io.Writer, _ io.Writer) (any, error) {
-			return "sibling", nil
-		}),
-	)
-	require.NoError(t, err)
-
-	callback := func(config aicommon.AICallerConfigIf, request *aicommon.AIRequest) (*aicommon.AIResponse, error) {
-		switch {
-		case request.GetCallerLabel() == "toolcall-review-wrongtool":
-			return batchHardeningAIResponse(config, fmt.Sprintf(`{"@action":"require-tool","tool":%q}`, replacement.Name))
-		case request.GetCallerLabel() == "toolcall-params":
-			return batchHardeningAIResponse(config, `{"@action":"call-tool","params":{"id":77}}`)
-		case aicommon.IsToolCallReasonLiteForgePrompt(request.GetPrompt()):
-			return batchHardeningAIResponse(config, aicommon.MockedToolCallReasonActionJSON)
-		default:
-			return nil, fmt.Errorf("unexpected AI call: caller=%s", request.GetCallerLabel())
-		}
-	}
-	reviews := new(batchHardeningReviewRecorder)
-	react := newBatchHardeningReplayRuntime(
-		t,
-		"batch-hardening-mutator-"+ksuid.New().String(),
-		12400,
-		callback,
-		reviews,
-		func(index int, _ batchHardeningReviewMaterial) string {
-			if index == 0 {
-				return fmt.Sprintf(`{"suggestion":"wrong_tool","suggestion_tool":%q}`, replacement.Name)
-			}
-			return `{"suggestion":"continue"}`
-		},
-		original, replacement, sibling,
-	)
-	loop, err := reactloops.NewReActLoop(
-		"batch-hardening-mutator-loop",
-		react,
-		reactloops.WithToolInvokeParamsMutator(func(toolName string, params aitool.InvokeParams) aitool.InvokeParams {
-			switch toolName {
-			case original.Name:
-				atomic.AddInt32(&originalMutations, 1)
-				params.Set(markerParam, "original")
-			case replacement.Name:
-				atomic.AddInt32(&replacementMutations, 1)
-				if params.GetString(markerParam) != "" {
-					atomic.StoreInt32(&replacementSawLeakedMarker, 1)
-				}
-				params.Set(markerParam, "replacement")
-			}
-			return params
-		}),
-	)
-	require.NoError(t, err)
-	react.config.DefaultTask.SetReActLoop(loop)
-
-	ctx, cancel := context.WithTimeout(context.Background(), 8*time.Second)
-	defer cancel()
-	result, execErr := react.ExecuteToolBatch(
-		ctx,
-		react.config.DefaultTask,
-		batchHardeningRequest(original.Name, sibling.Name, aitool.InvokeParams{"id": 1}),
-	)
-	require.NoError(t, execErr)
-	require.False(t, result.DirectlyAnswer)
-	require.Equal(t, int32(1), atomic.LoadInt32(&originalMutations), "original direct proposal is admission-mutated exactly once")
-	require.Equal(t, int32(1), atomic.LoadInt32(&replacementMutations), "replacement's generated proposal is mutated exactly once")
-	require.Equal(t, int32(0), atomic.LoadInt32(&replacementSawLeakedMarker), "replacement mutator must receive fresh replacement params")
-	require.Equal(t, int32(0), atomic.LoadInt32(&originalInvoked))
-	require.Equal(t, int32(1), atomic.LoadInt32(&replacementInvoked))
-	require.Equal(t, "replacement", replacementCallbackMarker.Load())
-	require.Equal(t, replacement.Name, result.Outcomes[0].FinalTool)
-	finalParams := batchHardeningResultParams(t, result.Outcomes[0].Result)
-	require.Equal(t, int64(77), finalParams.GetInt("id"))
-	require.Equal(t, "replacement", finalParams.GetString(markerParam))
-	require.Equal(t, aicommon.ToolCallStageDone, result.Outcomes[0].Stage)
-
-	materials := reviews.snapshot()
-	require.Len(t, materials, 2)
-	require.Equal(t, original.Name, materials[0].Tool)
-	require.Equal(t, "original", materials[0].Params.GetString(markerParam))
-	require.Equal(t, replacement.Name, materials[1].Tool)
-	require.Equal(t, "replacement", materials[1].Params.GetString(markerParam))
-}
-
-func TestExecuteToolBatch_ReviewRepairFailuresAreChildLocal(t *testing.T) {
-	tests := []struct {
-		name            string
-		reviewKind      string
-		failurePoint    string
-		wantReviewCount int32
-	}{
-		{
-			name:            "wrong tool reselection AI failure",
-			reviewKind:      "wrong_tool",
-			failurePoint:    "repair_ai",
-			wantReviewCount: 1,
-		},
-		{
-			name:            "wrong tool recursive parameter generation failure",
-			reviewKind:      "wrong_tool",
-			failurePoint:    "recursive_param_generation",
-			wantReviewCount: 1,
-		},
-		{
-			name:            "wrong params regeneration AI failure",
-			reviewKind:      "wrong_params",
-			failurePoint:    "repair_ai",
-			wantReviewCount: 1,
-		},
-		{
-			name:            "wrong params recursive review failure",
-			reviewKind:      "wrong_params",
-			failurePoint:    "recursive_review",
-			wantReviewCount: 2,
-		},
-	}
-
-	for testIndex, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			var originalInvoked int32
-			var replacementInvoked int32
-			var siblingInvoked int32
-
-			original, err := aitool.New(
-				fmt.Sprintf("batch_review_error_original_%d", testIndex),
-				aitool.WithIntegerParam("id", aitool.WithParam_Required(true)),
-				aitool.WithSimpleCallback(func(_ aitool.InvokeParams, _ io.Writer, _ io.Writer) (any, error) {
-					atomic.AddInt32(&originalInvoked, 1)
-					return "original must not invoke after rejected review repair", nil
-				}),
-			)
-			require.NoError(t, err)
-			replacement, err := aitool.New(
-				fmt.Sprintf("batch_review_error_replacement_%d", testIndex),
-				aitool.WithIntegerParam("id", aitool.WithParam_Required(true)),
-				aitool.WithSimpleCallback(func(_ aitool.InvokeParams, _ io.Writer, _ io.Writer) (any, error) {
-					atomic.AddInt32(&replacementInvoked, 1)
-					return "replacement must not invoke after recursive failure", nil
-				}),
-			)
-			require.NoError(t, err)
-			sibling, err := aitool.New(
-				fmt.Sprintf("batch_review_error_sibling_%d", testIndex),
-				aitool.WithIntegerParam("id", aitool.WithParam_Required(true)),
-				aitool.WithDangerousNoNeedUserReview(true),
-				aitool.WithSimpleCallback(func(_ aitool.InvokeParams, _ io.Writer, _ io.Writer) (any, error) {
-					atomic.AddInt32(&siblingInvoked, 1)
-					return "sibling executed", nil
-				}),
-			)
-			require.NoError(t, err)
-
+			original := makeTool("reconsider_original", &originalCalls, false)
+			replacement := makeTool("reconsider_replacement", &replacementCalls, false)
+			sibling := makeTool("reconsider_sibling", &siblingCalls, true)
 			callback := func(config aicommon.AICallerConfigIf, request *aicommon.AIRequest) (*aicommon.AIResponse, error) {
-				switch {
-				case request.GetCallerLabel() == "toolcall-review-wrongtool":
-					if test.reviewKind == "wrong_tool" && test.failurePoint == "repair_ai" {
-						return nil, fmt.Errorf("forced wrong-tool reselection failure")
-					}
-					return batchHardeningAIResponse(config, fmt.Sprintf(`{"@action":"require-tool","tool":%q}`, replacement.Name))
-				case request.GetCallerLabel() == "toolcall-review-wrongparams":
-					if test.reviewKind == "wrong_params" && test.failurePoint == "repair_ai" {
-						return nil, fmt.Errorf("forced wrong-params regeneration failure")
-					}
-					return batchHardeningAIResponse(config, `{"@action":"call-tool","params":{"id":42}}`)
-				case request.GetCallerLabel() == "toolcall-params":
-					if test.failurePoint == "recursive_param_generation" {
-						return nil, fmt.Errorf("forced recursive parameter generation failure")
-					}
-					return batchHardeningAIResponse(config, `{"@action":"call-tool","params":{"id":77}}`)
-				case aicommon.IsToolCallReasonLiteForgePrompt(request.GetPrompt()):
-					return batchHardeningAIResponse(config, aicommon.MockedToolCallReasonActionJSON)
-				default:
-					return nil, fmt.Errorf("unexpected AI call: caller=%s", request.GetCallerLabel())
-				}
+				aiCalls.Add(1)
+				return nil, fmt.Errorf("review must not call auxiliary AI: %s", request.GetCallerLabel())
 			}
-
+			runtimeID := "review-reconsider-" + ksuid.New().String()
 			reviews := new(batchHardeningReviewRecorder)
-			react := newBatchHardeningReplayRuntime(
-				t,
-				fmt.Sprintf("batch-review-error-%d-%s", testIndex, ksuid.New().String()),
-				12500+int64(testIndex*100),
-				callback,
-				reviews,
-				func(index int, _ batchHardeningReviewMaterial) string {
-					if index == 0 {
-						if test.reviewKind == "wrong_tool" {
-							return fmt.Sprintf(`{"suggestion":"wrong_tool","suggestion_tool":%q}`, replacement.Name)
-						}
-						return `{"suggestion":"wrong_params","extra_prompt":"use a repaired id"}`
-					}
-					if test.failurePoint == "recursive_review" {
-						return `{"suggestion":"unsupported_recursive_decision"}`
-					}
-					return `{"suggestion":"continue"}`
-				},
-				original,
-				replacement,
-				sibling,
-			)
-			require.NoError(t, aicommon.WithAIAutoRetry(1)(react.config))
-			require.NoError(t, aicommon.WithAITransactionAutoRetry(1)(react.config))
-
+			first := newBatchHardeningReplayRuntime(t, runtimeID, 12200, callback, reviews,
+				func(int, batchHardeningReviewMaterial) string {
+					return fmt.Sprintf(`{"suggestion":%q,"suggestion_tool":%q,"extra_prompt":"use id 42"}`, kind, replacement.Name)
+				}, original, replacement, sibling)
 			ctx, cancel := context.WithTimeout(context.Background(), 8*time.Second)
 			defer cancel()
-			result, execErr := react.ExecuteToolBatch(
-				ctx,
-				react.config.DefaultTask,
-				batchHardeningRequest(original.Name, sibling.Name, aitool.InvokeParams{"id": 1}),
-			)
-			require.NoError(t, execErr, "one child repair error must remain an all-settled batch outcome")
-			require.False(t, result.DirectlyAnswer, "repair failures are not explicit direct-answer decisions")
-			require.Len(t, result.Outcomes, 2)
-			require.Equal(t, aicommon.ToolCallStagePrepareFailed, result.Outcomes[0].Stage)
-			require.Error(t, result.Outcomes[0].Err)
+			request := func() *aicommon.ToolBatchRequest {
+				return batchHardeningRequest(original.Name, sibling.Name, aitool.InvokeParams{"id": 1})
+			}
+			result, err := first.ExecuteToolBatch(ctx, first.config.DefaultTask, request())
+			require.NoError(t, err)
+			var rejected *aicommon.ToolReviewReconsiderError
+			require.ErrorAs(t, result.Outcomes[0].Err, &rejected)
+			require.Contains(t, rejected.Feedback, "use id 42")
 			require.Nil(t, result.Outcomes[0].Result)
-			require.False(t, result.Outcomes[0].DirectlyAnswer)
+			require.False(t, result.DirectlyAnswer)
 			require.Equal(t, aicommon.ToolCallStageDone, result.Outcomes[1].Stage)
-			require.NotNil(t, result.Outcomes[1].Result)
-			require.Equal(t, int32(0), atomic.LoadInt32(&originalInvoked))
-			require.Equal(t, int32(0), atomic.LoadInt32(&replacementInvoked))
-			require.Equal(t, int32(1), atomic.LoadInt32(&siblingInvoked), "a sibling must still invoke after another child fails review repair")
-			require.Equal(t, test.wantReviewCount, atomic.LoadInt32(&reviews.count))
-
-			committed := react.config.DefaultTask.GetAllToolCallResults()
-			require.Len(t, committed, 1)
-			require.Equal(t, sibling.Name, committed[0].Name)
+			require.Zero(t, originalCalls.Load())
+			require.Zero(t, replacementCalls.Load())
+			require.EqualValues(t, 1, siblingCalls.Load())
+			require.EqualValues(t, 1, reviews.count)
+			require.Zero(t, aiCalls.Load())
+			require.True(t, first.config.GetAiToolManager().IsRecentlyUsedTool(original.Name))
+			if kind == "wrong_tool" {
+				require.True(t, first.config.GetAiToolManager().IsRecentlyUsedTool(replacement.Name))
+			}
+			replayReviews := new(batchHardeningReviewRecorder)
+			replay := newBatchHardeningReplayRuntime(t, runtimeID, 12200, callback, replayReviews, nil, original, replacement, sibling)
+			restored, err := replay.ExecuteToolBatch(ctx, replay.config.DefaultTask, request())
+			require.NoError(t, err)
+			require.ErrorAs(t, restored.Outcomes[0].Err, &rejected)
+			require.Zero(t, replayReviews.count)
+			require.Zero(t, originalCalls.Load())
+			require.Zero(t, replacementCalls.Load())
+			require.EqualValues(t, 1, siblingCalls.Load())
+			require.Zero(t, aiCalls.Load())
+			next := original
+			if kind == "wrong_tool" {
+				next = replacement
+			}
+			retry := batchHardeningRequest(next.Name, sibling.Name, aitool.InvokeParams{"id": 42})
+			settled, err := replay.ExecuteToolBatch(ctx, replay.config.DefaultTask, retry)
+			require.NoError(t, err)
+			require.Equal(t, aicommon.ToolCallStageDone, settled.Outcomes[0].Stage)
+			require.EqualValues(t, 42, batchHardeningResultParams(t, settled.Outcomes[0].Result).GetInt("id"))
+			require.EqualValues(t, 1, originalCalls.Load()+replacementCalls.Load())
+			require.Zero(t, aiCalls.Load())
 		})
 	}
 }

@@ -1,0 +1,69 @@
+// yak common/ai/aismoking/tool_review.yak
+// Real aim loop: review rejection returns to the owner; no auxiliary argument repair.
+include "common/ai/aismoking/mock.inc"
+accepted = file.Join(smokeRoot,"accepted.txt")
+rejected = file.Join(smokeRoot,"rejected.txt")
+file.Save(accepted,"ACCEPTED_SOURCE_SENTINEL")~
+file.Save(rejected,"REJECTED_SOURCE_SENTINEL")~
+step,reviews,helperCalls,config,kind = 0,0,0,nil,""
+smokeHandler = func(w,body) {
+    native = len(body.tools)>0
+    prompt = smokePrompt(body)
+    if "SMOKE_CALLER:liteforge[session-title-generator]" in prompt {
+        smokeAnswer(w,false,"session-title-generator",{"session_title":"工具审核回归"}); return
+    }
+    if "SMOKE_CALLER:liteforge[tool-call-reason]" in prompt || "SMOKE_CALLER:tool-call-reason\n" in prompt {
+        smokeAnswer(w,false,"tool-call-reason",{"reason":"读取用户确认的本地来源"}); return
+    }
+    if "SMOKE_CALLER:directly-answer" in prompt {
+        helperCalls++
+        if kind == "direct_answer" { smokeAnswer(w,false,"directly_answer",{"answer_payload":"工具审核验证结束，不读取文件。"}); return }
+        w.Header().Set("Content-Type","text/event-stream")
+        smokeFrame(w,{"content":"工具审核验证结束。"},"stop")
+        w.Write("data: [DONE]\n\n")~; return
+    }
+    assert "SMOKE_CALLER:react-loop:default" in prompt || "SMOKE_CALLER:react-loop:main" in prompt, "unexpected review auxiliary request"
+    assert !("tool_compose" in json.dumps(body.tools)), "removed tool DAG still advertised"
+    step++
+    if step == 1 {
+        smokeAnswer(w,native,"directly_call_tool",{"directly_call_tool_name":"read_file","directly_call_tool_params":{"file":rejected},"directly_call_reason":"等待人工审核后才读取"}); return
+    }
+    assert !("REJECTED_SOURCE_SENTINEL" in prompt), "rejected proposal executed"
+    if kind in ["wrong_tool","wrong_params"] && step == 2 {
+        assert reviews == 1 && "tool_review_reconsider" in prompt && "REVIEW_FEEDBACK_SENTINEL" in prompt, "feedback did not return to the owning loop"
+        assert "CACHE_TOOL_CALL" in prompt && "Direct Params Schema" in prompt, "review reconsideration lost the schema"
+        smokeAnswer(w,native,"directly_call_tool",{"directly_call_tool_name":"read_file","directly_call_tool_params":{"file":accepted},"directly_call_reason":"根据用户反馈读取正确来源"}); return
+    }
+    assert "ACCEPTED_SOURCE_SENTINEL" in prompt && reviews == 2, "corrected/manual proposal did not execute exactly once"
+    smokeAnswer(w,native,"finish",{})
+}
+for native in [false,true] {
+ for scenario in ["wrong_tool","wrong_params","manual_edit","direct_answer"] {
+    step,reviews,helperCalls,config,kind = 0,0,0,nil,scenario
+    die(aim.InvokeReAct("工具调用必须先审核；纠错后只读取用户确认的来源。",aim.context(smokeCtx),aim.workdir(smokeRoot),aim.reviewPolicy("manual"),aim.maxIteration(6),aim.timeout(35),aim.disableMCPServers(true),aim.disableAIForge(true),aim.aiCallback(smokeModel),aim.onEvent(func(op,e) {
+        config = op.GetConfig()
+        if string(e.Type) != "tool_use_review_require" { return }
+        data = json.loads(string(e.Content))
+        reviews++
+        response = {"suggestion":"continue"}
+        if reviews == 1 {
+            assert data.tool == "read_file" && data.params.file == rejected
+            if kind == "manual_edit" { response = {"suggestion":"wrong_params","params":{"file":accepted}} } else if kind == "direct_answer" { response = {"suggestion":"direct_answer","extra_prompt":"直接结束，不读文件。"} } else { response = {"suggestion":kind,"suggestion_tool":"read_file","extra_prompt":"REVIEW_FEEDBACK_SENTINEL：读取 accepted.txt。"} }
+        } else { assert reviews == 2 && data.params.file == accepted, "unexpected recursive repair/review" }
+        smokeApprove(op,data,response)
+    }),aim.configOptions(aiagent.aiCallback(smokeModel),aiagent.functionCallMode(native),func(c) {
+        c.DisableCreateDBRuntime,c.DisablePerception,c.DisableMemoryTriage,c.DisableIntervalReview = true,true,true,true
+        c.AiAutoRetry,c.AiTransactionAutoRetry = 1,1
+        c.GetTimeline().SetTimelineBucketByteSize(-1)
+        return nil
+    }),func(c) { c.Stateless = true }))
+    expected = 3
+    if kind == "manual_edit" { expected = 2 }
+    if kind == "direct_answer" { expected = 1; assert reviews == 1 } else { assert reviews == 2 }
+    expectedAnswers = 1
+    if kind == "direct_answer" { expectedAnswers = 2 } // Existing loop also emits its final summary.
+    assert step == expected && helperCalls == expectedAnswers && config != nil, "review lifecycle did not converge"
+    printf("PASS tool review: native=%v scenario=%s decisions=%d reviews=%d auxiliary_params=0\n",native,kind,step,reviews)
+ }
+}
+smokeCheck()

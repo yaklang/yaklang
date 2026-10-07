@@ -27,6 +27,8 @@ func init() {
 			// meta/schema-level loop actions vs toolkit-style names (see names.go for embedded tools).
 			metaActions := []string{
 				schema.AI_REACT_LOOP_ACTION_DIRECTLY_ANSWER,
+				schema.AI_REACT_LOOP_ACTION_REQUIRE_TOOL,
+				schema.AI_REACT_LOOP_ACTION_DIRECTLY_CALL_TOOL,
 				"finish",
 				schema.AI_REACT_LOOP_ACTION_KNOWLEDGE_ENHANCE,
 				schema.AI_REACT_LOOP_ACTION_SEARCH_CAPABILITIES,
@@ -42,17 +44,11 @@ func init() {
 			}
 			toolActions := []string{
 				"web_search",
-				"scan_port",
-				"simple_crawler",
-				"banner_grab",
-				"dig",
 				"do_http_request",
 				"batch_do_http_request",
 				"read_file",
 				"find_files",
 				"grep_text",
-				"subdomain_scan",
-				"network_space_search",
 				"search_knowledge",
 			}
 			allowed := append(append([]string{}, metaActions...), toolActions...)
@@ -67,7 +63,7 @@ func init() {
 
 			preset := []reactloops.ReActLoopOption{
 				reactloops.WithAllowRAG(true),
-				reactloops.WithAllowToolCall(false),
+				reactloops.WithAllowToolCall(true),
 				reactloops.WithAllowAIForge(false),
 				reactloops.WithAllowPlanAndExec(false),
 				reactloops.WithInitTask(buildInitTask(r)),
@@ -128,12 +124,6 @@ func init() {
 				probeAPICandidatesAction(r),
 				searchKnowledgeInfosec(r),
 				webSearchAction(r),
-				scanPortAction(r),
-				simpleCrawlerAction(r),
-				bannerGrabAction(r),
-				digAction(r),
-				subdomainScanAction(r),
-				networkSpaceAction(r),
 				readFileAction(r),
 				findFilesAction(r),
 				grepTextAction(r),

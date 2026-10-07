@@ -44,8 +44,6 @@ func TestToolCallsKeepTheirOwnVerifiedState(t *testing.T) {
 	requireRead := `{"@action":"require_tool","tool_require_payload":"read_file"}`
 	requireGrep := `{"@action":"require_tool","tool_require_payload":"grep"}`
 	requireBatch := `{"@action":"require_tool","tool_require_calls":[{"tool_name":"grep"},{"tool_name":"read_file"}]}`
-	composeRead := `{"@action":"tool_compose","tool_compose_payload":"[{\"call_id\":\"read_node\",\"tool_name\":\"read_file\",\"call_intent\":\"read file\"}]"}`
-	composeGrep := `{"@action":"tool_compose","tool_compose_payload":"[{\"call_id\":\"grep_node\",\"tool_name\":\"grep\",\"call_intent\":\"search file\"}]"}`
 	for _, tc := range []struct {
 		name        string
 		calls       []string
@@ -60,7 +58,6 @@ func TestToolCallsKeepTheirOwnVerifiedState(t *testing.T) {
 		{"require scalar then batch", []string{requireRead, requireBatch}, nil, nil},
 		{"require batch then scalar", []string{requireBatch, requireGrep}, nil, nil},
 		{"mixed actions", []string{directRead, requireBatch, directGrep, requireRead}, []string{"read_file", "grep"}, []string{"/first", "/second"}},
-		{"compose distinct DAGs", []string{composeRead, composeGrep}, []string{"read_file", "grep"}, []string{"/generated-file", "/generated-path"}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			ctx := context.Background()
@@ -87,8 +84,6 @@ func TestToolCallsKeepTheirOwnVerifiedState(t *testing.T) {
 				handler := loopAction_directlyCallTool
 				if name == "require_tool" {
 					handler = loopAction_toolRequireAndCall
-				} else if name == "tool_compose" {
-					handler = loopAction_toolCompose
 				}
 				require.NoError(t, handler.ActionVerifier(loop, action))
 				calls = append(calls, reactloops.LoopCall{Action: action, LoopAction: handler})

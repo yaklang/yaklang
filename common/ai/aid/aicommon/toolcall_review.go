@@ -1,6 +1,7 @@
 package aicommon
 
 import (
+	"errors"
 	"strings"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
@@ -72,52 +73,10 @@ func (t *ToolCaller) review(
 		return targetTool, param, nil, HandleToolUseNext_Default, nil
 	}
 
-	extraPrompt := userInput.GetString("extra_prompt")
-	_ = extraPrompt
 	e := t.emitter
 	switch suggestion {
 	case "wrong_tool":
-		// Check context before processing
-		select {
-		case <-t.ctx.Done():
-			e.EmitError("context cancelled during tool review")
-			return targetTool, param, nil, HandleToolUseNext_Default, t.ctx.Err()
-		default:
-		}
-
-		if t.reviewWrongToolHandler == nil {
-			e.EmitError("no review wrong tool handler defined")
-			return targetTool, param, nil, HandleToolUseNext_Default, nil
-		}
-		newTool, directlyAnswer, err := t.reviewWrongToolHandler(
-			t.ctx,
-			targetTool,
-			userInput.GetString("suggestion_tool"),
-			userInput.GetString("suggestion_tool_keyword"),
-		)
-		if err != nil {
-			e.EmitError("error handling tool review: %v", err)
-			return targetTool, param, nil, HandleToolUseNext_Default, err
-		}
-		if directlyAnswer {
-			userCancelHandler("tool directly answer (user 's choice)")
-			return targetTool, param, nil, HandleToolUseNext_DirectlyAnswer, nil
-		}
-
-		targetTool = newTool
-		// Review 换了工具, 原始 reason 已与新工具不符; 重置 reason 状态, 让递归的
-		// CallTool -> CallToolWithExistedParams 的统一 reason 处理点重新生成一次.
-		t.resetReasonForReview()
-		result, directlyAnswer, err := t.CallTool(newTool)
-		if directlyAnswer {
-			userCancelHandler("tool directly answer")
-			return targetTool, param, nil, HandleToolUseNext_DirectlyAnswer, nil
-		}
-		if err != nil {
-			e.EmitError("error handling tool review: %v", err)
-			return targetTool, param, nil, HandleToolUseNext_Default, err
-		}
-		return targetTool, param, result, HandleToolUseNext_Override, nil
+		return t.rejectToolProposal(targetTool, param, userInput, userCancelHandler)
 	case "wrong_params":
 		// Check context before processing
 		select {
@@ -132,15 +91,7 @@ func (t *ToolCaller) review(
 			return targetTool, param, nil, HandleToolUseNext_Default, err
 		}
 		if !hasEditedParam {
-			if t.reviewWrongParamHandler == nil {
-				e.EmitError("wrong params suggestion received, but no handler defined")
-				return targetTool, param, nil, HandleToolUseNext_Override, nil
-			}
-			newParam, err = t.reviewWrongParamHandler(t.ctx, targetTool, param, userInput.GetString("extra_prompt"))
-			if err != nil {
-				e.EmitError("error handling tool review: %v", err)
-				return targetTool, param, nil, HandleToolUseNext_Default, err
-			}
+			return t.rejectToolProposal(targetTool, param, userInput, userCancelHandler)
 		}
 		return t.reviewWithEditedParams(targetTool, param, newParam, hasEditedParam, userCancelHandler)
 	case "direct_answer":
@@ -191,9 +142,7 @@ func (t *ToolCaller) reviewWithEditedParams(
 	if approveUnchangedExplicitEdit && invokeParamsEqual(originalParam, editedParam) {
 		// An explicit wrong_params response may echo an unchanged form. Treat it as
 		// approval after validation; recursively reviewing an identical proposal
-		// would otherwise create an endless sequence of duplicate cards. AI-generated
-		// repairs keep the legacy behavior and always receive a second review card,
-		// even when the repair model happens to return the original values.
+		// would otherwise create an endless sequence of duplicate cards.
 		return targetTool, originalParam, nil, HandleToolUseNext_Default, nil
 	}
 
@@ -202,7 +151,10 @@ func (t *ToolCaller) reviewWithEditedParams(
 	t.resetReasonForReview()
 	result, directlyAnswer, err := t.CallToolWithExistedParams(targetTool, true, editedParam)
 	if err != nil {
-		t.emitter.EmitError("error handling tool review: %v", err)
+		var reconsider *ToolReviewReconsiderError
+		if !errors.As(err, &reconsider) {
+			t.emitter.EmitError("error handling tool review: %v", err)
+		}
 		return targetTool, originalParam, nil, HandleToolUseNext_Default, err
 	}
 	if directlyAnswer {
@@ -210,4 +162,27 @@ func (t *ToolCaller) reviewWithEditedParams(
 		return targetTool, editedParam, nil, HandleToolUseNext_DirectlyAnswer, nil
 	}
 	return targetTool, editedParam, result, HandleToolUseNext_Override, nil
+}
+
+// ToolReviewReconsiderError ends an unapproved proposal. The owning loop must
+// decide again; this is neither a plugin failure nor a request for direct answer.
+type ToolReviewReconsiderError struct {
+	ToolName string
+	Feedback string
+}
+
+func (e *ToolReviewReconsiderError) Error() string {
+	return "tool proposal rejected by review: " + e.ToolName
+}
+
+func (t *ToolCaller) rejectToolProposal(tool *aitool.Tool, params, feedback aitool.InvokeParams, cancel func(any)) (*aitool.Tool, aitool.InvokeParams, *aitool.ToolResult, HandleToolUseNext, error) {
+	if err := t.ctx.Err(); err != nil {
+		return tool, params, nil, HandleToolUseNext_Default, err
+	}
+	hint := "用户拒绝本次工具提案，未执行工具。按用户反馈重新决策；需要工具时先读取真实 Schema，再显式调用 directly_call_tool。\n" + feedback.Dump()
+	if t.reviewReconsiderHandler != nil {
+		hint = t.reviewReconsiderHandler(t.ctx, tool, params, feedback)
+	}
+	cancel("review rejected proposal; return to owning loop")
+	return tool, params, nil, HandleToolUseNext_Default, &ToolReviewReconsiderError{ToolName: tool.Name, Feedback: hint}
 }

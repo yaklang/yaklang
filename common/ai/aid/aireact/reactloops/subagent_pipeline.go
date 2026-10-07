@@ -800,8 +800,7 @@ func countToolCallsFromActionRecords(records []*ActionRecord) int {
 		}
 		switch record.ActionType {
 		case schema.AI_REACT_LOOP_ACTION_REQUIRE_TOOL,
-			schema.AI_REACT_LOOP_ACTION_DIRECTLY_CALL_TOOL,
-			schema.AI_REACT_LOOP_ACTION_TOOL_COMPOSE:
+			schema.AI_REACT_LOOP_ACTION_DIRECTLY_CALL_TOOL:
 			if record.ToolCallCount > 0 {
 				count += record.ToolCallCount
 			} else {

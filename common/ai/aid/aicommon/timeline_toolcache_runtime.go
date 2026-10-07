@@ -16,16 +16,30 @@ func (c *Config) RecordRecentlyUsedTool(tool *aitool.Tool) buildinaitools.Recent
 // RecordRecentlyUsedToolForMode also supports an explicit loop-level protocol
 // override without changing the shared Config or rewriting frozen history.
 func (c *Config) RecordRecentlyUsedToolForMode(tool *aitool.Tool, native bool) buildinaitools.RecentToolCacheMutation {
+	return c.recordRecentlyUsedToolForMode(tool, native, false)
+}
+
+// PreloadRecentlyUsedToolForMode shares the Timeline journal but never evicts
+// existing schemas merely because a specialized mode has optional tools.
+func (c *Config) PreloadRecentlyUsedToolForMode(tool *aitool.Tool, native bool) buildinaitools.RecentToolCacheMutation {
+	return c.recordRecentlyUsedToolForMode(tool, native, true)
+}
+
+func (c *Config) recordRecentlyUsedToolForMode(tool *aitool.Tool, native, preload bool) buildinaitools.RecentToolCacheMutation {
 	if c == nil || tool == nil || c.GetAiToolManager() == nil {
 		return buildinaitools.RecentToolCacheMutation{}
 	}
+	add := c.GetAiToolManager().AddRecentlyUsedToolForMode
+	if preload {
+		add = c.GetAiToolManager().PreloadRecentlyUsedToolForMode
+	}
 	if c.GetTimeline() == nil {
-		return c.GetAiToolManager().AddRecentlyUsedToolForMode(tool, native)
+		return add(tool, native)
 	}
 	tl := c.GetTimeline()
 	tl.toolCacheMu.Lock()
 	defer tl.toolCacheMu.Unlock()
-	mutation := c.GetAiToolManager().AddRecentlyUsedToolForMode(tool, native)
+	mutation := add(tool, native)
 	entry := mutation.Upsert
 	if entry == nil {
 		entry = mutation.Reuse

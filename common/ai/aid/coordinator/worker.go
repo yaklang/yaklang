@@ -39,7 +39,7 @@ func NewWorkerLoop(r aicommon.AIInvokeRuntime, opts ...reactloops.ReActLoopOptio
 	if err != nil {
 		return nil, err
 	}
-	for _, name := range []string{"directly_answer", "request_plan", "request_plan_and_execution", "require_ai_blueprint", "dispatch_sub_react_agents", "inspect_sub_react_agents", "wait_sub_react_agents", "cancel_sub_react_agents", "report_generating", "tool_compose", "load_capability"} {
+	for _, name := range []string{"directly_answer", "request_plan", "request_plan_and_execution", "require_ai_blueprint", "dispatch_sub_react_agents", "inspect_sub_react_agents", "wait_sub_react_agents", "cancel_sub_react_agents", "report_generating", "load_capability"} {
 		loop.RemoveAction(name)
 	}
 	if err := configureWorkerFinish(loop); err != nil {

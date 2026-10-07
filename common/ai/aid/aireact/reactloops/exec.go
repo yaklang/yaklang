@@ -251,9 +251,6 @@ func inferActionTypeFromPayload(action *aicommon.Action, finalAnswer string) str
 	if hasField("directly_call_tool_name") || hasField("directly_call_identifier") || hasCanonicalField("directly_call_tool_calls") {
 		return "directly_call_tool"
 	}
-	if hasField("tool_compose_payload") {
-		return "tool_compose"
-	}
 	if hasField("capability_identifier") {
 		return "load_capability"
 	}

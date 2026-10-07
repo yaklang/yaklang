@@ -93,28 +93,6 @@ func TestToolCallReviewSubAIHonorsCallContextCancellation(t *testing.T) {
 		expectExplicitTaskQuery bool
 	}{
 		{
-			name:                    "wrong tool",
-			expectExplicitTaskQuery: true,
-			call: func(ctx context.Context) error {
-				_, _, err := react._invokeToolCall_ReviewWrongToolForTask(ctx, task, tool, "", "")
-				return err
-			},
-		},
-		{
-			name:                    "wrong params",
-			expectExplicitTaskQuery: true,
-			call: func(ctx context.Context) error {
-				_, err := react._invokeToolCall_ReviewWrongParamForTask(
-					ctx,
-					task,
-					tool,
-					aitool.InvokeParams{"input": "old"},
-					"review suggestion",
-				)
-				return err
-			},
-		},
-		{
 			name:                    "interval review",
 			expectExplicitTaskQuery: true,
 			call: func(ctx context.Context) error {

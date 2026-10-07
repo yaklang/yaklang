@@ -95,6 +95,12 @@ func handleToolCallResult(
 	if !directly && result != nil {
 		operator.MarkToolExecuted()
 	}
+	var reconsider *aicommon.ToolReviewReconsiderError
+	if errors.As(err, &reconsider) {
+		operator.Feedback(reconsider.Feedback)
+		operator.Continue()
+		return
+	}
 	if err != nil {
 		errMsg := fmt.Sprintf("Tool '%s' invocation protocol failed: %v.", toolPayload, err)
 		invoker.AddToTimeline("[TOOL_PROTOCOL_ERROR]", errMsg)

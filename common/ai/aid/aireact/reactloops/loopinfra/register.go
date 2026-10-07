@@ -12,7 +12,6 @@ func init() {
 	reactloops.RegisterAction(loopAction_RequestPlanAndExecution)
 	reactloops.RegisterAction(loopAction_RequestPlanAlias)
 	reactloops.RegisterAction(loopAction_RequireAIBlueprintForge)
-	reactloops.RegisterAction(loopAction_toolCompose)
 	reactloops.RegisterAction(loopAction_LoadingSkills)
 	reactloops.RegisterAction(loopAction_ChangeSkillViewOffset)
 	reactloops.RegisterAction(loopAction_LoadSkillResources)
