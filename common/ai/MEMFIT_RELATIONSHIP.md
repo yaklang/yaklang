@@ -95,7 +95,7 @@ flowchart TB
 
 - LiteForge 核心在 `common/ai/aid/liteforge/`，应用在其子包 `liteforgeapp/`。
 - 多步 Forge 在 `common/ai/aiforge/`，与 `aid/`、`rag/` 同属 `common/ai/`。
-- 新版规划和任务执行在 `common/ai/aid/coordinator/`；旧版接口集中在 `coordinator_legacy/`，不用于新版 Forge。
+- 规划和任务执行统一在 `common/ai/aid/coordinator/`，Forge 也使用同一 Session。
 - `aireducer` 仍在 `common/aireducer/`。
 - AI Yak 冒烟统一在 `common/ai/aismoking/`，从仓库根目录执行 `yak common/ai/aismoking/run.yak`。
 - `aireact` 通过 `init()` 注册到 `aicommon` 工厂，新增 `loop_xxx/` 必须在 [reactinit/init.go](aid/aireact/reactloops/reactinit/init.go) 加空白 import

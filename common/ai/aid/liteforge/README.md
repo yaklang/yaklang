@@ -1,6 +1,6 @@
 # LiteForge 单次请求底层
 
-`common/ai/aid/liteforge` 是独立的单次结构化请求执行器。[liteforgeapp](liteforgeapp/README.md) 的应用、Yak `liteforge.Execute`、`ai.FunctionCall`（含分级模型入口）和基于 `aicommon` 的 typed helper 共用它。执行器使用 `aicommon.Config` 的模型选择、重试和用量通道，以及 `aiprojection` 的请求投影；不依赖 coordinator、coordinator_legacy、ReAct 或 aiforge，也不创建 PLAN、任务循环或旧事件循环。Forge 的多步执行由新版 `coordinator` 承担，结构化结果交付复用本执行器。
+`common/ai/aid/liteforge` 是独立的单次结构化请求执行器。[liteforgeapp](liteforgeapp/README.md) 的应用、Yak `liteforge.Execute`、`ai.FunctionCall`（含分级模型入口）和基于 `aicommon` 的 typed helper 共用它。执行器使用 `aicommon.Config` 的模型选择、重试和用量通道，以及 `aiprojection` 的请求投影；不依赖 coordinator、ReAct 或 aiforge，也不创建 PLAN、任务循环或旧事件循环。Forge 的多步执行由新版 `coordinator` 承担，结构化结果交付复用本执行器。
 
 应用层的文件分析、多媒体、知识提炼、索引和 ERM 实现统一归入 `liteforgeapp`。核心包不导入应用包；Go 调用方导入 `github.com/yaklang/yaklang/common/ai/aid/liteforge/liteforgeapp`，Yak 的模块名和函数名保持不变。
 

@@ -304,9 +304,6 @@ func NewReAct(opts ...aicommon.ConfigOption) (*ReAct, error) {
 	if cfg.Timeline == nil {
 		cfg.Timeline = aicommon.NewTimeline(cfg, nil)
 	}
-	if cfg.TimelineDiffer == nil {
-		cfg.TimelineDiffer = aicommon.NewTimelineDiffer(cfg.Timeline)
-	}
 	aimem.RegisterTimelineMemoryPersistence(cfg.Timeline, react.memoryTriage, cfg.GetContext())
 	// Initialize prompt manager (workdir does not depend on artifacts, which is lazy)
 	workdir := cfg.Workdir

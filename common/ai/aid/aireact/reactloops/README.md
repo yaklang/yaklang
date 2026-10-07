@@ -73,7 +73,7 @@ flowchart TD
 | [loop_code_security_audit](loop_code_security_audit) | 代码安全审计 | 高 | 多阶段（scan/verify）、特殊 finding 事件 |
 | [loop_http_flow_analyze](loop_http_flow_analyze) | HTTP 流量分析 | 高 | 强制 finalize fallback、多种 match action |
 | [loop_infosec_recon](loop_infosec_recon) | 信息安全侦察 | 高 | 多工具组合、复杂 init |
-| [loop_plan](loop_plan) | 文档化任务规划 | 高 | 多步 LiteForge、生成 plan 文档 |
+| [coordinator / pe_task](../../coordinator/README.md) | 计划、审批与任务执行 | 高 | Session、自动 DAG 调度与结果验收 |
 | [loop_http_fuzztest](loop_http_fuzztest) | HTTP 模糊测试（最复杂） | **极高** | **所有扩展点几乎都用到**，推荐作为模板 |
 
 > **新人推荐路径**：先读 [loop_default](loop_default/base.go) 理解最小骨架 → 读 [loop_intent](loop_intent/init.go) 理解 ContextProvider → 读 [loop_http_flow_analyze](loop_http_flow_analyze/init.go) 理解 finalize hook → 最后挑战 [loop_http_fuzztest](loop_http_fuzztest/init.go)。

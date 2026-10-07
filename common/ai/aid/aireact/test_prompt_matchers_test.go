@@ -20,10 +20,6 @@ func isToolParamGenerationPrompt(prompt, toolName string) bool {
 	return aicommon.IsToolParamGenerationPrompt(prompt, toolName)
 }
 
-func isToolParamGenPrompt(prompt string) bool {
-	return aicommon.IsToolParamGenPrompt(prompt)
-}
-
 func isToolParamGenPromptForTool(prompt, toolName string) bool {
 	return aicommon.IsToolParamGenPromptForTool(prompt, toolName)
 }
@@ -36,10 +32,6 @@ func isToolParamGenPromptWithOldParams(prompt string) bool {
 	return aicommon.IsToolParamGenPromptWithOldParams(prompt)
 }
 
-func isToolParamGenPromptForToolWithOldParams(prompt, toolName string) bool {
-	return aicommon.IsToolParamGenPromptForToolWithOldParams(prompt, toolName)
-}
-
 func isToolParamGenPromptForBlueprintWithOldParams(prompt, forgeName string) bool {
 	return aicommon.IsToolParamGenPromptForBlueprintWithOldParams(prompt, forgeName)
 }
@@ -49,10 +41,6 @@ func isChangeBlueprintPrompt(prompt string) bool {
 }
 
 // --- 其他角色识别 ---
-
-func isIntentEnrichmentPrompt(prompt string) bool {
-	return aicommon.IsIntentEnrichmentPrompt(prompt)
-}
 
 func isDirectAnswerPrompt(prompt string) bool {
 	return aicommon.IsDirectAnswerPrompt(prompt)

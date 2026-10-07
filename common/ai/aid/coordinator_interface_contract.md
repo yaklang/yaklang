@@ -126,6 +126,6 @@ worker 执行完成先保留 processing，释放执行槽位并由任务管理�
 
 ## 6. 使用与验证边界
 
-选择新引擎不改变 RPC。未指定 focus 的 PLAN 请求通过默认循环进入新版 coordinator；旧 plan / coordinator_legacy focus 名称也转入新版，公开列表不再展示旧模式。aim.planEngine(...) 仅为 focus 别名。Go 新运行体使用 coordinator.NewSession；coordinator_legacy.NewCoordinatorContext 始终保留旧语义。新 Session 自己拥有任务树 DTO、审批、进度和恢复适配，不调用旧 Coordinator 的内部方法。plan_engine 仅保存在记录中，恢复入口校验原归属；旧记录在入队之前返回明确停用错误，要求重新生成新版计划，不隐式迁移旧状态。
+选择新引擎不改变 RPC。未指定 focus 的 PLAN 请求通过默认循环进入新版 coordinator；旧 plan / coordinator_legacy focus 名称也转入新版，公开列表不再展示旧模式。aim.planEngine(...) 仅为 focus 别名。Go 新运行体使用 coordinator.NewSession；新 Session 自己拥有任务树 DTO、审批、进度和恢复适配，不调用旧 Coordinator 的内部方法。plan_engine 仅保存在记录中，恢复入口校验原归属；旧记录在入队之前返回明确停用错误，要求重新生成新版计划，不隐式迁移旧状态。
 
 自动化验证包含两种协议 × 人工/YOLO 的真实 Yak/aim DAG、普通/编辑/detached 确认、审核反馈重试、消息与等待、局部编辑、取消实际退出、恢复、报告与晚到消息，以及 PLAN-only/预设/mocker 回归。确定性 provider 只脚本化模型决定，不替代实际供应商模型质量、缓存命中率或完整 Electron UI 人工验收。详见 [本地验收记录](coordinator/execution_review.md)。

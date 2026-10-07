@@ -736,9 +736,6 @@ func BuildReActInvoker(ctx context.Context, options ...aicommon.ConfigOption) (a
 	if cfg.Timeline == nil {
 		cfg.Timeline = aicommon.NewTimeline(cfg, nil)
 	}
-	if cfg.TimelineDiffer == nil {
-		cfg.TimelineDiffer = aicommon.NewTimelineDiffer(cfg.Timeline)
-	}
 	aimem.RegisterTimelineMemoryPersistence(cfg.Timeline, invoker.memoryTriage, cfg.GetContext())
 	cfg.EnhanceKnowledgeManager.SetEmitter(cfg.Emitter)
 	// Initialize prompt manager (workdir does not depend on artifacts, which is lazy)

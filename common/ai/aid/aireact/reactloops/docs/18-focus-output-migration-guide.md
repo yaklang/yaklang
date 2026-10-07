@@ -211,7 +211,7 @@ return reactloops.WithRegisterLoopAction(
 )
 ```
 
-`loop_plan/action_recon.go` 不为每个工具单独声明 `request`；`loop_java_decompiler` 已去掉 `rewrite_reason`，finish 示例也不再使用多余的 `summary` 参数。
+通用显式工具调用使用各工具 Schema，不重复声明 `request`；`loop_java_decompiler` 已去掉 `rewrite_reason`，finish 示例也不再使用多余的 `summary` 参数。
 
 ## 标准改造流程
 

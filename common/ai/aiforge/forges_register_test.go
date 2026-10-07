@@ -87,15 +87,6 @@ func TestExecuteForgeAndAutoRegister_UsesLatestDBForge(t *testing.T) {
 	require.Nil(t, gotPlanV2, "invalid DAGs must fail before approval or model execution")
 }
 
-type planPromptPayload struct {
-	MainTask     string `json:"main_task"`
-	MainTaskGoal string `json:"main_task_goal"`
-	Tasks        []struct {
-		SubtaskName string `json:"subtask_name"`
-		SubtaskGoal string `json:"subtask_goal"`
-	} `json:"tasks"`
-}
-
 type planReviewEvent struct {
 	Plans struct {
 		RootTask struct {
@@ -114,17 +105,4 @@ func decodePlanReviewEvent(t *testing.T, content []byte) *planReviewEvent {
 	var payload planReviewEvent
 	require.NoError(t, json.Unmarshal(content, &payload))
 	return &payload
-}
-
-func assertPlanMatchesPrompt(t *testing.T, planPrompt string, event *planReviewEvent) {
-	t.Helper()
-	var expected planPromptPayload
-	require.NoError(t, json.Unmarshal([]byte(planPrompt), &expected))
-	require.Equal(t, expected.MainTask, event.Plans.RootTask.Name)
-	require.Equal(t, expected.MainTaskGoal, event.Plans.RootTask.Goal)
-	require.Equal(t, len(expected.Tasks), len(event.Plans.RootTask.Subtasks))
-	for idx, task := range expected.Tasks {
-		require.Equal(t, task.SubtaskName, event.Plans.RootTask.Subtasks[idx].Name)
-		require.Equal(t, task.SubtaskGoal, event.Plans.RootTask.Subtasks[idx].Goal)
-	}
 }

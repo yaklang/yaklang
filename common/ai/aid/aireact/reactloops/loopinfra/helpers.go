@@ -27,21 +27,6 @@ func loopInfraStatus(loop *reactloops.ReActLoop, zh, en string) {
 	reactloops.EmitStatusI18n(loop, zh, en)
 }
 
-func loopInfraSystemLog(loop *reactloops.ReActLoop, nodeID, message string) {
-	if loop == nil || nodeID == "" || strings.TrimSpace(message) == "" {
-		return
-	}
-	emitter := loop.GetEmitter()
-	if emitter == nil {
-		return
-	}
-	taskID := ""
-	if task := loop.GetCurrentTask(); task != nil {
-		taskID = task.GetId()
-	}
-	_, _ = emitter.EmitDefaultSystemStreamEvent(nodeID, strings.NewReader(message), taskID)
-}
-
 func loopInfraActionStart(loop *reactloops.ReActLoop, nodeID, line, statusZh, statusEn string) {
 	reactloops.EmitActionLog(loop, nodeID, line)
 	loopInfraStatus(loop, statusZh, statusEn)

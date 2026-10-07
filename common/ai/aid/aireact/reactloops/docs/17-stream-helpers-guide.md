@@ -98,7 +98,7 @@ reactloops.EmitActionLog(loop, "http-flow-query", "完成: 找到 18 条流量",
 - 不要为多个说明字段分别挂 `LoopStreamField` 打到同一 thought 通道，否则会 schema 冲突或重复输出。
 - Prompt / `output_example` 里只示范这一个共用字段；handler 侧**不要**把它拼进 `EmitActionLog` 的 `lines`。
 
-参考：`loop_plan/action_recon.go`（不在每个 action 单独声明 request）、`loop_java_decompiler`（已去掉 `rewrite_reason` 与 finish 示例里的 `summary`）。
+参考：`loop_java_decompiler` 已去掉 `rewrite_reason` 与 finish 示例里的 `summary`；通用显式工具调用直接使用各工具 Schema。
 
 ### `SaveAndPinFile`
 

@@ -222,7 +222,7 @@ state.OneLinerSummary = action.GetString("summary")
 
 ### D. 计划生成
 
-[loop_plan/generate_document_and_plan.go](../../../coordinator_legacy/loop_plan/generate_document_and_plan.go) 一系列 LiteForge 步骤生成正式的多步任务计划。
+计划由 [coordinator](../../../coordinator/README.md) 主循环直接生成和审核，不通过多个辅助 LiteForge 串联构造。
 
 ### F. HTTP fuzz 初始化
 

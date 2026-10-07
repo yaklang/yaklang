@@ -305,7 +305,6 @@ type Config struct {
 	*/
 	// timeline
 	Timeline                  *Timeline
-	TimelineDiffer            *TimelineDiffer
 	TimelineContentSizeLimit  int // in tokens
 	TimelineTotalContentLimit int // in tokens
 
@@ -652,9 +651,6 @@ func NewConfig(ctx context.Context, opts ...ConfigOption) *Config {
 	// the child uses the same Timeline instance for proper timeline diff tracking
 	if config.Timeline == nil {
 		config.Timeline = NewTimeline(config, nil)
-	}
-	if config.TimelineDiffer == nil {
-		config.TimelineDiffer = NewTimelineDiffer(config.Timeline)
 	}
 	config.Timeline.SoftBindConfig(config, config)
 
@@ -2289,7 +2285,6 @@ func WithForceManualPlanReview(b ...bool) ConfigOption {
 // WithPlanPrompt sets additional context that will be injected into the Plan phase only.
 // This content appears once during plan initialization and does not affect subsequent task execution.
 // It is useful for providing planning-specific instructions or constraints.
-// The prompt is also stored in KeyValueConfig with key "plan_prompt" for loop_plan to access.
 func WithPlanPrompt(prompt string) ConfigOption {
 	return func(c *Config) error {
 		if c.m == nil {
@@ -2298,8 +2293,6 @@ func WithPlanPrompt(prompt string) ConfigOption {
 		c.m.Lock()
 		c.PlanPrompt = prompt
 		c.m.Unlock()
-		// Also set to KeyValueConfig so loop_plan can access via GetConfigString
-		c.SetConfig("plan_prompt", prompt)
 		return nil
 	}
 }
@@ -4170,7 +4163,6 @@ func (c *Config) restorePersistentSession() {
 	}
 
 	c.Timeline = timelineInstance
-	c.TimelineDiffer = NewTimelineDiffer(timelineInstance)
 
 	// Restore WorkDir from previous runtime so that Session Artifacts persist across restarts
 	if runtime.WorkDir != "" {

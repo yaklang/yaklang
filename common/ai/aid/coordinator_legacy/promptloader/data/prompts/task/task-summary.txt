@@ -1,2 +1,0 @@
-## 任务状态
-{{ .CurrentTaskInfo }}

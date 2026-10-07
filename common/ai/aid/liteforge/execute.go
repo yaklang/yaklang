@@ -31,10 +31,9 @@ func Execute(ctx context.Context, r Request, opts ...aicommon.ConfigOption) (*ai
 	// A one-shot reader must not rebind the parent's live compression state.
 	opts = append(opts, func(cfg *aicommon.Config) error {
 		if r.DisableTimeline {
-			cfg.Timeline, cfg.TimelineDiffer = nil, nil
+			cfg.Timeline = nil
 		} else if cfg.Timeline != nil {
 			cfg.Timeline = cfg.Timeline.CopyReducibleTimelineWithMemory()
-			cfg.TimelineDiffer = nil
 		}
 		return nil
 	})

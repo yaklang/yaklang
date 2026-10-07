@@ -7,7 +7,7 @@ import (
 )
 
 // This file provides shared prompt-matcher helpers used by test mock AI
-// callbacks across packages (common/ai/aid/coordinator_legacy/integration, common/ai/aid/aireact, and
+// callbacks across packages (common/ai/aid/aireact, common/ai/aiforge, and
 // reactloopstests) to classify which role-prompt the AI received so the mock
 // can return an appropriate canned response.
 //
@@ -21,10 +21,10 @@ import (
 // When static prompts are edited, the散文 (prose) MUST NOT contain any concrete
 // action literal. See common/ai/aid/aiprojection/README.md.
 
-// --- Forge 参数生成与 legacy fixture 的旧构参请求识别 ---
+// --- Forge 参数生成与已停用工具构参请求识别 ---
 
 // IsToolParamGenerationPrompt detects a parameter-generation prompt (R2/R3/R5).
-// Retained for Forge/legacy fixtures and rejecting retired tool-generation requests.
+// Used by Forge fixtures and to reject retired tool-generation requests.
 func IsToolParamGenerationPrompt(prompt, toolName string) bool {
 	if name, _, ok := promptParameterTarget(prompt); ok {
 		return IsToolParamGenPrompt(prompt) && (toolName == "" || toolName == name)

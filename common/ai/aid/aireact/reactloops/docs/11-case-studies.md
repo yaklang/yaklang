@@ -1,8 +1,8 @@
-# 11. 案例研究：17 个专注模式横向对比
+# 11. 案例研究：专注模式横向对比
 
 > 回到 [README](../README.md) | 上一章：[10-build-your-own-loop.md](10-build-your-own-loop.md) | 下一章：[12-debugging-and-observability.md](12-debugging-and-observability.md)
 
-reactloops 目录下当前已注册 17 个专注模式。本章给出横向对比表，并对其中 5 个**最有学习价值**的 loop 做深度拆解。
+本章比较常用 ReAct 专注模式与 PLAN 运行体，并展示其扩展方式；公开模式以运行时注册列表为准。
 
 ## 11.1 横向对比表
 
@@ -12,7 +12,7 @@ reactloops 目录下当前已注册 17 个专注模式。本章给出横向对�
 | [loop_intent](../loop_intent) | 中 | InitTask + OnPostIteraction | 2（query_capabilities, finalize_enrichment） | 否（用 finalize_enrichment 替代） | DeepIntent 实现 | 多 | persistent_instruction + reactive_data | 内部意图识别 |
 | [loop_smart_qa](../loop_smart_qa) | 中 | InitTask | 7（search_knowledge, web_search 等） | 否（用 final_answer） | 否 | 多 | persistent_instruction | 智能问答 |
 | [loop_knowledge_enhance](../loop_knowledge_enhance) | 中 | OnPostIteraction（finalize fallback） | 1（search） | 否 | finalize fallback | 1 | persistent_instruction | 知识库增强 |
-| [loop_plan](../loop_plan) | 高 | InitTask + OnPostIteraction | save_evidence、信息收集与规划交接动作 | 否（用 finish_exploration） | 多个 LiteForge 步骤生成文档/计划 | 多（含 AITag） | persistent + plan_from_document + guidance_document | 任务规划 |
+| [coordinator / pe_task](../../../coordinator/README.md) | 高 | Session + 自动 DAG 调度 | 计划编辑、审核、报告与显式工具调用 | 由运行时验收 | 辅助结构化请求 | 按动作声明 | 计划 / 执行角色与状态 | 规划和任务执行 |
 | [loop_http_fuzztest](../loop_http_fuzztest) | 极高 | InitTask + OnPostIteraction | 9（set_http_request, fuzz_method, fuzz_path 等） | 是 | 初始化 + finalize 多次 | 多（AITag + Stream） | persistent + reactive_data + output_example | HTTP 安全模糊测试 |
 | [loop_http_flow_analyze](../loop_http_flow_analyze) | 高 | OnPostIteraction（强制 fallback） | 4（filter, match, get_detail, output_findings） | 是 | finalize fallback | 多 | persistent + reactive_data | HTTP 流量分析 |
 | [loop_code_security_audit](../loop_code_security_audit) | 极高 | InitTask + 多阶段 | 多（phase1 + phase2 扫描） | 是 | 多个 phase 内部 | 多 | persistent + 多 phase | 代码安全审计 |
@@ -41,7 +41,7 @@ reactloops 目录下当前已注册 17 个专注模式。本章给出横向对�
 3. **[loop_knowledge_enhance](../loop_knowledge_enhance)**：理解 finalize fallback 模式
 4. **[loop_intent](../loop_intent)**：理解内部 loop + meta 行为
 5. **[loop_http_flow_analyze](../loop_http_flow_analyze)**：理解多 action + finalize fallback
-6. **[loop_plan](../loop_plan)**：理解多 LiteForge 编排
+6. **[coordinator / pe_task](../../../coordinator/README.md)**：理解计划审批、调度及实际结果验收
 7. **[loop_http_fuzztest](../loop_http_fuzztest)**：理解极端定制化（终极目标）
 
 下面给 5 个最值得细看的 loop 做深度拆解。
@@ -158,69 +158,11 @@ finalAnswerAction(r),
 
 ---
 
-## 11.6 深度拆解 4：loop_plan
+## 11.6 深度拆解 4：coordinator / pe_task
 
-### 角色
+PLAN 使用 [coordinator](../../../coordinator/README.md) 协调计划、审批和任务 DAG；`pe_task` 执行已批准任务。计划由主循环生成，工具采用显式参数调用，schema 加载不执行工具、不请求辅助模型构参。
 
-任务规划。生成结构化的多步执行计划，结合知识库 / 文件系统 / 互联网信息 / SMART 思维框架。
-
-### 关键配置
-
-源码 [coordinator_legacy/loop_plan/init.go](../../../coordinator_legacy/loop_plan/init.go)（以下节选关键配置）：
-
-```go
-reactloops.WithAllowRAG(false)
-reactloops.WithAllowToolCall(false)
-reactloops.WithAllowAIForge(false)
-reactloops.WithAllowPlanAndExec(false)
-// 关键：用 PersistentContextProvider 而不是简单的 Instruction
-reactloops.WithPersistentContextProvider(func(loop, nonce) (string, error) {
-    return utils.RenderTemplate(persistentInstruction, map[string]any{
-        "Nonce": nonce, "UserInput": ..., "PlanPrompt": planPrompt,
-    })
-})
-// save_evidence 使用公共 action，证据保存到 session timeline。
-// ActionFilter 保留 schema.AI_REACT_LOOP_ACTION_SAVE_EVIDENCE。
-reactloops.WithMaxIterations(PlanMaxIterations),  // 4
-// 规划入口与信息收集 actions：
-generateDirectPlan(r), beginDeepPlanning(r), finishExploration(r),
-searchKnowledge(r),
-readFileAction(r), findFilesAction(r), grepTextAction(r),
-webSearchAction(r), scanPortAction(r), simpleCrawlerAction(r),
-```
-
-### 关键设计
-
-#### 末轮 action 收紧
-
-```go
-isLastIteration := currentIter+1 >= maxIter
-if isLastIteration {
-    for _, name := range infoGatheringActions {
-        loop.RemoveAction(name)
-    }
-    // 强制只能 finish_exploration
-}
-```
-
-最后一轮**动态删除**所有信息收集 action，强制 LLM 收尾。这是 reactloops 的高级用法。
-
-#### 多次 LiteForge 编排
-
-`finish_exploration` 触发后，`OnPostIteraction` 会调多个 LiteForge：
-
-1. `generateGuidanceDocument`：根据 session evidence 生成结构化文档
-2. `generatePlanFromDocument`：再把文档转成可执行计划
-3. 流式输出到不同 NodeId
-
-源码 [loop_plan/generate_document_and_plan.go](../../../coordinator_legacy/loop_plan/generate_document_and_plan.go)。
-
-### 学到什么
-
-- **PersistentContextProvider vs PersistentInstruction**：后者是字符串，前者是动态渲染（每轮都跑一次）
-- **末轮强制收尾**：LLM 不主动 finish 时，框架强行剥夺它的选项
-- **多 LiteForge 串联**：复杂的"工程化生成"用 LiteForge 拆步
-- **共享证据**：规划与执行通过 `save_evidence` 保存证据，由 session Timeline 统一管理和提升。
+协调员接收 worker 的实际完成结果和 Evidence，审核后推进后继任务。任务树与状态快照由运行时管理，不能把模型声明完成当作执行成功。实现与双协议测试见 [coordinator](../../../coordinator/README.md)。
 
 ---
 
@@ -426,7 +368,7 @@ AI 技能审计。检查已有 skill 库的覆盖率。
 
 ### 模式 A：白名单 ActionFilter
 
-`loop_smart_qa` / `loop_intent` / `loop_plan` 都用 `WithActionFilter` 严格白名单。**这是控制 loop 范围的最强武器**。
+`loop_smart_qa` / `loop_intent` 用 `WithActionFilter` 限定 actions。通用框架仍提供显式工具执行等公共能力，应按具体循环需求配置。
 
 ### 模式 B：Finalize Fallback
 
@@ -447,9 +389,9 @@ IgnoreError on max iterations
 
 `loop_http_fuzztest` / `loop_syntaxflow_rule` / `loop_yaklangcode` 在 init 阶段用 LiteForge 处理用户输入：抽参数、提取上下文、生成 quick_plan。
 
-### 模式 E：末轮收紧
+### 模式 E：运行时完成门禁
 
-`loop_plan` 在最后一轮删除所有信息收集 action。这是**框架级强制收尾**的范例。
+`coordinator` 依据批准的计划、实际任务结果和报告发布状态决定是否完成；不能用模型输出或迭代结束代替业务验收。
 
 ### 模式 F：内部 Loop（Hidden）
 
