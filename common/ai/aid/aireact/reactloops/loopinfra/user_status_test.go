@@ -38,7 +38,7 @@ func TestBuildToolCallGroupResultToolsPreservesActualState(t *testing.T) {
 	request := &aicommon.ToolCallGroupRequest{Calls: []aicommon.ToolCallGroupCall{
 		{Index: 0, ToolName: "read_file"},
 		{Index: 1, ToolName: "grep"},
-		{Index: 2, ToolName: "web_search"},
+		{Index: 2, ToolName: "read_file"},
 	}}
 	outcomes := []aicommon.ToolCallOutcome{
 		{Index: 0, FinalTool: "read_file", Stage: aicommon.ToolCallStageDone, Result: &aitool.ToolResult{Success: true}},
@@ -53,6 +53,52 @@ func TestBuildToolCallGroupResultToolsPreservesActualState(t *testing.T) {
 	require.Equal(t, aicommon.StatusStateSuccess, tools[0].State)
 	require.Equal(t, "grep_files", tools[1].Name)
 	require.Equal(t, aicommon.StatusStateSuccess, tools[1].State)
-	require.Equal(t, "web_search", tools[2].Name)
+	require.Equal(t, "read_file", tools[2].Name)
 	require.Equal(t, aicommon.StatusStateError, tools[2].State)
+}
+
+func TestBatchStatusAggregatesNamesWithoutAggregatingCalls(t *testing.T) {
+	for _, preparing := range []bool{false, true} {
+		var statuses []aicommon.StatusPayload
+		emitter := aicommon.NewEmitter("repeated-tool-status", func(event *schema.AiOutputEvent) (*schema.AiOutputEvent, error) {
+			if event.NodeId == "status" {
+				var status aicommon.StatusPayload
+				if err := json.Unmarshal(event.Content, &status); err != nil {
+					return nil, err
+				}
+				statuses = append(statuses, status)
+			}
+			return event, nil
+		})
+		loop := reactloops.NewMinimalReActLoop(&aicommon.Config{Emitter: emitter}, nil)
+		names := []string{"read_file", "grep", "read_file", "grep", "read_file"}
+		if preparing {
+			emitToolsPreparingStatus(loop, names)
+		} else {
+			emitToolBatchRunningStatus(loop, names)
+		}
+		require.Len(t, statuses, 1)
+		status := statuses[0]
+		require.Contains(t, status.Value, "read_file × 3、grep × 2")
+		require.Contains(t, status.ValueI18n.En, "read_file × 3, grep × 2")
+		require.Equal(t, &aicommon.StatusProgress{Current: 0, Total: 5, Unit: "tool"}, status.Progress)
+		require.Len(t, status.Tools, 5)
+		for i, name := range names {
+			require.Equal(t, name, status.Tools[i].Name)
+		}
+	}
+}
+
+func TestStatusToolNamesGroupsByToolIdentityBeforeTruncating(t *testing.T) {
+	tools := []aicommon.StatusTool{
+		{Name: "read_file", DisplayName: "读取文件", DisplayNameI18n: &schema.I18n{En: "Read file"}},
+		{Name: "grep", DisplayName: "搜索", DisplayNameI18n: &schema.I18n{En: "Search"}},
+		{Name: "read_file", DisplayName: "读取文件", DisplayNameI18n: &schema.I18n{En: "Read file"}},
+		{Name: "web_search", DisplayName: "搜索", DisplayNameI18n: &schema.I18n{En: "Search"}},
+		{Name: "write_file", DisplayName: "写文件"},
+	}
+	require.Equal(t, "读取文件 × 2、搜索、搜索等 1 个工具", statusToolNames(tools, false))
+	require.Equal(t, "Read file × 2, Search, Search and 1 more", statusToolNames(tools, true))
+	require.Equal(t, "unnamed × 2", statusToolNames([]aicommon.StatusTool{{DisplayName: "unnamed"}, {DisplayName: "unnamed"}}, false))
+	require.Empty(t, statusToolNames(nil, false))
 }

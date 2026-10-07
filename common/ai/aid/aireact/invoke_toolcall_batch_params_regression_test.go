@@ -61,6 +61,44 @@ func TestExecuteToolCallGroupExplicitParamsNeedNoAuxiliaryRequest(t *testing.T) 
 	}
 }
 
+func TestExecuteToolCallGroupBusinessMetadataFieldsDoNotReplaceChildMetadata(t *testing.T) {
+	tool, err := aitool.New("business_metadata_group_tool",
+		aitool.WithStringParam("identifier", aitool.WithParam_Required(true)),
+		aitool.WithStringParam("call_expectations", aitool.WithParam_Required(true)),
+		aitool.WithDangerousNoNeedUserReview(true),
+		aitool.WithSimpleCallback(func(params aitool.InvokeParams, _, _ io.Writer) (any, error) {
+			return params.GetString("identifier") + ":" + params.GetString("call_expectations"), nil
+		}))
+	require.NoError(t, err)
+	react := newBatchTestReAct(t, tool, nil)
+	request := &aicommon.ToolCallGroupRequest{Calls: []aicommon.ToolCallGroupCall{
+		{ToolName: tool.Name, Identifier: "first_artifact", Expectations: "first invocation", Reason: "first call",
+			Params: aitool.InvokeParams{"identifier": "first-business", "call_expectations": "first business"}},
+		{ToolName: tool.Name, Identifier: "second_artifact", Expectations: "second invocation", Reason: "second call",
+			Params: aitool.InvokeParams{"identifier": "second-business", "call_expectations": "second business"}},
+	}}
+	result, err := react.ExecuteToolCallGroup(context.Background(), react.config.DefaultTask, request)
+	require.NoError(t, err)
+	require.Len(t, result.Outcomes, 2)
+	for i, outcome := range result.Outcomes {
+		require.Equal(t, aicommon.ToolCallStageDone, outcome.Stage)
+		require.NotNil(t, outcome.Result)
+		require.True(t, outcome.Result.Success, "%s", outcome.Result.Error)
+		encoded, err := json.Marshal(outcome.Result.Param)
+		require.NoError(t, err)
+		var params aitool.InvokeParams
+		require.NoError(t, json.Unmarshal(encoded, &params))
+		require.Equal(t, request.Calls[i].Params, params)
+	}
+	dirs := batchArtifactDirs(t, react)
+	require.Len(t, dirs, 2)
+	identifiers := make([]string, 0, len(dirs))
+	for _, dir := range dirs {
+		identifiers = append(identifiers, readBatchArtifactManifest(t, dir).Identifier)
+	}
+	require.ElementsMatch(t, []string{"first_artifact", "second_artifact"}, identifiers)
+}
+
 func TestToolCallGroupRestoredNameOnlyRequestCannotGenerateArguments(t *testing.T) {
 	var invoked, requests int
 	tool, err := aitool.New("restored_name_only", aitool.WithDangerousNoNeedUserReview(true), aitool.WithSimpleCallback(func(aitool.InvokeParams, io.Writer, io.Writer) (any, error) { invoked++; return "bad", nil }))
