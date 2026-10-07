@@ -95,7 +95,7 @@ func readBatchArtifactManifest(t *testing.T, dir string) batchArtifactManifestFi
 	return manifest
 }
 
-func TestExecuteToolBatch_RejectsScalarRequest(t *testing.T) {
+func TestExecuteToolCallGroup_RejectsScalarRequest(t *testing.T) {
 	tool, err := aitool.New(
 		"batch_min_items_tool",
 		aitool.WithDangerousNoNeedUserReview(true),
@@ -106,14 +106,14 @@ func TestExecuteToolBatch_RejectsScalarRequest(t *testing.T) {
 	require.NoError(t, err)
 	react := newBatchTestReAct(t, tool, nil)
 
-	result, execErr := react.ExecuteToolBatch(context.Background(), react.config.DefaultTask, &aicommon.ToolBatchRequest{
-		Calls: []aicommon.ToolBatchCall{{Mode: aicommon.ToolCallModeDirect, ToolName: tool.Name}},
+	result, execErr := react.ExecuteToolCallGroup(context.Background(), react.config.DefaultTask, &aicommon.ToolCallGroupRequest{
+		Calls: []aicommon.ToolCallGroupCall{{ToolName: tool.Name}},
 	})
 	require.Nil(t, result)
 	require.ErrorContains(t, execErr, "at least 2")
 }
 
-func TestExecuteToolBatch_DirectBoundedConcurrencyAndOrderedCommit(t *testing.T) {
+func TestExecuteToolCallGroup_DirectBoundedConcurrencyAndOrderedCommit(t *testing.T) {
 	var active int32
 	var maxActive int32
 	var completionMu sync.Mutex
@@ -145,13 +145,13 @@ func TestExecuteToolBatch_DirectBoundedConcurrencyAndOrderedCommit(t *testing.T)
 	react := newBatchTestReAct(t, tool, nil)
 	react.config.SetConfig(aicommon.ConfigKeyToolBatchInvokeConcurrency, 2)
 
-	request := &aicommon.ToolBatchRequest{Calls: []aicommon.ToolBatchCall{
-		{Mode: aicommon.ToolCallModeDirect, ToolName: tool.Name, Reason: "test call 0", Params: aitool.InvokeParams{"id": 0, "delay_ms": 180}},
-		{Mode: aicommon.ToolCallModeDirect, ToolName: tool.Name, Reason: "test call 1", Params: aitool.InvokeParams{"id": 1, "delay_ms": 20}},
-		{Mode: aicommon.ToolCallModeDirect, ToolName: tool.Name, Reason: "test call 2", Params: aitool.InvokeParams{"id": 2, "delay_ms": 20}},
+	request := &aicommon.ToolCallGroupRequest{Calls: []aicommon.ToolCallGroupCall{
+		{ToolName: tool.Name, Reason: "test call 0", Params: aitool.InvokeParams{"id": 0, "delay_ms": 180}},
+		{ToolName: tool.Name, Reason: "test call 1", Params: aitool.InvokeParams{"id": 1, "delay_ms": 20}},
+		{ToolName: tool.Name, Reason: "test call 2", Params: aitool.InvokeParams{"id": 2, "delay_ms": 20}},
 	}}
 
-	batchResult, execErr := react.ExecuteToolBatch(context.Background(), react.config.DefaultTask, request)
+	batchResult, execErr := react.ExecuteToolCallGroup(context.Background(), react.config.DefaultTask, request)
 	require.NoError(t, execErr)
 	require.Len(t, batchResult.Outcomes, 3)
 	require.Equal(t, int32(2), atomic.LoadInt32(&maxActive), "invoke concurrency must use its own configured bound")
@@ -174,7 +174,7 @@ func TestExecuteToolBatch_DirectBoundedConcurrencyAndOrderedCommit(t *testing.T)
 	require.Equal(t, 3, snapshot.ToolCallTotal, "each successful batch child must count as one tool call")
 }
 
-func TestExecuteToolBatch_ConcurrentEventsRemainIsolatedPerChild(t *testing.T) {
+func TestExecuteToolCallGroup_ConcurrentEventsRemainIsolatedPerChild(t *testing.T) {
 	var eventsMu sync.Mutex
 	var events []*schema.AiOutputEvent
 	tool, err := aitool.New(
@@ -211,13 +211,13 @@ func TestExecuteToolBatch_ConcurrentEventsRemainIsolatedPerChild(t *testing.T) {
 	)
 	require.NoError(t, err)
 	react.config.SetConfig(aicommon.ConfigKeyToolBatchInvokeConcurrency, 3)
-	request := &aicommon.ToolBatchRequest{Calls: []aicommon.ToolBatchCall{
-		{Mode: aicommon.ToolCallModeDirect, ToolName: tool.Name, Reason: "event child zero", Params: aitool.InvokeParams{"id": 0, "delay_ms": 120}},
-		{Mode: aicommon.ToolCallModeDirect, ToolName: tool.Name, Reason: "event child one", Params: aitool.InvokeParams{"id": 1, "delay_ms": 40}},
-		{Mode: aicommon.ToolCallModeDirect, ToolName: tool.Name, Reason: "event child two", Params: aitool.InvokeParams{"id": 2, "delay_ms": 5}},
+	request := &aicommon.ToolCallGroupRequest{Calls: []aicommon.ToolCallGroupCall{
+		{ToolName: tool.Name, Reason: "event child zero", Params: aitool.InvokeParams{"id": 0, "delay_ms": 120}},
+		{ToolName: tool.Name, Reason: "event child one", Params: aitool.InvokeParams{"id": 1, "delay_ms": 40}},
+		{ToolName: tool.Name, Reason: "event child two", Params: aitool.InvokeParams{"id": 2, "delay_ms": 5}},
 	}}
 
-	result, execErr := react.ExecuteToolBatch(context.Background(), react.config.DefaultTask, request)
+	result, execErr := react.ExecuteToolCallGroup(context.Background(), react.config.DefaultTask, request)
 	require.NoError(t, execErr)
 	require.Len(t, result.Outcomes, 3)
 
@@ -279,7 +279,7 @@ func TestExecuteToolBatch_ConcurrentEventsRemainIsolatedPerChild(t *testing.T) {
 	}
 }
 
-func TestExecuteToolBatch_SameToolLiveOutputEventsStayBoundToTheirChild(t *testing.T) {
+func TestExecuteToolCallGroup_SameToolLiveOutputEventsStayBoundToTheirChild(t *testing.T) {
 	type capturedEvent struct {
 		sequence int
 		event    *schema.AiOutputEvent
@@ -338,12 +338,12 @@ func TestExecuteToolBatch_SameToolLiveOutputEventsStayBoundToTheirChild(t *testi
 	)
 	require.NoError(t, err)
 	react.config.SetConfig(aicommon.ConfigKeyToolBatchInvokeConcurrency, 2)
-	request := &aicommon.ToolBatchRequest{Calls: []aicommon.ToolBatchCall{
-		{Mode: aicommon.ToolCallModeDirect, ToolName: tool.Name, Reason: "live output child zero", Params: aitool.InvokeParams{"id": 0}},
-		{Mode: aicommon.ToolCallModeDirect, ToolName: tool.Name, Reason: "live output child one", Params: aitool.InvokeParams{"id": 1}},
+	request := &aicommon.ToolCallGroupRequest{Calls: []aicommon.ToolCallGroupCall{
+		{ToolName: tool.Name, Reason: "live output child zero", Params: aitool.InvokeParams{"id": 0}},
+		{ToolName: tool.Name, Reason: "live output child one", Params: aitool.InvokeParams{"id": 1}},
 	}}
 
-	result, execErr := react.ExecuteToolBatch(context.Background(), react.config.DefaultTask, request)
+	result, execErr := react.ExecuteToolCallGroup(context.Background(), react.config.DefaultTask, request)
 	require.NoError(t, execErr)
 	require.Len(t, result.Outcomes, 2)
 
@@ -476,7 +476,7 @@ func TestExecuteToolBatch_SameToolLiveOutputEventsStayBoundToTheirChild(t *testi
 	}
 }
 
-func TestExecuteToolBatch_ArtifactsAreIsolatedAndOrderedDespiteOutOfOrderCompletion(t *testing.T) {
+func TestExecuteToolCallGroup_ArtifactsAreIsolatedAndOrderedDespiteOutOfOrderCompletion(t *testing.T) {
 	var completionMu sync.Mutex
 	completion := make([]int, 0, 3)
 	tool, err := aitool.New(
@@ -499,13 +499,13 @@ func TestExecuteToolBatch_ArtifactsAreIsolatedAndOrderedDespiteOutOfOrderComplet
 	react := newBatchTestReAct(t, tool, nil)
 	react.config.SetConfig(aicommon.ConfigKeyToolBatchInvokeConcurrency, 3)
 	identifiers := []string{"model_zero", "model_one", "model_two"}
-	request := &aicommon.ToolBatchRequest{Calls: []aicommon.ToolBatchCall{
-		{Mode: aicommon.ToolCallModeDirect, ToolName: tool.Name, Identifier: identifiers[0], Reason: "artifact 0", Params: aitool.InvokeParams{"id": 0, "delay_ms": 180}},
-		{Mode: aicommon.ToolCallModeDirect, ToolName: tool.Name, Identifier: identifiers[1], Reason: "artifact 1", Params: aitool.InvokeParams{"id": 1, "delay_ms": 70}},
-		{Mode: aicommon.ToolCallModeDirect, ToolName: tool.Name, Identifier: identifiers[2], Reason: "artifact 2", Params: aitool.InvokeParams{"id": 2, "delay_ms": 10}},
+	request := &aicommon.ToolCallGroupRequest{Calls: []aicommon.ToolCallGroupCall{
+		{ToolName: tool.Name, Identifier: identifiers[0], Reason: "artifact 0", Params: aitool.InvokeParams{"id": 0, "delay_ms": 180}},
+		{ToolName: tool.Name, Identifier: identifiers[1], Reason: "artifact 1", Params: aitool.InvokeParams{"id": 1, "delay_ms": 70}},
+		{ToolName: tool.Name, Identifier: identifiers[2], Reason: "artifact 2", Params: aitool.InvokeParams{"id": 2, "delay_ms": 10}},
 	}}
 
-	result, execErr := react.ExecuteToolBatch(context.Background(), react.config.DefaultTask, request)
+	result, execErr := react.ExecuteToolCallGroup(context.Background(), react.config.DefaultTask, request)
 	require.NoError(t, execErr)
 	require.Len(t, result.Outcomes, 3)
 	completionMu.Lock()
@@ -560,7 +560,7 @@ func TestExecuteToolBatch_ArtifactsAreIsolatedAndOrderedDespiteOutOfOrderComplet
 	}, react.config.Timeline.GetTimelineItemIDs(), "Timeline must commit in model-index order")
 }
 
-func TestExecuteToolBatch_DirectAdmissionFailureSkipsOnlyRejectedChild(t *testing.T) {
+func TestExecuteToolCallGroup_DirectAdmissionFailureSkipsOnlyRejectedChild(t *testing.T) {
 	var invoked int32
 	tool, err := aitool.New(
 		"batch_validate_tool",
@@ -574,10 +574,10 @@ func TestExecuteToolBatch_DirectAdmissionFailureSkipsOnlyRejectedChild(t *testin
 	require.NoError(t, err)
 	react := newBatchTestReAct(t, tool, nil)
 
-	batchResult, execErr := react.ExecuteToolBatch(context.Background(), react.config.DefaultTask, &aicommon.ToolBatchRequest{
-		Calls: []aicommon.ToolBatchCall{
-			{Mode: aicommon.ToolCallModeDirect, ToolName: tool.Name, Reason: "valid test call", Params: aitool.InvokeParams{"required_value": "valid"}},
-			{Mode: aicommon.ToolCallModeDirect, ToolName: tool.Name, Reason: "invalid test call", Params: aitool.InvokeParams{}},
+	batchResult, execErr := react.ExecuteToolCallGroup(context.Background(), react.config.DefaultTask, &aicommon.ToolCallGroupRequest{
+		Calls: []aicommon.ToolCallGroupCall{
+			{ToolName: tool.Name, Reason: "valid test call", Params: aitool.InvokeParams{"required_value": "valid"}},
+			{ToolName: tool.Name, Reason: "invalid test call", Params: aitool.InvokeParams{}},
 		},
 	})
 	require.NoError(t, execErr)
@@ -588,7 +588,7 @@ func TestExecuteToolBatch_DirectAdmissionFailureSkipsOnlyRejectedChild(t *testin
 	require.Nil(t, batchResult.Outcomes[1].Result)
 }
 
-func TestExecuteToolBatch_FreshRequestReplaysStableCheckpointIdentity(t *testing.T) {
+func TestExecuteToolCallGroup_FreshRequestReplaysStableCheckpointIdentity(t *testing.T) {
 	var invoked int32
 	tool, err := aitool.New(
 		"batch_checkpoint_replay_tool",
@@ -617,16 +617,16 @@ func TestExecuteToolBatch_FreshRequestReplaysStableCheckpointIdentity(t *testing
 		require.NoError(t, runtimeErr)
 		return react
 	}
-	newRequest := func() *aicommon.ToolBatchRequest {
-		return &aicommon.ToolBatchRequest{Calls: []aicommon.ToolBatchCall{
-			{Mode: aicommon.ToolCallModeDirect, ToolName: tool.Name, Reason: "replay call 0", Params: aitool.InvokeParams{"id": 0}},
-			{Mode: aicommon.ToolCallModeDirect, ToolName: tool.Name, Reason: "replay call 1", Params: aitool.InvokeParams{"id": 1}},
+	newRequest := func() *aicommon.ToolCallGroupRequest {
+		return &aicommon.ToolCallGroupRequest{Calls: []aicommon.ToolCallGroupCall{
+			{ToolName: tool.Name, Reason: "replay call 0", Params: aitool.InvokeParams{"id": 0}},
+			{ToolName: tool.Name, Reason: "replay call 1", Params: aitool.InvokeParams{"id": 1}},
 		}}
 	}
 
 	firstRuntime := newRuntime()
 	firstRequest := newRequest()
-	firstResult, firstErr := firstRuntime.ExecuteToolBatch(context.Background(), firstRuntime.config.DefaultTask, firstRequest)
+	firstResult, firstErr := firstRuntime.ExecuteToolCallGroup(context.Background(), firstRuntime.config.DefaultTask, firstRequest)
 	require.NoError(t, firstErr)
 	require.Equal(t, int32(2), atomic.LoadInt32(&invoked))
 	require.Len(t, firstResult.Outcomes, 2)
@@ -637,7 +637,7 @@ func TestExecuteToolBatch_FreshRequestReplaysStableCheckpointIdentity(t *testing
 	// neither carries IDs from the first in-memory objects.
 	secondRuntime := newRuntime()
 	secondRequest := newRequest()
-	secondResult, secondErr := secondRuntime.ExecuteToolBatch(context.Background(), secondRuntime.config.DefaultTask, secondRequest)
+	secondResult, secondErr := secondRuntime.ExecuteToolCallGroup(context.Background(), secondRuntime.config.DefaultTask, secondRequest)
 	require.NoError(t, secondErr)
 	require.Equal(t, int32(2), atomic.LoadInt32(&invoked), "finished checkpoints must replay without invoking plugins again")
 	require.Equal(t, firstBatchID, secondRequest.BatchID)
@@ -649,7 +649,7 @@ func TestExecuteToolBatch_FreshRequestReplaysStableCheckpointIdentity(t *testing
 	}
 }
 
-func TestExecuteToolBatch_CheckpointReplayCompactArtifactDoesNotCreateDuplicateBundle(t *testing.T) {
+func TestExecuteToolCallGroup_CheckpointReplayCompactArtifactDoesNotCreateDuplicateBundle(t *testing.T) {
 	var invoked int32
 	tool, err := aitool.New(
 		"batch_compact_replay_tool",
@@ -681,15 +681,15 @@ func TestExecuteToolBatch_CheckpointReplayCompactArtifactDoesNotCreateDuplicateB
 		require.NoError(t, runtimeErr)
 		return react
 	}
-	newRequest := func() *aicommon.ToolBatchRequest {
-		return &aicommon.ToolBatchRequest{Calls: []aicommon.ToolBatchCall{
-			{Mode: aicommon.ToolCallModeDirect, ToolName: tool.Name, Identifier: "compact_alpha", Reason: "compact replay 0", Params: aitool.InvokeParams{"id": 0}},
-			{Mode: aicommon.ToolCallModeDirect, ToolName: tool.Name, Identifier: "compact_beta", Reason: "compact replay 1", Params: aitool.InvokeParams{"id": 1}},
+	newRequest := func() *aicommon.ToolCallGroupRequest {
+		return &aicommon.ToolCallGroupRequest{Calls: []aicommon.ToolCallGroupCall{
+			{ToolName: tool.Name, Identifier: "compact_alpha", Reason: "compact replay 0", Params: aitool.InvokeParams{"id": 0}},
+			{ToolName: tool.Name, Identifier: "compact_beta", Reason: "compact replay 1", Params: aitool.InvokeParams{"id": 1}},
 		}}
 	}
 
 	firstRuntime := newRuntime()
-	firstResult, firstErr := firstRuntime.ExecuteToolBatch(context.Background(), firstRuntime.config.DefaultTask, newRequest())
+	firstResult, firstErr := firstRuntime.ExecuteToolCallGroup(context.Background(), firstRuntime.config.DefaultTask, newRequest())
 	require.NoError(t, firstErr)
 	require.Equal(t, int32(2), atomic.LoadInt32(&invoked))
 	require.Len(t, firstResult.Outcomes, 2)
@@ -704,7 +704,7 @@ func TestExecuteToolBatch_CheckpointReplayCompactArtifactDoesNotCreateDuplicateB
 	require.Len(t, batchArtifactDirs(t, firstRuntime), 2)
 
 	secondRuntime := newRuntime()
-	secondResult, secondErr := secondRuntime.ExecuteToolBatch(context.Background(), secondRuntime.config.DefaultTask, newRequest())
+	secondResult, secondErr := secondRuntime.ExecuteToolCallGroup(context.Background(), secondRuntime.config.DefaultTask, newRequest())
 	require.NoError(t, secondErr)
 	require.Equal(t, int32(2), atomic.LoadInt32(&invoked), "checkpoint replay must not invoke plugins")
 	require.Len(t, secondResult.Outcomes, 2)
@@ -718,7 +718,7 @@ func TestExecuteToolBatch_CheckpointReplayCompactArtifactDoesNotCreateDuplicateB
 	}
 }
 
-func TestExecuteToolBatch_ReviewCardsFollowModelArrayOrder(t *testing.T) {
+func TestExecuteToolCallGroup_ReviewCardsFollowModelArrayOrder(t *testing.T) {
 	var invoked int32
 	var reviewMu sync.Mutex
 	var reviewedIDs []int
@@ -767,11 +767,11 @@ func TestExecuteToolBatch_ReviewCardsFollowModelArrayOrder(t *testing.T) {
 	require.NoError(t, err)
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	batchResult, execErr := react.ExecuteToolBatch(ctx, react.config.DefaultTask, &aicommon.ToolBatchRequest{
-		Calls: []aicommon.ToolBatchCall{
-			{Mode: aicommon.ToolCallModeDirect, ToolName: tool.Name, Reason: "review call 0", Params: aitool.InvokeParams{"id": 0}},
-			{Mode: aicommon.ToolCallModeDirect, ToolName: tool.Name, Reason: "review call 1", Params: aitool.InvokeParams{"id": 1}},
-			{Mode: aicommon.ToolCallModeDirect, ToolName: tool.Name, Reason: "review call 2", Params: aitool.InvokeParams{"id": 2}},
+	batchResult, execErr := react.ExecuteToolCallGroup(ctx, react.config.DefaultTask, &aicommon.ToolCallGroupRequest{
+		Calls: []aicommon.ToolCallGroupCall{
+			{ToolName: tool.Name, Reason: "review call 0", Params: aitool.InvokeParams{"id": 0}},
+			{ToolName: tool.Name, Reason: "review call 1", Params: aitool.InvokeParams{"id": 1}},
+			{ToolName: tool.Name, Reason: "review call 2", Params: aitool.InvokeParams{"id": 2}},
 		},
 	})
 	require.NoError(t, execErr)
@@ -782,7 +782,7 @@ func TestExecuteToolBatch_ReviewCardsFollowModelArrayOrder(t *testing.T) {
 	reviewMu.Unlock()
 }
 
-func TestExecuteToolBatch_ReviewCheckpointIdentityMismatchIsRejected(t *testing.T) {
+func TestExecuteToolCallGroup_ReviewCheckpointIdentityMismatchIsRejected(t *testing.T) {
 	var invoked int32
 	tool, err := aitool.New(
 		"batch_review_checkpoint_tool",
@@ -824,10 +824,10 @@ func TestExecuteToolBatch_ReviewCheckpointIdentityMismatchIsRejected(t *testing.
 		"params":       aitool.InvokeParams{},
 	}))
 
-	batchResult, execErr := react.ExecuteToolBatch(context.Background(), react.config.DefaultTask, &aicommon.ToolBatchRequest{
-		Calls: []aicommon.ToolBatchCall{
-			{Mode: aicommon.ToolCallModeDirect, ToolName: tool.Name, Reason: "identity mismatch 0", Params: aitool.InvokeParams{}},
-			{Mode: aicommon.ToolCallModeDirect, ToolName: tool.Name, Reason: "identity mismatch 1", Params: aitool.InvokeParams{}},
+	batchResult, execErr := react.ExecuteToolCallGroup(context.Background(), react.config.DefaultTask, &aicommon.ToolCallGroupRequest{
+		Calls: []aicommon.ToolCallGroupCall{
+			{ToolName: tool.Name, Reason: "identity mismatch 0", Params: aitool.InvokeParams{}},
+			{ToolName: tool.Name, Reason: "identity mismatch 1", Params: aitool.InvokeParams{}},
 		},
 	})
 	require.NoError(t, execErr)
@@ -836,180 +836,7 @@ func TestExecuteToolBatch_ReviewCheckpointIdentityMismatchIsRejected(t *testing.
 	require.ErrorContains(t, batchResult.Outcomes[0].Err, "review checkpoint identity mismatch")
 }
 
-func TestExecuteToolBatch_RequireBoundsParamGenerationSeparately(t *testing.T) {
-	var activeAI int32
-	var maxActiveAI int32
-	var invoked int32
-	twoAIActive := make(chan struct{})
-	var releaseAI sync.Once
-	type childContextMarker struct{}
-	tool, err := aitool.New(
-		"batch_require_tool",
-		aitool.WithIntegerParam("id", aitool.WithParam_Required(true)),
-		aitool.WithDangerousNoNeedUserReview(true),
-		aitool.WithSimpleCallback(func(_ aitool.InvokeParams, _ io.Writer, _ io.Writer) (any, error) {
-			atomic.AddInt32(&invoked, 1)
-			return "ok", nil
-		}),
-	)
-	require.NoError(t, err)
-
-	var missingChildContext int32
-	callback := func(config aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
-		if req.GetContext() == nil || req.GetContext().Value(childContextMarker{}) != "batch-child" {
-			atomic.StoreInt32(&missingChildContext, 1)
-		}
-		current := atomic.AddInt32(&activeAI, 1)
-		for {
-			old := atomic.LoadInt32(&maxActiveAI)
-			if current <= old || atomic.CompareAndSwapInt32(&maxActiveAI, old, current) {
-				break
-			}
-		}
-		if current >= 2 {
-			releaseAI.Do(func() { close(twoAIActive) })
-		}
-		select {
-		case <-twoAIActive:
-		case <-time.After(3 * time.Second):
-		}
-		atomic.AddInt32(&activeAI, -1)
-		response := config.NewAIResponse()
-		response.EmitOutputStream(bytes.NewBufferString(`{"@action":"call-tool","identifier":"batch","params":{"id":1}}`))
-		response.Close()
-		return response, nil
-	}
-	react := newBatchTestReAct(t, tool, callback)
-	react.config.SetConfig(aicommon.ConfigKeyToolBatchParamConcurrency, 2)
-	react.config.SetConfig(aicommon.ConfigKeyToolBatchInvokeConcurrency, 3)
-
-	batchCtx := context.WithValue(context.Background(), childContextMarker{}, "batch-child")
-	batchResult, execErr := react.ExecuteToolBatch(batchCtx, react.config.DefaultTask, &aicommon.ToolBatchRequest{
-		Calls: []aicommon.ToolBatchCall{
-			{Mode: aicommon.ToolCallModeRequire, ToolName: tool.Name, Reason: "first"},
-			{Mode: aicommon.ToolCallModeRequire, ToolName: tool.Name, Reason: "second"},
-			{Mode: aicommon.ToolCallModeRequire, ToolName: tool.Name, Reason: "third"},
-		},
-	})
-	require.NoError(t, execErr)
-	require.Len(t, batchResult.Outcomes, 3)
-	require.Equal(t, int32(2), atomic.LoadInt32(&maxActiveAI))
-	require.Equal(t, int32(0), atomic.LoadInt32(&missingChildContext), "parameter AI requests must carry the child context")
-	require.Equal(t, int32(3), atomic.LoadInt32(&invoked))
-	for _, outcome := range batchResult.Outcomes {
-		require.Equal(t, aicommon.ToolCallStageDone, outcome.Stage)
-	}
-}
-
-func TestExecuteToolBatch_RequireParamFailureIsAllSettled(t *testing.T) {
-	var aiCalls int32
-	var invoked int32
-	tool, err := aitool.New(
-		"batch_require_all_settled_tool",
-		aitool.WithIntegerParam("id", aitool.WithParam_Required(true)),
-		aitool.WithDangerousNoNeedUserReview(true),
-		aitool.WithSimpleCallback(func(_ aitool.InvokeParams, _ io.Writer, _ io.Writer) (any, error) {
-			atomic.AddInt32(&invoked, 1)
-			return "ok", nil
-		}),
-	)
-	require.NoError(t, err)
-	callback := func(config aicommon.AICallerConfigIf, _ *aicommon.AIRequest) (*aicommon.AIResponse, error) {
-		if atomic.AddInt32(&aiCalls, 1) == 1 {
-			return nil, fmt.Errorf("synthetic parameter generation failure")
-		}
-		response := config.NewAIResponse()
-		response.EmitOutputStream(bytes.NewBufferString(`{"@action":"call-tool","params":{"id":1}}`))
-		response.Close()
-		return response, nil
-	}
-	react := newBatchTestReAct(t, tool, callback)
-	react.config.AiAutoRetry = 1
-	react.config.AiTransactionAutoRetry = 1
-	react.config.SetConfig(aicommon.ConfigKeyToolBatchParamConcurrency, 3)
-
-	batchResult, execErr := react.ExecuteToolBatch(context.Background(), react.config.DefaultTask, &aicommon.ToolBatchRequest{
-		Calls: []aicommon.ToolBatchCall{
-			{Mode: aicommon.ToolCallModeRequire, ToolName: tool.Name, Reason: "first"},
-			{Mode: aicommon.ToolCallModeRequire, ToolName: tool.Name, Reason: "second"},
-			{Mode: aicommon.ToolCallModeRequire, ToolName: tool.Name, Reason: "third"},
-		},
-	})
-	require.NoError(t, execErr)
-	require.Len(t, batchResult.Outcomes, 3)
-	require.Equal(t, int32(2), atomic.LoadInt32(&invoked), "one prepare failure must not cancel successful siblings")
-	var preparedFailed, done int
-	for _, outcome := range batchResult.Outcomes {
-		switch outcome.Stage {
-		case aicommon.ToolCallStagePrepareFailed:
-			preparedFailed++
-		case aicommon.ToolCallStageDone:
-			done++
-		}
-	}
-	require.Equal(t, 1, preparedFailed)
-	require.Equal(t, 2, done)
-}
-
-func TestExecuteToolBatch_RequireParamCancellationDoesNotRetry(t *testing.T) {
-	var aiCalls int32
-	started := make(chan struct{})
-	tool, err := aitool.New(
-		"batch_require_cancel_params_tool",
-		aitool.WithIntegerParam("id", aitool.WithParam_Required(true)),
-		aitool.WithDangerousNoNeedUserReview(true),
-		aitool.WithSimpleCallback(func(_ aitool.InvokeParams, _ io.Writer, _ io.Writer) (any, error) {
-			return "must not invoke", nil
-		}),
-	)
-	require.NoError(t, err)
-	callback := func(_ aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
-		if atomic.AddInt32(&aiCalls, 1) == 1 {
-			close(started)
-		}
-		requestCtx := req.GetContext()
-		if requestCtx == nil {
-			return nil, fmt.Errorf("missing request context")
-		}
-		<-requestCtx.Done()
-		return nil, requestCtx.Err()
-	}
-	react := newBatchTestReAct(t, tool, callback)
-	react.config.AiAutoRetry = 5
-	react.config.AiTransactionAutoRetry = 5
-	react.config.SetConfig(aicommon.ConfigKeyToolBatchParamConcurrency, 1)
-
-	ctx, cancel := context.WithCancel(context.Background())
-	done := make(chan struct{})
-	var batchResult *aicommon.ToolBatchResult
-	var execErr error
-	go func() {
-		batchResult, execErr = react.ExecuteToolBatch(ctx, react.config.DefaultTask, &aicommon.ToolBatchRequest{
-			Calls: []aicommon.ToolBatchCall{
-				{Mode: aicommon.ToolCallModeRequire, ToolName: tool.Name, Reason: "cancel while generating params 0"},
-				{Mode: aicommon.ToolCallModeRequire, ToolName: tool.Name, Reason: "cancel while generating params 1"},
-			},
-		})
-		close(done)
-	}()
-	select {
-	case <-started:
-	case <-time.After(3 * time.Second):
-		t.Fatal("parameter AI callback did not start")
-	}
-	cancel()
-	select {
-	case <-done:
-	case <-time.After(2 * time.Second):
-		t.Fatal("parameter transaction did not stop on child cancellation")
-	}
-	require.ErrorIs(t, execErr, context.Canceled)
-	require.Equal(t, int32(1), atomic.LoadInt32(&aiCalls), "cancellation must not enter gateway or transaction retries")
-	require.NotNil(t, batchResult)
-	require.Equal(t, aicommon.ToolCallStageCancelled, batchResult.Outcomes[0].Stage)
-}
-
-func TestExecuteToolBatch_DirectAnswerCancelsWholeBatchBeforeAnyInvoke(t *testing.T) {
+func TestExecuteToolCallGroup_DirectAnswerCancelsWholeBatchBeforeAnyInvoke(t *testing.T) {
 	var invoked int32
 	var reviewCount int32
 	input := make(chan *ypb.AIInputEvent, 4)
@@ -1045,10 +872,10 @@ func TestExecuteToolBatch_DirectAnswerCancelsWholeBatchBeforeAnyInvoke(t *testin
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	batchResult, execErr := react.ExecuteToolBatch(ctx, react.config.DefaultTask, &aicommon.ToolBatchRequest{
-		Calls: []aicommon.ToolBatchCall{
-			{Mode: aicommon.ToolCallModeDirect, ToolName: tool.Name, Reason: "direct answer call 0", Params: aitool.InvokeParams{}},
-			{Mode: aicommon.ToolCallModeDirect, ToolName: tool.Name, Reason: "direct answer call 1", Params: aitool.InvokeParams{}},
+	batchResult, execErr := react.ExecuteToolCallGroup(ctx, react.config.DefaultTask, &aicommon.ToolCallGroupRequest{
+		Calls: []aicommon.ToolCallGroupCall{
+			{ToolName: tool.Name, Reason: "direct answer call 0", Params: aitool.InvokeParams{}},
+			{ToolName: tool.Name, Reason: "direct answer call 1", Params: aitool.InvokeParams{}},
 		},
 	})
 	require.NoError(t, execErr)
@@ -1061,7 +888,7 @@ func TestExecuteToolBatch_DirectAnswerCancelsWholeBatchBeforeAnyInvoke(t *testin
 	require.Empty(t, batchArtifactDirs(t, react), "direct-answer before invoke must not create artifact bundles")
 }
 
-func TestExecuteToolBatch_OrdinaryFailureRetainsFailedArtifact(t *testing.T) {
+func TestExecuteToolCallGroup_OrdinaryFailureRetainsFailedArtifact(t *testing.T) {
 	tool, err := aitool.New(
 		"batch_failed_artifact_tool",
 		aitool.WithIntegerParam("id", aitool.WithParam_Required(true)),
@@ -1078,10 +905,10 @@ func TestExecuteToolBatch_OrdinaryFailureRetainsFailedArtifact(t *testing.T) {
 	)
 	require.NoError(t, err)
 	react := newBatchTestReAct(t, tool, nil)
-	result, execErr := react.ExecuteToolBatch(context.Background(), react.config.DefaultTask, &aicommon.ToolBatchRequest{
-		Calls: []aicommon.ToolBatchCall{
-			{Mode: aicommon.ToolCallModeDirect, ToolName: tool.Name, Identifier: "failed_child", Reason: "fail normally", Params: aitool.InvokeParams{"id": 0}},
-			{Mode: aicommon.ToolCallModeDirect, ToolName: tool.Name, Identifier: "successful_child", Reason: "succeed normally", Params: aitool.InvokeParams{"id": 1}},
+	result, execErr := react.ExecuteToolCallGroup(context.Background(), react.config.DefaultTask, &aicommon.ToolCallGroupRequest{
+		Calls: []aicommon.ToolCallGroupCall{
+			{ToolName: tool.Name, Identifier: "failed_child", Reason: "fail normally", Params: aitool.InvokeParams{"id": 0}},
+			{ToolName: tool.Name, Identifier: "successful_child", Reason: "succeed normally", Params: aitool.InvokeParams{"id": 1}},
 		},
 	})
 	require.NoError(t, execErr, "batch is all-settled even when one child fails")
@@ -1107,7 +934,7 @@ func TestExecuteToolBatch_OrdinaryFailureRetainsFailedArtifact(t *testing.T) {
 	require.FileExists(t, filepath.Join(failedDir, "report.md"))
 }
 
-func TestExecuteToolBatch_CancellationReachesRunningChildren(t *testing.T) {
+func TestExecuteToolCallGroup_CancellationReachesRunningChildren(t *testing.T) {
 	started := make(chan struct{}, 2)
 	allowLateWrites := make(chan struct{})
 	lateWritesDone := make(chan struct{}, 2)
@@ -1133,13 +960,13 @@ func TestExecuteToolBatch_CancellationReachesRunningChildren(t *testing.T) {
 
 	ctx, cancel := context.WithCancel(context.Background())
 	done := make(chan struct{})
-	var batchResult *aicommon.ToolBatchResult
+	var batchResult *aicommon.ToolCallGroupResult
 	var execErr error
 	go func() {
-		batchResult, execErr = react.ExecuteToolBatch(ctx, react.config.DefaultTask, &aicommon.ToolBatchRequest{
-			Calls: []aicommon.ToolBatchCall{
-				{Mode: aicommon.ToolCallModeDirect, ToolName: tool.Name, Reason: "cancel call 0", Params: aitool.InvokeParams{}},
-				{Mode: aicommon.ToolCallModeDirect, ToolName: tool.Name, Reason: "cancel call 1", Params: aitool.InvokeParams{}},
+		batchResult, execErr = react.ExecuteToolCallGroup(ctx, react.config.DefaultTask, &aicommon.ToolCallGroupRequest{
+			Calls: []aicommon.ToolCallGroupCall{
+				{ToolName: tool.Name, Reason: "cancel call 0", Params: aitool.InvokeParams{}},
+				{ToolName: tool.Name, Reason: "cancel call 1", Params: aitool.InvokeParams{}},
 			},
 		})
 		close(done)

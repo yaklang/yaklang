@@ -19,21 +19,21 @@
 *. 缺少任务所需的一手证据时，本轮工具 action 就是执行机会；立即选择工具，禁止回答“没有工具执行机会”或要求重发任务。
 
 *. 如果你想要使用工具，先枚举本轮可立即执行的真实调用：
-    * 默认用标量单调用：`{"@action":"require_tool","tool_require_payload":"..[your-toolname]..","human_readable_thought":"加载工具定义"}`
+    * 默认用标量单调用：`{"@action":"require_tool","require_tool_payload":"..[your-toolname]..","human_readable_thought":"加载工具定义"}`
     * 需要多个工具的定义时，可批量加载 Schema，不生成参数、不执行工具：
-      `{"@action":"require_tool","identifier":"parallel_inspection","human_readable_thought":"加载所需工具定义","tool_require_calls":[{"tool_name":"grep","identifier":"find_handlers","reason":"定位处理函数"},{"tool_name":"read_file","identifier":"read_config","reason":"读取独立配置"}]}`
-    * 只有真实 Schema 已展示且每层参数全部明确时，才可用 `directly_call_tool_calls`；嵌套 wrapper、页面状态操作或任一参数不确定时使用单调用。
+      `{"@action":"require_tool","identifier":"parallel_inspection","human_readable_thought":"加载所需工具定义","require_tool_payload":["grep","read_file"]}`
+    * 只有真实 Schema 已展示且每层参数全部明确时，才可用 `directly_call_tool_params_group`；嵌套 wrapper、页面状态操作或任一参数不确定时使用单调用。
     * 批次首次出现准入、Schema 或参数错误后，保留成功 child，只将失败项改为修正后的单调用；禁止原样重试批次。
 
 *. `todo_delta` 使用案例（维护 TODO 工作集，与正常动作同轮携带）：
     * 任务一开始就需要拆成多个入口时，第一条动作同时建立初始 TODO 并指定 current：
-      `{"@action": "require_tool", "tool_require_payload": "http_request", "human_readable_thought": "加载 HTTP 工具定义，为登录验证构造参数", "todo_delta": {"add": [{"id": "login_auth", "text": "验证 /api/login 对有效、错误及空凭据的处理：来源为 crawler 发现的表单 action；对照会话签发与受保护响应，结论限定于这些认证条件，异常差异需继续追踪"}, {"id": "explore_admin", "text": "待探索：/admin/ 路径下的后台入口，来源为 sitemap.xml；尚未访问"}], "current": "login_auth"}}`
+      `{"@action": "require_tool", "require_tool_payload": "http_request", "human_readable_thought": "加载 HTTP 工具定义，为登录验证构造参数", "todo_delta": {"add": [{"id": "login_auth", "text": "验证 /api/login 对有效、错误及空凭据的处理：来源为 crawler 发现的表单 action；对照会话签发与受保护响应，结论限定于这些认证条件，异常差异需继续追踪"}, {"id": "explore_admin", "text": "待探索：/admin/ 路径下的后台入口，来源为 sitemap.xml；尚未访问"}], "current": "login_auth"}}`
     * 工具 Observation 暴露了新的范围内入口（例如响应里出现了新的跳转链接）：先把新线索记为"待探索"再继续推进 current：
-      `{"@action": "require_tool", "identifier": "compare_auth_tokens", "tool_require_payload": "http_request", "human_readable_thought": "加载 HTTP 工具定义，为 token 对照构造参数", "todo_delta": {"add": [{"id": "explore_refresh_token", "text": "待探索：/api/v2/token/refresh 接口，来源为上一次响应头 Set-Cookie 差异；尚未验证是否可重放"}]}}`
+      `{"@action": "require_tool", "identifier": "compare_auth_tokens", "require_tool_payload": "http_request", "human_readable_thought": "加载 HTTP 工具定义，为 token 对照构造参数", "todo_delta": {"add": [{"id": "explore_refresh_token", "text": "待探索：/api/v2/token/refresh 接口，来源为上一次响应头 Set-Cookie 差异；尚未验证是否可重放"}]}}`
     * 当前 current 已有结论，关闭并切换到下一条待探索项：
-      `{"@action": "require_tool", "tool_require_payload": "http_request", "human_readable_thought": "加载 HTTP 工具定义，为刷新接口验证构造参数", "todo_delta": {"update": [{"id": "explore_refresh_token", "text": "验证 /api/v2/token/refresh 的同一 refresh_token 重放行为：来源为响应头 Set-Cookie 差异；比较首次刷新和再次使用同一 token 是否签发可用新会话，异常差异继续追踪"}], "close": [{"id": "login_auth", "outcome": "resolved", "reason": "有效凭据签发会话并可读取受保护响应；错误和空凭据均被拒绝且未签发会话。仅完成这三种凭据条件的验证，不推断其它入口或认证条件安全", "refs": ["tool-call-valid", "tool-call-invalid", "tool-call-empty"]}], "current": "explore_refresh_token"}}`
+      `{"@action": "require_tool", "require_tool_payload": "http_request", "human_readable_thought": "加载 HTTP 工具定义，为刷新接口验证构造参数", "todo_delta": {"update": [{"id": "explore_refresh_token", "text": "验证 /api/v2/token/refresh 的同一 refresh_token 重放行为：来源为响应头 Set-Cookie 差异；比较首次刷新和再次使用同一 token 是否签发可用新会话，异常差异继续追踪"}], "close": [{"id": "login_auth", "outcome": "resolved", "reason": "有效凭据签发会话并可读取受保护响应；错误和空凭据均被拒绝且未签发会话。仅完成这三种凭据条件的验证，不推断其它入口或认证条件安全", "refs": ["tool-call-valid", "tool-call-invalid", "tool-call-empty"]}], "current": "explore_refresh_token"}}`
     * 首次访问失败仍保留该目标，记录具体不同的替代实验，不能以“已分析”关闭：
-      `{"@action":"require_tool","tool_require_payload":"read_file","human_readable_thought":"加载文件读取工具定义，为实际配置路径构造参数","todo_delta":{"add":[{"id":"active_config","text":"读取 config/runtime.json 并核对当前配置：来源为 tool-call-7 的配置迁移提示；实际读取后与用户要求的生效值比对"}],"current":"active_config"}}`
+      `{"@action":"require_tool","require_tool_payload":"read_file","human_readable_thought":"加载文件读取工具定义，为实际配置路径构造参数","todo_delta":{"add":[{"id":"active_config","text":"读取 config/runtime.json 并核对当前配置：来源为 tool-call-7 的配置迁移提示；实际读取后与用户要求的生效值比对"}],"current":"active_config"}}`
 
 *. `save_evidence` 使用案例（确认关键事实后主动沉淀，不等任务结束）：
     * 确认一个安全风险后，先落证据再继续，同时把新发现的关联入口记为待探索：

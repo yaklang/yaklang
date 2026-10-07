@@ -176,10 +176,7 @@ func mockedToolCallingWithAIMemory2(i aicommon.AICallerConfigIf, req *aicommon.A
 	}
 
 	if isToolParamGenerationPrompt(prompt, toolName) {
-		rsp := i.NewAIResponse()
-		rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "call-tool", "params": { "seconds" : 0.1 }}`))
-		rsp.Close()
-		return rsp, nil
+		return nil, fmt.Errorf("unexpected retired tool parameter-generation request")
 	}
 
 	if isVerifySatisfactionPrompt(prompt) {

@@ -80,9 +80,9 @@ func TestToolCallExamplesAreInAssembledMainLoopSchema(t *testing.T) {
 	directExamples := exactToolCallJSONsFromExamples(t, direct.OutputExamples)
 	requireExamples := exactToolCallJSONsFromExamples(t, required.OutputExamples)
 	require.Contains(t, directExamples[0], `"directly_call_tool_name"`, "the reliable scalar form must be taught first")
-	require.Contains(t, directExamples[1], `"directly_call_tool_calls"`)
-	require.Contains(t, requireExamples[0], `"tool_require_payload"`, "the reliable scalar form must be taught first")
-	require.Contains(t, requireExamples[1], `"tool_require_calls"`)
+	require.Contains(t, directExamples[1], `"directly_call_tool_params_group"`)
+	require.Contains(t, requireExamples[0], `"require_tool_payload"`, "the reliable scalar form must be taught first")
+	require.Contains(t, requireExamples[1], `"require_tool_payload"`)
 	var emittedSchema map[string]any
 	require.NoError(t, json.Unmarshal([]byte(schemaText), &emittedSchema))
 	properties := emittedSchema["properties"].(map[string]any)
@@ -91,9 +91,9 @@ func TestToolCallExamplesAreInAssembledMainLoopSchema(t *testing.T) {
 		exact string
 	}{
 		{field: "directly_call_tool_name", exact: directExamples[0]},
-		{field: "directly_call_tool_calls", exact: directExamples[1]},
-		{field: "tool_require_payload", exact: requireExamples[0]},
-		{field: "tool_require_calls", exact: requireExamples[1]},
+		{field: "directly_call_tool_params_group", exact: directExamples[1]},
+		{field: "require_tool_payload", exact: requireExamples[0]},
+		{field: "require_tool_payload", exact: requireExamples[1]},
 	} {
 		fieldSchema := properties[placement.field].(map[string]any)
 		require.Contains(t, fieldSchema["description"].(string), placement.exact,
@@ -156,7 +156,7 @@ func TestToolInventoryMirrorUsesBatchFailureRecoveryPolicy(t *testing.T) {
 	})
 
 	require.Contains(t, rendered, "单工具入口: 默认选择")
-	require.Contains(t, rendered, "批量执行使用 `directly_call_tool_calls`")
+	require.Contains(t, rendered, "批量执行使用 `directly_call_tool_params_group`")
 	require.Contains(t, rendered, "调用须低风险、独立且互不干扰")
 	require.Contains(t, rendered, "从完整 Schema 构造每项参数")
 	require.Contains(t, rendered, "不生成参数、不执行工具")

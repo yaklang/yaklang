@@ -631,11 +631,7 @@ func TestReAct_ToolUse_WithNoToolsCache(t *testing.T) {
 		}
 
 		if isToolParamGenerationPrompt(prompt, toolName) {
-			rsp := i.NewAIResponse()
-			// Include identifier field for new directory structure
-			rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "call-tool", "identifier": "sleep_test", "params": { "seconds" : 0.1 }}`))
-			rsp.Close()
-			return rsp, nil
+			return nil, fmt.Errorf("unexpected retired tool parameter-generation request")
 		}
 
 		if isVerifySatisfactionPrompt(prompt) {
@@ -1248,11 +1244,7 @@ yakit.Info("Enable: %v", enableValue)
 		}
 
 		if isToolParamGenerationPrompt(prompt, toolName) {
-			rsp := i.NewAIResponse()
-			// 明确设置 enable 参数为 false
-			rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "call-tool", "identifier": "bool_test", "params": { "enable": false }}`))
-			rsp.Close()
-			return rsp, nil
+			return nil, fmt.Errorf("unexpected retired tool parameter-generation request")
 		}
 
 		if utils.MatchAllOfSubString(prompt, "review the tool call", "approve_tool_call") {

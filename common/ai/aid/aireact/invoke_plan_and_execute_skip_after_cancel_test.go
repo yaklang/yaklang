@@ -2,6 +2,7 @@ package aireact
 
 import (
 	"bytes"
+	"fmt"
 	"io"
 	"strings"
 	"sync/atomic"
@@ -127,16 +128,7 @@ func TestReAct_PlanAndExecute_SkipAfterCancel(t *testing.T) {
 			}
 
 			if isToolParamGenerationPrompt(prompt, mockToolName) {
-				rsp := i.NewAIResponse()
-				rsp.EmitOutputStream(bytes.NewBufferString(`
-{
-  "@action": "call-tool",
-  "tool": "` + mockToolName + `",
-  "params": {}
-}
-`))
-				rsp.Close()
-				return rsp, nil
+				return nil, fmt.Errorf("unexpected retired tool parameter-generation request")
 			}
 
 			if isToolParamGenPromptForBlueprint(prompt, testForgeName) {

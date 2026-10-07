@@ -39,7 +39,6 @@ func TestExecuteToolCallInternal_ValidationFailureIsVisibleInEventAndTimeline(t 
 		context.Background(),
 		tool.Name,
 		aitool.InvokeParams{"value": []any{"invalid"}},
-		true,
 		aicommon.WithToolCaller_Reason("verify invalid JSON input visibility"),
 	)
 	require.NoError(t, err, "tool failures should be returned as inspectable ToolResult values")

@@ -624,8 +624,6 @@ func (b *toolCallArtifactBundle) finalize(
 	callToolID, identifier string,
 	params aitool.InvokeParams,
 	toolResult *aitool.ToolResult,
-	paramGenDuration time.Duration,
-	rawAIParamResponse string,
 ) error {
 	if toolResult == nil {
 		return nil
@@ -725,7 +723,7 @@ func (b *toolCallArtifactBundle) finalize(
 		return nil
 	}
 
-	report := b.renderReport(tool, identifier, params, toolResult, paramGenDuration, rawAIParamResponse)
+	report := b.renderReport(tool, identifier, params, toolResult)
 	if err := os.WriteFile(b.reportPath, []byte(report), 0o644); err != nil {
 		normalizeToolResultData(toolResult, combined, resultText, toolArtifactHint(nil, err))
 		log.Warnf("tool artifact report persistence failed: %v", err)
@@ -753,7 +751,7 @@ func tokenCountSumExceeds(limit int, texts ...string) bool {
 	return false
 }
 
-func (b *toolCallArtifactBundle) renderReport(tool *aitool.Tool, identifier string, params aitool.InvokeParams, toolResult *aitool.ToolResult, paramGenDuration time.Duration, rawAIParamResponse string) string {
+func (b *toolCallArtifactBundle) renderReport(tool *aitool.Tool, identifier string, params aitool.InvokeParams, toolResult *aitool.ToolResult) string {
 	var md strings.Builder
 	md.WriteString(fmt.Sprintf("# Tool Call Report: %s\n\n", tool.Name))
 	md.WriteString("## Basic Info\n\n")
@@ -762,12 +760,7 @@ func (b *toolCallArtifactBundle) renderReport(tool *aitool.Tool, identifier stri
 		md.WriteString(fmt.Sprintf("- **Identifier**: %s\n", identifier))
 	}
 	md.WriteString("\n## Parameters\n\n")
-	if paramGenDuration > 0 {
-		md.WriteString(fmt.Sprintf("Parameter generation took **%.2fs**\n\n", paramGenDuration.Seconds()))
-	}
-	if rawAIParamResponse != "" {
-		md.WriteString("### Raw AI Response\n\n" + markdownCodeFence + "\n" + ShrinkTextBlockByTokens(rawAIParamResponse, 2048) + "\n" + markdownCodeFence + "\n\n")
-	}
+
 	md.WriteString("### Parsed Parameters (YAML)\n\n" + markdownCodeFence + "yaml\n" + renderParamsAsYAML(params) + markdownCodeFence + "\n\n")
 	md.WriteString("## Execution Result Preview\n\n" + markdownCodeFence + "\n" + utils.InterfaceToString(toolResult.Data) + "\n" + markdownCodeFence + "\n\n")
 	md.WriteString("## Artifact Files\n\n")

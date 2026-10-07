@@ -189,7 +189,7 @@ func buildSingleSuggestion(name string, resolved *ResolvedIdentifier) string {
 	case ResolvedAs_Tool:
 		return fmt.Sprintf(
 			"IMPORTANT: '%s' is NOT a skill or blueprint. It is a TOOL. "+
-				"Use @action '%s' with tool_require_payload '%s' instead. "+
+				"Use @action '%s' with require_tool_payload '%s' instead. "+
 				"Do NOT retry the current action.",
 			name, schema.AI_REACT_LOOP_ACTION_REQUIRE_TOOL, name,
 		)

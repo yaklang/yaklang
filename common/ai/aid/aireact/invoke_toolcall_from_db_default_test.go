@@ -55,16 +55,7 @@ func TestReAct_ToolUse_FromDB_ViaToolSearch_WithDefaultConfig(t *testing.T) {
 
 			// Generate parameters
 			if isToolParamGenerationPrompt(prompt, "") {
-				rsp := i.NewAIResponse()
-				if strings.Contains(prompt, "tools_search") {
-					// Provide search query
-					rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "call-tool", "params": { "query" : "mock_db_tool" }}`))
-				} else {
-					// Provide parameters for the actual tool
-					rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "call-tool", "params": { "message" : "test from search" }}`))
-				}
-				rsp.Close()
-				return rsp, nil
+				return nil, fmt.Errorf("unexpected retired tool parameter-generation request")
 			}
 
 			// Verify satisfaction

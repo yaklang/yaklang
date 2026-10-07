@@ -8,7 +8,7 @@ import (
 
 // Keep the scalar-first safety rule in the prompt layers closest to model output.
 func TestDefaultPromptTeachesScalarBeforeOptionalBatch(t *testing.T) {
-	const batchField = "tool_require_calls"
+	const batchField = "require_tool_payload"
 
 	for name, test := range map[string]struct {
 		prompt           string
@@ -18,13 +18,13 @@ func TestDefaultPromptTeachesScalarBeforeOptionalBatch(t *testing.T) {
 	}{
 		"instruction": {
 			prompt:           instruction,
-			scalarMarker:     "标量 `tool_require_payload`",
+			scalarMarker:     "标量 `require_tool_payload`",
 			directBatchRule:  "严格给出每个完整 JSON 参数",
 			requireBatchRule: "仅加载缺少的定义",
 		},
 		"output_example": {
 			prompt:           outputExample,
-			scalarMarker:     `"tool_require_payload":"..[your-toolname].."`,
+			scalarMarker:     `"require_tool_payload":"..[your-toolname].."`,
 			directBatchRule:  "每层参数全部明确",
 			requireBatchRule: "不生成参数、不执行工具",
 		},

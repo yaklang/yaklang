@@ -245,10 +245,10 @@ func inferActionTypeFromPayload(action *aicommon.Action, finalAnswer string) str
 	if strings.TrimSpace(finalAnswer) != "" || hasField("answer_payload") {
 		return "directly_answer"
 	}
-	if hasField("tool_require_payload") || hasCanonicalField("tool_require_calls") {
+	if hasField("tool_require_payload") || hasCanonicalField("require_tool_payload") {
 		return "require_tool"
 	}
-	if hasField("directly_call_tool_name") || hasField("directly_call_identifier") || hasCanonicalField("directly_call_tool_calls") {
+	if hasField("directly_call_tool_name") || hasField("directly_call_identifier") || hasCanonicalField("directly_call_tool_params_group") {
 		return "directly_call_tool"
 	}
 	if hasField("capability_identifier") {
@@ -1146,7 +1146,7 @@ func (r *ReActLoop) isDebugModeEnabled() bool {
 // 字段优先级:
 //  1. directly_call_tool_name 顶层
 //  2. next_action.directly_call_tool_name (legacy 兼容)
-//  3. tool_require_payload (require_tool 路径)
+//  3. require_tool_payload (require_tool 名称或名称数组)
 //  4. tool_name / tool 通用兜底
 //
 // 全部命中为空返回空串, 表示该 action 不是 tool 调用类。
@@ -1172,7 +1172,23 @@ func extractToolNamesFromAction(action *aicommon.Action) []string {
 		roots = append(roots, nextAction)
 	}
 	for _, root := range roots {
-		for _, field := range []string{"directly_call_tool_calls", "tool_require_calls"} {
+		if raw, ok := root["require_tool_payload"]; ok {
+			if name, ok := raw.(string); ok && strings.TrimSpace(name) != "" {
+				return []string{strings.TrimSpace(name)}
+			}
+			if items, ok := raw.([]any); ok {
+				names := make([]string, 0, len(items))
+				for _, item := range items {
+					if name, ok := item.(string); ok && strings.TrimSpace(name) != "" {
+						names = append(names, strings.TrimSpace(name))
+					}
+				}
+				if len(names) > 0 {
+					return names
+				}
+			}
+		}
+		for _, field := range []string{"directly_call_tool_params_group"} {
 			raw, ok := root[field]
 			if !ok || raw == nil {
 				continue

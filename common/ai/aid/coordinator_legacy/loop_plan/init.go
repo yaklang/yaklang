@@ -151,8 +151,6 @@ func init() {
 				findFilesAction(r),
 				grepTextAction(r),
 				webSearchAction(r),
-				scanPortAction(r),
-				simpleCrawlerAction(r),
 			}
 			preset = append(opts, preset...)
 			return reactloops.NewReActLoop(schema.AI_REACT_LOOP_NAME_PLAN, r, preset...)

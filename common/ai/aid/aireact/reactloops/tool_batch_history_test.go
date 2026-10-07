@@ -22,7 +22,7 @@ func TestToolBatchActionInferenceAndHistoryExtraction(t *testing.T) {
 			name: "top_level_direct_batch",
 			payload: `{
 				"@action":"directly_call_tool",
-				"directly_call_tool_calls":[
+				"directly_call_tool_params_group":[
 					{"tool_name":"read_file","params":{"path":"/a"}},
 					{"tool_name":"grep","params":{"pattern":"auth"}}
 				]
@@ -38,10 +38,7 @@ func TestToolBatchActionInferenceAndHistoryExtraction(t *testing.T) {
 				"@action":"object",
 				"next_action":{
 					"type":"require_tool",
-					"tool_require_calls":[
-						{"tool_name":"grep"},
-						{"tool_name":"read_file"}
-					]
+					"require_tool_payload":["grep", "read_file"]
 				}
 			}`,
 			actionName: "object",

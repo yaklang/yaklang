@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"testing"
 	"time"
@@ -121,16 +122,7 @@ func TestReAct_PlanAndExecute_TaskCancel(t *testing.T) {
 
 			// 工具参数生成 - 最先匹配，避免被其他条件误匹配
 			if isToolParamGenerationPrompt(prompt, mockToolName) {
-				rsp := i.NewAIResponse()
-				rsp.EmitOutputStream(bytes.NewBufferString(`
-{
-  "@action": "call-tool",
-  "tool": "` + mockToolName + `",
-  "params": {}
-}
-		`))
-				rsp.Close()
-				return rsp, nil
+				return nil, fmt.Errorf("unexpected retired tool parameter-generation request")
 			}
 
 			// Blueprint 参数生成 - 精确匹配本测试的 testForgeName

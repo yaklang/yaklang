@@ -15,18 +15,17 @@ import (
 )
 
 var (
-	_ aicommon.ToolBatchInvokeRuntime = (*ReAct)(nil)
+	_ aicommon.ToolCallGroupInvokeRuntime = (*ReAct)(nil)
 
 	errToolBatchDirectAnswer = errors.New("tool batch cancelled by direct-answer review")
 )
 
 type toolBatchWork struct {
-	call            aicommon.ToolBatchCall
+	call            aicommon.ToolCallGroupCall
 	batchID         string
 	tool            *aitool.Tool
 	params          aitool.InvokeParams
 	checkpointSeq   int64
-	paramSeq        int64
 	reviewSeq       int64
 	watcherSeq      int64
 	resultID        int64
@@ -118,8 +117,8 @@ func aicommonIdempotentRelease(release func()) func() {
 	return func() { once.Do(release) }
 }
 
-// orderedBatchStage makes stateful parameter mutators deterministic. Require
-// calls can finish their AI transactions in any order, but each mutator runs in
+// orderedBatchStage makes stateful explicit-parameter mutators deterministic.
+// Each mutator runs in
 // model array order exactly once. A call that fails before reaching its mutator
 // marks its turn complete from the worker defer, so later calls cannot deadlock.
 type orderedBatchStage struct {
@@ -324,11 +323,9 @@ func (r *ReAct) newToolCallerForBatchCall(
 	task aicommon.AIStatefulTask,
 	work *toolBatchWork,
 	baseEmitter *aicommon.Emitter,
-	paramGate aicommon.ToolCallerGate,
 	reviewGate aicommon.ToolCallerGate,
 	beforeInvoke aicommon.ToolCallerBeforeInvoke,
 	paramMutator func(*aitool.Tool, aitool.InvokeParams) aitool.InvokeParams,
-	promptMu *sync.Mutex,
 ) (*aicommon.ToolCaller, error) {
 	childEmitter := baseEmitter
 	if childEmitter != nil {
@@ -339,12 +336,9 @@ func (r *ReAct) newToolCallerForBatchCall(
 	}
 
 	statsSource := aicommon.StatsSourceToolDirect
-	if work.call.Mode == aicommon.ToolCallModeRequire {
-		statsSource = aicommon.StatsSourceToolRequested
-	}
 	opts := []aicommon.ToolCallerOption{
 		aicommon.WithToolCaller_AICallerConfig(r.config),
-		aicommon.WithToolCaller_AICaller(r.config),
+
 		aicommon.WithToolCaller_InvokeRuntime(r),
 		aicommon.WithToolCaller_RuntimeId(r.config.Id),
 		aicommon.WithToolCaller_Emitter(childEmitter),
@@ -353,11 +347,10 @@ func (r *ReAct) newToolCallerForBatchCall(
 		aicommon.WithToolCaller_Reason(work.call.Reason),
 		aicommon.WithToolCaller_CallExpectations(work.call.Expectations),
 		aicommon.WithToolCaller_DestinationIdentifier(work.call.Identifier),
-		aicommon.WithToolCaller_ParamGenerationGate(paramGate),
 		aicommon.WithToolCaller_ReviewGate(reviewGate),
 		aicommon.WithToolCaller_BeforeInvoke(beforeInvoke),
 		aicommon.WithToolCaller_CheckpointSeq(work.checkpointSeq),
-		aicommon.WithToolCaller_ParamTransactionSeq(work.paramSeq),
+
 		aicommon.WithToolCaller_ReviewCheckpointSeq(work.reviewSeq),
 		aicommon.WithToolCaller_WatcherCheckpointSeq(work.watcherSeq),
 		aicommon.WithToolCaller_ResultID(work.resultID),
@@ -379,39 +372,18 @@ func (r *ReAct) newToolCallerForBatchCall(
 			}
 		}
 	}
-	// Retain the low-level require-mode builder until its separate migration.
-	// Explicit direct proposals and review reconsideration do not enter it.
-	opts = append(opts,
-		aicommon.WithToolCaller_GenerateToolParamsBuilderWithMeta(
-			func(tool *aitool.Tool, toolName string) (*aicommon.ToolParamsPromptMeta, error) {
-				// PromptManager owns mutable dynamic rendering state. Only prompt
-				// construction is serialized; the expensive AI transactions run
-				// under the independent parameter-generation semaphore.
-				promptMu.Lock()
-				defer promptMu.Unlock()
-				return r.generateToolParamsPromptWithMetaForTask(task, tool, toolName)
-			},
-		),
-		aicommon.WithToolCaller_FunctionCallParamsPromptBuilder(
-			func(tool *aitool.Tool, _ string, intent aicommon.ToolParamsCallIntent) (string, error) {
-				promptMu.Lock()
-				defer promptMu.Unlock()
-				return r.promptManager.GenerateFunctionCallToolParamsPromptForTask(task, tool, intent)
-			},
-		),
-	)
 	return aicommon.NewToolCaller(ctx, opts...)
 }
 
-// ExecuteToolBatch executes one directly_call_tool/require_tool array. It never
+// ExecuteToolCallGroup executes an explicit directly_call_tool parameter group. It never
 // reads or swaps ReAct.currentTask and never mutates task.Emitter. Child events
 // use immutable derived emitters, while task/timeline results are committed by
 // this coordinator in model order after every child has settled.
-func (r *ReAct) ExecuteToolBatch(
+func (r *ReAct) ExecuteToolCallGroup(
 	ctx context.Context,
 	task aicommon.AIStatefulTask,
-	request *aicommon.ToolBatchRequest,
-) (*aicommon.ToolBatchResult, error) {
+	request *aicommon.ToolCallGroupRequest,
+) (*aicommon.ToolCallGroupResult, error) {
 	if r == nil || r.config == nil {
 		return nil, fmt.Errorf("tool batch runtime is not initialized")
 	}
@@ -470,7 +442,7 @@ func (r *ReAct) ExecuteToolBatch(
 			r.config.GetRuntimeId(), ":", batchSeedSeq,
 		)
 	}
-	result := &aicommon.ToolBatchResult{
+	result := &aicommon.ToolCallGroupResult{
 		BatchID:  request.BatchID,
 		Outcomes: make([]aicommon.ToolCallOutcome, len(request.Calls)),
 	}
@@ -495,10 +467,11 @@ func (r *ReAct) ExecuteToolBatch(
 		}
 		request.Calls[i].Index = i
 		request.Calls[i].ExecutionCallID = call.ExecutionCallID
+		// Keep the historical sequence slot reserved so checkpoint identities do not shift.
+		r.config.AcquireId()
 		work := toolBatchWork{
 			call:            call,
 			batchID:         request.BatchID,
-			paramSeq:        r.config.AcquireId(),
 			reviewSeq:       r.config.AcquireId(),
 			checkpointSeq:   r.config.AcquireId(),
 			watcherSeq:      r.config.AcquireId(),
@@ -511,9 +484,9 @@ func (r *ReAct) ExecuteToolBatch(
 			RequestedTool: call.ToolName,
 			Stage:         aicommon.ToolCallStageQueued,
 		}
-		if call.Mode != aicommon.ToolCallModeDirect && call.Mode != aicommon.ToolCallModeRequire {
+		if call.Params == nil {
 			result.Outcomes[i].Stage = aicommon.ToolCallStageValidationFailed
-			result.Outcomes[i].Err = fmt.Errorf("unsupported tool call mode %q", call.Mode)
+			result.Outcomes[i].Err = &aicommon.ToolCallRetryError{ToolName: call.ToolName, Reason: "explicit params are required; use {} for a parameterless tool"}
 			works[i] = work
 			continue
 		}
@@ -526,10 +499,7 @@ func (r *ReAct) ExecuteToolBatch(
 		}
 		work.tool = tool
 		if loop != nil {
-			guardParams := aitool.InvokeParams(nil)
-			if call.Mode == aicommon.ToolCallModeDirect {
-				guardParams = call.Params
-			}
+			guardParams := call.Params
 			if allow, guardMessage := reactloops.CheckToolInvokeGuard(loop, call.ToolName, guardParams); !allow {
 				result.Outcomes[i].Stage = aicommon.ToolCallStageValidationFailed
 				result.Outcomes[i].Err = utils.Error(guardMessage)
@@ -537,7 +507,7 @@ func (r *ReAct) ExecuteToolBatch(
 				continue
 			}
 		}
-		if call.Mode == aicommon.ToolCallModeDirect {
+		{
 			work.params = cloneToolBatchParams(call.Params)
 			if loop != nil {
 				if err := ctx.Err(); err != nil {
@@ -558,24 +528,17 @@ func (r *ReAct) ExecuteToolBatch(
 		works[i] = work
 	}
 
-	paramConcurrency := r.config.GetConfigInt(
-		aicommon.ConfigKeyToolBatchParamConcurrency,
-		aicommon.DefaultToolBatchParamConcurrency,
-	)
 	invokeConcurrency := r.config.GetConfigInt(
 		aicommon.ConfigKeyToolBatchInvokeConcurrency,
 		aicommon.DefaultToolBatchInvokeConcurrency,
 	)
-	paramGate := toolBatchSemaphoreGate(paramConcurrency)
 	invokeGate := toolBatchSemaphoreGate(invokeConcurrency)
 	barrier := newToolBatchBarrier(len(works))
-	orderedMutators := newOrderedBatchStage(len(works))
 	orderedReviews := newOrderedBatchStage(len(works))
 	baseEmitter := r.batchTaskEmitter(task)
-	promptMu := new(sync.Mutex)
 	// A direct-answer review is a batch-wide terminal decision. Keep this
 	// cancellation separate from the caller/task context: it stops siblings
-	// immediately, but ExecuteToolBatch still returns the settled batch result
+	// immediately, but ExecuteToolCallGroup still returns the settled batch result
 	// rather than an external context error.
 	workerCtx, cancelWorkers := context.WithCancel(ctx)
 	defer cancelWorkers()
@@ -589,16 +552,12 @@ func (r *ReAct) ExecuteToolBatch(
 	for i := range works {
 		i := i
 		work := &works[i]
-		if work.call.Mode == aicommon.ToolCallModeDirect {
-			orderedMutators.complete(i)
-		}
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
 			defer func() {
 				// Review can terminate through direct_answer before beforeInvoke.
 				// Always release this child's ordered mutator turn on every exit.
-				orderedMutators.complete(i)
 				// Failures and direct-answer returns can terminate before the final
 				// invoke boundary; they must still hand the ordered review turn to
 				// the next model-array child.
@@ -627,14 +586,7 @@ func (r *ReAct) ExecuteToolBatch(
 				return
 			}
 			var paramMutator func(*aitool.Tool, aitool.InvokeParams) aitool.InvokeParams
-			if work.call.Mode == aicommon.ToolCallModeRequire {
-				paramMutator = func(currentTool *aitool.Tool, params aitool.InvokeParams) aitool.InvokeParams {
-					if _, err := orderedMutators.wait(workerCtx, i); err != nil || loop == nil || currentTool == nil {
-						return params
-					}
-					return reactloops.ApplyToolInvokeParamsMutators(loop, currentTool.Name, params)
-				}
-			} else if loop != nil {
+			if loop != nil {
 				// Direct calls were already admission-mutated before any card or
 				// callback was allowed. Skip that first application; an explicit manual
 				// edit is a new proposal and must pass the same tool's mutator once.
@@ -658,7 +610,6 @@ func (r *ReAct) ExecuteToolBatch(
 				// This child has finished approval, including any explicit manual
 				// edits, and can safely expose the next
 				// array index's approval card.
-				orderedMutators.complete(i)
 				orderedReviews.complete(i)
 				if err := callCtx.Err(); err != nil {
 					return nil, err
@@ -673,11 +624,9 @@ func (r *ReAct) ExecuteToolBatch(
 				task,
 				work,
 				baseEmitter,
-				paramGate,
 				reviewGate,
 				beforeInvoke,
 				paramMutator,
-				promptMu,
 			)
 			if callerErr != nil {
 				result.Outcomes[i].Stage = aicommon.ToolCallStagePrepareFailed
@@ -688,15 +637,7 @@ func (r *ReAct) ExecuteToolBatch(
 			var toolResult *aitool.ToolResult
 			var directlyAnswer bool
 			var callErr error
-			if work.call.Mode == aicommon.ToolCallModeDirect {
-				toolResult, directlyAnswer, callErr = caller.CallToolWithExistedParams(
-					work.tool,
-					true,
-					work.params,
-				)
-			} else {
-				toolResult, directlyAnswer, callErr = caller.CallTool(work.tool)
-			}
+			toolResult, directlyAnswer, callErr = caller.CallToolWithExistedParams(work.tool, work.params)
 
 			outcome := &result.Outcomes[i]
 			outcome.Result = toolResult

@@ -43,16 +43,7 @@ func mockedMCPToolCalling(i aicommon.AICallerConfigIf, req *aicommon.AIRequest, 
 	}
 
 	if isToolParamGenerationPrompt(prompt, toolName) {
-		// Verify that the prompt contains the nonce in the schema
-		if !strings.Contains(prompt, nonce) {
-			return nil, utils.Errorf("SECURITY CHECK FAILED: prompt does not contain nonce %s, schema was not properly included", nonce)
-		}
-
-		rsp := i.NewAIResponse()
-		// Generate message with nonce to prove we read the schema
-		rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "call-tool", "params": { "message" : "message_` + nonce + `" }}`))
-		rsp.Close()
-		return rsp, nil
+		return nil, fmt.Errorf("unexpected retired tool parameter-generation request")
 	}
 
 	if isVerifySatisfactionPrompt(prompt) {

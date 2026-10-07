@@ -106,8 +106,8 @@ func init() {
 
 | ActionType | 异步? | 文件 | 何时启用 | 触发条件 |
 |------------|-------|------|----------|----------|
-| `require_tool` | 否 | `action_tool_require_and_call.go` | `allowToolCall=true` | 单个工具走 `tool_require_payload`，多个定义走 `tool_require_calls`；只加载 Schema，不生成参数、不执行工具 |
-| `directly_call_tool` | 否 | `action_directly_call_tool.go` | `allowToolCall=true` 且 `aiToolManager != nil` | 单个工具走旧标量字段；2–8 个独立、完整参数已知的调用可走 `directly_call_tool_calls`；recent-cache miss 仅告警 |
+| `require_tool` | 否 | `action_tool_require_and_call.go` | `allowToolCall=true` | `require_tool_payload` 接收一个工具名或名称数组；只加载 Schema，不生成参数、不执行工具 |
+| `directly_call_tool` | 否 | `action_directly_call_tool.go` | `allowToolCall=true` 且 `aiToolManager != nil` | 单个工具走旧标量字段；2–8 个独立、完整参数已知的调用可走 `directly_call_tool_params_group`；recent-cache miss 仅告警 |
 | `ask_for_clarification` | 否 | `action_ask_for_clarification.go` | `allowUserInteract=true` | 信息不足问用户 |
 | `knowledge_enhance` | 否 | `action_enhance_knowledge_answer.go` | `allowRAG=true` | RAG 检索回答 |
 | `save_evidence` | 是 | `reactloops/action_save_evidence.go` | 总是 | 幂等写入共享 Session Evidence Store 后继续任务 |
@@ -127,8 +127,8 @@ func init() {
 
 `require_tool` 用对象数组加载多个工具定义；`directly_call_tool` 在**一个 Action 的对象数组**中声明 2–8 个彼此独立的真实工具调用。它不是多个顶层 Action，也不是 Provider 原生 `tool_calls[]`。
 
-- 完整参数已知：`directly_call_tool_calls: [{tool_name, params, ...}]`；
-- 缺少 Schema：`tool_require_calls: [{tool_name, ...}]` 只加载定义，下一轮观察后自行构参并使用 `directly_call_tool` 执行；
+- 完整参数已知：`directly_call_tool_params_group: [{tool_name, params, ...}]`；
+- 缺少 Schema：`require_tool_payload: ["tool_name", ...]` 只加载定义，下一轮观察后自行构参并使用 `directly_call_tool` 执行；
 - 后一项依赖前一项结果：不要放进普通 batch，先读取真实结果，再在下一轮显式调用；
 
 完整业务解释、合法/非法输入、运行时并发与 barrier、审批/取消、checkpoint replay、Prompt 放置和 CI 闭环见 [19-parallel-tool-call-actions.md](19-parallel-tool-call-actions.md)。

@@ -12,7 +12,6 @@ import (
 	aicommon_testutil "github.com/yaklang/yaklang/common/ai/aid/aicommon/testutil"
 	"github.com/yaklang/yaklang/common/ai/aid/aiprojection"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
-	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 )
 
 func TestUserInputAttachmentQueryStaysOutOfMainDynamic(t *testing.T) {
@@ -31,7 +30,6 @@ func TestUserInputAttachmentQueryStaysOutOfMainDynamic(t *testing.T) {
 	t.Cleanup(installTaskInlineAttachmentProvider(react.config.ContextProviderManager, task))
 	_, err = react.config.AppendUserInputHistory(query, time.Now())
 	require.NoError(t, err)
-	tool := aitool.NewWithoutCallback("read_file", aitool.WithStringParam("path"))
 	for _, frozen := range []bool{false, true} {
 		if frozen {
 			react.config.GetTimeline().FreezeAll()
@@ -43,12 +41,6 @@ func TestUserInputAttachmentQueryStaysOutOfMainDynamic(t *testing.T) {
 				base, err := react.promptManager.GetLoopPromptBaseMaterials(nil, "helper")
 				require.NoError(t, err)
 				require.Contains(t, base.AutoContext, "User Prompt: "+query)
-				helper, err := react.promptManager.GenerateToolParamsPromptWithMetaForTask(task, tool)
-				require.NoError(t, err)
-				require.Contains(t, helper.Prompt, query)
-				nativeHelper, err := react.promptManager.GenerateFunctionCallToolParamsPromptForTask(task, tool, aicommon.ToolParamsCallIntent{})
-				require.NoError(t, err)
-				require.Contains(t, nativeHelper, query)
 				assembled, err := react.promptManager.AssembleLoopPrompt(nil, &reactloops.LoopPromptAssemblyInput{
 					Nonce: "attachment", FunctionCallMode: native, Lightweight: lightweight,
 				})
@@ -84,9 +76,9 @@ func TestUserInputHistoryPromptPromotionAcrossModes(t *testing.T) {
 				input := &reactloops.LoopPromptAssemblyInput{Nonce: "input-1", UserQuery: "UNJOURNALED_HELPER_QUERY", FunctionCallMode: functionCall, Lightweight: lightweight}
 				open, err := react.promptManager.AssembleLoopPrompt(nil, input)
 				require.NoError(t, err)
-				require.Contains(t, r2PromptSection(t, open.Prompt, "timeline-open"), original)
-				require.NotContains(t, r2PromptSection(t, open.Prompt, "semi-dynamic-1"), original)
-				require.Contains(t, r2PromptSection(t, open.Prompt, "timeline-open"), current)
+				require.Contains(t, loopPromptSection(t, open.Prompt, "timeline-open"), original)
+				require.NotContains(t, loopPromptSection(t, open.Prompt, "semi-dynamic-1"), original)
+				require.Contains(t, loopPromptSection(t, open.Prompt, "timeline-open"), current)
 				require.Equal(t, 1, strings.Count(open.Prompt, current))
 				require.NotContains(t, open.Prompt, "CURRENT_TASK_INPUT")
 				require.NotContains(t, open.Prompt, "USER_QUERY")
@@ -100,10 +92,10 @@ func TestUserInputHistoryPromptPromotionAcrossModes(t *testing.T) {
 				input.Nonce = "input-2"
 				sealed, err := react.promptManager.AssembleLoopPrompt(nil, input)
 				require.NoError(t, err)
-				require.Contains(t, r2PromptSection(t, sealed.Prompt, "semi-dynamic-1"), original)
+				require.Contains(t, loopPromptSection(t, sealed.Prompt, "semi-dynamic-1"), original)
 				require.NotContains(t, optionalUserInputPromptSection(t, sealed.Prompt, "timeline-open"), original)
-				require.NotContains(t, sealed.Prompt[:strings.Index(sealed.Prompt, r2PromptSection(t, sealed.Prompt, "semi-dynamic-1"))], original)
-				require.Contains(t, r2PromptSection(t, sealed.Prompt, "semi-dynamic-1"), current)
+				require.NotContains(t, sealed.Prompt[:strings.Index(sealed.Prompt, loopPromptSection(t, sealed.Prompt, "semi-dynamic-1"))], original)
+				require.Contains(t, loopPromptSection(t, sealed.Prompt, "semi-dynamic-1"), current)
 				require.NotContains(t, optionalUserInputPromptSection(t, sealed.Prompt, "timeline-open"), current)
 				require.Equal(t, 1, strings.Count(sealed.Prompt, current))
 				require.NotContains(t, sealed.Prompt, "USER_QUERY")
@@ -124,9 +116,9 @@ func TestUserInputHistoryPromptPromotionAcrossModes(t *testing.T) {
 				input.Nonce = "input-3"
 				pending, err := react.promptManager.AssembleLoopPrompt(nil, input)
 				require.NoError(t, err)
-				require.Equal(t, r2PromptSection(t, sealed.Prompt, "semi-dynamic-1"), r2PromptSection(t, pending.Prompt, "semi-dynamic-1"))
-				require.Contains(t, r2PromptSection(t, pending.Prompt, "timeline-open"), "FOLLOWUP_INPUT")
-				require.NotContains(t, r2PromptSection(t, pending.Prompt, "semi-dynamic-1"), "FOLLOWUP_INPUT")
+				require.Equal(t, loopPromptSection(t, sealed.Prompt, "semi-dynamic-1"), loopPromptSection(t, pending.Prompt, "semi-dynamic-1"))
+				require.Contains(t, loopPromptSection(t, pending.Prompt, "timeline-open"), "FOLLOWUP_INPUT")
+				require.NotContains(t, loopPromptSection(t, pending.Prompt, "semi-dynamic-1"), "FOLLOWUP_INPUT")
 			})
 		}
 	}
@@ -137,7 +129,7 @@ func optionalUserInputPromptSection(t *testing.T, prompt, name string) string {
 	if !strings.Contains(prompt, aiprojection.CreateTemplate("<|PROMPT_SECTION_"+name+"|>")) {
 		return ""
 	}
-	return r2PromptSection(t, prompt, name)
+	return loopPromptSection(t, prompt, name)
 }
 
 func TestUserInputPromotionIsOptInForMainContext(t *testing.T) {
@@ -149,7 +141,6 @@ func TestUserInputPromotionIsOptInForMainContext(t *testing.T) {
 	require.NoError(t, err)
 	task := aicommon.NewStatefulTaskBase("compat-task", "CURRENT_HELPER_QUERY", react.config.GetContext(), react.config.GetEmitter())
 	react.config.GetTimeline().EnsureTaskUserInput(task.GetId(), task.GetUserInput(), react.config.AcquireId)
-	tool := aitool.NewWithoutCallback("read_file", aitool.WithStringParam("path"))
 	for _, sealed := range []bool{false, true} {
 		if sealed {
 			react.config.GetTimeline().FreezeAll()
@@ -171,18 +162,6 @@ func TestUserInputPromotionIsOptInForMainContext(t *testing.T) {
 		require.Contains(t, main.Prompt, "关注 Timeline 中的用户输入")
 		require.Contains(t, main.Prompt, task.GetUserInput())
 		require.NotContains(t, main.Prompt, "USER_QUERY")
-		native, err := react.promptManager.GenerateFunctionCallToolParamsPromptForTask(task, tool, aicommon.ToolParamsCallIntent{})
-		require.NoError(t, err)
-		text, err := react.promptManager.GenerateToolParamsPromptWithMetaForTask(task, tool)
-		require.NoError(t, err)
-		retry, err := react.promptManager.GenerateReGenerateToolParamsPromptWithMeta(task.GetUserInput(), aitool.InvokeParams{"path": "old"}, tool)
-		require.NoError(t, err)
-		for _, helper := range []string{native, text.Prompt, retry.Prompt} {
-			require.Contains(t, helper, original)
-			require.Contains(t, helper, task.GetUserInput())
-			require.NotContains(t, helper, "USER_INTERACT_")
-			require.NotContains(t, helper, "CURRENT_TASK_INPUT_")
-		}
 		rawAfter, err := aicommon.MarshalTimeline(react.config.GetTimeline())
 		require.NoError(t, err)
 		require.JSONEq(t, rawBefore, rawAfter, "main and helper rendering must not mutate shared history")

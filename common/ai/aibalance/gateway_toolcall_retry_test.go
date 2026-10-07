@@ -25,7 +25,7 @@ func TestMemfitToolCallOnlyResponseDoesNotRetry(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		requests.Add(1)
 		w.Header().Set("Content-Type", "text/event-stream")
-		_, _ = fmt.Fprint(w, `data: {"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"id":"call_once","type":"function","function":{"name":"submit_tool_params","arguments":"{\"params\":{\"value\":\"ok\"}}"}}]},"finish_reason":null}]}`+"\n\n")
+		_, _ = fmt.Fprint(w, `data: {"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"id":"call_once","type":"function","function":{"name":"fixture_submit","arguments":"{\"params\":{\"value\":\"ok\"}}"}}]},"finish_reason":null}]}`+"\n\n")
 		_, _ = fmt.Fprint(w, "data: [DONE]\n\n")
 	}))
 	defer server.Close()

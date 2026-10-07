@@ -52,7 +52,7 @@ func TestToolCallerIntervalReviewReceivesDeepParamsSnapshot(t *testing.T) {
 	caller, err := NewToolCaller(
 		ctx,
 		WithToolCaller_AICallerConfig(cfg),
-		WithToolCaller_AICaller(cfg),
+
 		WithToolCaller_Task(cfg.DefaultTask),
 		WithToolCaller_Emitter(cfg.Emitter),
 		WithToolCaller_IntervalReviewDuration(time.Millisecond),
@@ -81,7 +81,7 @@ func TestToolCallerIntervalReviewReceivesDeepParamsSnapshot(t *testing.T) {
 		"marker":  "original-marker",
 		"payload": map[string]any{"value": "original-value"},
 	}
-	result, directlyAnswer, callErr := caller.CallToolWithExistedParams(tool, true, initialParams)
+	result, directlyAnswer, callErr := caller.CallToolWithExistedParams(tool, initialParams)
 	require.NoError(t, callErr)
 	require.False(t, directlyAnswer)
 	require.NotNil(t, result)

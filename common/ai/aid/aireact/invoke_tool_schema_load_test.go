@@ -63,7 +63,7 @@ func TestMainLoopLoadSchemasThenDirectExecution(t *testing.T) {
 							if loader == "load_capability" {
 								add(loader, `{"capability_identifier":"schema_probe_a"}`)
 							} else {
-								add(loader, `{"tool_require_calls":[{"tool_name":"schema_probe_a"},{"tool_name":"schema_probe_b"}]}`)
+								add(loader, `{"require_tool_payload":["schema_probe_a", "schema_probe_b"]}`)
 							}
 						case 2:
 							require.Zero(t, executions.Load())
@@ -101,7 +101,7 @@ func TestMainLoopLoadSchemasThenDirectExecution(t *testing.T) {
 							add("directly_call_tool", `{"directly_call_tool_name":"schema_probe_a","directly_call_tool_params":{"value":"single"}}`)
 						case 5:
 							require.EqualValues(t, 1, executions.Load())
-							add("directly_call_tool", `{"directly_call_tool_calls":[{"tool_name":"schema_probe_a","params":{"value":"batch-a"}},{"tool_name":"schema_probe_b","params":{"value":"batch-b"}}]}`)
+							add("directly_call_tool", `{"directly_call_tool_params_group":[{"tool_name":"schema_probe_a","params":{"value":"batch-a"}},{"tool_name":"schema_probe_b","params":{"value":"batch-b"}}]}`)
 						case 6:
 							require.EqualValues(t, 3, executions.Load())
 							add("directly_answer", `{"answer_payload":"Both schemas loaded; single and batch execution completed."}`)

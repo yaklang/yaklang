@@ -501,10 +501,6 @@ func (m *MockInvoker) InvokeLiteForge(ctx context.Context, actionName string, pr
 	return nil, utils.Errorf("unexpected action: %s", actionName)
 }
 
-func (m *MockInvoker) ExecuteToolRequiredAndCall(ctx context.Context, name string, opt ...aicommon.ToolCallerOption) (*aitool.ToolResult, bool, error) {
-	return nil, false, nil
-}
-
 func (m *MockInvoker) ExecuteToolRequiredAndCallWithoutRequired(ctx context.Context, toolName string, params aitool.InvokeParams, opt ...aicommon.ToolCallerOption) (*aitool.ToolResult, bool, error) {
 	return nil, false, nil
 }

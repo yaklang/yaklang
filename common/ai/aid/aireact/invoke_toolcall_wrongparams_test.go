@@ -3,6 +3,7 @@ package aireact
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 
 	"io"
 	"reflect"
@@ -79,10 +80,7 @@ func TestReAct_ToolUse_EmitFinalInvokeParams(t *testing.T) {
 			}
 
 			if isToolParamGenerationPrompt(prompt, toolName) {
-				rsp := i.NewAIResponse()
-				rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "call-tool", "params": { "input" : "` + expectedInput + `" }}`))
-				rsp.Close()
-				return rsp, nil
+				return nil, fmt.Errorf("unexpected retired tool parameter-generation request")
 			}
 
 			if isVerifySatisfactionPrompt(prompt) {

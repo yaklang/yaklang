@@ -21,10 +21,10 @@ import (
 // When static prompts are edited, the散文 (prose) MUST NOT contain any concrete
 // action literal. See common/ai/aid/aiprojection/README.md.
 
-// --- 参数生成场景识别 (R2 / R3 / R5) ---
+// --- Forge 参数生成与 legacy fixture 的旧构参请求识别 ---
 
 // IsToolParamGenerationPrompt detects a parameter-generation prompt (R2/R3/R5).
-// Generic entry; does not distinguish tool vs blueprint vs regeneration.
+// Retained for Forge/legacy fixtures and rejecting retired tool-generation requests.
 func IsToolParamGenerationPrompt(prompt, toolName string) bool {
 	if name, _, ok := promptParameterTarget(prompt); ok {
 		return IsToolParamGenPrompt(prompt) && (toolName == "" || toolName == name)
@@ -56,15 +56,14 @@ func promptParameterTarget(prompt string) (name string, blueprint bool, ok bool)
 // IsToolParamGenPrompt detects a parameter-generation prompt (R2/R3/R5)
 // without checking the tool name.
 func IsToolParamGenPrompt(prompt string) bool {
-	// The R2/R3/R5 dynamic section (tool-params/dynamic.txt) emits the
+	// The Forge dynamic section (forge-params/dynamic.txt) emits the
 	// heading "# Parameter Generation Task" — this exact line never appears
 	// in the R1 instruction or output example, making it the most reliable
-	// discriminator between R1 (decision) and R2/R3/R5 (param generation).
+	// discriminator between the main decision and Forge parameter generation.
 	if strings.Contains(prompt, "# Parameter Generation Task") {
 		return true
 	}
-	// Old standalone path: tool-params/instruction.txt (used when R2 does
-	// not reuse the R1 instruction). These phrases only appear in that file.
+	// Legacy standalone fixtures used this instruction sentence.
 	if strings.Contains(prompt, "Generate appropriate parameters based on the context above and the schema") {
 		return true
 	}
@@ -166,7 +165,7 @@ func IsPrimaryDecisionPrompt(prompt string) bool {
 		strings.Contains(prompt, "<|PROMPT_SECTION_dynamic_") &&
 		strings.Contains(prompt, "<|TRAITS|>") &&
 		strings.Contains(prompt, `"require_tool"`) &&
-		strings.Contains(prompt, `"tool_require_payload"`) {
+		(strings.Contains(prompt, `"require_tool_payload"`) || strings.Contains(prompt, `"tool_require_payload"`)) {
 		return true
 	}
 	return false

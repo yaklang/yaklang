@@ -1,5 +1,5 @@
 # Parameter Generation
-你负责为一个即将执行的工具或 AI Blueprint 调用生成参数，目标是产出一个可直接进入后续评估与执行流程的调用载荷。
+你负责为一个即将执行的AI Blueprint 调用生成参数，目标是产出一个可直接进入后续评估与执行流程的调用载荷。
 Generate appropriate parameters based on the context above and the schema.
 
 ## Core Rules
@@ -10,8 +10,6 @@ Generate appropriate parameters based on the context above and the schema.
 - 简单参数直接写入 JSON `params`
 - 多行文本、脚本、长配置、复杂转义内容，改用 AITAG 承载
 - 如果提供了旧参数，需要基于旧参数的失败原因重新生成，不要简单复制
-- 工具参数生成时，工具已经选定；只输出一次调用的完整 `call-tool` 对象，`tool` 必须等于当前工具名
-- 工具文档中的 `directly_call_tool` 示例属于主循环；本阶段只提取其中的业务参数写入 `params`，不复制主循环 action 外壳
 - 每次响应必须独立提供所有必填参数；使用 AITAG 时，省略 JSON 字段的前提是本次响应确实包含对应的完整内容块
 - 重试时重新给出完整参数和内容块，不依赖上一轮输出，不只补交缺失字段
 - 字符串内容按原文保留；布尔参数使用 JSON `true` / `false`，不要加引号
@@ -34,40 +32,7 @@ Generate appropriate parameters based on the context above and the schema.
 
 ## Response Patterns
 
-### Pattern 1: Simple JSON Params (Tool)
-```json
-{
-  "@action": "call-tool",
-  "tool": "<selected_tool_name>",
-  "identifier": "list_directory",
-  "params": {
-    "path": "./workspace"
-  },
-  "call_expectations": "~3s, success when the target directory listing is returned"
-}
-```
-
-### Pattern 2: JSON + AITAG Hybrid (Tool)
-```json
-{
-  "@action": "call-tool",
-  "tool": "<selected_tool_name>",
-  "identifier": "run_script",
-  "params": {
-    "timeout": 30
-  }
-}
-```
-
-复杂参数改用下面形式承载：
-
-```text
-<|TOOL_PARAM_<param_name>_<current_nonce>|>
-... raw block content ...
-<|TOOL_PARAM_<param_name>_END_<current_nonce>|>
-```
-
-### Pattern 3: AI Blueprint Params
+### AI Blueprint Response: AI Blueprint Params
 ```json
 {
   "@action": "call-ai-blueprint",

@@ -68,14 +68,7 @@ func mockedToolCallingForJumpWithCounter(i aicommon.AICallerConfigIf, req *aicom
 	}
 
 	if isToolParamGenerationPrompt(prompt, toolName) {
-		rsp := i.NewAIResponse()
-		if toolName == "slow_task" {
-			rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "call-tool", "params": { "seconds" : 3.0 }}`))
-		} else {
-			rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "call-tool", "params": { "seconds" : 0.1 }}`))
-		}
-		rsp.Close()
-		return rsp, nil
+		return nil, fmt.Errorf("unexpected retired tool parameter-generation request")
 	}
 
 	if isVerifySatisfactionPrompt(prompt) {

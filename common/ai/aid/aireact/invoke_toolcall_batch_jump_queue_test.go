@@ -117,7 +117,7 @@ func TestReAct_JumpQueueCancelsRunningDirectBatchWithoutCommit(t *testing.T) {
   "@action": "directly_call_tool",
   "identifier": "running_batch_before_jump",
   "human_readable_thought": "Run two cancellable children concurrently",
-  "directly_call_tool_calls": [
+  "directly_call_tool_params_group": [
     {
       "tool_name": "jump_cancel_batch_first",
       "params": {},

@@ -29,7 +29,7 @@ func TestToolSchemaLoadTimelineLifecycle(t *testing.T) {
 				require.False(t, invoker.toolCallCalled, "loading must not execute or generate parameters")
 				return op.GetFeedback().String()
 			}
-			feedback := load(`{"@action":"require_tool","tool_require_calls":[{"tool_name":"read_file"},{"tool_name":"read_file"},{"tool_name":"grep"},{"tool_name":"missing-probe"}]}`)
+			feedback := load(`{"@action":"require_tool","require_tool_payload":["read_file", "read_file", "grep", "missing-probe"]}`)
 			require.Contains(t, feedback, "schema_loaded")
 			require.Contains(t, feedback, "Tool unavailable")
 			before := aicommon.RenderTimelineFrozenOpen(cfg.Timeline)
@@ -54,7 +54,7 @@ func TestNativeToolSchemaLoadRejectsMalformedRequests(t *testing.T) {
 	for _, payload := range []string{
 		`{}`, `{"tool_require_payload":42}`, `{"tool_require_payload":" "}`,
 		`{"tool_require_calls":[]}`, `{"tool_require_calls":[null]}`,
-		`{"tool_require_payload":"read_file","tool_require_calls":[{"tool_name":"grep"}]}`,
+		`{"tool_require_payload":"read_file","require_tool_payload":["grep"]}`,
 		`{"tool_require_calls":[{"tool_name":"read_file","params":{"file":"a"}}]}`,
 	} {
 		t.Run(payload, func(t *testing.T) {
@@ -71,7 +71,7 @@ func TestNativeToolSchemaLoadRejectsMalformedRequests(t *testing.T) {
 func TestRequireToolValidatesCompleteActionBeforeCaching(t *testing.T) {
 	for _, payload := range []string{
 		`{"@action":"require_tool","tool_require_payload":"read_file","directly_call_tool_params":{"file":"a"}}`,
-		`{"@action":"require_tool","tool_require_payload":"read_file","tool_require_calls":[{"tool_name":"grep"}]}`,
+		`{"@action":"require_tool","require_tool_payload":"read_file","tool_require_payload":"grep"}`,
 	} {
 		t.Run(payload, func(t *testing.T) {
 			ctx := context.Background()
@@ -97,9 +97,9 @@ func TestRequireToolValidatesCompleteActionBeforeCaching(t *testing.T) {
 
 func TestNativeDirectToolMetadataAndNoParameterFallback(t *testing.T) {
 	loop, _ := newToolBatchTestLoop(t)
-	batch := parseToolBatchPromptExample(t, `{"@action":"directly_call_tool","directly_call_reason":"inspect files","directly_call_tool_calls":[{"tool_name":"read_file","params":{"file":"a"},"identifier":"read_a"},{"tool_name":"read_file","params":{"file":"b"},"identifier":"read_b","reason":"specific"}]}`, "directly_call_tool")
+	batch := parseToolBatchPromptExample(t, `{"@action":"directly_call_tool","directly_call_reason":"inspect files","directly_call_tool_params_group":[{"tool_name":"read_file","params":{"file":"a"},"identifier":"read_a"},{"tool_name":"read_file","params":{"file":"b"},"identifier":"read_b","reason":"specific"}]}`, "directly_call_tool")
 	require.NoError(t, nativeDirectToolAction.ActionVerifier(loop, batch))
-	request, ok := loop.GetActionExecutionValue(batch, actionStateDirectToolBatch).(*aicommon.ToolBatchRequest)
+	request, ok := loop.GetActionExecutionValue(batch, actionStateDirectToolBatch).(*aicommon.ToolCallGroupRequest)
 	require.True(t, ok)
 	require.Empty(t, request.Calls[0].Reason)
 	require.Equal(t, "read_a", request.Calls[0].Identifier)
@@ -119,8 +119,8 @@ func TestDirectToolValidationLoadsSchemaForRetry(t *testing.T) {
 	for _, payload := range []string{
 		`{"@action":"directly_call_tool","directly_call_tool_name":"read_file","directly_call_tool_params":{}}`,
 		`{"@action":"directly_call_tool","directly_call_tool_name":"read_file","directly_call_tool_params":[]}`,
-		`{"@action":"directly_call_tool","directly_call_tool_calls":[{"tool_name":"read_file","params":{}},{"tool_name":"grep","params":{}}]}`,
-		`{"@action":"directly_call_tool","directly_call_tool_calls":[{"tool_name":"read_file"},{"tool_name":"grep","params":{}}]}`,
+		`{"@action":"directly_call_tool","directly_call_tool_params_group":[{"tool_name":"read_file","params":{}},{"tool_name":"grep","params":{}}]}`,
+		`{"@action":"directly_call_tool","directly_call_tool_params_group":[{"tool_name":"read_file"},{"tool_name":"grep","params":{}}]}`,
 	} {
 		t.Run(payload, func(t *testing.T) {
 			manager, _, _ := newToolBatchTestManager(t)

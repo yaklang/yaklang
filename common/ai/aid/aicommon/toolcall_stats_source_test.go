@@ -106,7 +106,7 @@ func TestToolCaller_CheckpointReplayDoesNotDoubleCountSessionOrStats(t *testing.
 		caller, callerErr := NewToolCaller(
 			context.Background(),
 			WithToolCaller_AICallerConfig(cfg),
-			WithToolCaller_AICaller(cfg),
+
 			WithToolCaller_Task(cfg.DefaultTask),
 			WithToolCaller_Emitter(cfg.GetEmitter()),
 			WithToolCaller_CallToolID(callToolID),
@@ -119,7 +119,7 @@ func TestToolCaller_CheckpointReplayDoesNotDoubleCountSessionOrStats(t *testing.
 	}
 
 	firstConfig, firstCaller := newConfigAndCaller()
-	firstResult, directlyAnswer, err := firstCaller.CallToolWithExistedParams(tool, true, aitool.InvokeParams{})
+	firstResult, directlyAnswer, err := firstCaller.CallToolWithExistedParams(tool, aitool.InvokeParams{})
 	require.NoError(t, err)
 	require.False(t, directlyAnswer)
 	require.NotNil(t, firstResult)
@@ -131,7 +131,7 @@ func TestToolCaller_CheckpointReplayDoesNotDoubleCountSessionOrStats(t *testing.
 	// checkpoint returns the stored result but must not emit a second session or
 	// persistent hit-stat event, because no plugin callback executes this time.
 	replayConfig, replayCaller := newConfigAndCaller()
-	replayResult, directlyAnswer, err := replayCaller.CallToolWithExistedParams(tool, true, aitool.InvokeParams{})
+	replayResult, directlyAnswer, err := replayCaller.CallToolWithExistedParams(tool, aitool.InvokeParams{})
 	require.NoError(t, err)
 	require.False(t, directlyAnswer)
 	require.NotNil(t, replayResult)

@@ -200,7 +200,7 @@ func TestReAct_SyncUserIntervention_PromptContainsHistoryForAI(t *testing.T) {
 			history[1].UserInput == userInput
 	}, time.Second, 20*time.Millisecond)
 
-	open := r2PromptSection(t, prompt, "timeline-open")
+	open := loopPromptSection(t, prompt, "timeline-open")
 	require.Contains(t, open, "User Input: "+content)
 	require.Contains(t, open, "User Input: "+userInput)
 	require.Equal(t, 1, strings.Count(prompt, userInput), "loop startup must reuse the queue ingress record")

@@ -6,17 +6,14 @@ import (
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 )
 
-// Tool batch configuration is independent from the legacy shared grep concurrency option.
-// A tool batch is one ReAct action containing mutually independent calls; it
-// has no dependency graph and all of its outcomes are joined before the next
-// ReAct iteration starts.
+// Parameter groups contain explicit, independent tool calls in one directly_call_tool action.
+// Existing size/concurrency option names and persisted keys are retained; no mode
+// or parameter-generation concurrency remains. Outcomes settle before the next decision.
 const (
 	ConfigKeyToolBatchMaxCalls          = "tool_batch_max_calls"
-	ConfigKeyToolBatchParamConcurrency  = "tool_batch_param_concurrency"
 	ConfigKeyToolBatchInvokeConcurrency = "tool_batch_invoke_concurrency"
 
 	DefaultToolBatchMaxCalls          = 8
-	DefaultToolBatchParamConcurrency  = 2
 	DefaultToolBatchInvokeConcurrency = 3
 )
 
@@ -41,18 +38,11 @@ func clampToolBatchConcurrency(value int) int {
 }
 
 // WithToolBatchMaxCalls configures the native action-array limit. It is
-// intentionally independent from ToolComposeConcurrency and clamped to the
+// clamped to the
 // action schema's minItems/maxItems contract.
 func WithToolBatchMaxCalls(value int) ConfigOption {
 	return func(config *Config) error {
 		config.SetConfig(ConfigKeyToolBatchMaxCalls, clampToolBatchMaxCalls(value))
-		return nil
-	}
-}
-
-func WithToolBatchParamConcurrency(value int) ConfigOption {
-	return func(config *Config) error {
-		config.SetConfig(ConfigKeyToolBatchParamConcurrency, clampToolBatchConcurrency(value))
 		return nil
 	}
 }
@@ -64,26 +54,18 @@ func WithToolBatchInvokeConcurrency(value int) ConfigOption {
 	}
 }
 
-type ToolCallMode string
-
-const (
-	ToolCallModeDirect  ToolCallMode = "direct"
-	ToolCallModeRequire ToolCallMode = "require"
-)
-
-// ToolBatchRequest is the canonical representation used by both
-// directly_call_tool and require_tool. Index is the model-provided array order
+// ToolCallGroupRequest is the canonical representation used by both
+// directly_call_tool parameter groups. Index is the model-provided array order
 // and must remain stable even when calls finish in a different order.
-type ToolBatchRequest struct {
-	BatchID string          `json:"batch_id,omitempty"`
-	Calls   []ToolBatchCall `json:"calls"`
+type ToolCallGroupRequest struct {
+	BatchID string              `json:"batch_id,omitempty"`
+	Calls   []ToolCallGroupCall `json:"calls"`
 }
 
-type ToolBatchCall struct {
+type ToolCallGroupCall struct {
 	Index        int                 `json:"index"`
-	Mode         ToolCallMode        `json:"mode"`
 	ToolName     string              `json:"tool_name"`
-	Params       aitool.InvokeParams `json:"params,omitempty"`
+	Params       aitool.InvokeParams `json:"params"`
 	Identifier   string              `json:"identifier,omitempty"`
 	Expectations string              `json:"expectations,omitempty"`
 	Reason       string              `json:"reason,omitempty"`
@@ -122,19 +104,19 @@ type ToolCallOutcome struct {
 	DirectlyAnswer  bool                       `json:"directly_answer,omitempty"`
 }
 
-type ToolBatchResult struct {
+type ToolCallGroupResult struct {
 	BatchID        string            `json:"batch_id,omitempty"`
 	Outcomes       []ToolCallOutcome `json:"outcomes"`
 	DirectlyAnswer bool              `json:"directly_answer,omitempty"`
 }
 
-// ToolBatchInvokeRuntime is an optional extension rather than a method on the
+// ToolCallGroupInvokeRuntime is an optional extension rather than a method on the
 // large AIInvokeRuntime interface. Existing embedders and test doubles keep
-// compiling, while the production ReAct runtime can opt into native batches.
-type ToolBatchInvokeRuntime interface {
-	ExecuteToolBatch(
+// compiling, while the production ReAct runtime can execute explicit parameter groups.
+type ToolCallGroupInvokeRuntime interface {
+	ExecuteToolCallGroup(
 		ctx context.Context,
 		task AIStatefulTask,
-		request *ToolBatchRequest,
-	) (*ToolBatchResult, error)
+		request *ToolCallGroupRequest,
+	) (*ToolCallGroupResult, error)
 }

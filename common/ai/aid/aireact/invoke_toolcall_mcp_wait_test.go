@@ -46,7 +46,7 @@ func TestExecuteToolCallInternal_WaitsForMCPStubBeforeInvoke(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	result, _, err := react.executeToolCallInternal(ctx, toolName, aitool.InvokeParams{"x": "1"}, true)
+	result, _, err := react.executeToolCallInternal(ctx, toolName, aitool.InvokeParams{"x": "1"})
 	require.NoError(t, err)
 	require.NotNil(t, result)
 	assert.True(t, result.Success)
