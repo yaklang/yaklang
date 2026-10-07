@@ -24,6 +24,7 @@ func TestToolCallerIntervalReviewReceivesDeepParamsSnapshot(t *testing.T) {
 	reviewObservedParams := make(chan aitool.InvokeParams, 1)
 	reviewReleasedTool := make(chan struct{})
 	var reviewOnce sync.Once
+	var pluginParams aitool.InvokeParams
 
 	tool, err := aitool.New(
 		"interval_review_params_snapshot_tool",
@@ -37,6 +38,7 @@ func TestToolCallerIntervalReviewReceivesDeepParamsSnapshot(t *testing.T) {
 		aitool.WithNoRuntimeCallback(func(callCtx context.Context, params aitool.InvokeParams, _ io.Writer, _ io.Writer) (any, error) {
 			delete(params, "marker")
 			params["payload"].(map[string]any)["value"] = "mutated-by-tool"
+			pluginParams = cloneEndpointParams(params)
 			close(toolMutatedParams)
 			select {
 			case <-reviewReleasedTool:
@@ -95,8 +97,11 @@ func TestToolCallerIntervalReviewReceivesDeepParamsSnapshot(t *testing.T) {
 	case <-ctx.Done():
 		t.Fatal("interval review did not observe its params snapshot")
 	}
-	require.Empty(t, initialParams.GetString("marker"), "the tool still owns and may mutate its original params")
-	require.Equal(t, "mutated-by-tool", initialParams.GetObject("payload").GetString("value"))
+	require.Empty(t, pluginParams.GetString("marker"), "the tool may mutate its private params")
+	require.Equal(t, "mutated-by-tool", pluginParams.GetObject("payload").GetString("value"))
+	require.Equal(t, "original-marker", initialParams.GetString("marker"))
+	require.Equal(t, "original-value", initialParams.GetObject("payload").GetString("value"))
+	require.NotContains(t, initialParams, "runtime_id", "runtime metadata must not enter the source payload")
 }
 
 const (

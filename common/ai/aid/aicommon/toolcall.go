@@ -833,6 +833,11 @@ func SanitizeTaskName(name string) string {
 // CallToolWithExistedParams validates, reviews and executes an explicit parameter
 // object. It never asks an auxiliary model to create or repair tool arguments.
 func (t *ToolCaller) CallToolWithExistedParams(tool *aitool.Tool, invokeParams aitool.InvokeParams) (result *aitool.ToolResult, directlyAnswer bool, err error) {
+	// Metadata extraction, parameter augmentation and plugins must not mutate
+	// the caller's payload. Preserve nil so missing explicit arguments still fail.
+	if invokeParams != nil {
+		invokeParams = cloneEndpointParams(invokeParams)
+	}
 	if t.emitter == nil {
 		emitter := t.config.GetEmitter()
 		if emitter == nil {
@@ -940,21 +945,9 @@ func (t *ToolCaller) CallToolWithExistedParams(tool *aitool.Tool, invokeParams a
 		destinationIdentifier = sanitizeIdentifier(utils.InterfaceToString(id))
 		delete(invokeParams, ReservedKeyIdentifier)
 	}
-	if destinationIdentifier == "" {
-		if id, ok := invokeParams["identifier"]; ok {
-			destinationIdentifier = sanitizeIdentifier(utils.InterfaceToString(id))
-			delete(invokeParams, "identifier")
-		}
-	}
 	if ce, ok := invokeParams[ReservedKeyCallExpectations]; ok {
 		t.callExpectations = utils.InterfaceToString(ce)
 		delete(invokeParams, ReservedKeyCallExpectations)
-	}
-	if t.callExpectations == "" {
-		if ce, ok := invokeParams["call_expectations"]; ok {
-			t.callExpectations = utils.InterfaceToString(ce)
-			delete(invokeParams, "call_expectations")
-		}
 	}
 	if destinationIdentifier != "" {
 		t.emitter.EmitInfo("tool[%v] destination identifier: %v", tool.Name, destinationIdentifier)
