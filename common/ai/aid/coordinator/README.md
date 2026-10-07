@@ -2,11 +2,11 @@
 
 `coordinator` 是新的 PLAN 引擎和专注模式。它负责探索、计划文档、用户审批、任务调度、等待、验收、重试和报告；`pe_task` 执行批准的任务书。新引擎只有这两种 ReAct 循环，沿用主循环的协议配置：文本流 JSON action 或原生 `tool_calls`。提示词按当前模式选择对应的中文指令及参数定义；不会回退到旧 PLAN/replan/task-review/report 循环。
 
-这个目录独立拥有 [Session](session.go)、计划树与 DAG、控制对象、模型 actions、worker、工具权限、原生辅助调用，以及 [Yakit 事件和存储适配](session_events.go)。新运行体不构造或调用 `coordinator_legacy.Coordinator`、旧 `AiTask`、旧 PLAN runtime，也不借用旧 LiteForge 构造通道。
+这个目录独立拥有 [Session](session.go)、计划树与 DAG、控制对象、模型 actions、worker、工具权限、原生辅助调用，以及 [Yakit 事件和存储适配](session_events.go)。结构化辅助请求复用独立 LiteForge 执行器。
 
-最上层 [coordinator.go](../aireact/coordinator.go) 默认使用新版。旧引擎的实现、任务和私有资源整包保留在同层 [coordinator_legacy](../coordinator_legacy/README.md)，包外生产代码和测试不再导入它或其子包。两边共享 aicommon、reactloops、Timeline、事件封套和数据库表这些通用基础设施，不共享执行状态机。父级 `aid` 只保留公共接口，不提供旧类型的兼容别名。
+最上层 [coordinator.go](../aireact/coordinator.go) 统一进入此引擎；公共基础设施由 aicommon、reactloops、Timeline、事件封套和数据库表提供。父级 `aid` 只保留公共接口。
 
-[Legacy 接口迁移契约](LEGACY_INTERFACE.md) 分别定义 aiforge 底层迁移和边缘 legacy coordinator 接口兼容，包含接入清单、mocker/结果交付、Yak 配置继承、审核事件、观测、恢复与双协议验收要求。当前默认 Forge 已切换到新版，具体接口、边界与本地验收见该文档第 14 节。
+Forge、Yak、审核事件、恢复与双协议边界见 [接口契约](../coordinator_interface_contract.md)。
 
 Forge 使用 [ForgeExecution](../../aiforge/forge_execution.go) 包装本次 Session；计划、审核、DAG 和 worker 仍由此目录负责。结果模板读取 [ContextSnapshot](context_snapshot.go)，不接入旧 provider 回调。任务全部验收、消息处理完成后，[ResultDelivery](delivery.go) 保存业务结果及确定性的执行证明，再通过完成门禁；不额外调用模型生成通用报告。独立入口和父 ReAct Blueprint 入口复用同一机制，协议由 `EnableFunctionCallMode` 决定。独立冒烟可运行 `yak common/ai/aismoking/forge.yak`。
 
@@ -73,9 +73,9 @@ err = aim.InvokeReAct(
 die(err)
 ```
 
-`aim.planEngine("coordinator")` 保留为 focus 的入口别名；旧 focus 别名现在也升级为新版，不再启用旧运行体。两个循环继承会话的 `EnableFunctionCallMode`，不因开启 PLAN 覆盖主循环协议。`EnablePlan=false` 禁止从该 focus 开启 PLAN。工具的原有人工/AI/YOLO 策略继续生效，AI 风险评估使用一次原生 `review_risk` 调用。Timeline 压缩、附件提取等继承新引擎的单步辅助输出也使用原生函数调用，不新增 ReAct 角色。
+`aim.planEngine("coordinator")` 保留为 focus 的入口别名；旧 focus 别名现在也升级为新版，不再启用旧运行体。两个循环继承会话的 `EnableFunctionCallMode`，不因开启 PLAN 覆盖主循环协议。`EnablePlan=false` 禁止从该 focus 开启 PLAN。工具的原有人工/AI/YOLO 策略继续生效，AI 风险评估使用一次原生 `review_risk` 调用。LiteForge 辅助请求默认文本流；Timeline 压缩等直接使用结构化调度的请求按各自协议配置执行，不新增 ReAct 角色。
 
-旧 `coordinator_legacy.NewCoordinatorContext` 仍是隔离的旧库实现。ReAct 不开放其执行入口。`plan_engine` 只保留在持久化协议中，与 `coordinator_state` 一起校验恢复数据。旧记录可供查看，但批准或恢复会返回明确的停用错误，需要重新生成新版计划；不隐式导入新调度器。
+`plan_engine` 只保留在持久化协议中，与 `coordinator_state` 一起校验恢复数据。旧记录可供查看，但批准或恢复会返回明确的停用错误，需要重新生成新版计划；不隐式导入新调度器。
 
 ## 默认 gRPC 入口与 detached 时序
 

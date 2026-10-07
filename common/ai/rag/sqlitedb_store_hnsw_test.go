@@ -8,7 +8,6 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/yaklang/yaklang/common/ai/rag/vectorstore"
-	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
@@ -61,18 +60,4 @@ func mockVector() []float32 {
 		vector[j] = rand.Float32()
 	}
 	return vector
-}
-
-func TestAddPerformance(t *testing.T) {
-	log.SetLevel(log.DebugLevel)
-	ragSys, _ := NewRAGSystem(WithDB(consts.GetGormProfileDatabase()), WithName("测试"))
-	startTime := time.Now()
-	ragSys.VectorStore.Add(&vectorstore.Document{
-		ID:        "doc1",
-		Content:   "Yaklang是一种安全研究编程语言",
-		Metadata:  map[string]any{"source": "Yaklang介绍"},
-		Embedding: mockVector(),
-	})
-	elapsed := time.Since(startTime)
-	fmt.Printf("AddPerformance time: %v\n", elapsed)
 }

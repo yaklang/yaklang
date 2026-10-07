@@ -2,7 +2,7 @@
 
 本文描述本次实现。新包位于 [coordinator](coordinator/README.md)，专注模式名为 coordinator，中文名为“任务协调”。接口字段和 Yakit 契约见 [接口文档](coordinator_interface_contract.md)。
 
-旧引擎整包保留在同层 [coordinator_legacy](coordinator_legacy/README.md)，包含旧 Coordinator、任务、规划/执行循环、提示词、测试和示例。包外生产代码和测试均不导入它或其子包，正式执行统一使用新版。`aid` 根包只保留公共能力，不再承载旧实现或兼容别名。运行时事件和 Yakit 契约保持不变。
+PLAN 与 Forge 统一使用 `coordinator.Session`；`aid` 根包只保留公共能力。运行时事件和 Yakit 契约保持不变。
 
 核对基线：yaklang main a0d6763d0d20a2c307f8e116ee3c1d45ceaad400；Yakit master 87904ea55a4af130b4fa8c22dc806405f62e3332。当前 ReAct / gRPC PLAN 入口统一使用新版；旧 focus 隐藏，历史旧计划停止执行。
 
@@ -41,7 +41,7 @@ flowchart TD
 
 入口约束位于 [aireact/coordinator.go](aireact/coordinator.go)，旧 ReAct 宿主适配已删除。[Session](coordinator/session.go) 实现 [Host](coordinator/controller.go) 的 Prepare、Approve、Execute、Changed，独立持有新调度器、任务运行体、输入镜像和生命周期。[PlanNode](coordinator/plan_wire.go) 只复用 Yakit JSON 字段，不继承旧 AiTask。
 
-旧 coordinator_legacy.Coordinator、计划阶段和进度结构均不包含新版本判断、桥或 Snapshot 字段。结构化辅助调用统一使用 [aid/liteforge](liteforge/README.md) 的独立执行器，应用封装归入 [liteforgeapp](liteforge/liteforgeapp/README.md)；协议遵循 Config，支持原生 function call 和文本 JSON 流。共同基础设施只负责工具、消息、Timeline、观测与模型调用，不解释 PLAN 版本。
+结构化辅助调用统一使用 [aid/liteforge](liteforge/README.md) 的独立执行器，应用封装归入 [liteforgeapp](liteforge/liteforgeapp/README.md)；默认文本 JSON 流，单次调用可显式选择原生 function call，不继承父 Config 的协议。共同基础设施只负责工具、消息、Timeline、观测与模型调用，不解释 PLAN 版本。
 
 模型只能请求操作。状态由校验后的操作和实际 worker 退出更新；没有任意设置 completed 的 update_plan_status。状态快照按 revision 顺序发布，宿主获得独立副本，异步 worker 不持有可变草稿。
 
@@ -102,7 +102,7 @@ EnableDetachedPlan 使用旧 detached_plan_require 面板。submit_plan 保存�
 
 ## 7. 接入与验证
 
-Go 显式使用 coordinator.NewSession 构造新运行体，提供 Run、RunPlanOnly、RunExecuteApprovedPlan、RunExecuteOnly。coordinator_legacy.NewCoordinatorContext 永远是旧版。ReAct 默认使用新版，aim.focus("coordinator") 可直接进入；旧 focus 名称在最上层升级为新版。aim.planEngine 是 focus 的兼容别名。Config 不携带 plan_engine；只有持久化保留该标记供恢复路由使用。RPC 消息定义不变。
+Go 显式使用 coordinator.NewSession 构造新运行体，提供 Run、RunPlanOnly、RunExecuteApprovedPlan、RunExecuteOnly。ReAct 默认使用新版，aim.focus("coordinator") 可直接进入；旧 focus 名称在最上层升级为新版。aim.planEngine 是 focus 的兼容别名。Config 不携带 plan_engine；只有持久化保留该标记供恢复路由使用。RPC 消息定义不变。
 
 测试覆盖自动 DAG、人工/YOLO 审核、局部拆分、受影响闭包、实际取消退出、重试历史、消息批次及游标、定时去重、报告门禁、真实 artifact、晚到用户消息、恢复、两种协议及原生参数校验。Yak/aim 四种执行组合使用 A/B 独立、C 依赖 A、D 依赖 B/C，运行实际读取工具、Evidence、任务与报告事件。采样、时序与验证记录见 [执行验收记录](coordinator/execution_review.md)。
 

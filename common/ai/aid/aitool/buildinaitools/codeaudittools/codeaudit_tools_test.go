@@ -5,7 +5,6 @@ import (
 	"context"
 	"encoding/json"
 	"path/filepath"
-	"strings"
 	"testing"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
@@ -65,12 +64,12 @@ func TestCreateCodeAuditTools(t *testing.T) {
 	assert.Assert(t, len(tools) == 6, "expected 6 tools, got %d", len(tools))
 
 	expectedNames := map[string]bool{
-		"java_project_probe":              false,
-		"java_maven_gradle_dependencies":   false,
-		"java_hardcoded_secrets_scan":      false,
-		"java_cms_product_audit":           false,
-		"java_framework_arch_info":         false,
-		"java_framework_config_audit":      false,
+		"java_project_probe":             false,
+		"java_maven_gradle_dependencies": false,
+		"java_hardcoded_secrets_scan":    false,
+		"java_cms_product_audit":         false,
+		"java_framework_arch_info":       false,
+		"java_framework_config_audit":    false,
 	}
 	for _, tool := range tools {
 		_, ok := expectedNames[tool.Name]
@@ -266,9 +265,4 @@ func TestBuildOptions(t *testing.T) {
 
 	// We can't directly inspect the options, but we can verify no panic occurs
 	// and the slice is non-trivial.
-}
-
-// TestMarshalReport verifies the JSON output format.
-func TestMarshalReport(t *testing.T) {
-	_ = strings.Contains
 }

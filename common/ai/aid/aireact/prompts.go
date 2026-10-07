@@ -108,14 +108,6 @@ func (pm *PromptManager) currentUserInput() string {
 	return ""
 }
 
-func promptLoopForTask(task aicommon.AIStatefulTask) *reactloops.ReActLoop {
-	if task == nil {
-		return nil
-	}
-	loop, _ := task.GetReActLoop().(*reactloops.ReActLoop)
-	return loop
-}
-
 // currentLoopInstructionAndExample fetches the persistent instruction and
 // output example injected by the active ReActLoop, falling back to the
 // supplied defaults when the loop has none.
@@ -260,21 +252,6 @@ func (pm *PromptManager) preparePromptPrefixMaterials(
 	return base, pm.NewPromptMaterials(base, input), nil
 }
 
-func (pm *PromptManager) preparePromptPrefixMaterialsForLoop(
-	tools []*aitool.Tool,
-	input *reactloops.LoopPromptAssemblyInput,
-	loop *reactloops.ReActLoop,
-) (*reactloops.LoopPromptBaseMaterials, *aicommon.PromptMaterials, error) {
-	if input == nil {
-		return nil, nil, fmt.Errorf("prompt assembly input is nil")
-	}
-	base, err := pm.GetLoopPromptBaseMaterialsForLoop(tools, input.Nonce, loop)
-	if err != nil {
-		return nil, nil, err
-	}
-	return base, pm.NewPromptMaterials(base, input), nil
-}
-
 // assemblePromptWithDynamicSection renders the dynamic tail and joins it with
 // the shared prefix sections, producing the final tagged prompt string.
 func (pm *PromptManager) assemblePromptWithDynamicSection(
@@ -304,17 +281,6 @@ func (pm *PromptManager) applyLoopInstructionAndExample(
 	materials.TaskInstruction = instruction
 	materials.OutputExample = example
 	materials.SkillsContext = pm.renderSkillsContextForPrompt()
-}
-
-func (pm *PromptManager) applyLoopInstructionAndExampleForLoop(
-	materials *aicommon.PromptMaterials,
-	loop *reactloops.ReActLoop,
-	fallbackInstruction, fallbackExample string,
-) {
-	instruction, example := loopInstructionAndExample(loop, fallbackInstruction, fallbackExample)
-	materials.TaskInstruction = instruction
-	materials.OutputExample = example
-	materials.SkillsContext = renderSkillsContextForLoop(loop)
 }
 
 // GenerateVerificationPrompt generates the verification prompt using the shared

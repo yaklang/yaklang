@@ -350,47 +350,6 @@ func runWithLLMRerank(
 	return metrics
 }
 
-// --- Phase 5: Full Matrix Report ---
-
-// TestPhase5_GenerateFullReport reads all saved metrics and generates the combined report.
-// Run: go test -run TestPhase5_GenerateFullReport -v ./common/ai/aid/aireact/knowledgebench/
-func TestPhase5_GenerateFullReport(t *testing.T) {
-	cleanupBenchArtifacts(t)
-	resultsDir := getResultsDir()
-	entries, err := os.ReadDir(resultsDir)
-	if err != nil {
-		t.Skipf("no results dir: %v", err)
-	}
-
-	var allMetrics []*RunMetrics
-	for _, entry := range entries {
-		if entry.IsDir() || filepath.Ext(entry.Name()) != ".jsonl" {
-			continue
-		}
-		path := filepath.Join(resultsDir, entry.Name())
-		queries, err := loadMetricsFile(path)
-		if err != nil {
-			t.Logf("skip %s: %v", entry.Name(), err)
-			continue
-		}
-		allMetrics = append(allMetrics, queries...)
-	}
-
-	if len(allMetrics) == 0 {
-		t.Skip("no metrics found")
-	}
-
-	writeReport(t, allMetrics, "16-knowledge-param-experiment.md")
-}
-
-func loadMetricsFile(path string) ([]*RunMetrics, error) {
-	queries, err := LoadFixtures(path) // reuse JSONL loader format
-	_ = queries
-	// For simplicity, metrics files are also JSONL but with RunMetrics schema.
-	// We'll implement proper loading when needed.
-	return nil, err
-}
-
 func writeReport(t *testing.T, allMetrics []*RunMetrics, filename string) {
 	t.Helper()
 	report := GenerateMarkdownReport(allMetrics)

@@ -640,4 +640,4 @@ yak test ./common/ai/aid/aireact/reactloops/loop_log_analyze/...
 - 参考项目：
   - 简单：[loop_default](../loop_default)
   - 中等：[loop_smart_qa](../loop_smart_qa)、[loop_knowledge_enhance](../loop_knowledge_enhance)
-  - 复杂：[loop_http_fuzztest](../loop_http_fuzztest)、[loop_plan](../loop_plan)
+  - 复杂：[loop_http_fuzztest](../loop_http_fuzztest)、[coordinator](../../../coordinator/README.md)

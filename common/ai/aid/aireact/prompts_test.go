@@ -628,53 +628,6 @@ func TestPromptManager_WithMixedContextProviders(t *testing.T) {
 	t.Logf("Second call context: %s", ctx2)
 }
 
-// Example usage of the new traced context providers
-func TestExample_WithTracedDynamicContextProvider(t *testing.T) {
-	// This example shows how to use the new traced context provider features
-
-	// Create a ReAct instance with traced providers
-	react, err := NewTestReAct(
-		// Regular dynamic context provider (no tracing)
-		aicommon.WithDynamicContextProvider("system_info", func(config aicommon.AICallerConfigIf, emitter *aicommon.Emitter, key string) (string, error) {
-			return "System: Linux x86_64", nil
-		}),
-
-		// Traced dynamic context provider (tracks changes)
-		aicommon.WithTracedDynamicContextProvider("user_session", func(config aicommon.AICallerConfigIf, emitter *aicommon.Emitter, key string) (string, error) {
-			return fmt.Sprintf("Session active since %s", time.Now().Format("15:04:05")), nil
-		}),
-
-		// Traced file context provider (monitors file changes)
-		aicommon.WithTracedFileContext("config_file", "/etc/config.yaml"),
-
-		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
-			rsp := i.NewAIResponse()
-			rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "object", "next_action": {"type": "directly_answer", "answer_payload": "Example completed"}, "cumulative_summary": "Example summary", "human_readable_thought": "Example thought"}`))
-			rsp.Close()
-			return rsp, nil
-		}),
-	)
-
-	if err != nil {
-		fmt.Printf("Failed to create ReAct instance: %v\n", err)
-		return
-	}
-
-	// First call - no diff information
-	_ = react.promptManager.DynamicContext()
-	fmt.Printf("First call includes system info and initial session time\n")
-
-	// Wait a moment to ensure different timestamps
-	time.Sleep(100 * time.Millisecond)
-
-	// Second call - will include diff for traced providers
-	_ = react.promptManager.DynamicContext()
-	fmt.Printf("Second call includes changes for traced providers\n")
-
-	// Output: First call includes system info and initial session time
-	// Output: Second call includes changes for traced providers
-}
-
 type promptFixtureForgeFactory struct {
 	aicommon.AIForgeFactory
 	forges []*schema.AIForge

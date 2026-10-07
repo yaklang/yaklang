@@ -4,7 +4,7 @@
 
 单步结构化输出与应用在 [LiteForge](../aid/liteforge/README.md) 和其 `liteforgeapp` 子包；本包不承载 LiteForge 应用实现。
 
-完整迁移契约见 [LEGACY_INTERFACE.md](../aid/coordinator/LEGACY_INTERFACE.md)。Yak 模块名 `aiagent` 保持不变，Go 导入路径为 `github.com/yaklang/yaklang/common/ai/aiforge`。
+运行接口与恢复边界见 [Coordinator 接口契约](../aid/coordinator_interface_contract.md)。Yak 模块名 `aiagent` 保持不变，Go 导入路径为 `github.com/yaklang/yaklang/common/ai/aiforge`。
 
 验证从仓库根目录启动：
 

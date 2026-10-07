@@ -1,5 +1,5 @@
 // Package coordinator owns the native PLAN runtime, scheduler and Yakit
-// adapter. It does not depend on coordinator_legacy.Coordinator.
+// adapter.
 package coordinator
 
 import (
