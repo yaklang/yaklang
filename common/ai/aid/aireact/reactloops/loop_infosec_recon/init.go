@@ -24,38 +24,6 @@ func init() {
 	err := reactloops.RegisterLoopFactory(
 		schema.AI_REACT_LOOP_NAME_INFOSEC_RECON,
 		func(r aicommon.AIInvokeRuntime, opts ...reactloops.ReActLoopOption) (*reactloops.ReActLoop, error) {
-			// meta/schema-level loop actions vs toolkit-style names (see names.go for embedded tools).
-			metaActions := []string{
-				schema.AI_REACT_LOOP_ACTION_DIRECTLY_ANSWER,
-				schema.AI_REACT_LOOP_ACTION_REQUIRE_TOOL,
-				schema.AI_REACT_LOOP_ACTION_DIRECTLY_CALL_TOOL,
-				"finish",
-				schema.AI_REACT_LOOP_ACTION_KNOWLEDGE_ENHANCE,
-				schema.AI_REACT_LOOP_ACTION_SEARCH_CAPABILITIES,
-				schema.AI_REACT_LOOP_ACTION_LOAD_CAPABILITY,
-				schema.AI_REACT_LOOP_ACTION_LOADING_SKILLS,
-				schema.AI_REACT_LOOP_ACTION_LOAD_SKILL_RESOURCES,
-				schema.AI_REACT_LOOP_ACTION_CHANGE_SKILL_VIEW_OFFSET,
-				"recon_register_seed",
-				"api_pool_merge",
-				ToolCrawlJsCollector,
-				ToolJsStaticExtractAI,
-				"probe_api_candidates",
-			}
-			toolActions := []string{
-				"web_search",
-				"do_http_request",
-				"batch_do_http_request",
-				"read_file",
-				"find_files",
-				"grep_text",
-				"search_knowledge",
-			}
-			allowed := append(append([]string{}, metaActions...), toolActions...)
-			if r.GetConfig().GetAllowUserInteraction() {
-				allowed = append(allowed, schema.AI_REACT_LOOP_ACTION_ASK_FOR_CLARIFICATION)
-			}
-
 			maxIter := int(r.GetConfig().GetMaxIterationCount())
 			if maxIter < 16 {
 				maxIter = 16
@@ -69,14 +37,6 @@ func init() {
 				reactloops.WithInitTask(buildInitTask(r)),
 				reactloops.WithMaxIterations(maxIter),
 				reactloops.WithAllowUserInteract(r.GetConfig().GetAllowUserInteraction()),
-				reactloops.WithActionFilter(func(action *reactloops.LoopAction) bool {
-					for _, name := range allowed {
-						if action.ActionType == name {
-							return true
-						}
-					}
-					return false
-				}),
 				reactloops.WithPersistentInstruction(persistentInstruction),
 				reactloops.WithOutputExample(outputExample),
 				reactloops.WithReactiveDataBuilder(func(loop *reactloops.ReActLoop, feedbacker *bytes.Buffer, nonce string) (string, error) {
