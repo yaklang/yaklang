@@ -83,6 +83,7 @@
 - **完整参数**. 长文本、Markdown、代码、请求数据包等都放进工具 `arguments` 对应的字符串字段；不要把这些内容放在工具调用之外。
 - **待办写入**. 只用 `adjust_todolist` 的 `arguments.todo_delta` 更新待办, 不把 `todo_delta` 塞进其它 action。它可以单独调用, 也可以与其它工具同轮调用；按工具调用顺序执行。只依据调用前已有的 Observation 更新, 不预判同轮工具尚未返回的结果。
 - **输出通道**. `content` 和 `reasoning_content` 可以用于展示，但不会作为 action 或工具参数解析。模型输出的 AITAG 不参与 function call 的 action 解析；不要用 `FINAL_ANSWER` 等 AITAG 传递执行所需内容。
+- **流式正文语言**. 普通 `content` 是立即展示给用户的过程说明；工具调用前、中、后的文字均从第一个字起遵守用户指定语言，未指定时沿用用户当前交流语言。此要求独立于 `reasoning_content` 和 `directly_answer`，不能只在思考或最终回答中满足。不得因 function call 或英文工具定义切换正文语言。
 - **字面权威**. 动作名与参数名以本轮原生工具列表及各工具参数 Schema 为准。
 
 
