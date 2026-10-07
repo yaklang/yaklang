@@ -13,6 +13,7 @@ import (
 	"runtime"
 	"strconv"
 	"strings"
+	"sync"
 	"syscall"
 	"testing"
 	"time"
@@ -283,12 +284,84 @@ type engineCLIChild struct {
 	ready grpcReadyEvent
 }
 
+// Keep failure diagnostics bounded without blocking either child output stream.
+type engineCLIOutput struct {
+	sync.Mutex
+	tail []byte
+}
+
+func (o *engineCLIOutput) Write(p []byte) (int, error) {
+	o.Lock()
+	defer o.Unlock()
+	const limit = 16 * 1024
+	n := len(p)
+	if n >= limit {
+		o.tail = append(o.tail[:0], p[n-limit:]...)
+	} else {
+		if overflow := len(o.tail) + n - limit; overflow > 0 {
+			o.tail = o.tail[overflow:]
+		}
+		o.tail = append(o.tail, p...)
+	}
+	return n, nil
+}
+
+func (o *engineCLIOutput) diagnostic() string {
+	o.Lock()
+	defer o.Unlock()
+	// Drop a possibly truncated first line, then omit credential/config lines.
+	text := string(o.tail)
+	if len(o.tail) == 16*1024 {
+		_, text, _ = strings.Cut(text, "\n")
+	}
+	lines := strings.Split(text, "\n")
+	for i, line := range lines {
+		lower := strings.ToLower(line)
+		for _, sensitive := range []string{"apikey", "api_key", "api key", "token", "password", "authorization", "secret"} {
+			if strings.Contains(lower, sensitive) {
+				lines[i] = "[credential/config line omitted]"
+				break
+			}
+		}
+	}
+	return strings.Join(lines, "\n")
+}
+
+func logEngineStartupFailure(t *testing.T, home string, output *engineCLIOutput) {
+	t.Helper()
+	t.Logf("engine output tail:\n%s", output.diagnostic())
+	// Stdout caching can redirect control events before forwarding them. Inspect
+	// only this child's isolated cache, without treating it as readiness.
+	paths, _ := filepath.Glob(filepath.Join(home, "temp", "combined-outputs-*.txt"))
+	for i, path := range paths {
+		if i == 3 {
+			break
+		}
+		file, err := os.Open(path)
+		if err != nil {
+			continue
+		}
+		info, err := file.Stat()
+		if err == nil {
+			start := info.Size() - 16*1024
+			if start < 0 {
+				start = 0
+			}
+			var cached engineCLIOutput
+			_, _ = io.Copy(&cached, io.NewSectionReader(file, start, 16*1024))
+			t.Logf("engine cached output %s:\n%s", filepath.Base(path), cached.diagnostic())
+		}
+		file.Close()
+	}
+}
+
 func startEngineCLI(t *testing.T, f engineCLI, args ...string) *engineCLIChild {
 	t.Helper()
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 	t.Cleanup(cancel)
 	cmd := exec.CommandContext(ctx, f.binary, args...)
-	cmd.Env, cmd.Dir, cmd.Stderr = f.env, f.home, io.Discard
+	output := new(engineCLIOutput)
+	cmd.Env, cmd.Dir, cmd.Stderr = f.env, f.home, output
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
 		t.Fatal(err)
@@ -303,6 +376,7 @@ func startEngineCLI(t *testing.T, f engineCLI, args ...string) *engineCLIChild {
 		scanner.Buffer(make([]byte, 4096), 1024*1024)
 		for scanner.Scan() {
 			line := scanner.Text()
+			_, _ = output.Write([]byte(line + "\n"))
 			if strings.HasPrefix(line, grpcReadyMarkerPrefix) {
 				var event grpcReadyEvent
 				if json.Unmarshal([]byte(strings.TrimPrefix(line, grpcReadyMarkerPrefix)), &event) == nil {
@@ -312,6 +386,9 @@ func startEngineCLI(t *testing.T, f engineCLI, args ...string) *engineCLIChild {
 					}
 				}
 			}
+		}
+		if err := scanner.Err(); err != nil {
+			_, _ = output.Write([]byte("stdout scanner failed: " + err.Error() + "\n"))
 		}
 		child.err = cmd.Wait()
 		close(child.done)
@@ -328,8 +405,10 @@ func startEngineCLI(t *testing.T, f engineCLI, args ...string) *engineCLIChild {
 	select {
 	case child.ready = <-ready:
 	case <-child.done:
+		logEngineStartupFailure(t, f.home, output)
 		t.Fatalf("engine exited before readiness: %v", child.err)
 	case <-time.After(30 * time.Second):
+		logEngineStartupFailure(t, f.home, output)
 		t.Fatal("engine readiness timeout")
 	}
 	return child
