@@ -28,6 +28,7 @@ func TestCLIStartupUnixSignalRecovery(t *testing.T) {
 				requireEngineEcho(t, "unix", endpoint, secret)
 				return child
 			}
+			t.Log("starting initial engine")
 			first := start()
 			stopErr := first.stop(t, signal)
 			_, socketErr := os.Lstat(endpoint)
@@ -39,6 +40,7 @@ func TestCLIStartupUnixSignalRecovery(t *testing.T) {
 				t.Fatalf("normal signal did not clean up: %v / %v", stopErr, socketErr)
 			}
 			// No test-side unlink: restart directly with the SAME path and DBs.
+			t.Log("restarting engine with the same endpoint and databases")
 			second := start()
 			if err := second.stop(t, syscall.SIGTERM); err != nil {
 				t.Fatal(err)
