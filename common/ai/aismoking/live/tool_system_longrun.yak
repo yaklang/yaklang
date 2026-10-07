@@ -1,0 +1,262 @@
+// yak common/ai/aismoking/live/tool_system_longrun.yak
+// 50 intended tool operations; native parameter groups, controlled HTTP retry,
+// Timeline compression and real memory persistence. Local fixtures only.
+// Reuses the long-run capture/callback design and memory_capture.inc decoder.
+include "common/ai/aismoking/live/memory_capture.inc"
+root = os.Getenv("AISMOKING_OUTPUT")
+assert root != "" && !file.IsExisted(file.Join(root,"result.json")), "Choose a fresh AISMOKING_OUTPUT"
+file.MkdirAll(root)~
+variant = os.Getenv("AISMOKING_VARIANT")
+if variant == "" { variant = "current" }
+model = os.Getenv("AISMOKING_TOOL_MODEL")
+if model=="" { model="deepseek-v4.1-flash" }
+namespace = "tool-longrun-" + variant + "-" + randstr(12)
+seedPacket = nil
+_, seedErr = ai.IntelligentChat("只回答 OK。",ai.model(model),ai.timeout(40),
+    ai.rawHTTPRequestResponseCallback(func(packet,header,body,usage) { seedPacket = packet }),
+    func(c) { c.Context = context.Seconds(45); c.DisableProviderFallback = true })
+assert seedPacket != nil && seedErr == nil, "Configured provider is unavailable"
+port = os.GetRandomAvailableTCPPort()
+base = "http://" + str.HostPort("127.0.0.1",port)
+runCtx = context.Seconds(2400)
+mu = sync.NewMutex()
+requests,receipts,commits,events = [],[],[],[]
+config, memorySaves, memoryIndexes = nil,0,0
+armed = {}
+itemCopies = {}
+httpAttempts, httpReceipts = {},[]
+toolFacts = {}
+previousSummary,previousCandidates = "",[]
+file.SaveJson(file.Join(root,"run-metadata.json"),{"model":model,"namespace":namespace,"scenario":"12-wave ERP reconciliation; 50 intended operations plus one HTTP retry"})~
+sampling=true
+sampleWG=sync.NewWaitGroup()
+sampleWG.Add(1)
+go func() {
+    defer sampleWG.Done()
+    for {
+        time.Sleep(2)
+        mu.Lock()
+        active=sampling
+        eventSnapshot=json.dumps(events)
+        factSnapshot=json.dumps(toolFacts)
+        mu.Unlock()
+        if !active { return }
+        file.Save(file.Join(root,"events.json"),eventSnapshot)~
+        file.Save(file.Join(root,"tool-facts.json"),factSnapshot)~
+    }
+}()
+go httpserver.Serve("127.0.0.1",port,httpserver.context(runCtx),httpserver.handler(func(w,req) {
+    if req.URL.Path == "/ready" { w.Write("ready"); return }
+    if str.HasPrefix(req.URL.Path,"/erp/snapshot/") {
+        wave = parseInt(str.TrimPrefix(req.URL.Path,"/erp/snapshot/"))
+        if wave<1 || wave>12 { w.WriteHeader(404); w.Write("Unknown wave"); return }
+        mu.Lock()
+        httpAttempts[string(wave)] = int(httpAttempts[string(wave)])+1
+        attempt = httpAttempts[string(wave)]
+        mu.Unlock()
+        time.Sleep(0.08)
+        if wave==7 && attempt==1 {
+            w.Header().Set("Content-Type","application/json")
+            w.WriteHeader(503); w.Write(`{"status":"temporary_unavailable","retryable":true,"message":"No snapshot delivered; retry this GET only."}`)
+            mu.Lock(); httpReceipts=append(httpReceipts,{"wave":wave,"attempt":attempt,"status":503}); file.SaveJson(file.Join(root,"http-receipts.json"),httpReceipts)~; mu.Unlock()
+            return
+        }
+        rows=4
+        if wave==2 || wave==5 { rows=5 }
+        adjustment={"status":"none"}
+        if wave>=4 {
+            adjustment={"correlation_id":"AUDIT-CORR-2026","status":"accepted","operations":[{"order_id":"A02","op":"void"},{"order_id":"A01","op":"replace_unit_price","unit_price":14}]}
+        }
+        if wave==12 { adjustment.status="succeeded"; adjustment.receipt_id="ERP-EXECUTED-12" }
+        snapshot={"wave":wave,"source_version":sprintf("ERP-%02d",wave),"currency":"CNY","expected_csv_rows":rows,"adjustment":adjustment}
+        w.Header().Set("Content-Type","application/json"); w.Write(json.dumps(snapshot))
+        mu.Lock(); httpReceipts=append(httpReceipts,{"wave":wave,"attempt":attempt,"status":200}); file.SaveJson(file.Join(root,"http-receipts.json"),httpReceipts)~; mu.Unlock()
+        return
+    }
+    caller = codec.DecodeUrl(str.TrimSuffix(str.TrimPrefix(req.URL.Path,"/"),"/v1/chat/completions"))~
+    body = json.loads(string(io.ReadAll(req.Body)~))
+    body.stream_options = {"include_usage":true}
+    fileBody=json.dumps(body)
+    if "tools" in body && len(body.tools)>0 { assert body.tool_choice=="auto", "Native tool choice must be auto" }
+    if "qwen" in str.ToLower(model) { assert !("cache_control" in fileBody), "Qwen explicit cache metadata unexpectedly enabled" }
+    mu.Lock()
+    seq = len(requests)+1
+    row = {"seq":seq,"caller":caller,"model":body.model,"native":("tools" in body && len(body.tools)>0),"completed":false,"transport_error":nil,"usage":nil,"seconds":0,"retry_prompt":false,"parse_errors":[],"invalid_arguments":0,"unadvertised":0,"tool_calls":[]}
+    requests = append(requests,row)
+    file.SaveJson(file.Join(root,"requests.json"),requests)~
+    mu.Unlock()
+    prompt = ""
+    for message in body.messages { if message.content != nil { prompt += string(message.content)+"\n\n" } }
+    row.prompt_chars = len(prompt)
+    row.retry_prompt = "# 重试纠正" in prompt
+    file.SaveJson(file.Join(root,sprintf("request-%03d.json",seq)),body)~
+    file.Save(file.Join(root,sprintf("prompt-%03d.txt",seq)),prompt)~
+    began = time.Now()
+    response,_,relayErr = poc.HTTP(seedPacket,poc.https(true),poc.replaceBody([]byte(json.dumps(body)),false),
+        poc.timeout(130),poc.retryTimes(0),poc.redirectTimes(0),poc.save(false))
+    if relayErr != nil {
+        mu.Lock(); row.transport_error,row.completed = "Provider transport failed",true; file.SaveJson(file.Join(root,"requests.json"),requests)~; mu.Unlock()
+        w.WriteHeader(502); w.Write("Provider transport failed"); return
+    }
+    split = str.SplitN(string(response),"\r\n\r\n",2)
+    header,raw = split[0],split[1]
+    if "transfer-encoding: chunked" in str.ToLower(header) { raw = string(codec.DecodeChunked([]byte(raw))~) }
+    decoded = memoryDecodeResponse(raw)
+    mu.Lock()
+    row.finish_reason,row.tool_calls,row.content,row.reasoning_bytes = decoded.finish_reason,decoded.tool_calls,decoded.content,len(decoded.reasoning_content)
+    row.parse_errors=decoded.parse_errors
+    row.invalid_arguments,row.unadvertised=0,0
+    declared=[]
+    for tool in body.tools { declared=append(declared,tool["function"].name) }
+    for call in decoded.tool_calls {
+        _,argumentError=json.New(call.arguments)
+        if argumentError!=nil { row.invalid_arguments++ }
+        if !(call.name in declared) { row.unadvertised++ }
+    }
+    row.usage = nil
+    for line in str.Split(raw,"\n") {
+        if !str.HasPrefix(str.TrimSpace(line),"data:") { continue }
+        payload = str.TrimSpace(str.TrimPrefix(str.TrimSpace(line),"data:"))
+        frame,frameErr = json.New(payload)
+        if frameErr == nil && "usage" in frame.Value() && frame.Value().usage != nil { row.usage = frame.Value().usage }
+    }
+    row.seconds,row.completed = time.Since(began).Seconds(),true
+    row.status = str.Split(header,"\r\n")[0]
+    file.SaveJson(file.Join(root,sprintf("response-%03d.json",seq)),decoded)~
+    file.Save(file.Join(root,sprintf("response-%03d.sse",seq)),raw)~
+    file.SaveJson(file.Join(root,"requests.json"),requests)~
+    mu.Unlock()
+    printf("LONGRUN_REQUEST seq=%d caller=%s native=%v seconds=%.2f finish=%s\n",seq,caller,row.native,row.seconds,row.finish_reason)
+    status = parseInt(str.Split(row.status," ")[1])
+    w.Header().Set("Content-Type","text/event-stream")
+    w.WriteHeader(status)
+    w.Write(raw)~
+}))
+for i=0;i<100;i++ { _,err=http.Get(base+"/ready"); if err==nil { break }; time.Sleep(0.02) }
+// Preserve the production projection and per-call protocol; caller identity is
+// only in the local relay URL and is not inserted into the model's prompt.
+modelCall = func(callerConfig,request) {
+    response = callerConfig.NewAIResponse()
+    go func() {
+        defer response.Close()
+        options = [ai.type("openai"),ai.model(model),ai.apiKey("diagnostic-relay"),
+            ai.baseURL(base+"/"+codec.EscapeUrl(request.GetCallerLabel())+"/v1/chat/completions"),ai.noHttps(true),ai.timeout(140),
+            ai.onStream(func(reader) { response.EmitOutputStream(reader) }),
+            ai.onReasonStream(func(reader) { response.EmitReasonStream(reader) }),
+            ai.rawHTTPRequestResponseCallback(func(packet,header,body,usage) { response.SetUsageInfo(usage) }),
+            func(c) { c.Context=request.GetContext(); c.DisableProviderFallback=true; c.FunctionCallRetryTimes=1 }]
+        options = append(options,request.GetExtraSpecOpts()...)
+        if request.IsToolCallArgumentsStreamEnabled() {
+            options=append(options,func(c) { c.ToolCallArgumentsStreamHandler=func(reader) { response.EmitOutputStream(reader) } })
+        }
+        _,err=ai.Chat(request.GetPrompt(),options...)
+        if err!=nil { response.SetError(err) }
+    }()
+    return response,nil
+}
+
+fixture=file.Join(root,"fixture")
+file.MkdirAll(fixture)~
+for i=1;i<=12;i++ {
+    ledger=sprintf("SOURCE LEDGER-%02d\norder_id,sku,quantity,unit_price,status\nA%02d,A,3,%d,paid\nB%02d,B,2,%d,paid\nR%02d,A,1,%d,refunded\nP%02d,B,1,%d,pending\n",i,i,11+i,i,13+i,i,3*i,i,100+i)
+    if i==2 { ledger+="A01,A,3,12,paid\n" }
+    if i==5 { ledger+="U05,X,1,77,paid\n" }
+    file.Save(file.Join(fixture,sprintf("ledger-%02d.csv",i)),ledger)~
+    metadata={"wave":i,"source_version":sprintf("META-%02d",i),"currency":"CNY","allowed_skus":["A","B"],"deduplicate":"first order_id across all waves","exclude_statuses":["pending"],"refund_rule":"quantity multiplied by unit_price; subtract from paid","execution_rule":"accepted is not executed; only matching succeeded receipt applies adjustment"}
+    file.SaveJson(file.Join(fixture,sprintf("meta-%02d.json",i)),metadata)~
+}
+path=str.ReplaceAll(root,"\\","/")
+task=sprintf(`完成一次可审计的12批订单对账。输入目录%s/fixture；本地ERP服务%s。本次工程报告用中文，必须区分已读取、已执行和未确认状态；不要提交或推送代码。使用当前主循环，不进入PLAN、不创建子任务、不执行命令或外部访问。
+每批01至12按编号处理。每批的三份来源相互独立：ledger-NN.csv、meta-NN.json和GET %s/erp/snapshot/N（URL的N为整数1至12）。先用require_tool一次加载read_file、do_http_request、write_file的Schema；加载不算执行。每批使用一次directly_call_tool_params_group读取这三份来源，两个read_file和一个do_http_request各自提交完整params、独立identifier、reason。无需再要求用户确认。不要用脚本读全部数据，也不要把这些独立读取改成串行。若某项失败，只重试该项，已经完成的同组成员不能重读。ERP的503是暂时故障，无有效快照，必须重新GET该批快照；不可将错误报文当成来源。
+规则：paid/refunded金额均为quantity*unit_price；按order_id跨批去重保留首次；pending不计金额；只允许A、B两种SKU，未知SKU排除金额。核对ERP的expected_csv_rows与本批实际CSV数据行数（含重复或异常行），ledger的SOURCE行不计为数据。只有correlation_id一致的succeeded回执能执行调整；accepted只是通知，不能提前应用，也不能重复应用。
+每批三份来源核验后，用write_file在%s/checkpoint-NN.json写检查点，并用save_evidence保存该批进度；必须写完检查点才能开始下一批。每个检查点JSON字段：wave、source_versions（ledger/meta/erp）、raw_rows（累计数据行数）、unique_orders（累计唯一ID数量，含pending和未知SKU）、paid_total/refund_total/net_total（累计未调整数字）、effective_paid_total/effective_net_total（按已执行回执调整的数字）、adjustment_state（none/accepted/succeeded）、adjustment_applied（bool）、duplicates/unknown_skus/pending_orders（累计ID数组）。证据写清已核对来源、累计数字和待执行调整；压缩后依据这些状态继续，不能重复读取已完成来源。
+最后同时写%s/audit.json和%s/audit.md，两份报告可用一个两项参数组。audit.json含raw_rows、unique_orders、duplicates、unknown_skus、pending_orders、before_adjustment与after_adjustment（paid_total/refund_total/net_total）、correlation_id、receipt_id、completed_waves。中文报告说明异常、503的处理、accepted与succeeded的区别、调整前后金额和12批实际核对范围；最后给出中文结论。预期业务工作为36个读取、12个检查点写入和2个最终报告写入；失败项重试单独记录。禁止仅宣称完成而不调用工具。`,path,base,base,path,path,path)
+file.Save(file.Join(root,"task.txt"),task)~
+started=time.Now()
+runErr=aim.InvokeReAct(task,aim.sessionID(namespace),aim.context(runCtx),aim.timeout(2350),aim.workdir(root),
+    aim.aiCallback(modelCall),aim.speedPriorityAICallback(modelCall),aim.qualityPriorityAICallback(modelCall),
+    aim.reviewPolicy("yolo"),aim.timelineContentLimit(120000),aim.allowUserInteract(false),aim.maxIteration(100),
+    aim.disableMCPServers(true),aim.disableAIForge(true),aim.includeToolNames("read_file","write_file","do_http_request"),
+    aim.configOptions(aiagent.functionCallMode(true),aiagent.aiCallback(modelCall),func(c) {
+        c.DisablePerception,c.DisableIntentRecognition,c.DisableMemoryTriage=true,true,false
+        c.MemoryTriageId=namespace
+        c.SetConfig("disable_session_title_generation",true)
+        return nil
+    }),aim.onEvent(func(op,e) {
+        typ,node=string(e.Type),e.NodeId
+        if typ in ["stream","stream_start","stream_end"] { return }
+        mu.Lock()
+        events=append(events,{"type":typ,"node":node,"task":e.TaskIndex,"content":string(e.Content),"ts":time.Now().UnixMilli()})
+        if node=="memory-save" { memorySaves++ }
+        if node=="memory-index" { memoryIndexes++ }
+        if typ in ["tool_call_start","tool_call_param","tool_call_done","tool_call_error","tool_call_cancel","tool_call_result"] {
+            fact=json.loads(string(e.Content)); id=fact.call_tool_id
+            if id!=nil {
+                if !(id in toolFacts) { toolFacts[id]=json.loads("{}"); toolFacts[id].id=id }
+                if typ=="tool_call_start" { toolFacts[id].tool=fact.tool.name; toolFacts[id].start=fact.start_time_ms }
+                if typ=="tool_call_param" { toolFacts[id].params=fact.params }
+                if typ=="tool_call_done" {
+                    toolFacts[id].done=true; toolFacts[id].end=fact.end_time_ms; toolFacts[id].duration_ms=fact.duration_ms
+                    current=toolFacts[id]
+                    if config!=nil && current.tool=="write_file" && current.params!=nil {
+                        for marker in ["checkpoint-04.json","checkpoint-08.json"] {
+                            if !(marker in armed) && str.HasSuffix(current.params.file,marker) { armed[marker]=true; config.GetTimeline().SetTimelineContentLimit(1) }
+                        }
+                    }
+                }
+                if typ=="tool_call_error" { toolFacts[id].error=fact }
+                if typ=="tool_call_cancel" { toolFacts[id].cancelled=true }
+            }
+        }
+        mu.Unlock()
+        if node!="react_task_enqueue" || config!=nil { return }
+        config=op.GetConfig(); tl=config.GetTimeline(); tl.SetTimelineBucketByteSize(-1)
+        tl.RegisterItemInputCallback("tool-longrun.sample",func(event) {
+            mu.Lock()
+            itemCopies[string(event.ID)]=event.ItemJSON
+            mu.Unlock()
+        })
+        tl.RegisterSummaryCallback("tool-longrun.sample",func(event) {
+            summary=string(io.ReadAll(event.Summary)~)
+            frozen,open=tl.DumpFrozenOpen()
+            mu.Lock()
+            index=len(receipts)+1
+            visible=true
+            for candidate in previousCandidates { if !(candidate.content in event.Prompt) { visible=false } }
+            receipt={"index":index,"through_id":event.ThroughID,"summary":summary,"source_chars":len(event.Prompt),"frozen_chars":len(frozen),"open_chars":len(open),"retained_ids":event.RetainedIDs,"retained_range":event.RetainedRange,"previous_summary_visible":previousSummary=="" || previousSummary in event.Prompt,"previous_memory_visible":visible,"memory_entities":[],"memory_error":"pending"}
+            receipts=append(receipts,receipt); previousSummary=summary
+            file.Save(file.Join(root,sprintf("compression-%02d-source.txt",index)),event.Prompt)~
+            file.Save(file.Join(root,sprintf("compression-%02d-summary.txt",index)),summary)~
+            file.SaveJson(file.Join(root,"receipts.json"),receipts)~
+            mu.Unlock(); tl.SetTimelineContentLimit(120000)
+        })
+        tl.RegisterMemoryCallback("tool-longrun.sample",func(event) {
+            mu.Lock()
+            for receipt in receipts { if receipt.through_id==event.ThroughID { receipt.memory_entities=event.MemoryEntities; receipt.memory_error=sprintf("%v",event.Err) } }
+            previousCandidates=tl.GetSessionMemoryCandidates()
+            file.SaveJson(file.Join(root,"receipts.json"),receipts)~
+            mu.Unlock()
+        })
+        tl.RegisterCompressFreezeCallback("tool-longrun.sample",func(event) {
+            checks=[]
+            for id in event.Compression.RetainedIDs {
+                item,found=tl.GetIdToTimelineItem().Get(id)
+                matches=found && string(id) in itemCopies && string(item.MarshalJSON()~)==itemCopies[string(id)]
+                checks=append(checks,{"id":id,"unchanged":matches})
+            }
+            mu.Lock(); commits=append(commits,{"compression":event.Compression,"retained_checks":checks}); file.SaveJson(file.Join(root,"commits.json"),commits)~; mu.Unlock()
+        })
+    }))
+mu.Lock(); sampling=false; mu.Unlock()
+sampleWG.Wait()
+file.SaveJson(file.Join(root,"events.json"),events)~
+file.SaveJson(file.Join(root,"tool-facts.json"),toolFacts)~
+runtimeState={"error":sprintf("%v",runErr),"seconds":time.Since(started).Seconds(),"memory_finalization_pending":nil,"runtime_error_known":true,"capture_replayed":false}
+if config!=nil {
+    file.Save(file.Join(root,"final-timeline.txt"),config.GetTimeline().Dump())~
+    file.Save(file.Join(root,"final-evidence.txt"),config.GetSessionEvidenceRendered())~
+    file.SaveJson(file.Join(root,"session-candidates.json"),config.GetTimeline().GetSessionMemoryCandidates())~
+    runtimeState.memory_finalization_pending=config.GetTimeline().HasPendingMemoryFinalization()
+    file.SaveJson(file.Join(root,"runtime-state.json"),runtimeState)~
+}
+include "common/ai/aismoking/live/tool_system_longrun_assert.inc"
