@@ -227,12 +227,12 @@ func TestNativeFunctionCallStatusNamesAppearBeforeProviderFinishes(t *testing.T)
 			Function: aispec.FuncReturn{Name: nativeAdjustTodolistActionName}}})
 		statusMu.Lock()
 		require.Equal(t, "action.preparing", statuses[len(statuses)-1].Code, "show the function as soon as its name arrives")
-		require.Equal(t, "正在调用调整待办事项", statuses[len(statuses)-1].Value)
+		require.Equal(t, "调整待办事项中…", statuses[len(statuses)-1].Value)
 		require.Zero(t, readersStarted, "displaying a name does not start argument consumers or execute a tool")
 		statusMu.Unlock()
 		cfg.ToolCallCallback([]*aispec.ToolCall{{Index: 0, ID: "todo", Function: aispec.FuncReturn{Arguments: `{"todo_delta":{}`}}})
 		statusMu.Lock()
-		sawFirst = statuses[len(statuses)-1].Value == "正在调用调整待办事项"
+		sawFirst = statuses[len(statuses)-1].Value == "调整待办事项中…"
 		statusMu.Unlock()
 		cfg.ToolCallCallback([]*aispec.ToolCall{{Index: 1, ID: "answer", Type: "function",
 			Function: aispec.FuncReturn{Name: "directly_answer", Arguments: `{"answer_payload":"你好"}`}}})
@@ -277,9 +277,9 @@ func TestNativeFunctionCallStatusNamesAppearBeforeProviderFinishes(t *testing.T)
 	var localizedAction bool
 	for _, status := range statuses {
 		require.NotEqual(t, "reasoning.thinking", status.Code)
-		if status.Value == "正在调用调整待办事项" {
+		if status.Value == "调整待办事项中…" {
 			require.NotNil(t, status.ValueI18n)
-			require.Equal(t, "Calling: updating the task list", status.ValueI18n.En)
+			require.Equal(t, "Updating the task list…", status.ValueI18n.En)
 			localizedAction = true
 		}
 		if status.Code == "action.batch.preparing" {

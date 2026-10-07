@@ -7,7 +7,7 @@
 {{ end }}{{ if .UserHistory }}{{ .UserHistory }}{{ end }}
 
 # Current Response Contract
-{{ if eq .Language "zh" }}LANGUAGE: Please respond in Chinese (中文) unless specifically asked otherwise.{{ else }}LANGUAGE: Please respond in English unless specifically asked otherwise.{{ end }}
+- 正文遵守用户明确指定的语言；未指定时沿用用户当前交流语言，不默认使用英文。
 - 只返回符合 schema 的 JSON 对象
 - 如果使用 AITAG，必须使用当前 nonce `{{ .Nonce }}`
 - 当前 FINAL_ANSWER Start tag: `<|FINAL_ANSWER_{{ .Nonce }}|>`

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"math/rand"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -40,6 +41,7 @@ type responseActivity struct {
 	calls           map[string]string
 	callOrder       []string
 	tools           map[string][]string
+	todoOperations  map[string]map[string]bool
 	toolLabels      map[string]schema.I18n
 	lastText        string
 	lastReason      time.Time
@@ -49,6 +51,7 @@ type responseActivity struct {
 	stopWaiting     chan struct{}
 	outputStarted   bool
 	contentStarted  bool
+	fieldStarted    bool
 	general         *liveGeneralOutput
 	headerSuccessor *responseActivity
 }
@@ -58,7 +61,7 @@ func newResponseActivity(loop *ReActLoop, allowed []string) *responseActivity {
 		allowed = loop.GetAllActionNames()
 	}
 	a := &responseActivity{loop: loop, allowed: make(map[string]bool, len(allowed)),
-		calls: make(map[string]string), tools: make(map[string][]string), toolLabels: make(map[string]schema.I18n),
+		calls: make(map[string]string), tools: make(map[string][]string), todoOperations: make(map[string]map[string]bool), toolLabels: make(map[string]schema.I18n),
 		thinkingIndex: uint64(rand.Intn(len(thinkingStatusNames))), waitingIndex: rand.Intn(len(waitingStatusNames)), stopWaiting: make(chan struct{})}
 	for _, name := range allowed {
 		a.allowed[name] = true
@@ -183,6 +186,8 @@ func (a *responseActivity) identifyCall(previous, id string) {
 		delete(a.calls, previous)
 		a.tools[id] = a.tools[previous]
 		delete(a.tools, previous)
+		a.todoOperations[id] = a.todoOperations[previous]
+		delete(a.todoOperations, previous)
 		for i, key := range a.callOrder {
 			if key == previous {
 				a.callOrder[i] = id
@@ -203,6 +208,7 @@ func containsStatusName(names []string, name string) bool {
 // Decoded key paths distinguish call metadata from arbitrary business params.
 // Array indices are omitted by jsonextractor's parent paths.
 func (a *responseActivity) field(id string, key string, value any, parents []string) {
+	a.todoOperation(id, key, value, parents)
 	name, ok := value.(string)
 	if !ok || strings.TrimSpace(name) == "" {
 		return
@@ -242,7 +248,7 @@ func (a *responseActivity) reason(data []byte) {
 	}
 	now := time.Now()
 	a.startOutput()
-	if len(a.actions) > 0 || a.contentStarted {
+	if len(a.actions) > 0 || a.contentStarted || a.fieldStarted {
 		return
 	}
 	if !a.lastReason.IsZero() && now.Sub(a.lastReason) < 6*time.Second {
@@ -296,6 +302,9 @@ func (a *responseActivity) emitPreparing() {
 		zhNames, enNames = append(zhNames, label.zh), append(enNames, label.en)
 	}
 	zh, en := "正在调用"+joinedStatusNames(zhNames, false), "Calling: "+joinedStatusNames(enNames, true)
+	if len(a.actions) == 1 && a.actions[0] == nativeAdjustTodolistActionName {
+		zh, en = "调整待办事项中…", "Updating the task list…"
+	}
 	if zh == a.lastText {
 		return
 	}
@@ -305,6 +314,97 @@ func (a *responseActivity) emitPreparing() {
 		code = "action.batch.preparing"
 	}
 	a.loop.UserStatus(zh, en, aicommon.WithStatusCode(code), aicommon.WithStatusTools(tools...))
+}
+
+// Observe actual decoded field bytes, before a display prefix is added. An
+// empty annotation must not stop the waiting indicator or create a fake stream.
+func (a *responseActivity) displayField(id, field string) {
+	var label actionStatusName
+	var code string
+	switch field {
+	case "human_readable_thought":
+		label, code = actionStatusName{"正在整理执行说明…", "Preparing an execution note…"}, "response.noting"
+	case "cumulative_summary":
+		label, code = actionStatusName{"正在整理本轮进展…", "Summarizing this step's progress…"}, "response.progress"
+	default:
+		return
+	}
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	if a.closed || len(a.todoOperations[id]) > 0 || containsStatusName(a.actions, schema.AI_REACT_LOOP_ACTION_DIRECTLY_CALL_TOOL) {
+		return
+	}
+	// Late fields from an earlier call cannot replace the newer call's status.
+	if len(a.callOrder) > 0 && a.callOrder[len(a.callOrder)-1] != id {
+		return
+	}
+	a.startOutput()
+	a.fieldStarted = true
+	if a.lastText != label.zh {
+		a.lastText = label.zh
+		a.loop.UserStatus(label.zh, label.en, aicommon.WithStatusCode(code))
+	}
+}
+
+type displayFieldReader struct {
+	io.Reader
+	onData func()
+}
+
+func (r *displayFieldReader) Read(data []byte) (int, error) {
+	n, err := r.Reader.Read(data)
+	if r.onData != nil && strings.TrimSpace(string(data[:n])) != "" {
+		r.onData()
+		r.onData = nil
+	}
+	return n, err
+}
+
+// Count completed canonical operations as their closing bytes arrive. These
+// are proposals only: execution still validates/applies the full delta once.
+func (a *responseActivity) todoOperation(id, key string, value any, parents []string) {
+	path := parents
+	if len(path) > 0 && path[0] == "next_action" {
+		path = path[1:]
+	}
+	if len(path) == 0 || path[0] != "todo_delta" {
+		return
+	}
+	operation := ""
+	if len(path) == 1 && key == "current" {
+		if _, valid := value.(string); valid || value == nil {
+			operation = "current"
+		}
+	} else if len(path) == 2 && (path[1] == "add" || path[1] == "update" || path[1] == "close") {
+		index, indexErr := strconv.Atoi(key)
+		if _, valid := value.(map[string]any); valid && indexErr == nil && index >= 0 {
+			operation = path[1] + "/" + key
+		}
+	}
+	if operation == "" {
+		return
+	}
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	if a.closed || len(a.callOrder) > 0 && a.callOrder[len(a.callOrder)-1] != id {
+		return
+	}
+	if id != "text" && a.calls[id] != nativeAdjustTodolistActionName {
+		return
+	}
+	if a.todoOperations[id] == nil {
+		a.todoOperations[id] = make(map[string]bool)
+	}
+	if a.todoOperations[id][operation] {
+		return
+	}
+	a.todoOperations[id][operation] = true
+	a.startOutput()
+	a.fieldStarted = true
+	count := len(a.todoOperations[id])
+	a.lastText = fmt.Sprintf("调整待办事项中… 已准备 %d 项调整", count)
+	a.loop.UserStatus(a.lastText, fmt.Sprintf("Updating the task list… %d changes prepared", count),
+		aicommon.WithStatusCode("todo.preparing"), aicommon.WithStatusProgress(int64(count), 0, "todo_change"))
 }
 
 // Resolve each discovered tool once; successive fragments reuse its UI label.

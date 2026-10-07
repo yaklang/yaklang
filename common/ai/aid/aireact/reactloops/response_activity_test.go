@@ -3,6 +3,7 @@ package reactloops
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -100,6 +101,236 @@ func (c *activityStatusCapture) wait(predicate func(aicommon.StatusPayload) bool
 			return false
 		}
 	}
+}
+
+func TestAnnotationStatusArrivesBeforeFieldCompletes(t *testing.T) {
+	for _, native := range []bool{false, true} {
+		for _, field := range []string{"human_readable_thought", "cumulative_summary"} {
+			t.Run(fmt.Sprintf("native=%v/%s", native, field), func(t *testing.T) {
+				var capture *activityStatusCapture
+				code := "response.noting"
+				if field == "cumulative_summary" {
+					code = "response.progress"
+				}
+				loop := newCallAILoopTransactionTestLoop(t, native, func(_ *aicommon.AIRequest, cfg *aispec.AIConfig) (*aicommon.AIResponse, error) {
+					resp := aicommon.NewUnboundAIResponse()
+					partial := `{"` + field + `":"正在核对`
+					if native {
+						cfg.ToolCallCallback([]*aispec.ToolCall{{ID: "note", Type: "function", Function: aispec.FuncReturn{Name: "accept", Arguments: partial}}})
+						if !capture.wait(func(s aicommon.StatusPayload) bool { return s.Code == code }) {
+							resp.Close()
+							return resp, io.ErrNoProgress
+						}
+						cfg.ToolCallCallback([]*aispec.ToolCall{{ID: "note", Function: aispec.FuncReturn{Arguments: `事实"}`}}})
+						cfg.FinishReasonCallback("tool_calls", nil)
+						resp.Close()
+					} else {
+						reader, writer := io.Pipe()
+						resp.EmitOutputStream(reader)
+						go func() {
+							defer writer.Close()
+							defer resp.Close()
+							_, _ = io.WriteString(writer, partial)
+							if !capture.wait(func(s aicommon.StatusPayload) bool { return s.Code == code }) {
+								return
+							}
+							_, _ = io.WriteString(writer, `事实","@action":"accept"}`)
+							cfg.FinishReasonCallback("stop", nil)
+						}()
+					}
+					return resp, nil
+				})
+				loop.actions.Set("accept", &LoopAction{ActionType: "accept"})
+				loop.streamFields = omap.NewEmptyOrderedMap[string, *LoopStreamField]()
+				loop.streamFields.Set(field, &LoopStreamField{FieldName: field, AINodeId: "note"})
+				capture = captureActivityStatus(loop)
+				var streams sync.WaitGroup
+				calls, _, _, err := loop.callAILoopTransaction(&streams, "unchanged", "nonce", nil,
+					func(io.Reader, io.Reader) {}, func(_, _ string, description, arguments io.Reader) {
+						_, _ = io.Copy(io.Discard, description)
+						_, _ = io.Copy(io.Discard, arguments)
+					})
+				require.NoError(t, err)
+				streams.Wait()
+				require.Len(t, calls, 1)
+				require.Equal(t, "正在核对事实", calls[0].Action.GetString(field))
+				require.True(t, capture.waitStream("note", "正在核对事实"))
+			})
+		}
+	}
+}
+
+func TestAnnotationStatusCannotOverwriteToolsOrLaterCalls(t *testing.T) {
+	loop := NewMinimalReActLoop(mock.NewMockedAIConfig(context.Background()), mock.NewMockInvoker(context.Background()))
+	capture := captureActivityStatus(loop)
+	activity := newResponseActivity(loop, []string{"accept", nativeAdjustTodolistActionName, schema.AI_REACT_LOOP_ACTION_DIRECTLY_CALL_TOOL})
+	defer activity.close()
+	activity.displayField("text", "human_readable_thought")
+	activity.reason([]byte("later reason"))
+	require.Equal(t, "response.noting", capture.snapshot()[0].Code)
+	require.Len(t, capture.snapshot(), 1)
+	activity.prepare("todo", nativeAdjustTodolistActionName)
+	require.Equal(t, "调整待办事项中…", capture.snapshot()[1].Value)
+	activity.prepare("tool", schema.AI_REACT_LOOP_ACTION_DIRECTLY_CALL_TOOL)
+	count := len(capture.snapshot())
+	activity.displayField("todo", "human_readable_thought")
+	activity.displayField("tool", "cumulative_summary")
+	require.Len(t, capture.snapshot(), count)
+	activity.close()
+	activity.displayField("tool", "human_readable_thought")
+	require.Len(t, capture.snapshot(), count)
+}
+
+func TestEmptyAnnotationDoesNotEmitPrefixOrStatus(t *testing.T) {
+	for _, native := range []bool{false, true} {
+		t.Run(fmt.Sprintf("native=%v", native), func(t *testing.T) {
+			loop := newCallAILoopTransactionTestLoop(t, native, func(_ *aicommon.AIRequest, cfg *aispec.AIConfig) (*aicommon.AIResponse, error) {
+				resp := aicommon.NewUnboundAIResponse()
+				if native {
+					cfg.ToolCallCallback([]*aispec.ToolCall{{ID: "empty", Type: "function", Function: aispec.FuncReturn{Name: "accept", Arguments: `{"human_readable_thought":""}`}}})
+					cfg.FinishReasonCallback("tool_calls", nil)
+				} else {
+					resp.EmitOutputStream(strings.NewReader(`{"@action":"accept","human_readable_thought":""}`))
+					cfg.FinishReasonCallback("stop", nil)
+				}
+				resp.Close()
+				return resp, nil
+			})
+			loop.actions.Set("accept", &LoopAction{ActionType: "accept"})
+			loop.streamFields = omap.NewEmptyOrderedMap[string, *LoopStreamField]()
+			loop.streamFields.Set("human_readable_thought", &LoopStreamField{FieldName: "human_readable_thought", Prefix: "记录", AINodeId: "empty-note"})
+			capture := captureActivityStatus(loop)
+			var streams sync.WaitGroup
+			calls, _, _, err := loop.callAILoopTransaction(&streams, "unchanged", "nonce", nil,
+				func(io.Reader, io.Reader) {}, func(_, _ string, description, arguments io.Reader) {
+					_, _ = io.Copy(io.Discard, description)
+					_, _ = io.Copy(io.Discard, arguments)
+				})
+			require.NoError(t, err)
+			streams.Wait()
+			require.Len(t, calls, 1)
+			for _, status := range capture.snapshot() {
+				require.NotEqual(t, "response.noting", status.Code)
+			}
+			capture.mu.Lock()
+			defer capture.mu.Unlock()
+			for _, event := range capture.events {
+				require.NotEqual(t, "empty-note", event.NodeId, "empty annotation must not create a prefixed stream card")
+			}
+		})
+	}
+}
+
+func TestTodoPreparationCountsStreamBeforeExecution(t *testing.T) {
+	for _, native := range []bool{false, true} {
+		t.Run(fmt.Sprintf("native=%v", native), func(t *testing.T) {
+			var capture *activityStatusCapture
+			var loop *ReActLoop
+			loop = newCallAILoopTransactionTestLoop(t, native, func(_ *aicommon.AIRequest, cfg *aispec.AIConfig) (*aicommon.AIResponse, error) {
+				resp := aicommon.NewUnboundAIResponse()
+				reader, writer := io.Pipe()
+				if native {
+					cfg.ToolCallCallback([]*aispec.ToolCall{{ID: "adjust", Type: "function", Function: aispec.FuncReturn{Name: nativeAdjustTodolistActionName}}})
+					if !capture.wait(func(s aicommon.StatusPayload) bool { return s.Value == "调整待办事项中…" }) {
+						resp.Close()
+						return resp, io.ErrNoProgress
+					}
+				} else {
+					resp.EmitOutputStream(reader)
+				}
+				go func() {
+					defer writer.Close()
+					defer resp.Close()
+					if !native {
+						_, _ = io.WriteString(writer, `{"@action":"accept",`)
+					}
+					frames := []string{`"todo_delta":{"add":[{"id":"one","text":"核对输入"},`,
+						`{"id":"two","text":"核对输出"}],"current":"one","update":[`, `]}}`}
+					for index, frame := range frames {
+						if native {
+							if index == 0 {
+								frame = "{" + frame
+							}
+							cfg.ToolCallCallback([]*aispec.ToolCall{{ID: "adjust", Function: aispec.FuncReturn{Arguments: frame}}})
+						} else {
+							_, _ = io.WriteString(writer, frame)
+						}
+						if index < 2 {
+							count := int64(1)
+							if index == 1 {
+								count = 3
+							}
+							if !capture.wait(func(s aicommon.StatusPayload) bool {
+								return s.Code == "todo.preparing" && s.Progress != nil && s.Progress.Current == count
+							}) {
+								return
+							}
+						}
+					}
+					if native {
+						cfg.FinishReasonCallback("tool_calls", nil)
+					} else {
+						cfg.FinishReasonCallback("stop", nil)
+					}
+				}()
+				return resp, nil
+			})
+			loop.actions.Set("accept", &LoopAction{ActionType: "accept"})
+			loop.actions.Set(nativeAdjustTodolistActionName, loopAction_AdjustTodolistNative)
+			loop.SetCurrentTask(newMockSimpleTask("stream-todo", "1"))
+			capture = captureActivityStatus(loop)
+			calls, _, _, err := loop.callAILoopTransaction(&sync.WaitGroup{}, "unchanged", "nonce", nil,
+				func(io.Reader, io.Reader) {}, func(_, _ string, description, arguments io.Reader) {
+					_, _ = io.Copy(io.Discard, description)
+					_, _ = io.Copy(io.Discard, arguments)
+				})
+			require.NoError(t, err)
+			require.Len(t, calls, 1)
+			open, _, _ := loop.config.SnapshotCanonicalTodos(aicommon.BuildVerificationTodoScope(loop.GetCurrentTask()))
+			require.Empty(t, open, "streaming proposals must not mutate TODO state")
+			var counts []int64
+			for _, status := range capture.snapshot() {
+				if native {
+					require.NotEqual(t, "action.ready", status.Code, "preserve streamed TODO progress until execution")
+				}
+				if status.Code == "todo.preparing" {
+					counts = append(counts, status.Progress.Current)
+				}
+			}
+			require.Equal(t, []int64{1, 2, 3}, counts)
+			delta, err := aicommon.NormalizeTodoDelta(calls[0].Action)
+			require.NoError(t, err)
+			require.Len(t, delta.Add, 2)
+			require.NotNil(t, delta.Current)
+			require.Equal(t, "one", *delta.Current)
+		})
+	}
+}
+
+func TestTodoPreparationIgnoresNestedValuesDuplicatesAndRetiredCalls(t *testing.T) {
+	loop := NewMinimalReActLoop(mock.NewMockedAIConfig(context.Background()), mock.NewMockInvoker(context.Background()))
+	capture := captureActivityStatus(loop)
+	activity := newResponseActivity(loop, []string{nativeAdjustTodolistActionName})
+	defer activity.close()
+	item := map[string]any{"id": "one", "text": "verify result"}
+	activity.prepare("first", nativeAdjustTodolistActionName)
+	activity.field("first", "0", item, []string{"todo_delta", "add"})
+	count := len(capture.snapshot())
+	activity.field("first", "0", item, []string{"todo_delta", "add"})
+	activity.field("first", "0", item, []string{"params", "todo_delta", "add"})
+	activity.field("first", "not_an_index", item, []string{"todo_delta", "add"})
+	activity.displayField("first", "human_readable_thought")
+	require.Len(t, capture.snapshot(), count)
+	activity.prepare("second", nativeAdjustTodolistActionName)
+	count = len(capture.snapshot())
+	activity.field("first", "1", item, []string{"todo_delta", "add"})
+	require.Len(t, capture.snapshot(), count, "an earlier argument reader must not overwrite the new call")
+	activity.field("second", "0", item, []string{"todo_delta", "add"})
+	statuses := capture.snapshot()
+	require.Equal(t, int64(1), statuses[len(statuses)-1].Progress.Current, "each call has its own counter")
+	activity.close()
+	activity.field("second", "1", item, []string{"todo_delta", "add"})
+	require.Len(t, capture.snapshot(), len(statuses))
 }
 
 func TestResponseActivityStreamsToolNamesBeforeArgumentsFinish(t *testing.T) {

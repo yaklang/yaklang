@@ -794,9 +794,9 @@ func (r *ReActLoop) callAIFunctionTransaction(
 		readyNames = append(readyNames, call.Action.Name())
 		hasToolCall = hasToolCall || call.Action.Name() == schema.AI_REACT_LOOP_ACTION_DIRECTLY_CALL_TOOL
 	}
-	// Tool handlers publish their own named lifecycle; do not replace the
-	// streamed tool names with a generic action-ready banner.
-	if hasToolCall {
+	// Keep streamed tool names and TODO preparation counts visible until their
+	// handlers publish execution status, without a generic readiness flash.
+	if hasToolCall || len(readyNames) == 1 && readyNames[0] == nativeAdjustTodolistActionName {
 		keepExecutionState = true
 		return acceptedCalls, LoopStopToolCalls, descriptor, nil
 	}
@@ -978,7 +978,9 @@ func (r *ReActLoop) callAINormalTransaction(streamWg *sync.WaitGroup, prompt str
 					}()
 
 					log.Debugf("stream handler started for field [%s]", key)
-					jsonReader := utils.JSONStringReader(reader)
+					jsonReader := &displayFieldReader{Reader: utils.JSONStringReader(reader), onData: func() {
+						activity.displayField("text", key)
+					}}
 
 					fieldIns, ok := streamFields.Get(key)
 					if !ok {
@@ -994,14 +996,18 @@ func (r *ReActLoop) callAINormalTransaction(streamWg *sync.WaitGroup, prompt str
 							pw.Close()
 							log.Debugf("stream copy goroutine for field [%s] completed, took %v", key, time.Since(copyStartTime))
 						}()
+						decoded, readable, readErr := waitReadableStream(jsonReader)
+						if readErr != nil || !readable {
+							return
+						}
 						if field.StreamHandler != nil {
-							field.StreamHandler(jsonReader, pw)
+							field.StreamHandler(decoded, pw)
 							return
 						}
 						if field.Prefix != "" {
 							pw.WriteString(field.Prefix + ": ")
 						}
-						n, copyErr := io.Copy(pw, jsonReader)
+						n, copyErr := io.Copy(pw, decoded)
 						if copyErr != nil {
 							log.Warnf("stream copy for field [%s] error: %v (copied %d bytes)", key, copyErr, n)
 						} else {
