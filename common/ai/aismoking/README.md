@@ -55,6 +55,7 @@ yak common/ai/aismoking/forge.yak
 
 这些入口直接 `yak xxx.yak`，不会由默认套件自动执行：
 
+- [live/explicit_tools.yak](live/explicit_tools.yak)：使用已配置的 DeepSeek 与真实 `aim.InvokeReAct`，验证侦察预加载、回环 HTTP/文件批量调用、`wrong_params` 修正来源及 `wrong_tool` 从 HTTP 换到文件工具；审核仅针对脚本创建的材料。设置新的 `AISMOKING_OUTPUT` 和隔离的 `YAKIT_HOME`，可用 `EXPLICIT_TOOL_CASES=recon,wrong_params,wrong_tool` 选择案例。保留完整请求正文、响应、arguments、事件及服务端缓存用量；证据未保存、拒绝操作被执行、重复读取或协议错误都会失败，不用回答文本代替执行结果。
 - [live/scan_port.yak](live/scan_port.yak)：原硬编码私人靶机的 SYN/点对点路由实验，直接以 `yak` 运行生产工具。需显式设置 `AISMOKING_SCAN_TARGET` 为已准备好 FTP/SSH/HTTP 服务的单个实验室 IPv4 主机；保留路由错误、开放端口、服务和完成断言，限时 60 秒。`AISMOKING_SCAN_PREFLIGHT=1` 只构造命令，不扫描。确定性的回环、TUN 降级与取消测试仍保留为 Go 回归。
 - [live/forge_file_tasks.yak](live/forge_file_tasks.yak)：原 `aiforge/aibp/tests` 的解码、长文件定位及分块链接分析实验，改用公开 Forge Blueprint 的双协议入口；保留原编码串和 HTML 材料，增加完成状态、解码原文、字节位置、上下文及链接来源断言。使用已配置 provider，输出到新的 `AISMOKING_OUTPUT`。设置 `AISMOKING_FORGE_PREFLIGHT=1` 只校验材料和六次 Blueprint 构造，不请求模型，也不代表业务验证通过。旧 Go 实验依赖私人 `openrouter.txt`、忽略执行错误且没有业务断言，已移除；确定性 Forge 生命周期及文件工具回归仍由原 Go 测试和默认冒烟覆盖。
 - [live/timeline_memory_finalization.yak](live/timeline_memory_finalization.yak)：`aim.InvokeReAct` 双协议 × 短任务、阈值压缩长任务、空记忆，共六组；正常返回前等待真实保存/索引完成，重复结束不再请求模型，内部进度不进入静态上下文或压缩输入。需可用 embedding 服务，使用临时 `YAKIT_HOME`，仅在本地运行。

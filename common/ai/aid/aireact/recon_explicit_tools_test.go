@@ -59,6 +59,15 @@ func TestReconPreloadsAndExplicitlyCallsSixToolsBothProtocols(t *testing.T) {
 						name = "directly_call_tool"
 						args = fmt.Sprintf(`{"directly_call_tool_name":%q,"directly_call_tool_params":{"target":"127.0.0.1"},"directly_call_reason":"local recon probe"}`, names[step-1])
 					}
+					if step == len(names)+1 {
+						name, args = "save_evidence", `{"evidence_id":"recon_probe","evidence_content":"Six explicit local recon probes completed with recon_probe_result."}`
+						if !native {
+							args = `{"evidence_id":"recon_probe","evidence_content":"Six explicit local recon probes completed with recon_probe_result.","todo_delta":{"add":[{"id":"recon_probe","text":"Verify six local probes"}],"close":[{"id":"recon_probe","outcome":"resolved","reason":"All six explicit probes returned recon_probe_result.","refs":["recon_probe"]}]}}`
+						}
+					}
+					if native && step == len(names)+2 {
+						name, args = "adjust_todolist", `{"todo_delta":{"add":[{"id":"recon_probe","text":"Verify six local probes"}],"close":[{"id":"recon_probe","outcome":"resolved","reason":"All six explicit probes returned recon_probe_result.","refs":["recon_probe"]}]}}`
+					}
 					rsp := cfg.NewAIResponse()
 					if native {
 						opts := aispec.NewDefaultAIConfig(req.GetExtraSpecOpts()...)
@@ -78,6 +87,14 @@ func TestReconPreloadsAndExplicitlyCallsSixToolsBothProtocols(t *testing.T) {
 			react.config.Timeline.SetTimelineBucketByteSize(-1)
 			loop, err := reactloops.CreateLoopByName("infosec_recon", react, reactloops.WithDisableLoopPerception(true), reactloops.WithDisablePeriodicVerification(true))
 			require.NoError(t, err)
+			for _, name := range []string{"save_evidence", "load_capability"} {
+				_, err = loop.GetActionHandler(name)
+				require.NoError(t, err, "recon must retain generic loop actions")
+			}
+			if native {
+				_, err = loop.GetActionHandler("adjust_todolist")
+				require.NoError(t, err, "recon must retain the native TODO action")
+			}
 			for _, name := range append(append([]string{}, names...), "tool_compose") {
 				_, err = loop.GetActionHandler(name)
 				require.Error(t, err, "no recon action may implicitly generate arguments")
@@ -86,7 +103,12 @@ func TestReconPreloadsAndExplicitlyCallsSixToolsBothProtocols(t *testing.T) {
 			defer cancel()
 			require.NoError(t, loop.Execute("recon-explicit", ctx, "Use the six local recon probes with explicit target parameters."))
 			require.EqualValues(t, 6, executions.Load())
-			require.EqualValues(t, 7, decisions.Load())
+			expectedDecisions := 8
+			if native {
+				expectedDecisions++
+			}
+			require.EqualValues(t, expectedDecisions, decisions.Load())
+			require.Contains(t, react.config.GetSessionEvidenceRendered(), "Six explicit local recon probes completed")
 			frozen := aicommon.RenderTimelineFrozenOpen(react.config.Timeline)
 			for _, name := range names {
 				require.Equal(t, 1, strings.Count(frozen.Open, "[UPSERT] "+name))
