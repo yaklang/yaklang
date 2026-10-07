@@ -419,16 +419,17 @@ func executeVerifiedToolBatch(
 	for _, call := range request.Calls {
 		toolNames = append(toolNames, call.ToolName)
 	}
-	emitToolsPreparingStatus(loop, toolNames)
-	emitToolBatchRunningStatus(loop, toolNames)
 	batchRuntime, supported := invoker.(aicommon.ToolCallGroupInvokeRuntime)
 	var (
 		result *aicommon.ToolCallGroupResult
 		err    error
 	)
 	if supported {
+		emitToolsPreparingStatus(loop, toolNames)
+		emitToolBatchRunningStatus(loop, toolNames)
 		result, err = batchRuntime.ExecuteToolCallGroup(ctx, task, request)
 	} else {
+		emitToolCallGroupResultStatus(loop, request, nil)
 		for _, call := range request.Calls {
 			operator.Feedback(directToolRetryFeedback(loop, call.ToolName, "runtime does not support explicit parameter groups; submit one directly_call_tool at a time", false))
 		}
@@ -449,6 +450,11 @@ func handleToolBatchActionResult(
 	operator *reactloops.LoopActionHandlerOperator,
 ) {
 	if err != nil {
+		var outcomes []aicommon.ToolCallOutcome
+		if result != nil {
+			outcomes = result.Outcomes
+		}
+		emitToolCallGroupResultStatus(loop, request, outcomes)
 		msg := fmt.Sprintf("tool batch execution failed before completion: %v", err)
 		invoker.AddToTimeline("[TOOL_BATCH_ERROR]", msg)
 		operator.Feedback(msg)
@@ -461,6 +467,7 @@ func handleToolBatchActionResult(
 		return
 	}
 	if result == nil {
+		emitToolCallGroupResultStatus(loop, request, nil)
 		for _, call := range request.Calls {
 			operator.Feedback(directToolRetryFeedback(loop, call.ToolName, "tool batch returned no result", true))
 		}

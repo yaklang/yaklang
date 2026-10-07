@@ -58,7 +58,9 @@ func ConvertAIToolToLoopAction(tool *aitool.Tool) *LoopAction {
 		return cleanParams
 	}
 
+	label := tool.GetVerboseNameI18n()
 	return &LoopAction{
+		VerboseNameI18n:   &label,
 		AsyncMode:         false,
 		ActionType:        tool.GetName(),
 		Description:       tool.GetDescription(),

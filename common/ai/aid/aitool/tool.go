@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"strings"
 
 	"github.com/yaklang/gorm"
 	"github.com/yaklang/yaklang/common/schema"
@@ -844,6 +845,19 @@ func (t *Tool) GetVerboseName() string {
 
 func (t *Tool) GetVerboseNameZh() string {
 	return t.VerboseNameZh
+}
+
+// GetVerboseNameI18n always supplies both UI labels, including external tools
+// whose provider only supplies a stable name. It does not change tool schemas.
+func (t *Tool) GetVerboseNameI18n() schema.I18n {
+	zh, en := strings.TrimSpace(t.VerboseNameZh), strings.TrimSpace(t.VerboseName)
+	if zh == "" {
+		zh = t.GetName()
+	}
+	if en == "" {
+		en = t.GetName()
+	}
+	return schema.I18n{Zh: zh, En: en}
 }
 
 func (t *Tool) GetKeywords() []string {

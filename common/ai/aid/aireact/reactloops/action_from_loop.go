@@ -19,12 +19,17 @@ func ConvertReActLoopFactoryToActionFactory(
 
 		// Get metadata for better description
 		description := "focus on solving the problem using [" + name + "] loop"
-		if meta, ok := GetLoopMetadata(name); ok && meta.Description != "" {
-			description = meta.Description
+		var displayName *schema.I18n
+		if meta, ok := GetLoopMetadata(name); ok {
+			if meta.Description != "" {
+				description = meta.Description
+			}
+			displayName = &schema.I18n{Zh: meta.VerboseNameZh, En: meta.VerboseName}
 		}
 
 		action := &LoopAction{
 			ActionType:        name,
+			VerboseNameI18n:   displayName,
 			Description:       description,
 			NativeDescription: description,
 			StreamFields:      []*LoopStreamField{},

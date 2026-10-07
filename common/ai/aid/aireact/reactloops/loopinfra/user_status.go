@@ -6,7 +6,6 @@ import (
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
-	"github.com/yaklang/yaklang/common/schema"
 )
 
 func buildStatusTools(loop *reactloops.ReActLoop, names []string, state aicommon.StatusState) []aicommon.StatusTool {
@@ -19,16 +18,9 @@ func buildStatusTools(loop *reactloops.ReActLoop, names []string, state aicommon
 		statusTool := aicommon.StatusTool{Name: name, DisplayName: name, State: state}
 		if loop != nil && loop.GetConfig() != nil && loop.GetConfig().GetAiToolManager() != nil {
 			if tool, err := loop.GetConfig().GetAiToolManager().GetToolByName(name); err == nil && tool != nil {
-				zh := strings.TrimSpace(tool.GetVerboseNameZh())
-				en := strings.TrimSpace(tool.GetVerboseName())
-				if zh != "" {
-					statusTool.DisplayName = zh
-				} else if en != "" {
-					statusTool.DisplayName = en
-				}
-				if zh != "" || en != "" {
-					statusTool.DisplayNameI18n = &schema.I18n{Zh: zh, En: en}
-				}
+				label := tool.GetVerboseNameI18n()
+				statusTool.DisplayName = label.Zh
+				statusTool.DisplayNameI18n = &label
 			}
 		}
 		tools = append(tools, statusTool)
@@ -36,7 +28,7 @@ func buildStatusTools(loop *reactloops.ReActLoop, names []string, state aicommon
 	return tools
 }
 
-func statusToolNames(tools []aicommon.StatusTool, english bool) string {
+func statusToolNames(tools []aicommon.StatusTool, english bool, includeNames ...bool) string {
 	const visibleLimit = 3
 	type toolLabelGroup struct {
 		label string
@@ -55,6 +47,13 @@ func statusToolNames(tools []aicommon.StatusTool, english bool) string {
 		name := strings.TrimSpace(tool.Name)
 		if name == "" {
 			name = label
+		}
+		if len(includeNames) > 0 && includeNames[0] && label != name {
+			if english {
+				label += " (" + name + ")"
+			} else {
+				label += "（" + name + "）"
+			}
 		}
 		if index, ok := indexes[name]; ok {
 			groups[index].count++
@@ -121,8 +120,8 @@ func emitToolBatchRunningStatus(loop *reactloops.ReActLoop, names []string) {
 	}
 	reactloops.EmitStatusI18n(
 		loop,
-		fmt.Sprintf("正在批量执行 %d 个工具：%s", len(tools), statusToolNames(tools, false)),
-		fmt.Sprintf("Running %d tools: %s", len(tools), statusToolNames(tools, true)),
+		fmt.Sprintf("正在调用 %d 个工具：%s", len(tools), statusToolNames(tools, false, true)),
+		fmt.Sprintf("Calling %d tools: %s", len(tools), statusToolNames(tools, true, true)),
 		aicommon.WithStatusCode("tool.batch.running"),
 		aicommon.WithStatusProgress(0, int64(len(tools)), "tool"),
 		aicommon.WithStatusTools(tools...),
@@ -184,18 +183,18 @@ func emitToolCallGroupResultStatus(
 
 	state := aicommon.StatusStateWarning
 	code := "tool.batch.partial"
-	zh := fmt.Sprintf("%d 个工具中有 %d 个已完成，正在整理可用结果", total, successful)
-	en := fmt.Sprintf("%d of %d tools completed; organizing the available results", successful, total)
+	zh := fmt.Sprintf("%d/%d 次调用已完成：%s", successful, total, statusToolNames(tools, false, true))
+	en := fmt.Sprintf("%d of %d calls completed: %s", successful, total, statusToolNames(tools, true, true))
 	if successful == total {
 		state = aicommon.StatusStateSuccess
 		code = "tool.batch.completed"
-		zh = fmt.Sprintf("%d 个工具已完成，正在整理结果", total)
-		en = fmt.Sprintf("All %d tools completed; organizing the results", total)
+		zh = fmt.Sprintf("%d 次调用已完成：%s", total, statusToolNames(tools, false, true))
+		en = fmt.Sprintf("All %d calls completed: %s", total, statusToolNames(tools, true, true))
 	} else if successful == 0 {
 		state = aicommon.StatusStateError
 		code = "tool.batch.failed"
-		zh = "这批工具暂时没能完成，正在调整"
-		en = "This tool batch could not complete; adjusting the approach"
+		zh = "这轮调用未完成：" + statusToolNames(tools, false, true)
+		en = "These calls did not complete: " + statusToolNames(tools, true, true)
 	}
 	reactloops.EmitStatusI18n(
 		loop,
@@ -215,16 +214,16 @@ func emitToolResultStatus(loop *reactloops.ReActLoop, name string, success bool)
 	if len(tools) == 0 {
 		return
 	}
-	zhName := statusToolNames(tools, false)
-	enName := statusToolNames(tools, true)
+	zhName := statusToolNames(tools, false, true)
+	enName := statusToolNames(tools, true, true)
 	zh := fmt.Sprintf("「%s」暂时没能完成这一步", zhName)
 	en := fmt.Sprintf("%s could not complete this step", enName)
 	if success {
 		state = aicommon.StatusStateSuccess
 		code = "tool.completed"
 		tools[0].State = state
-		zh = fmt.Sprintf("「%s」已经完成，正在整理结果", zhName)
-		en = fmt.Sprintf("%s has finished; organizing the results", enName)
+		zh = fmt.Sprintf("%s 调用已完成", zhName)
+		en = fmt.Sprintf("%s call completed", enName)
 	}
 	reactloops.EmitStatusI18n(
 		loop,
@@ -232,6 +231,20 @@ func emitToolResultStatus(loop *reactloops.ReActLoop, name string, success bool)
 		en,
 		aicommon.WithStatusCode(code),
 		aicommon.WithStatusState(state),
+		aicommon.WithStatusTools(tools...),
+	)
+}
+
+func emitToolRetryStatus(loop *reactloops.ReActLoop, name string) {
+	tools := buildStatusTools(loop, []string{name}, aicommon.StatusStateRecovering)
+	if len(tools) == 0 {
+		return
+	}
+	reactloops.EmitStatusI18n(loop,
+		fmt.Sprintf("正在调整 %s 的调用", statusToolNames(tools, false, true)),
+		fmt.Sprintf("Revising the call to %s", statusToolNames(tools, true, true)),
+		aicommon.WithStatusCode("tool.retrying"),
+		aicommon.WithStatusState(aicommon.StatusStateRecovering),
 		aicommon.WithStatusTools(tools...),
 	)
 }

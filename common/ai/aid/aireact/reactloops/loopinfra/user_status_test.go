@@ -28,10 +28,10 @@ func TestEmitToolBatchRunningStatusNamesAndProgress(t *testing.T) {
 	emitToolBatchRunningStatus(loop, []string{"read_file", "grep_files"})
 	require.Len(t, statuses, 1)
 	require.Equal(t, "tool.batch.running", statuses[0].Code)
-	require.Equal(t, "正在批量执行 2 个工具：read_file、grep_files", statuses[0].Value)
+	require.Equal(t, "正在调用 2 个工具：read_file、grep_files", statuses[0].Value)
 	require.Equal(t, &aicommon.StatusProgress{Current: 0, Total: 2, Unit: "tool"}, statuses[0].Progress)
 	require.Equal(t, []string{"read_file", "grep_files"}, []string{statuses[0].Tools[0].Name, statuses[0].Tools[1].Name})
-	require.Equal(t, "Running 2 tools: read_file, grep_files", statuses[0].ValueI18n.En)
+	require.Equal(t, "Calling 2 tools: read_file, grep_files", statuses[0].ValueI18n.En)
 }
 
 func TestBuildToolCallGroupResultToolsPreservesActualState(t *testing.T) {
@@ -99,6 +99,8 @@ func TestStatusToolNamesGroupsByToolIdentityBeforeTruncating(t *testing.T) {
 	}
 	require.Equal(t, "读取文件 × 2、搜索、搜索等 1 个工具", statusToolNames(tools, false))
 	require.Equal(t, "Read file × 2, Search, Search and 1 more", statusToolNames(tools, true))
+	require.Equal(t, "读取文件（read_file） × 2、搜索（grep）、搜索（web_search）等 1 个工具", statusToolNames(tools, false, true))
+	require.Equal(t, "Read file (read_file) × 2, Search (grep), Search (web_search) and 1 more", statusToolNames(tools, true, true))
 	require.Equal(t, "unnamed × 2", statusToolNames([]aicommon.StatusTool{{DisplayName: "unnamed"}, {DisplayName: "unnamed"}}, false))
 	require.Empty(t, statusToolNames(nil, false))
 }

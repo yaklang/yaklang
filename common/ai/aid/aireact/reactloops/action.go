@@ -3,6 +3,7 @@ package reactloops
 import (
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
+	"github.com/yaklang/yaklang/common/schema"
 )
 
 type LoopActionFactory func(r aicommon.AIInvokeRuntime) (*LoopAction, error)
@@ -16,6 +17,8 @@ type LoopAction struct {
 	ActionType  string `json:"type"`
 	Description string `json:"description"`
 	Options     []aitool.ToolOption
+	// Display names are UI metadata; they never enter model prompts or schemas.
+	VerboseNameI18n *schema.I18n `json:"-"`
 	// NativeDescription and NativeOptions replace text-output instructions when
 	// this action is exposed as a provider function. Nil NativeOptions keeps the
 	// ordinary Options; the text schema is never changed by these overrides.

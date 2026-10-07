@@ -105,6 +105,8 @@ type AIResponse struct {
 
 	onReasonChunk   func([]byte)
 	onReasonChunkMu sync.Mutex
+	onReasonData    func([]byte)
+	onReasonDataMu  sync.Mutex
 
 	setErrorFunc func(error)  // 设置错误的函数，支持 TeeAIResponse 拷贝
 	getErrorFunc func() error // 获取错误的函数，支持 TeeAIResponse 拷贝
@@ -191,6 +193,27 @@ func (a *AIResponse) SetOnReasonChunk(fn func([]byte)) {
 	a.onReasonChunkMu.Lock()
 	a.onReasonChunk = fn
 	a.onReasonChunkMu.Unlock()
+}
+
+// SetOnReasonData observes nonempty Reason bytes when consumed, before EOF.
+// The callback must return promptly and must not retain or modify the bytes.
+// Completed-payload capture (SetOnReasonChunk) remains independent.
+func (a *AIResponse) SetOnReasonData(fn func([]byte)) {
+	a.onReasonDataMu.Lock()
+	a.onReasonData = fn
+	a.onReasonDataMu.Unlock()
+}
+
+type reasonDataWriter struct{ response *AIResponse }
+
+func (w reasonDataWriter) Write(p []byte) (int, error) {
+	w.response.onReasonDataMu.Lock()
+	fn := w.response.onReasonData
+	w.response.onReasonDataMu.Unlock()
+	if len(p) > 0 && fn != nil {
+		fn(p)
+	}
+	return len(p), nil
 }
 
 // SetOnOutputFinished registers a callback invoked with the full plain output
@@ -799,6 +822,7 @@ func (r *AIResponse) EmitOutputStream(reader io.Reader) {
 
 func (r *AIResponse) EmitReasonStream(reader io.Reader) {
 	reader = r.guardStream(reader)
+	reader = io.TeeReader(reader, reasonDataWriter{r})
 	counted := &byteCountingReader{reader: reader, counter: &r.totalOutputBytes}
 	r.ch.SafeFeed(&AIResponseOutputStream{
 		IsReason: true,
@@ -819,7 +843,7 @@ func (r *AIResponse) guardStream(reader io.Reader) io.Reader {
 func (r *AIResponse) EmitReasonStreamWithoutConsumption(reader io.Reader) {
 	r.ch.SafeFeed(&AIResponseOutputStream{
 		IsReason: true,
-		out:      reader,
+		out:      io.TeeReader(reader, reasonDataWriter{r}),
 	})
 }
 
