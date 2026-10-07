@@ -106,7 +106,7 @@ func (r *ReAct) executeToolCallInternal(ctx context.Context, toolName string, pa
 		}
 
 		if err != nil {
-			return nil, false, utils.Errorf("tool call failed: %v", err)
+			return nil, false, utils.Errorf("tool call failed: %w", err)
 		}
 		return r.finalizeToolCallResult(currentTask, result, directlyAnswer)
 	})
@@ -193,7 +193,7 @@ func (r *ReAct) newToolCallerForCall(ctx context.Context, currentTask aicommon.A
 		aicommon.WithToolCaller_Emitter(currentTask.GetEmitter()),
 		// r implements AIInvokeRuntime; enables lightweight (re)generation of the
 		// tool-call reason: fallback when no reason was preset, and after a review
-		// override (wrong_tool/wrong_params). No-op when nil.
+		// explicit manual parameter edit. No-op when nil.
 		aicommon.WithToolCaller_InvokeRuntime(r),
 	)
 
@@ -228,21 +228,8 @@ func (r *ReAct) newToolCallerForCall(ctx context.Context, currentTask aicommon.A
 		aicommon.WithToolCaller_OnEnd(func(callToolId string) {
 			toolCaller.SetEmitter(toolCaller.GetEmitter().PopEventProcesser())
 		}),
-		aicommon.WithToolCaller_ReviewWrongTool(func(
-			ctx context.Context,
-			tool *aitool.Tool,
-			newToolName string,
-			keyword string,
-		) (*aitool.Tool, bool, error) {
-			return r._invokeToolCall_ReviewWrongToolForTask(ctx, currentTask, tool, newToolName, keyword)
-		}),
-		aicommon.WithToolCaller_ReviewWrongParam(func(
-			ctx context.Context,
-			tool *aitool.Tool,
-			oldParam aitool.InvokeParams,
-			suggestion string,
-		) (aitool.InvokeParams, error) {
-			return r._invokeToolCall_ReviewWrongParamForTask(ctx, currentTask, tool, oldParam, suggestion)
+		aicommon.WithToolCaller_ReviewReconsider(func(ctx context.Context, tool *aitool.Tool, params, feedback aitool.InvokeParams) string {
+			return r.reconsiderToolReviewForTask(ctx, currentTask, tool, params, feedback)
 		}),
 	)
 
@@ -358,8 +345,8 @@ func (r *ReAct) DirectlyCallTool(ctx context.Context, toolName string, action *a
 		currentTask.SetEmitter(currentTask.GetEmitter().PopEventProcesser())
 	}()
 
-	// Always attach the param-gen builder so fallbackToRequire can reuse this card
-	// and switch to the AI param-generation path.
+	// Retain low-level prepare/fallback compatibility until its separate migration.
+	// Model actions veto that fallback; review corrections return to their owner.
 	toolCaller, err := r.newToolCallerForCall(
 		ctx,
 		currentTask,
@@ -381,7 +368,7 @@ func (r *ReAct) DirectlyCallTool(ctx context.Context, toolName string, action *a
 	r.tryFillVerboseNameForPlaceholder(directlyCallTool)
 	result, directlyAnswer, err := toolCaller.DirectlyCallTool(directlyCallTool, action, prepare)
 	if err != nil {
-		return nil, false, utils.Errorf("tool call failed: %v", err)
+		return nil, false, utils.Errorf("tool call failed: %w", err)
 	}
 	return r.finalizeToolCallResult(currentTask, result, directlyAnswer)
 }

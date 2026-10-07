@@ -6,7 +6,7 @@ import (
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 )
 
-// Tool batch configuration is deliberately independent from tool_compose.
+// Tool batch configuration is independent from the legacy shared grep concurrency option.
 // A tool batch is one ReAct action containing mutually independent calls; it
 // has no dependency graph and all of its outcomes are joined before the next
 // ReAct iteration starts.

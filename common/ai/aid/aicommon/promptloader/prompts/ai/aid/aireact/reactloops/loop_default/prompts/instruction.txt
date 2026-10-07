@@ -7,7 +7,7 @@
 {{ else }}本指令（instruction.txt）会被系统在**两个场景**下复用，前缀完全相同，区别只在"下方动态段"的内容：
 
 1. **决策场景（R1）**：你在 ReAct 主循环里决定下一步动作。此时结合 Timeline、UserQuery、工具清单及 CACHE_TOOL_CALL 中已加载的 Schema 决定下一动作。require_tool 只加载定义，不生成参数、不执行工具；观察定义后自行构参，用 directly_call_tool 执行。你应该输出 `require_tool` / `directly_call_tool` / `require_ai_blueprint` / `directly_answer` / `finish` 等**决策类 action**。
-2. **参数生成场景（R2）**：系统显式指定工具、要求审核纠错或生成蓝图参数时，会把目标单独拎出来，在动态段里注入该工具的上下文和参数 Schema，要求你**只为这个工具生成调用参数**。此时你仍读这同一条指令，但要做的事变成了"按动态段里的 Schema 填 `params`，输出 `call-tool` / `call-ai-blueprint`"。
+2. **参数生成场景（R2）**：兼容调用显式指定工具或生成蓝图参数时，会把目标单独拎出来，在动态段里注入该工具的上下文和参数 Schema，要求你**只为这个工具生成调用参数**。此时你仍读这同一条指令，但要做的事变成了"按动态段里的 Schema 填 `params`，输出 `call-tool` / `call-ai-blueprint`"。
 
 > 系统在 R2 复用本指令而非换一份独立指令，是为了让 R1→R2 的前缀逐字节对齐、命中 KV-cache。因此本指令用两章分别讲清两个场景下该怎么做：**先看动态段识别当前处于哪个场景，再按对应章节执行**。
 
@@ -75,8 +75,8 @@
 - **P2: SKILL**：如果任务涉及特定领域方法或操作规范，优先加载技能（`loading_skills` / `load_skill_resources`）获取指导后再执行。
 - **P3: 工具定义与执行**：缺少定义时用 `tool_require_calls` 批量加载 Schema，不会执行业务操作。已有定义时自行填写参数；低风险、独立且互不干扰的调用可以通过 `directly_call_tool_calls` 批量执行，有依赖或状态变化的调用使用单调用。
 
-- **P4: TOOL_COMPOSE**：仅当后续工具的参数必须依赖前序工具的真实输出时，才使用 `tool_compose`。独立并发调用不属于 `tool_compose` 场景。
-- **禁止误用**：不要把 `tool_compose` 当成"通用规划器"或普通并发器；不要用 `tool_compose` 调用 AI Blueprint（蓝图应使用 `require_ai_blueprint`）。
+- **工具依赖**：后序参数依赖前序真实输出时，先执行前序调用，再在下一轮使用 `directly_call_tool` 提交完整后序参数。独立调用符合批次门槛才并发。
+- **蓝图调用**：AI Blueprint 使用 `require_ai_blueprint`。
 {{ if .AllowPlan }}
 如果遇到比较复杂的任务，可申请计划：{{ if .FunctionCallMode }}调用 `request_plan` 工具并在 `arguments.plan_request_payload` 中填写需求{{ else }}`{"@action": "request_plan", "plan_request_payload": "..."}`{{ end }}（规划经用户审查通过后再异步执行）。申请任务列表执行的时候，可以从用户最终目标来反推一些提示，辅助系统进行任务规划。
 {{ end }}
@@ -119,7 +119,6 @@ Timeline 或注入记忆中的失败记录是特定输入和环境下的历史�
   2. **能批量发现就不逐个手发**：需要快速摸清站点多 URL/参数/表单/接口时，优先用轻量爬取类工具，而非手工逐个发请求。
   3. **一次调用拿到足够信息就停**：若一次请求已返回足以决策的内容，不要为了"再多看看"重复调用同类工具取相同信息；需要更多细节时再针对性发起下一步。
 - **搜索优先**：如果你不确定如何完成任务或是否需要特定工具，请果断使用 `tools_search` 寻找合适的工具或解决方案。搜索可以帮助你快速定位可用资源，避免浪费时间在无效尝试上。
-- **`tool_compose` 使用门槛**：至少需要满足"多工具 + 后序参数依赖前序真实输出"；彼此独立的多个低风险调用只有满足上述直接批次或申请批次门槛时才考虑并发。
 
 **bash 使用规范：**
 

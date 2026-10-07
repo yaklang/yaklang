@@ -211,3 +211,32 @@ func TestRecentToolCache_ActualToolSizes(t *testing.T) {
 	assert.Check(t, combinedSize > httpSize, "combined metadata-backed cache size should exceed do_http_request alone")
 	assert.Check(t, combinedSize < defaultRecentToolCacheMaxTokens, "bash + do_http_request metadata-backed cache size should fit in the token budget")
 }
+
+func TestRecentToolCachePreloadPreservesWorkingSet(t *testing.T) {
+	for _, native := range []bool{false, true} {
+		existing := makeTool("existing", "working schema", aitool.WithStringParam("x"))
+		optional := makeTool("optional", "optional schema", aitool.WithStringParam("x"))
+		budget := newRecentToolEntry(existing, native).Size + newRecentToolEntry(optional, native).Size - 1
+		mgr := newManagerWithCache(budget)
+		mgr.AddRecentlyUsedToolForMode(existing, native)
+		mutation := mgr.PreloadRecentlyUsedToolForMode(optional, native)
+		assert.Check(t, mutation.Upsert == nil && mutation.Reuse == nil)
+		assert.Equal(t, len(mutation.Deleted), 0)
+		assert.Check(t, mgr.IsRecentlyUsedTool(existing.Name))
+		assert.Check(t, !mgr.IsRecentlyUsedTool(optional.Name))
+		reuse := mgr.PreloadRecentlyUsedToolForMode(existing, native)
+		assert.Check(t, reuse.Reuse != nil)
+		assert.Equal(t, len(reuse.Deleted), 0)
+		var wg sync.WaitGroup
+		for i := 0; i < 20; i++ {
+			wg.Add(1)
+			go func() { defer wg.Done(); mgr.PreloadRecentlyUsedToolForMode(optional, native) }()
+		}
+		wg.Wait()
+		assert.Check(t, mgr.totalCacheSize() <= budget)
+		assert.Equal(t, len(mgr.GetRecentToolNames()), 1)
+		oversized := newManagerWithCache(1)
+		assert.Check(t, oversized.PreloadRecentlyUsedToolForMode(optional, native).Upsert == nil)
+		assert.Check(t, !oversized.HasRecentlyUsedTools())
+	}
+}

@@ -15,7 +15,7 @@ Phase 2 的目标是**尽可能广地覆盖可疑点并提交 finding**；精确
 
 ## 工具白名单（代码强制）
 
-本 loop **禁止** `require_tool` / `directly_call_tool` / `tool_compose` 及一切未列出的工具（含 `cybersecurity-risk`、`bash`、`do_http_request` 等）。
+本 loop **禁止** `require_tool` / `directly_call_tool` 及一切未列出的工具（含 `cybersecurity-risk`、`bash`、`do_http_request` 等）。
 
 **仅可使用**：
 - **内置 FS 工具**（直接作为 `@action`）：`grep`、`read_file`、`find_file`

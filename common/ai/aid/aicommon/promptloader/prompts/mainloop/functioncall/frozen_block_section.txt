@@ -6,12 +6,12 @@
 执行：原生函数名为 `directly_call_tool`，业务名称写入 `arguments.directly_call_tool_name`，业务参数写入 `arguments.directly_call_tool_params`。例如读取文件：函数名为 `directly_call_tool`，arguments 为 `{"identifier":"read_source","directly_call_tool_name":"read_file","directly_call_tool_params":{"file":"/absolute/path/source.txt"}}`；不要以 `read_file` 为原生函数名。
 
 
-## 工具调用模式（单调用、可选并发批次或 tool_compose）
+## 工具调用模式（单调用或独立并发批次）
 
 - 单工具入口：默认使用；参数不明时先加载 Schema，有写入、页面状态或后续依赖结果时逐步执行。
 - 批量执行仍调用 `directly_call_tool`，数组写入 `arguments.directly_call_tool_calls`；各项须低风险、独立且互不干扰，参数来自完整 Schema。`require_tool` 的 `arguments.tool_require_calls` 仅批量加载定义。这两个数组字段不是函数名。
 
-- 工具编排入口 (tool_compose): 只用于存在明确上游产物依赖的意图 DAG. 它的节点不承载模型直接给出的最终工具参数, 不能替代上述并发调用数组.
+- 参数依赖前序结果时，先执行前序调用，读取真实输出后在下一轮构造后续调用参数。不要猜测尚未产生的输出。
 - 嵌套 wrapper、页面状态操作或参数有歧义时必须走单调用.
 - 任一批次发生准入、Schema 或参数错误后，保留已成功结果，将失败调用改为修正后的单调用；禁止原样重试批次.
 

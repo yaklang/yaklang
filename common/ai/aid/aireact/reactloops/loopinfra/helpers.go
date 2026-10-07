@@ -10,7 +10,6 @@ import (
 )
 
 const (
-	loopInfraNodeToolCompose        = "tool_compose_progress"
 	loopInfraNodeLoadCapability     = "load_capability"
 	loopInfraNodeLoadSkillResources = "load_skill_resources_path"
 	loopInfraNodeSingleFileWrite    = "infra-file-write"

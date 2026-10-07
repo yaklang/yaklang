@@ -2,6 +2,7 @@ package aicommon
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"strings"
@@ -166,6 +167,7 @@ type ToolCaller struct {
 	intervalReviewHandler  func(ctx context.Context, tool *aitool.Tool, params aitool.InvokeParams, stdoutSnapshot, stderrSnapshot []byte, callExpectations string) (bool, error)
 	intervalReviewDuration time.Duration // interval duration for review, default is DefaultToolCallIntervalReviewDuration
 
+	reviewReconsiderHandler func(context.Context, *aitool.Tool, aitool.InvokeParams, aitool.InvokeParams) string
 	reviewWrongToolHandler  func(ctx context.Context, tool *aitool.Tool, newToolName, keyword string) (*aitool.Tool, bool, error)
 	reviewWrongParamHandler func(ctx context.Context, tool *aitool.Tool, oldParam aitool.InvokeParams, suggestion string) (aitool.InvokeParams, error)
 
@@ -371,7 +373,7 @@ func WithToolCaller_Reason(reason string) ToolCallerOption {
 // WithToolCaller_InvokeRuntime sets an optional AIInvokeRuntime on the ToolCaller.
 // When present, a speed-priority lite forge is used to (re)generate a
 // human-readable reason: as a fallback in emitStart when no reason was preset,
-// and after a review override (wrong_tool/wrong_params) so the card's reason
+// and after explicit manual parameter edits so the card's reason
 // matches the finally-executed tool/params. When absent, both paths no-op and
 // behavior is unchanged.
 func WithToolCaller_InvokeRuntime(rt AIInvokeRuntime) ToolCallerOption {
@@ -467,6 +469,12 @@ func buildRecentToolCallSummary(task AITask, maxItems int) string {
 		sb.WriteString(fmt.Sprintf("- %s: %s%s\n", r.Name, status, extra))
 	}
 	return sb.String()
+}
+
+// WithToolCaller_ReviewReconsider routes rejected proposals back to their owner.
+// The handler may load schemas and record feedback, but must not invoke tools.
+func WithToolCaller_ReviewReconsider(handler func(context.Context, *aitool.Tool, aitool.InvokeParams, aitool.InvokeParams) string) ToolCallerOption {
+	return func(tc *ToolCaller) { tc.reviewReconsiderHandler = handler }
 }
 
 func WithToolCaller_ReviewWrongTool(
@@ -711,8 +719,8 @@ func (t *ToolCaller) emitIdentifierReasonFallback() {
 	}
 }
 
-// resetReasonForReview clears the reason state so the recursive CallTool
-// (after review changed the tool or params) may generate a fresh reason once
+// resetReasonForReview clears the reason state so an explicit manual parameter
+// edit may generate a fresh reason once
 // more from the unified reason-handling point. This is the only legitimate
 // case for regenerating a reason. reasonFinalized is reset only so the thinking
 // stream is allowed to emit again until a new concrete reason is set.
@@ -1267,7 +1275,7 @@ func (t *ToolCaller) CallToolWithExistedParams(tool *aitool.Tool, presetParams b
 			}
 		}
 		// Only the pending approval endpoint is serialized. Apply the decision
-		// outside the gate so legacy wrong_tool/wrong_params recursive calls can
+		// outside the gate so explicit manual-edit proposals can
 		// acquire the same gate without deadlocking.
 		releaseReview()
 		if params == nil {
@@ -1285,8 +1293,17 @@ func (t *ToolCaller) CallToolWithExistedParams(tool *aitool.Tool, presetParams b
 			tool, invokeParams, params, handleUserCancel,
 		)
 		if err != nil {
-			t.emitter.EmitError("error handling tool use review: %v", err)
-			handleError(fmt.Sprintf("error handling tool use review: %v", err))
+			var reconsider *ToolReviewReconsiderError
+			if errors.As(err, &reconsider) {
+				if !reviewReplayed {
+					if cfg, ok := config.(*Config); ok {
+						cfg.SubmitToolReviewValueFeedback(ep, reviewQuestion, originalReviewParams, nil)
+					}
+				}
+			} else {
+				t.emitter.EmitError("error handling tool use review: %v", err)
+				handleError(fmt.Sprintf("error handling tool use review: %v", err))
+			}
 			return nil, false, err
 		}
 

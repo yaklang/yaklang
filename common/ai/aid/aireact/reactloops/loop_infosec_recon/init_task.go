@@ -2,6 +2,7 @@ package loop_infosec_recon
 
 import (
 	_ "embed"
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"strings"
@@ -117,6 +118,8 @@ func buildInitTask(r aicommon.AIInvokeRuntime) func(loop *reactloops.ReActLoop, 
 			mergeInfosecLongRunningToolIntervalReviewExtraPrompt(c)
 		}
 
+		preloadReconToolSchemas(loop, task)
+
 		r.AddToTimeline("infosec_recon_init", "API surface recon loop ready. recon_register_seed → "+ToolCrawlJsCollector+" (optional deep_js) → "+ToolJsStaticExtractAI+"(paths / verified JS dir) → api_pool_merge / probe_api_candidates as needed.")
 		reactloops.EmitStatusI18n(loop, "已经明确目标，正在开始查找线索", "The target is clear; starting to look for leads")
 		operator.Continue()
@@ -165,4 +168,18 @@ func ensurePoolFile(workDir string) error {
 	}
 	p := &APIPool{Version: poolFormatVersion, Entries: []APIPoolEntry{}}
 	return SaveAPIPool(workDir, p)
+}
+
+// Stable preference order, enabled tools only. Optional schemas never evict a
+// user's current working set; require_tool remains available for later demand.
+func preloadReconToolSchemas(loop *reactloops.ReActLoop, task aicommon.AIStatefulTask) {
+	ctx := loop.GetConfig().GetContext()
+	if task != nil && task.GetContext() != nil {
+		ctx = task.GetContext()
+	}
+	results := loop.PreloadToolSchemas(ctx, []string{"scan_port", "simple_crawler", "banner_grab", "dig", "subdomain_scan", "network_space_search", "do_http_request", "read_file", "grep", "find_file", "web_search", "batch_do_http_request"})
+	if len(results) > 0 {
+		encoded, _ := json.Marshal(results)
+		loop.GetInvoker().AddToTimeline("recon_schema_preload", string(encoded))
+	}
 }

@@ -364,21 +364,8 @@ func (r *ReAct) newToolCallerForBatchCall(
 		aicommon.WithToolCaller_ArtifactOrdinal(work.artifactOrdinal),
 		aicommon.WithToolCaller_BatchMetadata(work.batchID, work.call.Index),
 		aicommon.WithToolCaller_StatsSource(statsSource),
-		aicommon.WithToolCaller_ReviewWrongTool(func(
-			callCtx context.Context,
-			tool *aitool.Tool,
-			newToolName string,
-			keyword string,
-		) (*aitool.Tool, bool, error) {
-			return r._invokeToolCall_ReviewWrongToolForTask(callCtx, task, tool, newToolName, keyword)
-		}),
-		aicommon.WithToolCaller_ReviewWrongParam(func(
-			callCtx context.Context,
-			tool *aitool.Tool,
-			old aitool.InvokeParams,
-			extraPrompt string,
-		) (aitool.InvokeParams, error) {
-			return r._invokeToolCall_ReviewWrongParamForTask(callCtx, task, tool, old, extraPrompt)
+		aicommon.WithToolCaller_ReviewReconsider(func(ctx context.Context, tool *aitool.Tool, params, feedback aitool.InvokeParams) string {
+			return r.reconsiderToolReviewForTask(ctx, task, tool, params, feedback)
 		}),
 	}
 	if paramMutator != nil {
@@ -392,10 +379,8 @@ func (r *ReAct) newToolCallerForBatchCall(
 			}
 		}
 	}
-	// Direct proposals normally arrive with preset params, but a manual
-	// wrong_tool decision recursively enters CallTool for the replacement. Keep
-	// the real builder on every batch child so that path generates parameters
-	// exactly like the scalar runtime instead of failing after review.
+	// Retain the low-level require-mode builder until its separate migration.
+	// Explicit direct proposals and review reconsideration do not enter it.
 	opts = append(opts,
 		aicommon.WithToolCaller_GenerateToolParamsBuilderWithMeta(
 			func(tool *aitool.Tool, toolName string) (*aicommon.ToolParamsPromptMeta, error) {
@@ -651,9 +636,8 @@ func (r *ReAct) ExecuteToolBatch(
 				}
 			} else if loop != nil {
 				// Direct calls were already admission-mutated before any card or
-				// callback was allowed. Skip that first application; recursive review
-				// proposals must be mutated once for their *current* (possibly changed)
-				// tool rather than inheriting the originally requested tool's mutator.
+				// callback was allowed. Skip that first application; an explicit manual
+				// edit is a new proposal and must pass the same tool's mutator once.
 				firstProposal := true
 				paramMutator = func(currentTool *aitool.Tool, params aitool.InvokeParams) aitool.InvokeParams {
 					if firstProposal {
@@ -671,8 +655,8 @@ func (r *ReAct) ExecuteToolBatch(
 				_ *aitool.Tool,
 				_ aitool.InvokeParams,
 			) (func(), error) {
-				// This child has finished every possible review (including recursive
-				// wrong-tool/wrong-param review) and can safely expose the next
+				// This child has finished approval, including any explicit manual
+				// edits, and can safely expose the next
 				// array index's approval card.
 				orderedMutators.complete(i)
 				orderedReviews.complete(i)

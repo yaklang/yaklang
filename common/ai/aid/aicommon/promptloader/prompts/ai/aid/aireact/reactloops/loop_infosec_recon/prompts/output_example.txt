@@ -1,4 +1,11 @@
-{
-  "@action": "recon_register_seed",
-  "human_readable_thought": "The user provided an authorized target; I register the seed URL and scope before crawling."
-}
+[[- if .FunctionCallMode -]]
+调用 recon_register_seed，arguments：
+{"seed_url":"https://target.example","scope_hosts":"target.example"}
+
+按 CACHE_TOOL_CALL 中的 Schema 调用 directly_call_tool，arguments：
+{"directly_call_tool_name":"read_file","directly_call_tool_params":{"file":"/workspace/recon.txt"},"directly_call_reason":"核对已有侦察材料"}
+[[- else -]]
+{"@action":"recon_register_seed","seed_url":"https://target.example","scope_hosts":"target.example"}
+
+{"@action":"directly_call_tool","directly_call_tool_name":"read_file","directly_call_tool_params":{"file":"/workspace/recon.txt"},"directly_call_reason":"核对已有侦察材料"}
+[[- end -]]

@@ -60,6 +60,12 @@ func TestToolBatchActionInferenceAndHistoryExtraction(t *testing.T) {
 	}
 }
 
+func TestRemovedToolDAGPayloadCannotInferExecutableAction(t *testing.T) {
+	action, err := aicommon.ExtractAction(`{"@action":"object","tool_compose_payload":"[{\"tool_name\":\"read_file\"}]"}`, "object")
+	require.NoError(t, err)
+	require.Empty(t, inferActionTypeFromPayload(action, ""))
+}
+
 func TestToolBatchHistoryCountsChildrenAndClonesParams(t *testing.T) {
 	records := []*ActionRecord{
 		{
@@ -76,12 +82,12 @@ func TestToolBatchHistoryCountsChildrenAndClonesParams(t *testing.T) {
 			ToolCallCount: 3,
 		},
 		// A legacy record has no ToolCallCount and remains one call.
-		{ActionType: schema.AI_REACT_LOOP_ACTION_TOOL_COMPOSE, ToolName: "legacy"},
+		{ActionType: schema.AI_REACT_LOOP_ACTION_DIRECTLY_CALL_TOOL, ToolName: "legacy"},
 	}
 	require.Equal(t, 6, countToolCallsFromActionRecords(records))
 	require.Equal(
 		t,
-		"directly_call_tool(read_file,grep) -> require_tool(search,search,read_file) -> tool_compose(legacy)",
+		"directly_call_tool(read_file,grep) -> require_tool(search,search,read_file) -> directly_call_tool(legacy)",
 		summarizeValueFeedbackActions(records),
 	)
 	feedbackAction := valueFeedbackActionFromRecord(records[0])

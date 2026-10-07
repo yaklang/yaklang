@@ -17,7 +17,6 @@ var actionStatusNames = map[string]actionStatusName{
 	"finish":                                 {"完成任务", "finishing the task"},
 	schema.AI_REACT_LOOP_ACTION_REQUIRE_TOOL: {"申请工具使用", "requesting a tool"},
 	schema.AI_REACT_LOOP_ACTION_DIRECTLY_CALL_TOOL:        {"调用工具", "calling a tool"},
-	schema.AI_REACT_LOOP_ACTION_TOOL_COMPOSE:              {"批量执行工具", "running a tool batch"},
 	schema.AI_REACT_LOOP_ACTION_SEARCH_CAPABILITIES:       {"查找可用能力", "finding available capabilities"},
 	schema.AI_REACT_LOOP_ACTION_ASK_FOR_CLARIFICATION:     {"确认需求", "clarifying the request"},
 	schema.AI_REACT_LOOP_ACTION_KNOWLEDGE_ENHANCE:         {"检索知识", "searching knowledge"},
@@ -55,7 +54,6 @@ func preparingActionStatusText(name string) (zh, en string) {
 		return "正在申请工具使用", "Requesting tool access"
 	case schema.AI_REACT_LOOP_ACTION_DIRECTLY_CALL_TOOL:
 		return "正在准备调用工具", "Preparing to call a tool"
-	case schema.AI_REACT_LOOP_ACTION_TOOL_COMPOSE:
 		return "正在准备批量执行工具", "Preparing a tool batch"
 	default:
 		return "正在准备" + label.zh, "Preparing: " + label.en

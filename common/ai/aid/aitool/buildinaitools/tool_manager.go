@@ -632,17 +632,12 @@ func (m *AiToolManager) AddRecentlyUsedToolForMode(tool *aitool.Tool, native boo
 }
 
 func (m *AiToolManager) addRecentlyUsedToolLocked(tool *aitool.Tool, native bool) RecentToolCacheMutation {
+	return m.addRecentToolEntryLocked(newRecentToolEntry(tool, native))
+}
+
+func (m *AiToolManager) addRecentToolEntryLocked(newEntry *RecentToolEntry) RecentToolCacheMutation {
 	var mutation RecentToolCacheMutation
-	name := tool.GetName()
-	desc := tool.GetDescription()
-	schemaStr := tool.ToJSONSchemaString()
-	usage := tool.GetUsage()
-	renderedUsage, err := aitool.RenderUsageForMode(usage, native)
-	if err != nil {
-		log.Warnf("cannot render Usage for cached tool %q: %v", name, err)
-		renderedUsage = ""
-	}
-	entrySize := ytoken.CalcTokenCount(name) + ytoken.CalcTokenCount(desc) + ytoken.CalcTokenCount(schemaStr) + ytoken.CalcTokenCount(renderedUsage)
+	name := newEntry.Name
 
 	// remove existing entry with same name (will be re-appended at tail)
 	filtered := make([]*RecentToolEntry, 0, len(m.recentToolsCache))
@@ -656,13 +651,6 @@ func (m *AiToolManager) addRecentlyUsedToolLocked(tool *aitool.Tool, native bool
 	}
 	m.recentToolsCache = filtered
 
-	newEntry := &RecentToolEntry{
-		Name:          name,
-		Description:   desc,
-		SchemaSnippet: schemaStr,
-		Usage:         renderedUsage,
-		Size:          entrySize,
-	}
 	m.recentToolsCache = append(m.recentToolsCache, newEntry)
 	if previous == nil || previous.Description != newEntry.Description || previous.SchemaSnippet != newEntry.SchemaSnippet || previous.Usage != newEntry.Usage {
 		cp := *newEntry
@@ -942,4 +930,41 @@ func buildStubToolFromMCPCache(fullName string, cfg *schema.MCPServerToolConfig)
 
 	tool := aitool.NewWithoutCallback(fullName, opts...)
 	return tool
+}
+
+// PreloadRecentlyUsedToolForMode admits optional schemas without evicting the
+// working set. Admission and insertion share one lock; an oversized preload is
+// skipped rather than relying on the ordinary single-oversized-entry fallback.
+func (m *AiToolManager) PreloadRecentlyUsedToolForMode(tool *aitool.Tool, native bool) RecentToolCacheMutation {
+	if tool == nil {
+		return RecentToolCacheMutation{}
+	}
+	m.recentToolsMu.Lock()
+	defer m.recentToolsMu.Unlock()
+	candidate := newRecentToolEntry(tool, native)
+	total := m.totalCacheSize() + candidate.Size
+	for _, entry := range m.recentToolsCache {
+		if entry.Name == candidate.Name {
+			total -= entry.Size
+		}
+	}
+	if total > m.getMaxCacheTokens() {
+		return RecentToolCacheMutation{}
+	}
+	return m.addRecentToolEntryLocked(candidate)
+}
+
+func newRecentToolEntry(tool *aitool.Tool, native bool) *RecentToolEntry {
+	name := tool.GetName()
+	desc := tool.GetDescription()
+	schemaStr := tool.ToJSONSchemaString()
+	usage := tool.GetUsage()
+	renderedUsage, err := aitool.RenderUsageForMode(usage, native)
+	if err != nil {
+		log.Warnf("cannot render Usage for cached tool %q: %v", name, err)
+		renderedUsage = ""
+	}
+	size := ytoken.CalcTokenCount(name) + ytoken.CalcTokenCount(desc) + ytoken.CalcTokenCount(schemaStr) + ytoken.CalcTokenCount(renderedUsage)
+
+	return &RecentToolEntry{Name: name, Description: desc, SchemaSnippet: schemaStr, Usage: renderedUsage, Size: size}
 }
