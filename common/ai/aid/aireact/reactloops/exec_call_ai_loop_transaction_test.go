@@ -220,19 +220,25 @@ func TestNativeFunctionCallStatusNamesAppearBeforeProviderFinishes(t *testing.T)
 	var statusMu sync.Mutex
 	var statuses []aicommon.StatusPayload
 	var sawFirst, sawBatch bool
+	var readersStarted int
 	loop := newCallAILoopTransactionTestLoop(t, true, func(_ *aicommon.AIRequest, cfg *aispec.AIConfig) (*aicommon.AIResponse, error) {
 		resp := aicommon.NewAIResponse(nil)
 		cfg.ToolCallCallback([]*aispec.ToolCall{{Index: 0, Type: "function",
 			Function: aispec.FuncReturn{Name: nativeAdjustTodolistActionName}}})
 		statusMu.Lock()
-		sawFirst = len(statuses) > 0 && statuses[len(statuses)-1].Value == "正在准备调整待办事项"
+		require.Equal(t, "action.preparing", statuses[len(statuses)-1].Code, "show the function as soon as its name arrives")
+		require.Equal(t, "正在调用调整待办事项", statuses[len(statuses)-1].Value)
+		require.Zero(t, readersStarted, "displaying a name does not start argument consumers or execute a tool")
 		statusMu.Unlock()
 		cfg.ToolCallCallback([]*aispec.ToolCall{{Index: 0, ID: "todo", Function: aispec.FuncReturn{Arguments: `{"todo_delta":{}`}}})
+		statusMu.Lock()
+		sawFirst = statuses[len(statuses)-1].Value == "正在调用调整待办事项"
+		statusMu.Unlock()
 		cfg.ToolCallCallback([]*aispec.ToolCall{{Index: 1, ID: "answer", Type: "function",
 			Function: aispec.FuncReturn{Name: "directly_answer", Arguments: `{"answer_payload":"你好"}`}}})
 		statusMu.Lock()
 		sawBatch = len(statuses) > 0 && statuses[len(statuses)-1].Code == "action.batch.preparing" &&
-			strings.Contains(statuses[len(statuses)-1].Value, "调整待办事项、回复用户")
+			strings.Contains(statuses[len(statuses)-1].Value, "调整待办事项，回复用户")
 		statusMu.Unlock()
 		cfg.ToolCallCallback([]*aispec.ToolCall{{Index: 0, Function: aispec.FuncReturn{Arguments: `}`}}})
 		cfg.FinishReasonCallback("tool_calls", nil)
@@ -255,6 +261,9 @@ func TestNativeFunctionCallStatusNamesAppearBeforeProviderFinishes(t *testing.T)
 	})
 	calls, _, _, err := loop.callAILoopTransaction(&sync.WaitGroup{}, "prompt", "nonce", nil,
 		func(io.Reader, io.Reader) {}, func(_, _ string, description, arguments io.Reader) {
+			statusMu.Lock()
+			readersStarted++
+			statusMu.Unlock()
 			_, _ = io.Copy(io.Discard, description)
 			_, _ = io.Copy(io.Discard, arguments)
 		})
@@ -267,10 +276,10 @@ func TestNativeFunctionCallStatusNamesAppearBeforeProviderFinishes(t *testing.T)
 	var batchPreparing int
 	var localizedAction bool
 	for _, status := range statuses {
-		require.NotEqual(t, "正在梳理思路", status.Value)
-		if status.Value == "正在准备调整待办事项" {
+		require.NotEqual(t, "reasoning.thinking", status.Code)
+		if status.Value == "正在调用调整待办事项" {
 			require.NotNil(t, status.ValueI18n)
-			require.Equal(t, "Preparing: updating the task list", status.ValueI18n.En)
+			require.Equal(t, "Calling: updating the task list", status.ValueI18n.En)
 			localizedAction = true
 		}
 		if status.Code == "action.batch.preparing" {
@@ -278,7 +287,7 @@ func TestNativeFunctionCallStatusNamesAppearBeforeProviderFinishes(t *testing.T)
 		}
 	}
 	require.True(t, localizedAction)
-	require.Equal(t, 2, batchPreparing, "one update on discovery and one after validation")
+	require.Equal(t, 1, batchPreparing, "do not repeat preparation after validation")
 }
 
 func TestCallAILoopTransactionNativeArgumentsEmitDeclaredFields(t *testing.T) {
@@ -693,6 +702,34 @@ func TestLoopToolCallCollectorReusedIndexKeepsCallsByID(t *testing.T) {
 	require.JSONEq(t, `{"value":"B"}`, calls[1].Function.Arguments)
 	require.Equal(t, calls[0].Function.Arguments, streamed["call_a"])
 	require.Equal(t, calls[1].Function.Arguments, streamed["call_b"])
+}
+
+func TestLoopToolCallCollectorDelayedNamesKeepDisplayIdentities(t *testing.T) {
+	loop := newCallAILoopTransactionTestLoop(t, true, nil)
+	activity := newResponseActivity(loop, []string{"check_a", "check_b"})
+	defer activity.close()
+	collector := newLoopToolCallCollector(func(_, _ string, description, arguments io.Reader) {
+		_, _ = io.Copy(io.Discard, description)
+		_, _ = io.Copy(io.Discard, arguments)
+	}, activity.prepare)
+	collector.onCallIdentified = activity.identifyCall
+	// Names arrive out of creation order, with the second name and its ID in
+	// the same callback. Display identities must remain distinct and rekeyed.
+	collector.add([]*aispec.ToolCall{{Index: 0}, {Index: 1, Function: aispec.FuncReturn{Name: "check_b"}}})
+	collector.add([]*aispec.ToolCall{
+		{Index: 0, Function: aispec.FuncReturn{Name: "check_a"}},
+		{Index: 0, ID: "call_a", Function: aispec.FuncReturn{Arguments: `{}`}},
+		{Index: 1, ID: "call_b", Function: aispec.FuncReturn{Arguments: `{}`}},
+	})
+	calls, err := collector.finish()
+	require.NoError(t, err)
+	require.Len(t, calls, 2)
+	require.Equal(t, "check_a", calls[0].Function.Name)
+	require.Equal(t, "check_b", calls[1].Function.Name)
+	activity.mu.Lock()
+	defer activity.mu.Unlock()
+	require.Equal(t, map[string]string{"call_a": "check_a", "call_b": "check_b"}, activity.calls)
+	require.Equal(t, []string{"call_b", "call_a"}, activity.callOrder)
 }
 
 func TestCallAILoopTransactionFunctionModeDiscardsEarlierProviderResponse(t *testing.T) {

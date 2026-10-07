@@ -679,9 +679,9 @@ LOOP:
 		}
 
 		r.UserStatus(
-			"正在推进下一步",
-			"Moving on to the next step",
-			aicommon.WithStatusCode("task.working"),
+			"正在准备本轮上下文…",
+			"Preparing context for this turn…",
+			aicommon.WithStatusCode("response.preparing"),
 		)
 		var prompt string
 		// PE-TASK 的计划上下文交给 Open 区，任务输入仅为历史压缩提供目标。

@@ -15,11 +15,12 @@ import (
 // emitted while arguments arrive; nested-only legacy fields are emitted after
 // validation. A new attempt is created for every retry/provider response.
 type nativeFieldStreamAttempt struct {
-	loop    *ReActLoop
-	allowed map[string]bool
-	mu      sync.Mutex
-	emitted map[string]map[string]bool
-	err     error
+	loop     *ReActLoop
+	allowed  map[string]bool
+	mu       sync.Mutex
+	emitted  map[string]map[string]bool
+	err      error
+	activity *responseActivity
 }
 
 func (r *ReActLoop) nativeStreamFields(action *LoopAction) *omap.OrderedMap[string, *LoopStreamField] {
@@ -101,15 +102,18 @@ func (a *nativeFieldStreamAttempt) stream(id, name string, argumentReader io.Rea
 		return
 	}
 	fields := r.nativeStreamFields(handler)
-	if fields.Len() == 0 {
-		_, _ = io.Copy(io.Discard, argumentReader)
-		return
-	}
 	taskIndex := ""
 	if task := r.GetCurrentTask(); task != nil {
 		taskIndex = task.GetIndex()
 	}
 	var options []jsonextractor.CallbackOption
+	if a.activity != nil {
+		options = append(options, jsonextractor.WithFormatKeyValueCallback(func(key, value any, parents []string) {
+			if keyString, ok := key.(string); ok && keyString != "@action" {
+				a.activity.field(id, keyString, value, parents)
+			}
+		}))
+	}
 	for _, field := range fields.Values() {
 		if field == nil || field.FieldName == "" {
 			continue
@@ -142,7 +146,11 @@ func (a *nativeFieldStreamAttempt) stream(id, name string, argumentReader io.Rea
 	// Extractor's field readers run concurrently with this parse and the
 	// emitter consumes each decoded string as its JSON bytes arrive.
 	if err := jsonextractor.ExtractStructuredJSONFromStream(argumentReader, options...); err != nil {
-		a.setError(utils.Wrapf(err, "extract native arguments for %q", id))
+		// UI-only observation must not change argument admission. Calls without
+		// declared display fields still use the existing canonical JSON verifier.
+		if fields.Len() > 0 {
+			a.setError(utils.Wrapf(err, "extract native arguments for %q", id))
+		}
 	}
 	_, _ = io.Copy(io.Discard, argumentReader)
 }

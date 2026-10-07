@@ -485,6 +485,7 @@ type ActionMaker struct {
 	alias            []string
 	jsonCallback     []jsonextractor.CallbackOption
 	onRootFields     func(map[string]any)
+	onField          func(string, any, []string)
 	onReaderFinished []func()
 	tagToKey         map[string]string // tag to param name mapping
 	// tagToExtraNonces 给单个 tag 注册额外的 nonce 候选 (与 m.nonce 并列, 不替代).
@@ -522,6 +523,13 @@ func WithActionAlias(alias ...string) ActionMakerOption {
 // WaitParseResult and the canonical object. Nested fields are never forwarded.
 func WithActionRootFieldsCallback(callback func(map[string]any)) ActionMakerOption {
 	return func(maker *ActionMaker) { maker.onRootFields = callback }
+}
+
+// WithActionFieldCallback observes decoded fields as they arrive, including
+// nested paths. This is display-only observation, not action admission. The
+// callback must not mutate values retained by the parser.
+func WithActionFieldCallback(callback func(string, any, []string)) ActionMakerOption {
+	return func(maker *ActionMaker) { maker.onField = callback }
 }
 
 func WithActionJSONCallback(opts ...jsonextractor.CallbackOption) ActionMakerOption {
@@ -764,6 +772,9 @@ func (m *ActionMaker) ReadFromReader(ctx context.Context, reader io.Reader) *Act
 				return
 			}
 			keyString := utils.InterfaceToString(key)
+			if m.onField != nil && !canonicalObjectFound {
+				m.onField(keyString, data, parents)
+			}
 			if len(parents) == 0 && !canonicalObjectFound {
 				if m.onRootFields != nil {
 					if rootFields == nil {

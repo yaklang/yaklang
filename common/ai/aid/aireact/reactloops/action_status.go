@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/schema"
 )
 
@@ -15,8 +16,8 @@ var actionStatusNames = map[string]actionStatusName{
 	"adjust_todolist":                        {"调整待办事项", "updating the task list"},
 	"directly_answer":                        {"回复用户", "answering the user"},
 	"finish":                                 {"完成任务", "finishing the task"},
-	schema.AI_REACT_LOOP_ACTION_REQUIRE_TOOL: {"申请工具使用", "requesting a tool"},
-	schema.AI_REACT_LOOP_ACTION_DIRECTLY_CALL_TOOL:        {"调用工具", "calling a tool"},
+	schema.AI_REACT_LOOP_ACTION_REQUIRE_TOOL: {"加载工具定义", "loading tool schemas"},
+	schema.AI_REACT_LOOP_ACTION_DIRECTLY_CALL_TOOL:        {"执行工具", "running tools"},
 	schema.AI_REACT_LOOP_ACTION_SEARCH_CAPABILITIES:       {"查找可用能力", "finding available capabilities"},
 	schema.AI_REACT_LOOP_ACTION_ASK_FOR_CLARIFICATION:     {"确认需求", "clarifying the request"},
 	schema.AI_REACT_LOOP_ACTION_KNOWLEDGE_ENHANCE:         {"检索知识", "searching knowledge"},
@@ -42,38 +43,85 @@ func statusNameForAction(name string) actionStatusName {
 	return actionStatusName{zh: fmt.Sprintf("执行「%s」动作", name), en: fmt.Sprintf("running the %s action", name)}
 }
 
-func actionStatusText(name string) (zh, en string) {
-	label := statusNameForAction(name)
-	return "正在" + label.zh, "Currently " + label.en
-}
-
-func preparingActionStatusText(name string) (zh, en string) {
-	label := statusNameForAction(name)
-	switch name {
-	case schema.AI_REACT_LOOP_ACTION_REQUIRE_TOOL:
-		return "正在申请工具使用", "Requesting tool access"
-	case schema.AI_REACT_LOOP_ACTION_DIRECTLY_CALL_TOOL:
-		return "正在准备调用工具", "Preparing to call a tool"
-		return "正在准备批量执行工具", "Preparing a tool batch"
-	default:
-		return "正在准备" + label.zh, "Preparing: " + label.en
-	}
-}
-
-func actionBatchStatusNames(names []string) (zh, en string) {
+func (r *ReActLoop) actionBatchStatusNames(names []string) (zh, en string) {
 	const visibleLimit = 3
 	zhNames, enNames := make([]string, 0, visibleLimit), make([]string, 0, visibleLimit)
+	seen := make(map[string]bool, len(names))
+	unique := make([]string, 0, len(names))
 	for _, name := range names {
+		if !seen[name] {
+			seen[name] = true
+			unique = append(unique, name)
+		}
+	}
+	for _, name := range unique {
 		if len(zhNames) == visibleLimit {
 			break
 		}
-		label := statusNameForAction(name)
+		label := r.statusNameForAction(name)
 		zhNames, enNames = append(zhNames, label.zh), append(enNames, label.en)
 	}
-	zh, en = strings.Join(zhNames, "、"), strings.Join(enNames, ", ")
-	if remaining := len(names) - len(zhNames); remaining > 0 {
+	zh, en = strings.Join(zhNames, "，"), strings.Join(enNames, ", ")
+	if remaining := len(unique) - len(zhNames); remaining > 0 {
 		zh += fmt.Sprintf("等 %d 个动作", remaining)
 		en += fmt.Sprintf(" and %d more actions", remaining)
 	}
 	return zh, en
+}
+
+// GetVerboseNameI18n resolves UI-only metadata for built-in and custom actions.
+func (a *LoopAction) GetVerboseNameI18n() schema.I18n {
+	label := statusNameForAction(a.ActionType)
+	if a.VerboseNameI18n != nil {
+		if v := strings.TrimSpace(a.VerboseNameI18n.Zh); v != "" {
+			label.zh = v
+		}
+		if v := strings.TrimSpace(a.VerboseNameI18n.En); v != "" {
+			label.en = v
+		}
+	}
+	return schema.I18n{Zh: label.zh, En: label.en}
+}
+
+func (r *ReActLoop) statusNameForAction(name string) actionStatusName {
+	// Display updates must not invoke dynamic action factories.
+	if r.actions != nil {
+		if action, ok := r.actions.Get(name); ok && action != nil {
+			label := r.actionForProtocol(action).GetVerboseNameI18n()
+			return actionStatusName{label.Zh, label.En}
+		}
+	}
+	label := statusNameForAction(name)
+	if meta, ok := GetLoopMetadata(name); ok {
+		if v := strings.TrimSpace(meta.VerboseNameZh); v != "" {
+			label.zh = v
+		}
+		if v := strings.TrimSpace(meta.VerboseName); v != "" {
+			label.en = v
+		}
+	}
+	return label
+}
+
+func (r *ReActLoop) actionStatusText(name string) (string, string) {
+	label := r.statusNameForAction(name)
+	return "正在" + label.zh, "Currently " + label.en
+}
+
+func (r *ReActLoop) statusNameForCall(action *aicommon.Action) actionStatusName {
+	label := r.statusNameForAction(action.Name())
+	if action.Name() != schema.AI_REACT_LOOP_ACTION_DIRECTLY_CALL_TOOL {
+		return label
+	}
+	var names []string
+	for _, name := range extractToolNamesFromAction(action) {
+		if !containsStatusName(names, name) {
+			names = append(names, name)
+		}
+	}
+	if len(names) > 0 {
+		label.zh = "工具调用（" + joinedStatusNames(names, false) + "）"
+		label.en = "tool calls (" + joinedStatusNames(names, true) + ")"
+	}
+	return label
 }

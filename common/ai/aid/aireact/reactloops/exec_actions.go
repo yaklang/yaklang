@@ -258,8 +258,9 @@ func (r *ReActLoop) execOneCall(
 		return result
 	}
 	actionName := action.Name()
-	zhRunning, enRunning := actionStatusText(actionName)
-	label := statusNameForAction(actionName)
+	toolOwnsStatus := actionName == schema.AI_REACT_LOOP_ACTION_DIRECTLY_CALL_TOOL
+	zhRunning, enRunning := r.actionStatusText(actionName)
+	label := r.statusNameForCall(action)
 	actionProgress := label.zh
 	actionProgressEn := label.en
 	if callCount > 1 {
@@ -281,13 +282,15 @@ func (r *ReActLoop) execOneCall(
 		case result.skipPostIteration:
 			r.UserStatus(fmt.Sprintf("%s未通过检查，正在重新确认", actionProgress), fmt.Sprintf("%s was rejected; reconsidering", actionProgressEn), append(statusOptions,
 				aicommon.WithStatusCode("action.rejected"), aicommon.WithStatusState(aicommon.StatusStateRecovering))...)
-		case result.result != loopActionsAsync:
+		case result.result != loopActionsAsync && !toolOwnsStatus:
 			r.UserStatus(fmt.Sprintf("%s已完成", actionProgress), fmt.Sprintf("%s completed", actionProgressEn), append(statusOptions,
 				aicommon.WithStatusCode("action.completed"), aicommon.WithStatusState(aicommon.StatusStateSuccess))...)
 		}
 	}()
 	emitLoopActionEvent(eventSink, call, "started", "Executing action.")
-	r.UserStatus(zhRunning, enRunning, append(statusOptions, aicommon.WithStatusCode("action.running"))...)
+	if !toolOwnsStatus {
+		r.UserStatus(zhRunning, enRunning, append(statusOptions, aicommon.WithStatusCode("action.running"))...)
+	}
 	toolNames := extractToolNamesFromAction(action)
 	record := &ActionRecord{
 		ActionType: action.ActionType(), ActionName: actionName,

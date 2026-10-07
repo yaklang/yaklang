@@ -4,6 +4,7 @@ import (
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm"
 )
@@ -105,6 +106,7 @@ func buildActionOptionFromDict(caller *FocusModeYakHookCaller, raw any, override
 	}
 
 	asyncMode := utils.MapGetBool(entry, "async")
+	displayName := &schema.I18n{Zh: utils.MapGetString(entry, "verbose_name_zh"), En: utils.MapGetString(entry, "verbose_name")}
 	outputExamples := utils.MapGetString(entry, "output_examples")
 
 	// options 列表
@@ -174,6 +176,7 @@ func buildActionOptionFromDict(caller *FocusModeYakHookCaller, raw any, override
 		loopAction := &LoopAction{
 			AsyncMode:         asyncMode,
 			ActionType:        actionType,
+			VerboseNameI18n:   displayName,
 			Description:       description,
 			NativeDescription: nativeDescription,
 			Options:           optionList,
@@ -191,6 +194,7 @@ func buildActionOptionFromDict(caller *FocusModeYakHookCaller, raw any, override
 	}
 	opt := WithRegisterLoopActionWithStreamField(actionType, description, optionList, streamFields, verifier, handler, func(action *LoopAction) {
 		action.NativeDescription = nativeDescription
+		action.VerboseNameI18n = displayName
 	})
 	if asyncMode || outputExamples != "" {
 		// 包装一层用于额外补丁 AsyncMode / OutputExamples

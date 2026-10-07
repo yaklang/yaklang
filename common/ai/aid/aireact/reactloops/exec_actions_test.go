@@ -74,6 +74,36 @@ func actionExecutionTestCall(index int, id, name string, handler LoopActionHandl
 	}
 }
 
+func TestDirectToolHandlerStatusIsNotReplacedByOuterAction(t *testing.T) {
+	for _, failed := range []bool{false, true} {
+		t.Run(fmt.Sprint("failed=", failed), func(t *testing.T) {
+			loop, _, task := newActionExecutionTestLoop(t)
+			capture := captureActivityStatus(loop)
+			code, state := "tool.completed", aicommon.StatusStateSuccess
+			if failed {
+				code, state = "tool.failed", aicommon.StatusStateError
+			}
+			call := actionExecutionTestCall(0, "http", schema.AI_REACT_LOOP_ACTION_DIRECTLY_CALL_TOOL,
+				func(loop *ReActLoop, _ *aicommon.Action, op *LoopActionHandlerOperator) {
+					loop.UserStatus("正在调用 do_http_request", "Calling do_http_request", aicommon.WithStatusCode("tool.running"))
+					loop.UserStatus("do_http_request result", "do_http_request result", aicommon.WithStatusCode(code), aicommon.WithStatusState(state))
+					op.MarkToolExecuted()
+					op.Continue()
+				})
+			call.Action.GetParams()["directly_call_tool_name"] = "do_http_request"
+			result := loop.execCalls([]LoopCall{call}, 1, task, "prompt", utils.NewOnce(), nil)
+			require.NoError(t, result.err)
+			require.Equal(t, loopActionsContinue, result.result)
+			statuses := capture.snapshot()
+			require.Len(t, statuses, 2)
+			require.Equal(t, "tool.running", statuses[0].Code)
+			require.Equal(t, code, statuses[1].Code)
+			require.Equal(t, state, statuses[1].State)
+			require.Equal(t, 1, loop.actionHistory[0].ExecutedToolCallCount)
+		})
+	}
+}
+
 func TestExecuteFunctionCallActionsSerialAndProjectsOneAssistantManyTools(t *testing.T) {
 	loop, invoker, task := newActionExecutionTestLoop(t)
 	var statuses []aicommon.StatusPayload

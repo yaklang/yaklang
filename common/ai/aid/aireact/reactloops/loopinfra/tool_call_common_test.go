@@ -2,6 +2,7 @@ package loopinfra
 
 import (
 	"context"
+	"encoding/json"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -10,8 +11,37 @@ import (
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools"
+	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 )
+
+func TestHandleToolCallResult_RetryPreservesNamedStatusWithoutExecution(t *testing.T) {
+	for _, err := range []error{
+		&aicommon.ToolReviewReconsiderError{Feedback: "correct the request"},
+		&aicommon.ToolCallRetryError{ToolName: "read_file", Reason: "invalid explicit arguments"},
+	} {
+		t.Run(err.Error(), func(t *testing.T) {
+			var statuses []aicommon.StatusPayload
+			emitter := aicommon.NewEmitter("retry-status", func(event *schema.AiOutputEvent) (*schema.AiOutputEvent, error) {
+				if event.NodeId == "status" {
+					var status aicommon.StatusPayload
+					require.NoError(t, json.Unmarshal(event.Content, &status))
+					statuses = append(statuses, status)
+				}
+				return event, nil
+			})
+			loop, invoker := newToolBatchTestLoop(t, emitter)
+			op := reactloops.NewActionHandlerOperator(newTestTask(context.Background()))
+			handleToolCallResult(loop, context.Background(), invoker, "read_file", nil, false, err, op)
+			require.True(t, op.IsContinued())
+			require.Zero(t, op.GetExecutedToolCallCount())
+			require.Len(t, statuses, 1)
+			require.Equal(t, "tool.retrying", statuses[0].Code)
+			require.Equal(t, aicommon.StatusStateRecovering, statuses[0].State)
+			require.Contains(t, statuses[0].Value, "read_file")
+		})
+	}
+}
 
 func TestHandleToolCallResult_MCPInitializing_ErrorPath(t *testing.T) {
 	ctx := context.Background()

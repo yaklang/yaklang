@@ -97,12 +97,14 @@ func handleToolCallResult(
 	}
 	var reconsider *aicommon.ToolReviewReconsiderError
 	if errors.As(err, &reconsider) {
+		emitToolRetryStatus(loop, toolPayload)
 		operator.Feedback(reconsider.Feedback)
 		operator.Continue()
 		return
 	}
 	var retry *aicommon.ToolCallRetryError
 	if errors.As(err, &retry) {
+		emitToolRetryStatus(loop, retry.ToolName)
 		operator.Feedback(directToolRetryFeedback(loop, retry.ToolName, retry.Reason, false))
 		operator.Continue()
 		return

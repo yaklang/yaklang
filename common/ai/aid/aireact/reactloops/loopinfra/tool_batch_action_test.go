@@ -48,12 +48,15 @@ func newToolBatchTestManager(t *testing.T) (*buildinaitools.AiToolManager, *aito
 	return manager, readFile, grep
 }
 
-func newToolBatchTestLoop(t *testing.T) (*reactloops.ReActLoop, *testInvoker) {
+func newToolBatchTestLoop(t *testing.T, emitters ...*aicommon.Emitter) (*reactloops.ReActLoop, *testInvoker) {
 	t.Helper()
 	ctx := context.Background()
 	manager, readFile, _ := newToolBatchTestManager(t)
 	manager.AddRecentlyUsedTool(readFile)
 	cfg := &aicommon.Config{AiToolManager: manager}
+	if len(emitters) > 0 {
+		cfg.Emitter = emitters[0]
+	}
 	invoker := newTestInvoker(ctx)
 	loop := reactloops.NewMinimalReActLoop(cfg, invoker)
 	return loop, invoker
@@ -921,7 +924,16 @@ func TestToolScalarPromptExamples_ExecuteActualToolCallbacks(t *testing.T) {
 }
 
 func TestToolParameterGroupWithoutRuntimeReturnsRetryWithoutExecution(t *testing.T) {
-	loop, invoker := newToolBatchTestLoop(t)
+	var statuses []aicommon.StatusPayload
+	emitter := aicommon.NewEmitter("unsupported-group-status", func(event *schema.AiOutputEvent) (*schema.AiOutputEvent, error) {
+		if event.NodeId == "status" {
+			var status aicommon.StatusPayload
+			require.NoError(t, json.Unmarshal(event.Content, &status))
+			statuses = append(statuses, status)
+		}
+		return event, nil
+	})
+	loop, invoker := newToolBatchTestLoop(t, emitter)
 	action := parseToolBatchPromptExample(t, directlyCallToolBatchOutputExampleJSON, "directly_call_tool")
 	require.NoError(t, loopAction_directlyCallTool.ActionVerifier(loop, action))
 	operator := reactloops.NewActionHandlerOperator(newTestTask(context.Background()))
@@ -932,4 +944,9 @@ func TestToolParameterGroupWithoutRuntimeReturnsRetryWithoutExecution(t *testing
 	require.Contains(t, operator.GetFeedback().String(), "reason:")
 	require.Contains(t, operator.GetFeedback().String(), "retry:")
 	require.Contains(t, invoker.getTimelineString(), "完整 Schema 已放入 CACHE_TOOL_CALL")
+	require.NotEmpty(t, statuses)
+	require.Equal(t, "tool.batch.failed", statuses[len(statuses)-1].Code)
+	for _, status := range statuses {
+		require.NotEqual(t, "tool.batch.running", status.Code, "unsupported runtime did not start calls")
+	}
 }

@@ -12,6 +12,11 @@ func WithFunctionCallActionVariants() ReActLoopOption {
 func (r *ReActLoop) actionForProtocol(action *LoopAction) *LoopAction {
 	if action != nil && r.functionCallMode && r.useFunctionCallActionVariants {
 		if native := action.FunctionCallAction; native != nil && native.ActionType == action.ActionType {
+			if native.VerboseNameI18n == nil && action.VerboseNameI18n != nil {
+				copy := *native
+				copy.VerboseNameI18n = action.VerboseNameI18n
+				return &copy
+			}
 			return native
 		}
 	}
