@@ -282,6 +282,8 @@ func (r *ReActLoop) execOneCall(
 		case result.skipPostIteration:
 			r.UserStatus(fmt.Sprintf("%s未通过检查，正在重新确认", actionProgress), fmt.Sprintf("%s was rejected; reconsidering", actionProgressEn), append(statusOptions,
 				aicommon.WithStatusCode("action.rejected"), aicommon.WithStatusState(aicommon.StatusStateRecovering))...)
+		case actionName == nativeAdjustTodolistActionName:
+			r.emitTodoAdjustmentStatus(action, result.appliedTodoDelta, statusOptions)
 		case result.result != loopActionsAsync && !toolOwnsStatus:
 			r.UserStatus(fmt.Sprintf("%s已完成", actionProgress), fmt.Sprintf("%s completed", actionProgressEn), append(statusOptions,
 				aicommon.WithStatusCode("action.completed"), aicommon.WithStatusState(aicommon.StatusStateSuccess))...)
@@ -445,4 +447,22 @@ func (r *ReActLoop) execOneCall(
 	}
 	emitLoopActionEvent(eventSink, call, "completed", strings.TrimSpace(op.GetFeedback().String()))
 	return result
+}
+
+// TODO completion describes committed mutations, not the model's proposal.
+// Rejection and idempotent adjustments must never be presented as new progress.
+func (r *ReActLoop) emitTodoAdjustmentStatus(action *aicommon.Action, delta *aicommon.TodoDelta, options []aicommon.StatusOption) {
+	if r.GetActionExecutionValue(action, todoAdjustmentErrorState) != nil {
+		r.UserStatus("待办调整未应用，正在重新确认", "Task list changes were not applied; reconsidering", append(options,
+			aicommon.WithStatusCode("todo.rejected"), aicommon.WithStatusState(aicommon.StatusStateRecovering))...)
+		return
+	}
+	if delta == nil || !delta.HasChanges() {
+		r.UserStatus("待办事项没有变化", "The task list is unchanged", append(options,
+			aicommon.WithStatusCode("todo.unchanged"))...)
+		return
+	}
+	count := len(aicommon.TodoDeltaToOperations(delta))
+	r.UserStatus(fmt.Sprintf("待办事项已更新，共调整 %d 项", count), fmt.Sprintf("Task list updated; %d changes applied", count), append(options,
+		aicommon.WithStatusCode("todo.updated"), aicommon.WithStatusState(aicommon.StatusStateSuccess))...)
 }

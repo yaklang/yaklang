@@ -104,6 +104,47 @@ func TestDirectToolHandlerStatusIsNotReplacedByOuterAction(t *testing.T) {
 	}
 }
 
+func TestTodoAdjustmentStatusReflectsAppliedState(t *testing.T) {
+	for _, tc := range []struct{ name, raw, code string }{
+		{"applied", `{"add":[{"id":"todo-1","text":"inspect source"}],"current":"todo-1"}`, "todo.updated"},
+		{"empty", `{}`, "todo.unchanged"},
+		{"state_rejected", `{"current":"missing"}`, "todo.rejected"},
+		{"syntax_rejected", `{"add":"invalid"}`, "todo.rejected"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			loop, _, task := newActionExecutionTestLoop(t)
+			capture := captureActivityStatus(loop)
+			action, err := aicommon.ExtractAction(`{"@action":"adjust_todolist","todo_delta":`+tc.raw+`}`, "adjust_todolist")
+			require.NoError(t, err)
+			validateTodoDeltaBeforeActionVerifier(loop, action)
+			call := LoopCall{Action: action, LoopAction: loopAction_AdjustTodolistNative, ToolCallID: "todo"}
+			result := loop.execCalls([]LoopCall{call}, 1, task, "unchanged", utils.NewOnce(), nil)
+			require.NoError(t, result.err)
+			statuses := capture.snapshot()
+			require.Equal(t, tc.code, statuses[len(statuses)-1].Code)
+			for _, status := range statuses {
+				require.NotEqual(t, "action.completed", status.Code)
+			}
+			open, current, _ := loop.config.SnapshotCanonicalTodos(aicommon.BuildVerificationTodoScope(task))
+			if tc.code == "todo.updated" {
+				require.Len(t, open, 1)
+				require.Equal(t, "todo-1", current)
+				// An identical request is accepted without claiming new progress.
+				action, err = aicommon.ExtractAction(`{"@action":"adjust_todolist","todo_delta":`+tc.raw+`}`, "adjust_todolist")
+				require.NoError(t, err)
+				call.Action = action
+				result = loop.execCalls([]LoopCall{call}, 2, task, "unchanged", utils.NewOnce(), nil)
+				require.NoError(t, result.err)
+				statuses = capture.snapshot()
+				require.Equal(t, "todo.unchanged", statuses[len(statuses)-1].Code)
+			} else {
+				require.Empty(t, open)
+				require.Empty(t, current)
+			}
+		})
+	}
+}
+
 func TestExecuteFunctionCallActionsSerialAndProjectsOneAssistantManyTools(t *testing.T) {
 	loop, invoker, task := newActionExecutionTestLoop(t)
 	var statuses []aicommon.StatusPayload

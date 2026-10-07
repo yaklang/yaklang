@@ -132,7 +132,11 @@ func (a *nativeFieldStreamAttempt) stream(id, name string, argumentReader io.Rea
 					_, _ = io.Copy(io.Discard, raw)
 					return
 				}
-				readable, err := emitNativeActionField(emitter, taskIndex, field, raw)
+				readable, err := emitNativeActionField(emitter, taskIndex, field, raw, func() {
+					if a.activity != nil {
+						a.activity.displayField(id, field.FieldName)
+					}
+				})
 				if !readable {
 					a.unmark(id, field.FieldName)
 				}
@@ -212,8 +216,15 @@ func (r *ReActLoop) emitNativeActionStreamFields(resp *aicommon.AIResponse, call
 	return nil
 }
 
-func emitNativeActionField(emitter *aicommon.Emitter, taskIndex string, field *LoopStreamField, raw io.Reader) (bool, error) {
-	reader := utils.JSONStringReader(raw)
+func emitNativeActionField(emitter *aicommon.Emitter, taskIndex string, field *LoopStreamField, raw io.Reader, onData ...func()) (bool, error) {
+	var reader io.Reader = utils.JSONStringReader(raw)
+	if len(onData) > 0 {
+		reader = &displayFieldReader{Reader: reader, onData: onData[0]}
+	}
+	reader, readable, err := waitReadableStream(reader)
+	if err != nil || !readable {
+		return false, err
+	}
 	if field.StreamHandler != nil {
 		pipeReader, pipeWriter := io.Pipe()
 		go func() {

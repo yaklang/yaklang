@@ -7,6 +7,8 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 )
 
+const todoAdjustmentErrorState = "todo_adjustment_error"
+
 // suppressInvalidTodoDelta keeps TODO maintenance subordinate to the selected
 // ReAct action. The invalid delta is rejected atomically and recorded for a
 // later correction, while the already-valid tool/answer action is preserved.
@@ -21,6 +23,7 @@ func suppressInvalidTodoDelta(r *ReActLoop, action *aicommon.Action, err error) 
 		err,
 	)
 	if r != nil {
+		r.SetActionExecutionValue(action, todoAdjustmentErrorState, err)
 		if invoker := r.GetInvoker(); invoker != nil {
 			invoker.AddToTimeline("TODO_DELTA_ERROR", message)
 		}
@@ -75,7 +78,8 @@ func applyTodoDeltaBottomLine(r *ReActLoop, task aicommon.AIStatefulTask, iterat
 		timelineHook = invoker.AddToTimeline
 	}
 	results := aicommon.ApplyTodoDeltaAndEmit(r.config, r.GetEmitter(), task, aicommon.BuildVerificationTodoScope(task), iteration, delta, timelineHook)
-	if aicommon.FormatVerificationTodoApplyErrors(results) != "" {
+	if message := aicommon.FormatVerificationTodoApplyErrors(results); message != "" {
+		r.SetActionExecutionValue(action, todoAdjustmentErrorState, fmt.Errorf("%s", message))
 		return nil
 	}
 	return delta
