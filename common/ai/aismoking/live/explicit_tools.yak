@@ -70,15 +70,17 @@ go httpserver.Serve("127.0.0.1",port,httpserver.context(context.Seconds(1800)),h
     w.WriteHeader(parseInt(str.Split(str.Split(header,"\r\n")[0]," ")[1])); w.Write(raw)
 }))
 for i=0;i<100;i++ { _,err=http.Get(base+"/ready"); if err==nil { break }; time.Sleep(0.02) }
-cases = ["recon","wrong_params","wrong_tool"]
+cases = ["recon","wrong_params","wrong_tool","params_group"]
 if os.Getenv("EXPLICIT_TOOL_CASES") != "" { cases = str.SplitAndTrim(os.Getenv("EXPLICIT_TOOL_CASES"),",") }
 for name in cases {
-    assert name in ["recon","wrong_params","wrong_tool"], "Unknown explicit tool case"
+    assert name in ["recon","wrong_params","wrong_tool","params_group"], "Unknown explicit tool case"
     dir = file.Join(root,name)
     file.MkdirAll(dir)~
     accepted,rejected = file.Join(dir,"approved-ledger.txt"),file.Join(dir,"draft-ledger.txt")
     file.Save(accepted,"正式台账：订单 A 数量 3 单价 17；订单 B 数量 4 单价 23；订单 C 已退款 19。净额=订单 A 金额+订单 B 金额-退款。来源标记 APPROVED_LEDGER_2026。")~
     file.Save(rejected,"这是已废弃草稿，仅供验证审核阻止执行。DRAFT_MUST_NOT_EXECUTE_991。")~
+    adjustment = file.Join(dir,"adjustment.txt")
+    file.Save(adjustment,"独立调整凭证：追加已确认收入 6。来源标记 APPROVED_ADJUSTMENT_2026。与正式台账净额相加。")~
     sample = {"dir":dir,"requests":[],"events":[],"reviews":0,"config":nil}
     samples[name] = sample
     task = "先读取 "+str.ReplaceAll(rejected,"\\","/")+"，审核通过后计算台账净额，保存核验 evidence，再给出中文结论。不要 PLAN、子任务或命令。"
@@ -87,6 +89,9 @@ for name in cases {
     }
     if name == "recon" {
         task = "在侦察模式核验授权本地服务。先 GET "+base+"/health 获取服务、版本、状态和库存数量；再读取 "+str.ReplaceAll(accepted,"\\","/")+" 核对台账，计算净额。保存来源 evidence，中文报告精确说明版本、库存、净额。只允许这个回环 URL 和该本地文件，禁止其他扫描、搜索、命令、PLAN 或子任务。"
+    }
+    if name == "params_group" {
+        task = "核对两份相互独立的本地来源并合并计算：正式台账 "+str.ReplaceAll(accepted,"\\","/")+" 和调整凭证 "+str.ReplaceAll(adjustment,"\\","/")+"。先用 require_tool 加载 read_file 的 Schema，然后在同一次 directly_call_tool 中使用 directly_call_tool_params_group 并行读取两份文件；每项必须有独立的完整 params、identifier 和 reason。不要串行读取，不要使用 HTTP、命令、PLAN 或子任务。计算正式台账净额，再加上调整凭证的收入。保存两份来源的 evidence，给出最终金额及各项算式。"
     }
     file.Save(file.Join(dir,"task.txt"),task)~
     // Caller labels are captured out of band; the runtime prompt is unchanged.
@@ -98,14 +103,14 @@ for name in cases {
         return response,nil
     }
     policy = "manual"
-    if name == "recon" { policy = "yolo" }
+    if name in ["recon","params_group"] { policy = "yolo" }
     options = [aim.aiCallback(liveModel),aim.context(context.Seconds(420)),aim.timeout(420),aim.maxIteration(20),aim.workdir(dir),aim.reviewPolicy(policy),aim.allowUserInteract(false),aim.disableMCPServers(true),aim.disableAIForge(true),aim.includeToolNames("read_file","do_http_request"),aim.onEvent(func(op,e) {
         sample.config = op.GetConfig()
         typ = string(e.Type)
         if typ in ["stream","stream_start","stream_end"] { return }
         sample.events = append(sample.events,{"type":typ,"node":e.NodeId,"content":string(e.Content)})
         file.SaveJson(file.Join(dir,"events.json"),sample.events)~
-        if typ != "tool_use_review_require" || name == "recon" { return }
+        if typ != "tool_use_review_require" || name in ["recon","params_group"] { return }
         data = json.loads(string(e.Content))
         sample.reviews++
         response = {"suggestion":"continue"}
@@ -128,32 +133,37 @@ for name in cases {
     began = time.Now()
     runErr = aim.InvokeReAct(task,options...)
     file.SaveJson(file.Join(dir,"events.json"),sample.events)~
-    checks,answer,readResults,httpResults = [],"",0,0
+    checks,answer,readResults,httpResults,adjustmentResults,parameterGroups,argumentRequests = [],"",0,0,0,0,0
     for event in sample.events {
         if event.type == "result" { answer += json.loads(event.content).result }
         if event.type == "fail_react_task" { checks = append(checks,"business_failure") }
         if event.type == "tool_call_result" {
             if "APPROVED_LEDGER_2026" in event.content { readResults++ }
+            if "APPROVED_ADJUSTMENT_2026" in event.content { adjustmentResults++ }
             if "DRAFT_MUST_NOT_EXECUTE_991" in event.content { checks = append(checks,"rejected_tool_executed") }
             if "inventory" in event.content && "2.6.4" in event.content { httpResults++ }
         }
     }
     if runErr != nil { checks = append(checks,"runtime_error") }
-    if !("124" in answer) { checks = append(checks,"incorrect_net_total") }
+    expected = "124"
+    if name == "params_group" { expected = "130" }
+    if !(expected in answer) { checks = append(checks,"incorrect_net_total") }
     if readResults != 1 { checks = append(checks,"ledger_execution_count") }
     if name == "recon" {
         if httpResults != 1 || !("37" in answer) || !("2.6.4" in answer) { checks = append(checks,"incorrect_http_verification") }
+    } else if name == "params_group" {
+        if adjustmentResults != 1 || httpResults != 0 { checks = append(checks,"incorrect_group_execution") }
     } else {
         if sample.reviews != 2 { checks = append(checks,"review_did_not_converge") }
         if name == "wrong_tool" && httpResults != 0 { checks = append(checks,"rejected_http_executed") }
     }
-    if sample.config == nil || sample.config.GetSessionEvidenceRendered() == "" { checks = append(checks,"missing_evidence") }
+    if sample.config == nil || sample.config.GetSessionEvidenceRendered() == "" { checks = append(checks,"missing_evidence") } else { file.Save(file.Join(dir,"evidence.txt"),sample.config.GetSessionEvidenceRendered())~ }
     main,helper = {"requests":0,"input_tokens":0,"cached_tokens":0,"warm_input_tokens":0,"warm_cached_tokens":0,"missing_usage":0,"hit_ratio":nil,"warm_hit_ratio":nil},{"requests":0,"input_tokens":0,"cached_tokens":0,"missing_usage":0,"hit_ratio":nil}
     for request in sample.requests {
         group = helper
         if request.native { group = main }
         group.requests++
-        if "generate" in request.label && "param" in request.label { checks = append(checks,"implicit_argument_generation") }
+        if request.label == "toolcall-params" || ("generate" in request.label && "param" in request.label) { argumentRequests++; checks = append(checks,"implicit_argument_generation") }
         if request.invalid_json != 0 || request.unadvertised != 0 { checks = append(checks,"invalid_function_call") }
         if !request.completed { checks = append(checks,"incomplete_provider_request") }
         if request.usage == nil { group.missing_usage++; continue }
@@ -162,11 +172,21 @@ for name in cases {
         group.input_tokens += tokens; group.cached_tokens += cached
         if request.native && group.requests>1 { group.warm_input_tokens += tokens; group.warm_cached_tokens += cached }
     }
+    for request in sample.requests {
+        response = json.loads(string(file.ReadFile(file.Join(dir,sprintf("response-%03d.json",request.seq)))~))
+        for call in response.tool_calls {
+            if call.name == "directly_call_tool" {
+                arguments = json.loads(call.arguments)
+                if arguments.directly_call_tool_params_group != nil && len(arguments.directly_call_tool_params_group) == 2 { parameterGroups++ }
+            }
+        }
+    }
+    if name == "params_group" && parameterGroups != 1 { checks = append(checks,"parameter_group_not_used_once") }
     main.hit_ratio,main.warm_hit_ratio,helper.hit_ratio = nil,nil,nil
     if main.input_tokens>0 { main.hit_ratio = float(main.cached_tokens)/float(main.input_tokens) }
     if main.warm_input_tokens>0 { main.warm_hit_ratio = float(main.warm_cached_tokens)/float(main.warm_input_tokens) }
     if helper.input_tokens>0 { helper.hit_ratio = float(helper.cached_tokens)/float(helper.input_tokens) }
-    row = {"case":name,"pass":len(checks)==0,"checks":checks,"seconds":time.Since(began).Seconds(),"answer":answer,"reviews":sample.reviews,"approved_ledger_reads":readResults,"http_results":httpResults,"main":main,"helper":helper}
+    row = {"case":name,"pass":len(checks)==0,"checks":checks,"seconds":time.Since(began).Seconds(),"answer":answer,"reviews":sample.reviews,"approved_ledger_reads":readResults,"http_results":httpResults,"adjustment_reads":adjustmentResults,"parameter_groups":parameterGroups,"argument_generation_requests":argumentRequests,"main":main,"helper":helper}
     summaries = append(summaries,row)
     file.SaveJson(file.Join(root,"summary.json"),summaries)~
     printf("LIVE_CASE %s\n",json.dumps(row))

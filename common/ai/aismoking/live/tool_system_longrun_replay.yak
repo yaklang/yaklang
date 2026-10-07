@@ -1,0 +1,26 @@
+// yak common/ai/aismoking/live/tool_system_longrun_replay.yak
+// Re-evaluate captured artifacts without another AI request. Unknown runtime
+// state remains explicitly unknown; replay never claims the live process passed.
+root=os.Getenv("AISMOKING_OUTPUT")
+metadata=json.loads(string(file.ReadFile(file.Join(root,"run-metadata.json"))~))
+model,namespace=metadata.model,metadata.namespace
+path=str.ReplaceAll(root,"\\","/")
+requests=json.loads(string(file.ReadFile(file.Join(root,"requests.json"))~))
+events=json.loads(string(file.ReadFile(file.Join(root,"events.json"))~))
+toolFacts=json.loads(string(file.ReadFile(file.Join(root,"tool-facts.json"))~))
+receipts=json.loads(string(file.ReadFile(file.Join(root,"receipts.json"))~))
+commits=json.loads(string(file.ReadFile(file.Join(root,"commits.json"))~))
+httpReceipts=json.loads(string(file.ReadFile(file.Join(root,"http-receipts.json"))~))
+httpAttempts={}
+for receipt in httpReceipts { httpAttempts[string(receipt.wave)]=int(httpAttempts[string(receipt.wave)])+1 }
+memorySaves,memoryIndexes=0,0
+for event in events { if event.node=="memory-save" { memorySaves++ }; if event.node=="memory-index" { memoryIndexes++ } }
+runtimeState={"error":"not captured","seconds":float(events[len(events)-1].ts-events[0].ts)/1000,"memory_finalization_pending":nil,"runtime_error_known":false,"capture_replayed":true}
+if file.IsExisted(file.Join(root,"runtime-state.json")) { runtimeState=json.loads(string(file.ReadFile(file.Join(root,"runtime-state.json"))~)); runtimeState.capture_replayed=true }
+if !file.IsExisted(file.Join(root,"session-candidates.json")) {
+    candidates=[]
+    seen={}
+    for receipt in receipts { for candidate in receipt.memory_entities { if !(candidate.content in seen) { seen[candidate.content]=true; candidates=append(candidates,candidate) } } }
+    file.SaveJson(file.Join(root,"session-candidates.json"),candidates)~
+}
+include "common/ai/aismoking/live/tool_system_longrun_assert.inc"

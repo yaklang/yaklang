@@ -1,0 +1,53 @@
+// yak common/ai/aismoking/tool_params_group.yak
+// Real local tools, schema-only loading and parameter groups in both protocols.
+include "common/ai/aismoking/mock.inc"
+first,second = file.Join(smokeRoot,"source-a.txt"),file.Join(smokeRoot,"source-b.txt")
+file.Save(first,"PARAM_GROUP_SOURCE_A_17")~
+file.Save(second,"PARAM_GROUP_SOURCE_B_23")~
+step,config,mainHashes = 0,nil,[]
+smokeHandler = func(w,body) {
+ native = len(body.tools)>0
+ prompt = smokePrompt(body)
+ if "SMOKE_CALLER:verification" in prompt {
+  w.Header().Set("Content-Type","text/event-stream")
+  smokeFrame(w,{"content":`{"@action":"verify-satisfaction","user_satisfied":false,"reasoning":"继续完成证据与回答。","evidence":[]}`},"stop")
+  w.Write("data: [DONE]\n\n")~;return
+ }
+ if "SMOKE_CALLER:liteforge[session-title-generator]" in prompt {name="session-title-generator";if native {name=body.tools[0]["function"].name};smokeAnswer(w,native,name,{"session_title":"参数分组验证"});return}
+ if "SMOKE_CALLER:directly-answer" in prompt {w.Header().Set("Content-Type","text/event-stream");smokeFrame(w,{"content":"两份实际来源已核对，参数分组与证据保存通过。"},"stop");w.Write("data: [DONE]\n\n")~;return}
+ assert "SMOKE_CALLER:react-loop:default" in prompt || "SMOKE_CALLER:react-loop:main" in prompt,"Unexpected auxiliary parameter-generation request"
+ advertised = json.dumps(body.tools)
+ assert !("tool_require_calls" in advertised) && !("directly_call_tool_calls" in advertised),"Retired batch fields are advertised"
+ mainHashes = append(mainHashes,codec.Sha256(json.dumps(body.messages[0])))
+ step++
+ if step == 1 {smokeAnswer(w,native,"require_tool",{"require_tool_payload":["read_file","grep"]});return}
+ if step == 2 {
+  assert !("PARAM_GROUP_SOURCE_A_17" in prompt) && !("PARAM_GROUP_SOURCE_B_23" in prompt),"Schema loading executed a tool"
+  assert "CACHE_TOOL_CALL" in prompt && "立即调用 directly_call_tool" in prompt,"Missing schema continuation in Timeline"
+  smokeAnswer(w,native,"directly_call_tool",{"directly_call_tool_params_group":[{"tool_name":"read_file","params":{"file":first},"reason":"核对来源 A"},{"tool_name":"read_file","params":{},"reason":"验证第二项无效参数"}]});return
+ }
+ if step == 3 {
+  assert !("PARAM_GROUP_SOURCE_A_17" in prompt) && !("PARAM_GROUP_SOURCE_B_23" in prompt),"Invalid group partially executed"
+  assert "reason:" in prompt && "retry:" in prompt,"Group validation lost explicit correction"
+  smokeAnswer(w,native,"directly_call_tool",{"directly_call_tool_params_group":[{"tool_name":"read_file","params":{"file":first},"identifier":"source_a","reason":"核对来源 A"},{"tool_name":"read_file","params":{"file":second},"identifier":"source_b","reason":"核对来源 B"}]});return
+ }
+ assert "PARAM_GROUP_SOURCE_A_17" in prompt && "PARAM_GROUP_SOURCE_B_23" in prompt,"Group results are missing or crossed"
+ if step == 4 {smokeAnswer(w,native,"save_evidence",{"evidence_id":"params.group","evidence_content":"两个实际工具结果：PARAM_GROUP_SOURCE_A_17 与 PARAM_GROUP_SOURCE_B_23。"});return}
+ if step == 5 {smokeAnswer(w,native,"directly_answer",{"answer_payload":"两份来源已核对，分组调用实际完成。"});return}
+ smokeAnswer(w,native,"finish",{})
+}
+for native in [false,true] {
+ step,config,mainHashes = 0,nil,[]
+ die(aim.InvokeReAct("加载文件读取和搜索工具的 Schema，再读取两个本地来源，保存核验 evidence 并回答。",aim.context(smokeCtx),aim.workdir(smokeRoot),aim.reviewPolicy("yolo"),aim.maxIteration(10),aim.timeout(60),aim.disableMCPServers(true),aim.disableAIForge(true),aim.aiCallback(smokeModel),aim.onEvent(func(op,e){config=op.GetConfig()}),aim.configOptions(aiagent.aiCallback(smokeModel),aiagent.functionCallMode(native),func(c){
+  c.DisableCreateDBRuntime,c.DisablePerception,c.DisableMemoryTriage,c.DisableIntervalReview=true,true,true,true
+  c.AiAutoRetry,c.AiTransactionAutoRetry=1,2
+  c.GetTimeline().SetTimelineBucketByteSize(-1)
+  return nil
+ }),func(c){c.Stateless=true}))
+ assert step == 6 && config != nil,"Group lifecycle did not converge"
+ assert "params.group" in config.GetSessionEvidenceRendered(),"Evidence was not saved"
+ assert len(mainHashes)==6
+ for hash in mainHashes {assert hash==mainHashes[0],"Static prefix changed while loading or executing parameter groups"}
+ printf("PASS parameter groups: native=%v schema_only=1 invalid_zero_execution=1 real_reads=2 static_prefix_stable=1\n",native)
+}
+smokeCheck()

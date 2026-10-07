@@ -1,0 +1,59 @@
+// yak common/ai/aismoking/live/tool_system_longrun_verify.yak
+// Independent business/operation and persisted-memory verification; no AI calls.
+root=os.Getenv("AISMOKING_OUTPUT")
+result=json.loads(string(file.ReadFile(file.Join(root,"result.json"))~))
+checks=[]
+for i=1;i<=12;i++ {
+    raw,readErr=file.ReadFile(file.Join(root,sprintf("checkpoint-%02d.json",i)))
+    if readErr!=nil { checks=append(checks,sprintf("missing_checkpoint_%02d",i)); continue }
+    parsed,parseErr=json.New(string(raw))
+    if parseErr!=nil { checks=append(checks,sprintf("invalid_checkpoint_%02d",i)); continue }
+    cp=parsed.Value()
+    pending=[]
+    for j=1;j<=i;j++ { pending=append(pending,sprintf("P%02d",j)) }
+    if len(cp.pending_orders)!=i { checks=append(checks,sprintf("pending_count_%02d",i)) }
+    for id in pending { if !(id in cp.pending_orders) { checks=append(checks,sprintf("missing_pending_%02d_%s",i,id)) } }
+    duplicateCount=0; if i>=2 { duplicateCount=1 }
+    unknownCount=0; if i>=5 { unknownCount=1 }
+    if len(cp.duplicates)!=duplicateCount || (i>=2 && cp.duplicates[0]!="A01") { checks=append(checks,sprintf("duplicate_%02d",i)) }
+    if len(cp.unknown_skus)!=unknownCount || (i>=5 && cp.unknown_skus[0]!="U05") { checks=append(checks,sprintf("unknown_%02d",i)) }
+}
+facts=json.loads(string(file.ReadFile(file.Join(root,"tool-facts.json"))~))
+reviews={}
+events=json.loads(string(file.ReadFile(file.Join(root,"events.json"))~))
+for event in events {
+    if event.type!="tool_use_review_require" { continue }
+    review=json.loads(event.content)
+    if review.batch_id!=nil { reviews[review.call_tool_id]=review }
+}
+groups={}
+for id,fact in facts {
+    if !(id in reviews) || !fact.done { continue }
+    review=reviews[id]
+    if !(review.batch_id in groups) { groups[review.batch_id]=[] }
+    groups[review.batch_id]=append(groups[review.batch_id],fact)
+}
+overlapping=0
+for id,group in groups {
+    overlap=false
+    for a in group { for b in group {
+        if a.id==b.id { continue }
+        // Plugin-only durations from the actual completion events, milliseconds.
+        if a.end-float(a.duration_ms)<b.end && b.end-float(b.duration_ms)<a.end { overlap=true }
+    } }
+    if overlap { overlapping++ }
+}
+candidates=json.loads(string(file.ReadFile(file.Join(root,"session-candidates.json"))~))
+verified=0
+for candidate in candidates {
+    entities,err=aimemory.SearchMemory(candidate.content,aimemory.memoryNamespace(result.namespace),aimemory.memorySearchMode("bm25"),aimemory.memoryTokenLimit(8192))
+    found=false
+    if err==nil { for entity in entities { if entity.Content==candidate.content { found=true } } }
+    if found { verified++ } else { checks=append(checks,"memory_candidate_not_persisted_or_searchable") }
+}
+memoryCoverage="verified"; if len(candidates)==0 { memoryCoverage="not_exercised_empty_candidates" }
+verification={"memory_persistence_coverage":memoryCoverage,"passed":len(checks)==0 && result.business_passed,"checks":checks,"parameter_groups_observed":len(groups),"groups_with_plugin_interval_overlap":overlapping,"memory_candidates":len(candidates),"memory_candidates_found_in_store":verified,"original_result_passed":result.passed,"original_business_passed":result.business_passed}
+file.SaveJson(file.Join(root,"verification.json"),verification)~
+printf("TOOL_LONGRUN_VERIFY %s\n",json.dumps(verification))
+assert verification.passed,"Independent long-run verification failed"
+println("AISMOKING_PASS tool_system_longrun_verify")

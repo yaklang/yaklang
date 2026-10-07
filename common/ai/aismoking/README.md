@@ -21,6 +21,7 @@ yak common/ai/aismoking/run.yak
 | 脚本 | 覆盖内容 |
 | --- | --- |
 | [mainloop.yak](mainloop.yak) | 默认 `aim.InvokeReAct` × 两种协议 × require/load_capability；只加载 Schema、错误参数 reason/retry、修正后显式执行、实际读文件、session Evidence、冻结提升和纯动态区不重复展示用户输入 |
+| [tool_params_group.yak](tool_params_group.yak) | 双协议；名称数组只加载 Schema、无效分组零执行、修正后真实文件读取、结果隔离、Evidence 及六轮主请求静态前缀稳定 |
 | [tool_review.yak](tool_review.yak) | `aim.InvokeReAct` × 双协议；wrong_tool/wrong_params 返回所属循环、零辅助构参、显式修正、人工改参再次审核、直接回答；真实只读来源 |
 | [recon.yak](recon.yak) | 内置侦察模式双协议；预加载零执行、移除六类隐式动作、显式读取本地来源、静态缓存前缀稳定；不发起扫描 |
 | [retry.yak](retry.yak) | `aim.InvokeReAct`、`liteforge.Execute`、`ai.FunctionCall` × 两种协议；回放真实 DSML 格式错误后重试，核对原始 arguments/content、中文纠正、schema 和缓存前缀不变，采样六份重试提示 |
@@ -55,7 +56,8 @@ yak common/ai/aismoking/forge.yak
 
 这些入口直接 `yak xxx.yak`，不会由默认套件自动执行：
 
-- [live/explicit_tools.yak](live/explicit_tools.yak)：使用已配置的 DeepSeek 与真实 `aim.InvokeReAct`，验证侦察预加载、回环 HTTP/文件批量调用、`wrong_params` 修正来源及 `wrong_tool` 从 HTTP 换到文件工具；审核仅针对脚本创建的材料。设置新的 `AISMOKING_OUTPUT` 和隔离的 `YAKIT_HOME`，可用 `EXPLICIT_TOOL_CASES=recon,wrong_params,wrong_tool` 选择案例。保留完整请求正文、响应、arguments、事件及服务端缓存用量；证据未保存、拒绝操作被执行、重复读取或协议错误都会失败，不用回答文本代替执行结果。
+- [live/explicit_tools.yak](live/explicit_tools.yak)：使用已配置的 DeepSeek 与真实 `aim.InvokeReAct`，验证侦察预加载、回环 HTTP/文件批量调用、`wrong_params` 修正来源及 `wrong_tool` 从 HTTP 换到文件工具；`params_group` 要求一次参数组读取两份独立来源并精确合并金额，核对每份来源只执行一次和旧构参请求为零；审核仅针对脚本创建的材料。设置新的 `AISMOKING_OUTPUT` 和隔离的 `YAKIT_HOME`，可用 `EXPLICIT_TOOL_CASES=recon,wrong_params,wrong_tool,params_group` 选择案例。保留完整请求正文、响应、arguments、事件及服务端缓存用量；证据未保存、拒绝操作被执行、重复读取或协议错误都会失败，不用回答文本代替执行结果。
+- [live/tool_system_longrun.yak](live/tool_system_longrun.yak)：12批订单对账、50个正常工具操作；每批三项异种工具参数组、单项503重试、检查点、最终两项写入组、两次运行中压缩及正常收尾记忆候选处理（允许空候选）。设置隔离的 `YAKIT_HOME`、新的 `AISMOKING_OUTPUT` 和 `AISMOKING_TOOL_MODEL=deepseek-v4.1-flash` 或 `qwen3.8-flash`，用同一脚本比较实际调用、协议、业务结果和服务端缓存 usage；不使用真实业务服务。随后用 [live/tool_system_longrun_verify.yak](live/tool_system_longrun_verify.yak) 独立核验异常ID、执行重叠及非空候选的入库检索；空候选明确标记保存链路未被覆盖。事件在内存采样、低频落盘，避免采样放大队列拥塞。可用 [live/tool_system_longrun_replay.yak](live/tool_system_longrun_replay.yak) 离线重算原始采样，不发模型请求；未捕获的运行状态不会据此宣称通过。协议错误保留在严格验收结果中，同时单列业务结果。以上入口仅供本地开发。
 - [live/scan_port.yak](live/scan_port.yak)：原硬编码私人靶机的 SYN/点对点路由实验，直接以 `yak` 运行生产工具。需显式设置 `AISMOKING_SCAN_TARGET` 为已准备好 FTP/SSH/HTTP 服务的单个实验室 IPv4 主机；保留路由错误、开放端口、服务和完成断言，限时 60 秒。`AISMOKING_SCAN_PREFLIGHT=1` 只构造命令，不扫描。确定性的回环、TUN 降级与取消测试仍保留为 Go 回归。
 - [live/forge_file_tasks.yak](live/forge_file_tasks.yak)：原 `aiforge/aibp/tests` 的解码、长文件定位及分块链接分析实验，改用公开 Forge Blueprint 的双协议入口；保留原编码串和 HTML 材料，增加完成状态、解码原文、字节位置、上下文及链接来源断言。使用已配置 provider，输出到新的 `AISMOKING_OUTPUT`。设置 `AISMOKING_FORGE_PREFLIGHT=1` 只校验材料和六次 Blueprint 构造，不请求模型，也不代表业务验证通过。旧 Go 实验依赖私人 `openrouter.txt`、忽略执行错误且没有业务断言，已移除；确定性 Forge 生命周期及文件工具回归仍由原 Go 测试和默认冒烟覆盖。
 - [live/timeline_memory_finalization.yak](live/timeline_memory_finalization.yak)：`aim.InvokeReAct` 双协议 × 短任务、阈值压缩长任务、空记忆，共六组；正常返回前等待真实保存/索引完成，重复结束不再请求模型，内部进度不进入静态上下文或压缩输入。需可用 embedding 服务，使用临时 `YAKIT_HOME`，仅在本地运行。

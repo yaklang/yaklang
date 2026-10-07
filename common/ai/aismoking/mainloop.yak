@@ -31,7 +31,7 @@ smokeHandler = func(w,body) {
     assert len(dynamic) == 2 && !(query in dynamic[1]), "user query leaked into pure dynamic region"
     step++
     if step == 1 {
-        args = {"tool_require_payload":"read_file"}
+        args = {"require_tool_payload":"read_file"}
         if loadEntry.name == "load_capability" { args = {"capability_identifier":"read_file"} }
         smokeAnswer(w,native,loadEntry.name,args); return
     }
