@@ -28,18 +28,19 @@ import (
 )
 
 const (
-	serverFocusCapabilityHTTPRequest           = "http.request"
-	serverFocusCapabilityExtractReferences     = "web.extract_references"
-	serverFocusCapabilitySubmitAsset           = "result.asset"
-	serverFocusCapabilitySubmitRisk            = "result.risk"
-	serverFocusCapabilitySourceWorkspaceInfo   = "source.workspace.info"
-	serverFocusCapabilitySourceList            = "source.list"
-	serverFocusCapabilitySourceRead            = "source.read"
-	serverFocusCapabilitySourceSearch          = "source.search"
-	serverFocusCapabilitySubmitFindingV1       = "result.finding.v1"
-	serverFocusCapabilitySubmitReportV1        = "result.report.v1"
-	serverFocusCapabilitySubmitRiskJudgementV1 = "result.risk_judgement.v1"
-	serverFocusCapabilityTaskStage             = "task.stage"
+	serverFocusCapabilityHTTPRequest             = "http.request"
+	serverFocusCapabilityExtractReferences       = "web.extract_references"
+	serverFocusCapabilitySubmitAsset             = "result.asset"
+	serverFocusCapabilitySubmitRisk              = "result.risk"
+	serverFocusCapabilitySourceWorkspaceInfo     = "source.workspace.info"
+	serverFocusCapabilitySourceList              = "source.list"
+	serverFocusCapabilitySourceRead              = "source.read"
+	serverFocusCapabilitySourceSearch            = "source.search"
+	serverFocusCapabilitySubmitFindingV1         = "result.finding.v1"
+	serverFocusCapabilitySubmitReportV1          = "result.report.v1"
+	serverFocusCapabilitySubmitRiskJudgementV1   = "result.risk_judgement.v1"
+	serverFocusCapabilityRiskJudgementProgressV1 = "risk_judgement.progress.v1"
+	serverFocusCapabilityTaskStage               = "task.stage"
 	// Temporary aliases for already-published pre-platform Releases.
 	serverFocusCapabilitySubmitCodeFinding = "result.code_finding"
 	serverFocusCapabilitySubmitCodeAudit   = "result.code_audit_report"
@@ -237,6 +238,8 @@ func (r *legionServerFocusRuntime) Execute(
 		return r.submitReportV1(capability, params)
 	case serverFocusCapabilitySubmitRiskJudgementV1:
 		return r.submitRiskJudgementV1(capability, params)
+	case serverFocusCapabilityRiskJudgementProgressV1:
+		return r.riskJudgementProgressV1(params)
 	case serverFocusCapabilityTaskStage:
 		return r.publishTaskStage(params)
 	default:
@@ -593,12 +596,13 @@ func (r *legionServerFocusRuntime) activeRiskJudgementResultContract(
 			"result.risk_judgement.v1 is available only during the authorized Focus Turn",
 		)
 	}
-	if contract == nil || !contract.allowsCapability(capability) {
+	if contract == nil || !contract.allowsCapability(capability) ||
+		!contract.allowsCapability(serverFocusCapabilitySubmitRiskJudgementV1) {
 		return legionFocusExecutionResultContract{}, fmt.Errorf(
 			"result.risk_judgement.v1 is not allowed by the immutable Focus execution contract",
 		)
 	}
-	resultContract, ok := contract.resultForCapability(capability)
+	resultContract, ok := contract.resultForCapability(serverFocusCapabilitySubmitRiskJudgementV1)
 	if !ok {
 		return legionFocusExecutionResultContract{}, fmt.Errorf(
 			"result.risk_judgement.v1 has no immutable result contract",
