@@ -28,10 +28,19 @@ func TestTimelineCompressionBeforePromptLifecycle(t *testing.T) {
 	tl.SetTimelineContentLimit(200)
 	tl.SetTimelineBucketByteSize(1)
 	tl.PushText(1, "small history")
-	result, err := tl.CompressBeforePrompt(compressionTestOptions())
+	var stages []TimelineCompressionStage
+	opts := compressionTestOptions()
+	opts.OnProgress = func(stage TimelineCompressionStage) {
+		// Callbacks must be able to inspect history without deadlocking.
+		tl.mu.RLock()
+		tl.mu.RUnlock()
+		stages = append(stages, stage)
+	}
+	result, err := tl.CompressBeforePrompt(opts)
 	require.NoError(t, err)
 	require.Nil(t, result)
 	require.Zero(t, calls)
+	require.Empty(t, stages, "below-threshold history is not an optimization")
 	importFreezeItem(tl, 2, time.Now().Add(10*time.Minute), &TextTimelineItem{ID: 2, Text: strings.Repeat("history observation ", 300)})
 	require.True(t, tl.PushPromotable(3, TimelinePromotedKindRecentTool, TimelinePromotedTargetSemiDynamic1, "probe", TimelinePromotedOperationUpsert, "EXACT_BEFORE_PROMPT_SCHEMA"))
 	before := RenderTimelineFrozenOpen(tl)
@@ -39,10 +48,11 @@ func TestTimelineCompressionBeforePromptLifecycle(t *testing.T) {
 	require.Empty(t, before.PromotedRecentTools)
 	require.Contains(t, before.Open, "EXACT_BEFORE_PROMPT_SCHEMA")
 	require.Zero(t, calls)
-	result, err = tl.CompressBeforePrompt(compressionTestOptions())
+	result, err = tl.CompressBeforePrompt(opts)
 	require.NoError(t, err)
 	require.NotNil(t, result)
 	require.Equal(t, 1, calls)
+	require.Equal(t, []TimelineCompressionStage{TimelineCompressionOptimizing}, stages)
 	require.EqualValues(t, 1, tl.FreezeSnapshot().Version)
 	view := RenderTimelineFrozenOpen(tl)
 	require.Empty(t, view.Open)
@@ -117,7 +127,16 @@ func TestTimelineCompressionBeforePromptSharedWaitAndCancellation(t *testing.T) 
 	_, err := tl.CompressBeforePrompt(opts)
 	require.ErrorIs(t, err, context.Canceled)
 	second := make(chan error, 1)
-	go func() { _, err := tl.CompressBeforePrompt(compressionTestOptions()); second <- err }()
+	waiting := make(chan TimelineCompressionStage, 1)
+	waitOpts := compressionTestOptions()
+	waitOpts.OnProgress = func(stage TimelineCompressionStage) { waiting <- stage }
+	go func() { _, err := tl.CompressBeforePrompt(waitOpts); second <- err }()
+	select {
+	case stage := <-waiting:
+		require.Equal(t, TimelineCompressionWaiting, stage)
+	case <-time.After(2 * time.Second):
+		t.Fatal("missing compression waiting status")
+	}
 	select {
 	case <-second:
 		t.Fatal("before-prompt check returned before active transaction finished")

@@ -76,10 +76,13 @@ func TestTimelineSessionMemoryPendingTailAndFailure(t *testing.T) {
 	require.Empty(t, h.snapshot(), "prompt assembly must not wait for a pending tail")
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Millisecond)
 	defer cancel()
-	require.ErrorIs(t, h.wait(ctx), context.DeadlineExceeded)
+	waits := 0
+	require.ErrorIs(t, h.waitWithProgress(ctx, func() { waits++ }), context.DeadlineExceeded)
+	require.Equal(t, 1, waits)
 	completion.output = &timelineCompressionOutput{MemoryEntities: []any{compressionMemoryFixture()}}
 	close(completion.done)
-	require.NoError(t, h.wait(context.Background()))
+	require.NoError(t, h.waitWithProgress(context.Background(), func() { waits++ }))
+	require.Equal(t, 1, waits, "completed memory must not flash a waiting status")
 	require.Len(t, h.snapshot(), 1)
 	failed := &timelineCompressionCompletion{done: make(chan struct{}), output: completion.output, err: errors.New("invalid memory tail")}
 	h.record(&timelineCompressionSnapshot{MemoryCompletion: failed})
@@ -113,16 +116,22 @@ func TestTimelineSessionMemoryNextCompressionWaitsWithinContext(t *testing.T) {
 		return compressionMockSummary("next history"), nil
 	})
 	options := compressionTestOptions()
+	var stages []TimelineCompressionStage
+	options.OnProgress = func(stage TimelineCompressionStage) { stages = append(stages, stage) }
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Millisecond)
 	defer cancel()
 	options.Context = ctx
 	_, err := tl.CompressOnce(options)
 	require.ErrorIs(t, err, context.DeadlineExceeded)
 	require.Zero(t, calls, "do not issue another extraction with missing prior candidates")
+	require.Equal(t, []TimelineCompressionStage{TimelineCompressionOptimizing, TimelineCompressionMemory}, stages)
 	require.Contains(t, RenderTimelineFrozenOpen(tl).Open, "new observation")
 	completion.output = &timelineCompressionOutput{MemoryEntities: []any{compressionMemoryFixture()}}
 	close(completion.done)
-	_, err = tl.CompressOnce(compressionTestOptions())
+	stages = nil
+	options.Context = context.Background()
+	_, err = tl.CompressOnce(options)
 	require.NoError(t, err)
 	require.Equal(t, 1, calls)
+	require.Equal(t, []TimelineCompressionStage{TimelineCompressionOptimizing}, stages)
 }

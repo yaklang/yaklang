@@ -103,23 +103,41 @@ func (h *timelineSessionMemory) snapshot() []any {
 // Only a new compression waits for earlier memory tails, under its own context.
 // Ordinary prompt assembly, writes and the published summary remain unblocked.
 func (h *timelineSessionMemory) wait(ctx context.Context) error {
+	return h.waitWithProgress(ctx, nil)
+}
+
+func (h *timelineSessionMemory) waitWithProgress(ctx context.Context, onWait func()) error {
 	if h == nil {
 		return nil
 	}
 	h.mu.Lock()
 	pending := append([]*timelineCompressionCompletion(nil), h.pending...)
 	h.mu.Unlock()
-	for _, completion := range pending {
+	var notified bool
+	wait := func(done <-chan struct{}) error {
 		select {
-		case <-completion.done:
+		case <-done:
+			return nil
+		default:
+		}
+		if !notified && onWait != nil {
+			notified = true
+			onWait()
+		}
+		select {
+		case <-done:
+			return nil
 		case <-ctx.Done():
 			return ctx.Err()
 		}
+	}
+	for _, completion := range pending {
+		if err := wait(completion.done); err != nil {
+			return err
+		}
 		if completion.notified != nil {
-			select {
-			case <-completion.notified:
-			case <-ctx.Done():
-				return ctx.Err()
+			if err := wait(completion.notified); err != nil {
+				return err
 			}
 		}
 	}

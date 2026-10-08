@@ -30,6 +30,15 @@ type TimelineCompressedHistoryNode struct {
 	CreatedAtMs      int64  `json:"created_at_ms"`
 }
 
+// TimelineCompressionStage describes actual compression work or blocking waits.
+type TimelineCompressionStage string
+
+const (
+	TimelineCompressionOptimizing TimelineCompressionStage = "optimizing"
+	TimelineCompressionWaiting    TimelineCompressionStage = "waiting"
+	TimelineCompressionMemory     TimelineCompressionStage = "memory"
+)
+
 // TimelineCompressionOptions describes one explicit compression, not automatic
 // scheduling policy. Safety limits reject oversized input/output without loss;
 // they are never requested target lengths or compression ratios in the prompt.
@@ -39,6 +48,15 @@ type TimelineCompressionOptions struct {
 	MaxSummaryTokens int
 	RetainedContext  map[string]string // actual independent prompt fields, not inferred from their names
 	FinalizeMemory   bool              // include exact-only business context and wait for the full memory tail before commit
+	// OnProgress runs synchronously outside Timeline locks, only when work or
+	// waiting actually occurs. It must not schedule another compression.
+	OnProgress func(TimelineCompressionStage)
+}
+
+func (o TimelineCompressionOptions) reportProgress(stage TimelineCompressionStage) {
+	if o.OnProgress != nil {
+		o.OnProgress(stage)
+	}
 }
 
 var errTimelineCompressionBusy = errors.New("timeline compression is already running")
@@ -137,6 +155,7 @@ func (m *Timeline) compressOnce(options TimelineCompressionOptions, checked *tim
 			snapshot.NotifyCommitted()
 		}
 	}()
+	options.reportProgress(TimelineCompressionOptimizing)
 	snapshot.RetainedContext = make(map[string]string, len(options.RetainedContext))
 	for key, value := range options.RetainedContext {
 		snapshot.RetainedContext[key] = value
@@ -159,10 +178,17 @@ func (m *Timeline) compressOnce(options TimelineCompressionOptions, checked *tim
 	if snapshot.InputText == "" {
 		return m.commitCompressionSnapshot(snapshot, "")
 	}
-	if err := m.sessionMemory.wait(options.Context); err != nil {
+	waitedForMemory := false
+	if err := m.sessionMemory.waitWithProgress(options.Context, func() {
+		waitedForMemory = true
+		options.reportProgress(TimelineCompressionMemory)
+	}); err != nil {
 		return nil, err
 	}
 	snapshot.SessionMemoryCandidates = m.sessionMemory.snapshot()
+	if waitedForMemory {
+		options.reportProgress(TimelineCompressionOptimizing)
+	}
 	summary, err := m.summarizeCompressionSnapshot(snapshot, options)
 	if err != nil {
 		return nil, err
