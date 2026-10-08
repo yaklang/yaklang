@@ -44,6 +44,7 @@ func (m *Timeline) CompressBeforePrompt(options TimelineCompressionOptions) (*Ti
 		if m.compressing {
 			done := m.compressionDone
 			m.mu.Unlock()
+			options.reportProgress(TimelineCompressionWaiting)
 			select {
 			case <-done:
 				continue
