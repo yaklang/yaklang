@@ -305,3 +305,65 @@ was 4m54.65s with the existing GC/memory settings. This omits 99.7% of the
 updates that a full resident rewrite would issue in this run. Different host
 conditions and IR counts from earlier runs prevent a controlled speedup or
 exact structural-equivalence claim.
+
+## Dirty IR flush and cache ownership (2026-10-08)
+
+The resident fast path now queues dirty IDs when instructions are registered
+or mutated. Both unit and final flushes visit this queue; an empty queue returns
+without enumerating resident instructions or computing their fingerprints.
+Fingerprints remain useful for dirty setters that leave the serialized payload
+unchanged. Successful saves clear only the observed dirty generation, while
+failed saves and newer generations remain queued. Deletion removes the dirty
+ID as well as the resident object.
+
+Value setters, use-def/member relations, operand replacement, CFG updates,
+function metadata, parameter defaults, closures and lazy-instruction setters
+publish mutations. Callers that directly change exported instruction fields
+must call `ProgramCache.MarkInstructionDirty(inst)`. Clean database reloads
+publish no dirty work.
+
+Successful persistence releases clean, unnamed ordinary body instructions
+whose owning function has finished. Hot opcodes, cross-unit boundaries,
+unfinished functions and values still bound to lexical variables retain their
+canonical objects. Late mutations through a held concrete instruction can
+queue that object again. Database reloads use a bounded 1024-entry, one-minute
+cache and bypass the additional global raw-IR row cache. Releasing a resident
+entry does not prove that every other owner has released the same object.
+
+Values now contain their instruction base in the same allocation. Their
+construction-only pending type occupies a slot later reused for the concrete
+dirty-publication owner; it no longer allocates a deferred-type closure for
+every value. Explicit one-time type-saving callbacks clear their closure after
+execution. Empty dirty maps and completed persistence batches release their
+backing references, and instruction fingerprints use paged storage. A parent
+database row-cache eviction closes its child cache and workers; recreating the
+same program cache cannot resurrect a closed child from a retained loader
+result.
+
+Mutable types, named values and function scopes still carry cross-unit
+identity. This change does not clear those graphs or change the GC frequency
+or memory limit. Focused regression coverage includes late changes after
+save/eviction, new function metadata after save, direct-field dirty publication,
+failed-save retry, dirty-generation settlement, clean reloads, one-allocation
+value construction and child-cache lifetime.
+
+Run artifacts and the measured limitations are recorded in
+`/mnt/data/scan-outputs/ir-dirty-release-20261008-1213/summary.md`.
+
+The delivery GoBlog run (`goblog-delivery`) completed with exit 0 in 4m03.23s.
+Read-only SQL confirmed 498100 rows and 498100 unique instruction IDs, matching
+the writer's unique-persisted counter. Actual row writes were 498777; 1099
+unchanged dirty candidates were skipped, 30115 clean-residency releases were
+recorded, and 467986 instructions remained protected/resident. Final dirty and
+pending counts were zero. With no dirty IR at final close, instruction close
+took 51.509us; the entire final cache-save phase took 422.379ms.
+
+The process peak RSS was 2493200KiB (about 2.38GiB), and final sampled live heap
+was 1068.92MB. CPU windows attributed 73.53%, 88.65% and 89.36% cumulatively to
+`runtime.gcDrain`; removing clean IR traversal has not removed the GC bottleneck.
+The run ended before five minutes, so its initial/early/final profiles cover the
+whole run. Longer intermediate runs retain their five-minute profiles. Two
+pre-existing `method call, but object is nil` diagnostics remain; persistence
+errors were zero. Host conditions and instruction counts varied between runs,
+so these measurements do not establish an overall speedup, a lower peak RSS,
+or exact structural equivalence with the prior revision.

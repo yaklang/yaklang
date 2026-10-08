@@ -61,6 +61,7 @@ func (f *Function) NewBasicBlockNotAddUnSealed(name string) *BasicBlock {
 }
 
 func (f *Function) newBasicBlockEx(name string, isSealed bool, nodAddToBlocks bool) *BasicBlock {
+	defer f.markPersistenceDirty()
 	b := &BasicBlock{
 		anValue: NewValue(),
 		Preds:   make([]int64, 0),
@@ -89,6 +90,7 @@ func (f *Function) newBasicBlockEx(name string, isSealed bool, nodAddToBlocks bo
 
 func addToBlocks(block *BasicBlock) {
 	f := block.GetFunc()
+	defer f.markPersistenceDirty()
 	index := len(f.Blocks)
 
 	name := block.GetName()
@@ -104,6 +106,7 @@ func addToBlocks(block *BasicBlock) {
 }
 
 func (b *BasicBlock) SetScope(s ScopeIF) {
+	defer b.markPersistenceDirty()
 	// If block already has a scope, check if we need to create a new sub scope
 	if b.ScopeTable != nil && !b.scopeRestored {
 		// If the scope is already associated with another block, create a new sub scope
@@ -119,6 +122,7 @@ func (b *BasicBlock) SetScope(s ScopeIF) {
 				if block := GetBlockByScope(s.GetParent()); block != nil {
 					b.Parent = block.GetId()
 					block.Child = append(block.Child, b.GetId())
+					block.markPersistenceDirty()
 				}
 			}
 			return
@@ -147,6 +151,7 @@ func (b *BasicBlock) SetScope(s ScopeIF) {
 		if block := GetBlockByScope(s.GetParent()); block != nil {
 			b.Parent = block.GetId()
 			block.Child = append(block.Child, b.GetId())
+			block.markPersistenceDirty()
 		}
 	}
 }
@@ -258,6 +263,7 @@ func (b *BasicBlock) SetConditionFromValue(v Value, source string) {
 	if b == nil || utils.IsNil(v) {
 		return
 	}
+	defer b.markPersistenceDirty()
 	// Do not assign b.Condition here: that field is owned by ssa4analyze.BlockCondition
 	// (merged reachability formula). Early ids break getCondition(), which ANDs edgeCond
 	// with GetValueById(from.Condition) and can call NewBinOp with a nil operand when the
@@ -279,6 +285,7 @@ func (b *BasicBlock) SetConditionInstID(instID int64) {
 	if b == nil || instID <= 0 {
 		return
 	}
+	defer b.markPersistenceDirty()
 	b.ConditionInst = instID
 }
 
@@ -327,6 +334,8 @@ func (b *BasicBlock) BlockConditionSummary() BlockConditionSummary {
 }
 
 func (b *BasicBlock) AddSucc(succ *BasicBlock) {
+	defer b.markPersistenceDirty()
+	defer succ.markPersistenceDirty()
 	b.Succs = append(b.Succs, succ.GetId())
 	succ.Preds = append(succ.Preds, b.GetId())
 }

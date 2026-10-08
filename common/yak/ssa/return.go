@@ -106,6 +106,7 @@ func (b *FunctionBuilder) fixupParameterWithThis() {
 			continue
 		}
 		param.FormalParameterIndex = i
+		param.markPersistenceDirty()
 	}
 	// fixup side effect,
 	// if this side-effect is member call, the index just "--"
@@ -252,6 +253,7 @@ func (f *Function) Finish() {
 	if utils.IsNil(f) {
 		return
 	}
+	defer f.markPersistenceDirty()
 	if f.finished {
 		return
 	}

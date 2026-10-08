@@ -44,6 +44,7 @@ type FunctionSideEffect struct {
 }
 
 func (f *Function) AddForceSideEffect(variable *Variable, value Value, index int, kind SideEffectKind) {
+	defer f.markPersistenceDirty()
 	if variable.IsMemberCall() {
 		if para, ok := ToParameter(variable.object); ok {
 			f.SideEffects = append(f.SideEffects, &FunctionSideEffect{
@@ -83,6 +84,7 @@ func (f *Function) AddForceSideEffect(variable *Variable, value Value, index int
 }
 
 func (f *Function) AddSideEffect(variable *Variable, v Value) {
+	defer f.markPersistenceDirty()
 	var bind *Variable = variable
 
 	// f.builder is nil for functions rebuilt from DB (compile-unit spill +
@@ -114,6 +116,7 @@ func (f *Function) AddSideEffect(variable *Variable, v Value) {
 }
 
 func (f *FunctionBuilder) CheckMemberSideEffect(variable *Variable, v Value) {
+	defer f.Function.markPersistenceDirty()
 	var bind *Variable = variable
 
 	if f.builder == nil {
@@ -243,6 +246,7 @@ func shouldBindSideEffectInCurrentScope(se *FunctionSideEffect, lexicalVar, bind
 }
 
 func handleSideEffect(c *Call, funcTyp *FunctionType, buildPointer bool) {
+	defer c.markPersistenceDirty()
 	currentScope := c.GetBlock().ScopeTable
 	function := c.GetFunc()
 	builder := function.builder
@@ -473,6 +477,7 @@ func handleSideEffect(c *Call, funcTyp *FunctionType, buildPointer bool) {
 }
 
 func handleSideEffectBind(c *Call, funcTyp *FunctionType) {
+	defer c.markPersistenceDirty()
 	currentScope := c.GetBlock().ScopeTable
 	function := c.GetFunc()
 	builder := function.builder
@@ -669,6 +674,7 @@ func handleSideEffectBind(c *Call, funcTyp *FunctionType) {
 				currentScope.SetCapturedSideEffect(actualVerboseName, variable, se.Variable)
 
 				function.SideEffects = append(function.SideEffects, se)
+				function.markPersistenceDirty()
 			}
 
 			applySideEffectByScope := func(find *Variable) {
@@ -835,6 +841,7 @@ func isParameterCalledInFunction(calleeFunc *Function, paramIndex int) bool {
 // 2. If the corresponding parameter is actually called inside the callee
 // 3. If both conditions are met, create SideEffect instructions at the call site
 func handleArgumentFunctionSideEffect(c *Call, calleeFuncTyp *FunctionType) {
+	defer c.markPersistenceDirty()
 	if calleeFuncTyp == nil {
 		return
 	}

@@ -36,6 +36,7 @@ func DeleteInst(i Instruction) {
 		log.Debugf("void block!! %s:%s", i, i.GetRange())
 		return
 	}
+	defer b.markPersistenceDirty()
 	if phi, ok := ToPhi(i); ok {
 		b.Phis = lo.Filter(b.Phis, func(item int64, index int) bool {
 			return item != phi.GetId()
@@ -206,6 +207,7 @@ func (f *FunctionBuilder) EmitInstructionAfter(i, after Instruction) {
 func (f *FunctionBuilder) emitAroundInstruction(i, other Instruction, insert func(Instruction)) {
 	recoverBuilder := f.SetCurrent(other, true)
 	defer recoverBuilder()
+	defer f.CurrentBlock.markPersistenceDirty()
 
 	f.emitEx(i, insert)
 }
@@ -223,10 +225,13 @@ func (f *FunctionBuilder) SetInstructionPosition(i Instruction) {
 }
 
 func (f *FunctionBuilder) EmitOnly(i Instruction) {
+	defer f.CurrentBlock.markPersistenceDirty()
 	f.CurrentBlock.Insts = append(f.CurrentBlock.Insts, i.GetId())
 }
 
 func (f *FunctionBuilder) emitEx(i Instruction, insert func(Instruction)) {
+	defer f.CurrentBlock.markPersistenceDirty()
+	defer f.Function.markPersistenceDirty()
 	// i.SetScope(f.CurrentScope)
 	if i.GetRange() == nil {
 		i.SetRange(f.CurrentRange)
@@ -659,6 +664,7 @@ func (f *FunctionBuilder) EmitPhi(name string, vs Values) *Phi {
 }
 
 func (f *FunctionBuilder) SetReturnSideEffects() {
+	defer f.Function.markPersistenceDirty()
 	SideEffectsReturn := make(map[*Variable]*FunctionSideEffect)
 	var value Value
 	scope := f.CurrentBlock.ScopeTable

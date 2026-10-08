@@ -645,6 +645,7 @@ func (b *FunctionBuilder) freeValueMap() map[*Variable]int64 {
 }
 
 func (b *FunctionBuilder) BuildFreeValue(name string) *Parameter {
+	defer b.Function.markPersistenceDirty()
 	scope := b.CurrentBlock.ScopeTable
 	headScope := scope.GetHead()
 	if variable := headScope.ReadVariable(name); variable != nil {

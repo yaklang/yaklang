@@ -106,6 +106,7 @@ func (f *Function) GetType() Type {
 }
 
 func (f *Function) AddThrow(vs ...Value) {
+	defer f.markPersistenceDirty()
 	f.Throws = append(f.Throws, lo.Map(vs, func(v Value, _ int) int64 {
 		return v.GetId()
 	})...)
@@ -115,11 +116,15 @@ func (f *Function) SetType(t Type) {
 	if utils.IsNil(f) || utils.IsNil(t) {
 		return
 	}
+	defer f.markPersistenceDirty()
 
 	if funTyp, ok := ToFunctionType(t); ok {
 		f.typeMu.Lock()
 		f.Type = funTyp
 		f.typeMu.Unlock()
+		// Final persistence closes the type store before dirty IR. Register
+		// a replacement now so its row exists when that IR is saved.
+		f.anValue.typId = f.anValue.cacheType(funTyp)
 	} else if t.GetTypeKind() == AnyTypeKind {
 		// Assigning AnyType to a function is an expected, benign condition that
 		// fires once per function on large projects (hadoop scan produced ~59k
@@ -149,6 +154,8 @@ func (f *Function) GetCachedFunc() *Function {
 }
 
 func (f *Function) addAnonymous(anon *Function) {
+	defer f.markPersistenceDirty()
+	defer anon.markPersistenceDirty()
 	f.ChildFuncs = append(f.ChildFuncs, anon.GetId())
 	anon.parent = f.GetId()
 }
@@ -160,9 +167,11 @@ func (f *FunctionBuilder) NewParam(name string, pos ...CanStartStopToken) *Param
 }
 
 func (f *FunctionBuilder) NewParameterMember(name string, obj *Parameter, key Value) *ParameterMember {
+	defer f.Function.markPersistenceDirty()
 	paraMember := NewParamMember(name, f, obj, key)
 	f.ParameterMembers = append(f.ParameterMembers, paraMember.GetId())
 	paraMember.FormalParameterIndex = len(f.ParameterMembers) - 1
+	paraMember.markPersistenceDirty()
 	if f.MarkedThisObject != nil &&
 		obj.GetDefault() != nil &&
 		f.MarkedThisObject.GetId() == obj.GetDefault().GetId() {
@@ -173,15 +182,19 @@ func (f *FunctionBuilder) NewParameterMember(name string, obj *Parameter, key Va
 	return paraMember
 }
 func (f *FunctionBuilder) NewMoreParameterMember(name string, member *ParameterMember, key Value) *ParameterMember {
+	defer f.Function.markPersistenceDirty()
 	paraMember := NewMoreParamMember(name, f, member, key)
 	variable := f.CreateVariable(name)
 	f.AssignVariable(variable, paraMember)
 	f.ParameterMembers = append(f.ParameterMembers, paraMember.GetId())
 	paraMember.FormalParameterIndex = len(f.ParameterMembers) - 1
+	paraMember.markPersistenceDirty()
 	return paraMember
 }
 
 func (f *FunctionBuilder) appendParam(p *Parameter, token ...CanStartStopToken) {
+	defer f.Function.markPersistenceDirty()
+	defer p.markPersistenceDirty()
 	f.Params = append(f.Params, p.GetId())
 	p.FormalParameterIndex = len(f.Params) - 1
 	p.IsFreeValue = false

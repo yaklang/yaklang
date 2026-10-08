@@ -57,6 +57,7 @@ func (f *FunctionBuilder) EmitCall(c *Call) *Call {
 
 // handleMethod handle method for call,this call have more type,need handle this type
 func (c *Call) handleMethod() {
+	defer c.markPersistenceDirty()
 	callMethod, ok := c.GetValueById(c.Method)
 	if !ok || callMethod == nil {
 		return
@@ -239,6 +240,7 @@ func (c *Call) handlerGeneric() {
 	}
 }
 func (c *Call) handlerObjectMethod() {
+	defer c.markPersistenceDirty()
 	args := c.Args
 	target, ok := c.GetValueById(c.Method)
 	if !ok || target == nil {
@@ -348,6 +350,7 @@ func (c *Call) handlerReturnType() {
 
 // handler if method, set object for first argument
 func (c *Call) handleCalleeFunction() {
+	defer c.markPersistenceDirty()
 	function := c.GetFunc()
 	builder := function.builder
 
@@ -363,6 +366,7 @@ func (c *Call) handleCalleeFunction() {
 			caller := param.GetFunc()
 			callee := caller.anValue.GetFunc()
 			caller.SideEffects = append(caller.SideEffects, callee.SideEffects...)
+			caller.markPersistenceDirty()
 		}
 
 		// Handle case where method is a Call instruction (e.g., f1() where f1 = f())
@@ -541,6 +545,7 @@ func (c *Call) handleCalleeFunction() {
 }
 
 func (c *Call) HandleFreeValue(fvs []*Parameter) {
+	defer c.markPersistenceDirty()
 	builder := c.GetFunc().builder
 
 	// Functions rebuilt from DB have no builder; free-value binding needs the
