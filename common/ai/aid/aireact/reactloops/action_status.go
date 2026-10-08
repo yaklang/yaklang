@@ -1,7 +1,6 @@
 package reactloops
 
 import (
-	"fmt"
 	"strings"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
@@ -41,32 +40,6 @@ func statusNameForAction(name string) actionStatusName {
 		return label
 	}
 	return actionStatusName{zh: "执行操作", en: "performing an action"}
-}
-
-func (r *ReActLoop) actionBatchStatusNames(names []string) (zh, en string) {
-	const visibleLimit = 3
-	zhNames, enNames := make([]string, 0, visibleLimit), make([]string, 0, visibleLimit)
-	seen := make(map[string]bool, len(names))
-	unique := make([]string, 0, len(names))
-	for _, name := range names {
-		if !seen[name] {
-			seen[name] = true
-			unique = append(unique, name)
-		}
-	}
-	for _, name := range unique {
-		if len(zhNames) == visibleLimit {
-			break
-		}
-		label := r.statusNameForAction(name)
-		zhNames, enNames = append(zhNames, label.zh), append(enNames, label.en)
-	}
-	zh, en = strings.Join(zhNames, "，"), strings.Join(enNames, ", ")
-	if remaining := len(unique) - len(zhNames); remaining > 0 {
-		zh += fmt.Sprintf("等 %d 个动作", remaining)
-		en += fmt.Sprintf(" and %d more actions", remaining)
-	}
-	return zh, en
 }
 
 // GetVerboseNameI18n resolves UI-only metadata for built-in and custom actions.

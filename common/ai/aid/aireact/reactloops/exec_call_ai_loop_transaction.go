@@ -16,7 +16,6 @@ import (
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/ai/aispec"
 	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 )
 
@@ -788,28 +787,8 @@ func (r *ReActLoop) callAIFunctionTransaction(
 		return nil, failedLoopStopReason(descriptor, err), descriptor, err
 	}
 	descriptor.finish(acceptedResp, lastOutput, lastReason, lastRawCalls)
-	readyNames := make([]string, 0, len(acceptedCalls))
-	hasToolCall := false
-	for _, call := range acceptedCalls {
-		readyNames = append(readyNames, call.Action.Name())
-		hasToolCall = hasToolCall || call.Action.Name() == schema.AI_REACT_LOOP_ACTION_DIRECTLY_CALL_TOOL
-	}
-	// Keep streamed tool names and TODO preparation counts visible until their
-	// handlers publish execution status, without a generic readiness flash.
-	if hasToolCall || len(readyNames) == 1 && readyNames[0] == nativeAdjustTodolistActionName {
-		keepExecutionState = true
-		return acceptedCalls, LoopStopToolCalls, descriptor, nil
-	}
-	if len(readyNames) == 1 {
-		zh, en := r.actionStatusText(readyNames[0])
-		r.UserStatus(zh, en, aicommon.WithStatusCode("action.ready"))
-	} else {
-		zh, en := r.actionBatchStatusNames(readyNames)
-		r.UserStatus(fmt.Sprintf("即将执行 %d 个动作：%s", len(readyNames), zh),
-			fmt.Sprintf("About to execute %d actions: %s", len(readyNames), en),
-			aicommon.WithStatusCode("action.ready"),
-			aicommon.WithStatusProgress(0, int64(len(readyNames)), "action"))
-	}
+	// Execution handlers publish their own next phase. Keep the latest streamed
+	// content/call status visible until then instead of flashing generic readiness.
 	keepExecutionState = true
 	return acceptedCalls, LoopStopToolCalls, descriptor, nil
 }
@@ -1223,11 +1202,6 @@ func (r *ReActLoop) callAINormalTransaction(streamWg *sync.WaitGroup, prompt str
 			aicommon.WithStatusState(aicommon.StatusStateError),
 		)
 		return nil, nil, utils.Error("action is nil in ReActLoop")
-	}
-
-	if getNextActionType(action) != schema.AI_REACT_LOOP_ACTION_DIRECTLY_CALL_TOOL {
-		zhReady, enReady := r.actionStatusText(getNextActionType(action))
-		r.UserStatus(zhReady, enReady, aicommon.WithStatusCode("action.ready"))
 	}
 
 	handler, err := r.GetActionHandler(getNextActionType(action))
