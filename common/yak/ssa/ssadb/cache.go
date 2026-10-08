@@ -31,22 +31,41 @@ var irCodeSingleFlight singleflight.Group
 var initIrCodeOnce = sync.Once{}
 var irCodeCaches *utils.CacheEx[*utils.CacheExWithKey[int64, *IrCode]]
 
+var programRowCacheMu sync.Mutex
+
+// A parent entry owns its child cache's two background workers. Dropping a
+// pointer alone leaves those workers (and their cached rows) alive indefinitely.
+func newProgramRowCache[T any]() *utils.CacheEx[*utils.CacheExWithKey[int64, T]] {
+	parent := utils.NewCacheEx[*utils.CacheExWithKey[int64, T]](utils.WithCacheTTL(ProgramCacheTTL))
+	parent.SetExpirationCallback(func(_ string, child *utils.CacheExWithKey[int64, T], _ utils.EvictionReason) {
+		if child != nil {
+			child.Close()
+		}
+	})
+	return parent
+}
+
+func getProgramRowCache[T any](parent *utils.CacheEx[*utils.CacheExWithKey[int64, T]], name string) *utils.CacheExWithKey[int64, T] {
+	if child, ok := parent.Get(name); ok {
+		return child
+	}
+	programRowCacheMu.Lock()
+	defer programRowCacheMu.Unlock()
+	if child, ok := parent.Get(name); ok {
+		return child
+	}
+	child := utils.NewCacheExWithKey[int64, T](utils.WithCacheCapacity(irCacheCapacity), utils.WithCacheTTL(irCacheTTL))
+	// GetOrLoad retains completed flight results separately from TTL entries;
+	// using it here would resurrect a closed child after parent eviction.
+	parent.Set(name, child)
+	return child
+}
+
 func GetIrTypeCache(progName string) *utils.CacheExWithKey[int64, *IrType] {
 	initIrTypeOnce.Do(func() {
-		irTypeCaches = utils.NewCacheEx[*utils.CacheExWithKey[int64, *IrType]](
-			utils.WithCacheTTL(ProgramCacheTTL),
-		)
+		irTypeCaches = newProgramRowCache[*IrType]()
 	})
-	if ret, err := irTypeCaches.GetOrLoad(progName, func() (*utils.CacheExWithKey[int64, *IrType], error) {
-		return utils.NewCacheExWithKey[int64, *IrType](
-			utils.WithCacheCapacity(irCacheCapacity),
-			utils.WithCacheTTL(irCacheTTL),
-		), nil
-	}); err == nil {
-		return ret
-	} else {
-		return nil
-	}
+	return getProgramRowCache(irTypeCaches, progName)
 }
 
 func deleteCache(progName string) {
@@ -60,18 +79,9 @@ func deleteCache(progName string) {
 
 func GetIrCodeCache(progName string) *utils.CacheExWithKey[int64, *IrCode] {
 	initIrCodeOnce.Do(func() {
-		irCodeCaches = utils.NewCacheEx[*utils.CacheExWithKey[int64, *IrCode]](utils.WithCacheTTL(ProgramCacheTTL))
+		irCodeCaches = newProgramRowCache[*IrCode]()
 	})
-
-	if ret, err := irCodeCaches.GetOrLoad(progName, func() (*utils.CacheExWithKey[int64, *IrCode], error) {
-		return utils.NewCacheExWithKey[int64, *IrCode](
-			utils.WithCacheCapacity(irCacheCapacity),
-			utils.WithCacheTTL(irCacheTTL),
-		), nil
-	}); err == nil {
-		return ret
-	}
-	return nil
+	return getProgramRowCache(irCodeCaches, progName)
 }
 
 func dbKey(programName string, id int64) string {

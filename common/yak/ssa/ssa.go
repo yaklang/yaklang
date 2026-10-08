@@ -452,6 +452,7 @@ func (f *Function) GetCurrentReturnType() Type {
 }
 
 func (f *Function) SetMethodName(name string) {
+	defer f.markPersistenceDirty()
 	f.isMethod = true
 	f.methodName = name
 }
@@ -541,6 +542,7 @@ type BlockConditionSummary struct {
 }
 
 func (b *BasicBlock) SetReachable(boolean bool) {
+	defer b.markPersistenceDirty()
 	if boolean {
 		b.canBeReached = BasicBlockReachable
 	} else {
@@ -992,6 +994,7 @@ type Parameter struct {
 }
 
 func (p *Parameter) ReplaceValue(v Value, to Value) {
+	defer p.markPersistenceDirty()
 	if p.defaultValue == v.GetId() {
 		p.defaultValue = to.GetId()
 	}
@@ -1005,6 +1008,7 @@ func (p *Parameter) SetDefault(v Value) {
 	if p == nil {
 		return
 	}
+	defer p.markPersistenceDirty()
 	p.defaultValue = v.GetId()
 	//增加一个ud关系绑定
 	v.AddPointer(p)
