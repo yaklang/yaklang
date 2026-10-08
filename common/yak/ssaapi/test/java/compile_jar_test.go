@@ -11,6 +11,9 @@ import (
 )
 
 func TestCompile_Jar(t *testing.T) {
+	// test.jar / test-nested.jar fixtures match the built-in test-named archive
+	// excludes; these tests assert that archive compilation itself works, so
+	// disable the built-in defaults for the full-scan behavior.
 	t.Run("test should compile jar file", func(t *testing.T) {
 		jarPath, err := ssatest.GetJarFile()
 		require.NoError(t, err)
@@ -20,7 +23,7 @@ func TestCompile_Jar(t *testing.T) {
 			"local_file": jarPath,
 		}
 
-		prog, err := ssaapi.ParseProject(ssaapi.WithLanguage(ssaconfig.JAVA), ssaapi.WithConfigInfo(info))
+		prog, err := ssaapi.ParseProject(ssaapi.WithLanguage(ssaconfig.JAVA), ssaconfig.WithCodeSourceMap(info), ssaapi.WithDisableDefaultCompileExcludes(true))
 		require.NoError(t, err)
 		require.NotNil(t, prog)
 		prog.Show()
@@ -57,7 +60,7 @@ func TestCompile_Jar(t *testing.T) {
 			"local_file": nestedJarPath,
 		}
 
-		prog, err := ssaapi.ParseProject(ssaapi.WithLanguage(ssaconfig.JAVA), ssaapi.WithConfigInfo(info))
+		prog, err := ssaapi.ParseProject(ssaapi.WithLanguage(ssaconfig.JAVA), ssaconfig.WithCodeSourceMap(info), ssaapi.WithDisableDefaultCompileExcludes(true))
 		require.NoError(t, err)
 		require.NotNil(t, prog)
 		prog.Show()

@@ -123,6 +123,11 @@ var WithExcludeFunc = ssaconfig.WithCompileExcludeFiles
 // the compile-time exclude files option.
 var WithExcludeFile = ssaconfig.WithCompileExcludeFiles
 
+// WithDisableDefaultCompileExcludes 禁用内置默认编译排除项（测试 fixtures、
+// 构建产物、依赖归档等），仅保留用户显式提供的排除模式。恢复内置排除项
+// 引入之前的全量扫描行为，供嵌入方和测试使用。
+var WithDisableDefaultCompileExcludes = ssaconfig.WithCompileDisableDefaultExcludes
+
 var withProcessOption = ssaconfig.SetOption("ssa_compile/process", func(c *Config, v ProcessFunc) {
 	c.process = v
 })
@@ -354,9 +359,17 @@ func DefaultConfig(opts ...ssaconfig.Option) (*Config, error) {
 	if sc.SSACompile != nil {
 		userExclude = sc.SSACompile.ExcludeFiles
 	}
-	c.excludeFile = ssaconfig.BuildCompileExcludeFunc(userExclude, sc.GetCodeSourceLocalFile())
-
+	// honor WithDisableDefaultCompileExcludes: apply options before building the
+	// exclude matcher so the flag is visible here
 	ssaconfig.ApplyExtraOptions(c, c.Config)
+	c.excludeFile = ssaconfig.BuildCompileExcludeFuncWithDefaults(userExclude, sc.GetCodeSourceLocalFile(), !sc.GetCompileDisableDefaultExcludes())
+	if sc.GetCompileDisableDefaultExcludes() {
+		// propagate to ctx so context-only consumers (ScanProjectFiles,
+		// java prehandler filter, reducer) also skip default excludes
+		if c.ctx != nil {
+			c.ctx = ssaconfig.WithDefaultCompileExcludesDisabled(c.ctx)
+		}
+	}
 
 	// 只有当 c.fs 为 nil 时，才从配置中解析文件系统
 	// 这样可以避免覆盖通过 WithFileSystem 显式设置的文件系统
