@@ -179,14 +179,6 @@ Boot 与 Run 双相执行：
 
 `__OVERRIDE_ACTIONS__` 与 `__ACTIONS__` 同结构，作用是**替换**已注册的同名 action（例如自定义 `directly_answer` 的校验）。`__ACTIONS_FROM_TOOLS__` / `__ACTIONS_FROM_LOOPS__` 是字符串列表，用于把已有工具或子 loop 包装成 action。
 
-For `__ACTIONS__` and `__OVERRIDE_ACTIONS__`, the selected action's `options`
-schema is validated before its optional custom verifier and handler. Missing
-required fields, invalid enum values, types, and numeric bounds enter the
-existing AI transaction correction flow; unrelated actions' required fields
-do not apply. Explicit zero bounds and zero/false values are preserved. Unknown
-properties remain allowed, and unsupported option types retain the existing
-string fallback. Custom verifiers still own semantic checks beyond the schema.
-
 实现：[../yak_focus_mode_actions.go](../yak_focus_mode_actions.go) + [../yak_focus_mode_action_options.go](../yak_focus_mode_action_options.go)。
 
 ## 13.4 文件命名与 sidekick 机制
