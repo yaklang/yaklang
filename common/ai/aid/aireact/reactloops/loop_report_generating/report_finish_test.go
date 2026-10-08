@@ -137,6 +137,10 @@ func TestReportOutputFilterPreservesAITagEdits(t *testing.T) {
 				defer mu.Unlock()
 				for _, event := range events {
 					require.NotEqual(t, "report-content", event.NodeId)
+					if event.Type == schema.EVENT_TYPE_REPORT_FINISH {
+						require.False(t, internal, "internal reporting leaves delivery to its caller")
+						require.Equal(t, final, event.GetContentJSONPath("$.summary_markdown"), "final delivery must preserve the saved Markdown format")
+					}
 					if event.NodeId == "stream-finished" {
 						require.NotEqual(t, "report-content", event.GetContentJSONPath("$.node_id"))
 					}
@@ -159,15 +163,15 @@ func TestReportGeneratingOutputLifecycle(t *testing.T) {
 			referencePath := filepath.Join(workdir, "reference.md")
 			reportPath := filepath.Join(workdir, "report.md")
 			overview := "这是一个 Go 项目，提供多个服务入口。"
-			report := "# 项目探索报告\n\n## 项目概览\n\n" + overview +
+			report := "\n# 项目探索报告\n\n> 探索对象：`/workspace/project`\n> 版本：1.0\n\n## 项目概览\n\n" + overview +
 				"\n\n## 目录结构\n\n```text\n" + strings.Repeat("internal/module/\n", 200) +
-				"```\n\n## 关键配置\n\n| 文件 | 说明 |\n| --- | --- |\n| go.mod | 依赖声明 |"
+				"```\n\n## 关键配置\n\n| 文件 | 说明 |\n| --- | --- |\n| go.mod | 依赖声明 |\n"
 			require.NoError(t, os.WriteFile(referencePath, []byte("# 参考资料\n项目使用 Go。"), 0o600))
 			responses := []string{
 				`{"@action":"read_reference_file","identifier":"read_reference","file_path":"` + filepath.ToSlash(referencePath) + `"}` +
 					"\n<|GEN_REPORT_CURRENT_NONCE|>placeholder<|GEN_REPORT_END_CURRENT_NONCE|>",
 				`{"@action":"write_section","identifier":"write_report"}` +
-					"\n<|GEN_REPORT_CURRENT_NONCE|>" + report + "<|GEN_REPORT_END_CURRENT_NONCE|>",
+					"\n<|GEN_REPORT_CURRENT_NONCE|>\n" + report + "\n<|GEN_REPORT_END_CURRENT_NONCE|>",
 				`{"@action":"finish","identifier":"finish_report"}` +
 					"\n<|GEN_REPORT_CURRENT_NONCE|>placeholder<|GEN_REPORT_END_CURRENT_NONCE|>",
 			}
@@ -254,10 +258,11 @@ func TestReportGeneratingOutputLifecycle(t *testing.T) {
 			} else {
 				require.Len(t, finished, 1)
 				require.Equal(t, 1, pins)
-				require.Equal(t, overview+"\n\n完整内容见报告文件。", finished[0].SummaryMarkdown)
-				require.NotContains(t, finished[0].SummaryMarkdown, "go.mod")
+				require.Equal(t, report, finished[0].SummaryMarkdown, "the final card must render the entire saved report, including tables and code blocks")
+				require.Equal(t, "项目探索报告", finished[0].Title)
 				require.Equal(t, reportPath, finished[0].ReportPath)
-				require.Contains(t, task.GetResult(), overview)
+				require.Equal(t, report, loop.Get("result_summary"))
+				require.Equal(t, report+"\n\n报告文件："+reportPath, task.GetResult())
 			}
 		})
 	}
@@ -298,15 +303,6 @@ func TestReportFinishRequiresSavedArtifact(t *testing.T) {
 			}
 		})
 	}
-}
-
-func TestReportFinishPreviewKeepsCompleteParagraphs(t *testing.T) {
-	content := "# 测试报告\n\n## 概览\n\n项目用于展示结构。\n\n```text\n" + strings.Repeat("目录/\n", 200) + "```\n\n| 文件 | 说明 |\n| --- | --- |\n| tail.md | 尾部配置 |"
-	title, summary := buildReportFinishPreview(content)
-	require.Equal(t, "测试报告", title)
-	require.Equal(t, "项目用于展示结构。\n\n完整内容见报告文件。", summary)
-	_, fallback := buildReportFinishPreview("# 标题\n\n```text\nproject/\n\nmodule/\n```\n\n| 文件 | 说明 |\n| --- | --- |")
-	require.Equal(t, "报告已生成，完整内容见报告文件。", fallback)
 }
 
 func TestInternalReportOutputLeavesCallerEventsVisible(t *testing.T) {
