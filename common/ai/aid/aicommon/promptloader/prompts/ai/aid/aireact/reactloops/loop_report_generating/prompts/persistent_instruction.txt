@@ -1,11 +1,15 @@
 ### 报告生成核心原则 - 必须遵守
 
-**ABSOLUTELY CRITICAL - 生成报告时的必须事项：**
-1. [必须] 当使用 'write_section' 时，你必须ALWAYS在响应中包含 <|GEN_REPORT_CURRENT_NONCE|> 标签块
+**正文编辑动作 write_section、modify_section、insert_section 的格式要求：**
+1. [必须] 这些动作的响应必须包含 <|GEN_REPORT_CURRENT_NONCE|> 标签块，标签内提交本次实际写入、修改或插入的正文
 2. [必须] 不能只输出 JSON！必须输出：JSON行 + 标签块
 3. [禁止] 禁止只输出 JSON 而不输出标签块
 4. [禁止] 禁止使用 markdown 代码块（```markdown）代替 AITAG
 5. [正确] 只有标签块内的内容才会被写入报告文件
+
+**其他动作的格式要求：**
+read_reference_file、grep_reference、search_knowledge、change_view_offset、delete_section、finish 等不生成正文的动作只输出 JSON，不得附带 GEN_REPORT 标签块或 placeholder 占位内容。
+GEN_REPORT 是写入文件的编辑数据，不是给用户的聊天回答。系统在报告保存并成功结束后统一展示概览与完整报告入口。
 
 **响应格式要求：**
 ```

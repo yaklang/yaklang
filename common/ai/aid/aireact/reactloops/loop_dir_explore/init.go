@@ -2,11 +2,15 @@ package loop_dir_explore
 
 import (
 	"math"
+	"os"
+	"strings"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
+	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops/loop_report_generating"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
+	"github.com/yaklang/yaklang/common/utils"
 )
 
 func init() {
@@ -37,13 +41,29 @@ func generateExploreReport(
 	writePrompt string,
 	reportPath string,
 	noteFiles []string,
-	state *ExploreState,
 ) error {
 	reportLoop, err := reactloops.CreateLoopByName(
 		schema.AI_REACT_LOOP_NAME_REPORT_GENERATING,
 		r,
 		reactloops.WithMaxIterations(math.MaxInt32),
 		reactloops.WithAllowUserInteract(false),
+		reactloops.WithAllowRAG(false),
+		reactloops.WithAllowToolCall(false),
+		reactloops.WithAllowAIForge(false),
+		reactloops.WithAllowPlanAndExec(false),
+		reactloops.WithActionFilter(func(action *reactloops.LoopAction) bool {
+			switch action.ActionType {
+			case "read_reference_file", "grep_reference", "change_view_offset",
+				"write_section", "modify_section", "insert_section", "delete_section", "finish":
+				return true
+			}
+			return false
+		}),
+		// This child assembles existing notes; it does not need exploratory
+		// perception or a second verification watchdog on the shared runtime.
+		reactloops.WithDisableLoopPerception(true),
+		reactloops.WithDisablePeriodicVerification(true),
+		loop_report_generating.WithInternalReportOutput(),
 		reactloops.WithInitTask(func(innerLoop *reactloops.ReActLoop, task aicommon.AIStatefulTask, innerOp *reactloops.InitTaskOperator) {
 			innerLoop.Set("report_filename", reportPath)
 			innerLoop.Set("full_report_code", "")
@@ -60,5 +80,26 @@ func generateExploreReport(
 	}
 
 	subTask := aicommon.NewSubTaskBase(parentLoop.GetCurrentTask(), "dir-explore-report", writePrompt, true)
-	return reportLoop.ExecuteWithExistedTask(subTask)
+	if err := reportLoop.ExecuteWithExistedTask(subTask); err != nil {
+		return err
+	}
+	// Execute can also return nil after a soft iteration limit. Only an accepted
+	// finish and a saved, nonempty report count as successful delivery.
+	if reportLoop.Get("report_finished") != "true" || subTask.IsUserCancelled() {
+		return utils.Error("报告生成未完成")
+	}
+	if err := parentLoop.GetCurrentTask().GetContext().Err(); err != nil {
+		return err
+	}
+	content, err := os.ReadFile(reportPath)
+	if err != nil {
+		return utils.Errorf("无法读取生成的报告: %v", err)
+	}
+	if strings.TrimSpace(string(content)) == "" {
+		return utils.Error("生成的报告为空")
+	}
+	if strings.TrimSpace(string(content)) != strings.TrimSpace(reportLoop.Get("full_report_code")) {
+		return utils.Error("报告内容尚未完整保存")
+	}
+	return nil
 }

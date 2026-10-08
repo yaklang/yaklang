@@ -190,6 +190,8 @@
   "human_readable_thought": "已完成目录结构、入口点（5个，含 common/ 下子模块入口）、技术栈、核心模块概览等探索，并写出了 4 个探索文件。现在调用 complete_explore 结束探索。",
   "target_path": "/home/user/yaklang",
   "project_name": "yaklang",
+	"project_overview": "Yaklang 是安全工具与脚本执行框架，提供 Yak 解释器、静态分析、爬虫和指纹识别能力，并通过 gRPC 供 Yakit 客户端调用。",
+	"reading_guide": "先读 go.mod 了解依赖，再读 cmd/yak/yak.go 和 common/yak 理解脚本执行；需要了解客户端调用链时阅读 common/yakgrpc。",
   "tech_stack": "Go 1.21, gRPC/protobuf, Antlr4 (语法解析), SQLite (本地存储)",
   "entry_points": "cmd/yak/yak.go (Yak解释器); cmd/yaklang-server/server.go (gRPC服务端); common/crawlerx/cmd/run.go (爬虫引擎); common/aibalance/cmd/aibalance.go (AI负载均衡); common/fp/cmd/scanfp.go (指纹扫描)",
   "modules_summary": "common/yak (Yak引擎), common/yakgrpc (gRPC服务实现), common/syntaxflow (静态分析), common/ai (AI功能框架), common/crawlerx (爬虫), common/fp (指纹识别)"
@@ -206,6 +208,8 @@
   "human_readable_thought": "PHP 7.4 Web 应用探索完成。入口文件 index.php / admin.php，无框架，原生 mysqli，已写出 dir_structure.md / entry_points.md / tech_stack.md 共 3 个文件。",
   "target_path": "/var/www/html/myapp",
   "project_name": "myapp",
+	"project_overview": "该项目是一个 PHP Web 应用，包含前台页面、后台管理和定时清理任务。",
+	"reading_guide": "从 index.php 和 admin.php 了解请求入口，再读 includes/auth.php 与 includes/db.php 理解认证和数据库访问。",
   "tech_stack": "PHP 7.4, 原生 mysqli, MySQL 5.7, 无框架",
   "entry_points": "index.php (前台入口), admin.php (后台管理入口), cron/cleanup.php (定时任务脚本)",
   "modules_summary": "includes/auth.php (认证), includes/db.php (数据库封装), includes/user.php (用户逻辑), templates/ (页面模板)"
@@ -222,6 +226,8 @@
   "human_readable_thought": "Spring Boot 多模块 Maven 项目探索完成。共 3 个子模块，2 个含 main 函数。已写出 4 个探索文件。",
   "target_path": "/home/user/spring-platform",
   "project_name": "spring-platform",
+	"project_overview": "该项目是由 API 网关、用户微服务和共享库组成的 Spring Boot 多模块服务。",
+	"reading_guide": "先读父 pom.xml 了解模块关系，再读网关和用户服务的 Application 入口及配置。",
   "tech_stack": "Java 11, Spring Boot 2.7.14, MyBatis 3.5, Maven 多模块, MySQL 8.0, Redis 7",
   "entry_points": "api-gateway/src/main/java/com/example/gateway/GatewayApplication.java (API网关,端口8080), user-service/src/main/java/com/example/user/UserServiceApplication.java (用户微服务,端口8081)",
   "modules_summary": "api-gateway/ (路由网关), user-service/ (用户CRUD微服务), common-lib/ (共享工具库,无main函数)"
