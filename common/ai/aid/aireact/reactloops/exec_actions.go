@@ -271,7 +271,7 @@ func (r *ReActLoop) execOneCall(
 		enRunning += suffix
 	}
 	statusOptions := []aicommon.StatusOption{
-		aicommon.WithStatusDetail(fmt.Sprintf("动作 %s", actionName), fmt.Sprintf("Action %s", actionName)),
+		aicommon.WithStatusDetail(label.zh, label.en),
 		aicommon.WithStatusProgress(int64(position+1), int64(callCount), "action"),
 	}
 	defer func() {

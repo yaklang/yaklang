@@ -479,8 +479,8 @@ var loopAction_directlyCallTool = &reactloops.LoopAction{
 			tools := buildStatusTools(loop, []string{name}, aicommon.StatusStateRunning)
 			reactloops.EmitStatusI18n(
 				loop,
-				fmt.Sprintf("正在调用 %s", statusToolNames(tools, false, true)),
-				fmt.Sprintf("Calling %s", statusToolNames(tools, true, true)),
+				fmt.Sprintf("正在调用 %s", statusToolNames(tools, false)),
+				fmt.Sprintf("Calling %s", statusToolNames(tools, true)),
 				aicommon.WithStatusCode("tool.running"),
 				aicommon.WithStatusTools(tools...),
 			)

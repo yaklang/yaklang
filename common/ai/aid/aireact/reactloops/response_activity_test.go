@@ -105,12 +105,14 @@ func (c *activityStatusCapture) wait(predicate func(aicommon.StatusPayload) bool
 
 func TestAnnotationStatusArrivesBeforeFieldCompletes(t *testing.T) {
 	for _, native := range []bool{false, true} {
-		for _, field := range []string{"human_readable_thought", "cumulative_summary"} {
+		for _, field := range []string{"human_readable_thought", "cumulative_summary", "answer_payload", "summary"} {
 			t.Run(fmt.Sprintf("native=%v/%s", native, field), func(t *testing.T) {
 				var capture *activityStatusCapture
 				code := "response.noting"
 				if field == "cumulative_summary" {
 					code = "response.progress"
+				} else if field == "answer_payload" || field == "summary" {
+					code = "response.writing"
 				}
 				loop := newCallAILoopTransactionTestLoop(t, native, func(_ *aicommon.AIRequest, cfg *aispec.AIConfig) (*aicommon.AIResponse, error) {
 					resp := aicommon.NewUnboundAIResponse()
@@ -346,7 +348,7 @@ func TestResponseActivityStreamsToolNamesBeforeArgumentsFinish(t *testing.T) {
 					raw = "{" + partial + tail
 					cfg.ToolCallCallback([]*aispec.ToolCall{{ID: "group", Type: "function", Function: aispec.FuncReturn{Name: schema.AI_REACT_LOOP_ACTION_DIRECTLY_CALL_TOOL, Arguments: "{" + partial}}})
 					if !capture.wait(func(s aicommon.StatusPayload) bool {
-						return s.Value == "正在调用read_file，grep"
+						return s.Value == "正在准备工具：工具，工具"
 					}) {
 						resp.Close()
 						return resp, io.ErrNoProgress
@@ -363,7 +365,7 @@ func TestResponseActivityStreamsToolNamesBeforeArgumentsFinish(t *testing.T) {
 						defer resp.Close()
 						_, _ = io.WriteString(writer, `{"@action":"directly_call_tool",`+partial)
 						if !capture.wait(func(s aicommon.StatusPayload) bool {
-							return s.Value == "正在调用read_file，grep"
+							return s.Value == "正在准备工具：工具，工具"
 						}) {
 							return
 						}
@@ -404,7 +406,7 @@ func TestResponseActivityStreamsToolNamesBeforeArgumentsFinish(t *testing.T) {
 			}
 			require.Len(t, preparations, 3, "generic action, first tool, second unique tool; no repeated read_file")
 			require.Len(t, preparations[2].Tools, 2)
-			require.Equal(t, "Calling: read_file, grep", preparations[2].ValueI18n.En)
+			require.Equal(t, "Preparing tools: tool, tool", preparations[2].ValueI18n.En)
 		})
 	}
 }
@@ -434,17 +436,17 @@ func TestResponseActivityDedupReasonThrottleAndRetirement(t *testing.T) {
 	a.field("second", "directly_call_tool_name", "read_file", nil)
 	a.prepare("third", "custom")
 	statuses := capture.snapshot()
-	require.Len(t, statuses, 5, "duplicate action/tool names do not flicker")
-	require.Equal(t, "正在调用read_file，核对结论", statuses[4].Value)
-	require.Equal(t, "Calling: read_file, checking conclusions", statuses[4].ValueI18n.En)
+	require.Len(t, statuses, 7, "each new call replaces earlier calls; repeated fragments do not flicker")
+	require.Equal(t, "正在准备：核对结论（第 3 个调用）", statuses[6].Value)
+	require.Equal(t, "Preparing: checking conclusions (call 3)", statuses[6].ValueI18n.En)
 	a.close()
 	a.prepare("late", "custom")
 	a.field("first", "directly_call_tool_name", "late_tool", nil)
 	a.reason([]byte("late Reason"))
-	require.Len(t, capture.snapshot(), 5, "late streams cannot overwrite verification/execution")
+	require.Len(t, capture.snapshot(), 7, "late streams cannot overwrite verification/execution")
 	fresh := newResponseActivity(loop, nil)
 	fresh.prepare("retry", "custom")
-	require.Equal(t, "正在调用核对结论", capture.snapshot()[5].Value, "retry does not keep previous names")
+	require.Equal(t, "正在准备：核对结论", capture.snapshot()[7].Value, "retry does not keep previous names")
 }
 
 func TestActionVerboseNamesDoNotChangeModelSchema(t *testing.T) {
@@ -513,7 +515,7 @@ func TestResponseActivityBeforeRealCallerReturns(t *testing.T) {
 						return "", err
 					}
 				}
-				if !capture.wait(func(s aicommon.StatusPayload) bool { return s.Value == "正在调用读取文件（read_file）" }) {
+				if !capture.wait(func(s aicommon.StatusPayload) bool { return s.Value == "正在准备工具：读取文件" }) {
 					return "", io.ErrNoProgress
 				}
 				if native {
@@ -758,4 +760,112 @@ func TestActivityReaderFromDiscardedResponseCannotBindLaterHeaders(t *testing.T)
 	require.Equal(t, "late discarded reasoning", string(bytes), "UI retirement never changes canonical bytes")
 	require.Empty(t, capture.snapshot(), "old readers must not create reasoning for the latest response")
 	third.close()
+}
+
+func TestResponseActivityLatestCallAndContentOwnStatus(t *testing.T) {
+	cfg := aicommon.NewConfig(context.Background(), aicommon.WithTools(
+		aitool.NewWithoutCallback("read_file", aitool.WithVerboseNameZh("读取文件"), aitool.WithVerboseName("Read file")),
+		aitool.NewWithoutCallback("grep", aitool.WithVerboseNameZh("搜索文件"), aitool.WithVerboseName("Search files"))))
+	loop := NewMinimalReActLoop(cfg, mock.NewMockInvoker(context.Background()))
+	loop.actions = omap.NewEmptyOrderedMap[string, *LoopAction]()
+	loop.actions.Set("report_action", &LoopAction{ActionType: "report_action", VerboseNameI18n: &schema.I18n{Zh: "生成报告", En: "Generate report"}})
+	capture := captureActivityStatus(loop)
+	activity := newResponseActivity(loop, []string{schema.AI_REACT_LOOP_ACTION_DIRECTLY_CALL_TOOL, "report_action"})
+	defer activity.close()
+	latest := func() aicommon.StatusPayload {
+		statuses := capture.snapshot()
+		return statuses[len(statuses)-1]
+	}
+	activity.content()
+	require.Equal(t, "正在生成回复正文…", latest().Value)
+	activity.prepare("pending", schema.AI_REACT_LOOP_ACTION_DIRECTLY_CALL_TOOL)
+	activity.identifyCall("pending", "first")
+	activity.field("first", "directly_call_tool_name", "read_file", nil)
+	require.Equal(t, "正在准备工具：读取文件", latest().Value)
+	require.Equal(t, "Preparing tools: Read file", latest().ValueI18n.En)
+	require.Equal(t, "read_file", latest().Tools[0].Name)
+	activity.prepare("second", schema.AI_REACT_LOOP_ACTION_DIRECTLY_CALL_TOOL)
+	activity.field("second", "directly_call_tool_name", "grep", nil)
+	require.Equal(t, "正在准备工具：搜索文件（第 2 个调用）", latest().Value)
+	count := len(capture.snapshot())
+	activity.field("first", "directly_call_tool_name", "grep", nil)
+	activity.displayField("first", "answer")
+	activity.prepare("first", schema.AI_REACT_LOOP_ACTION_DIRECTLY_CALL_TOOL)
+	activity.reason([]byte("late reasoning"))
+	require.Len(t, capture.snapshot(), count, "earlier readers cannot reclaim the indicator")
+	activity.content()
+	require.Equal(t, "response.writing", latest().Code, "content interleaved after a call is visible immediately")
+	count = len(capture.snapshot())
+	activity.content()
+	activity.field("second", "directly_call_tool_name", "grep", nil)
+	require.Len(t, capture.snapshot(), count, "duplicate fragments do not flash preparation again")
+	activity.prepare("third", "report_action")
+	require.Equal(t, "正在准备：生成报告（第 3 个调用）", latest().Value)
+	activity.displayField("third", "summary")
+	require.Equal(t, "正在撰写总结…（生成报告）", latest().Value)
+	activity.displayField("second", "cumulative_summary")
+	require.Equal(t, "response.writing", latest().Code)
+	for _, status := range capture.snapshot() {
+		for _, name := range []string{"read_file", "grep", "report_action"} {
+			require.NotContains(t, status.Value, name)
+			require.NotContains(t, status.ValueI18n.En, name)
+		}
+	}
+}
+
+func TestStatusToolLabelUsesAvailableVerboseNames(t *testing.T) {
+	cfg := aicommon.NewConfig(context.Background(), aicommon.WithTools(
+		aitool.NewWithoutCallback("en_only", aitool.WithVerboseName("Read a document")),
+		aitool.NewWithoutCallback("zh_only", aitool.WithVerboseNameZh("读取文档")),
+		aitool.NewWithoutCallback("identifier_only", aitool.WithVerboseName("identifier_only"))))
+	loop := NewMinimalReActLoop(cfg, nil)
+	require.Equal(t, schema.I18n{Zh: "Read a document", En: "Read a document"}, loop.StatusToolLabel("en_only"))
+	require.Equal(t, schema.I18n{Zh: "读取文档", En: "读取文档"}, loop.StatusToolLabel("zh_only"))
+	for _, name := range []string{"identifier_only", "unknown"} {
+		require.Equal(t, schema.I18n{Zh: "工具", En: "tool"}, loop.StatusToolLabel(name))
+	}
+	action := aicommon.NewSimpleAction(schema.AI_REACT_LOOP_ACTION_DIRECTLY_CALL_TOOL, aitool.InvokeParams{
+		"directly_call_tool_name": "en_only",
+	})
+	require.Equal(t, actionStatusName{"工具调用（Read a document）", "tool calls (Read a document)"}, loop.statusNameForCall(action))
+}
+
+func TestTextResponseContentStatusBeforeProviderReturns(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	var capture *activityStatusCapture
+	callback := aicommon.AIChatToAICallbackType(func(_ string, opts ...aispec.AIConfigOption) (string, error) {
+		wire := aispec.NewDefaultAIConfig(opts...)
+		reader, writer := io.Pipe()
+		defer writer.Close()
+		wire.StreamHandler(reader)
+		wire.RawHTTPResponseHeaderCallback([]byte("HTTP/1.1 200 OK\r\n\r\n"))
+		_, _ = io.WriteString(writer, `{"@action":"directly_answer","answer_payload":"开始回复`)
+		if !capture.wait(func(status aicommon.StatusPayload) bool { return status.Code == "response.writing" }) {
+			return "", io.ErrNoProgress
+		}
+		_, _ = io.WriteString(writer, `内容"}`)
+		wire.FinishReasonCallback("stop", nil)
+		return "", nil
+	})
+	cfg := aicommon.NewConfig(ctx, aicommon.WithAICallback(callback), aicommon.WithAITransactionAutoRetry(1), aicommon.WithAIAutoRetry(1))
+	invoker := mock.NewMockInvoker(ctx)
+	invoker.SetConfig(cfg)
+	loop := NewMinimalReActLoop(cfg, invoker)
+	loop.actions = omap.NewEmptyOrderedMap[string, *LoopAction]()
+	loop.actions.Set("directly_answer", &LoopAction{ActionType: "directly_answer", StreamFields: []*LoopStreamField{
+		{FieldName: "answer_payload", AINodeId: "answer"},
+	}})
+	capture = captureActivityStatus(loop)
+	var streams sync.WaitGroup
+	calls, _, _, err := loop.callAILoopTransaction(&streams, "prompt", "nonce", nil,
+		func(io.Reader, io.Reader) {}, func(_, _ string, description, arguments io.Reader) {})
+	require.NoError(t, err)
+	streams.Wait()
+	require.Len(t, calls, 1)
+	require.Equal(t, "开始回复内容", calls[0].Action.GetString("answer_payload"))
+	statuses := capture.snapshot()
+	require.Equal(t, "response.writing", statuses[len(statuses)-1].Code,
+		"completed action parsing must not overwrite the latest content status")
+	require.Equal(t, "正在生成回复正文…（回复用户）", statuses[len(statuses)-1].Value)
 }
