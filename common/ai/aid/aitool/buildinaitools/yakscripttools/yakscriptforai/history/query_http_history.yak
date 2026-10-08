@@ -7,6 +7,7 @@ project_id 默认 0 查询运行时当前项目；指定其他库前使用 query
 keyword 为 URL/请求/响应等字段搜索，url 为 URL 模糊匹配，methods 可逗号分隔，status_code 可写 200,300-399。
 filter_json 使用 QueryHTTPFlowRequest 字段名，例如 {"Tags":["登录"],"IncludeInIP":["127.0.0.1"],"AfterUpdatedAt":1700000000,"BeforeUpdatedAt":1800000000,"RuntimeId":"xxx","FromPlugin":"插件"}。未知字段报错；分页使用 limit/offset。显式的非空快捷参数覆盖同名 JSON 字段。
 默认返回流量元数据。读取具体数据包时用 flow_id 或 filter_json 的 IncludeId；单条请求/响应各最多 content_limit 字符，truncated 时使用 content_offset 续读。limit 1–50，每页正文总预算有界。
+分页范围为 limit 1–50、content_limit 1–8192，且 limit × content_limit ≤ 65536；默认 10 × 2048，可先用默认值。回读请求/响应报文时还需 limit × content_limit × 2 ≤ 65536，建议 flow_id 配合 limit=1。
 [[- if .FunctionCallMode -]]
 arguments 示例：
 ```json
@@ -29,7 +30,7 @@ filterJSON = cli.String("filter_json", cli.setHelp("高级 QueryHTTPFlowRequest 
 limit = cli.Int("limit", cli.setDefault(10), cli.setHelp("返回条数 1–50"))
 offset = cli.Int("offset", cli.setDefault(0), cli.setHelp("分页偏移"))
 contentOffset = cli.Int("content_offset", cli.setDefault(0), cli.setHelp("请求/响应字符偏移"))
-contentLimit = cli.Int("content_limit", cli.setDefault(2048), cli.setHelp("请求/响应各自的字符限制 1–8192"))
+contentLimit = cli.Int("content_limit", cli.setDefault(2048), cli.setHelp("请求/响应各自的字符限制 1–8192；回读报文时 limit × 本值 × 2 ≤ 65536"))
 cli.check()
 filter = {}
 if filterJSON != "" { filter = json.loads(filterJSON) }

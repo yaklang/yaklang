@@ -6,6 +6,7 @@ __USAGE__ = <<<USAGE
 默认查询运行时当前项目；跨库先用 query_yak_projects 取得 project_id，只接受注册 ID。keyword 搜索标题、URL、IP、payload、details 等，severity 可用 high,critical，network 支持 IP/CIDR，ports 支持范围。
 filter_json 为 QueryRisksRequest JSON，例如 {"RuntimeId":"xxx","Tags":"SQL注入|登录","AfterCreatedAt":1700000000,"SSAProgramNames":["项目名"],"IsRead":"false","WaitingVerified":false}。未指定 WaitingVerified 时查询两种状态；指定 true/false 时筛选对应状态。RiskType 使用 Yakit 的风险类型显示名称前缀。分页用 limit/offset，不接受 Pagination/Token。
 先查询候选 risk_id，再以 risk_id 单条回读 content（JSON 文本，包含漏洞细节、修复建议、payload、请求响应和 packet_pairs）。content 被截断时用 next_content_offset 继续读取，拼接后解析。http_flow_ids 可交给 query_http_history 的 flow_id，保持相同 project_id。
+分页范围为 limit 1–50、content_limit 1–8192，且 limit × content_limit ≤ 65536；默认 10 × 2048，可先用默认值。
 [[- if .FunctionCallMode -]]
 arguments 示例：
 ```json
@@ -28,7 +29,7 @@ filterJSON = cli.String("filter_json", cli.setHelp("高级 QueryRisksRequest JSO
 limit = cli.Int("limit", cli.setDefault(10), cli.setHelp("返回条数 1–50"))
 offset = cli.Int("offset", cli.setDefault(0), cli.setHelp("分页偏移"))
 contentOffset = cli.Int("content_offset", cli.setDefault(0), cli.setHelp("证据 JSON 字符偏移"))
-contentLimit = cli.Int("content_limit", cli.setDefault(2048), cli.setHelp("正文字符限制 1–8192"))
+contentLimit = cli.Int("content_limit", cli.setDefault(2048), cli.setHelp("正文字符限制 1–8192；limit × 本值 ≤ 65536"))
 cli.check()
 filter = {}
 if filterJSON != "" { filter = json.loads(filterJSON) }

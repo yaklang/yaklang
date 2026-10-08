@@ -7,6 +7,7 @@ __USAGE__ = <<<USAGE
 数据库型字典每条返回 payload_id，可管理；文件型字典返回真实行内容样本、line_number 和 editable=false，payload_id 是文件字典注册记录，不代表独立行。文件样本按匹配行分页，扫描有上限。长内容用 next_content_offset 续读，truncated 的样本不要直接当作完整载荷。
 结果 usage 中有 {{payload(组名)}}、{{payload:nodup(组名)}}、{{payload:full(组名)}}。默认 payload 从数据库逐条展开并去重（文件型按行读取）；full 保留每条完整多行内容。文件夹引用 {{payload(文件夹/*)}}。
 推荐工作流：查询字典 → 必要时 manage_payloads 增删改 → do_http_request 设置 fuzztag=true，把标签放入 query/form/body/packet，设置 max-requests 限制展开规模。URL 模式 query/form 传原始值，工具负责一次编码；嵌套编码可用 {{base64({{payload(组名)}})}}。原生标签名为 payload（单数），不存在 payloads 标签。多个标签默认取笛卡尔积，同层 ::row 可同步配对。
+分页范围为 limit 1–50、content_limit 1–8192，且 limit × content_limit ≤ 65536；默认 10 × 2048，可先用默认值。
 [[- if .FunctionCallMode -]]
 arguments 示例：
 ```json
@@ -26,7 +27,7 @@ payloadID = cli.Int("payload_id", cli.setDefault(0), cli.setHelp("精确数据�
 limit = cli.Int("limit", cli.setDefault(10), cli.setHelp("返回条数 1–50"))
 offset = cli.Int("offset", cli.setDefault(0), cli.setHelp("分页偏移"))
 contentOffset = cli.Int("content_offset", cli.setDefault(0), cli.setHelp("载荷字符偏移"))
-contentLimit = cli.Int("content_limit", cli.setDefault(2048), cli.setHelp("每条载荷字符限制 1–8192"))
+contentLimit = cli.Int("content_limit", cli.setDefault(2048), cli.setHelp("每条载荷字符限制 1–8192；limit × 本值 ≤ 65536"))
 cli.check()
 filter = {"group":group,"query":query,"payload_id":payloadID}
 if folder != "" { filter["folder"] = folder }

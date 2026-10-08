@@ -35,6 +35,6 @@ description: 查询和管理当前 Yakit 工作空间的记忆、会话历史、
 
 ## 回读和管理边界
 
-正文有 `truncated` 和 `next_content_offset` 时，保持原 ID 和筛选范围，用 content_offset 续读；offset 是条目分页，content_offset 是正文字符偏移。风险 content 为 JSON 时拼接完整后解析。每页有限额，截断样本不要作为完整载荷发送。
+正文有 `truncated` 和 `next_content_offset` 时，保持原 ID 和筛选范围，用 content_offset 续读；offset 是条目分页，content_offset 是正文字符偏移。风险 content 为 JSON 时拼接完整后解析。历史、知识、风险和 payload 查询满足 `limit × content_limit ≤ 65536`；HTTP 报文回读还需乘 2。先用默认 10 × 2048，精确 ID 回读用 limit=1。截断样本不要作为完整载荷发送。
 
 记忆、知识、payload 的删除使用精确 ID；知识还必须属于选中知识库。文件型 payload 返回 editable=false，只读样本；delete_group 只移除登记，不删除磁盘文件。修改后回读确认，并向用户说明具体改变的条目。
