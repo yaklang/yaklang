@@ -1,0 +1,18 @@
+# Complete caller-bounded XML-RPC bodies. HTTP extraction and TCP reassembly
+# belong to the enclosing caller. Parsed method names are metadata only.
+Package:
+  XMLRPC:
+    operator: |
+      if !this.HasMaxLength() { panic("xmlrpc: document requires an explicit boundary") }
+      limit = getCtx("xmlrpcMessageLimit")
+      if !hasCtx("xmlrpcMessageLimit") { limit = 1048576 }
+      if limit <= 0 || this.GetMaxLength() > limit { panic("xmlrpc: document exceeds limit") }
+      depth = getCtx("xmlrpcDepthLimit")
+      if !hasCtx("xmlrpcDepthLimit") { depth = 64 }
+      text = this.ProcessSubNode("XML Text").Value
+      message, err = decodeXMLRPCText(text, depth)
+      if err != nil { panic(err) }
+      this.AddInfo("XML-RPC Message", message)
+      this.AddInfo("Kind", message.Kind)
+      this.AddInfo("Method Name", message.Method)
+    XML Text: string

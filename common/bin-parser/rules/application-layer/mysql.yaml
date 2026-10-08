@@ -1,0 +1,128 @@
+endian: little
+Package:
+  MySQLPacket:
+    operator: |
+      this.ProcessSubNode("Payload Length")
+      this.ProcessSubNode("Sequence ID")
+      l = getNodeResult("Payload Length").Value
+      this.GetSubNode("Payload").SetMaxLength(l)
+      this.ProcessSubNode("Payload")
+    Payload Length: uint32,24bit
+    Sequence ID: uint8
+    Payload:
+      operator: |
+        first = this.ProcessSubNode("First").Value
+        rem = 0
+        if this.GetMaxLength() > this.Length() {
+          rem = this.GetMaxLength() - this.Length()
+        }
+        if first == 0x0a {
+          this.ProcessSubNode("Handshake")
+          return
+        }
+        if first == 0x00 && rem >= 6 && rem < 1048576 {
+          this.ProcessByType("MySQLOK")
+          return
+        }
+        if first == 0xff && rem >= 8 && rem < 1048576 {
+          this.ProcessByType("MySQLERR")
+          return
+        }
+        if first == 0xfe {
+          this.ProcessSubNode("EOF")
+          return
+        }
+        if first == 0x01 {
+          return
+        }
+        if first == 0x03 && rem > 0 && rem < 1048576 {
+          this.GetSubNode("Query").SetMaxLength(rem)
+          this.ProcessSubNode("Query")
+          return
+        }
+        if first == 0x02 && rem > 0 && rem < 1048576 {
+          this.GetSubNode("Schema").SetMaxLength(rem)
+          this.ProcessSubNode("Schema")
+          return
+        }
+        if rem > 0 && rem < 1048576 {
+          this.GetSubNode("Octets").SetMaxLength(rem)
+          this.ProcessSubNode("Octets")
+        }
+        return
+      First: uint8
+      Handshake:
+        operator: |
+          this.ProcessSubNode("Server Version")
+          this.ProcessSubNode("Connection ID")
+          this.ProcessSubNode("Auth Plugin Data 1")
+          this.ProcessSubNode("Filler")
+          this.ProcessSubNode("Capability Low")
+          this.ProcessSubNode("Character Set")
+          this.ProcessSubNode("Status Flags")
+          this.ProcessSubNode("Capability High")
+          this.ProcessSubNode("Auth Plugin Data Len")
+          this.ProcessSubNode("Reserved")
+          n = getNodeResult("Auth Plugin Data Len").Value
+          if n > 8 {
+            this.GetSubNode("Auth Plugin Data 2").SetMaxLength(n - 8)
+            this.ProcessSubNode("Auth Plugin Data 2")
+          }
+          if this.GetMaxLength() != 0 && this.Length() < this.GetMaxLength() {
+            this.ProcessSubNode("Auth Plugin Name")
+          }
+        Server Version: "del:\0;type:string"
+        Connection ID: uint32
+        Auth Plugin Data 1: raw,8
+        Filler: uint8
+        Capability Low: uint16
+        Character Set: uint8
+        Status Flags: uint16
+        Capability High: uint16
+        Auth Plugin Data Len: uint8
+        Reserved: raw,10
+        Auth Plugin Data 2: string
+        Auth Plugin Name: "del:\0;type:string"
+      EOF:
+        Warnings: uint16
+        Status Flags: uint16
+      Query: string
+      Schema: string
+      Octets: string
+MySQLOK:
+  operator: |
+    this.ProcessSubNode("Affected Rows")
+    this.ProcessSubNode("Last Insert ID")
+    this.ProcessSubNode("Status Flags")
+    this.ProcessSubNode("Warnings")
+    if this.GetMaxLength() > this.Length() {
+      rem = this.GetMaxLength() - this.Length()
+      if rem > 0 && rem < 1048576 {
+        this.GetSubNode("Info").SetMaxLength(rem)
+        this.ProcessSubNode("Info")
+      }
+    }
+    return
+  Affected Rows: uint8
+  Last Insert ID: uint8
+  Status Flags: uint16
+  Warnings: uint16
+  Info: string
+MySQLERR:
+  operator: |
+    this.ProcessSubNode("Error Code")
+    this.ProcessSubNode("SQL State Marker")
+    this.GetSubNode("SQL State").SetMaxLength(5)
+    this.ProcessSubNode("SQL State")
+    if this.GetMaxLength() > this.Length() {
+      rem = this.GetMaxLength() - this.Length()
+      if rem > 0 && rem < 1048576 {
+        this.GetSubNode("Error Message").SetMaxLength(rem)
+        this.ProcessSubNode("Error Message")
+      }
+    }
+    return
+  Error Code: uint16
+  SQL State Marker: uint8
+  SQL State: string
+  Error Message: string

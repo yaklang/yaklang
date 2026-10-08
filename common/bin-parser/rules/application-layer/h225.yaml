@@ -1,0 +1,40 @@
+# ITU-T H.225.0 (12/2009) H323-MESSAGES, X.691 aligned PER.
+# Fixed official schema mirror:
+# https://github.com/wireshark/wireshark/blob/411f78566bed622a2ca2e6480c659486175db129/epan/dissectors/asn1/h225/H323-MESSAGES.asn
+# Explicit bounded RAS and TPKT/Q.931 H323-UserInformation entry points.
+# Root RAS alternatives: GRQ/GCF/RRQ/RCF/ARQ/ACF/DRQ/IRQ.
+# Root calls: Setup/CallProceeding/Connect/Alerting/Information/ReleaseComplete.
+# Unknown PER extension additions and non-user Q.931 IEs retain raw bytes.
+# No H.245/application interpretation, cryptographic transforms, TCP assembly,
+# schema generation, fragmented PER determinants, or implicit dispatch.
+endian: big
+unit: byte
+Package:
+  H225RAS:
+    operator: |
+      err = parseH225Message("ras")
+      if err != nil { panic(err) }
+  H225Call:
+    operator: |
+      err = parseH225Message("call")
+      if err != nil { panic(err) }
+  H225RASCarrier:
+    operator: |
+      if !this.HasMaxLength() || this.GetMaxLength("bit") == 0 || this.GetMaxLength("bit") % 8 != 0 { panic("h225: explicit nonempty byte boundary required") }
+      candidate, trial = this.TryProcessByType("H225ExactRAS", "H225RAS")
+      if trial.OK { trial.Save(); return }
+      trial.Recovery()
+      raw = this.NewUnknownNode("Unparsed H225 Message")
+      raw.SetMaxLength(this.GetMaxLength())
+      raw.Process()
+  H225CallCarrier:
+    operator: |
+      if !this.HasMaxLength() || this.GetMaxLength("bit") == 0 || this.GetMaxLength("bit") % 8 != 0 { panic("h225: explicit nonempty byte boundary required") }
+      candidate, trial = this.TryProcessByType("H225ExactCall", "H225Call")
+      if trial.OK { trial.Save(); return }
+      trial.Recovery()
+      raw = this.NewUnknownNode("Unparsed H225 Message")
+      raw.SetMaxLength(this.GetMaxLength())
+      raw.Process()
+H225ExactRAS: "import:application-layer/h225.yaml;node:H225RAS"
+H225ExactCall: "import:application-layer/h225.yaml;node:H225Call"

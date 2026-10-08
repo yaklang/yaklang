@@ -1,0 +1,103 @@
+# Passive Redfish SERVICE-ROOT REQUEST profile, not an entire Redfish service.
+# DMTF DSP0266 1.23.1 sections 6.6/6.7, 7.1, 7.2.1/7.2.3, 7.3.1-7.3.3:
+# https://www.dmtf.org/sites/default/files/standards/documents/DSP0266_1.23.1.html
+# GET /redfish/v1/ and its normative no-trailing-slash alias, HTTP/1.1 only.
+# The path supplies major version 1, not a minor/errata or schema version.
+# Host is checked as an HTTP authority, not used as proof of endpoint identity.
+# OData-Version is optional for clients; absent is not fabricated as a wire
+# value. Present version headers support 4.0 in this implementation profile.
+# GET bodies are retained in HTTPExact: the Redfish specification says services
+# ignore them. Both Content-Length and chunked framing remain fully parsed.
+# Query codec supports root-applicable excerpt/includeoriginofcondition,
+# Redfish $expand modes/levels, and ASCII property-path $select. Unknown non-$
+# pairs are preserved; collection-only and unimplemented $ parameters are
+# explicitly outside this entry's scope. No response/capability/object lookup,
+# body semantics, conditional retrieval outcome, TLS or session is inferred.
+# Implementation limits: 16384-byte request, 8192-byte target, 256 query pairs;
+# standard query duplicates are outside this single-occurrence profile.
+# HTTP wire leaves stay unchanged. Derived parameter spans are relative to the
+# original Path bytes before percent decoding. GenerateBinary is unsupported.
+Package:
+  RedfishServiceRootRequest: RedfishServiceRootRequestMessage
+  RedfishServiceRootRequestCarrier:
+    operator: |
+      if !this.HasMaxLength() { panic("redfish service-root: explicit carrier boundary required") }
+      if this.GetMaxLength("bit") % 8 != 0 { panic("redfish service-root: explicit byte boundary required") }
+      if this.GetMaxLength() == 0 { panic("redfish service-root: empty carrier") }
+      candidate, trial = this.TryProcessByType("RedfishServiceRootRequestFrame")
+      if trial.OK { trial.Save(); return }
+      trial.Recovery()
+      raw = this.NewUnknownNode("Unparsed Redfish Service Root Request")
+      raw.SetMaxLength(this.GetMaxLength())
+      raw.Process()
+
+RedfishServiceRootRequestFrame: "import:application-layer/redfish.yaml;node:RedfishServiceRootRequest"
+
+RedfishServiceRootRequestMessage:
+  operator: |
+    if !this.HasMaxLength() { panic("redfish service-root: explicit request boundary required") }
+    if this.GetMaxLength("bit") % 8 != 0 { panic("redfish service-root: explicit byte boundary required") }
+    if this.GetMaxLength() > 16384 { panic("redfish service-root: request exceeds 16384-byte implementation profile") }
+    http = this.ProcessSubNode("HTTP")
+    request = http.Child("Message").Child("HTTP Request")
+    if request == nil { panic("redfish service-root: request required, not a response") }
+    if request.Child("Method").Value != "GET" { panic("redfish service-root: retrieval profile requires GET") }
+    if request.Child("Version").Value != "HTTP/1.1" { panic("redfish service-root: HTTP/1.1 request profile required") }
+    decoded, err = decodeRedfishServiceRootTarget(string(request.Child("Path").Value))
+    if err != nil { panic(string(err)) }
+    host = ""
+    hosts = 0
+    odata = ""
+    odatas = 0
+    maxVersion = ""
+    maxVersions = 0
+    accepts = []string{}
+    conditions = []string{}
+    agents = []string{}
+    for _, item = range request.Child("Headers").Children() {
+      line = string(item.Value)
+      if len(line) == 0 { continue }
+      parts = line.SplitN(":", 2)
+      name = parts[0].Lower()
+      value = parts[1].Trim(" \t")
+      if name == "host" { hosts++; host = value }
+      if name == "odata-version" { odatas++; odata = value }
+      if name == "odata-maxversion" { maxVersions++; maxVersion = value }
+      if name == "accept" { accepts.Append(value) }
+      if name == "if-none-match" { conditions.Append(value) }
+      if name == "user-agent" { agents.Append(value) }
+    }
+    if hosts != 1 || len(host) == 0 { panic("redfish service-root: HTTP/1.1 requires one nonempty Host") }
+    if odatas > 1 || maxVersions > 1 { panic("redfish service-root: duplicate version headers outside profile") }
+    if (odatas == 1 && odata != "4.0") || (maxVersions == 1 && maxVersion != "4.0") { panic("redfish service-root: version header outside OData 4.0 profile") }
+    for _, octet = range []byte(host) {
+      if octet <= 32 || octet >= 127 || octet in []byte("/?#@\\") { panic("redfish service-root: invalid Host authority") }
+    }
+    endpoint, err = decodeHTTPServiceURL("http://" + host + "/")
+    if err != nil { panic("redfish service-root: invalid Host authority: " + string(err)) }
+    for key, value = range decoded { this.AddInfo(key, value) }
+    this.AddInfo("Profile", "Redfish v1 service-root HTTP request parameter codec")
+    this.AddInfo("Method", "GET")
+    this.AddInfo("Request Target Form", "origin-form")
+    this.AddInfo("Host Header", host)
+    this.AddInfo("Hostname", endpoint["hostname"])
+    this.AddInfo("Port", endpoint["port"])
+    this.AddInfo("OData Version", odata)
+    this.AddInfo("OData Version Present", odatas == 1)
+    this.AddInfo("OData Maximum Version", maxVersion)
+    this.AddInfo("OData Maximum Version Present", maxVersions == 1)
+    this.AddInfo("Accept Values", accepts)
+    this.AddInfo("Accept Header Present", len(accepts) > 0)
+    this.AddInfo("Accept Semantics Validated", false)
+    this.AddInfo("If-None-Match Values", conditions)
+    this.AddInfo("Conditional Outcome Validated", false)
+    this.AddInfo("User-Agent Values", agents)
+    this.AddInfo("Body Node Present", request.Child("Body") != nil)
+    this.AddInfo("GET Body Ignored By Specification", true)
+    this.AddInfo("Body Semantics Decoded", false)
+    this.AddInfo("Response Schema Parsed", false)
+    this.AddInfo("Session Observed", false)
+    this.AddInfo("TLS Observed", false)
+    this.AddInfo("Endpoint Identity Proven", false)
+    this.AddInfo("Maximum Request Bytes", 16384)
+  HTTP: "import:application-layer/http.yaml;node:HTTPExact"

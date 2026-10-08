@@ -1,0 +1,98 @@
+# NetBIOS Frames (the LLC-carried format commonly called NetBEUI), not NBNS
+# or the TCP session service. A caller supplies one exact link-layer payload.
+# User data remains bytes: Only/Last does not alone prove an unfragmented PDU.
+endian: little
+Package:
+  NetBIOSFrame:
+    operator: |
+      if !this.HasMaxLength() { panic("netbios-frame: frame boundary is required") }
+      size = this.GetMaxLength()
+      limit = getCtx("netBIOSFrameLimit")
+      if !hasCtx("netBIOSFrameLimit") { limit = 65535 }
+      if size < 14 || size > 65535 || limit <= 0 || size > limit { panic("netbios-frame: invalid frame size") }
+      if hasCtx("netBIOSFrameLength") && size != getCtx("netBIOSFrameLength") { panic("netbios-frame: length differs from external frame boundary") }
+      header = this.ProcessSubNode("Header Length").Value
+      if this.ProcessSubNode("Delimiter").Value != 0xefff { panic("netbios-frame: invalid delimiter") }
+      command = int(this.ProcessSubNode("Command").Value)
+      if !(command in [0,1,2,3,7,8,9,10,13,14,15,19,20,21,22,23,24,25,26,27,28,31]) { panic("netbios-frame: unsupported command") }
+      expected = 14
+      if command < 16 { expected = 44 }
+      if header != expected || header > size { panic("netbios-frame: invalid command header length") }
+      data1 = this.ProcessSubNode("Data 1").Value
+      data2 = this.ProcessSubNode("Data 2").Value
+      this.ProcessSubNode("Transmit Correlator")
+      this.ProcessSubNode("Response Correlator")
+      if header == 44 {
+        this.ProcessSubNode("Receiver Name Bytes")
+        this.ProcessSubNode("Receiver Name Suffix")
+        this.ProcessSubNode("Sender Name Bytes")
+        this.ProcessSubNode("Sender Name Suffix")
+      } else {
+        this.ProcessSubNode("Remote Session")
+        this.ProcessSubNode("Local Session")
+      }
+      // Keep reserved values verbatim. Their presence does not establish a
+      // command-specific meaning, and historic captures contain nonzero ones.
+      if command == 3 {
+        this.AddInfo("Status Request", data1)
+        this.AddInfo("Status Buffer Length", data2)
+      }
+      if command == 10 || command == 14 {
+        this.AddInfo("Name Local Session", data2 & 0xff)
+        this.AddInfo("Call Name Type", data2 >> 8)
+      }
+      if command == 13 {
+        this.AddInfo("Name Status", data1)
+        this.AddInfo("Name Type", data2)
+      }
+      if command == 15 {
+        this.AddInfo("Status Response", data1)
+        this.AddInfo("Status Exceeds Frame", data2 & 0x8000 != 0)
+        this.AddInfo("Status Exceeds Buffer", data2 & 0x4000 != 0)
+        this.AddInfo("Status Data Length", data2 & 0x3fff)
+        this.AddInfo("Status Data Decoded", false)
+        if size-header != data2 & 0x3fff { panic("netbios-frame: status data length differs from frame boundary") }
+      }
+      this.AddInfo("Session Context Required", command == 21 || command == 22)
+      if command == 21 || command == 22 {
+        this.AddInfo("ACK Included", data1 & 8 != 0)
+        this.AddInfo("ACK Expected", data1 & 2 != 0)
+        this.AddInfo("Resynchronization Indicator", data2)
+        if command == 21 {
+          this.AddInfo("Receive Continue Requested", data1 & 1 != 0)
+          this.AddInfo("Data Fragment Kind", "first-or-middle")
+        } else {
+          this.AddInfo("ACK With Data Allowed", data1 & 4 != 0)
+          this.AddInfo("Data Fragment Kind", "only-or-last")
+        }
+      }
+      if command == 23 || command == 25 {
+        this.AddInfo("Send Without ACK", data1 & 0x80 != 0)
+        this.AddInfo("Version Two Or Later", data1 & 1 != 0)
+        this.AddInfo("Maximum Receive Size", data2)
+        if command == 25 { this.AddInfo("Largest Frame Code", (data1 >> 1) & 7) }
+      }
+      if command == 24 { this.AddInfo("Termination Indicator", data2) }
+      if command == 26 || command == 27 {
+        this.AddInfo("Data Bytes Accepted", data2)
+        if command == 26 { this.AddInfo("Received Send Without ACK", data1 & 2 != 0) }
+      }
+      if size > header {
+        if !(command in [8,9,15,21,22]) { panic("netbios-frame: unexpected data after command header") }
+        this.ProcessSubNode("User Data")
+      }
+      if this.Length() != size { panic("netbios-frame: frame not fully consumed") }
+    Header Length: uint16
+    Delimiter: uint16
+    Command: uint8
+    Data 1: uint8
+    Data 2: uint16
+    Transmit Correlator: uint16
+    Response Correlator: uint16
+    Receiver Name Bytes: raw,15
+    Receiver Name Suffix: uint8
+    Sender Name Bytes: raw,15
+    Sender Name Suffix: uint8
+    Remote Session: uint8
+    Local Session: uint8
+    User Data: raw

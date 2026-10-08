@@ -1,0 +1,52 @@
+endian: big
+Package:
+  BOOTP:
+    operator: |
+      this.ProcessSubNode("Operation")
+      op = getNodeResult("Operation").Value
+      if op != 1 && op != 2 {
+        panic("bootp: invalid operation")
+      }
+      this.ProcessSubNode("Hardware Type")
+      this.ProcessSubNode("Hardware Length")
+      hlen = getNodeResult("Hardware Length").Value
+      if hlen > 16 {
+        panic("bootp: hardware address is longer than chaddr")
+      }
+      this.ProcessSubNode("Hops")
+      this.ProcessSubNode("Xid")
+      this.ProcessSubNode("Seconds")
+      this.ProcessSubNode("Flags")
+      this.ProcessSubNode("Client IP")
+      this.ProcessSubNode("Your IP")
+      this.ProcessSubNode("Server IP")
+      this.ProcessSubNode("Gateway IP")
+      this.ProcessSubNode("Client MAC")
+      this.ProcessSubNode("Client Hardware Padding")
+      this.ProcessSubNode("Server Host Name")
+      this.ProcessSubNode("Boot File")
+      maximum = this.GetMaxLength()
+      # A plain reader has no declared message boundary and is represented by
+      # an unbounded maximum. Only consume the variable vendor area when the
+      # caller supplies an exact BOOTP message length.
+      if maximum > this.Length() && maximum <= 524280 {
+        remaining = maximum - this.Length()
+        this.GetSubNode("Vendor Area").SetMaxLength(remaining)
+        this.ProcessSubNode("Vendor Area")
+      }
+    Operation: uint8
+    Hardware Type: uint8
+    Hardware Length: uint8
+    Hops: uint8
+    Xid: uint32
+    Seconds: uint16
+    Flags: uint16
+    Client IP: raw,4
+    Your IP: raw,4
+    Server IP: raw,4
+    Gateway IP: raw,4
+    Client MAC: raw,6
+    Client Hardware Padding: raw,10
+    Server Host Name: raw,64
+    Boot File: raw,128
+    Vendor Area: raw

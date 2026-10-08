@@ -1,0 +1,62 @@
+Package:
+  RTSP:
+    operator: |
+      res,op = this.TryProcessByType("FirstWorld")
+      op.Recovery()
+      first = string(res.Value)
+      if first.HasPrefix("RTSP/") {
+        this.ProcessSubNode("RTSP Response")
+      }else{
+        if !(first.HasPrefix("OPTIONS") || first.HasPrefix("DESCRIBE") || first.HasPrefix("SETUP") || first.HasPrefix("PLAY") || first.HasPrefix("PAUSE") || first.HasPrefix("TEARDOWN") || first.HasPrefix("GET_PARAMETER") || first.HasPrefix("SET_PARAMETER") || first.HasPrefix("ANNOUNCE") || first.HasPrefix("RECORD") || first.HasPrefix("REDIRECT")) {
+          panic("rtsp: unknown method")
+        }
+        this.ProcessSubNode("RTSP Request")
+      }
+      remaining = this.GetMaxLength() - this.Length()
+      if remaining > 0 {
+        this.GetSubNode("Body").SetMaxLength(remaining)
+        this.ProcessSubNode("Body")
+      }
+    Body: raw
+    RTSP Request:
+      FirstLine:
+        unpack: true
+        Method: "del: ;type:string"
+        URI: "del: ;type:string"
+        Version: "del:\r\n;type:string"
+      Headers: RTSPHeaders
+    RTSP Response:
+      FirstLine:
+        unpack: true
+        Version: "del: ;type:string"
+        Status: "del: ;type:string"
+        Reason: "del:\r\n;type:string"
+      Headers: RTSPHeaders
+  Interleaved:
+    endian: big
+    operator: |
+      this.ProcessSubNode("Magic")
+      if getNodeResult("Magic").Value != 0x24 { panic("rtsp: interleaved magic") }
+      this.ProcessSubNode("Channel")
+      this.ProcessSubNode("Length")
+      n = getNodeResult("Length").Value
+      if n != this.GetMaxLength() - this.Length() { panic("rtsp: interleaved length") }
+      if n > 0 {
+        this.GetSubNode("Data").SetMaxLength(n)
+        this.ProcessSubNode("Data")
+      }
+    Magic: uint8
+    Channel: uint8
+    Length: uint16
+    Data: raw
+FirstWorld: "del: ;type:string"
+RTSPHeaders:
+  operator: |
+    for {
+      data := this.NewElement().Process().Value
+      if data == nil || len(data) == 0 {
+        return
+      }
+    }
+  list: true
+  Item: "del:\r\n;type:string"

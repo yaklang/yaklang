@@ -1,0 +1,35 @@
+# RFC 2080 request/response and every 20-octet route/next-hop entry.
+endian: big
+Package:
+  RIPng:
+    operator: |
+      if !this.HasMaxLength() { panic("ripng: a datagram boundary is required") }
+      this.ProcessSubNode("Command")
+      this.ProcessSubNode("Version")
+      this.ProcessSubNode("Reserved")
+      command = getNodeResult("Command").Value
+      if command != 1 && command != 2 { panic("ripng: unknown command") }
+      if getNodeResult("Version").Value != 1 { panic("ripng: version must be one") }
+      remaining = this.GetMaxLength() - this.Length()
+      if remaining % 20 != 0 { panic("ripng: incomplete route entry") }
+      if remaining > 0 { this.ProcessSubNode("Entries") }
+    Command: uint8
+    Version: uint8
+    Reserved: uint16
+    Entries:
+      list: true
+      Entry: RIPngEntry
+      operator: |
+        for this.Length() < this.GetMaxLength() { this.NewElement().Process() }
+RIPngEntry:
+  operator: |
+    this.ProcessSubNode("Prefix")
+    this.ProcessSubNode("Route Tag")
+    this.ProcessSubNode("Prefix Length")
+    this.ProcessSubNode("Metric")
+    metric = getNodeResult("Metric").Value
+    if metric != 255 && (metric < 1 || metric > 16 || getNodeResult("Prefix Length").Value > 128) { panic("ripng: invalid route entry") }
+  Prefix: raw,16
+  Route Tag: uint16
+  Prefix Length: uint8
+  Metric: uint8

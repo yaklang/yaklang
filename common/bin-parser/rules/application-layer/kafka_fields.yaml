@@ -1,0 +1,15 @@
+# Kafka protocol request/response on a caller-supplied role.
+# Supported matrix (non-flexible): Produce 0-7, Fetch 0-11, Metadata 0-8, ApiVersions 0-2.
+# Uncompressed RecordBatch magic 2 only; compressed batches fail closed.
+# Length prefix is not an API-key guess; responses are a separate entry.
+endian: big
+unit: byte
+Package:
+  KafkaRequestFields:
+    operator: |
+      err = parseKafkaFields("request")
+      if err != nil { panic(err) }
+  KafkaResponseFields:
+    operator: |
+      err = parseKafkaFields("response")
+      if err != nil { panic(err) }

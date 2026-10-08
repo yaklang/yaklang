@@ -1,0 +1,185 @@
+Package:
+  Redis:
+    unpack: true
+    operator: |
+      this.ProcessByType("RESP")
+RESP:
+  operator: |
+    p = this.ProcessSubNode("Prefix").Value
+    switch p {
+      case 0x2a:
+        this.ProcessSubNode("Array")
+      case 0x24:
+        this.ProcessSubNode("Bulk")
+      case 0x2b:
+        this.ProcessSubNode("Simple")
+      case 0x2d:
+        this.ProcessSubNode("Error")
+      case 0x3a:
+        this.ProcessSubNode("Integer")
+      case 0x5f:
+        this.ProcessSubNode("Null")
+      case 0x23:
+        this.ProcessSubNode("Boolean")
+      case 0x2c:
+        this.ProcessSubNode("Double")
+      case 0x28:
+        this.ProcessSubNode("BigNumber")
+      case 0x25:
+        this.ProcessSubNode("Map")
+      case 0x7e:
+        this.ProcessSubNode("Set")
+      case 0x3e:
+        this.ProcessSubNode("Push")
+      case 0x21:
+        this.ProcessSubNode("BlobError")
+      case 0x3d:
+        this.ProcessSubNode("Verbatim")
+      default:
+        panic("redis: invalid RESP prefix")
+    }
+  Prefix: uint8
+  Array:
+    operator: |
+      nstr = this.ProcessSubNode("Count").Value
+      n = int(nstr)
+      if n == -1 { return }
+      if n < 0 || n > 4096 { panic("redis: array count exceeds limit") }
+      rest = n
+      if n >= 1 {
+        prefix, trial = this.TryProcessByType("RedisPeekByte")
+        trial.Recovery()
+        if trial.OK && prefix.Value == 0x24 {
+          this.ProcessByType("RedisCommand")
+          rest = n - 1
+        }
+      }
+      if rest > 0 {
+        this.GetSubNode("Arguments").SetCfg("list-length", rest)
+        this.ProcessSubNode("Arguments")
+      }
+      return
+    Count: "del:\r\n;type:string"
+    Arguments:
+      list: true
+      Element: RESP
+  Bulk:
+    operator: |
+      nstr = this.ProcessSubNode("Len").Value
+      n = int(nstr)
+      if n == -1 { return }
+      if n < 0 || n > 1048576 { panic("redis: invalid bulk length") }
+      if n > 0 {
+        this.GetSubNode("Bulk").SetMaxLength(n)
+        this.ProcessSubNode("Bulk")
+      }
+      this.ProcessSubNode("CRLF")
+      if string(getNodeResult("CRLF").Value) != "\r\n" { panic("redis: invalid bulk terminator") }
+    Len: "del:\r\n;type:string"
+    Bulk: string
+    CRLF: raw,2
+  Simple:
+    Message: "del:\r\n;type:string"
+  Error:
+    Message: "del:\r\n;type:string"
+  Integer:
+    Message: "del:\r\n;type:string"
+  "Null":
+    CRLF: raw,2
+  Boolean:
+    Message: "del:\r\n;type:string"
+  Double:
+    Message: "del:\r\n;type:string"
+  BigNumber:
+    Message: "del:\r\n;type:string"
+  Map:
+    operator: |
+      nstr = this.ProcessSubNode("Count").Value
+      n = int(nstr)
+      if n < 0 || n > 2048 { panic("redis: map count exceeds limit") }
+      n = n * 2
+      if n > 0 {
+        this.GetSubNode("Entries").SetCfg("list-length", n)
+        this.ProcessSubNode("Entries")
+      }
+    Count: "del:\r\n;type:string"
+    Entries:
+      list: true
+      Element: RESP
+  Set:
+    operator: |
+      nstr = this.ProcessSubNode("Count").Value
+      n = int(nstr)
+      if n < 0 || n > 4096 { panic("redis: collection count exceeds limit") }
+      if n > 0 {
+        this.GetSubNode("Members").SetCfg("list-length", n)
+        this.ProcessSubNode("Members")
+      }
+    Count: "del:\r\n;type:string"
+    Members:
+      list: true
+      Element: RESP
+  Push:
+    operator: |
+      nstr = this.ProcessSubNode("Count").Value
+      n = int(nstr)
+      if n < 0 || n > 4096 { panic("redis: collection count exceeds limit") }
+      if n > 0 {
+        this.GetSubNode("Items").SetCfg("list-length", n)
+        this.ProcessSubNode("Items")
+      }
+    Count: "del:\r\n;type:string"
+    Items:
+      list: true
+      Element: RESP
+  BlobError:
+    operator: |
+      nstr = this.ProcessSubNode("Len").Value
+      n = int(nstr)
+      if n < 0 || n > 1048576 { panic("redis: invalid bulk length") }
+      if n > 0 {
+        this.GetSubNode("Bulk").SetMaxLength(n)
+        this.ProcessSubNode("Bulk")
+      }
+      this.ProcessSubNode("CRLF")
+      if string(getNodeResult("CRLF").Value) != "\r\n" { panic("redis: invalid bulk terminator") }
+    Len: "del:\r\n;type:string"
+    Bulk: string
+    CRLF: raw,2
+  Verbatim:
+    operator: |
+      nstr = this.ProcessSubNode("Len").Value
+      n = int(nstr)
+      if n < 0 || n > 1048576 { panic("redis: invalid bulk length") }
+      if n > 0 {
+        this.GetSubNode("Bulk").SetMaxLength(n)
+        this.ProcessSubNode("Bulk")
+      }
+      this.ProcessSubNode("CRLF")
+      if string(getNodeResult("CRLF").Value) != "\r\n" { panic("redis: invalid bulk terminator") }
+    Len: "del:\r\n;type:string"
+    Bulk: string
+    CRLF: raw,2
+RedisCommand:
+  operator: |
+    p = this.ProcessSubNode("Prefix").Value
+    if p != 0x24 {
+      panic("redis: command must be a bulk string")
+    }
+    nstr = this.ProcessSubNode("Len").Value
+    n = int(nstr)
+    if n == -1 { return }
+    if n < 0 || n > 1048576 { panic("redis: invalid command length") }
+    if n > 0 {
+      this.GetSubNode("Command").SetMaxLength(n)
+      this.ProcessSubNode("Command")
+    }
+    this.ProcessSubNode("CRLF")
+    if string(getNodeResult("CRLF").Value) != "\r\n" { panic("redis: invalid bulk terminator") }
+    return
+  Prefix: uint8
+  Len: "del:\r\n;type:string"
+  Command: string
+  CRLF: raw,2
+
+RedisPeekByte: uint8

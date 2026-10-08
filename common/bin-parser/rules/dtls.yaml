@@ -1,0 +1,73 @@
+endian: big
+Package:
+  DTLS:
+    operator: |
+      this.ProcessSubNode("Content Type")
+      ct = getNodeResult("Content Type").Value
+      if ct < 20 || ct > 24 {
+        panic("dtls: content type must be 20-24")
+      }
+      this.ProcessSubNode("Version")
+      ver = getNodeResult("Version").Value
+      if ver != 0xfeff && ver != 0xfefd {
+        panic("dtls: unexpected version")
+      }
+      this.ProcessSubNode("Epoch")
+      this.ProcessSubNode("Sequence")
+      this.ProcessSubNode("Length")
+      l = getNodeResult("Length").Value
+      setCtx("dtls_ct", ct)
+      setCtx("dtls_epoch", getNodeResult("Epoch").Value)
+      if l > 18432 || (getCtx("dtls_epoch") == 0 && l > 16384) {
+        panic("dtls: record payload exceeds version limit")
+      }
+      if l > 0 && l < 1048576 {
+        this.GetSubNode("Fragment").SetMaxLength(l)
+        this.ProcessSubNode("Fragment")
+      }
+    Content Type: uint8
+    Version: uint16
+    Epoch: uint16
+    Sequence: raw,6
+    Length: uint16
+    Fragment:
+      operator: |
+        ct = getCtx("dtls_ct")
+        if ct == 22 && getCtx("dtls_epoch") == 0 {
+          if this.GetMaxLength() < 12 { panic("dtls: truncated handshake header") }
+          this.ProcessSubNode("Handshake Type")
+          this.ProcessSubNode("Handshake Length")
+          this.ProcessSubNode("Message Seq")
+          this.ProcessSubNode("Fragment Offset")
+          this.ProcessSubNode("Fragment Length")
+          ht = getNodeResult("Handshake Type").Value
+          total = getNodeResult("Handshake Length").Value
+          offset = getNodeResult("Fragment Offset").Value
+          fragment = getNodeResult("Fragment Length").Value
+          if offset > total || fragment > total - offset || fragment > this.GetMaxLength() - this.Length() || (total > 0 && fragment == 0) {
+            panic("dtls: invalid handshake fragment range")
+          }
+          if ht == 1 && offset == 0 && fragment >= 2 {
+            this.ProcessSubNode("Client Version")
+          }
+          if this.GetMaxLength() > this.Length() {
+            rest = this.GetMaxLength() - this.Length()
+            if rest > 0 && rest < 1048576 {
+              this.GetSubNode("Handshake Body").SetMaxLength(rest)
+              this.ProcessSubNode("Handshake Body")
+            }
+          }
+          return
+        }
+        rest = this.GetMaxLength()
+        if rest > 0 && rest < 1048576 {
+          this.GetSubNode("Handshake Body").SetMaxLength(rest)
+          this.ProcessSubNode("Handshake Body")
+        }
+      Handshake Type: uint8
+      Handshake Length: uint32,24bit
+      Message Seq: uint16
+      Fragment Offset: uint32,24bit
+      Fragment Length: uint32,24bit
+      Client Version: uint16
+      Handshake Body: string

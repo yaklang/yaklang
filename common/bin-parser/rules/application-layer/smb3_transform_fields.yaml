@@ -1,0 +1,20 @@
+# MS-SMB2 2.2.41, explicit full encrypted carrier; no decryption/authentication.
+# Retains reserved bytes and cipher-dependent nonce bytes uninterpreted.
+endian: little
+unit: byte
+Package:
+  SMB3TransformFields:
+    operator: |
+      err = parseSMB3TransformFields()
+      if err != nil { panic(err) }
+  SMB3TransformFieldsCarrier:
+    operator: |
+      if !this.HasMaxLength() || this.GetMaxLength("bit") == 0 || this.GetMaxLength("bit") % 8 != 0 { panic("smb3-transform: explicit nonempty byte boundary required") }
+      if this.GetMaxLength() > 1048576 { panic("smb3-transform: exceeds 1 MiB resource limit") }
+      candidate, trial = this.TryProcessByType("SMB3TransformFieldsExact", "SMB3TransformFields")
+      if trial.OK { trial.Save(); return }
+      trial.Recovery()
+      raw = this.NewUnknownNode("Unparsed SMB3 Transform")
+      raw.SetMaxLength(this.GetMaxLength())
+      raw.Process()
+SMB3TransformFieldsExact: "import:application-layer/smb3_transform_fields.yaml;node:SMB3TransformFields"

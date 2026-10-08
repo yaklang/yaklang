@@ -1,0 +1,52 @@
+# IEEE C37.118-2005 / C37.118.2-2011 common frame, CFG-1/2 and command fields.
+# Configuration-aware data fields are in additionInfo["C37.118 Message"].
+# c37118Configuration must be a current CFG-2 selected by the caller from the
+# same transport association. There is no implicit configuration/session cache.
+# Numeric data retains wire units; CFG-3 and vendor command data remain opaque.
+endian: big
+Package:
+  C37118:
+    operator: |
+      start = getCurrentPosition()
+      this.ProcessSubNode("Sync")
+      this.ProcessSubNode("Sync Reserved")
+      kind = this.ProcessSubNode("Frame Type").Value
+      this.ProcessSubNode("Version")
+      size = this.ProcessSubNode("Frame Size").Value
+      if size < 16 { panic("c37118: invalid frame size") }
+      if this.HasMaxLength() && this.GetMaxLength() != size { panic("c37118: frame size differs from message boundary") }
+      this.SetMaxLength(size)
+      this.ProcessSubNode("ID Code")
+      this.ProcessSubNode("Second Of Century")
+      this.ProcessSubNode("Time Quality")
+      this.ProcessSubNode("Fraction Of Second")
+      if kind == 4 {
+        if size < 18 { panic("c37118: truncated command") }
+        this.ProcessSubNode("Command")
+      }
+      remaining = size-this.Length()-2
+      if remaining > 0 {
+        this.GetSubNode("Body").SetMaxLength(remaining)
+        this.ProcessSubNode("Body")
+      }
+      this.ProcessSubNode("Checksum")
+      cfg = []byte{}
+      if hasCtx("c37118Configuration") { cfg = getCtx("c37118Configuration") }
+      message, err = decodeC37118Frame(getCtx("buffer").Bytes()[start:start+size], cfg)
+      if err != nil { panic(err) }
+      this.AddInfo("C37.118 Message", message)
+      this.AddInfo("CRC Valid", true)
+      this.AddInfo("Body Decoded", message.BodyDecoded)
+      this.AddInfo("Configuration Required", message.ConfigurationRequired)
+    Sync: uint8
+    Sync Reserved: uint8,1bit
+    Frame Type: uint8,3bit
+    Version: uint8,4bit
+    Frame Size: uint16
+    ID Code: uint16
+    Second Of Century: uint32
+    Time Quality: uint8
+    Fraction Of Second: uint32,24bit
+    Command: uint16
+    Body: raw
+    Checksum: uint16

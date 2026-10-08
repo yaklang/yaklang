@@ -1,0 +1,77 @@
+# HL7 v2 MLLP framing and delimited segment fields. Repetition/component and
+# escape text is preserved verbatim; clinical schemas are not interpreted.
+endian: big
+Package:
+  HL7Message: HL7Message
+  HL7Messages:
+    list: true
+    Message: HL7Message
+    operator: |
+      if !this.HasMaxLength() { panic("hl7: message sequence requires a boundary") }
+      for this.Length() < this.GetMaxLength() { this.NewElement().Process() }
+HL7Message:
+  operator: |
+    limit = getCtx("hl7MessageLimit")
+    if !hasCtx("hl7MessageLimit") { limit = 1048576 }
+    if limit <= 0 { panic("hl7: invalid message limit") }
+    if this.HasMaxLength() && this.GetMaxLength() < limit { limit = this.GetMaxLength() }
+    this.SetMaxLength(limit)
+    this.ProcessSubNode("Start Block")
+    if getNodeResult("Start Block").Value != 11 { panic("hl7: invalid MLLP start") }
+    setCtx("hl7Header", nil)
+    setCtx("hl7FieldSeparator", nil)
+    this.ProcessSubNode("Segments")
+    header = getCtx("hl7Header")
+    if header == nil { panic("hl7: missing message header") }
+    for key, value in header { this.AddInfo(key, value) }
+    this.ProcessSubNode("End Block")
+    if getNodeResult("End Block").Value != 0x1c0d { panic("hl7: invalid MLLP end") }
+    this.SetMaxLength(this.Length())
+  Start Block: uint8
+  Segments:
+    list: true
+    Segment: HL7Segment
+    operator: |
+      for {
+        res, probe = this.TryProcessByType("MLLPEnd")
+        probe.Recovery()
+        if !probe.OK { panic("hl7: truncated message") }
+        if res.Value == 0x1c0d { break }
+        this.NewElement().Process()
+      }
+  End Block: uint16
+MLLPEnd: uint16
+HL7Segment:
+  operator: |
+    this.ProcessSubNode("Segment ID")
+    kind = getNodeResult("Segment ID").Value
+    for c in []byte(kind) { if !(c >= 65 && c <= 90) && !(c >= 48 && c <= 57) { panic("hl7: invalid segment identifier") } }
+    this.ProcessSubNode("Field Separator")
+    separator = getNodeResult("Field Separator").Value
+    c = []byte(separator)[0]
+    if c < 33 || c > 126 { panic("hl7: invalid field separator") }
+    this.ProcessSubNode("Fields")
+    text = getNodeResult("Fields").Value
+    for c in []byte(text) { if c < 32 || c == 127 { panic("hl7: control character in field") } }
+    fields = text.Split(separator)
+    if getCtx("hl7Header") == nil {
+      if kind != "MSH" || len(fields) < 11 { panic("hl7: incomplete initial MSH segment") }
+      encoding = fields[0]
+      if len(encoding) != 4 && len(encoding) != 5 { panic("hl7: invalid encoding characters") }
+      seen = separator
+      for c in []byte(encoding) {
+        if c < 33 || c > 126 { panic("hl7: invalid encoding character") }
+        for prior in []byte(seen) { if c == prior { panic("hl7: duplicate delimiter") } }
+        seen += string([]byte{c})
+      }
+      if fields[7] == "" || fields[8] == "" || fields[10] == "" { panic("hl7: missing required MSH field") }
+      setCtx("hl7FieldSeparator", separator)
+      setCtx("hl7Header", {"Encoding Characters": encoding, "Message Type": fields[7], "Message Control ID": fields[8], "Processing ID": fields[9], "Version": fields[10]})
+    } else {
+      if kind == "MSH" { panic("hl7: multiple MSH segments in one message") }
+      if separator != getCtx("hl7FieldSeparator") { panic("hl7: field separator changed within message") }
+    }
+    this.AddInfo("Fields", fields)
+  Segment ID: string,3
+  Field Separator: string,1
+  Fields: "del:\r;type:string"

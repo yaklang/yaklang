@@ -1,0 +1,53 @@
+# RFC 9114 sections 4/6/7, RFC 9204 sections 3/4, RFC 9218 section 7.2.
+# Explicit decrypted contiguous stream inputs starting at offset zero, NOT
+# QUIC packets. RequestStream requires a complete ordinary http/https request
+# message; CONNECT, responses and push streams are outside this profile.
+# UnidirectionalStream accepts a complete instruction/frame prefix; it does
+# not assert FIN on a critical stream. Unknown frame/stream bytes are retained.
+# HTTP3RequestStream dynamic QPACK requires caller context keys:
+# http3QPACKEncoderStream ([]byte, complete encoder prefix including type 2),
+# http3QPACKMaxTableCapacity (uint64/int, peer decoder SETTINGS capacity).
+# Defaults are empty table and capacity zero. Each parse replays isolated state;
+# absent, expired or unavailable references fail instead of being reclassified.
+# Limits: 1 MiB stream/snapshot/table/decoded section, 4096 frames/instructions/
+# entries/fields, 65536 encoded/decoded string bytes, 62-bit integers. These are
+# implementation bounds. Wire fields retain actual compressed bit positions;
+# decoded metadata explicitly distinguishes static, request and encoder sources.
+# No QUIC decryption/reassembly, connection/ack/eviction-reference lifecycle,
+# response schema, application body or endpoint verification is performed.
+# Priority ID and ASCII value are retained; Structured Fields are not evaluated.
+# Parse-only: NodeToBytes preserves input, structured GenerateBinary unsupported.
+# Request URI validation uses the existing 8192-byte http/https URL profile;
+# :authority is required, asterisk targets require OPTIONS, and Content-Length
+# is a single decimal uint64 field equal to the complete DATA byte total.
+# Equal duplicate/list Content-Length forms and CONNECT are outside this profile.
+endian: big
+Package:
+  HTTP3RequestStream:
+    operator: |
+      err = parseHTTP3Stream("request")
+      if err != nil { panic(err) }
+  HTTP3UnidirectionalStream:
+    operator: |
+      err = parseHTTP3Stream("uni")
+      if err != nil { panic(err) }
+  HTTP3RequestStreamCarrier:
+    operator: |
+      if !this.HasMaxLength() || this.GetMaxLength("bit") == 0 || this.GetMaxLength("bit") % 8 != 0 { panic("http3: explicit nonempty byte carrier boundary required") }
+      candidate, trial = this.TryProcessByType("HTTP3RequestExact", "HTTP3RequestStream")
+      if trial.OK { trial.Save(); return }
+      trial.Recovery()
+      raw = this.NewUnknownNode("Unparsed HTTP3 Request Stream")
+      raw.SetMaxLength(this.GetMaxLength())
+      raw.Process()
+  HTTP3UnidirectionalStreamCarrier:
+    operator: |
+      if !this.HasMaxLength() || this.GetMaxLength("bit") == 0 || this.GetMaxLength("bit") % 8 != 0 { panic("http3: explicit nonempty byte carrier boundary required") }
+      candidate, trial = this.TryProcessByType("HTTP3UniExact", "HTTP3UnidirectionalStream")
+      if trial.OK { trial.Save(); return }
+      trial.Recovery()
+      raw = this.NewUnknownNode("Unparsed HTTP3 Unidirectional Stream")
+      raw.SetMaxLength(this.GetMaxLength())
+      raw.Process()
+HTTP3RequestExact: "import:application-layer/http3.yaml;node:HTTP3RequestStream"
+HTTP3UniExact: "import:application-layer/http3.yaml;node:HTTP3UnidirectionalStream"
