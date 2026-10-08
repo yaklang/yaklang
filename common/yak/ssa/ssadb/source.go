@@ -1,6 +1,7 @@
 package ssadb
 
 import (
+	"path"
 	"strconv"
 	"strings"
 
@@ -190,7 +191,7 @@ func MarshalFolder(folderPaths []string) *IrSource {
 		return nil
 	}
 	folderName := folderPaths[len(folderPaths)-1]
-	folderPath := irSourceJoin(folderPaths[:len(folderPaths)-1]...)
+	folderPath := path.Join(folderPaths[:len(folderPaths)-1]...)
 	if !strings.HasSuffix(folderPath, "/") {
 		folderPath = folderPath + "/"
 	}

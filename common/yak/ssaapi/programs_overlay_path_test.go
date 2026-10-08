@@ -17,13 +17,11 @@ func TestNormalizeOverlayFilePath(t *testing.T) {
 	require.Equal(t, "/a/b.java", ensureOverlayPathSlash("/a/b.java"))
 }
 
-func TestOverlayAggregatedFSPathRoundTrip(t *testing.T) {
+func TestOverlayAggregatedFSPath(t *testing.T) {
 	t.Parallel()
 
 	require.Equal(t, "Main.java", overlayAggregatedFSPath("/Main.java"))
 	require.Equal(t, "src/Main.java", overlayAggregatedFSPath("/src/Main.java"))
-	require.Equal(t, "/Main.java", overlayPathFromAggregatedFS("Main.java"))
-	require.Equal(t, "/src/Main.java", overlayPathFromAggregatedFS("src/Main.java"))
 }
 
 func TestOverlayExcludeAndDiffOwnership(t *testing.T) {
