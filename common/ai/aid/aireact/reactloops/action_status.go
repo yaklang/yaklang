@@ -9,7 +9,7 @@ import (
 )
 
 // These names are for the user's activity indicator. ActionType remains the
-// stable protocol identifier and is kept in the status detail for diagnostics.
+// stable protocol identifier in action records and execution events.
 type actionStatusName struct{ zh, en string }
 
 var actionStatusNames = map[string]actionStatusName{
@@ -40,7 +40,7 @@ func statusNameForAction(name string) actionStatusName {
 	if label, ok := actionStatusNames[name]; ok {
 		return label
 	}
-	return actionStatusName{zh: fmt.Sprintf("执行「%s」动作", name), en: fmt.Sprintf("running the %s action", name)}
+	return actionStatusName{zh: "执行操作", en: "performing an action"}
 }
 
 func (r *ReActLoop) actionBatchStatusNames(names []string) (zh, en string) {
@@ -73,10 +73,10 @@ func (r *ReActLoop) actionBatchStatusNames(names []string) (zh, en string) {
 func (a *LoopAction) GetVerboseNameI18n() schema.I18n {
 	label := statusNameForAction(a.ActionType)
 	if a.VerboseNameI18n != nil {
-		if v := strings.TrimSpace(a.VerboseNameI18n.Zh); v != "" {
+		if v := strings.TrimSpace(a.VerboseNameI18n.Zh); v != "" && v != a.ActionType {
 			label.zh = v
 		}
-		if v := strings.TrimSpace(a.VerboseNameI18n.En); v != "" {
+		if v := strings.TrimSpace(a.VerboseNameI18n.En); v != "" && v != a.ActionType {
 			label.en = v
 		}
 	}
@@ -93,10 +93,10 @@ func (r *ReActLoop) statusNameForAction(name string) actionStatusName {
 	}
 	label := statusNameForAction(name)
 	if meta, ok := GetLoopMetadata(name); ok {
-		if v := strings.TrimSpace(meta.VerboseNameZh); v != "" {
+		if v := strings.TrimSpace(meta.VerboseNameZh); v != "" && v != name {
 			label.zh = v
 		}
-		if v := strings.TrimSpace(meta.VerboseName); v != "" {
+		if v := strings.TrimSpace(meta.VerboseName); v != "" && v != name {
 			label.en = v
 		}
 	}
@@ -113,15 +113,47 @@ func (r *ReActLoop) statusNameForCall(action *aicommon.Action) actionStatusName 
 	if action.Name() != schema.AI_REACT_LOOP_ACTION_DIRECTLY_CALL_TOOL {
 		return label
 	}
-	var names []string
+	var names, zhNames, enNames []string
 	for _, name := range extractToolNamesFromAction(action) {
 		if !containsStatusName(names, name) {
 			names = append(names, name)
+			display := r.StatusToolLabel(name)
+			zhNames, enNames = append(zhNames, display.Zh), append(enNames, display.En)
 		}
 	}
 	if len(names) > 0 {
-		label.zh = "工具调用（" + joinedStatusNames(names, false) + "）"
-		label.en = "tool calls (" + joinedStatusNames(names, true) + ")"
+		label.zh = "工具调用（" + joinedStatusNames(zhNames, false) + "）"
+		label.en = "tool calls (" + joinedStatusNames(enNames, true) + ")"
+	}
+	return label
+}
+
+// StatusToolLabel keeps protocol identifiers out of user-visible status text.
+// A one-language display name can serve both languages; missing metadata uses
+// a neutral label while StatusTool.Name retains the identity for consumers.
+func (r *ReActLoop) StatusToolLabel(name string) schema.I18n {
+	label := schema.I18n{}
+	if r != nil {
+		if cfg := r.GetConfig(); cfg != nil && cfg.GetAiToolManager() != nil {
+			if tool, err := cfg.GetAiToolManager().GetToolByName(name); err == nil && tool != nil {
+				label.Zh, label.En = strings.TrimSpace(tool.GetVerboseNameZh()), strings.TrimSpace(tool.GetVerboseName())
+			}
+		}
+	}
+	if label.Zh == name {
+		label.Zh = ""
+	}
+	if label.En == name {
+		label.En = ""
+	}
+	if label.Zh == "" {
+		label.Zh = label.En
+	}
+	if label.En == "" {
+		label.En = label.Zh
+	}
+	if label.Zh == "" {
+		label = schema.I18n{Zh: "工具", En: "tool"}
 	}
 	return label
 }

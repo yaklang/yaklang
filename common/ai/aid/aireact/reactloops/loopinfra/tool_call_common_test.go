@@ -38,7 +38,9 @@ func TestHandleToolCallResult_RetryPreservesNamedStatusWithoutExecution(t *testi
 			require.Len(t, statuses, 1)
 			require.Equal(t, "tool.retrying", statuses[0].Code)
 			require.Equal(t, aicommon.StatusStateRecovering, statuses[0].State)
-			require.Contains(t, statuses[0].Value, "read_file")
+			require.NotContains(t, statuses[0].Value, "read_file")
+			require.Contains(t, statuses[0].Value, "工具")
+			require.Equal(t, "read_file", statuses[0].Tools[0].Name)
 		})
 	}
 }

@@ -37,7 +37,7 @@ type responseActivity struct {
 	loop            *ReActLoop
 	allowed         map[string]bool
 	closed          bool
-	actions         []string
+	currentCall     string
 	calls           map[string]string
 	callOrder       []string
 	tools           map[string][]string
@@ -154,11 +154,30 @@ func (a *responseActivity) content() {
 		return
 	}
 	a.startOutput()
-	if a.contentStarted || len(a.actions) > 0 {
+	a.contentStarted = true
+	const text = "正在生成回复正文…"
+	if a.lastText == text {
+		return
+	}
+	a.lastText = text
+	a.loop.UserStatus(text, "Writing the response content…", aicommon.WithStatusCode("response.writing"))
+}
+
+// Text mode is generating an action envelope. Its bytes must not be presented
+// as reply content while we wait for the first decoded action or display field.
+func (a *responseActivity) envelope() {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	if a.closed {
+		return
+	}
+	a.startOutput()
+	if a.contentStarted || a.fieldStarted || a.currentCall != "" {
 		return
 	}
 	a.contentStarted = true
-	a.loop.UserStatus("正在回复…", "Responding…", aicommon.WithStatusCode("response.writing"))
+	a.lastText = "正在准备下一步操作…"
+	a.loop.UserStatus(a.lastText, "Preparing the next action…", aicommon.WithStatusCode("response.preparing"))
 }
 
 func (a *responseActivity) prepare(id, name string) {
@@ -170,11 +189,11 @@ func (a *responseActivity) prepare(id, name string) {
 	a.startOutput()
 	if _, exists := a.calls[id]; !exists {
 		a.callOrder = append(a.callOrder, id)
+		a.currentCall = id
+	} else if a.currentCall != id || a.calls[id] == name {
+		return
 	}
 	a.calls[id] = name
-	if !containsStatusName(a.actions, name) {
-		a.actions = append(a.actions, name)
-	}
 	a.emitPreparing()
 }
 
@@ -182,6 +201,9 @@ func (a *responseActivity) identifyCall(previous, id string) {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	if name, exists := a.calls[previous]; exists {
+		if a.currentCall == previous {
+			a.currentCall = id
+		}
 		a.calls[id] = name
 		delete(a.calls, previous)
 		a.tools[id] = a.tools[previous]
@@ -229,10 +251,11 @@ func (a *responseActivity) field(id string, key string, value any, parents []str
 		return
 	}
 	name = strings.TrimSpace(name)
-	if !containsStatusName(a.tools[id], name) {
-		a.tools[id] = append(a.tools[id], name)
+	if containsStatusName(a.tools[id], name) {
+		return
 	}
-	if a.calls[id] == schema.AI_REACT_LOOP_ACTION_DIRECTLY_CALL_TOOL {
+	a.tools[id] = append(a.tools[id], name)
+	if id == a.currentCall && a.calls[id] == schema.AI_REACT_LOOP_ACTION_DIRECTLY_CALL_TOOL {
 		a.emitPreparing()
 	}
 }
@@ -248,7 +271,7 @@ func (a *responseActivity) reason(data []byte) {
 	}
 	now := time.Now()
 	a.startOutput()
-	if len(a.actions) > 0 || a.contentStarted || a.fieldStarted {
+	if a.currentCall != "" || a.contentStarted || a.fieldStarted {
 		return
 	}
 	if !a.lastReason.IsZero() && now.Sub(a.lastReason) < 6*time.Second {
@@ -261,59 +284,40 @@ func (a *responseActivity) reason(data []byte) {
 	a.loop.UserStatus(label.zh, label.en, aicommon.WithStatusCode("reasoning.thinking"))
 }
 
+// The latest discovered call owns the indicator until fresh content or the next
+// call arrives. Earlier argument readers may finish later without reclaiming it.
 func (a *responseActivity) emitPreparing() {
-	var zhNames, enNames []string
+	name := a.calls[a.currentCall]
+	label := a.loop.statusNameForAction(name)
 	var tools []aicommon.StatusTool
-	for _, name := range a.actions {
-		label := a.loop.statusNameForAction(name)
-		if name == schema.AI_REACT_LOOP_ACTION_DIRECTLY_CALL_TOOL {
-			label = actionStatusName{zh: "工具", en: "tools"}
-			var names []string
-			// Preserve provider discovery order across distinct calls.
-			for _, id := range a.callOrder {
-				if a.calls[id] != name {
-					continue
-				}
-				for _, tool := range a.tools[id] {
-					if !containsStatusName(names, tool) {
-						names = append(names, tool)
-					}
-				}
-			}
-			var zhTools, enTools []string
-			for _, toolName := range names {
-				toolLabel := a.toolLabel(toolName)
-				tools = append(tools, aicommon.StatusTool{Name: toolName, DisplayName: toolLabel.Zh,
-					DisplayNameI18n: &toolLabel, State: aicommon.StatusStateRunning})
-				zhLabel, enLabel := toolLabel.Zh, toolLabel.En
-				if zhLabel != toolName {
-					zhLabel += "（" + toolName + "）"
-				}
-				if enLabel != toolName {
-					enLabel += " (" + toolName + ")"
-				}
-				zhTools, enTools = append(zhTools, zhLabel), append(enTools, enLabel)
-			}
-			if len(names) > 0 {
-				label.zh = joinedStatusNames(zhTools, false)
-				label.en = joinedStatusNames(enTools, true)
-			}
+	zh, en := "正在准备："+label.zh, "Preparing: "+label.en
+	if name == schema.AI_REACT_LOOP_ACTION_DIRECTLY_CALL_TOOL {
+		var zhTools, enTools []string
+		for _, toolName := range a.tools[a.currentCall] {
+			toolLabel := a.toolLabel(toolName)
+			tools = append(tools, aicommon.StatusTool{Name: toolName, DisplayName: toolLabel.Zh,
+				DisplayNameI18n: &toolLabel, State: aicommon.StatusStateRunning})
+			zhTools, enTools = append(zhTools, toolLabel.Zh), append(enTools, toolLabel.En)
 		}
-		zhNames, enNames = append(zhNames, label.zh), append(enNames, label.en)
-	}
-	zh, en := "正在调用"+joinedStatusNames(zhNames, false), "Calling: "+joinedStatusNames(enNames, true)
-	if len(a.actions) == 1 && a.actions[0] == nativeAdjustTodolistActionName {
+		zh, en = "正在准备工具调用…", "Preparing a tool call…"
+		if len(tools) > 0 {
+			zh, en = "正在准备工具："+joinedStatusNames(zhTools, false), "Preparing tools: "+joinedStatusNames(enTools, true)
+		}
+	} else if name == nativeAdjustTodolistActionName {
 		zh, en = "调整待办事项中…", "Updating the task list…"
+	}
+	code := "action.preparing"
+	if len(a.callOrder) > 1 {
+		code = "action.batch.preparing"
+		zh += fmt.Sprintf("（第 %d 个调用）", len(a.callOrder))
+		en += fmt.Sprintf(" (call %d)", len(a.callOrder))
 	}
 	if zh == a.lastText {
 		return
 	}
 	a.lastText = zh
-	code := "action.preparing"
-	if len(a.calls) > 1 {
-		code = "action.batch.preparing"
-	}
-	a.loop.UserStatus(zh, en, aicommon.WithStatusCode(code), aicommon.WithStatusTools(tools...))
+	a.loop.UserStatus(zh, en, aicommon.WithStatusCode(code), aicommon.WithStatusTools(tools...),
+		aicommon.WithStatusProgress(int64(len(a.callOrder)), 0, "call"))
 }
 
 // Observe actual decoded field bytes, before a display prefix is added. An
@@ -322,6 +326,10 @@ func (a *responseActivity) displayField(id, field string) {
 	var label actionStatusName
 	var code string
 	switch field {
+	case "answer_payload", "answer":
+		label, code = actionStatusName{"正在生成回复正文…", "Writing the response content…"}, "response.writing"
+	case "summary":
+		label, code = actionStatusName{"正在撰写总结…", "Writing the summary…"}, "response.writing"
 	case "human_readable_thought":
 		label, code = actionStatusName{"正在整理执行说明…", "Preparing an execution note…"}, "response.noting"
 	case "cumulative_summary":
@@ -331,15 +339,20 @@ func (a *responseActivity) displayField(id, field string) {
 	}
 	a.mu.Lock()
 	defer a.mu.Unlock()
-	if a.closed || len(a.todoOperations[id]) > 0 || containsStatusName(a.actions, schema.AI_REACT_LOOP_ACTION_DIRECTLY_CALL_TOOL) {
+	if a.closed || len(a.todoOperations[id]) > 0 || a.calls[id] == schema.AI_REACT_LOOP_ACTION_DIRECTLY_CALL_TOOL {
 		return
 	}
 	// Late fields from an earlier call cannot replace the newer call's status.
-	if len(a.callOrder) > 0 && a.callOrder[len(a.callOrder)-1] != id {
+	if a.currentCall != "" && a.currentCall != id {
 		return
 	}
 	a.startOutput()
 	a.fieldStarted = true
+	if name := a.calls[id]; name != "" {
+		actionLabel := a.loop.statusNameForAction(name)
+		label.zh += "（" + actionLabel.zh + "）"
+		label.en += " (" + actionLabel.en + ")"
+	}
 	if a.lastText != label.zh {
 		a.lastText = label.zh
 		a.loop.UserStatus(label.zh, label.en, aicommon.WithStatusCode(code))
@@ -386,7 +399,7 @@ func (a *responseActivity) todoOperation(id, key string, value any, parents []st
 	}
 	a.mu.Lock()
 	defer a.mu.Unlock()
-	if a.closed || len(a.callOrder) > 0 && a.callOrder[len(a.callOrder)-1] != id {
+	if a.closed || a.currentCall != "" && a.currentCall != id {
 		return
 	}
 	if id != "text" && a.calls[id] != nativeAdjustTodolistActionName {
@@ -412,12 +425,7 @@ func (a *responseActivity) toolLabel(name string) schema.I18n {
 	if label, ok := a.toolLabels[name]; ok {
 		return label
 	}
-	label := schema.I18n{Zh: name, En: name}
-	if cfg := a.loop.GetConfig(); cfg != nil && cfg.GetAiToolManager() != nil {
-		if tool, err := cfg.GetAiToolManager().GetToolByName(name); err == nil && tool != nil {
-			label = tool.GetVerboseNameI18n()
-		}
-	}
+	label := a.loop.StatusToolLabel(name)
 	a.toolLabels[name] = label
 	return label
 }

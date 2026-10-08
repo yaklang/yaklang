@@ -2,6 +2,7 @@ package reactloops
 
 import (
 	"io"
+	"strings"
 	"sync"
 
 	"github.com/yaklang/yaklang/common/ai/aispec"
@@ -80,8 +81,12 @@ func (r *activityProviderReader) Read(data []byte) (int, error) {
 		}
 		if r.reason {
 			r.activity.reason(data[:n])
+		} else if r.native {
+			if strings.TrimSpace(string(data[:n])) != "" {
+				r.activity.content()
+			}
 		} else {
-			r.activity.content()
+			r.activity.envelope()
 		}
 		if r.native {
 			r.activity.general.write(data[:n], r.reason)
@@ -192,11 +197,23 @@ func (a *responseActivity) newTextMirror() io.WriteCloser {
 	a.streamClosers = append(a.streamClosers, output)
 	a.mu.Unlock()
 	go func() {
-		_ = jsonextractor.ExtractStructuredJSONFromStream(input, jsonextractor.WithFormatKeyValueCallback(func(key, value any, parents []string) {
+		options := []jsonextractor.CallbackOption{jsonextractor.WithFormatKeyValueCallback(func(key, value any, parents []string) {
 			if key, ok := key.(string); ok {
 				a.field("text", key, value, parents)
 			}
-		}))
+		})}
+		for _, field := range []string{"human_readable_thought", "cumulative_summary", "answer_payload", "answer", "summary"} {
+			field := field
+			options = append(options, jsonextractor.WithRegisterFieldStreamHandler(field, func(_ string, reader io.Reader, parents []string) {
+				if len(parents) != 0 {
+					_, _ = io.Copy(io.Discard, reader)
+					return
+				}
+				observed := &displayFieldReader{Reader: utils.JSONStringReader(reader), onData: func() { a.displayField("text", field) }}
+				_, _ = io.Copy(io.Discard, observed)
+			}))
+		}
+		_ = jsonextractor.ExtractStructuredJSONFromStream(input, options...)
 		_, _ = io.Copy(io.Discard, input)
 	}()
 	return output
