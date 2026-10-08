@@ -158,7 +158,9 @@ func aiContentSlice(s string, offset, limit int) (string, int, bool) {
 // QueryYakProjects lists real project databases across folders from the profile
 // registry located through the existing YAKIT_HOME/default home infrastructure.
 func QueryYakProjects(keyword string, opts ...AIQueryOption) (map[string]any, error) {
-	c, err := aiQueryOptions(opts)
+	// Project listings have no content chunks. Do not let the default 2048
+	// character content budget reject the advertised 50 metadata rows.
+	c, err := aiQueryOptions(append([]AIQueryOption{WithAIContentLimit(1)}, opts...))
 	if err != nil {
 		return nil, err
 	}

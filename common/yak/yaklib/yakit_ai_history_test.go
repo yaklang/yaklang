@@ -11,6 +11,28 @@ import (
 	"testing"
 )
 
+func TestMUSTPASS_QueryYakProjectsFullPageLimit(t *testing.T) {
+	profile, err := gorm.Open("sqlite3", filepath.Join(t.TempDir(), "profile.db"))
+	require.NoError(t, err)
+	defer profile.Close()
+	require.NoError(t, profile.AutoMigrate(&schema.Project{}).Error)
+	for i := 0; i < 55; i++ {
+		require.NoError(t, profile.Create(&schema.Project{ProjectName: "project-" + strconv.Itoa(i), DatabasePath: "project-" + strconv.Itoa(i) + ".db", Type: "project"}).Error)
+	}
+	opts := []AIQueryOption{WithAIQueryDatabases(profile, profile), WithAIQueryLimit(50)}
+	first, err := QueryYakProjects("", opts...)
+	require.NoError(t, err)
+	require.Equal(t, 55, first["total"])
+	require.Len(t, first["projects"], 50)
+	require.Equal(t, 50, first["next_offset"])
+	second, err := QueryYakProjects("", append(opts, WithAIQueryOffset(50))...)
+	require.NoError(t, err)
+	require.Len(t, second["projects"], 5)
+	require.Equal(t, 55, second["next_offset"])
+	_, err = QueryYakProjects("", append(opts, WithAIQueryLimit(51))...)
+	require.Error(t, err)
+}
+
 func TestMUSTPASS_QueryHTTPHistoryProjectIDsAndFilters(t *testing.T) {
 	profile, err := gorm.Open("sqlite3", filepath.Join(t.TempDir(), "profile.db"))
 	require.NoError(t, err)
