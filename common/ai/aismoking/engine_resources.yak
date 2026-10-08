@@ -1,0 +1,148 @@
+// yak common/ai/aismoking/engine_resources.yak (run from repository root)
+// Prefer AISMOKING_CASE=engine_resources yak common/ai/aismoking/run.yak for an isolated home.
+// Real aim + builtin Yak tools + SQL + loopback HTTP; only model decisions are fixtures.
+include "common/ai/aismoking/mock.inc"
+assert os.Getenv("YAKIT_HOME") != "", "Use the smoke runner or set a disposable YAKIT_HOME"
+allTools = ["read_memory","amend_memory","grep_timeline_history","query_yak_projects","query_http_history","query_cybersecurity_risk","query_knowledge","manage_knowledge","query_payloads","manage_payloads"]
+config, plan, cursor, awaiting, currentCase, historySeeded = nil, [], 0, false, "", false
+results, toolExecutions, observedValues = [], [], []
+reactOperator=nil
+artifactDirs={}
+namespace, memoryID, previousMemoryID, knowledgeID, entryID, oldEntryID, payloadID, riskID, flowID = "", "", "", 0, 0, 0, 0, 0, 0
+collection, group = "engine-resource-notes-"+randstr(8), "engine-resource-payloads-"+randstr(8)
+httpPort = os.GetRandomAvailableTCPPort()
+httpBase = "http://"+str.HostPort("127.0.0.1",httpPort)
+go httpserver.Serve("127.0.0.1",httpPort,httpserver.context(smokeCtx),httpserver.handler(func(w,req) {
+    if req.URL.Path == "/ready" { w.Write("ready"); return }
+    assert req.URL.Path == "/search"
+    smokeMutex.Lock(); observedValues = append(observedValues,req.URL.Query().Get("q")); smokeMutex.Unlock()
+    w.Header().Set("Content-Type","text/plain")
+    w.Write("echo:"+req.URL.Query().Get("q"))~
+}))
+ready = false
+for i=0;i<100;i++ { _,err=http.Get(httpBase+"/ready"); if err==nil { ready=true;break };time.Sleep(0.02) }
+assert ready
+request = "POST /login HTTP/1.1\r\nHost: engine-fixture.example\r\nContent-Length: 0\r\n\r\n"
+response = "HTTP/1.1 401 Unauthorized\r\nContent-Length: 22\r\n\r\nengine-evidence-denied"
+r = risk.CreateRisk("http://engine-fixture.example/login",risk.title("engine-fixture authentication risk"),risk.severity("high"),risk.description("engine-evidence-denied"),risk.solution("Require authenticated access"),risk.appendPacketPairs(request,response))
+assert len(r.PacketPairs)==1
+flowID=r.PacketPairs[0].HTTPFlowId
+risk.Save(r)~
+riskID = yakit.QueryCybersecurityRisk(`{"Search":"engine-fixture authentication risk"}`)~.hits[0].risk_id
+func addStep(name,params,check) { plan=append(plan,{"name":name,"params":params,"check":check}) }
+func matches(result,needle) { assert needle in json.dumps(result), "result missing "+needle }
+func checkPrevious() {
+    calls=reactOperator.GetCurrentTask().GetAllToolCallResults()
+    assert len(calls)==cursor, sprintf("each scripted decision must execute exactly once: got %d expected %d",len(calls),cursor)
+    actual=calls[len(calls)-1]
+    expected=plan[cursor-1]
+    assert actual.Success && actual.Name==expected.name, string(actual.Error)
+    directory=""
+    for i=0;i<100;i++ { smokeMutex.Lock();directory=artifactDirs[actual.ToolCallID];smokeMutex.Unlock();if directory!=nil && directory!="" { break };time.Sleep(0.01) }
+    assert directory!=nil && directory!="", "tool artifact directory must be emitted"
+    manifest=json.loads(string(file.ReadFile(file.Join(directory,"manifest.json"))~))
+    assert manifest.success && manifest.call_tool_id==actual.ToolCallID
+    value=json.loads(string(file.ReadFile(manifest.files.result.path)~))
+    expected.check(value)
+    toolExecutions=append(toolExecutions,{"case":currentCase,"tool":actual.Name,"params":actual.Param,"result":value,"success":true})
+    file.SaveJson(file.Join(smokeRoot,"tool-executions.json"),toolExecutions)~
+    awaiting=false
+}
+smokeHandler=func(w,body) {
+    native,prompt=len(body.tools)>0,smokePrompt(body)
+    if "SMOKE_CALLER:liteforge[session-title-generator]" in prompt { smokeAnswer(w,native,"session-title-generator",{"session_title":"引擎数据工具实测"});return }
+    if "SMOKE_CALLER:liteforge[perception]" in prompt {
+        smokeAnswer(w,native,"perception",{"summary":"核验隔离引擎数据任务","topics":["引擎数据","工具调用"],"keywords":["knowledge","payload","timeline"],"changed":false,"confidence":1,"intent_shift":"none"});return
+    }
+    if "SMOKE_CALLER:directly-answer" in prompt {
+        w.Header().Set("Content-Type","text/event-stream")
+        smokeFrame(w,{"content":sprintf("已核验 %s 的 %d 次实际工具调用，参数和结果见 tool-executions.json。",currentCase,cursor)},"stop")
+        w.Write("data: [DONE]\n\n")~;return
+    }
+    if "SMOKE_CALLER:verification" in prompt {
+        w.Header().Set("Content-Type","text/event-stream")
+        smokeFrame(w,{"content":`{"@action":"verify-satisfaction","user_satisfied":true,"reasoning":"实际调用结果已按任务条件验证。","evidence":[]}`},"stop")
+        w.Write("data: [DONE]\n\n")~;return
+    }
+    assert "SMOKE_CALLER:react-loop:default" in prompt || "SMOKE_CALLER:react-loop:main" in prompt, "unexpected auxiliary model call"
+    assert "引擎数据检索与管理" in prompt, "engine-data did not auto-load"
+    for name in allTools { assert name in prompt, "missing default tool "+name }
+    if !historySeeded { config.GetTimeline().PushText(1,"engine-history-sentinel：先检查登录接口。");historySeeded=true }
+    if awaiting { checkPrevious() }
+    if cursor==len(plan) { smokeAnswer(w,native,"finish",{});return }
+    action=plan[cursor]
+    if native && !config.GetAiToolManager().IsRecentlyUsedTool(action.name) {
+        smokeAnswer(w,native,"require_tool",{"require_tool_payload":action.name});return
+    }
+    params=action.params()
+    cursor++;awaiting=true
+    smokeAnswer(w,native,"directly_call_tool",{"directly_call_tool_name":action.name,"directly_call_tool_params":params,"directly_call_reason":"执行隔离测试任务："+currentCase})
+}
+scenarios=["memory","history-risk","knowledge","payload-http"]
+if os.Getenv("ENGINE_RESOURCE_CASES")!="" {
+    selected=[]
+    for name in str.Split(os.Getenv("ENGINE_RESOURCE_CASES"),",") { assert name in scenarios, "Unknown ENGINE_RESOURCE_CASES task";selected=append(selected,name) }
+    scenarios=selected
+}
+for native in [false,true] {
+    for scenario in scenarios {
+        currentCase=sprintf("%s/native=%v",scenario,native)
+        plan,cursor,awaiting,config,historySeeded=[],0,false,nil,false
+        namespace="engine-resources-"+randstr(12)
+        task=""
+        if scenario=="memory" {
+            task="记录报告偏好，查询确认，改成证据优先，再查询并删除本次临时偏好。"
+            addStep("amend_memory",func(){return {"operator":"add","content":"engine-memory-original：报告包含复现步骤。","tags":["a,b","报告"]}},func(v){memoryID=v.memory_id;assert memoryID!=""})
+            addStep("read_memory",func(){return {"query":"engine-memory-original","search_mode":"bm25"}},func(v){assert len(v.hits)==1;matches(v,"复现步骤");assert v.hits[0].memory_id==memoryID})
+            addStep("amend_memory",func(){previousMemoryID=memoryID;return {"operator":"change","memory_id":memoryID,"content":"engine-memory-revised：报告先列证据。"}},func(v){memoryID=v.memory_id;assert memoryID!=previousMemoryID})
+            addStep("read_memory",func(){return {"query":"engine-memory-original","search_mode":"bm25"}},func(v){assert len(v.hits)==0})
+            addStep("read_memory",func(){return {"query":"engine-memory-revised","search_mode":"bm25"}},func(v){assert len(v.hits)==1;matches(v,"先列证据")})
+            addStep("amend_memory",func(){return {"operator":"delete","memory_id":memoryID}},func(v){assert v.memory_id==memoryID})
+            addStep("read_memory",func(){return {"query":"engine-memory-revised","search_mode":"bm25"}},func(v){assert len(v.hits)==0})
+        }
+        if scenario=="history-risk" {
+            task="回顾本次调查，搜索 engine-history-sentinel，再定位登录接口的高危记录，读取证据和关联 HTTP 报文。"
+            addStep("grep_timeline_history",func(){return {"query":"engine-history-sentinel","search_mode":"literal"}},func(v){assert v.session_id==namespace;matches(v,"engine-history-sentinel")})
+            addStep("grep_timeline_history",func(){return {"query":"engine-history-sentinel","search_mode":"regexp","view":"value_json"}},func(v){matches(v,"engine-history-sentinel")})
+            addStep("query_yak_projects",func(){return {"limit":20}},func(v){assert v.yakit_home!=""})
+            addStep("query_cybersecurity_risk",func(){return {"keyword":"engine-fixture authentication risk","severity":"high"}},func(v){assert v.total==1 && v.hits[0].risk_id==riskID})
+            addStep("query_cybersecurity_risk",func(){return {"risk_id":riskID,"content_limit":8192,"limit":1}},func(v){matches(v,"Require authenticated access");assert v.hits[0].http_flow_ids[0]==flowID})
+            addStep("query_http_history",func(){return {"flow_id":flowID,"limit":1}},func(v){matches(v,"POST /login");matches(v,"401 Unauthorized")})
+        }
+        if scenario=="knowledge" {
+            task="把接口认证规则写入知识库，回读后完整替换，再查旧新版本并清理这条临时知识。"
+            addStep("manage_knowledge",func(){return {"operator":"add","collection":collection,"title":"认证规则","content":"engine-knowledge-original：登录接口拒绝匿名访问。","keywords":["认证","a,b"],"questions":["匿名访问如何处理？"]}},func(v){knowledgeID,entryID=v.knowledge_base_id,v.entry_id;assert v.semantic_index_status=="pending"})
+            addStep("query_knowledge",func(){return {"knowledge_base_id":knowledgeID,"query":"engine-knowledge-original"}},func(v){assert v.total==1;matches(v,"拒绝匿名访问")})
+            addStep("manage_knowledge",func(){oldEntryID=entryID;return {"operator":"change","knowledge_base_id":knowledgeID,"entry_id":entryID,"title":"认证规则更新","content":"engine-knowledge-revised：匿名访问返回 401，登录用户还需 CSRF token。"}},func(v){entryID=v.entry_id;assert entryID!=oldEntryID})
+            addStep("query_knowledge",func(){return {"knowledge_base_id":knowledgeID,"entry_id":oldEntryID}},func(v){assert v.total==0})
+            addStep("query_knowledge",func(){return {"knowledge_base_id":knowledgeID,"entry_id":entryID}},func(v){assert v.total==1;matches(v,"CSRF token")})
+            addStep("manage_knowledge",func(){return {"operator":"delete","knowledge_base_id":knowledgeID,"entry_id":entryID}},func(v){assert v.index_status=="deleted"})
+            addStep("query_knowledge",func(){return {"knowledge_base_id":knowledgeID,"entry_id":entryID}},func(v){assert v.total==0})
+        }
+        if scenario=="payload-http" {
+            task="创建两个带特殊字符的字典条目，用 payload FuzzTag 发到本地回显接口，核对原始值，修改并删除临时字典。"
+            observedValues=[]
+            addStep("manage_payloads",func(){return {"operator":"add","group":group,"contents":["a & b","c+\" {{int(1-3)}}"]}},func(v){assert v.affected==2})
+            addStep("query_payloads",func(){return {"group":group}},func(v){assert v.total==2;payloadID=v.hits[0].payload_id;matches(v,"payload("+group+")")})
+            addStep("do_http_request",func(){return {"url":httpBase+"/search","query":{"q":"{{payload("+group+")}}"},"fuzztag":true,"max-requests":2}},func(v){assert v.response_received_count==2;assert len(observedValues)==2;assert "a & b" in observedValues && "c+\" {{int(1-3)}}" in observedValues})
+            addStep("manage_payloads",func(){return {"operator":"change","group":group,"payload_ids":[payloadID],"contents":["replacement,with\nnewline"]}},func(v){assert v.affected==1})
+            addStep("query_payloads",func(){return {"group":group,"payload_id":payloadID}},func(v){assert v.total==1 && v.hits[0].content=="replacement,with\nnewline"})
+            addStep("manage_payloads",func(){return {"operator":"delete","group":group,"payload_ids":[payloadID]}},func(v){assert v.affected==1})
+            addStep("manage_payloads",func(){return {"operator":"delete_group","group":group}},func(v){assert v.affected>=1})
+            addStep("query_payloads",func(){return {"query":group}},func(v){assert v.total==0})
+        }
+        started=time.Now().UnixMilli()
+        die(aim.InvokeReAct(task,aim.sessionID(namespace),aim.context(smokeCtx),aim.timeout(120),aim.maxIteration(24),aim.reviewPolicy("yolo"),aim.disableMCPServers(true),aim.disableAIForge(true),aim.workdir(smokeRoot),aim.aiCallback(smokeModel),aim.onEvent(func(op,e){config=op.GetConfig();reactOperator=op;if string(e.Type)=="tool_call_log_dir" { info=json.loads(string(e.Content));smokeMutex.Lock();artifactDirs[info.call_tool_id]=file.Join(info.dir_path,"..");smokeMutex.Unlock() }}),aim.configOptions(aiagent.aiCallback(smokeModel),aiagent.functionCallMode(native),func(c){
+            c.DisableCreateDBRuntime,c.DisablePerception,c.DisableMemoryTriage,c.DisableIntervalReview=true,true,true,true
+            c.MemoryTriageId=namespace
+            c.AiAutoRetry,c.AiTransactionAutoRetry=1,1
+            c.GetTimeline().SetTimelineBucketByteSize(-1)
+            return nil
+        })))
+        assert cursor==len(plan) && !awaiting
+        results=append(results,{"task":scenario,"function_call":native,"tool_calls":cursor,"passed":true,"duration_ms":time.Now().UnixMilli()-started})
+        file.SaveJson(file.Join(smokeRoot,"task-results.json"),results)~
+        printf("PASS task=%s native=%v tool_calls=%d\n",scenario,native,cursor)
+    }
+}
+smokeCheck()

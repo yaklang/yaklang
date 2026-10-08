@@ -48,6 +48,10 @@ Host: example.com
 
 以实际 request packet 和结构化 request/response/status/transport_error 为准：先保留正常基线，一次改变一个变量，比较状态、内容、响应头和耗时；一次未命中不能代表漏洞不存在。
 
+## 使用已有 Payload 字典
+
+先用 `query_payloads` 查看运行时字典的组名、样本和 usage；需要维护时用 `manage_payloads` 的 add/change/delete。将返回的 `{{payload(组名)}}` 放入 do_http_request 的 query/form/body/packet，并设置 fuzztag:true 和 max-requests。原生标签是单数 payload；`payload:full` 保留每条完整多行载荷。文件型字典只读。自动加载的 `engine-data` Skill 提供字典管理、历史流量和风险追溯的连续任务示例。
+
 ## 查看全集
 
 需要更多标签、别名与运行条件，用 `loading_skills` 加载 `skill_name:"fuzztag-reference"`；选好标签后用 exec_fuzztag 验证。

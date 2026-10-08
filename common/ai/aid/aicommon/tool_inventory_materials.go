@@ -9,6 +9,16 @@ import (
 // inventoryPriorityToolNames 是 Tool Inventory 展示优先级名单, 与 capability_inventory fixed 段对齐.
 var inventoryPriorityToolNames = []string{
 	"search_capabilities",
+	"read_memory",
+	"amend_memory",
+	"grep_timeline_history",
+	"query_yak_projects",
+	"query_http_history",
+	"query_cybersecurity_risk",
+	"query_knowledge",
+	"manage_knowledge",
+	"query_payloads",
+	"manage_payloads",
 	"browser.instances.list",
 	"browser.capability.catalog",
 	"browser.capability.call",
