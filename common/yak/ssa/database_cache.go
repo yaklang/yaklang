@@ -301,11 +301,11 @@ func (c *ProgramCache) SaveToDatabase(cb ...func(int)) error {
 					avgBatch = float64(persistStats.WriteOperations) / float64(persistStats.BatchCount)
 				}
 				// Writer summary (v3 §A.3)
-				log.Infof("[ssa-persist-writer-summary] program=%s request=%d enqueued=%d completed=%d write_ops=%d unique_persisted=%d resident=%d pending=%d persisted_instructions=%d batch_count=%d avg_batch=%.2f queue_depth_current=%d pending_current=%d errors=0",
+				log.Infof("[ssa-persist-writer-summary] program=%s request=%d enqueued=%d completed=%d write_ops=%d unique_persisted=%d resident=%d pending=%d persisted_instructions=%d batch_count=%d avg_batch=%.2f queue_depth_current=%d pending_current=%d unchanged_skipped=%d errors=0",
 					progName, persistStats.Requests, persistStats.Enqueued, persistStats.Completed,
 					persistStats.WriteOperations, persistStats.UniquePersisted, persistStats.Resident,
 					persistStats.Pending, persistStats.WriteOperations, persistStats.BatchCount, avgBatch,
-					persistStats.Resident, persistStats.Pending)
+					persistStats.Resident, persistStats.Pending, persistStats.UnchangedSkipped)
 			}
 			return nil
 		},
