@@ -350,7 +350,3 @@ func mergeExtraFileStubs(progName string, vf *filesys.VirtualFS) {
 		vf.AddFile(vfPath, "")
 	}
 }
-
-func irSourceJoin(element ...string) string {
-	return path.Join(element...)
-}

@@ -30,24 +30,6 @@ func ParseProjectWithFS(fs fi.FileSystem, opts ...ssaconfig.Option) (Programs, e
 	return ParseProject(opts...)
 }
 
-// ParseProjectWithIncrementalCompile runs incremental compile when baseProgramName is set.
-// The result program exposes overlay via GetOverlay().
-func ParseProjectWithIncrementalCompile(
-	newFS fi.FileSystem,
-	baseProgramName, diffProgramName string,
-	language ssaconfig.Language,
-	opts ...ssaconfig.Option,
-) (Programs, error) {
-	incrementalOpts := []ssaconfig.Option{
-		WithFileSystem(newFS),
-		WithBaseProgramName(baseProgramName),
-		WithProgramName(diffProgramName),
-		WithLanguage(language),
-	}
-	incrementalOpts = append(incrementalOpts, opts...)
-	return ParseProject(incrementalOpts...)
-}
-
 func PeepholeCompile(fs fi.FileSystem, size int, opts ...ssaconfig.Option) (Programs, error) {
 	opts = append(opts, WithFileSystem(fs), WithPeepholeSize(size))
 	return ParseProject(opts...)
@@ -160,6 +142,64 @@ func ParseProject(opts ...ssaconfig.Option) (prog Programs, err error) {
 	return config.parseProject()
 }
 
+// compileMode resolves, in one place, whether a config participates in the
+// incremental/overlay compile flow. The raw EnableIncrementalCompile /
+// BaseProgramName pair is intentionally inconsistent during an internal diff
+// compile — CompileDiffProgramAndSaveToDB turns the enable flag off to avoid
+// recursing into ParseProject while keeping BaseProgramName so the diff
+// program still persists overlay metadata — so downstream code must ask
+// compileMode() instead of re-deriving the state from the two flags.
+type compileMode int
+
+const (
+	// compileModeFull：普通全量编译，不参与任何增量编译序列。
+	compileModeFull compileMode = iota
+	// compileModeIncrementalBase：增量序列的首个编译。实际执行的是一次全量编译，
+	// 只是产物会被标记为后续差量编译的 overlay 基座（IsOverlay + OverlayLayers）。
+	compileModeIncrementalBase
+	// compileModeIncrementalDiff：基于 base program 的差量编译，只编译变更文件。
+	// 内部 diff 编译（CompileDiffProgramAndSaveToDB）也处于此模式：它为了防递归
+	// 关闭了 EnableIncrementalCompile，但仍携带 BaseProgramName。
+	compileModeIncrementalDiff
+)
+
+func (c *Config) compileMode() compileMode {
+	if c.GetBaseProgramName() != "" {
+		return compileModeIncrementalDiff
+	}
+	if c.GetEnableIncrementalCompile() {
+		return compileModeIncrementalBase
+	}
+	return compileModeFull
+}
+
+// cleanupProgramBeforeCompile clears programName's old IR rows before a full
+// compile re-inserts under the same name: the UNIQUE indexes on
+// ir_codes/ir_offsets otherwise reject the re-inserted rows (e.g.
+// recompiling the same program twice in the risk-disposal inheritance test;
+// mirrors the delete-then-insert contract documented in SaveIrOffsetBatch).
+// forced (an explicit recompile) always clears; a plain compile only clears
+// when the program already exists in the database.
+func (c *Config) cleanupProgramBeforeCompile(programName string, forced bool) error {
+	stage := "recompile project, delete old data"
+	if !forced {
+		if programName == "" {
+			return nil
+		}
+		if _, err := ssadb.GetProgram(programName, ssadb.Application); err != nil {
+			return nil // program does not exist yet, nothing to clear
+		}
+		stage = "recompile project, delete old data for existing program"
+	}
+	c.Processf(0, "%s...", stage)
+	if err := ssadb.DeleteProgramIrCode(ssadb.GetDB(), programName); err != nil {
+		return utils.Wrap(err, "failed to clear old IR data before compile")
+	}
+	ProgramCache.Remove(programName)
+	c.Processf(0, "%s finish", stage)
+	return nil
+}
+
 func (c *Config) parseProject() (progs Programs, err error) {
 	// Wire up debug/pprof output when debug_dir is set.
 	// Keep the shared Postgres SSA IR DB (redirectSSADB=false) so the
@@ -168,13 +208,19 @@ func (c *Config) parseProject() (progs Programs, err error) {
 	defer debugCleanup()
 
 	programName := c.GetProgramName()
-	isIncrementalCompile := c.GetEnableIncrementalCompile() && c.fs != nil
-	isDiffCompile := isIncrementalCompile && c.GetBaseProgramName() != ""
-	var programNameToDelete string
-	if isDiffCompile {
+	// Routing mode: the incremental paths diff against a filesystem, so a
+	// config without one degrades to a full compile regardless of the flags.
+	mode := c.compileMode()
+	if mode != compileModeFull && c.fs == nil {
+		mode = compileModeFull
+	}
+
+	// Roll back the program this compile produces on failure or panic: a
+	// diff compile writes a fresh program (latest name) and must never take
+	// the base down with it; everything else rolls back its own name.
+	programNameToDelete := programName
+	if mode == compileModeIncrementalDiff {
 		programNameToDelete = c.GetLatestProgramName()
-	} else {
-		programNameToDelete = programName
 	}
 	defer func() {
 		c.Cleanup()
@@ -195,39 +241,21 @@ func (c *Config) parseProject() (progs Programs, err error) {
 		}
 	}()
 
-	if c.GetCompileReCompile() {
-		if !isIncrementalCompile {
-			c.Processf(0, "recompile project, delete old data...")
-			if err := ssadb.DeleteProgramIrCode(ssadb.GetDB(), programName); err != nil {
-				return nil, utils.Wrap(err, "failed to clear old IR data before recompile")
-			}
-			ProgramCache.Remove(programName)
-			c.Processf(0, "recompile project, delete old data finish")
-		} else {
+	// Old IR rows must go before a full compile re-inserts under the same
+	// name; an incremental compile keeps its base program untouched.
+	if mode != compileModeFull {
+		if c.GetCompileReCompile() {
 			c.Processf(0, "recompile incremental project, keep base program...")
 		}
-	} else if !isIncrementalCompile && programName != "" {
-		// A non-incremental full compile of an already-existing program name
-		// must clear the program's old IR rows before re-inserting. The
-		// UNIQUE indexes on ir_codes/ir_offsets otherwise reject the
-		// re-inserted rows (e.g. recompiling the same program twice in the
-		// risk-disposal inheritance test). This mirrors the delete-then-insert
-		// contract documented in SaveIrOffsetBatch.
-		if _, err := ssadb.GetProgram(programName, ssadb.Application); err == nil {
-			c.Processf(0, "recompile project, delete old data for existing program...")
-			if err := ssadb.DeleteProgramIrCode(ssadb.GetDB(), programName); err != nil {
-				return nil, utils.Wrap(err, "failed to clear old IR data before compile")
-			}
-			ProgramCache.Remove(programName)
-			c.Processf(0, "recompile project, delete old data for existing program finish")
-		}
+	} else if err := c.cleanupProgramBeforeCompile(programName, c.GetCompileReCompile()); err != nil {
+		return nil, err
 	}
 
 	c.Processf(0, "recompile project, start compile")
 
-	if isIncrementalCompile {
+	if mode != compileModeFull {
 		var prog *Program
-		if isDiffCompile {
+		if mode == compileModeIncrementalDiff {
 			c.Processf(0.02, "incremental compile detected, base program: %s", c.GetBaseProgramName())
 			prog, err = c.parseProjectWithIncrementalCompile()
 		} else {
@@ -246,7 +274,7 @@ func (c *Config) parseProject() (progs Programs, err error) {
 		if c.structScan != nil && c.structScan.wantsScan() {
 			c.structScan.skipped = true
 			c.structScan.skipReason = "peephole compile"
-			log.Warnf("[struct_scan] skipped: peephole compile")
+			log.Warnf("[struct_scan] skipped: %s", c.structScan.skipReason)
 		}
 		if progs, err = c.peephole(); err != nil {
 			return nil, err
@@ -391,23 +419,12 @@ func overlayAggregatedFSPath(canonical string) string {
 	return p
 }
 
-func overlayPathFromAggregatedFS(vfsPath string) string {
-	if vfsPath == "" || vfsPath == "." {
-		return "/"
-	}
-	return ensureOverlayPathSlash(vfsPath)
-}
-
-func removeProgramNamePrefixFromFS(fs fi.FileSystem, programName string) (fi.FileSystem, error) {
-	if fs == nil {
-		return nil, utils.Errorf("file system is nil")
-	}
-	if programName == "" {
-		return fs, nil
-	}
-	// Aggregated paths are already stored without the program name. This hook
-	// only rewrites a leftover prefix on lookup, and leaves "." unchanged so
-	// VirtualFS listings still resolve.
+// wrapBaseFSWithoutProgramPrefix rewrites leftover "/{programName}/..." path
+// prefixes into program-relative paths on lookup, so the diff engine can walk
+// an aggregated base FS with plain relative paths. Aggregated paths are
+// already stored without the program name; "." is left unchanged so VirtualFS
+// listings still resolve.
+func wrapBaseFSWithoutProgramPrefix(fs fi.FileSystem, programName string) fi.FileSystem {
 	hooked := filesys.NewHookFS(fs)
 	hooked.SetPathHook(func(name string) (string, error) {
 		if name == "" || name == "." || name == "/" {
@@ -419,7 +436,7 @@ func removeProgramNamePrefixFromFS(fs fi.FileSystem, programName string) (fi.Fil
 		}
 		return strings.TrimPrefix(cleaned, "/"), nil
 	})
-	return hooked, nil
+	return hooked
 }
 
 func buildFileSystemFromProgramName(programName string) (fi.FileSystem, error) {
@@ -477,6 +494,33 @@ func buildFileSystemFromProgramName(programName string) (fi.FileSystem, error) {
 
 var buildFileSystemFromProgramNameForIncremental = buildFileSystemFromProgramName
 
+// resolveBaseOverlay 判断差量编译的 base program 自身是否是增量编译产物
+// （"对增量项目做增量编译"的情况），是则返回它的 overlay：
+//   - 优先使用从 OverlayLayers 元数据还原的 overlay（FromDatabase 加载时恢复）；
+//   - 元数据缺失/损坏且 base 是差量 program 时，回退为
+//     "base 的 base + base" 两层重建。
+// 返回 nil 表示 base 是普通全量编译 program。
+// 约定：返回非 nil 时 Base 与 Diff 必然就绪，可直接用于 extendOverlayWithNewLayer。
+func (c *Config) resolveBaseOverlay(baseProgram *Program) (*ProgramOverLay, error) {
+	if overlay := baseProgram.GetOverlay(); overlay != nil && overlay.Base != nil && len(overlay.Diff) > 0 {
+		c.Processf(0.08, "base program is an overlay with %d layers", overlay.ProgramCount())
+		return overlay, nil
+	}
+	if !baseProgram.IsIncrementalCompile() || baseProgram.IsBaseProgram() {
+		return nil, nil
+	}
+	baseBaseProgram, err := FromDatabase(baseProgram.GetBaseProgramName())
+	if err != nil {
+		return nil, utils.Wrapf(err, "failed to load base program's base program: %s", baseProgram.GetBaseProgramName())
+	}
+	overlay := NewProgramOverLay(baseBaseProgram, baseProgram)
+	if overlay == nil {
+		return nil, utils.Errorf("failed to create overlay for diff base program")
+	}
+	c.Processf(0.08, "base program is a diff program, created overlay with 2 layers")
+	return overlay, nil
+}
+
 func (c *Config) parseProjectWithIncrementalCompile() (*Program, error) {
 	baseProgramName := c.GetBaseProgramName()
 	c.Processf(0.03, "loading base program from database: %s", baseProgramName)
@@ -486,41 +530,21 @@ func (c *Config) parseProjectWithIncrementalCompile() (*Program, error) {
 	}
 	c.Processf(0.06, "base program loaded: %s", baseProgram.GetProgramName())
 
-	var baseOverlay *ProgramOverLay
-	var baseFSForDiff fi.FileSystem
+	// 情况判定收敛到一个决策点：非 nil = base 自身是增量产物（情况4），nil = 普通全量（情况3）
+	baseOverlay, err := c.resolveBaseOverlay(baseProgram)
+	if err != nil {
+		return nil, err
+	}
 
-	baseOverlay = baseProgram.GetOverlay()
-	if baseOverlay != nil && baseOverlay.Base != nil && len(baseOverlay.Diff) > 0 {
+	// diff 的基准文件系统：情况4 直接取 base overlay 的聚合 FS；情况3 从数据库/配置重建
+	var baseFSForDiff fi.FileSystem
+	if baseOverlay != nil {
 		aggregatedFS := baseOverlay.GetAggregatedFileSystem()
 		if aggregatedFS == nil {
 			return nil, utils.Errorf("base overlay has no aggregated file system")
 		}
-		baseFSForDiff, err = removeProgramNamePrefixFromFS(aggregatedFS, baseProgramName)
-		if err != nil {
-			return nil, utils.Wrapf(err, "failed to remove program name prefix from aggregated file system")
-		}
-		c.Processf(0.08, "base program is an overlay with %d layers", baseOverlay.ProgramCount())
-	} else if baseProgram.IsIncrementalCompile() && !baseProgram.IsBaseProgram() {
-		baseProgramName := baseProgram.GetBaseProgramName()
-		baseBaseProgram, err := FromDatabase(baseProgramName)
-		if err != nil {
-			return nil, utils.Wrapf(err, "failed to load base program's base program: %s", baseProgramName)
-		}
-		baseOverlay = NewProgramOverLay(baseBaseProgram, baseProgram)
-		if baseOverlay == nil {
-			return nil, utils.Errorf("failed to create overlay for diff base program")
-		}
-		aggregatedFS := baseOverlay.GetAggregatedFileSystem()
-		if aggregatedFS == nil {
-			return nil, utils.Errorf("base overlay has no aggregated file system")
-		}
-		baseFSForDiff, err = removeProgramNamePrefixFromFS(aggregatedFS, baseProgramName)
-		if err != nil {
-			return nil, utils.Wrapf(err, "failed to remove program name prefix from aggregated file system")
-		}
-		c.Processf(0.08, "base program is a diff program, created overlay with 2 layers")
+		baseFSForDiff = wrapBaseFSWithoutProgramPrefix(aggregatedFS, baseProgramName)
 	} else {
-		var err error
 		baseFSForDiff, err = buildFileSystemFromProgramNameForIncremental(baseProgramName)
 		if err == nil && baseFSForDiff != nil {
 			c.Processf(0.08, "base program is a full compilation program, rebuilt file system from program name")
@@ -551,9 +575,9 @@ func (c *Config) parseProjectWithIncrementalCompile() (*Program, error) {
 	c.Processf(0.8, "diff program compiled: %s", diffProgram.GetProgramName())
 
 	c.Processf(0.85, "creating program overlay...")
+	// 情况4：在 base overlay 上追加一层；情况3：与 base 组成两层 overlay
 	var overlay *ProgramOverLay
-
-	if baseOverlay != nil && baseOverlay.Base != nil && len(baseOverlay.Diff) > 0 {
+	if baseOverlay != nil {
 		overlay = extendOverlayWithNewLayer(baseOverlay, diffProgram)
 	} else {
 		overlay = NewProgramOverLay(baseProgram, diffProgram)

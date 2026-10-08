@@ -503,7 +503,7 @@ func (c *Config) parseProjectWithFSUnits(
 		// paths to preserve its overlay semantics.
 		// Skip both for incremental compile to preserve overlay.
 		flushThreshold := flushCompileUnitThreshold()
-		isIncremental := c.GetEnableIncrementalCompile() || c.GetBaseProgramName() != ""
+		isIncremental := c.compileMode() != compileModeFull
 		flushedUnits := make(map[string]bool)
 		if !prog.RunDeferredBuildsForUnitsWithUnitCallback(unitKeys,
 			func(index int, total int) bool {
@@ -628,7 +628,7 @@ func (c *Config) parseProjectWithFSUnits(
 	// boundary instructions (Function/BasicBlock) resident instead of ~2.6M
 	// ordinary instructions that would otherwise be marshaled and GC-scanned
 	// during the final flush.
-	if !(c.GetEnableIncrementalCompile() || c.GetBaseProgramName() != "") &&
+	if c.compileMode() == compileModeFull &&
 		prog.DatabaseKind != ssa.ProgramCacheMemory && prog.Cache != nil {
 		prog.Cache.FlushCompileUnit("final")
 		prog.Cache.FlushInstructionSaver()
