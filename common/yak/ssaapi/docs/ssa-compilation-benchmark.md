@@ -254,7 +254,7 @@ count reduction without comparing heap profiles and controlled measurements.
 
 ## SQLite final IR updates (2026-09-30)
 
-The resident-cache final flush still writes a fresh snapshot: instructions can
+The resident-cache final flush checks a fresh snapshot: instructions can
 change in place after an incremental flush, so a persisted ID alone is not a
 safe reason to skip that write. With the production `(program_name, code_id)`
 unique index, `SaveIrCodeBatch` now uses SQLite `ON CONFLICT DO UPDATE` in bounded
@@ -269,4 +269,39 @@ already persisted before final close. Its 11:56 and 12:01 goroutine snapshots
 both showed the final flush in `bulkUpsertIrCode`'s SQLite delete. That run exited
 137 and is incomplete performance evidence. The failure-preservation and
 row-identity regressions fail with the old implementation and pass with native
-UPSERT. End-to-end time and memory still require completed project runs.
+UPSERT. Completed runs for that source snapshot are recorded under
+`/mnt/data/scan-outputs/ir-upsert-20260930-1438/summary.md`.
+
+## Resident IR change detection (2026-10-08)
+
+The resident fast path now remembers a fingerprint of each successfully saved
+IR payload. Final flush still checks the resident instructions, but skips
+unchanged payloads before issuing any database write. New IDs use INSERT;
+changed saved IDs use UPSERT. The fingerprint covers the entire serialized
+`IrCode` columns, including zero values and in-place relation slice/map edits.
+Custom fields use their SQL `driver.Valuer` representation: `Int64Map` has
+private key/value fields that ordinary JSON cannot preserve, and nil/empty
+slices that write the same SQL string must compare equally.
+Strings use the database write hook's normalization; GORM row identity and
+timestamps are excluded. The fingerprint is updated only after a
+successful database transaction, so a failed change remains eligible for retry.
+
+The original GoBlog final close rewrote all 504000 resident instructions,
+bringing write operations to 1008000. That full rewrite is no longer the
+resident fast path's policy. `unchanged_skipped` in the writer summary counts
+snapshots omitted from persistence; `write_ops` continues to count actual
+successful row writes. Instructions remain resident for compile/query reuse.
+
+This reduces database modification work; it does not remove the final
+snapshot/hash pass or claim version tracking for the separate writer cache.
+SQL-trigger regressions reject updates to unchanged rows, while additional
+regressions cover new rows, in-place changes, zero values and failed-save retry.
+
+Completed GoBlog evidence is in
+`/mnt/data/scan-outputs/ir-delta-20261008-1057/goblog-final/`: exit 0,
+497029 unique IR rows, 1457 final updates, 495572 unchanged snapshots skipped,
+and 498486 total row writes. Final cache flush took 10.882s; process wall time
+was 4m54.65s with the existing GC/memory settings. This omits 99.7% of the
+updates that a full resident rewrite would issue in this run. Different host
+conditions and IR counts from earlier runs prevent a controlled speedup or
+exact structural-equivalence claim.
