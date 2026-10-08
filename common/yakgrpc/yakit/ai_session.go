@@ -117,6 +117,11 @@ func DeleteAISession(projectDB *gorm.DB, sessionId string) (deletedRuntimes int6
 		return deletedRuntimes, 0, err
 	}
 
+	if projectDB.HasTable(&schema.AITimelineHistory{}) {
+		if err = projectDB.Where("session_id = ?", sessionId).Unscoped().Delete(&schema.AITimelineHistory{}).Error; err != nil {
+			return deletedRuntimes, 0, err
+		}
+	}
 	deletedEvents, err = DeleteAIEventBySessionID(projectDB, sessionId)
 	if err != nil {
 		return deletedRuntimes, 0, err
@@ -130,7 +135,7 @@ func DeleteAISession(projectDB *gorm.DB, sessionId string) (deletedRuntimes int6
 }
 
 // DeleteAllAISessionData deletes all session-scoped data from projectDB:
-// - AISession meta, AIAgentRuntime, AiCheckpoint, AiOutputEvent + associations, AISessionPlanAndExec
+// - AISession meta, AIAgentRuntime, AiCheckpoint, AiOutputEvent + associations, AITimelineHistory, AISessionPlanAndExec
 func DeleteAllAISessionData(projectDB *gorm.DB) (deletedSessions int64, deletedRuntimes int64, deletedEvents int64, deletedPlanExec int64, err error) {
 	if projectDB == nil {
 		return 0, 0, 0, 0, utils.Errorf("projectDB is nil")
@@ -153,6 +158,11 @@ func DeleteAllAISessionData(projectDB *gorm.DB) (deletedSessions int64, deletedR
 		return deletedSessions, deletedRuntimes, 0, 0, err
 	}
 
+	if projectDB.HasTable(&schema.AITimelineHistory{}) {
+		if err = projectDB.Unscoped().Where("1 = 1").Delete(&schema.AITimelineHistory{}).Error; err != nil {
+			return deletedSessions, deletedRuntimes, 0, 0, err
+		}
+	}
 	deletedEvents, err = DeleteAllAIEventWithCount(projectDB)
 	if err != nil {
 		return deletedSessions, deletedRuntimes, 0, 0, err

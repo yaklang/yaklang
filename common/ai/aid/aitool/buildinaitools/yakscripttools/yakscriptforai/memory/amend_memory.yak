@@ -1,0 +1,13 @@
+__DESC__ = "Add, delete or change a persistent memory in the current runtime namespace. Use exact memory IDs from read_memory; change deletes the original and its indexes, then creates a replacement."
+__VERBOSE_NAME__ = "Amend Memory"
+__VERBOSE_NAME_ZH__ = "管理记忆"
+__KEYWORDS__ = "memory,amend_memory,add,delete,change,记忆,修改,删除,偏好"
+__USAGE__ = "operator 必填 add/delete/change。add 必填 content，不填 memory_id；delete 必填 memory_id；change 必填 memory_id 和 content，返回新的 memory_id。tags 可选逗号分隔。只操作当前记忆空间，适用于用户偏好、明确事实和长期经验；删除应根据确切 ID，不能用搜索词批量删除。"
+operator = cli.String("operator", cli.setRequired(true), cli.setHelp("add/delete/change"))
+memoryID = cli.String("memory_id", cli.setHelp("delete/change 的精确记忆 ID"))
+content = cli.String("content", cli.setHelp("add/change 的新正文，1–32768 字符"))
+tags = cli.StringSlice("tags", cli.setHelp("记忆标签，最多 32 项"))
+cli.check()
+namespace = aimemory.CurrentNamespace()
+row = aimemory.AmendMemory(operator, memoryID, content, tags, aimemory.memoryNamespace(namespace))~
+RESULT = {"operator":operator,"namespace":namespace,"memory_id":row.MemoryID}

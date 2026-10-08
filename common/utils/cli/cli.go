@@ -706,7 +706,7 @@ func (c *CliApp) Double(name string, opts ...SetCliExtraParam) float64 {
 func (c *CliApp) Urls(name string, opts ...SetCliExtraParam) []string {
 	s, p := c._cliFromString(name, opts...)
 	p._type = "urls"
-	ret := utils.ParseStringToUrlsWith3W(utils.ParseStringToHosts(s)...)
+	ret := utils.ParseStringToUrlsWith3W(utils.ParseStringToHosts(cliJSONArrayAsCSV(s))...)
 	if ret == nil {
 		return []string{}
 	}
@@ -751,7 +751,7 @@ func (c *CliApp) Url(name string, opts ...SetCliExtraParam) []string {
 func (c *CliApp) Ports(name string, opts ...SetCliExtraParam) []int {
 	s, p := c._cliFromString(name, opts...)
 	p._type = "port"
-	ret := utils.ParseStringToPorts(s)
+	ret := utils.ParseStringToPorts(cliJSONArrayAsCSV(s))
 	if ret == nil {
 		return []int{}
 	}
@@ -795,7 +795,7 @@ func (c *CliApp) Port(name string, opts ...SetCliExtraParam) []int {
 func (c *CliApp) Hosts(name string, opts ...SetCliExtraParam) []string {
 	s, p := c._cliFromString(name, opts...)
 	p._type = "hosts"
-	ret := utils.ParseStringToHosts(s)
+	ret := utils.ParseStringToHosts(cliJSONArrayAsCSV(s))
 	if ret == nil {
 		c.paramInvalid.Set()
 		c.errorMsg += fmt.Sprintf("\n  Parameter [%s] error: Parse string to host error: %s", p.optName, s)
@@ -924,6 +924,12 @@ func (c *CliApp) FileNames(name string, opts ...SetCliExtraParam) []string {
 	if rawStr == "" {
 		return []string{}
 	}
+	// AI tools carry arrays as JSON to preserve commas, whitespace and newlines.
+	// Keep the traditional comma-separated command-line syntax as a fallback.
+	var values []string
+	if strings.HasPrefix(strings.TrimSpace(rawStr), "[") && json.Unmarshal([]byte(rawStr), &values) == nil {
+		return values
+	}
 
 	return utils.PrettifyListFromStringSplited(rawStr, ",")
 }
@@ -1000,6 +1006,13 @@ func (c *CliApp) FileOrContent(name string, opts ...SetCliExtraParam) []byte {
 func (c *CliApp) LineDict(name string, opts ...SetCliExtraParam) []string {
 	s, p := c._cliFromString(name, opts...)
 	p._type = "file-or-content"
+	if values, ok := cliJSONStringArray(s); ok {
+		lines := make([]string, 0)
+		for _, value := range values {
+			lines = append(lines, utils.ParseStringToLines(string(utils.StringAsFileParams(value)))...)
+		}
+		return lines
+	}
 	raw := utils.StringAsFileParams(s)
 	if raw == nil {
 		c.paramInvalid.Set()
@@ -1105,8 +1118,27 @@ func (c *CliApp) StringSlice(name string, options ...SetCliExtraParam) []string 
 	if rawStr == "" {
 		return []string{}
 	}
+	var values []string
+	if strings.HasPrefix(strings.TrimSpace(rawStr), "[") && json.Unmarshal([]byte(rawStr), &values) == nil {
+		return values
+	}
 
 	return utils.PrettifyListFromStringSplited(rawStr, ",")
+}
+
+func cliJSONStringArray(raw string) ([]string, bool) {
+	var values []string
+	if !strings.HasPrefix(strings.TrimSpace(raw), "[") || json.Unmarshal([]byte(raw), &values) != nil {
+		return nil, false
+	}
+	return values, true
+}
+
+func cliJSONArrayAsCSV(raw string) string {
+	if values, ok := cliJSONStringArray(raw); ok {
+		return strings.Join(values, ",")
+	}
+	return raw
 }
 
 // PeekStringSlice reads a comma-separated argument without registering CLI
@@ -1285,9 +1317,11 @@ func (c *CliApp) SetSelectOption(name, value string) SetCliExtraParam {
 // // 关键词: cli.setJsonSchema, 用 JSON Schema 在 Yakit 中渲染复杂表单
 // // 独立运行时仍按 JSON 解析; 这里用默认值演示解析过程(图形化中由 schema 驱动表单)
 // info = cli.Json("info",
-//     cli.setVerboseName("项目信息"),
-//     cli.setJsonSchema(`{"type":"object","properties":{"name":{"type":"string"}}}`),
-//     cli.setDefault(`{"name": "Chuck"}`),
+//
+//	cli.setVerboseName("项目信息"),
+//	cli.setJsonSchema(`{"type":"object","properties":{"name":{"type":"string"}}}`),
+//	cli.setDefault(`{"name": "Chuck"}`),
+//
 // )
 // println("name:", info["name"]) // 预期输出: name: Chuck
 // assert info["name"] == "Chuck", "json default should be parsed"

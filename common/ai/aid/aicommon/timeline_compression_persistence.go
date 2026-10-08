@@ -6,6 +6,7 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"strconv"
 )
 
@@ -34,13 +35,20 @@ func (m *Timeline) saveChecked(db *gorm.DB, persistentId string) error {
 		return err
 	}
 
-	result := strconv.Quote(tlstr)
-	update := db.Model(&schema.AIAgentRuntime{}).Where("persistent_session = ?", persistentId).Update("quoted_timeline", result)
-	if update.Error != nil {
-		return update.Error
+	if err := yakit.EnsureAITimelineHistory(db, false); err != nil {
+		return err
 	}
-	if update.RowsAffected == 0 {
-		return fmt.Errorf("timeline checkpoint has no runtime for persistent session %q", persistentId)
-	}
-	return nil
+	return db.Transaction(func(tx *gorm.DB) error {
+		if err := yakit.ArchiveAITimelineSnapshot(tx, persistentId, tlstr); err != nil {
+			return err
+		}
+		update := tx.Model(&schema.AIAgentRuntime{}).Where("persistent_session = ?", persistentId).Update("quoted_timeline", strconv.Quote(tlstr))
+		if update.Error != nil {
+			return update.Error
+		}
+		if update.RowsAffected == 0 {
+			return fmt.Errorf("timeline checkpoint has no runtime for persistent session %q", persistentId)
+		}
+		return nil
+	})
 }

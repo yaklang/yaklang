@@ -14,11 +14,13 @@ import (
 func TestDeleteAISession_DeletesRuntimeAndEvents(t *testing.T) {
 	projectDB, err := utils.CreateTempTestDatabaseInMemory()
 	require.NoError(t, err)
-	require.NoError(t, projectDB.AutoMigrate(&schema.AISession{}, &schema.AIAgentRuntime{}, &schema.AiCheckpoint{}, &schema.AiOutputEvent{}, &schema.AiProcessAndAiEvent{}).Error)
+	require.NoError(t, projectDB.AutoMigrate(&schema.AISession{}, &schema.AITimelineHistory{}, &schema.AIAgentRuntime{}, &schema.AiCheckpoint{}, &schema.AiOutputEvent{}, &schema.AiProcessAndAiEvent{}).Error)
 
 	sessionA := "sess-" + uuid.NewString()
 	sessionB := "sess-" + uuid.NewString()
 
+	require.NoError(t, projectDB.Create(&schema.AITimelineHistory{SessionID: sessionA, HistoryID: "a", Content: "history a"}).Error)
+	require.NoError(t, projectDB.Create(&schema.AITimelineHistory{SessionID: sessionB, HistoryID: "b", Content: "history b"}).Error)
 	// runtimes (project DB)
 	runtimeA1 := uuid.NewString()
 	runtimeA2 := uuid.NewString()
@@ -59,6 +61,11 @@ func TestDeleteAISession_DeletesRuntimeAndEvents(t *testing.T) {
 	require.Equal(t, int64(2), deletedRuntimes)
 	require.Equal(t, int64(2), deletedEvents)
 
+	var historyCount int64
+	require.NoError(t, projectDB.Model(&schema.AITimelineHistory{}).Where("session_id = ?", sessionA).Count(&historyCount).Error)
+	require.Zero(t, historyCount)
+	require.NoError(t, projectDB.Model(&schema.AITimelineHistory{}).Where("session_id = ?", sessionB).Count(&historyCount).Error)
+	require.EqualValues(t, 1, historyCount)
 	var runtimeCount int64
 	require.NoError(t, projectDB.Model(&schema.AIAgentRuntime{}).Where("persistent_session = ?", sessionA).Count(&runtimeCount).Error)
 	require.Equal(t, int64(0), runtimeCount)
@@ -90,6 +97,7 @@ func TestDeleteAllAISessionData(t *testing.T) {
 
 	require.NoError(t, projectDB.AutoMigrate(
 		&schema.AISession{},
+		&schema.AITimelineHistory{},
 		&schema.AIAgentRuntime{},
 		&schema.AiCheckpoint{},
 		&schema.AiOutputEvent{},
@@ -151,6 +159,7 @@ func TestDeleteAllAISessionData(t *testing.T) {
 	require.NoError(t, projectDB.Create(&schema.AiProcessAndAiEvent{ProcessesId: "p2", EventId: e2}).Error)
 	require.NoError(t, projectDB.Create(&schema.AiProcessAndAiEvent{ProcessesId: "p3", EventId: e3}).Error)
 
+	require.NoError(t, projectDB.Create(&schema.AITimelineHistory{SessionID: sessionA, HistoryID: "a", Content: "all history"}).Error)
 	deletedSessions, deletedRuntimes, deletedEvents, deletedPlanExec, err := DeleteAllAISessionData(projectDB)
 	require.NoError(t, err)
 	require.Equal(t, int64(2), deletedSessions)
@@ -159,6 +168,8 @@ func TestDeleteAllAISessionData(t *testing.T) {
 	require.Equal(t, int64(2), deletedPlanExec)
 
 	var count int64
+	require.NoError(t, projectDB.Model(&schema.AITimelineHistory{}).Count(&count).Error)
+	require.Zero(t, count)
 	require.NoError(t, projectDB.Model(&schema.AIAgentRuntime{}).Count(&count).Error)
 	require.Equal(t, int64(0), count)
 	require.NoError(t, projectDB.Model(&schema.AiOutputEvent{}).Count(&count).Error)

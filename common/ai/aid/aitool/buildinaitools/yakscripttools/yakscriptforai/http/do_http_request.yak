@@ -34,13 +34,15 @@ __INPUT_CONSTRAINTS__ = `{
   }
 }`
 
-__DESC__ = "统一执行单包与批量 HTTP 测试、路径枚举、接口批量验证、IDOR/越权验证和请求重放。url 或 packet 二选一；fuzztag=true 时用 {{int(1-10)}}、{{list(a|b)}}、{{params(name)}} 的 variables 数组构成多包，同层 ::row 同步配对，其余标签取笛卡尔积，支持嵌套编码与 repeat 重复请求。一次调用完成展开、并发发包、响应筛选、逐包请求/响应预览、关键词/正则匹配上下文、状态统计、汇总表和完整响应/结果文件；单包保留详细报文。"
+__DESC__ = "统一执行单包与批量 HTTP 测试、路径枚举、接口批量验证、IDOR/越权验证和请求重放。url 或 packet 二选一；fuzztag=true 时用 {{int(1-10)}}、{{list(a|b)}}、{{params(name)}} 的 variables 数组和 {{payload(group)}} 字典构成多包；字典可用 query_payloads/manage_payloads 查询管理。同层 ::row 同步配对，其余标签取笛卡尔积，支持嵌套编码与 repeat 重复请求。一次调用完成展开、并发发包、响应筛选、逐包请求/响应预览、关键词/正则匹配上下文、状态统计、汇总表和完整响应/结果文件；单包保留详细报文。"
 __VERBOSE_NAME__ = "HTTP Request"
 __VERBOSE_NAME_ZH__ = "HTTP请求"
 __KEYWORDS__ = "batch http,batch request,concurrent,multi path,path enumeration,api endpoint validation,idor validation,request replay,批量HTTP,并发请求,路径枚举,接口批量验证,未授权访问验证,越权验证,IDOR验证,请求重放,http request,curl,web,network,packet,raw request,http response,url,post,get,https,proxy,redirect,header,body,api,http tool,web debug,traffic"
 
 __USAGE__ = <<<USAGE_BLOCK
 HTTP 请求测试：`url` 与 `packet` 二选一。URL 模式由工具生成请求包；需要重复参数、固定顺序或自定义编码时用原样 `packet`。`fuzztag:true` 可将同一模板展开成多包并发测试；批量请求也使用本工具，先把变化的路径、目标或载荷放入 FuzzTag/variables；一次调用执行全部组合，不要逐个循环调用。
+
+字典工作流：先用 query_payloads 查看可用组和载荷，必要时 manage_payloads 添加/修改，然后在 query/form/body/packet 使用 {{payload(组名)}}，设置 fuzztag=true 和 max-requests。原生标签是 payload（单数）；payload 默认逐条加载并去重，payload:nodup 保留重复，payload:full 保留每条完整多行内容，payload(文件夹/*) 展开文件夹。嵌套编码示例 {{base64({{payload(api_cases)}})}}。URL 模式原始载荷由 query/form 自动编码一次。字典展开使用与查询管理相同的运行时 Profile 库；多个标签会相乘，超过 max-requests 会在发送前报错。
 
 参数要点：URL 模式的 `query`/`form` 是 JSON 对象，传原始未转义值，由工具各编码一次；不要先编码 `%`、`&` 等字符。`body` 是原始请求体，覆盖 `form`；Packet 模式的路径和查询必须自行编码。`headers` 可传对象或逐行的 `Key: Value`。默认 `timeout=10` 秒、`redirect-times=3`；仅在结果可能涉及漏洞或确需完整报文复核时设置 `save-packet=true` 保存请求和响应，普通探测保持默认，大报文内联输出会截断。
 

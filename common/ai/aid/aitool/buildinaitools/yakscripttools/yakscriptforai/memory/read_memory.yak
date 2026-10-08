@@ -1,0 +1,17 @@
+__DESC__ = "Search persistent memories in the current runtime memory namespace. Recall past decisions, preferences, facts and experience with BM25, vector or hybrid search."
+__VERBOSE_NAME__ = "Read Memory"
+__VERBOSE_NAME_ZH__ = "读取记忆"
+__KEYWORDS__ = "memory,read_memory,recall,bm25,vector,记忆,搜索,偏好,历史"
+__USAGE__ = "query 是待回顾的信息；search_mode 为 bm25/vector/hybrid。默认仅搜索运行时当前记忆空间；返回 memory_id 可用于 amend_memory。当前用户指令优先于历史记忆。"
+query = cli.String("query", cli.setRequired(true), cli.setHelp("待查找的记忆，1–1024 字符"))
+mode = cli.String("search_mode", cli.setDefault("hybrid"), cli.setHelp("bm25/vector/hybrid"))
+limit = cli.Int("limit", cli.setDefault(5), cli.setHelp("最多返回 1–20 条记忆"))
+tokenLimit = cli.Int("token_limit", cli.setDefault(1500), cli.setHelp("正文总 token 预算，64–8192"))
+cli.check()
+namespace = aimemory.CurrentNamespace()
+memories = aimemory.SearchMemory(query, aimemory.memoryNamespace(namespace), aimemory.memoryTokenLimit(tokenLimit), aimemory.memoryLimit(limit), aimemory.memorySearchMode(mode))~
+hits = []
+for memory in memories {
+    hits = append(hits, {"memory_id":memory.MemoryID,"content":memory.Content,"tags":memory.Tags,"created_at":memory.CreatedAt.Format("2006-01-02 15:04:05")})
+}
+RESULT = {"namespace":namespace,"search_mode":mode,"hits":hits}

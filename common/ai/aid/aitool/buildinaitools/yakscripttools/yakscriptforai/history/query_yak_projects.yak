@@ -1,0 +1,10 @@
+__DESC__ = "List local Yakit projects and registered database IDs across project folders. Automatically locates Yakit home through its configured runtime; project IDs can be used by query_http_history."
+__VERBOSE_NAME__ = "Query Yak Projects"
+__VERBOSE_NAME_ZH__ = "查询 Yakit 项目"
+__KEYWORDS__ = "yakit,projects,database,http,项目,数据库,安装目录"
+__USAGE__ = "keyword 可选项目名称。limit 1–50，offset 分页。返回 project_id、数据库路径、当前项目标记和 yakit_home；项目 ID 用于 query_http_history 的 project_id。无需猜测安装目录或直接传数据库路径。"
+keyword = cli.String("keyword", cli.setHelp("项目名称关键词"))
+limit = cli.Int("limit", cli.setDefault(20), cli.setHelp("返回条数，1–50"))
+offset = cli.Int("offset", cli.setDefault(0), cli.setHelp("分页偏移"))
+cli.check()
+RESULT = yakit.QueryYakProjects(keyword, yakit.aiQueryLimit(limit), yakit.aiQueryOffset(offset))~

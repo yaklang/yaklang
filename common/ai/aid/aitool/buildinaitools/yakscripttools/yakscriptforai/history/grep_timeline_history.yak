@@ -1,0 +1,16 @@
+__DESC__ = "Search original timeline history in the current AI conversation, including archived entries retired by compression. Supports BM25, literal and regexp search; session ID is injected by the runtime."
+__VERBOSE_NAME__ = "Grep Timeline History"
+__VERBOSE_NAME_ZH__ = "搜索会话历史"
+__KEYWORDS__ = "timeline,history,grep,recall,bm25,regexp,历史,回顾,压缩,事件"
+__USAGE__ = "query 可空以分页浏览历史，search_mode 为 bm25/regexp/literal。BM25 的 1–2 字符短词回退字面匹配，结果 literal_fallback 标记降级。返回的是 AI Timeline 原始条目，不是前端展示 event。会话 ID 由运行时注入。升级前已被丢弃的原文无法从摘要恢复。limit 1–50；offset 为命中条目偏移。view 默认 content；value_json 可读取完整原始 value（包括工具结果、prompt-only 文本等），搜索覆盖两者。正文默认 2048 字符，truncated 为真时用 item_id 和 content_offset 分段读取原条目；分段读取时 query 留空。"
+query = cli.String("query", cli.setHelp("搜索词或正则；空值浏览历史"))
+mode = cli.String("search_mode", cli.setDefault("bm25"), cli.setHelp("bm25/regexp/literal"))
+limit = cli.Int("limit", cli.setDefault(10), cli.setHelp("返回条数，1–50"))
+offset = cli.Int("offset", cli.setDefault(0), cli.setHelp("命中条目偏移"))
+itemID = cli.Int("item_id", cli.setDefault(0), cli.setHelp("返回结果的历史 item_id（恢复会话后仍稳定）；0 不限制"))
+contentOffset = cli.Int("content_offset", cli.setDefault(0), cli.setHelp("条目正文字符偏移"))
+contentLimit = cli.Int("content_limit", cli.setDefault(2048), cli.setHelp("每条正文最大字符数 1–8192；条数乘长度不超过 65536"))
+view = cli.String("view", cli.setDefault("content"), cli.setHelp("content/value_json；原始结构化内容使用 value_json"))
+cli.check()
+sessionID = yakit.CurrentAISession()
+RESULT = yakit.GrepAITimelineHistory(query, yakit.aiSession(sessionID), yakit.aiSearchMode(mode), yakit.aiQueryLimit(limit), yakit.aiQueryOffset(offset), yakit.aiTimelineItem(itemID), yakit.aiContentOffset(contentOffset), yakit.aiContentLimit(contentLimit), yakit.aiTimelineView(view))~
