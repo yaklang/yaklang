@@ -1,7 +1,6 @@
 package ssa
 
 import (
-	"bytes"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/gorm"
@@ -376,6 +375,7 @@ func TestSaveToDatabaseFlushesInstructionSaverBeforeTypes(t *testing.T) {
 	require.NoError(t, err)
 
 	prog := NewProgram(cfg, ProgramCacheDBWrite, Application, nil, "", 1)
+	defer prog.Cache.CloseWithoutSave()
 
 	builder := prog.GetAndCreateFunctionBuilder("testFunc", string(MainFunctionName))
 	builder.EmitUndefined("testInst")
@@ -384,13 +384,13 @@ func TestSaveToDatabaseFlushesInstructionSaverBeforeTypes(t *testing.T) {
 
 	prog.Cache.FlushCompileUnit("unit-a")
 
-	// Capture log output
-	var logBuf bytes.Buffer
+	// Capture concurrent saver output without changing the shared logger level
+	// while its background workers are running.
+	var logBuf flushLogBuffer
 	yaklog.SetOutput(&logBuf)
-	yaklog.SetLevel(yaklog.InfoLevel)
 	defer func() {
+		prog.Cache.CloseWithoutSave()
 		yaklog.SetOutput(os.Stdout)
-		yaklog.SetLevel(yaklog.InfoLevel)
 	}()
 
 	err = prog.Cache.SaveToDatabase()

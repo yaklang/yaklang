@@ -325,7 +325,7 @@ func getMethodsNameWithBuilder(t Type, builder MethodBuilder) []string {
 }
 
 func GetAllKey(t Type) []string {
-	return getAllKeyWithBuilder(t, ExternMethodBuilder)
+	return getAllKeyWithBuilder(t, getExternMethodBuilder())
 }
 
 // GetAllKey includes this program's configured methods when suggesting member

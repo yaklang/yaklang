@@ -69,7 +69,8 @@ type instructionStore struct {
 	// stay resident until Close, with synchronous incremental batched flush.
 	residentCache *dbcache.ResidentFlushCache[int64, Instruction, *instructionPersistRecord]
 	// Clean reloads have bounded residency and never enter the dirty queue.
-	residentReloads *utils.CacheExWithKey[int64, Instruction]
+	residentReloads          *utils.CacheExWithKey[int64, Instruction]
+	residentReloadsCloseOnce sync.Once
 
 	persistedCount   atomic.Int64
 	batchSaveCount   atomic.Int64
@@ -560,7 +561,7 @@ func (s *instructionStore) CloseWithoutSave() {
 		s.writer.CloseWithoutSave()
 	}
 	if s.residentReloads != nil {
-		s.residentReloads.Close()
+		s.residentReloadsCloseOnce.Do(s.residentReloads.Close)
 	}
 }
 
