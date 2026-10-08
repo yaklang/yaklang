@@ -58,7 +58,7 @@ func TestToolCallerHTTPAttemptObserverUsesConcurrentInvocationIdentity(t *testin
 	results := make(chan error, 2)
 	for _, id := range []string{"traffic-tool-a", "traffic-tool-b"} {
 		caller, err := NewToolCaller(ctx,
-			WithToolCaller_AICallerConfig(cfg), WithToolCaller_AICaller(cfg),
+			WithToolCaller_AICallerConfig(cfg),
 			WithToolCaller_Task(cfg.DefaultTask), WithToolCaller_Emitter(cfg.Emitter),
 			WithToolCaller_CallToolID(id), WithToolCaller_RuntimeId("shared-react-session"))
 		require.NoError(t, err)
@@ -67,7 +67,7 @@ func TestToolCallerHTTPAttemptObserverUsesConcurrentInvocationIdentity(t *testin
 			params["runtime_id"] = "caller-supplied-shared-session"
 		}
 		go func() {
-			result, _, callErr := caller.CallToolWithExistedParams(tool, true, params)
+			result, _, callErr := caller.CallToolWithExistedParams(tool, params)
 			if callErr == nil && (result == nil || !result.Success) {
 				callErr = fmt.Errorf("tool callback did not succeed: %v", result)
 			}
