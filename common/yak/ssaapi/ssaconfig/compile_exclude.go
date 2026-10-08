@@ -1,6 +1,7 @@
 package ssaconfig
 
 import (
+	"context"
 	"path/filepath"
 	"strings"
 
@@ -10,6 +11,35 @@ import (
 
 // CompileExcludeFunc matches project paths that should be skipped during SSA compile scan.
 type CompileExcludeFunc func(path string) bool
+
+// disableDefaultCompileExcludesKey is the context key marking that built-in
+// default compile exclude patterns should be skipped for this build, leaving
+// only user-provided patterns active. It is consulted by the
+// ...WithDefaultExcludes functions through a context value (see
+// WithDefaultCompileExcludesDisabled), so the flag can flow through call sites
+// that only receive a context.Context.
+type disableDefaultCompileExcludesKeyType struct{}
+
+var disableDefaultCompileExcludesKey disableDefaultCompileExcludesKeyType
+
+// DefaultCompileExcludesDisabledFromContext reports whether built-in default
+// compile excludes were disabled via WithDefaultCompileExcludesDisabled.
+func DefaultCompileExcludesDisabledFromContext(ctx context.Context) bool {
+	if ctx == nil {
+		return false
+	}
+	v, ok := ctx.Value(disableDefaultCompileExcludesKey).(bool)
+	return ok && v
+}
+
+// WithDefaultCompileExcludesDisabled returns a context derivative under which
+// built-in default compile exclude patterns are not merged into exclude
+// matchers built by BuildCompileExcludeFuncWithDefaults/ResolveCompileExcludeFunc.
+// Only user-provided patterns remain in effect; this restores the pre-default
+// full-scan behavior for embedders and tests that need it.
+func WithDefaultCompileExcludesDisabled(ctx context.Context) context.Context {
+	return context.WithValue(ctx, disableDefaultCompileExcludesKey, true)
+}
 
 // DefaultCompileExcludeDirNames are directory base names skipped during recursive scan.
 // Each name is also expanded into glob patterns in DefaultCompileExcludePatterns().
@@ -231,9 +261,21 @@ func ShouldSkipCompileDirName(name string) bool {
 
 // BuildCompileExcludeFunc merges userPatterns with DefaultCompileExcludePatterns().
 func BuildCompileExcludeFunc(userPatterns []string, basePath string) CompileExcludeFunc {
+	return BuildCompileExcludeFuncWithDefaults(userPatterns, basePath, true)
+}
+
+// BuildCompileExcludeFuncWithDefaults merges userPatterns with
+// DefaultCompileExcludePatterns() unless includeDefaults is false. When
+// includeDefaults is false, only userPatterns are compiled; this is the
+// escape hatch for callers (tests, embedders) that need the built-in
+// excludes to not apply at all.
+func BuildCompileExcludeFuncWithDefaults(userPatterns []string, basePath string, includeDefaults bool) CompileExcludeFunc {
 	var compiled []glob.Glob
 	seenPatterns := make(map[string]bool)
 	patterns := append(append([]string(nil), userPatterns...), DefaultCompileExcludePatterns()...)
+	if !includeDefaults {
+		patterns = append([]string(nil), userPatterns...)
+	}
 	basePath = normalizeCompileExcludePath(basePath)
 
 	addPattern := func(pattern string) {
@@ -303,6 +345,20 @@ func normalizeCompileExcludePath(path string) string {
 func ResolveCompileExcludeFunc(exclude CompileExcludeFunc) CompileExcludeFunc {
 	if exclude != nil {
 		return exclude
+	}
+	return BuildCompileExcludeFunc(nil, "")
+}
+
+// ResolveCompileExcludeFuncInContext behaves like ResolveCompileExcludeFunc but
+// honors WithDefaultCompileExcludesDisabled: when the context disables default
+// excludes and no explicit exclude func was provided, an always-false matcher
+// is returned so every file enters the compile pipeline.
+func ResolveCompileExcludeFuncInContext(ctx context.Context, exclude CompileExcludeFunc) CompileExcludeFunc {
+	if exclude != nil {
+		return exclude
+	}
+	if DefaultCompileExcludesDisabledFromContext(ctx) {
+		return func(string) bool { return false }
 	}
 	return BuildCompileExcludeFunc(nil, "")
 }

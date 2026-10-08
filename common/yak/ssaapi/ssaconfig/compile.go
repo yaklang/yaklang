@@ -316,9 +316,14 @@ func WithProjectLanguage(language Language) Option {
 // / extra option key `ssa_compile/ast_order`. Non-OutOfOrder modes buffer all file ASTs before main build — high RAM on large trees.
 // Pre-handler pipeline channel sizing is capped in ssareducer.pipeInitBufSize (not proportional to total file count).
 type SSACompileConfig struct {
-	StrictMode               bool            `json:"strict_mode"`
-	PeepholeSize             int             `json:"peephole_size"`
-	ExcludeFiles             []string        `json:"exclude_files"`
+	StrictMode   bool     `json:"strict_mode"`
+	PeepholeSize int      `json:"peephole_size"`
+	ExcludeFiles []string `json:"exclude_files"`
+	// DisableDefaultExcludes turns off the built-in default compile exclude
+	// patterns (test fixtures, build outputs, dependency archives, ...).
+	// When true, only ExcludeFiles (user-provided patterns) apply. This is
+	// the escape hatch for embedders/tests that need full-tree scanning.
+	DisableDefaultExcludes   bool            `json:"disable_default_excludes,omitempty"`
 	EntryFiles               []string        `json:"entry_files,omitempty"`
 	ReCompile                bool            `json:"re_compile"`
 	MemoryCompile            bool            `json:"memory_compile"`
@@ -396,6 +401,23 @@ func (c *Config) SetCompileExcludeFiles(excludeFiles []string) {
 		return strings.Split(item, ",")
 	})
 	c.SSACompile.ExcludeFiles = allFiles
+}
+
+func (c *Config) GetCompileDisableDefaultExcludes() bool {
+	if c == nil || c.SSACompile == nil {
+		return false
+	}
+	return c.SSACompile.DisableDefaultExcludes
+}
+
+func (c *Config) SetCompileDisableDefaultExcludes(disable bool) {
+	if c == nil {
+		return
+	}
+	if c.SSACompile == nil {
+		c.SSACompile = defaultSSACompileConfig()
+	}
+	c.SSACompile.DisableDefaultExcludes = disable
 }
 
 func (c *Config) GetCompileEntryFiles() []string {
@@ -656,6 +678,34 @@ func WithCompileExcludeFiles(excludeFiles ...string) Option {
 			return strings.Split(item, ",")
 		})
 		c.SSACompile.ExcludeFiles = append(c.SSACompile.ExcludeFiles, allFiles...)
+		return nil
+	}
+}
+
+// WithCompileDisableDefaultExcludes 禁用内置默认编译排除项
+//
+// 默认情况下，编译排除匹配器会合并一组内置排除模式（测试代码/fixtures、
+// 构建产物、依赖归档等，见 DefaultCompileExcludePatterns）。设置本选项后，
+// 内置排除项不再生效，仅保留用户通过 withExcludeFile 显式提供的排除模式。
+// 这恢复了内置排除项引入之前的全量扫描行为，供需要完整扫描的嵌入方和测试使用。
+//
+// 参数:
+//   - disable: true 表示禁用内置默认排除项
+//
+// 返回值:
+//   - 编译配置可选项
+//
+// Example:
+// ```
+// opt = ssa.withDisableDefaultCompileExcludes(true)
+// println(opt)
+// ```
+func WithCompileDisableDefaultExcludes(disable bool) Option {
+	return func(c *Config) error {
+		if err := c.ensureSSACompile("Compile Disable Default Excludes"); err != nil {
+			return err
+		}
+		c.SSACompile.DisableDefaultExcludes = disable
 		return nil
 	}
 }

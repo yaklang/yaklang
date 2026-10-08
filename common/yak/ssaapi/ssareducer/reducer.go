@@ -94,7 +94,7 @@ func ReducerCompile(base string, opts ...Option) error {
 			return nil
 		}
 		folder, name := c.fs.PathSplit(path)
-		if ssaconfig.ShouldSkipCompileDirName(name) {
+		if !ssaconfig.DefaultCompileExcludesDisabledFromContext(c.ctx) && ssaconfig.ShouldSkipCompileDirName(name) {
 			return filesys.SkipDir
 		}
 		// if have Database, save folder
