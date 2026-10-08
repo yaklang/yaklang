@@ -17,17 +17,23 @@ import (
 func _open(conf *CaptureConfig, ctx context.Context, handler *PcapHandleWrapper) error {
 	innerCtx, cancel := context.WithCancel(ctx)
 	defer cancel()
-	packetSource := gopacket.NewPacketSource(handler, handler.LinkType())
+	if conf.recorder != nil {
+		if err := conf.recorder.init(handler.LinkType()); err != nil {
+			return err
+		}
+	}
+	packetSource := gopacket.NewPacketSource(handler, captureLinkDecoder(handler.LinkType()))
 	packetSource.Lazy = true
 	packetSource.NoCopy = true
-	packetSource.DecodeStreamsAsDatagrams = true
+	// Stateful protocol parsing owns TCP application framing; a segment is not a datagram.
+	packetSource.DecodeStreamsAsDatagrams = conf.binParser == nil
 	if conf.onNetInterfaceCreated != nil {
 		conf.onNetInterfaceCreated(handler)
 	}
 	if conf.Filename != "" && len(conf.onEveryPacket) == 0 && conf.Output == nil && !conf.Debug {
 		return openOfflineFast(conf, innerCtx, handler)
 	}
-	if conf.Filename == "" && conf.trafficPool.parallel != nil {
+	if conf.Filename == "" && conf.requiresExclusiveHandle() {
 		return openLiveWorkers(conf, innerCtx, handler)
 	}
 
@@ -42,6 +48,12 @@ func _open(conf *CaptureConfig, ctx context.Context, handler *PcapHandleWrapper)
 			if err != nil {
 				return err
 			}
+			conf.trafficPool.observeCapture(len(packet.Data()))
+			if conf.recorder != nil {
+				if err := conf.recorder.write(packet.Data(), packet.Metadata().CaptureInfo, handler.LinkType()); err != nil {
+					return err
+				}
+			}
 			conf.packetHandler(innerCtx, packet)
 		}
 		return nil
@@ -55,6 +67,7 @@ func _open(conf *CaptureConfig, ctx context.Context, handler *PcapHandleWrapper)
 			if packet == nil {
 				return nil
 			}
+			conf.trafficPool.observeCapture(len(packet.Data()))
 			conf.packetHandler(innerCtx, packet)
 		}
 	}
@@ -67,14 +80,33 @@ func Start(opt ...CaptureOption) (resultErr error) {
 			return utils.Errorf("set option failed: %s", err)
 		}
 	}
+	// File users share one API. Use the driver-free reader unless an option
+	// actually needs a native handle (for example a BPF program).
+	if conf.Filename != "" && conf.BPFFilter == "" && conf.onNetInterfaceCreated == nil && !conf.EnableCache && conf.captureBuffer == 0 && len(conf.DeviceAdapter) == 0 && len(conf.Device) == 0 {
+		return replayFileWithConfig(conf.Filename, conf)
+	}
+	if err := conf.prepareBinParser(); err != nil {
+		return err
+	}
+	if (conf.recorder != nil || conf.outputFile != "" || conf.captureBuffer > 0) && conf.EnableCache {
+		return errors.New("capture writer/buffer requires an exclusive capture handle")
+	}
+	if conf.captureBuffer > 0 && conf.Filename != "" {
+		return errors.New("capture buffer applies only to live devices")
+	}
 	if conf.reassemblyOptions.Stream && conf.requiresFullStream {
 		return utils.Errorf("TCP streaming cannot be combined with built-in HTTP/TLS parsers")
 	}
 	if conf.reassemblyOptions.Workers > 1 && conf.EnableCache {
 		return utils.Errorf("TCP workers require an exclusive capture handle; disable capture cache")
 	}
+	closeOutput, err := conf.openCaptureOutput()
+	if err != nil {
+		return err
+	}
+	defer func() { resultErr = errors.Join(resultErr, closeOutput()) }()
 	handlers := omap.NewOrderedMap(map[string]PcapHandleOperation{})
-	if conf.reassemblyOptions.Workers > 1 {
+	if conf.requiresExclusiveHandle() {
 		defer handlers.ForEach(func(_ string, op PcapHandleOperation) bool {
 			if h, ok := op.(*PcapHandleWrapper); ok {
 				h.close()
@@ -87,6 +119,12 @@ func Start(opt ...CaptureOption) (resultErr error) {
 		if err != nil {
 			return err
 		} else {
+			if conf.BPFFilter != "" {
+				if err := pcapHandler.SetBPFFilter(conf.BPFFilter); err != nil {
+					pcapHandler.Close()
+					return err
+				}
+			}
 			handlers.Set(conf.Filename, WrapPcapHandle(pcapHandler))
 		}
 	} else if len(conf.DeviceAdapter) > 0 {
@@ -100,7 +138,7 @@ func Start(opt ...CaptureOption) (resultErr error) {
 			cacheId, handler, err := getInterfaceHandlerFromConfig(pcapIface, conf)
 			if err != nil {
 				log.Errorf("open device (%v) failed: %s", pcapIface, err)
-				if conf.reassemblyOptions.Workers > 1 {
+				if conf.requiresExclusiveHandle() {
 					return err
 				}
 				continue
@@ -120,7 +158,7 @@ func Start(opt ...CaptureOption) (resultErr error) {
 			cacheId, handler, err := getInterfaceHandlerFromConfig(pcapIface, conf)
 			if err != nil {
 				log.Errorf("open device (%v) failed: %s", pcapIface, err)
-				if conf.reassemblyOptions.Workers > 1 {
+				if conf.requiresExclusiveHandle() {
 					return err
 				}
 				continue
@@ -152,7 +190,7 @@ func Start(opt ...CaptureOption) (resultErr error) {
 			cacheId, handler, err := getInterfaceHandlerFromConfig(iface.Name, conf)
 			if err != nil {
 				log.Errorf("open device (%v) failed: %s", iface.Name, err)
-				if conf.reassemblyOptions.Workers > 1 {
+				if conf.requiresExclusiveHandle() {
 					return err
 				}
 				continue
@@ -168,6 +206,7 @@ func Start(opt ...CaptureOption) (resultErr error) {
 	}
 	ctx, cancel := context.WithCancel(conf.Context)
 	conf.trafficPool = newTrafficPool(ctx, conf.reassemblyOptions)
+	conf.trafficPool.captureAccountingAvailable = !conf.EnableCache
 	defer func() {
 		conf.trafficPool.Close()
 		cancel()
@@ -177,6 +216,7 @@ func Start(opt ...CaptureOption) (resultErr error) {
 		if conf.onReassemblyStats != nil {
 			conf.onReassemblyStats(conf.trafficPool.Stats())
 		}
+		resultErr = errors.Join(resultErr, conf.finishBinParser())
 	}()
 
 	conf.trafficPool.captureConf = conf
@@ -227,12 +267,13 @@ func Start(opt ...CaptureOption) (resultErr error) {
 				return
 			}
 			defer func() {
-				if conf.Filename == "" && conf.trafficPool.parallel != nil {
-					conf.trafficPool.parallel.deviceStats(handler)
+				if conf.Filename == "" && conf.requiresExclusiveHandle() {
+					conf.trafficPool.deviceStats(handler)
 				}
 				handler.close()
 			}()
 			if err := _open(conf, ctx, handler); err != nil {
+				cancel()
 				captureErrMu.Lock()
 				captureErr = errors.Join(captureErr, err)
 				captureErrMu.Unlock()

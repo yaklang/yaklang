@@ -2,6 +2,7 @@ package pcaputil
 
 import (
 	"fmt"
+	"sort"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -162,6 +163,9 @@ func (c *trafficFlowCache) ForEach(h func(string, *TrafficFlow)) {
 		flows = append(flows, e.flow)
 	}
 	c.mu.Unlock()
+	// Stable close order also makes the first reported trailing sequence gap
+	// deterministic when several captured flows end incomplete.
+	sort.Slice(flows, func(i, j int) bool { return flows[i].Hash < flows[j].Hash })
 	for _, f := range flows {
 		h(f.Hash, f)
 	}

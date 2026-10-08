@@ -93,3 +93,18 @@ func (r *classicPcapReader) read() ([]byte, gopacket.CaptureInfo, error) {
 	}
 	return raw, ci, err
 }
+
+// NewBoundedPcapReader shares ReplayPcap's pre-allocation validation with
+// offline consumers. ReadPacketData returns owned bytes, like pcapgo.Reader.
+func NewBoundedPcapReader(input io.Reader) (*classicPcapReader, error) {
+	return newClassicPcapReader(input)
+}
+func (r *classicPcapReader) ReadPacketData() ([]byte, gopacket.CaptureInfo, error) {
+	raw, ci, err := r.read()
+	if err != nil {
+		return nil, ci, err
+	}
+	return append([]byte(nil), raw...), ci, nil
+}
+func (r *classicPcapReader) LinkType() layers.LinkType { return r.link }
+func (r *classicPcapReader) Snaplen() uint32           { return r.snaplen }

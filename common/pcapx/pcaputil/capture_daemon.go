@@ -85,7 +85,10 @@ func getInterfaceHandlerFromConfig(ifaceName string, conf *CaptureConfig) (strin
 	}
 
 	loop := false
-	if conf.reassemblyOptions.Workers > 1 {
+	if conf.captureBuffer > 0 {
+		defLiveOpts = append(defLiveOpts, func(o *OpenIfaceLiveOptions) { o.BufferSize = conf.captureBuffer })
+	}
+	if conf.requiresExclusiveHandle() {
 		defLiveOpts = append(defLiveOpts, WithTimeout(20*time.Millisecond))
 	}
 	if conf.mock == nil {
@@ -153,10 +156,11 @@ func getInterfaceHandlerFromConfig(ifaceName string, conf *CaptureConfig) (strin
 					log.Infof("background iface: %v is start...", ifaceName)
 				}
 
-				packetSource := gopacket.NewPacketSource(handler, handler.LinkType())
+				packetSource := gopacket.NewPacketSource(handler, captureLinkDecoder(handler.LinkType()))
 				packetSource.Lazy = true
 				packetSource.NoCopy = true
-				packetSource.DecodeStreamsAsDatagrams = true
+				// Stateful protocol parsing owns TCP application framing; a segment is not a datagram.
+				packetSource.DecodeStreamsAsDatagrams = conf.binParser == nil
 				//source := packetSource.PacketsCtx(conf.Context)
 				source := packetSource.Packets()
 
@@ -244,7 +248,8 @@ func getInterfaceHandlerFromConfig(ifaceName string, conf *CaptureConfig) (strin
 	handler.device = dev
 	err = handler.SetBPFFilter(bpf)
 	if err != nil {
-		return "", handler, err
+		handler.close()
+		return "", nil, err
 	}
 	return "", handler, err
 }
