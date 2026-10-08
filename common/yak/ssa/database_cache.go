@@ -141,6 +141,15 @@ func (c *ProgramCache) SetInstruction(inst Instruction) {
 	}
 }
 
+// MarkInstructionDirty publishes changes made directly to exported IR fields.
+// Normal instruction setters and relation mutators do this automatically.
+func (c *ProgramCache) MarkInstructionDirty(inst Instruction) {
+	if c != nil && c.instructions != nil && c.instructions.residentCache != nil && inst != nil {
+		bindInstructionPersistence(inst)
+		c.instructions.residentCache.Set(inst.GetId(), inst)
+	}
+}
+
 func (c *ProgramCache) DeleteInstruction(inst Instruction) {
 	if c == nil || c.instructions == nil || utils.IsNil(inst) {
 		return
@@ -301,11 +310,11 @@ func (c *ProgramCache) SaveToDatabase(cb ...func(int)) error {
 					avgBatch = float64(persistStats.WriteOperations) / float64(persistStats.BatchCount)
 				}
 				// Writer summary (v3 §A.3)
-				log.Infof("[ssa-persist-writer-summary] program=%s request=%d enqueued=%d completed=%d write_ops=%d unique_persisted=%d resident=%d pending=%d persisted_instructions=%d batch_count=%d avg_batch=%.2f queue_depth_current=%d pending_current=%d unchanged_skipped=%d errors=0",
+				log.Infof("[ssa-persist-writer-summary] program=%s request=%d enqueued=%d completed=%d write_ops=%d unique_persisted=%d resident=%d pending=%d persisted_instructions=%d batch_count=%d avg_batch=%.2f queue_depth_current=%d pending_current=%d unchanged_skipped=%d resident_released=%d errors=0",
 					progName, persistStats.Requests, persistStats.Enqueued, persistStats.Completed,
 					persistStats.WriteOperations, persistStats.UniquePersisted, persistStats.Resident,
 					persistStats.Pending, persistStats.WriteOperations, persistStats.BatchCount, avgBatch,
-					persistStats.Resident, persistStats.Pending, persistStats.UnchangedSkipped)
+					persistStats.Resident, persistStats.Pending, persistStats.UnchangedSkipped, persistStats.ResidentReleased)
 			}
 			return nil
 		},
