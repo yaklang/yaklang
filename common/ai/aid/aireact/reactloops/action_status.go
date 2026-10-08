@@ -46,11 +46,21 @@ func statusNameForAction(name string) actionStatusName {
 func (a *LoopAction) GetVerboseNameI18n() schema.I18n {
 	label := statusNameForAction(a.ActionType)
 	if a.VerboseNameI18n != nil {
-		if v := strings.TrimSpace(a.VerboseNameI18n.Zh); v != "" && v != a.ActionType {
-			label.zh = v
+		zh, en := strings.TrimSpace(a.VerboseNameI18n.Zh), strings.TrimSpace(a.VerboseNameI18n.En)
+		if zh == a.ActionType {
+			zh = ""
 		}
-		if v := strings.TrimSpace(a.VerboseNameI18n.En); v != "" && v != a.ActionType {
-			label.en = v
+		if en == a.ActionType {
+			en = ""
+		}
+		if zh == "" {
+			zh = en
+		}
+		if en == "" {
+			en = zh
+		}
+		if zh != "" {
+			label = actionStatusName{zh, en}
 		}
 	}
 	return schema.I18n{Zh: label.zh, En: label.en}
@@ -113,6 +123,11 @@ func (r *ReActLoop) StatusToolLabel(name string) schema.I18n {
 			}
 		}
 	}
+	return statusToolLabel(name, label)
+}
+
+func statusToolLabel(name string, label schema.I18n) schema.I18n {
+	label.Zh, label.En = strings.TrimSpace(label.Zh), strings.TrimSpace(label.En)
 	if label.Zh == name {
 		label.Zh = ""
 	}
