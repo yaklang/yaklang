@@ -29,20 +29,20 @@
   {
     "name": "batch-website-baseline",
     "description": "对公开示例网站做最小只读黑盒基线，验证批量工具的并发、汇总和错误可见性。",
-    "expected_tools": ["batch_do_http_request"],
+    "expected_tools": ["do_http_request"],
     "min_tool_calls": 1,
     "max_tool_calls": 1,
     "expected_result_tokens": ["Batch Request Summary", "/robots.txt", "Total:"],
-    "prompt": "这是受控的公开网站只读黑盒测试。把 https://example.com 当作未知网站；必须且只调用一次 batch_do_http_request。参数使用 base-url=https://example.com，paths 传换行字符串 `/\\n/robots.txt\\n/yak-react-definitely-not-found-20260802`，concurrent=2、timeout=10；响应会自动输出，不要传 requests、concurrency 或 include_body。不得访问其他主机、登录、爆破或追加路径。比较三条结果的状态码、大小和内容特征，并说明批量汇总是否足以支持结论。"
+    "prompt": "这是受控的公开网站只读黑盒测试。把 https://example.com 当作未知网站；必须且只调用一次 do_http_request。使用 url=https://example.com{{params(path)}}、variables={\"path\":[\"/\",\"/robots.txt\",\"/yak-react-definitely-not-found-20260802\"]}、fuzztag=true、concurrent=2、timeout=10。不得访问其他主机、登录、爆破或追加路径。比较三条结果的状态码、大小、正文特征和传输错误，并说明批量汇总是否足以支持结论。"
   },
   {
     "name": "mixed-baseline-and-diff",
-    "description": "验证单发与批量工具协作时的调用效率、证据复用和 ReAct 收口质量。",
-    "expected_tools": ["do_http_request", "batch_do_http_request"],
+    "description": "验证同一 HTTP 工具单包与多包模式的调用效率、证据复用和 ReAct 收口质量。",
+    "expected_tools": ["do_http_request"],
     "min_tool_calls": 2,
     "max_tool_calls": 2,
     "expected_result_tokens": ["request packet", "Batch Request Summary", "example.com"],
-    "prompt": "这是受控的公开网站只读黑盒效率测试，只能访问 https://example.com。第一步调用一次 do_http_request，url=https://example.com/、method=GET、timeout=10、verbose=true，取得完整基线。第二步调用一次 batch_do_http_request，base-url=https://example.com、paths 传换行字符串 `/robots.txt\\n/yak-react-diff-20260802`、method=GET、concurrent=2、timeout=10；不要传 requests、concurrency 或 include_body。总共只能调用两次工具，不得重复请求。复用已有证据，对比状态、大小和正文特征，评价两种工具的适用场景后立即结束。"
+    "prompt": "这是受控的公开网站只读黑盒效率测试，只能访问 https://example.com。第一步调用一次 do_http_request，url=https://example.com/、method=GET、timeout=10，取得单包基线。第二步调用一次 do_http_request，url=https://example.com{{params(path)}}、variables={\"path\":[\"/robots.txt\",\"/yak-react-diff-20260802\"]}、fuzztag=true、concurrent=2、timeout=10。总共只能调用两次工具，不得重复请求。复用已有证据，对比状态、大小和正文特征，评价单包与多包输出后立即结束。"
   },
   {
     "name": "python-iterative-script-refinement",
@@ -252,11 +252,11 @@
     "name": "mixed-http-file-shell-artifact",
     "suite": "execution-semantics",
     "description": "批量 HTTP、文件增量修改、Bash 验证和 artifact 回读混合闭环。",
-    "include_tools": ["batch_do_http_request", "read_file", "modify_file", "bash"],
-    "expected_tools": ["batch_do_http_request", "read_file", "modify_file", "bash"],
+    "include_tools": ["do_http_request", "read_file", "modify_file", "bash"],
+    "expected_tools": ["do_http_request", "read_file", "modify_file", "bash"],
     "min_tool_calls": 6,
     "max_tool_calls": 12,
-    "expected_tool_min_counts": {"batch_do_http_request": 1, "read_file": 2, "modify_file": 1, "bash": 2},
+    "expected_tool_min_counts": {"read_file": 2, "modify_file": 1, "bash": 2, "do_http_request": 1},
     "setup_files": [
       {"path": "probe_summary.json", "content": "{\"statuses\": {}, \"verified\": false}\n"}
     ],
@@ -266,7 +266,7 @@
     "verification_commands": [
       {"command": "python3 -m json.tool {{WORKDIR}}/probe_summary.json", "expected_tokens": ["\"verified\": true", "\"404\"", "\"500\""]}
     ],
-    "prompt": "在受控环境完成混合闭环。第一轮并发：调用一次 batch_do_http_request，base-url={{ORACLE_URL}}、paths 为 `/status/200\\n/status/404\\n/status/500`、concurrent=3、timeout=5；同时 read_file 读取 {{WORKDIR}}/probe_summary.json。根据批量 Result 的 status_code_distribution，只用 modify_file 把三个状态计数和 verified=true 写入 JSON。随后用 bash 执行 `python3 -m json.tool {{WORKDIR}}/probe_summary.json`，再用 read_file 回读，最后用 bash 运行 Python 一行断言三个状态各为 1 且 verified 为 true。不得使用 write_file/sed/heredoc；至少 6 次工具调用，必须区分响应数和传输错误数。"
+    "prompt": "在受控环境完成混合闭环。第一轮并发：调用一次 do_http_request，url={{ORACLE_URL}}/status/{{list(200|404|500)}}、fuzztag=true、concurrent=3、timeout=5；同时 read_file 读取 {{WORKDIR}}/probe_summary.json。根据批量 Result 的 status_code_distribution，只用 modify_file 把三个状态计数和 verified=true 写入 JSON。随后用 bash 执行 `python3 -m json.tool {{WORKDIR}}/probe_summary.json`，再用 read_file 回读，最后用 bash 运行 Python 一行断言三个状态各为 1 且 verified 为 true。不得使用 write_file/sed/heredoc；至少 6 次工具调用，必须区分响应数和传输错误数。"
   },
   {
     "name": "finish-multiphase-ledger-repair",

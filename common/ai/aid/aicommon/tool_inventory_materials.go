@@ -31,7 +31,6 @@ var inventoryPriorityToolNames = []string{
 	"scan_port",
 	"git-clone",
 	"do_http_request",
-	"batch_do_http_request",
 	"simple_crawler",
 	"cybersecurity-risk",
 	"brute",

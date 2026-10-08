@@ -177,7 +177,7 @@ func preloadReconToolSchemas(loop *reactloops.ReActLoop, task aicommon.AIStatefu
 	if task != nil && task.GetContext() != nil {
 		ctx = task.GetContext()
 	}
-	results := loop.PreloadToolSchemas(ctx, []string{"scan_port", "simple_crawler", "banner_grab", "dig", "subdomain_scan", "network_space_search", "do_http_request", "read_file", "grep", "find_file", "web_search", "batch_do_http_request"})
+	results := loop.PreloadToolSchemas(ctx, []string{"scan_port", "simple_crawler", "banner_grab", "dig", "subdomain_scan", "network_space_search", "do_http_request", "read_file", "grep", "find_file", "web_search"})
 	if len(results) > 0 {
 		encoded, _ := json.Marshal(results)
 		loop.GetInvoker().AddToTimeline("recon_schema_preload", string(encoded))

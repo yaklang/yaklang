@@ -22,7 +22,6 @@ func BenchmarkHTTPFuzztagInvocation(b *testing.B) {
 		toolName := "do_http_request"
 		if batch {
 			name = "batch"
-			toolName = "batch_do_http_request"
 		}
 		b.Run(name, func(b *testing.B) {
 			source, err := yakscripttools.GetEmbedFS().ReadFile("yakscriptforai/http/" + toolName + ".yak")
@@ -40,7 +39,7 @@ func BenchmarkHTTPFuzztagInvocation(b *testing.B) {
 			for i := 0; i < b.N; i++ {
 				if batch {
 					_, err := tool.InvokeWithParams(aitool.InvokeParams{
-						"base-url": server.URL, "paths": "/users/{{int(1-12)}}", "concurrent": 1, "max-requests": 24,
+						"url": server.URL + "/users/{{int(1-12)}}", "fuzztag": true, "concurrent": 1, "max-requests": 24,
 						"query": map[string]any{"value": "{{base64({{list(a|b)}})}}"},
 					})
 					require.NoError(b, err)

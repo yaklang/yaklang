@@ -38,13 +38,13 @@ Host: example.com
 
 ## 直接辅助 HTTP 测试
 
-少量编码或随机字段直接用 `do_http_request`，设置 `fuzztag:true`，在 `packet` 或 URL 模式的 `url`、`headers`、`body`、`query`/`form` 值中写标签。它要求恰好一份渲染结果；多结果改用 `batch_do_http_request`。普通请求默认原样发送，模板里的局部字面文本用 raw。
+少量编码或随机字段直接用 `do_http_request`，设置 `fuzztag:true`，在 `packet` 或 URL 模式的 `url`、`headers`、`body`、`query`/`form` 值中写标签。它可直接展开并发送多份请求：单包显示完整报文与执行结果，多包默认显示逐包摘要和统计，RESULT.items 按模板顺序保存执行状态与报文预览。普通请求默认原样发送，模板里的局部字面文本用 raw。
 
-多路径、多载荷优先一次调用 `batch_do_http_request`，无需先生成字典文件或逐个调用单请求工具。默认启用 FuzzTag：`paths:"/users/{{int(1-3)}}"` 配 `form:{"input":"{{params(payload)}}"}` 与 `variables:{"payload":["normal","a & b"]}` 得 3×2=6 份请求。先小样本核对，再设置合适的 `max-requests`、`concurrent`、响应筛选条件。
+同一请求模板的范围、字典与编码组合可直接用 `do_http_request`，例如 `url:"https://target.example/users/{{int(1-10)}}"`、`query:{"token":"{{base64({{hex(abc)}})}}"}`、`fuzztag:true`、`max-requests:10`。精确 packet 的查询编码可写 `{{urlescape({{base64({{params(payload)}})}})}}`；URL 模式结构化 query/form 不再套 URL 编码。`concurrent` 默认 5，设为 1 顺序发送；`max-requests` 默认 100、最多 500，超限整批不发送。多包不自动做 JSON→form 重试，便于比较原始测试；`verbose:true` 展示报文，`save-packet:true` 保存完整包。
 
-URL 模式先一起渲染各字段，再对 query/form 的原始值编码一次；不要对结构化值再套 urlenc。`paths:"/users/{{int::row(1-2)}}"` 与 `query:{"role":"{{list::row(reader|admin)}}"}` 同步成两份请求。精确 packet 模式自行编码，如 `{{urlescape({{base64({{params(payload)}})}})}}`；`{{PATH}}` 是当前 paths 行的字面值，路径与 packet 分阶段展开成笛卡尔积，需要同步的标签写在同一份 packet 中。
+多个路径通过 `url:"https://target.example{{params(path)}}"` 与 `variables:{"path":["/health","/api/users","/admin"]}` 发送；完整目标 URL 数组用 `url:"{{params(target)}}"`。路径 × 载荷是笛卡尔积，例如 3 个路径配 `form:{"input":"{{params(payload)}}"}`、`variables.payload:["normal","a & b"]` 得 6 包。需要配对时给同层标签相同 `::row`：URL 的 `{{int::row(1-2)}}` 与 query 的 `{{list::row(reader|admin)}}` 只发 2 包。精确 packet 中直接使用 params/int/list 和嵌套编码，所有字段一起展开，无需特殊路径占位符或中间文件。
 
-变量标量/数组用 params 注入，值里的标签不再次执行；批量旧 `{{name}}` 仍兼容。重复项保留，`repeat(3)` 可测试重复请求的稳定性。批量 `max-requests` 默认100、最多500，限制展开后的总数，超限整批不发送。未知标签、缺失变量、未闭合模板在发包前报错；HTTP 入口不启用文件/插件标签。批量 `disable-fuzztag:true` 全部原样发送，包括 PATH。
+多包输出含逐包 request/Response 预览、匹配上下文、响应文件、状态分布、汇总表与 output_file；完整响应自动保存。`include-code`、`exclude-code`、`exclude-size` 只影响展示，filtered_count 与 RESULT.items 保留过滤信息；`max-body-size` 控制响应预览。`delay-seconds` 设置请求间隔并强制顺序发送。重复项保留；未知标签、缺失变量、未闭合模板与超限在发包前报错，整批不发送。HTTP 入口不启用文件/插件标签；`fuzztag:false` 全部原样发送。
 
 以实际 request packet 和结构化 request/response/status/transport_error 为准：先保留正常基线，一次改变一个变量，比较状态、内容、响应头和耗时；一次未命中不能代表漏洞不存在。
 

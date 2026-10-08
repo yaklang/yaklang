@@ -285,7 +285,7 @@ You have access to 95 built-in tools. Top 15 tools:
 
 * `git-clone`: 一个用于克隆Git远程仓库的工具，支持指定本地路径、分支、深度等选项。适用于代码下载、仓库同步等场景。
 
-* `do_http_request`: A powerful HTTP request tool comparable to curl. Supports two modes: URL mode (specify URL, method, headers, body, params) and Packet mode (send raw HTTP request packet). Features include timeout control, redirect handling, keyword/regex matching, proxy support, and HTTPS auto-detection. if you want to exec batch requests, please use batch_do_http_request tool instead. 强大的HTTP请求工具，功能媲美curl。支持两种模式：URL模式（指定URL、方法、头部、请求体、参数）和报文模式（发送原始HTTP请求报文）。功能包括超时控制、重定向处理、关键字/正则匹配、代理支持和HTTPS自动检测。如果需要执行批量请求，需要遍历某个参数，同时访问多个请求，请使用batch_do_http_request工具。
+* `do_http_request`: 统一执行单包与批量 HTTP 测试。url 或 packet 二选一；fuzztag=true 时用 int/list/params 标签和 variables 数组构成批量请求，独立标签取笛卡尔积，同层 ::row 同步配对。支持嵌套编码、并发、超时、代理、响应筛选、匹配上下文、逐包报文预览、状态统计、汇总表和结果文件。
 
 ... use `search_capabilities` to discover more tools and related capabilities.
 
