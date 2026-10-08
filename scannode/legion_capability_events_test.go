@@ -116,6 +116,7 @@ func TestLegionJobBridgePublishesCapabilityAlertEvent(t *testing.T) {
 		t.Fatalf("unexpected capability publisher type: %T", bridge.capabilityPublisher)
 	}
 	publisher.js = fakeJS
+	publisher.conn = newReconnectingEventTestConn(t)
 	publisher.natsURL = session.NATSURL
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -209,6 +210,7 @@ func TestCapabilityEventPublisherPublishesCapabilityStatusDetail(t *testing.T) {
 	publisher := newCapabilityEventPublisher(base)
 	fakeJS := &fakeJetStreamContext{}
 	publisher.js = fakeJS
+	publisher.conn = newReconnectingEventTestConn(t)
 	publisher.natsURL = session.NATSURL
 
 	err = publisher.PublishStatus(context.Background(), capabilityCommandRef{
@@ -280,6 +282,7 @@ func TestCapabilityEventPublisherPublishesHIDSSnapshotObservation(t *testing.T) 
 	publisher := newCapabilityEventPublisher(base)
 	fakeJS := &fakeJetStreamContext{}
 	publisher.js = fakeJS
+	publisher.conn = newReconnectingEventTestConn(t)
 	publisher.natsURL = session.NATSURL
 
 	observedAt := time.Date(2026, 4, 20, 15, 10, 0, 0, time.UTC)
@@ -359,6 +362,7 @@ func TestCapabilityEventPublisherPublishesHIDSResponseActionResult(t *testing.T)
 	publisher := newCapabilityEventPublisher(base)
 	fakeJS := &fakeJetStreamContext{}
 	publisher.js = fakeJS
+	publisher.conn = newReconnectingEventTestConn(t)
 	publisher.natsURL = session.NATSURL
 
 	observedAt := time.Date(2026, 4, 21, 10, 0, 0, 0, time.UTC)
@@ -455,6 +459,7 @@ func TestCapabilityEventPublisherNormalizesStoppedCapabilityStatus(t *testing.T)
 	publisher := newCapabilityEventPublisher(base)
 	fakeJS := &fakeJetStreamContext{}
 	publisher.js = fakeJS
+	publisher.conn = newReconnectingEventTestConn(t)
 	publisher.natsURL = session.NATSURL
 
 	err = publisher.PublishStatus(context.Background(), capabilityCommandRef{

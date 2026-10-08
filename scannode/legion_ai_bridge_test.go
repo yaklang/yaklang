@@ -1624,6 +1624,7 @@ func TestHandleAISessionCloseRetainsRuntimeUntilTerminalEventsPublish(t *testing
 	command.ResultContext = validAIFocusResultContext()
 	command.Session.RunId = command.ResultContext.FocusRunId
 	bridge.publisher.js = fakeJS
+	bridge.publisher.conn = newReconnectingEventTestConn(t)
 	bridge.publisher.natsURL = "nats://node-ai.test"
 	if err := bridge.handleAISessionBind(context.Background(), mustMarshalProto(t, command)); err != nil {
 		t.Fatalf("handle ai bind: %v", err)
@@ -1664,6 +1665,7 @@ func TestHandleAISessionCancelRetainsRuntimeUntilTerminalEventsPublish(t *testin
 	command.ResultContext = validAIFocusResultContext()
 	command.Session.RunId = command.ResultContext.FocusRunId
 	bridge.publisher.js = fakeJS
+	bridge.publisher.conn = newReconnectingEventTestConn(t)
 	bridge.publisher.natsURL = "nats://node-ai.test"
 	if err := bridge.handleAISessionBind(context.Background(), mustMarshalProto(t, command)); err != nil {
 		t.Fatalf("handle ai bind: %v", err)
@@ -1704,6 +1706,7 @@ func TestRuntimeEmitterRetriesTerminalPublication(t *testing.T) {
 	command.ResultContext = validAIFocusResultContext()
 	command.Session.RunId = command.ResultContext.FocusRunId
 	bridge.publisher.js = fakeJS
+	bridge.publisher.conn = newReconnectingEventTestConn(t)
 	bridge.publisher.natsURL = "nats://node-ai.test"
 	if err := bridge.handleAISessionBind(context.Background(), mustMarshalProto(t, command)); err != nil {
 		t.Fatalf("handle ai bind: %v", err)
@@ -1726,6 +1729,7 @@ func TestRuntimeEmitterSingleRunCompletesWithTurnCausationAndRemovesRuntime(t *t
 	command.ResultContext = validAIFocusResultContext()
 	command.Session.RunId = command.ResultContext.FocusRunId
 	bridge.publisher.js = fakeJS
+	bridge.publisher.conn = newReconnectingEventTestConn(t)
 	bridge.publisher.natsURL = "nats://node-ai.test"
 	if err := bridge.handleAISessionBind(context.Background(), mustMarshalProto(t, command)); err != nil {
 		t.Fatalf("handle ai bind: %v", err)
@@ -1766,6 +1770,7 @@ func TestRuntimeEmitterFocusTurnCompletesRunWithoutClosingChatSession(t *testing
 	command.ResultContext = validAIFocusResultContext()
 	command.Session.RunId = command.ResultContext.FocusRunId
 	bridge.publisher.js = fakeJS
+	bridge.publisher.conn = newReconnectingEventTestConn(t)
 	bridge.publisher.natsURL = "nats://node-ai.test"
 	if err := bridge.handleAISessionBind(context.Background(), mustMarshalProto(t, command)); err != nil {
 		t.Fatalf("handle ai bind: %v", err)
@@ -1799,6 +1804,7 @@ func TestRuntimeEmitterFocusTurnCancellationCancelsRunWithoutClosingChatSession(
 	command.ResultContext = validAIFocusResultContext()
 	command.Session.RunId = command.ResultContext.FocusRunId
 	bridge.publisher.js = fakeJS
+	bridge.publisher.conn = newReconnectingEventTestConn(t)
 	bridge.publisher.natsURL = "nats://node-ai.test"
 	if err := bridge.handleAISessionBind(context.Background(), mustMarshalProto(t, command)); err != nil {
 		t.Fatalf("handle ai bind: %v", err)
@@ -1834,6 +1840,7 @@ func TestRuntimeEmitterConversationResultKeepsRuntimeAfterTurn(t *testing.T) {
 	command.ResultContext.ExecutionMode = legionAIConversationExecutionMode
 	command.Session.RunId = command.ResultContext.FocusRunId
 	bridge.publisher.js = fakeJS
+	bridge.publisher.conn = newReconnectingEventTestConn(t)
 	bridge.publisher.natsURL = "nats://node-ai.test"
 	if err := bridge.handleAISessionBind(context.Background(), mustMarshalProto(t, command)); err != nil {
 		t.Fatalf("handle ai conversation bind: %v", err)
@@ -1876,6 +1883,7 @@ func TestRuntimeEmitterConversationTurnPublicationOutlivesTerminalTimeout(t *tes
 	command.ResultContext.ExecutionMode = legionAIConversationExecutionMode
 	command.Session.RunId = command.ResultContext.FocusRunId
 	bridge.publisher.js = fakeJS
+	bridge.publisher.conn = newReconnectingEventTestConn(t)
 	bridge.publisher.natsURL = "nats://node-ai.test"
 	if err := bridge.handleAISessionBind(context.Background(), mustMarshalProto(t, command)); err != nil {
 		t.Fatalf("handle conversation bind: %v", err)
@@ -1903,6 +1911,7 @@ func TestRuntimeEmitterConversationFailureKeepsRuntime(t *testing.T) {
 	command.ResultContext.ExecutionMode = legionAIConversationExecutionMode
 	command.Session.RunId = command.ResultContext.FocusRunId
 	bridge.publisher.js = fakeJS
+	bridge.publisher.conn = newReconnectingEventTestConn(t)
 	bridge.publisher.natsURL = "nats://node-ai.test"
 	if err := bridge.handleAISessionBind(context.Background(), mustMarshalProto(t, command)); err != nil {
 		t.Fatalf("handle ai conversation bind: %v", err)
@@ -2012,6 +2021,7 @@ func TestRuntimeEmitterSingleRunFailureRemovesRuntimeWithoutLateSuccess(t *testi
 	command.ResultContext = validAIFocusResultContext()
 	command.Session.RunId = command.ResultContext.FocusRunId
 	bridge.publisher.js = fakeJS
+	bridge.publisher.conn = newReconnectingEventTestConn(t)
 	bridge.publisher.natsURL = "nats://node-ai.test"
 	if err := bridge.handleAISessionBind(context.Background(), mustMarshalProto(t, command)); err != nil {
 		t.Fatalf("handle ai bind: %v", err)
@@ -2208,6 +2218,7 @@ func newTestAISessionBridge(
 	bridge.aiRuntime = newAISessionRuntimeManager(driver)
 	fakeJS := &aiFakeJetStreamContext{}
 	bridge.aiPublisher.js = fakeJS
+	bridge.aiPublisher.conn = newReconnectingEventTestConn(t)
 	bridge.aiPublisher.natsURL = session.NATSURL
 	return bridge, fakeJS, driver
 }

@@ -316,6 +316,7 @@ func TestManagedInputJobEventsUseTransportBindNamespace(t *testing.T) {
 	bridge, events, _ := newTestAISessionBridge(t)
 	session, _ := bridge.agent.node.GetSessionState()
 	bridge.publisher.js = events
+	bridge.publisher.conn = newReconnectingEventTestConn(t)
 	bridge.publisher.natsURL = session.NATSURL
 	command := managedInputBindFixture(t, "synthetic_inventory", "hello")
 	publish := func(command *aiv1.BindAISessionCommand) ([]string, string) {
