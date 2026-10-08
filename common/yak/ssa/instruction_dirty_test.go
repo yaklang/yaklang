@@ -1,11 +1,36 @@
 package ssa
 
 import (
+	"sync"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 )
+
+func TestFastPathCloseWithoutSaveIsIdempotent(t *testing.T) {
+	prog := newResidentDeltaProgram(t)
+	defer closeUnsavedFlushFixture(t, prog)()
+	var callers sync.WaitGroup
+	callers.Add(2)
+	for i := 0; i < 2; i++ {
+		go func() {
+			defer callers.Done()
+			prog.Cache.instructions.CloseWithoutSave()
+		}()
+	}
+	done := make(chan struct{})
+	go func() {
+		callers.Wait()
+		close(done)
+	}()
+	select {
+	case <-done:
+	case <-time.After(5 * time.Second):
+		t.Fatal("repeated reload-cache closure must complete")
+	}
+}
 
 func TestFastPathDirtyRelationsAndReleasedInstruction(t *testing.T) {
 	prog := newResidentDeltaProgram(t)
