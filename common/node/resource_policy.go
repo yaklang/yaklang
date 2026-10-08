@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/url"
+	"time"
 )
 
 // ResourcePolicy is a complete replacement. Explicit zero reserves are valid;
@@ -15,7 +16,16 @@ type ResourcePolicy struct {
 	MaxRunningJobs              uint32 `json:"max_running_jobs"`
 }
 type HeartbeatResponse struct {
-	ResourcePolicy *ResourcePolicy `json:"resource_policy,omitempty"`
+	ResourcePolicy           *ResourcePolicy `json:"resource_policy,omitempty"`
+	CompanyID                string          `json:"company_id,omitempty"`
+	NATSCredentials          string          `json:"nats_credentials,omitempty"`
+	NATSCredentialsExpiresAt time.Time       `json:"nats_credentials_expires_at,omitempty"`
+	CommandStream            string          `json:"command_stream,omitempty"`
+	CommandConsumer          string          `json:"command_consumer,omitempty"`
+	InboxPrefix              string          `json:"inbox_prefix,omitempty"`
+	CommandSubject           string          `json:"command_subject,omitempty"`
+	EventSubjectPrefix       string          `json:"event_subject_prefix,omitempty"`
+	ExpiresAt                time.Time       `json:"expires_at,omitempty"`
 }
 type ResourcePolicyApplier interface{ ApplyResourcePolicy(ResourcePolicy) error }
 

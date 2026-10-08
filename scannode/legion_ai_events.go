@@ -85,10 +85,11 @@ type aiLogsCommandRef struct {
 type aiSessionEventPublisher struct {
 	node *node.NodeBase
 
-	mu      sync.Mutex
-	natsURL string
-	conn    *nats.Conn
-	js      nats.JetStreamContext
+	mu         sync.Mutex
+	natsURL    string
+	sessionKey string
+	conn       *nats.Conn
+	js         nats.JetStreamContext
 }
 
 func newAISessionEventPublisher(base *node.NodeBase) *aiSessionEventPublisher {
@@ -324,7 +325,7 @@ func (p *aiSessionEventPublisher) publish(
 	if !ok {
 		return ErrNodeSessionNotReady
 	}
-	if err := p.ensureJetStream(session.NATSURL); err != nil {
+	if err := p.ensureJetStream(session); err != nil {
 		return err
 	}
 
@@ -334,10 +335,7 @@ func (p *aiSessionEventPublisher) publish(
 		CausationId:   ref.CommandID,
 		CorrelationId: ref.SessionID,
 		EmittedAt:     timestamppb.New(time.Now().UTC()),
-		Node: &nodev1.NodeRef{
-			NodeId:        p.node.CurrentNodeID(),
-			NodeSessionId: session.SessionID,
-		},
+		Node:          nodeRefForSession(p.node.CurrentNodeID(), session),
 	}
 	if err := attachAIEventMetadata(message, metadata); err != nil {
 		return err
@@ -347,7 +345,11 @@ func (p *aiSessionEventPublisher) publish(
 	if err != nil {
 		return fmt.Errorf("marshal ai session event: %w", err)
 	}
-	msg := nats.NewMsg(jobEventSubject(session.EventSubjectPrefix, eventType))
+	subject, err := sessionScopedOutboundSubject(session, jobEventSubject(session.EventSubjectPrefix, eventType))
+	if err != nil {
+		return err
+	}
+	msg := nats.NewMsg(subject)
 	msg.Data = raw
 
 	p.mu.Lock()
@@ -2654,7 +2656,7 @@ func (p *aiSessionEventPublisher) publishProvider(
 	if !ok {
 		return ErrNodeSessionNotReady
 	}
-	if err := p.ensureJetStream(session.NATSURL); err != nil {
+	if err := p.ensureJetStream(session); err != nil {
 		return err
 	}
 
@@ -2664,10 +2666,7 @@ func (p *aiSessionEventPublisher) publishProvider(
 		CausationId:   ref.CommandID,
 		CorrelationId: ref.OwnerUserID,
 		EmittedAt:     timestamppb.New(time.Now().UTC()),
-		Node: &nodev1.NodeRef{
-			NodeId:        p.node.CurrentNodeID(),
-			NodeSessionId: session.SessionID,
-		},
+		Node:          nodeRefForSession(p.node.CurrentNodeID(), session),
 	}
 	if err := attachAIEventMetadata(message, metadata); err != nil {
 		return err
@@ -2677,7 +2676,11 @@ func (p *aiSessionEventPublisher) publishProvider(
 	if err != nil {
 		return fmt.Errorf("marshal ai provider event: %w", err)
 	}
-	msg := nats.NewMsg(jobEventSubject(session.EventSubjectPrefix, eventType))
+	subject, err := sessionScopedOutboundSubject(session, jobEventSubject(session.EventSubjectPrefix, eventType))
+	if err != nil {
+		return err
+	}
+	msg := nats.NewMsg(subject)
 	msg.Data = raw
 
 	p.mu.Lock()
@@ -2703,7 +2706,7 @@ func (p *aiSessionEventPublisher) publishLogs(
 	if !ok {
 		return ErrNodeSessionNotReady
 	}
-	if err := p.ensureJetStream(session.NATSURL); err != nil {
+	if err := p.ensureJetStream(session); err != nil {
 		return err
 	}
 
@@ -2717,10 +2720,7 @@ func (p *aiSessionEventPublisher) publishLogs(
 		CausationId:   ref.CommandID,
 		CorrelationId: correlationID,
 		EmittedAt:     timestamppb.New(time.Now().UTC()),
-		Node: &nodev1.NodeRef{
-			NodeId:        p.node.CurrentNodeID(),
-			NodeSessionId: session.SessionID,
-		},
+		Node:          nodeRefForSession(p.node.CurrentNodeID(), session),
 	}
 	if err := attachAIEventMetadata(message, metadata); err != nil {
 		return err
@@ -2730,7 +2730,11 @@ func (p *aiSessionEventPublisher) publishLogs(
 	if err != nil {
 		return fmt.Errorf("marshal ai logs event: %w", err)
 	}
-	msg := nats.NewMsg(jobEventSubject(session.EventSubjectPrefix, eventType))
+	subject, err := sessionScopedOutboundSubject(session, jobEventSubject(session.EventSubjectPrefix, eventType))
+	if err != nil {
+		return err
+	}
+	msg := nats.NewMsg(subject)
 	msg.Data = raw
 
 	p.mu.Lock()
@@ -2756,7 +2760,7 @@ func (p *aiSessionEventPublisher) publishFocus(
 	if !ok {
 		return ErrNodeSessionNotReady
 	}
-	if err := p.ensureJetStream(session.NATSURL); err != nil {
+	if err := p.ensureJetStream(session); err != nil {
 		return err
 	}
 
@@ -2766,10 +2770,7 @@ func (p *aiSessionEventPublisher) publishFocus(
 		CausationId:   ref.CommandID,
 		CorrelationId: ref.OwnerUserID,
 		EmittedAt:     timestamppb.New(time.Now().UTC()),
-		Node: &nodev1.NodeRef{
-			NodeId:        p.node.CurrentNodeID(),
-			NodeSessionId: session.SessionID,
-		},
+		Node:          nodeRefForSession(p.node.CurrentNodeID(), session),
 	}
 	if err := attachAIEventMetadata(message, metadata); err != nil {
 		return err
@@ -2779,7 +2780,11 @@ func (p *aiSessionEventPublisher) publishFocus(
 	if err != nil {
 		return fmt.Errorf("marshal ai focus event: %w", err)
 	}
-	msg := nats.NewMsg(jobEventSubject(session.EventSubjectPrefix, eventType))
+	subject, err := sessionScopedOutboundSubject(session, jobEventSubject(session.EventSubjectPrefix, eventType))
+	if err != nil {
+		return err
+	}
+	msg := nats.NewMsg(subject)
 	msg.Data = raw
 
 	p.mu.Lock()
@@ -2805,7 +2810,7 @@ func (p *aiSessionEventPublisher) publishMaterials(
 	if !ok {
 		return ErrNodeSessionNotReady
 	}
-	if err := p.ensureJetStream(session.NATSURL); err != nil {
+	if err := p.ensureJetStream(session); err != nil {
 		return err
 	}
 
@@ -2815,10 +2820,7 @@ func (p *aiSessionEventPublisher) publishMaterials(
 		CausationId:   ref.CommandID,
 		CorrelationId: ref.OwnerUserID,
 		EmittedAt:     timestamppb.New(time.Now().UTC()),
-		Node: &nodev1.NodeRef{
-			NodeId:        p.node.CurrentNodeID(),
-			NodeSessionId: session.SessionID,
-		},
+		Node:          nodeRefForSession(p.node.CurrentNodeID(), session),
 	}
 	if err := attachAIEventMetadata(message, metadata); err != nil {
 		return err
@@ -2828,7 +2830,11 @@ func (p *aiSessionEventPublisher) publishMaterials(
 	if err != nil {
 		return fmt.Errorf("marshal ai materials event: %w", err)
 	}
-	msg := nats.NewMsg(jobEventSubject(session.EventSubjectPrefix, eventType))
+	subject, err := sessionScopedOutboundSubject(session, jobEventSubject(session.EventSubjectPrefix, eventType))
+	if err != nil {
+		return err
+	}
+	msg := nats.NewMsg(subject)
 	msg.Data = raw
 
 	p.mu.Lock()
@@ -2854,7 +2860,7 @@ func (p *aiSessionEventPublisher) publishForge(
 	if !ok {
 		return ErrNodeSessionNotReady
 	}
-	if err := p.ensureJetStream(session.NATSURL); err != nil {
+	if err := p.ensureJetStream(session); err != nil {
 		return err
 	}
 
@@ -2864,10 +2870,7 @@ func (p *aiSessionEventPublisher) publishForge(
 		CausationId:   ref.CommandID,
 		CorrelationId: ref.OwnerUserID,
 		EmittedAt:     timestamppb.New(time.Now().UTC()),
-		Node: &nodev1.NodeRef{
-			NodeId:        p.node.CurrentNodeID(),
-			NodeSessionId: session.SessionID,
-		},
+		Node:          nodeRefForSession(p.node.CurrentNodeID(), session),
 	}
 	if err := attachAIEventMetadata(message, metadata); err != nil {
 		return err
@@ -2877,7 +2880,11 @@ func (p *aiSessionEventPublisher) publishForge(
 	if err != nil {
 		return fmt.Errorf("marshal ai forge event: %w", err)
 	}
-	msg := nats.NewMsg(jobEventSubject(session.EventSubjectPrefix, eventType))
+	subject, err := sessionScopedOutboundSubject(session, jobEventSubject(session.EventSubjectPrefix, eventType))
+	if err != nil {
+		return err
+	}
+	msg := nats.NewMsg(subject)
 	msg.Data = raw
 
 	p.mu.Lock()
@@ -2903,7 +2910,7 @@ func (p *aiSessionEventPublisher) publishTool(
 	if !ok {
 		return ErrNodeSessionNotReady
 	}
-	if err := p.ensureJetStream(session.NATSURL); err != nil {
+	if err := p.ensureJetStream(session); err != nil {
 		return err
 	}
 
@@ -2913,10 +2920,7 @@ func (p *aiSessionEventPublisher) publishTool(
 		CausationId:   ref.CommandID,
 		CorrelationId: ref.OwnerUserID,
 		EmittedAt:     timestamppb.New(time.Now().UTC()),
-		Node: &nodev1.NodeRef{
-			NodeId:        p.node.CurrentNodeID(),
-			NodeSessionId: session.SessionID,
-		},
+		Node:          nodeRefForSession(p.node.CurrentNodeID(), session),
 	}
 	if err := attachAIEventMetadata(message, metadata); err != nil {
 		return err
@@ -2926,7 +2930,11 @@ func (p *aiSessionEventPublisher) publishTool(
 	if err != nil {
 		return fmt.Errorf("marshal ai tool event: %w", err)
 	}
-	msg := nats.NewMsg(jobEventSubject(session.EventSubjectPrefix, eventType))
+	subject, err := sessionScopedOutboundSubject(session, jobEventSubject(session.EventSubjectPrefix, eventType))
+	if err != nil {
+		return err
+	}
+	msg := nats.NewMsg(subject)
 	msg.Data = raw
 
 	p.mu.Lock()
@@ -2952,7 +2960,7 @@ func (p *aiSessionEventPublisher) publishMCP(
 	if !ok {
 		return ErrNodeSessionNotReady
 	}
-	if err := p.ensureJetStream(session.NATSURL); err != nil {
+	if err := p.ensureJetStream(session); err != nil {
 		return err
 	}
 
@@ -2962,10 +2970,7 @@ func (p *aiSessionEventPublisher) publishMCP(
 		CausationId:   ref.CommandID,
 		CorrelationId: ref.OwnerUserID,
 		EmittedAt:     timestamppb.New(time.Now().UTC()),
-		Node: &nodev1.NodeRef{
-			NodeId:        p.node.CurrentNodeID(),
-			NodeSessionId: session.SessionID,
-		},
+		Node:          nodeRefForSession(p.node.CurrentNodeID(), session),
 	}
 	if err := attachAIEventMetadata(message, metadata); err != nil {
 		return err
@@ -2975,7 +2980,11 @@ func (p *aiSessionEventPublisher) publishMCP(
 	if err != nil {
 		return fmt.Errorf("marshal ai mcp event: %w", err)
 	}
-	msg := nats.NewMsg(jobEventSubject(session.EventSubjectPrefix, eventType))
+	subject, err := sessionScopedOutboundSubject(session, jobEventSubject(session.EventSubjectPrefix, eventType))
+	if err != nil {
+		return err
+	}
+	msg := nats.NewMsg(subject)
 	msg.Data = raw
 
 	p.mu.Lock()
@@ -3001,7 +3010,7 @@ func (p *aiSessionEventPublisher) publishLocalModel(
 	if !ok {
 		return ErrNodeSessionNotReady
 	}
-	if err := p.ensureJetStream(session.NATSURL); err != nil {
+	if err := p.ensureJetStream(session); err != nil {
 		return err
 	}
 
@@ -3011,10 +3020,7 @@ func (p *aiSessionEventPublisher) publishLocalModel(
 		CausationId:   ref.CommandID,
 		CorrelationId: ref.OwnerUserID,
 		EmittedAt:     timestamppb.New(time.Now().UTC()),
-		Node: &nodev1.NodeRef{
-			NodeId:        p.node.CurrentNodeID(),
-			NodeSessionId: session.SessionID,
-		},
+		Node:          nodeRefForSession(p.node.CurrentNodeID(), session),
 	}
 	if err := attachAIEventMetadata(message, metadata); err != nil {
 		return err
@@ -3024,7 +3030,11 @@ func (p *aiSessionEventPublisher) publishLocalModel(
 	if err != nil {
 		return fmt.Errorf("marshal local model event: %w", err)
 	}
-	msg := nats.NewMsg(jobEventSubject(session.EventSubjectPrefix, eventType))
+	subject, err := sessionScopedOutboundSubject(session, jobEventSubject(session.EventSubjectPrefix, eventType))
+	if err != nil {
+		return err
+	}
+	msg := nats.NewMsg(subject)
 	msg.Data = raw
 
 	p.mu.Lock()
@@ -3050,7 +3060,7 @@ func (p *aiSessionEventPublisher) publishKnowledgeBase(
 	if !ok {
 		return ErrNodeSessionNotReady
 	}
-	if err := p.ensureJetStream(session.NATSURL); err != nil {
+	if err := p.ensureJetStream(session); err != nil {
 		return err
 	}
 
@@ -3060,10 +3070,7 @@ func (p *aiSessionEventPublisher) publishKnowledgeBase(
 		CausationId:   ref.CommandID,
 		CorrelationId: ref.OwnerUserID,
 		EmittedAt:     timestamppb.New(time.Now().UTC()),
-		Node: &nodev1.NodeRef{
-			NodeId:        p.node.CurrentNodeID(),
-			NodeSessionId: session.SessionID,
-		},
+		Node:          nodeRefForSession(p.node.CurrentNodeID(), session),
 	}
 	if err := attachAIEventMetadata(message, metadata); err != nil {
 		return err
@@ -3073,7 +3080,11 @@ func (p *aiSessionEventPublisher) publishKnowledgeBase(
 	if err != nil {
 		return fmt.Errorf("marshal ai knowledge base event: %w", err)
 	}
-	msg := nats.NewMsg(jobEventSubject(session.EventSubjectPrefix, eventType))
+	subject, err := sessionScopedOutboundSubject(session, jobEventSubject(session.EventSubjectPrefix, eventType))
+	if err != nil {
+		return err
+	}
+	msg := nats.NewMsg(subject)
 	msg.Data = raw
 
 	p.mu.Lock()
@@ -3099,7 +3110,7 @@ func (p *aiSessionEventPublisher) publishMemory(
 	if !ok {
 		return ErrNodeSessionNotReady
 	}
-	if err := p.ensureJetStream(session.NATSURL); err != nil {
+	if err := p.ensureJetStream(session); err != nil {
 		return err
 	}
 
@@ -3109,10 +3120,7 @@ func (p *aiSessionEventPublisher) publishMemory(
 		CausationId:   ref.CommandID,
 		CorrelationId: ref.OwnerUserID,
 		EmittedAt:     timestamppb.New(time.Now().UTC()),
-		Node: &nodev1.NodeRef{
-			NodeId:        p.node.CurrentNodeID(),
-			NodeSessionId: session.SessionID,
-		},
+		Node:          nodeRefForSession(p.node.CurrentNodeID(), session),
 	}
 	if err := attachAIEventMetadata(message, metadata); err != nil {
 		return err
@@ -3122,7 +3130,11 @@ func (p *aiSessionEventPublisher) publishMemory(
 	if err != nil {
 		return fmt.Errorf("marshal ai memory event: %w", err)
 	}
-	msg := nats.NewMsg(jobEventSubject(session.EventSubjectPrefix, eventType))
+	subject, err := sessionScopedOutboundSubject(session, jobEventSubject(session.EventSubjectPrefix, eventType))
+	if err != nil {
+		return err
+	}
+	msg := nats.NewMsg(subject)
 	msg.Data = raw
 
 	p.mu.Lock()
@@ -3148,7 +3160,7 @@ func (p *aiSessionEventPublisher) publishRuntimeQuery(
 	if !ok {
 		return ErrNodeSessionNotReady
 	}
-	if err := p.ensureJetStream(session.NATSURL); err != nil {
+	if err := p.ensureJetStream(session); err != nil {
 		return err
 	}
 
@@ -3158,10 +3170,7 @@ func (p *aiSessionEventPublisher) publishRuntimeQuery(
 		CausationId:   ref.CommandID,
 		CorrelationId: ref.OwnerUserID,
 		EmittedAt:     timestamppb.New(time.Now().UTC()),
-		Node: &nodev1.NodeRef{
-			NodeId:        p.node.CurrentNodeID(),
-			NodeSessionId: session.SessionID,
-		},
+		Node:          nodeRefForSession(p.node.CurrentNodeID(), session),
 	}
 	if err := attachAIEventMetadata(message, metadata); err != nil {
 		return err
@@ -3171,7 +3180,11 @@ func (p *aiSessionEventPublisher) publishRuntimeQuery(
 	if err != nil {
 		return fmt.Errorf("marshal ai runtime query event: %w", err)
 	}
-	msg := nats.NewMsg(jobEventSubject(session.EventSubjectPrefix, eventType))
+	subject, err := sessionScopedOutboundSubject(session, jobEventSubject(session.EventSubjectPrefix, eventType))
+	if err != nil {
+		return err
+	}
+	msg := nats.NewMsg(subject)
 	msg.Data = raw
 
 	p.mu.Lock()
@@ -3196,7 +3209,7 @@ func (p *aiSessionEventPublisher) putObjectBytes(
 	if !ok {
 		return ErrNodeSessionNotReady
 	}
-	if err := p.ensureJetStream(session.NATSURL); err != nil {
+	if err := p.ensureJetStream(session); err != nil {
 		return err
 	}
 
@@ -3229,7 +3242,7 @@ func (p *aiSessionEventPublisher) getObjectBytes(
 	if !ok {
 		return nil, ErrNodeSessionNotReady
 	}
-	if err := p.ensureJetStream(session.NATSURL); err != nil {
+	if err := p.ensureJetStream(session); err != nil {
 		return nil, err
 	}
 
@@ -3254,17 +3267,23 @@ func (p *aiSessionEventPublisher) getObjectBytes(
 	return data, nil
 }
 
-func (p *aiSessionEventPublisher) ensureJetStream(natsURL string) error {
+func (p *aiSessionEventPublisher) ensureJetStream(session node.SessionState) error {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
+	if err := validateCompanyNATSSession(session, time.Now()); err != nil {
+		p.closeLocked()
+		return err
+	}
+	key := natsSessionConnectionKey(session)
 	// Let NATS manage transient reconnects; replace only a terminal connection.
-	if p.js != nil && p.conn != nil && !p.conn.IsClosed() && p.natsURL == natsURL {
+	if p.js != nil && p.conn != nil && !p.conn.IsClosed() && ((p.sessionKey != "" && p.sessionKey == key) ||
+		(p.sessionKey == "" && session.CompanyID == "" && p.natsURL == session.NATSURL)) {
 		return nil
 	}
 	p.closeLocked()
 
-	conn, err := nats.Connect(natsURL, nats.Name("yak-node-ai-events-"+p.node.CurrentNodeID()))
+	conn, err := connectNATSForSession(session, "yak-node-ai-events-"+p.node.CurrentNodeID())
 	if err != nil {
 		return fmt.Errorf("connect ai event nats: %w", err)
 	}
@@ -3275,7 +3294,8 @@ func (p *aiSessionEventPublisher) ensureJetStream(natsURL string) error {
 	}
 	p.conn = conn
 	p.js = js
-	p.natsURL = natsURL
+	p.natsURL = session.NATSURL
+	p.sessionKey = key
 	return nil
 }
 
@@ -3286,6 +3306,7 @@ func (p *aiSessionEventPublisher) closeLocked() {
 	p.conn = nil
 	p.js = nil
 	p.natsURL = ""
+	p.sessionKey = ""
 }
 
 func attachAIEventMetadata(message proto.Message, metadata *nodev1.EventMetadata) error {

@@ -46,6 +46,8 @@ const (
 )
 
 type RuntimeHostConfig struct {
+	// NATSCAFile is operator-owned startup trust material, never command metadata.
+	NATSCAFile                  string
 	Enabled                     bool
 	BaseDir                     string
 	PlatformAPIBaseURL          string
@@ -65,6 +67,7 @@ type RuntimeHostConfig struct {
 }
 
 type runtimeHostExecutor struct {
+	natsCAFile                string
 	docker                    runtimeHostDocker
 	baseDir                   string
 	platformAPIBaseURL        string
@@ -101,6 +104,9 @@ func newRuntimeHostExecutor(cfg RuntimeHostConfig) (*runtimeHostExecutor, error)
 	if !cfg.Enabled {
 		return nil, fmt.Errorf("runtime host is disabled")
 	}
+	if err := validateRuntimeHostCAFile(cfg.NATSCAFile); err != nil {
+		return nil, err
+	}
 	dockerClient := cfg.docker
 	var err error
 	if dockerClient == nil {
@@ -123,6 +129,7 @@ func newRuntimeHostExecutor(cfg RuntimeHostConfig) (*runtimeHostExecutor, error)
 		runtimePlatformAPIBaseURL = platformAPIBaseURL
 	}
 	executor := &runtimeHostExecutor{
+		natsCAFile:                strings.TrimSpace(cfg.NATSCAFile),
 		docker:                    dockerClient,
 		baseDir:                   strings.TrimSpace(cfg.BaseDir),
 		platformAPIBaseURL:        platformAPIBaseURL,
@@ -278,7 +285,11 @@ func (b *legionJobBridge) publishRuntimeHostResult(result *nodev1.AIRuntimeResul
 	if consumer == nil || consumer.conn == nil {
 		return fmt.Errorf("runtime host reply transport is unavailable")
 	}
-	return consumer.conn.Publish(runtimeHostReplyPrefix+result.CommandId, encoded)
+	subject, err := sessionScopedOutboundSubject(session, runtimeHostReplyPrefix+result.CommandId)
+	if err != nil {
+		return err
+	}
+	return consumer.conn.Publish(subject, encoded)
 }
 
 func (e *runtimeHostExecutor) validateCommand(command *nodev1.AIRuntimeCommand, session node.SessionState) error {
@@ -304,7 +315,11 @@ func (e *runtimeHostExecutor) validateCommand(command *nodev1.AIRuntimeCommand, 
 	if command.Target == nil || command.Target.NodeId != strings.TrimSpace(e.nodeIDProvider()) || command.Target.NodeSessionId != session.SessionID {
 		return fmt.Errorf("runtime host command targets another node session")
 	}
-	if command.ReplySubject != runtimeHostReplyPrefix+command.Metadata.CommandId ||
+	expectedReplySubject, err := sessionScopedOutboundSubject(session, runtimeHostReplyPrefix+command.Metadata.CommandId)
+	if err != nil {
+		return err
+	}
+	if command.ReplySubject != expectedReplySubject ||
 		!runtimeHostIdentifierPattern.MatchString(command.Metadata.CommandId) {
 		return fmt.Errorf("runtime host reply subject is invalid")
 	}
@@ -378,6 +393,7 @@ func (e *runtimeHostExecutor) validateContainerSpec(spec *nodev1.AIRuntimeContai
 	allowedEnvironment := map[string]struct{}{
 		"LEGION_NATS_URL": {}, "LEGION_API_URL": {}, "LEGION_ENROLLMENT_TOKEN": {},
 		"LEGION_SESSIONMGR_URL": {}, "LEGION_AI_SESSION_ID": {}, "LEGION_AI_RUNTIME": {},
+		"LEGION_COMPANY_ID": {}, "LEGION_NATS_CA": {}, "SSL_CERT_FILE": {},
 	}
 	for key, value := range spec.Environment {
 		if _, ok := allowedEnvironment[key]; !ok || strings.ContainsRune(value, '\x00') {
@@ -387,6 +403,24 @@ func (e *runtimeHostExecutor) validateContainerSpec(spec *nodev1.AIRuntimeContai
 	if spec.Environment["LEGION_AI_SESSION_ID"] != sessionID || strings.TrimSpace(spec.Environment["LEGION_ENROLLMENT_TOKEN"]) == "" {
 		return fmt.Errorf("runtime container startup credential is missing")
 	}
+	if e.sessionProvider == nil {
+		return fmt.Errorf("runtime host session is unavailable")
+	}
+	session, ok := e.sessionProvider()
+	if !ok || spec.Environment["LEGION_COMPANY_ID"] != session.CompanyID {
+		return fmt.Errorf("runtime container company does not match host session")
+	}
+	if e.natsCAFile != "" {
+		if spec.Environment["LEGION_NATS_CA"] != runtimeHostContainerCAPath || spec.Environment["SSL_CERT_FILE"] != runtimeHostContainerCAPath {
+			return fmt.Errorf("runtime CA must use the fixed container path")
+		}
+	} else if spec.Environment["LEGION_NATS_CA"] != "" || spec.Environment["SSL_CERT_FILE"] != "" {
+		return fmt.Errorf("runtime host has no configured CA trust material")
+	}
+	natsScheme := "nats"
+	if session.CompanyID != "" {
+		natsScheme = "tls"
+	}
 	runtimePlatformAPIBaseURL := e.runtimePlatformAPIBaseURL
 	if runtimePlatformAPIBaseURL == "" {
 		runtimePlatformAPIBaseURL = e.platformAPIBaseURL
@@ -394,7 +428,7 @@ func (e *runtimeHostExecutor) validateContainerSpec(spec *nodev1.AIRuntimeContai
 	if strings.TrimRight(spec.Environment["LEGION_API_URL"], "/") != runtimePlatformAPIBaseURL ||
 		spec.Environment["LEGION_AI_RUNTIME"] != "stateless" ||
 		!runtimeHostURLHasScheme(spec.Environment["LEGION_SESSIONMGR_URL"], "http", "https") ||
-		!runtimeHostURLHasScheme(spec.Environment["LEGION_NATS_URL"], "nats") {
+		!runtimeHostURLHasScheme(spec.Environment["LEGION_NATS_URL"], natsScheme) {
 		return fmt.Errorf("runtime container endpoints do not match the fixed startup contract")
 	}
 	allowedFlags := map[string]struct{}{
@@ -476,7 +510,7 @@ func newRuntimeHostResult(command *nodev1.AIRuntimeCommand, session node.Session
 		Metadata: &nodev1.EventMetadata{
 			EventId: uuid.NewString(), EventType: "ai.runtime.result", CausationId: command.Metadata.CommandId,
 			CorrelationId: command.AiSessionId, EmittedAt: timestamppb.Now(),
-			Node: &nodev1.NodeRef{NodeId: command.Target.NodeId, NodeSessionId: session.SessionID},
+			Node: nodeRefForSession(command.Target.NodeId, session),
 		},
 		CommandId: command.Metadata.CommandId, Operation: command.Operation,
 		AiSessionId: command.AiSessionId, CleanupKey: command.CleanupKey, LeaseToken: command.LeaseToken,
@@ -610,7 +644,8 @@ func (e *runtimeHostExecutor) start(ctx context.Context, command *nodev1.AIRunti
 		environment = append(environment, key+"="+command.Container.Environment[key])
 	}
 	created, err := e.docker.CreateAndStart(ctx, runtimeHostContainerInput{
-		Name: command.Container.ContainerName, Image: imageID, Network: e.network,
+		NATSCAFile: e.natsCAFile,
+		Name:       command.Container.ContainerName, Image: imageID, Network: e.network,
 		Args: append([]string(nil), command.Container.Arguments...), Env: environment,
 		CPUMillicores:   command.Container.Resources.CpuMillicores,
 		MemoryBytes:     command.Container.Resources.MemoryBytes,
@@ -670,6 +705,7 @@ func (e *runtimeHostExecutor) stop(ctx context.Context, command *nodev1.AIRuntim
 
 func runtimeHostRecordFromCommand(command *nodev1.AIRuntimeCommand, containerID, state string) runtimeHostOperationRecord {
 	return runtimeHostOperationRecord{
+		CompanyID:  command.GetMetadata().GetCompanyId(),
 		CleanupKey: command.CleanupKey, LeaseToken: command.LeaseToken,
 		SessionID: command.AiSessionId, ReleaseID: command.Release.ReleaseId,
 		ContainerID: containerID, State: state,

@@ -10,20 +10,27 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"path"
 	"strings"
 	"time"
 
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/node"
 	"github.com/yaklang/yaklang/common/utils"
 )
 
 type ssaArtifactTicketRequest struct {
-	TaskID    string `json:"task_id"`
-	ObjectKey string `json:"object_key"`
+	NodeSessionID string `json:"node_session_id"`
+	TaskID        string `json:"task_id"`
+	AttemptID     string `json:"attempt_id"`
+	ArtifactKind  string `json:"artifact_kind"`
 }
 
 type ssaArtifactTicketResponse struct {
 	TaskID           string      `json:"task_id"`
+	AttemptID        string      `json:"attempt_id"`
+	ArtifactKind     string      `json:"artifact_kind"`
+	CompanyID        string      `json:"company_id"`
 	ObjectKey        string      `json:"object_key"`
 	Codec            string      `json:"codec"`
 	Bucket           string      `json:"bucket"`
@@ -39,9 +46,10 @@ type ssaArtifactTicketResponse struct {
 	STSSecretKey     secretValue `json:"sts_secret_key"`
 	STSSessionToken  secretValue `json:"sts_session_token"`
 	STSExpiresAt     int64       `json:"sts_expires_at"`
+	ExpiresAt        time.Time   `json:"expires_at"`
 }
 
-func (s *ScanNode) fetchSSAArtifactUploadTicket(ctx context.Context, taskID, objectKey string) (cfg *SSAArtifactUploadConfig, err error) {
+func (s *ScanNode) fetchSSAArtifactUploadTicket(ctx context.Context, taskID, attemptID, artifactKind string) (cfg *SSAArtifactUploadConfig, err error) {
 	fetchStart := time.Now()
 	defer func() {
 		fetchMs := time.Since(fetchStart).Milliseconds()
@@ -58,6 +66,14 @@ func (s *ScanNode) fetchSSAArtifactUploadTicket(ctx context.Context, taskID, obj
 	if taskID == "" {
 		return nil, utils.Errorf("task id required")
 	}
+	attemptID = strings.TrimSpace(attemptID)
+	if attemptID == "" {
+		return nil, utils.Errorf("attempt id required")
+	}
+	artifactKind = strings.TrimSpace(artifactKind)
+	if artifactKind == "" {
+		return nil, utils.Errorf("artifact kind required")
+	}
 
 	baseURL := strings.TrimRight(strings.TrimSpace(s.resolvePlatformAPIBaseURL()), "/")
 	if baseURL == "" {
@@ -70,23 +86,25 @@ func (s *ScanNode) fetchSSAArtifactUploadTicket(ctx context.Context, taskID, obj
 	if parsedBaseURL.Scheme == "http" && !ssaExplicitHTTPAllowed() {
 		return nil, utils.Errorf("plaintext ticket endpoint requires SCANNODE_SSA_ALLOW_HTTP=1")
 	}
-	token := strings.TrimSpace(s.node.GetToken())
-	if token == "" {
+	session, ok := s.node.GetSessionState()
+	if !ok || strings.TrimSpace(session.SessionToken) == "" {
 		return nil, utils.Errorf("node token unavailable")
 	}
 
 	rawReq, err := json.Marshal(&ssaArtifactTicketRequest{
-		TaskID:    taskID,
-		ObjectKey: strings.TrimSpace(objectKey),
+		NodeSessionID: session.SessionID,
+		TaskID:        taskID,
+		AttemptID:     attemptID,
+		ArtifactKind:  artifactKind,
 	})
 	if err != nil {
 		return nil, err
 	}
-	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, baseURL+"/api/ssa/task/artifact-ticket", bytes.NewReader(rawReq))
+	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, baseURL+"/v1/nodes/self/artifact-ticket", bytes.NewReader(rawReq))
 	if err != nil {
 		return nil, err
 	}
-	httpReq.Header.Set("Authorization", "Bearer "+token)
+	httpReq.Header.Set("Authorization", "Bearer "+session.SessionToken)
 	httpReq.Header.Set("Content-Type", "application/json")
 
 	client, err := newSSATicketHTTPClient()
@@ -123,9 +141,31 @@ func (s *ScanNode) fetchSSAArtifactUploadTicket(ctx context.Context, taskID, obj
 			}
 		}
 	}
+	return uploadConfigFromTicket(ticket, session, taskID, attemptID, artifactKind)
+}
+
+func uploadConfigFromTicket(ticket ssaArtifactTicketResponse, session node.SessionState, taskID, attemptID, artifactKind string) (*SSAArtifactUploadConfig, error) {
+	if ticket.TaskID != "" && strings.TrimSpace(ticket.TaskID) != taskID {
+		return nil, utils.Errorf("invalid upload ticket: task mismatch")
+	}
+	if ticket.AttemptID != "" && strings.TrimSpace(ticket.AttemptID) != attemptID {
+		return nil, utils.Errorf("invalid upload ticket: attempt mismatch")
+	}
+	if ticket.ArtifactKind != "" && strings.TrimSpace(ticket.ArtifactKind) != artifactKind {
+		return nil, utils.Errorf("invalid upload ticket: artifact kind mismatch")
+	}
+	if session.CompanyID != "" && ticket.CompanyID != "" && strings.TrimSpace(ticket.CompanyID) != session.CompanyID {
+		return nil, utils.Errorf("invalid upload ticket: company mismatch")
+	}
+	if !ticket.ExpiresAt.IsZero() {
+		ticket.STSExpiresAt = ticket.ExpiresAt.Unix()
+	}
+	if session.CompanyID != "" && ticket.STSExpiresAt <= time.Now().Unix() {
+		return nil, utils.Errorf("invalid upload ticket: expires_at is missing or expired")
+	}
 	ticketEndpoint := strings.TrimSpace(ticket.Endpoint)
 	legacySchemeLessHTTP := ticketEndpoint != "" && !ticket.UseSSL && !strings.Contains(ticketEndpoint, "://")
-	cfg = &SSAArtifactUploadConfig{
+	cfg := &SSAArtifactUploadConfig{
 		ObjectKey:        strings.TrimSpace(ticket.ObjectKey),
 		Codec:            strings.TrimSpace(ticket.Codec),
 		Endpoint:         ticketEndpoint,
@@ -139,12 +179,27 @@ func (s *ScanNode) fetchSSAArtifactUploadTicket(ctx context.Context, taskID, obj
 		VirtualHostStyle: ticket.VirtualHostStyle,
 		STSExpiresAt:     ticket.STSExpiresAt,
 	}
+	if session.CompanyID != "" {
+		for _, segment := range []string{session.CompanyID, taskID, attemptID} {
+			if segment == "" || segment == "." || segment == ".." || strings.ContainsAny(segment, "/\\") {
+				return nil, utils.Errorf("invalid upload ticket identity")
+			}
+		}
+		expectedDir := path.Join("companies", session.CompanyID, "jobs", taskID, "attempts", attemptID)
+		if err := validateSSAObjectKey(cfg.ObjectKey); err != nil || path.Dir(cfg.ObjectKey) != expectedDir {
+			return nil, utils.Errorf("invalid upload ticket: object key is outside the authenticated attempt")
+		}
+		cfg.authorizedAttemptDir = expectedDir
+		if ticket.STSSessionToken == "" {
+			return nil, utils.Errorf("invalid upload ticket: STS session token is missing")
+		}
+	}
 	cfg.setSTSCredentials(ticket.STSAccessKey.raw(), ticket.STSSecretKey.raw(), ticket.STSSessionToken.raw())
 	if cfg.Codec == "" {
 		cfg.Codec = "zstd"
 	}
 	if cfg.ObjectKey == "" {
-		cfg.ObjectKey = strings.TrimSpace(objectKey)
+		return nil, utils.Errorf("invalid upload ticket: object key missing")
 	}
 	if cfg.accessKeySecret().raw() == "" || cfg.secretKeySecret().raw() == "" {
 		return nil, utils.Errorf("invalid upload ticket: missing sts credentials")

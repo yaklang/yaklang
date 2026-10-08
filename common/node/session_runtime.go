@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"math"
+	"strings"
 	"time"
 
 	"github.com/yaklang/yaklang/common/log"
@@ -45,12 +46,61 @@ func (n *NodeBase) bootstrapSession() error {
 	if session.NodeID == "" {
 		return fmt.Errorf("bootstrap response node_id is required")
 	}
+	if err := validateSessionState(session, time.Now()); err != nil {
+		return err
+	}
 	n.setCurrentNodeID(session.NodeID)
 
 	n.sessionMu.Lock()
+	if n.boundCompanyID != "" && n.boundCompanyID != session.CompanyID {
+		n.sessionMu.Unlock()
+		return fmt.Errorf("bootstrap cannot change or remove the bound company")
+	}
+	if session.CompanyID != "" {
+		n.boundCompanyID = session.CompanyID
+	}
 	n.session = session
 	n.sessionMu.Unlock()
 	log.Infof("node session established: node_id=%s session_id=%s", n.CurrentNodeID(), session.SessionID)
+	return nil
+}
+
+func validateSessionState(session SessionState, now time.Time) error {
+	if strings.TrimSpace(session.SessionID) == "" {
+		return fmt.Errorf("bootstrap response node_session_id is required")
+	}
+	if strings.TrimSpace(session.SessionToken) == "" {
+		return fmt.Errorf("bootstrap response session_token is required")
+	}
+	if strings.TrimSpace(session.CompanyID) == "" {
+		return nil
+	}
+	missing := ""
+	switch {
+	case session.SessionStartedAt.IsZero() || session.SessionStartedAt.After(now.Add(30*time.Second)):
+		missing = "session_started_at"
+	case session.ExpiresAt.IsZero() || !session.ExpiresAt.After(now):
+		missing = "expires_at"
+	case strings.TrimSpace(session.NATSURL) == "":
+		missing = "nats_url"
+	case strings.TrimSpace(session.NATSCredentials) == "":
+		missing = "nats_credentials"
+	case session.NATSCredentialsExpiresAt.IsZero() || !session.NATSCredentialsExpiresAt.After(now):
+		missing = "nats_credentials_expires_at"
+	case strings.TrimSpace(session.CommandStream) == "":
+		missing = "command_stream"
+	case strings.TrimSpace(session.CommandConsumer) == "":
+		missing = "command_consumer"
+	case strings.TrimSpace(session.InboxPrefix) == "":
+		missing = "inbox_prefix"
+	case strings.TrimSpace(session.CommandSubject) == "":
+		missing = "command_subject"
+	case strings.TrimSpace(session.EventSubjectPrefix) == "":
+		missing = "event_subject_prefix"
+	}
+	if missing != "" {
+		return fmt.Errorf("company node session requires %s", missing)
+	}
 	return nil
 }
 
@@ -110,9 +160,15 @@ func (n *NodeBase) GetSessionState() (SessionState, bool) {
 
 func (n *NodeBase) clearSession() {
 	n.sessionMu.Lock()
+	previous, hook := n.session, n.sessionInvalidatedHook
 	n.session = SessionState{}
 	n.sessionMu.Unlock()
-	n.isRegistered.UnSet()
+	if n.isRegistered != nil {
+		n.isRegistered.UnSet()
+	}
+	if previous.SessionID != "" && hook != nil {
+		hook(previous)
+	}
 }
 
 func durationToWholeSeconds(value time.Duration) uint32 {
@@ -125,4 +181,11 @@ func durationToWholeSeconds(value time.Duration) uint32 {
 		return 1
 	}
 	return seconds
+}
+
+// SetSessionInvalidatedHook joins runtime revocation to HTTP session loss.
+func (n *NodeBase) SetSessionInvalidatedHook(hook func(SessionState)) {
+	n.sessionMu.Lock()
+	defer n.sessionMu.Unlock()
+	n.sessionInvalidatedHook = hook
 }

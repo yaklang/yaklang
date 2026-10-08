@@ -21,10 +21,10 @@ func newAILocalModelOperation(
 	targetNodeID string,
 ) *aiv1.AILocalModelOperation {
 	return &aiv1.AILocalModelOperation{
-		OperationId: strings.TrimSpace(operationID),
-		Kind:        strings.TrimSpace(kind),
-		ModelName:   strings.TrimSpace(modelName),
-		Title:       strings.TrimSpace(title),
+		OperationId:  strings.TrimSpace(operationID),
+		Kind:         strings.TrimSpace(kind),
+		ModelName:    strings.TrimSpace(modelName),
+		Title:        strings.TrimSpace(title),
 		TargetNodeId: strings.TrimSpace(targetNodeID),
 	}
 }
@@ -223,7 +223,7 @@ func (b *legionJobBridge) handleAILlamaServerInstall(ctx context.Context, raw []
 		return b.ensureAIPublisher().PublishAILlamaServerInstallFailed(ctx, ref, "ai_local_model_invalid_command", err.Error())
 	}
 	operation := newAILocalModelOperation(command.GetMetadata().GetCommandId(), "install_llama_server", "", "安装 llama-server", command.GetTargetNodeId())
-	opCtx, cancel := context.WithCancel(context.Background())
+	opCtx, cancel := context.WithCancel(b.companyExecutionContext(context.Background()))
 	b.aiLocalModelOps.Store(operation.GetOperationId(), cancel)
 	if err := b.ensureAIPublisher().PublishAILocalModelOperationAccepted(ctx, ref, operation); err != nil {
 		b.aiLocalModelOps.Remove(operation.GetOperationId())
@@ -397,7 +397,7 @@ func (b *legionJobBridge) handleAILocalModelStart(ctx context.Context, raw []byt
 		return b.ensureAIPublisher().PublishAILocalModelStartFailed(ctx, ref, "ai_local_model_invalid_name", "model name is required")
 	}
 	operation := newAILocalModelOperation(command.GetMetadata().GetCommandId(), "start_model", modelName, fmt.Sprintf("启动模型 %s", modelName), command.GetTargetNodeId())
-	opCtx, cancel := context.WithCancel(context.Background())
+	opCtx, cancel := context.WithCancel(b.companyExecutionContext(context.Background()))
 	b.aiLocalModelOps.Store(operation.GetOperationId(), cancel)
 	if err := b.ensureAIPublisher().PublishAILocalModelOperationAccepted(ctx, ref, operation); err != nil {
 		b.aiLocalModelOps.Remove(operation.GetOperationId())
@@ -470,7 +470,7 @@ func (b *legionJobBridge) handleAILocalModelDownload(ctx context.Context, raw []
 		return b.ensureAIPublisher().PublishAILocalModelDownloadFailed(ctx, ref, "ai_local_model_invalid_name", "model name is required")
 	}
 	operation := newAILocalModelOperation(command.GetMetadata().GetCommandId(), "download_model", modelName, fmt.Sprintf("下载模型 %s", modelName), command.GetTargetNodeId())
-	opCtx, cancel := context.WithCancel(context.Background())
+	opCtx, cancel := context.WithCancel(b.companyExecutionContext(context.Background()))
 	b.aiLocalModelOps.Store(operation.GetOperationId(), cancel)
 	if err := b.ensureAIPublisher().PublishAILocalModelOperationAccepted(ctx, ref, operation); err != nil {
 		b.aiLocalModelOps.Remove(operation.GetOperationId())
@@ -710,7 +710,7 @@ func newLocalModelExecStream(ctx context.Context, onEvent func(*ypb.ExecResult))
 	return &localModelExecStream{ctx: ctx, onEvent: onEvent}
 }
 
-func (s *localModelExecStream) SetHeader(metadata.MD) error { return nil }
+func (s *localModelExecStream) SetHeader(metadata.MD) error  { return nil }
 func (s *localModelExecStream) SendHeader(metadata.MD) error { return nil }
 func (s *localModelExecStream) SetTrailer(metadata.MD)       {}
 func (s *localModelExecStream) Context() context.Context     { return s.ctx }

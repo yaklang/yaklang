@@ -46,10 +46,17 @@ type BootstrapRequest struct {
 
 // SessionState is the session material returned by the platform.
 type SessionState struct {
+	SessionStartedAt            time.Time
 	NodeID                      string
 	SessionID                   string
 	SessionToken                string
+	CompanyID                   string
 	NATSURL                     string
+	NATSCredentials             string
+	NATSCredentialsExpiresAt    time.Time
+	CommandStream               string
+	CommandConsumer             string
+	InboxPrefix                 string
 	CommandSubject              string
 	EventSubjectPrefix          string
 	ExpiresAt                   time.Time
@@ -150,8 +157,15 @@ func (t *httpTransport) Bootstrap(
 	var response struct {
 		NodeID                      string    `json:"node_id"`
 		NodeSessionID               string    `json:"node_session_id"`
+		SessionStartedAt            time.Time `json:"session_started_at"`
 		SessionToken                string    `json:"session_token"`
+		CompanyID                   string    `json:"company_id"`
 		NATSURL                     string    `json:"nats_url"`
+		NATSCredentials             string    `json:"nats_credentials"`
+		NATSCredentialsExpiresAt    time.Time `json:"nats_credentials_expires_at"`
+		CommandStream               string    `json:"command_stream"`
+		CommandConsumer             string    `json:"command_consumer"`
+		InboxPrefix                 string    `json:"inbox_prefix"`
 		CommandSubject              string    `json:"command_subject"`
 		EventSubjectPrefix          string    `json:"event_subject_prefix"`
 		ExpiresAt                   time.Time `json:"expires_at"`
@@ -165,8 +179,15 @@ func (t *httpTransport) Bootstrap(
 	return SessionState{
 		NodeID:                      strings.TrimSpace(response.NodeID),
 		SessionID:                   response.NodeSessionID,
+		SessionStartedAt:            response.SessionStartedAt,
 		SessionToken:                response.SessionToken,
+		CompanyID:                   strings.TrimSpace(response.CompanyID),
 		NATSURL:                     response.NATSURL,
+		NATSCredentials:             response.NATSCredentials,
+		NATSCredentialsExpiresAt:    response.NATSCredentialsExpiresAt,
+		CommandStream:               strings.TrimSpace(response.CommandStream),
+		CommandConsumer:             strings.TrimSpace(response.CommandConsumer),
+		InboxPrefix:                 strings.TrimSpace(response.InboxPrefix),
 		CommandSubject:              response.CommandSubject,
 		EventSubjectPrefix:          response.EventSubjectPrefix,
 		ExpiresAt:                   response.ExpiresAt,

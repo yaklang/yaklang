@@ -57,6 +57,7 @@ type dispatchAdmissionRegistry struct {
 	mu sync.Mutex
 
 	sessionID     string
+	sessionFenced bool
 	shuttingDown  bool
 	byAttempt     map[string]*dispatchReservation
 	byCommand     map[string]string
@@ -85,6 +86,7 @@ func (r *dispatchAdmissionRegistry) SwitchSession(sessionID string) []*dispatchR
 		stale = append(stale, reservation)
 	}
 	r.sessionID = sessionID
+	r.sessionFenced = sessionID == ""
 	r.byAttempt = make(map[string]*dispatchReservation)
 	r.byCommand = make(map[string]string)
 	r.bySubtask = make(map[string]map[string]*dispatchReservation)
@@ -101,7 +103,7 @@ func (r *dispatchAdmissionRegistry) Reserve(
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	r.pruneLocked(time.Now().UTC())
-	if r.shuttingDown || (r.sessionID != "" && sessionID != r.sessionID) {
+	if r.shuttingDown || r.sessionFenced || (r.sessionID != "" && sessionID != r.sessionID) {
 		return nil, dispatchStaleSession
 	}
 	if r.sessionID == "" {

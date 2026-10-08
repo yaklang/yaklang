@@ -1,6 +1,7 @@
 package schema
 
 import (
+	"fmt"
 	"github.com/samber/lo"
 	"github.com/yaklang/gorm"
 	"github.com/yaklang/yaklang/common/log"
@@ -168,6 +169,16 @@ func AutoMigrate(db *gorm.DB, key uint8) {
 	} else {
 		log.Errorf("Database schema key: %v is %v", key, KeySchemaToName(key))
 	}
+}
+
+// AutoMigrateWithError is the explicit operations entrypoint. Legacy callers
+// keep their logging behavior; operations must not report a failed DDL as ready.
+func AutoMigrateWithError(db *gorm.DB, key uint8) error {
+	models, ok := databaseSchemas[key]
+	if !ok || len(models) == 0 {
+		return fmt.Errorf("database schema %s is empty", KeySchemaToName(key))
+	}
+	return db.AutoMigrate(models...).Error
 }
 
 func RegisterDatabasePatch(key uint8, patch func(db *gorm.DB)) {

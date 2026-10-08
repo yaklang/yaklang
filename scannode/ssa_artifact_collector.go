@@ -48,6 +48,8 @@ type SSAArtifactUploadConfig struct {
 	STSSecretKey    string `json:"-"`
 	STSSessionToken string `json:"-"`
 	STSExpiresAt    int64
+	// Set only by a validated node-session ticket, never by script parameters.
+	authorizedAttemptDir string
 }
 
 func (cfg *SSAArtifactUploadConfig) accessKeySecret() secretValue {

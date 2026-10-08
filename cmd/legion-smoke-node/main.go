@@ -42,7 +42,7 @@ func main() {
 }
 
 func run(args []string) error {
-	if shouldRunDistYak(args) {
+	if shouldRunDistYak(args) || (len(args) > 1 && args[1] == scannode.SSAIRSchemaCommand.Name) {
 		return runDistYak(args)
 	}
 	return runNode(args[1:])
@@ -54,11 +54,14 @@ func shouldRunDistYak(args []string) bool {
 
 func runDistYak(args []string) error {
 	app := cli.NewApp()
-	app.Commands = []cli.Command{scannode.DistYakCommand}
+	app.Commands = []cli.Command{scannode.DistYakCommand, scannode.SSAIRSchemaCommand}
 	return app.Run(args)
 }
 
 func runNode(args []string) error {
+	if err := scannode.ValidateNodeDatabaseEnvironment(); err != nil {
+		return err
+	}
 	flags := flag.NewFlagSet("legion-smoke-node", flag.ContinueOnError)
 	apiURL := flags.String("api-url", "http://127.0.0.1:8080", "Legion platform HTTP API base URL")
 	runtimeAPIURL := flags.String("runtime-api-url", strings.TrimSpace(os.Getenv("LEGION_RUNTIME_API_URL")), "Container-facing Legion platform HTTP API base URL for Runtime Host commands")
@@ -200,6 +203,7 @@ func runNode(args []string) error {
 		scanNodeOptions = append(scanNodeOptions, scannode.WithRuntimeHost(scannode.RuntimeHostConfig{
 			Enabled: *runtimeHost, PlatformAPIBaseURL: *apiURL, RuntimePlatformAPIBaseURL: *runtimeAPIURL, EnrollmentToken: *enrollmentToken,
 			AgentInstallationID: *agentInstallationID, Network: *runtimeNetwork,
+			NATSCAFile:      strings.TrimSpace(os.Getenv("LEGION_NATS_CA")),
 			EngineReleaseID: *engineReleaseID, EngineDigest: *engineDigest,
 			SystemReservedCPUMillicores: *runtimeSystemReservedCPU,
 			SystemReservedMemoryBytes:   *runtimeSystemReservedMemory,

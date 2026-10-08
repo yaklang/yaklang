@@ -281,6 +281,12 @@ func (s *ScanNode) uploadDebugArtifacts(
 		}
 
 		provider := s.buildDebugUploadConfigProvider(ctx, reporter, cfg, objKey)
+		resolved, err := provider(false)
+		if err != nil {
+			log.Warnf("[debug] resolve upload ticket for %s: %v", art.FileName, err)
+			continue
+		}
+		objKey = resolved.ObjectKey
 		if err := uploadDebugArtifactFile(ctx, art.FilePath, size, objKey, provider); err != nil {
 			log.Warnf("[debug] upload %s failed: %v", art.FileName, err)
 			continue
@@ -302,7 +308,13 @@ func (s *ScanNode) buildDebugUploadConfigProvider(
 	baseCfg *SSAArtifactUploadConfig,
 	objKey string,
 ) ssaUploadConfigProvider {
-	baseProvider := s.buildSSAArtifactUploadConfigProvider(ctx, reporter, baseCfg)
+	ticketCfg := baseCfg
+	if s != nil && s.node != nil {
+		if session, ok := s.node.GetSessionState(); ok && strings.TrimSpace(session.CompanyID) != "" {
+			ticketCfg = &SSAArtifactUploadConfig{Codec: baseCfg.Codec}
+		}
+	}
+	baseProvider := s.buildSSAArtifactUploadConfigProvider(ctx, reporter, ticketCfg, ssaArtifactTicketKindDebug)
 	return func(force bool) (*SSAArtifactUploadConfig, error) {
 		cfg, err := baseProvider(force)
 		if err != nil {
@@ -310,6 +322,9 @@ func (s *ScanNode) buildDebugUploadConfigProvider(
 		}
 		cp := *cfg
 		cp.ObjectKey = objKey
+		if cfg.authorizedAttemptDir != "" {
+			cp.ObjectKey = cfg.authorizedAttemptDir + "/debug/" + filepath.Base(objKey)
+		}
 		return &cp, nil
 	}
 }
@@ -323,7 +338,9 @@ func uploadDebugArtifactFile(ctx context.Context, path string, size int64, objKe
 			return nil, err
 		}
 		cp := *cfg
-		cp.ObjectKey = strings.TrimSpace(objKey)
+		if cfg.authorizedAttemptDir == "" {
+			cp.ObjectKey = strings.TrimSpace(objKey)
+		}
 		return &cp, nil
 	})
 }
