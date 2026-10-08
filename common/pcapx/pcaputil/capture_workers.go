@@ -6,10 +6,11 @@ import (
 	"io"
 
 	"github.com/gopacket/gopacket"
+	"github.com/gopacket/gopacket/layers"
 	"github.com/yaklang/pcap"
 )
 
-// Worker captures own a finite-timeout native reader. No producer goroutine
+// Exclusive bin-parser/worker captures own a finite-timeout native reader. No producer goroutine
 // remains inside libpcap when final device statistics are collected.
 func openLiveWorkers(conf *CaptureConfig, ctx context.Context, h *PcapHandleWrapper) error {
 	private := len(conf.onEveryPacket) == 0 && conf.Output == nil && !conf.Debug
@@ -18,6 +19,13 @@ func openLiveWorkers(conf *CaptureConfig, ctx context.Context, h *PcapHandleWrap
 		read = h.handle.ZeroCopyReadPacketData
 	}
 	link := h.LinkType()
+	return readLiveWorkerPackets(conf, ctx, read, link, private)
+}
+
+// Keep the native reader separate so offline regressions exercise live dispatch.
+func readLiveWorkerPackets(conf *CaptureConfig, ctx context.Context, read func() ([]byte, gopacket.CaptureInfo, error), link layers.LinkType, private bool) error {
+	d := offlineDecoder{conf: conf, link: link}
+	var number uint64
 	for ctx.Err() == nil {
 		raw, ci, err := read()
 		if err == pcap.NextErrorTimeoutExpired {
@@ -29,17 +37,40 @@ func openLiveWorkers(conf *CaptureConfig, ctx context.Context, h *PcapHandleWrap
 		if err != nil {
 			return err
 		}
+		number++
+		evidence := evidenceFrom(ci)
+		if evidence.Ref.Number == 0 {
+			evidence.Ref.Number = number
+		}
+		ci = withEvidence(ci, evidence)
+		conf.trafficPool.observeCapture(len(raw))
+		if conf.recorder != nil {
+			if err := conf.recorder.write(raw, ci, link); err != nil {
+				return err
+			}
+		}
 		if private {
+			if conf.trafficPool.parallel == nil {
+				if ci.CaptureLength < ci.Length {
+					conf.trafficPool.singleDiagnostics.truncated.Add(1)
+					conf.trafficPool.reassemblyFailure("truncated live capture")
+				}
+				d.feed(ctx, raw, ci)
+				continue
+			}
 			conf.trafficPool.parallel.checkTruncation(ci)
 			if !conf.DisableAssembly {
 				if key, ok, err := rawFlowKey(raw, link); err != nil {
 					conf.trafficPool.malformedPacket(err.Error())
 				} else if ok {
-					conf.trafficPool.parallel.submit(workerPacket{data: raw, ts: ci.Timestamp, link: link, raw: true, key: key})
+					key.domain = evidence.Ref.Domain
+					conf.trafficPool.parallel.submit(workerPacket{data: raw, ts: ci.Timestamp, captureLength: ci.CaptureLength, originalLength: ci.Length, link: link, raw: true, key: key, evidence: evidence})
+				} else if conf.binParser != nil {
+					d.feed(ctx, raw, ci)
 				}
 			}
 		} else {
-			packet := gopacket.NewPacket(raw, link, gopacket.DecodeOptions{Lazy: true, NoCopy: true, DecodeStreamsAsDatagrams: true})
+			packet := gopacket.NewPacket(raw, captureLinkDecoder(link), gopacket.DecodeOptions{Lazy: true, NoCopy: true, DecodeStreamsAsDatagrams: conf.binParser == nil})
 			packet.Metadata().CaptureInfo = ci
 			conf.packetHandler(ctx, packet)
 		}
