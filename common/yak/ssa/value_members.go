@@ -35,6 +35,7 @@ func (n *anValue) appendMemberPairIDs(keyID, memberID int64) {
 		return
 	}
 	n.memberPairs = append(n.memberPairs, pair)
+	n.markPersistenceDirty()
 }
 
 func (n *anValue) appendOwnerPairIDs(objectID, keyID int64) {
@@ -53,6 +54,7 @@ func (n *anValue) appendOwnerPairIDs(objectID, keyID int64) {
 		}
 	}
 	n.ownerPairs = append(n.ownerPairs, pair)
+	n.markPersistenceDirty()
 }
 
 func (n *anValue) memberPairMatchesKey(pair memberPairRecord, key Value) bool {
@@ -104,6 +106,7 @@ func (n *anValue) DeleteMember(k Value) {
 	n.memberPairs = slices.DeleteFunc(slices.Clone(n.memberPairs), func(pair memberPairRecord) bool {
 		return remove[pair.key]
 	})
+	n.markPersistenceDirty()
 }
 
 func sameConstKeyValue(lhs, rhs Value) bool {

@@ -237,6 +237,7 @@ func (b *FunctionBuilder) PopFunction() *FunctionBuilder {
 
 // function param
 func (b FunctionBuilder) HandlerEllipsis() {
+	defer b.Function.markPersistenceDirty()
 	if len(b.Params) == 0 {
 		b.hasEllipsis = true
 		return

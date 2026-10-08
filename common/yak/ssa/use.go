@@ -152,6 +152,7 @@ func (p *Phi) HasValues() bool   { return true }
 func (p *Phi) GetValues() Values { return p.GetValuesByIDs(p.Edge) }
 
 func (p *Phi) ReplaceValue(v Value, to Value) {
+	defer p.markPersistenceDirty()
 	// p.Edge = slices.Replace(p.Edge, 0, len(p.Edge), v, to)
 	if index := slices.Index(p.Edge, v.GetId()); index != -1 {
 		p.Edge[index] = to.GetId()
@@ -215,6 +216,7 @@ func (e *ExternLib) GetValues() Values {
 	return ret
 }
 func (e *ExternLib) ReplaceValue(v Value, to Value) {
+	defer e.markPersistenceDirty()
 	fromID, toID := v.GetId(), to.GetId()
 	e.relationsMu.Lock()
 	defer e.relationsMu.Unlock()
@@ -250,6 +252,7 @@ func (c *ConstInst) GetValues() Values {
 }
 
 func (c *ConstInst) ReplaceValue(v Value, to Value) {
+	defer c.markPersistenceDirty()
 	if c.Origin > 0 {
 		user, ok := c.GetUsersByID(c.Origin)
 		if ok {
@@ -267,6 +270,7 @@ func (b *BinOp) HasValues() bool   { return true }
 func (b *BinOp) GetValues() Values { return b.GetValuesByIDs([]int64{b.X, b.Y}) }
 
 func (b *BinOp) ReplaceValue(v Value, to Value) {
+	defer b.markPersistenceDirty()
 	if b.X == v.GetId() {
 		b.X = to.GetId()
 	} else if b.Y == v.GetId() {
@@ -281,6 +285,7 @@ func (n *UnOp) HasValues() bool   { return true }
 func (n *UnOp) GetValues() Values { return n.GetValuesByIDs([]int64{n.X}) }
 
 func (u *UnOp) ReplaceValue(v Value, to Value) {
+	defer u.markPersistenceDirty()
 	if u.X == v.GetId() {
 		u.X = to.GetId()
 	} else {
@@ -308,6 +313,7 @@ func (c *Call) GetValues() Values {
 func (c *Call) ReplaceValue(v Value, to Value) {
 	fromID := v.GetId()
 	toID := to.GetId()
+	defer c.markPersistenceDirty()
 	if c.Method == fromID {
 		c.Method = toID
 		c.handlerObjectMethod()
@@ -335,6 +341,7 @@ func (c *Call) ReplaceValue(v Value, to Value) {
 func (s *SideEffect) HasValues() bool   { return true }
 func (s *SideEffect) GetValues() Values { return s.GetValuesByIDs([]int64{s.CallSite, s.Value}) }
 func (s *SideEffect) ReplaceValue(v Value, to Value) {
+	defer s.markPersistenceDirty()
 	if s.CallSite == v.GetId() {
 		s.CallSite = to.GetId()
 	} else if s.Value == v.GetId() {
@@ -348,6 +355,7 @@ func (s *SideEffect) ReplaceValue(v Value, to Value) {
 func (r *Return) HasValues() bool   { return true }
 func (r *Return) GetValues() Values { return r.GetValuesByIDs(r.Results) }
 func (r *Return) ReplaceValue(v Value, to Value) {
+	defer r.markPersistenceDirty()
 	if index := slices.Index(r.Results, v.GetId()); index > -1 {
 		r.Results[index] = to.GetId()
 	} else {
@@ -364,6 +372,7 @@ func (i *Make) GetValues() Values {
 	return i.GetValuesByIDs(ids)
 }
 func (i *Make) ReplaceValue(v, to Value) {
+	defer i.markPersistenceDirty()
 	if i.Cap == v.GetId() {
 		i.Cap = to.GetId()
 	} else if i.Len == v.GetId() {
@@ -387,6 +396,7 @@ func (i *Make) ReplaceValue(v, to Value) {
 func (n *Next) HasValues() bool   { return true }
 func (n *Next) GetValues() Values { return n.GetValuesByIDs([]int64{n.Iter}) }
 func (n *Next) ReplaceValue(v, to Value) {
+	defer n.markPersistenceDirty()
 	if n.Iter == v.GetId() {
 		n.Iter = to.GetId()
 	} else {
@@ -402,6 +412,7 @@ func (a *Assert) GetValues() Values {
 }
 
 func (a *Assert) ReplaceValue(v, to Value) {
+	defer a.markPersistenceDirty()
 	if a.Cond == v.GetId() {
 		a.Cond = to.GetId()
 	} else if a.MsgValue == v.GetId() {
@@ -417,6 +428,7 @@ func (r *Assert) GetUsers() Users { return nil }
 func (t *TypeCast) HasValues() bool   { return true }
 func (t *TypeCast) GetValues() Values { return t.GetValuesByIDs([]int64{t.Value}) }
 func (t *TypeCast) ReplaceValue(v, to Value) {
+	defer t.markPersistenceDirty()
 	if t.Value == v.GetId() {
 		t.Value = to.GetId()
 	} else {
@@ -432,6 +444,7 @@ func (t *TypeValue) GetValues() Values { return nil }
 func (p *Panic) HasValues() bool   { return true }
 func (p *Panic) GetValues() Values { return p.GetValuesByIDs([]int64{p.Info}) }
 func (p *Panic) ReplaceValue(v, to Value) {
+	defer p.markPersistenceDirty()
 	if p.Info == v.GetId() {
 		p.Info = to.GetId()
 	} else {
@@ -453,6 +466,7 @@ func (i *If) GetValues() Values {
 	return i.GetValuesByIDs([]int64{i.Cond})
 }
 func (i *If) ReplaceValue(v Value, to Value) {
+	defer i.markPersistenceDirty()
 	if i.Cond == v.GetId() {
 		i.Cond = to.GetId()
 	} else {
@@ -468,6 +482,7 @@ func (l *Loop) GetValues() Values {
 	return l.GetValuesByIDs([]int64{l.Cond, l.Init, l.Step, l.Key})
 }
 func (l *Loop) ReplaceValue(v Value, to Value) {
+	defer l.markPersistenceDirty()
 	if l.Cond == v.GetId() {
 		l.Cond = to.GetId()
 	} else if l.Init == v.GetId() {
@@ -495,6 +510,7 @@ func (l *Jump) GetValues() Values {
 	return nil
 }
 func (l *Jump) ReplaceValue(v Value, to Value) {
+	defer l.markPersistenceDirty()
 	if l.To == v.GetId() {
 		l.To = to.GetId()
 	} else {
@@ -525,6 +541,7 @@ func (sw *Switch) GetValues() Values {
 	return ret
 }
 func (sw *Switch) ReplaceValue(v Value, to Value) {
+	defer sw.markPersistenceDirty()
 	if sw.Cond == v.GetId() {
 		sw.Cond = to.GetId()
 	}
@@ -567,6 +584,7 @@ func (e *ErrorHandler) GetValues() Values {
 	return vs
 }
 func (e *ErrorHandler) ReplaceValue(v Value, to Value) {
+	defer e.markPersistenceDirty()
 	// Check in catches
 	for i, c := range e.Catch {
 		if c == v.GetId() {
@@ -604,6 +622,7 @@ func (e *ErrorCatch) GetValues() Values {
 	return vs
 }
 func (e *ErrorCatch) ReplaceValue(v Value, to Value) {
+	defer e.markPersistenceDirty()
 	if e.CatchBody == v.GetId() {
 		e.CatchBody = to.GetId()
 	} else if e.Exception == v.GetId() {

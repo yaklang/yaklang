@@ -12,10 +12,13 @@ import (
 )
 
 type anInstruction struct {
-	fun   *Function
-	prog  *Program
-	block *BasicBlock
-	R     *memedit.Range
+	// The concrete owner lets a mutation requeue an instruction even after its
+	// clean cache entry was released. This self-cycle is collectible by GC.
+	persistState any
+	fun          *Function
+	prog         *Program
+	block        *BasicBlock
+	R            *memedit.Range
 	// scope *Scope
 
 	name        string
@@ -143,6 +146,7 @@ func (i *anInstruction) GetShortVerboseName() string {
 }
 
 func (i *anInstruction) SetVerboseName(verbose string) {
+	defer i.markPersistenceDirty()
 	i.verboseName = verbose
 }
 
@@ -154,6 +158,7 @@ func NewInstruction() *anInstruction {
 
 // ssa function and block
 func (a *anInstruction) SetFunc(f *Function) {
+	defer a.markPersistenceDirty()
 	a.fun = f
 	if f != nil {
 		a.prog = f.GetProgram()
@@ -227,6 +232,7 @@ func (a *anInstruction) SetProgram(prog *Program) {
 }
 
 func (a *anInstruction) SetIsAnnotation(b bool) {
+	defer a.markPersistenceDirty()
 	a.isAnnotation = b
 }
 func (v *anInstruction) IsSupportConstMethod() bool {
@@ -242,6 +248,7 @@ func (a *anInstruction) IsAnnotation() bool {
 }
 
 func (a *anInstruction) SetBlock(block *BasicBlock) {
+	defer a.markPersistenceDirty()
 	a.block = block
 	if block != nil {
 		a.setLocationIDs(a.funcId, block.GetId())
@@ -287,6 +294,7 @@ func (c *anInstruction) GetRange() *memedit.Range {
 }
 
 func (c *anInstruction) SetRange(pos *memedit.Range) {
+	defer c.markPersistenceDirty()
 	// if c.Pos == nil {
 	c.R = pos
 	// }
@@ -299,8 +307,11 @@ func (c *anInstruction) SetRange(pos *memedit.Range) {
 // 	}
 // }
 
-func (c *anInstruction) IsExtern() bool   { return c.isExtern }
-func (c *anInstruction) SetExtern(b bool) { c.isExtern = b }
+func (c *anInstruction) IsExtern() bool { return c.isExtern }
+func (c *anInstruction) SetExtern(b bool) {
+	c.isExtern = b
+	c.markPersistenceDirty()
+}
 
 // error logger
 func (c *anInstruction) NewError(kind ErrorKind, tag ErrorTag, msg string) {
@@ -313,6 +324,7 @@ func (c *anInstruction) NewError(kind ErrorKind, tag ErrorTag, msg string) {
 
 // variable
 func (a *anInstruction) SetName(v string) {
+	defer a.markPersistenceDirty()
 	if utils.IsNil(a) {
 		return
 	}
@@ -361,7 +373,9 @@ type ownerPairRecord struct {
 }
 
 type anValue struct {
-	*anInstruction
+	// Own the base state in the same allocation. Values must not be copied
+	// after use (relationsMu and sync.Once fields already prohibit copying).
+	anInstruction
 
 	typId       int64
 	relationsMu sync.Mutex
@@ -396,7 +410,7 @@ var defaultAnyType = CreateAnyType()
 
 func NewValue() *anValue {
 	ret := &anValue{
-		anInstruction: NewInstruction(),
+		anInstruction: anInstruction{id: -1},
 		typId:         -1,
 	}
 	ret.SetType(defaultAnyType)
@@ -426,12 +440,23 @@ func (n *anValue) SetLazySaveType(lazySaveType func()) {
 }
 
 func (n *anValue) LazySaveType() {
+	if pendingType, ok := n.persistState.(Type); ok {
+		if cache := n.getProgramCache(); cache != nil {
+			cache.rememberType(pendingType)
+			n.typId = pendingType.GetId()
+			n.persistState = nil
+		}
+	}
 	if n.lazySaveType != nil {
-		n.lazySaveType()
+		work := n.lazySaveType
+		// Construction-only closures must not keep old type graphs alive.
+		n.lazySaveType = nil
+		work()
 	}
 }
 
 func (n *anValue) SetType(typ Type) {
+	defer n.markPersistenceDirty()
 	if typ == nil {
 		return
 	}
@@ -475,13 +500,12 @@ func (n *anValue) cacheType(typ Type) int64 {
 	}
 	if cache := n.getProgramCache(); cache != nil {
 		cache.rememberType(typ)
+		if _, pending := n.persistState.(Type); pending {
+			n.persistState = nil
+		}
 	} else {
-		n.SetLazySaveType(func() {
-			if cache := n.getProgramCache(); cache != nil {
-				cache.rememberType(typ)
-				n.typId = typ.GetId()
-			}
-		})
+		// Defer the type itself without allocating a closure per SSA value.
+		n.persistState = typ
 	}
 	return typ.GetId()
 }
@@ -557,6 +581,7 @@ func (a *anValue) GetAllVariables() map[string]*Variable {
 }
 
 func (a *anValue) AddVariable(v *Variable) {
+	defer a.markPersistenceDirty()
 	if v == nil {
 		return
 	}
@@ -587,6 +612,7 @@ func (i *anValue) getMaskMap(create ...bool) *omap.OrderedMap[int64, int64] {
 }
 
 func (i *anValue) AddMask(v Value) {
+	defer i.markPersistenceDirty()
 	id := v.GetId()
 	i.getMaskMap(true).Set(id, id)
 }
@@ -608,6 +634,7 @@ func (i *anValue) Masked() bool {
 }
 
 func (i *anValue) SetReference(v Value) {
+	defer i.markPersistenceDirty()
 	i.reference = v.GetId()
 }
 
@@ -617,6 +644,7 @@ func (i *anValue) GetReference() Value {
 }
 
 func (i *anValue) AddPointer(v Value) {
+	defer i.markPersistenceDirty()
 	i.pointer = append(i.pointer, v.GetId())
 }
 
@@ -625,6 +653,7 @@ func (i *anValue) GetPointer() Values {
 }
 
 func (i *anValue) AddOccultation(p Value) {
+	defer i.markPersistenceDirty()
 	i.occultation = append(i.occultation, p.GetId())
 }
 

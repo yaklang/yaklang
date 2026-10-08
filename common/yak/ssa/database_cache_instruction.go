@@ -68,6 +68,8 @@ type instructionStore struct {
 	// residentCache drives the adaptive DB-write fast path: all instructions
 	// stay resident until Close, with synchronous incremental batched flush.
 	residentCache *dbcache.ResidentFlushCache[int64, Instruction, *instructionPersistRecord]
+	// Clean reloads have bounded residency and never enter the dirty queue.
+	residentReloads *utils.CacheExWithKey[int64, Instruction]
 
 	persistedCount   atomic.Int64
 	batchSaveCount   atomic.Int64
@@ -76,6 +78,7 @@ type instructionStore struct {
 	persistCompleted atomic.Int64
 	writeOperations  atomic.Int64
 	unchangedSkipped atomic.Int64
+	residentReleased atomic.Int64
 
 	// persistedIDs tracks which instruction IDs have been successfully
 	// persisted to the DB. This prevents duplicate INSERTs when the async
@@ -85,7 +88,7 @@ type instructionStore struct {
 	persistedIDs   map[int64]struct{}
 	// Only the resident fast path keeps snapshots for final change detection.
 	// A fingerprint is published after its database transaction succeeds.
-	residentFingerprints map[int64][sha256.Size]byte
+	residentFingerprints typeFingerprints
 
 	// reservedIDs tracks IDs that have been enqueued for persistence
 	// (MarkDirty called) but not yet saved. When Set is called for a
@@ -155,7 +158,7 @@ func newInstructionStore(
 		store.reader = reader
 	case ProgramCacheDBWrite:
 		if useAdaptiveInstructionFastPath(cfg) {
-			store.residentFingerprints = make(map[int64][sha256.Size]byte)
+			store.residentFingerprints = make(typeFingerprints)
 			store.flushResidentOnClose = true
 			store.saveSize = min(max(saveSize*20, 5000), maxSaveSize)
 			store.residentCache = dbcache.NewResidentFlushCache[int64, Instruction, *instructionPersistRecord](
@@ -164,6 +167,24 @@ func newInstructionStore(
 				store.saveInstructionPersistRecords,
 			)
 			store.resident = store.residentCache.Map()
+			store.residentReloads = utils.NewCacheExWithKey[int64, Instruction](
+				utils.WithCacheCapacity(largeProjectCacheMax), utils.WithCacheTTL(time.Minute))
+			store.residentCache.SetOnSaved(func(id int64, inst Instruction) {
+				store.residentReloads.Delete(id)
+				if shouldKeepInstructionResident(inst) || shouldKeepCompileUnitBoundaryResident(inst) || shouldDelayInstructionEviction(inst) {
+					return
+				}
+				// Named values can still be held by lexical scopes. Keep their
+				// canonical object until those scopes finish using it.
+				if value, ok := inst.(interface{ getAnValue() *anValue }); ok {
+					if variables := value.getAnValue().getVariablesMap(); variables != nil && variables.Len() > 0 {
+						return
+					}
+				}
+				if store.residentCache.DeleteClean(id) {
+					store.residentReleased.Inc()
+				}
+			})
 			return store
 		}
 
@@ -218,6 +239,11 @@ func (s *instructionStore) Set(inst Instruction) {
 	} else {
 		setAtomicMaxIfGreater(s.nextID, id)
 	}
+	if s.residentCache != nil {
+		bindInstructionPersistence(inst)
+		s.residentCache.Set(id, inst)
+		return
+	}
 
 	// If already persisted: skip — DB already has this row.
 	if s.isPersisted(id) {
@@ -266,6 +292,16 @@ func (s *instructionStore) Get(id int64) Instruction {
 		if inst, ok := s.resident.Get(id); ok {
 			return inst
 		}
+		if s.residentCache != nil && s.isPersisted(id) {
+			if inst, ok := s.residentReloads.Get(id); ok {
+				return inst
+			}
+			if inst, err := s.loadInstruction(id); err == nil {
+				// Loading a persisted row is a clean read, not a mutation.
+				s.residentReloads.Set(id, inst)
+				return inst
+			}
+		}
 	}
 	return nil
 }
@@ -279,6 +315,9 @@ func (s *instructionStore) Delete(id int64) {
 		s.writer.Delete(id)
 	case s.reader != nil:
 		s.reader.Delete(id)
+	case s.residentCache != nil:
+		s.residentCache.Delete(id)
+		s.residentReloads.Delete(id)
 	case s.resident != nil:
 		s.resident.Delete(id)
 	}
@@ -520,6 +559,9 @@ func (s *instructionStore) CloseWithoutSave() {
 	if s.writer != nil {
 		s.writer.CloseWithoutSave()
 	}
+	if s.residentReloads != nil {
+		s.residentReloads.Close()
+	}
 }
 
 func (s *instructionStore) Stats() dbcache.CacheStats {
@@ -720,7 +762,7 @@ func (s *instructionStore) Close(progress func(int)) error {
 	case s.residentCache != nil:
 		log.Infof("[ssa-instruction-store] program=%s Close: residentCache mode, count=%d", progName, s.residentCache.Count())
 		s.flushRequests.Add(1)
-		// Flush(true) checks every snapshot, saving only new or changed IR,
+		// Flush(true) visits only dirty keys, saving new or changed IR,
 		// and keeps the instructions resident
 		// so the Program stays queryable for compile+scan reuse. Do NOT
 		// call Close() — that would Clear() the resident map and break
@@ -736,8 +778,8 @@ func (s *instructionStore) Close(progress func(int)) error {
 // residentCache. It turns an instruction into a persist record for the close
 // flush (EvictionReasonDeleted). ok=false means the item has no DB row to
 // write (e.g. an empty instruction) and is silently skipped; err is a marshal
-// failure to accumulate and return. Unchanged successfully persisted snapshots
-// are skipped; new IDs use INSERT and changed IDs use UPSERT.
+// failure to accumulate and return. Only dirty keys reach this callback.
+// Fingerprints filter no-op setter calls; new IDs INSERT and changed IDs UPSERT.
 func (s *instructionStore) marshalResidentRecord(inst Instruction, _ bool) (*instructionPersistRecord, bool, error) {
 	irCode, err := s.marshalIrCodeWithReason(inst, utils.EvictionReasonDeleted)
 	if err != nil {
@@ -754,7 +796,7 @@ func (s *instructionStore) marshalResidentRecord(inst Instruction, _ bool) (*ins
 		return nil, false, err
 	}
 	s.persistedIDsMu.RLock()
-	previous, saved := s.residentFingerprints[inst.GetId()]
+	previous, saved := s.residentFingerprints.get(inst.GetId())
 	s.persistedIDsMu.RUnlock()
 	if saved && previous == fingerprint {
 		releaseIrCode(irCode)
@@ -794,7 +836,19 @@ func (s *instructionStore) PreloadByIDsFast(ids []int64) {
 
 func (s *instructionStore) loadInstruction(id int64) (Instruction, error) {
 	start := time.Now()
-	inst, err := NewLazyInstruction(s.program, id)
+	var inst Instruction
+	var err error
+	if s.residentCache != nil {
+		// This store owns a bounded reload cache. Avoid also retaining every
+		// fetched row in the global 100,000-entry raw-IR cache.
+		row := ssadb.GetIrCodeItemById(s.db, s.program.GetProgramName(), id)
+		if row == nil {
+			return nil, utils.Errorf("IR %d not found", id)
+		}
+		inst, err = NewLazyInstructionFromIrCode(row, s.program)
+	} else {
+		inst, err = NewLazyInstruction(s.program, id)
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -1005,7 +1059,7 @@ func (s *instructionStore) saveInstructionPersistRecords(records []*instructionP
 	if s.residentFingerprints != nil {
 		s.persistedIDsMu.Lock()
 		for _, record := range records {
-			s.residentFingerprints[record.CodeID] = record.Fingerprint
+			s.residentFingerprints.set(record.CodeID, record.Fingerprint)
 		}
 		s.persistedIDsMu.Unlock()
 	}
@@ -1170,6 +1224,7 @@ type InstructionPersistStats struct {
 	Pending          int64
 	BatchCount       int64
 	UnchangedSkipped int64
+	ResidentReleased int64
 }
 
 func (s *instructionStore) PersistenceStats() InstructionPersistStats {
@@ -1184,6 +1239,7 @@ func (s *instructionStore) PersistenceStats() InstructionPersistStats {
 		UniquePersisted:  s.persistedCount.Load(),
 		BatchCount:       s.batchSaveCount.Load(),
 		UnchangedSkipped: s.unchangedSkipped.Load(),
+		ResidentReleased: s.residentReleased.Load(),
 	}
 	switch {
 	case s.writer != nil:
@@ -1197,13 +1253,8 @@ func (s *instructionStore) PersistenceStats() InstructionPersistStats {
 			return true
 		})
 	case s.residentCache != nil:
-		s.resident.ForEach(func(id int64, _ Instruction) bool {
-			stats.Resident++
-			if !s.isPersisted(id) {
-				stats.RemainingDirty++
-			}
-			return true
-		})
+		stats.Resident = int64(s.residentCache.Count())
+		stats.RemainingDirty = int64(s.residentCache.DirtyCount())
 	case s.reader != nil:
 		stats.Resident = int64(s.reader.Count())
 	case s.resident != nil:
