@@ -222,7 +222,8 @@ func (p *ssaRuleSyncEventPublisher) ensureJetStream(natsURL string) error {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
-	if p.js != nil && p.natsURL == natsURL {
+	// Let NATS manage transient reconnects; replace only a terminal connection.
+	if p.js != nil && p.conn != nil && !p.conn.IsClosed() && p.natsURL == natsURL {
 		return nil
 	}
 	if p.conn != nil {
