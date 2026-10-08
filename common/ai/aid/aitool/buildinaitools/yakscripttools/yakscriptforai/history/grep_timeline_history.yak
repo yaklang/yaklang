@@ -2,7 +2,21 @@ __DESC__ = "Search original timeline history in the current AI conversation, inc
 __VERBOSE_NAME__ = "Grep Timeline History"
 __VERBOSE_NAME_ZH__ = "搜索会话历史"
 __KEYWORDS__ = "timeline,history,grep,recall,bm25,regexp,历史,回顾,压缩,事件"
-__USAGE__ = "query 可空以分页浏览历史，search_mode 为 bm25/regexp/literal。BM25 的 1–2 字符短词回退字面匹配，结果 literal_fallback 标记降级。返回的是 AI Timeline 原始条目，不是前端展示 event。会话 ID 由运行时注入。升级前已被丢弃的原文无法从摘要恢复。limit 1–50；offset 为命中条目偏移。view 默认 content；value_json 可读取完整原始 value（包括工具结果、prompt-only 文本等），搜索覆盖两者。正文默认 2048 字符，truncated 为真时用 item_id 和 content_offset 分段读取原条目；分段读取时 query 留空。"
+__USAGE__ = <<<USAGE
+query 可空以分页浏览历史，search_mode 为 bm25/regexp/literal。BM25 的 1–2 字符短词回退字面匹配，结果 literal_fallback 标记降级。返回的是 AI Timeline 原始条目，不是前端展示 event。会话 ID 由运行时注入。升级前已被丢弃的原文无法从摘要恢复。limit 1–50；offset 为命中条目偏移。view 默认 content；value_json 可读取完整原始 value（包括工具结果、prompt-only 文本等），搜索覆盖两者。正文默认 2048 字符，truncated 为真时用 item_id 和 content_offset 分段读取原条目；分段读取时 query 留空。
+
+[[- if .FunctionCallMode -]]
+arguments 示例：
+```json
+{"query":"认证失败","search_mode":"literal","limit":10}
+```
+[[- else -]]
+文本流 action 示例：
+```json
+{"@action":"directly_call_tool","directly_call_tool_name":"grep_timeline_history","directly_call_tool_params":{"query":"认证失败","search_mode":"literal","limit":10}}
+```
+[[- end -]]
+USAGE
 query = cli.String("query", cli.setHelp("搜索词或正则；空值浏览历史"))
 mode = cli.String("search_mode", cli.setDefault("bm25"), cli.setHelp("bm25/regexp/literal"))
 limit = cli.Int("limit", cli.setDefault(10), cli.setHelp("返回条数，1–50"))

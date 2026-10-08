@@ -6,6 +6,17 @@ __USAGE__ = <<<USAGE
 默认查询运行时当前项目；跨库先用 query_yak_projects 取得 project_id，只接受注册 ID。keyword 搜索标题、URL、IP、payload、details 等，severity 可用 high,critical，network 支持 IP/CIDR，ports 支持范围。
 filter_json 为 QueryRisksRequest JSON，例如 {"RuntimeId":"xxx","Tags":"SQL注入|登录","AfterCreatedAt":1700000000,"SSAProgramNames":["项目名"],"IsRead":"false","WaitingVerified":false}。未指定 WaitingVerified 时查询两种状态；指定 true/false 时筛选对应状态。RiskType 使用 Yakit 的风险类型显示名称前缀。分页用 limit/offset，不接受 Pagination/Token。
 先查询候选 risk_id，再以 risk_id 单条回读 content（JSON 文本，包含漏洞细节、修复建议、payload、请求响应和 packet_pairs）。content 被截断时用 next_content_offset 继续读取，拼接后解析。http_flow_ids 可交给 query_http_history 的 flow_id，保持相同 project_id。
+[[- if .FunctionCallMode -]]
+arguments 示例：
+```json
+{"keyword":"SQL注入","severity":"high,critical","limit":10}
+```
+[[- else -]]
+文本流 action 示例：
+```json
+{"@action":"directly_call_tool","directly_call_tool_name":"query_cybersecurity_risk","directly_call_tool_params":{"keyword":"SQL注入","severity":"high,critical","limit":10}}
+```
+[[- end -]]
 USAGE
 projectID = cli.Int("project_id", cli.setDefault(0), cli.setHelp("query_yak_projects 返回的 ID；0 当前项目"))
 keyword = cli.String("keyword", cli.setHelp("风险关键词"))

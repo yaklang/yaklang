@@ -9,6 +9,17 @@ delete 必填 entry_id 或 entry_uuid，只删除该知识库中的精确条目�
 原文、旧问题/向量索引删除和图快照失效处于同一事务，提交后关闭对应图缓存，避免继续检索到过时内容。add/change 保存的原文、关键词和问题立即可通过 query_knowledge 的 source=entries 查询。结果明确返回 semantic_index_status=pending，新语义向量/问题向量需使用 Yakit 的正常索引生成流程；本工具写入不依赖外部 embedding/AI 服务。
 content 最多 32768 字符，title 最多 512；importance 1–10，默认 5；keywords/questions 为字符串数组各最多 32 项。长原文用 query_knowledge 的 content_offset 续读。
 示例：{"operator":"add","collection":"调查笔记","title":"接口认证规则","content":"POST /api/orders 需要登录态及 CSRF token。","keywords":["认证","CSRF"]}。
+[[- if .FunctionCallMode -]]
+arguments 示例：
+```json
+{"operator":"add","collection":"调查笔记","title":"接口认证规则","content":"POST /api/orders 需要登录态及 CSRF token。","keywords":["认证","CSRF"]}
+```
+[[- else -]]
+文本流 action 示例：
+```json
+{"@action":"directly_call_tool","directly_call_tool_name":"manage_knowledge","directly_call_tool_params":{"operator":"add","collection":"调查笔记","title":"接口认证规则","content":"POST /api/orders 需要登录态及 CSRF token。","keywords":["认证","CSRF"]}}
+```
+[[- end -]]
 USAGE
 operator = cli.String("operator", cli.setRequired(true), cli.setJsonSchema(`{"type":"string","enum":["add","delete","change"]}`), cli.setHelp("add/delete/change"))
 knowledgeBaseID = cli.Int("knowledge_base_id", cli.setDefault(0), cli.setHelp("query_knowledge 返回的知识库 ID"))
