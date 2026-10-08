@@ -1,3 +1,12 @@
 # Prompt bytes are part of the model protocol and cache prefix on every OS.
 # Existing prompt whitespace is intentional and must survive relocation.
 common/ai/aid/aicommon/promptloader/prompts/** text eol=lf -whitespace
+common/bin-parser/rules/**/*.yaml text eol=lf
+common/bin-parser/rules/*.yaml text eol=lf
+*.zst binary
+common/bin-parser/testdata/corpus-batches/*.zip binary
+# Existing native certificate/key fixtures retain their exact wire bytes.
+common/bin-parser/testdata/protocol-native/** -text
+common/pcapx/pcaputil/testdata/protocol-sessions/**/*.keys -text
+# Independent TShark exports preserve empty trailing columns.
+scripts/protocol-tests/generate-dcerpc-session/*.tsv -text whitespace=-blank-at-eol

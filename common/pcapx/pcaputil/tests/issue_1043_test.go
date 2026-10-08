@@ -1,23 +1,37 @@
 package tests
 
 import (
-	_ "embed"
 	"fmt"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/pcapx/pcaputil"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"github.com/yaklang/yaklang/common/utils/lowhttp/httpctx"
+
 	"net/http"
+	"os"
 	"testing"
 	"time"
+
+	"github.com/yaklang/yaklang/internal/trafficfixture"
 )
 
-//go:embed image.pcapng
-var sample1043 []byte
+var sample1043, sample1043_2 []byte
 
-//go:embed aes_wtih_magic.pcapng
-var sample1043_2 []byte
+func TestMain(m *testing.M) {
+	var err error
+	sample1043, err = trafficfixture.ReadFile("image.pcapng")
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
+	sample1043_2, err = trafficfixture.ReadFile("aes_wtih_magic.pcapng")
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
+	os.Exit(m.Run())
+}
 
 func TestIssue1043_2(t *testing.T) {
 	for i := 0; i < 200; i++ {

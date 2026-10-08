@@ -46,10 +46,59 @@ func probeModbus(w []byte, limit int) ProbeResult {
 	fc := w[7] & 0x7f
 	switch fc {
 	case 1, 2, 3, 4, 5, 6, 15, 16:
-		_ = limit
-		return probeAccept("modbus", "tcp", 91)
+	default:
+		return ProbeResult{Verdict: ProbeReject}
 	}
-	return ProbeResult{Verdict: ProbeReject}
+	// MBAP alone also matches unrelated binary envelopes such as DICOM.
+	// Validate the supported PDU shape using only its bounded header; total
+	// stream length may include subsequent frames or just a partial first frame.
+	need := 12
+	if w[7]&0x80 != 0 {
+		if n != 3 {
+			return ProbeResult{Verdict: ProbeReject}
+		}
+		need = 9
+	} else if fc <= 4 && n != 6 {
+		if n < 4 {
+			return ProbeResult{Verdict: ProbeReject}
+		}
+		need = 9
+	} else if (fc == 5 || fc == 6) && n != 6 {
+		return ProbeResult{Verdict: ProbeReject}
+	} else if fc == 15 || fc == 16 {
+		if n != 6 {
+			if n < 7 {
+				return ProbeResult{Verdict: ProbeReject}
+			}
+			need = 13
+		}
+	}
+	if len(w) < need {
+		return probeNeed("modbus", "tcp", len(w), min(limit, need))
+	}
+	if w[7]&0x80 == 0 {
+		if fc <= 4 && n != 6 {
+			if int(w[8]) != n-3 || w[8] == 0 || fc >= 3 && w[8]%2 != 0 {
+				return ProbeResult{Verdict: ProbeReject}
+			}
+		} else if (fc == 15 || fc == 16) && n != 6 {
+			quantity := int(binary.BigEndian.Uint16(w[10:12]))
+			expected, maximum := (quantity+7)/8, 1968
+			if fc == 16 {
+				expected, maximum = quantity*2, 123
+			}
+			if quantity == 0 || quantity > maximum || int(w[12]) != expected || n != 7+expected {
+				return ProbeResult{Verdict: ProbeReject}
+			}
+		}
+	}
+	if len(w) >= n+6 {
+		pdu := w[7 : n+6]
+		if validateModbusPDU(pdu, false) != nil && validateModbusPDU(pdu, true) != nil {
+			return ProbeResult{Verdict: ProbeReject}
+		}
+	}
+	return probeAccept("modbus", "tcp", 91)
 }
 
 func (f *binFlow) frameModbus(w []byte) (int, *binSpec, error) {

@@ -70,9 +70,24 @@ func packetEvidence(p gopacket.Packet) captureEvidence {
 			e.Ref.Domain.Encapsulation += fmt.Sprintf("/vxlan:%s:%d", outer, v.VNI)
 		case *layers.GRE:
 			e.Ref.Domain.Encapsulation += fmt.Sprintf("/gre:%s:%d", outer, v.Key)
+		case *layers.Geneve:
+			e.Ref.Domain.Encapsulation += fmt.Sprintf("/geneve:%s:%d", outer, v.VNI)
+		case *layers.IPv4:
+			e.Ref.Domain.Encapsulation += ipEncapsulation(v.Protocol, outer)
 		}
 	}
 	return e
+}
+
+func ipEncapsulation(protocol layers.IPProtocol, outer string) string {
+	switch protocol {
+	case layers.IPProtocolIPv4:
+		return "/ipip:" + outer
+	case layers.IPProtocolIPv6:
+		return "/6in4:" + outer
+	default:
+		return ""
+	}
 }
 func (e *ProtocolEvent) finalizeEvidence() {
 	if e.Profile == "" {

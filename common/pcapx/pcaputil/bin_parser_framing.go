@@ -200,14 +200,21 @@ func cassandraInitialExchangeHeader(w []byte, maxFrameBytes int) bool {
 
 // Detection runs only on the bounded initial prefix. Ports narrow candidates;
 // they never choose a negotiated version, phase, or native decoder by themselves.
-func (f *binFlow) detect(w []byte) {
+func (f *binFlow) detectBinding(w []byte) bool {
 	for _, port := range []uint16{0, f.ports[0], f.ports[1]} {
 		for _, b := range f.a.bindings[port] {
 			if b.Probe(w) {
 				f.protocol, f.binding = b.Protocol, b
-				return
+				return true
 			}
 		}
+	}
+	return false
+}
+
+func (f *binFlow) detect(w []byte) {
+	if f.detectBinding(w) {
+		return
 	}
 	if isHTTPStartLineCandidate(w) && f.probeHTTPStartLine(w).Verdict == ProbeAccept {
 		f.protocol = "http"
@@ -240,7 +247,7 @@ func (f *binFlow) detect(w []byte) {
 			}
 		}
 	}
-	if bytes.HasPrefix(w, []byte("stats\r\n")) || bytes.HasPrefix(w, []byte("STAT ")) || (len(w) >= 24 && w[0] == 0x80 && w[1] == 0 && w[4] == 0 && w[5] == 0 && binary.BigEndian.Uint32(w[8:12]) >= uint32(binary.BigEndian.Uint16(w[2:4]))) {
+	if bytes.HasPrefix(w, []byte("stats\r\n")) || bytes.HasPrefix(w, []byte("STAT ")) {
 		f.protocol = "memcached"
 		return
 	}
@@ -248,11 +255,11 @@ func (f *binFlow) detect(w []byte) {
 	// default port. This includes the v5 envelope format used for OPTIONS,
 	// STARTUP, and their unframed responses, but does not claim later v5
 	// framing or arbitrary CQL opcodes.
-	if f.port(9042) && cassandraInitialExchangeHeader(w, f.a.budget.MaxFrameBytes) {
+	if f.port(9042) && cassandraInitialExchangeHeader(w, f.a.budget.MaxFrameBytes) || cassandraRequestEvidence(w, f.a.budget.MaxFrameBytes) {
 		f.protocol = "cassandra"
 		return
 	}
-	if f.port(88) && len(w) >= 6 && kerberosTag(w[4]) && binary.BigEndian.Uint32(w[:4]) >= 2 {
+	if len(w) >= 6 && kerberosTag(w[4]) && binary.BigEndian.Uint32(w[:4]) >= 2 && (f.port(88) || int(binary.BigEndian.Uint32(w[:4]))+4 <= len(w) && kerberosWireEvidence(w[4:4+int(binary.BigEndian.Uint32(w[:4]))], f.a.budget.MaxFrameBytes)) {
 		f.protocol = "kerberos"
 		return
 	}
@@ -518,6 +525,12 @@ func kerberosTag(tag byte) bool {
 	return tag == 0x6a || tag == 0x6b || tag == 0x6c || tag == 0x6d || tag == 0x7e
 }
 func dnsHeader(w []byte) bool {
+	if len(w) < 12 {
+		return false
+	}
+	if binary.BigEndian.Uint16(w[2:4]) == 0 && binary.BigEndian.Uint64(w[4:12]) == 0 {
+		return false
+	}
 	return len(w) >= 12 && (w[2]>>3)&15 <= 5 && binary.BigEndian.Uint16(w[4:6]) <= 256
 }
 
@@ -557,6 +570,12 @@ func (a *binParser) datagramFields(network gopacket.NetworkLayer, udp *layers.UD
 		e.Status, e.Summary = "limited", "UDP datagram exceeds message limit"
 		a.limited.Add(uint64(len(wire)))
 	} else {
+		if events, ok := a.decodeMAVLinkDatagram(e, wire, uint16(udp.SrcPort), uint16(udp.DstPort)); ok {
+			for _, event := range events {
+				a.emit(event)
+			}
+			return
+		}
 		if events, ok := a.decodeQUICDatagram(e, wire); ok {
 			for _, event := range events {
 				a.emit(event)
@@ -568,7 +587,7 @@ func (a *binParser) datagramFields(network gopacket.NetworkLayer, udp *layers.UD
 			return
 		}
 		var spec *binSpec
-		if (udp.SrcPort == 88 || udp.DstPort == 88) && len(wire) >= 2 && kerberosTag(wire[0]) {
+		if len(wire) >= 2 && kerberosTag(wire[0]) && ((udp.SrcPort == 88 || udp.DstPort == 88) || kerberosWireEvidence(wire, a.config.MaxMessageBytes)) {
 			e.Protocol = "kerberos"
 			spec = a.specs["application-layer.kerberos_fields/KerberosMessageFields"]
 		}

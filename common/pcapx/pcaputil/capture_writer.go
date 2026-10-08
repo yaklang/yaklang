@@ -18,6 +18,21 @@ func (p *TrafficPool) observeCapture(size int) {
 	p.capturedBytes.Add(uint64(size))
 }
 
+// Capture loss is a reader fact, independent of TCP, worker count or observers.
+// Account for it once at ingress, before packet normalization or dispatch.
+func (p *TrafficPool) observeCaptureInfo(size int, ci gopacket.CaptureInfo) {
+	p.observeCapture(size)
+	if ci.CaptureLength >= ci.Length {
+		return
+	}
+	if p.parallel != nil {
+		p.parallel.checkTruncation(ci)
+	} else {
+		p.singleDiagnostics.truncated.Add(1)
+		p.reassemblyFailure(fmt.Sprintf("capture contains truncated packets (captured %d of %d bytes)", ci.CaptureLength, ci.Length))
+	}
+}
+
 func (c *CaptureConfig) requiresExclusiveHandle() bool {
 	return c.reassemblyOptions.Workers > 1 || c.binParser != nil || c.recorder != nil || c.captureBuffer > 0
 }

@@ -10,12 +10,14 @@ import (
 // encryption from PRELOGIN, and SQLBatch/RPC pair with the next type-4 token
 // stream. Ports are never consulted.
 type binTDS struct {
-	client    int
-	version   uint32
-	version72 bool
-	loggedIn  bool
-	encrypt   byte // 0xff until an ENCRYPTION token is observed
-	pending   []string
+	client      int
+	version     uint32
+	version72   bool
+	loggedIn    bool
+	loginAck    bool
+	loginFailed bool
+	encrypt     byte // 0xff until an ENCRYPTION token is observed
+	pending     []string
 }
 
 const tdsEncryptUnknown = 0xff
@@ -248,10 +250,19 @@ func (t *binTDS) consume(dir int, raw []byte, result map[string]any, maxPending 
 		}
 		info["Outstanding"] = true
 	case 16:
+		if dir != t.client {
+			return nil, fmt.Errorf("tds: LOGIN7 must originate from the observed client")
+		}
+		for _, pending := range t.pending {
+			if pending == "LOGIN7" {
+				return nil, fmt.Errorf("tds: overlapping LOGIN7 requests")
+			}
+		}
 		login, err := tdsParseLogin7(body)
 		if err != nil {
 			return nil, err
 		}
+		t.loggedIn, t.loginAck, t.loginFailed = false, false, false
 		for k, v := range login {
 			info[k] = v
 		}
@@ -305,10 +316,56 @@ func (t *binTDS) consume(dir int, raw []byte, result map[string]any, maxPending 
 			}
 			info["Token Names"] = names
 		}
-		t.match("", info)
-		if name, _ := info["Matched Request"].(string); name == "LOGIN7" {
-			t.loggedIn = true
-			info["Logged In"] = true
+		if len(t.pending) > 0 && t.pending[0] == "LOGIN7" {
+			// A type-4 response alone is not evidence of successful login.
+			// Keep an ACK observed in an earlier EOM message until final DONE.
+			// Client-originated tokens cannot confirm a server login.
+			if dir == t.client {
+				info["Unmatched"], info["Association Status"] = true, "wrong-direction"
+				info["Context Level"] = "partial"
+				return info, nil
+			}
+			final := false
+			tokens, _ := info["Response Tokens"].([]map[string]any)
+			for _, token := range tokens {
+				if final {
+					// Login completion must be the last token, not a marker
+					// embedded in a longer server response.
+					t.loginFailed = true
+				}
+				switch token["Name"] {
+				case "LOGINACK":
+					if !final {
+						t.loginAck = true
+					}
+				case "DONEPROC", "DONEINPROC":
+					// Procedure completion is not a LOGIN7 completion token.
+					t.loginFailed = true
+				case "DONE":
+					status, _ := token["Status"].(uint64)
+					final = status&1 == 0
+					t.loginFailed = t.loginFailed || status&(2|0x100) != 0
+				}
+			}
+			info["Login Acknowledged"] = t.loginAck
+			if !final {
+				info["Matched Request"], info["Association Status"] = "LOGIN7", "partial"
+				info["Outstanding"], info["Login Result"] = true, "pending"
+				return info, nil
+			}
+			t.match("LOGIN7", info)
+			t.loggedIn = t.loginAck && !t.loginFailed
+			// Completion consumes the confirmation for this request only.
+			// Even anomalous queued LOGIN7 messages cannot inherit its ACK.
+			t.loginAck, t.loginFailed = false, false
+			info["Logged In"] = t.loggedIn
+			if t.loggedIn {
+				info["Login Result"] = "accepted"
+			} else {
+				info["Login Result"] = "rejected"
+			}
+		} else {
+			t.match("", info)
 		}
 	case 6:
 		if err := t.push("Attention", maxPending); err != nil {

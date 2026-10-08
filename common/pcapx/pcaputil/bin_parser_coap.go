@@ -60,6 +60,15 @@ func probeCoAP(w []byte, limit int) ProbeResult {
 	if typ == 3 && code != 0 || typ == 2 && code > 0 && class == 0 || typ == 1 && code == 0 {
 		return ProbeResult{Verdict: ProbeReject}
 	}
+	// RFC 7252 section 4.1: an Empty message has TKL=0 and no bytes after
+	// its four-byte header. EtherNet/IP ListIdentity and tunnel payloads
+	// otherwise resemble an empty ACK and are incorrectly admitted as CoAP.
+	if code == 0 && (w[0]&15 != 0 || len(w) != 4) {
+		return ProbeResult{Verdict: ProbeReject}
+	}
+	if n, err := coapMessageLength(w); err != nil || n != len(w) || n == 0 {
+		return ProbeResult{Verdict: ProbeReject}
+	}
 	_ = limit
 	return probeAccept("coap", "rfc7252", 88)
 }

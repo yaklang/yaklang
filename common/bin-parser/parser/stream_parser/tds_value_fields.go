@@ -320,6 +320,9 @@ func (r *tdsFieldsReader) response() []map[string]any {
 				r.fields[len(r.fields)-1].Type = "int32"
 			}
 			m["Value"] = int64(int32(v))
+		case 0xad:
+			m["Name"] = "LOGINACK"
+			m["Login Acknowledgement"] = r.loginAck()
 		case 0xac:
 			m["Name"] = "RETURNVALUE"
 			m["Ordinal"] = r.uint("Parameter Ordinal", 2)
@@ -339,4 +342,39 @@ func (r *tdsFieldsReader) response() []map[string]any {
 		r.fail("missing response token")
 	}
 	return tokens
+}
+
+// MS-TDS 2.2.7.14: the USHORT token length excludes the type and length
+// fields. Bound the name and product version to this token, so a malformed
+// B_VARCHAR cannot borrow bytes from the following DONE token.
+func (r *tdsFieldsReader) loginAck() map[string]any {
+	n := r.uint("Login Acknowledgement Length", 2)
+	if r.err != nil {
+		return nil
+	}
+	if n < 10 || n > uint64(r.end-r.at) {
+		r.fail("invalid LOGINACK length")
+		return nil
+	}
+	outer := r.end
+	r.end = r.at + int(n)
+	defer func() { r.end = outer }()
+	m := map[string]any{"Interface": r.uint("Login Interface", 1)}
+	if m["Interface"].(uint64) > 1 {
+		r.fail("invalid LOGINACK interface")
+	}
+	version := r.take("Login TDS Version", "uint32", 4)
+	if r.err == nil {
+		r.fields[len(r.fields)-1].Endian = "big"
+		m["TDS Version"] = binary.BigEndian.Uint32(version)
+	}
+	m["Program Name"] = r.name("Login Program Name", 1)
+	m["Major Version"] = r.uint("Login Major Version", 1)
+	m["Minor Version"] = r.uint("Login Minor Version", 1)
+	m["Build High"] = r.uint("Login Build High", 1)
+	m["Build Low"] = r.uint("Login Build Low", 1)
+	if r.err == nil && r.at != r.end {
+		r.fail("trailing LOGINACK bytes")
+	}
+	return m
 }

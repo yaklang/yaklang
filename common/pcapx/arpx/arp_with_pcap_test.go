@@ -3,11 +3,16 @@ package arpx
 import (
 	"context"
 	"github.com/davecgh/go-spew/spew"
+	"os"
 	"testing"
 )
 
 func TestArpWithPcap(t *testing.T) {
-	a, err := ArpWithPcap(context.Background(), "en0", "192.168.31.1/24")
+	iface, target := os.Getenv("YAK_PCAP_LIVE_INTERFACE"), os.Getenv("YAK_PCAP_LIVE_TARGET")
+	if os.Getenv("YAK_PCAP_LIVE_TEST") != "1" || iface == "" || target == "" {
+		t.Skip("live ARP requires explicit interface, target and YAK_PCAP_LIVE_TEST=1")
+	}
+	a, err := ArpWithPcap(context.Background(), iface, target)
 	if err != nil {
 		panic(err)
 	}

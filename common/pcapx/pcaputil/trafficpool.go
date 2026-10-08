@@ -211,6 +211,13 @@ func (p *TrafficPool) feedEvidence(ethernetLayer *layers.Ethernet, networkLayer 
 	if p.closed || p.canceled() {
 		return
 	}
+	// Validate packet-local flags before touching the tuple cache. Otherwise an
+	// invalid SYN can remove a completed flow or admit a new one, so late bytes
+	// become a new session and the next legitimate SYN loses its initial cursor.
+	if tcp.SYN && (tcp.FIN || tcp.RST) {
+		p.invalidSegment("TCP SYN combined with FIN or RST")
+		return
+	}
 	defer p.retireFlows()
 	flow, ok := p.flowCache.Get(key)
 	if ok && flow.IsClosed() {

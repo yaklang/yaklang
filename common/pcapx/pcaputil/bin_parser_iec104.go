@@ -32,7 +32,7 @@ func probeIEC104(w []byte, _ int) ProbeResult {
 		return ProbeResult{Verdict: ProbeReject}
 	}
 	if w[2]&1 == 0 {
-		if n < 10 {
+		if n < 10 || w[4]&1 != 0 {
 			return ProbeResult{Verdict: ProbeReject}
 		}
 		if len(w) < 12 {

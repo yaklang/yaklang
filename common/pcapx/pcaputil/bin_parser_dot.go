@@ -53,6 +53,29 @@ func probeDoT(w []byte, limit int) ProbeResult {
 	return probeAccept("dot", "rfc7858", 90)
 }
 
+// An observed TCP carrier on an arbitrary port supplies no DNS identity.
+// RFC 1035 sections 4.1/4.2.2 and RFC 7766 describe a whole DNS message after
+// the two-byte length, not a fourteen-byte signature. Keep a bounded candidate
+// pending until its first complete message validates; a coincidental header
+// must not lock an unrelated stream into the DNS session decoder.
+func probeDNSTCP(w []byte, maxBytes int) ProbeResult {
+	p := probeDoT(w, maxBytes)
+	if p.Verdict == ProbeReject || len(w) < 2 {
+		return p
+	}
+	total := 2 + int(binary.BigEndian.Uint16(w[:2]))
+	if total > min(maxBytes, 4098) {
+		return ProbeResult{Verdict: ProbeReject}
+	}
+	if len(w) < total {
+		return probeNeed("dot", "rfc7766", len(w), total)
+	}
+	if !dnsDatagramEvidence(w[2:total]) {
+		return ProbeResult{Verdict: ProbeReject}
+	}
+	return probeAccept("dot", "rfc7766", 98)
+}
+
 func (f *binFlow) frameDoT(w []byte) (int, *binSpec, error) {
 	d := f.dot
 	if d == nil {

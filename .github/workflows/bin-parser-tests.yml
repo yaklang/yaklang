@@ -1,0 +1,76 @@
+name: Bin Parser Traffic Tests
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened, ready_for_review, labeled, unlabeled]
+    # Keep traffic validation separate from the general Essential Tests matrix.
+    paths:
+      - "common/bin-parser/**"
+      - "common/pcapx/**"
+      - "common/yak/cmd/yakcmds/shark-cli/**"
+      - "internal/trafficfixture/**"
+      - "scripts/protocol-tests/**"
+      - ".github/workflows/bin-parser-tests.yml"
+  workflow_dispatch:
+    inputs:
+      target:
+        description: "Branch or commit SHA to test (empty uses the selected workflow ref)"
+        type: string
+        required: false
+        default: ""
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || inputs.target || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  traffic-tests:
+    name: Bin Parser / pcapx / Capture CLI
+    # Manual runs are an explicit opt-in, including for WIP/Draft branches.
+    # Match the existing Essential Tests pre-check's case-insensitive WIP labels.
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (!github.event.pull_request.draft &&
+       !contains(github.event.pull_request.labels.*.name, 'wip') &&
+       !contains(github.event.pull_request.labels.*.name, 'work in progress') &&
+       !contains(github.event.pull_request.labels.*.name, 'do-not-merge') &&
+       !contains(github.event.pull_request.labels.*.name, 'rfc'))
+    runs-on: ubuntu-22.04
+    timeout-minutes: 30
+    env:
+      GOMAXPROCS: "2"
+    steps:
+      - name: Checkout tested revision
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ github.event.pull_request.head.repo.full_name || github.repository }}
+          ref: ${{ inputs.target || github.event.pull_request.head.sha || github.sha }}
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: ./go.mod
+
+      - name: Run complete parser and traffic tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          go run ./internal/trafficfixture/cmd/corpus test
+          go test -json -count=1 -timeout=5m ./internal/trafficfixture/... ./common/bin-parser/... ./common/pcapx/... ./common/yak/cmd/yakcmds/shark-cli ./scripts/ci > "$RUNNER_TEMP/bin-parser-traffic.jsonl" 2> "$RUNNER_TEMP/bin-parser-build.log"
+          go run ./internal/trafficfixture/cmd/corpus exec -- python3 @scripts/protocol-tests/check_go_test_json.py "$RUNNER_TEMP/bin-parser-traffic.jsonl" --inventory @scripts/protocol-tests/required-tests-v13.json --tier full > "$RUNNER_TEMP/required-tests-result.json"
+
+      - name: Upload test log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: bin-parser-traffic-${{ github.run_id }}
+          path: |
+            ${{ runner.temp }}/bin-parser-traffic.jsonl
+            ${{ runner.temp }}/bin-parser-build.log
+            ${{ runner.temp }}/required-tests-result.json
+          if-no-files-found: ignore
+          retention-days: 3

@@ -3,6 +3,7 @@ package pcaputil
 import (
 	"bytes"
 	"encoding/binary"
+
 	"io"
 	"os"
 	"path/filepath"
@@ -12,6 +13,8 @@ import (
 	"github.com/gopacket/gopacket"
 	"github.com/gopacket/gopacket/pcapgo"
 	"github.com/stretchr/testify/require"
+
+	"github.com/yaklang/yaklang/internal/trafficfixture"
 )
 
 func classicFixture(order binary.ByteOrder, nano bool, snap uint32, payloads ...[]byte) []byte {
@@ -97,7 +100,7 @@ func TestClassicPcapTruncationAndLengths(t *testing.T) {
 }
 
 func TestClassicPcapNativeParityAndHandleFilter(t *testing.T) {
-	source, err := os.ReadFile(makeTestCapture(t, "ipv4"))
+	source, err := trafficfixture.ReadFile(makeTestCapture(t, "ipv4"))
 	require.NoError(t, err)
 	ref, err := pcapgo.NewReader(bytes.NewReader(source))
 	require.NoError(t, err)

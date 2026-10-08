@@ -21,8 +21,8 @@ func probeFTP(w []byte, limit int) ProbeResult {
 	if w[0] == '2' {
 		line, ok := firstCRLF(w)
 		if !ok {
-			if smtpReplyPrefix(w) && len(w) < min(limit, 64) && bytes.Contains(bytes.ToUpper(w), []byte("FTP")) {
-				return probeNeed("ftp", "rfc959", len(w), min(limit, 24))
+			if smtpReplyPrefix(w) && len(w) < mailLineMax && ftpBanner(w) {
+				return probeNeed("ftp", "rfc959", len(w), len(w)+1)
 			}
 			return ProbeResult{Verdict: ProbeReject}
 		}
@@ -144,7 +144,7 @@ func (s *binFTP) consume(raw []byte) (map[string]any, error) {
 		}
 		if s.pending != "" {
 			out["In Reply To"] = s.pending
-			if s.pending == "AUTH" && (code == 234 || code == 334) && s.authTLS {
+			if s.pending == "AUTH" && code == 234 && s.authTLS {
 				s.encrypted = true
 				out["Encrypted"] = true
 				out["Protocol Transition"] = "ftp->tls"
@@ -161,8 +161,12 @@ func (s *binFTP) consume(raw []byte) (map[string]any, error) {
 		return nil, fmt.Errorf("ftp: unknown command %q", cmd)
 	}
 	s.pending = cmd
-	if cmd == "AUTH" && strings.Contains(strings.ToUpper(line), "TLS") {
-		s.authTLS = true
+	if cmd == "AUTH" {
+		// AUTH selects a new mechanism even when the preceding attempt failed.
+		// RFC 4217 sections 4.2 and 16 permit TLS (and TLS-C), with 234
+		// starting negotiation; RFC 2228's 334 instead requests ADAT.
+		args := strings.Fields(line)
+		s.authTLS = len(args) == 2 && (strings.EqualFold(args[1], "TLS") || strings.EqualFold(args[1], "TLS-C"))
 	}
 	out := map[string]any{"Packet Name": cmd, "Role": "command", "Line": line}
 	return out, nil

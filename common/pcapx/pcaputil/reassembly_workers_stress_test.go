@@ -5,6 +5,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/binary"
+
 	"hash"
 	"io"
 	"net"
@@ -20,6 +21,8 @@ import (
 	"github.com/gopacket/gopacket/layers"
 	"github.com/gopacket/gopacket/pcapgo"
 	"github.com/stretchr/testify/require"
+
+	"github.com/yaklang/yaklang/internal/trafficfixture"
 )
 
 func TestTCPWorkersLargeStream(t *testing.T) {
@@ -100,7 +103,7 @@ func TestTCPWorkersHTTP(t *testing.T) {
 		var counts [2]int64
 		for i, workers := range []int{1, 4} {
 			var count atomic.Int64
-			err := OpenPcapFile(filepath.Join("tests", file), WithTCPReassemblyWorkers(workers), WithHTTPFlow(func(_ *TrafficFlow, r *http.Request, s *http.Response) {
+			err := OpenPcapFile(fixturePath(t, filepath.Join("tests", file)), WithTCPReassemblyWorkers(workers), WithHTTPFlow(func(_ *TrafficFlow, r *http.Request, s *http.Response) {
 				if r != nil && s != nil {
 					count.Add(1)
 				}
@@ -115,7 +118,7 @@ func TestTCPWorkersHTTP(t *testing.T) {
 
 func TestTCPWorkersHTTPCallbackPanic(t *testing.T) {
 	var stats TCPReassemblyStats
-	err := OpenPcapFile(filepath.Join("tests", "image.pcapng"), WithTCPReassemblyWorkers(4), WithTCPReassemblyStats(func(s TCPReassemblyStats) { stats = s }), WithHTTPFlow(func(*TrafficFlow, *http.Request, *http.Response) {
+	err := OpenPcapFile(fixturePath(t, filepath.Join("tests", "image.pcapng")), WithTCPReassemblyWorkers(4), WithTCPReassemblyStats(func(s TCPReassemblyStats) { stats = s }), WithHTTPFlow(func(*TrafficFlow, *http.Request, *http.Response) {
 		panic("HTTP consumer failed")
 	}))
 	require.ErrorContains(t, err, "panic")
@@ -133,7 +136,7 @@ func TestTCPWorkersCaptureLossIsVisible(t *testing.T) {
 		require.Len(t, p.Stats().Devices, 1)
 	}
 	name := makeTestCapture(t, "ipv4")
-	raw, err := os.ReadFile(name)
+	raw, err := trafficfixture.ReadFile(name)
 	require.NoError(t, err)
 	// The second packet has a complete TCP header but an impossible data offset.
 	firstLen := int(binary.LittleEndian.Uint32(raw[32:36]))
@@ -145,7 +148,7 @@ func TestTCPWorkersCaptureLossIsVisible(t *testing.T) {
 	require.Error(t, err)
 	require.Positive(t, stats.DecodeErrors)
 	// Report snaplen truncation, even when the surviving TCP prefix decodes.
-	valid, err := os.ReadFile(makeTestCapture(t, "ipv4"))
+	valid, err := trafficfixture.ReadFile(makeTestCapture(t, "ipv4"))
 	require.NoError(t, err)
 	r, err := pcapgo.NewReader(bytes.NewReader(valid))
 	require.NoError(t, err)

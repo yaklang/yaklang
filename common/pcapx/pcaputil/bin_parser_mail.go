@@ -81,6 +81,13 @@ func probeIMAP(w []byte, limit int) ProbeResult {
 	if w[0] == '*' || imapTagStart(w[0]) {
 		line, ok := firstCRLF(w)
 		if !ok {
+			// The greeting's response token is sufficient evidence once its
+			// trailing delimiter is present. Real capability greetings often
+			// extend beyond the default 64-byte preview; framing still enforces
+			// the line limit and waits for the complete CRLF boundary.
+			if imapDelimitedPrefix(w) {
+				return probeAccept("imap", "rfc3501", 93)
+			}
 			if len(w) >= min(limit, 64) {
 				return ProbeResult{Verdict: ProbeReject}
 			}
@@ -122,8 +129,15 @@ func probePOP3(w []byte, limit int) ProbeResult {
 }
 
 func smtpCommandPrefix(w []byte) bool {
+	u := bytes.ToUpper(w)
+	if bytes.HasPrefix(u, []byte("AUTH ")) {
+		fields := bytes.Fields(u)
+		if len(fields) >= 2 && (bytes.Equal(fields[1], []byte("TLS")) || bytes.Equal(fields[1], []byte("SSL"))) {
+			return false // FTP security negotiation, not SMTP SASL authentication.
+		}
+	}
 	for _, cmd := range []string{"EHLO ", "HELO ", "LHLO ", "MAIL FROM:", "RCPT TO:", "DATA\r", "STARTTLS", "RSET", "VRFY ", "EXPN ", "NOOP", "QUIT", "HELP", "AUTH "} {
-		if bytes.HasPrefix(bytes.ToUpper(w), []byte(cmd)) {
+		if bytes.HasPrefix(u, []byte(cmd)) {
 			return true
 		}
 	}
@@ -177,6 +191,22 @@ func imapGreetingOrTagged(line []byte) bool {
 		return false
 	}
 	return imapKnownCommand(cmd)
+}
+
+func imapDelimitedPrefix(w []byte) bool {
+	// Reject controls within the inspected preview and avoid recognizing a
+	// partial token (for example "* OKAY" or "a1 LOGINNING").
+	for _, b := range w {
+		if b < ' ' || b == 127 {
+			return false
+		}
+	}
+	for i := 0; i < len(w); i++ {
+		if w[i] == ' ' && imapGreetingOrTagged(w[:i]) {
+			return true
+		}
+	}
+	return false
 }
 
 func imapKnownCommand(cmd string) bool {

@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/yaklang/yaklang/common/ai/rag/vectorstore"
 	"github.com/yaklang/yaklang/common/utils"
 )
 
@@ -119,27 +120,30 @@ func TestRandomEntityGeneration(t *testing.T) {
 }
 
 func TestEntityCollection(t *testing.T) {
-	// 创建测试数据库
-	db, _ := utils.CreateTempTestDatabaseInMemory()
-	if db == nil {
-		t.Skip("database not available")
-		return
+	// Exercise the real collection and index with the existing local embedding
+	// fixture. This serial test must not depend on the public embedding service.
+	previousMockMode := vectorstore.IsMockMode
+	vectorstore.IsMockMode = true
+	t.Cleanup(func() { vectorstore.IsMockMode = previousMockMode })
+	db, err := utils.CreateTempTestDatabaseInMemory()
+	if err != nil || db == nil {
+		t.Fatalf("create test database: %v", err)
 	}
+	t.Cleanup(func() { db.Close() })
 
 	collectionName := "test_entity_collection_" + utils.RandStringBytes(8)
 
 	// 创建实体集合
 	entityCollection, err := NewEntityCollection(db, collectionName)
 	if err != nil {
-		t.Logf("Failed to create entity collection (may be expected if embedding service is not available): %v", err)
-		t.Skip("skipping test due to entity collection creation failure")
-		return
+		t.Fatalf("create entity collection: %v", err)
 	}
 
-	// 清理测试数据
-	defer func() {
-		// 这里可以添加清理逻辑
-	}()
+	t.Cleanup(func() {
+		if err := vectorstore.DeleteCollection(db, collectionName); err != nil {
+			t.Errorf("delete test collection: %v", err)
+		}
+	})
 
 	// 创建测试实体
 	testEntities := []*Entity{
@@ -170,6 +174,15 @@ func TestEntityCollection(t *testing.T) {
 	for i, entity := range searchResults {
 		t.Logf("Result %d: ID=%s, Name=%s, Type=%s", i+1, entity.ID, entity.Name, entity.Type)
 	}
+	foundDocker := false
+	for _, entity := range searchResults {
+		if entity.ID == "test_import_1" && entity.Name == "Docker容器技术" {
+			foundDocker = true
+		}
+	}
+	if !foundDocker {
+		t.Error("entity search did not return the imported Docker entity")
+	}
 
 	// 测试按类型搜索
 	t.Log("Testing search by type...")
@@ -180,6 +193,9 @@ func TestEntityCollection(t *testing.T) {
 	}
 
 	t.Logf("Technology entities containing '容器': %d found", len(techResults))
+	if len(techResults) != 1 || techResults[0].ID != "test_import_1" || techResults[0].Type != EntityTypeTechnology {
+		t.Errorf("type search should return only the Docker technology entity, got %v", techResults)
+	}
 
 	// 测试获取特定实体
 	t.Log("Testing get specific entity...")

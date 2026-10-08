@@ -16,6 +16,7 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 	"unicode/utf8"
 )
@@ -307,11 +308,12 @@ func OpenIfaceLive(iface string, opts ...LiveConfig) (*pcap.Handle, error) {
 }
 
 type PcapHandleWrapper struct {
-	device     string
-	handle     *pcap.Handle
-	mutex      *sync.RWMutex
-	isClose    bool
-	isLoopback bool
+	packetNumber atomic.Uint64
+	device       string
+	handle       *pcap.Handle
+	mutex        *sync.RWMutex
+	isClose      bool
+	isLoopback   bool
 }
 
 func WrapPcapHandle(handle *pcap.Handle, isloop ...bool) *PcapHandleWrapper {
@@ -351,7 +353,11 @@ func (w *PcapHandleWrapper) ReadPacketData() ([]byte, gopacket.CaptureInfo, erro
 	// libpcap's Handle serializes reads with Close internally. Holding the
 	// wrapper lock during a blocking read prevents Close from setting its stop
 	// flag, so cancelling an idle live capture can otherwise deadlock.
-	return handle.ReadPacketData()
+	raw, ci, err := handle.ReadPacketData()
+	if err == nil {
+		ci = w.numberCapture(ci)
+	}
+	return raw, ci, err
 }
 
 func (w *PcapHandleWrapper) close() {
@@ -447,5 +453,21 @@ func (w *PcapHandleWrapper) SnaLen() int {
 }
 
 func (w *PcapHandleWrapper) ZeroCopyReadPacketData() ([]byte, gopacket.CaptureInfo, error) {
-	return w.handle.ZeroCopyReadPacketData()
+	raw, ci, err := w.handle.ZeroCopyReadPacketData()
+	if err == nil {
+		ci = w.numberCapture(ci)
+	}
+	return raw, ci, err
+}
+
+// Native packet sources use the wrapper as their reader, including the shared
+// daemon. Number successful records here so adding an observer does not remove
+// source evidence; empty captured records count, failed reads and timeouts do not.
+func (w *PcapHandleWrapper) numberCapture(ci gopacket.CaptureInfo) gopacket.CaptureInfo {
+	number := w.packetNumber.Add(1)
+	e := evidenceFrom(ci)
+	if e.Ref.Number == 0 {
+		e.Ref.Number = number
+	}
+	return withEvidence(ci, e)
 }

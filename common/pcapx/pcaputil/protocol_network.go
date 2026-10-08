@@ -27,20 +27,29 @@ type ipFragment struct {
 	ref   PacketReference
 }
 type fragmentSet struct {
-	parts []ipFragment
-	end   int
-	last  time.Time
-	cost  int64
+	parts    []ipFragment
+	header   []byte
+	end      int
+	last     time.Time
+	cost     int64
+	rejected bool
 }
 type fragmentStore struct {
-	mu    sync.Mutex
-	sets  map[fragmentKey]*fragmentSet
-	clock time.Time
+	mu           sync.Mutex
+	sets         map[fragmentKey]*fragmentSet
+	clock        time.Time
+	blockedUntil time.Time
 }
 
 func (a *binParser) networkPacket(p gopacket.Packet) (gopacket.Packet, bool) {
 	e := packetEvidence(p)
 	ci := p.Metadata().CaptureInfo
+	if decoded := p.Layers(); len(decoded) != 0 {
+		if can, ok := decoded[0].(*socketCANLayer); ok {
+			a.decodeCANRecord(can.wire, e, ci)
+			return nil, true
+		}
+	}
 	if eth, ok := p.Layer(layers.LayerTypeEthernet).(*layers.Ethernet); ok {
 		etherType, payload := eth.EthernetType, eth.Payload
 		// Follow the Ethernet carrier through 802.1Q / 802.1ad tags. Each
@@ -49,6 +58,10 @@ func (a *binParser) networkPacket(p gopacket.Packet) (gopacket.Packet, bool) {
 		for (etherType == layers.EthernetTypeDot1Q || etherType == layers.EthernetTypeQinQ) && len(payload) >= 4 {
 			etherType = layers.EthernetType(binary.BigEndian.Uint16(payload[2:4]))
 			payload = payload[4:]
+		}
+		if etherType == layers.EthernetType(0x88cc) {
+			a.decodeLLDPEthernet(eth, payload, e, ci)
+			return nil, true
 		}
 		if etherType == layers.EthernetType(0x88b8) {
 			// Consume near-matches too: an unknown-EtherType diagnostic must not
@@ -61,25 +74,40 @@ func (a *binParser) networkPacket(p gopacket.Packet) (gopacket.Packet, bool) {
 	// supported tunnel to its innermost IP before transport dispatch.
 	var inner gopacket.NetworkLayer
 	networks, tunnels := 0, 0
+	unsupportedTunnel := false
 	for _, l := range p.Layers() {
 		if n, ok := l.(gopacket.NetworkLayer); ok {
 			inner = n
 			networks++
 		}
-		switch l.(type) {
+		switch v := l.(type) {
 		case *layers.GRE, *layers.VXLAN:
 			tunnels++
+		case *layers.Geneve:
+			tunnels++
+			// Admit only the option-free v0 Ethernet data profile. Read the version
+			// bits from the captured header: gopacket's Version field does
+			// not retain both bits. OAM and critical options need semantics
+			// that this transport normalization does not implement.
+			header := v.LayerContents()
+			if len(header) != 8 || header[0] != 0 || header[1] != 0 || header[7] != 0 || v.Protocol != layers.EthernetTypeTransparentEthernetBridging {
+				unsupportedTunnel = true
+			}
+		case *layers.IPv4:
+			if v.Protocol == layers.IPProtocolIPv4 || v.Protocol == layers.IPProtocolIPv6 {
+				tunnels++
+			}
 		}
 	}
 	if networks > 1 {
-		if tunnels == 0 || tunnels > 4 || networks != tunnels+1 {
+		if unsupportedTunnel || tunnels == 0 || tunnels > 4 || networks != tunnels+1 {
 			a.networkDiagnostic(e, ci, "limited", "EncapsulationDepthOrProfile")
 			return nil, true
 		}
 		raw := append(bytes.Clone(inner.LayerContents()), inner.LayerPayload()...)
 		ci.CaptureLength, ci.Length = len(raw), len(raw)
 		ci = withEvidence(ci, e)
-		p = gopacket.NewPacket(raw, layers.LinkTypeRaw, gopacket.Default)
+		p = gopacket.NewPacket(raw, protocolPacketDecoder{decoder: layers.LinkTypeRaw}, gopacket.Default)
 		p.Metadata().CaptureInfo = ci
 	}
 	var key fragmentKey
@@ -100,7 +128,9 @@ func (a *binParser) networkPacket(p gopacket.Packet) (gopacket.Packet, bool) {
 			if !ok {
 				return nil, true
 			}
-			key = fragmentKey{e.Ref.Domain, ip.SrcIP.String(), ip.DstIP.String(), v.Identification, byte(v.NextHeader), true}
+			// RFC 8200 associates fragments by addresses and Identification, not
+			// Next Header. Only the offset-zero fragment supplies that field.
+			key = fragmentKey{e.Ref.Domain, ip.SrcIP.String(), ip.DstIP.String(), v.Identification, 0, true}
 			off = int(v.FragmentOffset) * 8
 			more = v.MoreFragments
 			payload = v.Payload
@@ -260,10 +290,20 @@ func (a *binParser) networkDiagnostic(e captureEvidence, ci gopacket.CaptureInfo
 	a.emit(&ProtocolEvent{Timestamp: ci.Timestamp, Transport: "network", Protocol: "ip", Domain: e.Ref.Domain, Status: status, Completeness: status, ExpertCode: code, Error: code, SourceBytes: ByteSource{Kind: "captured", PacketRefs: []PacketReference{e.Ref}}})
 }
 func (a *binParser) fragment(p gopacket.Packet, e captureEvidence, key fragmentKey, off int, more bool, payload []byte) (gopacket.Packet, bool) {
+	ci := p.Metadata().CaptureInfo
+	// RFC 6946: atomic fragments neither join nor remove a matching pending
+	// datagram, including one quarantined after an overlap.
+	if key.v6 && off == 0 && !more {
+		header, err := fragmentHeader(p, true)
+		if err != nil || p.Metadata().Truncated || ci.CaptureLength < ci.Length || len(header)-40+len(payload) > 65535 {
+			a.networkDiagnostic(e, ci, "malformed", "FragmentLength")
+			return nil, true
+		}
+		return a.reassembledPacket(header, payload, e, ci, true)
+	}
 	s := &a.fragments
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	ci := p.Metadata().CaptureInfo
 	if s.sets == nil {
 		s.sets = map[fragmentKey]*fragmentSet{}
 	}
@@ -277,16 +317,41 @@ func (a *binParser) fragment(p gopacket.Packet, e captureEvidence, key fragmentK
 			a.fragmentDiagnostic(v, "FragmentTimeout")
 		}
 	}
+	if s.clock.Before(s.blockedUntil) {
+		a.networkDiagnostic(e, ci, "limited", "FragmentQuarantineBudget")
+		return nil, true
+	}
+	if v := s.sets[key]; v != nil && v.rejected {
+		return nil, true
+	}
 	invalid := func(code string) (gopacket.Packet, bool) {
-		if v := s.sets[key]; v != nil {
-			a.buffered.Add(-v.cost)
-			delete(s.sets, key)
+		if v := s.sets[key]; v != nil && v.cost >= 128 {
+			// Discard all bytes, but retain a budgeted tombstone until the
+			// original deadline. Later fragments must not resurrect the datagram.
+			a.buffered.Add(-(v.cost - 128))
+			v.parts, v.header, v.cost, v.rejected = nil, nil, 128, true
+		} else {
+			delete(s.sets, key) // An unreserved, empty provisional set owns no bytes.
+			if len(s.sets) < a.budget.MaxCollectionElements && a.reserveEvidence(128) {
+				s.sets[key] = &fragmentSet{last: s.clock, cost: 128, rejected: true}
+			} else {
+				// Without space to remember a rejected ID, fail closed for fragment
+				// admission for one bounded lifetime. Unfragmented traffic and IPv6
+				// atomic fragments remain independent.
+				s.blockedUntil = s.clock.Add(30 * time.Second)
+			}
 		}
 		a.networkDiagnostic(e, ci, "malformed", code)
 		return nil, true
 	}
-	if ci.CaptureLength < ci.Length || off+len(payload) > 65535 || len(payload) == 0 || more && len(payload)%8 != 0 {
+	if p.Metadata().Truncated || ci.CaptureLength < ci.Length || off+len(payload) > 65535 || len(payload) == 0 || more && len(payload)%8 != 0 {
 		return invalid("FragmentLength")
+	}
+	if key.v6 && off == 0 {
+		f, ok := p.Layer(layers.LayerTypeIPv6Fragment).(*layers.IPv6Fragment)
+		if !ok || !completeFragmentFirstHeader(byte(f.NextHeader), payload) {
+			return invalid("FragmentFirstHeader")
+		}
 	}
 	v := s.sets[key]
 	if v == nil {
@@ -294,7 +359,7 @@ func (a *binParser) fragment(p gopacket.Packet, e captureEvidence, key fragmentK
 			a.networkDiagnostic(e, ci, "limited", "FragmentSessionBudget")
 			return nil, true
 		}
-		v = &fragmentSet{end: -1}
+		v = &fragmentSet{end: -1, last: s.clock}
 		s.sets[key] = v
 	}
 	for _, part := range v.parts {
@@ -323,6 +388,15 @@ func (a *binParser) fragment(p gopacket.Packet, e captureEvidence, key fragmentK
 		v.end = off + len(payload)
 	}
 	cost := int64(len(payload) + 128)
+	var header []byte
+	if off == 0 {
+		var err error
+		header, err = fragmentHeader(p, key.v6)
+		if err != nil {
+			return invalid("FragmentHeader")
+		}
+		cost += int64(len(header))
+	}
 	if !a.reserveEvidence(cost) {
 		if len(v.parts) == 0 {
 			delete(s.sets, key)
@@ -331,7 +405,9 @@ func (a *binParser) fragment(p gopacket.Packet, e captureEvidence, key fragmentK
 		return nil, true
 	}
 	v.cost += cost
-	v.last = s.clock
+	if header != nil {
+		v.header = header
+	}
 	v.parts = append(v.parts, ipFragment{off, bytes.Clone(payload), e.Ref})
 	sort.Slice(v.parts, func(i, j int) bool { return v.parts[i].start < v.parts[j].start })
 	cursor := 0
@@ -350,21 +426,120 @@ func (a *binParser) fragment(p gopacket.Packet, e captureEvidence, key fragmentK
 		raw = append(raw, part.data...)
 		refs = append(refs, part.ref)
 	}
+	length := len(v.header) + len(raw)
+	if key.v6 {
+		length -= 40
+	}
+	if len(v.header) == 0 || length > 65535 {
+		return invalid("FragmentLength")
+	}
+	header = v.header
 	a.buffered.Add(-v.cost)
 	delete(s.sets, key)
-	var ip gopacket.SerializableLayer
-	if key.v6 {
-		ip = &layers.IPv6{Version: 6, SrcIP: net.ParseIP(key.src), DstIP: net.ParseIP(key.dst), NextHeader: layers.IPProtocol(key.protocol), HopLimit: 64}
-	} else {
-		ip = &layers.IPv4{Version: 4, IHL: 5, SrcIP: net.ParseIP(key.src), DstIP: net.ParseIP(key.dst), Protocol: layers.IPProtocol(key.protocol), TTL: 64, Id: uint16(key.id)}
-	}
-	b := gopacket.NewSerializeBuffer()
-	if err := gopacket.SerializeLayers(b, gopacket.SerializeOptions{FixLengths: true, ComputeChecksums: true}, ip, gopacket.Payload(raw)); err != nil {
-		return invalid("FragmentSerialization")
-	}
-	q := gopacket.NewPacket(b.Bytes(), layers.LinkTypeRaw, gopacket.Default)
-	ci.CaptureLength, ci.Length = len(b.Bytes()), len(b.Bytes())
 	e.refs = refs
+	return a.reassembledPacket(header, raw, e, ci, key.v6)
+}
+
+// RFC 8200 section 4.5 requires the offset-zero fragment to contain the
+// extension chain and upper-layer header. Splitting TCP ports from the rest of
+// its header must not establish a flow after reassembly. The walk consumes at
+// least eight bytes per extension and never allocates retained state.
+func completeFragmentFirstHeader(next byte, b []byte) bool {
+	for {
+		switch next {
+		case 0, 43, 60, 51:
+			if len(b) < 2 {
+				return false
+			}
+			n := (int(b[1]) + 1) * 8
+			if next == 51 {
+				n = (int(b[1]) + 2) * 4
+			}
+			if n > len(b) {
+				return false
+			}
+			next, b = b[0], b[n:]
+		case 6:
+			if len(b) < 20 {
+				return false
+			}
+			n := int(b[12]>>4) * 4
+			return n >= 20 && n <= len(b)
+		case 17, 58, 50:
+			return len(b) >= 8
+		case 4:
+			if len(b) < 20 {
+				return false
+			}
+			n := int(b[0]&15) * 4
+			return n >= 20 && n <= len(b)
+		case 41:
+			return len(b) >= 40
+		default:
+			// Unknown upper layers remain unknown to normal ingress; no
+			// transport admission is inferred from their identifier.
+			return true
+		}
+	}
+}
+
+// Retain the offset-zero IP header and pre-fragment extension headers. Rebuilding
+// a minimal IP header would silently erase options, traffic class and hop limit.
+func fragmentHeader(p gopacket.Packet, v6 bool) ([]byte, error) {
+	if !v6 {
+		ip, ok := p.NetworkLayer().(*layers.IPv4)
+		if !ok || len(ip.LayerContents()) < 20 {
+			return nil, fmt.Errorf("IPv4 header")
+		}
+		return bytes.Clone(ip.LayerContents()), nil
+	}
+	var header []byte
+	next := 6
+	for _, l := range p.Layers() {
+		if ip, ok := l.(*layers.IPv6); ok {
+			header = bytes.Clone(ip.LayerContents())
+			continue
+		}
+		if len(header) == 0 {
+			continue
+		}
+		if f, ok := l.(*layers.IPv6Fragment); ok {
+			if len(header) < 40 || next >= len(header) {
+				break
+			}
+			header[next] = byte(f.NextHeader)
+			return header, nil
+		}
+		switch l.LayerType() {
+		case layers.LayerTypeIPv6HopByHop, layers.LayerTypeIPv6Routing, layers.LayerTypeIPv6Destination, layers.LayerTypeIPSecAH:
+			next = len(header)
+			header = append(header, l.LayerContents()...)
+		default:
+			return nil, fmt.Errorf("unsupported pre-fragment header")
+		}
+	}
+	return nil, fmt.Errorf("IPv6 fragment header")
+}
+
+func (a *binParser) reassembledPacket(header, payload []byte, e captureEvidence, ci gopacket.CaptureInfo, v6 bool) (gopacket.Packet, bool) {
+	raw := append(bytes.Clone(header), payload...)
+	if v6 {
+		binary.BigEndian.PutUint16(raw[4:6], uint16(len(raw)-40))
+	} else {
+		binary.BigEndian.PutUint16(raw[2:4], uint16(len(raw)))
+		binary.BigEndian.PutUint16(raw[6:8], binary.BigEndian.Uint16(raw[6:8])&0x4000)
+		raw[10], raw[11] = 0, 0
+		var sum uint32
+		for i := 0; i < len(header); i += 2 {
+			sum += uint32(binary.BigEndian.Uint16(raw[i : i+2]))
+		}
+		for sum>>16 != 0 {
+			sum = (sum & 65535) + (sum >> 16)
+		}
+		binary.BigEndian.PutUint16(raw[10:12], ^uint16(sum))
+	}
+	q := gopacket.NewPacket(raw, protocolPacketDecoder{decoder: layers.LinkTypeRaw}, gopacket.Default)
+	ci.CaptureLength, ci.Length = len(raw), len(raw)
 	ci = withEvidence(ci, e)
 	q.Metadata().CaptureInfo = ci
 	return q, false
@@ -378,6 +553,7 @@ func (a *binParser) closeFragments() {
 		a.fragmentDiagnostic(v, "FragmentCaptureEnded")
 	}
 	s.sets = nil
+	s.blockedUntil = time.Time{}
 }
 func (a *binParser) fragmentDiagnostic(v *fragmentSet, code string) {
 	if len(v.parts) == 0 {

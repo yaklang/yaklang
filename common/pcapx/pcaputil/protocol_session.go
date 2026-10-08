@@ -98,14 +98,21 @@ type ProtocolSession interface {
 }
 
 type captureSession struct {
-	f      *binFlow
-	events []*ProtocolEvent
-	closed bool
+	f         *binFlow
+	events    []*ProtocolEvent
+	closed    bool
+	transport string
 }
 
 // NewProtocolSession builds an isolated capture flow on the same binFlow
 // feed path as pcap replay. Ports are zero so admission cannot use 5432/389.
 func NewProtocolSession(budget ParserBudget) (ProtocolSession, error) {
+	return NewProtocolSessionWithOptions(budget)
+}
+
+// NewProtocolSessionWithOptions adds observed transport and endpoint context
+// without changing the original constructor or its function type.
+func NewProtocolSessionWithOptions(budget ParserBudget, options ...ProtocolSessionOption) (ProtocolSession, error) {
 	defaults := DefaultParserBudget()
 	for _, pair := range [][2]*int{
 		{&budget.MaxFrameBytes, &defaults.MaxFrameBytes}, {&budget.MaxMessageBytes, &defaults.MaxMessageBytes},
@@ -148,6 +155,17 @@ func NewProtocolSession(budget ParserBudget) (ProtocolSession, error) {
 		ports:             [2]uint16{40000, 40001},
 		syslogStreamProbe: true,
 	}
+	for _, option := range options {
+		if option == nil {
+			return nil, fmt.Errorf("nil session option")
+		}
+		if err := option(s); err != nil {
+			return nil, err
+		}
+	}
+	if s.transport == "udp" && s.f.tcpClientKnown {
+		return nil, fmt.Errorf("TCP initiator direction cannot be set on a UDP session")
+	}
 	return s, nil
 }
 
@@ -169,14 +187,43 @@ func NewDecryptedQUICSession(budget ParserBudget, source string) (ProtocolSessio
 }
 
 func (s *captureSession) Probe(data []byte) ProbeResult {
+	if s.transport == "udp" {
+		return probeDatagram(data, s.f.a.budget.MaxFrameBytes)
+	}
 	limit := s.f.a.config.ProbeBytes
 	if limit <= 0 {
 		limit = 64
 	}
 	input := data
+	if s.f.tcpClientKnown && len(input) > 0 && input[0] == 1 {
+		if p := probeATG(input, s.f.a.budget.MaxFrameBytes); p.Verdict != ProbeReject {
+			return p
+		}
+	}
+	if p := probeRDP(input, s.f.a.budget.MaxFrameBytes); p.Verdict == ProbeAccept {
+		return p
+	}
+	if p := probeS7(input, s.f.a.budget.MaxFrameBytes); p.Verdict != ProbeReject {
+		if p.Verdict == ProbeNeedMore && len(input) >= 4 && int(binary.BigEndian.Uint16(input[2:4])) == len(input) {
+			return ProbeResult{Verdict: ProbeReject, Reason: "COTP carrier alone does not establish S7"}
+		}
+		return p
+	}
+	if p := probeGenisys(input, s.f.a.budget.MaxFrameBytes); p.Verdict != ProbeReject {
+		return p
+	}
+	if p := probeROCPlus(input, s.f.a.budget.MaxFrameBytes); p.Verdict != ProbeReject {
+		return p
+	}
+	if p := probeDoIP(input, s.f.a.budget.MaxFrameBytes); p.Verdict != ProbeReject {
+		return p
+	}
 	if isHTTPStartLineCandidate(input) {
 		// CONNECT/INFO can be long NATS control lines. Preserve their bounded
 		// exact admission before testing the more general HTTP method syntax.
+		if p := initialProtocolNeedMore(input, s.f.a.budget.MaxFrameBytes); p.Verdict != ProbeReject {
+			return p
+		}
 		if result := s.f.probeBoundedText(input); result.Verdict != ProbeReject {
 			return result
 		}
@@ -187,7 +234,7 @@ func (s *captureSession) Probe(data []byte) ProbeResult {
 	}
 	probe := *s.f
 	probe.protocol, probe.binding = "", nil
-	probe.detect(data)
+	probe.detect(input)
 	if probe.protocol != "" {
 		if probe.protocol == "cassandra" && len(data) >= 9 {
 			total := 9 + int(binary.BigEndian.Uint32(data[5:9]))
@@ -197,13 +244,18 @@ func (s *captureSession) Probe(data []byte) ProbeResult {
 		}
 		return probeAccept(probe.protocol, "", 90)
 	}
+	if s.f.captureTCP {
+		if p := probeDNSTCP(input, s.f.a.budget.MaxFrameBytes); p.Verdict != ProbeReject {
+			return p
+		}
+	}
 	if result := s.f.probeBoundedText(input); result.Verdict != ProbeReject {
 		return result
 	}
 	if probe := probeOpenWire(input, s.f.a.budget.MaxFrameBytes); probe.Verdict != ProbeReject {
 		return probe
 	}
-	return probeWire(data, limit)
+	return probeWireTransport(data, limit, s.f.captureTCP)
 }
 
 func (s *captureSession) Feed(direction int, ts time.Time, data []byte) FeedResult {
@@ -212,6 +264,9 @@ func (s *captureSession) Feed(direction int, ts time.Time, data []byte) FeedResu
 	}
 	if direction != 0 && direction != 1 {
 		return FeedResult{Err: &ProtocolError{Kind: ErrMalformedMessage, Message: "direction must be 0 or 1"}}
+	}
+	if s.transport == "udp" {
+		return s.feedDatagram(direction, ts, data)
 	}
 	before := s.f.a.input.Load()
 	s.events = nil
@@ -246,6 +301,10 @@ func (s *captureSession) Close(reason string) []*ProtocolEvent {
 	s.closed = true
 	s.events = nil
 	s.f.close(TrafficFlowCloseReason(reason))
+	s.f.a.closeUDPSessions()
+	s.f.a.closeMediaAssociations()
+	s.f.a.closeRTSPMedia()
+	s.f.a.flows.Store(0)
 	events := s.events
 	s.events = nil
 	return events
@@ -283,7 +342,7 @@ func (f *binFlow) hasSession() bool {
 	if f.protocol == "nats" {
 		return true // NATS allocates its budgeted negotiation state at consumption.
 	}
-	return f.tls != nil || f.dnp3 != nil || f.c37118 != nil || f.goose != nil || f.syslog != nil || f.rfb != nil || f.diameter != nil || f.iec104 != nil || f.s7 != nil || f.opcua != nil || f.ipp != nil || f.rtsp != nil || f.stun != nil || f.h2 != nil || f.mysql != nil || f.pg != nil || f.ws != nil || f.ldap != nil || f.redis != nil || f.mqtt != nil || f.nats != nil || f.mongo != nil || f.kafka != nil || f.tds != nil || f.amqp != nil || f.smb2 != nil || f.dcerpc != nil || f.ssh != nil || f.nfs != nil || f.snmp != nil || f.rdp != nil || f.dot != nil || f.doh != nil || f.sip != nil || f.rtp != nil || f.quic != nil || f.smtp != nil || f.imap != nil || f.pop3 != nil || f.ftp != nil || f.tns != nil || f.socks5 != nil || f.scgi != nil || f.msgpackRPC != nil || f.textInternet != nil || f.radius != nil || f.dhcp != nil || f.ntp != nil || f.coap != nil || f.modbus != nil || f.enip != nil || f.stratum != nil || f.gearman != nil || f.beanstalk != nil || f.zookeeper != nil || f.clickhouse != nil || f.stomp != nil
+	return f.tls != nil || f.dnp3 != nil || f.c37118 != nil || f.goose != nil || f.syslog != nil || f.rfb != nil || f.diameter != nil || f.iec104 != nil || f.s7 != nil || f.opcua != nil || f.ipp != nil || f.rtsp != nil || f.stun != nil || f.h2 != nil || f.mysql != nil || f.pg != nil || f.ws != nil || f.ldap != nil || f.redis != nil || f.mqtt != nil || f.nats != nil || f.mongo != nil || f.kafka != nil || f.tds != nil || f.amqp != nil || f.smb2 != nil || f.dcerpc != nil || f.ssh != nil || f.nfs != nil || f.snmp != nil || f.rdp != nil || f.dot != nil || f.doh != nil || f.sip != nil || f.rtp != nil || f.quic != nil || f.smtp != nil || f.imap != nil || f.pop3 != nil || f.ftp != nil || f.tns != nil || f.socks5 != nil || f.scgi != nil || f.msgpackRPC != nil || f.textInternet != nil || f.radius != nil || f.dhcp != nil || f.ntp != nil || f.coap != nil || f.modbus != nil || f.memcached != nil || f.enip != nil || f.doip != nil || f.genisys != nil || f.rocplus != nil || f.atg != nil || f.stratum != nil || f.gearman != nil || f.beanstalk != nil || f.zookeeper != nil || f.clickhouse != nil || f.stomp != nil
 }
 
 func (f *binFlow) mailLike() bool {
@@ -306,6 +365,25 @@ func probeAccept(protocol, version string, conf uint8) ProbeResult {
 }
 
 func probeWire(w []byte, limit int) ProbeResult {
+	return probeWireTransport(w, limit, false)
+}
+
+func probeWireTransport(w []byte, limit int, tcp bool) ProbeResult {
+	memcached := probeMemcached(w, limit)
+	if memcached.Verdict == ProbeAccept {
+		return memcached
+	}
+	if tcp {
+		if p := probeROCPlus(w, limit); p.Verdict != ProbeReject {
+			return p
+		}
+	}
+	if p := probeDoIP(w, limit); p.Verdict != ProbeReject {
+		return p
+	}
+	if p := probeENIP(w); p.Verdict != ProbeReject {
+		return p
+	}
 	if p := probeGearman(w, limit); p.Verdict != ProbeReject {
 		return p
 	}
@@ -327,7 +405,7 @@ func probeWire(w []byte, limit int) ProbeResult {
 	if p := probeOPCUA(w, limit); p.Verdict != ProbeReject {
 		return p
 	}
-	if p := probeS7(w, limit); p.Verdict != ProbeReject {
+	if p := probeS7(w, limit); p.Verdict == ProbeAccept {
 		return p
 	}
 	if p := probeIEC104(w, limit); p.Verdict != ProbeReject {
@@ -348,6 +426,11 @@ func probeWire(w []byte, limit int) ProbeResult {
 	if p := probeMySQL(w, limit); p.Verdict != ProbeReject {
 		return p
 	}
+	if tcp {
+		if p := probeGenisys(w, limit); p.Verdict != ProbeReject {
+			return p
+		}
+	}
 	if p := probePostgres(w, limit); p.Verdict != ProbeReject {
 		return p
 	}
@@ -363,10 +446,10 @@ func probeWire(w []byte, limit int) ProbeResult {
 	if p := probeFTP(w, limit); p.Verdict != ProbeReject {
 		return p
 	}
-	if p := probeDHCP(w, limit); p.Verdict != ProbeReject {
+	if p := probeDHCP(w, limit); !tcp && p.Verdict != ProbeReject {
 		return p
 	}
-	if p := probeRADIUS(w, limit); p.Verdict != ProbeReject {
+	if p := probeRADIUS(w, limit); !tcp && p.Verdict != ProbeReject {
 		return p
 	}
 	if p := probeDNP3(w, limit); p.Verdict != ProbeReject {
@@ -393,9 +476,9 @@ func probeWire(w []byte, limit int) ProbeResult {
 	if p := probeRedis(w, limit); p.Verdict != ProbeReject {
 		return p
 	}
-	if p := probeWebSocket(w, limit); p.Verdict != ProbeReject {
-		return p
-	}
+	// A WebSocket frame has no standalone wire signature. Admission belongs
+	// to the validated HTTP upgrade; otherwise many unrelated binary messages
+	// match its two-byte header.
 	if p := probeMQTT(w, limit); p.Verdict != ProbeReject {
 		return p
 	}
@@ -426,26 +509,29 @@ func probeWire(w []byte, limit int) ProbeResult {
 	if p := probeRDP(w, limit); p.Verdict != ProbeReject {
 		return p
 	}
-	if p := probeDoT(w, limit); p.Verdict != ProbeReject {
+	if p := probeDoT(w, limit); !tcp && p.Verdict != ProbeReject {
 		return p
 	}
 	if p := probeSIP(w, limit); p.Verdict != ProbeReject {
 		return p
 	}
-	if p := probeNTP(w, limit); p.Verdict != ProbeReject {
+	if p := probeNTP(w, limit); !tcp && p.Verdict != ProbeReject {
 		return p
 	}
-	if p := probeCoAP(w, limit); p.Verdict != ProbeReject {
+	if p := probeCoAP(w, limit); !tcp && p.Verdict != ProbeReject {
 		return p
 	}
-	if p := probeRTP(w, limit); p.Verdict != ProbeReject {
+	if p := probeRTP(w, limit); !tcp && p.Verdict != ProbeReject {
 		return p
 	}
-	if p := probeQUIC(w, limit); p.Verdict != ProbeReject {
+	if p := probeQUIC(w, limit); !tcp && p.Verdict != ProbeReject {
 		return p
 	}
 	if p := probeStratum(w, limit); p.Verdict != ProbeReject {
 		return p
+	}
+	if memcached.Verdict == ProbeNeedMore {
+		return memcached
 	}
 	return ProbeResult{Verdict: ProbeReject, Reason: "no protocol match"}
 }
@@ -463,21 +549,25 @@ func probeHTTP2(w []byte, limit int) ProbeResult {
 }
 
 func probeMySQL(w []byte, _ int) ProbeResult {
-	// The first five greeting bytes can resemble a short PostgreSQL header.
-	// Wait for the server-version prefix before allowing another candidate.
-	if len(w) == 5 && w[3] == 0 && w[4] == 10 {
-		return probeNeed("mysql", "10", len(w), 6)
-	}
-	if len(w) < 6 {
+	if len(w) < 5 || w[3] != 0 || w[4] != 10 {
 		return ProbeResult{Verdict: ProbeReject}
 	}
-	if w[3] != 0 || w[4] != 10 {
+	payload := int(w[0]) | int(w[1])<<8 | int(w[2])<<16
+	if payload < 31 {
+		return ProbeResult{Verdict: ProbeReject}
+	}
+	if len(w) < 6 {
+		return probeNeed("mysql", "10", len(w), 6)
+	}
+	// A numeric server version, connection ID, salt, zero filler and protocol-41
+	// capability distinguish a greeting from an OP_REPLY or arbitrary packet.
+	if w[5] < '0' || w[5] > '9' {
 		return ProbeResult{Verdict: ProbeReject}
 	}
 	end := indexByte(w[5:], 0)
 	if end < 0 {
-		if len(w) < 32 {
-			return probeNeed("mysql", "10", len(w), 32)
+		if len(w) < 64 {
+			return probeNeed("mysql", "10", len(w), len(w)+1)
 		}
 		return ProbeResult{Verdict: ProbeReject}
 	}
@@ -486,7 +576,17 @@ func probeMySQL(w []byte, _ int) ProbeResult {
 			return ProbeResult{Verdict: ProbeReject}
 		}
 	}
-	return probeAccept("mysql", "10", 90)
+	at := 6 + end
+	if at+15 > payload+4 {
+		return ProbeResult{Verdict: ProbeReject}
+	}
+	if len(w) < at+15 {
+		return probeNeed("mysql", "10", len(w), at+15)
+	}
+	if w[at+12] != 0 || binary.LittleEndian.Uint16(w[at+13:at+15])&0x0200 == 0 {
+		return ProbeResult{Verdict: ProbeReject}
+	}
+	return probeAccept("mysql", "10", 98)
 }
 
 func bytesHasPrefix(b, prefix []byte) bool {

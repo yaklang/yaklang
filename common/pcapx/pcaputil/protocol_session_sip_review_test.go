@@ -1,0 +1,230 @@
+package pcaputil
+
+import (
+	"bytes"
+	"fmt"
+	"strconv"
+	"strings"
+	"testing"
+	"time"
+
+	"github.com/gopacket/gopacket/layers"
+	"github.com/stretchr/testify/require"
+)
+
+func TestSIPHTTPOptionsAdmission(t *testing.T) {
+	for _, target := range []string{"sip:bob@example.test", "sips:bob@example.test", "SIP:bob@example.test", "tel:+12025550123", "urn:service:sos", "http://example.test/call", "*"} {
+		for _, chunk := range []int{0, 1, 2, 7} {
+			t.Run(fmt.Sprintf("%s/chunk=%d", target, chunk), func(t *testing.T) {
+				req := sipMsg("OPTIONS "+target+" SIP/2.0", [][2]string{
+					{"Via", "SIP/2.0/TCP example.test;branch=z9hG4bKoptions"},
+					{"From", "<sip:alice@example.test>;tag=1"},
+					{"To", "<sip:bob@example.test>"},
+					{"Call-ID", "options@example.test"},
+					{"CSeq", "1 OPTIONS"},
+				}, "")
+				resp := sipResp("200", "OK", "z9hG4bKoptions", "1 OPTIONS", "options@example.test", "<sip:alice@example.test>;tag=1", "<sip:bob@example.test>;tag=2")
+				events, _ := sessionTestFlow(t, "sip", []sessionStep{{0, req}, {1, resp}}, chunk, false)
+				require.Len(t, events, 2)
+				assertSessionEvents(t, events, "sip", false)
+			})
+		}
+	}
+	for _, target := range []string{"*", "/path", "http://example.test/path"} {
+		events, _ := sessionTestFlow(t, "http", []sessionStep{
+			{0, []byte("OPTIONS " + target + " HTTP/1.1\r\nHost: example.test\r\n\r\n")},
+			{1, []byte("HTTP/1.1 204 No Content\r\n\r\n")},
+		}, 1, true)
+		require.Len(t, events, 2)
+		for _, e := range events {
+			require.Equal(t, "http", e.Protocol)
+			require.Equal(t, "deferred", e.Status)
+			require.Empty(t, e.Error)
+			result, err := e.Decode()
+			require.NoError(t, err)
+			require.NotEmpty(t, result)
+		}
+	}
+}
+
+func TestSIPRequestURIBoundaries(t *testing.T) {
+	for _, line := range []string{
+		"OPTIONS bob@example.test SIP/2.0",
+		"OPTIONS <sip:bob@example.test> SIP/2.0",
+		"OPTIONS sip:%ZZ SIP/2.0",
+		"INVITE * SIP/2.0",
+		"OPTIONS tel:\tbob SIP/2.0",
+	} {
+		require.False(t, sipRequestLine(line), line)
+		require.NotEqual(t, ProbeAccept, probeSIP([]byte(line+"\r\n"), len(line)+2).Verdict, line)
+	}
+}
+
+func TestSIPResponseStatusLineBoundary(t *testing.T) {
+	for _, line := range []string{
+		"SIP/2.0 2000 OK",
+		"SIP/2.0 200",
+		"SIP/2.0 20x OK",
+	} {
+		require.False(t, sipResponseLine(line), line)
+		require.NotEqual(t, ProbeAccept, probeSIP([]byte(line+"\r\n"), len(line)+2).Verdict, line)
+	}
+	require.True(t, sipResponseLine("SIP/2.0 204 "), "empty reason phrase still has its delimiter")
+}
+
+func TestSIPAdmissionSurvivesGopherPortHint(t *testing.T) {
+	req := sipMsg("OPTIONS sip:bob@example.test SIP/2.0", [][2]string{
+		{"Via", "SIP/2.0/TCP client.example.test;branch=z9hG4bKoptions"},
+		{"From", "<sip:alice@example.test>;tag=1"},
+		{"To", "<sip:bob@example.test>"},
+		{"Call-ID", "options@example.test"},
+		{"CSeq", "1 OPTIONS"},
+	}, "")
+	resp := sipResp("200", "OK", "z9hG4bKoptions", "1 OPTIONS", "options@example.test", "<sip:alice@example.test>;tag=1", "<sip:bob@example.test>;tag=2")
+	steps := []tcpStep{
+		{seq: 100, syn: true},
+		{seq: 300, syn: true, synack: true, reverse: true},
+		{seq: 101, ack: 301},
+	}
+	clientNext, serverNext := uint32(101), uint32(301)
+	for at := 0; at < len(req); at++ {
+		steps = append(steps, tcpStep{seq: clientNext, ack: serverNext, data: string(req[at : at+1])})
+		clientNext++
+	}
+	for at := 0; at < len(resp); at++ {
+		steps = append(steps, tcpStep{seq: serverNext, ack: clientNext, reverse: true, data: string(resp[at : at+1])})
+		serverNext++
+	}
+	steps = append(steps, tcpStep{seq: clientNext, ack: serverNext, fin: true})
+	pcap := binTestPcap(t, steps, layers.TCPPort(70), false, false)
+	events, _, err := binReplay(t, pcap, 1)
+	require.NoError(t, err)
+	require.Len(t, events, 2)
+	for _, event := range events {
+		require.Equal(t, "sip", event.Protocol, "%s: %s", event.Status, event.Summary)
+		require.Equal(t, "decoded", event.Status, "%s: %s", event.Status, event.Summary)
+	}
+}
+
+func TestProtocolSessionSIPLongStartLineBoundaries(t *testing.T) {
+	// Explicitly synthetic RFC 3261 regression sample; the manifest carries
+	// its source classification and digest, separate from independent captures.
+	invite := messagingRegressionBytes(t, "sip-long-invite.txt")
+	for _, method := range []string{"INVITE", "OPTIONS"} {
+		wire := bytes.ReplaceAll(invite, []byte("INVITE"), []byte(method))
+		combined := append(bytes.Clone(wire), wire...)
+		for split := 0; split <= len(combined); split++ {
+			s := newReviewSession(t, ParserBudget{})
+			probe := s.Probe(wire)
+			require.Equal(t, ProbeAccept, probe.Verdict, "method=%s split=%d", method, split)
+			require.Equal(t, "sip", probe.Protocol)
+			var events []*ProtocolEvent
+			for _, chunk := range [][]byte{combined[:split], combined[split:]} {
+				r := s.Feed(0, time.Unix(1, 0), chunk)
+				if r.Err != nil {
+					require.Equal(t, ErrNeedMore, r.Err.Kind, "method=%s split=%d: %s", method, split, r.Err)
+				}
+				events = append(events, r.Events...)
+			}
+			require.Len(t, events, 2, "method=%s split=%d", method, split)
+			for _, event := range events {
+				require.Equal(t, "decoded", event.Status, event.Error)
+				require.Equal(t, wire, event.Raw)
+			}
+		}
+		s := newReviewSession(t, ParserBudget{})
+		var events []*ProtocolEvent
+		for _, b := range wire {
+			r := s.Feed(0, time.Unix(1, 0), []byte{b})
+			if r.Err != nil {
+				require.Equal(t, ErrNeedMore, r.Err.Kind)
+			}
+			events = append(events, r.Events...)
+		}
+		require.Len(t, events, 1)
+		assertSessionEvents(t, events, "sip", false)
+	}
+}
+
+func TestProtocolSessionSIPLongStartLineBudgets(t *testing.T) {
+	for _, wire := range [][]byte{
+		[]byte("INVITE sip:" + strings.Repeat("x", 100)),
+		[]byte("SIP/2.0 200 " + strings.Repeat("x", 100)),
+		[]byte("OPTIONS sip:" + strings.Repeat("x", 100)),
+		[]byte("INVITE sip:" + strings.Repeat("x", 100) + "@example.test SIP/2.0\r\n"),
+	} {
+		s := newReviewSession(t, ParserBudget{MaxFrameBytes: 80})
+		require.Equal(t, ProbeReject, s.Probe(wire).Verdict)
+		r := s.Feed(0, time.Unix(1, 0), wire)
+		require.NotNil(t, r.Err)
+		require.False(t, r.NeedMore)
+		require.NotEqual(t, "sip", r.State)
+	}
+	wire := []byte("INVITE sip:" + strings.Repeat("x", sipMaxHeaderBytes))
+	s := newReviewSession(t, ParserBudget{})
+	require.Equal(t, ProbeReject, s.Probe(wire).Verdict)
+	r := s.Feed(0, time.Unix(1, 0), wire)
+	require.NotNil(t, r.Err)
+	require.False(t, r.NeedMore)
+	for _, wire := range [][]byte{
+		[]byte("INVITE sip:" + strings.Repeat("x", 100) + " HTTP/1.1\r\n"),
+		[]byte("INVITE sip:" + strings.Repeat("x", 100) + "\n"),
+	} {
+		require.Equal(t, ProbeReject, newReviewSession(t, ParserBudget{}).Probe(wire).Verdict)
+	}
+}
+
+func TestProtocolSessionSIPContentLengthSyntaxAndOverflow(t *testing.T) {
+	// Synthetic malformed Content-Length values verify the RFC 3261 1*DIGIT
+	// grammar and checked frame-length arithmetic, including a coalesced frame.
+	base := messagingRegressionBytes(t, "sip-long-invite.txt")
+	for _, value := range []string{strconv.Itoa(maxInt()), "+0", "-0", "", "18446744073709551616"} {
+		wire := bytes.Replace(base, []byte("Content-Length: 0"), []byte("Content-Length: "+value), 1)
+		if value == "9223372036854775807" {
+			require.Equal(t, wire, messagingRegressionBytes(t, "sip-content-length-overflow.txt"))
+		}
+		for _, split := range []int{0, len(wire) - 3} {
+			s := newReviewSession(t, ParserBudget{})
+			if split > 0 {
+				first := s.Feed(0, time.Unix(1, 0), wire[:split])
+				require.True(t, first.NeedMore)
+			}
+			result := s.Feed(0, time.Unix(1, 0), append(bytes.Clone(wire[split:]), base...))
+			require.NotNil(t, result.Err, "value=%q split=%d", value, split)
+			if value == strconv.Itoa(maxInt()) || value == "18446744073709551616" {
+				require.Equal(t, ErrResourceExceeded, result.Err.Kind)
+			} else {
+				require.Equal(t, ErrMalformedMessage, result.Err.Kind)
+			}
+			require.Len(t, result.Events, 1)
+			require.NotEqual(t, "decoded", result.Events[0].Status)
+		}
+	}
+}
+
+func TestProtocolSessionSIPContentLengthPreservesBodyBoundary(t *testing.T) {
+	base := messagingRegressionBytes(t, "sip-long-invite.txt")
+	// Leading zeroes are still a valid decimal; an embedded SIP-looking line
+	// belongs to this body, never to the next command in the TCP stream.
+	body := []byte("SIP/2.0 200 fake\r\n\r\n\x00")
+	wire := bytes.Replace(base, []byte("Content-Length: 0"), []byte(fmt.Sprintf("Content-Length: %04d", len(body))), 1)
+	wire = append(wire, body...)
+	combined := append(bytes.Clone(wire), base...)
+	for split := len(wire) - len(body); split <= len(wire)+1; split++ {
+		s := newReviewSession(t, ParserBudget{})
+		var events []*ProtocolEvent
+		for _, chunk := range [][]byte{combined[:split], combined[split:]} {
+			r := s.Feed(0, time.Unix(1, 0), chunk)
+			if r.Err != nil {
+				require.Equal(t, ErrNeedMore, r.Err.Kind)
+			}
+			events = append(events, r.Events...)
+		}
+		require.Len(t, events, 2)
+		require.Equal(t, wire, events[0].Raw)
+		require.Equal(t, base, events[1].Raw)
+		for _, event := range events {
+			require.Equal(t, "decoded", event.Status, event.Error)
+		}
+	}
+}

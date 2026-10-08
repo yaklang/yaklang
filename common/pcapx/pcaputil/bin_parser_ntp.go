@@ -3,9 +3,10 @@ package pcaputil
 import (
 	"encoding/binary"
 	"fmt"
+	"strconv"
 )
 
-// binNTP is the M0 session state for RFC 5905 NTPv4 client/server (mode 3/4).
+// binNTP is the M0 session state for NTPv3/v4 client/server (mode 3/4).
 // Port 123 is never consulted. NTS and control/private modes are out of scope.
 type binNTP struct {
 	origin []byte
@@ -17,7 +18,7 @@ func probeNTP(w []byte, limit int) ProbeResult {
 	}
 	vn := (w[0] >> 3) & 7
 	mode := w[0] & 7
-	if vn != 4 || (mode != 3 && mode != 4) {
+	if (vn != 3 && vn != 4) || (mode != 3 && mode != 4) {
 		return ProbeResult{Verdict: ProbeReject}
 	}
 	if len(w) < 48 {
@@ -32,7 +33,7 @@ func probeNTP(w []byte, limit int) ProbeResult {
 		return ProbeResult{Verdict: ProbeReject}
 	}
 	_ = limit
-	return probeAccept("ntp", "4", 90)
+	return probeAccept("ntp", strconv.Itoa(int(vn)), 90)
 }
 
 func (f *binFlow) frameNTP(w []byte) (int, *binSpec, error) {
@@ -47,8 +48,8 @@ func (f *binFlow) frameNTP(w []byte) (int, *binSpec, error) {
 		return 0, nil, nil
 	}
 	vn := (w[0] >> 3) & 7
-	if vn != 4 {
-		return 0, nil, fmt.Errorf("ntp: version must be 4")
+	if vn != 3 && vn != 4 {
+		return 0, nil, fmt.Errorf("ntp: version must be 3 or 4")
 	}
 	return 48, f.spec("ntp", "NTP"), nil
 }
@@ -59,11 +60,14 @@ func (s *binNTP) consume(raw []byte) (map[string]any, error) {
 	}
 	vn := (raw[0] >> 3) & 7
 	mode := raw[0] & 7
-	if vn != 4 {
-		return nil, fmt.Errorf("ntp: version must be 4")
+	if vn != 3 && vn != 4 {
+		return nil, fmt.Errorf("ntp: version must be 3 or 4")
 	}
 	if mode != 3 && mode != 4 {
 		return nil, fmt.Errorf("ntp: first-version profile is mode 3/4")
+	}
+	if raw[1] > 16 {
+		return nil, fmt.Errorf("ntp: invalid stratum")
 	}
 	name := "Client"
 	if mode == 4 {

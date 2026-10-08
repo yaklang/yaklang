@@ -245,9 +245,20 @@ String:
         setCtx("inList",false)
         return
       }
+      # RFC 1035 4.1.4: a literal label sequence may end in a pointer.
+      # Consume exactly the second pointer octet and end this encoded name;
+      # interpreting 0xc0 as a label length loses every following RR boundary.
+      if (count & 192) == 192 {
+        low = this.ProcessSubNode("PointerLow").Value
+        this.AddInfo("Pointer Offset", ((count & 63) << 8) | low)
+        setCtx("inList",false)
+        return
+      }
+      if count > 63 { panic("dns: reserved label type") }
       this.GetSubNode("Text").SetMaxLength(count)
       this.ProcessSubNode("Text")
     Count: uint8
+    PointerLow: uint8
     Text: string
 DNSA:
   Address: raw,4

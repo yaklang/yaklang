@@ -104,6 +104,7 @@ type workerPacket struct {
 }
 
 type workerBatch struct {
+	fence   chan struct{}
 	arena   []byte
 	packets []workerPacket
 	used    int
@@ -443,6 +444,10 @@ func (d *tcpWorkers) run(w *tcpWorker) {
 	}
 	decoder := offlineDecoder{conf: conf}
 	for b := range w.queue {
+		if b.fence != nil {
+			close(b.fence)
+			continue
+		}
 		for i := range b.packets {
 			func() {
 				defer func() {
@@ -492,6 +497,33 @@ func (d *tcpWorkers) run(w *tcpWorker) {
 		b := <-w.free
 		b.arena = nil
 		b.packets = nil
+	}
+}
+
+// synchronizeProtocolContext completes earlier TCP submissions before the
+// capture reader decodes a UDP packet which can depend on their negotiated
+// state (for example RTSP SETUP or SIP SDP). It does not close or expire flows.
+// Worker-side decoding never waits on its own queue.
+func (p *TrafficPool) synchronizeProtocolContext() {
+	if p.parallel == nil || p.owner != nil {
+		return
+	}
+	d := p.parallel
+	d.mu.Lock()
+	if d.closed || d.stats.accepted.Load() == d.stats.processed.Load() {
+		d.mu.Unlock()
+		return
+	}
+	fences := make([]chan struct{}, 0, len(d.workers))
+	for _, w := range d.workers {
+		d.publish(w)
+		fence := make(chan struct{})
+		w.queue <- &workerBatch{fence: fence}
+		fences = append(fences, fence)
+	}
+	d.mu.Unlock()
+	for _, fence := range fences {
+		<-fence
 	}
 }
 
@@ -578,17 +610,31 @@ func rawFlowKey(raw []byte, link layers.LinkType) (flowKey, bool, error) {
 		}
 	}
 	packet := gopacket.NewPacket(raw, captureLinkDecoder(link), gopacket.DecodeOptions{Lazy: true, NoCopy: true, DecodeStreamsAsDatagrams: false})
-	tcp, ok := packet.TransportLayer().(*layers.TCP)
-	if !ok && packet.TransportLayer() != nil {
+	// Tunnel decoders expose the outer NetworkLayer/TransportLayer. Route
+	// using the innermost pair, just as protocol network normalization does.
+	// Combining outer IP addresses with inner TCP ports can split the two
+	// directions when the carrier keeps the same outer endpoint order.
+	var network gopacket.NetworkLayer
+	var tcp *layers.TCP
+	for _, layer := range packet.Layers() {
+		if inner, ok := layer.(gopacket.NetworkLayer); ok {
+			network = inner
+			tcp = nil
+		}
+		if inner, ok := layer.(*layers.TCP); ok {
+			tcp = inner
+		}
+	}
+	if tcp == nil && packet.TransportLayer() != nil {
 		return flowKey{}, false, nil
 	}
 	if failure := packet.ErrorLayer(); failure != nil && !unsupportedNetworkDecode(packet) {
 		return flowKey{}, false, failure.Error()
 	}
-	if !ok {
+	if tcp == nil {
 		return flowKey{}, false, nil
 	}
-	switch ip := packet.NetworkLayer().(type) {
+	switch ip := network.(type) {
 	case *layers.IPv4:
 		key, ok := makeFlowKey(ip.SrcIP, ip.DstIP, uint16(tcp.SrcPort), uint16(tcp.DstPort), false)
 		return key, ok, nil

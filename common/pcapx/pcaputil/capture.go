@@ -48,13 +48,13 @@ func _open(conf *CaptureConfig, ctx context.Context, handler *PcapHandleWrapper)
 			if err != nil {
 				return err
 			}
-			conf.trafficPool.observeCapture(len(packet.Data()))
+			conf.trafficPool.observeCaptureInfo(len(packet.Data()), packet.Metadata().CaptureInfo)
 			if conf.recorder != nil {
 				if err := conf.recorder.write(packet.Data(), packet.Metadata().CaptureInfo, handler.LinkType()); err != nil {
 					return err
 				}
 			}
-			conf.packetHandler(innerCtx, packet)
+			conf.packetHandlerWithLink(innerCtx, packet, handler.LinkType())
 		}
 		return nil
 	}
@@ -67,8 +67,8 @@ func _open(conf *CaptureConfig, ctx context.Context, handler *PcapHandleWrapper)
 			if packet == nil {
 				return nil
 			}
-			conf.trafficPool.observeCapture(len(packet.Data()))
-			conf.packetHandler(innerCtx, packet)
+			conf.trafficPool.observeCaptureInfo(len(packet.Data()), packet.Metadata().CaptureInfo)
+			conf.packetHandlerWithLink(innerCtx, packet, handler.LinkType())
 		}
 	}
 }
