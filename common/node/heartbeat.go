@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/yaklang/yaklang/common/log"
+	"strings"
 	"time"
 )
 
@@ -54,12 +55,60 @@ func (n *NodeBase) heartbeat() error {
 		} else if session.ResourcePolicyRequired {
 			return n.rejectHeartbeatPolicy(fmt.Errorf("required resource policy missing from heartbeat"))
 		}
+		if err := n.applyHeartbeatSession(response); err != nil {
+			return err
+		}
 		return nil
 	}
 	if session.ResourcePolicyRequired {
 		return fmt.Errorf("resource policy transport unavailable")
 	}
 	return n.transport.Heartbeat(ctx, session, request)
+}
+
+func (n *NodeBase) applyHeartbeatSession(response HeartbeatResponse) error {
+	n.sessionMu.Lock()
+	defer n.sessionMu.Unlock()
+	current := n.session
+	if current.SessionID == "" {
+		return fmt.Errorf("node session not established")
+	}
+	if response.CompanyID != "" {
+		companyID := strings.TrimSpace(response.CompanyID)
+		if current.CompanyID != "" && companyID != current.CompanyID {
+			return fmt.Errorf("heartbeat company_id does not match the node session")
+		}
+		current.CompanyID = companyID
+	}
+	if response.NATSCredentials != "" {
+		current.NATSCredentials = response.NATSCredentials
+	}
+	if !response.NATSCredentialsExpiresAt.IsZero() {
+		current.NATSCredentialsExpiresAt = response.NATSCredentialsExpiresAt
+	}
+	if response.CommandStream != "" {
+		current.CommandStream = strings.TrimSpace(response.CommandStream)
+	}
+	if response.CommandConsumer != "" {
+		current.CommandConsumer = strings.TrimSpace(response.CommandConsumer)
+	}
+	if response.InboxPrefix != "" {
+		current.InboxPrefix = strings.TrimSpace(response.InboxPrefix)
+	}
+	if response.CommandSubject != "" {
+		current.CommandSubject = strings.TrimSpace(response.CommandSubject)
+	}
+	if response.EventSubjectPrefix != "" {
+		current.EventSubjectPrefix = strings.TrimSpace(response.EventSubjectPrefix)
+	}
+	if !response.ExpiresAt.IsZero() {
+		current.ExpiresAt = response.ExpiresAt
+	}
+	if err := validateSessionState(current, time.Now()); err != nil {
+		return fmt.Errorf("invalid heartbeat session renewal: %w", err)
+	}
+	n.session = current
+	return nil
 }
 
 func (n *NodeBase) runtimeStatus() RuntimeStatus {

@@ -9,6 +9,7 @@ option go_package = "github.com/yaklang/yaklang/scannode/gen/legionpb/legion/nod
 message NodeRef {
   string node_id = 1;
   string node_session_id = 2;
+  string company_id = 3;
 }
 
 message CommandMetadata {
@@ -17,6 +18,7 @@ message CommandMetadata {
   string trace_id = 3;
   google.protobuf.Timestamp issued_at = 4;
   google.protobuf.Timestamp expire_at = 5;
+  string company_id = 6;
 }
 
 message EventMetadata {
@@ -82,6 +84,13 @@ message BootstrapResponse {
   string node_id = 7;
   bool runtime_host_capacity_accepted = 8;
   bool resource_policy_required = 9;
+  string company_id = 10;
+  string nats_credentials = 11;
+  google.protobuf.Timestamp nats_credentials_expires_at = 12;
+  string command_stream = 13;
+  string command_consumer = 14;
+  string inbox_prefix = 15;
+  google.protobuf.Timestamp session_started_at = 16;
 }
 
 message ActiveAttemptHeartbeat {
@@ -140,4 +149,13 @@ message NodeResourcePolicy {
 
 message NodeHeartbeatResponse {
   NodeResourcePolicy resource_policy = 1;
+  string company_id = 2;
+  string nats_credentials = 3;
+  google.protobuf.Timestamp nats_credentials_expires_at = 4;
+  string command_stream = 5;
+  string command_consumer = 6;
+  string inbox_prefix = 7;
+  string command_subject = 8;
+  string event_subject_prefix = 9;
+  google.protobuf.Timestamp expires_at = 10;
 }

@@ -21,7 +21,9 @@ var DistYakCommand = cli.Command{
 	Action: func(c *cli.Context) error {
 		ctx, stop := newDistYakContext()
 		defer stop()
-		applySSADatabaseFromEnv()
+		if err := applySSADatabaseFromEnv(); err != nil {
+			return err
+		}
 		runtimeID := os.Getenv("YAK_RUNTIME_ID")
 		args := c.Args()
 		if len(args) > 0 {
@@ -56,10 +58,24 @@ func newDistYakContext() (context.Context, context.CancelFunc) {
 // shared Postgres and scan jobs reload it via NewProgramFromDB. Without this
 // call the global SSA_PROJECT_DB_RAW stays at the default SQLite path and the
 // env var is silently ignored.
-func applySSADatabaseFromEnv() {
+func applySSADatabaseFromEnv() error {
+	companyID := strings.TrimSpace(os.Getenv(consts.ENV_SSA_DATABASE_COMPANY_ID))
+	defer os.Unsetenv(consts.ENV_SSA_DATABASE_COMPANY_ID)
+	consts.SetSSADatabaseCompanyID(companyID)
 	if envRaw := consts.GetSSADatabaseInfoFromEnv(); envRaw != "" {
 		consts.SetSSADatabaseInfo(envRaw)
 	}
+	consts.SetSSADatabaseSkipMigrate(utils.InterfaceToBoolean(os.Getenv(consts.ENV_SSA_DB_SKIP_MIGRATE)))
+	// The trusted distyak entrypoint consumes the connection material before
+	// evaluating the dispatched Yak source. The source and any process it
+	// starts cannot recover the DSN from its environment.
+	_ = os.Unsetenv(consts.ENV_SSA_DATABASE_RAW)
+	_ = os.Unsetenv(consts.ENV_SSA_DB_SKIP_MIGRATE)
+	if companyID != "" {
+		_, raw := consts.GetSSADataBaseInfo()
+		return consts.SetGormSSAProjectDatabaseByInfo(raw)
+	}
+	return nil
 }
 
 func runDistYakFile(parent context.Context, file string, runtimeID string) error {

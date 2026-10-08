@@ -959,6 +959,7 @@ const %s string = %q
 
 var DistributionCommands = []*cli.Command{
 	&scannode.DistYakCommand,
+	&scannode.SSAIRSchemaCommand,
 	{
 		Name:   "node",
 		Usage:  "join legion platform, bootstrap node session over HTTP, and consume job commands over NATS",

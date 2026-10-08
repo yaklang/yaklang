@@ -449,15 +449,19 @@ func initYakitDatabase() error {
 		publishProjectDatabaseBinding(projectDataBase, projectReadDatabase, currentProjectDatabasePath, false)
 
 		/* 创建SSA数据库 */
-		ssaDatabaseDialect, ssaDatabaseRaw := GetSSADataBaseInfo()
-		ssaprojectDatabase, err := CreateSSAProjectDatabase(ssaDatabaseDialect, ssaDatabaseRaw)
-		if err != nil {
-			err = utils.Errorf("init ssa-db[%s %s] failed: %s", ssaDatabaseRaw, ssaDatabaseDialect, err)
-			log.Errorf("%s", err)
-			initYakitDatabaseRetError = utils.JoinErrors(initYakitDatabaseRetError, err)
+		// A trusted distyak task can open and validate its company database
+		// before profile initialization. Preserve that explicit binding.
+		if ssaDatabase == nil {
+			ssaDatabaseDialect, ssaDatabaseRaw := GetSSADataBaseInfo()
+			ssaprojectDatabase, err := CreateSSAProjectDatabase(ssaDatabaseDialect, ssaDatabaseRaw)
+			if err != nil {
+				err = utils.Errorf("init SSA database (%s) failed: %s", ssaDatabaseDialect, err)
+				log.Errorf("%s", err)
+				initYakitDatabaseRetError = utils.JoinErrors(initYakitDatabaseRetError, err)
+			}
+			SetGormSSAProjectDatabase(ssaprojectDatabase)
 		}
-		schema.SetDefaultSSADatabase(ssaprojectDatabase)
-		SetGormSSAProjectDatabase(ssaprojectDatabase)
+		schema.SetDefaultSSADatabase(ssaDatabase)
 	})
 	return initYakitDatabaseRetError
 }

@@ -137,7 +137,7 @@ func newManagedInputJetStreamHarness(t *testing.T, suffix string, ackWait time.D
 	}); err != nil {
 		t.Fatalf("create task consumer ack_wait=%s: %v", ackWait, err)
 	}
-	consumer, err := bridge.startConsumer(context.Background(), brokerURL, session.SessionID, session.CommandSubject)
+	consumer, err := bridge.startConsumer(context.Background(), session)
 	if err != nil {
 		_ = commandJS.DeleteConsumer(legionCommandStream, durable)
 		commandConn.Close()
@@ -145,9 +145,6 @@ func newManagedInputJetStreamHarness(t *testing.T, suffix string, ackWait time.D
 		platform.Close()
 		t.Fatalf("start task consumer: %v", err)
 	}
-	bridge.mu.Lock()
-	bridge.consumer = consumer
-	bridge.mu.Unlock()
 	h := &managedInputJetStreamHarness{
 		bridge: bridge, manager: manager, driver: driver, resolver: resolver,
 		resolverDir: resolverDir, commandJS: commandJS, commandConn: commandConn,

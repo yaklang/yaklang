@@ -101,7 +101,7 @@ func TestResilienceAISessionConcurrentReconnectHonorsWaiterDeadline(t *testing.T
 	defer cancelConnect()
 	first := make(chan error, 1)
 	go func() {
-		_, err := publisher.jetStreamForContext(connecting, url)
+		_, err := publisher.jetStreamForContext(connecting, node.SessionState{NATSURL: url})
 		first <- err
 	}()
 	select {
@@ -113,7 +113,7 @@ func TestResilienceAISessionConcurrentReconnectHonorsWaiterDeadline(t *testing.T
 	defer cancel()
 	second := make(chan error, 1)
 	go func() {
-		_, err := publisher.jetStreamForContext(ctx, url)
+		_, err := publisher.jetStreamForContext(ctx, node.SessionState{NATSURL: url})
 		second <- err
 	}()
 	select {

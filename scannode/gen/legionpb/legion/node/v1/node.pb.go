@@ -136,6 +136,7 @@ type NodeRef struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	NodeId        string                 `protobuf:"bytes,1,opt,name=node_id,json=nodeId,proto3" json:"node_id,omitempty"`
 	NodeSessionId string                 `protobuf:"bytes,2,opt,name=node_session_id,json=nodeSessionId,proto3" json:"node_session_id,omitempty"`
+	CompanyId     string                 `protobuf:"bytes,3,opt,name=company_id,json=companyId,proto3" json:"company_id,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -184,6 +185,13 @@ func (x *NodeRef) GetNodeSessionId() string {
 	return ""
 }
 
+func (x *NodeRef) GetCompanyId() string {
+	if x != nil {
+		return x.CompanyId
+	}
+	return ""
+}
+
 type CommandMetadata struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	CommandId     string                 `protobuf:"bytes,1,opt,name=command_id,json=commandId,proto3" json:"command_id,omitempty"`
@@ -191,6 +199,7 @@ type CommandMetadata struct {
 	TraceId       string                 `protobuf:"bytes,3,opt,name=trace_id,json=traceId,proto3" json:"trace_id,omitempty"`
 	IssuedAt      *timestamppb.Timestamp `protobuf:"bytes,4,opt,name=issued_at,json=issuedAt,proto3" json:"issued_at,omitempty"`
 	ExpireAt      *timestamppb.Timestamp `protobuf:"bytes,5,opt,name=expire_at,json=expireAt,proto3" json:"expire_at,omitempty"`
+	CompanyId     string                 `protobuf:"bytes,6,opt,name=company_id,json=companyId,proto3" json:"company_id,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -258,6 +267,13 @@ func (x *CommandMetadata) GetExpireAt() *timestamppb.Timestamp {
 		return x.ExpireAt
 	}
 	return nil
+}
+
+func (x *CommandMetadata) GetCompanyId() string {
+	if x != nil {
+		return x.CompanyId
+	}
+	return ""
 }
 
 type EventMetadata struct {
@@ -615,6 +631,13 @@ type BootstrapResponse struct {
 	NodeId                      string                 `protobuf:"bytes,7,opt,name=node_id,json=nodeId,proto3" json:"node_id,omitempty"`
 	RuntimeHostCapacityAccepted bool                   `protobuf:"varint,8,opt,name=runtime_host_capacity_accepted,json=runtimeHostCapacityAccepted,proto3" json:"runtime_host_capacity_accepted,omitempty"`
 	ResourcePolicyRequired      bool                   `protobuf:"varint,9,opt,name=resource_policy_required,json=resourcePolicyRequired,proto3" json:"resource_policy_required,omitempty"`
+	CompanyId                   string                 `protobuf:"bytes,10,opt,name=company_id,json=companyId,proto3" json:"company_id,omitempty"`
+	NatsCredentials             string                 `protobuf:"bytes,11,opt,name=nats_credentials,json=natsCredentials,proto3" json:"nats_credentials,omitempty"`
+	NatsCredentialsExpiresAt    *timestamppb.Timestamp `protobuf:"bytes,12,opt,name=nats_credentials_expires_at,json=natsCredentialsExpiresAt,proto3" json:"nats_credentials_expires_at,omitempty"`
+	CommandStream               string                 `protobuf:"bytes,13,opt,name=command_stream,json=commandStream,proto3" json:"command_stream,omitempty"`
+	CommandConsumer             string                 `protobuf:"bytes,14,opt,name=command_consumer,json=commandConsumer,proto3" json:"command_consumer,omitempty"`
+	InboxPrefix                 string                 `protobuf:"bytes,15,opt,name=inbox_prefix,json=inboxPrefix,proto3" json:"inbox_prefix,omitempty"`
+	SessionStartedAt            *timestamppb.Timestamp `protobuf:"bytes,16,opt,name=session_started_at,json=sessionStartedAt,proto3" json:"session_started_at,omitempty"`
 	unknownFields               protoimpl.UnknownFields
 	sizeCache                   protoimpl.SizeCache
 }
@@ -710,6 +733,55 @@ func (x *BootstrapResponse) GetResourcePolicyRequired() bool {
 		return x.ResourcePolicyRequired
 	}
 	return false
+}
+
+func (x *BootstrapResponse) GetCompanyId() string {
+	if x != nil {
+		return x.CompanyId
+	}
+	return ""
+}
+
+func (x *BootstrapResponse) GetNatsCredentials() string {
+	if x != nil {
+		return x.NatsCredentials
+	}
+	return ""
+}
+
+func (x *BootstrapResponse) GetNatsCredentialsExpiresAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.NatsCredentialsExpiresAt
+	}
+	return nil
+}
+
+func (x *BootstrapResponse) GetCommandStream() string {
+	if x != nil {
+		return x.CommandStream
+	}
+	return ""
+}
+
+func (x *BootstrapResponse) GetCommandConsumer() string {
+	if x != nil {
+		return x.CommandConsumer
+	}
+	return ""
+}
+
+func (x *BootstrapResponse) GetInboxPrefix() string {
+	if x != nil {
+		return x.InboxPrefix
+	}
+	return ""
+}
+
+func (x *BootstrapResponse) GetSessionStartedAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.SessionStartedAt
+	}
+	return nil
 }
 
 type ActiveAttemptHeartbeat struct {
@@ -1163,10 +1235,19 @@ func (x *NodeResourcePolicy) GetMaxRunningJobs() uint32 {
 }
 
 type NodeHeartbeatResponse struct {
-	state          protoimpl.MessageState `protogen:"open.v1"`
-	ResourcePolicy *NodeResourcePolicy    `protobuf:"bytes,1,opt,name=resource_policy,json=resourcePolicy,proto3" json:"resource_policy,omitempty"`
-	unknownFields  protoimpl.UnknownFields
-	sizeCache      protoimpl.SizeCache
+	state                    protoimpl.MessageState `protogen:"open.v1"`
+	ResourcePolicy           *NodeResourcePolicy    `protobuf:"bytes,1,opt,name=resource_policy,json=resourcePolicy,proto3" json:"resource_policy,omitempty"`
+	CompanyId                string                 `protobuf:"bytes,2,opt,name=company_id,json=companyId,proto3" json:"company_id,omitempty"`
+	NatsCredentials          string                 `protobuf:"bytes,3,opt,name=nats_credentials,json=natsCredentials,proto3" json:"nats_credentials,omitempty"`
+	NatsCredentialsExpiresAt *timestamppb.Timestamp `protobuf:"bytes,4,opt,name=nats_credentials_expires_at,json=natsCredentialsExpiresAt,proto3" json:"nats_credentials_expires_at,omitempty"`
+	CommandStream            string                 `protobuf:"bytes,5,opt,name=command_stream,json=commandStream,proto3" json:"command_stream,omitempty"`
+	CommandConsumer          string                 `protobuf:"bytes,6,opt,name=command_consumer,json=commandConsumer,proto3" json:"command_consumer,omitempty"`
+	InboxPrefix              string                 `protobuf:"bytes,7,opt,name=inbox_prefix,json=inboxPrefix,proto3" json:"inbox_prefix,omitempty"`
+	CommandSubject           string                 `protobuf:"bytes,8,opt,name=command_subject,json=commandSubject,proto3" json:"command_subject,omitempty"`
+	EventSubjectPrefix       string                 `protobuf:"bytes,9,opt,name=event_subject_prefix,json=eventSubjectPrefix,proto3" json:"event_subject_prefix,omitempty"`
+	ExpiresAt                *timestamppb.Timestamp `protobuf:"bytes,10,opt,name=expires_at,json=expiresAt,proto3" json:"expires_at,omitempty"`
+	unknownFields            protoimpl.UnknownFields
+	sizeCache                protoimpl.SizeCache
 }
 
 func (x *NodeHeartbeatResponse) Reset() {
@@ -1206,21 +1287,88 @@ func (x *NodeHeartbeatResponse) GetResourcePolicy() *NodeResourcePolicy {
 	return nil
 }
 
+func (x *NodeHeartbeatResponse) GetCompanyId() string {
+	if x != nil {
+		return x.CompanyId
+	}
+	return ""
+}
+
+func (x *NodeHeartbeatResponse) GetNatsCredentials() string {
+	if x != nil {
+		return x.NatsCredentials
+	}
+	return ""
+}
+
+func (x *NodeHeartbeatResponse) GetNatsCredentialsExpiresAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.NatsCredentialsExpiresAt
+	}
+	return nil
+}
+
+func (x *NodeHeartbeatResponse) GetCommandStream() string {
+	if x != nil {
+		return x.CommandStream
+	}
+	return ""
+}
+
+func (x *NodeHeartbeatResponse) GetCommandConsumer() string {
+	if x != nil {
+		return x.CommandConsumer
+	}
+	return ""
+}
+
+func (x *NodeHeartbeatResponse) GetInboxPrefix() string {
+	if x != nil {
+		return x.InboxPrefix
+	}
+	return ""
+}
+
+func (x *NodeHeartbeatResponse) GetCommandSubject() string {
+	if x != nil {
+		return x.CommandSubject
+	}
+	return ""
+}
+
+func (x *NodeHeartbeatResponse) GetEventSubjectPrefix() string {
+	if x != nil {
+		return x.EventSubjectPrefix
+	}
+	return ""
+}
+
+func (x *NodeHeartbeatResponse) GetExpiresAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.ExpiresAt
+	}
+	return nil
+}
+
 var File_legion_node_v1_node_proto protoreflect.FileDescriptor
 
 const file_legion_node_v1_node_proto_rawDesc = "" +
 	"\n" +
-	"\x19legion/node/v1/node.proto\x12\x0elegion.node.v1\x1a\x1fgoogle/protobuf/timestamp.proto\"J\n" +
+	"\x19legion/node/v1/node.proto\x12\x0elegion.node.v1\x1a\x1fgoogle/protobuf/timestamp.proto\"i\n" +
 	"\aNodeRef\x12\x17\n" +
 	"\anode_id\x18\x01 \x01(\tR\x06nodeId\x12&\n" +
-	"\x0fnode_session_id\x18\x02 \x01(\tR\rnodeSessionId\"\xe0\x01\n" +
+	"\x0fnode_session_id\x18\x02 \x01(\tR\rnodeSessionId\x12\x1d\n" +
+	"\n" +
+	"company_id\x18\x03 \x01(\tR\tcompanyId\"\xff\x01\n" +
 	"\x0fCommandMetadata\x12\x1d\n" +
 	"\n" +
 	"command_id\x18\x01 \x01(\tR\tcommandId\x12!\n" +
 	"\fcommand_type\x18\x02 \x01(\tR\vcommandType\x12\x19\n" +
 	"\btrace_id\x18\x03 \x01(\tR\atraceId\x127\n" +
 	"\tissued_at\x18\x04 \x01(\v2\x1a.google.protobuf.TimestampR\bissuedAt\x127\n" +
-	"\texpire_at\x18\x05 \x01(\v2\x1a.google.protobuf.TimestampR\bexpireAt\"\xfb\x01\n" +
+	"\texpire_at\x18\x05 \x01(\v2\x1a.google.protobuf.TimestampR\bexpireAt\x12\x1d\n" +
+	"\n" +
+	"company_id\x18\x06 \x01(\tR\tcompanyId\"\xfb\x01\n" +
 	"\rEventMetadata\x12\x19\n" +
 	"\bevent_id\x18\x01 \x01(\tR\aeventId\x12\x1d\n" +
 	"\n" +
@@ -1260,7 +1408,7 @@ const file_legion_node_v1_node_proto_rawDesc = "" +
 	"\rhost_identity\x18\v \x01(\v2 .legion.node.v1.NodeHostIdentityR\fhostIdentity\x1a9\n" +
 	"\vLabelsEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
-	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\xa9\x03\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\x8d\x06\n" +
 	"\x11BootstrapResponse\x12&\n" +
 	"\x0fnode_session_id\x18\x01 \x01(\tR\rnodeSessionId\x12#\n" +
 	"\rsession_token\x18\x02 \x01(\tR\fsessionToken\x12\x19\n" +
@@ -1271,7 +1419,16 @@ const file_legion_node_v1_node_proto_rawDesc = "" +
 	"expires_at\x18\x06 \x01(\v2\x1a.google.protobuf.TimestampR\texpiresAt\x12\x17\n" +
 	"\anode_id\x18\a \x01(\tR\x06nodeId\x12C\n" +
 	"\x1eruntime_host_capacity_accepted\x18\b \x01(\bR\x1bruntimeHostCapacityAccepted\x128\n" +
-	"\x18resource_policy_required\x18\t \x01(\bR\x16resourcePolicyRequired\"\x95\x02\n" +
+	"\x18resource_policy_required\x18\t \x01(\bR\x16resourcePolicyRequired\x12\x1d\n" +
+	"\n" +
+	"company_id\x18\n" +
+	" \x01(\tR\tcompanyId\x12)\n" +
+	"\x10nats_credentials\x18\v \x01(\tR\x0fnatsCredentials\x12Y\n" +
+	"\x1bnats_credentials_expires_at\x18\f \x01(\v2\x1a.google.protobuf.TimestampR\x18natsCredentialsExpiresAt\x12%\n" +
+	"\x0ecommand_stream\x18\r \x01(\tR\rcommandStream\x12)\n" +
+	"\x10command_consumer\x18\x0e \x01(\tR\x0fcommandConsumer\x12!\n" +
+	"\finbox_prefix\x18\x0f \x01(\tR\vinboxPrefix\x12H\n" +
+	"\x12session_started_at\x18\x10 \x01(\v2\x1a.google.protobuf.TimestampR\x10sessionStartedAt\"\x95\x02\n" +
 	"\x16ActiveAttemptHeartbeat\x12\x1d\n" +
 	"\n" +
 	"attempt_id\x18\x01 \x01(\tR\tattemptId\x12\x15\n" +
@@ -1323,9 +1480,21 @@ const file_legion_node_v1_node_proto_rawDesc = "" +
 	"\x12NodeResourcePolicy\x12C\n" +
 	"\x1esystem_reserved_cpu_millicores\x18\x01 \x01(\x04R\x1bsystemReservedCpuMillicores\x12?\n" +
 	"\x1csystem_reserved_memory_bytes\x18\x02 \x01(\x04R\x19systemReservedMemoryBytes\x12(\n" +
-	"\x10max_running_jobs\x18\x03 \x01(\rR\x0emaxRunningJobs\"d\n" +
+	"\x10max_running_jobs\x18\x03 \x01(\rR\x0emaxRunningJobs\"\x94\x04\n" +
 	"\x15NodeHeartbeatResponse\x12K\n" +
-	"\x0fresource_policy\x18\x01 \x01(\v2\".legion.node.v1.NodeResourcePolicyR\x0eresourcePolicy*\xc2\x01\n" +
+	"\x0fresource_policy\x18\x01 \x01(\v2\".legion.node.v1.NodeResourcePolicyR\x0eresourcePolicy\x12\x1d\n" +
+	"\n" +
+	"company_id\x18\x02 \x01(\tR\tcompanyId\x12)\n" +
+	"\x10nats_credentials\x18\x03 \x01(\tR\x0fnatsCredentials\x12Y\n" +
+	"\x1bnats_credentials_expires_at\x18\x04 \x01(\v2\x1a.google.protobuf.TimestampR\x18natsCredentialsExpiresAt\x12%\n" +
+	"\x0ecommand_stream\x18\x05 \x01(\tR\rcommandStream\x12)\n" +
+	"\x10command_consumer\x18\x06 \x01(\tR\x0fcommandConsumer\x12!\n" +
+	"\finbox_prefix\x18\a \x01(\tR\vinboxPrefix\x12'\n" +
+	"\x0fcommand_subject\x18\b \x01(\tR\x0ecommandSubject\x120\n" +
+	"\x14event_subject_prefix\x18\t \x01(\tR\x12eventSubjectPrefix\x129\n" +
+	"\n" +
+	"expires_at\x18\n" +
+	" \x01(\v2\x1a.google.protobuf.TimestampR\texpiresAt*\xc2\x01\n" +
 	"\x12NodeLifecycleState\x12$\n" +
 	" NODE_LIFECYCLE_STATE_UNSPECIFIED\x10\x00\x12\x1e\n" +
 	"\x1aNODE_LIFECYCLE_STATE_READY\x10\x01\x12!\n" +
@@ -1383,23 +1552,27 @@ var file_legion_node_v1_node_proto_depIdxs = []int32{
 	5,  // 5: legion.node.v1.BootstrapRequest.host_facts:type_name -> legion.node.v1.NodeHostFacts
 	6,  // 6: legion.node.v1.BootstrapRequest.host_identity:type_name -> legion.node.v1.NodeHostIdentity
 	18, // 7: legion.node.v1.BootstrapResponse.expires_at:type_name -> google.protobuf.Timestamp
-	18, // 8: legion.node.v1.ActiveAttemptHeartbeat.last_activity_at:type_name -> google.protobuf.Timestamp
-	4,  // 9: legion.node.v1.NodeHeartbeat.metadata:type_name -> legion.node.v1.EventMetadata
-	0,  // 10: legion.node.v1.NodeHeartbeat.lifecycle_state:type_name -> legion.node.v1.NodeLifecycleState
-	16, // 11: legion.node.v1.NodeHeartbeat.labels:type_name -> legion.node.v1.NodeHeartbeat.LabelsEntry
-	9,  // 12: legion.node.v1.NodeHeartbeat.active_attempts:type_name -> legion.node.v1.ActiveAttemptHeartbeat
-	18, // 13: legion.node.v1.NodeHeartbeat.observed_at:type_name -> google.protobuf.Timestamp
-	5,  // 14: legion.node.v1.NodeHeartbeat.host_facts:type_name -> legion.node.v1.NodeHostFacts
-	10, // 15: legion.node.v1.NodeHeartbeat.runtime_host_capacity:type_name -> legion.node.v1.RuntimeHostCapacity
-	4,  // 16: legion.node.v1.NodeLog.metadata:type_name -> legion.node.v1.EventMetadata
-	1,  // 17: legion.node.v1.NodeLog.level:type_name -> legion.node.v1.LogLevel
-	17, // 18: legion.node.v1.NodeLog.attributes:type_name -> legion.node.v1.NodeLog.AttributesEntry
-	13, // 19: legion.node.v1.NodeHeartbeatResponse.resource_policy:type_name -> legion.node.v1.NodeResourcePolicy
-	20, // [20:20] is the sub-list for method output_type
-	20, // [20:20] is the sub-list for method input_type
-	20, // [20:20] is the sub-list for extension type_name
-	20, // [20:20] is the sub-list for extension extendee
-	0,  // [0:20] is the sub-list for field type_name
+	18, // 8: legion.node.v1.BootstrapResponse.nats_credentials_expires_at:type_name -> google.protobuf.Timestamp
+	18, // 9: legion.node.v1.BootstrapResponse.session_started_at:type_name -> google.protobuf.Timestamp
+	18, // 10: legion.node.v1.ActiveAttemptHeartbeat.last_activity_at:type_name -> google.protobuf.Timestamp
+	4,  // 11: legion.node.v1.NodeHeartbeat.metadata:type_name -> legion.node.v1.EventMetadata
+	0,  // 12: legion.node.v1.NodeHeartbeat.lifecycle_state:type_name -> legion.node.v1.NodeLifecycleState
+	16, // 13: legion.node.v1.NodeHeartbeat.labels:type_name -> legion.node.v1.NodeHeartbeat.LabelsEntry
+	9,  // 14: legion.node.v1.NodeHeartbeat.active_attempts:type_name -> legion.node.v1.ActiveAttemptHeartbeat
+	18, // 15: legion.node.v1.NodeHeartbeat.observed_at:type_name -> google.protobuf.Timestamp
+	5,  // 16: legion.node.v1.NodeHeartbeat.host_facts:type_name -> legion.node.v1.NodeHostFacts
+	10, // 17: legion.node.v1.NodeHeartbeat.runtime_host_capacity:type_name -> legion.node.v1.RuntimeHostCapacity
+	4,  // 18: legion.node.v1.NodeLog.metadata:type_name -> legion.node.v1.EventMetadata
+	1,  // 19: legion.node.v1.NodeLog.level:type_name -> legion.node.v1.LogLevel
+	17, // 20: legion.node.v1.NodeLog.attributes:type_name -> legion.node.v1.NodeLog.AttributesEntry
+	13, // 21: legion.node.v1.NodeHeartbeatResponse.resource_policy:type_name -> legion.node.v1.NodeResourcePolicy
+	18, // 22: legion.node.v1.NodeHeartbeatResponse.nats_credentials_expires_at:type_name -> google.protobuf.Timestamp
+	18, // 23: legion.node.v1.NodeHeartbeatResponse.expires_at:type_name -> google.protobuf.Timestamp
+	24, // [24:24] is the sub-list for method output_type
+	24, // [24:24] is the sub-list for method input_type
+	24, // [24:24] is the sub-list for extension type_name
+	24, // [24:24] is the sub-list for extension extendee
+	0,  // [0:24] is the sub-list for field type_name
 }
 
 func init() { file_legion_node_v1_node_proto_init() }

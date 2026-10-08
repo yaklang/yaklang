@@ -52,8 +52,10 @@ type NodeBase struct {
 
 	isRegistered *atomicbool.AtomicBool
 
-	sessionMu sync.RWMutex
-	session   SessionState
+	sessionMu              sync.RWMutex
+	session                SessionState
+	boundCompanyID         string
+	sessionInvalidatedHook func(SessionState)
 
 	instanceLock *nodeInstanceLock
 }
