@@ -1,0 +1,240 @@
+# Small, bounded message formats exercised by the protocol corpus.  Each
+# entry validates its own declared boundary; opaque application data remains
+# bytes instead of being assigned undocumented meaning.
+endian: big
+Package:
+  NinePVersion:
+    endian: little
+    operator: |
+      this.ProcessSubNode("Size")
+      size = getNodeResult("Size").Value
+      if size != this.GetMaxLength() { panic("9p: message size does not match input") }
+      if size < 13 { panic("9p: version message is too short") }
+      this.ProcessSubNode("Type")
+      if getNodeResult("Type").Value != 100 { panic("9p: expected Tversion") }
+      this.ProcessSubNode("Tag")
+      if getNodeResult("Tag").Value != 65535 { panic("9p: Tversion tag must be NOTAG") }
+      this.ProcessSubNode("Msize")
+      this.ProcessSubNode("Version Length")
+      n = getNodeResult("Version Length").Value
+      if n != this.GetMaxLength() - this.Length() { panic("9p: version length does not match input") }
+      this.GetSubNode("Version").SetMaxLength(n)
+      this.ProcessSubNode("Version")
+    Size: uint32
+    Type: uint8
+    Tag: uint16
+    Msize: uint32
+    Version Length: uint16
+    Version: string
+
+  CMPPConnect:
+    operator: |
+      this.ProcessSubNode("Total Length")
+      total = getNodeResult("Total Length").Value
+      if total != this.GetMaxLength() { panic("cmpp: total length does not match input") }
+      if total != 39 { panic("cmpp: CONNECT must be 39 bytes") }
+      this.ProcessSubNode("Command ID")
+      if getNodeResult("Command ID").Value != 1 { panic("cmpp: expected CONNECT command") }
+      this.ProcessSubNode("Sequence ID")
+      this.ProcessSubNode("Source Address")
+      this.ProcessSubNode("Authenticator Source")
+      this.ProcessSubNode("Version")
+      this.ProcessSubNode("Timestamp")
+    Total Length: uint32
+    Command ID: uint32
+    Sequence ID: uint32
+    Source Address: raw,6
+    Authenticator Source: raw,16
+    Version: uint8
+    Timestamp: uint32
+
+  QuakeConnectionless:
+    operator: |
+      this.ProcessSubNode("Marker")
+      if getNodeResult("Marker").Value != 4294967295 { panic("quake: invalid connectionless marker") }
+      this.ProcessSubNode("Command")
+      if this.Length() != this.GetMaxLength() { panic("quake: unconsumed command bytes") }
+    Marker: uint32
+    Command:
+      type: string
+      delimiter: "\n"
+
+  QuakeControl:
+    operator: |
+      this.ProcessSubNode("Length and Flags")
+      declared = getNodeResult("Length and Flags").Value & 2147483647
+      if declared != this.GetMaxLength() { panic("quake: declared length does not match datagram") }
+      remaining = this.GetMaxLength() - this.Length()
+      if remaining == 0 { panic("quake: empty control payload") }
+      this.GetSubNode("Control Data").SetMaxLength(remaining)
+      this.ProcessSubNode("Control Data")
+    Length and Flags: uint32
+    Control Data: raw
+
+  RloginRequest:
+    operator: |
+      this.ProcessSubNode("Leading Zero")
+      if getNodeResult("Leading Zero").Value != 0 { panic("rlogin: request must begin with zero") }
+      this.ProcessSubNode("Client User")
+      this.ProcessSubNode("Server User")
+      this.ProcessSubNode("Terminal")
+      if this.Length() != this.GetMaxLength() { panic("rlogin: trailing request bytes") }
+    Leading Zero: uint8
+    Client User:
+      type: string
+      delimiter: "\x00"
+    Server User:
+      type: string
+      delimiter: "\x00"
+    Terminal:
+      type: string
+      delimiter: "\x00"
+
+  TZSP:
+    operator: |
+      this.ProcessSubNode("Version")
+      if getNodeResult("Version").Value != 1 { panic("tzsp: version must be one") }
+      this.ProcessSubNode("Type")
+      if getNodeResult("Type").Value != 0 { panic("tzsp: expected received-packet type") }
+      this.ProcessSubNode("Encapsulation")
+      if getNodeResult("Encapsulation").Value != 1 { panic("tzsp: expected Ethernet encapsulation") }
+      remaining = this.GetMaxLength() - this.Length()
+      if remaining < 14 { panic("tzsp: encapsulated Ethernet frame is truncated") }
+      this.GetSubNode("Ethernet Frame").SetMaxLength(remaining)
+      this.ProcessSubNode("Ethernet Frame")
+    Version: uint8
+    Type: uint8
+    Encapsulation: uint16
+    Ethernet Frame: raw
+
+  X11SetupLittle:
+    endian: little
+    operator: |
+      this.ProcessSubNode("Byte Order")
+      if getNodeResult("Byte Order").Value != 108 { panic("x11: expected little-endian setup") }
+      this.ProcessSubNode("Unused")
+      this.ProcessSubNode("Protocol Major")
+      this.ProcessSubNode("Protocol Minor")
+      this.ProcessSubNode("Authorization Name Length")
+      this.ProcessSubNode("Authorization Data Length")
+      this.ProcessSubNode("Unused 2")
+      nameLength = getNodeResult("Authorization Name Length").Value
+      dataLength = getNodeResult("Authorization Data Length").Value
+      namePadded = (nameLength + 3) / 4 * 4
+      dataPadded = (dataLength + 3) / 4 * 4
+      if namePadded + dataPadded != this.GetMaxLength() - this.Length() { panic("x11: setup authorization lengths do not match input") }
+      if namePadded > 0 { this.GetSubNode("Authorization Name").SetMaxLength(namePadded); this.ProcessSubNode("Authorization Name") }
+      if dataPadded > 0 { this.GetSubNode("Authorization Data").SetMaxLength(dataPadded); this.ProcessSubNode("Authorization Data") }
+    Byte Order: uint8
+    Unused: uint8
+    Protocol Major: uint16
+    Protocol Minor: uint16
+    Authorization Name Length: uint16
+    Authorization Data Length: uint16
+    Unused 2: uint16
+    Authorization Name: raw
+    Authorization Data: raw
+
+  ISCSIBasicHeader:
+    operator: |
+      if this.GetMaxLength() < 48 { panic("iscsi: basic header is truncated") }
+      this.ProcessSubNode("Opcode")
+      this.ProcessSubNode("Flags")
+      this.ProcessSubNode("Reserved")
+      this.ProcessSubNode("Total AHS Length")
+      this.ProcessSubNode("Data Length High")
+      this.ProcessSubNode("Data Length Middle")
+      this.ProcessSubNode("Data Length Low")
+      this.ProcessSubNode("Header Fields")
+      ahs = getNodeResult("Total AHS Length").Value * 4
+      dataLength = getNodeResult("Data Length High").Value * 65536 + getNodeResult("Data Length Middle").Value * 256 + getNodeResult("Data Length Low").Value
+      padded = (dataLength + 3) / 4 * 4
+      if 48 + ahs + padded != this.GetMaxLength() { panic("iscsi: declared AHS/data lengths do not match input") }
+      if ahs > 0 { this.GetSubNode("AHS").SetMaxLength(ahs); this.ProcessSubNode("AHS") }
+      if dataLength > 0 { this.GetSubNode("Data").SetMaxLength(dataLength); this.ProcessSubNode("Data") }
+      padding = padded - dataLength
+      if padding > 0 { this.GetSubNode("Padding").SetMaxLength(padding); this.ProcessSubNode("Padding") }
+    Opcode: uint8
+    Flags: uint8
+    Reserved: raw,2
+    Total AHS Length: uint8
+    Data Length High: uint8
+    Data Length Middle: uint8
+    Data Length Low: uint8
+    Header Fields: raw,40
+    AHS: raw
+    Data: raw
+    Padding: raw
+
+  OLSRPacket:
+    operator: |
+      this.ProcessSubNode("Packet Length")
+      length = getNodeResult("Packet Length").Value
+      if length < 4 || length != this.GetMaxLength() { panic("olsr: packet length does not match input") }
+      this.ProcessSubNode("Packet Sequence Number")
+      remaining = this.GetMaxLength() - this.Length()
+      if remaining > 0 { this.GetSubNode("Messages").SetMaxLength(remaining); this.ProcessSubNode("Messages") }
+    Packet Length: uint16
+    Packet Sequence Number: uint16
+    Messages: raw
+
+  MSDPMessage:
+    operator: |
+      this.ProcessSubNode("Type")
+      this.ProcessSubNode("Length")
+      length = getNodeResult("Length").Value
+      if length < 3 || length != this.GetMaxLength() { panic("msdp: message length does not match input") }
+      remaining = this.GetMaxLength() - this.Length()
+      if remaining > 0 { this.GetSubNode("Body").SetMaxLength(remaining); this.ProcessSubNode("Body") }
+    Type: uint8
+    Length: uint16
+    Body: raw
+
+  UCPMessage:
+    operator: |
+      this.ProcessSubNode("STX")
+      if getNodeResult("STX").Value != 2 { panic("ucp: missing STX") }
+      this.ProcessSubNode("Transaction Reference")
+      this.ProcessSubNode("Separator 1")
+      this.ProcessSubNode("Length Text")
+      this.ProcessSubNode("Separator 2")
+      this.ProcessSubNode("Operation")
+      this.ProcessSubNode("Separator 3")
+      this.ProcessSubNode("Operation Type")
+      this.ProcessSubNode("Separator 4")
+      this.ProcessSubNode("Data")
+      this.ProcessSubNode("Checksum")
+      this.ProcessSubNode("ETX")
+      if getNodeResult("Separator 1").Value != 47 || getNodeResult("Separator 2").Value != 47 || getNodeResult("Separator 3").Value != 47 || getNodeResult("Separator 4").Value != 47 { panic("ucp: invalid separator") }
+      if getNodeResult("ETX").Value != 3 { panic("ucp: missing ETX") }
+      if this.Length() != this.GetMaxLength() { panic("ucp: trailing bytes") }
+      lengthText = string(getNodeResult("Length Text").Value)
+      if int(lengthText) != this.GetMaxLength() - 2 { panic("ucp: declared length does not match message") }
+      body = string(getNodeResult("Transaction Reference").Value) + "/" + lengthText + "/" + string(getNodeResult("Operation").Value) + "/" + string(getNodeResult("Operation Type").Value) + "/" + string(getNodeResult("Data").Value) + "/"
+      total = 0
+      for _, octet = range []byte(body) { total = total + octet }
+      check = []byte(string(getNodeResult("Checksum").Value))
+      value = 0
+      for _, octet = range check {
+        nibble = -1
+        if octet >= 48 && octet <= 57 { nibble = octet - 48 }
+        if octet >= 65 && octet <= 70 { nibble = octet - 55 }
+        if octet >= 97 && octet <= 102 { nibble = octet - 87 }
+        if nibble < 0 { panic("ucp: checksum is not hexadecimal") }
+        value = value * 16 + nibble
+      }
+      if value != total & 255 { panic("ucp: checksum mismatch") }
+    STX: uint8
+    Transaction Reference: string,2
+    Separator 1: uint8
+    Length Text: string,5
+    Separator 2: uint8
+    Operation: string,1
+    Separator 3: uint8
+    Operation Type: string,2
+    Separator 4: uint8
+    Data:
+      type: string
+      delimiter: "/"
+    Checksum: string,2
+    ETX: uint8

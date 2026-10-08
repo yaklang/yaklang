@@ -1,0 +1,96 @@
+# SEBEK v2/v3 bounded binary records, all integers in network byte order.
+# Layout: honeynet/sebek@11bb9954c589f1a3e33c27c1d541f9d34d5d4bbc,
+# linux-2.6/src/net.h (sbk_h/sbk_sock_rec), net.c (gen_pkt/sock_track).
+# v2: wireshark/wireshark@57bf672140761a871aaad0f709fb7f7c32fd186b,
+# epan/dissectors/packet-sebek.c, dissect_sebek case 2.
+# Magic and transport ports are configurable, not fixed identifiers. These
+# explicit entries do not prove transport provenance or validate a configured
+# Magic value. No UDP classifier is installed by this rule.
+# The 65527-byte implementation profile is the maximum non-jumbo UDP payload
+# (65535 minus its 8-byte header), not the uint32 Data Length field's limit.
+# Version 3 Type 2 contains the packed 15-byte IPv4 endpoint record. Other
+# bodies, including unknown record types, remain raw; no application semantics,
+# cross-record ordering, time normalization, or body execution is performed.
+# Command Name retains all 12 bytes, including NULs; it need not terminate.
+# Parsed NodeToBytes is supported; structured GenerateBinary is unsupported.
+endian: big
+Package:
+  SEBEK: SEBEKRecord
+  SEBEKCarrier:
+    operator: |
+      if !this.HasMaxLength() { panic("sebek: explicit record boundary required") }
+      if this.GetMaxLength("bit") % 8 != 0 { panic("sebek: explicit byte boundary required") }
+      if this.GetMaxLength() == 0 { panic("sebek: empty carrier has no record") }
+      candidate, trial = this.TryProcessByType("SEBEKFrame")
+      if trial.OK { trial.Save(); return }
+      trial.Recovery()
+      raw = this.NewUnknownNode("Unparsed SEBEK Record")
+      raw.SetMaxLength(this.GetMaxLength())
+      raw.Process()
+
+SEBEKFrame: "import:application-layer/sebek.yaml;node:SEBEK"
+
+SEBEKRecord:
+  operator: |
+    if !this.HasMaxLength() { panic("sebek: explicit record boundary required") }
+    if this.GetMaxLength("bit") % 8 != 0 { panic("sebek: explicit byte boundary required") }
+    total = this.GetMaxLength()
+    if total < 48 { panic("sebek: truncated fixed header") }
+    if total > 65527 { panic("sebek: record exceeds 65527-byte implementation profile") }
+    this.ProcessSubNode("Magic")
+    version = int(this.ProcessSubNode("Version").Value)
+    if version != 2 && version != 3 { panic("sebek: unsupported record version") }
+    headerLength = 48
+    if version == 3 { headerLength = 56 }
+    if total < headerLength { panic("sebek: truncated version-specific header") }
+    kind = int(this.ProcessSubNode("Record Type").Value)
+    this.ProcessSubNode("Counter")
+    this.ProcessSubNode("Time Seconds")
+    this.ProcessSubNode("Time Microseconds")
+    if version == 3 { this.ProcessSubNode("Parent Process ID") }
+    this.ProcessSubNode("Process ID")
+    this.ProcessSubNode("User ID")
+    this.ProcessSubNode("File Descriptor")
+    if version == 3 { this.ProcessSubNode("Inode") }
+    this.ProcessSubNode("Command Name")
+    length = int(this.ProcessSubNode("Data Length").Value)
+    if length != total-headerLength { panic("sebek: data length does not equal bounded body") }
+    endpoint = version == 3 && kind == 2
+    if endpoint {
+      if length != 15 { panic("sebek: IPv4 endpoint record must contain exactly 15 bytes") }
+      this.ProcessSubNode("IPv4 Endpoint Record")
+    } else if length > 0 {
+      this.GetSubNode("Record Data").SetMaxLength(length)
+      this.ProcessSubNode("Record Data")
+    }
+    if this.Length() != total { panic("sebek: unconsumed record bytes") }
+    this.AddInfo("Profile", "SEBEK v2/v3 bounded binary record")
+    this.AddInfo("Header Bytes", headerLength)
+    this.AddInfo("Maximum Record Bytes", 65527)
+    this.AddInfo("IPv4 Endpoint Fields Decoded", endpoint)
+    this.AddInfo("Configured Magic Validated", false)
+    this.AddInfo("Transport Context Validated", false)
+    this.AddInfo("Body Application Semantics Decoded", false)
+    this.AddInfo("Cross-Record Consistency Validated", false)
+    this.AddInfo("Timestamp Normalized", false)
+  Magic: uint32
+  Version: uint16
+  Record Type: uint16
+  Counter: uint32
+  Time Seconds: uint32
+  Time Microseconds: uint32
+  Parent Process ID: uint32
+  Process ID: uint32
+  User ID: uint32
+  File Descriptor: uint32
+  Inode: uint32
+  Command Name: string,12
+  Data Length: uint32
+  IPv4 Endpoint Record:
+    Destination Address: raw,4
+    Destination Port: uint16
+    Source Address: raw,4
+    Source Port: uint16
+    Call ID: uint16
+    IP Protocol: uint8
+  Record Data: raw

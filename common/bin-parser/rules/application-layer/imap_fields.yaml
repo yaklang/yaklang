@@ -1,0 +1,58 @@
+# Explicit bounded IMAP4rev1 layouts; historical imap.yaml is unchanged.
+# https://www.rfc-editor.org/rfc/rfc3501.html
+# Caller supplies complete direction-specific messages, including literal octets.
+# No TCP reassembly, tag matching, mailbox-state or negotiated extension inference.
+# Local cap: 1 MiB, 4096 collection items/responses and 32768 wire leaves.
+# Unknown grammar stays raw; nested BODYSTRUCTURE/ENVELOPE responses are not
+# implemented in this profile. IMAP4rev2/non-synchronizing literals are not implied.
+# A response block is a sequence of complete responses, not a full transaction.
+# Header-only FETCH sections expose unfolded headers with encoded byte provenance;
+# they are not relabeled complete messages or MIME-decoded bodies.
+endian: big
+unit: byte
+Package:
+  IMAPCommandFields:
+    operator: |
+      err = parseIMAPFields("command")
+      if err != nil { panic(err) }
+  IMAPCommandFieldsCarrier:
+    operator: |
+      if !this.HasMaxLength() || this.GetMaxLength("bit") == 0 || this.GetMaxLength("bit") % 8 != 0 { panic("imap-fields: explicit nonempty byte boundary required") }
+      if this.GetMaxLength() > 1048576 { panic("imap-fields: exceeds 1 MiB resource limit") }
+      candidate, trial = this.TryProcessByType("IMAPCommandExact", "IMAPCommandFields")
+      if trial.OK { trial.Save(); return }
+      trial.Recovery()
+      raw = this.NewUnknownNode("Unparsed IMAP Wire")
+      raw.SetMaxLength(this.GetMaxLength())
+      raw.Process()
+  IMAPResponseFields:
+    operator: |
+      err = parseIMAPFields("response")
+      if err != nil { panic(err) }
+  IMAPResponseFieldsCarrier:
+    operator: |
+      if !this.HasMaxLength() || this.GetMaxLength("bit") == 0 || this.GetMaxLength("bit") % 8 != 0 { panic("imap-fields: explicit nonempty byte boundary required") }
+      if this.GetMaxLength() > 1048576 { panic("imap-fields: exceeds 1 MiB resource limit") }
+      candidate, trial = this.TryProcessByType("IMAPResponseExact", "IMAPResponseFields")
+      if trial.OK { trial.Save(); return }
+      trial.Recovery()
+      raw = this.NewUnknownNode("Unparsed IMAP Wire")
+      raw.SetMaxLength(this.GetMaxLength())
+      raw.Process()
+  IMAPResponseBlockFields:
+    operator: |
+      err = parseIMAPFields("response-block")
+      if err != nil { panic(err) }
+  IMAPResponseBlockFieldsCarrier:
+    operator: |
+      if !this.HasMaxLength() || this.GetMaxLength("bit") == 0 || this.GetMaxLength("bit") % 8 != 0 { panic("imap-fields: explicit nonempty byte boundary required") }
+      if this.GetMaxLength() > 1048576 { panic("imap-fields: exceeds 1 MiB resource limit") }
+      candidate, trial = this.TryProcessByType("IMAPResponseBlockExact", "IMAPResponseBlockFields")
+      if trial.OK { trial.Save(); return }
+      trial.Recovery()
+      raw = this.NewUnknownNode("Unparsed IMAP Wire")
+      raw.SetMaxLength(this.GetMaxLength())
+      raw.Process()
+IMAPCommandExact: "import:application-layer/imap_fields.yaml;node:IMAPCommandFields"
+IMAPResponseExact: "import:application-layer/imap_fields.yaml;node:IMAPResponseFields"
+IMAPResponseBlockExact: "import:application-layer/imap_fields.yaml;node:IMAPResponseBlockFields"

@@ -1,0 +1,82 @@
+# Plain-text Checkmk agent sections. The caller supplies a complete bounded
+# report, normally after TCP reassembly through the connection's FIN. There is
+# no in-band end marker: a line-aligned prefix cannot prove report completeness.
+# Section-specific metric schemas and piggyback/cached/encrypted forms are not
+# interpreted by this entry point. Original row text is always retained.
+Package:
+  CheckmkReport:
+    operator: |
+      if !this.HasMaxLength() { panic("checkmk: report requires an explicit boundary") }
+      limit = getCtx("checkmkReportLimit")
+      if !hasCtx("checkmkReportLimit") { limit = 16777216 }
+      if limit <= 0 || this.GetMaxLength() > limit { panic("checkmk: report exceeds limit") }
+      if hasCtx("checkmkReportLength") && this.GetMaxLength() != getCtx("checkmkReportLength") { panic("checkmk: report length does not match external boundary") }
+      setCtx("checkmkSection", nil)
+      setCtx("checkmkSeparator", nil)
+      setCtx("checkmkSections", 0)
+      this.ProcessSubNode("Lines")
+      if getCtx("checkmkSection") == nil { panic("checkmk: missing section header") }
+      this.AddInfo("Section Count", getCtx("checkmkSections"))
+    Lines:
+      list: true
+      Line: CheckmkLine
+      operator: |
+        for this.Length() < this.GetMaxLength() { this.NewElement().Process() }
+CheckmkLine:
+  operator: |
+    limit = getCtx("checkmkLineLimit")
+    if !hasCtx("checkmkLineLimit") { limit = 65536 }
+    if limit <= 0 { panic("checkmk: invalid line limit") }
+    if this.GetMaxLength() < limit { limit = this.GetMaxLength() }
+    this.SetMaxLength(limit)
+    text = this.ProcessSubNode("Text").Value
+    for c in []byte(text) { if (c < 32 && c != 9) || c == 127 { panic("checkmk: invalid control character") } }
+    if text.HasPrefix("<<<") {
+      if !text.HasSuffix(">>>") || text.HasPrefix("<<<<") { panic("checkmk: invalid or unsupported section header") }
+      parts = text[3:len(text)-3].Split(":")
+      name = parts[0]
+      if name == "" { panic("checkmk: empty section name") }
+      for c in []byte(name) {
+        if !(c >= 65 && c <= 90) && !(c >= 97 && c <= 122) && !(c >= 48 && c <= 57) && c != 95 && c != 45 && c != 46 { panic("checkmk: invalid section name") }
+      }
+      separator = -1
+      if len(parts) > 2 { panic("checkmk: unsupported section attributes") }
+      if len(parts) == 2 {
+        option = parts[1]
+        if !option.HasPrefix("sep(") || !option.HasSuffix(")") { panic("checkmk: unsupported section attribute") }
+        digits = option[4:len(option)-1]
+        if len(digits) == 0 || len(digits) > 3 { panic("checkmk: invalid separator") }
+        separator = 0
+        for c in []byte(digits) {
+          if c < 48 || c > 57 { panic("checkmk: invalid separator") }
+          separator = separator*10 + int(c)-48
+        }
+        if separator > 127 || separator == 10 || separator == 13 { panic("checkmk: invalid separator") }
+      }
+      setCtx("checkmkSection", name)
+      setCtx("checkmkSeparator", separator)
+      setCtx("checkmkSections", getCtx("checkmkSections")+1)
+      this.AddInfo("Kind", "section")
+      this.AddInfo("Section Name", name)
+      this.AddInfo("Separator", separator)
+    } else {
+      name = getCtx("checkmkSection")
+      if name == nil { panic("checkmk: row precedes section header") }
+      separator = getCtx("checkmkSeparator")
+      columns = []string{}
+      if separator == -1 {
+        for column in text.ReplaceAll("\t", " ").Split(" ") {
+          if column != "" { columns.Append(column) }
+        }
+      } else if separator == 0 {
+        columns = []string{text}
+      } else {
+        columns = text.Split(string([]byte{separator}))
+      }
+      this.AddInfo("Kind", "row")
+      this.AddInfo("Section Name", name)
+      this.AddInfo("Separator", separator)
+      this.AddInfo("Columns", columns)
+    }
+    this.SetMaxLength(this.Length())
+  Text: "del:\n;type:string"

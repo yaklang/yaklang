@@ -1,0 +1,119 @@
+# WPAD default configuration retrieval REQUEST profile, not discovery traffic
+# or a PAC interpreter. draft-ietf-wrec-wpad-01 is an expired Internet-Draft,
+# not an RFC: sections 3 and 4.6 describe HTTP, /wpad.dat and Accept/User-Agent.
+# https://datatracker.ietf.org/doc/html/draft-ietf-wrec-wpad-01
+# RFC 9112 section 3.2 permits origin-form and absolute-form; absolute-form
+# alone does not prove a proxy was used. Its authority takes priority over Host.
+# https://www.rfc-editor.org/rfc/rfc9112.html#section-3.2
+# This implementation profile is GET /wpad.dat (optional query), HTTP/1.0 or
+# HTTP/1.1, one nonempty Host, an HTTP service URL authority (including bracketed
+# IPv6), optional port 0..65535, and at most 8192 bytes. These implementation
+# bounds are not WPAD requirements. Other discovered paths, responses, redirects, DHCP,
+# DNS, SLP and configuration-body semantics are outside this entry's scope.
+# Imported HTTPExact retains all HTTP wire fields and body framing. Derived
+# metadata never substitutes for wire leaves or claims PAC has been parsed.
+# Missing Accept/User-Agent is recorded, not rejected as malformed HTTP.
+# GenerateBinary is unsupported without an explicit input boundary; parsed
+# NodeToBytes remains byte exact. The carrier rolls back before raw fallback.
+Package:
+  WPADRequest: WPADRequestMessage
+  WPADRequestCarrier:
+    operator: |
+      if !this.HasMaxLength() { panic("wpad: explicit carrier boundary required") }
+      if this.GetMaxLength("bit") % 8 != 0 { panic("wpad: explicit byte boundary required") }
+      if this.GetMaxLength() == 0 { panic("wpad: empty carrier has no request") }
+      candidate, trial = this.TryProcessByType("WPADRequestFrame")
+      if trial.OK { trial.Save(); return }
+      trial.Recovery()
+      raw = this.NewUnknownNode("Unparsed WPAD Request")
+      raw.SetMaxLength(this.GetMaxLength())
+      raw.Process()
+
+WPADRequestFrame: "import:application-layer/wpad.yaml;node:WPADRequest"
+
+WPADRequestMessage:
+  operator: |
+    if !this.HasMaxLength() { panic("wpad: explicit request boundary required") }
+    if this.GetMaxLength("bit") % 8 != 0 { panic("wpad: explicit byte boundary required") }
+    if this.GetMaxLength() > 8192 { panic("wpad: request exceeds 8192-byte implementation profile") }
+    http = this.ProcessSubNode("HTTP")
+    request = http.Child("Message").Child("HTTP Request")
+    if request == nil { panic("wpad: configuration request required, not a response") }
+    if request.Child("Method").Value != "GET" { panic("wpad: retrieval profile requires GET") }
+    target = string(request.Child("Path").Value)
+    form = "origin-form"
+    authority = ""
+    pathQuery = target
+    if target.Lower().HasPrefix("http://") {
+      form = "absolute-form"
+      parts = target[7:].SplitN("/", 2)
+      if len(parts) != 2 { panic("wpad: absolute target requires default configuration path") }
+      authority = parts[0]
+      pathQuery = "/" + parts[1]
+    } else if !target.HasPrefix("/") {
+      panic("wpad: unsupported request target form or scheme")
+    }
+    parts = pathQuery.SplitN("?", 2)
+    if parts[0] != "/wpad.dat" { panic("wpad: outside default configuration path profile") }
+    query = ""
+    if len(parts) == 2 { query = parts[1] }
+    hex = []byte("0123456789abcdefABCDEF")
+    queryBytes = []byte(query)
+    for i = 0; i < len(queryBytes); i++ {
+      octet = queryBytes[i]
+      if octet == 37 {
+        if i+2 >= len(queryBytes) || queryBytes[i+1] not in hex || queryBytes[i+2] not in hex { panic("wpad: invalid query percent escape") }
+        i += 2
+      } else if (octet < 65 || octet > 90) && (octet < 97 || octet > 122) && (octet < 48 || octet > 57) && octet not in []byte("-._~!$&'()*+,;=:@/?") {
+        panic("wpad: invalid query character")
+      }
+    }
+    host = ""
+    hosts = 0
+    accepts = []string{}
+    agents = []string{}
+    for _, item = range request.Child("Headers").Children() {
+      line = string(item.Value)
+      if len(line) == 0 { continue }
+      header = line.SplitN(":", 2)
+      name = header[0].Lower()
+      value = header[1].Trim(" \t")
+      if name == "host" { hosts++; host = value }
+      if name == "accept" { accepts.Append(value) }
+      if name == "user-agent" { agents.Append(value) }
+    }
+    if hosts != 1 || len(host) == 0 { panic("wpad: profile requires exactly one nonempty Host") }
+    if form == "origin-form" { authority = host }
+    # Host must be an authority, not a URI or userinfo. Validate it separately
+    # without rejecting an absolute target mismatch (RFC 9112 precedence).
+    for _, value = range []string{host, authority} {
+      for _, octet = range []byte(value) {
+        if octet <= 32 || octet >= 127 || octet in []byte("/?#@\\") { panic("wpad: invalid URI authority") }
+      }
+    }
+    hostURL, err = decodeHTTPServiceURL("http://" + host + "/wpad.dat")
+    if err != nil { panic("wpad: invalid Host authority: " + string(err)) }
+    endpoint, err = decodeHTTPServiceURL("http://" + authority + pathQuery)
+    if err != nil { panic("wpad: invalid configuration authority: " + string(err)) }
+    if endpoint["escaped_path"] != "/wpad.dat" { panic("wpad: outside default configuration path profile") }
+    this.AddInfo("Profile", "WPAD default-path HTTP retrieval request")
+    this.AddInfo("Request Target Form", form)
+    this.AddInfo("Configuration Authority", authority)
+    this.AddInfo("Configuration Hostname", endpoint["hostname"])
+    this.AddInfo("Configuration Port", endpoint["port"])
+    this.AddInfo("Configuration Path", "/wpad.dat")
+    this.AddInfo("Configuration Query", query)
+    this.AddInfo("Configuration URI", "http://" + authority + pathQuery)
+    this.AddInfo("Scheme Source", "WPAD HTTP retrieval profile")
+    this.AddInfo("Host Header", host)
+    this.AddInfo("Accept Values", accepts)
+    this.AddInfo("User-Agent Values", agents)
+    this.AddInfo("Accept Header Present", len(accepts) > 0)
+    this.AddInfo("User-Agent Header Present", len(agents) > 0)
+    this.AddInfo("Draft Accept Requirement Missing", len(accepts) == 0)
+    this.AddInfo("Accept Semantics Validated", false)
+    this.AddInfo("Discovery Exchange Observed", false)
+    this.AddInfo("Proxy Use Proven", false)
+    this.AddInfo("Configuration Body Parsed", false)
+    this.AddInfo("Maximum Request Bytes", 8192)
+  HTTP: "import:application-layer/http.yaml;node:HTTPExact"

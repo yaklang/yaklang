@@ -1,3 +1,8 @@
+# Additional named RDATA: RFC 3596 section 2.2 (AAAA), RFC 1035 section
+# 3.3.14 (TXT), RFC 8659 section 4.1 (CAA). CAA values remain binary octets;
+# exposing a CAA property does not validate DNSSEC or certificate issuance.
+endian: big
+unit: byte
 Package:
   DNS:
       Header:
@@ -43,6 +48,42 @@ Package:
           list: true
           list-length-from-field: "../Header/Answer RRs"
           Answer:
+            operator: |
+              this.ProcessSubNode("Name")
+              this.ProcessSubNode("Type")
+              this.ProcessSubNode("Class")
+              this.ProcessSubNode("TTL")
+              this.ProcessSubNode("RDLength")
+              t = getNodeResult("Type").Value
+              l = getNodeResult("RDLength").Value
+              if t == 1 && l == 4 {
+                this.ProcessByType("DNSA")
+                return
+              }
+              if t == 28 {
+                if l != 16 { panic("dns: AAAA RDATA length must be 16") }
+                this.ProcessByType("DNSAAAA")
+                return
+              }
+              if t == 16 {
+                if l == 0 { panic("DNS TXT requires at least one character-string") }
+                this.ProcessByType("DNSTXT")
+                return
+              }
+              if t == 257 {
+                if l < 3 { panic("dns: CAA RDATA is too short") }
+                this.ProcessByType("DNSCAA")
+                return
+              }
+              if t == 12 && l > 0 && l < 1048576 {
+                this.ProcessByType("DNSPTR")
+                return
+              }
+              if l > 0 && l < 1048576 {
+                this.GetSubNode("RData").SetMaxLength(l)
+                this.ProcessSubNode("RData")
+              }
+              return
             Name:
               operator: |
                   res,op = this.TryProcessSubNode("PointerFlag")
@@ -53,14 +94,143 @@ Package:
                           this.ProcessSubNode("Pointer")
                       }else{
                           op.Recovery()
-                          this.ProcessSubNode("Data")
+                          this.ProcessSubNode("Labels")
                       }
                   }else{
+                      op.Recovery()
                       panic(op.Message)
                   }
               PointerFlag: uint8,2bit
               Pointer: uint16,14bit
-              Data: String
+              Labels: String
+            Type: uint16
+            Class: uint16
+            TTL: uint32
+            RDLength: uint16
+            RData: "type:raw;length-from-field:../RDLength"
+      Authority:
+          list: true
+          list-length-from-field: "../Header/Authority RRs"
+          Record:
+            operator: |
+              this.ProcessSubNode("Name")
+              this.ProcessSubNode("Type")
+              this.ProcessSubNode("Class")
+              this.ProcessSubNode("TTL")
+              this.ProcessSubNode("RDLength")
+              t = getNodeResult("Type").Value
+              l = getNodeResult("RDLength").Value
+              if t == 1 && l == 4 {
+                this.ProcessByType("DNSA")
+                return
+              }
+              if t == 28 {
+                if l != 16 { panic("dns: AAAA RDATA length must be 16") }
+                this.ProcessByType("DNSAAAA")
+                return
+              }
+              if t == 16 {
+                if l == 0 { panic("DNS TXT requires at least one character-string") }
+                this.ProcessByType("DNSTXT")
+                return
+              }
+              if t == 257 {
+                if l < 3 { panic("dns: CAA RDATA is too short") }
+                this.ProcessByType("DNSCAA")
+                return
+              }
+              if t == 12 && l > 0 && l < 1048576 {
+                this.ProcessByType("DNSPTR")
+                return
+              }
+              if l > 0 && l < 1048576 {
+                this.GetSubNode("RData").SetMaxLength(l)
+                this.ProcessSubNode("RData")
+              }
+              return
+            Name:
+              operator: |
+                  res,op = this.TryProcessSubNode("PointerFlag")
+                  if op.OK {
+                      res = res.Value
+                      if res == 3 {
+                          op.Save()
+                          this.ProcessSubNode("Pointer")
+                      }else{
+                          op.Recovery()
+                          this.ProcessSubNode("Labels")
+                      }
+                  }else{
+                      op.Recovery()
+                      panic(op.Message)
+                  }
+              PointerFlag: uint8,2bit
+              Pointer: uint16,14bit
+              Labels: String
+            Type: uint16
+            Class: uint16
+            TTL: uint32
+            RDLength: uint16
+            RData: "type:raw;length-from-field:../RDLength"
+      Additional:
+          list: true
+          list-length-from-field: "../Header/Additional RRs"
+          Record:
+            operator: |
+              this.ProcessSubNode("Name")
+              this.ProcessSubNode("Type")
+              this.ProcessSubNode("Class")
+              this.ProcessSubNode("TTL")
+              this.ProcessSubNode("RDLength")
+              t = getNodeResult("Type").Value
+              l = getNodeResult("RDLength").Value
+              if t == 1 && l == 4 {
+                this.ProcessByType("DNSA")
+                return
+              }
+              if t == 28 {
+                if l != 16 { panic("dns: AAAA RDATA length must be 16") }
+                this.ProcessByType("DNSAAAA")
+                return
+              }
+              if t == 16 {
+                if l == 0 { panic("DNS TXT requires at least one character-string") }
+                this.ProcessByType("DNSTXT")
+                return
+              }
+              if t == 257 {
+                if l < 3 { panic("dns: CAA RDATA is too short") }
+                this.ProcessByType("DNSCAA")
+                return
+              }
+              if t == 12 && l > 0 && l < 1048576 {
+                this.ProcessByType("DNSPTR")
+                return
+              }
+              if l > 0 && l < 1048576 {
+                this.GetSubNode("RData").SetMaxLength(l)
+                this.ProcessSubNode("RData")
+              }
+              return
+            Name:
+              operator: |
+                  res,op = this.TryProcessSubNode("PointerFlag")
+                  if op.OK {
+                      res = res.Value
+                      if res == 3 {
+                          op.Save()
+                          this.ProcessSubNode("Pointer")
+                      }else{
+                          op.Recovery()
+                          this.ProcessSubNode("Labels")
+                      }
+                  }else{
+                      op.Recovery()
+                      panic(op.Message)
+                  }
+              PointerFlag: uint8,2bit
+              Pointer: uint16,14bit
+              Labels: String
             Type: uint16
             Class: uint16
             TTL: uint32
@@ -75,7 +245,58 @@ String:
         setCtx("inList",false)
         return
       }
-      this.GetSubNode("Data").SetMaxLength(count)
-      this.ProcessSubNode("Data")
+      this.GetSubNode("Text").SetMaxLength(count)
+      this.ProcessSubNode("Text")
     Count: uint8
-    Data: string
+    Text: string
+DNSA:
+  Address: raw,4
+DNSPTR:
+  Name: String
+
+DNSAAAA:
+  Address: raw,16
+DNSTXT:
+  length-from-field: ../RDLength
+  Strings:
+    list: true
+    String: DNSCharacterString
+    operator: |
+      count = 0
+      for this.Length() < this.GetMaxLength() {
+        if count >= 4096 { panic("dns: TXT exceeds 4096 character-strings") }
+        this.NewElement().Process()
+        count = count + 1
+      }
+DNSCharacterString:
+  operator: |
+    n = this.ProcessSubNode("Length").Value
+    if n > this.GetMaxLength() - 1 { panic("dns: TXT character-string exceeds RDATA") }
+    if n > 0 {
+      this.GetSubNode("Text").SetMaxLength(n)
+      this.ProcessSubNode("Text")
+    }
+  Length: uint8
+  Text: string
+DNSCAA:
+  length-from-field: ../RDLength
+  operator: |
+    this.ProcessSubNode("Flags")
+    n = this.ProcessSubNode("TagLength").Value
+    if n == 0 || n > this.GetMaxLength() - 2 { panic("dns: CAA tag length is invalid") }
+    this.GetSubNode("Tag").SetMaxLength(n)
+    tag = this.ProcessSubNode("Tag").Value
+    for _, c = range []byte(tag) {
+      if !((c >= 65 && c <= 90) || (c >= 97 && c <= 122) || (c >= 48 && c <= 57)) {
+        panic("dns: CAA tag must be ASCII alphanumeric")
+      }
+    }
+    remaining = this.GetMaxLength() - 2 - n
+    if remaining > 0 {
+      this.GetSubNode("Value").SetMaxLength(remaining)
+      this.ProcessSubNode("Value")
+    }
+  Flags: uint8
+  TagLength: uint8
+  Tag: string
+  Value: raw

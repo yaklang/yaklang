@@ -1,0 +1,115 @@
+# Cisco IGRP IPv4 wire format, independently described from:
+# https://www.cisco.com/c/en/us/support/docs/ip/interior-gateway-routing-protocol-igrp/26825-5.html
+# https://github.com/wireshark/wireshark/blob/v4.4.9/epan/dissectors/packet-igrp.c
+# This bounded entry decodes advertised vectors, not routing-table convergence
+# or a composite metric that requires caller/interface-specific K parameters.
+endian: big
+Package:
+  IGRP:
+    operator: |
+      if !this.HasMaxLength() { panic("igrp: explicit packet boundary required") }
+      size = this.GetMaxLength()
+      if size < 12 { panic("igrp: truncated header") }
+      start = getCurrentPosition()
+      if this.ProcessSubNode("Version").Value != 1 { panic("igrp: unsupported version") }
+      opcode = this.ProcessSubNode("Opcode").Value
+      if opcode != 1 && opcode != 2 { panic("igrp: unsupported opcode") }
+      edition = this.ProcessSubNode("Edition").Value
+      this.ProcessSubNode("Autonomous System")
+      interior = this.ProcessSubNode("Interior Count").Value
+      system = this.ProcessSubNode("System Count").Value
+      exterior = this.ProcessSubNode("Exterior Count").Value
+      checksum = this.ProcessSubNode("Checksum").Value
+      count = int(interior)+int(system)+int(exterior)
+      // Cisco's described 1500-byte IPv4 datagrams carry at most 104 vectors.
+      // This is the entry's explicit supported bound, not an inferred MTU.
+      if count > 104 { panic("igrp: route count exceeds supported 104-entry limit") }
+      if size != 12+14*count { panic("igrp: route counts do not match packet boundary") }
+      if opcode == 2 && (edition != 0 || count != 0) { panic("igrp: request edition and route counts must be zero") }
+      names = ["Interior Routes", "System Routes", "Exterior Routes"]
+      for i, routes = range [interior, system, exterior] {
+        if routes > 0 {
+          list = this.GetSubNode(names[i])
+          list.SetMaxLength(14*routes)
+          list.Process()
+        }
+      }
+      this.AddInfo("Composite Metric Computed", false)
+      this.AddInfo("Checksum Validated", false)
+      // The request description says unused fields are zero. Also accept a
+      // request carrying a valid checksum under the general checksum rule.
+      if opcode == 2 && checksum == 0 { return }
+      data = getCtx("buffer").Bytes()[start:start+size]
+      sum = 0
+      for i = 0; i < len(data); i += 2 { sum += (int(data[i]) << 8) + int(data[i+1]) }
+      for sum > 65535 { sum = (sum & 65535) + (sum >> 16) }
+      if sum != 65535 { panic("igrp: checksum mismatch") }
+      this.AddInfo("Checksum Validated", true)
+    Version: uint8,4bit
+    Opcode: uint8,4bit
+    Edition: uint8
+    Autonomous System: uint16
+    Interior Count: uint16
+    System Count: uint16
+    Exterior Count: uint16
+    Checksum: uint16
+    Interior Routes: IGRPRoutes
+    System Routes: IGRPRoutes
+    Exterior Routes: IGRPRoutes
+
+  IGRPCarrier:
+    operator: |
+      if !this.HasMaxLength() { panic("igrp: explicit carrier boundary required") }
+      if this.GetMaxLength() == 0 { panic("igrp: empty carrier has no message") }
+      value, operation = this.TryProcessByType("IGRPMessage")
+      if operation.OK { operation.Save(); return }
+      operation.Recovery()
+      raw = this.NewUnknownNode("IGRP Payload")
+      raw.SetMaxLength(this.GetMaxLength())
+      raw.Process()
+
+IGRPMessage: "import:igrp.yaml;node:IGRP"
+IGRPRoutes:
+  list: true
+  Route: IGRPRoute
+  operator: |
+    count = this.GetMaxLength()/14
+    if !this.HasMaxLength() || this.GetMaxLength()%14 != 0 || count > 104 { panic("igrp: invalid route-list boundary") }
+    for i = 0; i < count; i++ {
+      route = this.NewElement()
+      route.SetMaxLength(14)
+      value = route.Process()
+      number = value.Child("Number").Value
+      if this.Name != "System Routes" && this.Name != "Exterior Routes" {
+        // The wire carries only the last three octets; the first comes from
+        // the enclosing interface/network context, which this entry lacks.
+        route.AddInfo("Destination Context Required", true)
+      } else {
+        route.AddInfo("Destination Context Required", false)
+        route.AddInfo("Destination IPv4 Octets", []byte{byte(number >> 16), byte((number >> 8) & 255), byte(number & 255), 0})
+      }
+    }
+    this.AddInfo("Route Count", count)
+
+IGRPRoute:
+  operator: |
+    if !this.HasMaxLength() || this.GetMaxLength() != 14 { panic("igrp: route must contain 14 bytes") }
+    this.ProcessSubNode("Number")
+    delay = this.ProcessSubNode("Delay").Value
+    this.ProcessSubNode("Bandwidth")
+    this.ProcessSubNode("MTU")
+    this.ProcessSubNode("Reliability")
+    this.ProcessSubNode("Load")
+    this.ProcessSubNode("Hop Count")
+    this.AddInfo("Unreachable", delay == 0xffffff)
+    if delay != 0xffffff { this.AddInfo("Delay Microseconds", int(delay)*10) }
+  Number: uint32,24bit
+  # Delay is in 10 microsecond units; all ones denotes unreachable.
+  Delay: uint32,24bit
+  # Bandwidth is the advertised inverse-bandwidth metric (10^10 / bits/sec).
+  Bandwidth: uint32,24bit
+  MTU: uint16
+  # Reliability and load are fractions with denominator 255; preserve all bits.
+  Reliability: uint8
+  Load: uint8
+  Hop Count: uint8

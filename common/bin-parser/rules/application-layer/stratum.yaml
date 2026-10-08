@@ -1,0 +1,6 @@
+Package:
+  StratumLine:
+    # The native session codec validates JSON-RPC structure, mining methods,
+    # request direction and response IDs. This leaf only preserves an exact
+    # newline-delimited wire message for deferred/full replay parity.
+    Line: "del:\n;type:string"

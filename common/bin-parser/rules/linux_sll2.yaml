@@ -1,0 +1,48 @@
+# LINKTYPE_LINUX_SLL2, as defined by libpcap's pcap/sll.h. The address is
+# link-type-dependent bytes, not necessarily a MAC address. One record only.
+endian: big
+Package:
+  LinuxSLL2:
+    operator: |
+      if !this.HasMaxLength() { panic("linux-sll2: record boundary is required") }
+      size = this.GetMaxLength()
+      limit = getCtx("linuxSLL2RecordLimit")
+      if !hasCtx("linuxSLL2RecordLimit") { limit = 1048576 }
+      if size < 20 || limit <= 0 || size > limit { panic("linux-sll2: invalid record size") }
+      if hasCtx("linuxSLL2RecordLength") && size != getCtx("linuxSLL2RecordLength") { panic("linux-sll2: length differs from external record boundary") }
+      protocol = this.ProcessSubNode("Protocol").Value
+      if this.ProcessSubNode("Reserved").Value != 0 { panic("linux-sll2: reserved field must be zero") }
+      if this.ProcessSubNode("Interface Index").Value == 0 { panic("linux-sll2: interface index must be one-based") }
+      hardware = this.ProcessSubNode("ARPHRD Type").Value
+      this.ProcessSubNode("Packet Type")
+      addressLength = this.ProcessSubNode("Address Length").Value
+      if addressLength > 8 { panic("linux-sll2: address length exceeds eight bytes") }
+      this.ProcessSubNode("Address")
+      this.AddInfo("Address Is MAC", hardware == 1 && addressLength == 6)
+      // ARPHRD can change the meaning of Protocol (e.g. GRE/netlink). Do not
+      // route those values through the Ethernet protocol namespace.
+      if hardware == 1 || hardware == 772 {
+        if protocol == 0x0800 { this.ProcessByType("IP"); return }
+        if protocol == 0x86dd { this.ProcessByType("IPv6"); return }
+        if protocol == 0x0806 { this.ProcessByType("ARP"); return }
+        if protocol == 0x0004 { this.ProcessByType("LLC"); return }
+        if protocol == 0x0001 { this.ProcessByType("IPX"); return }
+      }
+      this.AddInfo("Payload Decoded", false)
+      if size > 20 {
+        this.GetSubNode("Payload").SetMaxLength(size - 20)
+        this.ProcessSubNode("Payload")
+      }
+    Protocol: uint16
+    Reserved: uint16
+    Interface Index: uint32
+    ARPHRD Type: uint16
+    Packet Type: uint8
+    Address Length: uint8
+    Address: raw,8
+    Payload: raw
+IP: "import:internet_protocol.yaml;node:Internet Protocol"
+IPv6: "import:internet_protocol_version_6.yaml;node:Internet Protocol Version 6"
+ARP: "import:address_resolution_protocol.yaml;node:Address Resolution Protocol"
+LLC: "import:llc.yaml;node:LLC"
+IPX: "import:ipx.yaml;node:IPX"
