@@ -60,16 +60,7 @@ func FromDatabase(programName string) (p *Program, err error) {
 		} else {
 			if irProg != nil {
 				prog.irProgram = irProg
-				if irProg.IsOverlay && len(irProg.OverlayLayers) > 0 {
-					if prog.GetOverlay() == nil {
-						overlay, err := loadOverlayFromDatabase(irProg.OverlayLayers, make(map[string]bool))
-						if err != nil {
-							log.Warnf("failed to load overlay from cache: %v", err)
-						} else {
-							prog.overlay = overlay
-						}
-					}
-				}
+				attachOverlayIfNeeded(prog, irProg, make(map[string]bool))
 			}
 			return prog, nil
 		}
@@ -88,6 +79,44 @@ func FromDatabase(programName string) (p *Program, err error) {
 
 func fromDatabase(name string) (*Program, error) {
 	return fromDatabaseWithVisited(name, make(map[string]bool))
+}
+
+// attachOverlayIfNeeded 按行上记录的增量类型为刚加载的 program 挂载合并视图：
+//   - 行是 overlay 链头且层名单完整（HasSavedOverlayLayers）：按配方逐层加载，
+//     在内存中聚合为 ProgramOverLay；
+//   - 行是差量层但配方缺失/损坏：加载其 base，重建两层视图兜底；
+//   - 其他（普通全量编译、增量基座层）：无需视图。
+// 任何一步失败都只告警并降级为裸 program（查询范围缩小但不出错）。这与编译
+// 路径 resolveBaseOverlay 的"重建失败即中断"是刻意不同的策略：加载服务查询，
+// 查询可以缩小范围；diff 基准不完整却不能继续编译。
+func attachOverlayIfNeeded(prog *Program, irProg *ssadb.IrProgram, visited map[string]bool) {
+	if prog == nil || irProg == nil || prog.GetOverlay() != nil {
+		return
+	}
+	if irProg.HasSavedOverlayLayers() {
+		overlay, err := loadOverlayFromDatabase(irProg.OverlayLayers, visited)
+		if err != nil {
+			log.Warnf("failed to load overlay from database: %v", err)
+			return
+		}
+		prog.overlay = overlay
+		return
+	}
+	if irProg.IsIncrementalKind() && !irProg.IsBaseProgramKind() {
+		baseProgram, err := fromDatabaseWithVisited(irProg.BaseProgramName, visited)
+		if err != nil {
+			log.Warnf("failed to load base program %s for diff program %s: %v",
+				irProg.BaseProgramName, irProg.ProgramName, err)
+			return
+		}
+		overlay := NewProgramOverLay(baseProgram, prog)
+		if overlay == nil {
+			log.Warnf("failed to create overlay for diff program %s with base %s",
+				irProg.ProgramName, irProg.BaseProgramName)
+			return
+		}
+		prog.overlay = overlay
+	}
 }
 
 func fromDatabaseWithVisited(name string, visited map[string]bool) (*Program, error) {
@@ -120,37 +149,8 @@ func fromDatabaseWithVisited(name string, visited map[string]bool) (*Program, er
 	ret.enableDatabase = true
 	ret.irProgram = irProg
 
-	// 如果这是一个 overlay（已保存的 overlay），直接加载
-	if irProg != nil && irProg.IsOverlay && len(irProg.OverlayLayers) > 0 {
-		overlay, err := loadOverlayFromDatabase(irProg.OverlayLayers, visited)
-		if err != nil {
-			log.Warnf("failed to load overlay from database: %v", err)
-		} else {
-			ret.overlay = overlay
-		}
-		return ret, nil
-	}
-
-	// 如果这是一个差量 program（增量编译但不是 base program），需要聚合生成 ProgramOverLay
-	// 问题1：当一个 program 被从数据库中拿出来时，如果它是一个差量的，就必须要聚合生成 ProgramOverLay
-	if ret.IsIncrementalCompile() && !ret.IsBaseProgram() {
-		// 加载 base program
-		baseProgramName := ret.GetBaseProgramName()
-		baseProgram, err := fromDatabaseWithVisited(baseProgramName, visited)
-		if err != nil {
-			log.Warnf("failed to load base program %s for diff program %s: %v", baseProgramName, name, err)
-			// 如果加载失败，仍然返回当前 program，但不设置 overlay
-			return ret, nil
-		}
-
-		// 创建 ProgramOverLay：base program 作为 Layer1，当前 diff program 作为 Layer2
-		overlay := NewProgramOverLay(baseProgram, ret)
-		if overlay == nil {
-			log.Warnf("failed to create overlay for diff program %s with base %s", name, prog.BaseProgramName)
-		} else {
-			ret.overlay = overlay
-		}
-	}
+	// 行上的增量类型决定是否挂载合并视图（配方聚合 / 两层兜底 / 无操作）
+	attachOverlayIfNeeded(ret, irProg, visited)
 
 	return ret, nil
 }

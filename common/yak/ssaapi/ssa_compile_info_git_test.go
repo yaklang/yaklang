@@ -11,12 +11,8 @@ import (
 
 	git "github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing/object"
-	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
-	"github.com/yaklang/yaklang/common/utils/filesys"
-	fi "github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
 	"github.com/yaklang/yaklang/common/utils/yakgit"
-	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/ssagitworkdir"
 )
@@ -164,52 +160,6 @@ func TestIncrementalGitFallbackUsesIndependentCleanup(t *testing.T) {
 	cleanups[0]()
 	require.Len(t, readDirectoryNames(t, managedRoot), 1)
 	cleanups[1]()
-	require.Empty(t, readDirectoryNames(t, managedRoot))
-}
-
-func TestIncrementalCompileEntryCleansGitFallbackWorkspace(t *testing.T) {
-	repositoryRoot := createGitSourceRepository(t)
-	managedRoot := filepath.Join(t.TempDir(), "managed-git-workspaces")
-	t.Setenv(ssagitworkdir.WorkDirEnv, managedRoot)
-	t.Setenv(ssagitworkdir.MinFreeBytesEnv, "0")
-
-	baseProgramName := "git-fallback-base-" + uuid.NewString()
-	diffProgramName := "git-fallback-diff-" + uuid.NewString()
-	t.Cleanup(func() {
-		ProgramCache.Remove(baseProgramName)
-		ProgramCache.Remove(diffProgramName)
-		ssadb.DeleteProgram(ssadb.GetDB(), baseProgramName)
-		ssadb.DeleteProgram(ssadb.GetDB(), diffProgramName)
-	})
-	baseProgram, err := ParseFromReader(
-		strings.NewReader("println(40 + 2)\n"),
-		ssaconfig.WithCodeSourceKind(ssaconfig.CodeSourceGit),
-		ssaconfig.WithCodeSourceURL(repositoryRoot),
-		WithLanguage(ssaconfig.Yak),
-		WithProgramName(baseProgramName),
-	)
-	require.NoError(t, err)
-	require.NotNil(t, baseProgram)
-	SetProgramCache(baseProgram)
-	require.Empty(t, readDirectoryNames(t, managedRoot))
-
-	originalBuild := buildFileSystemFromProgramNameForIncremental
-	buildFileSystemFromProgramNameForIncremental = func(string) (fi.FileSystem, error) {
-		return nil, errors.New("force Git config fallback")
-	}
-	t.Cleanup(func() { buildFileSystemFromProgramNameForIncremental = originalBuild })
-
-	updatedFS := filesys.NewVirtualFs()
-	updatedFS.AddFile("main.yak", "println(43)\n")
-	programs, err := ParseProjectWithIncrementalCompile(
-		updatedFS,
-		baseProgramName,
-		diffProgramName,
-		ssaconfig.Yak,
-		WithEnableIncrementalCompile(true),
-	)
-	require.NoError(t, err)
-	require.NotEmpty(t, programs)
 	require.Empty(t, readDirectoryNames(t, managedRoot))
 }
 

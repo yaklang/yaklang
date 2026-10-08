@@ -72,6 +72,26 @@ func (*IrProgram) TableName() string {
 	return TableIrPrograms
 }
 
+// IsIncrementalKind reports whether this row belongs to an incremental
+// compilation series (overlay chain head, diff layer, or base layer).
+func (i *IrProgram) IsIncrementalKind() bool {
+	return i.IsOverlay || i.BaseProgramName != "" || len(i.FileHashMap) > 0
+}
+
+// IsBaseProgramKind reports whether this row is the first (base) layer of an
+// incremental series: incremental, but built on no earlier program.
+func (i *IrProgram) IsBaseProgramKind() bool {
+	return i.IsIncrementalKind() && i.BaseProgramName == ""
+}
+
+// HasSavedOverlayLayers reports whether this row carries a complete overlay
+// recipe: the chain-head flag plus enough layer names (>= 2) to reassemble
+// the merged view. The base layer of a series records only its own name —
+// a one-layer chain needs no assembly.
+func (i *IrProgram) HasSavedOverlayLayers() bool {
+	return i.IsOverlay && len(i.OverlayLayers) >= 2
+}
+
 func CreateProgramWithError(name, version string, kind ProgramKind) (*IrProgram, error) {
 	db := GetDB().Model(&IrProgram{})
 	out := &IrProgram{
