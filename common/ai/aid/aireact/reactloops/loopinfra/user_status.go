@@ -31,17 +31,29 @@ func statusToolNames(tools []aicommon.StatusTool, english bool) string {
 	groups := make([]toolLabelGroup, 0, len(tools))
 	indexes := make(map[string]int, len(tools))
 	for _, tool := range tools {
-		label := tool.DisplayName
-		if english && tool.DisplayNameI18n != nil && strings.TrimSpace(tool.DisplayNameI18n.En) != "" {
-			label = tool.DisplayNameI18n.En
+		name := strings.TrimSpace(tool.Name)
+		candidates := []string{tool.DisplayName}
+		if tool.DisplayNameI18n != nil {
+			zh, en := tool.DisplayNameI18n.Zh, tool.DisplayNameI18n.En
+			if english {
+				candidates = []string{en, tool.DisplayName, zh}
+			} else {
+				candidates = []string{zh, tool.DisplayName, en}
+			}
 		}
-		if strings.TrimSpace(label) == "" {
+		var label string
+		for _, candidate := range candidates {
+			if candidate = strings.TrimSpace(candidate); candidate != "" && candidate != name {
+				label = candidate
+				break
+			}
+		}
+		if label == "" {
 			label = "工具"
 			if english {
 				label = "tool"
 			}
 		}
-		name := strings.TrimSpace(tool.Name)
 		if name == "" {
 			name = label
 		}

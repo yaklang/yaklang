@@ -17,46 +17,57 @@ func makeToolForwardAction(
 	toolOpts []aitool.ToolOption,
 ) func(r aicommon.AIInvokeRuntime) reactloops.ReActLoopOption {
 	return func(r aicommon.AIInvokeRuntime) reactloops.ReActLoopOption {
-		return reactloops.WithRegisterLoopAction(
-			actionName,
-			desc, toolOpts,
-			nil,
-			func(loop *reactloops.ReActLoop, action *aicommon.Action, op *reactloops.LoopActionHandlerOperator) {
-				invoker := loop.GetInvoker()
-				ctx := loop.GetConfig().GetContext()
-				task := loop.GetCurrentTask()
-				if task != nil && !utils.IsNil(task.GetContext()) {
-					ctx = task.GetContext()
-				}
+		return func(loop *reactloops.ReActLoop) {
+			label := loop.StatusToolLabel(targetToolName)
+			reactloops.WithRegisterLoopActionWithStreamField(
+				actionName,
+				desc, toolOpts,
+				nil,
+				nil,
+				func(loop *reactloops.ReActLoop, action *aicommon.Action, op *reactloops.LoopActionHandlerOperator) {
+					invoker := loop.GetInvoker()
+					ctx := loop.GetConfig().GetContext()
+					task := loop.GetCurrentTask()
+					if task != nil && !utils.IsNil(task.GetContext()) {
+						ctx = task.GetContext()
+					}
 
-				loop.UserStatus(
-					fmt.Sprintf("正在调用工具「%s」", targetToolName),
-					fmt.Sprintf("Calling tool %q", targetToolName),
-				)
+					label := loop.StatusToolLabel(targetToolName)
+					loop.UserStatus(
+						fmt.Sprintf("正在调用工具「%s」", label.Zh),
+						fmt.Sprintf("Calling tool %q", label.En),
+						aicommon.WithStatusCode("tool.running"),
+						aicommon.WithStatusTools(aicommon.StatusTool{
+							Name: targetToolName, DisplayName: label.Zh, DisplayNameI18n: &label,
+							State: aicommon.StatusStateRunning,
+						}),
+					)
 
-				params := action.GetParams()
-				result, _, err := invoker.ExecuteToolRequiredAndCallWithoutRequired(ctx, targetToolName, params)
-				if err != nil {
-					log.Warnf("%s call failed: %v", targetToolName, err)
-					op.Feedback(fmt.Sprintf("%s failed: %v", targetToolName, err))
+					params := action.GetParams()
+					result, _, err := invoker.ExecuteToolRequiredAndCallWithoutRequired(ctx, targetToolName, params)
+					if err != nil {
+						log.Warnf("%s call failed: %v", targetToolName, err)
+						op.Feedback(fmt.Sprintf("%s failed: %v", targetToolName, err))
+						op.Continue()
+						return
+					}
+
+					content := ""
+					if result != nil {
+						content = utils.InterfaceToString(result.Data)
+					}
+
+					invoker.AddToTimeline(
+						fmt.Sprintf("%s_result", actionName),
+						fmt.Sprintf("[%s] %s", targetToolName, utils.ShrinkString(content, 2048)),
+					)
+
+					op.Feedback(fmt.Sprintf("%s completed (%d bytes)", targetToolName, len(content)))
 					op.Continue()
-					return
-				}
-
-				content := ""
-				if result != nil {
-					content = utils.InterfaceToString(result.Data)
-				}
-
-				invoker.AddToTimeline(
-					fmt.Sprintf("%s_result", actionName),
-					fmt.Sprintf("[%s] %s", targetToolName, utils.ShrinkString(content, 2048)),
-				)
-
-				op.Feedback(fmt.Sprintf("%s completed (%d bytes)", targetToolName, len(content)))
-				op.Continue()
-			},
-		)
+				},
+				func(action *reactloops.LoopAction) { action.VerboseNameI18n = &label },
+			)(loop)
+		}
 	}
 }
 

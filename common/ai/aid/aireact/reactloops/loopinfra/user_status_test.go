@@ -102,3 +102,13 @@ func TestStatusToolNamesGroupsByToolIdentityBeforeTruncating(t *testing.T) {
 	require.Equal(t, "unnamed × 2", statusToolNames([]aicommon.StatusTool{{DisplayName: "unnamed"}, {DisplayName: "unnamed"}}, false))
 	require.Empty(t, statusToolNames(nil, false))
 }
+
+func TestStatusToolNamesRejectsIdentifierDisplayFallback(t *testing.T) {
+	tools := []aicommon.StatusTool{{Name: "do_http_request", DisplayName: "do_http_request",
+		DisplayNameI18n: &schema.I18n{Zh: "do_http_request", En: "HTTP Request"}}}
+	require.Equal(t, "HTTP Request", statusToolNames(tools, false))
+	require.Equal(t, "HTTP Request", statusToolNames(tools, true))
+	tools[0].DisplayNameI18n.En = "do_http_request"
+	require.Equal(t, "工具", statusToolNames(tools, false))
+	require.Equal(t, "tool", statusToolNames(tools, true))
+}

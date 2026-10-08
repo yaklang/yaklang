@@ -830,6 +830,77 @@ func TestStatusToolLabelUsesAvailableVerboseNames(t *testing.T) {
 	require.Equal(t, actionStatusName{"工具调用（Read a document）", "tool calls (Read a document)"}, loop.statusNameForCall(action))
 }
 
+func TestConvertedToolActionUsesSingleLanguageVerboseName(t *testing.T) {
+	for _, option := range []aitool.ToolOption{aitool.WithVerboseName("HTTP Request"), aitool.WithVerboseNameZh("HTTP请求")} {
+		tool := aitool.NewWithoutCallback("do_http_request", option)
+		action := ConvertAIToolToLoopAction(tool)
+		label := action.GetVerboseNameI18n()
+		require.NotContains(t, label.Zh, "do_http_request")
+		require.NotContains(t, label.En, "do_http_request")
+		require.Equal(t, label.Zh, label.En, "the available verbose name serves both languages")
+	}
+	tool := aitool.NewWithoutCallback("identifier_only")
+	require.Equal(t, schema.I18n{Zh: "工具", En: "tool"}, ConvertAIToolToLoopAction(tool).GetVerboseNameI18n())
+}
+
+func TestToolVerificationStatusUsesHTTPVerboseName(t *testing.T) {
+	for _, native := range []bool{false, true} {
+		t.Run(fmt.Sprintf("native=%v", native), func(t *testing.T) {
+			const actionName = schema.AI_REACT_LOOP_ACTION_DIRECTLY_CALL_TOOL
+			const args = `{"directly_call_tool_name":"do_http_request","directly_call_tool_params":{"url":"https://example.test"}}`
+			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer cancel()
+			cfg := aicommon.NewConfig(ctx, aicommon.WithDebug(false), aicommon.WithDisableAutoSkills(true),
+				aicommon.WithDisableCreateDBRuntime(true), aicommon.WithAITransactionAutoRetry(1), aicommon.WithAIAutoRetry(1),
+				aicommon.WithTools(aitool.NewWithoutCallback("do_http_request", aitool.WithVerboseNameZh("HTTP请求"), aitool.WithVerboseName("HTTP Request"))),
+				aicommon.WithAICallback(func(_ aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+					wire := aispec.NewDefaultAIConfig(req.GetExtraSpecOpts()...)
+					resp := aicommon.NewUnboundAIResponse()
+					if native {
+						wire.ToolCallCallback([]*aispec.ToolCall{{ID: "http", Type: "function", Function: aispec.FuncReturn{Name: actionName, Arguments: args}}})
+						wire.FinishReasonCallback("tool_calls", nil)
+					} else {
+						resp.EmitOutputStream(strings.NewReader(`{"@action":"` + actionName + `",` + args[1:]))
+						wire.FinishReasonCallback("stop", nil)
+					}
+					resp.Close()
+					return resp, nil
+				}))
+			invoker := mock.NewMockInvoker(ctx)
+			invoker.SetConfig(cfg)
+			loop := NewMinimalReActLoop(cfg, invoker)
+			loop.functionCallMode = native
+			loop.actions = omap.NewEmptyOrderedMap[string, *LoopAction]()
+			capture := captureActivityStatus(loop)
+			verified := false
+			loop.actions.Set(actionName, &LoopAction{ActionType: actionName, ActionVerifier: func(_ *ReActLoop, action *aicommon.Action) error {
+				statuses := capture.snapshot()
+				status := statuses[len(statuses)-1]
+				require.Equal(t, "action.verifying", status.Code)
+				require.Contains(t, status.Value, "工具调用（HTTP请求）")
+				require.Contains(t, status.ValueI18n.En, "tool calls (HTTP Request)")
+				require.Equal(t, "do_http_request", action.GetString("directly_call_tool_name"))
+				verified = true
+				return nil
+			}})
+			var streams sync.WaitGroup
+			calls, _, _, err := loop.callAILoopTransaction(&streams, "prompt", "nonce", nil,
+				func(io.Reader, io.Reader) {}, func(_, _ string, description, arguments io.Reader) {
+					_, _ = io.Copy(io.Discard, description)
+					_, _ = io.Copy(io.Discard, arguments)
+				})
+			require.NoError(t, err)
+			streams.Wait()
+			require.Len(t, calls, 1)
+			require.True(t, verified)
+			for _, status := range capture.snapshot() {
+				require.NotContains(t, status.Value, "do_http_request")
+				require.NotContains(t, status.ValueI18n.En, "do_http_request")
+			}
+		})
+	}
+}
+
 func TestTextResponseContentStatusBeforeProviderReturns(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
