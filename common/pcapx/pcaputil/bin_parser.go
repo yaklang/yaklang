@@ -213,6 +213,7 @@ type binSpec struct {
 }
 type binParser struct {
 	datagramDecodeAs                                                           map[uint16]string
+	canDecodeAs                                                                map[int]string
 	fragments                                                                  fragmentStore
 	dnsMu                                                                      sync.Mutex
 	dns                                                                        dnsCorrelation
@@ -278,6 +279,10 @@ func (c *CaptureConfig) prepareBinParser() error {
 	a.datagramDecodeAs = make(map[uint16]string, len(c.datagramDecodeAs))
 	for k, v := range c.datagramDecodeAs {
 		a.datagramDecodeAs[k] = v
+	}
+	a.canDecodeAs = make(map[int]string, len(c.canDecodeAs))
+	for k, v := range c.canDecodeAs {
+		a.canDecodeAs[k] = v
 	}
 	c.binParser = a
 	c.reassemblyOptions.Stream = true
@@ -351,6 +356,10 @@ type binDirection struct {
 	offset          uint64
 	ts              time.Time
 	stopped         bool
+	// RFC4253 section 7.3 switches SSH keys independently in each direction.
+	// Only ErrEncrypted after observed NEWKEYS preserves the peer's plaintext
+	// phase; malformed data, resource exhaustion and panics still invalidate it.
+	sshOpaque bool
 }
 type binFlow struct {
 	domain            CaptureDomain
@@ -359,6 +368,8 @@ type binFlow struct {
 	byteSource        string
 	parentID          uint64
 	captureTCP        bool
+	tcpClientKnown    bool
+	tcpClientDir      int
 	syslogStreamProbe bool
 	lastSessionError  *ProtocolError
 	sessionBytes      int64
@@ -400,6 +411,12 @@ type binFlow struct {
 	coap              *binCoAP
 	modbus            *binModbus
 	enip              *binENIP
+	atg               *binATG
+	doip              *binDoIP
+	genisys           *binGenisys
+	rocplus           *binROCPlus
+	bsap              *binBSAP
+	memcached         *binMemcached
 	stratum           *binStratum
 	gearman           *binGearman
 	beanstalk         *binBeanstalk
@@ -438,7 +455,7 @@ type binFlow struct {
 }
 
 func (a *binParser) newFlow(t *TrafficFlow) *binFlow {
-	return &binFlow{domain: t.key.domain, a: a, captureTCP: true, id: a.flows.Add(1), endpoints: [2]string{t.ClientConn.LocalAddr().String(), t.ServerConn.LocalAddr().String()}, ports: [2]uint16{uint16(t.ClientConn.LocalPort()), uint16(t.ServerConn.LocalPort())}}
+	return &binFlow{domain: t.key.domain, a: a, captureTCP: true, tcpClientKnown: !t.IsHalfOpen, id: a.flows.Add(1), endpoints: [2]string{t.ClientConn.LocalAddr().String(), t.ServerConn.LocalAddr().String()}, ports: [2]uint16{uint16(t.ClientConn.LocalPort()), uint16(t.ServerConn.LocalPort())}}
 }
 
 func (f *binFlow) event(dir int, raw []byte, status, detail string) *BinParserEvent {
@@ -493,6 +510,7 @@ func (f *binFlow) stop(dir int, wire []byte, status, reason string) {
 	preview := wire[:min(len(wire), f.a.config.ProbeBytes)]
 	e := f.event(dir, preview, status, reason)
 	e.sessionError, f.lastSessionError = f.lastSessionError, nil
+	d.sshOpaque = f.protocol == "ssh" && e.sessionError != nil && e.sessionError.Kind == ErrEncrypted
 	e.Length = len(wire)
 	if status == "unrecognized" {
 		f.a.unknown.Add(1)
@@ -518,11 +536,12 @@ func (f *binFlow) feed(dir int, data []byte, ts time.Time) {
 			a.err.CompareAndSwap(nil, &binParserError{fmt.Errorf("protocol flow panic: %v", p)})
 			a.malformed.Add(1)
 			d.stopped = true
+			d.sshOpaque = false
 			f.release(d)
 		}
 		// Resource exhaustion and panic containment invalidate connection-wide
 		// dictionaries/sequence state just as a malformed session message does.
-		if d.stopped && f.hasSession() {
+		if d.stopped && f.hasSession() && !d.sshOpaque {
 			f.invalidateSession(1 - dir)
 			f.closeSession()
 		}
@@ -591,7 +610,7 @@ func (f *binFlow) feed(dir int, data []byte, ts time.Time) {
 			}
 			if f.protocol == "" {
 				if len(wire) >= a.config.ProbeBytes {
-					if len(wire) < a.budget.MaxFrameBytes && (needsMoreHTTPStartLine(wire) || f.needsMorePortProtocolPrefix(wire) || f.needsMoreBoundedText(wire) || f.needsMoreOpenWire(wire)) {
+					if len(wire) < a.budget.MaxFrameBytes && (f.captureTCP && probeDNSTCP(wire, a.budget.MaxFrameBytes).Verdict == ProbeNeedMore || needsMoreS7Prefix(wire, a.budget.MaxFrameBytes) || f.needsMoreSSHServerPreamble(dir, wire) || initialProtocolNeedMore(wire, a.budget.MaxFrameBytes).Verdict == ProbeNeedMore || needsMoreHTTPStartLine(wire) || f.needsMorePortProtocolPrefix(wire) || f.needsMoreBoundedText(wire) || f.needsMoreOpenWire(wire)) {
 						break
 					}
 					f.stop(dir, wire, "unrecognized", "bounded detection exhausted; subsequent bytes are counted without VM retries")
@@ -610,7 +629,7 @@ func (f *binFlow) feed(dir int, data []byte, ts time.Time) {
 			status, typed := classifySessionError(err)
 			f.lastSessionError = typed
 			f.stop(dir, wire, status, err.Error())
-			if f.hasSession() {
+			if f.hasSession() && !d.sshOpaque {
 				f.invalidateSession(1 - dir)
 				f.closeSession()
 			}
@@ -651,6 +670,13 @@ func (f *binFlow) feed(dir int, data []byte, ts time.Time) {
 		if f.protocol == "dns" || f.protocol == "dot" {
 			e.decodeSkip = 2
 		}
+		var dnsFields map[string]any
+		var dnsErr error
+		if f.protocol == "dns" || f.protocol == "dot" {
+			// Enforce native collection budgets before the rule VM can retry a
+			// rejected message. Reuse accepted fields for DNS association below.
+			dnsFields, dnsErr = DecodeDNSMessage(e.Raw[e.decodeSkip:], a.budget.MaxCollectionElements)
+		}
 		if f.protocol == "smb2" {
 			e.decodeSkip = 4
 		}
@@ -672,7 +698,10 @@ func (f *binFlow) feed(dir int, data []byte, ts time.Time) {
 		if f.protocol == "syslog" && a.config.Deferred {
 			stateful = false
 		}
-		if !a.config.Deferred || stateful || f.protocol == "tls" {
+		// DNS publishes request/response state below. Validate the same rule
+		// projection first in both modes so deferred errors cannot publish a
+		// successful association that eager decoding would have rejected.
+		if !a.config.Deferred || stateful || f.protocol == "tls" || f.protocol == "dns" || f.protocol == "dot" {
 			rawCopy := e.Raw
 			if f.protocol == "quic" {
 				rawCopy = append([]byte(nil), e.Raw...)
@@ -685,17 +714,19 @@ func (f *binFlow) feed(dir int, data []byte, ts time.Time) {
 				} else {
 					result, err = f.consumeTLS(dir, e)
 				}
-			} else if f.protocol == "redis" || f.protocol == "syslog" || f.protocol == "snmp" || f.protocol == "smb2" || f.protocol == "enip" || f.protocol == "stratum" || f.protocol == "gearman" || f.protocol == "beanstalkd" || f.protocol == "scgi" || f.protocol == "msgpack-rpc" || f.protocol == "zookeeper" || f.protocol == "clickhouse" || f.protocol == "stomp" || f.protocol == "nats" || f.textInternet != nil || e.Entry == "MySQLPreparedFields" {
+			} else if f.protocol == "redis" || f.protocol == "syslog" || f.protocol == "snmp" || f.protocol == "smb2" || f.protocol == "enip" || f.protocol == "doip" || f.protocol == "genisys" || f.protocol == "roc-plus" || f.protocol == "atg" || f.memcached != nil || (e.Entry == "SSHIdentification" || e.Entry == "SSHPreIdentification") || f.protocol == "stratum" || f.protocol == "gearman" || f.protocol == "beanstalkd" || f.protocol == "scgi" || f.protocol == "msgpack-rpc" || f.protocol == "zookeeper" || f.protocol == "clickhouse" || f.protocol == "stomp" || f.protocol == "nats" || f.textInternet != nil || e.Entry == "MySQLPreparedFields" {
 				result = map[string]any{}
 			} else if e.Protocol == "websocket" && e.Entry == "WebSocket" && f.ws != nil && f.ws.deflate {
 				result = map[string]any{"fields": map[string]any{}}
 			} else {
-				result, err = e.Decode()
-				// A rule diagnostic must not hide the shared DNS codec's typed
-				// resource failure. Keep successful structured output unchanged.
-				if err != nil && (f.protocol == "dns" || f.protocol == "dot") {
-					if _, semanticErr := DecodeDNSMessage(e.Raw[e.decodeSkip:], a.budget.MaxCollectionElements); semanticErr != nil {
-						err = semanticErr
+				var budgetErr *ProtocolError
+				if errors.As(dnsErr, &budgetErr) && budgetErr.Kind == ErrResourceExceeded {
+					err = dnsErr
+				} else {
+					result, err = e.Decode()
+					// Preserve the shared codec's established error classification.
+					if err != nil && dnsErr != nil {
+						err = dnsErr
 					}
 				}
 			}
@@ -704,7 +735,7 @@ func (f *binFlow) feed(dir int, data []byte, ts time.Time) {
 					e.Raw = rawCopy
 				}
 				err = f.consumeSession(dir, e, result)
-				if f.protocol == "redis" || f.protocol == "syslog" || e.Entry == "MySQLPreparedFields" {
+				if f.protocol == "redis" || f.protocol == "syslog" || e.Entry == "MySQLPreparedFields" || e.Entry == "SSHIdentification" || e.Entry == "SSHPreIdentification" {
 					result = map[string]any{"fields": e.Session}
 				}
 				if f.protocol == "smb2" && e.Session != nil {
@@ -715,7 +746,7 @@ func (f *binFlow) feed(dir int, data []byte, ts time.Time) {
 					e.semanticFields = cloneSession(e.Session)
 					result = map[string]any{"fields": e.semanticFields}
 				}
-				if f.protocol == "enip" && e.Session != nil {
+				if (f.protocol == "enip" || f.protocol == "doip" || f.protocol == "genisys" || f.protocol == "roc-plus" || f.protocol == "atg" || f.memcached != nil) && e.Session != nil {
 					e.semanticFields = cloneSession(e.Session)
 					result = map[string]any{"fields": e.semanticFields}
 				}
@@ -778,7 +809,7 @@ func (f *binFlow) feed(dir int, data []byte, ts time.Time) {
 				e.Status, e.sessionError = classifySessionError(err)
 				e.Error = err.Error()
 			} else if a.config.Deferred {
-				if e.Protocol == "tls" || e.Protocol == "enip" || e.Protocol == "stratum" || e.Protocol == "gearman" || e.Protocol == "beanstalkd" || e.Protocol == "scgi" || e.Protocol == "msgpack-rpc" {
+				if e.Protocol == "tls" || e.Protocol == "enip" || e.Protocol == "doip" || e.Protocol == "genisys" || e.Protocol == "roc-plus" || e.Protocol == "atg" || e.Protocol == "stratum" || e.Protocol == "gearman" || e.Protocol == "beanstalkd" || e.Protocol == "scgi" || e.Protocol == "msgpack-rpc" {
 					e.Structured = result
 				}
 			} else {
@@ -808,6 +839,10 @@ func (f *binFlow) feed(dir int, data []byte, ts time.Time) {
 				var err error
 				if dns, ok := e.Session["DNS"].(map[string]any); ok {
 					err = a.dnsEventDecoded(e, dns)
+				} else if dnsErr != nil {
+					err = dnsErr
+				} else if dnsFields != nil {
+					err = a.dnsEventDecoded(e, dnsFields)
 				} else {
 					err = a.dnsEvent(e, e.Raw[2:])
 				}
@@ -842,7 +877,7 @@ func (f *binFlow) feed(dir int, data []byte, ts time.Time) {
 		if !failed {
 			f.deliverTLS(dir, e)
 		}
-		if failed && !((e.Protocol == "http2" || e.Protocol == "grpc" || e.Protocol == "doh") && e.Session["Error Scope"] == "stream") {
+		if failed && !(e.Protocol == "roc-plus" && rocRecoverableMessageError(e.sessionError)) && !(e.Protocol == "genisys" && genisysRecoverableMessageError(e.sessionError)) && !((e.Protocol == "http2" || e.Protocol == "grpc" || e.Protocol == "doh") && e.Session["Error Scope"] == "stream") {
 			if stateful {
 				f.invalidateSession(1 - dir)
 				f.closeSession()
@@ -886,7 +921,7 @@ func (f *binFlow) feed(dir int, data []byte, ts time.Time) {
 func (f *binFlow) close(reason TrafficFlowCloseReason) {
 	hadBuffered := len(f.directions[0].buffer) > 0 || len(f.directions[1].buffer) > 0
 	defer func() {
-		if !hadBuffered && !f.directions[0].stopped && !f.directions[1].stopped {
+		if (!hadBuffered || f.rocplus != nil && f.rocplus.pending != nil) && !f.directions[0].stopped && !f.directions[1].stopped {
 			f.finishSession(reason)
 		}
 		f.closeSession()

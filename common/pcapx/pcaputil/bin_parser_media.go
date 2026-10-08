@@ -473,6 +473,11 @@ func (a *binParser) matchSDPMedia(domain CaptureDomain, source, destination stri
 				g.match.clockRate = 0
 				g.match.encoding = ""
 			}
+			// Equivalent SDP spellings share a case-insensitive group. Select
+			// an observed spelling deterministically instead of exporting the
+			// first candidate reached through map traversal.
+			g.match.encoding = min(g.match.encoding, association.encoding)
+			g.match.proto = min(g.match.proto, association.proto)
 		}
 		g.values = append(g.values, association)
 		g.endpoints[association.endpoint] = struct{}{}
@@ -505,6 +510,11 @@ func (a *binParser) matchSDPMedia(domain CaptureDomain, source, destination stri
 		}
 		// These provenance collections are sets. Map traversal must not
 		// change exported evidence between identical capture replays.
+		if g.match.direction != "" {
+			directions := strings.Split(g.match.direction, ",")
+			sort.Strings(directions)
+			g.match.direction = strings.Join(directions, ",")
+		}
 		sort.Strings(g.match.endpoints)
 		sort.Slice(g.match.eventIDs, func(i, j int) bool { return g.match.eventIDs[i] < g.match.eventIDs[j] })
 		sort.Slice(g.match.packetRefs, func(i, j int) bool {

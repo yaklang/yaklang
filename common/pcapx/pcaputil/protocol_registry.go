@@ -8,6 +8,19 @@ type ProtocolProfile struct{ Protocol, Transport, Framing, Context string }
 
 func NativeProtocolProfiles() []ProtocolProfile {
 	return []ProtocolProfile{
+		{"dronecan", "can", "explicit-interface v0 single-frame NodeStatus", "standard message type341 complete fields; strict tail and DSDL bit order; reserved Mode/nonzero SubMode preserved; no multi-frame CRC/reassembly, anonymous/services, CAN FD application, Cyphal v1 or authenticated/online node inference"},
+		{"socketcan", "can", "DLT227 controller records", "network-order CAN IDs; classical data/RTR/controller-error details and canonical72-byteFD; opaque padding, no bus CRC/authenticated peer or transaction claim"},
+		{"j1939", "can", "explicit-interface classical CAN", "Request PGN and unverified Address Claim NAME fields; other parameter groups stay opaque; no TP reassembly, FD application, address-claim success, ISO-TP/UDS/OBD or automatic extended-ID admission"},
+		{"lldp", "l2", "ended Ethernet discovery TLVs", "ordered mandatory identity/TTL and bounded optional/management fields; selected PNO Port Status/Chassis MAC and IEEE802.3 MAC/PHY; unverified neighbor observation, no topology cache or PROFINET DCP/RT claim"},
+		{"genisys", "tcp", "bounded escaped serial wire messages", "pinned reverse-engineered CRC0 and received-trace CRCFFFF dialects stay distinct and fixed per flow; ordered raw address/value pairs; checksum-free controls need prior strong admission; no signal meaning, authentication or checkback/request association claim"},
+		{"bsap", "udp", "Jan-2022 local serial-carried RDB ReadByName", "DLE/CRC validation, endpoint/application sequence and one bounded request; selected type/logical/string values and errors; value-only responses require type context; no analog interpretation, global routing or native BSAP-IP"},
+		{"roc-plus", "tcp", "October 2022 Read/Set Real-time Clock and Error Indicator frames", "observed TCP initiator and reversed logical station addresses with one pending request; overlaps ambiguous until close, Ethernet CRC diagnostic, reported clock unauthenticated; no other opcodes or serial receiver"},
+		{"rtps", "udp", "RTPS2.1-2.5 SPDP parameter-list discovery and inline KeyHash/StatusInfo lifecycle DATA, INFO_TS and PAD", "observed GUID, sequence, endpoint set, lease and locators; repeated claims remain ordered and conflicting scalars ambiguous; no topic CDR, DATA_FRAG, reliable-writer or DDS Security inference"},
+		{"semtech-udp", "udp", "Semtech packet-forwarder v2 PUSH_DATA/PUSH_ACK/PULL_DATA/PULL_ACK", "validated JSON/length and port hint or explicit DecodeAs for short controls; observed gateway/token only, no token association or LoRaWAN PHY/security"},
+		{"mavlink", "udp", "MAVLink v1/v2 HEARTBEAT, SYS_STATUS and GLOBAL_POSITION_INT", "pinned common-message CRC_EXTRA and complete datagram; v2 signatures opaque and unverified"},
+		{"nmea", "udp", "complete NMEA 0183 GGA/RMC sentences", "XOR checksum, bounded fields and coordinates; position is observed and unauthenticated; no AIS"},
+		{"memcached", "tcp", "text get/gets/set and binary GET/SET", "observed direction, text reply order or binary opaque ID; values bounded by declared length; legacy stats layout remains available"},
+		{"doip", "tcp", "DoIP v2/v3 routing activation, alive checks and diagnostic messages", "observed routing and logical addresses; UDS DiagnosticSessionControl positive/negative/pending response only; no UDP discovery, TLS or manufacturer policy"},
 		{"nats", "tcp", "plaintext client control/payload frames including HPUB/HMSG", "observed INFO/CONNECT capabilities, client direction and subscription; no TLS plaintext inference"},
 		{"stomp", "tcp", "STOMP 1.0/1.1/1.2 commands and binary bodies", "observed CONNECT/CONNECTED version, escapes, content-length and transaction state"},
 		{"opcua", "tcp", "UA TCP HEL/ACK/RHE and bounded secure-channel chunks", "observed endpoints/channel/policy; protected OPN/MSG/CLO payload remains opaque"},
@@ -27,6 +40,7 @@ func NativeProtocolProfiles() []ProtocolProfile {
 		{"mqtt-sn", "udp", "v1.2 one- or three-octet length datagram", "wire length, supported message type and complete type-specific fields; port hint or explicit DecodeAs"},
 		{"bittorrent-dht", "udp", "complete KRPC bencoded datagram", "canonical bounded dictionary, transaction, 20-byte node ID and method-specific fields; port hint or explicit DecodeAs"},
 		{"stratum", "tcp", "newline-delimited mining JSON-RPC", "complete mining request and observed request ID for response association"},
+		{"atg", "tcp", "TLS-450 SOH+i201TT computer-format inventory", "observed TCP initiator, command echo, bounded tank records, checksum and request order; units unobserved"},
 		{"gearman", "tcp", "12-byte binary header and exact payload length", "request/response magic, supported type and bounded method-specific fields"},
 		{"beanstalkd", "tcp", "CRLF commands with bounded put/reserved body", "strict put syntax on port 11300 and observed response order"},
 		{"bjnp", "udp", "16-byte printer datagram header and exact payload", "observed command family, direction, sequence and session; port hint or explicit DecodeAs"},
@@ -45,7 +59,7 @@ func WithProtocolDecodeAs(transport string, port uint16, protocol string) Captur
 			return fmt.Errorf("DecodeAs requires UDP and a nonzero port")
 		}
 		switch protocol {
-		case "dns", "mdns", "llmnr", "dhcp", "dhcpv6", "syslog", "snmp", "mqtt-sn", "bittorrent-dht", "bjnp", "rtp", "sip", "stun", "turn", "dtls":
+		case "dns", "mdns", "llmnr", "dhcp", "dhcpv6", "syslog", "snmp", "mqtt-sn", "bittorrent-dht", "bjnp", "rtp", "sip", "stun", "turn", "dtls", "mavlink", "nmea", "semtech-udp", "rtps", "bsap":
 		default:
 			return fmt.Errorf("unsupported native DecodeAs profile")
 		}
@@ -60,6 +74,26 @@ func WithProtocolDecodeAs(transport string, port uint16, protocol string) Captur
 	}
 }
 
+// WithCANDecodeAs selects a bounded J1939 or DroneCAN classical profile on one
+// capture interface. Selection is required because extended CAN IDs are also
+// used by other protocols. It does not authenticate an address claim or enable
+// automotive ISO-TP (the existing isotp rule describes RFC1006/COTP).
+func WithCANDecodeAs(captureInterface int, protocol string) CaptureOption {
+	return func(c *CaptureConfig) error {
+		if captureInterface < 0 || (protocol != "j1939" && protocol != "dronecan") {
+			return fmt.Errorf("CAN DecodeAs requires a nonnegative capture interface and a supported j1939/dronecan profile")
+		}
+		if c.canDecodeAs == nil {
+			c.canDecodeAs = make(map[int]string)
+		}
+		if old := c.canDecodeAs[captureInterface]; old != "" && old != protocol {
+			return fmt.Errorf("conflicting CAN DecodeAs profile")
+		}
+		c.canDecodeAs[captureInterface] = protocol
+		return nil
+	}
+}
+
 type nativeDatagramProfile struct {
 	name     string
 	ports    []uint16
@@ -68,6 +102,9 @@ type nativeDatagramProfile struct {
 }
 
 var nativeDatagrams = []nativeDatagramProfile{
+	{"rtps", nil, rtpsDatagramHeader, decodeRTPSDatagram},
+	{"semtech-udp", []uint16{1700}, validSemtechDatagram, decodeSemtechDatagram},
+	{"nmea", nil, validNMEADatagram, decodeNMEADatagram},
 	{"mdns", []uint16{5353}, dnsHeader, DecodeDNSMessage},
 	{"llmnr", []uint16{5355}, dnsHeader, DecodeDNSMessage},
 	{"dns", []uint16{53}, dnsHeader, DecodeDNSMessage},
@@ -87,7 +124,15 @@ func (a *binParser) decodeNativeDatagram(e *ProtocolEvent, w []byte, src, dst ui
 	if explicit == "" {
 		explicit = a.datagramDecodeAs[src]
 	}
-	if explicit == "" && (src == bacnetIPv4UDPPort || dst == bacnetIPv4UDPPort) && a.decodeBACnetDatagram(e, w) {
+	if explicit == "mavlink" {
+		return false // multi-message framing is handled before this registry
+	}
+	if explicit == "bsap" || explicit == "" && bsapStart(w) {
+		if a.decodeBSAPDatagram(e, w, explicit == "bsap") {
+			return true
+		}
+	}
+	if explicit == "" && a.decodeBACnetDatagram(e, w) {
 		return true
 	}
 	if explicit == "dtls" {
@@ -146,6 +191,9 @@ func (a *binParser) decodeNativeDatagram(e *ProtocolEvent, w []byte, src, dst ui
 			return a.decodeRTPDatagram(e, w, false, false, match)
 		}
 	}
+	if explicit == "" && len(w) == 48 && probeNTP(w, len(w)).Verdict == ProbeAccept {
+		return a.decodeSessionDatagram(e, w)
+	}
 	for _, p := range nativeDatagrams {
 		hint := len(p.ports) == 0
 		for _, port := range p.ports {
@@ -155,13 +203,13 @@ func (a *binParser) decodeNativeDatagram(e *ProtocolEvent, w []byte, src, dst ui
 			if explicit != p.name || !p.validate(w) {
 				continue
 			}
-		} else if !hint || !p.validate(w) {
+		} else if !p.validate(w) || !hint && !(p.name == "semtech-udp" && len(w) > 12 && w[3] == 0 || p.name == "dns" && dnsDatagramEvidence(w) || p.name == "snmp" && probeDatagram(w, a.config.MaxMessageBytes).Protocol == "snmp") {
 			continue
 		}
 		e.Protocol = p.name
 		e.Profile = p.name + "-native"
 		e.Admission = "wire-and-port-hint"
-		if len(p.ports) == 0 {
+		if len(p.ports) == 0 || !hint {
 			e.Admission = "wire-signature"
 		}
 		if explicit != "" {
@@ -208,7 +256,9 @@ func (a *binParser) decodeNativeDatagram(e *ProtocolEvent, w []byte, src, dst ui
 			}
 		}
 		e.semanticFields = cloneSession(fields)
-		e.Structured = map[string]any{"fields": e.semanticFields}
+		if p.name != "rtps" || err == nil {
+			e.Structured = map[string]any{"fields": e.semanticFields}
+		}
 		e.Status = "decoded"
 		e.Summary = p.name
 		a.messages.Add(1)

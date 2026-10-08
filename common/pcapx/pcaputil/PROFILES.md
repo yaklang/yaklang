@@ -6,6 +6,8 @@ A decoded envelope is not complete application support. The tables below describ
 
 | Protocol | Profile implemented | Must-have coverage on the session path | Explicitly not complete |
 |---|---|---|---|
+| DroneCAN | Explicit `WithCANDecodeAs(interface, "dronecan")`, classical extended CAN, v0 standard ID 341 single-frame NodeStatus | Complete uptime/health/mode/sub-mode/vendor code and transport fields; strict tail/length, per-interface evidence, byte budgets and owned data | Multi-frame CRC/reassembly, anonymous messages, services, CAN FD application, Cyphal v1, node authentication, online/restart inference or request/response association |
+| SocketCAN / selected J1939 | DLT227 classical controller records and canonical 72-byte CAN FD; J1939 requires `WithCANDecodeAs(interface, "j1939")` | Network-order IDs, strict flags/lengths, RTR, controller error details, FD flags, interface domains and owned data; selected classical Request PGN and Address Claim NAME | Bus CRC/authenticated identity, address-claim success, J1939 TP/FD application, automotive ISO-TP/UDS/OBD; other parameter-group payloads remain opaque |
 | PostgreSQL | Protocol 3.0 | Startup, SSLRequest, auth, Query, Parse/Bind/Describe/Execute/Sync, RowDescription/DataRow/CommandComplete/Error/Ready; C/D/E not guessed from port 5432 | GSS/SCRAM crypto; encrypted TLS body |
 | WebSocket | RFC 6455 v13 | Validated HTTP Upgrade, masking, fragmentation, UTF-8 and negotiated permessage-deflate | 15-bit window profile; no unsupported extension guessing |
 | LDAP | LDAPv3 RFC 4511 | BER LDAPMessage, MessageID, Bind, Search entry/done/reference, Modify/Add/Delete/ModifyDN, Extended, StartTLS | LDAPS decrypt without keys |
@@ -36,6 +38,7 @@ A decoded envelope is not complete application support. The tables below describ
 
 | Protocol | Implemented session content | Boundary |
 |---|---|---|
+| LLDP | Ended Ethernet discovery with ordered Chassis/Port/TTL and optional TLVs, binary-safe text, management address, selected PNO Port Status/Chassis MAC and IEEE802.3 MAC/PHY fields; VLAN/domain evidence and bounded byte/TLV collections | Neighbor identity remains unverified; no learned topology, PROFINET DCP/RT, or End-less LLDP profile; unknown TLVs stay ordered and opaque |
 | STUN | TCP framing and bounded UDP conversations; direction/endpoint/transaction association and expiry; IPv4/IPv6 XOR addresses, padded attributes, fingerprint validation | MESSAGE-INTEGRITY is explicitly unverified without credentials; classic pre-cookie STUN is separate |
 | TURN | Allocate/Refresh observations, multi-peer CreatePermission, ChannelBind, TCP/UDP ChannelData and expiry; transaction/permission/channel/byte limits | Observed grants are not authenticated; relay payload stays opaque; ambiguous bidirectional channel IDs do not invent a peer |
 | TFTP | RRQ/WRQ, server transfer-ID binding, OACK, blocksize/timeout/tsize, DATA/ACK/error, identical retransmission, 16-bit rollover and final empty block | No retained file body; windowsize above 1 is explicit unsupported; UDP only |
@@ -75,7 +78,10 @@ This is a documented subset, not full Wireshark filter compatibility.
 
 Use `pcap-inspect -read capture.pcap -tls-keylog authorized.keys`, or
 `yak shark --pcap-file capture.pcap --tls-keylog authorized.keys`. Keys are never
-auto-discovered or exported. The existing `.keys` fixtures contain generated loopback session secrets and remain separate from the corpus ZIP. Record authentication does not prove certificate trust
+auto-discovered or exported by production readers. The existing `.keys` fixtures
+contain generated loopback session secrets, sealed with the reproduction tools
+in the supporting-materials ZIP. Tests materialize explicit private copies for
+filename APIs. Record authentication does not prove certificate trust
 or business authentication. Certificate metadata always says `not-evaluated`.
 
 ## Recognition and additional transport profiles
@@ -102,7 +108,12 @@ are not added here. Redis streamed strings/aggregates remain unsupported.
 loopback PCAP (tcpdump reported zero kernel drops), actual socket reply oracles,
 and a 63-message Kafka TShark 4.4.8 field export. Redis 7.2.5 and Kafka 3.9.1
 ran on isolated ports. Reproduction instructions and an independent Python
-client are in `scripts/protocol-tests/generate-m2a/`.
+client are sealed at `scripts/protocol-tests/generate-m2a/`.
+
+Reproduction paths in this document are virtual ZIP aliases. Use
+`go run ./internal/trafficfixture/cmd/corpus export /tmp/new-traffic-workspace`
+to obtain configs, certificates, synthetic keylogs and the original build/capture
+recipes, or `corpus exec -- ... @path` for temporary verified tool inputs.
 
 Capture-backed tests run full/deferred with workers 1/2/4 and check all 31 Kafka
 response associations, actual record values/offsets/CRC, Redis pushes, and

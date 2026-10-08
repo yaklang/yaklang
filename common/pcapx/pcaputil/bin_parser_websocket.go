@@ -37,6 +37,14 @@ func probeWebSocket(w []byte, limit int) ProbeResult {
 		}
 		return probeNeed("websocket", "13", len(w), min(limit, need))
 	}
+	// A two-byte non-final data header is weak evidence: a Modbus transaction
+	// ID has exactly this shape. Wait for the next two bytes (or the complete
+	// shorter frame) so MBAP's protocol ID can be tested before committing to
+	// a fragmented WebSocket message. Established upgraded flows use their
+	// framer directly and do not need this discovery guard.
+	if w[0]&128 == 0 && len(w) < min(n, 4) {
+		return probeNeed("websocket", "13", len(w), min(n, 4))
+	}
 	return probeAccept("websocket", "13", 55)
 }
 

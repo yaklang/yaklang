@@ -94,6 +94,9 @@ TDSLogin7:
   endian: little
   operator: |
     this.ProcessSubNode("Login Length")
+    if getNodeResult("Login Length").Value != this.GetMaxLength() {
+      panic("tds: LOGIN7 length does not match payload boundary")
+    }
     this.ProcessSubNode("TDS Version")
     this.ProcessSubNode("Packet Size")
     if this.GetMaxLength() > this.Length() {
@@ -111,20 +114,32 @@ TDSLogin7:
         this.ProcessSubNode("HostName Offset")
         this.ProcessSubNode("HostName Chars")
         ib = getNodeResult("HostName Offset").Value
+        n = getNodeResult("HostName Chars").Value * 2
         used = this.Length()
+        if n > 0 && (ib < used || ib > this.GetMaxLength() || n > this.GetMaxLength() - ib) {
+          panic("tds: LOGIN7 HostName exceeds payload boundary")
+        }
         if ib >= used {
           skip = ib - used
           if skip > 0 && skip < 1048576 {
             this.GetSubNode("Skip").SetMaxLength(skip)
             this.ProcessSubNode("Skip")
           }
-          n = getNodeResult("HostName Chars").Value * 2
           if n > 0 && n < 1048576 {
             this.GetSubNode("HostName").SetMaxLength(n)
             this.ProcessSubNode("HostName")
           }
         }
       }
+    }
+    // LOGIN7 contains other offset-addressed fields after HostName. Preserve
+    // the exact remainder as opaque bytes rather than treating it as padding
+    // or claiming to decode credentials, feature extensions or SSPI data.
+    rest = this.GetMaxLength() - this.Length()
+    if rest > 0 {
+      tail = this.NewUnknownNode("Remaining LOGIN7 Data")
+      tail.SetMaxLength(rest)
+      tail.Process()
     }
     return
   Login Length: uint32

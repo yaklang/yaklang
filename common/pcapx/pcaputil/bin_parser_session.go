@@ -11,13 +11,68 @@ const binH2Preface = "PRI * HTTP/2.0\r\n\r\nSM\r\n\r\n"
 
 func (f *binFlow) detectDirection(dir int, wire []byte) {
 	w := wire[:min(len(wire), f.a.config.ProbeBytes)]
-	// Explicit user bindings retain precedence.
+	// Explicit user bindings retain precedence. RFC1006 has no application
+	// identity until its data TPDU arrives; keep its bounded prefix away from
+	// weak length-prefixed DNS detection. An actual RDP negotiation is decisive.
+	if f.detectBinding(wire) {
+		return
+	}
+	if len(wire) > 0 && wire[0] == 1 {
+		if p := probeATG(wire, f.a.budget.MaxFrameBytes); p.Verdict == ProbeAccept {
+			f.protocol, f.atg = "atg", &binATG{clientDir: f.tcpClientDir, clientKnown: f.tcpClientKnown, maxElements: f.a.budget.MaxCollectionElements}
+			return
+		} else if p.Verdict == ProbeNeedMore {
+			return
+		}
+	}
+	if probeRDP(wire, f.a.budget.MaxFrameBytes).Verdict == ProbeAccept {
+		f.protocol, f.rdp = "rdp", &binRDP{client: dir}
+		return
+	}
+	if p := probeS7(wire, f.a.budget.MaxFrameBytes); p.Verdict == ProbeAccept {
+		f.protocol, f.s7 = "s7comm", &binS7{}
+		return
+	} else if p.Verdict == ProbeNeedMore {
+		return
+	}
+	if p := probeGenisys(wire, f.a.budget.MaxFrameBytes); p.Verdict == ProbeAccept {
+		f.protocol, f.genisys = "genisys", newBinGenisys(dir, wire)
+		return
+	}
+	if p := probeROCPlus(wire, f.a.budget.MaxFrameBytes); p.Verdict == ProbeAccept {
+		f.protocol, f.rocplus = "roc-plus", &binROCPlus{clientDir: f.tcpClientDir, clientKnown: f.tcpClientKnown}
+		return
+	} else if p.Verdict == ProbeNeedMore {
+		return
+	}
+	if p := probeDoIP(wire, f.a.budget.MaxFrameBytes); p.Verdict == ProbeAccept {
+		f.protocol, f.doip = "doip", &binDoIP{clientDir: dir, maxPending: f.a.budget.MaxCollectionElements}
+		return
+	} else if p.Verdict == ProbeNeedMore {
+		return
+	}
 	f.detect(wire)
 	if f.binding != nil || f.protocol != "" {
 		return
 	}
+	if f.captureTCP && probeDNSTCP(wire, f.a.budget.MaxFrameBytes).Verdict == ProbeAccept {
+		f.protocol, f.dot = "dot", &binDoT{pending: map[uint16]string{}}
+		return
+	}
 	if p := probeOpenWire(wire, f.a.budget.MaxFrameBytes); p.Verdict == ProbeAccept {
 		f.protocol = "openwire"
+		return
+	}
+	if p := probeS7(wire, f.a.budget.MaxFrameBytes); p.Verdict == ProbeAccept {
+		f.protocol, f.s7 = "s7comm", &binS7{}
+		return
+	}
+	if f.tcpClientKnown && dir != f.tcpClientDir && probeSSHServerPreamble(wire, f.a.budget.MaxFrameBytes).Verdict == ProbeAccept {
+		f.protocol, f.ssh = "ssh", &binSSH{client: f.tcpClientDir, clientKnown: true}
+		return
+	}
+	if f.captureTCP && probeQUIC(w, f.a.config.ProbeBytes).Verdict == ProbeAccept {
+		f.protocol = "quic" // report unsupported TCP carrier without decoding its payload
 		return
 	}
 	if f.captureTCP {
@@ -28,10 +83,20 @@ func (f *binFlow) detectDirection(dir int, wire []byte) {
 	}
 	if verdict := f.probeBoundedText(wire); verdict.Verdict == ProbeAccept {
 		switch verdict.Protocol {
+		case "memcached":
+			client := dir
+			if bytes.HasPrefix(wire, []byte("VALUE ")) {
+				client = 1 - dir
+			}
+			f.protocol, f.memcached = "memcached", newBinMemcached(client, verdict.Version, f.a.budget.MaxCollectionElements, f.reserveSession)
 		case "nats":
 			f.protocol = "nats"
 		case "stomp":
 			f.protocol, f.stomp = "stomp", &binSTOMP{clientDir: dir}
+		case "imap":
+			f.protocol, f.imap = "imap", &binIMAP{pending: map[string]string{}, maxPending: f.a.budget.MaxCollectionElements}
+		case "ftp":
+			f.protocol, f.ftp = "ftp", &binFTP{}
 		case "sip":
 			f.protocol, f.sip = "sip", &binSIP{pending: map[sipTxnKey]string{}, seen: map[sipTxnKey]int{}}
 		}
@@ -44,7 +109,7 @@ func (f *binFlow) detectDirection(dir int, wire []byte) {
 		f.protocol, f.beanstalk = "beanstalkd", &binBeanstalk{client: dir}
 		return
 	}
-	if f.captureTCP && (f.ports[0] == 44818 || f.ports[1] == 44818) && probeENIP(w).Verdict == ProbeAccept {
+	if probeENIP(w).Verdict == ProbeAccept {
 		f.protocol = "enip"
 		f.enip = &binENIP{clientDir: dir, maxPending: f.a.budget.MaxCollectionElements}
 		return
@@ -63,7 +128,7 @@ func (f *binFlow) detectDirection(dir int, wire []byte) {
 	if f.probeFTPControlExchange(dir, wire) {
 		p = probeAccept("ftp", "rfc959", 99)
 	} else {
-		p = probeWire(w, f.a.config.ProbeBytes)
+		p = probeWireTransport(w, f.a.config.ProbeBytes, f.captureTCP)
 	}
 	if p.Verdict != ProbeAccept {
 		return
@@ -78,6 +143,20 @@ func (f *binFlow) detectDirection(dir int, wire []byte) {
 		}
 	}
 	switch p.Protocol {
+	case "memcached":
+		client := dir
+		if w[0] == 0x81 || bytes.HasPrefix(w, []byte("VALUE ")) {
+			client = 1 - dir
+		}
+		f.protocol, f.memcached = "memcached", newBinMemcached(client, p.Version, f.a.budget.MaxCollectionElements, f.reserveSession)
+	case "genisys":
+		f.protocol, f.genisys = "genisys", newBinGenisys(dir, wire)
+	case "roc-plus":
+		f.protocol, f.rocplus = "roc-plus", &binROCPlus{clientDir: f.tcpClientDir, clientKnown: f.tcpClientKnown}
+	case "doip":
+		f.protocol, f.doip = "doip", &binDoIP{clientDir: dir, maxPending: f.a.budget.MaxCollectionElements}
+	case "enip":
+		f.protocol, f.enip = "enip", &binENIP{clientDir: dir, maxPending: f.a.budget.MaxCollectionElements}
 	case "zookeeper":
 		clientDir := dir
 		if p.Version == "jute-connect-v0/ConnectResponse" {
@@ -147,7 +226,7 @@ func (f *binFlow) detectDirection(dir int, wire []byte) {
 			proposals: map[uint32][]dcerpcProposal{}, frags: map[dcerpcFragmentKey]dcerpcFragment{},
 		}
 	case "ssh":
-		f.protocol, f.ssh = "ssh", &binSSH{client: dir}
+		f.protocol, f.ssh = "ssh", &binSSH{client: f.tcpClientDir, clientKnown: f.tcpClientKnown}
 	case "nfs":
 		f.protocol, f.nfs = "nfs", &binNFS{client: dir, pending: map[uint32]string{}}
 	case "snmp":
@@ -203,10 +282,21 @@ func (f *binFlow) detectDirection(dir int, wire []byte) {
 func (f *binFlow) probeBoundedText(wire []byte) ProbeResult {
 	budget := f.a.budget
 	budget.MaxMessageBytes = min(budget.MaxMessageBytes, budget.MaxFrameBytes)
+	if len(wire) > 0 && wire[0] != 0x80 && wire[0] != 0x81 {
+		if p := probeMemcached(wire[:min(len(wire), mailLineMax)], min(budget.MaxMessageBytes, mailLineMax)); p.Verdict != ProbeReject {
+			return p
+		}
+	}
 	if p, _ := natsAdmissionWithBudget(wire, budget); p.Verdict != ProbeReject {
 		return p
 	}
 	if p := probeSTOMP(wire, min(budget.MaxMessageBytes, stompMaxHeaderBytes+stompMaxLineBytes+4)); p.Verdict != ProbeReject {
+		return p
+	}
+	if p := probeIMAP(wire[:min(len(wire), mailLineMax)], mailLineMax); p.Verdict != ProbeReject {
+		return p
+	}
+	if p := probeFTP(wire[:min(len(wire), mailLineMax)], mailLineMax); p.Verdict != ProbeReject {
 		return p
 	}
 	return probeSIP(wire, min(budget.MaxMessageBytes, sipMaxHeaderBytes))
@@ -433,6 +523,42 @@ func (f *binFlow) consumeSession(dir int, e *ProtocolEvent, result map[string]an
 		e.Session, err = f.c37118.consume(e.Raw)
 	case "goose":
 		e.Session, err = f.goose.consume(e.Raw)
+	case "memcached":
+		if f.memcached != nil {
+			e.Session, err = f.memcached.consume(dir, e.Raw)
+			if err == nil {
+				e.semanticFields = cloneSession(e.Session)
+				e.Profile, e.Completeness = "memcached-get-set", "message"
+			}
+		}
+	case "atg":
+		e.Session, err = f.atg.consume(dir, e.Raw)
+		if err == nil {
+			e.semanticFields = cloneSession(e.Session)
+			e.Profile, e.Completeness = "atg-tls450-i201", "message"
+		}
+	case "genisys":
+		e.Session, err = f.genisys.consume(dir, e.Raw, f.a.budget.MaxCollectionElements)
+		if err == nil {
+			e.semanticFields = cloneSession(e.Session)
+			e.Profile, e.Completeness = "genisys-tcp-observed-wire", "message"
+		}
+	case "roc-plus":
+		// Allocate the stable event identity before retaining its request slot.
+		if e.ID == 0 {
+			e.ID = f.a.ids.Add(1)
+		}
+		e.Session, e.ResponseTo, err = f.rocplus.consume(dir, e.Raw, e.ID, f.a.budget.MaxCollectionElements)
+		if err == nil {
+			e.semanticFields = cloneSession(e.Session)
+			e.Profile, e.Completeness = "roc-plus-tcp-clock-2022", "message"
+		}
+	case "doip":
+		e.Session, err = f.doip.consume(dir, e.Raw)
+		if err == nil {
+			e.semanticFields = cloneSession(e.Session)
+			e.Profile, e.Completeness = "doip-routing-dsc", "message"
+		}
 	case "enip":
 		e.Session, err = f.enip.consume(dir, e.Raw, f.a.budget.MaxCollectionElements)
 		if err == nil {
@@ -666,6 +792,15 @@ func (f *binFlow) closeSession() {
 	f.diameter, f.iec104, f.s7, f.opcua = nil, nil, nil, nil
 	f.rfb = nil
 	f.enip = nil
+	f.atg = nil
+	f.doip = nil
+	f.genisys = nil
+	f.rocplus = nil
+	f.bsap = nil
+	if f.memcached != nil {
+		f.memcached.close()
+		f.memcached = nil
+	}
 	f.stratum = nil
 	f.gearman = nil
 	f.beanstalk = nil
@@ -803,6 +938,18 @@ func (f *binFlow) finishSession(reason TrafficFlowCloseReason) {
 	}
 	if c := f.coap; c != nil && len(c.pending) > 0 {
 		emit(0, map[string]any{"Outstanding": len(c.pending)}, "CoAP exchange ended with unmatched Message IDs")
+	}
+	if m := f.memcached; m != nil && m.outstanding() > 0 {
+		emit(m.clientDir, map[string]any{"Outstanding": m.outstanding()}, "Memcached exchange ended with unmatched requests")
+	}
+	if a := f.atg; a != nil && a.outstanding() > 0 {
+		emit(a.clientDir, map[string]any{"Outstanding": a.outstanding()}, "ATG exchange ended with unmatched requests")
+	}
+	if r := f.rocplus; r != nil && r.pending != nil {
+		emit(r.clientDir, map[string]any{"Outstanding": 1}, "ROC Plus clock exchange ended with an unmatched request")
+	}
+	if d := f.doip; d != nil && d.outstanding() > 0 {
+		emit(d.clientDir, map[string]any{"Outstanding": d.outstanding()}, "DoIP exchange ended with unmatched requests")
 	}
 	if m := f.modbus; m != nil && len(m.pending) > 0 {
 		emit(0, map[string]any{"Outstanding": len(m.pending)}, "Modbus exchange ended with unmatched Transaction IDs")

@@ -12,6 +12,7 @@ import (
 	"testing"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
+	"github.com/yaklang/yaklang/common/ai/aid/aimem"
 	"github.com/yaklang/yaklang/common/ai/aispec"
 	"github.com/yaklang/yaklang/common/ai/rag"
 	"github.com/yaklang/yaklang/common/utils"
@@ -162,6 +163,9 @@ func runTestForgeByAICommon(t *testing.T, forge *schema.AIForge, initFlag, persi
 		"query": "1+1",
 	},
 		aicommon.WithAICallback(MockAICallback(t, initFlag, persistentFlag, "")),
+		// Factory/VM assertions use a mocked AI callback; memory must use the
+		// matching local fixture rather than initialize a remote embedder.
+		aicommon.WithMemoryTriage(aimem.NewMockMemoryTriage()),
 		aicommon.WithAgreeYOLO(),
 		aicommon.WithDisableDynamicPlanning(true),
 	)

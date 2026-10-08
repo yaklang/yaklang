@@ -35,6 +35,7 @@ type DeviceAdapter struct {
 type CaptureConfig struct {
 	tlsSecrets            TLSSecretProvider
 	datagramDecodeAs      map[uint16]string
+	canDecodeAs           map[int]string
 	binParserConfig       *BinParserConfig
 	binParser             *binParser
 	recorder              *captureWriter
@@ -521,11 +522,8 @@ func (c *CaptureConfig) packetHandler(ctx context.Context, packet gopacket.Packe
 	if packet == nil {
 		return
 	}
-	if c.trafficPool.parallel != nil && c.trafficPool.owner == nil {
-		c.trafficPool.parallel.checkTruncation(packet.Metadata().CaptureInfo)
-	}
-
 	if c.binParser != nil {
+		packet = protocolAnalysisPacket(packet)
 		var consumed bool
 		packet, consumed = c.binParser.networkPacket(packet)
 		if consumed {
@@ -537,6 +535,7 @@ func (c *CaptureConfig) packetHandler(ctx context.Context, packet gopacket.Packe
 	if !isOk && packet.TransportLayer() != nil {
 		if c.binParser != nil {
 			if udp, ok := packet.TransportLayer().(*layers.UDP); ok {
+				c.trafficPool.synchronizeProtocolContext()
 				c.binParser.datagram(packet, udp)
 			}
 		}

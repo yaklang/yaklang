@@ -20,57 +20,80 @@ type binS7 struct {
 	pdu       uint16
 }
 
-func probeS7(w []byte, _ int) ProbeResult {
+// RFC 1006/COTP is shared by S7 and MMS. A connection TPDU, including its
+// TSAPs, is carrier evidence only. Retain it until actual S7 data establishes
+// the application, then replay the buffered connection records normally.
+func probeS7(w []byte, limit int) ProbeResult {
 	if len(w) == 0 || w[0] != 3 {
 		return ProbeResult{Verdict: ProbeReject}
 	}
-	if len(w) < 7 {
-		return probeNeed("s7comm", "s7", len(w), 7)
-	}
-	n := int(binary.BigEndian.Uint16(w[2:]))
-	if w[1] != 0 || n < 7 {
+	if limit <= 0 {
 		return ProbeResult{Verdict: ProbeReject}
 	}
-	if w[5] == 0xf0 && w[4] == 2 {
-		if len(w) < 8 {
-			return probeNeed("s7comm", "s7", len(w), 8)
+	var header [12]byte
+	have, bodyBytes, offset := 0, 0, 0
+	for frames := 0; frames < 64; frames++ {
+		if len(w)-offset < 4 {
+			return probeNeed("s7comm", "s7", len(w), offset+4)
 		}
-		if w[7] == 0x32 {
-			return probeAccept("s7comm", "s7", 98)
-		}
-	}
-	if w[5]&0xf0 == 0xe0 || w[5]&0xf0 == 0xd0 {
-		if n > 64 || n < 13 {
+		p := w[offset:]
+		n := int(binary.BigEndian.Uint16(p[2:4]))
+		if p[0] != 3 || p[1] != 0 || n < 7 || offset+n > limit {
 			return ProbeResult{Verdict: ProbeReject}
 		}
-		if len(w) < n {
-			return probeNeed("s7comm", "s7", len(w), n)
+		if len(p) < n {
+			return probeNeed("s7comm", "s7", len(w), offset+n)
 		}
-		if int(w[4])+5 != n {
-			return ProbeResult{Verdict: ProbeReject}
-		}
-		p := w[11:n]
-		src, dst := false, false
-		for len(p) >= 2 {
-			l := int(p[1])
-			if l+2 > len(p) {
+		p = p[:n]
+		li := int(p[4])
+		kind := p[5] & 0xf0
+		if kind == 0xe0 || kind == 0xd0 {
+			if bodyBytes != 0 || li < 6 || li+5 != n {
 				return ProbeResult{Verdict: ProbeReject}
 			}
-			if l == 2 && p[2] >= 1 && p[2] <= 3 {
-				if p[0] == 0xc1 {
-					src = true
+			params := p[11:]
+			for len(params) > 0 {
+				if len(params) < 2 || int(params[1])+2 > len(params) {
+					return ProbeResult{Verdict: ProbeReject}
 				}
-				if p[0] == 0xc2 {
-					dst = true
-				}
+				params = params[2+int(params[1]):]
 			}
-			p = p[2+l:]
+		} else if kind == 0xf0 && li == 2 {
+			body := p[7:]
+			if have < len(header) {
+				have += copy(header[have:], body)
+			}
+			bodyBytes += len(body)
+			if have > 0 && header[0] != 0x32 {
+				return ProbeResult{Verdict: ProbeReject}
+			}
+			if p[6]&0x80 != 0 {
+				if have < 10 || header[0] != 0x32 || header[2] != 0 || header[3] != 0 {
+					return ProbeResult{Verdict: ProbeReject}
+				}
+				h := 10
+				switch header[1] {
+				case 1, 7:
+				case 2, 3:
+					h = 12
+				default:
+					return ProbeResult{Verdict: ProbeReject}
+				}
+				if have < h || h+int(binary.BigEndian.Uint16(header[6:8]))+int(binary.BigEndian.Uint16(header[8:10])) != bodyBytes {
+					return ProbeResult{Verdict: ProbeReject}
+				}
+				return probeAccept("s7comm", "s7", 98)
+			}
+		} else {
+			return ProbeResult{Verdict: ProbeReject}
 		}
-		if len(p) == 0 && src && dst {
-			return probeAccept("s7comm", "s7", 98)
-		}
+		offset += n
 	}
 	return ProbeResult{Verdict: ProbeReject}
+}
+
+func needsMoreS7Prefix(w []byte, limit int) bool {
+	return len(w) < limit && probeS7(w, limit).Verdict == ProbeNeedMore
 }
 func (f *binFlow) frameS7(w []byte) (int, *binSpec, error) {
 	s := f.s7

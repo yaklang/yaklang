@@ -123,6 +123,45 @@ func (f *binFlow) frameDirection(dir int, w []byte) (int, *binSpec, error) {
 			return f.frameCoAP(w)
 		case "modbus":
 			return f.frameModbus(w)
+		case "memcached":
+			if f.memcached != nil {
+				if err := f.reserveSession(f.memcached.sessionBytes()); err != nil {
+					return 0, nil, err
+				}
+				n, err := memcachedFrameSize(w, f.a.budget.MaxFrameBytes, f.a.budget.MaxCollectionElements)
+				return n, &binSpec{}, err
+			}
+		case "atg":
+			if !f.atg.clientKnown {
+				return 0, nil, protocolError(ErrContextRequired, "ATG inventory requires observed TCP initiator")
+			}
+			if err := f.reserveSession(f.atg.sessionBytes()); err != nil {
+				return 0, nil, err
+			}
+			n, err := atgFrameSize(w, dir == f.atg.clientDir, f.a.budget.MaxFrameBytes)
+			return n, &binSpec{}, err
+		case "genisys":
+			if err := f.reserveSession(256); err != nil {
+				return 0, nil, err
+			}
+			n, err := genisysFrameSize(w, f.a.budget.MaxFrameBytes)
+			return n, &binSpec{}, err
+		case "roc-plus":
+			if !f.rocplus.clientKnown {
+				return 0, nil, protocolError(ErrContextRequired, "ROC Plus clock requires an observed TCP initiator")
+			}
+			// Fixed state and one pending slot are charged before admitting a frame.
+			if err := f.reserveSession(256); err != nil {
+				return 0, nil, err
+			}
+			n, err := rocFrameSize(w, f.a.budget.MaxFrameBytes)
+			return n, &binSpec{}, err
+		case "doip":
+			if err := f.reserveSession(f.doip.sessionBytes()); err != nil {
+				return 0, nil, err
+			}
+			n, err := doipFrameSize(w, f.a.budget.MaxFrameBytes)
+			return n, &binSpec{}, err
 		case "enip":
 			return f.frameENIP(w)
 		case "stratum":

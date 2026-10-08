@@ -118,23 +118,33 @@ func replayWithConfig(input io.Reader, conf *CaptureConfig) (resultErr error) {
 		}
 		e := captureEvidence{Ref: PacketReference{Number: r.number, Domain: CaptureDomain{Section: r.section, Interface: ci.InterfaceIndex}}}
 		d.link = link
-		pool.observeCapture(len(raw))
+		pool.observeCaptureInfo(len(raw), ci)
 		if conf.recorder != nil {
 			if err := conf.recorder.write(raw, ci, link); err != nil {
 				return err
 			}
 		}
+		// gopacket does not invoke a link decoder for an empty record. The
+		// recorded CAN link type still supplies enough context to report the
+		// missing header, including in the observable packet path.
+		if link == 227 && len(raw) == 0 && conf.binParser != nil && len(conf.onEveryPacket) == 0 && conf.Output == nil && !conf.Debug {
+			conf.binParser.decodeCANRecord(raw, e, ci)
+			continue
+		}
 		if len(conf.onEveryPacket) != 0 || conf.Output != nil || conf.Debug {
 			packet := gopacket.NewPacket(raw, captureLinkDecoder(link), gopacket.DecodeOptions{Lazy: true, NoCopy: false, DecodeStreamsAsDatagrams: conf.binParser == nil})
 			packet.Metadata().CaptureInfo = withEvidence(ci, e)
-			conf.packetHandler(ctx, packet)
+			conf.packetHandlerWithLink(ctx, packet, link)
 		} else if pool.parallel != nil && !conf.DisableAssembly {
-			pool.parallel.checkTruncation(ci)
 			if key, ok, err := rawFlowKey(raw, link); err != nil {
-				pool.malformedPacket(err.Error())
+				if conf.binParser != nil {
+					d.feedWithEvidence(ctx, raw, ci, e)
+				} else {
+					pool.malformedPacket(err.Error())
+				}
 			} else if ok {
 				key.domain = e.Ref.Domain
-				pool.parallel.submit(workerPacket{data: raw, ts: ci.Timestamp, link: link, raw: true, key: key, evidence: e})
+				pool.parallel.submit(workerPacket{data: raw, ts: ci.Timestamp, captureLength: ci.CaptureLength, originalLength: ci.Length, link: link, raw: true, key: key, evidence: e})
 			} else if conf.binParser != nil {
 				d.feedWithEvidence(ctx, raw, ci, e) // datagrams; TCP still uses the private worker path
 			}

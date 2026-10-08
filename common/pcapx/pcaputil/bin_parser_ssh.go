@@ -7,20 +7,24 @@ import (
 	"encoding/binary"
 	"fmt"
 	"strings"
+	"unicode"
+	"unicode/utf8"
 )
 
 // binSSH is the M0 session state for RFC 4253 first handshake. After both
 // NEWKEYS messages the transport is encrypted; ciphertext is not interpreted
 // as login, channel, or shell. Port 22 is never consulted.
 type binSSH struct {
-	client    int
-	banner    [2]bool
-	ident     [2]string
-	kex       [2]sshKexLists
-	haveKEX   [2]bool
-	newkeys   [2]bool
-	selected  map[string]string
-	encrypted bool
+	client             int
+	clientKnown        bool
+	preLines, preBytes int
+	banner             [2]bool
+	ident              [2]string
+	kex                [2]sshKexLists
+	haveKEX            [2]bool
+	newkeys            [2]bool
+	selected           map[string]string
+	encrypted          bool
 }
 
 type sshKexLists struct {
@@ -39,8 +43,7 @@ func probeSSH(w []byte, limit int) ProbeResult {
 		return ProbeResult{Verdict: ProbeReject}
 	}
 	if i := bytes.IndexByte(w, '\n'); i >= 0 {
-		line := bytes.TrimRight(w[:i], "\r")
-		if !bytes.HasPrefix(line, []byte("SSH-2.0-")) && !bytes.HasPrefix(line, []byte("SSH-1.99-")) {
+		if _, _, err := sshIdentification(w[:i+1]); err != nil {
 			return ProbeResult{Verdict: ProbeReject, Protocol: "ssh", Reason: "unsupported identification"}
 		}
 		_ = limit
@@ -52,12 +55,116 @@ func probeSSH(w []byte, limit int) ProbeResult {
 	return probeNeed("ssh", "2.0", len(w), min(limit, 255))
 }
 
+const sshMaxPreLines = 8
+const sshMaxPreBytes = 2048
+const sshMaxPreLineBytes = 1024
+
+// RFC 4253 4.2 permits pre-identification lines only from the server. These
+// limits define a bounded observed profile, not a limit imposed by the RFC.
+func sshPreLine(raw []byte) (string, error) {
+	if len(raw) == 0 || raw[len(raw)-1] != '\n' || len(raw) > sshMaxPreLineBytes || bytes.HasPrefix(raw, []byte("SSH-")) {
+		return "", protocolError(ErrMalformedMessage, "SSH pre-identification line is invalid")
+	}
+	line := raw[:len(raw)-1]
+	if len(line) > 0 && line[len(line)-1] == '\r' {
+		line = line[:len(line)-1]
+	}
+	if !utf8.Valid(line) {
+		return "", protocolError(ErrMalformedMessage, "SSH pre-identification is not UTF-8")
+	}
+	for _, r := range string(line) {
+		if unicode.IsControl(r) && r != '\t' {
+			return "", protocolError(ErrMalformedMessage, "SSH pre-identification contains control bytes")
+		}
+	}
+	return string(line), nil
+}
+
+func sshIdentification(raw []byte) (string, string, error) {
+	if len(raw) == 0 || len(raw) > 255 || raw[len(raw)-1] != '\n' {
+		return "", "", protocolError(ErrMalformedMessage, "SSH identification length or termination is invalid")
+	}
+	line := raw[:len(raw)-1]
+	if len(line) > 0 && line[len(line)-1] == '\r' {
+		line = line[:len(line)-1]
+	}
+	version := "2.0"
+	var software []byte
+	if bytes.HasPrefix(line, []byte("SSH-2.0-")) {
+		software = line[8:]
+	} else if bytes.HasPrefix(line, []byte("SSH-1.99-")) {
+		version = "1.99"
+		software = line[9:]
+	} else {
+		return "", "", protocolError(ErrUnsupportedVersion, "SSH identification version is unsupported")
+	}
+	if i := bytes.IndexByte(software, ' '); i >= 0 {
+		software = software[:i]
+	}
+	if len(software) == 0 {
+		return "", "", protocolError(ErrMalformedMessage, "SSH software version is empty")
+	}
+	for _, b := range software {
+		if b <= 32 || b >= 127 || b == '-' {
+			return "", "", protocolError(ErrMalformedMessage, "SSH software version is invalid")
+		}
+	}
+	for _, b := range line {
+		if b < 32 || b == 127 {
+			return "", "", protocolError(ErrMalformedMessage, "SSH identification contains control bytes")
+		}
+	}
+	if !utf8.Valid(line) {
+		return "", "", protocolError(ErrMalformedMessage, "SSH identification is not UTF-8")
+	}
+	return string(line), version, nil
+}
+
+// Call only with observed server direction. A line of arbitrary text, a port
+// hint, or a client preamble alone never admits SSH.
+func probeSSHServerPreamble(w []byte, limit int) ProbeResult {
+	bound := min(limit, sshMaxPreBytes+255)
+	if bound <= 0 {
+		return ProbeResult{Verdict: ProbeReject}
+	}
+	offset, lines := 0, 0
+	for offset < len(w) {
+		p := w[offset:]
+		i := bytes.IndexByte(p, '\n')
+		if i < 0 {
+			if len(w) >= bound || len(p) >= sshMaxPreLineBytes {
+				return ProbeResult{Verdict: ProbeReject}
+			}
+			return probeNeed("ssh", "2.0", len(w), min(bound, len(w)+1))
+		}
+		n := i + 1
+		if bytes.HasPrefix(p, []byte("SSH-")) {
+			if offset+n > bound {
+				return ProbeResult{Verdict: ProbeReject}
+			}
+			if _, _, err := sshIdentification(p[:n]); err == nil {
+				return probeAccept("ssh", "server-preamble/2.0", 95)
+			}
+			return ProbeResult{Verdict: ProbeReject}
+		}
+		if _, err := sshPreLine(p[:n]); err != nil || lines >= sshMaxPreLines || offset+n > sshMaxPreBytes {
+			return ProbeResult{Verdict: ProbeReject}
+		}
+		offset += n
+		lines++
+	}
+	if offset >= bound {
+		return ProbeResult{Verdict: ProbeReject}
+	}
+	return probeNeed("ssh", "2.0", len(w), min(bound, len(w)+1))
+}
+
 func (f *binFlow) frameSSH(dir int, w []byte) (int, *binSpec, error) {
 	s := f.ssh
 	if s == nil {
 		return 0, nil, sessionContext("SSH session was not observed")
 	}
-	if err := f.reserveSession(512); err != nil {
+	if err := f.reserveSession(512 + int64(len(s.ident[0])+len(s.ident[1]))); err != nil {
 		return 0, nil, err
 	}
 	if s.newkeys[dir] || s.encrypted {
@@ -69,20 +176,43 @@ func (f *binFlow) frameSSH(dir int, w []byte) (int, *binSpec, error) {
 	if !s.banner[dir] {
 		if i := bytes.IndexByte(w, '\n'); i >= 0 {
 			n := i + 1
-			if n > 255 {
-				return 0, nil, fmt.Errorf("ssh: identification exceeds 255 bytes")
+			if bytes.HasPrefix(w, []byte("SSH-")) {
+				if _, _, err := sshIdentification(w[:n]); err != nil {
+					return 0, nil, err
+				}
+				if err := f.reserveSession(512 + int64(len(s.ident[0])+len(s.ident[1])+n)); err != nil {
+					return 0, nil, err
+				}
+				return n, &binSpec{entry: "SSHIdentification"}, nil
 			}
-			line := bytes.TrimRight(w[:i], "\r")
-			if !bytes.HasPrefix(line, []byte("SSH-")) {
-				return 0, nil, fmt.Errorf("ssh: identification must start with SSH-")
+			if !s.clientKnown {
+				return 0, nil, protocolError(ErrContextRequired, "SSH pre-identification requires observed server direction")
 			}
-			return n, f.spec("ssh", "SSH"), nil
+			if dir == s.client {
+				return 0, nil, protocolError(ErrMalformedMessage, "SSH client must start with its identification")
+			}
+			if _, err := sshPreLine(w[:n]); err != nil {
+				return 0, nil, err
+			}
+			if s.preLines >= sshMaxPreLines || s.preBytes+n > sshMaxPreBytes {
+				return 0, nil, protocolError(ErrResourceExceeded, "SSH pre-identification line/byte limit exceeded")
+			}
+			return n, &binSpec{entry: "SSHPreIdentification"}, nil
 		}
-		if len(w) >= 255 {
-			return 0, nil, fmt.Errorf("ssh: identification exceeds 255 bytes")
+		ident := bytes.HasPrefix([]byte("SSH-"), w) || bytes.HasPrefix(w, []byte("SSH-"))
+		if ident && len(w) >= 255 {
+			return 0, nil, protocolError(ErrMalformedMessage, "SSH identification exceeds 255 bytes")
 		}
-		if len(w) > 0 && !bytes.HasPrefix([]byte("SSH-"), w) && !bytes.HasPrefix(w, []byte("SSH-")) {
-			return 0, nil, fmt.Errorf("ssh: identification must start with SSH-")
+		if !ident {
+			if !s.clientKnown {
+				return 0, nil, protocolError(ErrContextRequired, "SSH pre-identification requires observed server direction")
+			}
+			if dir == s.client {
+				return 0, nil, protocolError(ErrMalformedMessage, "SSH client must start with its identification")
+			}
+			if len(w) >= sshMaxPreLineBytes || s.preBytes+len(w) >= sshMaxPreBytes {
+				return 0, nil, protocolError(ErrResourceExceeded, "SSH pre-identification byte limit exceeded")
+			}
 		}
 		return 0, nil, nil
 	}
@@ -112,17 +242,26 @@ func (s *binSSH) consume(dir int, raw []byte) (map[string]any, error) {
 		s.client = dir
 	}
 	if !s.banner[dir] {
-		i := bytes.IndexByte(raw, '\n')
-		if i < 0 {
-			return nil, fmt.Errorf("ssh: truncated identification")
+		if !bytes.HasPrefix(raw, []byte("SSH-")) {
+			if !s.clientKnown || dir == s.client {
+				return nil, protocolError(ErrMalformedMessage, "SSH pre-identification requires observed server direction")
+			}
+			line, err := sshPreLine(raw)
+			if err != nil {
+				return nil, err
+			}
+			if s.preLines >= sshMaxPreLines || s.preBytes+len(raw) > sshMaxPreBytes {
+				return nil, protocolError(ErrResourceExceeded, "SSH pre-identification limit exceeded")
+			}
+			s.preLines++
+			s.preBytes += len(raw)
+			return map[string]any{"Packet Name": "pre-identification line", "Text": line, "Line Number": s.preLines, "Context Level": "observed-server"}, nil
 		}
-		line := string(bytes.TrimRight(raw[:i], "\r"))
-		s.banner[dir] = true
-		s.ident[dir] = line
-		ver := "2.0"
-		if strings.HasPrefix(line, "SSH-1.99-") {
-			ver = "1.99"
+		line, ver, err := sshIdentification(raw)
+		if err != nil {
+			return nil, err
 		}
+		s.banner[dir], s.ident[dir] = true, line
 		return map[string]any{
 			"Packet Name":    "identification",
 			"Identification": line,

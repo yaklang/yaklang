@@ -62,10 +62,20 @@ func (d *captureDNSReader) labels() []any {
 	for d.pos < len(d.wire) {
 		n := d.wire[d.pos]
 		d.pos++
-		if int(n) > len(d.wire)-d.pos {
+		label := map[string]any{"Count": n}
+		if n&0xc0 == 0xc0 {
+			// String projects an encoded pointer as its two original octets.
+			// It ends this label list without resolving or appending a root label.
+			if d.pos == len(d.wire) {
+				return nil
+			}
+			label["PointerLow"] = d.wire[d.pos]
+			d.pos++
+			return append(labels, label)
+		}
+		if n > 63 || int(n) > len(d.wire)-d.pos {
 			return nil
 		}
-		label := map[string]any{"Count": n}
 		if n != 0 {
 			label["Text"] = string(d.wire[d.pos : d.pos+int(n)])
 			d.pos += int(n)

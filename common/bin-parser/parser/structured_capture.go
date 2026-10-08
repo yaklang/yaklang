@@ -23,7 +23,7 @@ var captureStructuredRules = sync.OnceValue(func() map[string]bool {
 		"http":      "e356b5b5c242f5d3b29a03a92a37795137036448162223253997d14bce14ea04",
 		"tls":       "be13dbbbb55ff16bd7127c680e4f7cae22a7e826465390051b5a22e55c982bd2",
 		"tls_hello": "f9809596ebeddc2ef3d1c8272aee12fbf202918bc73d46ade66b3df5f92be9d9",
-		"dns":       "ba2d6db7c414c01626ae18497a690dc0bf8291dc62200c964fb65262c22a894d",
+		"dns":       "9e1938283598174a4e90ee852cf54ff09606a919af539831ab1b13e3ca7b8d95",
 	} {
 		wire, err := rules.RuleFS.ReadFile("application-layer/" + name + ".yaml")
 		if err == nil {

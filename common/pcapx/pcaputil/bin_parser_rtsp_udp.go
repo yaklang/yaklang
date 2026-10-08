@@ -511,6 +511,11 @@ func (a *binParser) decodeRTSPMediaDatagram(e *ProtocolEvent, wire []byte, match
 		e.Session["RTSP Media Direction"] = "server-to-client"
 	}
 	e.semanticFields = cloneSession(e.Session)
+	if e.Structured != nil {
+		// RTP decoding populated the eager cache before the RTSP association
+		// was applied. Keep it consistent with the final semantic snapshot.
+		e.Structured = map[string]any{"fields": cloneSession(e.semanticFields), "session": cloneSession(e.Session)}
+	}
 	return true
 }
 

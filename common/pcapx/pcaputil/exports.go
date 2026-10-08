@@ -12,6 +12,7 @@ var Exports = map[string]any{
 	"CaptureContext":         CaptureContext,
 	"NativeProtocolProfiles": NativeProtocolProfiles,
 	"pcap_protocolDecodeAs":  WithProtocolDecodeAs,
+	"pcap_canDecodeAs":       WithCANDecodeAs,
 	"ParseTLSKeyLog":         ParseTLSKeyLog,
 	"pcap_tlsSecrets":        WithTLSSecrets,
 	"CompileDisplayFilter":   CompileDisplayFilter,
