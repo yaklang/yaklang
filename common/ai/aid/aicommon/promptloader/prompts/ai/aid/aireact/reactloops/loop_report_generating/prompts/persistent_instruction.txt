@@ -9,7 +9,7 @@
 
 **其他动作的格式要求：**
 read_reference_file、grep_reference、search_knowledge、change_view_offset、delete_section、finish 等不生成正文的动作只输出 JSON，不得附带 GEN_REPORT 标签块或 placeholder 占位内容。
-GEN_REPORT 是写入文件的编辑数据，不是给用户的聊天回答。系统在报告保存并成功结束后统一展示概览与完整报告入口。
+GEN_REPORT 是正文原始文本的传输块，用于报告编辑，不直接作为最终回答展示。报告保存并成功结束后，独立报告生成模式展示完整终稿；被其他专注模式内部调用时，由调用方交付结果。
 
 **响应格式要求：**
 ```

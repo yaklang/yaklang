@@ -15,9 +15,8 @@ import (
 
 const reportFinishEventNode = "report-finish"
 
-const reportFinishSummaryMaxChars = 480
-
-// reportFinishEvent renders a coherent overview and a link to the full artifact.
+// SummaryMarkdown is the existing frontend card body field. Standalone report
+// generation fills it with the complete saved Markdown; a parent may supply an overview.
 type reportFinishEvent struct {
 	ReportPath      string `json:"report_path"`
 	Title           string `json:"title,omitempty"`
@@ -48,11 +47,12 @@ func readSavedReport(loop *reactloops.ReActLoop) (string, error) {
 	if err != nil {
 		return "", utils.Errorf("报告文件未保存: %v", err)
 	}
-	content := strings.TrimSpace(string(raw))
-	if content == "" {
+	content := string(raw)
+	trimmed := strings.TrimSpace(content)
+	if trimmed == "" {
 		return "", utils.Error("报告文件为空")
 	}
-	if expected := strings.TrimSpace(loop.Get("full_report_code")); expected != "" && expected != content {
+	if expected := strings.TrimSpace(loop.Get("full_report_code")); expected != "" && expected != trimmed {
 		return "", utils.Error("报告内容尚未完整保存")
 	}
 	return content, nil
@@ -87,30 +87,30 @@ func emitReportFinish(loop *reactloops.ReActLoop) {
 		log.Warnf("report_generating: skip report_finish (report not saved: %s, %v)", reportPath, err)
 		return
 	}
-	title, summary := buildReportFinishPreview(content)
+	title := buildReportFinishTitle(content)
 	if title == "" {
 		title = strings.TrimSuffix(filepath.Base(reportPath), filepath.Ext(reportPath))
 	}
 
-	if provided := strings.TrimSpace(loop.Get("report_summary_markdown")); provided != "" {
-		summary = provided
-	}
-	if err := EmitReportFinish(loop, reportPath, title, summary); err != nil {
+	// The standalone mode's deliverable is the report itself. Draft streams
+	// remain hidden, and the final card renders the complete saved artifact once.
+	if err := EmitReportFinish(loop, reportPath, title, content); err != nil {
 		log.Warnf("report_generating: emit report_finish failed: %v", err)
 		return
 	}
 	loop.Set("result_report_path", reportPath)
-	loop.Set("result_summary", summary)
+	loop.Set("result_summary", content)
 	if task := loop.GetCurrentTask(); task != nil {
-		result := summary + "\n\n报告文件：" + reportPath
+		result := content + "\n\n报告文件：" + reportPath
 		task.SetResult(result)
 		_, _ = loop.GetEmitter().EmitResultAfterStream("result", result, true)
 	}
 }
 
 // EmitReportFinish is also used by a parent focus mode after its report child
-// succeeds. The caller supplies a user-facing summary, never a head/tail slice.
-func EmitReportFinish(loop *reactloops.ReActLoop, reportPath, title, summary string) error {
+// succeeds. The card body is the full report for standalone generation, or a
+// caller-supplied overview for directory exploration. Never splice Markdown.
+func EmitReportFinish(loop *reactloops.ReActLoop, reportPath, title, markdown string) error {
 	content, err := os.ReadFile(reportPath)
 	if err != nil {
 		return err
@@ -126,7 +126,7 @@ func EmitReportFinish(loop *reactloops.ReActLoop, reportPath, title, summary str
 		return err
 	}
 	if _, err := emitter.EmitJSON(schema.EVENT_TYPE_REPORT_FINISH, reportFinishEventNode, reportFinishEvent{
-		ReportPath: reportPath, Title: title, SummaryMarkdown: summary,
+		ReportPath: reportPath, Title: title, SummaryMarkdown: markdown,
 	}); err != nil {
 		return err
 	}
@@ -135,45 +135,19 @@ func EmitReportFinish(loop *reactloops.ReActLoop, reportPath, title, summary str
 	reactloops.EmitActionLog(loop, reportFinishEventNode, "完整报告已保存: "+reportPath, string(content))
 	if invoker := loop.GetInvoker(); invoker != nil {
 		invoker.AddToTimeline("report_finish", fmt.Sprintf(
-			"Report finished: %s\nTitle: %s\nSummary:\n%s",
-			reportPath, title, summary,
+			"Report finished: %s\nTitle: %s\nContent:\n%s",
+			reportPath, title, markdown,
 		))
 	}
 	return nil
 }
 
-func buildReportFinishPreview(content string) (title, summary string) {
-	if content == "" {
-		return "", ""
-	}
+func buildReportFinishTitle(content string) string {
 	for _, line := range strings.Split(content, "\n") {
 		trimmed := strings.TrimSpace(line)
 		if strings.HasPrefix(trimmed, "# ") {
-			title = strings.TrimSpace(strings.TrimPrefix(trimmed, "#"))
-			break
+			return strings.TrimSpace(strings.TrimPrefix(trimmed, "#"))
 		}
 	}
-	// Select a complete prose paragraph. Never splice the beginning and end of
-	// Markdown: that merges unrelated sections and breaks tables/code fences.
-	inFence := false
-	for _, paragraph := range strings.Split(content, "\n\n") {
-		paragraph = strings.TrimSpace(paragraph)
-		if strings.Contains(paragraph, "```") || strings.Contains(paragraph, "~~~") {
-			if (strings.Count(paragraph, "```")+strings.Count(paragraph, "~~~"))%2 != 0 {
-				inFence = !inFence
-			}
-			continue
-		}
-		if inFence || paragraph == "" || strings.HasPrefix(paragraph, "#") ||
-			strings.HasPrefix(paragraph, "|") || strings.HasPrefix(paragraph, "- ") ||
-			len([]rune(paragraph)) > reportFinishSummaryMaxChars {
-			continue
-		}
-		summary = paragraph + "\n\n完整内容见报告文件。"
-		break
-	}
-	if summary == "" {
-		summary = "报告已生成，完整内容见报告文件。"
-	}
-	return title, summary
+	return ""
 }
