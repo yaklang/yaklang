@@ -141,26 +141,38 @@ func buildActionOptionFromDict(caller *FocusModeYakHookCaller, raw any, override
 		return nil
 	}
 
-	// 构造 verifier wrapper（可选）
-	var verifier LoopActionVerifierFunc
-	if verifierFn != nil {
-		verifier = func(loop *ReActLoop, action *aicommon.Action) error {
-			ret, err := caller.CallFunction("verifier:"+actionType, verifierFn, loop, action)
-			if err != nil {
-				return err
-			}
-			if utils.IsNil(ret) {
-				return nil
-			}
-			if errVal, ok := ret.(error); ok {
-				return errVal
-			}
-			s := utils.InterfaceToString(ret)
-			if s != "" && s != "<nil>" {
-				return utils.Error(s)
-			}
+	// Validate only this action's schema, before custom verification or handler
+	// side effects. Returning an error here uses the existing transaction retry
+	// path for both text actions and native function calls.
+	validationTool := aitool.NewWithoutCallback(actionType, optionList...)
+	verifier := func(loop *ReActLoop, action *aicommon.Action) error {
+		// Keep the canonical outer object, including real fields named "params".
+		// Copy it so schema defaults cannot mutate streamed actions' replay data.
+		params := make(map[string]any)
+		for key, value := range action.GetParams() {
+			params[key] = value
+		}
+		if valid, problems := validationTool.ValidateParams(params); !valid {
+			return utils.Errorf("Action '%s' parameter validation failed: %v", actionType, problems)
+		}
+		if verifierFn == nil {
 			return nil
 		}
+		ret, err := caller.CallFunction("verifier:"+actionType, verifierFn, loop, action)
+		if err != nil {
+			return err
+		}
+		if utils.IsNil(ret) {
+			return nil
+		}
+		if errVal, ok := ret.(error); ok {
+			return errVal
+		}
+		s := utils.InterfaceToString(ret)
+		if s != "" && s != "<nil>" {
+			return utils.Error(s)
+		}
+		return nil
 	}
 
 	handler := func(loop *ReActLoop, action *aicommon.Action, operator *LoopActionHandlerOperator) {

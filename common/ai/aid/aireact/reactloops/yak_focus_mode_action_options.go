@@ -76,7 +76,7 @@ func ParseFocusModeActionOptions(items []any) []aitool.ToolOption {
 		switch paramType {
 		case "string", "string_array":
 			if enumRaw := utils.MapGetRaw(entry, "enum"); !utils.IsNil(enumRaw) {
-				if list, ok := enumRaw.([]any); ok && len(list) > 0 {
+				if list, err := utils.InterfaceToSliceInterfaceE(enumRaw); err == nil && len(list) > 0 {
 					strs := make([]string, 0, len(list))
 					for _, v := range list {
 						strs = append(strs, utils.InterfaceToString(v))
@@ -94,11 +94,11 @@ func ParseFocusModeActionOptions(items []any) []aitool.ToolOption {
 				propOpts = append(propOpts, aitool.WithParam_Pattern(pattern))
 			}
 		case "integer", "int", "number", "float":
-			if max := utils.MapGetFloat64(entry, "max"); max != 0 {
-				propOpts = append(propOpts, aitool.WithParam_Max(max))
+			if raw, exists := entry["max"]; exists && !utils.IsNil(raw) {
+				propOpts = append(propOpts, aitool.WithParam_Max(utils.MapGetFloat64(entry, "max")))
 			}
-			if min := utils.MapGetFloat64(entry, "min"); min != 0 {
-				propOpts = append(propOpts, aitool.WithParam_Min(min))
+			if raw, exists := entry["min"]; exists && !utils.IsNil(raw) {
+				propOpts = append(propOpts, aitool.WithParam_Min(utils.MapGetFloat64(entry, "min")))
 			}
 		}
 
