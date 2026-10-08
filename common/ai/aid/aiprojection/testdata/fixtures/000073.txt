@@ -2,18 +2,18 @@
 seq:    000073
 time:   2026-05-03T11:38:09+08:00
 model:  memfit-light-free
-total:  133173 bytes / 4 chunks
+total:  132741 bytes / 4 chunks
 
 ## sections
 [1] section=high-static   nonce=high-static              bytes=8822 hash=7a49ff8118696481 seen=5 first=2026-05-03T11:35:39+08:00
-[2] section=semi-dynamic  nonce=semi-dynamic             bytes=12683 hash=83c6d07057edd970 seen=5 first=2026-05-03T11:35:39+08:00
+[2] section=semi-dynamic  nonce=semi-dynamic             bytes=12251 hash=dbd785e8c1e013d2 seen=5 first=2026-05-03T11:35:39+08:00
 [3] section=timeline      nonce=timeline                 bytes=75484 hash=52383595d3e2587d seen=1 first=2026-05-03T11:38:09+08:00
 [4] section=dynamic       nonce=dynamic_hUeX             bytes=35916 hash=6568d89ddbb5ee4f seen=1 first=2026-05-03T11:38:09+08:00
 
 ## hit report
 prefix_hit_chunks: 2
-prefix_hit_bytes:  21505
-prefix_hit_ratio:  16.2%
+prefix_hit_bytes:  21073
+prefix_hit_ratio:  15.9%
 global_uniq_chunks: 231
 global_cache_bytes: 3598484
 total_requests:    73
@@ -27,9 +27,9 @@ section_hash_count:
 ## advices
 - high-static section unstable: 49 distinct hashes seen, check template variables polluting it
 - semi-dynamic section drifts more than expected: 52 distinct hashes, tool/forge/schema list may be churning
-- hit ratio poor (16.2%) - prefix alignment broken early
+- hit ratio poor (15.9%) - prefix alignment broken early
 
-## raw prompt (133173 bytes)
+## raw prompt (132741 bytes)
 <|PROMPT_SECTION_high-static|>
 <|TRAITS|>
 ## Core Traits (核心性格) - 严肃/专业/无Emoji

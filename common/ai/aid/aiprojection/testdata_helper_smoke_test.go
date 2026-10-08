@@ -17,8 +17,10 @@ func TestFixtureLoader_Smoke(t *testing.T) {
 	}{
 		{"000001.txt", 3},
 		{"000005.txt", 4},
+		{"000010.txt", 4},
 		{"000045.txt", 1},
 		{"000060.txt", 4},
+		{"000073.txt", 4},
 	}
 	for _, c := range cases {
 		c := c
@@ -34,6 +36,9 @@ func TestFixtureLoader_Smoke(t *testing.T) {
 			for i, sec := range meta.Sections {
 				assert.Equal(t, sec.Section, split.Chunks[i].Section, "section[%d] name mismatch", i)
 				assert.Equal(t, sec.Bytes, split.Chunks[i].Bytes, "section[%d] bytes mismatch", i)
+				if sec.Section == SectionSemiDynamic {
+					assert.Equal(t, sec.Hash, split.Chunks[i].Hash[:16], "section[%d] hash mismatch", i)
+				}
 			}
 		})
 	}

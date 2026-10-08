@@ -113,17 +113,35 @@ name=a%20%26%20b
 FuzzTag 发包辅助：设置 `fuzztag=true`，直接在 `packet` 或 URL 模式的 `url`、`headers`、`body`、`query`/`form` 值中写标签，省去先调用 exec_fuzztag 再复制报文的步骤。默认 false 保留原样文本。`variables` 支持标量或数组，用 `{{params(name)}}` 取值；变量插入后不会作为标签再次执行。URL 模式先渲染再编码 query/form 一次，结构化值不要再套 urlescape/urlenc；精确 packet 模式自行处理编码。自动根据展开结果选择单包或多包输出；`max-requests` 默认 100、最多 500，超限整批不发送；`concurrent` 默认 5，设为 1 可顺序发送。文件/插件标签未启用；未知标签、缺失变量、未闭合模板会报错。
 
 嵌套编码单请求：
+[[- if .FunctionCallMode -]]
 ```json
 {"url":"https://target.example/query","query":{"token":"{{base64({{params(payload)}})}}"},"variables":{"payload":"a & b"},"fuzztag":true}
 ```
+[[- else -]]
+```json
+{"@action":"directly_call_tool","directly_call_tool_name":"do_http_request","directly_call_tool_params":{"url":"https://target.example/query","query":{"token":"{{base64({{params(payload)}})}}"},"variables":{"payload":"a & b"},"fuzztag":true}}
+```
+[[- end -]]
 范围与编码多包测试（10 份请求）：
+[[- if .FunctionCallMode -]]
 ```json
 {"url":"https://target.example/users/{{int(1-10)}}","query":{"token":"{{base64({{hex(abc)}})}}"},"fuzztag":true,"max-requests":10,"concurrent":5}
 ```
+[[- else -]]
+```json
+{"@action":"directly_call_tool","directly_call_tool_name":"do_http_request","directly_call_tool_params":{"url":"https://target.example/users/{{int(1-10)}}","query":{"token":"{{base64({{hex(abc)}})}}"},"fuzztag":true,"max-requests":10,"concurrent":5}}
+```
+[[- end -]]
 精确 packet 中嵌套编码与范围（JSON 报文字符串使用真实的 JSON 转义）：
+[[- if .FunctionCallMode -]]
 ```json
 {"packet":"GET /query?id={{int(1-10)}}&token={{urlescape({{base64(a & b)}})}} HTTP/1.1\r\nHost: target.example\r\n\r\n","https":"yes","fuzztag":true,"max-requests":10}
 ```
+[[- else -]]
+```json
+{"@action":"directly_call_tool","directly_call_tool_name":"do_http_request","directly_call_tool_params":{"packet":"GET /query?id={{int(1-10)}}&token={{urlescape({{base64(a & b)}})}} HTTP/1.1\r\nHost: target.example\r\n\r\n","https":"yes","fuzztag":true,"max-requests":10}}
+```
+[[- end -]]
 默认不同标签取笛卡尔积；需要字段一一配对时给同层标签使用相同 `::row`，如 URL 的 `{{int::row(1-2)}}` 与 query 的 `{{list::row(reader|admin)}}`。重复请求用 `{{repeat(3)}}`，不会去重。
 
 如何构成批量请求：
@@ -133,13 +151,25 @@ FuzzTag 发包辅助：设置 `fuzztag=true`，直接在 `packet` 或 URL 模式
 4. 设置 `fuzztag:true` 才执行标签。`max-requests` 限制最终组合数（包含重复项），默认 100、最多 500；模板错误或超限在发送前整批报错。`concurrent` 默认 5，控制网络并发；`delay-seconds` 设置间隔并强制顺序发送。先用小样本核对实际 request，再扩大范围。
 
 路径列表 × 载荷数组，一次调用发 6 包，query/form 的原始值只编码一次：
+[[- if .FunctionCallMode -]]
 ```json
 {"url":"https://target.example{{params(path)}}","method":"POST","headers":{"Cookie":"session=demo"},"form":{"input":"{{params(payload)}}"},"variables":{"path":["/health","/api/users","/admin"],"payload":["normal","a & b"]},"fuzztag":true,"max-requests":6,"concurrent":3}
 ```
+[[- else -]]
+```json
+{"@action":"directly_call_tool","directly_call_tool_name":"do_http_request","directly_call_tool_params":{"url":"https://target.example{{params(path)}}","method":"POST","headers":{"Cookie":"session=demo"},"form":{"input":"{{params(payload)}}"},"variables":{"path":["/health","/api/users","/admin"],"payload":["normal","a & b"]},"fuzztag":true,"max-requests":6,"concurrent":3}}
+```
+[[- end -]]
 两个 ID 与两个角色同步配对：
+[[- if .FunctionCallMode -]]
 ```json
 {"url":"https://target.example/users/{{int::row(1-2)}}","query":{"role":"{{list::row(reader|admin)}}"},"fuzztag":true,"max-requests":2}
 ```
+[[- else -]]
+```json
+{"@action":"directly_call_tool","directly_call_tool_name":"do_http_request","directly_call_tool_params":{"url":"https://target.example/users/{{int::row(1-2)}}","query":{"role":"{{list::row(reader|admin)}}"},"fuzztag":true,"max-requests":2}}
+```
+[[- end -]]
 
 输出与筛选：单包保留 `RESULT.request_built/request_sent/response_received/status_code/transport_error` 和详细报文。多包自动输出 Batch Request Summary、逐包 URL/Path/HTTPS、实际 request 预览、Response 预览、关键词/正则匹配上下文、完整响应文件路径、Results Summary Table 和结果文件。`max-body-size` 默认 4096 字节，设 0 隐藏批量响应预览；完整响应仍自动保存。`include-code:"200,302"` 只展示指定状态，`exclude-code:"404"` 排除状态，`exclude-size:"0,400-600"` 排除响应大小；过滤只影响展示，不证明目标安全，过滤项也保留执行状态与响应文件。
 

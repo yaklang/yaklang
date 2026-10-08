@@ -16,6 +16,8 @@ import (
 // These digests were captured from aicache.Split and aicache.Observe at
 // db6b63778d using the default 1024-byte threshold. They cover the cache
 // observation shape and the provider-visible messages, including cache_control.
+// Fixtures 000010, 000060 and 000073 have refreshed HTTP tool inventory text
+// and matching dump metadata; their digests reflect those fixture edits.
 func TestLegacyAICacheOutputCompatibility(t *testing.T) {
 	setProjectionThresholdMerge(t, 1024)
 	static := "<|AI_CACHE_SYSTEM_high-static|>stable<|AI_CACHE_SYSTEM_END_high-static|>"
@@ -25,12 +27,12 @@ func TestLegacyAICacheOutputCompatibility(t *testing.T) {
 	}{
 		"000001": {hash: "088202f5f7c34652be18ce4ae709839aecf06bb8797a722f9b7c2656adf8dfab"},
 		"000005": {hash: "49711dcf781a93e0605e7db8c841c0665e47a841357d92891666066ca8d74a34"},
-		"000010": {hash: "a4a34f23783087bca8399c44b0ce6b229467a160ecbf2acbb279d4126564477f"},
+		"000010": {hash: "9a873ca99dc446caab548de1fc7d276705d4d9f9e9fb27c52be42c6ebc5ca913"},
 		"000020": {hash: "613d03e1132f148547ed40c84c8bbafe3cdb45d57cb05994c0de91e06068242a"},
 		"000040": {hash: "d1375ac4b21231e8c814310770665bbee388be07cfd0fc65b8a4ba35bbc8b328"},
 		"000045": {hash: "653ec1e7035f311ef4a13102b6c0726961a32642d5b14bbddf1ae19d4a27c043"},
-		"000060": {hash: "daf90e6b64ce87e6a5fb8fd185e19fa9d40604ceaf8c03fddaaa1aba69f6a9f9"},
-		"000073": {hash: "24484175059ab556bb16e2c27989893773ee8f77b71b30ac6a454b3e5fd3e045"},
+		"000060": {hash: "c8f1a22d4b9ee38f47f4a7ee4d6bbd3b64fc45b74a52253c971cc27c12ef7a65"},
+		"000073": {hash: "7833cf0d1b82363917071ee9f08030180cea45ea2be7f215c3fcfbcd26869df2"},
 		"legacy-static": {
 			prompt: "<|PROMPT_SECTION_high-static|>stable<|PROMPT_SECTION_END_high-static|><|PROMPT_SECTION_dynamic_x|>question<|PROMPT_SECTION_dynamic_END_x|>",
 			hash:   "621a1b5343ee7d6d7db52eb48754df6889a14268d82a18463a0de635bf0f098e",
