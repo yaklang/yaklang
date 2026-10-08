@@ -566,7 +566,7 @@ func TestBuiltinFuzztagDefaultContext(t *testing.T) {
 		t.Fatal("reference must remain on demand")
 	}
 	rendered := manager.RenderAutoLoadedSkills()
-	for _, text := range []string{"FuzzTag 文本生成", "do_http_request", "batch_do_http_request"} {
+	for _, text := range []string{"FuzzTag 文本生成", "do_http_request", "{{int(1-10)}}"} {
 		if !strings.Contains(rendered, text) {
 			t.Errorf("default prompt missing %q", text)
 		}

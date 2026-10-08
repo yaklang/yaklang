@@ -88,7 +88,6 @@ func init() {
 				findFilesAction(r),
 				grepTextAction(r),
 				doHTTPAction(r),
-				batchHTTPAction(r),
 			}
 			preset = append(preset, opts...)
 			return reactloops.NewReActLoop(schema.AI_REACT_LOOP_NAME_INFOSEC_RECON, r, preset...)

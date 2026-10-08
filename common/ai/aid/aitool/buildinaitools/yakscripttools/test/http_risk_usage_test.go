@@ -15,7 +15,6 @@ var usageJSONExample = regexp.MustCompile("(?s)```json\\s*\\n(.*?)\\n```")
 func TestHTTPRequestAndRiskUsagesRenderForBothCallModes(t *testing.T) {
 	paths := []string{
 		"http/do_http_request.yak",
-		"http/batch_do_http_request.yak",
 		"risk/cybersecurity-risk.yak",
 		"risk/ssa-risk.yak",
 	}
@@ -54,9 +53,6 @@ func TestHTTPRequestAndRiskUsagesRenderForBothCallModes(t *testing.T) {
 						t.Fatalf("invalid JSON example mode=%t: %v\n%s", mode, err, match[1])
 					}
 				}
-			}
-			if path == "http/batch_do_http_request.yak" && !strings.Contains(tool.Usage, "{{PATH}}") {
-				t.Fatal("batch packet placeholder lost")
 			}
 		})
 	}

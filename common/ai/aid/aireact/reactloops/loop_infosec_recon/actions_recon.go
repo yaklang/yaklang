@@ -139,16 +139,20 @@ var (
 	)
 	doHTTPAction = makeToolForwardAction(
 		"do_http_request", "do_http_request",
-		"Single HTTP request for probing endpoints.",
+		"Single or batch HTTP probing: set fuzztag=true and use int/list tags or params with variable arrays; independent tags form a Cartesian product, ::row pairs fields.",
 		[]aitool.ToolOption{
-			aitool.WithStringParam("url", aitool.WithParam_Required(true)),
-		},
-	)
-	batchHTTPAction = makeToolForwardAction(
-		"batch_do_http_request", "batch_do_http_request",
-		"Batch HTTP requests with constrained concurrency.",
-		[]aitool.ToolOption{
-			aitool.WithStringParam("requests", aitool.WithParam_Description("Batch request spec per tool docs.")),
+			aitool.WithStringParam("url", aitool.WithParam_Description("Absolute URL or FuzzTag template; provide url or packet.")),
+			aitool.WithStringParam("packet", aitool.WithParam_Description("Raw HTTP request or FuzzTag template.")),
+			aitool.WithBoolParam("fuzztag", aitool.WithParam_Default(false)),
+			aitool.WithRawParam("variables", map[string]any{"type": "object"}, aitool.WithParam_Description("Literal scalar/array values for {{params(name)}}.")),
+			aitool.WithStringParam("method"),
+			aitool.WithStringParam("headers"),
+			aitool.WithStringParam("body"),
+			aitool.WithRawParam("query", map[string]any{"type": "object"}),
+			aitool.WithRawParam("form", map[string]any{"type": "object"}),
+			aitool.WithIntegerParam("max-requests", aitool.WithParam_Default(100)),
+			aitool.WithIntegerParam("concurrent", aitool.WithParam_Default(5)),
+			aitool.WithIntegerParam("timeout", aitool.WithParam_Default(10)),
 		},
 	)
 )

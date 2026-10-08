@@ -34,13 +34,13 @@ __INPUT_CONSTRAINTS__ = `{
   }
 }`
 
-__DESC__ = "向指定目标发送一次 HTTP 请求并返回实际请求、响应和结构化结果；普通请求用 url 加 query/form 对象由工具编码，需保留参数顺序、重复键或特殊编码时用原样 packet，多路径或多载荷请求用 batch_do_http_request；fuzztag=true 可直接渲染嵌套编码、随机值和变量。"
+__DESC__ = "统一执行单包与批量 HTTP 测试、路径枚举、接口批量验证、IDOR/越权验证和请求重放。url 或 packet 二选一；fuzztag=true 时用 {{int(1-10)}}、{{list(a|b)}}、{{params(name)}} 的 variables 数组构成多包，同层 ::row 同步配对，其余标签取笛卡尔积，支持嵌套编码与 repeat 重复请求。一次调用完成展开、并发发包、响应筛选、逐包请求/响应预览、关键词/正则匹配上下文、状态统计、汇总表和完整响应/结果文件；单包保留详细报文。"
 __VERBOSE_NAME__ = "HTTP Request"
 __VERBOSE_NAME_ZH__ = "HTTP请求"
-__KEYWORDS__ = "http request,curl,web,network,packet,raw request,http response,url,post,get,https,proxy,redirect,header,body,api,http tool,web debug,traffic"
+__KEYWORDS__ = "batch http,batch request,concurrent,multi path,path enumeration,api endpoint validation,idor validation,request replay,批量HTTP,并发请求,路径枚举,接口批量验证,未授权访问验证,越权验证,IDOR验证,请求重放,http request,curl,web,network,packet,raw request,http response,url,post,get,https,proxy,redirect,header,body,api,http tool,web debug,traffic"
 
 __USAGE__ = <<<USAGE_BLOCK
-单次 HTTP 请求：`url` 与 `packet` 二选一。URL 模式由工具生成并显示实际请求包；需要重复参数、固定顺序或自定义编码时用原样 `packet`。多路径测试用 batch_do_http_request。
+HTTP 请求测试：`url` 与 `packet` 二选一。URL 模式由工具生成请求包；需要重复参数、固定顺序或自定义编码时用原样 `packet`。`fuzztag:true` 可将同一模板展开成多包并发测试；批量请求也使用本工具，先把变化的路径、目标或载荷放入 FuzzTag/variables；一次调用执行全部组合，不要逐个循环调用。
 
 参数要点：URL 模式的 `query`/`form` 是 JSON 对象，传原始未转义值，由工具各编码一次；不要先编码 `%`、`&` 等字符。`body` 是原始请求体，覆盖 `form`；Packet 模式的路径和查询必须自行编码。`headers` 可传对象或逐行的 `Key: Value`。默认 `timeout=10` 秒、`redirect-times=3`；仅在结果可能涉及漏洞或确需完整报文复核时设置 `save-packet=true` 保存请求和响应，普通探测保持默认，大报文内联输出会截断。
 
@@ -110,12 +110,42 @@ Content-Type: application/x-www-form-urlencoded
 name=a%20%26%20b
 <|TOOL_PARAM_packet_END_{NONCE}|>
 [[- end -]]
-FuzzTag 发包辅助：设置 `fuzztag=true`，直接在 `packet` 或 URL 模式的 `url`、`headers`、`body`、`query`/`form` 值中写标签，省去先调用 exec_fuzztag 再复制报文的步骤。默认 false 保留原样文本。`variables` 支持标量或数组，用 `{{params(name)}}` 取值；变量插入后不会作为标签再次执行。URL 模式先渲染再编码 query/form 一次，结构化值不要再套 urlescape/urlenc；精确 packet 模式自行处理编码。仅允许生成一份请求，多结果会在发包前报错并提示使用 batch_do_http_request。文件/插件标签未启用；未知标签、缺失变量、未闭合模板会报错。
+FuzzTag 发包辅助：设置 `fuzztag=true`，直接在 `packet` 或 URL 模式的 `url`、`headers`、`body`、`query`/`form` 值中写标签，省去先调用 exec_fuzztag 再复制报文的步骤。默认 false 保留原样文本。`variables` 支持标量或数组，用 `{{params(name)}}` 取值；变量插入后不会作为标签再次执行。URL 模式先渲染再编码 query/form 一次，结构化值不要再套 urlescape/urlenc；精确 packet 模式自行处理编码。自动根据展开结果选择单包或多包输出；`max-requests` 默认 100、最多 500，超限整批不发送；`concurrent` 默认 5，设为 1 可顺序发送。文件/插件标签未启用；未知标签、缺失变量、未闭合模板会报错。
 
 嵌套编码单请求：
 ```json
 {"url":"https://target.example/query","query":{"token":"{{base64({{params(payload)}})}}"},"variables":{"payload":"a & b"},"fuzztag":true}
 ```
+范围与编码多包测试（10 份请求）：
+```json
+{"url":"https://target.example/users/{{int(1-10)}}","query":{"token":"{{base64({{hex(abc)}})}}"},"fuzztag":true,"max-requests":10,"concurrent":5}
+```
+精确 packet 中嵌套编码与范围（JSON 报文字符串使用真实的 JSON 转义）：
+```json
+{"packet":"GET /query?id={{int(1-10)}}&token={{urlescape({{base64(a & b)}})}} HTTP/1.1\r\nHost: target.example\r\n\r\n","https":"yes","fuzztag":true,"max-requests":10}
+```
+默认不同标签取笛卡尔积；需要字段一一配对时给同层标签使用相同 `::row`，如 URL 的 `{{int::row(1-2)}}` 与 query 的 `{{list::row(reader|admin)}}`。重复请求用 `{{repeat(3)}}`，不会去重。
+
+如何构成批量请求：
+1. 选一个正常请求作为模板，保留认证头、Cookie、方法与请求体。URL 模式使用一个完整 `url`；packet 模式把路径、Header、Body 的变化写在同一份报文中。
+2. 数字范围直接写 `{{int(1-10)}}`；少量路径用 `{{list(/health|/api/users|/admin)}}`；已有路径列表传 `variables:{"path":["/health","/api/users","/admin"]}`，URL 写成 `https://target.example{{params(path)}}`。多个站点直接用 `url:"{{params(target)}}"` 配完整 URL 数组。`variables` 中的元素是原始字面值，不会作为标签再次执行。
+3. 默认所有独立标签取笛卡尔积：2 个 ID × 2 种载荷 = 4 包。需要字段一一对应时在同层标签使用相同 `::row`；例如 URL 的 `{{int::row(1-2)}}` 与 query 的 `{{list::row(reader|admin)}}` 只发 2 包。`{{repeat(3)}}` 保留 3 次重复请求。
+4. 设置 `fuzztag:true` 才执行标签。`max-requests` 限制最终组合数（包含重复项），默认 100、最多 500；模板错误或超限在发送前整批报错。`concurrent` 默认 5，控制网络并发；`delay-seconds` 设置间隔并强制顺序发送。先用小样本核对实际 request，再扩大范围。
+
+路径列表 × 载荷数组，一次调用发 6 包，query/form 的原始值只编码一次：
+```json
+{"url":"https://target.example{{params(path)}}","method":"POST","headers":{"Cookie":"session=demo"},"form":{"input":"{{params(payload)}}"},"variables":{"path":["/health","/api/users","/admin"],"payload":["normal","a & b"]},"fuzztag":true,"max-requests":6,"concurrent":3}
+```
+两个 ID 与两个角色同步配对：
+```json
+{"url":"https://target.example/users/{{int::row(1-2)}}","query":{"role":"{{list::row(reader|admin)}}"},"fuzztag":true,"max-requests":2}
+```
+
+输出与筛选：单包保留 `RESULT.request_built/request_sent/response_received/status_code/transport_error` 和详细报文。多包自动输出 Batch Request Summary、逐包 URL/Path/HTTPS、实际 request 预览、Response 预览、关键词/正则匹配上下文、完整响应文件路径、Results Summary Table 和结果文件。`max-body-size` 默认 4096 字节，设 0 隐藏批量响应预览；完整响应仍自动保存。`include-code:"200,302"` 只展示指定状态，`exclude-code:"404"` 排除状态，`exclude-size:"0,400-600"` 排除响应大小；过滤只影响展示，不证明目标安全，过滤项也保留执行状态与响应文件。
+
+多包 `RESULT` 返回 `mode:multi`、`request_count`、`request_completed_count`、`request_sent_count`、`response_received_count`、`filtered_count`、`transport_error_count`、`status_code_distribution`、`output_file` 和按模板顺序排列的 `items`。每项含 idx、url/path/https、执行状态、status_code/body_size/duration_ms、filtered/filter_reason、匹配次数及上下文、最多 5KB 的 request/response 预览、response_file 和 artifact_error。404/500 计入已收到响应；筛选后也计入状态分布。连接、TLS、代理等错误单独记录，失败包不影响其他包。文件保存失败只报告 artifact_error，不重新发包。内联结果总量超过 50KB 时截断，完整结果查看 output_file。
+
+`verbose:true` 可在发送时展示逐包报文与连接信息；`save-packet:true` 额外保存完整请求，完整响应在多包模式始终保存。多包不自动做 JSON→form 重试，便于比较原始测试。单包与多包都用本工具：拿到差异后收缩为一份请求，再深测与复核；发现新入口先记入待办。
 标签原样发送：不设置 fuzztag，或用 `{{=原文=}}` 保留模板中的局部文本。
 USAGE_BLOCK
 
@@ -167,8 +197,18 @@ postParams = cli.String("post-params", cli.setHelp("legacy k=v&k2=v2 form string
 packet = cli.String("packet", cli.setHelp("raw HTTP request packet for Packet mode; request target/query must already be encoded"), cli.setRequired(false))
 
 // Template rendering is opt-in for existing raw request callers.
-fuzztag = cli.Bool("fuzztag", cli.setDefault(false), cli.setHelp("render FuzzTag in packet or URL-mode fields before encoding; exactly one variant is required, use batch_do_http_request for multiple variants"))
+fuzztag = cli.Bool("fuzztag", cli.setDefault(false), cli.setHelp("render FuzzTag in packet or URL-mode fields before encoding; single or multiple variants are sent automatically"))
 variables = cli.Json("variables", cli.setDefault("{}"), cli.setJsonSchema(`{"type":"object","additionalProperties":{"oneOf":[{"type":"string"},{"type":"number"},{"type":"boolean"},{"type":"array","items":{"oneOf":[{"type":"string"},{"type":"number"},{"type":"boolean"}]}}]}}`), cli.setHelp("named scalar/array values used by {{params(name)}}; inserted values remain literal"))
+
+maxRequests = cli.Int("max-requests", cli.setDefault(100), cli.setHelp("maximum rendered requests; exceeding this limit sends nothing"), cli.setJsonSchema(`{"type":"integer","minimum":1,"maximum":500}`))
+concurrent = cli.Int("concurrent", cli.setDefault(5), cli.setHelp("concurrent requests for multi-packet tests; 1 sends sequentially"), cli.setJsonSchema(`{"type":"integer","minimum":1,"maximum":50}`))
+
+// Batch presentation controls; single requests retain their detailed output.
+delaySeconds = cli.Float("delay-seconds", cli.setDefault(0.0), cli.setHelp("delay between batch requests; forces sequential sending"), cli.setJsonSchema(`{"type":"number","minimum":0}`))
+includeCode = cli.String("include-code", cli.setHelp("show only these response status codes, comma-separated"))
+excludeCode = cli.String("exclude-code", cli.setHelp("hide these response status codes, comma-separated"))
+excludeSize = cli.String("exclude-size", cli.setHelp("hide response body sizes or ranges, e.g. 0,400-600"))
+maxBodySize = cli.Int("max-body-size", cli.setDefault(4096), cli.setHelp("batch response preview byte limit; 0 hides preview; complete responses are saved"), cli.setJsonSchema(`{"type":"integer","minimum":0}`))
 
 // Common params
 httpsMode = cli.String("https", cli.setHelp("force HTTPS: yes/no/auto"), cli.setDefault("auto"))
@@ -187,21 +227,28 @@ cli.check()
 
 // RESULT is the objective HTTP execution channel. A received 404/500 is still
 // a received response; it must not be collapsed into a protocol failure.
-RESULT = {
-    "request_built": false,
-    "request_sent": false,
-    "response_received": false,
-    "status_code": nil,
-    "body_size": 0,
-    "keyword": keyword,
-    "keyword_match_count": 0,
-    "regexp": regexpMatch,
-    "regexp_match_count": 0,
-    "regexp_valid": true,
-    "redirect_count": 0,
-    "duration_ms": 0,
-    "transport_error": nil,
+newResult = func() {
+    return {
+        "request_built": false,
+        "request_sent": false,
+        "request_completed": false,
+        "response_received": false,
+        "status_code": nil,
+        "body_size": 0,
+        "keyword": keyword,
+        "keyword_match_count": 0,
+        "regexp": regexpMatch,
+        "regexp_match_count": 0,
+        "regexp_valid": true,
+        "redirect_count": 0,
+        "duration_ms": 0,
+        "transport_error": nil,
+        "filtered": false,
+        "filter_reason": "",
+        "artifact_error": nil,
+    }
 }
+RESULT = newResult()
 
 // Safe scalar recovery. Keep the correction visible so the AI knows which
 // effective values were used instead of silently changing request behavior.
@@ -319,511 +366,744 @@ if packet == "" && urlStr == "" {
 requestCtx = context.Background()
 injectedCtx = getParam("CTX")
 if injectedCtx != nil && injectedCtx != "" { requestCtx = injectedCtx }
-if fuzztag {
-    if packet != "" {
-        rendered, renderErr = fuzz.RenderHTTPTemplate(packet, variables, 1, requestCtx)
-        if renderErr != nil {
-            RESULT["transport_error"] = "template_error: " + sprint(renderErr)
-            die(sprintf("FuzzTag render failed: %v. No request sent; use batch_do_http_request for multiple variants.", renderErr))
+if maxRequests < 1 || maxRequests > 500 { die("max-requests must be between 1 and 500") }
+if concurrent < 1 || concurrent > 50 { die("concurrent must be between 1 and 50") }
+
+if maxBodySize < 0 || delaySeconds < 0 { die("max-body-size and delay-seconds must be nonnegative") }
+parseCodes = func(raw) {
+    codes = make(map[int]bool)
+    for _, text := range str.SplitAndTrim(raw, ",") {
+        code, err := atoi(text)
+        if err != nil || code < 100 || code > 999 { die(sprintf("invalid status code: %v", text)) }
+        codes[code] = true
+    }
+    return codes
+}
+includeCodeSet, excludeCodeSet = parseCodes(includeCode), parseCodes(excludeCode)
+excludeSizeRanges = []
+for _, text := range str.SplitAndTrim(excludeSize, ",") {
+    parts = str.SplitN(text, "-", 2)
+    start, err := atoi(parts[0])
+    if err != nil || start < 0 { die(sprintf("invalid exclude-size: %v", text)) }
+    end = start
+    if len(parts) == 2 {
+        end, err = atoi(parts[1])
+        if err != nil || end < start { die(sprintf("invalid exclude-size: %v", text)) }
+    }
+    excludeSizeRanges.Push({"start":start, "end":end})
+}
+filterReason = func(status, size) {
+    if excludeCodeSet[status] { return "excluded-code" }
+    if len(includeCodeSet) > 0 && !includeCodeSet[status] { return "not-in-include-code" }
+    for _, sizeRange := range excludeSizeRanges {
+        if size >= sizeRange["start"] && size <= sizeRange["end"] { return "excluded-size" }
+    }
+    return ""
+}
+
+// Expand all variants before sending; per-row maps prevent concurrent workers
+// from overwriting values belonging to another request.
+requestItems = []
+if packet != "" {
+    packets = [packet]
+    if fuzztag {
+        packets, renderErr = fuzz.RenderHTTPTemplate(packet, variables, maxRequests, requestCtx)
+        if renderErr != nil { die(sprintf("FuzzTag render failed before sending: %v", renderErr)) }
+    }
+    for _, renderedPacket := range packets {
+        requestItems.Push({"packet":renderedPacket, "method":method, "body":body, "content_type":contentType})
+    }
+} else {
+    fields = [urlStr, method, headers, body, contentType, queryParams, postParams]
+    valueMaps = [legacyQueryValues, queryValues, legacyFormValues, formValues]
+    keys = []
+    for _, values := range valueMaps {
+        mapKeys = []
+        for key, value := range values {
+            mapKeys.Push(key)
+            fields.Push(sprint(value))
         }
-        packet = rendered[0]
-    } else {
-        fields = [urlStr, method, headers, body, contentType, queryParams, postParams]
-        valueMaps = [legacyQueryValues, queryValues, legacyFormValues, formValues]
-        keys = []
-        for _, values := range valueMaps {
-            mapKeys = []
-            for key, value := range values {
-                mapKeys.Push(key)
-                fields.Push(sprint(value))
-            }
-            keys.Push(mapKeys)
-        }
-        rendered, renderErr = fuzz.RenderHTTPFields(fields, variables, 1, requestCtx)
-        if renderErr != nil {
-            RESULT["transport_error"] = "template_error: " + sprint(renderErr)
-            die(sprintf("FuzzTag render failed: %v. No request sent; use batch_do_http_request for multiple variants.", renderErr))
-        }
-        row = rendered[0]
-        urlStr, method, headers, body, contentType, queryParams, postParams = row[0], row[1], row[2], row[3], row[4], row[5], row[6]
+        keys.Push(mapKeys)
+    }
+    rows = [fields]
+    if fuzztag {
+        rows, renderErr = fuzz.RenderHTTPFields(fields, variables, maxRequests, requestCtx)
+        if renderErr != nil { die(sprintf("FuzzTag render failed before sending: %v", renderErr)) }
+    }
+    for _, row := range rows {
+        maps = []
         offset = 7
-        for i, values := range valueMaps {
-            for _, key := range keys[i] {
+        for _, mapKeys := range keys {
+            values = {}
+            for _, key := range mapKeys {
                 values[key] = row[offset]
                 offset++
             }
+            maps.Push(values)
         }
+        requestItems.Push({"packet":"", "url":row[0], "method":row[1], "headers":row[2],
+            "body":row[3], "content_type":row[4], "query_params":row[5], "post_params":row[6],
+            "legacy_query":maps[0], "query":maps[1], "legacy_form":maps[2], "form":maps[3]})
     }
 }
+batchMode = len(requestItems) > 1
 
-// --- build poc options ---
-opts = [poc.context(requestCtx)]
-redirectLogs = []
+executeRequest = func(item, RESULT) {
+    defer func() { RESULT["request_completed"] = true }()
+    // Local parameters and execution state are isolated for every worker.
+    packet, urlStr, method, headers, body, contentType, queryParams, postParams := item["packet"], item["url"], item["method"], item["headers"], item["body"], item["content_type"], item["query_params"], item["post_params"]
+    legacyQueryValues, queryValues, legacyFormValues, formValues := item["legacy_query"], item["query"], item["legacy_form"], item["form"]
+    // --- build poc options ---
+    opts = [poc.context(requestCtx)]
+    redirectLogs = []
 
-// timeout
-if timeout > 0 {
-    opts.Push(poc.timeout(float64(timeout)))
-}
-
-// redirect handling
-redirectCount = 0
-if redirectTimes <= 0 {
-    opts.Push(poc.noRedirect(true))
-} else {
-    opts.Push(poc.noRedirect(false), poc.redirectTimes(int(redirectTimes)))
-    opts.Push(poc.redirectHandler((redirectIsHttps, redirectReq, redirectRsp) => {
-        redirectCount++
-        redirectUrl = poc.GetHTTPPacketHeader(redirectRsp, "Location")
-        statusCode = poc.GetStatusCodeFromResponse(redirectRsp)
-        yakit.Info("redirect #%d [%v] -> %v", redirectCount, statusCode, redirectUrl)
-        logEntry = sprintf("========== Redirect #%d [Status: %v] ==========\nTarget: %v\n\n--- Request ---\n%v\n\n--- Response ---\n%v\n\n",
-            redirectCount, statusCode, redirectUrl, string(redirectReq), string(redirectRsp))
-        redirectLogs.Push(logEntry)
-        return true
-    }))
-}
-
-// proxy
-if proxy != "" {
-    opts.Push(poc.proxy(proxy))
-    yakit.Info("using proxy: %v", proxy)
-}
-
-// --- determine HTTPS ---
-resolveHttps = func(isAutoDetected) {
-    httpsLower = str.ToLower(httpsMode)
-    if httpsLower == "yes" || httpsLower == "y" || httpsLower == "true" {
-        return true
-    }
-    if httpsLower == "no" || httpsLower == "n" || httpsLower == "false" {
-        return false
-    }
-    // auto mode: use detected value
-    return isAutoDetected
-}
-
-// --- build and send request ---
-rawPacket = undefined
-isHttps = false
-
-if packet != "" {
-    // === Packet Mode ===
-    if verbose { yakit.Info("mode: Packet (raw HTTP request)") }
-    rawPacket = []byte(packet)
-
-    // detect HTTPS from packet Host header
-    host = poc.GetHTTPPacketHeader(rawPacket, "Host")
-    autoHttps = str.HasPrefix(str.ToLower(host), "443") || str.Contains(host, ":443")
-    isHttps = resolveHttps(autoHttps)
-
-    url = poc.GetUrlFromHTTPRequest(isHttps ? "https" : "http", rawPacket)
-    methodStr = poc.GetHTTPRequestMethod(rawPacket)
-    // 单行请求摘要: 默认就打 (一行, 高价值); 完整 target 行只在 verbose 下打.
-    if url != "" {
-        yakit.Info("request: %v %v", methodStr, url)
-        if verbose { yakit.Info("packet target: [%v] %v (https=%v)", methodStr, url, isHttps) }
-    }
-} else {
-    // === URL Mode ===
-    if verbose { yakit.Info("mode: URL (%v %v)", method, urlStr) }
-    // 单行请求摘要: 默认就打, 让 AI 知道这次打的是哪个 URL.
-    yakit.Info("request: %v %v", method, urlStr)
-
-    // parse URL to raw packet
-    autoHttps, parsedPacket, err := poc.ParseUrlToHTTPRequestRaw(method, urlStr)
-    if err != nil {
-        yakit.Error("failed to parse URL to HTTP request: %v. Recovery: provide an absolute URL such as https://host/path, or use packet mode when exact request bytes are required. Request was not sent.", err)
-        RESULT["transport_error"] = "request_build_error: " + sprint(err)
-        return
-    }
-    rawPacket = parsedPacket
-    isHttps = resolveHttps(autoHttps)
-
-    // apply custom Content-Type
-    if contentType != "" {
-        rawPacket = poc.ReplaceHTTPPacketHeader(rawPacket, "Content-Type", contentType)
+    // timeout
+    if timeout > 0 {
+        opts.Push(poc.timeout(float64(timeout)))
     }
 
-    // apply custom headers
-    if headers != "" {
-        headerLineIndex = 0
-        for _, line := range str.SplitAndTrim(headers, "\n") {
-            headerLineIndex++
-            line = str.TrimSpace(line)
-            if line == "" {
-                continue
-            }
-            idx = str.Index(line, ":")
-            if idx <= 0 {
-                yakit.Warn("ignored malformed header line #%v: expected 'Name: value'. Fix the headers parameter and retry if this header is required.", headerLineIndex)
-                continue
-            }
-            hKey = str.TrimSpace(str.SplitN(line, ":", 2)[0])
-            hVal = str.TrimSpace(str.SplitN(line, ":", 2)[1])
-            if hKey != "" {
-                rawPacket = poc.ReplaceHTTPPacketHeader(rawPacket, hKey, hVal)
+    // redirect handling
+    redirectCount = 0
+    if redirectTimes <= 0 {
+        opts.Push(poc.noRedirect(true))
+    } else {
+        opts.Push(poc.noRedirect(false), poc.redirectTimes(int(redirectTimes)))
+        opts.Push(poc.redirectHandler((redirectIsHttps, redirectReq, redirectRsp) => {
+            redirectCount++
+            redirectUrl = poc.GetHTTPPacketHeader(redirectRsp, "Location")
+            statusCode = poc.GetStatusCodeFromResponse(redirectRsp)
+            if !batchMode || verbose { yakit.Info("redirect #%d [%v] -> %v", redirectCount, statusCode, redirectUrl) }
+            logEntry = sprintf("========== Redirect #%d [Status: %v] ==========\nTarget: %v\n\n--- Request ---\n%v\n\n--- Response ---\n%v\n\n",
+                redirectCount, statusCode, redirectUrl, string(redirectReq), string(redirectRsp))
+            redirectLogs.Push(logEntry)
+            return true
+        }))
+    }
+
+    // proxy
+    if proxy != "" {
+        opts.Push(poc.proxy(proxy))
+        if !batchMode || verbose { yakit.Info("using proxy: %v", proxy) }
+    }
+
+    // --- determine HTTPS ---
+    resolveHttps = func(isAutoDetected) {
+        httpsLower = str.ToLower(httpsMode)
+        if httpsLower == "yes" || httpsLower == "y" || httpsLower == "true" {
+            return true
+        }
+        if httpsLower == "no" || httpsLower == "n" || httpsLower == "false" {
+            return false
+        }
+        // auto mode: use detected value
+        return isAutoDetected
+    }
+
+    // --- build and send request ---
+    rawPacket = undefined
+    isHttps = false
+
+    if packet != "" {
+        // === Packet Mode ===
+        if verbose { yakit.Info("mode: Packet (raw HTTP request)") }
+        rawPacket = []byte(packet)
+
+        // detect HTTPS from packet Host header
+        host = poc.GetHTTPPacketHeader(rawPacket, "Host")
+        autoHttps = str.HasPrefix(str.ToLower(host), "443") || str.Contains(host, ":443")
+        isHttps = resolveHttps(autoHttps)
+
+        url = poc.GetUrlFromHTTPRequest(isHttps ? "https" : "http", rawPacket)
+        methodStr = poc.GetHTTPRequestMethod(rawPacket)
+        // 单行请求摘要: 默认就打 (一行, 高价值); 完整 target 行只在 verbose 下打.
+        if url != "" && (!batchMode || verbose) {
+            yakit.Info("request: %v %v", methodStr, url)
+            if verbose { yakit.Info("packet target: [%v] %v (https=%v)", methodStr, url, isHttps) }
+        }
+    } else {
+        // === URL Mode ===
+        if verbose { yakit.Info("mode: URL (%v %v)", method, urlStr) }
+        // 单行请求摘要: 默认就打, 让 AI 知道这次打的是哪个 URL.
+        if !batchMode || verbose { yakit.Info("request: %v %v", method, urlStr) }
+
+        // parse URL to raw packet
+        if batchMode { RESULT["url"] = urlStr }
+        autoHttps, parsedPacket, err := poc.ParseUrlToHTTPRequestRaw(method, urlStr)
+        if err != nil {
+            yakit.Error("failed to parse URL to HTTP request: %v. Recovery: provide an absolute URL such as https://host/path, or use packet mode when exact request bytes are required. Request was not sent.", err)
+            RESULT["transport_error"] = "request_build_error: " + sprint(err)
+            return RESULT
+        }
+        rawPacket = parsedPacket
+        isHttps = resolveHttps(autoHttps)
+
+        // apply custom Content-Type
+        if contentType != "" {
+            rawPacket = poc.ReplaceHTTPPacketHeader(rawPacket, "Content-Type", contentType)
+        }
+
+        // apply custom headers
+        if headers != "" {
+            headerLineIndex = 0
+            for _, line := range str.SplitAndTrim(headers, "\n") {
+                headerLineIndex++
+                line = str.TrimSpace(line)
+                if line == "" {
+                    continue
+                }
+                idx = str.Index(line, ":")
+                if idx <= 0 {
+                    yakit.Warn("ignored malformed header line #%v: expected 'Name: value'. Fix the headers parameter and retry if this header is required.", headerLineIndex)
+                    continue
+                }
+                hKey = str.TrimSpace(str.SplitN(line, ":", 2)[0])
+                hVal = str.TrimSpace(str.SplitN(line, ":", 2)[1])
+                if hKey != "" {
+                    rawPacket = poc.ReplaceHTTPPacketHeader(rawPacket, hKey, hVal)
+                }
             }
         }
-    }
 
-    // apply query params
-    if queryParams != "" {
-        for _, pair := range str.SplitAndTrim(queryParams, "&") {
-            parts = str.SplitN(pair, "=", 2)
-            if len(parts) == 2 {
-                rawPacket = poc.ReplaceHTTPPacketQueryParam(rawPacket, parts[0], parts[1])
-            } elif len(parts) == 1 && parts[0] != "" {
-                rawPacket = poc.ReplaceHTTPPacketQueryParam(rawPacket, parts[0], "")
-            }
-        }
-    }
-
-    // Object values stay structurally separate until this point. The lowhttp patcher
-    // performs the one and only URL-encoding pass.
-    for key, value := range legacyQueryValues {
-        rawPacket = poc.ReplaceHTTPPacketQueryParam(rawPacket, sprint(key), sprint(value))
-    }
-    for key, value := range queryValues {
-        rawPacket = poc.ReplaceHTTPPacketQueryParam(rawPacket, sprint(key), sprint(value))
-    }
-
-    // Apply form params only when there is no raw body. `body` is the explicit raw
-    // representation and therefore wins without inheriting a form Content-Type.
-    if body == "" {
-        hasFormValues = postParams != "" || len(legacyFormValues) > 0 || len(formValues) > 0
-        if hasFormValues {
-            rawPacket = poc.ReplaceHTTPPacketHeader(rawPacket, "Content-Type", "application/x-www-form-urlencoded")
-        }
-        if postParams != "" {
-            for _, pair := range str.SplitAndTrim(postParams, "&") {
+        // apply query params
+        if queryParams != "" {
+            for _, pair := range str.SplitAndTrim(queryParams, "&") {
                 parts = str.SplitN(pair, "=", 2)
                 if len(parts) == 2 {
-                    rawPacket = poc.ReplaceHTTPPacketPostParam(rawPacket, parts[0], parts[1])
+                    rawPacket = poc.ReplaceHTTPPacketQueryParam(rawPacket, parts[0], parts[1])
                 } elif len(parts) == 1 && parts[0] != "" {
-                    rawPacket = poc.ReplaceHTTPPacketPostParam(rawPacket, parts[0], "")
+                    rawPacket = poc.ReplaceHTTPPacketQueryParam(rawPacket, parts[0], "")
                 }
             }
         }
-        for key, value := range legacyFormValues {
-            rawPacket = poc.ReplaceHTTPPacketPostParam(rawPacket, sprint(key), sprint(value))
+
+        // Object values stay structurally separate until this point. The lowhttp patcher
+        // performs the one and only URL-encoding pass.
+        for key, value := range legacyQueryValues {
+            rawPacket = poc.ReplaceHTTPPacketQueryParam(rawPacket, sprint(key), sprint(value))
         }
-        for key, value := range formValues {
-            rawPacket = poc.ReplaceHTTPPacketPostParam(rawPacket, sprint(key), sprint(value))
+        for key, value := range queryValues {
+            rawPacket = poc.ReplaceHTTPPacketQueryParam(rawPacket, sprint(key), sprint(value))
         }
-    }
 
-    // Apply the raw body last.
-    if body != "" {
-        rawPacket = poc.ReplaceHTTPPacketBody(rawPacket, []byte(body))
-    }
-}
-
-opts.Push(poc.https(isHttps))
-RESULT["request_built"] = rawPacket != nil && len(rawPacket) > 0
-
-// AI 必须在请求成功或失败前都能看到参数实际生成的 packet，才能快速修订编码、
-// header 和 body。大报文仅截断展示；save-packet 仍负责把完整报文落盘。
-printRequestPacket = func(label, requestPacket) {
-    packetSize = len(requestPacket)
-    if packetSize <= 0 {
-        yakit.Info("%v: (empty)", label)
-        return
-    }
-    if packetSize <= 5120 {
-        yakit.Info("%v (%v bytes):\n%v", label, packetSize, string(requestPacket))
-        return
-    }
-    if savePacket {
-        yakit.Info("%v (%v bytes, truncated to 5KB):\n%v\n... (truncated, full request will be saved to file)", label, packetSize, string(requestPacket[:5120]))
-    } else {
-        yakit.Info("%v (%v bytes, truncated to 5KB):\n%v\n... (truncated; set save-packet=true to dump the full packet to a file)", label, packetSize, string(requestPacket[:5120]))
-    }
-}
-
-// --- execute request ---
-printRequestPacket("request packet", rawPacket)
-RESULT["request_sent"] = true
-requestStartedAt = time.Now()
-rspIns, _, err := poc.HTTPEx(rawPacket, opts...)
-RESULT["duration_ms"] = time.Since(requestStartedAt).Milliseconds()
-if err != nil {
-    yakit.Error("HTTP request failed: %v. Recovery: inspect the generated request packet above, verify URL/DNS/TLS/proxy and authentication headers, then retry; increase timeout only for a known-slow endpoint, or use packet mode for exact bytes. No response packet was received.", err)
-    RESULT["transport_error"] = sprint(err)
-    return
-}
-
-rsp = rspIns.RawPacket
-req = rspIns.RawRequest
-RESULT["response_received"] = true
-RESULT["status_code"] = poc.GetStatusCodeFromResponse(rsp)
-RESULT["body_size"] = rspIns.ResponseBodySize
-
-// --- form-encoded 兜底重试 ---
-// 现场问题: AI 对登录/表单类接口习惯发 application/json, 但很多服务端只收
-// application/x-www-form-urlencoded (见 redhaze login.js: URLSearchParams + form),
-// 导致明明带了字段却收到 400 "xxx and password are required" / "invalid request body",
-// AI 误以为是字段名错了而死磕 (run-2/run-3 各 9 次, 漏掉 SQLi 认证绕过).
-// 这里兜底: 当 POST + JSON body + 400 + 响应像"字段必填/invalid body" 时, 自动把 JSON
-// body 转成 form-encoded 重发一次, 并明确提示 AI "JSON 被拒, 已用 form 重试".
-// 关键词: do_http_request form 重试, content-type 不匹配, application/x-www-form-urlencoded
-tryFormRetryOnJsonRejected = func() {
-    // 只对 POST + URL 模式 + 用了 body 的情况生效.
-    if packet != "" {
-        return false
-    }
-    if str.ToUpper(method) != "POST" {
-        return false
-    }
-    if body == "" {
-        return false
-    }
-    // 原始请求必须是 JSON (AI 主动带了 application/json).
-    ct = str.ToLower(str.TrimSpace(contentType))
-    if !str.Contains(ct, "json") {
-        return false
-    }
-    // 响应必须是 400.
-    statusCode = poc.GetStatusCodeFromResponse(rsp)
-    if statusCode != 400 {
-        return false
-    }
-    // 响应体像"字段必填 / invalid body"这类典型的 content-type/编码不匹配信号.
-    bodyLower = str.ToLower(poc.GetHTTPPacketBody(rsp))
-    isRejectedSignal = str.Contains(bodyLower, "required") || str.Contains(bodyLower, "invalid") || str.Contains(bodyLower, "missing")
-    if !isRejectedSignal {
-        return false
-    }
-    // 把 JSON body 转成 form-encoded: {"a":"b","c":"d"} -> a=b&c=d
-    // 不依赖 JSON 库: AI 发的登录 body 通常是扁平对象, 用字符串切分即可.
-    // 去掉外层大括号后按逗号切分, 每段按第一个冒号切 k/v, 去掉首尾引号.
-    inner = str.Trim(str.TrimSpace(body), "{}")
-    if inner == "" {
-        return false
-    }
-    pairs = []
-    for _, seg := range str.Split(inner, ",") {
-        kv = str.SplitN(seg, ":", 2)
-        if len(kv) == 2 {
-            fk = str.Trim(str.TrimSpace(kv[0]), "\"")
-            fv = str.Trim(str.TrimSpace(kv[1]), "\"")
-            if fk != "" {
-                pairs.Push(sprintf("%v=%v", codec.EscapeQueryUrl(fk), codec.EscapeQueryUrl(fv)))
+        // Apply form params only when there is no raw body. `body` is the explicit raw
+        // representation and therefore wins without inheriting a form Content-Type.
+        if body == "" {
+            hasFormValues = postParams != "" || len(legacyFormValues) > 0 || len(formValues) > 0
+            if hasFormValues {
+                rawPacket = poc.ReplaceHTTPPacketHeader(rawPacket, "Content-Type", "application/x-www-form-urlencoded")
+            }
+            if postParams != "" {
+                for _, pair := range str.SplitAndTrim(postParams, "&") {
+                    parts = str.SplitN(pair, "=", 2)
+                    if len(parts) == 2 {
+                        rawPacket = poc.ReplaceHTTPPacketPostParam(rawPacket, parts[0], parts[1])
+                    } elif len(parts) == 1 && parts[0] != "" {
+                        rawPacket = poc.ReplaceHTTPPacketPostParam(rawPacket, parts[0], "")
+                    }
+                }
+            }
+            for key, value := range legacyFormValues {
+                rawPacket = poc.ReplaceHTTPPacketPostParam(rawPacket, sprint(key), sprint(value))
+            }
+            for key, value := range formValues {
+                rawPacket = poc.ReplaceHTTPPacketPostParam(rawPacket, sprint(key), sprint(value))
             }
         }
-    }
-    if len(pairs) == 0 {
-        return false
-    }
-    formBody = str.Join(pairs, "&")
 
-    // 用同一份 rawPacket, 换 Content-Type 为 form, 换 body 为 formBody, 重新发送.
-    retryPacket = rawPacket
-    retryPacket = poc.ReplaceHTTPPacketHeader(retryPacket, "Content-Type", "application/x-www-form-urlencoded")
-    retryPacket = poc.ReplaceHTTPPacketBody(retryPacket, []byte(formBody))
-    printRequestPacket("retry request packet", retryPacket)
-    retryRspIns, _, retryErr := poc.HTTPEx(retryPacket, opts...)
-    if retryErr != nil {
-        return false
+        // Apply the raw body last.
+        if body != "" {
+            rawPacket = poc.ReplaceHTTPPacketBody(rawPacket, []byte(body))
+        }
     }
-    // 只有当 form 重试后状态码不再是 400 时, 才认为重试"奏效" (服务端接受了 form),
-    // 此时把 req/rsp 替换成重试的版本, 并提示 AI.
-    retryStatusCode = poc.GetStatusCodeFromResponse(retryRspIns.RawPacket)
-    if retryStatusCode == 400 {
-        return false
-    }
-    yakit.Info("[content-type hint] JSON body was rejected with HTTP 400 (likely '%v'). Retried the SAME request as application/x-www-form-urlencoded and the server accepted it (now HTTP %v). => This endpoint expects FORM-ENCODED bodies, NOT JSON. For login/form endpoints like this, use post-params (or content-type=application/x-www-form-urlencoded) instead of a JSON body. The response being JSON does NOT mean the request should be JSON.", str.TrimSpace(poc.GetHTTPPacketBody(rsp)), retryStatusCode)
-    rspIns = retryRspIns
-    rsp = retryRspIns.RawPacket
-    req = retryRspIns.RawRequest
-    return true
-}
 
-tryFormRetryOnJsonRejected()
-RESULT["status_code"] = poc.GetStatusCodeFromResponse(rsp)
-RESULT["body_size"] = rspIns.ResponseBodySize
-RESULT["redirect_count"] = redirectCount
+    opts.Push(poc.https(isHttps))
+    RESULT["request_built"] = rawPacket != nil && len(rawPacket) > 0
 
-// --- report results ---
-// connection info (verbose only; trace is noise for batch IDOR/enum flows)
-if verbose {
-    if rspIns.PortIsOpen {
-        yakit.Info("remote %v is open", rspIns.RemoteAddr)
+    // AI 必须在请求成功或失败前都能看到参数实际生成的 packet，才能快速修订编码、
+    // header 和 body。大报文仅截断展示；save-packet 仍负责把完整报文落盘。
+    printRequestPacket = func(label, requestPacket) {
+        packetSize = len(requestPacket)
+        if packetSize <= 0 {
+            yakit.Info("%v: (empty)", label)
+            return
+        }
+        if packetSize <= 5120 {
+            yakit.Info("%v (%v bytes):\n%v", label, packetSize, string(requestPacket))
+            return
+        }
+        if savePacket {
+            yakit.Info("%v (%v bytes, truncated to 5KB):\n%v\n... (truncated, full request will be saved to file)", label, packetSize, string(requestPacket[:5120]))
+        } else {
+            yakit.Info("%v (%v bytes, truncated to 5KB):\n%v\n... (truncated; set save-packet=true to dump the full packet to a file)", label, packetSize, string(requestPacket[:5120]))
+        }
     }
+
+    // --- execute request ---
+    if !batchMode || verbose { printRequestPacket("request packet", rawPacket) }
+    if batchMode {
+        RESULT["url"] = poc.GetUrlFromHTTPRequest(isHttps ? "https" : "http", rawPacket)
+        RESULT["request_size"] = len(rawPacket)
+        RESULT["request"] = string(rawPacket[:min(len(rawPacket), 5120)])
+        RESULT["request_truncated"] = len(rawPacket) > 5120
+        RESULT["path"] = poc.GetHTTPRequestPath(rawPacket)
+        RESULT["https"] = isHttps
+        if savePacket {
+            reqFile, saveErr := file.TempFileName("http-request-*.txt")
+            if saveErr == nil {
+                saveErr = file.Save(reqFile, string(rawPacket))
+                if saveErr == nil { RESULT["request_file"] = reqFile }
+            }
+            if saveErr != nil { RESULT["artifact_error"] = sprint(saveErr) }
+        }
+    }
+    RESULT["request_sent"] = true
+    requestStartedAt = time.Now()
+    rspIns, _, err := poc.HTTPEx(rawPacket, opts...)
+    RESULT["duration_ms"] = time.Since(requestStartedAt).Milliseconds()
+    if err != nil {
+        if !batchMode || verbose { yakit.Error("HTTP request failed: %v. Recovery: inspect the generated request packet above, verify URL/DNS/TLS/proxy and authentication headers, then retry; increase timeout only for a known-slow endpoint, or use packet mode for exact bytes. No response packet was received.", err) }
+        RESULT["transport_error"] = sprint(err)
+        return RESULT
+    }
+
+    rsp = rspIns.RawPacket
+    req = rspIns.RawRequest
+    RESULT["response_received"] = true
+    RESULT["status_code"] = poc.GetStatusCodeFromResponse(rsp)
+    RESULT["body_size"] = rspIns.ResponseBodySize
+
+    // --- form-encoded 兜底重试 ---
+    // 现场问题: AI 对登录/表单类接口习惯发 application/json, 但很多服务端只收
+    // application/x-www-form-urlencoded (见 redhaze login.js: URLSearchParams + form),
+    // 导致明明带了字段却收到 400 "xxx and password are required" / "invalid request body",
+    // AI 误以为是字段名错了而死磕 (run-2/run-3 各 9 次, 漏掉 SQLi 认证绕过).
+    // 这里兜底: 当 POST + JSON body + 400 + 响应像"字段必填/invalid body" 时, 自动把 JSON
+    // body 转成 form-encoded 重发一次, 并明确提示 AI "JSON 被拒, 已用 form 重试".
+    // 关键词: do_http_request form 重试, content-type 不匹配, application/x-www-form-urlencoded
+    tryFormRetryOnJsonRejected = func() {
+        // 只对 POST + URL 模式 + 用了 body 的情况生效.
+        if packet != "" {
+            return false
+        }
+        if str.ToUpper(method) != "POST" {
+            return false
+        }
+        if body == "" {
+            return false
+        }
+        // 原始请求必须是 JSON (AI 主动带了 application/json).
+        ct = str.ToLower(str.TrimSpace(contentType))
+        if !str.Contains(ct, "json") {
+            return false
+        }
+        // 响应必须是 400.
+        statusCode = poc.GetStatusCodeFromResponse(rsp)
+        if statusCode != 400 {
+            return false
+        }
+        // 响应体像"字段必填 / invalid body"这类典型的 content-type/编码不匹配信号.
+        bodyLower = str.ToLower(poc.GetHTTPPacketBody(rsp))
+        isRejectedSignal = str.Contains(bodyLower, "required") || str.Contains(bodyLower, "invalid") || str.Contains(bodyLower, "missing")
+        if !isRejectedSignal {
+            return false
+        }
+        // 把 JSON body 转成 form-encoded: {"a":"b","c":"d"} -> a=b&c=d
+        // 不依赖 JSON 库: AI 发的登录 body 通常是扁平对象, 用字符串切分即可.
+        // 去掉外层大括号后按逗号切分, 每段按第一个冒号切 k/v, 去掉首尾引号.
+        inner = str.Trim(str.TrimSpace(body), "{}")
+        if inner == "" {
+            return false
+        }
+        pairs = []
+        for _, seg := range str.Split(inner, ",") {
+            kv = str.SplitN(seg, ":", 2)
+            if len(kv) == 2 {
+                fk = str.Trim(str.TrimSpace(kv[0]), "\"")
+                fv = str.Trim(str.TrimSpace(kv[1]), "\"")
+                if fk != "" {
+                    pairs.Push(sprintf("%v=%v", codec.EscapeQueryUrl(fk), codec.EscapeQueryUrl(fv)))
+                }
+            }
+        }
+        if len(pairs) == 0 {
+            return false
+        }
+        formBody = str.Join(pairs, "&")
+
+        // 用同一份 rawPacket, 换 Content-Type 为 form, 换 body 为 formBody, 重新发送.
+        retryPacket = rawPacket
+        retryPacket = poc.ReplaceHTTPPacketHeader(retryPacket, "Content-Type", "application/x-www-form-urlencoded")
+        retryPacket = poc.ReplaceHTTPPacketBody(retryPacket, []byte(formBody))
+        printRequestPacket("retry request packet", retryPacket)
+        retryRspIns, _, retryErr := poc.HTTPEx(retryPacket, opts...)
+        if retryErr != nil {
+            return false
+        }
+        // 只有当 form 重试后状态码不再是 400 时, 才认为重试"奏效" (服务端接受了 form),
+        // 此时把 req/rsp 替换成重试的版本, 并提示 AI.
+        retryStatusCode = poc.GetStatusCodeFromResponse(retryRspIns.RawPacket)
+        if retryStatusCode == 400 {
+            return false
+        }
+        yakit.Info("[content-type hint] JSON body was rejected with HTTP 400 (likely '%v'). Retried the SAME request as application/x-www-form-urlencoded and the server accepted it (now HTTP %v). => This endpoint expects FORM-ENCODED bodies, NOT JSON. For login/form endpoints like this, use post-params (or content-type=application/x-www-form-urlencoded) instead of a JSON body. The response being JSON does NOT mean the request should be JSON.", str.TrimSpace(poc.GetHTTPPacketBody(rsp)), retryStatusCode)
+        rspIns = retryRspIns
+        rsp = retryRspIns.RawPacket
+        req = retryRspIns.RawRequest
+        return true
+    }
+
+    if !batchMode { tryFormRetryOnJsonRejected() }
+    RESULT["status_code"] = poc.GetStatusCodeFromResponse(rsp)
+    RESULT["body_size"] = rspIns.ResponseBodySize
+    RESULT["redirect_count"] = redirectCount
+
+    if batchMode {
+        // HTTPEx may fix request framing or follow redirects; retain actual bytes.
+        RESULT["request_size"] = len(req)
+        RESULT["request"] = string(req[:min(len(req), 5120)])
+        RESULT["request_truncated"] = len(req) > 5120
+        if RESULT["request_file"] != nil {
+            saveErr := file.Save(RESULT["request_file"], string(req))
+            if saveErr != nil { RESULT["artifact_error"] = sprint(saveErr) }
+        }
+        RESULT["response_size"] = len(rsp)
+        RESULT["response"] = string(rsp[:min(len(rsp), 5120)])
+        RESULT["response_truncated"] = len(rsp) > 5120
+        RESULT["response_preview"] = codec.FixUTF8(rsp[:min(len(rsp), maxBodySize)])
+        RESULT["preview_truncated"] = len(rsp) > maxBodySize
+        RESULT["filter_reason"] = filterReason(RESULT["status_code"], RESULT["body_size"])
+        RESULT["filtered"] = RESULT["filter_reason"] != ""
+        keywordMatches, regexpMatches = [], []
+        matchBudget = 5000
+        collectMatch = func(rg) {
+            text := []byte(rg.GetTextContextWithPrompt(3))
+            if len(text) > matchBudget { RESULT["match_preview_truncated"] = true }
+            if matchBudget > 0 {
+                preview := text[:min(len(text), matchBudget)]
+                matchBudget -= len(preview)
+                return codec.FixUTF8(preview)
+            }
+            return ""
+        }
+        if keyword != "" || regexpMatch != "" {
+            edt = memeditor.New(string(rsp))
+            if keyword != "" {
+                edt.FindStringRange(keyword, rg => {
+                    RESULT["keyword_match_count"]++
+                    text := collectMatch(rg)
+                    if text != "" { keywordMatches.Push(text) }
+                    return nil
+                })
+            }
+            if regexpMatch != "" {
+                matchErr := edt.FindRegexpRange(regexpMatch, rg => {
+                    RESULT["regexp_match_count"]++
+                    text := collectMatch(rg)
+                    if text != "" { regexpMatches.Push(text) }
+                    return nil
+                })
+                if matchErr != nil {
+                    RESULT["regexp_valid"] = false
+                    RESULT["regexp_error"] = sprint(matchErr)
+                }
+            }
+        }
+        RESULT["keyword_matches"], RESULT["regexp_matches"] = keywordMatches, regexpMatches
+        if verbose { yakit.Info("response #%v packet (%v bytes):\n%v", RESULT["idx"], len(rsp), RESULT["response"]) }
+        // Save every complete batch response, including filtered responses.
+        rspFile, saveErr := file.TempFileName("http-response-*.txt")
+        if saveErr == nil {
+            saveErr = file.Save(rspFile, string(rsp))
+            if saveErr == nil { RESULT["response_file"] = rspFile }
+        }
+        if saveErr != nil { RESULT["artifact_error"] = sprint(saveErr) }
+        return RESULT
+    }
+
+    // --- report results ---
+    // connection info (verbose only; trace is noise for batch IDOR/enum flows)
+    if verbose {
+        if rspIns.PortIsOpen {
+            yakit.Info("remote %v is open", rspIns.RemoteAddr)
+        }
+        try {
+            yakit.Info("dns: %v, connect: %v, server: %v, total: %v",
+                rspIns.TraceInfo.DNSTime.String(),
+                rspIns.TraceInfo.ConnTime.String(),
+                rspIns.TraceInfo.ServerTime.String(),
+                rspIns.TraceInfo.TotalTime.String())
+        } catch e {}
+    }
+
+    // status line
     try {
-        yakit.Info("dns: %v, connect: %v, server: %v, total: %v",
-            rspIns.TraceInfo.DNSTime.String(),
-            rspIns.TraceInfo.ConnTime.String(),
-            rspIns.TraceInfo.ServerTime.String(),
-            rspIns.TraceInfo.TotalTime.String())
-    } catch e {}
-}
-
-// status line
-try {
-    rspStr = string(rsp)
-    crlfIdx = str.Index(rspStr, "\r\n")
-    if crlfIdx > 0 {
-        statusLine = rspStr[:crlfIdx]
-        yakit.Info("response: %v (body size: %v)", statusLine, rspIns.ResponseBodySize)
-    } else {
+        rspStr = string(rsp)
+        crlfIdx = str.Index(rspStr, "\r\n")
+        if crlfIdx > 0 {
+            statusLine = rspStr[:crlfIdx]
+            yakit.Info("response: %v (body size: %v)", statusLine, rspIns.ResponseBodySize)
+        } else {
+            yakit.Info("response body size: %v", rspIns.ResponseBodySize)
+        }
+    } catch e {
         yakit.Info("response body size: %v", rspIns.ResponseBodySize)
     }
-} catch e {
-    yakit.Info("response body size: %v", rspIns.ResponseBodySize)
-}
 
-// save request/response/redirect to files only when save-packet is enabled.
-// 默认不落盘, 保持输出精简; 完整报文已在内联打印中给出 (大报文会截断).
-if savePacket {
-    reqFile, err := file.TempFileName("http-request-*.txt")
-    if err == nil {
-        file.Save(reqFile, string(req))
-        yakit.Info("request packet [size:%v], full request saved to file: %v", len(req), reqFile)
-    }
-
-    rspFile, err := file.TempFileName("http-response-*.txt")
-    if err != nil {
-        yakit.Error("failed to create temp file for response: %v", err)
-    } else {
-        file.Save(rspFile, string(rsp))
-        yakit.Info("response packet [size:%v] saved to %v", len(rsp), rspFile)
-    }
-
-    if len(redirectLogs) > 0 {
-        redirectFile, err := file.TempFileName("http-redirect-logs-*.txt")
+    // save request/response/redirect to files only when save-packet is enabled.
+    // 默认不落盘, 保持输出精简; 完整报文已在内联打印中给出 (大报文会截断).
+    if savePacket {
+        reqFile, err := file.TempFileName("http-request-*.txt")
         if err == nil {
-            file.Save(redirectFile, str.Join(redirectLogs, "\n"))
-            yakit.Info("%d redirects recorded, saved to %v", len(redirectLogs), redirectFile)
+            file.Save(reqFile, string(req))
+            yakit.Info("request packet [size:%v], full request saved to file: %v", len(req), reqFile)
+        }
+
+        rspFile, err := file.TempFileName("http-response-*.txt")
+        if err != nil {
+            yakit.Error("failed to create temp file for response: %v", err)
+        } else {
+            file.Save(rspFile, string(rsp))
+            yakit.Info("response packet [size:%v] saved to %v", len(rsp), rspFile)
+        }
+
+        if len(redirectLogs) > 0 {
+            redirectFile, err := file.TempFileName("http-redirect-logs-*.txt")
+            if err == nil {
+                file.Save(redirectFile, str.Join(redirectLogs, "\n"))
+                yakit.Info("%d redirects recorded, saved to %v", len(redirectLogs), redirectFile)
+            }
         }
     }
-}
 
-// print response packet inline with size/pattern-aware logic
-hasPattern = (keyword != "" || regexpMatch != "")
-if len(rsp) > 0 {
-    if hasPattern {
-        if len(rsp) <= 5120 {
-            yakit.Info("response packet (%v bytes):\n%v", len(rsp), string(rsp))
-        } else {
-            if savePacket {
-                yakit.Info("response packet too large (%v bytes), skip inline printing, see pattern match results below and saved file", len(rsp))
+    // print response packet inline with size/pattern-aware logic
+    hasPattern = (keyword != "" || regexpMatch != "")
+    if len(rsp) > 0 {
+        if hasPattern {
+            if len(rsp) <= 5120 {
+                yakit.Info("response packet (%v bytes):\n%v", len(rsp), string(rsp))
             } else {
-                yakit.Info("response packet too large (%v bytes), skip inline printing, see pattern match results below (set save-packet=true to dump the full packet to a file)", len(rsp))
+                if savePacket {
+                    yakit.Info("response packet too large (%v bytes), skip inline printing, see pattern match results below and saved file", len(rsp))
+                } else {
+                    yakit.Info("response packet too large (%v bytes), skip inline printing, see pattern match results below (set save-packet=true to dump the full packet to a file)", len(rsp))
+                }
+            }
+        } else {
+            if len(rsp) <= 10240 {
+                yakit.Info("response packet (%v bytes):\n%v", len(rsp), string(rsp))
+            } else {
+                if savePacket {
+                    yakit.Info("response packet (%v bytes, truncated to 10KB):\n%v\n... (truncated, full response saved to file)", len(rsp), string(rsp[:10240]))
+                } else {
+                    yakit.Info("response packet (%v bytes, truncated to 10KB):\n%v\n... (truncated; set save-packet=true to dump the full packet to a file)", len(rsp), string(rsp[:10240]))
+                }
             }
         }
     } else {
-        if len(rsp) <= 10240 {
-            yakit.Info("response packet (%v bytes):\n%v", len(rsp), string(rsp))
-        } else {
-            if savePacket {
-                yakit.Info("response packet (%v bytes, truncated to 10KB):\n%v\n... (truncated, full response saved to file)", len(rsp), string(rsp[:10240]))
-            } else {
-                yakit.Info("response packet (%v bytes, truncated to 10KB):\n%v\n... (truncated; set save-packet=true to dump the full packet to a file)", len(rsp), string(rsp[:10240]))
-            }
-        }
+        yakit.Error("response packet is empty after HTTP execution. Recovery: inspect the request packet and connection trace (verbose=true), verify the server did not close the connection, and retry with save-packet=true if the problem persists.")
     }
-} else {
-    yakit.Error("response packet is empty after HTTP execution. Recovery: inspect the request packet and connection trace (verbose=true), verify the server did not close the connection, and retry with save-packet=true if the problem persists.")
-}
 
-// --- 表单接口探测提示 (治本) ---
-// 现场问题: AI 看到 JSON 响应就以为请求也该是 JSON, 但很多登录/表单接口其实是
-// form-encoded (见 redhaze login.js: URLSearchParams + application/x-www-form-urlencoded).
-// 当响应是 HTML 含 <form>/<input name=> 或 JS 用 URLSearchParams 提交时, 主动提示 AI
-// "这是表单接口, 字段是 X/Y, 用 form-encoded 而非 JSON", 从源头避免 AI 死磕 JSON.
-// 关键词: do_http_request 表单探测, form hint, URLSearchParams, 别用 JSON
-if method == "GET" || (method == "POST" && body == "") {
-    rspText = string(rsp)
-    rspLower = str.ToLower(rspText)
-    hasFormHtml = str.Contains(rspLower, "<form") && str.Contains(rspLower, " name=")
-    hasFormJs = str.Contains(rspText, "URLSearchParams") || str.Contains(rspText, "x-www-form-urlencoded")
-    if hasFormHtml || hasFormJs {
-        // 从响应里尽量提取 input 字段名, 帮 AI 直接拼请求.
-        fieldNames = []
-        for _, line := range str.Split(rspText, "\n") {
-            lineLower = str.ToLower(line)
-            if str.Contains(lineLower, "<input") {
-                // 提取 name="xxx" 或 name='xxx'
-                idx = str.Index(str.ToLower(line), "name=")
-                if idx > 0 {
-                    rest = str.TrimSpace(line[idx+5:])
-                    // 去掉引号
-                    rest = str.Trim(rest, "\"'")
-                    // 取到下一个空白/引号前
-                    for _, ch := range [" ", "\t", ">", "/", "\"", "'"] {
-                        ci = str.Index(rest, ch)
-                        if ci > 0 {
-                            rest = rest[:ci]
+    // --- 表单接口探测提示 (治本) ---
+    // 现场问题: AI 看到 JSON 响应就以为请求也该是 JSON, 但很多登录/表单接口其实是
+    // form-encoded (见 redhaze login.js: URLSearchParams + application/x-www-form-urlencoded).
+    // 当响应是 HTML 含 <form>/<input name=> 或 JS 用 URLSearchParams 提交时, 主动提示 AI
+    // "这是表单接口, 字段是 X/Y, 用 form-encoded 而非 JSON", 从源头避免 AI 死磕 JSON.
+    // 关键词: do_http_request 表单探测, form hint, URLSearchParams, 别用 JSON
+    if method == "GET" || (method == "POST" && body == "") {
+        rspText = string(rsp)
+        rspLower = str.ToLower(rspText)
+        hasFormHtml = str.Contains(rspLower, "<form") && str.Contains(rspLower, " name=")
+        hasFormJs = str.Contains(rspText, "URLSearchParams") || str.Contains(rspText, "x-www-form-urlencoded")
+        if hasFormHtml || hasFormJs {
+            // 从响应里尽量提取 input 字段名, 帮 AI 直接拼请求.
+            fieldNames = []
+            for _, line := range str.Split(rspText, "\n") {
+                lineLower = str.ToLower(line)
+                if str.Contains(lineLower, "<input") {
+                    // 提取 name="xxx" 或 name='xxx'
+                    idx = str.Index(str.ToLower(line), "name=")
+                    if idx > 0 {
+                        rest = str.TrimSpace(line[idx+5:])
+                        // 去掉引号
+                        rest = str.Trim(rest, "\"'")
+                        // 取到下一个空白/引号前
+                        for _, ch := range [" ", "\t", ">", "/", "\"", "'"] {
+                            ci = str.Index(rest, ch)
+                            if ci > 0 {
+                                rest = rest[:ci]
+                            }
+                        }
+                        if rest != "" && rest != "submit" && rest != "button" {
+                            fieldNames.Push(rest)
                         }
                     }
-                    if rest != "" && rest != "submit" && rest != "button" {
-                        fieldNames.Push(rest)
-                    }
                 }
             }
-        }
-        // 去重
-        seen = {}
-        uniqueFields = []
-        for _, f := range fieldNames {
-            if !seen[f] {
-                seen[f] = true
-                uniqueFields.Push(f)
+            // 去重
+            seen = {}
+            uniqueFields = []
+            for _, f := range fieldNames {
+                if !seen[f] {
+                    seen[f] = true
+                    uniqueFields.Push(f)
+                }
             }
-        }
-        if len(uniqueFields) > 0 {
-            yakit.Info("[form-endpoint hint] This response contains an HTML <form> / form-submit JS. The likely login/form fields are: [%v]. Such form endpoints usually expect application/x-www-form-urlencoded (use post-params), NOT a JSON body — even when the API response is JSON. Verify the real encoding (e.g. via the page's JS) before sending.", str.Join(uniqueFields, ", "))
-        } else {
-            yakit.Info("[form-endpoint hint] This response contains form-submit JS (URLSearchParams / x-www-form-urlencoded). The endpoint likely expects FORM-ENCODED bodies, NOT JSON. Use post-params instead of a JSON body.")
-        }
-    }
-}
-
-// keyword and regex matching
-keywordMatchCount = 0
-regexpMatchCount = 0
-if hasPattern {
-    edt := memeditor.New(string(rsp))
-    if keyword != "" {
-        yakit.Info("searching keyword pattern: %v", keyword)
-        edt.FindStringRange(keyword, rg => {
-            keywordMatchCount++
-            matchContent := rg.GetTextContextWithPrompt(3)
-            if len(matchContent) > 30000 {
-                yakit.Info("keyword match [size:%v]:\n%v\n... (truncated)", len(matchContent), codec.FixUTF8([]byte(matchContent)[:30000]))
+            if len(uniqueFields) > 0 {
+                yakit.Info("[form-endpoint hint] This response contains an HTML <form> / form-submit JS. The likely login/form fields are: [%v]. Such form endpoints usually expect application/x-www-form-urlencoded (use post-params), NOT a JSON body — even when the API response is JSON. Verify the real encoding (e.g. via the page's JS) before sending.", str.Join(uniqueFields, ", "))
             } else {
-                yakit.Info("keyword match:\n%v", matchContent)
+                yakit.Info("[form-endpoint hint] This response contains form-submit JS (URLSearchParams / x-www-form-urlencoded). The endpoint likely expects FORM-ENCODED bodies, NOT JSON. Use post-params instead of a JSON body.")
             }
-        })
-        if keywordMatchCount == 0 {
-            yakit.Info("keyword match: not found in response (%v bytes). The HTTP response is still shown above; verify keyword spelling/case or retry without keyword to inspect the normal response preview.", len(rsp))
         }
     }
-    if regexpMatch != "" {
-        yakit.Info("searching regexp pattern: %v", regexpMatch)
-        try {
-            edt.FindRegexpRange(regexpMatch, rg => {
-                regexpMatchCount++
+
+    // keyword and regex matching
+    keywordMatchCount = 0
+    regexpMatchCount = 0
+    if hasPattern {
+        edt := memeditor.New(string(rsp))
+        if keyword != "" {
+            yakit.Info("searching keyword pattern: %v", keyword)
+            edt.FindStringRange(keyword, rg => {
+                keywordMatchCount++
                 matchContent := rg.GetTextContextWithPrompt(3)
                 if len(matchContent) > 30000 {
-                    yakit.Info("regexp match [size:%v]:\n%v\n... (truncated)", len(matchContent), codec.FixUTF8([]byte(matchContent)[:30000]))
+                    yakit.Info("keyword match [size:%v]:\n%v\n... (truncated)", len(matchContent), codec.FixUTF8([]byte(matchContent)[:30000]))
                 } else {
-                    yakit.Info("regexp match:\n%v", matchContent)
+                    yakit.Info("keyword match:\n%v", matchContent)
                 }
             })
-            if regexpMatchCount == 0 {
-                yakit.Info("regexp match: not found in response (%v bytes). Verify the expression or retry without regexp-match to inspect the normal response preview.", len(rsp))
+            if keywordMatchCount == 0 {
+                yakit.Info("keyword match: not found in response (%v bytes). The HTTP response is still shown above; verify keyword spelling/case or retry without keyword to inspect the normal response preview.", len(rsp))
             }
-        } catch e {
-            RESULT["regexp_valid"] = false
-            yakit.Error("invalid regexp-match %q: %v. Recovery: correct or remove regexp-match and retry; the HTTP request itself completed and its response summary is shown above.", regexpMatch, e)
+        }
+        if regexpMatch != "" {
+            yakit.Info("searching regexp pattern: %v", regexpMatch)
+            try {
+                edt.FindRegexpRange(regexpMatch, rg => {
+                    regexpMatchCount++
+                    matchContent := rg.GetTextContextWithPrompt(3)
+                    if len(matchContent) > 30000 {
+                        yakit.Info("regexp match [size:%v]:\n%v\n... (truncated)", len(matchContent), codec.FixUTF8([]byte(matchContent)[:30000]))
+                    } else {
+                        yakit.Info("regexp match:\n%v", matchContent)
+                    }
+                })
+                if regexpMatchCount == 0 {
+                    yakit.Info("regexp match: not found in response (%v bytes). Verify the expression or retry without regexp-match to inspect the normal response preview.", len(rsp))
+                }
+            } catch e {
+                RESULT["regexp_valid"] = false
+                yakit.Error("invalid regexp-match %q: %v. Recovery: correct or remove regexp-match and retry; the HTTP request itself completed and its response summary is shown above.", regexpMatch, e)
+            }
         }
     }
+
+    if keyword != "" {
+        RESULT["keyword_match_count"] = keywordMatchCount
+    }
+    if regexpMatch != "" {
+        RESULT["regexp_match_count"] = regexpMatchCount
+    }
+
+    return RESULT
 }
 
-if keyword != "" {
-    RESULT["keyword_match_count"] = keywordMatchCount
-}
-if regexpMatch != "" {
-    RESULT["regexp_match_count"] = regexpMatchCount
+if !batchMode {
+    RESULT = executeRequest(requestItems[0], newResult())
+} else {
+    if delaySeconds > 0 {
+        concurrent = 1
+        yakit.Info("Delay specified, forcing sequential execution (concurrent=1)")
+    }
+    yakit.Info("=== HTTP FuzzTag multi-packet test: %d requests, concurrent=%d ===", len(requestItems), concurrent)
+    // Store by template index, so completion order cannot change comparisons.
+    results = make([]map[string]any, len(requestItems))
+    swg = sync.NewSizedWaitGroup(concurrent)
+    for i, item := range requestItems {
+        swg.Add()
+        go func(idx, requestItem) {
+            defer swg.Done()
+            state = newResult()
+            state["idx"] = idx + 1
+            result = state
+            try {
+                result = executeRequest(requestItem, state)
+            } catch e {
+                result["request_completed"] = true
+                if result["response_received"] {
+                    result["artifact_error"] = "execution_error: " + sprint(e)
+                } else {
+                    result["transport_error"] = "execution_error: " + sprint(e)
+                }
+            }
+            results[idx] = result
+            yakit.Info("[%d/%d] %v -> status=%v, body=%v bytes, duration=%vms, keyword=%v, regexp=%v (valid=%v), filtered=%v, error=%v",
+                idx+1, len(requestItems), result["url"], result["status_code"], result["body_size"],
+                result["duration_ms"], result["keyword_match_count"], result["regexp_match_count"], result["regexp_valid"], result["filtered"], result["transport_error"])
+            if delaySeconds > 0 && idx < len(requestItems)-1 {
+                // Keep cancellation effective while pacing sequential requests.
+                timer := time.NewTimer(delaySeconds)
+                select {
+                    case <-requestCtx.Done():
+                    case <-timer.C:
+                }
+                timer.Stop()
+            }
+        }(i, item)
+    }
+    swg.Wait()
+    sentCount, responseCount, errorCount, filteredCount = 0, 0, 0, 0
+    statusDistribution = {}
+    for _, result := range results {
+        if result["request_sent"] { sentCount++ }
+        if result["response_received"] {
+            responseCount++
+            status = sprint(result["status_code"])
+            if statusDistribution[status] == nil { statusDistribution[status] = 0 }
+            statusDistribution[status]++
+        }
+        if result["filtered"] { filteredCount++ }
+        if result["transport_error"] != nil { errorCount++ }
+    }
+    RESULT = {"mode":"multi", "request_count":len(requestItems), "request_completed_count":len(results),
+        "request_sent_count":sentCount, "response_received_count":responseCount, "filtered_count":filteredCount,
+        "transport_error_count":errorCount, "status_code_distribution":statusDistribution, "items":results}
+    outputContent = sprintf("=== Batch Request Summary ===\nTotal: %d, Sent: %d, Responses: %d, Filtered: %d, Transport errors: %d\nStatus distribution: %v\n\n",
+        len(requestItems), sentCount, responseCount, filteredCount, errorCount, statusDistribution)
+    for _, result := range results {
+        if result["filtered"] { continue }
+        outputContent += sprintf("--- Request #%d ---\nURL: %v\nPath: %v\nHTTPS: %v\nStatus: %v\nSize: %v bytes\nDuration: %vms\nrequest #%d packet (preview):\n%v\n",
+            result["idx"], result["url"], result["path"], result["https"], result["status_code"], result["body_size"], result["duration_ms"], result["idx"], result["request"])
+        if result["response_received"] {
+            outputContent += sprintf("Full response: %v\n", result["response_file"])
+            if maxBodySize > 0 {
+                outputContent += sprintf("Response%s:\n%v\n", result["preview_truncated"] ? " (truncated)" : "", result["response_preview"])
+            }
+            for _, text := range result["keyword_matches"] { outputContent += sprintf("Keyword Match [%v]:\n%v\n", keyword, text) }
+            for _, text := range result["regexp_matches"] { outputContent += sprintf("Regexp Match [%v]:\n%v\n", regexpMatch, text) }
+            if keyword != "" && result["keyword_match_count"] == 0 { outputContent += "Keyword Match: not found\n" }
+            if regexpMatch != "" && result["regexp_match_count"] == 0 { outputContent += "Regexp Match: not found\n" }
+            if result["regexp_valid"] == false { outputContent += sprintf("Regexp error: %v\n", result["regexp_error"]) }
+        } else {
+            outputContent += sprintf("Transport error: %v\n", result["transport_error"])
+        }
+        if result["artifact_error"] != nil { outputContent += sprintf("Artifact error: %v\n", result["artifact_error"]) }
+        outputContent += "\n"
+    }
+    outputContent += "=== Results Summary Table ===\nIndex | Path | Status | Size | Duration | Filter\n"
+    for _, result := range results {
+        outputContent += sprintf("%d | %v | %v | %v | %vms | %v\n", result["idx"], result["path"],
+            result["response_received"] ? sprint(result["status_code"]) : "ERROR", result["body_size"], result["duration_ms"], result["filter_reason"])
+    }
+    outputFile, saveErr = file.TempFileName("http-results-*.txt")
+    if saveErr == nil { saveErr = file.Save(outputFile, outputContent) }
+    if saveErr != nil { RESULT["artifact_error"] = sprint(saveErr) } else {
+        RESULT["output_file"] = outputFile
+        yakit.Info("Results saved to: %v", outputFile)
+    }
+    outputBytes = []byte(outputContent)
+    yakit.Info("%v", codec.FixUTF8(outputBytes[:min(len(outputBytes), 50000)]))
+    if len(outputBytes) > 50000 { yakit.Info("... (output truncated at 50000 bytes, see full results in saved file)") }
+    yakit.Info("multi-packet summary: requests=%d, sent=%d, responses=%d, filtered=%d, errors=%d, status=%v",
+        len(requestItems), sentCount, responseCount, filteredCount, errorCount, statusDistribution)
 }

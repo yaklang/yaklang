@@ -593,7 +593,7 @@ func runCase(caseConfig, oracle) {
 
     includeTools = caseConfig["include_tools"]
     if includeTools == nil || includeTools == undefined || len(includeTools) == 0 {
-        includeTools = ["do_http_request", "batch_do_http_request"]
+        includeTools = ["do_http_request"]
     }
 
     opts = [
