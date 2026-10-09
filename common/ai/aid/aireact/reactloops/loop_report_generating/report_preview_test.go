@@ -60,7 +60,7 @@ func (r *reportTimelineRecorder) AddToTimeline(entry, content string) {
 	}
 }
 
-// The parent focus mode uses the same delivery helper with its own overview.
+// The parent focus mode uses the same saved-report delivery helper.
 // Verify it cannot bypass the display limit or copy the full body into timeline.
 func TestParentReportDeliveryBudget(t *testing.T) {
 	inv := &reportTimelineRecorder{MockInvoker: mock.NewMockInvoker(context.Background())}
@@ -78,7 +78,7 @@ func TestParentReportDeliveryBudget(t *testing.T) {
 	content := "# 报告\n\n" + strings.Repeat(strings.Repeat("中文 😀 ", 32)+"\n", 4000) + "全文尾部标记"
 	require.GreaterOrEqual(t, len(content), 1024*1024)
 	require.NoError(t, os.WriteFile(path, []byte(content), 0o600))
-	require.NoError(t, EmitReportFinish(loop, path, strings.Repeat("长标题😀", 10000), content))
+	require.NoError(t, EmitReportFinish(loop, path, strings.Repeat("长标题😀", 10000)))
 	cfg.GetEmitter().WaitForStream()
 	written, err := os.ReadFile(path)
 	require.NoError(t, err)
