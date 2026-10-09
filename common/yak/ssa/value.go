@@ -146,7 +146,13 @@ func (b *FunctionBuilder) readValueEx(
 
 	if ret := ReadVariableFromScopeAndParent(scope, name); ret != nil {
 		if local != nil && ret.GetCaptured().GetGlobalIndex() != local.GetCaptured().GetGlobalIndex() {
-			ret = local
+			// A loop-condition spin variable lives in the current scope; its
+			// global index differs from the parent's local variable, but
+			// replacing it would turn the loop-carried Phi into the initial
+			// constant and make the loop condition fold to a literal.
+			if ret.GetScope() != scope {
+				ret = local
+			}
 		}
 		if b.CurrentRange != nil {
 			ret.AddRange(b.CurrentRange, false)
@@ -470,6 +476,15 @@ func (b *FunctionBuilder) AssignVariable(variable *Variable, value Value) {
 			para.SetDefault(parentValue)
 			para.SetType(parentValue.GetType())
 			parentValue.AddOccultation(para)
+			// scope.AssignVariable ran before BuildFreeValue installed the
+			// free-value parameter, so the first branch saw no parent and was
+			// left out of the phi. The block scope is a *ScopeInstance, which
+			// embeds the versioned table; register through that method set.
+			if captured, ok := any(scope).(interface {
+				RegisterCapturedVariable(ssautil.VersionedIF[Value])
+			}); ok {
+				captured.RegisterCapturedVariable(variable)
+			}
 		}
 	}
 	if _, ok := b.RefParameter[variable.GetName()]; !ok {
