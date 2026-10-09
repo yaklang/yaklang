@@ -29,7 +29,7 @@ upperID = 0
 if id < 9223372036854775807 { upperID = id + 1 }
 page, err = db.QueryHTTPFlows(db.projectID(databaseID), db.afterID(id-1), db.beforeID(upperID), db.limit(1), db.packetLimit(packetLimit))
 if err != nil { die(err) }
-if len(page.Items) != 1 || page.Items[0].ID != id { die(f"HTTP flow not found: ${id}") }
+if len(page.Items) != 1 || page.Items[0].HTTPFlow.Model.ID != id { die(f"HTTP flow not found: ${id}") }
 item = page.Items[0]
 println(item.Dump())
 for part in ["request", "response"] {
