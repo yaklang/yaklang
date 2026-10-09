@@ -18,6 +18,7 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 	_ "github.com/yaklang/yaklang/common/yak"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
+	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"gotest.tools/v3/assert"
 )
 
@@ -172,6 +173,56 @@ func TestCybersecurityRisk_UsesRuntimeRiskSinkInsteadOfLocalDatabase(t *testing.
 	}
 	if len(localRisks) != 0 {
 		t.Fatalf("platform-bound risk leaked into local SQLite: %#v", localRisks)
+	}
+}
+
+func TestCybersecurityRisk_LocalSavePreservesInvocationClient(t *testing.T) {
+	db, err := utils.CreateTempTestDatabaseInMemory()
+	assert.NilError(t, err)
+	t.Cleanup(func() { _ = db.Close() })
+	assert.NilError(t, db.AutoMigrate(&schema.Risk{}).Error)
+	previous := consts.CaptureProjectDatabaseBinding()
+	consts.BindProjectDatabaseWithReader(db, nil, "")
+	t.Cleanup(func() {
+		consts.BindProjectDatabaseWithReader(previous.Database, previous.ReadDatabase, previous.Path)
+	})
+	tool := getCybersecurityRiskTool(t)
+	for _, riskType := range []string{"info", "xss"} {
+		t.Run(riskType, func(t *testing.T) {
+			runtimeID := uuid.NewString()
+			params := aitool.InvokeParams{
+				"target": "https://example.test/proof", "title": "测试发现", "summary": "已确认的观察结果。",
+			}
+			if riskType == "xss" {
+				params["type"] = "xss"
+				params["parameter"] = "q"
+				params["payload"] = "<script>alert(1)</script>"
+				params["request"] = "GET /proof?q=test HTTP/1.1\r\nHost: example.test\r\n\r\n"
+				params["response"] = "HTTP/1.1 200 OK\r\n\r\ntest"
+			}
+			var riskOutputs []*ypb.ExecResult
+			result, err := tool.InvokeWithParams(params, aitool.WithRuntimeConfig(&aitool.ToolRuntimeConfig{
+				RuntimeID:       runtimeID,
+				ProjectDatabase: db,
+				FeedBacker: func(output *ypb.ExecResult) error {
+					if strings.Contains(string(output.GetMessage()), "json-risk") {
+						riskOutputs = append(riskOutputs, output)
+					}
+					return nil
+				},
+			}))
+			assert.NilError(t, err)
+			status, _ := result.GetExecutionStatus()
+			assert.Equal(t, status, aitool.ToolExecutionStatusSucceeded)
+			records, err := yakit.GetRisksByRuntimeId(db, runtimeID)
+			assert.NilError(t, err)
+			assert.Equal(t, len(records), 1)
+			assert.Equal(t, records[0].RiskType, riskType)
+			assert.Equal(t, len(riskOutputs), 1, "saved risk must reach this invocation's feedbacker")
+			assert.Equal(t, riskOutputs[0].RuntimeID, runtimeID)
+			execution := result.Data.(*aitool.ToolExecutionResult)
+			assert.Equal(t, utils.InterfaceToString(utils.InterfaceToGeneralMap(execution.Result)["risk_hash"]), records[0].Hash)
+		})
 	}
 }
 
