@@ -523,6 +523,17 @@ func (scope *ScopedVersionedTable[T]) ChangeCapturedSideEffect(name string, ver 
 // }
 
 // try register captured variable
+// RegisterCapturedVariable records ver as a capture of name in this scope.
+// Call it again after the free-value parameter exists: the first assignment
+// of an outer variable runs before that parameter is installed, and the
+// initial registration sees no parent and drops the branch from the phi.
+func (v *ScopedVersionedTable[T]) RegisterCapturedVariable(ver VersionedIF[T]) {
+	if v == nil || ver == nil {
+		return
+	}
+	v.tryRegisterCapturedVariable(ver.GetName(), ver)
+}
+
 func (v *ScopedVersionedTable[T]) tryRegisterCapturedVariable(name string, ver VersionedIF[T]) {
 	if v.IsRoot() {
 		return
