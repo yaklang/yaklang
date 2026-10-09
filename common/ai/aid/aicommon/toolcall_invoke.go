@@ -467,6 +467,11 @@ func (a *ToolCaller) invoke(
 	}
 	if sessionProvider, ok := a.config.(interface{ GetPersistentSessionID() string }); ok {
 		runtimeCfg.PersistentSessionID = sessionProvider.GetPersistentSessionID()
+		if provider, ok := a.config.(interface{ GetTimeline() *Timeline }); ok {
+			runtimeCfg.TimelineHistorySnapshot = func() ([]schema.AITimelineHistory, error) {
+				return provider.GetTimeline().HistorySnapshot()
+			}
+		}
 	}
 	if config, ok := c.(*Config); ok {
 		runtimeCfg.MemoryNamespace = config.MemoryTriageId

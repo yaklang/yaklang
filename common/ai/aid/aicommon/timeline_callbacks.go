@@ -165,6 +165,7 @@ func (m *Timeline) RegisterSessionMemoryCallbackOnce(id string, fn func(Timeline
 // Capture under Timeline.mu; invoke only after the complete write is unlocked.
 // No serialization or event allocation is needed without input listeners.
 func (m *Timeline) collectItemInputCallbackLocked(notifications *[]func(), item *TimelineItem) {
+	m.collectHistoryWriteLocked(notifications, item)
 	if notifications == nil {
 		return
 	}

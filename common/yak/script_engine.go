@@ -12,6 +12,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/yaklang/yaklang/common/ai/aihistory"
 	"github.com/yaklang/yaklang/common/ai/aimemory"
 	"github.com/yaklang/yaklang/common/aiengine"
 
@@ -355,6 +356,7 @@ func initYaklangLib() {
 
 	yaklang.Import("aim", aiengine.Exports)
 	yaklang.Import("aimemory", aimemory.Exports)
+	yaklang.Import("aihistory", aihistory.Exports)
 
 	yaklang.Import("liteforge", liteforgeapp.LiteForgeExport)
 	yaklang.Import("jsonschema", aitool.SchemaGeneratorExports)

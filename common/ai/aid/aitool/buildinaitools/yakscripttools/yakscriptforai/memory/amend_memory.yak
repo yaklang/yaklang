@@ -1,0 +1,31 @@
+__DESC__ = "Add, delete or change a persistent memory in the current runtime namespace. Use exact memory IDs from read_memory; change deletes the original and its indexes, then creates a replacement."
+__VERBOSE_NAME__ = "Amend Memory"
+__VERBOSE_NAME_ZH__ = "管理记忆"
+__KEYWORDS__ = "memory,amend_memory,add,delete,change,记忆,修改,删除,偏好"
+__USAGE__ = <<<USAGE
+operator 必填 add/delete/change。add 必填 content，不填 memory_id；delete 必填 memory_id；change 必填 memory_id 和 content，返回新的 memory_id。tags 可选字符串数组，每项非空、首尾无空白且不含逗号（底层标签存储分隔符）。stdout 输出操作信息和 item.Dump() 文本。只操作当前记忆空间，适用于用户偏好、明确事实和长期经验；删除应根据确切 ID，不能用搜索词批量删除。
+
+[[- if .FunctionCallMode -]]
+arguments 示例：
+```json
+{"operator":"add","content":"用户希望报告包含复现步骤和修复建议。","tags":["报告格式"]}
+```
+[[- else -]]
+文本流 action 示例：
+```json
+{"@action":"directly_call_tool","directly_call_tool_name":"amend_memory","directly_call_tool_params":{"operator":"add","content":"用户希望报告包含复现步骤和修复建议。","tags":["报告格式"]}}
+```
+[[- end -]]
+USAGE
+operator = cli.String("operator", cli.setRequired(true), cli.setHelp("add/delete/change"))
+memoryID = cli.String("memory_id", cli.setHelp("delete/change 的精确记忆 ID"))
+content = cli.String("content", cli.setHelp("add/change 的新正文，1–32768 字符"))
+tagsJSON = cli.String("tags", cli.setJsonSchema(`{"type":"array","maxItems":32,"items":{"type":"string","maxLength":128}}`), cli.setHelp("记忆标签数组，最多 32 项"))
+cli.check()
+namespace = aimemory.CurrentNamespace()
+tags = []
+if tagsJSON != "" { tags = json.loads(tagsJSON) }
+item, err = aimemory.Amend(operator, memoryID, content, tags, aimemory.memoryNamespace(namespace))
+if err != nil { die(err) }
+printf("operator=%s namespace=%s\n", operator, namespace)
+println(item.Dump())

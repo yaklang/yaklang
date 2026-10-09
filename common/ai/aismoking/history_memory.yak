@@ -1,0 +1,82 @@
+// yak common/ai/aismoking/history_memory.yak, or AISMOKING_CASE=history_memory yak common/ai/aismoking/run.yak.
+// Real aim, SQL, native Yak libraries and tools; only model decisions are fixtures.
+include "common/ai/aismoking/mock.inc"
+assert os.Getenv("YAKIT_HOME") != "", "Use the smoke runner with a disposable home"
+config, operator, namespace, seeded, cursor, awaiting, nativeMode = nil,nil,"",false,0,false,false
+artifactDirs, results = {}, []
+plan = ["grep_timeline_history", "grep_timeline_history", "read_memory"]
+func seed() {
+    if seeded { return }
+    // One archived original plus a current match: only the former may be shown.
+    id=config.AcquireId()
+    config.GetTimeline().PushText(id,"archived-history-sentinel \"401\"\n压缩前调查依据")
+    config.GetTimeline().SoftDelete(id)
+    config.GetTimeline().PushText(config.AcquireId(),"live-history-sentinel must be excluded")
+    row=config.GetDB().Exec("INSERT INTO ai_memory_entities_v1(memory_id,session_id,content,created_at,updated_at,o_score,r_score) VALUES(?,?,?,datetime('now'),datetime('now'),0.8,0.8)", namespace+"-memory", namespace, "memory-sentinel \"报告偏好\"\n保留原始依据")
+    assert row.Error==nil, string(row.Error)
+    seeded=true
+}
+func checkPrevious() {
+    calls=operator.GetCurrentTask().GetAllToolCallResults()
+    assert len(calls)==cursor
+    actual=calls[len(calls)-1]
+    assert actual.Success && actual.Name==plan[cursor-1]
+    directory=""
+    for i=0;i<100;i++ { smokeMutex.Lock();directory=artifactDirs[actual.ToolCallID];smokeMutex.Unlock();if directory!=nil && directory!="" {break};time.Sleep(0.01) }
+    assert directory!=nil && directory!=""
+    manifest=json.loads(string(file.ReadFile(file.Join(directory,"manifest.json"))~))
+    assert manifest.success && manifest.files.result.bytes==0, "items must be carried by stdout"
+    text=string(file.ReadFile(manifest.files.stdout.path)~)
+    if actual.Name=="grep_timeline_history" {
+        assert "<|TIMELINE_" in text && "<|TIMELINE_END_" in text
+        assert "archived-history-sentinel" in text && `"401"` in text
+        assert !("live-history-sentinel" in text)
+    } else {
+        assert (namespace+"-memory") in text && "memory-sentinel" in text && `"报告偏好"` in text
+    }
+    awaiting=false
+}
+smokeHandler=func(w,body) {
+    native,prompt=len(body.tools)>0,smokePrompt(body)
+    if "SMOKE_CALLER:liteforge[session-title-generator]" in prompt { smokeAnswer(w,native,"session-title-generator",{"session_title":"历史与记忆查询"});return }
+    if "SMOKE_CALLER:directly-answer" in prompt {
+        w.Header().Set("Content-Type","text/event-stream")
+        smokeFrame(w,{"content":"已核验历史原文与报告偏好，继续工作。"},"stop")
+        w.Write("data: [DONE]\n\n")~;return
+    }
+    if "SMOKE_CALLER:verification" in prompt {
+        w.Header().Set("Content-Type","text/event-stream")
+        smokeFrame(w,{"content":`{"@action":"verify-satisfaction","user_satisfied":true,"reasoning":"查询结果已验证。","evidence":[]}`},"stop")
+        w.Write("data: [DONE]\n\n")~;return
+    }
+    assert "SMOKE_CALLER:react-loop:default" in prompt || "SMOKE_CALLER:react-loop:main" in prompt
+    assert "会话历史与记忆" in prompt && "aihistory.Query" in prompt && "aimemory.Query" in prompt
+    for name in ["grep_timeline_history","read_memory","amend_memory"] { assert name in prompt, "missing default tool "+name }
+    seed()
+    if awaiting { checkPrevious() }
+    if cursor==len(plan) { smokeAnswer(w,native,"finish",{});return }
+    name=plan[cursor]
+    if native && !config.GetAiToolManager().IsRecentlyUsedTool(name) { smokeAnswer(w,native,"require_tool",{"require_tool_payload":name});return }
+    params={"query":"history-sentinel","search_mode":"literal"}
+    if cursor==1 { params.search_mode="regexp" }
+    if name=="read_memory" { params={"query":"memory-sentinel","search_mode":"bm25"} }
+    cursor++;awaiting=true
+    smokeAnswer(w,native,"directly_call_tool",{"directly_call_tool_name":name,"directly_call_tool_params":params,"directly_call_reason":"验证归档历史和空间记忆的原始文本"})
+}
+for native in [false,true] {
+    namespace="history-memory-"+randstr(12)
+    config,operator,seeded,cursor,awaiting=nil,nil,false,0,false
+    die(aim.InvokeReAct("回顾 history-sentinel 的原始依据，再查询 memory-sentinel 的报告偏好。",aim.sessionID(namespace),aim.context(smokeCtx),aim.workdir(smokeRoot),aim.reviewPolicy("yolo"),aim.maxIteration(12),aim.timeout(60),aim.disableMCPServers(true),aim.disableAIForge(true),aim.aiCallback(smokeModel),aim.onEvent(func(op,e){
+        config,operator=op.GetConfig(),op
+        if string(e.Type)=="tool_call_log_dir" { info=json.loads(string(e.Content));smokeMutex.Lock();artifactDirs[info.call_tool_id]=file.Join(info.dir_path,"..");smokeMutex.Unlock() }
+    }),aim.configOptions(aiagent.aiCallback(smokeModel),aiagent.functionCallMode(native),func(c){
+        c.DisablePerception,c.DisableMemoryTriage,c.DisableIntervalReview=true,true,true
+        c.MemoryTriageId=namespace
+        c.AiAutoRetry,c.AiTransactionAutoRetry=1,1
+        return nil
+    })))
+    assert cursor==len(plan) && !awaiting
+    results=append(results,{"function_call":native,"tool_calls":cursor,"passed":true})
+    file.SaveJson(file.Join(smokeRoot,"task-results.json"),results)~
+}
+smokeCheck()

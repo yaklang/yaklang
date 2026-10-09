@@ -27,5 +27,14 @@ func bindMemorySearchToEngine(engine *antlr4yak.Engine, ctx context.Context, run
 	exports["SearchMemory"] = func(query string, opts ...aimemory.Option) ([]*schema.AIMemoryEntity, error) {
 		return aimemory.SearchMemory(query, append(append([]aimemory.Option{}, defaults...), opts...)...)
 	}
+	exports["Query"] = func(query string, opts ...aimemory.Option) ([]*aimemory.Item, error) {
+		return aimemory.Query(query, append(append([]aimemory.Option{}, defaults...), opts...)...)
+	}
+	exports["AmendMemory"] = func(operator, memoryID, content string, tags []string, opts ...aimemory.Option) (*schema.AIMemoryEntity, error) {
+		return aimemory.AmendMemory(operator, memoryID, content, tags, append(append([]aimemory.Option{}, defaults...), opts...)...)
+	}
+	exports["Amend"] = func(operator, memoryID, content string, tags []string, opts ...aimemory.Option) (*aimemory.Item, error) {
+		return aimemory.Amend(operator, memoryID, content, tags, append(append([]aimemory.Option{}, defaults...), opts...)...)
+	}
 	engine.SetVars(map[string]any{"aimemory": exports})
 }
