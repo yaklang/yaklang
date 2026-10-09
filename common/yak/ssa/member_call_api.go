@@ -12,6 +12,64 @@ type memberCallReadVisitKey struct {
 	wantFunction bool
 }
 
+// memberCallReadVisitSet is the recursion guard for phi member reads.
+//
+// Member reads nest only as deep as the phi chain in front of them, so a small
+// inline stack beats allocating a map on every top-level read. The overflow map
+// is only created if a pathological chain goes past the inline capacity, which
+// keeps the guard allocation-free on the common path while staying unbounded-safe.
+type memberCallReadVisitSet struct {
+	keys     [memberCallReadVisitStackDepth]memberCallReadVisitKey
+	length   int
+	overflow map[memberCallReadVisitKey]struct{}
+}
+
+const memberCallReadVisitStackDepth = 8
+
+func (s *memberCallReadVisitSet) contains(k memberCallReadVisitKey) bool {
+	for i := 0; i < s.length; i++ {
+		if s.keys[i] == k {
+			return true
+		}
+	}
+	if s.overflow != nil {
+		_, ok := s.overflow[k]
+		return ok
+	}
+	return false
+}
+
+// push records k and reports whether it landed in the overflow map. The caller
+// must pass that result back to pop: a key can legitimately be present both in
+// the inline stack (shallower frame) and in the overflow map (deeper frame), so
+// pop cannot infer the storage location from the key alone.
+func (s *memberCallReadVisitSet) push(k memberCallReadVisitKey) (inOverflow bool) {
+	if s.length < memberCallReadVisitStackDepth {
+		s.keys[s.length] = k
+		s.length++
+		return false
+	}
+	if s.overflow == nil {
+		s.overflow = make(map[memberCallReadVisitKey]struct{}, 8)
+	}
+	s.overflow[k] = struct{}{}
+	return true
+}
+
+func (s *memberCallReadVisitSet) pop(k memberCallReadVisitKey, inOverflow bool) {
+	if inOverflow {
+		// Only this frame inserted the overflow entry; the inline copy of k, if
+		// any, belongs to a shallower frame and must stay.
+		if s.overflow != nil {
+			delete(s.overflow, k)
+		}
+		return
+	}
+	if s.length > 0 && s.keys[s.length-1] == k {
+		s.length--
+	}
+}
+
 // ReadMemberCallMethodOrValue read member call method or value depends on type
 func (b *FunctionBuilder) ReadMemberCallMethodOrValue(object, key Value) Value {
 	res := checkCanMemberCallExist(object, key, false)
@@ -43,10 +101,12 @@ func (b *FunctionBuilder) ReadMemberCallValueByName(object Value, key string) Va
 }
 
 func (b *FunctionBuilder) readMemberCallValueEx(object, key Value, wantFunction bool) Value {
-	return b.readMemberCallValueExWithVisited(object, key, wantFunction, nil)
+	// Stack allocated: the guard lives only for this read and its nested edges.
+	var visited memberCallReadVisitSet
+	return b.readMemberCallValueExWithVisited(object, key, wantFunction, &visited)
 }
 
-func (b *FunctionBuilder) readMemberCallValueExWithVisited(object, key Value, wantFunction bool, visited map[memberCallReadVisitKey]struct{}) Value {
+func (b *FunctionBuilder) readMemberCallValueExWithVisited(object, key Value, wantFunction bool, visited *memberCallReadVisitSet) Value {
 	if res := b.CheckMemberCallNilValue(object, key, "readMemberCallVariableEx"); res != nil {
 		return res
 	}
@@ -67,19 +127,16 @@ func (b *FunctionBuilder) readMemberCallValueExWithVisited(object, key Value, wa
 
 	// Phi value: read member from each edge and merge as Phi.
 	if phi, ok := ToPhi(objectt); ok {
-		if visited == nil {
-			visited = make(map[memberCallReadVisitKey]struct{}, 8)
-		}
 		vk := memberCallReadVisitKey{
 			objectID:     objectt.GetId(),
 			keyID:        key.GetId(),
 			wantFunction: wantFunction,
 		}
-		if _, ok := visited[vk]; ok {
+		if visited.contains(vk) {
 			return b.getFieldValue(objectt, key, wantFunction)
 		}
-		visited[vk] = struct{}{}
-		defer delete(visited, vk)
+		inOverflow := visited.push(vk)
+		defer visited.pop(vk, inOverflow)
 
 		res := checkCanMemberCallExist(objectt, key, wantFunction)
 		if ret := b.PeekValueInThisFunction(res.name); ret != nil {

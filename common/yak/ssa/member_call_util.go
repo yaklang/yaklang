@@ -73,10 +73,17 @@ type checkMemberResult struct {
 	typ     Type
 }
 
+// memberCallVisitKey identifies one step of a member-read recursion.
+//
+// The type participates by identity. Types are only ever stored as pointers
+// (map[Type]struct{} is already used across the package), so a Type is a cheap,
+// comparable key: no GetId() is needed and nothing is stringified. The previous
+// version keyed on (typKind, typID, typ.RawString()), but fresh types carry no
+// id yet (id is claimed lazily at persist time) and Blueprint.RawString() is
+// empty, so distinct class types collapsed into one key -- which made the
+// cycle guard fire early and report members of the wrong object.
 type memberCallVisitKey struct {
-	typKind      TypeKind
-	typID        int64
-	typRaw       string
+	typ          Type
 	valueID      int64
 	keyID        int64
 	wantFunction bool
@@ -91,20 +98,8 @@ func makeMemberCallVisitKey(value, key Value, typ Type, wantFunction bool) membe
 	if !utils.IsNil(key) {
 		keyID = key.GetId()
 	}
-	typKind := AnyTypeKind
-	typID := int64(-1)
-	typRaw := ""
-	if !utils.IsNil(typ) {
-		typID = typ.GetId()
-		typKind = typ.GetTypeKind()
-		if typID <= 0 {
-			typRaw = typ.RawString()
-		}
-	}
 	return memberCallVisitKey{
-		typKind:      typKind,
-		typID:        typID,
-		typRaw:       typRaw,
+		typ:          typ,
 		valueID:      valueID,
 		keyID:        keyID,
 		wantFunction: wantFunction,
