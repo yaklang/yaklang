@@ -21,11 +21,11 @@ type capabilityDetail struct {
 }
 
 var capabilityTypeUsageGuides = map[string]string{
-	"tool":       "通过 `require_tool` 调用指定工具执行任务。/ Use `require_tool` to invoke the tool.",
-	"mcp-tool":   "通过 `require_tool` 调用指定 MCP 工具执行任务（工具名以 mcp_ 开头）。/ Use `require_tool` with the mcp_ prefixed name to invoke the MCP tool.",
+	"tool":       "本轮已广告工具专用 action 时，直接按其 Schema 填参调用；使用通用工具入口时，`require_tool` 仅加载定义，随后用 `directly_call_tool` 执行；已有 Schema 直接复用。/ Invoke an advertised dedicated action with its schema-defined arguments; otherwise use require_tool only to load the schema, then execute via directly_call_tool. Reuse a visible schema.",
+	"mcp-tool":   "MCP 工具使用完整名称 mcp_{server}_{tool}；`require_tool` 仅加载定义，不执行，按 Schema 用 `directly_call_tool` 执行；若已广告同名专用 action 则直接调用该 action。/ Use the full MCP tool name. require_tool only loads its schema; execute via directly_call_tool, or invoke an advertised dedicated action.",
 	"forge":      "通过 `require_ai_blueprint` 调用蓝图，由蓝图系统负责自动化执行编排。/ Use `require_ai_blueprint` to execute the blueprint workflow.",
 	"skill":      "技能会被自动加载到上下文中，提供特定领域的知识和方法指引。/ Skills are auto-loaded into context.",
-	"focus_mode": "通过 `enter_focus_mode` 进入专注模式，在独立的执行环境中完成特定任务。/ Use `enter_focus_mode` to enter focus mode.",
+	"focus_mode": "通过 `load_capability` 的 `capability_identifier` 指定能力标识进入专注模式，内部按本轮广告的 action 执行。/ Use load_capability with capability_identifier to enter focus mode, then follow that mode's advertised actions.",
 }
 
 var capabilityTypeLabels = map[string]string{

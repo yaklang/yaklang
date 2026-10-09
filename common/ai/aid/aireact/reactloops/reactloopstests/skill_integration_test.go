@@ -23,9 +23,8 @@ import (
 //
 // Priority order (first match wins):
 //   1. verify-satisfaction  — "verify-satisfaction" + "user_satisfied" + "reasoning"
-//   2. call-tool params     — "# Tool Context" + "call-tool" (R2 reuses R1 instruction)
-//   3. main ReAct prompt    — layered main-loop envelope + action schema
-//   4. unknown / fallback
+//   2. main ReAct prompt    — layered main-loop envelope + action schema
+//   3. unknown / fallback
 //
 // The main ReAct prompt is the only one that contains the action schema
 // (including loading_skills when skills are configured).
@@ -71,7 +70,6 @@ const (
 	promptUnknown promptType = iota
 	promptMainReAct
 	promptVerifySatisfaction
-	promptCallToolParams
 )
 
 // classifyPrompt determines the type of an AI prompt from its content.
@@ -82,12 +80,7 @@ func classifyPrompt(prompt string) promptType {
 		return promptVerifySatisfaction
 	}
 
-	// 2. call-tool params: two markers that uniquely identify it
-	if aicommon.IsToolParamGenPromptForTool(prompt, "") && strings.Contains(prompt, "call-tool") {
-		return promptCallToolParams
-	}
-
-	// 3. main ReAct prompt: layered envelope and the decision action schema.
+	// 2. main ReAct prompt: layered envelope and the decision action schema.
 	if aicommon.IsPrimaryDecisionPrompt(prompt) {
 		return promptMainReAct
 	}
@@ -128,10 +121,6 @@ func handleNonMainPrompt(prompt string, i aicommon.AICallerConfigIf) (*aicommon.
 	switch classifyPrompt(prompt) {
 	case promptVerifySatisfaction:
 		rsp, err := makeVerifySatisfactionResponse(i)
-		return rsp, err, true
-	case promptCallToolParams:
-		// call-tool params: should not appear in skill tests (no tools), finish gracefully
-		rsp, err := makeFinishResponse(i)
 		return rsp, err, true
 	case promptMainReAct:
 		return nil, nil, false // caller handles main prompt

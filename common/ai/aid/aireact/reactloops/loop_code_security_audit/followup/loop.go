@@ -17,8 +17,10 @@ import (
 var followupInstruction = promptloader.MustLoad("ai/aid/aireact/reactloops/loop_code_security_audit/followup/prompts/instruction.txt")
 
 const followupOutputExample = `
-* 当用户追问某段代码是否安全时：
-  {"@action": "require_tool", "tool": "read_file", "params": {"file": "/abs/path/to/file.go"}, "human_readable_thought": "读取用户关注的文件以结合审计结论分析"}
+* 需要读取代码但尚无完整工具 Schema 时，先加载定义（不读取文件）：
+  {"@action": "require_tool", "require_tool_payload": "read_file", "human_readable_thought": "加载文件读取工具定义"}
+* 观察 Schema 后读取文件；已有完整 Schema 时直接执行：
+  {"@action": "directly_call_tool", "directly_call_tool_name": "read_file", "directly_call_tool_params": {"file": "/abs/path/to/file.go"}, "human_readable_thought": "读取用户关注的文件以结合审计结论分析"}
 * 当信息已足够回答时：
   {"@action": "directly_answer", "answer_payload": "...", "human_readable_thought": "基于审计报告与选区代码给出结论"}
 `
@@ -38,7 +40,7 @@ const followupReactiveDataTpl = `## 审计后追问模式
 | 已排除 | {{ .SafeCount }} |
 | 高危/中危/低危 | {{ .HighCount }} / {{ .MediumCount }} / {{ .LowCount }} |
 
-**审计数据文件**（可用 read_file 或 read_audit_report 读取）:
+**审计数据文件**（报告优先用专用 action read_audit_report；其他文件通过本轮通用工具入口调用 read_file）:
 {{ if .ReportPath }}- 报告: {{ .ReportPath }}
 {{ end }}{{ if .VerifiedVulnsPath }}- 验证结果: {{ .VerifiedVulnsPath }}
 {{ end }}{{ if .FindingsPath }}- 原始 findings: {{ .FindingsPath }}
@@ -51,7 +53,7 @@ const followupReactiveDataTpl = `## 审计后追问模式
 {{ .FeedbackMessages }}
 {{ end }}
 <|AUDIT_FOLLOWUP_END_{{ .Nonce }}|>
-请基于审计结果与用户问题作答；需要更多代码细节时使用 read_file/grep。`
+请基于审计结果与用户问题作答；需要更多代码细节时，若缺少定义，先用 require_tool 的 require_tool_payload 加载 read_file/grep Schema，再用 directly_call_tool 提交完整参数；已有 Schema 直接执行。加载定义不等于已读取文件。`
 
 // BuildLoop runs interactive Q&A after the main audit pipeline has completed.
 // The frontend may keep focus mode locked to code_security_audit; this sub-loop handles
@@ -113,7 +115,7 @@ func buildReadAuditReportAction(state *model.AuditState) reactloops.ReActLoopOpt
 		func(loop *reactloops.ReActLoop, action *aicommon.Action, op *reactloops.LoopActionHandlerOperator) {
 			path := state.GetFinalReportPath()
 			if path == "" {
-				op.Feedback("审计报告尚未生成或路径未知，请改用 read_file 读取 audit 目录下的 security_audit_report.md。")
+				op.Feedback("审计报告尚未生成或路径未知，请通过本轮通用工具入口调用 read_file 读取 audit 目录下的 security_audit_report.md；require_tool 仅加载定义，不读取文件。")
 				return
 			}
 			content, err := os.ReadFile(path)
