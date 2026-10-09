@@ -295,13 +295,23 @@ func (s *binPFCP) retainAmbiguous(f *binFlow, k pfcpSequence, w []byte, id uint6
 // pair/domain, including another node profile. Retain only bounded markers so
 // delayed replies cannot revive a released candidate. Other peers are intact.
 // Called with udpMu held.
-func (a *binParser) blockPFCPConversation(e *ProtocolEvent) {
+func (a *binParser) blockPFCPConversation(e *ProtocolEvent, w []byte) {
 	if a.udpSessions == nil {
 		return
 	}
 	for _, el := range a.udpSessions.entries {
 		f := el.Value.(*binUDPEntry).flow
 		if f.pfcp != nil && f.domain == e.Domain && ((f.endpoints[0] == e.Source && f.endpoints[1] == e.Destination) || (f.endpoints[1] == e.Source && f.endpoints[0] == e.Destination)) {
+			if pfcpRequestHeader(w) && !f.pfcp.hasDeniedSequence {
+				dir := 0
+				if e.Source != f.endpoints[0] {
+					dir = 1
+				}
+				k := pfcpSequence{dir, pfcpSequenceNumber(w)}
+				if r := f.pfcp.seen[k]; r != nil && (r.ambiguous || !bytes.Equal(r.wire, w)) {
+					f.pfcp.deniedSequence, f.pfcp.hasDeniedSequence = k, true
+				}
+			}
 			f.blockPFCPSetup()
 		}
 	}

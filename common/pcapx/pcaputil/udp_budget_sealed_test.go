@@ -171,11 +171,6 @@ func TestUDPTerminalBudgetSealedCaptureMatrix(t *testing.T) {
 func TestUDPTerminalBudgetSealedSessionAndFrameLimits(t *testing.T) {
 	for _, c := range udpBudgetControls(t) {
 		t.Run(c.Name, func(t *testing.T) {
-			for _, st := range c.Steps {
-				if st.Interface != 0 {
-					t.Skip("Public session has one fixed capture domain; all 12 capture configurations above verify this isolation")
-				}
-			} // Public session has one fixed capture domain; tested by capture matrix above.
 			unknown := false
 			for _, st := range c.Steps {
 				unknown = unknown || (st.Expected == "generic-limit" && st.FrameExpected == "")
@@ -205,13 +200,24 @@ func TestUDPTerminalBudgetSealedSessionAndFrameLimits(t *testing.T) {
 					if frameOnly {
 						budget.MaxMessageBytes = 2048
 					}
-					s, err := NewProtocolSessionWithOptions(budget, WithSessionTransport("udp"), WithSessionPorts(39000, c.Port))
-					require.NoError(t, err)
-					x := s.(*captureSession)
-					x.f.a.config.Deferred = deferred
+					// Feed observes one fixed capture domain. Callers route different
+					// interfaces to independent sessions; the capture matrix above
+					// verifies the actual InterfaceIndex routing inside ReplayPcap.
+					sessions := map[int]ProtocolSession{}
+					fed := map[int]int{}
+					getSession := func(iface int) ProtocolSession {
+						if s := sessions[iface]; s != nil {
+							return s
+						}
+						s, err := NewProtocolSessionWithOptions(budget, WithSessionTransport("udp"), WithSessionPorts(39000, c.Port))
+						require.NoError(t, err)
+						s.(*captureSession).f.a.config.Deferred = deferred
+						sessions[iface] = s
+						return s
+					}
 					var events []*ProtocolEvent
-					for i, st := range scenario.Steps {
-
+					for _, st := range scenario.Steps {
+						s := getSession(st.Interface)
 						wire := wrapperWire(t, st.Wire)
 						out := s.Feed(st.Direction, time.Unix(st.Timestamp, 0), wire)
 						clear(wire)
@@ -219,7 +225,7 @@ func TestUDPTerminalBudgetSealedSessionAndFrameLimits(t *testing.T) {
 						events = append(events, out.Events...)
 						if st.Expected == "ResourceExceeded" {
 							rocTypedError(t, "ResourceExceeded", out.Err)
-							if i > 0 && st.Timestamp < 130 {
+							if fed[st.Interface] > 0 && st.Timestamp < 130 {
 								retained := int64(512)
 								if c.Protocol == "dlms-wrapper" {
 									retained = 768
@@ -227,6 +233,7 @@ func TestUDPTerminalBudgetSealedSessionAndFrameLimits(t *testing.T) {
 								require.Equal(t, retained, s.Stats().BufferedBytes)
 							}
 						}
+						fed[st.Interface]++
 					}
 					checkUDPBudgetEvents(t, scenario, events, deferred)
 					var refused uint64
@@ -235,10 +242,14 @@ func TestUDPTerminalBudgetSealedSessionAndFrameLimits(t *testing.T) {
 							refused += uint64(len(st.Wire) / 2)
 						}
 					}
-					require.Equal(t, refused, s.Stats().LimitedBytes)
-					s.Close("sealed terminal budget cleanup")
-					s.Close("idempotent")
-					require.Zero(t, s.Stats().BufferedBytes)
+					var actualRefused uint64
+					for _, s := range sessions {
+						actualRefused += s.Stats().LimitedBytes
+						s.Close("sealed terminal budget cleanup")
+						s.Close("idempotent")
+						require.Zero(t, s.Stats().BufferedBytes)
+					}
+					require.Equal(t, refused, actualRefused)
 				}
 			}
 		})

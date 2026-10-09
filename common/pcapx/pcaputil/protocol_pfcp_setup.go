@@ -344,7 +344,11 @@ func (s *binPFCP) retireSetupReply(w []byte, dir int) {
 	}
 }
 func (f *binFlow) blockPFCPSetup() {
+	previous := f.pfcp
 	f.pfcp = &binPFCP{blocked: true}
+	if previous != nil && previous.hasDeniedSequence {
+		f.pfcp.deniedSequence, f.pfcp.hasDeniedSequence = previous.deniedSequence, true
+	}
 	// Keep only the bounded terminal marker. The retained ledger already covers
 	// this smaller amount, so releasing request bodies cannot exceed the budget.
 	if f.sessionBytes > 512 {
@@ -383,7 +387,7 @@ func (a *binParser) refusePFCPOversize(e *ProtocolEvent, w []byte, src, dst uint
 			e.FlowID = el.Value.(*binUDPEntry).flow.id
 		}
 		a.quarantinePFCPPeers(e, w, nil)
-		a.blockPFCPConversation(e)
+		a.blockPFCPConversation(e, w)
 	}
 	a.udpMu.Unlock()
 	e.Protocol, e.Profile, e.Admission = "pfcp", discoveryProfile("pfcp", w), "wire-and-port-hint"

@@ -276,6 +276,10 @@ type pfcpRequest struct {
 type binPFCP struct {
 	seen    map[pfcpSequence]*pfcpRequest
 	blocked bool
+	// A terminal refusal releases the request bodies, but preserves the first
+	// already ambiguous sequence's public diagnostic in a fixed-size marker.
+	deniedSequence    pfcpSequence
+	hasDeniedSequence bool
 }
 
 const pfcpIdleTTL = 30 * time.Second
@@ -318,6 +322,13 @@ func (s *binPFCP) associate(f *binFlow, e *ProtocolEvent, w []byte, limit int) e
 	association := "unmatched-response"
 	if s.blocked {
 		association = "ambiguous-conversation"
+		blockedKey := k
+		if pfcpReplyHeader(w) {
+			blockedKey.dir = 1 - e.Direction
+		}
+		if s.hasDeniedSequence && blockedKey == s.deniedSequence {
+			association = "ambiguous-sequence"
+		}
 	} else if pfcpRequestHeader(w) {
 		association = "request"
 		r := s.seen[k]
@@ -487,7 +498,7 @@ func (a *binParser) decodeDiscoveryDatagram(e *ProtocolEvent, w []byte, src, dst
 		}
 		var denied *ProtocolError
 		if errors.As(err, &denied) && denied.Kind == ErrResourceExceeded {
-			a.blockPFCPConversation(e)
+			a.blockPFCPConversation(e, w)
 		}
 		a.udpMu.Unlock()
 	}
