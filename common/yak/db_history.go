@@ -33,4 +33,12 @@ func bindDBHistoryToEngine(engine *antlr4yak.Engine, ctx context.Context, runtim
 		return yaklib.QueryHTTPFlowByID(id, options(opts)...)
 	}
 	engine.SetVars(map[string]any{"db": exports})
+	riskExports := make(map[string]any, len(yaklib.RiskExports))
+	for name, fn := range yaklib.RiskExports {
+		riskExports[name] = fn
+	}
+	riskExports["QueryRiskInDatabase"] = func(filter map[string]any, opts ...yaklib.DBHistoryOption) (*yaklib.RiskDatabasePage, error) {
+		return yaklib.QueryRiskInDatabase(filter, options(opts)...)
+	}
+	engine.SetVars(map[string]any{"risk": riskExports})
 }

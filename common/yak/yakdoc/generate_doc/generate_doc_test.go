@@ -89,6 +89,9 @@ func CheckDocumentHelper(t *testing.T, helper *yakdoc.DocumentHelper) {
 	checkNormalFunction("", "yakfmt")
 	checkNormalFunction("yakit", "Info")
 	checkNormalFunction("yakit", "Error")
+	checkNormalFunction("risk", "QueryRiskInDatabase")
+	require.Contains(t, helper.Libs["risk"].Functions["QueryRiskInDatabase"].Document, "分页搜索")
+	checkStructMethods("github.com/yaklang/yaklang/common/yak/yaklib.RiskDatabasePage", "Dump")
 	// interface
 	checkStructMethods("github.com/yaklang/yaklang/common/mutate.FuzzHTTPRequestIf", "Repeat")
 	// struct
