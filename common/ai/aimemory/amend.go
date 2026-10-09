@@ -12,9 +12,9 @@ import (
 	"github.com/yaklang/yaklang/common/schema"
 )
 
-// AmendMemory manages one exact memory ID in a namespace. Change deletes the old
+// Amend manages one exact memory ID in a namespace. Change deletes the old
 // memory and its indexes, then writes a replacement with a new ID.
-func AmendMemory(operator, memoryID, content string, tags []string, opts ...Option) (*schema.AIMemoryEntity, error) {
+func Amend(operator, memoryID, content string, tags []string, opts ...Option) (*Item, error) {
 	c := &options{namespace: "default", ctx: context.Background()}
 	for _, opt := range opts {
 		opt(c)
@@ -65,7 +65,7 @@ func AmendMemory(operator, memoryID, content string, tags []string, opts ...Opti
 		if err := aimem.BatchCleanupMemories(c.ctx, c.db, c.namespace, []string{memoryID}); err != nil {
 			return nil, err
 		}
-		return &old, nil
+		return &Item{AIMemoryEntity: &old}, nil
 	}
 	// Prepare the storage/index backend before deleting anything.
 	store, err := aimem.NewMemoryStore(c.namespace, aimem.WithDatabase(c.db))
@@ -99,5 +99,5 @@ func AmendMemory(operator, memoryID, content string, tags []string, opts ...Opti
 	if err := c.db.Where("memory_id = ? AND session_id = ?", entity.Id, c.namespace).First(&row).Error; err != nil {
 		return nil, err
 	}
-	return &row, nil
+	return &Item{AIMemoryEntity: &row}, nil
 }

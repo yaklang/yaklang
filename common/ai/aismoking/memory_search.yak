@@ -104,14 +104,14 @@ for native in [true,false] {
     printf("PASS smart_qa shared Yak search: function_call=%v calls=1 namespace=1\n",native)
 }
 for searchMode in ["bm25","vector","hybrid"] {
-    missing = aimemory.SearchMemory("report",aimemory.memoryNamespace(namespace+"-missing"),aimemory.memorySearchMode(searchMode))~
+    missing = aimemory.Search("report",aimemory.memoryNamespace(namespace+"-missing"),aimemory.memorySearchMode(searchMode))~
     assert len(missing) == 0
 }
-foreign = aimemory.SearchMemory("foreign-memory-smoke-sentinel",aimemory.memoryNamespace(namespace+"-other"),aimemory.memorySearchMode("bm25"))~
+foreign = aimemory.Search("foreign-memory-smoke-sentinel",aimemory.memoryNamespace(namespace+"-other"),aimemory.memorySearchMode("bm25"))~
 assert len(foreign) == 1 && foreign[0].MemoryID == fixtureID+"-foreign"
-_,err = aimemory.SearchMemory("report",aimemory.memoryNamespace(namespace),aimemory.memoryLimit(21))
+_,err = aimemory.Search("report",aimemory.memoryNamespace(namespace),aimemory.memoryLimit(21))
 assert err != nil && "limit" in string(err)
-_,err = aimemory.SearchMemory("report",aimemory.memoryNamespace(namespace),aimemory.memorySearchMode("vector"))
+_,err = aimemory.Search("report",aimemory.memoryNamespace(namespace),aimemory.memorySearchMode("vector"))
 assert err != nil && "vector index is unavailable" in string(err)
-println("PASS standalone aimemory.SearchMemory: namespace=1 empty=1 limit_error=1 vector_error=1")
+println("PASS standalone aimemory.Search: namespace=1 empty=1 limit_error=1 vector_error=1")
 smokeCheck()

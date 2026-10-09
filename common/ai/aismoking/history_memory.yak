@@ -50,7 +50,7 @@ smokeHandler=func(w,body) {
         w.Write("data: [DONE]\n\n")~;return
     }
     assert "SMOKE_CALLER:react-loop:default" in prompt || "SMOKE_CALLER:react-loop:main" in prompt
-    assert "会话历史与记忆" in prompt && "aihistory.Query" in prompt && "aimemory.Query" in prompt
+    assert "会话历史与记忆" in prompt && "aihistory.Query" in prompt && "aimemory.Search" in prompt
     for name in ["grep_timeline_history","read_memory","amend_memory"] { assert name in prompt, "missing default tool "+name }
     seed()
     if awaiting { checkPrevious() }

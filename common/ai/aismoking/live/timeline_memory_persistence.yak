@@ -129,7 +129,7 @@ for native in [true,false] {
                 c.AiAutoRetry,c.AiTransactionAutoRetry = 1,1
                 return nil
             })))
-        memories = aimemory.SearchMemory("timeline-memory-persistence-sentinel",aimemory.memoryNamespace(namespace),aimemory.memorySearchMode("bm25"))~
+        memories = aimemory.Search("timeline-memory-persistence-sentinel",aimemory.memoryNamespace(namespace),aimemory.memorySearchMode("bm25"))~
         assert len(memories)==expected,"persisted memory not searchable in the session namespace"
         assert oldTriageCalls == 0
         printf("PASS memory notification: native=%v scenario=%s compression=%d save=%d index=%d searchable=%d old_triage_calls=%d\n",

@@ -146,7 +146,7 @@ for native in [true,false] {
         assert approvals == 1 && reports == 1 && ends == 1
         if memoryFinalization {
             assert memoryCompressions == 1 && memorySaves == 1 && memoryIndexes == 1, "normal PLAN completion must wait for one final durable save"
-            memories = aimemory.SearchMemory("工程报告",aimemory.memoryNamespace(memoryNamespace),aimemory.memorySearchMode("bm25"))~
+            memories = aimemory.Search("工程报告",aimemory.memoryNamespace(memoryNamespace),aimemory.memorySearchMode("bm25"))~
             assert len(memories)==1
             printf("PASS PLAN memory: native=%v manual=%v compression=1 save=1 index=1 searchable=1 old_triage=0\n",native,manual)
         }

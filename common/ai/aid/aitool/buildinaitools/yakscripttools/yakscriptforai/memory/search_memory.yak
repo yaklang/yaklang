@@ -31,7 +31,7 @@ tokenLimit = cli.Int("token_limit", cli.setDefault(1500), cli.setHelp("检索正
 cli.check()
 
 if namespace == "" { namespace = aimemory.CurrentNamespace() }
-memories = aimemory.SearchMemory(query, aimemory.memoryNamespace(namespace), aimemory.memoryTokenLimit(tokenLimit), aimemory.memoryLimit(limit), aimemory.memorySearchMode(mode))~
+memories = aimemory.Search(query, aimemory.memoryNamespace(namespace), aimemory.memoryTokenLimit(tokenLimit), aimemory.memoryLimit(limit), aimemory.memorySearchMode(mode))~
 hits = []
 for memory in memories {
     tags = []

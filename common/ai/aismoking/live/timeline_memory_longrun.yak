@@ -218,7 +218,7 @@ if config!=nil {
     file.Save(file.Join(root,"final-evidence.txt"),config.GetSessionEvidenceRendered())~
     file.SaveJson(file.Join(root,"session-candidates.json"),config.GetTimeline().GetSessionMemoryCandidates())~
 }
-memories,searchErr = aimemory.SearchMemory("工程报告",aimemory.memoryNamespace(namespace),aimemory.memorySearchMode("bm25"),aimemory.memoryTokenLimit(8192))
+memories,searchErr = aimemory.Search("工程报告",aimemory.memoryNamespace(namespace),aimemory.memorySearchMode("bm25"),aimemory.memoryTokenLimit(8192))
 if searchErr!=nil { checks=append(checks,"search_error:"+sprintf("%v",searchErr)) }
 file.SaveJson(file.Join(root,"search-memories.json"),memories)~
 pending=false

@@ -31,7 +31,7 @@ var allBuiltinSkills = []struct {
 	{"how-to-use-browser", "skills/how-to-use-browser/SKILL.md", []string{"snapshot", "click", "fill", "screenshot", "CDP"}},
 	{"authorization-bypass", "skills/authorization-bypass/SKILL.md", []string{"IDOR", "WSTG-ATHZ-02", "Horizontal", "Vertical", "do_http_request"}},
 	{"java-audit", "skills/java-audit/SKILL.md", []string{"java_project_probe", "java_audit", "RuoYi", "spring_boot", "scope-modules"}},
-	{"ai-history-memory", "skills/ai-history-memory/SKILL.md", []string{"aihistory.Query", "aimemory.Query", "item.Dump()", "grep_timeline_history"}},
+	{"ai-history-memory", "skills/ai-history-memory/SKILL.md", []string{"aihistory.Query", "aimemory.Search", "item.Dump()", "grep_timeline_history"}},
 	{"fuzztag", "skills/fuzztag/SKILL.md", []string{"fuzz.Strings", "笛卡尔积", "同步配对"}},
 	{"fuzztag-reference", "skills/fuzztag-reference/SKILL.md", []string{"exec_fuzztag", "codecflow", "params", "别名"}},
 }
@@ -575,7 +575,7 @@ func TestBuiltinFuzztagDefaultContext(t *testing.T) {
 	if !manager.IsAutoSkillLoadedAndUnfolded("ai-history-memory") || manager.IsForcedSkill("ai-history-memory") {
 		t.Fatal("history/memory skill must auto-load without a user-forced skill")
 	}
-	for _, text := range []string{"aihistory.Query", "aimemory.Query", "grep_timeline_history", "amend_memory"} {
+	for _, text := range []string{"aihistory.Query", "aimemory.Search", "grep_timeline_history", "amend_memory"} {
 		if !strings.Contains(rendered, text) {
 			t.Errorf("auto-loaded context missing %q", text)
 		}

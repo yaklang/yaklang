@@ -19,9 +19,9 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
-// SearchMemory reads an existing memory set. It does not initialize triage,
-// create collections or update injection. Presentation belongs to the Yak tool.
-func SearchMemory(query string, opts ...Option) ([]*schema.AIMemoryEntity, error) {
+// Search reads an existing memory set. It does not initialize triage,
+// create collections or update injection. Returned items expose raw readable Dump text.
+func Search(query string, opts ...Option) ([]*Item, error) {
 	c := &options{namespace: "default", mode: "hybrid", limit: 5, tokens: 1500, ctx: context.Background()}
 	for _, opt := range opts {
 		opt(c)
@@ -45,7 +45,7 @@ func SearchMemory(query string, opts ...Option) ([]*schema.AIMemoryEntity, error
 	if c.db == nil {
 		c.db = consts.GetGormProjectDatabase()
 	}
-	empty := []*schema.AIMemoryEntity{}
+	empty := []*Item{}
 	if !c.db.HasTable(&schema.AIMemoryEntity{}) {
 		return empty, nil
 	}
@@ -149,7 +149,7 @@ func SearchMemory(query string, opts ...Option) ([]*schema.AIMemoryEntity, error
 			break
 		}
 		remaining -= ytoken.CalcTokenCount(row.Content)
-		result = append(result, row)
+		result = append(result, &Item{AIMemoryEntity: row})
 	}
 	return result, nil
 }

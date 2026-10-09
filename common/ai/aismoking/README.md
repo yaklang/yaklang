@@ -2,7 +2,7 @@
 
 `memory_search.yak` 验证 `aim.InvokeReAct` 两种协议下的记忆工具调用、当前 memory 集默认值、隔离、过期/删除过滤，以及 Timeline 冻结保存。用 `AISMOKING_CASE=memory_search` 从总入口运行，只供本地开发，不进 CI。
 
-库入口：`aimemory.SearchMemory(query, aimemory.memoryNamespace(id), aimemory.memoryTokenLimit(1500), aimemory.memorySearchMode("hybrid"))`。仅一个 namespace/id，指向当前项目数据库里的 `ai-memory-<id>` 集合；不引入 workspace。AI 工具中默认绑定当前运行时实际使用的 memory 集，独立脚本默认 `default`。不假设 persistent session ID 就是 memory 集 ID。
+库入口：`aimemory.Search(query, aimemory.memoryNamespace(id), aimemory.memoryTokenLimit(1500), aimemory.memorySearchMode("hybrid"))`。仅一个 namespace/id，指向当前项目数据库里的 `ai-memory-<id>` 集合；不引入 workspace。AI 工具中默认绑定当前运行时实际使用的 memory 集，独立脚本默认 `default`。不假设 persistent session ID 就是 memory 集 ID。
 
 库复用 RAG BM25/向量查询及已有 memory 表接口，返回现有 `AIMemoryEntity` 行，限量、去重、过滤过期/删除项并限制正文 token；输出格式在 `search_memory.yak` 中维护。`bm25` 还补充正文/标签关键词匹配，缺少索引可回退；`hybrid` 向量不可用时保留关键词结果并记录英文诊断，`vector` 明确报错。无匹配返回空数组，不创建 memory 集、不初始化 triage。`smart_qa` 仍是已注册的专注模式，其 memory action 转发至同一脚本。
 

@@ -46,7 +46,7 @@ for id,group in groups {
 candidates=json.loads(string(file.ReadFile(file.Join(root,"session-candidates.json"))~))
 verified=0
 for candidate in candidates {
-    entities,err=aimemory.SearchMemory(candidate.content,aimemory.memoryNamespace(result.namespace),aimemory.memorySearchMode("bm25"),aimemory.memoryTokenLimit(8192))
+    entities,err=aimemory.Search(candidate.content,aimemory.memoryNamespace(result.namespace),aimemory.memorySearchMode("bm25"),aimemory.memoryTokenLimit(8192))
     found=false
     if err==nil { for entity in entities { if entity.Content==candidate.content { found=true } } }
     if found { verified++ } else { checks=append(checks,"memory_candidate_not_persisted_or_searchable") }
