@@ -983,7 +983,7 @@ func sharedScanCallbackOptions(cfg *Config) []ssaconfig.Option {
 		ssaconfig.WithScanRuleTimeout(cfg.GetScanRuleTimeout()),
 		ssaconfig.WithScanRuleWorkLimit(cfg.GetScanRuleWorkLimit()),
 	)
-	// Propagate the risk-persistence setting to nested scan stages.
+	// Propagate the independent result/task persistence settings to nested stages.
 	if cfg.IsNoSaveRisk() {
 		opts = append(opts, ssaconfig.WithNoSaveRisk(true))
 	}
@@ -992,6 +992,9 @@ func sharedScanCallbackOptions(cfg *Config) []ssaconfig.Option {
 	// earlier mode's finding.
 	if cfg.scanRuntime != nil {
 		opts = append(opts, WithScanRuntime(cfg.scanRuntime))
+	}
+	if cfg.IsNoSaveTask() {
+		opts = append(opts, ssaconfig.WithNoSaveTask(true))
 	}
 	return opts
 }
