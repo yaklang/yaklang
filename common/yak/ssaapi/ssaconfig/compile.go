@@ -410,16 +410,6 @@ func (c *Config) GetCompileDisableDefaultExcludes() bool {
 	return c.SSACompile.DisableDefaultExcludes
 }
 
-func (c *Config) SetCompileDisableDefaultExcludes(disable bool) {
-	if c == nil {
-		return
-	}
-	if c.SSACompile == nil {
-		c.SSACompile = defaultSSACompileConfig()
-	}
-	c.SSACompile.DisableDefaultExcludes = disable
-}
-
 func (c *Config) GetCompileEntryFiles() []string {
 	if c == nil || c.SSACompile == nil {
 		return nil
