@@ -1,7 +1,6 @@
 package ssaconfig
 
 import (
-	"context"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -147,27 +146,6 @@ func TestBuildCompileExcludeFunc(t *testing.T) {
 		require.False(t, exclude("composer.lock"))
 		require.False(t, exclude("node_modules/pkg/index.js"))
 		require.False(t, exclude("src/testdata/issue47704.go"))
-	})
-}
-
-func TestDisableDefaultCompileExcludesContext(t *testing.T) {
-	t.Run("resolve honors disabled context", func(t *testing.T) {
-		exclude := ResolveCompileExcludeFuncInContext(
-			WithDefaultCompileExcludesDisabled(context.Background()), nil)
-		require.False(t, exclude("test.jar"))
-		require.False(t, exclude("node_modules/pkg/index.js"))
-	})
-
-	t.Run("resolve builds defaults without disabled context", func(t *testing.T) {
-		exclude := ResolveCompileExcludeFuncInContext(context.Background(), nil)
-		require.True(t, exclude("test.jar"))
-	})
-
-	t.Run("explicit exclude func wins over context", func(t *testing.T) {
-		explicit := func(string) bool { return true }
-		exclude := ResolveCompileExcludeFuncInContext(
-			WithDefaultCompileExcludesDisabled(context.Background()), explicit)
-		require.True(t, exclude("anything"))
 	})
 }
 

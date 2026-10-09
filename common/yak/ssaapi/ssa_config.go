@@ -359,17 +359,8 @@ func DefaultConfig(opts ...ssaconfig.Option) (*Config, error) {
 	if sc.SSACompile != nil {
 		userExclude = sc.SSACompile.ExcludeFiles
 	}
-	// honor WithDisableDefaultCompileExcludes: apply options before building the
-	// exclude matcher so the flag is visible here
-	ssaconfig.ApplyExtraOptions(c, c.Config)
 	c.excludeFile = ssaconfig.BuildCompileExcludeFuncWithDefaults(userExclude, sc.GetCodeSourceLocalFile(), !sc.GetCompileDisableDefaultExcludes())
-	if sc.GetCompileDisableDefaultExcludes() {
-		// propagate to ctx so context-only consumers (ScanProjectFiles,
-		// java prehandler filter, reducer) also skip default excludes
-		if c.ctx != nil {
-			c.ctx = ssaconfig.WithDefaultCompileExcludesDisabled(c.ctx)
-		}
-	}
+	ssaconfig.ApplyExtraOptions(c, c.Config)
 
 	// 只有当 c.fs 为 nil 时，才从配置中解析文件系统
 	// 这样可以避免覆盖通过 WithFileSystem 显式设置的文件系统
