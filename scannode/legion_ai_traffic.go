@@ -236,17 +236,87 @@ func trafficSplitBudget(limit, leftSize, rightSize int) (int, int) {
 }
 
 func trafficRequestMetadata(record *aiv1.AITrafficRecord, packet []byte) {
+	// Preserve the attempt's start URL even if terminal packets are truncated,
+	// unavailable, or dropped by the local/platform raw-byte quota.
+	if record.RedactedUrl != nil {
+		return
+	}
 	if req, err := http.ReadRequest(bufio.NewReader(bytes.NewReader(packet))); err == nil {
 		record.Method = req.Method
 		record.Host = req.Host
-		if strings.ContainsAny(record.Host, "\r\n@") || len(record.Host) > 300 {
+		if !trafficValidURLHost(record.Scheme, record.Host) {
 			record.Host = ""
+		}
+		if safeURL := trafficRedactedURL(req.URL, record.Scheme, record.Host); safeURL != "" {
+			record.RedactedUrl = proto.String(safeURL)
 		}
 		req.Body.Close()
 	}
 	if len(record.Method) > 16 {
 		record.Method = ""
 	}
+}
+
+func trafficValidURLHost(scheme, host string) bool {
+	if (scheme != "http" && scheme != "https") || host == "" || len(host) > 300 {
+		return false
+	}
+	parsed, err := url.Parse(scheme + "://" + host)
+	return err == nil && parsed.Host == host && parsed.Hostname() != "" && parsed.User == nil && parsed.Path == "" && parsed.RawQuery == "" && parsed.Fragment == ""
+}
+
+// Keep these rules aligned with Legion internal/aitraffic.RedactURL. The node
+// cannot import the platform; no raw URL may enter event or spool metadata.
+func trafficSensitiveURLKey(key string) bool {
+	key = strings.ToLower(strings.NewReplacer("-", "", "_", "", ".", "").Replace(key))
+	for _, value := range []string{"authorization", "cookie", "token", "password", "passwd", "secret", "apikey", "credential"} {
+		if strings.Contains(key, value) {
+			return true
+		}
+	}
+	return key == "auth" || key == "pwd" || key == "sessionid"
+}
+
+func trafficRedactedURL(target *url.URL, scheme, host string) string {
+	if target == nil || target.Opaque != "" || !trafficValidURLHost(scheme, host) {
+		return ""
+	}
+	parsed := *target
+	if parsed.Scheme == "" {
+		parsed.Scheme = scheme
+	}
+	if parsed.Host == "" {
+		parsed.Host = host
+	}
+	if parsed.Scheme != scheme || !strings.EqualFold(parsed.Host, host) || len(parsed.String()) > 16<<10 {
+		return ""
+	}
+	// ParseQuery errors must fail closed instead of silently retaining partial
+	// query fields. URL credentials and fragments are never metadata.
+	values, err := url.ParseQuery(parsed.RawQuery)
+	if err != nil {
+		return ""
+	}
+	parsed.User, parsed.Fragment, parsed.RawFragment = nil, "", ""
+	const mask = "[REDACTED]"
+	segments := strings.Split(parsed.Path, "/")
+	for i := 1; i < len(segments); i++ {
+		if trafficSensitiveURLKey(segments[i-1]) {
+			segments[i] = mask
+		}
+	}
+	parsed.Path, parsed.RawPath = strings.Join(segments, "/"), ""
+	for key := range values {
+		if trafficSensitiveURLKey(key) {
+			values.Set(key, mask)
+		}
+	}
+	parsed.RawQuery = values.Encode()
+	redacted := parsed.String()
+	if len(redacted) > 16<<10 {
+		return ""
+	}
+	return redacted
 }
 
 // Oversize HTTPFlow implementations store headers/body separately. Read the
