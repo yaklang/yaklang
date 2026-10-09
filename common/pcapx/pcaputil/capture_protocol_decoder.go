@@ -69,6 +69,11 @@ func udpEncapsulation(next gopacket.LayerType) bool {
 }
 
 func (b *protocolPacketBuilder) NextDecoder(next gopacket.Decoder) error {
+	// These complete Ethernet PDUs have bounded native codecs. Do not invoke
+	// gopacket's unknown-EtherType decoder before their ingress can run.
+	if kind, ok := next.(layers.EthernetType); ok && (kind == 0x88ba || kind == 0x88a4) {
+		next = gopacket.LayerTypePayload
+	}
 	// The bounded native LLDP codec validates its own complete TLV layout.
 	// Observer packets retain the original gopacket view.
 	if layer, ok := next.(gopacket.LayerType); ok && layer == layers.LayerTypeLinkLayerDiscovery {

@@ -37,6 +37,8 @@ func (h *binHTTPState) config() map[string]any {
 func (f *binFlow) frameDirection(dir int, w []byte) (int, *binSpec, error) {
 	if f.binding == nil {
 		switch f.protocol {
+		case "slmp":
+			return f.frameSLMPTCP(w)
 		case "vnc":
 			return f.frameRFB(dir, w)
 		case "diameter":
@@ -139,6 +141,24 @@ func (f *binFlow) frameDirection(dir int, w []byte) (int, *binSpec, error) {
 				return 0, nil, err
 			}
 			n, err := atgFrameSize(w, dir == f.atg.clientDir, f.a.budget.MaxFrameBytes)
+			return n, &binSpec{}, err
+		case "dlms-wrapper":
+			n, err := wrapperFrameSize(w, min(f.a.budget.MaxFrameBytes, f.a.config.MaxMessageBytes))
+			if err == nil && n > 0 {
+				// Charge the complete owned event/projection before event() copies
+				// raw bytes, in addition to any retained invoke context.
+				err = f.reserveSession(f.wrapper.storage() + wrapperProjectionBytes + 256 + 128*int64(n))
+				var typed *ProtocolError
+				if errors.As(err, &typed) {
+					err = typed
+				}
+			}
+			return n, &binSpec{}, err
+		case "dlms":
+			if err := f.reserveSession(f.dlms.storage()); err != nil {
+				return 0, nil, err
+			}
+			n, err := dlmsFrameSize(w, f.a.budget.MaxFrameBytes)
 			return n, &binSpec{}, err
 		case "genisys":
 			if err := f.reserveSession(256); err != nil {

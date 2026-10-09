@@ -1,6 +1,7 @@
 # PROFINET DCP Identify and Set messages, including the RT frame identifier.
 # Unknown blocks retain their declared bytes; they are not interpreted as
-# known device properties. Field layout: Wireshark 4.4.8 packet-pn-dcp.c.
+# known device properties. Identify filters have no BlockInfo prefix.
+# Layout checked against p-net public/v1.0.2 459e043 and Wireshark 4.2.5 4aa814ac.
 endian: big
 Package:
   ProfinetDCP:
@@ -63,35 +64,39 @@ DCPBlock:
         return
       }
       if (option == 1 && (suboption == 1 || suboption == 2)) || (option == 2 && suboption >= 1 && suboption <= 5) {
-        if length < 2 { panic("dcp: missing block info or qualifier") }
-        if getNodeResult("../../../Service ID").Value == 4 && getNodeResult("../../../Service Type").Value == 0 {
-          this.ProcessSubNode("Block Qualifier")
-        } else { this.ProcessSubNode("Block Info") }
+        service = getNodeResult("../../../Service ID").Value
+        kind = getNodeResult("../../../Service Type").Value
+        prefix = 2
+        if service == 5 && kind == 0 { prefix = 0 }
+        if length < prefix { panic("dcp: missing block info or qualifier") }
+        if prefix != 0 {
+          if service == 4 && kind == 0 { this.ProcessSubNode("Block Qualifier") } else { this.ProcessSubNode("Block Info") }
+        }
         if option == 1 && suboption == 1 {
-          if length != 8 { panic("dcp: invalid MAC block length") }
+          if length != 6 + prefix { panic("dcp: invalid MAC block length") }
           this.ProcessSubNode("MAC Address")
         }
         if option == 1 && suboption == 2 {
-          if length != 14 { panic("dcp: invalid IP block length") }
+          if length != 12 + prefix { panic("dcp: invalid IP block length") }
           this.ProcessSubNode("IP Address")
           this.ProcessSubNode("Subnet Mask")
           this.ProcessSubNode("Gateway")
         }
-        if option == 2 && suboption == 1 && length > 2 { this.GetSubNode("Device Vendor").SetMaxLength(length-2); this.ProcessSubNode("Device Vendor") }
-        if option == 2 && suboption == 2 && length > 2 { this.GetSubNode("Station Name").SetMaxLength(length-2); this.ProcessSubNode("Station Name") }
+        if option == 2 && suboption == 1 && length > prefix { this.GetSubNode("Device Vendor").SetMaxLength(length-prefix); this.ProcessSubNode("Device Vendor") }
+        if option == 2 && suboption == 2 && length > prefix { this.GetSubNode("Station Name").SetMaxLength(length-prefix); this.ProcessSubNode("Station Name") }
         if option == 2 && suboption == 3 {
-          if length != 6 { panic("dcp: invalid device ID block length") }
+          if length != 4 + prefix { panic("dcp: invalid device ID block length") }
           this.ProcessSubNode("Vendor ID")
           this.ProcessSubNode("Device ID")
         }
         if option == 2 && suboption == 4 {
-          if length != 4 { panic("dcp: invalid device role block length") }
+          if length != 2 + prefix { panic("dcp: invalid device role block length") }
           this.ProcessSubNode("Device Role")
           this.ProcessSubNode("Role Reserved")
         }
         if option == 2 && suboption == 5 {
           if (length & 1) != 0 { panic("dcp: invalid device option list length") }
-          if length > 2 { this.GetSubNode("Device Options").SetMaxLength(length-2); this.ProcessSubNode("Device Options") }
+          if length > prefix { this.GetSubNode("Device Options").SetMaxLength(length-prefix); this.ProcessSubNode("Device Options") }
         }
         return
       }

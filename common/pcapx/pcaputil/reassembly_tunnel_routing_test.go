@@ -3,14 +3,13 @@ package pcaputil
 import (
 	"bytes"
 	"fmt"
+	"github.com/yaklang/yaklang/internal/trafficfixture"
 	"net"
 	"sync"
 	"testing"
-	"time"
 
 	"github.com/gopacket/gopacket"
 	"github.com/gopacket/gopacket/layers"
-	"github.com/gopacket/gopacket/pcapgo"
 	"github.com/stretchr/testify/require"
 )
 
@@ -85,13 +84,8 @@ func TestTunnelHTTPResponseWorkerParity(t *testing.T) {
 	response := "HTTP/1.1 200 OK\r\nContent-Length: 5\r\n\r\nhello"
 	for _, profile := range []string{"ipip", "6in4", "gre", "vxlan", "geneve"} {
 		t.Run(profile, func(t *testing.T) {
-			var capture bytes.Buffer
-			writer := pcapgo.NewWriterNanos(&capture)
-			require.NoError(t, writer.WriteFileHeader(65535, layers.LinkTypeEthernet))
-			packets := [][]byte{tunnelWorkerWire(t, profile, false, 99, true, false, ""), tunnelWorkerWire(t, profile, true, 199, true, false, ""), tunnelWorkerWire(t, profile, false, 100, false, false, request), tunnelWorkerWire(t, profile, true, 200, false, false, response), tunnelWorkerWire(t, profile, false, 100+uint32(len(request)), false, true, ""), tunnelWorkerWire(t, profile, true, 200+uint32(len(response)), false, true, "")}
-			for i, p := range packets {
-				require.NoError(t, writer.WritePacket(gopacket.CaptureInfo{Timestamp: time.Unix(1700000000, int64(i)), CaptureLength: len(p), Length: len(p)}, p))
-			}
+			capture, err := trafficfixture.ReadFile("industrial-link-core/carriers/captures/tunnel-" + profile + "-http-worker-transaction.pcap")
+			require.NoError(t, err)
 			var reference []string
 			for _, workers := range []int{1, 2, 4} {
 				for _, deferred := range []bool{false, true} {
@@ -104,7 +98,7 @@ func TestTunnelHTTPResponseWorkerParity(t *testing.T) {
 							if observe {
 								opts = append(opts, WithEveryPacket(func(gopacket.Packet) {}))
 							}
-							require.NoError(t, ReplayPcap(bytes.NewReader(capture.Bytes()), opts...))
+							require.NoError(t, ReplayPcap(bytes.NewReader(capture), opts...))
 							require.Zero(t, stats.BufferedBytes)
 							require.Len(t, es, 2)
 							require.Equal(t, "http", es[0].Protocol)

@@ -44,7 +44,7 @@ Run from the repository root:
 ```sh
 go run ./internal/trafficfixture/cmd/corpus test
 go test -json -count=1 -timeout=5m ./internal/trafficfixture/... ./common/bin-parser/... ./common/pcapx/... ./common/yak/cmd/yakcmds/shark-cli > traffic.jsonl
-go run ./internal/trafficfixture/cmd/corpus exec -- python3 @scripts/protocol-tests/check_go_test_json.py traffic.jsonl --inventory @scripts/protocol-tests/required-tests-v3.json --tier full
+go run ./internal/trafficfixture/cmd/corpus exec -- python3 @scripts/protocol-tests/check_go_test_json.py traffic.jsonl --inventory @scripts/protocol-tests/required-tests-v29.json --tier full
 ```
 
 The single `corpus` entry point uses the same bounded Go ZIP loader as tests.
@@ -83,8 +83,8 @@ their semantic coverage. The existing synthetic session keys are test inputs;
 production credentials, user private keys and material without redistribution
 permission belong in an external fixed-source download manifest.
 
-Current test requirements are sealed at `scripts/protocol-tests/required-tests-v3.json`;
-the historical inventories and all four earlier batches remain unchanged.
+Current test requirements are sealed at `scripts/protocol-tests/required-tests-v29.json`;
+the historical inventories and all earlier batches remain unchanged.
 The supplemental small-corpus batch contains 26 minimal controls, their explicit
 expected facts, an offline generator and the compact pinned source manifest.
 Two Modbus cases are sanitized derivatives of a licensed upstream resegmentation;
@@ -95,3 +95,36 @@ session feeds are asserted by `TestSmallCorpusSealedControls`; LOGINACK also has
 byte-boundary, malformed-length and ownership tests. These are scoped control
 assertions, not a semantic golden for the entire upstream collection. Process
 logs and the original large downloads remain outside the repository.
+
+The current workflow and executable gate use `required-tests-v29.json`. Older
+versioned inventories stay available as historical inputs; they are not the
+current acceptance entry. The DLMS HDLC batch contains owned tunnel/Get-normal
+controls and their independent fields/errors, CRC/byte validator, offline
+generator and pinned source metadata. Its tests assert complete selected
+messages, association, sequence reuse and disconnection, across TCP chunks and
+UDP capture domains. It does not promote the received duplicate DLMS capture
+with invalid FCS or same-direction UDP replies to a successful semantic golden.
+
+The selected OpenDroneID v2 batch seals 63 owned UDP controls (11 positive and
+52 expected refusals), their complete ordered field/error answers and offline
+generation/verification tools. Pinned Apache-2.0 `opendroneid-core-c` reference
+sources, attribution and a local build harness reproduce the recorded Basic ID,
+Location and selected-pack answers using an existing C compiler. This carrier
+is explicitly selected raw UDP, not BLE/Wi-Fi Remote ID or authenticated aircraft
+identity. The received `ODID`-prefixed attachment remains external and is not
+a valid positive. The mandatory gate also checks that a native UDP NeedMore
+event increments Incomplete rather than Malformed, using an earlier ZIP input.
+
+The selected C37.118 v1/v2 batch seals 55 owned TCP/UDP controls (26 positives
+and 29 refusals or missing-context boundaries) with complete raw field/error
+answers, independent byte/CRC validation and a fixed tshark 4.2.5 PDML check.
+The native profile decodes CFG-2 and multiple PMU DATA blocks using each observed
+publisher direction and capture domain. It handles configuration changes in any
+PMU, rejects unusable configuration and bounded resource overload, and owns its
+returned fields. Integer/raw IEEE floating-point values are retained; no
+engineering measurement-validity claim is made. CFG-1 does not establish DATA
+context, and CFG-3 remains explicitly unsupported in this native profile.
+Pinned pypmu reference failures for nonzero DIGUNIT masks are retained in the
+archive and do not count as passing independent reference runs.
+
+The current industrial link batch includes 61 SV/EtherCAT and TCP generation controls, plus 38 corrected carrier cases sharing 37 additional capture hashes. Historical synthetic ACK=0 carriers and their original application answers remain immutable; current application regressions bind the corrected carriers to those same answers, and separately verify that invalid reverse carriers are discarded. Rebuild and independent verification tools are sealed in that batch.

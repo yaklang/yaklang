@@ -68,6 +68,14 @@ func (e *ProtocolEvent) Decode() (result map[string]any, err error) {
 	if (e.Protocol == "tls" || e.Protocol == "redis" || e.Entry == "MySQLPreparedFields") && e.Session != nil {
 		return map[string]any{"fields": cloneSession(e.Session)}, nil
 	}
+	if e.ownsNativeFields() && e.sessionError != nil {
+		return nil, e.sessionError
+	}
+	// These native caches are separate from the public event projection. A
+	// caller may edit a returned tree without changing later field queries.
+	if e.ownsNativeFields() && e.semanticFields != nil {
+		return map[string]any{"fields": cloneSession(e.semanticFields)}, nil
+	}
 	if e.Structured != nil {
 		return e.Structured, nil
 	}
@@ -110,7 +118,7 @@ func (e *ProtocolEvent) Decode() (result map[string]any, err error) {
 // GetFields returns the protocol field tree directly, also for deferred events.
 // Decode remains the compatibility API returning the fields/metadata envelope.
 func (e *ProtocolEvent) GetFields() (map[string]any, error) {
-	if e.Fields != nil {
+	if e.Fields != nil && !e.ownsNativeFields() {
 		return e.Fields, nil
 	}
 	result, err := e.Decode()
@@ -118,6 +126,23 @@ func (e *ProtocolEvent) GetFields() (map[string]any, error) {
 		return nil, err
 	}
 	return protocolFields(result), nil
+}
+
+func (e *ProtocolEvent) ownsNativeFields() bool {
+	if e.Protocol == "semtech-udp" && e.Profile == semtechDownlinkProfile {
+		return true
+	}
+	if e.Protocol == "profinet" && e.Profile == "profinet-carrier-diagnostic" {
+		return true
+	}
+	if e.Protocol == "slmp" && (e.Profile == slmpTCPProfile || e.Profile == "slmp-binary-self-test") || e.Protocol == "doip" && e.Profile == doipDiscoveryProfile {
+		return true
+	}
+	switch e.Protocol {
+	case "dlms-wrapper", "dlms", "opendroneid", "c37118", "sv", "ethercat", "knx", "pfcp", "profinet-dcp":
+		return true
+	}
+	return false
 }
 
 func protocolFields(result map[string]any) map[string]any {
@@ -212,6 +237,7 @@ type binSpec struct {
 	plan        *binparser.StructuredPlan
 }
 type binParser struct {
+	pfcpSessionIdentity                                                        *pfcpSessionIdentity
 	datagramDecodeAs                                                           map[uint16]string
 	canDecodeAs                                                                map[int]string
 	fragments                                                                  fragmentStore
@@ -220,6 +246,9 @@ type binParser struct {
 	tlsSecrets                                                                 TLSSecretProvider
 	udpMu                                                                      sync.Mutex
 	udpSessions                                                                *binUDPStore
+	dcpMu                                                                      sync.Mutex
+	dcpClock                                                                   time.Time
+	dcpObservations                                                            map[dcpKey]*dcpObservation
 	mediaMu                                                                    sync.Mutex
 	mediaIndex                                                                 map[mediaEndpointKey][]*sipMediaAssociation
 	mediaEntries                                                               []*sipMediaAssociation
@@ -308,6 +337,7 @@ func (c *CaptureConfig) finishBinParser() error {
 	}
 	a := c.binParser
 	a.closeUDPSessions()
+	a.closeDCPObservations()
 	a.closeMediaAssociations()
 	a.closeRTSPMedia()
 	a.closeFragments()
@@ -416,6 +446,11 @@ type binFlow struct {
 	genisys           *binGenisys
 	rocplus           *binROCPlus
 	bsap              *binBSAP
+	pfcp              *binPFCP
+	slmp              *binSLMP
+	slmpTCP           *binSLMPTCP
+	wrapper           *binDLMSWrapper
+	dlms              *binDLMS
 	memcached         *binMemcached
 	stratum           *binStratum
 	gearman           *binGearman
@@ -462,6 +497,9 @@ func (f *binFlow) event(dir int, raw []byte, status, detail string) *BinParserEv
 	d := &f.directions[dir]
 	e := &BinParserEvent{FlowID: f.id, Timestamp: d.ts, Transport: "tcp", Source: f.endpoints[dir], Destination: f.endpoints[1-dir], Direction: dir, Offset: d.offset, Length: len(raw), Protocol: f.protocol, Status: status, Summary: detail, Raw: append([]byte(nil), raw...)}
 	f.eventEvidence(dir, e)
+	if f.slmpTCP != nil {
+		e.Profile, e.Completeness = slmpTCPProfile, "message"
+	}
 	return e
 }
 
@@ -610,7 +648,7 @@ func (f *binFlow) feed(dir int, data []byte, ts time.Time) {
 			}
 			if f.protocol == "" {
 				if len(wire) >= a.config.ProbeBytes {
-					if len(wire) < a.budget.MaxFrameBytes && (f.captureTCP && probeDNSTCP(wire, a.budget.MaxFrameBytes).Verdict == ProbeNeedMore || needsMoreS7Prefix(wire, a.budget.MaxFrameBytes) || f.needsMoreSSHServerPreamble(dir, wire) || initialProtocolNeedMore(wire, a.budget.MaxFrameBytes).Verdict == ProbeNeedMore || needsMoreHTTPStartLine(wire) || f.needsMorePortProtocolPrefix(wire) || f.needsMoreBoundedText(wire) || f.needsMoreOpenWire(wire)) {
+					if len(wire) < a.budget.MaxFrameBytes && (probeSLMPTCP(wire, min(a.budget.MaxFrameBytes, a.config.MaxMessageBytes), false).Verdict == ProbeNeedMore || wrapperIncompletePrefix(wire, a.budget.MaxFrameBytes) || f.captureTCP && probeDNSTCP(wire, a.budget.MaxFrameBytes).Verdict == ProbeNeedMore || needsMoreS7Prefix(wire, a.budget.MaxFrameBytes) || f.needsMoreSSHServerPreamble(dir, wire) || initialProtocolNeedMore(wire, a.budget.MaxFrameBytes).Verdict == ProbeNeedMore || needsMoreHTTPStartLine(wire) || f.needsMorePortProtocolPrefix(wire) || f.needsMoreBoundedText(wire) || f.needsMoreOpenWire(wire)) {
 						break
 					}
 					f.stop(dir, wire, "unrecognized", "bounded detection exhausted; subsequent bytes are counted without VM retries")
@@ -714,7 +752,7 @@ func (f *binFlow) feed(dir int, data []byte, ts time.Time) {
 				} else {
 					result, err = f.consumeTLS(dir, e)
 				}
-			} else if f.protocol == "redis" || f.protocol == "syslog" || f.protocol == "snmp" || f.protocol == "smb2" || f.protocol == "enip" || f.protocol == "doip" || f.protocol == "genisys" || f.protocol == "roc-plus" || f.protocol == "atg" || f.memcached != nil || (e.Entry == "SSHIdentification" || e.Entry == "SSHPreIdentification") || f.protocol == "stratum" || f.protocol == "gearman" || f.protocol == "beanstalkd" || f.protocol == "scgi" || f.protocol == "msgpack-rpc" || f.protocol == "zookeeper" || f.protocol == "clickhouse" || f.protocol == "stomp" || f.protocol == "nats" || f.textInternet != nil || e.Entry == "MySQLPreparedFields" {
+			} else if f.protocol == "slmp" || f.protocol == "redis" || f.protocol == "syslog" || f.protocol == "snmp" || f.protocol == "smb2" || f.protocol == "enip" || f.protocol == "doip" || f.protocol == "genisys" || f.protocol == "dlms-wrapper" || f.protocol == "dlms" || f.protocol == "c37118" || f.protocol == "roc-plus" || f.protocol == "atg" || f.memcached != nil || (e.Entry == "SSHIdentification" || e.Entry == "SSHPreIdentification") || f.protocol == "stratum" || f.protocol == "gearman" || f.protocol == "beanstalkd" || f.protocol == "scgi" || f.protocol == "msgpack-rpc" || f.protocol == "zookeeper" || f.protocol == "clickhouse" || f.protocol == "stomp" || f.protocol == "nats" || f.textInternet != nil || e.Entry == "MySQLPreparedFields" {
 				result = map[string]any{}
 			} else if e.Protocol == "websocket" && e.Entry == "WebSocket" && f.ws != nil && f.ws.deflate {
 				result = map[string]any{"fields": map[string]any{}}
@@ -746,7 +784,10 @@ func (f *binFlow) feed(dir int, data []byte, ts time.Time) {
 					e.semanticFields = cloneSession(e.Session)
 					result = map[string]any{"fields": e.semanticFields}
 				}
-				if (f.protocol == "enip" || f.protocol == "doip" || f.protocol == "genisys" || f.protocol == "roc-plus" || f.protocol == "atg" || f.memcached != nil) && e.Session != nil {
+				if (f.protocol == "dlms-wrapper" || f.protocol == "slmp") && e.Session != nil {
+					result = map[string]any{"fields": cloneSession(e.semanticFields)}
+				}
+				if (f.protocol == "enip" || f.protocol == "doip" || f.protocol == "genisys" || f.protocol == "dlms" || f.protocol == "c37118" || f.protocol == "roc-plus" || f.protocol == "atg" || f.memcached != nil) && e.Session != nil {
 					e.semanticFields = cloneSession(e.Session)
 					result = map[string]any{"fields": e.semanticFields}
 				}
@@ -809,7 +850,7 @@ func (f *binFlow) feed(dir int, data []byte, ts time.Time) {
 				e.Status, e.sessionError = classifySessionError(err)
 				e.Error = err.Error()
 			} else if a.config.Deferred {
-				if e.Protocol == "tls" || e.Protocol == "enip" || e.Protocol == "doip" || e.Protocol == "genisys" || e.Protocol == "roc-plus" || e.Protocol == "atg" || e.Protocol == "stratum" || e.Protocol == "gearman" || e.Protocol == "beanstalkd" || e.Protocol == "scgi" || e.Protocol == "msgpack-rpc" {
+				if e.Protocol == "tls" || e.Protocol == "enip" || e.Protocol == "doip" || e.Protocol == "genisys" || e.Protocol == "dlms-wrapper" || e.Protocol == "dlms" || e.Protocol == "c37118" || e.Protocol == "roc-plus" || e.Protocol == "atg" || e.Protocol == "stratum" || e.Protocol == "gearman" || e.Protocol == "beanstalkd" || e.Protocol == "scgi" || e.Protocol == "msgpack-rpc" {
 					e.Structured = result
 				}
 			} else {
@@ -821,6 +862,9 @@ func (f *binFlow) feed(dir int, data []byte, ts time.Time) {
 				// decoding and history; retrying a different grammar loses fields
 				// or rejects valid argumentless/multiline messages.
 				e.semanticFields = protocolFields(result)
+				if e.Protocol == "slmp" || e.Protocol == "dlms-wrapper" || e.Protocol == "dlms" || e.Protocol == "c37118" {
+					e.semanticFields = cloneSession(e.semanticFields)
+				}
 			}
 		}
 		if e.Protocol == "dns" || e.Protocol == "dot" {
@@ -877,7 +921,7 @@ func (f *binFlow) feed(dir int, data []byte, ts time.Time) {
 		if !failed {
 			f.deliverTLS(dir, e)
 		}
-		if failed && !(e.Protocol == "roc-plus" && rocRecoverableMessageError(e.sessionError)) && !(e.Protocol == "genisys" && genisysRecoverableMessageError(e.sessionError)) && !((e.Protocol == "http2" || e.Protocol == "grpc" || e.Protocol == "doh") && e.Session["Error Scope"] == "stream") {
+		if failed && !(e.Protocol == "slmp" && slmpTCPRecoverable(e.sessionError)) && !(e.Protocol == "dlms-wrapper" && dlmsRecoverableMessageError(e.sessionError)) && !(e.Protocol == "c37118" && c37118RecoverableMessageError(e.sessionError)) && !(e.Protocol == "dlms" && dlmsRecoverableMessageError(e.sessionError)) && !(e.Protocol == "roc-plus" && rocRecoverableMessageError(e.sessionError)) && !(e.Protocol == "genisys" && genisysRecoverableMessageError(e.sessionError)) && !((e.Protocol == "http2" || e.Protocol == "grpc" || e.Protocol == "doh") && e.Session["Error Scope"] == "stream") {
 			if stateful {
 				f.invalidateSession(1 - dir)
 				f.closeSession()

@@ -567,6 +567,10 @@ func (a *binParser) datagramFields(network gopacket.NetworkLayer, udp *layers.UD
 		e.Status, e.Summary = "incomplete", "truncated or invalid UDP datagram"
 		a.incomplete.Add(1)
 	} else if len(wire) > a.config.MaxMessageBytes {
+		if a.refuseUDPOversizeAssociation(e, wire, uint16(udp.SrcPort), uint16(udp.DstPort)) || a.refusePFCPOversize(e, wire, uint16(udp.SrcPort), uint16(udp.DstPort)) || a.refuseSemtechDownlinkOversize(e, wire, uint16(udp.SrcPort), uint16(udp.DstPort)) {
+			a.emit(e)
+			return
+		}
 		e.Status, e.Summary = "limited", "UDP datagram exceeds message limit"
 		a.limited.Add(uint64(len(wire)))
 	} else {

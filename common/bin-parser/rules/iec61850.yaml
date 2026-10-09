@@ -75,14 +75,14 @@ SVPDU:
     this.ProcessSubNode("ASDU Count")
     if getNodeResult("ASDU Count/Tag").Value != 0x80 { panic("sv: expected ASDU count") }
     count = getNodeResult("ASDU Count").Value
-    if count < 1 || count > 65535 { panic("sv: invalid ASDU count") }
+    if count > 65535 { panic("sv: invalid ASDU count") }
     this.ProcessSubNode("Sequence Tag")
     this.ProcessSubNode("Sequence Length")
     if getNodeResult("Sequence Tag").Value != 0xa2 { panic("sv: expected ASDU sequence") }
     length = getNodeResult("Sequence Length").Value
     if length != this.GetMaxLength() - this.Length() { panic("sv: sequence length mismatch") }
     this.GetSubNode("ASDUs").SetMaxLength(length)
-    this.ProcessSubNode("ASDUs")
+    if length > 0 { this.ProcessSubNode("ASDUs") } else if count != 0 { panic("sv: missing ASDU sequence") }
   Tag: uint8
   Length: IECLength
   ASDU Count: IECNumber
@@ -119,16 +119,16 @@ SVASDU:
         seen = seen | (1 << (tag - 0x80))
         if tag == 128 { this.ProcessSubNode("SV ID") }
         if tag == 129 { this.ProcessSubNode("Dataset") }
-        if tag == 130 { this.ProcessSubNode("Sample Counter") }
-        if tag == 131 { this.ProcessSubNode("Configuration Revision") }
-        if tag == 132 { this.ProcessSubNode("Reference Time") }
-        if tag == 133 { this.ProcessSubNode("Sample Synchronization") }
-        if tag == 134 { this.ProcessSubNode("Sample Rate") }
+        if tag == 130 { this.ProcessSubNode("Sample Counter"); if getNodeResult("Sample Counter").Value > 65535 { panic("sv: sample counter exceeds uint16") } }
+        if tag == 131 { this.ProcessSubNode("Configuration Revision"); if getNodeResult("Configuration Revision").Value > 4294967295 { panic("sv: configuration revision exceeds uint32") } }
+        if tag == 132 { this.ProcessSubNode("Reference Time"); if getNodeResult("Reference Time/Length").Value != 8 { panic("sv: reference time must have eight octets") } }
+        if tag == 133 { this.ProcessSubNode("Sample Synchronization"); if getNodeResult("Sample Synchronization").Value > 4294967295 { panic("sv: sample synchronization exceeds uint32") } }
+        if tag == 134 { this.ProcessSubNode("Sample Rate"); if getNodeResult("Sample Rate").Value > 65535 { panic("sv: sample rate exceeds uint16") } }
         if tag == 135 { this.ProcessSubNode("Sample Data") }
-        if tag == 136 { this.ProcessSubNode("Sample Mode") }
-        if tag == 137 { this.ProcessSubNode("Grandmaster Identity") }
+        if tag == 136 { this.ProcessSubNode("Sample Mode"); if getNodeResult("Sample Mode").Value > 4294967295 { panic("sv: sample mode exceeds uint32") } }
+        if tag == 137 { this.ProcessSubNode("Grandmaster Identity"); if getNodeResult("Grandmaster Identity/Length").Value != 8 { panic("sv: grandmaster identity must have eight octets") } }
       }
-      if (seen & 173) != 173 { panic("sv: missing mandatory ASDU field") }
+      if (seen & 141) != 141 { panic("sv: missing mandatory ASDU field") }
     SV ID: IECBytes
     Dataset: IECBytes
     Sample Counter: IECNumber

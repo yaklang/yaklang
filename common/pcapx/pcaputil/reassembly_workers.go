@@ -97,7 +97,7 @@ type workerPacket struct {
 	key                           flowKey
 	src, dst                      [16]byte
 	sport, dport                  uint16
-	seq                           uint32
+	seq, ack                      uint32
 	flags                         uint8
 	macSrc, macDst                [6]byte
 	ethernet                      bool
@@ -323,7 +323,7 @@ func (d *tcpWorkers) submitLayers(eth *layers.Ethernet, network gopacket.Seriali
 	}
 	src, _ := netip.AddrFromSlice(srcIP)
 	dst, _ := netip.AddrFromSlice(dstIP)
-	r := workerPacket{data: tcp.Payload, ts: ts, key: key, src: src.As16(), dst: dst.As16(), sport: uint16(tcp.SrcPort), dport: uint16(tcp.DstPort), seq: tcp.Seq}
+	r := workerPacket{data: tcp.Payload, ts: ts, key: key, src: src.As16(), dst: dst.As16(), sport: uint16(tcp.SrcPort), dport: uint16(tcp.DstPort), seq: tcp.Seq, ack: tcp.Ack}
 	if len(evidence) > 0 {
 		r.evidence = evidence[0]
 		r.key.domain = evidence[0].Ref.Domain
@@ -464,7 +464,7 @@ func (d *tcpWorkers) run(w *tcpWorker) {
 					}
 					decoder.feedWithEvidence(w.pool.ctx, r.data, ci, r.evidence)
 				} else {
-					tcp := layers.TCP{SrcPort: layers.TCPPort(r.sport), DstPort: layers.TCPPort(r.dport), Seq: r.seq, SYN: r.flags&1 != 0, ACK: r.flags&2 != 0, FIN: r.flags&4 != 0, RST: r.flags&8 != 0}
+					tcp := layers.TCP{SrcPort: layers.TCPPort(r.sport), DstPort: layers.TCPPort(r.dport), Seq: r.seq, Ack: r.ack, SYN: r.flags&1 != 0, ACK: r.flags&2 != 0, FIN: r.flags&4 != 0, RST: r.flags&8 != 0}
 					tcp.Payload = r.data
 					var network gopacket.SerializableLayer = &layers.IPv4{SrcIP: net.IP(r.src[:]), DstIP: net.IP(r.dst[:])}
 					if r.key.ipv6 {
@@ -590,7 +590,7 @@ func rawFlowKey(raw []byte, link layers.LinkType) (flowKey, bool, error) {
 			kind = binary.BigEndian.Uint16(raw[offset+2 : offset+4])
 			offset += 4
 		}
-		if kind == 0x88b8 {
+		if kind == 0x88b8 || kind == 0x88ba || kind == 0x88a4 {
 			// GOOSE has no TCP flow key. Its dedicated link-layer ingress
 			// validates the PDU; gopacket's unknown EtherType error must not
 			// discard it before that ingress runs in multi-worker captures.

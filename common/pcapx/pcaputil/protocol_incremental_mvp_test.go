@@ -121,6 +121,9 @@ func runIncrementalMVPSealedReplay(t *testing.T, prefix string, groups []string)
 			require.NoError(t, json.Unmarshal(fact.Expectations[0].PayloadConstraints, &binding))
 			require.Equal(t, c.Answer, binding.AnswerFile)
 			require.Equal(t, fmt.Sprintf("%x", sha256.Sum256(answer)), binding.AnswerSHA)
+			if prefix == "incremental-mvp" {
+				wire = correctedIncrementalCarrier(t, c, wire, answer)
+			}
 			var a incrementalMVPAnswer
 			require.NoError(t, json.Unmarshal(answer, &a))
 			incrementalMVPBudget(t, c, a, wire)
@@ -660,4 +663,47 @@ func assertFTPSSHReviewMVPEvents(t testing.TB, protocol string, raw json.RawMess
 	} else {
 		require.Len(t, events, len(decoded), "control must have no extra error/incomplete diagnostics")
 	}
+}
+
+// Historical synthetic captures are immutable, including their invalid ACK=0
+// carriers. The new carrier binds the same application bytes/answers and keeps
+// those application assertions intact while testing a legal opening handshake.
+type correctedCarrier struct {
+	Group                 string `json:"group"`
+	OriginalID            string `json:"original_id"`
+	Capture               string `json:"capture"`
+	SHA256                string `json:"sha256"`
+	Answer                string `json:"answer"`
+	AnswerSHA256          string `json:"answer_sha256"`
+	OriginalCaptureSHA256 string `json:"original_capture_sha256"`
+	OriginalAnswerSHA256  string `json:"original_answer_sha256"`
+}
+
+func correctedIncrementalCarrier(t *testing.T, c incrementalMVPCase, original, answer []byte) []byte {
+	t.Helper()
+	manifest, err := trafficfixture.ReadFile("industrial-link-core/carriers/manifest.json")
+	require.NoError(t, err)
+	var inventory struct{ Cases []correctedCarrier }
+	require.NoError(t, json.Unmarshal(manifest, &inventory))
+	require.Len(t, inventory.Cases, 38)
+	for _, v := range inventory.Cases {
+		if v.Group != c.Group || v.OriginalID != c.ID {
+			continue
+		}
+		require.Equal(t, fmt.Sprintf("%x", sha256.Sum256(original)), v.OriginalCaptureSHA256)
+		require.Equal(t, fmt.Sprintf("%x", sha256.Sum256(answer)), v.OriginalAnswerSHA256)
+		wire, err := trafficfixture.ReadFile("industrial-link-core/" + v.Capture)
+		require.NoError(t, err)
+		require.Equal(t, fmt.Sprintf("%x", sha256.Sum256(wire)), v.SHA256)
+		oracle, err := trafficfixture.ReadFile("industrial-link-core/" + v.Answer)
+		require.NoError(t, err)
+		require.Equal(t, fmt.Sprintf("%x", sha256.Sum256(oracle)), v.AnswerSHA256)
+		var a struct {
+			ApplicationAnswer json.RawMessage `json:"application_answer"`
+		}
+		require.NoError(t, json.Unmarshal(oracle, &a))
+		require.JSONEq(t, string(answer), string(a.ApplicationAnswer))
+		return wire
+	}
+	return original
 }

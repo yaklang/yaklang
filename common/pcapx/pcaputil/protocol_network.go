@@ -59,6 +59,10 @@ func (a *binParser) networkPacket(p gopacket.Packet) (gopacket.Packet, bool) {
 			etherType = layers.EthernetType(binary.BigEndian.Uint16(payload[2:4]))
 			payload = payload[4:]
 		}
+		if etherType == layers.EthernetType(0x8892) {
+			a.decodeDCPEthernet(p.Data(), e, ci)
+			return nil, true
+		}
 		if etherType == layers.EthernetType(0x88cc) {
 			a.decodeLLDPEthernet(eth, payload, e, ci)
 			return nil, true
@@ -67,6 +71,10 @@ func (a *binParser) networkPacket(p gopacket.Packet) (gopacket.Packet, bool) {
 			// Consume near-matches too: an unknown-EtherType diagnostic must not
 			// replace the strict GOOSE probe's rejection.
 			a.decodeGOOSEEthernet(eth, payload, e, ci)
+			return nil, true
+		}
+		if etherType == 0x88ba || etherType == 0x88a4 {
+			a.decodeIndustrialEthernet(eth, etherType, payload, e, ci)
 			return nil, true
 		}
 	}
