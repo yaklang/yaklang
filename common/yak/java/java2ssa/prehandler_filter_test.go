@@ -29,7 +29,7 @@ func TestMatchPreHandlerFile(t *testing.T) {
 }
 
 func TestDefaultCompileExcludeJavaDirs(t *testing.T) {
-	exclude := ssaconfig.BuildCompileExcludeFunc(nil, "")
+	exclude := ssaconfig.BuildCompileExcludeFunc(nil, "", true)
 	for _, path := range []string{
 		".github/workflows/maven.yml",
 		".mvn/jvm.config",

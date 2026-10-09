@@ -50,18 +50,18 @@ func TestDefaultCompileExcludePatterns(t *testing.T) {
 
 func TestBuildCompileExcludeFunc(t *testing.T) {
 	t.Run("user pattern", func(t *testing.T) {
-		exclude := BuildCompileExcludeFunc([]string{"vendor"}, "")
+		exclude := BuildCompileExcludeFunc([]string{"vendor"}, "", true)
 		require.True(t, exclude("vendor"))
 	})
 
 	t.Run("user testdata", func(t *testing.T) {
-		exclude := BuildCompileExcludeFunc([]string{"**/testdata/"}, "")
+		exclude := BuildCompileExcludeFunc([]string{"**/testdata/"}, "", true)
 		require.True(t, exclude("src/cmd/compile/internal/syntax/testdata"))
 		require.True(t, exclude("src/cmd/compile/internal/syntax/testdata/issue47704.go"))
 	})
 
 	t.Run("default test inputs", func(t *testing.T) {
-		exclude := BuildCompileExcludeFunc(nil, "")
+		exclude := BuildCompileExcludeFunc(nil, "", true)
 		require.True(t, exclude("src/test/service_test.go"))
 		require.True(t, exclude("src/testdata/issue47704.go"))
 		// "testing" directories are now excluded whole like other test dirs;
@@ -71,7 +71,7 @@ func TestBuildCompileExcludeFunc(t *testing.T) {
 	})
 
 	t.Run("aggregated test directories and fixtures", func(t *testing.T) {
-		exclude := BuildCompileExcludeFunc(nil, "")
+		exclude := BuildCompileExcludeFunc(nil, "", true)
 		require.True(t, exclude("spring-orm/src/test/resources/order.jar"))
 		require.True(t, exclude("src/tests/service_test.go"))
 		require.True(t, exclude("src/__tests__/app.test.js"))
@@ -80,14 +80,14 @@ func TestBuildCompileExcludeFunc(t *testing.T) {
 	})
 
 	t.Run("test-named archives excluded, runtime archives kept", func(t *testing.T) {
-		exclude := BuildCompileExcludeFunc(nil, "")
+		exclude := BuildCompileExcludeFunc(nil, "", true)
 		require.True(t, exclude("libs/mocktest.jar"))
 		require.True(t, exclude("libs/MockTest.jar"))
 		require.False(t, exclude("libs/spring-core.jar"))
 	})
 
 	t.Run("language-specific defaults", func(t *testing.T) {
-		exclude := BuildCompileExcludeFunc(nil, "")
+		exclude := BuildCompileExcludeFunc(nil, "", true)
 		// Java build machinery
 		require.True(t, exclude("gradle/wrapper/gradle-wrapper.jar"))
 		// Go
@@ -112,12 +112,12 @@ func TestBuildCompileExcludeFunc(t *testing.T) {
 	})
 
 	t.Run("default vendor", func(t *testing.T) {
-		exclude := BuildCompileExcludeFunc(nil, "")
+		exclude := BuildCompileExcludeFunc(nil, "", true)
 		require.True(t, exclude("src/vendor/lib.go"))
 	})
 
 	t.Run("default root dot git", func(t *testing.T) {
-		exclude := BuildCompileExcludeFunc(nil, "")
+		exclude := BuildCompileExcludeFunc(nil, "", true)
 		require.True(t, exclude(".git"))
 		require.True(t, exclude(".git/objects/pack/pack.idx"))
 		require.True(t, exclude("src/.git/config"))
@@ -125,7 +125,7 @@ func TestBuildCompileExcludeFunc(t *testing.T) {
 	})
 
 	t.Run("default generated directories", func(t *testing.T) {
-		exclude := BuildCompileExcludeFunc(nil, "")
+		exclude := BuildCompileExcludeFunc(nil, "", true)
 		require.True(t, exclude("node_modules/pkg/index.js"))
 		require.True(t, exclude("src/target/classes/App.java"))
 		require.True(t, exclude("build/generated/App.go"))
@@ -133,12 +133,12 @@ func TestBuildCompileExcludeFunc(t *testing.T) {
 	})
 
 	t.Run("folder trailing slash", func(t *testing.T) {
-		exclude := BuildCompileExcludeFunc([]string{"vendor/"}, "")
+		exclude := BuildCompileExcludeFunc([]string{"vendor/"}, "", true)
 		require.True(t, exclude("vendor/a.php"))
 	})
 
 	t.Run("defaults disabled keeps only user patterns", func(t *testing.T) {
-		exclude := BuildCompileExcludeFuncWithDefaults([]string{"vendor/"}, "", false)
+		exclude := BuildCompileExcludeFunc([]string{"vendor/"}, "", false)
 		// user pattern still applies (trailing slash expands to dir + dir/**)
 		require.True(t, exclude("vendor/lib.go"))
 		// built-in defaults no longer apply
