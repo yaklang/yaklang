@@ -253,6 +253,9 @@ func (f *FunctionBuilder) EmitUnOp(op UnaryOpcode, v Value) Value {
 	}
 	u := NewUnOp(op, v)
 	f.emit(u)
+	if f.valueEscapesViaCapture(v) {
+		return u
+	}
 	if c, ok := ToConstInst(HandlerUnOp(u)); ok {
 		f.emit(c)
 		return c
@@ -269,11 +272,86 @@ func (f *FunctionBuilder) EmitBinOp(op BinaryOpcode, x, y Value) Value {
 	}
 	binOp := NewBinOp(op, x, y)
 	f.emit(binOp)
+	// A closure can store into this variable from inside a later call that
+	// has no side-effect edge (an HTTP handler run by poc.Download). The
+	// reaching value is still the const, but the compare is not.
+	if f.valueEscapesViaCapture(x) || f.valueEscapesViaCapture(y) {
+		return binOp
+	}
 	if c, ok := ToConstInst(HandlerBinOp(binOp)); ok {
 		f.emit(c)
 		return c
 	}
 	return binOp
+}
+
+// valueEscapesViaCapture reports whether v is the current value of a variable
+// that a nested function captures. Reads of that variable stay in the program
+// so a callback can update them after this instruction is built.
+func (f *FunctionBuilder) valueEscapesViaCapture(v Value) bool {
+	if f == nil || f.Function == nil || v == nil || len(f.ChildFuncs) == 0 {
+		return false
+	}
+	names := make(map[string]struct{})
+	if last := v.GetLastVariable(); last != nil && last.GetName() != "" {
+		names[last.GetName()] = struct{}{}
+	}
+	for name := range v.GetAllVariables() {
+		if name != "" {
+			names[name] = struct{}{}
+		}
+	}
+	if len(names) == 0 {
+		return false
+	}
+	return childCapturesName(f.Function, names)
+}
+
+func childCapturesName(fn *Function, names map[string]struct{}) bool {
+	if fn == nil {
+		return false
+	}
+	seen := make(map[int64]struct{})
+	var walk func(*Function) bool
+	walk = func(cur *Function) bool {
+		if cur == nil || cur.GetId() <= 0 {
+			return false
+		}
+		if _, ok := seen[cur.GetId()]; ok {
+			return false
+		}
+		seen[cur.GetId()] = struct{}{}
+		for variable := range cur.FreeValues {
+			if variable == nil {
+				continue
+			}
+			if _, ok := names[variable.GetName()]; ok {
+				return true
+			}
+		}
+		for _, id := range cur.ChildFuncs {
+			val, ok := cur.GetValueById(id)
+			if !ok || val == nil {
+				continue
+			}
+			child, ok := ToFunction(val)
+			if ok && walk(child) {
+				return true
+			}
+		}
+		return false
+	}
+	for _, id := range fn.ChildFuncs {
+		val, ok := fn.GetValueById(id)
+		if !ok || val == nil {
+			continue
+		}
+		child, ok := ToFunction(val)
+		if ok && walk(child) {
+			return true
+		}
+	}
+	return false
 }
 
 func (f *FunctionBuilder) EmitIf() *If {
