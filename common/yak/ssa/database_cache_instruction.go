@@ -172,19 +172,7 @@ func newInstructionStore(
 				utils.WithCacheCapacity(largeProjectCacheMax), utils.WithCacheTTL(time.Minute))
 			store.residentCache.SetOnSaved(func(id int64, inst Instruction) {
 				store.residentReloads.Delete(id)
-				if shouldKeepInstructionResident(inst) || shouldKeepCompileUnitBoundaryResident(inst) || shouldDelayInstructionEviction(inst) {
-					return
-				}
-				// Named values can still be held by lexical scopes. Keep their
-				// canonical object until those scopes finish using it.
-				if value, ok := inst.(interface{ getAnValue() *anValue }); ok {
-					if variables := value.getAnValue().getVariablesMap(); variables != nil && variables.Len() > 0 {
-						return
-					}
-				}
-				if store.residentCache.DeleteClean(id) {
-					store.residentReleased.Inc()
-				}
+				store.releaseSavedAnonymousInstruction(id, inst)
 			})
 			return store
 		}
@@ -365,14 +353,41 @@ func (s *instructionStore) Track(ids []int64) {
 }
 
 func (s *instructionStore) TrackFunctionFinish(function *Function) {
-	if s == nil || s.mode != ProgramCacheDBWrite || s.writer == nil {
+	if s == nil || s.mode != ProgramCacheDBWrite || (s.writer == nil && s.residentCache == nil) {
 		return
 	}
 	ids := collectFinishedFunctionInstructionIDs(function)
 	if len(ids) == 0 {
 		return
 	}
-	s.writer.Track(ids)
+	if s.residentCache != nil {
+		// Visit this function once when its owner finishes, including clean
+		// tails saved before Finish. Clean flushes still do no map traversal.
+		for _, id := range ids {
+			if inst, exists := s.resident.Get(id); exists {
+				s.releaseSavedAnonymousInstruction(id, inst)
+			}
+		}
+	} else {
+		s.writer.Track(ids)
+	}
+}
+
+func (s *instructionStore) releaseSavedAnonymousInstruction(id int64, inst Instruction) {
+	if shouldKeepCompileUnitBoundaryResident(inst) || shouldDelayInstructionEviction(inst) || !s.isPersisted(id) {
+		return
+	}
+	// Scopes keep concrete named values during lazy and cross-unit builds.
+	// Anonymous constants, undefineds and objects have ID-based relations;
+	// they need no permanent residency once saved. Late setters requeue self.
+	if value, ok := inst.(interface{ getAnValue() *anValue }); ok {
+		if variables := value.getAnValue().getVariablesMap(); variables != nil && variables.Len() > 0 {
+			return
+		}
+	}
+	if s.residentCache.DeleteClean(id) {
+		s.residentReleased.Inc()
+	}
 }
 
 func (s *instructionStore) Flush(onComplete ...func()) {
@@ -560,8 +575,15 @@ func (s *instructionStore) CloseWithoutSave() {
 	if s.writer != nil {
 		s.writer.CloseWithoutSave()
 	}
+	if s.residentCache != nil {
+		s.residentCache.Discard()
+		s.persistedIDsMu.Lock()
+		s.residentFingerprints = nil
+		s.persistedIDsMu.Unlock()
+	}
 	if s.residentReloads != nil {
 		s.residentReloadsCloseOnce.Do(s.residentReloads.Close)
+		s.residentReloads.Cache.DeleteAll()
 	}
 }
 
@@ -846,7 +868,17 @@ func (s *instructionStore) loadInstruction(id int64) (Instruction, error) {
 		if row == nil {
 			return nil, utils.Errorf("IR %d not found", id)
 		}
-		inst, err = NewLazyInstructionFromIrCode(row, s.program)
+		owner := s.program
+		// Library instructions share the application's store. Their function
+		// remains resident and retains the original package/build context.
+		// Reconstructing every value on the application changes cross-unit
+		// member resolution while compilation is still in progress.
+		if function, exists := s.resident.Get(row.CurrentFunction); exists {
+			if fn, ok := function.(*Function); ok && fn.GetProgram() != nil {
+				owner = fn.GetProgram()
+			}
+		}
+		inst, err = NewLazyInstructionFromIrCode(row, owner)
 	} else {
 		inst, err = NewLazyInstruction(s.program, id)
 	}

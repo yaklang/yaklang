@@ -50,6 +50,9 @@ func (s *typeStore) remember(typ Type) Type {
 	if s == nil || utils.IsNil(typ) {
 		return typ
 	}
+	if s.program != nil {
+		internTypeStrings(typ, s.program.NameCache)
+	}
 	id := typ.GetId()
 	if id <= 0 {
 		if claimer, ok := typ.(interface {
@@ -62,8 +65,10 @@ func (s *typeStore) remember(typ Type) Type {
 			id = s.nextID.Inc()
 			typ.SetId(id)
 		}
-		setAtomicMaxIfGreater(s.nextID, id)
 	}
+	// Imported/shared types may already own an ID. Reserve it before the
+	// next new allocation, otherwise a primitive can replace that resident.
+	setAtomicMaxIfGreater(s.nextID, id)
 	s.resident.Set(id, typ)
 	return typ
 }
@@ -155,6 +160,10 @@ func (s *typeStore) flush() error {
 
 	for _, typ := range types {
 		snapshot := snapshotTypePersistence(typ)
+		if s.program != nil && s.program.NameCache != nil {
+			snapshot.text = s.program.NameCache.Intern(snapshot.text)
+			snapshot.name = s.program.NameCache.Intern(snapshot.name)
+		}
 		fingerprint := snapshot.fingerprint()
 		// Check ALL persisted fields before JSON encoding. ID/pointer-only
 		// checks would lose cross-unit updates, including in-place slice edits.

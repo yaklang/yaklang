@@ -5,19 +5,19 @@ import (
 )
 
 type node[T versionedValue] struct {
-	next  *node[T]
-	value VersionedIF[T]
-	ID    int64
+	// Newest -> oldest permits short-circuit reads without a full snapshot.
+	previous *node[T]
+	value    VersionedIF[T]
+	ID       int64
 }
 
 func (n *node[T]) Append(val VersionedIF[T]) *node[T] {
 	node := &node[T]{
-		next:  nil,
-		value: val,
-		ID:    0,
+		previous: n,
+		value:    val,
+		ID:       0,
 	}
 	if n != nil {
-		n.next = node
 		node.ID = n.ID + 1
 	}
 	val.SetVersion(node.ID)
@@ -56,18 +56,30 @@ func (n *LinkNode[T]) All() []VersionedIF[T] {
 		length = int(n.last.ID + 1)
 	}
 	if length <= 0 {
-		for current := n.header; current != nil; current = current.next {
+		for current := n.last; current != nil; current = current.previous {
 			length++
 		}
 	}
 
 	ret := make([]VersionedIF[T], length)
-	i := length - 1
-	for current := n.header; current != nil; current = current.next {
+	i := 0
+	for current := n.last; current != nil; current = current.previous {
 		ret[i] = current.value
-		i--
+		i++
 	}
 	return ret
+}
+
+func (n *LinkNode[T]) Find(match func(VersionedIF[T]) bool) VersionedIF[T] {
+	if n == nil {
+		return nil
+	}
+	for current := n.last; current != nil; current = current.previous {
+		if match(current.value) {
+			return current.value
+		}
+	}
+	return nil
 }
 
 type linkNodeMap[T versionedValue] struct {
@@ -96,6 +108,13 @@ func (m linkNodeMap[T]) Get(key string) VersionedIF[T] {
 func (m linkNodeMap[T]) GetAll(key string) []VersionedIF[T] {
 	if v, ok := m.val.Get(key); ok {
 		return v.All()
+	}
+	return nil
+}
+
+func (m linkNodeMap[T]) Find(key string, match func(VersionedIF[T]) bool) VersionedIF[T] {
+	if v, ok := m.val.Get(key); ok {
+		return v.Find(match)
 	}
 	return nil
 }

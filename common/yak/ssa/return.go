@@ -119,6 +119,7 @@ func (b *FunctionBuilder) fixupParameterWithThis() {
 
 // Finish current function builder
 func (b *FunctionBuilder) Finish() {
+	defer func() { b.placeholderConstants = nil }()
 	b.fixupParameterWithThis()
 
 	for _, fun := range b.MarkedFunctions {
