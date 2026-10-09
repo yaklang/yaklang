@@ -678,14 +678,12 @@ func (e *ScriptEngine) exec(ctx context.Context, id string, code string, params 
 	if e.client != nil {
 		client = e.client
 	} else {
+		// AOT builds skip the yaklib init that installs this client.
+		// AutoInitYakit returns nil when a client is already installed, so
+		// read the instance again after asking it to create one.
 		client = yaklib.GetYakitClientInstance()
 		if client == nil {
-			// The AOT runtime is built with ssa2llvm_aot, which skips the
-			// yaklib init that installs this client. Loading a stored plugin
-			// still has to execute, so install the empty client on demand.
-			client = yaklib.AutoInitYakit()
-		}
-		if client == nil {
+			yaklib.AutoInitYakit()
 			client = yaklib.GetYakitClientInstance()
 		}
 	}
