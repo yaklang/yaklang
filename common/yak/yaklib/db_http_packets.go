@@ -117,7 +117,7 @@ func (p *HTTPHistoryItem) openPacket(part string) (io.Reader, func(), error) {
 		flow := p.HTTPFlow
 		if part == "request" && p.IsTooLargeRequest && flow.Request == "" {
 			// A bounded projection may omit even the multipart skeleton. Read at most
-			// 8 MiB of the stored representation, never the spilled part bodies.
+			// 64 MiB of the stored representation, never the spilled part bodies.
 			c := p.config
 			db, closeDB, err := historyProjectDatabase(&c)
 			if err != nil {
@@ -125,12 +125,12 @@ func (p *HTTPHistoryItem) openPacket(part string) (io.Reader, func(), error) {
 				return nil, nil, err
 			}
 			decoded := &unquotedPacketReader{source: bufio.NewReader(&sqlitePacketReader{ctx: c.ctx, db: db, id: int64(p.ID), column: "request", offset: 1})}
-			skeleton, err := io.ReadAll(io.LimitReader(decoded, (8<<20)+1))
+			skeleton, err := io.ReadAll(io.LimitReader(decoded, (64<<20)+1))
 			closeDB()
-			if err != nil || len(skeleton) > 8<<20 {
+			if err != nil || len(skeleton) > 64<<20 {
 				h.Close()
 				if err == nil {
-					err = fmt.Errorf("multipart skeleton exceeds 8 MiB")
+					err = fmt.Errorf("multipart skeleton exceeds 64 MiB")
 				}
 				return nil, nil, err
 			}
