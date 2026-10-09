@@ -177,9 +177,10 @@ func TestHTTPPacketHistoryTools(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, sha256.Sum256(foreignBefore), sha256.Sum256(foreignAfter))
 	require.Equal(t, db, toolRuntime.ProjectDatabase)
-	// Preserve existing standalone exact-ID callers' HTTPFlow fields without a packetLimit.
+	// Preserve the concrete HTTPFlow type as well as fields for existing exact-ID callers.
 	legacy, err := yaklib.QueryHTTPFlowByID(1, yaklib.WithDBHistoryRuntime(ctx, db, profile))
 	require.NoError(t, err)
+	require.IsType(t, &schema.HTTPFlow{}, legacy)
 	require.Equal(t, "application/json", legacy.ContentType)
 	require.Equal(t, "fixture", legacy.Tags)
 
@@ -290,8 +291,10 @@ func TestHTTPPacketHistoryTools(t *testing.T) {
 	require.NoError(t, os.WriteFile(spill.TooLargeRequestBodyFile, largeRequest, 0600))
 	require.NoError(t, os.Remove(spill.TooLargeResponseBodyFile))
 	// Request export succeeds, then response export fails: remove partial artifacts.
-	item, err := yaklib.QueryHTTPFlowByID(5, yaklib.WithDBHistoryRuntime(ctx, db, profile))
+	failurePage, err := yaklib.QueryHTTPFlows(yaklib.WithDBHistoryRuntime(ctx, db, profile), yaklib.DatabaseExports["afterID"].(func(int64) yaklib.DBHistoryOption)(4), yaklib.DatabaseExports["beforeID"].(func(int64) yaklib.DBHistoryOption)(6))
 	require.NoError(t, err)
+	require.Len(t, failurePage.Items, 1)
+	item := failurePage.Items[0]
 	failedDir := t.TempDir()
 	_, err = item.ExportPackets(failedDir, "both")
 	require.Error(t, err)

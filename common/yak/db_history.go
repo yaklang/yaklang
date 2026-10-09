@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
+	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/yak/antlr4yak"
 	"github.com/yaklang/yaklang/common/yak/yaklib"
 )
@@ -28,7 +29,7 @@ func bindDBHistoryToEngine(engine *antlr4yak.Engine, ctx context.Context, runtim
 	exports["QueryHTTPFlows"] = func(opts ...yaklib.DBHistoryOption) (*yaklib.HTTPHistoryPage, error) {
 		return yaklib.QueryHTTPFlows(options(opts)...)
 	}
-	exports["QueryHTTPFlowByID"] = func(id int64, opts ...yaklib.DBHistoryOption) (*yaklib.HTTPHistoryItem, error) {
+	exports["QueryHTTPFlowByID"] = func(id int64, opts ...yaklib.DBHistoryOption) (*schema.HTTPFlow, error) {
 		return yaklib.QueryHTTPFlowByID(id, options(opts)...)
 	}
 	engine.SetVars(map[string]any{"db": exports})

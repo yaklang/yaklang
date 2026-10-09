@@ -19,8 +19,8 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 )
 
-// YakProject identifies a registered engine database, independently of the app's
-// numeric project ID (different Yakit/Memfit profiles may reuse that number).
+// YakProject 描述引擎识别的项目数据库及其可用性、大小与最近操作日期。
+// DatabaseID 区分不同 Yakit/Memfit 登记库中相同的数字 ProjectID，供 db.projectID 查询使用。
 type YakProject struct {
 	DatabaseID, Name, Description, DatabasePath, Source, Type string
 	ProjectID                                                 uint
@@ -29,6 +29,16 @@ type YakProject struct {
 	Current, Available, SupportsHTTP                          bool
 }
 
+// Dump 把项目元信息格式化为可直接 println 的文本。
+// SizeBytes 包括数据库主文件和 WAL；LastOperationAt 取项目登记更新时间与数据库文件修改时间中较新者，不代表本次读取时间。
+//
+// 返回值:
+//   - text: 数据库标识、名称、来源、类型、当前/可用标记、HTTP 查询能力、大小、最近操作日期、路径与描述
+//
+// Example:
+// ```
+// for project in db.ListYakProjects()~ { println(project.Dump()) }
+// ```
 func (p *YakProject) Dump() string {
 	return fmt.Sprintf("database_id=%s name=%q source=%s type=%s current=%t available=%t supports_http=%t\nsize=%s size_bytes=%d last_operation_at=%s\ndatabase_path=%s\ndescription=%s", p.DatabaseID, p.Name, p.Source, p.Type, p.Current, p.Available, p.SupportsHTTP, utils.ByteSize(uint64(p.SizeBytes)), p.SizeBytes, p.LastOperationAt.Format(time.RFC3339), p.DatabasePath, p.Description)
 }
@@ -247,8 +257,40 @@ func updateProjectFileInfo(p *YakProject) {
 	}
 }
 
-// ListYakProjects reads engine and installed Yakit/Memfit project registries.
-// It does not switch the active DB or repair/migrate any profile records.
+// ListYakProjects 列出引擎、Yakit 和 Memfit 登记的 Yaklang 项目（导出名为 db.ListYakProjects）。
+//
+// 默认读取当前运行绑定的项目登记库，并从 YAKIT_HOME、MEMFITAI_HOME、用户目录和两个应用的 config.json 发现其他登记库。
+// 只读取登记信息，不切换当前项目、不修复登记记录。相同数据库路径去重；不同登记库可以复用数字 ProjectID，跨库查询请使用返回的 DatabaseID。
+// 当前项目优先，其余按 LastOperationAt 降序排列；keyword 不区分大小写地匹配项目名称和描述，默认 limit=10、offset=0。
+//
+// 参数:
+//   - opts: 项目列表选项（可变参数），支持 db.keyword、db.limit、db.offset；limit 范围 1–100，offset 范围 0–1000000
+//
+// 返回值:
+//   - projects: YakProject 列表；包含 DatabaseID、ProjectID、Name、Description、DatabasePath、Source、Type、Current、Available、SupportsHTTP、SizeBytes、LastOperationAt；无匹配返回空列表
+//   - err: 登记库读取失败、选项无效或上下文取消时返回错误
+//
+// SizeBytes 为 SQLite 主文件与 WAL 文件大小之和；LastOperationAt 取登记更新时间与数据库/WAL 修改时间的较新值，不代表最后读取时间。
+// 只有 Available 和 SupportsHTTP 都为 true 的项目可用于 HTTP 查询；未登记的当前数据库以 current 标识展示，内存数据库大小为 0。
+//
+// <|EXAMPLE_START|> 列出项目并直接输出文本
+// ```
+// projects, err = db.ListYakProjects(db.limit(10), db.offset(0))
+// if err != nil { die(err) }
+// for project in projects { println(project.Dump()) }
+// ```
+// <|EXAMPLE_END|>
+//
+// <|EXAMPLE_START|> 按名称或描述查找项目
+// ```
+// projects = db.ListYakProjects(db.keyword("认证调查"), db.limit(5))~
+//
+//	for project in projects {
+//	    println(project.Name, project.SizeBytes, project.LastOperationAt)
+//	}
+//
+// ```
+// <|EXAMPLE_END|>
 func ListYakProjects(opts ...DBHistoryOption) ([]*YakProject, error) {
 	c, err := historyConfig(2048, opts)
 	if err != nil {

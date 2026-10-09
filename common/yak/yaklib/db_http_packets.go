@@ -13,17 +13,52 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 )
 
+// HTTPPacketFile 描述 ExportPackets 导出的原始报文文件，Part 为 request/response，Path 为绝对路径，Bytes 为实际原文字节数。
 type HTTPPacketFile struct {
 	Part, Path string
 	Bytes      int64
 }
 
+// Dump 输出报文文件路径与原文字节数，并提示使用 grep 或 read_file 阅读完整内容。
+//
+// 返回值:
+//   - text: request_file/response_file 路径、字节数与文件查询提示
+//
+// Example:
+// ```
+// host = "doc-http-file.example.test"
+// db.SaveHTTPFlowFromRaw("http://"+host+"/", []byte(f"GET / HTTP/1.1\r\nHost: ${host}\r\n\r\n"), []byte("HTTP/1.1 200 OK\r\n\r\nok"))~
+// page = db.QueryHTTPFlows(db.url(host), db.limit(1))~
+// files = page.Items[0].ExportPackets("", "response")~
+// for packetFile in files { println(packetFile.Dump()); file.Remove(packetFile.Path)~ }
+// ```
 func (f *HTTPPacketFile) Dump() string {
 	return fmt.Sprintf("%s_file=%s bytes=%d\nUse grep or read_file on this file to inspect the complete raw HTTP packet.", f.Part, f.Path, f.Bytes)
 }
 
-// ExportPackets streams complete packets, including large request/response and
-// multipart sidecars. Each file is newly created with 0600 permissions.
+// ExportPackets 把完整原始请求/响应流式导出为新文件，不受 packetLimit 展示预算限制。
+// 数据库 Go quoted 内容按块解码，旁路大报文/SSE 合并报文头与正文，multipart 复用引擎重建逻辑，不求值报文中的 fuzztag。
+// 每次生成独立文件，权限为 0600；失败时删除本次已生成文件。旁路资源缺失、上下文取消或文件写入失败会返回错误，不输出不完整的成功结果。
+//
+// 参数:
+//   - directory: 导出目录；空字符串使用系统临时目录，目录不存在时创建
+//   - part: 导出 request、response 或 both；both 按请求、响应顺序返回
+//
+// 返回值:
+//   - files: HTTPPacketFile 列表，提供 Part、绝对 Path、实际原文字节数 Bytes 与 Dump；使用完可自行删除文件
+//   - err: 参数无效、数据库或旁路文件不可用、上下文取消、目录或文件写入失败时返回错误
+//
+// Example:
+// ```
+// host = "doc-http-packets.example.test"
+// req = []byte(f"GET / HTTP/1.1\r\nHost: ${host}\r\n\r\n")
+// rsp = []byte("HTTP/1.1 200 OK\r\n\r\n" + str.Repeat("evidence\n", 100))
+// db.SaveHTTPFlowFromRaw("http://"+host+"/", req, rsp)~
+// page = db.QueryHTTPFlows(db.url(host), db.limit(1), db.packetLimit(128))~
+// files, err = page.Items[0].ExportPackets("", "both")
+// if err != nil { die(err) }
+// for packetFile in files { println(packetFile.Dump()); file.Remove(packetFile.Path)~ }
+// ```
 func (p *HTTPHistoryItem) ExportPackets(directory, part string) ([]*HTTPPacketFile, error) {
 	if part != "both" && part != "request" && part != "response" {
 		return nil, fmt.Errorf("packet must be request, response or both")
