@@ -40,6 +40,7 @@ func MutateHookCaller(ctx context.Context, raw string, caller YakitCallerIf, par
 		client := yaklib.NewVirtualYakitClient(caller)
 		db := consts.GetGormProjectDatabase()
 		scriptEngine.RegisterEngineHooks(func(engine *antlr4yak.Engine) error {
+			yaklib.BindEngineClient(engine, client)
 			engine.OverrideRuntimeGlobalVariables(map[string]any{
 				"yakit_output": FeedbackFactory(db, caller, false, "default"),
 				"yakit_save":   FeedbackFactory(db, caller, true, "default"),
@@ -48,7 +49,6 @@ func MutateHookCaller(ctx context.Context, raw string, caller YakitCallerIf, par
 						Id: id, Data: fmt.Sprint(i),
 					})
 				},
-				"yakit": yaklib.GetExtYakitLibByClient(client),
 			})
 			return nil
 		})

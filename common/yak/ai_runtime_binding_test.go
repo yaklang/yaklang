@@ -44,6 +44,76 @@ func TestAIToolRuntimeBindingsPreserveExports(t *testing.T) {
 	}
 }
 
+func TestYakToolPluginFeedbackRiskBinding(t *testing.T) {
+	db, err := utils.CreateTempTestDatabaseInMemory()
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = db.Close() })
+	require.NoError(t, db.AutoMigrate(&schema.Risk{}).Error)
+	previous := consts.CaptureProjectDatabaseBinding()
+	consts.BindProjectDatabaseWithReader(db, nil, "")
+	t.Cleanup(func() { consts.BindProjectDatabaseWithReader(previous.Database, previous.ReadDatabase, previous.Path) })
+	previousClient := yaklib.GetYakitClientInstance()
+	defaultClient := yaklib.NewVirtualYakitClient(func(*ypb.ExecResult) error {
+		t.Error("plugin risk output reached the global client")
+		return nil
+	})
+	yaklib.InitYakit(defaultClient)
+	t.Cleanup(func() { yaklib.InitYakit(previousClient) })
+	code := `
+emitRisk = func(stage) {
+    risk.NewRisk("http://127.0.0.1/" + marker + "/" + stage + "/new", risk.title(stage + "-new"), risk.runtimeId(marker))
+    risk.Save(risk.CreateRisk("http://127.0.0.1/" + marker + "/" + stage + "/save", risk.title(stage + "-save"), risk.runtimeId(marker)))~
+}
+emitRisk("load")
+handle = func() { emitRisk("hook") }
+beforeRequest = func(req) { emitRisk("hook"); return req }
+`
+	for _, mode := range []string{"set", "add", "fuzzer"} {
+		t.Run(mode, func(t *testing.T) {
+			manager := NewYakToCallerManager()
+			runtimeID := "plugin-feedback-" + mode
+			pluginCode := fmt.Sprintf("marker = %q\n", runtimeID) + code
+			manager.SetRuntimeId(runtimeID)
+			var mu sync.Mutex
+			var outputs []*ypb.ExecResult
+			feedback := YakitCallerIf(func(output *ypb.ExecResult) error {
+				mu.Lock()
+				defer mu.Unlock()
+				outputs = append(outputs, output)
+				return nil
+			})
+			if mode == "set" {
+				err = manager.SetForYakit(context.Background(), pluginCode, nil, feedback, "handle")
+			} else if mode == "add" {
+				err = manager.AddForYakit(context.Background(), &schema.YakScript{ScriptName: runtimeID}, nil, pluginCode, feedback, "handle")
+			} else {
+				before, _, _, _, _, _ := MutateHookCaller(context.Background(), pluginCode, feedback)
+				require.NotNil(t, before)
+				packet := []byte("GET / HTTP/1.1\r\nHost: example.com\r\n\r\n")
+				require.Equal(t, packet, before(false, packet, packet))
+			}
+			require.NoError(t, err)
+			if mode != "fuzzer" {
+				manager.CallByNameSync("handle")
+			}
+			mu.Lock()
+			defer mu.Unlock()
+			require.Len(t, outputs, 4, "both load-time and hook-time risk output must use plugin feedback")
+			for _, output := range outputs {
+				require.Contains(t, string(output.Message), `"level":"json-risk"`)
+				require.Contains(t, string(output.Message), runtimeID)
+				if mode == "add" {
+					require.Equal(t, runtimeID, output.PluginName)
+				}
+			}
+			count, err := yakit.CountRiskByRuntimeId(db, runtimeID)
+			require.NoError(t, err)
+			require.Equal(t, 4, count)
+			require.Same(t, defaultClient, yaklib.GetYakitClientInstance())
+		})
+	}
+}
+
 func TestAIToolRuntimeClientAndRiskSinkIsolation(t *testing.T) {
 	db, err := utils.CreateTempTestDatabaseInMemory()
 	require.NoError(t, err)

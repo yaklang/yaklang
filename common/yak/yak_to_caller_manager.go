@@ -490,6 +490,7 @@ func (y *YakToCallerManager) SetForYakit(
 	}
 	db := consts.GetGormProjectDatabase()
 	return y.Set(ctx, code, paramMap, func(engine *antlr4yak.Engine) error {
+		yaklib.BindEngineClient(engine, yaklib.NewVirtualYakitClient(caller))
 		engine.OverrideRuntimeGlobalVariables(map[string]any{
 			"yakit_output": FeedbackFactory(db, caller, false, "default"),
 			"yakit_save":   FeedbackFactory(db, caller, true, "default"),
@@ -499,7 +500,6 @@ func (y *YakToCallerManager) SetForYakit(
 					Data: fmt.Sprint(i),
 				})
 			},
-			"yakit": yaklib.GetExtYakitLibByClient(yaklib.NewVirtualYakitClient(caller)),
 		})
 		return nil
 	}, hooks...)
@@ -705,8 +705,8 @@ func (y *YakToCallerManager) AddForYakit(
 	db := consts.GetGormProjectDatabase()
 	return y.Add(ctx, script, paramMap, code, func(engine *antlr4yak.Engine) error {
 		scriptName := script.ScriptName
+		yaklib.BindEngineClient(engine, yaklib.NewVirtualYakitClient(caller))
 		engine.OverrideRuntimeGlobalVariables(map[string]any{
-			"yakit":           yaklib.GetExtYakitLibByClient(yaklib.NewVirtualYakitClient(caller)),
 			"RUNTIME_ID":      y.runtimeId,
 			"YAKIT_PLUGIN_ID": scriptName,
 			"yakit_output":    FeedbackFactory(db, caller, false, scriptName),
