@@ -236,6 +236,8 @@ type ReExportInfo struct {
 
 // both instruction and value
 type Program struct {
+	variableRangeMu      sync.Mutex
+	variableRanges       *utils.SafeMapWithKey[*memedit.MemEditor, *utils.SafeMapWithKey[variableRangePosition, *memedit.Range]]
 	compileDiagnosticsMu sync.Mutex
 	compileDiagnostics   CompileDiagnostics
 	// project
@@ -278,11 +280,12 @@ type Program struct {
 	diagnosticsRecorder *diagnostics.Recorder
 
 	// TODO: this four map should need????!
-	editorStackMu sync.RWMutex
-	editorStack   *omap.OrderedMap[string, *memedit.MemEditor]
-	fileListMu    sync.Mutex
-	FileList      map[string]string // file-name and file hash
-	LineCount     int
+	editorStackMu  sync.RWMutex
+	editorStack    *omap.OrderedMap[string, *memedit.MemEditor]
+	fileListMu     sync.Mutex
+	FileList       map[string]string // file-name and file hash
+	fileLineCounts *utils.SafeMapWithKey[string, int]
+	LineCount      int
 
 	libraryFileMu         sync.RWMutex
 	LibraryFile           map[string][]string //library and file relation

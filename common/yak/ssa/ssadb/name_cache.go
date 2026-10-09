@@ -2,12 +2,15 @@ package ssadb
 
 import (
 	"regexp"
+	"strings"
 	"sync"
 
 	"github.com/gobwas/glob"
+	"github.com/yaklang/yaklang/common/utils"
 )
 
 type NameCache struct {
+	strings *utils.SafeMapWithKey[string, string]
 	sync.RWMutex
 	nameToId map[string]int64
 	idToName map[int64]string
@@ -28,6 +31,7 @@ type NameCache struct {
 // pass false for in-memory programs so the cache never touches the SSA database.
 func NewNameCache(program string, useDB bool) *NameCache {
 	cache := &NameCache{
+		strings:  utils.NewSafeMapWithKey[string, string](),
 		nameToId: make(map[string]int64),
 		idToName: make(map[int64]string),
 		program:  program,
@@ -37,6 +41,23 @@ func NewNameCache(program string, useDB bool) *NameCache {
 		cache.Preload()
 	}
 	return cache
+}
+
+// Intern shares string storage in both memory and DB modes without assigning
+// a database name ID or performing SQL. Own the string to avoid retaining a
+// large source/JSON buffer through a small substring.
+func (c *NameCache) Intern(name string) string {
+	if c == nil || name == "" {
+		return name
+	}
+	if canonical, exists := c.strings.Get(name); exists {
+		return canonical
+	}
+	owned := strings.Clone(name)
+	canonical, _ := c.strings.GetOrLoad(owned, func() (string, error) {
+		return owned, nil
+	})
+	return canonical
 }
 
 func (c *NameCache) Preload() {
@@ -77,6 +98,7 @@ func (c *NameCache) Preload() {
 }
 
 func (c *NameCache) GetID(name string) int64 {
+	name = c.Intern(name)
 	// id=0 约定表示空字符串 ""，数据库 namepool 表中 id=0 对应 name=""
 	if name == "" {
 		c.Lock()

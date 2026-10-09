@@ -490,12 +490,9 @@ type baseType struct {
 	// id is read by every IR marshal of a shared type and assigned lazily by
 	// typeStore.remember, so it must never be a plain field: persist workers run
 	// concurrently over the same *FunctionType and friends.
-	id           atomic.Int64
-	method       map[string]*Function
-	methodGetter func() map[string]*Function
-	methodOnce   sync.Once
-	methodLock   sync.RWMutex
-	typeNameMu   sync.Mutex
+	id         atomic.Int64
+	methods    atomic.Pointer[typeMethodState]
+	typeNameMu sync.Mutex
 }
 
 func NewBaseType() *baseType {
@@ -526,42 +523,105 @@ func (b *baseType) claimIdIfUnset(candidate int64) (int64, bool) {
 	}
 }
 
+// Mutable method metadata is absent on the common primitive type.
+type typeMethodState struct {
+	mu       sync.RWMutex
+	once     sync.Once
+	getter   func() map[string]*Function
+	snapshot map[string]*Function // immutable, retained for the public Type API
+}
+
+func (b *baseType) methodState() *typeMethodState {
+	if state := b.methods.Load(); state != nil {
+		return state
+	}
+	created := &typeMethodState{}
+	if b.methods.CompareAndSwap(nil, created) {
+		return created
+	}
+	return b.methods.Load()
+}
+
 func (b *baseType) SetMethodGetter(f func() map[string]*Function) {
-	b.methodLock.Lock()
-	defer b.methodLock.Unlock()
-	b.methodGetter = f
+	state := b.methodState()
+	state.mu.Lock()
+	defer state.mu.Unlock()
+	state.getter = f
 }
 
 func cloneTypeMethods(src map[string]*Function) map[string]*Function {
-	ret := make(map[string]*Function, len(src))
-	for name, fn := range src {
-		ret[name] = fn
+	if len(src) == 0 {
+		return nil
 	}
-	return ret
+	copy := utils.NewSafeMapWithKey[string, *Function]()
+	for name, fn := range src {
+		copy.Set(name, fn)
+	}
+	return copy.GetAll()
 }
 
 func (b *baseType) SetMethod(m map[string]*Function) {
-	b.methodLock.Lock()
-	defer b.methodLock.Unlock()
-	b.method = cloneTypeMethods(m)
+	state := b.methodState()
+	state.mu.Lock()
+	defer state.mu.Unlock()
+	state.snapshot = cloneTypeMethods(m)
 }
 
 func (b *baseType) AddMethod(id string, f *Function) {
 	b.GetMethod()
-	b.methodLock.Lock()
-	defer b.methodLock.Unlock()
-	// GetMethod publishes immutable snapshots; additions cannot mutate a map
-	// currently being read by another compile unit.
-	methods := cloneTypeMethods(b.method)
-	methods[id] = f
-	b.method = methods
+	state := b.methodState()
+	state.mu.Lock()
+	defer state.mu.Unlock()
+	if old, exists := state.snapshot[id]; exists && old == f {
+		return
+	}
+	methods := utils.NewSafeMapWithKey[string, *Function]()
+	for name, fn := range state.snapshot {
+		methods.Set(name, fn)
+	}
+	methods.Set(id, f)
+	state.snapshot = methods.GetAll()
+}
+
+// AddMethods copies once and publishes an immutable snapshot. The SafeMap
+// owns construction; the returned map preserves the existing Type API.
+func (b *baseType) AddMethods(additions map[string]*Function) {
+	if len(additions) == 0 {
+		return
+	}
+	b.GetMethod()
+	state := b.methodState()
+	state.mu.Lock()
+	defer state.mu.Unlock()
+	changed := false
+	for name, fn := range additions {
+		if old, exists := state.snapshot[name]; !exists || old != fn {
+			changed = true
+			break
+		}
+	}
+	if !changed {
+		return
+	}
+	methods := utils.NewSafeMapWithKey[string, *Function]()
+	for name, fn := range state.snapshot {
+		methods.Set(name, fn)
+	}
+	for name, fn := range additions {
+		methods.Set(name, fn)
+	}
+	state.snapshot = methods.GetAll()
 }
 
 func (b *baseType) GetMethod() map[string]*Function {
-	b.methodOnce.Do(func() {
-		b.methodLock.RLock()
-		getter, initialized := b.methodGetter, b.method != nil
-		b.methodLock.RUnlock()
+	state := b.methods.Load()
+	if state == nil {
+		return nil
+	}
+	state.once.Do(func() {
+		state.mu.RLock()
+		getter, initialized := state.getter, state.snapshot != nil
+		state.mu.RUnlock()
 		if initialized {
 			return
 		}
@@ -569,15 +629,16 @@ func (b *baseType) GetMethod() map[string]*Function {
 		if getter != nil {
 			methods = getter()
 		}
-		b.methodLock.Lock()
-		defer b.methodLock.Unlock()
-		if b.method == nil {
-			b.method = cloneTypeMethods(methods)
+		state.mu.Lock()
+		defer state.mu.Unlock()
+		if state.snapshot == nil {
+			state.snapshot = cloneTypeMethods(methods)
 		}
+		state.getter = nil // lazy getter may capture parser and type graphs
 	})
-	b.methodLock.RLock()
-	defer b.methodLock.RUnlock()
-	return b.method
+	state.mu.RLock()
+	defer state.mu.RUnlock()
+	return state.snapshot
 }
 
 func (b *baseType) RangeMethod(f func(string, *Function)) {
@@ -591,41 +652,45 @@ type BasicType struct {
 	// allocation, avoiding a separate GC object and pointer per type. BasicType
 	// must not be copied after use (baseType contains atomics and locks).
 	baseType
-	Kind    TypeKind
-	name    string
-	pkgPath string
+	Kind        TypeKind
+	description *basicTypeDescription
 
 	fullTypeName []string
 }
 
+type basicTypeDescription struct{ name string }
+type basicTypeDescriptionKey struct {
+	kind TypeKind
+	name string
+}
+
+// Only immutable descriptions are shared. Keep this constructor fallback
+// bounded; each program's NameCache provides the full lifetime string pool.
+var basicTypeDescriptions = utils.NewSafeMapWithKey[basicTypeDescriptionKey, *basicTypeDescription]()
+
 func NewBasicType(kind TypeKind, name string) *BasicType {
-	typ := &BasicType{
-		Kind:         kind,
-		name:         name,
-		pkgPath:      name,
-		fullTypeName: make([]string, 0),
+	key := basicTypeDescriptionKey{kind, name}
+	description, exists := basicTypeDescriptions.Get(key)
+	if !exists {
+		if len(name) <= 4096 && basicTypeDescriptions.Count() < 4096 {
+			key.name = strings.Clone(name)
+			description, _ = basicTypeDescriptions.GetOrLoad(key, func() (*basicTypeDescription, error) {
+				return &basicTypeDescription{name: key.name}, nil
+			})
+		} else {
+			description = &basicTypeDescription{name: strings.Clone(name)}
+		}
 	}
+	typ := &BasicType{Kind: kind, description: description}
 	typ.id.Store(-1)
 	return typ
 }
 
 var _ Type = (*BasicType)(nil)
 
-func (b *BasicType) String() string {
-	return b.name
-}
-
-func (b *BasicType) PkgPathString() string {
-	result := b.pkgPath
-	if result == "" {
-		result = b.RawString()
-	}
-	return result
-}
-
-func (b *BasicType) RawString() string {
-	return b.name
-}
+func (b *BasicType) String() string        { return b.description.name }
+func (b *BasicType) PkgPathString() string { return b.description.name }
+func (b *BasicType) RawString() string     { return b.description.name }
 
 func (b *BasicType) GetTypeKind() TypeKind {
 	return b.Kind
@@ -679,7 +744,7 @@ func (b *BasicType) IsNull() bool {
 }
 
 func (b *BasicType) GetName() string {
-	return b.name
+	return b.description.name
 }
 
 // func (b *BasicType) GetAllKey() []string {
@@ -1330,6 +1395,7 @@ func (s *ObjectType) Finish() {
 }
 
 type FunctionType struct {
+	receiverMu sync.RWMutex
 	*baseType
 	Name            string
 	pkgPath         string
@@ -1363,10 +1429,10 @@ func (f *FunctionType) SetIsMethod(isMethod bool, obj Type) {
 	if f == nil {
 		return
 	}
-	f.methodLock.Lock()
+	f.receiverMu.Lock()
 	f.IsMethod = isMethod
 	f.ObjectType = obj
-	f.methodLock.Unlock()
+	f.receiverMu.Unlock()
 }
 
 func (f *FunctionType) AddFullTypeName(name string) {
