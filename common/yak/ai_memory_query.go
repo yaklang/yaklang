@@ -4,7 +4,6 @@ import (
 	"context"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/ai/aimemory"
-	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/yak/antlr4yak"
 )
 
@@ -24,14 +23,8 @@ func bindMemorySearchToEngine(engine *antlr4yak.Engine, ctx context.Context, run
 		exports[name] = value
 	}
 	exports["CurrentNamespace"] = func() string { return id }
-	exports["SearchMemory"] = func(query string, opts ...aimemory.Option) ([]*schema.AIMemoryEntity, error) {
-		return aimemory.SearchMemory(query, append(append([]aimemory.Option{}, defaults...), opts...)...)
-	}
-	exports["Query"] = func(query string, opts ...aimemory.Option) ([]*aimemory.Item, error) {
-		return aimemory.Query(query, append(append([]aimemory.Option{}, defaults...), opts...)...)
-	}
-	exports["AmendMemory"] = func(operator, memoryID, content string, tags []string, opts ...aimemory.Option) (*schema.AIMemoryEntity, error) {
-		return aimemory.AmendMemory(operator, memoryID, content, tags, append(append([]aimemory.Option{}, defaults...), opts...)...)
+	exports["Search"] = func(query string, opts ...aimemory.Option) ([]*aimemory.Item, error) {
+		return aimemory.Search(query, append(append([]aimemory.Option{}, defaults...), opts...)...)
 	}
 	exports["Amend"] = func(operator, memoryID, content string, tags []string, opts ...aimemory.Option) (*aimemory.Item, error) {
 		return aimemory.Amend(operator, memoryID, content, tags, append(append([]aimemory.Option{}, defaults...), opts...)...)

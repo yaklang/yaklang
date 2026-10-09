@@ -111,7 +111,7 @@ for commit in commits { for retained in commit.retained_checks { if !retained.un
 if len(receipts)<2 { checks=append(checks,"missing_threshold_compression") }
 pending=runtimeState.memory_finalization_pending
 if pending==true { checks=append(checks,"memory_finalization_pending") }
-memories,searchErr=aimemory.SearchMemory("报告",aimemory.memoryNamespace(namespace),aimemory.memorySearchMode("bm25"),aimemory.memoryTokenLimit(8192))
+memories,searchErr=aimemory.Search("报告",aimemory.memoryNamespace(namespace),aimemory.memorySearchMode("bm25"),aimemory.memoryTokenLimit(8192))
 if searchErr!=nil { checks=append(checks,"memory_search_failed") }
 file.SaveJson(file.Join(root,"search-memories.json"),memories)~
 main.hit_ratio,helper.hit_ratio=nil,nil

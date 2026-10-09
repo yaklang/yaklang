@@ -14,8 +14,8 @@ receipts=json.loads(string(file.ReadFile(file.Join(root,"receipts.json"))~))
 commits=json.loads(string(file.ReadFile(file.Join(root,"commits.json"))~))
 for receipt in receipts { assert receipt.previous_summary_visible && receipt.previous_memory_visible && receipt.memory_error=="<nil>" }
 for commit in commits { for retained in commit.retained_checks { assert retained.unchanged } }
-report=aimemory.SearchMemory("工程报告",aimemory.memoryNamespace(result.namespace),aimemory.memorySearchMode("bm25"),aimemory.memoryTokenLimit(8192))~
-commit=aimemory.SearchMemory("提交",aimemory.memoryNamespace(result.namespace),aimemory.memorySearchMode("bm25"),aimemory.memoryTokenLimit(8192))~
+report=aimemory.Search("工程报告",aimemory.memoryNamespace(result.namespace),aimemory.memorySearchMode("bm25"),aimemory.memoryTokenLimit(8192))~
+commit=aimemory.Search("提交",aimemory.memoryNamespace(result.namespace),aimemory.memorySearchMode("bm25"),aimemory.memoryTokenLimit(8192))~
 assert len(report)>0 && len(commit)>0,"Saved preferences are not searchable"
 file.SaveJson(file.Join(root,"verified-report-memories.json"),report)~
 file.SaveJson(file.Join(root,"verified-commit-memories.json"),commit)~

@@ -23,7 +23,7 @@ limit = cli.Int("limit", cli.setDefault(5), cli.setHelp("最多返回 1–20 条
 tokenLimit = cli.Int("token_limit", cli.setDefault(1500), cli.setHelp("正文总 token 预算，64–8192"))
 cli.check()
 namespace = aimemory.CurrentNamespace()
-items, err = aimemory.Query(query, aimemory.memoryNamespace(namespace), aimemory.memoryTokenLimit(tokenLimit), aimemory.memoryLimit(limit), aimemory.memorySearchMode(mode))
+items, err = aimemory.Search(query, aimemory.memoryNamespace(namespace), aimemory.memoryTokenLimit(tokenLimit), aimemory.memoryLimit(limit), aimemory.memorySearchMode(mode))
 if err != nil { die(err) }
 printf("namespace=%s search_mode=%s hits=%d\n", namespace, mode, len(items))
 for item in items { println(item.Dump()) }

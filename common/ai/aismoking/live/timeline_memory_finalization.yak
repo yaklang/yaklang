@@ -80,7 +80,7 @@ for native in [true,false] {
         // Repeated end with no new business data: no extraction and no new save.
         config.GetTimeline().FinalizeMemory(smokeCtx)~
         assert compressions == before && saves == expected && indexes == expected
-        memories = aimemory.SearchMemory("工程报告",aimemory.memoryNamespace(namespace),aimemory.memorySearchMode("bm25"))~
+        memories = aimemory.Search("工程报告",aimemory.memoryNamespace(namespace),aimemory.memorySearchMode("bm25"))~
         assert len(memories)==expected
         printf("PASS memory finalization: native=%v scenario=%s compression=%d save=%d index=%d searchable=%d old_triage=0\n",native,scenario,compressions,saves,indexes,len(memories))
     }

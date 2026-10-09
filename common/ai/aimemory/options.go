@@ -32,9 +32,7 @@ func WithContext(ctx context.Context) Option { return func(c *options) { c.ctx =
 func WithDatabase(db *gorm.DB) Option        { return func(c *options) { c.db = db } }
 
 var Exports = map[string]any{
-	"SearchMemory":     SearchMemory,
-	"Query":            Query,
-	"AmendMemory":      AmendMemory,
+	"Search":           Search,
 	"Amend":            Amend,
 	"CurrentNamespace": func() string { return "default" },
 	"memoryNamespace":  WithMemoryNamespace,

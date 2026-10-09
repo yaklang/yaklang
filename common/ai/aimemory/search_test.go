@@ -23,7 +23,7 @@ func memoryTestDB(t *testing.T) *gorm.DB {
 	return db
 }
 
-func TestSearchMemoryExistingRAGAndIsolation(t *testing.T) {
+func TestSearchExistingRAGAndIsolation(t *testing.T) {
 	db := memoryTestDB(t)
 	oldMock := vectorstore.IsMockMode
 	vectorstore.IsMockMode = true
@@ -49,7 +49,7 @@ func TestSearchMemoryExistingRAGAndIsolation(t *testing.T) {
 	require.True(t, db.HasTable(yakit.VectorDocumentVTableName()))
 	for _, mode := range []string{"bm25", "vector", "hybrid"} {
 		t.Run(mode, func(t *testing.T) {
-			rows, err := SearchMemory("report", WithDatabase(db), WithMemoryNamespace("team-a"), WithMemorySearchMode(mode))
+			rows, err := Search("report", WithDatabase(db), WithMemoryNamespace("team-a"), WithMemorySearchMode(mode))
 			require.NoError(t, err)
 			seen := map[string]bool{}
 			for _, row := range rows {
@@ -63,11 +63,11 @@ func TestSearchMemoryExistingRAGAndIsolation(t *testing.T) {
 			}
 		})
 	}
-	rows, err := SearchMemory("report", WithDatabase(db), WithMemoryNamespace("team-b"), WithMemorySearchMode("bm25"))
+	rows, err := Search("report", WithDatabase(db), WithMemoryNamespace("team-b"), WithMemorySearchMode("bm25"))
 	require.NoError(t, err)
 	require.Len(t, rows, 1)
 	require.Equal(t, "other", rows[0].MemoryID)
-	rows, err = SearchMemory("report", WithDatabase(db), WithMemoryNamespace("unknown"))
+	rows, err = Search("report", WithDatabase(db), WithMemoryNamespace("unknown"))
 	require.NoError(t, err)
 	require.Empty(t, rows)
 	_, err = yakit.GetRAGCollectionInfoByName(db, "ai-memory-unknown")
@@ -75,30 +75,30 @@ func TestSearchMemoryExistingRAGAndIsolation(t *testing.T) {
 	require.False(t, db.HasTable(&schema.KnowledgeBaseInfo{}), "search must not initialize a knowledge base")
 }
 
-func TestSearchMemoryBudgetFallbackAndCancellation(t *testing.T) {
+func TestSearchBudgetFallbackAndCancellation(t *testing.T) {
 	db := memoryTestDB(t)
 	require.NoError(t, db.Create(&schema.AIMemoryEntity{MemoryID: "long", SessionID: "default", Content: strings.Repeat("中文 report ", 1000)}).Error)
-	rows, err := SearchMemory("report", WithDatabase(db), WithMemoryTokenLimit(128))
+	rows, err := Search("report", WithDatabase(db), WithMemoryTokenLimit(128))
 	require.NoError(t, err)
 	require.Len(t, rows, 1)
 	require.LessOrEqual(t, ytoken.CalcTokenCount(rows[0].Content), 128)
-	_, err = SearchMemory("report", WithDatabase(db), WithMemorySearchMode("vector"))
+	_, err = Search("report", WithDatabase(db), WithMemorySearchMode("vector"))
 	require.ErrorContains(t, err, "vector index is unavailable")
 	for _, opt := range []Option{WithMemoryLimit(21), WithMemoryTokenLimit(63), WithMemorySearchMode("wrong")} {
-		_, err := SearchMemory("report", WithDatabase(db), opt)
+		_, err := Search("report", WithDatabase(db), opt)
 		require.Error(t, err)
 	}
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
-	_, err = SearchMemory("report", WithDatabase(db), WithContext(ctx))
+	_, err = Search("report", WithDatabase(db), WithContext(ctx))
 	require.ErrorIs(t, err, context.Canceled)
 }
 
-func TestSearchMemoryProjectDatabaseIsolation(t *testing.T) {
+func TestSearchProjectDatabaseIsolation(t *testing.T) {
 	for _, marker := range []string{"first", "second"} {
 		db := memoryTestDB(t)
 		require.NoError(t, db.Create(&schema.AIMemoryEntity{MemoryID: "same-id", SessionID: "same-namespace", Content: "report " + marker}).Error)
-		rows, err := SearchMemory("report", WithDatabase(db), WithMemoryNamespace("same-namespace"), WithMemorySearchMode("bm25"))
+		rows, err := Search("report", WithDatabase(db), WithMemoryNamespace("same-namespace"), WithMemorySearchMode("bm25"))
 		require.NoError(t, err)
 		require.Len(t, rows, 1)
 		require.Equal(t, "report "+marker, rows[0].Content)

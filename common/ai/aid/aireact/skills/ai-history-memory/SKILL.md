@@ -25,7 +25,7 @@ items, err = aihistory.Query("认证失败", aihistory.aiSession(aihistory.Curre
 if err != nil { die(err) }
 for item in items { println(item.Dump()) }
 
-items, err = aimemory.Query("报告偏好", aimemory.memoryNamespace(aimemory.CurrentNamespace()), aimemory.memorySearchMode("bm25"))
+items, err = aimemory.Search("报告偏好", aimemory.memoryNamespace(aimemory.CurrentNamespace()), aimemory.memorySearchMode("bm25"))
 if err != nil { die(err) }
 for item in items { println(item.Dump()) }
 ```
