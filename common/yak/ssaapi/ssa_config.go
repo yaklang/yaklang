@@ -85,12 +85,12 @@ type ExcludeFunc = ssaconfig.CompileExcludeFunc
 var DefaultExcludeFiles = ssaconfig.DefaultCompileExcludeGlobs
 
 func newExcludeFunc(patterns []string, basePath string) ExcludeFunc {
-	return ssaconfig.BuildCompileExcludeFunc(patterns, basePath)
+	return ssaconfig.BuildCompileExcludeFunc(patterns, basePath, true)
 }
 
 // CompileExcludeFunc returns a matcher that merges user patterns with built-in compile excludes.
 func CompileExcludeFunc(extraPatterns []string, basePath string) ExcludeFunc {
-	return ssaconfig.BuildCompileExcludeFunc(extraPatterns, basePath)
+	return ssaconfig.BuildCompileExcludeFunc(extraPatterns, basePath, true)
 }
 
 func resolveCompileExcludeFunc(exclude ExcludeFunc) ExcludeFunc {
@@ -359,7 +359,7 @@ func DefaultConfig(opts ...ssaconfig.Option) (*Config, error) {
 	if sc.SSACompile != nil {
 		userExclude = sc.SSACompile.ExcludeFiles
 	}
-	c.excludeFile = ssaconfig.BuildCompileExcludeFuncWithDefaults(userExclude, sc.GetCodeSourceLocalFile(), !sc.GetCompileDisableDefaultExcludes())
+	c.excludeFile = ssaconfig.BuildCompileExcludeFunc(userExclude, sc.GetCodeSourceLocalFile(), !sc.GetCompileDisableDefaultExcludes())
 	ssaconfig.ApplyExtraOptions(c, c.Config)
 
 	// 只有当 c.fs 为 nil 时，才从配置中解析文件系统

@@ -229,17 +229,11 @@ func ShouldSkipCompileDirName(name string) bool {
 	return false
 }
 
-// BuildCompileExcludeFunc merges userPatterns with DefaultCompileExcludePatterns().
-func BuildCompileExcludeFunc(userPatterns []string, basePath string) CompileExcludeFunc {
-	return BuildCompileExcludeFuncWithDefaults(userPatterns, basePath, true)
-}
-
-// BuildCompileExcludeFuncWithDefaults merges userPatterns with
-// DefaultCompileExcludePatterns() unless includeDefaults is false. When
-// includeDefaults is false, only userPatterns are compiled; this is the
-// escape hatch for callers (tests, embedders) that need the built-in
-// excludes to not apply at all.
-func BuildCompileExcludeFuncWithDefaults(userPatterns []string, basePath string, includeDefaults bool) CompileExcludeFunc {
+// BuildCompileExcludeFunc merges userPatterns with DefaultCompileExcludePatterns()
+// unless includeDefaults is false. When includeDefaults is false, only userPatterns
+// are compiled; this is the escape hatch for callers (tests, embedders) that need
+// the built-in excludes to not apply at all (see WithCompileDisableDefaultExcludes).
+func BuildCompileExcludeFunc(userPatterns []string, basePath string, includeDefaults bool) CompileExcludeFunc {
 	var compiled []glob.Glob
 	seenPatterns := make(map[string]bool)
 	patterns := append([]string(nil), userPatterns...)
@@ -316,5 +310,5 @@ func ResolveCompileExcludeFunc(exclude CompileExcludeFunc) CompileExcludeFunc {
 	if exclude != nil {
 		return exclude
 	}
-	return BuildCompileExcludeFunc(nil, "")
+	return BuildCompileExcludeFunc(nil, "", true)
 }
