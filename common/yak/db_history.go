@@ -33,6 +33,7 @@ func bindDBHistoryToEngine(engine *antlr4yak.Engine, ctx context.Context, runtim
 		return yaklib.QueryHTTPFlowByID(id, options(opts)...)
 	}
 	engine.SetVars(map[string]any{"db": exports})
+	// Keep the public risk exports, wrapping only the query's runtime DB/context.
 	riskExports := make(map[string]any, len(yaklib.RiskExports))
 	for name, fn := range yaklib.RiskExports {
 		riskExports[name] = fn

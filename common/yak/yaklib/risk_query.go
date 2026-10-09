@@ -33,7 +33,7 @@ type RiskDatabasePage struct {
 	HasMore                               bool
 }
 
-// Dump 输出风险摘要和分页信息，适合直接在 AI 工具中 println。
+// Dump 输出风险摘要和分页信息，普通 Yak 脚本和 AI 工具均可直接 println。
 // 返回值:
 //   - text: 数据库标识、总数、续查偏移及各条风险的标题、目标、证据和修复建议
 //
@@ -64,13 +64,14 @@ type riskDatabaseFilter struct {
 }
 
 func init() {
+	// 公共导出供普通脚本使用；AI 引擎仅为它补充运行时数据库绑定。
 	RiskExports["QueryRiskInDatabase"] = QueryRiskInDatabase
 }
 
 // QueryRiskInDatabase 分页搜索已保存的风险（导出名为 risk.QueryRiskInDatabase）。
-// 默认查询运行绑定的当前库，也可用 db.projectID 选择 db.ListYakProjects 返回的数据库标识；跨项目只读，不切换当前库。
+// 普通脚本默认查询当前项目库，AI 工具默认查询本次运行绑定的项目库；两者均可用 db.projectID 选择 db.ListYakProjects 返回的数据库标识，跨项目只读，不切换当前库。
 // 参数:
-//   - filter: 过滤字典；type 精确匹配风险类型或中文类型，支持逗号列表；severity 支持逗号列表；title 为标题关键词；runtime_id 为精确运行 ID；ids 为正整数 ID 列表；waiting_verified 默认 false，仅查已验证记录，true 仅查待验证记录。nil 或空字典使用默认过滤。
+//   - filter: 过滤字典；type 精确匹配风险类型或中文类型，支持逗号列表；severity 支持逗号列表；title 为标题关键词；runtime_id 为精确运行 ID；ids 为正整数 ID 列表；waiting_verified 默认 false，查询未处于等待验证状态的记录，true 仅查待验证记录。nil 或空字典使用默认过滤。
 //   - opts: db.projectID、db.keyword、db.url、db.limit、db.offset、db.afterID、db.beforeID；按 ID 降序，limit 默认 10，范围 1–100。
 //
 // 返回值:
