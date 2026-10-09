@@ -1,0 +1,42 @@
+__DESC__ = "查询当前项目或指定已注册项目数据库中的 Risk/漏洞记录，按关键词、级别、网络、端口、标签、时间、运行时和代码审计程序过滤；通过 risk_id 回读漏洞证据、请求响应和修复建议，关联 query_http_history 继续调查。查询保留已读状态。"
+__VERBOSE_NAME__ = "Query Cybersecurity Risk"
+__VERBOSE_NAME_ZH__ = "查询安全风险"
+__KEYWORDS__ = "risk,vulnerability,cve,severity,evidence,风险,漏洞,证据,修复建议,安全"
+__USAGE__ = <<<USAGE
+默认查询运行时当前项目；跨库先用 query_yak_projects 取得 project_id，只接受注册 ID。keyword 搜索标题、URL、IP、payload、details 等，severity 可用 high,critical，network 支持 IP/CIDR，ports 支持范围。
+filter_json 为 QueryRisksRequest JSON，例如 {"RuntimeId":"xxx","Tags":"SQL注入|登录","AfterCreatedAt":1700000000,"SSAProgramNames":["项目名"],"IsRead":"false","WaitingVerified":false}。未指定 WaitingVerified 时查询两种状态；指定 true/false 时筛选对应状态。RiskType 使用 Yakit 的风险类型显示名称前缀。分页用 limit/offset，不接受 Pagination/Token。
+先查询候选 risk_id，再以 risk_id 单条回读 content（JSON 文本，包含漏洞细节、修复建议、payload、请求响应和 packet_pairs）。content 被截断时用 next_content_offset 继续读取，拼接后解析。http_flow_ids 可交给 query_http_history 的 flow_id，保持相同 project_id。
+分页范围为 limit 1–50、content_limit 1–8192，且 limit × content_limit ≤ 65536；默认 10 × 2048，可先用默认值。
+[[- if .FunctionCallMode -]]
+arguments 示例：
+```json
+{"keyword":"SQL注入","severity":"high,critical","limit":10}
+```
+[[- else -]]
+文本流 action 示例：
+```json
+{"@action":"directly_call_tool","directly_call_tool_name":"query_cybersecurity_risk","directly_call_tool_params":{"keyword":"SQL注入","severity":"high,critical","limit":10}}
+```
+[[- end -]]
+USAGE
+projectID = cli.Int("project_id", cli.setDefault(0), cli.setHelp("query_yak_projects 返回的 ID；0 当前项目"))
+keyword = cli.String("keyword", cli.setHelp("风险关键词"))
+severity = cli.String("severity", cli.setHelp("风险级别，逗号分隔"))
+network = cli.String("network", cli.setHelp("IP 或 CIDR"))
+ports = cli.String("ports", cli.setHelp("端口列表或范围"))
+riskID = cli.Int("risk_id", cli.setDefault(0), cli.setHelp("精确风险 ID，返回分段证据与修复建议"))
+filterJSON = cli.String("filter_json", cli.setHelp("高级 QueryRisksRequest JSON 条件"))
+limit = cli.Int("limit", cli.setDefault(10), cli.setHelp("返回条数 1–50"))
+offset = cli.Int("offset", cli.setDefault(0), cli.setHelp("分页偏移"))
+contentOffset = cli.Int("content_offset", cli.setDefault(0), cli.setHelp("证据 JSON 字符偏移"))
+contentLimit = cli.Int("content_limit", cli.setDefault(2048), cli.setHelp("正文字符限制 1–8192；limit × 本值 ≤ 65536"))
+cli.check()
+filter = {}
+if filterJSON != "" { filter = json.loads(filterJSON) }
+if keyword != "" { filter["Search"] = keyword }
+if severity != "" { filter["Severity"] = severity }
+if network != "" { filter["Network"] = network }
+if ports != "" { filter["Ports"] = ports }
+if riskID < 0 { die("risk_id must be nonnegative") }
+if riskID > 0 { filter["Ids"] = [riskID] }
+RESULT = yakit.QueryCybersecurityRisk(json.dumps(filter), yakit.aiProject(projectID), yakit.aiQueryLimit(limit), yakit.aiQueryOffset(offset), yakit.aiContentOffset(contentOffset), yakit.aiContentLimit(contentLimit))~

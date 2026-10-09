@@ -22,7 +22,6 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/samber/lo"
-	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/filter"
 	"github.com/yaklang/yaklang/common/fuzztagx/parser"
 	"github.com/yaklang/yaklang/common/schema"
@@ -186,9 +185,16 @@ func readPayloadFileValue(filePath string, mode payloadRenderMode) (string, erro
 }
 
 func yieldPayloadTag(ctx context.Context, s string, mode payloadRenderMode, dedup bool, yield func(res *parser.FuzzResult)) error {
-	db := consts.GetGormProfileDatabase()
+	db := payloadDatabaseFromContext(ctx)
+	scoped := ctx != nil && ctx.Value(payloadDatabaseContextKey{}) != nil
 	if db == nil {
+		if scoped {
+			return fmt.Errorf("payload database is unavailable")
+		}
 		return tryYield(ctx, yield, s)
+	}
+	if scoped && strings.TrimSpace(s) == "" {
+		return fmt.Errorf("payload dictionary name is required")
 	}
 
 	for _, s := range utils.PrettifyListFromStringSplited(s, ",") {
@@ -210,6 +216,15 @@ func yieldPayloadTag(ctx context.Context, s string, mode payloadRenderMode, dedu
 			db = db.Or("`group` = ?", group)
 		} else if folder != "" {
 			db = db.Or("`folder` = ?", folder)
+		}
+	}
+	if scoped {
+		var count int
+		if err := db.Model(&schema.Payload{}).Count(&count).Error; err != nil {
+			return err
+		}
+		if count == 0 {
+			return fmt.Errorf("payload dictionary %q has no matching records; use query_payloads to inspect available groups", s)
 		}
 	}
 
@@ -236,11 +251,15 @@ func yieldPayloadTag(ctx context.Context, s string, mode payloadRenderMode, dedu
 			continue
 		}
 
-		if payload.GetIsFile() {
+		_, quotedContentErr := strconv.Unquote(*payload.Content)
+		if payload.GetIsFile() && quotedContentErr != nil {
 			payloadPath := payload.GetContent()
 			if mode == payloadRenderModeFull {
 				payloadRaw, err := readPayloadFileValue(payloadPath, mode)
 				if err != nil {
+					if scoped {
+						return fmt.Errorf("read payload file: %w", err)
+					}
 					log.Errorf("read payload err: %v", err)
 					continue
 				}
@@ -252,6 +271,9 @@ func yieldPayloadTag(ctx context.Context, s string, mode payloadRenderMode, dedu
 
 			ch, err := utils.FileLineReaderWithContext(payloadPath, ctx)
 			if err != nil {
+				if scoped {
+					return fmt.Errorf("read payload file: %w", err)
+				}
 				log.Errorf("read payload err: %v", err)
 				continue
 			}

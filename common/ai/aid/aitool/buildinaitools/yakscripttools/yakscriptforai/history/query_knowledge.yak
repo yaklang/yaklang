@@ -1,0 +1,37 @@
+__DESC__ = "查询本系统知识库目录、原始知识条目和 RAG 文档/问题索引，让 AI 检索已有知识后继续工作。原文关键词搜索覆盖标题、正文、摘要、关键词和潜在问题；文档索引支持 BM25，并提供 entry_uuid 回读原始条目。"
+__VERBOSE_NAME__ = "Query Knowledge"
+__VERBOSE_NAME_ZH__ = "查询知识库"
+__KEYWORDS__ = "knowledge,rag,bm25,question index,知识库,检索,原文,知识,参考资料"
+__USAGE__ = <<<USAGE
+使用运行时 Profile 数据库中的知识资料。
+source=collections 列出知识库名称、knowledge_base_id、rag_id 和条目数；query 筛选目录。source=entries（默认）用 query 搜索原始知识，或用 knowledge_base_id/collection 限定知识库，支持 entry_id/entry_uuid 精确回读。
+source=vector_collections 列出 RAG 向量集合的名称、UUID、rag_id 和文档数，包含仅有文档的集合。
+source=documents 用 query 搜索 RAG 文档与问题索引，使用已有 BM25 索引，没有索引或短关键词时退回字面搜索；collection 是 RAG 向量集合名称，document_id 精确选择文档。返回的 entry_uuid 可传给 source=entries 读取原始知识。
+collection 在 entries 下是知识库名称，在 documents 下是向量集合名称；先用对应目录查询获取精确名称，若未命中可省略 collection 搜索。不依赖外部 embedding/AI 服务。返回 content 和来源标识；truncated=true 时保持条目选择条件，用 next_content_offset 续读原文。查到知识后应结合来源与当前任务继续分析，而不是仅复述搜索结果。
+分页范围为 limit 1–50、content_limit 1–8192，且 limit × content_limit ≤ 65536；默认 10 × 2048，可先用默认值。
+[[- if .FunctionCallMode -]]
+arguments 示例：
+```json
+{"source":"entries","query":"认证","limit":10}
+```
+[[- else -]]
+文本流 action 示例：
+```json
+{"@action":"directly_call_tool","directly_call_tool_name":"query_knowledge","directly_call_tool_params":{"source":"entries","query":"认证","limit":10}}
+```
+[[- end -]]
+USAGE
+source = cli.String("source", cli.setDefault("entries"), cli.setJsonSchema(`{"type":"string","enum":["entries","collections","vector_collections","documents"]}`), cli.setHelp("entries 原始知识；collections 知识库目录；vector_collections 向量目录；documents 文档/问题索引"))
+query = cli.String("query", cli.setHelp("检索关键词；空串列出条目"))
+collection = cli.String("collection", cli.setHelp("知识库或向量集合的精确名称"))
+knowledgeBaseID = cli.Int("knowledge_base_id", cli.setDefault(0), cli.setHelp("原始知识库 ID"))
+entryID = cli.Int("entry_id", cli.setDefault(0), cli.setHelp("精确原文条目 ID"))
+entryUUID = cli.String("entry_uuid", cli.setHelp("文档结果中的原文 UUID"))
+documentID = cli.String("document_id", cli.setHelp("精确 RAG 文档 ID，配合 source=documents"))
+limit = cli.Int("limit", cli.setDefault(10), cli.setHelp("返回条数 1–50"))
+offset = cli.Int("offset", cli.setDefault(0), cli.setHelp("分页偏移"))
+contentOffset = cli.Int("content_offset", cli.setDefault(0), cli.setHelp("正文字符偏移"))
+contentLimit = cli.Int("content_limit", cli.setDefault(2048), cli.setHelp("每条正文字符限制 1–8192；limit × 本值 ≤ 65536"))
+cli.check()
+filter = {"source":source,"query":query,"collection":collection,"knowledge_base_id":knowledgeBaseID,"entry_id":entryID,"entry_uuid":entryUUID,"document_id":documentID}
+RESULT = yakit.QueryKnowledge(json.dumps(filter), yakit.aiQueryLimit(limit), yakit.aiQueryOffset(offset), yakit.aiContentOffset(contentOffset), yakit.aiContentLimit(contentLimit))~

@@ -33,6 +33,7 @@ func WithDatabase(db *gorm.DB) Option        { return func(c *options) { c.db = 
 
 var Exports = map[string]any{
 	"SearchMemory":     SearchMemory,
+	"AmendMemory":      AmendMemory,
 	"CurrentNamespace": func() string { return "default" },
 	"memoryNamespace":  WithMemoryNamespace,
 	"memoryTokenLimit": WithMemoryTokenLimit,

@@ -491,7 +491,7 @@ func (m *Timeline) AcknowledgeMemoryPersistence(sources []string) error {
 
 func (m *Timeline) checkpointCompressionMemory(snapshot *timelineCompressionSnapshot) error {
 	if snapshot.MemoryCompletion == nil {
-		return nil
+		return m.sessionMemory.saveOwner()
 	}
 	m.mu.Lock()
 	_, err := m.validateCompressionSourceLocked(snapshot)

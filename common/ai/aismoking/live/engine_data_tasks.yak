@@ -1,0 +1,36 @@
+// From repository root: yak common/ai/aismoking/live/engine_data_tasks.yak --task risk-review --keyword login
+// Uses the configured real AI provider and current Yakit data. No mocked decisions.
+// knowledge-note writes the requested note; payload-replay sends HTTP to the supplied URL.
+taskName=cli.String("task",cli.setDefault("risk-review"),cli.setHelp("resume / risk-review / knowledge-note / payload-replay"))
+keyword=cli.String("keyword",cli.setDefault("认证"),cli.setHelp("记忆、历史或风险检索词"))
+sessionID=cli.String("session-id",cli.setHelp("续接的 AI session；resume 必填"))
+projectID=cli.Int("project-id",cli.setDefault(0),cli.setHelp("已登记项目 ID；0 当前项目"))
+collection=cli.String("collection",cli.setHelp("knowledge-note 的知识库精确名称"))
+title=cli.String("title",cli.setHelp("knowledge-note 的标题"))
+content=cli.String("content",cli.setHelp("knowledge-note 的完整正文"))
+group=cli.String("group",cli.setHelp("payload-replay 的精确字典组名"))
+url=cli.String("url",cli.setHelp("payload-replay 的测试目标 URL"))
+maxRequests=cli.Int("max-requests",cli.setDefault(5),cli.setHelp("HTTP 字典展开上限 1–20"))
+cli.check()
+assert projectID>=0 && maxRequests>=1 && maxRequests<=20
+queryJSON=json.dumps({"keyword":keyword,"project_id":projectID})
+task=""
+if taskName=="resume" {
+    assert sessionID!="", "resume requires --session-id"
+    task="回顾当前会话关于 "+json.dumps(keyword)+" 的调查：用 read_memory 搜索稳定偏好，再用 grep_timeline_history 查原始决定及工具结果。引用实际 memory_id/item_id，给出已完成步骤、尚缺的证据和下一步。遇到截断续读；空结果如实说明。只读取数据。"
+}
+if taskName=="risk-review" {
+    task="基于已有 Yakit 记录做风险证据核对，条件为 "+queryJSON+"。先 query_yak_projects 确认登记项目，再 query_cybersecurity_risk 查候选和精确 risk_id，回读证据及修复建议。用返回的 http_flow_ids 调 query_http_history 回读报文；保持相同 project_id。最多调查三个候选，不发送新 HTTP 请求。结论列风险 ID、flow ID、已读到的证据和缺失项，不能把历史风险记录当作已验证的新漏洞。"
+}
+if taskName=="knowledge-note" {
+    assert collection!="" && title!="" && content!="", "knowledge-note requires --collection --title --content"
+    task="维护一条用户指定的知识笔记："+json.dumps({"collection":collection,"title":title,"content":content})+"。先 query_knowledge 查询知识库，再 manage_knowledge add 保存这条完整笔记，禁止修改或删除其他记录。使用返回的 knowledge_base_id 和 entry_id 回读，核对正文完全一致。给出 ID/UUID、原文检索结果和 semantic_index_status；pending 表示还需正常索引生成。"
+}
+if taskName=="payload-replay" {
+    assert group!="" && (str.HasPrefix(url,"http://") || str.HasPrefix(url,"https://")), "payload-replay requires --group and --url"
+    task="对用户指定的目标执行字典回显核对："+json.dumps({"group":group,"url":url,"max_requests":maxRequests})+"。先 query_payloads 查询精确组的完整载荷与 usage，保留正常基线，再 do_http_request GET 该 URL，query.q 使用返回的 {{payload(组名)}}，fuzztag=true，max-requests 按指定上限，concurrent=1。只访问这个 URL，不修改字典；展开超限则报告并停止，不自行提高上限。核对实际请求中的参数值与响应，说明次数、状态和差异，不把状态差异直接定性为漏洞。"
+}
+assert task!="", "Unknown --task"
+options=[aim.timeout(300),aim.maxIteration(24),aim.reviewPolicy("yolo"),aim.allowUserInteract(false),aim.disableMCPServers(true),aim.disableAIForge(true),aim.includeToolNames("read_memory","amend_memory","grep_timeline_history","query_yak_projects","query_http_history","query_cybersecurity_risk","query_knowledge","manage_knowledge","query_payloads","manage_payloads","do_http_request"),aim.onStreamContent(func(op,event,node,data){print(string(data))}),aim.onSessionID(func(id){printf("\nAI_SESSION_ID=%s\n",id)})]
+if sessionID!="" { options=append(options,aim.sessionID(sessionID)) }
+die(aim.InvokeReAct(task,options...))

@@ -1,6 +1,8 @@
 package aicommon
 
 import (
+	"fmt"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -9,6 +11,38 @@ import (
 	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools"
 	"github.com/yaklang/yaklang/common/utils/filesys"
 )
+
+func TestEngineDataToolsDefaultInventory(t *testing.T) {
+	names := []string{"read_memory", "amend_memory", "grep_timeline_history", "query_yak_projects", "query_http_history", "query_cybersecurity_risk", "query_knowledge", "manage_knowledge", "query_payloads", "manage_payloads"}
+	var tools []*aitool.Tool
+	// Crowded inventories and long descriptions must still show the engine tools.
+	for i := 0; i < 100; i++ {
+		tools = append(tools, aitool.NewWithoutCallback(fmt.Sprintf("filler_%d", i), aitool.WithDescription(strings.Repeat("description ", 100))))
+	}
+	for _, name := range inventoryPriorityToolNames {
+		tools = append(tools, aitool.NewWithoutCallback(name, aitool.WithDescription(strings.Repeat("details ", 100))))
+	}
+	cfg := &Config{AiToolManager: buildinaitools.NewToolManager(buildinaitools.WithExtendTools(tools, true)), TopToolsCount: 100, DisallowMCPServers: true}
+	items := BuildCapabilityInventoryItems(cfg, nil)
+	visible := make(map[string]CapabilityInventoryItem)
+	for _, item := range items {
+		visible[item.Name] = item
+	}
+	for _, name := range names {
+		require.Contains(t, visible, name)
+		require.True(t, visible[name].IsFixed, name)
+		require.Equal(t, CapabilityInventoryPositionFrozenBlock, visible[name].Position, name)
+		require.Equal(t, VisibilityNormal, LookupToolVisibility(name), name)
+	}
+	data := BuildToolInventoryData(tools, 100)
+	promptNames := make(map[string]bool)
+	for _, tool := range data.TopTools {
+		promptNames[tool.Name] = true
+	}
+	for _, name := range names {
+		require.True(t, promptNames[name], "default prompt must show %s", name)
+	}
+}
 
 func testSkillInventoryVFS() *filesys.VirtualFS {
 	vfs := filesys.NewVirtualFs()

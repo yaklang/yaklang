@@ -1,0 +1,39 @@
+__DESC__ = "管理运行时 Profile 库的知识条目，operator 支持 add/delete/change。通过 query_knowledge 的知识库 ID 和精确条目 ID/UUID 定位；change 先删除旧条目及关联问题/向量索引，再创建新条目，事务失败回滚。新原文立即可用于知识检索。"
+__VERBOSE_NAME__ = "Manage Knowledge"
+__VERBOSE_NAME_ZH__ = "管理知识库"
+__KEYWORDS__ = "knowledge,manage,rag,add,delete,change,知识库,知识,管理,增删改"
+__USAGE__ = <<<USAGE
+先用 query_knowledge 的 source=collections 找到知识库，再用 source=entries 查到精确 entry_id/entry_uuid。
+所有操作必须指定 knowledge_base_id 或 collection（精确知识库名称，两个都传时必须匹配）。add 不传条目 ID，title/content 必填；如果按 collection 名称新增到不存在的知识库，会创建该知识库。
+delete 必填 entry_id 或 entry_uuid，只删除该知识库中的精确条目；不接受搜索词批量删除。change 同样定位精确条目，并传完整的新 title/content；这是完整替换，先删除旧条目和旧索引，再创建新条目，返回新的 entry_id/entry_uuid。summary、keywords、questions 等元数据不传时采用默认值，不继承旧值。
+原文、旧问题/向量索引删除和图快照失效处于同一事务，提交后关闭对应图缓存，避免继续检索到过时内容。add/change 保存的原文、关键词和问题立即可通过 query_knowledge 的 source=entries 查询。结果明确返回 semantic_index_status=pending，新语义向量/问题向量需使用 Yakit 的正常索引生成流程；本工具写入不依赖外部 embedding/AI 服务。
+content 最多 32768 字符，title 最多 512；importance 1–10，默认 5；keywords/questions 为字符串数组各最多 32 项。长原文用 query_knowledge 的 content_offset 续读。
+示例：{"operator":"add","collection":"调查笔记","title":"接口认证规则","content":"POST /api/orders 需要登录态及 CSRF token。","keywords":["认证","CSRF"]}。
+[[- if .FunctionCallMode -]]
+arguments 示例：
+```json
+{"operator":"add","collection":"调查笔记","title":"接口认证规则","content":"POST /api/orders 需要登录态及 CSRF token。","keywords":["认证","CSRF"]}
+```
+[[- else -]]
+文本流 action 示例：
+```json
+{"@action":"directly_call_tool","directly_call_tool_name":"manage_knowledge","directly_call_tool_params":{"operator":"add","collection":"调查笔记","title":"接口认证规则","content":"POST /api/orders 需要登录态及 CSRF token。","keywords":["认证","CSRF"]}}
+```
+[[- end -]]
+USAGE
+operator = cli.String("operator", cli.setRequired(true), cli.setJsonSchema(`{"type":"string","enum":["add","delete","change"]}`), cli.setHelp("add/delete/change"))
+knowledgeBaseID = cli.Int("knowledge_base_id", cli.setDefault(0), cli.setHelp("query_knowledge 返回的知识库 ID"))
+collection = cli.String("collection", cli.setHelp("精确知识库名称；add 时不存在则创建"))
+entryID = cli.Int("entry_id", cli.setDefault(0), cli.setHelp("delete/change 的精确条目 ID"))
+entryUUID = cli.String("entry_uuid", cli.setHelp("delete/change 的精确原文 UUID"))
+title = cli.String("title", cli.setHelp("add/change 的完整新标题，1–512 字符"))
+content = cli.String("content", cli.setHelp("add/change 的完整新正文，1–32768 字符"))
+summary = cli.String("summary", cli.setHelp("新摘要，最多 2048 字符"))
+knowledgeType = cli.String("knowledge_type", cli.setDefault("note"), cli.setHelp("知识类型，默认 note"))
+importance = cli.Int("importance", cli.setDefault(5), cli.setHelp("重要性，1–10"))
+sourcePage = cli.Int("source_page", cli.setDefault(0), cli.setHelp("来源页码，0 表示未指定"))
+keywordsJSON = cli.String("keywords", cli.setDefault("[]"), cli.setJsonSchema(`{"type":"array","maxItems":32,"items":{"type":"string","maxLength":128}}`), cli.setHelp("新知识关键词数组"))
+questionsJSON = cli.String("questions", cli.setDefault("[]"), cli.setJsonSchema(`{"type":"array","maxItems":32,"items":{"type":"string","maxLength":512}}`), cli.setHelp("与新知识关联的问题数组"))
+cli.check()
+request = {"operator":operator,"knowledge_base_id":knowledgeBaseID,"collection":collection,"entry_id":entryID,"entry_uuid":entryUUID,"title":title,"content":content,"summary":summary,"knowledge_type":knowledgeType,"importance":importance,"source_page":sourcePage,"keywords":json.loads(keywordsJSON),"questions":json.loads(questionsJSON)}
+RESULT = yakit.ManageKnowledge(json.dumps(request))~

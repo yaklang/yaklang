@@ -138,6 +138,7 @@ var ProjectTables = []interface{}{
 	&AIReActSchedule{},
 	&AISessionPlanAndExec{},
 	&AIAgentRuntime{},
+	&AITimelineHistory{},
 	&AiCheckpoint{},
 	&AiOutputEvent{},
 	&AiProcess{},

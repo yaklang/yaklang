@@ -1,0 +1,34 @@
+__DESC__ = "管理运行时 Profile 库的 Payload 字典内容：add 按组添加并去重，change 修改精确条目，delete 删除精确条目，delete_group 删除指定字典组。批量操作使用事务，返回查询 ID 和 do_http_request 可用的 payload FuzzTag。"
+__VERBOSE_NAME__ = "Manage Payloads"
+__VERBOSE_NAME_ZH__ = "管理 Payload 字典"
+__KEYWORDS__ = "payload,manage,dictionary,fuzztag,add,delete,change,载荷,字典,管理,增删改"
+__USAGE__ = <<<USAGE
+先用 query_payloads 确认组名、存储方式和 payload_id。
+add：group 精确组名，contents 为原始字符串数组；不存在的组自动创建，folder 可指定新组文件夹，已有组会沿用所在文件夹。相同内容跳过，不重置命中次数。每个数组元素保存为完整载荷，保留空白、换行、引号和 FuzzTag 文字，不自动拆行。
+change：group + payload_ids=[一个ID] + contents=[新内容]，保留原条目 ID/命中次数；若新内容与已有条目冲突，事务回滚。
+delete：group + payload_ids 精确删除，任一 ID 不属于指定组则全部回滚。delete_group：仅 group，删除整个字典注册内容，文件型字典不会删除磁盘文件。文件型字典不支持逐行增删改，可在 Yakit 导入为数据库字典再编辑。
+每次最多 200 条，内容总量最多 256 KiB。成功后使用返回 usage 的 {{payload(group)}} / {{payload:full(group)}}，配合 do_http_request 的 fuzztag=true、query/form 和 max-requests 继续测试。
+示例：{"operator":"add","group":"api_cases","contents":["a & b","' OR 1=1--"]}；随后 do_http_request 使用 {"url":"https://target.example/search","query":{"q":"{{payload(api_cases)}}"},"fuzztag":true,"max-requests":20}。
+[[- if .FunctionCallMode -]]
+arguments 示例：
+```json
+{"operator":"add","group":"api_cases","contents":["a & b","' OR 1=1--"]}
+```
+[[- else -]]
+文本流 action 示例：
+```json
+{"@action":"directly_call_tool","directly_call_tool_name":"manage_payloads","directly_call_tool_params":{"operator":"add","group":"api_cases","contents":["a & b","' OR 1=1--"]}}
+```
+[[- end -]]
+USAGE
+operator = cli.String("operator", cli.setRequired(true), cli.setJsonSchema(`{"type":"string","enum":["add","change","delete","delete_group"]}`), cli.setHelp("add/change/delete/delete_group"))
+group = cli.String("group", cli.setRequired(true), cli.setHelp("精确字典组名"))
+folder = cli.String("folder", cli.setHelp("add 时指定新字典文件夹"))
+contentsJSON = cli.String("contents", cli.setDefault("[]"), cli.setJsonSchema(`{"type":"array","maxItems":200,"items":{"type":"string"}}`), cli.setHelp("add/change 的完整原始载荷数组，保留换行和空白"))
+payloadIDsJSON = cli.String("payload_ids", cli.setDefault("[]"), cli.setJsonSchema(`{"type":"array","maxItems":200,"items":{"type":"integer","minimum":1}}`), cli.setHelp("change/delete 的精确条目 ID 数组"))
+cli.check()
+contents = json.loads(contentsJSON)
+payloadIDs = json.loads(payloadIDsJSON)
+request = {"operator":operator,"group":group,"contents":contents,"payload_ids":payloadIDs}
+if folder != "" { request["folder"] = folder }
+RESULT = yakit.ManagePayloads(json.dumps(request))~

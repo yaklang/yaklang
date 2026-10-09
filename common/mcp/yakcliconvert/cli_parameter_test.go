@@ -85,6 +85,15 @@ cli.check()
 
 }
 
+func TestConvertCLIStringJSONArrayDefault(t *testing.T) {
+	prog, err := static_analyzer.SSAParse("values = cli.String(\"values\", cli.setJsonSchema(`{\"type\":\"array\",\"items\":{\"type\":\"string\"}}`), cli.setDefault(\"[]\"))\ncli.check()", "yak")
+	require.NoError(t, err)
+	tool := yakcliconvert.ConvertCliParameterToTool("array_default", prog)
+	property, ok := tool.InputSchema.Properties.Get("values")
+	require.True(t, ok)
+	require.Equal(t, []any{}, property.(map[string]any)["default"])
+}
+
 func TestConvertCliParameterUnionSchemaReplacesInferredPrimitiveType(t *testing.T) {
 	content := `
 headers = cli.String("headers", cli.setJsonSchema(` + "`" + `{

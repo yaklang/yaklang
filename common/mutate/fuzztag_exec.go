@@ -2,6 +2,7 @@ package mutate
 
 import (
 	"context"
+	"github.com/yaklang/gorm"
 
 	"github.com/pkg/errors"
 	"github.com/yaklang/yaklang/common/fuzztag"
@@ -19,6 +20,7 @@ type FuzzTagConfig struct {
 	resultLimit       int
 	assertError       bool
 	context           context.Context
+	payloadDatabase   *gorm.DB
 }
 
 func NewFuzzTagConfig() *FuzzTagConfig {
@@ -153,6 +155,9 @@ func FuzzTagExec(input interface{}, opts ...FuzzConfigOpt) (_ []string, err erro
 	ctx := config.context
 	if ctx == nil {
 		ctx = context.Background()
+	}
+	if config.payloadDatabase != nil {
+		ctx = WithPayloadDatabaseContext(ctx, config.payloadDatabase)
 	}
 	if v, ok := config.tagMethodMap["params"]; ok {
 		config.tagMethodMap["param"] = v

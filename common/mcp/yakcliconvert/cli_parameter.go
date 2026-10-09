@@ -182,6 +182,16 @@ func ConvertCliParameterToTool(toolName string, prog *ssaapi.Program) *mcp.Tool 
 					}
 				}
 			}
+			// A custom schema may expose a CLI string as a lossless JSON array.
+			// Its JSON default must also be an array when tool defaults are applied.
+			if field["type"] == "array" {
+				if raw, ok := field["default"].(string); ok {
+					var arrayDefault []any
+					if err := json.Unmarshal([]byte(raw), &arrayDefault); err == nil {
+						field["default"] = arrayDefault
+					}
+				}
+			}
 
 			// Remove required from property schema and add to InputSchema.required
 			if required, ok := field["required"].(bool); ok && required {

@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
+	"github.com/yaklang/yaklang/common/schema"
 )
 
 type TimelineItemValue interface {
@@ -18,6 +19,7 @@ type TimelineItemValue interface {
 }
 
 type TimelineItem struct {
+	historyID string
 	deleted   bool
 	createdAt time.Time
 
@@ -26,6 +28,7 @@ type TimelineItem struct {
 
 // timelineItemSerializable 用于序列化的 TimelineItem 结构体
 type timelineItemSerializable struct {
+	HistoryID string          `json:"history_id,omitempty"`
 	Deleted   bool            `json:"deleted"`
 	CreatedAt time.Time       `json:"created_at"`
 	Type      string          `json:"type"`
@@ -75,7 +78,12 @@ func (item *TimelineItem) MarshalJSON() ([]byte, error) {
 		valueJSON = []byte(fmt.Sprintf(`"%v"`, v))
 	}
 
+	historyID := item.historyID
+	if historyID == "" {
+		historyID = schema.AITimelineLegacyHistoryID(typeName, item.createdAt, valueJSON)
+	}
 	serializable := timelineItemSerializable{
+		HistoryID: historyID,
 		Deleted:   item.deleted,
 		CreatedAt: item.createdAt,
 		Type:      typeName,
@@ -93,6 +101,10 @@ func (item *TimelineItem) UnmarshalJSON(data []byte) error {
 		return err
 	}
 
+	item.historyID = serializable.HistoryID
+	if item.historyID == "" {
+		item.historyID = schema.AITimelineLegacyHistoryID(serializable.Type, serializable.CreatedAt, serializable.Value)
+	}
 	item.deleted = serializable.Deleted
 	item.createdAt = serializable.CreatedAt
 

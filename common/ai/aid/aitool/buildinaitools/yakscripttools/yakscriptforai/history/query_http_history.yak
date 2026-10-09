@@ -1,0 +1,43 @@
+__DESC__ = "Query saved HTTP flows with Yakit's HTTP filter conditions in the runtime project or a registered project database ID from query_yak_projects. Supports URL, request/response keyword, method, status, tags, IP, time, plugin and runtime filters."
+__VERBOSE_NAME__ = "Query HTTP History"
+__VERBOSE_NAME_ZH__ = "查询 HTTP 历史"
+__KEYWORDS__ = "http,flow,history,query,database,request,response,流量,历史,数据库"
+__USAGE__ = <<<USAGE
+project_id 默认 0 查询运行时当前项目；指定其他库前使用 query_yak_projects 返回的 project_id，不接受任意文件路径。跨库查询使用独立只读连接。
+keyword 为 URL/请求/响应等字段搜索，url 为 URL 模糊匹配，methods 可逗号分隔，status_code 可写 200,300-399。
+filter_json 使用 QueryHTTPFlowRequest 字段名，例如 {"Tags":["登录"],"IncludeInIP":["127.0.0.1"],"AfterUpdatedAt":1700000000,"BeforeUpdatedAt":1800000000,"RuntimeId":"xxx","FromPlugin":"插件"}。未知字段报错；分页使用 limit/offset。显式的非空快捷参数覆盖同名 JSON 字段。
+默认返回流量元数据。读取具体数据包时用 flow_id 或 filter_json 的 IncludeId；单条请求/响应各最多 content_limit 字符，truncated 时使用 content_offset 续读。limit 1–50，每页正文总预算有界。
+分页范围为 limit 1–50、content_limit 1–8192，且 limit × content_limit ≤ 65536；默认 10 × 2048，可先用默认值。回读请求/响应报文时还需 limit × content_limit × 2 ≤ 65536，建议 flow_id 配合 limit=1。
+[[- if .FunctionCallMode -]]
+arguments 示例：
+```json
+{"keyword":"login","methods":"POST","limit":10}
+```
+[[- else -]]
+文本流 action 示例：
+```json
+{"@action":"directly_call_tool","directly_call_tool_name":"query_http_history","directly_call_tool_params":{"keyword":"login","methods":"POST","limit":10}}
+```
+[[- end -]]
+USAGE
+projectID = cli.Int("project_id", cli.setDefault(0), cli.setHelp("query_yak_projects 返回的项目 ID；0 当前项目"))
+keyword = cli.String("keyword", cli.setHelp("HTTP 流量关键词"))
+url = cli.String("url", cli.setHelp("URL 模糊匹配"))
+methods = cli.String("methods", cli.setHelp("HTTP 方法，逗号分隔"))
+statusCode = cli.String("status_code", cli.setHelp("状态码或范围"))
+flowID = cli.Int("flow_id", cli.setDefault(0), cli.setHelp("精确流量 ID，并返回分段请求/响应"))
+filterJSON = cli.String("filter_json", cli.setHelp("高级 QueryHTTPFlowRequest JSON 过滤条件"))
+limit = cli.Int("limit", cli.setDefault(10), cli.setHelp("返回条数 1–50"))
+offset = cli.Int("offset", cli.setDefault(0), cli.setHelp("分页偏移"))
+contentOffset = cli.Int("content_offset", cli.setDefault(0), cli.setHelp("请求/响应字符偏移"))
+contentLimit = cli.Int("content_limit", cli.setDefault(2048), cli.setHelp("请求/响应各自的字符限制 1–8192；回读报文时 limit × 本值 × 2 ≤ 65536"))
+cli.check()
+filter = {}
+if filterJSON != "" { filter = json.loads(filterJSON) }
+if keyword != "" { filter["Keyword"] = keyword }
+if url != "" { filter["SearchURL"] = url }
+if methods != "" { filter["Methods"] = methods }
+if statusCode != "" { filter["StatusCode"] = statusCode }
+if flowID < 0 { die("flow_id must be nonnegative") }
+if flowID > 0 { filter["IncludeId"] = [flowID] }
+RESULT = yakit.QueryHTTPHistory(json.dumps(filter), yakit.aiProject(projectID), yakit.aiQueryLimit(limit), yakit.aiQueryOffset(offset), yakit.aiContentOffset(contentOffset), yakit.aiContentLimit(contentLimit))~

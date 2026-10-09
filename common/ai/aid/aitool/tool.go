@@ -22,9 +22,12 @@ import (
 )
 
 type ToolRuntimeConfig struct {
-	FeedBacker          func(result *ypb.ExecResult) error
-	RuntimeID           string
-	ProjectDatabase     *gorm.DB
+	FeedBacker      func(result *ypb.ExecResult) error
+	RuntimeID       string
+	ProjectDatabase *gorm.DB
+	ProfileDatabase *gorm.DB
+	// TimelineSnapshot captures the current live tail without using prompt compression.
+	TimelineSnapshot    func() (string, error)
 	PersistentSessionID string
 	// CurrentTaskUserInput is the unmodified user request that led to this tool
 	// invocation. Durable tools use it for provenance while keeping their

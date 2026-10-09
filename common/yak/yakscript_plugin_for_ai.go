@@ -218,6 +218,7 @@ func executeNativeYakPlugin(ctx context.Context, script *schema.YakScript, param
 				WithYakitClient(yakitClient),
 		)
 		bindMemorySearchToEngine(ae, ctx, runtimeConfig)
+		bindAIHistoryToEngine(ae, ctx, runtimeConfig)
 		return nil
 	})
 
@@ -236,14 +237,15 @@ func executeNativeYakPlugin(ctx context.Context, script *schema.YakScript, param
 	return collectNativePluginResult(runtimeId, script.ScriptName, stdout), nil
 }
 
-// nativeYakPluginArgString preserves structured object parameters when they cross
+// nativeYakPluginArgString preserves structured parameters when they cross
 // the AI-tool -> CLI boundary. fmt.Sprint turns a map into "map[k:v ...]", which is
-// ambiguous as soon as a value contains spaces, quotes, '&', or '#'. JSON is the
-// CLI's lossless representation for object parameters and is what cli.Json expects.
+// ambiguous as soon as a value contains spaces, quotes, '&', or '#'. JSON also
+// preserves array element boundaries. CLI list parsers accept JSON and legacy CSV;
+// scripts with custom array schemas can decode the JSON string directly.
 func nativeYakPluginArgString(v any) string {
 	if v != nil {
 		rv := reflect.ValueOf(v)
-		if rv.IsValid() && rv.Kind() == reflect.Map {
+		if rv.IsValid() && (rv.Kind() == reflect.Map || rv.Kind() == reflect.Slice || rv.Kind() == reflect.Array) {
 			if raw, err := json.Marshal(v); err == nil {
 				return string(raw)
 			}

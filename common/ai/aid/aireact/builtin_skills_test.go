@@ -32,6 +32,7 @@ var allBuiltinSkills = []struct {
 	{"authorization-bypass", "skills/authorization-bypass/SKILL.md", []string{"IDOR", "WSTG-ATHZ-02", "Horizontal", "Vertical", "do_http_request"}},
 	{"java-audit", "skills/java-audit/SKILL.md", []string{"java_project_probe", "java_audit", "RuoYi", "spring_boot", "scope-modules"}},
 	{"fuzztag", "skills/fuzztag/SKILL.md", []string{"fuzz.Strings", "笛卡尔积", "同步配对"}},
+	{"engine-data", "skills/engine-data/SKILL.md", []string{"read_memory", "grep_timeline_history", "manage_knowledge", "manage_payloads", "semantic_index_status"}},
 	{"fuzztag-reference", "skills/fuzztag-reference/SKILL.md", []string{"exec_fuzztag", "codecflow", "params", "别名"}},
 }
 
@@ -576,6 +577,22 @@ func TestBuiltinFuzztagDefaultContext(t *testing.T) {
 	}
 }
 
+func TestBuiltinEngineDataDefaultContext(t *testing.T) {
+	loader, err := aiskillloader.NewAutoSkillLoader(aiskillloader.WithAutoLoad_FileSystem(GetBuiltinSkillsFS()))
+	if err != nil {
+		t.Fatal(err)
+	}
+	manager := aiskillloader.NewSkillsContextManager(loader)
+	if !manager.IsAutoSkillLoadedAndUnfolded("engine-data") || manager.IsForcedSkill("engine-data") {
+		t.Fatal("engine-data must auto-load without a user-forced skill")
+	}
+	for _, name := range []string{"read_memory", "amend_memory", "grep_timeline_history", "query_yak_projects", "query_http_history", "query_cybersecurity_risk", "query_knowledge", "manage_knowledge", "query_payloads", "manage_payloads", "semantic_index_status", "do_http_request"} {
+		if !strings.Contains(manager.RenderAutoLoadedSkills(), name) {
+			t.Errorf("default skill context missing %q", name)
+		}
+	}
+}
+
 func TestBuiltinFuzztagDefaultReActLoop(t *testing.T) {
 	useTempBuiltinSkillReleaseDB(t)
 	useTempYakitHome(t)
@@ -605,5 +622,15 @@ func TestBuiltinFuzztagDefaultReActLoop(t *testing.T) {
 	}
 	if !strings.Contains(forge.Tags, "auto_load:true") {
 		t.Fatal("default-load metadata must survive skill-to-forge synchronization")
+	}
+	if !manager.IsAutoSkillLoadedAndUnfolded("engine-data") {
+		t.Fatal("fresh ReAct loop must include engine-data")
+	}
+	forge, err = yakit.GetAIForgeByName(builtinSkillReleaseDB(), "engine-data")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(forge.Tags, "auto_load:true") {
+		t.Fatal("engine-data auto-load metadata must survive database synchronization")
 	}
 }
