@@ -1,0 +1,29 @@
+__DESC__ = "Search persistent memories in the current runtime memory namespace. Recall past decisions, preferences, facts and experience with BM25, vector or hybrid search."
+__VERBOSE_NAME__ = "Read Memory"
+__VERBOSE_NAME_ZH__ = "读取记忆"
+__KEYWORDS__ = "memory,read_memory,recall,bm25,vector,记忆,搜索,偏好,历史"
+__USAGE__ = <<<USAGE
+query 是待回顾的信息；search_mode 为 bm25/vector/hybrid。默认仅搜索运行时当前记忆空间；返回 memory_id 可用于 amend_memory。stdout 逐条输出 item.Dump() 文本，保留原始引号和换行，不返回 RESULT。当前用户指令优先于历史记忆。
+
+[[- if .FunctionCallMode -]]
+arguments 示例：
+```json
+{"query":"用户偏好的报告格式","search_mode":"hybrid","limit":5}
+```
+[[- else -]]
+文本流 action 示例：
+```json
+{"@action":"directly_call_tool","directly_call_tool_name":"read_memory","directly_call_tool_params":{"query":"用户偏好的报告格式","search_mode":"hybrid","limit":5}}
+```
+[[- end -]]
+USAGE
+query = cli.String("query", cli.setRequired(true), cli.setHelp("待查找的记忆，1–1024 字符"))
+mode = cli.String("search_mode", cli.setDefault("hybrid"), cli.setHelp("bm25/vector/hybrid"))
+limit = cli.Int("limit", cli.setDefault(5), cli.setHelp("最多返回 1–20 条记忆"))
+tokenLimit = cli.Int("token_limit", cli.setDefault(1500), cli.setHelp("正文总 token 预算，64–8192"))
+cli.check()
+namespace = aimemory.CurrentNamespace()
+items, err = aimemory.Query(query, aimemory.memoryNamespace(namespace), aimemory.memoryTokenLimit(tokenLimit), aimemory.memoryLimit(limit), aimemory.memorySearchMode(mode))
+if err != nil { die(err) }
+printf("namespace=%s search_mode=%s hits=%d\n", namespace, mode, len(items))
+for item in items { println(item.Dump()) }

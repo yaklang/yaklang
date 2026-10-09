@@ -3,6 +3,7 @@ package aicommon
 import (
 	"cmp"
 	"fmt"
+	"github.com/google/uuid"
 	"strings"
 	"sync"
 	"text/template"
@@ -445,6 +446,9 @@ func (m *Timeline) PushToolResult(toolResult *aitool.ToolResult) {
 }
 
 func (m *Timeline) pushTimelineItem(ts int64, id int64, item *TimelineItem, notifications *[]func()) {
+	if item.historyID == "" {
+		item.historyID = uuid.NewString()
+	}
 	m.invalidateFreezeFromLocked(id)
 	m.OrderInsertId(id, item)
 	m.OrderInsertTs(ts, item)

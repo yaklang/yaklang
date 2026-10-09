@@ -1,0 +1,32 @@
+__DESC__ = "Search original timeline history in the current AI conversation, including archived entries retired by compression. Supports BM25, literal and regexp search; session ID is injected by the runtime."
+__VERBOSE_NAME__ = "Grep Timeline History"
+__VERBOSE_NAME_ZH__ = "搜索会话历史"
+__KEYWORDS__ = "timeline,history,grep,recall,bm25,regexp,历史,回顾,压缩,事件"
+__USAGE__ = <<<USAGE
+query 可空以分页浏览已归档历史，search_mode 为 bm25/regexp/literal。BM25 的 1–2 字符短词回退字面匹配，搜索覆盖数据库中所有原始 Timeline item（含压缩前原文），排除当前 Timeline 已有的 item；不是前端 event。会话 ID 由运行时注入。stdout 直接输出 Timeline dump 文本，保留原始引号和换行，不返回 RESULT/JSON。升级前已被丢弃的原文无法从摘要恢复。limit 1–50；offset 为排除当前 item 后的命中条目偏移。每条原始正文默认 2048 字符，dump 中显示 item_id、type、content_offset、next_content_offset、truncated；truncated=true 时保持 item_id、query 留空、用 content_offset 续读。
+
+[[- if .FunctionCallMode -]]
+arguments 示例：
+```json
+{"query":"认证失败","search_mode":"literal","limit":10}
+```
+[[- else -]]
+文本流 action 示例：
+```json
+{"@action":"directly_call_tool","directly_call_tool_name":"grep_timeline_history","directly_call_tool_params":{"query":"认证失败","search_mode":"literal","limit":10}}
+```
+[[- end -]]
+USAGE
+query = cli.String("query", cli.setHelp("搜索词或正则；空值浏览历史"))
+mode = cli.String("search_mode", cli.setDefault("bm25"), cli.setHelp("bm25/regexp/literal"))
+limit = cli.Int("limit", cli.setDefault(10), cli.setHelp("返回条数，1–50"))
+offset = cli.Int("offset", cli.setDefault(0), cli.setHelp("命中条目偏移"))
+itemID = cli.Int("item_id", cli.setDefault(0), cli.setHelp("返回结果的历史 item_id（恢复会话后仍稳定）；0 不限制"))
+contentOffset = cli.Int("content_offset", cli.setDefault(0), cli.setHelp("条目正文字符偏移"))
+contentLimit = cli.Int("content_limit", cli.setDefault(2048), cli.setHelp("每条正文最大字符数 1–8192；条数乘长度不超过 65536"))
+cli.check()
+sessionID = aihistory.CurrentSession()
+items, err = aihistory.Query(query, aihistory.aiSession(sessionID), aihistory.searchMode(mode), aihistory.limit(limit), aihistory.offset(offset), aihistory.itemID(itemID), aihistory.contentOffset(contentOffset), aihistory.contentLimit(contentLimit))
+if err != nil { die(err) }
+printf("session_id=%s search_mode=%s offset=%d next_offset=%d\n", sessionID, mode, offset, offset+len(items))
+for item in items { println(item.Dump()) }
