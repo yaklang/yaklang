@@ -27,9 +27,19 @@ Model-provider calls are excluded because only tool runtime IDs are bound.
 
 The start record fixes session, turn, tool, agent, node, node-session and bind
 epoch. Start and terminal uploads have the same random flow ID and independent
-phase keys. Metadata carries only method, scheme, host, status, timestamps,
-lengths, hashes, truncation and fixed error codes. It never contains URL queries,
-headers, bodies, response error text, credentials or local packet file paths.
+phase keys. Metadata carries method, scheme, host, status, timestamps, lengths,
+hashes, truncation, fixed error codes and the optional protocol-v1
+`AITrafficRecord.redacted_url` (field 25). The absolute URL is captured at request
+start and retained in terminal records even when packet headers are unavailable
+or local/platform byte quotas drop raw evidence. It is limited to 16 KiB and must
+match the record's scheme and host. Userinfo and fragments are removed. Sensitive
+query values and path segments following sensitive keys are replaced with
+`[REDACTED]`, using the same key rules as Legion URL redaction. Invalid or oversized
+URLs are omitted rather than copied into metadata. Legion validates origin and
+size again and applies its own redaction before persistence. Older producers that
+omit the field retain the legacy scheme/host fallback until packet metadata is
+available. Metadata never contains raw sensitive URL values, headers, bodies,
+response error text, credentials or local packet file paths.
 
 ## Durable queue and receipts
 

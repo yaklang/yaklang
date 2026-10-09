@@ -20141,8 +20141,8 @@ func (x *AITrafficAnalysisContext) GetReadOnly() bool {
 	return false
 }
 
-// This metadata never contains request headers, bodies, URL queries or errors
-// copied from the target. Raw evidence is sent only through authenticated HTTP.
+// Metadata contains only sanitized URL context, never raw headers, bodies,
+// sensitive URL values or target error text. Raw evidence uses authenticated HTTP.
 type AITrafficRecord struct {
 	state             protoimpl.MessageState `protogen:"open.v1"`
 	ProtocolVersion   uint32                 `protobuf:"varint,1,opt,name=protocol_version,json=protocolVersion,proto3" json:"protocol_version,omitempty"`
@@ -20169,8 +20169,12 @@ type AITrafficRecord struct {
 	RequestTruncated  bool                   `protobuf:"varint,22,opt,name=request_truncated,json=requestTruncated,proto3" json:"request_truncated,omitempty"`
 	ResponseTruncated bool                   `protobuf:"varint,23,opt,name=response_truncated,json=responseTruncated,proto3" json:"response_truncated,omitempty"`
 	CaptureError      string                 `protobuf:"bytes,24,opt,name=capture_error,json=captureError,proto3" json:"capture_error,omitempty"` // fixed code only
-	unknownFields     protoimpl.UnknownFields
-	sizeCache         protoimpl.SizeCache
+	// Optional in protocol v1. Absolute same-origin URL, at most 16 KiB UTF-8.
+	// Strip userinfo/fragment; redact sensitive path segments and query values.
+	// Captured before packet quotas apply. Absent legacy records use scheme/host.
+	RedactedUrl   *string `protobuf:"bytes,25,opt,name=redacted_url,json=redactedUrl,proto3,oneof" json:"redacted_url,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *AITrafficRecord) Reset() {
@@ -20367,6 +20371,13 @@ func (x *AITrafficRecord) GetResponseTruncated() bool {
 func (x *AITrafficRecord) GetCaptureError() string {
 	if x != nil {
 		return x.CaptureError
+	}
+	return ""
+}
+
+func (x *AITrafficRecord) GetRedactedUrl() string {
+	if x != nil && x.RedactedUrl != nil {
+		return *x.RedactedUrl
 	}
 	return ""
 }
@@ -22701,7 +22712,7 @@ const file_legion_ai_v1_ai_proto_rawDesc = "" +
 	"\x11source_session_id\x18\x01 \x01(\tR\x0fsourceSessionId\x12\x19\n" +
 	"\bflow_ids\x18\x02 \x03(\tR\aflowIds\x12#\n" +
 	"\revidence_text\x18\x03 \x01(\tR\fevidenceText\x12\x1b\n" +
-	"\tread_only\x18\x04 \x01(\bR\breadOnly\"\xb8\x06\n" +
+	"\tread_only\x18\x04 \x01(\bR\breadOnly\"\xf1\x06\n" +
 	"\x0fAITrafficRecord\x12)\n" +
 	"\x10protocol_version\x18\x01 \x01(\rR\x0fprotocolVersion\x12\x17\n" +
 	"\aflow_id\x18\x02 \x01(\tR\x06flowId\x12\x1d\n" +
@@ -22731,7 +22742,9 @@ const file_legion_ai_v1_ai_proto_rawDesc = "" +
 	"\x0fresponse_sha256\x18\x15 \x01(\tR\x0eresponseSha256\x12+\n" +
 	"\x11request_truncated\x18\x16 \x01(\bR\x10requestTruncated\x12-\n" +
 	"\x12response_truncated\x18\x17 \x01(\bR\x11responseTruncated\x12#\n" +
-	"\rcapture_error\x18\x18 \x01(\tR\fcaptureError\"t\n" +
+	"\rcapture_error\x18\x18 \x01(\tR\fcaptureError\x12&\n" +
+	"\fredacted_url\x18\x19 \x01(\tH\x00R\vredactedUrl\x88\x01\x01B\x0f\n" +
+	"\r_redacted_url\"t\n" +
 	"\x0eAITrafficBatch\x12)\n" +
 	"\x10protocol_version\x18\x01 \x01(\rR\x0fprotocolVersion\x127\n" +
 	"\arecords\x18\x02 \x03(\v2\x1d.legion.ai.v1.AITrafficRecordR\arecords\"\x8c\x01\n" +
@@ -23390,6 +23403,7 @@ func file_legion_ai_v1_ai_proto_init() {
 	if File_legion_ai_v1_ai_proto != nil {
 		return
 	}
+	file_legion_ai_v1_ai_proto_msgTypes[246].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
