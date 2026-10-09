@@ -1206,10 +1206,46 @@ func (s *ObjectType) GetField(key Value) Type {
 		if t := getField(s); t != nil {
 			return t
 		}
-		for _, obj := range s.AnonymousField {
-			if t := getField(obj); t != nil {
-				return t
+		if len(s.AnonymousField) == 0 {
+			return nil
+		}
+		// Search one embedding depth at a time: shallower fields shadow deeper
+		// fields, while multiple matches at the same depth are ambiguous.
+		current := map[*ObjectType]int{s: 1}
+		visited := make(map[*ObjectType]bool)
+		for len(current) > 0 {
+			var found Type
+			matches := 0
+			next := make(map[*ObjectType]int)
+			for obj, paths := range current {
+				visited[obj] = true
+				if t := getField(obj); t != nil {
+					found = t
+					matches += paths
+				}
+				for _, embedded := range obj.AnonymousField {
+					if embedded != nil {
+						// Keep duplicate paths (including diamonds) ambiguous,
+						// without retaining an unbounded number of paths.
+						next[embedded] = min(2, next[embedded]+paths)
+					}
+				}
 			}
+			if matches > 1 {
+				return nil
+			}
+			if matches == 1 {
+				return found
+			}
+			// Only drop types after completing the depth, so traversal order
+			// cannot hide duplicate paths. Previously visited types also stop
+			// recursive pointer embedding from looping indefinitely.
+			for obj := range next {
+				if visited[obj] {
+					delete(next, obj)
+				}
+			}
+			current = next
 		}
 	}
 	return nil

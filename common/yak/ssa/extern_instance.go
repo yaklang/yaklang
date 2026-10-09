@@ -367,7 +367,7 @@ func (prog *Program) handlerType(typ reflect.Type, level int) Type {
 				fieldType := prog.handlerType(field.Type, level)
 				structType.AddField(NewConst(field.Name), fieldType)
 				if field.Anonymous && IsObjectType(fieldType) {
-					structType.AnonymousField[Name] = fieldType.(*ObjectType)
+					structType.AnonymousField[field.Name] = fieldType.(*ObjectType)
 				}
 			}
 			structType.Finish()
