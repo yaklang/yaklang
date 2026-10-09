@@ -2194,8 +2194,8 @@ message AITrafficAnalysisContext {
   bool read_only = 4;
 }
 
-// This metadata never contains request headers, bodies, URL queries or errors
-// copied from the target. Raw evidence is sent only through authenticated HTTP.
+// Metadata contains only sanitized URL context, never raw headers, bodies,
+// sensitive URL values or target error text. Raw evidence uses authenticated HTTP.
 message AITrafficRecord {
   uint32 protocol_version = 1;
   string flow_id = 2;
@@ -2221,6 +2221,10 @@ message AITrafficRecord {
   bool request_truncated = 22;
   bool response_truncated = 23;
   string capture_error = 24; // fixed code only
+  // Optional in protocol v1. Absolute same-origin URL, at most 16 KiB UTF-8.
+  // Strip userinfo/fragment; redact sensitive path segments and query values.
+  // Captured before packet quotas apply. Absent legacy records use scheme/host.
+  optional string redacted_url = 25;
 }
 
 message AITrafficBatch {

@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -160,8 +161,11 @@ func TestAITrafficMetadataExcludesSensitiveURLAndHeaders(t *testing.T) {
 		upload := new(aiv1.AITrafficUpload)
 		proto.Unmarshal(raw, upload)
 		metadata := fmt.Sprint(upload.Record)
-		if strings.Contains(metadata, "SECRET") || strings.Contains(metadata, "private") {
+		if strings.Contains(metadata, "SECRET") {
 			t.Fatal("sensitive metadata escaped")
+		}
+		if !strings.Contains(upload.Record.GetRedactedUrl(), "/private?") {
+			t.Fatal("safe request path was lost")
 		}
 	}
 }
@@ -493,5 +497,109 @@ func TestAITrafficSingleHeaderBeyondPacketLimitIsExplicit(t *testing.T) {
 	}
 	if len(upload.RawRequest) != int(c.policy.PacketLimitBytes) || upload.Record.CaptureError != "packet_headers_limit" || !upload.Record.RequestTruncated {
 		t.Fatal("single oversized header was mistaken for body truncation")
+	}
+}
+
+func TestAITrafficRedactedURLPreservesSafeContextAndMasksSecrets(t *testing.T) {
+	for _, raw := range []string{
+		"https://user:SECRET@example.test/api/token/SECRET?i=3&api_key=SECRET&ordinary=yes#SECRET",
+		"https://example.test/api/%74oken/%53ECRET?i=3&%70assword=SECRET&session_id=SECRET&ordinary=yes",
+	} {
+		target, err := url.Parse(raw)
+		if err != nil {
+			t.Fatal(err)
+		}
+		redacted := trafficRedactedURL(target, "https", "example.test")
+		if redacted == "" || strings.Contains(redacted, "SECRET") || strings.Contains(redacted, "user") || !strings.Contains(redacted, "/api/token/%5BREDACTED%5D") || !strings.Contains(redacted, "i=3") || !strings.Contains(redacted, "ordinary=yes") {
+			t.Fatalf("unsafe or missing URL metadata: %q", redacted)
+		}
+	}
+	for _, raw := range []string{"http://example.test/path", "https://foreign.test/path", "https:opaque", "https://example.test/path?token=%zz", "https://example.test/" + strings.Repeat("x", 16<<10)} {
+		target, err := url.Parse(raw)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if trafficRedactedURL(target, "https", "example.test") != "" {
+			t.Fatalf("unsafe URL was admitted: %.70s", raw)
+		}
+	}
+	for _, host := range []string{"example.test?token=SECRET", "example.test/SECRET", "user:SECRET@example.test", "example.test#SECRET", "example.test:invalid", ""} {
+		record := &aiv1.AITrafficRecord{Scheme: "https"}
+		trafficRequestMetadata(record, []byte("GET /large?i=3 HTTP/1.1\r\nHost: "+host+"\r\n\r\n"))
+		if record.Host != "" || record.RedactedUrl != nil {
+			t.Fatal("host syntax allowed sensitive URL parts into metadata")
+		}
+	}
+}
+
+func TestAITrafficCaptureKeepsStartURLThroughQuotaAndUnavailablePackets(t *testing.T) {
+	for _, mode := range []string{"local_quota", "platform_quota", "packet_headers", "missing_packets"} {
+		t.Run(mode, func(t *testing.T) {
+			c := trafficTestCollector(t, "https://platform.invalid/records")
+			if mode == "local_quota" {
+				c.used = c.policy.SessionLimitBytes
+			}
+			if mode == "packet_headers" {
+				c.policy.PacketLimitBytes = 16
+			}
+			request := []byte("GET /large?i=3&token=SECRET HTTP/1.1\r\nHost: example.test\r\nAuthorization: SECRET\r\n\r\n")
+			start := time.Now()
+			finish := c.observe(lowhttp.HTTPAttempt{HTTPS: true, StartedAt: start, Request: request})
+			end := lowhttp.HTTPAttempt{FinishedAt: start.Add(time.Second), Request: request, Response: []byte("HTTP/1.1 200 OK\r\nContent-Length: 4\r\n\r\nbody")}
+			if mode == "missing_packets" {
+				end.RequestHeaderFile = filepath.Join(c.dir, "missing-packet")
+			}
+			finish(end)
+			paths, err := c.pending()
+			if err != nil || len(paths) != 2 {
+				t.Fatalf("start/terminal queue not preserved: %v %v", paths, err)
+			}
+			var captured string
+			for _, path := range paths {
+				raw, err := os.ReadFile(path)
+				if err != nil {
+					t.Fatal(err)
+				}
+				upload := new(aiv1.AITrafficUpload)
+				if err := proto.Unmarshal(raw, upload); err != nil {
+					t.Fatal(err)
+				}
+				metadata, _ := protojson.Marshal(upload.Record)
+				if bytes.Contains(metadata, []byte("SECRET")) || !strings.Contains(upload.Record.GetRedactedUrl(), "/large?i=3") {
+					t.Fatalf("secret leaked or request URL lost in %s metadata", upload.Record.Phase)
+				}
+				if captured != "" && captured != upload.Record.GetRedactedUrl() {
+					t.Fatal("terminal metadata replaced the start URL")
+				}
+				captured = upload.Record.GetRedactedUrl()
+				if mode == "local_quota" && upload.Record.Phase == "terminal" && (len(upload.RawRequest) > 0 || len(upload.RawResponse) > 0 || upload.Record.CaptureError != "local_session_limit") {
+					t.Fatal("local quota did not drop raw packets while keeping metadata")
+				}
+			}
+			// Exercise event emission and a platform quota receipt without network.
+			c.client.Transport = aiRuntimeRoundTripFunc(func(r *http.Request) (*http.Response, error) {
+				raw, _ := io.ReadAll(r.Body)
+				upload := new(aiv1.AITrafficUpload)
+				if err := proto.Unmarshal(raw, upload); err != nil {
+					return nil, err
+				}
+				status := "metadata_only"
+				if upload.Record.Phase == "terminal" && mode == "platform_quota" {
+					status = "quota_dropped"
+				}
+				receipt, _ := proto.Marshal(&aiv1.AITrafficReceipt{ProtocolVersion: 1, FlowId: upload.Record.FlowId, Phase: upload.Record.Phase, Durable: true, UploadSha256: trafficSHA(raw), StorageStatus: status})
+				return &http.Response{StatusCode: 200, Header: make(http.Header), Body: io.NopCloser(bytes.NewReader(receipt))}, nil
+			})
+			c.flush(context.Background())
+			emitter := c.emitter.(*trafficTestEmitter)
+			if len(emitter.events) == 0 {
+				t.Fatal("no metadata events emitted")
+			}
+			for _, raw := range emitter.events {
+				if bytes.Contains(raw, []byte("SECRET")) || !bytes.Contains(raw, []byte("/large?i=3")) {
+					t.Fatal("event leaked secrets or lost the captured URL")
+				}
+			}
+		})
 	}
 }
