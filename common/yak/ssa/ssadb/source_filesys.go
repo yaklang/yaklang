@@ -57,7 +57,17 @@ func (fs *irSourceFS) ReadFile(path string) ([]byte, error) {
 		return nil, err
 	}
 	if ok, _ := vf.Exists(path); !ok {
-		return nil, utils.Errorf("file [%v] not found", path)
+		// Full view (show-all-files) may surface lower layers' entries: try
+		// the owning layer's stored path shape before giving up.
+		layerPath, ok := fs.overlayFallbackPath(path)
+		if !ok {
+			return nil, utils.Errorf("file [%v] not found", path)
+		}
+		path = layerPath
+		vf, err = fs.treeFor(path)
+		if err != nil {
+			return nil, err
+		}
 	}
 	// Filled bodies live in the tree; a non-empty read is a pure memory hit.
 	// Empty real files degrade to a DB fetch per read (correct, just uncached):
@@ -70,6 +80,38 @@ func (fs *irSourceFS) ReadFile(path string) ([]byte, error) {
 	return fs.fillFileContent(vf, path)
 }
 
+// overlayFallbackPath maps /<head>/<rest> to the overlay layer that actually
+// stores that file (each layer's ir_sources rows keep their own program-name
+// prefix). Newest layer wins, matching the compiler's aggregation order.
+func (fs *irSourceFS) overlayFallbackPath(path string) (string, bool) {
+	progName, _ := fs.getProgram(path)
+	if progName == "" {
+		return "", false
+	}
+	prog, err := GetProgram(progName, Application)
+	if err != nil || prog == nil || !prog.HasSavedOverlayLayers() {
+		return "", false
+	}
+	rest := strings.TrimPrefix(path, "/"+progName)
+	for i := len(prog.OverlayLayers) - 1; i >= 0; i-- {
+		layer := prog.OverlayLayers[i]
+		if layer == progName {
+			continue
+		}
+		layerPath := "/" + layer + rest
+		vf, err := fs.treeFor(layerPath)
+		if err != nil {
+			continue
+		}
+		// Stat, not Exists: VirtualFS.Exists goes through Open, which fails on
+		// directories ("is a dir"), so base-only directories would never match.
+		if _, statErr := vf.Stat(layerPath); statErr == nil {
+			return layerPath, true
+		}
+	}
+	return "", false
+}
+
 func (fs *irSourceFS) Open(path string) (fs.File, error) {
 	if path == "/" {
 		return nil, utils.Errorf("path [%v] is a program root path, not file.", path)
@@ -79,7 +121,17 @@ func (fs *irSourceFS) Open(path string) (fs.File, error) {
 		return nil, err
 	}
 	if ok, _ := vf.Exists(path); !ok {
-		return nil, utils.Errorf("file [%v] not found", path)
+		// Full view (show-all-files) may surface lower layers' entries: try
+		// the owning layer's stored path shape before giving up.
+		layerPath, ok := fs.overlayFallbackPath(path)
+		if !ok {
+			return nil, utils.Errorf("file [%v] not found", path)
+		}
+		path = layerPath
+		vf, err = fs.treeFor(path)
+		if err != nil {
+			return nil, err
+		}
 	}
 	if data, err := vf.ReadFile(path); err == nil && len(data) > 0 {
 		return filesys.NewVirtualFile(path, string(data)), nil
@@ -106,22 +158,134 @@ func (fs *irSourceFS) Stat(path string) (fs.FileInfo, error) {
 	if err != nil {
 		return nil, err
 	}
-	return vf.Stat(path)
+	info, statErr := vf.Stat(path)
+	if statErr == nil {
+		return info, nil
+	}
+	// Full view (show-all-files) may surface lower layers' entries: try
+	// the owning layer's stored path shape before giving up.
+	layerPath, ok := fs.overlayFallbackPath(path)
+	if !ok {
+		return nil, statErr
+	}
+	layerVf, err := fs.treeFor(layerPath)
+	if err != nil {
+		return nil, err
+	}
+	return layerVf.Stat(layerPath)
 }
 
+// programRootEntries lists every program name as a directory entry for "/".
+func programRootEntries() []fs.DirEntry {
+	ret := make([]fs.DirEntry, 0)
+	for _, porgram := range AllPrograms(GetDB()) {
+		ret = append(ret, filesys.NewVirtualFileInfo(porgram.ProgramName, 0, true))
+	}
+	return ret
+}
+
+// ReadDir lists a directory cheaply: only the entries the path's own
+// program stores (for an incremental program's head, that is exactly the
+// last diff's files — the diffOnly=true view). It never aggregates overlay
+// layers, so the default listing costs one program's tree, not a
+// layer-chain walk. A directory that lives in lower overlay layers only (no
+// diff files under it in the head layer) reads as empty instead of failing,
+// so expanded nodes left over from the whole-file view don't error out.
+// FullReadDir serves the aggregated whole-file view instead.
 func (isfs *irSourceFS) ReadDir(path string) ([]fs.DirEntry, error) {
 	if path == "/" {
-		ret := make([]fs.DirEntry, 0)
-		for _, porgram := range AllPrograms(GetDB()) {
-			ret = append(ret, filesys.NewVirtualFileInfo(porgram.ProgramName, 0, true))
-		}
-		return ret, nil
+		return programRootEntries(), nil
 	}
 	vf, err := isfs.treeFor(path)
 	if err != nil {
 		return nil, err
 	}
-	return vf.ReadDir(path)
+	entries, err := vf.ReadDir(path)
+	if err == nil {
+		return entries, nil
+	}
+	if _, ok := isfs.overlayFallbackPath(path); ok {
+		return []fs.DirEntry{}, nil
+	}
+	return nil, err
+}
+
+// FullReadDir lists the aggregated whole-file view of an incremental
+// program — the explicit opt-in ("show all files" checked in the audit
+// frontend; the checked listing sends no diffOnly query, so listDir routes
+// here): the head layer's own entries plus every lower layer of the overlay
+// chain, deduplicated by name with newer layers shadowing older ones, minus
+// files deleted ("-1") by any layer's FileHashMap. This walks every layer's
+// tree and every layer's FileHashMap, so it is paid for only when the user
+// asked for it. Plain programs (and "/") have no overlay chain and degrade
+// to the cheap ReadDir.
+func (isfs *irSourceFS) FullReadDir(path string) ([]fs.DirEntry, error) {
+	if path == "/" {
+		return isfs.ReadDir(path)
+	}
+	progName, _ := isfs.getProgram(path)
+	prog, err := GetProgram(progName, Application)
+	if err != nil || prog == nil || !prog.HasSavedOverlayLayers() {
+		return isfs.ReadDir(path)
+	}
+	rel := strings.Trim(strings.TrimPrefix(path, "/"+progName), "/")
+
+	// Newest layer first so shadowing is a simple "already seen" check.
+	entries := make([]fs.DirEntry, 0, 8)
+	seen := make(map[string]struct{})
+	for i := len(prog.OverlayLayers) - 1; i >= 0; i-- {
+		layerPath := "/" + prog.OverlayLayers[i]
+		if rel != "" {
+			layerPath += "/" + rel
+		}
+		// Reuse each layer's own cached tree (treeFor); missing layers are
+		// skipped rather than failing the whole listing.
+		vf, err := isfs.treeFor(layerPath)
+		if err != nil {
+			continue
+		}
+		list, err := vf.ReadDir(layerPath)
+		if err != nil {
+			continue
+		}
+		for _, e := range list {
+			if _, ok := seen[e.Name()]; ok {
+				continue
+			}
+			seen[e.Name()] = struct{}{}
+			entries = append(entries, e)
+		}
+	}
+
+	// Files deleted by any layer's FileHashMap ("-1", program-relative
+	// paths) are absent from the final view no matter which layer holds them.
+	deleted := make(map[string]struct{})
+	for _, layer := range prog.OverlayLayers {
+		lp, err := GetProgram(layer, Application)
+		if err != nil || lp == nil {
+			continue
+		}
+		for file, status := range lp.FileHashMap {
+			if status == "-1" {
+				deleted[strings.Trim(file, "/")] = struct{}{}
+			}
+		}
+	}
+	if len(deleted) > 0 {
+		kept := entries[:0]
+		for _, e := range entries {
+			fullRel := e.Name()
+			if rel != "" {
+				fullRel = rel + "/" + e.Name()
+			}
+			if _, ok := deleted[fullRel]; ok && !e.IsDir() {
+				continue
+			}
+			kept = append(kept, e)
+		}
+		entries = kept
+	}
+	return entries, nil
 }
 
 func (fs *irSourceFS) PathSplit(p string) (string, string) {
@@ -150,6 +314,9 @@ func (f *irSourceFS) ExtraInfo(path string) map[string]any {
 		m["CreateAt"] = prog.CreatedAt.Unix()
 		m["Language"] = prog.Language
 		m["Description"] = prog.Description
+		// Incremental markers for the audit frontend (diffOnly / show-all-files).
+		m["IsIncremental"] = prog.IsIncrementalKind()
+		m["IsOverlayProgram"] = prog.HasSavedOverlayLayers()
 	}
 	return m
 }
@@ -208,8 +375,9 @@ func (f *irSourceFS) WriteFile(string, []byte, os.FileMode) error { return utils
 func (f *irSourceFS) MkdirAll(string, os.FileMode) error          { return utils.Error("implement me") }
 func (f *irSourceFS) Base(p string) string                        { return path.Base(p) }
 
-// treeFor resolves (and builds on first touch) the cached tree for the program
-// named by anyPath. The DB build runs under fs.mu to avoid duplicate builds.
+// treeFor resolves (and builds on first touch) the cached tree for the
+// program named by anyPath. The DB build runs under fs.mu to avoid
+// duplicate builds.
 func (fs *irSourceFS) treeFor(anyPath string) (*filesys.VirtualFS, error) {
 	progName, _ := fs.getProgram(anyPath)
 	if progName == "" {
@@ -247,6 +415,8 @@ func (fs *irSourceFS) fillFileContent(vf *filesys.VirtualFS, path string) ([]byt
 	return data, nil
 }
 
+// buildProgramTree builds the tree for a single program from its ir_sources
+// rows: dirs as dir nodes, files as empty stubs (bodies are lazily filled).
 func buildProgramTree(progName string, irfs *irSourceFS, vf *filesys.VirtualFS) error {
 	entries, err := GetIrSourceTreeByProgram(progName)
 	if err != nil {
