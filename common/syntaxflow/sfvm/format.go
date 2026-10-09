@@ -55,6 +55,30 @@ func (f *RuleFormat) GetTextFromToken(token CanStartStopToken) string {
 	return GetText(f.editor, token)
 }
 
+// escapeSyntaxFlowString 将文本转义为可安全嵌入 SyntaxFlow 双引号字面量的形式，
+// 与 mustUnquoteSyntaxFlowString 的解码行为互逆。
+func escapeSyntaxFlowString(s string) string {
+	var buf strings.Builder
+	buf.Grow(len(s))
+	for _, r := range s {
+		switch r {
+		case '"':
+			buf.WriteString(`\"`)
+		case '\\':
+			buf.WriteString(`\\`)
+		case '\n':
+			buf.WriteString(`\n`)
+		case '\r':
+			buf.WriteString(`\r`)
+		case '\t':
+			buf.WriteString(`\t`)
+		default:
+			buf.WriteRune(r)
+		}
+	}
+	return buf.String()
+}
+
 func (f *RuleFormat) Write(format string, args ...any) error {
 	if f.write == nil {
 		return nil
@@ -318,7 +342,7 @@ func (f *RuleFormat) VisitAlertStatement(alert sf.IAlertStatementContext) {
 			}
 			f.Write(res)
 		} else {
-			res := fmt.Sprintf("\t%s: \"%s\",\n", key, newVal)
+			res := fmt.Sprintf("\t%s: \"%s\",\n", key, escapeSyntaxFlowString(newVal))
 			if strings.Contains(res, "MISSING") {
 				log.Warnf("alert item %s value is missing, please check the rule: %s", key, res)
 			}
@@ -364,7 +388,7 @@ func (f *RuleFormat) VisitInfoDescription(desc sf.IDescriptionStatementContext) 
 			if valueItem.StringLiteral() != nil && !IsComplexDescType(descType) {
 				value := f.VisitStringLiteral(valueItem.StringLiteral())
 				value = f.descHandler(key, value)
-				f.Write("\t%s: \"%s\"\n", key, value)
+				f.Write("\t%s: \"%s\"\n", key, escapeSyntaxFlowString(value))
 			} else if valueItem.StringLiteral() != nil && IsComplexDescType(descType) {
 				// 虽然原规则使用StringLiteral写，但是descType是复杂类型，AI补全的可能是复杂文本
 				// 所以这里使用heredoc
@@ -402,7 +426,7 @@ func (f *RuleFormat) VisitInfoDescription(desc sf.IDescriptionStatementContext) 
 					f.Write("\t%s: %s\n", key, newValue)
 					continue
 				}
-				f.Write("\t%s: \"%s\"\n", key, value)
+				f.Write("\t%s: \"%s\"\n", key, escapeSyntaxFlowString(value))
 			}
 		}
 	}
@@ -435,7 +459,7 @@ func (f *RuleFormat) VisitInfoDescription(desc sf.IDescriptionStatementContext) 
 					f.Write("%s\n", upperKey)
 					continue
 				} else {
-					f.Write("\t%s: \"%s\"\n", string(keyType), value)
+					f.Write("\t%s: \"%s\"\n", string(keyType), escapeSyntaxFlowString(value))
 				}
 			} else {
 				f.Write("\t%s\n", string(keyType))

@@ -22,6 +22,16 @@ func extractExistingRuleID(ruleContent string) string {
 	return strings.TrimSpace(m[1])
 }
 
+// normalizeLiteralNewlines 将 AI 输出中的字面 "\n"（两个字符）归一化为真实换行。
+// LLM 常把多行文本写成字面 \n；heredoc 写入免转义但也不会解释它，
+// 不归一化会在美化结果里留下一堆 "\n" 符号。
+func normalizeLiteralNewlines(s string) string {
+	if !strings.Contains(s, `\n`) {
+		return s
+	}
+	return strings.ReplaceAll(s, `\n`, "\n")
+}
+
 // MergeBeautificationResults 将 AI 美化的 desc/alert 输出合并到原始规则内容中。
 // rule_id：原规则已有则保留，否则自动生成 UUID。
 func MergeBeautificationResults(descParams, alertParams aitool.InvokeParams, ruleContent string) (string, error) {
@@ -58,7 +68,7 @@ func MergeBeautificationResults(descParams, alertParams aitool.InvokeParams, rul
 			return value
 		}
 		if got := descParams.GetString(key); got != "" {
-			return got
+			return normalizeLiteralNewlines(got)
 		}
 		if got := descParams.GetInt(key); got != 0 {
 			return strconv.FormatInt(got, 10)
@@ -96,7 +106,7 @@ func MergeBeautificationResults(descParams, alertParams aitool.InvokeParams, rul
 			if aiVal == "" {
 				return value
 			}
-			return aiVal
+			return normalizeLiteralNewlines(aiVal)
 		}
 		return value
 	}
