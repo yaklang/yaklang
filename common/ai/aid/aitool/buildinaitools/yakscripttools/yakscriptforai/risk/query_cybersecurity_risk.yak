@@ -1,0 +1,39 @@
+__DESC__ = "Search existing cybersecurity risks in the current runtime project database or a database_id from list_yak_projects. Read risk IDs, titles, targets, severity, evidence excerpts and remediation with pagination."
+__VERBOSE_NAME__ = "Query Cybersecurity Risk"
+__VERBOSE_NAME_ZH__ = "搜索已有安全风险"
+__KEYWORDS__ = "risk,vulnerability,security,finding,history,query,search,风险,漏洞,查询,证据"
+__USAGE__ = <<<USAGE
+搜索已有风险，或在上报前检查同一目标、类型和输入点是否已有记录。不传 database_id 查询本次运行绑定的当前项目库；其他项目先用 list_yak_projects 获取 database_id，再只读查询。risk_id 只在对应数据库内有效。
+query 搜索目标、标题、类型、参数、payload、details、description 和 solution；url 是 URL 子串；type 精确匹配风险类型（如 sqli）或中文类型，支持逗号列表；severity 支持逗号列表，如 high,critical。title 是标题关键词，runtime_id 精确匹配运行 ID。waiting_verified 默认 false 查询已验证风险，true 查询待验证风险。
+按风险 ID 降序输出，使用 next_offset 续查。stdout 展示摘要和已有证据，保留文本换行；不包含原始 HTTP 报文。文本字段有 SQL 展示预算，截断会明确标记；缩小过滤范围并降低 limit 可增大每条摘要的预算，每字段最多 2048 字符。details 是数据库存储文本，可能含引号转义。没有匹配时 hits=0；查询不会修改风险的已读状态或切换项目库。
+
+[[- if .FunctionCallMode -]]
+```json
+{"query":"login","type":"sqli","severity":"high,critical","limit":5}
+```
+[[- else -]]
+```json
+{"@action":"directly_call_tool","directly_call_tool_name":"query_cybersecurity_risk","directly_call_tool_params":{"query":"login","type":"sqli","severity":"high,critical","limit":5}}
+```
+[[- end -]]
+USAGE
+databaseID = cli.String("database_id", cli.setHelp("list_yak_projects 返回的 database_id；空值/current 使用当前库"))
+query = cli.String("query", cli.setHelp("目标、标题、类型、输入点、证据、描述或修复建议关键词"))
+url = cli.String("url", cli.setHelp("风险 URL 子串"))
+riskType = cli.String("type", cli.setHelp("精确风险类型或中文类型，逗号分隔，如 sqli,xss"))
+severity = cli.String("severity", cli.setHelp("严重程度，逗号分隔，如 high,critical,middle,low,info"))
+title = cli.String("title", cli.setHelp("风险标题关键词"))
+runtimeID = cli.String("runtime_id", cli.setHelp("精确运行 ID"))
+riskID = cli.Int("risk_id", cli.setDefault(0), cli.setHelp("精确风险 ID，0 不限制"))
+waitingVerified = cli.Bool("waiting_verified", cli.setDefault(false), cli.setHelp("false 查询已验证风险，true 查询待验证风险"))
+afterID = cli.Int("after_id", cli.setDefault(0), cli.setHelp("仅查询 ID 大于该值的风险，0 不限制"))
+beforeID = cli.Int("before_id", cli.setDefault(0), cli.setHelp("仅查询 ID 小于该值的风险，0 不限制"))
+limit = cli.Int("limit", cli.setDefault(10), cli.setHelp("返回条数，1–100；更小的 limit 提供更大的文本预算"))
+offset = cli.Int("offset", cli.setDefault(0), cli.setHelp("记录偏移，使用 next_offset 续查"))
+cli.check()
+if riskID < 0 { die("risk_id must be nonnegative") }
+filter = {"type": riskType, "severity": severity, "title": title, "runtime_id": runtimeID, "waiting_verified": waitingVerified}
+if riskID > 0 { filter["ids"] = [riskID] }
+page, err = risk.QueryRiskInDatabase(filter, db.projectID(databaseID), db.keyword(query), db.url(url), db.limit(limit), db.offset(offset), db.afterID(afterID), db.beforeID(beforeID))
+if err != nil { die(err) }
+println(page.Dump())
