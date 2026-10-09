@@ -126,6 +126,29 @@ func runIncrementalMVPSealedReplay(t *testing.T, prefix string, groups []string)
 			}
 			var a incrementalMVPAnswer
 			require.NoError(t, json.Unmarshal(answer, &a))
+			if prefix == "incremental-mvp" && c.Group == "semtech" && c.ID == "semtech-downstream-unsupported" {
+				// Preserve the original upstream-only answer. The native downlink
+				// profile has a separately sealed, source-derived field oracle.
+				upgrade, err := trafficfixture.ReadFile("semtech-native-upgrade/upgrade.json")
+				require.NoError(t, err)
+				var binding struct {
+					Name, Profile string
+					CaptureSHA    string `json:"capture_sha256"`
+					AnswerSHA     string `json:"historical_answer_sha256"`
+					Payload       string `json:"payload_hex"`
+					PayloadSHA    string `json:"payload_sha256"`
+				}
+				require.NoError(t, json.Unmarshal(upgrade, &binding))
+				require.Equal(t, c.ID, binding.Name)
+				require.Equal(t, c.SHA256, binding.CaptureSHA)
+				require.Equal(t, fmt.Sprintf("%x", sha256.Sum256(answer)), binding.AnswerSHA)
+				require.Len(t, a.Steps, 1)
+				require.Equal(t, a.Steps[0].Hex, binding.Payload)
+				payload, err := hex.DecodeString(binding.Payload)
+				require.NoError(t, err)
+				require.Equal(t, fmt.Sprintf("%x", sha256.Sum256(payload)), binding.PayloadSHA)
+				require.NoError(t, json.Unmarshal(upgrade, &a))
+			}
 			incrementalMVPBudget(t, c, a, wire)
 			if prefix == "semantic-review-mvp" {
 				semanticReviewMVPSessions(t, c, a, answer)
@@ -390,6 +413,10 @@ func incrementalMVPMessages(t *testing.T, c incrementalMVPCase, a incrementalMVP
 			merged[k] = v
 		}
 		assertMVPJSONFields(t, want[i], merged)
+		if c.Group == "semtech" && c.ID == "semtech-downstream-unsupported" {
+			require.Equal(t, semtechDownlinkProfile, e.Profile)
+			rocEqualFields(t, want[i], fields)
+		}
 		if a.NativeRaw != nil {
 			require.Len(t, a.NativeRaw, len(decoded))
 			require.Equal(t, a.NativeRaw[i], hex.EncodeToString(e.Raw), "complete PDU source order")
@@ -404,7 +431,12 @@ func incrementalMVPMessages(t *testing.T, c incrementalMVPCase, a incrementalMVP
 		}
 		if c.Group == "nmea" || c.Group == "semtech" {
 			require.Zero(t, e.ResponseTo, "observed datagrams have no inferred transaction")
-			require.NotContains(t, e.Session, "Association")
+			if c.ID == "semtech-downstream-unsupported" {
+				require.Zero(t, e.TransactionID)
+				require.Equal(t, map[string]any{"Association": "unassociated-downlink-observation", "Authentication Verified": false, "RF Delivery Proven": false}, e.Session)
+			} else {
+				require.NotContains(t, e.Session, "Association")
+			}
 		}
 	}
 	terminal := a.TerminalError

@@ -23237,6 +23237,172 @@
         "common/pcapx/pcaputil/pfcp-deletion/verify-integrated.py": "verify-integrated.py",
         "scripts/protocol-tests/required-tests-v29.json": "tools/required-tests-v29.json"
       }
+    },
+    {
+      "id": "validation-native-compatibility-9814bfb6c51",
+      "kind": "reference",
+      "source_sha": "9814bfb6c511f2d919c6ffe2ecb96c06906ab654",
+      "file": "validation-native-compatibility-9814bfb6c51.zip",
+      "sha256": "07a8d7a81942d55f3b68732f711b7710f71de125c8531303174ba4db0d3fb1f0",
+      "password": "bin-parser",
+      "members": {
+        "LICENSE": {
+          "sha256": "c4bd992a61caff983a9114119d1915dc917ac5338c4cb9a9d8f4403f90f7bbdf",
+          "bytes": 127
+        },
+        "contract.json": {
+          "sha256": "d68d78f10763612582a4e53c7ee7a29ce32bbd80a751cb787357aa09b8c7ec6b",
+          "bytes": 4595
+        },
+        "oracle.py": {
+          "sha256": "249b33860a4bd467a567c474937fe5dbb3770cb713a482bb54cffcb6258ea9a3",
+          "bytes": 10982
+        },
+        "required-tests-v30.json": {
+          "sha256": "99bc8d22c8897465b066bdf65b695217ee79568c2be632c42fbe2995e23d2005",
+          "bytes": 96877
+        },
+        "seal.py": {
+          "sha256": "1da1b75fde43b48e774bdb6fa2fc5fbb1482f61f2e0ee3518317ac186cbf939e",
+          "bytes": 3818
+        },
+        "source-pin.json": {
+          "sha256": "6166200b2a06fb3234e6be669b00ebdd92415ac2789a5350b99e0a3a0649a758",
+          "bytes": 5495
+        },
+        "upgrade.json": {
+          "sha256": "475e9329cf55e04ab3b8af9bcadf337bebea5b99f5eeb425cdd33e99af82f905",
+          "bytes": 2565
+        }
+      },
+      "aliases": {
+        "common/pcapx/pcaputil/semtech-native-upgrade/LICENSE": "LICENSE",
+        "common/pcapx/pcaputil/semtech-native-upgrade/contract.json": "contract.json",
+        "common/pcapx/pcaputil/semtech-native-upgrade/oracle.py": "oracle.py",
+        "common/pcapx/pcaputil/semtech-native-upgrade/required-tests-v30.json": "required-tests-v30.json",
+        "common/pcapx/pcaputil/semtech-native-upgrade/seal.py": "seal.py",
+        "common/pcapx/pcaputil/semtech-native-upgrade/source-pin.json": "source-pin.json",
+        "common/pcapx/pcaputil/semtech-native-upgrade/upgrade.json": "upgrade.json",
+        "scripts/protocol-tests/required-tests-v30.json": "required-tests-v30.json"
+      }
+    },
+    {
+      "id": "validation-closure-core-9814bfb6c51",
+      "kind": "validation",
+      "source_sha": "9814bfb6c511f2d919c6ffe2ecb96c06906ab654",
+      "file": "validation-closure-core-9814bfb6c51.zip",
+      "sha256": "dbd2e5854f9cb2fb44035ea0d48f6cb574f8cf3e314d7281c61fa4781e2414f6",
+      "password": "bin-parser",
+      "members": {
+        "LICENSE": {
+          "sha256": "419520770cd1ccb765b0e423c812458ee8f4684e65c5222f92058f3fe09049ab",
+          "bytes": 103
+        },
+        "answers/ipv4-udp-complete.json": {
+          "sha256": "81ec9914d1b08fbc2e4cb7259db880470ba3b43826254d998576d92017f664fb",
+          "bytes": 1013
+        },
+        "answers/ipv4-udp-offload-zero.json": {
+          "sha256": "9896ee24f0b27e02d83906f21d30ea4ed1aff05380e06ede39f62eecf6b1f825",
+          "bytes": 1021
+        },
+        "answers/ipv6-udp-complete.json": {
+          "sha256": "2d0a0d6bd33ffb086bf92596e78216924f1b33fa8bb1aabd6ef4867724ad8cb5",
+          "bytes": 1013
+        },
+        "answers/ipv6-udp-offload-malformed-length.json": {
+          "sha256": "3940715aaa5a2278a3b67773d791713d450db2e5fd80012b5e176598b995510b",
+          "bytes": 682
+        },
+        "answers/ipv6-udp-offload-zero.json": {
+          "sha256": "455bcc9ef82c35b88b134fd8a7030ec1b4793eefe9d5e77daf939d29d01d080b",
+          "bytes": 1021
+        },
+        "answers/tcp-half-close-late-client-data.json": {
+          "sha256": "39a4225f391d9fc8f48d2f8561eca80031e0259940459d46fe3077792431d259",
+          "bytes": 1576
+        },
+        "answers/tcp-half-close-normal.json": {
+          "sha256": "99ce9d4d661cea14ddf7ae8550f8b0c0d788a25c33b2c6a7b5acf3b5a2fe1d2d",
+          "bytes": 1556
+        },
+        "build.py": {
+          "sha256": "58eba0b94e9629ead0156f571e6e830d42d71922912844422326f83e7fc02dc2",
+          "bytes": 5848
+        },
+        "cases/ipv4-udp-complete.pcap": {
+          "sha256": "bd122676d52f254f116639294cfef66a9eee17f62fd49173c2bd9ca79522b19b",
+          "bytes": 109
+        },
+        "cases/ipv4-udp-offload-zero.pcap": {
+          "sha256": "afeab91bc659f11858d4701ca26863a723ddb5d38dde9c6f3ea27d827d125d89",
+          "bytes": 109
+        },
+        "cases/ipv6-udp-complete.pcap": {
+          "sha256": "7f1c637c4cb39dad5ca3dd926ad13af4f151082e6079da05da26a0f870271e9d",
+          "bytes": 129
+        },
+        "cases/ipv6-udp-offload-malformed-length.pcap": {
+          "sha256": "75a1b3d51f51652d305c4ef0fcb8c20fb8fa7b77da2eab24d00c66b05108d07e",
+          "bytes": 129
+        },
+        "cases/ipv6-udp-offload-zero.pcap": {
+          "sha256": "8bbb83375057ff674594a297a9cb8c33c0ca28fa6c0579540bc81daa815d692d",
+          "bytes": 129
+        },
+        "cases/tcp-half-close-late-client-data.pcap": {
+          "sha256": "02d9e4d41c592e148ad793aafa2f96285aa8347cf774d6bb714e45e00a5536be",
+          "bytes": 643
+        },
+        "cases/tcp-half-close-normal.pcap": {
+          "sha256": "d6a8c43a8ce6039c70175b9b36ca4cbeb8e4fd49423a455a35a75c7c835972d6",
+          "bytes": 535
+        },
+        "controls.json": {
+          "sha256": "13902af376753e52624251630118a97b0ee492d2384d669fdd0cf66f1c98da00",
+          "bytes": 9191
+        },
+        "required-tests-v31.json": {
+          "sha256": "588709a7153913033625246784cde12ec0f0543ee9215f7cff8e3c6457abca4e",
+          "bytes": 97275
+        },
+        "seal.py": {
+          "sha256": "768c84e8e70055e90722cf693003a6a17f630b82fe131d7b9c989be7ebf86dc0",
+          "bytes": 3518
+        },
+        "source-pins.json": {
+          "sha256": "2b07e9721882d2073b419d26b0dca4bd365c02460e1bed6d0f1c454ae524de4a",
+          "bytes": 825
+        },
+        "validation/expected.json": {
+          "sha256": "8ec400958ffb88b9d7ebe3f7aab4da02231c42f73e4af238a1148d592e3583b2",
+          "bytes": 7530
+        }
+      },
+      "aliases": {
+        "common/pcapx/pcaputil/closure-core/LICENSE": "LICENSE",
+        "common/pcapx/pcaputil/closure-core/answers/ipv4-udp-complete.json": "answers/ipv4-udp-complete.json",
+        "common/pcapx/pcaputil/closure-core/answers/ipv4-udp-offload-zero.json": "answers/ipv4-udp-offload-zero.json",
+        "common/pcapx/pcaputil/closure-core/answers/ipv6-udp-complete.json": "answers/ipv6-udp-complete.json",
+        "common/pcapx/pcaputil/closure-core/answers/ipv6-udp-offload-malformed-length.json": "answers/ipv6-udp-offload-malformed-length.json",
+        "common/pcapx/pcaputil/closure-core/answers/ipv6-udp-offload-zero.json": "answers/ipv6-udp-offload-zero.json",
+        "common/pcapx/pcaputil/closure-core/answers/tcp-half-close-late-client-data.json": "answers/tcp-half-close-late-client-data.json",
+        "common/pcapx/pcaputil/closure-core/answers/tcp-half-close-normal.json": "answers/tcp-half-close-normal.json",
+        "common/pcapx/pcaputil/closure-core/build.py": "build.py",
+        "common/pcapx/pcaputil/closure-core/cases/ipv4-udp-complete.pcap": "cases/ipv4-udp-complete.pcap",
+        "common/pcapx/pcaputil/closure-core/cases/ipv4-udp-offload-zero.pcap": "cases/ipv4-udp-offload-zero.pcap",
+        "common/pcapx/pcaputil/closure-core/cases/ipv6-udp-complete.pcap": "cases/ipv6-udp-complete.pcap",
+        "common/pcapx/pcaputil/closure-core/cases/ipv6-udp-offload-malformed-length.pcap": "cases/ipv6-udp-offload-malformed-length.pcap",
+        "common/pcapx/pcaputil/closure-core/cases/ipv6-udp-offload-zero.pcap": "cases/ipv6-udp-offload-zero.pcap",
+        "common/pcapx/pcaputil/closure-core/cases/tcp-half-close-late-client-data.pcap": "cases/tcp-half-close-late-client-data.pcap",
+        "common/pcapx/pcaputil/closure-core/cases/tcp-half-close-normal.pcap": "cases/tcp-half-close-normal.pcap",
+        "common/pcapx/pcaputil/closure-core/controls.json": "controls.json",
+        "common/pcapx/pcaputil/closure-core/required-tests-v31.json": "required-tests-v31.json",
+        "common/pcapx/pcaputil/closure-core/seal.py": "seal.py",
+        "common/pcapx/pcaputil/closure-core/source-pins.json": "source-pins.json",
+        "common/pcapx/pcaputil/closure-core/validation/expected.json": "validation/expected.json",
+        "scripts/protocol-tests/required-tests-v31.json": "required-tests-v31.json"
+      }
     }
   ],
   "schema_version": 1,
