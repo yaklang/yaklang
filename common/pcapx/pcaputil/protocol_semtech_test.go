@@ -74,7 +74,7 @@ func TestSemtechMalformedAndUnsupportedControls(t *testing.T) {
 		_, err := decodeSemtechDatagram(w, 64)
 		require.Error(t, err, body)
 	}
-	for _, w := range [][]byte{semtechTestWire(1, "x"), semtechTestWire(2, "x"), semtechTestWire(4, "x"), semtechTestWire(0, ""), {2, 1, 2, 2}, {1, 1, 2, 1}, {2, 1, 2, 6}, semtechTestWire(3, `{"txpk":{}}`), semtechTestWire(5, "")} {
+	for _, w := range [][]byte{semtechTestWire(1, "x"), semtechTestWire(2, "x"), semtechTestWire(4, "x"), semtechTestWire(0, ""), {2, 1, 2, 2}, {1, 1, 2, 1}, {2, 1, 2, 6}, semtechTestWire(3, `{"txpk":[]}`), {2, 0x12, 0x34, 5}} {
 		require.False(t, validSemtechDatagram(w))
 		_, err := decodeSemtechDatagram(w, 64)
 		require.Error(t, err)

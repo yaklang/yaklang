@@ -177,11 +177,11 @@ func TestProtocolSessionC37118CFGThenData(t *testing.T) {
 	s, err := NewProtocolSession(DefaultParserBudget())
 	require.NoError(t, err)
 	ts := time.Unix(1, 0)
-	cfg := c37frame(3, 1, 7, []byte{0, 0, 0, 1, 0, 0})
+	cfg := c37ControlCFG(1, 7, 0)
 	r := s.Feed(1, ts, cfg)
 	require.Nil(t, r.Err, "%v", r.Err)
 	require.Equal(t, "CFG-2", r.Events[0].Session["Packet Name"])
-	r = s.Feed(0, ts, c37frame(0, 1, 7, []byte{0, 0, 0, 0, 0, 0}))
+	r = s.Feed(1, ts, c37frame(0, 1, 7, []byte{0, 0, 0, 0, 0, 0}))
 	require.Nil(t, r.Err, "%v", r.Err)
 	require.Equal(t, "DATA", r.Events[0].Session["Packet Name"])
 	_, required := r.Events[0].Session["Configuration Required"]
@@ -204,7 +204,7 @@ func TestProtocolSessionC37118FailClosed(t *testing.T) {
 func TestProtocolSessionC37118Fragmentation(t *testing.T) {
 	steps := []sessionStep{
 		{0, c37frame(4, 1, 7, []byte{0, 2})},
-		{1, c37frame(3, 1, 7, []byte{0, 0, 0, 1, 0, 0})},
+		{1, c37ControlCFG(1, 7, 0)},
 	}
 	assertFragmentation(t, steps, func(chunk int) []string { return runMailNames(t, steps, chunk) })
 }

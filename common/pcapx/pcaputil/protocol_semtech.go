@@ -17,8 +17,8 @@ import (
 
 // This profile describes observed Semtech packet-forwarder v2 datagrams. The
 // gateway identifier and random token do not authenticate or correlate peers.
-// RF payloads remain opaque; LoRaWAN PHY/MAC and downstream transmission are
-// outside this profile.
+// RF payloads remain opaque. Downlink fields are a separate observation profile;
+// LoRaWAN PHY/MAC and radio transmission are not inferred.
 func validSemtechDatagram(w []byte) bool {
 	_, err := decodeSemtechDatagram(w, DefaultParserBudget().MaxCollectionElements)
 	return err == nil
@@ -57,7 +57,7 @@ func decodeSemtechDatagram(w []byte, maxElements int) (map[string]any, error) {
 		}
 		f["Packet Name"], f["Gateway EUI"] = "PUSH_DATA", hex.EncodeToString(w[4:12])
 	case 3, 5:
-		return nil, protocolError(ErrUnsupportedFeature, "Semtech downstream is outside upstream datagram profile")
+		return decodeSemtechDownlink(w, maxElements)
 	default:
 		return nil, semtechMalformed("identifier is invalid")
 	}

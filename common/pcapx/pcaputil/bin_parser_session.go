@@ -17,6 +17,16 @@ func (f *binFlow) detectDirection(dir int, wire []byte) {
 	if f.detectBinding(wire) {
 		return
 	}
+	if p := probeSLMPTCP(wire, min(f.a.budget.MaxFrameBytes, f.a.config.MaxMessageBytes), f.port(5000)); p.Verdict == ProbeAccept {
+		client := dir
+		if f.tcpClientKnown {
+			client = f.tcpClientDir
+		}
+		f.protocol, f.slmpTCP = "slmp", &binSLMPTCP{clientDir: client}
+		return
+	} else if p.Verdict == ProbeNeedMore {
+		return
+	}
 	if len(wire) > 0 && wire[0] == 1 {
 		if p := probeATG(wire, f.a.budget.MaxFrameBytes); p.Verdict == ProbeAccept {
 			f.protocol, f.atg = "atg", &binATG{clientDir: f.tcpClientDir, clientKnown: f.tcpClientKnown, maxElements: f.a.budget.MaxCollectionElements}
@@ -25,12 +35,24 @@ func (f *binFlow) detectDirection(dir int, wire []byte) {
 			return
 		}
 	}
+	if wrapperPortStart(wire, f.ports) || f.a.probeWrapper(wire).Verdict == ProbeAccept {
+		f.protocol, f.wrapper = "dlms-wrapper", &binDLMSWrapper{}
+		return
+	} else if wrapperIncompletePrefix(wire, min(f.a.budget.MaxFrameBytes, f.a.config.MaxMessageBytes)) {
+		return
+	}
 	if probeRDP(wire, f.a.budget.MaxFrameBytes).Verdict == ProbeAccept {
 		f.protocol, f.rdp = "rdp", &binRDP{client: dir}
 		return
 	}
 	if p := probeS7(wire, f.a.budget.MaxFrameBytes); p.Verdict == ProbeAccept {
 		f.protocol, f.s7 = "s7comm", &binS7{}
+		return
+	} else if p.Verdict == ProbeNeedMore {
+		return
+	}
+	if p := probeDLMS(wire, f.a.budget.MaxFrameBytes); p.Verdict == ProbeAccept {
+		f.protocol, f.dlms = "dlms", &binDLMS{clientDir: f.tcpClientDir, clientKnown: f.tcpClientKnown}
 		return
 	} else if p.Verdict == ProbeNeedMore {
 		return
@@ -149,6 +171,8 @@ func (f *binFlow) detectDirection(dir int, wire []byte) {
 			client = 1 - dir
 		}
 		f.protocol, f.memcached = "memcached", newBinMemcached(client, p.Version, f.a.budget.MaxCollectionElements, f.reserveSession)
+	case "dlms":
+		f.protocol, f.dlms = "dlms", &binDLMS{clientDir: f.tcpClientDir, clientKnown: f.tcpClientKnown}
 	case "genisys":
 		f.protocol, f.genisys = "genisys", newBinGenisys(dir, wire)
 	case "roc-plus":
@@ -324,6 +348,20 @@ func (f *binFlow) needsMoreOpenWire(wire []byte) bool {
 func (f *binFlow) consumeSession(dir int, e *ProtocolEvent, result map[string]any) error {
 	var err error
 	switch f.protocol {
+	case "slmp":
+		if e.ID == 0 {
+			e.ID = f.a.ids.Add(1)
+		}
+		e.Profile, e.Completeness = slmpTCPProfile, "message"
+		e.Session, e.ResponseTo, err = f.slmpTCP.consume(e.Raw, dir, e.ID, f.a.budget.MaxCollectionElements, f.a.budget.MaxRecursionDepth)
+		if err == nil {
+			e.semanticFields = cloneSession(e.Session)
+			if e.ResponseTo != 0 {
+				e.TransactionID = e.ResponseTo
+			} else {
+				e.TransactionID = f.slmpTCP.requestID(e.Raw, e.ID)
+			}
+		}
 	case "vnc":
 		e.Session, err = f.rfb.consume(dir, e.Raw, f.a.budget.MaxCollectionElements, f.a.budget.MaxMessageBytes)
 	case "diameter":
@@ -520,7 +558,8 @@ func (f *binFlow) consumeSession(dir int, e *ProtocolEvent, result map[string]an
 	case "dnp3":
 		e.Session, err = f.dnp3.consume(e.Raw)
 	case "c37118":
-		e.Session, err = f.c37118.consume(e.Raw)
+		e.Profile = "c37118-v1-v2-cfg2-data"
+		e.Session, err = f.consumeC37118(dir, e.Raw)
 	case "goose":
 		e.Session, err = f.goose.consume(e.Raw)
 	case "memcached":
@@ -536,6 +575,21 @@ func (f *binFlow) consumeSession(dir int, e *ProtocolEvent, result map[string]an
 		if err == nil {
 			e.semanticFields = cloneSession(e.Session)
 			e.Profile, e.Completeness = "atg-tls450-i201", "message"
+		}
+	case "dlms-wrapper":
+		if e.ID == 0 {
+			e.ID = f.a.ids.Add(1)
+		}
+		e.Profile, e.Completeness = "dlms-wrapper-v1-get-normal", "message"
+		err = f.consumeWrapper(dir, e.Raw, e)
+	case "dlms":
+		if e.ID == 0 {
+			e.ID = f.a.ids.Add(1)
+		}
+		e.Profile, e.Completeness = "dlms-hdlc-get-normal", "message"
+		e.Session, e.ResponseTo, err = f.consumeDLMS(dir, e.Raw, e.ID)
+		if err == nil {
+			e.semanticFields = cloneSession(e.Session)
 		}
 	case "genisys":
 		e.Session, err = f.genisys.consume(dir, e.Raw, f.a.budget.MaxCollectionElements)
@@ -797,6 +851,11 @@ func (f *binFlow) closeSession() {
 	f.genisys = nil
 	f.rocplus = nil
 	f.bsap = nil
+	f.pfcp = nil
+	f.slmp = nil
+	f.slmpTCP = nil
+	f.dlms = nil
+	f.wrapper = nil
 	if f.memcached != nil {
 		f.memcached.close()
 		f.memcached = nil
@@ -944,6 +1003,15 @@ func (f *binFlow) finishSession(reason TrafficFlowCloseReason) {
 	}
 	if a := f.atg; a != nil && a.outstanding() > 0 {
 		emit(a.clientDir, map[string]any{"Outstanding": a.outstanding()}, "ATG exchange ended with unmatched requests")
+	}
+	if s := f.slmpTCP; s != nil && s.outstanding() > 0 {
+		emit(s.clientDir, map[string]any{"Outstanding": s.outstanding()}, "SLMP TCP exchange ended with unmatched observed requests")
+	}
+	if w := f.wrapper; w != nil && w.outstanding() > 0 {
+		emit(0, map[string]any{"Outstanding": w.outstanding()}, "DLMS Wrapper exchange ended with unmatched observed requests")
+	}
+	if d := f.dlms; d != nil && d.pending != nil {
+		emit(d.pending.dir, map[string]any{"Outstanding": 1}, "DLMS HDLC exchange ended with an unmatched request")
 	}
 	if r := f.rocplus; r != nil && r.pending != nil {
 		emit(r.clientDir, map[string]any{"Outstanding": 1}, "ROC Plus clock exchange ended with an unmatched request")

@@ -41,6 +41,7 @@ EtherCATDatagram:
     this.ProcessSubNode("Length Flags")
     flags = getNodeResult("Length Flags").Value
     length = flags & 0x07ff
+    if length > 1486 { panic("ethercat: datagram data exceeds 1486 octets") }
     if (flags & 0x3800) != 0 { panic("ethercat: reserved datagram flags are nonzero") }
     this.ProcessSubNode("Interrupt")
     if length + 2 > this.GetMaxLength() - this.Length() { panic("ethercat: datagram length exceeds frame") }

@@ -2,6 +2,7 @@ package stream_parser
 
 import (
 	"encoding/binary"
+	"errors"
 	"fmt"
 	"math"
 )
@@ -89,7 +90,18 @@ func c37118CRC(wire []byte) uint16 {
 	return crc
 }
 
+// ErrC37118CollectionLimit identifies a rejection before collection allocation.
+var ErrC37118CollectionLimit = errors.New("c37118: collection budget exceeded")
+
+// DecodeC37118Message validates a complete frame with caller-selected CFG-2.
+// The caller owns both input slices; no returned value aliases either input.
+func DecodeC37118Message(wire, configuration []byte, maxElements int) (*C37118Message, error) {
+	return decodeC37118Limited(wire, configuration, maxElements)
+}
 func decodeC37118Frame(wire, configuration []byte) (*C37118Message, error) {
+	return decodeC37118Limited(wire, configuration, 4096)
+}
+func decodeC37118Limited(wire, configuration []byte, maxElements int) (*C37118Message, error) {
 	if len(wire) < 16 || len(wire) > 65535 {
 		return nil, fmt.Errorf("c37118: invalid frame size")
 	}
@@ -119,7 +131,7 @@ func decodeC37118Frame(wire, configuration []byte) (*C37118Message, error) {
 		m.HeaderText, m.BodyDecoded = string(body), true
 	case 2, 3:
 		var err error
-		m.Configuration, err = c37118ReadConfiguration(body)
+		m.Configuration, err = c37118ReadConfiguration(body, maxElements)
 		if err != nil {
 			return nil, err
 		}
@@ -147,7 +159,7 @@ func decodeC37118Frame(wire, configuration []byte) (*C37118Message, error) {
 			m.OpaqueBody = append([]byte(nil), body...)
 			break
 		}
-		cfg, err := decodeC37118Frame(configuration, nil)
+		cfg, err := decodeC37118Limited(configuration, nil, maxElements)
 		if err != nil {
 			return nil, fmt.Errorf("c37118: invalid configuration context: %w", err)
 		}
@@ -167,7 +179,7 @@ func decodeC37118Frame(wire, configuration []byte) (*C37118Message, error) {
 	return m, nil
 }
 
-func c37118ReadConfiguration(body []byte) (*C37118Configuration, error) {
+func c37118ReadConfiguration(body []byte, maxElements int) (*C37118Configuration, error) {
 	if len(body) < 8 {
 		return nil, fmt.Errorf("c37118: truncated configuration header")
 	}
@@ -178,6 +190,10 @@ func c37118ReadConfiguration(body []byte) (*C37118Configuration, error) {
 	if c.TimeBase == 0 || count == 0 || count > (len(body)-8)/30 {
 		return nil, fmt.Errorf("c37118: invalid time base or PMU count")
 	}
+	if maxElements < 1 || count > maxElements {
+		return nil, ErrC37118CollectionLimit
+	}
+	elements := count
 	pos := 6
 	for i := 0; i < count; i++ {
 		if len(body)-pos < 32 {
@@ -189,6 +205,10 @@ func c37118ReadConfiguration(body []byte) (*C37118Configuration, error) {
 		need := (ph+an)*20 + dg*260 + 4
 		if need > len(body)-pos-2 {
 			return nil, fmt.Errorf("c37118: channel counts exceed configuration boundary")
+		}
+		elements += ph + an + dg*16
+		if elements > maxElements {
+			return nil, ErrC37118CollectionLimit
 		}
 		for j := 0; j < ph; j++ {
 			p.PhasorNames = append(p.PhasorNames, string(body[pos:pos+16]))

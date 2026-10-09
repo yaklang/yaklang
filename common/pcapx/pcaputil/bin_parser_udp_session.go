@@ -438,6 +438,8 @@ func (a *binParser) finishProtocolDatagram(e *ProtocolEvent, w []byte, spec *bin
 			a.contextRequired.Add(1)
 		} else if e.Status == "limited" {
 			a.limited.Add(uint64(len(w)))
+		} else if e.Status == "incomplete" {
+			a.incomplete.Add(1)
 		} else {
 			a.malformed.Add(1)
 		}

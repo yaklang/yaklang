@@ -85,6 +85,12 @@ func probeDatagram(raw []byte, maxBytes int) ProbeResult {
 	if len(raw) > maxBytes {
 		return ProbeResult{Verdict: ProbeReject, Reason: "datagram exceeds configured byte limit"}
 	}
+	if dlmsRequestEvidence(raw) {
+		return probeAccept("dlms", "hdlc-get-normal", 98)
+	}
+	if slmpRequestEvidence(raw) {
+		return probeAccept("slmp", "slmp-binary-self-test", 98)
+	}
 	if bsapEvidence(raw) {
 		if _, err := decodeBSAPMessage(raw, DefaultParserBudget().MaxCollectionElements); err == nil {
 			return probeAccept("bsap", "serial-local-rdb-name-2022", 98)
@@ -214,6 +220,9 @@ func cassandraRequestEvidence(w []byte, maxBytes int) bool {
 }
 
 func initialProtocolNeedMore(w []byte, maxBytes int) ProbeResult {
+	if p := probeDLMS(w, maxBytes); p.Verdict == ProbeNeedMore {
+		return p
+	}
 	if p := probeGenisys(w, maxBytes); p.Verdict == ProbeNeedMore {
 		return p
 	}

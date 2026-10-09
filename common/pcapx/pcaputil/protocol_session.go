@@ -163,6 +163,12 @@ func NewProtocolSessionWithOptions(budget ParserBudget, options ...ProtocolSessi
 			return nil, err
 		}
 	}
+	if b := s.f.a.pfcpSessionIdentity; b != nil {
+		if s.transport != "udp" {
+			return nil, fmt.Errorf("PFCP receiver identity requires a UDP session")
+		}
+		b.endpoints = s.f.endpoints
+	}
 	if s.transport == "udp" && s.f.tcpClientKnown {
 		return nil, fmt.Errorf("TCP initiator direction cannot be set on a UDP session")
 	}
@@ -188,6 +194,18 @@ func NewDecryptedQUICSession(budget ParserBudget, source string) (ProtocolSessio
 
 func (s *captureSession) Probe(data []byte) ProbeResult {
 	if s.transport == "udp" {
+		if p, ok := s.probeSemtechDownlink(data); ok {
+			return p
+		}
+		if p, ok := s.probeDoIPDiscovery(data); ok {
+			return p
+		}
+		if p := s.f.a.probeWrapperDatagram(data); p.Verdict == ProbeAccept {
+			return p
+		}
+		if p, ok := s.probeDiscovery(data); ok {
+			return p
+		}
 		return probeDatagram(data, s.f.a.budget.MaxFrameBytes)
 	}
 	limit := s.f.a.config.ProbeBytes
@@ -195,6 +213,9 @@ func (s *captureSession) Probe(data []byte) ProbeResult {
 		limit = 64
 	}
 	input := data
+	if p := probeSLMPTCP(input, min(s.f.a.budget.MaxFrameBytes, s.f.a.config.MaxMessageBytes), s.f.port(5000)); p.Verdict != ProbeReject {
+		return p
+	}
 	if s.f.tcpClientKnown && len(input) > 0 && input[0] == 1 {
 		if p := probeATG(input, s.f.a.budget.MaxFrameBytes); p.Verdict != ProbeReject {
 			return p
@@ -207,6 +228,12 @@ func (s *captureSession) Probe(data []byte) ProbeResult {
 		if p.Verdict == ProbeNeedMore && len(input) >= 4 && int(binary.BigEndian.Uint16(input[2:4])) == len(input) {
 			return ProbeResult{Verdict: ProbeReject, Reason: "COTP carrier alone does not establish S7"}
 		}
+		return p
+	}
+	if p := s.f.a.probeWrapper(input); p.Verdict != ProbeReject {
+		return p
+	}
+	if p := probeDLMS(input, s.f.a.budget.MaxFrameBytes); p.Verdict != ProbeReject {
 		return p
 	}
 	if p := probeGenisys(input, s.f.a.budget.MaxFrameBytes); p.Verdict != ProbeReject {
@@ -302,6 +329,7 @@ func (s *captureSession) Close(reason string) []*ProtocolEvent {
 	s.events = nil
 	s.f.close(TrafficFlowCloseReason(reason))
 	s.f.a.closeUDPSessions()
+	s.f.a.closeDCPObservations()
 	s.f.a.closeMediaAssociations()
 	s.f.a.closeRTSPMedia()
 	s.f.a.flows.Store(0)
@@ -342,7 +370,7 @@ func (f *binFlow) hasSession() bool {
 	if f.protocol == "nats" {
 		return true // NATS allocates its budgeted negotiation state at consumption.
 	}
-	return f.tls != nil || f.dnp3 != nil || f.c37118 != nil || f.goose != nil || f.syslog != nil || f.rfb != nil || f.diameter != nil || f.iec104 != nil || f.s7 != nil || f.opcua != nil || f.ipp != nil || f.rtsp != nil || f.stun != nil || f.h2 != nil || f.mysql != nil || f.pg != nil || f.ws != nil || f.ldap != nil || f.redis != nil || f.mqtt != nil || f.nats != nil || f.mongo != nil || f.kafka != nil || f.tds != nil || f.amqp != nil || f.smb2 != nil || f.dcerpc != nil || f.ssh != nil || f.nfs != nil || f.snmp != nil || f.rdp != nil || f.dot != nil || f.doh != nil || f.sip != nil || f.rtp != nil || f.quic != nil || f.smtp != nil || f.imap != nil || f.pop3 != nil || f.ftp != nil || f.tns != nil || f.socks5 != nil || f.scgi != nil || f.msgpackRPC != nil || f.textInternet != nil || f.radius != nil || f.dhcp != nil || f.ntp != nil || f.coap != nil || f.modbus != nil || f.memcached != nil || f.enip != nil || f.doip != nil || f.genisys != nil || f.rocplus != nil || f.atg != nil || f.stratum != nil || f.gearman != nil || f.beanstalk != nil || f.zookeeper != nil || f.clickhouse != nil || f.stomp != nil
+	return f.slmpTCP != nil || f.wrapper != nil || f.tls != nil || f.dnp3 != nil || f.c37118 != nil || f.goose != nil || f.syslog != nil || f.rfb != nil || f.diameter != nil || f.iec104 != nil || f.s7 != nil || f.opcua != nil || f.ipp != nil || f.rtsp != nil || f.stun != nil || f.h2 != nil || f.mysql != nil || f.pg != nil || f.ws != nil || f.ldap != nil || f.redis != nil || f.mqtt != nil || f.nats != nil || f.mongo != nil || f.kafka != nil || f.tds != nil || f.amqp != nil || f.smb2 != nil || f.dcerpc != nil || f.ssh != nil || f.nfs != nil || f.snmp != nil || f.rdp != nil || f.dot != nil || f.doh != nil || f.sip != nil || f.rtp != nil || f.quic != nil || f.smtp != nil || f.imap != nil || f.pop3 != nil || f.ftp != nil || f.tns != nil || f.socks5 != nil || f.scgi != nil || f.msgpackRPC != nil || f.textInternet != nil || f.radius != nil || f.dhcp != nil || f.ntp != nil || f.coap != nil || f.modbus != nil || f.memcached != nil || f.enip != nil || f.doip != nil || f.genisys != nil || f.dlms != nil || f.rocplus != nil || f.atg != nil || f.stratum != nil || f.gearman != nil || f.beanstalk != nil || f.zookeeper != nil || f.clickhouse != nil || f.stomp != nil
 }
 
 func (f *binFlow) mailLike() bool {
@@ -374,6 +402,9 @@ func probeWireTransport(w []byte, limit int, tcp bool) ProbeResult {
 		return memcached
 	}
 	if tcp {
+		if p := probeDLMS(w, limit); p.Verdict != ProbeReject {
+			return p
+		}
 		if p := probeROCPlus(w, limit); p.Verdict != ProbeReject {
 			return p
 		}

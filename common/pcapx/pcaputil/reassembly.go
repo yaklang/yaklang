@@ -56,6 +56,7 @@ type TrafficConnection struct {
 	currentSeq           uint32
 	waitACK              bool
 	initialed            bool
+	synSeen              bool
 	initHttpPacketDirect bool
 	isHttpRequestConn    bool
 }
@@ -157,6 +158,7 @@ func (t *TrafficConnection) Release() {
 	t.finSeq, t.finSeen = 0, false
 	t.resetPending, t.resetSeq = false, 0
 	t.waitACK, t.initialed, t.initHttpPacketDirect, t.isHttpRequestConn = false, false, false, false
+	t.synSeen = false
 
 	connectionPool.Put(t)
 }
@@ -343,6 +345,18 @@ func (t *TrafficConnection) pendingConflict(i int, seq uint32, payload []byte) b
 // FeedClient and FeedServer share the passive receive algorithm. Each direction
 // can start midstream; SYN retransmits never reset an established cursor.
 func (t *TrafficConnection) FeedClient(tcp *layers.TCP, ts time.Time) {
+	// Before a new connection has a reverse cursor, a late ACK from the previous
+	// use of this tuple must not close it or supply that cursor. RFC 9293 3.10.7.3
+	// rejects ACK <= ISS and non-SYN segments without ACK in SYN-SENT.
+	// Apply this only to an observed opening SYN; midstream captures and simultaneous open remain
+	// usable. An upper SND.NXT bound is not inferred from a passive capture,
+	// which may have omitted outgoing bytes.
+	if t.Flow != nil && t == t.Flow.ServerConn && !t.Flow.IsHalfOpen && !t.initialed &&
+		t.Flow.ClientConn.synSeen {
+		if (!tcp.ACK && !tcp.SYN) || (tcp.ACK && !seqBefore(t.Flow.ClientConn.isn, tcp.Ack)) {
+			return
+		}
+	}
 	if t.IsClosed() {
 		// FIN closes one direction. A later in-sequence RST still closes the
 		// whole flow, allowing a subsequent SYN to reuse this four-tuple.
@@ -386,6 +400,7 @@ func (t *TrafficConnection) FeedClient(tcp *layers.TCP, ts time.Time) {
 		if !t.initialed {
 			t.initialed, t.isn, t.nextSeq = true, tcp.Seq, seq
 		}
+		t.synSeen = true
 	}
 	if !t.initialed {
 		if len(tcp.Payload) == 0 && !tcp.FIN {
