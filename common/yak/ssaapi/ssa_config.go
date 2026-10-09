@@ -50,7 +50,10 @@ type Config struct {
 	// process ctx
 	ctx context.Context
 
-	excludeFile ExcludeFunc
+	// excludeMatcher merges user-configured exclude patterns with the built-in
+	// default compile excludes (unless disabled via WithDisableDefaultCompileExcludes);
+	// built in DefaultConfig and applied by ScanProjectFiles.
+	excludeMatcher ExcludeFunc
 
 	logLevel string
 
@@ -90,10 +93,6 @@ func CompileExcludeFunc(extraPatterns []string, basePath string) ExcludeFunc {
 	return ssaconfig.BuildCompileExcludeFunc(extraPatterns, basePath, true)
 }
 
-func resolveCompileExcludeFunc(exclude ExcludeFunc) ExcludeFunc {
-	return ssaconfig.ResolveCompileExcludeFunc(exclude)
-}
-
 func (c *Config) Processf(process float64, format string, arg ...any) {
 	msg := fmt.Sprintf(format, arg...)
 	if c.process != nil {
@@ -114,11 +113,18 @@ var WithLogLevel = ssaconfig.SetOption("ssa_compile/log_level", func(c *Config, 
 
 var WithCacheTTL = ssaconfig.WithCompileIrCacheTTL
 
-var WithExcludeFunc = ssaconfig.WithCompileExcludeFiles
+// WithUserExcludePatterns sets the user-configured exclude patterns. These are
+// distinct from the built-in default compile excludes (see
+// WithDisableDefaultCompileExcludes): user patterns always apply, and the two
+// lists are merged by BuildCompileExcludeFunc.
+var WithUserExcludePatterns = ssaconfig.WithCompileExcludeFiles
 
-// WithExcludeFile is kept for backward compatibility; internally it forwards to
-// the compile-time exclude files option.
-var WithExcludeFile = ssaconfig.WithCompileExcludeFiles
+// WithExcludeFunc and WithExcludeFile are kept for backward compatibility;
+// internally they forward to the user exclude patterns option.
+var (
+	WithExcludeFunc = ssaconfig.WithCompileExcludeFiles
+	WithExcludeFile = ssaconfig.WithCompileExcludeFiles
+)
 
 // WithDisableDefaultCompileExcludes 禁用内置默认编译排除项（测试 fixtures、
 // 构建产物、依赖归档等），仅保留用户显式提供的排除模式。恢复内置排除项
@@ -356,7 +362,7 @@ func DefaultConfig(opts ...ssaconfig.Option) (*Config, error) {
 	if sc.SSACompile != nil {
 		userExclude = sc.SSACompile.ExcludeFiles
 	}
-	c.excludeFile = ssaconfig.BuildCompileExcludeFunc(userExclude, sc.GetCodeSourceLocalFile(), !sc.GetCompileDisableDefaultExcludes())
+	c.excludeMatcher = ssaconfig.BuildCompileExcludeFunc(userExclude, sc.GetCodeSourceLocalFile(), !sc.GetCompileDisableDefaultExcludes())
 	ssaconfig.ApplyExtraOptions(c, c.Config)
 
 	// 只有当 c.fs 为 nil 时，才从配置中解析文件系统

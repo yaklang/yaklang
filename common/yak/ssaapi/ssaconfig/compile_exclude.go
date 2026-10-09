@@ -219,8 +219,10 @@ func DefaultCompileExcludePatterns() []string {
 	return patterns
 }
 
-// ShouldSkipCompileDirName reports whether a directory base name is excluded by default.
-func ShouldSkipCompileDirName(name string) bool {
+// IsDefaultCompileExcludeDirName reports whether a directory base name is in the
+// built-in default exclude list (DefaultCompileExcludeDirNames). User-configured
+// patterns are not consulted here.
+func IsDefaultCompileExcludeDirName(name string) bool {
 	for _, dir := range DefaultCompileExcludeDirNames {
 		if name == dir {
 			return true
