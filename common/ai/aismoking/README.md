@@ -87,6 +87,8 @@ yak common/ai/aismoking/forge.yak
 
 可选案例已归档到新位置，不表示本次执行过真实模型或安装了其外部依赖。新冒烟例都添加到这里，并把确定性案例登记到 `run.yak`。`mock.inc` 和 `cache/lib.inc` 是 include 支持文件，不冒充可运行测试。
 
+- [http_packet_history.yak](http_packet_history.yak)：`aim.InvokeReAct` 的文本流和 function-call 两种协议依次调用项目列表、HTTP 历史查询、精确 ID 获取及文件 grep，核对默认工具展示、Skill 自动加载、原始请求和完整大响应导出。使用 `AISMOKING_CASE=http_packet_history` 从总入口运行，仅供本地开发。
+
 ## 收集与清理范围
 
 已收集原 Coordinator 的 6 个 Yak 入口、Go `live_runner` 的综合实验、LiteForge 的注入式及直接入口、liteforgeapp 的应用案例、Forge 全流程案例、缓存脚本、17 个循环示例、2 个视频案例和 3 个 AI engine benchmark。注入式 `.yak` 和 Go live runner 已删除；原内部断言保留为普通 Go 回归，公共调用矩阵由此套件承接。VM 配置绑定仍有窄范围 Go 单元测试，不再用外部注入式业务脚本执行计划。

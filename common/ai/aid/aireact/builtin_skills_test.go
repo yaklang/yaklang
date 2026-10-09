@@ -31,6 +31,7 @@ var allBuiltinSkills = []struct {
 	{"how-to-use-browser", "skills/how-to-use-browser/SKILL.md", []string{"snapshot", "click", "fill", "screenshot", "CDP"}},
 	{"authorization-bypass", "skills/authorization-bypass/SKILL.md", []string{"IDOR", "WSTG-ATHZ-02", "Horizontal", "Vertical", "do_http_request"}},
 	{"java-audit", "skills/java-audit/SKILL.md", []string{"java_project_probe", "java_audit", "RuoYi", "spring_boot", "scope-modules"}},
+	{"http-packet-history", "skills/http-packet-history/SKILL.md", []string{"db.ListYakProjects", "db.QueryHTTPFlows", "db.QueryHTTPFlowByID", "database_id", "response_file"}},
 	{"ai-history-memory", "skills/ai-history-memory/SKILL.md", []string{"aihistory.Query", "aimemory.Search", "item.Dump()", "grep_timeline_history"}},
 	{"fuzztag", "skills/fuzztag/SKILL.md", []string{"fuzz.Strings", "笛卡尔积", "同步配对"}},
 	{"fuzztag-reference", "skills/fuzztag-reference/SKILL.md", []string{"exec_fuzztag", "codecflow", "params", "别名"}},

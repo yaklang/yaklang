@@ -1,0 +1,91 @@
+// yak common/ai/aismoking/http_packet_history.yak with a disposable YAKIT_HOME,
+// or AISMOKING_CASE=http_packet_history yak common/ai/aismoking/run.yak.
+// Real aim, SQLite, embedded tools and file grep; only model decisions are mocked.
+include "common/ai/aismoking/mock.inc"
+assert os.Getenv("YAKIT_HOME") != "", "Use a disposable home"
+config, operator, seeded, cursor, awaiting = nil,nil,false,0,false
+artifactDirs, results, flowID, responseFile = {}, [], 0, ""
+plan = ["list_yak_projects", "query_http_packet_history", "fetch_http_packet_by_id", "grep"]
+smallRequest = "POST /api/orders HTTP/1.1\r\nHost: fixture.example\r\n\r\n{\"note\":\"原始引号\"}\n第二行"
+largeResponse = "HTTP/1.1 403 Forbidden\r\nContent-Type: application/json\r\n\r\n" + str.Repeat("fixture-data\n",10000) + "LATE-HTTP-EVIDENCE \"CSRF token missing\"\n"
+func seed() {
+    if seeded { return }
+    row=config.GetDB().Exec("INSERT INTO http_flows(hash,url,method,status_code,source_type,request,response,created_at,updated_at) VALUES(?,?,?,?,?,?,?,datetime('now'),datetime('now'))",randstr(16),"https://fixture.example/api/orders","POST",403,"mitm",codec.StrconvQuote(smallRequest),codec.StrconvQuote(largeResponse))
+    assert row.Error==nil, string(row.Error)
+    page=db.QueryHTTPFlows(db.url("fixture.example/api/orders"),db.limit(1))~
+    assert len(page.Items)==1
+    flowID=page.Items[0].ID
+    seeded=true
+}
+func checkPrevious() {
+    calls=operator.GetCurrentTask().GetAllToolCallResults()
+    assert len(calls)==cursor
+    actual=calls[len(calls)-1]
+    assert actual.Success && actual.Name==plan[cursor-1]
+    directory=""
+    for i=0;i<100;i++ { smokeMutex.Lock();directory=artifactDirs[actual.ToolCallID];smokeMutex.Unlock();if directory!=nil && directory!="" {break};time.Sleep(0.01) }
+    assert directory!=nil && directory!=""
+    manifest=json.loads(string(file.ReadFile(file.Join(directory,"manifest.json"))~))
+    assert manifest.success && manifest.files.result.bytes==0, "tools must use stdout"
+    text=string(file.ReadFile(manifest.files.stdout.path)~)
+    if actual.Name=="list_yak_projects" {
+        assert "database_id=" in text && "current=true" in text && "size_bytes=" in text && "last_operation_at=" in text
+    } elif actual.Name=="query_http_packet_history" {
+        assert sprintf("http_flow_id=%d",flowID) in text && smallRequest in text
+        assert "response omitted:" in text && !("LATE-HTTP-EVIDENCE" in text)
+    } elif actual.Name=="fetch_http_packet_by_id" {
+        assert smallRequest in text && "response_file=" in text && "Use grep or read_file" in text
+        for line in str.Split(text,"\n") {
+            if str.HasPrefix(line,"response_file=") { responseFile=str.Split(str.TrimPrefix(line,"response_file=")," bytes=")[0] }
+        }
+        assert responseFile!="" && string(file.ReadFile(responseFile)~)==largeResponse
+    } else {
+        assert "LATE-HTTP-EVIDENCE" in text && `"CSRF token missing"` in text
+    }
+    awaiting=false
+}
+smokeHandler=func(w,body) {
+    native,prompt=len(body.tools)>0,smokePrompt(body)
+    if "SMOKE_CALLER:liteforge[session-title-generator]" in prompt { smokeAnswer(w,native,"session-title-generator",{"session_title":"HTTP 历史调查"});return }
+    if "SMOKE_CALLER:directly-answer" in prompt {
+        smokeAnswer(w,false,"directly_answer",{"answer_payload":"已从 HTTP 历史取回原始请求，完整响应文件中确认 CSRF 错误。"});return
+    }
+    if "SMOKE_CALLER:liteforge[perception]" in prompt {
+        smokeAnswer(w,false,"perception",{"summary":"HTTP 历史及文件证据已核验。","topics":["HTTP"],"keywords":["CSRF"],"changed":true,"confidence":1});return
+    }
+    if "SMOKE_CALLER:verification" in prompt {
+        w.Header().Set("Content-Type","text/event-stream")
+        smokeFrame(w,{"content":`{"@action":"verify-satisfaction","user_satisfied":true,"reasoning":"三工具与文件搜索均通过。","evidence":[]}`},"stop")
+        w.Write("data: [DONE]\n\n")~;return
+    }
+    assert "SMOKE_CALLER:react-loop:default" in prompt || "SMOKE_CALLER:react-loop:main" in prompt
+    assert "项目与 HTTP 历史" in prompt && "db.ListYakProjects" in prompt, "built-in skill must auto-load"
+    for name in plan { assert name in prompt, "missing default tool "+name }
+    seed()
+    if awaiting { checkPrevious() }
+    if cursor==len(plan) { smokeAnswer(w,native,"finish",{});return }
+    name=plan[cursor]
+    if native && !config.GetAiToolManager().IsRecentlyUsedTool(name) { smokeAnswer(w,native,"require_tool",{"require_tool_payload":name});return }
+    params={"limit":5}
+    if name=="query_http_packet_history" { params={"url":"fixture.example/api/orders","methods":"POST","status_code":"400-499","limit":1} }
+    if name=="fetch_http_packet_by_id" { params={"id":flowID,"output_dir":smokeRoot} }
+    if name=="grep" { params={"path":responseFile,"pattern":"LATE-HTTP-EVIDENCE","pattern-mode":"substr","context-buffer":80,"limit":1} }
+    cursor++;awaiting=true
+    smokeAnswer(w,native,"directly_call_tool",{"directly_call_tool_name":name,"directly_call_tool_params":params,"directly_call_reason":"核验项目、HTTP 原文与完整文件证据"})
+}
+for native in [false,true] {
+    config,operator,seeded,cursor,awaiting,responseFile=nil,nil,false,0,false,""
+    // Each mode gets a fresh flow so a repeated suite run cannot pick older data.
+    die(aim.InvokeReAct("列出当前 Yaklang 项目，查询 fixture.example 的 POST 认证失败历史，按 ID 取回原始报文；大响应导出后搜索 LATE-HTTP-EVIDENCE。",aim.sessionID("http-history-"+randstr(12)),aim.context(smokeCtx),aim.workdir(smokeRoot),aim.reviewPolicy("yolo"),aim.maxIteration(14),aim.timeout(90),aim.disableMCPServers(true),aim.disableAIForge(true),aim.aiCallback(smokeModel),aim.onEvent(func(op,e){
+        config,operator=op.GetConfig(),op
+        if string(e.Type)=="tool_call_log_dir" { info=json.loads(string(e.Content));smokeMutex.Lock();artifactDirs[info.call_tool_id]=file.Join(info.dir_path,"..");smokeMutex.Unlock() }
+    }),aim.configOptions(aiagent.aiCallback(smokeModel),aiagent.functionCallMode(native),func(c){
+        c.DisablePerception,c.DisableMemoryTriage,c.DisableIntervalReview=true,true,true
+        c.AiAutoRetry,c.AiTransactionAutoRetry=1,1
+        return nil
+    })))
+    assert cursor==len(plan) && !awaiting
+    results=append(results,{"function_call":native,"tool_calls":cursor,"passed":true})
+    file.SaveJson(file.Join(smokeRoot,"task-results.json"),results)~
+}
+smokeCheck()

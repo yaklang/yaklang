@@ -1,0 +1,34 @@
+__DESC__ = "Query stored HTTP flows in the current runtime project database or a database_id returned by list_yak_projects. Show IDs, URLs and bounded raw requests/responses on stdout, with pagination and packet fetch guidance."
+__VERBOSE_NAME__ = "Query HTTP Packet History"
+__VERBOSE_NAME_ZH__ = "查询 HTTP 报文历史"
+__KEYWORDS__ = "http,history,flow,packet,request,response,数据库,流量,历史"
+__USAGE__ = <<<USAGE
+不传 database_id 默认查询本次 AI 运行绑定的当前库；查询其他项目须先 list_yak_projects，使用其 database_id，以只读方式查询。id 只在对应数据库内有效。
+query 是引擎 HTTPFlow 全字段关键字过滤（数据库存储的请求、响应、URL 等），url 是 URL 子串，methods/source_type 可逗号分隔，status_code 支持 200,400-499。after_id/before_id 只返回大于/小于指定 ID 的记录。按 ID 降序，用 next_offset 续查。
+stdout 原样展示小请求和小响应，保留引号/换行；大报文不完整展示，提示 fetch_http_packet_by_id。packet_limit 控制每个报文的数据库存储字节预算（Go quoted 存储可能比原文大）；limit*packet_limit*2 不得超过 128 KiB。过滤器不扫描大报文旁路文件正文：要查该正文请 fetch 后 grep 文件。
+
+[[- if .FunctionCallMode -]]
+```json
+{"url":"/api/","methods":"POST","status_code":"400-499","limit":5}
+```
+[[- else -]]
+```json
+{"@action":"directly_call_tool","directly_call_tool_name":"query_http_packet_history","directly_call_tool_params":{"url":"/api/","methods":"POST","status_code":"400-499","limit":5}}
+```
+[[- end -]]
+USAGE
+databaseID = cli.String("database_id", cli.setHelp("list_yak_projects 返回的 database_id；空值/current 使用当前库"))
+query = cli.String("query", cli.setHelp("引擎 HTTPFlow 关键字；空值不过滤"))
+url = cli.String("url", cli.setHelp("URL 子串"))
+methods = cli.String("methods", cli.setHelp("HTTP 方法，如 GET,POST"))
+status = cli.String("status_code", cli.setHelp("状态码或范围，如 200,400-499"))
+source = cli.String("source_type", cli.setHelp("流量来源，可逗号分隔，如 mitm,scan"))
+afterID = cli.Int("after_id", cli.setDefault(0), cli.setHelp("仅查询大于该 HTTPFlow ID 的记录；0 不限制"))
+beforeID = cli.Int("before_id", cli.setDefault(0), cli.setHelp("仅查询小于该 HTTPFlow ID 的记录；0 不限制"))
+limit = cli.Int("limit", cli.setDefault(10), cli.setHelp("返回条数，1–100；配合 packet_limit 控制总预算"))
+offset = cli.Int("offset", cli.setDefault(0), cli.setHelp("记录偏移，使用 next_offset 续查"))
+packetLimit = cli.Int("packet_limit", cli.setDefault(2048), cli.setHelp("每个报文存储字节预算，1–32768；超限用 fetch 获取文件"))
+cli.check()
+page, err = db.QueryHTTPFlows(db.projectID(databaseID), db.keyword(query), db.url(url), db.methods(methods), db.statusCode(status), db.sourceType(source), db.afterID(afterID), db.beforeID(beforeID), db.limit(limit), db.offset(offset), db.packetLimit(packetLimit))
+if err != nil { die(err) }
+println(page.Dump())
